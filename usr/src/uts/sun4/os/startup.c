@@ -2773,6 +2773,7 @@ char obp_tte_str[] =
 	"h# %x constant HBLK_SZMASK "
 	"h# %x constant HBLK_RANGE_SHIFT "
 	"h# %x constant HMEBP_HBLK "
+	"h# %x constant HMEBLK_ENDPA "
 	"h# %x constant HMEBUCKET_SIZE "
 	"h# %x constant HTAG_SFMMUPSZ "
 	"h# %x constant HTAG_BSPAGE_SHIFT "
@@ -2835,7 +2836,7 @@ char obp_tte_str[] =
 	": HME_HASH_TABLE_SEARCH "
 	"       ( sfmmup hmebp hblktag --  sfmmup null | sfmmup hmeblkp ) "
 	"   >r hmebp_hblk + phys-x@ begin ( sfmmup hmeblkp ) ( r: hblktag ) "
-	"      dup if   		( sfmmup hmeblkp ) ( r: hblktag ) "
+	"      dup HMEBLK_ENDPA <> if     ( sfmmup hmeblkp ) ( r: hblktag ) "
 	"         dup hmeblk_tag + phys-x@ r@ = if ( sfmmup hmeblkp )	  "
 	"	     dup hmeblk_tag + 8 + phys-x@ 2 pick = if		  "
 	"		  true 	( sfmmup hmeblkp true ) ( r: hblktag )	  "
@@ -2848,7 +2849,7 @@ char obp_tte_str[] =
 	"			( sfmmup hmeblkp false ) ( r: hblktag )   "
 	"	  then 							  "
 	"      else							  "
-	"         true 							  "
+	"         drop 0 true 						  "
 	"      then  							  "
 	"   until r> drop 						  "
 	"; "
@@ -2932,6 +2933,7 @@ create_va_to_tte(void)
 	    HBLK_SZMASK,
 	    HBLK_RANGE_SHIFT,
 	    OFFSET(struct hmehash_bucket, hmeh_nextpa),
+	    HMEBLK_ENDPA,
 	    sizeof (struct hmehash_bucket),
 	    HTAG_SFMMUPSZ,
 	    HTAG_BSPAGE_SHIFT,

@@ -162,7 +162,8 @@ bspage:	/* TTE_PAGE_SHIFT in %g5 */				\
 	add	%g4, HMEBUCK_NEXTPA, %g4; /* %g4 is hmebucket PA */	\
 search_loop:								\
 	ldxa	[%g4]ASI_MEM, %g4;					\
-	brz	%g4, search_done;					\
+	cmp	%g4, HMEBLK_ENDPA;					\
+	be,pn	%xcc, search_done;					\
 	nop;								\
 									\
 	add	%g4, HMEBLK_TAG, %g4;	/* %g4 is now hmeblk PA */	\

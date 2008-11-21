@@ -167,6 +167,13 @@ static nucleus_hblk8_info_t	nucleus_hblk8;
 static nucleus_hblk1_info_t	nucleus_hblk1;
 
 /*
+ * Data to manage per-cpu hmeblk pending queues, hmeblks are queued here
+ * after the initial phase of removing an hmeblk from the hash chain, see
+ * the detailed comment in sfmmu_hblk_hash_rm() for further details.
+ */
+static cpu_hme_pend_t		*cpu_hme_pend;
+static uint_t			cpu_hme_pend_thresh;
+/*
  * SFMMU specific hat functions
  */
 void	hat_pagecachectl(struct page *, int);
@@ -405,15 +412,13 @@ static caddr_t	sfmmu_hblk_unload(struct hat *, struct hme_blk *, caddr_t,
 			caddr_t, demap_range_t *, uint_t);
 static caddr_t	sfmmu_hblk_sync(struct hat *, struct hme_blk *, caddr_t,
 			caddr_t, int);
-static void	sfmmu_hblk_free(struct hmehash_bucket *, struct hme_blk *,
-			uint64_t, struct hme_blk **);
-static void	sfmmu_hblks_list_purge(struct hme_blk **);
+static void	sfmmu_hblk_free(struct hme_blk **);
+static void	sfmmu_hblks_list_purge(struct hme_blk **, int);
 static uint_t	sfmmu_get_free_hblk(struct hme_blk **, uint_t);
 static uint_t	sfmmu_put_free_hblk(struct hme_blk *, uint_t);
 static struct hme_blk *sfmmu_hblk_steal(int);
 static int	sfmmu_steal_this_hblk(struct hmehash_bucket *,
-			struct hme_blk *, uint64_t, uint64_t,
-			struct hme_blk *);
+			struct hme_blk *, uint64_t, struct hme_blk *);
 static caddr_t	sfmmu_hblk_unlock(struct hme_blk *, caddr_t, caddr_t);
 
 static void	hat_do_memload_array(struct hat *, caddr_t, size_t,
@@ -509,6 +514,11 @@ static void	sfmmu_hblkcache_destructor(void *, void *);
 static void	sfmmu_hblkcache_reclaim(void *);
 static void	sfmmu_shadow_hcleanup(sfmmu_t *, struct hme_blk *,
 			struct hmehash_bucket *);
+static void	sfmmu_hblk_hash_rm(struct hmehash_bucket *, struct hme_blk *,
+			struct hme_blk *, struct hme_blk **, int);
+static void	sfmmu_hblk_hash_add(struct hmehash_bucket *, struct hme_blk *,
+			uint64_t);
+static struct hme_blk *sfmmu_check_pending_hblks(int);
 static void	sfmmu_free_hblks(sfmmu_t *, caddr_t, caddr_t, int);
 static void	sfmmu_cleanup_rhblk(sf_srd_t *, caddr_t, uint_t, int);
 static void	sfmmu_unload_hmeregion_va(sf_srd_t *, uint_t, caddr_t, caddr_t,
@@ -1090,10 +1100,12 @@ hat_init(void)
 	for (i = 0; i < khmehash_num; i++) {
 		mutex_init(&khme_hash[i].hmehash_mutex, NULL,
 		    MUTEX_DEFAULT, NULL);
+		khme_hash[i].hmeh_nextpa = HMEBLK_ENDPA;
 	}
 	for (i = 0; i < uhmehash_num; i++) {
 		mutex_init(&uhme_hash[i].hmehash_mutex, NULL,
 		    MUTEX_DEFAULT, NULL);
+		uhme_hash[i].hmeh_nextpa = HMEBLK_ENDPA;
 	}
 	khmehash_num--;		/* make sure counter starts from 0 */
 	uhmehash_num--;		/* make sure counter starts from 0 */
@@ -1420,6 +1432,21 @@ hat_init(void)
 	 */
 	hrm_hashtab = kmem_zalloc(HRM_HASHSIZE * sizeof (struct hrmstat *),
 	    KM_SLEEP);
+
+	/* Allocate per-cpu pending freelist of hmeblks */
+	cpu_hme_pend = kmem_zalloc((NCPU * sizeof (cpu_hme_pend_t)) + 64,
+	    KM_SLEEP);
+	cpu_hme_pend = (cpu_hme_pend_t *)P2ROUNDUP(
+	    (uintptr_t)cpu_hme_pend, 64);
+
+	for (i = 0; i < NCPU; i++) {
+		mutex_init(&cpu_hme_pend[i].chp_mutex, NULL, MUTEX_DEFAULT,
+		    NULL);
+	}
+
+	if (cpu_hme_pend_thresh == 0) {
+		cpu_hme_pend_thresh = CPU_HME_PEND_THRESH;
+	}
 }
 
 /*
@@ -1853,7 +1880,6 @@ hat_swapout(struct hat *sfmmup)
 	struct hme_blk *pr_hblk = NULL;
 	struct hme_blk *nx_hblk;
 	int i;
-	uint64_t hblkpa, prevpa, nx_pa;
 	struct hme_blk *list = NULL;
 	hatlock_t *hatlockp;
 	struct tsb_info *tsbinfop;
@@ -1884,8 +1910,6 @@ hat_swapout(struct hat *sfmmup)
 		hmebp = &uhme_hash[i];
 		SFMMU_HASH_LOCK(hmebp);
 		hmeblkp = hmebp->hmeblkp;
-		hblkpa = hmebp->hmeh_nextpa;
-		prevpa = 0;
 		pr_hblk = NULL;
 		while (hmeblkp) {
 
@@ -1900,23 +1924,19 @@ hat_swapout(struct hat *sfmmup)
 				    NULL, HAT_UNLOAD);
 			}
 			nx_hblk = hmeblkp->hblk_next;
-			nx_pa = hmeblkp->hblk_nextpa;
 			if (!hmeblkp->hblk_vcnt && !hmeblkp->hblk_hmecnt) {
 				ASSERT(!hmeblkp->hblk_lckcnt);
-				sfmmu_hblk_hash_rm(hmebp, hmeblkp,
-				    prevpa, pr_hblk);
-				sfmmu_hblk_free(hmebp, hmeblkp, hblkpa, &list);
+				sfmmu_hblk_hash_rm(hmebp, hmeblkp, pr_hblk,
+				    &list, 0);
 			} else {
 				pr_hblk = hmeblkp;
-				prevpa = hblkpa;
 			}
 			hmeblkp = nx_hblk;
-			hblkpa = nx_pa;
 		}
 		SFMMU_HASH_UNLOCK(hmebp);
 	}
 
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 
 	/*
 	 * Now free up the ctx so that others can reuse it.
@@ -2853,9 +2873,6 @@ sfmmu_tteload_find_hmeblk(sfmmu_t *sfmmup, struct hmehash_bucket *hmebp,
 	hmeblk_tag hblktag;
 	int hmeshift;
 	struct hme_blk *hmeblkp, *pr_hblk, *list = NULL;
-	uint64_t hblkpa, prevpa;
-	struct kmem_cache *sfmmu_cache;
-	uint_t forcefree;
 
 	SFMMU_VALIDATE_HMERID(sfmmup, rid, vaddr, TTEBYTES(size));
 
@@ -2868,8 +2885,7 @@ sfmmu_tteload_find_hmeblk(sfmmu_t *sfmmup, struct hmehash_bucket *hmebp,
 
 ttearray_realloc:
 
-	HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, hblkpa,
-	    pr_hblk, prevpa, &list);
+	HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, pr_hblk, &list);
 
 	/*
 	 * We block until hblk_reserve_lock is released; it's held by
@@ -2901,8 +2917,8 @@ ttearray_realloc:
 		if (get_hblk_ttesz(hmeblkp) != size) {
 			ASSERT(!hmeblkp->hblk_vcnt);
 			ASSERT(!hmeblkp->hblk_hmecnt);
-			sfmmu_hblk_hash_rm(hmebp, hmeblkp, prevpa, pr_hblk);
-			sfmmu_hblk_free(hmebp, hmeblkp, hblkpa, &list);
+			sfmmu_hblk_hash_rm(hmebp, hmeblkp, pr_hblk,
+			    &list, 0);
 			goto ttearray_realloc;
 		}
 		if (hmeblkp->hblk_shw_bit) {
@@ -2923,22 +2939,12 @@ ttearray_realloc:
 	}
 
 	/*
-	 * hat_memload() should never call kmem_cache_free(); see block
-	 * comment showing the stacktrace in sfmmu_hblk_alloc();
-	 * enqueue each hblk in the list to reserve list if it's created
-	 * from sfmmu8_cache *and* sfmmup == KHATID.
+	 * hat_memload() should never call kmem_cache_free() for kernel hmeblks;
+	 * see block comment showing the stacktrace in sfmmu_hblk_alloc();
+	 * set the flag parameter to 1 so that sfmmu_hblks_list_purge() will
+	 * just add these hmeblks to the per-cpu pending queue.
 	 */
-	forcefree = (sfmmup == KHATID) ? 1 : 0;
-	while ((pr_hblk = list) != NULL) {
-		list = pr_hblk->hblk_next;
-		sfmmu_cache = get_hblk_cache(pr_hblk);
-		if ((sfmmu_cache == sfmmu8_cache) &&
-		    sfmmu_put_free_hblk(pr_hblk, forcefree))
-			continue;
-
-		ASSERT(sfmmup != KHATID);
-		kmem_cache_free(sfmmu_cache, pr_hblk);
-	}
+	sfmmu_hblks_list_purge(&list, 1);
 
 	ASSERT(get_hblk_ttesz(hmeblkp) == size);
 	ASSERT(!hmeblkp->hblk_shw_bit);
@@ -3653,7 +3659,6 @@ sfmmu_free_hblks(sfmmu_t *sfmmup, caddr_t addr, caddr_t endaddr,
 	struct hmehash_bucket *hmebp;
 	struct hme_blk *hmeblkp;
 	struct hme_blk *nx_hblk, *pr_hblk, *list = NULL;
-	uint64_t hblkpa, prevpa, nx_pa;
 
 	ASSERT(hashno > 0);
 	hblktag.htag_id = sfmmup;
@@ -3668,11 +3673,8 @@ sfmmu_free_hblks(sfmmu_t *sfmmup, caddr_t addr, caddr_t endaddr,
 		SFMMU_HASH_LOCK(hmebp);
 		/* inline HME_HASH_SEARCH */
 		hmeblkp = hmebp->hmeblkp;
-		hblkpa = hmebp->hmeh_nextpa;
-		prevpa = 0;
 		pr_hblk = NULL;
 		while (hmeblkp) {
-			ASSERT(hblkpa == va_to_pa((caddr_t)hmeblkp));
 			if (HTAGS_EQ(hmeblkp->hblk_tag, hblktag)) {
 				/* found hme_blk */
 				ASSERT(!hmeblkp->hblk_shared);
@@ -3697,17 +3699,13 @@ sfmmu_free_hblks(sfmmu_t *sfmmup, caddr_t addr, caddr_t endaddr,
 			}
 
 			nx_hblk = hmeblkp->hblk_next;
-			nx_pa = hmeblkp->hblk_nextpa;
 			if (!hmeblkp->hblk_vcnt && !hmeblkp->hblk_hmecnt) {
-				sfmmu_hblk_hash_rm(hmebp, hmeblkp, prevpa,
-				    pr_hblk);
-				sfmmu_hblk_free(hmebp, hmeblkp, hblkpa, &list);
+				sfmmu_hblk_hash_rm(hmebp, hmeblkp, pr_hblk,
+				    &list, 0);
 			} else {
 				pr_hblk = hmeblkp;
-				prevpa = hblkpa;
 			}
 			hmeblkp = nx_hblk;
-			hblkpa = nx_pa;
 		}
 
 		SFMMU_HASH_UNLOCK(hmebp);
@@ -3725,7 +3723,7 @@ sfmmu_free_hblks(sfmmu_t *sfmmup, caddr_t addr, caddr_t endaddr,
 			    (1 << hmeshift));
 		}
 	}
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 }
 
 /*
@@ -3741,7 +3739,6 @@ sfmmu_cleanup_rhblk(sf_srd_t *srdp, caddr_t addr, uint_t rid, int ttesz)
 	struct hme_blk *hmeblkp;
 	struct hme_blk *pr_hblk;
 	struct hme_blk *list = NULL;
-	uint64_t hblkpa, prevpa;
 
 	ASSERT(SFMMU_IS_SHMERID_VALID(rid));
 	ASSERT(rid < SFMMU_MAX_HME_REGIONS);
@@ -3754,8 +3751,7 @@ sfmmu_cleanup_rhblk(sf_srd_t *srdp, caddr_t addr, uint_t rid, int ttesz)
 	hmebp = HME_HASH_FUNCTION(srdp, addr, hmeshift);
 
 	SFMMU_HASH_LOCK(hmebp);
-	HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, hblkpa, pr_hblk,
-	    prevpa, &list);
+	HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, pr_hblk, &list);
 	if (hmeblkp != NULL) {
 		ASSERT(hmeblkp->hblk_shared);
 		ASSERT(!hmeblkp->hblk_shw_bit);
@@ -3763,11 +3759,11 @@ sfmmu_cleanup_rhblk(sf_srd_t *srdp, caddr_t addr, uint_t rid, int ttesz)
 			panic("sfmmu_cleanup_rhblk: valid hmeblk");
 		}
 		ASSERT(!hmeblkp->hblk_lckcnt);
-		sfmmu_hblk_hash_rm(hmebp, hmeblkp, prevpa, pr_hblk);
-		sfmmu_hblk_free(hmebp, hmeblkp, hblkpa, &list);
+		sfmmu_hblk_hash_rm(hmebp, hmeblkp, pr_hblk,
+		    &list, 0);
 	}
 	SFMMU_HASH_UNLOCK(hmebp);
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 }
 
 /* ARGSUSED */
@@ -3791,7 +3787,6 @@ sfmmu_unload_hmeregion_va(sf_srd_t *srdp, uint_t rid, caddr_t addr,
 	struct hme_blk *hmeblkp;
 	struct hme_blk *pr_hblk;
 	struct hme_blk *list = NULL;
-	uint64_t hblkpa, prevpa;
 
 	ASSERT(SFMMU_IS_SHMERID_VALID(rid));
 	ASSERT(rid < SFMMU_MAX_HME_REGIONS);
@@ -3805,8 +3800,7 @@ sfmmu_unload_hmeregion_va(sf_srd_t *srdp, uint_t rid, caddr_t addr,
 	hmebp = HME_HASH_FUNCTION(srdp, addr, hmeshift);
 
 	SFMMU_HASH_LOCK(hmebp);
-	HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, hblkpa, pr_hblk,
-	    prevpa, &list);
+	HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, pr_hblk, &list);
 	if (hmeblkp != NULL) {
 		ASSERT(hmeblkp->hblk_shared);
 		ASSERT(!hmeblkp->hblk_lckcnt);
@@ -3816,11 +3810,11 @@ sfmmu_unload_hmeregion_va(sf_srd_t *srdp, uint_t rid, caddr_t addr,
 			ASSERT(*eaddrp > addr);
 		}
 		ASSERT(!hmeblkp->hblk_vcnt && !hmeblkp->hblk_hmecnt);
-		sfmmu_hblk_hash_rm(hmebp, hmeblkp, prevpa, pr_hblk);
-		sfmmu_hblk_free(hmebp, hmeblkp, hblkpa, &list);
+		sfmmu_hblk_hash_rm(hmebp, hmeblkp, pr_hblk,
+		    &list, 0);
 	}
 	SFMMU_HASH_UNLOCK(hmebp);
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 }
 
 static void
@@ -3962,7 +3956,7 @@ hat_unlock(struct hat *sfmmup, caddr_t addr, size_t len)
 		}
 	}
 
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 }
 
 void
@@ -3981,7 +3975,6 @@ hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
 	struct hme_blk *hmeblkp;
 	struct hme_blk *pr_hblk;
 	struct hme_blk *list;
-	uint64_t hblkpa, prevpa;
 
 	if (rcookie == HAT_INVALID_REGION_COOKIE) {
 		hat_unlock(sfmmup, addr, len);
@@ -4025,8 +4018,8 @@ hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
 			hblktag.htag_id = srdp;
 			hmebp = HME_HASH_FUNCTION(srdp, va, hmeshift);
 			SFMMU_HASH_LOCK(hmebp);
-			HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, hblkpa,
-			    pr_hblk, prevpa, &list);
+			HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, pr_hblk,
+			    &list);
 			if (hmeblkp == NULL) {
 				SFMMU_HASH_UNLOCK(hmebp);
 				ttesz--;
@@ -4044,7 +4037,7 @@ hat_unlock_region(struct hat *sfmmup, caddr_t addr, size_t len,
 			    "addr %p hat %p", (void *)va, (void *)sfmmup);
 		}
 	}
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 }
 
 /*
@@ -4921,7 +4914,7 @@ sfmmu_chgattr(struct hat *sfmmup, caddr_t addr, size_t len, uint_t attr,
 		}
 	}
 
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 	DEMAP_RANGE_FLUSH(&dmr);
 	cpuset = sfmmup->sfmmu_cpusran;
 	xt_sync(cpuset);
@@ -5274,7 +5267,7 @@ hat_chgprot(struct hat *sfmmup, caddr_t addr, size_t len, uint_t vprot)
 		}
 	}
 
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 	DEMAP_RANGE_FLUSH(&dmr);
 	cpuset = sfmmup->sfmmu_cpusran;
 	xt_sync(cpuset);
@@ -5499,7 +5492,6 @@ hat_unload_large_virtual(
 	struct hme_blk *nx_hblk;
 	struct hme_blk *list = NULL;
 	int i;
-	uint64_t hblkpa, prevpa, nx_pa;
 	demap_range_t dmr, *dmrp;
 	cpuset_t cpuset;
 	caddr_t	endaddr = startaddr + len;
@@ -5524,12 +5516,9 @@ hat_unload_large_virtual(
 		hmebp = &uhme_hash[i];
 		SFMMU_HASH_LOCK(hmebp);
 		hmeblkp = hmebp->hmeblkp;
-		hblkpa = hmebp->hmeh_nextpa;
-		prevpa = 0;
 		pr_hblk = NULL;
 		while (hmeblkp) {
 			nx_hblk = hmeblkp->hblk_next;
-			nx_pa = hmeblkp->hblk_nextpa;
 
 			/*
 			 * skip if not this context, if a shadow block or
@@ -5540,7 +5529,6 @@ hat_unload_large_virtual(
 			    (sa = (caddr_t)get_hblk_base(hmeblkp)) >= endaddr ||
 			    (ea = get_hblk_endaddr(hmeblkp)) <= startaddr) {
 				pr_hblk = hmeblkp;
-				prevpa = hblkpa;
 				goto next_block;
 			}
 
@@ -5561,12 +5549,10 @@ hat_unload_large_virtual(
 			    !hmeblkp->hblk_vcnt &&
 			    !hmeblkp->hblk_hmecnt) {
 				ASSERT(!hmeblkp->hblk_lckcnt);
-				sfmmu_hblk_hash_rm(hmebp, hmeblkp,
-				    prevpa, pr_hblk);
-				sfmmu_hblk_free(hmebp, hmeblkp, hblkpa, &list);
+				sfmmu_hblk_hash_rm(hmebp, hmeblkp, pr_hblk,
+				    &list, 0);
 			} else {
 				pr_hblk = hmeblkp;
-				prevpa = hblkpa;
 			}
 
 			if (callback == NULL)
@@ -5601,12 +5587,11 @@ hat_unload_large_virtual(
 
 next_block:
 			hmeblkp = nx_hblk;
-			hblkpa = nx_pa;
 		}
 		SFMMU_HASH_UNLOCK(hmebp);
 	}
 
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 	if (dmrp != NULL) {
 		DEMAP_RANGE_FLUSH(dmrp);
 		cpuset = sfmmup->sfmmu_cpusran;
@@ -5650,7 +5635,6 @@ hat_unload_callback(
 	struct hme_blk *hmeblkp, *pr_hblk, *list = NULL;
 	caddr_t endaddr;
 	cpuset_t cpuset;
-	uint64_t hblkpa, prevpa;
 	int addr_count = 0;
 	int a;
 	caddr_t cb_start_addr[MAX_CB_ADDR];
@@ -5745,8 +5729,7 @@ hat_unload_callback(
 
 		SFMMU_HASH_LOCK(hmebp);
 
-		HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, hblkpa, pr_hblk,
-		    prevpa, &list);
+		HME_HASH_SEARCH_PREV(hmebp, hblktag, hmeblkp, pr_hblk, &list);
 		if (hmeblkp == NULL) {
 			/*
 			 * didn't find an hmeblk. skip the appropiate
@@ -5805,9 +5788,8 @@ hat_unload_callback(
 			    get_hblk_span(hmeblkp));
 			if ((flags & HAT_UNLOAD_UNMAP) ||
 			    (iskernel && !issegkmap)) {
-				sfmmu_hblk_hash_rm(hmebp, hmeblkp, prevpa,
-				    pr_hblk);
-				sfmmu_hblk_free(hmebp, hmeblkp, hblkpa, &list);
+				sfmmu_hblk_hash_rm(hmebp, hmeblkp, pr_hblk,
+				    &list, 0);
 			}
 			SFMMU_HASH_UNLOCK(hmebp);
 
@@ -5871,9 +5853,7 @@ hat_unload_callback(
 
 		if (((flags & HAT_UNLOAD_UNMAP) || (iskernel && !issegkmap)) &&
 		    !hmeblkp->hblk_vcnt && !hmeblkp->hblk_hmecnt) {
-			sfmmu_hblk_hash_rm(hmebp, hmeblkp, prevpa,
-			    pr_hblk);
-			sfmmu_hblk_free(hmebp, hmeblkp, hblkpa, &list);
+			sfmmu_hblk_hash_rm(hmebp, hmeblkp, pr_hblk, &list, 0);
 		}
 		SFMMU_HASH_UNLOCK(hmebp);
 
@@ -5923,7 +5903,7 @@ hat_unload_callback(
 		}
 	}
 
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 	DEMAP_RANGE_FLUSH(dmrp);
 	if (dmrp != NULL) {
 		cpuset = sfmmup->sfmmu_cpusran;
@@ -6344,7 +6324,7 @@ hat_sync(struct hat *sfmmup, caddr_t addr, size_t len, uint_t clearflag)
 			hashno++;
 		}
 	}
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 	cpuset = sfmmup->sfmmu_cpusran;
 	xt_sync(cpuset);
 }
@@ -9094,12 +9074,45 @@ static void
 sfmmu_hblkcache_reclaim(void *cdrarg)
 {
 	int i;
-	uint64_t hblkpa, prevpa, nx_pa;
 	struct hmehash_bucket *hmebp;
 	struct hme_blk *hmeblkp, *nx_hblk, *pr_hblk = NULL;
 	static struct hmehash_bucket *uhmehash_reclaim_hand;
 	static struct hmehash_bucket *khmehash_reclaim_hand;
-	struct hme_blk *list = NULL;
+	struct hme_blk *list = NULL, *last_hmeblkp;
+	cpuset_t cpuset = cpu_ready_set;
+	cpu_hme_pend_t *cpuhp;
+
+	/* Free up hmeblks on the cpu pending lists */
+	for (i = 0; i < NCPU; i++) {
+		cpuhp = &cpu_hme_pend[i];
+		if (cpuhp->chp_listp != NULL)  {
+			mutex_enter(&cpuhp->chp_mutex);
+			if (cpuhp->chp_listp == NULL) {
+				mutex_exit(&cpuhp->chp_mutex);
+				continue;
+			}
+			for (last_hmeblkp = cpuhp->chp_listp;
+			    last_hmeblkp->hblk_next != NULL;
+			    last_hmeblkp = last_hmeblkp->hblk_next)
+				;
+			last_hmeblkp->hblk_next = list;
+			list = cpuhp->chp_listp;
+			cpuhp->chp_listp = NULL;
+			cpuhp->chp_count = 0;
+			mutex_exit(&cpuhp->chp_mutex);
+		}
+
+	}
+
+	if (list != NULL) {
+		kpreempt_disable();
+		CPUSET_DEL(cpuset, CPU->cpu_id);
+		xt_sync(cpuset);
+		xt_sync(cpuset);
+		kpreempt_enable();
+		sfmmu_hblk_free(&list);
+		list = NULL;
+	}
 
 	hmebp = uhmehash_reclaim_hand;
 	if (hmebp == NULL || hmebp > &uhme_hash[UHMEHASH_SZ])
@@ -9109,24 +9122,17 @@ sfmmu_hblkcache_reclaim(void *cdrarg)
 	for (i = UHMEHASH_SZ / sfmmu_cache_reclaim_scan_ratio; i; i--) {
 		if (SFMMU_HASH_LOCK_TRYENTER(hmebp) != 0) {
 			hmeblkp = hmebp->hmeblkp;
-			hblkpa = hmebp->hmeh_nextpa;
-			prevpa = 0;
 			pr_hblk = NULL;
 			while (hmeblkp) {
 				nx_hblk = hmeblkp->hblk_next;
-				nx_pa = hmeblkp->hblk_nextpa;
 				if (!hmeblkp->hblk_vcnt &&
 				    !hmeblkp->hblk_hmecnt) {
 					sfmmu_hblk_hash_rm(hmebp, hmeblkp,
-					    prevpa, pr_hblk);
-					sfmmu_hblk_free(hmebp, hmeblkp,
-					    hblkpa, &list);
+					    pr_hblk, &list, 0);
 				} else {
 					pr_hblk = hmeblkp;
-					prevpa = hblkpa;
 				}
 				hmeblkp = nx_hblk;
-				hblkpa = nx_pa;
 			}
 			SFMMU_HASH_UNLOCK(hmebp);
 		}
@@ -9142,31 +9148,24 @@ sfmmu_hblkcache_reclaim(void *cdrarg)
 	for (i = KHMEHASH_SZ / sfmmu_cache_reclaim_scan_ratio; i; i--) {
 		if (SFMMU_HASH_LOCK_TRYENTER(hmebp) != 0) {
 			hmeblkp = hmebp->hmeblkp;
-			hblkpa = hmebp->hmeh_nextpa;
-			prevpa = 0;
 			pr_hblk = NULL;
 			while (hmeblkp) {
 				nx_hblk = hmeblkp->hblk_next;
-				nx_pa = hmeblkp->hblk_nextpa;
 				if (!hmeblkp->hblk_vcnt &&
 				    !hmeblkp->hblk_hmecnt) {
 					sfmmu_hblk_hash_rm(hmebp, hmeblkp,
-					    prevpa, pr_hblk);
-					sfmmu_hblk_free(hmebp, hmeblkp,
-					    hblkpa, &list);
+					    pr_hblk, &list, 0);
 				} else {
 					pr_hblk = hmeblkp;
-					prevpa = hblkpa;
 				}
 				hmeblkp = nx_hblk;
-				hblkpa = nx_pa;
 			}
 			SFMMU_HASH_UNLOCK(hmebp);
 		}
 		if (hmebp++ == &khme_hash[KHMEHASH_SZ])
 			hmebp = khme_hash;
 	}
-	sfmmu_hblks_list_purge(&list);
+	sfmmu_hblks_list_purge(&list, 0);
 }
 
 /*
@@ -10677,6 +10676,7 @@ sfmmu_get_free_hblk(struct hme_blk **hmeblkpp, uint_t critical)
 {
 	struct  hme_blk *hblkp;
 
+
 	if (freehblkp != NULL) {
 		mutex_enter(&freehblkp_lock);
 		if (freehblkp != NULL) {
@@ -10697,10 +10697,28 @@ sfmmu_get_free_hblk(struct hme_blk **hmeblkpp, uint_t critical)
 			mutex_exit(&freehblkp_lock);
 			hblkp->hblk_next = NULL;
 			SFMMU_STAT(sf_get_free_success);
+
+			ASSERT(hblkp->hblk_hmecnt == 0);
+			ASSERT(hblkp->hblk_vcnt == 0);
+			ASSERT(hblkp->hblk_nextpa == va_to_pa((caddr_t)hblkp));
+
 			return (1);
 		}
 		mutex_exit(&freehblkp_lock);
 	}
+
+	/* Check cpu hblk pending queues */
+	if ((*hmeblkpp = sfmmu_check_pending_hblks(TTE8K)) != NULL) {
+		hblkp = *hmeblkpp;
+		hblkp->hblk_next = NULL;
+		hblkp->hblk_nextpa = va_to_pa((caddr_t)hblkp);
+
+		ASSERT(hblkp->hblk_hmecnt == 0);
+		ASSERT(hblkp->hblk_vcnt == 0);
+
+		return (1);
+	}
+
 	SFMMU_STAT(sf_get_free_fail);
 	return (0);
 }
@@ -10709,6 +10727,10 @@ static uint_t
 sfmmu_put_free_hblk(struct hme_blk *hmeblkp, uint_t critical)
 {
 	struct  hme_blk *hblkp;
+
+	ASSERT(hmeblkp->hblk_hmecnt == 0);
+	ASSERT(hmeblkp->hblk_vcnt == 0);
+	ASSERT(hmeblkp->hblk_nextpa == va_to_pa((caddr_t)hmeblkp));
 
 	/*
 	 * If the current thread is mapping into kernel space,
@@ -10761,13 +10783,14 @@ static void
 sfmmu_hblk_swap(struct hme_blk *new)
 {
 	struct hme_blk *old, *hblkp, *prev;
-	uint64_t hblkpa, prevpa, newpa;
+	uint64_t newpa;
 	caddr_t	base, vaddr, endaddr;
 	struct hmehash_bucket *hmebp;
 	struct sf_hment *osfhme, *nsfhme;
 	page_t *pp;
 	kmutex_t *pml;
 	tte_t tte;
+	struct hme_blk *list = NULL;
 
 #ifdef	DEBUG
 	hmeblk_tag		hblktag;
@@ -10802,15 +10825,13 @@ sfmmu_hblk_swap(struct hme_blk *new)
 
 	/*
 	 * search hash chain for hblk_reserve; this needs to be performed
-	 * after adding new, otherwise prevpa and prev won't correspond
-	 * to the hblk which is prior to old in hash chain when we call
-	 * sfmmu_hblk_hash_rm to remove old later.
+	 * after adding new, otherwise prev won't correspond to the hblk which
+	 * is prior to old in hash chain when we call sfmmu_hblk_hash_rm to
+	 * remove old later.
 	 */
-	for (prevpa = 0, prev = NULL,
-	    hblkpa = hmebp->hmeh_nextpa, hblkp = hmebp->hmeblkp;
-	    hblkp != NULL && hblkp != old;
-	    prevpa = hblkpa, prev = hblkp,
-	    hblkpa = hblkp->hblk_nextpa, hblkp = hblkp->hblk_next)
+	for (prev = NULL,
+	    hblkp = hmebp->hmeblkp; hblkp != NULL && hblkp != old;
+	    prev = hblkp, hblkp = hblkp->hblk_next)
 		;
 
 	if (hblkp != old)
@@ -10857,7 +10878,7 @@ sfmmu_hblk_swap(struct hme_blk *new)
 	/*
 	 * remove old from hash chain
 	 */
-	sfmmu_hblk_hash_rm(hmebp, old, prevpa, prev);
+	sfmmu_hblk_hash_rm(hmebp, old, prev, &list, 1);
 
 #ifdef	DEBUG
 
@@ -11225,9 +11246,10 @@ fill_hblk:
 			 * let's donate this hblk to our reserve list if
 			 * we are not mapping kernel range
 			 */
-			if (size == TTE8K && sfmmup != KHATID)
+			if (size == TTE8K && sfmmup != KHATID) {
 				if (sfmmu_put_free_hblk(hmeblkp, 0))
 					goto fill_hblk;
+			}
 		}
 	} else {
 		/*
@@ -11365,7 +11387,7 @@ hblk_init:
 	hmeblkp->hblk_tag = hblktag;
 	hmeblkp->hblk_shadow = shw_hblkp;
 	hblkpa = hmeblkp->hblk_nextpa;
-	hmeblkp->hblk_nextpa = 0;
+	hmeblkp->hblk_nextpa = HMEBLK_ENDPA;
 
 	ASSERT(get_hblk_ttesz(hmeblkp) == size);
 	ASSERT(get_hblk_span(hmeblkp) == HMEBLK_SPAN(size));
@@ -11378,95 +11400,46 @@ hblk_init:
 }
 
 /*
- * This function performs any cleanup required on the hme_blk
- * and returns it to the free list.
+ * This function cleans up the hme_blk and returns it to the free list.
  */
 /* ARGSUSED */
 static void
-sfmmu_hblk_free(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
-	uint64_t hblkpa, struct hme_blk **listp)
+sfmmu_hblk_free(struct hme_blk **listp)
 {
-	int shw_size, vshift;
-	struct hme_blk *shw_hblkp;
-	uint_t		shw_mask, newshw_mask;
-	caddr_t		vaddr;
+	struct hme_blk *hmeblkp, *next_hmeblkp;
 	int		size;
 	uint_t		critical;
+	uint64_t	hblkpa;
 
-	ASSERT(hmeblkp);
-	ASSERT(!hmeblkp->hblk_hmecnt);
-	ASSERT(!hmeblkp->hblk_vcnt);
-	ASSERT(!hmeblkp->hblk_lckcnt);
-	ASSERT(hblkpa == va_to_pa((caddr_t)hmeblkp));
-	ASSERT(hmeblkp != (struct hme_blk *)hblk_reserve);
+	ASSERT(*listp != NULL);
 
-	critical = (hblktosfmmu(hmeblkp) == KHATID) ? 1 : 0;
+	hmeblkp = *listp;
+	while (hmeblkp != NULL) {
+		next_hmeblkp = hmeblkp->hblk_next;
+		ASSERT(!hmeblkp->hblk_hmecnt);
+		ASSERT(!hmeblkp->hblk_vcnt);
+		ASSERT(!hmeblkp->hblk_lckcnt);
+		ASSERT(hmeblkp != (struct hme_blk *)hblk_reserve);
+		ASSERT(hmeblkp->hblk_shared == 0);
+		ASSERT(hmeblkp->hblk_shw_bit == 0);
+		ASSERT(hmeblkp->hblk_shadow == NULL);
 
-	size = get_hblk_ttesz(hmeblkp);
-	shw_hblkp = hmeblkp->hblk_shadow;
-	if (shw_hblkp) {
-		ASSERT(hblktosfmmu(hmeblkp) != KHATID);
-		ASSERT(!hmeblkp->hblk_shared);
-		if (mmu_page_sizes == max_mmu_page_sizes) {
-			ASSERT(size < TTE256M);
-		} else {
-			ASSERT(size < TTE4M);
+		hblkpa = va_to_pa((caddr_t)hmeblkp);
+		ASSERT(hblkpa != (uint64_t)-1);
+		critical = (hblktosfmmu(hmeblkp) == KHATID) ? 1 : 0;
+
+		size = get_hblk_ttesz(hmeblkp);
+		hmeblkp->hblk_next = NULL;
+		hmeblkp->hblk_nextpa = hblkpa;
+
+		if (hmeblkp->hblk_nuc_bit == 0) {
+
+			if (size != TTE8K ||
+			    !sfmmu_put_free_hblk(hmeblkp, critical))
+				kmem_cache_free(get_hblk_cache(hmeblkp),
+				    hmeblkp);
 		}
-
-		shw_size = get_hblk_ttesz(shw_hblkp);
-		vaddr = (caddr_t)get_hblk_base(hmeblkp);
-		vshift = vaddr_to_vshift(shw_hblkp->hblk_tag, vaddr, shw_size);
-		ASSERT(vshift < 8);
-		/*
-		 * Atomically clear shadow mask bit
-		 */
-		do {
-			shw_mask = shw_hblkp->hblk_shw_mask;
-			ASSERT(shw_mask & (1 << vshift));
-			newshw_mask = shw_mask & ~(1 << vshift);
-			newshw_mask = cas32(&shw_hblkp->hblk_shw_mask,
-			    shw_mask, newshw_mask);
-		} while (newshw_mask != shw_mask);
-		hmeblkp->hblk_shadow = NULL;
-	}
-	hmeblkp->hblk_next = NULL;
-	hmeblkp->hblk_nextpa = hblkpa;
-	hmeblkp->hblk_shw_bit = 0;
-
-	if (hmeblkp->hblk_shared) {
-		sf_srd_t	*srdp;
-		sf_region_t	*rgnp;
-		uint_t		rid;
-
-		srdp = hblktosrd(hmeblkp);
-		ASSERT(srdp != NULL && srdp->srd_refcnt != 0);
-		rid = hmeblkp->hblk_tag.htag_rid;
-		ASSERT(SFMMU_IS_SHMERID_VALID(rid));
-		ASSERT(rid < SFMMU_MAX_HME_REGIONS);
-		rgnp = srdp->srd_hmergnp[rid];
-		ASSERT(rgnp != NULL);
-		SFMMU_VALIDATE_SHAREDHBLK(hmeblkp, srdp, rgnp, rid);
-		hmeblkp->hblk_shared = 0;
-	}
-
-	if (hmeblkp->hblk_nuc_bit == 0) {
-
-		if (size == TTE8K && sfmmu_put_free_hblk(hmeblkp, critical))
-			return;
-
-		hmeblkp->hblk_next = *listp;
-		*listp = hmeblkp;
-	}
-}
-
-static void
-sfmmu_hblks_list_purge(struct hme_blk **listp)
-{
-	struct hme_blk	*hmeblkp;
-
-	while ((hmeblkp = *listp) != NULL) {
-		*listp = hmeblkp->hblk_next;
-		kmem_cache_free(get_hblk_cache(hmeblkp), hmeblkp);
+		hmeblkp = next_hmeblkp;
 	}
 }
 
@@ -11489,11 +11462,19 @@ sfmmu_hblk_steal(int size)
 	static struct hmehash_bucket *uhmehash_steal_hand = NULL;
 	struct hmehash_bucket *hmebp;
 	struct hme_blk *hmeblkp = NULL, *pr_hblk;
-	uint64_t hblkpa, prevpa;
+	uint64_t hblkpa;
 	int i;
 	uint_t loop_cnt = 0, critical;
 
 	for (;;) {
+		/* Check cpu hblk pending queues */
+		if ((hmeblkp = sfmmu_check_pending_hblks(size)) != NULL) {
+			hmeblkp->hblk_nextpa = va_to_pa((caddr_t)hmeblkp);
+			ASSERT(hmeblkp->hblk_hmecnt == 0);
+			ASSERT(hmeblkp->hblk_vcnt == 0);
+			return (hmeblkp);
+		}
+
 		if (size == TTE8K) {
 			critical =
 			    (++loop_cnt > SFMMU_HBLK_STEAL_THRESHOLD) ? 1 : 0;
@@ -11510,7 +11491,6 @@ sfmmu_hblk_steal(int size)
 			SFMMU_HASH_LOCK(hmebp);
 			hmeblkp = hmebp->hmeblkp;
 			hblkpa = hmebp->hmeh_nextpa;
-			prevpa = 0;
 			pr_hblk = NULL;
 			while (hmeblkp) {
 				/*
@@ -11532,8 +11512,7 @@ sfmmu_hblk_steal(int size)
 					    hmeblkp->hblk_hmecnt == 0) || (i >=
 					    BUCKETS_TO_SEARCH_BEFORE_UNLOAD)) {
 						if (sfmmu_steal_this_hblk(hmebp,
-						    hmeblkp, hblkpa, prevpa,
-						    pr_hblk)) {
+						    hmeblkp, hblkpa, pr_hblk)) {
 							/*
 							 * Hblk is unloaded
 							 * successfully
@@ -11543,7 +11522,6 @@ sfmmu_hblk_steal(int size)
 					}
 				}
 				pr_hblk = hmeblkp;
-				prevpa = hblkpa;
 				hblkpa = hmeblkp->hblk_nextpa;
 				hmeblkp = hmeblkp->hblk_next;
 			}
@@ -11565,7 +11543,6 @@ sfmmu_hblk_steal(int size)
 			SFMMU_HASH_LOCK(hmebp);
 			hmeblkp = hmebp->hmeblkp;
 			hblkpa = hmebp->hmeh_nextpa;
-			prevpa = 0;
 			pr_hblk = NULL;
 			while (hmeblkp) {
 				/*
@@ -11576,7 +11553,7 @@ sfmmu_hblk_steal(int size)
 				    (hmeblkp->hblk_vcnt == 0) &&
 				    (hmeblkp->hblk_hmecnt == 0)) {
 					if (sfmmu_steal_this_hblk(hmebp,
-					    hmeblkp, hblkpa, prevpa, pr_hblk)) {
+					    hmeblkp, hblkpa, pr_hblk)) {
 						break;
 					} else {
 						/*
@@ -11588,7 +11565,6 @@ sfmmu_hblk_steal(int size)
 				}
 
 				pr_hblk = hmeblkp;
-				prevpa = hblkpa;
 				hblkpa = hmeblkp->hblk_nextpa;
 				hmeblkp = hmeblkp->hblk_next;
 			}
@@ -11614,12 +11590,13 @@ sfmmu_hblk_steal(int size)
  */
 static int
 sfmmu_steal_this_hblk(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
-	uint64_t hblkpa, uint64_t prevpa, struct hme_blk *pr_hblk)
+	uint64_t hblkpa, struct hme_blk *pr_hblk)
 {
 	int shw_size, vshift;
 	struct hme_blk *shw_hblkp;
 	caddr_t vaddr;
 	uint_t shw_mask, newshw_mask;
+	struct hme_blk *list = NULL;
 
 	ASSERT(SFMMU_HASH_LOCK_ISHELD(hmebp));
 
@@ -11652,7 +11629,7 @@ sfmmu_steal_this_hblk(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
 	ASSERT(hmeblkp->hblk_lckcnt == 0);
 	ASSERT(hmeblkp->hblk_vcnt == 0 && hmeblkp->hblk_hmecnt == 0);
 
-	sfmmu_hblk_hash_rm(hmebp, hmeblkp, prevpa, pr_hblk);
+	sfmmu_hblk_hash_rm(hmebp, hmeblkp, pr_hblk, &list, 1);
 	hmeblkp->hblk_nextpa = hblkpa;
 
 	shw_hblkp = hmeblkp->hblk_shadow;
@@ -15557,4 +15534,292 @@ sfmmu_scdcache_destructor(void *buf, void *cdrarg)
 	sf_scd_t *scdp = (sf_scd_t *)buf;
 
 	mutex_destroy(&scdp->scd_mutex);
+}
+
+/*
+ * The listp parameter is a pointer to a list of hmeblks which are partially
+ * freed as result of calling sfmmu_hblk_hash_rm(), the last phase of the
+ * freeing process is to cross-call all cpus to ensure that there are no
+ * remaining cached references.
+ *
+ * If the local generation number is less than the global then we can free
+ * hmeblks which are already on the pending queue as another cpu has completed
+ * the cross-call.
+ *
+ * We cross-call to make sure that there are no threads on other cpus accessing
+ * these hmblks and then complete the process of freeing them under the
+ * following conditions:
+ * 	The total number of pending hmeblks is greater than the threshold
+ *	The reserve list has fewer than HBLK_RESERVE_CNT hmeblks
+ *	It is at least 1 second since the last time we cross-called
+ *
+ * Otherwise, we add the hmeblks to the per-cpu pending queue.
+ */
+static void
+sfmmu_hblks_list_purge(struct hme_blk **listp, int dontfree)
+{
+	struct hme_blk *hblkp, *pr_hblkp = NULL;
+	int		count = 0;
+	cpuset_t	cpuset = cpu_ready_set;
+	cpu_hme_pend_t	*cpuhp;
+	timestruc_t	now;
+	int		one_second_expired = 0;
+
+	gethrestime_lasttick(&now);
+
+	for (hblkp = *listp; hblkp != NULL; hblkp = hblkp->hblk_next) {
+		ASSERT(hblkp->hblk_shw_bit == 0);
+		ASSERT(hblkp->hblk_shared == 0);
+		count++;
+		pr_hblkp = hblkp;
+	}
+
+	cpuhp = &cpu_hme_pend[CPU->cpu_seqid];
+	mutex_enter(&cpuhp->chp_mutex);
+
+	if ((cpuhp->chp_count + count) == 0) {
+		mutex_exit(&cpuhp->chp_mutex);
+		return;
+	}
+
+	if ((now.tv_sec - cpuhp->chp_timestamp) > 1) {
+		one_second_expired  = 1;
+	}
+
+	if (!dontfree && (freehblkcnt < HBLK_RESERVE_CNT ||
+	    (cpuhp->chp_count + count) > cpu_hme_pend_thresh ||
+	    one_second_expired)) {
+		/* Append global list to local */
+		if (pr_hblkp == NULL) {
+			*listp = cpuhp->chp_listp;
+		} else {
+			pr_hblkp->hblk_next = cpuhp->chp_listp;
+		}
+		cpuhp->chp_listp = NULL;
+		cpuhp->chp_count = 0;
+		cpuhp->chp_timestamp = now.tv_sec;
+		mutex_exit(&cpuhp->chp_mutex);
+
+		kpreempt_disable();
+		CPUSET_DEL(cpuset, CPU->cpu_id);
+		xt_sync(cpuset);
+		xt_sync(cpuset);
+		kpreempt_enable();
+
+		/*
+		 * At this stage we know that no trap handlers on other
+		 * cpus can have references to hmeblks on the list.
+		 */
+		sfmmu_hblk_free(listp);
+	} else if (*listp != NULL) {
+		pr_hblkp->hblk_next = cpuhp->chp_listp;
+		cpuhp->chp_listp = *listp;
+		cpuhp->chp_count += count;
+		*listp = NULL;
+		mutex_exit(&cpuhp->chp_mutex);
+	} else {
+		mutex_exit(&cpuhp->chp_mutex);
+	}
+}
+
+/*
+ * Add an hmeblk to the the hash list.
+ */
+void
+sfmmu_hblk_hash_add(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
+	uint64_t hblkpa)
+{
+	ASSERT(SFMMU_HASH_LOCK_ISHELD(hmebp));
+#ifdef	DEBUG
+	if (hmebp->hmeblkp == NULL) {
+		ASSERT(hmebp->hmeh_nextpa == HMEBLK_ENDPA);
+	}
+#endif /* DEBUG */
+
+	hmeblkp->hblk_nextpa = hmebp->hmeh_nextpa;
+	/*
+	 * Since the TSB miss handler now does not lock the hash chain before
+	 * walking it, make sure that the hmeblks nextpa is globally visible
+	 * before we make the hmeblk globally visible by updating the chain root
+	 * pointer in the hash bucket.
+	 */
+	membar_producer();
+	hmebp->hmeh_nextpa = hblkpa;
+	hmeblkp->hblk_next = hmebp->hmeblkp;
+	hmebp->hmeblkp = hmeblkp;
+
+}
+
+/*
+ * This function is the first part of a 2 part process to remove an hmeblk
+ * from the hash chain. In this phase we unlink the hmeblk from the hash chain
+ * but leave the next physical pointer unchanged. The hmeblk is then linked onto
+ * a per-cpu pending list using the virtual address pointer.
+ *
+ * TSB miss trap handlers that start after this phase will no longer see
+ * this hmeblk. TSB miss handlers that still cache this hmeblk in a register
+ * can still use it for further chain traversal because we haven't yet modifed
+ * the next physical pointer or freed it.
+ *
+ * In the second phase of hmeblk removal we'll issue a barrier xcall before
+ * we reuse or free this hmeblk. This will make sure all lingering references to
+ * the hmeblk after first phase disappear before we finally reclaim it.
+ * This scheme eliminates the need for TSB miss handlers to lock hmeblk chains
+ * during their traversal.
+ *
+ * The hmehash_mutex must be held when calling this function.
+ *
+ * Input:
+ *	 hmebp - hme hash bucket pointer
+ *	 hmeblkp - address of hmeblk to be removed
+ *	 pr_hblk - virtual address of previous hmeblkp
+ *	 listp - pointer to list of hmeblks linked by virtual address
+ *	 free_now flag - indicates that a complete removal from the hash chains
+ *			 is necessary.
+ *
+ * It is inefficient to use the free_now flag as a cross-call is required to
+ * remove a single hmeblk from the hash chain but is necessary when hmeblks are
+ * in short supply.
+ */
+void
+sfmmu_hblk_hash_rm(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
+    struct hme_blk *pr_hblk, struct hme_blk **listp,
+    int free_now)
+{
+	int shw_size, vshift;
+	struct hme_blk *shw_hblkp;
+	uint_t		shw_mask, newshw_mask;
+	caddr_t		vaddr;
+	int		size;
+	cpuset_t cpuset = cpu_ready_set;
+
+	ASSERT(SFMMU_HASH_LOCK_ISHELD(hmebp));
+
+	if (hmebp->hmeblkp == hmeblkp) {
+		hmebp->hmeh_nextpa = hmeblkp->hblk_nextpa;
+		hmebp->hmeblkp = hmeblkp->hblk_next;
+	} else {
+		pr_hblk->hblk_nextpa = hmeblkp->hblk_nextpa;
+		pr_hblk->hblk_next = hmeblkp->hblk_next;
+	}
+
+	size = get_hblk_ttesz(hmeblkp);
+	shw_hblkp = hmeblkp->hblk_shadow;
+	if (shw_hblkp) {
+		ASSERT(hblktosfmmu(hmeblkp) != KHATID);
+		ASSERT(!hmeblkp->hblk_shared);
+#ifdef	DEBUG
+		if (mmu_page_sizes == max_mmu_page_sizes) {
+			ASSERT(size < TTE256M);
+		} else {
+			ASSERT(size < TTE4M);
+		}
+#endif /* DEBUG */
+
+		shw_size = get_hblk_ttesz(shw_hblkp);
+		vaddr = (caddr_t)get_hblk_base(hmeblkp);
+		vshift = vaddr_to_vshift(shw_hblkp->hblk_tag, vaddr, shw_size);
+		ASSERT(vshift < 8);
+		/*
+		 * Atomically clear shadow mask bit
+		 */
+		do {
+			shw_mask = shw_hblkp->hblk_shw_mask;
+			ASSERT(shw_mask & (1 << vshift));
+			newshw_mask = shw_mask & ~(1 << vshift);
+			newshw_mask = cas32(&shw_hblkp->hblk_shw_mask,
+			    shw_mask, newshw_mask);
+		} while (newshw_mask != shw_mask);
+		hmeblkp->hblk_shadow = NULL;
+	}
+	hmeblkp->hblk_shw_bit = 0;
+
+	if (hmeblkp->hblk_shared) {
+#ifdef	DEBUG
+		sf_srd_t	*srdp;
+		sf_region_t	*rgnp;
+		uint_t		rid;
+
+		srdp = hblktosrd(hmeblkp);
+		ASSERT(srdp != NULL && srdp->srd_refcnt != 0);
+		rid = hmeblkp->hblk_tag.htag_rid;
+		ASSERT(SFMMU_IS_SHMERID_VALID(rid));
+		ASSERT(rid < SFMMU_MAX_HME_REGIONS);
+		rgnp = srdp->srd_hmergnp[rid];
+		ASSERT(rgnp != NULL);
+		SFMMU_VALIDATE_SHAREDHBLK(hmeblkp, srdp, rgnp, rid);
+#endif /* DEBUG */
+		hmeblkp->hblk_shared = 0;
+	}
+	if (free_now) {
+		kpreempt_disable();
+		CPUSET_DEL(cpuset, CPU->cpu_id);
+		xt_sync(cpuset);
+		xt_sync(cpuset);
+		kpreempt_enable();
+
+		hmeblkp->hblk_nextpa = HMEBLK_ENDPA;
+		hmeblkp->hblk_next = NULL;
+	} else {
+		/* Append hmeblkp to listp for processing later. */
+		hmeblkp->hblk_next = *listp;
+		*listp = hmeblkp;
+	}
+}
+
+/*
+ * This routine is called when memory is in short supply and returns a free
+ * hmeblk of the requested size from the cpu pending lists.
+ */
+static struct hme_blk *
+sfmmu_check_pending_hblks(int size)
+{
+	int i;
+	struct hme_blk *hmeblkp = NULL, *last_hmeblkp;
+	int found_hmeblk;
+	cpuset_t cpuset = cpu_ready_set;
+	cpu_hme_pend_t *cpuhp;
+
+	/* Flush cpu hblk pending queues */
+	for (i = 0; i < NCPU; i++) {
+		cpuhp = &cpu_hme_pend[i];
+		if (cpuhp->chp_listp != NULL)  {
+			mutex_enter(&cpuhp->chp_mutex);
+			if (cpuhp->chp_listp == NULL)  {
+				mutex_exit(&cpuhp->chp_mutex);
+				continue;
+			}
+			found_hmeblk = 0;
+			last_hmeblkp = NULL;
+			for (hmeblkp = cpuhp->chp_listp; hmeblkp != NULL;
+			    hmeblkp = hmeblkp->hblk_next) {
+				if (get_hblk_ttesz(hmeblkp) == size) {
+					if (last_hmeblkp == NULL) {
+						cpuhp->chp_listp =
+						    hmeblkp->hblk_next;
+					} else {
+						last_hmeblkp->hblk_next =
+						    hmeblkp->hblk_next;
+					}
+					ASSERT(cpuhp->chp_count > 0);
+					cpuhp->chp_count--;
+					found_hmeblk = 1;
+					break;
+				} else {
+					last_hmeblkp = hmeblkp;
+				}
+			}
+			mutex_exit(&cpuhp->chp_mutex);
+
+			if (found_hmeblk) {
+				kpreempt_disable();
+				CPUSET_DEL(cpuset, CPU->cpu_id);
+				xt_sync(cpuset);
+				xt_sync(cpuset);
+				kpreempt_enable();
+				return (hmeblkp);
+			}
+		}
+	}
+	return (NULL);
 }

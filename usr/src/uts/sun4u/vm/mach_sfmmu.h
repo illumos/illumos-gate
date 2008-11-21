@@ -276,18 +276,21 @@ label/**/1:
 
 /*
  * TTE_SET_REF_ML is a macro that updates the reference bit if it is
- * not already set.
+ * not already set. Older sun4u platform use the virtual address to
+ * flush entries from dcache, this is not available here but there are
+ * only two positions in the 64K dcache where the cache line can reside
+ * so we need to flush both of them.
  *
  * Parameters:
  * tte      = reg containing tte
  * ttepa    = physical pointer to tte
- * tteva    = virtual ptr to tte
  * tsbarea  = tsb miss area
  * tmp1     = tmp reg
+ * tmp2     = tmp reg
  * label    = temporary label
  */
 
-#define	TTE_SET_REF_ML(tte, ttepa, tteva, tsbarea, tmp1, label)		\
+#define	TTE_SET_REF_ML(tte, ttepa, tsbarea, tmp1, tmp2, label)	\
 	/* BEGIN CSTYLED */						\
 	/* check reference bit */					\
 	andcc	tte, TTE_REF_INT, %g0;					\
@@ -304,8 +307,12 @@ label/**/1:
 	membar	#Sync;							\
 	ba	label/**/2;						\
 label/**/1:								\
-	and	tteva, tmp1, tmp1;					\
-	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line from dcache */	\
+	and	ttepa, tmp1, tmp1;					\
+	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line1 from dcache */	\
+	or	%g0, 1, tmp2;						\
+	sllx	tmp2, MMU_PAGESHIFT, tmp2;				\
+	xor	tmp1, tmp2, tmp1;					\
+	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line2 from dcache */	\
 	membar	#Sync;							\
 label/**/2:								\
 	or	tte, TTE_REF_INT, tmp1;					\
@@ -325,15 +332,15 @@ label/**/4:								\
  * Parameters:
  * tte      = reg containing tte
  * ttepa    = physical pointer to tte
- * tteva    = virtual ptr to tte
  * tsbarea  = tsb miss area
  * tmp1     = tmp reg
+ * tmp2     = tmp reg
  * label    = temporary label
  * exitlabel = label where to jump to if write perm bit not set.
  */
 
-#define	TTE_SET_REFMOD_ML(tte, ttepa, tteva, tsbarea, tmp1, label,	\
-	exitlabel)							\
+#define	TTE_SET_REFMOD_ML(tte, ttepa, tsbarea, tmp1, tmp2, label,	\
+    exitlabel)								\
 	/* BEGIN CSTYLED */						\
 	/* check reference bit */					\
 	andcc	tte, TTE_WRPRM_INT, %g0;				\
@@ -353,8 +360,12 @@ label/**/4:								\
 	membar	#Sync;							\
 	ba	label/**/2;						\
 label/**/1:								\
-	and	tteva, tmp1, tmp1;					\
-	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line from dcache */	\
+	and	ttepa, tmp1, tmp1;					\
+	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line1 from dcache */	\
+	or	%g0, 1, tmp2;						\
+	sllx	tmp2, MMU_PAGESHIFT, tmp2;				\
+	xor	tmp1, tmp2, tmp1;					\
+	stxa	%g0, [tmp1]ASI_DC_TAG; /* flush line2 from dcache */	\
 	membar	#Sync;							\
 label/**/2:								\
 	or	tte, TTE_HWWR_INT | TTE_REF_INT, tmp1;			\

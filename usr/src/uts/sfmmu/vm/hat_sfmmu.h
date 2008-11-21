@@ -301,6 +301,8 @@ struct tsb_info {
 #define	SFMMU_PRIVATE	0
 #define	SFMMU_SHARED	1
 
+#define	HMEBLK_ENDPA	1
+
 #ifndef _ASM
 
 #define	SFMMU_MAX_ISM_REGIONS		(64)
@@ -513,6 +515,24 @@ typedef struct sf_srd_bucket {
 		lnkp = &lnkp[_l2ix];					\
 	}								\
 }
+
+/*
+ *  Per cpu pending freelist of hmeblks.
+ */
+typedef struct cpu_hme_pend {
+	struct   hme_blk *chp_listp;
+	kmutex_t chp_mutex;
+	time_t	 chp_timestamp;
+	uint_t   chp_count;
+	uint8_t	 chp_pad[36];		/* pad to 64 bytes */
+} cpu_hme_pend_t;
+
+/*
+ * The default value of the threshold for the per cpu pending queues of hmeblks.
+ * The queues are flushed if either the number of hmeblks on the queue is above
+ * the threshold, or one second has elapsed since the last flush.
+ */
+#define	CPU_HME_PEND_THRESH 1000
 
 /*
  * Per-MMU context domain kstats.
@@ -1247,7 +1267,7 @@ struct hme_blk_misc {
 };
 
 struct hme_blk {
-	uint64_t	hblk_nextpa;	/* physical address for hash list */
+	volatile uint64_t hblk_nextpa;	/* physical address for hash list */
 
 	hmeblk_tag	hblk_tag;	/* tag used to obtain an hmeblk match */
 
@@ -1367,7 +1387,7 @@ struct hme_blk {
  */
 struct hmehash_bucket {
 	kmutex_t	hmehash_mutex;
-	uint64_t	hmeh_nextpa;	/* physical address for hash list */
+	volatile uint64_t hmeh_nextpa;	/* physical address for hash list */
 	struct hme_blk *hmeblkp;
 	uint_t		hmeh_listlock;
 };
@@ -1527,16 +1547,12 @@ struct hmehash_bucket {
  * will be set to NULL, otherwise it will point to the correct hme_blk.
  * This macro also cleans empty hblks.
  */
-#define	HME_HASH_SEARCH_PREV(hmebp, hblktag, hblkp, hblkpa,		\
-	pr_hblk, prevpa, listp)						\
+#define	HME_HASH_SEARCH_PREV(hmebp, hblktag, hblkp, pr_hblk, listp)	\
 {									\
 	struct hme_blk *nx_hblk;					\
-	uint64_t 	nx_pa;						\
 									\
 	ASSERT(SFMMU_HASH_LOCK_ISHELD(hmebp));				\
 	hblkp = hmebp->hmeblkp;						\
-	hblkpa = hmebp->hmeh_nextpa;					\
-	prevpa = 0;							\
 	pr_hblk = NULL;							\
 	while (hblkp) {							\
 		if (HTAGS_EQ(hblkp->hblk_tag, hblktag)) {		\
@@ -1544,26 +1560,21 @@ struct hmehash_bucket {
 			break;						\
 		}							\
 		nx_hblk = hblkp->hblk_next;				\
-		nx_pa = hblkp->hblk_nextpa;				\
 		if (!hblkp->hblk_vcnt && !hblkp->hblk_hmecnt) {		\
-			sfmmu_hblk_hash_rm(hmebp, hblkp, prevpa, pr_hblk); \
-			sfmmu_hblk_free(hmebp, hblkp, hblkpa, listp);   \
+			sfmmu_hblk_hash_rm(hmebp, hblkp, pr_hblk,	\
+			    listp, 0);					\
 		} else {						\
 			pr_hblk = hblkp;				\
-			prevpa = hblkpa;				\
 		}							\
 		hblkp = nx_hblk;					\
-		hblkpa = nx_pa;						\
 	}								\
 }
 
 #define	HME_HASH_SEARCH(hmebp, hblktag, hblkp, listp)			\
 {									\
 	struct hme_blk *pr_hblk;					\
-	uint64_t hblkpa, prevpa;					\
 									\
-	HME_HASH_SEARCH_PREV(hmebp, hblktag, hblkp, hblkpa, pr_hblk,	\
-		prevpa, listp);						\
+	HME_HASH_SEARCH_PREV(hmebp, hblktag, hblkp,  pr_hblk, listp);	\
 }
 
 /*
@@ -2274,10 +2285,6 @@ extern void	sfmmu_copytte(tte_t *, tte_t *);
 extern int	sfmmu_modifytte(tte_t *, tte_t *, tte_t *);
 extern int	sfmmu_modifytte_try(tte_t *, tte_t *, tte_t *);
 extern pfn_t	sfmmu_ttetopfn(tte_t *, caddr_t);
-extern void	sfmmu_hblk_hash_rm(struct hmehash_bucket *,
-			struct hme_blk *, uint64_t, struct hme_blk *);
-extern void	sfmmu_hblk_hash_add(struct hmehash_bucket *, struct hme_blk *,
-			uint64_t);
 extern uint_t	sfmmu_disable_intrs(void);
 extern void	sfmmu_enable_intrs(uint_t);
 /*

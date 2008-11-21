@@ -358,13 +358,13 @@ label/**/1:								\
  * Parameters:
  * tte      = reg containing tte
  * ttepa    = physical pointer to tte
- * tteva    = virtual ptr to tte
  * tsbarea  = tsb miss area
  * tmp1     = tmp reg
+ * tmp2     = tmp reg
  * label    = temporary label
  */
 
-#define	TTE_SET_REF_ML(tte, ttepa, tteva, tsbarea, tmp1, label)		\
+#define	TTE_SET_REF_ML(tte, ttepa, tsbarea, tmp1, tmp2, label)		\
 	/* BEGIN CSTYLED */						\
 	/* check reference bit */					\
 	btst	TTE_REF_INT, tte;					\
@@ -389,14 +389,14 @@ label/**/2:								\
  * Parameters:
  * tte      = reg containing tte
  * ttepa    = physical pointer to tte
- * tteva    = virtual ptr to tte
  * tsbarea  = tsb miss area
  * tmp1     = tmp reg
+ * tmp2     = tmp reg
  * label    = temporary label
  * exitlabel = label where to jump to if write perm bit not set.
  */
 
-#define	TTE_SET_REFMOD_ML(tte, ttepa, tteva, tsbarea, tmp1, label,	\
+#define	TTE_SET_REFMOD_ML(tte, ttepa, tsbarea, tmp1, tmp2, label,	\
 	exitlabel)							\
 	/* BEGIN CSTYLED */						\
 	/* check reference bit */					\

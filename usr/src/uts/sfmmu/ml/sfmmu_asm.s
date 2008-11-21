@@ -156,7 +156,7 @@
  *
  * tsbep = TSBE va (ro)
  * tmp1, tmp2 = scratch registers (clobbered)
- * label = label to use for branches (text)
+ * label = label to jump to if we fail to lock the tsb entry
  * %asi = ASI to use for TSB access
  *
  * NOTE that we flush the TSB using fast VIS instructions that
@@ -169,15 +169,14 @@
 
 #define	TSB_LOCK_ENTRY(tsbep, tmp1, tmp2, label)			\
 	lda	[tsbep]ASI_MEM, tmp1					;\
-label:									;\
 	sethi	%hi(TSBTAG_LOCKED), tmp2				;\
 	cmp	tmp1, tmp2 						;\
-	be,a,pn	%icc, label/**/b	/* if locked spin */		;\
-	  lda	[tsbep]ASI_MEM, tmp1					;\
+	be,a,pn	%icc, label		/* if locked ignore */		;\
+	  nop								;\
 	casa	[tsbep]ASI_MEM, tmp1, tmp2				;\
 	cmp	tmp1, tmp2 						;\
-	bne,a,pn %icc, label/**/b	/* didn't lock so try again */	;\
-	  lda	[tsbep]ASI_MEM, tmp1					;\
+	bne,a,pn %icc, label		/* didn't lock so ignore */	;\
+	  nop								;\
 	/* tsbe lock acquired */					;\
 	membar #StoreStore
 
@@ -185,15 +184,14 @@ label:									;\
 
 #define	TSB_LOCK_ENTRY(tsbep, tmp1, tmp2, label)			\
 	lda	[tsbep]%asi, tmp1					;\
-label:									;\
 	sethi	%hi(TSBTAG_LOCKED), tmp2				;\
 	cmp	tmp1, tmp2 						;\
-	be,a,pn	%icc, label/**/b	/* if locked spin */		;\
-	  lda	[tsbep]%asi, tmp1					;\
+	be,a,pn	%icc, label		/* if locked ignore */		;\
+	  nop								;\
 	casa	[tsbep]%asi, tmp1, tmp2					;\
 	cmp	tmp1, tmp2 						;\
-	bne,a,pn %icc, label/**/b	/* didn't lock so try again */	;\
-	  lda	[tsbep]%asi, tmp1					;\
+	bne,a,pn %icc, label		/* didn't lock so ignore */	;\
+	  nop								;\
 	/* tsbe lock acquired */					;\
 	membar #StoreStore
 
@@ -235,7 +233,7 @@ label:									;\
  *   we need to mask off the context and leave only the va (clobbered)
  * ttepa = pointer to the TTE to retrieve/load as pa (ro)
  * tmp1, tmp2 = scratch registers
- * label = label to use for branches (text)
+ * label = label to jump to if we fail to lock the tsb entry
  * %asi = ASI to use for TSB access
  */
 
@@ -254,7 +252,7 @@ label:									;\
 	srlx	tagtarget, TTARGET_VA_SHIFT, tagtarget			;\
 	sethi	%hi(TSBTAG_INVALID), tmp2				;\
 	add	tsbep, TSBE_TAG, tmp1					;\
-	brgez,a,pn tte, label/**/f					;\
+	brgez,a,pn tte, label						;\
 	 sta	tmp2, [tmp1]ASI_MEM			/* unlock */	;\
 	TSB_INSERT_UNLOCK_ENTRY(tsbep, tte, tagtarget, tmp1)		;\
 label:
@@ -272,7 +270,7 @@ label:
 	ldxa	[ttepa]ASI_MEM, tte					;\
 	srlx	tagtarget, TTARGET_VA_SHIFT, tagtarget			;\
 	sethi	%hi(TSBTAG_INVALID), tmp2				;\
-	brgez,a,pn tte, label/**/f					;\
+	brgez,a,pn tte, label						;\
 	 sta	tmp2, [tsbep + TSBE_TAG]%asi		/* unlock */	;\
 	TSB_INSERT_UNLOCK_ENTRY(tsbep, tte, tagtarget, tmp1)		;\
 label:
@@ -308,7 +306,7 @@ label:
 	ldxa	[ttepa]ASI_MEM, tte					;\
 	srlx	tagtarget, TTARGET_VA_SHIFT, tagtarget			;\
 	sethi	%hi(TSBTAG_INVALID), tmp2				;\
-	brgez,a,pn tte, label/**/f					;\
+	brgez,a,pn tte, label						;\
 	 sta	tmp2, [tsbep + TSBE_TAG]%asi		/* unlock */	;\
 	or	tte, tmp1, tte						;\
 	andn	tte, TTE_EXECPRM_INT, tte				;\
@@ -377,7 +375,7 @@ label:									;\
 	TSB_LOCK_ENTRY(tsbep, tmp1, tmp2, label)			;\
 	sethi	%hi(TSBTAG_INVALID), tmp2				;\
 	add	tsbep, TSBE_TAG, tmp1					;\
-	brgez,a,pn tteva, label/**/f					;\
+	brgez,a,pn tteva, label						;\
 	 sta	tmp2, [tmp1]ASI_MEM			/* unlock */	;\
 	TSB_INSERT_UNLOCK_ENTRY(tsbep, tteva, tagtarget, tmp1)		;\
 label:
@@ -389,7 +387,7 @@ label:
 	ldx	[tteva], tteva			/* load tte */		;\
 	TSB_LOCK_ENTRY(tsbep, tmp1, tmp2, label)			;\
 	sethi	%hi(TSBTAG_INVALID), tmp2				;\
-	brgez,a,pn tteva, label/**/f					;\
+	brgez,a,pn tteva, label						;\
 	 sta	tmp2, [tsbep + TSBE_TAG]%asi		/* unlock */	;\
 	TSB_INSERT_UNLOCK_ENTRY(tsbep, tteva, tagtarget, tmp1)		;\
 label:
@@ -1425,7 +1423,7 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	wrpr	%o5, PSTATE_IE, %pstate		/* disable interrupts */
 
 	SETUP_TSB_ASI(%o3, %g3)
-	TSB_UPDATE(%o0, %o2, %o1, %g1, %g2, 1)
+	TSB_UPDATE(%o0, %o2, %o1, %g1, %g2, locked_tsb_l8)
 
 	wrpr	%g0, %o5, %pstate		/* enable interrupts */
 	
@@ -1479,7 +1477,7 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 
 	srlx	%o0, TTARGET_VA_SHIFT, %g1;	! %g1 = tag target
 	/* TSB_UPDATE(tsbep, tteva, tagtarget, tmp1, tmp2, label) */
-	TSB_UPDATE(%g2, %o1, %g1, %o3, %o4, 1)
+	TSB_UPDATE(%g2, %o1, %g1, %o3, %o4, locked_tsb_l9)
 
 	wrpr	%g0, %o5, %pstate		! enable interrupts
 	retl
@@ -1540,296 +1538,6 @@ sfmmu_ttetopfn(tte_t *tte, caddr_t vaddr)
 	SET_SIZE(sfmmu_ttetopfn)
 
 #endif /* !lint */
-
-
-#if defined (lint)
-/*
- * The sfmmu_hblk_hash_add is the assembly primitive for adding hmeblks to the
- * the hash list.
- */
-/* ARGSUSED */
-void
-sfmmu_hblk_hash_add(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
-	uint64_t hblkpa)
-{
-}
-
-/*
- * The sfmmu_hblk_hash_rm is the assembly primitive to remove hmeblks from the
- * hash list.
- */
-/* ARGSUSED */
-void
-sfmmu_hblk_hash_rm(struct hmehash_bucket *hmebp, struct hme_blk *hmeblkp,
-	uint64_t hblkpa, struct hme_blk *prev_hblkp)
-{
-}
-#else /* lint */
-
-/*
- * Functions to grab/release hme bucket list lock.  I only use a byte
- * instead of the whole int because eventually we might want to
- * put some counters on the other bytes (of course, these routines would
- * have to change).  The code that grab this lock should execute
- * with interrupts disabled and hold the lock for the least amount of time
- * possible.
- */
-
-/*
- * Even though hmeh_listlock is updated using pa there's no need to flush
- * dcache since hmeh_listlock will be restored to the original value (0)
- * before interrupts are reenabled.
- */
-
-/*
- * For sparcv9 hme hash buckets may not be in the nucleus.  hme hash update
- * routines still use virtual addresses to update the bucket fields. But they
- * must not cause a TLB miss after grabbing the low level bucket lock. To
- * achieve this we must make sure the bucket structure is completely within an
- * 8K page.
- */
-
-#if (HMEBUCK_SIZE & (HMEBUCK_SIZE - 1))
-#error - the size of hmehash_bucket structure is not power of 2
-#endif
-
-/*
- * Enable backoff to significantly reduce locking overhead and reduce a chance
- * of xcall timeout. This is only enabled for sun4v as a Makefile compile-
- * time option.
- * The rd %ccr is better for performance compared to a non pipeline releasing
- * tight spin on N2/VF.
- * Backoff based fix is a temporary solution and doesn't allow scaling above
- * lock saturation point. The final fix is to eliminate HMELOCK_ENTER()
- * to avoid xcall timeouts and improve GET_TTE() performance.
- */
-
-#ifdef HMELOCK_BACKOFF_ENABLE
-
-#define HMELOCK_BACKOFF(reg, val)                               \
-	set     val, reg                                        ;\
-	rd	%ccr, %g0                                       ;\
-	brnz	reg, .-4                                        ;\
-	dec	reg
-
-#define CAS_HME(tmp1, tmp2, exitlabel, asi)                     \
-	mov     0xff, tmp2                                      ;\
-	casa    [tmp1]asi, %g0, tmp2                            ;\
-	brz,a,pt tmp2, exitlabel                                ;\
-	membar  #LoadLoad
-
-#define HMELOCK_ENTER(hmebp, tmp1, tmp2, label, asi)            \
-	mov     0xff, tmp2                                      ;\
-	add     hmebp, HMEBUCK_LOCK, tmp1                       ;\
-	casa    [tmp1]asi, %g0, tmp2                            ;\
-	brz,a,pt tmp2, label/**/2                               ;\
-	membar  #LoadLoad                                       ;\
-	HMELOCK_BACKOFF(tmp2,0x8)                               ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-	HMELOCK_BACKOFF(tmp2,0x10)                              ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-	HMELOCK_BACKOFF(tmp2,0x20)                              ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-	HMELOCK_BACKOFF(tmp2,0x40)                              ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-	HMELOCK_BACKOFF(tmp2,0x80)                              ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-label/**/1:                                                     ;\
-	HMELOCK_BACKOFF(tmp2,0x100)                             ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-	HMELOCK_BACKOFF(tmp2,0x200)                             ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-	HMELOCK_BACKOFF(tmp2,0x400)                             ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-	HMELOCK_BACKOFF(tmp2,0x800)                             ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-	HMELOCK_BACKOFF(tmp2,0x1000)                            ;\
-	CAS_HME(tmp1, tmp2, label/**/2, asi)                    ;\
-	HMELOCK_BACKOFF(tmp2,0x2000)                            ;\
-	mov     0xff, tmp2                                      ;\
-	casa    [tmp1]asi, %g0, tmp2                            ;\
-	brnz,pn tmp2, label/**/1     /* reset backoff */        ;\
-	membar  #LoadLoad                                       ;\
-label/**/2:
-
-#else /* HMELOCK_BACKOFF_ENABLE */
-
-#define HMELOCK_ENTER(hmebp, tmp1, tmp2, label1, asi)           \
-	mov     0xff, tmp2                                      ;\
-	add     hmebp, HMEBUCK_LOCK, tmp1                       ;\
-label1:                                                         ;\
-	casa    [tmp1]asi, %g0, tmp2                            ;\
-	brnz,pn tmp2, label1                                    ;\
-	mov     0xff, tmp2                                      ;\
-	membar  #LoadLoad
-
-#endif /* HMELOCK_BACKOFF_ENABLE */
-
-#define HMELOCK_EXIT(hmebp, tmp1, asi)                          \
-	membar  #LoadStore|#StoreStore                          ;\
-	add     hmebp, HMEBUCK_LOCK, tmp1                       ;\
-	sta     %g0, [tmp1]asi
-
-	.seg	".data"
-hblk_add_panic1:
-	.ascii	"sfmmu_hblk_hash_add: interrupts disabled"
-	.byte	0
-hblk_add_panic2:
-	.ascii	"sfmmu_hblk_hash_add: va hmeblkp is NULL but pa is not"
-	.byte	0
-	.align	4
-	.seg	".text"
-
-	ENTRY_NP(sfmmu_hblk_hash_add)
-	/*
-	 * %o0 = hmebp
-	 * %o1 = hmeblkp
-	 * %o2 = hblkpa
-	 */
-	rdpr	%pstate, %o5
-#ifdef DEBUG
-	andcc	%o5, PSTATE_IE, %g0		/* if interrupts already */
-	bnz,pt %icc, 3f				/* disabled, panic	 */
-	  nop
-	save	%sp, -SA(MINFRAME), %sp
-	sethi	%hi(hblk_add_panic1), %o0
-	call	panic
-	 or	%o0, %lo(hblk_add_panic1), %o0
-	ret
-	restore
-
-3:
-#endif /* DEBUG */
-	wrpr	%o5, PSTATE_IE, %pstate		/* disable interrupts */
-	mov	%o2, %g1
-
-	/*
-	 * g1 = hblkpa
-	 */
-	ldn	[%o0 + HMEBUCK_HBLK], %o4	/* next hmeblk */
-	ldx	[%o0 + HMEBUCK_NEXTPA], %g2	/* g2 = next hblkpa */
-#ifdef	DEBUG
-	cmp	%o4, %g0
-	bne,pt %xcc, 1f
-	 nop
-	brz,pt %g2, 1f
-	 nop
-	wrpr	%g0, %o5, %pstate		/* enable interrupts */
-	save	%sp, -SA(MINFRAME), %sp
-	sethi	%hi(hblk_add_panic2), %o0
-	call	panic
-	  or	%o0, %lo(hblk_add_panic2), %o0
-	ret
-	restore
-1:
-#endif /* DEBUG */
-	/*
-	 * We update hmeblks entries before grabbing lock because the stores
-	 * could take a tlb miss and require the hash lock.  The buckets
-	 * are part of the nucleus so we are cool with those stores.
-	 *
-	 * if buckets are not part of the nucleus our game is to
-	 * not touch any other page via va until we drop the lock.
-	 * This guarantees we won't get a tlb miss before the lock release
-	 * since interrupts are disabled.
-	 */
-	stn	%o4, [%o1 + HMEBLK_NEXT]	/* update hmeblk's next */
-	stx	%g2, [%o1 + HMEBLK_NEXTPA]	/* update hmeblk's next pa */
-	HMELOCK_ENTER(%o0, %o2, %o3, hashadd1, ASI_N)
-	stn	%o1, [%o0 + HMEBUCK_HBLK]	/* update bucket hblk next */
-	stx	%g1, [%o0 + HMEBUCK_NEXTPA]	/* add hmeblk to list */
-	HMELOCK_EXIT(%o0, %g2, ASI_N)
-	retl
-	  wrpr	%g0, %o5, %pstate		/* enable interrupts */
-	SET_SIZE(sfmmu_hblk_hash_add)
-
-	ENTRY_NP(sfmmu_hblk_hash_rm)
-	/*
-	 * This function removes an hmeblk from the hash chain. 
-	 * It is written to guarantee we don't take a tlb miss
-	 * by using physical addresses to update the list.
-	 * 
-	 * %o0 = hmebp
-	 * %o1 = hmeblkp
-	 * %o2 = hmeblkp previous pa
-	 * %o3 = hmeblkp previous
-	 */
-
-	mov	%o3, %o4			/* o4 = hmeblkp previous */
-
-	rdpr	%pstate, %o5
-#ifdef DEBUG
-	PANIC_IF_INTR_DISABLED_PSTR(%o5, sfmmu_di_l4, %g1)
-#endif /* DEBUG */
-	/*
-	 * disable interrupts, clear Address Mask to access 64 bit physaddr
-	 */
-	andn    %o5, PSTATE_IE, %g1
-	wrpr    %g1, 0, %pstate
-
-#ifndef sun4v
-	sethi   %hi(dcache_line_mask), %g4
-	ld      [%g4 + %lo(dcache_line_mask)], %g4
-#endif /* sun4v */
-
-	/*
-	 * if buckets are not part of the nucleus our game is to
-	 * not touch any other page via va until we drop the lock.
-	 * This guarantees we won't get a tlb miss before the lock release
-	 * since interrupts are disabled.
-	 */
-	HMELOCK_ENTER(%o0, %g1, %g3, hashrm1, ASI_N)
-	ldn	[%o0 + HMEBUCK_HBLK], %g2	/* first hmeblk in list */
-	cmp	%g2, %o1
-	bne,pt	%ncc,1f
-	 mov	ASI_MEM, %asi
-	/*
-	 * hmeblk is first on list
-	 */
-	ldx	[%o0 + HMEBUCK_NEXTPA], %g2	/* g2 = hmeblk pa */
-	ldna	[%g2 + HMEBLK_NEXT] %asi, %o3	/* read next hmeblk va */
-	ldxa	[%g2 + HMEBLK_NEXTPA] %asi, %g1	/* read next hmeblk pa */
-	stn	%o3, [%o0 + HMEBUCK_HBLK]	/* write va */
-	ba,pt	%xcc, 2f
-	  stx	%g1, [%o0 + HMEBUCK_NEXTPA]	/* write pa */
-1:
-	/* hmeblk is not first on list */
-
-	mov	%o2, %g3
-#ifndef sun4v
-	GET_CPU_IMPL(%g2)
-	cmp 	%g2, CHEETAH_IMPL
-	bge,a,pt %icc, hblk_hash_rm_1
-	  and	%o4, %g4, %g2
-	cmp	%g2, SPITFIRE_IMPL
-	blt	%icc, hblk_hash_rm_2		/* no flushing needed for OPL */
-	  and	%o4, %g4, %g2
-	stxa	%g0, [%g2]ASI_DC_TAG		/* flush prev pa from dcache */
-	add	%o4, HMEBLK_NEXT, %o4
-	and	%o4, %g4, %g2
-	ba	hblk_hash_rm_2
-	stxa	%g0, [%g2]ASI_DC_TAG		/* flush prev va from dcache */
-hblk_hash_rm_1:
-
-	stxa	%g0, [%g3]ASI_DC_INVAL		/* flush prev pa from dcache */
-	membar	#Sync
-	add     %g3, HMEBLK_NEXT, %g2
-	stxa	%g0, [%g2]ASI_DC_INVAL		/* flush prev va from dcache */
-hblk_hash_rm_2:
-	membar	#Sync
-#endif /* sun4v */
-	ldxa	[%g3 + HMEBLK_NEXTPA] %asi, %g2	/* g2 = hmeblk pa */ 
-	ldna	[%g2 + HMEBLK_NEXT] %asi, %o3	/* read next hmeblk va */
-	ldxa	[%g2 + HMEBLK_NEXTPA] %asi, %g1	/* read next hmeblk pa */
-	stna	%o3, [%g3 + HMEBLK_NEXT] %asi	/* write va */
-	stxa	%g1, [%g3 + HMEBLK_NEXTPA] %asi	/* write pa */
-2:
-	HMELOCK_EXIT(%o0, %g2, ASI_N)
-	retl
-	  wrpr	%g0, %o5, %pstate		/* enable interrupts */
-	SET_SIZE(sfmmu_hblk_hash_rm)
-
-#endif /* lint */
 
 /*
  * These macros are used to update global sfmmu hme hash statistics
@@ -2336,28 +2044,25 @@ label/**/2:								;\
 /*
  * Function to traverse hmeblk hash link list and find corresponding match.
  * The search is done using physical pointers. It returns the physical address
- * and virtual address pointers to the hmeblk that matches with the tag
- * provided.
+ * pointer to the hmeblk that matches with the tag provided.
  * Parameters:
  * hmebp	= register that points to hme hash bucket, also used as
  *		  tmp reg (clobbered)
  * hmeblktag	= register with hmeblk tag match
  * hatid	= register with hatid
  * hmeblkpa	= register where physical ptr will be stored
- * hmeblkva	= register where virtual ptr will be stored
  * tmp1		= tmp reg
  * label: temporary label
  */
 
-#define	HMEHASH_SEARCH(hmebp, hmeblktag, hatid, hmeblkpa, hmeblkva,	\
-	tsbarea, tmp1, label)					 	\
+#define	HMEHASH_SEARCH(hmebp, hmeblktag, hatid, hmeblkpa, tsbarea, 	\
+	tmp1, label)							\
 	add     hmebp, HMEBUCK_NEXTPA, hmeblkpa				;\
 	ldxa    [hmeblkpa]ASI_MEM, hmeblkpa				;\
-	add     hmebp, HMEBUCK_HBLK, hmeblkva				;\
-	ldxa    [hmeblkva]ASI_MEM, hmeblkva				;\
 	HAT_HSEARCH_DBSTAT(hatid, tsbarea, hmebp, tmp1)			;\
 label/**/1:								;\
-	brz,pn	hmeblkva, label/**/2					;\
+	cmp	hmeblkpa, HMEBLK_ENDPA					;\
+	be,pn   %xcc, label/**/2					;\
 	HAT_HLINK_DBSTAT(hatid, tsbarea, hmebp, tmp1)			;\
 	add	hmeblkpa, HMEBLK_TAG, hmebp				;\
 	ldxa	[hmebp]ASI_MEM, tmp1	 /* read 1st part of tag */	;\
@@ -2367,9 +2072,7 @@ label/**/1:								;\
 	xor	hmebp, hatid, hmebp					;\
 	or	hmebp, tmp1, hmebp					;\
 	brz,pn	hmebp, label/**/2	/* branch on hit */		;\
-	  add	hmeblkpa, HMEBLK_NEXT, hmebp				;\
-	ldna	[hmebp]ASI_MEM, hmeblkva	/* hmeblk ptr va */	;\
-	add	hmeblkpa, HMEBLK_NEXTPA, hmebp				;\
+	  add	hmeblkpa, HMEBLK_NEXTPA, hmebp				;\
 	ba,pt	%xcc, label/**/1					;\
 	  ldxa	[hmebp]ASI_MEM, hmeblkpa	/* hmeblk ptr pa */	;\
 label/**/2:
@@ -2377,22 +2080,22 @@ label/**/2:
 /*
  * Function to traverse hmeblk hash link list and find corresponding match.
  * The search is done using physical pointers. It returns the physical address
- * and virtual address pointers to the hmeblk that matches with the tag
+ * pointer to the hmeblk that matches with the tag
  * provided.
  * Parameters:
  * hmeblktag	= register with hmeblk tag match (rid field is 0)
  * hatid	= register with hatid (pointer to SRD)
  * hmeblkpa	= register where physical ptr will be stored
- * hmeblkva	= register where virtual ptr will be stored
  * tmp1		= tmp reg
  * tmp2		= tmp reg
  * label: temporary label
  */
 
-#define	HMEHASH_SEARCH_SHME(hmeblktag, hatid, hmeblkpa, hmeblkva,	\
-	tsbarea, tmp1, tmp2, label)			 		\
+#define	HMEHASH_SEARCH_SHME(hmeblktag, hatid, hmeblkpa, tsbarea,	\
+	tmp1, tmp2, label)			 			\
 label/**/1:								;\
-	brz,pn	hmeblkva, label/**/4					;\
+	cmp	hmeblkpa, HMEBLK_ENDPA					;\
+	be,pn   %xcc, label/**/4					;\
 	HAT_HLINK_DBSTAT(hatid, tsbarea, tmp1, tmp2)			;\
 	add	hmeblkpa, HMEBLK_TAG, tmp2				;\
 	ldxa	[tmp2]ASI_MEM, tmp1	 /* read 1st part of tag */	;\
@@ -2401,16 +2104,14 @@ label/**/1:								;\
 	xor	tmp1, hmeblktag, tmp1					;\
 	xor	tmp2, hatid, tmp2					;\
 	brz,pn	tmp2, label/**/3	/* branch on hit */		;\
-	  add	hmeblkpa, HMEBLK_NEXT, tmp2				;\
+	  add	hmeblkpa, HMEBLK_NEXTPA, tmp2				;\
 label/**/2:								;\
-	ldna	[tmp2]ASI_MEM, hmeblkva	/* hmeblk ptr va */		;\
-	add	hmeblkpa, HMEBLK_NEXTPA, tmp2				;\
 	ba,pt	%xcc, label/**/1					;\
 	  ldxa	[tmp2]ASI_MEM, hmeblkpa	/* hmeblk ptr pa */		;\
 label/**/3:								;\
 	cmp	tmp1, SFMMU_MAX_HME_REGIONS				;\
 	bgeu,pt	%xcc, label/**/2					;\
-	  add	hmeblkpa, HMEBLK_NEXT, tmp2				;\
+	  add	hmeblkpa, HMEBLK_NEXTPA, tmp2				;\
 	and	tmp1, BT_ULMASK, tmp2					;\
 	srlx	tmp1, BT_ULSHIFT, tmp1					;\
 	sllx	tmp1, CLONGSHIFT, tmp1					;\
@@ -2419,7 +2120,7 @@ label/**/3:								;\
 	srlx	tmp1, tmp2, tmp1					;\
 	btst	0x1, tmp1						;\
 	bz,pn	%xcc, label/**/2					;\
-	  add	hmeblkpa, HMEBLK_NEXT, tmp2				;\
+	  add	hmeblkpa, HMEBLK_NEXTPA, tmp2				;\
 label/**/4:
 
 #if ((1 << SFHME_SHIFT) != SFHME_SIZE)
@@ -2458,25 +2159,25 @@ label1:
  * hatid	= sfmmu pointer for TSB miss (in)
  * tte		= tte for TLB miss if found, otherwise clobbered (out)
  * hmeblkpa	= PA of hment if found, otherwise clobbered (out)
- * hmeblkva	= VA of hment if found, otherwise clobbered (out)
  * tsbarea	= pointer to the tsbmiss area for this cpu. (in)
  * hmemisc	= hblk_misc if TTE is found (out), otherwise clobbered
  * hmeshift	= constant/register to shift VA to obtain the virtual pfn
  *		  for this page size.
  * hashno	= constant/register hash number
+ * tmp		= temp value - clobbered
  * label	= temporary label for branching within macro.
  * foundlabel	= label to jump to when tte is found.
  * suspendlabel= label to jump to when tte is suspended.	
  * exitlabel	= label to jump to when tte is not found.
  *
  */
-#define GET_TTE(tagacc, hatid, tte, hmeblkpa, hmeblkva, tsbarea, hmemisc, \
-		hmeshift, hashno, label, foundlabel, suspendlabel, exitlabel) \
+#define GET_TTE(tagacc, hatid, tte, hmeblkpa, tsbarea, hmemisc, hmeshift, \
+		 hashno, tmp, label, foundlabel, suspendlabel, exitlabel) \
 									;\
 	stn	tagacc, [tsbarea + (TSBMISS_SCRATCH + TSB_TAGACC)]	;\
 	stn	hatid, [tsbarea + (TSBMISS_SCRATCH + TSBMISS_HATID)]	;\
 	HMEHASH_FUNC_ASM(tagacc, hatid, tsbarea, hmeshift, tte,		\
-		hmeblkpa, label/**/5, hmemisc, hmeblkva)		;\
+		hmeblkpa, label/**/5, hmemisc, tmp)			;\
 									;\
 	/*								;\
 	 * tagacc = tagacc						;\
@@ -2484,7 +2185,7 @@ label1:
 	 * tsbarea = tsbarea						;\
 	 * tte   = hmebp (hme bucket pointer)				;\
 	 * hmeblkpa  = vapg  (virtual page)				;\
-	 * hmemisc, hmeblkva = scratch					;\
+	 * hmemisc, tmp = scratch					;\
 	 */								;\
 	MAKE_HASHTAG(hmeblkpa, hatid, hmeshift, hashno, hmemisc)	;\
 	or	hmemisc, SFMMU_INVALID_SHMERID, hmemisc			;\
@@ -2495,22 +2196,20 @@ label1:
 	 * tte   = hmebp						;\
 	 * hmeblkpa  = CLOBBERED					;\
 	 * hmemisc  = htag_bspage+hashno+invalid_rid			;\
-	 * hmeblkva  = scratch						;\
+	 * tmp  = scratch						;\
 	 */								;\
 	stn	tte, [tsbarea + (TSBMISS_SCRATCH + TSBMISS_HMEBP)]	;\
-	HMELOCK_ENTER(tte, hmeblkpa, hmeblkva, label/**/3, ASI_MEM)	;\
-	HMEHASH_SEARCH(tte, hmemisc, hatid, hmeblkpa, hmeblkva, 	\
+	HMEHASH_SEARCH(tte, hmemisc, hatid, hmeblkpa, 	 		\
 		tsbarea, tagacc, label/**/1)				;\
 	/*								;\
 	 * tagacc = CLOBBERED						;\
 	 * tte = CLOBBERED						;\
 	 * hmeblkpa = hmeblkpa						;\
-	 * hmeblkva = hmeblkva						;\
+	 * tmp = scratch						;\
 	 */								;\
-	brnz,pt	hmeblkva, label/**/4	/* branch if hmeblk found */	;\
+	cmp	hmeblkpa, HMEBLK_ENDPA					;\
+	bne,pn   %xcc, label/**/4       /* branch if hmeblk found */    ;\
 	  ldn	[tsbarea + (TSBMISS_SCRATCH + TSB_TAGACC)], tagacc	;\
-	ldn	[tsbarea + (TSBMISS_SCRATCH + TSBMISS_HMEBP)], hmeblkva	;\
-	HMELOCK_EXIT(hmeblkva, hmeblkva, ASI_MEM)  /* drop lock */	;\
 	ba,pt	%xcc, exitlabel		/* exit if hblk not found */	;\
 	  nop								;\
 label/**/4:								;\
@@ -2523,7 +2222,7 @@ label/**/4:								;\
 	 * tte   = clobbered						;\
 	 * hmeblkpa  = hmeblkpa						;\
 	 * hmemisc  = hblktag						;\
-	 * hmeblkva  = hmeblkva 					;\
+	 * tmp = scratch						;\
 	 */								;\
 	HMEBLK_TO_HMENT(tagacc, hmeblkpa, hatid, hmemisc, tte,		\
 		label/**/2)						;\
@@ -2534,15 +2233,13 @@ label/**/4:								;\
 	 * tte   = clobbered						;\
 	 * hmeblkpa  = hmeblkpa						;\
 	 * hmemisc  = hblk_misc						;\
-	 * hmeblkva  = hmeblkva 					;\
+	 * tmp = scratch						;\
 	 */								;\
 									;\
 	add	hatid, SFHME_TTE, hatid					;\
 	add	hmeblkpa, hatid, hmeblkpa				;\
 	ldxa	[hmeblkpa]ASI_MEM, tte	/* MMU_READTTE through pa */	;\
-	add	hmeblkva, hatid, hmeblkva				;\
 	ldn	[tsbarea + (TSBMISS_SCRATCH + TSBMISS_HMEBP)], hatid 	;\
-	HMELOCK_EXIT(hatid, hatid, ASI_MEM)	/* drop lock */		;\
 	set	TTE_SUSPEND, hatid					;\
 	TTE_SUSPEND_INT_SHIFT(hatid)					;\
 	btst	tte, hatid						;\
@@ -2561,14 +2258,14 @@ label/**/4:								;\
  * If valid tte is found, hmemisc = shctx flag, i.e., shme is
  * either 0 (not part of scd) or 1 (part of scd).
  */
-#define GET_SHME_TTE(tagacc, hatid, tte, hmeblkpa, hmeblkva, tsbarea,	\
-		hmemisc, hmeshift, hashno, label, foundlabel,		\
+#define GET_SHME_TTE(tagacc, hatid, tte, hmeblkpa, tsbarea, hmemisc, 	\
+		hmeshift, hashno, tmp, label, foundlabel,		\
 		suspendlabel, exitlabel)				\
 									;\
 	stn	tagacc, [tsbarea + (TSBMISS_SCRATCH + TSB_TAGACC)]	;\
 	stn	hatid, [tsbarea + (TSBMISS_SCRATCH + TSBMISS_HATID)]	;\
 	HMEHASH_FUNC_ASM(tagacc, hatid, tsbarea, hmeshift, tte,		\
-		hmeblkpa, label/**/5, hmemisc, hmeblkva)		;\
+		hmeblkpa, label/**/5, hmemisc, tmp)			;\
 									;\
 	/*								;\
 	 * tagacc = tagacc						;\
@@ -2576,7 +2273,7 @@ label/**/4:								;\
 	 * tsbarea = tsbarea						;\
 	 * tte   = hmebp (hme bucket pointer)				;\
 	 * hmeblkpa  = vapg  (virtual page)				;\
-	 * hmemisc, hmeblkva = scratch					;\
+	 * hmemisc, tmp = scratch					;\
 	 */								;\
 	MAKE_HASHTAG(hmeblkpa, hatid, hmeshift, hashno, hmemisc)	;\
 									;\
@@ -2587,30 +2284,26 @@ label/**/4:								;\
 	 * tte   = hmebp						;\
 	 * hmemisc  = htag_bspage + hashno + 0 (for rid)		;\
 	 * hmeblkpa  = CLOBBERED					;\
-	 * hmeblkva  = scratch						;\
+	 * tmp = scratch						;\
 	 */								;\
 	stn	tte, [tsbarea + (TSBMISS_SCRATCH + TSBMISS_HMEBP)]	;\
-	HMELOCK_ENTER(tte, hmeblkpa, hmeblkva, label/**/3, ASI_MEM)	;\
 									;\
 	add     tte, HMEBUCK_NEXTPA, hmeblkpa				;\
 	ldxa    [hmeblkpa]ASI_MEM, hmeblkpa				;\
-	add     tte, HMEBUCK_HBLK, hmeblkva				;\
-	ldxa    [hmeblkva]ASI_MEM, hmeblkva				;\
 	HAT_HSEARCH_DBSTAT(hatid, tsbarea, tagacc, tte)			;\
 									;\
 label/**/8:								;\
-	HMEHASH_SEARCH_SHME(hmemisc, hatid, hmeblkpa, hmeblkva, 	\
+	HMEHASH_SEARCH_SHME(hmemisc, hatid, hmeblkpa,			\
 		tsbarea, tagacc, tte, label/**/1)			;\
 	/*								;\
 	 * tagacc = CLOBBERED						;\
 	 * tte = CLOBBERED						;\
 	 * hmeblkpa = hmeblkpa						;\
-	 * hmeblkva = hmeblkva						;\
+	 * tmp = scratch						;\
 	 */								;\
-	brnz,pt	hmeblkva, label/**/4	/* branch if hmeblk found */	;\
+	cmp	hmeblkpa, HMEBLK_ENDPA					;\
+	bne,pn   %xcc, label/**/4       /* branch if hmeblk found */    ;\
 	  ldn	[tsbarea + (TSBMISS_SCRATCH + TSB_TAGACC)], tagacc	;\
-	ldn	[tsbarea + (TSBMISS_SCRATCH + TSBMISS_HMEBP)], hmeblkva	;\
-	HMELOCK_EXIT(hmeblkva, hmeblkva, ASI_MEM)  /* drop lock */	;\
 	ba,pt	%xcc, exitlabel		/* exit if hblk not found */	;\
 	  nop								;\
 label/**/4:								;\
@@ -2623,8 +2316,8 @@ label/**/4:								;\
 	 * tte   = clobbered						;\
 	 * hmeblkpa  = hmeblkpa						;\
 	 * hmemisc  = hblktag						;\
-	 * hmeblkva  = hmeblkva 					;\
 	 * tsbarea = tsbmiss area					;\
+	 * tmp = scratch						;\
 	 */								;\
 	HMEBLK_TO_HMENT(tagacc, hmeblkpa, hatid, hmemisc, tte,		\
 		label/**/2)						;\
@@ -2635,15 +2328,15 @@ label/**/4:								;\
 	 * tte = clobbered						;\
 	 * hmeblkpa  = hmeblkpa						;\
 	 * hmemisc  = hblk_misc						;\
-	 * hmeblkva  = hmeblkva						;\
 	 * tsbarea = tsbmiss area					;\
+	 * tmp = scratch						;\
 	 */								;\
 									;\
 	add	hatid, SFHME_TTE, hatid					;\
 	add	hmeblkpa, hatid, hmeblkpa				;\
 	ldxa	[hmeblkpa]ASI_MEM, tte	/* MMU_READTTE through pa */	;\
 	brlz,pt tte, label/**/6						;\
-	  add	hmeblkva, hatid, hmeblkva				;\
+	  nop								;\
 	btst	HBLK_SZMASK, hmemisc					;\
 	bnz,a,pt %icc, label/**/7					;\
 	  ldn	[tsbarea + (TSBMISS_SCRATCH + TSBMISS_HMEBP)], hatid 	;\
@@ -2657,8 +2350,6 @@ label/**/4:								;\
 	sub	hmeblkpa, hatid, hmeblkpa				;\
 	ldn	[tsbarea + (TSBMISS_SCRATCH + TSBMISS_HATID)], hatid	;\
 	srlx	tagacc, hmeshift, tte					;\
-	add	hmeblkpa, HMEBLK_NEXT, hmeblkva				;\
-	ldxa	[hmeblkva]ASI_MEM, hmeblkva				;\
 	add	hmeblkpa, HMEBLK_NEXTPA, hmeblkpa			;\
 	ldxa	[hmeblkpa]ASI_MEM, hmeblkpa				;\
 	MAKE_HASHTAG(tte, hatid, hmeshift, hashno, hmemisc)		;\
@@ -2667,7 +2358,6 @@ label/**/6:								;\
 	GET_SCDSHMERMAP(tsbarea, hmeblkpa, hatid, hmemisc)		;\
 	ldn	[tsbarea + (TSBMISS_SCRATCH + TSBMISS_HMEBP)], hatid 	;\
 label/**/7:								;\
-	HMELOCK_EXIT(hatid, hatid, ASI_MEM)	/* drop lock */		;\
 	set	TTE_SUSPEND, hatid					;\
 	TTE_SUSPEND_INT_SHIFT(hatid)					;\
 	btst	tte, hatid						;\
@@ -3343,8 +3033,8 @@ udtlb_miss_probesecond:
 	 */
 2:
 
-	GET_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-		MMU_PAGESHIFT64K, TTE64K, tsb_l8K, tsb_checktte,
+	GET_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+		MMU_PAGESHIFT64K, TTE64K, %g5, tsb_l8K, tsb_checktte,
 		sfmmu_suspend_tl, tsb_512K)
 	/* NOT REACHED */
 
@@ -3372,8 +3062,8 @@ tsb_512K:
 	 * 512K hash
 	 */
 	
-	GET_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-		MMU_PAGESHIFT512K, TTE512K, tsb_l512K, tsb_checktte,
+	GET_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+		MMU_PAGESHIFT512K, TTE512K, %g5, tsb_l512K, tsb_checktte,
 		sfmmu_suspend_tl, tsb_4M)
 	/* NOT REACHED */
 
@@ -3389,8 +3079,8 @@ tsb_4M:
 	 * 4M hash
 	 */
 
-	GET_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-		MMU_PAGESHIFT4M, TTE4M, tsb_l4M, tsb_checktte,
+	GET_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+		MMU_PAGESHIFT4M, TTE4M, %g5, tsb_l4M, tsb_checktte,
 		sfmmu_suspend_tl, tsb_32M)
 	/* NOT REACHED */
 
@@ -3410,8 +3100,8 @@ tsb_32M:
 	 * 32M hash
 	 */
 
-	GET_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-		MMU_PAGESHIFT32M, TTE32M, tsb_l32M, tsb_checktte,
+	GET_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+		MMU_PAGESHIFT32M, TTE32M, %g5, tsb_l32M, tsb_checktte,
 		sfmmu_suspend_tl, tsb_256M)
 	/* NOT REACHED */
 	
@@ -3428,8 +3118,8 @@ tsb_256M:
 	 * 256M hash
 	 */
 		
-	GET_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-	    MMU_PAGESHIFT256M, TTE256M, tsb_l256M, tsb_checktte,
+	GET_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+	    MMU_PAGESHIFT256M, TTE256M, %g5, tsb_l256M, tsb_checktte,
 	    sfmmu_suspend_tl, tsb_shme)
 	/* NOT REACHED */
 
@@ -3439,7 +3129,6 @@ tsb_checktte:
 	 * g2 = tagacc
 	 * g3 = tte
 	 * g4 = tte pa
-	 * g5 = tte va
 	 * g6 = tsbmiss area
 	 * g7 = hatid
 	 */
@@ -3464,8 +3153,8 @@ tsb_shme:
 	brz,pn	%g7, tsb_pagefault
 	  nop
 
-	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-		MMU_PAGESHIFT64K, TTE64K, tsb_shme_l8K, tsb_shme_checktte,
+	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+		MMU_PAGESHIFT64K, TTE64K, %g5, tsb_shme_l8K, tsb_shme_checktte,
 		sfmmu_suspend_tl, tsb_shme_512K)
 	/* NOT REACHED */
 
@@ -3479,8 +3168,8 @@ tsb_shme_512K:
 	 * 512K hash
 	 */
 	
-	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-		MMU_PAGESHIFT512K, TTE512K, tsb_shme_l512K, tsb_shme_checktte,
+	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+		MMU_PAGESHIFT512K, TTE512K, %g5, tsb_shme_l512K, tsb_shme_checktte,
 		sfmmu_suspend_tl, tsb_shme_4M)
 	/* NOT REACHED */
 
@@ -3493,8 +3182,8 @@ tsb_shme_4M:
 	/*
 	 * 4M hash
 	 */
-	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-		MMU_PAGESHIFT4M, TTE4M, tsb_shme_l4M, tsb_shme_checktte,
+	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+		MMU_PAGESHIFT4M, TTE4M, %g5, tsb_shme_l4M, tsb_shme_checktte,
 		sfmmu_suspend_tl, tsb_shme_32M)
 	/* NOT REACHED */
 
@@ -3508,8 +3197,8 @@ tsb_shme_32M:
 	 * 32M hash
 	 */
 
-	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-		MMU_PAGESHIFT32M, TTE32M, tsb_shme_l32M, tsb_shme_checktte,
+	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+		MMU_PAGESHIFT32M, TTE32M, %g5, tsb_shme_l32M, tsb_shme_checktte,
 		sfmmu_suspend_tl, tsb_shme_256M)
 	/* NOT REACHED */
 
@@ -3523,8 +3212,8 @@ tsb_shme_256M:
 	 * 256M hash
 	 */
 		
-	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1,
-	    MMU_PAGESHIFT256M, TTE256M, tsb_shme_l256M, tsb_shme_checktte,
+	GET_SHME_TTE(%g2, %g7, %g3, %g4, %g6, %g1,
+	    MMU_PAGESHIFT256M, TTE256M, %g5, tsb_shme_l256M, tsb_shme_checktte,
 	    sfmmu_suspend_tl, tsb_pagefault)
 	/* NOT REACHED */
 
@@ -3536,7 +3225,6 @@ tsb_shme_checktte:
 	 * g1 = ctx1 flag
 	 * g3 = tte
 	 * g4 = tte pa
-	 * g5 = tte va
 	 * g6 = tsbmiss area
 	 * g7 = tt
 	 */
@@ -3554,7 +3242,6 @@ tsb_validtte:
 	/*
 	 * g3 = tte
 	 * g4 = tte pa
-	 * g5 = tte va
 	 * g6 = tsbmiss area
 	 * g7 = tt
 	 */
@@ -3566,7 +3253,7 @@ tsb_validtte:
 	bne,pt	%icc, 4f
 	  nop
 
-	TTE_SET_REFMOD_ML(%g3, %g4, %g5, %g6, %g7, tsb_lset_refmod,
+	TTE_SET_REFMOD_ML(%g3, %g4, %g6, %g7, %g5, tsb_lset_refmod,
 	    tsb_protfault) 
 
 	GET_MMU_D_TTARGET(%g2, %g7)		/* %g2 = ttarget */
@@ -3602,7 +3289,7 @@ tsb_validtte:
 	/*
 	 * Set reference bit if not already set
 	 */
-	TTE_SET_REF_ML(%g3, %g4, %g5, %g6, %g7, tsb_lset_ref) 
+	TTE_SET_REF_ML(%g3, %g4, %g6, %g7, %g5, tsb_lset_ref) 
 
 	/*
 	 * Now, load into TSB/TLB.  At this point:
@@ -3688,7 +3375,7 @@ tsb_user8k:
 	mov	%g7, %asi
 #endif /* !UTSB_PHYS */
 
-	TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, 5)
+	TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, locked_tsb_l3)
 
 	rdpr    %tt, %g5
 #ifdef sun4v
@@ -3731,7 +3418,7 @@ tsb_user4m:
 	mov	%g7, %asi
 #endif /* UTSB_PHYS */
 
-        TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, 6)
+        TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, locked_tsb_l4)
 
 5:
 	rdpr    %tt, %g5
@@ -3786,7 +3473,7 @@ tsb_user_pn_synth:
 
 	mov	ASI_N, %g7	/* user TSBs always accessed by VA */
 	mov	%g7, %asi
-	TSB_UPDATE_TL_PN(%g1, %g5, %g2, %g4, %g7, %g3, 4) /* update TSB */
+	TSB_UPDATE_TL_PN(%g1, %g5, %g2, %g4, %g7, %g3, locked_tsb_l5) /* update TSB */
 5:
         DTLB_STUFF(%g5, %g1, %g2, %g3, %g4)
         retry
@@ -3802,7 +3489,7 @@ tsb_user_itlb_synth:
 
 	mov	ASI_N, %g7	/* user TSBs always accessed by VA */
 	mov	%g7, %asi
-	TSB_UPDATE_TL_PN(%g1, %g5, %g2, %g4, %g7, %g3, 6) /* update TSB */
+	TSB_UPDATE_TL_PN(%g1, %g5, %g2, %g4, %g7, %g3, locked_tsb_l6) /* update TSB */
 7:
 	SET_TTE4M_PN(%g5, %g7)			/* add TTE4M pagesize to TTE */
         ITLB_STUFF(%g5, %g1, %g2, %g3, %g4)
@@ -3832,7 +3519,7 @@ tsb_kernel_patch_asi:
 	or	%g0, RUNTIME_PATCH, %g6
 	mov	%g6, %asi	! XXX avoid writing to %asi !!
 #endif
-	TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, 7)
+	TSB_UPDATE_TL(%g1, %g3, %g2, %g4, %g7, %g6, locked_tsb_l7)
 3:
 #ifdef sun4v
 	cmp	%g5, T_INSTR_MMU_MISS
@@ -3912,8 +3599,8 @@ tsb_ism_32M:
 	 * 32M hash.
 	 */
 		
-	GET_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1, MMU_PAGESHIFT32M,
-	    TTE32M, tsb_ism_l32M, tsb_ism_32M_found, sfmmu_suspend_tl,
+	GET_TTE(%g2, %g7, %g3, %g4, %g6, %g1, MMU_PAGESHIFT32M,
+	    TTE32M, %g5, tsb_ism_l32M, tsb_ism_32M_found, sfmmu_suspend_tl,
 	    tsb_ism_4M)
 	/* NOT REACHED */
 	
@@ -3931,8 +3618,8 @@ tsb_ism_256M:
 	/*
 	 * 256M hash.
 	 */
-	GET_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1, MMU_PAGESHIFT256M,
-	    TTE256M, tsb_ism_l256M, tsb_ism_256M_found, sfmmu_suspend_tl,
+	GET_TTE(%g2, %g7, %g3, %g4, %g6, %g1, MMU_PAGESHIFT256M,
+	    TTE256M, %g5, tsb_ism_l256M, tsb_ism_256M_found, sfmmu_suspend_tl,
 	    tsb_ism_4M)
 
 tsb_ism_256M_found:
@@ -3943,8 +3630,8 @@ tsb_ism_4M:
 	/*
 	 * 4M hash.
 	 */
-	GET_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1, MMU_PAGESHIFT4M,
-	    TTE4M, tsb_ism_l4M, tsb_ism_4M_found, sfmmu_suspend_tl,
+	GET_TTE(%g2, %g7, %g3, %g4, %g6, %g1, MMU_PAGESHIFT4M,
+	    TTE4M, %g5, tsb_ism_l4M, tsb_ism_4M_found, sfmmu_suspend_tl,
 	    tsb_ism_8K)
 	/* NOT REACHED */
 
@@ -3957,8 +3644,8 @@ tsb_ism_8K:
 	 * 8K and 64K hash.
 	 */
 	
-	GET_TTE(%g2, %g7, %g3, %g4, %g5, %g6, %g1, MMU_PAGESHIFT64K,
-	    TTE64K, tsb_ism_l8K, tsb_ism_8K_found, sfmmu_suspend_tl,
+	GET_TTE(%g2, %g7, %g3, %g4, %g6, %g1, MMU_PAGESHIFT64K,
+	    TTE64K, %g5, tsb_ism_l8K, tsb_ism_8K_found, sfmmu_suspend_tl,
 	    tsb_pagefault)
 	/* NOT REACHED */
 
@@ -4216,7 +3903,7 @@ sfmmu_kvaszc2pfn(caddr_t vaddr, int hashno)
 	 */
 	set     TAGACC_CTX_MASK, %g1
 	andn    %o0, %g1, %o0
-	GET_TTE(%o0, %o4, %g1, %g2, %g3, %o5, %g4, %g6, %g5,
+	GET_TTE(%o0, %o4, %g1, %g2, %o5, %g4, %g6, %g5, %g3, 
 		vatopfn_l1, kvtop_hblk_found, tsb_suspend, kvtop_nohblk)
 
 kvtop_hblk_found:
@@ -4226,7 +3913,7 @@ kvtop_hblk_found:
 	 * o2 = ttep
 	 * g1 = tte
 	 * g2 = tte pa
-	 * g3 = tte va
+	 * g3 = scratch
 	 * o2 = tsbmiss area
 	 * o1 = hat id
 	 */
@@ -4357,7 +4044,7 @@ vatopfn_nokernel:
 	 */
 	srlx	%o0, MMU_PAGESHIFT, %o0
 	sllx	%o0, MMU_PAGESHIFT, %o0
-	GET_TTE(%o0, %o4, %g3, %g4, %g5, %g1, %o5, %g6, %o1,
+	GET_TTE(%o0, %o4, %g3, %g4, %g1, %o5, %g6, %o1, %g5, 
 		kvaszc2pfn_l1, kvaszc2pfn_hblk_found, kvaszc2pfn_nohblk,
 		kvaszc2pfn_nohblk)
 
@@ -4643,12 +4330,16 @@ label/**/_ok:
 	mov	%g1, %asi
 #endif
 
-	/* TSB_LOCK_ENTRY(tsbp, tmp1, tmp2, label) (needs %asi set) */
-	TSB_LOCK_ENTRY(%g4, %g1, %g7, 6)
+	/*
+	 * TSB_LOCK_ENTRY(tsbp, tmp1, tmp2, label) (needs %asi set)
+	 * If we fail to lock the TSB entry then just load the tte into the
+	 * TLB.
+	 */
+	TSB_LOCK_ENTRY(%g4, %g1, %g7, locked_tsb_l1)
 
 	/* TSB_INSERT_UNLOCK_ENTRY(tsbp, tte, tagtarget, tmp) */
 	TSB_INSERT_UNLOCK_ENTRY(%g4, %g5, %g2, %g7)
-
+locked_tsb_l1:
 	DTLB_STUFF(%g5, %g1, %g2, %g4, %g6)
 
 	/* KPMLOCK_EXIT(kpmlckp, asi) */
@@ -4883,12 +4574,16 @@ label/**/_ok:
 	mov	%g1, %asi
 #endif
 
-	/* TSB_LOCK_ENTRY(tsbp, tmp1, tmp2, label) (needs %asi set) */
-	TSB_LOCK_ENTRY(%g4, %g1, %g7, 6)
+	/*
+	 * TSB_LOCK_ENTRY(tsbp, tmp1, tmp2, label) (needs %asi set)
+	 * If we fail to lock the TSB entry then just load the tte into the
+	 * TLB.
+	 */
+	TSB_LOCK_ENTRY(%g4, %g1, %g7, locked_tsb_l2)
 
 	/* TSB_INSERT_UNLOCK_ENTRY(tsbp, tte, tagtarget, tmp) */
 	TSB_INSERT_UNLOCK_ENTRY(%g4, %g5, %g2, %g7)
-
+locked_tsb_l2:
 	DTLB_STUFF(%g5, %g2, %g4, %g5, %g6)
 
 	/* KPMLOCK_EXIT(kpmlckp, asi) */
