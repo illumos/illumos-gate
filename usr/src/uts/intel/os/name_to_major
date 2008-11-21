@@ -154,3 +154,4 @@ amd_iommu 258
 xpvtap 259
 nulldriver 260
 ipnet 261
+intel_nhm 262
