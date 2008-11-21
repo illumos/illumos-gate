@@ -842,6 +842,7 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define PCI_DEVICE_ID_INTEL_82915GM_IG  0x2592
 #define PCI_DEVICE_ID_INTEL_82945G_IG   0x2772
 #define PCI_DEVICE_ID_INTEL_82945GM_IG  0x27A2
+#define PCI_DEVICE_ID_INTEL_82945GME_IG 0x27AE
 #define	PCI_DEVICE_ID_INTEL_82946_GZ	0x2972	
 #define	PCI_DEVICE_ID_INTEL_82G35_IG	0x2982
 #define	PCI_DEVICE_ID_INTEL_82Q963_IG	0x2992
@@ -866,7 +867,8 @@ extern int i915_wait_ring(drm_device_t * dev, int n, const char *caller);
 #define IS_I915G(dev) (dev->pci_device == PCI_DEVICE_ID_INTEL_82915G_IG)
 #define IS_I915GM(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_82915GM_IG)
 #define IS_I945G(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_82945G_IG)
-#define IS_I945GM(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_82945GM_IG)
+#define IS_I945GM(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_82945GM_IG || \
+                        (dev)->pci_device == PCI_DEVICE_ID_INTEL_82945GME_IG)
 
 #define IS_I965G(dev) ((dev)->pci_device == PCI_DEVICE_ID_INTEL_82946_GZ || \
                        (dev)->pci_device == PCI_DEVICE_ID_INTEL_82G35_IG || \
