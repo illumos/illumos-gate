@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * nisupdkeys.c
@@ -419,15 +416,15 @@ main(int argc, char *argv[])
 		nis_server	*nisserver;
 		nis_tag		tags, *tagres;
 		nis_error	status;
-		char		*t, *dirname, tmpbuf[1024];
+		char		*t, *dirname = NULL;
 
 		if (argc > optind) {
 			fprintf(stderr,
-				"No directories allowed with -s option\n");
+			    "No directories allowed with -s option\n");
 			usage(argv[0]);
 		}
 		if (!(nisserver =
-			__nis_host2nis_server_g(hostname, TRUE,	FALSE, NULL)))
+		    __nis_host2nis_server_g(hostname, TRUE,	FALSE, NULL)))
 			exit(1);
 
 		/* Get a list of directories served by this server */
@@ -441,22 +438,25 @@ main(int argc, char *argv[])
 			exit(1);
 		}
 		if ((strcmp(tagres->tag_val, "<Unknown Statistic>") == 0) ||
-			(strcasecmp(tagres->tag_val, "<error>") == 0) ||
-			(strcmp(tagres->tag_val, " ") == 0)) {
+		    (strcasecmp(tagres->tag_val, "<error>") == 0) ||
+		    (strcmp(tagres->tag_val, " ") == 0)) {
 			fprintf(stderr,
 			    "Attributes for the server \"%s\" cannot be "
 			    "updated by \"nisupdkeys -s\"\n", hostname);
 			fprintf(stderr,
 			    "Instead, use the following for all directories "
 			    "served by \"%s\"\n",
-				hostname);
+			    hostname);
 			fprintf(stderr, "\t%s [-a|-C] -H \"%s\" dir_name "
 			    "... \n", argv[0], hostname);
 			exit(1);
 		}
+		dirname = strdup(tagres->tag_val);
+		if (dirname == NULL) {
+			fprintf(stderr, "Cannot allocate buffer.");
+			exit(1);
+		}
 
-		strcpy(tmpbuf, tagres->tag_val);
-		dirname = tmpbuf;
 		while (t = strchr(dirname, ' ')) {
 			*t++ = NULL;
 			dirlist[i++] = dirname;
@@ -485,7 +485,7 @@ main(int argc, char *argv[])
 		res = nis_lookup(*curdir, MASTER_ONLY+EXPAND_NAME);
 		if (res->status != NIS_SUCCESS) {
 			fprintf(stderr,
-				"\tERROR: Unable to retrieve object.\n");
+			    "\tERROR: Unable to retrieve object.\n");
 			nis_perror(res->status, *curdir);
 			continue;
 		}
@@ -493,7 +493,7 @@ main(int argc, char *argv[])
 		sprintf(dname, "%s.%s", obj->zo_name, obj->zo_domain);
 		if (__type_of(obj) != NIS_DIRECTORY_OBJ) {
 			fprintf(stderr, "\tERROR: \"%s\" is not a directory.\n",
-				dname);
+			    dname);
 			continue;
 		}
 		ns = obj->DI_data.do_servers.do_servers_len;
