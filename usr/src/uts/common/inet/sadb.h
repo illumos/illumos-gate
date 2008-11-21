@@ -644,7 +644,7 @@ void sadb_ager(sadb_t *, queue_t *, queue_t *, int, netstack_t *);
 timeout_id_t sadb_retimeout(hrtime_t, queue_t *, void (*)(void *), void *,
     uint_t *, uint_t, short);
 void sadb_sa_refrele(void *target);
-void sadb_set_lpkt(ipsa_t *, mblk_t *, netstack_t *);
+boolean_t sadb_set_lpkt(ipsa_t *, mblk_t *, netstack_t *);
 mblk_t *sadb_clear_lpkt(ipsa_t *);
 void sadb_buf_pkt(ipsa_t *, mblk_t *, netstack_t *);
 void sadb_clear_buf_pkt(void *ipkt);

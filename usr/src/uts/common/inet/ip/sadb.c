@@ -263,11 +263,11 @@ sadb_freeassoc(ipsa_t *ipsa)
 	ASSERT(ipsa->ipsa_next == NULL);
 	ASSERT(ipsa->ipsa_ptpn == NULL);
 
-	ip_drop_packet(sadb_clear_lpkt(ipsa), B_TRUE, NULL, NULL,
+	mutex_enter(&ipsa->ipsa_lock);
+	/* Don't call sadb_clear_lpkt() since we hold the ipsa_lock anyway. */
+	ip_drop_packet(ipsa->ipsa_lpkt, B_TRUE, NULL, NULL,
 	    DROPPER(ipss, ipds_sadb_inlarval_timeout),
 	    &ipss->ipsec_sadb_dropper);
-
-	mutex_enter(&ipsa->ipsa_lock);
 	ipsec_destroy_ctx_tmpl(ipsa, IPSEC_ALG_AUTH);
 	ipsec_destroy_ctx_tmpl(ipsa, IPSEC_ALG_ENCR);
 	mutex_exit(&ipsa->ipsa_lock);
@@ -4198,7 +4198,7 @@ sadb_age_assoc(isaf_t *head, queue_t *pfkey_q, ipsa_t *assoc,
 		/*
 		 * Need to handle Mature case
 		 */
-		if (assoc->ipsa_state == IPSA_STATE_MATURE && !inbound) {
+		if (assoc->ipsa_state == IPSA_STATE_MATURE) {
 			sadb_expire_assoc(pfkey_q, assoc);
 		}
 	} else {
@@ -6836,49 +6836,55 @@ bail:
 }
 
 /*
- * ipsa_lpkt is a one-element queue, only manipulated by casptr within
- * the next two functions.
- *
- * These functions loop calling casptr() until the swap "happens",
- * turning a compare-and-swap op into an atomic swap operation.
+ * ipsa_lpkt is a one-element queue, only manipulated by the next two
+ * functions.  They have to hold the ipsa_lock because of potential races
+ * between key management using SADB_UPDATE, and inbound packets that may
+ * queue up on the larval SA (hence the 'l' in "lpkt").
  */
 
 /*
- * sadb_set_lpkt: Atomically swap in a value to ipsa->ipsa_lpkt and
- * freemsg the previous value.  free clue: freemsg(NULL) is safe.
+ * sadb_set_lpkt: Return TRUE if we can swap in a value to ipsa->ipsa_lpkt and
+ * freemsg the previous value.  Return FALSE if we lost the race and the SA is
+ * in a non-LARVAL state.  free clue: ip_drop_packet(NULL) is safe.
  */
-
-void
+boolean_t
 sadb_set_lpkt(ipsa_t *ipsa, mblk_t *npkt, netstack_t *ns)
 {
 	mblk_t *opkt;
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
+	boolean_t is_larval;
 
-	ASSERT(ipsa->ipsa_state == IPSA_STATE_LARVAL);
-
-	membar_producer();
-	do {
+	mutex_enter(&ipsa->ipsa_lock);
+	is_larval = (ipsa->ipsa_state == IPSA_STATE_LARVAL);
+	if (is_larval) {
 		opkt = ipsa->ipsa_lpkt;
-	} while (casptr(&ipsa->ipsa_lpkt, opkt, npkt) != opkt);
+		ipsa->ipsa_lpkt = npkt;
+	} else {
+		/* We lost the race. */
+		opkt = NULL;
+		ASSERT(ipsa->ipsa_lpkt == NULL);
+	}
+	mutex_exit(&ipsa->ipsa_lock);
 
 	ip_drop_packet(opkt, B_TRUE, NULL, NULL,
 	    DROPPER(ipss, ipds_sadb_inlarval_replace),
 	    &ipss->ipsec_sadb_dropper);
+	return (is_larval);
 }
 
 /*
  * sadb_clear_lpkt: Atomically clear ipsa->ipsa_lpkt and return the
  * previous value.
  */
-
 mblk_t *
 sadb_clear_lpkt(ipsa_t *ipsa)
 {
 	mblk_t *opkt;
 
-	do {
-		opkt = ipsa->ipsa_lpkt;
-	} while (casptr(&ipsa->ipsa_lpkt, opkt, NULL) != opkt);
+	mutex_enter(&ipsa->ipsa_lock);
+	opkt = ipsa->ipsa_lpkt;
+	ipsa->ipsa_lpkt = NULL;
+	mutex_exit(&ipsa->ipsa_lock);
 
 	return (opkt);
 }

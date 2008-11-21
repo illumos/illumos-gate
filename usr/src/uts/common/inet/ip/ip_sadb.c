@@ -721,9 +721,9 @@ ipsec_inbound_ah_sa(mblk_t *mp, netstack_t *ns)
 		return (NULL);
 	}
 
-	if (assoc->ipsa_state == IPSA_STATE_LARVAL) {
+	if (assoc->ipsa_state == IPSA_STATE_LARVAL &&
+	    sadb_set_lpkt(assoc, ipsec_in, ns)) {
 		/* Not fully baked; swap the packet under a rock until then */
-		sadb_set_lpkt(assoc, ipsec_in, ns);
 		IPSA_REFRELE(assoc);
 		return (NULL);
 	}
@@ -862,9 +862,9 @@ ipsec_inbound_esp_sa(mblk_t *ipsec_in_mp, netstack_t *ns)
 		return (NULL);
 	}
 
-	if (ipsa->ipsa_state == IPSA_STATE_LARVAL) {
+	if (ipsa->ipsa_state == IPSA_STATE_LARVAL &&
+	    sadb_set_lpkt(ipsa, ipsec_in_mp, ns)) {
 		/* Not fully baked; swap the packet under a rock until then */
-		sadb_set_lpkt(ipsa, ipsec_in_mp, ns);
 		IPSA_REFRELE(ipsa);
 		return (NULL);
 	}

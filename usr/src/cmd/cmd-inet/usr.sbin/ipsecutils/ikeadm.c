@@ -1408,16 +1408,16 @@ print_hdr(char *prefix, ike_p1_hdr_t *hdrp)
 	switch (hdrp->p1hdr_dpd_state) {
 	case DPD_SUCCESSFUL:
 		(void) strlcpy(sbuf, gettext("was successful at "), TBUF_SIZE);
-		(void) printf("%s %s", sbuf, tbuf);
 		break;
 	case DPD_FAILURE:
 		(void) strlcpy(sbuf, gettext("failed at "), TBUF_SIZE);
-		(void) printf("%s %s", sbuf, tbuf);
 		break;
 	case DPD_IN_PROGRESS:
 		(void) strlcpy(sbuf, gettext("is in progress."), TBUF_SIZE);
 		break;
 	}
+	(void) printf("%s %s", sbuf,
+	    (hdrp->p1hdr_dpd_state == DPD_IN_PROGRESS) ? "" : tbuf);
 	(void) printf("\n");
 }
 
