@@ -351,7 +351,6 @@ f none usr/lib/class/TS/TSdispadmin 555 root bin
 f none usr/lib/class/TS/TSpriocntl 555 root bin
 s none usr/lib/cron=../../etc/cron.d
 d none usr/lib/crypto 755 root bin
-f none usr/lib/crypto/kcfd 555 root bin
 d none usr/lib/devfsadm 755 root sys
 s none usr/lib/devfsadm/devfsadmd=../../sbin/devfsadm
 d none usr/lib/devfsadm/linkmod 755 root sys
@@ -809,7 +808,7 @@ f none usr/sbin/clri 555 root bin
 f none usr/sbin/consadm 555 root sys
 l none usr/sbin/consadmd=../../usr/sbin/consadm
 f none usr/sbin/cron 555 root sys
-f none usr/sbin/cryptoadm 555 root bin
+s none usr/sbin/cryptoadm=../../sbin/cryptoadm
 s none usr/sbin/dcopy=./clri
 l none usr/sbin/deallocate=../../usr/sbin/allocate
 f none usr/sbin/devfsadm 755 root sys

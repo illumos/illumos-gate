@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libipsecutil.a
@@ -38,8 +35,6 @@ SRCDIR =	../common
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lsocket -lnsl -lc
-LDLIBS +=	$(OPENSSL_LDFLAGS)
-DYNFLAGS +=	$(OPENSSL_DYNFLAGS)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR)

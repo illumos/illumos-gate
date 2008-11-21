@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Common definitions for all of usr/src/cmd/ssh subdirs
 #
@@ -41,7 +39,7 @@ CPPFLAGS = -DSSH_VERSION=$(SSH_VERSION) \
 	-I../include -I../../include \
 	-D_FILE_OFFSET_BITS=64 \
 	-erroff=E_STATEMENT_NOT_REACHED \
-	$(OPENSSL_CPPFLAGS) $(CPPFLAGS.master)
+	$(CPPFLAGS.master)
 
 SSH_COMMON_LDLIBS = \
 	-L../libssh/$(MACH) -lssh \

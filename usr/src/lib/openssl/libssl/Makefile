@@ -18,11 +18,9 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 include	../../../lib/Makefile.lib
 include ../Makefile.com
@@ -37,7 +35,7 @@ HDRS = \
 	dtls1.h
 
 HDRDIR=		$(OPENSSL_SRC)/ssl
-ROOTHDRDIR=	$(ROOTSFWINCLUDE)/openssl
+ROOTHDRDIR=	$(ROOT)/usr/include/openssl
 
 SUBDIRS=	$(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)

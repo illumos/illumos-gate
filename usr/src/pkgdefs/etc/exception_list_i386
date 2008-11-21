@@ -57,11 +57,11 @@ usr/include/passwdutil.h		i386
 #
 # Private/Internal libraries of the Cryptographic Framework.
 #
-usr/lib/llib-lelfsign.ln		i386
-usr/lib/llib-lelfsign			i386
-usr/lib/llib-lcryptoutil.ln		i386
-usr/lib/llib-lcryptoutil		i386
-usr/lib/amd64/llib-lcryptoutil.ln	i386
+lib/llib-lelfsign.ln			i386
+lib/llib-lelfsign			i386
+lib/llib-lcryptoutil.ln			i386
+lib/llib-lcryptoutil			i386
+lib/amd64/llib-lcryptoutil.ln		i386
 usr/include/cryptoutil.h		i386
 usr/include/libelfsign.h		i386
 usr/lib/llib-lsoftcrypto		i386

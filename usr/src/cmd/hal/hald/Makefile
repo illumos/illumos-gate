@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUBDIRS =	solaris
 
@@ -48,7 +46,6 @@ LDLIBS +=	-lc -lm -ldbus-1 -ldbus-glib-1 -lglib-2.0 -lgobject-2.0 \
 all install $(PROG) :=	LDLIBS += -lexpat
 
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
-CPPFLAGS +=	-I/usr/sfw/include
 C99MODE =	$(C99_ENABLE)
 
 all :=		TARGET= all

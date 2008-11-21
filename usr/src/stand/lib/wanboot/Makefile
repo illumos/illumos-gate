@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,9 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 # 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include $(SRC)/lib/openssl/Makefile.openssl
 
@@ -41,6 +37,10 @@ SRCS	= $(LOCOBJS:%.o=$(SRCDIR)/%.c) $(CMNOBJS:%.o=$(CMNDIR)/%.c)
 LDLIBS += -lcrypto -lsock -linet -lssl -lnvpair
 
 CPPFLAGS += -I$(CMNNETDIR)/dhcp -I$(TOPDIR)/common/net/wanboot/crypt \
-	-I../inet $(DHCPCPPFLAGS) $(SOCKCPPFLAGS) $(OPENSSL_CPPFLAGS)
+	-I../inet $(DHCPCPPFLAGS) $(SOCKCPPFLAGS)
+#
+# several objects need access to openssl headers, now in /usr/include
+#
+CPPFLAGS += -I$(ROOT)/usr/include
 
 include ../Makefile.targ

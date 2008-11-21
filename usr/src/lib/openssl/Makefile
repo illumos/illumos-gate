@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		../Makefile.lib
@@ -42,7 +39,7 @@ HDRS=		e_os2.h
 
 HDRDIR=		$(OPENSSL_SRC)
 
-ROOTHDRDIR=	$(ROOTSFWINCLUDE)/openssl
+ROOTHDRDIR=	$(ROOT)/usr/include/openssl
 
 .KEEP_STATE:
 
@@ -64,7 +61,7 @@ FRC:
 
 $(ROOTHDRS): $(ROOTHDRDIR)
 
-$(ROOTHDRDIR): $(ROOTSFW)
+$(ROOTHDRDIR):
 	$(INS.dir)
 
 include ../Makefile.targ

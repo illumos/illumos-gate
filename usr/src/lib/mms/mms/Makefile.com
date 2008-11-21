@@ -51,15 +51,13 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 SRCDIR =	../common
 
 LDLIBS +=	-lc -lsocket -lnsl -lscf
-LDLIBS +=	-L/usr/sfw/lib -lssl -lcrypto
-
-DYNFLAGS +=	-R/usr/sfw/lib	
+LDLIBS +=	-lssl -lcrypto
 
 CFLAGS +=	$(CTF_FLAGS) $(CCVERBOSE)
 CFLAGS += 	$(C_BIGPICFLAGS)
 
 CPPFLAGS +=	-DMMS_OPENSSL
-CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms -I/usr/sfw/include
+CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms
 
 C99MODE=	$(C99_ENABLE)
 

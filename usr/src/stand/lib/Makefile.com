@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -76,7 +73,8 @@ CMNDIR =	.
 # libc is of course not available to standalone binaries.
 #
 CPPDEFS	= 	-D$(KARCH) -D_BOOT -D_KERNEL -D_MACHDEP
-CPPINCS	= 	-YI,$(STANDDIR)/lib/sa -I$(STANDDIR) -I$(SRCDIR) -I$(CMNDIR) \
+CPPINCS	= 	-YI,$(STANDDIR)/lib/sa -I$(STANDDIR)/lib/sa \
+		-I$(STANDDIR) -I$(SRCDIR) -I$(CMNDIR) \
 		-I$(STANDDIR)/$(MACH) -I$(SYSDIR)/common $(ARCHDIRS) \
 		-I$(SYSDIR)/sun4 -I$(SYSDIR)/$(KARCH)
 
@@ -114,7 +112,7 @@ OPENSSL_BUILD_CPPFLAGS = $(OPENSSL_NO_XXX) -DOPENSSL_NO_HW \
 			-DOPENSSL_NO_CAST -DOPENSSL_NO_AES \
 			-DDEVRANDOM=\"/dev/urandom\" \
 			$(OPENSSL_BUILD_CPPFLAGS_$(MACH)) \
-			-I$(ROOTSFWINCLUDE) \
+			-I$(ROOT)/usr/include \
 			-I$(OPENSSL_SRC) -I$(OPENSSL_SRC)/crypto
 
 #

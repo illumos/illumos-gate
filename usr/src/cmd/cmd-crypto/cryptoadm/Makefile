@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG = cryptoadm
@@ -58,7 +55,9 @@ $(PROG): $(OBJS)
 $(POFILE): $(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
 
-install: all $(ROOTUSRSBINPROG)
+install: all $(ROOTSBINPROG)
+	$(RM) $(ROOTUSRSBINPROG)
+	-$(SYMLINK) ../../sbin/$(PROG) $(ROOTUSRSBINPROG)
 
 clean:
 	$(RM) -f $(OBJS) $(PROG)

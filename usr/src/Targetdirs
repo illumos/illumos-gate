@@ -38,11 +38,12 @@
 SYMLINKS=	$(SYM.ROOT.SYS) $(SYM.ROOT.BIN) $(SYM.OTHERS)
 
 TARGETDIRS=	$(ROOT.SYS) $(ROOT.BIN) $(ROOT.SYS2) \
-		$(UUCP.UUCP) $(OTHERS) $(SYM.USRCCSLIB) $(SYM.USRLIB) \
-		$(ROOT.SFW) $(ROOT.OTHER)
+		$(UUCP.UUCP) $(OTHERS) $(ROOT.SFW) $(ROOT.OTHER) \
+		$(SYM.USRCCSLIB) $(SYM.USRLIB)
 
 $(BUILD64)	TARGETDIRS += $(ROOT.SYS64.2) $(ROOT.BIN64) \
-		$(SYM.USRCCSLIB64) $(SYM.USRLIB64) $(ROOT.SFW64)
+		$(ROOT.SFW64) \
+		$(SYM.USRCCSLIB64) $(SYM.USRLIB64)
 
 $(BUILD64)	SYMLINKS += $(SYM.ROOT.BIN64) $(SYM.ROOT.SFW64)
 
@@ -194,9 +195,9 @@ ROOT.SYS= \
 
 # EXPORT DELETE START
 XROOT.BIN= \
-	/etc/sfw/openssl \
-	/etc/sfw/openssl/certs \
-	/etc/sfw/openssl/private \
+	/etc/openssl \
+	/etc/openssl/certs \
+	/etc/openssl/private \
 	/usr/lib/inet/wanboot
 # EXPORT DELETE END
 
@@ -218,6 +219,7 @@ ROOT.BIN= \
 	/etc/sma \
 	/etc/sma/snmp \
 	/lib \
+	/lib/crypto \
 	/lib/inet \
 	/lib/secure \
 	/lib/svc \
@@ -239,7 +241,6 @@ ROOT.BIN= \
 	/usr/demo/SOUND \
 	/usr/games \
 	/usr/include \
-	/usr/kvm \
 	/usr/include/ast \
 	/usr/include/sys/crypto \
 	/usr/include/fm \
@@ -248,10 +249,12 @@ ROOT.BIN= \
 	/usr/include/kerberosv5 \
 	/usr/include/libmilter \
 	/usr/include/libpolkit \
+	/usr/include/openssl \
 	/usr/include/sasl \
 	/usr/include/scsi \
-	/usr/include/tsol \
 	/usr/include/security \
+	/usr/include/tsol \
+	/usr/kvm \
 	/usr/lib \
 	/usr/lib/abi \
 	/usr/lib/brand \
@@ -350,6 +353,7 @@ amd64_ROOT.BIN64= \
 ROOT.BIN64= \
 	$($(MACH64)_ROOT.BIN64) \
 	/lib/$(MACH64) \
+	/lib/crypto/$(MACH64) \
 	/lib/secure/$(MACH64) \
 	/usr/bin/$(MACH64) \
 	/usr/ccs/bin/$(MACH64)  \
@@ -423,17 +427,11 @@ UUCP.UUCP= \
 
 ROOT.SFW= \
 	/usr/sfw/bin \
-	/usr/sfw/include \
-	/usr/sfw/lib \
-	/usr/sfw/share
+	/usr/sfw/lib
 
 ROOT.SFW64= \
+	/usr/sfw/bin/$(MACH64) \
 	/usr/sfw/lib/$(MACH64)
-
-# EXPORT DELETE START
-ROOT.SFW64+= \
-	/usr/sfw/bin/$(MACH64)
-# EXPORT DELETE END
 
 OTHERS=  \
 	/dev/term  \
@@ -477,6 +475,7 @@ SYM.ROOT.SYS= \
 SYM.ROOT.BIN= \
 	/bin \
 	/lib/32 \
+	/lib/crypto/32 \
 	/lib/secure/32 \
 	/etc/lib/ld.so.1 \
 	/etc/lib/libdl.so.1 \
@@ -506,6 +505,7 @@ sparc_SYM.ROOT.BIN64=
 SYM.ROOT.BIN64= \
 	$($(MACH)_SYM.ROOT.BIN64) \
 	/lib/64 \
+	/lib/crypto/64 \
 	/lib/secure/64 \
 	/usr/lib/64 \
 	/usr/lib/brand/sn1/64 \
@@ -524,6 +524,7 @@ SYM.ROOT.SFW64= \
 
 SYM.OTHERS=  \
 	/etc/log  \
+	/etc/sfw/openssl \
 	/usr/mail  \
 	/usr/tmp
 
@@ -608,7 +609,7 @@ $(ROOT)/root:=		DIRMODE= 700
 
 $(ROOT)/var/krb5/rcache/root:=	DIRMODE= 700
 
-$(ROOT)/etc/sfw/openssl/private:=	DIRMODE= 700
+$(ROOT)/etc/openssl/private:=	DIRMODE= 700
 
 #
 # These permissions must match the ones set
@@ -633,6 +634,7 @@ $(ROOT)/system/object:=		DIRMODE= 555
 $(ROOT)/usr/lib/cron:=			LINKDEST=../../etc/cron.d
 $(ROOT)/bin:=				LINKDEST=usr/bin
 $(ROOT)/lib/32:=			LINKDEST=.
+$(ROOT)/lib/crypto/32:=			LINKDEST=.
 $(ROOT)/lib/secure/32:=			LINKDEST=.
 $(ROOT)/dev/stdin:=			LINKDEST=fd/0
 $(ROOT)/dev/stdout:=			LINKDEST=fd/1
@@ -645,6 +647,7 @@ $(ROOT)/etc/lib/ld.so.1:=		LINKDEST=../../lib/ld.so.1
 $(ROOT)/etc/lib/libdl.so.1:=		LINKDEST=../../lib/libdl.so.1
 $(ROOT)/etc/lib/nss_files.so.1:=	LINKDEST=../../lib/nss_files.so.1
 $(ROOT)/etc/log:=			LINKDEST=../var/adm/log
+$(ROOT)/etc/sfw/openssl:=		LINKDEST=../openssl
 $(ROOT)/usr/mail:=			LINKDEST=../var/mail
 $(ROOT)/usr/news:=			LINKDEST=../var/news
 $(ROOT)/usr/preserve:=			LINKDEST=../var/preserve
@@ -664,6 +667,7 @@ $(ROOT)/usr/ucblib/32:=			LINKDEST=.
 
 
 $(BUILD64) $(ROOT)/lib/64:=		LINKDEST=$(MACH64)
+$(BUILD64) $(ROOT)/lib/crypto/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/lib/secure/64:=	LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/64:=		LINKDEST=$(MACH64)
 $(BUILD64) $(ROOT)/usr/lib/elfedit/64:=	LINKDEST=$(MACH64)
@@ -885,6 +889,8 @@ $(ROOT)/usr/lib/libcmdutils.so.1:=	REALPATH=../../lib/libcmdutils.so.1
 $(ROOT)/usr/lib/libcmdutils.so:=	REALPATH=../../lib/libcmdutils.so.1
 $(ROOT)/usr/lib/libcontract.so.1:=	REALPATH=../../lib/libcontract.so.1
 $(ROOT)/usr/lib/libcontract.so:=	REALPATH=../../lib/libcontract.so.1
+$(ROOT)/usr/lib/libcryptoutil.so.1:=	REALPATH=../../lib/libcryptoutil.so.1
+$(ROOT)/usr/lib/libcryptoutil.so:=	REALPATH=../../lib/libcryptoutil.so.1
 $(ROOT)/usr/lib/libctf.so.1:=		REALPATH=../../lib/libctf.so.1
 $(ROOT)/usr/lib/libctf.so:=		REALPATH=../../lib/libctf.so.1
 $(ROOT)/usr/lib/libcurses.so.1:=	REALPATH=../../lib/libcurses.so.1
@@ -919,6 +925,10 @@ $(ROOT)/usr/lib/libintl.so.1:=		REALPATH=../../lib/libintl.so.1
 $(ROOT)/usr/lib/libintl.so:=		REALPATH=../../lib/libintl.so.1
 $(ROOT)/usr/lib/libiscsitgt.so.1:=	REALPATH=../../lib/libiscsitgt.so.1
 $(ROOT)/usr/lib/libiscsitgt.so:=	REALPATH=../../lib/libiscsitgt.so.1
+$(ROOT)/usr/lib/libkmf.so.1:=		REALPATH=../../lib/libkmf.so.1
+$(ROOT)/usr/lib/libkmf.so:=		REALPATH=../../lib/libkmf.so.1
+$(ROOT)/usr/lib/libkmfberder.so.1:=	REALPATH=../../lib/libkmfberder.so.1
+$(ROOT)/usr/lib/libkmfberder.so:=	REALPATH=../../lib/libkmfberder.so.1
 $(ROOT)/usr/lib/libkstat.so.1:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/libkstat.so:=		REALPATH=../../lib/libkstat.so.1
 $(ROOT)/usr/lib/liblddbg.so.4:=		REALPATH=../../lib/liblddbg.so.4

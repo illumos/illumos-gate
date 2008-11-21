@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # cmd/sendmail/src/Makefile
 #
 
@@ -49,9 +47,9 @@ CRYPTOLIBS=	-lssl -lcrypto
 # EXPORT DELETE END
 LDLIBS += 	../libsmutil/libsmutil.a ../libsm/libsm.a -lresolv -lsocket \
 		-lnsl ../db/libdb.a -lldap -lsldap -lwrap -lumem \
-		-L$(ROOTSFWLIB) $(CRYPTOLIBS)
+		$(CRYPTOLIBS)
 
-INCPATH=	-I. -I../include -I../db -I$(ROOTSFWINCLUDE)
+INCPATH=	-I. -I../include -I../db
 
 # EXPORT DELETE START
 CRYPTOENVDEF=	-DSTARTTLS

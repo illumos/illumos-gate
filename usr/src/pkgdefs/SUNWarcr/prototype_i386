@@ -18,12 +18,8 @@
 #
 # CDDL HEADER END
 #
-
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -72,6 +68,8 @@ f none lib/amd64/llib-lefi.ln 644 root bin
 f none lib/amd64/llib-lelf.ln 644 root bin
 f none lib/amd64/llib-lgen.ln 644 root bin
 f none lib/amd64/llib-lintl.ln 644 root bin
+f none lib/amd64/llib-lkmf.ln 644 root bin
+f none lib/amd64/llib-lkmfberder.ln 644 root bin
 f none lib/amd64/llib-lkstat.ln 644 root bin
 f none lib/amd64/llib-lmd.ln 644 root bin
 f none lib/amd64/llib-lmd5.ln 644 root bin

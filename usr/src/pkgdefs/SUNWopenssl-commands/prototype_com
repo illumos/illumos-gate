@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -46,5 +43,7 @@ i depend
 d none usr 755 root sys
 d none usr/sfw 755 root bin
 d none usr/sfw/bin 755 root bin
-f none usr/sfw/bin/openssl 555 root bin
-f none usr/sfw/bin/CA.pl 555 root bin
+s none usr/sfw/bin/openssl=../../bin/openssl
+d none usr/bin 755 root bin
+f none usr/bin/openssl 555 root bin
+f none usr/bin/CA.pl 555 root bin

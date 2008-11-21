@@ -27,7 +27,7 @@
 # MMS SSL Self-Signed Certificate Authority
 #
 
-PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/sadm/bin:/usr/sfw/bin:$PATH
+PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/sadm/bin:$PATH
 LD_LIBRARY_PATH=/lib:/usr/lib:$LD_LIBRARY_PATH
 
 umask 066 

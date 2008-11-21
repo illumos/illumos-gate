@@ -36,7 +36,7 @@ extern "C" {
 #endif
 
 #define	_PATH_KCF_CONF		"/etc/crypto/kcf.conf"
-#define	_PATH_KCFD		"/usr/lib/crypto/kcfd"
+#define	_PATH_KCFD		"/lib/crypto/kcfd"
 #define	TMPFILE_TEMPLATE	"/etc/crypto/admXXXXXX"
 
 #define	ERROR_USAGE	2

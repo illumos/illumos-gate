@@ -19,24 +19,20 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
-VERS= .0.9.8
 
 include $(SRC)/lib/Makefile.lib
 include $(SRC)/lib/openssl/Makefile.openssl
+include $(SRC)/lib/Makefile.rootfs
+
+VERS =		.$(OPENSSL_VERSION)
 
 CPPFLAGS =	$(OPENSSL_BUILD_CPPFLAGS) $(CPPFLAGS.master)
 
 COPTFLAG =   -xO5
 sparcv9_COPTFLAG =	-xO5
-
-ROOTLIBDIR =     $(ROOTSFWLIB)
-ROOTLIBDIR64 =   $(ROOTSFWLIB64)
 
 #
 # Ensure `all' is the default target.
@@ -45,7 +41,7 @@ all:
 
 # Normally ROOTLIBPCDIR would be expressed in terms of ROOTLIBDIR
 # however it should always be /usr/lib/pkgconfig so we can't do that here
-# because ROOTLIBDIR is actually ROOTSFWLIB.
+# because ROOTLIBDIR is actually ROOTFS_LIBDIR.
 # LIBPCSRC could be expressed in terms of LIBNAME in some cases but
 # not this one because the libraries are libcrypto and libssl but the
 # expected .pc file is openssl.pc
@@ -54,21 +50,22 @@ all:
 # what is documented in pkg-config(1) and it is also where all the
 # existing sparcv9 pkgconfig files are.
 
-LIBPCDIR =/usr/lib/pkgconfig
-LIBPCDIR64 =/usr/lib/$(MACH64)/pkgconfig
-LIBPCSRC = openssl.pc
+LIBPCDIR =	/usr/lib/pkgconfig
+LIBPCDIR64 =	/usr/lib/$(MACH64)/pkgconfig
+LIBPCSRC =	openssl.pc
 
+OPENSSL_PREFIX = /usr
 $(LIBPCSRC): ../../$(LIBPCSRC).tmpl
-	$(SED)	-e "s@__VERSION__@$(VERS:.%=%)@" \
-		-e "s@__PREFIX__@$(SFW_ROOT)@" \
-		-e "s@__LIBDIR__@$(SFWLIBDIR)@" \
+	$(SED)	-e s@__VERSION__@$(OPENSSL_VERSION)@ \
+		-e s@__PREFIX__@$(OPENSSL_PREFIX)@ \
+		-e s@__LIBDIR__@$(OPENSSL_LIBDIR)@ \
 		 < ../../$(LIBPCSRC).tmpl > $(LIBPCSRC)
 
-ROOTLIBPCDIR = $(ROOT)/$(LIBPCDIR)
-ROOTLIBPC = $(LIBPCSRC:%=$(ROOTLIBPCDIR)/%)
+ROOTLIBPCDIR =	$(ROOT)/$(LIBPCDIR)
+ROOTLIBPC =	$(LIBPCSRC:%=$(ROOTLIBPCDIR)/%)
 
 ROOTLIBPCDIR64 = $(ROOT)/$(LIBPCDIR64)
-ROOTLIBPC64 = $(LIBPCSRC:%=$(ROOTLIBPCDIR64)/%)
+ROOTLIBPC64 =	$(LIBPCSRC:%=$(ROOTLIBPCDIR64)/%)
 
 $(ROOTLIBPCDIR):
 	$(INS.dir)

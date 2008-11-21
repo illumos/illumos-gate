@@ -87,9 +87,10 @@ ROOTCMDDIR64=	$(ROOTCMDDIR)/$(MACH64)
 ROOTLIB64=	$(ROOTLIB)/$(MACH64)
 ROOTUSRSBIN32=	$(ROOTUSRSBIN)/$(MACH32)
 ROOTUSRSBIN64=	$(ROOTUSRSBIN)/$(MACH64)
-ROOTMAN1=	$(ROOT)/usr/share/man/man1
-ROOTMAN1M=	$(ROOT)/usr/share/man/man1m
-ROOTMAN3=	$(ROOT)/usr/share/man/man3
+ROOTMAN=	$(ROOT)/usr/share/man
+ROOTMAN1=	$(ROOTMAN)/man1
+ROOTMAN1M=	$(ROOTMAN)/man1m
+ROOTMAN3=	$(ROOTMAN)/man3
 ROOTVARSMB=	$(ROOT)/var/smb
 
 #
@@ -105,29 +106,6 @@ ROOTCMDDIR=	$(ROOT)/__nonexistent_directory__
 ROOTSHAUDIO=	$(ROOT)/usr/share/audio
 ROOTAUDIOSAMP=	$(ROOTSHAUDIO)/samples
 ROOTAUDIOSAMPAU=$(ROOTAUDIOSAMP)/au
-
-#
-# Begin /usr/sfw freeware rules for freeware that has "External"
-# taxonomy stability level.
-#
-ROOTSFW=	$(ROOT)/usr/sfw
-ROOTSFWBIN=	$(ROOT)/usr/sfw/bin
-ROOTSFWSHARE=	$(ROOT)/usr/sfw/share
-ROOTSFWSHSRC=	$(ROOT)/usr/sfw/share/src
-ROOTSFWINFO=	$(ROOT)/usr/sfw/share/info
-ROOTSFWINCLUDE=	$(ROOT)/usr/sfw/include
-ROOTSFWLIB=	$(ROOT)/usr/sfw/lib
-ROOTLIBEXEC=	$(ROOT)/usr/sfw/libexec
-ROOTSFWMAN=	$(ROOT)/usr/sfw/share/man
-ROOTSFWMANN=	$(ROOT)/usr/sfw/share/mann
-ROOTSFWMAN1=	$(ROOT)/usr/sfw/share/man/man1
-ROOTSFWMAN1M=	$(ROOT)/usr/sfw/share/man/man1m
-ROOTSFWMAN3=	$(ROOT)/usr/sfw/share/man/man3
-ROOTSFWMAN5=	$(ROOT)/usr/sfw/share/man/man5
-ROOTSFWMAN7=	$(ROOT)/usr/sfw/share/man/man7
-#
-# End /usr/sfw freeware rules
-#
 
 ISAEXEC=	$(ROOT)/usr/lib/isaexec
 PLATEXEC=	$(ROOT)/usr/lib/platexec

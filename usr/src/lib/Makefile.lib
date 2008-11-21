@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -126,30 +125,6 @@ ROOTDEMOFILES=	$(DEMOFILES:%=$(ROOTDEMODIRBASE)/%)
 $(ROOTDEMODIRS) :=	OWNER =		root
 $(ROOTDEMODIRS) :=	GROUP =		bin
 $(ROOTDEMODIRS) :=	DIRMODE =	755
-
-#
-# Begin /usr/sfw freeware rules for freeware that has "External"
-# taxonomy stability level.
-#
-ROOTSFW=	$(ROOT)/usr/sfw
-ROOTSFWBIN=	$(ROOT)/usr/sfw/bin
-ROOTSFWETC=	$(ROOT)/etc/sfw
-ROOTSFWVAR=	$(ROOT)/var/sfw
-ROOTSFWSHARE=	$(ROOT)/usr/sfw/share
-ROOTSFWSHSRC=	$(ROOT)/usr/sfw/share/src
-ROOTSFWINCLUDE=	$(ROOT)/usr/sfw/include
-ROOTSFWLIB=	$(ROOT)/usr/sfw/lib
-ROOTSFWLIB64=	$(ROOT)/usr/sfw/lib/$(MACH64)
-ROOTSFWMAN=	$(ROOT)/usr/sfw/share/man
-ROOTSFWMANN=	$(ROOT)/usr/sfw/share/mann
-ROOTSFWMAN1=	$(ROOT)/usr/sfw/share/man/man1
-ROOTSFWMAN1M=	$(ROOT)/usr/sfw/share/man/man1m
-ROOTSFWMAN3=	$(ROOT)/usr/sfw/share/man/man3
-ROOTSFWMAN5=	$(ROOT)/usr/sfw/share/man/man5
-ROOTSFWMAN7=	$(ROOT)/usr/sfw/share/man/man7
-#
-# End /usr/sfw freeware rules
-#
 
 LINTLIB=	llib-l$(LIBNAME).ln
 LINTFLAGS=	-uaxm

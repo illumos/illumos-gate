@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG =	openssl
 
@@ -73,19 +70,19 @@ OBJS =	\
 	version.o \
 	x509.o
 
-SRCDIR	=	$(OPENSSL_SRC)/apps
+SRCDIR =	$(OPENSSL_SRC)/apps
 
-ROOTCMDDIR =	$(ROOTSFWBIN)
+ROOTCMDDIR =	$(ROOTBIN)
 
-CFLAGS += $(CCVERBOSE) \
+CFLAGS +=	$(CCVERBOSE) \
 	-erroff=E_END_OF_LOOP_CODE_NOT_REACHED,E_CONST_PROMOTED_UNSIGNED_LONG
 
-CFLAGS64 += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
+CFLAGS64 +=	-erroff=E_END_OF_LOOP_CODE_NOT_REACHED
 
-CPPFLAGS = $(OPENSSL_BUILD_CPPFLAGS) -I$(SRCDIR) -DMONOLITH $(CPPFLAGS.master)
+CPPFLAGS =	\
+	$(OPENSSL_BUILD_CPPFLAGS) -I$(SRCDIR) -DMONOLITH $(CPPFLAGS.master)
 
-LDLIBS += $(OPENSSL_LDFLAGS) -lcrypto -lssl -lnsl -lsocket -lc 
-DYNFLAGS += $(OPENSSL_DYNFLAGS)
+LDLIBS +=	-lcrypto -lssl -lnsl -lsocket -lc 
 
 .KEEP_STATE:
 

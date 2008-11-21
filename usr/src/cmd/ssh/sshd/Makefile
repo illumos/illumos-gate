@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/ssh/sshd/Makefile
 
@@ -76,13 +73,11 @@ LDLIBS += $(SSH_COMMON_LDLIBS) -lsocket \
 	-lpam \
 	-lbsm \
 	-lwrap \
-	$(OPENSSL_LDFLAGS) -lcrypto \
+	-lcrypto \
 	-lgss \
 	-lcontract
 MAPFILES = $(MAPFILE.INT) $(MAPFILE.NGB)
 LDFLAGS += $(MAPFILES:%=-M%)
-
-DYNFLAGS += $(OPENSSL_DYNFLAGS) $(C99_DISABLE)
 
 POFILE_DIR= ..
 

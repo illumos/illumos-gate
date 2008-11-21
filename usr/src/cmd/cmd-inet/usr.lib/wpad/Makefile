@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG =		wpad
@@ -35,11 +32,9 @@ include	../../../Makefile.cmd
 
 ROOTMANIFESTDIR = $(ROOTSVCNETWORK)
 
-LDFLAGS   += 	-L/usr/sfw/lib -R/usr/sfw/lib
 LDLIBS    += 	-ldladm -ldlpi
 all install := LDLIBS += -lcrypto
 
-CPPFLAGS  += 	-I/usr/sfw/include
 LINTFLAGS += 	-u
 
 .KEEP_STATE:

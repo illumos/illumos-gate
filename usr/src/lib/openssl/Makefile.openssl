@@ -19,25 +19,23 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # OpenSSL source is common between lib and stand (for wanboot).
-# For userland consumers it is in /usr/sfw so we define some macros in case
-# it moves else where later (it has moved twice already!).
-#
-# OPENSSL_CPPFLAGS and OPENSSL_LDLIBS OPENSSL_DYNFLAGS should be used 
-# by all the consumers of the OpenSSL libraries.
-#
+# For userland consumers it is in /usr so we define some macros in case
+# it moves else where later (it has moved thrice already!).
+
+OPENSSL_VERSION =	0.9.8
+OPENSSL_DATE =		"Oct 11 2005"
+
 # OPENSSL_SRC, OPENSSL_ETCDIR, OPENSSL_NO_XX, OPENSSL_BUILD_CPPFLAGS are
 # for use only for building OpenSSL, they are here because we built it in
 # two different places.
 #
 OPENSSL_SRC =		$(SRC)/common/openssl
 
-OPENSSL_ETCDIR =	/etc/sfw/openssl
+OPENSSL_ETCDIR =	/etc/openssl
 
 
 # The OPENSSL_NO_XXX variable is use to list the algorithms which Solaris
@@ -66,7 +64,7 @@ OPENSSL_NO_XXX = \
 OPENSSL_BUILD_CPPFLAGS_sparc = -DB_ENDIAN
 
 OPENSSL_BUILD_CPPFLAGS = \
-	-I$(ROOTSFWINCLUDE) \
+	-I$(ROOT)/usr/include \
 	-I$(OPENSSL_SRC)\
 	-I$(OPENSSL_SRC)/crypto \
 	-DSOLARIS_OPENSSL \
@@ -79,12 +77,6 @@ OPENSSL_BUILD_CPPFLAGS = \
 	$(OPENSSL_BUILD_CPPFLAGS_$(MACH)) \
 	$(OPENSSL_NO_XXX)
 
-OPENSSL_CPPFLAGS =	-I$(ROOTSFWINCLUDE)
-OPENSSL_CPPFLAGS +=	-I$(PARENT_ROOT)$(SFWINCDIR)
+OPENSSL_LIBDIR =	/lib
 
-OPENSSL_LDFLAGS =	-L$(ROOT)$(SFWLIBDIR)
-OPENSSL_LDFLAGS +=	-L$(PARENT_ROOT)$(SFWLIBDIR)
-OPENSSL_LDFLAGS +=	-L$(SFWLIBDIR)
-
-OPENSSL_DYNFLAGS =	-R $(SFWLIBDIR)
 CFLAGS +=		-_gcc=-fasm

@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Makefile for KMF Plugins
 #
 
@@ -40,17 +38,17 @@ KMFINC=		-I../../../include -I../../../ber_der/inc
 BERLIB=		-lkmf -lkmfberder
 BERLIB64=	$(BERLIB)
 
-OPENSSLLIBS=	$(BERLIB) $(OPENSSL_DYNFLAGS) $(OPENSSL_LDFLAGS) -lcrypto -lcryptoutil -lc
-OPENSSLLIBS64=	$(BERLIB64) $(OPENSSL_DYNFLAGS) $(OPENSSL_LDFLAGS) -lcrypto -lcryptoutil -lc
+OPENSSLLIBS=	$(BERLIB) -lcrypto -lcryptoutil -lc
+OPENSSLLIBS64=	$(BERLIB64) -lcrypto -lcryptoutil -lc
 
-LINTSSLLIBS	= $(BERLIB) $(OPENSSL_LDFLAGS) -lcrypto -lcryptoutil -lc
-LINTSSLLIBS64	= $(BERLIB64) $(OPENSSL_LDFLAGS) -lcrypto -lcryptoutil -lc
+LINTSSLLIBS	= $(BERLIB) -lcrypto -lcryptoutil -lc
+LINTSSLLIBS64	= $(BERLIB64) -lcrypto -lcryptoutil -lc
 
 SRCDIR=		../common
 INCDIR=		../../include
 
 CFLAGS		+=	$(CCVERBOSE) 
-CPPFLAGS	+=	-D_REENTRANT $(KMFINC) $(OPENSSL_CPPFLAGS) \
+CPPFLAGS	+=	-D_REENTRANT $(KMFINC) \
 			-I$(INCDIR) -I/usr/include/libxml2
 
 PICS=	$(OBJECTS:%=pics/%)
@@ -61,8 +59,8 @@ lint:=	OPENSSLLIBS64=	$(LINTSSLLIBS64)
 
 LDLIBS32 	+=	$(OPENSSLLIBS)
 
-ROOTLIBDIR=	$(ROOT)/usr/lib/security
-ROOTLIBDIR64=	$(ROOT)/usr/lib/security/$(MACH64)
+ROOTLIBDIR=	$(ROOTFS_LIBDIR)/crypto
+ROOTLIBDIR64=	$(ROOTFS_LIBDIR)/crypto/$(MACH64)
 
 .KEEP_STATE:
 

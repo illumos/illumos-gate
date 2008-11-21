@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libwanboot.a
@@ -63,13 +60,8 @@ include ../../Makefile.lib
 
 LIBS +=		$(LINTLIB)
 LDLIBS +=	-lnvpair -lresolv -lnsl -lsocket -ldevinfo -ldhcputil \
-    		-linetutil -lc  $(OPENSSL_LDFLAGS) -lcrypto -lssl
-DYNFLAGS +=	$(OPENSSL_DYNFLAGS)
-#
-# Note this uses CPPFLAGS.master to prepend because our parent may have
-# an old version of the OpenSSL headers in $ROOT/usr/include/openssl
-CPPFLAGS =	$(OPENSSL_CPPFLAGS) \
-		-I$(SRC)/common/net/wanboot/crypt $(CPPFLAGS.master)
+    		-linetutil -lc -lcrypto -lssl
+CPPFLAGS =	-I$(SRC)/common/net/wanboot/crypt $(CPPFLAGS.master)
 
 # Must override SRCS from Makefile.lib since sources have
 # multiple source directories.

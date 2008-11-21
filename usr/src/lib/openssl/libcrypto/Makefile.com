@@ -18,7 +18,6 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -231,8 +230,6 @@ CFLAGS64 +=	-K PIC
 LDLIBS +=	-lc -lsocket -lnsl
 
 MAPFILES =
-
-DYNFLAGS +=	$(OPENSSL_DYNFLAGS)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 SRCDIR =	$(OPENSSL_SRC)/crypto

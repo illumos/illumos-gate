@@ -18,11 +18,8 @@
 #
 # CDDL HEADER END
 #
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -39,87 +36,86 @@ i pkginfo
 i copyright
 i depend
 d none usr 755 root sys 644 root bin
-d none usr/sfw 755 root bin 644 root bin
-d none usr/sfw/include 755 root bin 644 root bin
-d none usr/sfw/include/openssl 755 root bin 644 root bin
-f none usr/sfw/include/openssl/aes.h 644 root bin
-f none usr/sfw/include/openssl/asn1.h 644 root bin
-f none usr/sfw/include/openssl/asn1_mac.h 644 root bin
-f none usr/sfw/include/openssl/asn1t.h 644 root bin
-f none usr/sfw/include/openssl/bio.h 644 root bin
-f none usr/sfw/include/openssl/bio_lcl.h 644 root bin         
-f none usr/sfw/include/openssl/blowfish.h 644 root bin
-f none usr/sfw/include/openssl/bn.h 644 root bin
-f none usr/sfw/include/openssl/buffer.h 644 root bin
-f none usr/sfw/include/openssl/cast.h 644 root bin
-f none usr/sfw/include/openssl/comp.h 644 root bin
-f none usr/sfw/include/openssl/conf.h 644 root bin
-f none usr/sfw/include/openssl/conf_api.h 644 root bin
-f none usr/sfw/include/openssl/crypto.h 644 root bin
-f none usr/sfw/include/openssl/des.h 644 root bin
-f none usr/sfw/include/openssl/des_old.h 644 root bin
-f none usr/sfw/include/openssl/dh.h 644 root bin
-f none usr/sfw/include/openssl/dsa.h 644 root bin
-f none usr/sfw/include/openssl/dso.h 644 root bin
-f none usr/sfw/include/openssl/dtls1.h 644 root bin         
-f none usr/sfw/include/openssl/e_os2.h 644 root bin
-f none usr/sfw/include/openssl/ebcdic.h 644 root bin
-f none usr/sfw/include/openssl/ec.h 644 root bin
-f none usr/sfw/include/openssl/ecdh.h 644 root bin
-f none usr/sfw/include/openssl/ecdsa.h 644 root bin         
-f none usr/sfw/include/openssl/ech_locl.h 644 root bin         
-f none usr/sfw/include/openssl/ecs_locl.h 644 root bin         
-f none usr/sfw/include/openssl/engine.h 644 root bin
-f none usr/sfw/include/openssl/err.h 644 root bin
-f none usr/sfw/include/openssl/evp.h 644 root bin
-f none usr/sfw/include/openssl/hmac.h 644 root bin
-f none usr/sfw/include/openssl/idea.h 644 root bin
-f none usr/sfw/include/openssl/krb5_asn.h 644 root bin
-f none usr/sfw/include/openssl/kssl.h 644 root bin
-f none usr/sfw/include/openssl/lhash.h 644 root bin
-f none usr/sfw/include/openssl/md2.h 644 root bin
-f none usr/sfw/include/openssl/md4.h 644 root bin
-f none usr/sfw/include/openssl/md5.h 644 root bin
-f none usr/sfw/include/openssl/mdc2.h 644 root bin
-f none usr/sfw/include/openssl/o_dir.h 644 root bin         
-f none usr/sfw/include/openssl/o_str.h 644 root bin         
-f none usr/sfw/include/openssl/obj_mac.h 644 root bin
-f none usr/sfw/include/openssl/objects.h 644 root bin
-f none usr/sfw/include/openssl/ocsp.h 644 root bin
-f none usr/sfw/include/openssl/opensslconf.h 644 root bin
-f none usr/sfw/include/openssl/opensslv.h 644 root bin
-f none usr/sfw/include/openssl/ossl_typ.h 644 root bin
-f none usr/sfw/include/openssl/pcy_int.h 644 root bin         
-f none usr/sfw/include/openssl/pem.h 644 root bin
-f none usr/sfw/include/openssl/pem2.h 644 root bin
-f none usr/sfw/include/openssl/pkcs12.h 644 root bin
-f none usr/sfw/include/openssl/pkcs7.h 644 root bin
-f none usr/sfw/include/openssl/pq_compat.h 644 root bin         
-f none usr/sfw/include/openssl/pqueue.h 644 root bin         
-f none usr/sfw/include/openssl/rand.h 644 root bin
-f none usr/sfw/include/openssl/rc2.h 644 root bin
-f none usr/sfw/include/openssl/rc4.h 644 root bin
-f none usr/sfw/include/openssl/rc5.h 644 root bin
-f none usr/sfw/include/openssl/ripemd.h 644 root bin
-f none usr/sfw/include/openssl/rsa.h 644 root bin
-f none usr/sfw/include/openssl/safestack.h 644 root bin
-f none usr/sfw/include/openssl/sha.h 644 root bin
-f none usr/sfw/include/openssl/ssl.h 644 root bin
-f none usr/sfw/include/openssl/ssl2.h 644 root bin
-f none usr/sfw/include/openssl/ssl23.h 644 root bin
-f none usr/sfw/include/openssl/ssl3.h 644 root bin
-f none usr/sfw/include/openssl/stack.h 644 root bin
-f none usr/sfw/include/openssl/store.h 644 root bin         
-f none usr/sfw/include/openssl/str_locl.h 644 root bin         
-f none usr/sfw/include/openssl/symhacks.h 644 root bin
-f none usr/sfw/include/openssl/tls1.h 644 root bin
-f none usr/sfw/include/openssl/tmdiff.h 644 root bin
-f none usr/sfw/include/openssl/txt_db.h 644 root bin
-f none usr/sfw/include/openssl/ui.h 644 root bin
-f none usr/sfw/include/openssl/ui_compat.h 644 root bin
-f none usr/sfw/include/openssl/x509.h 644 root bin
-f none usr/sfw/include/openssl/x509_vfy.h 644 root bin
+d none usr/include 755 root bin 644 root bin
+d none usr/include/openssl 755 root bin 644 root bin
+f none usr/include/openssl/aes.h 644 root bin
+f none usr/include/openssl/asn1.h 644 root bin
+f none usr/include/openssl/asn1_mac.h 644 root bin
+f none usr/include/openssl/asn1t.h 644 root bin
+f none usr/include/openssl/bio.h 644 root bin
+f none usr/include/openssl/bio_lcl.h 644 root bin         
+f none usr/include/openssl/blowfish.h 644 root bin
+f none usr/include/openssl/bn.h 644 root bin
+f none usr/include/openssl/buffer.h 644 root bin
+f none usr/include/openssl/cast.h 644 root bin
+f none usr/include/openssl/comp.h 644 root bin
+f none usr/include/openssl/conf.h 644 root bin
+f none usr/include/openssl/conf_api.h 644 root bin
+f none usr/include/openssl/crypto.h 644 root bin
+f none usr/include/openssl/des.h 644 root bin
+f none usr/include/openssl/des_old.h 644 root bin
+f none usr/include/openssl/dh.h 644 root bin
+f none usr/include/openssl/dsa.h 644 root bin
+f none usr/include/openssl/dso.h 644 root bin
+f none usr/include/openssl/dtls1.h 644 root bin         
+f none usr/include/openssl/e_os2.h 644 root bin
+f none usr/include/openssl/ebcdic.h 644 root bin
+f none usr/include/openssl/ec.h 644 root bin
+f none usr/include/openssl/ecdh.h 644 root bin
+f none usr/include/openssl/ecdsa.h 644 root bin         
+f none usr/include/openssl/ech_locl.h 644 root bin         
+f none usr/include/openssl/ecs_locl.h 644 root bin         
+f none usr/include/openssl/engine.h 644 root bin
+f none usr/include/openssl/err.h 644 root bin
+f none usr/include/openssl/evp.h 644 root bin
+f none usr/include/openssl/hmac.h 644 root bin
+f none usr/include/openssl/idea.h 644 root bin
+f none usr/include/openssl/krb5_asn.h 644 root bin
+f none usr/include/openssl/kssl.h 644 root bin
+f none usr/include/openssl/lhash.h 644 root bin
+f none usr/include/openssl/md2.h 644 root bin
+f none usr/include/openssl/md4.h 644 root bin
+f none usr/include/openssl/md5.h 644 root bin
+f none usr/include/openssl/mdc2.h 644 root bin
+f none usr/include/openssl/o_dir.h 644 root bin         
+f none usr/include/openssl/o_str.h 644 root bin         
+f none usr/include/openssl/obj_mac.h 644 root bin
+f none usr/include/openssl/objects.h 644 root bin
+f none usr/include/openssl/ocsp.h 644 root bin
+f none usr/include/openssl/opensslconf.h 644 root bin
+f none usr/include/openssl/opensslv.h 644 root bin
+f none usr/include/openssl/ossl_typ.h 644 root bin
+f none usr/include/openssl/pcy_int.h 644 root bin         
+f none usr/include/openssl/pem.h 644 root bin
+f none usr/include/openssl/pem2.h 644 root bin
+f none usr/include/openssl/pkcs12.h 644 root bin
+f none usr/include/openssl/pkcs7.h 644 root bin
+f none usr/include/openssl/pq_compat.h 644 root bin         
+f none usr/include/openssl/pqueue.h 644 root bin         
+f none usr/include/openssl/rand.h 644 root bin
+f none usr/include/openssl/rc2.h 644 root bin
+f none usr/include/openssl/rc4.h 644 root bin
+f none usr/include/openssl/rc5.h 644 root bin
+f none usr/include/openssl/ripemd.h 644 root bin
+f none usr/include/openssl/rsa.h 644 root bin
+f none usr/include/openssl/safestack.h 644 root bin
+f none usr/include/openssl/sha.h 644 root bin
+f none usr/include/openssl/ssl.h 644 root bin
+f none usr/include/openssl/ssl2.h 644 root bin
+f none usr/include/openssl/ssl23.h 644 root bin
+f none usr/include/openssl/ssl3.h 644 root bin
+f none usr/include/openssl/stack.h 644 root bin
+f none usr/include/openssl/store.h 644 root bin         
+f none usr/include/openssl/str_locl.h 644 root bin         
+f none usr/include/openssl/symhacks.h 644 root bin
+f none usr/include/openssl/tls1.h 644 root bin
+f none usr/include/openssl/tmdiff.h 644 root bin
+f none usr/include/openssl/txt_db.h 644 root bin
+f none usr/include/openssl/ui.h 644 root bin
+f none usr/include/openssl/ui_compat.h 644 root bin
+f none usr/include/openssl/x509.h 644 root bin
+f none usr/include/openssl/x509_vfy.h 644 root bin
+f none usr/include/openssl/x509v3.h 644 root bin
 d none usr/lib 755 root bin
 d none usr/lib/pkgconfig 755 root other
 f none usr/lib/pkgconfig/openssl.pc 644 root other
-f none usr/sfw/include/openssl/x509v3.h 644 root bin

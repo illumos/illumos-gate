@@ -21,8 +21,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"@(#)Makefile.com	1.19	08/08/12 SMI"
-#
 
 LIBRARY =	libssh.a
 VERS =		.1
@@ -94,8 +92,8 @@ LIBS =		$(LIBRARY) $(LINTLIB)
 
 # definitions for lint
 # Until libz is compiled against unsigned uid/gid ON bits.
-#LINTFLAGS +=	 $(OPENSSL_LDFLAGS) -lcrypto -lz -lsocket -lnsl -lc
-LINTFLAGS +=	 $(OPENSSL_LDFLAGS) -lcrypto -lsocket -lnsl -lc
+#LINTFLAGS +=	 -lcrypto -lz -lsocket -lnsl -lc
+LINTFLAGS +=	 -lcrypto -lsocket -lnsl -lc
 $(LINTLIB) :=	 SRCS = $(SRCDIR)/$(LINTSRC)
 
 POFILE_DIR =	../..

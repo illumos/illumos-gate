@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 OBJS =		devinfo.o devinfo_ieee1394.o devinfo_misc.o devinfo_pci.o \
 		devinfo_storage.o devinfo_usb.o hotplug.o osspec.o sysevent.o \
@@ -42,7 +40,6 @@ $(ROOTMANIFEST) :=	FILEMODE = 444
 $(ROOTLIBSVCMETHOD)/svc-hal:= FILEMODE = 555
 
 CPPFLAGS += $(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
-CPPFLAGS += -I/usr/sfw/include
 C99MODE =	$(C99_ENABLE)
 
 .KEEP_STATE:

@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/ssh/sftp-server/Makefile
 
@@ -33,9 +31,7 @@ SRCS =		$(OBJS:.o=.c)
 include ../../Makefile.cmd
 include ../Makefile.ssh-common
 
-LDLIBS +=	$(SSH_COMMON_LDLIBS) -lsocket $(OPENSSL_LDFLAGS) -lcrypto
-
-DYNFLAGS +=	$(OPENSSL_DYNFLAGS)
+LDLIBS +=	$(SSH_COMMON_LDLIBS) -lsocket -lcrypto
 
 POFILE_DIR =	..
 

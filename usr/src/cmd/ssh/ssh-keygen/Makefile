@@ -18,10 +18,8 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/ssh/ssh-keygen/Makefile
 
@@ -34,9 +32,7 @@ SRCS	= $(OBJS:.o=.c)
 include ../../Makefile.cmd
 include ../Makefile.ssh-common
 
-LDLIBS += $(SSH_COMMON_LDLIBS) $(OPENSSL_LDFLAGS) -lcrypto -lsocket
-
-DYNFLAGS += $(OPENSSL_DYNFLAGS)
+LDLIBS += $(SSH_COMMON_LDLIBS) -lcrypto -lsocket
 
 POFILE_DIR= ..
 
