@@ -887,8 +887,13 @@ e1000g_tx_setup(struct e1000g *Adapter)
 	buf_low = (uint32_t)tx_ring->tbd_dma_addr;
 	buf_high = (uint32_t)(tx_ring->tbd_dma_addr >> 32);
 
-	E1000_WRITE_REG(hw, E1000_TDBAL(0), buf_low);
+	/*
+	 * Write the highest location first and work backward to the lowest.
+	 * This is necessary for some adapter types to
+	 * prevent write combining from occurring.
+	 */
 	E1000_WRITE_REG(hw, E1000_TDBAH(0), buf_high);
+	E1000_WRITE_REG(hw, E1000_TDBAL(0), buf_low);
 
 	/* Setup our HW Tx Head & Tail descriptor pointers */
 	E1000_WRITE_REG(hw, E1000_TDH(0), 0);

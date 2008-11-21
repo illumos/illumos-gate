@@ -250,8 +250,6 @@ extern "C" {
  */
 #define	MAX_TX_BUF_SIZE		(8 * 1024)
 
-#define	ROUNDOFF		0x1000
-
 /*
  * Defines for Jumbo Frame
  */
@@ -831,6 +829,7 @@ typedef struct e1000g {
 	uint32_t rx_limit_onintr;
 	uint32_t rx_bcopy_thresh;
 	uint32_t rx_buf_align;
+	uint32_t desc_align;
 
 	boolean_t intr_adaptive;
 	boolean_t tx_intr_enable;

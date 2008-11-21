@@ -51,6 +51,18 @@ static void e1000g_free_tx_packets(e1000g_tx_ring_t *);
 static void e1000g_free_rx_packets(e1000g_rx_ring_t *);
 static int e1000g_alloc_dma_buffer(struct e1000g *,
     dma_buffer_t *, size_t, ddi_dma_attr_t *p_dma_attr);
+
+/*
+ * In order to avoid address error crossing 64KB boundary
+ * during PCI-X packets receving, e1000g_alloc_dma_buffer_82546
+ * is used by some necessary adapter types.
+ */
+static int e1000g_alloc_dma_buffer_82546(struct e1000g *,
+    dma_buffer_t *, size_t, ddi_dma_attr_t *p_dma_attr);
+static int e1000g_dma_mem_alloc_82546(dma_buffer_t *buf,
+    size_t size, size_t *len);
+static boolean_t e1000g_cross_64k_bound(void *, uintptr_t);
+
 static void e1000g_free_dma_buffer(dma_buffer_t *);
 #ifdef __sparc
 static int e1000g_alloc_dvma_buffer(struct e1000g *, dma_buffer_t *, size_t);
@@ -124,7 +136,7 @@ static ddi_dma_attr_t e1000g_desc_dma_attr = {
 	0,			/* lowest usable address */
 	0xffffffffffffffffULL,	/* highest usable address */
 	0x7fffffff,		/* maximum DMAable byte count */
-	E1000_MDALIGN,		/* alignment in bytes 4K! */
+	E1000_MDALIGN,		/* default alignment is 4k but can be changed */
 	0x7ff,			/* burst sizes (any?) */
 	1,			/* minimum transfer */
 	0xffffffffU,		/* maximum transfer */
@@ -213,6 +225,16 @@ e1000g_alloc_descriptors(struct e1000g *Adapter)
 	e1000g_tx_ring_t *tx_ring;
 	e1000g_rx_ring_t *rx_ring;
 
+	if ((Adapter->shared.mac.type == e1000_82545) ||
+	    (Adapter->shared.mac.type == e1000_82546) ||
+	    (Adapter->shared.mac.type == e1000_82546_rev_3)) {
+		/* Align on a 64k boundary for these adapter types */
+		Adapter->desc_align = E1000_MDALIGN_82546;
+	} else {
+		/* Align on a 4k boundary for all other adapter types */
+		Adapter->desc_align = E1000_MDALIGN;
+	}
+
 	tx_ring = Adapter->tx_ring;
 
 	result = e1000g_alloc_tx_descriptors(tx_ring);
@@ -282,6 +304,7 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 	 * Memory allocation for the transmit buffer descriptors.
 	 */
 	dma_attr.dma_attr_sgllen = 1;
+	dma_attr.dma_attr_align = Adapter->desc_align;
 
 	/*
 	 * Allocate a new DMA handle for the transmit descriptor
@@ -310,7 +333,7 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 	    &len, &tx_ring->tbd_acc_handle);
 
 	if ((mystat != DDI_SUCCESS) ||
-	    ((uintptr_t)tx_ring->tbd_area & (E1000_MDALIGN - 1))) {
+	    ((uintptr_t)tx_ring->tbd_area & (Adapter->desc_align - 1))) {
 		if (mystat == DDI_SUCCESS) {
 			ddi_dma_mem_free(&tx_ring->tbd_acc_handle);
 			tx_ring->tbd_acc_handle = NULL;
@@ -333,10 +356,10 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 	/*
 	 * If the previous DMA attributes setting could not give us contiguous
 	 * memory or the number of descriptors is greater than the page size,
-	 * we allocate 4K extra memory and then align it at a 4k boundary.
+	 * we allocate extra memory and then align it at appropriate boundary.
 	 */
 	if (!alloc_flag) {
-		size = size + ROUNDOFF;
+		size = size + Adapter->desc_align;
 
 		/*
 		 * DMA attributes set to no scatter/gather and 16 bit alignment
@@ -389,9 +412,11 @@ e1000g_alloc_tx_descriptors(e1000g_tx_ring_t *tx_ring)
 		bzero(tx_ring->tbd_area, len);
 		/*
 		 * Memory has been allocated with the ddi_dma_mem_alloc call,
-		 * but has not been aligned. We now align it on a 4k boundary.
+		 * but has not been aligned.
+		 * We now align it on the appropriate boundary.
 		 */
-		templong = P2NPHASE((uintptr_t)tx_ring->tbd_area, ROUNDOFF);
+		templong = P2NPHASE((uintptr_t)tx_ring->tbd_area,
+		    Adapter->desc_align);
 		len = size - templong;
 		templong += (uintptr_t)tx_ring->tbd_area;
 		tx_ring->tbd_area = (struct e1000_tx_desc *)templong;
@@ -471,10 +496,10 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	size = (sizeof (struct e1000_rx_desc)) * Adapter->rx_desc_num;
 
 	/*
-	 * Asking for aligned memory with DMA attributes set for 4k alignment
+	 * Asking for aligned memory with DMA attributes set for suitable value
 	 */
 	dma_attr.dma_attr_sgllen = 1;
-	dma_attr.dma_attr_align = E1000_MDALIGN;
+	dma_attr.dma_attr_align = Adapter->desc_align;
 
 	/*
 	 * Allocate a new DMA handle for the receive descriptors
@@ -505,7 +530,7 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	 * allocated memory is aligned correctly.
 	 */
 	if ((mystat != DDI_SUCCESS) ||
-	    ((uintptr_t)rx_ring->rbd_area & (E1000_MDALIGN - 1))) {
+	    ((uintptr_t)rx_ring->rbd_area & (Adapter->desc_align - 1))) {
 		if (mystat == DDI_SUCCESS) {
 			ddi_dma_mem_free(&rx_ring->rbd_acc_handle);
 			rx_ring->rbd_acc_handle = NULL;
@@ -531,7 +556,7 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 	if (!alloc_flag) {
 		dma_attr.dma_attr_align = 1;
 		dma_attr.dma_attr_sgllen = 1;
-		size = size + ROUNDOFF;
+		size = size + Adapter->desc_align;
 		/*
 		 * Allocate a new DMA handle for the receive descriptor.
 		 */
@@ -573,7 +598,8 @@ e1000g_alloc_rx_descriptors(e1000g_rx_ring_t *rx_ring)
 		 * Initialize the allocated receive descriptor memory to zero.
 		 */
 		bzero((caddr_t)rx_ring->rbd_area, len);
-		templong = P2NPHASE((uintptr_t)rx_ring->rbd_area, ROUNDOFF);
+		templong = P2NPHASE((uintptr_t)rx_ring->rbd_area,
+		    Adapter->desc_align);
 		len = size - templong;
 		templong += (uintptr_t)rx_ring->rbd_area;
 		rx_ring->rbd_area = (struct e1000_rx_desc *)templong;
@@ -917,6 +943,160 @@ e1000g_alloc_dma_buffer(struct e1000g *Adapter,
 	return (DDI_SUCCESS);
 }
 
+/*
+ * e1000g_alloc_dma_buffer_82546 - allocate a dma buffer along with all
+ * necessary handles.  Same as e1000g_alloc_dma_buffer() except ensure
+ * that buffer that doesn't cross a 64k boundary.
+ */
+static int
+e1000g_alloc_dma_buffer_82546(struct e1000g *Adapter,
+    dma_buffer_t *buf, size_t size, ddi_dma_attr_t *p_dma_attr)
+{
+	int mystat;
+	dev_info_t *devinfo;
+	ddi_dma_cookie_t cookie;
+	size_t len;
+	uint_t count;
+
+	if (e1000g_force_detach)
+		devinfo = Adapter->priv_dip;
+	else
+		devinfo = Adapter->dip;
+
+	mystat = ddi_dma_alloc_handle(devinfo,
+	    p_dma_attr,
+	    DDI_DMA_DONTWAIT, 0,
+	    &buf->dma_handle);
+
+	if (mystat != DDI_SUCCESS) {
+		buf->dma_handle = NULL;
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
+		    "Could not allocate dma buffer handle: %d\n", mystat);
+		return (DDI_FAILURE);
+	}
+
+	mystat = e1000g_dma_mem_alloc_82546(buf, size, &len);
+	if (mystat != DDI_SUCCESS) {
+		buf->acc_handle = NULL;
+		buf->address = NULL;
+		if (buf->dma_handle != NULL) {
+			ddi_dma_free_handle(&buf->dma_handle);
+			buf->dma_handle = NULL;
+		}
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
+		    "Could not allocate dma buffer memory: %d\n", mystat);
+		return (DDI_FAILURE);
+	}
+
+	mystat = ddi_dma_addr_bind_handle(buf->dma_handle,
+	    (struct as *)NULL,
+	    buf->address,
+	    len, DDI_DMA_READ | DDI_DMA_STREAMING,
+	    DDI_DMA_DONTWAIT, 0, &cookie, &count);
+
+	if (mystat != DDI_SUCCESS) {
+		if (buf->acc_handle != NULL) {
+			ddi_dma_mem_free(&buf->acc_handle);
+			buf->acc_handle = NULL;
+			buf->address = NULL;
+		}
+		if (buf->dma_handle != NULL) {
+			ddi_dma_free_handle(&buf->dma_handle);
+			buf->dma_handle = NULL;
+		}
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
+		    "Could not bind buffer dma handle: %d\n", mystat);
+		return (DDI_FAILURE);
+	}
+
+	ASSERT(count == 1);
+	if (count != 1) {
+		if (buf->dma_handle != NULL) {
+			ddi_dma_unbind_handle(buf->dma_handle);
+		}
+		if (buf->acc_handle != NULL) {
+			ddi_dma_mem_free(&buf->acc_handle);
+			buf->acc_handle = NULL;
+			buf->address = NULL;
+		}
+		if (buf->dma_handle != NULL) {
+			ddi_dma_free_handle(&buf->dma_handle);
+			buf->dma_handle = NULL;
+		}
+		E1000G_DEBUGLOG_1(Adapter, E1000G_WARN_LEVEL,
+		    "Could not bind buffer as a single frag. "
+		    "Count = %d\n", count);
+		return (DDI_FAILURE);
+	}
+
+	buf->dma_address = cookie.dmac_laddress;
+	buf->size = len;
+	buf->len = 0;
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * e1000g_dma_mem_alloc_82546 - allocate a dma buffer, making up to
+ * ALLOC_RETRY attempts to get a buffer that doesn't cross a 64k boundary.
+ */
+static int
+e1000g_dma_mem_alloc_82546(dma_buffer_t *buf, size_t size, size_t *len)
+{
+#define	ALLOC_RETRY	10
+	int stat;
+	int cnt = 0;
+	ddi_acc_handle_t hold[ALLOC_RETRY];
+
+	while (cnt < ALLOC_RETRY) {
+		hold[cnt] = NULL;
+
+		/* allocate memory */
+		stat = ddi_dma_mem_alloc(buf->dma_handle, size,
+		    &e1000g_buf_acc_attr, DDI_DMA_STREAMING, DDI_DMA_DONTWAIT,
+		    0, &buf->address, len, &buf->acc_handle);
+
+		if (stat != DDI_SUCCESS) {
+			break;
+		}
+
+		/*
+		 * Check 64k bounday:
+		 * if it is bad, hold it and retry
+		 * if it is good, exit loop
+		 */
+		if (e1000g_cross_64k_bound(buf->address, *len)) {
+			hold[cnt] = buf->acc_handle;
+			stat = DDI_FAILURE;
+		} else {
+			break;
+		}
+
+		cnt++;
+	}
+
+	/* Release any held buffers crossing 64k bounday */
+	for (--cnt; cnt >= 0; cnt--) {
+		if (hold[cnt])
+			ddi_dma_mem_free(&hold[cnt]);
+	}
+
+	return (stat);
+}
+
+/*
+ * e1000g_cross_64k_bound - If starting and ending address cross a 64k boundary
+ * return true; otherwise return false
+ */
+static boolean_t
+e1000g_cross_64k_bound(void *addr, uintptr_t len)
+{
+	uintptr_t start = (uintptr_t)addr;
+	uintptr_t end = start + len - 1;
+
+	return (((start ^ end) >> 16) == 0 ? B_FALSE : B_TRUE);
+}
+
 static void
 e1000g_free_dma_buffer(dma_buffer_t *buf)
 {
@@ -1131,8 +1311,15 @@ e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *rx_ring, ddi_dma_attr_t *p_dma_attr)
 		break;
 #endif
 	case USE_DMA:
-		mystat = e1000g_alloc_dma_buffer(Adapter,
-		    rx_buf, Adapter->rx_buffer_size, p_dma_attr);
+		if ((Adapter->shared.mac.type == e1000_82545) ||
+		    (Adapter->shared.mac.type == e1000_82546) ||
+		    (Adapter->shared.mac.type == e1000_82546_rev_3)) {
+			mystat = e1000g_alloc_dma_buffer_82546(Adapter,
+			    rx_buf, Adapter->rx_buffer_size, p_dma_attr);
+		} else {
+			mystat = e1000g_alloc_dma_buffer(Adapter,
+			    rx_buf, Adapter->rx_buffer_size, p_dma_attr);
+		}
 		break;
 	default:
 		ASSERT(B_FALSE);

@@ -336,17 +336,23 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	if (Adapter->strip_crc)
 		rctl |= E1000_RCTL_SECRC;	/* Strip Ethernet CRC */
 
-	if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_2K) &&
-	    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_4K))
-		rctl |= E1000_RCTL_SZ_4096 | E1000_RCTL_BSEX;
-	else if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_4K) &&
-	    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_8K))
-		rctl |= E1000_RCTL_SZ_8192 | E1000_RCTL_BSEX;
-	else if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_8K) &&
-	    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_16K))
-		rctl |= E1000_RCTL_SZ_16384 | E1000_RCTL_BSEX;
-	else
+	if ((hw->mac.type == e1000_82545) ||
+	    (hw->mac.type == e1000_82546) ||
+	    (hw->mac.type == e1000_82546_rev_3)) {
 		rctl |= E1000_RCTL_SZ_2048;
+	} else {
+		if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_2K) &&
+		    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_4K))
+			rctl |= E1000_RCTL_SZ_4096 | E1000_RCTL_BSEX;
+		else if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_4K) &&
+		    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_8K))
+			rctl |= E1000_RCTL_SZ_8192 | E1000_RCTL_BSEX;
+		else if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_8K) &&
+		    (Adapter->max_frame_size <= FRAME_SIZE_UPTO_16K))
+			rctl |= E1000_RCTL_SZ_16384 | E1000_RCTL_BSEX;
+		else
+			rctl |= E1000_RCTL_SZ_2048;
+	}
 
 	if (e1000_tbi_sbp_enabled_82543(hw))
 		rctl |= E1000_RCTL_SBP;

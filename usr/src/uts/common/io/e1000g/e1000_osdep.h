@@ -82,7 +82,9 @@ extern "C" {
 #define	ICH_FLASH_REG_SET	2	/* solaris mapping of flash memory */
 
 #define	RECEIVE_BUFFER_ALIGN_SIZE	256
+#define	RECEIVE_BUFFER_ALIGN_SIZE_82546	65536
 #define	E1000_MDALIGN			4096
+#define	E1000_MDALIGN_82546		65536
 #define	E1000_ERT_2048			0x100
 
 /* PHY Extended Status Register */

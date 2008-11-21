@@ -450,7 +450,13 @@ e1000_rar_set_generic(struct e1000_hw *hw, u8 *addr, u32 index)
 			rar_high |= E1000_RAH_AV;
 	}
 
+	/*
+	 * Some bridges will combine consecutive 32-bit writes into
+	 * a single burst write, which will malfunction on some
+	 * 82546 parts. The flush avoids this.
+	 */
 	E1000_WRITE_REG(hw, E1000_RAL(index), rar_low);
+	E1000_WRITE_FLUSH(hw);
 	E1000_WRITE_REG(hw, E1000_RAH(index), rar_high);
 }
 

@@ -610,4 +610,12 @@ Notes on packaging:
   This version has the following fix:
    6666998 Add support for ICH10 in e1000g driver
    6709230 Requesting driver support in e1000g for new Intel(R) single port MAC/PHY NIC
+   6727113 e1000g performance regression is observed with large connection and packet size if LSO is enabled
+   6756917 LSO is not enabled on some e1000g chips
+
+5.2.14
+======
+  This version has the following fix:
+   6713032 e1000g port hang, no xmit, no recv
+   6767201 e1000g default_mtu does not coincide with max_frame_size on some chipsets when set via e1000g.conf
 

@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.13";
+static char e1000g_version[] = "Driver Ver. 5.2.14";
 
 /*
  * Proto types for DDI entry points
@@ -847,17 +847,24 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 
 	Adapter->min_frame_size = ETHERMIN + ETHERFCSL;
 
-	rx_size = Adapter->max_frame_size + E1000G_IPALIGNPRESERVEROOM;
-	if ((rx_size > FRAME_SIZE_UPTO_2K) && (rx_size <= FRAME_SIZE_UPTO_4K))
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_4K;
-	else if ((rx_size > FRAME_SIZE_UPTO_4K) &&
-	    (rx_size <= FRAME_SIZE_UPTO_8K))
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_8K;
-	else if ((rx_size > FRAME_SIZE_UPTO_8K) &&
-	    (rx_size <= FRAME_SIZE_UPTO_16K))
-		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_16K;
-	else
+	if ((mac->type == e1000_82545) ||
+	    (mac->type == e1000_82546) ||
+	    (mac->type == e1000_82546_rev_3)) {
 		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
+	} else {
+		rx_size = Adapter->max_frame_size + E1000G_IPALIGNPRESERVEROOM;
+		if ((rx_size > FRAME_SIZE_UPTO_2K) &&
+		    (rx_size <= FRAME_SIZE_UPTO_4K))
+			Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_4K;
+		else if ((rx_size > FRAME_SIZE_UPTO_4K) &&
+		    (rx_size <= FRAME_SIZE_UPTO_8K))
+			Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_8K;
+		else if ((rx_size > FRAME_SIZE_UPTO_8K) &&
+		    (rx_size <= FRAME_SIZE_UPTO_16K))
+			Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_16K;
+		else
+			Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
+	}
 
 	tx_size = Adapter->max_frame_size;
 	if ((tx_size > FRAME_SIZE_UPTO_2K) && (tx_size <= FRAME_SIZE_UPTO_4K))
@@ -884,6 +891,10 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 	 */
 	if (mac->type < e1000_82543)
 		Adapter->rx_buf_align = RECEIVE_BUFFER_ALIGN_SIZE;
+	else if ((mac->type == e1000_82545) ||
+	    (mac->type == e1000_82546) ||
+	    (mac->type == e1000_82546_rev_3))
+		Adapter->rx_buf_align = RECEIVE_BUFFER_ALIGN_SIZE_82546;
 	else
 		Adapter->rx_buf_align = 1;
 }
@@ -1330,8 +1341,13 @@ e1000g_init(struct e1000g *Adapter)
 	if (hw->mac.type >= e1000_82544)
 		E1000_WRITE_REG(hw, E1000_WUC, 0);
 
-	/* MWI setup */
-	e1000_pci_set_mwi(hw);
+	/*
+	 * MWI should be disabled on 82546.
+	 */
+	if (hw->mac.type == e1000_82546)
+		e1000_pci_clear_mwi(hw);
+	else
+		e1000_pci_set_mwi(hw);
 
 	/*
 	 * Configure/Initialize hardware
@@ -3898,6 +3914,7 @@ e1000g_get_max_frame_size(struct e1000g *Adapter)
 
 	/* ich8 does not do jumbo frames */
 	if (mac->type == e1000_ich8lan) {
+		Adapter->default_mtu = ETHERMTU;
 		Adapter->max_frame_size = ETHERMTU +
 		    sizeof (struct ether_vlan_header) + ETHERFCSL;
 	}
@@ -3905,6 +3922,7 @@ e1000g_get_max_frame_size(struct e1000g *Adapter)
 	/* ich9 does not do jumbo frames on one phy type */
 	if ((mac->type == e1000_ich9lan) &&
 	    (phy->type == e1000_phy_ife)) {
+		Adapter->default_mtu = ETHERMTU;
 		Adapter->max_frame_size = ETHERMTU +
 		    sizeof (struct ether_vlan_header) + ETHERFCSL;
 	}
