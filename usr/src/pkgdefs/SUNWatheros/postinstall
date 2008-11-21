@@ -21,15 +21,14 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Driver info
 DRV=ath
-DRVALIAS='"pci168c,12" "pci168c,13" "pci168c,1014" "pci168c,1a" "pci168c,1b"'
+DRVALIAS='"pci168c,12" "pci168c,13" "pci168c,1014" "pci168c,1a" "pci168c,1b" 
+"pci168c,23" "pciex168c,1c" "pciex168c,24"'
 
 BASEDIR=${BASEDIR:-/}
 
