@@ -2977,6 +2977,8 @@ audiohd_find_dac(hda_codec_t *codec, wid_t wid,
 	if (depth > AUDIOHD_MAX_DEPTH)
 		return (uint32_t)(AUDIO_FAILURE);
 
+	if (widget == NULL)
+		return (uint32_t)(AUDIO_FAILURE);
 	/*
 	 * If exclusive is true, we try to find a path which doesn't
 	 * share any widget with other paths.
@@ -3205,7 +3207,7 @@ audiohd_build_output_amp(hda_codec_t *codec)
 					break;
 				wid = widget->avail_conn[widget->selconn];
 				widget = codec->widget[wid];
-				if (widget->out_weight != weight)
+				if (widget && widget->out_weight != weight)
 					break;
 			}
 
@@ -3236,7 +3238,7 @@ audiohd_build_output_amp(hda_codec_t *codec)
 					break;
 				wid = widget->avail_conn[widget->selconn];
 				widget = codec->widget[wid];
-				if (widget->out_weight != weight)
+				if (widget && widget->out_weight != weight)
 					break;
 			}
 			pin->gain_bits >>= AUDIOHD_GAIN_OFF;
@@ -3259,7 +3261,7 @@ audiohd_build_output_amp(hda_codec_t *codec)
 			weight = wdac->out_weight;
 			wid = ostream->pin_wid[0];
 			w = codec->widget[wid];
-			while (w->out_weight != weight) {
+			while (w && w->out_weight != weight) {
 				wid = w->avail_conn[w->selconn];
 				w = codec->widget[wid];
 			}
@@ -3446,6 +3448,8 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 
 	if (depth > AUDIOHD_MAX_DEPTH)
 		return (uint32_t)(AUDIO_FAILURE);
+	if (widget == NULL)
+		return (uint32_t)(AUDIO_FAILURE);
 
 	/* we don't share widgets */
 	if (widget->path_flags & AUDIOHD_PATH_ADC)
@@ -3512,12 +3516,12 @@ audiohd_find_input_pins(hda_codec_t *codec, wid_t wid, int allowmixer,
 					widget->in_weight++;
 					num = istream->pin_nums - 1;
 					istream->sum_selconn[num] = i;
+					istream->sum_wid = wid;
+					widget->path_flags |=
+					    AUDIOHD_PATH_ADC;
 					if (widget->selconn ==
 					    AUDIOHD_NULL_CONN) {
-						istream->sum_wid = wid;
 						widget->selconn = i;
-						widget->path_flags |=
-						    AUDIOHD_PATH_ADC;
 					}
 				}
 			}
@@ -3571,7 +3575,7 @@ audiohd_build_input_path(hda_codec_t *codec)
 		widget = codec->widget[wid];
 
 		/* check if it is an ADC widget */
-		if (widget->type != WTYPE_AUDIO_IN)
+		if (!widget || widget->type != WTYPE_AUDIO_IN)
 			continue;
 
 		if (istream == NULL)
@@ -3663,7 +3667,7 @@ audiohd_build_input_amp(hda_codec_t *codec)
 				break;
 			wid = w->avail_conn[w->selconn];
 			w = codec->widget[wid];
-			if (w->in_weight != weight)
+			if (w && w->in_weight != weight)
 				break;
 		}
 
@@ -3718,6 +3722,10 @@ audiohd_build_input_amp(hda_codec_t *codec)
 		 */
 		wid = istream->sum_wid;
 		wsum = codec->widget[wid]; /* sum widget */
+		if (wsum == NULL) {
+			istream = istream->next_stream;
+			continue;
+		}
 
 		for (i = 0; i < istream->pin_nums; i++) {
 			wid = istream->pin_wid[i];
@@ -3935,6 +3943,9 @@ audiohd_find_inpin_for_monitor(hda_codec_t *codec,
 
 	wid = id;
 	widget = codec->widget[wid];
+	if (widget == NULL)
+		return (uint32_t)(AUDIO_FAILURE);
+
 	if (widget->type == WTYPE_PIN) {
 		pin = (audiohd_pin_t *)widget->priv;
 		if (pin->no_phys_conn)
@@ -4143,7 +4154,7 @@ audiohd_do_finish_monitor_path(hda_codec_t *codec, audiohd_widget_t *wgt)
 	int			i;
 	int			share = 0;
 
-	if (widget->finish)
+	if (!widget || widget->finish)
 		return;
 	if (widget->path_flags & AUDIOHD_PATH_ADC)
 		share = 1;
