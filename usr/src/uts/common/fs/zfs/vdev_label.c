@@ -702,6 +702,11 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg, vdev_labeltype_t reason)
  */
 
 /*
+ * For use by zdb and debugging purposes only
+ */
+uint64_t ub_max_txg = UINT64_MAX;
+
+/*
  * Consider the following situation: txg is safely synced to disk.  We've
  * written the first uberblock for txg + 1, and then we lose power.  When we
  * come back up, we fail to see the uberblock for txg + 1 because, say,
@@ -738,7 +743,8 @@ vdev_uberblock_load_done(zio_t *zio)
 
 	if (zio->io_error == 0 && uberblock_verify(ub) == 0) {
 		mutex_enter(&rio->io_lock);
-		if (vdev_uberblock_compare(ub, ubbest) > 0)
+		if (ub->ub_txg <= ub_max_txg &&
+		    vdev_uberblock_compare(ub, ubbest) > 0)
 			*ubbest = *ub;
 		mutex_exit(&rio->io_lock);
 	}

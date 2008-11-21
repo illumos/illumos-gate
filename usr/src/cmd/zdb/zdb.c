@@ -87,8 +87,8 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "Usage: %s [-udibcsvL] [-U cachefile_path] "
-	    "[-S user:cksumalg] "
+	    "Usage: %s [-udibcsvL] [-U cachefile_path] [-t txg]\n"
+	    "\t   [-S user:cksumalg] "
 	    "dataset [object...]\n"
 	    "       %s -C [pool]\n"
 	    "       %s -l dev\n"
@@ -117,6 +117,8 @@ usage(void)
 	(void) fprintf(stderr, "        -e Pool is exported/destroyed/"
 	    "has altroot\n");
 	(void) fprintf(stderr, "	-p <Path to vdev dir> (use with -e)\n");
+	(void) fprintf(stderr, "	-t <txg> highest txg to use when "
+	    "searching for uberblocks\n");
 	(void) fprintf(stderr, "Specify an option more than once (e.g. -bb) "
 	    "to make only that option verbose\n");
 	(void) fprintf(stderr, "Default is to dump everything non-verbosely\n");
@@ -2244,7 +2246,7 @@ main(int argc, char **argv)
 
 	dprintf_setup(&argc, argv);
 
-	while ((c = getopt(argc, argv, "udibcsvCLS:U:lRep:")) != -1) {
+	while ((c = getopt(argc, argv, "udibcsvCLS:U:lRep:t:")) != -1) {
 		switch (c) {
 		case 'u':
 		case 'd':
@@ -2290,6 +2292,14 @@ main(int argc, char **argv)
 				zdb_sig_cksumalg = ZIO_CHECKSUM_FLETCHER_2;
 			else
 				usage();
+			break;
+		case 't':
+			ub_max_txg = strtoull(optarg, NULL, 0);
+			if (ub_max_txg < TXG_INITIAL) {
+				(void) fprintf(stderr, "incorrect txg "
+				    "specified: %s\n", optarg);
+				usage();
+			}
 			break;
 		default:
 			usage();
