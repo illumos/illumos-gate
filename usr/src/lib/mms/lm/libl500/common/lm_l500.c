@@ -31,14 +31,13 @@
 #define	L500_MAX_DRIVE	18
 
 #define	L500_CONFIG "config task [\"%d\"] scope [full] \
-bay [\"panel 1\" true] %s; "
+%s %s;"
 
-#define	L500_GROUP "slotgroup [\"group 1\" \"panel 1\" none \"ordinary\"] \
-slotgroup [\"group cap0\" \"panel 1\" both \"port\"]"
+#define	L500_GROUP "slotgroup [\"group 1\" \"panel 1\" none \"ordinary\"] "
 
 static	char	*_SrcFile = __FILE__;
 
-static acs_cap_t	acs_caps;
+static acs_cap_t	acs_caps[MAX_L500_CAPS];
 static acs_drive_t	acs_drives;
 
 /*ARGSUSED2*/
@@ -46,22 +45,102 @@ int
 lm_library_config_non_comm(int cmd_tid, char *full_str, char *tid,
     char *ret_msg)
 {
+	int	i;
+	int	num_caps;
+	char	cap_name[MAX_CAP_SIZE];
+	char	*bay_str = NULL;
+	char	*grp_str = NULL;
 
-	acs_caps.cap_size = MAX_L500_CAP_SIZE;
-	acs_caps.cap_capid = 0;
-	(void) strlcpy(acs_caps.cap_name, "group cap0",
-	    sizeof (acs_caps.cap_name));
-	acs_caps.cap_config = 1;
-	lm.lm_port = (void *)&acs_caps;
-	lm.lm_caps = 1;
+	CAPID	capid[MAX_ID];
+	QU_CAP_STATUS		*cs;
+	ACS_QUERY_CAP_RESPONSE	*cp;
+	acs_rsp_ele_t		*acs_rsp;
+
+	lm.lm_caps = num_caps = 1;
 	lm.lm_lsms = 1;
+
+	if (lm_num_panels(0, tid, ret_msg) != LM_OK) {
+		mms_trace(MMS_ERR, "lm_library_config: Unable to obtain "
+		    "number of panels in L500/SL500 library");
+		return (LM_ERROR);
+	}
+
+	if ((lm_acs_query_cap(&acs_rsp, capid, "activate", tid, ret_msg)) ==
+	    LM_ERROR) {
+		mms_trace(MMS_ERR, "lm_library_config: query of number of caps "
+		    "in L500/SL500 library failed");
+		return (LM_ERROR);
+	}
+
+	mms_trace(MMS_DEBUG, "lm_library_config: Received final response for "
+	    "acs_query_cap");
+
+	cp = (ACS_QUERY_CAP_RESPONSE *)acs_rsp->acs_rbuf;
+	if (cp->query_cap_status != STATUS_SUCCESS) {
+		mms_trace(MMS_ERR, "lm_library_config: response from "
+		    "acs_query_cap() failed, defaulting to one cap "
+		    ", status - %s", acs_status(cp->query_cap_status));
+		return (LM_ERROR);
+	}
+
+	for (num_caps = 0, i = 0; i < cp->count; i++) {
+		cs = &cp->cap_status[i];
+		if (cs->cap_id.lsm_id.acs == lm.lm_acs)
+			num_caps++;
+	}
+	lm.lm_caps = num_caps;
+
+	for (i = 0; i < MAX_L500_CAPS; i++) {
+		acs_caps[i].cap_size = MAX_L500_CAP_SIZE;
+		acs_caps[i].cap_capid = i;
+		(void) snprintf(cap_name, sizeof (cap_name),
+		    "group cap%d", i);
+		(void) strlcpy(acs_caps[i].cap_name, cap_name,
+		    sizeof (acs_caps[i].cap_name));
+		if (i < num_caps)
+			acs_caps[i].cap_config = 1;
+		else
+			acs_caps[i].cap_config = 0;
+	}
+
+	lm.lm_port = (void *)&acs_caps[0];
+
+	mms_trace(MMS_DEBUG, "lm_library_config: Number of caps for L500/SL500 "
+	    "library - %d", num_caps);
+
+	for (i = 1; i < lm.lm_panels; i++)
+		bay_str = mms_strapp(bay_str, "bay [\"panel %d\" true] ", i);
+
+	for (i = 1; i < lm.lm_panels; i++) {
+		grp_str = mms_strapp(grp_str, "slotgroup [\"group %d\" "
+		    "\"panel %d\" none \"ordinary\"]  ", i, i);
+		if (i == 1)
+			grp_str = mms_strapp(grp_str, "slotgroup [\"group "
+			    "cap0\" \"panel 1\" both \"port\"] ");
+	}
 
 	acs_drives.acs_max_drive = L500_MAX_DRIVE;
 	lm.lm_drive = (void *)&acs_drives;
 
-	(void) snprintf(full_str, FSBUFSIZE,
-	    L500_CONFIG, cmd_tid, L500_GROUP);
-	mms_trace(MMS_DEBUG, "lm_library_config_non_comm: Bay, Group - %s",
-	    full_str);
+	free(acs_rsp);
+
+	if ((bay_str && grp_str) != NULL) {
+		if ((snprintf(full_str, FSBUFSIZE,
+		    L500_CONFIG, cmd_tid, bay_str, grp_str)) > FSBUFSIZE) {
+			mms_trace(MMS_ERR, "lm_library_config: buffer size");
+			free(bay_str);
+			free(grp_str);
+			return (LM_ERROR);
+		}
+	} else {
+		mms_trace(MMS_ERR, "lm_library_config: bay_str and grp_str "
+		    "null");
+		return (LM_ERROR);
+	}
+
+	mms_trace(MMS_DEBUG, "lm_library_config: Bay, Group - %s", full_str);
+
+	free(bay_str);
+	free(grp_str);
 	return (LM_OK);
 }
