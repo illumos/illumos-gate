@@ -147,7 +147,7 @@ static	dmd_wcr_t	*dmd_wcr_p;
 static	dmd_stat_t	*dmd_stat_p;
 static	major_t		dmd_major;
 static	int		dmd_next_ord = DMD_FIRST_DEV_ORDINAL;
-#ifdef	MMSDEBUG
+#ifdef	DEBUG
 static	int	dmd_debug = 1;
 #else
 static	int	dmd_debug = 0;
@@ -644,15 +644,19 @@ dmd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	int		inst;
 	dmd_wcr_t	*wcr;
+	dmd_stat_t	*stat;
 
 	inst = ddi_get_instance(dip);
 	DMD_DEBUG((CE_CONT, "dmd_detach: inst = %d", inst));
 	switch (cmd) {
 	case DDI_DETACH:
+		/*
+		 * Free the watcher device
+		 */
 		wcr = (dmd_wcr_t *)ddi_get_soft_state(dmd_soft_statep, inst);
 		if (wcr == NULL) {
 			cmn_err(CE_WARN, "dmd_detach: "
-			    "can't get state struct\n");
+			    "can't get state struct of watcher device\n");
 			return (DDI_FAILURE);
 		}
 		if (wcr->wcr_proc_ref) {
@@ -660,6 +664,19 @@ dmd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			wcr->wcr_proc_ref = NULL;
 		}
 		ddi_soft_state_free(dmd_soft_statep, inst);
+
+		/*
+		 * Free the stat device
+		 */
+		inst++;
+		stat = (dmd_stat_t *)ddi_get_soft_state(dmd_soft_statep, inst);
+		if (stat == NULL) {
+			cmn_err(CE_WARN, "dmd_detach: "
+			    "can't get state struct of stat device\n");
+			return (DDI_FAILURE);
+		}
+		ddi_soft_state_free(dmd_soft_statep, inst);
+
 		ddi_remove_minor_node(dip, NULL);
 		return (DDI_SUCCESS);
 	default:
