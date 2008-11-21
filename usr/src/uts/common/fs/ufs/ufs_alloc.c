@@ -36,9 +36,6 @@
  * contributors.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/condvar_impl.h>
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -1018,17 +1015,26 @@ alloccg(struct inode *ip, int cg, daddr_t bpref, int size)
 		return (bno);
 	}
 	/*
-	 * Check to see if any fragments are already available
-	 * allocsiz is the size which will be allocated, hacking
-	 * it down to a smaller size if necessary.
+	 * Check fragment bitmap to see if any fragments are already available.
+	 * mapsearch() may fail because the fragment that fits this request
+	 * might still be on the cancel list and not available for re-use yet.
+	 * Look for a bigger sized fragment to allocate first before we have
+	 * to give up and fragment a whole new block eventually.
 	 */
 	frags = numfrags(fs, size);
-	for (allocsiz = frags; allocsiz < fs->fs_frag; allocsiz++)
+	allocsiz = frags;
+next_size:
+	for (; allocsiz < fs->fs_frag; allocsiz++)
 		if (cgp->cg_frsum[allocsiz] != 0)
 			break;
 
-	if (allocsiz != fs->fs_frag)
+	if (allocsiz != fs->fs_frag) {
 		bno = mapsearch(ufsvfsp, cgp, bpref, allocsiz);
+		if (bno < 0 && allocsiz < (fs->fs_frag - 1)) {
+			allocsiz++;
+			goto next_size;
+		}
+	}
 
 	if (allocsiz == fs->fs_frag || bno < 0) {
 		/*
