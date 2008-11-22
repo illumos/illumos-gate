@@ -473,7 +473,7 @@ aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	if (aes_ctx->ac_flags & CCM_MODE) {
 		length_needed = plaintext->cd_length + aes_ctx->ac_mac_len;
 	} else if (aes_ctx->ac_flags & GCM_MODE) {
-		length_needed = plaintext->cd_length + aes_ctx->ac_mac_len;
+		length_needed = plaintext->cd_length + aes_ctx->ac_tag_len;
 	} else {
 		length_needed = plaintext->cd_length;
 	}
@@ -598,8 +598,7 @@ aes_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 		saved_offset = plaintext->cd_offset;
 		saved_length = plaintext->cd_length;
 	} else if (aes_ctx->ac_flags & GCM_MODE) {
-		gcm_ctx_t *ctx = (gcm_ctx_t *)aes_ctx;
-		size_t pt_len = ciphertext->cd_length - ctx->gcm_tag_len;
+		size_t pt_len = ciphertext->cd_length - aes_ctx->ac_tag_len;
 
 		if (plaintext->cd_length < pt_len) {
 			plaintext->cd_length = pt_len;
@@ -1016,25 +1015,23 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 	aes_ctx_t aes_ctx;	/* on the stack */
 	off_t saved_offset;
 	size_t saved_length;
+	size_t length_needed;
 	int ret;
 
 	AES_ARG_INPLACE(plaintext, ciphertext);
 
-	if ((mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) &&
-	    (mechanism->cm_type != AES_CCM_MECH_INFO_TYPE)) {
-		/*
-		 * Plaintext must be a multiple of AES block size.
-		 * This test only works for non-padded mechanisms
-		 * when blocksize is 2^N.
-		 */
+	/*
+	 * CTR, CCM, and GCM modes do not require that ciphertext
+	 * be a multiple of AES block size.
+	 */
+	switch (mechanism->cm_type) {
+	case AES_CTR_MECH_INFO_TYPE:
+	case AES_CCM_MECH_INFO_TYPE:
+	case AES_GCM_MECH_INFO_TYPE:
+		break;
+	default:
 		if ((plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
 			return (CRYPTO_DATA_LEN_RANGE);
-	}
-
-	/* return length needed to store the output */
-	if (ciphertext->cd_length < plaintext->cd_length) {
-		ciphertext->cd_length = plaintext->cd_length;
-		return (CRYPTO_BUFFER_TOO_SMALL);
 	}
 
 	if ((ret = aes_check_mech_param(mechanism, NULL, 0)) != CRYPTO_SUCCESS)
@@ -1047,15 +1044,23 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 	if (ret != CRYPTO_SUCCESS)
 		return (ret);
 
-	if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
-		size_t length_needed
-		    = plaintext->cd_length + aes_ctx.ac_mac_len;
-		if (ciphertext->cd_length < length_needed) {
-			ciphertext->cd_length = length_needed;
-			return (CRYPTO_BUFFER_TOO_SMALL);
-		}
+	switch (mechanism->cm_type) {
+	case AES_CCM_MECH_INFO_TYPE:
+		length_needed = plaintext->cd_length + aes_ctx.ac_mac_len;
+		break;
+	case AES_GCM_MECH_INFO_TYPE:
+		length_needed = plaintext->cd_length + aes_ctx.ac_tag_len;
+		break;
+	default:
+		length_needed = plaintext->cd_length;
 	}
 
+	/* return size of buffer needed to store output */
+	if (ciphertext->cd_length < length_needed) {
+		ciphertext->cd_length = length_needed;
+		ret = CRYPTO_BUFFER_TOO_SMALL;
+		goto out;
+	}
 
 	saved_offset = ciphertext->cd_offset;
 	saved_length = ciphertext->cd_length;
@@ -1134,34 +1139,24 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 	aes_ctx_t aes_ctx;	/* on the stack */
 	off_t saved_offset;
 	size_t saved_length;
+	size_t length_needed;
 	int ret;
 
 	AES_ARG_INPLACE(ciphertext, plaintext);
 
 	/*
-	 * For block ciphers, ciphertext must be a multiple of AES block size.
-	 * This test is only valid for non-padded mechanisms
-	 * when blocksize is 2^N
-	 * Even though AES CCM mode is a block cipher, it does not
-	 * require the plaintext to be a multiple of AES block size.
-	 * The length requirement for AES CCM mode will be checked
-	 * at init time
+	 * CCM, GCM, and CTR modes do not require that ciphertext
+	 * be a multiple of AES block size.
 	 */
-	if ((mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) &&
-	    (mechanism->cm_type != AES_CCM_MECH_INFO_TYPE) &&
-	    ((ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0))
-		return (CRYPTO_DATA_LEN_RANGE);
-
-	/*
-	 * return length needed to store the output, length requirement
-	 * for AES CCM mode can not be determined until later
-	 */
-	if ((plaintext->cd_length < ciphertext->cd_length) &&
-	    (mechanism->cm_type != AES_CCM_MECH_INFO_TYPE)) {
-		plaintext->cd_length = ciphertext->cd_length;
-		return (CRYPTO_BUFFER_TOO_SMALL);
+	switch (mechanism->cm_type) {
+	case AES_CTR_MECH_INFO_TYPE:
+	case AES_CCM_MECH_INFO_TYPE:
+	case AES_GCM_MECH_INFO_TYPE:
+		break;
+	default:
+		if ((ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
+			return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
 	}
-
 
 	if ((ret = aes_check_mech_param(mechanism, NULL, 0)) != CRYPTO_SUCCESS)
 		return (ret);
@@ -1173,13 +1168,22 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 	if (ret != CRYPTO_SUCCESS)
 		return (ret);
 
-	/* check length requirement for AES CCM mode now */
-	if (mechanism->cm_type == AES_CCM_MECH_INFO_TYPE) {
-		if (plaintext->cd_length < aes_ctx.ac_data_len) {
-			plaintext->cd_length = aes_ctx.ac_data_len;
-			ret = CRYPTO_BUFFER_TOO_SMALL;
-			goto out;
-		}
+	switch (mechanism->cm_type) {
+	case AES_CCM_MECH_INFO_TYPE:
+		length_needed = aes_ctx.ac_data_len;
+		break;
+	case AES_GCM_MECH_INFO_TYPE:
+		length_needed = ciphertext->cd_length - aes_ctx.ac_tag_len;
+		break;
+	default:
+		length_needed = ciphertext->cd_length;
+	}
+
+	/* return size of buffer needed to store output */
+	if (plaintext->cd_length < length_needed) {
+		plaintext->cd_length = length_needed;
+		ret = CRYPTO_BUFFER_TOO_SMALL;
+		goto out;
 	}
 
 	saved_offset = plaintext->cd_offset;

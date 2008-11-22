@@ -248,6 +248,7 @@ typedef struct aes_ctx {
 #define	ac_data_len		acu.acu_ccm.ccm_data_len
 #define	ac_processed_mac_len	acu.acu_ccm.ccm_processed_mac_len
 #define	ac_processed_data_len	acu.acu_ccm.ccm_processed_data_len
+#define	ac_tag_len		acu.acu_gcm.gcm_tag_len
 
 typedef struct blowfish_ctx {
 	union {
