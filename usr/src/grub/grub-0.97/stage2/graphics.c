@@ -95,8 +95,6 @@ static inline void outb(unsigned short port, unsigned char val)
     __asm __volatile ("outb %0,%1"::"a" (val), "d" (port));
 }
 
-static int splashscreen_read = 0;
-
 static void MapMask(int value) {
     outb(0x3c4, 2);
     outb(0x3c5, value);
@@ -128,6 +126,10 @@ int graphics_init()
         saved_videomode = set_videomode(0x12);
     }
 
+    /*
+     * XXX this is known not to reset the image
+     * properly in the case of failure
+     */
     if (!read_image(splashimage)) {
         set_videomode(saved_videomode);
         grub_printf("failed to read image\n");
@@ -381,10 +383,16 @@ int read_image(char *s)
             break;
     }
 
-    /* allow 14 specified palette colors (indices 1 - 14) at most */
-    if (colors > 14) {
+    /*
+     * Allow 15 specified palette colors (indices 1 - 15) at most.
+     *
+     * One would expect that this should be 14 allowing for foreground
+     * and background, but there are a number of 15 color graphics in
+     * use that shouldn't break with this check.
+     */
+    if (colors > 15) {
 	grub_close();
-	return (0);
+	return 0;
     }
 
     /* eat rest of line - assumes chars per pixel is one */
