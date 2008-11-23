@@ -3739,9 +3739,11 @@ page_get_physical(int flags)
 	if (pp != NULL) {
 		page_io_unlock(pp);
 		page_hashout(pp, NULL);
+		mutex_exit(&pgp_mutex);
+		page_downgrade(pp);
+	} else {
+		mutex_exit(&pgp_mutex);
 	}
-	mutex_exit(&pgp_mutex);
-	page_downgrade(pp);
 	return (pp);
 }
 

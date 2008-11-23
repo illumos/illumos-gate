@@ -423,7 +423,7 @@ psm_install(void)
 		(void) strcpy(&machstring[0], cswp->psw_infop->p_mach_idstring);
 		err = mod_remove_by_name(cswp->psw_infop->p_mach_idstring);
 		if (err)
-			cmn_err(CE_WARN, "%s: mod_remove_by_name failed %d",
+			cmn_err(CE_WARN, "!%s: mod_remove_by_name failed %d",
 			    &machstring[0], err);
 		mutex_enter(&psmsw_lock);
 	}

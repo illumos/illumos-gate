@@ -2291,11 +2291,11 @@ drhd_only_for_gfx(intel_iommu_state_t *iommu)
 }
 
 /*
- * build_gfx_identity_map()
- *   build identity map for the gfx device
+ * build_dev_identity_map()
+ *   build identity map for a device
  */
 static void
-build_gfx_identity_map(dev_info_t *dip)
+build_dev_identity_map(dev_info_t *dip)
 {
 	struct memlist *mp;
 	dmar_domain_state_t *domain;
@@ -2306,8 +2306,6 @@ build_gfx_identity_map(dev_info_t *dip)
 		    ddi_node_name(dip));
 		return;
 	}
-
-	gfx_devinfo = dip;
 
 	ASSERT(bootops != NULL);
 	ASSERT(!modrootloaded);
@@ -2347,10 +2345,20 @@ build_isa_gfx_identity_walk(dev_info_t *dip, void *arg)
 		return (DDI_WALK_CONTINUE);
 
 	/* fix the gfx and fd */
-	if (private->idp_is_display)
-		build_gfx_identity_map(dip);
-	else if (private->idp_is_lpc)
+	if (private->idp_is_display) {
+		gfx_devinfo = dip;
+		build_dev_identity_map(dip);
+	} else if (private->idp_is_lpc) {
 		lpc_devinfo = dip;
+	}
+
+	/* workaround for pci8086,10bc pci8086,11bc */
+	if ((strcmp(ddi_node_name(dip), "pci8086,10bc") == 0) ||
+	    (strcmp(ddi_node_name(dip), "pci8086,11bc") == 0)) {
+		cmn_err(CE_CONT, "?Workaround for PRO/1000 PT Quad"
+		    " Port LP Server Adapter applied\n");
+		build_dev_identity_map(dip);
+	}
 
 	return (DDI_WALK_CONTINUE);
 }
