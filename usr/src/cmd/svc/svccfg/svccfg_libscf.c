@@ -11924,9 +11924,12 @@ int
 lscf_setprop(const char *pgname, const char *type, const char *value,
     const uu_list_t *values)
 {
-	scf_type_t ty;
-	scf_propertygroup_t *pg;
-	scf_property_t *prop;
+	scf_type_t ty, current_ty;
+	scf_service_t *svc;
+	scf_propertygroup_t *pg, *parent_pg;
+	scf_property_t *prop, *parent_prop;
+	scf_pg_tmpl_t *pgt;
+	scf_prop_tmpl_t *prt;
 	int ret, result = 0;
 	scf_transaction_t *tx;
 	scf_transaction_entry_t *e;
@@ -11939,8 +11942,13 @@ lscf_setprop(const char *pgname, const char *type, const char *value,
 	lscf_prep_hndl();
 
 	if ((e = scf_entry_create(g_hndl)) == NULL ||
+	    (svc = scf_service_create(g_hndl)) == NULL ||
+	    (parent_pg = scf_pg_create(g_hndl)) == NULL ||
 	    (pg = scf_pg_create(g_hndl)) == NULL ||
+	    (parent_prop = scf_property_create(g_hndl)) == NULL ||
 	    (prop = scf_property_create(g_hndl)) == NULL ||
+	    (pgt = scf_tmpl_pg_create(g_hndl)) == NULL ||
+	    (prt = scf_tmpl_prop_create(g_hndl)) == NULL ||
 	    (tx = scf_transaction_create(g_hndl)) == NULL)
 		scfdie();
 
@@ -12004,8 +12012,6 @@ lscf_setprop(const char *pgname, const char *type, const char *value,
 
 		ret = scf_pg_get_property(pg, propname, prop);
 		if (ret == SCF_SUCCESS) {
-			scf_type_t current_ty;
-
 			if (scf_property_type(prop, &current_ty) != SCF_SUCCESS)
 				scfdie();
 
@@ -12016,10 +12022,37 @@ lscf_setprop(const char *pgname, const char *type, const char *value,
 				scfdie();
 
 		} else if (scf_error() == SCF_ERROR_NOT_FOUND) {
+			/* Infer the type, if possible. */
 			if (type == NULL) {
-				semerr(
-			gettext("Type required for new properties.\n"));
-				goto fail;
+				/*
+				 * First check if we're an instance and the
+				 * property is set on the service.
+				 */
+				if (cur_inst != NULL &&
+				    scf_instance_get_parent(cur_inst,
+				    svc) == 0 &&
+				    scf_service_get_pg(cur_svc, pgname,
+				    parent_pg) == 0 &&
+				    scf_pg_get_property(parent_pg, propname,
+				    parent_prop) == 0 &&
+				    scf_property_type(parent_prop,
+				    &current_ty) == 0) {
+					ty = current_ty;
+
+				/* Then check for a type set in a template. */
+				} else if (scf_tmpl_get_by_pg(pg, pgt,
+				    NULL) == 0 &&
+				    scf_tmpl_get_by_prop(pgt, propname, prt,
+				    NULL) == 0 &&
+				    scf_tmpl_prop_type(prt, &current_ty) == 0) {
+					ty = current_ty;
+
+				/* If type can't be inferred, fail. */
+				} else {
+					semerr(gettext("Type required for new "
+					    "properties.\n"));
+					goto fail;
+				}
 			}
 			if (scf_transaction_property_new(tx, e, propname,
 			    ty) == -1)
@@ -12078,20 +12111,24 @@ lscf_setprop(const char *pgname, const char *type, const char *value,
 		goto fail;
 	}
 
-	scf_transaction_destroy(tx);
-	scf_entry_destroy(e);
-	scf_pg_destroy(pg);
-	scf_property_destroy(prop);
-
-	return (0);
+	ret = 0;
+	goto cleanup;
 
 fail:
+	ret = -1;
+
+cleanup:
 	scf_transaction_destroy(tx);
 	scf_entry_destroy(e);
+	scf_service_destroy(svc);
+	scf_pg_destroy(parent_pg);
 	scf_pg_destroy(pg);
+	scf_property_destroy(parent_prop);
 	scf_property_destroy(prop);
+	scf_tmpl_pg_destroy(pgt);
+	scf_tmpl_prop_destroy(prt);
 
-	return (-1);
+	return (ret);
 }
 
 void
