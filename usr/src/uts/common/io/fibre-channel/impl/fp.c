@@ -4996,6 +4996,39 @@ fp_plogi_group(fc_local_port_t *port, job_request_t *job)
 		ASSERT(d_id != 0);
 
 		pd = fctl_get_remote_port_by_did(port, d_id);
+
+		/*
+		 * We need to properly adjust the port device
+		 * reference counter before we assign the pd
+		 * to the ULP packets port device pointer.
+		 */
+		if (pd != NULL && ulp_pkt->pkt_pd == NULL) {
+			mutex_enter(&pd->pd_mutex);
+			pd->pd_ref_count++;
+			mutex_exit(&pd->pd_mutex);
+			FP_TRACE(FP_NHEAD1(3, 0),
+			    "fp_plogi_group: DID = 0x%x using new pd %p \
+			    old pd NULL\n", d_id, pd);
+		} else if (pd != NULL && ulp_pkt->pkt_pd != NULL &&
+		    ulp_pkt->pkt_pd != pd) {
+			mutex_enter(&pd->pd_mutex);
+			pd->pd_ref_count++;
+			mutex_exit(&pd->pd_mutex);
+			mutex_enter(&ulp_pkt->pkt_pd->pd_mutex);
+			ulp_pkt->pkt_pd->pd_ref_count--;
+			mutex_exit(&ulp_pkt->pkt_pd->pd_mutex);
+			FP_TRACE(FP_NHEAD1(3, 0),
+			    "fp_plogi_group: DID = 0x%x pkt_pd %p != pd %p\n",
+			    d_id, ulp_pkt->pkt_pd, pd);
+		} else if (pd == NULL && ulp_pkt->pkt_pd != NULL) {
+			mutex_enter(&ulp_pkt->pkt_pd->pd_mutex);
+			ulp_pkt->pkt_pd->pd_ref_count--;
+			mutex_exit(&ulp_pkt->pkt_pd->pd_mutex);
+			FP_TRACE(FP_NHEAD1(3, 0),
+			    "fp_plogi_group: DID = 0x%x pd is NULL and \
+			    pkt_pd = %p\n", d_id, ulp_pkt->pkt_pd);
+		}
+
 		ulp_pkt->pkt_pd = pd;
 
 		if (pd != NULL) {
