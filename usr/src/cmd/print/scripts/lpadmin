@@ -365,7 +365,7 @@ else
 		# set the bsdaddr
 		bsdaddr="${server},${rem_printer},Solaris"
 
-		if [[ -n "${printer}" ]] ; then
+		if [[ -n "${printer}" && -n "${server}" ]] ; then
 			${LPSET} -n system \
 				-a "printer-uri-supported=${uri}" \
 				-a "bsdaddr=${bsdaddr}" ${printer}
