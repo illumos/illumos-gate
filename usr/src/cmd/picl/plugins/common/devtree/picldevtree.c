@@ -1627,14 +1627,18 @@ update_subtree(picl_nodehdl_t nodeh, di_node_t dinode)
 		if (((strp = strrchr(path_buf, '/')) != NULL) &&
 		    strchr(strp, '@') == NULL) {
 			/*
-			 * this is an unattached node - so the path is not
+			 * This is an unattached node - so the path is not
 			 * unique. Need to find out which node it is.
-			 * Find the unit_address from the obp properties.
+			 * Find the unit_address from the OBP or devinfo
+			 * properties.
 			 */
 			err = ptree_create_node(nodename, nodeclass, &chdh);
 			if (err != PICL_SUCCESS)
 				return (err);
+
+			(void) add_devinfo_props(chdh, cnode);
 			(void) add_openprom_props(chdh, cnode);
+
 			err = get_unitaddr(nodeh, chdh, unitaddr,
 			    sizeof (unitaddr));
 			if (err != PICL_SUCCESS)
@@ -2018,6 +2022,23 @@ add_processor_info(picl_nodehdl_t cpuh, void *args)
 	err = get_cpu_portid(cpuh, &cpu_id);
 	if (err != PICL_SUCCESS)
 		return (PICL_WALK_CONTINUE);
+
+	/*
+	 * Check to make sure that the CPU is still present, i.e. that it
+	 * has not been DR'ed out of the system.
+	 */
+	if (p_online(cpu_id, P_STATUS) == -1) {
+		if (picldevtree_debug)
+			syslog(LOG_INFO,
+			    "picldevtree: cpu %d (%llx) does not exist - "
+			    "deleting node\n", cpu_id, cpuh);
+
+		if (ptree_delete_node(cpuh) == PICL_SUCCESS)
+			(void) ptree_destroy_node(cpuh);
+
+		return (PICL_WALK_CONTINUE);
+	}
+
 	(void) ptree_init_propinfo(&propinfo, PTREE_PROPINFO_VERSION,
 	    PICL_PTYPE_INT, PICL_READ, sizeof (int), PICL_PROP_ID, NULL, NULL);
 	err = ptree_create_and_add_prop(cpuh, &propinfo, &cpu_id, NULL);
@@ -3547,6 +3568,8 @@ picldevtree_init(void)
 	    picldevtree_evhandler, NULL);
 	(void) ptree_register_handler(PICLEVENT_CPU_STATE_CHANGE,
 	    picldevtree_evhandler, NULL);
+	(void) ptree_register_handler(PICLEVENT_DR_AP_STATE_CHANGE,
+	    picldevtree_evhandler, NULL);
 }
 
 /*
@@ -3562,6 +3585,8 @@ picldevtree_fini(void)
 	    picldevtree_evhandler, NULL);
 	(void) ptree_unregister_handler(PICLEVENT_CPU_STATE_CHANGE,
 	    picldevtree_evhandler, NULL);
+	(void) ptree_unregister_handler(PICLEVENT_DR_AP_STATE_CHANGE,
+	    picldevtree_evhandler, NULL);
 
 	conf_name_class_map = free_conf_entries(conf_name_class_map);
 }
@@ -3574,6 +3599,7 @@ picldevtree_fini(void)
  *	PICLEVENT_SYSEVENT_DEVICE_ADDED
  *	PICLEVENT_SYSEVENT_DEVICE_REMOVED
  *	PICLEVENT_CPU_STATE_CHANGE
+ *	PICLEVENT_DR_AP_STATE_CHANGE
  */
 /* ARGSUSED */
 static void
@@ -3587,12 +3613,19 @@ picldevtree_evhandler(const char *ename, const void *earg, size_t size,
 	picl_nodehdl_t		nodeh;
 	nvlist_t		*nvlp;
 
-	if (earg == NULL)
+	if ((earg == NULL) ||
+	    (ptree_get_node_by_path(PLATFORM_PATH, &plafh) != PICL_SUCCESS))
 		return;
 
+	if (strcmp(ename, PICLEVENT_DR_AP_STATE_CHANGE) == 0) {
+		(void) setup_cpus(plafh);
+		if (picldevtree_debug > 1)
+			syslog(LOG_INFO, "picldevtree: event handler done\n");
+		return;
+	}
+
 	nvlp = NULL;
-	if (ptree_get_node_by_path(PLATFORM_PATH, &plafh) != PICL_SUCCESS ||
-	    nvlist_unpack((char *)earg, size, &nvlp, NULL) ||
+	if (nvlist_unpack((char *)earg, size, &nvlp, NULL) ||
 	    nvlist_lookup_string(nvlp, PICLEVENTARG_DEVFS_PATH, &devfs_path) ||
 	    strlen(devfs_path) > (PATH_MAX - sizeof (PLATFORM_PATH))) {
 		syslog(LOG_INFO, PICL_EVENT_DROPPED, ename);
