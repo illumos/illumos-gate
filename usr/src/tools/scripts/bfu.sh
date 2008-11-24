@@ -297,6 +297,9 @@ superfluous_nonglobal_zone_files="
 	kernel
 	lib/libmeta.so
 	lib/libmeta.so.1
+	lib/svc/method/fc-fabric
+	lib/svc/method/iscsid
+	lib/svc/method/npivconfig
 	lib/svc/method/sf880dr
 	lib/svc/method/svc-cvcd
 	lib/svc/method/svc-dcs
@@ -317,6 +320,7 @@ superfluous_nonglobal_zone_files="
 	lib/svc/method/svc-rmvolmgr
 	lib/svc/method/svc-scheduler
 	lib/svc/method/svc-sckmd
+	lib/svc/method/svc-stmf
 	lib/svc/method/svc-syseventd
 	lib/svc/method/svc-tnctl
 	lib/svc/method/svc-tnd
@@ -351,6 +355,8 @@ superfluous_nonglobal_zone_files="
 	usr/platform/SUNW,SPARC-Enterprise/sbin/prtdscp
 	var/adm/pool
 	var/log/pool
+	var/svc/manifest/network/iscsi_initiator.xml
+	var/svc/manifest/network/npiv_config.xml
 	var/svc/manifest/network/rpc/mdcomm.xml
 	var/svc/manifest/network/rpc/meta.xml
 	var/svc/manifest/network/rpc/metamed.xml
@@ -366,7 +372,9 @@ superfluous_nonglobal_zone_files="
 	var/svc/manifest/platform/sun4u/sf880drd.xml
 	var/svc/manifest/platform/sun4v
 	var/svc/manifest/system/cvc.xml
+	var/svc/manifest/system/device/devices-fc-fabric.xml
 	var/svc/manifest/system/dumpadm.xml
+	var/svc/manifest/system/filesystem/rmvolmgr.xml
 	var/svc/manifest/system/fmd.xml
 	var/svc/manifest/system/hal.xml
 	var/svc/manifest/system/intrd.xml
@@ -380,10 +388,10 @@ superfluous_nonglobal_zone_files="
 	var/svc/manifest/system/power.xml
 	var/svc/manifest/system/resource-mgmt.xml
 	var/svc/manifest/system/scheduler.xml
+	var/svc/manifest/system/stmf.xml
 	var/svc/manifest/system/sysevent.xml
 	var/svc/manifest/system/vtdaemon.xml
 	var/svc/manifest/system/zones.xml
-	var/svc/manifest/system/filesystem/rmvolmgr.xml
 "
 
 #
