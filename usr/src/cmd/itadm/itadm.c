@@ -868,13 +868,17 @@ list_target(char *tgt, boolean_t verbose, boolean_t script)
 		}
 
 		if (!script) {
-			(void) printf("\n\t%-20s\t%s\n\t%-20s\t%s\n"
+			(void) printf("\n\t%-20s\t%s\n\t%-20s\t%s %s\n"
 			    "\t%-20s\t%s\n\t%-20s\t%s\n\t%-20s\t",
-			    "alias:", alias, "auth:", auth, "targetchapuser:",
+			    "alias:", alias, "auth:", auth,
+			    ((auth == gauth) ? "(defaults)" : ""),
+			    "targetchapuser:",
 			    chapu, "targetchapsecret:", chaps, "tpg-tags:");
 		} else {
-			(void) printf("\t%s\t%s\t%s\t%s\t",
-			    alias, auth, chapu, chaps);
+			(void) printf("\t%s\t%s %s\t%s\t%s\t",
+			    alias, auth,
+			    ((auth == gauth) ? "(defaults)" : ""),
+			    chapu, chaps);
 		}
 
 		first_tag = B_TRUE;
@@ -885,7 +889,8 @@ list_target(char *tgt, boolean_t verbose, boolean_t script)
 			} else {
 				first_tag = B_FALSE;
 			}
-			(void) printf("%s", tagp->tpgt_tpg_name);
+			(void) printf("%s = %d",
+			    tagp->tpgt_tpg_name, tagp->tpgt_tag);
 		}
 
 		if (first_tag) {

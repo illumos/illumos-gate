@@ -2187,11 +2187,8 @@ iscsit_handle_operational_key(iscsit_conn_t *ict, nvpair_t *nvp,
 		    B_TRUE);
 		break;
 	case KI_IMMEDIATE_DATA:
-		/*
-		 * For now we *require* IMMEDIATE_DATA=no.
-		 */
 		kvrc = iscsit_handle_boolean(ict, nvp, bool_val, ikvx,
-		    B_FALSE);
+		    bool_val);
 		break;
 	case KI_DATA_PDU_IN_ORDER:
 		kvrc = iscsit_handle_boolean(ict, nvp, bool_val, ikvx,
