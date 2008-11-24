@@ -33,7 +33,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implements a kernel based, client side RPC over Connection Oriented
@@ -181,6 +180,7 @@
 #include <sys/callb.h>
 #include <sys/sunddi.h>
 #include <sys/atomic.h>
+#include <sys/sdt.h>
 
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -398,7 +398,7 @@ static enum clnt_stat connmgr_cwait(struct cm_xprt *, const struct timeval *,
 	bool_t);
 static void connmgr_dis_and_wait(struct cm_xprt *);
 
-static void	clnt_dispatch_send(queue_t *, mblk_t *, calllist_t *, uint_t,
+static int	clnt_dispatch_send(queue_t *, mblk_t *, calllist_t *, uint_t,
 					uint_t);
 
 static int clnt_delay(clock_t, bool_t);
@@ -1081,8 +1081,22 @@ call_again:
 	    tidu_size);
 
 	wq = cm_entry->x_wq;
-	clnt_dispatch_send(wq, mp, call, p->cku_xid,
+	status = clnt_dispatch_send(wq, mp, call, p->cku_xid,
 	    (p->cku_flags & CKU_ONQUEUE));
+
+	if (status == RPC_CANTSEND) {
+		p->cku_err.re_status = status;
+		p->cku_err.re_errno = EIO;
+		DTRACE_PROBE(krpc__e__clntcots__kcallit__cantsend);
+
+		/*
+		 * Allow for processing of the QFULL queue.
+		 */
+		delay_first = TRUE;
+		ticks = clnt_cots_min_tout * drv_usectohz(1000000);
+
+		goto cots_done;
+	}
 
 	RPCLOG(64, "clnt_cots_kcallit: sent call for xid 0x%x\n",
 	    (uint_t)p->cku_xid);
@@ -2521,7 +2535,11 @@ connmgr_connect(
 	 * We use the entry in the handle that is normally used for
 	 * waiting for RPC replies to wait for the connection accept.
 	 */
-	clnt_dispatch_send(wq, mp, e, 0, 0);
+	if (clnt_dispatch_send(wq, mp, e, 0, 0) != RPC_SUCCESS) {
+		DTRACE_PROBE(krpc__e__connmgr__connect__cantsend);
+		freemsg(mp);
+		return (FALSE);
+	}
 
 	mutex_enter(&clnt_pending_lock);
 
@@ -2690,7 +2708,12 @@ connmgr_setopt(queue_t *wq, int level, int name, calllist_t *e)
 	 * We will use this connection regardless
 	 * of whether or not the option is settable.
 	 */
-	clnt_dispatch_send(wq, mp, e, 0, 0);
+	if (clnt_dispatch_send(wq, mp, e, 0, 0) != RPC_SUCCESS) {
+		DTRACE_PROBE(krpc__e__connmgr__setopt__cantsend);
+		freemsg(mp);
+		return (FALSE);
+	}
+
 	mutex_enter(&clnt_pending_lock);
 
 	waitp.tv_sec = clnt_cots_min_conntout;
@@ -2799,7 +2822,7 @@ connmgr_snddis(struct cm_xprt *cm_entry)
  * Sets up the entry for receiving replies, and calls rpcmod's write put proc
  * (through put) to send the call.
  */
-static void
+static int
 clnt_dispatch_send(queue_t *q, mblk_t *mp, calllist_t *e, uint_t xid,
 			uint_t queue_flag)
 {
@@ -2811,13 +2834,20 @@ clnt_dispatch_send(queue_t *q, mblk_t *mp, calllist_t *e, uint_t xid,
 	e->call_xid = xid;
 	e->call_notified = FALSE;
 
+	if (!canput(q)) {
+		e->call_status = RPC_CANTSEND;
+		e->call_reason = EIO;
+		return (RPC_CANTSEND);
+	}
+
 	/*
 	 * If queue_flag is set then the calllist_t is already on the hash
 	 * queue.  In this case just send the message and return.
 	 */
 	if (queue_flag) {
 		put(q, mp);
-		return;
+		return (RPC_SUCCESS);
+
 	}
 
 	/*
@@ -2842,6 +2872,7 @@ clnt_dispatch_send(queue_t *q, mblk_t *mp, calllist_t *e, uint_t xid,
 	}
 
 	put(q, mp);
+	return (RPC_SUCCESS);
 }
 
 /*

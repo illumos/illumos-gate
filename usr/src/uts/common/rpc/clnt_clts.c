@@ -33,7 +33,6 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implements a kernel based, client side RPC.
@@ -2102,9 +2101,12 @@ clnt_clts_dispatch_send(queue_t *q, mblk_t *mp, struct netbuf *addr,
 	/*
 	 * Send downstream.
 	 */
-	put(cp->call_wq, bp);
+	if (canput(cp->call_wq)) {
+		put(cp->call_wq, bp);
+		return (0);
+	}
 
-	return (0);
+	return (EIO);
 }
 
 /*
