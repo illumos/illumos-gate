@@ -133,7 +133,7 @@ kcf_soft_config_init(void)
 	static crypto_mech_name_t	aes_mechs[] = {
 	    "CKM_AES_ECB", "CKM_AES_CBC", "CKM_AES_CTR", "CKM_AES_CCM",
 	    "CKM_AES_GCM", ""};
-	static crypto_mech_name_t 	arcfour_mechs[] = {
+	static crypto_mech_name_t	arcfour_mechs[] = {
 	    "CKM_RC4", ""};
 	static crypto_mech_name_t	blowfish_mechs[] = {
 	    "CKM_BLOWFISH_ECB", "CKM_BLOWFISH_CBC", ""};
@@ -184,24 +184,20 @@ kcf_soft_config_init(void)
 	for (i = initial_soft_config_entries - 1; i >= 0; --i) {
 		initial_soft_config_entry_t *p = &initial_soft_config_entry[i];
 		crypto_mech_name_t	*mechsp;
-		char			*namep;
-		uint_t			namelen, alloc_size;
+		uint_t			alloc_size;
 		int			mech_count, r;
 
-		/* allocate/initialize memory for name and mechanism list */
-		namelen = strlen(p->name) + 1;
-		namep = kmem_alloc(namelen, KM_SLEEP);
-		(void) strlcpy(namep, p->name, namelen);
+		/* allocate/initialize memory for mechanism list */
 		mech_count = count_mechanisms(p->mechs);
 		alloc_size = mech_count * CRYPTO_MAX_MECH_NAME;
 		mechsp = kmem_alloc(alloc_size, KM_SLEEP);
 		bcopy(p->mechs, mechsp, alloc_size);
 
-		r = add_soft_config(namep, mech_count, mechsp);
+		r = add_soft_config(p->name, mech_count, mechsp);
 		if (r != 0)
 			cmn_err(CE_WARN,
 			    "add_soft_config(%s) failed; returned %d\n",
-			    namep, r);
+			    p->name, r);
 	}
 #if DEBUG
 	if (kcf_frmwrk_debug >= 1)
@@ -1038,8 +1034,8 @@ free_soft_config_entry(kcf_soft_conf_entry_t *p)
  * with default kernel providers) and from crypto_load_soft_config() for
  * the CRYPTO_LOAD_SOFT_CONFIG ioctl (for third-party kernel modules).
  *
- * Important note: the name and array arguments must be allocated memory
- * and are consumed in soft_config_list.
+ * Important note: the array argument must be allocated memory
+ * since it is consumed in soft_config_list.
  */
 static int
 add_soft_config(char *name, uint_t count, crypto_mech_name_t *array)
