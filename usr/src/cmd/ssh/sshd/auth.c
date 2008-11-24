@@ -306,19 +306,45 @@ audit_failed_login_cleanup(void *ctxt)
 	Authctxt *authctxt = (Authctxt *)ctxt;
 	adt_session_data_t *ah;
 
-	if (authctxt == NULL)
+	/*
+	 * This table lists the different variable combinations evaluated and
+	 * what the resulting PAM return value is.  As the table shows
+	 * authctxt and authctxt->valid need to be checked before either of
+	 * the authctxt->pam* variables.
+	 *
+	 *           authctxt->                     authctxt->     
+	 * authctxt    valid      authctxt->pam       pam_retval   PAM rval
+	 * --------  ----------   -------------     ------------   --------
+	 *   NULL      ANY             ANY              ANY        PAM_ABORT
+	 *    OK      zero (0)         ANY              ANY     PAM_USER_UNKNOWN
+	 *    OK       one (1)         NULL         PAM_SUCCESS  PAM_PERM_DENIED
+	 *    OK       one (1)         NULL        !PAM_SUCCESS   authctxt->
+	 *                                                          pam_retval
+	 *    OK       one (1)         VALID            ANY       authctxt->
+	 *                                                        pam_retval (+)
+	 * (+) If not set then default to PAM_PERM_DENIED
+	 */
+
+	if (authctxt == NULL) {
 		/* Internal error */
 		audit_sshd_login_failure(&ah, PAM_ABORT, NULL);
-	else if (authctxt->pam == NULL && authctxt->pam_retval != PAM_SUCCESS)
-		audit_sshd_login_failure(&ah, authctxt->pam_retval,
-		    authctxt->user);
-	else if (authctxt->pam == NULL && authctxt->pam_retval == PAM_SUCCESS)
-		audit_sshd_login_failure(&ah, PAM_PERM_DENIED, authctxt->user);
-	else if (!authctxt->valid)
+		return;
+	}
+
+	if (authctxt->valid == 0) {
 		audit_sshd_login_failure(&ah, PAM_USER_UNKNOWN, NULL);
-	else
+	} else if (authctxt->pam == NULL) {
+		if (authctxt->pam_retval == PAM_SUCCESS) {
+			audit_sshd_login_failure(&ah, PAM_PERM_DENIED,
+			    authctxt->user);
+		} else {
+			audit_sshd_login_failure(&ah, authctxt->pam_retval,
+			    authctxt->user);
+		}
+	} else {
 		audit_sshd_login_failure(&ah, AUTHPAM_ERROR(authctxt,
 		    PAM_PERM_DENIED), authctxt->user);
+	}
 }
 #endif /* HAVE_BSM */
 
