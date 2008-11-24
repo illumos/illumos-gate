@@ -157,10 +157,13 @@ remove_fdesc(Fdesc *fdp)
 	}
 	if (fdp->fd_fd)
 		(void) close(fdp->fd_fd);
-	if (fdp->fd_pname && (fdp->fd_pname != fdp->fd_nname))
-		free((void *)fdp->fd_pname);
-	if (fdp->fd_nname)
-		free((void *)fdp->fd_nname);
+
+	if ((fdp->fd_flags & FLG_FD_ALTER) == 0) {
+		if (fdp->fd_pname && (fdp->fd_pname != fdp->fd_nname))
+			free((void *)fdp->fd_pname);
+		if (fdp->fd_nname)
+			free((void *)fdp->fd_nname);
+	}
 }
 
 /*

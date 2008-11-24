@@ -1897,6 +1897,9 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 				return (0);
 			nfdp->fd_pname = pname;
 		}
+
+		nfdp->fd_flags |= FLG_FD_SLASH;
+
 	} else if (slash) {
 		Rej_desc	_rej = { 0 };
 
