@@ -2040,7 +2040,7 @@ _idm_init(void)
 		return (ENOMEM);
 	}
 
-	/* start watchdog thread */
+	/* Start watchdog thread */
 	idm.idm_wd_thread = thread_create(NULL, 0,
 	    idm_wd_thread, NULL, 0, &p0, TS_RUN, minclsyspri);
 	if (idm.idm_wd_thread == NULL) {
@@ -2053,6 +2053,7 @@ _idm_init(void)
 		return (ENOMEM);
 	}
 
+	/* Pause until the watchdog thread is running */
 	mutex_enter(&idm.idm_global_mutex);
 	while (!idm.idm_wd_thread_running)
 		cv_wait(&idm.idm_wd_cv, &idm.idm_global_mutex);

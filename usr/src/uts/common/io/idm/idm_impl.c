@@ -968,10 +968,10 @@ idm_wd_thread(void *arg)
 	clock_t		wake_time;
 	clock_t		idle_time;
 
+	/* Record the thread id for thread_join() */
+	idm.idm_wd_thread_did = curthread->t_did;
 	mutex_enter(&idm.idm_global_mutex);
 	idm.idm_wd_thread_running = B_TRUE;
-	idm.idm_wd_thread_did = idm.idm_wd_thread->t_did;
-
 	cv_signal(&idm.idm_wd_cv);
 
 	while (idm.idm_wd_thread_running) {
