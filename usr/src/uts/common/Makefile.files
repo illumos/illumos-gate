@@ -50,6 +50,7 @@ COMMON_CORE_OBJS +=		\
 		iscsiboot_prop.o	\
 		lgrp.o		\
 		lgrp_topo.o	\
+		mmapobj.o	\
 		mutex.o		\
 		page_lock.o	\
 		page_retire.o	\
@@ -198,6 +199,7 @@ GENUNIX_OBJS +=	\
 		lwp_timer.o	\
 		lwpsys.o	\
 		main.o		\
+		mmapobjsys.o	\
 		memcntl.o	\
 		memstr.o	\
 		lgrpsys.o	\

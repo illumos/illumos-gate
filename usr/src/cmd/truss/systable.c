@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -349,7 +347,7 @@ const struct systable systable[] = {
 {"lxstat",	3, DEC, NOV, DEC, STG, HEX},			/* 124 */
 {"fxstat",	3, DEC, NOV, DEC, DEC, HEX},			/* 125 */
 {"xmknod",	4, DEC, NOV, DEC, STG, OCT, HEX},		/* 126 */
-{ NULL,		8, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX, HEX},
+{"mmapobj",	5, DEC, NOV, DEC, HEX, HEX, HEX, HEX},		/* 127 */
 {"setrlimit",	2, DEC, NOV, RLM, HEX},				/* 128 */
 {"getrlimit",	2, DEC, NOV, RLM, HEX},				/* 129 */
 {"lchown",	3, DEC, NOV, STG, DEC, DEC},			/* 130 */

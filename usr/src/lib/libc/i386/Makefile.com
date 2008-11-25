@@ -242,6 +242,7 @@ COMSYSOBJS=			\
 	llseek.o		\
 	lseek.o			\
 	lstat.o			\
+	mmapobjsys.o		\
 	memcntl.o		\
 	mincore.o		\
 	mkdir.o			\

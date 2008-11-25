@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 #ifndef	_VM_SEG_DEV_H
 #define	_VM_SEG_DEV_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -120,6 +118,7 @@ extern int segdev_create(struct seg *, void *);
 
 extern int segdev_copyto(struct seg *, caddr_t, const void *, void *, size_t);
 extern int segdev_copyfrom(struct seg *, caddr_t, const void *, void *, size_t);
+extern struct seg_ops segdev_ops;
 
 #endif	/* _KERNEL */
 

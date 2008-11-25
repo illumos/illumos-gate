@@ -30,8 +30,6 @@
 
 /* ONC_PLUS EXTRACT END */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.51	*/
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -90,6 +88,7 @@ int	link();
 off32_t	lseek32();
 off_t	lseek64();
 int	lgrpsys();
+int	mmapobjsys();
 int	mknod();
 int	mount();
 int	nice();
@@ -601,7 +600,7 @@ struct sysent sysent[NSYSCALL] =
 			IF_i386(
 				SYSENT_CI("xmknod",	xmknod,	4),
 				SYSENT_NOSYS())),
-	/* 127 */ SYSENT_LOADABLE(),		/* was clocal */
+	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ IF_LP64(
 			SYSENT_CI("setrlimit",	setrlimit64,	2),
 			SYSENT_CI("setrlimit",	setrlimit32,	2)),
@@ -988,7 +987,7 @@ struct sysent sysent32[NSYSCALL] =
 	/* 126 */ IF_386_ABI(
 			SYSENT_CI("xmknod",	xmknod,		4),
 			SYSENT_NOSYS()),
-	/* 127 */ SYSENT_LOADABLE32(),		/* was clocal */
+	/* 127 */ SYSENT_CI("mmapobj",		mmapobjsys,	5),
 	/* 128 */ SYSENT_CI("setrlimit",	setrlimit32,	2),
 	/* 129 */ SYSENT_CI("getrlimit",	getrlimit32,	2),
 	/* 130 */ SYSENT_CI("lchown",		lchown,		3),

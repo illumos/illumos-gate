@@ -264,6 +264,7 @@ COMSYSOBJS=			\
 	mkdir.o			\
 	mknod.o			\
 	mmap.o			\
+	mmapobjsys.o		\
 	modctl.o		\
 	mount.o			\
 	mprotect.o		\

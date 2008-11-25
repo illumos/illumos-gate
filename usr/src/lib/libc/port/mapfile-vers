@@ -84,6 +84,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	lio_listio;
 	mkdtemp;
 	mkstemps;
+	mmapobj;
 	mq_close;
 	mq_getattr;
 	mq_notify;

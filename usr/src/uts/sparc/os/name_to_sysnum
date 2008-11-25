@@ -112,6 +112,7 @@ xstat			123
 lxstat			124
 fxstat			125
 xmknod			126
+mmapobj			127
 setrlimit		128
 getrlimit		129
 lchown			130

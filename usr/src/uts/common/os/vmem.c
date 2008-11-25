@@ -1151,6 +1151,11 @@ do_alloc:
 	if (vbest != NULL) {
 		ASSERT(vbest->vs_type == VMEM_FREE);
 		ASSERT(vbest->vs_knext != vbest);
+		/* re-position to end of buffer */
+		if (vmflag & VM_ENDALLOC) {
+			addr += ((vbest->vs_end - (addr + size)) / align) *
+			    align;
+		}
 		(void) vmem_seg_alloc(vmp, vbest, addr, size);
 		mutex_exit(&vmp->vm_lock);
 		if (xvaddr)
@@ -1280,6 +1285,9 @@ vmem_alloc(vmem_t *vmp, size_t size, int vmflag)
 	ASSERT(size <= (1UL << flist));
 	vsp = vmp->vm_freelist[flist].vs_knext;
 	addr = vsp->vs_start;
+	if (vmflag & VM_ENDALLOC) {
+		addr += vsp->vs_end - (addr + size);
+	}
 	(void) vmem_seg_alloc(vmp, vsp, addr, size);
 	mutex_exit(&vmp->vm_lock);
 	return ((void *)addr);

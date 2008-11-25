@@ -30,8 +30,6 @@
 #ifndef	_SYS_SYSCALL_H
 #define	_SYS_SYSCALL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -319,6 +317,7 @@ extern "C" {
 #define	SYS_lxstat	124
 #define	SYS_fxstat	125
 #define	SYS_xmknod	126
+#define	SYS_mmapobj	127
 #define	SYS_setrlimit	128
 #define	SYS_getrlimit	129
 #define	SYS_lchown	130

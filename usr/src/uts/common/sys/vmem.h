@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_VMEM_H
 #define	_SYS_VMEM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -61,6 +59,12 @@ extern "C" {
  * flag is a segkmem-specific flag, and should not be used by anyone else.
  */
 #define	VM_ABORT	0x00002000
+
+/*
+ * VM_ENDALLOC requests that large addresses be preferred in allocations.
+ * Has no effect if VM_NEXTFIT is active.
+ */
+#define	VM_ENDALLOC	0x00004000
 
 #define	VM_FLAGS	0x0000FFFF
 

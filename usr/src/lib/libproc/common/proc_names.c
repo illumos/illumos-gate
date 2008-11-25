@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #define	__EXTENSIONS__
@@ -245,7 +243,7 @@ static const char *const systable[] = {
 	"lxstat",		/* 124 */
 	"fxstat",		/* 125 */
 	"xmknod",		/* 126 */
-	"NULL",			/* 127 */
+	"mmapobj",		/* 127 */
 	"setrlimit",		/* 128 */
 	"getrlimit",		/* 129 */
 	"lchown",		/* 130 */

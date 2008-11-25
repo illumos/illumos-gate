@@ -368,6 +368,7 @@ CHKHDRS=			\
 	miiregs.h		\
 	mixer.h			\
 	mman.h			\
+	mmapobj.h		\
 	mntent.h		\
 	mntio.h			\
 	mnttab.h		\

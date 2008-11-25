@@ -40,8 +40,6 @@
 #ifndef	_SYS_MMAN_H
 #define	_SYS_MMAN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/feature_tests.h>
 
 #ifdef	__cplusplus
@@ -121,6 +119,71 @@ extern "C" {
 
 #include <sys/types.h>
 
+#endif	/* !_ASM && !_KERNEL */
+
+/* External flags for mmapobj syscall (Exclusive of MAP_* flags above) */
+#define	MMOBJ_PADDING		0x10000
+#define	MMOBJ_INTERPRET		0x20000
+
+#define	MMOBJ_ALL_FLAGS		(MMOBJ_PADDING | MMOBJ_INTERPRET)
+
+/*
+ * Values for mr_flags field of mmapobj_result_t below.
+ * The bottom 16 bits are mutually exclusive and thus only one
+ * of them can be set at a time.  Use MR_GET_TYPE below to check this value.
+ * The top 16 bits are used for flags which are not mutually exclusive and
+ * thus more than one of these flags can be set for a given mmapobj_result_t.
+ *
+ * MR_PADDING being set indicates that this memory range represents the user
+ * requested padding.
+ *
+ * MR_HDR_ELF being set indicates that the ELF header of the mapped object
+ * is mapped at mr_addr + mr_offset.
+ *
+ * MR_HDR_AOUT being set indicates that the AOUT (4.x) header of the mapped
+ * object is mapped at mr_addr + mr_offset.
+ */
+
+/*
+ * External flags for mr_flags field below.
+ */
+#define	MR_PADDING	0x1
+#define	MR_HDR_ELF	0x2
+#define	MR_HDR_AOUT	0x3
+
+/*
+ * Internal flags for mr_flags field below.
+ */
+#ifdef	_KERNEL
+#define	MR_RESV	0x80000000	/* overmapped /dev/null */
+#endif	/* _KERNEL */
+
+#define	MR_TYPE_MASK 0x0000ffff
+#define	MR_GET_TYPE(val)	((val) & MR_TYPE_MASK)
+
+#if	!defined(_ASM)
+typedef struct mmapobj_result {
+	caddr_t		mr_addr;	/* mapping address */
+	size_t		mr_msize;	/* mapping size */
+	size_t		mr_fsize;	/* file size */
+	size_t		mr_offset;	/* offset into file */
+	uint_t		mr_prot;	/* the protections provided */
+	uint_t		mr_flags;	/* info on the mapping */
+} mmapobj_result_t;
+
+#if defined(_KERNEL) || defined(_SYSCALL32)
+typedef struct mmapobj_result32 {
+	caddr32_t	mr_addr;	/* mapping address */
+	size32_t	mr_msize;	/* mapping size */
+	size32_t	mr_fsize;	/* file size */
+	size32_t	mr_offset;	/* offset into file */
+	uint_t		mr_prot;	/* the protections provided */
+	uint_t		mr_flags;	/* info on the mapping */
+} mmapobj_result32_t;
+#endif	/* defined(_KERNEL) || defined(_SYSCALL32) */
+#endif	/* !defined(_ASM) */
+
+#if	!defined(_ASM) && !defined(_KERNEL)
 /*
  * large file compilation environment setup
  *
@@ -157,6 +220,7 @@ extern "C" {
 #ifdef	__STDC__
 #if (_POSIX_C_SOURCE > 2) || defined(_XPG4_2)
 extern void *mmap(void *, size_t, int, int, int, off_t);
+extern int mmapobj(int, uint_t, void *, uint_t *, void *);
 extern int munmap(void *, size_t);
 extern int mprotect(void *, size_t, int);
 extern int msync(void *, size_t, int);
@@ -172,6 +236,7 @@ extern void *mmap64(void *, size_t, int, int, int, off64_t);
 #else	/* (_POSIX_C_SOURCE > 2) || defined(_XPG4_2) */
 extern caddr_t mmap(caddr_t, size_t, int, int, int, off_t);
 extern int munmap(caddr_t, size_t);
+extern int mmapobj(int, uint_t, mmapobj_result_t *, uint_t *, void *);
 extern int mprotect(caddr_t, size_t, int);
 extern int msync(caddr_t, size_t, int);
 extern int mlock(caddr_t, size_t);
@@ -211,6 +276,7 @@ extern int posix_madvise(void *, size_t, int);
 #else	/* __STDC__ */
 extern caddr_t mmap();
 extern int munmap();
+extern int mmapobj();
 extern int mprotect();
 extern int mincore();
 extern int memcntl();
