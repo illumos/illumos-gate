@@ -1754,7 +1754,7 @@ zfs_do_list(int argc, char **argv)
 	boolean_t scripted = B_FALSE;
 	static char default_fields[] =
 	    "name,used,available,referenced,mountpoint";
-	int types = ZFS_TYPE_DATASET;
+	int types = ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME;
 	boolean_t types_specified = B_FALSE;
 	char *fields = NULL;
 	list_cbdata_t cb = { 0 };

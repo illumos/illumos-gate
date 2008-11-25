@@ -2425,8 +2425,7 @@ arc_read_done(zio_t *zio)
  *
  * Normal callers should use arc_read and pass the arc buffer and offset
  * for the bp.  But if you know you don't need locking, you can use
- * arc_read_nolock.  Callers cannot use a "done" function in a prefetch
- * call (i.e., with ARC_NOWAIT set).
+ * arc_read_bp.
  */
 int
 arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_buf_t *pbuf,

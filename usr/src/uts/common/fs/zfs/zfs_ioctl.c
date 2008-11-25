@@ -1291,28 +1291,6 @@ zfs_ioc_objset_zplprops(zfs_cmd_t *zc)
 	return (err);
 }
 
-static void
-zfs_prefetch_datasets(zfs_cmd_t *zc, objset_t *os, char *p)
-{
-	uint64_t cookie = 0;
-	int error;
-
-	do {
-		error = dmu_dir_list_next(os,
-		    sizeof (zc->zc_name) - (p - zc->zc_name), p,
-		    NULL, &cookie);
-	} while (error == 0 && !INGLOBALZONE(curproc) &&
-	    !zone_dataset_visible(zc->zc_name, NULL) &&
-	    !dmu_objset_prefetch(zc->zc_name, NULL));
-}
-
-static void
-zfs_prefetch_snapshots(zfs_cmd_t *zc)
-{
-	dmu_objset_find(zc->zc_name, dmu_objset_prefetch,
-	    NULL, DS_FIND_SNAPSHOTS);
-}
-
 /*
  * inputs:
  * zc_name		name of filesystem
@@ -1344,8 +1322,6 @@ zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 		(void) strlcat(zc->zc_name, "/", sizeof (zc->zc_name));
 	p = zc->zc_name + strlen(zc->zc_name);
 
-	if (zc->zc_cookie == 0)
-		zfs_prefetch_datasets(zc, os, p);
 	do {
 		error = dmu_dir_list_next(os,
 		    sizeof (zc->zc_name) - (p - zc->zc_name), p,
@@ -1389,8 +1365,6 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 	if (error)
 		return (error == ENOENT ? ESRCH : error);
 
-	if (zc->zc_cookie == 0)
-		zfs_prefetch_snapshots(zc);
 	/*
 	 * A dataset name of maximum length cannot have any snapshots,
 	 * so exit immediately.
