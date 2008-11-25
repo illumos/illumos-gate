@@ -1249,7 +1249,7 @@ const struct st_drivetype st_drivetypes[] =
     {0x40, 0x40, 0x42, 0x42}, /* .densities       Density codes [Note 1]      */
     MT_DENSITY4,              /* .default_density (.densities[x])             */
     {0, 0, 0, 0},             /* .speeds          Speed codes [Note 2]        */
-    MINUTES(1),               /* .non_motion_timeout                          */
+    MINUTES(10),              /* .non_motion_timeout                          */
     MINUTES(5),               /* .io_timeout Four                             */
     MINUTES(10),              /* .rewind_timeout                              */
     MINUTES(20),              /* .space_timeout                               */
