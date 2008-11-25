@@ -698,15 +698,9 @@ ztest_random_compress(void)
 	return ((uint8_t)ztest_random(ZIO_COMPRESS_FUNCTIONS));
 }
 
-typedef struct ztest_replay {
-	objset_t	*zr_os;
-	uint64_t	zr_assign;
-} ztest_replay_t;
-
 static int
-ztest_replay_create(ztest_replay_t *zr, lr_create_t *lr, boolean_t byteswap)
+ztest_replay_create(objset_t *os, lr_create_t *lr, boolean_t byteswap)
 {
-	objset_t *os = zr->zr_os;
 	dmu_tx_t *tx;
 	int error;
 
@@ -715,7 +709,7 @@ ztest_replay_create(ztest_replay_t *zr, lr_create_t *lr, boolean_t byteswap)
 
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT);
-	error = dmu_tx_assign(tx, zr->zr_assign);
+	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
 		dmu_tx_abort(tx);
 		return (error);
@@ -732,16 +726,15 @@ ztest_replay_create(ztest_replay_t *zr, lr_create_t *lr, boolean_t byteswap)
 		(void) printf("replay create of %s object %llu"
 		    " in txg %llu = %d\n",
 		    osname, (u_longlong_t)lr->lr_doid,
-		    (u_longlong_t)zr->zr_assign, error);
+		    (u_longlong_t)dmu_tx_get_txg(tx), error);
 	}
 
 	return (error);
 }
 
 static int
-ztest_replay_remove(ztest_replay_t *zr, lr_remove_t *lr, boolean_t byteswap)
+ztest_replay_remove(objset_t *os, lr_remove_t *lr, boolean_t byteswap)
 {
-	objset_t *os = zr->zr_os;
 	dmu_tx_t *tx;
 	int error;
 
@@ -750,7 +743,7 @@ ztest_replay_remove(ztest_replay_t *zr, lr_remove_t *lr, boolean_t byteswap)
 
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_free(tx, lr->lr_doid, 0, DMU_OBJECT_END);
-	error = dmu_tx_assign(tx, zr->zr_assign);
+	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
 		dmu_tx_abort(tx);
 		return (error);
@@ -1278,7 +1271,6 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	zilog_t *zilog;
 	uint64_t seq;
 	uint64_t objects;
-	ztest_replay_t zr;
 
 	(void) rw_rdlock(&ztest_shared->zs_name_lock);
 	(void) snprintf(name, 100, "%s/%s_temp_%llu", za->za_pool, za->za_pool,
@@ -1295,8 +1287,7 @@ ztest_dmu_objset_create_destroy(ztest_args_t *za)
 	 */
 	if (ztest_random(2) == 0 &&
 	    dmu_objset_open(name, DMU_OST_OTHER, DS_MODE_OWNER, &os) == 0) {
-		zr.zr_os = os;
-		zil_replay(os, &zr, &zr.zr_assign, ztest_replay_vector, NULL);
+		zil_replay(os, os, ztest_replay_vector);
 		dmu_objset_close(os);
 	}
 
@@ -3140,7 +3131,6 @@ ztest_run(char *pool)
 		za[t].za_kill = za[0].za_kill;
 
 		if (t < zopt_datasets) {
-			ztest_replay_t zr;
 			int test_future = FALSE;
 			(void) rw_rdlock(&ztest_shared->zs_name_lock);
 			(void) snprintf(name, 100, "%s/%s_%d", pool, pool, d);
@@ -3164,9 +3154,8 @@ ztest_run(char *pool)
 			(void) rw_unlock(&ztest_shared->zs_name_lock);
 			if (test_future)
 				ztest_dmu_check_future_leak(&za[t]);
-			zr.zr_os = za[d].za_os;
-			zil_replay(zr.zr_os, &zr, &zr.zr_assign,
-			    ztest_replay_vector, NULL);
+			zil_replay(za[d].za_os, za[d].za_os,
+			    ztest_replay_vector);
 			za[d].za_zilog = zil_open(za[d].za_os, NULL);
 		}
 
