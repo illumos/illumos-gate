@@ -25,8 +25,7 @@
  */
 
 /*
- * Create a topology node for a top level PRI node, one that is a child
- * of the 'components' node.
+ * Enumerate a DIMM node
  */
 #include <sys/types.h>
 #include <strings.h>
@@ -35,27 +34,52 @@
 #include <fm/topo_hc.h>
 #include "pi_impl.h"
 
-#define	_ENUM_NAME	"enum_top"
+#define	_ENUM_NAME	"enum_mem"
 
-/*
- * This enumerator is the same as the generic enumerator, except that when
- * the FMRI is created, the parent node must be NULL.  This is true for all
- * top level nodes.
- */
 int
-pi_enum_top(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
+pi_enum_mem(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
     topo_instance_t inst, tnode_t *t_parent, const char *hc_name,
     tnode_t **t_node)
 {
-	int	result;
+	int		result;
+	int		err;
+	nvlist_t	*rsrc = NULL;
+
+	*t_node = NULL;
 
 	/*
-	 * This is a top-level topology node and there is no resource data
-	 * from which to generate an FMRI.  We use a NULL value for the FMRI
-	 * parent when creating the FMRI for this node so that the underlying
-	 * libtopo method does not fail.
+	 * Create the basic topology node for the DIMM using the generic
+	 * enumerator.  The dimm serial is added to the resource so
+	 * the retire agent can retire correct page whether the dimm
+	 * has been moved or not.
 	 */
 	result = pi_enum_generic_impl(mod, mdp, mde_node, inst, t_parent,
-	    NULL, hc_name, _ENUM_NAME, t_node, 0);
-	return (result);
+	    t_parent, hc_name, _ENUM_NAME, t_node, SUN4VPI_ENUM_ADD_SERIAL);
+	if (result != 0) {
+		/* Error messages are printed by the generic routine */
+		return (result);
+	}
+
+	/*
+	 * Set ASRU compute method, using resource as argument.
+	 */
+	result = topo_node_resource(*t_node, &rsrc, &err);
+	if (result != 0) {
+		topo_mod_dprintf(mod,
+		    "%s node_0x%llx failed to get resource: %s\n",
+		    _ENUM_NAME, (uint64_t)mde_node, topo_strerror(err));
+		return (-1);
+	}
+
+	/* Set the ASRU on the node with COMPUTE flag */
+	result = topo_node_asru_set(*t_node, rsrc, TOPO_ASRU_COMPUTE, &err);
+	nvlist_free(rsrc);
+	if (result != 0) {
+		topo_mod_dprintf(mod,
+		    "%s node_0x%llx failed to set ASRU: %s\n", _ENUM_NAME,
+		    (uint64_t)mde_node, topo_strerror(err));
+		return (-1);
+	}
+
+	return (0);
 }

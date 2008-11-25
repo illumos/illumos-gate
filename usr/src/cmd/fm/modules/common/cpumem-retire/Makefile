@@ -45,5 +45,5 @@ $(SPARC_BLD)INCDIRS += $(SRC)/uts/sun4u
 
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
 
-$(SPARC_BLD)LDFLAGS += -R/usr/lib/fm
-$(SPARC_BLD)LDLIBS += -L$(ROOTLIB)/fm -lfmd_agent
+LDFLAGS += -R/usr/lib/fm
+LDLIBS += -L$(ROOTLIB)/fm -lfmd_agent

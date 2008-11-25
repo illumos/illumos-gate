@@ -46,7 +46,8 @@ extern boolean_t cma_is_native;
 
 typedef struct cma_page {
 	struct cma_page *pg_next;	/* List of page retirements for retry */
-	nvlist_t *pg_fmri;		/* FMRI for this page */
+	nvlist_t *pg_rsrc;		/* Resource for this page */
+	nvlist_t *pg_asru;		/* ASRU for this page */
 	uint64_t pg_addr;		/* Address of this page */
 	char *pg_uuid;			/* UUID for this page's case */
 	uint_t pg_nretries;		/* Number of retries so far for page */
@@ -106,7 +107,7 @@ typedef struct cma_stats {
 extern cma_stats_t cma_stats;
 extern cma_t cma;
 
-extern int cma_cpu_retire(fmd_hdl_t *, nvlist_t *, nvlist_t *,
+extern int cma_cpu_cpu_retire(fmd_hdl_t *, nvlist_t *, nvlist_t *,
     const char *, boolean_t);
 extern int cma_cpu_hc_retire(fmd_hdl_t *, nvlist_t *, nvlist_t *,
     const char *, boolean_t);
@@ -129,6 +130,8 @@ extern int cma_fmri_page_retire(fmd_hdl_t *, nvlist_t *);
 extern int cma_fmri_page_unretire(fmd_hdl_t *, nvlist_t *);
 
 #ifdef sun4v
+extern void cma_cpu_start_retry(fmd_hdl_t *, nvlist_t *, const char *,
+    boolean_t);
 extern void cma_cpu_fini(fmd_hdl_t *);
 extern void cma_cpu_retry(fmd_hdl_t *);
 #endif /* sun4v */

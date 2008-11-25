@@ -45,7 +45,7 @@ INCDIRS = . \
 
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)' -Dsun4v
 LDFLAGS += -R/usr/lib/fm
-LDLIBS += -L$(ROOTLIB)/fm -lldom
+LDLIBS += -L$(ROOTLIB)/fm -lldom -ltopo
 
 %.o: $(CPUMEM_RETIRE_COMMON)/%.c
 	$(COMPILE.c) -o $@ $<

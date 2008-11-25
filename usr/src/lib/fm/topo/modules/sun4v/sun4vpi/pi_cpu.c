@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Enumerate a CPU node
  */
@@ -64,40 +62,59 @@ pi_enum_cpu(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	 * enumerator.
 	 */
 	result = pi_enum_generic_impl(mod, mdp, mde_node, inst, t_parent,
-	    t_parent, hc_name, _ENUM_NAME, t_node);
+	    t_parent, hc_name, _ENUM_NAME, t_node, 0);
 	if (result != 0) {
 		/* Error messages are printed by the generic routine */
 		return (result);
 	}
 
 	/*
-	 * Get the parameters required to create an FMRI.  The cpumask is
-	 * on the chip itself and while it may be part of an ereport
-	 * payload is unavailable here, so we set it to zero.
+	 * If the hc_name is "chip" or "core", set asru to resource,
+	 * otherwise for "cpu" and "strand", set asru to CPU scheme FMRI.
 	 */
-	cpumask = 0;
+	if (strcmp(hc_name, CHIP) == 0 || strcmp(hc_name, CORE) == 0) {
+		result = topo_node_resource(*t_node, &asru, &err);
+		if (result != 0) {
+			topo_mod_dprintf(mod,
+			    "%s node_0x%llx failed to get resource: %s\n",
+			    _ENUM_NAME, (uint64_t)mde_node, topo_strerror(err));
+			return (-1);
+		}
+	} else {
+		/*
+		 * Compute ASRU for "cpu" and "strand" node.
+		 * Get the parameters required to create an FMRI.  The cpumask
+		 * is on the chip itself and while it may be part of an ereport
+		 * payload is unavailable here, so we set it to zero.
+		 */
+		cpumask = 0;
 
-	/*
-	 * Find the serial number, which is on the "chip" node, not the
-	 * "cpu" node.
-	 */
-	result = pi_enum_cpu_serial(mod, mdp, mde_node, &serial);
-	if (result != 0 || serial == NULL) {
-		topo_mod_dprintf(mod, "%s node_0x%llx failed to find serial "
-		    "number.\n", _ENUM_NAME, (uint64_t)mde_node);
-		return (result);
-	}
+		/*
+		 * Find the serial number, which is on the "chip" node, not the
+		 * "cpu" node.
+		 */
+		result = pi_enum_cpu_serial(mod, mdp, mde_node, &serial);
+		if (result != 0 || serial == NULL) {
+			topo_mod_dprintf(mod,
+			    "%s node_0x%llx failed to find serial number.\n",
+			    _ENUM_NAME, (uint64_t)mde_node);
+			return (result);
+		}
 
-	/* Create a CPU scheme FMRI and set it as the ASRU for the CPU node */
-	asru = topo_mod_cpufmri(mod, FM_CPU_SCHEME_VERSION, inst, cpumask,
-	    serial);
-	topo_mod_strfree(mod, serial);
-	if (asru == NULL) {
-		topo_mod_dprintf(mod,
-		    "%s node_0x%llx failed to compute cpu scheme ASRU: %s\n",
-		    _ENUM_NAME, (uint64_t)mde_node,
-		    topo_strerror(topo_mod_errno(mod)));
-		return (-1);
+		/*
+		 * Create a CPU scheme FMRI and set it as the ASRU for the CPU
+		 * node
+		 */
+		asru = topo_mod_cpufmri(mod, FM_CPU_SCHEME_VERSION, inst,
+		    cpumask, serial);
+		topo_mod_strfree(mod, serial);
+		if (asru == NULL) {
+			topo_mod_dprintf(mod, "%s node_0x%llx failed to "
+			    "compute cpu scheme ASRU: %s\n",
+			    _ENUM_NAME, (uint64_t)mde_node,
+			    topo_strerror(topo_mod_errno(mod)));
+			return (-1);
+		}
 	}
 
 	/* Set the ASRU on the node without flags (the 0) */

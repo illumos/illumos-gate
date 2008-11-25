@@ -22,12 +22,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 ARCH = sun4v
 PRIDIR=../platform-mem
+PIDIR=../sun4vpi
 
-sun4v_SRCS = dimm_sun4v.c mem_mdesc.c
+sun4v_SRCS = dimm_sun4v.c mem_mdesc.c pi_meth.c
 
 INCDIRS = $(ROOT)/usr/platform/sun4v/include \
 		$(PRIDIR)
@@ -60,4 +60,11 @@ LDLIBS += -lumem -lmdesc -lldom
 	$(CTFCONVERT_O)
 
 %.ln: $(PRIDIR)/%.c
+	$(LINT.c) -c $<
+
+%.o: $(PIDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(PIDIR)/%.c
 	$(LINT.c) -c $<

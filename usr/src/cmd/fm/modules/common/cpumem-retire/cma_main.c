@@ -144,7 +144,7 @@ static const cma_subscriber_t cma_subrs[] = {
 	/*
 	 * The following faults do NOT retire a cpu thread,
 	 * and therefore must be intercepted before
-	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
+	 * the default "fault.cpu.*" dispatch to cma_cpu_hc_retire.
 	 */
 	{ "fault.cpu.amd.dramchannel", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
 	    NULL },
@@ -217,7 +217,7 @@ static const cma_subscriber_t cma_subrs[] = {
 	/*
 	 * The following ultraSPARC-T1/T2 faults do NOT retire a cpu thread,
 	 * and therefore must be intercepted before
-	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
+	 * the default "fault.cpu.*" dispatch to cma_cpu_hc_retire.
 	 */
 	{ "fault.cpu.*.l2cachedata", FM_FMRI_SCHEME_CPU,
 	    FM_CPU_SCHEME_VERSION, NULL },
@@ -249,8 +249,10 @@ static const cma_subscriber_t cma_subrs[] = {
 	    FM_CPU_SCHEME_VERSION, NULL },
 	{ "fault.cpu.ultraSPARC-T2plus.chip", FM_FMRI_SCHEME_HC,
 	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    cma_cpu_hc_retire },
 	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
-	    cma_cpu_retire },
+	    cma_cpu_hc_retire },
 #elif defined(opl)
 	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
@@ -259,9 +261,9 @@ static const cma_subscriber_t cma_subrs[] = {
 	{ "fault.memory.bank", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
 	{ "fault.cpu.SPARC64-VI.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
-	    cma_cpu_retire },
+	    cma_cpu_cpu_retire },
 	{ "fault.cpu.SPARC64-VII.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
-	    cma_cpu_retire },
+	    cma_cpu_cpu_retire },
 	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.se",
 		FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION, cma_cpu_hc_retire },
 	{ "fault.chassis.SPARC-Enterprise.cpu.SPARC64-VI.core.se-offlinereq",
@@ -308,7 +310,7 @@ static const cma_subscriber_t cma_subrs[] = {
 	/*
 	 * The following faults do NOT retire a cpu thread,
 	 * and therefore must be intercepted before
-	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
+	 * the default "fault.cpu.*" dispatch to cma_cpu_cpu_retire.
 	 */
 	{ "fault.cpu.ultraSPARC-IVplus.l2cachedata-line",
 	    FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
@@ -327,7 +329,7 @@ static const cma_subscriber_t cma_subrs[] = {
 	 * Default "fault.cpu.*" for "cpu" scheme ASRU dispatch.
 	 */
 	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
-	    cma_cpu_retire },
+	    cma_cpu_cpu_retire },
 #endif
 	{ NULL, NULL, 0, NULL }
 };

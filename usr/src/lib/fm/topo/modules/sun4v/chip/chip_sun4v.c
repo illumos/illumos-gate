@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -53,11 +51,12 @@
 #define	CPU_NODE_NAME	"cpu"
 #define	CHIP_NODE_NAME	"chip"
 
+extern topo_method_t pi_cpu_methods[];
+
 /* Forward declaration */
 static int chip_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
     topo_instance_t, void *, void *);
 static void chip_release(topo_mod_t *, tnode_t *);
-
 
 static const topo_modops_t chip_ops =
 	{ chip_enum, chip_release };
@@ -187,6 +186,13 @@ chip_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	/* Inherit the Label FRU fields from the parent */
 	(void) topo_node_label_set(ntn, label, &err);
 	(void) topo_node_fru_set(ntn, fru, 0, &err);
+
+	/* Register retire methods */
+	if (topo_method_register(mod, ntn, pi_cpu_methods) < 0)
+		topo_mod_dprintf(mod, "Unsable to register retire methods "
+		    "for %s%d/%s%d: %s\n",
+		    topo_node_name(parent), topo_node_instance(parent),
+		    name, i, topo_mod_errmsg(mod));
 
 	return (ntn);
 }

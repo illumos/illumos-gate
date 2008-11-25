@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Create a topology node for a PRI node of type 'pciexrc'
  */
@@ -78,7 +76,7 @@ pi_enum_pciexrc(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 	 * do this, and then we will add more attributes below.
 	 */
 	result = pi_enum_generic_impl(mod, mdp, mde_node, inst, t_parent,
-	    t_parent, hc_name, _ENUM_NAME, t_node);
+	    t_parent, hc_name, _ENUM_NAME, t_node, 0);
 	if (result != 0 || *t_node == NULL) {
 		topo_mod_dprintf(mod,
 		    "%s node_0x%llx failed to create topo node: %s\n",

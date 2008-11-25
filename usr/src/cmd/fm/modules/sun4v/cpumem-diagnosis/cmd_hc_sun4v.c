@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fm/fmd_api.h>
 #include <fm/libtopo.h>
@@ -36,6 +35,7 @@
 
 nvlist_t *dimm_nvl;
 nvlist_t *mb_nvl;
+nvlist_t *rsc_nvl;
 
 nvlist_t *
 cmd_fault_add_location(fmd_hdl_t *hdl, nvlist_t *flt, const char *locstr) {
@@ -416,4 +416,238 @@ cmd_find_dimm_by_sn(fmd_hdl_t *hdl, char *schemename, char *sn)
 	topo_walk_fini(twp);
 	fmd_hdl_topo_rele(hdl, thp);
 	return (dimm_nvl);
+}
+
+typedef struct cpuid {
+	char serial[100];
+	char id[10];
+} cpuid_t;
+
+/*ARGSUSED*/
+static int
+find_cpu_rsc_by_sn(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	int err;
+	nvlist_t *rsc;
+	cpuid_t *rscid = (cpuid_t *)arg;
+	char *sn, *name, *id;
+	nvlist_t **hcl;
+	uint_t n;
+
+	if (topo_node_resource(node, &rsc, &err) < 0) {
+		return (TOPO_WALK_NEXT);	/* no rsc, try next */
+	}
+
+	if (nvlist_lookup_string(rsc, FM_FMRI_HC_SERIAL_ID, &sn) != 0) {
+		nvlist_free(rsc);
+		return (TOPO_WALK_NEXT);
+	}
+	if (strcmp(rscid->serial, sn) != 0) {
+		nvlist_free(rsc);
+		return (TOPO_WALK_NEXT);
+	}
+
+	if (nvlist_lookup_nvlist_array(rsc, FM_FMRI_HC_LIST, &hcl, &n) != 0) {
+		nvlist_free(rsc);
+		return (TOPO_WALK_NEXT);
+	}
+
+	if ((nvlist_lookup_string(hcl[n - 1], FM_FMRI_HC_NAME, &name) != 0) ||
+	    (nvlist_lookup_string(hcl[n - 1], FM_FMRI_HC_ID, &id) != 0)) {
+		nvlist_free(rsc);
+		return (TOPO_WALK_NEXT);
+	}
+
+	if ((strcmp(name, "cpu") != 0) || (strcmp(rscid->id, id) != 0)) {
+		nvlist_free(rsc);
+		return (TOPO_WALK_NEXT);
+	}
+
+	(void) nvlist_dup(rsc, &rsc_nvl, NV_UNIQUE_NAME);
+
+	nvlist_free(rsc);
+	return (TOPO_WALK_TERMINATE);	/* if no space, give up */
+}
+
+nvlist_t *
+cmd_find_cpu_rsc_by_sn(fmd_hdl_t *hdl, cpuid_t *cpuid)
+{
+	topo_hdl_t *thp;
+	topo_walk_t *twp;
+	int err;
+
+	rsc_nvl = NULL;
+	if ((thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) == NULL)
+		return (NULL);
+	if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC,
+	    find_cpu_rsc_by_sn, cpuid, &err)) == NULL) {
+		fmd_hdl_topo_rele(hdl, thp);
+		return (NULL);
+	}
+	(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+	topo_walk_fini(twp);
+	fmd_hdl_topo_rele(hdl, thp);
+	return (rsc_nvl);
+}
+
+nvlist_t *
+get_cpu_fault_resource(fmd_hdl_t *hdl, nvlist_t *asru)
+{
+	uint32_t cpu;
+	uint64_t serint;
+	char serial[64];
+	nvlist_t *rsc = NULL;
+	cpuid_t cpuid;
+	char strid[10];
+
+	if (nvlist_lookup_uint64(asru, FM_FMRI_CPU_SERIAL_ID, &serint) != 0 ||
+	    nvlist_lookup_uint32(asru, FM_FMRI_CPU_ID, &cpu) != 0)
+		return (rsc);
+
+	(void) snprintf(serial, sizeof (serial), "%llx", serint);
+	(void) snprintf(strid, sizeof (strid), "%d", cpu);
+
+	(void) strcpy(cpuid.serial, serial);
+	(void) strcpy(cpuid.id, strid);
+
+	rsc = cmd_find_cpu_rsc_by_sn(hdl, &cpuid);
+	return (rsc);
+}
+
+/*ARGSUSED*/
+static int
+find_mem_rsc_hc(topo_hdl_t *thp, tnode_t *node, void *arg)
+{
+	int err;
+	nvlist_t *rsc;
+	char *sn;
+
+	if (topo_node_resource(node, &rsc, &err) < 0) {
+		return (TOPO_WALK_NEXT);	/* no rsc, try next */
+	}
+	if (nvlist_lookup_string(rsc, FM_FMRI_HC_SERIAL_ID, &sn) != 0) {
+		nvlist_free(rsc);
+		return (TOPO_WALK_NEXT);
+	}
+	if (strcmp(sn, (char *)arg) != 0) {
+		nvlist_free(rsc);
+		return (TOPO_WALK_NEXT);
+	}
+	(void) nvlist_dup(rsc, &rsc_nvl, NV_UNIQUE_NAME);
+	nvlist_free(rsc);
+	return (TOPO_WALK_TERMINATE);	/* if no space, give up */
+}
+
+nvlist_t *
+cmd_find_mem_rsc_by_sn(fmd_hdl_t *hdl, char *sn)
+{
+	topo_hdl_t *thp;
+	topo_walk_t *twp;
+	int err;
+
+	rsc_nvl = NULL;
+
+	if ((thp = fmd_hdl_topo_hold(hdl, TOPO_VERSION)) == NULL)
+		return (NULL);
+	if ((twp = topo_walk_init(thp, FM_FMRI_SCHEME_HC,
+	    find_mem_rsc_hc, sn, &err)) == NULL) {
+		fmd_hdl_topo_rele(hdl, thp);
+		return (NULL);
+	}
+	(void) topo_walk_step(twp, TOPO_WALK_CHILD);
+	topo_walk_fini(twp);
+	fmd_hdl_topo_rele(hdl, thp);
+	return (rsc_nvl);
+}
+
+nvlist_t *
+get_mem_fault_resource(fmd_hdl_t *hdl, nvlist_t *fru)
+{
+	char *sn;
+	uint_t n;
+	char **snarray;
+
+	if (nvlist_lookup_string(fru, FM_FMRI_HC_SERIAL_ID, &sn) == 0)
+		return (cmd_find_mem_rsc_by_sn(hdl, sn));
+
+	/*
+	 * T1 platform fru is in mem scheme
+	 */
+	if (nvlist_lookup_string_array(fru, FM_FMRI_MEM_SERIAL_ID,
+	    &snarray, &n) == 0)
+		return (cmd_find_mem_rsc_by_sn(hdl, snarray[0]));
+
+	return (NULL);
+}
+
+int
+is_T1_platform(nvlist_t *asru)
+{
+	char *unum;
+	if (nvlist_lookup_string(asru, FM_FMRI_MEM_UNUM, &unum) == 0) {
+		if (strstr(unum, "BR") == NULL)
+			return (1);
+	}
+	return (0);
+}
+
+nvlist_t *
+cmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class, uint8_t cert,
+    nvlist_t *asru, nvlist_t *fru, nvlist_t *rsrc)
+{
+	nvlist_t *fllist;
+	uint64_t offset, phyaddr;
+	nvlist_t *hsp = NULL;
+
+	rsrc = NULL;
+	(void) nvlist_add_nvlist(fru, FM_FMRI_AUTHORITY,
+	    cmd.cmd_auth); /* not an error if this fails */
+
+	if (strstr(class, "fault.memory.") != NULL) {
+		/*
+		 * For T1 platform fault.memory.bank and fault.memory.dimm,
+		 * do not issue the hc schmem for resource and fru
+		 */
+		if (is_T1_platform(asru) && (strstr(class, ".page") == NULL)) {
+			fllist = fmd_nvl_create_fault(hdl, class, cert, asru,
+			    fru, fru);
+			return (fllist);
+		}
+
+		rsrc = get_mem_fault_resource(hdl, fru);
+		/*
+		 * Need to append the phyaddr & offset into the
+		 * hc-specific of the fault.memory.page resource
+		 */
+		if ((rsrc != NULL) && strstr(class, ".page") != NULL) {
+			if (nvlist_alloc(&hsp, NV_UNIQUE_NAME, 0) == 0) {
+				if (nvlist_lookup_uint64(asru,
+				    FM_FMRI_MEM_PHYSADDR, &phyaddr) == 0)
+					(void) (nvlist_add_uint64(hsp,
+					    FM_FMRI_MEM_PHYSADDR,
+					    phyaddr));
+
+				if (nvlist_lookup_uint64(asru,
+				    FM_FMRI_MEM_OFFSET, &offset) == 0)
+					(void) nvlist_add_uint64(hsp,
+					    FM_FMRI_HC_SPECIFIC_OFFSET, offset);
+
+				(void) nvlist_add_nvlist(rsrc,
+				    FM_FMRI_HC_SPECIFIC, hsp);
+			}
+		}
+		fllist = fmd_nvl_create_fault(hdl, class, cert, asru,
+		    fru, rsrc);
+		if (hsp != NULL)
+			nvlist_free(hsp);
+	} else {
+		rsrc = get_cpu_fault_resource(hdl, asru);
+		fllist = fmd_nvl_create_fault(hdl, class, cert, asru,
+		    fru, rsrc);
+	}
+
+	if (rsrc != NULL)
+		nvlist_free(rsrc);
+
+	return (fllist);
 }

@@ -61,8 +61,8 @@
 static void
 cma_page_free(fmd_hdl_t *hdl, cma_page_t *page)
 {
-	if (page->pg_fmri != NULL)
-		nvlist_free(page->pg_fmri);
+	nvlist_free(page->pg_asru);
+	nvlist_free(page->pg_rsrc);
 	fmd_hdl_free(hdl, page, sizeof (cma_page_t));
 }
 
@@ -88,59 +88,45 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 {
 	cma_page_t *page;
 	uint64_t pageaddr;
-	nvlist_t *fmri = NULL;
 	const char *action = repair ? "unretire" : "retire";
 	int rc;
-#ifdef i386
-	nvlist_t *rsrc, *hcsp;
+	nvlist_t *rsrc = NULL, *asrucp = NULL, *hcsp;
 
-	/*
-	 * On x86, retire is done by resource
-	 */
-	if (nvlist_lookup_nvlist(nvl, FM_FAULT_RESOURCE, &rsrc) != 0) {
-		fmd_hdl_debug(hdl, "page retire resource lookup failed\n");
-		cma_stats.bad_flts.fmds_value.ui64++;
-		return (CMA_RA_FAILURE);
-	}
-	if (nvlist_dup(rsrc, &fmri, 0) != 0) {
-		fmd_hdl_debug(hdl, "page retire nvlist dup failed\n");
-		return (CMA_RA_FAILURE);
-	}
-#else /* i386 */
-	if (nvlist_dup(asru, &fmri, 0) != 0) {
+	(void) nvlist_lookup_nvlist(nvl, FM_FAULT_RESOURCE, &rsrc);
+
+	if (nvlist_dup(asru, &asrucp, 0) != 0) {
 		fmd_hdl_debug(hdl, "page retire nvlist dup failed\n");
 		return (CMA_RA_FAILURE);
 	}
 
 	/* It should already be expanded, but we'll do it again anyway */
-	if (fmd_nvl_fmri_expand(hdl, fmri) < 0) {
+	if (fmd_nvl_fmri_expand(hdl, asrucp) < 0) {
 		fmd_hdl_debug(hdl, "failed to expand page asru\n");
 		cma_stats.bad_flts.fmds_value.ui64++;
-		nvlist_free(fmri);
+		nvlist_free(asrucp);
 		return (CMA_RA_FAILURE);
 	}
-#endif /* i386 */
 
-	if (!repair && !fmd_nvl_fmri_present(hdl, fmri)) {
+	if (!repair && !fmd_nvl_fmri_present(hdl, asrucp)) {
 		fmd_hdl_debug(hdl, "page retire overtaken by events\n");
 		cma_stats.page_nonent.fmds_value.ui64++;
-		nvlist_free(fmri);
+		nvlist_free(asrucp);
 		return (CMA_RA_SUCCESS);
 	}
 
-#ifdef i386
-	if (nvlist_lookup_nvlist(fmri, FM_FMRI_HC_SPECIFIC, &hcsp) != 0 ||
+	/* Figure out physaddr from resource or asru */
+	if (rsrc == NULL ||
+	    nvlist_lookup_nvlist(rsrc, FM_FMRI_HC_SPECIFIC, &hcsp) != 0 ||
 	    (nvlist_lookup_uint64(hcsp, "asru-" FM_FMRI_HC_SPECIFIC_PHYSADDR,
 	    &pageaddr) != 0 && nvlist_lookup_uint64(hcsp,
 	    FM_FMRI_HC_SPECIFIC_PHYSADDR, &pageaddr) != 0)) {
-#else
-	if (nvlist_lookup_uint64(fmri, FM_FMRI_MEM_PHYSADDR, &pageaddr)
-	    != 0) {
-#endif
-		fmd_hdl_debug(hdl, "mem fault missing 'physaddr'\n");
-		cma_stats.bad_flts.fmds_value.ui64++;
-		nvlist_free(fmri);
-		return (CMA_RA_FAILURE);
+		if (nvlist_lookup_uint64(asrucp, FM_FMRI_MEM_PHYSADDR,
+		    &pageaddr) != 0) {
+			fmd_hdl_debug(hdl, "mem fault missing 'physaddr'\n");
+			cma_stats.bad_flts.fmds_value.ui64++;
+			nvlist_free(asrucp);
+			return (CMA_RA_FAILURE);
+		}
 	}
 
 	if (repair) {
@@ -148,23 +134,25 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 			fmd_hdl_debug(hdl, "suppressed unretire of page %llx\n",
 			    (u_longlong_t)pageaddr);
 			cma_stats.page_supp.fmds_value.ui64++;
-			nvlist_free(fmri);
+			nvlist_free(asrucp);
 			return (CMA_RA_SUCCESS);
 		}
+		/* If unretire via topo fails, we fall back to legacy way */
+		if (rsrc == NULL || (rc = fmd_nvl_fmri_unretire(hdl, rsrc)) < 0)
+			rc = cma_fmri_page_unretire(hdl, asrucp);
 	} else {
 		if (!cma.cma_page_doretire) {
 			fmd_hdl_debug(hdl, "suppressed retire of page %llx\n",
 			    (u_longlong_t)pageaddr);
 			cma_stats.page_supp.fmds_value.ui64++;
-			nvlist_free(fmri);
+			nvlist_free(asrucp);
 			return (CMA_RA_FAILURE);
 		}
+		/* If retire via topo fails, we fall back to legacy way */
+		if (rsrc == NULL || (rc = fmd_nvl_fmri_retire(hdl, rsrc)) < 0)
+			rc = cma_fmri_page_retire(hdl, asrucp);
 	}
 
-	if (repair)
-		rc = cma_fmri_page_unretire(hdl, fmri);
-	else
-		rc = cma_fmri_page_retire(hdl, fmri);
 	if (rc == FMD_AGENT_RETIRE_DONE) {
 		fmd_hdl_debug(hdl, "%sd page 0x%llx\n",
 		    action, (u_longlong_t)pageaddr);
@@ -172,7 +160,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 			cma_stats.page_repairs.fmds_value.ui64++;
 		else
 			cma_stats.page_flts.fmds_value.ui64++;
-		nvlist_free(fmri);
+		nvlist_free(asrucp);
 		return (CMA_RA_SUCCESS);
 	} else if (repair || rc != FMD_AGENT_RETIRE_ASYNC) {
 		fmd_hdl_debug(hdl, "%s of page 0x%llx failed, will not "
@@ -180,8 +168,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 		    strerror(errno));
 
 		cma_stats.page_fails.fmds_value.ui64++;
-
-		nvlist_free(fmri);
+		nvlist_free(asrucp);
 		return (CMA_RA_FAILURE);
 	}
 
@@ -193,7 +180,9 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 
 	page = fmd_hdl_zalloc(hdl, sizeof (cma_page_t), FMD_SLEEP);
 	page->pg_addr = pageaddr;
-	page->pg_fmri = fmri;
+	if (rsrc != NULL)
+		(void) nvlist_dup(rsrc, &page->pg_rsrc, 0);
+	page->pg_asru = asrucp;
 	if (uuid != NULL)
 		page->pg_uuid = fmd_hdl_strdup(hdl, uuid, FMD_SLEEP);
 
@@ -208,7 +197,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru,
 	cma.cma_page_timerid =
 	    fmd_timer_install(hdl, NULL, NULL, cma.cma_page_curdelay);
 
-	/* Don't free fmri here.  This FMRI will be needed for retry. */
+	/* Don't free asrucp here.  This FMRI will be needed for retry. */
 	return (CMA_RA_FAILURE);
 }
 
@@ -217,8 +206,8 @@ page_retry(fmd_hdl_t *hdl, cma_page_t *page)
 {
 	int rc;
 
-	if (page->pg_fmri != NULL && !fmd_nvl_fmri_present(hdl,
-	    page->pg_fmri)) {
+	if (page->pg_asru != NULL &&
+	    !fmd_nvl_fmri_present(hdl, page->pg_asru)) {
 		fmd_hdl_debug(hdl, "page retire overtaken by events");
 		cma_stats.page_nonent.fmds_value.ui64++;
 
@@ -227,7 +216,10 @@ page_retry(fmd_hdl_t *hdl, cma_page_t *page)
 		return (1); /* no longer a page to retire */
 	}
 
-	rc = cma_fmri_page_service_state(hdl, page->pg_fmri);
+	if (page->pg_rsrc == NULL ||
+	    (rc = fmd_nvl_fmri_service_state(hdl, page->pg_rsrc)) < 0)
+		rc = cma_fmri_page_service_state(hdl, page->pg_asru);
+
 	if (rc == FMD_SERVICE_STATE_UNUSABLE) {
 		fmd_hdl_debug(hdl, "retired page 0x%llx on retry %u\n",
 		    page->pg_addr, page->pg_nretries);
@@ -306,6 +298,8 @@ cma_page_fini(fmd_hdl_t *hdl)
 
 	while ((page = cma.cma_pages) != NULL) {
 		cma.cma_pages = page->pg_next;
+		if (page->pg_uuid != NULL)
+			fmd_hdl_strfree(hdl, page->pg_uuid);
 		cma_page_free(hdl, page);
 	}
 }

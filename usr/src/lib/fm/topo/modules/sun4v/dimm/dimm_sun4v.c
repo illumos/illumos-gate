@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <strings.h>
@@ -49,17 +47,17 @@
 #define	DIMM_VERSION	TOPO_VERSION
 #define	DIMM_NODE_NAME	"dimm"
 
+extern topo_method_t pi_mem_methods[];
+
 /* Forward declaration */
 static int dimm_enum(topo_mod_t *, tnode_t *, const char *, topo_instance_t,
     topo_instance_t, void *, void *);
 static void dimm_release(topo_mod_t *, tnode_t *);
 
-
 static const topo_modops_t dimm_ops =
 	{ dimm_enum, dimm_release };
 static const topo_modinfo_t dimm_info =
 	{ "dimm", FM_FMRI_SCHEME_HC, DIMM_VERSION, &dimm_ops };
-
 
 static const topo_pgroup_info_t mem_auth_pgroup = {
 	FM_FMRI_AUTHORITY,
@@ -163,29 +161,6 @@ mem_tnode_create(topo_mod_t *mod, tnode_t *parent,
 	return (ntn);
 }
 
-static nvlist_t *
-mem_fmri_create(topo_mod_t *mod, char *serial, char *label)
-{
-	int err;
-	nvlist_t *fmri;
-
-	if (topo_mod_nvalloc(mod, &fmri, NV_UNIQUE_NAME) != 0)
-		return (NULL);
-	err = nvlist_add_uint8(fmri, FM_VERSION, FM_MEM_SCHEME_VERSION);
-	err |= nvlist_add_string(fmri, FM_FMRI_SCHEME, FM_FMRI_SCHEME_MEM);
-	if (serial != NULL)
-		err |= nvlist_add_string(fmri, FM_FMRI_MEM_SERIAL_ID, serial);
-	if (label != NULL)
-		err |= nvlist_add_string(fmri, FM_FMRI_MEM_UNUM, label);
-	if (err != 0) {
-		nvlist_free(fmri);
-		(void) topo_mod_seterrno(mod, EMOD_FMRI_NVL);
-		return (NULL);
-	}
-
-	return (fmri);
-}
-
 typedef struct {
 	const char *nh_name;
 	const char *nh_sscan;
@@ -220,8 +195,8 @@ static int
 create_one_dimm(topo_mod_t *mod, tnode_t *pnode, int inst, mem_dimm_map_t *dp)
 {
 	tnode_t *cnode;
-	nvlist_t *asru, *fru;
-	int nerr = 0;
+	nvlist_t *rsrc, *fru;
+	int nerr = 0, err;
 
 	/*
 	 * Because mem_tnode_create will fill in a "FRU" value by default,
@@ -240,10 +215,14 @@ create_one_dimm(topo_mod_t *mod, tnode_t *pnode, int inst, mem_dimm_map_t *dp)
 	nvlist_free(fru);
 	if (cnode == NULL)
 		return (++nerr);
-	if ((asru = mem_fmri_create(mod, dp->dm_serid, dp->dm_label)) == NULL)
-		return (++nerr);
-	(void) topo_node_asru_set(cnode, asru, 0, &nerr);
-	nvlist_free(asru);
+
+	rsrc = NULL;
+	/* ASRU will be computed by topo method */
+	if (topo_node_resource(cnode, &rsrc, &err) < 0 ||
+	    topo_method_register(mod, cnode, pi_mem_methods) < 0 ||
+	    topo_node_asru_set(cnode, rsrc, TOPO_ASRU_COMPUTE, &err) < 0)
+		nerr++;
+	nvlist_free(rsrc);
 
 	return (nerr);
 }

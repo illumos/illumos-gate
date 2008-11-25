@@ -27,8 +27,6 @@
 #ifndef _PI_IMPL_H
 #define	_PI_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SUN4V Platform Independent Enumerator private interfaces
  */
@@ -49,6 +47,9 @@ extern "C" {
 #define	SUN4VPI_DESC		"SUN4V Platform independent topology enumerator"
 #define	SUN4VPI_SCHEME		"hc"
 #define	SUN4VPI_VERSION		TOPO_VERSION
+
+/* Flags used by pi_enum_generic_impl */
+#define	SUN4VPI_ENUM_ADD_SERIAL	1	/* Add serial to resource */
 
 /* Definitions used when working with PRI machine description nodes */
 #define	MD_STR_BACK		"back"
@@ -98,14 +99,15 @@ typedef struct pi_enum_s pi_enum_t;
 typedef int pi_enum_fn_t(topo_mod_t *, md_t *, mde_cookie_t, topo_instance_t,
     tnode_t *, const char *, tnode_t **);
 
-pi_enum_fn_t	pi_enum_cpu;		/* Enumerate a CPU node */
+pi_enum_fn_t	pi_enum_cpu;		/* Enumerate a CHIP/CORE/CPU node */
+pi_enum_fn_t	pi_enum_mem;		/* Enumerate a DIMM node */
 pi_enum_fn_t	pi_enum_generic;	/* Enumerate a generic PRI node */
 pi_enum_fn_t	pi_enum_niu;		/* Enumerate an NIU node */
 pi_enum_fn_t	pi_enum_pciexrc;	/* Enumerate a PCIEX root complex */
 pi_enum_fn_t	pi_enum_top;		/* Enumerate a top-level PRI node */
 
 int pi_enum_generic_impl(topo_mod_t *, md_t *, mde_cookie_t, topo_instance_t,
-    tnode_t *, tnode_t *, const char *, const char *, tnode_t **);
+    tnode_t *, tnode_t *, const char *, const char *, tnode_t **, int flag);
 
 
 /*

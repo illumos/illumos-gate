@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Support routines for managing per-CPU state.
@@ -251,4 +250,13 @@ cmd_cpu_mkfru(fmd_hdl_t *hdl, char *frustr, char *serialstr, char *partstr)
 
 	nvlist_free(hcelem);
 	return (fru);
+}
+
+nvlist_t *
+cmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class, uint8_t cert,
+    nvlist_t *asru, nvlist_t *fru, nvlist_t *rsrc)
+{
+	(void) nvlist_add_nvlist(fru, FM_FMRI_AUTHORITY,
+	    cmd.cmd_auth);
+	return (fmd_nvl_create_fault(hdl, class, cert, asru, fru, rsrc));
 }

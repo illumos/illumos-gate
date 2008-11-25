@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <cmd.h>
 
@@ -81,18 +80,4 @@ cmd_bufname(char *buf, size_t bufsz, const char *fmt, ...)
 	va_start(ap, fmt);
 	cmd_vbufname(buf, bufsz, fmt, ap);
 	va_end(ap);
-}
-
-/*
- * cmd_nvl_create_fault:
- * Add hardware platform authority to 'fru' before passing to fmd.
- */
-
-nvlist_t *
-cmd_nvl_create_fault(fmd_hdl_t *hdl, const char *class, uint8_t cert,
-    nvlist_t *asru, nvlist_t *fru, nvlist_t *rsrc)
-{
-	(void) nvlist_add_nvlist(fru, FM_FMRI_AUTHORITY,
-	    cmd.cmd_auth); /* not an error if this fails */
-	return (fmd_nvl_create_fault(hdl, class, cert, asru, fru, rsrc));
 }

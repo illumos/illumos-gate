@@ -23,12 +23,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <cma.h>
 
 #include <sys/fm/ldom.h>
 #include <sys/fm/protocol.h>
+#include <fm/fmd_fmri.h>
+#include <fm/libtopo.h>
 
 #include <assert.h>
 #include <fcntl.h>
@@ -83,6 +83,27 @@ static int
 cpu_cmd(fmd_hdl_t *hdl, nvlist_t *fmri, int cmd)
 {
 	int rc = 0;
+	char *scheme;
+
+	/*
+	 * We're using topo retire if the fmri is in "hc" scheme.
+	 */
+	if (nvlist_lookup_string(fmri, FM_FMRI_SCHEME, &scheme) == 0 &&
+	    strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
+		if (cmd != P_STATUS) {
+			errno = EINVAL;
+			return (-1);
+		}
+		rc = fmd_nvl_fmri_service_state(hdl, fmri);
+		switch (rc) {
+		case FMD_SERVICE_STATE_UNUSABLE:
+			return (P_FAULTED);
+		case -1:
+			return (-1);
+		default:
+			return (P_ONLINE);
+		}
+	}
 
 	switch (cmd & ~P_FORCED) {
 	case P_STATUS:
@@ -107,6 +128,63 @@ cpu_cmd(fmd_hdl_t *hdl, nvlist_t *fmri, int cmd)
 	return (rc);
 }
 
+void
+cma_cpu_start_retry(fmd_hdl_t *hdl, nvlist_t *fmri, const char *uuid,
+    boolean_t repair)
+{
+	cma_cpu_t *cpu;
+	char *scheme;
+	uint_t cpuid;
+	nvlist_t *asru = NULL;
+	topo_hdl_t *thp;
+	int err;
+
+	if (repair || nvlist_lookup_string(fmri, FM_FMRI_SCHEME, &scheme) != 0)
+		return;
+	if (strcmp(scheme, FM_FMRI_SCHEME_CPU) == 0) {
+		if (nvlist_lookup_uint32(fmri, FM_FMRI_CPU_ID, &cpuid) != 0)
+			return;
+	} else if (strcmp(scheme, FM_FMRI_SCHEME_HC) != 0) {
+		return;
+	} else {
+		/* lookup cpuid from ASRU */
+		thp = fmd_fmri_topo_hold(TOPO_VERSION);
+		if (thp != NULL) {
+			(void) topo_fmri_asru(thp, fmri, &asru, &err);
+			fmd_fmri_topo_rele(thp);
+		}
+		if (nvlist_lookup_uint32(asru, FM_FMRI_CPU_ID, &cpuid) != 0) {
+			nvlist_free(asru);
+			return;
+		}
+	}
+
+	/*
+	 * check to see if the cpu has been offline.
+	 */
+	fmd_hdl_debug(hdl, "cpu %u is not offline yet - sleeping\n", cpuid);
+
+	/*
+	 * Create a cpu node and add to the head of the cpu list
+	 */
+	cpu = fmd_hdl_zalloc(hdl, sizeof (cma_cpu_t), FMD_SLEEP);
+	(void) nvlist_dup(fmri, &cpu->cpu_fmri, 0);
+	if (uuid != NULL)
+		cpu->cpu_uuid = fmd_hdl_strdup(hdl, uuid, FMD_SLEEP);
+
+	cpu->cpuid = cpuid;
+	cpu->cpu_next = cma.cma_cpus;
+	cma.cma_cpus = cpu;
+
+	if (cma.cma_cpu_timerid != 0)
+		fmd_timer_remove(hdl, cma.cma_cpu_timerid);
+
+	cma.cma_cpu_curdelay = cma.cma_cpu_mindelay;
+
+	cma.cma_cpu_timerid =
+	    fmd_timer_install(hdl, NULL, NULL, cma.cma_cpu_curdelay);
+}
+
 
 int
 cma_cpu_statechange(fmd_hdl_t *hdl, nvlist_t *asru, const char *uuid,
@@ -114,7 +192,6 @@ cma_cpu_statechange(fmd_hdl_t *hdl, nvlist_t *asru, const char *uuid,
 {
 	int i;
 	uint_t cpuid;
-	cma_cpu_t *cpu;
 
 	if (nvlist_lookup_uint32(asru, FM_FMRI_CPU_ID, &cpuid) != 0) {
 		fmd_hdl_debug(hdl, "missing '%s'\n", FM_FMRI_CPU_ID);
@@ -141,33 +218,7 @@ cma_cpu_statechange(fmd_hdl_t *hdl, nvlist_t *asru, const char *uuid,
 		cma_stats.cpu_fails.fmds_value.ui64++;
 	}
 
-	if (repair)
-		return (CMA_RA_SUCCESS);
-
-	/*
-	 * check to see if the cpu has been offline.
-	 */
-	fmd_hdl_debug(hdl, "cpu is not offline yet - sleeping\n");
-
-	/*
-	 * Create a cpu node and add to the head of the cpu list
-	 */
-	cpu = fmd_hdl_zalloc(hdl, sizeof (cma_cpu_t), FMD_SLEEP);
-	(void) nvlist_dup(asru, &cpu->cpu_fmri, 0);
-	if (uuid != NULL)
-		cpu->cpu_uuid = fmd_hdl_strdup(hdl, uuid, FMD_SLEEP);
-
-	cpu->cpuid = cpuid;
-	cpu->cpu_next = cma.cma_cpus;
-	cma.cma_cpus = cpu;
-
-	if (cma.cma_cpu_timerid != 0)
-		fmd_timer_remove(hdl, cma.cma_cpu_timerid);
-
-	cma.cma_cpu_curdelay = cma.cma_cpu_mindelay;
-
-	cma.cma_cpu_timerid =
-	    fmd_timer_install(hdl, NULL, NULL, cma.cma_cpu_curdelay);
+	cma_cpu_start_retry(hdl, asru, uuid, repair);
 
 	return (CMA_RA_FAILURE);
 }

@@ -53,6 +53,14 @@ struct pi_enum_functions_s {
 };
 typedef struct pi_enum_functions_s pi_enum_functions_t;
 
+struct pi_methods_s {
+	topo_method_t	*meths;
+	char		*hc_name;
+};
+typedef struct pi_methods_s pi_methods_t;
+
+extern topo_method_t pi_cpu_methods[], pi_mem_methods[];
+
 /*
  * List of custom enumerators for PRI nodes that require them.  The most
  * common nodes are listed first.
@@ -60,12 +68,25 @@ typedef struct pi_enum_functions_s pi_enum_functions_t;
 static pi_enum_functions_t pi_enum_fns_builtin[] = {
 	{pi_enum_cpu,		STRAND},
 	{pi_enum_cpu,		CPU},
+	{pi_enum_mem,		DIMM},
+	{pi_enum_cpu,		CORE},
+	{pi_enum_cpu,		CHIP},
 	{pi_enum_pciexrc,	PCIEX_ROOT},
 	{pi_enum_niu,		NIU},
 	{NULL, NULL}
 };
 static nvlist_t *pi_enum_fns;
 
+/* List of methods that will be registered in the nodes. */
+static pi_methods_t pi_meths_builtin[] = {
+	{pi_cpu_methods,	CHIP},
+	{pi_cpu_methods,	CORE},
+	{pi_cpu_methods,	STRAND},
+	{pi_cpu_methods,	CPU},
+	{pi_mem_methods,	DIMM},
+	{NULL, NULL}
+};
+nvlist_t *pi_meths;
 
 /*
  * In order to create a topology node from a PRI MDE node we need to know the
@@ -115,10 +136,14 @@ pi_walker_init(topo_mod_t *mod)
 {
 	int			result;
 	pi_enum_functions_t	*fp;
+	pi_methods_t		*mp;
 
 	result = topo_mod_nvalloc(mod, &pi_enum_fns, NV_UNIQUE_NAME);
+	result |= topo_mod_nvalloc(mod, &pi_meths, NV_UNIQUE_NAME);
 	if (result != 0) {
 		topo_mod_dprintf(mod, "pi_walker_init failed\n");
+		nvlist_free(pi_enum_fns);
+		nvlist_free(pi_meths);
 		return (-1);
 	}
 
@@ -128,13 +153,25 @@ pi_walker_init(topo_mod_t *mod)
 		uint64_t	faddr;
 
 		faddr = (uint64_t)(uintptr_t)*(fp->func);
-		result = nvlist_add_uint64(pi_enum_fns, fp->hc_name, faddr);
-		if (result != 0) {
-			topo_mod_dprintf(mod, "pi_walker_init failed\n");
-			nvlist_free(pi_enum_fns);
-			return (-1);
-		}
+		result |= nvlist_add_uint64(pi_enum_fns, fp->hc_name, faddr);
 		fp++;
+	}
+
+	/* Add the builtin methods to the list */
+	mp = pi_meths_builtin;
+	while (mp != NULL && mp->hc_name != NULL) {
+		uint64_t	maddr;
+
+		maddr = (uint64_t)(uintptr_t)mp->meths;
+		result |= nvlist_add_uint64(pi_meths, mp->hc_name, maddr);
+		mp++;
+	}
+
+	if (result != 0) {
+		topo_mod_dprintf(mod, "pi_walker_init failed\n");
+		nvlist_free(pi_enum_fns);
+		nvlist_free(pi_meths);
+		return (-1);
 	}
 
 	return (0);
@@ -146,6 +183,7 @@ pi_walker_fini(topo_mod_t *mod)
 {
 	topo_mod_dprintf(mod, "pi_walker_fini: enter\n");
 	nvlist_free(pi_enum_fns);
+	nvlist_free(pi_meths);
 }
 
 
@@ -424,6 +462,7 @@ pi_walker_node_create(topo_mod_t *mod, md_t *mdp, mde_cookie_t mde_node,
 		    "failed to create topo entry for node_0x%llx type %s\n",
 		    (uint64_t)mde_node, hc_name);
 	}
+
 	topo_mod_strfree(mod, hc_name);
 
 	return (MDE_WALK_NEXT);
