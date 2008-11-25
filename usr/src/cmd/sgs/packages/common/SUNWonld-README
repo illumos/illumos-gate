@@ -1408,3 +1408,4 @@ Bugid   Risk Synopsis
 	PSARC/2008/715 PT_SUNWBSS removal
 6772661 ldd/lddstub/ld.so.1 dump core in current nightly while processing
 	libsoftcrypto_hwcap.so.1
+6765931 mcs generates unlink(NULL) system calls

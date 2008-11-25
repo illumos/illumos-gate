@@ -24,11 +24,9 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "stdlib.h"
 #include "conv.h"
@@ -79,7 +77,7 @@ main(int argc, char ** argv, char ** envp)
 		my_prog = STRIP;
 		opt = "DlxV?";
 	} else
-		exit(1);
+		exit(FAILURE);
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
@@ -195,7 +193,7 @@ main(int argc, char ** argv, char ** envp)
 	    CHK_OPT(cmd_info, aFLAG) ||
 	    CHK_OPT(cmd_info, cFLAG))) {
 		error_message(USAGE_ERROR, PLAIN_ERROR, (char *)0,  prog);
-		exit(1);
+		exit(FAILURE);
 	}
 
 	/*
@@ -264,12 +262,24 @@ queue(int activity, char *string)
 	actmax++;
 }
 
+/*
+ * Reset a temporary file descriptor for reuse.
+ * If the file requires unlinking, that is done first.
+ */
+void
+free_tempfile(Tmp_File *temp_file)
+{
+	if ((temp_file->tmp_name != NULL) && (temp_file->tmp_unlink))
+		(void) unlink(temp_file->tmp_name);
+	(void) memset(temp_file, 0, sizeof (*temp_file));
+}
+
 /*ARGSUSED0*/
 static void
 sigexit(int i)
 {
-	(void) unlink(artmpfile);
-	(void) unlink(elftmpfile);
+	free_tempfile(&artmpfile);
+	free_tempfile(&elftmpfile);
 	exit(100);
 }
 
@@ -288,8 +298,8 @@ usage(int me)
 void
 mcs_exit(int val)
 {
-	(void) unlink(artmpfile);
-	(void) unlink(elftmpfile);
+	free_tempfile(&artmpfile);
+	free_tempfile(&elftmpfile);
 	exit(val);
 }
 

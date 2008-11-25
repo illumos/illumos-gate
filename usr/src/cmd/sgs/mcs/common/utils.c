@@ -25,11 +25,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mcs.h"
 #include "extern.h"
@@ -203,13 +201,13 @@ dozap(section_info_table *info)
 	info->mdata = data = malloc(sizeof (Elf_Data));
 	if (data == NULL) {
 		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
-		exit(1);
+		mcs_exit(FAILURE);
 	}
 	*data = *info->data;
 	data->d_buf = calloc(1, data->d_size);
 	if (data->d_buf == NULL) {
 		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
-		exit(1);
+		mcs_exit(FAILURE);
 	}
 }
 
@@ -288,7 +286,7 @@ doappend(char *a_string, section_info_table *info)
 		if (data == NULL) {
 			error_message(MALLOC_ERROR, PLAIN_ERROR,
 			    (char *)0, prog);
-			exit(1);
+			mcs_exit(FAILURE);
 		}
 		*data = *info->data;
 
@@ -307,7 +305,7 @@ doappend(char *a_string, section_info_table *info)
 			if (data->d_buf == 0) {
 				error_message(MALLOC_ERROR, PLAIN_ERROR,
 				    (char *)0, prog);
-				exit(1);
+				mcs_exit(FAILURE);
 			}
 			tp = (char *)data->d_buf;
 			(void) memcpy(& tp[1], a_string, len + 1);
@@ -322,7 +320,7 @@ doappend(char *a_string, section_info_table *info)
 			if (p == NULL) {
 				error_message(MALLOC_ERROR, PLAIN_ERROR,
 				    (char *)0, prog);
-				exit(1);
+				mcs_exit(FAILURE);
 			}
 			(void) memcpy(p, data->d_buf, data->d_size);
 			(void) memcpy(&p[data->d_size], a_string, len + 1);
@@ -348,7 +346,7 @@ doappend(char *a_string, section_info_table *info)
 			if (data->d_buf == 0) {
 				error_message(MALLOC_ERROR, PLAIN_ERROR,
 				    (char *)0, prog);
-				exit(1);
+				mcs_exit(FAILURE);
 			}
 			tp = (char *)data->d_buf;
 			(void) memcpy(&tp[1], a_string, len + 1);
@@ -363,7 +361,7 @@ doappend(char *a_string, section_info_table *info)
 			if (p == NULL) {
 				error_message(MALLOC_ERROR, PLAIN_ERROR,
 				    (char *)0, prog);
-				exit(1);
+				mcs_exit(FAILURE);
 			}
 			(void) memcpy(p, data->d_buf, data->d_size);
 			(void) memcpy(&p[data->d_size], a_string, len + 1);
@@ -398,7 +396,7 @@ docompress(section_info_table *info)
 		if (data == NULL) {
 			error_message(MALLOC_ERROR, PLAIN_ERROR,
 			    (char *)0, prog);
-			exit(1);
+			mcs_exit(FAILURE);
 		}
 		*data = *info->data;
 		p = malloc(data->d_size);

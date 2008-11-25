@@ -22,10 +22,9 @@
  *	Copyright(c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include "mcs.h"
 
 static const char *msg[] = {
@@ -125,7 +124,7 @@ error_message(int args, ...)
 	case OPEN_WRITE_ERROR:
 		/* LINTED */
 		(void) fprintf(stderr, message, va_arg(ap, char *),
-					va_arg(ap, char *));
+		    va_arg(ap, char *));
 		break;
 	case WRITE_ERROR:
 	case READ_MANI_ERROR:
@@ -163,8 +162,8 @@ error_message(int args, ...)
 	}
 	default:
 		(void) fprintf(stderr, "internal error: error_message(%d)\n",
-			mes);
-		exit(100);
+		    mes);
+		mcs_exit(100);
 	}
 
 	if (flag != PLAIN_ERROR)

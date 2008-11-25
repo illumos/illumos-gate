@@ -23,14 +23,12 @@
  *	  All Rights Reserved
  *
  *
- *	Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
 #ifndef	_MCS_H
 #define	_MCS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -180,6 +178,14 @@ typedef struct seg_table {
 } Seg_Table;
 
 /*
+ * Temporary files
+ */
+typedef struct {
+	const char	*tmp_name;	/* NULL, or name of temp file */
+	int		tmp_unlink;   /* True if should unlink prior to exit */
+} Tmp_File;
+
+/*
  * Function prototypes.
  */
 int		apply_action(section_info_table *, char *, Cmd_Info *);
@@ -188,6 +194,7 @@ void		error_message(int, ...);
 void		mcs_exit(int);
 Listnode *	list_appendc(List *, const void*);
 int		sectcmp(char *);
+void		free_tempfile(Tmp_File *);
 
 /*
  * Error messages

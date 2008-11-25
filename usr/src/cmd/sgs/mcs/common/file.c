@@ -23,10 +23,9 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include "mcs.h"
@@ -53,7 +52,7 @@ typedef struct {
 /*
  * Function prototypes.
  */
-static void copy_file(int, char *, char *);
+static void copy_file(int, char *, Tmp_File *);
 static void
 copy_non_elf_to_temp_ar(int, Elf *, int, Elf_Arhdr *, char *, Cmd_Info *);
 static void copy_elf_file_to_temp_ar_file(int, Elf_Arhdr *, char *);
@@ -113,8 +112,8 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 	if ((elf_kind(arf) == ELF_K_AR)) {
 		ar_file = 1;
 		if (CHK_OPT(cmd_info, MIGHT_CHG)) {
-			artmpfile = tempnam(TMPDIR, "mcs2");
-			if ((fdartmp = open(artmpfile,
+			artmpfile.tmp_name = tempnam(TMPDIR, "mcs2");
+			if ((fdartmp = open(artmpfile.tmp_name,
 			    O_WRONLY | O_APPEND | O_CREAT,
 			    (mode_t)0666)) == NULL) {
 				error_message(OPEN_TEMP_ERROR,
@@ -122,13 +121,14 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 				    prog, artmpfile);
 				(void) elf_end(arf);
 				(void) close(fd);
-				exit(FAILURE);
+				mcs_exit(FAILURE);
 			}
+			artmpfile.tmp_unlink = 1;
 			/* write magic string to artmpfile */
 			if ((write(fdartmp, ARMAG, SARMAG)) != SARMAG) {
 				error_message(WRITE_ERROR,
 				    SYSTEM_ERROR, strerror(errno),
-				    prog, artmpfile, cur_file);
+				    prog, artmpfile.tmp_name, cur_file);
 				mcs_exit(FAILURE);
 			}
 		}
@@ -143,7 +143,7 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 	 * and there were no errors in
 	 * processing the object file.
 	 */
-	elftmpfile = tempnam(TMPDIR, "mcs1");
+	elftmpfile.tmp_name = tempnam(TMPDIR, "mcs1");
 
 	while ((elf = elf_begin(fd, cmd, arf)) != 0) {
 		if (ar_file) /* get header info */ {
@@ -156,7 +156,7 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 				(void) elf_end(elf);
 				(void) elf_end(arf);
 				(void) close(fd);
-				(void) unlink(artmpfile);
+				free_tempfile(&artmpfile);
 				return (FAILURE);
 			}
 
@@ -233,9 +233,9 @@ each_file(char *cur_file, Cmd_Info *cmd_info)
 	if (ar_file && CHK_OPT(cmd_info, MIGHT_CHG)) {
 		(void) close(fdartmp); /* done writing to ar_temp_file */
 		/* copy ar_temp_file to FILE */
-		copy_file(fd, cur_file, artmpfile);
+		copy_file(fd, cur_file, &artmpfile);
 	} else if (code != DONT_BUILD && CHK_OPT(cmd_info, MIGHT_CHG))
-		copy_file(fd, cur_file, elftmpfile);
+		copy_file(fd, cur_file, &elftmpfile);
 	(void) close(fd);   /* done processing this file */
 	return (error);
 }
@@ -700,16 +700,17 @@ build_file(Elf *src_elf, GElf_Ehdr *src_ehdr, Cmd_Info *cmd_info,
 		return (FAILURE);
 	}
 
-	if ((fdtmp = open(elftmpfile, O_RDWR | O_TRUNC | O_CREAT,
+	if ((fdtmp = open(elftmpfile.tmp_name, O_RDWR | O_TRUNC | O_CREAT,
 	    (mode_t)0666)) == -1) {
 		error_message(OPEN_TEMP_ERROR, SYSTEM_ERROR, strerror(errno),
-		    prog, elftmpfile);
+		    prog, elftmpfile.tmp_name);
 		return (FAILURE);
 	}
+	elftmpfile.tmp_unlink = 1;
 
 	if ((dst_elf = elf_begin(fdtmp, ELF_C_WRITE, (Elf *) 0)) == NULL) {
 		error_message(READ_ERROR, LIBelf_ERROR, elf_errmsg(-1),
-		    prog, elftmpfile);
+		    prog, elftmpfile.tmp_name);
 		(void) close(fdtmp);
 		return (FAILURE);
 	}
@@ -1271,13 +1272,13 @@ copy_elf_file_to_temp_ar_file(
 	int fdtmp3;
 	struct stat stbuf;
 
-	if ((fdtmp3 = open(elftmpfile, O_RDONLY)) == -1) {
+	if ((fdtmp3 = open(elftmpfile.tmp_name, O_RDONLY)) == -1) {
 		error_message(OPEN_TEMP_ERROR, SYSTEM_ERROR, strerror(errno),
-		    prog, elftmpfile);
+		    prog, elftmpfile.tmp_name);
 		mcs_exit(FAILURE);
 	}
 
-	(void) stat(elftmpfile, &stbuf); /* for size of file */
+	(void) stat(elftmpfile.tmp_name, &stbuf); /* for size of file */
 
 	if ((buf =
 	    malloc(ROUNDUP(stbuf.st_size))) == NULL) {
@@ -1287,7 +1288,7 @@ copy_elf_file_to_temp_ar_file(
 
 	if (read(fdtmp3, buf, stbuf.st_size) != stbuf.st_size) {
 		error_message(READ_MANI_ERROR, SYSTEM_ERROR, strerror(errno),
-		    prog, elftmpfile, cur_file);
+		    prog, elftmpfile.tmp_name, cur_file);
 		mcs_exit(FAILURE);
 	}
 
@@ -1300,7 +1301,7 @@ copy_elf_file_to_temp_ar_file(
 	    (unsigned)sizeof (struct ar_hdr)) !=
 	    (unsigned)sizeof (struct ar_hdr)) {
 		error_message(WRITE_MANI_ERROR, SYSTEM_ERROR, strerror(errno),
-		    prog, elftmpfile, cur_file);
+		    prog, elftmpfile.tmp_name, cur_file);
 		mcs_exit(FAILURE);
 	}
 
@@ -1309,12 +1310,14 @@ copy_elf_file_to_temp_ar_file(
 		if (write(fdartmp, buf, (size_t)ROUNDUP(stbuf.st_size)) !=
 		    (size_t)ROUNDUP(stbuf.st_size)) {
 			error_message(WRITE_MANI_ERROR,	SYSTEM_ERROR,
-			    strerror(errno), prog, elftmpfile, cur_file);
+			    strerror(errno), prog, elftmpfile.tmp_name,
+			    cur_file);
 			mcs_exit(FAILURE);
 		}
 	} else if (write(fdartmp, buf, stbuf.st_size) != stbuf.st_size) {
 			error_message(WRITE_MANI_ERROR, SYSTEM_ERROR,
-			    strerror(errno), prog, elftmpfile, cur_file);
+			    strerror(errno), prog, elftmpfile.tmp_name,
+			    cur_file);
 			mcs_exit(FAILURE);
 	}
 	free(buf);
@@ -1380,8 +1383,22 @@ copy_non_elf_to_temp_ar(
 	}
 }
 
+/*
+ * Replace contents of file
+ *
+ * entry:
+ *	ofd - Open file descriptor for file fname
+ *	fname - Name of file being processed
+ *	temp_file_name - Address of pointer to temporary
+ *		file containing new contents for fname.
+ *
+ * exit:
+ *	The contents of the file given by temp_file->tmp_name are
+ *	copied to the file fname. The temporary file is
+ *	unlinked, and temp_file reset.
+ */
 static void
-copy_file(int ofd, char *fname, char *temp_file_name)
+copy_file(int ofd, char *fname, Tmp_File *temp_file)
 {
 	enum { MMAP_USED, MMAP_UNUSED } mmap_status;
 	int		i;
@@ -1392,13 +1409,13 @@ copy_file(int ofd, char *fname, char *temp_file_name)
 	for (i = 0; signum[i]; i++) /* started writing, cannot interrupt */
 		(void) signal(signum[i], SIG_IGN);
 
-	if ((fdtmp2 = open(temp_file_name, O_RDONLY)) == -1) {
+	if ((fdtmp2 = open(temp_file->tmp_name, O_RDONLY)) == -1) {
 		error_message(OPEN_TEMP_ERROR, SYSTEM_ERROR, strerror(errno),
-		    prog, temp_file_name);
+		    prog, temp_file->tmp_name);
 		mcs_exit(FAILURE);
 	}
 
-	(void) stat(temp_file_name, &stbuf); /* for size of file */
+	(void) stat(temp_file->tmp_name, &stbuf); /* for size of file */
 
 	/*
 	 * Get the contents of the updated file.
@@ -1417,7 +1434,7 @@ copy_file(int ofd, char *fname, char *temp_file_name)
 
 		if (read(fdtmp2, buf, stbuf.st_size) != stbuf.st_size) {
 			error_message(READ_SYS_ERROR, SYSTEM_ERROR,
-			    strerror(errno), prog, temp_file_name);
+			    strerror(errno), prog, temp_file->tmp_name);
 			mcs_exit(FAILURE);
 		}
 		mmap_status = MMAP_UNUSED;
@@ -1447,7 +1464,7 @@ copy_file(int ofd, char *fname, char *temp_file_name)
 	else
 		free(buf);
 	(void) close(fdtmp2);
-	(void) unlink(temp_file_name); 	/* temp file */
+	free_tempfile(temp_file);
 }
 
 static uint64_t
@@ -1505,19 +1522,19 @@ initialize(int shnum, Cmd_Info *cmd_info, file_state_t *state)
 	    calloc(shnum + 1, sizeof (section_info_table));
 	if (state->sec_table == NULL) {
 		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
-		exit(FAILURE);
+		mcs_exit(FAILURE);
 	}
 
 	state->off_table = (int64_t *)calloc(shnum, sizeof (int64_t));
 	if (state->off_table == NULL) {
 		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
-		exit(FAILURE);
+		mcs_exit(FAILURE);
 	}
 
 	state->nobits_table = (int64_t *)calloc(shnum, sizeof (int64_t));
 	if (state->nobits_table == NULL) {
 		error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0, prog);
-		exit(FAILURE);
+		mcs_exit(FAILURE);
 	}
 }
 
@@ -1607,14 +1624,14 @@ post_process(Cmd_Info *cmd_info, file_state_t *state)
 		if ((sinfo->mdata = malloc(sizeof (Elf_Data))) == NULL) {
 			error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0,
 			    prog);
-			exit(FAILURE);
+			mcs_exit(FAILURE);
 		}
 		*(sinfo->mdata) = *(sinfo->data);
 		if ((ngrpdata = sinfo->mdata->d_buf =
 		    malloc(sinfo->data->d_size)) == NULL) {
 			error_message(MALLOC_ERROR, PLAIN_ERROR, (char *)0,
 			    prog);
-			exit(FAILURE);
+			mcs_exit(FAILURE);
 		}
 
 		grpdata = (Word *)(sinfo->data->d_buf);
