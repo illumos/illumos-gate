@@ -1433,6 +1433,7 @@ main(int argc, char *argv[])
 	(void) signal(SIGTSTP, SIG_IGN);
 	(void) signal(SIGTTIN, SIG_IGN);
 	(void) signal(SIGTTOU, SIG_IGN);
+	(void) signal(SIGPIPE, SIG_IGN);
 	(void) signal(SIGTERM, SIG_IGN);
 
 	/*
