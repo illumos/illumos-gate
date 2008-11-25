@@ -27,8 +27,6 @@
 #ifndef _SYS_NGE_CHIP_H
 #define	_SYS_NGE_CHIP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -640,6 +638,11 @@ typedef union _nge_uni_addr1 {
 		uint32_t	resv16_31:16;
 	} addr_bits;
 } nge_uni_addr1;
+
+#define	LOW_24BITS_MASK		0xffffffULL
+#define	REVERSE_MAC_ELITE	0x211900ULL
+#define	REVERSE_MAC_GIGABYTE	0xe61600ULL
+#define	REVERSE_MAC_ASUS	0x601d00ULL
 
 /*
  * Low 32 bit multicast address

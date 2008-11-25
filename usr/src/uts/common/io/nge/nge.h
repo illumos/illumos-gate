@@ -672,6 +672,7 @@ typedef struct nge_dev_spec_param {
 	boolean_t	msi_x;		/* specifies msi_x support */
 	boolean_t	vlan;		/* specifies vlan support */
 	boolean_t	advanced_pm;	/* advanced power management support */
+	boolean_t	mac_addr_order; /* mac address order */
 	boolean_t	tx_pause_frame;	/* specifies tx pause frame support */
 	boolean_t	rx_pause_frame;	/* specifies rx pause frame support */
 	boolean_t	jumbo;		/* jumbo frame support */
@@ -751,6 +752,7 @@ typedef struct nge {
 	boolean_t		poll;
 	boolean_t		ch_intr_mode;
 	boolean_t		intr_moderation;
+	uint32_t		mac_addr_reversion;
 	uint32_t		recv_count;
 	uint32_t		quiet_time;
 	uint32_t		busy_time;

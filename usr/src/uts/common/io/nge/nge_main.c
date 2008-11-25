@@ -165,6 +165,7 @@ static char sw_intr_intv[] = "sw-intr-intvl";
 static char nge_desc_mode[] = "desc-mode";
 static char default_mtu[] = "default_mtu";
 static char low_memory_mode[] = "minimal-memory-usage";
+static char mac_addr_reversion[] = "mac-addr-reversion";
 extern kmutex_t nge_log_mutex[1];
 
 static int		nge_m_start(void *);
@@ -998,6 +999,8 @@ nge_get_props(nge_t *ngep)
 	    DDI_PROP_DONTPASS, nge_desc_mode, dev_param_p->desc_type);
 	ngep->lowmem_mode = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
 	    DDI_PROP_DONTPASS, low_memory_mode, 0);
+	ngep->mac_addr_reversion = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
+	    DDI_PROP_DONTPASS, mac_addr_reversion, 0);
 
 	if (dev_param_p->jumbo) {
 		ngep->default_mtu = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
@@ -2451,6 +2454,7 @@ nge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Initialise the (internal) PHY.
 	 */
 	nge_phys_init(ngep);
+	ngep->nge_chip_state = NGE_CHIP_INITIAL;
 	err = nge_chip_reset(ngep);
 	if (err != DDI_SUCCESS) {
 		nge_problem(ngep, "nge_attach: nge_chip_reset() failed");

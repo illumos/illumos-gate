@@ -440,6 +440,7 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->msi_x = B_FALSE;
 		dev_param_p->vlan = B_FALSE;
 		dev_param_p->advanced_pm = B_FALSE;
+		dev_param_p->mac_addr_order = B_FALSE;
 		dev_param_p->tx_pause_frame = B_FALSE;
 		dev_param_p->rx_pause_frame = B_FALSE;
 		dev_param_p->jumbo = B_FALSE;
@@ -458,6 +459,7 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->msi_x = B_TRUE;
 		dev_param_p->vlan = B_FALSE;
 		dev_param_p->advanced_pm = B_FALSE;
+		dev_param_p->mac_addr_order = B_FALSE;
 		dev_param_p->tx_pause_frame = B_FALSE;
 		dev_param_p->rx_pause_frame = B_TRUE;
 		dev_param_p->jumbo = B_TRUE;
@@ -470,14 +472,13 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->nge_split = NGE_SPLIT_96;
 		break;
 
-	case DEVICE_ID_MCP61_3EE:
-	case DEVICE_ID_MCP61_3EF:
 	case DEVICE_ID_MCP51_268:
 	case DEVICE_ID_MCP51_269:
 		dev_param_p->msi = B_FALSE;
 		dev_param_p->msi_x = B_FALSE;
 		dev_param_p->vlan = B_FALSE;
 		dev_param_p->advanced_pm = B_TRUE;
+		dev_param_p->mac_addr_order = B_FALSE;
 		dev_param_p->tx_pause_frame = B_FALSE;
 		dev_param_p->rx_pause_frame = B_FALSE;
 		dev_param_p->jumbo = B_FALSE;
@@ -496,6 +497,7 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->msi_x = B_TRUE;
 		dev_param_p->vlan = B_TRUE;
 		dev_param_p->advanced_pm = B_TRUE;
+		dev_param_p->mac_addr_order = B_FALSE;
 		dev_param_p->tx_pause_frame = B_TRUE;
 		dev_param_p->rx_pause_frame = B_TRUE;
 		dev_param_p->jumbo = B_TRUE;
@@ -508,11 +510,31 @@ nge_init_dev_spec_param(nge_t *ngep)
 		dev_param_p->nge_split = NGE_SPLIT_96;
 		break;
 
+	case DEVICE_ID_MCP61_3EE:
+	case DEVICE_ID_MCP61_3EF:
+		dev_param_p->msi = B_FALSE;
+		dev_param_p->msi_x = B_FALSE;
+		dev_param_p->vlan = B_FALSE;
+		dev_param_p->advanced_pm = B_TRUE;
+		dev_param_p->mac_addr_order = B_TRUE;
+		dev_param_p->tx_pause_frame = B_FALSE;
+		dev_param_p->rx_pause_frame = B_FALSE;
+		dev_param_p->jumbo = B_FALSE;
+		dev_param_p->tx_rx_64byte = B_TRUE;
+		dev_param_p->rx_hw_checksum = B_FALSE;
+		dev_param_p->tx_hw_checksum = 0;
+		dev_param_p->desc_type = DESC_OFFLOAD;
+		dev_param_p->rx_desc_num = NGE_RECV_SLOTS_DESC_1024;
+		dev_param_p->tx_desc_num = NGE_SEND_SLOTS_DESC_1024;
+		dev_param_p->nge_split = NGE_SPLIT_32;
+		break;
+
 	default:
 		dev_param_p->msi = B_FALSE;
 		dev_param_p->msi_x = B_FALSE;
 		dev_param_p->vlan = B_FALSE;
 		dev_param_p->advanced_pm = B_FALSE;
+		dev_param_p->mac_addr_order = B_FALSE;
 		dev_param_p->tx_pause_frame = B_FALSE;
 		dev_param_p->rx_pause_frame = B_FALSE;
 		dev_param_p->jumbo = B_FALSE;
@@ -950,7 +972,8 @@ nge_chip_reset(nge_t *ngep)
 	int err;
 	uint8_t i;
 	uint32_t regno;
-	uint64_t mac;
+	uint64_t mac = 0;
+	uint64_t mac_tmp = 0;
 	nge_uni_addr1 uaddr1;
 	nge_cp_cntl ee_cntl;
 	nge_soft_misc soft_misc;
@@ -988,6 +1011,27 @@ nge_chip_reset(nge_t *ngep)
 		mac <<= 32;
 		mac |= nge_reg_get32(ngep, NGE_UNI_ADDR0);
 		if (mac != 0ULL && mac != ~0ULL) {
+			/*
+			 * workaround for the MAC address reversed issue
+			 * on some motherboards
+			 */
+			if (ngep->dev_spec_param.mac_addr_order &&
+			    (ngep->mac_addr_reversion ||
+			    (mac & LOW_24BITS_MASK) == REVERSE_MAC_ELITE ||
+			    (mac & LOW_24BITS_MASK) == REVERSE_MAC_GIGABYTE ||
+			    (mac & LOW_24BITS_MASK) == REVERSE_MAC_ASUS)) {
+				for (i = 0; i < ETHERADDRL; i ++) {
+					mac_tmp <<= 8;
+					mac_tmp += (mac & 0xffULL);
+					mac >>= 8;
+				}
+				mac = mac_tmp;
+				nge_reg_put32(ngep,
+				    NGE_UNI_ADDR0, (uint32_t)mac);
+				nge_reg_put32(ngep,
+				    NGE_UNI_ADDR1, (uint32_t)(mac>>32));
+			}
+
 			ngep->chipinfo.hw_mac_addr = mac;
 			for (i = ETHERADDRL; i-- != 0; ) {
 				ngep->chipinfo.vendor_addr.addr[i] =
