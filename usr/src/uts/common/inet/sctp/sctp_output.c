@@ -1002,10 +1002,18 @@ sctp_output(sctp_t *sctp, uint_t num_pkt)
 	cansend = sctp->sctp_frwnd;
 	if (sctp->sctp_unsent < cansend)
 		cansend = sctp->sctp_unsent;
+
+	/*
+	 * Start persist timer if unable to send or when
+	 * trying to send into a zero window. This timer
+	 * ensures the blocked send attempt is retried.
+	 */
 	if ((cansend < sctp->sctp_current->sfa_pmss / 2) &&
-	    sctp->sctp_unacked &&
+	    (sctp->sctp_unacked != 0) &&
 	    (sctp->sctp_unacked < sctp->sctp_current->sfa_pmss) &&
-	    !sctp->sctp_ndelay) {
+	    !sctp->sctp_ndelay ||
+	    (cansend == 0 && sctp->sctp_unacked == 0 &&
+	    sctp->sctp_unsent != 0)) {
 		head = NULL;
 		fp = sctp->sctp_current;
 		goto unsent_data;
