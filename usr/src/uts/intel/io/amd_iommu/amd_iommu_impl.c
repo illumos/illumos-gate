@@ -28,16 +28,18 @@
 #include <sys/iommulib.h>
 #include <sys/amd_iommu.h>
 #include <sys/pci_cap.h>
+#include <sys/bootconf.h>
+#include <sys/ddidmareq.h>
 
 #include "amd_iommu_impl.h"
-
-extern vmem_t *heap_arena;
+#include "amd_iommu_acpi.h"
+#include "amd_iommu_page_tables.h"
 
 static int amd_iommu_fini(amd_iommu_t *iommu);
 static void amd_iommu_teardown_interrupts(amd_iommu_t *iommu);
 static void amd_iommu_stop(amd_iommu_t *iommu);
 
-static int amd_iommu_probe(dev_info_t *rdip);
+static int amd_iommu_probe(iommulib_handle_t handle, dev_info_t *rdip);
 static int amd_iommu_allochdl(iommulib_handle_t handle,
     dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
     int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *dma_handlep);
@@ -64,8 +66,11 @@ static int amd_iommu_mctl(iommulib_handle_t handle, dev_info_t *dip,
     enum ddi_dma_ctlops request, off_t *offp, size_t *lenp,
     caddr_t *objpp, uint_t cache_flags);
 
-static int unmap_current_window(iommulib_handle_t handle, dev_info_t *rdip,
-    ddi_dma_handle_t dma_handle, int ncookies);
+static int unmap_current_window(amd_iommu_t *iommu, dev_info_t *rdip,
+    ddi_dma_cookie_t *cookie_array, uint_t ccount, int ncookies, int locked);
+
+extern void *device_arena_alloc(size_t size, int vm_flag);
+extern void device_arena_free(void * vaddr, size_t size);
 
 ddi_dma_attr_t amd_iommu_dma_attr = {
 	DMA_ATTR_V0,
@@ -104,11 +109,7 @@ struct iommulib_ops amd_iommulib_ops = {
 	amd_iommu_mctl
 };
 
-uint8_t amd_iommu_htatsresv;
-uint8_t amd_iommu_vasize;
-uint8_t amd_iommu_pasize;
-
-amd_iommu_debug_t amd_iommu_debug;
+static kmutex_t amd_iommu_pgtable_lock;
 
 static int
 amd_iommu_register(amd_iommu_t *iommu)
@@ -161,31 +162,57 @@ amd_iommu_unregister(amd_iommu_t *iommu)
 }
 
 static int
+amd_iommu_setup_passthru(amd_iommu_t *iommu)
+{
+	gfx_entry_t *gfxp;
+
+	/*
+	 * Setup passthru mapping for "special" devices
+	 */
+	amd_iommu_set_passthru(iommu, NULL);
+
+	for (gfxp = gfx_devinfo_list; gfxp; gfxp = gfxp->g_next) {
+		ASSERT(gfxp->g_dip);
+		amd_iommu_set_passthru(iommu, gfxp->g_dip);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+static int
 amd_iommu_start(amd_iommu_t *iommu)
 {
 	dev_info_t *dip = iommu->aiomt_dip;
 	int instance = ddi_get_instance(dip);
 	const char *driver = ddi_driver_name(dip);
+	amd_iommu_acpi_ivhd_t *hinfop;
 	const char *f = "amd_iommu_start";
 
-	/* Must be set prior to enabling command buffer */
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
-	    AMD_IOMMU_COMWAITINT_ENABLE, 1);
-	/* Must be set prior to enabling event logging */
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
-	    AMD_IOMMU_EVENTINT_ENABLE, 1);
+	hinfop = amd_iommu_lookup_all_ivhd();
 
 	/*
-	 * If IOMMU contains a HT tunnel that supports address translation
-	 * enable translation on the HT tunnel traffic
+	 * Disable HT tunnel translation.
+	 * XXX use ACPI
 	 */
-	if (AMD_IOMMU_REG_GET(iommu->aiomt_cap_hdr, AMD_IOMMU_CAP_HTTUN)) {
-		AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
-		    AMD_IOMMU_HT_TUN_ENABLE, 1);
-	} else {
-		AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
-		    AMD_IOMMU_HT_TUN_ENABLE, 0);
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+	    AMD_IOMMU_HT_TUN_ENABLE, 0);
+
+	if (hinfop) {
+		if (amd_iommu_debug) {
+			cmn_err(CE_NOTE,
+			    "amd_iommu: using ACPI for CTRL registers");
+		}
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+		    AMD_IOMMU_ISOC, hinfop->ach_Isoc);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+		    AMD_IOMMU_RESPASSPW, hinfop->ach_ResPassPW);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+		    AMD_IOMMU_PASSPW, hinfop->ach_PassPW);
 	}
+
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+	    AMD_IOMMU_INVTO, 5);
+
 
 	/*
 	 * The Device table entry bit 0 (V) controls whether the device
@@ -197,18 +224,16 @@ amd_iommu_start(amd_iommu_t *iommu)
 	 */
 
 	/* Finally enable the IOMMU ... */
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
-	    AMD_IOMMU_ENABLE, 0);
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+	    AMD_IOMMU_ENABLE, 1);
 
-	/* The following must be enabled after the IOMMU is enabled */
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
-	    AMD_IOMMU_CMDBUF_ENABLE, 1);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
-	    AMD_IOMMU_EVENTLOG_ENABLE, 1);
-
-	cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
-	    "Successfully started AMD IOMMU", f, driver, instance,
-	    iommu->aiomt_idx);
+	if (amd_iommu_debug) {
+		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
+		    "Successfully started AMD IOMMU", f, driver, instance,
+		    iommu->aiomt_idx);
+	}
+	cmn_err(CE_NOTE, "AMD IOMMU (%d,%d) enabled",
+	    instance, iommu->aiomt_idx);
 
 	return (DDI_SUCCESS);
 }
@@ -221,21 +246,21 @@ amd_iommu_stop(amd_iommu_t *iommu)
 	const char *driver = ddi_driver_name(dip);
 	const char *f = "amd_iommu_stop";
 
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
 	    AMD_IOMMU_ENABLE, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
 	    AMD_IOMMU_EVENTINT_ENABLE, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
 	    AMD_IOMMU_COMWAITINT_ENABLE, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
 	    AMD_IOMMU_EVENTLOG_ENABLE, 0);
 
 	/*
 	 * Disable translation on HT tunnel traffic
 	 */
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
 	    AMD_IOMMU_HT_TUN_ENABLE, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_ctrl_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
 	    AMD_IOMMU_CMDBUF_ENABLE, 0);
 
 	cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMYU idx=%d. "
@@ -253,6 +278,8 @@ amd_iommu_setup_tables_and_buffers(amd_iommu_t *iommu)
 	caddr_t addr;
 	uint32_t sz;
 	uint32_t p2sz;
+	int i;
+	uint64_t *dentry;
 	int err;
 	const char *f = "amd_iommu_setup_tables_and_buffers";
 
@@ -285,10 +312,11 @@ amd_iommu_setup_tables_and_buffers(amd_iommu_t *iommu)
 
 	/*
 	 * Alloc memory for tables and buffers
+	 * XXX remove cast to size_t
 	 */
 	err = ddi_dma_mem_alloc(iommu->aiomt_dmahdl, dma_bufsz,
-	    &amd_iommu_devacc, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
-	    NULL, (caddr_t *)&iommu->aiomt_dma_bufva,
+	    &amd_iommu_devacc, DDI_DMA_CONSISTENT|IOMEM_DATA_UNCACHED,
+	    DDI_DMA_SLEEP,  NULL, (caddr_t *)&iommu->aiomt_dma_bufva,
 	    (size_t *)&iommu->aiomt_dma_mem_realsz, &iommu->aiomt_dma_mem_hdl);
 	if (err != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s: %s%d: Cannot alloc memory for DMA "
@@ -371,12 +399,26 @@ amd_iommu_setup_tables_and_buffers(amd_iommu_t *iommu)
 	 */
 	iommu->aiomt_devtbl = iommu->aiomt_dma_bufva;
 	bzero(iommu->aiomt_devtbl, iommu->aiomt_devtbl_sz);
-	addr = (caddr_t)iommu->aiomt_buf_dma_cookie.dmac_cookie_addr;
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_devtbl_va),
+
+	/*
+	 * Set V=1 and TV = 0, so any inadvertant pass-thrus cause
+	 * page faults. Also set SE bit so we aren't swamped with
+	 * page fault messages
+	 */
+	for (i = 0; i <= AMD_IOMMU_MAX_DEVICEID; i++) {
+		/*LINTED*/
+		dentry = (uint64_t *)&iommu->aiomt_devtbl
+		    [i * AMD_IOMMU_DEVTBL_ENTRY_SZ];
+		AMD_IOMMU_REG_SET64(dentry, AMD_IOMMU_DEVTBL_V, 1);
+		AMD_IOMMU_REG_SET64(&(dentry[1]), AMD_IOMMU_DEVTBL_SE, 1);
+	}
+
+	addr = (caddr_t)(uintptr_t)iommu->aiomt_buf_dma_cookie.dmac_cookie_addr;
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_devtbl_va),
 	    AMD_IOMMU_DEVTABBASE, ((uint64_t)(uintptr_t)addr) >> 12);
 	sz = (iommu->aiomt_devtbl_sz >> 12) - 1;
 	ASSERT(sz <= ((1 << 9) - 1));
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_devtbl_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_devtbl_va),
 	    AMD_IOMMU_DEVTABSIZE, sz);
 
 	/*
@@ -386,19 +428,19 @@ amd_iommu_setup_tables_and_buffers(amd_iommu_t *iommu)
 	    iommu->aiomt_devtbl_sz;
 	bzero(iommu->aiomt_cmdbuf, iommu->aiomt_cmdbuf_sz);
 	addr += iommu->aiomt_devtbl_sz;
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_cmdbuf_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_cmdbuf_va),
 	    AMD_IOMMU_COMBASE, ((uint64_t)(uintptr_t)addr) >> 12);
 
 	p2sz = AMD_IOMMU_CMDBUF_SZ;
 	ASSERT(p2sz >= AMD_IOMMU_CMDBUF_MINSZ &&
 	    p2sz <= AMD_IOMMU_CMDBUF_MAXSZ);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_cmdbuf_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_cmdbuf_va),
 	    AMD_IOMMU_COMLEN, p2sz);
 	/*LINTED*/
 	iommu->aiomt_cmd_tail = (uint32_t *)iommu->aiomt_cmdbuf;
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_cmdbuf_head_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_cmdbuf_head_va),
 	    AMD_IOMMU_CMDHEADPTR, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_cmdbuf_tail_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_cmdbuf_tail_va),
 	    AMD_IOMMU_CMDTAILPTR, 0);
 
 	/*
@@ -408,25 +450,27 @@ amd_iommu_setup_tables_and_buffers(amd_iommu_t *iommu)
 	    iommu->aiomt_eventlog_sz;
 	bzero(iommu->aiomt_eventlog, iommu->aiomt_eventlog_sz);
 	addr += iommu->aiomt_cmdbuf_sz;
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_eventlog_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_eventlog_va),
 	    AMD_IOMMU_EVENTBASE, ((uint64_t)(uintptr_t)addr) >> 12);
 	p2sz = AMD_IOMMU_EVENTLOG_SZ;
 	ASSERT(p2sz >= AMD_IOMMU_EVENTLOG_MINSZ &&
 	    p2sz <= AMD_IOMMU_EVENTLOG_MAXSZ);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_eventlog_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_eventlog_va),
 	    AMD_IOMMU_EVENTLEN, sz);
 	/*LINTED*/
 	iommu->aiomt_event_head = (uint32_t *)iommu->aiomt_eventlog;
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_eventlog_head_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_eventlog_head_va),
 	    AMD_IOMMU_EVENTHEADPTR, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_eventlog_tail_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_eventlog_tail_va),
 	    AMD_IOMMU_EVENTTAILPTR, 0);
 
 	/* dma sync so device sees this init */
 	SYNC_FORDEV(iommu->aiomt_dmahdl);
 
-	cmn_err(CE_NOTE, "%s: %s%d: successfully setup AMD IOMMU tables, "
-	    "idx=%d", f, driver, instance, iommu->aiomt_idx);
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_TABLES) {
+		cmn_err(CE_NOTE, "%s: %s%d: successfully setup AMD IOMMU "
+		    "tables, idx=%d", f, driver, instance, iommu->aiomt_idx);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -440,21 +484,21 @@ amd_iommu_teardown_tables_and_buffers(amd_iommu_t *iommu)
 	const char *f = "amd_iommu_teardown_tables_and_buffers";
 
 	iommu->aiomt_eventlog = NULL;
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_eventlog_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_eventlog_va),
 	    AMD_IOMMU_EVENTBASE, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_eventlog_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_eventlog_va),
 	    AMD_IOMMU_EVENTLEN, 0);
 
 	iommu->aiomt_cmdbuf = NULL;
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_cmdbuf_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_cmdbuf_va),
 	    AMD_IOMMU_COMBASE, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_cmdbuf_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_cmdbuf_va),
 	    AMD_IOMMU_COMLEN, 0);
 
 	iommu->aiomt_devtbl = NULL;
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_devtbl_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_devtbl_va),
 	    AMD_IOMMU_DEVTABBASE, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_devtbl_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_devtbl_va),
 	    AMD_IOMMU_DEVTABSIZE, 0);
 
 	if (iommu->aiomt_dmahdl == NULL)
@@ -482,17 +526,59 @@ amd_iommu_teardown_tables_and_buffers(amd_iommu_t *iommu)
 	iommu->aiomt_dmahdl = NULL;
 }
 
+static void
+amd_iommu_enable_interrupts(amd_iommu_t *iommu)
+{
+	ASSERT(AMD_IOMMU_REG_GET64(REGADDR64(iommu->aiomt_reg_status_va),
+	    AMD_IOMMU_CMDBUF_RUN) == 0);
+	ASSERT(AMD_IOMMU_REG_GET64(REGADDR64(iommu->aiomt_reg_status_va),
+	    AMD_IOMMU_EVENT_LOG_RUN) == 0);
+
+	/* Must be set prior to enabling command buffer */
+	/* Must be set prior to enabling event logging */
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+	    AMD_IOMMU_CMDBUF_ENABLE, 1);
+	/* No interrupts for completion wait  - too heavy weight. use polling */
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+	    AMD_IOMMU_COMWAITINT_ENABLE, 0);
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+	    AMD_IOMMU_EVENTLOG_ENABLE, 1);
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+	    AMD_IOMMU_EVENTINT_ENABLE, 1);
+}
+
 static int
 amd_iommu_setup_exclusion(amd_iommu_t *iommu)
 {
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_excl_base_va),
-	    AMD_IOMMU_EXCL_BASE_ADDR, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_excl_base_va),
-	    AMD_IOMMU_EXCL_BASE_ALLOW, 1);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_excl_base_va),
-	    AMD_IOMMU_EXCL_BASE_EXEN, 0);
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_excl_lim_va),
-	    AMD_IOMMU_EXCL_LIM, 0);
+	amd_iommu_acpi_ivmd_t *minfop;
+
+	minfop = amd_iommu_lookup_all_ivmd();
+
+	if (minfop && minfop->acm_ExclRange == 1) {
+		cmn_err(CE_NOTE, "Programming exclusion range");
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_excl_base_va),
+		    AMD_IOMMU_EXCL_BASE_ADDR,
+		    minfop->acm_ivmd_phys_start >> 12);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_excl_base_va),
+		    AMD_IOMMU_EXCL_BASE_ALLOW, 1);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_excl_base_va),
+		    AMD_IOMMU_EXCL_BASE_EXEN, 1);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_excl_lim_va),
+		    AMD_IOMMU_EXCL_LIM, (minfop->acm_ivmd_phys_start +
+		    minfop->acm_ivmd_phys_len) >> 12);
+	} else {
+		if (amd_iommu_debug) {
+			cmn_err(CE_NOTE, "Skipping exclusion range");
+		}
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_excl_base_va),
+		    AMD_IOMMU_EXCL_BASE_ADDR, 0);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_excl_base_va),
+		    AMD_IOMMU_EXCL_BASE_ALLOW, 1);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_excl_base_va),
+		    AMD_IOMMU_EXCL_BASE_EXEN, 0);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_excl_lim_va),
+		    AMD_IOMMU_EXCL_LIM, 0);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -516,44 +602,41 @@ amd_iommu_intr_handler(caddr_t arg1, caddr_t arg2)
 	ASSERT(arg1);
 	ASSERT(arg2 == NULL);
 
-	cmn_err(CE_NOTE, "%s: %s%d: IOMMU unit idx=%d. In INTR handler",
-	    f, driver, instance, iommu->aiomt_idx);
-
-	if (AMD_IOMMU_REG_GET(REGVAL64(iommu->aiomt_reg_status_va),
-	    AMD_IOMMU_COMWAIT_INT) == 1) {
-		cmn_err(CE_NOTE, "%s: %s%d: IOMMU unit idx=%d "
-		    "Completion Wait Interrupt", f, driver, instance,
-		    iommu->aiomt_idx);
-		AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_status_va),
-		    AMD_IOMMU_COMWAIT_INT, 1);
-		sema_v(&iommu->aiomt_compl_wait_sema);
-		return (DDI_INTR_CLAIMED);
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+		cmn_err(CE_NOTE, "%s: %s%d: IOMMU unit idx=%d. In INTR handler",
+		    f, driver, instance, iommu->aiomt_idx);
 	}
 
-	if (AMD_IOMMU_REG_GET(REGVAL64(iommu->aiomt_reg_status_va),
+	if (AMD_IOMMU_REG_GET64(REGADDR64(iommu->aiomt_reg_status_va),
 	    AMD_IOMMU_EVENT_LOG_INT) == 1) {
-		cmn_err(CE_NOTE, "%s: %s%d: IOMMU unit idx=%d "
-		    "Event Log Interrupt", f, driver, instance,
-		    iommu->aiomt_idx);
-		(void) amd_iommu_read_log(iommu);
+		if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+			cmn_err(CE_NOTE, "%s: %s%d: IOMMU unit idx=%d "
+			    "Event Log Interrupt", f, driver, instance,
+			    iommu->aiomt_idx);
+		}
+		(void) amd_iommu_read_log(iommu, AMD_IOMMU_LOG_DISPLAY);
 		WAIT_SEC(1);
-		AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_status_va),
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_status_va),
 		    AMD_IOMMU_EVENT_LOG_INT, 1);
 		return (DDI_INTR_CLAIMED);
 	}
 
-	if (AMD_IOMMU_REG_GET(REGVAL64(iommu->aiomt_reg_status_va),
+	if (AMD_IOMMU_REG_GET64(REGADDR64(iommu->aiomt_reg_status_va),
 	    AMD_IOMMU_EVENT_OVERFLOW_INT) == 1) {
-		cmn_err(CE_NOTE, "%s: %s%d: IOMMU unit idx=%d "
+		cmn_err(CE_NOTE, "!%s: %s%d: IOMMU unit idx=%d "
 		    "Event Overflow Interrupt", f, driver, instance,
 		    iommu->aiomt_idx);
-		AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_status_va),
+		(void) amd_iommu_read_log(iommu, AMD_IOMMU_LOG_DISCARD);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_status_va),
+		    AMD_IOMMU_EVENT_LOG_INT, 1);
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_status_va),
 		    AMD_IOMMU_EVENT_OVERFLOW_INT, 1);
 		return (DDI_INTR_CLAIMED);
 	}
 
 	return (DDI_INTR_UNCLAIMED);
 }
+
 
 static int
 amd_iommu_setup_interrupts(amd_iommu_t *iommu)
@@ -579,9 +662,11 @@ amd_iommu_setup_interrupts(amd_iommu_t *iommu)
 		return (DDI_FAILURE);
 	}
 
-	cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
-	    "Interrupt types supported = 0x%x", f, driver, instance,
-	    iommu->aiomt_idx, type);
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
+		    "Interrupt types supported = 0x%x", f, driver, instance,
+		    iommu->aiomt_idx, type);
+	}
 
 	/*
 	 * for now we only support MSI
@@ -593,8 +678,10 @@ amd_iommu_setup_interrupts(amd_iommu_t *iommu)
 		return (DDI_FAILURE);
 	}
 
-	cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. MSI supported",
-	    f, driver, instance, iommu->aiomt_idx);
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. MSI supported",
+		    f, driver, instance, iommu->aiomt_idx);
+	}
 
 	err = ddi_intr_get_nintrs(dip, DDI_INTR_TYPE_MSI, &req);
 	if (err != DDI_SUCCESS) {
@@ -604,9 +691,11 @@ amd_iommu_setup_interrupts(amd_iommu_t *iommu)
 		return (DDI_FAILURE);
 	}
 
-	cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
-	    "MSI number of interrupts requested: %d",
-	    f, driver, instance, iommu->aiomt_idx, req);
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
+		    "MSI number of interrupts requested: %d",
+		    f, driver, instance, iommu->aiomt_idx, req);
+	}
 
 	if (req == 0) {
 		cmn_err(CE_WARN, "%s: %s%d: AMD IOMMU idx=%d: 0 MSI "
@@ -623,9 +712,11 @@ amd_iommu_setup_interrupts(amd_iommu_t *iommu)
 		return (DDI_FAILURE);
 	}
 
-	cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
-	    "MSI number of interrupts available: %d",
-	    f, driver, instance, iommu->aiomt_idx, avail);
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
+		    "MSI number of interrupts available: %d",
+		    f, driver, instance, iommu->aiomt_idx, avail);
+	}
 
 	if (avail == 0) {
 		cmn_err(CE_WARN, "%s: %s%d: AMD IOMMU idx=%d: 0 MSI "
@@ -656,9 +747,11 @@ amd_iommu_setup_interrupts(amd_iommu_t *iommu)
 	p2req--;
 	req = 1<<p2req;
 
-	cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
-	    "MSI power of 2 number of interrupts: %d,%d",
-	    f, driver, instance, iommu->aiomt_idx, p2req, req);
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
+		    "MSI power of 2 number of interrupts: %d,%d",
+		    f, driver, instance, iommu->aiomt_idx, p2req, req);
+	}
 
 	err = ddi_intr_alloc(iommu->aiomt_dip, iommu->aiomt_intr_htable,
 	    DDI_INTR_TYPE_MSI, 0, req, &actual, DDI_INTR_ALLOC_STRICT);
@@ -673,9 +766,11 @@ amd_iommu_setup_interrupts(amd_iommu_t *iommu)
 	iommu->aiomt_actual_intrs = actual;
 	iommu->aiomt_intr_state = AMD_IOMMU_INTR_ALLOCED;
 
-	cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
-	    "number of interrupts actually allocated %d",
-	    f, driver, instance, iommu->aiomt_idx, actual);
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d. "
+		    "number of interrupts actually allocated %d",
+		    f, driver, instance, iommu->aiomt_idx, actual);
+	}
 
 	if (iommu->aiomt_actual_intrs < req) {
 		cmn_err(CE_WARN, "%s: %s%d: AMD IOMMU idx=%d: "
@@ -720,9 +815,11 @@ amd_iommu_setup_interrupts(amd_iommu_t *iommu)
 
 	if (intrcap0 & DDI_INTR_FLAG_BLOCK) {
 		/* Need to call block enable */
-		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d: "
-		    "Need to call block enable",
-		    f, driver, instance, iommu->aiomt_idx);
+		if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+			cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d: "
+			    "Need to call block enable",
+			    f, driver, instance, iommu->aiomt_idx);
+		}
 		if (ddi_intr_block_enable(iommu->aiomt_intr_htable,
 		    iommu->aiomt_actual_intrs) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "%s: %s%d: AMD IOMMU idx=%d: "
@@ -734,9 +831,11 @@ amd_iommu_setup_interrupts(amd_iommu_t *iommu)
 			return (DDI_FAILURE);
 		}
 	} else {
-		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d: "
-		    "Need to call individual enable",
-		    f, driver, instance, iommu->aiomt_idx);
+		if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+			cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d: "
+			    "Need to call individual enable",
+			    f, driver, instance, iommu->aiomt_idx);
+		}
 		for (i = 0; i < iommu->aiomt_actual_intrs; i++) {
 			if (ddi_intr_enable(iommu->aiomt_intr_htable[i])
 			    != DDI_SUCCESS) {
@@ -754,11 +853,13 @@ amd_iommu_setup_interrupts(amd_iommu_t *iommu)
 	}
 	iommu->aiomt_intr_state = AMD_IOMMU_INTR_ENABLED;
 
-	cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d: "
-	    "Interrupts successfully %s enabled. # of interrupts = %d",
-	    f, driver, instance, iommu->aiomt_idx,
-	    (intrcap0 & DDI_INTR_FLAG_BLOCK) ? "(block)" : "(individually)",
-	    iommu->aiomt_actual_intrs);
+	if (amd_iommu_debug & AMD_IOMMU_DEBUG_INTR) {
+		cmn_err(CE_NOTE, "%s: %s%d: AMD IOMMU idx=%d: "
+		    "Interrupts successfully %s enabled. # of interrupts = %d",
+		    f, driver, instance, iommu->aiomt_idx,
+		    (intrcap0 & DDI_INTR_FLAG_BLOCK) ? "(block)" :
+		    "(individually)", iommu->aiomt_actual_intrs);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -813,7 +914,13 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 	uint32_t hi_addr32;
 	uint32_t range;
 	uint32_t misc;
+	uint64_t pgoffset;
+	amd_iommu_acpi_global_t *global;
+	amd_iommu_acpi_ivhd_t *hinfop;
 	const char *f = "amd_iommu_init";
+
+	global = amd_iommu_lookup_acpi_global();
+	hinfop = amd_iommu_lookup_any_ivhd();
 
 	low_addr32 = PCI_CAP_GET32(handle, 0, cap_base,
 	    AMD_IOMMU_CAP_ADDR_LOW_OFF);
@@ -829,7 +936,6 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 	mutex_enter(&iommu->aiomt_mutex);
 
 	mutex_init(&iommu->aiomt_cmdlock, NULL, MUTEX_DRIVER, NULL);
-	sema_init(&iommu->aiomt_compl_wait_sema, 1, NULL, SEMA_DRIVER, NULL);
 	mutex_init(&iommu->aiomt_eventlock, NULL, MUTEX_DRIVER, NULL);
 
 	iommu->aiomt_dip = dip;
@@ -843,11 +949,18 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 	/* Get cap header */
 	caphdr = PCI_CAP_GET32(handle, 0, cap_base, AMD_IOMMU_CAP_HDR_OFF);
 	iommu->aiomt_cap_hdr = caphdr;
-	iommu->aiomt_npcache = AMD_IOMMU_REG_GET(caphdr, AMD_IOMMU_CAP_NPCACHE);
-	iommu->aiomt_httun = AMD_IOMMU_REG_GET(caphdr, AMD_IOMMU_CAP_HTTUN);
-	iommu->aiomt_iotlb = AMD_IOMMU_REG_GET(caphdr, AMD_IOMMU_CAP_IOTLB);
-	iommu->aiomt_captype = AMD_IOMMU_REG_GET(caphdr, AMD_IOMMU_CAP_TYPE);
-	iommu->aiomt_capid = AMD_IOMMU_REG_GET(caphdr, AMD_IOMMU_CAP_ID);
+	iommu->aiomt_npcache = AMD_IOMMU_REG_GET32(&caphdr,
+	    AMD_IOMMU_CAP_NPCACHE);
+	iommu->aiomt_httun = AMD_IOMMU_REG_GET32(&caphdr, AMD_IOMMU_CAP_HTTUN);
+
+	if (hinfop)
+		iommu->aiomt_iotlb = hinfop->ach_IotlbSup;
+	else
+		iommu->aiomt_iotlb =
+		    AMD_IOMMU_REG_GET32(&caphdr, AMD_IOMMU_CAP_IOTLB);
+
+	iommu->aiomt_captype = AMD_IOMMU_REG_GET32(&caphdr, AMD_IOMMU_CAP_TYPE);
+	iommu->aiomt_capid = AMD_IOMMU_REG_GET32(&caphdr, AMD_IOMMU_CAP_ID);
 
 	/*
 	 * Get address of IOMMU control registers
@@ -857,50 +970,77 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 	iommu->aiomt_low_addr32 = low_addr32;
 	iommu->aiomt_hi_addr32 = hi_addr32;
 	low_addr32 &= ~AMD_IOMMU_REG_ADDR_LOCKED;
-	iommu->aiomt_reg_pa =  ((uint64_t)hi_addr32 << 32 | low_addr32);
+
+	if (hinfop) {
+		iommu->aiomt_reg_pa =  hinfop->ach_IOMMU_reg_base;
+		ASSERT(hinfop->ach_IOMMU_pci_seg == 0);
+	} else {
+		iommu->aiomt_reg_pa =  ((uint64_t)hi_addr32 << 32 | low_addr32);
+	}
 
 	/*
 	 * Get cap range reg
 	 */
 	range = PCI_CAP_GET32(handle, 0, cap_base, AMD_IOMMU_CAP_RANGE_OFF);
 	iommu->aiomt_range = range;
-	iommu->aiomt_rng_valid = AMD_IOMMU_REG_GET(range, AMD_IOMMU_RNG_VALID);
+	iommu->aiomt_rng_valid = AMD_IOMMU_REG_GET32(&range,
+	    AMD_IOMMU_RNG_VALID);
 	if (iommu->aiomt_rng_valid) {
-		iommu->aiomt_rng_bus = AMD_IOMMU_REG_GET(range,
+		iommu->aiomt_rng_bus = AMD_IOMMU_REG_GET32(&range,
 		    AMD_IOMMU_RNG_BUS);
-		iommu->aiomt_first_devfn = AMD_IOMMU_REG_GET(range,
+		iommu->aiomt_first_devfn = AMD_IOMMU_REG_GET32(&range,
 		    AMD_IOMMU_FIRST_DEVFN);
-		iommu->aiomt_last_devfn = AMD_IOMMU_REG_GET(range,
+		iommu->aiomt_last_devfn = AMD_IOMMU_REG_GET32(&range,
 		    AMD_IOMMU_LAST_DEVFN);
 	} else {
 		iommu->aiomt_rng_bus = 0;
 		iommu->aiomt_first_devfn = 0;
 		iommu->aiomt_last_devfn = 0;
 	}
-	iommu->aiomt_ht_unitid = AMD_IOMMU_REG_GET(range, AMD_IOMMU_HT_UNITID);
+
+	if (hinfop)
+		iommu->aiomt_ht_unitid = hinfop->ach_IOMMU_UnitID;
+	else
+		iommu->aiomt_ht_unitid = AMD_IOMMU_REG_GET32(&range,
+		    AMD_IOMMU_HT_UNITID);
 
 	/*
 	 * Get cap misc reg
 	 */
 	misc = PCI_CAP_GET32(handle, 0, cap_base, AMD_IOMMU_CAP_MISC_OFF);
 	iommu->aiomt_misc = misc;
-	iommu->aiomt_htatsresv = AMD_IOMMU_REG_GET(misc, AMD_IOMMU_HT_ATSRSV);
-	iommu->aiomt_vasize = AMD_IOMMU_REG_GET(misc, AMD_IOMMU_VA_SIZE);
-	iommu->aiomt_pasize = AMD_IOMMU_REG_GET(misc, AMD_IOMMU_PA_SIZE);
-	iommu->aiomt_msinum = AMD_IOMMU_REG_GET(misc, AMD_IOMMU_MSINUM);
+
+	if (global) {
+		iommu->aiomt_htatsresv = global->acg_HtAtsResv;
+		iommu->aiomt_vasize = global->acg_VAsize;
+		iommu->aiomt_pasize = global->acg_PAsize;
+	} else {
+		iommu->aiomt_htatsresv = AMD_IOMMU_REG_GET32(&misc,
+		    AMD_IOMMU_HT_ATSRSV);
+		iommu->aiomt_vasize = AMD_IOMMU_REG_GET32(&misc,
+		    AMD_IOMMU_VA_SIZE);
+		iommu->aiomt_pasize = AMD_IOMMU_REG_GET32(&misc,
+		    AMD_IOMMU_PA_SIZE);
+	}
+
+	if (hinfop) {
+		iommu->aiomt_msinum = hinfop->ach_IOMMU_MSInum;
+	} else {
+		iommu->aiomt_msinum =
+		    AMD_IOMMU_REG_GET32(&misc, AMD_IOMMU_MSINUM);
+	}
 
 	/*
 	 * Set up mapping between control registers PA and VA
 	 */
-	iommu->aiomt_reg_pages = btopr(AMD_IOMMU_REG_SIZE);
-	iommu->aiomt_reg_size = ptob(iommu->aiomt_reg_pages);
-	iommu->aiomt_mmu_reg_pages = mmu_btopr(AMD_IOMMU_REG_SIZE);
-	iommu->aiomt_mmu_reg_size = mmu_ptob(iommu->aiomt_mmu_reg_pages);
-	iommu->aiomt_reg_va =
-	    (uint64_t)(uintptr_t)vmem_alloc(heap_arena, iommu->aiomt_reg_size,
-	    VM_SLEEP);
+	pgoffset = iommu->aiomt_reg_pa & MMU_PAGEOFFSET;
+	ASSERT(pgoffset == 0);
+	iommu->aiomt_reg_pages = mmu_btopr(AMD_IOMMU_REG_SIZE + pgoffset);
+	iommu->aiomt_reg_size = mmu_ptob(iommu->aiomt_reg_pages);
 
-	if ((void *)(uintptr_t)iommu->aiomt_reg_va == NULL) {
+	iommu->aiomt_va = (uintptr_t)device_arena_alloc(
+	    ptob(iommu->aiomt_reg_pages), VM_SLEEP);
+	if (iommu->aiomt_va == 0) {
 		cmn_err(CE_WARN, "%s: %s%d: Failed to alloc VA for IOMMU "
 		    "control regs. Skipping IOMMU idx=%d", f, driver,
 		    instance, idx);
@@ -909,10 +1049,12 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 		return (NULL);
 	}
 
-	hat_devload(kas.a_hat, (void *)(uintptr_t)iommu->aiomt_reg_va,
-	    iommu->aiomt_mmu_reg_size,
-	    mmu_btop(iommu->aiomt_reg_pa), PROT_READ | PROT_WRITE,
-	    HAT_LOAD_LOCK);
+	hat_devload(kas.a_hat, (void *)(uintptr_t)iommu->aiomt_va,
+	    iommu->aiomt_reg_size,
+	    mmu_btop(iommu->aiomt_reg_pa), PROT_READ | PROT_WRITE
+	    | HAT_STRICTORDER, HAT_LOAD_LOCK);
+
+	iommu->aiomt_reg_va = iommu->aiomt_va + pgoffset;
 
 	/*
 	 * Setup the various control register's VA
@@ -950,13 +1092,33 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 		(void) amd_iommu_fini(iommu);
 		return (NULL);
 	}
+
 	if (amd_iommu_setup_exclusion(iommu) != DDI_SUCCESS) {
 		mutex_exit(&iommu->aiomt_mutex);
 		(void) amd_iommu_fini(iommu);
 		return (NULL);
 	}
 
+	amd_iommu_enable_interrupts(iommu);
+
 	if (amd_iommu_setup_interrupts(iommu) != DDI_SUCCESS) {
+		mutex_exit(&iommu->aiomt_mutex);
+		(void) amd_iommu_fini(iommu);
+		return (NULL);
+	}
+
+	/*
+	 * need to setup domain table before gfx bypass
+	 */
+	amd_iommu_init_page_tables(iommu);
+
+	/*
+	 * Set pass-thru for special devices like IOAPIC and HPET
+	 *
+	 * Also, gfx devices don't use DDI for DMA. No need to register
+	 * before setting up gfx passthru
+	 */
+	if (amd_iommu_setup_passthru(iommu) != DDI_SUCCESS) {
 		mutex_exit(&iommu->aiomt_mutex);
 		(void) amd_iommu_fini(iommu);
 		return (NULL);
@@ -968,14 +1130,17 @@ amd_iommu_init(dev_info_t *dip, ddi_acc_handle_t handle, int idx,
 		return (NULL);
 	}
 
+	/* xxx register/start race  */
 	if (amd_iommu_register(iommu) != DDI_SUCCESS) {
 		mutex_exit(&iommu->aiomt_mutex);
 		(void) amd_iommu_fini(iommu);
 		return (NULL);
 	}
 
-	cmn_err(CE_NOTE, "%s: %s%d: IOMMU idx=%d inited.", f, driver,
-	    instance, idx);
+	if (amd_iommu_debug) {
+		cmn_err(CE_NOTE, "%s: %s%d: IOMMU idx=%d inited.", f, driver,
+		    instance, idx);
+	}
 
 	return (iommu);
 }
@@ -996,18 +1161,19 @@ amd_iommu_fini(amd_iommu_t *iommu)
 		return (DDI_FAILURE);
 	}
 	amd_iommu_stop(iommu);
+	amd_iommu_fini_page_tables(iommu);
 	amd_iommu_teardown_interrupts(iommu);
 	amd_iommu_teardown_exclusion(iommu);
 	amd_iommu_teardown_tables_and_buffers(iommu);
-	if (iommu->aiomt_reg_va != NULL) {
-		hat_unload(kas.a_hat, (void *)(uintptr_t)iommu->aiomt_reg_va,
-		    iommu->aiomt_mmu_reg_size, HAT_UNLOAD_UNLOCK);
-		vmem_free(heap_arena, (void *)(uintptr_t)iommu->aiomt_reg_va,
-		    iommu->aiomt_reg_size);
+	if (iommu->aiomt_va != NULL) {
+		hat_unload(kas.a_hat, (void *)(uintptr_t)iommu->aiomt_va,
+		    iommu->aiomt_reg_size, HAT_UNLOAD_UNLOCK);
+		device_arena_free((void *)(uintptr_t)iommu->aiomt_va,
+		    ptob(iommu->aiomt_reg_pages));
+		iommu->aiomt_va = NULL;
 		iommu->aiomt_reg_va = NULL;
 	}
 	mutex_destroy(&iommu->aiomt_eventlock);
-	sema_destroy(&iommu->aiomt_compl_wait_sema);
 	mutex_destroy(&iommu->aiomt_cmdlock);
 	mutex_exit(&iommu->aiomt_mutex);
 	mutex_destroy(&iommu->aiomt_mutex);
@@ -1074,17 +1240,21 @@ amd_iommu_setup(dev_info_t *dip, amd_iommu_state_t *statep)
 
 		/* check if cap ID is secure device cap id */
 		if (id != PCI_CAP_ID_SECURE_DEV) {
-			cmn_err(CE_WARN, "%s: %s%d: skipping IOMMU: idx(0x%x) "
-			    "cap ID (0x%x) != secure dev capid (0x%x)", f,
-			    driver, instance, idx, id, PCI_CAP_ID_SECURE_DEV);
+			if (amd_iommu_debug) {
+				cmn_err(CE_WARN,
+				    "%s: %s%d: skipping IOMMU: idx(0x%x) "
+				    "cap ID (0x%x) != secure dev capid (0x%x)",
+				    f, driver, instance, idx, id,
+				    PCI_CAP_ID_SECURE_DEV);
+			}
 			continue;
 		}
 
 		/* check if cap type is IOMMU cap type */
 		caphdr = PCI_CAP_GET32(handle, 0, cap_base,
 		    AMD_IOMMU_CAP_HDR_OFF);
-		cap_type = AMD_IOMMU_REG_GET(caphdr, AMD_IOMMU_CAP_TYPE);
-		cap_id = AMD_IOMMU_REG_GET(caphdr, AMD_IOMMU_CAP_ID);
+		cap_type = AMD_IOMMU_REG_GET32(&caphdr, AMD_IOMMU_CAP_TYPE);
+		cap_id = AMD_IOMMU_REG_GET32(&caphdr, AMD_IOMMU_CAP_ID);
 
 		if (cap_type != AMD_IOMMU_CAP) {
 			cmn_err(CE_WARN, "%s: %s%d: skipping IOMMU: idx(0x%x) "
@@ -1115,8 +1285,10 @@ amd_iommu_setup(dev_info_t *dip, amd_iommu_state_t *statep)
 
 	pci_config_teardown(&handle);
 
-	cmn_err(CE_NOTE, "%s: %s%d: state=%p: setup %d IOMMU units",
-	    f, driver, instance, (void *)statep, statep->aioms_nunits);
+	if (amd_iommu_debug) {
+		cmn_err(CE_NOTE, "%s: %s%d: state=%p: setup %d IOMMU units",
+		    f, driver, instance, (void *)statep, statep->aioms_nunits);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -1153,9 +1325,25 @@ amd_iommu_teardown(dev_info_t *dip, amd_iommu_state_t *statep)
 /* Interface with IOMMULIB */
 /*ARGSUSED*/
 static int
-amd_iommu_probe(dev_info_t *rdip)
+amd_iommu_probe(iommulib_handle_t handle, dev_info_t *rdip)
 {
-	/* for now unconditionally return probe success */
+	const char *driver = ddi_driver_name(rdip);
+	char *s;
+	amd_iommu_t *iommu = iommulib_iommu_getdata(handle);
+
+	if (amd_iommu_disable_list) {
+		s = strstr(amd_iommu_disable_list, driver);
+		if (s == NULL)
+			return (DDI_SUCCESS);
+		if (s == amd_iommu_disable_list || *(s - 1) == ':') {
+			s += strlen(driver);
+			if (*s == '\0' || *s == ':') {
+				amd_iommu_set_passthru(iommu, rdip);
+				return (DDI_FAILURE);
+			}
+		}
+	}
+
 	return (DDI_SUCCESS);
 }
 
@@ -1179,26 +1367,26 @@ amd_iommu_freehdl(iommulib_handle_t handle,
 
 /*ARGSUSED*/
 static int
-map_current_window(iommulib_handle_t handle, dev_info_t *rdip,
-    ddi_dma_handle_t dma_handle)
+map_current_window(amd_iommu_t *iommu, dev_info_t *rdip, ddi_dma_attr_t *attrp,
+    struct ddi_dma_req *dmareq, ddi_dma_cookie_t *cookie_array, uint_t ccount,
+    int km_flags)
 {
-	amd_iommu_t *iommu = (amd_iommu_t *)iommulib_iommu_getdata(handle);
 	const char *driver = ddi_driver_name(iommu->aiomt_dip);
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	int idx = iommu->aiomt_idx;
-	ddi_dma_cookie_t cookie;
-	uint_t ccount;
 	int i;
-	dev_info_t *dip = ddi_root_node();
-	char path[MAXPATHLEN];
+	uint64_t start_va;
+	char *path;
+	int error = DDI_FAILURE;
 	const char *f = "map_current_window";
 
-	(void) ddi_pathname(rdip, path);
-
-	if (amd_iommu_debug & AMD_IOMMU_DEBUG_PAGE_TABLES) {
-		cmn_err(CE_NOTE, "%s: entered for device %s, rdip = %p",
-		    f, path, (void *)rdip);
+	path = kmem_alloc(MAXPATHLEN, km_flags);
+	if (path == NULL) {
+		return (DDI_DMA_NORESOURCES);
 	}
+
+	(void) ddi_pathname(rdip, path);
+	mutex_enter(&amd_iommu_pgtable_lock);
 
 	if (amd_iommu_debug == AMD_IOMMU_DEBUG_PAGE_TABLES) {
 		cmn_err(CE_WARN, "%s: %s%d: idx=%d Attempting to get cookies "
@@ -1206,85 +1394,96 @@ map_current_window(iommulib_handle_t handle, dev_info_t *rdip,
 		    f, driver, instance, idx, path);
 	}
 
-	if (iommulib_iommu_dma_get_cookies(dip, dma_handle, &cookie, &ccount) !=
-	    DDI_SUCCESS) {
-		cmn_err(CE_WARN, "%s: %s%d: idx=%d Cannot get cookies "
-		    "for device %s", f, driver, instance, idx, path);
-		return (DDI_FAILURE);
-	}
-
-	if (amd_iommu_debug == AMD_IOMMU_DEBUG_PAGE_TABLES) {
-		cmn_err(CE_WARN, "%s: %s%d: idx=%d GOT %d cookies from handle "
-		    "for device %s",
-		    f, driver, instance, idx, ccount, path);
-	}
-
-	for (i = 0; i < ccount; i++, ddi_dma_nextcookie(dma_handle, &cookie)) {
-		if (amd_iommu_map_pa2va(iommu, 1, rdip,
-		    cookie.dmac_cookie_addr,
-		    cookie.dmac_size) != DDI_SUCCESS) {
+	start_va = 0;
+	for (i = 0; i < ccount; i++) {
+		if ((error = amd_iommu_map_pa2va(iommu, rdip, attrp, dmareq,
+		    cookie_array[i].dmac_cookie_addr,
+		    cookie_array[i].dmac_size,
+		    AMD_IOMMU_VMEM_MAP, &start_va, km_flags)) != DDI_SUCCESS) {
 			break;
 		}
+		cookie_array[i].dmac_cookie_addr = (uintptr_t)start_va;
+		cookie_array[i].dmac_type = 0;
 	}
 
 	if (i != ccount) {
 		cmn_err(CE_WARN, "%s: %s%d: idx=%d Cannot map cookie# %d "
 		    "for device %s", f, driver, instance, idx, i, path);
-		(void) unmap_current_window(handle, rdip, dma_handle, i);
-		return (DDI_FAILURE);
+		(void) unmap_current_window(iommu, rdip, cookie_array,
+		    ccount, i, 1);
+		goto out;
 	}
-	iommulib_iommu_dma_reset_cookies(dip, dma_handle);
 
 	if (amd_iommu_debug & AMD_IOMMU_DEBUG_PAGE_TABLES) {
 		cmn_err(CE_NOTE, "%s: return SUCCESS", f);
 	}
 
-	return (DDI_SUCCESS);
+	error = DDI_DMA_MAPPED;
+out:
+	mutex_exit(&amd_iommu_pgtable_lock);
+	kmem_free(path, MAXPATHLEN);
+	return (error);
 }
 
 /*ARGSUSED*/
 static int
-unmap_current_window(iommulib_handle_t handle, dev_info_t *rdip,
-    ddi_dma_handle_t dma_handle, int ncookies)
+unmap_current_window(amd_iommu_t *iommu, dev_info_t *rdip,
+    ddi_dma_cookie_t *cookie_array, uint_t ccount, int ncookies, int locked)
 {
-	amd_iommu_t *iommu = (amd_iommu_t *)iommulib_iommu_getdata(handle);
 	const char *driver = ddi_driver_name(iommu->aiomt_dip);
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	int idx = iommu->aiomt_idx;
-	ddi_dma_cookie_t cookie;
-	uint_t ccount;
 	int i;
-	dev_info_t *dip = ddi_root_node();
-	char path[MAXPATHLEN];
+	int error = DDI_FAILURE;
+	char *path;
+	int pathfree;
 	const char *f = "unmap_current_window";
 
-	(void) ddi_pathname(rdip, path);
+	if (!locked)
+		mutex_enter(&amd_iommu_pgtable_lock);
 
-	if (iommulib_iommu_dma_get_cookies(dip, dma_handle, &cookie, &ccount) !=
-	    DDI_SUCCESS) {
-		cmn_err(CE_WARN, "%s: %s%d: idx=%d Cannot get cookies "
-		    "for device %s", f, driver, instance, idx, path);
-		return (DDI_FAILURE);
+	path = kmem_alloc(MAXPATHLEN, KM_NOSLEEP);
+	if (path) {
+		(void) ddi_pathname(rdip, path);
+		pathfree = 1;
+	} else {
+		path = "<path-mem-alloc-failed>";
+		pathfree = 0;
 	}
 
 	if (ncookies == -1)
 		ncookies = ccount;
 
 	for (i = 0; i < ncookies; i++) {
-		if (amd_iommu_unmap_va(iommu, 1, rdip, cookie.dmac_cookie_addr,
-		    cookie.dmac_size) != DDI_SUCCESS) {
+		if (amd_iommu_unmap_va(iommu, rdip,
+		    cookie_array[i].dmac_cookie_addr,
+		    cookie_array[i].dmac_size,
+		    AMD_IOMMU_VMEM_MAP) != DDI_SUCCESS) {
 			break;
 		}
-		ddi_dma_nextcookie(dma_handle, &cookie);
+	}
+
+	if (amd_iommu_cmd(iommu, AMD_IOMMU_CMD_COMPL_WAIT, NULL, 0, 0)
+	    != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: AMD IOMMU completion wait failed for: %s",
+		    f, path);
 	}
 
 	if (i != ncookies) {
 		cmn_err(CE_WARN, "%s: %s%d: idx=%d Cannot unmap cookie# %d "
 		    "for device %s", f, driver, instance, idx, i, path);
-		return (DDI_FAILURE);
+		error = DDI_FAILURE;
+		goto out;
 	}
-	iommulib_iommu_dma_reset_cookies(dip, dma_handle);
-	return (DDI_SUCCESS);
+
+	error = DDI_SUCCESS;
+
+out:
+	if (pathfree)
+		kmem_free(path, MAXPATHLEN);
+	if (!locked)
+		mutex_exit(&amd_iommu_pgtable_lock);
+	return (error);
 }
 
 /*ARGSUSED*/
@@ -1294,33 +1493,86 @@ amd_iommu_bindhdl(iommulib_handle_t handle, dev_info_t *dip,
     struct ddi_dma_req *dmareq, ddi_dma_cookie_t *cookiep,
     uint_t *ccountp)
 {
+	int dma_error = DDI_DMA_NOMAPPING;
 	int error;
+	char *path;
+	ddi_dma_cookie_t *cookie_array = NULL;
+	uint_t ccount = 0;
+	ddi_dma_impl_t *hp;
+	ddi_dma_attr_t *attrp;
+	int km_flags;
+	amd_iommu_t *iommu = iommulib_iommu_getdata(handle);
+	int instance = ddi_get_instance(rdip);
+	const char *driver = ddi_driver_name(rdip);
 	const char *f = "amd_iommu_bindhdl";
 
-	error = iommulib_iommu_dma_bindhdl(dip, rdip, dma_handle,
+	dma_error = iommulib_iommu_dma_bindhdl(dip, rdip, dma_handle,
 	    dmareq, cookiep, ccountp);
 
-	if (error != DDI_DMA_MAPPED && error != DDI_DMA_PARTIAL_MAP)
-		return (error);
+	if (dma_error != DDI_DMA_MAPPED && dma_error != DDI_DMA_PARTIAL_MAP)
+		return (dma_error);
+
+	km_flags = iommulib_iommu_dma_get_sleep_flags(dip, dma_handle);
+
+	path = kmem_alloc(MAXPATHLEN, km_flags);
+	if (path) {
+		(void) ddi_pathname(rdip, path);
+	} else {
+		dma_error = DDI_DMA_NORESOURCES;
+		goto unbind;
+	}
 
 	if (amd_iommu_debug & AMD_IOMMU_DEBUG_BIND) {
-		char buf[MAXPATHLEN];
-		(void) ddi_pathname(rdip, buf);
 		cmn_err(CE_NOTE, "%s: %s got cookie (%p), #cookies: %d",
-		    f, buf, (void *)cookiep->dmac_cookie_addr, *ccountp);
+		    f, path,
+		    (void *)cookiep->dmac_cookie_addr,
+		    *ccountp);
 	}
 
-	if (map_current_window(handle, rdip, dma_handle) != DDI_SUCCESS)
-		return (DDI_DMA_NOMAPPING);
+	cookie_array = NULL;
+	ccount = 0;
+	if ((error = iommulib_iommu_dma_get_cookies(dip, dma_handle,
+	    &cookie_array, &ccount)) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Cannot get cookies "
+		    "for device %s", f, driver, instance, path);
+		dma_error = error;
+		goto unbind;
+	}
+
+	hp = (ddi_dma_impl_t *)dma_handle;
+	attrp = &hp->dmai_attr;
+
+	error = map_current_window(iommu, rdip, attrp, dmareq,
+	    cookie_array, ccount, km_flags);
+	if (error != DDI_SUCCESS) {
+		dma_error = error;
+		goto unbind;
+	}
+
+	if ((error = iommulib_iommu_dma_set_cookies(dip, dma_handle,
+	    cookie_array, ccount)) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Cannot set cookies "
+		    "for device %s", f, driver, instance, path);
+		dma_error = error;
+		goto unbind;
+	}
+
+	*cookiep = cookie_array[0];
 
 	if (amd_iommu_debug & AMD_IOMMU_DEBUG_BIND) {
-		char buf[MAXPATHLEN];
-		(void) ddi_pathname(rdip, buf);
 		cmn_err(CE_NOTE, "%s: %s remapped cookie (%p), #cookies: %d",
-		    f, buf, (void *)cookiep->dmac_cookie_addr, *ccountp);
+		    f, path,
+		    (void *)(uintptr_t)cookiep->dmac_cookie_addr,
+		    *ccountp);
 	}
 
-	return (error);
+	kmem_free(path, MAXPATHLEN);
+	ASSERT(dma_error == DDI_DMA_MAPPED || dma_error == DDI_DMA_PARTIAL_MAP);
+	return (dma_error);
+unbind:
+	kmem_free(path, MAXPATHLEN);
+	(void) iommulib_iommu_dma_unbindhdl(dip, rdip, dma_handle);
+	return (dma_error);
 }
 
 /*ARGSUSED*/
@@ -1328,10 +1580,51 @@ static int
 amd_iommu_unbindhdl(iommulib_handle_t handle,
     dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t dma_handle)
 {
-	if (unmap_current_window(handle, rdip, dma_handle, -1) != DDI_SUCCESS)
-		return (DDI_FAILURE);
+	amd_iommu_t *iommu = iommulib_iommu_getdata(handle);
+	ddi_dma_cookie_t *cookie_array = NULL;
+	uint_t ccount = 0;
+	int error = DDI_FAILURE;
+	int instance = ddi_get_instance(rdip);
+	const char *driver = ddi_driver_name(rdip);
+	const char *f = "amd_iommu_unbindhdl";
 
-	return (iommulib_iommu_dma_unbindhdl(dip, rdip, dma_handle));
+	cookie_array = NULL;
+	ccount = 0;
+	if (iommulib_iommu_dma_get_cookies(dip, dma_handle, &cookie_array,
+	    &ccount) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Cannot get cookies "
+		    "for device %p", f, driver, instance, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	if (iommulib_iommu_dma_clear_cookies(dip, dma_handle) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Cannot clear cookies "
+		    "for device %p", f, driver, instance, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	if (iommulib_iommu_dma_unbindhdl(dip, rdip, dma_handle)
+	    != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: failed to unbindhdl for dip=%p",
+		    f, driver, instance, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	if (unmap_current_window(iommu, rdip, cookie_array, ccount, -1, 0)
+	    != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: failed to unmap current window "
+		    "for dip=%p", f, driver, instance, (void *)rdip);
+		error = DDI_FAILURE;
+	} else {
+		error = DDI_SUCCESS;
+	}
+out:
+	if (cookie_array)
+		kmem_free(cookie_array, sizeof (ddi_dma_cookie_t) * ccount);
+	return (error);
 }
 
 /*ARGSUSED*/
@@ -1340,8 +1633,46 @@ amd_iommu_sync(iommulib_handle_t handle, dev_info_t *dip,
     dev_info_t *rdip, ddi_dma_handle_t dma_handle, off_t off,
     size_t len, uint_t cache_flags)
 {
-	return (iommulib_iommu_dma_sync(dip, rdip, dma_handle, off,
-	    len, cache_flags));
+	ddi_dma_cookie_t *cookie_array = NULL;
+	uint_t ccount = 0;
+	int error;
+	const char *f = "amd_iommu_sync";
+
+	cookie_array = NULL;
+	ccount = 0;
+	if (iommulib_iommu_dma_get_cookies(dip, dma_handle, &cookie_array,
+	    &ccount) != DDI_SUCCESS) {
+		ASSERT(cookie_array == NULL);
+		cmn_err(CE_WARN, "%s: Cannot get cookies "
+		    "for device %p", f, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	if (iommulib_iommu_dma_clear_cookies(dip, dma_handle) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: Cannot clear cookies "
+		    "for device %p", f, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	error = iommulib_iommu_dma_sync(dip, rdip, dma_handle, off,
+	    len, cache_flags);
+
+	if (iommulib_iommu_dma_set_cookies(dip, dma_handle, cookie_array,
+	    ccount) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: Cannot set cookies "
+		    "for device %p", f, (void *)rdip);
+		error = DDI_FAILURE;
+	} else {
+		cookie_array = NULL;
+		ccount = 0;
+	}
+
+out:
+	if (cookie_array)
+		kmem_free(cookie_array, sizeof (ddi_dma_cookie_t) * ccount);
+	return (error);
 }
 
 /*ARGSUSED*/
@@ -1351,17 +1682,86 @@ amd_iommu_win(iommulib_handle_t handle, dev_info_t *dip,
     off_t *offp, size_t *lenp, ddi_dma_cookie_t *cookiep,
     uint_t *ccountp)
 {
-	int error;
+	int error = DDI_FAILURE;
+	amd_iommu_t *iommu = iommulib_iommu_getdata(handle);
+	ddi_dma_cookie_t *cookie_array = NULL;
+	uint_t ccount = 0;
+	int km_flags;
+	ddi_dma_impl_t *hp;
+	ddi_dma_attr_t *attrp;
+	struct ddi_dma_req sdmareq = {0};
+	int instance = ddi_get_instance(rdip);
+	const char *driver = ddi_driver_name(rdip);
+	const char *f = "amd_iommu_win";
 
-	if (unmap_current_window(handle, rdip, dma_handle, -1) != DDI_SUCCESS)
-		return (DDI_FAILURE);
+	km_flags = iommulib_iommu_dma_get_sleep_flags(dip, dma_handle);
 
-	error = iommulib_iommu_dma_win(dip, rdip, dma_handle, win,
-	    offp, lenp, cookiep, ccountp);
-	if (error != DDI_SUCCESS)
-		return (DDI_FAILURE);
+	cookie_array = NULL;
+	ccount = 0;
+	if (iommulib_iommu_dma_get_cookies(dip, dma_handle, &cookie_array,
+	    &ccount) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Cannot get cookies "
+		    "for device %p", f, driver, instance, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
 
-	return (map_current_window(handle, rdip, dma_handle));
+	if (iommulib_iommu_dma_clear_cookies(dip, dma_handle) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Cannot clear cookies "
+		    "for device %p", f, driver, instance, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	if (iommulib_iommu_dma_win(dip, rdip, dma_handle, win,
+	    offp, lenp, cookiep, ccountp) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: failed switch windows for dip=%p",
+		    f, driver, instance, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	(void) unmap_current_window(iommu, rdip, cookie_array, ccount, -1, 0);
+
+	if (cookie_array) {
+		kmem_free(cookie_array, sizeof (ddi_dma_cookie_t) * ccount);
+		cookie_array = NULL;
+		ccount = 0;
+	}
+
+	cookie_array = NULL;
+	ccount = 0;
+	if (iommulib_iommu_dma_get_cookies(dip, dma_handle, &cookie_array,
+	    &ccount) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Cannot get cookies "
+		    "for device %p", f, driver, instance, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	hp = (ddi_dma_impl_t *)dma_handle;
+	attrp = &hp->dmai_attr;
+
+	sdmareq.dmar_flags = DDI_DMA_RDWR;
+	error = map_current_window(iommu, rdip, attrp, &sdmareq,
+	    cookie_array, ccount, km_flags);
+
+	if (iommulib_iommu_dma_set_cookies(dip, dma_handle, cookie_array,
+	    ccount) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "%s: %s%d: Cannot set cookies "
+		    "for device %p", f, driver, instance, (void *)rdip);
+		error = DDI_FAILURE;
+		goto out;
+	}
+
+	*cookiep = cookie_array[0];
+
+	return (error == DDI_SUCCESS ? DDI_SUCCESS : DDI_FAILURE);
+out:
+	if (cookie_array)
+		kmem_free(cookie_array, sizeof (ddi_dma_cookie_t) * ccount);
+
+	return (error);
 }
 
 /* Obsoleted DMA routines */
@@ -1372,6 +1772,7 @@ amd_iommu_map(iommulib_handle_t handle, dev_info_t *dip,
     dev_info_t *rdip, struct ddi_dma_req *dmareq,
     ddi_dma_handle_t *dma_handle)
 {
+	ASSERT(0);
 	return (iommulib_iommu_dma_map(dip, rdip, dmareq, dma_handle));
 }
 
@@ -1382,6 +1783,68 @@ amd_iommu_mctl(iommulib_handle_t handle, dev_info_t *dip,
     enum ddi_dma_ctlops request, off_t *offp, size_t *lenp,
     caddr_t *objpp, uint_t cache_flags)
 {
+	ASSERT(0);
 	return (iommulib_iommu_dma_mctl(dip, rdip, dma_handle,
 	    request, offp, lenp, objpp, cache_flags));
+}
+
+uint64_t
+amd_iommu_reg_get64_workaround(uint64_t *regp, uint32_t bits)
+{
+	split_t s;
+	uint32_t *ptr32 = (uint32_t *)regp;
+	uint64_t *s64p = &(s.u64);
+
+	s.u32[0] = ptr32[0];
+	s.u32[1] = ptr32[1];
+
+	return (AMD_IOMMU_REG_GET64_IMPL(s64p, bits));
+}
+
+uint64_t
+amd_iommu_reg_set64_workaround(uint64_t *regp, uint32_t bits, uint64_t value)
+{
+	split_t s;
+	uint32_t *ptr32 = (uint32_t *)regp;
+	uint64_t *s64p = &(s.u64);
+
+	s.u32[0] = ptr32[0];
+	s.u32[1] = ptr32[1];
+
+	AMD_IOMMU_REG_SET64_IMPL(s64p, bits, value);
+
+	*regp = s.u64;
+
+	return (s.u64);
+}
+
+void
+amd_iommu_read_boot_props(void)
+{
+	amd_iommu_disable = startup_amd_iommu_disable;
+	amd_iommu_disable_list = startup_amd_iommu_disable_list;
+}
+
+void
+amd_iommu_lookup_conf_props(dev_info_t *dip)
+{
+	char *disable;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS|DDI_PROP_NOTPROM, "amd-iommu", &disable)
+	    == DDI_PROP_SUCCESS) {
+		if (strcmp(disable, "no") == 0) {
+			amd_iommu_disable = 1;
+		}
+		ddi_prop_free(disable);
+	}
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS|DDI_PROP_NOTPROM, "amd-iommu-disable-list",
+	    &disable) == DDI_PROP_SUCCESS) {
+		amd_iommu_disable_list = kmem_alloc(strlen(disable) + 1,
+		    KM_SLEEP);
+		(void) strcpy(amd_iommu_disable_list, disable);
+		ddi_prop_free(disable);
+	}
 }

@@ -126,25 +126,25 @@ devtab_illegal_entry(amd_iommu_t *iommu, uint32_t *event)
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	const char *f = "devtab_illegal_entry";
 
-	ASSERT(AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_TYPE) ==
+	ASSERT(AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_TYPE) ==
 	    AMD_IOMMU_EVENT_DEVTAB_ILLEGAL_ENTRY);
 
-	deviceid = AMD_IOMMU_REG_GET(event[0],
+	deviceid = AMD_IOMMU_REG_GET32(&event[0],
 	    AMD_IOMMU_EVENT_DEVTAB_ILL_DEVICEID);
 
-	TR = AMD_IOMMU_REG_GET(event[1],
+	TR = AMD_IOMMU_REG_GET32(&event[1],
 	    AMD_IOMMU_EVENT_DEVTAB_ILL_TR);
 
-	RZ = AMD_IOMMU_REG_GET(event[1],
+	RZ = AMD_IOMMU_REG_GET32(&event[1],
 	    AMD_IOMMU_EVENT_DEVTAB_ILL_RZ);
 
-	RW = AMD_IOMMU_REG_GET(event[1],
+	RW = AMD_IOMMU_REG_GET32(&event[1],
 	    AMD_IOMMU_EVENT_DEVTAB_ILL_RW);
 
-	I = AMD_IOMMU_REG_GET(event[1],
+	I = AMD_IOMMU_REG_GET32(&event[1],
 	    AMD_IOMMU_EVENT_DEVTAB_ILL_INTR);
 
-	vaddr_lo = AMD_IOMMU_REG_GET(event[2],
+	vaddr_lo = AMD_IOMMU_REG_GET32(&event[2],
 	    AMD_IOMMU_EVENT_DEVTAB_ILL_VADDR_LO);
 
 	vaddr_hi = event[3];
@@ -178,25 +178,25 @@ io_page_fault(amd_iommu_t *iommu, uint32_t *event)
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	const char *f = "io_page_fault";
 
-	ASSERT(AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_TYPE) ==
+	ASSERT(AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_TYPE) ==
 	    AMD_IOMMU_EVENT_IO_PAGE_FAULT);
 
-	deviceid = AMD_IOMMU_REG_GET(event[0],
+	deviceid = AMD_IOMMU_REG_GET32(&event[0],
 	    AMD_IOMMU_EVENT_IO_PGFAULT_DEVICEID);
 
-	TR = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_IO_PGFAULT_TR);
+	TR = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_IO_PGFAULT_TR);
 
-	RZ = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_IO_PGFAULT_RZ);
+	RZ = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_IO_PGFAULT_RZ);
 
-	PE = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_IO_PGFAULT_PE);
+	PE = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_IO_PGFAULT_PE);
 
-	RW = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_IO_PGFAULT_RW);
+	RW = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_IO_PGFAULT_RW);
 
-	PR = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_IO_PGFAULT_PR);
+	PR = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_IO_PGFAULT_PR);
 
-	I = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_IO_PGFAULT_INTR);
+	I = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_IO_PGFAULT_INTR);
 
-	domainid = AMD_IOMMU_REG_GET(event[1],
+	domainid = AMD_IOMMU_REG_GET32(&event[1],
 	    AMD_IOMMU_EVENT_IO_PGFAULT_DOMAINID);
 
 	vaddr_lo = event[2];
@@ -234,22 +234,24 @@ devtab_hw_error(amd_iommu_t *iommu, uint32_t *event)
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	const char *f = "devtab_hw_error";
 
-	ASSERT(AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_TYPE) ==
+	ASSERT(AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_TYPE) ==
 	    AMD_IOMMU_EVENT_DEVTAB_HW_ERROR);
 
-	deviceid = AMD_IOMMU_REG_GET(event[0],
+	deviceid = AMD_IOMMU_REG_GET32(&event[0],
 	    AMD_IOMMU_EVENT_DEVTAB_HWERR_DEVICEID);
 
-	type = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_DEVTAB_HWERR_TYPE);
+	type = AMD_IOMMU_REG_GET32(&event[1],
+	    AMD_IOMMU_EVENT_DEVTAB_HWERR_TYPE);
+
 	hwerr = get_hw_error(type);
 
-	TR = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_DEVTAB_HWERR_TR);
+	TR = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_DEVTAB_HWERR_TR);
 
-	RW = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_DEVTAB_HWERR_RW);
+	RW = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_DEVTAB_HWERR_RW);
 
-	I = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_DEVTAB_HWERR_INTR);
+	I = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_DEVTAB_HWERR_INTR);
 
-	physaddr_lo = AMD_IOMMU_REG_GET(event[2],
+	physaddr_lo = AMD_IOMMU_REG_GET32(&event[2],
 	    AMD_IOMMU_EVENT_DEVTAB_HWERR_PHYSADDR_LO);
 
 	physaddr_hi = event[3];
@@ -282,25 +284,27 @@ pgtable_hw_error(amd_iommu_t *iommu, uint32_t *event)
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	const char *f = "pgtable_hw_error";
 
-	ASSERT(AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_TYPE) ==
+	ASSERT(AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_TYPE) ==
 	    AMD_IOMMU_EVENT_PGTABLE_HW_ERROR);
 
-	deviceid = AMD_IOMMU_REG_GET(event[0],
+	deviceid = AMD_IOMMU_REG_GET32(&event[0],
 	    AMD_IOMMU_EVENT_PGTABLE_HWERR_DEVICEID);
 
-	type = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_DEVTAB_HWERR_TYPE);
+	type = AMD_IOMMU_REG_GET32(&event[1],
+	    AMD_IOMMU_EVENT_DEVTAB_HWERR_TYPE);
+
 	hwerr = get_hw_error(type);
 
-	TR = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_PGTABLE_HWERR_TR);
+	TR = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_PGTABLE_HWERR_TR);
 
-	RW = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_PGTABLE_HWERR_RW);
+	RW = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_PGTABLE_HWERR_RW);
 
-	I = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_PGTABLE_HWERR_INTR);
+	I = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_PGTABLE_HWERR_INTR);
 
-	domainid = AMD_IOMMU_REG_GET(event[1],
+	domainid = AMD_IOMMU_REG_GET32(&event[1],
 	    AMD_IOMMU_EVENT_PGTABLE_HWERR_DOMAINID);
 
-	physaddr_lo = AMD_IOMMU_REG_GET(event[2],
+	physaddr_lo = AMD_IOMMU_REG_GET32(&event[2],
 	    AMD_IOMMU_EVENT_PGTABLE_HWERR_PHYSADDR_LO);
 
 	physaddr_hi = event[3];
@@ -326,10 +330,10 @@ cmdbuf_illegal_cmd(amd_iommu_t *iommu, uint32_t *event)
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	const char *f = "cmdbuf_illegal_cmd";
 
-	ASSERT(AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_TYPE) ==
+	ASSERT(AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_TYPE) ==
 	    AMD_IOMMU_EVENT_CMDBUF_ILLEGAL_CMD);
 
-	physaddr_lo = AMD_IOMMU_REG_GET(event[2],
+	physaddr_lo = AMD_IOMMU_REG_GET32(&event[2],
 	    AMD_IOMMU_EVENT_CMDBUF_ILLEGAL_CMD_PHYS_LO);
 
 	physaddr_hi = event[3];
@@ -351,13 +355,15 @@ cmdbuf_hw_error(amd_iommu_t *iommu, uint32_t *event)
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	const char *f = "cmdbuf_hw_error";
 
-	ASSERT(AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_TYPE) ==
+	ASSERT(AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_TYPE) ==
 	    AMD_IOMMU_EVENT_CMDBUF_HW_ERROR);
 
-	type = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_CMDBUF_HWERR_TYPE);
+	type = AMD_IOMMU_REG_GET32(&event[1],
+	    AMD_IOMMU_EVENT_CMDBUF_HWERR_TYPE);
+
 	hwerr = get_hw_error(type);
 
-	physaddr_lo = AMD_IOMMU_REG_GET(event[2],
+	physaddr_lo = AMD_IOMMU_REG_GET32(&event[2],
 	    AMD_IOMMU_EVENT_CMDBUF_HWERR_PHYS_LO);
 
 	physaddr_hi = event[3];
@@ -381,17 +387,21 @@ iotlb_inval_to(amd_iommu_t *iommu, uint32_t *event)
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	const char *f = "iotlb_inval_to";
 
-	ASSERT(AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_TYPE) ==
+	ASSERT(AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_TYPE) ==
 	    AMD_IOMMU_EVENT_IOTLB_INVAL_TO);
 
-	deviceid = AMD_IOMMU_REG_GET(event[0],
+	deviceid = AMD_IOMMU_REG_GET32(&event[0],
 	    AMD_IOMMU_EVENT_IOTLB_INVAL_TO_DEVICEID);
 
-	type = AMD_IOMMU_REG_GET(event[1],
+	/*
+	 * XXX bug in spec. Is the type field available +04 26:25 or is
+	 * it reserved
+	 */
+	type = AMD_IOMMU_REG_GET32(&event[1],
 	    AMD_IOMMU_EVENT_IOTLB_INVAL_TO_TYPE);
 	hwerr = get_hw_error(type);
 
-	physaddr_lo = AMD_IOMMU_REG_GET(event[2],
+	physaddr_lo = AMD_IOMMU_REG_GET32(&event[2],
 	    AMD_IOMMU_EVENT_IOTLB_INVAL_TO_PHYS_LO);
 
 	physaddr_hi = event[3];
@@ -417,17 +427,18 @@ device_illegal_req(amd_iommu_t *iommu, uint32_t *event)
 	int instance = ddi_get_instance(iommu->aiomt_dip);
 	const char *f = "device_illegal_req";
 
-	ASSERT(AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_TYPE) ==
+	ASSERT(AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_TYPE) ==
 	    AMD_IOMMU_EVENT_DEVICE_ILLEGAL_REQ);
 
-	deviceid = AMD_IOMMU_REG_GET(event[0],
+	deviceid = AMD_IOMMU_REG_GET32(&event[0],
 	    AMD_IOMMU_EVENT_DEVICE_ILLEGAL_REQ_DEVICEID);
 
-	TR = AMD_IOMMU_REG_GET(event[1],
+	TR = AMD_IOMMU_REG_GET32(&event[1],
 	    AMD_IOMMU_EVENT_DEVICE_ILLEGAL_REQ_TR);
 
-	type = AMD_IOMMU_REG_GET(event[1],
+	type = AMD_IOMMU_REG_GET32(&event[1],
 	    AMD_IOMMU_EVENT_DEVICE_ILLEGAL_REQ_TYPE);
+
 	reqerr = get_illegal_req(type, TR);
 
 
@@ -460,7 +471,7 @@ amd_iommu_process_one_event(amd_iommu_t *iommu)
 		event[i] =  iommu->aiomt_event_head[i];
 	}
 
-	event_type = AMD_IOMMU_REG_GET(event[1], AMD_IOMMU_EVENT_TYPE);
+	event_type = AMD_IOMMU_REG_GET32(&event[1], AMD_IOMMU_EVENT_TYPE);
 
 	switch (event_type) {
 	case AMD_IOMMU_EVENT_DEVTAB_ILLEGAL_ENTRY:
@@ -495,18 +506,21 @@ amd_iommu_process_one_event(amd_iommu_t *iommu)
 }
 
 int
-amd_iommu_read_log(amd_iommu_t *iommu)
+amd_iommu_read_log(amd_iommu_t *iommu, amd_iommu_log_op_t op)
 {
 	caddr_t evtail;
 	uint64_t evtail_off;
 	uint64_t evhead_off;
 
+	ASSERT(op != AMD_IOMMU_LOG_INVALID_OP);
+
 	mutex_enter(&iommu->aiomt_eventlock);
 
 	ASSERT(iommu->aiomt_event_head != NULL);
 
-	evtail_off = AMD_IOMMU_REG_GET(
-	    REGVAL64(iommu->aiomt_reg_eventlog_tail_va),
+	/* XXX verify */
+	evtail_off = AMD_IOMMU_REG_GET64(
+	    REGADDR64(iommu->aiomt_reg_eventlog_tail_va),
 	    AMD_IOMMU_EVENTTAILPTR);
 
 	evtail_off = EV2OFF(evtail_off);
@@ -514,6 +528,17 @@ amd_iommu_read_log(amd_iommu_t *iommu)
 	ASSERT(evtail_off <  iommu->aiomt_eventlog_sz);
 
 	evtail = iommu->aiomt_eventlog + evtail_off;
+
+	if (op == AMD_IOMMU_LOG_DISCARD) {
+		/*LINTED*/
+		iommu->aiomt_event_head = (uint32_t *)evtail;
+		AMD_IOMMU_REG_SET64(REGADDR64(
+		    iommu->aiomt_reg_eventlog_head_va),
+		    AMD_IOMMU_EVENTHEADPTR, OFF2EV(evtail_off));
+		cmn_err(CE_NOTE, "Discarded IOMMU event log");
+		mutex_exit(&iommu->aiomt_eventlock);
+		return (DDI_SUCCESS);
+	}
 
 	/*LINTED*/
 	while (1) {
@@ -535,19 +560,20 @@ amd_iommu_read_log(amd_iommu_t *iommu)
 		if ((caddr_t)iommu->aiomt_event_head >=
 		    iommu->aiomt_eventlog + iommu->aiomt_eventlog_sz) {
 			/* wraparound */
+			iommu->aiomt_event_head =
 			/*LINTED*/
-			iommu->aiomt_event_head = (uint32_t *)(iommu->
-			    aiomt_eventlog);
+			    (uint32_t *)iommu->aiomt_eventlog;
 			evhead_off = 0;
 		} else {
-			evhead_off =  ((caddr_t)iommu->aiomt_event_head)
+			evhead_off =  (caddr_t)iommu->aiomt_event_head
 			/*LINTED*/
 			    - iommu->aiomt_eventlog;
 		}
 
 		ASSERT(evhead_off < iommu->aiomt_eventlog_sz);
 
-		AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_eventlog_head_va),
+		AMD_IOMMU_REG_SET64(REGADDR64(
+		    iommu->aiomt_reg_eventlog_head_va),
 		    AMD_IOMMU_EVENTHEADPTR, OFF2EV(evhead_off));
 	}
 	mutex_exit(&iommu->aiomt_eventlock);

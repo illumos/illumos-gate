@@ -42,6 +42,7 @@
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
 #include <sys/intel_iommu.h>
+#include <sys/iommulib.h>
 
 #define	pci_getb	(*pci_getb_func)
 #define	pci_getw	(*pci_getw_func)
@@ -1419,6 +1420,7 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	ushort_t is_pci_bridge = 0;
 	struct pci_devfunc *devlist = NULL, *entry = NULL;
 	iommu_private_t *private;
+	gfx_entry_t *gfxp;
 
 	ushort_t deviceid = pci_getw(bus, dev, func, PCI_CONF_DEVID);
 
@@ -1668,9 +1670,19 @@ process_devfunc(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	private->idp_is_display = (is_display(classcode) ? B_TRUE : B_FALSE);
 	private->idp_is_lpc = ((basecl == PCI_CLASS_BRIDGE) &&
 	    (subcl == PCI_BRIDGE_ISA));
-	private->idp_domain = NULL;
+	private->idp_intel_domain = NULL;
 	/* hook the private to dip */
 	DEVI(dip)->devi_iommu_private = private;
+
+	if (private->idp_is_display == B_TRUE) {
+		gfxp = kmem_zalloc(sizeof (*gfxp), KM_SLEEP);
+		gfxp->g_dip = dip;
+		gfxp->g_prev = NULL;
+		gfxp->g_next = gfx_devinfo_list;
+		gfx_devinfo_list = gfxp;
+		if (gfxp->g_next)
+			gfxp->g_next->g_prev = gfxp;
+	}
 
 	if (reprogram && (entry != NULL))
 		entry->reprogram = B_TRUE;

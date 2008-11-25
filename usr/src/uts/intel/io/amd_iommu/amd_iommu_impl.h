@@ -107,6 +107,11 @@ extern "C" {
 
 /* Control register bits */
 #define	AMD_IOMMU_CMDBUF_ENABLE		(12 << 16 | 12)
+#define	AMD_IOMMU_ISOC			(11 << 16 | 11)
+#define	AMD_IOMMU_COHERENT		(10 << 16 | 10)
+#define	AMD_IOMMU_RESPASSPW		(9 << 16 | 9)
+#define	AMD_IOMMU_PASSPW		(8 << 16 | 8)
+#define	AMD_IOMMU_INVTO			(7 << 16 | 5)
 #define	AMD_IOMMU_COMWAITINT_ENABLE	(4 << 16 | 4)
 #define	AMD_IOMMU_EVENTINT_ENABLE	(3 << 16 | 3)
 #define	AMD_IOMMU_EVENTLOG_ENABLE	(2 << 16 | 2)
@@ -134,6 +139,8 @@ extern "C" {
 #define	AMD_IOMMU_EVENTTAILPTR		(18 << 16 | 4)
 
 /* Status Register bits */
+#define	AMD_IOMMU_CMDBUF_RUN		(4 << 16 | 4)
+#define	AMD_IOMMU_EVENT_LOG_RUN		(3 << 16 | 3)
 #define	AMD_IOMMU_COMWAIT_INT		(2 << 16 | 2)
 #define	AMD_IOMMU_EVENT_LOG_INT		(1 << 16 | 1)
 #define	AMD_IOMMU_EVENT_OVERFLOW_INT	(0 << 16 | 0)
@@ -172,10 +179,6 @@ extern "C" {
 #define	AMD_IOMMU_DEVTBL_TV		(1 << 16 | 1)
 #define	AMD_IOMMU_DEVTBL_V		(0 << 16 | 0)
 
-#if 0
-#define	BUS_DEVFN_TO_BDF(b, devfn)	(((b) << 8) | (devfn))
-#endif
-
 #define	BUS_DEVFN_TO_BDF(b, devfn)	(devfn)
 #define	AMD_IOMMU_ALIAS_HASH_SZ		(256)
 
@@ -208,7 +211,7 @@ typedef enum {
 #define	AMD_IOMMU_CMD_OPCODE		(31 << 16 | 28)
 
 /* Completion Wait command bits */
-#define	AMD_IOMMU_CMD_COMPL_WAIT_S		(0 << 16 | 16)
+#define	AMD_IOMMU_CMD_COMPL_WAIT_S		(0 << 16 | 0)
 #define	AMD_IOMMU_CMD_COMPL_WAIT_I		(1 << 16 | 1)
 #define	AMD_IOMMU_CMD_COMPL_WAIT_F		(2 << 16 | 2)
 #define	AMD_IOMMU_CMD_COMPL_WAIT_STORE_ADDR_LO	(31 << 16 | 3)
@@ -220,7 +223,7 @@ typedef enum {
 /* Invalidate IOMMU Pages command bits */
 #define	AMD_IOMMU_CMD_INVAL_PAGES_DOMAINID		(15 << 16 | 0)
 #define	AMD_IOMMU_CMD_INVAL_PAGES_S			(0 << 16 | 0)
-#define	AMD_IOMMU_CMD_INVAL_PAGES_PDE			(1 << 16 | 16)
+#define	AMD_IOMMU_CMD_INVAL_PAGES_PDE			(1 << 16 | 1)
 #define	AMD_IOMMU_CMD_INVAL_PAGES_ADDR_LO		(31 << 16 | 12)
 #define	AMD_IOMMU_CMD_INVAL_PAGES_ADDR_HI		(63 << 16 | 32)
 
@@ -231,7 +234,7 @@ typedef enum {
 #define	AMD_IOMMU_CMD_INVAL_IOTLB_QUEUEID		(15 << 16 | 0)
 #define	AMD_IOMMU_CMD_INVAL_IOTLB_S			(0 << 16 | 0)
 #define	AMD_IOMMU_CMD_INVAL_IOTLB_ADDR_LO		(31 << 16 | 12)
-#define	AMD_IOMMU_CMD_INVAL_IOTLB_ADDR_HI		(63 << 16 | 32)
+#define	AMD_IOMMU_CMD_INVAL_IOTLB_ADDR_HI		(31 << 16 | 0)
 
 #define	AMD_IOMMU_DEFAULT_MAXPEND			(10)
 
@@ -246,8 +249,11 @@ typedef enum {
 
 #define	AMD_IOMMU_TABLE_ALIGN	((1ULL << 12) - 1)
 
+#define	AMD_IOMMU_MAX_DEVICEID	(0xFFFF)
+
 /*
  * DMA sync macros
+ * TODO: optimize sync only small ranges
  */
 #define	SYNC_FORDEV(h)	(void) ddi_dma_sync(h, 0, 0, DDI_DMA_SYNC_FORDEV)
 #define	SYNC_FORKERN(h)	(void) ddi_dma_sync(h, 0, 0, DDI_DMA_SYNC_FORKERNEL)
@@ -257,16 +263,85 @@ typedef enum {
 #define	CMD2OFF(c)	((c) << 4)
 #define	OFF2CMD(o)	((o) >> 4)
 
+typedef union split {
+	uint64_t u64;
+	uint32_t u32[2];
+} split_t;
+
+#define	BITPOS_START(b)	((b) >> 16)
+#define	BITPOS_END(b)	((b) & 0xFFFF)
+
+#define	START_MASK64(s)	(((s) == 63) ? ~((uint64_t)0) : \
+	(uint64_t)((1ULL << ((s)+1)) - 1))
+#define	START_MASK32(s)	(((s) == 31) ? ~((uint32_t)0) : \
+	(uint32_t)((1ULL << ((s)+1)) - 1))
+#define	START_MASK16(s)	(((s) == 15) ? ~((uint16_t)0) : \
+	(uint16_t)((1ULL << ((s)+1)) - 1))
+#define	START_MASK8(s)	(((s) == 7) ? ~((uint8_t)0) : \
+	(uint8_t)((1ULL << ((s)+1)) - 1))
+
+#define	END_MASK(e)	((1ULL << (e)) - 1)
+
+#define	BIT_MASK64(s, e)	(uint64_t)(START_MASK64(s) & ~END_MASK(e))
+#define	BIT_MASK32(s, e)	(uint32_t)(START_MASK32(s) & ~END_MASK(e))
+#define	BIT_MASK16(s, e)	(uint16_t)(START_MASK16(s) & ~END_MASK(e))
+#define	BIT_MASK8(s, e)		(uint8_t)(START_MASK8(s) & ~END_MASK(e))
+
+#define	AMD_IOMMU_REG_GET64_IMPL(rp, b) \
+	(((*(rp)) & (START_MASK64(BITPOS_START(b)))) >> BITPOS_END(b))
+#define	AMD_IOMMU_REG_GET64(rp, b) 					 \
+	((amd_iommu_64bit_bug) ? amd_iommu_reg_get64_workaround(rp, b) : \
+	AMD_IOMMU_REG_GET64_IMPL(rp, b))
+#define	AMD_IOMMU_REG_GET32(rp, b) \
+	(((*(rp)) & (START_MASK32(BITPOS_START(b)))) >> BITPOS_END(b))
+#define	AMD_IOMMU_REG_GET16(rp, b) \
+	(((*(rp)) & (START_MASK16(BITPOS_START(b)))) >> BITPOS_END(b))
+#define	AMD_IOMMU_REG_GET8(rp, b) \
+	(((*(rp)) & (START_MASK8(BITPOS_START(b)))) >> BITPOS_END(b))
+
+#define	AMD_IOMMU_REG_SET64_IMPL(rp, b, v) \
+	((*(rp)) = \
+	(((uint64_t)(*(rp)) & ~(BIT_MASK64(BITPOS_START(b), BITPOS_END(b)))) \
+	| ((uint64_t)(v) << BITPOS_END(b))))
+
+#define	AMD_IOMMU_REG_SET64(rp, b, v) 			\
+	(void) ((amd_iommu_64bit_bug) ?			\
+	amd_iommu_reg_set64_workaround(rp, b, v) : 	\
+	AMD_IOMMU_REG_SET64_IMPL(rp, b, v))
+
+#define	AMD_IOMMU_REG_SET32(rp, b, v) \
+	((*(rp)) = \
+	(((uint32_t)(*(rp)) & ~(BIT_MASK32(BITPOS_START(b), BITPOS_END(b)))) \
+	| ((uint32_t)(v) << BITPOS_END(b))))
+
+#define	AMD_IOMMU_REG_SET16(rp, b, v) \
+	((*(rp)) = \
+	(((uint16_t)(*(rp)) & ~(BIT_MASK16(BITPOS_START(b), BITPOS_END(b)))) \
+	| ((uint16_t)(v) << BITPOS_END(b))))
+
+#define	AMD_IOMMU_REG_SET8(rp, b, v) \
+	((*(rp)) = \
+	(((uint8_t)(*(rp)) & ~(BIT_MASK8(BITPOS_START(b), BITPOS_END(b)))) \
+	| ((uint8_t)(v) << BITPOS_END(b))))
+
 /*
- * Dereference a 64 bit register pointer
+ * Cast a 64 bit pointer to a uint64_t *
  */
-#define	REGVAL64(a)	(*((uint64_t *)(uintptr_t)(a)))
+#define	REGADDR64(a)	((uint64_t *)(uintptr_t)(a))
+
+typedef enum {
+	AMD_IOMMU_INTR_INVALID = 0,
+	AMD_IOMMU_INTR_TABLE,
+	AMD_IOMMU_INTR_ALLOCED,
+	AMD_IOMMU_INTR_HANDLER,
+	AMD_IOMMU_INTR_ENABLED
+} amd_iommu_intr_state_t;
+
 
 typedef struct amd_iommu {
 	kmutex_t aiomt_mutex;
-	kmutex_t aiomt_cmdlock;
 	kmutex_t aiomt_eventlock;
-	ksema_t aiomt_compl_wait_sema;
+	kmutex_t aiomt_cmdlock;
 	dev_info_t *aiomt_dip;
 	int aiomt_idx;
 	iommulib_handle_t aiomt_iommulib_handle;
@@ -280,6 +355,7 @@ typedef struct amd_iommu {
 	uint32_t aiomt_low_addr32;
 	uint32_t aiomt_hi_addr32;
 	uint64_t aiomt_reg_pa;
+	uint64_t aiomt_va;
 	uint64_t aiomt_reg_va;
 	uint32_t aiomt_range;
 	uint8_t aiomt_rng_bus;
@@ -294,15 +370,12 @@ typedef struct amd_iommu {
 	uint8_t aiomt_msinum;
 	uint8_t aiomt_reg_pages;
 	uint32_t aiomt_reg_size;
-	uint8_t aiomt_mmu_reg_pages;
-	uint32_t aiomt_mmu_reg_size;
 	uint32_t aiomt_devtbl_sz;
 	uint32_t aiomt_cmdbuf_sz;
 	uint32_t aiomt_eventlog_sz;
 	caddr_t aiomt_devtbl;
 	caddr_t aiomt_cmdbuf;
 	caddr_t aiomt_eventlog;
-	uint64_t aiomt_devtbl_ent_ref[1ULL << AMD_IOMMU_DEVTBL_SZ];
 	uint32_t *aiomt_cmd_tail;
 	uint32_t *aiomt_event_head;
 	ddi_dma_handle_t aiomt_dmahdl;
@@ -345,7 +418,7 @@ typedef struct amd_iommu_alias {
 } amd_iommu_alias_t;
 
 typedef struct amd_iommu_cmdargs {
-	caddr_t	ca_addr;
+	uint64_t ca_addr;
 	uint16_t ca_domainid;
 	uint16_t ca_deviceid;
 } amd_iommu_cmdargs_t;
@@ -358,6 +431,12 @@ typedef struct amd_iommu_page_table_hash {
 } amd_iommu_page_table_hash_t;
 
 typedef enum {
+	AMD_IOMMU_LOG_INVALID_OP = 0,
+	AMD_IOMMU_LOG_DISPLAY,
+	AMD_IOMMU_LOG_DISCARD
+} amd_iommu_log_op_t;
+
+typedef enum {
 	AMD_IOMMU_DEBUG_NONE = 0,
 	AMD_IOMMU_DEBUG_ALLOCHDL = 0x1,
 	AMD_IOMMU_DEBUG_FREEHDL = 0x2,
@@ -368,7 +447,11 @@ typedef enum {
 	AMD_IOMMU_DEBUG_DEVTBL = 0x40,
 	AMD_IOMMU_DEBUG_CMDBUF = 0x80,
 	AMD_IOMMU_DEBUG_EVENTLOG = 0x100,
-	AMD_IOMMU_DEBUG_ACPI = 0x200
+	AMD_IOMMU_DEBUG_ACPI = 0x200,
+	AMD_IOMMU_DEBUG_PA2VA = 0x400,
+	AMD_IOMMU_DEBUG_TABLES = 0x800,
+	AMD_IOMMU_DEBUG_EXCL = 0x1000,
+	AMD_IOMMU_DEBUG_INTR = 0x2000
 } amd_iommu_debug_t;
 
 extern const char *amd_iommu_modname;
@@ -381,17 +464,26 @@ extern amd_iommu_debug_t amd_iommu_debug;
 extern uint8_t amd_iommu_htatsresv;
 extern uint8_t amd_iommu_vasize;
 extern uint8_t amd_iommu_pasize;
+extern int amd_iommu_64bit_bug;
+extern int amd_iommu_unity_map;
+extern int amd_iommu_no_RW_perms;
+extern int amd_iommu_no_unmap;
+extern int amd_iommu_pageva_inval_all;
+extern int amd_iommu_disable;
+extern char *amd_iommu_disable_list;
+
+extern uint64_t amd_iommu_reg_get64_workaround(uint64_t *regp, uint32_t bits);
+extern uint64_t amd_iommu_reg_set64_workaround(uint64_t *regp, uint32_t bits,
+    uint64_t value);
 
 int amd_iommu_cmd(amd_iommu_t *iommu, amd_iommu_cmd_t cmd,
     amd_iommu_cmdargs_t *cmdargs, amd_iommu_cmd_flags_t flags, int lock_held);
 int amd_iommu_page_table_hash_init(amd_iommu_page_table_hash_t *ampt);
 void amd_iommu_page_table_hash_fini(amd_iommu_page_table_hash_t *ampt);
 
-int amd_iommu_map_pa2va(amd_iommu_t *iommu, uint16_t domainid, dev_info_t *rdip,
-    uint64_t pa, uint64_t pa_sz);
-int amd_iommu_unmap_va(amd_iommu_t *iommu, uint16_t domainid, dev_info_t *rdip,
-    uint64_t va, uint64_t va_sz);
-int amd_iommu_read_log(amd_iommu_t *iommu);
+int amd_iommu_read_log(amd_iommu_t *iommu, amd_iommu_log_op_t op);
+void amd_iommu_read_boot_props(void);
+void amd_iommu_lookup_conf_props(dev_info_t *dip);
 
 #endif	/* _KERNEL */
 

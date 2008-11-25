@@ -28,11 +28,18 @@
 #include <sys/amd_iommu.h>
 #include "amd_iommu_impl.h"
 
+extern int servicing_interrupt(void);
+
 static void
 amd_iommu_wait_for_completion(amd_iommu_t *iommu)
 {
 	ASSERT(MUTEX_HELD(&iommu->aiomt_cmdlock));
-	sema_p(&iommu->aiomt_compl_wait_sema);
+	while (AMD_IOMMU_REG_GET64(REGADDR64(
+	    iommu->aiomt_reg_status_va), AMD_IOMMU_COMWAIT_INT) != 1) {
+		AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+		    AMD_IOMMU_CMDBUF_ENABLE, 1);
+		WAIT_SEC(1);
+	}
 }
 
 static int
@@ -52,13 +59,15 @@ create_compl_wait_cmd(amd_iommu_t *iommu, amd_iommu_cmdargs_t *cmdargsp,
 		return (DDI_FAILURE);
 	}
 
-	AMD_IOMMU_REG_SET(cmdptr[0], AMD_IOMMU_CMD_COMPL_WAIT_S, 0);
-	AMD_IOMMU_REG_SET(cmdptr[0], AMD_IOMMU_CMD_COMPL_WAIT_I, 1);
-	AMD_IOMMU_REG_SET(cmdptr[0], AMD_IOMMU_CMD_COMPL_WAIT_F,
+	AMD_IOMMU_REG_SET32(&cmdptr[0], AMD_IOMMU_CMD_COMPL_WAIT_S, 0);
+	AMD_IOMMU_REG_SET32(&cmdptr[0], AMD_IOMMU_CMD_COMPL_WAIT_I, 1);
+	AMD_IOMMU_REG_SET32(&cmdptr[0], AMD_IOMMU_CMD_COMPL_WAIT_F,
 	    (flags & AMD_IOMMU_CMD_FLAGS_COMPL_WAIT_F) != 0);
-	AMD_IOMMU_REG_SET(cmdptr[0], AMD_IOMMU_CMD_COMPL_WAIT_STORE_ADDR_LO, 0);
-	AMD_IOMMU_REG_SET(cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x01);
-	AMD_IOMMU_REG_SET(cmdptr[1], AMD_IOMMU_CMD_COMPL_WAIT_STORE_ADDR_HI, 0);
+	AMD_IOMMU_REG_SET32(&cmdptr[0], AMD_IOMMU_CMD_COMPL_WAIT_STORE_ADDR_LO,
+	    0);
+	AMD_IOMMU_REG_SET32(&cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x01);
+	AMD_IOMMU_REG_SET32(&cmdptr[1], AMD_IOMMU_CMD_COMPL_WAIT_STORE_ADDR_HI,
+	    0);
 	cmdptr[2] = 0;
 	cmdptr[3] = 0;
 
@@ -85,9 +94,9 @@ create_inval_devtab_entry_cmd(amd_iommu_t *iommu, amd_iommu_cmdargs_t *cmdargsp,
 
 	deviceid = cmdargsp->ca_deviceid;
 
-	AMD_IOMMU_REG_SET(cmdptr[0], AMD_IOMMU_CMD_INVAL_DEVTAB_DEVICEID,
+	AMD_IOMMU_REG_SET32(&cmdptr[0], AMD_IOMMU_CMD_INVAL_DEVTAB_DEVICEID,
 	    deviceid);
-	AMD_IOMMU_REG_SET(cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x02);
+	AMD_IOMMU_REG_SET32(&cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x02);
 	cmdptr[2] = 0;
 	cmdptr[3] = 0;
 
@@ -104,20 +113,20 @@ create_inval_iommu_pages_cmd(amd_iommu_t *iommu, amd_iommu_cmdargs_t *cmdargsp,
 
 	ASSERT(cmdargsp);
 
-	addr_lo = AMD_IOMMU_REG_GET(REGVAL64(cmdargsp->ca_addr),
+	addr_lo = AMD_IOMMU_REG_GET64(REGADDR64(&cmdargsp->ca_addr),
 	    AMD_IOMMU_CMD_INVAL_PAGES_ADDR_LO);
-	addr_hi = AMD_IOMMU_REG_GET(REGVAL64(cmdargsp->ca_addr),
+	addr_hi = AMD_IOMMU_REG_GET64(REGADDR64(&cmdargsp->ca_addr),
 	    AMD_IOMMU_CMD_INVAL_PAGES_ADDR_HI);
 
 	cmdptr[0] = 0;
-	AMD_IOMMU_REG_SET(cmdptr[1], AMD_IOMMU_CMD_INVAL_PAGES_DOMAINID,
+	AMD_IOMMU_REG_SET32(&cmdptr[1], AMD_IOMMU_CMD_INVAL_PAGES_DOMAINID,
 	    cmdargsp->ca_domainid);
-	AMD_IOMMU_REG_SET(cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x03);
-	AMD_IOMMU_REG_SET(cmdptr[2], AMD_IOMMU_CMD_INVAL_PAGES_PDE,
+	AMD_IOMMU_REG_SET32(&cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x03);
+	AMD_IOMMU_REG_SET32(&cmdptr[2], AMD_IOMMU_CMD_INVAL_PAGES_PDE,
 	    (flags & AMD_IOMMU_CMD_FLAGS_PAGE_PDE_INVAL) != 0);
-	AMD_IOMMU_REG_SET(cmdptr[2], AMD_IOMMU_CMD_INVAL_PAGES_S,
+	AMD_IOMMU_REG_SET32(&cmdptr[2], AMD_IOMMU_CMD_INVAL_PAGES_S,
 	    (flags & AMD_IOMMU_CMD_FLAGS_PAGE_INVAL_S) != 0);
-	AMD_IOMMU_REG_SET(cmdptr[2], AMD_IOMMU_CMD_INVAL_PAGES_ADDR_LO,
+	AMD_IOMMU_REG_SET32(&cmdptr[2], AMD_IOMMU_CMD_INVAL_PAGES_ADDR_LO,
 	    addr_lo);
 	cmdptr[3] = addr_hi;
 
@@ -135,21 +144,22 @@ create_inval_iotlb_pages_cmd(amd_iommu_t *iommu, amd_iommu_cmdargs_t *cmdargsp,
 
 	ASSERT(cmdargsp);
 
-	addr_lo = AMD_IOMMU_REG_GET(REGVAL64(cmdargsp->ca_addr),
+	addr_lo = AMD_IOMMU_REG_GET64(REGADDR64(&cmdargsp->ca_addr),
 	    AMD_IOMMU_CMD_INVAL_IOTLB_ADDR_LO);
-	addr_hi = AMD_IOMMU_REG_GET(REGVAL64(cmdargsp->ca_addr),
+
+	addr_hi = AMD_IOMMU_REG_GET64(REGADDR64(&cmdargsp->ca_addr),
 	    AMD_IOMMU_CMD_INVAL_IOTLB_ADDR_HI);
 
-	AMD_IOMMU_REG_SET(cmdptr[0], AMD_IOMMU_CMD_INVAL_IOTLB_DEVICEID,
+	AMD_IOMMU_REG_SET32(&cmdptr[0], AMD_IOMMU_CMD_INVAL_IOTLB_DEVICEID,
 	    cmdargsp->ca_deviceid);
-	AMD_IOMMU_REG_SET(cmdptr[0], AMD_IOMMU_CMD_INVAL_IOTLB_MAXPEND,
+	AMD_IOMMU_REG_SET32(&cmdptr[0], AMD_IOMMU_CMD_INVAL_IOTLB_MAXPEND,
 	    AMD_IOMMU_DEFAULT_MAXPEND);
-	AMD_IOMMU_REG_SET(cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x04);
-	AMD_IOMMU_REG_SET(cmdptr[1], AMD_IOMMU_CMD_INVAL_IOTLB_QUEUEID,
+	AMD_IOMMU_REG_SET32(&cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x04);
+	AMD_IOMMU_REG_SET32(&cmdptr[1], AMD_IOMMU_CMD_INVAL_IOTLB_QUEUEID,
 	    cmdargsp->ca_deviceid);
-	AMD_IOMMU_REG_SET(cmdptr[2], AMD_IOMMU_CMD_INVAL_IOTLB_ADDR_LO,
+	AMD_IOMMU_REG_SET32(&cmdptr[2], AMD_IOMMU_CMD_INVAL_IOTLB_ADDR_LO,
 	    addr_lo);
-	AMD_IOMMU_REG_SET(cmdptr[2], AMD_IOMMU_CMD_INVAL_IOTLB_S,
+	AMD_IOMMU_REG_SET32(&cmdptr[2], AMD_IOMMU_CMD_INVAL_IOTLB_S,
 	    (flags & AMD_IOMMU_CMD_FLAGS_IOTLB_INVAL_S) != 0);
 	cmdptr[3] = addr_hi;
 
@@ -173,9 +183,9 @@ create_inval_intr_table_cmd(amd_iommu_t *iommu, amd_iommu_cmdargs_t *cmdargsp,
 		return (DDI_FAILURE);
 	}
 
-	AMD_IOMMU_REG_SET(cmdptr[0], AMD_IOMMU_CMD_INVAL_INTR_DEVICEID,
+	AMD_IOMMU_REG_SET32(&cmdptr[0], AMD_IOMMU_CMD_INVAL_INTR_DEVICEID,
 	    cmdargsp->ca_deviceid);
-	AMD_IOMMU_REG_SET(cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x05);
+	AMD_IOMMU_REG_SET32(&cmdptr[1], AMD_IOMMU_CMD_OPCODE, 0x05);
 	cmdptr[2] = 0;
 	cmdptr[3] = 0;
 
@@ -195,7 +205,6 @@ amd_iommu_cmd(amd_iommu_t *iommu, amd_iommu_cmd_t cmd,
 	uint64_t cmdtail_off;
 	const char *f = "amd_iommu_cmd";
 
-	ASSERT(flags != AMD_IOMMU_CMD_FLAGS_NONE);
 	ASSERT(lock_held == 0 || lock_held == 1);
 	ASSERT(lock_held == 0 || MUTEX_HELD(&iommu->aiomt_cmdlock));
 
@@ -244,6 +253,9 @@ amd_iommu_cmd(amd_iommu_t *iommu, amd_iommu_cmd_t cmd,
 		goto out;
 	}
 
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_ctrl_va),
+	    AMD_IOMMU_CMDBUF_ENABLE, 1);
+
 	ASSERT(iommu->aiomt_cmd_tail != NULL);
 
 	for (i = 0; i < 4; i++) {
@@ -251,8 +263,8 @@ amd_iommu_cmd(amd_iommu_t *iommu, amd_iommu_cmd_t cmd,
 	}
 
 wait_for_drain:
-	cmdhead_off = AMD_IOMMU_REG_GET(
-	    REGVAL64(iommu->aiomt_reg_cmdbuf_head_va),
+	cmdhead_off = AMD_IOMMU_REG_GET64(
+	    REGADDR64(iommu->aiomt_reg_cmdbuf_head_va),
 	    AMD_IOMMU_CMDHEADPTR);
 
 	cmdhead_off = CMD2OFF(cmdhead_off);
@@ -292,14 +304,14 @@ wait_for_drain:
 
 	ASSERT(cmdtail_off < iommu->aiomt_cmdbuf_sz);
 
-	AMD_IOMMU_REG_SET(REGVAL64(iommu->aiomt_reg_cmdbuf_tail_va),
+	AMD_IOMMU_REG_SET64(REGADDR64(iommu->aiomt_reg_cmdbuf_tail_va),
 	    AMD_IOMMU_CMDTAILPTR, OFF2CMD(cmdtail_off));
 
 	if (cmd == AMD_IOMMU_CMD_COMPL_WAIT) {
 		amd_iommu_wait_for_completion(iommu);
 	} else if (flags & AMD_IOMMU_CMD_FLAGS_COMPL_WAIT) {
 		error = amd_iommu_cmd(iommu, AMD_IOMMU_CMD_COMPL_WAIT,
-		    NULL, AMD_IOMMU_CMD_FLAGS_COMPL_WAIT_F, 1);
+		    NULL, 0, 1);
 	}
 
 out:

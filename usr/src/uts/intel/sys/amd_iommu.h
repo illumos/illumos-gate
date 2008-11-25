@@ -35,29 +35,6 @@ extern "C" {
 
 #ifdef _KERNEL
 
-#define	BITPOS_START(b)	((b) >> 16)
-#define	BITPOS_END(b)	((b) & 0xFFFF)
-
-#define	START_MASK(s)	(((s) == 63) ? ~((uint64_t)0) : (1ULL << ((s)+1)) - 1)
-#define	END_MASK(e)	((1ULL << (e)) - 1)
-
-#define	BIT_MASK(s, e)	(START_MASK(s) & ~END_MASK(e))
-
-#define	AMD_IOMMU_REG_GET(r, b) \
-	(((r) & (START_MASK(BITPOS_START(b)))) >> BITPOS_END(b))
-
-#define	AMD_IOMMU_REG_SET(r, b, v) \
-	((r) = (((uint64_t)(r) & ~(BIT_MASK(BITPOS_START(b), BITPOS_END(b)))) \
-	    | ((uint64_t)(v) << BITPOS_END(b))))
-
-typedef enum {
-	AMD_IOMMU_INTR_INVALID = 0,
-	AMD_IOMMU_INTR_TABLE,
-	AMD_IOMMU_INTR_ALLOCED,
-	AMD_IOMMU_INTR_HANDLER,
-	AMD_IOMMU_INTR_ENABLED
-} amd_iommu_intr_state_t;
-
 typedef struct amd_iommu_state {
 	int	aioms_instance;			/* instance */
 	dev_info_t *aioms_devi;			/* dip */

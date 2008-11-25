@@ -224,7 +224,12 @@ static int rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 static void rootnex_coredma_reset_cookies(dev_info_t *dip,
     ddi_dma_handle_t handle);
 static int rootnex_coredma_get_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
-    ddi_dma_cookie_t *cookiep, uint_t *ccountp);
+    ddi_dma_cookie_t **cookiepp, uint_t *ccountp);
+static int rootnex_coredma_set_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
+    ddi_dma_cookie_t *cookiep, uint_t ccount);
+static int rootnex_coredma_clear_cookies(dev_info_t *dip,
+    ddi_dma_handle_t handle);
+static int rootnex_coredma_get_sleep_flags(ddi_dma_handle_t handle);
 #endif
 static int rootnex_coredma_sync(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, off_t off, size_t len, uint_t cache_flags);
@@ -310,6 +315,9 @@ static iommulib_nexops_t iommulib_nexops = {
 	rootnex_coredma_unbindhdl,
 	rootnex_coredma_reset_cookies,
 	rootnex_coredma_get_cookies,
+	rootnex_coredma_set_cookies,
+	rootnex_coredma_clear_cookies,
+	rootnex_coredma_get_sleep_flags,
 	rootnex_coredma_sync,
 	rootnex_coredma_win,
 	rootnex_coredma_map,
@@ -1830,6 +1838,12 @@ rootnex_coredma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	sinfo = &dma->dp_sglinfo;
 	attr = &hp->dmai_attr;
 
+	if (dmareq->dmar_fp == DDI_DMA_SLEEP) {
+		dma->dp_sleep_flags = KM_SLEEP;
+	} else {
+		dma->dp_sleep_flags = KM_NOSLEEP;
+	}
+
 	hp->dmai_rflags = dmareq->dmar_flags & DMP_DDIFLAGS;
 
 	/*
@@ -2032,7 +2046,7 @@ rootnex_sgl_end:
 	/* if the first window uses the copy buffer, sync it for the device */
 	if ((dma->dp_window[dma->dp_current_win].wd_dosync) &&
 	    (hp->dmai_rflags & DDI_DMA_WRITE)) {
-		(void) rootnex_dma_sync(dip, rdip, handle, 0, 0,
+		(void) rootnex_coredma_sync(dip, rdip, handle, 0, 0,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 
@@ -2104,7 +2118,7 @@ rootnex_coredma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 	/* sync the current window before unbinding the buffer */
 	if (dma->dp_window && dma->dp_window[dma->dp_current_win].wd_dosync &&
 	    (hp->dmai_rflags & DDI_DMA_READ)) {
-		(void) rootnex_dma_sync(dip, rdip, handle, 0, 0,
+		(void) rootnex_coredma_sync(dip, rdip, handle, 0, 0,
 		    DDI_DMA_SYNC_FORCPU);
 	}
 
@@ -2177,39 +2191,156 @@ rootnex_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 }
 
 #if !defined(__xpv)
+
+static int
+rootnex_coredma_get_sleep_flags(ddi_dma_handle_t handle)
+{
+	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
+	rootnex_dma_t *dma = (rootnex_dma_t *)hp->dmai_private;
+
+	if (dma->dp_sleep_flags != KM_SLEEP &&
+	    dma->dp_sleep_flags != KM_NOSLEEP)
+		cmn_err(CE_PANIC, "kmem sleep flags not set in DMA handle");
+	return (dma->dp_sleep_flags);
+}
 /*ARGSUSED*/
 static void
 rootnex_coredma_reset_cookies(dev_info_t *dip, ddi_dma_handle_t handle)
 {
 	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
 	rootnex_dma_t *dma = (rootnex_dma_t *)hp->dmai_private;
+	rootnex_window_t *window;
 
-	hp->dmai_cookie = &dma->dp_cookies[0];
+	if (dma->dp_window) {
+		window = &dma->dp_window[dma->dp_current_win];
+		hp->dmai_cookie = window->wd_first_cookie;
+	} else {
+		hp->dmai_cookie = dma->dp_cookies;
+	}
 	hp->dmai_cookie++;
 }
 
 /*ARGSUSED*/
 static int
 rootnex_coredma_get_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
-    ddi_dma_cookie_t *cookiep, uint_t *ccountp)
+    ddi_dma_cookie_t **cookiepp, uint_t *ccountp)
 {
+	int i;
+	int km_flags;
 	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
 	rootnex_dma_t *dma = (rootnex_dma_t *)hp->dmai_private;
+	rootnex_window_t *window;
+	ddi_dma_cookie_t *cp;
+	ddi_dma_cookie_t *cookie;
 
+	ASSERT(*cookiepp == NULL);
+	ASSERT(*ccountp == 0);
 
-	if (hp->dmai_rflags & DDI_DMA_PARTIAL) {
-		*ccountp = dma->dp_window[dma->dp_current_win].wd_cookie_cnt;
+	if (dma->dp_window) {
+		window = &dma->dp_window[dma->dp_current_win];
+		cp = window->wd_first_cookie;
+		*ccountp = window->wd_cookie_cnt;
 	} else {
+		cp = dma->dp_cookies;
 		*ccountp = dma->dp_sglinfo.si_sgl_size;
 	}
-	*cookiep = dma->dp_cookies[0];
 
-	/* reset the cookies */
-	hp->dmai_cookie = &dma->dp_cookies[0];
-	hp->dmai_cookie++;
+	km_flags = rootnex_coredma_get_sleep_flags(handle);
+	cookie = kmem_zalloc(sizeof (ddi_dma_cookie_t) * (*ccountp), km_flags);
+	if (cookie == NULL) {
+		return (DDI_DMA_NORESOURCES);
+	}
+
+	for (i = 0; i < *ccountp; i++) {
+		cookie[i].dmac_notused = cp[i].dmac_notused;
+		cookie[i].dmac_type = cp[i].dmac_type;
+		cookie[i].dmac_address = cp[i].dmac_address;
+		cookie[i].dmac_size = cp[i].dmac_size;
+	}
+
+	*cookiepp = cookie;
 
 	return (DDI_SUCCESS);
 }
+
+/*ARGSUSED*/
+static int
+rootnex_coredma_set_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
+    ddi_dma_cookie_t *cookiep, uint_t ccount)
+{
+	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
+	rootnex_dma_t *dma = (rootnex_dma_t *)hp->dmai_private;
+	rootnex_window_t *window;
+	ddi_dma_cookie_t *cur_cookiep;
+
+	ASSERT(cookiep);
+	ASSERT(ccount != 0);
+	ASSERT(dma->dp_need_to_switch_cookies == B_FALSE);
+
+	if (dma->dp_window) {
+		window = &dma->dp_window[dma->dp_current_win];
+		dma->dp_saved_cookies = window->wd_first_cookie;
+		window->wd_first_cookie = cookiep;
+		ASSERT(ccount == window->wd_cookie_cnt);
+		cur_cookiep = (hp->dmai_cookie - dma->dp_saved_cookies)
+		    + window->wd_first_cookie;
+	} else {
+		dma->dp_saved_cookies = dma->dp_cookies;
+		dma->dp_cookies = cookiep;
+		ASSERT(ccount == dma->dp_sglinfo.si_sgl_size);
+		cur_cookiep = (hp->dmai_cookie - dma->dp_saved_cookies)
+		    + dma->dp_cookies;
+	}
+
+	dma->dp_need_to_switch_cookies = B_TRUE;
+	hp->dmai_cookie = cur_cookiep;
+
+	return (DDI_SUCCESS);
+}
+
+/*ARGSUSED*/
+static int
+rootnex_coredma_clear_cookies(dev_info_t *dip, ddi_dma_handle_t handle)
+{
+	ddi_dma_impl_t *hp = (ddi_dma_impl_t *)handle;
+	rootnex_dma_t *dma = (rootnex_dma_t *)hp->dmai_private;
+	rootnex_window_t *window;
+	ddi_dma_cookie_t *cur_cookiep;
+	ddi_dma_cookie_t *cookie_array;
+	uint_t ccount;
+
+	/* check if cookies have not been switched */
+	if (dma->dp_need_to_switch_cookies == B_FALSE)
+		return (DDI_SUCCESS);
+
+	ASSERT(dma->dp_saved_cookies);
+
+	if (dma->dp_window) {
+		window = &dma->dp_window[dma->dp_current_win];
+		cookie_array = window->wd_first_cookie;
+		window->wd_first_cookie = dma->dp_saved_cookies;
+		dma->dp_saved_cookies = NULL;
+		ccount = window->wd_cookie_cnt;
+		cur_cookiep = (hp->dmai_cookie - cookie_array)
+		    + window->wd_first_cookie;
+	} else {
+		cookie_array = dma->dp_cookies;
+		dma->dp_cookies = dma->dp_saved_cookies;
+		dma->dp_saved_cookies = NULL;
+		ccount = dma->dp_sglinfo.si_sgl_size;
+		cur_cookiep = (hp->dmai_cookie - cookie_array)
+		    + dma->dp_cookies;
+	}
+
+	kmem_free(cookie_array, sizeof (ddi_dma_cookie_t) * ccount);
+
+	hp->dmai_cookie = cur_cookiep;
+
+	dma->dp_need_to_switch_cookies = B_FALSE;
+
+	return (DDI_SUCCESS);
+}
+
 #endif
 
 /*
@@ -2307,6 +2438,9 @@ rootnex_clean_dmahdl(ddi_dma_impl_t *hp)
 	dma->dp_cbaddr = NULL;
 	dma->dp_inuse = B_FALSE;
 	dma->dp_need_to_free_cookie = B_FALSE;
+	dma->dp_need_to_switch_cookies = B_FALSE;
+	dma->dp_saved_cookies = NULL;
+	dma->dp_sleep_flags = KM_PANIC;
 	dma->dp_need_to_free_window = B_FALSE;
 	dma->dp_partial_required = B_FALSE;
 	dma->dp_trim_required = B_FALSE;
@@ -2561,7 +2695,6 @@ rootnex_get_sgl(ddi_dma_obj_t *dmar_object, ddi_dma_cookie_t *sgl,
 #else
 		raddr = paddr;
 #endif
-
 		/* check to see if this page needs the copy buffer */
 		if ((raddr < addrlo) || ((raddr + psize) > addrhi)) {
 			sglinfo->si_copybuf_req += MMU_PAGESIZE;
@@ -3992,6 +4125,11 @@ rootnex_coredma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 		return (DDI_SUCCESS);
 	}
 
+	if (strcmp(ddi_driver_name(rdip), "bnx") == 0 ||
+	    strcmp(ddi_driver_name(rdip), "ohci") == 0)
+		cmn_err(CE_WARN, "%s: syncing DMA ...",
+		    ddi_driver_name(rdip));
+
 	/* handle off and len special cases */
 	if ((off == 0) || (rootnex_sync_ignore_params)) {
 		offset = win->wd_offset;
@@ -4216,7 +4354,7 @@ rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	/* sync the old window before moving on to the new one */
 	window = &dma->dp_window[dma->dp_current_win];
 	if ((window->wd_dosync) && (hp->dmai_rflags & DDI_DMA_READ)) {
-		(void) rootnex_dma_sync(dip, rdip, handle, 0, 0,
+		(void) rootnex_coredma_sync(dip, rdip, handle, 0, 0,
 		    DDI_DMA_SYNC_FORCPU);
 	}
 
@@ -4370,7 +4508,7 @@ rootnex_coredma_win(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 
 	/* if the new window uses the copy buffer, sync it for the device */
 	if ((window->wd_dosync) && (hp->dmai_rflags & DDI_DMA_WRITE)) {
-		(void) rootnex_dma_sync(dip, rdip, handle, 0, 0,
+		(void) rootnex_coredma_sync(dip, rdip, handle, 0, 0,
 		    DDI_DMA_SYNC_FORDEV);
 	}
 

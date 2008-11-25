@@ -484,30 +484,6 @@ typedef struct pci_dev_info {
 	dev_info_t	*pdi_dip;
 } pci_dev_info_t;
 
-/*
- * struct iommu_dip_private
- *   the intel iommu private structure hook on dev_info
- */
-typedef struct iommu_private {
-	/* pci seg, bus, dev, func */
-	int		idp_seg;
-	int		idp_bus;
-	int		idp_devfn;
-
-	/* ppb information */
-	boolean_t	idp_is_bridge;
-	int		idp_bbp_type;
-	int		idp_sec;
-	int		idp_sub;
-
-	/* identifier for special devices */
-	boolean_t	idp_is_display;
-	boolean_t	idp_is_lpc;
-
-	/* domain ptr */
-	dmar_domain_state_t	*idp_domain;
-} iommu_private_t;
-
 #define		IOMMU_PPB_NONE		0
 #define		IOMMU_PPB_PCIE_PCIE	1
 #define		IOMMU_PPB_PCIE_PCI	2

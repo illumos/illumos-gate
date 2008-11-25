@@ -45,10 +45,6 @@
 #define	AMD_IOMMU_NODETYPE	"ddi_iommu"
 #define	AMD_IOMMU_MINOR_NAME	"amd-iommu"
 
-typedef enum {
-	AMD_IOMMU_IOC_INVAL_DTENTRY
-} amd_iommu_iocmd_t;
-
 static int amd_iommu_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
     void **result);
 static int amd_iommu_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
@@ -105,54 +101,70 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
+amd_iommu_debug_t amd_iommu_debug;
 kmutex_t amd_iommu_global_lock;
-amd_iommu_acpi_t *amd_iommu_acpip;
-const char *amd_iommu_modname;
+const char *amd_iommu_modname = "amd_iommu";
 amd_iommu_alias_t **amd_iommu_alias;
 amd_iommu_page_table_hash_t amd_iommu_page_table_hash;
 static void *amd_iommu_statep;
+int amd_iommu_64bit_bug;
+int amd_iommu_unity_map;
+int amd_iommu_no_RW_perms;
+int amd_iommu_no_unmap;
+int amd_iommu_pageva_inval_all;
+int amd_iommu_disable;		/* disable IOMMU */
+char *amd_iommu_disable_list;	/* list of drivers bypassing IOMMU */
 
 int
 _init(void)
 {
-	int error;
+	int error = ENOTSUP;
+
+#if defined(_LP64) && !defined(__xpv)
 
 	error = ddi_soft_state_init(&amd_iommu_statep,
 	    sizeof (struct amd_iommu_state), 1);
 	if (error) {
-		cmn_err(CE_WARN, "_init: failed to init soft state.");
+		cmn_err(CE_WARN, "%s: _init: failed to init soft state.",
+		    amd_iommu_modname);
 		return (error);
 	}
 
-	if (amd_iommu_acpi_init(&amd_iommu_acpip) != DDI_SUCCESS) {
+	amd_iommu_read_boot_props();
+
+	if (amd_iommu_acpi_init() != DDI_SUCCESS) {
+		if (amd_iommu_debug) {
+			cmn_err(CE_WARN, "%s: _init: ACPI init failed.",
+			    amd_iommu_modname);
+		}
 		ddi_soft_state_fini(&amd_iommu_statep);
-		return (EFAULT);
+		return (ENOTSUP);
 	}
 
 	if (amd_iommu_page_table_hash_init(&amd_iommu_page_table_hash)
 	    != DDI_SUCCESS) {
-		cmn_err(CE_WARN, "_init: ACPI init failed.");
-		amd_iommu_acpi_fini(&amd_iommu_acpip);
+		cmn_err(CE_WARN, "%s: _init: Page table hash init failed.",
+		    amd_iommu_modname);
+		amd_iommu_acpi_fini();
 		ddi_soft_state_fini(&amd_iommu_statep);
-		amd_iommu_acpip = NULL;
 		amd_iommu_statep = NULL;
 		return (EFAULT);
 	}
 
 	error = mod_install(&modlinkage);
 	if (error) {
-		cmn_err(CE_WARN, "_init: mod_install failed.");
+		cmn_err(CE_WARN, "%s: _init: mod_install failed.",
+		    amd_iommu_modname);
 		amd_iommu_page_table_hash_fini(&amd_iommu_page_table_hash);
-		amd_iommu_acpi_fini(&amd_iommu_acpip);
+		amd_iommu_acpi_fini();
 		ddi_soft_state_fini(&amd_iommu_statep);
-		amd_iommu_acpip = NULL;
 		amd_iommu_statep = NULL;
 		return (error);
 	}
+	error = 0;
+#endif
 
-	amd_iommu_modname = mod_modname(&modlinkage);
-
-	return (0);
+	return (error);
 }
 
 int
@@ -170,14 +182,14 @@ _fini(void)
 	if (error)
 		return (error);
 
-	amd_iommu_modname = NULL;
-
 	amd_iommu_page_table_hash_fini(&amd_iommu_page_table_hash);
-	amd_iommu_acpi_fini(&amd_iommu_acpip);
+	amd_iommu_acpi_fini();
 	ddi_soft_state_fini(&amd_iommu_statep);
-
-	amd_iommu_acpip = NULL;
 	amd_iommu_statep = NULL;
+	if (amd_iommu_disable_list) {
+		kmem_free(amd_iommu_disable_list,
+		    strlen(amd_iommu_disable_list) + 1);
+	}
 
 	return (0);
 }
@@ -252,7 +264,16 @@ amd_iommu_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		statep->aioms_iommu_start = NULL;
 		statep->aioms_iommu_end = NULL;
 
-		if (amd_iommu_setup(dip, statep) != DDI_SUCCESS) {
+		amd_iommu_lookup_conf_props(dip);
+
+		if (amd_iommu_disable_list) {
+			cmn_err(CE_NOTE, "AMD IOMMU disabled for the following"
+			    " drivers:\n%s", amd_iommu_disable_list);
+		}
+
+		if (amd_iommu_disable) {
+			cmn_err(CE_NOTE, "AMD IOMMU disabled by user");
+		} else if (amd_iommu_setup(dip, statep) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "Unable to initialize AMD IOMMU "
 			    "%s%d", driver, instance);
 			ddi_remove_minor_node(dip, NULL);
@@ -262,8 +283,6 @@ amd_iommu_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		ddi_report_dev(dip);
 
-		cmn_err(CE_NOTE, "AMD IOMMU %s%d attached",
-		    driver, instance);
 		return (DDI_SUCCESS);
 
 	case DDI_RESUME:
@@ -291,15 +310,7 @@ amd_iommu_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			    driver, instance);
 			return (DDI_FAILURE);
 		}
-		if (amd_iommu_teardown(dip, statep) != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "%s%d: Cannot turnoff one "
-			    "or more IOMMU units", driver, instance);
-			return (DDI_FAILURE);
-		}
-		ddi_remove_minor_node(dip, NULL);
-		ddi_soft_state_free(amd_iommu_statep, instance);
-		cmn_err(CE_NOTE, "AMD IOMMU %s%d detached", driver, instance);
-		return (DDI_SUCCESS);
+		return (DDI_FAILURE);
 	case DDI_SUSPEND:
 		return (DDI_SUCCESS);
 	default:
@@ -385,8 +396,6 @@ amd_iommu_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 {
 	int instance = AMD_IOMMU_MINOR2INST(getminor(dev));
 	struct amd_iommu_state *statep;
-	const char *driver;
-	amd_iommu_t *iommu;
 	const char *f = "amd_iommu_ioctl";
 
 	ASSERT(*rvalp);
@@ -416,24 +425,5 @@ amd_iommu_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 
 	ASSERT(statep->aioms_instance == instance);
 
-	driver = ddi_driver_name(statep->aioms_devi);
-
-	switch (cmd) {
-	case AMD_IOMMU_IOC_INVAL_DTENTRY:
-
-		cmn_err(CE_NOTE, "%s: %s%d: cmd %d", f, driver, instance, cmd);
-
-		for (iommu = statep->aioms_iommu_start; iommu;
-		    iommu = iommu->aiomt_next) {
-			cmn_err(CE_NOTE, "%s: %s%d: inval dtentry: "
-			    "amd_iommu_t = %p",
-			    f, driver, instance, (void *)iommu);
-		}
-		break;
-	default:
-		return (ENOTTY);
-	}
-
-	*rvalp = 0;
-	return (0);
+	return (ENOTTY);
 }

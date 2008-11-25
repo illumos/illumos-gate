@@ -45,24 +45,12 @@ typedef struct iommulib_unit {
 	struct iommulib_unit *ilu_prev;
 } iommulib_unit_t;
 
-typedef struct iommulib_cache {
-	dev_info_t *cache_rdip;
-	iommulib_unit_t *cache_unit;
-	struct iommulib_cache *cache_next;
-	struct iommulib_cache *cache_prev;
-} iommulib_cache_t;
-
 typedef struct iommulib_nex {
 	dev_info_t *nex_dip;
 	iommulib_nexops_t nex_ops;
 	struct iommulib_nex *nex_next;
 	struct iommulib_nex *nex_prev;
 } iommulib_nex_t;
-
-/* ********* Function prototypes ********************* */
-static int lookup_cache(dev_info_t *rdip, iommulib_unit_t **unitpp);
-static void insert_cache(dev_info_t *rdip, iommulib_unit_t *unitp);
-
 
 /* *********  Globals ************************ */
 
@@ -76,13 +64,6 @@ static uint64_t iommulib_num_units = 0;
 
 static kmutex_t iommulib_nexus_lock;
 static iommulib_nex_t *iommulib_nexus_list;
-
-#define	IOMMULIB_CACHE_SIZE 256
-static kmutex_t iommulib_cache_lock;
-static iommulib_cache_t **iommulib_cache;
-
-/* tunable via /etc/system */
-static uint_t iommulib_cache_size = IOMMULIB_CACHE_SIZE;
 
 /* can be set atomically without lock */
 static volatile uint32_t iommulib_fini;
@@ -104,15 +85,6 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	/*
-	 * static mutexes automagically initialized
-	 * by being allocated in zeroed memory
-	 */
-	mutex_enter(&iommulib_cache_lock);
-	iommulib_cache = kmem_zalloc(
-	    sizeof (iommulib_cache_t *) * iommulib_cache_size, KM_SLEEP);
-	mutex_exit(&iommulib_cache_lock);
-
 	return (mod_install(&modlinkage));
 }
 
@@ -125,12 +97,6 @@ _fini(void)
 		return (EBUSY);
 	}
 	iommulib_fini = 1;
-
-	mutex_enter(&iommulib_cache_lock);
-	kmem_free(iommulib_cache,
-	    sizeof (iommulib_cache_t *) * iommulib_cache_size);
-	iommulib_cache = NULL;
-	mutex_exit(&iommulib_cache_lock);
 
 	mutex_exit(&iommulib_lock);
 	return (mod_remove(&modlinkage));
@@ -219,7 +185,6 @@ iommulib_nexus_register(dev_info_t *dip, iommulib_nexops_t *nexops,
 		return (DDI_FAILURE);
 	}
 
-
 	if (nexops->nops_dma_reset_cookies == NULL) {
 		cmn_err(CE_WARN, "%s: %s%d: NULL nops_dma_reset_cookies op. "
 		    "Failing registration for ops vector: %p", f,
@@ -229,6 +194,27 @@ iommulib_nexus_register(dev_info_t *dip, iommulib_nexops_t *nexops,
 
 	if (nexops->nops_dma_get_cookies == NULL) {
 		cmn_err(CE_WARN, "%s: %s%d: NULL nops_dma_get_cookies op. "
+		    "Failing registration for ops vector: %p", f,
+		    driver, instance, (void *)nexops);
+		return (DDI_FAILURE);
+	}
+
+	if (nexops->nops_dma_set_cookies == NULL) {
+		cmn_err(CE_WARN, "%s: %s%d: NULL nops_dma_set_cookies op. "
+		    "Failing registration for ops vector: %p", f,
+		    driver, instance, (void *)nexops);
+		return (DDI_FAILURE);
+	}
+
+	if (nexops->nops_dma_clear_cookies == NULL) {
+		cmn_err(CE_WARN, "%s: %s%d: NULL nops_dma_clear_cookies op. "
+		    "Failing registration for ops vector: %p", f,
+		    driver, instance, (void *)nexops);
+		return (DDI_FAILURE);
+	}
+
+	if (nexops->nops_dma_get_sleep_flags == NULL) {
+		cmn_err(CE_WARN, "%s: %s%d: NULL nops_dma_get_sleep_flags op. "
 		    "Failing registration for ops vector: %p", f,
 		    driver, instance, (void *)nexops);
 		return (DDI_FAILURE);
@@ -327,7 +313,7 @@ iommulib_nexus_unregister(iommulib_nexhandle_t handle)
 
 	kmem_free(nexp, sizeof (iommulib_nex_t));
 
-	cmn_err(CE_WARN, "%s: %s%d: NEXUS (%s) handle successfully "
+	cmn_err(CE_NOTE, "!%s: %s%d: NEXUS (%s) handle successfully "
 	    "unregistered from IOMMULIB", f, driver, instance,
 	    ddi_node_name(dip));
 
@@ -401,8 +387,8 @@ iommulib_iommu_register(dev_info_t *dip, iommulib_ops_t *ops,
 		return (DDI_FAILURE);
 	}
 
-	cmn_err(CE_NOTE, "%s: %s%d: Detected IOMMU registration from vendor %s",
-	    f, driver, instance, vendor);
+	cmn_err(CE_NOTE, "!%s: %s%d: Detected IOMMU registration from vendor"
+	    " %s", f, driver, instance, vendor);
 
 	if (ops->ilops_data == NULL) {
 		cmn_err(CE_WARN, "%s: %s%d: NULL IOMMU data field. "
@@ -500,9 +486,10 @@ iommulib_iommu_register(dev_info_t *dip, iommulib_ops_t *ops,
 	unitp->ilu_data = ops->ilops_data;
 
 	unitp->ilu_next = iommulib_list;
-	unitp->ilu_prev = NULL;
-	iommulib_list->ilu_prev = unitp;
 	iommulib_list = unitp;
+	unitp->ilu_prev = NULL;
+	if (unitp->ilu_next)
+		unitp->ilu_next->ilu_prev = unitp;
 
 	mutex_exit(&unitp->ilu_lock);
 
@@ -512,7 +499,7 @@ iommulib_iommu_register(dev_info_t *dip, iommulib_ops_t *ops,
 
 	mutex_exit(&iommulib_lock);
 
-	cmn_err(CE_NOTE, "%s: %s%d: Succesfully registered IOMMU unit "
+	cmn_err(CE_NOTE, "!%s: %s%d: Succesfully registered IOMMU unit "
 	    "from vendor=%s, ops=%p, data=%p, IOMMULIB unitid=%u",
 	    f, driver, instance, vendor, (void *)ops, (void *)unitp->ilu_data,
 	    unitp->ilu_unitid);
@@ -585,7 +572,11 @@ iommulib_nex_open(dev_info_t *rdip, uint_t *errorp)
 	const char *f = "iommulib_nex_open";
 
 	*errorp = 0;
-	DEVI(rdip)->devi_iommulib_handle = NULL;
+
+	if (IOMMU_USED(rdip))
+		return (DDI_SUCCESS);
+
+	ASSERT(DEVI(rdip)->devi_iommulib_handle == NULL);
 
 	/* prevent use of IOMMU for AMD IOMMU's DMA */
 	if (strcmp(driver, "amd_iommu") == 0) {
@@ -593,23 +584,15 @@ iommulib_nex_open(dev_info_t *rdip, uint_t *errorp)
 		return (DDI_FAILURE);
 	}
 
-	if (lookup_cache(rdip, &unitp) == DDI_SUCCESS) {
-		DEVI(rdip)->devi_iommulib_handle =
-		    (iommulib_handle_t)unitp;
-		return (DDI_SUCCESS);
-	}
-
-
 	/*
-	 * Ok this dip is not in the cache. Use the probe entry point
-	 * to determine in a hardware specific manner whether this
-	 * dip is controlled by an IOMMU. If yes, insert it into the
-	 * cache and return the handle corresponding to the IOMMU unit.
+	 * Use the probe entry point to determine in a hardware specific
+	 * manner whether this dip is controlled by an IOMMU. If yes,
+	 * return the handle corresponding to the IOMMU unit.
 	 */
 
 	mutex_enter(&iommulib_lock);
 	for (unitp = iommulib_list; unitp; unitp = unitp->ilu_next) {
-		if (unitp->ilu_ops->ilops_probe(rdip) == DDI_SUCCESS)
+		if (unitp->ilu_ops->ilops_probe(unitp, rdip) == DDI_SUCCESS)
 			break;
 	}
 
@@ -631,8 +614,6 @@ iommulib_nex_open(dev_info_t *rdip, uint_t *errorp)
 	mutex_exit(&unitp->ilu_lock);
 	mutex_exit(&iommulib_lock);
 
-	insert_cache(rdip, unitp);
-
 	DEVI(rdip)->devi_iommulib_handle = unitp;
 
 	return (DDI_SUCCESS);
@@ -652,12 +633,6 @@ iommulib_nex_close(dev_info_t *rdip)
 		return;
 
 	DEVI(rdip)->devi_iommulib_handle = NULL;
-
-	/*
-	 * Assume we don't support DR of IOMMUs. The mapping of
-	 * dips to IOMMU units should not change. Let the mapping
-	 * persist in the cache.
-	 */
 
 	mutex_enter(&iommulib_lock);
 	mutex_enter(&unitp->ilu_lock);
@@ -706,8 +681,6 @@ iommulib_nexdma_freehdl(dev_info_t *dip, dev_info_t *rdip,
 	/* No need to grab lock - the handle is reference counted */
 	error = unitp->ilu_ops->ilops_dma_freehdl(handle, dip,
 	    rdip, dma_handle);
-
-	iommulib_nex_close(rdip);
 
 	return (error);
 }
@@ -856,12 +829,40 @@ iommulib_iommu_dma_reset_cookies(dev_info_t *dip, ddi_dma_handle_t handle)
 
 int
 iommulib_iommu_dma_get_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
-    ddi_dma_cookie_t *cookiep, uint_t *ccountp)
+    ddi_dma_cookie_t **cookiepp, uint_t *ccountp)
 {
 	iommulib_nexops_t *nexops = lookup_nexops(dip);
 	if (nexops == NULL)
 		return (DDI_FAILURE);
-	return (nexops->nops_dma_get_cookies(dip, handle, cookiep, ccountp));
+	return (nexops->nops_dma_get_cookies(dip, handle, cookiepp, ccountp));
+}
+
+int
+iommulib_iommu_dma_set_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
+    ddi_dma_cookie_t *cookiep, uint_t ccount)
+{
+	iommulib_nexops_t *nexops = lookup_nexops(dip);
+	if (nexops == NULL)
+		return (DDI_FAILURE);
+	return (nexops->nops_dma_set_cookies(dip, handle, cookiep, ccount));
+}
+
+int
+iommulib_iommu_dma_clear_cookies(dev_info_t *dip, ddi_dma_handle_t handle)
+{
+	iommulib_nexops_t *nexops = lookup_nexops(dip);
+	if (nexops == NULL)
+		return (DDI_FAILURE);
+	return (nexops->nops_dma_clear_cookies(dip, handle));
+}
+
+int
+iommulib_iommu_dma_get_sleep_flags(dev_info_t *dip, ddi_dma_handle_t handle)
+{
+	iommulib_nexops_t *nexops = lookup_nexops(dip);
+	if (nexops == NULL)
+		return (DDI_FAILURE);
+	return (nexops->nops_dma_get_sleep_flags(handle));
 }
 
 int
@@ -985,89 +986,4 @@ iommulib_iommu_getdata(iommulib_handle_t handle)
 	ASSERT(data);
 
 	return (data);
-}
-
-/*
- * Internal routines
- */
-
-static uint32_t
-hashfn(uint64_t ptr)
-{
-	return (ptr % iommulib_cache_size);
-}
-
-static int
-lookup_cache(dev_info_t *rdip, iommulib_unit_t **unitpp)
-{
-	uint64_t idx;
-	iommulib_cache_t *cachep;
-	iommulib_unit_t *unitp;
-	int retval = DDI_FAILURE;
-
-	*unitpp = NULL;
-
-	mutex_enter(&iommulib_lock);
-	mutex_enter(&iommulib_cache_lock);
-
-	ASSERT(iommulib_cache);
-
-	idx = hashfn((uint64_t)(uintptr_t)rdip);
-
-	ASSERT(idx < iommulib_cache_size);
-
-	for (cachep = iommulib_cache[idx]; cachep;
-	    cachep = cachep->cache_next) {
-		if (cachep->cache_rdip == rdip)
-			break;
-	}
-
-	if (cachep != NULL) {
-		unitp = cachep->cache_unit;
-		mutex_enter(&unitp->ilu_lock);
-		unitp->ilu_ref++;
-		mutex_exit(&unitp->ilu_lock);
-		*unitpp = unitp;
-		retval = DDI_SUCCESS;
-	}
-
-	mutex_exit(&iommulib_cache_lock);
-	mutex_exit(&iommulib_lock);
-	return (retval);
-}
-
-static void
-insert_cache(dev_info_t *rdip, iommulib_unit_t *unitp)
-{
-	uint32_t idx;
-	iommulib_cache_t *cachep;
-
-	mutex_enter(&iommulib_lock);
-	mutex_enter(&iommulib_cache_lock);
-
-	ASSERT(iommulib_cache);
-
-	idx = hashfn((uint64_t)(uintptr_t)rdip);
-
-	ASSERT(idx < iommulib_cache_size);
-
-	for (cachep = iommulib_cache[idx]; cachep;
-	    cachep = cachep->cache_next) {
-		if (cachep->cache_rdip == rdip)
-			break;
-	}
-
-	if (cachep == NULL) {
-		cachep = kmem_zalloc(sizeof (iommulib_cache_t), KM_SLEEP);
-		cachep->cache_rdip = rdip;
-		cachep->cache_unit = unitp;	/* ref-count set by caller */
-		cachep->cache_prev = NULL;
-		cachep->cache_next = iommulib_cache[idx];
-		if (cachep->cache_next)
-			cachep->cache_next->cache_prev = cachep;
-		iommulib_cache[idx] = cachep;
-	}
-
-	mutex_exit(&iommulib_cache_lock);
-	mutex_exit(&iommulib_lock);
 }

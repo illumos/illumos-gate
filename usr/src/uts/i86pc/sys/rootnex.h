@@ -283,6 +283,8 @@ typedef struct rootnex_dma_s {
 	ddi_dma_cookie_t	*dp_cookies;
 	boolean_t		dp_need_to_free_cookie;
 	uint_t			dp_current_cookie; /* for obsoleted I/Fs */
+	ddi_dma_cookie_t	*dp_saved_cookies;
+	boolean_t		dp_need_to_switch_cookies;
 
 	/*
 	 * pre allocated space for the bind state, allocated during alloc
@@ -299,6 +301,11 @@ typedef struct rootnex_dma_s {
 	 * size of si_max_pages, set when bind handler and freed when unbind
 	 */
 	void			*dp_dvma_cookies;
+
+	/*
+	 * sleep flags set on bind and unset on unbind
+	 */
+	int			dp_sleep_flags;
 } rootnex_dma_t;
 
 /*

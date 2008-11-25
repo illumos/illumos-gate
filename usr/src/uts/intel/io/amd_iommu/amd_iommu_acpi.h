@@ -41,9 +41,36 @@ extern "C" {
 #define	IVRS_SIG	"IVRS"
 
 /*
- * IVHD deventry extended data settings
+ * IVINFO settings
+ */
+#define	AMD_IOMMU_ACPI_IVINFO_RSV1	(31 << 16 | 23)
+#define	AMD_IOMMU_ACPI_HT_ATSRSV	(22 << 16 | 22)
+#define	AMD_IOMMU_ACPI_VA_SIZE		(21 << 16 | 15)
+#define	AMD_IOMMU_ACPI_PA_SIZE		(14 << 16 | 8)
+#define	AMD_IOMMU_ACPI_IVINFO_RSV2	(7 << 16 | 0)
+
+/*
+ * IVHD Device entry len field
  */
 #define	AMD_IOMMU_ACPI_DEVENTRY_LEN	(7 << 16 | 6)
+
+/*
+ * IVHD flag fields definition
+ */
+#define	AMD_IOMMU_ACPI_IVHD_FLAGS_RSV		(7 << 16 | 5)
+#define	AMD_IOMMU_ACPI_IVHD_FLAGS_IOTLBSUP	(4 << 16 | 4)
+#define	AMD_IOMMU_ACPI_IVHD_FLAGS_ISOC		(3 << 16 | 3)
+#define	AMD_IOMMU_ACPI_IVHD_FLAGS_RESPASSPW	(2 << 16 | 2)
+#define	AMD_IOMMU_ACPI_IVHD_FLAGS_PASSPW	(1 << 16 | 1)
+#define	AMD_IOMMU_ACPI_IVHD_FLAGS_HTTUNEN	(0 << 16 | 0)
+
+/*
+ * IVHD IOMMU info fields
+ */
+#define	AMD_IOMMU_ACPI_IOMMU_INFO_RSV1		(15 << 16 | 13)
+#define	AMD_IOMMU_ACPI_IOMMU_INFO_UNITID	(12 << 16 | 8)
+#define	AMD_IOMMU_ACPI_IOMMU_INFO_RSV2		(7 << 16 | 5)
+#define	AMD_IOMMU_ACPI_IOMMU_INFO_MSINUM	(4 << 16 | 0)
 
 /*
  * IVHD deventry data settings
@@ -51,6 +78,7 @@ extern "C" {
 #define	AMD_IOMMU_ACPI_LINT1PASS	(7 << 16 | 7)
 #define	AMD_IOMMU_ACPI_LINT0PASS	(6 << 16 | 6)
 #define	AMD_IOMMU_ACPI_SYSMGT		(5 << 16 | 4)
+#define	AMD_IOMMU_ACPI_DATRSV		(3 << 16 | 3)
 #define	AMD_IOMMU_ACPI_NMIPASS		(2 << 16 | 2)
 #define	AMD_IOMMU_ACPI_EXTINTPASS	(1 << 16 | 1)
 #define	AMD_IOMMU_ACPI_INITPASS		(0 << 16 | 0)
@@ -59,6 +87,24 @@ extern "C" {
  * IVHD deventry extended data settings
  */
 #define	AMD_IOMMU_ACPI_ATSDISABLED	(31 << 16 | 31)
+#define	AMD_IOMMU_ACPI_EXTDATRSV	(30 << 16 | 0)
+
+/*
+ * IVMD flags fields settings
+ */
+#define	AMD_IOMMU_ACPI_IVMD_RSV		(7 << 16 | 4)
+#define	AMD_IOMMU_ACPI_IVMD_EXCL_RANGE	(3 << 16 | 3)
+#define	AMD_IOMMU_ACPI_IVMD_IW		(2 << 16 | 2)
+#define	AMD_IOMMU_ACPI_IVMD_IR		(1 << 16 | 1)
+#define	AMD_IOMMU_ACPI_IVMD_UNITY	(0 << 16 | 0)
+
+#define	AMD_IOMMU_ACPI_INFO_HASH_SZ	(256)
+
+/*
+ * Deventry special device "variety"
+ */
+#define	AMD_IOMMU_ACPI_SPECIAL_APIC	0x1
+#define	AMD_IOMMU_ACPI_SPECIAL_HPET	0x2
 
 typedef enum {
 	DEVENTRY_INVALID = 0,
@@ -69,14 +115,24 @@ typedef enum {
 	DEVENTRY_ALIAS_SELECT,
 	DEVENTRY_ALIAS_RANGE,
 	DEVENTRY_EXTENDED_SELECT,
-	DEVENTRY_EXTENDED_RANGE
-} ivhd_deventry_flags_t;
+	DEVENTRY_EXTENDED_RANGE,
+	DEVENTRY_SPECIAL_DEVICE
+} ivhd_deventry_type_t;
+
+typedef enum {
+	IVMD_DEVICE_INVALID = 0,
+	IVMD_DEVICEID_ALL,
+	IVMD_DEVICEID_SELECT,
+	IVMD_DEVICEID_RANGE
+} ivmd_deviceid_type_t;
 
 typedef struct ivhd_deventry {
 	uint8_t idev_len;
-	ivhd_deventry_flags_t  idev_flags;
-	uint16_t idev_bdf;
-	uint16_t idev_src_bdf;
+	ivhd_deventry_type_t  idev_type;
+	int32_t idev_deviceid;
+	int32_t idev_src_deviceid;
+	uint8_t idev_handle;
+	uint8_t idev_variety;
 	uint8_t idev_Lint1Pass;
 	uint8_t idev_Lint0Pass;
 	uint8_t idev_SysMgt;
@@ -91,12 +147,11 @@ typedef struct ivhd {
 	uint8_t ivhd_type;
 	uint8_t ivhd_flags;
 	uint16_t ivhd_len;
-	uint8_t ivhd_bus;
-	uint8_t ivhd_devfn;
+	uint16_t ivhd_deviceid;
 	uint16_t ivhd_cap_off;
 	uint64_t ivhd_reg_base;
 	uint16_t ivhd_pci_seg;
-	uint8_t ivhd_msi_unitid;
+	uint16_t ivhd_iommu_info;
 	uint32_t ivhd_resv;
 } ivhd_t;
 
@@ -109,12 +164,11 @@ typedef struct ivhd_container {
 
 typedef struct ivmd {
 	uint8_t ivmd_type;
-	uint8_t ivmd_resv;
-	uint16_t ivmd_len;
-	uint16_t ivmd_devid;
-	uint8_t ivmd_resv2;
 	uint8_t ivmd_flags;
-	uint64_t ivmd_resv3;
+	uint16_t ivmd_len;
+	uint16_t ivmd_deviceid;
+	uint16_t ivmd_auxdata;
+	uint64_t ivmd_resv;
 	uint64_t ivmd_phys_start;
 	uint64_t ivmd_phys_len;
 } ivmd_t;
@@ -138,12 +192,110 @@ typedef struct amd_iommu_acpi {
 	ivmd_container_t *acp_last_ivmdc;
 } amd_iommu_acpi_t;
 
+
+/* Global IVINFo fields */
+typedef struct amd_iommu_acpi_global {
+	uint8_t acg_HtAtsResv;
+	uint8_t acg_VAsize;
+	uint8_t acg_PAsize;
+} amd_iommu_acpi_global_t;
+
+typedef struct amd_iommu_acpi_ivhd {
+	int32_t ach_deviceid_start;
+	int32_t ach_deviceid_end;
+
+	/* IVHD deventry type */
+	ivhd_deventry_type_t ach_dev_type;
+
+	/* IVHD flag fields */
+	uint8_t ach_IotlbSup;
+	uint8_t ach_Isoc;
+	uint8_t ach_ResPassPW;
+	uint8_t ach_PassPW;
+	uint8_t ach_HtTunEn;
+
+	/* IVHD fields */
+	uint16_t ach_IOMMU_deviceid;
+	uint16_t ach_IOMMU_cap_off;
+	uint64_t ach_IOMMU_reg_base;
+	uint16_t ach_IOMMU_pci_seg;
+
+	/* IVHD IOMMU info fields */
+	uint8_t ach_IOMMU_UnitID;
+	uint8_t ach_IOMMU_MSInum;
+
+	/* IVHD deventry data settings */
+	uint8_t ach_Lint1Pass;
+	uint8_t ach_Lint0Pass;
+	uint8_t ach_SysMgt;
+	uint8_t ach_NMIPass;
+	uint8_t ach_ExtIntPass;
+	uint8_t ach_INITPass;
+
+	/* alias */
+	int32_t ach_src_deviceid;
+
+	/* IVHD deventry extended data settings */
+	uint8_t ach_AtsDisabled;
+
+	/* IVHD deventry special device */
+	uint8_t ach_special_handle;
+	uint8_t ach_special_variety;
+
+	struct amd_iommu_acpi_ivhd *ach_next;
+} amd_iommu_acpi_ivhd_t;
+
+typedef struct amd_iommu_acpi_ivmd {
+	int32_t acm_deviceid_start;
+	int32_t acm_deviceid_end;
+
+	/* IVMD type */
+	ivmd_deviceid_type_t acm_dev_type;
+
+	/* IVMD flags */
+	uint8_t acm_ExclRange;
+	uint8_t acm_IW;
+	uint8_t acm_IR;
+	uint8_t acm_Unity;
+
+	/* IVMD mem block */
+	uint64_t acm_ivmd_phys_start;
+	uint64_t acm_ivmd_phys_len;
+
+	struct amd_iommu_acpi_ivmd *acm_next;
+} amd_iommu_acpi_ivmd_t;
+
+typedef union {
+	uint16_t   ent16;
+	uint8_t	   ent8[2];
+} align_16_t;
+
+typedef union {
+	uint32_t   ent32;
+	uint8_t	   ent8[4];
+} align_32_t;
+
+typedef union {
+	ivhd_t *ivhdp;
+	char   *cp;
+} align_ivhd_t;
+
+typedef union {
+	ivmd_t *ivmdp;
+	char   *cp;
+} align_ivmd_t;
+
 #pragma pack()
 
-extern amd_iommu_acpi_t *amd_iommu_acpip;
-
-int amd_iommu_acpi_init(amd_iommu_acpi_t **acpipp);
-void amd_iommu_acpi_fini(amd_iommu_acpi_t **acpipp);
+int amd_iommu_acpi_init(void);
+void amd_iommu_acpi_fini(void);
+amd_iommu_acpi_ivhd_t *amd_iommu_lookup_all_ivhd(void);
+amd_iommu_acpi_ivmd_t *amd_iommu_lookup_all_ivmd(void);
+amd_iommu_acpi_ivhd_t *amd_iommu_lookup_any_ivhd(void);
+amd_iommu_acpi_ivmd_t *amd_iommu_lookup_any_ivmd(void);
+amd_iommu_acpi_global_t *amd_iommu_lookup_acpi_global(void);
+amd_iommu_acpi_ivhd_t *amd_iommu_lookup_ivhd(int32_t deviceid);
+amd_iommu_acpi_ivmd_t *amd_iommu_lookup_ivmd(int32_t deviceid);
 
 #endif /* _KERNEL */
 

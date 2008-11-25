@@ -55,7 +55,7 @@ typedef struct iommulib_ops {
 	char			*ilops_id;
 	void			*ilops_data;
 
-	int	(*ilops_probe)(dev_info_t *rdip);
+	int	(*ilops_probe)(iommulib_handle_t handle, dev_info_t *rdip);
 
 	int	(*ilops_dma_allochdl)(iommulib_handle_t handle,
 	    dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attr,
@@ -127,7 +127,14 @@ typedef struct iommulib_nexops {
 	    ddi_dma_handle_t handle);
 
 	int (*nops_dma_get_cookies)(dev_info_t *dip, ddi_dma_handle_t handle,
-	    ddi_dma_cookie_t *cookiep, uint_t *ccountp);
+	    ddi_dma_cookie_t **cookiepp, uint_t *ccountp);
+
+	int (*nops_dma_set_cookies)(dev_info_t *dip, ddi_dma_handle_t handle,
+	    ddi_dma_cookie_t *cookiep, uint_t ccount);
+
+	int (*nops_dma_clear_cookies)(dev_info_t *dip, ddi_dma_handle_t handle);
+
+	int (*nops_dma_get_sleep_flags)(ddi_dma_handle_t handle);
 
 	int (*nops_dma_sync)(dev_info_t *dip, dev_info_t *rdip,
 	    ddi_dma_handle_t handle, off_t off, size_t len, uint_t cache_flags);
@@ -146,6 +153,38 @@ typedef struct iommulib_nexops {
 
 struct iommulib_nex;
 typedef struct iommulib_nex *iommulib_nexhandle_t;
+
+/*
+ * struct iommu_dip_private
+ *   private iommu structure hook on dev_info
+ */
+typedef struct iommu_private {
+	/* pci seg, bus, dev, func */
+	int		idp_seg;
+	int		idp_bus;
+	int		idp_devfn;
+
+	/* ppb information */
+	boolean_t	idp_is_bridge;
+	int		idp_bbp_type;
+	int		idp_sec;
+	int		idp_sub;
+
+	/* identifier for special devices */
+	boolean_t	idp_is_display;
+	boolean_t	idp_is_lpc;
+
+	/* domain ptr */
+	void		*idp_intel_domain;
+} iommu_private_t;
+
+#define	INTEL_IOMMU_PRIVATE(i)	(dmar_domain_state_t *)(i)
+
+typedef struct gfx_entry {
+	dev_info_t *g_dip;
+	struct gfx_entry *g_prev;
+	struct gfx_entry *g_next;
+} gfx_entry_t;
 
 /*
  * Interfaces for nexus drivers - typically rootnex
@@ -225,7 +264,15 @@ int iommulib_iommu_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 void iommulib_iommu_dma_reset_cookies(dev_info_t *dip, ddi_dma_handle_t handle);
 
 int iommulib_iommu_dma_get_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
-    ddi_dma_cookie_t *cookiep, uint_t *ccountp);
+    ddi_dma_cookie_t **cookiepp, uint_t *ccountp);
+
+int iommulib_iommu_dma_set_cookies(dev_info_t *dip, ddi_dma_handle_t handle,
+    ddi_dma_cookie_t *cookiep, uint_t ccount);
+
+int iommulib_iommu_dma_clear_cookies(dev_info_t *dip, ddi_dma_handle_t handle);
+
+int iommulib_iommu_dma_get_sleep_flags(dev_info_t *dip,
+    ddi_dma_handle_t handle);
 
 int iommulib_iommu_dma_sync(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, off_t off, size_t len, uint_t cache_flags);
