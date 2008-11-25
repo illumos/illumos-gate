@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
 #include <sys/dmu.h>
@@ -60,6 +58,8 @@ space_map_create(space_map_t *sm, uint64_t start, uint64_t size, uint8_t shift,
 {
 	bzero(sm, sizeof (*sm));
 
+	cv_init(&sm->sm_load_cv, NULL, CV_DEFAULT, NULL);
+
 	avl_create(&sm->sm_root, space_map_seg_compare,
 	    sizeof (space_seg_t), offsetof(struct space_seg, ss_node));
 
@@ -75,6 +75,7 @@ space_map_destroy(space_map_t *sm)
 	ASSERT(!sm->sm_loaded && !sm->sm_loading);
 	VERIFY3U(sm->sm_space, ==, 0);
 	avl_destroy(&sm->sm_root);
+	cv_destroy(&sm->sm_load_cv);
 }
 
 void
