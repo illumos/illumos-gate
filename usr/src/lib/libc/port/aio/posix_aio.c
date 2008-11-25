@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * posix_aio.c implements the POSIX async. I/O functions.
  *
@@ -1620,7 +1618,7 @@ int
 aio_fsync64(int op, aiocb64_t *aiocbp)
 {
 	aio_lio_t *head;
-	struct stat statb;
+	struct stat64 statb;
 	int fret;
 
 	if (aiocbp == NULL)
@@ -1633,7 +1631,7 @@ aio_fsync64(int op, aiocb64_t *aiocbp)
 		errno = EBUSY;
 		return (-1);
 	}
-	if (fstat(aiocbp->aio_fildes, &statb) < 0)
+	if (fstat64(aiocbp->aio_fildes, &statb) < 0)
 		return (-1);
 	if (_aio_sigev_thread64(aiocbp) != 0)
 		return (-1);
@@ -1710,9 +1708,9 @@ aio_cancel64(int fd, aiocb64_t *aiocbp)
 	aio_worker_t *aiowp;
 	int done = 0;
 	int canceled = 0;
-	struct stat buf;
+	struct stat64 buf;
 
-	if (fstat(fd, &buf) < 0)
+	if (fstat64(fd, &buf) < 0)
 		return (-1);
 
 	if (aiocbp != NULL) {
