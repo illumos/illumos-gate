@@ -61,8 +61,8 @@ slotnm_create(topo_mod_t *mp, int dev, char *str)
 	p->snm_mod = mp;
 	p->snm_next = NULL;
 	p->snm_dev = dev;
-	p->snm_label = topo_mod_strdup(mp, str);
-	if (p->snm_label == NULL) {
+	p->snm_name = topo_mod_strdup(mp, str);
+	if (p->snm_name == NULL) {
 		slotnm_destroy(p);
 		return (NULL);
 	}
@@ -75,8 +75,8 @@ slotnm_destroy(slotnm_t *p)
 	if (p == NULL)
 		return;
 	slotnm_destroy(p->snm_next);
-	if (p->snm_label != NULL)
-		topo_mod_strfree(p->snm_mod, p->snm_label);
+	if (p->snm_name != NULL)
+		topo_mod_strfree(p->snm_mod, p->snm_name);
 	topo_mod_free(p->snm_mod, p, sizeof (slotnm_t));
 }
 
@@ -88,7 +88,7 @@ slotnm_cp(did_t *from, did_t *to, int *nslots)
 
 	*nslots = 0;
 	for (nxt = from->dp_slotnames; nxt != NULL; nxt = nxt->snm_next) {
-		new = slotnm_create(to->dp_mod, nxt->snm_dev, nxt->snm_label);
+		new = slotnm_create(to->dp_mod, nxt->snm_dev, nxt->snm_name);
 		if (new == NULL) {
 			if (to->dp_slotnames != NULL)
 				slotnm_destroy(to->dp_slotnames);
@@ -135,7 +135,7 @@ di_devtype_get(topo_mod_t *mp, di_node_t src, char **devtype)
 }
 
 static int
-di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotnm)
+di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotname)
 {
 	char *slotbuf;
 	int sz;
@@ -143,6 +143,7 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotnm)
 
 	*slotnum = -1;
 	(void) di_uintprop_get(mp, src, DI_PHYSPROP, (uint_t *)slotnum);
+
 	if (*slotnum == -1)
 		return (0);
 
@@ -154,6 +155,8 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotnm)
 	if (di_bytes_get(mp, src, DI_SLOTPROP, &sz, &buf) == 0 &&
 	    sz > 4) {
 		slotbuf = (char *)&buf[4];
+		topo_mod_dprintf(mp, "di_physlotinfo_get: node=%p: "
+		    "found %s property\n", src, DI_SLOTPROP);
 	} else {
 		/*
 		 * Make generic description string "SLOT <num>", allow up to
@@ -161,15 +164,21 @@ di_physlotinfo_get(topo_mod_t *mp, di_node_t src, int *slotnum, char **slotnm)
 		 */
 		slotbuf = alloca(16);
 		(void) snprintf(slotbuf, 16, "SLOT %d", *slotnum);
+		topo_mod_dprintf(mp, "di_physlotinfo_get: node=%p: "
+		    "using generic slot name\n", src);
 	}
-	if ((*slotnm = topo_mod_strdup(mp, slotbuf)) == NULL)
+	if ((*slotname = topo_mod_strdup(mp, slotbuf)) == NULL)
 		return (-1);
+
+	topo_mod_dprintf(mp, "di_physlotinfo_get: node=%p: slotname=%s\n",
+	    src, *slotname);
 
 	return (0);
 }
 
 static int
-di_slotinfo_get(topo_mod_t *mp, di_node_t src, int *nslots, slotnm_t **slots)
+di_slotinfo_get(topo_mod_t *mp, di_node_t src, int *nslots,
+    slotnm_t **slotnames)
 {
 	slotnm_t *lastslot = NULL;
 	slotnm_t *newslot;
@@ -179,7 +188,7 @@ di_slotinfo_get(topo_mod_t *mp, di_node_t src, int *nslots, slotnm_t **slots)
 	int andbit;
 	int sz = -1;
 
-	*slots = NULL;
+	*slotnames = NULL;
 	*nslots = 0;
 	if (di_bytes_get(mp, src, DI_SLOTPROP, &sz, &slotbuf) < 0)
 		return (0);
@@ -195,13 +204,13 @@ di_slotinfo_get(topo_mod_t *mp, di_node_t src, int *nslots, slotnm_t **slots)
 			char *s = slotname;
 			slotname += strlen(s) + 1;
 			if ((newslot = slotnm_create(mp, andbit, s)) == NULL) {
-				slotnm_destroy(*slots);
-				*slots = NULL;
+				slotnm_destroy(*slotnames);
+				*slotnames = NULL;
 				*nslots = 0;
 				return (-1);
 			}
 			if (lastslot == NULL)
-				*slots = lastslot = newslot;
+				*slotnames = lastslot = newslot;
 			else {
 				lastslot->snm_next = newslot;
 				lastslot = newslot;
@@ -213,10 +222,17 @@ di_slotinfo_get(topo_mod_t *mp, di_node_t src, int *nslots, slotnm_t **slots)
 }
 
 int
-did_physslot(did_t *did)
+did_physlot(did_t *did)
 {
 	assert(did != NULL);
 	return (did->dp_physlot);
+}
+
+int
+did_physlot_exists(did_t *did)
+{
+	assert(did != NULL);
+	return ((did->dp_physlot >= 0) || (did->dp_nslots > 0));
 }
 
 did_t *
@@ -278,7 +294,7 @@ did_create(topo_mod_t *mp, di_node_t src,
 	 * There *may* be a physical slot number property we can capture.
 	 */
 	if (di_physlotinfo_get(mp,
-	    src, &np->dp_physlot, &np->dp_physlot_label) < 0) {
+	    src, &np->dp_physlot, &np->dp_physlot_name) < 0) {
 		if (np->dp_devtype != NULL)
 			topo_mod_strfree(mp, np->dp_devtype);
 		topo_mod_free(mp, np, sizeof (did_t));
@@ -290,8 +306,8 @@ did_create(topo_mod_t *mp, di_node_t src,
 	if (di_slotinfo_get(mp, src, &np->dp_nslots, &np->dp_slotnames) < 0) {
 		if (np->dp_devtype != NULL)
 			topo_mod_strfree(mp, np->dp_devtype);
-		if (np->dp_physlot_label != NULL)
-			topo_mod_strfree(mp, np->dp_physlot_label);
+		if (np->dp_physlot_name != NULL)
+			topo_mod_strfree(mp, np->dp_physlot_name);
 		topo_mod_free(mp, np, sizeof (did_t));
 		return (NULL);
 	}
@@ -357,8 +373,10 @@ did_destroy(did_t *dp)
 
 	if (dp->dp_devtype != NULL)
 		topo_mod_strfree(dp->dp_mod, dp->dp_devtype);
-	if (dp->dp_physlot_label != NULL)
-		topo_mod_strfree(dp->dp_mod, dp->dp_physlot_label);
+	if (dp->dp_physlot_name != NULL)
+		topo_mod_strfree(dp->dp_mod, dp->dp_physlot_name);
+	if (dp->dp_slot_label != NULL)
+		topo_mod_strfree(dp->dp_mod, dp->dp_slot_label);
 	slotnm_destroy(dp->dp_slotnames);
 	topo_mod_free(dp->dp_mod, dp, sizeof (did_t));
 }
@@ -461,19 +479,33 @@ did_bdf(did_t *dp)
 }
 
 const char *
-did_label(did_t *dp, int dev)
+did_physlot_name(did_t *dp, int dev)
 {
 	slotnm_t *slot;
 
 	assert(dp != NULL);
-	if (dp->dp_physlot_label != NULL)
-		return (dp->dp_physlot_label);
+	if (dp->dp_physlot_name != NULL)
+		return (dp->dp_physlot_name);
 	for (slot = dp->dp_slotnames; slot != NULL; slot = slot->snm_next)
 		if (slot->snm_dev == dev)
 			break;
 	if (slot != NULL)
-		return (slot->snm_label);
+		return (slot->snm_name);
 	return (NULL);
+}
+
+char *
+did_slot_label_get(did_t *did)
+{
+	assert(did != NULL);
+	return (did->dp_slot_label);
+}
+
+void
+did_slot_label_set(did_t *did, char *l)
+{
+	assert(did != NULL);
+	did->dp_slot_label = l;
 }
 
 did_t *
@@ -553,12 +585,12 @@ did_inherit(did_t *pdp, did_t *dp)
 	if (dp == pdp)
 		return (0);
 
-	if (pdp->dp_physlot_label != NULL) {
+	if (pdp->dp_physlot_name != NULL) {
 		topo_mod_dprintf(dp->dp_mod,
 		    "%p inherits physlot label from %p.\n", dp, pdp);
-		dp->dp_physlot_label =
-		    topo_mod_strdup(dp->dp_mod, pdp->dp_physlot_label);
-		if (dp->dp_physlot_label == NULL)
+		dp->dp_physlot_name =
+		    topo_mod_strdup(dp->dp_mod, pdp->dp_physlot_name);
+		if (dp->dp_physlot_name == NULL)
 			return (-1);
 	}
 	if (slotnm_cp(pdp, dp, &dp->dp_nslots) < 0)

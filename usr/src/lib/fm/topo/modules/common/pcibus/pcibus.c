@@ -492,7 +492,7 @@ declare_dev_and_fn(topo_mod_t *mod, tnode_t *bus, tnode_t **dev, di_node_t din,
 			 * Is this an adapter card? Check the bus's physlot
 			 */
 			dp = did_find(mod, topo_node_getspecific(bus));
-			if (did_physslot(dp) >= 0) {
+			if (did_physlot(dp) >= 0) {
 				topo_mod_dprintf(mod, "Found Neptune slot\n");
 				(void) topo_mod_enummap(mod, fn,
 				    "xfp", FM_FMRI_SCHEME_HC);

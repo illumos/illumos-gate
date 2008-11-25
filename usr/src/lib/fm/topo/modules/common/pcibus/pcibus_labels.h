@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _PCIBUS_LABELS_H
 #define	_PCIBUS_LABELS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <hostbridge.h>
 #include <did.h>
@@ -104,8 +102,7 @@ typedef struct missing_names {
 
 extern int pci_label_cmn(topo_mod_t *mod, tnode_t *, nvlist_t *, nvlist_t **);
 extern int pci_fru_cmn(topo_mod_t *mod, tnode_t *, nvlist_t *, nvlist_t **);
-extern const char *
-pci_slotname_lookup(topo_mod_t *, tnode_t *, did_t *, did_t *);
+extern char *pci_slot_label_lookup(topo_mod_t *, tnode_t *, did_t *, did_t *);
 
 #ifdef __cplusplus
 }

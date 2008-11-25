@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fm/topo_mod.h>
 #include <sys/fm/protocol.h>
 #include <string.h>
@@ -105,7 +103,7 @@ platform_pci_fru(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
 	did_t *dp, *pdp;
 	tnode_t *pnode;
 	char *nm, *plat, *pp, **cp;
-	const char *label;
+	char *label;
 	int found_t1plat = 0;
 	uchar_t *loc;
 	int locsiz;
@@ -160,7 +158,7 @@ platform_pci_fru(topo_mod_t *mod, tnode_t *node, nvlist_t *in,
 		/*
 		 * Is there a slotname associated with the device?
 		 */
-		if ((label = pci_slotname_lookup(mod, pnode, dp, pdp))
+		if ((label = pci_slot_label_lookup(mod, pnode, dp, pdp))
 		    != NULL) {
 			nvlist_t *rnvl;
 			char buf[PATH_MAX];

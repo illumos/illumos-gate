@@ -47,8 +47,8 @@ extern "C" {
 typedef struct slotnm {
 	topo_mod_t *snm_mod;	/* module that allocated the slot name */
 	struct slotnm *snm_next;
-	int snm_dev;	 /* device on the bus that implements the slot */
-	char *snm_label; /* label describing the slot */
+	int snm_dev;	/* device on the bus that implements the slot */
+	char *snm_name;	/* name describing the slot */
 } slotnm_t;
 
 typedef struct did_hash did_hash_t;
@@ -61,16 +61,16 @@ typedef struct did_hash did_hash_t;
  * have to be re-computed.
  */
 struct did {
-	struct did *dp_next; /* for chaining in a hash bucket */
-	struct did *dp_link; /* for chaining to related did_t */
-	struct did *dp_chain; /* for chaining to another chain of did_ts */
-	did_hash_t *dp_hash; /* the hash table where we reside */
-	topo_mod_t *dp_mod; /* module that allocated the did private data */
-	di_node_t dp_src; /* di_node_t from which the info was derived */
-	int dp_refcnt;	/* multiple nodes allowed to point at a did_t */
+	struct did *dp_next;	/* for chaining in a hash bucket */
+	struct did *dp_link;	/* for chaining to related did_t */
+	struct did *dp_chain;	/* for chaining to another chain of did_ts */
+	did_hash_t *dp_hash;	/* the hash table where we reside */
+	topo_mod_t *dp_mod;	/* module that allocated the private data */
+	di_node_t dp_src;	/* di_node_t from which the info was derived */
+	int dp_refcnt;		/* multiple nodes may point at a did_t */
 	uint_t dp_excap;	/* PCI-Express port/device type */
 	int dp_physlot;		/* PCI-Express physical slot # */
-	char *dp_physlot_label; /* PCI-Express slot implemented */
+	char *dp_physlot_name;	/* PCI-Express physical slot name */
 	int dp_class;		/* PCI class */
 	int dp_subclass;	/* PCI subclass */
 	char *dp_devtype;	/* PCI 1275 spec device-type */
@@ -81,14 +81,10 @@ struct did {
 	int dp_dev;		/* PCI device number on the above bus */
 	int dp_fn;		/* PCI function number of the above device */
 	int dp_bdf;		/* PCI "real" bdf */
-	/*
-	 * There may be some slot name info on devinfo node for a bus or
-	 * hostbridge.  We'll copy or reference it for child nodes of that
-	 * bus or hostbridge.
-	 */
-	int dp_nslots;		/* number of slots actually described */
-	slotnm_t *dp_slotnames; /* the slot names as labels */
-	tnode_t *dp_tnode;  /* the parent tnode */
+	int dp_nslots;		/* PCI number of slots described */
+	slotnm_t *dp_slotnames; /* PCI slot names list */
+	tnode_t *dp_tnode; 	/* the parent tnode */
+	char *dp_slot_label;	/* the slot label */
 };
 
 struct did_hash {
