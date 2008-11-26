@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -22,13 +22,12 @@
 #ifndef	_RT2560_VAR_H
 #define	_RT2560_VAR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #define	RAL_FLAG_RUNNING	(1<<0)
+#define	RAL_FLAG_SUSPENDING	(1<<1)
 
 #define	RAL_RCR_PROMISC		(1<<0)
 #define	RAL_RCR_MULTI		(2<<0)
@@ -55,7 +54,8 @@ extern "C" {
 #define	RAL_DBG_STATE		0x001000
 #define	RAL_DBG_RXPACKET	0x002000
 #define	RAL_DBG_TXPACKET	0x004000
-#define	RAL_DBG_ALL		0x007fff
+#define	RAL_DBG_SUSPEND		0x008000
+#define	RAL_DBG_ALL		0x00ffff
 
 #ifdef DEBUG
 #define	RAL_DEBUG \
@@ -206,7 +206,9 @@ struct rt2560_softc {
 				    enum ieee80211_state, int);
 };
 
-#define	RAL_IS_RUNNING(_sc)	((_sc)->sc_flags & RAL_FLAG_RUNNING)
+#define	RAL_IS_RUNNING(_sc)	(((_sc)->sc_flags & RAL_FLAG_RUNNING) && \
+	!((_sc)->sc_flags & RAL_FLAG_SUSPENDING))
+#define	RAL_IS_INITED(_sc)	((_sc)->sc_flags & RAL_FLAG_RUNNING)
 #define	RAL_LOCK(sc)		mutex_enter(&(sc)->sc_genlock)
 #define	RAL_UNLOCK(sc)		mutex_exit(&(sc)->sc_genlock)
 

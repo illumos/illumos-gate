@@ -9,8 +9,6 @@
  * See README for more details.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -493,33 +491,19 @@ void
 wpa_event_handler(void *cookie, wpa_event_type event)
 {
 	struct wpa_supplicant *wpa_s = cookie;
-	uint8_t bssid[IEEE80211_ADDR_LEN];
 
 	switch (event) {
 	case EVENT_ASSOC:
-		wpa_s->wpa_state = WPA_ASSOCIATED;
-		wpa_printf(MSG_DEBUG, "\nAssociation event - clear replay "
-		    "counter\n");
-		(void) memset(wpa_s->rx_replay_counter, 0,
-		    WPA_REPLAY_COUNTER_LEN);
-		wpa_s->rx_replay_counter_set = 0;
-		wpa_s->renew_snonce = 1;
-		if (wpa_s->driver->get_bssid(wpa_s->linkid,
-		    (char *)bssid) >= 0 &&
-		    memcmp(bssid, wpa_s->bssid, IEEE80211_ADDR_LEN) != 0) {
-			wpa_printf(MSG_DEBUG, "Associated to a new BSS: "
-			    "BSSID=" MACSTR, MAC2STR(bssid));
-			(void) memcpy(wpa_s->bssid, bssid, IEEE80211_ADDR_LEN);
-			if (wpa_s->key_mgmt != WPA_KEY_MGMT_NONE)
-				wpa_clear_keys(wpa_s, bssid);
-		}
-
-		wpa_s->eapol_received = 0;
-		if (wpa_s->key_mgmt == WPA_KEY_MGMT_NONE) {
-			wpa_supplicant_cancel_auth_timeout(wpa_s);
-		} else {
-			/* Timeout for receiving the first EAPOL packet */
-			wpa_supplicant_req_auth_timeout(wpa_s, 10, 0);
+		wpa_printf(MSG_DEBUG, "\nAssociation event\n");
+		/* async event */
+		if (wpa_s->wpa_state < WPA_ASSOCIATED) {
+			wpa_s->wpa_state = WPA_ASSOCIATED;
+			if (wpa_s->key_mgmt == WPA_KEY_MGMT_NONE) {
+				wpa_supplicant_cancel_auth_timeout(wpa_s);
+			} else {
+				/* Timeout for receiving first EAPOL packet */
+				wpa_supplicant_req_auth_timeout(wpa_s, 10, 0);
+			}
 		}
 		break;
 	case EVENT_DISASSOC:
@@ -532,6 +516,12 @@ wpa_event_handler(void *cookie, wpa_event_type event)
 		break;
 	case EVENT_SCAN_RESULTS:
 		wpa_supplicant_scan_results(wpa_s);
+		/* reset vars */
+		(void) memset(wpa_s->rx_replay_counter, 0,
+		    WPA_REPLAY_COUNTER_LEN);
+		wpa_s->rx_replay_counter_set = 0;
+		wpa_s->renew_snonce = 1;
+		wpa_s->eapol_received = 0;
 		break;
 	default:
 		wpa_printf(MSG_INFO, "Unknown event %d", event);

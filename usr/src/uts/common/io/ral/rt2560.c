@@ -164,7 +164,7 @@ DDI_DEFINE_STREAM_OPS(ral_dev_ops, nulldev, nulldev, rt2560_attach,
 
 static struct modldrv ral_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
-	"Ralink RT2500 driver v1.5",	/* short description */
+	"Ralink RT2500 driver v1.6",	/* short description */
 	&ral_dev_ops		/* driver specific ops */
 };
 
@@ -1463,6 +1463,11 @@ rt2560_mgmt_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 
 	mutex_enter(&sc->prioq.tx_lock);
 
+	if (!RAL_IS_RUNNING(sc)) {
+		err = ENXIO;
+		goto fail1;
+	}
+
 	if (sc->prioq.queued >= RT2560_PRIO_RING_COUNT) {
 		err = ENOMEM;
 		sc->sc_tx_nobuf++;
@@ -1726,13 +1731,17 @@ rt2560_m_tx(void *arg, mblk_t *mp)
 	struct ieee80211com *ic = &sc->sc_ic;
 	mblk_t *next;
 
+	if (!RAL_IS_RUNNING(sc)) {
+		freemsgchain(mp);
+		return (NULL);
+	}
 	/*
 	 * No data frames go out unless we're associated; this
 	 * should not happen as the 802.11 layer does not enable
 	 * the xmit queue until we enter the RUN state.
 	 */
 	if (ic->ic_state != IEEE80211_S_RUN) {
-		RAL_DEBUG(RAL_DBG_TX, "ral: rt2560_tx_data(): "
+		RAL_DEBUG(RAL_DBG_TX, "ral: rt2560_m_tx(): "
 		    "discard, state %u\n", ic->ic_state);
 		freemsgchain(mp);
 		return (NULL);
@@ -2263,6 +2272,15 @@ rt2560_intr(caddr_t arg)
 
 	RAL_LOCK(sc);
 
+	if (!RAL_IS_RUNNING(sc)) {
+		/*
+		 * The hardware is not ready/present, don't touch anything.
+		 * Note this can happen early on if the IRQ is shared.
+		 */
+		RAL_UNLOCK(sc);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	r = RAL_READ(sc, RT2560_CSR7);
 	RAL_WRITE(sc, RT2560_CSR7, r);
 
@@ -2357,8 +2375,20 @@ rt2560_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	RAL_DEBUG(RAL_DBG_GLD, "enter rt2560_attach()\n");
 
-	if (cmd != DDI_ATTACH)
+	switch (cmd) {
+	case DDI_ATTACH:
+		break;
+	case DDI_RESUME:
+		sc = ddi_get_soft_state(ral_soft_state_p,
+		    ddi_get_instance(devinfo));
+		sc->sc_flags &= ~RAL_FLAG_SUSPENDING;
+		if (RAL_IS_INITED(sc))
+			(void) rt2560_init(sc);
+		RAL_DEBUG(RAL_DBG_SUSPEND, "ral resume ...\n");
+		return (DDI_SUCCESS);
+	default:
 		return (DDI_FAILURE);
+	}
 
 	instance = ddi_get_instance(devinfo);
 
@@ -2636,8 +2666,18 @@ rt2560_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	RAL_DEBUG(RAL_DBG_GLD, "enter rt2560_detach()\n");
 	sc = ddi_get_soft_state(ral_soft_state_p, ddi_get_instance(devinfo));
 
-	if (cmd != DDI_DETACH)
+	switch (cmd) {
+	case DDI_DETACH:
+		break;
+	case DDI_SUSPEND:
+		if (RAL_IS_INITED(sc))
+			(void) rt2560_stop(sc);
+		sc->sc_flags |= RAL_FLAG_SUSPENDING;
+		RAL_DEBUG(RAL_DBG_SUSPEND, "ral suspend ...\n");
+		return (DDI_SUCCESS);
+	default:
 		return (DDI_FAILURE);
+	}
 
 	if (mac_disable(sc->sc_ic.ic_mach) != 0)
 		return (DDI_FAILURE);
