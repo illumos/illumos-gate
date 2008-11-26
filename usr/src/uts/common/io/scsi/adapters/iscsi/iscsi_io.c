@@ -2657,7 +2657,7 @@ iscsi_handle_text(iscsi_conn_t *icp, char *buf, uint32_t buf_len,
 
 	icmdp->cmd_type		= ISCSI_CMD_TYPE_TEXT;
 	icmdp->cmd_result	= ISCSI_STATUS_SUCCESS;
-	icmdp->cmd_free		= B_FALSE;
+	icmdp->cmd_misc_flags	&= ~ISCSI_CMD_MISCFLAG_FREE;
 	icmdp->cmd_completed	= B_FALSE;
 
 	icmdp->cmd_un.text.buf		= buf;
@@ -2709,7 +2709,7 @@ long_text_response:
 		 * text request.  This follows the behaviour specified
 		 * in RFC3720 regarding long text responses.
 		 */
-		icmdp->cmd_free			= B_FALSE;
+		icmdp->cmd_misc_flags		&= ~ISCSI_CMD_MISCFLAG_FREE;
 		icmdp->cmd_completed		= B_FALSE;
 		icmdp->cmd_un.text.data_len	= 0;
 		icmdp->cmd_un.text.stage	= ISCSI_CMD_TEXT_CONTINUATION;
@@ -3078,8 +3078,13 @@ iscsi_timeout_checks(iscsi_sess_t *isp)
 		 * when they are successfully moved to the active queue by
 		 * iscsi_cmd_state_pending() code.
 		 */
-		if ((icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI) ||
-		    (icmdp->cmd_type == ISCSI_CMD_TYPE_TEXT))
+		/*
+		 * If the cmd is stuck, at least give it a chance
+		 * to timeout
+		 */
+		if (((icmdp->cmd_type == ISCSI_CMD_TYPE_SCSI) ||
+		    (icmdp->cmd_type == ISCSI_CMD_TYPE_TEXT)) &&
+		    !(icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_STUCK))
 			continue;
 
 		/* Skip if timeout still in the future */

@@ -816,8 +816,7 @@ iscsi_tran_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 		icmdp->cmd_un.scsi.cmdlen	= cmdlen;
 		icmdp->cmd_un.scsi.statuslen	= statuslen;
 		icmdp->cmd_crc_error_seen	= B_FALSE;
-		icmdp->cmd_internal		= B_FALSE;
-		icmdp->cmd_free			= B_FALSE;
+		icmdp->cmd_misc_flags		= 0;
 		mutex_init(&icmdp->cmd_mutex, NULL, MUTEX_DRIVER, NULL);
 		cv_init(&icmdp->cmd_completion, NULL, CV_DRIVER, NULL);
 

@@ -213,8 +213,9 @@ iscsi_cmd_state_machine(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 	}
 
 	if (release_lock == B_TRUE) {
-		if ((icmdp->cmd_free == B_FALSE) ||
-		    (icmdp->cmd_internal == B_FALSE)) {
+		if (!(icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_FREE) ||
+		    !(icmdp->cmd_misc_flags &
+		    ISCSI_CMD_MISCFLAG_INTERNAL)) {
 			mutex_exit(&icmdp->cmd_mutex);
 			return;
 		}
@@ -237,7 +238,7 @@ iscsi_cmd_alloc(iscsi_conn_t *icp, int km_flags)
 		icmdp->cmd_sig		= ISCSI_SIG_CMD;
 		icmdp->cmd_state	= ISCSI_CMD_STATE_FREE;
 		icmdp->cmd_conn		= icp;
-		icmdp->cmd_internal	= B_TRUE;
+		icmdp->cmd_misc_flags	|= ISCSI_CMD_MISCFLAG_INTERNAL;
 		mutex_init(&icmdp->cmd_mutex, NULL, MUTEX_DRIVER, NULL);
 		cv_init(&icmdp->cmd_completion, NULL, CV_DRIVER, NULL);
 	}
@@ -256,7 +257,7 @@ iscsi_cmd_free(iscsi_cmd_t *icmdp)
 	ASSERT(icmdp->cmd_state == ISCSI_CMD_STATE_FREE);
 	ASSERT(icmdp->cmd_next == NULL);
 	ASSERT(icmdp->cmd_prev == NULL);
-	ASSERT(icmdp->cmd_internal);
+	ASSERT(icmdp->cmd_misc_flags & ISCSI_CMD_MISCFLAG_INTERNAL);
 
 	if (icmdp->cmd_type == ISCSI_CMD_TYPE_R2T)
 		ASSERT(icmdp->cmd_un.r2t.icmdp == NULL);
@@ -369,6 +370,8 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				mutex_exit(&isp->sess_cmdsn_mutex);
 				mutex_exit(&isp->sess_queue_pending.mutex);
 				isp->sess_window_open = B_FALSE;
+				icmdp->cmd_misc_flags |=
+				    ISCSI_CMD_MISCFLAG_STUCK;
 				return;
 			}
 
@@ -379,6 +382,8 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				mutex_exit(&isp->sess_cmdsn_mutex);
 				mutex_exit(&isp->sess_queue_pending.mutex);
 				isp->sess_window_open = B_FALSE;
+				icmdp->cmd_misc_flags |=
+				    ISCSI_CMD_MISCFLAG_STUCK;
 				return;
 			}
 			mutex_exit(&isp->sess_cmdsn_mutex);
@@ -409,7 +414,8 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				icmdp->cmd_un.abort.icmdp = NULL;
 
 				icmdp->cmd_state = ISCSI_CMD_STATE_FREE;
-				icmdp->cmd_free = B_TRUE;
+				icmdp->cmd_misc_flags |=
+				    ISCSI_CMD_MISCFLAG_FREE;
 				return;
 			}
 			/* FALLTHRU */
@@ -463,6 +469,8 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 				isp->sess_window_open = B_FALSE;
 				mutex_exit(&isp->sess_cmdsn_mutex);
 				mutex_exit(&isp->sess_queue_pending.mutex);
+				icmdp->cmd_misc_flags |=
+				    ISCSI_CMD_MISCFLAG_STUCK;
 				return;
 			}
 			if (icmdp->cmd_un.text.stage ==
@@ -475,6 +483,8 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 					mutex_exit(&isp->sess_queue_pending.
 					    mutex);
 					isp->sess_window_open = B_FALSE;
+					icmdp->cmd_misc_flags |=
+					    ISCSI_CMD_MISCFLAG_STUCK;
 					return;
 				}
 			}
@@ -542,7 +552,7 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 		/* free temporary commands */
 		if (free_icmdp == B_TRUE) {
 			icmdp->cmd_state = ISCSI_CMD_STATE_FREE;
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |= ISCSI_CMD_MISCFLAG_FREE;
 		}
 		break;
 
@@ -597,7 +607,8 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			 * also.  Just free the memory.
 			 */
 			icmdp->cmd_state = ISCSI_CMD_STATE_FREE;
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |=
+			    ISCSI_CMD_MISCFLAG_FREE;
 			break;
 
 		case ISCSI_CMD_TYPE_NOP:
@@ -607,7 +618,9 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			 * NOP request will be spawned to replace
 			 * this one.
 			 */
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |=
+			    ISCSI_CMD_MISCFLAG_FREE;
+
 			break;
 
 		case ISCSI_CMD_TYPE_ABORT:
@@ -620,7 +633,8 @@ iscsi_cmd_state_pending(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			icmdp->cmd_un.abort.icmdp = NULL;
 
 			icmdp->cmd_state = ISCSI_CMD_STATE_FREE;
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |=
+			    ISCSI_CMD_MISCFLAG_FREE;
 			break;
 
 		case ISCSI_CMD_TYPE_RESET:
@@ -723,7 +737,9 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			mutex_exit(&isp->sess_cmdsn_mutex);
 
 			/* free alloc */
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |=
+			    ISCSI_CMD_MISCFLAG_FREE;
+
 			break;
 
 		case ISCSI_CMD_TYPE_ABORT:
@@ -757,7 +773,9 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			mutex_exit(&t_icmdp->cmd_mutex);
 			icmdp->cmd_un.abort.icmdp = NULL;
 
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |=
+			    ISCSI_CMD_MISCFLAG_FREE;
+
 			break;
 		case ISCSI_CMD_TYPE_RESET:
 			icmdp->cmd_state = ISCSI_CMD_STATE_FREE;
@@ -837,7 +855,9 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			iscsi_dequeue_active_cmd(icmdp->cmd_conn, icmdp);
 			mutex_exit(&isp->sess_cmdsn_mutex);
 
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |=
+			    ISCSI_CMD_MISCFLAG_FREE;
+
 			break;
 
 		case ISCSI_CMD_TYPE_ABORT:
@@ -882,7 +902,9 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			mutex_exit(&t_icmdp->cmd_mutex);
 			icmdp->cmd_un.abort.icmdp = NULL;
 
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |=
+			    ISCSI_CMD_MISCFLAG_FREE;
+
 			break;
 
 		case ISCSI_CMD_TYPE_RESET:
@@ -972,7 +994,8 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			iscsi_sess_release_itt(isp, icmdp);
 			mutex_exit(&isp->sess_cmdsn_mutex);
 
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |=
+			    ISCSI_CMD_MISCFLAG_FREE;
 			break;
 
 		case ISCSI_CMD_TYPE_ABORT:
@@ -994,7 +1017,8 @@ iscsi_cmd_state_active(iscsi_cmd_t *icmdp, iscsi_cmd_event_t event, void *arg)
 			 */
 			icmdp->cmd_un.abort.icmdp = NULL;
 
-			icmdp->cmd_free = B_TRUE;
+			icmdp->cmd_misc_flags |=
+			    ISCSI_CMD_MISCFLAG_FREE;
 			break;
 
 		case ISCSI_CMD_TYPE_RESET:

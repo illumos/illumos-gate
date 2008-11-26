@@ -327,6 +327,13 @@ typedef enum iscsi_cmd_text_stage {
 } iscsi_cmd_text_stage_t;
 
 /*
+ * iscsi cmd misc flags - bitwise applicable
+ */
+#define	ISCSI_CMD_MISCFLAG_INTERNAL	0x1
+#define	ISCSI_CMD_MISCFLAG_FREE		0x2
+#define	ISCSI_CMD_MISCFLAG_STUCK	0x4
+
+/*
  * iSCSI cmd/pkt Structure
  */
 typedef struct iscsi_cmd {
@@ -342,8 +349,7 @@ typedef struct iscsi_cmd {
 	clock_t			cmd_lbolt_active;
 	clock_t			cmd_lbolt_aborting;
 	clock_t			cmd_lbolt_timeout;
-	boolean_t		cmd_internal;
-	boolean_t		cmd_free;
+	uint8_t			cmd_misc_flags;
 
 	union {
 		/* ISCSI_CMD_TYPE_SCSI */
