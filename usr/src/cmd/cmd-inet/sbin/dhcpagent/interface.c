@@ -23,6 +23,8 @@
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <net/if.h>
@@ -832,24 +834,9 @@ canonize_lif(dhcp_lif_t *lif, boolean_t dhcponly)
 	}
 
 	/* Netmask is under in.ndpd control with IPv6 */
-	if (!isv6) {
-		/* Clear the netmask */
-		if (ioctl(fd, SIOCSLIFNETMASK, &lifr) == -1) {
-			dhcpmsg(MSG_ERR,
-			    "canonize_lif: can't clear netmask on %s",
-			    lif->lif_name);
-		}
-		/*
-		 * When the netmask is cleared, the kernel actually sets the
-		 * netmask to 255.0.0.0.  So, refetch that netmask.
-		 */
-		if (ioctl(fd, SIOCGLIFNETMASK, &lifr) == -1) {
-			dhcpmsg(MSG_ERR,
-			    "canonize_lif: can't reload cleared netmask on %s",
-			    lif->lif_name);
-		}
-		lif->lif_netmask =
-		    ((struct sockaddr_in *)&lifr.lifr_addr)->sin_addr.s_addr;
+	if (!isv6 && ioctl(fd, SIOCSLIFNETMASK, &lifr) == -1) {
+		dhcpmsg(MSG_ERR, "canonize_lif: can't clear netmask on %s",
+		    lif->lif_name);
 	}
 
 	if (lif->lif_flags & IFF_POINTOPOINT) {
