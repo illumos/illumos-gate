@@ -612,21 +612,34 @@ msr_warning(cpu_t *cp, const char *rw, uint_t msr, int error)
 }
 
 /*
- * Determine the number of nodes in an Opteron / Greyhound family system.
+ * Determine the number of nodes in a Hammer / Greyhound / Griffin family
+ * system.
  */
 static uint_t
 opteron_get_nnodes(void)
 {
 	static uint_t nnodes = 0;
 
+	if (nnodes == 0) {
 #ifdef	DEBUG
-	uint_t family;
+		uint_t family;
 
-	family = cpuid_getfamily(CPU);
-	ASSERT(family == 0xf || family == 0x10);
+		/*
+		 * This routine uses a PCI config space based mechanism
+		 * for retrieving the number of nodes in the system.
+		 * Device 24, function 0, offset 0x60 as used here is not
+		 * AMD processor architectural, and may not work on processor
+		 * families other than those listed below.
+		 *
+		 * Callers of this routine must ensure that we're running on
+		 * a processor which supports this mechanism.
+		 * The assertion below is meant to catch calls on unsupported
+		 * processors.
+		 */
+		family = cpuid_getfamily(CPU);
+		ASSERT(family == 0xf || family == 0x10 || family == 0x11);
 #endif	/* DEBUG */
 
-	if (nnodes == 0) {
 		/*
 		 * Obtain the number of nodes in the system from
 		 * bits [6:4] of the Node ID register on node 0.
