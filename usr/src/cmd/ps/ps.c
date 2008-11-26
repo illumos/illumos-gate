@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ps -- print things about processes.
@@ -401,7 +399,7 @@ main(int argc, char **argv)
 				parg = getarg(&p1);
 				/* Convert string to integer */
 				ret = str2id(parg, (pid_t *)&id, 0,
-					MAX_LGRP_ID);
+				    MAX_LGRP_ID);
 				/* Complain if ID didn't parse correctly */
 				if (ret != 0) {
 					pgerrflg++;
@@ -988,7 +986,7 @@ retry:
 			prcom(&info, tp);
 			/* LINTED improper alignment */
 			lwpsinfo = (lwpsinfo_t *)((char *)lwpsinfo +
-				lpsinfobuf->pr_entsize);
+			    lpsinfobuf->pr_entsize);
 		} while (++nlwp < lpsinfobuf->pr_nent);
 	}
 	return (0);
@@ -1102,8 +1100,8 @@ parse_format(char *arg)
 		}
 	if (df >= &fname[NFIELDS]) {
 		(void) fprintf(stderr,
-			gettext("ps: unknown output format: -o %s\n"),
-			name);
+		    gettext("ps: unknown output format: -o %s\n"),
+		    name);
 		errflg++;
 		return (arg);
 	}
@@ -1378,21 +1376,21 @@ prcom(psinfo_t *psinfo, char *ttyp)
 				(void) printf("     0");
 			else if (psinfo->pr_rssize)
 				(void) printf(" %5lu",
-					(ulong_t)psinfo->pr_rssize);
+				    (ulong_t)psinfo->pr_rssize);
 			else
 				(void) printf("     ?");
 			if (psinfo->pr_flag & SSYS)		/* SZ */
 				(void) printf("      0");
 			else if (psinfo->pr_size)
 				(void) printf(" %6lu",
-					(ulong_t)psinfo->pr_size);
+				    (ulong_t)psinfo->pr_size);
 			else
 				(void) printf("      ?");
 		} else {
 #ifndef _LP64
 			if (psinfo->pr_addr)			/* ADDR */
 				(void) printf(" %8lx",
-					(ulong_t)psinfo->pr_addr);
+				    (ulong_t)psinfo->pr_addr);
 			else
 #endif
 				(void) printf("        ?");
@@ -1409,7 +1407,7 @@ prcom(psinfo_t *psinfo, char *ttyp)
 #ifndef _LP64
 		else if (psinfo->pr_lwp.pr_wchan)
 			(void) printf(" %8lx",
-				(ulong_t)psinfo->pr_lwp.pr_wchan);
+			    (ulong_t)psinfo->pr_lwp.pr_wchan);
 #endif
 		else
 			(void) printf("        ?");
@@ -1648,7 +1646,7 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 		break;
 	case F_OSZ:
 		(void) printf("%*lu", width,
-			(ulong_t)psinfo->pr_size / kbytes_per_page);
+		    (ulong_t)psinfo->pr_size / kbytes_per_page);
 		break;
 	case F_VSZ:
 		(void) printf("%*lu", width, (ulong_t)psinfo->pr_size);
@@ -1664,14 +1662,14 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 			(void) printf("%*d", width, psinfo->pr_lwp.pr_nice);
 		else
 			(void) printf("%*.*s", width, width,
-				psinfo->pr_lwp.pr_clname);
+			    psinfo->pr_lwp.pr_clname);
 		break;
 	case F_CLASS:
 		if (zombie_lwp)
 			(void) printf("%*s", width, "-");
 		else
 			(void) printf("%*.*s", width, width,
-				psinfo->pr_lwp.pr_clname);
+			    psinfo->pr_lwp.pr_clname);
 		break;
 	case F_STIME:
 		if (Lflg)
@@ -1682,7 +1680,7 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 	case F_ETIME:
 		if (Lflg)
 			print_time(delta_secs(&psinfo->pr_lwp.pr_start),
-				width);
+			    width);
 		else
 			print_time(delta_secs(&psinfo->pr_start), width);
 		break;
@@ -1706,14 +1704,14 @@ print_field(psinfo_t *psinfo, struct field *f, const char *ttyp)
 			(void) printf("%*s", width, "-");
 		else if (Lflg)
 			(void) printf("%*lx", width,
-				(long)psinfo->pr_lwp.pr_addr);
+			    (long)psinfo->pr_lwp.pr_addr);
 		else
 			(void) printf("%*lx", width, (long)psinfo->pr_addr);
 		break;
 	case F_WCHAN:
 		if (!zombie_lwp && psinfo->pr_lwp.pr_wchan)
 			(void) printf("%*lx", width,
-				(long)psinfo->pr_lwp.pr_wchan);
+			    (long)psinfo->pr_lwp.pr_wchan);
 		else
 			(void) printf("%*.*s", width, width, "-");
 		break;
@@ -2110,7 +2108,7 @@ przom(psinfo_t *psinfo)
 		if ((pwd = getpwuid(psinfo->pr_euid)) != NULL)
 			(void) printf("%8.8s ", pwd->pw_name);
 		else
-			(void) printf("%7.7u ", psinfo->pr_euid);
+			(void) printf(" %7.7u ", psinfo->pr_euid);
 	} else if (lflg)
 		(void) printf("%6u ", psinfo->pr_euid);
 
