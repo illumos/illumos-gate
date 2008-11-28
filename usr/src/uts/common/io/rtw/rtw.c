@@ -155,6 +155,7 @@ static void *rtw_soft_state_p = NULL;
 
 static int rtw_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd);
 static int rtw_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd);
+static int	rtw_quiesce(dev_info_t *dip);
 static int	rtw_m_stat(void *,  uint_t, uint64_t *);
 static int	rtw_m_start(void *);
 static void	rtw_m_stop(void *);
@@ -163,8 +164,13 @@ static int	rtw_m_multicst(void *, boolean_t, const uint8_t *);
 static int	rtw_m_unicst(void *, const uint8_t *);
 static mblk_t	*rtw_m_tx(void *, mblk_t *);
 static void	rtw_m_ioctl(void *, queue_t *, mblk_t *);
+static int	rtw_m_setprop(void *, const char *, mac_prop_id_t,
+    uint_t, const void *);
+static int	rtw_m_getprop(void *, const char *, mac_prop_id_t,
+    uint_t, uint_t, void *, uint_t *);
+
 static mac_callbacks_t rtw_m_callbacks = {
-	MC_IOCTL,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP,
 	rtw_m_stat,
 	rtw_m_start,
 	rtw_m_stop,
@@ -173,11 +179,16 @@ static mac_callbacks_t rtw_m_callbacks = {
 	rtw_m_unicst,
 	rtw_m_tx,
 	NULL,
-	rtw_m_ioctl
+	rtw_m_ioctl,
+	NULL,		/* mc_getcapab */
+	NULL,
+	NULL,
+	rtw_m_setprop,
+	rtw_m_getprop
 };
 
 DDI_DEFINE_STREAM_OPS(rtw_dev_ops, nulldev, nulldev, rtw_attach, rtw_detach,
-    nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+    nodev, NULL, D_MP, NULL, rtw_quiesce);
 
 static struct modldrv rtw_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
@@ -203,6 +214,12 @@ uint32_t rtw_dbg_flags = 0;
 	 * RTW_DEBUG_RECV | RTW_DEBUG_XMIT | RTW_DEBUG_80211 | RTW_DEBUG_INTR |
 	 * RTW_DEBUG_PKTDUMP;
 	 */
+
+/*
+ * Supported rates for 802.11b modes (in 500Kbps unit).
+ */
+static const struct ieee80211_rateset rtw_rateset_11b =
+	{ 4, { 2, 4, 11, 22 } };
 
 int
 _info(struct modinfo *modinfop)
@@ -968,23 +985,13 @@ rtw_init_channels(enum rtw_locale locale,
 static void
 rtw_set80211props(struct ieee80211com *ic)
 {
-	uint8_t nrate;
-
-	/* ic->ic_curmode = IEEE80211_MODE_11B; */
 	ic->ic_phytype = IEEE80211_T_DS;
 	ic->ic_opmode = IEEE80211_M_STA;
 	ic->ic_caps = IEEE80211_C_PMGT | IEEE80211_C_IBSS |
-	    IEEE80211_C_HOSTAP | IEEE80211_C_MONITOR |
-	    IEEE80211_C_SHPREAMBLE; /* | IEEE80211_C_WEP */
+	    IEEE80211_C_SHPREAMBLE;
+	/* IEEE80211_C_HOSTAP | IEEE80211_C_MONITOR | IEEE80211_C_WEP */
 
-	nrate = 0;
-	ic->ic_sup_rates[IEEE80211_MODE_11B].ir_rates[nrate++] =
-	    IEEE80211_RATE_BASIC | 2;
-	ic->ic_sup_rates[IEEE80211_MODE_11B].ir_rates[nrate++] =
-	    IEEE80211_RATE_BASIC | 4;
-	ic->ic_sup_rates[IEEE80211_MODE_11B].ir_rates[nrate++] = 11;
-	ic->ic_sup_rates[IEEE80211_MODE_11B].ir_rates[nrate++] = 22;
-	ic->ic_sup_rates[IEEE80211_MODE_11B].ir_nrates = nrate;
+	ic->ic_sup_rates[IEEE80211_MODE_11B] = rtw_rateset_11b;
 }
 
 /*ARGSUSED*/
@@ -1066,9 +1073,6 @@ rtw_rxdesc_init(rtw_softc_t *rsc, struct rtw_rxbuf *rbf, int idx, int is_last)
 	    DDI_DMA_SYNC_FORDEV);
 }
 
-/* Check all queues' activity. */
-#define	RTW_TPPOLL_ACTIVE	RTW_TPPOLL_ALL
-
 static void
 rtw_idle(struct rtw_regs *regs)
 {
@@ -1079,7 +1083,7 @@ rtw_idle(struct rtw_regs *regs)
 	RTW_WRITE8(regs, RTW_TPPOLL, RTW_TPPOLL_SALL);
 
 	for (active = 0; active < 300 &&
-	    (RTW_READ8(regs, RTW_TPPOLL) & RTW_TPPOLL_ACTIVE) != 0; active++)
+	    (RTW_READ8(regs, RTW_TPPOLL) & RTW_TPPOLL_ALL) != 0; active++)
 		drv_usecwait(10);
 }
 
@@ -1093,7 +1097,7 @@ rtw_io_enable(rtw_softc_t *rsc, uint8_t flags, int enable)
 	    enable ? "enable" : "disable", flags);
 
 	cr = RTW_READ8(regs, RTW_CR);
-#if 1
+
 	/* The receive engine will always start at RDSAR.  */
 	if (enable && (flags & ~cr & RTW_CR_RE)) {
 		RTW_DMA_SYNC_DESC(rsc->sc_desc_dma,
@@ -1103,7 +1107,7 @@ rtw_io_enable(rtw_softc_t *rsc, uint8_t flags, int enable)
 		rsc->rx_next = 0;
 		rtw_rxdesc_init(rsc, rsc->rxbuf_h, 0, 0);
 	}
-#endif
+
 	if (enable)
 		cr |= flags;
 	else
@@ -2899,45 +2903,6 @@ rtw_intr(caddr_t arg)
 	return (DDI_INTR_CLAIMED);
 }
 
-#ifdef DMA_DEBUG
-static int
-is_dma_over(rtw_softc_t *rsc)
-{
-	int i, j;
-	uint32_t hstat;
-	struct rtw_rxbuf *bf;
-	struct rtw_rxdesc *ds;
-#define	DMA_WAIT	5
-	RTW_DMA_SYNC(rsc->sc_desc_dma, DDI_DMA_SYNC_FORCPU);
-	for (i = 0; i < RTW_NTXPRI; i++) {
-		j = 0;
-		while (rsc->sc_txq[i].tx_nfree != rtw_qlen[i]) {
-			drv_usecwait(100000);
-			RTW_DMA_SYNC(rsc->sc_desc_dma, DDI_DMA_SYNC_FORCPU);
-			j++;
-			if (j >= DMA_WAIT)
-				break;
-		}
-		if (j == DMA_WAIT)
-			return (1);
-	}
-	j = 0;
-	for (i = 0; i < RTW_RXQLEN; i++) {
-		bf = rsc->rxbuf_h + i;
-		ds = bf->rxdesc;
-		hstat = (ds->rd_stat);
-		while (((hstat & RTW_RXSTAT_OWN) == 0) && (j < DMA_WAIT)) {
-			drv_usecwait(100000);
-			RTW_DMA_SYNC(rsc->sc_desc_dma, DDI_DMA_SYNC_FORCPU);
-			j++;
-		}
-		if (j == DMA_WAIT)
-			return (1);
-	}
-	return (0);
-}
-#endif
-
 static void
 rtw_m_stop(void *arg)
 {
@@ -2957,6 +2922,76 @@ rtw_m_stop(void *arg)
 	delay(1);
 
 	rsc->sc_invalid = 1;
+}
+
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+int
+rtw_quiesce(dev_info_t *dip)
+{
+	rtw_softc_t  *rsc = NULL;
+	struct rtw_regs *regs;
+
+	rsc = ddi_get_soft_state(rtw_soft_state_p, ddi_get_instance(dip));
+	ASSERT(rsc != NULL);
+	regs = &rsc->sc_regs;
+
+	rtw_dbg_flags = 0;
+	rtw_disable_interrupts(regs);
+	rtw_io_enable(rsc, RTW_CR_RE | RTW_CR_TE, 0);
+	RTW_WRITE8(regs, RTW_TPPOLL, RTW_TPPOLL_SALL);
+
+	return (DDI_SUCCESS);
+}
+
+/*
+ * callback functions for /get/set properties
+ */
+static int
+rtw_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t wldp_length, const void *wldp_buf)
+{
+	rtw_softc_t *rsc = arg;
+	int err;
+
+	err = ieee80211_setprop(&rsc->sc_ic, pr_name, wldp_pr_num,
+	    wldp_length, wldp_buf);
+
+	mutex_enter(&rsc->sc_genlock);
+	if (err == ENETRESET) {
+		if (rsc->sc_invalid == 0) {
+			mutex_exit(&rsc->sc_genlock);
+			rtw_m_stop(rsc);
+			(void) rtw_m_start(rsc);
+			(void) ieee80211_new_state(&rsc->sc_ic,
+			    IEEE80211_S_SCAN, -1);
+			mutex_enter(&rsc->sc_genlock);
+		}
+		err = 0;
+	}
+	mutex_exit(&rsc->sc_genlock);
+	return (err);
+}
+
+static int
+rtw_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+{
+	rtw_softc_t *rsc = arg;
+	int err;
+
+	err = ieee80211_getprop(&rsc->sc_ic, pr_name, wldp_pr_num,
+	    pr_flags, wldp_length, wldp_buf, perm);
+
+	return (err);
 }
 
 
@@ -3065,8 +3100,8 @@ rtw_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	err = ieee80211_ioctl(&rsc->sc_ic, wq, mp);
 	if (err == ENETRESET) {
 		if (rsc->sc_invalid == 0) {
-			(void) ieee80211_new_state(&rsc->sc_ic,
-			    IEEE80211_S_INIT, -1);
+			rtw_m_stop(rsc);
+			(void) rtw_m_start(rsc);
 			(void) ieee80211_new_state(&rsc->sc_ic,
 			    IEEE80211_S_SCAN, -1);
 		}
