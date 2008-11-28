@@ -361,6 +361,8 @@ struct _hxge_t {
 
 	kmutex_t		pio_lock;
 	hxge_timeout		timeout;
+
+	int			msix_count;
 };
 
 /*
@@ -434,6 +436,7 @@ typedef struct _hxge_rdc_kstat {
 	kstat_named_t	rcrfull;
 	kstat_named_t	rbr_empty;
 	kstat_named_t	rbr_empty_fail;
+	kstat_named_t	rbr_empty_restore;
 	kstat_named_t	rbrfull;
 	kstat_named_t	rcr_invalids;	/* Account for invalid RCR entries. */
 

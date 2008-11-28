@@ -172,6 +172,9 @@ static int hxge_get_priv_prop(p_hxge_t hxgep, const char *pr_name,
     uint_t pr_flags, uint_t pr_valsize, void *pr_val);
 static void hxge_link_poll(void *arg);
 static void hxge_link_update(p_hxge_t hxge, link_state_t state);
+static void hxge_msix_init(p_hxge_t hxgep);
+void hxge_check_msix_parity_err(p_hxge_t hxgep);
+static uint8_t gen_32bit_parity(uint32_t data, boolean_t odd_parity);
 
 mac_priv_prop_t hxge_priv_props[] = {
 	{"_rxdma_intr_time", MAC_PROP_PERM_RW},
@@ -483,6 +486,9 @@ hxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto hxge_attach_fail3;
 	}
 
+	/* Scrub the MSI-X memory */
+	hxge_msix_init(hxgep);
+
 	status = hxge_init_common_dev(hxgep);
 	if (status != HXGE_OK) {
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
@@ -552,12 +558,6 @@ hxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Enable interrupts.
 	 */
 	hxge_intrs_enable(hxgep);
-
-	/*
-	 * Take off all peu parity error mask here after ddi_intr_enable
-	 * is called
-	 */
-	HXGE_REG_WR32(hxgep->hpi_handle, PEU_INTR_MASK, 0x0);
 
 	if ((status = hxge_mac_register(hxgep)) != HXGE_OK) {
 		HXGE_DEBUG_MSG((hxgep, DDI_CTL,
@@ -1254,14 +1254,18 @@ hxge_suspend(p_hxge_t hxgep)
 {
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "==> hxge_suspend"));
 
-	hxge_intrs_disable(hxgep);
-	hxge_destroy_dev(hxgep);
-
-	/* Stop the link status timer */
+	/*
+	 * Stop the link status timer before hxge_intrs_disable() to avoid
+	 * accessing the the MSIX table simultaneously. Note that the timer
+	 * routine polls for MSIX parity errors.
+	 */
 	MUTEX_ENTER(&hxgep->timeout.lock);
 	if (hxgep->timeout.id)
 		(void) untimeout(hxgep->timeout.id);
 	MUTEX_EXIT(&hxgep->timeout.lock);
+
+	hxge_intrs_disable(hxgep);
+	hxge_destroy_dev(hxgep);
 
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "<== hxge_suspend"));
 }
@@ -1284,7 +1288,10 @@ hxge_resume(p_hxge_t hxgep)
 
 	hxgep->suspended = 0;
 
-	/* Resume the link status timer */
+	/*
+	 * Resume the link status timer after hxge_intrs_enable to avoid
+	 * accessing MSIX table simultaneously.
+	 */
 	MUTEX_ENTER(&hxgep->timeout.lock);
 	hxgep->timeout.id = timeout(hxge_link_poll, (void *)hxgep,
 	    hxgep->timeout.ticks);
@@ -4426,6 +4433,10 @@ hxge_uninit_common_dev(p_hxge_t hxgep)
 	HXGE_DEBUG_MSG((hxgep, MOD_CTL, "<= hxge_uninit_common_dev"));
 }
 
+#define	HXGE_MSIX_ENTRIES		32
+#define	HXGE_MSIX_WAIT_COUNT		10
+#define	HXGE_MSIX_PARITY_CHECK_COUNT	30
+
 static void
 hxge_link_poll(void *arg)
 {
@@ -4470,4 +4481,192 @@ hxge_link_update(p_hxge_t hxgep, link_state_t state)
 		statsp->mac_stats.link_duplex = 0;
 		statsp->mac_stats.link_up = 0;
 	}
+}
+
+static void
+hxge_msix_init(p_hxge_t hxgep)
+{
+	indacc_mem1_ctrl_t	indacc_mem1_ctrl;
+	indacc_mem1_data0_t	data0;
+	indacc_mem1_data1_t	data1;
+	indacc_mem1_data2_t	data2;
+	indacc_mem1_prty_t	prty;
+	int			count;
+	int			i;
+
+	for (i = 0; i < HXGE_MSIX_ENTRIES; i++) {
+		indacc_mem1_ctrl.value = 0;
+		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
+		    &indacc_mem1_ctrl.value);
+
+		data0.value = 0xffffffff - i;
+		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_DATA0,
+		    data0.value);
+		data1.value = 0xffffffff - i - 1;
+		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_DATA1,
+		    data1.value);
+		data2.value = 0xffffffff - i - 2;
+		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_DATA2,
+		    data2.value);
+
+		indacc_mem1_ctrl.value = 0;
+		indacc_mem1_ctrl.bits.mem1_addr = i;
+		indacc_mem1_ctrl.bits.mem1_sel = 2;
+		indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
+		indacc_mem1_ctrl.bits.mem1_command = 0;
+		indacc_mem1_ctrl.bits.mem1_diagen = 1;
+		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
+		    indacc_mem1_ctrl.value);
+
+		/* check that operation completed */
+		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
+		    &indacc_mem1_ctrl.value);
+
+		count = 0;
+		while (indacc_mem1_ctrl.bits.mem1_access_status != 1 &&
+		    count++ < HXGE_MSIX_WAIT_COUNT) {
+			HXGE_DELAY(1);
+			indacc_mem1_ctrl.value = 0;
+			HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
+			    &indacc_mem1_ctrl.value);
+		}
+	}
+
+	for (i = 0; i < HXGE_MSIX_ENTRIES; i++) {
+		indacc_mem1_ctrl.value = 0;
+		indacc_mem1_ctrl.bits.mem1_addr = i;
+		indacc_mem1_ctrl.bits.mem1_sel = 2;
+		indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
+		indacc_mem1_ctrl.bits.mem1_command = 1;
+		indacc_mem1_ctrl.bits.mem1_diagen = 1;
+
+		/* issue read command */
+		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
+		    indacc_mem1_ctrl.value);
+
+		/* wait for read operation to complete */
+		count = 0;
+		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
+		    &indacc_mem1_ctrl.value);
+		while (indacc_mem1_ctrl.bits.mem1_access_status != 1 &&
+		    count++ < HXGE_MSIX_WAIT_COUNT) {
+			HXGE_DELAY(1);
+			HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
+			    &indacc_mem1_ctrl.value);
+		}
+
+
+
+		data0.value = data1.value = data2.value = prty.value = 0;
+		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_DATA0,
+		    &data0.value);
+		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_DATA1,
+		    &data1.value);
+		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_DATA2,
+		    &data2.value);
+		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_PRTY,
+		    &prty.value);
+	}
+
+	/* Turn off diagnostic mode */
+	indacc_mem1_ctrl.value = 0;
+	indacc_mem1_ctrl.bits.mem1_addr = 0;
+	indacc_mem1_ctrl.bits.mem1_sel = 0;
+	indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
+	indacc_mem1_ctrl.bits.mem1_command = 0;
+	indacc_mem1_ctrl.bits.mem1_diagen = 0;
+	HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
+	    indacc_mem1_ctrl.value);
+}
+
+void
+hxge_check_msix_parity_err(p_hxge_t hxgep)
+{
+	indacc_mem1_ctrl_t	indacc_mem1_ctrl;
+	indacc_mem1_data0_t	data0;
+	indacc_mem1_data1_t	data1;
+	indacc_mem1_data2_t	data2;
+	indacc_mem1_prty_t	prty;
+	uint32_t		parity = 0;
+	int			count;
+	int			i;
+
+	hpi_handle_t		handle;
+	p_hxge_peu_sys_stats_t	statsp;
+
+	handle = hxgep->hpi_handle;
+	statsp = (p_hxge_peu_sys_stats_t)&hxgep->statsp->peu_sys_stats;
+
+	for (i = 0; i < HXGE_MSIX_ENTRIES; i++) {
+		indacc_mem1_ctrl.value = 0;
+		indacc_mem1_ctrl.bits.mem1_addr = i;
+		indacc_mem1_ctrl.bits.mem1_sel = 2;
+		indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
+		indacc_mem1_ctrl.bits.mem1_command = 1;
+		indacc_mem1_ctrl.bits.mem1_diagen = 1;
+
+		/* issue read command */
+		HXGE_REG_WR32(handle, INDACC_MEM1_CTRL, indacc_mem1_ctrl.value);
+
+		/* wait for read operation to complete */
+		count = 0;
+		HXGE_REG_RD32(handle, INDACC_MEM1_CTRL,
+		    &indacc_mem1_ctrl.value);
+		while (indacc_mem1_ctrl.bits.mem1_access_status != 1 &&
+		    count++ < HXGE_MSIX_WAIT_COUNT) {
+			HXGE_DELAY(1);
+			HXGE_REG_RD32(handle, INDACC_MEM1_CTRL,
+			    &indacc_mem1_ctrl.value);
+		}
+
+		data0.value = data1.value = data2.value = prty.value = 0;
+		HXGE_REG_RD32(handle, INDACC_MEM1_DATA0, &data0.value);
+		HXGE_REG_RD32(handle, INDACC_MEM1_DATA1, &data1.value);
+		HXGE_REG_RD32(handle, INDACC_MEM1_DATA2, &data2.value);
+		HXGE_REG_RD32(handle, INDACC_MEM1_PRTY, &prty.value);
+
+		parity = gen_32bit_parity(data0.value, B_FALSE) |
+		    (gen_32bit_parity(data1.value, B_FALSE) << 4) |
+		    (gen_32bit_parity(data2.value, B_FALSE) << 8);
+
+		if (parity != prty.bits.mem1_parity) {
+			statsp->eic_msix_parerr++;
+			if (statsp->eic_msix_parerr == 1) {
+				HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
+				    "==> hxge_check_msix_parity_err: "
+				    "eic_msix_parerr"));
+				HXGE_FM_REPORT_ERROR(hxgep, NULL,
+				    HXGE_FM_EREPORT_PEU_ERR);
+			}
+		}
+	}
+
+	/* Turn off diagnostic mode */
+	indacc_mem1_ctrl.value = 0;
+	indacc_mem1_ctrl.bits.mem1_addr = 0;
+	indacc_mem1_ctrl.bits.mem1_sel = 0;
+	indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
+	indacc_mem1_ctrl.bits.mem1_command = 0;
+	indacc_mem1_ctrl.bits.mem1_diagen = 0;
+	HXGE_REG_WR32(handle, INDACC_MEM1_CTRL, indacc_mem1_ctrl.value);
+}
+
+static uint8_t
+gen_32bit_parity(uint32_t data, boolean_t odd_parity)
+{
+	uint8_t		parity = 0;
+	uint8_t		data_byte = 0;
+	uint8_t		parity_bit = 0;
+	uint32_t	i = 0, j = 0;
+
+	for (i = 0; i < 4; i++) {
+		data_byte = (data >> (i * 8)) & 0xffULL;
+		parity_bit = odd_parity ? 1 : 0;
+		for (j = 0; j < 8; j++) {
+			parity_bit ^= (data_byte >> j) & 0x1ULL;
+		}
+		parity |= (parity_bit << i);
+	}
+
+	return (parity);
 }

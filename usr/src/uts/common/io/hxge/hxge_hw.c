@@ -337,6 +337,8 @@ hxge_peu_handle_sys_errors(p_hxge_t hxgep)
 		    "==> hxge_peu_handle_sys_errors: hcr_parerr"));
 	}
 
+	HXGE_FM_REPORT_ERROR(hxgep, NULL, HXGE_FM_EREPORT_PEU_ERR);
+
 	return (HXGE_OK);
 }
 

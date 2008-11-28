@@ -84,7 +84,7 @@ extern "C" {
 #define	RBR_BUFSZ0_512B			1
 #define	RBR_BUFSZ0_1K			2
 #define	RBR_BUFSZ0_256_BYTES		256
-#define	RBR_BUFSZ0_512B_BYTES		512
+#define	RBR_BUFSZ0_512_BYTES		512
 #define	RBR_BUFSZ0_1K_BYTES		1024
 
 /*

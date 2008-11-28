@@ -137,8 +137,7 @@ hxge_rx_vmac_init(p_hxge_t hxgep)
 	 * strip CRC.  Bug ID 11451 -- enable strip CRC will cause
 	 * rejection on minimum sized packets.
 	 */
-	xconfig = CFG_VMAC_RX_CRC_CHECK_DISABLE |
-	    CFG_VMAC_RX_PASS_FLOW_CTRL_FR;
+	xconfig = CFG_VMAC_RX_PASS_FLOW_CTRL_FR;
 
 	if (hxgep->filter.all_phys_cnt != 0)
 		xconfig |= CFG_VMAC_RX_PROMISCUOUS_MODE;

@@ -106,6 +106,8 @@ static hxge_status_t hxge_rxbuf_index_info_init(p_hxge_t hxgep,
 static hxge_status_t hxge_rxdma_fatal_err_recover(p_hxge_t hxgep,
 	uint16_t channel);
 static hxge_status_t hxge_rx_port_fatal_err_recover(p_hxge_t hxgep);
+static void hxge_rbr_empty_restore(p_hxge_t hxgep,
+	p_rx_rbr_ring_t rx_rbr_p);
 
 hxge_status_t
 hxge_init_rxdma_channels(p_hxge_t hxgep)
@@ -1000,9 +1002,6 @@ void hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p,
 void
 hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 {
-	hpi_status_t	hpi_status;
-	hxge_status_t	status;
-	int		i;
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_post_page"));
 
@@ -1028,67 +1027,10 @@ hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 	 * Accumulate some buffers in the ring before re-enabling the
 	 * DMA channel, if rbr empty was signaled.
 	 */
-	if (!rx_rbr_p->rbr_is_empty) {
-		hpi_rxdma_rdc_rbr_kick(HXGE_DEV_HPI_HANDLE(hxgep),
-		    rx_rbr_p->rdc, 1);
-	} else {
-		rx_rbr_p->accumulate++;
-		if (rx_rbr_p->accumulate >= HXGE_RBR_EMPTY_THRESHOLD) {
-			rx_rbr_p->rbr_is_empty = B_FALSE;
-			rx_rbr_p->accumulate = 0;
-
-			/*
-			 * Complete the processing for the RBR Empty by:
-			 *	0) kicking back HXGE_RBR_EMPTY_THRESHOLD
-			 *	   packets.
-			 *	1) Disable the RX vmac.
-			 *	2) Re-enable the affected DMA channel.
-			 *	3) Re-enable the RX vmac.
-			 */
-			hpi_rxdma_rdc_rbr_kick(HXGE_DEV_HPI_HANDLE(hxgep),
-			    rx_rbr_p->rdc, HXGE_RBR_EMPTY_THRESHOLD);
-
-			/*
-			 * Disable the RX VMAC, but setting the framelength
-			 * to 0, since there is a hardware bug when disabling
-			 * the vmac.
-			 */
-			MUTEX_ENTER(hxgep->genlock);
-			(void) hpi_vmac_rx_set_framesize(
-			    HXGE_DEV_HPI_HANDLE(hxgep), (uint16_t)0);
-
-			hpi_status = hpi_rxdma_cfg_rdc_enable(
-			    HXGE_DEV_HPI_HANDLE(hxgep), rx_rbr_p->rdc);
-			if (hpi_status != HPI_SUCCESS) {
-				p_hxge_rx_ring_stats_t	rdc_stats;
-
-				rdc_stats =
-				    &hxgep->statsp->rdc_stats[rx_rbr_p->rdc];
-				rdc_stats->rbr_empty_fail++;
-
-				status = hxge_rxdma_fatal_err_recover(hxgep,
-				    rx_rbr_p->rdc);
-				if (status != HXGE_OK) {
-					HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
-					    "hxge(%d): channel(%d) is empty.",
-					    hxgep->instance, rx_rbr_p->rdc));
-				}
-			}
-
-			for (i = 0; i < 1024; i++) {
-				uint64_t value;
-				RXDMA_REG_READ64(HXGE_DEV_HPI_HANDLE(hxgep),
-				    RDC_STAT, i & 3, &value);
-			}
-
-			/*
-			 * Re-enable the RX VMAC.
-			 */
-			(void) hpi_vmac_rx_set_framesize(
-			    HXGE_DEV_HPI_HANDLE(hxgep),
-			    (uint16_t)hxgep->vmac.maxframesize);
-			MUTEX_EXIT(hxgep->genlock);
-		}
+	hpi_rxdma_rdc_rbr_kick(HXGE_DEV_HPI_HANDLE(hxgep), rx_rbr_p->rdc, 1);
+	if (rx_rbr_p->rbr_is_empty &&
+	    rx_rbr_p->rbr_consumed < rx_rbr_p->rbb_max / 16) {
+		hxge_rbr_empty_restore(hxgep, rx_rbr_p);
 	}
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL,
@@ -2024,7 +1966,11 @@ hxge_rx_rbr_empty_recover(p_hxge_t hxgep, uint8_t channel)
 	 * the DMA channel.
 	 */
 	MUTEX_ENTER(&rbrp->post_lock);
-	rbrp->rbr_is_empty = B_TRUE;
+	if (rbrp->rbr_consumed < rbrp->rbb_max / 32) {
+		hxge_rbr_empty_restore(hxgep, rbrp);
+	} else {
+		rbrp->rbr_is_empty = B_TRUE;
+	}
 	MUTEX_EXIT(&rbrp->post_lock);
 }
 
@@ -2152,10 +2098,19 @@ hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
 	}
 
 	if (rxchan_fatal) {
+		p_rx_rcr_ring_t	rcrp;
+		p_rx_rbr_ring_t rbrp;
+
+		rcrp = hxgep->rx_rcr_rings->rcr_rings[channel];
+		rbrp = rcrp->rx_rbr_p;
+
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 		    " hxge_rx_err_evnts: fatal error on Channel #%d\n",
 		    channel));
+		MUTEX_ENTER(&rbrp->post_lock);
+		/* This function needs to be inside the post_lock */
 		status = hxge_rxdma_fatal_err_recover(hxgep, channel);
+		MUTEX_EXIT(&rbrp->post_lock);
 		if (status == HXGE_OK) {
 			FM_SERVICE_RESTORED(hxgep);
 		}
@@ -2828,9 +2783,19 @@ hxge_map_rxdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 	 * Buffer sizes suggested by NIU architect. 256, 512 and 2K.
 	 */
 
-	rbrp->pkt_buf_size0 = RBR_BUFSZ0_256B;
-	rbrp->pkt_buf_size0_bytes = RBR_BUFSZ0_256_BYTES;
-	rbrp->hpi_pkt_buf_size0 = SIZE_256B;
+	switch (hxgep->rx_bksize_code) {
+	case RBR_BKSIZE_4K:
+		rbrp->pkt_buf_size0 = RBR_BUFSZ0_256B;
+		rbrp->pkt_buf_size0_bytes = RBR_BUFSZ0_256_BYTES;
+		rbrp->hpi_pkt_buf_size0 = SIZE_256B;
+		break;
+	case RBR_BKSIZE_8K:
+		/* Use 512 to avoid possible rcr_full condition */
+		rbrp->pkt_buf_size0 = RBR_BUFSZ0_512B;
+		rbrp->pkt_buf_size0_bytes = RBR_BUFSZ0_512_BYTES;
+		rbrp->hpi_pkt_buf_size0 = SIZE_512B;
+		break;
+	}
 
 	rbrp->pkt_buf_size1 = RBR_BUFSZ1_1K;
 	rbrp->pkt_buf_size1_bytes = RBR_BUFSZ1_1K_BYTES;
@@ -3520,7 +3485,6 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 
 	MUTEX_ENTER(&rcrp->lock);
 	MUTEX_ENTER(&rbrp->lock);
-	MUTEX_ENTER(&rbrp->post_lock);
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "Disable RxDMA channel..."));
 
@@ -3613,7 +3577,6 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 		    "hpi_rxdma_cfg_rdc_enable (channel %d)", channel));
 	}
 
-	MUTEX_EXIT(&rbrp->post_lock);
 	MUTEX_EXIT(&rbrp->lock);
 	MUTEX_EXIT(&rcrp->lock);
 
@@ -3624,7 +3587,6 @@ hxge_rxdma_fatal_err_recover(p_hxge_t hxgep, uint16_t channel)
 	return (HXGE_OK);
 
 fail:
-	MUTEX_EXIT(&rbrp->post_lock);
 	MUTEX_EXIT(&rbrp->lock);
 	MUTEX_EXIT(&rcrp->lock);
 	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "Recovery failed"));
@@ -3641,6 +3603,8 @@ hxge_rx_port_fatal_err_recover(p_hxge_t hxgep)
 	int			ndmas;
 	int			i;
 	block_reset_t		reset_reg;
+	p_rx_rcr_ring_t	rcrp;
+	p_rx_rbr_ring_t rbrp;
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_rx_port_fatal_err_recover"));
 	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "Recovering from RDC error ..."));
@@ -3668,10 +3632,16 @@ hxge_rx_port_fatal_err_recover(p_hxge_t hxgep)
 
 	for (i = 0; i < ndmas; i++) {
 		channel = ((p_hxge_dma_common_t)dma_buf_p[i])->dma_channel;
+		rcrp = hxgep->rx_rcr_rings->rcr_rings[channel];
+		rbrp = rcrp->rx_rbr_p;
+
+		MUTEX_ENTER(&rbrp->post_lock);
+		/* This function needs to be inside the post_lock */
 		if (hxge_rxdma_fatal_err_recover(hxgep, channel) != HXGE_OK) {
 			HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
 			    "Could not recover channel %d", channel));
 		}
+		MUTEX_EXIT(&rbrp->post_lock);
 	}
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "Reset RxMAC..."));
@@ -3711,4 +3681,62 @@ hxge_rx_port_fatal_err_recover(p_hxge_t hxgep)
 fail:
 	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "Recovery failed"));
 	return (status);
+}
+
+static void
+hxge_rbr_empty_restore(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p)
+{
+	hpi_status_t		hpi_status;
+	hxge_status_t		status;
+	int			i;
+	p_hxge_rx_ring_stats_t	rdc_stats;
+
+	rdc_stats = &hxgep->statsp->rdc_stats[rx_rbr_p->rdc];
+	rdc_stats->rbr_empty_restore++;
+	rx_rbr_p->rbr_is_empty = B_FALSE;
+
+	/*
+	 * Complete the processing for the RBR Empty by:
+	 *	0) kicking back HXGE_RBR_EMPTY_THRESHOLD
+	 *	   packets.
+	 *	1) Disable the RX vmac.
+	 *	2) Re-enable the affected DMA channel.
+	 *	3) Re-enable the RX vmac.
+	 */
+
+	/*
+	 * Disable the RX VMAC, but setting the framelength
+	 * to 0, since there is a hardware bug when disabling
+	 * the vmac.
+	 */
+	MUTEX_ENTER(hxgep->genlock);
+	(void) hpi_vmac_rx_set_framesize(
+	    HXGE_DEV_HPI_HANDLE(hxgep), (uint16_t)0);
+
+	hpi_status = hpi_rxdma_cfg_rdc_enable(
+	    HXGE_DEV_HPI_HANDLE(hxgep), rx_rbr_p->rdc);
+	if (hpi_status != HPI_SUCCESS) {
+		rdc_stats->rbr_empty_fail++;
+
+		/* Assume we are already inside the post_lock */
+		status = hxge_rxdma_fatal_err_recover(hxgep, rx_rbr_p->rdc);
+		if (status != HXGE_OK) {
+			HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
+			    "hxge(%d): channel(%d) is empty.",
+			    hxgep->instance, rx_rbr_p->rdc));
+		}
+	}
+
+	for (i = 0; i < 1024; i++) {
+		uint64_t value;
+		RXDMA_REG_READ64(HXGE_DEV_HPI_HANDLE(hxgep),
+		    RDC_STAT, i & 3, &value);
+	}
+
+	/*
+	 * Re-enable the RX VMAC.
+	 */
+	(void) hpi_vmac_rx_set_framesize(HXGE_DEV_HPI_HANDLE(hxgep),
+	    (uint16_t)hxgep->vmac.maxframesize);
+	MUTEX_EXIT(hxgep->genlock);
 }
