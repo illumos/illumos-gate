@@ -1072,25 +1072,43 @@ vdev_validate(char *nv)
 
 /*
  * Get a list of valid vdev pathname from the boot device.
- * The caller should already allocate MAXNAMELEN memory for bootpath.
+ * The caller should already allocate MAXPATHLEN memory for bootpath and devid.
  */
 int
 vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath)
 {
 	char type[16];
 
-	bootpath[0] = '\0';
 	if (nvlist_lookup_value(nv, ZPOOL_CONFIG_TYPE, &type, DATA_TYPE_STRING,
 	    NULL))
 		return (ERR_FSYS_CORRUPT);
 
 	if (strcmp(type, VDEV_TYPE_DISK) == 0) {
-		if (vdev_validate(nv) != 0 ||
-		    (nvlist_lookup_value(nv, ZPOOL_CONFIG_PHYS_PATH,
-		    bootpath, DATA_TYPE_STRING, NULL) != 0) ||
-		    (nvlist_lookup_value(nv, ZPOOL_CONFIG_DEVID,
-		    devid, DATA_TYPE_STRING, NULL) != 0))
+		uint64_t guid;
+
+		if (vdev_validate(nv) != 0)
 			return (ERR_NO_BOOTPATH);
+
+		if (nvlist_lookup_value(nv, ZPOOL_CONFIG_GUID,
+		    &guid, DATA_TYPE_UINT64, NULL) != 0)
+			return (ERR_NO_BOOTPATH);
+
+		if (guid != inguid)
+			return (ERR_NO_BOOTPATH);
+
+		if (nvlist_lookup_value(nv, ZPOOL_CONFIG_PHYS_PATH,
+		    bootpath, DATA_TYPE_STRING, NULL) != 0)
+			bootpath[0] = '\0';
+
+		if (nvlist_lookup_value(nv, ZPOOL_CONFIG_DEVID,
+		    devid, DATA_TYPE_STRING, NULL) != 0)
+			devid[0] = '\0';
+
+		if (strlen(bootpath) >= MAXPATHLEN ||
+		    strlen(devid) >= MAXPATHLEN)
+			return (ERR_WONT_FIT);
+
+		return (0);
 
 	} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0) {
 		int nelm, i;
@@ -1101,37 +1119,16 @@ vdev_get_bootpath(char *nv, uint64_t inguid, char *devid, char *bootpath)
 			return (ERR_FSYS_CORRUPT);
 
 		for (i = 0; i < nelm; i++) {
-			char tmp_path[MAXNAMELEN];
-			char tmp_devid[MAXNAMELEN];
 			char *child_i;
-			uint64_t guid;
 
 			child_i = nvlist_array(child, i);
-			if (vdev_validate(child_i) != 0)
-				continue;
-
-			if (nvlist_lookup_value(child_i, ZPOOL_CONFIG_PHYS_PATH,
-			    tmp_path, DATA_TYPE_STRING, NULL) != 0)
-				return (ERR_NO_BOOTPATH);
-
-			if ((strlen(bootpath) + strlen(tmp_path)) > MAXNAMELEN)
-				return (ERR_WONT_FIT);
-
-			if (nvlist_lookup_value(child_i, ZPOOL_CONFIG_GUID,
-			    &guid, DATA_TYPE_UINT64, NULL) != 0)
-				return (ERR_NO_BOOTPATH);
-			if (nvlist_lookup_value(child_i, ZPOOL_CONFIG_DEVID,
-			    tmp_devid, DATA_TYPE_STRING, NULL) != 0)
-				return (ERR_NO_BOOTPATH);
-			if (guid == inguid) {
-				sprintf(devid, "%s", tmp_devid);
-				sprintf(bootpath, "%s", tmp_path);
-				break;
-			}
+			if (vdev_get_bootpath(child_i, inguid, devid,
+			    bootpath) == 0)
+				return (0);
 		}
 	}
 
-	return (strlen(bootpath) > 0 ? 0 : ERR_NO_BOOTPATH);
+	return (ERR_NO_BOOTPATH);
 }
 
 /*
@@ -1265,11 +1262,11 @@ zfs_mount(void)
 			    vdev_uberblock_compare(&ubbest->ubp_uberblock,
 			    &(current_uberblock)) <= 0)
 				continue;
+
 			/* Got the MOS. Save it at the memory addr MOS. */
 			grub_memmove(MOS, &osp->os_meta_dnode, DNODE_SIZE);
 			grub_memmove(&current_uberblock,
-			    &ubbest->ubp_uberblock,
-			    sizeof (uberblock_t));
+			    &ubbest->ubp_uberblock, sizeof (uberblock_t));
 			grub_memmove(current_bootpath, tmp_bootpath,
 			    MAXNAMELEN);
 			grub_memmove(current_devid, tmp_devid,

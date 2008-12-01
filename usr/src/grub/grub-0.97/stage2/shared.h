@@ -51,6 +51,10 @@ extern char *grub_scratch_mem;
 /* ZFS will use the top 4 Meg of physical memory (below 4Gig) for sratch */
 #define ZFS_SCRATCH_SIZE 0x400000
 
+#ifndef MAXPATHLEN
+#define	MAXPATHLEN	1024
+#endif
+
 #define	MAXNAMELEN	256
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
@@ -664,9 +668,9 @@ extern unsigned long current_drive;
 extern unsigned long current_partition;
 extern char current_rootpool[MAXNAMELEN];
 extern char current_bootfs[MAXNAMELEN];
-extern char current_bootpath[MAXNAMELEN];
 extern unsigned long long current_bootfs_obj;
-extern char current_devid[MAXNAMELEN];
+extern char current_bootpath[MAXPATHLEN];
+extern char current_devid[MAXPATHLEN];
 extern int is_zfs_mount;
 extern unsigned long best_drive;
 extern unsigned long best_part;

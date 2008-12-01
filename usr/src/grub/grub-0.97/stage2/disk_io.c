@@ -124,11 +124,11 @@ unsigned long part_length;
 int current_slice;
 
 /* ZFS root filesystem for booting */
-char current_bootpath[MAXNAMELEN];
 char current_rootpool[MAXNAMELEN];
 char current_bootfs[MAXNAMELEN];
 uint64_t current_bootfs_obj;
-char current_devid[MAXNAMELEN];
+char current_bootpath[MAXPATHLEN];
+char current_devid[MAXPATHLEN];
 int is_zfs_mount;
 unsigned long best_drive;
 unsigned long best_part;

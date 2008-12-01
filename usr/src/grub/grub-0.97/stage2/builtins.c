@@ -2753,15 +2753,23 @@ static struct builtin builtin_ioprobe =
 
 /*
  * To boot from a ZFS root filesystem, the kernel$ or module$ commands
- * must include "-B $ZFS-BOOTFS" to pass to the kernel:
+ * must include "-B $ZFS-BOOTFS" to expand to the zfs-bootfs, bootpath,
+ * and diskdevid boot property values for passing to the kernel:
  *
  * e.g.
  * kernel$ /platform/i86pc/kernel/$ISADIR/unix -B $ZFS-BOOTFS,console=ttya
  *
- * The expand_dollar_bootfs routine expands $ZFS-BOOTFS to
- * "pool-name/zfs-rootfilesystem-object-num", e.g. "rootpool/85"
- * so that in the kernel zfs_mountroot would know which zfs root
- * filesystem to be mounted.
+ * $ZFS-BOOTFS is expanded to
+ *
+ *    zfs-bootfs=<rootpool-name/zfs-rootfilesystem-object-num>,
+ *    bootpath=<device phys path>,
+ *    diskdevid=<device id>
+ *
+ * if both bootpath and diskdevid can be found.
+ * e.g
+ *    zfs-bootfs=rpool/85,
+ *    bootpath="/pci@0,0/pci1022,7450@a/pci17c2,10@4/sd@0,0:a",
+ *    diskdevid="id1,sd@SSEAGATE_ST336607LC______3JA0LNHE0000741326W6/a"
  */
 static int
 expand_dollar_bootfs(char *in, char *out)
@@ -2770,6 +2778,11 @@ expand_dollar_bootfs(char *in, char *out)
 	int outlen, blen;
 	int postcomma = 0;
 
+	if (current_bootpath[0] == '\0' && current_devid[0] == '\0') {
+		errnum = ERR_NO_BOOTPATH;
+		return (1);
+	}
+
 	outlen = strlen(in);
 	blen = current_bootfs_obj == 0 ? strlen(current_rootpool) :
 	    strlen(current_rootpool) + 11;
@@ -2777,7 +2790,7 @@ expand_dollar_bootfs(char *in, char *out)
 	out[0] = '\0';
 	while (token = strstr(in, "$ZFS-BOOTFS")) {
 
-		if ((outlen += blen) > MAX_CMDLINE) {
+		if ((outlen += blen) >= MAX_CMDLINE) {
 			errnum = ERR_WONT_FIT;
 			return (1);
 		}
@@ -2817,23 +2830,28 @@ expand_dollar_bootfs(char *in, char *out)
 	 * through '$ZFS-BOOTFS' or an explicit 'zfs-bootfs' setting.
 	 */
 	if (tmpout != out) {
-		if ((outlen += 12 + strlen(current_bootpath)) > MAX_CMDLINE) {
-			errnum = ERR_WONT_FIT;
-			return (1);
+		if (current_bootpath[0] != '\0') {
+			if ((outlen += 12 + strlen(current_bootpath))
+			    >= MAX_CMDLINE) {
+				errnum = ERR_WONT_FIT;
+				return (1);
+			}
+			grub_sprintf(tmpout,
+			    postcomma ? "bootpath=\"%s\"," : ",bootpath=\"%s\"",
+			    current_bootpath);
+			tmpout = out + strlen(out);
 		}
-		grub_sprintf(tmpout,
-		    postcomma ? "bootpath=\"%s\"," : ",bootpath=\"%s\"",
-		    current_bootpath);
-		tmpout = out + strlen(out);
-	}
-	if (strlen(current_devid)) {
-		if ((outlen += 13 + strlen(current_devid)) > MAX_CMDLINE) {
-			errnum = ERR_WONT_FIT;
-			return (1);
+
+		if (current_devid[0] != '\0') {
+			if ((outlen += 13 + strlen(current_devid))
+			    >= MAX_CMDLINE) {
+				errnum = ERR_WONT_FIT;
+				return (1);
+			}
+			grub_sprintf(tmpout,
+			    postcomma ? "diskdevid=\"%s\"," : ",diskdevid=\"%s\"",
+			    current_devid);
 		}
-		grub_sprintf(tmpout,
-		    postcomma ? "diskdevid=\"%s\"," : ",diskdevid=\"%s\"",
-		    current_devid);
 	}
 
 	strncat(out, in, MAX_CMDLINE);
@@ -3218,8 +3236,11 @@ kernel_dollar_func (char *arg, int flags)
 	return (1);
 
   mb_cmdline = (char *)MB_CMDLINE_BUF;
-  if (expand_dollar_bootfs(newarg, mb_cmdline))
+  if (expand_dollar_bootfs(newarg, mb_cmdline)) {
+	grub_printf("cannot expand $ZFS-BOOTFS for dataset %s\n",
+	    current_bootfs);
 	return (1);
+  }
 
   grub_printf("'%s' is loaded\n", mb_cmdline);
   mb_cmdline += grub_strlen(mb_cmdline) + 1;
@@ -3466,8 +3487,11 @@ module_dollar_func (char *arg, int flags)
   if (module_func(newarg, flags))
 	return (1);
 
-  if (expand_dollar_bootfs(newarg, cmdline_sav))
+  if (expand_dollar_bootfs(newarg, cmdline_sav)) {
+	grub_printf("cannot expand $ZFS-BOOTFS for dataset %s\n",
+	    current_bootfs);
 	return (1);
+  }
 
   grub_printf("'%s' is loaded\n", (char *)cmdline_sav);
   mb_cmdline += grub_strlen(cmdline_sav) + 1;
