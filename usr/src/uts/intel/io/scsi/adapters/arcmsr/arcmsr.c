@@ -2842,8 +2842,7 @@ arcmsr_cb_ioctl(dev_t dev, int ioctl_cmd, intptr_t arg, int mode,
 	struct ACB *acb;
 	struct CMD_MESSAGE_FIELD *pktioctlfld;
 	int retvalue = 0;
-	int instance = getminor(dev);
-
+	int instance = MINOR2INST(getminor(dev));
 
 	if (instance < 0)
 		return (ENXIO);
@@ -2879,7 +2878,7 @@ arcmsr_cb_ioctl(dev_t dev, int ioctl_cmd, intptr_t arg, int mode,
 		goto ioctl_out;
 	}
 
-	switch (ioctl_cmd) {
+	switch ((unsigned int)ioctl_cmd) {
 	case ARCMSR_MESSAGE_READ_RQBUFFER:
 	{
 		unsigned long *ver_addr;
