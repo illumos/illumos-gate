@@ -121,6 +121,7 @@ lpsched_printer_configuration_to_attributes(service_t *svc, printer_t *p,
 	char buf[BUFSIZ+1];
 	struct utsname sysname;
 	char **allowed = NULL, **denied = NULL;
+	char **f_allowed = NULL, **f_denied = NULL;
 
 	if ((svc == NULL) || (p == NULL) || (dest == NULL))
 		return (PAPI_BAD_ARGUMENT);
@@ -233,6 +234,23 @@ lpsched_printer_configuration_to_attributes(service_t *svc, printer_t *p,
 
 	freelist(allowed);
 	freelist(denied);
+
+	/* forms allow/deny list */
+	load_formprinter_access(dest, &f_allowed, &f_denied);
+	papiAttributeListAddLPStrings(&p->attributes, PAPI_ATTR_REPLACE,
+	    "form-supported", f_allowed);
+
+	/*
+	 * All forms allowed case
+	 * When all forms are allowed forms.allow does not get created but
+	 * forms.deny file gets created with no entries
+	 */
+	if ((f_allowed == NULL) && (f_denied != NULL) && (f_denied[0] == NULL))
+		papiAttributeListAddLPString(&p->attributes, PAPI_ATTR_REPLACE,
+		    "form-supported", "all");
+
+	freelist(f_allowed);
+	freelist(f_denied);
 
 #ifdef LP_USE_PAPI_ATTR
 	if (tmp->ppd != NULL) {

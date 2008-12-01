@@ -461,16 +461,16 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 					printf("\t\t%s\n", str);
 		}
 
-		str = "(none)";
+		str = "none";
 		iter = NULL;
 		(void) papiAttributeListGetString(attrs, &iter,
 					"form-supported", &str);
-		printf(gettext("\tForms allowed:\n\t\t%s\n"),
-			((str[0] == '\0') ? gettext("(none)") : str));
+		printf(gettext("\tForms allowed:\n\t\t(%s)\n"),
+			((str[0] == '\0') ? gettext("none") : str));
 		if ((str != NULL) && (str[0] != '\0'))
 			while (papiAttributeListGetString(attrs, &iter, NULL,
 					&str) == PAPI_OK)
-				printf("\t\t%s\n", str);
+				printf("\t\t(%s)\n", str);
 
 		str = "";
 		iter = NULL;
