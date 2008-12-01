@@ -277,9 +277,9 @@ vdev_config_generate(spa_t *spa, vdev_t *vd, boolean_t getstats,
 		    vd->vdev_islog) == 0);
 	}
 
-	if (vd->vdev_dtl.smo_object != 0)
+	if (vd->vdev_dtl_smo.smo_object != 0)
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_DTL,
-		    vd->vdev_dtl.smo_object) == 0);
+		    vd->vdev_dtl_smo.smo_object) == 0);
 
 	if (getstats) {
 		vdev_stat_t vs;

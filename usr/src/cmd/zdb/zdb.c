@@ -521,44 +521,52 @@ dump_metaslabs(spa_t *spa)
 }
 
 static void
+dump_dtl_seg(space_map_t *sm, uint64_t start, uint64_t size)
+{
+	char *prefix = (void *)sm;
+
+	(void) printf("%s [%llu,%llu) length %llu\n",
+	    prefix,
+	    (u_longlong_t)start,
+	    (u_longlong_t)(start + size),
+	    (u_longlong_t)(size));
+}
+
+static void
 dump_dtl(vdev_t *vd, int indent)
 {
-	avl_tree_t *t = &vd->vdev_dtl_map.sm_root;
-	space_seg_t *ss;
-	vdev_t *pvd;
-	int c;
+	spa_t *spa = vd->vdev_spa;
+	boolean_t required;
+	char *name[DTL_TYPES] = { "missing", "partial", "scrub", "outage" };
+	char prefix[256];
+
+	spa_vdev_state_enter(spa);
+	required = vdev_dtl_required(vd);
+	(void) spa_vdev_state_exit(spa, NULL, 0);
 
 	if (indent == 0)
 		(void) printf("\nDirty time logs:\n\n");
 
-	(void) printf("\t%*s%s\n", indent, "",
+	(void) printf("\t%*s%s [%s]\n", indent, "",
 	    vd->vdev_path ? vd->vdev_path :
-	    vd->vdev_parent ? vd->vdev_ops->vdev_op_type :
-	    spa_name(vd->vdev_spa));
+	    vd->vdev_parent ? vd->vdev_ops->vdev_op_type : spa_name(spa),
+	    required ? "DTL-required" : "DTL-expendable");
 
-	for (ss = avl_first(t); ss; ss = AVL_NEXT(t, ss)) {
-		/*
-		 * Everything in this DTL must appear in all parent DTL unions.
-		 */
-		for (pvd = vd; pvd; pvd = pvd->vdev_parent)
-			ASSERT(vdev_dtl_contains(&pvd->vdev_dtl_map,
-			    ss->ss_start, ss->ss_end - ss->ss_start));
-		(void) printf("\t%*soutage [%llu,%llu] length %llu\n",
-		    indent, "",
-		    (u_longlong_t)ss->ss_start,
-		    (u_longlong_t)ss->ss_end - 1,
-		    (u_longlong_t)(ss->ss_end - ss->ss_start));
+	for (int t = 0; t < DTL_TYPES; t++) {
+		space_map_t *sm = &vd->vdev_dtl[t];
+		if (sm->sm_space == 0)
+			continue;
+		(void) snprintf(prefix, sizeof (prefix), "\t%*s%s",
+		    indent + 2, "", name[t]);
+		mutex_enter(sm->sm_lock);
+		space_map_walk(sm, dump_dtl_seg, (void *)prefix);
+		mutex_exit(sm->sm_lock);
+		if (dump_opt['d'] > 5 && vd->vdev_children == 0)
+			dump_spacemap(spa->spa_meta_objset,
+			    &vd->vdev_dtl_smo, sm);
 	}
 
-	(void) printf("\n");
-
-	if (dump_opt['d'] > 5 && vd->vdev_children == 0) {
-		dump_spacemap(vd->vdev_spa->spa_meta_objset, &vd->vdev_dtl,
-		    &vd->vdev_dtl_map);
-		(void) printf("\n");
-	}
-
-	for (c = 0; c < vd->vdev_children; c++)
+	for (int c = 0; c < vd->vdev_children; c++)
 		dump_dtl(vd->vdev_child[c], indent + 4);
 }
 
@@ -672,7 +680,8 @@ visit_indirect(spa_t *spa, const dnode_phys_t *dnp,
 				break;
 			fill += cbp->blk_fill;
 		}
-		ASSERT3U(fill, ==, bp->blk_fill);
+		if (!err)
+			ASSERT3U(fill, ==, bp->blk_fill);
 		(void) arc_buf_remove_ref(buf, &buf);
 	}
 

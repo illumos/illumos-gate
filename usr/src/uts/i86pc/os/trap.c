@@ -32,7 +32,6 @@
 /*		All Rights Reserved   				*/
 /*								*/
 
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/param.h>
@@ -422,29 +421,27 @@ emulate_lsahf(struct regs *rp, uchar_t instr)
  * The first byte of prefetch instructions is always 0x0F.
  * The second byte is 0x18 for regular prefetch or 0x0D for AMD 3dnow prefetch.
  * The third byte is between 0 and 3 inclusive.
+ *
+ * In 64-bit mode, there may be a one-byte REX prefex (0x40-0x4F).
  */
-
-#define	PREFETCHSIZE 3
 
 static int
 cmp_to_prefetch(uchar_t *p)
 {
-	if (*p == 0x0F && (*(p+1) == 0x18 || *(p+1) == 0x0D) && *(p+2) <= 3)
-		return (1);
-	return (0);
+#ifdef _LP64
+	if ((p[0] & 0xF0) == 0x40)	/* 64-bit REX prefix */
+		p++;
+#endif
+	return (p[0] == 0x0F && (p[1] == 0x18 || p[1] == 0x0D) && p[2] <= 3);
 }
 
 static int
 instr_is_prefetch(caddr_t pc)
 {
-	uchar_t instr[PREFETCHSIZE];
-	int	error;
+	uchar_t instr[4];	/* optional REX prefix plus 3-byte opcode */
 
-	error = copyin_nowatch(pc, (caddr_t)instr, PREFETCHSIZE);
-
-	if (error == 0 && cmp_to_prefetch(instr))
-		return (1);
-	return (0);
+	return (copyin_nowatch(pc, instr, sizeof (instr)) == 0 &&
+	    cmp_to_prefetch(instr));
 }
 
 #endif /* OPTERON_ERRATUM_91 */

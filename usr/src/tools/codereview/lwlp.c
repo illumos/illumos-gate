@@ -736,7 +736,6 @@ printbanner(char *filename, FILE *outfile)
 	nlines++;
 
 	restore_format_state(&format_state, outfile);
-	savestate(outfile);
 	return (nlines);
 }
 
@@ -893,6 +892,7 @@ printpage(FILE *infile, FILE *outfile)
 	if (bannerfile) {
 		current.lineno += printbanner(bannerfile, outfile);
 		bannerfile = NULL;
+		savestate(outfile);
 	}
 	for (; current.lineno < lines_per_page; ) {
 		if (fgetline(bufin, sizeof (bufin), infile) == (char *)NULL) {
@@ -1186,7 +1186,7 @@ proc(char *in, FILE *outfile)
 		    current.row - DEFAULT_DESCENDER_FRACTION * point_size,
 		    end_x,
 		    current.row +
-			(1.0 - DEFAULT_DESCENDER_FRACTION) * point_size,
+		    (1.0 - DEFAULT_DESCENDER_FRACTION) * point_size,
 		    SHADE);
 	}
 

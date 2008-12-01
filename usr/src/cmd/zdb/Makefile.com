@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG:sh=	cd ..; basename `pwd`
@@ -35,7 +33,7 @@ include ../../Makefile.cmd
 INCS += -I../../../lib/libzpool/common 
 INCS +=	-I../../../uts/common/fs/zfs
 
-LDLIBS += -lzpool -lumem -lavl -lnvpair -lzfs
+LDLIBS += -lzpool -lumem -lnvpair -lzfs
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all

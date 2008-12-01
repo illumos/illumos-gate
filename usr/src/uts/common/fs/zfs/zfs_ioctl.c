@@ -1163,7 +1163,7 @@ zfs_ioc_vdev_detach(zfs_cmd_t *zc)
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
 		return (error);
 
-	error = spa_vdev_detach(spa, zc->zc_guid, B_FALSE);
+	error = spa_vdev_detach(spa, zc->zc_guid, 0, B_FALSE);
 
 	spa_close(spa, FTAG);
 	return (error);
