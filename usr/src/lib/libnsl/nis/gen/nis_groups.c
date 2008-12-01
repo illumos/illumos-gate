@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * 	nis_groups.c
@@ -358,14 +356,14 @@ lookup_recursive(
 	ASSERT(RW_READ_HELD(&g_cache_lock));
 	for (nl = varp->recursive;  nl != 0;  nl = nl->prochain) {
 		switch (do_ismember_2(princp, nl->nom, refname, lookup, stat)) {
-		    case ISMEM_YES:
-			ASSERT(RW_READ_HELD(&g_cache_lock));
-			return (ISMEM_YES);
-		    case ISMEM_NO:
-			break;
-		    default:
-			status = ISMEM_DUNNO;
-			break;
+			case ISMEM_YES:
+				ASSERT(RW_READ_HELD(&g_cache_lock));
+				return (ISMEM_YES);
+			case ISMEM_NO:
+				break;
+			default:
+				status = ISMEM_DUNNO;
+				break;
 		}
 	}
 	ASSERT(RW_READ_HELD(&g_cache_lock));
@@ -422,7 +420,7 @@ insert_g_entry(g_cache_ptr gc, g_entry *ge)
 {
 	ASSERT(RW_WRITE_HELD(&g_cache_lock));
 	return nis_insert_item((NIS_HASH_ITEM *)ge, &gc->ht) == 0
-		? 0 : ge;
+	    ? 0 : ge;
 }
 
 static g_entry *
@@ -615,7 +613,10 @@ cached_group_entry(
 		nis_object	*obj;
 
 		gc->nmisses++;
+		/* Lets drop the cache lock as actual lookup may take a while */
+		(void) rw_unlock(&g_cache_lock);
 		obj = get_group(group, refname, lookup, stat);
+		(void) rw_wrlock(&g_cache_lock);
 		if (obj == 0) {
 			gc->ncalls++;
 			(void) rw_unlock(&g_cache_lock);
@@ -699,7 +700,7 @@ static bool_t
 visited(g_entry *ge)
 {
 	struct visit_log *v = thr_main()? visit_list_main :
-		thr_get_storage(&visit_log_key, 0, NULL);
+	    thr_get_storage(&visit_log_key, 0, NULL);
 
 	while (v) {
 		if (v->ge_id == ge)
@@ -755,8 +756,8 @@ do_ismember_2(
 		return (ISMEM_NO);
 	}
 	easy_include =
-		lookup_explicit(&ge->include, princp) ||
-		lookup_implicit(&ge->include, princp);
+	    lookup_explicit(&ge->include, princp) ||
+	    lookup_implicit(&ge->include, princp);
 
 	/* Probable optimization; result will be the same with or without */
 	if (easy_include == 0 && ge->include.recursive == 0) {
@@ -771,21 +772,21 @@ do_ismember_2(
 	mark_visit(ge);
 
 	switch (lookup_recursive(&ge->exclude, princp, group, lookup, stat)) {
-	    case ISMEM_YES:
-		answer = ISMEM_NO;
-		break;
-	    case ISMEM_NO:
-		if (easy_include) {
-			answer = ISMEM_YES;
+		case ISMEM_YES:
+			answer = ISMEM_NO;
+			break;
+		case ISMEM_NO:
+			if (easy_include) {
+				answer = ISMEM_YES;
 		} else {
 			answer = lookup_recursive(&ge->include, princp,
 			    group, lookup, stat);
 		}
 		break;
-	    default:
+		default:
 		if (!easy_include &&
 		    (lookup_recursive(&ge->include, princp, group,
-			lookup, stat) == ISMEM_NO)) {
+		    lookup, stat) == ISMEM_NO)) {
 			answer = ISMEM_NO;
 		} else {
 			answer = ISMEM_DUNNO;
@@ -842,7 +843,7 @@ __do_ismember(
 		if (stat != NIS_SUCCESS) {
 			syslog(LOG_ERR,
 			"lookup failure on group \"%s\" from object \"%s.%s\"",
-			obj->zo_group, obj->zo_name, obj->zo_domain);
+			    obj->zo_group, obj->zo_name, obj->zo_domain);
 		}
 	}
 	return (isit == ISMEM_YES);
@@ -923,8 +924,8 @@ __nis_flush_group_exp_name(nis_name groupname)
 		char buf[NIS_MAXNAMELEN];
 
 		(void) snprintf(tname, sizeof (tname), "%s.%s",
-			nis_leaf_of_r(groupname, buf, NIS_MAXNAMELEN),
-			nis_domain_of(domainname));
+		    nis_leaf_of_r(groupname, buf, NIS_MAXNAMELEN),
+		    nis_domain_of(domainname));
 		__nis_flush_one_group(tname);
 	} else {
 		__nis_flush_one_group(groupname);
@@ -1057,7 +1058,7 @@ nis_addmember(
 	nis_object	*obj;	/* The group object	*/
 	nis_error	result;	/* our result		*/
 	int		nm,	/* Number of members 	*/
-			i;
+	    i;
 	nis_name	*ml;	/* member list		*/
 	nis_object	ngrp;	/* New group object	*/
 	char		name[NIS_MAXNAMELEN]; /* Group name	*/
@@ -1093,7 +1094,7 @@ nis_addmember(
 	ngrp.GR_data.gr_members.gr_members_val[nm] = princp;
 	ngrp.GR_data.gr_members.gr_members_len = nm+1;
 	(void) snprintf(name, sizeof (name),
-					"%s.%s", obj->zo_name, obj->zo_domain);
+	    "%s.%s", obj->zo_name, obj->zo_domain);
 	/* XXX overwrite problem if multiple writers ? */
 	res = nis_modify(name, &ngrp);
 	free(ngrp.GR_data.gr_members.gr_members_val);
@@ -1115,7 +1116,7 @@ nis_removemember(
 	nis_object	*obj;	/* The group object	*/
 	nis_error	result;	/* our result		*/
 	int		nm,	/* Number of members 	*/
-			i, x;
+	    i, x;
 	nis_name	*ml;	/* member list		*/
 	nis_object	ngrp;	/* New group object	*/
 	char		name[NIS_MAXNAMELEN]; /* Group name	*/
@@ -1160,7 +1161,7 @@ nis_removemember(
 	}
 	ngrp.GR_data.gr_members.gr_members_len = x;
 	(void) snprintf(name, sizeof (name),
-					"%s.%s", obj->zo_name, obj->zo_domain);
+	    "%s.%s", obj->zo_name, obj->zo_domain);
 	res = nis_modify(name, &ngrp);
 	free(ngrp.GR_data.gr_members.gr_members_val);
 	result = res->status;
