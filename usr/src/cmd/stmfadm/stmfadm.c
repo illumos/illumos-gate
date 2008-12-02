@@ -188,8 +188,8 @@ addHostGroupMemberFunc(int operandLen, char *operands[], cmdOptions_t *options,
 	int i;
 	int ret = 0;
 	int stmfRet;
-	stmfGroupName groupName;
-	wchar_t groupNamePrint[sizeof (stmfGroupName)];
+	stmfGroupName groupName = {0};
+	wchar_t groupNamePrint[sizeof (stmfGroupName)] = {0};
 	stmfDevid devid;
 
 	for (; options->optval; options++) {
@@ -197,8 +197,7 @@ addHostGroupMemberFunc(int operandLen, char *operands[], cmdOptions_t *options,
 			/* host group name */
 			case 'g':
 				(void) mbstowcs(groupNamePrint, options->optarg,
-				    sizeof (groupNamePrint));
-				bzero(groupName, sizeof (groupName));
+				    sizeof (stmfGroupName) - 1);
 				bcopy(options->optarg, groupName,
 				    strlen(options->optarg));
 				break;
@@ -276,8 +275,8 @@ addTargetGroupMemberFunc(int operandLen, char *operands[],
 	int i;
 	int ret = 0;
 	int stmfRet;
-	stmfGroupName groupName;
-	wchar_t groupNamePrint[sizeof (stmfGroupName)];
+	stmfGroupName groupName = {0};
+	wchar_t groupNamePrint[sizeof (stmfGroupName)] = {0};
 	stmfDevid devid;
 
 	for (; options->optval; options++) {
@@ -285,8 +284,7 @@ addTargetGroupMemberFunc(int operandLen, char *operands[],
 			/* target group name */
 			case 'g':
 				(void) mbstowcs(groupNamePrint, options->optarg,
-				    sizeof (groupNamePrint));
-				bzero(groupName, sizeof (groupName));
+				    sizeof (stmfGroupName) - 1);
 				bcopy(options->optarg, groupName,
 				    strlen(options->optarg));
 				break;
@@ -376,10 +374,10 @@ addTargetGroupMemberFunc(int operandLen, char *operands[],
 static int
 parseDevid(char *input, stmfDevid *devid)
 {
-	wchar_t inputWc[MAX_DEVID_INPUT];
+	wchar_t inputWc[MAX_DEVID_INPUT + 1] = {0};
 
 	/* convert to wcs */
-	(void) mbstowcs(inputWc, input, sizeof (inputWc));
+	(void) mbstowcs(inputWc, input, MAX_DEVID_INPUT);
 
 	/*
 	 * Check for known scsi name string formats
@@ -673,12 +671,12 @@ createHostGroupFunc(int operandLen, char *operands[],
 {
 	int ret = 0;
 	int stmfRet;
-	wchar_t groupNamePrint[sizeof (stmfGroupName)];
-	stmfGroupName groupName;
+	wchar_t groupNamePrint[sizeof (stmfGroupName)] = {0};
+	stmfGroupName groupName = {0};
 
 	(void) strlcpy(groupName, operands[0], sizeof (groupName));
 	(void) mbstowcs(groupNamePrint, (char *)groupName,
-	    sizeof (groupNamePrint));
+	    sizeof (stmfGroupName) - 1);
 	/* call create group */
 	stmfRet = stmfCreateHostGroup(&groupName);
 	switch (stmfRet) {
@@ -732,12 +730,12 @@ createTargetGroupFunc(int operandLen, char *operands[], cmdOptions_t *options,
 {
 	int ret = 0;
 	int stmfRet;
-	wchar_t groupNamePrint[sizeof (stmfGroupName)];
-	stmfGroupName groupName;
+	wchar_t groupNamePrint[sizeof (stmfGroupName)] = {0};
+	stmfGroupName groupName = {0};
 
 	(void) strlcpy(groupName, operands[0], sizeof (groupName));
 	(void) mbstowcs(groupNamePrint, (char *)groupName,
-	    sizeof (groupNamePrint));
+	    sizeof (stmfGroupName) - 1);
 	/* call create group */
 	stmfRet = stmfCreateTargetGroup(&groupName);
 	switch (stmfRet) {
@@ -791,12 +789,12 @@ deleteHostGroupFunc(int operandLen, char *operands[],
 {
 	int ret = 0;
 	int stmfRet;
-	wchar_t groupNamePrint[sizeof (stmfGroupName)];
-	stmfGroupName groupName;
+	wchar_t groupNamePrint[sizeof (stmfGroupName)] = {0};
+	stmfGroupName groupName = {0};
 
 	(void) strlcpy(groupName, operands[0], sizeof (groupName));
 	(void) mbstowcs(groupNamePrint, (char *)groupName,
-	    sizeof (groupNamePrint));
+	    sizeof (stmfGroupName) - 1);
 	/* call delete group */
 	stmfRet = stmfDeleteHostGroup(&groupName);
 	switch (stmfRet) {
@@ -856,12 +854,12 @@ deleteTargetGroupFunc(int operandLen, char *operands[], cmdOptions_t *options,
 {
 	int ret = 0;
 	int stmfRet;
-	wchar_t groupNamePrint[sizeof (stmfGroupName)];
-	stmfGroupName groupName;
+	wchar_t groupNamePrint[sizeof (stmfGroupName)] = {0};
+	stmfGroupName groupName = {0};
 
 	(void) strlcpy(groupName, operands[0], sizeof (groupName));
 	(void) mbstowcs(groupNamePrint, (char *)groupName,
-	    sizeof (groupNamePrint));
+	    sizeof (stmfGroupName) - 1);
 	/* call delete group */
 	stmfRet = stmfDeleteTargetGroup(&groupName);
 	switch (stmfRet) {
@@ -982,10 +980,12 @@ listHostGroupFunc(int operandLen, char *operands[], cmdOptions_t *options,
 		for (found = B_FALSE, j = 0; j < groupList->cnt; j++) {
 			(void) mbstowcs(groupNamePrint,
 			    (char *)groupList->name[j],
-			    sizeof (groupNamePrint));
+			    sizeof (stmfGroupName) - 1);
+			groupNamePrint[sizeof (stmfGroupName) - 1] = 0;
 			if (operandEntered) {
 				(void) mbstowcs(operandName, operands[i],
-				    sizeof (operandName));
+				    sizeof (stmfGroupName) - 1);
+				operandName[sizeof (stmfGroupName) - 1] = 0;
 				if (wcscmp(operandName, groupNamePrint)
 				    == 0) {
 					found = B_TRUE;
@@ -1027,12 +1027,12 @@ static void
 printGroupProps(stmfGroupProperties *groupProps)
 {
 	int i;
-	wchar_t memberIdent[sizeof (groupProps->name[0].ident) + 1];
+	wchar_t memberIdent[sizeof (groupProps->name[0].ident) + 1] = {0};
 
 
 	for (i = 0; i < groupProps->cnt; i++) {
 		(void) mbstowcs(memberIdent, (char *)groupProps->name[i].ident,
-		    sizeof (memberIdent));
+		    sizeof (groupProps->name[0].ident));
 		(void) printf("\tMember: %ws\n", memberIdent);
 	}
 }
@@ -1111,10 +1111,12 @@ listTargetGroupFunc(int operandLen, char *operands[], cmdOptions_t *options,
 		for (found = B_FALSE, j = 0; j < groupList->cnt; j++) {
 			(void) mbstowcs(groupNamePrint,
 			    (char *)groupList->name[j],
-			    sizeof (groupNamePrint));
+			    sizeof (stmfGroupName) - 1);
+			groupNamePrint[sizeof (stmfGroupName) - 1] = 0;
 			if (operandEntered) {
 				(void) mbstowcs(operandName, operands[i],
-				    sizeof (operandName));
+				    sizeof (stmfGroupName) - 1);
+				operandName[sizeof (stmfGroupName) - 1] = 0;
 				if (wcscmp(operandName, groupNamePrint)
 				    == 0) {
 					found = B_TRUE;
@@ -1430,7 +1432,8 @@ printSessionProps(stmfSessionList *sessionList)
 	for (i = 0; i < sessionList->cnt; i++) {
 		(void) mbstowcs(initiator,
 		    (char *)sessionList->session[i].initiator.ident,
-		    sizeof (initiator));
+		    STMF_IDENT_LENGTH);
+		initiator[STMF_IDENT_LENGTH] = 0;
 		(void) printf(LVL3_FORMAT, "Initiator: ");
 		(void) printf("%ws\n", initiator);
 		(void) printf(LVL4_FORMAT, "Alias: ");
@@ -1615,7 +1618,8 @@ listTargetFunc(int operandLen, char *operands[], cmdOptions_t *options,
 			if ((found && operandEntered) || !operandEntered) {
 				(void) mbstowcs(targetIdent,
 				    (char *)targetList->devid[j].ident,
-				    sizeof (targetIdent));
+				    STMF_IDENT_LENGTH);
+				targetIdent[STMF_IDENT_LENGTH] = 0;
 				(void) printf("Target: %ws\n", targetIdent);
 				if (verbose) {
 					stmfRet = stmfGetTargetProperties(
@@ -1774,7 +1778,9 @@ listViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				} else {
 					(void) mbstowcs(groupName,
 					    viewEntryList->ve[j].hostGroup,
-					    sizeof (groupName));
+					    sizeof (stmfGroupName) - 1);
+					groupName[sizeof (stmfGroupName) - 1]
+					    = 0;
 					(void) printf("%ws\n", groupName);
 				}
 				(void) printf(VIEW_FORMAT, "Target group");
@@ -1783,7 +1789,9 @@ listViewFunc(int operandLen, char *operands[], cmdOptions_t *options,
 				} else {
 					(void) mbstowcs(groupName,
 					    viewEntryList->ve[j].targetGroup,
-					    sizeof (groupName));
+					    sizeof (stmfGroupName) - 1);
+					groupName[sizeof (stmfGroupName) - 1]
+					    = 0;
 					(void) printf("%ws\n", groupName);
 				}
 				outputLuNbr = ((viewEntryList->ve[j].luNbr[0] &
@@ -1997,16 +2005,15 @@ removeHostGroupMemberFunc(int operandLen, char *operands[],
 	int i;
 	int ret = 0;
 	int stmfRet;
-	stmfGroupName groupName;
+	stmfGroupName groupName = {0};
 	stmfDevid devid;
-	wchar_t groupNamePrint[sizeof (stmfGroupName)];
+	wchar_t groupNamePrint[sizeof (stmfGroupName)] = {0};
 
 	for (; options->optval; options++) {
 		switch (options->optval) {
 			case 'g':
 				(void) mbstowcs(groupNamePrint, options->optarg,
-				    sizeof (groupNamePrint));
-				bzero(groupName, sizeof (groupName));
+				    sizeof (stmfGroupName) - 1);
 				bcopy(options->optarg, groupName,
 				    strlen(options->optarg));
 				break;
@@ -2085,16 +2092,15 @@ removeTargetGroupMemberFunc(int operandLen, char *operands[],
 	int i;
 	int ret = 0;
 	int stmfRet;
-	stmfGroupName groupName;
+	stmfGroupName groupName = {0};
 	stmfDevid devid;
-	wchar_t groupNamePrint[sizeof (stmfGroupName)];
+	wchar_t groupNamePrint[sizeof (stmfGroupName)] = {0};
 
 	for (; options->optval; options++) {
 		switch (options->optval) {
 			case 'g':
 				(void) mbstowcs(groupNamePrint, options->optarg,
-				    sizeof (groupNamePrint));
-				bzero(groupName, sizeof (groupName));
+				    sizeof (stmfGroupName) - 1);
 				bcopy(options->optarg, groupName,
 				    strlen(options->optarg));
 				break;

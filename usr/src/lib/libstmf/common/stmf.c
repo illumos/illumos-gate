@@ -1648,7 +1648,7 @@ stmfGetTargetList(stmfDevidList **targetList)
 	int i;
 	stmf_iocdata_t stmfIoctl;
 	/* framework target port list */
-	slist_target_port_t *fTargetList;
+	slist_target_port_t *fTargetList, *fTargetListP;
 	uint32_t fTargetListSize;
 
 	if (targetList == NULL) {
@@ -1671,14 +1671,15 @@ stmfGetTargetList(stmfDevidList **targetList)
 	 * Allocate ioctl input buffer
 	 */
 	fTargetListSize = MAX_TARGET_PORT * sizeof (slist_target_port_t);
-	fTargetList = (slist_target_port_t *)calloc(1, fTargetListSize);
+	fTargetListP = fTargetList =
+	    (slist_target_port_t *)calloc(1, fTargetListSize);
 	if (fTargetList == NULL) {
 		goto done;
 	}
 
 	bzero(&stmfIoctl, sizeof (stmfIoctl));
 	/*
-	 * Issue ioctl to add to the host group
+	 * Issue ioctl to retrieve target list
 	 */
 	stmfIoctl.stmf_version = STMF_VERSION_1;
 	stmfIoctl.stmf_obuf_size = fTargetListSize;
@@ -1706,7 +1707,8 @@ stmfGetTargetList(stmfDevidList **targetList)
 	if (stmfIoctl.stmf_obuf_max_nentries > MAX_TARGET_PORT) {
 		fTargetListSize = stmfIoctl.stmf_obuf_max_nentries *
 		    sizeof (slist_target_port_t);
-		fTargetList = realloc(fTargetList, fTargetListSize);
+		fTargetListP = fTargetList =
+		    realloc(fTargetList, fTargetListSize);
 		if (fTargetList == NULL) {
 			return (STMF_ERROR_NOMEM);
 		}
@@ -1748,7 +1750,7 @@ stmfGetTargetList(stmfDevidList **targetList)
 
 done:
 	(void) close(fd);
-	free(fTargetList);
+	free(fTargetListP);
 	return (ret);
 }
 
