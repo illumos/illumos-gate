@@ -1633,6 +1633,8 @@ mm_mount_candidate_loaded(mm_command_t *cmd) {
 	mms_trace(MMS_DEVP,
 	    "mm_mount_candidate_loaded: ");
 
+	mount_info->cmi_mount_cart_loaded = 0;
+
 	/* The list should already be ordered */
 	/* select the 1st available */
 	mms_list_foreach(&mount_info->cmi_cart_list, cart) {
