@@ -1952,7 +1952,8 @@ setup_credentials(void)
 		login_exit(1);
 	}
 
-	if ((error = pam_setcred(pamh, PAM_ESTABLISH_CRED)) != PAM_SUCCESS) {
+	if ((error = pam_setcred(pamh, zflag ? PAM_REINITIALIZE_CRED :
+	    PAM_ESTABLISH_CRED)) != PAM_SUCCESS) {
 		audit_error = ADT_FAIL_PAM + error;
 		login_exit(error);
 	}
