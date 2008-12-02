@@ -2773,6 +2773,10 @@ expand_dollar_bootfs(char *in, char *out)
 	int outlen, blen;
 	int postcomma = 0;
 
+	/* no op if this is not zfs */
+	if (is_zfs_mount == 0)
+		return (0);
+
 	if (current_bootpath[0] == '\0' && current_devid[0] == '\0') {
 		errnum = ERR_NO_BOOTPATH;
 		return (1);
