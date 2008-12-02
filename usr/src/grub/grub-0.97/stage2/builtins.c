@@ -1055,13 +1055,10 @@ static int splashimage_func(char *arg, int flags) {
     if (flags == BUILTIN_SCRIPT)
         flags = BUILTIN_CMDLINE;
 
-    if (flags == BUILTIN_CMDLINE) {
-	if (!grub_open(arg))
-	    return 1;
-	grub_close();
-    }
-
     strcpy(splashimage, arg);
+
+    if (!graphics_set_splash(splashimage))
+	return 1;
 
     /* get rid of TERM_NEED_INIT from the graphics terminal. */
     for (i = 0; term_table[i].name; i++) {
@@ -1071,8 +1068,6 @@ static int splashimage_func(char *arg, int flags) {
 	}
     }
     
-    graphics_set_splash(splashimage);
-
     if (flags == BUILTIN_CMDLINE && graphics_inited) {
 	/*
 	 * calling graphics_end() here flickers the screen black. OTOH not
