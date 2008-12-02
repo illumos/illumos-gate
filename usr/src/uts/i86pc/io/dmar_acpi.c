@@ -599,7 +599,6 @@ intel_iommu_probe_and_parse(void)
 	int i, len;
 	char *opt;
 
-	intel_iommu_support = B_FALSE;
 	dmar_info = NULL;
 
 	/*

@@ -55,6 +55,12 @@
 #include <sys/sunldi.h>
 #include <sys/sunldi_impl.h>
 
+#if defined(__i386) || defined(__amd64)
+#if !defined(__xpv)
+#include <sys/iommulib.h>
+#endif
+#endif
+
 #ifdef DEBUG
 int ddidebug = DDI_AUDIT;
 #else
@@ -1299,6 +1305,15 @@ detach_node(dev_info_t *dip, uint_t flag)
 	mutex_enter(&(DEVI(dip)->devi_lock));
 	DEVI_CLR_NEED_RESET(dip);
 	mutex_exit(&(DEVI(dip)->devi_lock));
+
+#if defined(__i386) || defined(__amd64)
+#if !defined(__xpv)
+	/*
+	 * Close any iommulib mediated linkage to an IOMMU
+	 */
+	iommulib_nex_close(dip);
+#endif
+#endif
 
 	/* destroy the taskq */
 	if (DEVI(dip)->devi_taskq) {

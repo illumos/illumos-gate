@@ -343,7 +343,7 @@ iommu_intr_handler(intel_iommu_state_t *iommu)
 {
 	uint32_t status;
 	int index, fault_reg_offset;
-	int sindex, max_fault_index;
+	int max_fault_index;
 
 	mutex_enter(&(iommu->iu_reg_lock));
 
@@ -359,23 +359,17 @@ iommu_intr_handler(intel_iommu_state_t *iommu)
 	/*
 	 * handle all primary pending faults
 	 */
-	sindex = index = IOMMU_FAULT_GET_INDEX(status);
+	index = IOMMU_FAULT_GET_INDEX(status);
 	max_fault_index =  IOMMU_CAP_GET_NFR(iommu->iu_capability) - 1;
 	fault_reg_offset = IOMMU_CAP_GET_FRO(iommu->iu_capability);
 
-	/*
-	 * don't loop forever for a misbehaving IOMMU. Return after 1 loop
-	 * so that we some progress.
-	 */
-	do {
+	_NOTE(CONSTCOND)
+	while (1) {
 		uint64_t val;
 		uint8_t fault_reason;
 		uint8_t fault_type;
 		uint16_t sid;
 		uint64_t pg_addr;
-
-		if (index > max_fault_index)
-			index = 0;
 
 		/* read the higher 64bits */
 		val = iommu_get_reg64(iommu,
@@ -410,7 +404,10 @@ iommu_intr_handler(intel_iommu_state_t *iommu)
 		    dmar_fault_reason[MIN(fault_reason,
 		    DMAR_MAX_REASON_NUMBER)]);
 
-	} while (++index < sindex);
+		index++;
+		if (index > max_fault_index)
+			index = 0;
+	}
 
 	/*
 	 * At this point we have cleared the overflow if any
@@ -2392,6 +2389,8 @@ dmar_check_boot_option(char *opt, int *var)
 {
 	int len;
 	char *boot_option;
+
+	*var = 0;
 
 	if ((len = do_bsys_getproplen(NULL, opt)) > 0) {
 		boot_option = kmem_alloc(len, KM_SLEEP);

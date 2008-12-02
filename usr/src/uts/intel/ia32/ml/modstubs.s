@@ -1337,6 +1337,12 @@ fcnname/**/_info:							\
 	END_MODULE(ipnet);
 #endif
 
+#ifndef IOMMULIB_MODULE
+	MODULE(iommulib,misc);
+	STUB(iommulib, iommulib_nex_close, nomod_void);
+        END_MODULE(iommulib);
+#endif
+
 / this is just a marker for the area of text that contains stubs 
 
 	ENTRY_NP(stubs_end)
