@@ -868,7 +868,9 @@ fmd_xprt_destroy(fmd_xprt_t *xp)
 
 	if (xip->xi_thread != NULL) {
 		fmd_eventq_abort(xip->xi_queue);
+		fmd_module_unlock(mp);
 		fmd_thread_destroy(xip->xi_thread, FMD_THREAD_JOIN);
+		fmd_module_lock(mp);
 	}
 
 	if (xip->xi_log != NULL)

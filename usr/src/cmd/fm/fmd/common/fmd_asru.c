@@ -526,6 +526,7 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 				unusable = FMD_B_TRUE;
 				break;
 			case FMD_SERVICE_STATE_OK:
+			case FMD_SERVICE_STATE_ISOLATE_PENDING:
 			case FMD_SERVICE_STATE_DEGRADED:
 				unusable = FMD_B_FALSE;
 				break;
@@ -1144,7 +1145,8 @@ fmd_asru_hash_delete_case(fmd_asru_hash_t *ahp, fmd_case_t *cp)
 static void
 fmd_asru_repair_containee(fmd_asru_link_t *alp, void *er)
 {
-	if (er && alp->al_asru_fmri && fmd_fmri_contains(er,
+	if (er && (alp->al_asru->asru_flags & FMD_ASRU_INVISIBLE) &&
+	    alp->al_asru_fmri && fmd_fmri_contains(er,
 	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
 	    FMD_ASRU_REPAIRED))
 		fmd_case_update(alp->al_case);
@@ -1168,7 +1170,7 @@ fmd_asru_repaired(fmd_asru_link_t *alp, void *er)
 	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
 	flags = alp->al_asru->asru_flags;
 	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
-	if (!(flags & FMD_ASRU_FAULTY))
+	if (!(flags & (FMD_ASRU_FAULTY | FMD_ASRU_INVISIBLE)))
 		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_repair_containee,
 		    alp->al_asru_fmri);
 
@@ -1188,7 +1190,8 @@ fmd_asru_repaired(fmd_asru_link_t *alp, void *er)
 static void
 fmd_asru_acquit_containee(fmd_asru_link_t *alp, void *er)
 {
-	if (er && alp->al_asru_fmri && fmd_fmri_contains(er,
+	if (er && (alp->al_asru->asru_flags & FMD_ASRU_INVISIBLE) &&
+	    alp->al_asru_fmri && fmd_fmri_contains(er,
 	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
 	    FMD_ASRU_ACQUITTED))
 		fmd_case_update(alp->al_case);
@@ -1212,7 +1215,7 @@ fmd_asru_acquit(fmd_asru_link_t *alp, void *er)
 	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
 	flags = alp->al_asru->asru_flags;
 	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
-	if (!(flags & FMD_ASRU_FAULTY))
+	if (!(flags & (FMD_ASRU_FAULTY | FMD_ASRU_INVISIBLE)))
 		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_acquit_containee,
 		    alp->al_asru_fmri);
 
@@ -1232,7 +1235,8 @@ fmd_asru_acquit(fmd_asru_link_t *alp, void *er)
 static void
 fmd_asru_replaced_containee(fmd_asru_link_t *alp, void *er)
 {
-	if (er && alp->al_asru_fmri && fmd_fmri_contains(er,
+	if (er && (alp->al_asru->asru_flags & FMD_ASRU_INVISIBLE) &&
+	    alp->al_asru_fmri && fmd_fmri_contains(er,
 	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
 	    FMD_ASRU_REPLACED))
 		fmd_case_update(alp->al_case);
@@ -1261,7 +1265,7 @@ fmd_asru_replaced(fmd_asru_link_t *alp, void *er)
 	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
 	flags = alp->al_asru->asru_flags;
 	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
-	if (!(flags & FMD_ASRU_FAULTY))
+	if (!(flags & (FMD_ASRU_FAULTY | FMD_ASRU_INVISIBLE)))
 		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_replaced_containee,
 		    alp->al_asru_fmri);
 
@@ -1273,7 +1277,8 @@ fmd_asru_replaced(fmd_asru_link_t *alp, void *er)
 static void
 fmd_asru_removed_containee(fmd_asru_link_t *alp, void *er)
 {
-	if (er && alp->al_asru_fmri && fmd_fmri_contains(er,
+	if (er && (alp->al_asru->asru_flags & FMD_ASRU_INVISIBLE) &&
+	    alp->al_asru_fmri && fmd_fmri_contains(er,
 	    alp->al_asru_fmri) > 0 && fmd_asru_clrflags(alp, FMD_ASRU_FAULTY,
 	    0))
 		fmd_case_update(alp->al_case);
@@ -1297,7 +1302,7 @@ fmd_asru_removed(fmd_asru_link_t *alp)
 	(void) pthread_mutex_lock(&alp->al_asru->asru_lock);
 	flags = alp->al_asru->asru_flags;
 	(void) pthread_mutex_unlock(&alp->al_asru->asru_lock);
-	if (!(flags & FMD_ASRU_FAULTY))
+	if (!(flags & (FMD_ASRU_FAULTY | FMD_ASRU_INVISIBLE)))
 		fmd_asru_al_hash_apply(fmd.d_asrus, fmd_asru_removed_containee,
 		    alp->al_asru_fmri);
 	if (rval)
@@ -1464,6 +1469,9 @@ fmd_asru_al_getstate(fmd_asru_link_t *alp)
 			st |= FMD_ASRU_UNUSABLE;
 			return (st);
 		} else if (us == FMD_SERVICE_STATE_OK) {
+			st &= ~FMD_ASRU_UNUSABLE;
+			return (st);
+		} else if (us == FMD_SERVICE_STATE_ISOLATE_PENDING) {
 			st &= ~FMD_ASRU_UNUSABLE;
 			return (st);
 		} else if (us == FMD_SERVICE_STATE_DEGRADED) {

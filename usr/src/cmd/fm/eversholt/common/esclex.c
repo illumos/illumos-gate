@@ -32,8 +32,6 @@
  * be run through cpp.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
@@ -117,6 +115,7 @@ static const struct {
 	{ "is_on", PATHFUNC },
 	{ "is_present", PATHFUNC },
 	{ "is_type", PATHFUNC },
+	{ "has_fault", PATHFUNC },
 	{ "confprop", PATHFUNC },
 	{ "confprop_defined", PATHFUNC },
 };

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <fmadm.h>
 #include <errno.h>
@@ -1090,6 +1088,9 @@ extract_record_info(nvlist_t *nvl, name_list_t **class_p,
 			nlp = alloc_name_list(name, lpct);
 			nlp->status = status;
 			free(name);
+			if (nvlist_lookup_string(nvl, FM_FAULT_LOCATION,
+			    &label) == 0)
+				nlp->label = strdup(label);
 			(void) merge_name_list(resource_p, nlp, 1);
 		}
 	}
@@ -1277,15 +1278,16 @@ static void
 print_name(name_list_t *list, char *(func)(char *), char *padding, int *np,
     int pct, int full)
 {
-	char *name, *fru = NULL;
+	char *name, *fru_label = NULL;
 
 	name = list->name;
-	if (func)
-		fru = func(list->name);
-	if (fru) {
-		(void) printf("%s \"%s\" (%s)", padding, fru, name);
+	if (list->label) {
+		(void) printf("%s \"%s\" (%s)", padding, list->label, name);
 		*np += 1;
-		free(fru);
+	} else if (func && (fru_label = func(list->name)) != NULL) {
+		(void) printf("%s \"%s\" (%s)", padding, fru_label, name);
+		*np += 1;
+		free(fru_label);
 	} else {
 		(void) printf("%s %s", padding, name);
 		*np += 1;
@@ -1368,7 +1370,7 @@ static void
 print_name_list(name_list_t *list, char *label, char *(func)(char *),
     int limit, int pct, void (func1)(int, char *), int full)
 {
-	char *name, *fru = NULL;
+	char *name, *fru_label = NULL;
 	char *padding;
 	int i, j, l, n;
 	name_list_t *end = list;
@@ -1380,18 +1382,13 @@ print_name_list(name_list_t *list, char *label, char *(func)(char *),
 	padding[l] = 0;
 	(void) printf("%s", label);
 	name = list->name;
-	if (func == NULL)
-		(void) printf(" %s", name);
-	else if (list->label)
+	if (list->label)
 		(void) printf(" \"%s\" (%s)", list->label, name);
-	else {
-		fru = func(list->name);
-		if (fru) {
-			(void) printf(" \"%s\" (%s)", fru, name);
-			free(fru);
-		} else
-			(void) printf(" %s", name);
-	}
+	else if (func && (fru_label = func(list->name)) != NULL) {
+		(void) printf(" \"%s\" (%s)", fru_label, name);
+		free(fru_label);
+	} else
+		(void) printf(" %s", name);
 	if (list->pct && pct > 0 && pct < 100) {
 		if (list->count > 1) {
 			if (full) {

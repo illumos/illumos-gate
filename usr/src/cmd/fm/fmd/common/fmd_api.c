@@ -1216,7 +1216,7 @@ fmd_case_add_suspect(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
 	char *class;
 	topo_hdl_t *thp;
 	int err;
-	nvlist_t *rsrc = NULL, *asru = NULL, *fru = NULL;
+	nvlist_t *rsrc = NULL, *asru_prop = NULL, *asru = NULL, *fru = NULL;
 	char *loc = NULL, *serial = NULL;
 
 	if (cip->ci_state >= FMD_CASE_SOLVED) {
@@ -1238,7 +1238,9 @@ fmd_case_add_suspect(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
 		if (strncmp(class, "defect", 6) == 0) {
 			if (asru == NULL && topo_fmri_getprop(thp, rsrc,
 			    TOPO_PGROUP_IO, TOPO_IO_MODULE, rsrc,
-			    &asru, &err) == 0) {
+			    &asru_prop, &err) == 0 &&
+			    nvlist_lookup_nvlist(asru_prop, TOPO_PROP_VAL_VAL,
+			    &asru) == 0) {
 				(void) nvlist_add_nvlist(nvl, FM_FAULT_ASRU,
 				    asru);
 				nvlist_free(asru);
@@ -1274,7 +1276,7 @@ fmd_case_add_suspect(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
 		(void) topo_fmri_label(thp, fru, &loc, &err);
 	else if (rsrc != NULL)
 		(void) topo_fmri_label(thp, rsrc, &loc, &err);
-	if (loc != NULL) {
+	if (strncmp(class, "defect", 6) != 0 && loc != NULL) {
 		(void) nvlist_remove(nvl, FM_FAULT_LOCATION, DATA_TYPE_STRING);
 		(void) nvlist_add_string(nvl, FM_FAULT_LOCATION, loc);
 		topo_hdl_strfree(thp, loc);

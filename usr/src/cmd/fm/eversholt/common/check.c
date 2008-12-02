@@ -32,8 +32,6 @@
  * cases are noted in the comments above the check function.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include "out.h"
 #include "stable.h"
@@ -82,6 +80,7 @@ static struct {
 	{ T_DEFECT, "FRU", 0, check_fru_asru, O_ERR },
 	{ T_DEFECT, "ASRU", 0, check_fru_asru, O_ERR },
 	{ T_DEFECT, "engine", 0, check_engine, O_ERR },
+	{ T_DEFECT, "FITrate", 0, check_num_func, O_ERR },
 	{ T_EREPORT, "poller", 0, check_id, O_ERR },
 	{ T_EREPORT, "delivery", 0, check_timeval, O_ERR },
 	{ T_EREPORT, "discard_if_config_unknown", 0, check_num, O_ERR },

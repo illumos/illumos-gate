@@ -416,19 +416,25 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *events[],
 		    globals, croot, arrowp, try, &duped);
 		path = ipath2str(NULL, ipath(nodep));
 		platform_units_translate(0, croot, &asru, &fru, &rsrc, path);
+		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line, "has_fault(");
+		ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, np->u.expr.left);
+		out(O_ALTFP|O_VERB2|O_NONL, ", \"%s\") ",
+		    np->u.expr.right->u.quote.s);
 		FREE((void *)path);
 		if (duped)
 			tree_free(nodep);
 
-		if (rsrc == NULL)
+		if (rsrc == NULL) {
 			valuep->v = 0;
-		else
+			out(O_ALTFP|O_VERB2, "no path");
+		} else {
 			valuep->v = fmd_nvl_fmri_has_fault(Hdl, rsrc,
 			    FMD_HAS_FAULT_RESOURCE,
 			    strcmp(np->u.expr.right->u.quote.s, "") == 0 ?
 			    NULL : (char *)np->u.expr.right->u.quote.s);
+			out(O_ALTFP|O_VERB2, "returned %lld", valuep->v);
+		}
 		valuep->t = UINT64;
-		valuep->v = 0;
 		return (1);
 	} else if (funcname == L_count) {
 		struct stats *statp;

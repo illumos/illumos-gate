@@ -100,7 +100,6 @@ static struct fme {
 	struct event *suspects;		/* current suspect list */
 	struct event *psuspects;	/* previous suspect list */
 	int nsuspects;			/* count of suspects */
-	int nonfault;			/* zero if all suspects T_FAULT */
 	int posted_suspects;		/* true if we've posted a diagnosis */
 	int uniqobs;			/* number of unique events observed */
 	int peek;			/* just peeking, don't track suspects */
@@ -881,12 +880,6 @@ is_problem(enum nametype t)
 }
 
 static int
-is_fault(enum nametype t)
-{
-	return (t == N_FAULT);
-}
-
-static int
 is_defect(enum nametype t)
 {
 	return (t == N_DEFECT);
@@ -969,10 +962,11 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 	struct node *serdinst;
 	char *serdname;
 	char *serdresource;
+	char *serdclass;
 	struct node *nid;
 	struct serd_entry *newentp;
 	int i, serdn = -1, serdincrement = 1, len = 0;
-	char *serdsuffix = NULL, *serdt = NULL, *ptr;
+	char *serdsuffix = NULL, *serdt = NULL;
 	struct evalue *ep;
 
 	ASSERT(sp->t == N_UPSET);
@@ -1008,25 +1002,22 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 	if (serdinst == NULL)
 		return (-1);
 
-	serdname = ipath2str(serdinst->u.stmt.np->u.event.ename->u.name.s,
-	    NULL);
-	serdresource = ipath2str(NULL,
-	    ipath(serdinst->u.stmt.np->u.event.epname));
-
-	len = strlen(serdname) + strlen(serdresource) + 2;
+	len = strlen(serdinst->u.stmt.np->u.event.ename->u.name.s) + 1;
 	if (serdsuffix != NULL)
 		len += strlen(serdsuffix);
-
-	ptr = MALLOC(len);
-	if (serdsuffix != NULL) {
-		(void) snprintf(ptr, len, "%s%s@%s", serdname, serdsuffix,
-		    serdresource);
-	} else {
-		(void) snprintf(ptr, len, "%s@%s", serdname, serdresource);
-	}
-	FREE(serdname);
+	serdclass = MALLOC(len);
+	if (serdsuffix != NULL)
+		(void) snprintf(serdclass, len, "%s%s",
+		    serdinst->u.stmt.np->u.event.ename->u.name.s, serdsuffix);
+	else
+		(void) snprintf(serdclass, len, "%s",
+		    serdinst->u.stmt.np->u.event.ename->u.name.s);
+	serdresource = ipath2str(NULL,
+	    ipath(serdinst->u.stmt.np->u.event.epname));
+	len += strlen(serdresource) + 1;
+	serdname = MALLOC(len);
+	(void) snprintf(serdname, len, "%s@%s", serdclass, serdresource);
 	FREE(serdresource);
-	serdname = ptr;
 
 	/* handle serd engine "id" property, if there is one */
 	if ((nid =
@@ -1077,30 +1068,12 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 		char *path;
 		uint_t nval;
 		hrtime_t tval;
-		const char *name;
-		char *tptr;
-		char *serd_name;
 		int i;
-		int tmplen;
 		char *ptr;
 		int got_n_override = 0, got_t_override = 0;
 
 		/* no SERD engine yet, so create it */
 		nodep = serdinst->u.stmt.np->u.event.epname;
-		tmplen = strlen(serdinst->u.stmt.np->u.event.ename->u.name.s)
-		    + 2;
-		if (serdsuffix != NULL)
-			tmplen += strlen(serdsuffix);
-		tptr = MALLOC(tmplen);
-		if (serdsuffix != NULL) {
-			(void) snprintf(tptr, len, "%s%s",
-			    serdinst->u.stmt.np->u.event.ename->u.name.s,
-			    serdsuffix);
-		} else {
-			(void) snprintf(tptr, len, "%s",
-			    serdinst->u.stmt.np->u.event.ename->u.name.s);
-		}
-		name = (const char *)tptr;
 		path = ipath2str(NULL, ipath(nodep));
 		cp = config_lookup(fmep->config, path, 0);
 		FREE((void *)path);
@@ -1116,18 +1089,18 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 			while (*ptr3 != '\0') {
 				ptr1 = strchr(ptr3, ',');
 				*ptr1 = '\0';
-				if (strcmp(ptr3, name) == 0) {
+				if (strcmp(ptr3, serdclass) == 0) {
 					ptr2 =  strchr(ptr1 + 1, ',');
 					*ptr2 = '\0';
 					nval = atoi(ptr1 + 1);
 					out(O_ALTFP, "serd override %s_n %d",
-					    name, nval);
+					    serdclass, nval);
 					ptr3 =  strchr(ptr2 + 1, ' ');
 					if (ptr3)
 						*ptr3 = '\0';
 					ptr = STRDUP(ptr2 + 1);
 					out(O_ALTFP, "serd override %s_t %s",
-					    name, ptr);
+					    serdclass, ptr);
 					got_n_override = 1;
 					got_t_override = 1;
 					break;
@@ -1144,40 +1117,42 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 
 		if (cp && got_n_override == 0) {
 			/*
-			 * convert serd engine name into property name
+			 * convert serd engine class into property name
 			 */
-			serd_name = MALLOC(strlen(name) + 3);
-			for (i = 0; i < strlen(name); i++) {
-				if (name[i] == '.')
-					serd_name[i] = '_';
+			char *prop_name = MALLOC(strlen(serdclass) + 3);
+			for (i = 0; i < strlen(serdclass); i++) {
+				if (serdclass[i] == '.')
+					prop_name[i] = '_';
 				else
-					serd_name[i] = name[i];
+					prop_name[i] = serdclass[i];
 			}
-			serd_name[i++] = '_';
-			serd_name[i++] = 'n';
-			serd_name[i] = '\0';
-			if (s = config_getprop(cp, serd_name)) {
+			prop_name[i++] = '_';
+			prop_name[i++] = 'n';
+			prop_name[i] = '\0';
+			if (s = config_getprop(cp, prop_name)) {
 				nval = atoi(s);
-				out(O_ALTFP, "serd override %s_n %s", name, s);
+				out(O_ALTFP, "serd override %s_n %s",
+				    serdclass, s);
 				got_n_override = 1;
 			}
-			serd_name[i - 1] = 't';
-			if (s = config_getprop(cp, serd_name)) {
+			prop_name[i - 1] = 't';
+			if (s = config_getprop(cp, prop_name)) {
 				ptr = STRDUP(s);
-				out(O_ALTFP, "serd override %s_t %s", name, s);
+				out(O_ALTFP, "serd override %s_t %s",
+				    serdclass, s);
 				got_t_override = 1;
 			}
-			FREE(serd_name);
+			FREE(prop_name);
 		}
 
 		if (serdn != -1 && got_n_override == 0) {
 			nval = serdn;
-			out(O_ALTFP, "serd override %s_n %d", name, serdn);
+			out(O_ALTFP, "serd override %s_n %d", serdclass, serdn);
 			got_n_override = 1;
 		}
 		if (serdt != NULL && got_t_override == 0) {
 			ptr = STRDUP(serdt);
-			out(O_ALTFP, "serd override %s_t %s", name, serdt);
+			out(O_ALTFP, "serd override %s_t %s", serdclass, serdt);
 			got_t_override = 1;
 		}
 
@@ -1206,11 +1181,11 @@ serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
 			FREE(ptr);
 		}
 		fmd_serd_create(hdl, serdname, nval, tval);
-		FREE(tptr);
 	}
 
 	newentp = MALLOC(sizeof (*newentp));
-	newentp->ename = stable(serdinst->u.stmt.np->u.event.ename->u.name.s);
+	newentp->ename = stable(serdclass);
+	FREE(serdclass);
 	newentp->ipath = ipath(serdinst->u.stmt.np->u.event.epname);
 	newentp->hdl = hdl;
 	if (lut_lookup(SerdEngines, newentp, (lut_cmp)serd_cmp) == NULL) {
@@ -2062,14 +2037,6 @@ boom:
 	return (NULL);
 }
 
-static uint_t
-avg(uint_t sum, uint_t cnt)
-{
-	unsigned long long s = sum * 10;
-
-	return ((s / cnt / 10) + (((s / cnt % 10) >= 5) ? 1 : 0));
-}
-
 static uint8_t
 percentof(uint_t part, uint_t whole)
 {
@@ -2132,53 +2099,6 @@ rslcmp(const void *a, const void *b)
 }
 
 /*
- *  rsluniq -- given an array of rsl structures, seek out and "remove"
- *	any duplicates.  Dups are "remove"d by NULLing the suspect pointer
- *	of the array element.  Removal also means updating the number of
- *	problems and the number of problems which are not faults.  User
- *	provides the first and last element pointers.
- */
-static void
-rsluniq(struct rsl *first, struct rsl *last, int *nprobs, int *nnonf)
-{
-	struct rsl *cr;
-
-	if (*nprobs == 1)
-		return;
-
-	/*
-	 *  At this point, we only expect duplicate defects.
-	 *  Eversholt's diagnosis algorithm prevents duplicate
-	 *  suspects, but we rewrite defects in the platform code after
-	 *  the diagnosis is made, and that can introduce new
-	 *  duplicates.
-	 */
-	while (first <= last) {
-		if (first->suspect == NULL || !is_defect(first->suspect->t)) {
-			first++;
-			continue;
-		}
-		cr = first + 1;
-		while (cr <= last) {
-			if (is_defect(first->suspect->t)) {
-				if (rslcmp(first, cr) == 0) {
-					cr->suspect = NULL;
-					rslfree(cr);
-					(*nprobs)--;
-					(*nnonf)--;
-				}
-			}
-			/*
-			 * assume all defects are in order after our
-			 * sort and short circuit here with "else break" ?
-			 */
-			cr++;
-		}
-		first++;
-	}
-}
-
-/*
  * get_resources -- for a given suspect, determine what ASRU, FRU and
  *     RSRC nvlists should be advertised in the final suspect list.
  */
@@ -2226,7 +2146,7 @@ get_resources(struct event *sp, struct rsl *rsrcs, struct config *croot)
  */
 static int
 trim_suspects(struct fme *fmep, struct rsl *begin, struct rsl *begin2,
-    fmd_event_t *ffep, int *mess_zero_nonfaultp)
+    fmd_event_t *ffep)
 {
 	struct event *ep;
 	struct rsl *rp = begin;
@@ -2248,14 +2168,10 @@ trim_suspects(struct fme *fmep, struct rsl *begin, struct rsl *begin2,
 			get_resources(ep, rp2, fmep->config);
 			rp2++;
 			mess_zero_count++;
-			if (!is_fault(ep->t))
-				(*mess_zero_nonfaultp)++;
 		} else {
 			get_resources(ep, rp, fmep->config);
 			rp++;
 			fmep->nsuspects++;
-			if (!is_fault(ep->t))
-				fmep->nonfault++;
 		}
 	}
 	return (mess_zero_count);
@@ -2762,7 +2678,7 @@ publish_suspects(struct fme *fmep, struct rsl *srl)
 	nvlist_t *fault;
 	uint8_t cert;
 	uint_t *frs;
-	uint_t fravg, frsum, fr;
+	uint_t frsum, fr;
 	uint_t messval;
 	uint_t retireval;
 	uint_t responseval;
@@ -2775,77 +2691,39 @@ publish_suspects(struct fme *fmep, struct rsl *srl)
 	 * sort the array
 	 */
 	qsort(srl, fmep->nsuspects, sizeof (struct rsl), rslcmp);
-	rsluniq(srl, erl, &fmep->nsuspects, &fmep->nonfault);
 
-	/*
-	 * If the suspect list is all faults, then for a given fault,
-	 * say X of N, X's certainty is computed via:
-	 *
-	 * fitrate(X) / (fitrate(1) + ... + fitrate(N)) * 100
-	 *
-	 * If none of the suspects are faults, and there are N suspects,
-	 * the certainty of a given suspect is 100/N.
-	 *
-	 * If there are are a mixture of faults and other problems in
-	 * the suspect list, we take an average of the faults'
-	 * FITrates and treat this average as the FITrate for any
-	 * non-faults.  The fitrate of any given suspect is then
-	 * computed per the first formula above.
-	 */
-	if (fmep->nonfault == fmep->nsuspects) {
-		/* NO faults in the suspect list */
-		cert = percentof(1, fmep->nsuspects);
-	} else {
-		/* sum the fitrates */
-		frs = alloca(fmep->nsuspects * sizeof (uint_t));
-		fridx = frcnt = frsum = 0;
+	/* sum the fitrates */
+	frs = alloca(fmep->nsuspects * sizeof (uint_t));
+	fridx = frcnt = frsum = 0;
 
-		for (rp = srl; rp <= erl; rp++) {
-			struct node *n;
+	for (rp = srl; rp <= erl; rp++) {
+		struct node *n;
 
-			if (rp->suspect == NULL)
-				continue;
-			if (!is_fault(rp->suspect->t)) {
-				frs[fridx++] = 0;
-				continue;
-			}
-			n = eventprop_lookup(rp->suspect, L_FITrate);
-			if (node2uint(n, &fr) != 0) {
-				out(O_DEBUG|O_NONL, "event ");
-				ipath_print(O_DEBUG|O_NONL,
-				    rp->suspect->enode->u.event.ename->u.name.s,
-				    rp->suspect->ipp);
-				out(O_DEBUG, " has no FITrate (using 1)");
-				fr = 1;
-			} else if (fr == 0) {
-				out(O_DEBUG|O_NONL, "event ");
-				ipath_print(O_DEBUG|O_NONL,
-				    rp->suspect->enode->u.event.ename->u.name.s,
-				    rp->suspect->ipp);
-				out(O_DEBUG, " has zero FITrate (using 1)");
-				fr = 1;
-			}
-
-			frs[fridx++] = fr;
-			frsum += fr;
-			frcnt++;
+		n = eventprop_lookup(rp->suspect, L_FITrate);
+		if (node2uint(n, &fr) != 0) {
+			out(O_DEBUG|O_NONL, "event ");
+			ipath_print(O_DEBUG|O_NONL,
+			    rp->suspect->enode->u.event.ename->u.name.s,
+			    rp->suspect->ipp);
+			out(O_DEBUG, " has no FITrate (using 1)");
+			fr = 1;
+		} else if (fr == 0) {
+			out(O_DEBUG|O_NONL, "event ");
+			ipath_print(O_DEBUG|O_NONL,
+			    rp->suspect->enode->u.event.ename->u.name.s,
+			    rp->suspect->ipp);
+			out(O_DEBUG, " has zero FITrate (using 1)");
+			fr = 1;
 		}
-		fravg = avg(frsum, frcnt);
-		for (fridx = 0; fridx < fmep->nsuspects; fridx++)
-			if (frs[fridx] == 0) {
-				frs[fridx] = fravg;
-				frsum += fravg;
-			}
+
+		frs[fridx++] = fr;
+		frsum += fr;
+		frcnt++;
 	}
 
 	/* Add them in reverse order of our sort, as fmd reverses order */
 	for (rp = erl; rp >= srl; rp--) {
-		if (rp->suspect == NULL)
-			continue;
-		if (!is_fault(rp->suspect->t))
-			allfaulty = B_FALSE;
-		if (fmep->nonfault != fmep->nsuspects)
-			cert = percentof(frs[--fridx], frsum);
+		cert = percentof(frs[--fridx], frsum);
 		fault = fmd_nvl_create_fault(fmep->hdl,
 		    rp->suspect->enode->u.event.ename->u.name.s,
 		    cert,
@@ -3267,7 +3145,6 @@ save_suspects(struct fme *fmep)
 	}
 	fmep->suspects = NULL;
 	fmep->nsuspects = 0;
-	fmep->nonfault = 0;
 }
 
 /*
@@ -3279,12 +3156,10 @@ restore_suspects(struct fme *fmep)
 	struct event *ep;
 	struct event *nextep;
 
-	fmep->nsuspects = fmep->nonfault = 0;
+	fmep->nsuspects = 0;
 	fmep->suspects = fmep->psuspects;
 	for (ep = fmep->psuspects; ep; ep = nextep) {
 		fmep->nsuspects++;
-		if (!is_fault(ep->t))
-			fmep->nonfault++;
 		nextep = ep->psuspects;
 		ep->suspects = ep->psuspects;
 	}
@@ -3301,7 +3176,6 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 	struct rsl *srl = NULL;
 	struct rsl *srl2 = NULL;
 	int mess_zero_count;
-	int mess_zero_nonfault = 0;
 	int rpcnt;
 
 	save_suspects(fmep);
@@ -3345,8 +3219,7 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 		bzero(srl, rpcnt * sizeof (struct rsl));
 		srl2 = MALLOC(rpcnt * sizeof (struct rsl));
 		bzero(srl2, rpcnt * sizeof (struct rsl));
-		mess_zero_count = trim_suspects(fmep, srl, srl2, ffep,
-		    &mess_zero_nonfault);
+		mess_zero_count = trim_suspects(fmep, srl, srl2, ffep);
 
 		/*
 		 * If the resulting suspect list has no members, we're
@@ -3364,7 +3237,6 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 			fmd_case_solve(fmep->hdl, fmep->fmcase);
 		} else if (fmep->nsuspects == 0 && mess_zero_count != 0) {
 			fmep->nsuspects = mess_zero_count;
-			fmep->nonfault = mess_zero_nonfault;
 			publish_suspects(fmep, srl2);
 			out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
 			    fmd_case_uuid(fmep->hdl, fmep->fmcase));
@@ -3387,7 +3259,6 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 			nfmep->id =  Nextid++;
 			nfmep->hdl = fmep->hdl;
 			nfmep->nsuspects = mess_zero_count;
-			nfmep->nonfault = mess_zero_nonfault;
 			nfmep->fmcase = fmd_case_open(fmep->hdl, NULL);
 			out(O_ALTFP|O_STAMP,
 			    "[creating parallel FME%d, case %s]", nfmep->id,
@@ -4134,8 +4005,6 @@ hypothesise(struct fme *fmep, struct event *ep,
 					ep->is_suspect = 1;
 					fmep->suspects = ep;
 					fmep->nsuspects++;
-					if (!is_fault(ep->t))
-						fmep->nonfault++;
 				}
 			}
 		} else
