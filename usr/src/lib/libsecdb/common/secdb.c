@@ -251,7 +251,7 @@ _kva_dup(kva_t *old_kva)
 	}
 	new_data = nkva->data;
 	nkva->length = old_kva->length;
-	for (i = 0; i <= nkva->length; i++) {
+	for (i = 0; i < nkva->length; i++) {
 		new_data[i].key = _strdup_null(old_data[i].key);
 		new_data[i].value = _strdup_null(old_data[i].value);
 	}
