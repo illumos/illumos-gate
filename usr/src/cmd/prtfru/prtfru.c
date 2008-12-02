@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <alloca.h>
 #include <assert.h>
 #include <errno.h>
@@ -34,6 +32,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <wchar.h>
+#include <wctype.h>
 
 #include "fru_tag.h"
 #include "libfrup.h"
@@ -52,6 +52,92 @@
 #define	TEMPERATURE_OFFSET 73
 #define	MIN_VERSION 17
 #define	GMT "%a, %b %d %Y %H:%M:%S GMT"
+
+typedef struct
+{
+    uint8_t value;
+    char *data;
+} Status_CurrentR;
+
+Status_CurrentR Status_CurrentR_status[] = {
+	{ 0x00, "OK"},
+	{ 0x04, "DEEMED FAULTY"},
+	{ 0x08, "FRU DETECTED"},
+	{ 0x0c, "FRU DETECTED, DEEMED FAULTY"},
+	{ 0x10, "PROXIED FAULT"},
+	{ 0x14, "DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0x18, "FRU DETECTED.  Also PROXIED FAULT"},
+	{ 0x1c, "FRU DETECTED, DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0x20, "SUSPECT"},
+	{ 0x24, "SUSPECT, DEEMED FAULTY"},
+	{ 0x28, "SUSPECT, FRU DETECTED"},
+	{ 0x2c, "SUSPECT, FRU DETECTED, DEEMED FAULTY"},
+	{ 0x30, "SUSPECT.  Also PROXIED FAULT"},
+	{ 0x34, "SUSPECT, DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0x38, "SUSPECT, FRU DETECTED.  Also PROXIED FAULT"},
+	{ 0x3c, "SUSPECT, FRU DETECTED, DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0x40, "MAINTENANCE REQUIRED"},
+	{ 0x44, "MAINTENANCE REQUIRED, DEEMED FAULTY"},
+	{ 0x48, "MAINTENANCE REQUIRED, FRU DETECTED"},
+	{ 0x4c, "MAINTENANCE REQUIRED, FRU DETECTED, DEEMED FAULTY"},
+	{ 0x50, "MAINTENANCE REQUIRED.  Also PROXIED FAULT"},
+	{ 0x54, "MAINTENANCE REQUIRED, DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0x58, "MAINTENANCE REQUIRED, FRU DETECTED.  Also PROXIED FAULT"},
+	{ 0x5c, "MAINTENANCE REQUIRED, FRU DETECTED, DEEMED FAULTY. \
+	    Also PROXIED FAULT"},
+	{ 0x60, "MAINTENANCE REQUIRED, SUSPECT"},
+	{ 0x64, "MAINTENANCE REQUIRED, SUSPECT, DEEMED FAULTY"},
+	{ 0x68, "MAINTENANCE REQUIRED, SUSPECT, FRU DETECTED"},
+	{ 0x6c, "MAINTENANCE REQUIRED, SUSPECT, FRU DETECTED, DEEMED FAULTY"},
+	{ 0x70, "MAINTENANCE REQUIRED, SUSPECT.  Also PROXIED FAULT"},
+	{ 0x74, "MAINTENANCE REQUIRED, SUSPECT, DEEMED FAULTY.\
+	    Also PROXIED FAULT"},
+	{ 0x78, "MAINTENANCE REQUIRED, SUSPECT, FRU DETECTED. \
+	    Also PROXIED FAULT"},
+	{ 0x7c, "MAINTENANCE REQUIRED, SUSPECT, FRU DETECTED, \
+	    DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0x80, "DISABLED"},
+	{ 0x84, "DISABLED, DEEMED FAULTY"},
+	{ 0x88, "DISABLED, FRU DETECTED"},
+	{ 0x8c, "DISABLED, FRU DETECTED, DEEMED FAULTY"},
+	{ 0x90, "DISABLED.  Also PROXIED FAULT"},
+	{ 0x94, "DISABLED, DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0x98, "DISABLED, FRU DETECTED.  Also PROXIED FAULT"},
+	{ 0x9c, "DISABLED, FRU DETECTED, DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0xa0, "DISABLED, SUSPECT"},
+	{ 0xa4, "DISABLED, SUSPECT, DEEMED FAULTY"},
+	{ 0xa8, "DISABLED, SUSPECT, FRU DETECTED"},
+	{ 0xac, "DISABLED, SUSPECT, FRU DETECTED, DEEMED FAULTY"},
+	{ 0xb0, "DISABLED, SUSPECT.  Also PROXIED FAULT"},
+	{ 0xb4, "DISABLED, SUSPECT, DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0xb8, "DISABLED, SUSPECT, FRU DETECTED.  Also PROXIED FAULT"},
+	{ 0xbc, "DISABLED, SUSPECT, FRU DETECTED, \
+	    DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0xc0, "DISABLED, MAINTENANCE REQUIRED"},
+	{ 0xc4, "DISABLED, MAINTENANCE REQUIRED, DEEMED FAULTY"},
+	{ 0xc8, "DISABLED, MAINTENANCE REQUIRED, FRU DETECTED"},
+	{ 0xcc, "DISABLED, MAINTENANCE REQUIRED, FRU DETECTED, DEEMED FAULTY"},
+	{ 0xd0, "DISABLED, MAINTENANCE REQUIRED.  Also PROXIED FAULT"},
+	{ 0xd4, "DISABLED, MAINTENANCE REQUIRED, \
+	    DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0xd8, "DISABLED, MAINTENANCE REQUIRED, \
+	    FRU DETECTED.  Also PROXIED FAULT"},
+	{ 0xdc, "DISABLED, MAINTENANCE REQUIRED, FRU DETECTED, \
+	    DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0xe0, "DISABLED, MAINTENANCE REQUIRED, SUSPECT"},
+	{ 0xe4, "DISABLED, MAINTENANCE REQUIRED, SUSPECT, DEEMED FAULTY"},
+	{ 0xe8, "DISABLED, MAINTENANCE REQUIRED, SUSPECT, FRU DETECTED"},
+	{ 0xec, "DISABLED, MAINTENANCE REQUIRED, SUSPECT, \
+	    FRU DETECTED, DEEMED FAULTY"},
+	{ 0xf0, "DISABLED, MAINTENANCE REQUIRED, SUSPECT.  Also PROXIED FAULT"},
+	{ 0xf4, "DISABLED, MAINTENANCE REQUIRED, SUSPECT, \
+	    DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0xf8, "DISABLED, MAINTENANCE REQUIRED, SUSPECT, \
+	    FRU DETECTED.  Also PROXIED FAULT"},
+	{ 0xfc, "DISABLED, MAINTENANCE REQUIRED, SUSPECT, \
+	    FRU DETECTED, DEEMED FAULTY.  Also PROXIED FAULT"},
+	{ 0xff, "RETIRED"}
+};
 
 static void	(*print_node)(fru_node_t fru_type, const char *path,
 				const char *name, end_node_fp_t *end_node,
@@ -360,6 +446,32 @@ static void convertbcdtobinary(int *val)
 	*val = newval;
 }
 
+/*
+ * Checking UTF-8 printable charecter
+ */
+static int check_utf_char(const uint8_t *field, int len)
+{
+	int i, status = 0;
+	char tmp[128], tmp1[128], tmp2[128];
+	(void) sprintf(tmp, " (Invalid Data");
+	(void) sprintf(tmp2, "0x");
+	for (i = 0; i < len && field[i]; i++) {
+		(void) sprintf(tmp1, "%2.2X", field[i]);
+		(void) strcat(tmp2, tmp1);
+		if (iswprint(field[i]) == 0) {
+			status = 1;
+			(void) sprintf(tmp1, " : 0x%2.2X", field[i]);
+			(void) strcat(tmp, tmp1);
+		}
+	}
+	if (status) {
+		(void) sprintf(tmp1, ")");
+		(void) strcat(tmp, tmp1);
+		(void) strcat(tmp2, tmp);
+		output("%s", tmp2);
+	}
+	return (status);
+}
 
 /*
  * Safely pretty-print the value of a field
@@ -478,6 +590,10 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 				}
 			}
 		}
+		if (strcmp(def->name, "Fru_Path") == 0) {
+			if (check_utf_char(field, def->payloadLen) == 1)
+				return;
+		}
 		for (i = 0; i < def->payloadLen && field[i]; i++)
 			safeputchar(field[i]);
 		return;
@@ -530,6 +646,26 @@ print_field(const uint8_t *field, const fru_regdef_t *def)
 			}
 			break;
 		default:
+			if ((strcmp(def->name, "Status") == 0) ||
+			    (strcmp(def->name, "Old_Status") == 0) ||
+			    (strcmp(def->name, "New_Status") == 0)) {
+				int status_length = \
+				    sizeof (Status_CurrentR_status) / \
+				    sizeof (*(Status_CurrentR_status));
+				i = 0;
+				do {
+					if (Status_CurrentR_status[i].value == \
+					    *(field))
+						break;
+					i++;
+				} while (i < status_length);
+				if (i < status_length)
+					output("0x%2.2X (%s)", *(field),
+					    Status_CurrentR_status[i].data);
+				else
+					output("0x%2.2X (UNKNOWN)", *(field));
+				break;
+			}
 			if (strcmp(def->name,
 			"SPD_Data_Revision_Code") == 0) {
 				value = 0;
@@ -970,6 +1106,11 @@ print_packets_in_segment(fru_seghdl_t segment, void *args)
 	else
 		output("%*sSEGMENT: %s\n", INDENT, "", name);
 
+	if (strcmp(name, "ED") == 0) {
+		if (xml) output("%*s</Segment>\n", INDENT, "");
+		free(name);
+		return (FRU_SUCCESS);
+	}
 	/* Iterate over the packets in the segment, printing the contents */
 	if ((status = fru_for_each_packet(segment, print_packet, args))
 	    != FRU_SUCCESS) {
