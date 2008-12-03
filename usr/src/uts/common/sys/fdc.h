@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FDC_H
 #define	_SYS_FDC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -285,6 +282,7 @@ struct fdcntlr {
 	kmutex_t	c_dorlock;	/* digital_output_register mutex */
 	kcondvar_t	c_iocv;		/* condition var for I/O done */
 	ksema_t		c_selsem;	/* sem for select unit */
+	boolean_t	c_suspended;	/* if DDI_SUSPENDed */
 
 	dev_info_t	*c_dip;
 	int		c_number;	/* logical controller number */
@@ -345,10 +343,7 @@ struct fdcntlr {
  */
 
 struct fcobjops {
-	int	(*fco_start)();		/* controller start */
 	int	(*fco_abort)();		/* controller abort */
-	int	(*fco_getcap)();	/* capability retrieval */
-	int	(*fco_setcap)();	/* capability establishment */
 	int	(*fco_dkinfo)();	/* get disk controller info */
 
 	int	(*fco_select)();	/* select / deselect unit */

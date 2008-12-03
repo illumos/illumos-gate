@@ -515,6 +515,14 @@ fd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		(void) ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
 		    DDI_KERNEL_IOCTL, NULL, 0);
+
+		/*
+		 * We want to get suspend/resume events, so that we can
+		 * refuse to suspend when pcfs is mounted.
+		 */
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip,
+		    "pm-hardware-state", "needs-suspend-resume");
+
 		/*
 		 * Ignoring return value because, for passed arguments, only
 		 * DDI_SUCCESS is returned.
@@ -522,22 +530,9 @@ fd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ddi_report_dev(dip);
 		return (DDI_SUCCESS);
 
-#ifdef NOT_YET
 	case DDI_RESUME:
-		drive_num = ddi_get_instance(dip);
-		if (!(fdp = ddi_get_soft_state(fd_state_head, drive_num)))
-			return (DDI_FAILURE);
-		fjp = (struct fcu_obj *)fdp->d_obj;
-		mutex_enter(&fjp->fj_lock);
-		if (!fjp->fj_suspended) {
-			mutex_exit(&fjp->fj_lock);
-			return (DDI_SUCCESS);
-		}
-		fjp->fj_fdc->c_curpcyl[drive_num & 3] = -1;
-		fjp->fj_suspended = 0;
-		mutex_exit(&fjp->fj_lock);
+		/* nothing for us to do */
 		return (DDI_SUCCESS);
-#endif
 
 	default:
 		return (DDI_FAILURE);
@@ -575,12 +570,13 @@ fd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_DETACH:
 		if (fd_unit_is_open(fdp)) {
-			rval = EBUSY;
+			rval = DDI_FAILURE;
 			break;
 		}
 		kstat_delete(fdp->d_iostat);
 		fdp->d_iostat = NULL;
 		fjp = (struct fcu_obj *)fdp->d_obj;
+		fjp->fj_flags &= ~FUNIT_DRVATCH;
 		fjp->fj_data = NULL;
 		fjp->fj_drive = NULL;
 		fjp->fj_chars = NULL;
@@ -591,21 +587,32 @@ fd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_soft_state_free(fd_state_head, drive_num);
 		break;
 
-#ifdef NOT_YET
 	case DDI_SUSPEND:
-		fjp = (struct fcu_obj *)fdp->d_obj;
-		fjp->fj_suspended = 1;	/* Must be before mutex */
-		mutex_enter(&fjp->fj_lock);
-		while (fjp->fj_flags & FUNIT_BUSY) {
-			/* Wait for I/O to finish */
-			cv_wait(&fjp->fj_flags, &fjp->fj_lock);
+		/*
+		 * Bad, bad, bad things will happen if someone
+		 * *changes* the disk in the drive while it is mounted
+		 * and the system is suspended.  We have no way to
+		 * detect that.  (Undetected filesystem corruption.
+		 * Its akin to changing the boot disk while the system
+		 * is suspended.  Don't do it!)
+		 *
+		 * So we refuse to suspend if there is a mounted filesystem.
+		 * (We guess this by looking for a block open.  Character
+		 * opens are fine.)  This limits some of the usability of
+		 * suspend/resume, but it certainly avoids this
+		 * potential filesytem corruption from pilot error.
+		 * Given the decreasing popularity of floppy media, we
+		 * don't see this as much of a limitation.
+		 */
+		if (fdp->d_regopen[OTYP_BLK]) {
+			cmn_err(CE_NOTE,
+			    "Unable to suspend while floppy is in use.");
+			rval = DDI_FAILURE;
 		}
-		mutex_exit(&fjp->fj_lock);
 		break;
-#endif
 
 	default:
-		rval = EINVAL;
+		rval = DDI_FAILURE;
 		break;
 	}
 	return (rval);

@@ -53,6 +53,7 @@
 #include <sys/conf.h>
 #include <sys/file.h>
 #include <sys/cmn_err.h>
+#include <sys/note.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
 #include <sys/stat.h>
@@ -296,10 +297,7 @@ _info(struct modinfo *modinfop)
 }
 
 
-int fdc_start(struct fcu_obj *);
 int fdc_abort(struct fcu_obj *);
-int fdc_getcap(struct fcu_obj *, char *, int);
-int fdc_setcap(struct fcu_obj *, char *, int, int);
 int fdc_dkinfo(struct fcu_obj *, struct dk_cinfo *);
 int fdc_select(struct fcu_obj *, int, int);
 int fdgetchng(struct fcu_obj *, int);
@@ -310,10 +308,7 @@ int fdtrkformat(struct fcu_obj *, int, int, int, int);
 int fdrawioctl(struct fcu_obj *, int, caddr_t);
 
 static struct fcobjops fdc_iops = {
-		fdc_start,	/* controller start */
 		fdc_abort,	/* controller abort */
-		fdc_getcap,	/* capability retrieval */
-		fdc_setcap,	/* capability establishment */
 		fdc_dkinfo,	/* get disk controller info */
 
 		fdc_select,	/* select / deselect unit */
@@ -333,7 +328,7 @@ static struct fcobjops fdc_iops = {
 void encode(xlate_tbl_t *tablep, int val, uchar_t *rcode);
 int decode(xlate_tbl_t *, int, int *);
 static int fdc_propinit1(struct fdcntlr *, int);
-static void fdc_propinit2(struct fdcntlr *, int);
+static void fdc_propinit2(struct fdcntlr *);
 void fdcquiesce(struct fdcntlr *);
 int fdcsense_chng(struct fdcntlr *, int);
 int fdcsense_drv(struct fdcntlr *, int);
@@ -352,13 +347,14 @@ int fdc_docmd(struct fdcntlr *, uchar_t *, uchar_t);
 int fdc_result(struct fdcntlr *, uchar_t *, uchar_t);
 
 
-/* ARGSUSED */
 static int
 fdc_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
     void *arg, void *result)
 {
 	struct 	fdcntlr *fcp;
 	struct	fcu_obj *fjp;
+
+	_NOTE(ARGUNUSED(result));
 
 	FCERRPRINT(FDEP_L0, FDEM_ATTA,
 	    (CE_CONT, "fdc_bus_ctl: cmd= %x\n", ctlop));
@@ -429,12 +425,13 @@ fdc_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	}
 }
 
-/* ARGSUSED */
 static int
 fdc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
 	struct fdcntlr *fcp;
 	int rval;
+
+	_NOTE(ARGUNUSED(dip));
 
 	switch (cmd) {
 	case DDI_INFO_DEVT2DEVINFO:
@@ -486,7 +483,6 @@ fdc_probe(dev_info_t *dip)
 	return (DDI_PROBE_SUCCESS);
 }
 
-/* ARGSUSED */
 static int
 fdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
@@ -545,7 +541,7 @@ fdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (ddi_add_intr(dip, (uint_t)0, NULL,
 		    (ddi_idevice_cookie_t *)0, fdc_intr, (caddr_t)fcp) !=
 		    DDI_SUCCESS) {
-			cmn_err(CE_WARN, "fdc: cannot add intr\n");
+			cmn_err(CE_WARN, "fdc: cannot add intr");
 			goto no_attach;
 		}
 		intr_set++;
@@ -557,7 +553,7 @@ fdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		if (ddi_dmae_alloc(dip, fcp->c_dmachan, DDI_DMA_DONTWAIT, NULL)
 		    != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "fdc: cannot acquire dma%d\n",
+			cmn_err(CE_WARN, "fdc: cannot acquire dma%d",
 			    fcp->c_dmachan);
 			goto no_attach;
 		}
@@ -596,12 +592,29 @@ fdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		mutex_exit(&fcp->c_lock);
 		sema_v(&fcp->c_selsem);
 
-		fdc_propinit2(fcp, cntlr_num);
+		fdc_propinit2(fcp);
 
 		ddi_report_dev(dip);
 		return (DDI_SUCCESS);
 
 	case DDI_RESUME:
+
+		fcp = ddi_get_driver_private(dip);
+
+		mutex_enter(&fcp->c_lock);
+		fcp->c_suspended = B_FALSE;
+		fcp->c_csb.csb_xstate = FXS_RESET;
+		fcp->c_flags |= FCFLG_WAITING;
+		fdcquiesce(fcp);
+
+		while (fcp->c_flags & FCFLG_WAITING) {
+			cv_wait(&fcp->c_iocv, &fcp->c_lock);
+		}
+		mutex_exit(&fcp->c_lock);
+
+		/* should be good to go now */
+		sema_v(&fcp->c_selsem);
+
 		return (DDI_SUCCESS);
 		/* break; */
 
@@ -646,9 +659,8 @@ fdc_propinit1(struct fdcntlr *fcp, int cntlr)
 	return (DDI_SUCCESS);
 }
 
-/* ARGSUSED */
 static void
-fdc_propinit2(struct fdcntlr *fcp, int cntlr)
+fdc_propinit2(struct fdcntlr *fcp)
 {
 	dev_info_t *dip;
 	int ccr;
@@ -724,7 +736,6 @@ fdc_propinit2(struct fdcntlr *fcp, int cntlr)
 	outb(fcp->c_regbase + FCR_CCR, 0);
 }
 
-/* ARGSUSED */
 static int
 fdc_enhance_probe(struct fdcntlr *fcp)
 {
@@ -826,12 +837,10 @@ fdc_enhance_probe(struct fdcntlr *fcp)
 	return (retcode);
 }
 
-/* ARGSUSED */
 static int
 fdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	struct fdcntlr *fcp;
-	struct fcu_obj *fjp;
 	int unit;
 	int rval = 0;
 
@@ -853,7 +862,7 @@ fdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		if (ddi_dmae_release(fcp->c_dip, fcp->c_dmachan) !=
 		    DDI_SUCCESS)
 			cmn_err(CE_WARN, "fdc_detach: dma release failed, "
-			    "dip %p, dmachan %x\n",
+			    "dip %p, dmachan %x",
 			    (void*)fcp->c_dip, fcp->c_dmachan);
 		ddi_prop_remove_all(fcp->c_dip);
 		ddi_set_driver_private(fcp->c_dip, NULL);
@@ -867,28 +876,28 @@ fdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	case DDI_SUSPEND:
 		/*
-		 * Following code causes the fdc (floppy controller)
-		 * to suspend as long as there are no floppy drives
-		 * attached to it.
-		 * At present the floppy driver does not support
-		 * SUSPEND/RESUME.
+		 * For suspend, we just use the semaphore to
+		 * keep any child devices from accessing any of our
+		 * hardware routines, and then shutdown the hardware.
 		 *
-		 * Check if any FD units are attached
-		 *
-		 * For now, SUSPEND/RESUME is not supported
-		 * if a floppy drive is present.
-		 * So if any FD unit is attached return DDI_FAILURE
+		 * On resume, we'll reinit the hardware and release the
+		 * semaphore.
 		 */
-		for (unit = 0; unit < NFDUN; unit++) {
-			fjp = fcp->c_unit[unit];
-			if (fjp->fj_flags & FUNIT_DRVATCH) {
-				cmn_err(CE_WARN,
-				    "fdc_detach: fd attached, failing SUSPEND");
-				return (DDI_FAILURE);
-			}
+		sema_p(&fcp->c_selsem);
+
+		if (ddi_dmae_disable(fcp->c_dip, fcp->c_dmachan) !=
+		    DDI_SUCCESS) {
+			cmn_err(CE_WARN, "fdc_suspend: dma disable failed, "
+			    "dip %p, dmachan %x", (void *)fcp->c_dip,
+			    fcp->c_dmachan);
+			/* give it back on failure */
+			sema_v(&fcp->c_selsem);
+			return (DDI_FAILURE);
 		}
 
-		cmn_err(CE_NOTE, "fdc_detach: SUSPEND fdc");
+		mutex_enter(&fcp->c_lock);
+		fcp->c_suspended = B_TRUE;
+		mutex_exit(&fcp->c_lock);
 
 		rval = DDI_SUCCESS;
 		break;
@@ -900,13 +909,6 @@ fdc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (rval);
 }
 
-
-/* ARGSUSED */
-int
-fdc_start(struct fcu_obj *fjp)
-{
-	return (ENOSYS);
-}
 
 int
 fdc_abort(struct fcu_obj *fjp)
@@ -928,7 +930,7 @@ fdc_abort(struct fcu_obj *fjp)
 			    DDI_SUCCESS)
 				cmn_err(CE_WARN,
 				    "fdc_detach: dma release failed, "
-				    "dip %p, dmachan %x\n",
+				    "dip %p, dmachan %x",
 				    (void*)fcp->c_dip, fcp->c_dmachan);
 		}
 		mutex_exit(&fcp->c_lock);
@@ -936,20 +938,6 @@ fdc_abort(struct fcu_obj *fjp)
 		return (DDI_SUCCESS);
 	}
 	return (DDI_FAILURE);
-}
-
-/* ARGSUSED */
-int
-fdc_getcap(struct fcu_obj *fjp, char *a, int i)
-{
-	return (ENOSYS);
-}
-
-/* ARGSUSED */
-int
-fdc_setcap(struct fcu_obj *fjp, char *a, int i, int j)
-{
-	return (ENOSYS);
 }
 
 int
@@ -975,7 +963,6 @@ fdc_dkinfo(struct fcu_obj *fjp, struct dk_cinfo *dcp)
 /*
  * on=> non-zero = select, 0 = de-select
  */
-/* ARGSUSED */
 int
 fdc_select(struct fcu_obj *fjp, int funit, int on)
 {
@@ -997,7 +984,7 @@ fdc_select(struct fcu_obj *fjp, int funit, int on)
 				cmn_err(CE_WARN,
 				    "fdc_select: controller setup rejected "
 				    "fdcntrl %p transfer rate %x step rate %x"
-				    " head load time 40\n", (void*)fcp,
+				    " head load time 40", (void*)fcp,
 				    fjp->fj_chars->fdc_transfer_rate,
 				    fjp->fj_drive->fdd_steprate);
 		}
@@ -1054,7 +1041,7 @@ int
 fdgetchng(struct fcu_obj *fjp, int funit)
 {
 	if (fdcsense_drv(fjp->fj_fdc, funit & 3))
-		cmn_err(CE_WARN, "fdgetchng: write protect check failed\n");
+		cmn_err(CE_WARN, "fdgetchng: write protect check failed");
 	return (fdcsense_chng(fjp->fj_fdc, funit & 3));
 }
 
@@ -1123,7 +1110,7 @@ fdrecalseek(struct fcu_obj *fjp, int funit, int arg, int execflg)
 		rval = ENODEV;
 
 	if (fdcsense_drv(fcp, unit))
-		cmn_err(CE_WARN, "fdgetchng: write protect check failed\n");
+		cmn_err(CE_WARN, "fdgetchng: write protect check failed");
 out:
 	return (rval);
 }
@@ -1217,13 +1204,13 @@ fdrw(struct fcu_obj *fjp, int funit, int rw, int cyl, int head,
 		csb->csb_handle_bound = 1;
 		if (ddi_dma_numwin(csb->csb_dmahandle, &csb->csb_dmawincnt) !=
 		    DDI_SUCCESS) {
-			cmn_err(CE_WARN, "fdrw: dma numwin failed\n");
+			cmn_err(CE_WARN, "fdrw: dma numwin failed");
 			rval = EINVAL;
 			goto out;
 		}
 	} else {
 		cmn_err(CE_WARN,
-		    "fdrw: dma addr bind handle failed, rval = %d\n", rval);
+		    "fdrw: dma addr bind handle failed, rval = %d", rval);
 		rval = EINVAL;
 		goto out;
 	}
@@ -1239,7 +1226,7 @@ out:
 			if (ddi_dma_unbind_handle(csb->csb_dmahandle) !=
 			    DDI_SUCCESS)
 				cmn_err(CE_WARN, "fdrw: "
-				    "dma unbind handle failed\n");
+				    "dma unbind handle failed");
 			csb->csb_handle_bound = 0;
 		}
 		if (mem_handle != NULL) {
@@ -1345,13 +1332,13 @@ fdtrkformat(struct fcu_obj *fjp, int funit, int cyl, int head, int filldata)
 		csb->csb_handle_bound = 1;
 		if (ddi_dma_numwin(csb->csb_dmahandle, &csb->csb_dmawincnt) !=
 		    DDI_SUCCESS) {
-			cmn_err(CE_WARN, "fdtrkformat: dma numwin failed\n");
+			cmn_err(CE_WARN, "fdtrkformat: dma numwin failed");
 			rval = EINVAL;
 			goto out;
 		}
 	} else {
 		cmn_err(CE_WARN,
-		    "fdtrkformat: dma buf bind handle failed, rval = %d\n",
+		    "fdtrkformat: dma buf bind handle failed, rval = %d",
 		    rval);
 		rval = EINVAL;
 		goto out;
@@ -1364,7 +1351,7 @@ out:
 			if (ddi_dma_unbind_handle(csb->csb_dmahandle) !=
 			    DDI_SUCCESS)
 				cmn_err(CE_WARN, "fdtrkformat: "
-				    "dma unbind handle failed\n");
+				    "dma unbind handle failed");
 			csb->csb_handle_bound = 0;
 		}
 		if (mem_handle != NULL) {
@@ -1376,7 +1363,6 @@ out:
 	return (rval);
 }
 
-/* ARGSUSED */
 int
 fdrawioctl(struct fcu_obj *fjp, int funit, caddr_t arg)
 {
@@ -1392,6 +1378,8 @@ fdrawioctl(struct fcu_obj *fjp, int funit, caddr_t arg)
 	ddi_acc_handle_t mem_handle = NULL;
 	caddr_t aligned_buf;
 	size_t real_size;
+
+	_NOTE(ARGUNUSED(funit));
 
 	FCERRPRINT(FDEP_L2, FDEM_RAWI,
 	    (CE_NOTE, "fdrawioctl: cmd[0]=0x%x", fdrp->fdr_cmd[0]));
@@ -1509,13 +1497,13 @@ fdrawioctl(struct fcu_obj *fjp, int funit, caddr_t arg)
 			if (ddi_dma_numwin(csb->csb_dmahandle,
 			    &csb->csb_dmawincnt) != DDI_SUCCESS) {
 				cmn_err(CE_WARN,
-				    "fdrawioctl: dma numwin failed\n");
+				    "fdrawioctl: dma numwin failed");
 				rval = EINVAL;
 				goto out;
 			}
 		} else {
 			cmn_err(CE_WARN, "fdrawioctl: "
-			    "dma buf bind handle failed, rval = %d\n", rval);
+			    "dma buf bind handle failed, rval = %d", rval);
 			rval = EINVAL;
 			goto out;
 		}
@@ -1565,7 +1553,7 @@ out:
 			if (ddi_dma_unbind_handle(csb->csb_dmahandle) !=
 			    DDI_SUCCESS)
 				cmn_err(CE_WARN, "fdrawioctl: "
-				    "dma unbind handle failed\n");
+				    "dma unbind handle failed");
 			csb->csb_handle_bound = 0;
 		}
 		if (mem_handle != NULL) {
@@ -1590,7 +1578,7 @@ encode(xlate_tbl_t *tablep, int val, uchar_t *rcode)
 		}
 	} while ((++tablep)->value);
 	*rcode = tablep->code;
-	cmn_err(CE_WARN, "fdc encode failed, table %p val %x code %x\n",
+	cmn_err(CE_WARN, "fdc encode failed, table %p val %x code %x",
 	    (void *)tablep, val, (uint_t)*rcode);
 }
 
@@ -1685,7 +1673,7 @@ fdcquiesce(struct fdcntlr *fcp)
 
 	if (ddi_dmae_stop(fcp->c_dip, fcp->c_dmachan) != DDI_SUCCESS)
 		cmn_err(CE_WARN, "fdcquiesce: dmae stop failed, "
-		    "dip %p, dmachan %x\n",
+		    "dip %p, dmachan %x",
 		    (void*)fcp->c_dip, fcp->c_dmachan);
 
 	fcp->c_digout = (fcp->c_digout & (FD_DMTREN | FD_DRSEL)) | FD_ENABLE;
@@ -2054,7 +2042,7 @@ fdc_motorsm(struct fcu_obj *fjp, int input, int timeval)
 		    (int)fjp->fj_unit, input, old_mstate));
 #if 0
 		cmn_err(CE_WARN,
-		    "fdc_motorsm: unit %d  bad input %d or bad state %d\n",
+		    "fdc_motorsm: unit %d  bad input %d or bad state %d",
 		    (int)fjp->fj_unit, input, old_mstate);
 		fcp->c_mtrstate[unit] = FMS_OFF;
 		if (fcp->c_motort[unit] != 0) {
@@ -2143,7 +2131,7 @@ fdc_dmae_isr(struct fdcntlr *fcp)
 			return (&csb->csb_dmacookie);
 		}
 	} else
-		cmn_err(CE_WARN, "fdc: unsolicited DMA interrupt\n");
+		cmn_err(CE_WARN, "fdc: unsolicited DMA interrupt");
 	return (NULL);
 }
 
@@ -2216,7 +2204,7 @@ retry:
 			cmn_err(CE_WARN,
 			    "fdc_select: controller setup rejected "
 			    "fdcntrl %p transfer rate %x step rate %x "
-			    "head load time 40\n", (void*)fcp,
+			    "head load time 40", (void*)fcp,
 			    fjp->fj_chars->fdc_transfer_rate,
 			    fjp->fj_drive->fdd_steprate);
 
@@ -2301,7 +2289,7 @@ retry:
 		if (ddi_dmae_prog(fcp->c_dip, &dmaereq, &csb->csb_dmacookie,
 		    fcp->c_dmachan) != DDI_SUCCESS)
 			cmn_err(CE_WARN, "fdc_exec: dmae prog failed, "
-			    "dip %p, dmachan %x\n",
+			    "dip %p, dmachan %x",
 			    (void*)fcp->c_dip, fcp->c_dmachan);
 	}
 
@@ -2495,7 +2483,7 @@ fdrecover(struct fdcntlr *fcp)
 			    &residual) != DDI_SUCCESS)
 				cmn_err(CE_WARN,
 				    "fdc_recover: dmae getcnt failed, "
-				    "dip %p dmachan %x residual %x\n",
+				    "dip %p dmachan %x residual %x",
 				    (void*)fcp->c_dip, fcp->c_dmachan,
 				    residual);
 			FCERRPRINT(FDEP_L2, FDEM_RECO,
@@ -2600,7 +2588,6 @@ fdrecover(struct fdcntlr *fcp)
 
 
 /*	Autovector Interrupt Entry Point	*/
-/* ARGSUSED */
 static uint_t
 fdc_intr(caddr_t arg)
 {
@@ -2618,6 +2605,11 @@ fdc_intr(caddr_t arg)
 	csb = &fcp->c_csb;
 
 	mutex_enter(&fcp->c_lock);
+	if (fcp->c_suspended) {
+		mutex_exit(&fcp->c_lock);
+		return (DDI_INTR_UNCLAIMED);
+	}
+
 	/*
 	 * Wait for the RQM bit to be set, or until we've tested it
 	 * a bunch of times (which may imply this isn't our interrupt).
@@ -2690,7 +2682,7 @@ fdc_intr(caddr_t arg)
 					    DDI_SUCCESS) {
 						cmn_err(CE_WARN,
 						    "fdc_intr: "
-						    "dma getwin failed\n");
+						    "dma getwin failed");
 					}
 					csb->csb_dmacurrcookie = 0;
 				}
@@ -2700,7 +2692,7 @@ fdc_intr(caddr_t arg)
 				    DDI_SUCCESS)
 					cmn_err(CE_WARN,
 					    "fdc_intr: dmae prog failed, "
-					    "dip %p dmachannel %x\n",
+					    "dip %p dmachannel %x",
 					    (void*)fcp->c_dip,
 					    fcp->c_dmachan);
 
@@ -2787,7 +2779,7 @@ fdwatch(void *arg)
 	if (fcp->c_flags & FCFLG_WAITING) {
 		if (ddi_dmae_stop(fcp->c_dip, fcp->c_dmachan) != DDI_SUCCESS)
 			cmn_err(CE_WARN, "fdwatch: dmae stop failed, "
-			    "dip %p, dmachan %x\n",
+			    "dip %p, dmachan %x",
 			    (void*)fcp->c_dip, fcp->c_dmachan);
 		csb = &fcp->c_csb;
 		FCERRPRINT(FDEP_L3, FDEM_WATC,
