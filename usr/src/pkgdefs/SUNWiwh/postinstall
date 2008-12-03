@@ -27,7 +27,7 @@
 
 # Driver info
 DRV=iwh
-DRVALIAS='"pciex8086,4232" "pciex8086,4235" "pciex8086,4236" "pciex8086, 423a"'
+DRVALIAS='"pciex8086,4232" "pciex8086,4235" "pciex8086,4236" "pciex8086,423a"'
 
 BASEDIR=${BASEDIR:-/}
 
