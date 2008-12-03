@@ -219,7 +219,7 @@ main(int argc, char **argv)
 		} else {
 			message(USAGE,
 			    gettext("Usage: %s [-] [ username [ arg ... ] ]"),
-				prog);
+			    prog);
 			exit(1);
 		}
 	}
@@ -236,7 +236,7 @@ main(int argc, char **argv)
 		if (*argv[1] == '-') {
 			message(USAGE,
 			    gettext("Usage: %s [-] [ username [ arg ... ] ]"),
-				prog);
+			    prog);
 			exit(1);
 		} else
 			nptr = argv[1];	/* use valid command-line username */
@@ -371,7 +371,7 @@ main(int argc, char **argv)
 		exit(2);
 	}
 	if (dosyslog)
-		syslog(getuid() == 0 ? LOG_INFO : LOG_NOTICE,
+		syslog(pwd.pw_uid == 0 ? LOG_NOTICE : LOG_INFO,
 		    "'su %s' succeeded for %s on %s",
 		    pwd.pw_name, username, ttyn);
 	closelog();
@@ -413,7 +413,7 @@ ok:
 	/* update audit session in a non-pam environment */
 	update_audit(&pwd);
 	if (dosyslog)
-		syslog(getuid() == 0 ? LOG_INFO : LOG_NOTICE,
+		syslog(pwd.pw_uid == 0 ? LOG_NOTICE : LOG_INFO,
 		    "'su %s' succeeded for %s on %s",
 		    pwd.pw_name, username, ttyn);
 #endif	/* DYNAMIC_SU */
@@ -530,13 +530,13 @@ ok:
 				if (strcmp(initenv[j], "TZ") == 0) {
 					(void) strcpy(tznam, "TZ=");
 					(void) strlcat(tznam, initvar,
-						sizeof (tznam));
+					    sizeof (tznam));
 
 				} else {
 					var = (char *)
-						malloc(strlen(initenv[j])
-							+ strlen(initvar)
-							+ 2);
+					    malloc(strlen(initenv[j])
+					    + strlen(initvar)
+					    + 2);
 					(void) strcpy(var, initenv[j]);
 					(void) strcat(var, "=");
 					(void) strcat(var, initvar);
@@ -554,7 +554,7 @@ ok:
 				if (initvar = defread("TIMEZONE=")) {
 					(void) strcpy(tznam, "TZ=");
 					(void) strlcat(tznam, initvar,
-							sizeof (tznam));
+					    sizeof (tznam));
 				}
 				(void) defopen(NULL);
 			}
@@ -1288,8 +1288,8 @@ validate(char *usernam, int *pw_change)
 			message(ERR, gettext("Sorry"));
 			audit_failure(PW_FALSE, &pwd, NULL, error);
 			if (dosyslog)
-			    syslog(LOG_CRIT, "'su %s' failed for %s on %s",
-				pwd.pw_name, usernam, ttyn);
+				syslog(LOG_CRIT, "'su %s' failed for %s on %s",
+				    pwd.pw_name, usernam, ttyn);
 			closelog();
 			exit(3);
 		}
