@@ -1677,7 +1677,7 @@ it_validate_configprops(nvlist_t *nvl, nvlist_t *errs)
 	 * number then update the nvlist
 	 */
 	if (update_rad_server) {
-		(void) nvlist_add_string(nvl, name, rad_server);
+		(void) nvlist_add_string(nvl, PROP_RADIUS_SERVER, rad_server);
 	}
 
 	/*
