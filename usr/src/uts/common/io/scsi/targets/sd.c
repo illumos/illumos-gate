@@ -21306,6 +21306,9 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case DKIOCSMBOOT:
 		case DKIOCG_PHYGEOM:
 		case DKIOCG_VIRTGEOM:
+#if defined(__i386) || defined(__amd64)
+		case DKIOCSETEXTPART:
+#endif
 			/* let cmlb handle it */
 			goto skip_ready_valid;
 
@@ -21448,6 +21451,9 @@ skip_ready_valid:
 	case DKIOCSMBOOT:
 	case DKIOCG_PHYGEOM:
 	case DKIOCG_VIRTGEOM:
+#if defined(__i386) || defined(__amd64)
+	case DKIOCSETEXTPART:
+#endif
 		SD_TRACE(SD_LOG_IOCTL, un, "DKIOC %d\n", cmd);
 
 		/* TUR should spin up */

@@ -993,6 +993,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 	case DKIOCGETEFI:
 	case DKIOCSETEFI:
 	case DKIOCPARTITION:
+	case DKIOCSETEXTPART:
 	{
 		int rc;
 

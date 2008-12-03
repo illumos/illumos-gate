@@ -364,6 +364,8 @@ f none usr/lib/amd64/passwdutil.so.1 755 root bin
 f none usr/lib/amd64/straddr.so.2 755 root bin
 s none usr/lib/amd64/straddr.so=straddr.so.2
 f none usr/lib/amd64/watchmalloc.so.1 755 root bin
+s none usr/lib/libfdisk.so.1=../../lib/libfdisk.so.1
+s none usr/lib/libfdisk.so=../../lib/libfdisk.so.1
 d none usr/xpg4/lib/amd64 755 root bin
 s none usr/xpg4/lib/64=amd64
 f none usr/xpg4/lib/amd64/libcurses.so.1 755 root bin

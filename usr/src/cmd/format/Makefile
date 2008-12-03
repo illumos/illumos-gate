@@ -53,8 +53,11 @@ $(ROOTETCDATA) := FILEMODE = 0644
 $(ROOTETCDATA) := OWNER = root
 $(ROOTETCDATA) := GROUP = sys
 
-LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair -ldevid
+LDLIBS_i386= -lfdisk 
+LDLIBS_sparc=
+LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair -ldevid $(LDLIBS_$(MACH))
 
+LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2
 CPPFLAGS    += -D_EXTVTOC
 
 .KEEP_STATE:

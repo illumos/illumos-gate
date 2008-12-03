@@ -39,6 +39,9 @@
 #include <sys/efi_partition.h>
 #include <sys/cmlb.h>
 #include <sys/cmlb_impl.h>
+#if defined(__i386) || defined(__amd64)
+#include <sys/fs/dv_node.h>
+#endif
 #include <sys/ddi_impldefs.h>
 
 /*
@@ -103,6 +106,78 @@ static struct driver_minor_data dk_minor_data[] = {
 #endif			/* defined(_FIRMWARE_NEEDS_FDISK) */
 	{0}
 };
+
+#if defined(__i386) || defined(__amd64)
+#if defined(_FIRMWARE_NEEDS_FDISK)
+static struct driver_minor_data dk_ext_minor_data[] = {
+	{"p5", 21, S_IFBLK},
+	{"p6", 22, S_IFBLK},
+	{"p7", 23, S_IFBLK},
+	{"p8", 24, S_IFBLK},
+	{"p9", 25, S_IFBLK},
+	{"p10", 26, S_IFBLK},
+	{"p11", 27, S_IFBLK},
+	{"p12", 28, S_IFBLK},
+	{"p13", 29, S_IFBLK},
+	{"p14", 30, S_IFBLK},
+	{"p15", 31, S_IFBLK},
+	{"p16", 32, S_IFBLK},
+	{"p17", 33, S_IFBLK},
+	{"p18", 34, S_IFBLK},
+	{"p19", 35, S_IFBLK},
+	{"p20", 36, S_IFBLK},
+	{"p21", 37, S_IFBLK},
+	{"p22", 38, S_IFBLK},
+	{"p23", 39, S_IFBLK},
+	{"p24", 40, S_IFBLK},
+	{"p25", 41, S_IFBLK},
+	{"p26", 42, S_IFBLK},
+	{"p27", 43, S_IFBLK},
+	{"p28", 44, S_IFBLK},
+	{"p29", 45, S_IFBLK},
+	{"p30", 46, S_IFBLK},
+	{"p31", 47, S_IFBLK},
+	{"p32", 48, S_IFBLK},
+	{"p33", 49, S_IFBLK},
+	{"p34", 50, S_IFBLK},
+	{"p35", 51, S_IFBLK},
+	{"p36", 52, S_IFBLK},
+	{"p5,raw", 21, S_IFCHR},
+	{"p6,raw", 22, S_IFCHR},
+	{"p7,raw", 23, S_IFCHR},
+	{"p8,raw", 24, S_IFCHR},
+	{"p9,raw", 25, S_IFCHR},
+	{"p10,raw", 26, S_IFCHR},
+	{"p11,raw", 27, S_IFCHR},
+	{"p12,raw", 28, S_IFCHR},
+	{"p13,raw", 29, S_IFCHR},
+	{"p14,raw", 30, S_IFCHR},
+	{"p15,raw", 31, S_IFCHR},
+	{"p16,raw", 32, S_IFCHR},
+	{"p17,raw", 33, S_IFCHR},
+	{"p18,raw", 34, S_IFCHR},
+	{"p19,raw", 35, S_IFCHR},
+	{"p20,raw", 36, S_IFCHR},
+	{"p21,raw", 37, S_IFCHR},
+	{"p22,raw", 38, S_IFCHR},
+	{"p23,raw", 39, S_IFCHR},
+	{"p24,raw", 40, S_IFCHR},
+	{"p25,raw", 41, S_IFCHR},
+	{"p26,raw", 42, S_IFCHR},
+	{"p27,raw", 43, S_IFCHR},
+	{"p28,raw", 44, S_IFCHR},
+	{"p29,raw", 45, S_IFCHR},
+	{"p30,raw", 46, S_IFCHR},
+	{"p31,raw", 47, S_IFCHR},
+	{"p32,raw", 48, S_IFCHR},
+	{"p33,raw", 49, S_IFCHR},
+	{"p34,raw", 50, S_IFCHR},
+	{"p35,raw", 51, S_IFCHR},
+	{"p36,raw", 52, S_IFCHR},
+	{0}
+};
+#endif			/* defined(_FIRMWARE_NEEDS_FDISK) */
+#endif			/* if defined(__i386) || defined(__amd64) */
 
 static struct driver_minor_data dk_minor_data_efi[] = {
 	{"a", 0, S_IFBLK},
@@ -247,6 +322,12 @@ static int cmlb_dkio_partition(struct cmlb_lun *cl, caddr_t arg, int flag,
     void *tg_cookie);
 
 #if defined(__i386) || defined(__amd64)
+static int cmlb_dkio_set_ext_part(struct cmlb_lun *cl, caddr_t arg, int flag,
+    void *tg_cookie);
+static int cmlb_validate_ext_part(struct cmlb_lun *cl, int part, int epart,
+    uint32_t start, uint32_t size);
+static int cmlb_is_linux_swap(struct cmlb_lun *cl, uint32_t part_start,
+    void *tg_cookie);
 static int cmlb_dkio_get_virtgeom(struct cmlb_lun *cl, caddr_t arg, int flag);
 static int cmlb_dkio_get_phygeom(struct cmlb_lun *cl, caddr_t  arg, int flag);
 static int cmlb_dkio_partinfo(struct cmlb_lun *cl, dev_t dev, caddr_t arg,
@@ -593,6 +674,9 @@ cmlb_attach(dev_info_t *devi, cmlb_tg_ops_t *tgopsp, int device_type,
 	cl->cl_alter_behavior = alter_behavior;
 	cl->cl_reserved = -1;
 	cl->cl_msglog_flag |= CMLB_ALLOW_2TB_WARN;
+#if defined(__i386) || defined(__amd64)
+	cl->cl_logical_drive_count = 0;
+#endif
 
 	if (is_removable == 0) {
 		mutex_exit(CMLB_MUTEX(cl));
@@ -1051,6 +1135,9 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 		case DKIOCSGEOM:
 		case DKIOCSETEFI:
 		case DKIOCSMBOOT:
+#if defined(__i386) || defined(__amd64)
+		case DKIOCSETEXTPART:
+#endif
 			break;
 		case DKIOCSVTOC:
 #if defined(__i386) || defined(__amd64)
@@ -1195,7 +1282,12 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 		err = ENOTTY;
 #endif
 		break;
-
+#if defined(__i386) || defined(__amd64)
+	case DKIOCSETEXTPART:
+		cmlb_dbg(CMLB_TRACE, cl, "DKIOCSETEXTPART");
+		err = cmlb_dkio_set_ext_part(cl, (caddr_t)arg, flag, tg_cookie);
+		break;
+#endif
 	default:
 		err = ENOTTY;
 
@@ -1632,7 +1724,7 @@ no_solaris_partition:
 	 * Note that dkl_cylno is not used for the fdisk map entries, so
 	 * we set it to an entirely bogus value.
 	 */
-	for (count = 0; count < FD_NUMPART; count++) {
+	for (count = 0; count < FDISK_PARTS; count++) {
 		cl->cl_map[FDISK_P1 + count].dkl_cylno = UINT16_MAX;
 		cl->cl_map[FDISK_P1 + count].dkl_nblk =
 		    cl->cl_fmap[count].fmap_nblk;
@@ -1837,6 +1929,267 @@ cmlb_resync_geom_caches(struct cmlb_lun *cl, diskaddr_t capacity,
 }
 
 
+#if defined(__i386) || defined(__amd64)
+/*
+ *    Function: cmlb_update_ext_minor_nodes
+ *
+ * Description: Routine to add/remove extended partition device nodes
+ *
+ *   Arguments:
+ *	cl		driver soft state (unit) structure
+ *	num_parts	Number of logical drives found on the LUN
+ *
+ * Should be called with the mutex held
+ *
+ * Return Code: 0 for success
+ *
+ *     Context: User and Kernel thread
+ *
+ */
+static int
+cmlb_update_ext_minor_nodes(struct cmlb_lun *cl, int num_parts)
+{
+	int	i;
+	char	name[48];
+	int	instance;
+	struct driver_minor_data	*demdp, *demdpr;
+	char	*devnm;
+	dev_info_t	*pdip;
+
+	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
+	ASSERT(cl->cl_update_ext_minor_nodes == 1);
+	instance = ddi_get_instance(CMLB_DEVINFO(cl));
+
+	demdp = dk_ext_minor_data;
+	demdpr = &dk_ext_minor_data[MAX_EXT_PARTS];
+
+	if (cl->cl_logical_drive_count) {
+		for (i = 0; i < cl->cl_logical_drive_count; i++) {
+			(void) sprintf(name, "%s", demdp->name);
+			ddi_remove_minor_node(CMLB_DEVINFO(cl), name);
+			(void) sprintf(name, "%s", demdpr->name);
+			ddi_remove_minor_node(CMLB_DEVINFO(cl), name);
+			demdp++;
+			demdpr++;
+		}
+		/* There are existing device nodes. Remove them */
+		devnm = kmem_alloc(MAXNAMELEN + 1, KM_SLEEP);
+		(void) ddi_deviname(cl->cl_devi, devnm);
+		pdip = ddi_get_parent(cl->cl_devi);
+		(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
+		kmem_free(devnm, MAXNAMELEN + 1);
+	}
+
+	demdp = dk_ext_minor_data;
+	demdpr = &dk_ext_minor_data[MAX_EXT_PARTS];
+
+	for (i = 0; i < num_parts; i++) {
+		(void) sprintf(name, "%s", demdp->name);
+		if (ddi_create_minor_node(CMLB_DEVINFO(cl), name,
+		    demdp->type,
+		    (instance << CMLBUNIT_SHIFT) | demdp->minor,
+		    cl->cl_node_type, NULL) == DDI_FAILURE) {
+			/*
+			 * Clean up any nodes that may have been
+			 * created, in case this fails in the middle
+			 * of the loop.
+			 */
+			ddi_remove_minor_node(CMLB_DEVINFO(cl), NULL);
+			cl->cl_logical_drive_count = 0;
+			return (ENXIO);
+		}
+		(void) sprintf(name, "%s", demdpr->name);
+		if (ddi_create_minor_node(CMLB_DEVINFO(cl), name,
+		    demdpr->type,
+		    (instance << CMLBUNIT_SHIFT) | demdpr->minor,
+		    cl->cl_node_type, NULL) == DDI_FAILURE) {
+			/*
+			 * Clean up any nodes that may have been
+			 * created, in case this fails in the middle
+			 * of the loop.
+			 */
+			ddi_remove_minor_node(CMLB_DEVINFO(cl), NULL);
+			cl->cl_logical_drive_count = 0;
+			return (ENXIO);
+		}
+		demdp++;
+		demdpr++;
+	}
+	cl->cl_logical_drive_count = i;
+	cl->cl_update_ext_minor_nodes = 0;
+	return (0);
+}
+/*
+ *    Function: cmlb_validate_ext_part
+ *
+ * Description: utility routine to validate an extended partition's
+ *		metadata as found on disk
+ *
+ *   Arguments:
+ *	cl		driver soft state (unit) structure
+ *	part		partition number of the extended partition
+ *	epart		partition number of the logical drive
+ *	start		absolute sector number of the start of the logical
+ *			drive being validated
+ *	size		size of logical drive being validated
+ *
+ * Return Code: 0 for success
+ *
+ *     Context: User and Kernel thread
+ *
+ * Algorithm :
+ * Error cases are :
+ *	1. If start block is lesser than or equal to the end block
+ *	2. If either start block or end block is beyond the bounadry
+ *	   of the extended partition.
+ *	3. start or end block overlap with existing partitions.
+ *		To check this, first make sure that the start block doesnt
+ *		overlap with existing partitions. Then, calculate the
+ *		possible end block for the given start block that doesnt
+ *		overlap with existing partitions. This can be calculated by
+ *		first setting the possible end block to the end of the
+ *		extended partition (optimistic) and then, checking if there
+ *		is any other partition that lies after the start of the
+ *		partition being validated. If so, set the possible end to
+ *		one block less than the beginning of the next nearest partition
+ *		If the actual end block is greater than the calculated end
+ *		block, we have an overlap.
+ *
+ */
+static int
+cmlb_validate_ext_part(struct cmlb_lun *cl, int part, int epart, uint32_t start,
+    uint32_t size)
+{
+	int i;
+	uint32_t end = start + size - 1;
+	uint32_t ext_start = cl->cl_fmap[part].fmap_start;
+	uint32_t ext_end = ext_start + cl->cl_fmap[part].fmap_nblk - 1;
+	uint32_t ts, te;
+	uint32_t poss_end = ext_end;
+
+	if (end <= start) {
+		return (1);
+	}
+
+	/*
+	 * Check if the logical drive boundaries are within that of the
+	 * extended partition.
+	 */
+	if (start <= ext_start || start > ext_end || end <= ext_start ||
+	    end > ext_end) {
+		return (1);
+	}
+
+	/*
+	 * epart will be equal to FD_NUMPART if it is the first logical drive.
+	 * There is no need to check for overlaps with other logical drives,
+	 * since it is the only logical drive that we have come across so far.
+	 */
+	if (epart == FD_NUMPART) {
+		return (0);
+	}
+
+	/* Check for overlaps with existing logical drives */
+	i = FD_NUMPART;
+	ts = cl->cl_fmap[FD_NUMPART].fmap_start;
+	te = ts + cl->cl_fmap[FD_NUMPART].fmap_nblk - 1;
+
+	while ((i < epart) && ts && te) {
+		if (start >= ts && start <= te) {
+			return (1);
+		}
+
+		if ((ts < poss_end) && (ts > start)) {
+			poss_end = ts - 1;
+		}
+
+		i++;
+		ts = cl->cl_fmap[i].fmap_start;
+		te = ts + cl->cl_fmap[i].fmap_nblk - 1;
+	}
+
+	if (end > poss_end) {
+		return (1);
+	}
+
+	return (0);
+}
+
+
+/*
+ *    Function: cmlb_is_linux_swap
+ *
+ * Description: utility routine to verify if a partition is a linux swap
+ *		partition or not.
+ *
+ *   Arguments:
+ *	cl		driver soft state (unit) structure
+ *	part_start	absolute sector number of the start of the partition
+ *			being verified
+ *	tg_cookie	cookie from target driver to be passed back to target
+ *			driver when we call back to it through tg_ops.
+ *
+ * Return Code: 0 for success
+ *
+ *     Context: User and Kernel thread
+ *
+ * Notes:
+ *	The linux swap magic "SWAP-SPACE" or "SWAPSPACE2" is found as the
+ *	last 10 bytes of a disk block whose size is that of the linux page
+ *	size. This disk block is found at the beginning of the swap partition.
+ */
+static int
+cmlb_is_linux_swap(struct cmlb_lun *cl, uint32_t part_start, void *tg_cookie)
+{
+	int		i;
+	int		rval = -1;
+	uint32_t	seek_offset;
+	uint32_t	linux_pg_size;
+	char 		*buf, *linux_swap_magic;
+	int		sec_sz = cl->cl_sys_blocksize;
+	/* Known linux kernel page sizes */
+	uint32_t	linux_pg_size_arr[] = {4096, };
+
+	ASSERT(cl != NULL);
+	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
+
+	if ((buf = kmem_zalloc(sec_sz, KM_NOSLEEP)) == NULL) {
+		return (ENOMEM);
+	}
+
+	linux_swap_magic = buf + sec_sz - 10;
+
+	for (i = 0; i < sizeof (linux_pg_size_arr)/sizeof (uint32_t); i++) {
+		linux_pg_size = linux_pg_size_arr[i];
+		seek_offset = linux_pg_size/sec_sz - 1;
+		seek_offset += part_start;
+
+		mutex_exit(CMLB_MUTEX(cl));
+		rval = DK_TG_READ(cl, buf, seek_offset, sec_sz, tg_cookie);
+		mutex_enter(CMLB_MUTEX(cl));
+
+		if (rval != 0) {
+			cmlb_dbg(CMLB_ERROR,  cl,
+			    "cmlb_is_linux_swap: disk read err\n");
+			rval = EIO;
+			break;
+		}
+
+		rval = -1;
+
+		if ((strncmp(linux_swap_magic, "SWAP-SPACE", 10) == 0) ||
+		    (strncmp(linux_swap_magic, "SWAPSPACE2", 10) == 0)) {
+			/* Found a linux swap */
+			rval = 0;
+			break;
+		}
+	}
+
+	kmem_free(buf, sec_sz);
+	return (rval);
+}
+#endif
+
 /*
  *    Function: cmlb_read_fdisk
  *
@@ -1869,7 +2222,7 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 	struct ipart	*fdp;
 	struct mboot	*mbp;
 	struct ipart	fdisk[FD_NUMPART];
-	int		i;
+	int		i, k;
 	char		sigbuf[2];
 	caddr_t		bufp;
 	int		uidx;
@@ -1878,6 +2231,13 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 	uint_t		solaris_offset;	/* offset to solaris part. */
 	daddr_t		solaris_size;	/* size of solaris partition */
 	uint32_t	blocksize;
+#if defined(__i386) || defined(__amd64)
+	struct ipart	eparts[2];
+	struct ipart	*efdp1 = &eparts[0];
+	struct ipart	*efdp2 = &eparts[1];
+	int		ext_part_exists = 0;
+	int		ld_count = 0;
+#endif
 
 	ASSERT(cl != NULL);
 	ASSERT(mutex_owned(CMLB_MUTEX(cl)));
@@ -1992,6 +2352,14 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 	for (fdp = fdisk, i = 0; i < FD_NUMPART; i++, fdp++) {
 		uint32_t relsect;
 		uint32_t numsect;
+		uchar_t systid;
+#if defined(__i386) || defined(__amd64)
+		/*
+		 * Stores relative block offset from the beginning of the
+		 * Extended Partition.
+		 */
+		int	ext_relsect = 0;
+#endif
 
 		if (fdp->numsect == 0) {
 			cl->cl_fmap[i].fmap_start = 0;
@@ -2007,6 +2375,96 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 
 		cl->cl_fmap[i].fmap_start = relsect;
 		cl->cl_fmap[i].fmap_nblk  = numsect;
+		cl->cl_fmap[i].fmap_systid = LE_8(fdp->systid);
+
+#if defined(__i386) || defined(__amd64)
+		/* Support only one extended partition per LUN */
+		if ((fdp->systid == EXTDOS || fdp->systid == FDISK_EXTLBA) &&
+		    (ext_part_exists == 0)) {
+			int j;
+			uint32_t logdrive_offset;
+			uint32_t ext_numsect;
+			uint32_t abs_secnum;
+			int is_linux_swap;
+
+			ext_part_exists = 1;
+
+			for (j = FD_NUMPART; j < FDISK_PARTS; j++) {
+				mutex_exit(CMLB_MUTEX(cl));
+				rval = DK_TG_READ(cl, bufp,
+				    (relsect + ext_relsect), blocksize,
+				    tg_cookie);
+				mutex_enter(CMLB_MUTEX(cl));
+
+				if (rval != 0) {
+					cmlb_dbg(CMLB_ERROR,  cl,
+					    "cmlb_read_fdisk: Extended "
+					    "partition read err\n");
+					goto done;
+				}
+				/*
+				 * The first ipart entry provides the offset
+				 * at which the logical drive starts off from
+				 * the beginning of the container partition
+				 * and the size of the logical drive.
+				 * The second ipart entry provides the offset
+				 * of the next container partition from the
+				 * beginning of the extended partition.
+				 */
+				bcopy(&bufp[FDISK_PART_TABLE_START], eparts,
+				    sizeof (eparts));
+				logdrive_offset = LE_32(efdp1->relsect);
+				ext_numsect = LE_32(efdp1->numsect);
+				systid = LE_8(efdp1->systid);
+				if (logdrive_offset <= 0 || ext_numsect <= 0)
+					break;
+				abs_secnum = relsect + ext_relsect +
+				    logdrive_offset;
+
+				/* Boundary condition and overlap checking */
+				if (cmlb_validate_ext_part(cl, i, j, abs_secnum,
+				    ext_numsect)) {
+					break;
+				}
+
+				if ((cl->cl_fmap[j].fmap_start != abs_secnum) ||
+				    (cl->cl_fmap[j].fmap_nblk != ext_numsect) ||
+				    (cl->cl_fmap[j].fmap_systid != systid)) {
+					/*
+					 * Indicates change from previous
+					 * partinfo. Need to recreate
+					 * logical device nodes.
+					 */
+					cl->cl_update_ext_minor_nodes = 1;
+				}
+				cl->cl_fmap[j].fmap_start = abs_secnum;
+				cl->cl_fmap[j].fmap_nblk  = ext_numsect;
+				cl->cl_fmap[j].fmap_systid = systid;
+				ld_count++;
+
+				is_linux_swap = 0;
+				if (efdp1->systid == SUNIXOS) {
+					if (cmlb_is_linux_swap(cl, abs_secnum,
+					    tg_cookie) == 0) {
+						is_linux_swap = 1;
+					}
+				}
+
+				if ((efdp1->systid == SUNIXOS) ||
+				    (efdp1->systid == SUNIXOS2)) {
+					if ((uidx == -1) && (!is_linux_swap)) {
+						uidx = 0;
+						solaris_offset = abs_secnum;
+						solaris_size = ext_numsect;
+					}
+				}
+
+				if ((ext_relsect = LE_32(efdp2->relsect)) == 0)
+					break;
+			}
+		}
+
+#endif
 
 		if (fdp->systid != SUNIXOS &&
 		    fdp->systid != SUNIXOS2 &&
@@ -2022,12 +2480,38 @@ cmlb_read_fdisk(struct cmlb_lun *cl, diskaddr_t capacity, void *tg_cookie)
 		 * then use the first inactive solaris partition id
 		 */
 		if ((uidx == -1) || (fdp->bootid == ACTIVE)) {
-			uidx = i;
-			solaris_offset = relsect;
-			solaris_size   = numsect;
+#if defined(__i386) || defined(__amd64)
+			if (cmlb_is_linux_swap(cl, relsect, tg_cookie) != 0) {
+#endif
+				uidx = i;
+				solaris_offset = relsect;
+				solaris_size   = numsect;
+#if defined(__i386) || defined(__amd64)
+			}
+#endif
 		}
 	}
-
+#if defined(__i386) || defined(__amd64)
+	if (ld_count < cl->cl_logical_drive_count) {
+		/*
+		 * Some/all logical drives were deleted. Clear out
+		 * the fmap entries correspoding to those deleted drives.
+		 */
+		for (k = ld_count + FD_NUMPART;
+		    k < cl->cl_logical_drive_count + FD_NUMPART; k++) {
+			cl->cl_fmap[k].fmap_start = 0;
+			cl->cl_fmap[k].fmap_nblk  = 0;
+			cl->cl_fmap[k].fmap_systid = 0;
+		}
+		cl->cl_update_ext_minor_nodes = 1;
+	}
+	if (cl->cl_update_ext_minor_nodes) {
+		rval = cmlb_update_ext_minor_nodes(cl, ld_count);
+		if (rval != 0) {
+			goto done;
+		}
+	}
+#endif
 	cmlb_dbg(CMLB_INFO,  cl, "fdisk 0x%x 0x%lx",
 	    cl->cl_solaris_offset, cl->cl_solaris_size);
 done:
@@ -4485,6 +4969,25 @@ cmlb_dkio_set_mboot(struct cmlb_lun *cl, caddr_t arg, int flag, void *tg_cookie)
 }
 
 
+#if defined(__i386) || defined(__amd64)
+/*ARGSUSED*/
+static int
+cmlb_dkio_set_ext_part(struct cmlb_lun *cl, caddr_t arg, int flag,
+    void *tg_cookie)
+{
+	int fdisk_rval;
+	diskaddr_t capacity;
+
+	ASSERT(!mutex_owned(CMLB_MUTEX(cl)));
+
+	mutex_enter(CMLB_MUTEX(cl));
+	capacity = cl->cl_blockcount;
+	fdisk_rval = cmlb_read_fdisk(cl, capacity, tg_cookie);
+	mutex_exit(CMLB_MUTEX(cl));
+	return (fdisk_rval);
+}
+#endif
+
 /*
  *    Function: cmlb_setup_default_geometry
  *
@@ -4723,7 +5226,7 @@ no_solaris_partition:
 	 * Note that dkl_cylno is not used for the fdisk map entries, so
 	 * we set it to an entirely bogus value.
 	 */
-	for (count = 0; count < FD_NUMPART; count++) {
+	for (count = 0; count < FDISK_PARTS; count++) {
 		cl->cl_map[FDISK_P1 + count].dkl_cylno = UINT32_MAX;
 		cl->cl_map[FDISK_P1 + count].dkl_nblk =
 		    cl->cl_fmap[count].fmap_nblk;

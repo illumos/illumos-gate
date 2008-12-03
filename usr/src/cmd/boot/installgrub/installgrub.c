@@ -43,6 +43,7 @@
 #include <locale.h>
 #include "message.h"
 #include <errno.h>
+#include <libfdisk.h>
 
 #ifndef	TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
@@ -72,7 +73,8 @@ static int is_floppy = 0;
 static int is_bootpar = 0;
 static int stage2_fd;
 static int partition, slice = 0xff;
-static unsigned int stage2_first_sector, stage2_second_sector;
+static char *device_p0;
+static uint32_t stage2_first_sector, stage2_second_sector;
 
 
 static char bpb_sect[SECTOR_SIZE];
@@ -171,10 +173,11 @@ static unsigned int
 get_start_sector(int fd)
 {
 	static unsigned int start_sect = 0;
-
-	int i;
+	uint32_t secnum, numsec;
+	int i, pno, rval, ext_sol_part_found = 0;
 	struct mboot *mboot;
 	struct ipart *part;
+	ext_part_t *epp;
 
 	if (start_sect)
 		return (start_sect);
@@ -187,6 +190,47 @@ get_start_sector(int fd)
 				break;
 		}
 	}
+
+	/* Read extended partition to find a solaris partition */
+	if ((rval = libfdisk_init(&epp, device_p0, NULL, FDISK_READ_DISK))
+	    != FDISK_SUCCESS) {
+		switch (rval) {
+			/*
+			 * FDISK_EBADLOGDRIVE and FDISK_ENOLOGDRIVE can
+			 * be considered as soft errors and hence
+			 * we do not exit
+			 */
+			case FDISK_EBADLOGDRIVE:
+				break;
+			case FDISK_ENOLOGDRIVE:
+				break;
+			case FDISK_ENOVGEOM:
+				fprintf(stderr, "Could not get virtual"
+				    " geometry for this device\n");
+				exit(1);
+				break;
+			case FDISK_ENOPGEOM:
+				fprintf(stderr, "Could not get physical"
+				    " geometry for this device\n");
+				exit(1);
+				break;
+			case FDISK_ENOLGEOM:
+				fprintf(stderr, "Could not get label"
+				    " geometry for this device\n");
+				exit(1);
+				break;
+			default:
+				perror("Failed to initialise libfdisk.\n");
+				exit(1);
+				break;
+		}
+	}
+
+	rval = fdisk_get_solaris_part(epp, &pno, &secnum, &numsec);
+	if (rval == FDISK_SUCCESS) {
+		ext_sol_part_found = 1;
+	}
+	libfdisk_fini(&epp);
 
 	/*
 	 * If there is no boot partition, find the solaris partition
@@ -217,6 +261,10 @@ get_start_sector(int fd)
 				(void) fprintf(stderr, BAD_PART, i);
 				exit(-1);
 			}
+
+			if (fdisk_is_dos_extended(part->systid))
+				continue;
+
 			if (edkpi.p_start >= part->relsect &&
 			    edkpi.p_start < (part->relsect + part->numsect)) {
 				/* Found the partition */
@@ -225,7 +273,7 @@ get_start_sector(int fd)
 		}
 	}
 
-	if (i == FD_NUMPART) {
+	if ((i == FD_NUMPART) && (!ext_sol_part_found)) {
 		(void) fprintf(stderr, BOOTPAR);
 		exit(-1);
 	}
@@ -239,12 +287,18 @@ get_start_sector(int fd)
 		}
 	}
 
-	start_sect = part->relsect;
+	if ((i == FD_NUMPART) && (ext_sol_part_found)) {
+		start_sect = secnum;
+		partition = pno;
+	} else {
+		start_sect = part->relsect;
+		partition = i;
+	}
+
 	if (part->bootid != 128 && write_mboot == 0) {
 		(void) fprintf(stdout, BOOTPAR_INACTIVE, i + 1);
 	}
 
-	partition = i;
 	return (start_sect);
 }
 
@@ -340,6 +394,7 @@ read_boot_sect(char *device)
 	device[i - 2] = 'p';
 	device[i - 1] = '0';
 
+	device_p0 = strdup(device);
 	fd = open(device, O_RDONLY);
 	if (fd == -1 || read(fd, boot_sect, SECTOR_SIZE) != SECTOR_SIZE) {
 		(void) fprintf(stderr, READ_FAIL_MBR, device);
@@ -448,8 +503,8 @@ modify_and_write_stage2(int dev_fd)
 
 	if (is_floppy || is_bootpar) {
 		int i = 0;
-		uint_t partition_offset;
-		uint_t install_addr = 0x8200;
+		uint32_t partition_offset;
+		uint32_t install_addr = 0x8200;
 		uchar_t *pos = (uchar_t *)stage2_buffer + STAGE2_BLOCKLIST;
 
 		stage2_first_sector = blocklist[0];

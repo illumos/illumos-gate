@@ -22,38 +22,43 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"@(#)Makefile	1.13	08/06/09 SMI"
 #
 
-#       Makefile for fdisk
+include		../Makefile.lib
 
-PROG= fdisk
-ROOTFS_PROG= $(PROG)
+LIBRARY= libfdisk.a
+VERS= .1
 
-ROOTSBINLINK=	$(ROOTUSRSBIN)/$(PROG)
+HDRS=		libfdisk.h
 
-include ../Makefile.cmd
+HDRDIR=		$(MACH)
 
-CPPFLAGS += -D_FILE_OFFSET_BITS=64
+all:=		TARGET= all
+install:=	TARGET= install
+clean:=		TARGET= clean
+clobber:=	TARGET= clobber
+lint:=		TARGET= lint
+_msg:=		TARGET= _msg
 
-LDLIBS_i386= -lfdisk
-LDLIBS_sparc=
-LDLIBS += -ladm -lefi $(LDLIBS_$(MACH))
+.KEEP_STATE:
 
-i386_CFLAGS += -D_LARGEFILE64_SOURCE
-i386_CFLAGS += -D_FILE_OFFSET_BITS=64
+SUBDIRS=	$(MACH) 
 
-all:	$(ROOTFS_PROG)
+all install clean clobber lint: $(SUBDIRS)
 
-install: all $(ROOTSBINPROG) $(ROOTSBINLINK)
 
-$(ROOTSBINLINK):	FRC
-	-$(RM) $@; $(SYMLINK) ../../sbin/$(PROG) $@
+# install rule for install_h target
+
+install_h: $(ROOTHDRS)
+
+check: $(CHECKHDRS)
+
+_msg: $(MSGSUBDIRS)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
-clean:
-
-lint:	lint_PROG
-
 include ../Makefile.targ
+include ../../Makefile.msg.targ

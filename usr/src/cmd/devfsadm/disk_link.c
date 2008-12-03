@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <devfsadm.h>
 #include <stdio.h>
 #include <strings.h>
@@ -46,6 +44,14 @@
 #define	MN_SMI		"h"
 #define	MN_EFI		"wd"
 #define	ASCIIWWNSIZE	255
+#if defined(__i386) || defined(__amd64)
+/*
+ * The number of minor nodes per LUN is defined by the disk drivers.
+ * Currently it is set to 64. Refer CMLBUNIT_SHIFT (cmlb_impl.h)
+ */
+#define	NUM_MINORS_PER_INSTANCE	64
+#endif
+
 
 extern int system_labeled;
 
@@ -297,14 +303,48 @@ disk_common(di_minor_t minor, di_node_t node, char *disk, int flags)
 	char *nt = NULL;
 	int *int_prop;
 	int  nflags = 0;
+#if defined(__i386) || defined(__amd64)
+	char mn_copy[4];
+	char *part;
+	int part_num;
+#endif
 
-	if (strstr(mn = di_minor_name(minor), ",raw")) {
+	mn = di_minor_name(minor);
+	if (strstr(mn, ",raw")) {
 		dir = "rdsk";
+#if defined(__i386) || defined(__amd64)
+		(void) strncpy(mn_copy, mn, 4);
+		part = strtok(mn_copy, ",");
+#endif
 	} else {
 		dir = "dsk";
+#if defined(__i386) || defined(__amd64)
+		part = mn;
+#endif
 	}
 
-	if (mn[0] < 113) {
+#if defined(__i386) || defined(__amd64)
+	/*
+	 * The following is a table describing the allocation of
+	 * minor numbers, minor names and /dev/dsk names for partitions
+	 * and slices on x86 systems.
+	 *
+	 *	Minor Number	Minor Name	/dev/dsk name
+	 *	---------------------------------------------
+	 *	0 to 15		"a" to "p"	s0 to s15
+	 *	16		"q"		p0
+	 *	17 to 20	"r" to "u"	p1 to p4
+	 *	21 to 52	"p5" to "p36"	p5 to p36
+	 *
+	 */
+	part_num = atoi(part + 1);
+
+	if ((mn[0] == 'p') && (part_num >= 5)) {
+		/* logical drive */
+		(void) snprintf(slice, 4, "%s", part);
+	} else {
+#endif
+	if (mn[0] < 'q') {
 		(void) sprintf(slice, "s%d", mn[0] - 'a');
 	} else if (strncmp(mn, MN_EFI, 2) != 0) {
 		(void) sprintf(slice, "p%d", mn[0] - 'q');
@@ -312,6 +352,9 @@ disk_common(di_minor_t minor, di_node_t node, char *disk, int flags)
 		/* For EFI label */
 		(void) sprintf(slice, SLICE_EFI);
 	}
+#if defined(__i386) || defined(__amd64)
+	}
+#endif
 
 	nflags = 0;
 	if (system_labeled) {

@@ -172,6 +172,8 @@ s none lib/crypto/64=amd64
 f none lib/crypto/amd64/kmf_nss.so.1 755 root bin
 f none lib/crypto/amd64/kmf_openssl.so.1 755 root bin
 f none lib/crypto/amd64/kmf_pkcs11.so.1 755 root bin
+s none lib/libfdisk.so=libfdisk.so.1
+f none lib/libfdisk.so.1 755 root bin
 v none lib/libc.so.1 755 root bin
 d none lib/secure/amd64 755 root bin
 s none lib/secure/64=amd64

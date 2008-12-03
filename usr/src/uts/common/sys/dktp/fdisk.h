@@ -44,6 +44,18 @@ extern "C" {
  */
 
 /*
+ * the MAX values are the maximum usable values for BIOS chs values
+ * The MAX_CYL value of 1022 is the maximum usable value
+ *   the value of 1023 is a fence value,
+ *   indicating no CHS geometry exists for the corresponding LBA value.
+ * HEAD range [ 0 .. MAX_HEAD ], so number of heads is (MAX_HEAD + 1)
+ * SECT range [ 1 .. MAX_SECT ], so number of sectors is (MAX_SECT)
+ */
+#define	MAX_SECT	(63)
+#define	MAX_CYL		(1022)
+#define	MAX_HEAD	(254)
+
+/*
  * BOOTSZ was reduced from 446 to 440 bytes to NOT overwrite the Windows
  * Vista DISKID. Otherwise Vista won't boot from Solaris GRUB in a dual-boot
  * setup.
@@ -80,6 +92,7 @@ struct ipart {
 /*
  * Values for systid.
  */
+#define	UNUSED		0	/* Empty Partition */
 #define	DOSOS12		1	/* DOS partition, 12-bit FAT */
 #define	PCIXOS		2	/* PC/IX partition */
 #define	DOSOS16		4	/* DOS partition, 16-bit FAT */
@@ -103,7 +116,7 @@ struct ipart {
 				/* raw partition.  ID was 0 but conflicted */
 				/* with DOS 3.3 fdisk    */
 #define	UNIXOS		99	/* UNIX V.x partition */
-#define	UNUSED		100	/* unassigned partition */
+#define	FDISK_NOVELL2	100	/* Novell Netware 286 */
 #define	FDISK_NOVELL3	101	/* Novell Netware 3.x and later */
 #define	FDISK_QNX4	119	/* QNX 4.x */
 #define	FDISK_QNX42	120	/* QNX 4.x 2nd part */
@@ -138,6 +151,20 @@ struct mboot {	/* master boot block */
 	char	parts[FD_NUMPART * sizeof (struct ipart)];
 	ushort_t signature;
 };
+
+#if defined(__i386) || defined(__amd64)
+
+/* Byte offset of the start of the partition table within the sector */
+#define	FDISK_PART_TABLE_START	446
+
+/* Maximum number of valid partitions assumed as 32 */
+#define	MAX_EXT_PARTS	32
+
+#else
+
+#define	MAX_EXT_PARTS	0
+
+#endif	/* if defined(__i386) || defined(__amd64) */
 
 #ifdef	__cplusplus
 }

@@ -35,10 +35,16 @@ extern "C" {
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
+/*
+ * FDISK partitions - 4 primary and MAX_EXT_PARTS number of Extended
+ * Partitions.
+ */
+#define	FDISK_PARTS		(FD_NUMPART + MAX_EXT_PARTS)
+
 #if defined(_SUNOS_VTOC_8)
 #define	NSDMAP			NDKMAP
 #elif defined(_SUNOS_VTOC_16)
-#define	NSDMAP			(NDKMAP + FD_NUMPART + 1)
+#define	NSDMAP			(NDKMAP + FDISK_PARTS + 1)
 #else
 #error "No VTOC format defined."
 #endif
@@ -115,6 +121,7 @@ extern "C" {
 struct fmap {
 	ulong_t fmap_start;	/* starting block number */
 	ulong_t fmap_nblk;	/* number of blocks */
+	uchar_t fmap_systid;		/* systid of the partition */
 };
 
 /* for cm_state */
@@ -150,7 +157,7 @@ typedef struct cmlb_lun {
 
 	diskaddr_t	cl_offset[MAXPART];	/* partition start blocks */
 
-	struct fmap	cl_fmap[FD_NUMPART];	/* fdisk partitions */
+	struct fmap	cl_fmap[FDISK_PARTS];	/* fdisk partitions */
 
 	uchar_t		cl_asciilabel[LEN_DKL_ASCII];	/* Disk ASCII label */
 
@@ -194,6 +201,15 @@ typedef struct cmlb_lun {
 	int		cl_device_type;		/* DTYPE_DIRECT,.. */
 	int		cl_reserved;		/* reserved efi partition # */
 	cmlb_tg_ops_t 	*cmlb_tg_ops;
+#if defined(__i386) || defined(__amd64)
+	/*
+	 * Flag indicating whether extended partition nodes should be created
+	 * or not. Is set in cmlb_attach. After creating nodes in
+	 * cmlb_read_fdisk, it will be unset.
+	 */
+	int		cl_update_ext_minor_nodes;
+	int		cl_logical_drive_count;
+#endif  /* __i386 || __amd64 */
 	uint8_t		cl_msglog_flag;		/* used to enable/suppress */
 						/* certain log messages */
 } cmlb_lun_t;

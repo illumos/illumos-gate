@@ -22,38 +22,62 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"@(#)Makefile	1.13	08/06/09 SMI"
 #
 
-#       Makefile for fdisk
+HDRS =          libfdisk.h
+ROOTHDRDIR=     $(ROOT)/usr/include
+ROOTHDRS=       $(HDRS:%=$(ROOTHDRDIR)/%)
+CHECKDIRS=	$(HDRS:%.h=%.check)
+HDRDIR =        ./
 
-PROG= fdisk
-ROOTFS_PROG= $(PROG)
+$(ROOTHDRDIR)/%: %
+        $(INS.file)
 
-ROOTSBINLINK=	$(ROOTUSRSBIN)/$(PROG)
+all :=		TARGET = all
+install_h:=	TARGET = install_h
 
-include ../Makefile.cmd
+install_h: $(ROOTHDRS)
 
-CPPFLAGS += -D_FILE_OFFSET_BITS=64
+LIBRARY= libfdisk.a
+VERS= .1
 
-LDLIBS_i386= -lfdisk
-LDLIBS_sparc=
-LDLIBS += -ladm -lefi $(LDLIBS_$(MACH))
+PICS=   pics/libfdisk.o
+
+pics/%.o: %.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+OBJECTS= \
+libfdisk.o
+
+# include library definitions
+include ../../Makefile.lib
+
+# install this library in the root filesystem
+include ../../Makefile.rootfs
+
+SRCDIR =	.
+
+C99MODE=	$(C99_DISABLE)
+
+MAPFILES += mapfile-vers
+
+CPPFLAGS += -I.
+LDLIBS += -lc
 
 i386_CFLAGS += -D_LARGEFILE64_SOURCE
 i386_CFLAGS += -D_FILE_OFFSET_BITS=64
 
-all:	$(ROOTFS_PROG)
+.KEEP_STATE:
 
-install: all $(ROOTSBINPROG) $(ROOTSBINLINK)
+LIBS=	$(DYNLIB) $(LINTLIB)
 
-$(ROOTSBINLINK):	FRC
-	-$(RM) $@; $(SYMLINK) ../../sbin/$(PROG) $@
+all: $(LIBS)
 
-FRC:
+lint: lintcheck
 
-clean:
+install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)
 
-lint:	lint_PROG
 
-include ../Makefile.targ
+# include library targets
+include ../../Makefile.targ

@@ -22,38 +22,30 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"@(#)Makefile	1.13	08/06/09 SMI"
 #
 
-#       Makefile for fdisk
-
-PROG= fdisk
-ROOTFS_PROG= $(PROG)
-
-ROOTSBINLINK=	$(ROOTUSRSBIN)/$(PROG)
-
-include ../Makefile.cmd
-
-CPPFLAGS += -D_FILE_OFFSET_BITS=64
-
-LDLIBS_i386= -lfdisk
-LDLIBS_sparc=
-LDLIBS += -ladm -lefi $(LDLIBS_$(MACH))
-
-i386_CFLAGS += -D_LARGEFILE64_SOURCE
-i386_CFLAGS += -D_FILE_OFFSET_BITS=64
-
-all:	$(ROOTFS_PROG)
-
-install: all $(ROOTSBINPROG) $(ROOTSBINLINK)
-
-$(ROOTSBINLINK):	FRC
-	-$(RM) $@; $(SYMLINK) ../../sbin/$(PROG) $@
-
-FRC:
-
-clean:
-
-lint:	lint_PROG
-
-include ../Makefile.targ
+SUNWprivate_1.1 {
+    global:
+        fdisk_ext_validate_part_start;
+        fdisk_commit_ext_part;
+        fdisk_ext_find_last_free_sec;
+        fdisk_ext_find_first_free_sec;
+        fdisk_delete_logical_drive;
+        fdisk_add_logical_drive;
+	fdisk_is_linux_swap;
+        fdisk_get_disk_geom;
+        fdisk_init_ext_part;
+	fdisk_get_solaris_part;
+	fdisk_get_part_info;
+        fdisk_invalid_bb_sig;
+	libfdisk_init;
+	libfdisk_reset;
+	libfdisk_fini;
+        fdisk_validate_logical_drive;
+        fdisk_change_logical_drive_id;
+        fdisk_delete_ext_part;
+        fdisk_ext_part_exists;
+	fdisk_mounted_logical_drives;
+    local:
+	*;
+};
