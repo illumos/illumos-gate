@@ -3624,8 +3624,21 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 			/* flush data for older drives per scsi spec. */
 			if (st_cmd(un, SCMD_WRITE_FILE_MARK, 0, SYNC_CMD)) {
 				err = EIO;
-			} else if (st_cmd(un, SCMD_REWIND, 1, ASYNC_CMD)) {
-				err = EIO;
+			} else {
+				/* release the drive before rewind immediate */
+				if ((un->un_rsvd_status &
+				    (ST_RESERVE | ST_PRESERVE_RESERVE)) ==
+				    ST_RESERVE) {
+					if (st_reserve_release(un, ST_RELEASE,
+					    st_uscsi_cmd)) {
+						err = EIO;
+					}
+				}
+
+				/* send rewind with immediate bit set */
+				if (st_cmd(un, SCMD_REWIND, 1, ASYNC_CMD)) {
+					err = EIO;
+				}
 			}
 		}
 		/*
@@ -8705,14 +8718,13 @@ st_make_cmd(struct scsi_tape *un, struct buf *bp, int (*func)(caddr_t))
 			 * the command is accepted by the device. We clear the
 			 * B_ASYNC flag so we wait for that acceptance.
 			 */
+			fixbit = 0;
 			if (bp->b_flags & B_ASYNC) {
 				allocbp = bp;
 				if (count) {
 					fixbit = 1;
 					bp->b_flags &= ~B_ASYNC;
 				}
-			} else {
-				fixbit = 0;
 			}
 			count = 0;
 			bp->b_bcount = 0;
@@ -11078,11 +11090,34 @@ check_keys:
 		/*
 		 * If in process of getting ready retry.
 		 */
-		if (sensep->es_add_code  == 0x04 &&
-		    sensep->es_qual_code == 0x01 &&
-		    ri->pkt_retry_cnt++ < st_retry_count) {
-			rval = QUE_COMMAND;
-			severity = SCSI_ERR_INFO;
+		if (sensep->es_add_code == 0x04) {
+			switch (sensep->es_qual_code) {
+			case 0x07:
+				/*
+				 * We get here when the tape is rewinding.
+				 * QUE_BUSY_COMMAND retries every 10 seconds.
+				 */
+				if (ri->pkt_retry_cnt++ <
+				    (un->un_dp->rewind_timeout / 10)) {
+					rval = QUE_BUSY_COMMAND;
+					severity = SCSI_ERR_INFO;
+				} else {
+					/* give up */
+					rval = COMMAND_DONE_ERROR;
+					severity = SCSI_ERR_FATAL;
+				}
+				break;
+			case 0x01:
+				if (ri->pkt_retry_cnt++ < st_retry_count) {
+					rval = QUE_COMMAND;
+					severity = SCSI_ERR_INFO;
+					break;
+				}
+			default: /* FALLTHRU */
+				/* give up */
+				rval = COMMAND_DONE_ERROR;
+				severity = SCSI_ERR_FATAL;
+			}
 		} else {
 			/* give up */
 			rval = COMMAND_DONE_ERROR;
@@ -12789,9 +12824,14 @@ st_check_cmd_for_need_to_reserve(struct scsi_tape *un, uchar_t cmd, int cnt)
 
 	ST_FUNC(ST_DEVINFO, st_check_cmd_for_need_to_reserve);
 
+	/*
+	 * Do not reserve when already reserved, when not supported or when
+	 * auto-rewinding on device closure.
+	 */
 	if ((un->un_rsvd_status & (ST_APPLICATION_RESERVATIONS)) ||
 	    ((un->un_rsvd_status & (ST_RESERVE | ST_LOST_RESERVE)) ==
-	    ST_RESERVE) || (un->un_dp->options & ST_NO_RESERVE_RELEASE)) {
+	    ST_RESERVE) || (un->un_dp->options & ST_NO_RESERVE_RELEASE) ||
+	    ((un->un_state == ST_STATE_CLOSING) && (cmd == SCMD_REWIND))) {
 		ST_DEBUG6(ST_DEVINFO, st_label, CE_NOTE,
 		    "st_check_cmd_for_need_to_reserve() reserve unneeded %s",
 		    st_print_scsi_cmd(cmd));
@@ -12874,7 +12914,7 @@ st_reserve_release(struct scsi_tape *un, int cmd, ubufunc_t ubf)
 		 * reserve/release command(ATAPI drives).
 		 */
 		if (un->un_status == KEY_ILLEGAL_REQUEST) {
-			if (un->un_dp->options & ST_NO_RESERVE_RELEASE) {
+			if ((un->un_dp->options & ST_NO_RESERVE_RELEASE) == 0) {
 				un->un_dp->options |= ST_NO_RESERVE_RELEASE;
 				ST_DEBUG3(ST_DEVINFO, st_label, SCSI_DEBUG,
 				    "Tape unit does not support "
