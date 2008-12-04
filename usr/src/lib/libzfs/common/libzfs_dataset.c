@@ -2902,8 +2902,8 @@ check_parents(libzfs_handle_t *hdl, const char *path, uint64_t *zoned,
 	zfs_handle_t *zhp;
 	char errbuf[1024];
 
-	(void) snprintf(errbuf, sizeof (errbuf), "cannot create '%s'",
-	    path);
+	(void) snprintf(errbuf, sizeof (errbuf),
+	    dgettext(TEXT_DOMAIN, "cannot create '%s'"), path);
 
 	/* get parent, and check to see if this is just a pool */
 	if (parent_name(path, parent, sizeof (parent)) != 0) {
