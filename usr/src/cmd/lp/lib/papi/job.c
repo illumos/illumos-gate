@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -823,6 +822,7 @@ papiJobMove(papi_service_t handle, char *printer, int32_t job_id,
 		char *destination)
 {
 	papi_status_t result = PAPI_OK;
+	long bits;
 	service_t *svc = handle;
 	char req_id[64];
 	char *queue;
@@ -851,7 +851,7 @@ papiJobMove(papi_service_t handle, char *printer, int32_t job_id,
 		char *dest = printer_name_from_uri_id(destination, -1);
 
 		if ((snd_msg(svc, S_MOVE_REQUEST, req_id, dest) < 0) ||
-		    (rcv_msg(svc, R_MOVE_REQUEST, &status) < 0))
+		    (rcv_msg(svc, R_MOVE_REQUEST, &status, &bits) < 0))
 			status = MTRANSMITERR;
 
 		free(dest);
