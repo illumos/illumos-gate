@@ -611,8 +611,8 @@ libnwam_select_wlan(const char *ifname, const char *essid, const char *bssid)
  * Set the encryption key needed for a given AP.  The key string is cleartext.
  */
 int
-libnwam_wlan_key(const char *ifname, const char *essid, const char *bssid,
-    const char *key)
+libnwam_wlan_key_secmode(const char *ifname, const char *essid,
+    const char *bssid, const char *key, const char *secmode)
 {
 	nwam_door_cmd_t cmd;
 	uintptr_t cmd_buf[BUFFER_SIZE];
@@ -626,8 +626,17 @@ libnwam_wlan_key(const char *ifname, const char *essid, const char *bssid,
 	(void) strlcpy(cmd.ndc_essid, essid, sizeof (cmd.ndc_essid));
 	(void) strlcpy(cmd.ndc_bssid, bssid, sizeof (cmd.ndc_bssid));
 	(void) strlcpy(cmd.ndc_key, key, sizeof (cmd.ndc_key));
+	(void) strlcpy(cmd.ndc_secmode, secmode, sizeof (cmd.ndc_secmode));
 	retv = make_door_call(&cmd, &cmd_ret, &cmd_size, &cmd_rsize);
 	return (handle_errors(retv, cmd_ret, cmd_buf, cmd_size, cmd_rsize));
+}
+
+/* For compatibility with old nwam-manager binaries */
+int
+libnwam_wlan_key(const char *ifname, const char *essid, const char *bssid,
+    const char *key)
+{
+	return (libnwam_wlan_key_secmode(ifname, essid, bssid, key, ""));
 }
 
 /* Initiate wireless scan on the indicated interface */

@@ -632,12 +632,17 @@ start_event_collection(void)
 		dprintf("routing thread: %d", routing);
 	}
 
-	if (err = pthread_create(&scan, NULL, periodic_wireless_scan, NULL)) {
-		syslog(LOG_ERR, "pthread_create wireless scan: %s",
-		    strerror(err));
-		exit(EXIT_FAILURE);
+	if (wlan_scan_interval != 0) {
+		err = pthread_create(&scan, NULL, periodic_wireless_scan, NULL);
+		if (err != 0) {
+			syslog(LOG_ERR, "pthread_create wireless scan: %s",
+			    strerror(err));
+			exit(EXIT_FAILURE);
+		} else {
+			dprintf("wireless scan thread: %d", scan);
+		}
 	} else {
-		dprintf("scan thread: %d", scan);
+		dprintf("periodic wireless scan disabled");
 	}
 
 	/*

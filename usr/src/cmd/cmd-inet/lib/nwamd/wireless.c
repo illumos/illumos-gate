@@ -59,6 +59,16 @@
  * periodically to look for available APs.  In both cases, if there are
  * new APs, the above AP connection procedure will be performed.
  *
+ * As a way to deal with the innumerable bugs that seem to plague wireless
+ * interfaces with respect to concurrent operations, we completely exclude all
+ * connect operations on all interfaces when another connect or scan is
+ * running, and exclude all scans on all interfaces when another connect or
+ * scan is running.  This is done using wifi_scan_intf.
+ *
+ * Much of the BSSID handling logic in this module is questionable due to
+ * underlying bugs such as CR 6772510.  There's likely little that we can do
+ * about this.
+ *
  * Lock ordering note: wifi_mutex and wifi_init_mutex are not held at the same
  * time.
  */
@@ -116,7 +126,8 @@ static uint_t wi_link_count;
  * to store the interface doing the scan.  It is protected by
  * wifi_init_mutex.
  */
-static char wifi_scan_intf[LIFNAMSIZ];
+static const char *wifi_scan_intf;
+static boolean_t connect_running;
 static pthread_mutex_t wifi_init_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t wifi_init_cond = PTHREAD_COND_INITIALIZER;
 
@@ -138,8 +149,6 @@ static struct wireless_lan *add_wlan_entry(const char *, const char *,
     const char *, dladm_wlan_attr_t *);
 static boolean_t check_wlan(const wireless_if_t *, const char *, const char *,
     boolean_t);
-static return_vals_t connect_or_autoconf(struct wireless_lan *,
-    wireless_if_t *);
 static struct wireless_lan *find_wlan_entry(const char *, const char *,
     const char *);
 static void free_wireless_lan(struct wireless_lan *);
@@ -163,6 +172,12 @@ uint_t wlan_scan_interval = 120;
  * when a periodic wireless scan needs to be done.
  */
 dladm_wlan_strength_t wireless_scan_level = DLADM_WLAN_STRENGTH_VERY_WEAK;
+
+/*
+ * This controls whether we are strict about matching BSSID in the known wifi
+ * networks file.  By default, we're not strict.
+ */
+boolean_t strict_bssid;
 
 void
 initialize_wireless(void)
@@ -435,55 +450,82 @@ unexpected:
 }
 
 /*
- * Examine all WLANs associated with an interface, and update the 'connected'
- * and 'known' attributes appropriately.  The caller holds wifi_mutex.
+ * Examine all WLANs associated with an interface, verify the expected WLAN,
+ * and update the 'connected' attribute appropriately.  The caller holds
+ * wifi_mutex and deals with the 'known' flag.  If the expected WLAN is NULL,
+ * then we expect to be connected to just "any" (autoconf) network.
  */
 static boolean_t
-update_connected_wlan(wireless_if_t *wip)
+update_connected_wlan(wireless_if_t *wip, struct wireless_lan *exp_wlan)
 {
 	dladm_wlan_linkattr_t attr;
 	struct wireless_lan *wlan, *lastconn, *newconn;
 	char essid[DLADM_STRSIZE];
 	char bssid[DLADM_STRSIZE];
 	boolean_t connected, wasconn;
-	int retries = 0;
 
-	/*
-	 * This is awful, but some wireless drivers (particularly 'ath') will
-	 * erroneously report "disconnected" if queried right after a scan.  If
-	 * we see 'down' reported here, we retry a few times to make sure.
-	 */
-	while (retries++ < 4) {
-		if (dladm_wlan_get_linkattr(wip->wi_linkid, &attr) !=
-		    DLADM_STATUS_OK)
-			attr.la_status = DLADM_WLAN_LINK_DISCONNECTED;
-		else if (attr.la_status == DLADM_WLAN_LINK_CONNECTED)
-			break;
-	}
+	if (dladm_wlan_get_linkattr(wip->wi_linkid, &attr) != DLADM_STATUS_OK)
+		attr.la_status = DLADM_WLAN_LINK_DISCONNECTED;
 	if (attr.la_status == DLADM_WLAN_LINK_CONNECTED) {
 		(void) dladm_wlan_essid2str(&attr.la_wlan_attr.wa_essid, essid);
 		(void) dladm_wlan_bssid2str(&attr.la_wlan_attr.wa_bssid, bssid);
 		connected = B_TRUE;
 		wip->wi_wireless_done = B_TRUE;
-		dprintf("update: %s is connected to %s %s", wip->wi_name, essid,
-		    bssid);
+		dprintf("update: %s reports connection to %s %s", wip->wi_name,
+		    essid, bssid);
 	} else {
 		connected = B_FALSE;
 		dprintf("update: %s is currently unconnected", wip->wi_name);
 	}
+
+	/*
+	 * First, verify that if we're connected, then we should be and that
+	 * we're connected to the expected AP.
+	 */
+	if (exp_wlan != NULL) {
+		/*
+		 * If we're connected to the wrong one, then disconnect.  Note:
+		 * we'd like to verify BSSID, but we cannot due to CR 6772510.
+		 */
+		if (connected && strcmp(exp_wlan->essid, essid) != 0) {
+			dprintf("update: wrong AP on %s; expected %s %s",
+			    exp_wlan->wl_if_name, exp_wlan->essid,
+			    exp_wlan->bssid);
+			(void) dladm_wlan_disconnect(wip->wi_linkid);
+			connected = B_FALSE;
+		}
+		/* If we're not in the expected state, then report disconnect */
+		if (exp_wlan->connected != connected) {
+			exp_wlan->connected = B_FALSE;
+			if (connected) {
+				dprintf("update: unexpected connection to %s "
+				    "%s; clearing", essid, bssid);
+				(void) dladm_wlan_disconnect(wip->wi_linkid);
+			} else {
+				dprintf("update: not connected to %s %s as "
+				    "expected", exp_wlan->essid,
+				    exp_wlan->bssid);
+				report_wlan_disconnect(exp_wlan);
+			}
+			connected = B_FALSE;
+		}
+	}
+
+	/*
+	 * State is now known to be good, so make the list entries match.
+	 */
 	wasconn = B_FALSE;
 	lastconn = newconn = NULL;
 	for (wlan = wlans; wlan < wlans + wireless_lan_used; wlan++) {
 		if (strcmp(wlan->wl_if_name, wip->wi_name) != 0)
 			continue;
-		if (connected && strcmp(wlan->essid, essid) == 0 &&
-		    strcmp(wlan->bssid, bssid) == 0) {
+		/* missing bssid check */
+		if (connected && strcmp(wlan->essid, essid) == 0) {
 			wasconn = wlan->connected;
 			wlan->connected = connected;
 			newconn = wlan;
-		} else {
-			if (wlan->connected)
-				lastconn = wlan;
+		} else if (wlan->connected) {
+			lastconn = wlan;
 			wlan->connected = B_FALSE;
 		}
 	}
@@ -495,20 +537,88 @@ update_connected_wlan(wireless_if_t *wip)
 	}
 	if (lastconn != NULL)
 		report_wlan_disconnect(lastconn);
-	if (newconn != NULL && !wasconn && connected) {
-		/*
-		 * If we're already connected but not yet known, then it's
-		 * clear that this is a "known wlan" for the user.  He must
-		 * have issued a dladm connect-wifi command to get here.
-		 */
-		if (!newconn->known) {
-			newconn->known = B_TRUE;
-			(void) add_known_wifi_nets_file(newconn->essid,
-			    newconn->bssid);
-		}
+	if (newconn != NULL && !wasconn && connected)
 		report_wlan_connected(newconn);
-	}
 	return (connected);
+}
+
+/*
+ * If there is already a scan or connect in progress, defer until the operation
+ * is done to avoid radio interference *and* significant driver bugs.
+ *
+ * Returns B_TRUE when the lock is taken and the caller must call
+ * scanconnect_exit.  Returns B_FALSE when lock not taken; caller must not call
+ * scanconnect_exit.
+ *
+ * If we happen to be doing a scan, and the interface doing the scan is the
+ * same as the one requesting a new scan, then wait for it to finish, and then
+ * report that we're done by returning B_FALSE (no lock taken).
+ */
+static boolean_t
+scanconnect_entry(const char *ifname, boolean_t is_connect)
+{
+	boolean_t already_done;
+
+	if (pthread_mutex_lock(&wifi_init_mutex) != 0)
+		return (B_FALSE);
+	already_done = B_FALSE;
+	while (wifi_scan_intf != NULL) {
+		dprintf("%s in progress on %s; blocking %s of %s",
+		    connect_running ? "connect" : "scan", wifi_scan_intf,
+		    is_connect ? "connect" : "scan", ifname);
+		if (!is_connect && !connect_running &&
+		    strcmp(wifi_scan_intf, ifname) == 0)
+			already_done = B_TRUE;
+		(void) pthread_cond_wait(&wifi_init_cond, &wifi_init_mutex);
+		if (already_done || shutting_down) {
+			(void) pthread_mutex_unlock(&wifi_init_mutex);
+			return (B_FALSE);
+		}
+	}
+	dprintf("now exclusively %s on %s",
+	    is_connect ? "connecting" : "scanning", ifname);
+	wifi_scan_intf = ifname;
+	connect_running = is_connect;
+	(void) pthread_mutex_unlock(&wifi_init_mutex);
+	return (B_TRUE);
+}
+
+static void
+scanconnect_exit(void)
+{
+	(void) pthread_mutex_lock(&wifi_init_mutex);
+	dprintf("done exclusively %s on %s",
+	    connect_running ? "connecting" : "scanning", wifi_scan_intf);
+	wifi_scan_intf = NULL;
+	(void) pthread_cond_broadcast(&wifi_init_cond);
+	(void) pthread_mutex_unlock(&wifi_init_mutex);
+}
+
+/*
+ * Return B_TRUE if we're in the midst of connecting on a given wireless
+ * interface.  We shouldn't try to take such an interface down.
+ */
+static boolean_t
+connecting_on(const char *ifname)
+{
+	boolean_t in_progress;
+
+	if (pthread_mutex_lock(&wifi_init_mutex) != 0)
+		return (B_FALSE);
+	in_progress = (wifi_scan_intf != NULL && connect_running &&
+	    strcmp(ifname, wifi_scan_intf) == 0);
+	(void) pthread_mutex_unlock(&wifi_init_mutex);
+	return (in_progress);
+}
+
+/*
+ * Terminate all waiting transient threads as soon as possible.  This assumes
+ * that the shutting_down flag has already been set.
+ */
+void
+terminate_wireless(void)
+{
+	(void) pthread_cond_broadcast(&wifi_init_cond);
 }
 
 /*
@@ -518,7 +628,6 @@ update_connected_wlan(wireless_if_t *wip)
 static void
 scan_wireless_nets(const char *ifname)
 {
-	boolean_t	already_done;
 	boolean_t	dropped;
 	boolean_t	new_found;
 	dladm_status_t	status;
@@ -527,27 +636,11 @@ scan_wireless_nets(const char *ifname)
 	wireless_if_t	*wip;
 
 	/*
-	 * If there is already a scan in progress, defer until the scan is done
-	 * to avoid radio interference.  But if the interface doing the scan is
-	 * the same as the one requesting the new scan, then wait for it to
-	 * finish, and then we're done.
+	 * Wait for scan/connect to finish, and return if error or if this
+	 * interface is already done.
 	 */
-	if (pthread_mutex_lock(&wifi_init_mutex) != 0)
+	if (!scanconnect_entry(ifname, B_FALSE))
 		return;
-	already_done = B_FALSE;
-	while (wifi_scan_intf[0] != '\0') {
-		dprintf("scan_wireless_nets in progress: old %s new %s",
-		    wifi_scan_intf, ifname);
-		if (strcmp(wifi_scan_intf, ifname) == 0)
-			already_done = B_TRUE;
-		(void) pthread_cond_wait(&wifi_init_cond, &wifi_init_mutex);
-		if (already_done) {
-			(void) pthread_mutex_unlock(&wifi_init_mutex);
-			return;
-		}
-	}
-	(void) strlcpy(wifi_scan_intf, ifname, sizeof (wifi_scan_intf));
-	(void) pthread_mutex_unlock(&wifi_init_mutex);
 
 	/* Grab the linkid from the wireless interface */
 	if (pthread_mutex_lock(&wifi_mutex) != 0)
@@ -587,18 +680,93 @@ scan_end:
 	/* Need to sample this global before clearing out scan lock */
 	new_found = new_ap_found;
 
+	/*
+	 * Due to common driver bugs, it's necessary to check the state of the
+	 * interface right after doing a scan.  If it's connected and we didn't
+	 * expect it to be, or if we're accidentally connected to the wrong AP,
+	 * then disconnect now and reconnect.
+	 */
 	if (pthread_mutex_lock(&wifi_mutex) == 0) {
 		if ((wip = find_wireless_if(ifname)) != NULL) {
+			dladm_wlan_linkattr_t attr;
+			struct wireless_lan *wlan;
+			char essid[DLADM_STRSIZE];
+			char bssid[DLADM_STRSIZE];
+			boolean_t connected;
+			int retries = 0;
+
 			wip->wi_scan_running = B_FALSE;
-			(void) update_connected_wlan(wip);
+
+			/*
+			 * This is awful, but some wireless drivers
+			 * (particularly 'ath') will erroneously report
+			 * "disconnected" if queried right after a scan.  If we
+			 * see 'down' reported here, we retry a few times to
+			 * make sure it's really down.
+			 */
+			while (retries++ < 4) {
+				if (dladm_wlan_get_linkattr(wip->wi_linkid,
+				    &attr) != DLADM_STATUS_OK)
+					attr.la_status =
+					    DLADM_WLAN_LINK_DISCONNECTED;
+				else if (attr.la_status ==
+				    DLADM_WLAN_LINK_CONNECTED)
+					break;
+			}
+			if (attr.la_status == DLADM_WLAN_LINK_CONNECTED) {
+				(void) dladm_wlan_essid2str(
+				    &attr.la_wlan_attr.wa_essid, essid);
+				(void) dladm_wlan_bssid2str(
+				    &attr.la_wlan_attr.wa_bssid, bssid);
+				connected = B_TRUE;
+				dprintf("scan: %s reports connection to %s "
+				    "%s", ifname, essid, bssid);
+			} else {
+				connected = B_FALSE;
+				dprintf("scan: %s is currently unconnected",
+				    ifname);
+			}
+			/* Disconnect from wrong AP first */
+			for (wlan = wlans; wlan < wlans + wireless_lan_used;
+			    wlan++) {
+				if (strcmp(wlan->wl_if_name, ifname) != 0)
+					continue;
+				/* missing bssid check */
+				if (strcmp(wlan->essid, essid) == 0) {
+					/*
+					 * This is the one we are currently
+					 * connected to.  See if we should be
+					 * here.
+					 */
+					if (!connected || !wlan->connected)
+						(void) dladm_wlan_disconnect(
+						    linkid);
+					break;
+				}
+			}
+			/* Connect to right AP by reporting disconnect */
+			for (wlan = wlans; wlan < wlans + wireless_lan_used;
+			    wlan++) {
+				if (strcmp(wlan->wl_if_name, ifname) != 0)
+					continue;
+				if (wlan->connected) {
+					/* missing bssid check */
+					if (connected &&
+					    strcmp(wlan->essid, essid) == 0)
+						break;
+					/*
+					 * We weren't where we were supposed to
+					 * be.  Try to reconnect now.
+					 */
+					(void) np_queue_add_event(EV_LINKDISC,
+					    ifname);
+				}
+			}
 		}
 		(void) pthread_mutex_unlock(&wifi_mutex);
 	}
 
-	(void) pthread_mutex_lock(&wifi_init_mutex);
-	wifi_scan_intf[0] = '\0';
-	(void) pthread_cond_broadcast(&wifi_init_cond);
-	(void) pthread_mutex_unlock(&wifi_init_mutex);
+	scanconnect_exit();
 
 	if (status == DLADM_STATUS_OK)
 		report_scan_complete(ifname, dropped || new_found, wlans,
@@ -766,29 +934,118 @@ get_scan_results(void *arg, dladm_wlan_attr_t *attrp)
 	return (retv);
 }
 
+/*
+ * This is called when IP reports that the link layer is down.  It just
+ * verifies that we're still connected as expected.  If not, then cover for the
+ * known driver bugs (by disconnecting) and send an event so that we'll attempt
+ * to recover.  No scan is done; if a scan is needed, we'll do one the next
+ * time the timer pops.
+ *
+ * Note that we don't retry in case of error.  Since IP has reported the
+ * interface as down, the best case here is that we detect a link failure and
+ * start the connection process over again.
+ */
+void
+wireless_verify(const char *ifname)
+{
+	datalink_id_t linkid;
+	dladm_wlan_linkattr_t attr;
+	wireless_if_t *wip;
+	struct wireless_lan *wlan;
+	boolean_t is_failure;
+
+	/*
+	 * If these calls fail, it means that the wireless link is down.
+	 */
+	if (dladm_name2info(ifname, &linkid, NULL, NULL, NULL) !=
+	    DLADM_STATUS_OK ||
+	    dladm_wlan_get_linkattr(linkid, &attr) != DLADM_STATUS_OK) {
+		attr.la_status = DLADM_WLAN_LINK_DISCONNECTED;
+	}
+
+	/*
+	 * If the link is down, then work around a known driver bug (by forcing
+	 * disconnect), and then deliver an event so that the state machine can
+	 * retry.
+	 */
+	if (attr.la_status != DLADM_WLAN_LINK_CONNECTED) {
+		if (connecting_on(ifname))
+			return;
+		is_failure = B_TRUE;
+		if (pthread_mutex_lock(&wifi_mutex) == 0) {
+			if ((wip = find_wireless_if(ifname)) != NULL) {
+				/*
+				 * Link down while waiting for user to supply
+				 * key is *not* a failure case.
+				 */
+				if (!wip->wi_wireless_done &&
+				    wip->wi_need_key) {
+					is_failure = B_FALSE;
+				} else {
+					wip->wi_wireless_done = B_FALSE;
+					wip->wi_need_key = B_FALSE;
+				}
+			}
+			if (is_failure) {
+				for (wlan = wlans;
+				    wlan < wlans + wireless_lan_used; wlan++) {
+					if (strcmp(wlan->wl_if_name, ifname) ==
+					    0) {
+						if (wlan->connected)
+							report_wlan_disconnect(
+							    wlan);
+						wlan->connected = B_FALSE;
+					}
+				}
+			}
+			(void) pthread_mutex_unlock(&wifi_mutex);
+		}
+		if (is_failure) {
+			dprintf("wireless check indicates disconnect");
+			(void) dladm_wlan_disconnect(linkid);
+			(void) np_queue_add_event(EV_LINKDISC, ifname);
+		}
+	}
+}
+
 /* ARGSUSED */
 void *
 periodic_wireless_scan(void *arg)
 {
-	/*
-	 * No periodic scan if the "-i" option is used to change the
-	 * interval to 0.
-	 */
-	if (wlan_scan_interval == 0)
-		return (NULL);
-
 	for (;;) {
-		int ret;
+		int ret, intv;
 		dladm_wlan_linkattr_t attr;
 		char ifname[LIFNAMSIZ];
 		libnwam_interface_type_t ift;
 		datalink_id_t linkid;
+		char essid[DLADM_STRSIZE];
+		struct wireless_lan *wlan;
 
-		ret = poll(NULL, 0, wlan_scan_interval * MILLISEC);
+		/*
+		 * Stop the scanning process if the user changes the interval
+		 * to zero dynamically.  Reset the thread ID to a known-invalid
+		 * value.  (Copy to a local variable to avoid race condition in
+		 * case SIGINT hits between this test and the call to poll().)
+		 */
+		if ((intv = wlan_scan_interval) == 0) {
+			dprintf("periodic wireless scan halted");
+			break;
+		}
+
+		ret = poll(NULL, 0, intv * MILLISEC);
 		if (ret == -1) {
 			if (errno == EINTR)
 				continue;
 			syslog(LOG_INFO, "periodic_wireless_scan: poll failed");
+			break;
+		}
+
+		/*
+		 * Just one more check before doing a scan that might now be
+		 * unwanted
+		 */
+		if (wlan_scan_interval == 0) {
+			dprintf("periodic wireless scan halted");
 			break;
 		}
 
@@ -821,7 +1078,32 @@ periodic_wireless_scan(void *arg)
 			if (attr.la_status == DLADM_WLAN_LINK_CONNECTED &&
 			    attr.la_wlan_attr.wa_strength >
 			    wireless_scan_level) {
-				continue;
+				/*
+				 * Double-check the ESSID.  Some drivers
+				 * (notably 'iwh') have a habit of randomly
+				 * reconnecting themselves to APs that you
+				 * never requested.
+				 */
+				(void) dladm_wlan_essid2str(
+				    &attr.la_wlan_attr.wa_essid, essid);
+				if (pthread_mutex_lock(&wifi_mutex) != 0)
+					continue;
+				for (wlan = wlans;
+				    wlan < wlans + wireless_lan_used; wlan++) {
+					if (wlan->connected &&
+					    strcmp(wlan->wl_if_name, ifname) ==
+					    0)
+						break;
+				}
+				if (wlan >= wlans + wireless_lan_used ||
+				    strcmp(wlan->essid, essid) == 0) {
+					(void) pthread_mutex_unlock(
+					    &wifi_mutex);
+					continue;
+				}
+				dprintf("%s is connected to %s instead of %s",
+				    ifname, essid, wlan->essid);
+				(void) pthread_mutex_unlock(&wifi_mutex);
 			}
 		}
 
@@ -846,6 +1128,8 @@ periodic_wireless_scan(void *arg)
 					    wifi_mutex);
 					continue;
 				}
+				wip->wi_wireless_done = B_FALSE;
+				wip->wi_need_key = B_FALSE;
 			}
 			(void) pthread_mutex_unlock(&wifi_mutex);
 
@@ -857,17 +1141,16 @@ periodic_wireless_scan(void *arg)
 			(void) dladm_wlan_disconnect(linkid);
 
 			/*
-			 * Deactivate the original AP.  If we reached this
-			 * point, we either were not connected, or were
-			 * connected with "very weak" signal strength; so we're
-			 * assuming that having this llp active was not very
-			 * useful.  So we deactivate.
+			 * Tell the state machine that we've lost this link so
+			 * that it can do something about the problem.
 			 */
 			(void) np_queue_add_event(
 			    (attr.la_status == DLADM_WLAN_LINK_CONNECTED ?
 			    EV_LINKFADE : EV_LINKDISC), ifname);
 		}
 	}
+	scan = 0;
+	(void) pthread_detach(pthread_self());
 	return (NULL);
 }
 
@@ -1259,12 +1542,23 @@ known_wifi_nets_lookup(const char *new_essid, const char *new_bssid,
 		}
 
 		/*
+		 * If we're searching on ESSID alone, then any match on a
+		 * specific ESSID will do.
+		 */
+		if (*new_bssid == '\0') {
+			if (*new_essid != '\0' &&
+			    strcmp(tok[ESSID], new_essid) == 0) {
+				found = B_TRUE;
+				break;
+			}
+		}
+		/*
 		 * If BSSID match is found we check ESSID, which should
 		 * either match as well, or be an empty string.
 		 * In latter case we'll retrieve the ESSID from known_wifi_nets
 		 * later.
 		 */
-		if (strcmp(tok[BSSID], new_bssid) == 0) {
+		else if (strcmp(tok[BSSID], new_bssid) == 0) {
 			/*
 			 * Got BSSID match, either ESSID was not specified,
 			 * or it should match
@@ -1490,6 +1784,8 @@ connect_chosen_lan(struct wireless_lan *reqlan, wireless_if_t *wip)
 		return (FAILURE);
 	}
 	attr.wa_valid = DLADM_WLAN_ATTR_ESSID;
+
+	/* note: bssid logic here is non-functional */
 	if (reqlan->bssid[0] != '\0') {
 		if (dladm_wlan_str2bssid(reqlan->bssid, &attr.wa_bssid) !=
 		    DLADM_STATUS_OK) {
@@ -1529,6 +1825,10 @@ connect_chosen_lan(struct wireless_lan *reqlan, wireless_if_t *wip)
 	    keycount, flags);
 	dprintf("connect_chosen_lan: dladm_wlan_connect returned %s",
 	    dladm_status2str(status, errmsg));
+	/*
+	 * This doesn't work due to CR 6772510.
+	 */
+#ifdef CR6772510_FIXED
 	if (status == DLADM_STATUS_TIMEDOUT && reqlan->bssid[0] != '\0') {
 		syslog(LOG_INFO, "connect_chosen_lan: failed for (%s, %s), "
 		    "trying again with just (%s)",
@@ -1538,6 +1838,7 @@ connect_chosen_lan(struct wireless_lan *reqlan, wireless_if_t *wip)
 		status = dladm_wlan_connect(wip->wi_linkid, &attr, timeout,
 		    key, keycount, flags);
 	}
+#endif /* CR6772510_FIXED */
 	if (status == DLADM_STATUS_OK) {
 		return (SUCCESS);
 	} else {
@@ -1547,27 +1848,6 @@ connect_chosen_lan(struct wireless_lan *reqlan, wireless_if_t *wip)
 		    dladm_status2str(status, errmsg));
 		return (FAILURE);
 	}
-}
-
-/*
- * First attempt to connect to the network specified by essid.
- * If that fails, attempt to connect using autoconf.
- */
-static return_vals_t
-connect_or_autoconf(struct wireless_lan *reqlan, wireless_if_t *wip)
-{
-	return_vals_t rval;
-
-	rval = connect_chosen_lan(reqlan, wip);
-	if (rval == FAILURE) {
-		report_wlan_connect_fail(wip->wi_name);
-		reqlan->rescan = B_TRUE;
-		syslog(LOG_WARNING,
-		    "Could not connect to chosen WLAN %s, going to auto-conf",
-		    reqlan->essid);
-		rval = (wlan_autoconf(wip) ? SUCCESS : FAILURE);
-	}
-	return (rval);
 }
 
 /*
@@ -1596,132 +1876,194 @@ check_wlan_connected(const char *ifname, const char *essid, const char *bssid)
 }
 
 /*
- * This is the entry point for GUI "select access point" requests.  We attempt
- * to do what the GUI requested.  If we fail, then there will be a new request
- * enqueued for the GUI to act on.
- * Returns:
- *	0	- ok (or more data requested with new event)
- *	ENXIO	- no such interface
- *	ENODEV	- requested access point unknown
- *	EINVAL	- failed to perform requested action
+ * This thread performs the blocking actions related to a wireless connection
+ * request.  The attempt to connect isn't started until all other connects and
+ * scans have finished, and while the connect is in progress, no new connects
+ * or scans can be started.
  */
-int
-set_specific_lan(const char *ifname, const char *essid, const char *bssid)
+static void *
+connect_thread(void *arg)
 {
-	libnwam_interface_type_t ift;
+	struct wireless_lan *req_wlan = arg;
 	wireless_if_t *wip;
-	struct wireless_lan *wlan, local_wlan;
-	int retv;
-	boolean_t key_wait = B_FALSE;
+	struct wireless_lan *wlan = NULL;
 
-	ift = get_if_type(ifname);
-	if (ift != IF_UNKNOWN && ift != IF_WIRELESS)
-		return (EINVAL);
+	if (!scanconnect_entry(req_wlan->wl_if_name, B_TRUE))
+		goto failure_noentry;
 
-	if ((retv = pthread_mutex_lock(&wifi_mutex)) != 0)
-		return (retv);
+	if (pthread_mutex_lock(&wifi_mutex) != 0)
+		goto failure_unlocked;
 
-	if ((wip = find_wireless_if(ifname)) == NULL) {
-		retv = ENXIO;
-		goto done;
-	}
+	if ((wip = find_wireless_if(req_wlan->wl_if_name)) == NULL)
+		goto failure;
 
 	/* This is an autoconf request. */
-	if (essid[0] == '\0' && bssid[0] == '\0') {
-		retv = (wlan_autoconf(wip) ? 0 : EINVAL);
-		goto done;
+	if (req_wlan->essid[0] == '\0' && req_wlan->bssid[0] == '\0') {
+		if (!wlan_autoconf(wip) && !update_connected_wlan(wip, NULL))
+			goto failure;
+		else
+			goto done;
 	}
 
-	if ((wlan = find_wlan_entry(ifname, essid, bssid)) == NULL) {
-		local_wlan.essid = (char *)essid;
-		local_wlan.bssid = (char *)bssid;
-		wlan = &local_wlan;
-	}
-
-	retv = 0;
+	wlan = find_wlan_entry(req_wlan->wl_if_name, req_wlan->essid,
+	    req_wlan->bssid);
+	if (wlan == NULL)
+		wlan = req_wlan;
 
 	/*
 	 * now attempt to connect to selection
 	 */
 	switch (connect_chosen_lan(wlan, wip)) {
 	case WAITING:
-		key_wait = B_TRUE;
 		break;
 
-	case SUCCESS:
+	case SUCCESS: {
+		dladm_status_t		status;
+		dladm_wlan_linkattr_t	attr;
+		char			lclssid[DLADM_STRSIZE];
+		char			unnecessary_buf[DLADM_STRSIZE];
+
 		/*
-		 * Succeeded, so add entry to known_essid_list_file;
-		 * but first make sure the wlan->bssid isn't empty.
-		 * Note that empty bssid is never allocated.
+		 * Successful connection to user-chosen AP; add entry to
+		 * known_essid_list_file.  First make sure the wlan->bssid
+		 * isn't empty.  Note that empty bssid is never allocated.
+		 *
+		 * We would like to query the driver only in the case where the
+		 * BSSID is not known, but it turns out that due to CR 6772510,
+		 * the actual BSSID we connect to is arbitrary.  Nothing we can
+		 * do about that; just get the new value and live with it.
 		 */
-		if (wlan->bssid[0] == '\0') {
-			dladm_status_t		status;
-			dladm_wlan_linkattr_t	attr;
-			char			lclbssid[DLADM_STRSIZE];
-
-			status = dladm_wlan_get_linkattr(wip->wi_linkid,
-			    &attr);
-
-			if (status == DLADM_STATUS_OK) {
-				(void) dladm_wlan_bssid2str(
-				    &attr.la_wlan_attr.wa_bssid, lclbssid);
-				wlan->bssid = strdup(lclbssid);
-			} else {
-				dprintf("failed to get linkattr after "
-				    "connecting to %s", wlan->essid);
-			}
+		status = dladm_wlan_get_linkattr(wip->wi_linkid, &attr);
+		if (status != DLADM_STATUS_OK) {
+			dprintf("failed to get linkattr on %s after connecting "
+			    "to %s: %s", wlan->wl_if_name, wlan->essid,
+			    dladm_status2str(status, unnecessary_buf));
+			goto failure;
 		}
-		if (wlan->bssid != NULL && wlan->bssid[0] != '\0') {
-			wlan->known = B_TRUE;
-			(void) add_known_wifi_nets_file(wlan->essid,
-			    wlan->bssid);
-			if (wlan == &local_wlan && local_wlan.bssid != bssid)
-				free(local_wlan.bssid);
-		} else {
+		(void) dladm_wlan_essid2str(&attr.la_wlan_attr.wa_essid,
+		    lclssid);
+		if (strcmp(req_wlan->essid, lclssid) != 0) {
+			dprintf("connected to strange network: expected %s got "
+			    "%s", req_wlan->essid, lclssid);
+			goto failure;
+		}
+		(void) dladm_wlan_bssid2str(&attr.la_wlan_attr.wa_bssid,
+		    lclssid);
+		if (wlan == req_wlan || strcmp(wlan->bssid, lclssid) != 0) {
+			wlan = add_wlan_entry(req_wlan->wl_if_name,
+			    req_wlan->essid, lclssid, &attr.la_wlan_attr);
+			if (wlan == NULL)
+				goto failure;
+		}
+		if (wlan->bssid[0] == '\0' && lclssid[0] != '\0')
+			wlan->bssid = strdup(lclssid);
+		if (wlan->bssid == NULL || wlan->bssid[0] == '\0') {
 			/* Don't leave it as NULL (for simplicity) */
 			wlan->bssid = "";
-			retv = EINVAL;
+			goto failure;
 		}
+		wlan->connected = B_TRUE;
+		if (!update_connected_wlan(wip, wlan))
+			goto failure;
+		wlan->known = B_TRUE;
+		(void) add_known_wifi_nets_file(wlan->essid, wlan->bssid);
+		/* We're done; trigger IP bring-up. */
+		(void) np_queue_add_event(EV_RESELECT, wlan->wl_if_name);
+		report_wlan_connected(wlan);
 		break;
+	}
 
 	default:
-		retv = EINVAL;
-		break;
+		goto failure;
 	}
 
 done:
-	if (retv == 0 && !update_connected_wlan(wip))
-		retv = EINVAL;
-	if (retv != 0) {
-		/*
-		 * Failed to connect.  Set 'rescan' flag so that we treat this
-		 * AP as new if it's seen again, because the wireless radio may
-		 * have just been off briefly while we were trying to connect.
-		 */
-		syslog(LOG_WARNING, "Could not connect to chosen WLAN %s",
-		    wlan->essid);
-		report_wlan_connect_fail(ifname);
+	(void) pthread_mutex_unlock(&wifi_mutex);
+	scanconnect_exit();
+	free_wireless_lan(req_wlan);
+	return (NULL);
+
+failure:
+	/*
+	 * Failed to connect.  Set 'rescan' flag so that we treat this AP as
+	 * new if it's seen again, because the wireless radio may have just
+	 * been off briefly while we were trying to connect.
+	 */
+	if (wip != NULL) {
 		wip->wi_need_key = B_FALSE;
 		wip->wi_wireless_done = B_FALSE;
-		wlan->rescan = B_TRUE;
+		(void) dladm_wlan_disconnect(wip->wi_linkid);
 	}
+	if (wlan != NULL)
+		wlan->rescan = B_TRUE;
 	(void) pthread_mutex_unlock(&wifi_mutex);
 
-	/*
-	 * If this is the selected profile, then go ahead and bring up IP now.
-	 */
-	if (retv == 0 && !key_wait)
-		(void) np_queue_add_event(EV_RESELECT, ifname);
+failure_unlocked:
+	scanconnect_exit();
+failure_noentry:
+	syslog(LOG_WARNING, "could not connect to chosen WLAN %s on %s",
+	    req_wlan->essid, req_wlan->wl_if_name);
+	report_wlan_connect_fail(req_wlan->wl_if_name);
+	free_wireless_lan(req_wlan);
+	return (NULL);
+}
+
+/*
+ * This is the entry point for GUI "select access point" requests.  It verifies
+ * the parameters and then launches a new thread to perform the connect
+ * operation.  When it returns success (0), the user should expect future
+ * events indicating progress.
+ *
+ * Returns:
+ *	0	- ok (or more data requested with new event)
+ *	ENXIO	- no such interface
+ *	ENODEV	- interface is not wireless
+ *	EINVAL	- failed to perform requested action
+ */
+int
+set_specific_lan(const char *ifname, const char *essid, const char *bssid)
+{
+	libnwam_interface_type_t ift;
+	pthread_t conn_thr;
+	pthread_attr_t attr;
+	struct wireless_lan *wlan;
+	int retv;
+
+	if ((ift = get_if_type(ifname)) == IF_UNKNOWN)
+		return (ENXIO);
+	if (ift != IF_WIRELESS)
+		return (EINVAL);
+
+	if ((wlan = calloc(1, sizeof (struct wireless_lan))) == NULL)
+		return (ENOMEM);
+	(void) strlcpy(wlan->wl_if_name, ifname, sizeof (wlan->wl_if_name));
+	wlan->essid = strdup(essid);
+	wlan->bssid = *bssid == '\0' ? "" : strdup(bssid);
+	if (wlan->essid == NULL || wlan->bssid == NULL) {
+		free_wireless_lan(wlan);
+		return (ENOMEM);
+	}
+	(void) pthread_attr_init(&attr);
+	(void) pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+	retv = pthread_create(&conn_thr, &attr, connect_thread, wlan);
+	if (retv == 0)
+		dprintf("started connect thread %d for %s %s %s", conn_thr,
+		    ifname, essid, bssid);
+	else
+		free_wireless_lan(wlan);
 	return (retv);
 }
 
 int
 set_wlan_key(const char *ifname, const char *essid, const char *bssid,
-    const char *key)
+    const char *key, const char *secmode)
 {
 	libnwam_interface_type_t ift;
-	struct wireless_lan *wlan;
+	struct wireless_lan *wlan, local_wlan;
+	wireless_if_t *wip;
 	int retv;
+	boolean_t need_key;
+	dladm_wlan_secmode_t smode = DLADM_WLAN_SECMODE_WEP;
 
 	ift = get_if_type(ifname);
 	if (ift == IF_UNKNOWN)
@@ -1729,20 +2071,56 @@ set_wlan_key(const char *ifname, const char *essid, const char *bssid,
 	if (ift != IF_WIRELESS)
 		return (EINVAL);
 
+	if (*secmode != '\0' &&
+	    dladm_wlan_str2secmode(secmode, &smode) != DLADM_STATUS_OK)
+		return (EINVAL);
+
 	if ((retv = pthread_mutex_lock(&wifi_mutex)) != 0)
 		return (retv);
 
-	if ((wlan = find_wlan_entry(ifname, essid, bssid)) == NULL)
-		retv = ENODEV;
-	else if ((wlan->raw_key = strdup(key)) == NULL)
-		retv = ENOMEM;
-	else if (store_key(wlan) != 0)
+	if ((wlan = find_wlan_entry(ifname, essid, bssid)) == NULL) {
+		/* If not seen in scan, then secmode is required */
+		if (*secmode == '\0') {
+			retv = ENODEV;
+			goto done;
+		}
+		/* Prohibit a completely blank entry */
+		if (*essid == '\0' && *bssid == '\0') {
+			retv = EINVAL;
+			goto done;
+		}
+		(void) memset(&local_wlan, 0, sizeof (local_wlan));
+		wlan = &local_wlan;
+		(void) strlcpy(wlan->wl_if_name, ifname,
+		    sizeof (wlan->wl_if_name));
+		wlan->essid = (char *)essid;
+		wlan->bssid = (char *)bssid;
+		wlan->raw_key = (char *)key;
+		wlan->attrs.wa_secmode = smode;
+	} else {
+		/* If seen in scan, then secmode given (if any) must match */
+		if (*secmode != '\0' && smode != wlan->attrs.wa_secmode) {
+			retv = EINVAL;
+			goto done;
+		}
+		/* save a copy of the new key in the scan entry */
+		if ((wlan->raw_key = strdup(key)) == NULL) {
+			retv = ENOMEM;
+			goto done;
+		}
+	}
+
+	if (store_key(wlan) != 0)
 		retv = EINVAL;
 	else
 		retv = 0;
+
+done:
+	wip = find_wireless_if(ifname);
+	need_key = wip != NULL && wip->wi_need_key;
 	(void) pthread_mutex_unlock(&wifi_mutex);
 
-	if (retv == 0)
+	if (retv == 0 && need_key)
 		retv = set_specific_lan(ifname, essid, bssid);
 
 	return (retv);
@@ -1805,31 +2183,31 @@ handle_wireless_lan(const char *ifname)
 	struct wireless_lan *most_recent;
 	boolean_t many_present;
 	dladm_wlan_strength_t strongest = DLADM_WLAN_STRENGTH_VERY_WEAK;
-	return_vals_t connect_result;
+	return_vals_t connect_result = FAILURE;
 
 	/*
-	 * We wait while a scan is in progress.  Since we allow a user
-	 * to initiate a re-scan, we can proceed even when no scan
-	 * has been done to fill in the AP list.
+	 * We wait while a scan or another connect is in progress, and then
+	 * block other connects/scans.  Since we allow a user to initiate a
+	 * re-scan, we can proceed even when no scan has yet been done to fill
+	 * in the AP list.
 	 */
-	if (pthread_mutex_lock(&wifi_init_mutex) != 0)
-		return (FAILURE);
-	while (wifi_scan_intf[0] != '\0')
-		(void) pthread_cond_wait(&wifi_init_cond, &wifi_init_mutex);
-	(void) pthread_mutex_unlock(&wifi_init_mutex);
-
-	if (pthread_mutex_lock(&wifi_mutex) != 0)
+	if (!scanconnect_entry(ifname, B_TRUE))
 		return (FAILURE);
 
-	if ((wip = find_wireless_if(ifname)) == NULL) {
-		connect_result = FAILURE;
-		goto finished;
+	if (pthread_mutex_lock(&wifi_mutex) != 0) {
+		scanconnect_exit();
+		return (FAILURE);
 	}
+
+	if ((wip = find_wireless_if(ifname)) == NULL)
+		goto finished;
 
 	if (wip->wi_wireless_done) {
 		dprintf("handle_wireless_lan: skipping policy scan; done");
-		connect_result = SUCCESS;
-		goto finished;
+		/* special case; avoid interface update */
+		(void) pthread_mutex_unlock(&wifi_mutex);
+		scanconnect_exit();
+		return (SUCCESS);
 	}
 
 	dprintf("handle_wireless_lan: starting policy scan");
@@ -1853,6 +2231,15 @@ handle_wireless_lan(const char *ifname)
 		if (known_wifi_nets_lookup(cur_wlan->essid, cur_wlan->bssid,
 		    NULL))
 			cur_wlan->known = B_TRUE;
+
+		if (!cur_wlan->known && !strict_bssid &&
+		    known_wifi_nets_lookup(cur_wlan->essid, "", NULL)) {
+			dprintf("noticed new BSSID %s for ESSID %s on %s",
+			    cur_wlan->bssid, cur_wlan->essid, ifname);
+			if (add_known_wifi_nets_file(cur_wlan->essid,
+			    cur_wlan->bssid) == 0)
+				cur_wlan->known = B_TRUE;
+		}
 
 		if (cur_wlan->known || cur_wlan->connected) {
 			/*
@@ -1893,9 +2280,25 @@ handle_wireless_lan(const char *ifname)
 			    most_recent->essid);
 			connect_result = SUCCESS;
 		} else {
-			dprintf("%s auto-connect to %s", ifname,
+			dprintf("%s connecting automatically to %s", ifname,
 			    most_recent->essid);
-			connect_result = connect_or_autoconf(most_recent, wip);
+			connect_result = connect_chosen_lan(most_recent, wip);
+			switch (connect_result) {
+			case FAILURE:
+				report_wlan_connect_fail(wip->wi_name);
+				most_recent->rescan = B_TRUE;
+				syslog(LOG_WARNING, "could not connect to "
+				    "chosen WLAN %s on %s, going to auto-conf",
+				    most_recent->essid, ifname);
+				connect_result = wlan_autoconf(wip) ? SUCCESS :
+				    FAILURE;
+				most_recent = NULL;
+				break;
+			case SUCCESS:
+				most_recent->connected = B_TRUE;
+				report_wlan_connected(most_recent);
+				break;
+			}
 		}
 	} else if (request_wlan_selection(ifname, wlans, wireless_lan_used)) {
 		dprintf("%s is unknown and not connected; requested help",
@@ -1904,12 +2307,15 @@ handle_wireless_lan(const char *ifname)
 	} else {
 		dprintf("%s has no connected AP or GUI; try auto", ifname);
 		connect_result = wlan_autoconf(wip) ? SUCCESS : FAILURE;
+		most_recent = NULL;
 	}
 
 finished:
-	if (connect_result == SUCCESS && !update_connected_wlan(wip))
+	if (connect_result == SUCCESS &&
+	    !update_connected_wlan(wip, most_recent))
 		connect_result = FAILURE;
 	(void) pthread_mutex_unlock(&wifi_mutex);
+	scanconnect_exit();
 
 	return (connect_result);
 }

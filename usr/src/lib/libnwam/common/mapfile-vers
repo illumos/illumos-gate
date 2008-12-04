@@ -39,6 +39,7 @@ SUNWprivate_1.1 {
 	libnwam_delete_known_ap;
 	libnwam_select_wlan;
 	libnwam_wlan_key;
+	libnwam_wlan_key_secmode;
 	libnwam_start_rescan;
 	libnwam_fini;
 	libnwam_init;

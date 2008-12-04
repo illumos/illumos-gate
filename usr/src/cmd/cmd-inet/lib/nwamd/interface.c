@@ -41,6 +41,11 @@
  * IPv6 is brought up in addition to IPv4 (assuming the LLP configuration
  * includes IPv6; this is the default for automatic configuration).
  *
+ * When an interface is taken down, we unplumb the IPv6 link-local interface
+ * completely, so that dhcpagent and in.ndpd will remove any addresses they've
+ * added.  Events are watched on the IPv4 interface alone, which is always
+ * present for this version of NWAM.
+ *
  * Interfaces are brought up and torn down by a sequence of ifconfig
  * commands (currently posix_spawn'd() by nwamd; the longer-term direction
  * here is to use libinetcfg).
@@ -656,17 +661,28 @@ takedowninterface(const char *ifname, libnwam_diag_cause_t cause)
 		report_interface_down(ifname, cause);
 
 	if (ifp != NULL) {
-		if (ifp->if_type == IF_WIRELESS)
+		/* We're no longer expecting the interface to be up */
+		ifp->if_flags = flags & ~IFF_UP;
+		if (ifp->if_type == IF_WIRELESS) {
+			/* and if it's wireless, it's not running, either */
+			ifp->if_flags &= ~IFF_RUNNING;
 			disconnect_wlan(ifp->if_name);
+		}
 		dprintf("takedown interface, zero cached ip address");
-		ifp->if_flags = flags;
 		ifp->if_lflags &= ~IF_DHCPSTARTED & ~IF_DHCPACQUIRED;
 		ifp->if_ipv4addr = INADDR_ANY;
 		ifp->if_up_attempted = B_FALSE;
 	}
 }
 
-/* Called only in the main thread */
+/*
+ * Called only in the main thread
+ *
+ * For IPv6, unplumbing the link local interface causes dhcp and ndpd to remove
+ * other addresses they have added.  We watch for routing socket events on the
+ * IPv4 interface, which is always enabled, so no need to keep IPv6 around on a
+ * switch.
+ */
 void
 clear_cached_address(const char *ifname)
 {
@@ -676,8 +692,11 @@ clear_cached_address(const char *ifname)
 	if ((ifp = get_interface(ifname)) == NULL) {
 		dprintf("clear_cached_address: can't find interface struct "
 		    "for %s", ifname);
+		(void) start_child(IFCONFIG, ifname, "inet6", "unplumb", NULL);
 		return;
 	}
+	if (ifp->if_v6onlink)
+		(void) start_child(IFCONFIG, ifname, "inet6", "unplumb", NULL);
 	ifflags = get_ifflags(ifname, AF_INET);
 	if ((ifflags & IFF_UP) && !(ifflags & IFF_RUNNING))
 		zero_out_v4addr(ifname);

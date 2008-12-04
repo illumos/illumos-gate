@@ -161,6 +161,7 @@ lookup_daemon_properties(void)
 	boolean_t debug_set;
 	uint64_t scan_interval;
 	uint64_t idle_time;
+	boolean_t strict_bssid_set;
 
 	if (lookup_boolean_property(OUR_PG, "debug", &debug_set) == 0)
 		debug = debug_set;
@@ -168,6 +169,9 @@ lookup_daemon_properties(void)
 		wlan_scan_interval = scan_interval;
 	if (lookup_count_property(OUR_PG, "idle_time", &idle_time) == 0)
 		door_idle_time = idle_time;
+	if (lookup_boolean_property(OUR_PG, "strict_bssid",
+	    &strict_bssid_set) == 0)
+		strict_bssid = strict_bssid_set;
 	dprintf("Read daemon configuration properties.");
 }
 
@@ -176,7 +180,7 @@ static void *
 sighandler(void *arg)
 {
 	sigset_t sigset;
-	int sig;
+	int sig, err;
 	uint32_t now;
 
 	(void) sigfillset(&sigset);
@@ -201,6 +205,21 @@ sighandler(void *arg)
 			 * Refresh action - reread configuration properties.
 			 */
 			lookup_daemon_properties();
+			/*
+			 * Check if user restarted scanning.
+			 */
+			if (scan == 0 && wlan_scan_interval != 0) {
+				err = pthread_create(&scan, NULL,
+				    periodic_wireless_scan, NULL);
+				if (err != 0) {
+					syslog(LOG_NOTICE,
+					    "pthread_create wireless scan: %s",
+					    strerror(err));
+				} else {
+					dprintf("wireless scan thread: %d",
+					    scan);
+				}
+			}
 			break;
 		case SIGINT:
 			/*
@@ -209,6 +228,23 @@ sighandler(void *arg)
 			print_llp_status();
 			print_interface_status();
 			print_wireless_status();
+			break;
+		case SIGTHAW:
+			/*
+			 * It seems unlikely that this is helpful, but it can't
+			 * hurt: when waking up from a sleep, check if the
+			 * wireless interface is still viable.  There've been
+			 * bugs in this area.
+			 */
+			if (pthread_mutex_lock(&machine_lock) == 0) {
+				if (link_layer_profile != NULL &&
+				    link_layer_profile->llp_type ==
+				    IF_WIRELESS) {
+					wireless_verify(
+					    link_layer_profile->llp_lname);
+				}
+				(void) pthread_mutex_unlock(&machine_lock);
+			}
 			break;
 		default:
 			syslog(LOG_NOTICE, "%s received, shutting down",
@@ -225,13 +261,28 @@ sighandler(void *arg)
 	return (NULL);
 }
 
+/* ARGSUSED */
+static void
+sigdummy(int sig)
+{
+}
+
 static void
 init_signalhandling(void)
 {
+	struct sigaction act;
 	pthread_attr_t attr;
 	pthread_t sighand;
 	int err;
 	sigset_t new;
+
+	/*
+	 * The default is to ignore, so we need a dummy handler.
+	 */
+	(void) memset(&act, 0, sizeof (act));
+	act.sa_handler = sigdummy;
+	act.sa_flags = SA_RESTART;
+	(void) sigaction(SIGTHAW, &act, NULL);
 
 	(void) sigfillset(&new);
 	(void) pthread_sigmask(SIG_BLOCK, &new, &original_sigmask);
@@ -399,9 +450,11 @@ main(int argc, char *argv[])
 	}
 	syslog(LOG_DEBUG, "terminating routing and scanning threads");
 	(void) pthread_cancel(routing);
-	(void) pthread_cancel(scan);
 	(void) pthread_join(routing, NULL);
-	(void) pthread_join(scan, NULL);
+	if (scan != 0) {
+		(void) pthread_cancel(scan);
+		(void) pthread_join(scan, NULL);
+	}
 	syslog(LOG_INFO, "nwamd shutting down");
 	return (EXIT_SUCCESS);
 }

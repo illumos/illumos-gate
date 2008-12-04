@@ -85,6 +85,7 @@ extern void print_interface_status(void);
 
 /* wireless.c: wifi link handling */
 extern void initialize_wireless(void);
+extern void terminate_wireless(void);
 extern void add_wireless_if(const char *);
 extern void remove_wireless_if(const char *);
 extern struct wireless_lan *prompt_for_visited(void);
@@ -92,10 +93,12 @@ extern return_vals_t handle_wireless_lan(const char *);
 extern libnwam_known_ap_t *get_known_ap_list(size_t *, uint_t *);
 extern int add_known_ap(const char *, const char *);
 extern int delete_known_ap(const char *, const char *);
+extern void wireless_verify(const char *);
 extern void *periodic_wireless_scan(void *);
 extern boolean_t check_wlan_connected(const char *, const char *, const char *);
 extern int set_specific_lan(const char *, const char *, const char *);
-extern int set_wlan_key(const char *, const char *, const char *, const char *);
+extern int set_wlan_key(const char *, const char *, const char *, const char *,
+    const char *);
 extern int launch_wireless_scan(const char *);
 extern void disconnect_wlan(const char *);
 extern void get_wireless_state(const char *, boolean_t *, boolean_t *);

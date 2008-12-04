@@ -186,6 +186,42 @@ state_machine(struct np_event *e)
 			    e->npe_type == EV_LINKDISC ? dcGone :
 			    e->npe_type == EV_USER ? dcUser :
 			    dcBetter);
+		} else if (prefllp == evllp) {
+			/*
+			 * If this is a negative event on our preferred link,
+			 * then we need to pay closer attention.  (We can
+			 * ignore negative events on other links.)
+			 */
+			switch (e->npe_type) {
+			case EV_LINKFADE:
+			case EV_LINKDISC:
+				/*
+				 * If the link has faded or disconnected, then
+				 * it's a wireless link, and something has gone
+				 * wrong with the connection to the AP.  The
+				 * above tests mean that we do intend to stay
+				 * with this link for now, so we have to
+				 * recover it by attempting to reconnect.
+				 * Invoking reselect will do that by calling
+				 * bringupinterface.
+				 */
+				dprintf("disconnect on preferred llp; "
+				    "attempting reconnect");
+				prefllp->llp_waiting = B_TRUE;
+				llp_reselect();
+				break;
+			case EV_LINKDROP:
+				/*
+				 * If link status has dropped on a wireless
+				 * interface, then we need to check whether
+				 * we're still connected.  We're probably not,
+				 * and this will cause us to attempt
+				 * reconnection.
+				 */
+				if (prefllp->llp_type == IF_WIRELESS)
+					wireless_verify(e->npe_name);
+				break;
+			}
 		}
 		if (e->npe_type == EV_USER)
 			llp_write_changed_priority(evllp);
@@ -376,10 +412,11 @@ state_machine(struct np_event *e)
 void
 cleanup(void)
 {
+	terminate_wireless();
 	deactivate_upper_layer_profile();
-	if (link_layer_profile != NULL) {
+	if (link_layer_profile != NULL)
 		takedowninterface(link_layer_profile->llp_lname, dcShutdown);
-	}
+
 	/*
 	 * Since actions taken in nwamd result in dhcpagent being
 	 * launched, it's under our contract.  Thus, it needs to be

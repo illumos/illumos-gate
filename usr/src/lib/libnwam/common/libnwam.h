@@ -160,6 +160,9 @@ extern int libnwam_delete_known_ap(const char *, const char *);
 extern int libnwam_select_wlan(const char *, const char *, const char *);
 extern int libnwam_wlan_key(const char *, const char *, const char *,
     const char *);
+#pragma weak libnwam_wlan_key_secmode
+extern int libnwam_wlan_key_secmode(const char *, const char *, const char *,
+    const char *, const char *);
 extern int libnwam_start_rescan(const char *);
 extern int libnwam_fini(void);
 extern int libnwam_init(int);

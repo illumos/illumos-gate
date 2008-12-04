@@ -48,6 +48,7 @@ extern uint32_t timer_expire;
 
 extern uint_t wlan_scan_interval;
 extern dladm_wlan_strength_t wireless_scan_level;
+extern boolean_t strict_bssid;
 
 extern uint_t door_idle_time;
 

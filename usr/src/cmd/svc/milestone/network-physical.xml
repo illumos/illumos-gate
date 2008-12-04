@@ -113,6 +113,7 @@
 		<propval name='dhcp_wait_time' type='count' value='60' />
 		<propval name='scan_interval' type='count' value='120' />
 		<propval name='idle_time' type='count' value='10' />
+		<propval name='strict_bssid' type='boolean' value='false' />
 		<propval name='value_authorization' type='astring'
 			value='solaris.smf.value.nwam' />
 	</property_group>

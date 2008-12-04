@@ -824,7 +824,7 @@ nwam_door_server(void *cookie, char *argp, size_t arg_size, door_desc_t *dp,
 		dprintf("door: selecting WLAN key on %s for %s %s",
 		    ndc->ndc_interface, ndc->ndc_essid, ndc->ndc_bssid);
 		retv = set_wlan_key(ndc->ndc_interface, ndc->ndc_essid,
-		    ndc->ndc_bssid, ndc->ndc_key);
+		    ndc->ndc_bssid, ndc->ndc_key, ndc->ndc_secmode);
 		(void) pthread_mutex_unlock(&machine_lock);
 		break;
 

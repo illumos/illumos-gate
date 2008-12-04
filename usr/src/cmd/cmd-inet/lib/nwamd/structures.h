@@ -246,6 +246,7 @@ typedef struct nwam_door_cmd_s {
 	char			ndc_essid[DLADM_STRSIZE];
 	char			ndc_bssid[DLADM_STRSIZE];
 	char			ndc_key[DLADM_STRSIZE];
+	char			ndc_secmode[DLADM_STRSIZE];
 } nwam_door_cmd_t;
 
 typedef struct nwam_llp_data_s {
