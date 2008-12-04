@@ -495,7 +495,28 @@ typedef struct nxge_hw_list {
 	nxge_os_mutex_t 	nxge_mdio_lock;
 
 	nxge_dev_info_t		*parent_devp;
-	struct _nxge_t		*nxge_p[NXGE_MAX_PORTS];
+#if defined(sun4v)
+	/*
+	 * With Hybrid I/O, a VR (virtualization region) is the moral
+	 * equivalent of a device function as seen in the service domain.
+	 * And, a guest domain can map up to 8 VRs for a single NIU for both
+	 * of the physical ports.  Hence, need space for up to the maximum
+	 * number of VRs (functions) for the guest domain driver.
+	 *
+	 * For non-sun4v platforms, NXGE_MAX_PORTS provides the correct
+	 * number of functions for the device. For sun4v platforms,
+	 * NXGE_MAX_FUNCTIONS will be defined by the number of
+	 * VRs that the guest domain can map.
+	 *
+	 * NOTE: This solution only works for one NIU and will need to
+	 * revisit this for KT-NIU.
+	 */
+#define	NXGE_MAX_GUEST_FUNCTIONS	8
+#define	NXGE_MAX_FUNCTIONS		NXGE_MAX_GUEST_FUNCTIONS
+#else
+#define	NXGE_MAX_FUNCTIONS		NXGE_MAX_PORTS
+#endif
+	struct _nxge_t		*nxge_p[NXGE_MAX_FUNCTIONS];
 	uint32_t		ndevs;
 	uint32_t 		flags;
 	uint32_t 		magic;
