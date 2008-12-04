@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG =		hald-probe-network-printer
@@ -35,11 +34,10 @@ include ../../Makefile.hal
 ROOTCMDDIR =	$(ROOTLIB_HAL)
 
 LDLIBS +=	-lc -ldbus-1 -lhal
-LDLIBS +=	-L$(SFWLIBDIR) -R$(SFWLIBDIR) $(ZIGNORE) -lnetsnmp
+LDLIBS +=	$(ZIGNORE) -lnetsnmp
 
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
 CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../utils -I../../hald
-CPPFLAGS +=	-I$(SFWINCDIR)
 C99MODE =	$(C99_ENABLE)
 
 .KEEP_STATE:

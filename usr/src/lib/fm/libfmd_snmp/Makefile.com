@@ -44,20 +44,19 @@ LIBS = $(DYNLIB) $(LINTLIB)
 
 SRCDIR =	../common
 
-CPPFLAGS += -I../common -I. -I/usr/sfw/include
+CPPFLAGS += -I../common -I.
 $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 CFLAGS += $(CCVERBOSE) $(C_BIGPICFLAGS)
 CFLAGS64 += $(CCVERBOSE) $(C_BIGPICFLAGS)
 
 # No lint libraries are delivered for Net-SNMP yet
-SNMPLIBS = -L$(SFWLIBDIR) -lnetsnmp -lnetsnmphelpers -lnetsnmpagent
+SNMPLIBS = -lnetsnmp -lnetsnmphelpers -lnetsnmpagent
 lint := SNMPLIBS=
 
 LDLIBS += $(MACH_LDLIBS)
 LDLIBS += -lfmd_adm -luutil -lnvpair -ltopo
 LDLIBS += $(SNMPLIBS)
 LDLIBS += -lc
-DYNFLAGS += -R$(SFWLIBDIR)
 
 LINTFLAGS = -msux
 LINTFLAGS64 = -msux -m64

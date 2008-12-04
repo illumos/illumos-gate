@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 MODULE = snmp-trapgen
@@ -39,8 +38,7 @@ include ../../Makefile.plugin
 SNMPLIBS = -lnetsnmp -lnetsnmpagent
 lint := SNMPLIBS =
 
-CPPFLAGS += -I/usr/sfw/include
-LDFLAGS += -L/usr/sfw/lib -L$(ROOT)/usr/lib/fm -R/usr/sfw/lib:/usr/lib/fm
+LDFLAGS += -L$(ROOT)/usr/lib/fm -R/usr/lib/fm
 LINTFLAGS += -L$(ROOT)/usr/lib/fm
 LDLIBS += $(SNMPLIBS) -lfmd_msg
 

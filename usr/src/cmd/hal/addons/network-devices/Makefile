@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG =		hald-addon-network-discovery
@@ -42,11 +41,10 @@ ROOTCMDDIR =	$(ROOTLIB_HAL)
 
 LDLIBS +=	-lc -ldbus-1 -lhal -lglib-2.0 -ldbus-glib-1
 LDLIBS +=	-lnsl -lsocket
-LDLIBS +=	-L$(SFWLIBDIR) -R$(SFWLIBDIR) $(ZIGNORE) -lnetsnmp
+LDLIBS +=	$(ZIGNORE) -lnetsnmp
 
 CPPFLAGS +=	$(HAL_DBUS_CPPFLAGS) $(HAL_GLIB_CPPFLAGS) $(HAL_CONFIG_CPPFLAGS)
 CPPFLAGS +=	-I$(ROOT)/usr/include/hal -I../../hald -I../../utils
-CPPFLAGS +=	-I$(SFWINCDIR)
 C99MODE =	$(C99_ENABLE)
 
 .KEEP_STATE:
