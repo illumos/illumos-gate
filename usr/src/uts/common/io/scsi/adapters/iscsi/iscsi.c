@@ -2971,7 +2971,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		if (persistent_disc_meth_set(method) == B_FALSE) {
 			rtn = EIO;
 		} else {
-			(void) iscsid_enable_discovery(ihp, method, B_TRUE);
+			(void) iscsid_enable_discovery(ihp, method, B_FALSE);
 			iscsid_poke_discovery(ihp, method);
 			(void) iscsid_login_tgt(ihp, NULL, method, NULL);
 		}

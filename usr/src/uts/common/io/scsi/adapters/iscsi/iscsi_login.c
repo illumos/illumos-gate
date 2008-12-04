@@ -175,9 +175,11 @@ login_start:
 	default:
 		/* All other errors are hard failures */
 		cmn_err(CE_WARN, "iscsi connection(%u) login failed - "
-		    "%s (0x%02x/0x%02x)", icp->conn_oid,
+		    "%s (0x%02x/0x%02x) Target: %s, TPGT: %d",
+		    icp->conn_oid,
 		    iscsi_login_failure_str(status_class, status_detail),
-		    status_class, status_detail);
+		    status_class, status_detail, isp->sess_name,
+		    isp->sess_tpgt_conf);
 
 		iscsi_net->close(icp->conn_socket);
 
