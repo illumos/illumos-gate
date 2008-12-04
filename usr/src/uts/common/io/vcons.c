@@ -447,13 +447,15 @@ vt_send_hotkeys(void *timeout_arg)
 	int retries = 0;
 	door_arg_t door_arg;
 
-	mutex_enter(&vt_pending_vtno_lock);
-
 	arg.vt_ev = VT_EV_HOTKEYS;
+
+	mutex_enter(&vt_pending_vtno_lock);
 	arg.vt_num = vt_pending_vtno;
+	mutex_exit(&vt_pending_vtno_lock);
 
 	/* only available in kernel context or user context */
 	if (door_ki_open(VT_DAEMON_DOOR_FILE, &door) != 0) {
+		mutex_enter(&vt_pending_vtno_lock);
 		vt_pending_vtno = -1;
 		mutex_exit(&vt_pending_vtno_lock);
 		return;
@@ -478,8 +480,8 @@ vt_send_hotkeys(void *timeout_arg)
 
 	door_ki_rele(door);
 
+	mutex_enter(&vt_pending_vtno_lock);
 	vt_pending_vtno = -1;
-
 	mutex_exit(&vt_pending_vtno_lock);
 }
 
