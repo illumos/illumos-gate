@@ -472,6 +472,7 @@ smb_nt_trans_dispatch(struct smb_request *sr, struct smb_xa *xa)
 	case SDRC_DROP_VC:
 	case SDRC_NO_REPLY:
 	case SDRC_ERROR:
+	case SDRC_SR_KEPT:
 		return (rc);
 
 	case SDRC_NOT_IMPLEMENTED:

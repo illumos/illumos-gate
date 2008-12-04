@@ -782,15 +782,12 @@ smb_session_worker(
 	switch (sr->sr_state) {
 	case SMB_REQ_STATE_SUBMITTED:
 		mutex_exit(&sr->sr_mutex);
-		smb_dispatch_request(sr);
-		mutex_enter(&sr->sr_mutex);
-		if (!sr->sr_keep) {
+		if (smb_dispatch_request(sr)) {
+			mutex_enter(&sr->sr_mutex);
 			sr->sr_state = SMB_REQ_STATE_COMPLETED;
 			mutex_exit(&sr->sr_mutex);
 			smb_request_free(sr);
-			break;
 		}
-		mutex_exit(&sr->sr_mutex);
 		break;
 
 	default:

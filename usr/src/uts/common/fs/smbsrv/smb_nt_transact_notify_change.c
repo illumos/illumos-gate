@@ -242,7 +242,7 @@ smb_nt_transact_notify_change(struct smb_request *sr, struct smb_xa *xa)
 			smb_fem_fcn_install(node);
 
 			mutex_exit(&sr->sr_mutex);
-			return (SDRC_NO_REPLY);
+			return (SDRC_SR_KEPT);
 		} else {
 			/* node already changed, reply immediately */
 			if (--node->waiting_event == 0)

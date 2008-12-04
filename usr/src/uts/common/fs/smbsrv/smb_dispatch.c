@@ -568,13 +568,24 @@ smbsr_cleanup(smb_request_t *sr)
 		sr->sr_state = SMB_REQ_STATE_CLEANED_UP;
 	mutex_exit(&sr->sr_mutex);
 }
-
-void
+/*
+ * smb_dispatch_request
+ *
+ * Returns:
+ *
+ *    B_TRUE	The caller must free the smb request passed in.
+ *    B_FALSE	The caller must not access the smb request passed in. It has
+ *		been kept in an internal queue and may have already been freed.
+ */
+boolean_t
 smb_dispatch_request(struct smb_request *sr)
 {
 	smb_sdrc_t		sdrc;
 	smb_dispatch_table_t	*sdd;
 	boolean_t		disconnect = B_FALSE;
+	smb_session_t		*session;
+
+	session = sr->session;
 
 	ASSERT(sr->tid_tree == 0);
 	ASSERT(sr->uid_user == 0);
@@ -640,12 +651,12 @@ smb_dispatch_request(struct smb_request *sr)
 	 * Verify SMB signature if signing is enabled, dialect is NT LM 0.12,
 	 * signing was negotiated and authentication has occurred.
 	 */
-	if (sr->session->signing.flags & SMB_SIGNING_ENABLED) {
+	if (session->signing.flags & SMB_SIGNING_ENABLED) {
 		if (smb_sign_check_request(sr) != 0) {
 			smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
 			    ERRDOS, ERROR_ACCESS_DENIED);
 			disconnect = B_TRUE;
-			smb_rwx_rwenter(&sr->session->s_lock, RW_READER);
+			smb_rwx_rwenter(&session->s_lock, RW_READER);
 			goto report_error;
 		}
 	}
@@ -654,7 +665,7 @@ andx_more:
 	sdd = &dispatch[sr->smb_com];
 	ASSERT(sdd->sdt_function);
 
-	smb_rwx_rwenter(&sr->session->s_lock, sdd->sdt_slock_mode);
+	smb_rwx_rwenter(&session->s_lock, sdd->sdt_slock_mode);
 
 	if (smb_mbc_decodef(&sr->command, "b", &sr->smb_wct) != 0) {
 		disconnect = B_TRUE;
@@ -714,7 +725,7 @@ andx_more:
 	 * override the user credentials.
 	 */
 	if (!(sdd->sdt_flags & SDDF_SUPPRESS_UID) && (sr->uid_user == NULL)) {
-		sr->uid_user = smb_user_lookup_by_uid(sr->session, sr->smb_uid);
+		sr->uid_user = smb_user_lookup_by_uid(session, sr->smb_uid);
 		if (sr->uid_user == NULL) {
 			smbsr_error(sr, 0, ERRSRV, ERRbaduid);
 			smbsr_cleanup(sr);
@@ -741,7 +752,7 @@ andx_more:
 	 * (if the current state is SMB_SESSION_STATE_OPLOCK_BREAKING).
 	 * Otherwise we let the read raw handler to deal with it.
 	 */
-	if ((sr->session->s_state == SMB_SESSION_STATE_OPLOCK_BREAKING) &&
+	if ((session->s_state == SMB_SESSION_STATE_OPLOCK_BREAKING) &&
 	    (sr->smb_com != SMB_COM_READ_RAW)) {
 		krw_t	mode;
 		/*
@@ -751,11 +762,11 @@ andx_more:
 		 * Whatever mode was used to enter the lock, it will
 		 * be restored.
 		 */
-		mode = smb_rwx_rwupgrade(&sr->session->s_lock);
-		if (sr->session->s_state == SMB_SESSION_STATE_OPLOCK_BREAKING)
-			sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
+		mode = smb_rwx_rwupgrade(&session->s_lock);
+		if (session->s_state == SMB_SESSION_STATE_OPLOCK_BREAKING)
+			session->s_state = SMB_SESSION_STATE_NEGOTIATED;
 
-		smb_rwx_rwdowngrade(&sr->session->s_lock, mode);
+		smb_rwx_rwdowngrade(&session->s_lock, mode);
 	}
 
 	/*
@@ -773,28 +784,19 @@ andx_more:
 		/*
 		 * Handle errors from raw write.
 		 */
-		if (sr->session->s_state ==
-		    SMB_SESSION_STATE_WRITE_RAW_ACTIVE) {
+		if (session->s_state == SMB_SESSION_STATE_WRITE_RAW_ACTIVE) {
 			/*
 			 * Set state so that the netbios session
 			 * daemon will start accepting data again.
 			 */
-			sr->session->s_write_raw_status = 0;
-			sr->session->s_state = SMB_SESSION_STATE_NEGOTIATED;
+			session->s_write_raw_status = 0;
+			session->s_state = SMB_SESSION_STATE_NEGOTIATED;
 		}
 	}
-
-	(*sdd->sdt_post_op)(sr);
-
-	/*
-	 * Only call smbsr_cleanup if smb->sr_keep is not set.
-	 * smb_nt_transact_notify_change will set smb->sr_keep if it
-	 * retains control of the request when it returns.  In that
-	 * case the notify change code will call smbsr_cleanup later
-	 * when the request has completed.
-	 */
-	if (sr->sr_keep == 0)
+	if (sdrc != SDRC_SR_KEPT) {
+		(*sdd->sdt_post_op)(sr);
 		smbsr_cleanup(sr);
+	}
 
 	switch (sdrc) {
 	case SDRC_SUCCESS:
@@ -805,8 +807,12 @@ andx_more:
 		goto drop_connection;
 
 	case SDRC_NO_REPLY:
-		smb_rwx_rwexit(&sr->session->s_lock);
-		return;
+		smb_rwx_rwexit(&session->s_lock);
+		return (B_TRUE);
+
+	case SDRC_SR_KEPT:
+		smb_rwx_rwexit(&session->s_lock);
+		return (B_FALSE);
 
 	case SDRC_ERROR:
 		goto report_error;
@@ -831,7 +837,7 @@ andx_more:
 	(void) smb_mbc_poke(&sr->reply, sr->andx_prev_wct + 1, "b.w",
 	    sr->andx_com, MBC_LENGTH(&sr->reply));
 
-	smb_rwx_rwexit(&sr->session->s_lock);
+	smb_rwx_rwexit(&session->s_lock);
 
 	sr->command.chain_offset = sr->orig_request_hdr + sr->andx_off;
 	sr->smb_com = sr->andx_com;
@@ -852,18 +858,20 @@ reply_ready:
 
 drop_connection:
 	if (disconnect) {
-		switch (sr->session->s_state) {
+		switch (session->s_state) {
 		case SMB_SESSION_STATE_DISCONNECTED:
 		case SMB_SESSION_STATE_TERMINATED:
 			break;
 		default:
-			smb_soshutdown(sr->session->sock);
-			sr->session->s_state = SMB_SESSION_STATE_DISCONNECTED;
+			smb_soshutdown(session->sock);
+			session->s_state = SMB_SESSION_STATE_DISCONNECTED;
 			break;
 		}
 	}
 
-	smb_rwx_rwexit(&sr->session->s_lock);
+	smb_rwx_rwexit(&session->s_lock);
+
+	return (B_TRUE);
 }
 
 int

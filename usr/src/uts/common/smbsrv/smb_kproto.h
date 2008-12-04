@@ -259,7 +259,7 @@ uint32_t smb_omode_to_amask(uint32_t desired_access);
 
 void	sshow_distribution_info(char *);
 
-void	smb_dispatch_request(struct smb_request *);
+boolean_t smb_dispatch_request(smb_request_t *);
 void	smbsr_disconnect_file(smb_request_t *);
 void	smbsr_disconnect_dir(smb_request_t *);
 int	smbsr_encode_empty_result(struct smb_request *);

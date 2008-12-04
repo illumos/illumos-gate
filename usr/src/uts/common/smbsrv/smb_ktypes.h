@@ -1436,6 +1436,7 @@ typedef enum {
 	SDRC_ERROR,
 	SDRC_DROP_VC,
 	SDRC_NO_REPLY,
+	SDRC_SR_KEPT,
 	SDRC_NOT_IMPLEMENTED
 } smb_sdrc_t;
 
