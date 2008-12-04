@@ -32,8 +32,6 @@
  * $Id: nb_net.c,v 1.8 2004/03/19 01:49:47 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -53,6 +51,12 @@
 #include <netsmb/netbios.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/nb_lib.h>
+#include "private.h"
+
+/*
+ * General networking stuff, in spite of the names
+ * that imply they're specific to NetBIOS.
+ */
 
 int
 nb_getlocalname(char *name, size_t maxlen)
@@ -114,121 +118,3 @@ nb_resolvehost_in(const char *name, struct sockaddr **dest)
 	*dest = (struct sockaddr *)sinp;
 	return (0);
 }
-
-#ifdef NOT_DEFINED
-int
-nb_enum_if(struct nb_ifdesc **iflist) {
-	struct lifconf ifc;
-	struct lifreq *ifrqp;
-	struct nb_ifdesc *ifd;
-	struct in_addr iaddr, imask;
-	struct lifnum ifn;
-	char *ifrdata, *iname;
-	int s, rdlen, ifcnt, error, iflags, i;
-
-	*iflist = NULL;
-	s = socket(AF_INET, SOCK_DGRAM, 0);
-	if (s == -1)
-		return (errno);
-
-	/* Get number of interfaces. */
-	ifn.lifn_family = AF_INET;
-	ifn.lifn_flags = 0;
-	ifn.lifn_count = 0;
-	if (ioctl(s, SIOCGLIFNUM, &ifn) != 0) {
-		error = errno;
-		goto bad;
-	}
-
-	rdlen = ifn.lifn_count * sizeof (struct lifreq);
-	ifrdata = malloc(rdlen);
-	if (ifrdata == NULL) {
-		error = ENOMEM;
-		goto bad;
-	}
-	ifc.lifc_flags = 0;
-	ifc.lifc_family = AF_INET;
-	ifc.lifc_len = rdlen;
-	ifc.lifc_buf = ifrdata;
-	if (ioctl(s, SIOCGLIFCONF, &ifc) != 0) {
-		error = errno;
-		goto bad;
-	}
-	ifrqp = ifc.lifc_req;
-	ifcnt = ifc.lifc_len / sizeof (struct lifreq);
-	error = 0;
-	for (i = 0; i < ifcnt; i++, ifrqp++) {
-		/* XXX for now, avoid IP6 broadcast performance costs */
-		if (ifrqp->lifr_addr.ss_family != AF_INET)
-			continue;
-		if (ioctl(s, SIOCGLIFFLAGS, ifrqp) != 0)
-			continue;
-		iflags = ifrqp->lifr_flags;
-		if ((iflags & IFF_UP) == 0 || (iflags & IFF_BROADCAST) == 0)
-			continue;
-
-		if (ioctl(s, SIOCGLIFADDR, ifrqp) != 0 ||
-		    ifrqp->lifr_addr.ss_family != AF_INET) {
-			continue;
-		}
-		iname = ifrqp->lifr_name;
-		if (strlen(iname) >= sizeof (ifd->id_name))
-			continue;
-		iaddr = (*(struct sockaddr_in *)&ifrqp->lifr_addr).sin_addr;
-
-		if (ioctl(s, SIOCGLIFNETMASK, ifrqp) != 0)
-			continue;
-		imask = ((struct sockaddr_in *)&ifrqp->lifr_addr)->sin_addr;
-
-		ifd = malloc(sizeof (struct nb_ifdesc));
-		if (ifd == NULL)
-			return (ENOMEM);
-		bzero(ifd, sizeof (struct nb_ifdesc));
-		strcpy(ifd->id_name, iname);
-		ifd->id_flags = iflags;
-		ifd->id_addr = iaddr;
-		ifd->id_mask = imask;
-		ifd->id_next = *iflist;
-		*iflist = ifd;
-	}
-bad:
-	free(ifrdata);
-	close(s);
-	return (error);
-}
-
-/*ARGSUSED*/
-int
-nbns_resolvename(const char *name, struct sockaddr **dest)
-{
-	printf("NetBIOS name resolver is not included in this distribution.\n");
-	printf("Please use '-I' option to specify an IP address of server.\n");
-	return (EHOSTUNREACH);
-}
-
-int
-nb_hostlookup(struct nb_name *np, const char *server, const char *hint,
-	struct sockaddr_nb **dst)
-{
-	struct sockaddr_nb *snb;
-	int error;
-
-	error = nb_sockaddr(NULL, np, &snb);
-	if (error)
-		return (error);
-	do {
-		if (hint) {
-			error = nb_resolvehost_in(host, snb);
-			if (error)
-				break;
-		} else {
-			error = nb_resolvename(server);
-		}
-	} while (0);
-	if (!error) {
-		*dst = snb;
-	} else
-		nb_snbfree(snb);
-	return (error);
-}
-#endif

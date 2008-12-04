@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Functions supporting Solaris Extended Attributes,
  * used to provide access to CIFS "named streams".
@@ -44,7 +42,6 @@
 #include <sys/stat.h>
 #include <sys/cmn_err.h>
 #include <sys/dnlc.h>
-#include <sys/vfs_opreg.h>
 #include <sys/u8_textprep.h>
 
 #include <netsmb/smb_osdep.h>

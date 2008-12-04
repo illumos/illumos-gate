@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SMB specific functions
  */
@@ -72,9 +70,7 @@ static int yes_no_validator(int, char *, char *);
 static int ip_address_validator(int, char *, char *);
 static int minauth_validator(int, char *, char *);
 static int password_validator(int, char *, char *);
-#ifdef NOT_DEFINED
-static int nbscope_validator(int, char *, char *);
-#endif
+static int signing_validator(int, char *, char *);
 
 int propset_changed = 0;
 
@@ -183,23 +179,9 @@ struct smbclnt_proto_option_defs smbclnt_proto_options[] = {
 	{ "workgroup", NULL, PROTO_OPT_WORKGROUP,
 	    0, 0, MAX_VALUE_BUFLEN,
 	    string_length_check_validator},
-#ifdef NOT_DEFINED
-	{ "nbscope", NULL, PROTO_OPT_NBSCOPE,
+	{ "signing", NULL, PROTO_OPT_SIGNING,
 	    0, 0, MAX_VALUE_BUFLEN,
-	    nbscope_validator},
-	{ "nbtimeout", NULL, PROTO_OPT_NBTIMEOUT,
-	    0, 0, 60,
-	    range_check_validator},
-	{ "retry_count", NULL, PROTO_OPT_RETRY_COUNT,
-	    0, 0, 10,
-	    range_check_validator},
-	{ "use_negprot_domain", NULL, PROTO_OPT_USE_NEGPROT_DOMAIN,
-	    0, 0, 0,
-	    yes_no_validator},
-	{ "charset", NULL, PROTO_OPT_CHARSETS,
-	    0, 0, MAX_VALUE_BUFLEN,
-	    ip_address_validator},
-#endif
+	    signing_validator},
 	{NULL}
 };
 
@@ -302,18 +284,21 @@ minauth_validator(int index, char *section, char *value)
 		return (SA_BAD_VALUE);
 }
 
-#ifdef NOT_DEFINED
 /*ARGSUSED*/
 static int
-nbscope_validator(int index, char *section, char *value)
+signing_validator(int index, char *section, char *value)
 {
-	/*
-	 * XXX - not sure what's legal here.  Looks like it's not
-	 * used in nb_name_encode() right now anyway.
-	 */
-	return (SA_OK);
+	if (value == NULL)
+		return (SA_BAD_VALUE);
+	if (strlen(value) == 0)
+		return (SA_OK);
+	if (strcmp(value, "disabled") == 0 ||
+	    strcmp(value, "enabled") == 0 ||
+	    strcmp(value, "required") == 0)
+		return (SA_OK);
+	else
+		return (SA_BAD_VALUE);
 }
-#endif
 
 /*ARGSUSED*/
 static int
@@ -366,84 +351,61 @@ smbclnt_config_load()
 	char *lastpgname = NULL, *pgname = NULL;
 	char *name = NULL, *value = NULL;
 	sa_property_t sect, node;
-	int pending = 0;
-#ifdef DEBUG
-	char *sectname = NULL;
-#endif
 
 	props = scf_simple_app_props_get(NULL, SMBC_DEFAULT_INSTANCE_FMRI);
 	if (props == NULL)
 		return (-1);
 
-	while ((prop = (scf_simple_prop_t *)
-	    scf_simple_app_props_next(props, lastprop)) != NULL) {
+	for (;;) {
+		lastprop = prop;
+		prop = (scf_simple_prop_t *)
+		    scf_simple_app_props_next(props, lastprop);
+		if (prop == NULL)
+			break;
 
 		/* Ignore properties that don't have our prefix */
 		pgname = scf_simple_prop_pgname(prop);
-		if (strncmp("S-", pgname, 2) != 0) {
-			lastprop = prop;
+		if (strncmp("S-", pgname, 2) != 0)
 			continue;
-		}
 
-		/* Note property group name changes, which mark sections */
+		/*
+		 * Note property group name changes, which mark sections
+		 *
+		 * The memory allocated by sa_create_section is
+		 * linked into the list of children under protoset,
+		 * and will eventually be freed via that list.
+		 */
 		if (lastpgname == NULL || strcmp(lastpgname, pgname) != 0) {
-#ifdef DEBUG
-			if (pending)
-				fprintf(stderr, "smbclnt_config_load: "
-				    "Ignoring empty section %s\n", sectname);
-			fprintf(stderr, "smbclnt_config_load: new pg=%s\n",
-			    pgname);
-#endif
 			sect = sa_create_section(NULL, pgname+2);
 			(void) xmlSetProp(sect, (xmlChar *)"type",
 			    (xmlChar *)SMBFS_PROTOCOL_NAME);
+			(void) sa_add_protocol_property(protoset, sect);
 			if (lastpgname)
 				free(lastpgname);
 			lastpgname = strdup(pgname);
-			pending = 1;
 		}
 		name = scf_simple_prop_name(prop);
 		value = scf_simple_prop_next_astring(prop);
 
 		/* If we get a section name, apply it and consume it */
 		if (strncmp("section", name, 7) == 0 && value != NULL) {
-#ifdef DEBUG
-			if (sectname)
-				free(sectname);
-			sectname = strdup(value);
-			fprintf(stderr, "smbclnt_config_load: section=%s\n",
-			    sectname);
-#endif
 			(void) xmlSetProp(sect, (xmlChar *)"name",
 			    (xmlChar *)value);
-			lastprop = prop;
 			continue;
 		}
-#ifdef DEBUG
-		fprintf(stderr, "pg=%s, sect=%s, nm=%s, val=%s\n",
-		    pgname, sectname ? sectname : "NULL", name, value);
-#endif
+
 		/*
-		 * If we have an ordinary property, add to the section.
-		 * Also, if this is the first ordinary property, we
-		 * can commit the non-empty section to the protoset.
+		 * We have an ordinary property.  Add to the section.
+		 *
+		 * The memory allocated by sa_create_property is
+		 * linked into the list of children under "sect",
+		 * and will eventually be freed via that list.
 		 */
 		node = sa_create_property(name, value);
 		(void) sa_add_protocol_property(sect, node);
-		lastprop = prop;
-		if (pending) {
-			(void) sa_add_protocol_property(protoset, sect);
-			pending = 0;
-		}
 	}
 	scf_simple_app_props_free(props);
-	if (pending) {
-#ifdef DEBUG
-		fprintf(stderr, "smbclnt_config_load: "
-		    "Deleting empty section %s\n", sectname);
-#endif
-		(void) smbfs_delete_property_group(lastpgname);
-	}
+
 	if (lastpgname)
 		free(lastpgname);
 	return (0);
@@ -469,11 +431,11 @@ smbfs_save_propset()
 	int new = 0, nonnull = 0;
 
 	propset = sa_get_protocol_section(protoset, section);
-	(void) strncpy(propgroup, SMBC_PG_PREFIX, SMBC_PG_PREFIX_LEN);
+	(void) strlcpy(propgroup, SMBC_PG_PREFIX, sizeof (propgroup));
 	propgroup[SMBC_PG_PREFIX_LEN] = '\0';
 	uu = sa_get_property_attr(propset, "extra");
 	if (uu != NULL) {
-		(void) strncat(propgroup, uu, UUID_PRINTABLE_STRING_LENGTH);
+		(void) strlcat(propgroup, uu, sizeof (propgroup));
 		free(uu);
 	} else {
 		new = 1;
@@ -481,10 +443,6 @@ smbfs_save_propset()
 		uuid_generate(uuid);
 		uuid_unparse(uuid, &propgroup[SMBC_PG_PREFIX_LEN]);
 	}
-#ifdef DEBUG
-	fprintf(stderr, "smbfs_save_propset: %s pgname=%s\n",
-	    new ? "new" : "old", propgroup);
-#endif
 
 	handle = smb_smf_scf_init(SMBC_FMRI_PREFIX);
 	if (handle == NULL) {
@@ -508,12 +466,6 @@ smbfs_save_propset()
 	for (i = PROTO_OPT_SECTION+1; i <= SMBC_OPT_MAX; i++) {
 		if ((smbclnt_proto_options[i].flags & SMBC_MODIFIED) == 0)
 			continue;
-#ifdef DEBUG
-		fprintf(stderr, "smbfs_save_propset: saving "
-		    "i=%d/name=%s/value=%s\n", i,
-		    smbclnt_proto_options[i].name,
-		    smbclnt_proto_options[i].value);
-#endif
 		if (strcmp(smbclnt_proto_options[i].value, "") == 0)
 			ret = smb_smf_delete_property(handle,
 			    smbclnt_proto_options[i].name);
@@ -533,12 +485,6 @@ smbfs_save_propset()
 	 * Suppress new, null entries by not saving the section name.
 	 */
 	if (!new || nonnull) {
-#ifdef DEBUG
-		fprintf(stderr, "smbfs_save_propset: saving "
-		    "i=%d/name=%s/value=%s\n", PROTO_OPT_SECTION,
-		    smbclnt_proto_options[PROTO_OPT_SECTION].name,
-		    smbclnt_proto_options[PROTO_OPT_SECTION].value);
-#endif
 		ret = smb_smf_set_string_property(handle,
 		    smbclnt_proto_options[PROTO_OPT_SECTION].name,
 		    smbclnt_proto_options[PROTO_OPT_SECTION].value);
@@ -621,6 +567,8 @@ smbfs_fini()
 {
 	if (propset_changed)
 		(void) smbfs_save_propset();
+	xmlFreeNode(protoset);
+	protoset = NULL;
 }
 
 /*
@@ -665,18 +613,8 @@ smbfs_save_property(int index, char *section, char *value)
 	char *s;
 
 	if (index == PROTO_OPT_WORKGROUP) {
-#ifdef DEBUG
-		fprintf(stderr, "smbfs_save_property: "
-		    "index %d being mapped to %d\n",
-		    index, PROTO_OPT_DOMAIN);
-#endif
 		index = PROTO_OPT_DOMAIN;
 	}
-#ifdef DEBUG
-	fprintf(stderr, "smbfs_save_property: "
-	    "section=%s, index=%d, name=%s, value=%s\n",
-	    section, index, smbclnt_proto_options[index].name, value);
-#endif
 	propset_changed = 1;
 	s = strdup(section);
 	if (s == NULL)
@@ -729,6 +667,8 @@ smbfs_set_proto_prop(sa_property_t prop)
 		sa_free_attr_string(name);
 	if (value != NULL)
 		sa_free_attr_string(value);
+	if (section != NULL)
+		sa_free_attr_string(section);
 
 	return (ret);
 }
@@ -763,12 +703,12 @@ smbfs_delete_section(char *section)
 	int ret = SA_SYSTEM_ERR;
 
 	propset = sa_get_protocol_section(protoset, section);
-	(void) strncpy(propgroup, SMBC_PG_PREFIX, SMBC_PG_PREFIX_LEN);
+	(void) strlcpy(propgroup, SMBC_PG_PREFIX, sizeof (propgroup));
 	propgroup[SMBC_PG_PREFIX_LEN] = '\0';
 	uu = sa_get_property_attr(propset, "extra");
 	if (uu == NULL)
 		goto out;
-	(void) strncat(propgroup, uu, UUID_PRINTABLE_STRING_LENGTH);
+	(void) strlcat(propgroup, uu, sizeof (propgroup));
 	free(uu);
 	if ((ret = smbfs_delete_property_group(propgroup)) != SMBC_SMF_OK)
 		goto out;
@@ -788,10 +728,6 @@ smbfs_delete_property_group(char *propgroup)
 	smb_scfhandle_t *handle = NULL;
 	int ret = SA_SYSTEM_ERR;
 
-#ifdef DEBUG
-	fprintf(stderr, "smbfs_delete_property_group: pgname=%s\n", propgroup);
-#endif
-
 	handle = smb_smf_scf_init(SMBC_FMRI_PREFIX);
 	if (handle == NULL)
 		goto out;
@@ -806,8 +742,5 @@ smbfs_delete_property_group(char *propgroup)
 	ret = SA_OK;
 out:
 	smb_smf_scf_fini(handle);
-#ifdef DEBUG
-	fprintf(stderr, "smbfs_delete_property_group: returning %d\n", ret);
-#endif
 	return (ret);
 }

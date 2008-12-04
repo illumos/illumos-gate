@@ -31,10 +31,14 @@
  *
  * $Id: smb_rq.h,v 1.9 2005/01/22 22:20:58 lindak Exp $
  */
+
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef _NETSMB_SMB_RQ_H_
 #define	_NETSMB_SMB_RQ_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <netsmb/mchain.h>
 #include <sys/queue.h>
@@ -81,7 +85,9 @@ struct smb_rq {
 	struct smb_vc		*sr_vc;
 	struct smb_share	*sr_share;
 	struct _kthread 	*sr_owner;
-	ushort_t			sr_mid;
+	ushort_t		sr_mid;
+	uint32_t		sr_seqno;	/* Seq. no. of request */
+	uint32_t		sr_rseqno;	/* Seq. no. of reply */
 	struct mbchain		sr_rq;
 	uchar_t			sr_cmd;
 	uint8_t			sr_rqflags;
@@ -123,7 +129,9 @@ struct smb_t2rq {
 	uint16_t	t2_maxpcount;	/* max param bytes to return */
 	uint16_t	t2_maxdcount;	/* max data bytes to return */
 	uint16_t	t2_fid;		/* for T2 request */
-	char		t_name[128];	/* for T, should be zero for T2 */
+	char		*t_name;	/* for T, must be NULL for T2 */
+	int		t_name_len;	/* t_name string length */
+	int		t_name_maxlen;	/* t_name allocated size */
 	int		t2_flags;	/* SMBT2_ */
 	struct mbchain	t2_tparam;	/* parameters to transmit */
 	struct mbchain	t2_tdata;	/* data to transmit */

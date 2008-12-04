@@ -21,7 +21,9 @@
  *
  * @APPLE_LICENSE_HEADER_END@
  */
-/*      @(#)charsets.c      *
+/* CSTYLED */
+/*
+ *      @(#)charsets.c      *
  *      (c) 2004   Apple Computer, Inc.  All Rights Reserved
  *
  *
@@ -33,31 +35,19 @@
  *       28-Nov-2004     Guy Harris	New today
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <iconv.h>
 #include <langinfo.h>
 #include <strings.h>
-
-#ifdef NOTPORTED
-#include <CoreFoundation/CoreFoundation.h>
-#include <CoreFoundation/CFStringDefaultEncoding.h>
-#include <CoreFoundation/CFStringEncodingConverter.h>
-#include <sys/mchain.h>
-#endif /* NOTPORTED */
 
 #include <netsmb/smb_lib.h>
 #include <netsmb/mchain.h>
 
 #include "charsets.h"
-
-#ifdef NOTPORTED
-extern 	 uid_t real_uid,eff_uid;
-#endif /* NOTPORTED */
 
 /*
  * On Solaris, we will need to do some rewriting to use our iconv
@@ -69,43 +59,47 @@ extern 	 uid_t real_uid,eff_uid;
 static unsigned
 xtoi(char u)
 {
-        if (isdigit(u))
-                return (u - '0'); 
-        else if (islower(u))
-                return (10 + u - 'a'); 
-        else if (isupper(u))
-                return (10 + u - 'A'); 
-        return (16);
+	if (isdigit(u))
+		return (u - '0');
+	else if (islower(u))
+		return (10 + u - 'a');
+	else if (isupper(u))
+		return (10 + u - 'A');
+	return (16);
 }
 
 
-/* Removes the "%" escape sequences from a URL component.
+/*
+ * Removes the "%" escape sequences from a URL component.
  * See IETF RFC 2396.
  */
 char *
-unpercent(char * component)
+unpercent(char *component)
 {
-        char c, *s;
-        unsigned hi, lo; 
+	char c, *s;
+	unsigned hi, lo;
 
-        if (component)
-                for (s = component; (c = *s) != 0; s++) {
-                        if (c != '%') 
-                                continue;
-                        if ((hi = xtoi(s[1])) > 15 || (lo = xtoi(s[2])) > 15)
-                                continue; /* ignore invalid escapes */
-                        s[0] = hi*16 + lo;
-                        /*      
-                         * This was strcpy(s + 1, s + 3); 
-                         * But nowadays leftward overlapping copies are
-                         * officially undefined in C.  Ours seems to
-                         * work or not depending upon alignment.
-                         */      
-                        memmove(s+1, s+3, strlen(s+3) + 1);
-                }       
-        return (component);
+	if (component == NULL)
+		return (component);
+
+	for (s = component; (c = *s) != 0; s++) {
+		if (c != '%')
+			continue;
+		if ((hi = xtoi(s[1])) > 15 || (lo = xtoi(s[2])) > 15)
+			continue; /* ignore invalid escapes */
+		s[0] = hi*16 + lo;
+		/*
+		 * This was strcpy(s + 1, s + 3);
+		 * But nowadays leftward overlapping copies are
+		 * officially undefined in C.  Ours seems to
+		 * work or not depending upon alignment.
+		 */
+		memmove(s+1, s+3, strlen(s+3) + 1);
+	}
+	return (component);
 }
 
+/* BEGIN CSTYLED */
 #ifdef NOTPORTED
 static CFStringEncoding
 get_windows_encoding_equivalent( void )
@@ -247,7 +241,7 @@ convert_wincs_to_utf8(const char *windows_string)
 	CFRelease(s);
 	return result;
 #else /* NOTPORTED */
-	return ((char*)windows_string);
+	return (strdup((char*)windows_string));
 #endif /* NOTPORTED */
 }
 
@@ -290,96 +284,15 @@ convert_utf8_to_wincs(const char *utf8_string)
 	CFRelease(s);
 	return result;
 #else /* NOTPORTED */
-	return ((char*)utf8_string);
+	return (strdup((char*)utf8_string));
 #endif /* NOTPORTED */
 }
+/* END CSTYLED */
 
 /*
- * Convert little-endian Unicode string to UTF-8.
- * Converts the Unicode string to host byte order in place.
+ * We replaced these routines for Solaris:
+ *	convert_leunicode_to_utf8
+ *	convert_unicode_to_utf8
+ *	convert_utf8_to_leunicode
+ * with new code in: utf_str.c
  */
-char *
-convert_leunicode_to_utf8(unsigned short *unicode_string)
-{
-	unsigned short *unicode_charp, unicode_char;
-	int len = 0;
-
-	for (unicode_charp = unicode_string;
-	    (unicode_char = *unicode_charp) != 0;
-	    unicode_charp++) {
-		*unicode_charp = letohs(unicode_char);
-		len = len + 2;
-	}
-	return (convert_unicode_to_utf8(unicode_string, len));
-}
-
-char *
-convert_unicode_to_utf8(unsigned short *unicode_string, int len)
-{
-	iconv_t cd;
-	char    from[BUFSIZ], to[BUFSIZ];
-	char *tptr = NULL;
-	const char *fptr;
-	size_t  ileft, oleft, ret;
-
-	cd = iconv_open("UTF-8", "UTF-16");
-	if (cd != (iconv_t)-1) {
-		ileft = len;
-		bcopy((char *)unicode_string, from, ileft);
-		fptr = from;
-		oleft = BUFSIZ;
-		tptr = to;
-		ret = iconv(cd, &fptr, &ileft, &tptr, &oleft);
-		if (ret != (size_t)-1) {
-			to[BUFSIZ-oleft] = '\0';
-			tptr = to;
-		} else {
-			tptr = NULL;
-		}
-		(void) iconv_close(cd);
-	}
-	return (tptr);
-}
-
-/*
- * Convert UTF-8 string to little-endian Unicode.
- */
-unsigned short *
-convert_utf8_to_leunicode(const char *utf8_string)
-{
-#ifdef NOTPORTED
-	CFStringRef s;
-	CFIndex maxlen;
-	unsigned short *result;
-	CFRange range;
-	int i;
-
-	s = CFStringCreateWithCString(NULL, utf8_string,
-	     kCFStringEncodingUTF8);
-	if (s == NULL) {
-		smb_error("CFStringCreateWithCString for UTF-8 failed on \"%s\"", -1,
-		    utf8_string);
-		return NULL;
-	}
-
-	maxlen = CFStringGetLength(s);
-	result = malloc(2*(maxlen + 1));
-	if (result == NULL) {
-		smb_error("Couldn't allocate buffer for Unicode string for \"%s\" - skipping", -1,
-		    utf8_string);
-		CFRelease(s);
-		return NULL;
-	}
-	range.location = 0;
-	range.length = maxlen;
-	CFStringGetCharacters(s, range, result);
-	for (i = 0; i < maxlen; i++)
-		result[i] = CFSwapInt16HostToLittle(result[i]);
-	result[maxlen] = 0;
-	CFRelease(s);
-	return result;
-#else /* NOTPORTED */
-	/* LINTED */ /* XXX Really need to fix this! */
-	return ((ushort_t *)utf8_string); /* XXX */
-#endif /* NOTPORTED */
-}

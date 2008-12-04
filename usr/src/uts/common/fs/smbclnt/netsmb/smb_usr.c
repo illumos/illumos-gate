@@ -32,7 +32,10 @@
  * $Id: smb_usr.c,v 1.15 2004/12/13 00:25:18 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <sys/param.h>
 #include <sys/kmem.h>
@@ -44,12 +47,7 @@
 #include <sys/socket.h>
 #include <sys/cmn_err.h>
 
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#include <sys/smb_iconv.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>
@@ -409,10 +407,6 @@ smb_usr_t2request(struct smb_share *ssp, smbioc_t2rq_t *dp,
 
 	if (dp->ioc_setupcnt > SMB_MAXSETUPWORDS)
 		return (EINVAL);
-
-	t2p = (struct smb_t2rq *)kmem_alloc(sizeof (struct smb_t2rq), KM_SLEEP);
-	if (t2p == NULL)
-		return (ENOMEM);
 	error = smb_t2_init(t2p, SSTOCP(ssp), dp->ioc_setup, dp->ioc_setupcnt,
 	    scred);
 	if (error)
@@ -420,12 +414,14 @@ smb_usr_t2request(struct smb_share *ssp, smbioc_t2rq_t *dp,
 	len = t2p->t2_setupcount = dp->ioc_setupcnt;
 	if (len > 1)
 		t2p->t2_setupdata = dp->ioc_setup;
-	if (dp->ioc_name) {
-		bcopy(dp->ioc_name, t2p->t_name, 128);
-		if (t2p->t_name == NULL) {
-			error = ENOMEM;
-			goto bad;
-		}
+	/* This ioc member is a fixed-size array. */
+	if (dp->ioc_name[0]) {
+		t2p->t_name_maxlen = SMBIOC_T2RQ_MAXNAME;
+		t2p->t_name = kmem_alloc(t2p->t_name_maxlen, KM_SLEEP);
+		bcopy(dp->ioc_name, t2p->t_name, t2p->t_name_maxlen);
+		/* Get the string length - carefully! */
+		t2p->t_name[t2p->t_name_maxlen - 1] = '\0';
+		t2p->t_name_len = strlen(t2p->t_name);
 	}
 	t2p->t2_maxscount = 0;
 	t2p->t2_maxpcount = dp->ioc_rparamcnt;
@@ -484,6 +480,10 @@ smb_usr_t2request(struct smb_share *ssp, smbioc_t2rq_t *dp,
 	} else
 		dp->ioc_rdatacnt = 0;
 bad:
+	if (t2p->t_name) {
+		kmem_free(t2p->t_name, t2p->t_name_maxlen);
+		t2p->t_name = NULL;
+	}
 	smb_t2_done(t2p);
 	return (error);
 }

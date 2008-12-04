@@ -33,11 +33,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/stat.h>
@@ -146,7 +144,6 @@ main(int argc, char *argv[])
 	struct smb_ctx sctx, *ctx = &sctx;
 	struct smbfs_args mdata;
 	struct stat st;
-	extern void dropsuid();
 	int opt, error, mntflags;
 	struct mnttab mnt;
 	struct mnttab *mntp = &mnt;
@@ -159,7 +156,6 @@ main(int argc, char *argv[])
 #define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
-	dropsuid();
 	if (argc == 2) {
 		if (strcmp(argv[1], "-h") == 0) {
 			usage();

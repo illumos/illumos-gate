@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * basic API declarations for share management
  */
@@ -60,16 +58,9 @@ extern struct smbclnt_proto_option_defs smbclnt_proto_options[];
 #define	PROTO_OPT_USER			8
 #define	PROTO_OPT_DOMAIN		9
 #define	PROTO_OPT_WORKGROUP		10
+#define	PROTO_OPT_SIGNING		11
 
-#ifdef NOT_DEFINED
-#define	PROTO_OPT_NBSCOPE		11
-#define	PROTO_OPT_NBTIMEOUT		12
-#define	PROTO_OPT_RETRY_COUNT		13
-#define	PROTO_OPT_USE_NEGPROT_DOMAIN	14
-#define	PROTO_OPT_CHARSETS		15
-#endif
-
-#define	SMBC_OPT_MAX	PROTO_OPT_WORKGROUP
+#define	SMBC_OPT_MAX	PROTO_OPT_SIGNING
 
 /*
  * Flags values

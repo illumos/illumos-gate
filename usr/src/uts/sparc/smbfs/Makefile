@@ -24,8 +24,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #	This makefile drives the production of the smbfs (Server 
 #	message block file system) kernel module.
 #
@@ -44,7 +42,6 @@ MODULE		= smbfs
 OBJECTS		= $(SMBFS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SMBFS_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_FS_DIR)/$(MODULE)
-ROOTLINK	= $(USR_SYS_DIR)/$(MODULE)
 
 #
 #	Include common rules.
@@ -56,7 +53,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Overrides.
@@ -88,9 +85,6 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
-
-$(ROOTLINK):	$(USR_SYS_DIR) $(ROOTMODULE)
-	-$(RM) $@; ln $(ROOTMODULE) $@
 
 #
 #	Include common targets.

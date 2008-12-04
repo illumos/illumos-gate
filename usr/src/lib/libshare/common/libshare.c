@@ -3402,8 +3402,11 @@ sa_get_protocol_section(sa_protocol_properties_t propset, char *section)
 	char *proto;
 
 	proto = sa_get_optionset_attr(propset, "type");
-	if ((sa_proto_get_featureset(proto) & SA_FEATURE_HAS_SECTIONS) == 0)
+	if ((sa_proto_get_featureset(proto) & SA_FEATURE_HAS_SECTIONS) == 0) {
+		if (proto != NULL)
+			sa_free_attr_string(proto);
 		return (propset);
+	}
 
 	for (node = node->children; node != NULL;
 	    node = node->next) {
@@ -3423,6 +3426,8 @@ sa_get_protocol_section(sa_protocol_properties_t propset, char *section)
 	}
 	if (value != NULL)
 		xmlFree(value);
+	if (proto != NULL)
+		sa_free_attr_string(proto);
 	if (node != NULL && xmlStrcmp(node->name, (xmlChar *)"section") != 0) {
 		/*
 		 * avoid a non option node -- it is possible to be a
@@ -3447,8 +3452,11 @@ sa_get_next_protocol_section(sa_property_t prop, char *find)
 	char *proto;
 
 	proto = sa_get_optionset_attr(prop, "type");
-	if ((sa_proto_get_featureset(proto) & SA_FEATURE_HAS_SECTIONS) == 0)
+	if ((sa_proto_get_featureset(proto) & SA_FEATURE_HAS_SECTIONS) == 0) {
+		if (proto != NULL)
+			sa_free_attr_string(proto);
 		return ((sa_property_t)NULL);
+	}
 
 	for (node = ((xmlNodePtr)prop)->next; node != NULL;
 	    node = node->next) {
@@ -3469,6 +3477,8 @@ sa_get_next_protocol_section(sa_property_t prop, char *find)
 	}
 	if (value != NULL)
 		xmlFree(value);
+	if (proto != NULL)
+		sa_free_attr_string(proto);
 	return ((sa_property_t)node);
 }
 

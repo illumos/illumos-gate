@@ -37,8 +37,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * various SMB requests. Most of the routines merely packs data into mbufs.
  */
@@ -86,10 +84,21 @@ int smb_timo_read = 45;
 int smb_timo_write = 60;	/* was SMBWRTTIMO */
 int smb_timo_append = 90;
 
+/*
+ * Debug/test feature to disable NTMLv2.
+ * Set this to zero to skip NTLMv2
+ */
+int nsmb_enable_ntlmv2 = 1;
+
 static int smb_smb_read(struct smb_share *ssp, u_int16_t fid,
-	int *len, int *rresid, uio_t *uiop, struct smb_cred *scred, int timo);
+	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
 static int smb_smb_write(struct smb_share *ssp, u_int16_t fid,
-	int *len, int *rresid, uio_t *uiop, struct smb_cred *scred, int timo);
+	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
+
+static int smb_smb_readx(struct smb_share *ssp, u_int16_t fid,
+	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
+static int smb_smb_writex(struct smb_share *ssp, u_int16_t fid,
+	uint32_t *lenp, uio_t *uiop, smb_cred_t *scred, int timo);
 
 struct smb_dialect {
 	int		d_id;
@@ -183,19 +192,44 @@ smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 	char *servercs;
 	void *servercshandle = NULL;
 	void *localcshandle = NULL;
+	int negotiated_signing = 0;
 	u_int16_t toklen;
 
-	vcp->vc_hflags = SMB_FLAGS_CASELESS;	/* XXX on Unix? */
 	/*
-	 * Make sure SMB_FLAGS2_UNICODE is "off" so mb_put_dstring
-	 * marshalls the dialect strings in plain ascii.
+	 * We set various flags below to keep track of
+	 * interesting things we learn from negotiation.
+	 * Clear all the flags except these two, which
+	 * are operational rather than protocol info.
 	 */
-	vcp->vc_hflags2 &= ~SMB_FLAGS2_UNICODE;
-	vcp->vc_hflags2 |= SMB_FLAGS2_ERR_STATUS;
-
 	SMB_VC_LOCK(vcp);
-	vcp->vc_flags &= ~(SMBV_ENCRYPT);
+	vcp->vc_flags &= (SMBV_GONE | SMBV_RECONNECTING);
 	SMB_VC_UNLOCK(vcp);
+
+	/*
+	 * Now vc_hflags and vc_hflags2.  Careful with this:
+	 * Leave SMB_FLAGS2_UNICODE off so mb_put_dstring
+	 * marshalls the dialect strings in plain ascii.
+	 * We'll turn that on below, if appropriate.
+	 *
+	 * Note: These flags are marshalled into the request
+	 * when we call smb_rq_alloc, so changing them after
+	 * this point does not affect THIS request.
+	 */
+	vcp->vc_hflags = SMB_FLAGS_CASELESS;
+	vcp->vc_hflags2 = (SMB_FLAGS2_ERR_STATUS |
+	    SMB_FLAGS2_KNOWS_LONG_NAMES);
+
+	/* User-level may ask for extended security. */
+	if (vcp->vc_vopt & SMBVOPT_EXT_SEC)
+		vcp->vc_hflags2 |= SMB_FLAGS2_EXT_SEC;
+
+	/* Also clear any old key (for reconnect) */
+	if (vcp->vc_mackey != NULL) {
+		kmem_free(vcp->vc_mackey, vcp->vc_mackeylen);
+		vcp->vc_mackey = NULL;
+		vcp->vc_mackeylen = 0;
+		vcp->vc_seqno = 0;
+	}
 
 	sp = &vcp->vc_sopt;
 	bzero(sp, sizeof (struct smb_sopt));
@@ -261,10 +295,64 @@ smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 			error = md_get_uint16le(mdp, &bc);
 			if (error)
 				break;
-			if (sp->sv_sm & SMB_SM_SIGS_REQUIRE)
-				SMBERROR("server configuration requires "
-				    "packet signing, which we dont support: "
-				    "sp->sv_sm %d\n", sp->sv_sm);
+
+			/* BEGIN CSTYLED */
+	/*
+	 * Will we do SMB signing?  Or block the connection?
+	 * The table below describes this logic.  References:
+	 * [Windows Server Protocols: MS-SMB, sec. 3.2.4.2.3]
+	 * http://msdn.microsoft.com/en-us/library/cc212511.aspx
+	 * http://msdn.microsoft.com/en-us/library/cc212929.aspx
+	 *
+	 * Srv/Cli     | Required | Enabled    | If Required | Disabled
+	 * ------------+----------+------------+-------------+-----------
+	 * Required    | Signed   | Signed     | Signed      | Blocked [1]
+	 * ------------+----------+------------+-------------+-----------
+	 * Enabled     | Signed   | Signed     | Not Signed  | Not Signed
+	 * ------------+----------+------------+-------------+-----------
+	 * If Required | Signed   | Not Signed | Not Signed  | Not Signed
+	 * ------------+----------+------------+-------------+-----------
+	 * Disabled    | Blocked  | Not Signed | Not Signed  | Not Signed
+	 *
+	 * [1] Like Windows 2003 and later, we don't really implement
+	 * the "Disabled" setting.  Instead we implement "If Required",
+	 * so we always sign if the server requires signing.
+	 */
+			/* END CSTYLED */
+
+			if (sp->sv_sm & SMB_SM_SIGS_REQUIRE) {
+				/*
+				 * Server requires signing.
+				 */
+				negotiated_signing = 1;
+			} else if (sp->sv_sm & SMB_SM_SIGS) {
+				/*
+				 * Server enables signing (client's option).
+				 * If enabled locally, do signing.
+				 */
+				if (vcp->vc_vopt & SMBVOPT_SIGNING_ENABLED)
+					negotiated_signing = 1;
+				/* else not signing. */
+			} else {
+				/*
+				 * Server does not support signing.
+				 * If we "require" it, bail now.
+				 */
+				if (vcp->vc_vopt & SMBVOPT_SIGNING_REQUIRED) {
+					SMBERROR("Client requires signing "
+					    "but server has it disabled.\n");
+					error = EBADRPC;
+					break;
+				}
+			}
+			SMBSDEBUG("Security signatures: %d\n",
+			    negotiated_signing);
+			if (negotiated_signing) {
+				SMB_VC_LOCK(vcp);
+				vcp->vc_flags |= SMBV_WILL_SIGN;
+				SMB_VC_UNLOCK(vcp);
+			}
+
 			if (sp->sv_caps & SMB_CAP_UNICODE) {
 				SMB_VC_LOCK(vcp);
 				vcp->vc_flags |= SMBV_UNICODE;
@@ -484,9 +572,7 @@ smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 		 * Max read/write sizes, WITHOUT overhead.
 		 * This is just the payload size, so we must
 		 * leave room for the SMB headers, etc.
-		 *
-		 * With CAP_LARGE_xxx, always use 60k.
-		 * Otherwise use the vc_txmax value, but
+		 * This is just the vc_txmax value, but
 		 * reduced and rounded down.  Tricky bit:
 		 *
 		 * Servers typically give us a value that's
@@ -497,14 +583,8 @@ smb_smb_negotiate(struct smb_vc *vcp, struct smb_cred *scred)
 		 * then round down to a 512 byte multiple.
 		 */
 		x = (vcp->vc_txmax - 68) & 0xFE00;
-		if (sp->sv_caps & SMB_CAP_LARGE_READX)
-			vcp->vc_rxmax = SMB_MAX_LARGE_RW_SIZE;
-		else
-			vcp->vc_rxmax = x;
-		if (sp->sv_caps & SMB_CAP_LARGE_WRITEX)
-			vcp->vc_wxmax = SMB_MAX_LARGE_RW_SIZE;
-		else
-			vcp->vc_wxmax = x;
+		vcp->vc_rxmax = x;
+		vcp->vc_wxmax = x;
 
 		SMBSDEBUG("TZ = %d\n", sp->sv_tz);
 		SMBSDEBUG("CAPS = %x\n", sp->sv_caps);
@@ -615,7 +695,8 @@ add_name_to_blob(uchar_t *blobnames, struct smb_vc *vcp, const uchar_t *name,
 }
 
 static uchar_t *
-make_ntlmv2_blob(struct smb_vc *vcp, u_int64_t client_nonce, size_t *bloblen)
+make_ntlmv2_blob(struct smb_vc *vcp, u_int64_t client_nonce,
+	size_t *bloblen, size_t *blob_allocsz)
 {
 	uchar_t *blob;
 	size_t blobsize;
@@ -646,11 +727,9 @@ make_ntlmv2_blob(struct smb_vc *vcp, u_int64_t client_nonce, size_t *bloblen)
 	srvlen = strlen(vcp->vc_srvname);
 	blobsize = sizeof (struct ntlmv2_blobhdr)
 	    + 3*sizeof (struct ntlmv2_namehdr) + 4 + 2*domainlen + 2*srvlen;
-	blob = kmem_zalloc(blobsize, KM_SLEEP);
-	/*LINTED*/
-	ASSERT(blob == (uchar_t *)((struct ntlmv2_blobhdr *)blob));
-	/*LINTED*/
-	blobhdr = (struct ntlmv2_blobhdr *)blob;
+	*blob_allocsz = blobsize;
+	blobhdr = kmem_zalloc(blobsize, KM_SLEEP);
+	blob = (uchar_t *)blobhdr;
 	blobhdr->header = htolel(0x00000101);
 	gethrestime(&now);
 	smb_time_local2NT(&now, 0, &timestamp);
@@ -669,20 +748,10 @@ make_ntlmv2_blob(struct smb_vc *vcp, u_int64_t client_nonce, size_t *bloblen)
 }
 
 /*
- * See radar 4134676.  This define helps us avoid how a certain old server
- * grants limited Guest access when we try NTLMv2, but works fine with NTLM.
- * The fingerprint we are looking for here is DOS error codes and no-Unicode.
- * Note XP grants Guest access but uses Unicode and NT error codes.
- */
-#define	smb_antique(rqp) (!((rqp)->sr_rpflags2 & SMB_FLAGS2_ERR_STATUS) && \
-	!((rqp)->sr_rpflags2 & SMB_FLAGS2_UNICODE))
-
-/*
  * When not doing Kerberos, we can try, in order:
  *
  *	NTLMv2
- *	NTLM with the ASCII password not upper-cased
- *	NTLM with the ASCII password upper-cased
+ *	NTLM (and maybe LM)
  *
  * if the server supports encrypted passwords, or
  *
@@ -691,9 +760,14 @@ make_ntlmv2_blob(struct smb_vc *vcp, u_int64_t client_nonce, size_t *bloblen)
  *
  * if it doesn't.
  */
-#define	STATE_NTLMV2	0
-#define	STATE_NOUCPW	1
-#define	STATE_UCPW	2
+typedef enum {
+	ClearUC,	/* Cleartext p/w, upper case */
+	ClearMC,	/* Cleartext p/w, mixed case */
+	NTLMv1,
+	NTLMv2,
+	ExtSec,		/* Extended Security (Kerberos) */
+	NullSes		/* Null session (keep last) */
+} authtype_t;
 
 int
 smb_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred)
@@ -704,22 +778,24 @@ smb_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred)
 	u_int8_t wc;
 	int minauth;
 	smb_uniptr unipp = NULL, ntencpass = NULL;
-	char *pp = NULL, *up = NULL, *ucup = NULL, *ucdp = NULL;
-	char *pbuf = NULL;
+	char *pp = NULL, *up = NULL, *ucup = NULL;
+	char *ucdp = vcp->vc_domain; /* already upper case */
 	char *encpass = NULL;
 	int error = 0;
-	size_t plen = 0, uniplen = 0, uniplen2 = 0, tmplen;
-	size_t ucup_sl = 0, ucdp_sl = 0;
-	int state;
-	size_t ntlmv2_bloblen;
+	size_t plen = 0, plen_alloc = 0;
+	size_t uniplen = 0, uniplen_alloc = 0;
+	size_t ucup_sl = 0;
+	authtype_t authtype;
+	size_t ntlmv2_bloblen, ntlmv2_blob_allocsz;
 	uchar_t *ntlmv2_blob;
 	u_int64_t client_nonce;
 	u_int32_t caps;
 	u_int16_t bl; /* BLOB length */
-	u_int16_t saveflags2 = vcp->vc_hflags2;
-	void *	savetoserver = vcp->vc_toserver;
+	u_int16_t bc; /* byte count */
 	u_int16_t action;
+	u_int16_t rpflags2;
 	int declinedguest = 0;
+	uchar_t v2hash[16];
 	static const char NativeOS[] = "Solaris";
 	static const char LanMan[] = "NETSMB";
 	/*
@@ -732,244 +808,304 @@ smb_smb_ssnsetup(struct smb_vc *vcp, struct smb_cred *scred)
 	    SMB_CAP_UNICODE |
 	    SMB_CAP_LARGE_FILES |
 	    SMB_CAP_NT_SMBS |
-	    SMB_CAP_STATUS32 |
-	    SMB_CAP_LARGE_READX |
-	    SMB_CAP_LARGE_WRITEX;
+	    SMB_CAP_STATUS32;
 
 	caps = vcp->vc_sopt.sv_caps & caps_mask;
+	minauth = vcp->vc_vopt & SMBVOPT_MINAUTH;
 
-	/* No unicode unless server supports and encryption on */
-	if (!((vcp->vc_sopt.sv_sm & SMB_SM_ENCRYPT) &&
-	    (vcp->vc_flags & SMBV_UNICODE))) {
-		vcp->vc_hflags2 &= 0xffff - SMB_FLAGS2_UNICODE;
-		vcp->vc_toserver = 0;
+	/*
+	 * This function tries authentication types in a
+	 * sequence going stronger to weaker, until it
+	 * succeeds or runs into "minauth" and fails.
+	 *
+	 * Extended security is a special case because
+	 * fall-back requires a return to user-level and
+	 * a new connection, new SMB negotiate, etc.
+	 * Null session is also special - no fall-back.
+	 *
+	 * Otherwise if the server supports encryption,
+	 * try NTLMv2, then NTLM, etc.
+	 */
+	if (vcp->vc_intok)
+		authtype = ExtSec;
+	else if (vcp->vc_username[0] == '\0')
+		authtype = NullSes;
+	else if ((vcp->vc_sopt.sv_sm & SMB_SM_USER) == 0) {
+		/* Share-level security. */
+		authtype = NullSes;
+	} else {
+		/* Have SMB_SM_USER.  Encryption? */
+		if (vcp->vc_sopt.sv_sm & SMB_SM_ENCRYPT) {
+			if (nsmb_enable_ntlmv2)
+				authtype = NTLMv2;
+			else
+				authtype = NTLMv1;
+		} else {
+			/*
+			 * This is normally disallowed
+			 * by the minauth check below.
+			 */
+			authtype = ClearMC;
+		}
 	}
 
-	minauth = vcp->vc_vopt & SMBVOPT_MINAUTH;
-	if (vcp->vc_intok) {
+	/*
+	 * If server does not support encryption,
+	 * disable unicode too.  (Spec. for this?)
+	 */
+	if ((vcp->vc_sopt.sv_sm & SMB_SM_ENCRYPT) == 0) {
+		if (vcp->vc_flags & SMBV_UNICODE) {
+			vcp->vc_hflags2 &= ~SMB_FLAGS2_UNICODE;
+			vcp->vc_toserver = 0;
+		}
+	}
+
+again:
+	SMBSDEBUG("authtype = %d\n", authtype);
+
+	/*
+	 * Now disallow auth. types that fall below
+	 * the minimum strength configured.
+	 * We hold no kmem here.
+	 */
+	switch (minauth) {
+
+	case SMBVOPT_MINAUTH_NONE:
+		break;
+
+	case SMBVOPT_MINAUTH_LM:
+	case SMBVOPT_MINAUTH_NTLM:
+		if (authtype < NTLMv1) {
+			error = EAUTH;
+			goto ssn_exit;
+		}
+		break;
+
+	case SMBVOPT_MINAUTH_NTLMV2:
+		if (authtype < NTLMv2) {
+			error = EAUTH;
+			goto ssn_exit;
+		}
+		break;
+
+	case SMBVOPT_MINAUTH_KERBEROS:
+		if (authtype < ExtSec) {
+			error = EAUTH;
+			goto ssn_exit;
+		}
+		break;
+
+	default:
+		SMBSDEBUG("bad minauth 0x%x\n", minauth);
+		error = EAUTH;
+		goto ssn_exit;
+	}
+
+	/*
+	 * See comment in smb_iod_sendrq()
+	 * about vc_smbuid initialization.
+	 */
+	vcp->vc_smbuid = SMB_UID_UNKNOWN;
+
+	/*
+	 * Within this switch, we may allocate either or both:
+	 * encpass, ntencpass (len: plen_alloc, uniplen_alloc)
+	 * and will free these below (see the label "bad")
+	 */
+	switch (authtype) {
+
+	case ExtSec:
+		/*
+		 * With extended security, the whole blob is
+		 * passed in from user-level (vc_intok)
+		 */
+		ASSERT(vcp->vc_intok != NULL);
+		caps |= SMB_CAP_EXT_SECURITY;
+		/* XXX Need Session Key  */
 		if (vcp->vc_intoklen > 65536 ||
 		    !(vcp->vc_hflags2 & SMB_FLAGS2_EXT_SEC) ||
 		    SMB_DIALECT(vcp) < SMB_DIALECT_NTLM0_12) {
+			/* We hold no kmem here. */
 			error = EINVAL;
 			goto ssn_exit;
 		}
 		vcp->vc_smbuid = 0;
-	}
+		break;
 
-	/*
-	 * Try only plain text passwords.
-	 */
-	if (vcp->vc_sopt.sv_sm & SMB_SM_ENCRYPT) {
-		state = STATE_NTLMV2;	/* try NTLMv2 first */
-	} else {
-		state = STATE_NOUCPW;	/* try plain-text mixed-case first */
-	}
-again:
-
-	if (!vcp->vc_intok)
-		vcp->vc_smbuid = SMB_UID_UNKNOWN;
-
-	if (!vcp->vc_intok) {
-		/*
-		 * We're not doing extended security, which, for
-		 * now, means we're not doing Kerberos.
-		 * Fail if the minimum authentication level is
-		 * Kerberos.
-		 */
-		if (minauth >= SMBVOPT_MINAUTH_KERBEROS) {
-			error = EAUTH;
-			goto ssn_exit;
-		}
-		if (vcp->vc_sopt.sv_sm & SMB_SM_ENCRYPT) {
-			/*
-			 * Server wants encrypted passwords.
-			 */
-			if (state > STATE_NTLMV2) {
-				/*
-				 * We tried NTLMv2 in STATE_NTLMV2.
-				 * Shall we allow fallback? (to NTLM)
-				 */
-				if (minauth >= SMBVOPT_MINAUTH_NTLMV2) {
-					error = EAUTH;
-					goto ssn_exit;
-				}
-			}
-			if (state > STATE_NOUCPW) {
-				/*
-				 * We tried NTLM in STATE_NOUCPW.
-				 * No need to try it again.
-				 */
-				error = EAUTH;
-				goto ssn_exit;
-			}
-		} else {
-			/*
-			 * Plain-text passwords.
-			 * Fail if the minimum authentication level is
-			 * LM or better.
-			 */
-			if (minauth > SMBVOPT_MINAUTH_NTLM) {
-				error = EAUTH;
-				goto ssn_exit;
-			}
-		}
-	}
-
-	error = smb_rq_alloc(VCTOCP(vcp), SMB_COM_SESSION_SETUP_ANDX,
-	    scred, &rqp);
-	if (error)
-		goto ssn_exit;
-
-	/*
-	 * Domain name must be upper-case, as that's what's used
-	 * when computing LMv2 and NTLMv2 responses - and, for NTLMv2,
-	 * the domain name in the request has to be upper-cased as well.
-	 * (That appears not to be the case for the user name.  Go
-	 * figure.)
-	 *
-	 * don't need to uppercase domain string. It's already uppercase UTF-8.
-	 */
-
-	ucdp_sl = strlen(vcp->vc_domain);
-	ucdp = kmem_zalloc(ucdp_sl + 1, KM_SLEEP);
-	memcpy(ucdp, vcp->vc_domain, ucdp_sl + 1);
-
-	if (vcp->vc_intok) {
-		caps |= SMB_CAP_EXT_SECURITY;
-	} else if (!(vcp->vc_sopt.sv_sm & SMB_SM_USER)) {
-		/*
-		 * In the share security mode password will be used
-		 * only in the tree authentication
-		 */
+	case NullSes:
 		pp = "";
 		plen = 1;
 		unipp = &smb_unieol;
 		uniplen = sizeof (smb_unieol);
-	} else {
-		pbuf = kmem_alloc(SMB_MAXPASSWORDLEN + 1, KM_SLEEP);
-		if (vcp->vc_sopt.sv_sm & SMB_SM_ENCRYPT) {
-			if (state == STATE_NTLMV2) {
-				/*
-				 * Compute the LMv2 and NTLMv2 responses,
-				 * derived from the challenge, the user name,
-				 * the domain/workgroup into which we're
-				 * logging, and the Unicode password.
-				 */
+		break;
 
-				/*
-				 * Construct the client nonce by getting
-				 * a bunch of random data.
-				 */
-				(void) random_get_pseudo_bytes((void *)
-				    &client_nonce,  sizeof (client_nonce));
+	case NTLMv2:
+		/*
+		 * Compute the LMv2 and NTLMv2 responses,
+		 * derived from the challenge, the user name,
+		 * the domain/workgroup into which we're
+		 * logging, and the Unicode password.
+		 */
 
-				/*
-				 * Convert the user name to upper-case, as
-				 * that's what's used when computing LMv2
-				 * and NTLMv2 responses.
-				 */
-				ucup_sl = strlen(vcp->vc_username);
-				ucup = kmem_alloc(ucup_sl + 1, KM_SLEEP);
-				smb_toupper((const char *)vcp->vc_username,
-				    ucup, ucup_sl);
-				ucup[ucup_sl] = '\0';
+		/*
+		 * Construct the client nonce by getting
+		 * a bunch of random data.
+		 */
+		(void) random_get_pseudo_bytes((void *)
+		    &client_nonce,  sizeof (client_nonce));
 
-				/*
-				 * Compute the LMv2 response, derived
-				 * from the server challenge, the
-				 * user name, the domain/workgroup
-				 * into which we're logging, the
-				 * client nonce, and the NT hash.
-				 */
-				smb_ntlmv2response(vcp->vc_nthash,
-				    (uchar_t *)ucup, (uchar_t *)ucdp,
-				    vcp->vc_challenge,
-				    (uchar_t *)&client_nonce, 8,
-				    (uchar_t **)&encpass, &plen);
-				pp = encpass;
+		/*
+		 * Convert the user name to upper-case, as
+		 * that's what's used when computing LMv2
+		 * and NTLMv2 responses.
+		 */
+		ucup_sl = strlen(vcp->vc_username);
+		ucup = kmem_alloc(ucup_sl + 1, KM_SLEEP);
+		smb_toupper((const char *)vcp->vc_username,
+		    ucup, ucup_sl);
+		ucup[ucup_sl] = '\0';
 
-				/*
-				 * Construct the blob.
-				 */
-				ntlmv2_blob = make_ntlmv2_blob(vcp,
-				    client_nonce, &ntlmv2_bloblen);
+		/*
+		 * Compute the NTLMv2 hash, which is
+		 * derived from the NTLMv1 hash and
+		 * the upper-case user + domain.
+		 */
+		smb_ntlmv2hash(vcp->vc_nthash,
+		    ucup, ucdp, v2hash);
 
-				/*
-				 * Compute the NTLMv2 response, derived
-				 * from the server challenge, the
-				 * user name, the domain/workgroup
-				 * into which we're logging, the
-				 * blob, and the NT hash.
-				 */
-				smb_ntlmv2response(vcp->vc_nthash,
-				    (uchar_t *)ucup, (uchar_t *)ucdp,
-				    vcp->vc_challenge,
-				    ntlmv2_blob, ntlmv2_bloblen,
-				    (uchar_t **)&ntencpass, &uniplen);
-				uniplen2 = uniplen;
-				unipp = ntencpass;
-				tmplen = plen;
+		/*
+		 * Compute the LMv2 response, derived from
+		 * the v2hash, the server challenge, and
+		 * the client nonce (random bits).
+		 * Note: kmem_alloc encpass (plen)
+		 */
+		smb_ntlmv2response(v2hash,
+		    vcp->vc_challenge,
+		    (uchar_t *)&client_nonce, 8,
+		    (uchar_t **)&encpass, &plen);
+		plen_alloc = plen;
+		pp = encpass;
 
-				kmem_free(ucup, ucup_sl + 1);
-				kmem_free((char *)ntlmv2_blob,
-				    sizeof (struct ntlmv2_blobhdr) +
-				    3 * sizeof (struct ntlmv2_namehdr) +
-				    4 +
-				    2 *  strlen(vcp->vc_domain) +
-				    2 * strlen(vcp->vc_srvname));
-			} else {
-				plen = 24;
-				encpass = kmem_zalloc(plen, KM_SLEEP);
-				/*
-				 * Compute the LM response, derived
-				 * from the challenge and the ASCII
-				 * password.
-				 */
-				if (minauth < SMBVOPT_MINAUTH_NTLM) {
-					smb_lmresponse(vcp->vc_lmhash,
-					    vcp->vc_challenge,
-					    (uchar_t *)encpass);
-				}
-				pp = encpass;
+		/*
+		 * Construct the blob.
+		 * Note: kmem_alloc ntlmv2_blob
+		 */
+		ntlmv2_blob = make_ntlmv2_blob(vcp,
+		    client_nonce, &ntlmv2_bloblen,
+		    &ntlmv2_blob_allocsz);
 
-				/*
-				 * Compute the NTLM response, derived from
-				 * the challenge and the NT hash.
-				 */
-				uniplen = 24;
-				uniplen2 = uniplen;
-				ntencpass = kmem_alloc(uniplen, KM_SLEEP);
-				smb_lmresponse(vcp->vc_nthash,
-				    vcp->vc_challenge,
-				    (uchar_t *)ntencpass);
-				unipp = ntencpass;
-			}
-		} else {
-			/*
-			 * We try w/o uppercasing first so Samba mixed case
-			 * passwords work.  If that fails, we come back and
-			 * try uppercasing to satisfy OS/2 and Windows for
-			 * Workgroups.
-			 */
-			get_ascii_password(vcp, (state == STATE_UCPW), pbuf);
-			plen = strlen(pbuf) + 1;
-			pp = pbuf;
-			uniplen = plen * 2;
-			uniplen2 = uniplen;
-			ntencpass = kmem_alloc(uniplen, KM_SLEEP);
-			(void) smb_strtouni(ntencpass, smb_vc_getpass(vcp),
-			    0, 0);
-			plen--;
-			/*
-			 * The uniplen is zeroed because Samba cannot deal
-			 * with this 2nd cleartext password.  This Samba
-			 * "bug" is actually a workaround for problems in
-			 * Microsoft clients.
-			 */
-			uniplen = 0; /* -= 2 */
-			unipp = ntencpass;
+		/*
+		 * Compute the NTLMv2 response, derived
+		 * from the server challenge, the
+		 * user name, the domain/workgroup
+		 * into which we're logging, the
+		 * blob, and the v2 hash.
+		 * Note: kmem_alloc ntencpass (uniplen)
+		 */
+		smb_ntlmv2response(v2hash,
+		    vcp->vc_challenge,
+		    ntlmv2_blob, ntlmv2_bloblen,
+		    (uchar_t **)&ntencpass, &uniplen);
+		uniplen_alloc = uniplen;
+		unipp = ntencpass;
+
+		/*
+		 * If we negotiated signing, compute the MAC key
+		 * and start signing messages, but only on the
+		 * first non-null session login.
+		 */
+		if ((vcp->vc_flags & SMBV_WILL_SIGN) &&
+		    !(vcp->vc_hflags2 & SMB_FLAGS2_SECURITY_SIGNATURE)) {
+			vcp->vc_hflags2 |= SMB_FLAGS2_SECURITY_SIGNATURE;
+			smb_calcv2mackey(vcp, v2hash,
+			    (uchar_t *)ntencpass, uniplen);
 		}
-	}
+		kmem_free(ucup, ucup_sl + 1);
+		kmem_free(ntlmv2_blob, ntlmv2_blob_allocsz);
+		break;
+
+	case NTLMv1:
+		/*
+		 * Compute the LM response, derived
+		 * from the challenge and the ASCII
+		 * password.  (If minauth allows it.)
+		 */
+		plen_alloc = plen = 24;
+		encpass = kmem_zalloc(plen, KM_SLEEP);
+		if (minauth < SMBVOPT_MINAUTH_NTLM) {
+			smb_lmresponse(vcp->vc_lmhash,
+			    vcp->vc_challenge,
+			    (uchar_t *)encpass);
+		}
+		pp = encpass;
+
+		/*
+		 * Compute the NTLM response, derived from
+		 * the challenge and the NT hash.
+		 */
+		uniplen_alloc = uniplen = 24;
+		ntencpass = kmem_alloc(uniplen, KM_SLEEP);
+		smb_lmresponse(vcp->vc_nthash,
+		    vcp->vc_challenge,
+		    (uchar_t *)ntencpass);
+		unipp = ntencpass;
+
+		/*
+		 * If we negotiated signing, compute the MAC key
+		 * and start signing messages, but only on the
+		 * first non-null session login.
+		 */
+		if ((vcp->vc_flags & SMBV_WILL_SIGN) &&
+		    !(vcp->vc_hflags2 & SMB_FLAGS2_SECURITY_SIGNATURE)) {
+			vcp->vc_hflags2 |= SMB_FLAGS2_SECURITY_SIGNATURE;
+			smb_calcmackey(vcp, vcp->vc_nthash,
+			    (uchar_t *)ntencpass, uniplen);
+		}
+		break;
+
+	case ClearMC:
+	case ClearUC:
+		/*
+		 * We try w/o uppercasing first so Samba mixed case
+		 * passwords work.  If that fails, we come back and
+		 * try uppercasing to satisfy OS/2 and Windows for
+		 * Workgroups.
+		 */
+		plen_alloc = plen = SMB_MAXPASSWORDLEN + 1;
+		encpass = kmem_zalloc(plen, KM_SLEEP);
+		get_ascii_password(vcp, (authtype == ClearUC), encpass);
+		plen = strlen(encpass) + 1;
+		pp = encpass;
+		uniplen_alloc = uniplen = plen * 2;
+		ntencpass = kmem_alloc(uniplen, KM_SLEEP);
+		(void) smb_strtouni(ntencpass, smb_vc_getpass(vcp), 0, 0);
+		plen--;
+		/*
+		 * The uniplen is zeroed because Samba cannot deal
+		 * with this 2nd cleartext password.  This Samba
+		 * "bug" is actually a workaround for problems in
+		 * Microsoft clients.
+		 */
+		uniplen = 0; /* -= 2 */
+		unipp = ntencpass;
+		break;
+
+	default:
+		ASSERT(0);
+		error = EAUTH;
+		goto ssn_exit;
+
+	} /* switch authtype */
+
+
+	error = smb_rq_alloc(VCTOCP(vcp), SMB_COM_SESSION_SETUP_ANDX,
+	    scred, &rqp);
+	if (error)
+		goto bad;
+
+	/*
+	 * Build the request.
+	 */
 	smb_rq_wstart(rqp);
 	mbp = &rqp->sr_rq;
 	up = vcp->vc_username;
@@ -1020,18 +1156,6 @@ again:
 	smb_put_dstring(mbp, vcp, NativeOS, SMB_CS_NONE); /* OS */
 	smb_put_dstring(mbp, vcp, LanMan, SMB_CS_NONE); /* LAN Mgr */
 	smb_rq_bend(rqp);
-	if (ntencpass) {
-		kmem_free(ntencpass, uniplen2);
-		ntencpass = NULL;
-	}
-	if (encpass) {
-		kmem_free(encpass, 24);
-		encpass = NULL;
-	}
-	if (ucdp) {
-		kmem_free(ucdp, ucdp_sl + 1);
-		ucdp = NULL;
-	}
 
 	/*
 	 * This request should not wait for
@@ -1041,84 +1165,158 @@ again:
 	error = smb_rq_simple_timed(rqp, SMBSSNSETUPTIMO);
 	SMBSDEBUG("%d\n", error);
 	if (error) {
-		if (rqp->sr_errclass == ERRDOS && rqp->sr_serror == ERRnoaccess)
+		if (rqp->sr_errclass == ERRDOS &&
+		    rqp->sr_serror == ERRnoaccess)
 			error = EAUTH;
 		if (!(rqp->sr_errclass == ERRDOS &&
 		    rqp->sr_serror == ERRmoredata))
 			goto bad;
 	}
+
+	/*
+	 * Parse the reply
+	 */
+	rpflags2 = rqp->sr_rpflags2;
 	vcp->vc_smbuid = rqp->sr_rpuid;
 	smb_rq_getreply(rqp, &mdp);
-	do {
-		error = md_get_uint8(mdp, &wc);
+	error = md_get_uint8(mdp, &wc);
+	if (error)
+		goto bad;
+	error = EBADRPC;
+	if (vcp->vc_intok) {
+		if (wc != 4)
+			goto bad;
+	} else if (wc != 3)
+		goto bad;
+	md_get_uint8(mdp, NULL);	/* secondary cmd */
+	md_get_uint8(mdp, NULL);	/* mbz */
+	md_get_uint16le(mdp, NULL);	/* andxoffset */
+	md_get_uint16le(mdp, &action);	/* action */
+	if (vcp->vc_intok)
+		md_get_uint16le(mdp, &bl);	/* ext security */
+	md_get_uint16le(mdp, &bc); /* byte count */
+	if (vcp->vc_intok) {
+		vcp->vc_outtoklen = bl;
+		vcp->vc_outtok = kmem_alloc(bl, KM_SLEEP);
+		error = md_get_mem(mdp, vcp->vc_outtok, bl, MB_MSYSTEM);
 		if (error)
-			break;
-		error = EBADRPC;
-		if (vcp->vc_intok) {
-			if (wc != 4)
-				break;
-		} else if (wc != 3)
-			break;
-		md_get_uint8(mdp, NULL);	/* secondary cmd */
-		md_get_uint8(mdp, NULL);	/* mbz */
-		md_get_uint16le(mdp, NULL);	/* andxoffset */
-		md_get_uint16le(mdp, &action);	/* action */
-		if (vcp->vc_intok)
-			md_get_uint16le(mdp, &bl);	/* ext security */
-		md_get_uint16le(mdp, NULL); /* byte count */
-		if (vcp->vc_intok) {
-			vcp->vc_outtoklen =  bl;
-			vcp->vc_outtok = kmem_alloc(bl, KM_SLEEP);
-			error = md_get_mem(mdp, vcp->vc_outtok, bl, MB_MSYSTEM);
-			if (error)
-				break;
+			goto bad;
+	}
+
+	/*
+	 * Server OS, LANMGR, & Domain follow here.
+	 * XXX: Should store these strings (later).
+	 *
+	 * Windows systems do not suport CAP_LARGE_...
+	 * when signing is enabled, so adjust sv_caps.
+	 * Match first 8 characters of server's OS
+	 * with the UCS-2LE string: "Windows "
+	 */
+	if (bc > 16) {
+		static const char WindowsU[16] =
+		    "W\0i\0n\0d\0o\0w\0s\0 ";
+		char osbuf[16];
+
+		/* align(2) */
+		if (((uintptr_t)mdp->md_pos) & 1)
+			md_get_uint8(mdp, NULL);
+
+		bzero(osbuf, sizeof (osbuf));
+		md_get_mem(mdp, osbuf, sizeof (osbuf), MB_MSYSTEM);
+		if (0 == bcmp(WindowsU, osbuf, sizeof (osbuf))) {
+			SMBSDEBUG("Server is Windows\n");
+			if (vcp->vc_flags & SMBV_WILL_SIGN) {
+				SMBSDEBUG("disable CAP_LARGE_(r/w)\n");
+				vcp->vc_sopt.sv_caps &=
+				    ~(SMB_CAP_LARGE_READX
+				    | SMB_CAP_LARGE_WRITEX);
+			}
 		}
-		/* server OS, LANMGR, & Domain here */
-		error = 0;
-		/*LINTED*/
-	} while (0);
+	}
+
+	/* success! */
+	error = 0;
+
 bad:
+
+	/*
+	 * When authentication fails and we're (possibly) doing
+	 * fall-back to another method, we have to reset things.
+	 */
+	if (error && vcp->vc_mackey) {
+		vcp->vc_hflags2 &= ~SMB_FLAGS2_SECURITY_SIGNATURE;
+		kmem_free(vcp->vc_mackey, vcp->vc_mackeylen);
+		vcp->vc_mackey = NULL;
+		vcp->vc_mackeylen = 0;
+		vcp->vc_seqno = 0;
+	}
+
+	if (rqp) {
+		smb_rq_done(rqp);
+		rqp = NULL;
+	}
 	if (encpass) {
-		kmem_free(encpass, tmplen);
+		kmem_free(encpass, plen_alloc);
 		encpass = NULL;
 	}
-	if (pbuf) {
-		kmem_free(pbuf, SMB_MAXPASSWORDLEN + 1);
-		pbuf = NULL;
+	if (ntencpass) {
+		kmem_free(ntencpass, uniplen_alloc);
+		ntencpass = NULL;
 	}
-	if (vcp->vc_sopt.sv_sm & SMB_SM_USER && !vcp->vc_intok &&
-	    (error || (*up != '\0' && action & SMB_ACT_GUEST &&
-	    state == STATE_NTLMV2 && smb_antique(rqp)))) {
+
+	/*
+	 * Shall we try again with another auth type?
+	 * Note: We hold no kmem here.
+	 */
+	switch (authtype) {
+
+	case NullSes:
+	case ExtSec:
+		/* Error or not, we're done. (no fallback) */
+		break;
+
+	case NTLMv2:
 		/*
 		 * We're doing user-level authentication (so we are actually
 		 * sending authentication stuff over the wire), and we're
 		 * not doing extended security, and the stuff we tried
 		 * failed (or we we're trying to login a real user but
 		 * got granted guest access instead.)
+		 *
+		 * See radar 4134676.  This check works around the way a
+		 * certain old server grants limited Guest access when we
+		 * try NTLMv2, but works fine with NTLM.  The fingerprint
+		 * we are looking for is DOS error codes and no-Unicode.
+		 * Note XP grants Guest access but uses Unicode and
+		 * NT error codes.
 		 */
-		if (!error)
+		if (error == 0 && (action & SMB_ACT_GUEST) &&
+		    !(rpflags2 & SMB_FLAGS2_ERR_STATUS) &&
+		    !(rpflags2 & SMB_FLAGS2_UNICODE)) {
+			/* force fallback */
 			declinedguest = 1;
-		/*
-		 * Should we try the next type of authentication?
-		 */
-		if (state < STATE_UCPW) {
-			/*
-			 * Yes, we still have more to try.
-			 */
-			state++;
-			smb_rq_done(rqp);
+			error = EAUTH;
+		}
+		/* FALLTHROUGH */
+	case NTLMv1:
+	case ClearMC:
+		if (error) {
+			authtype = authtype - 1;
 			goto again;
 		}
+		break;
+
+	case ClearUC:
+	default:
+		/* no more fallbacks */
+		break;
 	}
-	smb_rq_done(rqp);
 
 ssn_exit:
 	if (error && declinedguest)
 		SMBERROR("we declined ntlmv2 guest access. errno will be %d\n",
 		    error);
-	/* Restore things we changed and return */
-	vcp->vc_hflags2 = saveflags2;
-	vcp->vc_toserver = savetoserver;
+
 	return (error);
 }
 
@@ -1370,30 +1568,117 @@ smb_smb_treedisconnect(struct smb_share *ssp, struct smb_cred *scred)
 	return (error);
 }
 
-static int
-smb_smb_readx(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
-	uio_t *uiop, struct smb_cred *scred, int timo)
+/*
+ * Common function for read/write with UIO.
+ * Called by netsmb smb_usr_rw,
+ *  smbfs_readvnode, smbfs_writevnode
+ */
+int
+smb_rwuio(struct smb_share *ssp, uint16_t fid, uio_rw_t rw,
+	uio_t *uiop, smb_cred_t *scred, int timo)
 {
 	struct smb_vc *vcp = SSTOVC(ssp);
+	ssize_t  save_resid;
+	uint32_t len, rlen, maxlen;
+	int error = 0;
+	int (*iofun)(struct smb_share *, uint16_t, uint32_t *,
+	    uio_t *, smb_cred_t *, int);
+
+	/*
+	 * Determine which function to use,
+	 * and the transfer size per call.
+	 */
+	if (SMB_DIALECT(vcp) >= SMB_DIALECT_NTLM0_12) {
+		/*
+		 * Using NT LM 0.12, so readx, writex.
+		 * Make sure we can represent the offset.
+		 */
+		if ((vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_FILES) == 0 &&
+		    (uiop->uio_loffset + uiop->uio_resid) > UINT32_MAX)
+			return (EFBIG);
+
+		if (rw == UIO_READ) {
+			iofun = smb_smb_readx;
+			if (vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_READX)
+				maxlen = SMB_MAX_LARGE_RW_SIZE;
+			else
+				maxlen = vcp->vc_rxmax;
+		} else { /* UIO_WRITE */
+			iofun = smb_smb_writex;
+			if (vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_WRITEX)
+				maxlen = SMB_MAX_LARGE_RW_SIZE;
+			else
+				maxlen = vcp->vc_wxmax;
+		}
+	} else {
+		/*
+		 * Using the old SMB_READ and SMB_WRITE so
+		 * we're limited to 32-bit offsets, etc.
+		 * XXX: Someday, punt the old dialects.
+		 */
+		if ((uiop->uio_loffset + uiop->uio_resid) > UINT32_MAX)
+			return (EFBIG);
+
+		if (rw == UIO_READ) {
+			iofun = smb_smb_read;
+			maxlen = vcp->vc_rxmax;
+		} else { /* UIO_WRITE */
+			iofun = smb_smb_write;
+			maxlen = vcp->vc_wxmax;
+		}
+	}
+
+	save_resid = uiop->uio_resid;
+	while (uiop->uio_resid > 0) {
+		/* Lint: uio_resid may be 64-bits */
+		rlen = len = (uint32_t)min(maxlen, uiop->uio_resid);
+
+		SMBSDEBUG("rw=%d, off %lld, len %d\n",
+		    rw, uiop->uio_loffset, len);
+
+		error = (*iofun)(ssp, fid, &rlen, uiop, scred, timo);
+
+		/*
+		 * Note: the iofun called uio_update, so
+		 * not doing that here as one might expect.
+		 *
+		 * Quit the loop either on error, or if we
+		 * transferred less then requested.
+		 */
+		if (error || (rlen < len))
+			break;
+
+		timo = 0; /* only first I/O should wait */
+	}
+	if (error && (save_resid != uiop->uio_resid)) {
+		/*
+		 * Stopped on an error after having
+		 * successfully transferred data.
+		 * Suppress this error.
+		 */
+		SMBSDEBUG("error %d suppressed\n", error);
+		error = 0;
+	}
+
+	return (error);
+}
+
+static int
+smb_smb_readx(struct smb_share *ssp, uint16_t fid, uint32_t *lenp,
+	uio_t *uiop, smb_cred_t *scred, int timo)
+{
 	struct smb_rq *rqp;
 	struct mbchain *mbp;
 	struct mdchain *mdp;
-	u_int8_t wc;
 	int error;
-	u_int16_t residhi, residlo, off, doff;
-	u_int32_t resid;
+	uint32_t offlo, offhi, rlen;
+	uint16_t lenhi, lenlo, off, doff;
+	uint8_t wc;
 
-	if ((vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_READX) == 0) {
-		/* Fall back to the old cmd. */
-		return (smb_smb_read(ssp, fid, len, rresid, uiop,
-		    scred, timo));
-	}
-	if ((vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_FILES) == 0) {
-		/* Have ReadX but not large files? */
-		if ((uiop->uio_loffset + *len) > UINT32_MAX)
-			return (EFBIG);
-	}
-	*len = min(*len, vcp->vc_rxmax);
+	lenhi = (uint16_t)(*lenp >> 16);
+	lenlo = (uint16_t)*lenp;
+	offhi = (uint32_t)(uiop->uio_loffset >> 32);
+	offlo = (uint32_t)uiop->uio_loffset;
 
 	error = smb_rq_alloc(SSTOCP(ssp), SMB_COM_READ_ANDX, scred, &rqp);
 	if (error)
@@ -1404,13 +1689,13 @@ smb_smb_readx(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 	mb_put_uint8(mbp, 0);		/* MBZ */
 	mb_put_uint16le(mbp, 0);	/* offset to secondary */
 	mb_put_mem(mbp, (caddr_t)&fid, sizeof (fid), MB_MSYSTEM);
-	mb_put_uint32le(mbp, (u_int32_t)(uiop->uio_offset));
-	mb_put_uint16le(mbp, (u_int16_t)*len);	/* MaxCount */
-	mb_put_uint16le(mbp, (u_int16_t)*len);	/* MinCount */
-						/* (only indicates blocking) */
-	mb_put_uint32le(mbp, (unsigned)*len >> 16);	/* MaxCountHigh */
-	mb_put_uint16le(mbp, (u_int16_t)*len);	/* Remaining ("obsolete") */
-	mb_put_uint32le(mbp, (u_int32_t)((uiop->uio_loffset) >> 32));
+	mb_put_uint32le(mbp, offlo);	/* offset (low part) */
+	mb_put_uint16le(mbp, lenlo);	/* MaxCount */
+	mb_put_uint16le(mbp, 1);	/* MinCount */
+					/* (only indicates blocking) */
+	mb_put_uint32le(mbp, lenhi);	/* MaxCountHigh */
+	mb_put_uint16le(mbp, lenlo);	/* Remaining ("obsolete") */
+	mb_put_uint32le(mbp, offhi);	/* offset (high part) */
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);
@@ -1421,46 +1706,44 @@ smb_smb_readx(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 		if (error)
 			break;
 		smb_rq_getreply(rqp, &mdp);
-		off = SMB_HDRLEN;
 		md_get_uint8(mdp, &wc);
-		off++;
 		if (wc != 12) {
 			error = EBADRPC;
 			break;
 		}
 		md_get_uint8(mdp, NULL);
-		off++;
 		md_get_uint8(mdp, NULL);
-		off++;
 		md_get_uint16le(mdp, NULL);
-		off += 2;
 		md_get_uint16le(mdp, NULL);
-		off += 2;
 		md_get_uint16le(mdp, NULL);	/* data compaction mode */
-		off += 2;
 		md_get_uint16le(mdp, NULL);
-		off += 2;
-		md_get_uint16le(mdp, &residlo);
-		off += 2;
+		md_get_uint16le(mdp, &lenlo);	/* data len ret. */
 		md_get_uint16le(mdp, &doff);	/* data offset */
-		off += 2;
-		md_get_uint16le(mdp, &residhi);
-		off += 2;
-		resid = (residhi << 16) | residlo;
+		md_get_uint16le(mdp, &lenhi);
+		rlen = (lenhi << 16) | lenlo;
 		md_get_mem(mdp, NULL, 4 * 2, MB_MSYSTEM);
-		off += 4*2;
 		md_get_uint16le(mdp, NULL);	/* ByteCount */
-		off += 2;
+		/*
+		 * Does the data offset indicate padding?
+		 * Add up the gets above, we have:
+		 */
+		off = SMB_HDRLEN + 3 + (12 * 2); /* =59 */
 		if (doff > off)	/* pad byte(s)? */
 			md_get_mem(mdp, NULL, doff - off, MB_MSYSTEM);
-		if (resid == 0) {
-			*rresid = resid;
+		if (rlen == 0) {
+			*lenp = rlen;
 			break;
 		}
-		error = md_get_uio(mdp, uiop, resid);
+		/* paranoid */
+		if (rlen > *lenp) {
+			SMBSDEBUG("bad server! rlen %d, len %d\n",
+			    rlen, *lenp);
+			rlen = *lenp;
+		}
+		error = md_get_uio(mdp, uiop, rlen);
 		if (error)
 			break;
-		*rresid = resid;
+		*lenp = rlen;
 		/*LINTED*/
 	} while (0);
 	smb_rq_done(rqp);
@@ -1468,28 +1751,21 @@ smb_smb_readx(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 }
 
 static int
-smb_smb_writex(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
-	uio_t *uiop, struct smb_cred *scred, int timo)
+smb_smb_writex(struct smb_share *ssp, uint16_t fid, uint32_t *lenp,
+	uio_t *uiop, smb_cred_t *scred, int timo)
 {
-	struct smb_vc *vcp = SSTOVC(ssp);
 	struct smb_rq *rqp;
 	struct mbchain *mbp;
 	struct mdchain *mdp;
 	int error;
-	u_int8_t wc;
-	u_int16_t resid;
+	uint32_t offlo, offhi, rlen;
+	uint16_t lenhi, lenlo;
+	uint8_t wc;
 
-	if ((vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_WRITEX) == 0) {
-		/* Fall back to the old cmd. */
-		return (smb_smb_write(ssp, fid, len, rresid, uiop,
-		    scred, timo));
-	}
-	if ((vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_FILES) == 0) {
-		/* Have WriteX but not large files? */
-		if ((uiop->uio_loffset + *len) > UINT32_MAX)
-			return (EFBIG);
-	}
-	*len = min(*len, vcp->vc_wxmax);
+	lenhi = (uint16_t)(*lenp >> 16);
+	lenlo = (uint16_t)*lenp;
+	offhi = (uint32_t)(uiop->uio_loffset >> 32);
+	offlo = (uint32_t)uiop->uio_loffset;
 
 	error = smb_rq_alloc(SSTOCP(ssp), SMB_COM_WRITE_ANDX, scred, &rqp);
 	if (error)
@@ -1500,19 +1776,19 @@ smb_smb_writex(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 	mb_put_uint8(mbp, 0);		/* MBZ */
 	mb_put_uint16le(mbp, 0);	/* offset to secondary */
 	mb_put_mem(mbp, (caddr_t)&fid, sizeof (fid), MB_MSYSTEM);
-	mb_put_uint32le(mbp, (u_int32_t)(uiop->uio_offset));
+	mb_put_uint32le(mbp, offlo);	/* offset (low part) */
 	mb_put_uint32le(mbp, 0);	/* MBZ (timeout) */
 	mb_put_uint16le(mbp, 0);	/* !write-thru */
 	mb_put_uint16le(mbp, 0);
-	mb_put_uint16le(mbp, (u_int16_t)((unsigned)*len >> 16));
-	mb_put_uint16le(mbp, (u_int16_t)*len);
+	mb_put_uint16le(mbp, lenhi);
+	mb_put_uint16le(mbp, lenlo);
 	mb_put_uint16le(mbp, 64);	/* data offset from header start */
-	mb_put_uint32le(mbp, (u_int32_t)((uiop->uio_loffset) >> 32));
+	mb_put_uint32le(mbp, offhi);	/* offset (high part) */
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	do {
-		mb_put_uint8(mbp, 0xee);	/* mimic xp pad byte! */
-		error = mb_put_uio(mbp, uiop, *len);
+		mb_put_uint8(mbp, 0);	/* pad byte */
+		error = mb_put_uio(mbp, uiop, *lenp);
 		if (error)
 			break;
 		smb_rq_bend(rqp);
@@ -1527,19 +1803,14 @@ smb_smb_writex(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 			error = EBADRPC;
 			break;
 		}
-		md_get_uint8(mdp, NULL);
-		md_get_uint8(mdp, NULL);
-		md_get_uint16le(mdp, NULL);
-		md_get_uint16le(mdp, &resid); /* actually is # written */
-		*rresid = resid;
-		/*
-		 * if LARGE_WRITEX then there's one more bit of # written
-		 */
-		if ((vcp->vc_sopt.sv_caps & SMB_CAP_LARGE_WRITEX)) {
-			md_get_uint16le(mdp, NULL);
-			md_get_uint16le(mdp, &resid);
-			*rresid |= (int)(resid & 1) << 16;
-		}
+		md_get_uint8(mdp, NULL);	/* andx cmd */
+		md_get_uint8(mdp, NULL);	/* reserved */
+		md_get_uint16le(mdp, NULL);	/* andx offset */
+		md_get_uint16le(mdp, &lenlo);	/* data len ret. */
+		md_get_uint16le(mdp, NULL);	/* remaining */
+		md_get_uint16le(mdp, &lenhi);
+		rlen = (lenhi << 16) | lenlo;
+		*lenp = rlen;
 		/*LINTED*/
 	} while (0);
 
@@ -1548,20 +1819,23 @@ smb_smb_writex(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 }
 
 static int
-smb_smb_read(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
-	uio_t *uiop, struct smb_cred *scred, int timo)
+smb_smb_read(struct smb_share *ssp, uint16_t fid, uint32_t *lenp,
+	uio_t *uiop, smb_cred_t *scred, int timo)
 {
 	struct smb_rq *rqp;
 	struct mbchain *mbp;
 	struct mdchain *mdp;
-	u_int16_t resid, bc;
-	u_int8_t wc;
-	int error, rlen;
+	int error;
+	uint32_t off32;
+	uint16_t bc, cnt, dlen, rcnt, todo;
+	uint8_t wc;
 
-	/* This cmd is limited to 32-bit offsets. */
-	if ((uiop->uio_loffset + *len) > UINT32_MAX)
-		return (EFBIG);
-	*len = rlen = min(*len, SSTOVC(ssp)->vc_rxmax);
+	ASSERT(uiop->uio_loffset <= UINT32_MAX);
+	off32 = (uint32_t)uiop->uio_loffset;
+	ASSERT(*lenp <= UINT16_MAX);
+	cnt = (uint16_t)*lenp;
+	/* This next is an "estimate" of planned reads. */
+	todo = (uint16_t)min(uiop->uio_resid, UINT16_MAX);
 
 	error = smb_rq_alloc(SSTOCP(ssp), SMB_COM_READ, scred, &rqp);
 	if (error)
@@ -1569,9 +1843,9 @@ smb_smb_read(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
 	mb_put_mem(mbp, (caddr_t)&fid, sizeof (fid), MB_MSYSTEM);
-	mb_put_uint16le(mbp, (u_int16_t)rlen);
-	mb_put_uint32le(mbp, (u_int32_t)uiop->uio_offset);
-	mb_put_uint16le(mbp, (u_int16_t)min(uiop->uio_resid, 0xffff));
+	mb_put_uint16le(mbp, cnt);
+	mb_put_uint32le(mbp, off32);
+	mb_put_uint16le(mbp, todo);
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	smb_rq_bend(rqp);
@@ -1587,19 +1861,30 @@ smb_smb_read(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 			error = EBADRPC;
 			break;
 		}
-		md_get_uint16le(mdp, &resid);
-		md_get_mem(mdp, NULL, 4 * 2, MB_MSYSTEM);
-		md_get_uint16le(mdp, &bc);
-		md_get_uint8(mdp, NULL);		/* ignore buffer type */
-		md_get_uint16le(mdp, &resid);
-		if (resid == 0) {
-			*rresid = resid;
+		md_get_uint16le(mdp, &rcnt);	/* ret. count */
+		md_get_mem(mdp, NULL, 4 * 2, MB_MSYSTEM);  /* res. */
+		md_get_uint16le(mdp, &bc);	/* byte count */
+		md_get_uint8(mdp, NULL);	/* buffer format */
+		md_get_uint16le(mdp, &dlen);	/* data len */
+		if (dlen < rcnt) {
+			SMBSDEBUG("oops: dlen=%d rcnt=%d\n",
+			    (int)dlen, (int)rcnt);
+			rcnt = dlen;
+		}
+		if (rcnt == 0) {
+			*lenp = 0;
 			break;
 		}
-		error = md_get_uio(mdp, uiop, resid);
+		/* paranoid */
+		if (rcnt > cnt) {
+			SMBSDEBUG("bad server! rcnt %d, cnt %d\n",
+			    (int)rcnt, (int)cnt);
+			rcnt = cnt;
+		}
+		error = md_get_uio(mdp, uiop, (int)rcnt);
 		if (error)
 			break;
-		*rresid = resid;
+		*lenp = (int)rcnt;
 		/*LINTED*/
 	} while (0);
 	smb_rq_done(rqp);
@@ -1607,20 +1892,23 @@ smb_smb_read(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 }
 
 static int
-smb_smb_write(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
-	uio_t *uiop, struct smb_cred *scred, int timo)
+smb_smb_write(struct smb_share *ssp, uint16_t fid, uint32_t *lenp,
+	uio_t *uiop, smb_cred_t *scred, int timo)
 {
 	struct smb_rq *rqp;
 	struct mbchain *mbp;
 	struct mdchain *mdp;
-	u_int16_t resid;
-	u_int8_t wc;
 	int error;
+	uint32_t off32;
+	uint16_t cnt, rcnt, todo;
+	uint8_t wc;
 
-	/* This cmd is limited to 32-bit offsets. */
-	if ((uiop->uio_loffset + *len) > UINT32_MAX)
-		return (EFBIG);
-	*len = resid = min(*len, SSTOVC(ssp)->vc_wxmax);
+	ASSERT(uiop->uio_loffset <= UINT32_MAX);
+	off32 = (uint32_t)uiop->uio_loffset;
+	ASSERT(*lenp <= UINT16_MAX);
+	cnt = (uint16_t)*lenp;
+	/* This next is an "estimate" of planned writes. */
+	todo = (uint16_t)min(uiop->uio_resid, UINT16_MAX);
 
 	error = smb_rq_alloc(SSTOCP(ssp), SMB_COM_WRITE, scred, &rqp);
 	if (error)
@@ -1628,15 +1916,15 @@ smb_smb_write(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
 	mb_put_mem(mbp, (caddr_t)&fid, sizeof (fid), MB_MSYSTEM);
-	mb_put_uint16le(mbp, resid);
-	mb_put_uint32le(mbp, (u_int32_t)uiop->uio_offset);
-	mb_put_uint16le(mbp, (u_int16_t)min(uiop->uio_resid, 0xffff));
+	mb_put_uint16le(mbp, cnt);
+	mb_put_uint32le(mbp, off32);
+	mb_put_uint16le(mbp, todo);
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
 	mb_put_uint8(mbp, SMB_DT_DATA);
-	mb_put_uint16le(mbp, resid);
+	mb_put_uint16le(mbp, cnt);
 	do {
-		error = mb_put_uio(mbp, uiop, resid);
+		error = mb_put_uio(mbp, uiop, *lenp);
 		if (error)
 			break;
 		smb_rq_bend(rqp);
@@ -1651,67 +1939,11 @@ smb_smb_write(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 			error = EBADRPC;
 			break;
 		}
-		md_get_uint16le(mdp, &resid);
-		*rresid = resid;
+		md_get_uint16le(mdp, &rcnt);
+		*lenp = rcnt;
 		/*LINTED*/
 	} while (0);
 	smb_rq_done(rqp);
-	return (error);
-}
-
-/*
- * Common function for read/write with UIO.
- * Called by netsmb smb_usr_rw,
- *  smbfs_readvnode, smbfs_writevnode
- */
-int
-smb_rwuio(struct smb_share *ssp, u_int16_t fid, uio_rw_t rw,
-	uio_t *uiop, struct smb_cred *scred, int timo)
-{
-	ssize_t  old_resid, tsize;
-	offset_t  old_offset;
-	int len, resid;
-	int error = 0;
-
-	old_offset = uiop->uio_loffset;
-	old_resid = tsize = uiop->uio_resid;
-
-	while (tsize > 0) {
-		/* Lint: tsize may be 64-bits */
-		len = SMB_MAX_LARGE_RW_SIZE;
-		if (len > tsize)
-			len = (int)tsize;
-
-		if (rw == UIO_READ)
-			error = smb_smb_readx(ssp, fid, &len, &resid, uiop,
-			    scred, timo);
-		else
-			error = smb_smb_writex(ssp, fid, &len, &resid, uiop,
-			    scred, timo);
-		if (error)
-			break;
-
-		if (resid < len) {
-			error = EIO;
-			break;
-		}
-
-		tsize -= resid;
-		timo = 0; /* only first write is special */
-	}
-
-	if (error) {
-		/*
-		 * Errors can happen in copyin/copyout, the rpc, etc. so
-		 * they imply resid is unreliable.  The only safe thing is
-		 * to pretend zero bytes made it.  We needn't restore the
-		 * iovs because callers don't depend on them in error
-		 * paths - uio_resid and uio_offset are what matter.
-		 */
-		uiop->uio_loffset = old_offset;
-		uiop->uio_resid = old_resid;
-	}
-
 	return (error);
 }
 

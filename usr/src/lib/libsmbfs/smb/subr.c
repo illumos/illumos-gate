@@ -32,14 +32,9 @@
  * $Id: subr.c,v 1.19 2005/02/09 00:23:45 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/errno.h>
-#include <sys/syscall.h>
-#include <sys/wait.h>
-#include <sys/debug.h>
+#include <sys/time.h>
 
 #include <unistd.h>
 #include <ctype.h>
@@ -224,7 +219,8 @@ smb_open_rcfile(struct smb_ctx *ctx)
 		fprintf(stderr, dgettext(TEXT_DOMAIN,
 		    "Can't open %s: %s\n"), fn, smb_strerror(errno));
 #ifdef DEBUG
-	dump_props("after reading global repository");
+	if (smb_debug)
+		dump_props("after reading global repository");
 #endif
 
 	home = getenv("HOME");
@@ -244,7 +240,8 @@ smb_open_rcfile(struct smb_ctx *ctx)
 	}
 	home_nsmbrc = 0;
 #ifdef DEBUG
-	dump_props("after reading user settings");
+	if (smb_debug)
+		dump_props("after reading user settings");
 #endif
 	if (smb_rc == NULL) {
 		return (ENOENT);
@@ -304,76 +301,6 @@ smb_simpledecrypt(char *dst, const char *src)
 	}
 	*dst = 0;
 	return (0);
-}
-
-
-static int
-safe_execv(char *args[])
-{
-	int	pid;
-	int status;
-
-	pid = fork();
-	if (pid == 0) {
-		(void) execv(args[0], args);
-		/* Changed from errx() to fprintf(stderr) -Pavan */
-		fprintf(stderr, dgettext(TEXT_DOMAIN,
-		    "%s: execv %s failed, %s\n"), __progname,
-		    args[0], smb_strerror(errno));
-	}
-	if (pid == -1) {
-		fprintf(stderr, dgettext(TEXT_DOMAIN, "%s: fork failed, %s\n"),
-		    __progname, smb_strerror(errno));
-		return (1);
-	}
-	if (wait4(pid, &status, 0, NULL) != pid) {
-		fprintf(stderr, dgettext(TEXT_DOMAIN,
-		    "%s: BUG executing %s command\n"), __progname, args[0]);
-		return (1);
-	} else if (!WIFEXITED(status)) {
-		fprintf(stderr, dgettext(TEXT_DOMAIN,
-		    "%s: %s command aborted by signal %d\n"),
-		    __progname, args[0], WTERMSIG(status));
-		return (1);
-	} else if (WEXITSTATUS(status)) {
-		fprintf(stderr, dgettext(TEXT_DOMAIN,
-		    "%s: %s command failed, exit status %d: %s\n"),
-		    __progname, args[0], WEXITSTATUS(status),
-		    smb_strerror(WEXITSTATUS(status)));
-		return (1);
-	}
-	return (0);
-}
-
-
-void
-dropsuid()
-{
-	/* drop setuid root privs asap */
-	eff_uid = geteuid();
-	real_uid = getuid();
-	seteuid(real_uid);
-}
-
-
-#define	KEXTLOAD_COMMAND	"/sbin/kextload"
-#define	FS_KEXT_DIR		"/System/Library/Extensions/smbfs.kext"
-#define	FULL_KEXTNAME		"com.apple.filesystems.smbfs"
-
-
-int
-loadsmbvfs()
-{
-	char *kextargs[] = {KEXTLOAD_COMMAND, FS_KEXT_DIR, NULL};
-	int error = 0;
-
-	/*
-	 * temporarily revert to root (required for kextload)
-	 */
-	seteuid(eff_uid);
-	error = safe_execv(kextargs);
-	seteuid(real_uid); /* and back to real user */
-	return (error);
 }
 
 #undef __progname

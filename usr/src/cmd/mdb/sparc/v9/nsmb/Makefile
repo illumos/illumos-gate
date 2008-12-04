@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 MDBTGT		= kvm
 MODULE		= nsmb.so
 MODSRCS_DIR	= ../../../common/modules/nsmb
@@ -32,6 +30,10 @@ MODSRCS		= nsmb.c
 include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
 include ../../Makefile.sparcv9
+
+# This kmod goes in /usr/kernel/kmdb
+ROOTKMOD = $(ROOT)/usr/kernel/kmdb$(MACHMODDIR)
+
 include ../../../Makefile.module
 
 CPPFLAGS	+= -I$(SRC)/uts/common/fs/smbclnt/netsmb
@@ -39,3 +41,8 @@ CPPFLAGS	+= -I$(SRC)/uts/common
 
 C99MODE=	-xc99=%all
 C99LMODE=	-Xc99=%all
+
+# maybe not the best place for this, but
+# we need to create this directory.
+$(ROOTKMOD):
+	$(INS.dir)

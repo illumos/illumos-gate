@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ACL support for smbfs
  *
@@ -59,6 +57,8 @@
 #include <netsmb/smb_lib.h>
 #include <netsmb/smbfs_acl.h>
 #include <netsmb/smbfs_isec.h>
+#include <netsmb/mchain.h>
+#include "private.h"
 
 #ifdef _KERNEL
 #define	MALLOC(size) kmem_alloc(size, KM_SLEEP)
@@ -179,6 +179,7 @@ ifree_ace(i_ntace_t *ace)
 static int
 mb_get_ace(mbdata_t *mbp, i_ntace_t **acep)
 {
+	mbdata_t tmp_mb;
 	i_ntace_t *ace = NULL;
 	uint16_t ace_len;
 	int error;
@@ -187,13 +188,28 @@ mb_get_ace(mbdata_t *mbp, i_ntace_t **acep)
 		return (ENOMEM);
 	bzero(ace, sizeof (*ace));
 
-	ERRCHK(mb_get_uint8(mbp, &ace->ace_type));
-	ERRCHK(mb_get_uint8(mbp, &ace->ace_flags));
-	ERRCHK(mb_get_uint16le(mbp, &ace_len));
-	ERRCHK(mb_get_uint32le(mbp, &ace->ace_rights));
+	/*
+	 * The ACE is realy variable length,
+	 * with format determined by the type.
+	 * XXX: This only decodes types 0-7
+	 *
+	 * There may also be padding after it, so
+	 * decode the using a copy of the mbdata,
+	 * and then consume the specified length.
+	 */
+	tmp_mb = *mbp;
 
-	ERRCHK(mb_get_sid(mbp, &ace->ace_sid));
-	/* XXX: consume any ace_len not used? */
+	/* Fixed-size header */
+	ERRCHK(mb_get_uint8(&tmp_mb, &ace->ace_type));
+	ERRCHK(mb_get_uint8(&tmp_mb, &ace->ace_flags));
+	ERRCHK(mb_get_uint16le(&tmp_mb, &ace_len));
+
+	/* Variable-size body */
+	ERRCHK(mb_get_uint32le(&tmp_mb, &ace->ace_rights));
+	ERRCHK(mb_get_sid(&tmp_mb, &ace->ace_sid));
+
+	/* Now actually consume ace_len */
+	ERRCHK(mb_get_mem(mbp, NULL, ace_len));
 
 	/* Success! */
 	*acep = ace;
@@ -208,8 +224,7 @@ static int
 mb_put_ace(mbdata_t *mbp, i_ntace_t *ace)
 {
 	int cnt0, error;
-	char *ace_len_p;
-	uint16_t ace_len;
+	uint16_t ace_len, *ace_len_p;
 
 	if (ace == NULL)
 		return (EINVAL);
@@ -218,14 +233,13 @@ mb_put_ace(mbdata_t *mbp, i_ntace_t *ace)
 
 	ERRCHK(mb_put_uint8(mbp, ace->ace_type));
 	ERRCHK(mb_put_uint8(mbp, ace->ace_flags));
-	ERRCHK(mb_fit(mbp, 2, &ace_len_p));
+	ERRCHK(mb_fit(mbp, 2, (char **)&ace_len_p));
 	ERRCHK(mb_put_uint32le(mbp, ace->ace_rights));
 
 	ERRCHK(mb_put_sid(mbp, ace->ace_sid));
 
 	ace_len = mbp->mb_count - cnt0;
-	/* LINTED */
-	setwle(ace_len_p, 0, ace_len);
+	*ace_len_p = htoles(ace_len);
 
 	/* Success! */
 	return (0);
@@ -295,7 +309,10 @@ mb_get_acl(mbdata_t *mbp, i_ntacl_t **aclp)
 		ERRCHK(mb_get_ace(mbp, acep));
 		acep++;
 	}
-	/* XXX: consume any acl_len not used? */
+	/*
+	 * There may be more data here, but
+	 * the caller takes care of that.
+	 */
 
 	/* Success! */
 	*aclp = acl;
@@ -311,8 +328,7 @@ mb_put_acl(mbdata_t *mbp, i_ntacl_t *acl)
 {
 	i_ntace_t **acep;
 	uint8_t revision;
-	char *acl_len_p;
-	uint16_t acl_len;
+	uint16_t acl_len, *acl_len_p;
 	uint32_t *subauthp;
 	size_t aclsz;
 	int i, cnt0, error;
@@ -321,7 +337,7 @@ mb_put_acl(mbdata_t *mbp, i_ntacl_t *acl)
 
 	ERRCHK(mb_put_uint8(mbp, acl->acl_revision));
 	ERRCHK(mb_put_uint8(mbp, 0)); /* pad1 */
-	ERRCHK(mb_fit(mbp, 2, &acl_len_p));
+	ERRCHK(mb_fit(mbp, 2, (char **)&acl_len_p));
 	ERRCHK(mb_put_uint16le(mbp, acl->acl_acecount));
 	ERRCHK(mb_put_uint16le(mbp, 0)); /* pad2 */
 
@@ -333,8 +349,7 @@ mb_put_acl(mbdata_t *mbp, i_ntacl_t *acl)
 
 	/* Fill in acl_len_p */
 	acl_len = mbp->mb_count - cnt0;
-	/* LINTED */
-	setwle(acl_len_p, 0, acl_len);
+	*acl_len_p = htoles(acl_len);
 
 	/* Success! */
 	return (0);
@@ -441,7 +456,7 @@ errout:
 int
 mb_put_ntsd(mbdata_t *mbp, i_ntsd_t *sd)
 {
-	char *owneroffp, *groupoffp, *sacloffp, *dacloffp;
+	uint32_t *owneroffp, *groupoffp, *sacloffp, *dacloffp;
 	uint32_t owneroff, groupoff, sacloff, dacloff;
 	int cnt0, error;
 
@@ -451,10 +466,10 @@ mb_put_ntsd(mbdata_t *mbp, i_ntsd_t *sd)
 	ERRCHK(mb_put_uint8(mbp, sd->sd_revision));
 	ERRCHK(mb_put_uint8(mbp, 0)); /* pad1 */
 	ERRCHK(mb_put_uint16le(mbp, sd->sd_flags));
-	ERRCHK(mb_fit(mbp, 4, &owneroffp));
-	ERRCHK(mb_fit(mbp, 4, &groupoffp));
-	ERRCHK(mb_fit(mbp, 4, &sacloffp));
-	ERRCHK(mb_fit(mbp, 4, &dacloffp));
+	ERRCHK(mb_fit(mbp, 4, (char **)&owneroffp));
+	ERRCHK(mb_fit(mbp, 4, (char **)&groupoffp));
+	ERRCHK(mb_fit(mbp, 4, (char **)&sacloffp));
+	ERRCHK(mb_fit(mbp, 4, (char **)&dacloffp));
 
 	/*
 	 * These could be marshalled in any order, but
@@ -478,14 +493,10 @@ mb_put_ntsd(mbdata_t *mbp, i_ntsd_t *sd)
 	}
 
 	/* Fill in the offsets */
-	/* LINTED */
-	setdle(owneroffp, 0, owneroff);
-	/* LINTED */
-	setdle(groupoffp, 0, groupoff);
-	/* LINTED */
-	setdle(sacloffp,  0, sacloff);
-	/* LINTED */
-	setdle(dacloffp,  0, dacloff);
+	*owneroffp = htolel(owneroff);
+	*groupoffp = htolel(groupoff);
+	*sacloffp  = htolel(sacloff);
+	*dacloffp  = htolel(dacloff);
 
 	/* Success! */
 	return (0);
@@ -816,7 +827,7 @@ smbfs_acl_sd2zfs(
 	idms = I_GetMappings(idmap_gh);
 	if (idms != IDMAP_SUCCESS) {
 #ifdef	DEBUG
-		printf("idmap_get_mappings: rc=%d\n", rc);
+		printf("idmap_get_mappings: rc=%d\n", idms);
 #endif
 		/* creative error choice */
 		error = EIDRM;

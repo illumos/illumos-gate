@@ -37,8 +37,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/time.h>
@@ -804,10 +802,8 @@ smbfs_smb_flush(struct smbnode *np, struct smb_cred *scrp)
 
 	if (!(np->n_flag & NFLUSHWIRE))
 		return (0);
-	if (np->r_count == 0)
+	if (np->n_fidrefs == 0)
 		return (0); /* not open */
-	if (np->r_vnode->v_type != VREG)
-		return (0); /* not a file */
 
 	error = smb_rq_init(rqp, SSTOCP(ssp), SMB_COM_FLUSH, scrp);
 	if (error)

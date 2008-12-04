@@ -32,8 +32,6 @@
  * $Id: print.c,v 1.1.1.3 2001/07/06 22:38:43 conrad Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -50,6 +48,7 @@
 
 #include <netsmb/smb_lib.h>
 #include <cflib.h>
+#include "private.h"
 
 int
 smb_smb_open_print_file(struct smb_ctx *ctx, int setuplen, int mode,

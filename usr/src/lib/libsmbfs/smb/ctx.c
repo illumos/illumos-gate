@@ -32,7 +32,10 @@
  * $Id: ctx.c,v 1.32.70.2 2005/06/02 00:55:40 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -58,10 +61,6 @@
 #include <kerberosv5/krb5.h>
 #include <kerberosv5/com_err.h>
 
-extern uid_t real_uid, eff_uid;
-
-#define	NB_NEEDRESOLVER
-
 #include <netsmb/smb_lib.h>
 #include <netsmb/netbios.h>
 #include <netsmb/nb_lib.h>
@@ -71,6 +70,7 @@ extern uid_t real_uid, eff_uid;
 
 #include <spnego.h>
 #include "derparse.h"
+#include "private.h"
 
 extern MECH_OID g_stcMechOIDList [];
 
@@ -80,20 +80,23 @@ extern MECH_OID g_stcMechOIDList [];
 int smb_debug, smb_verbose;
 
 /*
- * This used to call the DCE/RPC code.
- * We want more strict layering than this.
- * The redirector should simply export a
- * remote pipe API, comsumed by dce rpc.
- * Make it a no-op for now.
+ * Give the RPC library a callback hook that will be
+ * called whenever we destroy or reinit an smb_ctx_t.
+ * The name rpc_cleanup_smbctx() is legacy, and was
+ * originally a direct call into the RPC code.
  */
-#if 0
-#include <rpc_cleanup.h>
-#else
+static smb_ctx_close_hook_t close_hook;
 static void
 rpc_cleanup_smbctx(struct smb_ctx *ctx)
 {
+	if (close_hook)
+		(*close_hook)(ctx);
 }
-#endif
+void
+smb_ctx_set_close_hook(smb_ctx_close_hook_t hook)
+{
+	close_hook = hook;
+}
 
 void
 dump_ctx_flags(int flags)
@@ -229,7 +232,9 @@ smb_ctx_init(struct smb_ctx *ctx, int argc, char *argv[],
 	ctx->ct_minlevel = minlevel;
 	ctx->ct_maxlevel = maxlevel;
 
+	/* Fill in defaults */
 	ctx->ct_ssn.ioc_opt = SMBVOPT_CREATE | SMBVOPT_MINAUTH_NTLM;
+
 	ctx->ct_ssn.ioc_timeout = 15;
 	ctx->ct_ssn.ioc_retrycount = 4;
 	ctx->ct_ssn.ioc_owner = SMBM_ANY_OWNER;
@@ -1230,7 +1235,6 @@ smb_ctx_ioctl(struct smb_ctx *ctx, int inum, struct smbioc_lookup *rqp)
 	/* Note: No longer put length in outtok[0] */
 	/* *((int *)rqp->ioc_ssn.ioc_outtok) = (int)siz; */
 
-	seteuid(eff_uid); /* restore setuid root briefly */
 	if (ioctl(ctx->ct_fd, inum, rqp) == -1) {
 		rc = errno;
 		goto out;
@@ -1255,7 +1259,6 @@ smb_ctx_ioctl(struct smb_ctx *ctx, int inum, struct smbioc_lookup *rqp)
 	if (ioctl(ctx->ct_fd, inum, rqp) == -1)
 		rc = errno;
 out:
-	seteuid(real_uid); /* and back to real user */
 	return (rc);
 }
 
@@ -1890,7 +1893,6 @@ smb_ctx_lookup(struct smb_ctx *ctx, int level, int flags)
 	/*
 	 * Otherwise we're doing plain old NTLM
 	 */
-	seteuid(eff_uid); /* restore setuid root briefly */
 	if ((ctx->ct_flags & SMBCF_SSNACTIVE) == 0) {
 		/*
 		 * This is the magic that tells the driver to
@@ -1915,7 +1917,6 @@ smb_ctx_lookup(struct smb_ctx *ctx, int level, int flags)
 	}
 
 out:
-	seteuid(real_uid); /* and back to real user */
 	if (failure) {
 		error = errno;
 		smb_error(dgettext(TEXT_DOMAIN,
@@ -1937,7 +1938,6 @@ smb_ctx_flags2(struct smb_ctx *ctx)
 		    "can't get flags2 for a session"), errno);
 		return (-1);
 	}
-	printf(dgettext(TEXT_DOMAIN, "Flags2 value is %d\n"), flags2);
 	return (flags2);
 }
 
@@ -2025,6 +2025,34 @@ smb_ctx_readrcsection(struct smb_ctx *ctx, const char *sname, int level)
 				 */
 				smb_error(dgettext(TEXT_DOMAIN,
 "invalid minimum authentication level \"%s\" specified in the section %s"),
+				    0, p, sname);
+				return (EINVAL);
+			}
+		}
+
+		rc_getstringptr(smb_rc, sname, "signing", &p);
+		if (p) {
+			/*
+			 * "signing" was set in this section; override
+			 * the current signing settings.
+			 */
+			ctx->ct_ssn.ioc_opt &= ~SMBVOPT_SIGNING_MASK;
+			if (strcmp(p, "disabled") == 0) {
+				/* leave flags zero (expr for lint) */
+				(void) ctx->ct_ssn.ioc_opt;
+			} else if (strcmp(p, "enabled") == 0) {
+				ctx->ct_ssn.ioc_opt |=
+				    SMBVOPT_SIGNING_ENABLED;
+			} else if (strcmp(p, "required") == 0) {
+				ctx->ct_ssn.ioc_opt |=
+				    SMBVOPT_SIGNING_ENABLED |
+				    SMBVOPT_SIGNING_REQUIRED;
+			} else {
+				/*
+				 * Unknown "signing" value.
+				 */
+				smb_error(dgettext(TEXT_DOMAIN,
+"invalid signing policy \"%s\" specified in the section %s"),
 				    0, p, sname);
 				return (EINVAL);
 			}

@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # lib/libsmbfs/Makefile.com
 
 LIBRARY=	libsmbfs.a
@@ -55,7 +53,8 @@ OBJECTS=\
 	spnego.o \
 	spnegoparse.o \
 	subr.o \
-	ui-sun.o
+	ui-sun.o \
+	utf_str.o
 
 include $(SRC)/lib/Makefile.lib
 

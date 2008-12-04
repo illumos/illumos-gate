@@ -32,10 +32,13 @@
  * $Id: smb_lib.h,v 1.21.82.2 2005/06/02 00:55:39 lindak Exp $
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef _NETSMB_SMB_LIB_H_
 #define	_NETSMB_SMB_LIB_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -65,47 +68,6 @@
 #define	SMB_NB_ERROR		0x20000
 
 /*
- * These get/set macros do not handle mis-aligned data.
- * The data are all supposed to be aligned, but that's
- * up to the server.  If we ever encounter a server that
- * doesn't obey this rule, a "strict alignment" client
- * (i.e. SPARC) may get an alignment trap in one of these.
- * If that ever happens, make these macros into functions
- * that can handle mis-aligned data.  (Or catch traps.)
- */
-#define	getb(buf, ofs) 		(((const uint8_t *)(buf))[ofs])
-#define	setb(buf, ofs, val)	(((uint8_t *)(buf))[ofs]) = val
-#define	getbw(buf, ofs)		((uint16_t)(getb(buf, ofs)))
-#define	getw(buf, ofs)		(*((uint16_t *)(&((uint8_t *)(buf))[ofs])))
-#define	getdw(buf, ofs)		(*((uint32_t *)(&((uint8_t *)(buf))[ofs])))
-
-#ifdef _LITTLE_ENDIAN
-
-#define	getwle(buf, ofs)	(*((uint16_t *)(&((uint8_t *)(buf))[ofs])))
-#define	getdle(buf, ofs)	(*((uint32_t *)(&((uint8_t *)(buf))[ofs])))
-#define	getwbe(buf, ofs)	(ntohs(getwle(buf, ofs)))
-#define	getdbe(buf, ofs)	(ntohl(getdle(buf, ofs)))
-
-#define	setwle(buf, ofs, val) getwle(buf, ofs) = val
-#define	setwbe(buf, ofs, val) getwle(buf, ofs) = htons(val)
-#define	setdle(buf, ofs, val) getdle(buf, ofs) = val
-#define	setdbe(buf, ofs, val) getdle(buf, ofs) = htonl(val)
-
-#else	/* _LITTLE_ENDIAN */
-
-#define	getwbe(buf, ofs) (*((uint16_t *)(&((uint8_t *)(buf))[ofs])))
-#define	getdbe(buf, ofs) (*((uint32_t *)(&((uint8_t *)(buf))[ofs])))
-#define	getwle(buf, ofs) (BSWAP_16(getwbe(buf, ofs)))
-#define	getdle(buf, ofs) (BSWAP_32(getdbe(buf, ofs)))
-
-#define	setwbe(buf, ofs, val) getwbe(buf, ofs) = val
-#define	setwle(buf, ofs, val) getwbe(buf, ofs) = BSWAP_16(val)
-#define	setdbe(buf, ofs, val) getdbe(buf, ofs) = val
-#define	setdle(buf, ofs, val) getdbe(buf, ofs) = BSWAP_32(val)
-
-#endif	/* _LITTLE_ENDIAN */
-
-/*
  * SMB work context. Used to store all values which are necessary
  * to establish connection to an SMB server.
  */
@@ -124,11 +86,6 @@ struct smb_ctx {
 	struct smbioc_oshare	ct_sh;
 	char		*ct_origshare;
 	char		*ct_home;
-#ifdef APPLE
-	/* temporary automount hack */
-	char	**ct_xxx;
-	int	ct_maxxxx;	/* max # to mount (-x arg) */
-#endif
 	void		*ct_secblob;
 	int		ct_secbloblen;
 	/* krb5 stuff: all anonymous struct pointers here. */
@@ -181,18 +138,6 @@ typedef struct smb_ctx smb_ctx_t;
 #define	SMB_ST_MAX		STYPE_UNKNOWN
 #define	SMB_ST_NONE		0xff	/* not a part of protocol */
 
-
-/*
- * request handling structures
- */
-struct mbuf {
-	int		m_len;
-	int		m_maxlen;
-	char		*m_data;
-	struct mbuf	*m_next;
-};
-typedef struct mbuf mbuf_t;
-
 struct mbdata {
 	struct mbuf	*mb_top;
 	struct mbuf	*mb_cur;
@@ -200,24 +145,6 @@ struct mbdata {
 	int		mb_count;
 };
 typedef struct mbdata mbdata_t;
-
-#define	M_ALIGNFACTOR	(sizeof (long))
-#define	M_ALIGN(len)	(((len) + M_ALIGNFACTOR - 1) & ~(M_ALIGNFACTOR - 1))
-#define	M_BASESIZE	(sizeof (struct mbuf))
-#define	M_MINSIZE	(256 - M_BASESIZE)
-#define	M_TOP(m)	((char *)(m) + M_BASESIZE)
-#define	M_TRAILINGSPACE(m) ((m)->m_maxlen - (m)->m_len)
-#define	mtod(m, t)	((t)(m)->m_data)
-
-struct smb_rq {
-	uchar_t		rq_cmd;
-	struct mbdata	rq_rq;
-	struct mbdata	rq_rp;
-	struct smb_ctx *rq_ctx;
-	int		rq_wcount;
-	int		rq_bcount;
-};
-typedef struct smb_rq smb_rq_t;
 
 struct smb_bitname {
 	uint_t	bn_bit;
@@ -231,8 +158,6 @@ extern struct rcfile *smb_rc;
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-struct sockaddr;
 
 int  smb_lib_init(void);
 int  smb_open_driver(void);
@@ -269,55 +194,20 @@ int  smb_ctx_flags2(struct smb_ctx *);
 int  smb_smb_open_print_file(struct smb_ctx *, int, int, const char *, smbfh*);
 int  smb_smb_close_print_file(struct smb_ctx *, smbfh);
 
-int  smb_read(struct smb_ctx *, smbfh, off_t, size_t, char *);
-int  smb_write(struct smb_ctx *, smbfh, off_t, size_t, const char *);
-
-#define	smb_rq_getrequest(rqp)	(&(rqp)->rq_rq)
-#define	smb_rq_getreply(rqp)	(&(rqp)->rq_rp)
-
-int  smb_rq_init(struct smb_ctx *, uchar_t, size_t, struct smb_rq **);
-void smb_rq_done(struct smb_rq *);
-void smb_rq_wend(struct smb_rq *);
-int  smb_rq_simple(struct smb_rq *);
-int  smb_rq_dmem(struct mbdata *, const char *, size_t);
-int  smb_rq_dstring(struct mbdata *, const char *);
+typedef void (*smb_ctx_close_hook_t)(struct smb_ctx *);
+void smb_ctx_set_close_hook(smb_ctx_close_hook_t);
+int  smb_fh_close(struct smb_ctx *ctx, smbfh fh);
+int  smb_fh_open(struct smb_ctx *ctx, const char *, int, smbfh *);
+int  smb_fh_read(struct smb_ctx *, smbfh, off_t, size_t, char *);
+int  smb_fh_write(struct smb_ctx *, smbfh, off_t, size_t, const char *);
+int  smb_fh_xactnp(struct smb_ctx *, smbfh, int, const char *,
+	int *, char *, int *);
 
 int  smb_t2_request(struct smb_ctx *, int, uint16_t *, const char *,
 	int, void *, int, void *, int *, void *, int *, void *, int *);
 
 void smb_simplecrypt(char *dst, const char *src);
 int  smb_simpledecrypt(char *dst, const char *src);
-
-int  m_getm(struct mbuf *, size_t, struct mbuf **);
-int  m_lineup(struct mbuf *, struct mbuf **);
-int  mb_init(struct mbdata *, size_t);
-int  mb_initm(struct mbdata *, struct mbuf *);
-int  mb_done(struct mbdata *);
-int  mb_fit(struct mbdata *mbp, size_t size, char **pp);
-int  mb_put_uint8(struct mbdata *, uint8_t);
-int  mb_put_uint16be(struct mbdata *, uint16_t);
-int  mb_put_uint16le(struct mbdata *, uint16_t);
-int  mb_put_uint32be(struct mbdata *, uint32_t);
-int  mb_put_uint32le(struct mbdata *, uint32_t);
-int  mb_put_uint64be(struct mbdata *, uint64_t);
-int  mb_put_uint64le(struct mbdata *, uint64_t);
-int  mb_put_mem(struct mbdata *, const char *, size_t);
-int  mb_put_pstring(struct mbdata *mbp, const char *s);
-int  mb_put_mbuf(struct mbdata *, struct mbuf *);
-
-int  mb_get_uint8(struct mbdata *, uint8_t *);
-int  mb_get_uint16(struct mbdata *, uint16_t *);
-int  mb_get_uint16le(struct mbdata *, uint16_t *);
-int  mb_get_uint16be(struct mbdata *, uint16_t *);
-int  mb_get_uint32(struct mbdata *, uint32_t *);
-int  mb_get_uint32be(struct mbdata *, uint32_t *);
-int  mb_get_uint32le(struct mbdata *, uint32_t *);
-int  mb_get_uint64(struct mbdata *, uint64_t *);
-int  mb_get_uint64be(struct mbdata *, uint64_t *);
-int  mb_get_uint64le(struct mbdata *, uint64_t *);
-int  mb_get_mem(struct mbdata *, char *, size_t);
-
-extern uchar_t nls_lower[256], nls_upper[256];
 
 int	nls_setrecode(const char *, const char *);
 int	nls_setlocale(const char *);

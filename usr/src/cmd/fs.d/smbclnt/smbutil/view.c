@@ -32,8 +32,6 @@
  * $Id: view.c,v 1.9 2004/12/13 00:25:39 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
@@ -132,9 +130,11 @@ reauth:
 		    gettext(shtype[sti]),
 		    ep->remark ? ep->remark : "");
 		free(ep->netname);
+		free(ep->remark);
 	}
 	printf(gettext("\n%d shares listed from %d available\n"),
 	    entries, total);
+
 	free(share_info);
 	smb_ctx_done(ctx);
 #ifdef APPLE

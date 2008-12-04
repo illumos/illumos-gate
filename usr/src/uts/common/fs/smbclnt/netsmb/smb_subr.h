@@ -40,8 +40,6 @@
 #ifndef _NETSMB_SMB_SUBR_H_
 #define	_NETSMB_SMB_SUBR_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/cmn_err.h>
 #include <sys/lock.h>
 #include <sys/note.h>
@@ -125,12 +123,12 @@ void *smb_zmalloc(unsigned long size);
 
 void smb_oldlm_hash(const char *apwd, uchar_t *hash);
 void smb_ntlmv1hash(const char *apwd, uchar_t *hash);
+void smb_ntlmv2hash(const uchar_t *v1hash, const char *user,
+	const char *destination, uchar_t *v2hash);
 
-int  smb_lmresponse(const uchar_t *hash, uchar_t *C8, uchar_t *RN);
-int  smb_ntlmresponse(const uchar_t *hash, uchar_t *C8, uchar_t *RN);
-int  smb_ntlmv2response(const uchar_t *hash, const uchar_t *user,
-	const uchar_t *destination, uchar_t *C8, const uchar_t *blob,
-	size_t bloblen, uchar_t **RN, size_t *RNlen);
+int  smb_lmresponse(const uchar_t *hash, const uchar_t *C8, uchar_t *RN);
+int  smb_ntlmv2response(const uchar_t *hash, const uchar_t *C8,
+    const uchar_t *blob, size_t bloblen, uchar_t **RN, size_t *RNlen);
 int  smb_maperror(int eclass, int eno);
 uint32_t  smb_maperr32(uint32_t eno);
 int  smb_put_dmem(struct mbchain *mbp, struct smb_vc *vcp,
@@ -145,5 +143,13 @@ int smb_cmp_sockaddr(struct sockaddr *, struct sockaddr *);
 struct sockaddr *smb_dup_sockaddr(struct sockaddr *sa);
 void smb_free_sockaddr(struct sockaddr *sa);
 int smb_toupper(const char *, char *, size_t);
+
+int smb_rq_sign(struct smb_rq *);
+int smb_rq_verify(struct smb_rq *);
+int smb_calcv2mackey(struct smb_vc *, const uchar_t *,
+	const uchar_t *, size_t);
+int smb_calcmackey(struct smb_vc *, const uchar_t *,
+	const uchar_t *, size_t);
+void smb_crypto_mech_init(void);
 
 #endif /* !_NETSMB_SMB_SUBR_H_ */

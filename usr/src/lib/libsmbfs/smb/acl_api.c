@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * ACL API for smbfs
  */
@@ -54,6 +52,7 @@
 #include <netsmb/smb_lib.h>
 #include <netsmb/smbfs_acl.h>
 #include <netsmb/smbfs_isec.h>
+#include "private.h"
 
 /* Sanity check SD sizes */
 #define	MAX_RAW_SD_SIZE	32768

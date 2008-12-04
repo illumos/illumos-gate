@@ -36,7 +36,10 @@
  */
 /* END CSTYLED */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <stdlib.h>
 #include <string.h>
@@ -47,11 +50,11 @@
 #include <netsmb/smb_lib.h>
 #include <netsmb/smb_rap.h>
 #include <netsmb/smb_netshareenum.h>
-#include "charsets.h"
+#include <smb/charsets.h>
 
 #if 0 /* XXX see below */
 #include <dce/exc_handling.h>
-#include <attrb.h>
+#include <rpc/attrb.h>
 #include "srvsvc.h"
 #endif
 
@@ -102,6 +105,7 @@ rpc_netshareenum(struct smb_ctx *ctx, int *entriesp, int *totalp,
 		return (EINVAL);
 	}
 	rpc_binding_from_string_binding(binding, &binding_h, &status);
+	rpc_string_free(&binding, (unsigned32 *)&free_status);
 	if (binding_status != rpc_s_ok) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "rpc_binding_from_string_binding failed with %d"), 0,
@@ -130,14 +134,12 @@ rpc_netshareenum(struct smb_ctx *ctx, int *entriesp, int *totalp,
 	}
 	strcpy(srvnamestr, "\\\\");
 	strcat(srvnamestr, addrstr);
-#ifdef NOTYETDEFINED
 	usrvnamestr = convert_utf8_to_leunicode(srvnamestr);
-#endif
-	usrvnamestr = srvnamestr;
 	if (usrvnamestr == NULL) {
 		smb_error(dgettext(TEXT_DOMAIN,
 		    "can't convert string for server address to Unicode"), 0);
 		rpc_binding_free(&binding_h, &free_status);
+		free(srvnamestr);
 		return (EINVAL);
 	}
 	if (!exceptions_initialized) {
@@ -200,16 +202,10 @@ rpc_netshareenum(struct smb_ctx *ctx, int *entriesp, int *totalp,
 	for (share = shares, elp = entry_list, i = 0; i < entries;
 	    i++, share++) {
 		elp->type = share->shi1_type;
-#ifdef NOTYETDEFINED
 		elp->netname = convert_unicode_to_utf8(share->shi1_share);
-#endif
-		elp->netname = share->shi1_share;
 		if (elp->netname == NULL)
 			goto fail;
-#ifdef NOTYETDEFINED
 		elp->remark = convert_unicode_to_utf8(share->shi1_remark);
-#endif
-		elp->remark = share->shi1_remark;
 		if (elp->remark == NULL)
 			goto fail;
 		elp++;
@@ -261,6 +257,46 @@ cleanup_and_return:
 }
 #endif /* XXX */
 
+/*
+ * Enumerate shares using RAP
+ */
+
+struct smb_share_info_1 {
+	char		shi1_netname[13];
+	char		shi1_pad;
+	uint16_t	shi1_type;
+	uint32_t	shi1_remark;		/* char * */
+};
+
+static int
+smb_rap_NetShareEnum(struct smb_ctx *ctx, int sLevel, void *pbBuffer,
+	int *cbBuffer, int *pcEntriesRead, int *pcTotalAvail)
+{
+	struct smb_rap *rap;
+	long lval = -1;
+	int error;
+	char *pass;
+	int i;
+
+	error = smb_rap_create(0, "WrLeh", "B13BWz", &rap);
+	if (error)
+		return (error);
+	smb_rap_setNparam(rap, sLevel);		/* W - sLevel */
+	smb_rap_setPparam(rap, pbBuffer);	/* r - pbBuffer */
+	smb_rap_setNparam(rap, *cbBuffer);	/* L - cbBuffer */
+	error = smb_rap_request(rap, ctx);
+	if (error == 0) {
+		*pcEntriesRead = rap->r_entries;
+		error = smb_rap_getNparam(rap, &lval);
+		*pcTotalAvail = lval;
+		/* Copy the data length into the IN/OUT variable. */
+		*cbBuffer = rap->r_rcvbuflen;
+	}
+	error = smb_rap_error(rap, error);
+	smb_rap_done(rap);
+	return (error);
+}
+
 static int
 rap_netshareenum(struct smb_ctx *ctx, int *entriesp, int *totalp,
     struct share_info **entries_listp)
@@ -294,10 +330,7 @@ rap_netshareenum(struct smb_ctx *ctx, int *entriesp, int *totalp,
 	    i++, ep++) {
 		elp->type = letohs(ep->shi1_type);
 		ep->shi1_pad = '\0'; /* ensure null termination */
-		elp->netname = strdup(ep->shi1_netname);
-#ifdef NOTYETDEFINED
 		elp->netname = convert_wincs_to_utf8(ep->shi1_netname);
-#endif
 		if (elp->netname == NULL)
 			continue;	/* punt on this entry */
 		/*
@@ -305,10 +338,7 @@ rap_netshareenum(struct smb_ctx *ctx, int *entriesp, int *totalp,
 		 */
 		if (ep->shi1_remark >= lbound && ep->shi1_remark < rbound) {
 			cp = (char *)rpbuf + ep->shi1_remark;
-			elp->remark = cp;
-#ifdef  NOTYETDEFINED
-			elp->remark = nls_str_toloc(cp, cp);
-#endif
+			elp->remark = convert_wincs_to_utf8(cp);
 		} else
 			elp->remark = NULL;
 		elp++;

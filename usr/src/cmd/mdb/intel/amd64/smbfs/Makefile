@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 MDBTGT		= kvm
 MODULE		= smbfs.so
 MODSRCS_DIR	= ../../../common/modules/smbfs
@@ -32,8 +30,16 @@ MODSRCS		= smbfs.c
 include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64
 include ../../Makefile.amd64
+
+# This kmod goes in /usr/kernel/kmdb
+ROOTKMOD = $(ROOT)/usr/kernel/kmdb$(MACHMODDIR)
+
 include ../../../Makefile.module
 
 CPPFLAGS	+= -I$(SRC)/uts/common/fs/smbclnt/smbfs
 CPPFLAGS	+= -I$(SRC)/uts/common
 
+# maybe not the best place for this, but
+# we need to create this directory.
+$(ROOTKMOD):
+	$(INS.dir)

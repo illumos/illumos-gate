@@ -32,8 +32,6 @@
  * $Id: nb_name.c,v 1.11 2004/12/11 05:23:59 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <ctype.h>
@@ -49,6 +47,7 @@
 #include <netsmb/smb_lib.h>
 #include <netsmb/nb_lib.h>
 #include <netsmb/mchain.h>
+#include "private.h"
 
 int
 nb_snballoc(int namelen, struct sockaddr_nb **dst)

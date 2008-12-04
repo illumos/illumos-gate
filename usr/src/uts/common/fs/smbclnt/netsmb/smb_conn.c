@@ -710,13 +710,6 @@ smb_vc_setup(struct smb_vcspec *vcspec, struct smb_cred *scred,
 	/* Just save all the SMBVOPT_ options. */
 	vcp->vc_vopt = vcspec->optflags;
 
-	/* Cleared if nego response shows antique server! */
-	vcp->vc_hflags2 |= SMB_FLAGS2_KNOWS_LONG_NAMES;
-
-	/* XXX: Odd place for this. */
-	if (vcspec->optflags & SMBVOPT_EXT_SEC)
-		vcp->vc_hflags2 |= SMB_FLAGS2_EXT_SEC;
-
 	if (is_ss) {
 		/* Called from smb_sm_ssnsetup */
 
@@ -942,6 +935,9 @@ smb_vc_free(struct smb_connobj *cp)
 		kmem_free(vcp->vc_outtok, vcp->vc_outtoklen);
 	if (vcp->vc_negtok)
 		kmem_free(vcp->vc_negtok, vcp->vc_negtoklen);
+
+	if (vcp->vc_mackey != NULL)
+		kmem_free(vcp->vc_mackey, vcp->vc_mackeylen);
 
 	cv_destroy(&vcp->iod_exit);
 	rw_destroy(&vcp->iod_rqlock);

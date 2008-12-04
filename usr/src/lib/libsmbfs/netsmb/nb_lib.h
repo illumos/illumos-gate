@@ -32,10 +32,13 @@
  * $Id: nb_lib.h,v 1.4 2004/12/11 05:23:58 lindak Exp $
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef _NETSMB_NB_LIB_H_
 #define	_NETSMB_NB_LIB_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Error codes
@@ -98,69 +101,17 @@ typedef struct nbns_nr nbns_nr_t;
 
 #define	NBNS_GROUPFLG 0x8000
 
-/*
- * nbns request
- */
-struct nbns_rq {
-	int		nr_opcode;
-	int		nr_nmflags;
-	int		nr_rcode;
-	int		nr_qdcount;
-	int		nr_ancount;
-	int		nr_nscount;
-	int		nr_arcount;
-	struct nb_name	*nr_qdname;
-	uint16_t	nr_qdtype;
-	uint16_t	nr_qdclass;
-	struct in_addr	nr_dest;	/* receiver of query */
-	struct sockaddr_in nr_sender;	/* sender of response */
-	int		nr_rpnmflags;
-	int		nr_rprcode;
-	uint16_t	nr_rpancount;
-	uint16_t	nr_rpnscount;
-	uint16_t	nr_rparcount;
-	uint16_t	nr_trnid;
-	struct nb_ctx	*nr_nbd;
-	struct mbdata	nr_rq;
-	struct mbdata	nr_rp;
-	struct nb_ifdesc *nr_if;
-	int		nr_flags;
-	int		nr_fd;
-	int		nr_maxretry;
-};
-typedef struct nbns_rq nbns_rq_t;
-
-struct nb_ifdesc {
-	int		id_flags;
-	struct in_addr	id_addr;
-	struct in_addr	id_mask;
-	char		id_name[16];	/* actually IFNAMSIZ */
-	struct nb_ifdesc *id_next;
-};
-typedef struct nb_ifdesc nb_ifdesc_t;
-
 struct sockaddr;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int nb_name_len(struct nb_name *);
-/* new flag UCflag. 1=uppercase,0=don't */
-int nb_name_encode(struct nb_name *, uchar_t *);
-int nb_encname_len(const uchar_t *);
-
-int  nb_snballoc(int namelen, struct sockaddr_nb **);
-void nb_snbfree(struct sockaddr *);
-int  nb_sockaddr(struct sockaddr *, struct nb_name *, struct sockaddr_nb **);
-
 int  nb_resolvehost_in(const char *, struct sockaddr **);
 int  nbns_resolvename(const char *, struct nb_ctx *, struct sockaddr **);
 int  nbns_getnodestatus(struct sockaddr *targethost,
     struct nb_ctx *ctx, char *system, char *workgroup);
 int  nb_getlocalname(char *name, size_t maxlen);
-int  nb_enum_if(struct nb_ifdesc **);
-
 const char *nb_strerror(int error);
 
 int  nb_ctx_create(struct nb_ctx **);

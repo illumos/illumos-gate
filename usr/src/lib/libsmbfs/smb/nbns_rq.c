@@ -32,8 +32,6 @@
  * $Id: nbns_rq.c,v 1.9 2005/02/24 02:04:38 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -56,6 +54,40 @@
 #include <netsmb/smb_lib.h>
 #include <netsmb/nb_lib.h>
 #include <netsmb/mchain.h>
+
+#include "private.h"
+
+/*
+ * nbns request
+ */
+struct nbns_rq {
+	int		nr_opcode;
+	int		nr_nmflags;
+	int		nr_rcode;
+	int		nr_qdcount;
+	int		nr_ancount;
+	int		nr_nscount;
+	int		nr_arcount;
+	struct nb_name	*nr_qdname;
+	uint16_t	nr_qdtype;
+	uint16_t	nr_qdclass;
+	struct in_addr	nr_dest;	/* receiver of query */
+	struct sockaddr_in nr_sender;	/* sender of response */
+	int		nr_rpnmflags;
+	int		nr_rprcode;
+	uint16_t	nr_rpancount;
+	uint16_t	nr_rpnscount;
+	uint16_t	nr_rparcount;
+	uint16_t	nr_trnid;
+	struct nb_ctx	*nr_nbd;
+	struct mbdata	nr_rq;
+	struct mbdata	nr_rp;
+	struct nb_ifdesc *nr_if;
+	int		nr_flags;
+	int		nr_fd;
+	int		nr_maxretry;
+};
+typedef struct nbns_rq nbns_rq_t;
 
 static int  nbns_rq_create(int opcode, struct nb_ctx *ctx,
     struct nbns_rq **rqpp);

@@ -35,8 +35,6 @@
 #ifndef _NETSMB_SMB_RAP_H_
 #define	_NETSMB_SMB_RAP_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 struct smb_rap {
 	char		*r_sparam;
 	char		*r_nparam;
@@ -54,13 +52,6 @@ struct smb_rap {
 	int		r_entries;
 };
 
-struct smb_share_info_1 {
-	char		shi1_netname[13];
-	char		shi1_pad;
-	uint16_t	shi1_type;
-	uint32_t	shi1_remark;		/* char * */
-};
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -70,9 +61,8 @@ void smb_rap_done(struct smb_rap *);
 int  smb_rap_request(struct smb_rap *, struct smb_ctx *);
 int  smb_rap_setNparam(struct smb_rap *, int);
 int  smb_rap_setPparam(struct smb_rap *, void *);
+int  smb_rap_getNparam(struct smb_rap *, long *);
 int  smb_rap_error(struct smb_rap *, int);
-
-int  smb_rap_NetShareEnum(struct smb_ctx *, int, void *, int *, int *, int *);
 
 #ifdef __cplusplus
 }

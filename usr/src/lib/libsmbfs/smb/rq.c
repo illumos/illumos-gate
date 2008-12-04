@@ -32,8 +32,6 @@
  * $Id: rq.c,v 1.4 2004/12/13 00:25:23 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -50,8 +48,7 @@
 #include <libintl.h>
 
 #include <netsmb/smb_lib.h>
-
-extern uid_t real_uid, eff_uid;
+#include "private.h"
 
 
 int
@@ -149,15 +146,12 @@ smb_rq_simple(struct smb_rq *rqp)
 	mbp = smb_rq_getreply(rqp);
 	krq.ioc_rpbufsz = mbp->mb_top->m_maxlen;
 	krq.ioc_rpbuf = mtod(mbp->mb_top, char *);
-	seteuid(eff_uid);
 	if (ioctl(rqp->rq_ctx->ct_fd, SMBIOC_REQUEST, &krq) == -1) {
-		seteuid(real_uid); /* and back to real user */
 		return (errno);
 	}
 	mbp->mb_top->m_len = krq.ioc_rwc * 2 + krq.ioc_rbc;
 	rqp->rq_wcount = krq.ioc_rwc;
 	rqp->rq_bcount = krq.ioc_rbc;
-	seteuid(real_uid); /* and back to real user */
 	return (0);
 }
 
@@ -197,9 +191,7 @@ smb_t2_request(struct smb_ctx *ctx, int setupcount, uint16_t *setup,
 	krq->ioc_rparam = rparam;
 	krq->ioc_rdata  = rdata;
 
-	seteuid(eff_uid);
 	if (ioctl(ctx->ct_fd, SMBIOC_T2RQ, krq) == -1) {
-		seteuid(real_uid); /* and back to real user */
 		return (errno);
 	}
 
@@ -207,7 +199,6 @@ smb_t2_request(struct smb_ctx *ctx, int setupcount, uint16_t *setup,
 	*rdatacnt = krq->ioc_rdatacnt;
 	*buffer_oflow = (krq->ioc_rpflags2 & SMB_FLAGS2_ERR_STATUS) &&
 	    (krq->ioc_error == NT_STATUS_BUFFER_OVERFLOW);
-	seteuid(real_uid); /* and back to real user */
 	free(krq);
 	return (0);
 }

@@ -32,7 +32,10 @@
  * $Id: mbuf.c,v 1.3 2004/12/13 00:25:22 lindak Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include <sys/types.h>
 #include <ctype.h>
@@ -47,6 +50,8 @@
 #include <netsmb/smb.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/mchain.h>
+
+#include "private.h"
 
 #ifdef APPLE
 #define	__func__ ""
@@ -190,9 +195,6 @@ out:
 /*
  * Routines to put data in a buffer
  */
-#define	MB_PUT(t)	int error; t *p; \
-		if ((error = mb_fit(mbp, sizeof (t), (char **)&p)) != 0) \
-			return (error)
 
 /*
  * Check if object of size 'size' fit to the current position and
@@ -223,61 +225,50 @@ mb_fit(struct mbdata *mbp, size_t size, char **pp)
 int
 mb_put_uint8(struct mbdata *mbp, uint8_t x)
 {
-	MB_PUT(uint8_t);
-	*p = x;
-	return (0);
+	uint8_t y = x;
+	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
 }
 
 int
 mb_put_uint16be(struct mbdata *mbp, uint16_t x)
 {
-	MB_PUT(uint16_t);
-	/* LINTED */
-	setwbe(p, 0, x);
-	return (0);
+	uint16_t y = htobes(x);
+	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
 }
 
 int
 mb_put_uint16le(struct mbdata *mbp, uint16_t x)
 {
-	MB_PUT(uint16_t);
-	/* LINTED */
-	setwle(p, 0, x);
-	return (0);
+	uint16_t y = htoles(x);
+	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
 }
 
 int
 mb_put_uint32be(struct mbdata *mbp, uint32_t x)
 {
-	MB_PUT(uint32_t);
-	/* LINTED */
-	setdbe(p, 0, x);
-	return (0);
+	uint32_t y = htobel(x);
+	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
 }
 
 int
 mb_put_uint32le(struct mbdata *mbp, uint32_t x)
 {
-	MB_PUT(uint32_t);
-	/* LINTED */
-	setdle(p, 0, x);
-	return (0);
+	uint32_t y = htolel(x);
+	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
 }
 
 int
 mb_put_uint64be(struct mbdata *mbp, uint64_t x)
 {
-	MB_PUT(uint64_t);
-	*p = htobeq(x);
-	return (0);
+	uint64_t y = htobeq(x);
+	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
 }
 
 int
 mb_put_uint64le(struct mbdata *mbp, uint64_t x)
 {
-	MB_PUT(uint64_t);
-	*p = htoleq(x);
-	return (0);
+	uint64_t y = htoleq(x);
+	return (mb_put_mem(mbp, (char *)&y, sizeof (y)));
 }
 
 int

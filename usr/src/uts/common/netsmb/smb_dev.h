@@ -40,8 +40,6 @@
 #ifndef _NETSMB_DEV_H_
 #define	_NETSMB_DEV_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file defines an internal ABI for the "nsmb" driver,
  * particularly the various data structures passed to ioctl.
@@ -137,6 +135,11 @@
 #define	SMBVOPT_EXT_SEC		0x0020	/* extended security negotiation */
 #define	SMBVOPT_USE_KEYCHAIN	0x0040	/* get p/w from keychain */
 #define	SMBVOPT_KC_DOMAIN	0x0080	/* keychain lookup uses domain */
+
+#define	SMBVOPT_SIGNING_ENABLED		0x0100	/* sign if server agrees */
+#define	SMBVOPT_SIGNING_REQUIRED	0x0200	/* signing required */
+#define	SMBVOPT_SIGNING_MASK		0x0300	/* all signing bits */
+
 /* XXX: How about a separate field for these? */
 #define	SMBVOPT_MINAUTH			0x7000	/* min. auth. level (mask) */
 #define	SMBVOPT_MINAUTH_NONE		0x0000	/* any authentication OK */
@@ -272,10 +275,12 @@ typedef struct smbioc_rq {
 	(offsetof(smbioc_rq_t, _ioc_twords))
 
 
+#define	SMBIOC_T2RQ_MAXNAME 128
+
 typedef struct smbioc_t2rq {
 	uint16_t	ioc_setup[SMB_MAXSETUPWORDS];
 	int32_t		ioc_setupcnt;
-	char		ioc_name[128];
+	char		ioc_name[SMBIOC_T2RQ_MAXNAME];
 	ushort_t	ioc_tparamcnt;
 	ushort_t	ioc_tdatacnt;
 	ushort_t	ioc_rparamcnt;

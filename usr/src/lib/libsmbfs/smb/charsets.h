@@ -34,15 +34,14 @@
  *       28-Nov-2004     Guy Harris	New today
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef __CHARSETS_H__
 #define	__CHARSETS_H__
 
 extern char *convert_wincs_to_utf8(const char *windows_string);
 extern char *convert_utf8_to_wincs(const char *utf8_string);
 extern char *convert_leunicode_to_utf8(unsigned short *windows_string);
-extern char *convert_unicode_to_utf8(unsigned short *windows_string, int len);
+extern char *convert_unicode_to_utf8(unsigned short *windows_string);
 extern unsigned short *convert_utf8_to_leunicode(const char *utf8_string);
+extern size_t unicode_strlen(const uint16_t *unicode_string);
 
 #endif /* __CHARSETS_H__ */

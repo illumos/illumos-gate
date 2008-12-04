@@ -21,23 +21,32 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUNWprivate_1.0 {
     global:
-	dropsuid;
+	convert_leunicode_to_utf8;
+	convert_unicode_to_utf8;
+	convert_utf8_to_leunicode;
+	convert_utf8_to_unicode;
+	convert_utf8_to_wincs;
+	convert_wincs_to_utf8;
+
 	nb_ctx_create;
 	nb_ctx_done;
 	nb_ctx_readrcsection;
 	nb_ctx_resolve;
 	nb_ctx_setns;
 	nb_resolvehost_in;
+	nb_strerror;
 	nbns_getnodestatus;
 	nbns_resolvename;
+
+	nls_str_toloc;
 	nls_str_upper;
+
 	rc_close;
 	rc_open;
+
 	smb_ctx_done;
 	smb_ctx_flags2;
 	smb_ctx_init;
@@ -45,21 +54,48 @@ SUNWprivate_1.0 {
 	smb_ctx_opt;
 	smb_ctx_readrc;
 	smb_ctx_resolve;
+	smb_ctx_set_close_hook;
+
+	smb_ctx_setfullserver;
+	smb_ctx_setpassword;
+	smb_ctx_setserver;
 	smb_ctx_setshare;
+	smb_ctx_setsrvaddr;
+	smb_ctx_setuser;
+	smb_ctx_setworkgroup;
+
 	smb_ctx_tdis;
-	smb_debug;
+	smb_debug	= NODIRECT;	# data
 	smb_error;
+#
+# Functions to support named pipes
+	smb_fh_close;
+	smb_fh_open;
+	smb_fh_read;
+	smb_fh_write;
+	smb_fh_xactnp;
+#
 	smb_getprogname;
 	smb_lib_init;
-	smb_netshareenum;
+	smb_netshareenum;	# will move to libnetapi
 	smb_open_rcfile;
 	smb_simplecrypt;
 	smb_simpledecrypt;
 	smb_strerror;
-	smb_rc;			# data
-	smb_read;
-	smb_write;
-	smb_verbose;
+	smb_rc		= NODIRECT;	# data
+#
+# Functions to support the Remote Access Protocol (RAP)
+	smb_rap_create;
+	smb_rap_done;
+	smb_rap_error;
+	smb_rap_getNparam;
+	smb_rap_request;
+	smb_rap_setNparam;
+	smb_rap_setPparam;
+#
+	smb_verbose	= NODIRECT;	# data
+#
+# Functions to support Access Control Lists (ACLs)
 	smbfs_acl_free_sd;
 	smbfs_acl_get;
 	smbfs_acl_getsd;
@@ -68,12 +104,14 @@ SUNWprivate_1.0 {
 	smbfs_acl_set;
 	smbfs_acl_setsd;
 	smbfs_acl_zfs2sd;
+#
 	smbfs_default_dom_usr;
 	smbfs_keychain_add;
 	smbfs_keychain_chk;
 	smbfs_keychain_del;
 	smbfs_keychain_del_everyone;
 	smbfs_keychain_del_owner;
+
 	unpercent;
     local:
 	*;

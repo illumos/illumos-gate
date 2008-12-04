@@ -165,7 +165,7 @@ static struct dev_ops nsmb_ops = {
 
 static struct modldrv nsmb_modldrv = {
 	&mod_driverops,				/* Driver module */
-	"SMBFS network driver",
+	"SMBFS network driver v" NSMB_VER_STR,
 	&nsmb_ops				/* Driver ops */
 };
 
@@ -195,6 +195,9 @@ _init(void)
 
 	/* Initialize password Key chain DB. */
 	smb_pkey_init();
+
+	/* Initialize crypto mechanisms. */
+	smb_crypto_mech_init();
 
 	zone_key_create(&nsmb_zone_key, NULL, nsmb_zone_shutdown,
 	    nsmb_zone_destroy);

@@ -533,12 +533,15 @@ static int
 smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	caller_context_t *ct)
 {
-	int		error;
-	struct vattr	va;
 	smbmntinfo_t	*smi;
 	smbnode_t	*np;
+	struct smb_cred scred;
+	struct vattr	va;
 	/* u_offset_t	off; */
 	/* offset_t	diff; */
+	offset_t	endoff;
+	ssize_t		past_eof;
+	int		error;
 
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
@@ -566,27 +569,44 @@ smbfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	    uiop->uio_loffset + uiop->uio_resid < 0)
 		return (EINVAL);
 
-	/* Shared lock for n_fid use in smbfs_readvnode */
-	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
-		return (EINTR);
-
 	/* get vnode attributes from server */
 	va.va_mask = AT_SIZE | AT_MTIME;
 	if (error = smbfsgetattr(vp, &va, cr))
-		goto out;
+		return (error);
 
-	/* should probably update mtime with mtime from server here */
+	/* Update mtime with mtime from server here? */
+
+	/* if offset is beyond EOF, read nothing */
+	if (uiop->uio_loffset >= va.va_size)
+		return (0);
 
 	/*
-	 * Darwin had a loop here that handled paging stuff.
-	 * Solaris does paging differently, so no loop needed.
+	 * Limit the read to the remaining file size.
+	 * Do this by temporarily reducing uio_resid
+	 * by the amount the lies beyoned the EOF.
 	 */
-	error = smbfs_readvnode(vp, uiop, cr, &va);
+	endoff = uiop->uio_loffset + uiop->uio_resid;
+	if (endoff > va.va_size) {
+		past_eof = (ssize_t)(endoff - va.va_size);
+		uiop->uio_resid -= past_eof;
+	} else
+		past_eof = 0;
 
-out:
+	/* Shared lock for n_fid use in smb_rwuio */
+	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
+		return (EINTR);
+	smb_credinit(&scred, curproc, cr);
+
+	error = smb_rwuio(smi->smi_share, np->n_fid, UIO_READ, uiop,
+	    &scred, smb_timo_read);
+
+	smb_credrele(&scred);
 	smbfs_rw_exit(&np->r_lkserlock);
-	return (error);
 
+	/* undo adjustment of resid */
+	uiop->uio_resid += past_eof;
+
+	return (error);
 }
 
 
@@ -595,10 +615,13 @@ static int
 smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	caller_context_t *ct)
 {
-	int		error;
 	smbmntinfo_t 	*smi;
 	smbnode_t 	*np;
-	int		timo = SMBWRTTIMO;
+	struct smb_cred scred;
+	struct vattr	va;
+	offset_t	endoff, limit;
+	ssize_t		past_limit;
+	int		error, timo;
 
 	np = VTOSMB(vp);
 	smi = VTOSMI(vp);
@@ -617,20 +640,86 @@ smbfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	if (uiop->uio_resid == 0)
 		return (0);
 
-	/* Shared lock for n_fid use in smbfs_writevnode */
-	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
-		return (EINTR);
-
+	/*
+	 * Handle ioflag bits: (FAPPEND|FSYNC|FDSYNC)
+	 */
+	if (ioflag & (FAPPEND | FSYNC)) {
+		if (np->n_flag & NMODIFIED) {
+			smbfs_attr_cacheremove(np);
+			/* XXX: smbfs_vinvalbuf? */
+		}
+	}
+	if (ioflag & FAPPEND) {
+		/*
+		 * File size can be changed by another client
+		 */
+		va.va_mask = AT_SIZE;
+		if (error = smbfsgetattr(vp, &va, cr))
+			return (error);
+		uiop->uio_loffset = va.va_size;
+	}
 
 	/*
-	 * Darwin had a loop here that handled paging stuff.
-	 * Solaris does paging differently, so no loop needed.
+	 * Like NFS3, just check for 63-bit overflow.
 	 */
-	error = smbfs_writevnode(vp, uiop, cr, ioflag, timo);
+	endoff = uiop->uio_loffset + uiop->uio_resid;
+	if (uiop->uio_loffset < 0 || endoff < 0)
+		return (EINVAL);
 
+	/*
+	 * Check to make sure that the process will not exceed
+	 * its limit on file size.  It is okay to write up to
+	 * the limit, but not beyond.  Thus, the write which
+	 * reaches the limit will be short and the next write
+	 * will return an error.
+	 *
+	 * So if we're starting at or beyond the limit, EFBIG.
+	 * Otherwise, temporarily reduce resid to the amount
+	 * the falls after the limit.
+	 */
+	limit = uiop->uio_llimit;
+	if (limit == RLIM64_INFINITY || limit > MAXOFFSET_T)
+		limit = MAXOFFSET_T;
+	if (uiop->uio_loffset >= limit)
+		return (EFBIG);
+	if (endoff > limit) {
+		past_limit = (ssize_t)(endoff - limit);
+		uiop->uio_resid -= past_limit;
+	} else
+		past_limit = 0;
+
+	/* Timeout: longer for append. */
+	timo = smb_timo_write;
+	if (endoff > np->n_size)
+		timo = smb_timo_append;
+
+	/* Shared lock for n_fid use in smb_rwuio */
+	if (smbfs_rw_enter_sig(&np->r_lkserlock, RW_READER, SMBINTR(vp)))
+		return (EINTR);
+	smb_credinit(&scred, curproc, cr);
+
+	error = smb_rwuio(smi->smi_share, np->n_fid, UIO_WRITE, uiop,
+	    &scred, timo);
+
+	if (error == 0) {
+		mutex_enter(&np->r_statelock);
+		np->n_flag |= (NFLUSHWIRE | NATTRCHANGED);
+		if (uiop->uio_loffset > (offset_t)np->n_size)
+			np->n_size = (len_t)uiop->uio_loffset;
+		mutex_exit(&np->r_statelock);
+		if (ioflag & (FSYNC|FDSYNC)) {
+			/* Don't error the I/O if this fails. */
+			(void) smbfs_smb_flush(np, &scred);
+		}
+	}
+
+	smb_credrele(&scred);
 	smbfs_rw_exit(&np->r_lkserlock);
-	return (error);
 
+	/* undo adjustment of resid */
+	uiop->uio_resid += past_limit;
+
+	return (error);
 }
 
 

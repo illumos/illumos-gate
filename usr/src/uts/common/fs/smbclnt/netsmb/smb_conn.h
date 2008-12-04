@@ -40,8 +40,6 @@
 #ifndef _SMB_CONN_H
 #define	_SMB_CONN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/t_lock.h>
 #include <sys/queue.h> /* for SLIST below */
 #include <sys/uio.h>
@@ -69,16 +67,19 @@ typedef struct smb_cred {
  * Many of these were duplicates of SMBVOPT_ flags
  * and we now keep those too instead of merging
  * them into vc_flags.
+ *
+ * Careful here: In smb_smb_negotiate, we clear ALL OF
+ * vc_flags except: SMBV_GONE, SMBV_RECONNECTING
  */
 
+#define	SMBV_RECONNECTING	0x0002	/* conn in process of reconnection */
 #define	SMBV_LONGNAMES		0x0004	/* conn configured to use long names */
 #define	SMBV_ENCRYPT		0x0008	/* server demands encrypted password */
 #define	SMBV_WIN95		0x0010	/* used to apply bugfixes for this OS */
 #define	SMBV_NT4		0x0020	/* used when NT4 issues invalid resp */
-#define	SMBV_RECONNECTING	0x0040	/* conn in process of reconnection */
-/*				0x0200	   unused - was SMBV_FAILED */
-#define	SMBV_UNICODE		0x0400	/* conn configured to use Unicode */
-#define	SMBV_EXT_SEC		0x0800	/* conn to use extended security */
+#define	SMBV_UNICODE		0x0040	/* conn configured to use Unicode */
+#define	SMBV_EXT_SEC		0x0080	/* conn to use extended security */
+#define	SMBV_WILL_SIGN		0x0100	/* negotiated signing */
 
 /*
  * Note: the common "obj" level uses this GONE flag by
@@ -245,7 +246,10 @@ typedef struct smb_vc {
 	char		*vc_pass;	/* password for usl case */
 	uchar_t		vc_lmhash[SMB_PWH_MAX];
 	uchar_t		vc_nthash[SMB_PWH_MAX];
-
+	uint8_t		*vc_mackey;	/* MAC key */
+	int		vc_mackeylen;	/* length of MAC key */
+	uint32_t	vc_seqno;	/* my next sequence number - */
+					/* - serialized by iod_rqlock */
 	uint_t		vc_timo;	/* default request timeout */
 	int		vc_maxvcs;	/* maximum number of VC per conn */
 
@@ -266,7 +270,7 @@ typedef struct smb_vc {
 	struct smb_tran_desc *vc_tdesc;
 	int		vc_chlen;	/* actual challenge length */
 	uchar_t 	vc_challenge[SMB_MAXCHALLENGELEN];
-	uint16_t		vc_mid;		/* multiplex id */
+	uint16_t	vc_mid;		/* multiplex id */
 	int		vc_vopt;	/* local options SMBVOPT_ */
 	struct smb_sopt	vc_sopt;	/* server options */
 	struct smb_cred	vc_scred;	/* used in reconnect procedure */

@@ -31,12 +31,11 @@
  *
  * $Id: smb_rq.c,v 1.29 2005/02/11 01:44:17 lindak Exp $
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -48,11 +47,7 @@
 #include <sys/cmn_err.h>
 #include <sys/sdt.h>
 
-#ifdef APPLE
-#include <sys/smb_apple.h>
-#else
 #include <netsmb/smb_osdep.h>
-#endif
 
 #include <netsmb/smb.h>
 #include <netsmb/smb_conn.h>
@@ -139,11 +134,10 @@ smb_rq_new(struct smb_rq *rqp, uchar_t cmd)
 	mb_put_mem(mbp, SMB_SIGNATURE, SMB_SIGLEN, MB_MSYSTEM);
 	mb_put_uint8(mbp, cmd);
 	mb_put_uint32le(mbp, 0);
-	mb_put_uint8(mbp, vcp->vc_hflags);
-	if (cmd == SMB_COM_TRANSACTION || cmd == SMB_COM_TRANSACTION_SECONDARY)
-		mb_put_uint16le(mbp, (vcp->vc_hflags2 & ~SMB_FLAGS2_UNICODE));
-	else
-		mb_put_uint16le(mbp, vcp->vc_hflags2);
+	rqp->sr_rqflags = vcp->vc_hflags;
+	mb_put_uint8(mbp, rqp->sr_rqflags);
+	rqp->sr_rqflags2 = vcp->vc_hflags2;
+	mb_put_uint16le(mbp, rqp->sr_rqflags2);
 	mb_put_mem(mbp, tzero, 12, MB_MSYSTEM);
 	ptr = mb_reserve(mbp, sizeof (u_int16_t));
 	/*LINTED*/
@@ -449,6 +443,20 @@ smb_rq_reply(struct smb_rq *rqp)
 	error = smb_iod_waitrq(rqp);
 	if (error)
 		return (error);
+
+	/*
+	 * If the request was signed, validate the
+	 * signature on the response.
+	 */
+	if (rqp->sr_rqflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) {
+		error = smb_rq_verify(rqp);
+		if (error)
+			return (error);
+	}
+
+	/*
+	 * Parse the SMB header
+	 */
 	error = md_get_uint32(mdp, &tdw);
 	if (error)
 		return (error);
@@ -603,13 +611,8 @@ smb_t2_done(struct smb_t2rq *t2p)
 	md_done(&t2p->t2_rdata);
 	mutex_destroy(&t2p->t2_lock);
 	cv_destroy(&t2p->t2_cond);
-#ifdef NOTYETRESOLVED
 	if (t2p->t2_flags & SMBT2_ALLOCED)
 		kmem_free(t2p, sizeof (*t2p));
-#endif
-	if (t2p) {
-		kmem_free(t2p, sizeof (*t2p));
-	}
 }
 
 u_int32_t
@@ -920,7 +923,7 @@ smb_t2_request_int(struct smb_t2rq *t2p)
 	mblk_t *m;
 	struct smb_rq *rqp;
 	int totpcount, leftpcount, totdcount, leftdcount, len, txmax, i;
-	int error, doff, poff, txdcount, txpcount, nmlen;
+	int error, doff, poff, txdcount, txpcount, nmlen, nmsize;
 
 	m = t2p->t2_tparam.mb_top;
 	if (m) {
@@ -941,7 +944,7 @@ smb_t2_request_int(struct smb_t2rq *t2p)
 	leftdcount = totdcount;
 	leftpcount = totpcount;
 	txmax = vcp->vc_txmax;
-	error = smb_rq_alloc(t2p->t2_source, t2p->t_name[0] ?
+	error = smb_rq_alloc(t2p->t2_source, t2p->t_name ?
 	    SMB_COM_TRANSACTION : SMB_COM_TRANSACTION2, scred, &rqp);
 	if (error)
 		return (error);
@@ -962,12 +965,21 @@ smb_t2_request_int(struct smb_t2rq *t2p)
 	len = mb_fixhdr(mbp);
 
 	/*
-	 * now we have known packet size as
-	 * ALIGN4(len + 5 * 2 + setupcount * 2 + 2 + strlen(name) + 1),
-	 * and need to decide which parts should go into the first request
+	 * Now we know the size of the trans overhead stuff:
+	 * ALIGN4(len + 5 * 2 + setupcount * 2 + 2 + nmsize),
+	 * where nmsize is the OTW size of the name, including
+	 * the unicode null terminator and any alignment.
+	 * Use this to decide which parts (and how much)
+	 * can go into this request: params, data
 	 */
-	nmlen = t2p->t_name ? strlen(t2p->t_name) : 0;
-	len = ALIGN4(len + 5 * 2 + t2p->t2_setupcount * 2 + 2 + nmlen + 1);
+	nmlen = t2p->t_name ? t2p->t_name_len : 0;
+	nmsize = nmlen + 1; /* null term. */
+	if (SMB_UNICODE_STRINGS(vcp)) {
+		nmsize *= 2;
+		/* we know put_dmem will need to align */
+		nmsize += 1;
+	}
+	len = ALIGN4(len + 5 * 2 + t2p->t2_setupcount * 2 + 2 + nmsize);
 	if (len + leftpcount > txmax) {
 		txpcount = min(leftpcount, txmax - len);
 		poff = len;
@@ -998,10 +1010,14 @@ smb_t2_request_int(struct smb_t2rq *t2p)
 	}
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
-	/* TDUNICODE */
-	if (t2p->t_name)
-		mb_put_mem(mbp, t2p->t_name, nmlen, MB_MSYSTEM);
-	mb_put_uint8(mbp, 0);	/* terminating zero */
+	if (t2p->t_name) {
+		/* Put the string and terminating null. */
+		smb_put_dmem(mbp, vcp, t2p->t_name, nmlen + 1,
+		    SMB_CS_NONE, NULL);
+	} else {
+		/* nmsize accounts for padding, char size. */
+		mb_put_mem(mbp, NULL, nmsize, MB_MZERO);
+	}
 	len = mb_fixhdr(mbp);
 	if (txpcount) {
 		mb_put_mem(mbp, NULL, ALIGN4(len) - len, MB_MZERO);

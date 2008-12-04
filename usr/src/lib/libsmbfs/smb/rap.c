@@ -34,8 +34,6 @@
  * This is very simple implementation of RAP protocol.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
@@ -52,6 +50,7 @@
 #include <netsmb/mchain.h>
 #include <netsmb/smb_lib.h>
 #include <netsmb/smb_rap.h>
+#include "private.h"
 
 static int
 smb_rap_parserqparam(const char *s, char **next, int *rlen)
@@ -166,23 +165,28 @@ smb_rap_rqparam_z(struct smb_rap *rap, const char *value)
 static int
 smb_rap_rqparam(struct smb_rap *rap, char ptype, char plen, int value)
 {
-	char *p = rap->r_npbuf;
 	int len = 0;
 	uint_t uv = (uint_t)value;
+	uint32_t *lp;
+	uint16_t *sp;
+	char *p;
 
 	switch (ptype) {
 	case 'L':
 	case 'W':
 		/* LINTED */
-		setwle(p, 0, uv);
-		len = 2;
+		sp = (uint16_t *)rap->r_npbuf;
+		*sp = htoles(uv);
+		len = sizeof (*sp);
 		break;
 	case 'D':
 		/* LINTED */
-		setdle(p, 0, uv);
-		len = 4;
+		lp = (uint32_t *)rap->r_npbuf;
+		*lp = htolel(uv);
+		len = sizeof (*lp);
 		break;
 	case 'b':
+		p = rap->r_npbuf;
 		memset(p, uv, plen);
 		len = plen;
 	default:
@@ -293,7 +297,7 @@ smb_rap_setPparam(struct smb_rap *rap, void *value)
 	return (0);
 }
 
-static int
+int
 smb_rap_getNparam(struct smb_rap *rap, long *value)
 {
 	char *p = rap->r_nparam;
@@ -435,34 +439,4 @@ smb_rap_error(struct smb_rap *rap, int error)
 	if (rap->r_result == 0)
 		return (0);
 	return (rap->r_result | SMB_RAP_ERROR);
-}
-
-/* todo: move this function to libnetapi */
-int
-smb_rap_NetShareEnum(struct smb_ctx *ctx, int sLevel, void *pbBuffer,
-	int *cbBuffer, int *pcEntriesRead, int *pcTotalAvail)
-{
-	struct smb_rap *rap;
-	long lval = -1;
-	int error;
-	char *pass;
-	int i;
-
-	error = smb_rap_create(0, "WrLeh", "B13BWz", &rap);
-	if (error)
-		return (error);
-	smb_rap_setNparam(rap, sLevel);		/* W - sLevel */
-	smb_rap_setPparam(rap, pbBuffer);	/* r - pbBuffer */
-	smb_rap_setNparam(rap, *cbBuffer);	/* L - cbBuffer */
-	error = smb_rap_request(rap, ctx);
-	if (error == 0) {
-		*pcEntriesRead = rap->r_entries;
-		error = smb_rap_getNparam(rap, &lval);
-		*pcTotalAvail = lval;
-		/* Copy the data length into the IN/OUT variable. */
-		*cbBuffer = rap->r_rcvbuflen;
-	}
-	error = smb_rap_error(rap, error);
-	smb_rap_done(rap);
-	return (error);
 }

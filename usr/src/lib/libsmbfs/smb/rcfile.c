@@ -32,8 +32,6 @@
  * $Id: rcfile.c,v 1.1.1.2 2001/07/06 22:38:43 conrad Exp $
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/queue.h>
@@ -51,6 +49,7 @@
 
 #include <cflib.h>
 #include "rcfile_priv.h"
+extern int smb_debug;
 
 SLIST_HEAD(rcfile_head, rcfile);
 static struct rcfile_head pf_head = {NULL};
@@ -312,15 +311,19 @@ set_value(struct rcfile *rcp, struct rcsection *rsp, struct rckey *rkp,
 		new = eval_minauth(ptr);
 		if (new >= now) {
 #ifdef DEBUG
-		printf("set_value: rejecting %s=%s from %s\n",
-		    rkp->rk_name, ptr, home_nsmbrc ? "user file" : "SMF");
+			if (smb_debug)
+				printf(
+				    "set_value: rejecting %s=%s from %s\n",
+				    rkp->rk_name, ptr, home_nsmbrc ?
+				    "user file" : "SMF");
 #endif
 			return;
 		}
 	}
 #ifdef DEBUG
-	printf("set_value: applying %s=%s from %s\n",
-	    rkp->rk_name, ptr, home_nsmbrc ? "user file" : "SMF");
+	if (smb_debug)
+		printf("set_value: applying %s=%s from %s\n",
+		    rkp->rk_name, ptr, home_nsmbrc ? "user file" : "SMF");
 #endif
 	rkp->rk_value = strdup(ptr);
 }
@@ -393,7 +396,8 @@ rc_parse(struct rcfile *rcp)
 			if (home_nsmbrc &&
 			    (strcmp(buf, "nbns") == 0 ||
 			    strcmp(buf, "nbns_enable") == 0 ||
-			    strcmp(buf, "nbns_broadcast") == 0)) {
+			    strcmp(buf, "nbns_broadcast") == 0 ||
+			    strcmp(buf, "signing") == 0)) {
 				fprintf(stderr, dgettext(TEXT_DOMAIN,
 				    "option %s may not be set "
 				    "in user .nsmbrc file\n"), buf);

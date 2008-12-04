@@ -285,7 +285,7 @@ smb_iod_disconnect(struct smb_vc *vcp)
  * Send one request.
  *
  * Called by _addrq (for internal requests)
- * and by _sendall (via _addrq, _waitrq)
+ * and _sendall (via _addrq, _multirq, _waitrq)
  */
 static int
 smb_iod_sendrq(struct smb_rq *rqp)
@@ -322,7 +322,6 @@ smb_iod_sendrq(struct smb_rq *rqp)
 	}
 
 	if (rqp->sr_sendcnt == 0) {
-
 		*rqp->sr_rquid = htoles(vcp->vc_smbuid);
 
 		/*
@@ -362,6 +361,14 @@ smb_iod_sendrq(struct smb_rq *rqp)
 			*rqp->sr_rqtid =
 			    htoles(ssp ? ssp->ss_tid : SMB_TID_UNKNOWN);
 		mb_fixhdr(&rqp->sr_rq);
+
+		/*
+		 * Sign the message now that we're finally done
+		 * filling in the SMB header fields, etc.
+		 */
+		if (rqp->sr_rqflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) {
+			smb_rq_sign(rqp);
+		}
 	}
 	if (rqp->sr_sendcnt++ >= 60/SMBSBTIMO) { /* one minute */
 		smb_iod_rqprocessed(rqp, rqp->sr_lerror, SMBR_RESTART);
@@ -716,6 +723,16 @@ smb_iod_addrq(struct smb_rq *rqp)
 		 * Note lock order: iod_rqlist, vc_sendlock
 		 */
 		rw_enter(&vcp->iod_rqlock, RW_WRITER);
+		if (rqp->sr_rqflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) {
+			/*
+			 * We're signing requests and verifying
+			 * signatures on responses.  Set the
+			 * sequence numbers of the request and
+			 * response here, used in smb_rq_verify.
+			 */
+			rqp->sr_seqno = vcp->vc_seqno++;
+			rqp->sr_rseqno = vcp->vc_seqno++;
+		}
 		TAILQ_INSERT_HEAD(&vcp->iod_rqlist, rqp, sr_link);
 		rw_downgrade(&vcp->iod_rqlock);
 
@@ -758,6 +775,16 @@ smb_iod_addrq(struct smb_rq *rqp)
 
 	rw_enter(&vcp->iod_rqlock, RW_WRITER);
 
+	if (rqp->sr_rqflags2 & SMB_FLAGS2_SECURITY_SIGNATURE) {
+		/*
+		 * We're signing requests and verifying
+		 * signatures on responses.  Set the
+		 * sequence numbers of the request and
+		 * response here, used in smb_rq_verify.
+		 */
+		rqp->sr_seqno = vcp->vc_seqno++;
+		rqp->sr_rseqno = vcp->vc_seqno++;
+	}
 	TAILQ_INSERT_TAIL(&vcp->iod_rqlist, rqp, sr_link);
 
 	/* iod_rqlock/WRITER protects iod_newrq */
