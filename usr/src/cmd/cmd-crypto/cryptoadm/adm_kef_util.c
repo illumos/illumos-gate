@@ -918,6 +918,7 @@ update_kcfconf(entry_t *pent, int update_mode)
 {
 	boolean_t	add_it = B_FALSE;
 	boolean_t	delete_it = B_FALSE;
+	boolean_t	this_entry_matches = B_FALSE;
 	boolean_t	found_entry = B_FALSE;
 	FILE		*pfile = NULL;
 	FILE		*pfile_tmp = NULL;
@@ -1010,7 +1011,7 @@ update_kcfconf(entry_t *pent, int update_mode)
 			}
 
 		} else { /* modify or delete */
-			found_entry = B_FALSE;
+			this_entry_matches = B_FALSE;
 
 			if (!(buffer[0] == '#' || buffer[0] == ' ' ||
 			    buffer[0] == '\n'|| buffer[0] == '\t')) {
@@ -1029,21 +1030,23 @@ update_kcfconf(entry_t *pent, int update_mode)
 				}
 
 				if (strcmp(pent->name, name) == 0) {
+					this_entry_matches = B_TRUE;
 					found_entry = B_TRUE;
 				}
 			}
 
-			if (found_entry && !delete_it) {
-				/*
-				 * This is the entry to be updated; get the
-				 * updated string and place into buffer.
-				 */
-				(void) strlcpy(buffer, new_str, BUFSIZ);
-				free(new_str);
-			}
 
-			if (!(found_entry && delete_it)) {
-				/* This is the entry to be updated/reserved */
+			if (!this_entry_matches || !delete_it) {
+				/* write this entry */
+				if (this_entry_matches) {
+					/*
+					 * Modify this entry: get the
+					 * updated string and place into buffer.
+					 */
+					(void) strlcpy(buffer, new_str, BUFSIZ);
+					free(new_str);
+				}
+				/* write the (unchanged or modified) entry */
 				if (fputs(buffer, pfile_tmp) == EOF) {
 					err = errno;
 					cryptoerror(LOG_STDERR, gettext(
