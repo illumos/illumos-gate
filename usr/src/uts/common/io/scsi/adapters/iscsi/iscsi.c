@@ -787,7 +787,8 @@ iscsi_tran_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
 	 * streams buffers. Make sure that the buffer is mapped in
 	 * so that the copy won't panic the system.
 	 */
-	if (bp && bp_mapin_common(bp, (callback == NULL_FUNC) ?
+	if (bp && (bp->b_bcount != 0) &&
+	    bp_mapin_common(bp, (callback == NULL_FUNC) ?
 	    VM_NOSLEEP : VM_SLEEP) == NULL) {
 		return (NULL);
 	}
