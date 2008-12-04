@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * poolstat - report active pool statistics
@@ -206,22 +203,25 @@ main(int argc, char *argv[])
 
 	pset_lf.plf_ffs = pset_ffs;
 	pset_lf.plf_ff_len = sizeof (pset_ffs) /
-		sizeof (poolstat_field_format_t);
+	    sizeof (poolstat_field_format_t);
 	pool_lf.plf_ffs = pool_ffs;
 	pool_lf.plf_ff_len = sizeof (pool_ffs) /
-		sizeof (poolstat_field_format_t);
+	    sizeof (poolstat_field_format_t);
+
+	/* Don't let buffering interfere with piped output. */
+	(void) setvbuf(stdout, NULL, _IOLBF, 0);
 
 	while ((c = getopt(argc, argv, ":p:r:o:")) != EOF) {
 		switch (c) {
 		case 'p':	/* pool name specification	*/
 			pflag++;
 			pnames = create_args_list(optarg, pnames,
-				" \t");
+			    " \t");
 			break;
 		case 'r': {	/* resource type 		*/
 			rflag++;
 			rtypes = create_args_list(optarg, rtypes,
-				" \t,");
+			    " \t,");
 			break;
 			}
 		case 'o': { 	/* format specification		*/
@@ -232,7 +232,7 @@ main(int argc, char *argv[])
 			}
 		case ':': {
 			(void) fprintf(stderr,
-				gettext(ERR_OPTION_ARGS), optopt);
+			    gettext(ERR_OPTION_ARGS), optopt);
 			usage();
 			/*NOTREACHED*/
 			}
@@ -277,7 +277,7 @@ main(int argc, char *argv[])
 	if ((conf = pool_conf_alloc()) == NULL)
 		die(gettext(ERR_NOMEM));
 	if (pool_conf_open(conf, pool_dynamic_location(), PO_RDONLY)
-			!= PO_SUCCESS)
+	    != PO_SUCCESS)
 		die(gettext(ERR_OPEN_DYNAMIC), get_errstr());
 
 	/* initialize statistic adapters	*/
@@ -353,7 +353,7 @@ create_prt_sequence_list(char *arg, poolstat_line_format_t *lf)
 		lf->plf_last->ple_obj = &(lf->plf_ffs[0]);
 		for (i = 1; i < lf->plf_ff_len; i++) {
 			lf->plf_ffs[i].pff_prt |=
-				PRINTABLE(i) ? PABLE_FIELD : 0;
+			    PRINTABLE(i) ? PABLE_FIELD : 0;
 			NEW0(lf->plf_last->ple_next);
 			lf->plf_last = lf->plf_last->ple_next;
 			lf->plf_last->ple_obj = &(lf->plf_ffs[i]);
@@ -388,16 +388,16 @@ create_prt_sequence_list(char *arg, poolstat_line_format_t *lf)
 		/* if the name wasn't found	*/
 		if (ffIdx == lf->plf_ff_len) {
 			(void) fprintf(stderr, gettext(ERR_UNSUPP_STAT_FIELD),
-				name);
+			    name);
 			usage();
 		}
 		if (lf->plf_last == NULL) {
-		    /* create first print handle */
-		    NEW0(lf->plf_prt_seq);
-		    lf->plf_last = lf->plf_prt_seq;
+			/* create first print handle */
+			NEW0(lf->plf_prt_seq);
+			lf->plf_last = lf->plf_prt_seq;
 		} else {
-		    NEW0(lf->plf_last->ple_next);
-		    lf->plf_last = lf->plf_last->ple_next;
+			NEW0(lf->plf_last->ple_next);
+			lf->plf_last = lf->plf_last->ple_next;
 		}
 		lf->plf_last->ple_obj = ff; 	/* refer to the format field */
 	}
@@ -450,7 +450,7 @@ default_f(char *str, int pos, int left, poolstat_field_format_t *ff, char *data)
 			if (pw < 0)
 				pw = 0;
 			used = snprintf(str + pos, left, "%*.*f",
-				ff->pff_width, pw, v);
+			    ff->pff_width, pw, v);
 		};
 		break;
 	case STR: {
@@ -557,10 +557,10 @@ bigno_f(char *str, int pos, int left, poolstat_field_format_t *ff, char *data)
 		pw = 0;
 	if (v < 1000)
 		used = snprintf(str + pos, left, "%*.*f",
-			ff->pff_width, pw, pv);
+		    ff->pff_width, pw, pv);
 	else
 		used = snprintf(str + pos, left, "%*.*f%c",
-			ff->pff_width - 1, pw, pv, tag);
+		    ff->pff_width - 1, pw, pv, tag);
 
 	return (used);
 }
@@ -578,14 +578,14 @@ used_stat_f(char *str, int pos, int left, poolstat_field_format_t *ff,
 		used = snprintf(str + pos, left, "%*c", ff->pff_width, '-');
 	} else {
 		if (v < 10) {
-		    pw = ff->pff_width - 2;
+			pw = ff->pff_width - 2;
 		} else if (v < 100) {
-		    pw = ff->pff_width - 3;
+			pw = ff->pff_width - 3;
 		} else if (v < 1000) {
-		    pw = ff->pff_width - 4;
+			pw = ff->pff_width - 4;
 		}
 		if (pw < 0)
-		    pw = 0;
+			pw = 0;
 		used = snprintf(str + pos, left, "%*.*f",
 		    ff->pff_width, pw, v);
 	}
@@ -604,10 +604,10 @@ header_f(char *str, int pos, int left, poolstat_field_format_t *ff, char *data)
 	if (ff->pff_type == STR)
 		/* strings are left justified	*/
 		used = snprintf(str + pos, left, "%-*s",
-			ff->pff_width, ff->pff_header);
+		    ff->pff_width, ff->pff_header);
 	else
 		used = snprintf(str + pos, left, "%*s",
-			ff->pff_width, ff->pff_header);
+		    ff->pff_width, ff->pff_header);
 	return (used);
 }
 
@@ -627,7 +627,7 @@ prt_stat_line(poolstat_line_format_t *lf)
 	for (le = lf->plf_prt_seq; le; le = le->ple_next) {
 		int used;
 		poolstat_field_format_t *ff =
-			(poolstat_field_format_t *)le->ple_obj;
+		    (poolstat_field_format_t *)le->ple_obj;
 		/* if the filed is marked to be printed	*/
 		if (ff->pff_prt & PABLE_FIELD) {
 			if (((used = ff->pff_format(line, pos, left, ff,
@@ -680,7 +680,7 @@ prt_stat_hd(const char *type)
 	for (le = lf->plf_prt_seq; le; le = le->ple_next) {
 		int used;	/* used chars in line	*/
 		poolstat_field_format_t *ff =
-			(poolstat_field_format_t *)le->ple_obj;
+		    (poolstat_field_format_t *)le->ple_obj;
 		/* if the filed is marked to be printed	*/
 		if (ff->pff_prt& PABLE_FIELD) {
 			if (((used = header_f(line, pos, left, ff, NULL)) + 1)
@@ -707,9 +707,9 @@ prt_stat_hd(const char *type)
 	pos = 0;
 	while (*(line + pos) != '\n') {
 		if (!isspace(*(line + pos))) {
-		    (void) printf("%s\n", line);
+			(void) printf("%s\n", line);
 
-		    break;
+			break;
 		}
 		pos++;
 	}
@@ -770,12 +770,12 @@ get_resources(const char *pool_name, const char *rtype, uint_t *nelem)
 		if ((pool = pool_get_pool(conf, pool_name)) == NULL)
 			die(gettext(ERR_STATS_POOL_N), pool_name);
 		if ((resources = pool_query_pool_resources(
-					conf, pool, nelem, pvals)) == NULL)
+		    conf, pool, nelem, pvals)) == NULL)
 			goto on_error;
 	} else {
 		/* collect all resources  */
 		if ((resources =
-			pool_query_resources(conf, nelem, pvals)) == NULL)
+		    pool_query_resources(conf, nelem, pvals)) == NULL)
 			goto on_error;
 	}
 
@@ -914,7 +914,7 @@ prt_pool_stats(poolstat_list_element_t *pn)
 			i++;
 		pools = ZALLOC(sizeof (pool_t *) * (i + 1));
 		for (poolid = pn, i = 0; poolid;
-			poolid = poolid->ple_next, i++) {
+		    poolid = poolid->ple_next, i++) {
 			pool_t **pool;
 			int64_t sysid = Atoi(poolid->ple_obj, &error);
 			if (error == 0) {
@@ -945,22 +945,22 @@ prt_pool_stats(poolstat_list_element_t *pn)
 		for (i = 0; pools[i] != NULL; i++) {
 			elem = pool_to_elem(conf, pools[i]);
 			if (pool_get_property(conf, elem, POOL_NAME, pv_name)
-				== -1)
+			    == -1)
 				goto on_error;
 			if (pool_value_get_string(pv_name, &sbag->sb_name) != 0)
 				goto on_error;
 			if (pool_get_property(
-				conf, elem, "pool.sys_id", pv_sys_id) == -1)
+			    conf, elem, "pool.sys_id", pv_sys_id) == -1)
 				goto on_error;
 			if (pool_value_get_int64(
-				pv_sys_id, &sbag->sb_sysid) != 0)
+			    pv_sys_id, &sbag->sb_sysid) != 0)
 				goto on_error;
 
 			for (rtype = rtypes; rtype; rtype = rtype->ple_next) {
 				resources = get_resources(
-					sbag->sb_name, rtype->ple_obj, &nelem);
+				    sbag->sb_name, rtype->ple_obj, &nelem);
 				update_resource_stats(*resources,
-					rtype->ple_obj);
+				    rtype->ple_obj);
 				FREE(resources);
 			}
 			prt_stat_line(&pool_lf);
@@ -972,20 +972,19 @@ prt_pool_stats(poolstat_list_element_t *pn)
 			for (i = 0; pools[i] != NULL; i++) {
 				elem = pool_to_elem(conf, pools[i]);
 				if (pool_get_property(
-					conf, elem, POOL_NAME, pv_name) == -1)
+				    conf, elem, POOL_NAME, pv_name) == -1)
 					goto on_error;
 				if (pool_value_get_string(
-					pv_name, &sbag->sb_name) != 0)
+				    pv_name, &sbag->sb_name) != 0)
 					goto on_error;
 				if (pool_get_property(
-					conf, elem, POOL_SYSID, pv_sys_id)
-					== -1)
+				    conf, elem, POOL_SYSID, pv_sys_id) == -1)
 					goto on_error;
 				if (pool_value_get_int64(
-					pv_sys_id, &sbag->sb_sysid) != 0)
+				    pv_sys_id, &sbag->sb_sysid) != 0)
 					goto on_error;
 				resources = get_resources(
-					sbag->sb_name, rtype->ple_obj, &nelem);
+				    sbag->sb_name, rtype->ple_obj, &nelem);
 				if (resources == NULL)
 					continue;
 				update_resource_stats(

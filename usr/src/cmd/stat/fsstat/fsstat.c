@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <kstat.h>
@@ -241,7 +239,7 @@ dflt_display(char *name, vopstats_t *oldvsp, vopstats_t *newvsp, int dispflag)
 	nnamerm = DELTA(nremove) + DELTA(nrmdir);
 	nnamechg = DELTA(nrename) + DELTA(nlink) + DELTA(nsymlink);
 	nattrret = DELTA(ngetattr) + DELTA(naccess) +
-				DELTA(ngetsecattr) + DELTA(nfid);
+	    DELTA(ngetsecattr) + DELTA(nfid);
 	nattrchg = DELTA(nsetattr) + DELTA(nsetsecattr) + DELTA(nspace);
 	nlookup = DELTA(nlookup);
 	nreaddir = DELTA(nreaddir);
@@ -606,7 +604,7 @@ parse_operands(
 			(*entityp)[nentities++].e_name = strdup(argv[optind]);
 			continue;
 		} else if (errno == ERANGE || *interval <= 0 ||
-							*interval > MAXLONG) {
+		    *interval > MAXLONG) {
 			/* Operand was a number, just out of range */
 			out_of_range++;
 		}
@@ -777,9 +775,8 @@ set_ksnames(entity_t *entities, int nentities, char **fstypes, int nfstypes)
 			    strcmp(ep->e_name, fstypes[j]) == 0) {
 				/* It's a file system type */
 				ep->e_type = ENTYPE_FSTYPE;
-				(void) snprintf(ep->e_ksname,
-						KSTAT_STRLEN, "%s%s",
-						VOPSTATS_STR, ep->e_name);
+				(void) snprintf(ep->e_ksname, KSTAT_STRLEN,
+				    "%s%s", VOPSTATS_STR, ep->e_name);
 				/* Now allocate the vopstats array */
 				ep->e_vs = calloc(VS_SIZE, sizeof (vopstats_t));
 				if (entities[i].e_vs == NULL) {
@@ -904,6 +901,9 @@ main(int argc, char *argv[])
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
+	/* Don't let buffering interfere with piped output. */
+	(void) setvbuf(stdout, NULL, _IOLBF, 0);
+
 	cmdname = argv[0];
 	while ((c = getopt(argc, argv, OPTIONS)) != EOF) {
 		switch (c) {
@@ -933,9 +933,8 @@ main(int argc, char *argv[])
 
 			/* If it was never set properly... */
 			if (timestamp == NODATE) {
-				(void) fprintf(stderr, gettext(
-				"%s: -T option requires either 'u' or 'd'\n"),
-					cmdname);
+				(void) fprintf(stderr, gettext("%s: -T option "
+				    "requires either 'u' or 'd'\n"), cmdname);
 				usage();
 			}
 			break;
@@ -965,7 +964,7 @@ main(int argc, char *argv[])
 #if PARSABLE_OUTPUT
 	if ((dispflag & DISP_RAW) && (timestamp != NODATE)) {
 		(void) fprintf(stderr, gettext(
-			"-P and -T options are mutually exclusive\n"));
+		    "-P and -T options are mutually exclusive\n"));
 		usage();
 	}
 #endif /* PARSABLE_OUTPUT */
