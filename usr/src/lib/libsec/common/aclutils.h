@@ -26,8 +26,6 @@
 #ifndef _ACLUTILS_H
 #define	_ACLUTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/acl.h>
 #include <strings.h>
@@ -120,6 +118,7 @@ extern acl_t *yyacl;
 
 extern int yyerror(const char *);
 extern int get_id(int entry_type, char *name, uid_t *id);
+extern int get_id_nofail(int entry_type, char *name);
 extern int ace_entry_type(int entry_type);
 extern int aclent_entry_type(int type, int owning, int *ret);
 extern int ace_perm_mask(struct acl_perm_type *, uint32_t *mask);

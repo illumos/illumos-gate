@@ -22,8 +22,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 %{
 #include <sys/acl.h>
 #include <aclutils.h>
@@ -65,6 +63,7 @@ struct yystrings {
 	char *y_logname;	/* user/group name from LOGNAME */
 	char *y_perms;		/* permssions from PERM_TOK */
 	char *y_iflags;		/* iflags from INHERIT_TOK */
+	char *y_idstr;		/* string of appened id */
 } yystrings;
 
 %}
@@ -84,6 +83,7 @@ struct yystrings {
  */
 
 ID	[0-9]+
+SID	S-[^:,\n]+
 LOGNAME [^:]+:
 PERM_STR [rRwWxpdDaAcCos-]+
 INHERIT_STR [fdinFSI-]+
@@ -664,8 +664,23 @@ INHERIT_STR [fdinFSI-]+
 			}
 <US>{ID}/[,\n]		{
 				BEGIN ES;
-				yylval.val = atoi(yytext);
+				yylval.str = strdup(yytext);
+				if (yylval.str == NULL) {
+					yylval.val = EACL_MEM_ERROR;
+					return (ERROR);
+				}
+				yystrings.y_idstr = yylval.str;
 				return (ID);
+			}
+<US>{SID}/[,\n]		{
+				BEGIN ES;
+				yylval.str = strdup(yytext);
+				if (yylval.str == NULL) {
+					yylval.val = EACL_MEM_ERROR;
+					return (ERROR);
+				}
+				yystrings.y_idstr = yylval.str;
+				return (SID);
 			}
 <US>:			{
 				return (COLON);
@@ -954,6 +969,17 @@ get_id(int entry_type, char *name, uid_t *id)
 	return (error);
 }
 
+int
+get_id_nofail(int entry_type, char *name)
+{
+	uid_t id;
+
+	if (get_id(entry_type, name, &id))
+		return (UID_NOBODY);
+	else
+		return (id);
+}
+
 /*
  * reset beginning state to TS and set character position
  * back to zero.
@@ -975,7 +1001,10 @@ yycleanup()
 		free(yystrings.y_perms);
 	if (yystrings.y_iflags)
 		free(yystrings.y_iflags);
+	if (yystrings.y_idstr)
+		free(yystrings.y_idstr);
 	yystrings.y_logname = NULL;
 	yystrings.y_perms = NULL;
 	yystrings.y_iflags = NULL;
+	yystrings.y_idstr = NULL;
 }

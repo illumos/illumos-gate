@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <acl_common.h>
 #include <aclutils.h>
 
@@ -46,15 +44,15 @@ extern acl_t *yyacl;
 %token OWNERAT_TOK GROUPAT_TOK EVERYONEAT_TOK DEFAULT_USER_TOK 
 %token DEFAULT_GROUP_TOK DEFAULT_MASK_TOK DEFAULT_OTHER_TOK
 %token COLON COMMA NL SLASH
-%token <str> IDNAME PERM_TOK INHERIT_TOK
-%token <val> ID ERROR ACE_PERM ACE_INHERIT ENTRY_TYPE ACCESS_TYPE
+%token <str> ID IDNAME PERM_TOK INHERIT_TOK SID
+%token <val> ERROR ACE_PERM ACE_INHERIT ENTRY_TYPE ACCESS_TYPE
 
-%type <str> idname
+%type <str> idname id
 %type <acl_perm> perms perm aclent_perm ace_perms
 %type <acl> acl_entry
 %type <ace> ace 
 %type <aclent> aclent
-%type <val> iflags verbose_iflag compact_iflag access_type id entry_type
+%type <val> iflags verbose_iflag compact_iflag access_type entry_type
 
 %left ERROR COLON
 
@@ -186,7 +184,7 @@ ace:	entry_type idname ace_perms access_type
 		}
 		error = get_id($1, $2, &id);
 		if (error) {
-			$$.a_who = $6;
+			$$.a_who = get_id_nofail($1, $6);
 		} else {
 			$$.a_who = id;
 		}
@@ -234,7 +232,7 @@ ace:	entry_type idname ace_perms access_type
 		}
 		error = get_id($1, $2, &id);
 		if (error) {
-			$$.a_who = $7;
+			$$.a_who = get_id_nofail($1, $7);
 		} else {
 			$$.a_who = id;
 		}
@@ -383,9 +381,9 @@ aclent: entry_type idname aclent_perm	/* user or group */
 			return (error);
 		}
 		error = get_id($1, $2, &id);
-		if (error)
-			$$.a_id = $5;	
-		else 
+		if (error) {
+			$$.a_id = get_id_nofail($1, $5);
+		} else 
 			$$.a_id = id;
 
 		error = aclent_entry_type($1, 0, &$$.a_type);
@@ -503,6 +501,7 @@ access_type: ACCESS_TYPE {$$ = $1;}
 	}
 
 id: ID {$$ = $1;}
+	| SID {$$ = $1;}
   	| COLON
 	{
 		acl_error(dgettext(TEXT_DOMAIN,
