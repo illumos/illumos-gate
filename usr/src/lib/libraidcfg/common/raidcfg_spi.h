@@ -27,8 +27,6 @@
 #ifndef	_SYS_RAIDCFG_SPI_H
 #define	_SYS_RAIDCFG_SPI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 
 #ifdef	__cplusplus
@@ -359,8 +357,8 @@ typedef	struct raid_lib_type {
 	int (*array_create)(uint32_t, array_attr_t *, int,
 		arraypart_attr_t *, char **);
 	int (*array_delete)(uint32_t, uint32_t, char **);
-	int (*hsp_bind)(uint32_t, uint32_t, hsp_relation_t *, char **);
-	int (*hsp_unbind)(uint32_t, uint32_t, hsp_relation_t *, char **);
+	int (*hsp_bind)(uint32_t, hsp_relation_t *, char **);
+	int (*hsp_unbind)(uint32_t, hsp_relation_t *, char **);
 	int (*flash_fw)(uint32_t, char *, uint32_t, char **);
 } raid_lib_t;
 

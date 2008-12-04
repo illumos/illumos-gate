@@ -27,8 +27,6 @@
 #ifndef	_RAIDCFG_H
 #define	_RAIDCFG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <raidcfg_spi.h>
 
@@ -91,8 +89,8 @@ int raidcfg_get_container(int);
 int raidcfg_list_head(int, raid_obj_type_id_t);
 int raidcfg_list_next(int);
 int raidcfg_set_attr(int, uint32_t, void *, char **);
-int raidcfg_set_hsp(int, raidcfg_hsp_relation_t *, char **);
-int raidcfg_unset_hsp(int, raidcfg_hsp_relation_t *, char **);
+int raidcfg_set_hsp(raidcfg_hsp_relation_t *, char **);
+int raidcfg_unset_hsp(raidcfg_hsp_relation_t *, char **);
 int raidcfg_create_array(int, int *, uint32_t, uint64_t, uint32_t, char **);
 int raidcfg_delete_array(int, char **);
 int raidcfg_update_fw(int, char *, char **);

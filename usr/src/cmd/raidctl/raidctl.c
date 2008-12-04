@@ -1295,7 +1295,7 @@ do_set_hsp(char *a_argp, char *disk_argp, char **argv, uint32_t optind)
 
 	/* Perform operation of set or unset */
 	if (flag == HSP_SET) {
-		if ((ret = raidcfg_set_hsp(1, &hsp_relation, NULL)) < 0) {
+		if ((ret = raidcfg_set_hsp(&hsp_relation, NULL)) < 0) {
 			(void) fprintf(stderr, "%s\n", raidcfg_errstr(ret));
 			(void) raidcfg_close_controller(ctl_handle, NULL);
 			return (FAILURE);
@@ -1311,7 +1311,7 @@ do_set_hsp(char *a_argp, char *disk_argp, char **argv, uint32_t optind)
 			    disk_argp, argv[optind]);
 		}
 	} else {
-		if ((ret = raidcfg_unset_hsp(1, &hsp_relation, NULL)) < 0) {
+		if ((ret = raidcfg_unset_hsp(&hsp_relation, NULL)) < 0) {
 			(void) fprintf(stderr, "%s\n", raidcfg_errstr(ret));
 			(void) raidcfg_close_controller(ctl_handle, NULL);
 			return (FAILURE);
