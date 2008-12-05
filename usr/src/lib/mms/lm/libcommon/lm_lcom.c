@@ -61,10 +61,6 @@ slot [\"%s\" \"panel %d\" \"group %d\" \"%s\" \"%s\" true true]; "
 #define	CONFIG_DRIVE_EVENT "config task [\"%d\"] scope [partial] \
 drive [\"%s\" \"%d,%d,%d,%d\" \"panel %d\" \"%s\" %s %s]; "
 
-#define	LM_SHOW_DRIVE "show task [\"%d\"] \
-match [streq(DRIVE.\"DriveName\" \"%s\")] \
-report[DRIVE.\"DriveGeometry\"] reportmode[namevalue]; "
-
 #define	LM_SHOW_SERIAL "show task [\"%d\"] \
 match [streq(DRIVE.\"DriveName\" \"%s\")] \
 report[DRIVE.\"DriveSerialNum\"] reportmode[namevalue]; "
@@ -1200,6 +1196,7 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 	int	slot_spec_size;
 	int	drive_spec_size;
 
+	char	*drv_geometry = NULL;
 	char	*kw = NULL;
 	char	*slot_spec = NULL;
 	char	*drive_spec = NULL;
@@ -1449,7 +1446,7 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				return (LM_ERROR);
 			}
 			(void) snprintf(cmd_str, sizeof (cmd_str),
-			    LM_SHOW_DRIVE, lmpl_tid, mms_pn_token(dname));
+			    LM_SHOW_SERIAL, lmpl_tid, mms_pn_token(dname));
 
 			mms_trace(MMS_DEBUG,
 			    "lm_scan: show cmd for scan drive:\n%s", cmd_str);
@@ -1464,7 +1461,7 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			} else if (rc != LMPL_FINAL_OK) {
 				mms_trace(MMS_ERR, "lm_scan: show cmd did not "
 				    "receive a successful response, unable "
-				    "to get drive %s's geometry",
+				    "to get drive %s's serialnumber",
 				    mms_pn_token(dname));
 				lm_remove_lmpl_cmd(lmpl_tid, ele);
 				continue;
@@ -1475,9 +1472,10 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			rsp = node->lmpl_rsp_tree;
 
 			loc = NULL;
-			if ((clause = mms_pn_lookup(rsp, "DriveGeometry",
+			if ((clause = mms_pn_lookup(rsp, "DriveSerialNum",
 			    MMS_PN_STRING, &loc)) == NULL) {
-				mms_trace(MMS_CRIT, "lm_scan: No DriveGeometry "
+				mms_trace(MMS_CRIT,
+				    "lm_scan: No DriveSerialNum "
 				    "attribute found in response to show cmd "
 				    "for drive %s", mms_pn_token(dname));
 				lm_remove_lmpl_cmd(lmpl_tid, ele);
@@ -1487,7 +1485,7 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			if ((attribute = mms_pn_lookup(clause, NULL,
 			    MMS_PN_STRING, &loc)) == NULL) {
 				mms_trace(MMS_ERR,
-				    "lm_scan: No DriveGeometry value"
+				    "lm_scan: No DriveSerialNum value"
 				    " found in response to show cmd for drive "
 				    "%s", mms_pn_token(dname));
 				lm_remove_lmpl_cmd(lmpl_tid, ele);
@@ -1514,10 +1512,28 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				free(err_buf);
 				return (LM_ERROR);
 			}
+
 			mms_trace(MMS_DEBUG,
-			    "lm_scan:, Drive %s has a geometry of "
-			    "%s", mms_pn_token(dname),
+			    "lm_scan:, Drive %s has a serialnum of "
+			    "%s, convert to geometry", mms_pn_token(dname),
 			    cptr);
+
+			if (lm_obtain_geometry(cptr,
+			    &drv_geometry, "scan", tid, ret_msg)
+			    != LM_OK) {
+				mms_trace(MMS_ERR,
+				    "lm_scan: Trying to obtain geometry "
+				    "for drive with serial "
+				    "number %s failed", serial);
+				/* Error return message set in function */
+				lm_set_drive_disabled(mms_pn_token(dname),
+				    "temporary");
+				lm_message("operator", "error",
+				    err_buf);
+				free(err_buf);
+				return (LM_ERROR);
+			}
+			cptr = drv_geometry;
 
 			if ((pptr = strstr(cptr, ",")) == NULL) {
 				mms_trace(MMS_ERR,
@@ -1525,12 +1541,13 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				    " drive geometry for"
 				    "drive %s, geometry = %s",
 				    mms_pn_token(dname),
-				    cptr);
+				    drv_geometry);
 				lm_set_drive_disabled(mms_pn_token(dname),
 				    "temporary");
 				lm_message("operator", "error",
 				    err_buf);
 				free(err_buf);
+				free(drv_geometry);
 				return (LM_ERROR);
 			}
 			*pptr = '\0';
@@ -1542,12 +1559,13 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				    " drive geometry for"
 				    "drive %s, geometry = %s",
 				    mms_pn_token(dname),
-				    cptr);
+				    drv_geometry);
 				lm_set_drive_disabled(mms_pn_token(dname),
 				    "temporary");
 				lm_message("operator", "error",
 				    err_buf);
 				free(err_buf);
+				free(drv_geometry);
 				return (LM_ERROR);
 			}
 			*pptr = '\0';
@@ -1559,12 +1577,13 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 				    " drive geometry for"
 				    "drive %s, geometry = %s",
 				    mms_pn_token(dname),
-				    cptr);
+				    drv_geometry);
 				lm_set_drive_disabled(mms_pn_token(dname),
 				    "temporary");
 				lm_message("operator", "error",
 				    err_buf);
 				free(err_buf);
+				free(drv_geometry);
 				return (LM_ERROR);
 			}
 			*pptr = '\0';
@@ -1572,6 +1591,7 @@ lm_scan(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			cptr = pptr + 1;
 			drive_id[i].drive = atoi(cptr);
 			/* free the err_buf for drive geometry */
+			free(drv_geometry);
 			free(err_buf);
 			err_buf = NULL;
 
@@ -2512,6 +2532,8 @@ lm_event(mms_par_node_t *cmd, char *tid, char *ret_msg)
 	int		accessible = 0;
 	int		occupied = 0;
 
+	char	*geometry = NULL;
+
 	mms_par_node_t	*loc = NULL;
 	mms_par_node_t	*clause;
 	mms_par_node_t	*object;
@@ -2556,7 +2578,7 @@ lm_event(mms_par_node_t *cmd, char *tid, char *ret_msg)
 			    "trying to generate config command for event");
 			return (LM_ERROR);
 		}
-		(void) snprintf(cmd_str, sizeof (cmd_str), LM_SHOW_DRIVE,
+		(void) snprintf(cmd_str, sizeof (cmd_str), LM_SHOW_SERIAL,
 		    lmpl_tid, obj_val);
 
 		mms_trace(MMS_DEBUG, "lm_event: show cmd for drive event:\n%s",
@@ -2581,9 +2603,9 @@ lm_event(mms_par_node_t *cmd, char *tid, char *ret_msg)
 		rsp = node->lmpl_rsp_tree;
 
 		loc = NULL;
-		if ((clause = mms_pn_lookup(rsp, "DriveGeometry",
+		if ((clause = mms_pn_lookup(rsp, "DriveSerialNum",
 		    MMS_PN_STRING, &loc)) == NULL) {
-			mms_trace(MMS_CRIT, "lm_event: No DriveGeometry "
+			mms_trace(MMS_CRIT, "lm_event: No DriveSerialNum "
 			    "attribute found in response to show cmd");
 			lm_remove_lmpl_cmd(lmpl_tid, ele);
 			return (LM_ERROR);
@@ -2591,16 +2613,31 @@ lm_event(mms_par_node_t *cmd, char *tid, char *ret_msg)
 
 		if ((attribute = mms_pn_lookup(clause, NULL, MMS_PN_STRING,
 		    &loc)) == NULL) {
-			mms_trace(MMS_CRIT, "lm_event:, No DriveGeometry value "
+			mms_trace(MMS_CRIT,
+			    "lm_event:, No DriveSerialNum value "
 			    "found in response to show cmd");
 			lm_remove_lmpl_cmd(lmpl_tid, ele);
 			return (LM_ERROR);
 		}
 
-		mms_trace(MMS_DEBUG, "lm_event: Drive %s has a geometry of %s",
+		mms_trace(MMS_DEBUG, "lm_event: Drive %s has a "
+		    "serialnum of %s, convert to geometry",
 		    obj_val, mms_pn_token(attribute));
 
 		cptr = mms_pn_token(attribute);
+
+		if (lm_obtain_geometry(cptr,
+		    &geometry, "event", tid, ret_msg)
+		    != LM_OK) {
+			mms_trace(MMS_ERR,
+			    "lm_event: Trying to obtain geometry "
+			    "for drive with serial "
+			    "number %s failed", cptr);
+			lm_remove_lmpl_cmd(lmpl_tid, ele);
+			return (LM_ERROR);
+		}
+		cptr = geometry;
+
 		pptr = strstr(cptr, ",");
 		*pptr = '\0';
 		drive_id[0].panel_id.lsm_id.acs = atoi(cptr);
@@ -2614,6 +2651,7 @@ lm_event(mms_par_node_t *cmd, char *tid, char *ret_msg)
 		drive_id[0].panel_id.panel = atoi(cptr);
 		cptr = pptr + 1;
 		drive_id[0].drive = atoi(cptr);
+		free(geometry);
 
 		mms_trace(MMS_DEBUG, "lm_event: Drive %s query_drive(), "
 		    "%d,%d,%d,%d", obj_val, drive_id[0].panel_id.lsm_id.acs,
