@@ -1766,10 +1766,13 @@ load(int funct, char *file)
 #ifdef i386
 	int 	ext_part_present = 0;
 	uint32_t	begsec, endsec, relsect;
-	int ldrvcount;
 	logical_drive_t *temp;
 	int part_count = 0, ldcnt = 0;
 	uint32_t ext_beg_sec, ext_end_sec;
+	uint32_t old_ext_beg_sec = 0, old_ext_num_sec = 0;
+	uint32_t new_ext_beg_sec = 0, new_ext_num_sec = 0;
+	int ext_part_inited = 0;
+	uchar_t	systid;
 #endif
 
 	switch (funct) {
@@ -1809,7 +1812,31 @@ load(int funct, char *file)
 					exit(1);
 				}
 				ext_part_present = 1;
-				fdisk_init_ext_part(epp, rsect, numsect);
+				/*
+				 * If the existing extended partition's start
+				 * and size matches the new one, do not
+				 * initialize the extended partition EBR
+				 * (Extended Boot Record) because there could
+				 * be existing logical drives.
+				 */
+				for (i = 0; i < FD_NUMPART; i++) {
+					systid = Old_Table[i].systid;
+					if (fdisk_is_dos_extended(systid)) {
+						old_ext_beg_sec =
+						    Old_Table[i].relsect;
+						old_ext_num_sec =
+						    Old_Table[i].numsect;
+						break;
+					}
+				}
+				new_ext_beg_sec = rsect;
+				new_ext_num_sec = numsect;
+				if ((old_ext_beg_sec != new_ext_beg_sec) ||
+				    (old_ext_num_sec != new_ext_num_sec)) {
+					fdisk_init_ext_part(epp,
+					    new_ext_beg_sec, new_ext_num_sec);
+					ext_part_inited = 1;
+				}
 			}
 
 			if (part_count > FD_NUMPART) {
@@ -1827,11 +1854,21 @@ load(int funct, char *file)
 					continue;
 				}
 
+				/*
+				 * If the start and size of the existing
+				 * extended partition matches the new one and
+				 * new logical drives are being defined via
+				 * the input file, initialize the EBR.
+				 */
+				if (!ext_part_inited) {
+					fdisk_init_ext_part(epp,
+					    new_ext_beg_sec, new_ext_num_sec);
+					ext_part_inited = 1;
+				}
+
 				begsec = rsect - offset;
 				if ((ldcnt =
 				    fdisk_get_logical_drive_count(epp)) == 0) {
-					ext_beg_sec =
-					    fdisk_get_ext_beg_sec(epp);
 					/* Adding the first logical drive */
 					/*
 					 * Make sure that begsec doesnt wrap
@@ -1851,7 +1888,7 @@ load(int funct, char *file)
 					 * not subtract MAX_LOGDRIVE_OFFSET
 					 * from the given start of partition.
 					 */
-					if (begsec != ext_beg_sec) {
+					if (begsec != new_ext_beg_sec) {
 						begsec = rsect;
 						offset = 0;
 					}
@@ -1978,7 +2015,7 @@ load(int funct, char *file)
 		}
 
 #ifdef i386
-		ldrvcount = FD_NUMPART + 1;
+		ldcnt = FD_NUMPART + 1;
 		for (temp = fdisk_get_ld_head(epp); temp != NULL;
 		    temp = temp->next) {
 			relsect = temp->abs_secnum + temp->logdrive_offset;
@@ -1994,10 +2031,10 @@ load(int funct, char *file)
 			    temp->parts[0].endcyl == (uchar_t)(ecyl & 0xff) &&
 			    relsect == LE_32(rsect) &&
 			    temp->parts[0].numsect == LE_32(numsect)) {
-				fdisk_delete_logical_drive(epp, ldrvcount);
+				fdisk_delete_logical_drive(epp, ldcnt);
 				return;
 			}
-			ldrvcount++;
+			ldcnt++;
 		}
 #endif
 
@@ -5330,7 +5367,7 @@ ext_part_menu()
 {
 	char buf[80];
 	uchar_t *bbsigp;
-	static bbsig_disp_flag = 1;
+	static int bbsig_disp_flag = 1;
 
 	int i;
 
