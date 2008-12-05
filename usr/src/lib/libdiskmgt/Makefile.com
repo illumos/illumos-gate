@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libdiskmgt.a
@@ -38,7 +36,7 @@ include ../../Makefile.lib
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-ldevinfo -ladm -ldevid -lkstat -lsysevent \
 		-lnvpair -lefi -lc
-LDFLAGS	+= 	-R/opt/VRTSvxvm/lib
+DYNFLAGS +=	-R/opt/VRTSvxvm/lib
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

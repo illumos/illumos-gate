@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Attempt to dynamically link in the Veritas libvxvmsc.so so that we can
@@ -44,6 +42,8 @@
 
 #include "libdiskmgt.h"
 #include "disks_private.h"
+
+#define	VXVM_LIB_NAME	"libvxvmsc.so"
 
 #define	VXVM_NAME_SIZE	1
 #define	VXVM_PATH_SIZE	2
@@ -87,7 +87,7 @@ inuse_vxvm(char *slice, nvlist_t *attrs, int *errp)
 
 	*errp = 0;
 	if (slice == NULL) {
-	    return (found);
+		return (found);
 	}
 
 	/*
@@ -95,48 +95,50 @@ inuse_vxvm(char *slice, nvlist_t *attrs, int *errp)
 	 * slice passed in.  Strip the slice component from the devname.
 	 */
 	if (is_ctds(slice)) {
-	    if ((sp = strrchr(slice, '/')) == NULL)
-		sp = slice;
+		if ((sp = strrchr(slice, '/')) == NULL)
+			sp = slice;
 
-	    while (*sp && *sp != 's')
-		sp++;
+		while (*sp && *sp != 's')
+			sp++;
 
-	    if (*sp)
-		*sp = 0;
-	    else
-		sp = NULL;
+		if (*sp)
+			*sp = 0;
+		else
+			sp = NULL;
 	}
 
 	(void) mutex_lock(&vxvm_lock);
 
 	curr_time = time(NULL);
 	if (timestamp < curr_time && (curr_time - timestamp) > 60) {
-	    free_vxvm();		/* free old entries */
-	    *errp = load_vxvm();	/* load the cache */
+		free_vxvm();		/* free old entries */
+		*errp = load_vxvm();	/* load the cache */
 
-	    timestamp = curr_time;
+		timestamp = curr_time;
 	}
 
 	if (*errp == 0) {
-	    struct vxvm_list	*listp;
+		struct vxvm_list	*listp;
 
-	    listp = vxvm_listp;
-	    while (listp != NULL) {
-		if (strcmp(slice, listp->slice) == 0) {
-		    libdiskmgt_add_str(attrs, DM_USED_BY, DM_USE_VXVM, errp);
-		    libdiskmgt_add_str(attrs, DM_USED_NAME, "", errp);
-		    found = 1;
-		    break;
+		listp = vxvm_listp;
+		while (listp != NULL) {
+			if (strcmp(slice, listp->slice) == 0) {
+				libdiskmgt_add_str(attrs, DM_USED_BY,
+				    DM_USE_VXVM, errp);
+				libdiskmgt_add_str(attrs, DM_USED_NAME,
+				    "", errp);
+				found = 1;
+				break;
+			}
+			listp = listp->next;
 		}
-		listp = listp->next;
-	    }
 	}
 
 	(void) mutex_unlock(&vxvm_lock);
 
 	/* restore slice name to orignal value */
 	if (sp != NULL)
-	    *sp = 's';
+		*sp = 's';
 
 	return (found);
 }
@@ -148,12 +150,12 @@ add_use_record(char *devname)
 
 	sp = (struct vxvm_list *)malloc(sizeof (struct vxvm_list));
 	if (sp == NULL) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 
 	if ((sp->slice = strdup(devname)) == NULL) {
-	    free(sp);
-	    return (ENOMEM);
+		free(sp);
+		return (ENOMEM);
 	}
 
 	sp->next = vxvm_listp;
@@ -164,14 +166,14 @@ add_use_record(char *devname)
 	 * slice passed in.  Strip the slice component from the devname.
 	 */
 	if (is_ctds(sp->slice)) {
-	    char	*dp;
+		char	*dp;
 
-	    if ((dp = strrchr(sp->slice, '/')) == NULL)
-		dp = sp->slice;
+		if ((dp = strrchr(sp->slice, '/')) == NULL)
+			dp = sp->slice;
 
-	    while (*dp && *dp != 's')
-		dp++;
-	    *dp = 0;
+		while (*dp && *dp != 's')
+			dp++;
+		*dp = 0;
 	}
 
 	return (0);
@@ -186,45 +188,45 @@ is_ctds(char *name)
 	char	*p;
 
 	if ((p = strrchr(name, '/')) == NULL)
-	    p = name;
+		p = name;
 	else
-	    p++;
+		p++;
 
 	if (*p++ != 'c') {
-	    return (0);
+		return (0);
 	}
 	/* skip controller digits */
 	while (isdigit(*p)) {
-	    p++;
+		p++;
 	}
 
 	/* handle optional target */
 	if (*p == 't') {
-	    p++;
-	    /* skip over target */
-	    while (isdigit(*p) || isupper(*p)) {
 		p++;
-	    }
+		/* skip over target */
+		while (isdigit(*p) || isupper(*p)) {
+			p++;
+		}
 	}
 
 	if (*p++ != 'd') {
-	    return (0);
+		return (0);
 	}
 	while (isdigit(*p)) {
-	    p++;
+		p++;
 	}
 
 	if (*p++ != 's') {
-	    return (0);
+		return (0);
 	}
 
 	/* check the slice number */
 	while (isdigit(*p)) {
-	    p++;
+		p++;
 	}
 
 	if (*p != 0) {
-	    return (0);
+		return (0);
 	}
 
 	return (1);
@@ -240,10 +242,10 @@ free_vxvm()
 	struct vxvm_list	*nextp;
 
 	while (listp != NULL) {
-	    nextp = listp->next;
-	    free((void *)listp->slice);
-	    free((void *)listp);
-	    listp = nextp;
+		nextp = listp->next;
+		free((void *)listp->slice);
+		free((void *)listp);
+		listp = nextp;
 	}
 
 	vxvm_listp = NULL;
@@ -257,32 +259,32 @@ init_vxvm()
 {
 	void	*lh;
 
-	if ((lh = dlopen("libvxvmsc.so", RTLD_NOW)) == NULL) {
-	    return (lh);
+	if ((lh = dlopen(VXVM_LIB_NAME, RTLD_NOW)) == NULL) {
+		return (NULL);
 	}
 
 	if ((vxdl_libvxvm_get_version = (int (*)(int))dlsym(lh,
 	    "libvxvm_get_version")) == NULL) {
-	    (void) dlclose(lh);
-	    return (NULL);
+		(void) dlclose(lh);
+		return (NULL);
 	}
 
 	if ((vxdl_libvxvm_get_conf = (int (*)(int))dlsym(lh,
 	    "libvxvm_get_conf")) == NULL) {
-	    (void) dlclose(lh);
-	    return (NULL);
+		(void) dlclose(lh);
+		return (NULL);
 	}
 
 	if ((vxdl_libvxvm_get_dgs = (int (*)(int, vm_name_t []))dlsym(lh,
 	    "libvxvm_get_dgs")) == NULL) {
-	    (void) dlclose(lh);
-	    return (NULL);
+		(void) dlclose(lh);
+		return (NULL);
 	}
 
 	if ((vxdl_libvxvm_get_disks = (int (*)(vm_name_t, int, vm_path_t []))
 	    dlsym(lh, "libvxvm_get_disks")) == NULL) {
-	    (void) dlclose(lh);
-	    return (NULL);
+		(void) dlclose(lh);
+		return (NULL);
 	}
 
 	return (lh);
@@ -302,87 +304,88 @@ load_vxvm()
 	int		i;
 
 	if ((lh = init_vxvm()) == NULL) {
-	    /* No library. */
-	    return (0);
+		/* No library. */
+		return (0);
 	}
 
 	vers = (vxdl_libvxvm_get_version)(1 << 8);
 	if (vers == -1) {
-	    /* unsupported version */
-	    (void) dlclose(lh);
-	    return (0);
+		/* unsupported version */
+		(void) dlclose(lh);
+		return (0);
 	}
 
 	nsize = (vxdl_libvxvm_get_conf)(VXVM_NAME_SIZE);
 	psize = (vxdl_libvxvm_get_conf)(VXVM_PATH_SIZE);
 
 	if (nsize == -1 || psize == -1) {
-	    (void) dlclose(lh);
-	    return (0);
+		(void) dlclose(lh);
+		return (0);
 	}
 
 	namep = (vm_name_t *)calloc(MAX_DISK_GROUPS, nsize);
 	if (namep == NULL) {
-	    (void) dlclose(lh);
-	    return (ENOMEM);
+		(void) dlclose(lh);
+		return (ENOMEM);
 	}
 
 	pathp = (vm_path_t *)calloc(MAX_DISKS_DG, psize);
 	if (pathp == NULL) {
-	    (void) dlclose(lh);
-	    free(namep);
-	    return (ENOMEM);
+		(void) dlclose(lh);
+		free(namep);
+		return (ENOMEM);
 	}
 
 	n_disk_groups = (vxdl_libvxvm_get_dgs)(MAX_DISK_GROUPS, namep);
 	if (n_disk_groups < 0) {
-	    (void) dlclose(lh);
-	    free(namep);
-	    free(pathp);
-	    return (0);
+		(void) dlclose(lh);
+		free(namep);
+		free(pathp);
+		return (0);
 	}
 
 	pnp = (char *)namep;
 	for (i = 0; i < n_disk_groups; i++) {
-	    int n_disks;
+		int n_disks;
 
-	    n_disks = (vxdl_libvxvm_get_disks)(pnp, MAX_DISKS_DG, pathp);
+		n_disks = (vxdl_libvxvm_get_disks)(pnp, MAX_DISKS_DG, pathp);
 
-	    if (n_disks >= 0) {
-		int	j;
-		char	*ppp;
+		if (n_disks >= 0) {
+			int	j;
+			char	*ppp;
 
-		ppp = (char *)pathp;
-		for (j = 0; j < n_disks; j++) {
+			ppp = (char *)pathp;
+			for (j = 0; j < n_disks; j++) {
 
-		    if (strncmp(ppp, "/dev/vx/", 8) == 0) {
-			char	*pslash;
-			char	nm[MAXPATHLEN];
+				if (strncmp(ppp, "/dev/vx/", 8) == 0) {
+					char	*pslash;
+					char	nm[MAXPATHLEN];
 
-			pslash = strrchr(ppp, '/');
-			pslash++;
+					pslash = strrchr(ppp, '/');
+					pslash++;
 
-			(void) snprintf(nm, sizeof (nm), "/dev/dsk/%s", pslash);
-			if (add_use_record(nm)) {
-			    (void) dlclose(lh);
-			    free(pathp);
-			    free(namep);
-			    return (ENOMEM);
+					(void) snprintf(nm, sizeof (nm),
+					    "/dev/dsk/%s", pslash);
+					if (add_use_record(nm)) {
+						(void) dlclose(lh);
+						free(pathp);
+						free(namep);
+						return (ENOMEM);
+					}
+				} else {
+					if (add_use_record(ppp)) {
+						(void) dlclose(lh);
+						free(pathp);
+						free(namep);
+						return (ENOMEM);
+					}
+				}
+
+				ppp += psize;
 			}
-		    } else {
-			if (add_use_record(ppp)) {
-			    (void) dlclose(lh);
-			    free(pathp);
-			    free(namep);
-			    return (ENOMEM);
-			}
-		    }
-
-		    ppp += psize;
 		}
-	    }
 
-	    pnp += nsize;
+		pnp += nsize;
 	}
 
 	(void) dlclose(lh);
