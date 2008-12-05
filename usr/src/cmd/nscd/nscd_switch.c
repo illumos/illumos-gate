@@ -416,7 +416,8 @@ try_local(
  * process. Return none zero if yes, 0 otherwise. This should be called
  * before the switch engine invokes any backend.
  * This function returns 1 if:
- *   -- the database is shadow and the source is nisplus
+ *   -- the database is shadow and the source is nisplus OR
+ *   -- the database is shadow and the source is compat
  */
 static int
 try_local2(
@@ -428,13 +429,15 @@ try_local2(
 
 	if (*NSCD_NSW_DB_NAME(dbi) == 's' &&
 	    strcmp(NSCD_NSW_DB_NAME(dbi), NSS_DBNAM_SHADOW) == 0) {
-		if (strcmp(NSCD_NSW_SRC_NAME(srci), "nisplus") == 0)
+		if (strcmp(NSCD_NSW_SRC_NAME(srci), "nisplus") == 0 ||
+		    strcmp(NSCD_NSW_SRC_NAME(srci), "compat") == 0)
 			rc = 1;
 	}
 
 	if (rc != 0) {
 		_NSCD_LOG(NSCD_LOG_SWITCH_ENGINE, NSCD_LOG_LEVEL_DEBUG)
-		(me, "TRYLOCAL: database: shadow, source: nisplus\n");
+		(me, "TRYLOCAL: database: shadow, source: %s\n",
+		    NSCD_NSW_SRC_NAME(srci));
 	}
 
 	return (rc);
