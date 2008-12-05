@@ -30,8 +30,6 @@
 #ifndef _SYS_MACHPARAM_H
 #define	_SYS_MACHPARAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #if !defined(_ASM)
 #include <sys/types.h>
 
@@ -111,7 +109,7 @@ extern "C" {
 #if defined(__amd64)
 #define	DEFAULTSTKSZ_NPGS	5
 #elif defined(__i386)
-#define	DEFAULTSTKSZ_NPGS	2
+#define	DEFAULTSTKSZ_NPGS	3
 #endif
 
 #if !defined(_ASM)
