@@ -30,6 +30,21 @@
 # items and for the members of the malloc() family.
 #
 
+#
+# README README README README README README: how to update this file
+#   1) each version of Solaris/OpenSolaris gets a version number.
+#      (Actually since Solaris is actually a series of OpenSolaris releases
+#	we'll just use OpenSolaris for this exercise.)
+#	OpenSolaris 2008.11 gets 1.23
+#	OpenSolaris 2009.04 gets 1.24
+#	etc.
+#   2) each project integration uses a unique version number.
+#	PSARC/2008/123 gets 1.24.1
+#	PSARC/2008/456 gets 1.24.2
+#	etc.
+#
+
+
 SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
     global:
 	_nl_domain_bindings;
@@ -145,17 +160,12 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	timer_getoverrun;
 	timer_gettime;
 	timer_settime;
-	u8_strcmp;
-	u8_textprep_str;
-	u8_validate;
 	uconv_u16tou32;
 	uconv_u16tou8;
 	uconv_u32tou16;
 	uconv_u32tou8;
 	uconv_u8tou16;
 	uconv_u8tou32;
-	uucopy;
-	uucopystr;
 	vforkx;
 	verr;
 	verrx;
@@ -163,11 +173,20 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	vwarnx;
 	warn;
 	warnx;
+} SUNW_1.22.4;
+
+SUNW_1.22.4 {		# s10u7 - SunOS 5.10 (Solaris 10) patch additions
+    protected:
+	u8_strcmp;
+	u8_validate;
 } SUNW_1.22.3;
 
 SUNW_1.22.3 {		# SunOS 5.10 (Solaris 10) patch additions
     protected:
 	mutex_consistent;
+	u8_textprep_str;
+	uucopy;
+	uucopystr;
 } SUNW_1.22.2;
 
 SUNW_1.22.2 {		# SunOS 5.10 (Solaris 10) patch additions
