@@ -90,7 +90,6 @@ static void iscsi_sess_inquiry(iscsi_sess_t *isp, uint16_t lun_num,
  * | External Session Interfaces					|
  * +--------------------------------------------------------------------+
  */
-
 iscsi_sess_t *
 iscsi_sess_create(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
     struct sockaddr *addr_dsc, char *target_name, int tpgt, uchar_t isid_lsb,
@@ -103,6 +102,11 @@ iscsi_sess_create(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
 
 	len = strlen(target_name);
 
+clean_failed_sess:
+	if (isp != NULL) {
+		(void) iscsi_sess_destroy(isp);
+	}
+
 	for (isp = ihp->hba_sess_list; isp; isp = isp->sess_next) {
 		/* Match target name and LSB ISID */
 		if ((strcmp((char *)isp->sess_name, target_name) == 0) &&
@@ -112,6 +116,29 @@ iscsi_sess_create(iscsi_hba_t *ihp, iSCSIDiscoveryMethod_t method,
 			if (isp->sess_tpgt_conf == tpgt) {
 				/* Found mathing session, return oid/ptr */
 				*oid = isp->sess_oid;
+				if (isp->sess_wd_thread)
+					return (isp);
+				/*
+				 * Under rare cases wd thread is already
+				 * freed, create it if so.
+				 */
+				th_name = kmem_zalloc(ISCSI_TH_MAX_NAME_LEN,
+				    KM_SLEEP);
+				if (snprintf(th_name, (ISCSI_TH_MAX_NAME_LEN
+				    - 1), ISCSI_SESS_WD_NAME_FORMAT,
+				    ihp->hba_oid, isp->sess_oid) <
+				    ISCSI_TH_MAX_NAME_LEN) {
+					isp->sess_wd_thread =
+					    iscsi_thread_create(ihp->hba_dip,
+					    th_name, iscsi_wd_thread, isp);
+					(void) iscsi_thread_start(
+					    isp->sess_wd_thread);
+				}
+				kmem_free(th_name, ISCSI_TH_MAX_NAME_LEN);
+				if (isp->sess_wd_thread == NULL) {
+					/* No way to save it */
+					goto clean_failed_sess;
+				}
 				return (isp);
 			}
 
@@ -482,7 +509,10 @@ iscsi_sess_destroy(iscsi_sess_t *isp)
 	ASSERT(isp->sess_state == ISCSI_SESS_STATE_FREE);
 
 	/* Stop watchdog before destroying connections */
-	iscsi_thread_destroy(isp->sess_wd_thread);
+	if (isp->sess_wd_thread) {
+		iscsi_thread_destroy(isp->sess_wd_thread);
+		isp->sess_wd_thread = NULL;
+	}
 
 	/* Destroy connections */
 	rw_enter(&isp->sess_conn_list_rwlock, RW_WRITER);
