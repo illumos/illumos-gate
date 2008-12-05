@@ -139,6 +139,7 @@ enum zio_compress {
 
 #define	ZIO_FLAG_PROBE			0x10000
 #define	ZIO_FLAG_GANG_CHILD		0x20000
+#define	ZIO_FLAG_RAW			0x40000
 
 #define	ZIO_FLAG_GANG_INHERIT		\
 	(ZIO_FLAG_CANFAIL |		\

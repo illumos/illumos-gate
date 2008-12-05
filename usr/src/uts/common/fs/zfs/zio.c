@@ -767,7 +767,8 @@ zio_read_bp_init(zio_t *zio)
 {
 	blkptr_t *bp = zio->io_bp;
 
-	if (BP_GET_COMPRESS(bp) != ZIO_COMPRESS_OFF && zio->io_logical == zio) {
+	if (BP_GET_COMPRESS(bp) != ZIO_COMPRESS_OFF &&
+	    zio->io_logical == zio && !(zio->io_flags & ZIO_FLAG_RAW)) {
 		uint64_t csize = BP_GET_PSIZE(bp);
 		void *cbuf = zio_buf_alloc(csize);
 

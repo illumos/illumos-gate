@@ -918,10 +918,10 @@ static int
 dsl_pool_scrub_clean_cb(dsl_pool_t *dp,
     const blkptr_t *bp, const zbookmark_t *zb)
 {
-	size_t size = BP_GET_LSIZE(bp);
+	size_t size = BP_GET_PSIZE(bp);
 	spa_t *spa = dp->dp_spa;
 	boolean_t needs_io;
-	int zio_flags = ZIO_FLAG_SCRUB_THREAD | ZIO_FLAG_CANFAIL;
+	int zio_flags = ZIO_FLAG_SCRUB_THREAD | ZIO_FLAG_RAW | ZIO_FLAG_CANFAIL;
 	int zio_priority;
 
 	ASSERT(bp->blk_birth > dp->dp_scrub_min_txg);
