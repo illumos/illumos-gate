@@ -28,9 +28,8 @@
 
 #include <sys/types.h>
 #include <sys/ethernet.h>
-#include <sys/mac.h>
-#include <sys/dls.h>
 #include <sys/param.h>
+#include <sys/mac.h>
 #include <sys/dld_ioc.h>
 
 #ifdef	__cplusplus
@@ -38,7 +37,7 @@ extern "C" {
 #endif
 
 /*
- * Note that the datastructures defined here define an ioctl interface
+ * Note that the data structures defined here define an ioctl interface
  * that is shared betwen user and kernel space.  The aggr driver thus
  * assumes that the structures have identical layout and size when
  * compiled in either IPL32 or LP64.

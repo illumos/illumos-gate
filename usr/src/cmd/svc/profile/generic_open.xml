@@ -59,6 +59,7 @@
     <instance name='flow'    enabled='false'/>
     <instance name='process' enabled='false'/>
     <instance name='task'    enabled='false'/>
+    <instance name='net'    enabled='false'/>
   </service>
   <service name='system/hal' version='1' type='service'>
     <instance name='default' enabled='true'/>

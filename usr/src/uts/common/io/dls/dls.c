@@ -23,583 +23,285 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Data-Link Services Module
  */
 
-#include	<sys/types.h>
-#include	<sys/stream.h>
 #include	<sys/strsun.h>
-#include	<sys/sysmacros.h>
-#include	<sys/atomic.h>
-#include	<sys/stat.h>
-#include	<sys/dlpi.h>
 #include	<sys/vlan.h>
-#include	<sys/ethernet.h>
-#include	<sys/byteorder.h>
-#include	<sys/mac.h>
-
-#include	<sys/dls.h>
-#include	<sys/dls_impl.h>
-#include	<sys/dls_soft_ring.h>
-
-static kmem_cache_t	*i_dls_impl_cachep;
-static uint32_t		i_dls_impl_count;
-
-static kstat_t	*dls_ksp = (kstat_t *)NULL;
-struct dls_kstats dls_kstat =
-{
-	{ "soft_ring_pkt_drop", KSTAT_DATA_UINT32 },
-};
-
-static int dls_open(dls_vlan_t *, dls_dl_handle_t ddh, dls_channel_t *);
-
-/*
- * Private functions.
- */
-
-/*ARGSUSED*/
-static int
-i_dls_constructor(void *buf, void *arg, int kmflag)
-{
-	dls_impl_t	*dip = buf;
-
-	bzero(buf, sizeof (dls_impl_t));
-
-	rw_init(&(dip->di_lock), NULL, RW_DRIVER, NULL);
-	return (0);
-}
-
-/*ARGSUSED*/
-static void
-i_dls_destructor(void *buf, void *arg)
-{
-	dls_impl_t	*dip = buf;
-
-	ASSERT(dip->di_dvp == NULL);
-	ASSERT(dip->di_mnh == NULL);
-	ASSERT(dip->di_dmap == NULL);
-	ASSERT(!dip->di_local);
-	ASSERT(!dip->di_bound);
-	ASSERT(dip->di_rx == NULL);
-	ASSERT(dip->di_txinfo == NULL);
-
-	rw_destroy(&(dip->di_lock));
-}
-
-static void
-i_dls_notify(void *arg, mac_notify_type_t type)
-{
-	dls_impl_t		*dip = arg;
-
-	switch (type) {
-	case MAC_NOTE_UNICST:
-		mac_unicst_get(dip->di_mh, dip->di_unicst_addr);
-		break;
-
-	case MAC_NOTE_PROMISC:
-	case MAC_NOTE_VNIC:
-		/*
-		 * Every time the MAC interface changes promiscuity or
-		 * the VNIC characteristics change we need to reset
-		 * our transmit information.
-		 */
-		dip->di_txinfo = mac_tx_get(dip->di_mh);
-		break;
-	}
-}
-
-static void
-dls_stat_init()
-{
-	if ((dls_ksp = kstat_create("dls", 0, "dls_stat",
-	    "net", KSTAT_TYPE_NAMED,
-	    sizeof (dls_kstat) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL)) == NULL) {
-		cmn_err(CE_WARN,
-		"DLS: failed to create kstat structure for dls stats");
-		return;
-	}
-	dls_ksp->ks_data = (void *)&dls_kstat;
-	kstat_install(dls_ksp);
-}
-
-static void
-dls_stat_destroy()
-{
-	kstat_delete(dls_ksp);
-}
-
-/*
- * Module initialization functions.
- */
-
-void
-dls_init(void)
-{
-	/*
-	 * Create a kmem_cache of dls_impl_t.
-	 */
-	i_dls_impl_cachep = kmem_cache_create("dls_cache",
-	    sizeof (dls_impl_t), 0, i_dls_constructor, i_dls_destructor, NULL,
-	    NULL, NULL, 0);
-	ASSERT(i_dls_impl_cachep != NULL);
-	soft_ring_init();
-	dls_stat_init();
-}
+#include	<sys/dld_impl.h>
 
 int
-dls_fini(void)
+dls_open(dls_link_t *dlp, dls_dl_handle_t ddh, dld_str_t *dsp)
 {
-	/*
-	 * If there are any dls_impl_t in use then return EBUSY.
-	 */
-	if (i_dls_impl_count != 0)
-		return (EBUSY);
-
-	/*
-	 * Destroy the kmem_cache.
-	 */
-	kmem_cache_destroy(i_dls_impl_cachep);
-	dls_stat_destroy();
-	return (0);
-}
-
-/*
- * Client functions.
- */
-
-/*
- * /dev node style-2 VLAN PPA access. This might result in a newly created
- * dls_vlan_t. Note that this dls_vlan_t is different from others, in that
- * this VLAN might not have a link name that is managed by dlmgmtd (we cannot
- * use its VLAN ppa hack name as it might conflict with a vanity name).
- */
-int
-dls_open_style2_vlan(major_t major, uint_t ppa, dls_channel_t *dcp)
-{
-	dev_t		dev = makedevice(major, DLS_PPA2INST(ppa) + 1);
-	uint_t		vid = DLS_PPA2VID(ppa);
-	dls_vlan_t	*lndvp, *dvp;
-	int		err;
-
-	/*
-	 * First find the dls_vlan_t this VLAN is created on. This must be
-	 * a GLDv3 driver based device.
-	 */
-	if ((err = dls_vlan_hold_by_dev(dev, &lndvp)) != 0)
-		return (err);
-
-	if (vid > VLAN_ID_MAX)
-		return (ENOENT);
-
-	err = dls_vlan_hold(lndvp->dv_dlp->dl_name, vid, &dvp, B_FALSE, B_TRUE);
-	if (err != 0)
-		goto done;
-
-	if ((err = dls_open(dvp, NULL, dcp)) != 0)
-		dls_vlan_rele(dvp);
-
-done:
-	dls_vlan_rele(lndvp);
-	return (err);
-}
-
-int
-dls_open_by_dev(dev_t dev, dls_channel_t *dcp)
-{
-	dls_dl_handle_t	ddh;
-	dls_vlan_t	*dvp;
-	int		err;
-
-	/*
-	 * Get a reference to the given dls_vlan_t.
-	 */
-	if ((err = dls_devnet_open_by_dev(dev, &dvp, &ddh)) != 0)
-		return (err);
-
-	if ((err = dls_open(dvp, ddh, dcp)) != 0) {
-		if (ddh != NULL)
-			dls_devnet_close(ddh);
-		else
-			dls_vlan_rele(dvp);
-	}
-
-	return (err);
-}
-
-static int
-dls_open(dls_vlan_t *dvp, dls_dl_handle_t ddh, dls_channel_t *dcp)
-{
-	dls_impl_t	*dip;
-	dls_link_t	*dlp;
-	int		err;
 	zoneid_t	zid = getzoneid();
 	boolean_t	local;
 
 	/*
-	 * Check whether this client belongs to the zone of this dvp. Note that
-	 * a global zone client is allowed to open a local zone dvp.
+	 * Check whether this client belongs to the zone of this dlp. Note that
+	 * a global zone client is allowed to open a local zone dlp.
 	 */
-	mutex_enter(&dvp->dv_lock);
-	if (zid != GLOBAL_ZONEID && dvp->dv_zid != zid) {
-		mutex_exit(&dvp->dv_lock);
+	if (zid != GLOBAL_ZONEID && dlp->dl_zid != zid)
 		return (ENOENT);
-	}
-	local = (zid == dvp->dv_zid);
-	dvp->dv_zone_ref += (local ? 1 : 0);
-	mutex_exit(&dvp->dv_lock);
 
-	dlp = dvp->dv_dlp;
-	if ((err = mac_start(dlp->dl_mh)) != 0) {
-		mutex_enter(&dvp->dv_lock);
-		dvp->dv_zone_ref -= (local ? 1 : 0);
-		mutex_exit(&dvp->dv_lock);
-		return (err);
-	}
-
-	/*
-	 * Allocate a new dls_impl_t.
-	 */
-	dip = kmem_cache_alloc(i_dls_impl_cachep, KM_SLEEP);
-	dip->di_dvp = dvp;
-	dip->di_ddh = ddh;
+	local = (zid == dlp->dl_zid);
+	dlp->dl_zone_ref += (local ? 1 : 0);
 
 	/*
 	 * Cache a copy of the MAC interface handle, a pointer to the
-	 * immutable MAC info and a copy of the current MAC address.
+	 * immutable MAC info.
 	 */
-	dip->di_mh = dlp->dl_mh;
-	dip->di_mip = dlp->dl_mip;
+	dsp->ds_dlp = dlp;
+	dsp->ds_mh = dlp->dl_mh;
+	dsp->ds_mch = dlp->dl_mch;
+	dsp->ds_mip = dlp->dl_mip;
+	dsp->ds_ddh = ddh;
+	dsp->ds_local = local;
 
-	mac_unicst_get(dip->di_mh, dip->di_unicst_addr);
-
-	/*
-	 * Set the MAC transmit information.
-	 */
-	dip->di_txinfo = mac_tx_get(dip->di_mh);
-
-	/*
-	 * Add a notification function so that we get updates from
-	 * the MAC.
-	 */
-	dip->di_mnh = mac_notify_add(dip->di_mh, i_dls_notify,
-	    (void *)dip);
-
-	/*
-	 * Bump the kmem_cache count to make sure it is not prematurely
-	 * destroyed.
-	 */
-	atomic_add_32(&i_dls_impl_count, 1);
-
-	dip->di_local = local;
-
-	/*
-	 * Hand back a reference to the dls_impl_t.
-	 */
-	*dcp = (dls_channel_t)dip;
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 	return (0);
 }
 
 void
-dls_close(dls_channel_t dc)
+dls_close(dld_str_t *dsp)
 {
-	dls_impl_t		*dip = (dls_impl_t *)dc;
-	dls_vlan_t		*dvp = dip->di_dvp;
-	dls_link_t		*dlp = dvp->dv_dlp;
+	dls_link_t		*dlp = dsp->ds_dlp;
 	dls_multicst_addr_t	*p;
 	dls_multicst_addr_t	*nextp;
-	dls_dl_handle_t		ddh = dip->di_ddh;
+	uint32_t		old_flags;
 
-	if (dip->di_local) {
-		mutex_enter(&dvp->dv_lock);
-		dvp->dv_zone_ref--;
-		mutex_exit(&dvp->dv_lock);
-	}
-	dip->di_local = B_FALSE;
+	ASSERT(dsp->ds_datathr_cnt == 0);
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 
-	dls_active_clear(dc);
-
-	rw_enter(&(dip->di_lock), RW_WRITER);
-	/*
-	 * Remove the notify function.
-	 */
-	mac_notify_remove(dip->di_mh, dip->di_mnh);
-	dip->di_mnh = NULL;
+	if (dsp->ds_local)
+		dlp->dl_zone_ref--;
+	dsp->ds_local = B_FALSE;
 
 	/*
-	 * If the dls_impl_t is bound then unbind it.
+	 * Walk the list of multicast addresses, disabling each at the MAC.
+	 * Note that we must remove multicast address before
+	 * mac_unicast_remove() (called by dls_active_clear()) because
+	 * mac_multicast_remove() relies on the unicast flows on the mac
+	 * client.
 	 */
-	if (dip->di_bound) {
-		rw_exit(&(dip->di_lock));
-		dls_link_remove(dlp, dip);
-		rw_enter(&(dip->di_lock), RW_WRITER);
-		dip->di_bound = B_FALSE;
-	}
-
-	/*
-	 * Walk the list of multicast addresses, disabling each at
-	 * the MAC.
-	 */
-	for (p = dip->di_dmap; p != NULL; p = nextp) {
-		(void) mac_multicst_remove(dip->di_mh, p->dma_addr);
+	for (p = dsp->ds_dmap; p != NULL; p = nextp) {
+		(void) mac_multicast_remove(dsp->ds_mch, p->dma_addr);
 		nextp = p->dma_nextp;
 		kmem_free(p, sizeof (dls_multicst_addr_t));
 	}
-	dip->di_dmap = NULL;
+	dsp->ds_dmap = NULL;
 
-	dip->di_rx = NULL;
-	dip->di_rx_arg = NULL;
-	rw_exit(&(dip->di_lock));
+	dls_active_clear(dsp);
+
+	/*
+	 * If the dld_str_t is bound then unbind it.
+	 */
+	if (dsp->ds_dlstate == DL_IDLE) {
+		(void) dls_unbind(dsp);
+		dsp->ds_dlstate = DL_UNBOUND;
+	}
 
 	/*
 	 * If the MAC has been set in promiscuous mode then disable it.
+	 * This needs to be done before resetting ds_rx.
 	 */
-	(void) dls_promisc(dc, 0);
-	dip->di_txinfo = NULL;
+	old_flags = dsp->ds_promisc;
+	dsp->ds_promisc = 0;
+	(void) dls_promisc(dsp, old_flags);
 
 	/*
-	 * Free the dls_impl_t back to the cache.
+	 * At this point we have cutoff inbound packet flow from the mac
+	 * for this 'dsp'. The dls_link_remove above cut off packets meant
+	 * for us and waited for upcalls to finish. Similarly the dls_promisc
+	 * reset above waited for promisc callbacks to finish. Now we can
+	 * safely reset ds_rx to NULL
 	 */
-	dip->di_txinfo = NULL;
+	dsp->ds_rx = NULL;
+	dsp->ds_rx_arg = NULL;
 
-	if (dip->di_soft_ring_list != NULL) {
-		soft_ring_set_destroy(dip->di_soft_ring_list,
-		    dip->di_soft_ring_size);
-		dip->di_soft_ring_list = NULL;
-	}
-	dip->di_soft_ring_size = 0;
+	dsp->ds_dlp = NULL;
 
 	/*
-	 * Decrement the reference count to allow the cache to be destroyed
-	 * if there are no more dls_impl_t.
+	 * Release our reference to the dls_link_t allowing that to be
+	 * destroyed if there are no more dls_impl_t.
 	 */
-	atomic_add_32(&i_dls_impl_count, -1);
-
-	dip->di_dvp = NULL;
-
-	kmem_cache_free(i_dls_impl_cachep, dip);
-
-	mac_stop(dvp->dv_dlp->dl_mh);
-
-	/*
-	 * Release our reference to the dls_vlan_t allowing that to be
-	 * destroyed if there are no more dls_impl_t. An unreferenced tagged
-	 * (non-persistent) vlan gets destroyed automatically.
-	 */
-	if (ddh != NULL)
-		dls_devnet_close(ddh);
-	else
-		dls_vlan_rele(dvp);
-}
-
-mac_handle_t
-dls_mac(dls_channel_t dc)
-{
-	return (((dls_impl_t *)dc)->di_mh);
-}
-
-uint16_t
-dls_vid(dls_channel_t dc)
-{
-	return (((dls_impl_t *)dc)->di_dvp->dv_id);
+	dls_link_rele(dlp);
 }
 
 int
-dls_bind(dls_channel_t dc, uint32_t sap)
+dls_bind(dld_str_t *dsp, uint32_t sap)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-	dls_link_t	*dlp;
 	uint32_t	dls_sap;
+
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 
 	/*
 	 * Check to see the value is legal for the media type.
 	 */
-	if (!mac_sap_verify(dip->di_mh, sap, &dls_sap))
+	if (!mac_sap_verify(dsp->ds_mh, sap, &dls_sap))
 		return (EINVAL);
-	if (dip->di_promisc & DLS_PROMISC_SAP)
+
+	if (dsp->ds_promisc & DLS_PROMISC_SAP)
 		dls_sap = DLS_SAP_PROMISC;
 
 	/*
-	 * Set up the dls_impl_t to mark it as able to receive packets.
+	 * Set up the dld_str_t to mark it as able to receive packets.
 	 */
-	rw_enter(&(dip->di_lock), RW_WRITER);
-	ASSERT(!dip->di_bound);
-	dip->di_sap = sap;
-	dip->di_bound = B_TRUE;
-	rw_exit(&(dip->di_lock));
+	dsp->ds_sap = sap;
 
 	/*
-	 * Now bind the dls_impl_t by adding it into the hash table in the
-	 * dls_link_t.
+	 * The MAC layer does the VLAN demultiplexing and will only pass up
+	 * untagged packets to non-promiscuous primary MAC clients. In order to
+	 * support the binding to the VLAN SAP which is required by DLPI, dls
+	 * needs to get a copy of all tagged packets when the client binds to
+	 * the VLAN SAP. We do this by registering a separate promiscuous
+	 * callback for each dls client binding to that SAP.
 	 *
-	 * NOTE: This must be done without the dls_impl_t lock being held
-	 *	 otherwise deadlock may ensue.
+	 * Note: even though there are two promiscuous handles in dld_str_t,
+	 * ds_mph is for the regular promiscuous mode, ds_vlan_mph is the handle
+	 * to receive VLAN pkt when promiscuous mode is not on. Only one of
+	 * them can be non-NULL at the same time, to avoid receiving dup copies
+	 * of pkts.
 	 */
-	dlp = dip->di_dvp->dv_dlp;
-	dls_link_add(dlp, dls_sap, dip);
+	if (sap == ETHERTYPE_VLAN && dsp->ds_promisc == 0) {
+		int err;
 
+		if (dsp->ds_vlan_mph != NULL)
+			return (EINVAL);
+		err = mac_promisc_add(dsp->ds_mch,
+		    MAC_CLIENT_PROMISC_ALL, dls_rx_vlan_promisc, dsp,
+		    &dsp->ds_vlan_mph, MAC_PROMISC_FLAGS_NO_PHYS);
+		return (err);
+	}
+
+	/*
+	 * Now bind the dld_str_t by adding it into the hash table in the
+	 * dls_link_t.
+	 */
+	dls_link_add(dsp->ds_dlp, dls_sap, dsp);
 	return (0);
 }
 
-void
-dls_unbind(dls_channel_t dc)
+int
+dls_unbind(dld_str_t *dsp)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-	dls_link_t	*dlp;
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 
 	/*
-	 * Unbind the dls_impl_t by removing it from the hash table in the
+	 * For VLAN SAP, there was a promisc handle registered when dls_bind.
+	 * When unbind this dls link, we need to remove the promisc handle.
+	 * See comments in dls_bind().
+	 */
+	if (dsp->ds_vlan_mph != NULL) {
+		int err;
+
+		err = mac_promisc_remove(dsp->ds_vlan_mph);
+		ASSERT(err == 0);
+		dsp->ds_vlan_mph = NULL;
+		return (err);
+	}
+
+	/*
+	 * Unbind the dld_str_t by removing it from the hash table in the
 	 * dls_link_t.
-	 *
-	 * NOTE: This must be done without the dls_impl_t lock being held
-	 *	 otherise deadlock may enuse.
 	 */
-	dlp = dip->di_dvp->dv_dlp;
-	dls_link_remove(dlp, dip);
-
-	/*
-	 * Mark the dls_impl_t as unable to receive packets This will make
-	 * sure that 'receives in flight' will not come our way.
-	 */
-	dip->di_bound = B_FALSE;
+	dls_link_remove(dsp->ds_dlp, dsp);
+	dsp->ds_sap = 0;
+	return (0);
 }
 
 int
-dls_promisc(dls_channel_t dc, uint32_t flags)
+dls_promisc(dld_str_t *dsp, uint32_t old_flags)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-	dls_link_t	*dlp;
 	int		err = 0;
 
-	ASSERT(!(flags & ~(DLS_PROMISC_SAP | DLS_PROMISC_MULTI |
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
+	ASSERT(!(dsp->ds_promisc & ~(DLS_PROMISC_SAP | DLS_PROMISC_MULTI |
 	    DLS_PROMISC_PHYS)));
 
-	/*
-	 * Check if we need to turn on 'all sap' mode.
-	 */
-	rw_enter(&(dip->di_lock), RW_WRITER);
-	dlp = dip->di_dvp->dv_dlp;
-	if ((flags & DLS_PROMISC_SAP) &&
-	    !(dip->di_promisc & DLS_PROMISC_SAP)) {
-		dip->di_promisc |= DLS_PROMISC_SAP;
-		if (!dip->di_bound)
-			goto multi;
+	if (old_flags == 0 && dsp->ds_promisc != 0) {
+		/*
+		 * If only DLS_PROMISC_SAP, we don't turn on the
+		 * physical promisc mode
+		 */
+		err = mac_promisc_add(dsp->ds_mch, MAC_CLIENT_PROMISC_ALL,
+		    dls_rx_promisc, dsp, &dsp->ds_mph,
+		    (dsp->ds_promisc != DLS_PROMISC_SAP) ? 0 :
+		    MAC_PROMISC_FLAGS_NO_PHYS);
+		if (err != 0)
+			return (err);
 
-		rw_exit(&(dip->di_lock));
-		dls_link_remove(dlp, dip);
-		dls_link_add(dlp, DLS_SAP_PROMISC, dip);
-		rw_enter(&(dip->di_lock), RW_WRITER);
-		goto multi;
-	}
-
-	/*
-	 * Check if we need to turn off 'all sap' mode.
-	 */
-	if (!(flags & DLS_PROMISC_SAP) &&
-	    (dip->di_promisc & DLS_PROMISC_SAP)) {
-		uint32_t dls_sap;
-
-		dip->di_promisc &= ~DLS_PROMISC_SAP;
-		if (!dip->di_bound)
-			goto multi;
-
-		rw_exit(&(dip->di_lock));
-		dls_link_remove(dlp, dip);
-		(void) mac_sap_verify(dip->di_mh, dip->di_sap, &dls_sap);
-		dls_link_add(dlp, dls_sap, dip);
-		rw_enter(&(dip->di_lock), RW_WRITER);
-	}
-
-multi:
-	/*
-	 * It's easiest to add the txloop callback up-front; if promiscuous
-	 * mode cannot be enabled, then we'll remove it before returning.
-	 * Use dl_promisc_lock to prevent racing with another thread also
-	 * manipulating the promiscuous state on another dls_impl_t associated
-	 * with the same dls_link_t.
-	 */
-	mutex_enter(&dlp->dl_promisc_lock);
-	if ((dlp->dl_npromisc == 0) && (flags & DLS_PROMISC_PHYS)) {
-		ASSERT(dlp->dl_mth == NULL);
-		dlp->dl_mth = mac_txloop_add(dlp->dl_mh, dls_link_txloop, dlp);
-	}
-
-	/*
-	 * Turn on or off 'all multicast' mode, if necessary.
-	 */
-	if (flags & DLS_PROMISC_MULTI) {
-		if (!(dip->di_promisc & DLS_PROMISC_MULTI)) {
-			if ((err = mac_promisc_set(dip->di_mh, B_TRUE,
-			    MAC_DEVPROMISC)) != 0) {
-				goto done;
-			}
-			dip->di_promisc |= DLS_PROMISC_MULTI;
+		/* Remove vlan promisc handle to avoid sending dup copy up */
+		if (dsp->ds_vlan_mph != NULL) {
+			err = mac_promisc_remove(dsp->ds_vlan_mph);
+			dsp->ds_vlan_mph = NULL;
 		}
-	} else {
-		if (dip->di_promisc & DLS_PROMISC_MULTI) {
-			if ((err = mac_promisc_set(dip->di_mh, B_FALSE,
-			    MAC_DEVPROMISC)) != 0) {
-				goto done;
-			}
-			dip->di_promisc &= ~DLS_PROMISC_MULTI;
+	} else if (old_flags != 0 && dsp->ds_promisc == 0) {
+		ASSERT(dsp->ds_mph != NULL);
+		err = mac_promisc_remove(dsp->ds_mph);
+		/*
+		 * The failure only relates to resetting the device promiscuity
+		 * The mac layer does not fail in freeing up the promiscuous
+		 * data structures, and so we clear the ds_mph. The dld stream
+		 * may be closing and we can't fail that.
+		 */
+		dsp->ds_mph = NULL;
+		if (err != 0)
+			return (err);
+
+		if (dsp->ds_sap == ETHERTYPE_VLAN &&
+		    dsp->ds_dlstate != DL_UNBOUND) {
+			int err;
+
+			if (dsp->ds_vlan_mph != NULL)
+				return (EINVAL);
+			err = mac_promisc_add(dsp->ds_mch,
+			    MAC_CLIENT_PROMISC_ALL, dls_rx_vlan_promisc, dsp,
+			    &dsp->ds_vlan_mph, MAC_PROMISC_FLAGS_NO_PHYS);
+			return (err);
 		}
+	} else if (old_flags == DLS_PROMISC_SAP && dsp->ds_promisc != 0 &&
+	    dsp->ds_promisc != old_flags) {
+		/*
+		 * If the old flag is PROMISC_SAP, but the current flag has
+		 * changed to some new non-zero value, we need to turn the
+		 * physical promiscuous mode.
+		 */
+		ASSERT(dsp->ds_mph != NULL);
+		err = mac_promisc_remove(dsp->ds_mph);
+		if (err != 0)
+			return (err);
+		err = mac_promisc_add(dsp->ds_mch, MAC_CLIENT_PROMISC_ALL,
+		    dls_rx_promisc, dsp, &dsp->ds_mph, 0);
 	}
 
-	/*
-	 * Turn on or off 'all physical' mode, if necessary.
-	 */
-	if (flags & DLS_PROMISC_PHYS) {
-		if (!(dip->di_promisc & DLS_PROMISC_PHYS)) {
-			err = mac_promisc_set(dip->di_mh, B_TRUE, MAC_PROMISC);
-			if (err != 0)
-				goto done;
-
-			dip->di_promisc |= DLS_PROMISC_PHYS;
-			dlp->dl_npromisc++;
-		}
-	} else {
-		if (dip->di_promisc & DLS_PROMISC_PHYS) {
-			err = mac_promisc_set(dip->di_mh, B_FALSE, MAC_PROMISC);
-			if (err != 0)
-				goto done;
-
-			dip->di_promisc &= ~DLS_PROMISC_PHYS;
-			dlp->dl_npromisc--;
-		}
-	}
-
-done:
-	if (dlp->dl_npromisc == 0 && dlp->dl_mth != NULL) {
-		mac_txloop_remove(dlp->dl_mh, dlp->dl_mth);
-		dlp->dl_mth = NULL;
-	}
-
-	ASSERT(dlp->dl_npromisc == 0 || dlp->dl_mth != NULL);
-	mutex_exit(&dlp->dl_promisc_lock);
-
-	rw_exit(&(dip->di_lock));
 	return (err);
 }
 
 int
-dls_multicst_add(dls_channel_t dc, const uint8_t *addr)
+dls_multicst_add(dld_str_t *dsp, const uint8_t *addr)
 {
-	dls_impl_t		*dip = (dls_impl_t *)dc;
 	int			err;
 	dls_multicst_addr_t	**pp;
 	dls_multicst_addr_t	*p;
 	uint_t			addr_length;
 
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
+
 	/*
 	 * Check whether the address is in the list of enabled addresses for
-	 * this dls_impl_t.
+	 * this dld_str_t.
 	 */
-	rw_enter(&(dip->di_lock), RW_WRITER);
-	addr_length = dip->di_mip->mi_addr_length;
-	for (pp = &(dip->di_dmap); (p = *pp) != NULL; pp = &(p->dma_nextp)) {
+	addr_length = dsp->ds_mip->mi_addr_length;
+
+	/*
+	 * Protect against concurrent access of ds_dmap by data threads using
+	 * ds_rw_lock. The mac perimeter serializes the dls_multicst_add and
+	 * remove operations. Dropping the ds_rw_lock across mac calls is thus
+	 * ok and is also required by the locking protocol.
+	 */
+	rw_enter(&dsp->ds_rw_lock, RW_WRITER);
+	for (pp = &(dsp->ds_dmap); (p = *pp) != NULL; pp = &(p->dma_nextp)) {
 		if (bcmp(addr, p->dma_addr, addr_length) == 0) {
 			/*
 			 * It is there so there's nothing to do.
@@ -610,92 +312,92 @@ dls_multicst_add(dls_channel_t dc, const uint8_t *addr)
 	}
 
 	/*
-	 * Allocate a new list item.
+	 * Allocate a new list item and add it to the list.
 	 */
-	if ((p = kmem_zalloc(sizeof (dls_multicst_addr_t),
-	    KM_NOSLEEP)) == NULL) {
-		err = ENOMEM;
-		goto done;
-	}
+	p = kmem_zalloc(sizeof (dls_multicst_addr_t), KM_SLEEP);
+	bcopy(addr, p->dma_addr, addr_length);
+	*pp = p;
+	rw_exit(&dsp->ds_rw_lock);
 
 	/*
 	 * Enable the address at the MAC.
 	 */
-	if ((err = mac_multicst_add(dip->di_mh, addr)) != 0) {
-		kmem_free(p, sizeof (dls_multicst_addr_t));
-		goto done;
-	}
+	err = mac_multicast_add(dsp->ds_mch, addr);
+	if (err == 0)
+		return (0);
 
-	/*
-	 * The address is now enabled at the MAC so add it to the list.
-	 */
-	bcopy(addr, p->dma_addr, addr_length);
-	*pp = p;
-
+	/* Undo the operation as it has failed */
+	rw_enter(&dsp->ds_rw_lock, RW_WRITER);
+	ASSERT(*pp == p && p->dma_nextp == NULL);
+	*pp = NULL;
+	kmem_free(p, sizeof (dls_multicst_addr_t));
 done:
-	rw_exit(&(dip->di_lock));
+	rw_exit(&dsp->ds_rw_lock);
 	return (err);
 }
 
 int
-dls_multicst_remove(dls_channel_t dc, const uint8_t *addr)
+dls_multicst_remove(dld_str_t *dsp, const uint8_t *addr)
 {
-	dls_impl_t		*dip = (dls_impl_t *)dc;
-	int			err;
 	dls_multicst_addr_t	**pp;
 	dls_multicst_addr_t	*p;
 	uint_t			addr_length;
 
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
+
 	/*
 	 * Find the address in the list of enabled addresses for this
-	 * dls_impl_t.
+	 * dld_str_t.
 	 */
-	rw_enter(&(dip->di_lock), RW_WRITER);
-	addr_length = dip->di_mip->mi_addr_length;
-	for (pp = &(dip->di_dmap); (p = *pp) != NULL; pp = &(p->dma_nextp)) {
+	addr_length = dsp->ds_mip->mi_addr_length;
+
+	/*
+	 * Protect against concurrent access to ds_dmap by data threads using
+	 * ds_rw_lock. The mac perimeter serializes the dls_multicst_add and
+	 * remove operations. Dropping the ds_rw_lock across mac calls is thus
+	 * ok and is also required by the locking protocol.
+	 */
+	rw_enter(&dsp->ds_rw_lock, RW_WRITER);
+	for (pp = &(dsp->ds_dmap); (p = *pp) != NULL; pp = &(p->dma_nextp)) {
 		if (bcmp(addr, p->dma_addr, addr_length) == 0)
 			break;
 	}
 
 	/*
 	 * If we walked to the end of the list then the given address is
-	 * not currently enabled for this dls_impl_t.
+	 * not currently enabled for this dld_str_t.
 	 */
 	if (p == NULL) {
-		err = ENOENT;
-		goto done;
+		rw_exit(&dsp->ds_rw_lock);
+		return (ENOENT);
 	}
-
-	/*
-	 * Disable the address at the MAC.
-	 */
-	if ((err = mac_multicst_remove(dip->di_mh, addr)) != 0)
-		goto done;
 
 	/*
 	 * Remove the address from the list.
 	 */
 	*pp = p->dma_nextp;
-	kmem_free(p, sizeof (dls_multicst_addr_t));
+	rw_exit(&dsp->ds_rw_lock);
 
-done:
-	rw_exit(&(dip->di_lock));
-	return (err);
+	/*
+	 * Disable the address at the MAC.
+	 */
+	mac_multicast_remove(dsp->ds_mch, addr);
+	kmem_free(p, sizeof (dls_multicst_addr_t));
+	return (0);
 }
 
 mblk_t *
-dls_header(dls_channel_t dc, const uint8_t *addr, uint16_t sap, uint_t pri,
+dls_header(dld_str_t *dsp, const uint8_t *addr, uint16_t sap, uint_t pri,
     mblk_t **payloadp)
 {
-	dls_impl_t *dip = (dls_impl_t *)dc;
 	uint16_t vid;
 	size_t extra_len;
 	uint16_t mac_sap;
 	mblk_t *mp, *payload;
-	boolean_t is_ethernet = (dip->di_mip->mi_media == DL_ETHER);
+	boolean_t is_ethernet = (dsp->ds_mip->mi_media == DL_ETHER);
 	struct ether_vlan_header *evhp;
 
-	vid = dip->di_dvp->dv_id;
+	vid = mac_client_vid(dsp->ds_mch);
 	payload = (payloadp == NULL) ? NULL : (*payloadp);
 
 	/*
@@ -719,7 +421,7 @@ dls_header(dls_channel_t dc, const uint8_t *addr, uint16_t sap, uint_t pri,
 		mac_sap = sap;
 	}
 
-	mp = mac_header(dip->di_mh, addr, mac_sap, payload, extra_len);
+	mp = mac_header(dsp->ds_mh, addr, mac_sap, payload, extra_len);
 	if (mp == NULL)
 		return (NULL);
 
@@ -772,209 +474,207 @@ dls_header(dls_channel_t dc, const uint8_t *addr, uint16_t sap, uint_t pri,
 	return (mp);
 }
 
-int
-dls_header_info(dls_channel_t dc, mblk_t *mp, mac_header_info_t *mhip)
-{
-	return (dls_link_header_info(((dls_impl_t *)dc)->di_dvp->dv_dlp,
-	    mp, mhip));
-}
-
 void
-dls_rx_set(dls_channel_t dc, dls_rx_t rx, void *arg)
+dls_rx_set(dld_str_t *dsp, dls_rx_t rx, void *arg)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-
-	rw_enter(&(dip->di_lock), RW_WRITER);
-	dip->di_rx = rx;
-	dip->di_rx_arg = arg;
-	rw_exit(&(dip->di_lock));
+	mutex_enter(&dsp->ds_lock);
+	dsp->ds_rx = rx;
+	dsp->ds_rx_arg = arg;
+	mutex_exit(&dsp->ds_lock);
 }
 
-mblk_t *
-dls_tx(dls_channel_t dc, mblk_t *mp)
-{
-	const mac_txinfo_t *mtp = ((dls_impl_t *)dc)->di_txinfo;
-
-	return (mtp->mt_fn(mtp->mt_arg, mp));
-}
-
-boolean_t
-dls_accept(dls_impl_t *dip, mac_header_info_t *mhip, dls_rx_t *di_rx,
-    void **di_rx_arg)
+static boolean_t
+dls_accept_common(dld_str_t *dsp, mac_header_info_t *mhip, dls_rx_t *ds_rx,
+    void **ds_rx_arg, boolean_t promisc, boolean_t promisc_loopback)
 {
 	dls_multicst_addr_t	*dmap;
-	size_t			addr_length = dip->di_mip->mi_addr_length;
+	size_t			addr_length = dsp->ds_mip->mi_addr_length;
 
 	/*
-	 * We must not accept packets if the dls_impl_t is not marked as bound
+	 * We must not accept packets if the dld_str_t is not marked as bound
 	 * or is being removed.
 	 */
-	rw_enter(&(dip->di_lock), RW_READER);
-	if (!dip->di_bound || dip->di_removing)
+	if (dsp->ds_dlstate != DL_IDLE)
 		goto refuse;
 
-	/*
-	 * If the dls_impl_t is in 'all physical' mode then always accept.
-	 */
-	if (dip->di_promisc & DLS_PROMISC_PHYS)
-		goto accept;
+	if (dsp->ds_promisc != 0) {
+		/*
+		 * Filter out packets that arrived from the data path
+		 * (i_dls_link_rx) when promisc mode is on.
+		 */
+		if (!promisc)
+			goto refuse;
+		/*
+		 * If the dls_impl_t is in 'all physical' mode then
+		 * always accept.
+		 */
+		if (dsp->ds_promisc & DLS_PROMISC_PHYS)
+			goto accept;
 
-	/*
-	 * For non-promiscs-phys streams, filter out the packets looped back
-	 * from the underlying driver because of promiscuous setting.
-	 */
-	if (mhip->mhi_prom_looped)
-		goto refuse;
+		/*
+		 * Loopback packets i.e. packets sent out by DLS on a given
+		 * mac end point, will be accepted back by DLS on loopback
+		 * from the mac, only in the 'all physical' mode which has been
+		 * covered by the previous check above
+		 */
+		if (promisc_loopback)
+			goto refuse;
+	}
 
 	switch (mhip->mhi_dsttype) {
 	case MAC_ADDRTYPE_UNICAST:
+	case MAC_ADDRTYPE_BROADCAST:
 		/*
-		 * Check to see if the destination address matches the
-		 * dls_impl_t unicast address.
+		 * We can accept unicast and broadcast packets because
+		 * filtering is already done by the mac layer.
 		 */
-		if (memcmp(mhip->mhi_daddr, dip->di_unicst_addr, addr_length) ==
-		    0) {
-			goto accept;
-		}
-		break;
+		goto accept;
 	case MAC_ADDRTYPE_MULTICAST:
 		/*
-		 * Check the address against the list of addresses enabled
-		 * for this dls_impl_t or accept it unconditionally if the
-		 * dls_impl_t is in 'all multicast' mode.
+		 * Additional filtering is needed for multicast addresses
+		 * because different streams may be interested in different
+		 * addresses.
 		 */
-		if (dip->di_promisc & DLS_PROMISC_MULTI)
+		if (dsp->ds_promisc & DLS_PROMISC_MULTI)
 			goto accept;
-		for (dmap = dip->di_dmap; dmap != NULL;
+
+		rw_enter(&dsp->ds_rw_lock, RW_READER);
+		for (dmap = dsp->ds_dmap; dmap != NULL;
 		    dmap = dmap->dma_nextp) {
 			if (memcmp(mhip->mhi_daddr, dmap->dma_addr,
 			    addr_length) == 0) {
+				rw_exit(&dsp->ds_rw_lock);
 				goto accept;
 			}
 		}
+		rw_exit(&dsp->ds_rw_lock);
 		break;
-	case MAC_ADDRTYPE_BROADCAST:
-		/*
-		 * If the address is broadcast then the dls_impl_t will
-		 * always accept it.
-		 */
-		goto accept;
 	}
 
 refuse:
-	rw_exit(&(dip->di_lock));
 	return (B_FALSE);
 
 accept:
 	/*
-	 * Since we hold di_lock here, the returned di_rx and di_rx_arg will
-	 * always be in sync.
+	 * the returned ds_rx and ds_rx_arg will always be in sync.
 	 */
-	*di_rx = dip->di_rx;
-	*di_rx_arg = dip->di_rx_arg;
-	rw_exit(&(dip->di_lock));
+	mutex_enter(&dsp->ds_lock);
+	*ds_rx = dsp->ds_rx;
+	*ds_rx_arg = dsp->ds_rx_arg;
+	mutex_exit(&dsp->ds_lock);
+
 	return (B_TRUE);
 }
 
 /* ARGSUSED */
 boolean_t
-dls_accept_loopback(dls_impl_t *dip, mac_header_info_t *mhip, dls_rx_t *di_rx,
-    void **di_rx_arg)
+dls_accept(dld_str_t *dsp, mac_header_info_t *mhip, dls_rx_t *ds_rx,
+    void **ds_rx_arg)
 {
-	/*
-	 * We must not accept packets if the dls_impl_t is not marked as bound
-	 * or is being removed.
-	 */
-	rw_enter(&(dip->di_lock), RW_READER);
-	if (!dip->di_bound || dip->di_removing)
-		goto refuse;
-
-	/*
-	 * A dls_impl_t should only accept loopback packets if it is in
-	 * 'all physical' mode.
-	 */
-	if (dip->di_promisc & DLS_PROMISC_PHYS)
-		goto accept;
-
-refuse:
-	rw_exit(&(dip->di_lock));
-	return (B_FALSE);
-
-accept:
-	/*
-	 * Since we hold di_lock here, the returned di_rx and di_rx_arg will
-	 * always be in sync.
-	 */
-	*di_rx = dip->di_rx;
-	*di_rx_arg = dip->di_rx_arg;
-	rw_exit(&(dip->di_lock));
-	return (B_TRUE);
+	return (dls_accept_common(dsp, mhip, ds_rx, ds_rx_arg, B_FALSE,
+	    B_FALSE));
 }
 
 boolean_t
+dls_accept_promisc(dld_str_t *dsp, mac_header_info_t *mhip, dls_rx_t *ds_rx,
+    void **ds_rx_arg, boolean_t loopback)
+{
+	return (dls_accept_common(dsp, mhip, ds_rx, ds_rx_arg, B_TRUE,
+	    loopback));
+}
+
+int
 dls_mac_active_set(dls_link_t *dlp)
 {
-	mutex_enter(&dlp->dl_lock);
+	int err = 0;
 
 	/*
-	 * If this is the first active client on this link, notify
-	 * the mac that we're becoming an active client.
+	 * First client; add the primary unicast address.
 	 */
-	if (dlp->dl_nactive == 0 && !mac_active_shareable_set(dlp->dl_mh)) {
-		mutex_exit(&dlp->dl_lock);
-		return (B_FALSE);
+	if (dlp->dl_nactive == 0) {
+		/*
+		 * First client; add the primary unicast address.
+		 */
+		mac_diag_t diag;
+
+		/* request the primary MAC address */
+		if ((err = mac_unicast_primary_add(dlp->dl_mch, &dlp->dl_mah,
+		    &diag)) != 0) {
+			return (err);
+		}
+
+		/*
+		 * Set the function to start receiving packets.
+		 */
+		mac_rx_set(dlp->dl_mch, i_dls_link_rx, dlp);
+
+		/*
+		 * We've got a MAC client for this link now.
+		 * Push down the flows that were defined on this link
+		 * hitherto. The flows are added to the active flow table
+		 * and SRS, softrings etc. are created as needed.
+		 */
+		mac_link_init_flows(dlp->dl_mch);
 	}
 	dlp->dl_nactive++;
-	mutex_exit(&dlp->dl_lock);
-	return (B_TRUE);
+	return (0);
 }
 
 void
 dls_mac_active_clear(dls_link_t *dlp)
 {
-	mutex_enter(&dlp->dl_lock);
-	if (--dlp->dl_nactive == 0)
-		mac_active_clear(dlp->dl_mh);
-	mutex_exit(&dlp->dl_lock);
+	if (--dlp->dl_nactive == 0) {
+		ASSERT(dlp->dl_mah != NULL);
+		/*
+		 * We would have initialized subflows etc. only if we
+		 * brought up the primary client and set the unicast
+		 * unicast address etc. Deactivate the flows. The flow
+		 * entry will be removed from the active flow tables,
+		 * and the associated SRS, softrings etc will be
+		 * deleted. But the flow entry itself won't be
+		 * destroyed, instead it will continue to be
+		 * archived off the  the global flow hash list, for a
+		 * possible future activation when say
+		 * IP is plumbed again
+		 */
+
+		mac_link_release_flows(dlp->dl_mch);
+		(void) mac_unicast_remove(dlp->dl_mch, dlp->dl_mah);
+		dlp->dl_mah = NULL;
+		mac_rx_clear(dlp->dl_mch);
+	}
 }
 
-boolean_t
-dls_active_set(dls_channel_t dc)
+int
+dls_active_set(dld_str_t *dsp)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-	dls_link_t	*dlp = dip->di_dvp->dv_dlp;
+	int err = 0;
 
-	rw_enter(&dip->di_lock, RW_WRITER);
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 
 	/* If we're already active, then there's nothing more to do. */
-	if (dip->di_active) {
-		rw_exit(&dip->di_lock);
-		return (B_TRUE);
+	if (dsp->ds_active)
+		return (0);
+
+	if ((err = dls_mac_active_set(dsp->ds_dlp)) != 0) {
+		/* except for ENXIO all other errors are mapped to EBUSY */
+		if (err != ENXIO)
+			return (EBUSY);
+		return (err);
 	}
 
-	if (!dls_mac_active_set(dlp)) {
-		rw_exit(&dip->di_lock);
-		return (B_FALSE);
-	}
-	dip->di_active = B_TRUE;
-	rw_exit(&dip->di_lock);
-	return (B_TRUE);
+	dsp->ds_active = B_TRUE;
+	return (0);
 }
 
 void
-dls_active_clear(dls_channel_t dc)
+dls_active_clear(dld_str_t *dsp)
 {
-	dls_impl_t	*dip = (dls_impl_t *)dc;
-	dls_link_t	*dlp = dip->di_dvp->dv_dlp;
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
 
-	rw_enter(&dip->di_lock, RW_WRITER);
+	if (!dsp->ds_active)
+		return;
 
-	if (!dip->di_active)
-		goto out;
-	dip->di_active = B_FALSE;
-
-	dls_mac_active_clear(dlp);
-
-out:
-	rw_exit(&dip->di_lock);
+	dls_mac_active_clear(dsp->ds_dlp);
+	dsp->ds_active = B_FALSE;
 }

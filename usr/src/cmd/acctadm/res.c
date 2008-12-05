@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <libintl.h>
@@ -89,6 +87,33 @@ static ac_resname_t ac_names[] = {
 	{ AC_FLOW,	AC_FLOW_ANAME,		"action"	},
 
 	/*
+	 * Net accounting resources
+	 */
+
+	{ AC_NET,	AC_NET_NAME,		"name"		},
+	{ AC_NET,	AC_NET_EHOST,		"ehost"		},
+	{ AC_NET,	AC_NET_EDEST,		"edest"		},
+	{ AC_NET,	AC_NET_VLAN_TPID,	"vlan_pid"	},
+	{ AC_NET,	AC_NET_VLAN_TCI,	"vlan_tci"	},
+	{ AC_NET,	AC_NET_SAP,		"sap"		},
+	{ AC_NET,	AC_NET_PRIORITY,	"priority"	},
+	{ AC_NET,	AC_NET_BWLIMIT,		"bwlimit"	},
+	{ AC_NET,	AC_NET_DEVNAME,		"devname"	},
+	{ AC_NET,	AC_NET_SADDR,		"src_ip"	},
+	{ AC_NET,	AC_NET_DADDR,		"dst_ip"	},
+	{ AC_NET,	AC_NET_SPORT,		"src_port"	},
+	{ AC_NET,	AC_NET_DPORT,		"dst_port"	},
+	{ AC_NET,	AC_NET_PROTOCOL,	"protocol"	},
+	{ AC_NET,	AC_NET_DSFIELD,		"dsfield"	},
+	{ AC_NET,	AC_NET_CURTIME,		"curtime"	},
+	{ AC_NET,	AC_NET_IBYTES,		"ibytes"	},
+	{ AC_NET,	AC_NET_OBYTES,		"obytes"	},
+	{ AC_NET,	AC_NET_IPKTS,		"ipkts"		},
+	{ AC_NET,	AC_NET_OPKTS,		"opkts"		},
+	{ AC_NET,	AC_NET_IERRPKTS,	"ierrpkts"	},
+	{ AC_NET,	AC_NET_OERRPKTS,	"oerrpkts"	},
+
+	/*
 	 * These are included for compatibility with old acctadm that
 	 * didn't have resource groups for individual accounting types.
 	 * It was possible to have resource "pid" enabled for task
@@ -134,6 +159,19 @@ static ac_group_t ac_groups[] = {
 		{ AC_FLOW_SADDR, AC_FLOW_DADDR, AC_FLOW_SPORT, AC_FLOW_DPORT,
 		AC_FLOW_PROTOCOL, AC_FLOW_NBYTES, AC_FLOW_NPKTS, AC_FLOW_ANAME,
 		AC_NONE } },
+	{ AC_NET,	"extended",
+		{ AC_NET_NAME, AC_NET_EHOST, AC_NET_EDEST, AC_NET_VLAN_TPID,
+		AC_NET_VLAN_TCI, AC_NET_SAP, AC_NET_PRIORITY,
+		AC_NET_BWLIMIT, AC_NET_DEVNAME, AC_NET_SADDR, AC_NET_DADDR,
+		AC_NET_SPORT, AC_NET_DPORT, AC_NET_PROTOCOL, AC_NET_DSFIELD,
+		AC_NET_CURTIME, AC_NET_IBYTES, AC_NET_OBYTES, AC_NET_IPKTS,
+		AC_NET_OPKTS, AC_NET_IERRPKTS, AC_NET_OERRPKTS, AC_NONE } },
+	{ AC_NET,	"basic",
+		{ AC_NET_NAME, AC_NET_DEVNAME, AC_NET_EHOST, AC_NET_EDEST,
+		AC_NET_VLAN_TPID, AC_NET_VLAN_TCI, AC_NET_SAP,
+		AC_NET_PRIORITY, AC_NET_BWLIMIT, AC_NET_CURTIME, AC_NET_IBYTES,
+		AC_NET_OBYTES, AC_NET_IPKTS, AC_NET_OPKTS, AC_NET_IERRPKTS,
+		AC_NET_OERRPKTS, AC_NONE } },
 	{ AC_NONE,	NULL,
 		{ AC_NONE } }
 };
@@ -202,9 +240,10 @@ printgroups(int type)
 {
 	int header = 0;
 
-	if ((type & AC_PROC) && (type & AC_TASK) && (type & AC_FLOW))
+	if ((type & AC_PROC) && (type & AC_TASK) && (type & AC_FLOW) &&
+	    (type & AC_NET)) {
 		header = 1;
-
+	}
 	if (type & AC_PROC) {
 		if (header == 1)
 			(void) printf("process:\n");
@@ -219,6 +258,11 @@ printgroups(int type)
 		if (header == 1)
 			(void) printf("flow:\n");
 		printgroup(AC_FLOW);
+	}
+	if (type & AC_NET) {
+		if (header == 1)
+			(void) printf("net:\n");
+		printgroup(AC_NET);
 	}
 }
 

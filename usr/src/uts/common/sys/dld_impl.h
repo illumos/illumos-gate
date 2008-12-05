@@ -27,13 +27,12 @@
 #define	_SYS_DLD_IMPL_H
 
 #include <sys/types.h>
-#include <sys/conf.h>
+#include <sys/list.h>
 #include <sys/ethernet.h>
 #include <sys/stream.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
-#include <sys/dls.h>
 #include <sys/dld.h>
+#include <sys/dls_impl.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -57,39 +56,50 @@ typedef enum {
 	DLD_ACTIVE
 } dld_passivestate_t;
 
-typedef struct dld_str	dld_str_t;
-typedef void		(*dld_tx_t)(struct dld_str *, mblk_t *);
-
 /*
- * dld_str_t object definition.
+ * The dld_str_t object definition and protection scheme for each member
+ * is described below. The framework locking mechanism details are described in
+ * mac_impl.h and mac.c
+ *
+ * Write Once Only (WO): Typically these are initialized when the end point
+ * is created or initialized and don't change subsequently
+ *
+ * Serializer (SL): Protected by the Serializer. All modify operations on an
+ * end point go through the serializer. Readers don't care about reading
+ * these fields atomically, or readers also use the serializer to see the
+ * values atomically.
+ *
+ * Lock: kmutex_t or kwrlock_t lock. Modify operations still go through the
+ * serializer, the lock helps synchronize readers with writers.
  */
-struct dld_str {
+
+struct dld_str_s {					/* Protected by */
 	/*
 	 * Major number of the device
 	 */
-	major_t			ds_major;
+	major_t			ds_major;		/* WO */
 
 	/*
 	 * Ephemeral minor number for the object.
 	 */
-	minor_t			ds_minor;
+	minor_t			ds_minor;		/* WO */
+
+	/*
+	 * PPA number this stream is attached to.
+	 */
+	t_uscalar_t		ds_ppa;			/* SL */
 
 	/*
 	 * Read/write queues for the stream which the object represents.
 	 */
-	queue_t			*ds_rq;
-	queue_t			*ds_wq;
-
-	/*
-	 * Lock to protect this structure.
-	 */
-	krwlock_t		ds_lock;
+	queue_t			*ds_rq;			/* WO */
+	queue_t			*ds_wq;			/* WO */
 
 	/*
 	 * Stream is open to DLD_CONTROL (control node) or
 	 * DLD_DLPI (DLS provider) node.
 	 */
-	uint_t			ds_type;
+	uint_t			ds_type;		/* WO */
 
 	/*
 	 * The following fields are only used for DLD_DLPI type objects.
@@ -98,158 +108,123 @@ struct dld_str {
 	/*
 	 * Current DLPI state.
 	 */
-	t_uscalar_t		ds_dlstate;
+	t_uscalar_t		ds_dlstate;		/* ds_lock */
 
 	/*
 	 * DLPI style
 	 */
-	t_uscalar_t		ds_style;
+	t_uscalar_t		ds_style;		/* WO */
 
 	/*
 	 * Currently bound DLSAP.
 	 */
-	uint16_t		ds_sap;
-
-	/*
-	 * Handle of the data-link channel that is used by this object.
-	 */
-	dls_channel_t		ds_dc;
+	uint16_t		ds_sap;			/* SL */
 
 	/*
 	 * Handle of the MAC that is used by the data-link interface.
 	 */
-	mac_handle_t		ds_mh;
-
-	/*
-	 * VLAN identifier of the data-link interface.
-	 */
-	uint16_t		ds_vid;
+	mac_handle_t		ds_mh;			/* SL */
+	mac_client_handle_t	ds_mch;			/* SL */
 
 	/*
 	 * Promiscuity level information.
 	 */
-	uint32_t		ds_promisc;
+	uint32_t		ds_promisc;		/* SL */
+	mac_promisc_handle_t	ds_mph;
+	mac_promisc_handle_t	ds_vlan_mph;
 
 	/*
 	 * Immutable information of the MAC which the channel is using.
 	 */
-	const mac_info_t	*ds_mip;
+	const mac_info_t	*ds_mip;		/* SL */
 
 	/*
 	 * Current packet priority.
 	 */
-	uint_t			ds_pri;
+	uint_t			ds_pri;			/* SL */
 
 	/*
 	 * Handle of our MAC notification callback.
 	 */
-	mac_notify_handle_t	ds_mnh;
+	mac_notify_handle_t	ds_mnh;			/* SL */
 
 	/*
 	 * Set of enabled DL_NOTE... notifications. (See dlpi.h).
 	 */
-	uint32_t		ds_notifications;
-
-	/*
-	 * Cached MAC unicast addresses.
-	 */
-	uint8_t			ds_fact_addr[MAXMACADDRLEN];
-	uint8_t			ds_curr_addr[MAXMACADDRLEN];
+	uint32_t		ds_notifications;	/* SL */
 
 	/*
 	 * Mode: unitdata, fast-path or raw.
 	 */
-	dld_str_mode_t		ds_mode;
+	dld_str_mode_t		ds_mode;		/* SL */
 
 	/*
 	 * Native mode state.
 	 */
-	boolean_t		ds_native;
+	boolean_t		ds_native;		/* SL */
 
 	/*
 	 * IP polling is operational if this flag is set.
 	 */
-	boolean_t		ds_polling;
-	boolean_t		ds_soft_ring;
+	boolean_t		ds_polling;		/* SL */
+	boolean_t		ds_direct;		/* SL */
 
 	/*
 	 * LSO is enabled if ds_lso is set.
 	 */
-	boolean_t		ds_lso;
-	uint64_t		ds_lso_max;
+	boolean_t		ds_lso;			/* SL */
+	uint64_t		ds_lso_max;		/* SL */
 
 	/*
 	 * State of DLPI user: may be active (regular network layer),
 	 * passive (snoop-like monitoring), or unknown (not yet
 	 * determined).
 	 */
-	dld_passivestate_t	ds_passivestate;
+	dld_passivestate_t	ds_passivestate;	/* SL */
 
 	/*
 	 * Dummy mblk used for flow-control.
 	 */
-	mblk_t			*ds_tx_flow_mp;
+	mblk_t			*ds_tx_flow_mp;		/* ds_lock */
 
 	/*
-	 * Internal transmit queue and its parameters.
+	 * List of queued DLPI requests. These will be processed
+	 * by a taskq thread. This block is protected by ds_lock
 	 */
-	kmutex_t		ds_tx_list_lock;
-	mblk_t			*ds_tx_list_head;
-	mblk_t			*ds_tx_list_tail;
-	uint_t			ds_tx_cnt;
-	uint_t			ds_tx_msgcnt;
-	timeout_id_t		ds_tx_qdepth_tid;
-	boolean_t		ds_tx_qbusy;
+	kmutex_t		ds_lock;
+	krwlock_t		ds_rw_lock;
+	kcondvar_t		ds_datathr_cv;		/* ds_lock */
+	uint_t			ds_datathr_cnt;		/* ds_lock */
+	mblk_t			*ds_pending_head;	/* ds_lock */
+	mblk_t			*ds_pending_tail;	/* ds_lock */
+	kcondvar_t		ds_dlpi_pending_cv;	/* ds_lock */
+	uint32_t
+				ds_dlpi_pending : 1,	/* ds_lock */
+				ds_local	: 1,
+				ds_pad		: 30;	/* ds_lock */
 
-	dld_tx_t		ds_tx;
-	dld_tx_t		ds_unitdata_tx;
-	kmutex_t		ds_tx_lock;
-	kcondvar_t		ds_tx_cv;
-	uint32_t		ds_intx_cnt;
-	boolean_t		ds_detaching;
-
-	/*
-	 * Pending control messages to be processed.
-	 */
-	mblk_t			*ds_pending_head;
-	mblk_t			*ds_pending_tail;
-
-	taskqid_t		ds_tid;
-	kmutex_t		ds_disp_lock;
-	kcondvar_t		ds_disp_cv;
-	boolean_t		ds_closing;
-
-	/*
-	 * Used to process ioctl message for control node. See comments
-	 * above dld_ioctl().
-	 */
-	void			(*ds_ioctl)(queue_t *, mblk_t *);
+	dls_link_t		*ds_dlp;		/* SL */
+	dls_multicst_addr_t	*ds_dmap;		/* ds_rw_lock */
+	dls_rx_t		ds_rx;			/* ds_lock */
+	void			*ds_rx_arg;		/* ds_lock */
+	boolean_t		ds_active;		/* SL */
+	dld_str_t		*ds_next;		/* SL */
+	dls_head_t		*ds_head;
+	dls_dl_handle_t		ds_ddh;
+	list_node_t		ds_tqlist;
 };
 
-#define	DLD_TX_ENTER(dsp) {					\
-	mutex_enter(&(dsp)->ds_tx_lock);			\
-	(dsp)->ds_intx_cnt++;					\
-	mutex_exit(&(dsp)->ds_tx_lock);				\
+#define	DLD_DATATHR_INC(dsp)	{		\
+	ASSERT(MUTEX_HELD(&(dsp)->ds_lock));	\
+	dsp->ds_datathr_cnt++;			\
 }
 
-#define	DLD_TX_EXIT(dsp) {					\
-	mutex_enter(&(dsp)->ds_tx_lock);			\
-	if ((--(dsp)->ds_intx_cnt == 0) && (dsp)->ds_detaching)	\
-		cv_signal(&(dsp)->ds_tx_cv);			\
-	mutex_exit(&(dsp)->ds_tx_lock);				\
-}
-
-/*
- * Quiesce the traffic.
- */
-#define	DLD_TX_QUIESCE(dsp) {						\
-	mutex_enter(&(dsp)->ds_tx_lock);				\
-	(dsp)->ds_tx = (dsp)->ds_unitdata_tx = NULL;			\
-	(dsp)->ds_detaching = B_TRUE;					\
-	while ((dsp)->ds_intx_cnt != 0)					\
-		cv_wait(&(dsp)->ds_tx_cv, &(dsp)->ds_tx_lock);		\
-	(dsp)->ds_detaching = B_FALSE;					\
-	mutex_exit(&(dsp)->ds_tx_lock);					\
+#define	DLD_DATATHR_DCR(dsp)	{		\
+	mutex_enter(&(dsp)->ds_lock);		\
+	(dsp)->ds_datathr_cnt--;		\
+	if ((dsp)->ds_datathr_cnt == 0)		\
+		cv_broadcast(&(dsp)->ds_datathr_cv);	\
+	mutex_exit(&(dsp)->ds_lock);		\
 }
 
 /*
@@ -269,26 +244,34 @@ extern void		dld_str_rx_fastpath(void *, mac_resource_handle_t,
     mblk_t *, mac_header_info_t *);
 extern void		dld_str_rx_unitdata(void *, mac_resource_handle_t,
     mblk_t *, mac_header_info_t *);
-
-extern void		dld_tx_flush(dld_str_t *);
 extern void		dld_str_notify_ind(dld_str_t *);
-extern void		dld_tx_single(dld_str_t *, mblk_t *);
-extern void		str_mdata_fastpath_put(dld_str_t *, mblk_t *);
-extern void		str_mdata_raw_put(dld_str_t *, mblk_t *);
-
-extern void		dld_ioctl(queue_t *, mblk_t *);
-extern void		dld_finish_pending_task(dld_str_t *);
+extern mac_tx_cookie_t	str_mdata_fastpath_put(dld_str_t *, mblk_t *,
+    uintptr_t, uint16_t);
+extern int		dld_flow_ctl_callb(dld_str_t *, uint64_t,
+    int (*func)(), void *);
 
 /*
  * dld_proto.c
  */
-extern void		dld_wput_proto_nondata(dld_str_t *, mblk_t *);
-extern void		dld_wput_proto_data(dld_str_t *, mblk_t *);
+extern void		dld_proto(dld_str_t *, mblk_t *);
+extern void		dld_proto_unitdata_req(dld_str_t *, mblk_t *);
 extern void		dld_capabilities_disable(dld_str_t *);
+extern void		proto_unitdata_req(dld_str_t *, mblk_t *);
+
+/*
+ * dld_flow.c
+ */
+extern void		flow_rx_pkt_chain(void *, void *, mblk_t *);
+
+/*
+ * dld_drv.c
+ */
+extern mac_handle_t	dld_mac_open(char *dev_name, int *err);
+#define	dld_mac_close(mh) mac_close(mh)
 
 /*
  * Options: there should be a separate bit defined here for each
- *	  DLD_PROP... defined in dld.h.
+ *          DLD_PROP... defined in dld.h.
  */
 #define	DLD_OPT_NO_FASTPATH	0x00000001
 #define	DLD_OPT_NO_POLL		0x00000002
@@ -315,6 +298,33 @@ typedef struct dld_ap {
  */
 
 #define	IMPLY(p, c)	(!(p) || (c))
+
+#define	DLD_SETQFULL(dsp) {						\
+	queue_t *q = (dsp)->ds_wq;					\
+									\
+	mutex_enter(&(dsp)->ds_lock);					\
+	if ((dsp)->ds_tx_flow_mp != NULL) {				\
+		(void) putq(q, (dsp)->ds_tx_flow_mp);			\
+		(dsp)->ds_tx_flow_mp = NULL;				\
+		qenable((dsp)->ds_wq);					\
+	}								\
+	mutex_exit(&(dsp)->ds_lock);					\
+}
+
+#define	DLD_CLRQFULL(dsp) {						\
+	queue_t *q = (dsp)->ds_wq;					\
+									\
+	mutex_enter(&(dsp)->ds_lock);					\
+	if (!mac_tx_is_flow_blocked((dsp)->ds_mch, NULL)) {		\
+		if ((dsp)->ds_tx_flow_mp == NULL)			\
+			(dsp)->ds_tx_flow_mp = getq(q);			\
+		ASSERT((dsp)->ds_tx_flow_mp != NULL);			\
+	}								\
+	mutex_exit(&(dsp)->ds_lock);					\
+}
+
+#define	DLD_TX(dsp, mp, f_hint, flag)					\
+	mac_tx(dsp->ds_mch, mp, f_hint, flag, NULL)
 
 #ifdef DEBUG
 #define	DLD_DBG		cmn_err

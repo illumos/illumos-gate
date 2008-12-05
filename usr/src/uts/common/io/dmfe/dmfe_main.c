@@ -207,12 +207,11 @@ static int		dmfe_m_promisc(void *, boolean_t);
 static int		dmfe_m_multicst(void *, boolean_t, const uint8_t *);
 static int		dmfe_m_unicst(void *, const uint8_t *);
 static void		dmfe_m_ioctl(void *, queue_t *, mblk_t *);
-static boolean_t	dmfe_m_getcapab(void *, mac_capab_t, void *);
 static mblk_t		*dmfe_m_tx(void *, mblk_t *);
 static int 		dmfe_m_stat(void *, uint_t, uint64_t *);
 
 static mac_callbacks_t dmfe_m_callbacks = {
-	(MC_IOCTL | MC_GETCAPAB),
+	(MC_IOCTL),
 	dmfe_m_stat,
 	dmfe_m_start,
 	dmfe_m_stop,
@@ -220,9 +219,8 @@ static mac_callbacks_t dmfe_m_callbacks = {
 	dmfe_m_multicst,
 	dmfe_m_unicst,
 	dmfe_m_tx,
-	NULL,
 	dmfe_m_ioctl,
-	dmfe_m_getcapab,
+	NULL,
 };
 
 
@@ -1620,46 +1618,6 @@ dmfe_m_promisc(void *arg, boolean_t on)
 
 	return (0);
 }
-
-/*ARGSUSED*/
-static boolean_t
-dmfe_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
-{
-	/*
-	 * Note that the chip could support some form of polling and
-	 * multiaddress support.  We should look into adding polling
-	 * support later, once Solaris is better positioned to take
-	 * advantage of it, although it may be of little use since
-	 * even a lowly 500MHz US-IIe should be able to keep up with
-	 * 100Mbps.  (Esp. if the packets are not unreasonably sized.)
-	 *
-	 * Multiaddress support, however, is likely to be of more
-	 * utility with crossbow and virtualized NICs.  Although, the
-	 * fact that dmfe is only supported on low-end US-IIe hardware
-	 * makes one wonder whether VNICs are likely to be used on
-	 * such platforms.  The chip certainly supports the notion,
-	 * since it can be run in HASH-ONLY mode.  (Though this would
-	 * require software to drop unicast packets that are
-	 * incorrectly received due to hash collision of the
-	 * destination mac address.)
-	 *
-	 * Interestingly enough, modern Davicom chips (the 9102D)
-	 * support full IP checksum offload, though its unclear
-	 * whether any of these chips are used on any systems that can
-	 * run Solaris.
-	 *
-	 * If this driver is ever supported on x86 hardware, then
-	 * these assumptions should be revisited.
-	 */
-	switch (cap) {
-	case MAC_CAPAB_POLL:
-	case MAC_CAPAB_MULTIADDRESS:
-	case MAC_CAPAB_HCKSUM:
-	default:
-		return (B_FALSE);
-	}
-}
-
 
 #undef	DMFE_DBG
 

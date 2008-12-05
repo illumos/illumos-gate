@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "bge_impl.h"
 
 
@@ -484,11 +482,11 @@ start_tx:
 	mutex_exit(srp->tx_lock);
 }
 
-static boolean_t
-bge_send(bge_t *bgep, mblk_t *mp)
+mblk_t *
+bge_ring_tx(void *arg, mblk_t *mp)
 {
-	uint_t ring = 0;	/* use ring 0 */
-	send_ring_t *srp;
+	send_ring_t *srp = arg;
+	bge_t *bgep = srp->bgep;
 	struct ether_vlan_header *ehp;
 	bge_queue_item_t *txbuf_item;
 	sw_txbuf_t *txbuf;
@@ -499,7 +497,6 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	char *pbuf;
 
 	ASSERT(mp->b_next == NULL);
-	srp = &bgep->send[ring];
 
 	/*
 	 * Get a s/w tx buffer first
@@ -510,7 +507,7 @@ bge_send(bge_t *bgep, mblk_t *mp)
 		srp->tx_nobuf++;
 		bgep->tx_resched_needed = B_TRUE;
 		bge_send_serial(bgep, srp);
-		return (B_FALSE);
+		return (mp);
 	}
 
 	/*
@@ -564,12 +561,23 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	 */
 	bge_send_serial(bgep, srp);
 
+	srp->pushed_bytes += MBLKL(mp);
+
 	/*
 	 * We've copied the contents, the message can be freed right away
 	 */
 	freemsg(mp);
+	return (NULL);
+}
 
-	return (B_TRUE);
+static mblk_t *
+bge_send(bge_t *bgep, mblk_t *mp)
+{
+	send_ring_t *ring;
+
+	ring = &bgep->send[0];	/* ring 0 */
+
+	return (bge_ring_tx(ring, mp));
 }
 
 uint_t
@@ -621,7 +629,7 @@ bge_m_tx(void *arg, mblk_t *mp)
 		next = mp->b_next;
 		mp->b_next = NULL;
 
-		if (!bge_send(bgep, mp)) {
+		if ((mp = bge_send(bgep, mp)) != NULL) {
 			mp->b_next = next;
 			break;
 		}

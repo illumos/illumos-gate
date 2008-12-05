@@ -70,6 +70,7 @@ HTMLENTS = \
 	SmfExAcctFlowStates.html \
 	SmfExAcctProcessStates.html \
 	SmfExAcctTaskStates.html \
+	SmfExAcctNetStates.html \
 	SmfHeader.html \
 	SmfInetdStates.html \
 	SmfIPsecStates.html \
@@ -93,6 +94,7 @@ HTMLENTS = \
 	SmfValueExAcctFlow.html \
 	SmfValueExAcctProcess.html \
 	SmfValueExAcctTask.html \
+	SmfValueExAcctNet.html \
 	SmfVtStates.html \
 	SmfValueHeader.html \
 	SmfValueInetd.html \

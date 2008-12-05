@@ -58,7 +58,6 @@
 #include <sys/taskq.h>
 #include <sys/note.h>
 #include <sys/mach_descrip.h>
-#include <sys/mac.h>
 #include <sys/mdeg.h>
 #include <sys/ldc.h>
 #include <sys/vsw_fdb.h>
@@ -88,7 +87,7 @@ int vsw_detach_ports(vsw_t *vswp);
 int vsw_port_add(vsw_t *vswp, md_t *mdp, mde_cookie_t *node);
 mcst_addr_t *vsw_del_addr(uint8_t devtype, void *arg, uint64_t addr);
 int vsw_port_detach(vsw_t *vswp, int p_instance);
-int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt, uint32_t count);
+int vsw_portsend(vsw_port_t *port, mblk_t *mp);
 int vsw_port_attach(vsw_port_t *portp);
 vsw_port_t *vsw_lookup_port(vsw_t *vswp, int p_instance);
 void vsw_vlan_unaware_port_reset(vsw_port_t *portp);
@@ -165,7 +164,6 @@ static void vsw_stop_rx_thread(vsw_ldc_t *ldcp);
 static void vsw_ldc_rx_worker(void *arg);
 
 /* Misc support routines */
-static	caddr_t vsw_print_ethaddr(uint8_t *addr, char *ebuf);
 static void vsw_free_lane_resources(vsw_ldc_t *, uint64_t);
 static void vsw_free_ring(dring_info_t *);
 static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
@@ -183,8 +181,7 @@ static void display_ring(dring_info_t *);
  * Functions imported from other files.
  */
 extern int vsw_set_hw(vsw_t *, vsw_port_t *, int);
-extern int vsw_unset_hw(vsw_t *, vsw_port_t *, int);
-extern void vsw_reconfig_hw(vsw_t *);
+extern void vsw_unset_hw(vsw_t *, vsw_port_t *, int);
 extern int vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port);
 extern void vsw_del_mcst_port(vsw_port_t *port);
 extern int vsw_add_mcst(vsw_t *vswp, uint8_t devtype, uint64_t addr, void *arg);
@@ -205,7 +202,10 @@ extern void vsw_hio_start(vsw_t *vswp, vsw_ldc_t *ldcp);
 extern void vsw_hio_stop(vsw_t *vswp, vsw_ldc_t *ldcp);
 extern void vsw_process_dds_msg(vsw_t *vswp, vsw_ldc_t *ldcp, void *msg);
 extern void vsw_hio_stop_port(vsw_port_t *portp);
-extern void vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr);
+extern void vsw_publish_macaddr(vsw_t *vswp, vsw_port_t *portp);
+extern int vsw_mac_client_init(vsw_t *vswp, vsw_port_t *port, int type);
+extern void vsw_mac_client_cleanup(vsw_t *vswp, vsw_port_t *port, int type);
+
 
 #define	VSW_NUM_VMPOOLS		3	/* number of vio mblk pools */
 
@@ -309,6 +309,7 @@ vsw_port_attach(vsw_port_t *port)
 	int			i;
 	int			nids = port->num_ldcs;
 	uint64_t		*ldcids;
+	int			rv;
 
 	D1(vswp, "%s: enter : port %d", __func__, port->p_instance);
 
@@ -328,6 +329,7 @@ vsw_port_attach(vsw_port_t *port)
 
 	mutex_init(&port->tx_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&port->mca_lock, NULL, MUTEX_DRIVER, NULL);
+	rw_init(&port->maccl_rwlock, NULL, RW_DRIVER, NULL);
 
 	mutex_init(&port->state_lock, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&port->state_cv, NULL, CV_DRIVER, NULL);
@@ -339,29 +341,20 @@ vsw_port_attach(vsw_port_t *port)
 		D2(vswp, "%s: ldcid (%llx)", __func__, (uint64_t)ldcids[i]);
 		if (vsw_ldc_attach(port, (uint64_t)ldcids[i]) != 0) {
 			DERR(vswp, "%s: ldc_attach failed", __func__);
-
-			rw_destroy(&port->p_ldclist.lockrw);
-
-			cv_destroy(&port->state_cv);
-			mutex_destroy(&port->state_lock);
-
-			mutex_destroy(&port->tx_lock);
-			mutex_destroy(&port->mca_lock);
-			kmem_free(port, sizeof (vsw_port_t));
-			return (1);
+			goto exit_error;
 		}
 	}
 
 	if (vswp->switching_setup_done == B_TRUE) {
 		/*
-		 * If the underlying physical device has been setup,
-		 * program the mac address of this port in it.
-		 * Otherwise, port macaddr will be set after the physical
-		 * device is successfully setup by the timeout handler.
+		 * If the underlying network device has been setup,
+		 * then open a mac client and porgram the mac address
+		 * for this port.
 		 */
-		mutex_enter(&vswp->hw_lock);
-		(void) vsw_set_hw(vswp, port, VSW_VNETPORT);
-		mutex_exit(&vswp->hw_lock);
+		rv = vsw_mac_client_init(vswp, port, VSW_VNETPORT);
+		if (rv != 0) {
+			goto exit_error;
+		}
 	}
 
 	/* create the fdb entry for this port/mac address */
@@ -386,11 +379,23 @@ vsw_port_attach(vsw_port_t *port)
 
 	/* announce macaddr of vnet to the physical switch */
 	if (vsw_publish_macaddr_count != 0) {	/* enabled */
-		vsw_publish_macaddr(vswp, (uint8_t *)&(port->p_macaddr));
+		vsw_publish_macaddr(vswp, port);
 	}
 
 	D1(vswp, "%s: exit", __func__);
 	return (0);
+
+exit_error:
+	rw_destroy(&port->p_ldclist.lockrw);
+
+	cv_destroy(&port->state_cv);
+	mutex_destroy(&port->state_lock);
+
+	rw_destroy(&port->maccl_rwlock);
+	mutex_destroy(&port->tx_lock);
+	mutex_destroy(&port->mca_lock);
+	kmem_free(port, sizeof (vsw_port_t));
+	return (1);
 }
 
 /*
@@ -427,29 +432,15 @@ vsw_port_detach(vsw_t *vswp, int p_instance)
 	 */
 	RW_EXIT(&plist->lockrw);
 
+	/* Cleanup and close the mac client */
+	vsw_mac_client_cleanup(vswp, port, VSW_VNETPORT);
+
 	/* Remove the fdb entry for this port/mac address */
 	vsw_fdbe_del(vswp, &(port->p_macaddr));
 	vsw_destroy_vlans(port, VSW_VNETPORT);
 
 	/* Remove any multicast addresses.. */
 	vsw_del_mcst_port(port);
-
-	/* Remove address if was programmed into HW. */
-	mutex_enter(&vswp->hw_lock);
-
-	/*
-	 * Port's address may not have been set in hardware. This could
-	 * happen if the underlying physical device is not yet available and
-	 * vsw_setup_switching_timeout() may be in progress.
-	 * We remove its addr from hardware only if it has been set before.
-	 */
-	if (port->addr_set != VSW_ADDR_UNSET)
-		(void) vsw_unset_hw(vswp, port, VSW_VNETPORT);
-
-	if (vswp->recfg_reqd)
-		vsw_reconfig_hw(vswp);
-
-	mutex_exit(&vswp->hw_lock);
 
 	if (vsw_port_delete(port)) {
 		return (1);
@@ -482,10 +473,8 @@ vsw_detach_ports(vsw_t *vswp)
 			return (1);
 		}
 
-		/* Remove address if was programmed into HW. */
-		mutex_enter(&vswp->hw_lock);
-		(void) vsw_unset_hw(vswp, port, VSW_VNETPORT);
-		mutex_exit(&vswp->hw_lock);
+		/* Cleanup and close the mac client */
+		vsw_mac_client_cleanup(vswp, port, VSW_VNETPORT);
 
 		/* Remove the fdb entry for this port/mac address */
 		vsw_fdbe_del(vswp, &(port->p_macaddr));
@@ -560,6 +549,7 @@ vsw_port_delete(vsw_port_t *port)
 
 	rw_destroy(&port->p_ldclist.lockrw);
 
+	rw_destroy(&port->maccl_rwlock);
 	mutex_destroy(&port->mca_lock);
 	mutex_destroy(&port->tx_lock);
 
@@ -570,6 +560,11 @@ vsw_port_delete(vsw_port_t *port)
 		kmem_free(port->ldc_ids, port->num_ldcs * sizeof (uint64_t));
 		port->num_ldcs = 0;
 	}
+
+	if (port->nvids != 0) {
+		kmem_free(port->vids, sizeof (vsw_vlanid_t) * port->nvids);
+	}
+
 	kmem_free(port, sizeof (vsw_port_t));
 
 	D1(vswp, "%s: exit", __func__);
@@ -4205,12 +4200,13 @@ vsw_process_err_pkt(vsw_ldc_t *ldcp, void *epkt, vio_msg_tag_t *tagp)
 
 /* transmit the packet over the given port */
 int
-vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt, uint32_t count)
+vsw_portsend(vsw_port_t *port, mblk_t *mp)
 {
 	vsw_ldc_list_t 	*ldcl = &port->p_ldclist;
 	vsw_ldc_t 	*ldcp;
+	mblk_t		*mpt;
+	int		count;
 	int		status = 0;
-	uint32_t	n;
 
 	READ_ENTER(&ldcl->lockrw);
 	/*
@@ -4224,18 +4220,13 @@ vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt, uint32_t count)
 		return (1);
 	}
 
-	n = vsw_vlan_frame_untag(port, VSW_VNETPORT, &mp, &mpt);
+	count = vsw_vlan_frame_untag(port, VSW_VNETPORT, &mp, &mpt);
 
-	count -= n;
-	if (count == 0) {
-		goto vsw_portsend_exit;
+	if (count != 0) {
+		status = ldcp->tx(ldcp, mp, mpt, count);
 	}
 
-	status = ldcp->tx(ldcp, mp, mpt, count);
-
-vsw_portsend_exit:
 	RW_EXIT(&ldcl->lockrw);
-
 	return (status);
 }
 
@@ -5733,14 +5724,6 @@ vsw_dring_match(dring_info_t *dp, vio_dring_reg_msg_t *msg)
 		return (1);
 	}
 
-}
-
-static caddr_t
-vsw_print_ethaddr(uint8_t *a, char *ebuf)
-{
-	(void) sprintf(ebuf, "%x:%x:%x:%x:%x:%x",
-	    a[0], a[1], a[2], a[3], a[4], a[5]);
-	return (ebuf);
 }
 
 /*

@@ -23,8 +23,6 @@
 
  CDDL HEADER END
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
 	operating system upgrade.  Make customizations in a different
@@ -165,6 +163,43 @@
 			<common_name>
 				<loctext xml:lang='C'>
 					configure task extended accounting
+				</loctext>
+			</common_name>
+	
+			<documentation>
+				<manpage
+					title='acctadm' section='1M'
+					manpath='/usr/share/man' />
+			</documentation>
+		</template>
+	</instance>
+
+	<instance name='net' enabled='false'>
+
+		<property_group name='general' type='framework'>
+			<propval name='action_authorization' type='astring'
+				value='solaris.smf.manage.extended-accounting.net' />
+			<propval name='value_authorization' type='astring'
+				value='solaris.smf.manage.extended-accounting.net' />
+		</property_group>
+
+		<property_group name='config' type='application'>
+			<propval name='value_authorization' type='astring'
+				value='solaris.smf.value.extended-accounting.net' />
+			<propval name='enabled' type='boolean'
+				value='false' />
+			<propval name='file' type='astring'
+				value='none' />
+			<propval name='tracked' type='astring'
+				value='none' />
+			<propval name='untracked' type='astring'
+				value='extended' />
+		</property_group>
+		
+		<template>
+			<common_name>
+				<loctext xml:lang='C'>
+					configure net extended accounting
 				</loctext>
 			</common_name>
 	

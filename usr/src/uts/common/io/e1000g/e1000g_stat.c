@@ -20,7 +20,7 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDLv1.
+ * Use is subject to license terms.
  */
 
 /*
@@ -185,7 +185,8 @@ e1000g_update_stats(kstat_t *ksp, int rw)
 	e1000g_ksp->rx_none.value.ul = rx_ring->stat_none;
 	e1000g_ksp->rx_multi_desc.value.ul = rx_ring->stat_multi_desc;
 	e1000g_ksp->rx_no_freepkt.value.ul = rx_ring->stat_no_freepkt;
-	e1000g_ksp->rx_avail_freepkt.value.ul = rx_ring->avail_freepkt;
+	e1000g_ksp->rx_avail_freepkt.value.ul = rx_ring->avail_freepkt +
+	    rx_ring->recycle_freepkt;
 
 	e1000g_ksp->tx_under_size.value.ul = tx_ring->stat_under_size;
 	e1000g_ksp->tx_exceed_frags.value.ul = tx_ring->stat_exceed_frags;

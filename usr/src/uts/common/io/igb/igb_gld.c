@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "igb_sw.h"
 
@@ -555,37 +555,6 @@ igb_m_multicst(void *arg, boolean_t add, const uint8_t *mcst_addr)
 }
 
 /*
- * Set a new device unicast address.
- */
-int
-igb_m_unicst(void *arg, const uint8_t *mac_addr)
-{
-	igb_t *igb = (igb_t *)arg;
-	int result;
-
-	mutex_enter(&igb->gen_lock);
-
-	if (igb->igb_state & IGB_SUSPENDED) {
-		mutex_exit(&igb->gen_lock);
-		return (ECANCELED);
-	}
-
-	/*
-	 * Store the new MAC address.
-	 */
-	bcopy(mac_addr, igb->hw.mac.addr, ETHERADDRL);
-
-	/*
-	 * Set MAC address in address slot 0, which is the default address.
-	 */
-	result = igb_unicst_set(igb, mac_addr, 0);
-
-	mutex_exit(&igb->gen_lock);
-
-	return (result);
-}
-
-/*
  * Pass on M_IOCTL messages passed to the DLD, and support
  * private IOCTLs for debugging and ndd.
  */
@@ -654,30 +623,22 @@ igb_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 	}
 }
 
-
 /*
- * Find an unused address slot, set the address to it, reserve
- * this slot and enable the device to start filtering on the
- * new address.
+ * Add a MAC address to the target RX group.
  */
-int
-igb_m_unicst_add(void *arg, mac_multi_addr_t *maddr)
+static int
+igb_addmac(void *arg, const uint8_t *mac_addr)
 {
-	igb_t *igb = (igb_t *)arg;
-	mac_addr_slot_t slot;
-	int err;
+	igb_rx_group_t *rx_group = (igb_rx_group_t *)arg;
+	igb_t *igb = rx_group->igb;
+	struct e1000_hw *hw = &igb->hw;
+	int i, slot;
 
 	mutex_enter(&igb->gen_lock);
 
 	if (igb->igb_state & IGB_SUSPENDED) {
 		mutex_exit(&igb->gen_lock);
 		return (ECANCELED);
-	}
-
-	if (mac_unicst_verify(igb->mac_hdl,
-	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE) {
-		mutex_exit(&igb->gen_lock);
-		return (EINVAL);
 	}
 
 	if (igb->unicst_avail == 0) {
@@ -687,155 +648,257 @@ igb_m_unicst_add(void *arg, mac_multi_addr_t *maddr)
 	}
 
 	/*
-	 * Primary/default address is in slot 0. The next addresses
-	 * are the multiple MAC addresses. So multiple MAC address 0
-	 * is in slot 1, 1 in slot 2, and so on. So the first multiple
-	 * MAC address resides in slot 1.
+	 * The slots from 0 to igb->num_rx_groups are reserved slots which
+	 * are 1 to 1 mapped with group index directly. The other slots are
+	 * shared between the all of groups. While adding a MAC address,
+	 * it will try to set the reserved slots first, then the shared slots.
 	 */
-	for (slot = 1; slot < igb->unicst_total; slot++) {
-		if (igb->unicst_addr[slot].mac.set == 0)
-			break;
-	}
+	slot = -1;
+	if (igb->unicst_addr[rx_group->index].mac.set == 1) {
+		/*
+		 * The reserved slot for current group is used, find the free
+		 * slots in the shared slots.
+		 */
+		for (i = igb->num_rx_groups; i < igb->unicst_total; i++) {
+			if (igb->unicst_addr[i].mac.set == 0) {
+				slot = i;
+				break;
+			}
+		}
+	} else
+		slot = rx_group->index;
 
-	ASSERT((slot > 0) && (slot < igb->unicst_total));
-
-	maddr->mma_slot = slot;
-
-	if ((err = igb_unicst_set(igb, maddr->mma_addr, slot)) == 0) {
-		igb->unicst_addr[slot].mac.set = 1;
-		igb->unicst_avail--;
-	}
-
-	mutex_exit(&igb->gen_lock);
-
-	return (err);
-}
-
-
-/*
- * Removes a MAC address that was added before.
- */
-int
-igb_m_unicst_remove(void *arg, mac_addr_slot_t slot)
-{
-	igb_t *igb = (igb_t *)arg;
-	int err;
-
-	mutex_enter(&igb->gen_lock);
-
-	if (igb->igb_state & IGB_SUSPENDED) {
+	if (slot == -1) {
+		/* no slots available in the shared slots */
 		mutex_exit(&igb->gen_lock);
-		return (ECANCELED);
+		return (ENOSPC);
 	}
 
-	if ((slot <= 0) || (slot >= igb->unicst_total)) {
-		mutex_exit(&igb->gen_lock);
-		return (EINVAL);
-	}
+	/* Set VMDq according to the mode supported by hardware. */
+	e1000_rar_set_vmdq(hw, mac_addr, slot, igb->vmdq_mode, rx_group->index);
 
-	if (igb->unicst_addr[slot].mac.set == 0) {
-		mutex_exit(&igb->gen_lock);
-		return (EINVAL);
-	}
+	bcopy(mac_addr, igb->unicst_addr[slot].mac.addr, ETHERADDRL);
+	igb->unicst_addr[slot].mac.group_index = rx_group->index;
+	igb->unicst_addr[slot].mac.set = 1;
+	igb->unicst_avail--;
 
-	/* Copy the default address to the passed slot */
-	if ((err = igb_unicst_set(igb,
-	    igb->unicst_addr[0].mac.addr, slot)) == 0) {
-		igb->unicst_addr[slot].mac.set = 0;
-		igb->unicst_avail++;
-	}
-
-	mutex_exit(&igb->gen_lock);
-
-	return (err);
-}
-
-/*
- * Modifies the value of an address that has been added before.
- * The new address length and the slot number that was returned
- * in the call to add should be passed in. mma_flags should be
- * set to 0.
- * Returns 0 on success.
- */
-int
-igb_m_unicst_modify(void *arg, mac_multi_addr_t *maddr)
-{
-	igb_t *igb = (igb_t *)arg;
-	mac_addr_slot_t slot;
-	int err;
-
-	mutex_enter(&igb->gen_lock);
-
-	if (igb->igb_state & IGB_SUSPENDED) {
-		mutex_exit(&igb->gen_lock);
-		return (ECANCELED);
-	}
-
-	if (mac_unicst_verify(igb->mac_hdl,
-	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE) {
-		mutex_exit(&igb->gen_lock);
-		return (EINVAL);
-	}
-
-	slot = maddr->mma_slot;
-
-	if ((slot <= 0) || (slot >= igb->unicst_total)) {
-		mutex_exit(&igb->gen_lock);
-		return (EINVAL);
-	}
-
-	if (igb->unicst_addr[slot].mac.set == 0) {
-		mutex_exit(&igb->gen_lock);
-		return (EINVAL);
-	}
-
-	err = igb_unicst_set(igb, maddr->mma_addr, slot);
-
-	mutex_exit(&igb->gen_lock);
-
-	return (err);
-}
-
-/*
- * Get the MAC address and all other information related to
- * the address slot passed in mac_multi_addr_t.
- * mma_flags should be set to 0 in the call.
- * On return, mma_flags can take the following values:
- * 1) MMAC_SLOT_UNUSED
- * 2) MMAC_SLOT_USED | MMAC_VENDOR_ADDR
- * 3) MMAC_SLOT_UNUSED | MMAC_VENDOR_ADDR
- * 4) MMAC_SLOT_USED
- */
-int
-igb_m_unicst_get(void *arg, mac_multi_addr_t *maddr)
-{
-	igb_t *igb = (igb_t *)arg;
-	mac_addr_slot_t slot;
-
-	mutex_enter(&igb->gen_lock);
-
-	if (igb->igb_state & IGB_SUSPENDED) {
-		mutex_exit(&igb->gen_lock);
-		return (ECANCELED);
-	}
-
-	slot = maddr->mma_slot;
-
-	if ((slot <= 0) || (slot >= igb->unicst_total)) {
-		mutex_exit(&igb->gen_lock);
-		return (EINVAL);
-	}
-
-	if (igb->unicst_addr[slot].mac.set == 1) {
-		bcopy(igb->unicst_addr[slot].mac.addr,
-		    maddr->mma_addr, ETHERADDRL);
-		maddr->mma_flags = MMAC_SLOT_USED;
-	} else {
-		maddr->mma_flags = MMAC_SLOT_UNUSED;
-	}
 	mutex_exit(&igb->gen_lock);
 
 	return (0);
+}
+
+/*
+ * Remove a MAC address from the specified RX group.
+ */
+static int
+igb_remmac(void *arg, const uint8_t *mac_addr)
+{
+	igb_rx_group_t *rx_group = (igb_rx_group_t *)arg;
+	igb_t *igb = rx_group->igb;
+	struct e1000_hw *hw = &igb->hw;
+	int slot;
+
+	mutex_enter(&igb->gen_lock);
+
+	if (igb->igb_state & IGB_SUSPENDED) {
+		mutex_exit(&igb->gen_lock);
+		return (ECANCELED);
+	}
+
+	slot = igb_unicst_find(igb, mac_addr);
+	if (slot == -1) {
+		mutex_exit(&igb->gen_lock);
+		return (EINVAL);
+	}
+
+	if (igb->unicst_addr[slot].mac.set == 0) {
+		mutex_exit(&igb->gen_lock);
+		return (EINVAL);
+	}
+
+	/* Clear the MAC ddress in the slot */
+	e1000_rar_clear(hw, slot);
+	igb->unicst_addr[slot].mac.set = 0;
+	igb->unicst_avail++;
+
+	mutex_exit(&igb->gen_lock);
+
+	return (0);
+}
+
+/*
+ * Enable interrupt on the specificed rx ring.
+ */
+int
+igb_rx_ring_intr_enable(mac_intr_handle_t intrh)
+{
+	igb_rx_ring_t *rx_ring = (igb_rx_ring_t *)intrh;
+	igb_t *igb = rx_ring->igb;
+	struct e1000_hw *hw = &igb->hw;
+	uint32_t index = rx_ring->index;
+
+	if (igb->intr_type == DDI_INTR_TYPE_MSIX) {
+		/* Interrupt enabling for MSI-X */
+		igb->eims_mask |= (E1000_EICR_RX_QUEUE0 << index);
+		E1000_WRITE_REG(hw, E1000_EIMS, igb->eims_mask);
+		E1000_WRITE_REG(hw, E1000_EIAC, igb->eims_mask);
+	} else {
+		ASSERT(index == 0);
+		/* Interrupt enabling for MSI and legacy */
+		igb->ims_mask |= E1000_IMS_RXT0;
+		E1000_WRITE_REG(hw, E1000_IMS, igb->ims_mask);
+	}
+
+	E1000_WRITE_FLUSH(hw);
+
+	return (0);
+}
+
+/*
+ * Disable interrupt on the specificed rx ring.
+ */
+int
+igb_rx_ring_intr_disable(mac_intr_handle_t intrh)
+{
+	igb_rx_ring_t *rx_ring = (igb_rx_ring_t *)intrh;
+	igb_t *igb = rx_ring->igb;
+	struct e1000_hw *hw = &igb->hw;
+	uint32_t index = rx_ring->index;
+
+	if (igb->intr_type == DDI_INTR_TYPE_MSIX) {
+		/* Interrupt disabling for MSI-X */
+		igb->eims_mask &= ~(E1000_EICR_RX_QUEUE0 << index);
+		E1000_WRITE_REG(hw, E1000_EIMC,
+		    (E1000_EICR_RX_QUEUE0 << index));
+		E1000_WRITE_REG(hw, E1000_EIAC, igb->eims_mask);
+	} else {
+		ASSERT(index == 0);
+		/* Interrupt disabling for MSI and legacy */
+		igb->ims_mask &= ~E1000_IMS_RXT0;
+		E1000_WRITE_REG(hw, E1000_IMC, E1000_IMS_RXT0);
+	}
+
+	E1000_WRITE_FLUSH(hw);
+
+	return (0);
+}
+
+/*
+ * Get the global ring index by a ring index within a group.
+ */
+int
+igb_get_rx_ring_index(igb_t *igb, int gindex, int rindex)
+{
+	igb_rx_ring_t *rx_ring;
+	int i;
+
+	for (i = 0; i < igb->num_rx_rings; i++) {
+		rx_ring = &igb->rx_rings[i];
+		if (rx_ring->group_index == gindex)
+			rindex--;
+		if (rindex < 0)
+			return (i);
+	}
+
+	return (-1);
+}
+
+static int
+igb_ring_start(mac_ring_driver_t rh, uint64_t mr_gen_num)
+{
+	igb_rx_ring_t *rx_ring = (igb_rx_ring_t *)rh;
+
+	mutex_enter(&rx_ring->rx_lock);
+	rx_ring->ring_gen_num = mr_gen_num;
+	mutex_exit(&rx_ring->rx_lock);
+	return (0);
+}
+
+/*
+ * Callback funtion for MAC layer to register all rings.
+ */
+/* ARGSUSED */
+void
+igb_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
+    const int index, mac_ring_info_t *infop, mac_ring_handle_t rh)
+{
+	igb_t *igb = (igb_t *)arg;
+	mac_intr_t *mintr = &infop->mri_intr;
+
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		igb_rx_ring_t *rx_ring;
+		int global_index;
+
+		/*
+		 * 'index' is the ring index within the group.
+		 * We need the global ring index by searching in group.
+		 */
+		global_index = igb_get_rx_ring_index(igb, rg_index, index);
+
+		ASSERT(global_index >= 0);
+
+		rx_ring = &igb->rx_rings[global_index];
+		rx_ring->ring_handle = rh;
+
+		infop->mri_driver = (mac_ring_driver_t)rx_ring;
+		infop->mri_start = igb_ring_start;
+		infop->mri_stop = NULL;
+		infop->mri_poll = (mac_ring_poll_t)igb_rx_ring_poll;
+
+		mintr->mi_handle = (mac_intr_handle_t)rx_ring;
+		mintr->mi_enable = igb_rx_ring_intr_enable;
+		mintr->mi_disable = igb_rx_ring_intr_disable;
+
+		break;
+	}
+	case MAC_RING_TYPE_TX: {
+		ASSERT(index < igb->num_tx_rings);
+
+		igb_tx_ring_t *tx_ring = &igb->tx_rings[index];
+		tx_ring->ring_handle = rh;
+
+		infop->mri_driver = (mac_ring_driver_t)tx_ring;
+		infop->mri_start = NULL;
+		infop->mri_stop = NULL;
+		infop->mri_tx = igb_tx_ring_send;
+
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+void
+igb_fill_group(void *arg, mac_ring_type_t rtype, const int index,
+    mac_group_info_t *infop, mac_group_handle_t gh)
+{
+	igb_t *igb = (igb_t *)arg;
+
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		igb_rx_group_t *rx_group;
+
+		ASSERT((index >= 0) && (index < igb->num_rx_groups));
+
+		rx_group = &igb->rx_groups[index];
+		rx_group->group_handle = gh;
+
+		infop->mgi_driver = (mac_group_driver_t)rx_group;
+		infop->mgi_start = NULL;
+		infop->mgi_stop = NULL;
+		infop->mgi_addmac = igb_addmac;
+		infop->mgi_remmac = igb_remmac;
+		infop->mgi_count = (igb->num_rx_rings / igb->num_rx_groups);
+
+		break;
+	}
+	case MAC_RING_TYPE_TX:
+		break;
+	default:
+		break;
+	}
 }
 
 /*
@@ -863,27 +926,34 @@ igb_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		*tx_hcksum_flags = HCKSUM_INET_PARTIAL | HCKSUM_IPHDRCKSUM;
 		break;
 	}
-	case MAC_CAPAB_MULTIADDRESS: {
-		multiaddress_capab_t *mmacp = cap_data;
+	case MAC_CAPAB_RINGS: {
+		mac_capab_rings_t *cap_rings = cap_data;
 
-		/*
-		 * The number of MAC addresses made available by
-		 * this capability is one less than the total as
-		 * the primary address in slot 0 is counted in
-		 * the total.
-		 */
-		mmacp->maddr_naddr = igb->unicst_total - 1;
-		mmacp->maddr_naddrfree = igb->unicst_avail;
-		/* No multiple factory addresses, set mma_flag to 0 */
-		mmacp->maddr_flag = 0;
-		mmacp->maddr_handle = igb;
-		mmacp->maddr_add = igb_m_unicst_add;
-		mmacp->maddr_remove = igb_m_unicst_remove;
-		mmacp->maddr_modify = igb_m_unicst_modify;
-		mmacp->maddr_get = igb_m_unicst_get;
-		mmacp->maddr_reserve = NULL;
+		switch (cap_rings->mr_type) {
+		case MAC_RING_TYPE_RX:
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+			cap_rings->mr_rnum = igb->num_rx_rings;
+			cap_rings->mr_gnum = igb->num_rx_groups;
+			cap_rings->mr_rget = igb_fill_ring;
+			cap_rings->mr_gget = igb_fill_group;
+			cap_rings->mr_gaddring = NULL;
+			cap_rings->mr_gremring = NULL;
+
+			break;
+		case MAC_RING_TYPE_TX:
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+			cap_rings->mr_rnum = igb->num_tx_rings;
+			cap_rings->mr_gnum = 0;
+			cap_rings->mr_rget = igb_fill_ring;
+			cap_rings->mr_gget = NULL;
+
+			break;
+		default:
+			break;
+		}
 		break;
 	}
+
 	default:
 		return (B_FALSE);
 	}

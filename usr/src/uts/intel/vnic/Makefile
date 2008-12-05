@@ -22,9 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-
 #
 # Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -55,7 +52,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 # Overrides
 #
 CFLAGS		+= $(CCVERBOSE)
-LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Ndrv/ip -Nmisc/dls
+LDFLAGS		+= -dy -Ndrv/dld -Nmisc/mac -Nmisc/dls
 
 #
 #	Default build targets.

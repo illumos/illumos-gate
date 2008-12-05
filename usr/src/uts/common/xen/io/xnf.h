@@ -135,7 +135,6 @@ typedef struct xnf {
 	struct tx_pktinfo	xnf_tx_pkt_info[NET_TX_RING_SIZE];
 	struct xnf_buffer_desc	*xnf_rxpkt_bufptr[XNF_MAX_RXDESCS];
 
-	mac_resource_handle_t	xnf_rx_handle;
 	ddi_iblock_cookie_t	xnf_icookie;
 	kmutex_t		xnf_tx_buf_mutex;
 	kmutex_t		xnf_rx_buf_mutex;

@@ -34,6 +34,7 @@
  *
  */
 
+#include <sys/mac_provider.h>
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_fzc.h>
 #include <sys/nxge/nxge_rxdma.h>
@@ -49,7 +50,9 @@
 extern npi_status_t npi_rxdma_dump_rdc_table(npi_handle_t, uint8_t);
 
 /* The following function may be found in nxge_main.c */
-extern int nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot);
+extern int nxge_m_mmac_remove(void *arg, int slot);
+extern int nxge_m_mmac_add_g(void *arg, const uint8_t *maddr, int rdctbl,
+	boolean_t usetbl);
 
 /* The following function may be found in nxge_[t|r]xdma.c */
 extern npi_status_t nxge_txdma_channel_disable(nxge_t *, int);
@@ -129,12 +132,38 @@ int
 nxge_hio_init(nxge_t *nxge)
 {
 	nxge_hio_data_t *nhd;
+	int i;
 
 	nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 	if (nhd == 0) {
 		nhd = KMEM_ZALLOC(sizeof (*nhd), KM_SLEEP);
 		MUTEX_INIT(&nhd->lock, NULL, MUTEX_DRIVER, NULL);
 		nxge->nxge_hw_p->hio = (uintptr_t)nhd;
+	}
+
+	/*
+	 * Initialize share and ring group structures.
+	 */
+	for (i = 0; i < NXGE_MAX_TDCS; i++)
+		nxge->tdc_is_shared[i] = B_FALSE;
+
+	for (i = 0; i < NXGE_MAX_TDC_GROUPS; i++) {
+		nxge->tx_hio_groups[i].ghandle = NULL;
+		nxge->tx_hio_groups[i].nxgep = nxge;
+		nxge->tx_hio_groups[i].type = MAC_RING_TYPE_TX;
+		nxge->tx_hio_groups[i].gindex = 0;
+		nxge->tx_hio_groups[i].sindex = 0;
+	}
+
+	for (i = 0; i < NXGE_MAX_RDC_GROUPS; i++) {
+		nxge->rx_hio_groups[i].ghandle = NULL;
+		nxge->rx_hio_groups[i].nxgep = nxge;
+		nxge->rx_hio_groups[i].type = MAC_RING_TYPE_RX;
+		nxge->rx_hio_groups[i].gindex = 0;
+		nxge->rx_hio_groups[i].sindex = 0;
+		nxge->rx_hio_groups[i].started = B_FALSE;
+		nxge->rx_hio_groups[i].rdctbl = -1;
+		nxge->rx_hio_groups[i].n_mac_addrs = 0;
 	}
 
 	nhd->hio.ldoms = B_FALSE;
@@ -400,7 +429,7 @@ nxge_grp_dc_add(
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_grp_dc_add"));
 
-	if (group == NULL)
+	if (group == 0)
 		return (0);
 
 	switch (type) {
@@ -424,7 +453,6 @@ nxge_grp_dc_add(
 	default:
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
 		    "nxge_grp_dc_add: unknown type channel(%d)", channel));
-		return (NXGE_ERROR);
 	}
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL,
@@ -540,9 +568,6 @@ nxge_grp_dc_remove(
 	MUTEX_ENTER(&nhd->lock);
 
 	set = dc->type == VP_BOUND_TX ? &nxge->tx_set : &nxge->rx_set;
-	if (isLDOMs(nxge) && ((1 << channel) && set->shared.map)) {
-		NXGE_DC_RESET(group->map, channel);
-	}
 
 	/* Remove the DC from its group. */
 	if (nxge_grp_dc_unlink(nxge, group, channel) != dc) {
@@ -663,7 +688,10 @@ nxge_grp_dc_append(
  *	Any domain
  */
 nxge_hio_dc_t *
-nxge_grp_dc_unlink(nxge_t *nxge, nxge_grp_t *group, int channel)
+nxge_grp_dc_unlink(
+	nxge_t *nxge,
+	nxge_grp_t *group,
+	int channel)
 {
 	nxge_hio_dc_t *current, *previous;
 
@@ -699,6 +727,7 @@ nxge_grp_dc_unlink(nxge_t *nxge, nxge_grp_t *group, int channel)
 		current->next = 0;
 		current->group = 0;
 
+		NXGE_DC_RESET(group->map, channel);
 		group->count--;
 	}
 
@@ -914,15 +943,14 @@ nxge_ddi_perror(
  * Local prototypes
  */
 static nxge_hio_vr_t *nxge_hio_vr_share(nxge_t *);
-
-static int nxge_hio_dc_share(nxge_t *, nxge_hio_vr_t *, mac_ring_type_t);
 static void nxge_hio_unshare(nxge_hio_vr_t *);
 
-static int nxge_hio_addres(nxge_hio_vr_t *, mac_ring_type_t, int);
+static int nxge_hio_addres(nxge_hio_vr_t *, mac_ring_type_t, uint64_t *);
 static void nxge_hio_remres(nxge_hio_vr_t *, mac_ring_type_t, res_map_t);
 
-static void nxge_hio_tdc_unshare(nxge_t *nxge, int channel);
-static void nxge_hio_rdc_unshare(nxge_t *nxge, int channel);
+static void nxge_hio_tdc_unshare(nxge_t *nxge, int dev_grpid, int channel);
+static void nxge_hio_rdc_unshare(nxge_t *nxge, int dev_grpid, int channel);
+static int nxge_hio_dc_share(nxge_t *, nxge_hio_vr_t *, mac_ring_type_t, int);
 static void nxge_hio_dc_unshare(nxge_t *, nxge_hio_vr_t *,
     mac_ring_type_t, int);
 
@@ -967,6 +995,28 @@ nxge_hio_init(
 		}
 	}
 
+	/*
+	 * Initialize share and ring group structures.
+	 */
+	for (i = 0; i < NXGE_MAX_TDC_GROUPS; i++) {
+		nxge->tx_hio_groups[i].ghandle = NULL;
+		nxge->tx_hio_groups[i].nxgep = nxge;
+		nxge->tx_hio_groups[i].type = MAC_RING_TYPE_TX;
+		nxge->tx_hio_groups[i].gindex = 0;
+		nxge->tx_hio_groups[i].sindex = 0;
+	}
+
+	for (i = 0; i < NXGE_MAX_RDC_GROUPS; i++) {
+		nxge->rx_hio_groups[i].ghandle = NULL;
+		nxge->rx_hio_groups[i].nxgep = nxge;
+		nxge->rx_hio_groups[i].type = MAC_RING_TYPE_RX;
+		nxge->rx_hio_groups[i].gindex = 0;
+		nxge->rx_hio_groups[i].sindex = 0;
+		nxge->rx_hio_groups[i].started = B_FALSE;
+		nxge->rx_hio_groups[i].rdctbl = -1;
+		nxge->rx_hio_groups[i].n_mac_addrs = 0;
+	}
+
 	if (!isLDOMs(nxge)) {
 		nhd->hio.ldoms = B_FALSE;
 		return (NXGE_OK);
@@ -983,22 +1033,15 @@ nxge_hio_init(
 	nhd->vrs = NXGE_VR_SR_MAX - 2;
 
 	/*
-	 * Initialize tdc share state, shares and ring group structures.
+	 * Initialize the share stuctures.
 	 */
 	for (i = 0; i < NXGE_MAX_TDCS; i++)
 		nxge->tdc_is_shared[i] = B_FALSE;
 
-	for (i = 0; i < NXGE_MAX_RDC_GROUPS; i++) {
-		nxge->rx_hio_groups[i].ghandle = NULL;
-		nxge->rx_hio_groups[i].nxgep = nxge;
-		nxge->rx_hio_groups[i].gindex = 0;
-		nxge->rx_hio_groups[i].sindex = 0;
-	}
-
 	for (i = 0; i < NXGE_VR_SR_MAX; i++) {
 		nxge->shares[i].nxgep = nxge;
 		nxge->shares[i].index = 0;
-		nxge->shares[i].vrp = (void *)NULL;
+		nxge->shares[i].vrp = NULL;
 		nxge->shares[i].tmap = 0;
 		nxge->shares[i].rmap = 0;
 		nxge->shares[i].rxgroup = 0;
@@ -1033,76 +1076,250 @@ nxge_hio_init(
 
 	return (0);
 }
+#endif /* defined(sun4v) */
+
+static int
+nxge_hio_group_mac_add(nxge_t *nxge, nxge_ring_group_t *g,
+    const uint8_t *macaddr)
+{
+	int rv;
+	nxge_rdc_grp_t *group;
+
+	mutex_enter(nxge->genlock);
+
+	/*
+	 * Initialize the NXGE RDC table data structure.
+	 */
+	group = &nxge->pt_config.rdc_grps[g->rdctbl];
+	if (!group->flag) {
+		group->port = NXGE_GET_PORT_NUM(nxge->function_num);
+		group->config_method = RDC_TABLE_ENTRY_METHOD_REP;
+		group->flag = B_TRUE;	/* This group has been configured. */
+	}
+
+	mutex_exit(nxge->genlock);
+
+	/*
+	 * Add the MAC address.
+	 */
+	if ((rv = nxge_m_mmac_add_g((void *)nxge, macaddr,
+	    g->rdctbl, B_TRUE)) != 0) {
+		return (rv);
+	}
+
+	mutex_enter(nxge->genlock);
+	g->n_mac_addrs++;
+	mutex_exit(nxge->genlock);
+	return (0);
+}
 
 static int
 nxge_hio_add_mac(void *arg, const uint8_t *mac_addr)
 {
-	nxge_rx_ring_group_t *rxgroup = (nxge_rx_ring_group_t *)arg;
-	p_nxge_t nxge = rxgroup->nxgep;
-	int group = rxgroup->gindex;
-	int rv, sindex;
+	nxge_ring_group_t *group = (nxge_ring_group_t *)arg;
+	p_nxge_t nxge = group->nxgep;
+	int rv;
 	nxge_hio_vr_t *vr;	/* The Virtualization Region */
 
-	sindex = nxge->rx_hio_groups[group].sindex;
-	vr = (nxge_hio_vr_t *)nxge->shares[sindex].vrp;
+	ASSERT(group->type == MAC_RING_TYPE_RX);
+
+	mutex_enter(nxge->genlock);
 
 	/*
-	 * Program the mac address for the group/share.
+	 * If the group is associated with a VR, then only one
+	 * address may be assigned to the group.
 	 */
-	if ((rv = nxge_hio_hostinfo_init(nxge, vr,
-	    (ether_addr_t *)mac_addr)) != 0) {
+	vr = (nxge_hio_vr_t *)nxge->shares[group->sindex].vrp;
+	if ((vr != NULL) && (group->n_mac_addrs)) {
+		mutex_exit(nxge->genlock);
+		return (ENOSPC);
+	}
+
+	mutex_exit(nxge->genlock);
+
+	/*
+	 * Program the mac address for the group.
+	 */
+	if ((rv = nxge_hio_group_mac_add(nxge, group,
+	    mac_addr)) != 0) {
 		return (rv);
 	}
 
 	return (0);
 }
 
+static int
+find_mac_slot(nxge_mmac_t *mmac_info, const uint8_t *mac_addr)
+{
+	int i;
+	for (i = 0; i <= mmac_info->num_mmac; i++) {
+		if (memcmp(mmac_info->mac_pool[i].addr, mac_addr,
+		    ETHERADDRL) == 0) {
+			return (i);
+		}
+	}
+	return (-1);
+}
+
 /* ARGSUSED */
 static int
 nxge_hio_rem_mac(void *arg, const uint8_t *mac_addr)
 {
-	nxge_rx_ring_group_t *rxgroup = (nxge_rx_ring_group_t *)arg;
-	p_nxge_t nxge = rxgroup->nxgep;
-	int group = rxgroup->gindex;
-	int sindex;
-	nxge_hio_vr_t *vr;	/* The Virtualization Region */
+	nxge_ring_group_t *group = (nxge_ring_group_t *)arg;
+	p_nxge_t nxge = group->nxgep;
+	nxge_mmac_t *mmac_info;
+	int rv, slot;
 
-	sindex = nxge->rx_hio_groups[group].sindex;
-	vr = (nxge_hio_vr_t *)nxge->shares[sindex].vrp;
+	ASSERT(group->type == MAC_RING_TYPE_RX);
+
+	mutex_enter(nxge->genlock);
+
+	mmac_info = &nxge->nxge_mmac_info;
+	slot = find_mac_slot(mmac_info, mac_addr);
+	if (slot < 0) {
+		mutex_exit(nxge->genlock);
+		return (EINVAL);
+	}
+
+	mutex_exit(nxge->genlock);
 
 	/*
-	 * Remove the mac address for the group/share.
+	 * Remove the mac address for the group
 	 */
-	nxge_hio_hostinfo_uninit(nxge, vr);
+	if ((rv = nxge_m_mmac_remove(nxge, slot)) != 0) {
+		return (rv);
+	}
+
+	mutex_enter(nxge->genlock);
+	group->n_mac_addrs--;
+	mutex_exit(nxge->genlock);
 
 	return (0);
 }
 
+static int
+nxge_hio_group_start(mac_group_driver_t gdriver)
+{
+	nxge_ring_group_t	*group = (nxge_ring_group_t *)gdriver;
+	int			rdctbl;
+	int			dev_gindex;
+
+	ASSERT(group->type == MAC_RING_TYPE_RX);
+
+#ifdef later
+	ASSERT(group->nxgep->nxge_mac_state == NXGE_MAC_STARTED);
+#endif
+	if (group->nxgep->nxge_mac_state != NXGE_MAC_STARTED)
+		return (ENXIO);
+
+	mutex_enter(group->nxgep->genlock);
+	dev_gindex = group->nxgep->pt_config.hw_config.def_mac_rxdma_grpid +
+	    group->gindex;
+
+	/*
+	 * Get an rdc table for this group.
+	 * Group ID is given by the caller, and that's the group it needs
+	 * to bind to.  The default group is already bound when the driver
+	 * was attached.
+	 *
+	 * For Group 0, it's RDC table was allocated at attach time
+	 * no need to allocate a new table.
+	 */
+	if (group->gindex != 0) {
+		rdctbl = nxge_fzc_rdc_tbl_bind(group->nxgep,
+		    dev_gindex, B_TRUE);
+		if (rdctbl < 0) {
+			mutex_exit(group->nxgep->genlock);
+			return (rdctbl);
+		}
+	} else {
+		rdctbl = group->nxgep->pt_config.hw_config.def_mac_rxdma_grpid;
+	}
+
+	group->rdctbl = rdctbl;
+
+	(void) nxge_init_fzc_rdc_tbl(group->nxgep, rdctbl);
+
+	group->started = B_TRUE;
+	mutex_exit(group->nxgep->genlock);
+
+	return (0);
+}
+
+static void
+nxge_hio_group_stop(mac_group_driver_t gdriver)
+{
+	nxge_ring_group_t *group = (nxge_ring_group_t *)gdriver;
+
+	ASSERT(group->type == MAC_RING_TYPE_RX);
+
+	mutex_enter(group->nxgep->genlock);
+	group->started = B_FALSE;
+
+	/*
+	 * Unbind the RDC table previously bound for this group.
+	 *
+	 * Since RDC table for group 0 was allocated at attach
+	 * time, no need to unbind the table here.
+	 */
+	if (group->gindex != 0)
+		(void) nxge_fzc_rdc_tbl_unbind(group->nxgep, group->rdctbl);
+
+	mutex_exit(group->nxgep->genlock);
+}
+
 /* ARGSUSED */
 void
-nxge_hio_group_get(void *arg, mac_ring_type_t type, int group,
+nxge_hio_group_get(void *arg, mac_ring_type_t type, int groupid,
 	mac_group_info_t *infop, mac_group_handle_t ghdl)
 {
-	p_nxge_t nxgep = (p_nxge_t)arg;
-	nxge_rx_ring_group_t *rxgroup;
+	p_nxge_t		nxgep = (p_nxge_t)arg;
+	nxge_ring_group_t	*group;
+	int			dev_gindex;
 
 	switch (type) {
 	case MAC_RING_TYPE_RX:
-		rxgroup = &nxgep->rx_hio_groups[group];
-		rxgroup->gindex = group;
+		group = &nxgep->rx_hio_groups[groupid];
+		group->nxgep = nxgep;
+		group->ghandle = ghdl;
+		group->gindex = groupid;
+		group->sindex = 0;	/* not yet bound to a share */
 
-		infop->mrg_driver = (mac_group_driver_t)rxgroup;
-		infop->mrg_start = NULL;
-		infop->mrg_stop = NULL;
-		infop->mrg_addmac = nxge_hio_add_mac;
-		infop->mrg_remmac = nxge_hio_rem_mac;
-		infop->mrg_count = NXGE_HIO_SHARE_MAX_CHANNELS;
+		dev_gindex = nxgep->pt_config.hw_config.def_mac_rxdma_grpid +
+		    groupid;
+
+		infop->mgi_driver = (mac_group_driver_t)group;
+		infop->mgi_start = nxge_hio_group_start;
+		infop->mgi_stop = nxge_hio_group_stop;
+		infop->mgi_addmac = nxge_hio_add_mac;
+		infop->mgi_remmac = nxge_hio_rem_mac;
+		infop->mgi_count =
+		    nxgep->pt_config.rdc_grps[dev_gindex].max_rdcs;
 		break;
 
 	case MAC_RING_TYPE_TX:
+		/*
+		 * 'groupid' for TX should be incremented by one since
+		 * the default group (groupid 0) is not known by the MAC layer
+		 */
+		group = &nxgep->tx_hio_groups[groupid + 1];
+		group->nxgep = nxgep;
+		group->ghandle = ghdl;
+		group->gindex = groupid + 1;
+		group->sindex = 0;	/* not yet bound to a share */
+
+		infop->mgi_driver = (mac_group_driver_t)group;
+		infop->mgi_start = NULL;
+		infop->mgi_stop = NULL;
+		infop->mgi_addmac = NULL;	/* not needed */
+		infop->mgi_remmac = NULL;	/* not needed */
+		/* no rings associated with group initially */
+		infop->mgi_count = 0;
 		break;
 	}
 }
+
+#if defined(sun4v)
 
 int
 nxge_hio_share_assign(
@@ -1126,7 +1343,6 @@ nxge_hio_share_assign(
 		NXGE_ERROR_MSG((nxge, HIO_CTL,
 		    "nxge_hio_share_assign: "
 		    "vr->assign() returned %d", hv_rv));
-		nxge_hio_unshare(vr);
 		return (-EIO);
 	}
 
@@ -1189,7 +1405,7 @@ nxge_hio_share_assign(
 	return (0);
 }
 
-int
+void
 nxge_hio_share_unassign(
 	nxge_hio_vr_t *vr)
 {
@@ -1237,23 +1453,15 @@ nxge_hio_share_unassign(
 			    vr->cookie, hv_rv));
 		}
 	}
-
-	return (0);
 }
 
 int
-nxge_hio_share_alloc(void *arg, uint64_t cookie, uint64_t *rcookie,
-	mac_share_handle_t *shandle)
+nxge_hio_share_alloc(void *arg, mac_share_handle_t *shandle)
 {
-	p_nxge_t nxge = (p_nxge_t)arg;
-	nxge_rx_ring_group_t *rxgroup;
-	nxge_share_handle_t *shp;
-
-	nxge_hio_vr_t *vr;	/* The Virtualization Region */
-	uint64_t rmap, tmap;
-	int rdctbl, rv;
-
-	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
+	p_nxge_t		nxge = (p_nxge_t)arg;
+	nxge_share_handle_t	*shp;
+	nxge_hio_vr_t		*vr;	/* The Virtualization Region */
+	nxge_hio_data_t		*nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_share"));
 
@@ -1269,56 +1477,13 @@ nxge_hio_share_alloc(void *arg, uint64_t cookie, uint64_t *rcookie,
 	if ((vr = nxge_hio_vr_share(nxge)) == 0)
 		return (EAGAIN);
 
-	/*
-	 * Get an RDC group for us to use.
-	 */
-	if ((rdctbl = nxge_hio_hostinfo_get_rdc_table(nxge)) < 0) {
-		nxge_hio_unshare(vr);
-		return (EBUSY);
-	}
-	vr->rdc_tbl = (uint8_t)rdctbl;
-
-	/*
-	 * Add resources to the share.
-	 */
-	tmap = 0;
-	rv = nxge_hio_addres(vr, MAC_RING_TYPE_TX,
-	    NXGE_HIO_SHARE_MAX_CHANNELS);
-	if (rv != 0) {
-		nxge_hio_unshare(vr);
-		return (rv);
-	}
-
-	rmap = 0;
-	rv = nxge_hio_addres(vr, MAC_RING_TYPE_RX,
-	    NXGE_HIO_SHARE_MAX_CHANNELS);
-	if (rv != 0) {
-		nxge_hio_remres(vr, MAC_RING_TYPE_TX, tmap);
-		nxge_hio_unshare(vr);
-		return (rv);
-	}
-
-	if ((rv = nxge_hio_share_assign(nxge, cookie, &tmap, &rmap, vr))) {
-		nxge_hio_remres(vr, MAC_RING_TYPE_RX, tmap);
-		nxge_hio_remres(vr, MAC_RING_TYPE_TX, tmap);
-		nxge_hio_unshare(vr);
-		return (rv);
-	}
-
-	rxgroup = &nxge->rx_hio_groups[vr->rdc_tbl];
-	rxgroup->gindex = vr->rdc_tbl;
-	rxgroup->sindex = vr->region;
-
 	shp = &nxge->shares[vr->region];
+	shp->nxgep = nxge;
 	shp->index = vr->region;
 	shp->vrp = (void *)vr;
-	shp->tmap = tmap;
-	shp->rmap = rmap;
-	shp->rxgroup = vr->rdc_tbl;
-	shp->active = B_TRUE;
-
-	/* high 32 bits are cfg_hdl and low 32 bits are HV cookie */
-	*rcookie = (((uint64_t)nxge->niu_cfg_hdl) << 32) | vr->cookie;
+	shp->tmap = shp->rmap = 0;	/* to be assigned by ms_sbind */
+	shp->rxgroup = 0;		/* to be assigned by ms_sadd */
+	shp->active = B_FALSE;		/* not bound yet */
 
 	*shandle = (mac_share_handle_t)shp;
 
@@ -1326,8 +1491,243 @@ nxge_hio_share_alloc(void *arg, uint64_t cookie, uint64_t *rcookie,
 	return (0);
 }
 
+
 void
 nxge_hio_share_free(mac_share_handle_t shandle)
+{
+	nxge_share_handle_t	*shp = (nxge_share_handle_t *)shandle;
+	nxge_hio_vr_t		*vr;
+
+	/*
+	 * Clear internal handle state.
+	 */
+	vr = shp->vrp;
+	shp->vrp = (void *)NULL;
+	shp->index = 0;
+	shp->tmap = 0;
+	shp->rmap = 0;
+	shp->rxgroup = 0;
+	shp->active = B_FALSE;
+
+	/*
+	 * Free VR resource.
+	 */
+	nxge_hio_unshare(vr);
+}
+
+
+void
+nxge_hio_share_query(mac_share_handle_t shandle, mac_ring_type_t type,
+    mac_ring_handle_t *rings, uint_t *n_rings)
+{
+	nxge_t			*nxge;
+	nxge_share_handle_t	*shp = (nxge_share_handle_t *)shandle;
+	nxge_ring_handle_t	*rh;
+	uint32_t		offset;
+
+	nxge = shp->nxgep;
+
+	switch (type) {
+	case MAC_RING_TYPE_RX:
+		rh = nxge->rx_ring_handles;
+		offset = nxge->pt_config.hw_config.start_rdc;
+		break;
+
+	case MAC_RING_TYPE_TX:
+		rh = nxge->tx_ring_handles;
+		offset = nxge->pt_config.hw_config.tdc.start;
+		break;
+	}
+
+	/*
+	 * In version 1.0, we may only give a VR 2 RDCs/TDCs.  Not only that,
+	 * but the HV has statically assigned the channels like so:
+	 * VR0: RDC0 & RDC1
+	 * VR1: RDC2 & RDC3, etc.
+	 * The TDCs are assigned in exactly the same way.
+	 */
+	if (rings != NULL) {
+		rings[0] = rh[(shp->index * 2) - offset].ring_handle;
+		rings[1] = rh[(shp->index * 2 + 1) - offset].ring_handle;
+	}
+	if (n_rings != NULL) {
+		*n_rings = 2;
+	}
+}
+
+int
+nxge_hio_share_add_group(mac_share_handle_t shandle,
+    mac_group_driver_t ghandle)
+{
+	nxge_t			*nxge;
+	nxge_share_handle_t	*shp = (nxge_share_handle_t *)shandle;
+	nxge_ring_group_t	*rg = (nxge_ring_group_t *)ghandle;
+	nxge_hio_vr_t		*vr;	/* The Virtualization Region */
+	nxge_grp_t		*group;
+	int			i;
+
+	if (rg->sindex != 0) {
+		/* the group is already bound to a share */
+		return (EALREADY);
+	}
+
+	nxge = rg->nxgep;
+	vr = shp->vrp;
+
+	switch (rg->type) {
+	case MAC_RING_TYPE_RX:
+		/*
+		 * Make sure that the group has the right rings associated
+		 * for the share. In version 1.0, we may only give a VR
+		 * 2 RDCs.  Not only that, but the HV has statically
+		 * assigned the channels like so:
+		 * VR0: RDC0 & RDC1
+		 * VR1: RDC2 & RDC3, etc.
+		 */
+		group = nxge->rx_set.group[rg->gindex];
+
+		if (group->count > 2) {
+			/* a share can have at most 2 rings */
+			return (EINVAL);
+		}
+
+		for (i = 0; i < NXGE_MAX_RDCS; i++) {
+			if (group->map & (1 << i)) {
+				if ((i != shp->index * 2) &&
+				    (i != (shp->index * 2 + 1))) {
+					/*
+					 * A group with invalid rings was
+					 * attempted to bind to this share
+					 */
+					return (EINVAL);
+				}
+			}
+		}
+
+		rg->sindex = vr->region;
+		vr->rdc_tbl = rg->rdctbl;
+		shp->rxgroup = vr->rdc_tbl;
+		break;
+
+	case MAC_RING_TYPE_TX:
+		/*
+		 * Make sure that the group has the right rings associated
+		 * for the share. In version 1.0, we may only give a VR
+		 * 2 TDCs.  Not only that, but the HV has statically
+		 * assigned the channels like so:
+		 * VR0: TDC0 & TDC1
+		 * VR1: TDC2 & TDC3, etc.
+		 */
+		group = nxge->tx_set.group[rg->gindex];
+
+		if (group->count > 2) {
+			/* a share can have at most 2 rings */
+			return (EINVAL);
+		}
+
+		for (i = 0; i < NXGE_MAX_TDCS; i++) {
+			if (group->map & (1 << i)) {
+				if ((i != shp->index * 2) &&
+				    (i != (shp->index * 2 + 1))) {
+					/*
+					 * A group with invalid rings was
+					 * attempted to bind to this share
+					 */
+					return (EINVAL);
+				}
+			}
+		}
+
+		vr->tdc_tbl = nxge->pt_config.hw_config.def_mac_txdma_grpid +
+		    rg->gindex;
+		rg->sindex = vr->region;
+		break;
+	}
+	return (0);
+}
+
+int
+nxge_hio_share_rem_group(mac_share_handle_t shandle,
+    mac_group_driver_t ghandle)
+{
+	nxge_share_handle_t	*shp = (nxge_share_handle_t *)shandle;
+	nxge_ring_group_t	*group = (nxge_ring_group_t *)ghandle;
+	nxge_hio_vr_t		*vr;	/* The Virtualization Region */
+	int			rv = 0;
+
+	vr = shp->vrp;
+
+	switch (group->type) {
+	case MAC_RING_TYPE_RX:
+		group->sindex = 0;
+		vr->rdc_tbl = 0;
+		shp->rxgroup = 0;
+		break;
+
+	case MAC_RING_TYPE_TX:
+		group->sindex = 0;
+		vr->tdc_tbl = 0;
+		break;
+	}
+
+	return (rv);
+}
+
+int
+nxge_hio_share_bind(mac_share_handle_t shandle, uint64_t cookie,
+    uint64_t *rcookie)
+{
+	nxge_t			*nxge;
+	nxge_share_handle_t	*shp = (nxge_share_handle_t *)shandle;
+	nxge_hio_vr_t		*vr;
+	uint64_t		rmap, tmap, hv_rmap, hv_tmap;
+	int			rv;
+
+	nxge = shp->nxgep;
+	vr = (nxge_hio_vr_t *)shp->vrp;
+
+	/*
+	 * Add resources to the share.
+	 * For each DMA channel associated with the VR, bind its resources
+	 * to the VR.
+	 */
+	tmap = 0;
+	rv = nxge_hio_addres(vr, MAC_RING_TYPE_TX, &tmap);
+	if (rv != 0) {
+		return (rv);
+	}
+
+	rmap = 0;
+	rv = nxge_hio_addres(vr, MAC_RING_TYPE_RX, &rmap);
+	if (rv != 0) {
+		nxge_hio_remres(vr, MAC_RING_TYPE_TX, tmap);
+		return (rv);
+	}
+
+	/*
+	 * Ask the Hypervisor to set up the VR and allocate slots for
+	 * each rings associated with the VR.
+	 */
+	hv_tmap = hv_rmap = 0;
+	if ((rv = nxge_hio_share_assign(nxge, cookie,
+	    &hv_tmap, &hv_rmap, vr))) {
+		nxge_hio_remres(vr, MAC_RING_TYPE_TX, tmap);
+		nxge_hio_remres(vr, MAC_RING_TYPE_RX, rmap);
+		return (rv);
+	}
+
+	shp->active = B_TRUE;
+	shp->tmap = hv_tmap;
+	shp->rmap = hv_rmap;
+
+	/* high 32 bits are cfg_hdl and low 32 bits are HV cookie */
+	*rcookie = (((uint64_t)nxge->niu_cfg_hdl) << 32) | vr->cookie;
+
+	return (0);
+}
+
+void
+nxge_hio_share_unbind(mac_share_handle_t shandle)
 {
 	nxge_share_handle_t *shp = (nxge_share_handle_t *)shandle;
 
@@ -1335,52 +1735,15 @@ nxge_hio_share_free(mac_share_handle_t shandle)
 	 * First, unassign the VR (take it back),
 	 * so we can enable interrupts again.
 	 */
-	(void) nxge_hio_share_unassign(shp->vrp);
+	nxge_hio_share_unassign(shp->vrp);
 
 	/*
 	 * Free Ring Resources for TX and RX
 	 */
 	nxge_hio_remres(shp->vrp, MAC_RING_TYPE_TX, shp->tmap);
 	nxge_hio_remres(shp->vrp, MAC_RING_TYPE_RX, shp->rmap);
-
-	/*
-	 * Free VR resource.
-	 */
-	nxge_hio_unshare(shp->vrp);
-
-	/*
-	 * Clear internal handle state.
-	 */
-	shp->index = 0;
-	shp->vrp = (void *)NULL;
-	shp->tmap = 0;
-	shp->rmap = 0;
-	shp->rxgroup = 0;
-	shp->active = B_FALSE;
 }
 
-void
-nxge_hio_share_query(mac_share_handle_t shandle, mac_ring_type_t type,
-	uint32_t *rmin, uint32_t *rmax, uint64_t *rmap, uint64_t *gnum)
-{
-	nxge_share_handle_t *shp = (nxge_share_handle_t *)shandle;
-
-	switch (type) {
-	case MAC_RING_TYPE_RX:
-		*rmin = NXGE_HIO_SHARE_MIN_CHANNELS;
-		*rmax = NXGE_HIO_SHARE_MAX_CHANNELS;
-		*rmap = shp->rmap;
-		*gnum = shp->rxgroup;
-		break;
-
-	case MAC_RING_TYPE_TX:
-		*rmin = NXGE_HIO_SHARE_MIN_CHANNELS;
-		*rmax = NXGE_HIO_SHARE_MAX_CHANNELS;
-		*rmap = shp->tmap;
-		*gnum = 0;
-		break;
-	}
-}
 
 /*
  * nxge_hio_vr_share
@@ -1474,7 +1837,11 @@ nxge_hio_unshare(
 	 *
 	 * nxge_hio_hostinfo_uninit(nxge, vr);
 	 */
-	(void) nxge_fzc_rdc_tbl_unbind(nxge, vr->rdc_tbl);
+
+	/*
+	 * XXX: This is done by ms_sremove?
+	 * (void) nxge_fzc_rdc_tbl_unbind(nxge, vr->rdc_tbl);
+	 */
 
 	nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
 
@@ -1495,23 +1862,53 @@ int
 nxge_hio_addres(
 	nxge_hio_vr_t *vr,
 	mac_ring_type_t type,
-	int count)
+	uint64_t *map)
 {
-	nxge_t *nxge = (nxge_t *)vr->nxge;
-	int i;
+	nxge_t		*nxge = (nxge_t *)vr->nxge;
+	nxge_grp_t	*group;
+	int		groupid;
+	int		i;
+	int		max_dcs;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_addres"));
 
 	if (!nxge)
 		return (EINVAL);
 
-	for (i = 0; i < count; i++) {
-		int rv;
-		if ((rv = nxge_hio_dc_share(nxge, vr, type)) < 0) {
-			if (i == 0) /* Couldn't get even one DC. */
-				return (-rv);
-			else
-				break;
+	/*
+	 * For each ring associated with the group, add the resources
+	 * to the group and bind.
+	 */
+	max_dcs = (type == MAC_RING_TYPE_TX) ? NXGE_MAX_TDCS : NXGE_MAX_RDCS;
+	if (type == MAC_RING_TYPE_TX) {
+		/* set->group is an array of group indexed by a port group id */
+		groupid = vr->tdc_tbl -
+		    nxge->pt_config.hw_config.def_mac_txdma_grpid;
+		group = nxge->tx_set.group[groupid];
+	} else {
+		/* set->group is an array of group indexed by a port group id */
+		groupid = vr->rdc_tbl -
+		    nxge->pt_config.hw_config.def_mac_rxdma_grpid;
+		group = nxge->rx_set.group[groupid];
+	}
+
+	if (group->map == 0) {
+		NXGE_DEBUG_MSG((nxge, HIO_CTL, "There is no rings associated "
+		    "with this VR"));
+		return (EINVAL);
+	}
+
+	for (i = 0; i < max_dcs; i++) {
+		if (group->map & (1 << i)) {
+			int rv;
+
+			if ((rv = nxge_hio_dc_share(nxge, vr, type, i)) < 0) {
+				if (*map == 0) /* Couldn't get even one DC. */
+					return (-rv);
+				else
+					break;
+			}
+			*map |= (1 << i);
 		}
 	}
 
@@ -1538,6 +1935,10 @@ nxge_hio_remres(
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_remres(%lx)", res_map));
 
+	/*
+	 * For each ring bound to the group, remove the DMA resources
+	 * from the group and unbind.
+	 */
 	group = (type == MAC_RING_TYPE_TX ? &vr->tx_group : &vr->rx_group);
 	while (group->dc) {
 		nxge_hio_dc_t *dc = group->dc;
@@ -1628,12 +2029,11 @@ nxge_hio_tdc_share(
 	nxge->tdc_is_shared[channel] = B_TRUE;
 	MUTEX_EXIT(&nhd->lock);
 
-
 	if (nxge_intr_remove(nxge, VP_BOUND_TX, channel) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_tdc_share: "
 		    "Failed to remove interrupt for TxDMA channel %d",
 		    channel));
-		return (NXGE_ERROR);
+		return (-EINVAL);
 	}
 
 	/* Disable TxDMA A.9.6.10 */
@@ -1698,12 +2098,8 @@ nxge_hio_rdc_share(
 	nxge_hio_vr_t *vr,
 	int channel)
 {
-	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
-	nxge_hw_pt_cfg_t *hardware = &nxge->pt_config.hw_config;
 	nxge_grp_set_t *set = &nxge->rx_set;
 	nxge_rdc_grp_t *rdc_grp;
-
-	int current, last;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_rdc_share"));
 
@@ -1737,21 +2133,6 @@ nxge_hio_rdc_share(
 
 	// Assert RST: RXDMA_CFIG1[30] = 1
 	nxge_grp_dc_remove(nxge, VP_BOUND_RX, channel);
-
-	/*
-	 * We have to reconfigure the RDC table(s)
-	 * to which this channel belongs.
-	 */
-	current = hardware->def_mac_rxdma_grpid;
-	last = current + hardware->max_rdc_grpids;
-	for (; current < last; current++) {
-		if (nhd->rdc_tbl[current].nxge == (uintptr_t)nxge) {
-			rdc_grp = &nxge->pt_config.rdc_grps[current];
-			rdc_grp->map = set->owned.map;
-			rdc_grp->max_rdcs--;
-			(void) nxge_init_fzc_rdc_tbl(nxge, current);
-		}
-	}
 
 	/*
 	 * The guest domain will reconfigure the RDC later.
@@ -1791,12 +2172,6 @@ nxge_hio_rdc_share(
 	}
 	NXGE_DC_SET(rdc_grp->map, channel);
 
-	if (nxge_init_fzc_rdc_tbl(nxge, vr->rdc_tbl) != NXGE_OK) {
-		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nxge_hio_rdc_share: nxge_init_fzc_rdc_tbl failed"));
-		return (-EIO);
-	}
-
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_rdc_share"));
 
 	return (0);
@@ -1811,8 +2186,7 @@ nxge_hio_rdc_share(
  * 	nxge
  * 	vr	The VR that <channel> will belong to.
  * 	type	Tx or Rx.
- * 	res_map	The resource map used by the caller, which we will
- *		update if successful.
+ * 	channel	Channel to share
  *
  * Notes:
  *
@@ -1823,59 +2197,17 @@ int
 nxge_hio_dc_share(
 	nxge_t *nxge,
 	nxge_hio_vr_t *vr,
-	mac_ring_type_t type)
+	mac_ring_type_t type,
+	int channel)
 {
 	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
-	nxge_hw_pt_cfg_t *hardware;
 	nxge_hio_dc_t *dc;
-	int channel, limit;
-
-	nxge_grp_set_t *set;
 	nxge_grp_t *group;
-
 	int slot;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_dc_share(%cdc %d",
 	    type == MAC_RING_TYPE_TX ? 't' : 'r', channel));
 
-	/*
-	 * In version 1.0, we may only give a VR 2 RDCs or TDCs.
-	 * Not only that, but the HV has statically assigned the
-	 * channels like so:
-	 * VR0: RDC0 & RDC1
-	 * VR1: RDC2 & RDC3, etc.
-	 * The TDCs are assigned in exactly the same way.
-	 *
-	 * So, for example
-	 *	hardware->start_rdc + vr->region * 2;
-	 *	VR1: hardware->start_rdc + 1 * 2;
-	 *	VR3: hardware->start_rdc + 3 * 2;
-	 *	If start_rdc is 0, we end up with 2 or 6.
-	 *	If start_rdc is 8, we end up with 10 or 14.
-	 */
-
-	set = (type == MAC_RING_TYPE_TX ? &nxge->tx_set : &nxge->rx_set);
-	hardware = &nxge->pt_config.hw_config;
-
-	// This code is still NIU-specific (assuming only 2 ports)
-	channel = hardware->start_rdc + (vr->region % 4) * 2;
-	limit = channel + 2;
-
-	MUTEX_ENTER(&nhd->lock);
-	for (; channel < limit; channel++) {
-		if ((1 << channel) & set->owned.map) {
-			break;
-		}
-	}
-
-	if (channel == limit) {
-		MUTEX_EXIT(&nhd->lock);
-		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nxge_hio_dc_share: there are no channels to share"));
-		return (-EIO);
-	}
-
-	MUTEX_EXIT(&nhd->lock);
 
 	/* -------------------------------------------------- */
 	slot = (type == MAC_RING_TYPE_TX) ?
@@ -1884,9 +2216,9 @@ nxge_hio_dc_share(
 
 	if (slot < 0) {
 		if (type == MAC_RING_TYPE_RX) {
-			nxge_hio_rdc_unshare(nxge, channel);
+			nxge_hio_rdc_unshare(nxge, vr->rdc_tbl, channel);
 		} else {
-			nxge_hio_tdc_unshare(nxge, channel);
+			nxge_hio_tdc_unshare(nxge, vr->tdc_tbl, channel);
 		}
 		return (slot);
 	}
@@ -1912,7 +2244,6 @@ nxge_hio_dc_share(
 	group = (type == MAC_RING_TYPE_TX ? &vr->tx_group : &vr->rx_group);
 
 	dc->group = group;
-
 	/* Initialize <group>, if necessary */
 	if (group->count == 0) {
 		group->nxge = nxge;
@@ -1952,15 +2283,20 @@ nxge_hio_dc_share(
 void
 nxge_hio_tdc_unshare(
 	nxge_t *nxge,
+	int dev_grpid,
 	int channel)
 {
 	nxge_grp_set_t *set = &nxge->tx_set;
-	nxge_grp_t *group = set->group[0];
+	nxge_grp_t *group;
+	int grpid;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_tdc_unshare"));
 
 	NXGE_DC_RESET(set->shared.map, channel);
 	set->shared.count--;
+
+	grpid = dev_grpid - nxge->pt_config.hw_config.def_mac_txdma_grpid;
+	group = set->group[grpid];
 
 	if ((nxge_grp_dc_add(nxge, group, VP_BOUND_TX, channel))) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_tdc_unshare: "
@@ -1994,14 +2330,12 @@ nxge_hio_tdc_unshare(
 void
 nxge_hio_rdc_unshare(
 	nxge_t *nxge,
+	int dev_grpid,
 	int channel)
 {
-	nxge_hio_data_t *nhd = (nxge_hio_data_t *)nxge->nxge_hw_p->hio;
-	nxge_hw_pt_cfg_t *hardware = &nxge->pt_config.hw_config;
-
-	nxge_grp_set_t *set = &nxge->rx_set;
-	nxge_grp_t *group = set->group[0];
-	int current, last;
+	nxge_grp_set_t		*set = &nxge->rx_set;
+	nxge_grp_t		*group;
+	int			grpid;
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "==> nxge_hio_rdc_unshare"));
 
@@ -2024,6 +2358,9 @@ nxge_hio_rdc_unshare(
 	NXGE_DC_RESET(set->shared.map, channel);
 	set->shared.count--;
 
+	grpid = dev_grpid - nxge->pt_config.hw_config.def_mac_rxdma_grpid;
+	group = set->group[grpid];
+
 	/*
 	 * Assert RST: RXDMA_CFIG1[30] = 1
 	 *
@@ -2035,7 +2372,7 @@ nxge_hio_rdc_unshare(
 		/* Be sure to re-enable the RX MAC. */
 		if (nxge_rx_mac_enable(nxge) != NXGE_OK) {
 			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-			    "nxge_hio_rdc_unshare: Rx MAC still disabled"));
+			    "nxge_hio_rdc_share: Rx MAC still disabled"));
 		}
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL, "nxge_hio_rdc_unshare: "
 		    "Failed to initialize RxDMA channel %d", channel));
@@ -2043,27 +2380,11 @@ nxge_hio_rdc_unshare(
 	}
 
 	/*
-	 * We have to reconfigure the RDC table(s)
-	 * to which this channel once again belongs.
-	 */
-	current = hardware->def_mac_rxdma_grpid;
-	last = current + hardware->max_rdc_grpids;
-	for (; current < last; current++) {
-		if (nhd->rdc_tbl[current].nxge == (uintptr_t)nxge) {
-			nxge_rdc_grp_t *group;
-			group = &nxge->pt_config.rdc_grps[current];
-			group->map = set->owned.map;
-			group->max_rdcs++;
-			(void) nxge_init_fzc_rdc_tbl(nxge, current);
-		}
-	}
-
-	/*
 	 * Enable RxMAC = A.9.2.10
 	 */
 	if (nxge_rx_mac_enable(nxge) != NXGE_OK) {
 		NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
-		    "nxge_hio_rdc_unshare: Rx MAC still disabled"));
+		    "nxge_hio_rdc_share: Rx MAC still disabled"));
 		return;
 	}
 
@@ -2120,9 +2441,9 @@ nxge_hio_dc_unshare(
 	dc->cookie = 0;
 
 	if (type == MAC_RING_TYPE_RX) {
-		nxge_hio_rdc_unshare(nxge, channel);
+		nxge_hio_rdc_unshare(nxge, vr->rdc_tbl, channel);
 	} else {
-		nxge_hio_tdc_unshare(nxge, channel);
+		nxge_hio_tdc_unshare(nxge, vr->tdc_tbl, channel);
 	}
 
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_dc_unshare"));

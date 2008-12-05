@@ -21,6 +21,11 @@
  * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef XGE_HAL_REGS_H
 #define XGE_HAL_REGS_H
 
@@ -814,8 +819,8 @@ typedef struct {
 	u64 rmac_cfg_key;
 #define XGE_HAL_RMAC_CFG_KEY(val)               vBIT(val,0,16)
 
-#define XGE_HAL_MAX_MAC_ADDRESSES               64
-#define XGE_HAL_MAC_MC_ALL_MC_ADDR_OFFSET       63
+#define XGE_HAL_MAX_MAC_ADDRESSES               256
+#define XGE_HAL_MAC_MC_ALL_MC_ADDR_OFFSET       255
 #define XGE_HAL_MAX_MAC_ADDRESSES_HERC          256
 #define XGE_HAL_MAC_MC_ALL_MC_ADDR_OFFSET_HERC  255
 

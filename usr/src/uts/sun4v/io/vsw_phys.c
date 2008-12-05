@@ -55,7 +55,8 @@
 #include <sys/machsystm.h>
 #include <sys/modctl.h>
 #include <sys/modhash.h>
-#include <sys/mac.h>
+#include <sys/mac_client.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/taskq.h>
 #include <sys/note.h>
@@ -63,178 +64,158 @@
 #include <sys/mac.h>
 #include <sys/mdeg.h>
 #include <sys/vsw.h>
+#include <sys/vlan.h>
 
 /* MAC Ring table functions. */
-static void vsw_mac_ring_tbl_init(vsw_t *vswp);
-static void vsw_mac_ring_tbl_destroy(vsw_t *vswp);
-static void vsw_queue_worker(vsw_mac_ring_t *rrp);
-static void vsw_queue_stop(vsw_queue_t *vqp);
-static vsw_queue_t *vsw_queue_create();
-static void vsw_queue_destroy(vsw_queue_t *vqp);
-static void vsw_rx_queue_cb(void *, mac_resource_handle_t, mblk_t *);
-static void vsw_rx_cb(void *, mac_resource_handle_t, mblk_t *);
+static void vsw_port_rx_cb(void *, mac_resource_handle_t, mblk_t *,
+    boolean_t);
+static void vsw_if_rx_cb(void *, mac_resource_handle_t, mblk_t *, boolean_t);
 
 /* MAC layer routines */
-static mac_resource_handle_t vsw_mac_ring_add_cb(void *arg,
-		mac_resource_t *mrp);
-static	int vsw_set_hw_addr(vsw_t *, mac_multi_addr_t *);
-static	int vsw_set_hw_promisc(vsw_t *, vsw_port_t *, int);
-static	int vsw_unset_hw_addr(vsw_t *, int);
-static	int vsw_unset_hw_promisc(vsw_t *, vsw_port_t *, int);
-static int vsw_prog_if(vsw_t *);
+static int vsw_set_port_hw_addr(vsw_port_t *port);
+static int vsw_set_if_hw_addr(vsw_t *vswp);
+static	void vsw_unset_hw_addr(vsw_t *, vsw_port_t *, int);
+static int vsw_maccl_open(vsw_t *vswp, vsw_port_t *port, int type);
+static void vsw_maccl_close(vsw_t *vswp, vsw_port_t *port, int type);
+static void vsw_mac_multicast_add_all(vsw_t *vswp, vsw_port_t *portp, int type);
+static void vsw_mac_multicast_remove_all(vsw_t *vswp,
+    vsw_port_t *portp, int type);
+static void vsw_mac_add_vlans(vsw_t *vswp, mac_client_handle_t mch,
+    uint8_t *macaddr, uint16_t flags, vsw_vlanid_t *vids, int nvids);
+static void vsw_mac_remove_vlans(mac_client_handle_t mch, vsw_vlanid_t *vids,
+    int nvids);
 static	void vsw_mac_set_mtu(vsw_t *vswp, uint32_t mtu);
 
 /* Support functions */
-static int vsw_prog_ports(vsw_t *);
 int vsw_set_hw(vsw_t *, vsw_port_t *, int);
-int vsw_unset_hw(vsw_t *, vsw_port_t *, int);
+void vsw_unset_hw(vsw_t *, vsw_port_t *, int);
 void vsw_reconfig_hw(vsw_t *);
-int vsw_mac_attach(vsw_t *vswp);
-void vsw_mac_detach(vsw_t *vswp);
 int vsw_mac_open(vsw_t *vswp);
 void vsw_mac_close(vsw_t *vswp);
+int vsw_mac_multicast_add(vsw_t *vswp, vsw_port_t *port, mcst_addr_t *mcst_p,
+    int type);
+void vsw_mac_multicast_remove(vsw_t *vswp, vsw_port_t *port,
+    mcst_addr_t *mcst_p, int type);
+int vsw_mac_client_init(vsw_t *vswp, vsw_port_t *port, int type);
+void vsw_mac_client_cleanup(vsw_t *vswp, vsw_port_t *port, int type);
+void vsw_mac_cleanup_ports(vsw_t *vswp);
 void vsw_unset_addrs(vsw_t *vswp);
 void vsw_set_addrs(vsw_t *vswp);
-int vsw_get_hw_maddr(vsw_t *);
-mblk_t *vsw_tx_msg(vsw_t *, mblk_t *);
-void vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr);
+mblk_t *vsw_tx_msg(vsw_t *, mblk_t *, int, vsw_port_t *);
+void vsw_publish_macaddr(vsw_t *vswp, vsw_port_t *portp);
+void vsw_port_mac_reconfig(vsw_port_t *portp, boolean_t update_vlans,
+    uint16_t new_pvid, vsw_vlanid_t *new_vids, int new_nvids);
+void vsw_mac_port_reconfig_vlans(vsw_port_t *portp, uint16_t new_pvid,
+    vsw_vlanid_t *new_vids, int new_nvids);
+void vsw_if_mac_reconfig(vsw_t *vswp, boolean_t update_vlans,
+    uint16_t new_pvid, vsw_vlanid_t *new_vids, int new_nvids);
 
+/*
+ * Functions imported from other files.
+ */
+extern int vsw_portsend(vsw_port_t *port, mblk_t *mp);
+extern void vsw_hio_stop_port(vsw_port_t *portp);
+extern void vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate);
+extern uint32_t vsw_publish_macaddr_count;
+extern uint32_t vsw_vlan_frame_untag(void *arg, int type, mblk_t **np,
+	mblk_t **npt);
 static char mac_mtu_propname[] = "mtu";
 
 /*
  * Tunables used in this file.
  */
 extern int vsw_mac_open_retries;
-extern boolean_t vsw_multi_ring_enable;
-extern int vsw_mac_rx_rings;
-extern uint32_t vsw_publish_macaddr_count;
+
+
+#define	WRITE_MACCL_ENTER(vswp, port, type)	\
+	(type == VSW_LOCALDEV) ?  rw_enter(&vswp->maccl_rwlock, RW_WRITER) :\
+	rw_enter(&port->maccl_rwlock, RW_WRITER)
+
+#define	READ_MACCL_ENTER(vswp, port, type)	\
+	(type == VSW_LOCALDEV) ?  rw_enter(&vswp->maccl_rwlock, RW_READER) :\
+	rw_enter(&port->maccl_rwlock, RW_READER)
+
+#define	RW_MACCL_EXIT(vswp, port, type)	\
+	(type == VSW_LOCALDEV) ?  rw_exit(&vswp->maccl_rwlock) :	\
+	rw_exit(&port->maccl_rwlock)
+
 
 /*
- * Check to see if the card supports the setting of multiple unicst
- * addresses.
+ * Locking strategy in this file is explained as follows:
+ *	 - A global lock(vswp->mac_lock) is used to protect the
+ *	   MAC calls that deal with entire device. That is, the
+ *	   operations that deal with mac_handle which include
+ *	   mac_open()/close() and mac_client_open().
  *
- * Returns 0 if card supports the programming of multiple unicast addresses,
- * otherwise returns 1.
+ *	- A per port/interface RW lock(maccl_rwlock) is used protect
+ *	  the operations that deal with the MAC client.
+ *
+ *	When both mac_lock and maccl_rwlock need to be held, the
+ *	mac_lock need be acquired first and then maccl_rwlock. That is,
+ *		mac_lock---->maccl_rwlock
+ *
+ *	The 'mca_lock' that protects the mcast list is also acquired
+ *	within the context of maccl_rwlock. The hierarchy for this
+ *	one is as below:
+ *		maccl_rwlock---->mca_lock
  */
-int
-vsw_get_hw_maddr(vsw_t *vswp)
-{
-	D1(vswp, "%s: enter", __func__);
 
-	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
-
-	if (vswp->mh == NULL)
-		return (1);
-
-	if (!mac_capab_get(vswp->mh, MAC_CAPAB_MULTIADDRESS, &vswp->maddr)) {
-		cmn_err(CE_NOTE, "!vsw%d: device (%s) does not support "
-		    "programming multiple addresses", vswp->instance,
-		    vswp->physname);
-		return (1);
-	}
-
-	D2(vswp, "%s: %d addrs : %d free", __func__,
-	    vswp->maddr.maddr_naddr, vswp->maddr.maddr_naddrfree);
-
-	D1(vswp, "%s: exit", __func__);
-
-	return (0);
-}
 
 /*
  * Program unicast and multicast addresses of vsw interface and the ports
- * into the physical device.
+ * into the network device.
  */
 void
 vsw_set_addrs(vsw_t *vswp)
 {
 	vsw_port_list_t	*plist = &vswp->plist;
 	vsw_port_t	*port;
-	mcst_addr_t	*mcap;
 	int		rv;
 
 	READ_ENTER(&vswp->if_lockrw);
 
 	if (vswp->if_state & VSW_IF_UP) {
 
-		/* program unicst addr of vsw interface in the physdev */
-		if (vswp->addr_set == VSW_ADDR_UNSET) {
-			mutex_enter(&vswp->hw_lock);
-			rv = vsw_set_hw(vswp, NULL, VSW_LOCALDEV);
-			mutex_exit(&vswp->hw_lock);
-			if (rv != 0) {
-				cmn_err(CE_NOTE,
-				    "!vsw%d: failed to program interface "
-				    "unicast address\n", vswp->instance);
-			}
-			/*
-			 * Notify the MAC layer of the changed address.
-			 */
+		/* Open a mac client and program addresses */
+		rv = vsw_mac_client_init(vswp, NULL, VSW_LOCALDEV);
+		if (rv != 0) {
+			cmn_err(CE_NOTE,
+			    "!vsw%d: failed to program interface "
+			    "unicast address\n", vswp->instance);
+		}
+
+		/*
+		 * Notify the MAC layer of the changed address.
+		 */
+		if (rv == 0) {
 			mac_unicst_update(vswp->if_mh,
 			    (uint8_t *)&vswp->if_addr);
 		}
 
-		/* program mcast addrs of vsw interface in the physdev */
-		mutex_enter(&vswp->mca_lock);
-		WRITE_ENTER(&vswp->mac_rwlock);
-		for (mcap = vswp->mcap; mcap != NULL; mcap = mcap->nextp) {
-			if (mcap->mac_added)
-				continue;
-			rv = mac_multicst_add(vswp->mh, (uchar_t *)&mcap->mca);
-			if (rv == 0) {
-				mcap->mac_added = B_TRUE;
-			} else {
-				cmn_err(CE_NOTE, "!vsw%d: unable to add "
-				    "multicast address: %s\n", vswp->instance,
-				    ether_sprintf((void *)&mcap->mca));
-			}
-		}
-		RW_EXIT(&vswp->mac_rwlock);
-		mutex_exit(&vswp->mca_lock);
-
 	}
 
 	RW_EXIT(&vswp->if_lockrw);
 
 	WRITE_ENTER(&plist->lockrw);
 
-	/* program unicast address of ports in the physical device */
-	mutex_enter(&vswp->hw_lock);
+	/* program unicast address of ports in the network device */
 	for (port = plist->head; port != NULL; port = port->p_next) {
-		if (port->addr_set != VSW_ADDR_UNSET) /* addr already set */
+		if (port->addr_set) /* addr already set */
 			continue;
-		if (vsw_set_hw(vswp, port, VSW_VNETPORT)) {
+
+		/* Open a mac client and program addresses */
+		rv = vsw_mac_client_init(vswp, port, VSW_VNETPORT);
+		if (rv != 0) {
 			cmn_err(CE_NOTE,
-			    "!vsw%d: port:%d failed to set unicast address\n",
-			    vswp->instance, port->p_instance);
+			    "!vsw%d: failed to program port(%d) "
+			    "unicast address\n", vswp->instance,
+			    port->p_instance);
 		}
 	}
-	mutex_exit(&vswp->hw_lock);
-
-	/* program multicast addresses of ports in the physdev */
-	for (port = plist->head; port != NULL; port = port->p_next) {
-		mutex_enter(&port->mca_lock);
-		WRITE_ENTER(&vswp->mac_rwlock);
-		for (mcap = port->mcap; mcap != NULL; mcap = mcap->nextp) {
-			if (mcap->mac_added)
-				continue;
-			rv = mac_multicst_add(vswp->mh, (uchar_t *)&mcap->mca);
-			if (rv == 0) {
-				mcap->mac_added = B_TRUE;
-			} else {
-				cmn_err(CE_NOTE, "!vsw%d: unable to add "
-				    "multicast address: %s\n", vswp->instance,
-				    ether_sprintf((void *)&mcap->mca));
-			}
-		}
-		RW_EXIT(&vswp->mac_rwlock);
-		mutex_exit(&port->mca_lock);
-	}
-
 	/* announce macaddr of vnets to the physical switch */
 	if (vsw_publish_macaddr_count != 0) {	/* enabled */
 		for (port = plist->head; port != NULL; port = port->p_next) {
-			vsw_publish_macaddr(vswp, (uint8_t *)&port->p_macaddr);
+			vsw_publish_macaddr(vswp, port);
 		}
 	}
 
@@ -242,93 +223,37 @@ vsw_set_addrs(vsw_t *vswp)
 }
 
 /*
- * Remove unicast and multicast addresses of vsw interface and the ports
- * from the physical device.
+ * Remove unicast, multicast addresses and close mac clients
+ * for the vsw interface and all ports.
  */
 void
 vsw_unset_addrs(vsw_t *vswp)
 {
-	vsw_port_list_t	*plist = &vswp->plist;
-	vsw_port_t	*port;
-	mcst_addr_t	*mcap;
-
 	READ_ENTER(&vswp->if_lockrw);
-
 	if (vswp->if_state & VSW_IF_UP) {
 
-		/*
-		 * Remove unicast addr of vsw interfce
-		 * from current physdev
-		 */
-		mutex_enter(&vswp->hw_lock);
-		(void) vsw_unset_hw(vswp, NULL, VSW_LOCALDEV);
-		mutex_exit(&vswp->hw_lock);
-
-		/*
-		 * Remove mcast addrs of vsw interface
-		 * from current physdev
-		 */
-		mutex_enter(&vswp->mca_lock);
-		WRITE_ENTER(&vswp->mac_rwlock);
-		for (mcap = vswp->mcap; mcap != NULL; mcap = mcap->nextp) {
-			if (!mcap->mac_added)
-				continue;
-			(void) mac_multicst_remove(vswp->mh,
-			    (uchar_t *)&mcap->mca);
-			mcap->mac_added = B_FALSE;
-		}
-		RW_EXIT(&vswp->mac_rwlock);
-		mutex_exit(&vswp->mca_lock);
-
+		/* Cleanup and close the mac client for the interface */
+		vsw_mac_client_cleanup(vswp, NULL, VSW_LOCALDEV);
 	}
-
 	RW_EXIT(&vswp->if_lockrw);
 
-	WRITE_ENTER(&plist->lockrw);
-
-	/*
-	 * Remove unicast address of ports from the current physical device
-	 */
-	mutex_enter(&vswp->hw_lock);
-	for (port = plist->head; port != NULL; port = port->p_next) {
-		/* Remove address if was programmed into HW. */
-		if (port->addr_set == VSW_ADDR_UNSET)
-			continue;
-		(void) vsw_unset_hw(vswp, port, VSW_VNETPORT);
-	}
-	mutex_exit(&vswp->hw_lock);
-
-	/* Remove multicast addresses of ports from the current physdev */
-	for (port = plist->head; port != NULL; port = port->p_next) {
-		mutex_enter(&port->mca_lock);
-		WRITE_ENTER(&vswp->mac_rwlock);
-		for (mcap = port->mcap; mcap != NULL; mcap = mcap->nextp) {
-			if (!mcap->mac_added)
-				continue;
-			(void) mac_multicst_remove(vswp->mh,
-			    (uchar_t *)&mcap->mca);
-			mcap->mac_added = B_FALSE;
-		}
-		RW_EXIT(&vswp->mac_rwlock);
-		mutex_exit(&port->mca_lock);
-	}
-
-	RW_EXIT(&plist->lockrw);
+	/* Cleanup and close the mac clients for all ports */
+	vsw_mac_cleanup_ports(vswp);
 }
 
 /*
- * Open the underlying physical device for access in layer2 mode.
+ * Open the underlying network device for access in layer2 mode.
  * Returns:
- * 0 on success
- * EAGAIN if mac_open() fails due to the device being not available yet.
- * EIO on any other failures.
+ *	0 on success
+ *	EAGAIN if mac_open() fails due to the device being not available yet.
+ *	EIO on any other failures.
  */
 int
 vsw_mac_open(vsw_t *vswp)
 {
-	int	rv;
+	int			rv;
 
-	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
 
 	if (vswp->mh != NULL) {
 		/* already open */
@@ -352,13 +277,14 @@ vsw_mac_open(vsw_t *vswp)
 		if (rv == ENOENT || rv == EBADF) {
 			return (EAGAIN);
 		} else {
-			cmn_err(CE_WARN, "vsw%d: device (%s) open failed rv:%x",
+			cmn_err(CE_WARN, "vsw%d: mac_open %s failed rv:%x",
 			    vswp->instance, vswp->physname, rv);
 			return (EIO);
 		}
 	}
-
 	vswp->mac_open_retries = 0;
+
+	vsw_mac_set_mtu(vswp, vswp->mtu);
 
 	return (0);
 }
@@ -369,121 +295,292 @@ vsw_mac_open(vsw_t *vswp)
 void
 vsw_mac_close(vsw_t *vswp)
 {
-	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
 
 	if (vswp->mh != NULL) {
+		if (vswp->mtu != vswp->mtu_physdev_orig) {
+			vsw_mac_set_mtu(vswp, vswp->mtu_physdev_orig);
+		}
 		mac_close(vswp->mh);
 		vswp->mh = NULL;
 	}
 }
 
 /*
- * Link into the MAC layer to gain access to the services provided by
- * the underlying physical device driver (which should also have
- * registered with the MAC layer).
- *
- * Only when in layer 2 mode.
+ * Add multicast addr.
  */
 int
-vsw_mac_attach(vsw_t *vswp)
+vsw_mac_multicast_add(vsw_t *vswp, vsw_port_t *port, mcst_addr_t *mcst_p,
+    int type)
 {
-	D1(vswp, "%s: enter", __func__);
+	int			ret = 0;
+	mac_client_handle_t	mch;
 
-	ASSERT(vswp->mrh == NULL);
-	ASSERT(vswp->mstarted == B_FALSE);
-	ASSERT(vswp->mresources == B_FALSE);
+	WRITE_MACCL_ENTER(vswp, port, type);
 
-	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
+	mch = (type == VSW_LOCALDEV) ? vswp->mch : port->p_mch;
 
-	ASSERT(vswp->mh != NULL);
-
-	D2(vswp, "vsw_mac_attach: using device %s", vswp->physname);
-
-	vsw_mac_set_mtu(vswp, vswp->mtu);
-
-	if (vsw_multi_ring_enable) {
-		/*
-		 * Initialize the ring table.
-		 */
-		vsw_mac_ring_tbl_init(vswp);
-
-		/*
-		 * Register our rx callback function.
-		 */
-		vswp->mrh = mac_rx_add(vswp->mh,
-		    vsw_rx_queue_cb, (void *)vswp);
-		ASSERT(vswp->mrh != NULL);
-
-		/*
-		 * Register our mac resource callback.
-		 */
-		mac_resource_set(vswp->mh, vsw_mac_ring_add_cb, (void *)vswp);
-		vswp->mresources = B_TRUE;
-
-		/*
-		 * Get the ring resources available to us from
-		 * the mac below us.
-		 */
-		mac_resources(vswp->mh);
-	} else {
-		/*
-		 * Just register our rx callback function
-		 */
-		vswp->mrh = mac_rx_add(vswp->mh, vsw_rx_cb, (void *)vswp);
-		ASSERT(vswp->mrh != NULL);
+	if (mch != NULL) {
+		ret = mac_multicast_add(mch, mcst_p->mca.ether_addr_octet);
+		if (ret != 0) {
+			cmn_err(CE_WARN, "!vsw%d: unable to "
+			    "program multicast address(%s) err=%d",
+			    vswp->instance,
+			    ether_sprintf((void *)&mcst_p->mca), ret);
+			RW_MACCL_EXIT(vswp, port, type);
+			return (ret);
+		}
+		mcst_p->mac_added = B_TRUE;
 	}
 
-	/* Get the MAC tx fn */
-	vswp->txinfo = mac_tx_get(vswp->mh);
-
-	/* start the interface */
-	if (mac_start(vswp->mh) != 0) {
-		cmn_err(CE_WARN, "!vsw%d: Could not start mac interface",
-		    vswp->instance);
-		goto mac_fail_exit;
-	}
-
-	vswp->mstarted = B_TRUE;
-
-	D1(vswp, "%s: exit", __func__);
-	return (0);
-
-mac_fail_exit:
-	vsw_mac_detach(vswp);
-
-	D1(vswp, "%s: exit", __func__);
-	return (1);
+	RW_MACCL_EXIT(vswp, port, type);
+	return (ret);
 }
 
+/*
+ * Remove multicast addr.
+ */
 void
-vsw_mac_detach(vsw_t *vswp)
+vsw_mac_multicast_remove(vsw_t *vswp, vsw_port_t *port, mcst_addr_t *mcst_p,
+    int type)
 {
-	D1(vswp, "vsw_mac_detach: enter");
+	mac_client_handle_t	mch;
 
-	ASSERT(vswp != NULL);
-	ASSERT(RW_LOCK_HELD(&vswp->mac_rwlock));
+	WRITE_MACCL_ENTER(vswp, port, type);
+	mch = (type == VSW_LOCALDEV) ? vswp->mch : port->p_mch;
 
-	if (vsw_multi_ring_enable) {
-		vsw_mac_ring_tbl_destroy(vswp);
+	if (mch != NULL && mcst_p->mac_added) {
+		mac_multicast_remove(mch, mcst_p->mca.ether_addr_octet);
+		mcst_p->mac_added = B_FALSE;
+	}
+	RW_MACCL_EXIT(vswp, port, type);
+}
+
+
+/*
+ * Add all multicast addresses of the port.
+ */
+static void
+vsw_mac_multicast_add_all(vsw_t *vswp, vsw_port_t *portp, int type)
+{
+	mcst_addr_t		*mcap;
+	mac_client_handle_t	mch;
+	kmutex_t		*mca_lockp;
+	int			rv;
+
+	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
+	if (type == VSW_LOCALDEV) {
+		ASSERT(RW_WRITE_HELD(&vswp->maccl_rwlock));
+		mch = vswp->mch;
+		mcap = vswp->mcap;
+		mca_lockp = &vswp->mca_lock;
+	} else {
+		ASSERT(RW_WRITE_HELD(&portp->maccl_rwlock));
+		mch = portp->p_mch;
+		mcap = portp->mcap;
+		mca_lockp = &portp->mca_lock;
 	}
 
-	if (vswp->mh != NULL) {
-		if (vswp->mstarted)
-			mac_stop(vswp->mh);
-		if (vswp->mrh != NULL)
-			mac_rx_remove(vswp->mh, vswp->mrh, B_TRUE);
-		if (vswp->mresources)
-			mac_resource_set(vswp->mh, NULL, NULL);
-		if (vswp->mtu != vswp->mtu_physdev_orig) {
-			vsw_mac_set_mtu(vswp, vswp->mtu_physdev_orig);
+	if (mch == NULL)
+		return;
+
+	mutex_enter(mca_lockp);
+	for (mcap = mcap; mcap != NULL; mcap = mcap->nextp) {
+		if (mcap->mac_added)
+			continue;
+		rv = mac_multicast_add(mch, (uchar_t *)&mcap->mca);
+		if (rv == 0) {
+			mcap->mac_added = B_TRUE;
+		} else {
+			cmn_err(CE_WARN, "!vsw%d: unable to program "
+			    "multicast address(%s) err=%d", vswp->instance,
+			    ether_sprintf((void *)&mcap->mca), rv);
 		}
 	}
+	mutex_exit(mca_lockp);
+}
 
-	vswp->mrh = NULL;
-	vswp->txinfo = NULL;
-	vswp->mstarted = B_FALSE;
+/*
+ * Remove all multicast addresses of the port.
+ */
+static void
+vsw_mac_multicast_remove_all(vsw_t *vswp, vsw_port_t *portp, int type)
+{
+	mac_client_handle_t	mch;
+	mcst_addr_t		*mcap;
+	kmutex_t		*mca_lockp;
 
-	D1(vswp, "vsw_mac_detach: exit");
+	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
+	if (type == VSW_LOCALDEV) {
+		ASSERT(RW_WRITE_HELD(&vswp->maccl_rwlock));
+		mch = vswp->mch;
+		mcap = vswp->mcap;
+		mca_lockp = &vswp->mca_lock;
+	} else {
+		ASSERT(RW_WRITE_HELD(&portp->maccl_rwlock));
+		mch = portp->p_mch;
+		mcap = portp->mcap;
+		mca_lockp = &portp->mca_lock;
+	}
+
+	if (mch == NULL)
+		return;
+
+	mutex_enter(mca_lockp);
+	for (; mcap != NULL; mcap = mcap->nextp) {
+		if (!mcap->mac_added)
+			continue;
+		(void) mac_multicast_remove(mch, (uchar_t *)&mcap->mca);
+		mcap->mac_added = B_FALSE;
+	}
+	mutex_exit(mca_lockp);
+}
+
+/*
+ * Open a mac client and program uncast and multicast addresses
+ * for a port or the interface.
+ * Returns:
+ *	0 on success
+ *	non-zero for failure.
+ */
+int
+vsw_mac_client_init(vsw_t *vswp, vsw_port_t *port, int type)
+{
+	int rv;
+
+	mutex_enter(&vswp->mac_lock);
+	WRITE_MACCL_ENTER(vswp, port, type);
+	rv = vsw_maccl_open(vswp, port, type);
+
+	/* Release mac_lock now */
+	mutex_exit(&vswp->mac_lock);
+
+	if (rv == 0) {
+		(void) vsw_set_hw(vswp, port, type);
+		vsw_mac_multicast_add_all(vswp, port, type);
+	}
+	RW_MACCL_EXIT(vswp, port, type);
+	return (rv);
+}
+
+/*
+ * Open a MAC client for a port or an interface.
+ * The flags and their purpose as below:
+ *
+ *	MAC_OPEN_FLAGS_NO_HWRINGS -- This flag is used by default
+ *	for all ports/interface so that they are associated with
+ *	default group & resources. It will not be used for the
+ *	ports that have HybridIO is enabled so that the h/w resources
+ *	assigned to it.
+ *
+ *	MAC_OPEN_FLAGS_SHARES_DESIRED -- This flag is used to indicate
+ *	that a port desires a Share. This will be the case with the
+ *	the ports that have hybrid mode enabled. This will only cause
+ *	MAC layer to allocate a share and corresponding resources
+ *	ahead of time.
+ *
+ *	MAC_OPEN_FLAGS_TAG_DISABLE -- This flag is used for VLAN
+ *	support. It will cause MAC to not add any tags, but expect
+ *	vsw to tag the packets.
+ *
+ *	MAC_OPEN_FLAGS_STRIP_DISABLE -- This flag is used for VLAN
+ *	support. It will case the MAC layer to not strip the tags.
+ *	Vsw may have to strip the tag for pvid case.
+ */
+static int
+vsw_maccl_open(vsw_t *vswp, vsw_port_t *port, int type)
+{
+	int		rv = 0;
+	int		instance;
+	char		mac_cl_name[MAXNAMELEN];
+	const char	*dev_name;
+	mac_client_handle_t *mchp;
+	uint64_t flags = (MAC_OPEN_FLAGS_NO_HWRINGS |
+	    MAC_OPEN_FLAGS_TAG_DISABLE |
+	    MAC_OPEN_FLAGS_STRIP_DISABLE);
+
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+	if (vswp->mh == NULL) {
+		/*
+		 * In case net-dev is changed (either set to nothing or
+		 * using aggregation device), return success here as the
+		 * timeout mechanism will handle it.
+		 */
+		return (0);
+	}
+
+	mchp = (type == VSW_LOCALDEV) ? &vswp->mch : &port->p_mch;
+	if (*mchp != NULL) {
+		/* already open */
+		return (0);
+	}
+	dev_name = ddi_driver_name(vswp->dip);
+	instance = ddi_get_instance(vswp->dip);
+	if (type == VSW_VNETPORT) {
+		if (port->p_hio_enabled == B_TRUE) {
+			flags &= ~MAC_OPEN_FLAGS_NO_HWRINGS;
+			flags |= MAC_OPEN_FLAGS_SHARES_DESIRED;
+		}
+		(void) snprintf(mac_cl_name, MAXNAMELEN, "%s%d%s%d", dev_name,
+		    instance, "_port", port->p_instance);
+	} else {
+		(void) snprintf(mac_cl_name, MAXNAMELEN, "%s%s%d",
+		    dev_name, "_if", instance);
+	}
+
+	rv = mac_client_open(vswp->mh, mchp, mac_cl_name, flags);
+	if (rv != 0) {
+		cmn_err(CE_NOTE, "!vsw%d:%s mac_client_open() failed\n",
+		    vswp->instance, mac_cl_name);
+	}
+	return (rv);
+}
+
+/*
+ * Clean up by removing uncast, multicast addresses and
+ * closing the MAC client for a port or the interface.
+ */
+void
+vsw_mac_client_cleanup(vsw_t *vswp, vsw_port_t *port, int type)
+{
+	WRITE_MACCL_ENTER(vswp, port, type);
+	vsw_unset_hw(vswp, port, type);
+	vsw_maccl_close(vswp, port, type);
+	vsw_mac_multicast_remove_all(vswp, port, type);
+	RW_MACCL_EXIT(vswp, port, type);
+}
+
+/*
+ * Close a MAC client for a port or an interface.
+ */
+static void
+vsw_maccl_close(vsw_t *vswp, vsw_port_t *port, int type)
+{
+	mac_client_handle_t *mchp;
+
+	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
+
+	mchp = (type == VSW_LOCALDEV) ? &vswp->mch : &port->p_mch;
+	if (*mchp != NULL) {
+		mac_client_close(*mchp, 0);
+		*mchp = NULL;
+	}
+}
+
+/*
+ * Cleanup MAC client related stuff for all ports.
+ */
+void
+vsw_mac_cleanup_ports(vsw_t *vswp)
+{
+	vsw_port_list_t		*plist = &vswp->plist;
+	vsw_port_t		*port;
+
+	READ_ENTER(&plist->lockrw);
+	for (port = plist->head; port != NULL; port = port->p_next) {
+		vsw_mac_client_cleanup(vswp, port, VSW_VNETPORT);
+	}
+	RW_EXIT(&plist->lockrw);
 }
 
 /*
@@ -492,90 +589,33 @@ vsw_mac_detach(vsw_t *vswp)
  *
  * If in layer 3 mode, then do nothing.
  *
- * If in layer 2 programmed mode attempt to program the unicast address
- * associated with the port into the physical device. If this is not
- * possible due to resource exhaustion or simply because the device does
- * not support multiple unicast addresses then if required fallback onto
- * putting the card into promisc mode.
- *
- * If in promisc mode then simply set the card into promisc mode.
+ * If in layer 2 mode, open a mac client and program the mac-address
+ * and vlan-ids. The MAC layer will take care of programming
+ * the address into h/w or set the h/w into promiscuous mode.
  *
  * Returns 0 success, 1 on failure.
  */
 int
 vsw_set_hw(vsw_t *vswp, vsw_port_t *port, int type)
 {
-	mac_multi_addr_t	mac_addr;
-	int			err;
+	int			err = 1;
 
 	D1(vswp, "%s: enter", __func__);
 
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
 	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
 
-	if (vswp->smode[vswp->smode_idx] == VSW_LAYER3)
+	if (vswp->smode == VSW_LAYER3)
 		return (0);
 
-	if (vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC) {
-		return (vsw_set_hw_promisc(vswp, port, type));
-	}
-
-	/*
-	 * Attempt to program the unicast address into the HW.
-	 */
-	mac_addr.mma_addrlen = ETHERADDRL;
 	if (type == VSW_VNETPORT) {
 		ASSERT(port != NULL);
-		ether_copy(&port->p_macaddr, &mac_addr.mma_addr);
+		err = vsw_set_port_hw_addr(port);
 	} else {
-		ether_copy(&vswp->if_addr, &mac_addr.mma_addr);
+		err = vsw_set_if_hw_addr(vswp);
 	}
-
-	err = vsw_set_hw_addr(vswp, &mac_addr);
-	if (err == ENOSPC) {
-		/*
-		 * Mark that attempt should be made to re-config sometime
-		 * in future if a port is deleted.
-		 */
-		vswp->recfg_reqd = B_TRUE;
-
-		/*
-		 * Only 1 mode specified, nothing more to do.
-		 */
-		if (vswp->smode_num == 1)
-			return (err);
-
-		/*
-		 * If promiscuous was next mode specified try to
-		 * set the card into that mode.
-		 */
-		if ((vswp->smode_idx <= (vswp->smode_num - 2)) &&
-		    (vswp->smode[vswp->smode_idx + 1] ==
-		    VSW_LAYER2_PROMISC)) {
-			vswp->smode_idx += 1;
-			return (vsw_set_hw_promisc(vswp, port, type));
-		}
-		return (err);
-	}
-
-	if (err != 0)
-		return (err);
-
-	if (type == VSW_VNETPORT) {
-		port->addr_slot = mac_addr.mma_slot;
-		port->addr_set = VSW_ADDR_HW;
-	} else {
-		vswp->addr_slot = mac_addr.mma_slot;
-		vswp->addr_set = VSW_ADDR_HW;
-	}
-
-	D2(vswp, "programmed addr %s into slot %d "
-	"of device %s", ether_sprintf((void *)mac_addr.mma_addr),
-	    mac_addr.mma_slot, vswp->physname);
 
 	D1(vswp, "%s: exit", __func__);
-
-	return (0);
+	return (err);
 }
 
 /*
@@ -588,92 +628,156 @@ vsw_set_hw(vsw_t *vswp, vsw_port_t *port, int type)
  *
  * Returns 0 on success.
  */
-int
+void
 vsw_unset_hw(vsw_t *vswp, vsw_port_t *port, int type)
 {
-	mac_addr_slot_t	slot;
-	int		rv;
+	D1(vswp, "%s: enter", __func__);
+
+	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
+
+	if (vswp->smode == VSW_LAYER3)
+		return;
+
+	if (type == VSW_VNETPORT) {
+		ASSERT(port != NULL);
+		vsw_unset_hw_addr(vswp, port, type);
+	} else {
+		vsw_unset_hw_addr(vswp, NULL, type);
+	}
+
+	D1(vswp, "%s: exit", __func__);
+}
+
+/*
+ * Program the macaddress and vlans of a port.
+ *
+ * Returns 0 on sucess, 1 on failure.
+ */
+static int
+vsw_set_port_hw_addr(vsw_port_t *port)
+{
+	vsw_t			*vswp = port->p_vswp;
+	uint16_t		mac_flags = 0;
+	mac_diag_t		diag;
+	uint8_t			*macaddr;
+	uint16_t		vid = VLAN_ID_NONE;
+	int			rv;
 
 	D1(vswp, "%s: enter", __func__);
 
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
-
-	if (vswp->smode[vswp->smode_idx] == VSW_LAYER3)
+	ASSERT(RW_WRITE_HELD(&port->maccl_rwlock));
+	if (port->p_mch == NULL)
 		return (0);
 
-	switch (type) {
-	case VSW_VNETPORT:
-		ASSERT(port != NULL);
-
-		if (port->addr_set == VSW_ADDR_PROMISC) {
-			return (vsw_unset_hw_promisc(vswp, port, type));
-
-		} else if (port->addr_set == VSW_ADDR_HW) {
-			slot = port->addr_slot;
-			if ((rv = vsw_unset_hw_addr(vswp, slot)) == 0)
-				port->addr_set = VSW_ADDR_UNSET;
-		}
-
-		break;
-
-	case VSW_LOCALDEV:
-		if (vswp->addr_set == VSW_ADDR_PROMISC) {
-			return (vsw_unset_hw_promisc(vswp, NULL, type));
-
-		} else if (vswp->addr_set == VSW_ADDR_HW) {
-			slot = vswp->addr_slot;
-			if ((rv = vsw_unset_hw_addr(vswp, slot)) == 0)
-				vswp->addr_set = VSW_ADDR_UNSET;
-		}
-
-		break;
-
-	default:
-		/* should never happen */
-		DERR(vswp, "%s: unknown type %d", __func__, type);
-		ASSERT(0);
-		return (1);
+	/*
+	 * If the port has a specific 'pvid', then
+	 * register with that vlan-id, otherwise register
+	 * with VLAN_ID_NONE.
+	 */
+	if (port->pvid != vswp->default_vlan_id) {
+		vid = port->pvid;
 	}
+	macaddr = (uint8_t *)port->p_macaddr.ether_addr_octet;
+
+	if (!(vswp->smode & VSW_LAYER2_PROMISC)) {
+		mac_flags |= MAC_UNICAST_HW;
+	}
+
+	if (port->addr_set == B_FALSE) {
+		port->p_muh = NULL;
+		rv = mac_unicast_add(port->p_mch, macaddr, mac_flags,
+		    &port->p_muh, vid, &diag);
+
+		if (rv != 0) {
+			cmn_err(CE_WARN, "vsw%d: Failed to program"
+			    "macaddr,vid(%s, %d) err=%d",
+			    vswp->instance, ether_sprintf((void *)macaddr),
+			    vid, rv);
+			return (rv);
+		}
+		port->addr_set = B_TRUE;
+
+		D2(vswp, "%s:programmed macaddr(%s) vid(%d) into device %s",
+		    __func__, ether_sprintf((void *)macaddr), vid,
+		    vswp->physname);
+	}
+
+	/* Add vlans to the MAC layer */
+	vsw_mac_add_vlans(vswp, port->p_mch, macaddr,
+	    mac_flags, port->vids, port->nvids);
+
+	mac_rx_set(port->p_mch, vsw_port_rx_cb, (void *)port);
 
 	D1(vswp, "%s: exit", __func__);
 	return (rv);
 }
 
 /*
- * Attempt to program a unicast address into HW.
+ * Program the macaddress and vlans of a port.
  *
  * Returns 0 on sucess, 1 on failure.
  */
 static int
-vsw_set_hw_addr(vsw_t *vswp, mac_multi_addr_t *mac)
+vsw_set_if_hw_addr(vsw_t *vswp)
 {
-	void	*mah;
-	int	rv = EINVAL;
+	uint16_t		mac_flags = 0;
+	mac_diag_t		diag;
+	uint8_t			*macaddr;
+	uint8_t			primary_addr[ETHERADDRL];
+	uint16_t		vid = VLAN_ID_NONE;
+	int			rv;
 
 	D1(vswp, "%s: enter", __func__);
 
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
+	ASSERT(RW_WRITE_HELD(&vswp->maccl_rwlock));
+	if (vswp->mch == NULL)
+		return (0);
 
-	if (vswp->maddr.maddr_handle == NULL)
-		return (rv);
+	macaddr = (uint8_t *)vswp->if_addr.ether_addr_octet;
 
-	mah = vswp->maddr.maddr_handle;
-
-	rv = vswp->maddr.maddr_add(mah, mac);
-
-	if (rv == 0)
-		return (rv);
+	/* check if it is the primary macaddr of the card. */
+	mac_unicast_primary_get(vswp->mh, primary_addr);
+	if (ether_cmp((void *)primary_addr, (void*)macaddr) == 0) {
+		mac_flags |= MAC_UNICAST_PRIMARY;
+	}
 
 	/*
-	 * Its okay for the add to fail because we have exhausted
-	 * all the resouces in the hardware device. Any other error
-	 * we want to flag.
+	 * If the interface has a specific 'pvid', then
+	 * register with that vlan-id, otherwise register
+	 * with VLAN_ID_NONE.
 	 */
-	if (rv != ENOSPC) {
-		cmn_err(CE_NOTE, "!vsw%d: error programming "
-		    "address %s into HW err (%d)",
-		    vswp->instance, ether_sprintf((void *)mac->mma_addr), rv);
+	if (vswp->pvid != vswp->default_vlan_id) {
+		vid = vswp->pvid;
 	}
+
+	if (!(vswp->smode & VSW_LAYER2_PROMISC)) {
+		mac_flags |= MAC_UNICAST_HW;
+	}
+
+	if (vswp->addr_set == B_FALSE) {
+		vswp->muh = NULL;
+		rv = mac_unicast_add(vswp->mch, macaddr, mac_flags,
+		    &vswp->muh, vid, &diag);
+
+		if (rv != 0) {
+			cmn_err(CE_WARN, "vsw%d: Failed to program"
+			    "macaddr,vid(%s, %d) err=%d",
+			    vswp->instance, ether_sprintf((void *)macaddr),
+			    vid, rv);
+			return (rv);
+		}
+		vswp->addr_set = B_TRUE;
+
+		D2(vswp, "%s:programmed macaddr(%s) vid(%d) into device %s",
+		    __func__, ether_sprintf((void *)macaddr), vid,
+		    vswp->physname);
+	}
+
+	vsw_mac_add_vlans(vswp, vswp->mch, macaddr, mac_flags,
+	    vswp->vids, vswp->nvids);
+
+	mac_rx_set(vswp->mch, vsw_if_rx_cb, (void *)vswp);
+
 	D1(vswp, "%s: exit", __func__);
 	return (rv);
 }
@@ -684,690 +788,359 @@ vsw_set_hw_addr(vsw_t *vswp, mac_multi_addr_t *mac)
  *
  * Returns 0 on sucess, 1 on failure.
  */
-static int
-vsw_unset_hw_addr(vsw_t *vswp, int slot)
+static void
+vsw_unset_hw_addr(vsw_t *vswp, vsw_port_t *port, int type)
 {
-	void	*mah;
-	int	rv;
+	vsw_vlanid_t		*vids;
+	int			nvids;
+	mac_client_handle_t	mch = NULL;
 
 	D1(vswp, "%s: enter", __func__);
 
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
-	ASSERT(slot >= 0);
-
-	if (vswp->maddr.maddr_handle == NULL)
-		return (1);
-
-	mah = vswp->maddr.maddr_handle;
-
-	rv = vswp->maddr.maddr_remove(mah, slot);
-	if (rv != 0) {
-		DWARN(vswp, "%s: unable to remove address "
-		    "from slot %d in device %s (err %d)",
-		    __func__, slot, vswp->physname, rv);
-		return (1);
-	}
-
-	D2(vswp, "removed addr from slot %d in device %s",
-	    slot, vswp->physname);
-
-	D1(vswp, "%s: exit", __func__);
-	return (0);
-}
-
-/*
- * Set network card into promisc mode.
- *
- * Returns 0 on success, 1 on failure.
- */
-static int
-vsw_set_hw_promisc(vsw_t *vswp, vsw_port_t *port, int type)
-{
-	D1(vswp, "%s: enter", __func__);
-
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
 	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
-
-	WRITE_ENTER(&vswp->mac_rwlock);
-	if (vswp->mh == NULL) {
-		RW_EXIT(&vswp->mac_rwlock);
-		return (1);
-	}
-
-	if (vswp->promisc_cnt++ == 0) {
-		if (mac_promisc_set(vswp->mh, B_TRUE, MAC_DEVPROMISC) != 0) {
-			vswp->promisc_cnt--;
-			RW_EXIT(&vswp->mac_rwlock);
-			return (1);
-		}
-		cmn_err(CE_NOTE, "!vsw%d: switching device %s into "
-		    "promiscuous mode", vswp->instance, vswp->physname);
-	}
-	RW_EXIT(&vswp->mac_rwlock);
 
 	if (type == VSW_VNETPORT) {
 		ASSERT(port != NULL);
-		port->addr_set = VSW_ADDR_PROMISC;
+		ASSERT(RW_WRITE_HELD(&port->maccl_rwlock));
+		vids = port->vids;
+		nvids = port->nvids;
 	} else {
-		vswp->addr_set = VSW_ADDR_PROMISC;
+		ASSERT(RW_WRITE_HELD(&vswp->maccl_rwlock));
+		vids = vswp->vids;
+		nvids = vswp->nvids;
 	}
 
-	D1(vswp, "%s: exit", __func__);
-
-	return (0);
-}
-
-/*
- * Turn off promiscuous mode on network card.
- *
- * Returns 0 on success, 1 on failure.
- */
-static int
-vsw_unset_hw_promisc(vsw_t *vswp, vsw_port_t *port, int type)
-{
-	vsw_port_list_t 	*plist = &vswp->plist;
-
-	D2(vswp, "%s: enter", __func__);
-
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
-	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
-
-	WRITE_ENTER(&vswp->mac_rwlock);
-	if (vswp->mh == NULL) {
-		RW_EXIT(&vswp->mac_rwlock);
-		return (1);
+	/* First clear the callback */
+	if (type == VSW_LOCALDEV) {
+		mch = vswp->mch;
+	} else if (type == VSW_VNETPORT) {
+		mch = port->p_mch;
 	}
 
-	if (--vswp->promisc_cnt == 0) {
-		if (mac_promisc_set(vswp->mh, B_FALSE, MAC_DEVPROMISC) != 0) {
-			vswp->promisc_cnt++;
-			RW_EXIT(&vswp->mac_rwlock);
-			return (1);
-		}
 
-		/*
-		 * We are exiting promisc mode either because we were
-		 * only in promisc mode because we had failed over from
-		 * switched mode due to HW resource issues, or the user
-		 * wanted the card in promisc mode for all the ports and
-		 * the last port is now being deleted. Tweak the message
-		 * accordingly.
-		 */
-		if (plist->num_ports != 0) {
-			cmn_err(CE_NOTE, "!vsw%d: switching device %s back to "
-			    "programmed mode", vswp->instance, vswp->physname);
-		} else {
-			cmn_err(CE_NOTE, "!vsw%d: switching device %s out of "
-			    "promiscuous mode", vswp->instance, vswp->physname);
-		}
-	}
-	RW_EXIT(&vswp->mac_rwlock);
-
-	if (type == VSW_VNETPORT) {
-		ASSERT(port != NULL);
-		ASSERT(port->addr_set == VSW_ADDR_PROMISC);
-		port->addr_set = VSW_ADDR_UNSET;
-	} else {
-		ASSERT(vswp->addr_set == VSW_ADDR_PROMISC);
-		vswp->addr_set = VSW_ADDR_UNSET;
-	}
-
-	D1(vswp, "%s: exit", __func__);
-	return (0);
-}
-
-/*
- * Determine whether or not we are operating in our prefered
- * mode and if not whether the physical resources now allow us
- * to operate in it.
- *
- * If a port is being removed should only be invoked after port has been
- * removed from the port list.
- */
-void
-vsw_reconfig_hw(vsw_t *vswp)
-{
-	int			s_idx;
-
-	D1(vswp, "%s: enter", __func__);
-
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
-
-	if (vswp->maddr.maddr_handle == NULL) {
+	if (mch == NULL) {
 		return;
 	}
 
-	/*
-	 * If we are in layer 2 (i.e. switched) or would like to be
-	 * in layer 2 then check if any ports or the vswitch itself
-	 * need to be programmed into the HW.
-	 *
-	 * This can happen in two cases - switched was specified as
-	 * the prefered mode of operation but we exhausted the HW
-	 * resources and so failed over to the next specifed mode,
-	 * or switched was the only mode specified so after HW
-	 * resources were exhausted there was nothing more we
-	 * could do.
-	 */
-	if (vswp->smode_idx > 0)
-		s_idx = vswp->smode_idx - 1;
-	else
-		s_idx = vswp->smode_idx;
+	mac_rx_clear(mch);
 
-	if (vswp->smode[s_idx] != VSW_LAYER2) {
-		return;
+	/* Remove vlans */
+	vsw_mac_remove_vlans(mch, vids, nvids);
+
+	if ((type == VSW_LOCALDEV) && (vswp->addr_set == B_TRUE)) {
+		(void) mac_unicast_remove(vswp->mch, vswp->muh);
+		vswp->muh = NULL;
+		D2(vswp, "removed vsw interface mac-addr from "
+		    "the device %s", vswp->physname);
+		vswp->addr_set = B_FALSE;
+
+	} else if ((type == VSW_VNETPORT) && (port->addr_set == B_TRUE)) {
+		(void) mac_unicast_remove(port->p_mch, port->p_muh);
+		port->p_muh = NULL;
+		D2(vswp, "removed port(0x%p) mac-addr from "
+		    "the device %s", port, vswp->physname);
+		port->addr_set = B_FALSE;
 	}
-
-	D2(vswp, "%s: attempting reconfig..", __func__);
-
-	/*
-	 * First, attempt to set the vswitch mac address into HW,
-	 * if required.
-	 */
-	if (vsw_prog_if(vswp)) {
-		return;
-	}
-
-	/*
-	 * Next, attempt to set any ports which have not yet been
-	 * programmed into HW.
-	 */
-	if (vsw_prog_ports(vswp)) {
-		return;
-	}
-
-	/*
-	 * By now we know that have programmed all desired ports etc
-	 * into HW, so safe to mark reconfiguration as complete.
-	 */
-	vswp->recfg_reqd = B_FALSE;
-
-	vswp->smode_idx = s_idx;
 
 	D1(vswp, "%s: exit", __func__);
 }
 
 /*
- * Check to see if vsw itself is plumbed, and if so whether or not
- * its mac address should be written into HW.
- *
- * Returns 0 if could set address, or didn't have to set it.
- * Returns 1 if failed to set address.
+ * receive callback routine for vsw interface. Invoked by MAC layer when there
+ * are pkts being passed up from physical device for this vsw interface.
  */
-static int
-vsw_prog_if(vsw_t *vswp)
-{
-	mac_multi_addr_t	addr;
-
-	D1(vswp, "%s: enter", __func__);
-
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
-
-	READ_ENTER(&vswp->if_lockrw);
-	if ((vswp->if_state & VSW_IF_UP) &&
-	    (vswp->addr_set != VSW_ADDR_HW)) {
-
-		addr.mma_addrlen = ETHERADDRL;
-		ether_copy(&vswp->if_addr, &addr.mma_addr);
-
-		if (vsw_set_hw_addr(vswp, &addr) != 0) {
-			RW_EXIT(&vswp->if_lockrw);
-			return (1);
-		}
-
-		vswp->addr_slot = addr.mma_slot;
-
-		/*
-		 * If previously when plumbed had had to place
-		 * interface into promisc mode, now reverse that.
-		 *
-		 * Note that interface will only actually be set into
-		 * non-promisc mode when last port/interface has been
-		 * programmed into HW.
-		 */
-		if (vswp->addr_set == VSW_ADDR_PROMISC)
-			(void) vsw_unset_hw_promisc(vswp, NULL, VSW_LOCALDEV);
-
-		vswp->addr_set = VSW_ADDR_HW;
-	}
-	RW_EXIT(&vswp->if_lockrw);
-
-	D1(vswp, "%s: exit", __func__);
-	return (0);
-}
-
-/*
- * Scan the port list for any ports which have not yet been set
- * into HW. For those found attempt to program their mac addresses
- * into the physical device.
- *
- * Returns 0 if able to program all required ports (can be 0) into HW.
- * Returns 1 if failed to set at least one mac address.
- */
-static int
-vsw_prog_ports(vsw_t *vswp)
-{
-	mac_multi_addr_t	addr;
-	vsw_port_list_t		*plist = &vswp->plist;
-	vsw_port_t		*tp;
-	int			rv = 0;
-
-	D1(vswp, "%s: enter", __func__);
-
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
-
-	READ_ENTER(&plist->lockrw);
-	for (tp = plist->head; tp != NULL; tp = tp->p_next) {
-		if (tp->addr_set != VSW_ADDR_HW) {
-			addr.mma_addrlen = ETHERADDRL;
-			ether_copy(&tp->p_macaddr, &addr.mma_addr);
-
-			if (vsw_set_hw_addr(vswp, &addr) != 0) {
-				rv = 1;
-				break;
-			}
-
-			tp->addr_slot = addr.mma_slot;
-
-			/*
-			 * If when this port had first attached we had
-			 * had to place the interface into promisc mode,
-			 * then now reverse that.
-			 *
-			 * Note that the interface will not actually
-			 * change to non-promisc mode until all ports
-			 * have been programmed.
-			 */
-			if (tp->addr_set == VSW_ADDR_PROMISC)
-				(void) vsw_unset_hw_promisc(vswp,
-				    tp, VSW_VNETPORT);
-
-			tp->addr_set = VSW_ADDR_HW;
-		}
-	}
-	RW_EXIT(&plist->lockrw);
-
-	D1(vswp, "%s: exit", __func__);
-	return (rv);
-}
-
+/* ARGSUSED */
 static void
-vsw_mac_ring_tbl_entry_init(vsw_t *vswp, vsw_mac_ring_t *ringp)
-{
-	ringp->ring_state = VSW_MAC_RING_FREE;
-	ringp->ring_arg = NULL;
-	ringp->ring_blank = NULL;
-	ringp->ring_vqp = NULL;
-	ringp->ring_vswp = vswp;
-}
-
-static void
-vsw_mac_ring_tbl_init(vsw_t *vswp)
-{
-	int		i;
-
-	mutex_init(&vswp->mac_ring_lock, NULL, MUTEX_DRIVER, NULL);
-
-	vswp->mac_ring_tbl_sz = vsw_mac_rx_rings;
-	vswp->mac_ring_tbl  =
-	    kmem_alloc(vsw_mac_rx_rings * sizeof (vsw_mac_ring_t), KM_SLEEP);
-
-	for (i = 0; i < vswp->mac_ring_tbl_sz; i++)
-		vsw_mac_ring_tbl_entry_init(vswp, &vswp->mac_ring_tbl[i]);
-}
-
-static void
-vsw_mac_ring_tbl_destroy(vsw_t *vswp)
-{
-	int		i;
-	vsw_mac_ring_t	*ringp;
-
-	mutex_enter(&vswp->mac_ring_lock);
-	for (i = 0; i < vswp->mac_ring_tbl_sz; i++) {
-		ringp = &vswp->mac_ring_tbl[i];
-
-		if (ringp->ring_state != VSW_MAC_RING_FREE) {
-			/*
-			 * Destroy the queue.
-			 */
-			vsw_queue_stop(ringp->ring_vqp);
-			vsw_queue_destroy(ringp->ring_vqp);
-
-			/*
-			 * Re-initialize the structure.
-			 */
-			vsw_mac_ring_tbl_entry_init(vswp, ringp);
-		}
-	}
-	mutex_exit(&vswp->mac_ring_lock);
-
-	mutex_destroy(&vswp->mac_ring_lock);
-	kmem_free(vswp->mac_ring_tbl,
-	    vswp->mac_ring_tbl_sz * sizeof (vsw_mac_ring_t));
-	vswp->mac_ring_tbl_sz = 0;
-}
-
-/*
- * Handle resource add callbacks from the driver below.
- */
-static mac_resource_handle_t
-vsw_mac_ring_add_cb(void *arg, mac_resource_t *mrp)
-{
-	vsw_t		*vswp = (vsw_t *)arg;
-	mac_rx_fifo_t	*mrfp = (mac_rx_fifo_t *)mrp;
-	vsw_mac_ring_t	*ringp;
-	vsw_queue_t	*vqp;
-	int		i;
-
-	ASSERT(vswp != NULL);
-	ASSERT(mrp != NULL);
-	ASSERT(vswp->mac_ring_tbl != NULL);
-
-	D1(vswp, "%s: enter", __func__);
-
-	/*
-	 * Check to make sure we have the correct resource type.
-	 */
-	if (mrp->mr_type != MAC_RX_FIFO)
-		return (NULL);
-
-	/*
-	 * Find a open entry in the ring table.
-	 */
-	mutex_enter(&vswp->mac_ring_lock);
-	for (i = 0; i < vswp->mac_ring_tbl_sz; i++) {
-		ringp = &vswp->mac_ring_tbl[i];
-
-		/*
-		 * Check for an empty slot, if found, then setup queue
-		 * and thread.
-		 */
-		if (ringp->ring_state == VSW_MAC_RING_FREE) {
-			/*
-			 * Create the queue for this ring.
-			 */
-			vqp = vsw_queue_create();
-
-			/*
-			 * Initialize the ring data structure.
-			 */
-			ringp->ring_vqp = vqp;
-			ringp->ring_arg = mrfp->mrf_arg;
-			ringp->ring_blank = mrfp->mrf_blank;
-			ringp->ring_state = VSW_MAC_RING_INUSE;
-
-			/*
-			 * Create the worker thread.
-			 */
-			vqp->vq_worker = thread_create(NULL, 0,
-			    vsw_queue_worker, ringp, 0, &p0,
-			    TS_RUN, minclsyspri);
-			if (vqp->vq_worker == NULL) {
-				vsw_queue_destroy(vqp);
-				vsw_mac_ring_tbl_entry_init(vswp, ringp);
-				ringp = NULL;
-			}
-
-			if (ringp != NULL) {
-				/*
-				 * Make sure thread get's running state for
-				 * this ring.
-				 */
-				mutex_enter(&vqp->vq_lock);
-				while ((vqp->vq_state != VSW_QUEUE_RUNNING) &&
-				    (vqp->vq_state != VSW_QUEUE_DRAINED)) {
-					cv_wait(&vqp->vq_cv, &vqp->vq_lock);
-				}
-
-				/*
-				 * If the thread is not running, cleanup.
-				 */
-				if (vqp->vq_state == VSW_QUEUE_DRAINED) {
-					vsw_queue_destroy(vqp);
-					vsw_mac_ring_tbl_entry_init(vswp,
-					    ringp);
-					ringp = NULL;
-				}
-				mutex_exit(&vqp->vq_lock);
-			}
-
-			mutex_exit(&vswp->mac_ring_lock);
-			D1(vswp, "%s: exit", __func__);
-			return ((mac_resource_handle_t)ringp);
-		}
-	}
-	mutex_exit(&vswp->mac_ring_lock);
-
-	/*
-	 * No slots in the ring table available.
-	 */
-	D1(vswp, "%s: exit", __func__);
-	return (NULL);
-}
-
-static void
-vsw_queue_stop(vsw_queue_t *vqp)
-{
-	mutex_enter(&vqp->vq_lock);
-
-	if (vqp->vq_state == VSW_QUEUE_RUNNING) {
-		vqp->vq_state = VSW_QUEUE_STOP;
-		cv_signal(&vqp->vq_cv);
-
-		while (vqp->vq_state != VSW_QUEUE_DRAINED)
-			cv_wait(&vqp->vq_cv, &vqp->vq_lock);
-	}
-
-	vqp->vq_state = VSW_QUEUE_STOPPED;
-
-	mutex_exit(&vqp->vq_lock);
-}
-
-static vsw_queue_t *
-vsw_queue_create()
-{
-	vsw_queue_t *vqp;
-
-	vqp = kmem_zalloc(sizeof (vsw_queue_t), KM_SLEEP);
-
-	mutex_init(&vqp->vq_lock, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&vqp->vq_cv, NULL, CV_DRIVER, NULL);
-	vqp->vq_first = NULL;
-	vqp->vq_last = NULL;
-	vqp->vq_state = VSW_QUEUE_STOPPED;
-
-	return (vqp);
-}
-
-static void
-vsw_queue_destroy(vsw_queue_t *vqp)
-{
-	cv_destroy(&vqp->vq_cv);
-	mutex_destroy(&vqp->vq_lock);
-	kmem_free(vqp, sizeof (vsw_queue_t));
-}
-
-static void
-vsw_queue_worker(vsw_mac_ring_t *rrp)
-{
-	mblk_t		*mp;
-	vsw_queue_t	*vqp = rrp->ring_vqp;
-	vsw_t		*vswp = rrp->ring_vswp;
-
-	mutex_enter(&vqp->vq_lock);
-
-	ASSERT(vqp->vq_state == VSW_QUEUE_STOPPED);
-
-	/*
-	 * Set the state to running, since the thread is now active.
-	 */
-	vqp->vq_state = VSW_QUEUE_RUNNING;
-	cv_signal(&vqp->vq_cv);
-
-	while (vqp->vq_state == VSW_QUEUE_RUNNING) {
-		/*
-		 * Wait for work to do or the state has changed
-		 * to not running.
-		 */
-		while ((vqp->vq_state == VSW_QUEUE_RUNNING) &&
-		    (vqp->vq_first == NULL)) {
-			cv_wait(&vqp->vq_cv, &vqp->vq_lock);
-		}
-
-		/*
-		 * Process packets that we received from the interface.
-		 */
-		if (vqp->vq_first != NULL) {
-			mp = vqp->vq_first;
-
-			vqp->vq_first = NULL;
-			vqp->vq_last = NULL;
-
-			mutex_exit(&vqp->vq_lock);
-
-			/* switch the chain of packets received */
-			vswp->vsw_switch_frame(vswp, mp,
-			    VSW_PHYSDEV, NULL, NULL);
-
-			mutex_enter(&vqp->vq_lock);
-		}
-	}
-
-	/*
-	 * We are drained and signal we are done.
-	 */
-	vqp->vq_state = VSW_QUEUE_DRAINED;
-	cv_signal(&vqp->vq_cv);
-
-	/*
-	 * Exit lock and drain the remaining packets.
-	 */
-	mutex_exit(&vqp->vq_lock);
-
-	/*
-	 * Exit the thread
-	 */
-	thread_exit();
-}
-
-/*
- * static void
- * vsw_rx_queue_cb() - Receive callback routine when
- *	vsw_multi_ring_enable is non-zero.  Queue the packets
- *	to a packet queue for a worker thread to process.
- */
-static void
-vsw_rx_queue_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
-{
-	vsw_mac_ring_t	*ringp = (vsw_mac_ring_t *)mrh;
-	vsw_t		*vswp = (vsw_t *)arg;
-	vsw_queue_t	*vqp;
-	mblk_t		*bp, *last;
-
-	ASSERT(mrh != NULL);
-	ASSERT(vswp != NULL);
-	ASSERT(mp != NULL);
-
-	D1(vswp, "%s: enter", __func__);
-
-	/*
-	 * Find the last element in the mblk chain.
-	 */
-	bp = mp;
-	do {
-		last = bp;
-		bp = bp->b_next;
-	} while (bp != NULL);
-
-	/* Get the queue for the packets */
-	vqp = ringp->ring_vqp;
-
-	/*
-	 * Grab the lock such we can queue the packets.
-	 */
-	mutex_enter(&vqp->vq_lock);
-
-	if (vqp->vq_state != VSW_QUEUE_RUNNING) {
-		freemsgchain(mp);
-		mutex_exit(&vqp->vq_lock);
-		goto vsw_rx_queue_cb_exit;
-	}
-
-	/*
-	 * Add the mblk chain to the queue.  If there
-	 * is some mblks in the queue, then add the new
-	 * chain to the end.
-	 */
-	if (vqp->vq_first == NULL)
-		vqp->vq_first = mp;
-	else
-		vqp->vq_last->b_next = mp;
-
-	vqp->vq_last = last;
-
-	/*
-	 * Signal the worker thread that there is work to
-	 * do.
-	 */
-	cv_signal(&vqp->vq_cv);
-
-	/*
-	 * Let go of the lock and exit.
-	 */
-	mutex_exit(&vqp->vq_lock);
-
-vsw_rx_queue_cb_exit:
-	D1(vswp, "%s: exit", __func__);
-}
-
-/*
- * receive callback routine. Invoked by MAC layer when there
- * are pkts being passed up from physical device.
- *
- * PERF: It may be more efficient when the card is in promisc
- * mode to check the dest address of the pkts here (against
- * the FDB) rather than checking later. Needs to be investigated.
- */
-static void
-vsw_rx_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
+vsw_if_rx_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
 {
 	_NOTE(ARGUNUSED(mrh))
 
 	vsw_t		*vswp = (vsw_t *)arg;
+	mblk_t		*mpt;
+	int		count;
 
 	ASSERT(vswp != NULL);
 
-	D1(vswp, "vsw_rx_cb: enter");
+	D1(vswp, "%s: enter", __func__);
 
-	/* switch the chain of packets received */
-	vswp->vsw_switch_frame(vswp, mp, VSW_PHYSDEV, NULL, NULL);
+	READ_ENTER(&vswp->if_lockrw);
+	if (vswp->if_state & VSW_IF_UP) {
+		RW_EXIT(&vswp->if_lockrw);
+		count = vsw_vlan_frame_untag(vswp, VSW_LOCALDEV, &mp, &mpt);
+		if (count != 0) {
+			mac_rx(vswp->if_mh, NULL, mp);
+		}
+	} else {
+		RW_EXIT(&vswp->if_lockrw);
+		freemsgchain(mp);
+	}
 
-	D1(vswp, "vsw_rx_cb: exit");
+	D1(vswp, "%s: exit", __func__);
 }
 
 /*
- * Send a message out over the physical device via the MAC layer.
+ * receive callback routine for port. Invoked by MAC layer when there
+ * are pkts being passed up from physical device for this port.
+ */
+/* ARGSUSED */
+static void
+vsw_port_rx_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
+{
+	_NOTE(ARGUNUSED(mrh))
+
+	vsw_t		*vswp;
+	vsw_port_t	*port = arg;
+
+	ASSERT(port != NULL);
+
+	vswp = port->p_vswp;
+
+	D1(vswp, "vsw_port_rx_cb: enter");
+
+	/*
+	 * Send the packets to the peer directly.
+	 */
+	(void) vsw_portsend(port, mp);
+
+	D1(vswp, "vsw_port_rx_cb: exit");
+}
+
+/*
+ * Send a message out over the physical device
+ * via the MAC layer.
  *
  * Returns any mblks that it was unable to transmit.
  */
 mblk_t *
-vsw_tx_msg(vsw_t *vswp, mblk_t *mp)
+vsw_tx_msg(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *port)
 {
-	const mac_txinfo_t	*mtp;
+	mac_client_handle_t	mch;
+	mac_unicast_handle_t	muh;
 
-	READ_ENTER(&vswp->mac_rwlock);
-	if ((vswp->mh == NULL) || (vswp->mstarted == B_FALSE)) {
+	READ_MACCL_ENTER(vswp, port, caller);
 
-		DERR(vswp, "vsw_tx_msg: dropping pkts: no tx routine avail");
-		RW_EXIT(&vswp->mac_rwlock);
-		return (mp);
-	} else {
-		mtp = vswp->txinfo;
-		mp = mtp->mt_fn(mtp->mt_arg, mp);
+	mch = (caller == VSW_LOCALDEV) ? vswp->mch : port->p_mch;
+	muh = (caller == VSW_LOCALDEV) ? vswp->muh : port->p_muh;
+
+	if ((mch != NULL) && (muh != NULL)) {
+		/* packets are sent or dropped */
+		(void) mac_tx(mch, mp, 0, MAC_DROP_ON_NO_DESC, NULL);
 	}
-	RW_EXIT(&vswp->mac_rwlock);
 
-	return (mp);
+	RW_MACCL_EXIT(vswp, port, caller);
+	return (NULL);
+}
+
+/*
+ * vsw_port_mac_reconfig -- Cleanup and close the MAC client
+ * and reopen and re-configure the MAC client with new flags etc.
+ * This function is useful for two different purposes:
+ *	1) To update the MAC client with new vlan-ids. This is done
+ *	   by freeing the existing vlan-ids and reopen with the new
+ *	   vlan-ids.
+ *
+ *	2) If the Hybrid mode status of a port changes, then the
+ *	   MAC client need to be closed and re-opened, otherwise,
+ *	   Share related resources may not be freed(hybird mode disabled)
+ *	   or assigned(hybrid mode enabled). To accomplish this,
+ *	   this function simply closes and reopens the MAC client.
+ *	   The reopen will result in using the flags based on the
+ *	   new hybrid mode of the port.
+ */
+void
+vsw_port_mac_reconfig(vsw_port_t *portp, boolean_t update_vlans,
+    uint16_t new_pvid, vsw_vlanid_t *new_vids, int new_nvids)
+{
+	vsw_t *vswp = portp->p_vswp;
+	int rv;
+
+	D1(vswp, "%s: enter", __func__);
+	/*
+	 * Remove the multi-cast addresses, unicast address
+	 * and close the mac-client.
+	 */
+	mutex_enter(&vswp->mac_lock);
+	WRITE_ENTER(&portp->maccl_rwlock);
+	vsw_mac_multicast_remove_all(vswp, portp, VSW_VNETPORT);
+	vsw_unset_hw(vswp, portp, VSW_VNETPORT);
+	vsw_maccl_close(vswp, portp, VSW_VNETPORT);
+
+	if (update_vlans == B_TRUE) {
+		if (portp->nvids != 0) {
+			kmem_free(portp->vids,
+			    sizeof (vsw_vlanid_t) * portp->nvids);
+			portp->vids = NULL;
+			portp->nvids = 0;
+		}
+		portp->vids = new_vids;
+		portp->nvids = new_nvids;
+		portp->pvid = new_pvid;
+	}
+
+	/*
+	 * Now re-open the mac-client and
+	 * configure unicast addr and multicast addrs.
+	 */
+	rv = vsw_maccl_open(vswp, portp, VSW_VNETPORT);
+	if (rv != 0) {
+		goto recret;
+	}
+
+	if (vsw_set_hw(vswp, portp, VSW_VNETPORT)) {
+		cmn_err(CE_NOTE, "!vsw%d: port:%d failed to "
+		    "set unicast address\n", vswp->instance, portp->p_instance);
+		goto recret;
+	}
+
+	vsw_mac_multicast_add_all(vswp, portp, VSW_VNETPORT);
+
+recret:
+	RW_EXIT(&portp->maccl_rwlock);
+	mutex_exit(&vswp->mac_lock);
+	D1(vswp, "%s: exit", __func__);
+}
+
+/*
+ * vsw_if_mac_reconfig -- Reconfigure the vsw interfaace's mac-client
+ * by closing and re-opening it. This function is used handle the
+ * following two cases:
+ *
+ *	1) Handle the MAC address change for the interface.
+ *	2) Handle vlan update.
+ */
+void
+vsw_if_mac_reconfig(vsw_t *vswp, boolean_t update_vlans,
+    uint16_t new_pvid, vsw_vlanid_t *new_vids, int new_nvids)
+{
+	int rv;
+
+	D1(vswp, "%s: enter", __func__);
+	/*
+	 * Remove the multi-cast addresses, unicast address
+	 * and close the mac-client.
+	 */
+	mutex_enter(&vswp->mac_lock);
+	WRITE_ENTER(&vswp->maccl_rwlock);
+	vsw_mac_multicast_remove_all(vswp, NULL, VSW_LOCALDEV);
+	vsw_unset_hw(vswp, NULL, VSW_LOCALDEV);
+	vsw_maccl_close(vswp, NULL, VSW_LOCALDEV);
+
+	if (update_vlans == B_TRUE) {
+		if (vswp->nvids != 0) {
+			kmem_free(vswp->vids,
+			    sizeof (vsw_vlanid_t) * vswp->nvids);
+			vswp->vids = NULL;
+			vswp->nvids = 0;
+		}
+		vswp->vids = new_vids;
+		vswp->nvids = new_nvids;
+		vswp->pvid = new_pvid;
+	}
+
+	/*
+	 * Now re-open the mac-client and
+	 * configure unicast addr and multicast addrs.
+	 */
+	rv = vsw_maccl_open(vswp, NULL, VSW_LOCALDEV);
+	if (rv != 0) {
+		goto ifrecret;
+	}
+
+	if (vsw_set_hw(vswp, NULL, VSW_LOCALDEV)) {
+		cmn_err(CE_NOTE, "!vsw%d:failed to set unicast address\n",
+		    vswp->instance);
+		goto ifrecret;
+	}
+
+	vsw_mac_multicast_add_all(vswp, NULL, VSW_LOCALDEV);
+
+ifrecret:
+	RW_EXIT(&vswp->maccl_rwlock);
+	mutex_exit(&vswp->mac_lock);
+	D1(vswp, "%s: exit", __func__);
+}
+
+/*
+ * vsw_mac_port_reconfig_vlans -- Reconfigure a port to handle
+ * vlan configuration update. As the removal of the last unicast-address,vid
+ * from the MAC client results in releasing all resources, it expects
+ * no Shares to be associated with such MAC client.
+ *
+ * To handle vlan configuration update for a port that already has
+ * a Share bound, then we need to free that share prior to reconfiguration.
+ * Initiate the hybrdIO setup again after the completion of reconfiguration.
+ */
+void
+vsw_mac_port_reconfig_vlans(vsw_port_t *portp, uint16_t new_pvid,
+    vsw_vlanid_t *new_vids, int new_nvids)
+{
+	/*
+	 * As the reconfiguration involves the close of
+	 * mac client, cleanup HybridIO and later restart
+	 * HybridIO setup again.
+	 */
+	if (portp->p_hio_enabled == B_TRUE) {
+		vsw_hio_stop_port(portp);
+	}
+	vsw_port_mac_reconfig(portp, B_TRUE, new_pvid, new_vids, new_nvids);
+	if (portp->p_hio_enabled == B_TRUE) {
+		/* reset to setup the HybridIO again. */
+		vsw_hio_port_reset(portp, B_FALSE);
+	}
+}
+
+/* Add vlans to MAC client */
+static void
+vsw_mac_add_vlans(vsw_t *vswp, mac_client_handle_t mch, uint8_t *macaddr,
+    uint16_t flags, vsw_vlanid_t *vids, int nvids)
+{
+	vsw_vlanid_t	*vidp;
+	mac_diag_t	diag;
+	int		rv;
+	int		i;
+
+	/* Add vlans to the MAC layer */
+	for (i = 0; i < nvids; i++) {
+		vidp = &vids[i];
+
+		if (vidp->vl_set == B_TRUE) {
+			continue;
+		}
+
+		rv = mac_unicast_add(mch, macaddr, flags,
+		    &vidp->vl_muh, vidp->vl_vid, &diag);
+		if (rv != 0) {
+			cmn_err(CE_WARN, "vsw%d: Failed to program"
+			    "macaddr,vid(%s, %d) err=%d",
+			    vswp->instance, ether_sprintf((void *)macaddr),
+			    vidp->vl_vid, rv);
+		} else {
+			vidp->vl_set = B_TRUE;
+			D2(vswp, "%s:programmed macaddr(%s) vid(%d) "
+			    "into device %s", __func__,
+			    ether_sprintf((void *)macaddr),
+			    vidp->vl_vid, vswp->physname);
+		}
+	}
+}
+
+/* Remove vlans from the MAC client */
+static void
+vsw_mac_remove_vlans(mac_client_handle_t mch, vsw_vlanid_t *vids, int nvids)
+{
+	int i;
+	vsw_vlanid_t *vidp;
+
+	for (i = 0; i < nvids; i++) {
+		vidp = &vids[i];
+		if (vidp->vl_set == B_FALSE) {
+			continue;
+		}
+		mac_unicast_remove(mch, vidp->vl_muh);
+		vidp->vl_set = B_FALSE;
+	}
 }
 
 #define	ARH_FIXED_LEN	8    /* Length of fixed part of ARP header(see arp.h) */
@@ -1386,7 +1159,7 @@ vsw_tx_msg(vsw_t *vswp, mblk_t *mp)
  * vsw_publish_macaddr_count to zero in /etc/system.
  */
 void
-vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr)
+vsw_publish_macaddr(vsw_t *vswp, vsw_port_t *portp)
 {
 	mblk_t			*mp;
 	mblk_t			*bp;
@@ -1404,7 +1177,7 @@ vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr)
 	/* Initialize eth header */
 	ehp = (struct  ether_header *)mp->b_rptr;
 	bcopy(&etherbroadcastaddr, &ehp->ether_dhost, ETHERADDRL);
-	bcopy(addr, &ehp->ether_shost, ETHERADDRL);
+	bcopy(&portp->p_macaddr, &ehp->ether_shost, ETHERADDRL);
 	ehp->ether_type = htons(ETHERTYPE_REVARP);
 
 	/* Initialize arp packet */
@@ -1420,13 +1193,13 @@ vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr)
 	cp += ARH_FIXED_LEN;
 
 	/* Sender's hardware address and protocol address */
-	bcopy(addr, cp, ETHERADDRL);
+	bcopy(&portp->p_macaddr, cp, ETHERADDRL);
 	cp += ETHERADDRL;
 	bzero(cp, plen);	/* INADDR_ANY */
 	cp += plen;
 
 	/* Target hardware address and protocol address */
-	bcopy(addr, cp, ETHERADDRL);
+	bcopy(&portp->p_macaddr, cp, ETHERADDRL);
 	cp += ETHERADDRL;
 	bzero(cp, plen);	/* INADDR_ANY */
 	cp += plen;
@@ -1441,7 +1214,7 @@ vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr)
 		}
 
 		/* transmit the packet */
-		bp = vsw_tx_msg(vswp, bp);
+		bp = vsw_tx_msg(vswp, bp, VSW_VNETPORT, portp);
 		if (bp != NULL) {
 			freemsg(bp);
 		}
@@ -1453,50 +1226,18 @@ vsw_publish_macaddr(vsw_t *vswp, uint8_t *addr)
 static void
 vsw_mac_set_mtu(vsw_t *vswp, uint32_t mtu)
 {
-	mac_prop_t	mp;
-	uint32_t	val;
-	int		rv;
-	uint_t		perm_flags = MAC_PROP_PERM_RW;
-	mp.mp_id = MAC_PROP_MTU;
-	mp.mp_name = mac_mtu_propname;
-	mp.mp_flags = 0;
+	uint_t	mtu_orig;
+	int	rv;
 
-	/* Get the mtu of the physical device */
-	rv = mac_get_prop(vswp->mh, &mp, (void *)&val, sizeof (uint32_t),
-	    &perm_flags);
-	if (rv != 0) {
-		cmn_err(CE_NOTE,
-		    "!vsw%d: Unable to get the mtu of the physical device:%s\n",
-		    vswp->instance, vswp->physname);
-		return;
-	}
-
-	/* Return if the mtu is read-only */
-	if (perm_flags != MAC_PROP_PERM_RW) {
-		cmn_err(CE_NOTE,
-		    "!vsw%d: Read-only mtu of the physical device:%s\n",
-		    vswp->instance, vswp->physname);
-		return;
-	}
-
-	/* save the original mtu of physdev to reset it back later if needed */
-	vswp->mtu_physdev_orig = val;
-
-	if (val == mtu) {
-		/* no need to set, as the device already has the right mtu */
-		return;
-	}
-
-	mp.mp_id = MAC_PROP_MTU;
-	mp.mp_name = mac_mtu_propname;
-	mp.mp_flags = 0;
-
-	/* Set the mtu in the physical device */
-	rv = mac_set_prop(vswp->mh, &mp, &mtu, sizeof (uint32_t));
+	rv = mac_set_mtu(vswp->mh, mtu, &mtu_orig);
 	if (rv != 0) {
 		cmn_err(CE_NOTE,
 		    "!vsw%d: Unable to set the mtu:%d, in the "
 		    "physical device:%s\n",
 		    vswp->instance, mtu, vswp->physname);
+		return;
 	}
+
+	/* save the original mtu of physdev to reset it back later if needed */
+	vswp->mtu_physdev_orig = mtu_orig;
 }

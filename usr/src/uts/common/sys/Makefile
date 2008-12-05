@@ -191,6 +191,7 @@ CHKHDRS=			\
 	dld_impl.h		\
 	dld_ioc.h		\
 	dls.h			\
+	dls_mgmt.h		\
 	dls_impl.h		\
 	dma_i8237A.h            \
 	dnlc.h			\
@@ -353,7 +354,13 @@ CHKHDRS=			\
 	lwp_upimutex_impl.h	\
 	lpif.h			\
 	mac.h			\
+	mac_client.h		\
+	mac_client_impl.h	\
+	mac_flow.h		\
+	mac_flow_impl.h		\
 	mac_impl.h		\
+	mac_provider.h		\
+	mac_soft_ring.h		\
 	machelf.h		\
 	map.h			\
 	md4.h			\
@@ -418,6 +425,7 @@ CHKHDRS=			\
 	pci.h			\
 	pcie.h			\
 	pci_impl.h		\
+	pci_tools.h		\
 	pcmcia.h		\
 	pctypes.h		\
 	pem.h			\

@@ -26,8 +26,6 @@
 #ifndef _RGE_H
 #define	_RGE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -59,7 +57,7 @@ extern "C" {
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 
 /*
@@ -430,7 +428,6 @@ typedef struct rge {
 	uint32_t		rf_next;	/* current free buf index */
 	uint32_t		rc_next;	/* current recycle buf index */
 	uint32_t		rx_free;	/* number of rx free buf */
-	mac_resource_handle_t	handle;
 
 	/* used for send */
 	rge_bd_t		*tx_ring;
@@ -705,7 +702,7 @@ void rge_chip_init(rge_t *rgep);
 void rge_chip_start(rge_t *rgep);
 void rge_chip_stop(rge_t *rgep, boolean_t fault);
 void rge_chip_sync(rge_t *rgep, enum rge_sync_op todo);
-void rge_chip_blank(void *arg, time_t ticks, uint_t count);
+void rge_chip_blank(void *arg, time_t ticks, uint_t count, int flag);
 void rge_tx_trigger(rge_t *rgep);
 void rge_hw_stats_dump(rge_t *rgep);
 uint_t rge_intr(caddr_t arg1, caddr_t arg2);

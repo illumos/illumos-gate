@@ -32,6 +32,11 @@
  */
 
 /*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * System Header files.
  */
 #include <sys/types.h>
@@ -1958,7 +1963,7 @@ next:
 		 * send up received packets
 		 */
 		mutex_exit(&dp->intrlock);
-		mac_rx(dp->mh, dp->mac_rx_ring_ha, rx_head);
+		mac_rx(dp->mh, NULL, rx_head);
 		mutex_enter(&dp->intrlock);
 	}
 
@@ -4050,11 +4055,10 @@ static int		gem_m_setpromisc(void *, boolean_t);
 static int		gem_m_multicst(void *, boolean_t, const uint8_t *);
 static int		gem_m_unicst(void *, const uint8_t *);
 static mblk_t		*gem_m_tx(void *, mblk_t *);
-static void		gem_m_resources(void *);
 static void		gem_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t	gem_m_getcapab(void *, mac_capab_t, void *);
 
-#define	GEM_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
+#define	GEM_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
 
 static mac_callbacks_t gem_m_callbacks = {
 	GEM_M_CALLBACK_FLAGS,
@@ -4065,7 +4069,6 @@ static mac_callbacks_t gem_m_callbacks = {
 	gem_m_multicst,
 	gem_m_unicst,
 	gem_m_tx,
-	gem_m_resources,
 	gem_m_ioctl,
 	gem_m_getcapab,
 };
@@ -4590,45 +4593,6 @@ gem_m_tx(void *arg, mblk_t *mp)
 }
 
 static void
-gem_set_coalease(void *arg, time_t ticks, uint_t count)
-{
-	struct gem_dev *dp = arg;
-	DPRINTF(1, (CE_CONT, "%s: %s: ticks:%d count:%d",
-	    dp->name, __func__, ticks, count));
-
-	mutex_enter(&dp->intrlock);
-	dp->poll_pkt_delay = min(count, dp->gc.gc_rx_ring_size/2);
-	mutex_exit(&dp->intrlock);
-}
-
-static void
-gem_m_resources(void *arg)
-{
-	struct gem_dev		*dp = arg;
-	mac_rx_fifo_t		mrf;
-
-	DPRINTF(0, (CE_CONT, "!%s: %s: called", dp->name, __func__));
-
-	mutex_enter(&dp->intrlock);
-	mutex_enter(&dp->xmitlock);
-
-	/*
-	 * Register Rx rings as resources and save mac
-	 * resource id for future reference
-	 */
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = gem_set_coalease;
-	mrf.mrf_arg = (void *)dp;
-	mrf.mrf_normal_blank_time = 1; /* in uS */
-	mrf.mrf_normal_pkt_count = dp->poll_pkt_delay;
-
-	dp->mac_rx_ring_ha = mac_resource_add(dp->mh, (mac_resource_t *)&mrf);
-
-	mutex_exit(&dp->xmitlock);
-	mutex_exit(&dp->intrlock);
-}
-
-static void
 gem_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 {
 	DPRINTF(0, (CE_CONT, "!%s: %s: called",
@@ -4637,18 +4601,11 @@ gem_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	gem_mac_ioctl((struct gem_dev *)arg, wq, mp);
 }
 
+/* ARGSUSED */
 static boolean_t
 gem_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
-	boolean_t	ret;
-
-	ret = B_FALSE;
-	switch (cap) {
-	case MAC_CAPAB_POLL:
-		ret = B_TRUE;
-		break;
-	}
-	return (ret);
+	return (B_FALSE);
 }
 
 static void

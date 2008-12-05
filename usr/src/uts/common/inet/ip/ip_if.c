@@ -44,6 +44,8 @@
 #include <sys/sunldi.h>
 #include <sys/file.h>
 #include <sys/bitmap.h>
+#include <sys/cpuvar.h>
+#include <sys/time.h>
 #include <sys/kmem.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -62,6 +64,7 @@
 #include <sys/strsun.h>
 #include <sys/policy.h>
 #include <sys/ethernet.h>
+#include <sys/callb.h>
 
 #include <inet/common.h>   /* for various inet/mi.h and inet/nd.h needs */
 #include <inet/mi.h>
@@ -94,7 +97,8 @@
 #include <netinet/igmp.h>
 #include <inet/ip_listutils.h>
 #include <inet/ipclassifier.h>
-#include <sys/mac.h>
+#include <sys/mac_client.h>
+#include <sys/dld.h>
 
 #include <sys/systeminfo.h>
 #include <sys/bootconf.h>
@@ -224,25 +228,27 @@ static void	ill_ipsec_capab_free(ill_ipsec_capab_t *);
 static void	ill_ipsec_capab_add(ill_t *, uint_t, boolean_t);
 static void	ill_ipsec_capab_delete(ill_t *, uint_t);
 static boolean_t ill_ipsec_capab_resize_algparm(ill_ipsec_capab_t *, int);
-static void ill_capability_proto(ill_t *, int, mblk_t *);
 static void ill_capability_dispatch(ill_t *, mblk_t *, dl_capability_sub_t *,
     boolean_t);
 static void ill_capability_id_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static void ill_capability_mdt_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
-static void ill_capability_mdt_reset(ill_t *, mblk_t **);
+static void ill_capability_mdt_reset_fill(ill_t *, mblk_t *);
 static void ill_capability_ipsec_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
-static void ill_capability_ipsec_reset(ill_t *, mblk_t **);
+static void ill_capability_ipsec_reset_fill(ill_t *, mblk_t *);
 static void ill_capability_hcksum_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
-static void ill_capability_hcksum_reset(ill_t *, mblk_t **);
+static void ill_capability_hcksum_reset_fill(ill_t *, mblk_t *);
 static void ill_capability_zerocopy_ack(ill_t *, mblk_t *,
     dl_capability_sub_t *);
-static void ill_capability_zerocopy_reset(ill_t *, mblk_t **);
-static void ill_capability_lso_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
-static void ill_capability_lso_reset(ill_t *, mblk_t **);
-static void ill_capability_dls_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
-static mac_resource_handle_t ill_ring_add(void *, mac_resource_t *);
-static void	ill_capability_dls_reset(ill_t *, mblk_t **);
-static void	ill_capability_dls_disable(ill_t *);
+static void ill_capability_zerocopy_reset_fill(ill_t *, mblk_t *);
+static int  ill_capability_ipsec_reset_size(ill_t *, int *, int *, int *,
+    int *);
+static void	ill_capability_dld_reset_fill(ill_t *, mblk_t *);
+static void	ill_capability_dld_ack(ill_t *, mblk_t *,
+		    dl_capability_sub_t *);
+static void	ill_capability_dld_enable(ill_t *);
+static void	ill_capability_ack_thr(void *);
+static void	ill_capability_lso_enable(ill_t *);
+static void	ill_capability_send(ill_t *, mblk_t *);
 
 static void	illgrp_cache_delete(ire_t *, char *);
 static void	illgrp_delete(ill_t *ill);
@@ -522,16 +528,6 @@ static ipif_t	ipif_zero;
  * interfaces have been plumbed.
  */
 uint_t	ill_no_arena = 12;	/* Setable in /etc/system */
-
-/*
- * Enable soft rings if ip_squeue_soft_ring or ip_squeue_fanout
- * is set and ip_soft_rings_cnt > 0. ip_squeue_soft_ring is
- * set through platform specific code (Niagara/Ontario).
- */
-#define	SOFT_RINGS_ENABLED()	(ip_soft_rings_cnt ? \
-		(ip_squeue_soft_ring || ip_squeue_fanout) : B_FALSE)
-
-#define	ILL_CAPAB_DLS	(ILL_CAPAB_SOFT_RING | ILL_CAPAB_POLL)
 
 static uint_t
 ipif_rand(ip_stack_t *ipst)
@@ -824,12 +820,8 @@ ill_delete_tail(ill_t *ill)
 	while (ill->ill_state_flags & ILL_DL_UNBIND_IN_PROGRESS)
 		cv_wait(&ill->ill_cv, &ill->ill_lock);
 	mutex_exit(&ill->ill_lock);
-
-	/*
-	 * Clean up polling and soft ring capabilities
-	 */
-	if (ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING))
-		ill_capability_dls_disable(ill);
+	ASSERT(!(ill->ill_capabilities &
+	    (ILL_CAPAB_DLD | ILL_CAPAB_DLD_POLL | ILL_CAPAB_DLD_DIRECT)));
 
 	if (ill->ill_net_type != IRE_LOOPBACK)
 		qprocsoff(ill->ill_rq);
@@ -879,16 +871,10 @@ ill_delete_tail(ill_t *ill)
 		ill->ill_lso_capab = NULL;
 	}
 
-	if (ill->ill_dls_capab != NULL) {
-		CONN_DEC_REF(ill->ill_dls_capab->ill_unbind_conn);
-		ill->ill_dls_capab->ill_unbind_conn = NULL;
-		kmem_free(ill->ill_dls_capab,
-		    sizeof (ill_dls_capab_t) +
-		    (sizeof (ill_rx_ring_t) * ILL_MAX_RINGS));
-		ill->ill_dls_capab = NULL;
+	if (ill->ill_dld_capab != NULL) {
+		kmem_free(ill->ill_dld_capab, sizeof (ill_dld_capab_t));
+		ill->ill_dld_capab = NULL;
 	}
-
-	ASSERT(!(ill->ill_capabilities & ILL_CAPAB_POLL));
 
 	while (ill->ill_ipif != NULL)
 		ipif_free_tail(ill->ill_ipif);
@@ -1478,7 +1464,7 @@ conn_ioctl_cleanup(conn_t *connp)
 	refheld = ill_waiter_inc(ill);
 	mutex_exit(&connp->conn_lock);
 	if (refheld) {
-		if (ipsq_enter(ill, B_TRUE)) {
+		if (ipsq_enter(ill, B_TRUE, NEW_OP)) {
 			ill_waiter_dcr(ill);
 			/*
 			 * Check whether this ioctl has started and is
@@ -1742,104 +1728,114 @@ ill_fastpath_probe(ill_t *ill, mblk_t *dlur_mp)
 void
 ill_capability_probe(ill_t *ill)
 {
-	/*
-	 * Do so only if capabilities are still unknown.
-	 */
-	if (ill->ill_dlpi_capab_state != IDS_UNKNOWN)
+	mblk_t	*mp;
+
+	ASSERT(IAM_WRITER_ILL(ill));
+
+	if (ill->ill_dlpi_capab_state != IDCS_UNKNOWN &&
+	    ill->ill_dlpi_capab_state != IDCS_FAILED)
 		return;
 
-	ill->ill_dlpi_capab_state = IDS_INPROGRESS;
+	/*
+	 * We are starting a new cycle of capability negotiation.
+	 * Free up the capab reset messages of any previous incarnation.
+	 * We will do a fresh allocation when we get the response to our probe
+	 */
+	if (ill->ill_capab_reset_mp != NULL) {
+		freemsg(ill->ill_capab_reset_mp);
+		ill->ill_capab_reset_mp = NULL;
+	}
+
 	ip1dbg(("ill_capability_probe: starting capability negotiation\n"));
-	ill_capability_proto(ill, DL_CAPABILITY_REQ, NULL);
+
+	mp = ip_dlpi_alloc(sizeof (dl_capability_req_t), DL_CAPABILITY_REQ);
+	if (mp == NULL)
+		return;
+
+	ill_capability_send(ill, mp);
+	ill->ill_dlpi_capab_state = IDCS_PROBE_SENT;
 }
 
 void
-ill_capability_reset(ill_t *ill)
+ill_capability_reset(ill_t *ill, boolean_t reneg)
 {
-	mblk_t *sc_mp = NULL;
-	mblk_t *tmp;
+	ASSERT(IAM_WRITER_ILL(ill));
 
-	/*
-	 * Note here that we reset the state to UNKNOWN, and later send
-	 * down the DL_CAPABILITY_REQ without first setting the state to
-	 * INPROGRESS.  We do this in order to distinguish the
-	 * DL_CAPABILITY_ACK response which may come back in response to
-	 * a "reset" apart from the "probe" DL_CAPABILITY_REQ.  This would
-	 * also handle the case where the driver doesn't send us back
-	 * a DL_CAPABILITY_ACK in response, since the "probe" routine
-	 * requires the state to be in UNKNOWN anyway.  In any case, all
-	 * features are turned off until the state reaches IDS_OK.
-	 */
-	ill->ill_dlpi_capab_state = IDS_UNKNOWN;
-	ill->ill_capab_reneg = B_FALSE;
-
-	/*
-	 * Disable sub-capabilities and request a list of sub-capability
-	 * messages which will be sent down to the driver.  Each handler
-	 * allocates the corresponding dl_capability_sub_t inside an
-	 * mblk, and links it to the existing sc_mp mblk, or return it
-	 * as sc_mp if it's the first sub-capability (the passed in
-	 * sc_mp is NULL).  Upon returning from all capability handlers,
-	 * sc_mp will be pulled-up, before passing it downstream.
-	 */
-	ill_capability_mdt_reset(ill, &sc_mp);
-	ill_capability_hcksum_reset(ill, &sc_mp);
-	ill_capability_zerocopy_reset(ill, &sc_mp);
-	ill_capability_ipsec_reset(ill, &sc_mp);
-	ill_capability_dls_reset(ill, &sc_mp);
-	ill_capability_lso_reset(ill, &sc_mp);
-
-	/* Nothing to send down in order to disable the capabilities? */
-	if (sc_mp == NULL)
+	if (ill->ill_dlpi_capab_state != IDCS_OK)
 		return;
 
-	tmp = msgpullup(sc_mp, -1);
-	freemsg(sc_mp);
-	if ((sc_mp = tmp) == NULL) {
-		cmn_err(CE_WARN, "ill_capability_reset: unable to send down "
-		    "DL_CAPABILITY_REQ (ENOMEM)\n");
-		return;
-	}
+	ill->ill_dlpi_capab_state = reneg ? IDCS_RENEG : IDCS_RESET_SENT;
 
-	ip1dbg(("ill_capability_reset: resetting negotiated capabilities\n"));
-	ill_capability_proto(ill, DL_CAPABILITY_REQ, sc_mp);
+	ill_capability_send(ill, ill->ill_capab_reset_mp);
+	ill->ill_capab_reset_mp = NULL;
+	/*
+	 * We turn off all capabilities except those pertaining to
+	 * direct function call capabilities viz. ILL_CAPAB_DLD*
+	 * which will be turned off by the corresponding reset functions.
+	 */
+	ill->ill_capabilities &= ~(ILL_CAPAB_MDT | ILL_CAPAB_HCKSUM  |
+	    ILL_CAPAB_ZEROCOPY | ILL_CAPAB_AH | ILL_CAPAB_ESP);
 }
 
-/*
- * Request or set new-style hardware capabilities supported by DLS provider.
- */
 static void
-ill_capability_proto(ill_t *ill, int type, mblk_t *reqp)
+ill_capability_reset_alloc(ill_t *ill)
 {
 	mblk_t *mp;
-	dl_capability_req_t *capb;
-	size_t size = 0;
-	uint8_t *ptr;
+	size_t	size = 0;
+	int	err;
+	dl_capability_req_t	*capb;
 
-	if (reqp != NULL)
-		size = MBLKL(reqp);
+	ASSERT(IAM_WRITER_ILL(ill));
+	ASSERT(ill->ill_capab_reset_mp == NULL);
 
-	mp = ip_dlpi_alloc(sizeof (dl_capability_req_t) + size, type);
-	if (mp == NULL) {
-		freemsg(reqp);
-		return;
+	if (ILL_MDT_CAPABLE(ill))
+		size += sizeof (dl_capability_sub_t) + sizeof (dl_capab_mdt_t);
+
+	if (ILL_HCKSUM_CAPABLE(ill)) {
+		size += sizeof (dl_capability_sub_t) +
+		    sizeof (dl_capab_hcksum_t);
 	}
-	ptr = mp->b_rptr;
 
-	capb = (dl_capability_req_t *)ptr;
-	ptr += sizeof (dl_capability_req_t);
-
-	if (reqp != NULL) {
-		capb->dl_sub_offset = sizeof (dl_capability_req_t);
-		capb->dl_sub_length = size;
-		bcopy(reqp->b_rptr, ptr, size);
-		ptr += size;
-		mp->b_cont = reqp->b_cont;
-		freeb(reqp);
+	if (ill->ill_capabilities & ILL_CAPAB_ZEROCOPY) {
+		size += sizeof (dl_capability_sub_t) +
+		    sizeof (dl_capab_zerocopy_t);
 	}
-	ASSERT(ptr == mp->b_wptr);
 
-	ill_dlpi_send(ill, mp);
+	if (ill->ill_capabilities & (ILL_CAPAB_AH | ILL_CAPAB_ESP)) {
+		size += sizeof (dl_capability_sub_t);
+		size += ill_capability_ipsec_reset_size(ill, NULL, NULL,
+		    NULL, NULL);
+	}
+
+	if (ill->ill_capabilities & ILL_CAPAB_DLD) {
+		size += sizeof (dl_capability_sub_t) +
+		    sizeof (dl_capab_dld_t);
+	}
+
+	mp = allocb_wait(size + sizeof (dl_capability_req_t), BPRI_MED,
+	    STR_NOSIG, &err);
+
+	mp->b_datap->db_type = M_PROTO;
+	bzero(mp->b_rptr, size + sizeof (dl_capability_req_t));
+
+	capb = (dl_capability_req_t *)mp->b_rptr;
+	capb->dl_primitive = DL_CAPABILITY_REQ;
+	capb->dl_sub_offset = sizeof (dl_capability_req_t);
+	capb->dl_sub_length = size;
+
+	mp->b_wptr += sizeof (dl_capability_req_t);
+
+	/*
+	 * Each handler fills in the corresponding dl_capability_sub_t
+	 * inside the mblk,
+	 */
+	ill_capability_mdt_reset_fill(ill, mp);
+	ill_capability_hcksum_reset_fill(ill, mp);
+	ill_capability_zerocopy_reset_fill(ill, mp);
+	ill_capability_ipsec_reset_fill(ill, mp);
+	ill_capability_dld_reset_fill(ill, mp);
+
+	ill->ill_capab_reset_mp = mp;
 }
 
 static void
@@ -1944,7 +1940,6 @@ ill_capability_mdt_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 		if (*ill_mdt_capab == NULL) {
 			*ill_mdt_capab = kmem_zalloc(sizeof (ill_mdt_capab_t),
 			    KM_NOSLEEP);
-
 			if (*ill_mdt_capab == NULL) {
 				cmn_err(CE_WARN, "ill_capability_mdt_ack: "
 				    "could not enable MDT version %d "
@@ -2017,42 +2012,22 @@ ill_capability_mdt_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 		mdt_oc->mdt_flags |= DL_CAPAB_MDT_ENABLE;
 
 		/* nmp points to a DL_CAPABILITY_REQ message to enable MDT */
-		ill_dlpi_send(ill, nmp);
+		ill_capability_send(ill, nmp);
 	}
 }
 
 static void
-ill_capability_mdt_reset(ill_t *ill, mblk_t **sc_mp)
+ill_capability_mdt_reset_fill(ill_t *ill, mblk_t *mp)
 {
-	mblk_t *mp;
 	dl_capab_mdt_t *mdt_subcap;
 	dl_capability_sub_t *dl_subcap;
-	int size;
 
 	if (!ILL_MDT_CAPABLE(ill))
 		return;
 
 	ASSERT(ill->ill_mdt_capab != NULL);
-	/*
-	 * Clear the capability flag for MDT but retain the ill_mdt_capab
-	 * structure since it's possible that another thread is still
-	 * referring to it.  The structure only gets deallocated when
-	 * we destroy the ill.
-	 */
-	ill->ill_capabilities &= ~ILL_CAPAB_MDT;
 
-	size = sizeof (*dl_subcap) + sizeof (*mdt_subcap);
-
-	mp = allocb(size, BPRI_HI);
-	if (mp == NULL) {
-		ip1dbg(("ill_capability_mdt_reset: unable to allocate "
-		    "request to disable MDT\n"));
-		return;
-	}
-
-	mp->b_wptr = mp->b_rptr + size;
-
-	dl_subcap = (dl_capability_sub_t *)mp->b_rptr;
+	dl_subcap = (dl_capability_sub_t *)mp->b_wptr;
 	dl_subcap->dl_cap = DL_CAPAB_MDT;
 	dl_subcap->dl_length = sizeof (*mdt_subcap);
 
@@ -2062,10 +2037,26 @@ ill_capability_mdt_reset(ill_t *ill, mblk_t **sc_mp)
 	mdt_subcap->mdt_hdr_head = 0;
 	mdt_subcap->mdt_hdr_tail = 0;
 
-	if (*sc_mp != NULL)
-		linkb(*sc_mp, mp);
-	else
-		*sc_mp = mp;
+	mp->b_wptr += sizeof (*dl_subcap) + sizeof (*mdt_subcap);
+}
+
+static void
+ill_capability_dld_reset_fill(ill_t *ill, mblk_t *mp)
+{
+	dl_capability_sub_t *dl_subcap;
+
+	if (!(ill->ill_capabilities & ILL_CAPAB_DLD))
+		return;
+
+	/*
+	 * The dl_capab_dld_t that follows the dl_capability_sub_t is not
+	 * initialized below since it is not used by DLD.
+	 */
+	dl_subcap = (dl_capability_sub_t *)mp->b_wptr;
+	dl_subcap->dl_cap = DL_CAPAB_DLD;
+	dl_subcap->dl_length = sizeof (dl_capab_dld_t);
+
+	mp->b_wptr += sizeof (dl_capability_sub_t) + sizeof (dl_capab_dld_t);
 }
 
 /*
@@ -2371,7 +2362,7 @@ ill_capability_ipsec_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 		 * nmp points to a DL_CAPABILITY_REQ message to enable
 		 * IPsec hardware acceleration.
 		 */
-		ill_dlpi_send(ill, nmp);
+		ill_capability_send(ill, nmp);
 
 	if (need_sadb_dump)
 		/*
@@ -2457,10 +2448,10 @@ ill_fill_ipsec_reset(uint_t nciphers, int stype, uint_t slen,
 }
 
 /* ARGSUSED */
-static void
-ill_capability_ipsec_reset(ill_t *ill, mblk_t **sc_mp)
+static int
+ill_capability_ipsec_reset_size(ill_t *ill, int *ah_cntp, int *ah_lenp,
+    int *esp_cntp, int *esp_lenp)
 {
-	mblk_t *mp;
 	ill_ipsec_capab_t *cap_ah = ill->ill_ipsec_capab_ah;
 	ill_ipsec_capab_t *cap_esp = ill->ill_ipsec_capab_esp;
 	uint64_t ill_capabilities = ill->ill_capabilities;
@@ -2469,7 +2460,7 @@ ill_capability_ipsec_reset(ill_t *ill, mblk_t **sc_mp)
 	int i, size = 0;
 
 	if (!(ill_capabilities & (ILL_CAPAB_AH | ILL_CAPAB_ESP)))
-		return;
+		return (0);
 
 	ASSERT(cap_ah != NULL || !(ill_capabilities & ILL_CAPAB_AH));
 	ASSERT(cap_esp != NULL || !(ill_capabilities & ILL_CAPAB_ESP));
@@ -2504,18 +2495,32 @@ ill_capability_ipsec_reset(ill_t *ill, mblk_t **sc_mp)
 		}
 	}
 
-	if (size == 0) {
-		ip1dbg(("ill_capability_ipsec_reset: capabilities exist but "
-		    "there's nothing to reset\n"));
-		return;
-	}
+	if (ah_cntp != NULL)
+		*ah_cntp = ah_cnt;
+	if (ah_lenp != NULL)
+		*ah_lenp = ah_len;
+	if (esp_cntp != NULL)
+		*esp_cntp = esp_cnt;
+	if (esp_lenp != NULL)
+		*esp_lenp = esp_len;
 
-	mp = allocb(size, BPRI_HI);
-	if (mp == NULL) {
-		ip1dbg(("ill_capability_ipsec_reset: unable to allocate "
-		    "request to disable IPSEC Hardware Acceleration\n"));
+	return (size);
+}
+
+/* ARGSUSED */
+static void
+ill_capability_ipsec_reset_fill(ill_t *ill, mblk_t *mp)
+{
+	ill_ipsec_capab_t *cap_ah = ill->ill_ipsec_capab_ah;
+	ill_ipsec_capab_t *cap_esp = ill->ill_ipsec_capab_esp;
+	int ah_cnt = 0, esp_cnt = 0;
+	int ah_len = 0, esp_len = 0;
+	int size;
+
+	size = ill_capability_ipsec_reset_size(ill, &ah_cnt, &ah_len,
+	    &esp_cnt, &esp_len);
+	if (size == 0)
 		return;
-	}
 
 	/*
 	 * Clear the capability flags for IPsec HA but retain the ill
@@ -2527,20 +2532,17 @@ ill_capability_ipsec_reset(ill_t *ill, mblk_t **sc_mp)
 	 * hardware acceleration, and by clearing them we ensure that new
 	 * outbound IPsec packets are sent down encrypted.
 	 */
-	ill->ill_capabilities &= ~(ILL_CAPAB_AH | ILL_CAPAB_ESP);
 
 	/* Fill in DL_CAPAB_IPSEC_AH sub-capability entries */
 	if (ah_cnt > 0) {
 		ill_fill_ipsec_reset(ah_cnt, DL_CAPAB_IPSEC_AH, ah_len,
 		    cap_ah, mp);
-		ASSERT(mp->b_rptr + size >= mp->b_wptr);
 	}
 
 	/* Fill in DL_CAPAB_IPSEC_ESP sub-capability entries */
 	if (esp_cnt > 0) {
 		ill_fill_ipsec_reset(esp_cnt, DL_CAPAB_IPSEC_ESP, esp_len,
 		    cap_esp, mp);
-		ASSERT(mp->b_rptr + size >= mp->b_wptr);
 	}
 
 	/*
@@ -2550,11 +2552,6 @@ ill_capability_ipsec_reset(ill_t *ill, mblk_t **sc_mp)
 	 * must stop inbound decryption (by destroying all inbound SAs)
 	 * and let the corresponding packets come in encrypted.
 	 */
-
-	if (*sc_mp != NULL)
-		linkb(*sc_mp, mp);
-	else
-		*sc_mp = mp;
 }
 
 static void
@@ -2562,15 +2559,6 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp,
     boolean_t encapsulated)
 {
 	boolean_t legacy = B_FALSE;
-
-	/*
-	 * If this DL_CAPABILITY_ACK came in as a response to our "reset"
-	 * DL_CAPABILITY_REQ, ignore it during this cycle.  We've just
-	 * instructed the driver to disable its advertised capabilities,
-	 * so there's no point in accepting any response at this moment.
-	 */
-	if (ill->ill_dlpi_capab_state == IDS_UNKNOWN)
-		return;
 
 	/*
 	 * Note that only the following two sub-capabilities may be
@@ -2611,421 +2599,12 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp,
 	case DL_CAPAB_ZEROCOPY:
 		ill_capability_zerocopy_ack(ill, mp, subp);
 		break;
-	case DL_CAPAB_POLL:
-		if (!SOFT_RINGS_ENABLED())
-			ill_capability_dls_ack(ill, mp, subp);
-		break;
-	case DL_CAPAB_SOFT_RING:
-		if (SOFT_RINGS_ENABLED())
-			ill_capability_dls_ack(ill, mp, subp);
-		break;
-	case DL_CAPAB_LSO:
-		ill_capability_lso_ack(ill, mp, subp);
+	case DL_CAPAB_DLD:
+		ill_capability_dld_ack(ill, mp, subp);
 		break;
 	default:
 		ip1dbg(("ill_capability_dispatch: unknown capab type %d\n",
 		    subp->dl_cap));
-	}
-}
-
-/*
- * As part of negotiating polling capability, the driver tells us
- * the default (or normal) blanking interval and packet threshold
- * (the receive timer fires if blanking interval is reached or
- * the packet threshold is reached).
- *
- * As part of manipulating the polling interval, we always use our
- * estimated interval (avg service time * number of packets queued
- * on the squeue) but we try to blank for a minimum of
- * rr_normal_blank_time * rr_max_blank_ratio. We disable the
- * packet threshold during this time. When we are not in polling mode
- * we set the blank interval typically lower, rr_normal_pkt_cnt *
- * rr_min_blank_ratio but up the packet cnt by a ratio of
- * rr_min_pkt_cnt_ratio so that we are still getting chains if
- * possible although for a shorter interval.
- */
-#define	RR_MAX_BLANK_RATIO	20
-#define	RR_MIN_BLANK_RATIO	10
-#define	RR_MAX_PKT_CNT_RATIO	3
-#define	RR_MIN_PKT_CNT_RATIO	3
-
-/*
- * These can be tuned via /etc/system.
- */
-int rr_max_blank_ratio = RR_MAX_BLANK_RATIO;
-int rr_min_blank_ratio = RR_MIN_BLANK_RATIO;
-int rr_max_pkt_cnt_ratio = RR_MAX_PKT_CNT_RATIO;
-int rr_min_pkt_cnt_ratio = RR_MIN_PKT_CNT_RATIO;
-
-static mac_resource_handle_t
-ill_ring_add(void *arg, mac_resource_t *mrp)
-{
-	ill_t			*ill = (ill_t *)arg;
-	mac_rx_fifo_t		*mrfp = (mac_rx_fifo_t *)mrp;
-	ill_rx_ring_t		*rx_ring;
-	int			ip_rx_index;
-
-	ASSERT(mrp != NULL);
-	if (mrp->mr_type != MAC_RX_FIFO) {
-		return (NULL);
-	}
-	ASSERT(ill != NULL);
-	ASSERT(ill->ill_dls_capab != NULL);
-
-	mutex_enter(&ill->ill_lock);
-	for (ip_rx_index = 0; ip_rx_index < ILL_MAX_RINGS; ip_rx_index++) {
-		rx_ring = &ill->ill_dls_capab->ill_ring_tbl[ip_rx_index];
-		ASSERT(rx_ring != NULL);
-
-		if (rx_ring->rr_ring_state == ILL_RING_FREE) {
-			time_t normal_blank_time =
-			    mrfp->mrf_normal_blank_time;
-			uint_t normal_pkt_cnt =
-			    mrfp->mrf_normal_pkt_count;
-
-	bzero(rx_ring, sizeof (ill_rx_ring_t));
-
-	rx_ring->rr_blank = mrfp->mrf_blank;
-	rx_ring->rr_handle = mrfp->mrf_arg;
-	rx_ring->rr_ill = ill;
-	rx_ring->rr_normal_blank_time = normal_blank_time;
-	rx_ring->rr_normal_pkt_cnt = normal_pkt_cnt;
-
-			rx_ring->rr_max_blank_time =
-			    normal_blank_time * rr_max_blank_ratio;
-			rx_ring->rr_min_blank_time =
-			    normal_blank_time * rr_min_blank_ratio;
-			rx_ring->rr_max_pkt_cnt =
-			    normal_pkt_cnt * rr_max_pkt_cnt_ratio;
-			rx_ring->rr_min_pkt_cnt =
-			    normal_pkt_cnt * rr_min_pkt_cnt_ratio;
-
-			rx_ring->rr_ring_state = ILL_RING_INUSE;
-			mutex_exit(&ill->ill_lock);
-
-			DTRACE_PROBE2(ill__ring__add, (void *), ill,
-			    (int), ip_rx_index);
-			return ((mac_resource_handle_t)rx_ring);
-		}
-	}
-
-	/*
-	 * We ran out of ILL_MAX_RINGS worth rx_ring structures. If
-	 * we have devices which can overwhelm this limit, ILL_MAX_RING
-	 * should be made configurable. Meanwhile it cause no panic because
-	 * driver will pass ip_input a NULL handle which will make
-	 * IP allocate the default squeue and Polling mode will not
-	 * be used for this ring.
-	 */
-	cmn_err(CE_NOTE, "Reached maximum number of receiving rings (%d) "
-	    "for %s\n", ILL_MAX_RINGS, ill->ill_name);
-
-	mutex_exit(&ill->ill_lock);
-	return (NULL);
-}
-
-static boolean_t
-ill_capability_dls_init(ill_t *ill)
-{
-	ill_dls_capab_t	*ill_dls = ill->ill_dls_capab;
-	conn_t 			*connp;
-	size_t			sz;
-	ip_stack_t *ipst = ill->ill_ipst;
-
-	if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING) {
-		if (ill_dls == NULL) {
-			cmn_err(CE_PANIC, "ill_capability_dls_init: "
-			    "soft_ring enabled for ill=%s (%p) but data "
-			    "structs uninitialized\n", ill->ill_name,
-			    (void *)ill);
-		}
-		return (B_TRUE);
-	} else if (ill->ill_capabilities & ILL_CAPAB_POLL) {
-		if (ill_dls == NULL) {
-			cmn_err(CE_PANIC, "ill_capability_dls_init: "
-			    "polling enabled for ill=%s (%p) but data "
-			    "structs uninitialized\n", ill->ill_name,
-			    (void *)ill);
-		}
-		return (B_TRUE);
-	}
-
-	if (ill_dls != NULL) {
-		ill_rx_ring_t 	*rx_ring = ill_dls->ill_ring_tbl;
-		/* Soft_Ring or polling is being re-enabled */
-
-		connp = ill_dls->ill_unbind_conn;
-		ASSERT(rx_ring != NULL);
-		bzero((void *)ill_dls, sizeof (ill_dls_capab_t));
-		bzero((void *)rx_ring,
-		    sizeof (ill_rx_ring_t) * ILL_MAX_RINGS);
-		ill_dls->ill_ring_tbl = rx_ring;
-		ill_dls->ill_unbind_conn = connp;
-		return (B_TRUE);
-	}
-
-	if ((connp = ipcl_conn_create(IPCL_TCPCONN, KM_NOSLEEP,
-	    ipst->ips_netstack)) == NULL)
-		return (B_FALSE);
-
-	sz = sizeof (ill_dls_capab_t);
-	sz += sizeof (ill_rx_ring_t) * ILL_MAX_RINGS;
-
-	ill_dls = kmem_zalloc(sz, KM_NOSLEEP);
-	if (ill_dls == NULL) {
-		cmn_err(CE_WARN, "ill_capability_dls_init: could not "
-		    "allocate dls_capab for %s (%p)\n", ill->ill_name,
-		    (void *)ill);
-		CONN_DEC_REF(connp);
-		return (B_FALSE);
-	}
-
-	/* Allocate space to hold ring table */
-	ill_dls->ill_ring_tbl = (ill_rx_ring_t *)&ill_dls[1];
-	ill->ill_dls_capab = ill_dls;
-	ill_dls->ill_unbind_conn = connp;
-	return (B_TRUE);
-}
-
-/*
- * ill_capability_dls_disable: disable soft_ring and/or polling
- * capability. Since any of the rings might already be in use, need
- * to call ip_squeue_clean_all() which gets behind the squeue to disable
- * direct calls if necessary.
- */
-static void
-ill_capability_dls_disable(ill_t *ill)
-{
-	ill_dls_capab_t	*ill_dls = ill->ill_dls_capab;
-
-	if (ill->ill_capabilities & ILL_CAPAB_DLS) {
-		ip_squeue_clean_all(ill);
-		ill_dls->ill_tx = NULL;
-		ill_dls->ill_tx_handle = NULL;
-		ill_dls->ill_dls_change_status = NULL;
-		ill_dls->ill_dls_bind = NULL;
-		ill_dls->ill_dls_unbind = NULL;
-	}
-
-	ASSERT(!(ill->ill_capabilities & ILL_CAPAB_DLS));
-}
-
-static void
-ill_capability_dls_capable(ill_t *ill, dl_capab_dls_t *idls,
-    dl_capability_sub_t *isub)
-{
-	uint_t			size;
-	uchar_t			*rptr;
-	dl_capab_dls_t	dls, *odls;
-	ill_dls_capab_t	*ill_dls;
-	mblk_t			*nmp = NULL;
-	dl_capability_req_t	*ocap;
-	uint_t			sub_dl_cap = isub->dl_cap;
-
-	if (!ill_capability_dls_init(ill))
-		return;
-	ill_dls = ill->ill_dls_capab;
-
-	/* Copy locally to get the members aligned */
-	bcopy((void *)idls, (void *)&dls,
-	    sizeof (dl_capab_dls_t));
-
-	/* Get the tx function and handle from dld */
-	ill_dls->ill_tx = (ip_dld_tx_t)dls.dls_tx;
-	ill_dls->ill_tx_handle = (void *)dls.dls_tx_handle;
-
-	if (sub_dl_cap == DL_CAPAB_SOFT_RING) {
-		ill_dls->ill_dls_change_status =
-		    (ip_dls_chg_soft_ring_t)dls.dls_ring_change_status;
-		ill_dls->ill_dls_bind = (ip_dls_bind_t)dls.dls_ring_bind;
-		ill_dls->ill_dls_unbind =
-		    (ip_dls_unbind_t)dls.dls_ring_unbind;
-		ill_dls->ill_dls_soft_ring_cnt = ip_soft_rings_cnt;
-	}
-
-	size = sizeof (dl_capability_req_t) + sizeof (dl_capability_sub_t) +
-	    isub->dl_length;
-
-	if ((nmp = ip_dlpi_alloc(size, DL_CAPABILITY_REQ)) == NULL) {
-		cmn_err(CE_WARN, "ill_capability_dls_capable: could "
-		    "not allocate memory for CAPAB_REQ for %s (%p)\n",
-		    ill->ill_name, (void *)ill);
-		return;
-	}
-
-	/* initialize dl_capability_req_t */
-	rptr = nmp->b_rptr;
-	ocap = (dl_capability_req_t *)rptr;
-	ocap->dl_sub_offset = sizeof (dl_capability_req_t);
-	ocap->dl_sub_length = sizeof (dl_capability_sub_t) + isub->dl_length;
-	rptr += sizeof (dl_capability_req_t);
-
-	/* initialize dl_capability_sub_t */
-	bcopy(isub, rptr, sizeof (*isub));
-	rptr += sizeof (*isub);
-
-	odls = (dl_capab_dls_t *)rptr;
-	rptr += sizeof (dl_capab_dls_t);
-
-	/* initialize dl_capab_dls_t to be sent down */
-	dls.dls_rx_handle = (uintptr_t)ill;
-	dls.dls_rx = (uintptr_t)ip_input;
-	dls.dls_ring_add = (uintptr_t)ill_ring_add;
-
-	if (sub_dl_cap == DL_CAPAB_SOFT_RING) {
-		dls.dls_ring_cnt = ip_soft_rings_cnt;
-		dls.dls_ring_assign = (uintptr_t)ip_soft_ring_assignment;
-		dls.dls_flags = SOFT_RING_ENABLE;
-	} else {
-		dls.dls_flags = POLL_ENABLE;
-		ip1dbg(("ill_capability_dls_capable: asking interface %s "
-		    "to enable polling\n", ill->ill_name));
-	}
-	bcopy((void *)&dls, (void *)odls,
-	    sizeof (dl_capab_dls_t));
-	ASSERT(nmp->b_wptr == (nmp->b_rptr + size));
-	/*
-	 * nmp points to a DL_CAPABILITY_REQ message to
-	 * enable either soft_ring or polling
-	 */
-	ill_dlpi_send(ill, nmp);
-}
-
-static void
-ill_capability_dls_reset(ill_t *ill, mblk_t **sc_mp)
-{
-	mblk_t *mp;
-	dl_capab_dls_t *idls;
-	dl_capability_sub_t *dl_subcap;
-	int size;
-
-	if (!(ill->ill_capabilities & ILL_CAPAB_DLS))
-		return;
-
-	ASSERT(ill->ill_dls_capab != NULL);
-
-	size = sizeof (*dl_subcap) + sizeof (*idls);
-
-	mp = allocb(size, BPRI_HI);
-	if (mp == NULL) {
-		ip1dbg(("ill_capability_dls_reset: unable to allocate "
-		    "request to disable soft_ring\n"));
-		return;
-	}
-
-	mp->b_wptr = mp->b_rptr + size;
-
-	dl_subcap = (dl_capability_sub_t *)mp->b_rptr;
-	dl_subcap->dl_length = sizeof (*idls);
-	if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING)
-		dl_subcap->dl_cap = DL_CAPAB_SOFT_RING;
-	else
-		dl_subcap->dl_cap = DL_CAPAB_POLL;
-
-	idls = (dl_capab_dls_t *)(dl_subcap + 1);
-	if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING)
-		idls->dls_flags = SOFT_RING_DISABLE;
-	else
-		idls->dls_flags = POLL_DISABLE;
-
-	if (*sc_mp != NULL)
-		linkb(*sc_mp, mp);
-	else
-		*sc_mp = mp;
-}
-
-/*
- * Process a soft_ring/poll capability negotiation ack received
- * from a DLS Provider.isub must point to the sub-capability
- * (DL_CAPAB_SOFT_RING/DL_CAPAB_POLL) of a DL_CAPABILITY_ACK message.
- */
-static void
-ill_capability_dls_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
-{
-	dl_capab_dls_t		*idls;
-	uint_t			sub_dl_cap = isub->dl_cap;
-	uint8_t			*capend;
-
-	ASSERT(sub_dl_cap == DL_CAPAB_SOFT_RING ||
-	    sub_dl_cap == DL_CAPAB_POLL);
-
-	if (ill->ill_isv6)
-		return;
-
-	/*
-	 * Note: range checks here are not absolutely sufficient to
-	 * make us robust against malformed messages sent by drivers;
-	 * this is in keeping with the rest of IP's dlpi handling.
-	 * (Remember, it's coming from something else in the kernel
-	 * address space)
-	 */
-	capend = (uint8_t *)(isub + 1) + isub->dl_length;
-	if (capend > mp->b_wptr) {
-		cmn_err(CE_WARN, "ill_capability_dls_ack: "
-		    "malformed sub-capability too long for mblk");
-		return;
-	}
-
-	/*
-	 * There are two types of acks we process here:
-	 * 1. acks in reply to a (first form) generic capability req
-	 *    (dls_flag will be set to SOFT_RING_CAPABLE or POLL_CAPABLE)
-	 * 2. acks in reply to a SOFT_RING_ENABLE or POLL_ENABLE
-	 *    capability req.
-	 */
-	idls = (dl_capab_dls_t *)(isub + 1);
-
-	if (!dlcapabcheckqid(&idls->dls_mid, ill->ill_lmod_rq)) {
-		ip1dbg(("ill_capability_dls_ack: mid token for dls "
-		    "capability isn't as expected; pass-thru "
-		    "module(s) detected, discarding capability\n"));
-		if (ill->ill_capabilities & ILL_CAPAB_DLS) {
-			/*
-			 * This is a capability renegotitation case.
-			 * The interface better be unusable at this
-			 * point other wise bad things will happen
-			 * if we disable direct calls on a running
-			 * and up interface.
-			 */
-			ill_capability_dls_disable(ill);
-		}
-		return;
-	}
-
-	switch (idls->dls_flags) {
-	default:
-		/* Disable if unknown flag */
-	case SOFT_RING_DISABLE:
-	case POLL_DISABLE:
-		ill_capability_dls_disable(ill);
-		break;
-	case SOFT_RING_CAPABLE:
-	case POLL_CAPABLE:
-		/*
-		 * If the capability was already enabled, its safe
-		 * to disable it first to get rid of stale information
-		 * and then start enabling it again.
-		 */
-		ill_capability_dls_disable(ill);
-		ill_capability_dls_capable(ill, idls, isub);
-		break;
-	case SOFT_RING_ENABLE:
-	case POLL_ENABLE:
-		mutex_enter(&ill->ill_lock);
-		if (sub_dl_cap == DL_CAPAB_SOFT_RING &&
-		    !(ill->ill_capabilities & ILL_CAPAB_SOFT_RING)) {
-			ASSERT(ill->ill_dls_capab != NULL);
-			ill->ill_capabilities |= ILL_CAPAB_SOFT_RING;
-		}
-		if (sub_dl_cap == DL_CAPAB_POLL &&
-		    !(ill->ill_capabilities & ILL_CAPAB_POLL)) {
-			ASSERT(ill->ill_dls_capab != NULL);
-			ill->ill_capabilities |= ILL_CAPAB_POLL;
-			ip1dbg(("ill_capability_dls_ack: interface %s "
-			    "has enabled polling\n", ill->ill_name));
-		}
-		mutex_exit(&ill->ill_lock);
-		break;
 	}
 }
 
@@ -3164,7 +2743,7 @@ ill_capability_hcksum_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 		 * nmp points to a DL_CAPABILITY_REQ message to enable
 		 * hardware checksum acceleration.
 		 */
-		ill_dlpi_send(ill, nmp);
+		ill_capability_send(ill, nmp);
 	} else {
 		ip1dbg(("ill_capability_hcksum_ack: interface %s has "
 		    "advertised %x hardware checksum capability flags\n",
@@ -3173,37 +2752,17 @@ ill_capability_hcksum_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 }
 
 static void
-ill_capability_hcksum_reset(ill_t *ill, mblk_t **sc_mp)
+ill_capability_hcksum_reset_fill(ill_t *ill, mblk_t *mp)
 {
-	mblk_t *mp;
 	dl_capab_hcksum_t *hck_subcap;
 	dl_capability_sub_t *dl_subcap;
-	int size;
 
 	if (!ILL_HCKSUM_CAPABLE(ill))
 		return;
 
 	ASSERT(ill->ill_hcksum_capab != NULL);
-	/*
-	 * Clear the capability flag for hardware checksum offload but
-	 * retain the ill_hcksum_capab structure since it's possible that
-	 * another thread is still referring to it.  The structure only
-	 * gets deallocated when we destroy the ill.
-	 */
-	ill->ill_capabilities &= ~ILL_CAPAB_HCKSUM;
 
-	size = sizeof (*dl_subcap) + sizeof (*hck_subcap);
-
-	mp = allocb(size, BPRI_HI);
-	if (mp == NULL) {
-		ip1dbg(("ill_capability_hcksum_reset: unable to allocate "
-		    "request to disable hardware checksum offload\n"));
-		return;
-	}
-
-	mp->b_wptr = mp->b_rptr + size;
-
-	dl_subcap = (dl_capability_sub_t *)mp->b_rptr;
+	dl_subcap = (dl_capability_sub_t *)mp->b_wptr;
 	dl_subcap->dl_cap = DL_CAPAB_HCKSUM;
 	dl_subcap->dl_length = sizeof (*hck_subcap);
 
@@ -3211,10 +2770,7 @@ ill_capability_hcksum_reset(ill_t *ill, mblk_t **sc_mp)
 	hck_subcap->hcksum_version = ill->ill_hcksum_capab->ill_hcksum_version;
 	hck_subcap->hcksum_txflags = 0;
 
-	if (*sc_mp != NULL)
-		linkb(*sc_mp, mp);
-	else
-		*sc_mp = mp;
+	mp->b_wptr += sizeof (*dl_subcap) + sizeof (*hck_subcap);
 }
 
 static void
@@ -3325,42 +2881,22 @@ ill_capability_zerocopy_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 		zc_oc->zerocopy_flags |= DL_CAPAB_VMSAFE_MEM;
 
 		/* nmp points to a DL_CAPABILITY_REQ message to enable zcopy */
-		ill_dlpi_send(ill, nmp);
+		ill_capability_send(ill, nmp);
 	}
 }
 
 static void
-ill_capability_zerocopy_reset(ill_t *ill, mblk_t **sc_mp)
+ill_capability_zerocopy_reset_fill(ill_t *ill, mblk_t *mp)
 {
-	mblk_t *mp;
 	dl_capab_zerocopy_t *zerocopy_subcap;
 	dl_capability_sub_t *dl_subcap;
-	int size;
 
 	if (!(ill->ill_capabilities & ILL_CAPAB_ZEROCOPY))
 		return;
 
 	ASSERT(ill->ill_zerocopy_capab != NULL);
-	/*
-	 * Clear the capability flag for Zero-copy but retain the
-	 * ill_zerocopy_capab structure since it's possible that another
-	 * thread is still referring to it.  The structure only gets
-	 * deallocated when we destroy the ill.
-	 */
-	ill->ill_capabilities &= ~ILL_CAPAB_ZEROCOPY;
 
-	size = sizeof (*dl_subcap) + sizeof (*zerocopy_subcap);
-
-	mp = allocb(size, BPRI_HI);
-	if (mp == NULL) {
-		ip1dbg(("ill_capability_zerocopy_reset: unable to allocate "
-		    "request to disable Zero-copy\n"));
-		return;
-	}
-
-	mp->b_wptr = mp->b_rptr + size;
-
-	dl_subcap = (dl_capability_sub_t *)mp->b_rptr;
+	dl_subcap = (dl_capability_sub_t *)mp->b_wptr;
 	dl_subcap->dl_cap = DL_CAPAB_ZEROCOPY;
 	dl_subcap->dl_length = sizeof (*zerocopy_subcap);
 
@@ -3369,30 +2905,24 @@ ill_capability_zerocopy_reset(ill_t *ill, mblk_t **sc_mp)
 	    ill->ill_zerocopy_capab->ill_zerocopy_version;
 	zerocopy_subcap->zerocopy_flags = 0;
 
-	if (*sc_mp != NULL)
-		linkb(*sc_mp, mp);
-	else
-		*sc_mp = mp;
+	mp->b_wptr += sizeof (*dl_subcap) + sizeof (*zerocopy_subcap);
 }
 
 /*
- * Process Large Segment Offload capability negotiation ack received from a
- * DLS Provider.  isub must point to the sub-capability (DL_CAPAB_LSO) of a
- * DL_CAPABILITY_ACK message.
+ * DLD capability
+ * Refer to dld.h for more information regarding the purpose and usage
+ * of this capability.
  */
 static void
-ill_capability_lso_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
+ill_capability_dld_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 {
-	mblk_t *nmp = NULL;
-	dl_capability_req_t *oc;
-	dl_capab_lso_t *lso_ic, *lso_oc;
-	ill_lso_capab_t **ill_lso_capab;
-	uint_t sub_dl_cap = isub->dl_cap;
-	uint8_t *capend;
+	dl_capab_dld_t		*dld_ic, dld;
+	uint_t			sub_dl_cap = isub->dl_cap;
+	uint8_t			*capend;
+	ill_dld_capab_t		*idc;
 
-	ASSERT(sub_dl_cap == DL_CAPAB_LSO);
-
-	ill_lso_capab = (ill_lso_capab_t **)&ill->ill_lso_capab;
+	ASSERT(IAM_WRITER_ILL(ill));
+	ASSERT(sub_dl_cap == DL_CAPAB_DLD);
 
 	/*
 	 * Note: range checks here are not absolutely sufficient to
@@ -3403,164 +2933,394 @@ ill_capability_lso_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 	 */
 	capend = (uint8_t *)(isub + 1) + isub->dl_length;
 	if (capend > mp->b_wptr) {
-		cmn_err(CE_WARN, "ill_capability_lso_ack: "
+		cmn_err(CE_WARN, "ill_capability_dld_ack: "
 		    "malformed sub-capability too long for mblk");
 		return;
 	}
-
-	lso_ic = (dl_capab_lso_t *)(isub + 1);
-
-	if (lso_ic->lso_version != LSO_VERSION_1) {
-		cmn_err(CE_CONT, "ill_capability_lso_ack: "
-		    "unsupported LSO sub-capability (version %d, expected %d)",
-		    lso_ic->lso_version, LSO_VERSION_1);
+	dld_ic = (dl_capab_dld_t *)(isub + 1);
+	if (dld_ic->dld_version != DLD_CURRENT_VERSION) {
+		cmn_err(CE_CONT, "ill_capability_dld_ack: "
+		    "unsupported DLD sub-capability (version %d, "
+		    "expected %d)", dld_ic->dld_version,
+		    DLD_CURRENT_VERSION);
 		return;
 	}
-
-	if (!dlcapabcheckqid(&lso_ic->lso_mid, ill->ill_lmod_rq)) {
-		ip1dbg(("ill_capability_lso_ack: mid token for LSO "
+	if (!dlcapabcheckqid(&dld_ic->dld_mid, ill->ill_lmod_rq)) {
+		ip1dbg(("ill_capability_dld_ack: mid token for dld "
 		    "capability isn't as expected; pass-thru module(s) "
 		    "detected, discarding capability\n"));
 		return;
 	}
 
-	if ((lso_ic->lso_flags & LSO_TX_ENABLE) &&
-	    (lso_ic->lso_flags & LSO_TX_BASIC_TCP_IPV4)) {
-		if (*ill_lso_capab == NULL) {
-			*ill_lso_capab = kmem_zalloc(sizeof (ill_lso_capab_t),
-			    KM_NOSLEEP);
+	/*
+	 * Copy locally to ensure alignment.
+	 */
+	bcopy(dld_ic, &dld, sizeof (dl_capab_dld_t));
 
-			if (*ill_lso_capab == NULL) {
-				cmn_err(CE_WARN, "ill_capability_lso_ack: "
-				    "could not enable LSO version %d "
-				    "for %s (ENOMEM)\n", LSO_VERSION_1,
-				    ill->ill_name);
-				return;
-			}
-		}
-
-		(*ill_lso_capab)->ill_lso_version = lso_ic->lso_version;
-		(*ill_lso_capab)->ill_lso_flags = lso_ic->lso_flags;
-		(*ill_lso_capab)->ill_lso_max = lso_ic->lso_max;
-		ill->ill_capabilities |= ILL_CAPAB_LSO;
-
-		ip1dbg(("ill_capability_lso_ack: interface %s "
-		    "has enabled LSO\n ", ill->ill_name));
-	} else if (lso_ic->lso_flags & LSO_TX_BASIC_TCP_IPV4) {
-		uint_t size;
-		uchar_t *rptr;
-
-		size = sizeof (dl_capability_req_t) +
-		    sizeof (dl_capability_sub_t) + sizeof (dl_capab_lso_t);
-
-		if ((nmp = ip_dlpi_alloc(size, DL_CAPABILITY_REQ)) == NULL) {
-			cmn_err(CE_WARN, "ill_capability_lso_ack: "
-			    "could not enable LSO for %s (ENOMEM)\n",
+	if ((idc = ill->ill_dld_capab) == NULL) {
+		idc = kmem_zalloc(sizeof (ill_dld_capab_t), KM_NOSLEEP);
+		if (idc == NULL) {
+			cmn_err(CE_WARN, "ill_capability_dld_ack: "
+			    "could not enable DLD version %d "
+			    "for %s (ENOMEM)\n", DLD_CURRENT_VERSION,
 			    ill->ill_name);
 			return;
 		}
+		idc->idc_capab_df = (ip_capab_func_t)dld.dld_capab;
+		idc->idc_capab_dh = (void *)dld.dld_capab_handle;
+		ill->ill_dld_capab = idc;
+	}
+	ip1dbg(("ill_capability_dld_ack: interface %s "
+	    "supports DLD version %d\n", ill->ill_name, DLD_CURRENT_VERSION));
 
-		rptr = nmp->b_rptr;
-		/* initialize dl_capability_req_t */
-		oc = (dl_capability_req_t *)nmp->b_rptr;
-		oc->dl_sub_offset = sizeof (dl_capability_req_t);
-		oc->dl_sub_length = sizeof (dl_capability_sub_t) +
-		    sizeof (dl_capab_lso_t);
-		nmp->b_rptr += sizeof (dl_capability_req_t);
+	ill_capability_dld_enable(ill);
+}
 
-		/* initialize dl_capability_sub_t */
-		bcopy(isub, nmp->b_rptr, sizeof (*isub));
-		nmp->b_rptr += sizeof (*isub);
+/*
+ * Typically capability negotiation between IP and the driver happens via
+ * DLPI message exchange. However GLD also offers a direct function call
+ * mechanism to exchange the DLD_DIRECT_CAPAB and DLD_POLL_CAPAB capabilities,
+ * But arbitrary function calls into IP or GLD are not permitted, since both
+ * of them are protected by their own perimeter mechanism. The perimeter can
+ * be viewed as a coarse lock or serialization mechanism. The hierarchy of
+ * these perimeters is IP -> MAC. Thus for example to enable the squeue
+ * polling, IP needs to enter its perimeter, then call ill_mac_perim_enter
+ * to enter the mac perimeter and then do the direct function calls into
+ * GLD to enable squeue polling. The ring related callbacks from the mac into
+ * the stack to add, bind, quiesce, restart or cleanup a ring are all
+ * protected by the mac perimeter.
+ */
+static void
+ill_mac_perim_enter(ill_t *ill, mac_perim_handle_t *mphp)
+{
+	ill_dld_capab_t		*idc = ill->ill_dld_capab;
+	int			err;
 
-		/* initialize dl_capab_lso_t */
-		lso_oc = (dl_capab_lso_t *)nmp->b_rptr;
-		bcopy(lso_ic, lso_oc, sizeof (*lso_ic));
+	err = idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_PERIM, mphp,
+	    DLD_ENABLE);
+	ASSERT(err == 0);
+}
 
-		nmp->b_rptr = rptr;
-		ASSERT(nmp->b_wptr == (nmp->b_rptr + size));
+static void
+ill_mac_perim_exit(ill_t *ill, mac_perim_handle_t mph)
+{
+	ill_dld_capab_t		*idc = ill->ill_dld_capab;
+	int			err;
 
-		/* set ENABLE flag */
-		lso_oc->lso_flags |= LSO_TX_ENABLE;
+	err = idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_PERIM, mph,
+	    DLD_DISABLE);
+	ASSERT(err == 0);
+}
 
-		/* nmp points to a DL_CAPABILITY_REQ message to enable LSO */
-		ill_dlpi_send(ill, nmp);
+boolean_t
+ill_mac_perim_held(ill_t *ill)
+{
+	ill_dld_capab_t		*idc = ill->ill_dld_capab;
+
+	return (idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_PERIM, NULL,
+	    DLD_QUERY));
+}
+
+static void
+ill_capability_direct_enable(ill_t *ill)
+{
+	ill_dld_capab_t		*idc = ill->ill_dld_capab;
+	ill_dld_direct_t	*idd = &idc->idc_direct;
+	dld_capab_direct_t	direct;
+	int			rc;
+
+	ASSERT(!ill->ill_isv6 && IAM_WRITER_ILL(ill));
+
+	bzero(&direct, sizeof (direct));
+	direct.di_rx_cf = (uintptr_t)ip_input;
+	direct.di_rx_ch = ill;
+
+	rc = idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_DIRECT, &direct,
+	    DLD_ENABLE);
+	if (rc == 0) {
+		idd->idd_tx_df = (ip_dld_tx_t)direct.di_tx_df;
+		idd->idd_tx_dh = direct.di_tx_dh;
+		idd->idd_tx_cb_df = (ip_dld_callb_t)direct.di_tx_cb_df;
+		idd->idd_tx_cb_dh = direct.di_tx_cb_dh;
+		/*
+		 * One time registration of flow enable callback function
+		 */
+		ill->ill_flownotify_mh = idd->idd_tx_cb_df(idd->idd_tx_cb_dh,
+		    ill_flow_enable, ill);
+		ill->ill_capabilities |= ILL_CAPAB_DLD_DIRECT;
+		DTRACE_PROBE1(direct_on, (ill_t *), ill);
 	} else {
-		ip1dbg(("ill_capability_lso_ack: interface %s has "
-		    "advertised %x LSO capability flags\n",
-		    ill->ill_name, lso_ic->lso_flags));
+		cmn_err(CE_WARN, "warning: could not enable DIRECT "
+		    "capability, rc = %d\n", rc);
+		DTRACE_PROBE2(direct_off, (ill_t *), ill, (int), rc);
 	}
 }
 
 static void
-ill_capability_lso_reset(ill_t *ill, mblk_t **sc_mp)
+ill_capability_poll_enable(ill_t *ill)
 {
-	mblk_t *mp;
-	dl_capab_lso_t *lso_subcap;
-	dl_capability_sub_t *dl_subcap;
-	int size;
+	ill_dld_capab_t		*idc = ill->ill_dld_capab;
+	dld_capab_poll_t	poll;
+	int			rc;
 
-	if (!(ill->ill_capabilities & ILL_CAPAB_LSO))
-		return;
+	ASSERT(!ill->ill_isv6 && IAM_WRITER_ILL(ill));
 
-	ASSERT(ill->ill_lso_capab != NULL);
-	/*
-	 * Clear the capability flag for LSO but retain the
-	 * ill_lso_capab structure since it's possible that another
-	 * thread is still referring to it.  The structure only gets
-	 * deallocated when we destroy the ill.
-	 */
-	ill->ill_capabilities &= ~ILL_CAPAB_LSO;
+	bzero(&poll, sizeof (poll));
+	poll.poll_ring_add_cf = (uintptr_t)ip_squeue_add_ring;
+	poll.poll_ring_remove_cf = (uintptr_t)ip_squeue_clean_ring;
+	poll.poll_ring_quiesce_cf = (uintptr_t)ip_squeue_quiesce_ring;
+	poll.poll_ring_restart_cf = (uintptr_t)ip_squeue_restart_ring;
+	poll.poll_ring_bind_cf = (uintptr_t)ip_squeue_bind_ring;
+	poll.poll_ring_ch = ill;
+	rc = idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_POLL, &poll,
+	    DLD_ENABLE);
+	if (rc == 0) {
+		ill->ill_capabilities |= ILL_CAPAB_DLD_POLL;
+		DTRACE_PROBE1(poll_on, (ill_t *), ill);
+	} else {
+		ip1dbg(("warning: could not enable POLL "
+		    "capability, rc = %d\n", rc));
+		DTRACE_PROBE2(poll_off, (ill_t *), ill, (int), rc);
+	}
+}
 
-	size = sizeof (*dl_subcap) + sizeof (*lso_subcap);
+/*
+ * Enable the LSO capability.
+ */
+static void
+ill_capability_lso_enable(ill_t *ill)
+{
+	ill_dld_capab_t	*idc = ill->ill_dld_capab;
+	dld_capab_lso_t	lso;
+	int rc;
 
-	mp = allocb(size, BPRI_HI);
-	if (mp == NULL) {
-		ip1dbg(("ill_capability_lso_reset: unable to allocate "
-		    "request to disable LSO\n"));
-		return;
+	ASSERT(!ill->ill_isv6 && IAM_WRITER_ILL(ill));
+
+	if (ill->ill_lso_capab == NULL) {
+		ill->ill_lso_capab = kmem_zalloc(sizeof (ill_lso_capab_t),
+		    KM_NOSLEEP);
+		if (ill->ill_lso_capab == NULL) {
+			cmn_err(CE_WARN, "ill_capability_lso_enable: "
+			    "could not enable LSO for %s (ENOMEM)\n",
+			    ill->ill_name);
+			return;
+		}
 	}
 
-	mp->b_wptr = mp->b_rptr + size;
+	bzero(&lso, sizeof (lso));
+	if ((rc = idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_LSO, &lso,
+	    DLD_ENABLE)) == 0) {
+		ill->ill_lso_capab->ill_lso_flags = lso.lso_flags;
+		ill->ill_lso_capab->ill_lso_max = lso.lso_max;
+		ill->ill_capabilities |= ILL_CAPAB_DLD_LSO;
+		ip1dbg(("ill_capability_lso_enable: interface %s "
+		    "has enabled LSO\n ", ill->ill_name));
+	} else {
+		kmem_free(ill->ill_lso_capab, sizeof (ill_lso_capab_t));
+		ill->ill_lso_capab = NULL;
+		DTRACE_PROBE2(lso_off, (ill_t *), ill, (int), rc);
+	}
+}
 
-	dl_subcap = (dl_capability_sub_t *)mp->b_rptr;
-	dl_subcap->dl_cap = DL_CAPAB_LSO;
-	dl_subcap->dl_length = sizeof (*lso_subcap);
+static void
+ill_capability_dld_enable(ill_t *ill)
+{
+	mac_perim_handle_t mph;
 
-	lso_subcap = (dl_capab_lso_t *)(dl_subcap + 1);
-	lso_subcap->lso_version = ill->ill_lso_capab->ill_lso_version;
-	lso_subcap->lso_flags = 0;
+	ASSERT(IAM_WRITER_ILL(ill));
 
-	if (*sc_mp != NULL)
-		linkb(*sc_mp, mp);
-	else
-		*sc_mp = mp;
+	if (ill->ill_isv6)
+		return;
+
+	ill_mac_perim_enter(ill, &mph);
+	if (!ill->ill_isv6) {
+		ill_capability_direct_enable(ill);
+		ill_capability_poll_enable(ill);
+		ill_capability_lso_enable(ill);
+	}
+	ill->ill_capabilities |= ILL_CAPAB_DLD;
+	ill_mac_perim_exit(ill, mph);
+}
+
+static void
+ill_capability_dld_disable(ill_t *ill)
+{
+	ill_dld_capab_t	*idc;
+	ill_dld_direct_t *idd;
+	mac_perim_handle_t	mph;
+
+	ASSERT(IAM_WRITER_ILL(ill));
+
+	if (!(ill->ill_capabilities & ILL_CAPAB_DLD))
+		return;
+
+	ill_mac_perim_enter(ill, &mph);
+
+	idc = ill->ill_dld_capab;
+	if ((ill->ill_capabilities & ILL_CAPAB_DLD_DIRECT) != 0) {
+		/*
+		 * For performance we avoid locks in the transmit data path
+		 * and don't maintain a count of the number of threads using
+		 * direct calls. Thus some threads could be using direct
+		 * transmit calls to GLD, even after the capability mechanism
+		 * turns it off. This is still safe since the handles used in
+		 * the direct calls continue to be valid until the unplumb is
+		 * completed. Remove the callback that was added (1-time) at
+		 * capab enable time.
+		 */
+		mutex_enter(&ill->ill_lock);
+		ill->ill_capabilities &= ~ILL_CAPAB_DLD_DIRECT;
+		mutex_exit(&ill->ill_lock);
+		if (ill->ill_flownotify_mh != NULL) {
+			idd = &idc->idc_direct;
+			idd->idd_tx_cb_df(idd->idd_tx_cb_dh, NULL,
+			    ill->ill_flownotify_mh);
+			ill->ill_flownotify_mh = NULL;
+		}
+		(void) idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_DIRECT,
+		    NULL, DLD_DISABLE);
+	}
+
+	if ((ill->ill_capabilities & ILL_CAPAB_DLD_POLL) != 0) {
+		ill->ill_capabilities &= ~ILL_CAPAB_DLD_POLL;
+		ip_squeue_clean_all(ill);
+		(void) idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_POLL,
+		    NULL, DLD_DISABLE);
+	}
+
+	if ((ill->ill_capabilities & ILL_CAPAB_DLD_LSO) != 0) {
+		ASSERT(ill->ill_lso_capab != NULL);
+		/*
+		 * Clear the capability flag for LSO but retain the
+		 * ill_lso_capab structure since it's possible that another
+		 * thread is still referring to it.  The structure only gets
+		 * deallocated when we destroy the ill.
+		 */
+
+		ill->ill_capabilities &= ~ILL_CAPAB_DLD_LSO;
+		(void) idc->idc_capab_df(idc->idc_capab_dh, DLD_CAPAB_LSO,
+		    NULL, DLD_DISABLE);
+	}
+
+	ill->ill_capabilities &= ~ILL_CAPAB_DLD;
+	ill_mac_perim_exit(ill, mph);
+}
+
+/*
+ * Capability Negotiation protocol
+ *
+ * We don't wait for DLPI capability operations to finish during interface
+ * bringup or teardown. Doing so would introduce more asynchrony and the
+ * interface up/down operations will need multiple return and restarts.
+ * Instead the 'ipsq_current_ipif' of the ipsq is not cleared as long as
+ * the 'ill_dlpi_deferred' chain is non-empty. This ensures that the next
+ * exclusive operation won't start until the DLPI operations of the previous
+ * exclusive operation complete.
+ *
+ * The capability state machine is shown below.
+ *
+ * state		next state		event, action
+ *
+ * IDCS_UNKNOWN 	IDCS_PROBE_SENT		ill_capability_probe
+ * IDCS_PROBE_SENT	IDCS_OK			ill_capability_ack
+ * IDCS_PROBE_SENT	IDCS_FAILED		ip_rput_dlpi_writer (nack)
+ * IDCS_OK		IDCS_RENEG		Receipt of DL_NOTE_CAPAB_RENEG
+ * IDCS_OK		IDCS_RESET_SENT		ill_capability_reset
+ * IDCS_RESET_SENT	IDCS_UNKNOWN		ill_capability_ack_thr
+ * IDCS_RENEG		IDCS_PROBE_SENT		ill_capability_ack_thr ->
+ *						    ill_capability_probe.
+ */
+
+/*
+ * Dedicated thread started from ip_stack_init that handles capability
+ * disable. This thread ensures the taskq dispatch does not fail by waiting
+ * for resources using TQ_SLEEP. The taskq mechanism is used to ensure
+ * that direct calls to DLD are done in a cv_waitable context.
+ */
+void
+ill_taskq_dispatch(ip_stack_t *ipst)
+{
+	callb_cpr_t cprinfo;
+	char 	name[64];
+	mblk_t	*mp;
+
+	(void) snprintf(name, sizeof (name), "ill_taskq_dispatch_%d",
+	    ipst->ips_netstack->netstack_stackid);
+	CALLB_CPR_INIT(&cprinfo, &ipst->ips_capab_taskq_lock, callb_generic_cpr,
+	    name);
+	mutex_enter(&ipst->ips_capab_taskq_lock);
+
+	for (;;) {
+		mp = list_head(&ipst->ips_capab_taskq_list);
+		while (mp != NULL) {
+			list_remove(&ipst->ips_capab_taskq_list, mp);
+			mutex_exit(&ipst->ips_capab_taskq_lock);
+			VERIFY(taskq_dispatch(system_taskq,
+			    ill_capability_ack_thr, mp, TQ_SLEEP) != 0);
+			mutex_enter(&ipst->ips_capab_taskq_lock);
+			mp = list_head(&ipst->ips_capab_taskq_list);
+		}
+
+		if (ipst->ips_capab_taskq_quit)
+			break;
+		CALLB_CPR_SAFE_BEGIN(&cprinfo);
+		cv_wait(&ipst->ips_capab_taskq_cv, &ipst->ips_capab_taskq_lock);
+		CALLB_CPR_SAFE_END(&cprinfo, &ipst->ips_capab_taskq_lock);
+	}
+	VERIFY(list_head(&ipst->ips_capab_taskq_list) == NULL);
+	CALLB_CPR_EXIT(&cprinfo);
+	thread_exit();
 }
 
 /*
  * Consume a new-style hardware capabilities negotiation ack.
- * Called from ip_rput_dlpi_writer().
+ * Called via taskq on receipt of DL_CAPABBILITY_ACK.
  */
-void
-ill_capability_ack(ill_t *ill, mblk_t *mp)
+static void
+ill_capability_ack_thr(void *arg)
 {
+	mblk_t	*mp = arg;
 	dl_capability_ack_t *capp;
 	dl_capability_sub_t *subp, *endp;
+	ill_t	*ill;
+	boolean_t reneg;
 
-	if (ill->ill_dlpi_capab_state == IDS_INPROGRESS)
-		ill->ill_dlpi_capab_state = IDS_OK;
+	ill = (ill_t *)mp->b_prev;
+	VERIFY(ipsq_enter(ill, B_FALSE, CUR_OP) == B_TRUE);
+
+	if (ill->ill_dlpi_capab_state == IDCS_RESET_SENT ||
+	    ill->ill_dlpi_capab_state == IDCS_RENEG) {
+		/*
+		 * We have received the ack for our DL_CAPAB reset request.
+		 * There isnt' anything in the message that needs processing.
+		 * All message based capabilities have been disabled, now
+		 * do the function call based capability disable.
+		 */
+		reneg = ill->ill_dlpi_capab_state == IDCS_RENEG;
+		ill_capability_dld_disable(ill);
+		ill->ill_dlpi_capab_state = IDCS_UNKNOWN;
+		if (reneg)
+			ill_capability_probe(ill);
+		goto done;
+	}
+
+	if (ill->ill_dlpi_capab_state == IDCS_PROBE_SENT)
+		ill->ill_dlpi_capab_state = IDCS_OK;
 
 	capp = (dl_capability_ack_t *)mp->b_rptr;
 
-	if (capp->dl_sub_length == 0)
+	if (capp->dl_sub_length == 0) {
 		/* no new-style capabilities */
-		return;
+		goto done;
+	}
 
 	/* make sure the driver supplied correct dl_sub_length */
 	if ((sizeof (*capp) + capp->dl_sub_length) > MBLKL(mp)) {
 		ip0dbg(("ill_capability_ack: bad DL_CAPABILITY_ACK, "
 		    "invalid dl_sub_length (%d)\n", capp->dl_sub_length));
-		return;
+		goto done;
 	}
+
 
 #define	SC(base, offset) (dl_capability_sub_t *)(((uchar_t *)(base))+(offset))
 	/*
@@ -3582,6 +3342,34 @@ ill_capability_ack(ill_t *ill, mblk_t *mp)
 		}
 	}
 #undef SC
+done:
+	inet_freemsg(mp);
+	ill_capability_done(ill);
+	ipsq_exit(ill->ill_phyint->phyint_ipsq);
+}
+
+/*
+ * This needs to be started in a taskq thread to provide a cv_waitable
+ * context.
+ */
+void
+ill_capability_ack(ill_t *ill, mblk_t *mp)
+{
+	ip_stack_t	*ipst = ill->ill_ipst;
+
+	mp->b_prev = (mblk_t *)ill;
+	if (taskq_dispatch(system_taskq, ill_capability_ack_thr, mp,
+	    TQ_NOSLEEP) != 0)
+		return;
+
+	/*
+	 * The taskq dispatch failed. Signal the ill_taskq_dispatch thread
+	 * which will do the dispatch using TQ_SLEEP to guarantee success.
+	 */
+	mutex_enter(&ipst->ips_capab_taskq_lock);
+	list_insert_tail(&ipst->ips_capab_taskq_list, mp);
+	cv_signal(&ipst->ips_capab_taskq_cv);
+	mutex_exit(&ipst->ips_capab_taskq_lock);
 }
 
 /*
@@ -7609,7 +7397,7 @@ ipsq_dq(ipsq_t *ipsq)
  */
 #define	ENTER_SQ_WAIT_TICKS 100
 boolean_t
-ipsq_enter(ill_t *ill, boolean_t force)
+ipsq_enter(ill_t *ill, boolean_t force, int type)
 {
 	ipsq_t	*ipsq;
 	boolean_t waited_enough = B_FALSE;
@@ -7630,7 +7418,8 @@ ipsq_enter(ill_t *ill, boolean_t force)
 		ipsq = ill->ill_phyint->phyint_ipsq;
 		mutex_enter(&ipsq->ipsq_lock);
 		if (ipsq->ipsq_writer == NULL &&
-		    (ipsq->ipsq_current_ipif == NULL || waited_enough)) {
+		    (type == CUR_OP || ipsq->ipsq_current_ipif == NULL ||
+		    waited_enough)) {
 			break;
 		} else if (ipsq->ipsq_writer != NULL) {
 			mutex_exit(&ipsq->ipsq_lock);
@@ -7659,6 +7448,18 @@ ipsq_enter(ill_t *ill, boolean_t force)
 	mutex_exit(&ipsq->ipsq_lock);
 	mutex_exit(&ill->ill_lock);
 	return (B_TRUE);
+}
+
+boolean_t
+ill_perim_enter(ill_t *ill)
+{
+	return (ipsq_enter(ill, B_FALSE, CUR_OP));
+}
+
+void
+ill_perim_exit(ill_t *ill)
+{
+	ipsq_exit(ill->ill_phyint->phyint_ipsq);
 }
 
 /*
@@ -9984,6 +9785,13 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 		ill->ill_ip_muxid = islink ? li->l_index : 0;
 
 	/*
+	 * Mark the ipsq busy until the capability operations initiated below
+	 * complete. The PLINK/UNLINK ioctl itself completes when our caller
+	 * returns, but the capability operation may complete asynchronously
+	 * much later.
+	 */
+	ipsq_current_start(ipsq, ill->ill_ipif, ioccmd);
+	/*
 	 * If there's at least one up ipif on this ill, then we're bound to
 	 * the underlying driver via DLPI.  In that case, renegotiate
 	 * capabilities to account for any possible change in modules
@@ -9993,8 +9801,9 @@ ip_sioctl_plink_ipmod(ipsq_t *ipsq, queue_t *q, mblk_t *mp, int ioccmd,
 		if (islink)
 			ill_capability_probe(ill);
 		else
-			ill_capability_reset(ill);
+			ill_capability_reset(ill, B_FALSE);
 	}
+	ipsq_current_finish(ipsq);
 
 	if (entered_ipsq)
 		ipsq_exit(ipsq);
@@ -18244,19 +18053,19 @@ ill_dl_down(ill_t *ill)
 		ill->ill_state_flags |= ILL_DL_UNBIND_IN_PROGRESS;
 		mutex_exit(&ill->ill_lock);
 		/*
-		 * Reset the capabilities if the negotiation is done or is
-		 * still in progress. Note that ill_capability_reset() will
-		 * set ill_dlpi_capab_state to IDS_UNKNOWN, so the subsequent
-		 * DL_CAPABILITY_ACK and DL_NOTE_CAPAB_RENEG will be ignored.
-		 *
-		 * Further, reset ill_capab_reneg to be B_FALSE so that the
-		 * subsequent DL_CAPABILITY_ACK can be ignored, to prevent
-		 * the capabilities renegotiation from happening.
+		 * ip_rput does not pass up normal (M_PROTO) DLPI messages
+		 * after ILL_CONDEMNED is set. So in the unplumb case, we call
+		 * ill_capability_dld_disable disable rightaway. If this is not
+		 * an unplumb operation then the disable happens on receipt of
+		 * the capab ack via ip_rput_dlpi_writer ->
+		 * ill_capability_ack_thr. In both cases the order of
+		 * the operations seen by DLD is capability disable followed
+		 * by DL_UNBIND. Also the DLD capability disable needs a
+		 * cv_wait'able context.
 		 */
-		if (ill->ill_dlpi_capab_state != IDS_UNKNOWN)
-			ill_capability_reset(ill);
-		ill->ill_capab_reneg = B_FALSE;
-
+		if (ill->ill_state_flags & ILL_CONDEMNED)
+			ill_capability_dld_disable(ill);
+		ill_capability_reset(ill, B_FALSE);
 		ill_dlpi_send(ill, mp);
 	}
 
@@ -18314,7 +18123,6 @@ ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
 		ill->ill_dlpi_pending = prim;
 	}
 	mutex_exit(&ill->ill_lock);
-
 	putnext(ill->ill_wq, mp);
 }
 
@@ -18370,6 +18178,26 @@ ill_dlpi_send(ill_t *ill, mblk_t *mp)
 	}
 	mutex_exit(&ill->ill_lock);
 	ill_dlpi_dispatch(ill, mp);
+}
+
+static void
+ill_capability_send(ill_t *ill, mblk_t *mp)
+{
+	ill->ill_capab_pending_cnt++;
+	ill_dlpi_send(ill, mp);
+}
+
+void
+ill_capability_done(ill_t *ill)
+{
+	ASSERT(ill->ill_capab_pending_cnt != 0);
+
+	ill_dlpi_done(ill, DL_CAPABILITY_REQ);
+
+	ill->ill_capab_pending_cnt--;
+	if (ill->ill_capab_pending_cnt == 0 &&
+	    ill->ill_dlpi_capab_state == IDCS_OK)
+		ill_capability_reset_alloc(ill);
 }
 
 /*

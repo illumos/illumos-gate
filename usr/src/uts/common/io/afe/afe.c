@@ -184,7 +184,6 @@ static mac_callbacks_t afe_m_callbacks = {
 	afe_m_multicst,
 	afe_m_unicst,
 	afe_m_tx,
-	NULL,		/* mc_resources */
 	NULL,		/* mc_ioctl */
 	NULL,		/* mc_getcapab */
 	NULL,		/* mc_open */

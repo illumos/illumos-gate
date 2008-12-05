@@ -41,6 +41,7 @@ f none kernel/kmdb/amd64/ipp 555 root sys
 f none kernel/kmdb/amd64/krtld 555 root sys
 f none kernel/kmdb/amd64/lofs 555 root sys
 f none kernel/kmdb/amd64/logindmux 555 root sys
+f none kernel/kmdb/amd64/mac 555 root sys
 f none kernel/kmdb/amd64/md 555 root sys
 f none kernel/kmdb/amd64/mdb_ds 555 root sys
 f none kernel/kmdb/amd64/mpt 555 root sys
@@ -72,6 +73,7 @@ f none kernel/kmdb/ipp 555 root sys
 f none kernel/kmdb/krtld 555 root sys
 f none kernel/kmdb/lofs 555 root sys
 f none kernel/kmdb/logindmux 555 root sys
+f none kernel/kmdb/mac 555 root sys
 f none kernel/kmdb/md 555 root sys
 f none kernel/kmdb/mdb_ds 555 root sys
 f none kernel/kmdb/mpt 555 root sys

@@ -31,17 +31,19 @@
  * link administration (i.e. not limited to one specific type of link).
  */
 
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <libdladm.h>
-#include <kstat.h>
+#include <libdladm_impl.h>
+#include <sys/mac_flow.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 typedef struct dladm_attr {
-	uint_t		da_max_sdu;
+	uint_t			da_max_sdu;
 } dladm_attr_t;
 
 typedef struct dladm_phys_attr {
@@ -85,6 +87,32 @@ typedef enum {
 typedef int	dladm_secobj_class_t;
 
 typedef int (dladm_walkcb_t)(const char *, void *);
+
+/* possible flags for ma_flags below */
+#define	DLADM_MACADDR_USED	0x1
+
+typedef enum {
+	DLADM_HWGRP_TYPE_RX = 0x1,
+	DLADM_HWGRP_TYPE_TX
+} dladm_hwgrp_type_t;
+
+typedef struct dladm_hwgrp_attr {
+	char		hg_link_name[MAXLINKNAMELEN];
+	uint_t		hg_grp_num;
+	dladm_hwgrp_type_t	hg_grp_type;
+	uint_t		hg_n_rings;
+	uint_t		hg_n_clnts;
+	char		hg_client_names[MAXCLIENTNAMELEN];
+} dladm_hwgrp_attr_t;
+
+typedef struct dladm_macaddr_attr {
+	uint_t		ma_slot;
+	uint_t		ma_flags;
+	uchar_t		ma_addr[MAXMACADDRLEN];
+	uint_t		ma_addrlen;
+	char		ma_client_name[MAXNAMELEN];
+	datalink_id_t	ma_client_linkid;
+} dladm_macaddr_attr_t;
 
 extern dladm_status_t	dladm_walk(dladm_walkcb_t *, void *, datalink_class_t,
 			    datalink_media_t, uint32_t);
@@ -148,11 +176,18 @@ extern dladm_status_t	dladm_phys_delete(datalink_id_t);
 
 extern dladm_status_t	dladm_phys_info(datalink_id_t, dladm_phys_attr_t *,
 			    uint32_t);
-extern dladm_status_t	dladm_get_single_mac_stat(datalink_id_t, const char *,
-    uint8_t, void *);
-extern int		dladm_kstat_value(kstat_t *, const char *, uint8_t,
-    void *);
 extern dladm_status_t	dladm_parselink(const char *, char *, uint_t *);
+
+extern int		dladm_walk_macaddr(datalink_id_t, void *,
+			    boolean_t (*)(void *, dladm_macaddr_attr_t *));
+extern int		dladm_walk_hwgrp(datalink_id_t, void *,
+			    boolean_t (*)(void *, dladm_hwgrp_attr_t *));
+
+extern dladm_status_t	dladm_link_get_proplist(datalink_id_t,
+			    dladm_arg_list_t **);
+
+extern dladm_status_t	i_dladm_set_link_proplist_db(char *,
+			    dladm_arg_list_t *);
 
 #ifdef	__cplusplus
 }

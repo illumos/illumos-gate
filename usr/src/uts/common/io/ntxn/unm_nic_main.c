@@ -2513,9 +2513,6 @@ ntxn_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			    HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM);
 		}
 		break;
-
-	case MAC_CAPAB_POLL:
-	case MAC_CAPAB_MULTIADDRESS:
 	default:
 		return (B_FALSE);
 	}
@@ -2534,7 +2531,6 @@ static mac_callbacks_t ntxn_m_callbacks = {
 	ntxn_m_multicst,
 	ntxn_m_unicst,
 	ntxn_m_tx,
-	NULL,			/* mc_resources */
 	ntxn_m_ioctl,
 	ntxn_m_getcapab,
 	NULL,			/* mc_open */

@@ -23,9 +23,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/stropts.h>
+#include <sys/strsubr.h>
+#include <sys/callb.h>
 #include <sys/softmac_impl.h>
 
 int
@@ -192,11 +192,9 @@ softmac_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 }
 
 static void
-softmac_process_notify_ind(queue_t *rq, mblk_t *mp)
+softmac_process_notify_ind(softmac_t *softmac, mblk_t *mp)
 {
-	softmac_lower_t	*slp = rq->q_ptr;
 	dl_notify_ind_t	*dlnip = (dl_notify_ind_t *)mp->b_rptr;
-	softmac_t	*softmac = slp->sl_softmac;
 	uint_t		addroff, addrlen;
 
 	ASSERT(dlnip->dl_primitive == DL_NOTIFY_IND);
@@ -229,6 +227,73 @@ softmac_process_notify_ind(queue_t *rq, mblk_t *mp)
 	}
 
 	freemsg(mp);
+}
+
+void
+softmac_notify_thread(void *arg)
+{
+	softmac_t	*softmac = arg;
+	callb_cpr_t	cprinfo;
+
+	CALLB_CPR_INIT(&cprinfo, &softmac->smac_mutex, callb_generic_cpr,
+	    "softmac_notify_thread");
+
+	mutex_enter(&softmac->smac_mutex);
+
+	/*
+	 * Quit the thread if smac_mh is unregistered.
+	 */
+	while (softmac->smac_mh != NULL &&
+	    !(softmac->smac_flags & SOFTMAC_NOTIFY_QUIT)) {
+		mblk_t		*mp, *nextmp;
+
+		if ((mp = softmac->smac_notify_head) == NULL) {
+			CALLB_CPR_SAFE_BEGIN(&cprinfo);
+			cv_wait(&softmac->smac_cv, &softmac->smac_mutex);
+			CALLB_CPR_SAFE_END(&cprinfo, &softmac->smac_mutex);
+			continue;
+		}
+
+		softmac->smac_notify_head = softmac->smac_notify_tail = NULL;
+		mutex_exit(&softmac->smac_mutex);
+
+		while (mp != NULL) {
+			nextmp = mp->b_next;
+			mp->b_next = NULL;
+			softmac_process_notify_ind(softmac, mp);
+			mp = nextmp;
+		}
+		mutex_enter(&softmac->smac_mutex);
+	}
+
+	/*
+	 * The softmac is being destroyed, simply free all of the DL_NOTIFY_IND
+	 * messages left in the queue which did not have the chance to be
+	 * processed.
+	 */
+	freemsgchain(softmac->smac_notify_head);
+	softmac->smac_notify_head = softmac->smac_notify_tail = NULL;
+	softmac->smac_notify_thread = NULL;
+	cv_broadcast(&softmac->smac_cv);
+	CALLB_CPR_EXIT(&cprinfo);
+	thread_exit();
+}
+
+static void
+softmac_enqueue_notify_ind(queue_t *rq, mblk_t *mp)
+{
+	softmac_lower_t	*slp = rq->q_ptr;
+	softmac_t	*softmac = slp->sl_softmac;
+
+	mutex_enter(&softmac->smac_mutex);
+	if (softmac->smac_notify_tail == NULL) {
+		softmac->smac_notify_head = softmac->smac_notify_tail = mp;
+	} else {
+		softmac->smac_notify_tail->b_next = mp;
+		softmac->smac_notify_tail = mp;
+	}
+	cv_broadcast(&softmac->smac_cv);
+	mutex_exit(&softmac->smac_mutex);
 }
 
 static void
@@ -295,7 +360,29 @@ softmac_rput_process_proto(queue_t *rq, mblk_t *mp)
 		if (len < DL_NOTIFY_IND_SIZE)
 			goto runt;
 
-		softmac_process_notify_ind(rq, mp);
+		/*
+		 * Enqueue all the DL_NOTIFY_IND messages and process them
+		 * in another separate thread to avoid deadlock. Here is an
+		 * example of the deadlock scenario:
+		 *
+		 * Thread A: mac_promisc_set()->softmac_m_promisc()
+		 *
+		 *   The softmac driver waits for the ACK of the
+		 *   DL_PROMISC_PHYS request with the MAC perimeter;
+		 *
+		 * Thread B:
+		 *
+		 *   The driver handles the DL_PROMISC_PHYS request. Before
+		 *   it sends back the ACK, it could first send a
+		 *   DL_NOTE_PROMISC_ON_PHYS notification.
+		 *
+		 * Since DL_NOTIFY_IND could eventually cause softmac to call
+		 * mac_xxx_update(), which requires MAC perimeter, this would
+		 * cause deadlock between the two threads. Enqueuing the
+		 * DL_NOTIFY_IND message and defer its processing would
+		 * avoid the potential deadlock.
+		 */
+		softmac_enqueue_notify_ind(rq, mp);
 		return;
 
 	case DL_NOTIFY_ACK:

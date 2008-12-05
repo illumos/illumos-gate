@@ -31,9 +31,14 @@
  * DAMAGE.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef _SFE_UTIL_H_
 #define	_SFE_UTIL_H_
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 
 /*

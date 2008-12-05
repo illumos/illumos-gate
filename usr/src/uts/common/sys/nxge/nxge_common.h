@@ -277,15 +277,24 @@ typedef struct  nxge_tdc_cfg {
 #define	RDC_TABLE_ENTRY_METHOD_SEQ	0
 #define	RDC_TABLE_ENTRY_METHOD_REP	1
 
+/* per transmit DMA channel table group data structure */
+typedef struct nxge_tdc_grp {
+	uint32_t	start_tdc;	/* assume assigned in sequence */
+	uint8_t		max_tdcs;
+	dc_map_t	map;
+	uint8_t		grp_index;	/* nxge_t.tx_set.group[grp_index] */
+} nxge_tdc_grp_t, *p_nxge_tdc_grp_t;
+
 /* per receive DMA channel table group data structure */
 typedef struct nxge_rdc_grp {
-	uint32_t	flag;		/* 0: not configured 1: configured */
+	boolean_t	flag;		/* 0: not configured 1: configured */
 	uint8_t		port;
-	uint8_t		start_rdc;	/* assume assigned in sequence	*/
+	uint32_t	start_rdc;	/* assume assigned in sequence	*/
 	uint8_t		max_rdcs;
 	uint8_t		def_rdc;
 	dc_map_t	map;
 	uint16_t	config_method;
+	uint8_t		grp_index;	/* nxge_t.rx_set.group[grp_index] */
 } nxge_rdc_grp_t, *p_nxge_rdc_grp_t;
 
 #define	RDC_MAP_IN(map, rdc) \
@@ -383,7 +392,6 @@ typedef struct nxge_hw_pt_cfg {
 	uint32_t	ser_ldvid;
 	uint32_t	def_rdc;	 /* default RDC			*/
 	uint32_t	drr_wt;		 /* port DRR weight		*/
-	uint32_t	start_grpid;	 /* starting group ID		*/
 	uint32_t	max_grpids;	 /* max group ID		*/
 	uint32_t	grpids[NXGE_MAX_RDCS]; /* RDC group IDs		*/
 	uint32_t	max_rdc_grpids;	 /* max RDC group ID		*/
@@ -393,6 +401,7 @@ typedef struct nxge_hw_pt_cfg {
 	uint32_t	start_mac_entry; /* where to put the first mac	*/
 	uint32_t	max_macs;	 /* the max mac entry allowed	*/
 	uint32_t	mac_pref;	 /* preference over VLAN	*/
+	uint32_t	def_mac_txdma_grpid; /* default TDC group ID	*/
 	uint32_t	def_mac_rxdma_grpid; /* default RDC group ID	*/
 	uint32_t	vlan_pref;	 /* preference over MAC		*/
 
@@ -416,6 +425,9 @@ typedef struct nxge_dma_pt_cfg {
 	 * hardware properties or the default properties.
 	 */
 	uint32_t	tx_dma_map;	/* Transmit DMA channel bit map */
+
+	/* Transmit DMA channel: device wise */
+	nxge_tdc_grp_t  tdc_grps[NXGE_MAX_TDC_GROUPS];
 
 	/* Receive DMA channel */
 	nxge_rdc_grp_t	rdc_grps[NXGE_MAX_RDC_GROUPS];

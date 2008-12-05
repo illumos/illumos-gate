@@ -359,23 +359,14 @@ space_free(char *key)
 
 const uint32_t crc32_table[256] = { CRC32_TABLE };
 
-
 /*
- * We need to fanout load from NIC which can overwhelm a single
- * CPU. A 10Gb NIC interrupting a single CPU is a good example.
- * Instead of fanning out to random CPUs, it a big performance
- * win if you can fanout to the threads on the same core (niagara)
- * that is taking interrupts.
- *
- * We need a better mechanism to figure out the other threads on
- * the same core or cores on the same chip which share caches etc.
- * but for time being, this will suffice.
+ * We need to fanout load from NIC which can overwhelm a single CPU.
+ * This becomes especially important on systems having slow CPUs
+ * (sun4v architecture). mac_soft_ring_enable is false on all
+ * systems except sun4v. On sun4v, they get enabled by default (see
+ * sun4v/os/mach_startup.c).
  */
-#define	NUMBER_OF_THREADS_PER_CPU	4
-uint_t		ip_threads_per_cpu = NUMBER_OF_THREADS_PER_CPU;
-
-/* Global flag to enable/disable soft ring facility */
-boolean_t	ip_squeue_soft_ring = B_FALSE;
+boolean_t	mac_soft_ring_enable = B_FALSE;
 
 /*
  * Global iscsi boot prop

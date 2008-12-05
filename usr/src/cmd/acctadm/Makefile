@@ -19,8 +19,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -37,7 +35,7 @@ include ../Makefile.cmd
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 
 CFLAGS += $(CCVERBOSE)
-LDLIBS += -lexacct -lscf -lsecdb
+LDLIBS += -lexacct -lscf -lsecdb -ldladm
 POFILE = acctadm.po
 XGETFLAGS = -a -x acctadm.xcl
 FILEMODE = 0555

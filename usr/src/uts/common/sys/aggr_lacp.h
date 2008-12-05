@@ -157,8 +157,6 @@ typedef struct Agg {
 	aggr_lacp_timer_t PeriodicTimer;	/* AGGR_LACP_{LONG,SHORT} */
 	uint64_t	TimeOfLastOperChange;	/* Time in state */
 	boolean_t	ready;			/* Ready_N for all ports TRUE */
-
-	krwlock_t	gl_lock;
 } Agg_t;
 
 /*
@@ -190,6 +188,19 @@ typedef struct state_machine {
 	lacp_mux_state_t	mux_state;	/* State of mux machine */
 	lacp_churn_state_t	churn_state;	/* State of churn machine */
 } state_machine_t;
+
+/*
+ * The following three flags are set when specific timer is timed out; used
+ * by the LACP timer handler thread.
+ */
+#define	LACP_PERIODIC_TIMEOUT		0x01
+#define	LACP_WAIT_WHILE_TIMEOUT		0x02
+#define	LACP_CURRENT_WHILE_TIMEOUT	0x04
+/*
+ * Set when the port is being deleted; used to inform the LACP timer handler
+ * thread to exit.
+ */
+#define	LACP_THREAD_EXIT		0x08
 
 /*
  * 802.3ad Variables associated with each port (section 43.4.7)
@@ -228,6 +239,10 @@ typedef struct aggr_lacp_port {
 	lacp_timer_t	current_while_timer;
 	lacp_timer_t	periodic_timer;
 	lacp_timer_t	wait_while_timer;
+	uint32_t	lacp_timer_bits;
+	kthread_t	*lacp_timer_thread;
+	kmutex_t	lacp_timer_lock;
+	kcondvar_t	lacp_timer_cv;
 	hrtime_t	time;
 } aggr_lacp_port_t;
 

@@ -37,6 +37,7 @@
 #include <sys/strsun.h>
 #include <sys/strsubr.h>
 #include <sys/dlpi.h>
+#include <sys/mac_provider.h>
 
 #include <sys/pattr.h>		/* for HCK_PARTIALCKSUM */
 #include <sys/sysmacros.h>	/* for offsetof */
@@ -309,7 +310,6 @@ static mac_callbacks_t ib_m_callbacks = {
 	ibd_m_multicst,
 	ibd_m_unicst,
 	ibd_m_tx,
-	NULL,
 	NULL,
 	ibd_m_getcapab
 };
@@ -4102,13 +4102,6 @@ ibd_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			return (B_FALSE);
 		break;
 	}
-	case MAC_CAPAB_POLL:
-		/*
-		 * Fallthrough to default, as we don't support GLDv3
-		 * polling.  When blanking is implemented, we will need to
-		 * change this to return B_TRUE in addition to registering
-		 * an mc_resources callback.
-		 */
 	default:
 		return (B_FALSE);
 	}

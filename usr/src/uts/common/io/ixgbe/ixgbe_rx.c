@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *      http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "ixgbe_sw.h"
 
@@ -176,7 +176,10 @@ ixgbe_rx_bind(ixgbe_rx_ring_t *rx_ring, uint32_t index, uint32_t pkt_len)
 		 * DMA buffer, we have to return and use bcopy to
 		 * process the packet.
 		 */
-		if (current_rcb->mp == NULL) {
+		if (current_rcb->mp != NULL) {
+			current_rcb->mp->b_rptr += IPHDR_ALIGN_ROOM;
+			current_rcb->mp->b_wptr += IPHDR_ALIGN_ROOM;
+		} else {
 			atomic_inc_32(&rx_ring->rcb_free);
 			return (NULL);
 		}
@@ -246,7 +249,7 @@ ixgbe_rx_assoc_hcksum(mblk_t *mp, uint32_t status_error)
 }
 
 /*
- * ixgbe_rx - Receive the data of one ring.
+ * ixgbe_ring_rx - Receive the data of one ring.
  *
  * This function goes throught h/w descriptor in one specified rx ring,
  * receives the data if the descriptor status shows the data is ready.
@@ -254,7 +257,7 @@ ixgbe_rx_assoc_hcksum(mblk_t *mp, uint32_t status_error)
  * passed up to mac_rx().
  */
 mblk_t *
-ixgbe_rx(ixgbe_rx_ring_t *rx_ring)
+ixgbe_ring_rx(ixgbe_rx_ring_t *rx_ring, int poll_bytes)
 {
 	union ixgbe_adv_rx_desc *current_rbd;
 	rx_control_block_t *current_rcb;
@@ -266,6 +269,7 @@ ixgbe_rx(ixgbe_rx_ring_t *rx_ring)
 	uint32_t pkt_len;
 	uint32_t status_error;
 	uint32_t pkt_num;
+	uint32_t received_bytes;
 	ixgbe_t *ixgbe = rx_ring->ixgbe;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 
@@ -289,6 +293,7 @@ ixgbe_rx(ixgbe_rx_ring_t *rx_ring)
 	rx_next = rx_ring->rbd_next;
 
 	current_rbd = &rx_ring->rbd_ring[rx_next];
+	received_bytes = 0;
 	pkt_num = 0;
 	status_error = current_rbd->wb.upper.status_error;
 	while (status_error & IXGBE_RXD_STAT_DD) {
@@ -309,6 +314,13 @@ ixgbe_rx(ixgbe_rx_ring_t *rx_ring)
 		    (status_error & IXGBE_RXDADV_ERR_IPE));
 
 		pkt_len = current_rbd->wb.upper.length;
+
+		if ((poll_bytes != IXGBE_POLL_NULL) &&
+		    ((received_bytes + pkt_len) > poll_bytes))
+			break;
+
+		received_bytes += pkt_len;
+
 		mp = NULL;
 		/*
 		 * For packets with length more than the copy threshold,
@@ -377,4 +389,22 @@ rx_discard:
 	}
 
 	return (mblk_head);
+}
+
+mblk_t *
+ixgbe_ring_rx_poll(void *arg, int n_bytes)
+{
+	ixgbe_rx_ring_t *rx_ring = (ixgbe_rx_ring_t *)arg;
+	mblk_t *mp = NULL;
+
+	ASSERT(n_bytes >= 0);
+
+	if (n_bytes == 0)
+		return (mp);
+
+	mutex_enter(&rx_ring->rx_lock);
+	mp = ixgbe_ring_rx(rx_ring, n_bytes);
+	mutex_exit(&rx_ring->rx_lock);
+
+	return (mp);
 }

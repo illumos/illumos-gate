@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This utility constitutes a private interface - it will be removed
  * in a future release of Solaris.  Neither users nor other software
@@ -40,7 +38,7 @@
 #include <libdlpi.h>
 
 typedef struct vnic_attr {
-	dladm_vnic_attr_sys_t attr;
+	dladm_vnic_attr_t attr;
 	char *name;
 } vnic_attr_t;
 
@@ -48,7 +46,7 @@ typedef struct vnic_attr {
 static int
 v_print(datalink_id_t vnic_id, void *arg)
 {
-	dladm_vnic_attr_sys_t attr;
+	dladm_vnic_attr_t attr;
 	char vnic[MAXLINKNAMELEN];
 	char link[MAXLINKNAMELEN];
 
@@ -87,8 +85,8 @@ static int
 v_find(datalink_id_t vnic_id, void *arg)
 {
 	vnic_attr_t *vattr = arg;
-	dladm_vnic_attr_sys_t *specp = &vattr->attr;
-	dladm_vnic_attr_sys_t attr;
+	dladm_vnic_attr_t *specp = &vattr->attr;
+	dladm_vnic_attr_t attr;
 	char linkname[MAXLINKNAMELEN];
 
 	if (dladm_vnic_info(vnic_id, &attr, DLADM_OPT_ACTIVE) !=
@@ -221,7 +219,8 @@ v_add(char *link, char *addr, char *name)
 		 */
 		status = dladm_vnic_create(name, linkid,
 		    VNIC_MAC_ADDR_TYPE_FIXED, (uchar_t *)ea->ether_addr_octet,
-		    ETHERADDRL, &vnic_id, DLADM_OPT_ACTIVE);
+		    ETHERADDRL, NULL, 0, 0, &vnic_id, NULL, DLADM_OPT_ACTIVE);
+
 		if (status != DLADM_STATUS_OK) {
 			(void) fprintf(stderr, "dladm_vnic_create: %s\n",
 			    dladm_status2str(status, buf));

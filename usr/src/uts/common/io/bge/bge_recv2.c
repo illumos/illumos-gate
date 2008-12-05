@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "bge_impl.h"
 
 #define	U32TOPTR(x)	((void *)(uintptr_t)(uint32_t)(x))
@@ -274,7 +272,9 @@ error:
  * the chip to indicate the packets it has accepted from the ring.
  */
 static mblk_t *bge_receive_ring(bge_t *bgep, recv_ring_t *rrp);
+#ifndef	DEBUG
 #pragma	inline(bge_receive_ring)
+#endif
 
 static mblk_t *
 bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
@@ -328,36 +328,61 @@ bge_receive_ring(bge_t *bgep, recv_ring_t *rrp)
 }
 
 /*
+ * XXX: Poll a particular ring. The implementation is incomplete.
+ * Once the ring interrupts are disabled, we need to do bge_recyle()
+ * for the ring as well and re enable the ring interrupt automatically
+ * if the poll doesn't find any packets in the ring. We need to
+ * have MSI-X interrupts support for this.
+ *
+ * The basic poll policy is that rings that are dealing with explicit
+ * flows (like TCP or some service) and are marked as such should
+ * have their own MSI-X interrupt per ring. bge_intr() should leave
+ * that interrupt disabled after an upcall. The ring is in poll mode.
+ * When a poll thread comes down and finds nothing, the MSI-X interrupt
+ * is automatically enabled. Squeue needs to deal with the race of
+ * a new interrupt firing and reaching before poll thread returns.
+ */
+mblk_t *
+bge_poll_ring(void *arg, int bytes_to_pickup)
+{
+	recv_ring_t *rrp = arg;
+	bge_t *bgep = rrp->bgep;
+	bge_rbd_t *hw_rbd_p;
+	uint64_t slot;
+	mblk_t *head;
+	mblk_t **tail;
+	mblk_t *mp;
+	size_t sz = 0;
+
+	mutex_enter(rrp->rx_lock);
+
+	/*
+	 * Sync (all) the receive ring descriptors
+	 * before accepting the packets they describe
+	 */
+	DMA_SYNC(rrp->desc, DDI_DMA_SYNC_FORKERNEL);
+	hw_rbd_p = DMA_VPTR(rrp->desc);
+	head = NULL;
+	tail = &head;
+	slot = rrp->rx_next;
+
+	/* Note: volatile */
+	while ((slot != *rrp->prod_index_p) && (sz <= bytes_to_pickup)) {
+		if ((mp = bge_receive_packet(bgep, &hw_rbd_p[slot])) != NULL) {
+			*tail = mp;
+			sz += msgdsize(mp);
+			tail = &mp->b_next;
+		}
+		rrp->rx_next = slot = NEXT(slot, rrp->desc.nslots);
+	}
+
+	bge_mbx_put(bgep, rrp->chip_mbx_reg, rrp->rx_next);
+	mutex_exit(rrp->rx_lock);
+	return (head);
+}
+
+/*
  * Receive all packets in all rings.
- *
- * To give priority to low-numbered rings, whenever we have received any
- * packets in any ring except 0, we restart scanning again from ring 0.
- * Thus, for example, if rings 0, 3, and 10 are carrying traffic, the
- * pattern of receives might go 0, 3, 10, 3, 0, 10, 0:
- *
- *	0	found some - receive them
- *	1..2					none found
- *	3	found some - receive them	and restart scan
- *	0..9					none found
- *	10	found some - receive them	and restart scan
- *	0..2					none found
- *	3	found some more - receive them	and restart scan
- *	0	found some more - receive them
- *	1..9					none found
- *	10	found some more - receive them	and restart scan
- *	0	found some more - receive them
- *	1..15					none found
- *
- * The routine returns only when a complete scan has been performed either
- * without finding any packets to receive or BGE_MAXPKT_RCVED packets were
- * received from ring 0 and other rings (if used) are empty.
- *
- * Note that driver-defined locks may *NOT* be held across calls
- * to gld_recv().
- *
- * Note: the expression (BGE_RECV_RINGS_USED > 1), yields a compile-time
- * constant and allows the compiler to optimise away the outer do-loop
- * if only one receive ring is being used.
  */
 void bge_receive(bge_t *bgep, bge_status_t *bsp);
 #pragma	no_inline(bge_receive)
@@ -366,41 +391,31 @@ void
 bge_receive(bge_t *bgep, bge_status_t *bsp)
 {
 	recv_ring_t *rrp;
-	uint64_t ring;
-	uint64_t rx_rings = bgep->chipid.rx_rings;
+	uint64_t index;
 	mblk_t *mp;
 
-restart:
-	ring = 0;
-	rrp = &bgep->recv[ring];
-	do {
+	for (index = 0; index < bgep->chipid.rx_rings; index++) {
+		/*
+		 * Start from the first ring.
+		 */
+		rrp = &bgep->recv[index];
+
 		/*
 		 * For each ring, (rrp->prod_index_p) points to the
 		 * proper index within the status block (which has
 		 * already been sync'd by the caller)
 		 */
-		ASSERT(rrp->prod_index_p == RECV_INDEX_P(bsp, ring));
+		ASSERT(rrp->prod_index_p == RECV_INDEX_P(bsp, index));
 
-		if (*rrp->prod_index_p == rrp->rx_next)
+		if (*rrp->prod_index_p == rrp->rx_next || rrp->poll_flag)
 			continue;		/* no packets		*/
 		if (mutex_tryenter(rrp->rx_lock) == 0)
 			continue;		/* already in process	*/
 		mp = bge_receive_ring(bgep, rrp);
 		mutex_exit(rrp->rx_lock);
 
-		if (mp != NULL) {
-			mac_rx(bgep->mh, rrp->handle, mp);
-
-			/*
-			 * Restart from ring 0, if the driver is compiled
-			 * with multiple rings and we're not on ring 0 now
-			 */
-			if (rx_rings > 1 && ring > 0)
-				goto restart;
-		}
-
-		/*
-		 * Loop over all rings (if there *are* multiple rings)
-		 */
-	} while (++rrp, ++ring < rx_rings);
+		if (mp != NULL)
+			mac_rx_ring(bgep->mh, rrp->ring_handle, mp,
+			    rrp->ring_gen_num);
+	}
 }

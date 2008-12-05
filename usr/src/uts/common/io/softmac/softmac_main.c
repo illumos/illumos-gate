@@ -44,6 +44,8 @@
 #include <sys/file.h>
 #include <sys/cred.h>
 #include <sys/dlpi.h>
+#include <sys/mac_provider.h>
+#include <sys/disp.h>
 #include <sys/sunndi.h>
 #include <sys/modhash.h>
 #include <sys/stropts.h>
@@ -53,11 +55,19 @@
 #include <sys/softmac.h>
 #include <sys/dls.h>
 
+/* Used as a parameter to the mod hash walk of softmac structures */
+typedef struct {
+	softmac_t	*smw_softmac;
+	boolean_t	smw_retry;
+} softmac_walk_t;
+
 /*
  * Softmac hash table including softmacs for both style-2 and style-1 devices.
  */
 static krwlock_t	softmac_hash_lock;
 static mod_hash_t	*softmac_hash;
+static kmutex_t		smac_global_lock;
+static kcondvar_t	smac_global_cv;
 
 #define	SOFTMAC_HASHSZ		64
 
@@ -71,7 +81,7 @@ static void softmac_m_close(void *);
 static boolean_t softmac_m_getcapab(void *, mac_capab_t, void *);
 
 #define	SOFTMAC_M_CALLBACK_FLAGS	\
-	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB | MC_OPEN | MC_CLOSE)
+	(MC_IOCTL | MC_GETCAPAB | MC_OPEN | MC_CLOSE)
 
 static mac_callbacks_t softmac_m_callbacks = {
 	SOFTMAC_M_CALLBACK_FLAGS,
@@ -82,7 +92,6 @@ static mac_callbacks_t softmac_m_callbacks = {
 	softmac_m_multicst,
 	softmac_m_unicst,
 	softmac_m_tx,
-	softmac_m_resources,
 	softmac_m_ioctl,
 	softmac_m_getcapab,
 	softmac_m_open,
@@ -97,6 +106,8 @@ softmac_init()
 	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
 
 	rw_init(&softmac_hash_lock, NULL, RW_DEFAULT, NULL);
+	mutex_init(&smac_global_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&smac_global_cv, NULL, CV_DRIVER, NULL);
 }
 
 void
@@ -104,6 +115,8 @@ softmac_fini()
 {
 	rw_destroy(&softmac_hash_lock);
 	mod_hash_destroy_hash(softmac_hash);
+	mutex_destroy(&smac_global_lock);
+	cv_destroy(&smac_global_cv);
 }
 
 /* ARGSUSED */
@@ -128,7 +141,8 @@ softmac_busy()
 }
 
 /*
- * This function is called for each minor node during the post-attach of
+ *
+ * softmac_create() is called for each minor node during the post-attach of
  * each DDI_NT_NET device instance.  Note that it is possible that a device
  * instance has two minor nodes (DLPI style-1 and style-2), so that for that
  * specific device, softmac_create() could be called twice.
@@ -139,7 +153,99 @@ softmac_busy()
  * For each minor node of a legacy device, a taskq is started to finish
  * softmac_mac_register(), which will finish the rest of work (see comments
  * above softmac_mac_register()).
+ *
+ *			softmac state machine
+ * --------------------------------------------------------------------------
+ * OLD STATE		EVENT					NEW STATE
+ * --------------------------------------------------------------------------
+ * UNINIT		attach of 1st minor node 		ATTACH_INPROG
+ * okcnt = 0		net_postattach -> softmac_create	okcnt = 1
+ *
+ * ATTACH_INPROG	attach of 2nd minor node (GLDv3)	ATTACH_DONE
+ * okcnt = 1		net_postattach -> softmac_create	okcnt = 2
+ *
+ * ATTACH_INPROG	attach of 2nd minor node (legacy)	ATTACH_INPROG
+ * okcnt = 1		net_postattach -> softmac_create	okcnt = 2
+ *			schedule softmac_mac_register
+ *
+ * ATTACH_INPROG	legacy device node			ATTACH_DONE
+ * okcnt = 2		softmac_mac_register			okcnt = 2
+ *
+ * ATTACH_DONE		detach of 1st minor node		DETACH_INPROG
+ * okcnt = 2		(success)				okcnt = 1
+ *
+ * DETACH_INPROG	detach of 2nd minor node		UNINIT (or free)
+ * okcnt = 1		(success)				okcnt = 0
+ *
+ * ATTACH_DONE		detach failure				state unchanged
+ * DETACH_INPROG						left = okcnt
+ *
+ * DETACH_INPROG	reattach				ATTACH_INPROG
+ * okcnt = 0,1		net_postattach -> softmac_create
+ *
+ * ATTACH_DONE		reattach				ATTACH_DONE
+ * left != 0		net_postattach -> softmac_create	left = 0
+ *
+ * Abbreviation notes:
+ * states have SOFTMAC_ prefix,
+ * okcnt - softmac_attach_okcnt,
+ * left - softmac_attached_left
  */
+
+#ifdef DEBUG
+void
+softmac_state_verify(softmac_t *softmac)
+{
+	ASSERT(MUTEX_HELD(&softmac->smac_mutex));
+
+	/*
+	 * There are at most 2 minor nodes, one per DLPI style
+	 */
+	ASSERT(softmac->smac_cnt <= 2 && softmac->smac_attachok_cnt <= 2);
+
+	/*
+	 * The smac_attachok_cnt represents the number of attaches i.e. the
+	 * number of times net_postattach -> softmac_create() has been called
+	 * for a device instance.
+	 */
+	ASSERT(softmac->smac_attachok_cnt == SMAC_NONZERO_NODECNT(softmac));
+
+	/*
+	 * softmac_create (or softmac_mac_register) ->  softmac_create_datalink
+	 * happens only after all minor nodes have been attached
+	 */
+	ASSERT(softmac->smac_state != SOFTMAC_ATTACH_DONE ||
+	    softmac->smac_attachok_cnt == softmac->smac_cnt);
+
+	if (softmac->smac_attachok_cnt == 0) {
+		ASSERT(softmac->smac_state == SOFTMAC_UNINIT);
+		ASSERT(softmac->smac_mh == NULL);
+	} else if (softmac->smac_attachok_cnt < softmac->smac_cnt) {
+		ASSERT(softmac->smac_state == SOFTMAC_ATTACH_INPROG ||
+		    softmac->smac_state == SOFTMAC_DETACH_INPROG);
+		ASSERT(softmac->smac_mh == NULL);
+	} else {
+		/*
+		 * In the stable condition the state whould be
+		 * SOFTMAC_ATTACH_DONE. But there is a small transient window
+		 * in softmac_destroy where we change the state to
+		 * SOFTMAC_DETACH_INPROG and drop the lock before doing
+		 * the link destroy
+		 */
+		ASSERT(softmac->smac_attachok_cnt == softmac->smac_cnt);
+		ASSERT(softmac->smac_state != SOFTMAC_UNINIT);
+	}
+	if (softmac->smac_mh != NULL)
+		ASSERT(softmac->smac_attachok_cnt == softmac->smac_cnt);
+}
+#endif
+
+#ifdef DEBUG
+#define	SOFTMAC_STATE_VERIFY(softmac)	softmac_state_verify(softmac)
+#else
+#define	SOFTMAC_STATE_VERIFY(softmac)
+#endif
+
 int
 softmac_create(dev_info_t *dip, dev_t dev)
 {
@@ -181,9 +287,7 @@ softmac_create(dev_info_t *dip, dev_t dev)
 		softmac = kmem_zalloc(sizeof (softmac_t), KM_SLEEP);
 		mutex_init(&softmac->smac_mutex, NULL, MUTEX_DRIVER, NULL);
 		cv_init(&softmac->smac_cv, NULL, CV_DRIVER, NULL);
-		rw_init(&softmac->smac_lock, NULL, RW_DRIVER, NULL);
 		(void) strlcpy(softmac->smac_devname, devname, MAXNAMELEN);
-
 		/*
 		 * Insert the softmac into the hash table.
 		 */
@@ -191,9 +295,15 @@ softmac_create(dev_info_t *dip, dev_t dev)
 		    (mod_hash_key_t)softmac->smac_devname,
 		    (mod_hash_val_t)softmac);
 		ASSERT(err == 0);
+		mutex_enter(&smac_global_lock);
+		cv_broadcast(&smac_global_cv);
+		mutex_exit(&smac_global_lock);
 	}
 
 	mutex_enter(&softmac->smac_mutex);
+	SOFTMAC_STATE_VERIFY(softmac);
+	if (softmac->smac_state != SOFTMAC_ATTACH_DONE)
+		softmac->smac_state = SOFTMAC_ATTACH_INPROG;
 	if (softmac->smac_attachok_cnt == 0) {
 		/*
 		 * Initialize the softmac if this is the post-attach of the
@@ -231,45 +341,26 @@ softmac_create(dev_info_t *dip, dev_t dev)
 	index = (getmajor(dev) == ddi_name_to_major("clone"));
 	if (softmac->smac_softmac[index] != NULL) {
 		/*
-		 * This is possible if the post_attach() is called:
-		 *
-		 * a. after pre_detach() fails.
-		 *
-		 * b. for a new round of reattachment. Note that DACF will not
-		 * call pre_detach() for successfully post_attached minor
-		 * nodes even when the post-attach failed after all.
-		 *
-		 * Both seem to be defects in the DACF framework. To work
-		 * around it and only clear the SOFTMAC_ATTACH_DONE flag for
-		 * the b case, a smac_attached_left field is used to tell
-		 * the two cases apart.
+		 * This is possible if the post_attach() is called after
+		 * pre_detach() fails. This seems to be a defect of the DACF
+		 * framework. We work around it by using a smac_attached_left
+		 * field that tracks this
 		 */
-		ASSERT(softmac->smac_attachok_cnt != 0);
-
-		if (softmac->smac_attached_left != 0)
-			/* case a */
-			softmac->smac_attached_left--;
-		else if (softmac->smac_attachok_cnt != softmac->smac_cnt) {
-			/* case b */
-			softmac->smac_flags &= ~SOFTMAC_ATTACH_DONE;
-		}
+		ASSERT(softmac->smac_attached_left != 0);
+		softmac->smac_attached_left--;
 		mutex_exit(&softmac->smac_mutex);
 		rw_exit(&softmac_hash_lock);
 		return (0);
+
 	}
 	mutex_exit(&softmac->smac_mutex);
 	rw_exit(&softmac_hash_lock);
 
-	/*
-	 * No lock is needed for access this softmac pointer, as pre-detach and
-	 * post-attach won't happen at the same time.
-	 */
-	mutex_enter(&softmac->smac_mutex);
-
 	softmac_dev = kmem_zalloc(sizeof (softmac_dev_t), KM_SLEEP);
 	softmac_dev->sd_dev = dev;
-	softmac->smac_softmac[index] = softmac_dev;
 
+	mutex_enter(&softmac->smac_mutex);
+	softmac->smac_softmac[index] = softmac_dev;
 	/*
 	 * Continue to register the mac and create the datalink only when all
 	 * the minor nodes are attached.
@@ -281,18 +372,22 @@ softmac_create(dev_info_t *dip, dev_t dev)
 
 	/*
 	 * All of the minor nodes have been attached; start a taskq
-	 * to do the rest of the work.  We use a taskq instead of of
+	 * to do the rest of the work.  We use a taskq instead of
 	 * doing the work here because:
 	 *
-	 * - We could be called as a result of an open() system call
-	 *   where spec_open() already SLOCKED the snode.  Using a taskq
-	 *   sidesteps the risk that our ldi_open_by_dev() call would
-	 *   deadlock trying to set SLOCKED on the snode again.
+	 * We could be called as a result of a open() system call
+	 * where spec_open() already SLOCKED the snode. Using a taskq
+	 * sidesteps the risk that our ldi_open_by_dev() call would
+	 * deadlock trying to set SLOCKED on the snode again.
 	 *
-	 * - The devfs design requires no interruptible function calls
-	 *   in the device post-attach routine, but we need to make an
-	 *   (interruptible) upcall.  Using a taskq to make the upcall
-	 *   sidesteps this.
+	 * The devfs design requires that the downcalls don't use any
+	 * interruptible cv_wait which happens when we do door upcalls.
+	 * Otherwise the downcalls which may be holding devfs resources
+	 * may cause a deadlock if the thread is stopped. Also we need to make
+	 * sure these downcalls into softmac_create or softmac_destroy
+	 * don't cv_wait on any devfs related condition. Thus softmac_destroy
+	 * returns EBUSY if the asynchronous threads started in softmac_create
+	 * haven't finished.
 	 */
 	ASSERT(softmac->smac_taskq == NULL);
 	softmac->smac_taskq = taskq_dispatch(system_taskq,
@@ -331,7 +426,6 @@ softmac_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 	 * simply return B_TRUE if we support it.
 	 */
 	case MAC_CAPAB_NO_ZCOPY:
-	case MAC_CAPAB_POLL:
 	case MAC_CAPAB_NO_NATIVEVLAN:
 	default:
 		break;
@@ -396,8 +490,6 @@ softmac_create_datalink(softmac_t *softmac)
 	datalink_id_t	linkid = DATALINK_INVALID_LINKID;
 	int		err;
 
-	ASSERT(MUTEX_HELD(&softmac->smac_mutex));
-
 	/*
 	 * Inform dlmgmtd of this link so that softmac_hold_device() is able
 	 * to know the existence of this link. If this failed with EBADF,
@@ -429,8 +521,11 @@ softmac_create_datalink(softmac_t *softmac)
 		return (err);
 	}
 
-	if (linkid == DATALINK_INVALID_LINKID)
+	if (linkid == DATALINK_INVALID_LINKID) {
+		mutex_enter(&softmac->smac_mutex);
 		softmac->smac_flags |= SOFTMAC_NEED_RECREATE;
+		mutex_exit(&softmac->smac_mutex);
+	}
 
 	return (0);
 }
@@ -453,6 +548,8 @@ softmac_create_task(void *arg)
 	mutex_enter(&softmac->smac_mutex);
 	softmac->smac_media = (mac_info(mh))->mi_nativemedia;
 	softmac->smac_mh = mh;
+	softmac->smac_taskq = NULL;
+	mutex_exit(&softmac->smac_mutex);
 
 	/*
 	 * We can safely release the reference on the mac because
@@ -467,10 +564,13 @@ softmac_create_task(void *arg)
 	 */
 	err = softmac_create_datalink(softmac);
 
+	mutex_enter(&softmac->smac_mutex);
 done:
-	ASSERT(!(softmac->smac_flags & SOFTMAC_ATTACH_DONE));
-	softmac->smac_flags |= SOFTMAC_ATTACH_DONE;
-	softmac->smac_attacherr = err;
+	if (err != 0) {
+		softmac->smac_mh = NULL;
+		softmac->smac_attacherr = err;
+	}
+	softmac->smac_state = SOFTMAC_ATTACH_DONE;
 	softmac->smac_taskq = NULL;
 	cv_broadcast(&softmac->smac_cv);
 	mutex_exit(&softmac->smac_mutex);
@@ -498,6 +598,8 @@ softmac_mac_register(softmac_t *softmac)
 	 * as softmac_destroy() will wait until this function is called.
 	 */
 	ASSERT(softmac != NULL);
+	ASSERT(softmac->smac_state == SOFTMAC_ATTACH_INPROG &&
+	    softmac->smac_attachok_cnt == softmac->smac_cnt);
 
 	if ((err = ldi_ident_from_dip(softmac_dip, &li)) != 0) {
 		mutex_enter(&softmac->smac_mutex);
@@ -617,11 +719,9 @@ softmac_mac_register(softmac_t *softmac)
 		 * dl_bind() because some drivers return DL_ERROR_ACK if the
 		 * stream is not bound. It is also before mac_register(), so
 		 * we don't need any lock protection here.
-		 *
-		 * Softmac always supports POLL.
 		 */
 		softmac->smac_capab_flags =
-		    (MAC_CAPAB_POLL | MAC_CAPAB_NO_ZCOPY | MAC_CAPAB_LEGACY);
+		    (MAC_CAPAB_NO_ZCOPY | MAC_CAPAB_LEGACY);
 
 		softmac->smac_no_capability_req = B_FALSE;
 		if (softmac_fill_capab(lh, softmac) != 0)
@@ -714,6 +814,7 @@ softmac_mac_register(softmac_t *softmac)
 			goto done;
 		}
 	}
+	mutex_exit(&softmac->smac_mutex);
 
 	/*
 	 * Try to create the datalink for this softmac.
@@ -724,10 +825,21 @@ softmac_mac_register(softmac_t *softmac)
 			softmac->smac_mh = NULL;
 		}
 	}
+	/*
+	 * If succeed, create the thread which handles the DL_NOTIFY_IND from
+	 * the lower stream.
+	 */
+	if (softmac->smac_mh != NULL) {
+		softmac->smac_notify_thread = thread_create(NULL, 0,
+		    softmac_notify_thread, softmac, 0, &p0,
+		    TS_RUN, minclsyspri);
+	}
 
+	mutex_enter(&softmac->smac_mutex);
 done:
-	ASSERT(!(softmac->smac_flags & SOFTMAC_ATTACH_DONE));
-	softmac->smac_flags |= SOFTMAC_ATTACH_DONE;
+	ASSERT(softmac->smac_state == SOFTMAC_ATTACH_INPROG &&
+	    softmac->smac_attachok_cnt == softmac->smac_cnt);
+	softmac->smac_state = SOFTMAC_ATTACH_DONE;
 	softmac->smac_attacherr = err;
 	softmac->smac_taskq = NULL;
 	cv_broadcast(&softmac->smac_cv);
@@ -743,24 +855,37 @@ softmac_destroy(dev_info_t *dip, dev_t dev)
 	int			index;
 	int			ppa, err;
 	datalink_id_t		linkid;
+	mac_handle_t		smac_mh;
+	uint32_t		smac_flags;
 
 	ppa = ddi_get_instance(dip);
 	(void) snprintf(devname, MAXNAMELEN, "%s%d", ddi_driver_name(dip), ppa);
 
-	rw_enter(&softmac_hash_lock, RW_WRITER);
+	/*
+	 * We are called only from the predetach entry point. The DACF
+	 * framework ensures there can't be a concurrent postattach call
+	 * for the same softmac. The softmac found out from the modhash
+	 * below can't vanish beneath us since this is the only place where
+	 * it is deleted.
+	 */
 	err = mod_hash_find(softmac_hash, (mod_hash_key_t)devname,
 	    (mod_hash_val_t *)&softmac);
 	ASSERT(err == 0);
 
 	mutex_enter(&softmac->smac_mutex);
+	SOFTMAC_STATE_VERIFY(softmac);
 
 	/*
 	 * Fail the predetach routine if this softmac is in-use.
+	 * Make sure these downcalls into softmac_create or softmac_destroy
+	 * don't cv_wait on any devfs related condition. Thus softmac_destroy
+	 * returns EBUSY if the asynchronous thread started in softmac_create
+	 * hasn't finished
 	 */
-	if (softmac->smac_hold_cnt != 0) {
+	if ((softmac->smac_hold_cnt != 0) ||
+	    (softmac->smac_state == SOFTMAC_ATTACH_INPROG)) {
 		softmac->smac_attached_left = softmac->smac_attachok_cnt;
 		mutex_exit(&softmac->smac_mutex);
-		rw_exit(&softmac_hash_lock);
 		return (EBUSY);
 	}
 
@@ -772,78 +897,106 @@ softmac_destroy(dev_info_t *dip, dev_t dev)
 	 */
 	if (softmac->smac_attached_left != 0) {
 		mutex_exit(&softmac->smac_mutex);
-		rw_exit(&softmac_hash_lock);
 		return (EBUSY);
 	}
 
-	if (softmac->smac_attachok_cnt != softmac->smac_cnt)
-		goto done;
+	smac_mh = softmac->smac_mh;
+	smac_flags = softmac->smac_flags;
+	softmac->smac_state = SOFTMAC_DETACH_INPROG;
+	mutex_exit(&softmac->smac_mutex);
 
-	/*
-	 * This is the detach for the first minor node.  Wait until all the
-	 * minor nodes are attached.
-	 */
-	while (!(softmac->smac_flags & SOFTMAC_ATTACH_DONE))
-		cv_wait(&softmac->smac_cv, &softmac->smac_mutex);
-
-	if (softmac->smac_mh != NULL) {
-		if (!(softmac->smac_flags & SOFTMAC_NOSUPP)) {
-			if ((err = dls_devnet_destroy(softmac->smac_mh,
-			    &linkid)) != 0) {
-				goto done;
+	if (smac_mh != NULL) {
+		/*
+		 * This is the first minor node that is being detached for this
+		 * softmac.
+		 */
+		ASSERT(softmac->smac_attachok_cnt == softmac->smac_cnt);
+		if (!(smac_flags & SOFTMAC_NOSUPP)) {
+			if ((err = dls_devnet_destroy(smac_mh, &linkid,
+			    B_FALSE)) != 0) {
+				goto error;
 			}
 		}
 		/*
 		 * If softmac_mac_register() succeeds in registering the mac
 		 * of the legacy device, unregister it.
 		 */
-		if (!(softmac->smac_flags & (SOFTMAC_GLDV3 | SOFTMAC_NOSUPP))) {
-			if ((err = mac_unregister(softmac->smac_mh)) != 0) {
-				(void) dls_devnet_create(softmac->smac_mh,
-				    linkid);
-				goto done;
+		if (!(smac_flags & (SOFTMAC_GLDV3 | SOFTMAC_NOSUPP))) {
+			if ((err = mac_disable_nowait(smac_mh)) != 0) {
+				(void) dls_devnet_create(smac_mh, linkid);
+				goto error;
 			}
+			/*
+			 * Ask softmac_notify_thread to quit, and wait for
+			 * that to be done.
+			 */
+			mutex_enter(&softmac->smac_mutex);
+			softmac->smac_flags |= SOFTMAC_NOTIFY_QUIT;
+			cv_broadcast(&softmac->smac_cv);
+			while (softmac->smac_notify_thread != NULL) {
+				cv_wait(&softmac->smac_cv,
+				    &softmac->smac_mutex);
+			}
+			mutex_exit(&softmac->smac_mutex);
+			VERIFY(mac_unregister(smac_mh) == 0);
 		}
 		softmac->smac_mh = NULL;
 	}
-	softmac->smac_flags &= ~SOFTMAC_ATTACH_DONE;
 
-done:
-	if (err == 0) {
-		/*
-		 * Free softmac_dev
-		 */
-		index = (getmajor(dev) == ddi_name_to_major("clone"));
-		softmac_dev = softmac->smac_softmac[index];
-		ASSERT(softmac_dev != NULL);
-		softmac->smac_softmac[index] = NULL;
-		kmem_free(softmac_dev, sizeof (softmac_dev_t));
+	/*
+	 * Free softmac_dev
+	 */
+	rw_enter(&softmac_hash_lock, RW_WRITER);
+	mutex_enter(&softmac->smac_mutex);
 
-		if (--softmac->smac_attachok_cnt == 0) {
-			mod_hash_val_t	hashval;
+	ASSERT(softmac->smac_state == SOFTMAC_DETACH_INPROG &&
+	    softmac->smac_attachok_cnt != 0);
+	softmac->smac_mh = NULL;
+	index = (getmajor(dev) == ddi_name_to_major("clone"));
+	softmac_dev = softmac->smac_softmac[index];
+	ASSERT(softmac_dev != NULL);
+	softmac->smac_softmac[index] = NULL;
+	kmem_free(softmac_dev, sizeof (softmac_dev_t));
 
-			err = mod_hash_remove(softmac_hash,
-			    (mod_hash_key_t)devname,
-			    (mod_hash_val_t *)&hashval);
-			ASSERT(err == 0);
+	if (--softmac->smac_attachok_cnt == 0) {
+		mod_hash_val_t	hashval;
 
+		softmac->smac_state = SOFTMAC_UNINIT;
+		if (softmac->smac_hold_cnt != 0) {
+			/*
+			 * Someone did a softmac_hold_device while we dropped
+			 * the locks. Leave the softmac itself intact which
+			 * will be reused by the reattach
+			 */
 			mutex_exit(&softmac->smac_mutex);
 			rw_exit(&softmac_hash_lock);
-
-			ASSERT(softmac->smac_taskq == NULL);
-			ASSERT(!(softmac->smac_flags & SOFTMAC_ATTACH_DONE));
-			mutex_destroy(&softmac->smac_mutex);
-			cv_destroy(&softmac->smac_cv);
-			rw_destroy(&softmac->smac_lock);
-			kmem_free(softmac, sizeof (softmac_t));
 			return (0);
 		}
-	} else {
-		softmac->smac_attached_left = softmac->smac_attachok_cnt;
-	}
+		ASSERT(softmac->smac_taskq == NULL);
 
+		err = mod_hash_remove(softmac_hash,
+		    (mod_hash_key_t)devname,
+		    (mod_hash_val_t *)&hashval);
+		ASSERT(err == 0);
+
+		mutex_exit(&softmac->smac_mutex);
+		rw_exit(&softmac_hash_lock);
+
+		mutex_destroy(&softmac->smac_mutex);
+		cv_destroy(&softmac->smac_cv);
+		kmem_free(softmac, sizeof (softmac_t));
+		return (0);
+	}
 	mutex_exit(&softmac->smac_mutex);
 	rw_exit(&softmac_hash_lock);
+	return (0);
+
+error:
+	mutex_enter(&softmac->smac_mutex);
+	softmac->smac_attached_left = softmac->smac_attachok_cnt;
+	softmac->smac_state = SOFTMAC_ATTACH_DONE;
+	cv_broadcast(&softmac->smac_cv);
+	mutex_exit(&softmac->smac_mutex);
 	return (err);
 }
 
@@ -863,17 +1016,33 @@ softmac_mac_recreate(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 	softmac_t	*softmac = (softmac_t *)val;
 	datalink_id_t	linkid;
 	int		err;
-
-	ASSERT(RW_READ_HELD(&softmac_hash_lock));
+	softmac_walk_t	*smwp = arg;
 
 	/*
-	 * Wait for softmac_create() and softmac_mac_register() to exit.
+	 * The framework itself must not hold any locks across calls to the
+	 * mac perimeter. Thus this function does not call any framework
+	 * function that needs to grab the mac perimeter.
 	 */
-	mutex_enter(&softmac->smac_mutex);
-	while (!(softmac->smac_flags & SOFTMAC_ATTACH_DONE))
-		cv_wait(&softmac->smac_cv, &softmac->smac_mutex);
+	ASSERT(RW_READ_HELD(&softmac_hash_lock));
 
-	if ((softmac->smac_attacherr != 0) ||
+	smwp->smw_retry = B_FALSE;
+	mutex_enter(&softmac->smac_mutex);
+	SOFTMAC_STATE_VERIFY(softmac);
+	if (softmac->smac_state == SOFTMAC_ATTACH_INPROG) {
+		/*
+		 * Wait till softmac_create or softmac_mac_register finishes
+		 * Hold the softmac to ensure it stays around. The wait itself
+		 * is done in the caller, since we need to drop all locks
+		 * including the mod hash's internal lock before calling
+		 * cv_wait.
+		 */
+		smwp->smw_retry = B_TRUE;
+		smwp->smw_softmac = softmac;
+		softmac->smac_hold_cnt++;
+		return (MH_WALK_TERMINATE);
+	}
+
+	if ((softmac->smac_state != SOFTMAC_ATTACH_DONE) ||
 	    !(softmac->smac_flags & SOFTMAC_NEED_RECREATE)) {
 		mutex_exit(&softmac->smac_mutex);
 		return (MH_WALK_CONTINUE);
@@ -918,13 +1087,30 @@ softmac_mac_recreate(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 void
 softmac_recreate()
 {
+	softmac_walk_t	smw;
+	softmac_t	*softmac;
+
 	/*
 	 * Walk through the softmac_hash table. Request to create the
 	 * [link name, linkid] mapping if we failed to do so.
 	 */
-	rw_enter(&softmac_hash_lock, RW_READER);
-	mod_hash_walk(softmac_hash, softmac_mac_recreate, NULL);
-	rw_exit(&softmac_hash_lock);
+	do {
+		smw.smw_retry = B_FALSE;
+		rw_enter(&softmac_hash_lock, RW_READER);
+		mod_hash_walk(softmac_hash, softmac_mac_recreate, &smw);
+		rw_exit(&softmac_hash_lock);
+		if (smw.smw_retry) {
+			/*
+			 * softmac_create or softmac_mac_register hasn't yet
+			 * finished and the softmac is not yet in the
+			 * SOFTMAC_ATTACH_DONE state.
+			 */
+			softmac = smw.smw_softmac;
+			cv_wait(&softmac->smac_cv, &softmac->smac_mutex);
+			softmac->smac_hold_cnt--;
+			mutex_exit(&softmac->smac_mutex);
+		}
+	} while (smw.smw_retry);
 }
 
 /* ARGSUSED */
@@ -1064,20 +1250,14 @@ softmac_m_open(void *arg)
 	softmac_lower_t	*slp;
 	int		err;
 
-	rw_enter(&softmac->smac_lock, RW_READER);
-	if (softmac->smac_state == SOFTMAC_READY)
-		goto done;
-	rw_exit(&softmac->smac_lock);
+	ASSERT(MAC_PERIM_HELD(softmac->smac_mh));
+	ASSERT(softmac->smac_lower_state == SOFTMAC_INITIALIZED);
 
 	if ((err = softmac_lower_setup(softmac, &slp)) != 0)
 		return (err);
 
-	rw_enter(&softmac->smac_lock, RW_WRITER);
-	ASSERT(softmac->smac_state == SOFTMAC_INITIALIZED);
 	softmac->smac_lower = slp;
-	softmac->smac_state = SOFTMAC_READY;
-done:
-	rw_exit(&softmac->smac_lock);
+	softmac->smac_lower_state = SOFTMAC_READY;
 	return (0);
 }
 
@@ -1087,7 +1267,8 @@ softmac_m_close(void *arg)
 	softmac_t	*softmac = arg;
 	softmac_lower_t	*slp;
 
-	rw_enter(&softmac->smac_lock, RW_WRITER);
+	ASSERT(MAC_PERIM_HELD(softmac->smac_mh));
+	ASSERT(softmac->smac_lower_state == SOFTMAC_READY);
 	slp = softmac->smac_lower;
 	ASSERT(slp != NULL);
 
@@ -1095,9 +1276,8 @@ softmac_m_close(void *arg)
 	 * Note that slp is destroyed when lh is closed.
 	 */
 	(void) ldi_close(slp->sl_lh, FREAD|FWRITE, kcred);
-	softmac->smac_state = SOFTMAC_INITIALIZED;
+	softmac->smac_lower_state = SOFTMAC_INITIALIZED;
 	softmac->smac_lower = NULL;
-	rw_exit(&softmac->smac_lock);
 }
 
 int
@@ -1146,7 +1326,10 @@ again:
 		 * be recreated when device fails to detach (as this device
 		 * is held).
 		 */
+		mutex_enter(&smac_global_lock);
 		rw_exit(&softmac_hash_lock);
+		cv_wait(&smac_global_cv, &smac_global_lock);
+		mutex_exit(&smac_global_lock);
 		goto again;
 	}
 
@@ -1155,16 +1338,15 @@ again:
 	 */
 	mutex_enter(&softmac->smac_mutex);
 	softmac->smac_hold_cnt++;
-	mutex_exit(&softmac->smac_mutex);
-
 	rw_exit(&softmac_hash_lock);
 
 	/*
 	 * Wait till the device is fully attached.
 	 */
-	mutex_enter(&softmac->smac_mutex);
-	while (!(softmac->smac_flags & SOFTMAC_ATTACH_DONE))
+	while (softmac->smac_state != SOFTMAC_ATTACH_DONE)
 		cv_wait(&softmac->smac_cv, &softmac->smac_mutex);
+
+	SOFTMAC_STATE_VERIFY(softmac);
 
 	if ((err = softmac->smac_attacherr) != 0)
 		softmac->smac_hold_cnt--;

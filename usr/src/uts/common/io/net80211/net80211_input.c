@@ -39,6 +39,7 @@
  * Process received frame
  */
 
+#include <sys/mac_provider.h>
 #include <sys/byteorder.h>
 #include <sys/strsun.h>
 #include "net80211_impl.h"

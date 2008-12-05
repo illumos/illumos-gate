@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/exacct.h>
 #include <sys/exacct_catalog.h>
 #include <sys/disp.h>
@@ -43,6 +41,7 @@
 #include <sys/sysmacros.h>
 #include <sys/bitmap.h>
 #include <sys/msacct.h>
+#include <sys/mac.h>
 
 /*
  * exacct usage and recording routines
@@ -1160,6 +1159,271 @@ exacct_commit_proc(proc_t *p, int wstat)
 		gacg = zone_getspecific(exacct_zone_key, global_zone);
 		exacct_do_commit_proc(&gacg->ac_proc, p, wstat);
 	}
+}
+
+static int
+exacct_attach_netstat_item(net_stat_t *ns, ea_object_t *record, int res)
+{
+	int		attached = 1;
+
+	switch (res) {
+	case AC_NET_NAME:
+		(void) ea_attach_item(record, ns->ns_name,
+		    strlen(ns->ns_name) + 1, EXT_STRING | EXD_NET_STATS_NAME);
+		break;
+	case AC_NET_CURTIME:
+		{
+			uint64_t	now;
+			timestruc_t	ts;
+
+			gethrestime(&ts);
+			now = (uint64_t)(ulong_t)ts.tv_sec;
+			(void) ea_attach_item(record,  &now, sizeof (uint64_t),
+			    EXT_UINT64 | EXD_NET_STATS_CURTIME);
+		}
+		break;
+	case AC_NET_IBYTES:
+		(void) ea_attach_item(record, &ns->ns_ibytes,
+		    sizeof (uint64_t), EXT_UINT64 | EXD_NET_STATS_IBYTES);
+		break;
+	case AC_NET_OBYTES:
+		(void) ea_attach_item(record, &ns->ns_obytes,
+		    sizeof (uint64_t), EXT_UINT64 | EXD_NET_STATS_OBYTES);
+		break;
+	case AC_NET_IPKTS:
+		(void) ea_attach_item(record, &ns->ns_ipackets,
+		    sizeof (uint64_t), EXT_UINT64 | EXD_NET_STATS_IPKTS);
+		break;
+	case AC_NET_OPKTS:
+		(void) ea_attach_item(record, &ns->ns_opackets,
+		    sizeof (uint64_t), EXT_UINT64 | EXD_NET_STATS_OPKTS);
+		break;
+	case AC_NET_IERRPKTS:
+		(void) ea_attach_item(record, &ns->ns_ierrors,
+		    sizeof (uint64_t), EXT_UINT64 | EXD_NET_STATS_IERRPKTS);
+		break;
+	case AC_NET_OERRPKTS:
+		(void) ea_attach_item(record, &ns->ns_oerrors,
+		    sizeof (uint64_t), EXT_UINT64 | EXD_NET_STATS_OERRPKTS);
+		break;
+	default:
+		attached = 0;
+	}
+	return (attached);
+}
+
+static int
+exacct_attach_netdesc_item(net_desc_t *nd, ea_object_t *record, int res)
+{
+	int attached = 1;
+
+	switch (res) {
+	case AC_NET_NAME:
+		(void) ea_attach_item(record, nd->nd_name,
+		    strlen(nd->nd_name) + 1, EXT_STRING | EXD_NET_DESC_NAME);
+		break;
+	case AC_NET_DEVNAME:
+		(void) ea_attach_item(record, nd->nd_devname,
+		    strlen(nd->nd_devname) + 1, EXT_STRING |
+		    EXD_NET_DESC_DEVNAME);
+		break;
+	case AC_NET_EHOST:
+		(void) ea_attach_item(record, &nd->nd_ehost,
+		    sizeof (nd->nd_ehost), EXT_RAW | EXD_NET_DESC_EHOST);
+		break;
+	case AC_NET_EDEST:
+		(void) ea_attach_item(record, &nd->nd_edest,
+		    sizeof (nd->nd_edest), EXT_RAW | EXD_NET_DESC_EDEST);
+		break;
+	case AC_NET_VLAN_TPID:
+		(void) ea_attach_item(record, &nd->nd_vlan_tpid,
+		    sizeof (ushort_t), EXT_UINT16 | EXD_NET_DESC_VLAN_TPID);
+		break;
+	case AC_NET_VLAN_TCI:
+		(void) ea_attach_item(record, &nd->nd_vlan_tci,
+		    sizeof (ushort_t), EXT_UINT16 | EXD_NET_DESC_VLAN_TCI);
+		break;
+	case AC_NET_SAP:
+		(void) ea_attach_item(record, &nd->nd_sap,
+		    sizeof (ushort_t), EXT_UINT16 | EXD_NET_DESC_SAP);
+		break;
+	case AC_NET_PRIORITY:
+		(void) ea_attach_item(record, &nd->nd_priority,
+		    sizeof (ushort_t), EXT_UINT16 | EXD_NET_DESC_PRIORITY);
+		break;
+	case AC_NET_BWLIMIT:
+		(void) ea_attach_item(record, &nd->nd_bw_limit,
+		    sizeof (uint64_t), EXT_UINT64 | EXD_NET_DESC_BWLIMIT);
+		break;
+	case AC_NET_SADDR:
+		if (nd->nd_isv4) {
+			(void) ea_attach_item(record, &nd->nd_saddr[3],
+			    sizeof (uint32_t), EXT_UINT32 |
+			    EXD_NET_DESC_V4SADDR);
+		} else {
+			(void) ea_attach_item(record, &nd->nd_saddr,
+			    sizeof (nd->nd_saddr), EXT_RAW |
+			    EXD_NET_DESC_V6SADDR);
+		}
+		break;
+	case AC_NET_DADDR:
+		if (nd->nd_isv4) {
+			(void) ea_attach_item(record, &nd->nd_daddr[3],
+			    sizeof (uint32_t), EXT_UINT32 |
+			    EXD_NET_DESC_V4DADDR);
+		} else {
+			(void) ea_attach_item(record, &nd->nd_daddr,
+			    sizeof (nd->nd_daddr), EXT_RAW |
+			    EXD_NET_DESC_V6DADDR);
+		}
+		break;
+	case AC_NET_SPORT:
+		(void) ea_attach_item(record, &nd->nd_sport,
+		    sizeof (uint16_t), EXT_UINT16 | EXD_NET_DESC_SPORT);
+		break;
+	case AC_NET_DPORT:
+		(void) ea_attach_item(record, &nd->nd_dport,
+		    sizeof (uint16_t), EXT_UINT16 | EXD_NET_DESC_DPORT);
+		break;
+	case AC_NET_PROTOCOL:
+		(void) ea_attach_item(record, &nd->nd_protocol,
+		    sizeof (uint8_t), EXT_UINT8 | EXD_NET_DESC_PROTOCOL);
+		break;
+	case AC_NET_DSFIELD:
+		(void) ea_attach_item(record, &nd->nd_dsfield,
+		    sizeof (uint8_t), EXT_UINT8 | EXD_NET_DESC_DSFIELD);
+		break;
+	default:
+		attached = 0;
+	}
+	return (attached);
+}
+
+static ea_object_t *
+exacct_assemble_net_record(void *ninfo, ulong_t *mask, ea_catalog_t record_type,
+    int what)
+{
+	int		res;
+	int		count;
+	ea_object_t	*record;
+
+	/*
+	 * Assemble usage values into group.
+	 */
+	record = ea_alloc_group(EXT_GROUP | EXC_DEFAULT | record_type);
+	for (res = 1, count = 0; res <= AC_NET_MAX_RES; res++)
+		if (BT_TEST(mask, res)) {
+			if (what == EX_NET_LNDESC_REC ||
+			    what == EX_NET_FLDESC_REC) {
+				count += exacct_attach_netdesc_item(
+				    (net_desc_t *)ninfo, record, res);
+			} else {
+				count += exacct_attach_netstat_item(
+				    (net_stat_t *)ninfo, record, res);
+			}
+		}
+	if (count == 0) {
+		ea_free_object(record, EUP_ALLOC);
+		record = NULL;
+	}
+	return (record);
+}
+
+int
+exacct_assemble_net_usage(ac_info_t *ac_net, void *ninfo,
+    int (*callback)(ac_info_t *, void *, size_t, void *, size_t, size_t *),
+    void *ubuf, size_t ubufsize, size_t *actual, int what)
+{
+	ulong_t		mask[AC_MASK_SZ];
+	ea_object_t	*net_desc;
+	ea_catalog_t	record_type;
+	void		*buf;
+	size_t		bufsize;
+	int		ret;
+
+	mutex_enter(&ac_net->ac_lock);
+	if (ac_net->ac_state == AC_OFF) {
+		mutex_exit(&ac_net->ac_lock);
+		return (ENOTACTIVE);
+	}
+	bt_copy(&ac_net->ac_mask[0], mask, AC_MASK_SZ);
+	mutex_exit(&ac_net->ac_lock);
+
+	switch (what) {
+	case EX_NET_LNDESC_REC:
+		record_type = EXD_GROUP_NET_LINK_DESC;
+		break;
+	case EX_NET_LNSTAT_REC:
+		record_type = EXD_GROUP_NET_LINK_STATS;
+		break;
+	case EX_NET_FLDESC_REC:
+		record_type = EXD_GROUP_NET_FLOW_DESC;
+		break;
+	case EX_NET_FLSTAT_REC:
+		record_type = EXD_GROUP_NET_FLOW_STATS;
+		break;
+	}
+
+	net_desc = exacct_assemble_net_record(ninfo, mask, record_type, what);
+	if (net_desc == NULL)
+		return (0);
+
+	/*
+	 * Pack object into buffer and pass to callback.
+	 */
+	bufsize = ea_pack_object(net_desc, NULL, 0);
+	buf = kmem_alloc(bufsize, KM_NOSLEEP);
+	if (buf == NULL)
+		return (ENOMEM);
+
+	(void) ea_pack_object(net_desc, buf, bufsize);
+
+	ret = callback(ac_net, ubuf, ubufsize, buf, bufsize, actual);
+
+	/*
+	 * Free all previously allocations.
+	 */
+	kmem_free(buf, bufsize);
+	ea_free_object(net_desc, EUP_ALLOC);
+	return (ret);
+}
+
+int
+exacct_commit_netinfo(void *arg, int what)
+{
+	size_t			size;
+	ulong_t			mask[AC_MASK_SZ];
+	struct exacct_globals	*acg;
+	ac_info_t		*ac_net;
+
+	if (exacct_zone_key == ZONE_KEY_UNINITIALIZED) {
+		/*
+		 * acctctl module not loaded. Nothing to do.
+		 */
+		return (ENOTACTIVE);
+	}
+
+	/*
+	 * Even though each zone nominally has its own flow accounting settings
+	 * (ac_flow), these are only maintained by and for the global zone.
+	 *
+	 * If this were to change in the future, this function should grow a
+	 * second zoneid (or zone) argument, and use the corresponding zone's
+	 * settings rather than always using those of the global zone.
+	 */
+	acg = zone_getspecific(exacct_zone_key, global_zone);
+	ac_net = &acg->ac_net;
+
+	mutex_enter(&ac_net->ac_lock);
+	if (ac_net->ac_state == AC_OFF) {
+		mutex_exit(&ac_net->ac_lock);
+		return (ENOTACTIVE);
+	}
+	bt_copy(&ac_net->ac_mask[0], mask, AC_MASK_SZ);
+	mutex_exit(&ac_net->ac_lock);
+
+	return (exacct_assemble_net_usage(ac_net, arg, exacct_commit_callback,
+	    NULL, 0, &size, what));
 }
 
 static int

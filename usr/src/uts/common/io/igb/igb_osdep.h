@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,14 +20,16 @@
  */
 
 /*
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ */
+
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #ifndef	_IGB_OSDEP_H
 #define	_IGB_OSDEP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -95,6 +95,18 @@ extern "C" {
 #define	IEEE_ESR_1000T_FD_CAPS	0x2000	/* 1000T FD capable */
 #define	IEEE_ESR_1000X_HD_CAPS	0x4000	/* 1000X HD capable */
 #define	IEEE_ESR_1000X_FD_CAPS	0x8000	/* 1000X FD capable */
+
+/* VMDq MODE supported by hardware */
+#define	E1000_VMDQ_OFF		0
+#define	E1000_VMDQ_MAC		1
+#define	E1000_VMDQ_MAC_RSS	2
+
+/* VMDq based on packet destination MAC address */
+#define	E1000_MRQC_ENABLE_VMDQ_MAC_GROUP	0x00000003
+/* VMDq based on packet destination MAC address and RSS */
+#define	E1000_MRQC_ENABLE_VMDQ_MAC_RSS_GROUP	0x00000005
+/* The default queue in each VMDqs */
+#define	E1000_VMDQ_MAC_GROUP_DEFAULT_QUEUE	0x100
 
 #define	E1000_WRITE_FLUSH(a)	(void) E1000_READ_REG(a, E1000_STATUS)
 

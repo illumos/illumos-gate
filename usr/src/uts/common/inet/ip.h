@@ -50,6 +50,7 @@ extern "C" {
 #ifdef _KERNEL
 #include <netinet/ip6.h>
 #include <sys/avl.h>
+#include <sys/list.h>
 #include <sys/vmem.h>
 #include <sys/squeue.h>
 #include <net/route.h>
@@ -379,6 +380,13 @@ typedef struct ipf_s {
 	uint16_t	ipf_checksum_flags; /* Hardware checksum flags */
 	uint32_t	ipf_checksum;	/* Partial checksum of fragment data */
 } ipf_t;
+
+/*
+ * IPv4 Fragments
+ */
+#define	IS_V4_FRAGMENT(ipha_fragment_offset_and_flags)			\
+	(((ntohs(ipha_fragment_offset_and_flags) & IPH_OFFSET) != 0) ||	\
+	((ntohs(ipha_fragment_offset_and_flags) & IPH_MF) != 0))
 
 #define	ipf_src	V4_PART_OF_V6(ipf_v6src)
 #define	ipf_dst	V4_PART_OF_V6(ipf_v6dst)
@@ -1718,9 +1726,10 @@ typedef union ill_g_head_u {
 #define	ILL_CAPAB_MDT		0x04		/* Multidata Transmit */
 #define	ILL_CAPAB_HCKSUM	0x08		/* Hardware checksumming */
 #define	ILL_CAPAB_ZEROCOPY	0x10		/* Zero-copy */
-#define	ILL_CAPAB_POLL		0x20		/* Polling Toggle */
-#define	ILL_CAPAB_SOFT_RING	0x40		/* Soft_Ring capability */
-#define	ILL_CAPAB_LSO		0x80		/* Large Segment Offload */
+#define	ILL_CAPAB_DLD		0x20		/* DLD capabilities */
+#define	ILL_CAPAB_DLD_POLL	0x40		/* Polling */
+#define	ILL_CAPAB_DLD_DIRECT	0x80		/* Direct function call */
+#define	ILL_CAPAB_DLD_LSO	0x100		/* Large Segment Offload */
 
 /*
  * Per-ill Multidata Transmit capabilities.
@@ -1743,9 +1752,9 @@ typedef struct ill_hcksum_capab_s ill_hcksum_capab_t;
 typedef struct ill_zerocopy_capab_s ill_zerocopy_capab_t;
 
 /*
- * Per-ill Polling/soft ring capbilities.
+ * DLD capbilities.
  */
-typedef struct ill_dls_capab_s ill_dls_capab_t;
+typedef struct ill_dld_capab_s ill_dld_capab_t;
 
 /*
  * Per-ill polling resource map.
@@ -1762,7 +1771,6 @@ typedef struct ill_lso_capab_s ill_lso_capab_t;
 #define	ILL_CONDEMNED		0x02	/* No more new ref's to the ILL */
 #define	ILL_CHANGING		0x04	/* ILL not globally visible */
 #define	ILL_DL_UNBIND_IN_PROGRESS	0x08	/* UNBIND_REQ is sent */
-#define	ILL_SOFT_RING_ASSIGN	0x10	/* Making soft ring assignment */
 
 /* Is this an ILL whose source address is used by other ILL's ? */
 #define	IS_USESRC_ILL(ill)			\
@@ -1870,8 +1878,10 @@ typedef struct ill_s {
 
 		ill_note_link : 1,	/* supports link-up notification */
 		ill_capab_reneg : 1, /* capability renegotiation to be done */
+		ill_dld_capab_inprog : 1, /* direct dld capab call in prog */
 		ill_need_recover_multicast : 1,
-		ill_pad_to_bit_31 : 17;
+
+		ill_pad_to_bit_31 : 16;
 
 	/* Following bit fields protected by ill_lock */
 	uint_t
@@ -1883,6 +1893,7 @@ typedef struct ill_s {
 		ill_arp_bringup_pending : 1,
 		ill_mtu_userspecified : 1, /* SIOCSLIFLNKINFO has set the mtu */
 		ill_arp_extend : 1,	/* ARP has DAD extensions */
+
 		ill_pad_bit_31 : 25;
 
 	/*
@@ -1903,15 +1914,17 @@ typedef struct ill_s {
 	/*
 	 * Capabilities related fields.
 	 */
-	uint_t  ill_dlpi_capab_state;	/* State of capability query, IDS_* */
+	uint_t  ill_dlpi_capab_state;	/* State of capability query, IDCS_* */
+	uint_t	ill_capab_pending_cnt;
 	uint64_t ill_capabilities;	/* Enabled capabilities, ILL_CAPAB_* */
 	ill_mdt_capab_t	*ill_mdt_capab;	/* Multidata Transmit capabilities */
 	ill_ipsec_capab_t *ill_ipsec_capab_ah;	/* IPsec AH capabilities */
 	ill_ipsec_capab_t *ill_ipsec_capab_esp;	/* IPsec ESP capabilities */
 	ill_hcksum_capab_t *ill_hcksum_capab; /* H/W cksumming capabilities */
 	ill_zerocopy_capab_t *ill_zerocopy_capab; /* Zero-copy capabilities */
-	ill_dls_capab_t *ill_dls_capab; /* Polling, soft ring capabilities */
-	ill_lso_capab_t *ill_lso_capab; /* Large Segment Offload capabilities */
+	ill_dld_capab_t *ill_dld_capab; /* DLD capabilities */
+	ill_lso_capab_t	*ill_lso_capab;	/* Large Segment Offload capabilities */
+	mblk_t	*ill_capab_reset_mp;	/* Preallocated mblk for capab reset */
 
 	/*
 	 * New fields for IPv6
@@ -1989,6 +2002,7 @@ typedef struct ill_s {
 	zoneid_t	ill_zoneid;
 	ip_stack_t	*ill_ipst;	/* Corresponds to a netstack_hold */
 	uint32_t	ill_dhcpinit;	/* IP_DHCPINIT_IFs for ill */
+	void		*ill_flownotify_mh; /* Tx flow ctl, mac cb handle */
 	uint_t		ill_ilm_cnt;    /* ilms referencing this ill */
 	uint_t		ill_ipallmulti_cnt; /* ip_join_allmulti() calls */
 } ill_t;
@@ -2069,6 +2083,7 @@ typedef struct ill_s {
  * ill_type			ipsq + down ill		only when ill is up
  * ill_dlpi_multicast_state	ill_lock		ill_lock
  * ill_dlpi_fastpath_state	ill_lock		ill_lock
+ * ill_dlpi_capab_state		ipsq			ipsq
  * ill_max_hops			ipsq			Not atomic
  *
  * ill_max_mtu
@@ -2110,6 +2125,8 @@ typedef struct ill_s {
  * ill_trace			ill_lock		ill_lock
  * ill_usesrc_grp_next		ill_g_usesrc_lock	ill_g_usesrc_lock
  * ill_dhcpinit			atomics			atomics
+ * ill_flownotify_mh		write once		write once
+ * ill_capab_pending_cnt	ipsq			ipsq
  */
 
 /*
@@ -2182,12 +2199,21 @@ typedef struct ipmx_s {
  * State for detecting if a driver supports certain features.
  * Support for DL_ENABMULTI_REQ uses ill_dlpi_multicast_state.
  * Support for DLPI M_DATA fastpath uses ill_dlpi_fastpath_state.
- * Support for DL_CAPABILITY_REQ uses ill_dlpi_capab_state.
  */
 #define	IDS_UNKNOWN	0	/* No DLPI request sent */
 #define	IDS_INPROGRESS	1	/* DLPI request sent */
 #define	IDS_OK		2	/* DLPI request completed successfully */
 #define	IDS_FAILED	3	/* DLPI request failed */
+
+/* Support for DL_CAPABILITY_REQ uses ill_dlpi_capab_state. */
+enum {
+	IDCS_UNKNOWN,
+	IDCS_PROBE_SENT,
+	IDCS_OK,
+	IDCS_RESET_SENT,
+	IDCS_RENEG,
+	IDCS_FAILED
+};
 
 /* Named Dispatch Parameter Management Structure */
 typedef struct ipparam_s {
@@ -3165,6 +3191,8 @@ extern int	ip_opt_set_ill(conn_t *, int, boolean_t, boolean_t,
 extern void	ip_rput(queue_t *, mblk_t *);
 extern void	ip_input(ill_t *, ill_rx_ring_t *, mblk_t *,
     struct mac_header_info_s *);
+extern mblk_t	*ip_accept_tcp(ill_t *, ill_rx_ring_t *, squeue_t *,
+    mblk_t *, mblk_t **, uint_t *cnt);
 extern void	ip_rput_dlpi(queue_t *, mblk_t *);
 extern void	ip_rput_forward(ire_t *, ipha_t *, mblk_t *, ill_t *);
 extern void	ip_rput_forward_multicast(ipaddr_t, mblk_t *, ipif_t *);
@@ -3201,13 +3229,13 @@ extern ipaddr_t ip_net_mask(ipaddr_t);
 extern void	ip_newroute(queue_t *, mblk_t *, ipaddr_t, conn_t *, zoneid_t,
 		    ip_stack_t *);
 extern ipxmit_state_t	ip_xmit_v4(mblk_t *, ire_t *, struct ipsec_out_s *,
-    boolean_t);
+    boolean_t, conn_t *);
 extern int	ip_hdr_complete(ipha_t *, zoneid_t, ip_stack_t *);
 
 extern struct qinit iprinitv6;
 extern struct qinit ipwinitv6;
 
-extern void	conn_drain_insert(conn_t *connp);
+extern	void	conn_drain_insert(conn_t *connp);
 extern	int	conn_ipsec_length(conn_t *connp);
 extern void	ip_wput_ipsec_out(queue_t *, mblk_t *, ipha_t *, ill_t *,
     ire_t *);
@@ -3437,17 +3465,22 @@ struct ill_zerocopy_capab_s {
 };
 
 struct ill_lso_capab_s {
-	uint_t	ill_lso_version;	/* interface version */
 	uint_t	ill_lso_on;		/* on/off switch for LSO on this ILL */
 	uint_t	ill_lso_flags;		/* capabilities */
 	uint_t	ill_lso_max;		/* maximum size of payload */
 };
 
-/* Possible ill_states */
-#define	ILL_RING_INPROC		3	/* Being assigned to squeue */
-#define	ILL_RING_INUSE		2	/* Already Assigned to Rx Ring */
-#define	ILL_RING_BEING_FREED	1	/* Being Unassigned */
-#define	ILL_RING_FREE		0	/* Available to be assigned to Ring */
+/*
+ * rr_ring_state cycles in the order shown below from RR_FREE through
+ * RR_FREE_IN_PROG and  back to RR_FREE.
+ */
+typedef enum {
+	RR_FREE,			/* Free slot */
+	RR_SQUEUE_UNBOUND,		/* Ring's squeue is unbound */
+	RR_SQUEUE_BIND_INPROG,		/* Ring's squeue bind in progress */
+	RR_SQUEUE_BOUND,		/* Ring's squeue bound to cpu */
+	RR_FREE_INPROG			/* Ring is being freed */
+} ip_ring_state_t;
 
 #define	ILL_MAX_RINGS		256	/* Max num of rx rings we can manage */
 #define	ILL_POLLING		0x01	/* Polling in use */
@@ -3457,73 +3490,92 @@ struct ill_lso_capab_s {
  * we need to duplicate the definitions here because we cannot
  * include mac/dls header files here.
  */
-typedef void	(*ip_mac_blank_t)(void *, time_t, uint_t);
-typedef void	(*ip_dld_tx_t)(void *, mblk_t *);
+typedef void	*ip_mac_tx_cookie_t;
+typedef void	(*ip_mac_intr_disable_t)(void *);
+typedef void	(*ip_mac_intr_enable_t)(void *);
+typedef void	*(*ip_dld_tx_t)(void *, mblk_t *, uint64_t, uint16_t);
+typedef	void	(*ip_flow_enable_t)(void *, ip_mac_tx_cookie_t);
+typedef void	*(*ip_dld_callb_t)(void *, ip_flow_enable_t, void *);
+typedef int	(*ip_capab_func_t)(void *, uint_t, void *, uint_t);
 
-typedef void	(*ip_dls_chg_soft_ring_t)(void *, int);
-typedef void	(*ip_dls_bind_t)(void *, processorid_t);
-typedef void	(*ip_dls_unbind_t)(void *);
+/*
+ * POLLING README
+ * sq_get_pkts() is called to pick packets from softring in poll mode. It
+ * calls rr_rx to get the chain and process it with rr_ip_accept.
+ * rr_rx = mac_soft_ring_poll() to pick packets
+ * rr_ip_accept = ip_accept_tcp() to process packets
+ */
 
+/*
+ * XXX: With protocol, service specific squeues, they will have
+ * specific acceptor functions.
+ */
+typedef	mblk_t *(*ip_mac_rx_t)(void *, size_t);
+typedef mblk_t *(*ip_accept_t)(ill_t *, ill_rx_ring_t *,
+    squeue_t *, mblk_t *, mblk_t **, uint_t *);
+
+/*
+ * rr_intr_enable, rr_intr_disable, rr_rx_handle, rr_rx:
+ * May be accessed while in the squeue AND after checking that SQS_POLL_CAPAB
+ * is set.
+ *
+ * rr_ring_state: Protected by ill_lock.
+ */
 struct ill_rx_ring {
-	ip_mac_blank_t		rr_blank; /* Driver interrupt blanking func */
-	void			*rr_handle; /* Handle for Rx ring */
+	ip_mac_intr_disable_t	rr_intr_disable; /* Interrupt disabling func */
+	ip_mac_intr_enable_t	rr_intr_enable;	/* Interrupt enabling func */
+	void			*rr_intr_handle; /* Handle interrupt funcs */
+	ip_mac_rx_t		rr_rx;		/* Driver receive function */
+	ip_accept_t		rr_ip_accept;	/* IP accept function */
+	void			*rr_rx_handle;	/* Handle for Rx ring */
 	squeue_t		*rr_sqp; /* Squeue the ring is bound to */
-	ill_t			*rr_ill; /* back pointer to ill */
-	clock_t			rr_poll_time; /* Last lbolt polling was used */
-	uint32_t		rr_poll_state; /* polling state flags */
-	uint32_t		rr_max_blank_time; /* Max interrupt blank */
-	uint32_t		rr_min_blank_time; /* Min interrupt blank */
-	uint32_t		rr_max_pkt_cnt; /* Max pkts before interrupt */
-	uint32_t		rr_min_pkt_cnt; /* Mix pkts before interrupt */
-	uint32_t		rr_normal_blank_time; /* Normal intr freq */
-	uint32_t		rr_normal_pkt_cnt; /* Normal intr pkt cnt */
-	uint32_t		rr_ring_state; /* State of this ring */
+	ill_t			*rr_ill;	/* back pointer to ill */
+	ip_ring_state_t		rr_ring_state;	/* State of this ring */
 };
 
-struct ill_dls_capab_s {
-	ip_dld_tx_t		ill_tx;		/* Driver Tx routine */
-	void			*ill_tx_handle;	/* Driver Tx handle */
-	ip_dls_chg_soft_ring_t	ill_dls_change_status;
-						/* change soft ring fanout */
-	ip_dls_bind_t		ill_dls_bind;	/* to add CPU affinity */
-	ip_dls_unbind_t		ill_dls_unbind;	/* remove CPU affinity */
-	ill_rx_ring_t		*ill_ring_tbl; /* Ring to Sqp mapping table */
-	uint_t			ill_dls_soft_ring_cnt; /* Number of soft ring */
-	conn_t			*ill_unbind_conn; /* Conn used during unplumb */
+/*
+ * IP - DLD direct function call capability
+ * Suffixes, df - dld function, dh - dld handle,
+ * cf - client (IP) function, ch - client handle
+ */
+typedef struct ill_dld_direct_s {		/* DLD provided driver Tx */
+	ip_dld_tx_t		idd_tx_df;	/* str_mdata_fastpath_put */
+	void			*idd_tx_dh;	/* dld_str_t *dsp */
+	ip_dld_callb_t		idd_tx_cb_df;	/* mac_tx_srs_notify */
+	void			*idd_tx_cb_dh;	/* mac_client_handle_t *mch */
+} ill_dld_direct_t;
+
+/* IP - DLD polling capability */
+typedef struct ill_dld_poll_s {
+	ill_rx_ring_t		idp_ring_tbl[ILL_MAX_RINGS];
+} ill_dld_poll_t;
+
+/* Describes ill->ill_dld_capab */
+struct ill_dld_capab_s {
+	ip_capab_func_t		idc_capab_df;	/* dld_capab_func */
+	void			*idc_capab_dh;	/* dld_str_t *dsp */
+	ill_dld_direct_t	idc_direct;
+	ill_dld_poll_t		idc_poll;
 };
 
 /*
  * IP squeues exports
  */
-extern int 		ip_squeue_profile;
-extern int 		ip_squeue_bind;
 extern boolean_t 	ip_squeue_fanout;
-extern boolean_t	ip_squeue_soft_ring;
-extern uint_t		ip_threads_per_cpu;
-extern uint_t		ip_squeues_per_cpu;
-extern uint_t		ip_soft_rings_cnt;
 
-typedef struct squeue_set_s {
-	kmutex_t	sqs_lock;
-	struct squeue_s	**sqs_list;
-	int		sqs_size;
-	int		sqs_max_size;
-	processorid_t	sqs_bind;
-} squeue_set_t;
-
-#define	IP_SQUEUE_GET(hint) 						\
-	((!ip_squeue_fanout) ?	(CPU->cpu_squeue_set->sqs_list[0]) :	\
-		ip_squeue_random(hint))
-
-typedef void (*squeue_func_t)(squeue_t *, mblk_t *, sqproc_t, void *, uint8_t);
+#define	IP_SQUEUE_GET(hint) ip_squeue_random(hint)
 
 extern void ip_squeue_init(void (*)(squeue_t *));
 extern squeue_t	*ip_squeue_random(uint_t);
 extern squeue_t *ip_squeue_get(ill_rx_ring_t *);
-extern int ip_squeue_bind_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
+extern squeue_t *ip_squeue_getfree(pri_t);
+extern int ip_squeue_cpu_move(squeue_t *, processorid_t);
+extern void *ip_squeue_add_ring(ill_t *, void *);
+extern void ip_squeue_bind_ring(ill_t *, ill_rx_ring_t *, processorid_t);
+extern void ip_squeue_clean_ring(ill_t *, ill_rx_ring_t *);
+extern void ip_squeue_quiesce_ring(ill_t *, ill_rx_ring_t *);
+extern void ip_squeue_restart_ring(ill_t *, ill_rx_ring_t *);
 extern void ip_squeue_clean_all(ill_t *);
-extern void ip_soft_ring_assignment(ill_t *, ill_rx_ring_t *,
-    mblk_t *, struct mac_header_info_s *);
 
 extern void ip_resume_tcp_bind(void *, mblk_t *, void *);
 extern void tcp_wput(queue_t *, mblk_t *);
@@ -3580,6 +3632,9 @@ typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 #define	SQTAG_TCP_KSSL_INPUT		36
 #define	SQTAG_TCP_DROP_Q0		37
 #define	SQTAG_TCP_CONN_REQ_2		38
+#define	SQTAG_IP_INPUT_RX_RING		39
+#define	SQTAG_SQUEUE_CHANGE		40
+#define	SQTAG_CONNECT_FINISH		41
 
 #define	NOT_OVER_IP(ip_wq)	\
 	(ip_wq->q_next != NULL ||	\

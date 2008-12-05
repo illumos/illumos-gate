@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_EXACCT_CATALOG_H
 #define	_SYS_EXACCT_CATALOG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -104,6 +101,10 @@ extern "C" {
 #define	EXD_GROUP_FLOW		0x000109
 #define	EXD_GROUP_RFMA		0x00010a
 #define	EXD_GROUP_FMA		0x00010b
+#define	EXD_GROUP_NET_LINK_DESC	0X00010c
+#define	EXD_GROUP_NET_FLOW_DESC	0X00010d
+#define	EXD_GROUP_NET_LINK_STATS	0X00010e
+#define	EXD_GROUP_NET_FLOW_STATS	0X00010f
 
 #define	EXD_PROC_PID		0x001000
 #define	EXD_PROC_UID		0x001001
@@ -203,6 +204,36 @@ extern "C" {
 #define	EXD_FMA_INODE		0x00400A
 #define	EXD_FMA_OFFSET		0x00400B
 #define	EXD_FMA_UUID		0x00400C
+
+/* For EXD_GROUP_FLDESC  and EXD_GROUP_LNDESC */
+#define	EXD_NET_DESC_NAME	0x005001
+#define	EXD_NET_DESC_EHOST	0x005002
+#define	EXD_NET_DESC_EDEST	0x005003
+#define	EXD_NET_DESC_VLAN_TPID	0x005004
+#define	EXD_NET_DESC_VLAN_TCI	0x005005
+#define	EXD_NET_DESC_SAP	0x005006
+#define	EXD_NET_DESC_PRIORITY	0x005007
+#define	EXD_NET_DESC_BWLIMIT	0x005008
+/* For EXD_GROUP_FLDESC  only */
+#define	EXD_NET_DESC_DEVNAME	0x005009
+#define	EXD_NET_DESC_V4SADDR	0x00500a
+#define	EXD_NET_DESC_V4DADDR	0x00500b
+#define	EXD_NET_DESC_V6SADDR	0x00500c
+#define	EXD_NET_DESC_V6DADDR	0x00500d
+#define	EXD_NET_DESC_SPORT	0x00500e
+#define	EXD_NET_DESC_DPORT	0x00500f
+#define	EXD_NET_DESC_PROTOCOL	0x005010
+#define	EXD_NET_DESC_DSFIELD	0x005011
+
+/* For EXD_NET_STATS */
+#define	EXD_NET_STATS_NAME	0x006000
+#define	EXD_NET_STATS_CURTIME	0x006001
+#define	EXD_NET_STATS_IBYTES	0x006002
+#define	EXD_NET_STATS_OBYTES	0x006003
+#define	EXD_NET_STATS_IPKTS	0x006004
+#define	EXD_NET_STATS_OPKTS	0x006005
+#define	EXD_NET_STATS_IERRPKTS	0x006006
+#define	EXD_NET_STATS_OERRPKTS	0x006007
 
 #ifdef	__cplusplus
 }

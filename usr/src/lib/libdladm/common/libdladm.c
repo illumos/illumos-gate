@@ -29,6 +29,7 @@
 #include <fcntl.h>
 #include <strings.h>
 #include <dirent.h>
+#include <stdlib.h>
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <libdladm_impl.h>
@@ -89,7 +90,7 @@ dladm_status2str(dladm_status_t status, char *buf)
 		s = "I/O error";
 		break;
 	case DLADM_STATUS_TEMPONLY:
-		s = "change cannot be persistent, specify -t please";
+		s = "change cannot be persistent";
 		break;
 	case DLADM_STATUS_TIMEDOUT:
 		s = "operation timed out";
@@ -126,6 +127,117 @@ dladm_status2str(dladm_status_t status, char *buf)
 		break;
 	case DLADM_STATUS_NONOTIF:
 		s = "link notification is not supported";
+		break;
+	case DLADM_STATUS_BADTIMEVAL:
+		s = "invalid time range";
+		break;
+	case DLADM_STATUS_INVALIDMACADDR:
+		s = "invalid MAC address value";
+		break;
+	case DLADM_STATUS_INVALIDMACADDRNIC:
+		s = "MAC address reserved for use by underlying data-link";
+		break;
+	case DLADM_STATUS_INVALIDMACADDRINUSE:
+		s = "MAC address is already in use";
+		break;
+	case DLADM_STATUS_MACFACTORYSLOTINVALID:
+		s = "invalid factory MAC address slot";
+		break;
+	case DLADM_STATUS_MACFACTORYSLOTUSED:
+		s = "factory MAC address slot already used";
+		break;
+	case DLADM_STATUS_MACFACTORYSLOTALLUSED:
+		s = "all factory MAC address slots are in use";
+		break;
+	case DLADM_STATUS_MACFACTORYNOTSUP:
+		s = "factory MAC address slots not supported";
+		break;
+	case DLADM_STATUS_INVALIDMACPREFIX:
+		s = "Invalid MAC address prefix value";
+		break;
+	case DLADM_STATUS_INVALIDMACPREFIXLEN:
+		s = "Invalid MAC address prefix length";
+		break;
+	case DLADM_STATUS_CPUMAX:
+		s = "non-existent processor ID";
+		break;
+	case DLADM_STATUS_CPUERR:
+		s = "could not determine processor status";
+		break;
+	case DLADM_STATUS_CPUNOTONLINE:
+		s = "processor not online";
+		break;
+	case DLADM_STATUS_DB_NOTFOUND:
+		s = "database not found";
+		break;
+	case DLADM_STATUS_DB_PARSE_ERR:
+		s = "database parse error";
+		break;
+	case DLADM_STATUS_PROP_PARSE_ERR:
+		s = "property parse error";
+		break;
+	case DLADM_STATUS_ATTR_PARSE_ERR:
+		s = "attribute parse error";
+		break;
+	case DLADM_STATUS_FLOW_DB_ERR:
+		s = "flow database error";
+		break;
+	case DLADM_STATUS_FLOW_DB_OPEN_ERR:
+		s = "flow database open error";
+		break;
+	case DLADM_STATUS_FLOW_DB_PARSE_ERR:
+		s = "flow database parse error";
+		break;
+	case DLADM_STATUS_FLOWPROP_DB_PARSE_ERR:
+		s = "flow property database parse error";
+		break;
+	case DLADM_STATUS_FLOW_ADD_ERR:
+		s = "flow add error";
+		break;
+	case DLADM_STATUS_FLOW_WALK_ERR:
+		s = "flow walk error";
+		break;
+	case DLADM_STATUS_FLOW_IDENTICAL:
+		s = "a flow with identical attributes exists";
+		break;
+	case DLADM_STATUS_FLOW_INCOMPATIBLE:
+		s = "flow(s) with incompatible attributes exists";
+		break;
+	case DLADM_STATUS_FLOW_EXISTS:
+		s = "link still has flows";
+		break;
+	case DLADM_STATUS_PERSIST_FLOW_EXISTS:
+		s = "persistent flow with the same name exists";
+		break;
+	case DLADM_STATUS_INVALID_IP:
+		s = "invalid IP address";
+		break;
+	case DLADM_STATUS_INVALID_PREFIXLEN:
+		s = "invalid IP prefix length";
+		break;
+	case DLADM_STATUS_INVALID_PROTOCOL:
+		s = "invalid IP protocol";
+		break;
+	case DLADM_STATUS_INVALID_PORT:
+		s = "invalid port number";
+		break;
+	case DLADM_STATUS_INVALID_DSF:
+		s = "invalid dsfield";
+		break;
+	case DLADM_STATUS_INVALID_DSFMASK:
+		s = "invalid dsfield mask";
+		break;
+	case DLADM_STATUS_INVALID_MACMARGIN:
+		s = "MTU check failed, use lower MTU or -f option";
+		break;
+	case DLADM_STATUS_BADPROP:
+		s = "invalid property";
+		break;
+	case DLADM_STATUS_MINMAXBW:
+		s = "minimum value for maxbw is 1.2M";
+		break;
+	case DLADM_STATUS_NO_HWRINGS:
+		s = "request hw rings failed";
 		break;
 	default:
 		s = "<unknown error>";
@@ -169,9 +281,98 @@ dladm_errno2status(int err)
 		return (DLADM_STATUS_LINKBUSY);
 	case EAGAIN:
 		return (DLADM_STATUS_TRYAGAIN);
+	case ENOTEMPTY:
+		return (DLADM_STATUS_FLOW_EXISTS);
+	case EOPNOTSUPP:
+		return (DLADM_STATUS_FLOW_INCOMPATIBLE);
+	case EALREADY:
+		return (DLADM_STATUS_FLOW_IDENTICAL);
 	default:
 		return (DLADM_STATUS_FAILED);
 	}
+}
+
+dladm_status_t
+dladm_str2bw(char *oarg, uint64_t *bw)
+{
+	char		*endp = NULL;
+	int64_t		n;
+	int		mult = 1;
+
+	n = strtoull(oarg, &endp, 10);
+
+	if ((errno != 0) || (strlen(endp) > 1))
+		return (DLADM_STATUS_BADARG);
+
+	if (n < 0)
+		return (DLADM_STATUS_BADVAL);
+
+	switch (*endp) {
+	case 'k':
+	case 'K':
+		mult = 1000;
+		break;
+	case 'm':
+	case 'M':
+	case '\0':
+		mult = 1000000;
+		break;
+	case 'g':
+	case 'G':
+		mult = 1000000000;
+		break;
+	case '%':
+		/*
+		 * percentages not supported for now,
+		 * see RFE 6540675
+		 */
+		return (DLADM_STATUS_NOTSUP);
+	default:
+		return (DLADM_STATUS_BADVAL);
+	}
+
+	*bw = n * mult;
+
+	/* check for overflow */
+	if (*bw / mult != n)
+		return (DLADM_STATUS_BADARG);
+
+	return (DLADM_STATUS_OK);
+}
+
+/*
+ * Convert bandwidth in bps to a string in mpbs.  For values greater
+ * than 1mbps or 1000000, print a whole mbps value.  For values that
+ * have fractional Mbps in whole Kbps , print the bandwidth in a manner
+ * simlilar to a floating point format.
+ *
+ *        bps       string
+ *          0            0
+ *        100            0
+ *       2000        0.002
+ *     431000        0.431
+ *    1000000            1
+ *    1030000        1.030
+ *  100000000          100
+ */
+const char *
+dladm_bw2str(int64_t bw, char *buf)
+{
+	int kbps, mbps;
+
+	kbps = (bw%1000000)/1000;
+	mbps = bw/1000000;
+	if (kbps != 0) {
+		if (mbps == 0)
+			(void) snprintf(buf, DLADM_STRSIZE, "0.%03u", kbps);
+		else
+			(void) snprintf(buf, DLADM_STRSIZE, "%5u.%03u", mbps,
+			    kbps);
+	} else {
+		(void) snprintf(buf, DLADM_STRSIZE, "%5u", mbps);
+	}
+
+	return (buf);
 }
 
 #define	LOCK_DB_PERMS	S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
@@ -240,6 +441,9 @@ dladm_class2str(datalink_class_t class, char *buf)
 		break;
 	case DATALINK_CLASS_VNIC:
 		s = "vnic";
+		break;
+	case DATALINK_CLASS_ETHERSTUB:
+		s = "etherstub";
 		break;
 	default:
 		s = "unknown";
@@ -490,4 +694,124 @@ dladm_valid_linkname(const char *link)
 	}
 
 	return (B_TRUE);
+}
+
+/*
+ * Convert priority string to a value.
+ */
+dladm_status_t
+dladm_str2pri(char *token, mac_priority_level_t *pri)
+{
+	if (strlen(token) == strlen("low") &&
+	    strncasecmp(token, "low", strlen("low")) == 0) {
+		*pri = MPL_LOW;
+	} else if (strlen(token) == strlen("medium") &&
+	    strncasecmp(token, "medium", strlen("medium")) == 0) {
+		*pri = MPL_MEDIUM;
+	} else if (strlen(token) == strlen("high") &&
+	    strncasecmp(token, "high", strlen("high")) == 0) {
+		*pri = MPL_HIGH;
+	} else {
+		return (DLADM_STATUS_BADVAL);
+	}
+	return (DLADM_STATUS_OK);
+}
+
+/*
+ * Convert priority value to a string.
+ */
+const char *
+dladm_pri2str(mac_priority_level_t pri, char *buf)
+{
+	const char	*s;
+
+	switch (pri) {
+	case MPL_LOW:
+		s = "low";
+		break;
+	case MPL_MEDIUM:
+		s = "medium";
+		break;
+	case MPL_HIGH:
+		s = "high";
+		break;
+	default:
+		s = "--";
+		break;
+	}
+	(void) snprintf(buf, DLADM_STRSIZE, "%s", dgettext(TEXT_DOMAIN, s));
+	return (buf);
+}
+
+void
+dladm_free_args(dladm_arg_list_t *list)
+{
+	if (list != NULL) {
+		free(list->al_buf);
+		free(list);
+	}
+}
+
+dladm_status_t
+dladm_parse_args(char *str, dladm_arg_list_t **listp, boolean_t novalues)
+{
+	dladm_arg_list_t	*list;
+	dladm_arg_info_t	*aip;
+	char			*buf, *curr;
+	int			len, i;
+
+	list = malloc(sizeof (dladm_arg_list_t));
+	if (list == NULL)
+		return (dladm_errno2status(errno));
+
+	list->al_count = 0;
+	list->al_buf = buf = strdup(str);
+	if (buf == NULL)
+		return (dladm_errno2status(errno));
+
+	curr = buf;
+	len = strlen(buf);
+	aip = NULL;
+	for (i = 0; i < len; i++) {
+		char		c = buf[i];
+		boolean_t	match = (c == '=' || c == ',');
+
+		if (!match && i != len - 1)
+			continue;
+
+		if (match) {
+			buf[i] = '\0';
+			if (*curr == '\0')
+				goto fail;
+		}
+
+		if (aip != NULL && c != '=') {
+			if (aip->ai_count > DLADM_MAX_ARG_VALS)
+				goto fail;
+
+			if (novalues)
+				goto fail;
+
+			aip->ai_val[aip->ai_count] = curr;
+			aip->ai_count++;
+		} else {
+			if (list->al_count > DLADM_MAX_ARG_VALS)
+				goto fail;
+
+			aip = &list->al_info[list->al_count];
+			aip->ai_name = curr;
+			aip->ai_count = 0;
+			list->al_count++;
+			if (c == ',')
+				aip = NULL;
+		}
+		curr = buf + i + 1;
+	}
+
+	*listp = list;
+	return (DLADM_STATUS_OK);
+
+fail:
+	dladm_free_args(list);
+	return (DLADM_STATUS_FAILED);
 }

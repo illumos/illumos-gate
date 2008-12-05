@@ -5044,7 +5044,7 @@ xge_hal_device_macaddr_find(xge_hal_device_t *hldev, macaddr_t wanted)
 		return XGE_HAL_ERR_INVALID_DEVICE;
 	}
 
-	for (i=1; i<XGE_HAL_MAX_MAC_ADDRESSES; i++) {
+	for (i=0; i<XGE_HAL_MAX_MAC_ADDRESSES; i++) {
 		(void) xge_hal_device_macaddr_get(hldev, i, &macaddr);
 		if (!xge_os_memcmp(macaddr, wanted, sizeof(macaddr_t))) {
 			return i;

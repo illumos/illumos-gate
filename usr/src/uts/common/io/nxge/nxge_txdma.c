@@ -31,7 +31,7 @@
 #include <sys/llc1.h>
 
 uint32_t 	nxge_reclaim_pending = TXDMA_RECLAIM_PENDING_DEFAULT;
-uint32_t	nxge_tx_minfree = 32;
+uint32_t	nxge_tx_minfree = 64;
 uint32_t	nxge_tx_intr_thres = 0;
 uint32_t	nxge_tx_max_gathers = TX_MAX_GATHER_POINTERS;
 uint32_t	nxge_tx_tiny_pack = 1;
@@ -53,9 +53,7 @@ extern ddi_device_acc_attr_t nxge_dev_buf_dma_acc_attr;
 extern ddi_dma_attr_t nxge_desc_dma_attr;
 extern ddi_dma_attr_t nxge_tx_dma_attr;
 
-extern int nxge_serial_tx(mblk_t *mp, void *arg);
-
-void nxge_txdma_freemsg_task(p_tx_ring_t tx_ring_p);
+extern void nxge_tx_ring_task(void *arg);
 
 static nxge_status_t nxge_map_txdma(p_nxge_t, int);
 
@@ -97,22 +95,25 @@ nxge_init_txdma_channels(p_nxge_t nxgep)
 	nxge_grp_set_t	*set = &nxgep->tx_set;
 	int		i, tdc, count;
 	nxge_grp_t	*group;
+	dc_map_t	map;
+	int		dev_gindex;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_init_txdma_channels"));
 
 	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
 		if ((1 << i) & set->lg.map) {
 			group = set->group[i];
-
+			dev_gindex =
+			    nxgep->pt_config.hw_config.def_mac_txdma_grpid + i;
+			map = nxgep->pt_config.tdc_grps[dev_gindex].map;
 			for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
-				if ((1 << tdc) & group->map) {
-					if ((nxge_grp_dc_add(nxgep, group,
-					    VP_BOUND_TX, tdc)))
+				if ((1 << tdc) & map) {
+					if ((nxge_grp_dc_add(nxgep,
+					    group, VP_BOUND_TX, tdc)))
 						goto init_txdma_channels_exit;
 				}
 			}
 		}
-
 		if (++count == set->lg.count)
 			break;
 	}
@@ -124,21 +125,22 @@ init_txdma_channels_exit:
 	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
 		if ((1 << i) & set->lg.map) {
 			group = set->group[i];
-
+			dev_gindex =
+			    nxgep->pt_config.hw_config.def_mac_txdma_grpid + i;
+			map = nxgep->pt_config.tdc_grps[dev_gindex].map;
 			for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
-				if ((1 << tdc) & group->map) {
+				if ((1 << tdc) & map) {
 					nxge_grp_dc_remove(nxgep,
 					    VP_BOUND_TX, tdc);
 				}
 			}
 		}
-
 		if (++count == set->lg.count)
 			break;
 	}
 
-	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "<== nxge_init_txdma_channels"));
 	return (NXGE_ERROR);
+
 }
 
 nxge_status_t
@@ -890,44 +892,6 @@ nxge_tx_pkt_nmblocks(p_mblk_t mp, int *tot_xfer_len_p)
 	return (nmblks);
 }
 
-static void
-nxge_txdma_freemsg_list_add(p_tx_ring_t tx_ring_p, p_tx_msg_t msgp)
-{
-	MUTEX_ENTER(&tx_ring_p->freelock);
-	if (tx_ring_p->tx_free_list_p != NULL)
-		msgp->nextp = tx_ring_p->tx_free_list_p;
-	tx_ring_p->tx_free_list_p = msgp;
-	MUTEX_EXIT(&tx_ring_p->freelock);
-}
-
-/*
- * void
- * nxge_txdma_freemsg_task() -- walk the list of messages to be
- *	freed and free the messages.
- */
-void
-nxge_txdma_freemsg_task(p_tx_ring_t tx_ring_p)
-{
-	p_tx_msg_t	msgp, nextp;
-
-	if (tx_ring_p->tx_free_list_p != NULL) {
-		MUTEX_ENTER(&tx_ring_p->freelock);
-		msgp = tx_ring_p->tx_free_list_p;
-		tx_ring_p->tx_free_list_p = (p_tx_msg_t)NULL;
-		MUTEX_EXIT(&tx_ring_p->freelock);
-
-		while (msgp != NULL) {
-			nextp = msgp->nextp;
-			if (msgp->tx_message != NULL) {
-				freemsg(msgp->tx_message);
-				msgp->tx_message = NULL;
-			}
-			msgp->nextp = NULL;
-			msgp = nextp;
-		}
-	}
-}
-
 boolean_t
 nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 {
@@ -947,7 +911,7 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 	uint16_t		head_index, tail_index;
 	uint8_t			tdc;
 	boolean_t		head_wrap, tail_wrap;
-	p_nxge_tx_ring_stats_t	tdc_stats;
+	p_nxge_tx_ring_stats_t tdc_stats;
 	int			rc;
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_txdma_reclaim"));
@@ -1093,13 +1057,12 @@ nxge_txdma_reclaim(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, int nmblks)
 			}
 			NXGE_DEBUG_MSG((nxgep, TX_CTL,
 			    "==> nxge_txdma_reclaim: count packets"));
-
 			/*
 			 * count a chained packet only once.
 			 */
 			if (tx_msg_p->tx_message != NULL) {
-				nxge_txdma_freemsg_list_add(tx_ring_p,
-				    tx_msg_p);
+				freemsg(tx_msg_p->tx_message);
+				tx_msg_p->tx_message = NULL;
 			}
 
 			tx_msg_p->flags.dma_type = USE_NONE;
@@ -1223,13 +1186,7 @@ nxge_tx_intr(void *arg1, void *arg2)
 		    "status 0x%08x (mk bit set, calling reclaim)",
 		    channel, vindex, rs));
 
-		MUTEX_ENTER(&tx_ring_p->lock);
-		(void) nxge_txdma_reclaim(nxgep, tx_rings[vindex], 0);
-		MUTEX_EXIT(&tx_ring_p->lock);
-
-		nxge_txdma_freemsg_task(tx_ring_p);
-
-		mac_tx_update(nxgep->mach);
+		nxge_tx_ring_task((void *)tx_ring_p);
 	}
 
 	/*
@@ -1596,7 +1553,6 @@ nxge_txdma_fixup_channel(p_nxge_t nxgep, p_tx_ring_t ring_p, uint16_t channel)
 	ring_p->ring_kick_tail.value = 0;
 	ring_p->descs_pending = 0;
 	MUTEX_EXIT(&ring_p->lock);
-	nxge_txdma_freemsg_task(ring_p);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_txdma_fixup_channel"));
 }
@@ -1831,7 +1787,6 @@ nxge_txdma_channel_hung(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, uint16_t channel)
 	tail_wrap = tx_ring_p->wr_index_wrap;
 	tx_rd_index = tx_ring_p->rd_index;
 	MUTEX_EXIT(&tx_ring_p->lock);
-	nxge_txdma_freemsg_task(tx_ring_p);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
 	    "==> nxge_txdma_channel_hung: tdc %d tx_rd_index %d "
@@ -2010,8 +1965,6 @@ nxge_txdma_fixup_hung_channel(p_nxge_t nxgep, p_tx_ring_t ring_p,
 	(void) nxge_txdma_reclaim(nxgep, ring_p, 0);
 	MUTEX_EXIT(&ring_p->lock);
 
-	nxge_txdma_freemsg_task(ring_p);
-
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
 	/*
 	 * Stop the dma channel waits for the stop done.
@@ -2072,10 +2025,8 @@ nxge_reclaim_rings(p_nxge_t nxgep)
 				NXGE_DEBUG_MSG((nxgep, TX_CTL,
 				    "==> nxge_reclaim_rings: TDC %d", tdc));
 				MUTEX_ENTER(&ring->lock);
-				(void) nxge_txdma_reclaim(nxgep, ring, tdc);
+				(void) nxge_txdma_reclaim(nxgep, ring, 0);
 				MUTEX_EXIT(&ring->lock);
-
-				nxge_txdma_freemsg_task(ring);
 			}
 		}
 	}
@@ -2580,6 +2531,7 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	int			i, j, index;
 	uint32_t		size, bsize;
 	uint32_t 		nblocks, nmsgs;
+	char			qname[TASKQ_NAMELEN];
 
 	NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
 	    "==> nxge_map_txdma_channel_buf_ring"));
@@ -2611,14 +2563,19 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	    KMEM_ZALLOC(sizeof (tx_ring_t), KM_SLEEP);
 	MUTEX_INIT(&tx_ring_p->lock, NULL, MUTEX_DRIVER,
 	    (void *)nxgep->interrupt_cookie);
-	MUTEX_INIT(&tx_ring_p->freelock, NULL, MUTEX_DRIVER,
-	    (void *)nxgep->interrupt_cookie);
 
 	(void) atomic_swap_32(&tx_ring_p->tx_ring_offline, NXGE_TX_RING_ONLINE);
 	tx_ring_p->tx_ring_busy = B_FALSE;
 	tx_ring_p->nxgep = nxgep;
-	tx_ring_p->serial = nxge_serialize_create(nmsgs,
-	    nxge_serial_tx, tx_ring_p);
+	tx_ring_p->tx_ring_handle = (mac_ring_handle_t)NULL;
+	(void) snprintf(qname, TASKQ_NAMELEN, "tx_%d_%d",
+	    nxgep->instance, channel);
+	tx_ring_p->taskq = ddi_taskq_create(nxgep->dip, qname, 1,
+	    TASKQ_DEFAULTPRI, 0);
+	if (tx_ring_p->taskq == NULL) {
+		goto nxge_map_txdma_channel_buf_ring_fail1;
+	}
+
 	/*
 	 * Allocate transmit message rings and handles for packets
 	 * not to be copied to premapped buffers.
@@ -2683,7 +2640,6 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 
 		for (j = 0; j < nblocks; j++) {
 			tx_msg_ring[index].buf_dma_handle = tx_buf_dma_handle;
-			tx_msg_ring[index].nextp = NULL;
 			dmap = &tx_msg_ring[index++].buf_dma;
 #ifdef TX_MEM_DEBUG
 			NXGE_DEBUG_MSG((nxgep, MEM3_CTL,
@@ -2705,9 +2661,9 @@ nxge_map_txdma_channel_buf_ring(p_nxge_t nxgep, uint16_t channel,
 	goto nxge_map_txdma_channel_buf_ring_exit;
 
 nxge_map_txdma_channel_buf_ring_fail1:
-	if (tx_ring_p->serial) {
-		nxge_serialize_destroy(tx_ring_p->serial);
-		tx_ring_p->serial = NULL;
+	if (tx_ring_p->taskq) {
+		ddi_taskq_destroy(tx_ring_p->taskq);
+		tx_ring_p->taskq = NULL;
 	}
 
 	index--;
@@ -2716,8 +2672,6 @@ nxge_map_txdma_channel_buf_ring_fail1:
 			ddi_dma_free_handle(&tx_msg_ring[index].dma_handle);
 		}
 	}
-
-	MUTEX_DESTROY(&tx_ring_p->freelock);
 	MUTEX_DESTROY(&tx_ring_p->lock);
 	KMEM_FREE(tx_msg_ring, size);
 	KMEM_FREE(tx_ring_p, sizeof (tx_ring_t));
@@ -2783,12 +2737,11 @@ nxge_unmap_txdma_channel_buf_ring(p_nxge_t nxgep, p_tx_ring_t tx_ring_p)
 
 	MUTEX_EXIT(&tx_ring_p->lock);
 
-	if (tx_ring_p->serial) {
-		nxge_serialize_destroy(tx_ring_p->serial);
-		tx_ring_p->serial = NULL;
+	if (tx_ring_p->taskq) {
+		ddi_taskq_destroy(tx_ring_p->taskq);
+		tx_ring_p->taskq = NULL;
 	}
 
-	MUTEX_DESTROY(&tx_ring_p->freelock);
 	MUTEX_DESTROY(&tx_ring_p->lock);
 	KMEM_FREE(tx_msg_ring, sizeof (tx_msg_t) * tx_ring_p->tx_ring_size);
 	KMEM_FREE(tx_ring_p, sizeof (tx_ring_t));
@@ -3408,8 +3361,6 @@ nxge_txdma_fatal_err_recover(
 	if (status != NXGE_OK)
 		goto fail;
 
-	nxge_txdma_freemsg_task(tx_ring_p);
-
 	NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 	    "Recovery Successful, TxDMAChannel#%d Restored",
 	    channel));
@@ -3419,8 +3370,6 @@ nxge_txdma_fatal_err_recover(
 
 fail:
 	MUTEX_EXIT(&tx_ring_p->lock);
-
-	nxge_txdma_freemsg_task(tx_ring_p);
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL,
 	    "nxge_txdma_fatal_err_recover (channel %d): "
@@ -3519,7 +3468,6 @@ nxge_tx_port_fatal_err_recover(p_nxge_t nxgep)
 			tx_ring_t *ring = nxgep->tx_rings->rings[tdc];
 			if (ring) {
 				(void) nxge_txdma_reclaim(nxgep, ring, 0);
-				nxge_txdma_freemsg_task(ring);
 			}
 		}
 	}

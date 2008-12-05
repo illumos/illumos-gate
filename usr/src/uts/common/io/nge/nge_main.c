@@ -196,7 +196,6 @@ static mac_callbacks_t nge_m_callbacks = {
 	nge_m_multicst,
 	nge_m_unicst,
 	nge_m_tx,
-	NULL,
 	nge_m_ioctl,
 	nge_m_getcapab,
 	NULL,
@@ -2137,12 +2136,6 @@ nge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			return (B_FALSE);
 		break;
 	}
-	case MAC_CAPAB_POLL:
-		/*
-		 * There's nothing for us to fill in, simply returning
-		 * B_TRUE, stating that we support polling is sufficient.
-		 */
-		break;
 	default:
 		return (B_FALSE);
 	}

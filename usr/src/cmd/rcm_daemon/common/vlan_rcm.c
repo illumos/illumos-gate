@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This RCM module adds support to the RCM framework for VLAN links
  */
@@ -68,7 +66,6 @@ typedef struct dl_vlan {
 	struct dl_vlan	*dv_next;		/* next VLAN on the same link */
 	struct dl_vlan	*dv_prev;		/* prev VLAN on the same link */
 	datalink_id_t	dv_vlanid;
-	boolean_t	dv_implicit;
 	vlan_flag_t	dv_flags;		/* VLAN link flags */
 } dl_vlan_t;
 
@@ -399,7 +396,6 @@ vlan_online_vlan(link_cache_t *node)
 		if (!(vlan->dv_flags & VLAN_OFFLINED))
 			continue;
 
-		assert(!vlan->dv_implicit);
 		if ((status = dladm_vlan_up(vlan->dv_vlanid)) !=
 		    DLADM_STATUS_OK) {
 			/*
@@ -429,10 +425,6 @@ vlan_offline_vlan(link_cache_t *node, uint32_t flags, cache_node_state_t state)
 	 * Try to delete all explicit created VLAN
 	 */
 	for (vlan = node->vc_vlan; vlan != NULL; vlan = vlan->dv_next) {
-
-		if (vlan->dv_implicit)
-			continue;
-
 		if ((status = dladm_vlan_delete(vlan->dv_vlanid,
 		    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
 			rcm_log_message(RCM_WARNING,
@@ -918,7 +910,6 @@ vlan_update(datalink_id_t vlanid, void *arg)
 		node->vc_vlan = vlan;
 	}
 
-	vlan->dv_implicit = vlan_attr.dv_implicit;
 	node->vc_state &= ~CACHE_NODE_STALE;
 
 	if (newnode)
@@ -1186,18 +1177,16 @@ vlan_notify_new_vlan(rcm_handle_t *hd, char *rsrc)
 	}
 
 	for (vlan = node->vc_vlan; vlan != NULL; vlan = vlan->dv_next) {
-		if (!vlan->dv_implicit) {
-			rcm_log_message(RCM_TRACE2,
-			    "VLAN: vlan_notify_new_vlan add (%u)\n",
-			    vlan->dv_vlanid);
+		rcm_log_message(RCM_TRACE2,
+		    "VLAN: vlan_notify_new_vlan add (%u)\n",
+		    vlan->dv_vlanid);
 
-			id = vlan->dv_vlanid;
-			if (nvlist_add_uint64(nvl, RCM_NV_LINKID, id) != 0) {
-				rcm_log_message(RCM_ERROR,
-				    _("VLAN: failed to construct nvlist\n"));
-				(void) mutex_unlock(&cache_lock);
-				goto done;
-			}
+		id = vlan->dv_vlanid;
+		if (nvlist_add_uint64(nvl, RCM_NV_LINKID, id) != 0) {
+			rcm_log_message(RCM_ERROR,
+			    _("VLAN: failed to construct nvlist\n"));
+			(void) mutex_unlock(&cache_lock);
+			goto done;
 		}
 	}
 	(void) mutex_unlock(&cache_lock);

@@ -344,7 +344,6 @@ typedef struct _rx_rcr_ring_t {
 	uint32_t		intr_timeout;
 	uint32_t		intr_threshold;
 	uint64_t		max_receive_pkts;
-	mac_resource_handle_t	rcr_mac_handle;
 	uint32_t		rcvd_pkt_bytes; /* Received bytes of a packet */
 } rx_rcr_ring_t, *p_rx_rcr_ring_t;
 

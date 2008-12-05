@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *      http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "ixgbe_sw.h"
 
@@ -87,17 +87,29 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 		ixgbe_ks->tx_reschedule.value.ui64 +=
 		    ixgbe->tx_rings[i].stat_reschedule;
 	}
+#endif
 
 	/*
 	 * Hardware calculated statistics.
 	 */
+	ixgbe_ks->gprc.value.ui64 = 0;
+	ixgbe_ks->gptc.value.ui64 = 0;
+	ixgbe_ks->tor.value.ui64 = 0;
+	ixgbe_ks->tot.value.ui64 = 0;
 	for (i = 0; i < 16; i++) {
-		ixgbe_ks->gprc.value.ul += IXGBE_READ_REG(hw, IXGBE_QPRC(i));
-		ixgbe_ks->gptc.value.ul += IXGBE_READ_REG(hw, IXGBE_QPTC(i));
-		ixgbe_ks->tor.value.ui64 += IXGBE_READ_REG(hw, IXGBE_QBRC(i));
-		ixgbe_ks->tot.value.ui64 += IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+		ixgbe_ks->qprc[i].value.ui64 +=
+		    IXGBE_READ_REG(hw, IXGBE_QPRC(i));
+		ixgbe_ks->gprc.value.ui64 += ixgbe_ks->qprc[i].value.ui64;
+		ixgbe_ks->qptc[i].value.ui64 +=
+		    IXGBE_READ_REG(hw, IXGBE_QPTC(i));
+		ixgbe_ks->gptc.value.ui64 += ixgbe_ks->qptc[i].value.ui64;
+		ixgbe_ks->qbrc[i].value.ui64 +=
+		    IXGBE_READ_REG(hw, IXGBE_QBRC(i));
+		ixgbe_ks->tor.value.ui64 += ixgbe_ks->qbrc[i].value.ui64;
+		ixgbe_ks->qbtc[i].value.ui64 +=
+		    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+		ixgbe_ks->tot.value.ui64 += ixgbe_ks->qbtc[i].value.ui64;
 	}
-
 	/*
 	 * This is a Workaround:
 	 * Currently h/w GORCH, GOTCH, TORH registers are not
@@ -124,7 +136,6 @@ ixgbe_update_stats(kstat_t *ks, int rw)
 	ixgbe_ks->ptc511.value.ul += IXGBE_READ_REG(hw, IXGBE_PTC511);
 	ixgbe_ks->ptc1023.value.ul += IXGBE_READ_REG(hw, IXGBE_PTC1023);
 	ixgbe_ks->ptc1522.value.ul += IXGBE_READ_REG(hw, IXGBE_PTC1522);
-#endif
 
 	ixgbe_ks->mspdc.value.ui64 += IXGBE_READ_REG(hw, IXGBE_MSPDC);
 	for (i = 0; i < 8; i++)
@@ -200,6 +211,7 @@ ixgbe_init_stats(ixgbe_t *ixgbe)
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->tx_reschedule, "tx_reschedule",
 	    KSTAT_DATA_UINT64);
+#endif
 
 	kstat_named_init(&ixgbe_ks->gprc, "good_pkts_recvd",
 	    KSTAT_DATA_UINT64);
@@ -233,7 +245,138 @@ ixgbe_init_stats(ixgbe_t *ixgbe)
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->ptc1522, "pkts_xmitd_(1024-1522b)",
 	    KSTAT_DATA_UINT64);
-#endif
+
+	kstat_named_init(&ixgbe_ks->qprc[0], "queue_pkts_recvd [ 0]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[1], "queue_pkts_recvd [ 1]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[2], "queue_pkts_recvd [ 2]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[3], "queue_pkts_recvd [ 3]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[4], "queue_pkts_recvd [ 4]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[5], "queue_pkts_recvd [ 5]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[6], "queue_pkts_recvd [ 6]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[7], "queue_pkts_recvd [ 7]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[8], "queue_pkts_recvd [ 8]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[9], "queue_pkts_recvd [ 9]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[10], "queue_pkts_recvd [10]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[11], "queue_pkts_recvd [11]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[12], "queue_pkts_recvd [12]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[13], "queue_pkts_recvd [13]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[14], "queue_pkts_recvd [14]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qprc[15], "queue_pkts_recvd [15]",
+	    KSTAT_DATA_UINT64);
+
+	kstat_named_init(&ixgbe_ks->qptc[0], "queue_pkts_xmitd [ 0]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[1], "queue_pkts_xmitd [ 1]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[2], "queue_pkts_xmitd [ 2]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[3], "queue_pkts_xmitd [ 3]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[4], "queue_pkts_xmitd [ 4]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[5], "queue_pkts_xmitd [ 5]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[6], "queue_pkts_xmitd [ 6]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[7], "queue_pkts_xmitd [ 7]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[8], "queue_pkts_xmitd [ 8]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[9], "queue_pkts_xmitd [ 9]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[10], "queue_pkts_xmitd [10]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[11], "queue_pkts_xmitd [11]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[12], "queue_pkts_xmitd [12]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[13], "queue_pkts_xmitd [13]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[14], "queue_pkts_xmitd [14]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qptc[15], "queue_pkts_xmitd [15]",
+	    KSTAT_DATA_UINT64);
+
+	kstat_named_init(&ixgbe_ks->qbrc[0], "queue_bytes_recvd [ 0]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[1], "queue_bytes_recvd [ 1]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[2], "queue_bytes_recvd [ 2]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[3], "queue_bytes_recvd [ 3]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[4], "queue_bytes_recvd [ 4]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[5], "queue_bytes_recvd [ 5]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[6], "queue_bytes_recvd [ 6]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[7], "queue_bytes_recvd [ 7]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[8], "queue_bytes_recvd [ 8]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[9], "queue_bytes_recvd [ 9]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[10], "queue_bytes_recvd [10]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[11], "queue_bytes_recvd [11]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[12], "queue_bytes_recvd [12]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[13], "queue_bytes_recvd [13]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[14], "queue_bytes_recvd [14]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbrc[15], "queue_bytes_recvd [15]",
+	    KSTAT_DATA_UINT64);
+
+	kstat_named_init(&ixgbe_ks->qbtc[0], "queue_bytes_xmitd [ 0]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[1], "queue_bytes_xmitd [ 1]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[2], "queue_bytes_xmitd [ 2]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[3], "queue_bytes_xmitd [ 3]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[4], "queue_bytes_xmitd [ 4]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[5], "queue_bytes_xmitd [ 5]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[6], "queue_bytes_xmitd [ 6]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[7], "queue_bytes_xmitd [ 7]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[8], "queue_bytes_xmitd [ 8]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[9], "queue_bytes_xmitd [ 9]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[10], "queue_bytes_xmitd [10]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[11], "queue_bytes_xmitd [11]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[12], "queue_bytes_xmitd [12]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[13], "queue_bytes_xmitd [13]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[14], "queue_bytes_xmitd [14]",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->qbtc[15], "queue_bytes_xmitd [15]",
+	    KSTAT_DATA_UINT64);
 
 	kstat_named_init(&ixgbe_ks->mspdc, "mac_short_packet_discard",
 	    KSTAT_DATA_UINT64);

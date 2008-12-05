@@ -155,6 +155,13 @@ typedef struct _nxge_rdc_sys_stats {
 	uint32_t	zcp_eop_err;
 } nxge_rdc_sys_stats_t, *p_nxge_rdc_sys_stats_t;
 
+/*
+ * Software reserved buffer offset
+ */
+typedef struct _nxge_rxbuf_off_hdr_t {
+	uint32_t		index;
+} nxge_rxbuf_off_hdr_t, *p_nxge_rxbuf_off_hdr_t;
+
 
 typedef struct _rx_msg_t {
 	nxge_os_dma_common_t	buf_dma;
@@ -231,8 +238,11 @@ typedef struct _rx_rcr_ring_t {
 	uint32_t		intr_timeout;
 	uint32_t		intr_threshold;
 	uint64_t		max_receive_pkts;
-	mac_resource_handle_t	rcr_mac_handle;
+	mac_ring_handle_t	rcr_mac_handle;
+	uint64_t		rcr_gen_num;
 	uint32_t		rcvd_pkt_bytes; /* Received bytes of a packet */
+	p_nxge_ldv_t		ldvp;
+	p_nxge_ldg_t		ldgp;
 } rx_rcr_ring_t, *p_rx_rcr_ring_t;
 
 
@@ -359,11 +369,13 @@ typedef struct _rx_mbox_t {
 typedef struct _rx_rbr_rings_t {
 	p_rx_rbr_ring_t 	*rbr_rings;
 	uint32_t		ndmas;
+	boolean_t		rxbuf_allocated;
 } rx_rbr_rings_t, *p_rx_rbr_rings_t;
 
 typedef struct _rx_rcr_rings_t {
 	p_rx_rcr_ring_t 	*rcr_rings;
 	uint32_t		ndmas;
+	boolean_t		cntl_buf_allocated;
 } rx_rcr_rings_t, *p_rx_rcr_rings_t;
 
 typedef struct _rx_mbox_areas_t {
@@ -414,6 +426,10 @@ void nxge_rxdma_fix_channel(p_nxge_t, uint16_t);
 void nxge_rxdma_fixup_channel(p_nxge_t, uint16_t, int);
 int nxge_rxdma_get_ring_index(p_nxge_t, uint16_t);
 
+mblk_t *nxge_rx_poll(void *, int);
+int nxge_enable_poll(void *);
+int nxge_disable_poll(void *);
+
 void nxge_rxdma_regs_dump_channels(p_nxge_t);
 nxge_status_t nxge_rxdma_handle_sys_errors(p_nxge_t);
 void nxge_rxdma_inject_err(p_nxge_t, uint32_t, uint8_t);
@@ -421,6 +437,8 @@ void nxge_rxdma_inject_err(p_nxge_t, uint32_t, uint8_t);
 extern nxge_status_t nxge_alloc_rx_mem_pool(p_nxge_t);
 extern nxge_status_t nxge_alloc_rxb(p_nxge_t nxgep, int channel);
 extern void nxge_free_rxb(p_nxge_t nxgep, int channel);
+
+int nxge_get_rxring_index(p_nxge_t, int, int);
 
 #ifdef	__cplusplus
 }

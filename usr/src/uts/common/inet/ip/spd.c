@@ -176,13 +176,6 @@ int ipsec_weird_null_inbound_policy = 0;
 	    (((sa1)->ipsa_dst_cid == (sa2)->ipsa_dst_cid))))
 
 /*
- * IPv4 Fragments
- */
-#define	IS_V4_FRAGMENT(ipha_fragment_offset_and_flags)			\
-	(((ntohs(ipha_fragment_offset_and_flags) & IPH_OFFSET) != 0) ||	\
-	((ntohs(ipha_fragment_offset_and_flags) & IPH_MF) != 0))
-
-/*
  * IPv6 Fragments
  */
 #define	IS_V6_FRAGMENT(ipp)	(ipp.ipp_fields & IPPF_FRAGHDR)

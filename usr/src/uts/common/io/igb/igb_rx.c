@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "igb_sw.h"
 
@@ -251,6 +251,24 @@ igb_rx_assoc_hcksum(mblk_t *mp, uint32_t status_error)
 	}
 }
 
+mblk_t *
+igb_rx_ring_poll(void *arg, int bytes)
+{
+	igb_rx_ring_t *rx_ring = (igb_rx_ring_t *)arg;
+	mblk_t *mp = NULL;
+
+	ASSERT(bytes >= 0);
+
+	if (bytes == 0)
+		return (mp);
+
+	mutex_enter(&rx_ring->rx_lock);
+	mp = igb_rx(rx_ring, bytes);
+	mutex_exit(&rx_ring->rx_lock);
+
+	return (mp);
+}
+
 /*
  * igb_rx - Receive the data of one ring
  *
@@ -260,7 +278,7 @@ igb_rx_assoc_hcksum(mblk_t *mp, uint32_t status_error)
  * passed up to mac_rx().
  */
 mblk_t *
-igb_rx(igb_rx_ring_t *rx_ring)
+igb_rx(igb_rx_ring_t *rx_ring, int poll_bytes)
 {
 	union e1000_adv_rx_desc *current_rbd;
 	rx_control_block_t *current_rcb;
@@ -272,6 +290,7 @@ igb_rx(igb_rx_ring_t *rx_ring)
 	uint32_t pkt_len;
 	uint32_t status_error;
 	uint32_t pkt_num;
+	uint32_t total_bytes;
 	igb_t *igb = rx_ring->igb;
 
 	mblk_head = NULL;
@@ -296,6 +315,7 @@ igb_rx(igb_rx_ring_t *rx_ring)
 
 	current_rbd = &rx_ring->rbd_ring[rx_next];
 	pkt_num = 0;
+	total_bytes = 0;
 	status_error = current_rbd->wb.upper.status_error;
 	while (status_error & E1000_RXD_STAT_DD) {
 		/*
@@ -315,6 +335,14 @@ igb_rx(igb_rx_ring_t *rx_ring)
 		    (status_error & E1000_RXDEXT_STATERR_IPE));
 
 		pkt_len = current_rbd->wb.upper.length;
+
+		if ((poll_bytes != IGB_NO_POLL) &&
+		    ((pkt_len + total_bytes) > poll_bytes))
+			break;
+
+		IGB_DEBUG_STAT(rx_ring->stat_pkt_cnt);
+		total_bytes += pkt_len;
+
 		mp = NULL;
 		/*
 		 * For packets with length more than the copy threshold,

@@ -78,6 +78,7 @@
 #include <inet/ipclassifier.h>
 #include <inet/ipsec_impl.h>
 #include <inet/ipp_common.h>
+#include <sys/squeue_impl.h>
 #include <inet/ipnet.h>
 
 /*
@@ -196,14 +197,15 @@ static int	udp_rinfop(queue_t *q, infod_t *dp);
 static int	udp_rrw(queue_t *q, struiod_t *dp);
 static int	udp_status_report(queue_t *q, mblk_t *mp, caddr_t cp,
 		    cred_t *cr);
-static void	udp_send_data(udp_t *, queue_t *, mblk_t *, ipha_t *);
+static void	udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp,
+		    ipha_t *ipha);
 static void	udp_ud_err(queue_t *q, mblk_t *mp, uchar_t *destaddr,
 		    t_scalar_t destlen, t_scalar_t err);
 static void	udp_unbind(queue_t *q, mblk_t *mp);
 static in_port_t udp_update_next_port(udp_t *udp, in_port_t port,
     boolean_t random);
 static mblk_t	*udp_output_v4(conn_t *, mblk_t *, ipaddr_t, uint16_t, uint_t,
-		    int *, boolean_t);
+    int *, boolean_t);
 static mblk_t	*udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6,
 		    int *error);
 static void	udp_wput_other(queue_t *q, mblk_t *mp);
@@ -4401,6 +4403,7 @@ udp_input(void *arg1, mblk_t *mp, void *arg2)
 			UDP_STAT(us, udp_in_recvucred);
 		}
 
+		/* XXX FIXME: apply to AF_INET6 as well */
 		/*
 		 * If SO_TIMESTAMP is set allocate the appropriate sized
 		 * buffer. Since gethrestime() expects a pointer aligned
@@ -6237,8 +6240,12 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	dev_q = ire->ire_stq->q_next;
 	ASSERT(dev_q != NULL);
 
+	ill = ire_to_ill(ire);
+	ASSERT(ill != NULL);
 
-	if (DEV_Q_IS_FLOW_CTLED(dev_q)) {
+	/* is queue flow controlled? */
+	if (q->q_first != NULL || connp->conn_draining ||
+	    DEV_Q_FLOW_BLOCKED(dev_q)) {
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsHCOutRequests);
 		BUMP_MIB(&ipst->ips_ip_mib, ipIfStatsOutDiscards);
 		if (ipst->ips_ip_output_queue)
@@ -6256,8 +6263,6 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	dst = ipha->ipha_dst;
 	src = ipha->ipha_src;
 
-	ill = ire_to_ill(ire);
-	ASSERT(ill != NULL);
 
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCOutRequests);
 
@@ -6334,31 +6339,32 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
 	    ntohs(ipha->ipha_length));
 
-	if (ILL_DLS_CAPABLE(ill)) {
-		/*
-		 * Send the packet directly to DLD, where it may be queued
-		 * depending on the availability of transmit resources at
-		 * the media layer.
-		 */
-		IP_DLS_ILL_TX(ill, ipha, mp, ipst, ire_fp_mp_len);
-	} else {
-		DTRACE_PROBE4(ip4__physical__out__start,
-		    ill_t *, NULL, ill_t *, ill,
-		    ipha_t *, ipha, mblk_t *, mp);
-		FW_HOOKS(ipst->ips_ip4_physical_out_event,
-		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, ill, ipha, mp, mp, ll_multicast, ipst);
-		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-		if (mp != NULL) {
-			if (ipst->ips_ipobs_enabled) {
-				ipobs_hook(mp, IPOBS_HOOK_OUTBOUND,
-				    IP_REAL_ZONEID(connp->conn_zoneid, ipst),
-				    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len,
-				    ipst);
-			}
-			DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,
-			    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill,
-			    ipha_t *, ipha, ip6_t *, NULL, int, 0);
+	DTRACE_PROBE4(ip4__physical__out__start,
+	    ill_t *, NULL, ill_t *, ill, ipha_t *, ipha, mblk_t *, mp);
+	FW_HOOKS(ipst->ips_ip4_physical_out_event,
+	    ipst->ips_ipv4firewall_physical_out, NULL, ill, ipha, mp, mp,
+	    ll_multicast, ipst);
+	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+	if (ipst->ips_ipobs_enabled && mp != NULL) {
+		zoneid_t szone;
+
+		szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
+		    ipst, ALL_ZONES);
+		ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
+		    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len, ipst);
+	}
+
+	if (mp != NULL) {
+		DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,
+		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill,
+		    ipha_t *, ipha, ip6_t *, NULL, int, 0);
+
+		if (ILL_DIRECT_CAPABLE(ill)) {
+			ill_dld_direct_t *idd = &ill->ill_dld_capab->idc_direct;
+
+			(void) idd->idd_tx_df(idd->idd_tx_dh, mp,
+			    (uintptr_t)connp, 0);
+		} else {
 			putnext(ire->ire_stq, mp);
 		}
 	}

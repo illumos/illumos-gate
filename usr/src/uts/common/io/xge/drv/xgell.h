@@ -60,7 +60,7 @@
 #include <sys/pattr.h>
 #include <sys/strsun.h>
 
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 
 #ifdef __cplusplus
@@ -69,11 +69,6 @@ extern "C" {
 
 #define	XGELL_DESC		"Xframe I/II 10Gb Ethernet"
 #define	XGELL_IFNAME		"xge"
-#define	XGELL_TX_LEVEL_LOW	8
-#define	XGELL_TX_LEVEL_HIGH	32
-#define	XGELL_TX_LEVEL_CHECK	3
-#define	XGELL_MAX_RING_DEFAULT	8
-#define	XGELL_MAX_FIFO_DEFAULT	1
 
 #include <xgehal.h>
 
@@ -93,25 +88,64 @@ extern "C" {
 #define	XGELL_RX_BUFFER_TOTAL		XGE_HAL_RING_RXDS_PER_BLOCK(1) * 6
 #define	XGELL_RX_BUFFER_POST_HIWAT	XGE_HAL_RING_RXDS_PER_BLOCK(1) * 5
 
-/* Control driver to copy or DMA received packets */
-#define	XGELL_RX_DMA_LOWAT		256
+/*
+ * Multiple rings configuration
+ */
+#define	XGELL_RX_RING_MAIN			0
+#define	XGELL_TX_RING_MAIN			0
 
-#define	XGELL_RING_MAIN_QID		0
+#define	XGELL_RX_RING_NUM_MIN			1
+#define	XGELL_TX_RING_NUM_MIN			1
+#define	XGELL_RX_RING_NUM_MAX			8
+#define	XGELL_TX_RING_NUM_MAX			1 /* TODO */
+#define	XGELL_RX_RING_NUM_DEFAULT		XGELL_RX_RING_NUM_MAX
+#define	XGELL_TX_RING_NUM_DEFAULT		XGELL_TX_RING_NUM_MAX
 
-#if defined(__x86)
-#define	XGELL_TX_DMA_LOWAT		128
+#define	XGELL_MINTR_NUM_MIN			1
+#define	XGELL_MINTR_NUM_MAX			\
+	(XGELL_RX_RING_NUM_MAX + XGELL_TX_RING_NUM_MAX + 1)
+#define	XGELL_MINTR_NUM_DEFAULT			XGELL_MINTR_NUM_MAX
+
+#define	XGELL_CONF_GROUP_POLICY_BASIC		0
+#define	XGELL_CONF_GROUP_POLICY_VIRT		1
+#define	XGELL_CONF_GROUP_POLICY_PERF		2
+#if 0
+#if defined(__sparc)
+#define	XGELL_CONF_GROUP_POLICY_DEFAULT		XGELL_CONF_GROUP_POLICY_PERF
 #else
-#define	XGELL_TX_DMA_LOWAT		512
+#define	XGELL_CONF_GROUP_POLICY_DEFAULT		XGELL_CONF_GROUP_POLICY_VIRT
+#endif
+#else
+/*
+ * The _PERF configuration enable a fat group of all rx rings, as approachs
+ * better fanout performance of the primary interface.
+ */
+#define	XGELL_CONF_GROUP_POLICY_DEFAULT		XGELL_CONF_GROUP_POLICY_PERF
+#endif
+
+#define	XGELL_TX_LEVEL_LOW	8
+#define	XGELL_TX_LEVEL_HIGH	32
+#define	XGELL_TX_LEVEL_CHECK	3
+#define	XGELL_MAX_RING_DEFAULT	8
+#define	XGELL_MAX_FIFO_DEFAULT	1
+
+/* Control driver to copy or DMA inbound/outbound packets */
+#if defined(__sparc)
+#define	XGELL_RX_DMA_LOWAT			256
+#define	XGELL_TX_DMA_LOWAT			512
+#else
+#define	XGELL_RX_DMA_LOWAT			256
+#define	XGELL_TX_DMA_LOWAT			128
 #endif
 
 /*
  * Try to collapse up to XGELL_RX_PKT_BURST packets into single mblk
  * sequence before mac_rx() is called.
  */
-#define	XGELL_RX_PKT_BURST		32
+#define	XGELL_RX_PKT_BURST			32
 
 /* About 1s */
-#define	XGE_DEV_POLL_TICKS drv_usectohz(1000000)
+#define	XGE_DEV_POLL_TICKS			drv_usectohz(1000000)
 
 #define	XGELL_LSO_MAXLEN			65535
 #define	XGELL_CONF_ENABLE_BY_DEFAULT		1
@@ -157,6 +191,7 @@ extern "C" {
 #define	XGE_HAL_DEFAULT_RX_TIMER_AC_EN		1
 #define	XGE_HAL_DEFAULT_RX_TIMER_VAL		384
 
+#define	XGE_HAL_DEFAULT_FIFO_QUEUE_LENGTH_A	1024
 #define	XGE_HAL_DEFAULT_FIFO_QUEUE_LENGTH_J	2048
 #define	XGE_HAL_DEFAULT_FIFO_QUEUE_LENGTH_N	4096
 #define	XGE_HAL_DEFAULT_FIFO_QUEUE_INTR		0
@@ -171,15 +206,14 @@ extern "C" {
  */
 #define	XGE_HAL_DEFAULT_FIFO_ALIGNMENT_SIZE	4096
 #define	XGE_HAL_DEFAULT_FIFO_MAX_ALIGNED_FRAGS	1
-#if defined(__x86)
-#define	XGE_HAL_DEFAULT_FIFO_FRAGS		128
-#else
+#if defined(__sparc)
 #define	XGE_HAL_DEFAULT_FIFO_FRAGS		64
+#else
+#define	XGE_HAL_DEFAULT_FIFO_FRAGS		128
 #endif
 #define	XGE_HAL_DEFAULT_FIFO_FRAGS_THRESHOLD	18
 
-#define	XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_J	2
-#define	XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS_N	2
+#define	XGE_HAL_DEFAULT_RING_QUEUE_BLOCKS	2
 #define	XGE_HAL_RING_QUEUE_BUFFER_MODE_DEFAULT	1
 #define	XGE_HAL_DEFAULT_BACKOFF_INTERVAL_US	64
 #define	XGE_HAL_DEFAULT_RING_PRIORITY		0
@@ -202,18 +236,15 @@ extern "C" {
 #define	XGE_HAL_DEFAULT_STATS_REFRESH_TIME	1
 
 #if defined(__sparc)
-#define	XGE_HAL_DEFAULT_MMRB_COUNT		\
-		XGE_HAL_MAX_MMRB_COUNT
-#define	XGE_HAL_DEFAULT_SPLIT_TRANSACTION	\
-		XGE_HAL_EIGHT_SPLIT_TRANSACTION
+#define	XGE_HAL_DEFAULT_MMRB_COUNT		XGE_HAL_MAX_MMRB_COUNT
+#define	XGE_HAL_DEFAULT_SPLIT_TRANSACTION	XGE_HAL_EIGHT_SPLIT_TRANSACTION
 #else
 #define	XGE_HAL_DEFAULT_MMRB_COUNT		1 /* 1k */
-#define	XGE_HAL_DEFAULT_SPLIT_TRANSACTION	\
-		XGE_HAL_TWO_SPLIT_TRANSACTION
+#define	XGE_HAL_DEFAULT_SPLIT_TRANSACTION	XGE_HAL_TWO_SPLIT_TRANSACTION
 #endif
 
 /*
- * default the size of buffers allocated for ndd interface functions
+ * Default the size of buffers allocated for ndd interface functions
  */
 #define	XGELL_STATS_BUFSIZE			8192
 #define	XGELL_PCICONF_BUFSIZE			2048
@@ -222,17 +253,12 @@ extern "C" {
 #define	XGELL_DEVCONF_BUFSIZE			8192
 
 /*
- * xgell_event_e
+ * Multiple mac address definitions
  *
- * This enumeration derived from xgehal_event_e. It extends it
- * for the reason to get serialized context.
+ * We'll use whole MAC Addresses Configuration Memory for unicast addresses,
+ * since current multicast implementation in HAL is by enabling promise mode.
  */
-/* Renamb the macro from HAL */
-#define	XGELL_EVENT_BASE	XGE_LL_EVENT_BASE
-typedef enum xgell_event_e {
-	/* LL events */
-	XGELL_EVENT_RESCHED_NEEDED	= XGELL_EVENT_BASE + 1,
-} xgell_event_e;
+#define	XGE_RX_MULTI_MAC_ADDRESSES_MAX		8 /* per ring group */
 
 typedef struct {
 	int rx_pkt_burst;
@@ -240,24 +266,27 @@ typedef struct {
 	int rx_buffer_post_hiwat;
 	int rx_dma_lowat;
 	int tx_dma_lowat;
-	int msix_enable;
 	int lso_enable;
+	int msix_enable;
+	int grouping;
 } xgell_config_t;
 
-typedef struct xgell_ring xgell_ring_t;
-typedef struct xgell_fifo xgell_fifo_t;
+typedef struct xgell_multi_mac xgell_multi_mac_t;
+typedef struct xgell_rx_ring xgell_rx_ring_t;
+typedef struct xgell_tx_ring xgell_tx_ring_t;
+typedef struct xgelldev xgelldev_t;
 
 typedef struct xgell_rx_buffer_t {
-	struct xgell_rx_buffer_t	*next;
-	void				*vaddr;
-	dma_addr_t			dma_addr;
-	ddi_dma_handle_t		dma_handle;
-	ddi_acc_handle_t		dma_acch;
-	xgell_ring_t			*ring;
-	frtn_t				frtn;
+	struct xgell_rx_buffer_t *next;
+	void			*vaddr;
+	dma_addr_t		dma_addr;
+	ddi_dma_handle_t	dma_handle;
+	ddi_acc_handle_t	dma_acch;
+	xgell_rx_ring_t		*ring;
+	frtn_t			frtn;
 } xgell_rx_buffer_t;
 
-/* Buffer pool for all rings */
+/* Buffer pool for one rx ring */
 typedef struct xgell_rx_buffer_pool_t {
 	uint_t			total;		/* total buffers */
 	uint_t			size;		/* buffer size */
@@ -266,50 +295,92 @@ typedef struct xgell_rx_buffer_pool_t {
 	uint_t			post;		/* posted buffers */
 	uint_t			post_hiwat;	/* hiwat to stop post */
 	spinlock_t		pool_lock;	/* buffer pool lock */
+	boolean_t		live;		/* pool status */
 	xgell_rx_buffer_t	*recycle_head;	/* recycle list's head */
 	xgell_rx_buffer_t	*recycle_tail;	/* recycle list's tail */
 	uint_t			recycle;	/* # of rx buffers recycled */
 	spinlock_t		recycle_lock;	/* buffer recycle lock */
 } xgell_rx_buffer_pool_t;
 
-typedef struct xgelldev xgelldev_t;
-
-struct xgell_ring {
-	xge_hal_channel_h	channelh;
-	xgelldev_t		*lldev;
-	mac_resource_handle_t	handle;		/* per ring cookie */
-	xgell_rx_buffer_pool_t	bf_pool;
+struct xgell_multi_mac {
+	int			naddr;		/* total supported addresses */
+	int			naddrfree;	/* free addresses slots */
+	ether_addr_t		mac_addr[XGE_RX_MULTI_MAC_ADDRESSES_MAX];
+	boolean_t		mac_addr_set[XGE_RX_MULTI_MAC_ADDRESSES_MAX];
 };
 
-struct xgell_fifo {
-	xge_hal_channel_h	channelh;
-	xgelldev_t		*lldev;
-	int			level_low;
+typedef uint_t (*intr_func_t)(caddr_t, caddr_t);
+
+typedef struct xgell_intr {
+	uint_t			index;
+	ddi_intr_handle_t	*handle;	/* DDI interrupt handle */
+	intr_func_t		*function;	/* interrupt function */
+	caddr_t			arg;		/* interrupt source */
+} xgell_intr_t;
+
+struct xgell_rx_ring {
+	int			index;
+	boolean_t		live;		/* ring active status */
+	xge_hal_channel_h	channelh;	/* hardware channel */
+	xgelldev_t		*lldev;		/* driver device */
+	mac_ring_handle_t	ring_handle;	/* call back ring handle */
+	mac_group_handle_t	group_handle;	/* call back group handle */
+	uint64_t		ring_gen_num;
+
+	xgell_multi_mac_t	mmac;		/* per group multiple addrs */
+	xgell_rx_buffer_pool_t	bf_pool;	/* per ring buffer pool */
+	int			received_bytes;	/* total received bytes */
+	int			intr_bytes;	/* interrupt received bytes */
+	int			poll_bytes;	/* bytes to be polled up */
+	int			polled_bytes;	/* total polled bytes */
+	mblk_t			*poll_mp;	/* polled messages */
+
+	spinlock_t		ring_lock;	/* per ring lock */
+};
+
+struct xgell_tx_ring {
+	int			index;
+	boolean_t		live;		/* ring active status */
+	xge_hal_channel_h	channelh;	/* hardware channel */
+	xgelldev_t		*lldev;		/* driver device */
+	mac_ring_handle_t	ring_handle;	/* call back ring handle */
+	int			sent_bytes;	/* bytes sent though the ring */
+
+	boolean_t		need_resched;
 };
 
 struct xgelldev {
-	caddr_t			ndp;
+	volatile int		is_initialized;
+	volatile int		in_reset;
+	kmutex_t		genlock;
 	mac_handle_t		mh;
 	int			instance;
 	dev_info_t		*dev_info;
 	xge_hal_device_h	devh;
-	xgell_ring_t		rings[XGE_HAL_MAX_RING_NUM];
-	xgell_fifo_t		fifos[XGE_HAL_MAX_FIFO_NUM];
-	int			resched_avail;
-	int			resched_send;
-	int			resched_retry;
-	int			tx_copied_max;
-	volatile int		is_initialized;
-	xgell_config_t		config;
-	volatile int		in_reset;
+	caddr_t			ndp;
 	timeout_id_t		timeout_id;
-	kmutex_t		genlock;
+
+	int			init_rx_rings;
+	int			init_tx_rings;
+	int			init_rx_groups;
+
+	int			live_rx_rings;
+	int			live_tx_rings;
+	xgell_rx_ring_t		rx_ring[XGELL_RX_RING_NUM_DEFAULT];
+	xgell_tx_ring_t		tx_ring[XGELL_TX_RING_NUM_DEFAULT];
+
+	int			tx_copied_max;
+
+	xgell_intr_t		intrs[XGELL_MINTR_NUM_DEFAULT];
+
 	ddi_intr_handle_t	*intr_table;
 	uint_t			intr_table_size;
 	int			intr_type;
 	int			intr_cnt;
 	uint_t			intr_pri;
 	int			intr_cap;
+
+	xgell_config_t		config;
 };
 
 typedef struct {

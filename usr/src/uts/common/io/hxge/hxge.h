@@ -202,7 +202,6 @@ typedef struct _hxge_stats_t {
 
 	hxge_pfc_stats_t	pfc_stats;	/* pfc stats */
 	hxge_port_stats_t	port_stats;	/* port stats */
-	hxge_mmac_stats_t	mmac_stats;	/* Multi mac. stats */
 
 	hxge_peu_sys_stats_t	peu_sys_stats;	/* PEU system stats */
 } hxge_stats_t, *p_hxge_stats_t;
@@ -357,7 +356,6 @@ struct _hxge_t {
 	uint32_t 		hxge_port_rbr_size;
 	uint32_t 		hxge_port_rcr_size;
 	uint32_t 		hxge_port_tx_ring_size;
-	hxge_mmac_t		hxge_mmac_info;
 
 	kmutex_t		pio_lock;
 	hxge_timeout		timeout;

@@ -27,11 +27,11 @@
 #ifndef _VNET_RES_H
 #define	_VNET_RES_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <sys/mac_provider.h>
 
 /*
  * Vio network resource types.

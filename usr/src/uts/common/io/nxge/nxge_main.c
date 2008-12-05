@@ -117,14 +117,6 @@ nxge_tx_mode_t	nxge_tx_scheme = NXGE_USE_SERIAL;
 #define		NXGE_LSO_MAXLEN	65535
 uint32_t	nxge_lso_max = NXGE_LSO_MAXLEN;
 
-/*
- * Debugging flags:
- *		nxge_no_tx_lb : transmit load balancing
- *		nxge_tx_lb_policy: 0 - TCP port (default)
- *				   3 - DEST MAC
- */
-uint32_t 	nxge_no_tx_lb = 0;
-uint32_t 	nxge_tx_lb_policy = NXGE_TX_LB_TCPUDP;
 
 /*
  * Add tunable to reduce the amount of time spent in the
@@ -208,8 +200,7 @@ static void nxge_remove_hard_properties(p_nxge_t);
 /*
  * These two functions are required by nxge_hio.c
  */
-extern int nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr);
-extern int nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot);
+extern int nxge_m_mmac_remove(void *arg, int slot);
 extern void nxge_grp_cleanup(p_nxge_t nxge);
 
 static nxge_status_t nxge_setup_system_dma_pages(p_nxge_t);
@@ -224,9 +215,7 @@ static void nxge_test_map_regs(p_nxge_t nxgep);
 #endif
 
 static nxge_status_t nxge_add_intrs(p_nxge_t nxgep);
-static nxge_status_t nxge_add_soft_intrs(p_nxge_t nxgep);
 static void nxge_remove_intrs(p_nxge_t nxgep);
-static void nxge_remove_soft_intrs(p_nxge_t nxgep);
 
 static nxge_status_t nxge_add_intrs_adv(p_nxge_t nxgep);
 static nxge_status_t nxge_add_intrs_adv_type(p_nxge_t, uint32_t);
@@ -284,20 +273,19 @@ extern int nxge_param_set_mac(p_nxge_t, queue_t *, mblk_t *,
  */
 static int nxge_m_start(void *);
 static void nxge_m_stop(void *);
-static int nxge_m_unicst(void *, const uint8_t *);
 static int nxge_m_multicst(void *, boolean_t, const uint8_t *);
 static int nxge_m_promisc(void *, boolean_t);
 static void nxge_m_ioctl(void *, queue_t *, mblk_t *);
-static void nxge_m_resources(void *);
-mblk_t *nxge_m_tx(void *arg, mblk_t *);
 static nxge_status_t nxge_mac_register(p_nxge_t);
-int nxge_altmac_set(p_nxge_t nxgep, uint8_t *mac_addr,
-	mac_addr_slot_t slot, uint8_t rdctbl);
-void nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot,
+static int nxge_altmac_set(p_nxge_t nxgep, uint8_t *mac_addr,
+	int slot, int rdctbl, boolean_t usetbl);
+void nxge_mmac_kstat_update(p_nxge_t nxgep, int slot,
 	boolean_t factory);
-static int nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr);
-static int nxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr);
-static int nxge_m_mmac_get(void *arg, mac_multi_addr_t *maddr);
+#if defined(sun4v)
+extern mblk_t *nxge_m_tx(void *arg, mblk_t *mp);
+#endif
+
+static void nxge_m_getfactaddr(void *, uint_t, uint8_t *);
 static	boolean_t nxge_m_getcapab(void *, mac_capab_t, void *);
 static int nxge_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
@@ -308,6 +296,12 @@ static int nxge_set_priv_prop(nxge_t *, const char *, uint_t,
 static int nxge_get_priv_prop(nxge_t *, const char *, uint_t, uint_t,
     void *, uint_t *);
 static int nxge_get_def_val(nxge_t *, mac_prop_id_t, uint_t, void *);
+static void nxge_fill_ring(void *, mac_ring_type_t, const int, const int,
+    mac_ring_info_t *, mac_ring_handle_t);
+static void nxge_group_add_ring(mac_group_driver_t, mac_ring_driver_t,
+    mac_ring_type_t);
+static void nxge_group_rem_ring(mac_group_driver_t, mac_ring_driver_t,
+    mac_ring_type_t);
 
 static void nxge_niu_peu_reset(p_nxge_t nxgep);
 static void nxge_set_pci_replay_timeout(nxge_t *);
@@ -336,15 +330,11 @@ mac_priv_prop_t nxge_priv_props[] = {
 #define	NXGE_MAX_PRIV_PROPS	\
 	(sizeof (nxge_priv_props)/sizeof (mac_priv_prop_t))
 
-#define	NXGE_M_CALLBACK_FLAGS\
-	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
-
-
 #define	NXGE_NEPTUNE_MAGIC	0x4E584745UL
 #define	MAX_DUMP_SZ 256
 
 #define	NXGE_M_CALLBACK_FLAGS	\
-	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
 mac_callbacks_t nxge_m_callbacks = {
 	NXGE_M_CALLBACK_FLAGS,
@@ -353,9 +343,8 @@ mac_callbacks_t nxge_m_callbacks = {
 	nxge_m_stop,
 	nxge_m_promisc,
 	nxge_m_multicst,
-	nxge_m_unicst,
-	nxge_m_tx,
-	nxge_m_resources,
+	NULL,
+	NULL,
 	nxge_m_ioctl,
 	nxge_m_getcapab,
 	NULL,
@@ -631,6 +620,11 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (nxgep->niu_type != N2_NIU) {
 		nxge_set_pci_replay_timeout(nxgep);
 	}
+#if defined(sun4v)
+	if (isLDOMguest(nxgep)) {
+		nxge_m_callbacks.mc_tx = nxge_m_tx;
+	}
+#endif
 
 #if defined(sun4v)
 	/* This is required by nxge_hio_init(), which follows. */
@@ -847,13 +841,6 @@ nxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto nxge_attach_fail;
 	}
 
-	status = nxge_add_soft_intrs(nxgep);
-	if (status != DDI_SUCCESS) {
-		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
-		    "add_soft_intr failed"));
-		goto nxge_attach_fail;
-	}
-
 	/* If a guest, register with vio_net instead. */
 	if ((status = nxge_mac_register(nxgep)) != NXGE_OK) {
 		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
@@ -1031,9 +1018,6 @@ nxge_unattach(p_nxge_t nxgep)
 	 * Stop any further interrupts.
 	 */
 	nxge_remove_intrs(nxgep);
-
-	/* remove soft interrups */
-	nxge_remove_soft_intrs(nxgep);
 
 	/*
 	 * Stop the device and free resources.
@@ -3742,6 +3726,20 @@ nxge_m_start_exit:
 	return (0);
 }
 
+
+static boolean_t
+nxge_check_groups_stopped(p_nxge_t nxgep)
+{
+	int	i;
+
+	for (i = 0; i < NXGE_MAX_RDC_GROUPS; i++) {
+		if (nxgep->rx_hio_groups[i].started)
+			return (B_FALSE);
+	}
+
+	return (B_TRUE);
+}
+
 /*
  *	nxge_m_stop(): stop transmitting and receiving.
  */
@@ -3749,8 +3747,20 @@ static void
 nxge_m_stop(void *arg)
 {
 	p_nxge_t 	nxgep = (p_nxge_t)arg;
+	boolean_t	groups_stopped;
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "==> nxge_m_stop"));
+
+	groups_stopped = nxge_check_groups_stopped(nxgep);
+#ifdef later
+	ASSERT(groups_stopped == B_FALSE);
+#endif
+
+	if (!groups_stopped) {
+		cmn_err(CE_WARN, "nxge(%d): groups are not stopped!\n",
+		    nxgep->instance);
+		return;
+	}
 
 	MUTEX_ENTER(nxgep->genlock);
 	nxgep->nxge_mac_state = NXGE_MAC_STOPPING;
@@ -3767,26 +3777,6 @@ nxge_m_stop(void *arg)
 	MUTEX_EXIT(nxgep->genlock);
 
 	NXGE_DEBUG_MSG((nxgep, NXGE_CTL, "<== nxge_m_stop"));
-}
-
-static int
-nxge_m_unicst(void *arg, const uint8_t *macaddr)
-{
-	p_nxge_t 	nxgep = (p_nxge_t)arg;
-	struct 		ether_addr addrp;
-
-	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "==> nxge_m_unicst"));
-
-	bcopy(macaddr, (uint8_t *)&addrp, ETHERADDRL);
-	if (nxge_set_mac_addr(nxgep, &addrp)) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
-		    "<== nxge_m_unicst: set unitcast failed"));
-		return (EINVAL);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, MAC_CTL, "<== nxge_m_unicst"));
-
-	return (0);
 }
 
 static int
@@ -3942,77 +3932,8 @@ nxge_m_ioctl(void *arg,  queue_t *wq, mblk_t *mp)
 
 extern void nxge_rx_hw_blank(void *arg, time_t ticks, uint_t count);
 
-static void
-nxge_m_resources(void *arg)
-{
-	p_nxge_t		nxgep = arg;
-	mac_rx_fifo_t 		mrf;
-
-	nxge_grp_set_t		*set = &nxgep->rx_set;
-	uint8_t			rdc;
-
-	rx_rcr_ring_t		*ring;
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_m_resources"));
-
-	MUTEX_ENTER(nxgep->genlock);
-
-	if (set->owned.map == 0) {
-		NXGE_ERROR_MSG((NULL, NXGE_ERR_CTL,
-		    "nxge_m_resources: no receive resources"));
-		goto nxge_m_resources_exit;
-	}
-
-	/*
-	 * CR 6492541 Check to see if the drv_state has been initialized,
-	 * if not * call nxge_init().
-	 */
-	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
-		if (nxge_init(nxgep) != NXGE_OK)
-			goto nxge_m_resources_exit;
-	}
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = nxge_rx_hw_blank;
-	mrf.mrf_arg = (void *)nxgep;
-
-	mrf.mrf_normal_blank_time = 128;
-	mrf.mrf_normal_pkt_count = 8;
-
-	/*
-	 * Export our receive resources to the MAC layer.
-	 */
-	for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
-		if ((1 << rdc) & set->owned.map) {
-			ring = nxgep->rx_rcr_rings->rcr_rings[rdc];
-			if (ring == 0) {
-				/*
-				 * This is a big deal only if we are
-				 * *not* in an LDOMs environment.
-				 */
-				if (nxgep->environs == SOLARIS_DOMAIN) {
-					cmn_err(CE_NOTE,
-					    "==> nxge_m_resources: "
-					    "ring %d == 0", rdc);
-				}
-				continue;
-			}
-			ring->rcr_mac_handle = mac_resource_add
-			    (nxgep->mach, (mac_resource_t *)&mrf);
-
-			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			    "==> nxge_m_resources: RDC %d RCR %p MAC handle %p",
-			    rdc, ring, ring->rcr_mac_handle));
-		}
-	}
-
-nxge_m_resources_exit:
-	MUTEX_EXIT(nxgep->genlock);
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_m_resources"));
-}
-
 void
-nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot, boolean_t factory)
+nxge_mmac_kstat_update(p_nxge_t nxgep, int slot, boolean_t factory)
 {
 	p_nxge_mmac_stats_t mmac_stats;
 	int i;
@@ -4040,15 +3961,16 @@ nxge_mmac_kstat_update(p_nxge_t nxgep, mac_addr_slot_t slot, boolean_t factory)
 /*
  * nxge_altmac_set() -- Set an alternate MAC address
  */
-int
-nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot,
-	uint8_t rdctbl)
+static int
+nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, int slot,
+	int rdctbl, boolean_t usetbl)
 {
 	uint8_t addrn;
 	uint8_t portn;
 	npi_mac_addr_t altmac;
 	hostinfo_t mac_rdc;
 	p_nxge_class_pt_cfg_t clscfgp;
+
 
 	altmac.w2 = ((uint16_t)maddr[0] << 8) | ((uint16_t)maddr[1] & 0x0ff);
 	altmac.w1 = ((uint16_t)maddr[2] << 8) | ((uint16_t)maddr[3] & 0x0ff);
@@ -4057,8 +3979,8 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot,
 	portn = nxgep->mac.portnum;
 	addrn = (uint8_t)slot - 1;
 
-	if (npi_mac_altaddr_entry(nxgep->npi_handle, OP_SET, portn,
-	    addrn, &altmac) != NPI_SUCCESS)
+	if (npi_mac_altaddr_entry(nxgep->npi_handle, OP_SET,
+	    nxgep->function_num, addrn, &altmac) != NPI_SUCCESS)
 		return (EIO);
 
 	/*
@@ -4067,8 +3989,11 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot,
 	 */
 	clscfgp = (p_nxge_class_pt_cfg_t)&nxgep->class_config;
 	mac_rdc.value = 0;
-	clscfgp->mac_host_info[addrn].rdctbl = rdctbl;
-	mac_rdc.bits.w0.rdc_tbl_num = rdctbl;
+	if (usetbl)
+		mac_rdc.bits.w0.rdc_tbl_num = rdctbl;
+	else
+		mac_rdc.bits.w0.rdc_tbl_num =
+		    clscfgp->mac_host_info[addrn].rdctbl;
 	mac_rdc.bits.w0.mac_pref = clscfgp->mac_host_info[addrn].mpr_npr;
 
 	if (npi_mac_hostinfo_entry(nxgep->npi_handle, OP_SET,
@@ -4088,22 +4013,25 @@ nxge_altmac_set(p_nxge_t nxgep, uint8_t *maddr, mac_addr_slot_t slot,
 	else
 		addrn = (uint8_t)slot;
 
-	if (npi_mac_altaddr_enable(nxgep->npi_handle, portn, addrn)
-	    != NPI_SUCCESS)
+	if (npi_mac_altaddr_enable(nxgep->npi_handle,
+	    nxgep->function_num, addrn) != NPI_SUCCESS) {
 		return (EIO);
+	}
+
 	return (0);
 }
 
 /*
- * nxeg_m_mmac_add() - find an unused address slot, set the address
+ * nxeg_m_mmac_add_g() - find an unused address slot, set the address
  * value to the one specified, enable the port to start filtering on
  * the new MAC address.  Returns 0 on success.
  */
 int
-nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
+nxge_m_mmac_add_g(void *arg, const uint8_t *maddr, int rdctbl,
+	boolean_t usetbl)
 {
 	p_nxge_t nxgep = arg;
-	mac_addr_slot_t slot;
+	int slot;
 	nxge_mmac_t *mmac_info;
 	int err;
 	nxge_status_t status;
@@ -4127,16 +4055,10 @@ nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
 		mutex_exit(nxgep->genlock);
 		return (ENOSPC);
 	}
-	if (!mac_unicst_verify(nxgep->mach, maddr->mma_addr,
-	    maddr->mma_addrlen)) {
-		mutex_exit(nxgep->genlock);
-		return (EINVAL);
-	}
+
 	/*
 	 * 	Search for the first available slot. Because naddrfree
 	 * is not zero, we are guaranteed to find one.
-	 * 	Slot 0 is for unique (primary) MAC. The first alternate
-	 * MAC slot is slot 1.
 	 *	Each of the first two ports of Neptune has 16 alternate
 	 * MAC slots but only the first 7 (of 15) slots have assigned factory
 	 * MAC addresses. We first search among the slots without bundled
@@ -4146,131 +4068,26 @@ nxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
 	 * But the slot could be used by factory MAC again after calling
 	 * nxge_m_mmac_remove and nxge_m_mmac_reserve.
 	 */
-	if (mmac_info->num_factory_mmac < mmac_info->num_mmac) {
-		for (slot = mmac_info->num_factory_mmac + 1;
-		    slot <= mmac_info->num_mmac; slot++) {
-			if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
-				break;
-		}
-		if (slot > mmac_info->num_mmac) {
-			for (slot = 1; slot <= mmac_info->num_factory_mmac;
-			    slot++) {
-				if (!(mmac_info->mac_pool[slot].flags
-				    & MMAC_SLOT_USED))
-					break;
-			}
-		}
-	} else {
-		for (slot = 1; slot <= mmac_info->num_mmac; slot++) {
-			if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
-				break;
-		}
+	for (slot = 0; slot <= mmac_info->num_mmac; slot++) {
+		if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
+			break;
 	}
+
 	ASSERT(slot <= mmac_info->num_mmac);
 
-	/*
-	 * def_mac_rxdma_grpid is the default rdc table for the port.
-	 */
-	if ((err = nxge_altmac_set(nxgep, maddr->mma_addr, slot,
-	    nxgep->pt_config.hw_config.def_mac_rxdma_grpid)) != 0) {
+	if ((err = nxge_altmac_set(nxgep, (uint8_t *)maddr, slot, rdctbl,
+	    usetbl)) != 0) {
 		mutex_exit(nxgep->genlock);
 		return (err);
 	}
 
-	bcopy(maddr->mma_addr, mmac_info->mac_pool[slot].addr, ETHERADDRL);
+	bcopy(maddr, mmac_info->mac_pool[slot].addr, ETHERADDRL);
 	mmac_info->mac_pool[slot].flags |= MMAC_SLOT_USED;
 	mmac_info->mac_pool[slot].flags &= ~MMAC_VENDOR_ADDR;
 	mmac_info->naddrfree--;
 	nxge_mmac_kstat_update(nxgep, slot, B_FALSE);
 
-	maddr->mma_slot = slot;
-
 	mutex_exit(nxgep->genlock);
-	return (0);
-}
-
-/*
- * This function reserves an unused slot and programs the slot and the HW
- * with a factory mac address.
- */
-static int
-nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr)
-{
-	p_nxge_t nxgep = arg;
-	mac_addr_slot_t slot;
-	nxge_mmac_t *mmac_info;
-	int err;
-	nxge_status_t status;
-
-	mutex_enter(nxgep->genlock);
-
-	/*
-	 * Make sure that nxge is initialized, if _start() has
-	 * not been called.
-	 */
-	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
-		status = nxge_init(nxgep);
-		if (status != NXGE_OK) {
-			mutex_exit(nxgep->genlock);
-			return (ENXIO);
-		}
-	}
-
-	mmac_info = &nxgep->nxge_mmac_info;
-	if (mmac_info->naddrfree == 0) {
-		mutex_exit(nxgep->genlock);
-		return (ENOSPC);
-	}
-
-	slot = maddr->mma_slot;
-	if (slot == -1) {  /* -1: Take the first available slot */
-		for (slot = 1; slot <= mmac_info->num_factory_mmac; slot++) {
-			if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
-				break;
-		}
-		if (slot > mmac_info->num_factory_mmac) {
-			mutex_exit(nxgep->genlock);
-			return (ENOSPC);
-		}
-	}
-	if (slot < 1 || slot > mmac_info->num_factory_mmac) {
-		/*
-		 * Do not support factory MAC at a slot greater than
-		 * num_factory_mmac even when there are available factory
-		 * MAC addresses because the alternate MACs are bundled with
-		 * slot[1] through slot[num_factory_mmac]
-		 */
-		mutex_exit(nxgep->genlock);
-		return (EINVAL);
-	}
-	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
-		mutex_exit(nxgep->genlock);
-		return (EBUSY);
-	}
-	/* Verify the address to be reserved */
-	if (!mac_unicst_verify(nxgep->mach,
-	    mmac_info->factory_mac_pool[slot], ETHERADDRL)) {
-		mutex_exit(nxgep->genlock);
-		return (EINVAL);
-	}
-	if (err = nxge_altmac_set(nxgep,
-	    mmac_info->factory_mac_pool[slot], slot,
-	    nxgep->pt_config.hw_config.def_mac_rxdma_grpid)) {
-		mutex_exit(nxgep->genlock);
-		return (err);
-	}
-	bcopy(mmac_info->factory_mac_pool[slot], maddr->mma_addr, ETHERADDRL);
-	mmac_info->mac_pool[slot].flags |= MMAC_SLOT_USED | MMAC_VENDOR_ADDR;
-	mmac_info->naddrfree--;
-
-	nxge_mmac_kstat_update(nxgep, slot, B_TRUE);
-	mutex_exit(nxgep->genlock);
-
-	/* Pass info back to the caller */
-	maddr->mma_slot = slot;
-	maddr->mma_addrlen = ETHERADDRL;
-	maddr->mma_flags = MMAC_SLOT_USED | MMAC_VENDOR_ADDR;
-
 	return (0);
 }
 
@@ -4279,7 +4096,7 @@ nxge_m_mmac_reserve(void *arg, mac_multi_addr_t *maddr)
  * the mac address anymore.
  */
 int
-nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot)
+nxge_m_mmac_remove(void *arg, int slot)
 {
 	p_nxge_t nxgep = arg;
 	nxge_mmac_t *mmac_info;
@@ -4350,141 +4167,37 @@ nxge_m_mmac_remove(void *arg, mac_addr_slot_t slot)
 }
 
 /*
- * Modify a mac address added by nxge_m_mmac_add or nxge_m_mmac_reserve().
+ * The callback to query all the factory addresses. naddr must be the same as
+ * the number of factory addresses (returned by MAC_CAPAB_MULTIFACTADDR), and
+ * mcm_addr is the space allocated for keep all the addresses, whose size is
+ * naddr * MAXMACADDRLEN.
  */
-static int
-nxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr)
+static void
+nxge_m_getfactaddr(void *arg, uint_t naddr, uint8_t *addr)
 {
-	p_nxge_t nxgep = arg;
-	mac_addr_slot_t slot;
-	nxge_mmac_t *mmac_info;
-	int err = 0;
-	nxge_status_t status;
-
-	if (!mac_unicst_verify(nxgep->mach, maddr->mma_addr,
-	    maddr->mma_addrlen))
-		return (EINVAL);
-
-	slot = maddr->mma_slot;
+	nxge_t		*nxgep = arg;
+	nxge_mmac_t	*mmac_info;
+	int		i;
 
 	mutex_enter(nxgep->genlock);
 
-	/*
-	 * Make sure that nxge is initialized, if _start() has
-	 * not been called.
-	 */
-	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
-		status = nxge_init(nxgep);
-		if (status != NXGE_OK) {
-			mutex_exit(nxgep->genlock);
-			return (ENXIO);
-		}
+	mmac_info = &nxgep->nxge_mmac_info;
+	ASSERT(naddr == mmac_info->num_factory_mmac);
+
+	for (i = 0; i < naddr; i++) {
+		bcopy(mmac_info->factory_mac_pool[i + 1],
+		    addr + i * MAXMACADDRLEN, ETHERADDRL);
 	}
 
-	mmac_info = &nxgep->nxge_mmac_info;
-	if (slot < 1 || slot > mmac_info->num_mmac) {
-		mutex_exit(nxgep->genlock);
-		return (EINVAL);
-	}
-	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
-		if ((err = nxge_altmac_set(nxgep,
-		    maddr->mma_addr, slot,
-		    nxgep->pt_config.hw_config.def_mac_rxdma_grpid)) != 0) {
-			bcopy(maddr->mma_addr, mmac_info->mac_pool[slot].addr,
-			    ETHERADDRL);
-			/*
-			 * Assume that the MAC passed down from the caller
-			 * is not a factory MAC address (The user should
-			 * call mmac_remove followed by mmac_reserve if
-			 * he wants to use the factory MAC for this slot).
-			 */
-			mmac_info->mac_pool[slot].flags &= ~MMAC_VENDOR_ADDR;
-			nxge_mmac_kstat_update(nxgep, slot, B_FALSE);
-		}
-	} else {
-		err = EINVAL;
-	}
 	mutex_exit(nxgep->genlock);
-	return (err);
 }
 
-/*
- * nxge_m_mmac_get() - Get the MAC address and other information
- * related to the slot.  mma_flags should be set to 0 in the call.
- * Note: although kstat shows MAC address as zero when a slot is
- * not used, Crossbow expects nxge_m_mmac_get to copy factory MAC
- * to the caller as long as the slot is not using a user MAC address.
- * The following table shows the rules,
- *
- *				   USED    VENDOR    mma_addr
- * ------------------------------------------------------------
- * (1) Slot uses a user MAC:        yes      no     user MAC
- * (2) Slot uses a factory MAC:     yes      yes    factory MAC
- * (3) Slot is not used but is
- *     factory MAC capable:         no       yes    factory MAC
- * (4) Slot is not used and is
- *     not factory MAC capable:     no       no        0
- * ------------------------------------------------------------
- */
-static int
-nxge_m_mmac_get(void *arg, mac_multi_addr_t *maddr)
-{
-	nxge_t *nxgep = arg;
-	mac_addr_slot_t slot;
-	nxge_mmac_t *mmac_info;
-	nxge_status_t status;
-
-	slot = maddr->mma_slot;
-
-	mutex_enter(nxgep->genlock);
-
-	/*
-	 * Make sure that nxge is initialized, if _start() has
-	 * not been called.
-	 */
-	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
-		status = nxge_init(nxgep);
-		if (status != NXGE_OK) {
-			mutex_exit(nxgep->genlock);
-			return (ENXIO);
-		}
-	}
-
-	mmac_info = &nxgep->nxge_mmac_info;
-
-	if (slot < 1 || slot > mmac_info->num_mmac) {
-		mutex_exit(nxgep->genlock);
-		return (EINVAL);
-	}
-	maddr->mma_flags = 0;
-	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED)
-		maddr->mma_flags |= MMAC_SLOT_USED;
-
-	if (mmac_info->mac_pool[slot].flags & MMAC_VENDOR_ADDR) {
-		maddr->mma_flags |= MMAC_VENDOR_ADDR;
-		bcopy(mmac_info->factory_mac_pool[slot],
-		    maddr->mma_addr, ETHERADDRL);
-		maddr->mma_addrlen = ETHERADDRL;
-	} else {
-		if (maddr->mma_flags & MMAC_SLOT_USED) {
-			bcopy(mmac_info->mac_pool[slot].addr,
-			    maddr->mma_addr, ETHERADDRL);
-			maddr->mma_addrlen = ETHERADDRL;
-		} else {
-			bzero(maddr->mma_addr, ETHERADDRL);
-			maddr->mma_addrlen = 0;
-		}
-	}
-	mutex_exit(nxgep->genlock);
-	return (0);
-}
 
 static boolean_t
 nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
 	nxge_t *nxgep = arg;
 	uint32_t *txflags = cap_data;
-	multiaddress_capab_t *mmacp = cap_data;
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM:
@@ -4495,33 +4208,15 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		}
 		break;
 
-	case MAC_CAPAB_POLL:
-		/*
-		 * There's nothing for us to fill in, simply returning
-		 * B_TRUE stating that we support polling is sufficient.
-		 */
-		break;
+	case MAC_CAPAB_MULTIFACTADDR: {
+		mac_capab_multifactaddr_t	*mfacp = cap_data;
 
-	case MAC_CAPAB_MULTIADDRESS:
-		mmacp = (multiaddress_capab_t *)cap_data;
 		mutex_enter(nxgep->genlock);
-
-		mmacp->maddr_naddr = nxgep->nxge_mmac_info.num_mmac;
-		mmacp->maddr_naddrfree = nxgep->nxge_mmac_info.naddrfree;
-		mmacp->maddr_flag = 0; /* 0 is required by PSARC2006/265 */
-		/*
-		 * maddr_handle is driver's private data, passed back to
-		 * entry point functions as arg.
-		 */
-		mmacp->maddr_handle	= nxgep;
-		mmacp->maddr_add	= nxge_m_mmac_add;
-		mmacp->maddr_remove	= nxge_m_mmac_remove;
-		mmacp->maddr_modify	= nxge_m_mmac_modify;
-		mmacp->maddr_get	= nxge_m_mmac_get;
-		mmacp->maddr_reserve	= nxge_m_mmac_reserve;
-
+		mfacp->mcm_naddr = nxgep->nxge_mmac_info.num_factory_mmac;
+		mfacp->mcm_getaddr = nxge_m_getfactaddr;
 		mutex_exit(nxgep->genlock);
 		break;
+	}
 
 	case MAC_CAPAB_LSO: {
 		mac_capab_lso_t *cap_lso = cap_data;
@@ -4541,39 +4236,49 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		}
 	}
 
-#if defined(sun4v)
 	case MAC_CAPAB_RINGS: {
-		mac_capab_rings_t *mrings = (mac_capab_rings_t *)cap_data;
+		mac_capab_rings_t	*cap_rings = cap_data;
+		p_nxge_hw_pt_cfg_t	p_cfgp = &nxgep->pt_config.hw_config;
 
-		/*
-		 * Only the service domain driver responds to
-		 * this capability request.
-		 */
-		if (isLDOMservice(nxgep)) {
-			mrings->mr_handle = (void *)nxgep;
+		mutex_enter(nxgep->genlock);
+		if (cap_rings->mr_type == MAC_RING_TYPE_RX) {
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_DYNAMIC;
+			cap_rings->mr_rnum = p_cfgp->max_rdcs;
+			cap_rings->mr_rget = nxge_fill_ring;
+			cap_rings->mr_gnum = p_cfgp->max_rdc_grpids;
+			cap_rings->mr_gget = nxge_hio_group_get;
+			cap_rings->mr_gaddring = nxge_group_add_ring;
+			cap_rings->mr_gremring = nxge_group_rem_ring;
 
-			/*
-			 * No dynamic allocation of groups and
-			 * rings at this time.  Shares dictate the
-			 * configuration.
-			 */
-			mrings->mr_gadd_ring = NULL;
-			mrings->mr_grem_ring = NULL;
-			mrings->mr_rget = NULL;
-			mrings->mr_gget = nxge_hio_group_get;
-
-			if (mrings->mr_type == MAC_RING_TYPE_RX) {
-				mrings->mr_rnum = 8; /* XXX */
-				mrings->mr_gnum = 6; /* XXX */
+			NXGE_DEBUG_MSG((nxgep, RX_CTL,
+			    "==> nxge_m_getcapab: rx nrings[%d] ngroups[%d]",
+			    p_cfgp->max_rdcs, p_cfgp->max_rdc_grpids));
+		} else {
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_DYNAMIC;
+			cap_rings->mr_rnum = p_cfgp->tdc.count;
+			cap_rings->mr_rget = nxge_fill_ring;
+			if (isLDOMservice(nxgep)) {
+				/* share capable */
+				/* Do not report the default ring: hence -1 */
+				cap_rings->mr_gnum =
+				    NXGE_MAX_TDC_GROUPS / nxgep->nports - 1;
 			} else {
-				mrings->mr_rnum = 8; /* XXX */
-				mrings->mr_gnum = 0; /* XXX */
+				cap_rings->mr_gnum = 0;
 			}
-		} else
-			return (B_FALSE);
+
+			cap_rings->mr_gget = nxge_hio_group_get;
+			cap_rings->mr_gaddring = nxge_group_add_ring;
+			cap_rings->mr_gremring = nxge_group_rem_ring;
+
+			NXGE_DEBUG_MSG((nxgep, TX_CTL,
+			    "==> nxge_m_getcapab: tx rings # of rings %d",
+			    p_cfgp->tdc.count));
+		}
+		mutex_exit(nxgep->genlock);
 		break;
 	}
 
+#if defined(sun4v)
 	case MAC_CAPAB_SHARES: {
 		mac_capab_share_t *mshares = (mac_capab_share_t *)cap_data;
 
@@ -4581,16 +4286,22 @@ nxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		 * Only the service domain driver responds to
 		 * this capability request.
 		 */
+		mutex_enter(nxgep->genlock);
 		if (isLDOMservice(nxgep)) {
 			mshares->ms_snum = 3;
 			mshares->ms_handle = (void *)nxgep;
 			mshares->ms_salloc = nxge_hio_share_alloc;
 			mshares->ms_sfree = nxge_hio_share_free;
-			mshares->ms_sadd = NULL;
-			mshares->ms_sremove = NULL;
+			mshares->ms_sadd = nxge_hio_share_add_group;
+			mshares->ms_sremove = nxge_hio_share_rem_group;
 			mshares->ms_squery = nxge_hio_share_query;
-		} else
+			mshares->ms_sbind = nxge_hio_share_bind;
+			mshares->ms_sunbind = nxge_hio_share_unbind;
+			mutex_exit(nxgep->genlock);
+		} else {
+			mutex_exit(nxgep->genlock);
 			return (B_FALSE);
+		}
 		break;
 	}
 #endif
@@ -5160,12 +4871,6 @@ nxge_set_priv_prop(p_nxge_t nxgep, const char *pr_name, uint_t pr_valsize,
 	}
 
 	if (strcmp(pr_name, "_soft_lso_enable") == 0) {
-		if (nxgep->nxge_mac_state == NXGE_MAC_STARTED) {
-			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
-			    "==> nxge_set_priv_prop: name %s (busy)", pr_name));
-			err = EBUSY;
-			return (err);
-		}
 		if (pr_val == NULL) {
 			NXGE_DEBUG_MSG((nxgep, NXGE_CTL,
 			    "==> nxge_set_priv_prop: name %s (null)", pr_name));
@@ -5695,6 +5400,290 @@ _info(struct modinfo *modinfop)
 }
 
 /*ARGSUSED*/
+static int
+nxge_tx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num)
+{
+	p_nxge_ring_handle_t	rhp = (p_nxge_ring_handle_t)rdriver;
+	p_nxge_t		nxgep = rhp->nxgep;
+	uint32_t		channel;
+	p_tx_ring_t		ring;
+
+	channel = nxgep->pt_config.hw_config.tdc.start + rhp->index;
+	ring = nxgep->tx_rings->rings[channel];
+
+	MUTEX_ENTER(&ring->lock);
+	ring->tx_ring_handle = rhp->ring_handle;
+	MUTEX_EXIT(&ring->lock);
+
+	return (0);
+}
+
+static void
+nxge_tx_ring_stop(mac_ring_driver_t rdriver)
+{
+	p_nxge_ring_handle_t	rhp = (p_nxge_ring_handle_t)rdriver;
+	p_nxge_t		nxgep = rhp->nxgep;
+	uint32_t		channel;
+	p_tx_ring_t		ring;
+
+	channel = nxgep->pt_config.hw_config.tdc.start + rhp->index;
+	ring = nxgep->tx_rings->rings[channel];
+
+	MUTEX_ENTER(&ring->lock);
+	ring->tx_ring_handle = (mac_ring_handle_t)NULL;
+	MUTEX_EXIT(&ring->lock);
+}
+
+static int
+nxge_rx_ring_start(mac_ring_driver_t rdriver, uint64_t mr_gen_num)
+{
+	p_nxge_ring_handle_t	rhp = (p_nxge_ring_handle_t)rdriver;
+	p_nxge_t		nxgep = rhp->nxgep;
+	uint32_t		channel;
+	p_rx_rcr_ring_t		ring;
+	int			i;
+
+	channel = nxgep->pt_config.hw_config.start_rdc + rhp->index;
+	ring =  nxgep->rx_rcr_rings->rcr_rings[channel];
+
+	MUTEX_ENTER(&ring->lock);
+
+	if (nxgep->rx_channel_started[channel] == B_TRUE) {
+		MUTEX_EXIT(&ring->lock);
+		return (0);
+	}
+
+	/* set rcr_ring */
+	for (i = 0; i < nxgep->ldgvp->maxldvs; i++) {
+		if ((nxgep->ldgvp->ldvp[i].is_rxdma == 1) &&
+		    (nxgep->ldgvp->ldvp[i].channel == channel)) {
+			ring->ldvp = &nxgep->ldgvp->ldvp[i];
+			ring->ldgp = nxgep->ldgvp->ldvp[i].ldgp;
+		}
+	}
+
+	nxgep->rx_channel_started[channel] = B_TRUE;
+	ring->rcr_mac_handle = rhp->ring_handle;
+	ring->rcr_gen_num = mr_gen_num;
+	MUTEX_EXIT(&ring->lock);
+
+	return (0);
+}
+
+static void
+nxge_rx_ring_stop(mac_ring_driver_t rdriver)
+{
+	p_nxge_ring_handle_t	rhp = (p_nxge_ring_handle_t)rdriver;
+	p_nxge_t		nxgep = rhp->nxgep;
+	uint32_t		channel;
+	p_rx_rcr_ring_t		ring;
+
+	channel = nxgep->pt_config.hw_config.start_rdc + rhp->index;
+	ring =  nxgep->rx_rcr_rings->rcr_rings[channel];
+
+	MUTEX_ENTER(&ring->lock);
+	nxgep->rx_channel_started[channel] = B_FALSE;
+	ring->rcr_mac_handle = NULL;
+	MUTEX_EXIT(&ring->lock);
+}
+
+/*
+ * Callback funtion for MAC layer to register all rings.
+ */
+static void
+nxge_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
+    const int index, mac_ring_info_t *infop, mac_ring_handle_t rh)
+{
+	p_nxge_t		nxgep = (p_nxge_t)arg;
+	p_nxge_hw_pt_cfg_t	p_cfgp = &nxgep->pt_config.hw_config;
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL,
+	    "==> nxge_fill_ring 0x%x index %d", rtype, index));
+
+	switch (rtype) {
+	case MAC_RING_TYPE_TX: {
+		p_nxge_ring_handle_t	rhandlep;
+
+		NXGE_DEBUG_MSG((nxgep, TX_CTL,
+		    "==> nxge_fill_ring (TX) 0x%x index %d ntdcs %d",
+		    rtype, index, p_cfgp->tdc.count));
+
+		ASSERT((index >= 0) && (index < p_cfgp->tdc.count));
+		rhandlep = &nxgep->tx_ring_handles[index];
+		rhandlep->nxgep = nxgep;
+		rhandlep->index = index;
+		rhandlep->ring_handle = rh;
+
+		infop->mri_driver = (mac_ring_driver_t)rhandlep;
+		infop->mri_start = nxge_tx_ring_start;
+		infop->mri_stop = nxge_tx_ring_stop;
+		infop->mri_tx = nxge_tx_ring_send;
+
+		break;
+	}
+	case MAC_RING_TYPE_RX: {
+		p_nxge_ring_handle_t	rhandlep;
+		int			nxge_rindex;
+		mac_intr_t		nxge_mac_intr;
+
+		NXGE_DEBUG_MSG((nxgep, RX_CTL,
+		    "==> nxge_fill_ring (RX) 0x%x index %d nrdcs %d",
+		    rtype, index, p_cfgp->max_rdcs));
+
+		/*
+		 * 'index' is the ring index within the group.
+		 * Find the ring index in the nxge instance.
+		 */
+		nxge_rindex = nxge_get_rxring_index(nxgep, rg_index, index);
+
+		ASSERT((nxge_rindex >= 0) && (nxge_rindex < p_cfgp->max_rdcs));
+		rhandlep = &nxgep->rx_ring_handles[nxge_rindex];
+		rhandlep->nxgep = nxgep;
+		rhandlep->index = nxge_rindex;
+		rhandlep->ring_handle = rh;
+
+		/*
+		 * Entrypoint to enable interrupt (disable poll) and
+		 * disable interrupt (enable poll).
+		 */
+		nxge_mac_intr.mi_handle = (mac_intr_handle_t)rhandlep;
+		nxge_mac_intr.mi_enable = (mac_intr_enable_t)nxge_disable_poll;
+		nxge_mac_intr.mi_disable = (mac_intr_disable_t)nxge_enable_poll;
+		infop->mri_driver = (mac_ring_driver_t)rhandlep;
+		infop->mri_start = nxge_rx_ring_start;
+		infop->mri_stop = nxge_rx_ring_stop;
+		infop->mri_intr = nxge_mac_intr; /* ??? */
+		infop->mri_poll = nxge_rx_poll;
+
+		break;
+	}
+	default:
+		break;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_fill_ring 0x%x",
+	    rtype));
+}
+
+static void
+nxge_group_add_ring(mac_group_driver_t gh, mac_ring_driver_t rh,
+    mac_ring_type_t type)
+{
+	nxge_ring_group_t	*rgroup = (nxge_ring_group_t *)gh;
+	nxge_ring_handle_t	*rhandle = (nxge_ring_handle_t *)rh;
+	nxge_t			*nxge;
+	nxge_grp_t		*grp;
+	nxge_rdc_grp_t		*rdc_grp;
+	uint16_t		channel;	/* device-wise ring id */
+	int			dev_gindex;
+	int			rv;
+
+	nxge = rgroup->nxgep;
+
+	switch (type) {
+	case MAC_RING_TYPE_TX:
+		/*
+		 * nxge_grp_dc_add takes a channel number which is a
+		 * "devise" ring ID.
+		 */
+		channel = nxge->pt_config.hw_config.tdc.start + rhandle->index;
+
+		/*
+		 * Remove the ring from the default group
+		 */
+		if (rgroup->gindex != 0) {
+			(void) nxge_grp_dc_remove(nxge, VP_BOUND_TX, channel);
+		}
+
+		/*
+		 * nxge->tx_set.group[] is an array of groups indexed by
+		 * a "port" group ID.
+		 */
+		grp = nxge->tx_set.group[rgroup->gindex];
+		rv = nxge_grp_dc_add(nxge, grp, VP_BOUND_TX, channel);
+		if (rv != 0) {
+			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+			    "nxge_group_add_ring: nxge_grp_dc_add failed"));
+		}
+		break;
+
+	case MAC_RING_TYPE_RX:
+		/*
+		 * nxge->rx_set.group[] is an array of groups indexed by
+		 * a "port" group ID.
+		 */
+		grp = nxge->rx_set.group[rgroup->gindex];
+
+		dev_gindex = nxge->pt_config.hw_config.def_mac_rxdma_grpid +
+		    rgroup->gindex;
+		rdc_grp = &nxge->pt_config.rdc_grps[dev_gindex];
+
+		/*
+		 * nxge_grp_dc_add takes a channel number which is a
+		 * "devise" ring ID.
+		 */
+		channel = nxge->pt_config.hw_config.start_rdc + rhandle->index;
+		rv = nxge_grp_dc_add(nxge, grp, VP_BOUND_RX, channel);
+		if (rv != 0) {
+			NXGE_ERROR_MSG((nxge, NXGE_ERR_CTL,
+			    "nxge_group_add_ring: nxge_grp_dc_add failed"));
+		}
+
+		rdc_grp->map |= (1 << channel);
+		rdc_grp->max_rdcs++;
+
+		(void) nxge_init_fzc_rdc_tbl(nxge, rgroup->rdctbl);
+		break;
+	}
+}
+
+static void
+nxge_group_rem_ring(mac_group_driver_t gh, mac_ring_driver_t rh,
+    mac_ring_type_t type)
+{
+	nxge_ring_group_t	*rgroup = (nxge_ring_group_t *)gh;
+	nxge_ring_handle_t	*rhandle = (nxge_ring_handle_t *)rh;
+	nxge_t			*nxge;
+	uint16_t		channel;	/* device-wise ring id */
+	nxge_rdc_grp_t		*rdc_grp;
+	int			dev_gindex;
+
+	nxge = rgroup->nxgep;
+
+	switch (type) {
+	case MAC_RING_TYPE_TX:
+		dev_gindex = nxge->pt_config.hw_config.def_mac_txdma_grpid +
+		    rgroup->gindex;
+		channel = nxge->pt_config.hw_config.tdc.start + rhandle->index;
+		nxge_grp_dc_remove(nxge, VP_BOUND_TX, channel);
+
+		/*
+		 * Add the ring back to the default group
+		 */
+		if (rgroup->gindex != 0) {
+			nxge_grp_t *grp;
+			grp = nxge->tx_set.group[0];
+			(void) nxge_grp_dc_add(nxge, grp, VP_BOUND_TX, channel);
+		}
+		break;
+
+	case MAC_RING_TYPE_RX:
+		dev_gindex = nxge->pt_config.hw_config.def_mac_rxdma_grpid +
+		    rgroup->gindex;
+		rdc_grp = &nxge->pt_config.rdc_grps[dev_gindex];
+		channel = rdc_grp->start_rdc + rhandle->index;
+		nxge_grp_dc_remove(nxge, VP_BOUND_RX, channel);
+
+		rdc_grp->map &= ~(1 << channel);
+		rdc_grp->max_rdcs--;
+
+		(void) nxge_init_fzc_rdc_tbl(nxge, rgroup->rdctbl);
+		break;
+	}
+}
+
+
+/*ARGSUSED*/
 static nxge_status_t
 nxge_add_intrs(p_nxge_t nxgep)
 {
@@ -5815,33 +5804,6 @@ nxge_add_intrs(p_nxge_t nxgep)
 	}
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_add_intrs"));
-	return (status);
-}
-
-/*ARGSUSED*/
-static nxge_status_t
-nxge_add_soft_intrs(p_nxge_t nxgep)
-{
-
-	int		ddi_status = DDI_SUCCESS;
-	nxge_status_t	status = NXGE_OK;
-
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_add_soft_intrs"));
-
-	nxgep->resched_id = NULL;
-	nxgep->resched_running = B_FALSE;
-	ddi_status = ddi_add_softintr(nxgep->dip, DDI_SOFTINT_LOW,
-	    &nxgep->resched_id,
-	    NULL, NULL, nxge_reschedule, (caddr_t)nxgep);
-	if (ddi_status != DDI_SUCCESS) {
-		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_add_soft_intrs: "
-		    "ddi_add_softintrs failed: status 0x%08x",
-		    ddi_status));
-		return (NXGE_ERROR | NXGE_DDI_FAILED);
-	}
-
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_ddi_add_soft_intrs"));
-
 	return (status);
 }
 
@@ -6277,21 +6239,6 @@ nxge_remove_intrs(p_nxge_t nxgep)
 
 /*ARGSUSED*/
 static void
-nxge_remove_soft_intrs(p_nxge_t nxgep)
-{
-	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_remove_soft_intrs"));
-	if (nxgep->resched_id) {
-		ddi_remove_softintr(nxgep->resched_id);
-		NXGE_DEBUG_MSG((nxgep, INT_CTL,
-		    "==> nxge_remove_soft_intrs: removed"));
-		nxgep->resched_id = NULL;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_remove_soft_intrs"));
-}
-
-/*ARGSUSED*/
-static void
 nxge_intrs_enable(p_nxge_t nxgep)
 {
 	p_nxge_intr_t	intrp;
@@ -6389,6 +6336,7 @@ nxge_mac_register(p_nxge_t nxgep)
 	macp->m_margin = VLAN_TAGSZ;
 	macp->m_priv_props = nxge_priv_props;
 	macp->m_priv_prop_count = NXGE_MAX_PRIV_PROPS;
+	macp->m_v12n = MAC_VIRT_HIO | MAC_VIRT_LEVEL1 | MAC_VIRT_SERIALIZE;
 
 	NXGE_DEBUG_MSG((nxgep, MAC_CTL,
 	    "==> nxge_mac_register: instance %d "
@@ -6941,7 +6889,7 @@ nxge_niu_peu_reset(p_nxge_t nxgep)
 static void
 nxge_set_pci_replay_timeout(p_nxge_t nxgep)
 {
-	p_dev_regs_t 	dev_regs;
+	p_dev_regs_t	dev_regs;
 	uint32_t	value;
 
 	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_set_pci_replay_timeout"));

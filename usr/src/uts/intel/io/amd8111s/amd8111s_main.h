@@ -1,12 +1,10 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef AMD8111S_MAIN_H
 #define	AMD8111S_MAIN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 2001-2006 Advanced Micro Devices, Inc.  All rights reserved.
@@ -55,10 +53,6 @@
  * nationals of countries subject to national security controls.
  */
 
-
-#pragma ident "@(#)$RCSfile: odl.h,v $ $Revision: 1.1 $  " \
-"$Date: 2004/04/22 15:22:52 $ AMD"
-
 #include <sys/types.h>
 #include <sys/errno.h>
 #include <sys/kmem.h>
@@ -79,7 +73,7 @@
 
 #include <sys/ethernet.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/netlb.h>
 #include "amd8111s_hw.h"
@@ -278,7 +272,6 @@ struct odl {
 	dev_info_t *devinfo;
 
 	mac_handle_t mh;		/* mac module handle */
-	mac_resource_handle_t mrh;
 
 	struct amd8111s_statistics statistics;
 

@@ -22,13 +22,10 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 #
 #	This makefile drives the production of the mac driver 
 #	kernel module.
 #
-
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -53,13 +50,15 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
 #	Overrides.
 #
 CFLAGS		+= $(CCVERBOSE)
 LDFLAGS		+= -dy
+
+LINTTAGS	+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
 #	Default build targets.

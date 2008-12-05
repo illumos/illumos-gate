@@ -27,8 +27,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/param.h>
@@ -8450,18 +8448,25 @@ hcksum_retrieve(mblk_t *mp, multidata_t *mmd, pdesc_t *pd,
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_MULTIDATA);
 	if (mp->b_datap->db_type == M_DATA) {
 		if (flags != NULL) {
-			*flags = DB_CKSUMFLAGS(mp);
-			if (*flags & HCK_PARTIALCKSUM) {
-				if (start != NULL)
-					*start = (uint32_t)DB_CKSUMSTART(mp);
-				if (stuff != NULL)
-					*stuff = (uint32_t)DB_CKSUMSTUFF(mp);
-				if (end != NULL)
-					*end = (uint32_t)DB_CKSUMEND(mp);
+			*flags = DB_CKSUMFLAGS(mp) & (HCK_IPV4_HDRCKSUM |
+			    HCK_PARTIALCKSUM | HCK_FULLCKSUM |
+			    HCK_FULLCKSUM_OK);
+			if ((*flags & (HCK_PARTIALCKSUM |
+			    HCK_FULLCKSUM)) != 0) {
 				if (value != NULL)
 					*value = (uint32_t)DB_CKSUM16(mp);
-			} else if ((*flags & HW_LSO) && (value != NULL))
-				*value = (uint32_t)DB_LSOMSS(mp);
+				if ((*flags & HCK_PARTIALCKSUM) != 0) {
+					if (start != NULL)
+						*start =
+						    (uint32_t)DB_CKSUMSTART(mp);
+					if (stuff != NULL)
+						*stuff =
+						    (uint32_t)DB_CKSUMSTUFF(mp);
+					if (end != NULL)
+						*end =
+						    (uint32_t)DB_CKSUMEND(mp);
+				}
+			}
 		}
 	} else {
 		pattrinfo_t hck_attr = {PATTR_HCKSUM};
@@ -8485,6 +8490,28 @@ hcksum_retrieve(mblk_t *mp, multidata_t *mmd, pdesc_t *pd,
 				*value = (uint32_t)
 				    hck->hcksum_cksum_val.inet_cksum;
 		}
+	}
+}
+
+void
+lso_info_set(mblk_t *mp, uint32_t mss, uint32_t flags)
+{
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	/* Set the flags */
+	DB_LSOFLAGS(mp) |= flags;
+	DB_LSOMSS(mp) = mss;
+}
+
+void
+lso_info_get(mblk_t *mp, uint32_t *mss, uint32_t *flags)
+{
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	if (flags != NULL) {
+		*flags = DB_CKSUMFLAGS(mp) & HW_LSO;
+		if ((*flags != 0) && (mss != NULL))
+			*mss = (uint32_t)DB_LSOMSS(mp);
 	}
 }
 

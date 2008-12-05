@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -115,6 +113,7 @@ ac_file_in_use(vnode_t *vp)
 		mutex_enter(&acg->ac_proc.ac_lock);
 		mutex_enter(&acg->ac_task.ac_lock);
 		mutex_enter(&acg->ac_flow.ac_lock);
+		mutex_enter(&acg->ac_net.ac_lock);
 	}
 
 	for (acg = list_head(&exacct_globals_list); !in_use && acg != NULL;
@@ -125,7 +124,8 @@ ac_file_in_use(vnode_t *vp)
 		 */
 		if (vn_compare(acg->ac_proc.ac_vnode, vp) ||
 		    vn_compare(acg->ac_task.ac_vnode, vp) ||
-		    vn_compare(acg->ac_flow.ac_vnode, vp))
+		    vn_compare(acg->ac_flow.ac_vnode, vp) ||
+		    vn_compare(acg->ac_net.ac_vnode, vp))
 			in_use = B_TRUE;
 	}
 
@@ -137,6 +137,7 @@ ac_file_in_use(vnode_t *vp)
 		mutex_exit(&acg->ac_proc.ac_lock);
 		mutex_exit(&acg->ac_task.ac_lock);
 		mutex_exit(&acg->ac_flow.ac_lock);
+		mutex_exit(&acg->ac_net.ac_lock);
 	}
 	mutex_exit(&exacct_globals_list_lock);
 	return (in_use);
@@ -449,16 +450,20 @@ acctctl(int cmd, void *buf, size_t bufsz)
 		info = &acg->ac_proc;
 		maxres = AC_PROC_MAX_RES;
 		break;
+	/*
+	 * Flow/net accounting isn't configurable in non-global
+	 * zones, but we have this field on a per-zone basis for future
+	 * expansion as well as the ability to return default "unset"
+	 * values for the various AC_*_GET queries.  AC_*_SET commands
+	 * fail with EPERM for AC_FLOW and AC_NET in non-global zones.
+	 */
 	case AC_FLOW:
-		/*
-		 * Flow accounting isn't currently configurable in non-global
-		 * zones, but we have this field on a per-zone basis for future
-		 * expansion as well as the ability to return default "unset"
-		 * values for the various AC_*_GET queries.  AC_*_SET commands
-		 * fail with EPERM for AC_FLOW in non-global zones.
-		 */
 		info = &acg->ac_flow;
 		maxres = AC_FLOW_MAX_RES;
+		break;
+	case AC_NET:
+		info = &acg->ac_net;
+		maxres = AC_NET_MAX_RES;
 		break;
 	default:
 		return (set_errno(EINVAL));
@@ -468,7 +473,8 @@ acctctl(int cmd, void *buf, size_t bufsz)
 	case AC_STATE_SET:
 		if ((error = secpolicy_acct(CRED())) != 0)
 			break;
-		if (mode == AC_FLOW && getzoneid() != GLOBAL_ZONEID) {
+		if ((mode == AC_FLOW || mode == AC_NET) &&
+		    getzoneid() != GLOBAL_ZONEID) {
 			error = EPERM;
 			break;
 		}
@@ -480,7 +486,8 @@ acctctl(int cmd, void *buf, size_t bufsz)
 	case AC_FILE_SET:
 		if ((error = secpolicy_acct(CRED())) != 0)
 			break;
-		if (mode == AC_FLOW && getzoneid() != GLOBAL_ZONEID) {
+		if ((mode == AC_FLOW || mode == AC_NET) &&
+		    getzoneid() != GLOBAL_ZONEID) {
 			error = EPERM;
 			break;
 		}
@@ -492,7 +499,8 @@ acctctl(int cmd, void *buf, size_t bufsz)
 	case AC_RES_SET:
 		if ((error = secpolicy_acct(CRED())) != 0)
 			break;
-		if (mode == AC_FLOW && getzoneid() != GLOBAL_ZONEID) {
+		if ((mode == AC_FLOW || mode == AC_NET) &&
+		    getzoneid() != GLOBAL_ZONEID) {
 			error = EPERM;
 			break;
 		}
@@ -580,6 +588,7 @@ exacct_zone_shutdown(zoneid_t zoneid, void *data)
 	exacct_free_info(&acg->ac_proc);
 	exacct_free_info(&acg->ac_task);
 	exacct_free_info(&acg->ac_flow);
+	exacct_free_info(&acg->ac_net);
 }
 
 /* ARGSUSED */
@@ -595,6 +604,7 @@ exacct_zone_fini(zoneid_t zoneid, void *data)
 	mutex_destroy(&acg->ac_proc.ac_lock);
 	mutex_destroy(&acg->ac_task.ac_lock);
 	mutex_destroy(&acg->ac_flow.ac_lock);
+	mutex_destroy(&acg->ac_net.ac_lock);
 	kmem_free(acg, sizeof (*acg));
 }
 

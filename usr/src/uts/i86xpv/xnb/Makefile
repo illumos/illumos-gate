@@ -20,10 +20,9 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the xnb
 #	network driver support module.
@@ -59,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # Module depends on VNIC.
 #
-LDFLAGS		+= -dy -N drv/vnic
+LDFLAGS		+= -dy -N drv/vnic -N misc/mac
 
 #
 # use Solaris specific code in xen public header files

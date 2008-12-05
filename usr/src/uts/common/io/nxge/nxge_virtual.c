@@ -77,6 +77,12 @@ extern uint32_t nxge_rbr_spare_size;
 
 extern npi_status_t npi_mac_altaddr_disable(npi_handle_t, uint8_t, uint8_t);
 
+/*
+ * XXX: Use temporarily to specify the number of packets each interrupt process
+ * By default, the number of packet processed per interrupt is 1.
+ */
+int	nxge_max_intr_pkts;
+
 static uint8_t p2_tx_fair[2] = {12, 12};
 static uint8_t p2_tx_equal[2] = {12, 12};
 static uint8_t p4_tx_fair[4] = {6, 6, 6, 6};
@@ -783,7 +789,7 @@ nxge_update_txdma_properties(p_nxge_t nxgep, config_token_t token,
 	int ddi_status = DDI_SUCCESS;
 	int num_ports = nxgep->nports;
 	int port, bits, j;
-	uint8_t start_tdc = 0, num_tdc = 0;
+	uint8_t  start_tdc, num_tdc = 0;
 	p_nxge_param_t param_arr;
 	uint32_t tdc_bitmap[MAX_SIBLINGS];
 	int custom_start_tdc[MAX_SIBLINGS];
@@ -1616,6 +1622,14 @@ nxge_get_config_properties(p_nxge_t nxgep)
 	}
 
 	/*
+	 * XXX: read-in the config file to determine the number of packet
+	 * to process by each interrupt.
+	 */
+	nxge_max_intr_pkts = ddi_getprop(DDI_DEV_T_ANY, nxgep->dip,
+	    DDI_PROP_CANSLEEP | DDI_PROP_DONTPASS, "max_intr_pkts", 1);
+
+
+	/*
 	 * Get info on how many ports Neptune card has.
 	 */
 	nxgep->nports = nxge_get_nports(nxgep);
@@ -1806,12 +1820,12 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 		return (NXGE_DDI_FAILED);
 	}
 
-	p_cfgp->tdc.count = nxgep->max_tdcs = ndmas;
+	p_cfgp->tdc.count = ndmas;
 	p_cfgp->tdc.owned = p_cfgp->tdc.count;
 
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "==> nxge_use_default_dma_config_n2: "
-	    "p_cfgp 0x%llx max_tdcs %d nxgep->max_tdcs %d start %d",
-	    p_cfgp, p_cfgp->tdc.count, nxgep->max_tdcs, p_cfgp->tdc.start));
+	    "p_cfgp 0x%llx max_tdcs %d start %d",
+	    p_cfgp, p_cfgp->tdc.count, p_cfgp->tdc.start));
 
 	/* Receive DMA */
 	ndmas = NXGE_RDMA_PER_NIU_PORT;
@@ -1834,12 +1848,11 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 		return (NXGE_DDI_FAILED);
 	}
 
-	p_cfgp->max_rdcs = nxgep->max_rdcs = ndmas;
+	p_cfgp->max_rdcs = ndmas;
 	nxgep->rdc_mask = (ndmas - 1);
 
 	/* Hypervisor: rdc # and group # use the same # !! */
 	p_cfgp->max_grpids = p_cfgp->max_rdcs + p_cfgp->tdc.owned;
-	p_cfgp->start_grpid = 0;
 	p_cfgp->mif_ldvid = p_cfgp->mac_ldvid = p_cfgp->ser_ldvid = 0;
 
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, nxgep->dip, 0,
@@ -1909,12 +1922,11 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 
 	p_cfgp->max_ldgs = p_cfgp->max_grpids;
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL,
-	    "==> nxge_use_default_dma_config_n2: "
-	    "p_cfgp 0x%llx max_rdcs %d nxgep->max_rdcs %d max_grpids %d"
-	    "start_grpid %d macid %d mifid %d serrid %d",
-	    p_cfgp, p_cfgp->max_rdcs, nxgep->max_rdcs, p_cfgp->max_grpids,
-	    p_cfgp->start_grpid,
+	    "==> nxge_use_default_dma_config_n2: p_cfgp 0x%llx max_rdcs %d "
+	    "max_grpids %d macid %d mifid %d serrid %d",
+	    p_cfgp, p_cfgp->max_rdcs, p_cfgp->max_grpids,
 	    p_cfgp->mac_ldvid, p_cfgp->mif_ldvid, p_cfgp->ser_ldvid));
+
 
 	NXGE_DEBUG_MSG((nxgep, OBP_CTL, "==> nxge_use_default_dma_config_n2: "
 	    "p_cfgp p%p start_ldg %d nxgep->max_ldgs %d",
@@ -1923,12 +1935,14 @@ nxge_use_default_dma_config_n2(p_nxge_t nxgep)
 	/*
 	 * RDC groups and the beginning RDC group assigned to this function.
 	 */
-	p_cfgp->max_rdc_grpids = 1;
-	p_cfgp->def_mac_rxdma_grpid = (nxgep->function_num * 1);
+	p_cfgp->max_rdc_grpids = NXGE_MAX_RDC_GROUPS / nxgep->nports;
+	p_cfgp->def_mac_rxdma_grpid =
+	    nxgep->function_num * NXGE_MAX_RDC_GROUPS / nxgep->nports;
+	p_cfgp->def_mac_txdma_grpid =
+	    nxgep->function_num * NXGE_MAX_TDC_GROUPS / nxgep->nports;
 
-	if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind
-	    (nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE))
-	    >= NXGE_MAX_RDC_GRPS) {
+	if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind(nxgep,
+	    p_cfgp->def_mac_rxdma_grpid, B_TRUE)) >= NXGE_MAX_RDC_GRPS) {
 		NXGE_ERROR_MSG((nxgep, CFG_CTL,
 		    "nxge_use_default_dma_config_n2(): "
 		    "nxge_fzc_rdc_tbl_bind failed"));
@@ -2060,11 +2074,10 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		    prop, tx_ndmas);
 	}
 
-	p_cfgp->tdc.count = nxgep->max_tdcs = tx_ndmas;
+	p_cfgp->tdc.count = tx_ndmas;
 	p_cfgp->tdc.owned = p_cfgp->tdc.count;
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_use_cfg_dma_config: "
-	    "p_cfgp 0x%llx max_tdcs %d nxgep->max_tdcs %d",
-	    p_cfgp, p_cfgp->tdc.count, nxgep->max_tdcs));
+	    "p_cfgp 0x%llx max_tdcs %d", p_cfgp, p_cfgp->tdc.count));
 
 	prop = param_arr[param_rxdma_channels_begin].fcode_name;
 
@@ -2149,44 +2162,23 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		    prop, rx_ndmas);
 	}
 
-	p_cfgp->max_rdcs = nxgep->max_rdcs = rx_ndmas;
+	p_cfgp->max_rdcs = rx_ndmas;
 
-	prop = param_arr[param_rdc_grps_start].fcode_name;
-	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
-	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
-		p_cfgp->def_mac_rxdma_grpid = *prop_val;
-		ddi_prop_free(prop_val);
-		if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind
-		    (nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE))
-		    >= NXGE_MAX_RDC_GRPS) {
-			NXGE_ERROR_MSG((nxgep, CFG_CTL,
-			    "nxge_use_cfg_dma_config(): "
-			    "nxge_fzc_rdc_tbl_bind failed"));
-			cmn_err(CE_CONT, "nxge%d: group not available!\n",
-			    nxgep->instance);
-			goto nxge_use_cfg_dma_config_exit;
-		}
+	/*
+	 * RDC groups and the beginning RDC group assigned to this function.
+	 * XXX: this may be wrong if prop value is used.
+	 */
+	p_cfgp->def_mac_rxdma_grpid =
+	    nxgep->function_num * NXGE_MAX_RDC_GROUPS / nxgep->nports;
+	p_cfgp->def_mac_txdma_grpid =
+	    nxgep->function_num * NXGE_MAX_TDC_GROUPS / nxgep->nports;
 
-		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-		    "==> nxge_use_default_dma_config: "
-		    "use property " "start_grpid %d ",
-		    p_cfgp->start_grpid));
-	} else {
-		p_cfgp->def_mac_rxdma_grpid = nxgep->function_num;
-		if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind(
-		    nxgep, p_cfgp->def_mac_rxdma_grpid, B_TRUE)) >=
-		    NXGE_MAX_RDC_GRPS) {
-			cmn_err(CE_CONT, "nxge%d: group not available!\n",
-			    nxgep->instance);
-			goto nxge_use_cfg_dma_config_exit;
-		}
-		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
-		    prop, p_cfgp->def_mac_rxdma_grpid);
-		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-		    "==> nxge_use_default_dma_config: "
-		    "use default "
-		    "start_grpid %d (same as function #)",
-		    p_cfgp->start_grpid));
+	if ((p_cfgp->def_mac_rxdma_grpid = nxge_fzc_rdc_tbl_bind(nxgep,
+	    p_cfgp->def_mac_rxdma_grpid, B_TRUE)) >= NXGE_MAX_RDC_GRPS) {
+		NXGE_ERROR_MSG((nxgep, CFG_CTL,
+		    "nxge_use_default_dma_config2(): "
+		    "nxge_fzc_rdc_tbl_bind failed"));
+		goto nxge_use_cfg_dma_config_exit;
 	}
 
 	prop = param_arr[param_rx_rdc_grps].fcode_name;
@@ -2195,7 +2187,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		nrxgp = *prop_val;
 		ddi_prop_free(prop_val);
 	} else {
-		nrxgp = 1;
+		nrxgp = NXGE_MAX_RDC_GRPS / nxgep->nports;
 		(void) ddi_prop_update_int(DDI_DEV_T_NONE, nxgep->dip,
 		    prop, nrxgp);
 		NXGE_DEBUG_MSG((nxgep, CFG_CTL,
@@ -2203,7 +2195,6 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 		    "num_rdc_grpid not found: use def:# of "
 		    "rdc groups %d\n", nrxgp));
 	}
-
 	p_cfgp->max_rdc_grpids = nrxgp;
 
 	/*
@@ -2213,10 +2204,9 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 	p_cfgp->max_ldgs = NXGE_LDGRP_PER_4PORTS;
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_use_default_dma_config: "
-	    "p_cfgp 0x%llx max_rdcs %d nxgep->max_rdcs %d max_grpids %d"
-	    "start_grpid %d",
-	    p_cfgp, p_cfgp->max_rdcs, nxgep->max_rdcs, p_cfgp->max_grpids,
-	    p_cfgp->start_grpid));
+	    "p_cfgp 0x%llx max_rdcs %d max_grpids %d default_grpid %d",
+	    p_cfgp, p_cfgp->max_rdcs, p_cfgp->max_grpids,
+	    p_cfgp->def_mac_rxdma_grpid));
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_use_cfg_dma_config: "
 	    "p_cfgp 0x%016llx start_ldg %d nxgep->max_ldgs %d "
@@ -2264,7 +2254,7 @@ nxge_get_logical_props(p_nxge_t nxgep)
 
 	(void) memset(port, 0, sizeof (*port));
 
-	port->mac_port = 0;	/* := function number */
+	port->mac_port = nxgep->function_num;	/* := function number */
 
 	/*
 	 * alloc_buf_size:
@@ -2300,8 +2290,9 @@ nxge_get_logical_props(p_nxge_t nxgep)
 
 	group = &port->rdc_grps[0];
 
-	group->flag = 1;	/* configured */
+	group->flag = B_TRUE;	/* configured */
 	group->config_method = RDC_TABLE_ENTRY_METHOD_REP;
+	group->port = NXGE_GET_PORT_NUM(nxgep->function_num);
 
 	/* HIO futures: this is still an open question. */
 	hardware->max_macs = 1;
@@ -2407,129 +2398,138 @@ nxge_set_rdc_intr_property(p_nxge_t nxgep)
 static void
 nxge_set_hw_dma_config(p_nxge_t nxgep)
 {
-	int i, ndmas, ngrps, bitmap, end, st_rdc;
-	int32_t status;
-	uint8_t rdcs_per_grp;
-	p_nxge_dma_pt_cfg_t p_dma_cfgp;
-	p_nxge_hw_pt_cfg_t p_cfgp;
-	p_nxge_rdc_grp_t rdc_grp_p;
-	int rdcgrp_cfg = CFG_NOT_SPECIFIED, rx_quick_cfg;
-	char *prop, *prop_val;
-	p_nxge_param_t param_arr;
-	config_token_t token;
-	nxge_grp_t *group;
+	int			i, j, ngrps, bitmap, end, st_rdc;
+	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
+	p_nxge_hw_pt_cfg_t	p_cfgp;
+	p_nxge_rdc_grp_t	rdc_grp_p;
+	p_nxge_tdc_grp_t	tdc_grp_p;
+	nxge_grp_t		*group;
+	uint8_t			nrdcs;
+	dc_map_t		map = 0;
 
 	NXGE_DEBUG_MSG((nxgep, CFG_CTL, "==> nxge_set_hw_dma_config"));
 
 	p_dma_cfgp = (p_nxge_dma_pt_cfg_t)&nxgep->pt_config;
 	p_cfgp = (p_nxge_hw_pt_cfg_t)&p_dma_cfgp->hw_config;
-	rdc_grp_p = p_dma_cfgp->rdc_grps;
 
+	switch (nxgep->niu_type) {
+	case NEPTUNE_4_1GC:
+	case NEPTUNE_2_10GF_2_1GC:
+	case NEPTUNE_1_10GF_3_1GC:
+	case NEPTUNE_1_1GC_1_10GF_2_1GC:
+	case NEPTUNE_2_10GF_2_1GRF:
+	default:
+		ngrps = 2;
+		break;
+	case NEPTUNE_2_10GF:
+	case NEPTUNE_2_1GRF:
+	case N2_NIU:
+		ngrps = 4;
+		break;
+	}
+
+	/*
+	 * Setup TDC groups
+	 */
 	bitmap = 0;
 	end = p_cfgp->tdc.start + p_cfgp->tdc.owned;
-	p_dma_cfgp->tx_dma_map = 0;
 	for (i = p_cfgp->tdc.start; i < end; i++) {
 		bitmap |= (1 << i);
 	}
 
 	nxgep->tx_set.owned.map |= bitmap; /* Owned, & not shared. */
-
-	group = (nxge_grp_t *)nxge_grp_add(nxgep, NXGE_TRANSMIT_GROUP);
-	group->map = bitmap;
-
+	nxgep->tx_set.owned.count = p_cfgp->tdc.owned;
 	p_dma_cfgp->tx_dma_map = bitmap;
-	param_arr = nxgep->param_arr;
-
-	/* Assume RDCs are evenly distributed */
-	rx_quick_cfg = param_arr[param_rx_quick_cfg].value;
-	switch (rx_quick_cfg) {
-	case CFG_NOT_SPECIFIED:
-		prop = "rxdma-grp-cfg";
-		status = ddi_prop_lookup_string(DDI_DEV_T_NONE,
-		    nxgep->dip, 0, prop, (char **)&prop_val);
-		if (status != DDI_PROP_SUCCESS) {
-			NXGE_DEBUG_MSG((nxgep, CFG_CTL,
-			    " property %s not found", prop));
-			rdcgrp_cfg = CFG_L3_DISTRIBUTE;
-		} else {
-			token = nxge_get_config_token(prop_val);
-			switch (token) {
-			case L2_CLASSIFY:
-				break;
-			case CLASSIFY:
-			case L3_CLASSIFY:
-			case L3_DISTRIBUTE:
-			case L3_TCAM:
-				rdcgrp_cfg = CFG_L3_DISTRIBUTE;
-				break;
-			default:
-				rdcgrp_cfg = CFG_L3_DISTRIBUTE;
-				break;
-			}
-			ddi_prop_free(prop_val);
-		}
-		break;
-	case CFG_L3_WEB:
-	case CFG_L3_DISTRIBUTE:
-	case CFG_L2_CLASSIFY:
-	case CFG_L3_TCAM:
-		rdcgrp_cfg = rx_quick_cfg;
-		break;
-	default:
-		rdcgrp_cfg = CFG_L3_DISTRIBUTE;
-		break;
-	}
-
-	st_rdc = p_cfgp->start_rdc;
-
-	switch (rdcgrp_cfg) {
-	case CFG_L3_DISTRIBUTE:
-	case CFG_L3_WEB:
-	case CFG_L3_TCAM:
-		ndmas = p_cfgp->max_rdcs;
-		ngrps = 1;
-		rdcs_per_grp = ndmas / ngrps;
-		break;
-	case CFG_L2_CLASSIFY:
-		ndmas = p_cfgp->max_rdcs / 2;
-		if (p_cfgp->max_rdcs < 2)
-			ndmas = 1;
-		ngrps = 1;
-		rdcs_per_grp = ndmas / ngrps;
-		break;
-	default:
-		ngrps = p_cfgp->max_rdc_grpids;
-		ndmas = p_cfgp->max_rdcs;
-		rdcs_per_grp = ndmas / ngrps;
-		break;
-	}
 
 	for (i = 0; i < ngrps; i++) {
-		uint8_t count = rdcs_per_grp;
-		dc_map_t map = 0;
+		group = (nxge_grp_t *)nxge_grp_add(nxgep,
+		    NXGE_TRANSMIT_GROUP);
+		tdc_grp_p = &p_dma_cfgp->tdc_grps[
+		    p_cfgp->def_mac_txdma_grpid + i];
+		if (i == 0)
+			tdc_grp_p->map = bitmap;
+		else
+			tdc_grp_p->map = 0;
+		/* no ring is associated with a group initially */
+		tdc_grp_p->start_tdc = 0;
+		tdc_grp_p->max_tdcs = 0;
+		tdc_grp_p->grp_index = group->index;
+	}
+
+	for (i = 0; i < NXGE_MAX_RDCS; i++) {
+		nxgep->rx_channel_started[i] = B_FALSE;
+	}
+
+	/*
+	 * Setup RDC groups
+	 */
+	st_rdc = p_cfgp->start_rdc;
+	for (i = 0; i < ngrps; i++) {
+		/*
+		 * All rings are associated with the default group initially
+		 */
+		if (i == 0) {
+			/* default group */
+			switch (nxgep->niu_type) {
+			case NEPTUNE_4_1GC:
+				nrdcs = rx_4_1G[nxgep->function_num];
+				break;
+			case N2_NIU:
+			case NEPTUNE_2_10GF:
+				nrdcs = rx_2_10G[nxgep->function_num];
+				break;
+			case NEPTUNE_2_10GF_2_1GC:
+				nrdcs = rx_2_10G_2_1G[nxgep->function_num];
+				break;
+			case NEPTUNE_1_10GF_3_1GC:
+				nrdcs = rx_1_10G_3_1G[nxgep->function_num];
+				break;
+			case NEPTUNE_1_1GC_1_10GF_2_1GC:
+				nrdcs = rx_1_1G_1_10G_2_1G[nxgep->function_num];
+				break;
+			default:
+				switch (nxgep->platform_type) {
+				case P_NEPTUNE_ALONSO:
+					nrdcs =
+					    rx_2_10G_2_1G[nxgep->function_num];
+					break;
+				default:
+					nrdcs = rx_4_1G[nxgep->function_num];
+					break;
+				}
+				break;
+			}
+		} else {
+			nrdcs = 0;
+		}
 
 		rdc_grp_p = &p_dma_cfgp->rdc_grps[
 		    p_cfgp->def_mac_rxdma_grpid + i];
-		rdc_grp_p->start_rdc = st_rdc + i * rdcs_per_grp;
-		rdc_grp_p->max_rdcs = rdcs_per_grp;
+		rdc_grp_p->start_rdc = st_rdc;
+		rdc_grp_p->max_rdcs = nrdcs;
 		rdc_grp_p->def_rdc = rdc_grp_p->start_rdc;
 
 		/* default to: 0, 1, 2, 3, ...., 0, 1, 2, 3.... */
-		while (count) {
-			map |= (1 << count);
-			count--;
-		}
-		map >>= 1;	/* In case <start_rdc> is zero (0) */
-		map <<= rdc_grp_p->start_rdc;
+		if (nrdcs != 0) {
+			for (j = 0; j < nrdcs; j++) {
+				map |= (1 << j);
+			}
+			map <<= rdc_grp_p->start_rdc;
+		} else
+			map = 0;
 		rdc_grp_p->map = map;
 
 		nxgep->rx_set.owned.map |= map; /* Owned, & not shared. */
+		nxgep->rx_set.owned.count = nrdcs;
 
 		group = (nxge_grp_t *)nxge_grp_add(nxgep, NXGE_RECEIVE_GROUP);
-		group->map = rdc_grp_p->map;
 
 		rdc_grp_p->config_method = RDC_TABLE_ENTRY_METHOD_SEQ;
-		rdc_grp_p->flag = 1; /* This group has been configured. */
+		rdc_grp_p->flag = B_TRUE; /* This group has been configured. */
+		rdc_grp_p->grp_index = group->index;
+		rdc_grp_p->port = NXGE_GET_PORT_NUM(nxgep->function_num);
+
+		map = 0;
 	}
 
 
@@ -2742,7 +2742,7 @@ nxge_set_hw_mac_class_config(p_nxge_t nxgep)
 				    " id %d grp %d",
 				    mac_map->param_id, mac_map->map_to));
 				mac_host_info[mac_map->param_id].mpr_npr =
-				    mac_map->pref;
+				    p_cfgp->mac_pref;
 				mac_host_info[mac_map->param_id].rdctbl =
 				    mac_map->map_to +
 				    p_cfgp->def_mac_rxdma_grpid;
@@ -2967,15 +2967,11 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 	}
 
 	/*
-	 * Port0 uses the HW based syserr interrupt, and port1 uses the
-	 * SW based syserr interrupt. There is only one syserr and the
-	 * function zero device gets it.
+	 * HW based syserr interrupt for port0, and SW based syserr interrupt
+	 * for port1
 	 */
 	if (own_sys_err && p_cfgp->ser_ldvid) {
 		ldv = p_cfgp->ser_ldvid;
-		/*
-		 * Port0 - HW based: use an intr vector
-		 */
 		/*
 		 * Unmask the system interrupt states.
 		 */
@@ -2999,8 +2995,8 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		nldvs++;
 	} else {
 		/*
-		 * Port1 - SW based: allocate the ldv for the syserr since
-		 * the vector should not be consumed for port1
+		 * SW based: allocate the ldv for the syserr since the vector
+		 * should not be consumed for port1
 		 */
 		sysldvp = KMEM_ZALLOC(sizeof (nxge_ldv_t), KM_SLEEP);
 		sysldvp->use_timer = B_TRUE;
@@ -3010,8 +3006,9 @@ nxge_ldgv_init_n2(p_nxge_t nxgep, int *navail_p, int *nrequired_p)
 		sysldvp->ldv_ldf_masks = 0;
 		sysldvp->nxgep = nxgep;
 		ldgvp->ldvp_syserr = sysldvp;
-		ldgvp->ldvp_syserr_allocated = B_TRUE;
+		ldgvp->ldvp_syserr_alloced = B_TRUE;
 	}
+
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_ldgv_init_n2: "
 	    "(before rx) func %d nldvs %d navail %d nrequired %d",
@@ -3326,7 +3323,7 @@ nxge_ldgv_uninit(p_nxge_t nxgep)
 		    "no logical group configured."));
 		return (NXGE_OK);
 	}
-	if (ldgvp->ldvp_syserr_allocated == B_TRUE) {
+	if (ldgvp->ldvp_syserr_alloced == B_TRUE) {
 		KMEM_FREE(ldgvp->ldvp_syserr, sizeof (nxge_ldv_t));
 	}
 	if (ldgvp->ldgp) {
@@ -3924,4 +3921,30 @@ nxge_init_mmac(p_nxge_t nxgep, boolean_t compute_addrs)
 	/* Initialize the first two parameters for mmac kstat */
 	nxgep->statsp->mmac_stats.mmac_max_cnt = mmac_info->num_mmac;
 	nxgep->statsp->mmac_stats.mmac_avail_cnt = mmac_info->num_mmac;
+}
+
+/*
+ * Convert an RDC group index into a port ring index.  That is, map
+ * <groupid> to an index into nxgep->rx_ring_handles.
+ * (group ring index -> port ring index)
+ */
+int
+nxge_get_rxring_index(p_nxge_t nxgep, int groupid, int ringidx)
+{
+	int			i;
+	int			index = 0;
+	p_nxge_rdc_grp_t	rdc_grp_p;
+	p_nxge_dma_pt_cfg_t	p_dma_cfgp;
+	p_nxge_hw_pt_cfg_t	p_cfgp;
+
+	p_dma_cfgp = &nxgep->pt_config;
+	p_cfgp = &p_dma_cfgp->hw_config;
+
+	for (i = 0; i < groupid; i++) {
+		rdc_grp_p =
+		    &p_dma_cfgp->rdc_grps[p_cfgp->def_mac_rxdma_grpid + i];
+		index += rdc_grp_p->max_rdcs;
+	}
+
+	return (index + ringidx);
 }

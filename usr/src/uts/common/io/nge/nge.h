@@ -61,7 +61,7 @@ extern "C" {
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 
 /*

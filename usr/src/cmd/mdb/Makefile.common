@@ -24,7 +24,8 @@
 #
 # MDB modules used for debugging user processes that every ISA's build
 # subdirectory will need to build.
-# 
+#
+ 
 COMMON_MODULES_PROC = \
 	dof \
 	libavl \
@@ -70,6 +71,7 @@ COMMON_MODULES_KVM = \
 	krtld \
 	lofs \
 	logindmux \
+	mac \
 	md \
 	nca \
 	nsctl \

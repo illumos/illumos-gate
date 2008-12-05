@@ -362,10 +362,6 @@ typedef struct mcst_addr {
 #define	VSW_PORT_DETACHING	0x2	/* In process of being detached */
 #define	VSW_PORT_DETACHABLE	0x4	/* Safe to detach */
 
-#define	VSW_ADDR_UNSET		0x0	/* Addr not set */
-#define	VSW_ADDR_HW		0x1	/* Addr programmed in HW */
-#define	VSW_ADDR_PROMISC	0x2	/* Card in promisc to see addr */
-
 /* port information associated with a vsw */
 typedef struct vsw_port {
 	int			p_instance;	/* port instance */
@@ -382,20 +378,22 @@ typedef struct vsw_port {
 	kmutex_t		state_lock;
 	kcondvar_t		state_cv;
 
+	krwlock_t		maccl_rwlock;	/* protect fields below */
+	mac_client_handle_t	p_mch;		/* mac client handle */
+	mac_unicast_handle_t	p_muh;		/* mac unicast handle */
+
 	kmutex_t		mca_lock;	/* multicast lock */
 	mcst_addr_t		*mcap;		/* list of multicast addrs */
 
-	mac_addr_slot_t		addr_slot;	/* Unicast address slot */
-	int			addr_set;	/* Addr set where */
+	boolean_t		addr_set;	/* Addr set where */
 
 	/*
 	 * mac address of the port & connected device
 	 */
 	struct ether_addr	p_macaddr;
 	uint16_t		pvid;	/* port vlan id (untagged) */
-	uint16_t		*vids;	/* vlan ids (tagged) */
+	struct vsw_vlanid	*vids;	/* vlan ids (tagged) */
 	uint16_t		nvids;	/* # of vids */
-	uint32_t		vids_size; /* size alloc'd for vids list */
 	mod_hash_t		*vlan_hashp;	/* vlan hash table */
 	uint32_t		vlan_nchains;	/* # of vlan hash chains */
 
@@ -444,7 +442,7 @@ static	struct	ether_addr	etherbroadcastaddr = {
 };
 
 #define	IS_BROADCAST(ehp) \
-	(ether_cmp(&ehp->ether_dhost, &etherbroadcastaddr) == 0)
+	(bcmp(&ehp->ether_dhost, &etherbroadcastaddr, ETHERADDRL) == 0)
 #define	IS_MULTICAST(ehp) \
 	((ehp->ether_dhost.ether_addr_octet[0] & 01) == 1)
 

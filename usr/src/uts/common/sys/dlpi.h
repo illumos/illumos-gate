@@ -586,12 +586,8 @@ union	DL_qos_types {
 					/* dl_data is dl_capab_mdt_t */
 #define	DL_CAPAB_ZEROCOPY	0x05	/* Zero-copy capability */
 					/* dl_data is dl_capab_zerocopy_t */
-#define	DL_CAPAB_POLL		0x06	/* Polling capability */
-					/* dl_data is dl_capab_dls_t */
-#define	DL_CAPAB_SOFT_RING   	0x07	/* Soft ring capable */
-					/* dl_data is dl_capab_dls_t */
-#define	DL_CAPAB_LSO		0x08	/* Large Send Offload capability */
-					/* dl_data is dl_capab_lso_t */
+#define	DL_CAPAB_DLD		0x06	/* dld capability */
+					/* dl_data is dl_capab_dld_t */
 
 typedef struct {
 	t_uscalar_t	dl_cap;		/* capability type */
@@ -710,55 +706,22 @@ typedef struct {
 #ifdef _KERNEL
 
 /*
- * This structure is used by DL_CAPAB_POLL and DL_CAPAB_SOFT_RING
- * capabilities. It provides a mechanism for IP to exchange function
- * pointers with a gldv3-based driver to enable it to bypass streams-
- * data-paths. DL_CAPAB_POLL mechanism provides a way to blank
- * interrupts. Note: True polling support will be added in the future.
- * DL_CAPAB_SOFT_RING provides a mechanism to create soft ring at the
- * dls layer.
+ * The DL_CAPAB_DLD capability enables the capabilities of gldv3-based drivers
+ * to be negotiated using a function call (dld_capab) instead of using streams.
  */
-typedef struct dl_capab_dls_s {
-	t_uscalar_t		dls_version;
-	t_uscalar_t		dls_flags;
+typedef struct dl_capab_dld_s {
+	t_uscalar_t		dld_version;
+	t_uscalar_t		dld_flags;
 
 	/* DLD provided information */
-	uintptr_t		dls_tx_handle;
-	uintptr_t		dls_tx;
-	uintptr_t		dls_ring_change_status;
-	uintptr_t		dls_ring_bind;
-	uintptr_t		dls_ring_unbind;
+	uintptr_t		dld_capab;
+	uintptr_t		dld_capab_handle;
+	dl_mid_t		dld_mid;	/* module ID */
+} dl_capab_dld_t;
 
-	/* IP provided information */
-	uintptr_t		dls_rx_handle;
-	uintptr_t		dls_ring_assign;
-	uintptr_t		dls_rx;
-	uintptr_t		dls_ring_add;
-	t_uscalar_t		dls_ring_cnt;
-
-	dl_mid_t		dls_mid;		/* module ID */
-} dl_capab_dls_t;
-
-#define	POLL_CURRENT_VERSION	0x01
-#define	POLL_VERSION_1		0x01
-
-#define	SOFT_RING_VERSION_1		0x01
-
-/* Values for poll_flags */
-#define	POLL_ENABLE		0x01	/* Set to enable polling */
-					/* capability */
-#define	POLL_CAPABLE		0x02	/* Polling ability exists */
-#define	POLL_DISABLE		0x03	/* Disable Polling */
-
-/* Values for soft_ring_flags */
-#define	SOFT_RING_ENABLE		0x04	/* Set to enable soft_ring */
-						/* capability */
-#define	SOFT_RING_CAPABLE		0x05	/* Soft_Ring ability exists */
-#define	SOFT_RING_DISABLE		0x06	/* Disable Soft_Ring */
-
-/* Soft_Ring fanout types (used by soft_ring_change_status) */
-#define	SOFT_RING_NONE			0x00
-#define	SOFT_RING_FANOUT		0x01
+#define	DL_CAPAB_DLD_ENABLE	0x00000001
+#define	DLD_VERSION_1		1
+#define	DLD_CURRENT_VERSION	DLD_VERSION_1
 
 #endif /* _KERNEL */
 
@@ -784,29 +747,6 @@ typedef struct {
 #define	DL_CAPAB_VMSAFE_MEM		0x01	/* Driver is zero-copy safe */
 						/* wrt VM named buffers on */
 						/* transmit */
-
-/*
- * Large Send Offload sub-capability (follows dl_capability_sub_t)
- */
-typedef struct {
-	t_uscalar_t	lso_version;		/* interface version */
-	t_uscalar_t	lso_flags;		/* capability flags */
-	t_uscalar_t	lso_max;		/* maximum payload */
-	t_uscalar_t	reserved[1];		/* reserved fields */
-	dl_mid_t	lso_mid;		/* module ID */
-} dl_capab_lso_t;
-
-/*
- * Large Send Offload revision definition history
- */
-#define	LSO_CURRENT_VERSION		0x01
-#define	LSO_VERSION_1			0x01
-
-/*
- * Currently supported values of lso_flags
- */
-#define	LSO_TX_ENABLE			0x01	/* to enable LSO */
-#define	LSO_TX_BASIC_TCP_IPV4		0x02	/* TCP LSO capability */
 
 /*
  * DLPI interface primitive definitions.

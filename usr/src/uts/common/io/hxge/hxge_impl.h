@@ -68,8 +68,7 @@ extern "C" {
 #include <sys/netlb.h>
 #include <sys/ddi_intr.h>
 
-#include <sys/mac.h>
-#include <sys/mac_impl.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 
 /*
@@ -314,32 +313,6 @@ typedef struct _dev_regs_t {
 	hxge_os_acc_handle_t	hxge_romh;	/* fcode rom handle */
 	unsigned char		*hxge_romp;	/* fcode pointer */
 } dev_regs_t, *p_dev_regs_t;
-
-typedef struct _nxge_mac_addr_t {
-	ether_addr_t	addr;
-	uint_t		flags;
-} hxge_mac_addr_t;
-
-/*
- * Driver alternate mac address structure.
- */
-typedef struct _hxge_mmac_t {
-	uint8_t		total_factory_macs;
-	uint8_t		num_mmac;
-	uint8_t		num_factory_mmac;
-	hxge_mac_addr_t	mac_pool[16];
-	ether_addr_t	factory_mac_pool[16];
-	uint8_t		naddrfree;  /* number of alt mac addr available */
-} hxge_mmac_t;
-
-/*
- * mmac stats structure
- */
-typedef struct _hxge_mmac_stats_t {
-	uint8_t mmac_max_cnt;
-	uint8_t	mmac_avail_cnt;
-	struct ether_addr mmac_avail_pool[16];
-} hxge_mmac_stats_t, *p_hxge_mmac_stats_t;
 
 #include <hxge_common_impl.h>
 #include <hxge_common.h>

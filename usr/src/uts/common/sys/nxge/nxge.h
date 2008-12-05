@@ -319,6 +319,7 @@ typedef struct _filter_t {
 	uint32_t all_sap_cnt;
 } filter_t, *p_filter_t;
 
+
 typedef struct _nxge_port_stats_t {
 	/*
 	 *  Overall structure size
@@ -470,6 +471,8 @@ typedef struct _nxge_stats_t {
 
 } nxge_stats_t, *p_nxge_stats_t;
 
+
+
 typedef struct _nxge_intr_t {
 	boolean_t		intr_registered; /* interrupts are registered */
 	boolean_t		intr_enabled; 	/* interrupts are enabled */
@@ -497,7 +500,7 @@ typedef struct _nxge_ldgv_t {
 	p_nxge_ldg_t		ldgp;
 	p_nxge_ldv_t		ldvp;
 	p_nxge_ldv_t		ldvp_syserr;
-	int			ldvp_syserr_allocated;
+	boolean_t		ldvp_syserr_alloced;
 } nxge_ldgv_t, *p_nxge_ldgv_t;
 
 typedef enum {
@@ -542,7 +545,8 @@ typedef struct {
 #define	NXGE_DC_SET(map, channel)	map |= (1 << channel)
 #define	NXGE_DC_RESET(map, channel)	map &= (~(1 << channel))
 
-#define	NXGE_LOGICAL_GROUP_MAX	NXGE_MAX_TDCS
+/* For now, we only support up to 8 RDC/TDC groups */
+#define	NXGE_LOGICAL_GROUP_MAX	NXGE_MAX_RDC_GROUPS
 
 typedef struct {
 	int			sequence; /* To order groups in time. */
@@ -558,6 +562,12 @@ typedef struct {
 } nxge_grp_set_t;
 
 /*
+ * Transmit Ring Group
+ * TX groups will be used exclusively for the purpose of Hybrid I/O.  From
+ * the point of view of the nxge driver, the groups will be software
+ * constructs which will be used to establish the relationship between TX
+ * rings and shares.
+ *
  * Receive Ring Group
  * One of the advanced virtualization features is the ability to bundle
  * multiple Receive Rings in a single group.  One or more MAC addresses may
@@ -567,12 +577,16 @@ typedef struct {
  * RX ring groups can come with a predefined set of member rings, or they
  * are programmable by adding and removing rings to/from them.
  */
-typedef struct _nxge_rx_ring_group_t {
+typedef struct _nxge_ring_group_t {
 	mac_group_handle_t	ghandle;
 	p_nxge_t		nxgep;
+	boolean_t		started;
+	mac_ring_type_t		type;
 	int			gindex;
 	int			sindex;
-} nxge_rx_ring_group_t;
+	int			rdctbl;
+	int			n_mac_addrs;
+} nxge_ring_group_t;
 
 /*
  * Ring Handle
@@ -581,7 +595,7 @@ typedef struct _nxge_ring_handle_t {
 	p_nxge_t		nxgep;
 	int			index;		/* port-wise */
 	mac_ring_handle_t	ring_handle;
-} nxge_ring_handle_t;
+} nxge_ring_handle_t, *p_nxge_ring_handle_t;
 
 /*
  * Share Handle
@@ -613,9 +627,6 @@ struct _nxge_t {
 	uint64_t		nxge_debug_level; /* driver state bit flags */
 	kmutex_t		genlock[1];
 	enum nxge_mac_state	nxge_mac_state;
-	ddi_softintr_t		resched_id;	/* reschedule callback	*/
-	boolean_t		resched_needed;
-	boolean_t		resched_running;
 
 	p_dev_regs_t		dev_regs;
 	npi_handle_t		npi_handle;
@@ -695,16 +706,11 @@ struct _nxge_t {
 	p_rx_rcr_rings_t 	rx_rcr_rings;
 	p_rx_mbox_areas_t 	rx_mbox_areas_p;
 
-	uint32_t		start_rdc;
-	uint32_t		max_rdcs;
 	uint32_t		rdc_mask;
 
 	/* Transmit descriptors rings */
 	p_tx_rings_t 		tx_rings;
 	p_tx_mbox_areas_t	tx_mbox_areas_p;
-
-	uint32_t		start_tdc;
-	uint32_t		max_tdcs;
 
 	ddi_dma_handle_t 	dmasparehandle;
 
@@ -777,7 +783,15 @@ struct _nxge_t {
 	nxge_grp_set_t		tx_set;
 	boolean_t		tdc_is_shared[NXGE_MAX_TDCS];
 
-	nxge_rx_ring_group_t	rx_hio_groups[NXGE_MAX_RDC_GROUPS];
+	boolean_t		rx_channel_started[NXGE_MAX_RDCS];
+
+	/* Ring Handles */
+	nxge_ring_handle_t	tx_ring_handles[NXGE_MAX_TDCS];
+	nxge_ring_handle_t	rx_ring_handles[NXGE_MAX_RDCS];
+
+	nxge_ring_group_t	tx_hio_groups[NXGE_MAX_TDC_GROUPS];
+	nxge_ring_group_t	rx_hio_groups[NXGE_MAX_RDC_GROUPS];
+
 	nxge_share_handle_t	shares[NXGE_MAX_VRS];
 };
 

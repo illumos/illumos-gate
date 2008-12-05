@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "rge.h"
 
 #define	U32TOPTR(x)	((void *)(uintptr_t)(uint32_t)(x))
@@ -369,7 +367,7 @@ rge_receive(rge_t *rgep)
 	mutex_exit(rgep->rx_lock);
 
 	if (mp != NULL)
-		mac_rx(rgep->mh, rgep->handle, mp);
+		mac_rx(rgep->mh, NULL, mp);
 }
 
 

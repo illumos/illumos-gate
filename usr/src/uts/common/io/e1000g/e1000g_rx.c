@@ -20,7 +20,7 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDLv1.
+ * Use is subject to license terms.
  */
 
 /*
@@ -147,10 +147,16 @@ e1000g_rxfree_func(p_rx_sw_packet_t packet)
 		}
 	}
 
-	mutex_enter(&rx_ring->freelist_lock);
-	QUEUE_PUSH_TAIL(&rx_ring->free_list, &packet->Link);
-	rx_ring->avail_freepkt++;
-	mutex_exit(&rx_ring->freelist_lock);
+	/*
+	 * Enqueue the recycled packets in a recycle queue. When freelist
+	 * dries up, move the entire chain of packets from recycle queue
+	 * to freelist. This helps in avoiding per packet mutex contention
+	 * around freelist.
+	 */
+	mutex_enter(&rx_ring->recycle_lock);
+	QUEUE_PUSH_TAIL(&rx_ring->recycle_list, &packet->Link);
+	rx_ring->recycle_freepkt++;
+	mutex_exit(&rx_ring->recycle_lock);
 
 	rw_exit(&e1000g_rx_detach_lock);
 }
@@ -236,6 +242,8 @@ e1000g_rx_setup(struct e1000g *Adapter)
 		/* Init the list of "Free Receive Buffer" */
 		QUEUE_INIT_LIST(&rx_ring->free_list);
 
+		/* Init the list of "Free Receive Buffer" */
+		QUEUE_INIT_LIST(&rx_ring->recycle_list);
 		/*
 		 * Setup Receive list and the Free list. Note that
 		 * the both were allocated in one packet area.
@@ -263,6 +271,7 @@ e1000g_rx_setup(struct e1000g *Adapter)
 			    &packet->Link);
 		}
 		rx_ring->avail_freepkt = Adapter->rx_freelist_num;
+		rx_ring->recycle_freepkt = 0;
 
 		Adapter->rx_buffer_setup = B_TRUE;
 	} else {
@@ -414,8 +423,23 @@ e1000g_get_buf(e1000g_rx_ring_t *rx_ring)
 	mutex_enter(&rx_ring->freelist_lock);
 	packet = (p_rx_sw_packet_t)
 	    QUEUE_POP_HEAD(&rx_ring->free_list);
-	if (packet != NULL)
+	if (packet != NULL) {
 		rx_ring->avail_freepkt--;
+	} else {
+		/*
+		 * If the freelist has no packets, check the recycle list
+		 * to see if there are any available descriptor there.
+		 */
+		mutex_enter(&rx_ring->recycle_lock);
+		QUEUE_SWITCH(&rx_ring->free_list, &rx_ring->recycle_list);
+		rx_ring->avail_freepkt = rx_ring->recycle_freepkt;
+		rx_ring->recycle_freepkt = 0;
+		mutex_exit(&rx_ring->recycle_lock);
+		packet = (p_rx_sw_packet_t)
+		    QUEUE_POP_HEAD(&rx_ring->free_list);
+		if (packet != NULL)
+			rx_ring->avail_freepkt--;
+	}
 	mutex_exit(&rx_ring->freelist_lock);
 
 	return (packet);
@@ -427,7 +451,7 @@ e1000g_get_buf(e1000g_rx_ring_t *rx_ring)
  * This routine will process packets received in an interrupt
  */
 mblk_t *
-e1000g_receive(struct e1000g *Adapter)
+e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t *sz)
 {
 	struct e1000_hw *hw;
 	mblk_t *nmp;
@@ -443,7 +467,7 @@ e1000g_receive(struct e1000g *Adapter)
 	boolean_t accept_frame;
 	boolean_t end_of_packet;
 	boolean_t need_copy;
-	e1000g_rx_ring_t *rx_ring;
+	struct e1000g *Adapter;
 	dma_buffer_t *rx_buf;
 	uint16_t cksumflags;
 
@@ -452,9 +476,10 @@ e1000g_receive(struct e1000g *Adapter)
 	pkt_count = 0;
 	desc_count = 0;
 	cksumflags = 0;
+	*sz = 0;
 
+	Adapter = rx_ring->adapter;
 	hw = &Adapter->shared;
-	rx_ring = Adapter->rx_ring;
 
 	/* Sync the Rx descriptor DMA buffers */
 	(void) ddi_dma_sync(rx_ring->rbd_dma_handle,
@@ -805,6 +830,8 @@ rx_end_of_packet:
 			ret_nmp = rx_ring->rx_mblk;
 		}
 		ret_nmp->b_next = NULL;
+		*tail = ret_nmp;
+		*sz += length;
 
 		rx_ring->rx_mblk = NULL;
 		rx_ring->rx_mblk_tail = NULL;

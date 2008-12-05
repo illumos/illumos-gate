@@ -26,7 +26,7 @@
 #ifndef _LIBDLADM_H
 #define	_LIBDLADM_H
 
-#include <sys/dls.h>
+#include <sys/dls_mgmt.h>
 #include <sys/dlpi.h>
 
 /*
@@ -60,15 +60,27 @@ extern "C" {
  *
  *  - DLADM_OPT_PREFIX:
  *    The function requests to generate a link name using the specified prefix.
+ *
+ *  - DLADM_OPT_VLAN:
+ *    Signifies VLAN creation code path
+ *
+ *  - DLADM_OPT_HWRINGS:
+ *    Requires a hardware group of rings when creating a vnic.
  */
 #define	DLADM_OPT_ACTIVE	0x00000001
 #define	DLADM_OPT_PERSIST	0x00000002
 #define	DLADM_OPT_CREATE	0x00000004
 #define	DLADM_OPT_FORCE		0x00000008
 #define	DLADM_OPT_PREFIX	0x00000010
+#define	DLADM_OPT_ANCHOR	0x00000020
+#define	DLADM_OPT_VLAN		0x00000040
+#define	DLADM_OPT_HWRINGS	0x00000080
 
 #define	DLADM_WALK_TERMINATE	0
 #define	DLADM_WALK_CONTINUE	-1
+
+#define	DLADM_MAX_ARG_CNT	32
+#define	DLADM_MAX_ARG_VALS	32
 
 typedef enum {
 	DLADM_STATUS_OK = 0,
@@ -99,7 +111,44 @@ typedef enum {
 	DLADM_STATUS_VIDINVAL,
 	DLADM_STATUS_NONOTIF,
 	DLADM_STATUS_TRYAGAIN,
-	DLADM_STATUS_NOTDEFINED
+	DLADM_STATUS_BADTIMEVAL,
+	DLADM_STATUS_INVALIDMACADDR,
+	DLADM_STATUS_INVALIDMACADDRNIC,
+	DLADM_STATUS_INVALIDMACADDRINUSE,
+	DLADM_STATUS_MACFACTORYSLOTINVALID,
+	DLADM_STATUS_MACFACTORYSLOTUSED,
+	DLADM_STATUS_MACFACTORYSLOTALLUSED,
+	DLADM_STATUS_MACFACTORYNOTSUP,
+	DLADM_STATUS_INVALIDMACPREFIX,
+	DLADM_STATUS_INVALIDMACPREFIXLEN,
+	DLADM_STATUS_CPUMAX,
+	DLADM_STATUS_CPUERR,
+	DLADM_STATUS_CPUNOTONLINE,
+	DLADM_STATUS_DB_NOTFOUND,
+	DLADM_STATUS_DB_PARSE_ERR,
+	DLADM_STATUS_PROP_PARSE_ERR,
+	DLADM_STATUS_ATTR_PARSE_ERR,
+	DLADM_STATUS_FLOW_DB_ERR,
+	DLADM_STATUS_FLOW_DB_OPEN_ERR,
+	DLADM_STATUS_FLOW_DB_PARSE_ERR,
+	DLADM_STATUS_FLOWPROP_DB_PARSE_ERR,
+	DLADM_STATUS_FLOW_ADD_ERR,
+	DLADM_STATUS_FLOW_WALK_ERR,
+	DLADM_STATUS_FLOW_IDENTICAL,
+	DLADM_STATUS_FLOW_INCOMPATIBLE,
+	DLADM_STATUS_FLOW_EXISTS,
+	DLADM_STATUS_PERSIST_FLOW_EXISTS,
+	DLADM_STATUS_INVALID_IP,
+	DLADM_STATUS_INVALID_PREFIXLEN,
+	DLADM_STATUS_INVALID_PROTOCOL,
+	DLADM_STATUS_INVALID_PORT,
+	DLADM_STATUS_INVALID_DSF,
+	DLADM_STATUS_INVALID_DSFMASK,
+	DLADM_STATUS_INVALID_MACMARGIN,
+	DLADM_STATUS_NOTDEFINED,
+	DLADM_STATUS_BADPROP,
+	DLADM_STATUS_MINMAXBW,
+	DLADM_STATUS_NO_HWRINGS
 } dladm_status_t;
 
 typedef enum {
@@ -111,11 +160,63 @@ typedef enum {
 typedef int dladm_conf_t;
 #define	DLADM_INVALID_CONF	0
 
+typedef struct dladm_arg_info {
+	const char	*ai_name;
+	char		*ai_val[DLADM_MAX_ARG_VALS];
+	uint_t		ai_count;
+} dladm_arg_info_t;
+
+typedef struct dladm_arg_list {
+	dladm_arg_info_t	al_info[DLADM_MAX_ARG_CNT];
+	uint_t			al_count;
+	char			*al_buf;
+} dladm_arg_list_t;
+
+typedef enum {
+	DLADM_LOGTYPE_LINK = 1,
+	DLADM_LOGTYPE_FLOW
+} dladm_logtype_t;
+
+typedef struct dladm_usage {
+	char		du_name[MAXLINKNAMELEN];
+	uint64_t	du_duration;
+	uint64_t	du_stime;
+	uint64_t	du_etime;
+	uint64_t	du_ipackets;
+	uint64_t	du_rbytes;
+	uint64_t	du_opackets;
+	uint64_t	du_obytes;
+	uint64_t	du_bandwidth;
+	boolean_t	du_last;
+} dladm_usage_t;
+
 extern const char	*dladm_status2str(dladm_status_t, char *);
 extern dladm_status_t	dladm_set_rootdir(const char *);
 extern const char	*dladm_class2str(datalink_class_t, char *);
 extern const char	*dladm_media2str(uint32_t, char *);
 extern boolean_t	dladm_valid_linkname(const char *);
+extern dladm_status_t	dladm_str2bw(char *, uint64_t *);
+extern const char	*dladm_bw2str(int64_t, char *);
+
+extern dladm_status_t	dladm_parse_flow_props(char *, dladm_arg_list_t **,
+			    boolean_t);
+extern dladm_status_t	dladm_parse_link_props(char *, dladm_arg_list_t **,
+			    boolean_t);
+extern void		dladm_free_props(dladm_arg_list_t *);
+extern dladm_status_t	dladm_parse_flow_attrs(char *, dladm_arg_list_t **,
+			    boolean_t);
+extern void		dladm_free_attrs(dladm_arg_list_t *);
+
+extern dladm_status_t	dladm_start_usagelog(dladm_logtype_t, uint_t);
+extern dladm_status_t	dladm_stop_usagelog(dladm_logtype_t);
+extern dladm_status_t	dladm_walk_usage_res(int (*)(dladm_usage_t *, void *),
+			    int, char *, char *, char *, char *, void *);
+extern dladm_status_t	dladm_walk_usage_time(int (*)(dladm_usage_t *, void *),
+			    int, char *, char *, char *, void *);
+extern dladm_status_t	dladm_usage_summary(int (*)(dladm_usage_t *, void *),
+			    int, char *, void *);
+extern dladm_status_t	dladm_usage_dates(int (*)(dladm_usage_t *, void *),
+			    int, char *, char *, void *);
 
 #ifdef	__cplusplus
 }

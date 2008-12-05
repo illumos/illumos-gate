@@ -76,7 +76,6 @@ static int amd8111s_detach(dev_info_t *, ddi_detach_cmd_t);
 static int amd8111s_m_unicst(void *, const uint8_t *);
 static int amd8111s_m_promisc(void *, boolean_t);
 static int amd8111s_m_stat(void *, uint_t, uint64_t *);
-static void amd8111s_m_resources(void *arg);
 static void amd8111s_m_ioctl(void *, queue_t *, mblk_t *);
 static int amd8111s_m_multicst(void *, boolean_t, const uint8_t *addr);
 static int amd8111s_m_start(void *);
@@ -186,11 +185,9 @@ static ddi_device_acc_attr_t pcn_acc_attr = {
 	DDI_STRICTORDER_ACC
 };
 
-#define	AMD8111S_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL)
-
 
 static mac_callbacks_t amd8111s_m_callbacks = {
-	AMD8111S_M_CALLBACK_FLAGS,
+	MC_IOCTL,
 	amd8111s_m_stat,
 	amd8111s_m_start,
 	amd8111s_m_stop,
@@ -198,7 +195,6 @@ static mac_callbacks_t amd8111s_m_callbacks = {
 	amd8111s_m_multicst,
 	amd8111s_m_unicst,
 	amd8111s_m_tx,
-	amd8111s_m_resources,
 	amd8111s_m_ioctl
 };
 
@@ -246,29 +242,6 @@ _fini()
 	}
 
 	return (status);
-}
-
-/* Adjust Interrupt Coalescing Register to coalesce interrupts */
-static void
-amd8111s_m_blank(void *arg, time_t ticks, uint32_t count)
-{
-	_NOTE(ARGUNUSED(arg, ticks, count));
-}
-
-static void
-amd8111s_m_resources(void *arg)
-{
-	struct LayerPointers *adapter = arg;
-	mac_rx_fifo_t mrf;
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = amd8111s_m_blank;
-	mrf.mrf_arg = (void *)adapter;
-	mrf.mrf_normal_blank_time = 128;
-	mrf.mrf_normal_pkt_count = 8;
-
-	adapter->pOdl->mrh = mac_resource_add(adapter->pOdl->mh,
-	    (mac_resource_t *)&mrf);
 }
 
 /*
@@ -665,7 +638,7 @@ amd8111s_receive(struct LayerPointers *pLayerPointers)
 	}
 
 	if (ret_mp) {
-		mac_rx(pOdl->mh, pOdl->mrh, ret_mp);
+		mac_rx(pOdl->mh, NULL, ret_mp);
 	}
 
 	(void) ddi_dma_sync(pOdl->rx_desc_dma_handle, 0, 0,

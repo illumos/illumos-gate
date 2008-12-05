@@ -54,6 +54,7 @@
 #include <sys/vfs.h>
 #include <sys/mntent.h>
 #include <sys/contract_impl.h>
+#include <sys/dld_ioc.h>
 
 /*
  * There are two possible layers of privilege routines and two possible
@@ -2266,4 +2267,24 @@ secpolicy_xvm_control(const cred_t *cr)
 	if (PRIV_POLICY(cr, PRIV_XVM_CONTROL, B_FALSE, EPERM, NULL))
 		return (EPERM);
 	return (0);
+}
+
+/*
+ * secpolicy_dld_ioctl
+ *
+ * Determine if the subject has permission to use certain dld ioctls.
+ * Each ioctl should require a limited number of privileges. A large
+ * number indicates a poor design.
+ */
+int
+secpolicy_dld_ioctl(const cred_t *cr, const char *dld_priv, const char *msg)
+{
+	int rv;
+
+	if ((rv = priv_getbyname(dld_priv, 0)) >= 0) {
+		return (PRIV_POLICY(cr, rv, B_FALSE, EPERM, msg));
+	}
+	/* priv_getbyname() returns -ve errno */
+	return (-rv);
+
 }

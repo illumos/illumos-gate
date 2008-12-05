@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *      http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,15 +20,16 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "ixgbe_sw.h"
 
-static boolean_t ixgbe_tx(ixgbe_tx_ring_t *, mblk_t *);
 static int ixgbe_tx_copy(ixgbe_tx_ring_t *, tx_control_block_t *, mblk_t *,
     uint32_t, boolean_t);
 static int ixgbe_tx_bind(ixgbe_tx_ring_t *, tx_control_block_t *, mblk_t *,
@@ -44,7 +43,7 @@ static int ixgbe_get_context(mblk_t *, ixgbe_tx_context_t *);
 static boolean_t ixgbe_check_context(ixgbe_tx_ring_t *,
     ixgbe_tx_context_t *);
 static void ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *,
-    ixgbe_tx_context_t *);
+    ixgbe_tx_context_t *, int);
 
 #ifndef IXGBE_DEBUG
 #pragma inline(ixgbe_save_desc)
@@ -54,65 +53,9 @@ static void ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *,
 #endif
 
 /*
- * ixgbe_m_tx
+ * ixgbe_ring_tx
  *
- * The GLDv3 interface to call driver's tx routine to transmit
- * the mblks.
- */
-mblk_t *
-ixgbe_m_tx(void *arg, mblk_t *mp)
-{
-	ixgbe_t *ixgbe = (ixgbe_t *)arg;
-	mblk_t *next;
-	ixgbe_tx_ring_t *tx_ring;
-
-	/*
-	 * If the adapter is suspended, or it is not started, or the link
-	 * is not up, the mblks are simply dropped.
-	 */
-	if (((ixgbe->ixgbe_state & IXGBE_SUSPENDED) != 0) ||
-	    ((ixgbe->ixgbe_state & IXGBE_STARTED) == 0) ||
-	    (ixgbe->link_state != LINK_STATE_UP)) {
-		/* Free the mblk chain */
-		while (mp != NULL) {
-			next = mp->b_next;
-			mp->b_next = NULL;
-
-			freemsg(mp);
-			mp = next;
-		}
-
-		return (NULL);
-	}
-
-	/*
-	 * Decide which tx ring is used to transmit the packets.
-	 * This needs to be updated later to fit the new interface
-	 * of the multiple rings support.
-	 */
-	tx_ring = &ixgbe->tx_rings[0];
-
-	while (mp != NULL) {
-		next = mp->b_next;
-		mp->b_next = NULL;
-
-		if (!ixgbe_tx(tx_ring, mp)) {
-			mp->b_next = next;
-			break;
-		}
-
-		mp = next;
-	}
-
-	return (mp);
-}
-
-/*
- * ixgbe_tx - Main transmit processing
- *
- * Called from ixgbe_m_tx with an mblk ready to transmit. this
- * routine sets up the transmit descriptors and sends data to
- * the wire.
+ * To transmit one mblk through one specified ring.
  *
  * One mblk can consist of several fragments, each fragment
  * will be processed with different methods based on the size.
@@ -136,9 +79,10 @@ ixgbe_m_tx(void *arg, mblk_t *mp)
  * be used. After the processing, those tx control blocks will
  * be put to the work list.
  */
-static boolean_t
-ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
+mblk_t *
+ixgbe_ring_tx(void *arg, mblk_t *mp)
 {
+	ixgbe_tx_ring_t *tx_ring = (ixgbe_tx_ring_t *)arg;
 	ixgbe_t *ixgbe = tx_ring->ixgbe;
 	tx_type_t current_flag, next_flag;
 	uint32_t current_len, next_len;
@@ -150,11 +94,19 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 	tx_control_block_t *tcb;
 	ixgbe_tx_context_t tx_context, *ctx;
 	link_list_t pending_list;
+	uint32_t len, hdr_frag_len, hdr_len;
+	uint32_t copy_thresh;
+	mblk_t *new_mp;
+	mblk_t *pre_mp;
+
+	ASSERT(mp->b_next == NULL);
+
+	copy_thresh = tx_ring->copy_thresh;
 
 	/* Get the mblk size */
 	mbsize = 0;
 	for (nmp = mp; nmp != NULL; nmp = nmp->b_cont) {
-		mbsize += MBLK_LEN(nmp);
+		mbsize += MBLKL(nmp);
 	}
 
 	if (ixgbe->tx_hcksum_enable) {
@@ -166,24 +118,23 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 		ctx = &tx_context;
 		if (ixgbe_get_context(mp, ctx) < 0) {
 			freemsg(mp);
-			return (B_TRUE);
+			return (NULL);
 		}
 
 		/*
 		 * If the mblk size exceeds the max size ixgbe could
-		 * process, then discard this mblk, and return B_TRUE
+		 * process, then discard this mblk, and return NULL.
 		 */
 		if ((ctx->lso_flag && ((mbsize - ctx->mac_hdr_len)
 		    > IXGBE_LSO_MAXLEN)) || (!ctx->lso_flag &&
 		    (mbsize > (ixgbe->max_frame_size - ETHERFCSL)))) {
 			freemsg(mp);
 			IXGBE_DEBUGLOG_0(ixgbe, "ixgbe_tx: packet oversize");
-			return (B_TRUE);
+			return (NULL);
 		}
 	} else {
 		ctx = NULL;
 	}
-
 
 	/*
 	 * Check and recycle tx descriptors.
@@ -194,13 +145,13 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 
 	/*
 	 * After the recycling, if the tbd_free is less than the
-	 * overload_threshold, assert overload, return B_FALSE;
+	 * overload_threshold, assert overload, return mp;
 	 * and we need to re-schedule the tx again.
 	 */
 	if (tx_ring->tbd_free < tx_ring->overload_thresh) {
 		tx_ring->reschedule = B_TRUE;
 		IXGBE_DEBUG_STAT(tx_ring->stat_overload);
-		return (B_FALSE);
+		return (mp);
 	}
 
 	/*
@@ -213,12 +164,77 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 	desc_num = 0;
 	desc_total = 0;
 
+	/*
+	 * The software should guarantee LSO packet header(MAC+IP+TCP)
+	 * to be within one descriptor. Here we reallocate and refill the
+	 * the header if it's physical memory non-contiguous.
+	 */
+	if ((ctx != NULL) && ctx->lso_flag) {
+		/* find the last fragment of the header */
+		len = MBLKL(mp);
+		ASSERT(len > 0);
+		nmp = mp;
+		pre_mp = NULL;
+		hdr_len = ctx->ip_hdr_len + ctx->mac_hdr_len + ctx->l4_hdr_len;
+		while (len < hdr_len) {
+			pre_mp = nmp;
+			nmp = nmp->b_cont;
+			len += MBLKL(nmp);
+		}
+		/*
+		 * If the header and the payload are in different mblks,
+		 * we simply force the header to be copied into pre-allocated
+		 * page-aligned buffer.
+		 */
+		if (len == hdr_len)
+			goto adjust_threshold;
+
+		hdr_frag_len = hdr_len - (len - MBLKL(nmp));
+		/*
+		 * There are two cases we need to reallocate a mblk for the
+		 * last header fragment:
+		 * 1. the header is in multiple mblks and the last fragment
+		 * share the same mblk with the payload
+		 * 2. the header is in a single mblk shared with the payload
+		 * and the header is physical memory non-contiguous
+		 */
+		if ((nmp != mp) ||
+		    (P2NPHASE((uintptr_t)nmp->b_rptr, ixgbe->sys_page_size)
+		    < len)) {
+			IXGBE_DEBUG_STAT(tx_ring->stat_lso_header_fail);
+			/*
+			 * reallocate the mblk for the last header fragment,
+			 * expect to bcopy into pre-allocated page-aligned
+			 * buffer
+			 */
+			new_mp = allocb(hdr_frag_len, NULL);
+			if (!new_mp)
+				return (B_FALSE);
+			bcopy(nmp->b_rptr, new_mp->b_rptr, hdr_frag_len);
+			/* link the new header fragment with the other parts */
+			new_mp->b_wptr = new_mp->b_rptr + hdr_frag_len;
+			new_mp->b_cont = nmp;
+			if (pre_mp)
+				pre_mp->b_cont = new_mp;
+			nmp->b_rptr += hdr_frag_len;
+			if (hdr_frag_len == hdr_len)
+				mp = new_mp;
+		}
+adjust_threshold:
+		/*
+		 * adjust the bcopy threshhold to guarantee
+		 * the header to use bcopy way
+		 */
+		if (copy_thresh < hdr_len)
+			copy_thresh = hdr_len;
+	}
+
 	current_mp = mp;
-	current_len = MBLK_LEN(current_mp);
+	current_len = MBLKL(current_mp);
 	/*
 	 * Decide which method to use for the first fragment
 	 */
-	current_flag = (current_len <= tx_ring->copy_thresh) ?
+	current_flag = (current_len <= copy_thresh) ?
 	    USE_COPY : USE_DMA;
 	/*
 	 * If the mblk includes several contiguous small fragments,
@@ -238,7 +254,7 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 	while (current_mp) {
 		next_mp = current_mp->b_cont;
 		eop = (next_mp == NULL); /* Last fragment of the packet? */
-		next_len = eop ? 0: MBLK_LEN(next_mp);
+		next_len = eop ? 0: MBLKL(next_mp);
 
 		/*
 		 * When the current fragment is an empty fragment, if
@@ -254,7 +270,7 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 		if ((current_len == 0) && (copy_done)) {
 			current_mp = next_mp;
 			current_len = next_len;
-			current_flag = (current_len <= tx_ring->copy_thresh) ?
+			current_flag = (current_len <= copy_thresh) ?
 			    USE_COPY : USE_DMA;
 			continue;
 		}
@@ -302,10 +318,10 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 				 * copied to the current tx buffer, we need
 				 * to complete the current copy processing.
 				 */
-				next_flag = (next_len > tx_ring->copy_thresh) ?
+				next_flag = (next_len > copy_thresh) ?
 				    USE_DMA: USE_COPY;
 				copy_done = B_TRUE;
-			} else if (next_len > tx_ring->copy_thresh) {
+			} else if (next_len > copy_thresh) {
 				/*
 				 * The next fragment needs to be processed with
 				 * DMA binding. So the copy prcessing will be
@@ -329,7 +345,7 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 			 * Check whether to use bcopy or DMA binding to process
 			 * the next fragment.
 			 */
-			next_flag = (next_len > tx_ring->copy_thresh) ?
+			next_flag = (next_len > copy_thresh) ?
 			    USE_DMA: USE_COPY;
 			ASSERT(copy_done == B_TRUE);
 
@@ -367,7 +383,7 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 
 	/*
 	 * If the number of free tx descriptors is not enough for transmit
-	 * then return failure.
+	 * then return mp.
 	 *
 	 * Note: we must put this check under the mutex protection to
 	 * ensure the correctness when multiple threads access it in
@@ -386,7 +402,7 @@ ixgbe_tx(ixgbe_tx_ring_t *tx_ring, mblk_t *mp)
 
 	mutex_exit(&tx_ring->tx_lock);
 
-	return (B_TRUE);
+	return (NULL);
 
 tx_failure:
 	/*
@@ -410,7 +426,7 @@ tx_failure:
 	/* Transmit failed, do not drop the mblk, rechedule the transmit */
 	tx_ring->reschedule = B_TRUE;
 
-	return (B_FALSE);
+	return (mp);
 }
 
 /*
@@ -536,7 +552,9 @@ static int
 ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 {
 	uint32_t start;
-	uint32_t flags;
+	uint32_t hckflags;
+	uint32_t lsoflags;
+	uint32_t mss;
 	uint32_t len;
 	uint32_t size;
 	uint32_t offset;
@@ -548,16 +566,16 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 
 	ASSERT(mp != NULL);
 
-	hcksum_retrieve(mp, NULL, NULL, &start, NULL, NULL, NULL, &flags);
+	hcksum_retrieve(mp, NULL, NULL, &start, NULL, NULL, NULL, &hckflags);
 	bzero(ctx, sizeof (ixgbe_tx_context_t));
-	ctx->hcksum_flags = flags;
 
-	if (flags == 0)
+	if (hckflags == 0)
 		return (0);
+	ctx->hcksum_flags = hckflags;
 
-	ctx->mss = DB_LSOMSS(mp);
-	ctx->lso_flag = (ctx->hcksum_flags & HW_LSO) &&
-	    (ctx->mss != 0);
+	lso_info_get(mp, &mss, &lsoflags);
+	ctx->mss = mss;
+	ctx->lso_flag = (lsoflags == HW_LSO);
 
 	/*
 	 * LSO relies on tx h/w checksum, so here will drop the package
@@ -582,12 +600,12 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 	 * in one mblk fragment, so we go thourgh the fragments to parse
 	 * the ether type.
 	 */
-	size = len = MBLK_LEN(mp);
+	size = len = MBLKL(mp);
 	offset = offsetof(struct ether_header, ether_type);
 	while (size <= offset) {
 		mp = mp->b_cont;
 		ASSERT(mp != NULL);
-		len = MBLK_LEN(mp);
+		len = MBLKL(mp);
 		size += len;
 	}
 	pos = mp->b_rptr + offset + len - size;
@@ -601,7 +619,7 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 		while (size <= offset) {
 			mp = mp->b_cont;
 			ASSERT(mp != NULL);
-			len = MBLK_LEN(mp);
+			len = MBLKL(mp);
 			size += len;
 		}
 		pos = mp->b_rptr + offset + len - size;
@@ -613,25 +631,32 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 	}
 
 	/*
-	 * Here we assume the IP(V6) header is fully included in
+	 * Here we don't assume the IP(V6) header is fully included in
 	 * one mblk fragment.
 	 */
 	switch (etype) {
 	case ETHERTYPE_IP:
-		offset = mac_hdr_len;
-		while (size <= offset) {
-			mp = mp->b_cont;
-			ASSERT(mp != NULL);
-			len = MBLK_LEN(mp);
-			size += len;
-		}
-		pos = mp->b_rptr + offset + len - size;
-
 		if (ctx->lso_flag) {
-			*((uint16_t *)(uintptr_t)(pos + offsetof(ipha_t,
-			    ipha_length))) = 0;
-			*((uint16_t *)(uintptr_t)(pos + offsetof(ipha_t,
-			    ipha_hdr_checksum))) = 0;
+			offset = offsetof(ipha_t, ipha_length) + mac_hdr_len;
+			while (size <= offset) {
+				mp = mp->b_cont;
+				ASSERT(mp != NULL);
+				len = MBLKL(mp);
+				size += len;
+			}
+			pos = mp->b_rptr + offset + len - size;
+			*((uint16_t *)(uintptr_t)(pos)) = 0;
+
+			offset = offsetof(ipha_t, ipha_hdr_checksum) +
+			    mac_hdr_len;
+			while (size <= offset) {
+				mp = mp->b_cont;
+				ASSERT(mp != NULL);
+				len = MBLKL(mp);
+				size += len;
+			}
+			pos = mp->b_rptr + offset + len - size;
+			*((uint16_t *)(uintptr_t)(pos)) = 0;
 
 			/*
 			 * To perform ixgbe LSO, here also need to fill
@@ -642,14 +667,23 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 			 */
 		}
 
-		l4_proto = *(uint8_t *)(pos + offsetof(ipha_t, ipha_protocol));
+		offset = offsetof(ipha_t, ipha_protocol) + mac_hdr_len;
+		while (size <= offset) {
+			mp = mp->b_cont;
+			ASSERT(mp != NULL);
+			len = MBLKL(mp);
+			size += len;
+		}
+		pos = mp->b_rptr + offset + len - size;
+
+		l4_proto = *(uint8_t *)pos;
 		break;
 	case ETHERTYPE_IPV6:
 		offset = offsetof(ip6_t, ip6_nxt) + mac_hdr_len;
 		while (size <= offset) {
 			mp = mp->b_cont;
 			ASSERT(mp != NULL);
-			len = MBLK_LEN(mp);
+			len = MBLKL(mp);
 			size += len;
 		}
 		pos = mp->b_rptr + offset + len - size;
@@ -667,7 +701,7 @@ ixgbe_get_context(mblk_t *mp, ixgbe_tx_context_t *ctx)
 		while (size <= offset) {
 			mp = mp->b_cont;
 			ASSERT(mp != NULL);
-			len = MBLK_LEN(mp);
+			len = MBLKL(mp);
 			size += len;
 		}
 		pos = mp->b_rptr + offset + len - size;
@@ -702,13 +736,14 @@ ixgbe_check_context(ixgbe_tx_ring_t *tx_ring, ixgbe_tx_context_t *ctx)
 		return (B_FALSE);
 
 	/*
-	 * Compare the checksum data retrieved from the mblk and the
-	 * stored checksum data of the last context descriptor. The data
-	 * need to be checked are:
+	 * Compare the context data retrieved from the mblk and the
+	 * stored data of the last context descriptor. The data need
+	 * to be checked are:
 	 *	hcksum_flags
 	 *	l4_proto
 	 *	mac_hdr_len
 	 *	ip_hdr_len
+	 *	lso_flag
 	 *	mss (only checked for LSO)
 	 *	l4_hr_len (only checked for LSO)
 	 * Either one of the above data is changed, a new context descriptor
@@ -716,16 +751,14 @@ ixgbe_check_context(ixgbe_tx_ring_t *tx_ring, ixgbe_tx_context_t *ctx)
 	 */
 	last = &tx_ring->tx_context;
 
-	if (ctx->hcksum_flags != 0) {
-		if ((ctx->hcksum_flags != last->hcksum_flags) ||
-		    (ctx->l4_proto != last->l4_proto) ||
-		    (ctx->mac_hdr_len != last->mac_hdr_len) ||
-		    (ctx->ip_hdr_len != last->ip_hdr_len) ||
-		    (ctx->lso_flag && ((ctx->mss != last->mss) ||
-		    (ctx->l4_hdr_len != last->l4_hdr_len)))) {
-
-			return (B_TRUE);
-		}
+	if ((ctx->hcksum_flags != last->hcksum_flags) ||
+	    (ctx->l4_proto != last->l4_proto) ||
+	    (ctx->mac_hdr_len != last->mac_hdr_len) ||
+	    (ctx->ip_hdr_len != last->ip_hdr_len) ||
+	    (ctx->lso_flag != last->lso_flag) ||
+	    (ctx->lso_flag && ((ctx->mss != last->mss) ||
+	    (ctx->l4_hdr_len != last->l4_hdr_len)))) {
+		return (B_TRUE);
 	}
 
 	return (B_FALSE);
@@ -738,11 +771,11 @@ ixgbe_check_context(ixgbe_tx_ring_t *tx_ring, ixgbe_tx_context_t *ctx)
  */
 static void
 ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *ctx_tbd,
-    ixgbe_tx_context_t *ctx)
+    ixgbe_tx_context_t *ctx, int ring_index)
 {
 	/*
 	 * Fill the context descriptor with the checksum
-	 * context information we've got
+	 * context information we've got.
 	 */
 	ctx_tbd->vlan_macip_lens = ctx->ip_hdr_len;
 	ctx_tbd->vlan_macip_lens |= ctx->mac_hdr_len <<
@@ -775,12 +808,12 @@ ixgbe_fill_context(struct ixgbe_adv_tx_context_desc *ctx_tbd,
 	}
 
 	ctx_tbd->seqnum_seed = 0;
+	ctx_tbd->mss_l4len_idx = ring_index << 4;
+
 	if (ctx->lso_flag) {
-		ctx_tbd->mss_l4len_idx =
+		ctx_tbd->mss_l4len_idx |=
 		    (ctx->l4_hdr_len << IXGBE_ADVTXD_L4LEN_SHIFT) |
 		    (ctx->mss << IXGBE_ADVTXD_MSS_SHIFT);
-	} else {
-		ctx_tbd->mss_l4len_idx = 0;
 	}
 }
 
@@ -838,7 +871,7 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 			 */
 			ixgbe_fill_context(
 			    (struct ixgbe_adv_tx_context_desc *)tbd,
-			    ctx);
+			    ctx, tx_ring->index);
 
 			index = NEXT_INDEX(index, 1, tx_ring->ring_size);
 			desc_num++;
@@ -908,6 +941,14 @@ ixgbe_tx_fill_ring(ixgbe_tx_ring_t *tx_ring, link_list_t *pending_list,
 	 */
 	ASSERT(first_tbd != NULL);
 	first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_IFCS;
+	first_tbd->read.olinfo_status |= (tx_ring->index << 4);
+
+	if (ctx != NULL && ctx->lso_flag) {
+		first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
+		first_tbd->read.olinfo_status |=
+		    (mbsize - ctx->mac_hdr_len - ctx->ip_hdr_len
+		    - ctx->l4_hdr_len) << IXGBE_ADVTXD_PAYLEN_SHIFT;
+	}
 
 	if (ctx != NULL && ctx->lso_flag) {
 		first_tbd->read.cmd_type_len |= IXGBE_ADVTXD_DCMD_TSE;
@@ -1017,14 +1058,18 @@ ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *tx_ring)
 	 * The mutex_tryenter() is used to avoid unnecessary
 	 * lock contention.
 	 */
-	if (mutex_tryenter(&tx_ring->recycle_lock) == 0)
-		return (0);
+	mutex_enter(&tx_ring->recycle_lock);
 
 	ASSERT(tx_ring->tbd_free <= tx_ring->ring_size);
 
 	if (tx_ring->tbd_free == tx_ring->ring_size) {
 		tx_ring->recycle_fail = 0;
 		tx_ring->stall_watchdog = 0;
+		if (tx_ring->reschedule) {
+			tx_ring->reschedule = B_FALSE;
+			mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
+			    tx_ring->ring_handle);
+		}
 		mutex_exit(&tx_ring->recycle_lock);
 		return (0);
 	}
@@ -1108,6 +1153,12 @@ ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *tx_ring)
 	 */
 	atomic_add_32(&tx_ring->tbd_free, desc_num);
 
+	if ((tx_ring->tbd_free >= tx_ring->resched_thresh) &&
+	    (tx_ring->reschedule)) {
+		tx_ring->reschedule = B_FALSE;
+		mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
+		    tx_ring->ring_handle);
+	}
 	mutex_exit(&tx_ring->recycle_lock);
 
 	/*
@@ -1152,14 +1203,18 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 	 * The mutex_tryenter() is used to avoid unnecessary
 	 * lock contention.
 	 */
-	if (mutex_tryenter(&tx_ring->recycle_lock) == 0)
-		return (0);
+	mutex_enter(&tx_ring->recycle_lock);
 
 	ASSERT(tx_ring->tbd_free <= tx_ring->ring_size);
 
 	if (tx_ring->tbd_free == tx_ring->ring_size) {
 		tx_ring->recycle_fail = 0;
 		tx_ring->stall_watchdog = 0;
+		if (tx_ring->reschedule) {
+			tx_ring->reschedule = B_FALSE;
+			mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
+			    tx_ring->ring_handle);
+		}
 		mutex_exit(&tx_ring->recycle_lock);
 		return (0);
 	}
@@ -1245,6 +1300,12 @@ ixgbe_tx_recycle_head_wb(ixgbe_tx_ring_t *tx_ring)
 	 */
 	atomic_add_32(&tx_ring->tbd_free, desc_num);
 
+	if ((tx_ring->tbd_free >= tx_ring->resched_thresh) &&
+	    (tx_ring->reschedule)) {
+		tx_ring->reschedule = B_FALSE;
+		mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
+		    tx_ring->ring_handle);
+	}
 	mutex_exit(&tx_ring->recycle_lock);
 
 	/*

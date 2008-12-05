@@ -22,14 +22,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the mac driver 
 #	kernel module.
 #
 #	sparc architecture dependent
 #
-
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -54,7 +52,6 @@ include $(UTSBASE)/sparc/Makefile.sparc
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
-LINTTAGS	+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
 #	Overrides.
@@ -63,6 +60,9 @@ CFLAGS				+= $(CCVERBOSE)
 $(RELEASE_BUILD)CFLAGS		+= -xinline=auto -xcrossfile
 $(RELEASE_BUILD)COPTIMIZE	= -xO5
 LDFLAGS				+= -dy
+
+LINTTAGS			+= -erroff=E_PTRDIFF_OVERFLOW
+LINTTAGS			+= -erroff=E_BAD_PTR_CAST_ALIGN
 
 #
 #	Default build targets.

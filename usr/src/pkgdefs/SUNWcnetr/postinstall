@@ -109,6 +109,44 @@ if [ -f "${ORIG}" ]; then
 	removef -f $PKGINST > /dev/null 2>&1
 fi
 
+# Convert hostname.xxx and zonecfg vlan entries
+host_ifs=`ls -1 $rootprefix/etc | egrep -e '^hostname.|^hostname6.|^dhcp.'| \
+    cut -d . -f2 | sort -u` 
+
+zones=`zoneadm list -c | grep -v global`
+for zone in $zones
+do
+	zonecfg -z $zone info ip-type | grep exclusive >/dev/null
+	if [ $? -eq 0 ]; then
+		zif=`zonecfg -z $zone info net | grep physical | \
+		    nawk '{print $2}'`
+		zone_ifs="$zone_ifs $zif"
+	fi
+done
+
+ORIG=$BASEDIR/etc/dladm/datalink.conf
+for ifname in $host_ifs $zone_ifs
+do
+	grep $ifname $ORIG >/dev/null
+	if [ $? != 0 ]; then
+		phys=`echo $ifname | sed "s/[0-9]*$//"`
+		devnum=`echo $ifname | sed "s/$phys//g"`
+		if [ "$phys$devnum" != $ifname -o \
+		    -n "`echo $devnum | tr -d '[0-9]'`" ]; then
+			echo "skipping invalid interface $ifname"
+			continue
+		fi
+
+		vid=`expr $devnum / 1000`
+		inst=`expr $devnum % 1000`
+
+		if [ "$vid" != "0" ]; then
+			echo dladm create-vlan -l $phys$inst -v $vid \
+			    $ifname >> ${PKG_INSTALL_ROOT}/$UPGRADE_SCRIPT
+		fi
+	fi
+done
+
 #
 # Change permissions of public IKE certificates and CRLs
 # that may have been incorrectly created as private

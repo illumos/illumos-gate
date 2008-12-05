@@ -48,7 +48,7 @@
 #include <sys/modctl.h>
 #include <sys/devops.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
 #include <sys/net80211.h>
 #include <sys/net80211_proto.h>
@@ -423,7 +423,6 @@ mac_callbacks_t	iwk_m_callbacks = {
 	iwk_m_multicst,
 	iwk_m_unicst,
 	iwk_m_tx,
-	NULL,
 	iwk_m_ioctl,
 	NULL,
 	NULL,

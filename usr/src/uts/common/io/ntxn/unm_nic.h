@@ -54,7 +54,7 @@
 #include <inet/mi.h>
 #include <inet/nd.h>
 
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/miiregs.h> /* by fjlite out of intel */
 

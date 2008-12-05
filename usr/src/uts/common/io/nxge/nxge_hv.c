@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * nxge_hv.c
  *
@@ -36,6 +34,8 @@
 
 #include <sys/nxge/nxge_impl.h>
 #include <sys/nxge/nxge_hio.h>
+
+#if defined(sun4v)
 
 void
 nxge_hio_hv_init(nxge_t *nxge)
@@ -79,3 +79,5 @@ nxge_hio_hv_init(nxge_t *nxge)
 
 	rx->getinfo = &hv_niu_vrrx_getinfo;
 }
+
+#endif /* defined(sun4v) */

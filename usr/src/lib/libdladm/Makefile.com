@@ -22,13 +22,13 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY = libdladm.a
 VERS    = .1
 OBJECTS = libdladm.o secobj.o linkprop.o libdllink.o libdlaggr.o \
-	libdlwlan.o libdlvnic.o libdlmgmt.o libdlvlan.o
+	libdlwlan.o libdlvnic.o libdlmgmt.o libdlvlan.o \
+	flowattr.o flowprop.o propfuncs.o libdlflow.o libdlstat.o \
+	usage.o
 
 include ../../Makefile.lib
 
@@ -36,8 +36,8 @@ include ../../Makefile.lib
 include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-ldevinfo -lc -linetutil -lsocket -lscf -lrcm \
-		-lnvpair -lkstat 
+LDLIBS +=	-ldevinfo -lc -linetutil -lsocket -lscf -lrcm -lnvpair \
+		-lexacct -lnsl -lkstat -lcurses
 
 SRCDIR =	../common
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)

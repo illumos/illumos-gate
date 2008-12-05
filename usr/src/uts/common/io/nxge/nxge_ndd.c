@@ -980,15 +980,13 @@ nxge_param_get_txdma_info(p_nxge_t nxgep, queue_t *q, p_mblk_t mp, caddr_t cp)
 	mp->b_cont = np;
 	print_len = 0;
 
-	((mblk_t *)np)->b_wptr += print_len;
-	buf_len -= print_len;
 	print_len = snprintf((char *)((mblk_t *)np)->b_wptr, buf_len,
 	    "TDC\t HW TDC\t\n");
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 
 	set = &nxgep->tx_set;
-	for (tdc = 0; tdc < NXGE_MAX_RDCS; tdc++) {
+	for (tdc = 0; tdc < NXGE_MAX_TDCS; tdc++) {
 		if ((1 << tdc) & set->owned.map) {
 			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
 			    buf_len, "%d\n", tdc);

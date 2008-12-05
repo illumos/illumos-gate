@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *      http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,14 +20,16 @@
  */
 
 /*
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ */
+
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #ifndef	_IXGBE_SW_H
 #define	_IXGBE_SW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,7 +48,7 @@ extern "C" {
 #include <sys/modctl.h>
 #include <sys/errno.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/vlan.h>
 #include <sys/ddi.h>
@@ -89,6 +89,8 @@ extern "C" {
 #define	IXGBE_INTR_MSI			2
 #define	IXGBE_INTR_LEGACY		3
 
+#define	IXGBE_POLL_NULL			-1
+
 #define	MAX_COOKIE			18
 #define	MIN_NUM_TX_DESC			2
 
@@ -102,6 +104,7 @@ extern "C" {
  */
 #define	MAX_TX_QUEUE_NUM		32
 #define	MAX_RX_QUEUE_NUM		64
+#define	MAX_RX_GROUP_NUM		1
 
 #define	MAX_TX_RING_SIZE		4096
 #define	MAX_RX_RING_SIZE		4096
@@ -121,6 +124,7 @@ extern "C" {
  */
 #define	MIN_TX_QUEUE_NUM		1
 #define	MIN_RX_QUEUE_NUM		1
+#define	MIN_RX_GROUP_NUM		1
 #define	MIN_TX_RING_SIZE		64
 #define	MIN_RX_RING_SIZE		64
 
@@ -136,22 +140,31 @@ extern "C" {
 /*
  * Default values for user configurable parameters
  */
-#define	DEFAULT_TX_QUEUE_NUM		1
-#define	DEFAULT_RX_QUEUE_NUM		1
-#define	DEFAULT_TX_RING_SIZE		512
-#define	DEFAULT_RX_RING_SIZE		512
+#define	DEFAULT_TX_QUEUE_NUM		8
+#define	DEFAULT_RX_QUEUE_NUM		8
+#define	DEFAULT_RX_GROUP_NUM		1
+#define	DEFAULT_TX_RING_SIZE		1024
+#define	DEFAULT_RX_RING_SIZE		1024
 
 #define	DEFAULT_MTU			ETHERMTU
 #define	DEFAULT_RX_LIMIT_PER_INTR	256
 #define	DEFAULT_INTR_THROTTLING		200	/* In unit of 256 nsec */
 #define	DEFAULT_RX_COPY_THRESHOLD	128
 #define	DEFAULT_TX_COPY_THRESHOLD	512
-#define	DEFAULT_TX_RECYCLE_THRESHOLD	MAX_COOKIE
+#define	DEFAULT_TX_RECYCLE_THRESHOLD	(MAX_COOKIE + 1)
 #define	DEFAULT_TX_OVERLOAD_THRESHOLD	MIN_NUM_TX_DESC
 #define	DEFAULT_TX_RESCHED_THRESHOLD	128
 #define	DEFAULT_FCRTH			0x20000
 #define	DEFAULT_FCRTL			0x10000
 #define	DEFAULT_FCPAUSE			0xFFFF
+
+#define	DEFAULT_TX_HCKSUM_ENABLE	B_TRUE
+#define	DEFAULT_RX_HCKSUM_ENABLE	B_TRUE
+#define	DEFAULT_LSO_ENABLE		B_TRUE
+#define	DEFAULT_MR_ENABLE		B_TRUE
+#define	DEFAULT_TX_HEAD_WB_ENABLE	B_TRUE
+
+#define	IXGBE_LSO_MAXLEN		65535
 
 #define	DEFAULT_TX_HCKSUM_ENABLE	B_TRUE
 #define	DEFAULT_RX_HCKSUM_ENABLE	B_TRUE
@@ -167,11 +180,12 @@ extern "C" {
 #define	MAX_LINK_DOWN_TIMEOUT		8	/* 8 seconds */
 
 /*
- * limits on msi-x vectors for 82598
+ * Limits on msi-x vectors for 82598
  */
-#define	IXGBE_MAX_INTR_VECTOR  18
-#define	IXGBE_MAX_OTHER_VECTOR 2
-#define	IXGBE_MAX_RING_VECTOR (IXGBE_MAX_INTR_VECTOR - IXGBE_MAX_OTHER_VECTOR)
+#define	IXGBE_MAX_INTR_VECTOR		18
+#define	IXGBE_MAX_OTHER_VECTOR		1
+#define	IXGBE_MAX_TCP_TIMER_VECTOR	1
+#define	IXGBE_MAX_RING_VECTOR		16
 
 /*
  * Extra register bit masks for 82598
@@ -209,11 +223,13 @@ extern "C" {
 #define	PROP_TX_RING_SIZE		"tx_ring_size"
 #define	PROP_RX_QUEUE_NUM		"rx_queue_number"
 #define	PROP_RX_RING_SIZE		"rx_ring_size"
+#define	PROP_RX_GROUP_NUM		"rx_group_number"
 
 #define	PROP_INTR_FORCE			"intr_force"
 #define	PROP_TX_HCKSUM_ENABLE		"tx_hcksum_enable"
 #define	PROP_RX_HCKSUM_ENABLE		"rx_hcksum_enable"
 #define	PROP_LSO_ENABLE			"lso_enable"
+#define	PROP_MR_ENABLE			"mr_enable"
 #define	PROP_TX_HEAD_WB_ENABLE		"tx_head_wb_enable"
 #define	PROP_TX_COPY_THRESHOLD		"tx_copy_threshold"
 #define	PROP_TX_RECYCLE_THRESHOLD	"tx_recycle_threshold"
@@ -263,9 +279,6 @@ enum ioc_reply {
 	IOC_ACK,	/* OK, just send ACK */
 	IOC_REPLY	/* OK, just send reply */
 };
-
-#define	MBLK_LEN(mp)		((uintptr_t)(mp)->b_wptr - \
-				(uintptr_t)(mp)->b_rptr)
 
 #define	DMA_SYNC(area, flag)	((void) ddi_dma_sync((area)->dma_handle, \
 				    0, 0, (flag)))
@@ -533,13 +546,15 @@ typedef struct ixgbe_tx_ring {
 	uint32_t		stat_fail_no_tcb;
 	uint32_t		stat_fail_dma_bind;
 	uint32_t		stat_reschedule;
+	uint32_t		stat_lso_header_fail;
 #endif
+
+	mac_ring_handle_t	ring_handle;
 
 	/*
 	 * Pointer to the ixgbe struct
 	 */
 	struct ixgbe		*ixgbe;
-
 } ixgbe_tx_ring_t;
 
 /*
@@ -590,9 +605,20 @@ typedef struct ixgbe_rx_ring {
 	uint32_t		stat_exceed_pkt;
 #endif
 
-	struct ixgbe		*ixgbe;		/* Pointer to ixgbe struct */
+	mac_ring_handle_t	ring_handle;
+	uint64_t		ring_gen_num;
 
+	struct ixgbe		*ixgbe;		/* Pointer to ixgbe struct */
 } ixgbe_rx_ring_t;
+
+/*
+ * Software Receive Ring Group
+ */
+typedef struct ixgbe_rx_group {
+	uint32_t		index;		/* Group index */
+	mac_group_handle_t	group_handle;   /* call back group handle */
+	struct ixgbe		*ixgbe;		/* Pointer to ixgbe struct */
+} ixgbe_rx_group_t;
 
 /*
  * structure to map ring cleanup to msi-x vector
@@ -641,6 +667,12 @@ typedef struct ixgbe {
 	uint32_t		rx_buf_size;	/* Rx buffer size */
 
 	/*
+	 * Receive Groups
+	 */
+	ixgbe_rx_group_t	*rx_groups;	/* Array of rx groups */
+	uint32_t		num_rx_groups;	/* Number of rx groups in use */
+
+	/*
 	 * Transmit Rings
 	 */
 	ixgbe_tx_ring_t		*tx_rings;	/* Array of tx rings */
@@ -651,6 +683,7 @@ typedef struct ixgbe {
 	boolean_t		tx_head_wb_enable; /* Tx head wrtie-back */
 	boolean_t		tx_hcksum_enable; /* Tx h/w cksum offload */
 	boolean_t 		lso_enable; 	/* Large Segment Offload */
+	boolean_t 		mr_enable; 	/* Multiple Tx and Rx Ring */
 	uint32_t		tx_copy_thresh;	/* Tx copy threshold */
 	uint32_t		tx_recycle_thresh; /* Tx recycle threshold */
 	uint32_t		tx_overload_thresh; /* Tx overload threshold */
@@ -684,6 +717,8 @@ typedef struct ixgbe {
 	uint32_t		mcast_count;
 	struct ether_addr	mcast_table[MAX_NUM_MULTICAST_ADDRESSES];
 
+	ulong_t			sys_page_size;
+
 	/*
 	 * Kstat definitions
 	 */
@@ -694,13 +729,11 @@ typedef struct ixgbe {
 	 */
 	caddr_t			nd_data;
 	nd_param_t		nd_params[PARAM_COUNT];
-
 } ixgbe_t;
 
 typedef struct ixgbe_stat {
-
 	kstat_named_t link_speed;	/* Link Speed */
-#ifdef IXGBE_DEBUG
+
 	kstat_named_t reset_count;	/* Reset Count */
 
 	kstat_named_t rx_frame_error;	/* Rx Error in Packet */
@@ -729,7 +762,11 @@ typedef struct ixgbe_stat {
 	kstat_named_t ptc511;	/* Packets Xmitted (255-511b) */
 	kstat_named_t ptc1023;	/* Packets Xmitted (512-1023b) */
 	kstat_named_t ptc1522;	/* Packets Xmitted (1024-1522b */
-#endif
+	kstat_named_t qprc[16];	/* Queue Packets Received Count */
+	kstat_named_t qptc[16];	/* Queue Packets Transmitted Count */
+	kstat_named_t qbrc[16];	/* Queue Bytes Received Count */
+	kstat_named_t qbtc[16];	/* Queue Bytes Transmitted Count */
+
 	kstat_named_t crcerrs;	/* CRC Error Count */
 	kstat_named_t illerrc;	/* Illegal Byte Error Count */
 	kstat_named_t errbc;	/* Error Byte Count */
@@ -770,7 +807,6 @@ void ixgbe_set_fma_flags(int, int);
 int ixgbe_start(ixgbe_t *);
 void ixgbe_stop(ixgbe_t *);
 int ixgbe_driver_setup_link(ixgbe_t *, boolean_t);
-int ixgbe_unicst_set(ixgbe_t *, const uint8_t *, mac_addr_slot_t);
 int ixgbe_multicst_add(ixgbe_t *, const uint8_t *);
 int ixgbe_multicst_remove(ixgbe_t *, const uint8_t *);
 enum ioc_reply ixgbe_loopback_ioctl(ixgbe_t *, struct iocblk *, mblk_t *);
@@ -783,6 +819,13 @@ int ixgbe_check_acc_handle(ddi_acc_handle_t handle);
 int ixgbe_check_dma_handle(ddi_dma_handle_t handle);
 void ixgbe_fm_ereport(ixgbe_t *, char *);
 
+void ixgbe_fill_ring(void *, mac_ring_type_t, const int, const int,
+    mac_ring_info_t *, mac_ring_handle_t);
+void ixgbe_fill_group(void *arg, mac_ring_type_t, const int,
+    mac_group_info_t *, mac_group_handle_t);
+int ixgbe_rx_ring_intr_enable(mac_intr_handle_t);
+int ixgbe_rx_ring_intr_disable(mac_intr_handle_t);
+
 /*
  * Function prototypes in ixgbe_gld.c
  */
@@ -790,26 +833,22 @@ int ixgbe_m_start(void *);
 void ixgbe_m_stop(void *);
 int ixgbe_m_promisc(void *, boolean_t);
 int ixgbe_m_multicst(void *, boolean_t, const uint8_t *);
-int ixgbe_m_unicst(void *, const uint8_t *);
 int ixgbe_m_stat(void *, uint_t, uint64_t *);
 void ixgbe_m_resources(void *);
 void ixgbe_m_ioctl(void *, queue_t *, mblk_t *);
-int ixgbe_m_unicst_add(void *, mac_multi_addr_t *);
-int ixgbe_m_unicst_remove(void *, mac_addr_slot_t);
-int ixgbe_m_unicst_modify(void *, mac_multi_addr_t *);
-int ixgbe_m_unicst_get(void *, mac_multi_addr_t *);
 boolean_t ixgbe_m_getcapab(void *, mac_capab_t, void *);
 
 /*
  * Function prototypes in ixgbe_rx.c
  */
-mblk_t *ixgbe_rx(ixgbe_rx_ring_t *);
+mblk_t *ixgbe_ring_rx(ixgbe_rx_ring_t *, int);
 void ixgbe_rx_recycle(caddr_t arg);
+mblk_t *ixgbe_ring_rx_poll(void *, int);
 
 /*
  * Function prototypes in ixgbe_tx.c
  */
-mblk_t *ixgbe_m_tx(void *, mblk_t *);
+mblk_t *ixgbe_ring_tx(void *, mblk_t *);
 void ixgbe_free_tcb(tx_control_block_t *);
 void ixgbe_put_free_list(ixgbe_tx_ring_t *, link_list_t *);
 uint32_t ixgbe_tx_recycle_legacy(ixgbe_tx_ring_t *);
@@ -833,7 +872,6 @@ enum ioc_reply ixgbe_nd_ioctl(ixgbe_t *, queue_t *, mblk_t *, struct iocblk *);
  * Function prototypes in ixgbe_stat.c
  */
 int ixgbe_init_stats(ixgbe_t *);
-
 
 #ifdef __cplusplus
 }

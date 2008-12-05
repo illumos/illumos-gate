@@ -208,7 +208,6 @@ static void nxge_check_guest_state(nxge_hio_vr_t *);
  *	Guest domain
  */
 /* ARGSUSED */
-
 int
 nxge_hio_vr_add(nxge_t *nxge)
 {
@@ -249,7 +248,7 @@ nxge_hio_vr_add(nxge_t *nxge)
 		return (NXGE_ERROR);
 	}
 
-	cookie = (uint32_t)reg_val[0];
+	cookie = (uint32_t)(reg_val[0]);
 	ddi_prop_free(reg_val);
 
 	fp = &nhd->hio.vr;
@@ -521,10 +520,16 @@ res_map_parse(
 	 */
 	if (type == NXGE_TRANSMIT_GROUP) {
 		nxge_dma_pt_cfg_t *port = &nxge->pt_config;
+		nxge_tdc_grp_t *tdc_grp = &nxge->pt_config.tdc_grps[0];
 
 		hardware->tdc.start = first;
 		hardware->tdc.count = count;
 		hardware->tdc.owned = count;
+
+		tdc_grp->start_tdc = first;
+		tdc_grp->max_tdcs = (uint8_t)count;
+		tdc_grp->grp_index = group->index;
+		tdc_grp->map = slots;
 
 		group->map = slots;
 
@@ -944,7 +949,6 @@ nxge_check_guest_state(
 	NXGE_DEBUG_MSG((nxge, SYSERR_CTL, "==> nxge_check_guest_state"));
 
 	MUTEX_ENTER(nxge->genlock);
-
 	nxge->nxge_timerid = 0;
 
 	if (nxge->nxge_mac_state == NXGE_MAC_STARTED) {

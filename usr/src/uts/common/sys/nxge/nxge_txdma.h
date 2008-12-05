@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -31,9 +30,9 @@
 extern "C" {
 #endif
 
+#include <sys/taskq.h>
 #include <sys/nxge/nxge_txdma_hw.h>
 #include <npi_txdma.h>
-#include <sys/nxge/nxge_serialize.h>
 
 #define	TXDMA_PORT_BITMAP(nxgep)		(nxgep->pt_config.tx_dma_map)
 
@@ -152,14 +151,13 @@ typedef struct _tx_ring_t {
 	uint32_t		tx_ring_offline;
 	boolean_t		tx_ring_busy;
 
-	p_tx_msg_t		tx_free_list_p;
-	nxge_os_mutex_t		freelock;
-
 	nxge_os_mutex_t		lock;
+	mac_ring_handle_t	tx_ring_handle;
+	ddi_taskq_t		*taskq;
 	uint16_t 		index;
 	uint16_t		tdc;
 	struct nxge_tdc_cfg	*tdc_p;
-	uint_t 			tx_ring_size;
+	int 			tx_ring_size;
 	uint32_t 		num_chunks;
 
 	uint_t 			tx_wrap_mask;
@@ -170,11 +168,10 @@ typedef struct _tx_ring_t {
 	tx_ring_kick_t		ring_kick_tail;
 	txdma_mailbox_t		tx_mbox;
 
-	uint_t 			descs_pending;
+	int 			descs_pending;
 	boolean_t 		queueing;
 
 	nxge_os_mutex_t		sq_lock;
-	nxge_serialize_t 	*serial;
 	p_mblk_t 		head;
 	p_mblk_t 		tail;
 

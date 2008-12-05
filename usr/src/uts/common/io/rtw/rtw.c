@@ -54,7 +54,7 @@
 #include <sys/sunddi.h>
 #include <sys/pci.h>
 #include <sys/errno.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
 #include <sys/list.h>
@@ -178,7 +178,6 @@ static mac_callbacks_t rtw_m_callbacks = {
 	rtw_m_multicst,
 	rtw_m_unicst,
 	rtw_m_tx,
-	NULL,
 	rtw_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,

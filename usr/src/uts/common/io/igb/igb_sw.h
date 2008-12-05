@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,14 +20,16 @@
  */
 
 /*
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ */
+
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 #ifndef	_IGB_SW_H
 #define	_IGB_SW_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,7 +48,7 @@ extern "C" {
 #include <sys/modctl.h>
 #include <sys/errno.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/vlan.h>
 #include <sys/ddi.h>
@@ -88,6 +88,9 @@ extern "C" {
 #define	IGB_INTR_MSI			2
 #define	IGB_INTR_LEGACY			3
 
+#define	IGB_NO_POLL			-1
+#define	IGB_NO_FREE_SLOT		-1
+
 #define	MAX_NUM_UNICAST_ADDRESSES	E1000_RAR_ENTRIES
 #define	MAX_NUM_MULTICAST_ADDRESSES	256
 #define	MAX_NUM_EITR			10
@@ -97,10 +100,9 @@ extern "C" {
 /*
  * Maximum values for user configurable parameters
  */
-#define	MAX_TX_QUEUE_NUM		4
-#define	MAX_RX_QUEUE_NUM		4
 #define	MAX_TX_RING_SIZE		4096
 #define	MAX_RX_RING_SIZE		4096
+#define	MAX_RX_GROUP_NUM		4
 
 #define	MAX_MTU				9000
 #define	MAX_RX_LIMIT_PER_INTR		4096
@@ -119,10 +121,9 @@ extern "C" {
 /*
  * Minimum values for user configurable parameters
  */
-#define	MIN_TX_QUEUE_NUM		1
-#define	MIN_RX_QUEUE_NUM		1
 #define	MIN_TX_RING_SIZE		64
 #define	MIN_RX_RING_SIZE		64
+#define	MIN_RX_GROUP_NUM		1
 
 #define	MIN_MTU				ETHERMIN
 #define	MIN_RX_LIMIT_PER_INTR		16
@@ -140,10 +141,11 @@ extern "C" {
 /*
  * Default values for user configurable parameters
  */
-#define	DEFAULT_TX_QUEUE_NUM		1
-#define	DEFAULT_RX_QUEUE_NUM		1
+#define	DEFAULT_TX_QUEUE_NUM		4
+#define	DEFAULT_RX_QUEUE_NUM		4
 #define	DEFAULT_TX_RING_SIZE		512
 #define	DEFAULT_RX_RING_SIZE		512
+#define	DEFAULT_RX_GROUP_NUM		1
 
 #define	DEFAULT_MTU			ETHERMTU
 #define	DEFAULT_RX_LIMIT_PER_INTR	256
@@ -187,7 +189,6 @@ extern "C" {
 #define	ATTACH_PROGRESS_ENABLE_INTR	0x1000	/* DDI interrupts enabled */
 #define	ATTACH_PROGRESS_FMINIT		0x2000	/* FMA initialized */
 
-
 #define	PROP_ADV_AUTONEG_CAP		"adv_autoneg_cap"
 #define	PROP_ADV_1000FDX_CAP		"adv_1000fdx_cap"
 #define	PROP_ADV_1000HDX_CAP		"adv_1000hdx_cap"
@@ -197,10 +198,10 @@ extern "C" {
 #define	PROP_ADV_10HDX_CAP		"adv_10hdx_cap"
 #define	PROP_DEFAULT_MTU		"default_mtu"
 #define	PROP_FLOW_CONTROL		"flow_control"
-#define	PROP_TX_QUEUE_NUM		"tx_queue_number"
 #define	PROP_TX_RING_SIZE		"tx_ring_size"
-#define	PROP_RX_QUEUE_NUM		"rx_queue_number"
 #define	PROP_RX_RING_SIZE		"rx_ring_size"
+#define	PROP_MR_ENABLE			"mr_enable"
+#define	PROP_RX_GROUP_NUM		"rx_group_number"
 
 #define	PROP_INTR_FORCE			"intr_force"
 #define	PROP_TX_HCKSUM_ENABLE		"tx_hcksum_enable"
@@ -410,7 +411,7 @@ typedef union igb_ether_addr {
 	} reg;
 	struct {
 		uint8_t		set;
-		uint8_t		redundant;
+		uint8_t		group_index;
 		uint8_t		addr[ETHERADDRL];
 	} mac;
 } igb_ether_addr_t;
@@ -479,6 +480,7 @@ typedef struct rx_control_block {
  */
 typedef struct igb_tx_ring {
 	uint32_t		index;	/* Ring index */
+	uint32_t		intr_vector;	/* Interrupt vector index */
 
 	/*
 	 * Mutexes
@@ -538,13 +540,14 @@ typedef struct igb_tx_ring {
 	uint32_t		stat_fail_no_tcb;
 	uint32_t		stat_fail_dma_bind;
 	uint32_t		stat_reschedule;
+	uint32_t		stat_pkt_cnt;
 #endif
 
 	/*
 	 * Pointer to the igb struct
 	 */
 	struct igb		*igb;
-
+	mac_ring_handle_t	ring_handle;	/* call back ring handle */
 } igb_tx_ring_t;
 
 /*
@@ -592,11 +595,23 @@ typedef struct igb_rx_ring {
 	uint32_t		stat_frame_error;
 	uint32_t		stat_cksum_error;
 	uint32_t		stat_exceed_pkt;
+	uint32_t		stat_pkt_cnt;
 #endif
 
 	struct igb		*igb;		/* Pointer to igb struct */
-
+	mac_ring_handle_t	ring_handle; /* call back ring handle */
+	uint32_t		group_index;	/* group index */
+	uint64_t		ring_gen_num;
 } igb_rx_ring_t;
+
+/*
+ * Software Receive Ring Group
+ */
+typedef struct igb_rx_group {
+	uint32_t		index;		/* Group index */
+	mac_group_handle_t	group_handle;   /* call back group handle */
+	struct igb		*igb;		/* Pointer to igb struct */
+} igb_rx_group_t;
 
 typedef struct igb {
 	int 			instance;
@@ -616,13 +631,18 @@ typedef struct igb {
 	uint32_t		loopback_mode;
 	uint32_t		max_frame_size;
 
+	uint32_t		mr_enable;	/* Enable multiple rings */
+	uint32_t		vmdq_mode;	/* Mode of VMDq */
+
 	/*
-	 * Receive Rings
+	 * Receive Rings and Groups
 	 */
 	igb_rx_ring_t		*rx_rings;	/* Array of rx rings */
 	uint32_t		num_rx_rings;	/* Number of rx rings in use */
 	uint32_t		rx_ring_size;	/* Rx descriptor ring size */
 	uint32_t		rx_buf_size;	/* Rx buffer size */
+	igb_rx_group_t		*rx_groups;	/* Array of rx groups */
+	uint32_t		num_rx_groups;	/* Number of rx groups in use */
 
 	/*
 	 * Transmit Rings
@@ -652,6 +672,7 @@ typedef struct igb {
 	uint_t			intr_pri;
 	ddi_intr_handle_t	*htable;
 	uint32_t		eims_mask;
+	uint32_t		ims_mask;
 
 	kmutex_t		gen_lock; /* General lock for device access */
 	kmutex_t		watchdog_lock;
@@ -772,7 +793,8 @@ void igb_free_dma(igb_t *);
 int igb_start(igb_t *);
 void igb_stop(igb_t *);
 int igb_setup_link(igb_t *, boolean_t);
-int igb_unicst_set(igb_t *, const uint8_t *, mac_addr_slot_t);
+int igb_unicst_find(igb_t *, const uint8_t *);
+int igb_unicst_set(igb_t *, const uint8_t *, int);
 int igb_multicst_add(igb_t *, const uint8_t *);
 int igb_multicst_remove(igb_t *, const uint8_t *);
 enum ioc_reply igb_loopback_ioctl(igb_t *, struct iocblk *, mblk_t *);
@@ -795,22 +817,23 @@ int igb_m_unicst(void *, const uint8_t *);
 int igb_m_stat(void *, uint_t, uint64_t *);
 void igb_m_resources(void *);
 void igb_m_ioctl(void *, queue_t *, mblk_t *);
-int igb_m_unicst_add(void *, mac_multi_addr_t *);
-int igb_m_unicst_remove(void *, mac_addr_slot_t);
-int igb_m_unicst_modify(void *, mac_multi_addr_t *);
-int igb_m_unicst_get(void *, mac_multi_addr_t *);
 boolean_t igb_m_getcapab(void *, mac_capab_t, void *);
+void igb_fill_ring(void *, mac_ring_type_t, const int, const int,
+    mac_ring_info_t *, mac_ring_handle_t);
+void igb_fill_group(void *arg, mac_ring_type_t, const int,
+    mac_group_info_t *, mac_group_handle_t);
+int igb_rx_ring_intr_enable(mac_intr_handle_t);
+int igb_rx_ring_intr_disable(mac_intr_handle_t);
 
 /*
  * Function prototypes in igb_rx.c
  */
-mblk_t *igb_rx(igb_rx_ring_t *);
+mblk_t *igb_rx(igb_rx_ring_t *, int);
 void igb_rx_recycle(caddr_t arg);
 
 /*
  * Function prototypes in igb_tx.c
  */
-mblk_t *igb_m_tx(void *, mblk_t *);
 void igb_free_tcb(tx_control_block_t *);
 void igb_put_free_list(igb_tx_ring_t *, link_list_t *);
 uint32_t igb_tx_recycle_legacy(igb_tx_ring_t *);
@@ -835,6 +858,8 @@ enum ioc_reply igb_nd_ioctl(igb_t *, queue_t *, mblk_t *, struct iocblk *);
  */
 int igb_init_stats(igb_t *);
 
+mblk_t *igb_rx_ring_poll(void *, int);
+mblk_t *igb_tx_ring_send(void *, mblk_t *);
 
 #ifdef __cplusplus
 }

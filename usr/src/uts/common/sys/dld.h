@@ -38,6 +38,7 @@
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/dld_ioc.h>
+#include <sys/mac_flow.h>
 #include <sys/conf.h>
 #include <sys/sad.h>
 #include <net/if.h>
@@ -84,14 +85,18 @@ extern "C" {
  */
 #define	DLD_DRIVER_NAME		"dld"
 
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
+
 /*
  * IOCTL codes and data structures.
  */
 #define	DLDIOC_ATTR	DLDIOC(0x03)
 
 typedef struct dld_ioc_attr {
-	datalink_id_t	dia_linkid;
-	uint_t		dia_max_sdu;
+	datalink_id_t		dia_linkid;
+	uint_t			dia_max_sdu;
 } dld_ioc_attr_t;
 
 #define	DLDIOC_VLAN_ATTR	DLDIOC(0x04)
@@ -100,7 +105,6 @@ typedef struct dld_ioc_vlan_attr {
 	uint16_t	div_vid;
 	datalink_id_t	div_linkid;
 	boolean_t	div_force;
-	boolean_t	div_implicit;
 } dld_ioc_vlan_attr_t;
 
 #define	DLDIOC_PHYS_ATTR	DLDIOC(0x05)
@@ -203,14 +207,7 @@ typedef struct dld_ioc_rename {
 typedef struct dld_ioc_zid {
 	zoneid_t	diz_zid;
 	char		diz_link[MAXLINKNAMELEN];
-	boolean_t	diz_is_ppa_hack;
 } dld_ioc_zid_t;
-
-#define	DLDIOC_GETZID  		DLDIOC(0x13)
-typedef struct dld_ioc_getzid {
-	datalink_id_t	dig_linkid;
-	zoneid_t	dig_zid;
-} dld_ioc_getzid_t;
 
 /*
  * data-link autopush configuration.
@@ -221,8 +218,72 @@ struct dlautopush {
 	char	dap_aplist[MAXAPUSH][FMNAMESZ+1];
 };
 
-#define	DLDIOC_SETMACPROP	DLDIOC(0x14)
-#define	DLDIOC_GETMACPROP	DLDIOC(0x15)
+#define	DLDIOC_MACADDRGET	DLDIOC(0x15)
+typedef struct dld_ioc_macaddrget {
+	datalink_id_t	dig_linkid;
+	uint_t		dig_count;
+	uint_t		dig_size;
+} dld_ioc_macaddrget_t;
+
+/* possible flags for dmi_flags below */
+#define	DLDIOCMACADDR_USED	0x1	/* address slot used */
+
+typedef struct dld_macaddrinfo {
+	uint_t		dmi_slot;
+	uint_t		dmi_flags;
+	uint_t		dmi_addrlen;
+	uchar_t		dmi_addr[MAXMACADDRLEN];
+	char		dmi_client_name[MAXNAMELEN];
+	datalink_id_t	dma_client_linkid;
+} dld_macaddrinfo_t;
+
+/*
+ * IOCTL codes and data structures for flowadm.
+ */
+#define	DLDIOC_ADDFLOW		DLDIOC(0x16)
+typedef struct dld_ioc_addflow {
+	datalink_id_t		af_linkid;
+	flow_desc_t		af_flow_desc;
+	mac_resource_props_t	af_resource_props;
+	char			af_name[MAXNAMELEN];
+} dld_ioc_addflow_t;
+
+#define	DLDIOC_REMOVEFLOW	DLDIOC(0x17)
+typedef struct dld_ioc_removeflow {
+	char			rf_name[MAXNAMELEN];
+} dld_ioc_removeflow_t;
+
+#define	DLDIOC_MODIFYFLOW	DLDIOC(0x18)
+typedef struct dld_ioc_modifyflow {
+	char			mf_name[MAXNAMELEN];
+	mac_resource_props_t	mf_resource_props;
+} dld_ioc_modifyflow_t;
+
+#define	DLDIOC_WALKFLOW		DLDIOC(0x19)
+typedef struct dld_ioc_walkflow {
+	datalink_id_t		wf_linkid;
+	char			wf_name[MAXNAMELEN];
+	uint32_t		wf_nflows;
+	uint_t			wf_len;
+} dld_ioc_walkflow_t;
+
+typedef struct dld_flowinfo {
+	datalink_id_t		fi_linkid;
+	flow_desc_t		fi_flow_desc;
+	mac_resource_props_t	fi_resource_props;
+	char			fi_flowname[MAXNAMELEN];
+	uint32_t		fi_pad;
+} dld_flowinfo_t;
+
+#define	DLDIOC_USAGELOG		DLDIOC(0x1a)
+typedef struct dld_ioc_usagelog {
+	mac_logtype_t	ul_type;
+	boolean_t	ul_onoff;
+	uint_t		ul_interval;
+} dld_ioc_usagelog_t;
+
+#define	DLDIOC_SETMACPROP	DLDIOC(0x1b)
+#define	DLDIOC_GETMACPROP	DLDIOC(0x1c)
 #define	MAC_PROP_VERSION	1
 
 typedef struct dld_ioc_macprop_s {
@@ -236,7 +297,111 @@ typedef struct dld_ioc_macprop_s {
 	char		pr_val[1];
 } dld_ioc_macprop_t;
 
+#define	DLDIOC_GETHWGRP		DLDIOC(0x1d)
+
+typedef struct dld_ioc_hwgrpget {
+	datalink_id_t	dih_linkid;
+	uint_t		dih_n_groups;	/* number of groups included in ioc */
+	uint_t		dih_size;
+} dld_ioc_hwgrpget_t;
+
+#define	MAXCLIENTNAMELEN	1024
+typedef struct dld_hwgrpinfo {
+	char	dhi_link_name[MAXLINKNAMELEN];
+	uint_t	dhi_grp_num;
+	uint_t	dhi_grp_type;
+	uint_t	dhi_n_rings;
+	uint_t	dhi_n_clnts;
+	/* XXXX later we should use dhi_n_clnts * MAXNAMELEN for dhi_clnts */
+	char	dhi_clnts[MAXCLIENTNAMELEN];
+} dld_hwgrpinfo_t;
+
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
+
 #ifdef _KERNEL
+
+#define	DLD_CAPAB_DIRECT	0x00000001
+#define	DLD_CAPAB_POLL		0x00000002
+#define	DLD_CAPAB_PERIM		0x00000003
+#define	DLD_CAPAB_LSO		0x00000004
+
+#define	DLD_ENABLE		0x00000001
+#define	DLD_DISABLE		0x00000002
+#define	DLD_QUERY		0x00000003
+
+/*
+ * GLDv3 entry point for negotiating capabilities.
+ * This is exposed to IP after negotiation of DL_CAPAB_DLD.
+ *
+ * This function takes the following arguments:
+ * handle: used for identifying the interface to operate on (provided by dld).
+ * type: capability type.
+ * arg: points to a capability-specific structure.
+ * flags: used for indicating whether to enable or disable a capability.
+ *
+ * With this function, capability negotiation is reduced from a multi-step
+ * process to just one single function call.
+ * e.g. the following code would pass 'x' from IP to dld and obtain
+ * arg.output_arg from dld:
+ *
+ * arg.input_arg = x;
+ * rc = (*dld_capab)(handle, DLD_CAPAB_XXX, &arg, DLD_ENABLE);
+ * ill->info1 = arg.output_arg;
+ */
+typedef	int	(*dld_capab_func_t)(void *, uint_t, void *, uint_t);
+
+/*
+ * Direct Tx/Rx capability.
+ */
+typedef struct dld_capab_direct_s {
+	/*
+	 * Rx entry point and handle, owned by IP.
+	 */
+	uintptr_t	di_rx_cf;
+	void		*di_rx_ch;
+
+	/*
+	 * Tx entry points and handle, owned by DLD.
+	 */
+	/* Entry point for transmitting packets */
+	uintptr_t	di_tx_df;
+	void		*di_tx_dh;
+
+	/* flow control notification callback */
+	uintptr_t	di_tx_cb_df; /* callback registration/de-registration */
+	void		*di_tx_cb_dh;
+} dld_capab_direct_t;
+
+/*
+ * Polling/softring capability.
+ */
+#define	POLL_SOFTRING		0x00000001
+typedef struct dld_capab_poll_s {
+	uintptr_t	poll_ring_add_cf;
+	uintptr_t	poll_ring_remove_cf;
+	uintptr_t	poll_ring_quiesce_cf;
+	uintptr_t	poll_ring_restart_cf;
+	uintptr_t	poll_ring_bind_cf;
+	void		*poll_ring_ch;
+	uintptr_t	poll_mac_accept_df;
+	void		*poll_mac_dh;
+} dld_capab_poll_t;
+
+/*
+ * LSO capability
+ */
+/*
+ * Currently supported flags for LSO.
+ */
+#define	DLD_LSO_TX_BASIC_TCP_IPV4	0x01	/* TCP LSO capability */
+
+typedef struct dld_capab_lso_s {
+	uint_t  lso_flags;	/* capability flags */
+	uint_t  lso_max;	/* maximum payload */
+} dld_capab_lso_t;
+
 int	dld_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 int	dld_open(queue_t *, dev_t *, int, int, cred_t *);
 int	dld_close(queue_t *);
@@ -245,6 +410,13 @@ void	dld_wsrv(queue_t *);
 void	dld_init_ops(struct dev_ops *, const char *);
 void	dld_fini_ops(struct dev_ops *);
 int	dld_autopush(dev_t *, struct dlautopush *);
+
+int	dld_add_flow(datalink_id_t, char *, flow_desc_t *,
+    mac_resource_props_t *);
+int	dld_remove_flow(char *);
+int	dld_modify_flow(char *, mac_resource_props_t *);
+int	dld_walk_flow(dld_ioc_walkflow_t *, intptr_t);
+
 #endif
 
 #ifdef	__cplusplus

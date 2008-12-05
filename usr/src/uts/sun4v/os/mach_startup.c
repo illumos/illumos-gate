@@ -308,18 +308,18 @@ mach_hw_copy_limit(void)
 }
 
 /*
- * We need to enable soft ring functionality on Niagara platform since
- * one strand can't handle interrupts for a 1Gb NIC. Set the tunable
- * ip_squeue_soft_ring by default on this platform. We can also set
- * ip_threads_per_cpu to track number of threads per core. The variables
- * themselves are defined in space.c and used by IP module
+ * We need to enable soft ring functionality on Niagara platforms since
+ * one strand can't handle interrupts for a 1Gb NIC. So set the tunable
+ * mac_soft_ring_enable by default on this platform.
+ * mac_soft_ring_enable variable is defined in space.c and used by MAC
+ * module. This tunable in concert with mac_soft_ring_count (declared
+ * in mac.h) will configure the number of fanout soft rings for a link.
  */
-extern uint_t ip_threads_per_cpu;
-extern boolean_t ip_squeue_soft_ring;
+extern boolean_t mac_soft_ring_enable;
 void
 startup_platform(void)
 {
-	ip_squeue_soft_ring = B_TRUE;
+	mac_soft_ring_enable = B_TRUE;
 	if (clock_tick_threshold == 0)
 		clock_tick_threshold = SUN4V_CLOCK_TICK_THRESHOLD;
 	if (clock_tick_ncpus == 0)

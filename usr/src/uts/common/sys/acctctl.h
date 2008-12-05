@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_ACCTCTL_H
 #define	_SYS_ACCTCTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/bitmap.h>
@@ -44,10 +41,11 @@ extern "C" {
 /*
  * modes
  */
-#define	AC_PROC		(0x1 << 28)	/* change process accounting settings */
-#define	AC_TASK		(0x2 << 28)	/* change task accounting settings */
-#define	AC_FLOW		(0x4 << 28)	/* change flow accounting settings */
-#define	AC_MODE(x)	((x) & 0xf0000000)
+#define	AC_PROC		(0x1 << 24)	/* change process accounting settings */
+#define	AC_TASK		(0x2 << 24)	/* change task accounting settings */
+#define	AC_FLOW		(0x4 << 24)	/* change flow accounting settings */
+#define	AC_NET		(0x8 << 24)	/* change network accounting settings */
+#define	AC_MODE(x)	((x) & 0xff000000)
 
 /*
  * options
@@ -58,7 +56,7 @@ extern "C" {
 #define	AC_RES_GET	(0x08)	/* get a list of enabled resources */
 #define	AC_STATE_SET	(0x10)	/* set accounting mode state (on/off) */
 #define	AC_STATE_GET	(0x20)	/* get accounting mode state */
-#define	AC_OPTION(x)	((x) & 0x0fffffff)
+#define	AC_OPTION(x)	((x) & 0x00ffffff)
 
 /*
  * Process accounting resource IDs
@@ -113,8 +111,36 @@ extern "C" {
 #define	AC_FLOW_ANAME		13	/* action instance name */
 #define	AC_FLOW_MAX_RES		13	/* must be equal to the number above */
 
-#define	AC_MAX_RES_TMP		MAX(AC_PROC_MAX_RES, AC_TASK_MAX_RES)
-#define	AC_MAX_RES		MAX(AC_MAX_RES_TMP, AC_FLOW_MAX_RES)
+/*
+ * Network accounting resource IDs
+ */
+#define	AC_NET_NAME		1	/* flow name */
+#define	AC_NET_EHOST		2	/* ethernet source address */
+#define	AC_NET_EDEST		3	/* ethernet destination address */
+#define	AC_NET_VLAN_TPID	4	/* VLAN protocol ID */
+#define	AC_NET_VLAN_TCI		5	/* VLAN tag control info. */
+#define	AC_NET_SAP		6	/* SAP */
+#define	AC_NET_PRIORITY		7	/* Priority */
+#define	AC_NET_BWLIMIT		8	/* Bandwidth limit */
+#define	AC_NET_DEVNAME		9	/* Device name */
+#define	AC_NET_SADDR		10	/* Source IP address */
+#define	AC_NET_DADDR		11	/* Dest IP address */
+#define	AC_NET_SPORT		12	/* Source Port */
+#define	AC_NET_DPORT		13	/* Dest Port */
+#define	AC_NET_PROTOCOL		14	/* Protocol */
+#define	AC_NET_DSFIELD		15	/* DiffServ field */
+#define	AC_NET_CURTIME		16	/* Current Time */
+#define	AC_NET_IBYTES		17	/* Inbound Bytes */
+#define	AC_NET_OBYTES		18	/* Outbound Bytes */
+#define	AC_NET_IPKTS		19	/* Inbound Packets */
+#define	AC_NET_OPKTS		20	/* Outbound Packets */
+#define	AC_NET_IERRPKTS		21	/* Inbound Error Packets */
+#define	AC_NET_OERRPKTS		22	/* Outbound Error Packets */
+#define	AC_NET_MAX_RES		22	/* must be equal to the number above */
+
+#define	AC_MAX_RES		\
+	MAX(MAX(MAX(AC_PROC_MAX_RES, AC_TASK_MAX_RES), AC_FLOW_MAX_RES), \
+	AC_NET_MAX_RES)
 #define	AC_MASK_SZ		BT_BITOUL(AC_MAX_RES + 1)
 
 /*
@@ -150,7 +176,7 @@ extern zone_key_t exacct_zone_key;
 
 /*
  * Per-zone exacct settings.  Each zone may have its own settings for
- * process, task, and flow accounting.
+ * process, task, flow, and network accounting.
  *
  * Per-zone flow accounting has not yet been implemented, so this
  * provides zones with the view that flow accounting in the zone hasn't
@@ -164,6 +190,7 @@ struct exacct_globals {
 	ac_info_t	ac_task;
 	ac_info_t	ac_proc;
 	ac_info_t	ac_flow;
+	ac_info_t	ac_net;
 	list_node_t	ac_link;
 };
 

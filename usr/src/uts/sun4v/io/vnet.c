@@ -39,7 +39,7 @@
 #include <sys/ethernet.h>
 #include <sys/dlpi.h>
 #include <net/if.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>

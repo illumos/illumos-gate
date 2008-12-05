@@ -30,35 +30,101 @@
 #include <sys/ethernet.h>
 #include <sys/param.h>
 #include <sys/mac.h>
+#include <sys/mac_flow.h>
 #include <sys/dld_ioc.h>
+#include <inet/ip.h>
+#include <inet/ip6.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 /*
- * Note that the datastructures defined here define an ioctl interface
- * that is shared betwen user and kernel space.  The vnic driver thus
- * assumes that the structures have identical layout and size when
- * compiled in either IPL32 or LP64.
+ * Extended diagnostic codes that can be returned by the various
  */
+typedef enum {
+	VNIC_IOC_DIAG_NONE,
+	VNIC_IOC_DIAG_MACADDR_NIC,
+	VNIC_IOC_DIAG_MACADDR_INUSE,
+	VNIC_IOC_DIAG_MACADDR_INVALID,
+	VNIC_IOC_DIAG_MACADDRLEN_INVALID,
+	VNIC_IOC_DIAG_MACFACTORYSLOTINVALID,
+	VNIC_IOC_DIAG_MACFACTORYSLOTUSED,
+	VNIC_IOC_DIAG_MACFACTORYSLOTALLUSED,
+	VNIC_IOC_DIAG_MACFACTORYNOTSUP,
+	VNIC_IOC_DIAG_MACPREFIX_INVALID,
+	VNIC_IOC_DIAG_MACPREFIXLEN_INVALID,
+	VNIC_IOC_DIAG_MACMARGIN_INVALID,
+	VNIC_IOC_DIAG_NO_HWRINGS
+} vnic_ioc_diag_t;
 
 /*
- * For now, we support only MAC addresses specified by value.
+ * Allowed VNIC MAC address types.
+ *
+ * - VNIC_MAC_ADDR_TYPE_FIXED, VNIC_MAC_ADDR_TYPE_RANDOM:
+ *   The MAC address is specified by value by the caller, which
+ *   itself can obtain it from the user directly,
+ *   or pick it in a random fashion. Which method is used by the
+ *   caller is irrelevant to the VNIC driver. However two different
+ *   types are provided so that the information can be made available
+ *   back to user-space when listing the kernel defined VNICs.
+ *
+ *   When a VNIC is created, the address in passed through the
+ *   vc_mac_addr and vc_mac_len fields of the vnic_ioc_create_t
+ *   structure.
+ *
+ * - VNIC_MAC_ADDR_TYPE_FACTORY: the MAC address is obtained from
+ *   one of the MAC factory MAC addresses of the underyling NIC.
+ *
+ * - VNIC_MAC_ADDR_TYPE_AUTO: the VNIC driver attempts to
+ *   obtain the address from one of the factory MAC addresses of
+ *   the underlying NIC. If none is available, the specified
+ *   MAC address value is used.
+ *
+ * - VNIC_MAC_ADDR_TYPE_PRIMARY: this is a VNIC based VLAN. The
+ *   address for this is the address of the primary MAC client.
+ *
  */
 
 typedef enum {
-	VNIC_MAC_ADDR_TYPE_FIXED
+	VNIC_MAC_ADDR_TYPE_FIXED,
+	VNIC_MAC_ADDR_TYPE_RANDOM,
+	VNIC_MAC_ADDR_TYPE_FACTORY,
+	VNIC_MAC_ADDR_TYPE_AUTO,
+	VNIC_MAC_ADDR_TYPE_PRIMARY
 } vnic_mac_addr_type_t;
 
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
+
 #define	VNIC_IOC_CREATE		VNICIOC(1)
+
+#define	VNIC_IOC_CREATE_NODUPCHECK		0x00000001
+#define	VNIC_IOC_CREATE_ANCHOR			0x00000002
+
+/*
+ * Force creation of VLAN based VNIC without checking if the
+ * undelying MAC supports the margin size.
+ */
+#define	VNIC_IOC_CREATE_FORCE			0x00000004
+
+/* Allocate a hardware ring to the vnic */
+#define	VNIC_IOC_CREATE_REQ_HWRINGS		0x00000008
 
 typedef struct vnic_ioc_create {
 	datalink_id_t	vc_vnic_id;
 	datalink_id_t	vc_link_id;
-	uint_t		vc_mac_len;
 	vnic_mac_addr_type_t vc_mac_addr_type;
+	uint_t		vc_mac_len;
 	uchar_t		vc_mac_addr[MAXMACADDRLEN];
+	uint_t		vc_mac_prefix_len;
+	int		vc_mac_slot;
+	uint16_t	vc_vid;
+	uint_t		vc_status;
+	uint_t		vc_flags;
+	vnic_ioc_diag_t	vc_diag;
+	mac_resource_props_t vc_resource_props;
 } vnic_ioc_create_t;
 
 #define	VNIC_IOC_DELETE		VNICIOC(2)
@@ -69,32 +135,42 @@ typedef struct vnic_ioc_delete {
 
 #define	VNIC_IOC_INFO		VNICIOC(3)
 
-typedef struct vnic_ioc_info_vnic {
+typedef struct vnic_info {
 	datalink_id_t	vn_vnic_id;
 	datalink_id_t	vn_link_id;
-	uint32_t	vn_mac_len;
-	uchar_t		vn_mac_addr[MAXMACADDRLEN];
 	vnic_mac_addr_type_t vn_mac_addr_type;
-} vnic_ioc_info_vnic_t;
+	uint_t		vn_mac_len;
+	uchar_t		vn_mac_addr[MAXMACADDRLEN];
+	uint_t		vn_mac_slot;
+	uint32_t	vn_mac_prefix_len;
+	uint16_t	vn_vid;
+	boolean_t	vn_force;
+	mac_resource_props_t vn_resource_props;
+} vnic_info_t;
 
 typedef struct vnic_ioc_info {
-	uint_t		vi_nvnics;
-	uint_t		vi_size;
-	datalink_id_t	vi_vnic_id;	/* DATALINK_ALL_LINKID returns all */
-	datalink_id_t	vi_linkid;
+	vnic_info_t	vi_info;
 } vnic_ioc_info_t;
 
 #define	VNIC_IOC_MODIFY		VNICIOC(4)
 
 #define	VNIC_IOC_MODIFY_ADDR		0x01
+#define	VNIC_IOC_MODIFY_RESOURCE_CTL	0x02
 
 typedef struct vnic_ioc_modify {
 	datalink_id_t	vm_vnic_id;
 	uint_t		vm_modify_mask;
+	uint_t		vm_mac_len;
+	int		vm_mac_slot;
 	uchar_t		vm_mac_addr[MAXMACADDRLEN];
 	vnic_mac_addr_type_t vm_mac_addr_type;
-	uint_t		vm_mac_len;
+	mac_resource_props_t vm_resource_props;
+	vnic_ioc_diag_t	vm_diag;
 } vnic_ioc_modify_t;
+
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 
 #ifdef	__cplusplus
 }

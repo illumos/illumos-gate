@@ -21,6 +21,11 @@
  * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifndef XGE_HAL_CHANNEL_H
 #define XGE_HAL_CHANNEL_H
 
@@ -69,7 +74,8 @@ typedef enum xge_hal_channel_type_e {
 typedef enum xge_hal_channel_flag_e {
 	XGE_HAL_CHANNEL_FLAG_NONE		= 0x0,
 	XGE_HAL_CHANNEL_FLAG_USE_TX_LOCK	= 0x1,
-	XGE_HAL_CHANNEL_FLAG_FREE_RXD	        = 0x2
+	XGE_HAL_CHANNEL_FLAG_FREE_RXD	        = 0x2,
+	XGE_HAL_CHANNEL_FLAG_USE_RX_POLLING     = 0x4
 } xge_hal_channel_flag_e;
 
 /**

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IEEE 802.3ad Link Aggregation - Receive
  *
@@ -42,7 +40,18 @@
 #include <sys/aggr_impl.h>
 
 static void
-aggr_recv_lacp(aggr_port_t *port, mblk_t *mp)
+aggr_mac_rx(mac_handle_t lg_mh, mac_resource_handle_t mrh, mblk_t *mp)
+{
+	if (mrh == NULL) {
+		mac_rx(lg_mh, mrh, mp);
+	} else {
+		aggr_pseudo_rx_ring_t	*ring = (aggr_pseudo_rx_ring_t *)mrh;
+		mac_rx_ring(lg_mh, ring->arr_rh, mp, ring->arr_gen);
+	}
+}
+
+void
+aggr_recv_lacp(aggr_port_t *port, mac_resource_handle_t mrh, mblk_t *mp)
 {
 	aggr_grp_t *grp = port->lp_grp;
 
@@ -51,35 +60,26 @@ aggr_recv_lacp(aggr_port_t *port, mblk_t *mp)
 		mblk_t *nmp = copymsg(mp);
 
 		if (nmp != NULL)
-			mac_rx(grp->lg_mh, NULL, nmp);
+			aggr_mac_rx(grp->lg_mh, mrh, nmp);
 	}
 
-	aggr_lacp_rx(port, mp);
+	aggr_lacp_rx_enqueue(port, mp);
 }
 
 /*
  * Callback function invoked by MAC service module when packets are
  * made available by a MAC port.
  */
+/* ARGSUSED */
 void
-aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
+aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
 {
 	aggr_port_t *port = (aggr_port_t *)arg;
 	aggr_grp_t *grp = port->lp_grp;
 
-	/*
-	 * If this message is looped back from the legacy devices, drop
-	 * it as the Nemo framework will be responsible for looping it
-	 * back by the mac_txloop() function.
-	 */
-	if (mp->b_flag & MSGNOLOOP) {
-		ASSERT(mp->b_next == NULL);
-		freemsg(mp);
-		return;
-	}
-
 	if (grp->lg_lacp_mode == AGGR_LACP_OFF) {
-		mac_rx(grp->lg_mh, mrh, mp);
+		aggr_mac_rx(grp->lg_mh, mrh, mp);
 	} else {
 		mblk_t *cmp, *last, *head;
 		struct ether_header *ehp;
@@ -100,10 +100,12 @@ aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 				} else {
 					/* send up accumulated packets */
 					last->b_next = NULL;
-					if (port->lp_collector_enabled)
-						mac_rx(grp->lg_mh, mrh, head);
-					else
+					if (port->lp_collector_enabled) {
+						aggr_mac_rx(grp->lg_mh, mrh,
+						    head);
+					} else {
 						freemsgchain(head);
+					}
 					head = cmp->b_next;
 					cmp->b_next = NULL;
 					freemsg(cmp);
@@ -126,21 +128,23 @@ aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 					ASSERT(last == NULL);
 					head = cmp->b_next;
 					cmp->b_next = NULL;
-					aggr_recv_lacp(port, cmp);
+					aggr_recv_lacp(port, mrh, cmp);
 					cmp = head;
 				} else {
 					/* previously accumulated packets */
 					ASSERT(last != NULL);
 					/* send up non-LACP packets */
 					last->b_next = NULL;
-					if (port->lp_collector_enabled)
-						mac_rx(grp->lg_mh, mrh, head);
-					else
+					if (port->lp_collector_enabled) {
+						aggr_mac_rx(grp->lg_mh, mrh,
+						    head);
+					} else {
 						freemsgchain(head);
+					}
 					/* unlink and pass up LACP packets */
 					head = cmp->b_next;
 					cmp->b_next = NULL;
-					aggr_recv_lacp(port, cmp);
+					aggr_recv_lacp(port, mrh, cmp);
 					cmp = head;
 					last = NULL;
 				}
@@ -151,7 +155,7 @@ aggr_recv_cb(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 		}
 		if (head != NULL) {
 			if (port->lp_collector_enabled)
-				mac_rx(grp->lg_mh, mrh, head);
+				aggr_mac_rx(grp->lg_mh, mrh, head);
 			else
 				freemsgchain(head);
 		}

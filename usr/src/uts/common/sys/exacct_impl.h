@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_EXACCT_IMPL_H
 #define	_SYS_EXACCT_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -128,6 +125,42 @@ typedef struct flow_usage {
 	boolean_t fu_isv4;	/* to extract the correct l/r-addr */
 	char *fu_aname;		/* action instance name */
 } flow_usage_t;
+
+#define	EX_NET_LNDESC_REC 1
+#define	EX_NET_FLDESC_REC 2
+#define	EX_NET_LNSTAT_REC 3
+#define	EX_NET_FLSTAT_REC 4
+
+typedef struct net_stat_s {
+	char		*ns_name;
+	uint64_t	ns_ibytes;
+	uint64_t	ns_obytes;
+	uint64_t	ns_ipackets;
+	uint64_t	ns_opackets;
+	uint64_t	ns_ierrors;
+	uint64_t	ns_oerrors;
+	boolean_t	ns_isref;
+} net_stat_t;
+
+typedef struct net_desc_s {
+	char		*nd_name;
+	char		*nd_devname;
+	uchar_t		nd_ehost[6];
+	uchar_t		nd_edest[6];
+	ushort_t	nd_vlan_tpid;
+	ushort_t	nd_vlan_tci;
+	ushort_t	nd_sap;
+	ushort_t	nd_priority;
+	uint64_t	nd_bw_limit;
+	uint32_t	nd_saddr[4];
+	uint32_t	nd_daddr[4];
+	boolean_t	nd_isv4;
+	uint16_t	nd_sport;
+	uint16_t	nd_dport;
+	uint8_t		nd_protocol;
+	uint8_t		nd_dsfield;
+	int		nd_type;
+} net_desc_t;
 
 extern void exacct_order16(uint16_t *);
 extern void exacct_order32(uint32_t *);

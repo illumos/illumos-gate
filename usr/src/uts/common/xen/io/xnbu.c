@@ -40,7 +40,7 @@
 #include <sys/strsubr.h>
 #include <sys/dlpi.h>
 #include <sys/pattr.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <xen/sys/xendev.h>
 
@@ -51,19 +51,16 @@ static int	xnbu_m_set_mac_addr(void *, const uint8_t *);
 static int	xnbu_m_set_multicast(void *, boolean_t, const uint8_t *);
 static int	xnbu_m_set_promiscuous(void *, boolean_t);
 static int	xnbu_m_stat(void *, uint_t, uint64_t *);
-static void	xnbu_m_blank(void *, time_t, uint_t);
-static void	xnbu_m_resources(void *);
 static boolean_t xnbu_m_getcapab(void *, mac_capab_t, void *);
 static mblk_t	*xnbu_m_send(void *, mblk_t *);
 
 typedef struct xnbu {
 	mac_handle_t		u_mh;
-	mac_resource_handle_t	u_mrh;
 	boolean_t		u_need_sched;
 } xnbu_t;
 
 static mac_callbacks_t xnb_callbacks = {
-	MC_RESOURCES | MC_GETCAPAB,
+	MC_GETCAPAB,
 	xnbu_m_stat,
 	xnbu_m_start,
 	xnbu_m_stop,
@@ -71,7 +68,6 @@ static mac_callbacks_t xnb_callbacks = {
 	xnbu_m_set_multicast,
 	xnbu_m_set_mac_addr,
 	xnbu_m_send,
-	xnbu_m_resources,
 	NULL,
 	xnbu_m_getcapab
 };
@@ -84,7 +80,7 @@ xnbu_to_host(xnb_t *xnbp, mblk_t *mp)
 
 	ASSERT(mp != NULL);
 
-	mac_rx(xnbup->u_mh, xnbup->u_mrh, mp);
+	mac_rx(xnbup->u_mh, NULL, mp);
 
 	mutex_enter(&xnbp->xnb_rx_lock);
 
@@ -328,32 +324,6 @@ xnbu_m_stat(void *arg, uint_t stat, uint64_t *val)
 	return (0);
 }
 
-/*ARGSUSED*/
-static void
-xnbu_m_blank(void *arg, time_t ticks, uint_t count)
-{
-	/*
-	 * XXPV dme: blanking is not currently implemented.
-	 */
-}
-
-static void
-xnbu_m_resources(void *arg)
-{
-	xnb_t *xnbp = arg;
-	xnbu_t *xnbup = xnbp->xnb_flavour_data;
-	mac_rx_fifo_t mrf;
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = xnbu_m_blank;
-	mrf.mrf_arg = (void *)xnbp;
-	mrf.mrf_normal_blank_time = 128; /* XXPV dme: see xnbu_m_blank() */
-	mrf.mrf_normal_pkt_count = 8;    /* XXPV dme: see xnbu_m_blank() */
-
-	xnbup->u_mrh = mac_resource_add(xnbup->u_mh,
-	    (mac_resource_t *)&mrf);
-}
-
 static boolean_t
 xnbu_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
@@ -369,11 +339,6 @@ xnbu_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			*capab = 0;
 		break;
 	}
-
-	case MAC_CAPAB_POLL:
-		/* Just return B_TRUE. */
-		break;
-
 	default:
 		return (B_FALSE);
 	}

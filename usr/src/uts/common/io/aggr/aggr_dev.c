@@ -42,38 +42,8 @@ static int aggr_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
 static int aggr_attach(dev_info_t *, ddi_attach_cmd_t);
 static int aggr_detach(dev_info_t *, ddi_detach_cmd_t);
 
-static struct cb_ops aggr_cb_ops = {
-	nulldev,		/* open */
-	nulldev,		/* close */
-	nulldev,		/* strategy */
-	nulldev,		/* print */
-	nodev,			/* dump */
-	nodev,			/* read */
-	nodev,			/* write */
-	nodev,			/* ioctl */
-	nodev,			/* devmap */
-	nodev,			/* mmap */
-	nodev,			/* segmap */
-	nochpoll,		/* poll */
-	ddi_prop_op,		/* cb_prop_op */
-	0,			/* streamtab  */
-	D_MP			/* Driver compatibility flag */
-};
-
-static struct dev_ops aggr_dev_ops = {
-	DEVO_REV,		/* devo_rev */
-	0,			/* refcnt */
-	aggr_getinfo,		/* get_dev_info */
-	nulldev,		/* identify */
-	nulldev,		/* probe */
-	aggr_attach,		/* attach */
-	aggr_detach,		/* detach */
-	nodev,			/* reset */
-	&aggr_cb_ops,		/* driver operations */
-	NULL,			/* bus operations */
-	nodev,			/* dev power */
-	ddi_quiesce_not_supported,	/* dev quiesce */
-};
+DDI_DEFINE_STREAM_OPS(aggr_dev_ops, nulldev, nulldev, aggr_attach, aggr_detach,
+    nodev, aggr_getinfo, D_MP, NULL, ddi_quiesce_not_supported);
 
 static struct modldrv aggr_modldrv = {
 	&mod_driverops,		/* Type of module.  This one is a driver */
@@ -82,9 +52,7 @@ static struct modldrv aggr_modldrv = {
 };
 
 static struct modlinkage modlinkage = {
-	MODREV_1,
-	&aggr_modldrv,
-	NULL
+	MODREV_1, &aggr_modldrv, NULL
 };
 
 int

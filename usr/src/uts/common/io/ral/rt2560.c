@@ -43,7 +43,7 @@
 #include <sys/modctl.h>
 #include <sys/devops.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
 #include <sys/net80211.h>
 #include <sys/net80211_proto.h>
@@ -196,7 +196,6 @@ static mac_callbacks_t rt2560_m_callbacks = {
 	rt2560_m_multicst,
 	rt2560_m_unicst,
 	rt2560_m_tx,
-	NULL,		/* mc_resources; */
 	rt2560_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,

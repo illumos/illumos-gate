@@ -80,7 +80,7 @@
 #include <inet/ip_impl.h>
 #include <sys/gld.h>
 #include <sys/modctl.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/bootinfo.h>
 #include <sys/mach_mmu.h>
@@ -148,8 +148,6 @@ static int	xnf_set_promiscuous(void *, boolean_t);
 static mblk_t	*xnf_send(void *, mblk_t *);
 static uint_t	xnf_intr(caddr_t);
 static int	xnf_stat(void *, uint_t, uint64_t *);
-static void	xnf_blank(void *, time_t, uint_t);
-static void	xnf_resources(void *);
 static void	xnf_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t xnf_getcapab(void *, mac_capab_t, void *);
 
@@ -178,7 +176,7 @@ static boolean_t xnf_kstat_init(xnf_t *xnfp);
  * XXPV dme: remove MC_IOCTL?
  */
 static mac_callbacks_t xnf_callbacks = {
-	MC_RESOURCES | MC_IOCTL | MC_GETCAPAB,
+	MC_IOCTL | MC_GETCAPAB,
 	xnf_stat,
 	xnf_start,
 	xnf_stop,
@@ -186,7 +184,6 @@ static mac_callbacks_t xnf_callbacks = {
 	xnf_set_multicast,
 	xnf_set_mac_addr,
 	xnf_send,
-	xnf_resources,
 	xnf_ioctl,
 	xnf_getcapab
 };
@@ -1436,7 +1433,7 @@ xnf_intr(caddr_t arg)
 			mp = xnf_process_recv(xnfp);
 
 		if (mp != NULL)
-			mac_rx(xnfp->xnf_mh, xnfp->xnf_rx_handle, mp);
+			mac_rx(xnfp->xnf_mh, NULL, mp);
 	}
 
 	xnfp->xnf_stat_interrupts++;
@@ -2518,39 +2515,6 @@ xnf_stat(void *arg, uint_t stat, uint64_t *val)
 
 /*ARGSUSED*/
 static void
-xnf_blank(void *arg, time_t ticks, uint_t count)
-{
-	/*
-	 * XXPV dme: blanking is not currently implemented.
-	 *
-	 * It's not obvious how to use the 'ticks' argument here.
-	 *
-	 * 'Count' might be used as an indicator of how to set
-	 * rsp_event when posting receive buffers to the rx_ring.  It
-	 * would replace the code at the tail of xnf_process_recv()
-	 * that simply indicates that the next completed packet should
-	 * cause an interrupt.
-	 */
-}
-
-static void
-xnf_resources(void *arg)
-{
-	xnf_t *xnfp = arg;
-	mac_rx_fifo_t mrf;
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = xnf_blank;
-	mrf.mrf_arg = (void *)xnfp;
-	mrf.mrf_normal_blank_time = 128;	/* XXPV dme: see xnf_blank() */
-	mrf.mrf_normal_pkt_count = 8;		/* XXPV dme: see xnf_blank() */
-
-	xnfp->xnf_rx_handle = mac_resource_add(xnfp->xnf_mh,
-	    (mac_resource_t *)&mrf);
-}
-
-/*ARGSUSED*/
-static void
 xnf_ioctl(void *arg, queue_t *q, mblk_t *mp)
 {
 	miocnak(q, mp, 0, EINVAL);
@@ -2588,11 +2552,6 @@ xnf_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			*capab = 0;
 		break;
 	}
-
-	case MAC_CAPAB_POLL:
-		/* Just return B_TRUE. */
-		break;
-
 	default:
 		return (B_FALSE);
 	}

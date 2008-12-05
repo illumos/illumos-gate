@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/acctctl.h>
@@ -107,6 +105,8 @@ ac_type_name(int type)
 		return (gettext("flow"));
 	case AC_TASK:
 		return (gettext("task"));
+	case AC_NET:
+		return (gettext("net"));
 	default:
 		die(gettext("invalid type %d\n"), type);
 	}
@@ -217,8 +217,9 @@ verify_exacct_file(const char *file, int type)
 		} else {
 			/*
 			 * A non-header object exists.  Insist that it be
-			 * either a process, task, or flow accounting record,
-			 * the same type as is desired.
+			 * either a process, task, flow  or net accounting
+			 * record, the same type as is desired.
+			 * xxx-venu:check 101 merge for EXD_GROUP_NET_*
 			 */
 			uint_t c = eo.eo_catalog & EXD_DATA_MASK;
 
@@ -226,7 +227,12 @@ verify_exacct_file(const char *file, int type)
 			    (eo.eo_catalog & EXC_CATALOG_MASK) != EXC_NONE ||
 			    (!(c == EXD_GROUP_PROC && type == AC_PROC ||
 			    c == EXD_GROUP_TASK && type == AC_TASK ||
-			    c == EXD_GROUP_FLOW && type == AC_FLOW))) {
+			    c == EXD_GROUP_FLOW && type == AC_FLOW ||
+			    (c == EXD_GROUP_NET_LINK_DESC ||
+			    c == EXD_GROUP_NET_FLOW_DESC ||
+			    c == EXD_GROUP_NET_LINK_STATS ||
+			    c == EXD_GROUP_NET_FLOW_STATS) &&
+			    type == AC_NET))) {
 				(void) ea_close(&ef);
 				return (B_FALSE);
 			}

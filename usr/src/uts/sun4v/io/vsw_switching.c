@@ -58,7 +58,6 @@
 #include <sys/taskq.h>
 #include <sys/note.h>
 #include <sys/mach_descrip.h>
-#include <sys/mac.h>
 #include <sys/mdeg.h>
 #include <sys/ldc.h>
 #include <sys/vsw_fdb.h>
@@ -82,6 +81,8 @@ static	int vsw_setup_layer2(vsw_t *);
 static	int vsw_setup_layer3(vsw_t *);
 
 /* Switching/data transmit routines */
+static	void vsw_switch_l2_frame_mac_client(vsw_t *vswp, mblk_t *mp, int caller,
+    vsw_port_t *port, mac_resource_handle_t);
 static	void vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 	vsw_port_t *port, mac_resource_handle_t);
 static	void vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
@@ -117,26 +118,26 @@ void vsw_del_mcst_vsw(vsw_t *);
 
 /* Support functions */
 static mblk_t *vsw_dupmsgchain(mblk_t *mp);
-static uint32_t vsw_get_same_dest_list(struct ether_header *ehp,
-    mblk_t **rhead, mblk_t **rtail, mblk_t **mpp);
+static mblk_t *vsw_get_same_dest_list(struct ether_header *ehp, mblk_t **mpp);
 
 
 /*
  * Functions imported from other files.
  */
-extern mblk_t *vsw_tx_msg(vsw_t *, mblk_t *);
+extern mblk_t *vsw_tx_msg(vsw_t *, mblk_t *, int, vsw_port_t *);
 extern mcst_addr_t *vsw_del_addr(uint8_t, void *, uint64_t);
 extern int vsw_mac_open(vsw_t *vswp);
 extern void vsw_mac_close(vsw_t *vswp);
 extern void vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
     mblk_t *mp, vsw_macrx_flags_t flags);
 extern void vsw_set_addrs(vsw_t *vswp);
-extern int vsw_get_hw_maddr(vsw_t *);
-extern int vsw_mac_attach(vsw_t *vswp);
-extern int vsw_portsend(vsw_port_t *port, mblk_t *mp, mblk_t *mpt,
-	uint32_t count);
+extern int vsw_portsend(vsw_port_t *port, mblk_t *mp);
 extern void vsw_hio_init(vsw_t *vswp);
 extern void vsw_hio_start_ports(vsw_t *vswp);
+extern int vsw_mac_multicast_add(vsw_t *vswp, vsw_port_t *port,
+    mcst_addr_t *mcst_p, int type);
+extern void vsw_mac_multicast_remove(vsw_t *vswp, vsw_port_t *port,
+    mcst_addr_t *mcst_p, int type);
 
 /*
  * Tunables used in this file.
@@ -226,9 +227,9 @@ vsw_stop_switching_timeout(vsw_t *vswp)
 
 	(void) atomic_swap_32(&vswp->switching_setup_done, B_FALSE);
 
-	WRITE_ENTER(&vswp->mac_rwlock);
+	mutex_enter(&vswp->mac_lock);
 	vswp->mac_open_retries = 0;
-	RW_EXIT(&vswp->mac_rwlock);
+	mutex_exit(&vswp->mac_lock);
 }
 
 /*
@@ -246,39 +247,24 @@ vsw_stop_switching_timeout(vsw_t *vswp)
 int
 vsw_setup_switching(vsw_t *vswp)
 {
-	int	i, rv = 1;
+	int	rv = 1;
 
 	D1(vswp, "%s: enter", __func__);
 
 	/*
 	 * Select best switching mode.
-	 * Note that we start from the saved smode_idx. This is done as
-	 * this routine can be called from the timeout handler to retry
-	 * setting up a specific mode. Currently only the function which
-	 * sets up layer2/promisc mode returns EAGAIN if the underlying
-	 * physical device is not available yet, causing retries.
+	 * This is done as this routine can be called from the timeout
+	 * handler to retry setting up a specific mode. Currently only
+	 * the function which sets up layer2/promisc mode returns EAGAIN
+	 * if the underlying network device is not available yet, causing
+	 * retries.
 	 */
-	for (i = vswp->smode_idx; i < vswp->smode_num; i++) {
-		vswp->smode_idx = i;
-		switch (vswp->smode[i]) {
-		case VSW_LAYER2:
-		case VSW_LAYER2_PROMISC:
-			rv = vsw_setup_layer2(vswp);
-			break;
-
-		case VSW_LAYER3:
-			rv = vsw_setup_layer3(vswp);
-			break;
-
-		default:
-			DERR(vswp, "unknown switch mode");
-			break;
-		}
-
-		if ((rv == 0) || (rv == EAGAIN))
-			break;
-
-		/* all other errors(rv != 0): continue & select the next mode */
+	if (vswp->smode & VSW_LAYER2) {
+		rv = vsw_setup_layer2(vswp);
+	} else if (vswp->smode & VSW_LAYER3) {
+		rv = vsw_setup_layer3(vswp);
+	} else {
+		DERR(vswp, "unknown switch mode");
 		rv = 1;
 	}
 
@@ -290,7 +276,7 @@ vsw_setup_switching(vsw_t *vswp)
 	}
 
 	D2(vswp, "%s: Operating in mode %d", __func__,
-	    vswp->smode[vswp->smode_idx]);
+	    vswp->smode);
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -312,7 +298,12 @@ vsw_setup_layer2(vsw_t *vswp)
 
 	D1(vswp, "%s: enter", __func__);
 
+	/*
+	 * Until the network device is successfully opened,
+	 * set the switching to use vsw_switch_l2_frame.
+	 */
 	vswp->vsw_switch_frame = vsw_switch_l2_frame;
+	vswp->mac_cl_switching = B_FALSE;
 
 	rv = strlen(vswp->physname);
 	if (rv == 0) {
@@ -320,61 +311,42 @@ vsw_setup_layer2(vsw_t *vswp)
 		 * Physical device name is NULL, which is
 		 * required for layer 2.
 		 */
-		cmn_err(CE_WARN, "!vsw%d: no physical device name specified",
+		cmn_err(CE_WARN, "!vsw%d: no network device name specified",
 		    vswp->instance);
 		return (EIO);
 	}
 
-	WRITE_ENTER(&vswp->mac_rwlock);
+	mutex_enter(&vswp->mac_lock);
 
 	rv = vsw_mac_open(vswp);
 	if (rv != 0) {
 		if (rv != EAGAIN) {
-			cmn_err(CE_WARN, "!vsw%d: Unable to open physical "
+			cmn_err(CE_WARN, "!vsw%d: Unable to open network "
 			    "device: %s\n", vswp->instance, vswp->physname);
 		}
-		RW_EXIT(&vswp->mac_rwlock);
+		mutex_exit(&vswp->mac_lock);
 		return (rv);
 	}
 
-	if (vswp->smode[vswp->smode_idx] == VSW_LAYER2) {
-		/*
-		 * Verify that underlying device can support multiple
-		 * unicast mac addresses.
-		 */
-		rv = vsw_get_hw_maddr(vswp);
-		if (rv != 0) {
-			goto exit_error;
-		}
-	}
-
 	/*
-	 * Attempt to link into the MAC layer so we can get
-	 * and send packets out over the physical adapter.
+	 * Now we can use the mac client switching, so set the switching
+	 * function to use vsw_switch_l2_frame_mac_client(), which simply
+	 * sends the packets to MAC layer for switching.
 	 */
-	rv = vsw_mac_attach(vswp);
-	if (rv != 0) {
-		/*
-		 * Registration with the MAC layer has failed,
-		 * so return error so that can fall back to next
-		 * prefered switching method.
-		 */
-		cmn_err(CE_WARN, "!vsw%d: Unable to setup physical device: "
-		    "%s\n", vswp->instance, vswp->physname);
-		goto exit_error;
-	}
+	vswp->vsw_switch_frame = vsw_switch_l2_frame_mac_client;
+	vswp->mac_cl_switching = B_TRUE;
 
 	D1(vswp, "%s: exit", __func__);
 
-	RW_EXIT(&vswp->mac_rwlock);
-
 	/* Initialize HybridIO related stuff */
 	vsw_hio_init(vswp);
+
+	mutex_exit(&vswp->mac_lock);
 	return (0);
 
 exit_error:
 	vsw_mac_close(vswp);
-	RW_EXIT(&vswp->mac_rwlock);
+	mutex_exit(&vswp->mac_lock);
 	return (EIO);
 }
 
@@ -400,6 +372,31 @@ vsw_switch_frame_nop(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *port,
 }
 
 /*
+ * Use mac client for layer 2 switching .
+ */
+static void
+vsw_switch_l2_frame_mac_client(vsw_t *vswp, mblk_t *mp, int caller,
+    vsw_port_t *port, mac_resource_handle_t mrh)
+{
+	_NOTE(ARGUNUSED(mrh))
+
+	mblk_t		*ret_m;
+
+	/*
+	 * This switching function is expected to be called by
+	 * the ports or the interface only. The packets from
+	 * physical interface already switched.
+	 */
+	ASSERT((caller == VSW_VNETPORT) || (caller == VSW_LOCALDEV));
+
+	if ((ret_m = vsw_tx_msg(vswp, mp, caller, port)) != NULL) {
+		DERR(vswp, "%s: drop mblks to "
+		    "phys dev", __func__);
+		freemsgchain(ret_m);
+	}
+}
+
+/*
  * Switch the given ethernet frame when operating in layer 2 mode.
  *
  * vswp: pointer to the vsw instance
@@ -419,8 +416,6 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 {
 	struct ether_header	*ehp;
 	mblk_t			*bp, *ret_m;
-	mblk_t			*mpt = NULL;
-	uint32_t		count;
 	vsw_fdbe_t		*fp;
 
 	D1(vswp, "%s: enter (caller %d)", __func__, caller);
@@ -435,8 +430,8 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 	bp = mp;
 	while (bp) {
 		ehp = (struct ether_header *)bp->b_rptr;
-		count = vsw_get_same_dest_list(ehp, &mp, &mpt, &bp);
-		ASSERT(count != 0);
+		mp = vsw_get_same_dest_list(ehp, &bp);
+		ASSERT(mp != NULL);
 
 		D2(vswp, "%s: mblk data buffer %lld : actual data size %lld",
 		    __func__, MBLKSIZE(mp), MBLKL(mp));
@@ -476,7 +471,7 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 			 * vsw_port (connected to a vnet device -
 			 * VSW_VNETPORT)
 			 */
-			(void) vsw_portsend(fp->portp, mp, mpt, count);
+			(void) vsw_portsend(fp->portp, mp);
 
 			/* Release the reference on the fdb entry */
 			VSW_FDBE_REFRELE(fp);
@@ -517,8 +512,8 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 					    VSW_MACRX_PROMISC |
 					    VSW_MACRX_COPYMSG);
 
-					if ((ret_m = vsw_tx_msg(vswp, mp))
-					    != NULL) {
+					if ((ret_m = vsw_tx_msg(vswp, mp,
+					    caller, arg)) != NULL) {
 						DERR(vswp, "%s: drop mblks to "
 						    "phys dev", __func__);
 						freemsgchain(ret_m);
@@ -539,8 +534,8 @@ vsw_switch_l2_frame(vsw_t *vswp, mblk_t *mp, int caller,
 					 * Pkt came down the stack, send out
 					 * over physical device.
 					 */
-					if ((ret_m = vsw_tx_msg(vswp, mp))
-					    != NULL) {
+					if ((ret_m = vsw_tx_msg(vswp, mp,
+					    caller, NULL)) != NULL) {
 						DERR(vswp, "%s: drop mblks to "
 						    "phys dev", __func__);
 						freemsgchain(ret_m);
@@ -566,8 +561,6 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 {
 	struct ether_header	*ehp;
 	mblk_t			*bp = NULL;
-	mblk_t			*mpt;
-	uint32_t		count;
 	vsw_fdbe_t		*fp;
 
 	D1(vswp, "%s: enter (caller %d)", __func__, caller);
@@ -587,8 +580,8 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 	bp = mp;
 	while (bp) {
 		ehp = (struct ether_header *)bp->b_rptr;
-		count = vsw_get_same_dest_list(ehp, &mp, &mpt, &bp);
-		ASSERT(count != 0);
+		mp = vsw_get_same_dest_list(ehp, &bp);
+		ASSERT(mp != NULL);
 
 		D2(vswp, "%s: mblk data buffer %lld : actual data size %lld",
 		    __func__, MBLKSIZE(mp), MBLKL(mp));
@@ -601,7 +594,7 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 		if (fp != NULL) {
 
 			D2(vswp, "%s: sending to target port", __func__);
-			(void) vsw_portsend(fp->portp, mp, mpt, count);
+			(void) vsw_portsend(fp->portp, mp);
 
 			/* Release the reference on the fdb entry */
 			VSW_FDBE_REFRELE(fp);
@@ -644,8 +637,7 @@ vsw_switch_l3_frame(vsw_t *vswp, mblk_t *mp, int caller,
 void
 vsw_setup_layer2_post_process(vsw_t *vswp)
 {
-	if ((vswp->smode[vswp->smode_idx] == VSW_LAYER2) ||
-	    (vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC)) {
+	if (vswp->smode & VSW_LAYER2) {
 		/*
 		 * Program unicst, mcst addrs of vsw
 		 * interface and ports in the physdev.
@@ -676,13 +668,13 @@ vsw_forward_all(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 	 * Broadcast message from inside ldoms so send to outside
 	 * world if in either of layer 2 modes.
 	 */
-	if (((vswp->smode[vswp->smode_idx] == VSW_LAYER2) ||
-	    (vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC)) &&
+	if ((vswp->smode & VSW_LAYER2) &&
 	    ((caller == VSW_LOCALDEV) || (caller == VSW_VNETPORT))) {
 
 		nmp = vsw_dupmsgchain(mp);
 		if (nmp) {
-			if ((ret_m = vsw_tx_msg(vswp, nmp)) != NULL) {
+			if ((ret_m = vsw_tx_msg(vswp, nmp, caller, arg))
+			    != NULL) {
 				DERR(vswp, "%s: dropping pkt(s) "
 				    "consisting of %ld bytes of data for"
 				    " physical device", __func__, MBLKL(ret_m));
@@ -716,20 +708,12 @@ vsw_forward_all(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 		} else {
 			nmp = vsw_dupmsgchain(mp);
 			if (nmp) {
-				mblk_t	*mpt = nmp;
-				uint32_t count = 1;
-
-				/* Find tail */
-				while (mpt->b_next != NULL) {
-					mpt = mpt->b_next;
-					count++;
-				}
 				/*
 				 * The plist->lockrw is protecting the
 				 * portp from getting destroyed here.
 				 * So, no ref_cnt is incremented here.
 				 */
-				(void) vsw_portsend(portp, nmp, mpt, count);
+				(void) vsw_portsend(portp, nmp);
 			} else {
 				DERR(vswp, "vsw_forward_all: nmp NULL");
 			}
@@ -772,12 +756,12 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 	 * over the physical adapter, and then check to see if any other
 	 * vnets are interested in it.
 	 */
-	if (((vswp->smode[vswp->smode_idx] == VSW_LAYER2) ||
-	    (vswp->smode[vswp->smode_idx] == VSW_LAYER2_PROMISC)) &&
+	if ((vswp->smode & VSW_LAYER2) &&
 	    ((caller == VSW_VNETPORT) || (caller == VSW_LOCALDEV))) {
 		nmp = vsw_dupmsgchain(mp);
 		if (nmp) {
-			if ((ret_m = vsw_tx_msg(vswp, nmp)) != NULL) {
+			if ((ret_m = vsw_tx_msg(vswp, nmp, caller, arg))
+			    != NULL) {
 				DERR(vswp, "%s: dropping pkt(s) consisting of "
 				    "%ld bytes of data for physical device",
 				    __func__, MBLKL(ret_m));
@@ -819,21 +803,12 @@ vsw_forward_grp(vsw_t *vswp, mblk_t *mp, int caller, vsw_port_t *arg)
 
 				nmp = vsw_dupmsgchain(mp);
 				if (nmp) {
-					mblk_t	*mpt = nmp;
-					uint32_t count = 1;
-
-					/* Find tail */
-					while (mpt->b_next != NULL) {
-						mpt = mpt->b_next;
-						count++;
-					}
 					/*
 					 * The vswp->mfdbrw is protecting the
 					 * portp from getting destroyed here.
 					 * So, no ref_cnt is incremented here.
 					 */
-					(void) vsw_portsend(port, nmp, mpt,
-					    count);
+					(void) vsw_portsend(port, nmp);
 				}
 			} else {
 				vsw_mac_rx(vswp, NULL,
@@ -970,32 +945,46 @@ vsw_vlan_add_ids(void *arg, int type)
 		rv = mod_hash_insert(vswp->vlan_hashp,
 		    (mod_hash_key_t)VLAN_ID_KEY(vswp->pvid),
 		    (mod_hash_val_t)B_TRUE);
-		ASSERT(rv == 0);
+		if (rv != 0) {
+			cmn_err(CE_WARN, "vsw%d: Duplicate vlan-id(%d) for "
+			    "the interface", vswp->instance, vswp->pvid);
+		}
 
 		for (i = 0; i < vswp->nvids; i++) {
 			rv = mod_hash_insert(vswp->vlan_hashp,
-			    (mod_hash_key_t)VLAN_ID_KEY(vswp->vids[i]),
+			    (mod_hash_key_t)VLAN_ID_KEY(vswp->vids[i].vl_vid),
 			    (mod_hash_val_t)B_TRUE);
-			ASSERT(rv == 0);
+			if (rv != 0) {
+				cmn_err(CE_WARN, "vsw%d: Duplicate vlan-id(%d)"
+				    " for the interface", vswp->instance,
+				    vswp->pvid);
+			}
 		}
 
 	} else if (type == VSW_VNETPORT) {
 		vsw_port_t	*portp = (vsw_port_t *)arg;
+		vsw_t		*vswp = portp->p_vswp;
 
 		rv = mod_hash_insert(portp->vlan_hashp,
 		    (mod_hash_key_t)VLAN_ID_KEY(portp->pvid),
 		    (mod_hash_val_t)B_TRUE);
-		ASSERT(rv == 0);
+		if (rv != 0) {
+			cmn_err(CE_WARN, "vsw%d: Duplicate vlan-id(%d) for "
+			    "the port(%d)", vswp->instance, vswp->pvid,
+			    portp->p_instance);
+		}
 
 		for (i = 0; i < portp->nvids; i++) {
 			rv = mod_hash_insert(portp->vlan_hashp,
-			    (mod_hash_key_t)VLAN_ID_KEY(portp->vids[i]),
+			    (mod_hash_key_t)VLAN_ID_KEY(portp->vids[i].vl_vid),
 			    (mod_hash_val_t)B_TRUE);
-			ASSERT(rv == 0);
+			if (rv != 0) {
+				cmn_err(CE_WARN, "vsw%d: Duplicate vlan-id(%d)"
+				    " for the port(%d)", vswp->instance,
+				    vswp->pvid, portp->p_instance);
+			}
 		}
 
-	} else {
-		return;
 	}
 }
 
@@ -1021,10 +1010,12 @@ vsw_vlan_remove_ids(void *arg, int type)
 		}
 
 		for (i = 0; i < vswp->nvids; i++) {
-			rv = vsw_vlan_lookup(vswp->vlan_hashp, vswp->vids[i]);
+			rv = vsw_vlan_lookup(vswp->vlan_hashp,
+			    vswp->vids[i].vl_vid);
 			if (rv == B_TRUE) {
 				rv = mod_hash_remove(vswp->vlan_hashp,
-				    (mod_hash_key_t)VLAN_ID_KEY(vswp->vids[i]),
+				    (mod_hash_key_t)VLAN_ID_KEY(
+				    vswp->vids[i].vl_vid),
 				    (mod_hash_val_t *)&vp);
 				ASSERT(rv == 0);
 			}
@@ -1043,10 +1034,12 @@ vsw_vlan_remove_ids(void *arg, int type)
 		}
 
 		for (i = 0; i < portp->nvids; i++) {
-			rv = vsw_vlan_lookup(portp->vlan_hashp, portp->vids[i]);
+			rv = vsw_vlan_lookup(portp->vlan_hashp,
+			    portp->vids[i].vl_vid);
 			if (rv == B_TRUE) {
 				rv = mod_hash_remove(portp->vlan_hashp,
-				    (mod_hash_key_t)VLAN_ID_KEY(portp->vids[i]),
+				    (mod_hash_key_t)VLAN_ID_KEY(
+				    portp->vids[i].vl_vid),
 				    (mod_hash_val_t *)&vp);
 				ASSERT(rv == 0);
 			}
@@ -1097,7 +1090,11 @@ vsw_fdbe_add(vsw_t *vswp, void *port)
 	 */
 	rv = mod_hash_insert(vswp->fdb_hashp, (mod_hash_key_t)addr,
 	    (mod_hash_val_t)fp);
-	ASSERT(rv == 0);
+	if (rv != 0) {
+		cmn_err(CE_WARN, "vsw%d: Duplicate mac-address(%s) for "
+		    "the port(%d)", vswp->instance,
+		    ether_sprintf(&portp->p_macaddr), portp->p_instance);
+	}
 }
 
 /*
@@ -1264,7 +1261,7 @@ vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp)
  * Returns:
  *   np:     head of updated chain of packets
  *   npt:    tail of updated chain of packets
- *   rv:     count of any packets dropped
+ *   rv:     count of the packets in the returned list
  */
 uint32_t
 vsw_vlan_frame_untag(void *arg, int type, mblk_t **np, mblk_t **npt)
@@ -1285,6 +1282,7 @@ vsw_vlan_frame_untag(void *arg, int type, mblk_t **np, mblk_t **npt)
 
 	ASSERT((type == VSW_LOCALDEV) || (type == VSW_VNETPORT));
 
+
 	if (type == VSW_LOCALDEV) {
 		vswp = (vsw_t *)arg;
 		pvid = vswp->pvid;
@@ -1296,6 +1294,27 @@ vsw_vlan_frame_untag(void *arg, int type, mblk_t **np, mblk_t **npt)
 		vswp = portp->p_vswp;
 		vlan_hashp = portp->vlan_hashp;
 		pvid = portp->pvid;
+	}
+
+	/*
+	 * If the MAC layer switching in place, then
+	 * untagging required only if the pvid is not
+	 * the same as default_vlan_id. This is because,
+	 * the MAC layer will send packets for the
+	 * registered vlans only.
+	 */
+	if ((vswp->mac_cl_switching == B_TRUE) &&
+	    (pvid == vswp->default_vlan_id)) {
+		/* simply count and set the tail */
+		count = 1;
+		bp = *np;
+		ASSERT(bp != NULL);
+		while (bp->b_next != NULL) {
+			bp = bp->b_next;
+			count++;
+		}
+		*npt = bp;
+		return (count);
 	}
 
 	bpn = bph = bpt = NULL;
@@ -1313,44 +1332,66 @@ vsw_vlan_frame_untag(void *arg, int type, mblk_t **np, mblk_t **npt)
 		is_tagged = vsw_frame_lookup_vid(arg, type, ehp, &vlan_id);
 
 		/*
-		 * Check if the destination is in the same vlan.
+		 * If MAC layer switching in place, then we
+		 * need to untag only if the tagged packet has
+		 * vlan-id same as the pvid.
 		 */
-		rv = vsw_vlan_lookup(vlan_hashp, vlan_id);
-		if (rv == B_FALSE) {
-			/* drop the packet */
-			freemsg(bp);
-			count++;
-			continue;
-		}
+		if (vswp->mac_cl_switching == B_TRUE) {
 
-		/*
-		 * Check the frame header if tag/untag is  needed.
-		 */
-		if (is_tagged == B_FALSE) {
-			/*
-			 * Untagged frame. We shouldn't have an untagged
-			 * packet at this point, unless the destination's
-			 * vlan id is default-vlan-id; if it is not the
-			 * default-vlan-id, we drop the packet.
-			 */
-			if (vlan_id != vswp->default_vlan_id) {
-				/* drop the packet */
-				freemsg(bp);
-				count++;
-				continue;
-			}
-		} else {
-			/*
-			 * Tagged frame, untag if it's the destination's pvid.
-			 */
+			/* only tagged packets expected here */
+			ASSERT(is_tagged == B_TRUE);
 			if (vlan_id == pvid) {
-
 				bp = vnet_vlan_remove_tag(bp);
 				if (bp == NULL) {
 					/* packet dropped */
-					count++;
 					continue;
 				}
+			}
+		} else { /* No MAC layer switching */
+
+			/*
+			 * Check the frame header if tag/untag is  needed.
+			 */
+			if (is_tagged == B_FALSE) {
+				/*
+				 * Untagged frame. We shouldn't have an
+				 * untagged packet at this point, unless
+				 * the destination's  vlan id is
+				 * default-vlan-id; if it is not the
+				 * default-vlan-id, we drop the packet.
+				 */
+				if (vlan_id != vswp->default_vlan_id) {
+					/* drop the packet */
+					freemsg(bp);
+					continue;
+				}
+			} else {	/* Tagged */
+				/*
+				 * Tagged frame, untag if it's the
+				 * destination's pvid.
+				 */
+				if (vlan_id == pvid) {
+
+					bp = vnet_vlan_remove_tag(bp);
+					if (bp == NULL) {
+						/* packet dropped */
+						continue;
+					}
+				} else {
+
+					/*
+					 * Check if the destination is in the
+					 * same vlan.
+					 */
+					rv = vsw_vlan_lookup(vlan_hashp,
+					    vlan_id);
+					if (rv == B_FALSE) {
+						/* drop the packet */
+						freemsg(bp);
+						continue;
+					}
+				}
+
 			}
 		}
 
@@ -1361,12 +1402,11 @@ vsw_vlan_frame_untag(void *arg, int type, mblk_t **np, mblk_t **npt)
 			bpt->b_next = bp;
 			bpt = bp;
 		}
-
+		count++;
 	}
 
 	*np = bph;
 	*npt = bpt;
-
 	return (count);
 }
 
@@ -1476,26 +1516,13 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * just increments a ref counter (which is
 				 * used when the address is being deleted)
 				 */
-				WRITE_ENTER(&vswp->mac_rwlock);
-				if (vswp->mh != NULL) {
-					if (mac_multicst_add(vswp->mh,
-					    (uchar_t *)&mcst_pkt->mca[i])) {
-						RW_EXIT(&vswp->mac_rwlock);
-						cmn_err(CE_WARN, "!vsw%d: "
-						    "unable to add multicast "
-						    "address: %s\n",
-						    vswp->instance,
-						    ether_sprintf((void *)
-						    &mcst_p->mca));
-						(void) vsw_del_mcst(vswp,
-						    VSW_VNETPORT, addr, port);
-						kmem_free(mcst_p,
-						    sizeof (*mcst_p));
-						return (1);
-					}
-					mcst_p->mac_added = B_TRUE;
+				if (vsw_mac_multicast_add(vswp, port, mcst_p,
+				    VSW_VNETPORT)) {
+					(void) vsw_del_mcst(vswp,
+					    VSW_VNETPORT, addr, port);
+					kmem_free(mcst_p, sizeof (*mcst_p));
+					return (1);
 				}
-				RW_EXIT(&vswp->mac_rwlock);
 
 				mutex_enter(&port->mca_lock);
 				mcst_p->nextp = port->mcap;
@@ -1530,24 +1557,8 @@ vsw_add_rem_mcst(vnet_mcast_msg_t *mcst_pkt, vsw_port_t *port)
 				 * if other ports are interested in this
 				 * address.
 				 */
-				WRITE_ENTER(&vswp->mac_rwlock);
-				if (vswp->mh != NULL && mcst_p->mac_added) {
-					if (mac_multicst_remove(vswp->mh,
-					    (uchar_t *)&mcst_pkt->mca[i])) {
-						RW_EXIT(&vswp->mac_rwlock);
-						cmn_err(CE_WARN, "!vsw%d: "
-						    "unable to remove mcast "
-						    "address: %s\n",
-						    vswp->instance,
-						    ether_sprintf((void *)
-						    &mcst_p->mca));
-						kmem_free(mcst_p,
-						    sizeof (*mcst_p));
-						return (1);
-					}
-					mcst_p->mac_added = B_FALSE;
-				}
-				RW_EXIT(&vswp->mac_rwlock);
+				vsw_mac_multicast_remove(vswp, port, mcst_p,
+				    VSW_VNETPORT);
 				kmem_free(mcst_p, sizeof (*mcst_p));
 
 			} else {
@@ -1780,13 +1791,7 @@ vsw_del_mcst_port(vsw_port_t *port)
 		 * if other ports are interested in this
 		 * address.
 		 */
-		WRITE_ENTER(&vswp->mac_rwlock);
-		if (vswp->mh != NULL && mcap->mac_added) {
-			(void) mac_multicst_remove(vswp->mh,
-			    (uchar_t *)&mcap->mca);
-		}
-		RW_EXIT(&vswp->mac_rwlock);
-
+		vsw_mac_multicast_remove(vswp, port, mcap, VSW_VNETPORT);
 		kmem_free(mcap, sizeof (*mcap));
 
 		mutex_enter(&port->mca_lock);
@@ -1829,11 +1834,9 @@ vsw_del_mcst_vsw(vsw_t *vswp)
 	D1(vswp, "%s: exit", __func__);
 }
 
-static uint32_t
-vsw_get_same_dest_list(struct ether_header *ehp,
-    mblk_t **rhead, mblk_t **rtail, mblk_t **mpp)
+mblk_t *
+vsw_get_same_dest_list(struct ether_header *ehp, mblk_t **mpp)
 {
-	uint32_t		count = 0;
 	mblk_t			*bp;
 	mblk_t			*nbp;
 	mblk_t			*head = NULL;
@@ -1860,16 +1863,12 @@ vsw_get_same_dest_list(struct ether_header *ehp,
 				tail->b_next = bp;
 				tail = bp;
 			}
-			count++;
 		} else {
 			prev = bp;
 		}
 		bp = nbp;
 	}
-	*rhead = head;
-	*rtail = tail;
-	DTRACE_PROBE1(vsw_same_dest, int, count);
-	return (count);
+	return (head);
 }
 
 static mblk_t *

@@ -193,6 +193,8 @@ Network Management:solaris:cmd:::/sbin/routeadm:euid=0;\
 	privs=proc_chroot,proc_owner,sys_ip_config
 Network Management:solaris:cmd:::/sbin/dladm:euid=dladm;egid=sys;\
 	privs=sys_dl_config,net_rawaccess,proc_audit
+Network Management:solaris:cmd:::/sbin/flowadm:euid=dladm;egid=sys;\
+	privs=sys_dl_config,net_rawaccess,proc_audit
 Network Management:suser:cmd:::/usr/bin/netstat:uid=0
 Network Management:suser:cmd:::/usr/bin/rup:euid=0
 Network Management:suser:cmd:::/usr/bin/ruptime:euid=0

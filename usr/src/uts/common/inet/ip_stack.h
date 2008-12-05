@@ -35,7 +35,7 @@ extern "C" {
 #include <netinet/igmp_var.h>
 
 #ifdef _KERNEL
-
+#include <sys/list.h>
 
 /*
  * IP statistics.
@@ -174,6 +174,13 @@ struct ip_stack {
 
 	struct ill_group *ips_illgrp_head_v4;	/* Head of IPv4 ill groups */
 	struct ill_group *ips_illgrp_head_v6;	/* Head of IPv6 ill groups */
+
+	/* Taskq dispatcher for capability operations */
+	kmutex_t	ips_capab_taskq_lock;
+	kcondvar_t	ips_capab_taskq_cv;
+	list_t		ips_capab_taskq_list;
+	kthread_t	*ips_capab_taskq_thread;
+	boolean_t	ips_capab_taskq_quit;
 
 /* ipclassifier.c - keep in ip_stack_t */
 	/* ipclassifier hash tables */

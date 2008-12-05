@@ -24,10 +24,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- *  Copyright (c) 2002-2005 Neterion, Inc.
+ *  Copyright (c) 2002-2008 Neterion, Inc.
  *  All right Reserved.
  *
  *  FileName :    xgell.c
@@ -100,9 +98,7 @@ static int		xgell_m_start(void *);
 static void		xgell_m_stop(void *);
 static int		xgell_m_promisc(void *, boolean_t);
 static int		xgell_m_multicst(void *, boolean_t, const uint8_t *);
-static int		xgell_m_unicst(void *, const uint8_t *);
 static void		xgell_m_ioctl(void *, queue_t *, mblk_t *);
-static mblk_t 		*xgell_m_tx(void *, mblk_t *);
 static boolean_t	xgell_m_getcapab(void *, mac_capab_t, void *);
 
 #define	XGELL_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
@@ -114,8 +110,7 @@ static mac_callbacks_t xgell_m_callbacks = {
 	xgell_m_stop,
 	xgell_m_promisc,
 	xgell_m_multicst,
-	xgell_m_unicst,
-	xgell_m_tx,
+	NULL,
 	NULL,
 	xgell_m_ioctl,
 	xgell_m_getcapab
@@ -124,7 +119,7 @@ static mac_callbacks_t xgell_m_callbacks = {
 /*
  * xge_device_poll
  *
- * Cyclic should call me every 1s. xge_callback_event_queued should call me
+ * Timeout should call me every 1s. xge_callback_event_queued should call me
  * when HAL hope event was rescheduled.
  */
 /*ARGSUSED*/
@@ -194,32 +189,34 @@ xgell_callback_link_down(void *userdata)
  * xgell_rx_buffer_replenish_all
  *
  * To replenish all freed dtr(s) with buffers in free pool. It's called by
- * xgell_rx_buffer_recycle() or xgell_rx_1b_compl().
+ * xgell_rx_buffer_recycle() or xgell_rx_1b_callback().
  * Must be called with pool_lock held.
  */
 static void
-xgell_rx_buffer_replenish_all(xgell_ring_t *ring)
+xgell_rx_buffer_replenish_all(xgell_rx_ring_t *ring)
 {
+	xgell_rx_buffer_pool_t *bf_pool = &ring->bf_pool;
 	xge_hal_dtr_h dtr;
 	xgell_rx_buffer_t *rx_buffer;
 	xgell_rxd_priv_t *rxd_priv;
 
-	xge_assert(mutex_owned(&ring->bf_pool.pool_lock));
+	xge_assert(mutex_owned(&bf_pool->pool_lock));
 
-	while ((ring->bf_pool.free > 0) &&
-	    (xge_hal_ring_dtr_reserve(ring->channelh, &dtr) ==
-	    XGE_HAL_OK)) {
-		rx_buffer = ring->bf_pool.head;
-		ring->bf_pool.head = rx_buffer->next;
-		ring->bf_pool.free--;
+	while ((bf_pool->free > 0) &&
+	    (xge_hal_ring_dtr_reserve(ring->channelh, &dtr) == XGE_HAL_OK)) {
+		xge_assert(bf_pool->head);
 
-		xge_assert(rx_buffer);
+		rx_buffer = bf_pool->head;
+
+		bf_pool->head = rx_buffer->next;
+		bf_pool->free--;
+
 		xge_assert(rx_buffer->dma_addr);
 
 		rxd_priv = (xgell_rxd_priv_t *)
 		    xge_hal_ring_dtr_private(ring->channelh, dtr);
 		xge_hal_ring_dtr_1b_set(dtr, rx_buffer->dma_addr,
-		    ring->bf_pool.size);
+		    bf_pool->size);
 
 		rxd_priv->rx_buffer = rx_buffer;
 		xge_hal_ring_dtr_post(ring->channelh, dtr);
@@ -235,15 +232,16 @@ xgell_rx_buffer_replenish_all(xgell_ring_t *ring)
 static void
 xgell_rx_buffer_release(xgell_rx_buffer_t *rx_buffer)
 {
-	xgell_ring_t *ring = rx_buffer->ring;
+	xgell_rx_ring_t *ring = rx_buffer->ring;
+	xgell_rx_buffer_pool_t *bf_pool = &ring->bf_pool;
 
-	xge_assert(mutex_owned(&ring->bf_pool.pool_lock));
+	xge_assert(mutex_owned(&bf_pool->pool_lock));
 
 	/* Put the buffer back to pool */
-	rx_buffer->next = ring->bf_pool.head;
-	ring->bf_pool.head = rx_buffer;
+	rx_buffer->next = bf_pool->head;
+	bf_pool->head = rx_buffer;
 
-	ring->bf_pool.free++;
+	bf_pool->free++;
 }
 
 /*
@@ -266,7 +264,7 @@ static void
 xgell_rx_buffer_recycle(char *arg)
 {
 	xgell_rx_buffer_t *rx_buffer = (xgell_rx_buffer_t *)arg;
-	xgell_ring_t *ring = rx_buffer->ring;
+	xgell_rx_ring_t *ring = rx_buffer->ring;
 	xgelldev_t *lldev = ring->lldev;
 	xgell_rx_buffer_pool_t *bf_pool = &ring->bf_pool;
 
@@ -282,18 +280,17 @@ xgell_rx_buffer_recycle(char *arg)
 	 * Before finding a good way to set this hiwat, just always call to
 	 * replenish_all. *TODO*
 	 */
-	if ((lldev->is_initialized != 0) &&
+	if ((lldev->is_initialized != 0) && (ring->live) &&
 	    (bf_pool->recycle >= XGELL_RX_BUFFER_RECYCLE_CACHE)) {
-		if (mutex_tryenter(&bf_pool->pool_lock)) {
-			bf_pool->recycle_tail->next = bf_pool->head;
-			bf_pool->head = bf_pool->recycle_head;
-			bf_pool->recycle_head = bf_pool->recycle_tail = NULL;
-			bf_pool->post -= bf_pool->recycle;
-			bf_pool->free += bf_pool->recycle;
-			bf_pool->recycle = 0;
-			xgell_rx_buffer_replenish_all(ring);
-			mutex_exit(&bf_pool->pool_lock);
-		}
+		mutex_enter(&bf_pool->pool_lock);
+		bf_pool->recycle_tail->next = bf_pool->head;
+		bf_pool->head = bf_pool->recycle_head;
+		bf_pool->recycle_head = bf_pool->recycle_tail = NULL;
+		bf_pool->post -= bf_pool->recycle;
+		bf_pool->free += bf_pool->recycle;
+		bf_pool->recycle = 0;
+		xgell_rx_buffer_replenish_all(ring);
+		mutex_exit(&bf_pool->pool_lock);
 	}
 
 	mutex_exit(&bf_pool->recycle_lock);
@@ -306,8 +303,10 @@ xgell_rx_buffer_recycle(char *arg)
  * Return NULL if failed.
  */
 static xgell_rx_buffer_t *
-xgell_rx_buffer_alloc(xgell_ring_t *ring)
+xgell_rx_buffer_alloc(xgell_rx_ring_t *ring)
 {
+	xgelldev_t *lldev = ring->lldev;
+	xgell_rx_buffer_pool_t *bf_pool = &ring->bf_pool;
 	xge_hal_device_t *hldev;
 	void *vaddr;
 	ddi_dma_handle_t dma_handle;
@@ -318,7 +317,6 @@ xgell_rx_buffer_alloc(xgell_ring_t *ring)
 	size_t real_size;
 	extern ddi_device_acc_attr_t *p_xge_dev_attr;
 	xgell_rx_buffer_t *rx_buffer;
-	xgelldev_t *lldev = ring->lldev;
 
 	hldev = (xge_hal_device_t *)lldev->devh;
 
@@ -330,7 +328,7 @@ xgell_rx_buffer_alloc(xgell_ring_t *ring)
 	}
 
 	/* reserve some space at the end of the buffer for recycling */
-	if (ddi_dma_mem_alloc(dma_handle, HEADROOM + ring->bf_pool.size +
+	if (ddi_dma_mem_alloc(dma_handle, HEADROOM + bf_pool->size +
 	    sizeof (xgell_rx_buffer_t), p_xge_dev_attr, DDI_DMA_STREAMING,
 	    DDI_DMA_SLEEP, 0, (caddr_t *)&vaddr, &real_size, &dma_acch) !=
 	    DDI_SUCCESS) {
@@ -339,7 +337,7 @@ xgell_rx_buffer_alloc(xgell_ring_t *ring)
 		goto mem_failed;
 	}
 
-	if (HEADROOM + ring->bf_pool.size + sizeof (xgell_rx_buffer_t) >
+	if (HEADROOM + bf_pool->size + sizeof (xgell_rx_buffer_t) >
 	    real_size) {
 		xge_debug_ll(XGE_ERR, "%s%d: can not allocate DMA-able memory",
 		    XGELL_IFNAME, lldev->instance);
@@ -347,14 +345,14 @@ xgell_rx_buffer_alloc(xgell_ring_t *ring)
 	}
 
 	if (ddi_dma_addr_bind_handle(dma_handle, NULL, (char *)vaddr + HEADROOM,
-	    ring->bf_pool.size, DDI_DMA_READ | DDI_DMA_STREAMING,
+	    bf_pool->size, DDI_DMA_READ | DDI_DMA_STREAMING,
 	    DDI_DMA_SLEEP, 0, &dma_cookie, &ncookies) != DDI_SUCCESS) {
 		xge_debug_ll(XGE_ERR, "%s%d: out of mapping for mblk",
 		    XGELL_IFNAME, lldev->instance);
 		goto bind_failed;
 	}
 
-	if (ncookies != 1 || dma_cookie.dmac_size < ring->bf_pool.size) {
+	if (ncookies != 1 || dma_cookie.dmac_size < bf_pool->size) {
 		xge_debug_ll(XGE_ERR, "%s%d: can not handle partial DMA",
 		    XGELL_IFNAME, lldev->instance);
 		goto check_failed;
@@ -393,64 +391,77 @@ handle_failed:
  * Destroy buffer pool. If there is still any buffer hold by upper layer,
  * recorded by bf_pool.post, return DDI_FAILURE to reject to be unloaded.
  */
-static int
-xgell_rx_destroy_buffer_pool(xgell_ring_t *ring)
+static boolean_t
+xgell_rx_destroy_buffer_pool(xgell_rx_ring_t *ring)
 {
+	xgelldev_t *lldev = ring->lldev;
+	xgell_rx_buffer_pool_t *bf_pool = &ring->bf_pool;
 	xgell_rx_buffer_t *rx_buffer;
 	ddi_dma_handle_t  dma_handle;
 	ddi_acc_handle_t  dma_acch;
-	xgelldev_t *lldev = ring->lldev;
 	int i;
 
-	if (ring->bf_pool.recycle > 0) {
-		ring->bf_pool.recycle_tail->next = ring->bf_pool.head;
-		ring->bf_pool.head = ring->bf_pool.recycle_head;
-		ring->bf_pool.recycle_tail =
-		    ring->bf_pool.recycle_head = NULL;
-		ring->bf_pool.post -= ring->bf_pool.recycle;
-		ring->bf_pool.free += ring->bf_pool.recycle;
-		ring->bf_pool.recycle = 0;
+	/*
+	 * If the pool has been destroied, just return B_TRUE
+	 */
+	if (!bf_pool->live)
+		return (B_TRUE);
+
+	mutex_enter(&bf_pool->recycle_lock);
+	if (bf_pool->recycle > 0) {
+		mutex_enter(&bf_pool->pool_lock);
+		bf_pool->recycle_tail->next = bf_pool->head;
+		bf_pool->head = bf_pool->recycle_head;
+		bf_pool->recycle_tail = bf_pool->recycle_head = NULL;
+		bf_pool->post -= bf_pool->recycle;
+		bf_pool->free += bf_pool->recycle;
+		bf_pool->recycle = 0;
+		mutex_exit(&bf_pool->pool_lock);
 	}
+	mutex_exit(&bf_pool->recycle_lock);
 
 	/*
 	 * If there is any posted buffer, the driver should reject to be
 	 * detached. Need notice upper layer to release them.
 	 */
-	if (ring->bf_pool.post != 0) {
+	if (bf_pool->post != 0) {
 		xge_debug_ll(XGE_ERR,
 		    "%s%d has some buffers not be recycled, try later!",
 		    XGELL_IFNAME, lldev->instance);
-		return (DDI_FAILURE);
+		return (B_FALSE);
 	}
 
 	/*
-	 * Relase buffers one by one.
+	 * Release buffers one by one.
 	 */
-	for (i = ring->bf_pool.total; i > 0; i--) {
-		rx_buffer = ring->bf_pool.head;
+	for (i = bf_pool->total; i > 0; i--) {
+		rx_buffer = bf_pool->head;
 		xge_assert(rx_buffer != NULL);
 
-		ring->bf_pool.head = rx_buffer->next;
+		bf_pool->head = rx_buffer->next;
 
 		dma_handle = rx_buffer->dma_handle;
 		dma_acch = rx_buffer->dma_acch;
 
 		if (ddi_dma_unbind_handle(dma_handle) != DDI_SUCCESS) {
-			xge_debug_ll(XGE_ERR, "%s",
-			    "failed to unbind DMA handle!");
-			ring->bf_pool.head = rx_buffer;
-			return (DDI_FAILURE);
+			xge_debug_ll(XGE_ERR, "failed to unbind DMA handle!");
+			bf_pool->head = rx_buffer;
+			return (B_FALSE);
 		}
 		ddi_dma_mem_free(&dma_acch);
 		ddi_dma_free_handle(&dma_handle);
 
-		ring->bf_pool.total--;
-		ring->bf_pool.free--;
+		bf_pool->total--;
+		bf_pool->free--;
 	}
 
-	mutex_destroy(&ring->bf_pool.recycle_lock);
-	mutex_destroy(&ring->bf_pool.pool_lock);
-	return (DDI_SUCCESS);
+	xge_assert(!mutex_owned(&bf_pool->pool_lock));
+
+	mutex_destroy(&bf_pool->recycle_lock);
+	mutex_destroy(&bf_pool->pool_lock);
+	bf_pool->live = B_FALSE;
+
+	return (B_TRUE);
 }
 
 /*
@@ -458,29 +469,34 @@ xgell_rx_destroy_buffer_pool(xgell_ring_t *ring)
  *
  * Initialize RX buffer pool for all RX rings. Refer to rx_buffer_pool_t.
  */
-static int
-xgell_rx_create_buffer_pool(xgell_ring_t *ring)
+static boolean_t
+xgell_rx_create_buffer_pool(xgell_rx_ring_t *ring)
 {
+	xgelldev_t *lldev = ring->lldev;
+	xgell_rx_buffer_pool_t *bf_pool = &ring->bf_pool;
 	xge_hal_device_t *hldev;
 	xgell_rx_buffer_t *rx_buffer;
-	xgelldev_t *lldev = ring->lldev;
 	int i;
+
+	if (bf_pool->live)
+		return (B_TRUE);
 
 	hldev = (xge_hal_device_t *)lldev->devh;
 
-	ring->bf_pool.total = 0;
-	ring->bf_pool.size = XGELL_MAX_FRAME_SIZE(hldev);
-	ring->bf_pool.head = NULL;
-	ring->bf_pool.free = 0;
-	ring->bf_pool.post = 0;
-	ring->bf_pool.post_hiwat = lldev->config.rx_buffer_post_hiwat;
-	ring->bf_pool.recycle = 0;
-	ring->bf_pool.recycle_head = NULL;
-	ring->bf_pool.recycle_tail = NULL;
+	bf_pool->total = 0;
+	bf_pool->size = XGELL_MAX_FRAME_SIZE(hldev);
+	bf_pool->head = NULL;
+	bf_pool->free = 0;
+	bf_pool->post = 0;
+	bf_pool->post_hiwat = lldev->config.rx_buffer_post_hiwat;
+	bf_pool->recycle = 0;
+	bf_pool->recycle_head = NULL;
+	bf_pool->recycle_tail = NULL;
+	bf_pool->live = B_TRUE;
 
-	mutex_init(&ring->bf_pool.pool_lock, NULL, MUTEX_DRIVER,
+	mutex_init(&bf_pool->pool_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(hldev->irqh));
-	mutex_init(&ring->bf_pool.recycle_lock, NULL, MUTEX_DRIVER,
+	mutex_init(&bf_pool->recycle_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(hldev->irqh));
 
 	/*
@@ -491,17 +507,17 @@ xgell_rx_create_buffer_pool(xgell_ring_t *ring)
 	for (i = 0; i < lldev->config.rx_buffer_total; i++) {
 		if ((rx_buffer = xgell_rx_buffer_alloc(ring)) == NULL) {
 			(void) xgell_rx_destroy_buffer_pool(ring);
-			return (DDI_FAILURE);
+			return (B_FALSE);
 		}
 
-		rx_buffer->next = ring->bf_pool.head;
-		ring->bf_pool.head = rx_buffer;
+		rx_buffer->next = bf_pool->head;
+		bf_pool->head = rx_buffer;
 
-		ring->bf_pool.total++;
-		ring->bf_pool.free++;
+		bf_pool->total++;
+		bf_pool->free++;
 	}
 
-	return (DDI_SUCCESS);
+	return (B_TRUE);
 }
 
 /*
@@ -514,23 +530,26 @@ xge_hal_status_e
 xgell_rx_dtr_replenish(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, int index,
     void *userdata, xge_hal_channel_reopen_e reopen)
 {
-	xgell_ring_t *ring = userdata;
+	xgell_rx_ring_t *ring = userdata;
+	xgell_rx_buffer_pool_t *bf_pool = &ring->bf_pool;
 	xgell_rx_buffer_t *rx_buffer;
 	xgell_rxd_priv_t *rxd_priv;
 
-	if (ring->bf_pool.head == NULL) {
-		xge_debug_ll(XGE_ERR, "%s", "no more available rx DMA buffer!");
+	mutex_enter(&bf_pool->pool_lock);
+	if (bf_pool->head == NULL) {
+		xge_debug_ll(XGE_ERR, "no more available rx DMA buffer!");
 		return (XGE_HAL_FAIL);
 	}
-	rx_buffer = ring->bf_pool.head;
-	ring->bf_pool.head = rx_buffer->next;
-	ring->bf_pool.free--;
-
+	rx_buffer = bf_pool->head;
 	xge_assert(rx_buffer);
 	xge_assert(rx_buffer->dma_addr);
 
+	bf_pool->head = rx_buffer->next;
+	bf_pool->free--;
+	mutex_exit(&bf_pool->pool_lock);
+
 	rxd_priv = (xgell_rxd_priv_t *)xge_hal_ring_dtr_private(channelh, dtr);
-	xge_hal_ring_dtr_1b_set(dtr, rx_buffer->dma_addr, ring->bf_pool.size);
+	xge_hal_ring_dtr_1b_set(dtr, rx_buffer->dma_addr, bf_pool->size);
 
 	rxd_priv->rx_buffer = rx_buffer;
 
@@ -637,9 +656,10 @@ xgell_rx_hcksum_assoc(mblk_t *mp, char *vaddr, int pkt_length,
  * new message and copy the payload in.
  */
 static mblk_t *
-xgell_rx_1b_msg_alloc(xgelldev_t *lldev, xgell_rx_buffer_t *rx_buffer,
+xgell_rx_1b_msg_alloc(xgell_rx_ring_t *ring, xgell_rx_buffer_t *rx_buffer,
     int pkt_length, xge_hal_dtr_info_t *ext_info, boolean_t *copyit)
 {
+	xgelldev_t *lldev = ring->lldev;
 	mblk_t *mp;
 	char *vaddr;
 
@@ -676,24 +696,25 @@ xgell_rx_1b_msg_alloc(xgelldev_t *lldev, xgell_rx_buffer_t *rx_buffer,
 }
 
 /*
- * xgell_rx_1b_compl
+ * xgell_rx_1b_callback
  *
  * If the interrupt is because of a received frame or if the receive ring
  * contains fresh as yet un-processed frames, this function is called.
  */
 static xge_hal_status_e
-xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
+xgell_rx_1b_callback(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
     void *userdata)
 {
-	xgell_ring_t *ring = (xgell_ring_t *)userdata;
+	xgell_rx_ring_t *ring = (xgell_rx_ring_t *)userdata;
 	xgelldev_t *lldev = ring->lldev;
 	xgell_rx_buffer_t *rx_buffer;
 	mblk_t *mp_head = NULL;
 	mblk_t *mp_end  = NULL;
 	int pkt_burst = 0;
 
-	mutex_enter(&ring->bf_pool.pool_lock);
+	xge_debug_ll(XGE_TRACE, "xgell_rx_1b_callback on ring %d", ring->index);
 
+	mutex_enter(&ring->bf_pool.pool_lock);
 	do {
 		int pkt_length;
 		dma_addr_t dma_data;
@@ -744,7 +765,7 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 			copyit = B_FALSE;
 		}
 
-		mp = xgell_rx_1b_msg_alloc(lldev, rx_buffer, pkt_length,
+		mp = xgell_rx_1b_msg_alloc(ring, rx_buffer, pkt_length,
 		    &ext_info, &copyit);
 
 		xge_hal_ring_dtr_free(channelh, dtr);
@@ -771,8 +792,10 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 		 * Associate cksum_flags per packet type and h/w
 		 * cksum flags.
 		 */
-		xgell_rx_hcksum_assoc(mp, (char *)rx_buffer->vaddr +
-		    HEADROOM, pkt_length, &ext_info);
+		xgell_rx_hcksum_assoc(mp, (char *)rx_buffer->vaddr + HEADROOM,
+		    pkt_length, &ext_info);
+
+		ring->received_bytes += pkt_length;
 
 		if (mp_head == NULL) {
 			mp_head = mp;
@@ -782,6 +805,26 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 			mp_end = mp;
 		}
 
+		/*
+		 * Inlined implemented polling function.
+		 */
+		if ((ring->poll_mp == NULL) && (ring->poll_bytes > 0)) {
+			ring->poll_mp = mp_head;
+		}
+		if (ring->poll_mp != NULL) {
+			if ((ring->poll_bytes -= pkt_length) <= 0) {
+				/* have polled enough packets. */
+				break;
+			} else {
+				/* continue polling packets. */
+				continue;
+			}
+		}
+
+		/*
+		 * We're not in polling mode, so try to chain more messages
+		 * or send the chain up according to pkt_burst.
+		 */
 		if (++pkt_burst < lldev->config.rx_pkt_burst)
 			continue;
 
@@ -791,8 +834,8 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 		}
 		mutex_exit(&ring->bf_pool.pool_lock);
 		if (mp_head != NULL) {
-			mac_rx(lldev->mh, ((xgell_ring_t *)userdata)->handle,
-			    mp_head);
+			mac_rx_ring(lldev->mh, ring->ring_handle, mp_head,
+			    ring->ring_gen_num);
 		}
 		mp_head = mp_end  = NULL;
 		pkt_burst = 0;
@@ -807,11 +850,37 @@ xgell_rx_1b_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 	xgell_rx_buffer_replenish_all(ring);
 	mutex_exit(&ring->bf_pool.pool_lock);
 
-	if (mp_head != NULL) {
-		mac_rx(lldev->mh, ((xgell_ring_t *)userdata)->handle, mp_head);
+	/*
+	 * If we're not in polling cycle, call mac_rx(), otherwise
+	 * just return while leaving packets chained to ring->poll_mp.
+	 */
+	if ((ring->poll_mp == NULL) && (mp_head != NULL)) {
+		mac_rx_ring(lldev->mh, ring->ring_handle, mp_head,
+		    ring->ring_gen_num);
 	}
 
 	return (XGE_HAL_OK);
+}
+
+mblk_t *
+xgell_rx_poll(void *arg, int bytes_to_pickup)
+{
+	xgell_rx_ring_t *ring = (xgell_rx_ring_t *)arg;
+	int got_rx = 0;
+	mblk_t *mp;
+
+	xge_debug_ll(XGE_TRACE, "xgell_rx_poll on ring %d", ring->index);
+
+	ring->poll_mp = NULL;
+	ring->poll_bytes = bytes_to_pickup;
+	(void) xge_hal_device_poll_rx_channel(ring->channelh, &got_rx);
+
+	mp = ring->poll_mp;
+	ring->poll_bytes = -1;
+	ring->polled_bytes += got_rx;
+	ring->poll_mp = NULL;
+
+	return (mp);
 }
 
 /*
@@ -826,8 +895,8 @@ static xge_hal_status_e
 xgell_xmit_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
     void *userdata)
 {
-	xgell_fifo_t *fifo = (xgell_fifo_t *)userdata;
-	xgelldev_t *lldev = fifo->lldev;
+	xgell_tx_ring_t *ring = userdata;
+	xgelldev_t *lldev = ring->lldev;
 
 	do {
 		xgell_txd_priv_t *txd_priv = ((xgell_txd_priv_t *)
@@ -861,58 +930,36 @@ xgell_xmit_compl(xge_hal_channel_h channelh, xge_hal_dtr_h dtr, u8 t_code,
 			txd_priv->mblk = NULL;
 		}
 
-		lldev->resched_avail++;
-
 	} while (xge_hal_fifo_dtr_next_completed(channelh, &dtr, &t_code) ==
 	    XGE_HAL_OK);
 
-	if (lldev->resched_retry &&
-	    xge_queue_produce_context(xge_hal_device_queue(lldev->devh),
-	    XGELL_EVENT_RESCHED_NEEDED, fifo) == XGE_QUEUE_OK) {
-		xge_debug_ll(XGE_TRACE, "%s%d: IRQ produced event for queue %d",
-		    XGELL_IFNAME, lldev->instance,
-		    ((xge_hal_channel_t *)channelh)->post_qid);
-		lldev->resched_send = lldev->resched_avail;
-		lldev->resched_retry = 0;
-	}
+	if (ring->need_resched)
+		mac_tx_ring_update(lldev->mh, ring->ring_handle);
 
 	return (XGE_HAL_OK);
 }
 
-/*
- * xgell_send
- * @hldev: pointer to xge_hal_device_t strucutre
- * @mblk: pointer to network buffer, i.e. mblk_t structure
- *
- * Called by the xgell_m_tx to transmit the packet to the XFRAME firmware.
- * A pointer to an M_DATA message that contains the packet is passed to
- * this routine.
- */
-static boolean_t
-xgell_send(xgelldev_t *lldev, mblk_t *mp)
+mblk_t *
+xgell_ring_tx(void *arg, mblk_t *mp)
 {
+	xgell_tx_ring_t *ring = (xgell_tx_ring_t *)arg;
 	mblk_t *bp;
-	boolean_t retry;
+	xgelldev_t *lldev = ring->lldev;
 	xge_hal_device_t *hldev = lldev->devh;
 	xge_hal_status_e status;
 	xge_hal_dtr_h dtr;
 	xgell_txd_priv_t *txd_priv;
 	uint32_t hckflags;
+	uint32_t lsoflags;
 	uint32_t mss;
 	int handle_cnt, frag_cnt, ret, i, copied;
 	boolean_t used_copy;
-	xgell_fifo_t *fifo;
-	xge_hal_channel_h fifo_channel;
 
 _begin:
-	retry = B_FALSE;
 	handle_cnt = frag_cnt = 0;
 
 	if (!lldev->is_initialized || lldev->in_reset)
-		return (B_FALSE);
-
-	fifo = &lldev->fifos[0];
-	fifo_channel = fifo->channelh;
+		return (mp);
 
 	/*
 	 * If the free Tx dtrs count reaches the lower threshold,
@@ -921,23 +968,17 @@ _begin:
 	 * gld through gld_sched call, when the free dtrs count exceeds
 	 * the higher threshold.
 	 */
-	if (xge_hal_channel_dtr_count(fifo_channel)
+	if (xge_hal_channel_dtr_count(ring->channelh)
 	    <= XGELL_TX_LEVEL_LOW) {
-		if (++fifo->level_low > XGELL_TX_LEVEL_CHECK) {
-			xge_debug_ll(XGE_TRACE, "%s%d: queue %d: err on xmit,"
-			    "free descriptors count at low threshold %d",
-			    XGELL_IFNAME, lldev->instance,
-			    ((xge_hal_channel_t *)fifo_channel)->post_qid,
-			    XGELL_TX_LEVEL_LOW);
-			fifo->level_low = 0;
-			retry = B_TRUE;
-			goto _exit;
-		}
-	} else {
-		fifo->level_low = 0;
+		xge_debug_ll(XGE_TRACE, "%s%d: queue %d: err on xmit,"
+		    "free descriptors count at low threshold %d",
+		    XGELL_IFNAME, lldev->instance,
+		    ((xge_hal_channel_t *)ring->channelh)->post_qid,
+		    XGELL_TX_LEVEL_LOW);
+		goto _exit;
 	}
 
-	status = xge_hal_fifo_dtr_reserve(fifo_channel, &dtr);
+	status = xge_hal_fifo_dtr_reserve(ring->channelh, &dtr);
 	if (status != XGE_HAL_OK) {
 		switch (status) {
 		case XGE_HAL_INF_CHANNEL_IS_NOT_READY:
@@ -945,19 +986,17 @@ _begin:
 			    "%s%d: channel %d is not ready.", XGELL_IFNAME,
 			    lldev->instance,
 			    ((xge_hal_channel_t *)
-			    fifo_channel)->post_qid);
-			retry = B_TRUE;
+			    ring->channelh)->post_qid);
 			goto _exit;
 		case XGE_HAL_INF_OUT_OF_DESCRIPTORS:
 			xge_debug_ll(XGE_TRACE, "%s%d: queue %d: error in xmit,"
 			    " out of descriptors.", XGELL_IFNAME,
 			    lldev->instance,
 			    ((xge_hal_channel_t *)
-			    fifo_channel)->post_qid);
-			retry = B_TRUE;
+			    ring->channelh)->post_qid);
 			goto _exit;
 		default:
-			return (B_FALSE);
+			return (mp);
 		}
 	}
 
@@ -1002,6 +1041,8 @@ _begin:
 			continue;
 		}
 
+		ring->sent_bytes += mblen;
+
 		/*
 		 * Check the message length to decide to DMA or bcopy() data
 		 * to tx descriptor(s).
@@ -1009,7 +1050,7 @@ _begin:
 		if (mblen < lldev->config.tx_dma_lowat &&
 		    (copied + mblen) < lldev->tx_copied_max) {
 			xge_hal_status_e rc;
-			rc = xge_hal_fifo_dtr_buffer_append(fifo_channel,
+			rc = xge_hal_fifo_dtr_buffer_append(ring->channelh,
 			    dtr, bp->b_rptr, mblen);
 			if (rc == XGE_HAL_OK) {
 				used_copy = B_TRUE;
@@ -1017,11 +1058,11 @@ _begin:
 				continue;
 			} else if (used_copy) {
 				xge_hal_fifo_dtr_buffer_finalize(
-				    fifo_channel, dtr, frag_cnt++);
+				    ring->channelh, dtr, frag_cnt++);
 				used_copy = B_FALSE;
 			}
 		} else if (used_copy) {
-			xge_hal_fifo_dtr_buffer_finalize(fifo_channel,
+			xge_hal_fifo_dtr_buffer_finalize(ring->channelh,
 			    dtr, frag_cnt++);
 			used_copy = B_FALSE;
 		}
@@ -1075,7 +1116,7 @@ _begin:
 
 		/* setup the descriptors for this data buffer */
 		while (ncookies) {
-			xge_hal_fifo_dtr_buffer_set(fifo_channel, dtr,
+			xge_hal_fifo_dtr_buffer_set(ring->channelh, dtr,
 			    frag_cnt++, dma_cookie.dmac_laddress,
 			    dma_cookie.dmac_size);
 			if (--ncookies) {
@@ -1108,7 +1149,7 @@ _begin:
 
 	/* finalize unfinished copies */
 	if (used_copy) {
-		xge_hal_fifo_dtr_buffer_finalize(fifo_channel, dtr,
+		xge_hal_fifo_dtr_buffer_finalize(ring->channelh, dtr,
 		    frag_cnt++);
 	}
 
@@ -1118,11 +1159,14 @@ _begin:
 	 * If LSO is required, just call xge_hal_fifo_dtr_mss_set(dtr, mss) to
 	 * do all necessary work.
 	 */
-	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, &mss, &hckflags);
-	if ((hckflags & HW_LSO) && (mss != 0)) {
+	lso_info_get(mp, &mss, &lsoflags);
+
+	if (lsoflags & HW_LSO) {
+		xge_assert((mss != 0) && (mss <= XGE_HAL_DEFAULT_MTU));
 		xge_hal_fifo_dtr_mss_set(dtr, mss);
 	}
 
+	hcksum_retrieve(mp, NULL, NULL, NULL, NULL, NULL, NULL, &hckflags);
 	if (hckflags & HCK_IPV4_HDRCKSUM) {
 		xge_hal_fifo_dtr_cksum_set_bits(dtr,
 		    XGE_HAL_TXD_TX_CKO_IPV4_EN);
@@ -1132,63 +1176,376 @@ _begin:
 		    XGE_HAL_TXD_TX_CKO_UDP_EN);
 	}
 
-	xge_hal_fifo_dtr_post(fifo_channel, dtr);
+	xge_hal_fifo_dtr_post(ring->channelh, dtr);
 
-	return (B_TRUE);
+	return (NULL);
 
 _exit_cleanup:
-
+	/*
+	 * Could not successfully transmit but have changed the message,
+	 * so just free it and return NULL
+	 */
 	for (i = 0; i < handle_cnt; i++) {
 		(void) ddi_dma_unbind_handle(txd_priv->dma_handles[i]);
 		ddi_dma_free_handle(&txd_priv->dma_handles[i]);
 		txd_priv->dma_handles[i] = 0;
 	}
 
-	xge_hal_fifo_dtr_free(fifo_channel, dtr);
+	xge_hal_fifo_dtr_free(ring->channelh, dtr);
+
+	freemsg(mp);
+	return (NULL);
 
 _exit:
-	if (retry) {
-		if (lldev->resched_avail != lldev->resched_send &&
-		    xge_queue_produce_context(xge_hal_device_queue(lldev->devh),
-		    XGELL_EVENT_RESCHED_NEEDED, fifo) == XGE_QUEUE_OK) {
-			lldev->resched_send = lldev->resched_avail;
-			return (B_FALSE);
-		} else {
-			lldev->resched_retry = 1;
-		}
-	}
-
-	if (mp)
-		freemsg(mp);
-	return (B_TRUE);
+	ring->need_resched = B_TRUE;
+	return (mp);
 }
 
 /*
- * xge_m_tx
- * @arg: pointer to the xgelldev_t structure
- * @resid: resource id
- * @mp: pointer to the message buffer
- *
- * Called by MAC Layer to send a chain of packets
+ * xgell_ring_macaddr_init
  */
-static mblk_t *
-xgell_m_tx(void *arg, mblk_t *mp)
+static void
+xgell_rx_ring_maddr_init(xgell_rx_ring_t *ring)
 {
-	xgelldev_t *lldev = arg;
-	mblk_t *next;
+	int i;
+	xgelldev_t *lldev = ring->lldev;
+	xge_hal_device_t *hldev = lldev->devh;
+	int slot_start;
 
-	while (mp != NULL) {
-		next = mp->b_next;
-		mp->b_next = NULL;
+	xge_debug_ll(XGE_TRACE, "%s", "xgell_rx_ring_maddr_init");
 
-		if (!xgell_send(lldev, mp)) {
-			mp->b_next = next;
-			break;
-		}
-		mp = next;
+	ring->mmac.naddr = XGE_RX_MULTI_MAC_ADDRESSES_MAX;
+	ring->mmac.naddrfree = ring->mmac.naddr;
+
+	/*
+	 * For the default rx ring, the first MAC address is the factory one.
+	 * This will be set by the framework, so need to clear it for now.
+	 */
+	(void) xge_hal_device_macaddr_clear(hldev, 0);
+
+	/*
+	 * Read the MAC address Configuration Memory from HAL.
+	 * The first slot will hold a factory MAC address, contents in other
+	 * slots will be FF:FF:FF:FF:FF:FF.
+	 */
+	slot_start = ring->index * 32;
+	for (i = 0; i < ring->mmac.naddr; i++) {
+		(void) xge_hal_device_macaddr_get(hldev, slot_start + i,
+		    ring->mmac.mac_addr + i);
+		ring->mmac.mac_addr_set[i] = B_FALSE;
+	}
+}
+
+static int xgell_maddr_set(xgelldev_t *, int, uint8_t *);
+
+static int
+xgell_addmac(void *arg, const uint8_t *mac_addr)
+{
+	xgell_rx_ring_t *ring = arg;
+	xgelldev_t *lldev = ring->lldev;
+	xge_hal_device_t *hldev = lldev->devh;
+	int slot;
+	int slot_start;
+
+	xge_debug_ll(XGE_TRACE, "%s", "xgell_addmac");
+
+	mutex_enter(&lldev->genlock);
+
+	if (ring->mmac.naddrfree == 0) {
+		mutex_exit(&lldev->genlock);
+		return (ENOSPC);
 	}
 
-	return (mp);
+	/* First slot is for factory MAC address */
+	for (slot = 0; slot < ring->mmac.naddr; slot++) {
+		if (ring->mmac.mac_addr_set[slot] == B_FALSE) {
+			break;
+		}
+	}
+
+	ASSERT(slot < ring->mmac.naddr);
+
+	slot_start = ring->index * 32;
+
+	if (xgell_maddr_set(lldev, slot_start + slot, (uint8_t *)mac_addr) !=
+	    0) {
+		mutex_exit(&lldev->genlock);
+		return (EIO);
+	}
+
+	/* Simply enable RTS for the whole section. */
+	(void) xge_hal_device_rts_section_enable(hldev, slot_start + slot);
+
+	/*
+	 * Read back the MAC address from HAL to keep the array up to date.
+	 */
+	if (xge_hal_device_macaddr_get(hldev, slot_start + slot,
+	    ring->mmac.mac_addr + slot) != XGE_HAL_OK) {
+		(void) xge_hal_device_macaddr_clear(hldev, slot_start + slot);
+		return (EIO);
+	}
+
+	ring->mmac.mac_addr_set[slot] = B_TRUE;
+	ring->mmac.naddrfree--;
+
+	mutex_exit(&lldev->genlock);
+
+	return (0);
+}
+
+static int
+xgell_remmac(void *arg, const uint8_t *mac_addr)
+{
+	xgell_rx_ring_t *ring = arg;
+	xgelldev_t *lldev = ring->lldev;
+	xge_hal_device_t *hldev = lldev->devh;
+	xge_hal_status_e status;
+	int slot;
+	int slot_start;
+
+	xge_debug_ll(XGE_TRACE, "%s", "xgell_remmac");
+
+	slot = xge_hal_device_macaddr_find(hldev, (uint8_t *)mac_addr);
+	if (slot == -1)
+		return (EINVAL);
+
+	slot_start = ring->index * 32;
+
+	/*
+	 * Adjust slot to the offset in the MAC array of this ring (group).
+	 */
+	slot -= slot_start;
+
+	/*
+	 * Only can remove a pre-set MAC address for this ring (group).
+	 */
+	if (slot < 0 || slot >= ring->mmac.naddr)
+		return (EINVAL);
+
+
+	xge_assert(ring->mmac.mac_addr_set[slot]);
+
+	mutex_enter(&lldev->genlock);
+	if (!ring->mmac.mac_addr_set[slot]) {
+		mutex_exit(&lldev->genlock);
+		/*
+		 * The result will be unexpected when reach here. WARNING!
+		 */
+		xge_debug_ll(XGE_ERR,
+		    "%s%d: caller is trying to remove an unset MAC address",
+		    XGELL_IFNAME, lldev->instance);
+		return (ENXIO);
+	}
+
+	status = xge_hal_device_macaddr_clear(hldev, slot_start + slot);
+	if (status != XGE_HAL_OK) {
+		mutex_exit(&lldev->genlock);
+		return (EIO);
+	}
+
+	ring->mmac.mac_addr_set[slot] = B_FALSE;
+	ring->mmac.naddrfree++;
+
+	/*
+	 * TODO: Disable MAC RTS if all addresses have been cleared.
+	 */
+
+	/*
+	 * Read back the MAC address from HAL to keep the array up to date.
+	 */
+	(void) xge_hal_device_macaddr_get(hldev, slot_start + slot,
+	    ring->mmac.mac_addr + slot);
+	mutex_exit(&lldev->genlock);
+
+	return (0);
+}
+
+/*
+ * Temporarily calling hal function.
+ *
+ * With MSI-X implementation, no lock is needed, so that the interrupt
+ * handling could be faster.
+ */
+int
+xgell_rx_ring_intr_enable(mac_intr_handle_t ih)
+{
+	xgell_rx_ring_t *ring = (xgell_rx_ring_t *)ih;
+
+	mutex_enter(&ring->ring_lock);
+	xge_hal_device_rx_channel_disable_polling(ring->channelh);
+	mutex_exit(&ring->ring_lock);
+
+	return (0);
+}
+
+int
+xgell_rx_ring_intr_disable(mac_intr_handle_t ih)
+{
+	xgell_rx_ring_t *ring = (xgell_rx_ring_t *)ih;
+
+	mutex_enter(&ring->ring_lock);
+	xge_hal_device_rx_channel_enable_polling(ring->channelh);
+	mutex_exit(&ring->ring_lock);
+
+	return (0);
+}
+
+static int
+xgell_rx_ring_start(mac_ring_driver_t rh, uint64_t mr_gen_num)
+{
+	xgell_rx_ring_t *rx_ring = (xgell_rx_ring_t *)rh;
+
+	rx_ring->ring_gen_num = mr_gen_num;
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static void
+xgell_rx_ring_stop(mac_ring_driver_t rh)
+{
+}
+
+/*ARGSUSED*/
+static int
+xgell_tx_ring_start(mac_ring_driver_t rh, uint64_t useless)
+{
+	return (0);
+}
+
+/*ARGSUSED*/
+static void
+xgell_tx_ring_stop(mac_ring_driver_t rh)
+{
+}
+
+/*
+ * Callback funtion for MAC layer to register all rings.
+ *
+ * Xframe hardware doesn't support grouping explicitly, so the driver needs
+ * to pretend having resource groups. We may also optionally group all 8 rx
+ * rings into a single group for increased scalability on CMT architectures,
+ * or group one rx ring per group for maximum virtualization.
+ *
+ * TX grouping is actually done by framework, so, just register all TX
+ * resources without grouping them.
+ */
+void
+xgell_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
+    const int index, mac_ring_info_t *infop, mac_ring_handle_t rh)
+{
+	xgelldev_t *lldev = (xgelldev_t *)arg;
+	mac_intr_t *mintr;
+
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		xgell_rx_ring_t *rx_ring;
+
+		xge_assert(index < lldev->init_rx_rings);
+		xge_assert(rg_index < lldev->init_rx_groups);
+
+		/*
+		 * Performance vs. Virtualization
+		 */
+		if (lldev->init_rx_rings == lldev->init_rx_groups)
+			rx_ring = lldev->rx_ring + rg_index;
+		else
+			rx_ring = lldev->rx_ring + index;
+
+		rx_ring->ring_handle = rh;
+
+		infop->mri_driver = (mac_ring_driver_t)rx_ring;
+		infop->mri_start = xgell_rx_ring_start;
+		infop->mri_stop = xgell_rx_ring_stop;
+		infop->mri_poll = xgell_rx_poll;
+
+		mintr = &infop->mri_intr;
+		mintr->mi_handle = (mac_intr_handle_t)rx_ring;
+		mintr->mi_enable = xgell_rx_ring_intr_enable;
+		mintr->mi_disable = xgell_rx_ring_intr_disable;
+
+		break;
+	}
+	case MAC_RING_TYPE_TX: {
+		xgell_tx_ring_t *tx_ring;
+
+		xge_assert(rg_index == -1);
+
+		xge_assert((index >= 0) && (index < lldev->init_tx_rings));
+
+		tx_ring = lldev->tx_ring + index;
+		tx_ring->ring_handle = rh;
+
+		infop->mri_driver = (mac_ring_driver_t)tx_ring;
+		infop->mri_start = xgell_tx_ring_start;
+		infop->mri_stop = xgell_tx_ring_stop;
+		infop->mri_tx = xgell_ring_tx;
+
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+void
+xgell_fill_group(void *arg, mac_ring_type_t rtype, const int index,
+    mac_group_info_t *infop, mac_group_handle_t gh)
+{
+	xgelldev_t *lldev = (xgelldev_t *)arg;
+
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		xgell_rx_ring_t *rx_ring;
+
+		xge_assert(index < lldev->init_rx_groups);
+
+		rx_ring = lldev->rx_ring + index;
+
+		rx_ring->group_handle = gh;
+
+		infop->mgi_driver = (mac_group_driver_t)rx_ring;
+		infop->mgi_start = NULL;
+		infop->mgi_stop = NULL;
+		infop->mgi_addmac = xgell_addmac;
+		infop->mgi_remmac = xgell_remmac;
+		infop->mgi_count = lldev->init_rx_rings / lldev->init_rx_groups;
+
+		break;
+	}
+	case MAC_RING_TYPE_TX:
+		xge_assert(0);
+		break;
+	default:
+		break;
+	}
+}
+
+/*
+ * xgell_macaddr_set
+ */
+static int
+xgell_maddr_set(xgelldev_t *lldev, int index, uint8_t *macaddr)
+{
+	xge_hal_device_t *hldev = lldev->devh;
+	xge_hal_status_e status;
+
+	xge_debug_ll(XGE_TRACE, "%s", "xgell_maddr_set");
+
+	xge_debug_ll(XGE_TRACE,
+	    "setting macaddr: 0x%02x-%02x-%02x-%02x-%02x-%02x",
+	    macaddr[0], macaddr[1], macaddr[2],
+	    macaddr[3], macaddr[4], macaddr[5]);
+
+	status = xge_hal_device_macaddr_set(hldev, index, (uchar_t *)macaddr);
+
+	if (status != XGE_HAL_OK) {
+		xge_debug_ll(XGE_ERR, "%s%d: can not set mac address",
+		    XGELL_IFNAME, lldev->instance);
+		return (EIO);
+	}
+
+	return (0);
 }
 
 /*
@@ -1201,17 +1558,149 @@ static void
 xgell_rx_dtr_term(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
     xge_hal_dtr_state_e state, void *userdata, xge_hal_channel_reopen_e reopen)
 {
-	xgell_ring_t *ring = (xgell_ring_t *)userdata;
 	xgell_rxd_priv_t *rxd_priv =
 	    ((xgell_rxd_priv_t *)xge_hal_ring_dtr_private(channelh, dtrh));
 	xgell_rx_buffer_t *rx_buffer = rxd_priv->rx_buffer;
 
 	if (state == XGE_HAL_DTR_STATE_POSTED) {
+		xgell_rx_ring_t *ring = rx_buffer->ring;
+
 		mutex_enter(&ring->bf_pool.pool_lock);
 		xge_hal_ring_dtr_free(channelh, dtrh);
 		xgell_rx_buffer_release(rx_buffer);
 		mutex_exit(&ring->bf_pool.pool_lock);
 	}
+}
+
+/*
+ * To open a rx ring.
+ */
+static boolean_t
+xgell_rx_ring_open(xgell_rx_ring_t *rx_ring)
+{
+	xge_hal_status_e status;
+	xge_hal_channel_attr_t attr;
+	xgelldev_t *lldev = rx_ring->lldev;
+	xge_hal_device_t *hldev = lldev->devh;
+
+	if (rx_ring->live)
+		return (B_TRUE);
+
+	/* Create the buffer pool first */
+	if (!xgell_rx_create_buffer_pool(rx_ring)) {
+		xge_debug_ll(XGE_ERR, "can not create buffer pool for ring: %d",
+		    rx_ring->index);
+		return (B_FALSE);
+	}
+
+	/* Default ring initialization */
+	attr.post_qid		= rx_ring->index;
+	attr.compl_qid		= 0;
+	attr.callback		= xgell_rx_1b_callback;
+	attr.per_dtr_space	= sizeof (xgell_rxd_priv_t);
+	attr.flags		= 0;
+	attr.type		= XGE_HAL_CHANNEL_TYPE_RING;
+	attr.dtr_init		= xgell_rx_dtr_replenish;
+	attr.dtr_term		= xgell_rx_dtr_term;
+	attr.userdata		= rx_ring;
+
+	status = xge_hal_channel_open(lldev->devh, &attr, &rx_ring->channelh,
+	    XGE_HAL_CHANNEL_OC_NORMAL);
+	if (status != XGE_HAL_OK) {
+		xge_debug_ll(XGE_ERR, "%s%d: cannot open Rx channel got status "
+		    " code %d", XGELL_IFNAME, lldev->instance, status);
+		(void) xgell_rx_destroy_buffer_pool(rx_ring);
+		return (B_FALSE);
+	}
+
+	xgell_rx_ring_maddr_init(rx_ring);
+
+	mutex_init(&rx_ring->ring_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(hldev->irqh));
+
+	rx_ring->received_bytes = 0;
+	rx_ring->poll_bytes = -1;
+	rx_ring->polled_bytes = 0;
+	rx_ring->poll_mp = NULL;
+	rx_ring->live = B_TRUE;
+
+	xge_debug_ll(XGE_TRACE, "RX ring [%d] is opened successfully",
+	    rx_ring->index);
+
+	return (B_TRUE);
+}
+
+static void
+xgell_rx_ring_close(xgell_rx_ring_t *rx_ring)
+{
+	if (!rx_ring->live)
+		return;
+	xge_hal_channel_close(rx_ring->channelh, XGE_HAL_CHANNEL_OC_NORMAL);
+	rx_ring->channelh = NULL;
+	/* This may not clean up all used buffers, driver will handle it */
+	if (xgell_rx_destroy_buffer_pool(rx_ring))
+		rx_ring->live = B_FALSE;
+
+	mutex_destroy(&rx_ring->ring_lock);
+}
+
+/*
+ * xgell_rx_open
+ * @lldev: the link layer object
+ *
+ * Initialize and open all RX channels.
+ */
+static boolean_t
+xgell_rx_open(xgelldev_t *lldev)
+{
+	xgell_rx_ring_t *rx_ring;
+	int i;
+
+	if (lldev->live_rx_rings != 0)
+		return (B_TRUE);
+
+	lldev->live_rx_rings = 0;
+
+	/*
+	 * Initialize all rings
+	 */
+	for (i = 0; i < lldev->init_rx_rings; i++) {
+		rx_ring = &lldev->rx_ring[i];
+		rx_ring->index = i;
+		rx_ring->lldev = lldev;
+		rx_ring->live = B_FALSE;
+
+		if (!xgell_rx_ring_open(rx_ring))
+			return (B_FALSE);
+
+		lldev->live_rx_rings++;
+	}
+
+	return (B_TRUE);
+}
+
+static void
+xgell_rx_close(xgelldev_t *lldev)
+{
+	xgell_rx_ring_t *rx_ring;
+	int i;
+
+	if (lldev->live_rx_rings == 0)
+		return;
+
+	/*
+	 * Close all rx rings
+	 */
+	for (i = 0; i < lldev->init_rx_rings; i++) {
+		rx_ring = &lldev->rx_ring[i];
+
+		if (rx_ring->live) {
+			xgell_rx_ring_close(rx_ring);
+			lldev->live_rx_rings--;
+		}
+	}
+
+	xge_assert(lldev->live_rx_rings == 0);
 }
 
 /*
@@ -1252,213 +1741,103 @@ xgell_tx_term(xge_hal_channel_h channelh, xge_hal_dtr_h dtrh,
 	}
 }
 
-/*
- * xgell_tx_close
- * @lldev: the link layer object
- *
- * Close all Tx channels
- */
-static void
-xgell_tx_close(xgelldev_t *lldev)
+static boolean_t
+xgell_tx_ring_open(xgell_tx_ring_t *tx_ring)
 {
-	xge_list_t *item, *list;
-	xge_hal_device_t *hldev = (xge_hal_device_t *)lldev->devh;
+	xge_hal_status_e status;
+	xge_hal_channel_attr_t attr;
+	xgelldev_t *lldev = tx_ring->lldev;
 
-	list = &hldev->fifo_channels;
-	while (!xge_list_is_empty(list)) {
-		item = xge_list_first_get(list);
-		xge_hal_channel_t *channel = xge_container_of(item,
-		    xge_hal_channel_t, item);
+	if (tx_ring->live)
+		return (B_TRUE);
 
-		xge_hal_channel_close(channel, XGE_HAL_CHANNEL_OC_NORMAL);
+	attr.post_qid		= tx_ring->index;
+	attr.compl_qid		= 0;
+	attr.callback		= xgell_xmit_compl;
+	attr.per_dtr_space	= sizeof (xgell_txd_priv_t);
+	attr.flags		= 0;
+	attr.type		= XGE_HAL_CHANNEL_TYPE_FIFO;
+	attr.dtr_init		= NULL;
+	attr.dtr_term		= xgell_tx_term;
+	attr.userdata		= tx_ring;
+
+	status = xge_hal_channel_open(lldev->devh, &attr, &tx_ring->channelh,
+	    XGE_HAL_CHANNEL_OC_NORMAL);
+	if (status != XGE_HAL_OK) {
+		xge_debug_ll(XGE_ERR, "%s%d: cannot open Tx channel got status "
+		    "code %d", XGELL_IFNAME, lldev->instance, status);
+		return (B_FALSE);
 	}
+
+	tx_ring->sent_bytes = 0;
+	tx_ring->live = B_TRUE;
+
+	return (B_TRUE);
+}
+
+static void
+xgell_tx_ring_close(xgell_tx_ring_t *tx_ring)
+{
+	if (!tx_ring->live)
+		return;
+	xge_hal_channel_close(tx_ring->channelh, XGE_HAL_CHANNEL_OC_NORMAL);
+	tx_ring->live = B_FALSE;
 }
 
 /*
  * xgell_tx_open
  * @lldev: the link layer object
  *
- * Initialize and open all Tx channels;
+ * Initialize and open all TX channels.
  */
 static boolean_t
 xgell_tx_open(xgelldev_t *lldev)
 {
-	xge_hal_status_e status;
-	u64 adapter_status;
-	xge_hal_channel_attr_t attr;
-	xge_list_t *item;
-	xge_hal_device_t *hldev = (xge_hal_device_t *)lldev->devh;
+	xgell_tx_ring_t *tx_ring;
+	int i;
 
-	attr.post_qid		= 0;
-	attr.compl_qid		= 0;
-	attr.callback		= xgell_xmit_compl;
-	attr.per_dtr_space	= sizeof (xgell_txd_priv_t);
-	attr.flags		= 0;
-	attr.type		= XGE_HAL_CHANNEL_TYPE_FIFO;
-	attr.userdata		= lldev;
-	attr.dtr_init		= NULL;
-	attr.dtr_term		= xgell_tx_term;
+	if (lldev->live_tx_rings != 0)
+		return (B_TRUE);
 
-	if (xge_hal_device_status(lldev->devh, &adapter_status)) {
-		xge_debug_ll(XGE_ERR, "%s%d: device is not ready "
-		    "adaper status reads 0x%"PRIx64, XGELL_IFNAME,
-		    lldev->instance, (uint64_t)adapter_status);
-		return (B_FALSE);
-	}
+	lldev->live_tx_rings = 0;
 
 	/*
-	 * Open only configured channels. HAL structures are static,
-	 * so, no worries here..
+	 * Enable rings by reserve sequence to match the h/w sequences.
 	 */
-_next_channel:
-	xge_list_for_each(item, &hldev->free_channels) {
-		xge_hal_channel_t *channel = xge_container_of(item,
-		    xge_hal_channel_t, item);
-		xgell_fifo_t *fifo;
+	for (i = 0; i < lldev->init_tx_rings; i++) {
+		tx_ring = &lldev->tx_ring[i];
+		tx_ring->index = i;
+		tx_ring->lldev = lldev;
+		tx_ring->live = B_FALSE;
 
-		/* filter on FIFO channels */
-		if (channel->type != XGE_HAL_CHANNEL_TYPE_FIFO)
-			continue;
-
-		fifo = &lldev->fifos[attr.post_qid];
-		fifo->lldev = lldev;
-		attr.userdata = fifo;
-
-		status = xge_hal_channel_open(lldev->devh, &attr,
-		    &fifo->channelh, XGE_HAL_CHANNEL_OC_NORMAL);
-		if (status != XGE_HAL_OK) {
-			xge_debug_ll(XGE_ERR, "%s%d: cannot open Tx channel "
-			    "got status  code %d", XGELL_IFNAME,
-			    lldev->instance, status);
-			/* unwind */
-			xgell_tx_close(lldev);
+		if (!xgell_tx_ring_open(tx_ring))
 			return (B_FALSE);
-		}
 
-		attr.post_qid++;
-
-		/*
-		 * because channel_open() moves xge_list entry
-		 * to the fifos_channels
-		 */
-		goto _next_channel;
+		lldev->live_tx_rings++;
 	}
 
 	return (B_TRUE);
 }
 
-/*
- * xgell_rx_close
- * @lldev: the link layer object
- *
- * Close all Rx channels
- */
 static void
-xgell_rx_close(xgelldev_t *lldev)
+xgell_tx_close(xgelldev_t *lldev)
 {
-	xge_list_t *item, *list;
-	xge_hal_device_t *hldev = (xge_hal_device_t *)lldev->devh;
+	xgell_tx_ring_t *tx_ring;
+	int i;
 
-	list = &hldev->ring_channels;
-	while (!xge_list_is_empty(list)) {
-		item = xge_list_first_get(list);
-		xge_hal_channel_t *channel = xge_container_of(item,
-		    xge_hal_channel_t, item);
-		xgell_ring_t *ring = xge_hal_channel_userdata(channel);
-
-		xge_hal_channel_close(channel, XGE_HAL_CHANNEL_OC_NORMAL);
-
-		/*
-		 * destroy Ring's buffer pool
-		 */
-		if (xgell_rx_destroy_buffer_pool(ring) != DDI_SUCCESS) {
-			xge_debug_ll(XGE_ERR, "unable to destroy Ring%d "
-			    "buffer pool", channel->post_qid);
-		}
-		list = &hldev->ring_channels;
-	}
-}
-
-/*
- * xgell_rx_open
- * @lldev: the link layer object
- *
- * Initialize and open all Rx channels;
- */
-static boolean_t
-xgell_rx_open(xgelldev_t *lldev)
-{
-	xge_hal_status_e status;
-	u64 adapter_status;
-	xge_hal_channel_attr_t attr;
-	xge_list_t *item;
-	xge_hal_device_t *hldev = (xge_hal_device_t *)lldev->devh;
-
-	attr.post_qid		= 0;
-	attr.compl_qid		= 0;
-	attr.callback		= xgell_rx_1b_compl;
-	attr.per_dtr_space	= sizeof (xgell_rxd_priv_t);
-	attr.flags		= 0;
-	attr.type		= XGE_HAL_CHANNEL_TYPE_RING;
-	attr.dtr_init		= xgell_rx_dtr_replenish;
-	attr.dtr_term		= xgell_rx_dtr_term;
-
-	if (xge_hal_device_status(lldev->devh, &adapter_status)) {
-		xge_debug_ll(XGE_ERR,
-		    "%s%d: device is not ready adaper status reads 0x%"PRIx64,
-		    XGELL_IFNAME, lldev->instance,
-		    (uint64_t)adapter_status);
-		return (B_FALSE);
-	}
+	if (lldev->live_tx_rings == 0)
+		return;
 
 	/*
-	 * Open only configured channels. HAL structures are static,
-	 * so, no worries here..
+	 * Enable rings by reserve sequence to match the h/w sequences.
 	 */
-_next_channel:
-	xge_list_for_each(item, &hldev->free_channels) {
-		xge_hal_channel_t *channel = xge_container_of(item,
-		    xge_hal_channel_t, item);
-		xgell_ring_t *ring;
-
-		/* filter on RING channels */
-		if (channel->type != XGE_HAL_CHANNEL_TYPE_RING)
-			continue;
-
-		ring = &lldev->rings[attr.post_qid];
-		ring->lldev = lldev;
-		attr.userdata = ring;
-
-		if (xgell_rx_create_buffer_pool(ring) != DDI_SUCCESS) {
-			xge_debug_ll(XGE_ERR, "unable to create Ring%d "
-			    "buffer pool", attr.post_qid);
-			/* unwind */
-			xgell_rx_close(lldev);
-			return (B_FALSE);
+	for (i = 0; i < lldev->init_tx_rings; i++) {
+		tx_ring = &lldev->tx_ring[i];
+		if (tx_ring->live) {
+			xgell_tx_ring_close(tx_ring);
+			lldev->live_tx_rings--;
 		}
-
-		status = xge_hal_channel_open(lldev->devh, &attr,
-		    &ring->channelh, XGE_HAL_CHANNEL_OC_NORMAL);
-		if (status != XGE_HAL_OK) {
-			xge_debug_ll(XGE_ERR, "%s%d: cannot open Rx channel "
-			    "got status got status code %d", XGELL_IFNAME,
-			    lldev->instance, status);
-			/* unwind */
-			(void) xgell_rx_destroy_buffer_pool(ring);
-			xgell_rx_close(lldev);
-			return (B_FALSE);
-		}
-
-		attr.post_qid++;
-
-		/*
-		 * because chhannel_open() moves xge_list entry
-		 * to the rings channels
-		 */
-		goto _next_channel;
 	}
-
-	return (B_TRUE);
 }
 
 static int
@@ -1485,13 +1864,13 @@ xgell_initiate_start(xgelldev_t *lldev)
 	}
 
 	/* tune jumbo/normal frame UFC counters */
-	hldev->config.ring.queue[XGELL_RING_MAIN_QID].rti.ufc_b = \
-	    maxpkt > XGE_HAL_DEFAULT_MTU ?
+	hldev->config.ring.queue[XGELL_RX_RING_MAIN].rti.ufc_b =
+	    (maxpkt > XGE_HAL_DEFAULT_MTU) ?
 	    XGE_HAL_DEFAULT_RX_UFC_B_J :
 	    XGE_HAL_DEFAULT_RX_UFC_B_N;
 
-	hldev->config.ring.queue[XGELL_RING_MAIN_QID].rti.ufc_c = \
-	    maxpkt > XGE_HAL_DEFAULT_MTU ?
+	hldev->config.ring.queue[XGELL_RX_RING_MAIN].rti.ufc_c =
+	    (maxpkt > XGE_HAL_DEFAULT_MTU) ?
 	    XGE_HAL_DEFAULT_RX_UFC_C_J :
 	    XGE_HAL_DEFAULT_RX_UFC_C_N;
 
@@ -1515,6 +1894,7 @@ xgell_initiate_start(xgelldev_t *lldev)
 			    XGELL_IFNAME, lldev->instance,
 			    (uint64_t)adapter_status, status);
 		}
+		xgell_rx_close(lldev);
 		xge_os_mdelay(1500);
 		return (ENOMEM);
 	}
@@ -1531,9 +1911,9 @@ xgell_initiate_start(xgelldev_t *lldev)
 			    XGELL_IFNAME, lldev->instance,
 			    (uint64_t)adapter_status, status);
 		}
-		xge_os_mdelay(1500);
+		xgell_tx_close(lldev);
 		xgell_rx_close(lldev);
-
+		xge_os_mdelay(1500);
 		return (ENOMEM);
 	}
 
@@ -1685,46 +2065,6 @@ xgell_onerr_reset(xgelldev_t *lldev)
 
 	return (rc);
 }
-
-
-/*
- * xgell_m_unicst
- * @arg: pointer to device private strucutre(hldev)
- * @mac_addr:
- *
- * This function is called by MAC Layer to set the physical address
- * of the XFRAME firmware.
- */
-static int
-xgell_m_unicst(void *arg, const uint8_t *macaddr)
-{
-	xge_hal_status_e status;
-	xgelldev_t *lldev = (xgelldev_t *)arg;
-	xge_hal_device_t *hldev = lldev->devh;
-	xge_debug_ll(XGE_TRACE, "%s", "MAC_UNICST");
-
-	xge_debug_ll(XGE_TRACE, "%s", "M_UNICAST");
-
-	mutex_enter(&lldev->genlock);
-
-	xge_debug_ll(XGE_TRACE,
-	    "setting macaddr: 0x%02x-%02x-%02x-%02x-%02x-%02x",
-	    macaddr[0], macaddr[1], macaddr[2],
-	    macaddr[3], macaddr[4], macaddr[5]);
-
-	status = xge_hal_device_macaddr_set(hldev, 0, (uchar_t *)macaddr);
-	if (status != XGE_HAL_OK) {
-		xge_debug_ll(XGE_ERR, "%s%d: can not set mac address",
-		    XGELL_IFNAME, lldev->instance);
-		mutex_exit(&lldev->genlock);
-		return (EIO);
-	}
-
-	mutex_exit(&lldev->genlock);
-
-	return (0);
-}
-
 
 /*
  * xgell_m_multicst
@@ -2039,11 +2379,13 @@ xgell_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	}
 }
 
-/* ARGSUSED */
+
 static boolean_t
 xgell_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
 	xgelldev_t *lldev = arg;
+
+	xge_debug_ll(XGE_TRACE, "xgell_m_getcapab: %x", cap);
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM: {
@@ -2062,6 +2404,29 @@ xgell_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		} else {
 			return (B_FALSE);
 		}
+	}
+	case MAC_CAPAB_RINGS: {
+		mac_capab_rings_t *cap_rings = cap_data;
+
+		switch (cap_rings->mr_type) {
+		case MAC_RING_TYPE_RX:
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+			cap_rings->mr_rnum = lldev->init_rx_rings;
+			cap_rings->mr_gnum = lldev->init_rx_groups;
+			cap_rings->mr_rget = xgell_fill_ring;
+			cap_rings->mr_gget = xgell_fill_group;
+			break;
+		case MAC_RING_TYPE_TX:
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+			cap_rings->mr_rnum = lldev->init_tx_rings;
+			cap_rings->mr_gnum = 0;
+			cap_rings->mr_rget = xgell_fill_ring;
+			cap_rings->mr_gget = NULL;
+			break;
+		default:
+			break;
+		}
+		break;
 	}
 	default:
 		return (B_FALSE);
@@ -2320,8 +2685,7 @@ xgell_devconfig_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *credp)
 		return (ENOSPC);
 	}
 	status = xge_hal_aux_device_config_read(lldev->devh,
-	    XGELL_DEVCONF_BUFSIZE,
-	    buf, &retsize);
+	    XGELL_DEVCONF_BUFSIZE, buf, &retsize);
 	if (status != XGE_HAL_OK) {
 		kmem_free(buf, XGELL_DEVCONF_BUFSIZE);
 		xge_debug_ll(XGE_ERR, "device_config_read(): status %d",
@@ -2349,6 +2713,9 @@ xgell_device_register(xgelldev_t *lldev, xgell_config_t *config)
 	mac_register_t *macp = NULL;
 	xge_hal_device_t *hldev = (xge_hal_device_t *)lldev->devh;
 
+	/*
+	 * Initialize some NDD interface for internal debug.
+	 */
 	if (nd_load(&lldev->ndp, "pciconf", xgell_pciconf_get, NULL,
 	    (caddr_t)lldev) == B_FALSE)
 		goto xgell_ndd_fail;
@@ -2393,11 +2760,11 @@ xgell_device_register(xgelldev_t *lldev, xgell_config_t *config)
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = hldev->config.mtu;
 	macp->m_margin = VLAN_TAGSZ;
-	/*
-	 * Finally, we're ready to register ourselves with the Nemo
-	 * interface; if this succeeds, we're all ready to start()
-	 */
+	macp->m_v12n = MAC_VIRT_LEVEL1;
 
+	/*
+	 * MAC Registration.
+	 */
 	if (mac_register(macp, &lldev->mh) != 0)
 		goto xgell_register_fail;
 

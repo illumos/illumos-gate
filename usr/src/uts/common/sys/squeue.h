@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SQUEUE_H
 #define	_SYS_SQUEUE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,7 +44,30 @@ typedef struct squeue_s squeue_t;
 	(mp)->b_prev = (mblk_t *)(arg);				\
 }
 
-#define	GET_SQUEUE(mp)		((conn_t *)((mp)->b_prev))->conn_sqp
+#define	GET_SQUEUE(mp)	((conn_t *)((mp)->b_prev))->conn_sqp
+
+#define	SQ_FILL		0x0001
+#define	SQ_NODRAIN	0x0002
+#define	SQ_PROCESS	0x0004
+
+#define	SQUEUE_ENTER(sqp, head, tail, cnt, flag, tag) {	\
+	sqp->sq_enter(sqp, head, tail, cnt, flag, tag);	\
+}
+
+#define	SQUEUE_ENTER_ONE(sqp, mp, proc, arg, flag, tag) {	\
+	ASSERT(mp->b_next == NULL);				\
+	ASSERT(mp->b_prev == NULL);				\
+	SET_SQUEUE(mp, proc, arg);				\
+	SQUEUE_ENTER(sqp, mp, mp, 1, flag, tag);		\
+}
+
+/*
+ * May be called only by a thread executing in the squeue. The thread must
+ * not continue to execute any code needing squeue protection after calling
+ * this macro. Please see the comments in squeue.c for more details.
+ */
+#define	SQUEUE_SWITCH(connp, new_sqp)				\
+	(connp)->conn_sqp = new_sqp;
 
 /*
  * Facility-special private data in squeues.
@@ -57,26 +77,13 @@ typedef enum {
 	SQPRIVATE_MAX
 } sqprivate_t;
 
-typedef void (*sqproc_t)(void *, mblk_t *, void *);
-
 extern void squeue_init(void);
-extern squeue_t *squeue_create(char *, processorid_t, clock_t, pri_t);
+extern squeue_t *squeue_create(clock_t, pri_t);
 extern void squeue_bind(squeue_t *, processorid_t);
 extern void squeue_unbind(squeue_t *);
-extern void squeue_enter_chain(squeue_t *, mblk_t *, mblk_t *,
-    uint32_t, uint8_t);
-extern void squeue_enter(squeue_t *, mblk_t *, sqproc_t, void *, uint8_t);
-extern void squeue_enter_nodrain(squeue_t *, mblk_t *, sqproc_t, void *,
-    uint8_t);
-extern void squeue_fill(squeue_t *, mblk_t *, sqproc_t, void *, uint8_t);
+extern void squeue_enter(squeue_t *, mblk_t *, mblk_t *,
+    uint32_t, int, uint8_t);
 extern uintptr_t *squeue_getprivate(squeue_t *, sqprivate_t);
-extern processorid_t squeue_binding(squeue_t *);
-
-extern void squeue_profile_reset(squeue_t *);
-extern void squeue_profile_enable(squeue_t *);
-extern void squeue_profile_disable(squeue_t *);
-extern void squeue_profile_stop(void);
-extern void squeue_profile_start(void);
 
 #ifdef	__cplusplus
 }

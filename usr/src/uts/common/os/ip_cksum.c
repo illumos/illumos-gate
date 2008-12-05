@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/inttypes.h>
@@ -36,6 +33,7 @@
 #include <sys/ddi.h>
 #include <sys/vtrace.h>
 #include <inet/sctp_crc32.h>
+#include <inet/ip.h>
 
 #include <sys/multidata.h>
 #include <sys/multidata_impl.h>
@@ -154,14 +152,14 @@ ip_cksum(mblk_t *mp, int offset, uint_t sum)
 				 */
 				if (mlen)
 					mlen += dp->db_cksumend
-						- dp->db_cksumstuff;
+					    - dp->db_cksumstuff;
 				else {
 					w = (ushort_t *)(mp->b_rptr +
 					    dp->db_cksumstuff);
 					if (is_odd(w))
 						goto slow;
 					mlen = dp->db_cksumend
-						- dp->db_cksumstuff;
+					    - dp->db_cksumstuff;
 				}
 			} else if (mlen == 0)
 				return (psum);
@@ -239,7 +237,7 @@ slow1:
 				int odd;
 			douio:
 				odd = is_odd(dp->db_cksumstuff -
-						dp->db_cksumstart);
+				    dp->db_cksumstart);
 				if (pmlen == -1) {
 					/*
 					 * Previous mlen was odd, so swap
@@ -262,7 +260,7 @@ slow1:
 					 */
 					if (mlen)
 						mlen += dp->db_cksumend
-							- dp->db_cksumstuff;
+						    - dp->db_cksumstuff;
 					else {
 						w = (ushort_t *)(mp->b_rptr +
 						    dp->db_cksumstuff);
@@ -385,7 +383,7 @@ done:
 	sum = (sum & 0xFFFF) + (sum >> 16);
 	sum = (sum & 0xFFFF) + (sum >> 16);
 	TRACE_3(TR_FAC_IP, TR_IP_CKSUM_END,
-		"ip_cksum_end:(%S) type %d (%X)", "ip_cksum", 1, sum);
+	    "ip_cksum_end:(%S) type %d (%X)", "ip_cksum", 1, sum);
 	return (sum);
 }
 
@@ -536,4 +534,31 @@ ip_md_cksum(pdesc_t *pd, int offset, uint_t sum)
 	sum = (sum & 0xffff) + (sum >> 16);
 
 	return (sum);
+}
+
+/* Return the IP checksum for the IP header at "iph". */
+uint16_t
+ip_csum_hdr(ipha_t *ipha)
+{
+	uint16_t	*uph;
+	uint32_t	sum;
+	int		opt_len;
+
+	opt_len = (ipha->ipha_version_and_hdr_length & 0xF) -
+	    IP_SIMPLE_HDR_LENGTH_IN_WORDS;
+	uph = (uint16_t *)ipha;
+	sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
+	    uph[5] + uph[6] + uph[7] + uph[8] + uph[9];
+	if (opt_len > 0) {
+		do {
+			sum += uph[10];
+			sum += uph[11];
+			uph += 2;
+		} while (--opt_len);
+	}
+	sum = (sum & 0xFFFF) + (sum >> 16);
+	sum = ~(sum + (sum >> 16)) & 0xFFFF;
+	if (sum == 0xffff)
+		sum = 0;
+	return ((uint16_t)sum);
 }

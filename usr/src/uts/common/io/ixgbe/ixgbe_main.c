@@ -61,6 +61,8 @@ static void ixgbe_setup_rx_ring(ixgbe_rx_ring_t *);
 static void ixgbe_setup_tx_ring(ixgbe_tx_ring_t *);
 static void ixgbe_setup_rss(ixgbe_t *);
 static void ixgbe_init_unicst(ixgbe_t *);
+static int ixgbe_unicst_set(ixgbe_t *, const uint8_t *, int);
+static int ixgbe_unicst_find(ixgbe_t *, const uint8_t *);
 static void ixgbe_setup_multicst(ixgbe_t *);
 static void ixgbe_get_hw_state(ixgbe_t *);
 static void ixgbe_get_conf(ixgbe_t *);
@@ -83,7 +85,9 @@ static int ixgbe_alloc_intr_handles(ixgbe_t *, int);
 static int ixgbe_add_intr_handlers(ixgbe_t *);
 static void ixgbe_map_rxring_to_vector(ixgbe_t *, int, int);
 static void ixgbe_map_txring_to_vector(ixgbe_t *, int, int);
-static void ixgbe_set_ivar(ixgbe_t *, uint16_t, uint8_t);
+static void ixgbe_setup_ivar(ixgbe_t *, uint16_t, uint8_t);
+static void ixgbe_enable_ivar(ixgbe_t *, uint16_t);
+static void ixgbe_disable_ivar(ixgbe_t *, uint16_t);
 static int ixgbe_map_rings_to_vectors(ixgbe_t *);
 static void ixgbe_setup_adapter_vector(ixgbe_t *);
 static void ixgbe_rem_intr_handlers(ixgbe_t *);
@@ -92,12 +96,14 @@ static int ixgbe_enable_intrs(ixgbe_t *);
 static int ixgbe_disable_intrs(ixgbe_t *);
 static uint_t ixgbe_intr_legacy(void *, void *);
 static uint_t ixgbe_intr_msi(void *, void *);
-static uint_t ixgbe_intr_rx(void *, void *);
-static uint_t ixgbe_intr_tx_other(void *, void *);
+static uint_t ixgbe_intr_rx_tx(void *, void *);
+static uint_t ixgbe_intr_other(void *, void *);
 static void ixgbe_intr_rx_work(ixgbe_rx_ring_t *);
 static void ixgbe_intr_tx_work(ixgbe_tx_ring_t *);
 static void ixgbe_intr_other_work(ixgbe_t *);
 static void ixgbe_get_driver_control(struct ixgbe_hw *);
+static int ixgbe_addmac(void *, const uint8_t *);
+static int ixgbe_remmac(void *, const uint8_t *);
 static void ixgbe_release_driver_control(struct ixgbe_hw *);
 
 static int ixgbe_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -188,8 +194,7 @@ static mac_callbacks_t ixgbe_m_callbacks = {
 	ixgbe_m_stop,
 	ixgbe_m_promisc,
 	ixgbe_m_multicst,
-	ixgbe_m_unicst,
-	ixgbe_m_tx,
+	NULL,
 	NULL,
 	ixgbe_m_ioctl,
 	ixgbe_m_getcapab
@@ -675,6 +680,7 @@ ixgbe_register_mac(ixgbe_t *ixgbe)
 	mac->m_min_sdu = 0;
 	mac->m_max_sdu = ixgbe->default_mtu;
 	mac->m_margin = VLAN_TAGSZ;
+	mac->m_v12n = MAC_VIRT_LEVEL1;
 
 	status = mac_register(mac, &ixgbe->mac_hdl);
 
@@ -765,6 +771,7 @@ static int
 ixgbe_init_driver_settings(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
+	dev_info_t *devinfo = ixgbe->dip;
 	ixgbe_rx_ring_t *rx_ring;
 	ixgbe_tx_ring_t *tx_ring;
 	uint32_t rx_size;
@@ -777,6 +784,11 @@ ixgbe_init_driver_settings(ixgbe_t *ixgbe)
 	if (ixgbe_init_shared_code(hw) != IXGBE_SUCCESS) {
 		return (IXGBE_FAILURE);
 	}
+
+	/*
+	 * Get the system page size
+	 */
+	ixgbe->sys_page_size = ddi_ptob(devinfo, (ulong_t)1);
 
 	/*
 	 * Set rx buffer size
@@ -1569,6 +1581,23 @@ ixgbe_alloc_rings(ixgbe_t *ixgbe)
 		return (IXGBE_FAILURE);
 	}
 
+	/*
+	 * Allocate memory space for rx ring groups
+	 */
+	ixgbe->rx_groups = kmem_zalloc(
+	    sizeof (ixgbe_rx_group_t) * ixgbe->num_rx_groups,
+	    KM_NOSLEEP);
+
+	if (ixgbe->rx_groups == NULL) {
+		kmem_free(ixgbe->rx_rings,
+		    sizeof (ixgbe_rx_ring_t) * ixgbe->num_rx_rings);
+		kmem_free(ixgbe->tx_rings,
+		    sizeof (ixgbe_tx_ring_t) * ixgbe->num_tx_rings);
+		ixgbe->rx_rings = NULL;
+		ixgbe->tx_rings = NULL;
+		return (IXGBE_FAILURE);
+	}
+
 	return (IXGBE_SUCCESS);
 }
 
@@ -1588,6 +1617,12 @@ ixgbe_free_rings(ixgbe_t *ixgbe)
 		kmem_free(ixgbe->tx_rings,
 		    sizeof (ixgbe_tx_ring_t) * ixgbe->num_tx_rings);
 		ixgbe->tx_rings = NULL;
+	}
+
+	if (ixgbe->rx_groups != NULL) {
+		kmem_free(ixgbe->rx_groups,
+		    sizeof (ixgbe_rx_group_t) * ixgbe->num_rx_groups);
+		ixgbe->rx_groups = NULL;
 	}
 }
 
@@ -1693,7 +1728,9 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 {
 	ixgbe_rx_ring_t *rx_ring;
 	struct ixgbe_hw *hw = &ixgbe->hw;
+	ixgbe_rx_group_t *rx_group;
 	uint32_t reg_val;
+	uint32_t ring_mapping;
 	int i;
 
 	/*
@@ -1721,6 +1758,29 @@ ixgbe_setup_rx(ixgbe_t *ixgbe)
 		rx_ring = &ixgbe->rx_rings[i];
 		ixgbe_setup_rx_ring(rx_ring);
 	}
+
+	/*
+	 * Setup rx groups.
+	 */
+	for (i = 0; i < ixgbe->num_rx_groups; i++) {
+		rx_group = &ixgbe->rx_groups[i];
+		rx_group->index = i;
+		rx_group->ixgbe = ixgbe;
+	}
+
+	/*
+	 * Setup the per-ring statistics mapping.
+	 */
+	ring_mapping = 0;
+	for (i = 0; i < ixgbe->num_rx_rings; i++) {
+		ring_mapping |= (i & 0xF) << (8 * (i & 0x3));
+		if ((i & 0x3) == 0x3) {
+			IXGBE_WRITE_REG(hw, IXGBE_RQSMR(i >> 2), ring_mapping);
+			ring_mapping = 0;
+		}
+	}
+	if ((i & 0x3) != 0x3)
+		IXGBE_WRITE_REG(hw, IXGBE_RQSMR(i >> 2), ring_mapping);
 
 	/*
 	 * The Max Frame Size in MHADD will be internally increased by four
@@ -1858,12 +1918,27 @@ ixgbe_setup_tx(ixgbe_t *ixgbe)
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	ixgbe_tx_ring_t *tx_ring;
 	uint32_t reg_val;
+	uint32_t ring_mapping;
 	int i;
 
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
 		tx_ring = &ixgbe->tx_rings[i];
 		ixgbe_setup_tx_ring(tx_ring);
 	}
+
+	/*
+	 * Setup the per-ring statistics mapping.
+	 */
+	ring_mapping = 0;
+	for (i = 0; i < ixgbe->num_tx_rings; i++) {
+		ring_mapping |= (i & 0xF) << (8 * (i & 0x3));
+		if ((i & 0x3) == 0x3) {
+			IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2), ring_mapping);
+			ring_mapping = 0;
+		}
+	}
+	if ((i & 0x3) != 0x3)
+		IXGBE_WRITE_REG(hw, IXGBE_TQSMR(i >> 2), ring_mapping);
 
 	/*
 	 * Enable CRC appending and TX padding (for short tx frames)
@@ -1936,13 +2011,13 @@ static void
 ixgbe_init_unicst(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
+	uint8_t *mac_addr;
 	int slot;
 	/*
 	 * Here we should consider two situations:
 	 *
-	 * 1. Chipset is initialized the first time
-	 *    Initialize the multiple unicast addresses, and
-	 *    save the default mac address.
+	 * 1. Chipset is initialized at the first time,
+	 *    Clear all the multiple unicast addresses.
 	 *
 	 * 2. Chipset is reset
 	 *    Recover the multiple unicast addresses from the
@@ -1953,36 +2028,36 @@ ixgbe_init_unicst(ixgbe_t *ixgbe)
 		 * Initialize the multiple unicast addresses
 		 */
 		ixgbe->unicst_total = MAX_NUM_UNICAST_ADDRESSES;
-
-		ixgbe->unicst_avail = ixgbe->unicst_total - 1;
-
-		bcopy(hw->mac.addr, ixgbe->unicst_addr[0].mac.addr,
-		    ETHERADDRL);
-		ixgbe->unicst_addr[0].mac.set = 1;
-
-		for (slot = 1; slot < ixgbe->unicst_total; slot++)
+		ixgbe->unicst_avail = ixgbe->unicst_total;
+		for (slot = 0; slot < ixgbe->unicst_total; slot++) {
+			mac_addr = ixgbe->unicst_addr[slot].mac.addr;
+			bzero(mac_addr, ETHERADDRL);
+			(void) ixgbe_set_rar(hw, slot, mac_addr, NULL, NULL);
 			ixgbe->unicst_addr[slot].mac.set = 0;
-
+		}
 		ixgbe->unicst_init = B_TRUE;
 	} else {
-		/*
-		 * Recover the default mac address
-		 */
-		bcopy(ixgbe->unicst_addr[0].mac.addr, hw->mac.addr,
-		    ETHERADDRL);
-
 		/* Re-configure the RAR registers */
-		for (slot = 1; slot < ixgbe->unicst_total; slot++)
-			(void) ixgbe_set_rar(hw, slot,
-			    ixgbe->unicst_addr[slot].mac.addr, NULL, NULL);
+		for (slot = 0; slot < ixgbe->unicst_total; slot++) {
+			mac_addr = ixgbe->unicst_addr[slot].mac.addr;
+			if (ixgbe->unicst_addr[slot].mac.set == 1) {
+				(void) ixgbe_set_rar(hw, slot, mac_addr,
+				    NULL, IXGBE_RAH_AV);
+			} else {
+				bzero(mac_addr, ETHERADDRL);
+				(void) ixgbe_set_rar(hw, slot, mac_addr,
+				    NULL, NULL);
+			}
+		}
 	}
 }
+
 /*
  * ixgbe_unicst_set - Set the unicast address to the specified slot.
  */
 int
 ixgbe_unicst_set(ixgbe_t *ixgbe, const uint8_t *mac_addr,
-    mac_addr_slot_t slot)
+    int slot)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
 
@@ -1996,7 +2071,7 @@ ixgbe_unicst_set(ixgbe_t *ixgbe, const uint8_t *mac_addr,
 	/*
 	 * Set the unicast address to the RAR register
 	 */
-	(void) ixgbe_set_rar(hw, slot, (uint8_t *)mac_addr, NULL, NULL);
+	(void) ixgbe_set_rar(hw, slot, (uint8_t *)mac_addr, NULL, IXGBE_RAH_AV);
 
 	if (ixgbe_check_acc_handle(ixgbe->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(ixgbe->dip, DDI_SERVICE_DEGRADED);
@@ -2004,6 +2079,25 @@ ixgbe_unicst_set(ixgbe_t *ixgbe, const uint8_t *mac_addr,
 	}
 
 	return (0);
+}
+
+/*
+ * ixgbe_unicst_find - Find the slot for the specified unicast address
+ */
+int
+ixgbe_unicst_find(ixgbe_t *ixgbe, const uint8_t *mac_addr)
+{
+	int slot;
+
+	ASSERT(mutex_owned(&ixgbe->gen_lock));
+
+	for (slot = 0; slot < ixgbe->unicst_total; slot++) {
+		if (bcmp(ixgbe->unicst_addr[slot].mac.addr,
+		    mac_addr, ETHERADDRL) == 0)
+			return (slot);
+	}
+
+	return (-1);
 }
 
 /*
@@ -2153,7 +2247,7 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	 * Ethernet flow control configuration
 	 */
 	flow_control = ixgbe_get_prop(ixgbe, PROP_FLOW_CONTROL,
-	    ixgbe_fc_none, 3, ixgbe_fc_full);
+	    ixgbe_fc_none, 3, ixgbe_fc_none);
 	if (flow_control == 3)
 		flow_control = ixgbe_fc_default;
 
@@ -2173,10 +2267,25 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	    MIN_RX_RING_SIZE, MAX_RX_RING_SIZE, DEFAULT_RX_RING_SIZE);
 
 	/*
+	 * Multiple groups configuration
+	 */
+	ixgbe->num_rx_groups = ixgbe_get_prop(ixgbe, PROP_RX_GROUP_NUM,
+	    MIN_RX_GROUP_NUM, MAX_RX_GROUP_NUM, DEFAULT_RX_GROUP_NUM);
+
+	ixgbe->mr_enable = ixgbe_get_prop(ixgbe, PROP_MR_ENABLE,
+	    0, 1, DEFAULT_MR_ENABLE);
+
+	if (ixgbe->mr_enable == B_FALSE) {
+		ixgbe->num_tx_rings = 1;
+		ixgbe->num_rx_rings = 1;
+		ixgbe->num_rx_groups = 1;
+	}
+
+	/*
 	 * Tunable used to force an interrupt type. The only use is
 	 * for testing of the lesser interrupt types.
 	 * 0 = don't force interrupt type
-	 * 1 = force interrupt type MSIX
+	 * 1 = force interrupt type MSI-X
 	 * 2 = force interrupt type MSI
 	 * 3 = force interrupt type Legacy
 	 */
@@ -2413,6 +2522,7 @@ ixgbe_stall_check(ixgbe_t *ixgbe)
 	result = B_FALSE;
 	for (i = 0; i < ixgbe->num_tx_rings; i++) {
 		tx_ring = &ixgbe->tx_rings[i];
+		tx_ring->tx_recycle(tx_ring);
 
 		if (tx_ring->recycle_fail > 0)
 			tx_ring->stall_watchdog++;
@@ -2872,11 +2982,12 @@ ixgbe_intr_rx_work(ixgbe_rx_ring_t *rx_ring)
 
 	mutex_enter(&rx_ring->rx_lock);
 
-	mp = ixgbe_rx(rx_ring);
+	mp = ixgbe_ring_rx(rx_ring, IXGBE_POLL_NULL);
 	mutex_exit(&rx_ring->rx_lock);
 
 	if (mp != NULL)
-		mac_rx(rx_ring->ixgbe->mac_hdl, NULL, mp);
+		mac_rx_ring(rx_ring->ixgbe->mac_hdl, rx_ring->ring_handle, mp,
+		    rx_ring->ring_gen_num);
 }
 
 #pragma inline(ixgbe_intr_tx_work)
@@ -2897,7 +3008,8 @@ ixgbe_intr_tx_work(ixgbe_tx_ring_t *tx_ring)
 	if (tx_ring->reschedule &&
 	    (tx_ring->tbd_free >= tx_ring->resched_thresh)) {
 		tx_ring->reschedule = B_FALSE;
-		mac_tx_update(tx_ring->ixgbe->mac_hdl);
+		mac_tx_ring_update(tx_ring->ixgbe->mac_hdl,
+		    tx_ring->ring_handle);
 		IXGBE_DEBUG_STAT(tx_ring->stat_reschedule);
 	}
 }
@@ -2943,6 +3055,7 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 	ixgbe_t *ixgbe = (ixgbe_t *)arg1;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	ixgbe_tx_ring_t *tx_ring;
+	ixgbe_rx_ring_t *rx_ring;
 	uint32_t eicr;
 	mblk_t *mp;
 	boolean_t tx_reschedule;
@@ -2974,16 +3087,20 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 		ASSERT(ixgbe->num_tx_rings == 1);
 
 		/*
-		 * For legacy interrupt, we can't differentiate
-		 * between tx and rx, so always clean both
+		 * For legacy interrupt, rx rings[0] will use RTxQ[0].
 		 */
-		if (eicr & IXGBE_EICR_RTX_QUEUE) {
-
+		if (eicr & 0x1) {
 			/*
 			 * Clean the rx descriptors
 			 */
-			mp = ixgbe_rx(&ixgbe->rx_rings[0]);
+			rx_ring = &ixgbe->rx_rings[0];
+			mp = ixgbe_ring_rx(rx_ring, IXGBE_POLL_NULL);
+		}
 
+		/*
+		 * For legacy interrupt, tx rings[0] will use RTxQ[1].
+		 */
+		if (eicr & 0x2) {
 			/*
 			 * Recycle the tx descriptors
 			 */
@@ -3020,11 +3137,12 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 	 * Do the following work outside of the gen_lock
 	 */
 	if (mp != NULL)
-		mac_rx(ixgbe->mac_hdl, NULL, mp);
+		mac_rx_ring(rx_ring->ixgbe->mac_hdl, rx_ring->ring_handle, mp,
+		    rx_ring->ring_gen_num);
 
 	if (tx_reschedule)  {
 		tx_ring->reschedule = B_FALSE;
-		mac_tx_update(ixgbe->mac_hdl);
+		mac_tx_ring_update(ixgbe->mac_hdl, tx_ring->ring_handle);
 		IXGBE_DEBUG_STAT(tx_ring->stat_reschedule);
 	}
 
@@ -3055,11 +3173,16 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 	ASSERT(ixgbe->num_tx_rings == 1);
 
 	/*
-	 * For MSI interrupt, we can't differentiate
-	 * between tx and rx, so always clean both.
+	 * For MSI interrupt, rx rings[0] will use RTxQ[0].
 	 */
-	if (eicr & IXGBE_EICR_RTX_QUEUE) {
+	if (eicr & 0x1) {
 		ixgbe_intr_rx_work(&ixgbe->rx_rings[0]);
+	}
+
+	/*
+	 * For MSI interrupt, tx rings[0] will use RTxQ[1].
+	 */
+	if (eicr & 0x2) {
 		ixgbe_intr_tx_work(&ixgbe->tx_rings[0]);
 	}
 
@@ -3071,38 +3194,47 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 }
 
 /*
- * ixgbe_intr_rx - Interrupt handler for rx.
+ * ixgbe_intr_rx_tx - Interrupt handler for rx and tx.
  */
 static uint_t
-ixgbe_intr_rx(void *arg1, void *arg2)
+ixgbe_intr_rx_tx(void *arg1, void *arg2)
 {
 	_NOTE(ARGUNUSED(arg2));
-	ixgbe_ring_vector_t	*vect = (ixgbe_ring_vector_t *)arg1;
-	ixgbe_t			*ixgbe = vect->ixgbe;
-	int			r_idx;
+	ixgbe_ring_vector_t *vect = (ixgbe_ring_vector_t *)arg1;
+	ixgbe_t *ixgbe = vect->ixgbe;
+	int r_idx = 0;
 
 	/*
-	 * clean each rx ring that has its bit set in the map
+	 * Clean each rx ring that has its bit set in the map
 	 */
 	r_idx = bt_getlowbit(vect->rx_map, 0, (ixgbe->num_rx_rings - 1));
-
 	while (r_idx >= 0) {
 		ixgbe_intr_rx_work(&ixgbe->rx_rings[r_idx]);
 		r_idx = bt_getlowbit(vect->rx_map, (r_idx + 1),
 		    (ixgbe->num_rx_rings - 1));
 	}
 
+	/*
+	 * Clean each tx ring that has its bit set in the map
+	 */
+	r_idx = bt_getlowbit(vect->tx_map, 0, (ixgbe->num_tx_rings - 1));
+	while (r_idx >= 0) {
+		ixgbe_intr_tx_work(&ixgbe->tx_rings[r_idx]);
+		r_idx = bt_getlowbit(vect->tx_map, (r_idx + 1),
+		    (ixgbe->num_tx_rings - 1));
+	}
+
 	return (DDI_INTR_CLAIMED);
 }
 
 /*
- * ixgbe_intr_tx_other - Interrupt handler for both tx and other.
+ * ixgbe_intr_other - Interrupt handler for other.
  *
- * Always look for Tx cleanup work.  Only look for other work if the right
- * bits are set in the Interrupt Cause Register.
+ * Only look for other work if the right bits are set in the
+ * Interrupt Cause Register.
  */
 static uint_t
-ixgbe_intr_tx_other(void *arg1, void *arg2)
+ixgbe_intr_other(void *arg1, void *arg2)
 {
 	_NOTE(ARGUNUSED(arg2));
 	ixgbe_t *ixgbe = (ixgbe_t *)arg1;
@@ -3112,14 +3244,8 @@ ixgbe_intr_tx_other(void *arg1, void *arg2)
 	eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
 
 	/*
-	 * Always look for Tx cleanup work.  We don't have separate
-	 * transmit vectors, so we have only one tx ring enabled.
-	 */
-	ASSERT(ixgbe->num_tx_rings == 1);
-	ixgbe_intr_tx_work(&ixgbe->tx_rings[0]);
-
-	/*
-	 * Check for "other" causes.
+	 * Need check cause bits and only link change will
+	 * be processed
 	 */
 	if (eicr & IXGBE_EICR_LSC) {
 		ixgbe_intr_other_work(ixgbe);
@@ -3174,12 +3300,13 @@ ixgbe_alloc_intrs(ixgbe_t *ixgbe)
 	}
 
 	/*
-	 * MSI-X not used, force rings to 1
+	 * MSI-X not used, force rings and groups to 1
 	 */
 	ixgbe->num_rx_rings = 1;
+	ixgbe->num_rx_groups = 1;
 	ixgbe->num_tx_rings = 1;
 	ixgbe_log(ixgbe,
-	    "MSI-X not used, force rx and tx queue number to 1");
+	    "MSI-X not used, force rings and groups number to 1");
 
 	/*
 	 * Install MSI interrupts
@@ -3217,29 +3344,18 @@ ixgbe_alloc_intrs(ixgbe_t *ixgbe)
  *
  * For legacy and MSI, only 1 handle is needed.  For MSI-X,
  * if fewer than 2 handles are available, return failure.
- * Upon success, this sets the number of Rx rings to a number that
- * matches the handles available for Rx interrupts.
+ * Upon success, this maps the vectors to rx and tx rings for
+ * interrupts.
  */
 static int
 ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 {
 	dev_info_t *devinfo;
 	int request, count, avail, actual;
-	int rx_rings, minimum;
+	int minimum;
 	int rc;
 
 	devinfo = ixgbe->dip;
-
-	/*
-	 * Currently only 1 tx ring is supported. More tx rings
-	 * will be supported with future enhancement.
-	 */
-	if (ixgbe->num_tx_rings > 1) {
-		ixgbe->num_tx_rings = 1;
-		ixgbe_log(ixgbe,
-		    "Use only 1 MSI-X vector for tx, "
-		    "force tx queue number to 1");
-	}
 
 	switch (intr_type) {
 	case DDI_INTR_TYPE_FIXED:
@@ -3257,11 +3373,11 @@ ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 	case DDI_INTR_TYPE_MSIX:
 		/*
 		 * Best number of vectors for the adapter is
-		 * # rx rings + # tx rings + 1 for other
-		 * But currently we only support number of vectors of
-		 * # rx rings + 1 for tx & other
+		 * # rx rings + # tx rings + 1 for other.
 		 */
-		request = ixgbe->num_rx_rings + 1;
+		request = ixgbe->num_rx_rings + ixgbe->num_tx_rings + 1;
+		if (request > (IXGBE_MAX_RING_VECTOR + 1))
+			request = IXGBE_MAX_RING_VECTOR + 1;
 		minimum = 2;
 		IXGBE_DEBUGLOG_0(ixgbe, "interrupt type: MSI-X");
 		break;
@@ -3327,27 +3443,13 @@ ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 	ixgbe->intr_cnt = actual;
 
 	/*
-	 * Now we know the actual number of vectors.  Here we assume that
-	 * tx and other will share 1 vector and all remaining (must be at
-	 * least 1 remaining) will be used for rx.
+	 * Now we know the actual number of vectors.  Here we map the vector
+	 * to other, rx rings and tx ring.
 	 */
 	if (actual < minimum) {
 		ixgbe_log(ixgbe, "Insufficient interrupt handles available: %d",
 		    actual);
 		goto alloc_handle_fail;
-	}
-
-	/*
-	 * For MSI-X, actual might force us to reduce number of rx rings
-	 */
-	if (intr_type == DDI_INTR_TYPE_MSIX) {
-		rx_rings = actual - 1;
-		if (rx_rings < ixgbe->num_rx_rings) {
-			ixgbe_log(ixgbe,
-			    "MSI-X vectors force Rx queue number to %d",
-			    rx_rings);
-			ixgbe->num_rx_rings = rx_rings;
-		}
 	}
 
 	/*
@@ -3386,56 +3488,47 @@ alloc_handle_fail:
 static int
 ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 {
-	ixgbe_rx_ring_t *rx_ring;
-	int vector;
+	int vector = 0;
 	int rc;
-	int i;
-
-	vector = 0;
 
 	switch (ixgbe->intr_type) {
 	case DDI_INTR_TYPE_MSIX:
 		/*
-		 * Add interrupt handler for tx + other
+		 * Add interrupt handler for rx and tx rings: vector[0 -
+		 * (ixgbe->intr_cnt -1)].
 		 */
-		rc = ddi_intr_add_handler(ixgbe->htable[vector],
-		    (ddi_intr_handler_t *)ixgbe_intr_tx_other,
-		    (void *)ixgbe, NULL);
-		if (rc != DDI_SUCCESS) {
-			ixgbe_log(ixgbe,
-			    "Add tx/other interrupt handler failed: %d", rc);
-			return (IXGBE_FAILURE);
-		}
-		vector++;
-
-		/*
-		 * Add interrupt handler for each rx ring
-		 */
-		for (i = 0; i < ixgbe->num_rx_rings; i++) {
-			rx_ring = &ixgbe->rx_rings[i];
-
+		for (vector = 0; vector < (ixgbe->intr_cnt -1); vector++) {
 			/*
 			 * install pointer to vect_map[vector]
 			 */
 			rc = ddi_intr_add_handler(ixgbe->htable[vector],
-			    (ddi_intr_handler_t *)ixgbe_intr_rx,
+			    (ddi_intr_handler_t *)ixgbe_intr_rx_tx,
 			    (void *)&ixgbe->vect_map[vector], NULL);
 
 			if (rc != DDI_SUCCESS) {
 				ixgbe_log(ixgbe,
 				    "Add rx interrupt handler failed. "
-				    "return: %d, rx ring: %d", rc, i);
+				    "return: %d, vector: %d", rc, vector);
 				for (vector--; vector >= 0; vector--) {
 					(void) ddi_intr_remove_handler(
 					    ixgbe->htable[vector]);
 				}
 				return (IXGBE_FAILURE);
 			}
-
-			rx_ring->intr_vector = vector;
-
-			vector++;
 		}
+
+		/*
+		 * Add interrupt handler for other: vector[ixgbe->intr_cnt -1]
+		 */
+		rc = ddi_intr_add_handler(ixgbe->htable[vector],
+		    (ddi_intr_handler_t *)ixgbe_intr_other,
+		    (void *)ixgbe, NULL);
+		if (rc != DDI_SUCCESS) {
+			ixgbe_log(ixgbe,
+			    "Add other interrupt handler failed: %d", rc);
+			return (IXGBE_FAILURE);
+		}
+
 		break;
 
 	case DDI_INTR_TYPE_MSI:
@@ -3452,10 +3545,6 @@ ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 			return (IXGBE_FAILURE);
 		}
 
-		rx_ring = &ixgbe->rx_rings[0];
-		rx_ring->intr_vector = vector;
-
-		vector++;
 		break;
 
 	case DDI_INTR_TYPE_FIXED:
@@ -3472,17 +3561,13 @@ ixgbe_add_intr_handlers(ixgbe_t *ixgbe)
 			return (IXGBE_FAILURE);
 		}
 
-		rx_ring = &ixgbe->rx_rings[0];
-		rx_ring->intr_vector = vector;
-
-		vector++;
 		break;
 
 	default:
 		return (IXGBE_FAILURE);
 	}
 
-	ASSERT(vector == ixgbe->intr_cnt);
+	ASSERT(vector == (ixgbe->intr_cnt -1));
 
 	return (IXGBE_SUCCESS);
 }
@@ -3509,6 +3594,7 @@ ixgbe_map_rxring_to_vector(ixgbe_t *ixgbe, int r_idx, int v_idx)
 	/*
 	 * Remember bit position
 	 */
+	ixgbe->rx_rings[r_idx].intr_vector = v_idx;
 	ixgbe->rx_rings[r_idx].vect_bit = 1 << v_idx;
 }
 
@@ -3534,48 +3620,81 @@ ixgbe_map_txring_to_vector(ixgbe_t *ixgbe, int t_idx, int v_idx)
 	/*
 	 * Remember bit position
 	 */
+	ixgbe->tx_rings[t_idx].intr_vector = v_idx;
 	ixgbe->tx_rings[t_idx].vect_bit = 1 << v_idx;
 }
 
 /*
- * ixgbe_set_ivar - Set the given entry in the given interrupt vector
+ * ixgbe_setup_ivar - Set the given entry in the given interrupt vector
  * allocation register (IVAR).
  */
 static void
-ixgbe_set_ivar(ixgbe_t *ixgbe, uint16_t int_alloc_entry, uint8_t msix_vector)
+ixgbe_setup_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry, uint8_t msix_vector)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	u32 ivar, index;
 
 	msix_vector |= IXGBE_IVAR_ALLOC_VAL;
-	index = (int_alloc_entry >> 2) & 0x1F;
+	index = (intr_alloc_entry >> 2) & 0x1F;
 	ivar = IXGBE_READ_REG(hw, IXGBE_IVAR(index));
-	ivar &= ~(0xFF << (8 * (int_alloc_entry & 0x3)));
-	ivar |= (msix_vector << (8 * (int_alloc_entry & 0x3)));
+	ivar &= ~(0xFF << (8 * (intr_alloc_entry & 0x3)));
+	ivar |= (msix_vector << (8 * (intr_alloc_entry & 0x3)));
+	IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
+}
+
+/*
+ * ixgbe_enable_ivar - Enable the given entry by setting the VAL bit of
+ * given interrupt vector allocation register (IVAR).
+ */
+static void
+ixgbe_enable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry)
+{
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	u32 ivar, index;
+
+	index = (intr_alloc_entry >> 2) & 0x1F;
+	ivar = IXGBE_READ_REG(hw, IXGBE_IVAR(index));
+	ivar |= (IXGBE_IVAR_ALLOC_VAL << (8 * (intr_alloc_entry & 0x3)));
+	IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
+}
+
+/*
+ * ixgbe_enable_ivar - Disble the given entry by clearing the VAL bit of
+ * given interrupt vector allocation register (IVAR).
+ */
+static void
+ixgbe_disable_ivar(ixgbe_t *ixgbe, uint16_t intr_alloc_entry)
+{
+	struct ixgbe_hw *hw = &ixgbe->hw;
+	u32 ivar, index;
+
+	index = (intr_alloc_entry >> 2) & 0x1F;
+	ivar = IXGBE_READ_REG(hw, IXGBE_IVAR(index));
+	ivar &= ~(IXGBE_IVAR_ALLOC_VAL << (8 * (intr_alloc_entry & 0x3)));
 	IXGBE_WRITE_REG(hw, IXGBE_IVAR(index), ivar);
 }
 
 /*
  * ixgbe_map_rings_to_vectors - Map descriptor rings to interrupt vectors.
  *
- * For msi-x, this currently implements only the scheme which is
- * 1 vector for tx + other, 1 vector for each rx ring.
+ * For MSI-X, here will map rx and tx ring to vector[0 - (vectors -1)].
+ * The last vector will be used for other interrupt.
  */
 static int
 ixgbe_map_rings_to_vectors(ixgbe_t *ixgbe)
 {
 	int i, vector = 0;
-	int vect_remain = ixgbe->intr_cnt;
 
 	/* initialize vector map */
 	bzero(&ixgbe->vect_map, sizeof (ixgbe->vect_map));
 
 	/*
-	 * non-MSI-X case is very simple: all interrupts on vector 0
+	 * non-MSI-X case is very simple: rx rings[0] on RTxQ[0],
+	 * tx rings[0] on RTxQ[1].
 	 */
 	if (ixgbe->intr_type != DDI_INTR_TYPE_MSIX) {
 		ixgbe_map_rxring_to_vector(ixgbe, 0, 0);
-		ixgbe_map_txring_to_vector(ixgbe, 0, 0);
+		ixgbe_map_txring_to_vector(ixgbe, 0, 1);
 		return (IXGBE_SUCCESS);
 	}
 
@@ -3584,16 +3703,19 @@ ixgbe_map_rings_to_vectors(ixgbe_t *ixgbe)
 	 */
 
 	/*
-	 * Map vector 0 to tx
+	 * Map vectors to rx rings
 	 */
-	ixgbe_map_txring_to_vector(ixgbe, 0, vector++);
-	vect_remain--;
+	for (i = 0; i < ixgbe->num_rx_rings; i++) {
+		ixgbe_map_rxring_to_vector(ixgbe, i, vector);
+		vector = (vector +1) % (ixgbe->intr_cnt -1);
+	}
 
 	/*
-	 * Map remaining vectors to rx rings
+	 * Map vectors to tx rings
 	 */
-	for (i = 0; i < vect_remain; i++) {
-		ixgbe_map_rxring_to_vector(ixgbe, i, vector++);
+	for (i = 0; i < ixgbe->num_tx_rings; i++) {
+		ixgbe_map_txring_to_vector(ixgbe, i, vector);
+		vector = (vector +1) % (ixgbe->intr_cnt -1);
 	}
 
 	return (IXGBE_SUCCESS);
@@ -3602,16 +3724,16 @@ ixgbe_map_rings_to_vectors(ixgbe_t *ixgbe)
 /*
  * ixgbe_setup_adapter_vector - Setup the adapter interrupt vector(s).
  *
- * This relies on queue/vector mapping already set up in the
+ * This relies on ring/vector mapping already set up in the
  * vect_map[] structures
  */
 static void
 ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	ixgbe_ring_vector_t	*vect;	/* vector bitmap */
-	int			r_idx;	/* ring index */
-	int			v_idx;	/* vector index */
+	ixgbe_ring_vector_t *vect;	/* vector bitmap */
+	int r_idx;	/* ring index */
+	int v_idx;	/* vector index */
 
 	/*
 	 * Clear any previous entries
@@ -3620,9 +3742,20 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 		IXGBE_WRITE_REG(hw, IXGBE_IVAR(v_idx), 0);
 
 	/*
-	 * "Other" is always on vector 0
+	 * For non MSI-X interrupt, rx rings[0] will use RTxQ[0], and
+	 * tx rings[0] will use RTxQ[1].
 	 */
-	ixgbe_set_ivar(ixgbe, IXGBE_IVAR_OTHER_CAUSES_INDEX, 0);
+	if (ixgbe->intr_type != DDI_INTR_TYPE_MSIX) {
+		ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_RX_QUEUE(0), 0);
+		ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_TX_QUEUE(0), 1);
+		return;
+	}
+
+	/*
+	 * For MSI-X interrupt, "Other" is always on last vector.
+	 */
+	ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_OTHER_CAUSES_INDEX,
+	    (ixgbe->intr_cnt - 1));
 
 	/*
 	 * For each interrupt vector, populate the IVAR table
@@ -3637,7 +3770,7 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 		    (ixgbe->num_rx_rings - 1));
 
 		while (r_idx >= 0) {
-			ixgbe_set_ivar(ixgbe, IXGBE_IVAR_RX_QUEUE(r_idx),
+			ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_RX_QUEUE(r_idx),
 			    v_idx);
 			r_idx = bt_getlowbit(vect->rx_map, (r_idx + 1),
 			    (ixgbe->num_rx_rings - 1));
@@ -3650,7 +3783,7 @@ ixgbe_setup_adapter_vector(ixgbe_t *ixgbe)
 		    (ixgbe->num_tx_rings - 1));
 
 		while (r_idx >= 0) {
-			ixgbe_set_ivar(ixgbe, IXGBE_IVAR_TX_QUEUE(r_idx),
+			ixgbe_setup_ivar(ixgbe, IXGBE_IVAR_TX_QUEUE(r_idx),
 			    v_idx);
 			r_idx = bt_getlowbit(vect->tx_map, (r_idx + 1),
 			    (ixgbe->num_tx_rings - 1));
@@ -3995,4 +4128,232 @@ ixgbe_fm_ereport(ixgbe_t *ixgbe, char *detail)
 		ddi_fm_ereport_post(ixgbe->dip, buf, ena, DDI_NOSLEEP,
 		    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
 	}
+}
+
+static int
+ixgbe_ring_start(mac_ring_driver_t rh, uint64_t mr_gen_num)
+{
+	ixgbe_rx_ring_t *rx_ring = (ixgbe_rx_ring_t *)rh;
+
+	mutex_enter(&rx_ring->rx_lock);
+	rx_ring->ring_gen_num = mr_gen_num;
+	mutex_exit(&rx_ring->rx_lock);
+	return (0);
+}
+
+/*
+ * Callback funtion for MAC layer to register all rings.
+ */
+/* ARGSUSED */
+void
+ixgbe_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
+    const int ring_index, mac_ring_info_t *infop, mac_ring_handle_t rh)
+{
+	ixgbe_t *ixgbe = (ixgbe_t *)arg;
+	mac_intr_t *mintr = &infop->mri_intr;
+
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		ASSERT(rg_index == 0);
+		ASSERT(ring_index < ixgbe->num_rx_rings);
+
+		ixgbe_rx_ring_t *rx_ring = &ixgbe->rx_rings[ring_index];
+		rx_ring->ring_handle = rh;
+
+		infop->mri_driver = (mac_ring_driver_t)rx_ring;
+		infop->mri_start = ixgbe_ring_start;
+		infop->mri_stop = NULL;
+		infop->mri_poll = ixgbe_ring_rx_poll;
+
+		mintr->mi_handle = (mac_intr_handle_t)rx_ring;
+		mintr->mi_enable = ixgbe_rx_ring_intr_enable;
+		mintr->mi_disable = ixgbe_rx_ring_intr_disable;
+
+		break;
+	}
+	case MAC_RING_TYPE_TX: {
+		ASSERT(rg_index == -1);
+		ASSERT(ring_index < ixgbe->num_tx_rings);
+
+		ixgbe_tx_ring_t *tx_ring = &ixgbe->tx_rings[ring_index];
+		tx_ring->ring_handle = rh;
+
+		infop->mri_driver = (mac_ring_driver_t)tx_ring;
+		infop->mri_start = NULL;
+		infop->mri_stop = NULL;
+		infop->mri_tx = ixgbe_ring_tx;
+
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+/*
+ * Callback funtion for MAC layer to register all groups.
+ */
+void
+ixgbe_fill_group(void *arg, mac_ring_type_t rtype, const int index,
+    mac_group_info_t *infop, mac_group_handle_t gh)
+{
+	ixgbe_t *ixgbe = (ixgbe_t *)arg;
+
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		ixgbe_rx_group_t *rx_group;
+
+		rx_group = &ixgbe->rx_groups[index];
+		rx_group->group_handle = gh;
+
+		infop->mgi_driver = (mac_group_driver_t)rx_group;
+		infop->mgi_start = NULL;
+		infop->mgi_stop = NULL;
+		infop->mgi_addmac = ixgbe_addmac;
+		infop->mgi_remmac = ixgbe_remmac;
+		infop->mgi_count = (ixgbe->num_rx_rings / ixgbe->num_rx_groups);
+
+		break;
+	}
+	case MAC_RING_TYPE_TX:
+		break;
+	default:
+		break;
+	}
+}
+
+/*
+ * Enable interrupt on the specificed rx ring.
+ */
+int
+ixgbe_rx_ring_intr_enable(mac_intr_handle_t intrh)
+{
+	ixgbe_rx_ring_t *rx_ring = (ixgbe_rx_ring_t *)intrh;
+	ixgbe_t *ixgbe = rx_ring->ixgbe;
+	int r_idx = rx_ring->index;
+	int v_idx = rx_ring->intr_vector;
+
+	mutex_enter(&ixgbe->gen_lock);
+	ASSERT(BT_TEST(ixgbe->vect_map[v_idx].rx_map, r_idx) == 0);
+
+	/*
+	 * To enable interrupt by setting the VAL bit of given interrupt
+	 * vector allocation register (IVAR).
+	 */
+	ixgbe_enable_ivar(ixgbe, IXGBE_IVAR_RX_QUEUE(r_idx));
+
+	BT_SET(ixgbe->vect_map[v_idx].rx_map, r_idx);
+	mutex_exit(&ixgbe->gen_lock);
+
+	return (0);
+}
+
+/*
+ * Disable interrupt on the specificed rx ring.
+ */
+int
+ixgbe_rx_ring_intr_disable(mac_intr_handle_t intrh)
+{
+	ixgbe_rx_ring_t *rx_ring = (ixgbe_rx_ring_t *)intrh;
+	ixgbe_t *ixgbe = rx_ring->ixgbe;
+	int r_idx = rx_ring->index;
+	int v_idx = rx_ring->intr_vector;
+
+	mutex_enter(&ixgbe->gen_lock);
+
+	ASSERT(BT_TEST(ixgbe->vect_map[v_idx].rx_map, r_idx) == 1);
+
+	/*
+	 * To disable interrupt by clearing the VAL bit of given interrupt
+	 * vector allocation register (IVAR).
+	 */
+	ixgbe_disable_ivar(ixgbe, IXGBE_IVAR_RX_QUEUE(r_idx));
+
+	BT_CLEAR(ixgbe->vect_map[v_idx].rx_map, r_idx);
+
+	mutex_exit(&ixgbe->gen_lock);
+
+	return (0);
+}
+
+/*
+ * Add a mac address.
+ */
+static int
+ixgbe_addmac(void *arg, const uint8_t *mac_addr)
+{
+	ixgbe_rx_group_t *rx_group = (ixgbe_rx_group_t *)arg;
+	ixgbe_t *ixgbe = rx_group->ixgbe;
+	int slot;
+	int err;
+
+	mutex_enter(&ixgbe->gen_lock);
+
+	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
+		mutex_exit(&ixgbe->gen_lock);
+		return (ECANCELED);
+	}
+
+	if (ixgbe->unicst_avail == 0) {
+		/* no slots available */
+		mutex_exit(&ixgbe->gen_lock);
+		return (ENOSPC);
+	}
+
+	for (slot = 0; slot < ixgbe->unicst_total; slot++) {
+		if (ixgbe->unicst_addr[slot].mac.set == 0)
+			break;
+	}
+
+	ASSERT((slot >= 0) && (slot < ixgbe->unicst_total));
+
+	if ((err = ixgbe_unicst_set(ixgbe, mac_addr, slot)) == 0) {
+		ixgbe->unicst_addr[slot].mac.set = 1;
+		ixgbe->unicst_avail--;
+	}
+
+	mutex_exit(&ixgbe->gen_lock);
+
+	return (err);
+}
+
+/*
+ * Remove a mac address.
+ */
+static int
+ixgbe_remmac(void *arg, const uint8_t *mac_addr)
+{
+	ixgbe_rx_group_t *rx_group = (ixgbe_rx_group_t *)arg;
+	ixgbe_t *ixgbe = rx_group->ixgbe;
+	int slot;
+	int err;
+
+	mutex_enter(&ixgbe->gen_lock);
+
+	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
+		mutex_exit(&ixgbe->gen_lock);
+		return (ECANCELED);
+	}
+
+	slot = ixgbe_unicst_find(ixgbe, mac_addr);
+	if (slot == -1) {
+		mutex_exit(&ixgbe->gen_lock);
+		return (EINVAL);
+	}
+
+	if (ixgbe->unicst_addr[slot].mac.set == 0) {
+		mutex_exit(&ixgbe->gen_lock);
+		return (EINVAL);
+	}
+
+	bzero(ixgbe->unicst_addr[slot].mac.addr, ETHERADDRL);
+	if ((err = ixgbe_unicst_set(ixgbe,
+	    ixgbe->unicst_addr[slot].mac.addr, slot)) == 0) {
+		ixgbe->unicst_addr[slot].mac.set = 0;
+		ixgbe->unicst_avail++;
+	}
+
+	mutex_exit(&ixgbe->gen_lock);
+
+	return (err);
 }

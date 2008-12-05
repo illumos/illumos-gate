@@ -62,6 +62,50 @@ i_dladm_info(int fd, const datalink_id_t linkid, dladm_attr_t *dap)
 	return (DLADM_STATUS_OK);
 }
 
+static dladm_status_t
+dladm_usagelog(dladm_logtype_t type, dld_ioc_usagelog_t *log_info)
+{
+	int		fd;
+
+	fd = open(DLD_CONTROL_DEV, O_RDWR);
+	if (fd < 0)
+		return (DLADM_STATUS_IOERR);
+
+	if (type == DLADM_LOGTYPE_FLOW)
+		log_info->ul_type = MAC_LOGTYPE_FLOW;
+	else
+		log_info->ul_type = MAC_LOGTYPE_LINK;
+
+	if (ioctl(fd, DLDIOC_USAGELOG, log_info) < 0) {
+		(void) close(fd);
+		return (DLADM_STATUS_IOERR);
+	}
+	(void) close(fd);
+	return (DLADM_STATUS_OK);
+}
+
+dladm_status_t
+dladm_start_usagelog(dladm_logtype_t type, uint_t interval)
+{
+	dld_ioc_usagelog_t	log_info;
+
+	log_info.ul_onoff = B_TRUE;
+	log_info.ul_interval = interval;
+
+	return (dladm_usagelog(type, &log_info));
+}
+
+dladm_status_t
+dladm_stop_usagelog(dladm_logtype_t type)
+{
+	dld_ioc_usagelog_t	log_info;
+
+	log_info.ul_onoff = B_FALSE;
+	log_info.ul_interval = 0;
+
+	return (dladm_usagelog(type, &log_info));
+}
+
 struct i_dladm_walk_arg {
 	dladm_walkcb_t *fn;
 	void *arg;
@@ -94,6 +138,112 @@ dladm_walk(dladm_walkcb_t *fn, void *arg, datalink_class_t class,
 	walk_arg.arg = arg;
 	return (dladm_walk_datalink_id(i_dladm_walk, &walk_arg,
 	    class, dmedia, flags));
+}
+
+#define	MAXGRPPERLINK	64
+
+int
+dladm_walk_hwgrp(datalink_id_t linkid, void *arg,
+    boolean_t (*fn)(void *, dladm_hwgrp_attr_t *))
+{
+	int		fd, bufsize, ret;
+	int		nhwgrp = MAXGRPPERLINK;
+	dld_ioc_hwgrpget_t *iomp = NULL;
+
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (-1);
+
+	bufsize = sizeof (dld_ioc_hwgrpget_t) +
+	    nhwgrp * sizeof (dld_hwgrpinfo_t);
+
+	if ((iomp = (dld_ioc_hwgrpget_t *)calloc(1, bufsize)) == NULL)
+		return (-1);
+
+	iomp->dih_size = nhwgrp * sizeof (dld_hwgrpinfo_t);
+	iomp->dih_linkid = linkid;
+
+	ret = ioctl(fd, DLDIOC_GETHWGRP, iomp);
+	if (ret == 0) {
+		int i;
+		dld_hwgrpinfo_t *dhip;
+		dladm_hwgrp_attr_t attr;
+
+		dhip = (dld_hwgrpinfo_t *)(iomp + 1);
+		for (i = 0; i < iomp->dih_n_groups; i++) {
+			bzero(&attr, sizeof (attr));
+
+			(void) strlcpy(attr.hg_link_name,
+			    dhip->dhi_link_name, sizeof (attr.hg_link_name));
+			attr.hg_grp_num = dhip->dhi_grp_num;
+			attr.hg_grp_type = dhip->dhi_grp_type;
+			attr.hg_n_rings = dhip->dhi_n_rings;
+			attr.hg_n_clnts = dhip->dhi_n_clnts;
+			(void) strlcpy(attr.hg_client_names,
+			    dhip->dhi_clnts, sizeof (attr.hg_client_names));
+
+			if (!(*fn)(arg, &attr))
+				break;
+			dhip++;
+		}
+	}
+	free(iomp);
+	(void) close(fd);
+	return (ret);
+}
+
+/*
+ * Invoke the specified callback for each MAC address entry defined on
+ * the specified device.
+ */
+int
+dladm_walk_macaddr(datalink_id_t linkid, void *arg,
+    boolean_t (*fn)(void *, dladm_macaddr_attr_t *))
+{
+	int		fd, bufsize, ret;
+	int		nmacaddr = 1024;
+	dld_ioc_macaddrget_t *iomp = NULL;
+
+	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (-1);
+
+	bufsize = sizeof (dld_ioc_macaddrget_t) +
+	    nmacaddr * sizeof (dld_macaddrinfo_t);
+
+	if ((iomp = (dld_ioc_macaddrget_t *)calloc(1, bufsize)) == NULL)
+		return (-1);
+
+	iomp->dig_size = nmacaddr * sizeof (dld_macaddrinfo_t);
+	iomp->dig_linkid = linkid;
+
+	ret = ioctl(fd, DLDIOC_MACADDRGET, iomp);
+	if (ret == 0) {
+		int i;
+		dld_macaddrinfo_t *dmip;
+		dladm_macaddr_attr_t attr;
+
+		dmip = (dld_macaddrinfo_t *)(iomp + 1);
+		for (i = 0; i < iomp->dig_count; i++) {
+			bzero(&attr, sizeof (attr));
+
+			attr.ma_slot = dmip->dmi_slot;
+			attr.ma_flags = 0;
+			if (dmip->dmi_flags & DLDIOCMACADDR_USED)
+				attr.ma_flags |= DLADM_MACADDR_USED;
+			bcopy(dmip->dmi_addr, attr.ma_addr,
+			    dmip->dmi_addrlen);
+			attr.ma_addrlen = dmip->dmi_addrlen;
+			(void) strlcpy(attr.ma_client_name,
+			    dmip->dmi_client_name, MAXNAMELEN);
+			attr.ma_client_linkid = dmip->dma_client_linkid;
+
+			if (!(*fn)(arg, &attr))
+				break;
+			dmip++;
+		}
+	}
+	free(iomp);
+	(void) close(fd);
+	return (ret);
 }
 
 /*
@@ -253,84 +403,22 @@ dladm_linkduplex2str(link_duplex_t duplex, char *buf)
 /*
  * Set zoneid of a given link. Note that this function takes a link name
  * argument instead of a linkid, because a data-link (and its linkid) could
- * be created implicitly as the result of this function. For example, a VLAN
- * could be created if a VLAN PPA hack name is assigned to an exclusive
- * non-global zone.
+ * be created implicitly as the result of this function.
  */
 dladm_status_t
 dladm_setzid(const char *dlname, char *zone_name)
 {
 	datalink_id_t	linkid;
-	char		*val;
-	char		**prop_val;
-	char		link[MAXLINKNAMELEN];
-	uint_t		ppa;
-	char		dev[DLPI_LINKNAME_MAX];
-	int		valsize;
 	dladm_status_t	status = DLADM_STATUS_OK;
-	char		*prop_name = "zone";
-	boolean_t	needfree = B_FALSE;
-	char		delim = ':';
 
 	/* If the link does not exist, it is a ppa-hacked vlan. */
 	status = dladm_name2info(dlname, &linkid, NULL, NULL, NULL);
-	switch (status) {
-	case DLADM_STATUS_NOTFOUND:
-		if (strlen(dlname) > MAXLINKNAMELEN)
-			return (DLADM_STATUS_BADVAL);
+	if (status != DLADM_STATUS_OK)
+		return (status);
 
-		if (strlen(zone_name) > ZONENAME_MAX)
-			return (DLADM_STATUS_BADVAL);
-
-		status = dladm_parselink(dlname, dev, &ppa);
-		if (status != DLADM_STATUS_OK)
-			return (status);
-
-		ppa = (uint_t)DLS_PPA2INST(ppa);
-		(void) snprintf(link, sizeof (link), "%s%d", dev, ppa);
-
-		status = dladm_name2info(link, &linkid, NULL,  NULL, NULL);
-		if (status != DLADM_STATUS_OK)
-			return (status);
-
-		/*
-		 * Since the link does not exist as yet, we've to pass the
-		 * link name too as part of data, so that the kernel can
-		 * create the link. Hence, we're packing the zone_name and
-		 * the link name into val.
-		 */
-		valsize = ZONENAME_MAX + MAXLINKNAMELEN + 1;
-		val = malloc(valsize);
-		if (val == NULL)
-			return (DLADM_STATUS_NOMEM);
-		needfree = B_TRUE;
-
-		(void) snprintf(val, valsize, "%s%c%s", zone_name,
-		    delim, dlname);
-
-		break;
-	case DLADM_STATUS_OK:
-		/*
-		 * The link exists, so only the zone_name is being passed as
-		 * val. We could also pass zone_name + linkname like in the
-		 * previous case just to maintain consistency, but other calls
-		 * like set_linkprop() in dladm.c [which is called when we run
-		 * 'dladm set-linkprop -p zone <linkname>' at the command line]
-		 * pass in the value entered at the command line [which is zone
-		 * name] as val.
-		 */
-		val = zone_name;
-		break;
-	default:
-		return (DLADM_STATUS_FAILED);
-	}
-
-	prop_val = &val;
-	status = dladm_set_linkprop(linkid, prop_name, prop_val, 1,
+	status = dladm_set_linkprop(linkid, "zone", &zone_name, 1,
 	    DLADM_OPT_ACTIVE);
 
-	if (needfree)
-		free(val);
 	return (status);
 }
 
@@ -955,86 +1043,6 @@ dladm_linkid2legacyname(datalink_id_t linkid, char *dev, size_t len)
 
 done:
 	return (status);
-}
-
-dladm_status_t
-dladm_get_single_mac_stat(datalink_id_t linkid, const char *name, uint8_t type,
-    void *val)
-{
-	char		module[DLPI_LINKNAME_MAX];
-	uint_t		instance;
-	char 		link[DLPI_LINKNAME_MAX];
-	dladm_status_t	status;
-	uint32_t	flags, media;
-	kstat_ctl_t	*kcp;
-	kstat_t		*ksp;
-	dladm_phys_attr_t dpap;
-
-	if ((status = dladm_datalink_id2info(linkid, &flags, NULL, &media,
-	    link, DLPI_LINKNAME_MAX)) != DLADM_STATUS_OK)
-		return (status);
-
-	if (media != DL_ETHER)
-		return (DLADM_STATUS_LINKINVAL);
-
-	status = dladm_phys_info(linkid, &dpap, DLADM_OPT_PERSIST);
-
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	status = dladm_parselink(dpap.dp_dev, module, &instance);
-
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	if ((kcp = kstat_open()) == NULL)
-		return (dladm_errno2status(errno));
-
-	/*
-	 * The kstat query could fail if the underlying MAC
-	 * driver was already detached.
-	 */
-	if ((ksp = kstat_lookup(kcp, module, instance, "mac")) == NULL &&
-	    (ksp = kstat_lookup(kcp, module, instance, NULL)) == NULL)
-		goto bail;
-
-	if (kstat_read(kcp, ksp, NULL) == -1)
-		goto bail;
-
-	if (dladm_kstat_value(ksp, name, type, val) < 0)
-		goto bail;
-
-	(void) kstat_close(kcp);
-	return (DLADM_STATUS_OK);
-bail:
-	(void) kstat_close(kcp);
-	return (dladm_errno2status(errno));
-
-}
-
-int
-dladm_kstat_value(kstat_t *ksp, const char *name, uint8_t type, void *buf)
-{
-	kstat_named_t	*knp;
-
-	if ((knp = kstat_data_lookup(ksp, (char *)name)) == NULL)
-		return (-1);
-
-	if (knp->data_type != type)
-		return (-1);
-
-	switch (type) {
-	case KSTAT_DATA_UINT64:
-		*(uint64_t *)buf = knp->value.ui64;
-		break;
-	case KSTAT_DATA_UINT32:
-		*(uint32_t *)buf = knp->value.ui32;
-		break;
-	default:
-		return (-1);
-	}
-
-	return (0);
 }
 
 dladm_status_t

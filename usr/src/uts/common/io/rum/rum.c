@@ -43,7 +43,7 @@
 #include <sys/modctl.h>
 #include <sys/devops.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
 #include <sys/net80211.h>
 #include <sys/net80211_proto.h>
@@ -291,7 +291,6 @@ static mac_callbacks_t rum_m_callbacks = {
 	rum_m_multicst,
 	rum_m_unicst,
 	rum_m_tx,
-	NULL,		/* mc_resources; */
 	rum_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,

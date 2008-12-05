@@ -1258,11 +1258,12 @@ rge_chip_sync(rge_t *rgep, enum rge_sync_op todo)
 	}
 }
 
-void rge_chip_blank(void *arg, time_t ticks, uint_t count);
+void rge_chip_blank(void *arg, time_t ticks, uint_t count, int flag);
 #pragma	no_inline(rge_chip_blank)
 
+/* ARGSUSED */
 void
-rge_chip_blank(void *arg, time_t ticks, uint_t count)
+rge_chip_blank(void *arg, time_t ticks, uint_t count, int flag)
 {
 	_NOTE(ARGUNUSED(arg, ticks, count));
 }

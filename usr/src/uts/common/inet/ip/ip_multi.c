@@ -1201,7 +1201,7 @@ ipsq_enter_byifindex(uint_t ifindex, boolean_t isv6, ip_stack_t *ipst)
 			return (NULL);
 		}
 		ill_refrele(ill);
-		in_ipsq = ipsq_enter(ill, B_FALSE);
+		in_ipsq = ipsq_enter(ill, B_FALSE, NEW_OP);
 		ill_waiter_dcr(ill);
 		if (!in_ipsq)
 			ill = NULL;
@@ -3912,7 +3912,7 @@ retry:
 		 * be refheld for cleanup by those routines and it would be
 		 * a mutual deadlock.
 		 */
-		success = ipsq_enter(ill, B_FALSE);
+		success = ipsq_enter(ill, B_FALSE, NEW_OP);
 		ipsq = ill->ill_phyint->phyint_ipsq;
 		ill_waiter_dcr(ill);
 		mutex_enter(&connp->conn_lock);

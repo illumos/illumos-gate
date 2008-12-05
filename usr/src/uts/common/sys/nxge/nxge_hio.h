@@ -34,7 +34,7 @@ extern "C" {
 #include <nxge_mac.h>
 #include <nxge_ipp.h>
 #include <nxge_fflp.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #if defined(sun4v)
 #include <sys/vnet_res.h>
 #endif
@@ -249,9 +249,10 @@ typedef struct nxge_hio_vr {
 	size_t		size;
 	vr_region_t	region;	/* 1 of 8 regions. */
 
-	uint8_t		rdc_tbl; /* 1 of 8 RDC tables. */
+	int		rdc_tbl; /* 1 of 8 RDC tables. */
+	int		tdc_tbl; /* 1 of 8 TDC tables. */
 	ether_addr_t	altmac;	/* The alternate MAC address. */
-	mac_addr_slot_t	slot;	/* According to nxge_m_mmac_add(). */
+	int		slot;	/* According to nxge_m_mmac_add(). */
 
 #if defined(sun4v)
 	vio_net_handle_t vhp;	/* The handle given to us by the vnet. */
@@ -369,12 +370,18 @@ extern const char *nxge_ddi_perror(int);
  */
 extern void nxge_hio_group_get(void *arg, mac_ring_type_t type, int group,
 	mac_group_info_t *infop, mac_group_handle_t ghdl);
-extern int nxge_hio_share_alloc(void *arg, uint64_t cookie, uint64_t *rcookie,
-	mac_share_handle_t *shandle);
+extern int nxge_hio_share_alloc(void *arg, mac_share_handle_t *shandle);
 extern void nxge_hio_share_free(mac_share_handle_t shandle);
 extern void nxge_hio_share_query(mac_share_handle_t shandle,
-	mac_ring_type_t type, uint32_t *rmin, uint32_t *rmax, uint64_t *rmap,
-	uint64_t *gnum);
+	mac_ring_type_t type, mac_ring_handle_t *rings, uint_t *n_rings);
+extern int nxge_hio_share_add_group(mac_share_handle_t,
+    mac_group_driver_t);
+extern int nxge_hio_share_rem_group(mac_share_handle_t,
+    mac_group_driver_t);
+extern int nxge_hio_share_bind(mac_share_handle_t, uint64_t cookie,
+    uint64_t *rcookie);
+extern void nxge_hio_share_unbind(mac_share_handle_t);
+
 
 				/* nxge_hio_guest.c */
 extern void nxge_hio_unregister(nxge_t *);
@@ -415,12 +422,6 @@ extern void nxge_hio_hv_init(nxge_t *);
 extern int nxge_hio_hostinfo_get_rdc_table(p_nxge_t);
 extern int nxge_hio_hostinfo_init(nxge_t *, nxge_hio_vr_t *, ether_addr_t *);
 extern void nxge_hio_hostinfo_uninit(nxge_t *, nxge_hio_vr_t *);
-
-				/* nxge_rxdma.c */
-extern nxge_status_t nxge_rx_poll(nxge_t *, int);
-
-				/* nxge_txdma.c */
-extern uint_t nxge_tx_poll(nxge_t *, int);
 
 #ifdef	__cplusplus
 }

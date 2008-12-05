@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * mod_hash: flexible hash table implementation.
@@ -810,6 +808,22 @@ mod_hash_find_cb(mod_hash_t *hash, mod_hash_key_t key, mod_hash_val_t *val,
 	res = i_mod_hash_find_nosync(hash, key, val);
 	if (res == 0) {
 		find_cb(key, *val);
+	}
+	rw_exit(&hash->mh_contents);
+
+	return (res);
+}
+
+int
+mod_hash_find_cb_rval(mod_hash_t *hash, mod_hash_key_t key, mod_hash_val_t *val,
+    int (*find_cb)(mod_hash_key_t, mod_hash_val_t), int *cb_rval)
+{
+	int res;
+
+	rw_enter(&hash->mh_contents, RW_READER);
+	res = i_mod_hash_find_nosync(hash, key, val);
+	if (res == 0) {
+		*cb_rval = find_cb(key, *val);
 	}
 	rw_exit(&hash->mh_contents);
 

@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *      http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,13 +20,15 @@
  */
 
 /*
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ */
+
+/*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Use is subject to license terms.
  */
 
 /* IntelVersion: 1.159 v2008-03-04 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ixgbe_common.h"
 #include "ixgbe_api.h"
@@ -1546,27 +1546,11 @@ ixgbe_set_mta(struct ixgbe_hw *hw, u8 *mc_addr)
 void
 ixgbe_add_mc_addr(struct ixgbe_hw *hw, u8 *mc_addr)
 {
-	u32 rar_entries = hw->mac.num_rar_entries;
-	u32 rar;
-
 	DEBUGOUT6(" MC Addr =%.2X %.2X %.2X %.2X %.2X %.2X\n",
 	    mc_addr[0], mc_addr[1], mc_addr[2],
 	    mc_addr[3], mc_addr[4], mc_addr[5]);
 
-	/*
-	 * Place this multicast address in the RAR if there is room,
-	 * else put it in the MTA
-	 */
-	if (hw->addr_ctrl.rar_used_count < rar_entries) {
-		/* use RAR from the end up for multicast */
-		rar = rar_entries - hw->addr_ctrl.mc_addr_in_rar_count - 1;
-		hw->mac.ops.set_rar(hw, rar, mc_addr, 0, IXGBE_RAH_AV);
-		DEBUGOUT1("Added a multicast address to RAR[%d]\n", rar);
-		hw->addr_ctrl.rar_used_count++;
-		hw->addr_ctrl.mc_addr_in_rar_count++;
-	} else {
-		ixgbe_set_mta(hw, mc_addr);
-	}
+	ixgbe_set_mta(hw, mc_addr);
 
 	DEBUGOUT("ixgbe_add_mc_addr Complete\n");
 }
@@ -1588,7 +1572,6 @@ ixgbe_update_mc_addr_list_generic(struct ixgbe_hw *hw, u8 *mc_addr_list,
     u32 mc_addr_count, ixgbe_mc_addr_itr next)
 {
 	u32 i;
-	u32 rar_entries = hw->mac.num_rar_entries;
 	u32 vmdq;
 
 	/*
@@ -1596,17 +1579,7 @@ ixgbe_update_mc_addr_list_generic(struct ixgbe_hw *hw, u8 *mc_addr_list,
 	 * use.
 	 */
 	hw->addr_ctrl.num_mc_addrs = mc_addr_count;
-	hw->addr_ctrl.rar_used_count -= hw->addr_ctrl.mc_addr_in_rar_count;
-	hw->addr_ctrl.mc_addr_in_rar_count = 0;
 	hw->addr_ctrl.mta_in_use = 0;
-
-	/* Zero out the other receive addresses. */
-	DEBUGOUT2("Clearing RAR[%d-%d]\n", hw->addr_ctrl.rar_used_count,
-	    rar_entries - 1);
-	for (i = hw->addr_ctrl.rar_used_count; i < rar_entries; i++) {
-		IXGBE_WRITE_REG(hw, IXGBE_RAL(i), 0);
-		IXGBE_WRITE_REG(hw, IXGBE_RAH(i), 0);
-	}
 
 	/* Clear the MTA */
 	DEBUGOUT(" Clearing MTA\n");

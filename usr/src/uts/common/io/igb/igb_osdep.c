@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "igb_osdep.h"
 #include "igb_api.h"
@@ -113,4 +113,62 @@ e1000_enable_pciex_master(struct e1000_hw *hw)
 	ctrl = E1000_READ_REG(hw, E1000_CTRL);
 	ctrl &= ~E1000_CTRL_GIO_MASTER_DISABLE;
 	E1000_WRITE_REG(hw, E1000_CTRL, ctrl);
+}
+
+/*
+ * e1000_rar_set_vmdq - Clear the RAR registers
+ */
+void
+e1000_rar_clear(struct e1000_hw *hw, uint32_t index)
+{
+
+	uint32_t rar_high;
+
+	/* Make the hardware the Address invalid by setting the clear bit */
+	rar_high = ~E1000_RAH_AV;
+
+	E1000_WRITE_REG_ARRAY(hw, E1000_RA, ((index << 1) + 1), rar_high);
+	E1000_WRITE_FLUSH(hw);
+}
+
+/*
+ * e1000_rar_set_vmdq - Set the RAR registers for VMDq
+ */
+void
+e1000_rar_set_vmdq(struct e1000_hw *hw, const uint8_t *addr, uint32_t index,
+	uint32_t vmdq_mode, uint8_t qsel)
+{
+	uint32_t rar_low, rar_high;
+
+	/*
+	 * NIC expects these in little endian so reverse the byte order
+	 * from network order (big endian) to little endian.
+	 */
+
+	rar_low = ((uint32_t)addr[0] | ((uint32_t)addr[1] << 8) |
+	    ((uint32_t)addr[2] << 16) | ((uint32_t)addr[3] << 24));
+
+	rar_high = ((uint32_t)addr[4] | ((uint32_t)addr[5] << 8));
+
+	/* Indicate to hardware the Address is Valid. */
+	rar_high |= E1000_RAH_AV;
+
+	/* Set que selector based on vmdq mode */
+	switch (vmdq_mode) {
+	default:
+	case E1000_VMDQ_OFF:
+		break;
+	case E1000_VMDQ_MAC:
+		rar_high |= (qsel << 18);
+		break;
+	case E1000_VMDQ_MAC_RSS:
+		rar_high |= 1 << (18 + qsel);
+		break;
+
+	}
+
+	/* write to receive address registers */
+	E1000_WRITE_REG_ARRAY(hw, E1000_RA, (index << 1), rar_low);
+	E1000_WRITE_REG_ARRAY(hw, E1000_RA, ((index << 1) + 1), rar_high);
+	E1000_WRITE_FLUSH(hw);
 }

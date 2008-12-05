@@ -46,7 +46,7 @@
 #include <sys/pccard.h>
 #include <sys/pci.h>
 #include <sys/policy.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/stream.h>
 #include <inet/common.h>
 #include <inet/nd.h>
@@ -89,7 +89,6 @@ mac_callbacks_t pcwl_m_callbacks = {
 	pcwl_sdmulti,
 	pcwl_saddr,
 	pcwl_tx,
-	NULL,
 	pcwl_ioctl
 };
 

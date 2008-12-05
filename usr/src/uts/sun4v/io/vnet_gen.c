@@ -42,7 +42,7 @@
 #include <sys/sunddi.h>
 #include <sys/strsun.h>
 #include <sys/note.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/ldc.h>
 #include <sys/mach_descrip.h>

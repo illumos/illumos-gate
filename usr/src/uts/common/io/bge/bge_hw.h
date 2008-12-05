@@ -858,30 +858,53 @@ extern "C" {
 /*
  * Receive Rules definition
  */
-#define	RULE_MATCH_TO_RING		2
-	/* ring that traffic will go into when recv rule matches.	*/
-	/* value is between 1 and 16, not 0 and 15 */
-
+#define	ETHERHEADER_DEST_OFFSET		0x00
 #define	IPHEADER_PROTO_OFFSET		0x08
 #define	IPHEADER_SIP_OFFSET		0x0c
+#define	IPHEADER_DIP_OFFSET		0x10
+#define	TCPHEADER_SPORT_OFFSET		0x00
+#define	TCPHEADER_DPORT_OFFSET		0x02
+#define	UDPHEADER_SPORT_OFFSET		0x00
+#define	UDPHEADER_DPORT_OFFSET		0x02
 
-#define	RULE_PROTO_CONTROL	(RECV_RULE_CTL_ENABLE | RECV_RULE_CTL_MASK | \
-				    RECV_RULE_CTL_OP_EQ | \
-				    RECV_RULE_CTL_HEADER_IP | \
-				    RECV_RULE_CTL_CLASS(RULE_MATCH_TO_RING) | \
-				    IPHEADER_PROTO_OFFSET)
-#define	RULE_TCP_MASK_VALUE		0x00ff0006
-#define	RULE_UDP_MASK_VALUE		0x00ff0011
-#define	RULE_ICMP_MASK_VALUE		0x00ff0001
+#define	RULE_MATCH(ring)	(RECV_RULE_CTL_ENABLE | RECV_RULE_CTL_OP_EQ | \
+				    RECV_RULE_CTL_CLASS((ring)))
 
-#define	RULE_SIP_ADDR			0x0a000001
-	/* ip address in 32-bit integer,such as, 0x0a000001 is "10.0.0.1" */
+#define	RULE_MATCH_MASK(ring)	(RULE_MATCH(ring) | RECV_RULE_CTL_MASK)
 
-#define	RULE_SIP_CONTROL	(RECV_RULE_CTL_ENABLE | RECV_RULE_CTL_OP_EQ | \
-				    RECV_RULE_CTL_HEADER_IP | \
-				    RECV_RULE_CTL_CLASS(RULE_MATCH_TO_RING) | \
+#define	RULE_DEST_MAC_1(ring)	(RULE_MATCH(ring) | \
+				    RECV_RULE_CTL_HEADER_FRAME | \
+				    ETHERHEADER_DEST_OFFSET)
+
+#define	RULE_DEST_MAC_2(ring)	(RULE_MATCH_MASK(ring) | \
+				    RECV_RULE_CTL_HEADER_FRAME | \
+				    ETHERHEADER_DEST_OFFSET + 4)
+
+#define	RULE_LOCAL_IP(ring)	(RULE_MATCH(ring) | RECV_RULE_CTL_HEADER_IP | \
+				    IPHEADER_DIP_OFFSET)
+
+#define	RULE_REMOTE_IP(ring)	(RULE_MATCH(ring) | RECV_RULE_CTL_HEADER_IP | \
 				    IPHEADER_SIP_OFFSET)
-#define	RULE_SIP_MASK_VALUE		RULE_SIP_ADDR
+
+#define	RULE_IP_PROTO(ring)	(RULE_MATCH_MASK(ring) | \
+				    RECV_RULE_CTL_HEADER_IP | \
+				    IPHEADER_PROTO_OFFSET)
+
+#define	RULE_TCP_SPORT(ring)	(RULE_MATCH_MASK(ring) | \
+				    RECV_RULE_CTL_HEADER_TCP | \
+				    TCPHEADER_SPORT_OFFSET)
+
+#define	RULE_TCP_DPORT(ring)	(RULE_MATCH_MASK(ring) | \
+				    RECV_RULE_CTL_HEADER_TCP | \
+				    TCPHEADER_DPORT_OFFSET)
+
+#define	RULE_UDP_SPORT(ring)	(RULE_MATCH_MASK(ring) | \
+				    RECV_RULE_CTL_HEADER_UDP | \
+				    UDPHEADER_SPORT_OFFSET)
+
+#define	RULE_UDP_DPORT(ring)	(RULE_MATCH_MASK(ring) | \
+				    RECV_RULE_CTL_HEADER_UDP | \
+				    UDPHEADER_DPORT_OFFSET)
 
 /*
  * 1000BaseX low-level access registers
@@ -1684,6 +1707,14 @@ typedef struct {
 	uint32_t	control;
 	uint32_t	mask_value;
 } bge_recv_rule_t;
+
+/*
+ * This describes which sub-rule slots are used by a particular rule.
+ */
+typedef struct {
+	int		start;
+	int		count;
+} bge_rule_info_t;
 
 /*
  * Indexes into the <buff_cons_index> array

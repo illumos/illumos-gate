@@ -26,8 +26,6 @@
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
 # All rights reserved.
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
 . /lib/svc/share/net_include.sh
@@ -81,6 +79,14 @@ if smf_is_globalzone; then
 	/sbin/dladm up-aggr
 	/sbin/dladm up-vlan
 	/sbin/dladm init-secobj
+	#
+	# Bring up VNICs
+	#
+	/sbin/dladm up-vnic
+	#
+	# Create flows via flowadm.
+	#
+	/sbin/flowadm init-flow
 fi
 
 #

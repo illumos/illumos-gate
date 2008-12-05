@@ -27,8 +27,6 @@
 #ifndef _INET_IP_FTABLE_H
 #define	_INET_IP_FTABLE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -94,6 +92,8 @@ extern	void ire_delete_host_redirects(ipaddr_t, ip_stack_t *);
 extern	ire_t *ire_ihandle_lookup_onlink(ire_t *);
 extern	ire_t *ire_forward(ipaddr_t, enum ire_forward_action *, ire_t *,
     ire_t *, const struct ts_label_s *, ip_stack_t *);
+extern	ire_t *ire_forward_simple(ipaddr_t, enum ire_forward_action *,
+    ip_stack_t *);
 extern irb_t	*ire_get_bucket(ire_t *);
 extern uint_t ifindex_lookup(const struct sockaddr *, zoneid_t);
 extern int ipfil_sendpkt(const struct sockaddr *, mblk_t *, uint_t, zoneid_t);

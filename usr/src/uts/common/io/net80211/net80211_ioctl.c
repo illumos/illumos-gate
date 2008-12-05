@@ -41,7 +41,7 @@
 #include <inet/nd.h>
 #include <inet/mi.h>
 #include <sys/note.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <inet/wifi_ioctl.h>
 #include "net80211_impl.h"
 

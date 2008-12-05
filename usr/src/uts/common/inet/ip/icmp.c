@@ -24,9 +24,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
@@ -4331,8 +4328,7 @@ icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp, ip4_pkt_t *pktinfop)
 	}
 
 	mblk_setcred(mp, connp->conn_cred);
-	ip_output_options(connp, mp, q, IP_WPUT,
-	    &optinfo);
+	ip_output_options(connp, mp, q, IP_WPUT, &optinfo);
 }
 
 static boolean_t

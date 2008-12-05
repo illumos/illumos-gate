@@ -47,7 +47,7 @@
 #include	<sys/ethernet.h>
 #include	<sys/vlan.h>
 #include	<sys/policy.h>
-#include	<sys/mac.h>
+#include	<sys/mac_provider.h>
 #include	<sys/mac_ether.h>
 #include	<sys/dlpi.h>
 
@@ -200,7 +200,6 @@ static mac_callbacks_t eri_m_callbacks = {
 	eri_m_multicst,
 	eri_m_unicst,
 	eri_m_tx,
-	NULL,
 	eri_m_ioctl,
 	eri_m_getcapab
 };
@@ -1293,7 +1292,6 @@ eri_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		*hcksum_txflags = HCKSUM_INET_PARTIAL;
 		return (B_TRUE);
 	}
-	case MAC_CAPAB_POLL:
 	default:
 		return (B_FALSE);
 	}

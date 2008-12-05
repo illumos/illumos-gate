@@ -84,6 +84,7 @@
 #include <sys/ptms.h>
 #include <sys/aggr.h>
 #include <sys/dld.h>
+#include <sys/vnic.h>
 #include <sys/fs/zfs.h>
 #include <inet/kssl/kssl.h>
 #include <sys/dkio.h>
@@ -844,18 +845,38 @@ const struct ioc {
 	{ (uint_t)DLDIOC_ATTR,		"DLDIOC_ATTR",		"dld_ioc_attr"},
 	{ (uint_t)DLDIOC_PHYS_ATTR,	"DLDIOC_PHYS_ATTR",
 		"dld_ioc_phys_attr"},
-	{ (uint_t)DLDIOC_VLAN_ATTR,	"DLDIOC_VLAN_ATTR",
-		"dld_ioc_vlan_attr"},
-	{ (uint_t)DLDIOC_CREATE_VLAN,	"DLDIOC_CREATE_VLAN",
-		"dld_ioc_create_vlan"},
-	{ (uint_t)DLDIOC_DELETE_VLAN,	"DLDIOC_DELETE_VLAN",
-		"dld_ioc_delete_vlan"},
-	{ (uint_t)DLDIOC_DOORSERVER,   "DLDIOC_DOORSERVER", "dld_ioc_door"},
-	{ (uint_t)DLDIOC_RENAME,   "DLDIOC_RENAME", "dld_ioc_rename"},
-	{ (uint_t)DLDIOC_SETMACPROP,   "DLDIOC_SETMACPROP",
+	{ (uint_t)DLDIOC_DOORSERVER,	"DLDIOC_DOORSERVER", "dld_ioc_door"},
+	{ (uint_t)DLDIOC_RENAME,	"DLDIOC_RENAME", "dld_ioc_rename"},
+	{ (uint_t)DLDIOC_SECOBJ_GET,		"DLDIOC_SECOBJ_GET",
+		"dld_ioc_secobj_get"},
+	{ (uint_t)DLDIOC_SECOBJ_SET,		"DLDIOC_SECOBJ_SET",
+		"dld_ioc_secobj_set"},
+	{ (uint_t)DLDIOC_SECOBJ_UNSET,		"DLDIOC_SECOBJ_UNSET",
+		"dld_ioc_secobj_unset"},
+	{ (uint_t)DLDIOC_MACADDRGET,		"DLDIOC_MACADDRGET",
+		"dld_ioc_macaddrget"},
+	{ (uint_t)DLDIOC_SETMACPROP,		"DLDIOC_SETMACPROP",
 		"dld_ioc_macprop_s"},
-	{ (uint_t)DLDIOC_GETMACPROP,   "DLDIOC_GETMACPROP",
+	{ (uint_t)DLDIOC_GETMACPROP,		"DLDIOC_GETMACPROP",
 		"dld_ioc_macprop_s"},
+	{ (uint_t)DLDIOC_ADDFLOW,		"DLDIOC_ADDFLOW",
+		"dld_ioc_addflow"},
+	{ (uint_t)DLDIOC_REMOVEFLOW,		"DLDIOC_REMOVEFLOW",
+		"dld_ioc_removeflow"},
+	{ (uint_t)DLDIOC_MODIFYFLOW,		"DLDIOC_MODIFYFLOW",
+		"dld_ioc_modifyflow"},
+	{ (uint_t)DLDIOC_WALKFLOW,		"DLDIOC_WALKFLOW",
+		"dld_ioc_walkflow"},
+	{ (uint_t)DLDIOC_USAGELOG,		"DLDIOC_USAGELOG",
+		"dld_ioc_usagelog"},
+
+	/* vnic ioctls */
+	{ (uint_t)VNIC_IOC_CREATE,		"VNIC_IOC_CREATE",
+		"vnic_ioc_create"},
+	{ (uint_t)VNIC_IOC_DELETE,		"VNIC_IOC_DELETE",
+		"vnic_ioc_delete"},
+	{ (uint_t)VNIC_IOC_INFO,		"VNIC_IOC_INFO",
+		"vnic_ioc_info"},
 
 	/* ZFS ioctls */
 	{ (uint_t)ZFS_IOC_POOL_CREATE,		"ZFS_IOC_POOL_CREATE",

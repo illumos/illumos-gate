@@ -36,13 +36,13 @@
 #ifndef	_MXFEIMPL_H
 #define	_MXFEIMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This entire file is private to the MXFE driver.
  */
 
 #ifdef	_KERNEL
+
+#include	<sys/mac_provider.h>
 
 /*
  * Compile time tunables.

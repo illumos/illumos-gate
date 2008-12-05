@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Hypervisor calls called by niu leaf driver.
  */
@@ -33,6 +31,8 @@
 #include <sys/asm_linkage.h>
 #include <sys/hypervisor_api.h>
 #include <sys/nxge/nxge_impl.h>
+
+#if defined(sun4v)
 
 /*
  * NIU HV API v1.0 definitions
@@ -518,3 +518,5 @@ hv_niu_vrrx_set_ino(uint32_t cookie, uint64_t vridx, uint32_t ino)
 	SET_SIZE(hv_niu_vrtx_param_set)
 
 #endif	/* lint || __lint */
+
+#endif /*defined(sun4v)*/

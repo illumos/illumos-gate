@@ -23,34 +23,21 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Data-Link Services Module
  */
 
-#include	<sys/types.h>
-#include	<sys/stream.h>
-#include	<sys/strsun.h>
-#include	<sys/strsubr.h>
 #include	<sys/sysmacros.h>
-#include	<sys/atomic.h>
-#include	<sys/modhash.h>
-#include	<sys/dlpi.h>
-#include	<sys/ethernet.h>
-#include	<sys/byteorder.h>
+#include	<sys/strsubr.h>
+#include	<sys/strsun.h>
 #include	<sys/vlan.h>
-#include	<sys/mac.h>
-#include	<sys/sdt.h>
-
-#include	<sys/dls.h>
 #include	<sys/dld_impl.h>
-#include	<sys/dls_impl.h>
+#include	<sys/sdt.h>
+#include	<sys/atomic.h>
 
 static kmem_cache_t	*i_dls_link_cachep;
 static mod_hash_t	*i_dls_link_hash;
 static uint_t		i_dls_link_count;
-static krwlock_t	i_dls_link_lock;
 
 #define		LINK_HASHSZ	67	/* prime */
 #define		IMPL_HASHSZ	67	/* prime */
@@ -58,15 +45,8 @@ static krwlock_t	i_dls_link_lock;
 /*
  * Construct a hash key encompassing both DLSAP value and VLAN idenitifier.
  */
-#define	MAKE_KEY(_sap, _vid)						\
-	((mod_hash_key_t)(uintptr_t)					\
-	(((_sap) << VLAN_ID_SIZE) | (_vid) & VLAN_ID_MASK))
-
-/*
- * Extract the DLSAP value from the hash key.
- */
-#define	KEY_SAP(_key)							\
-	(((uint32_t)(uintptr_t)(_key)) >> VLAN_ID_SIZE)
+#define	MAKE_KEY(_sap)						\
+	((mod_hash_key_t)(uintptr_t)((_sap) << VLAN_ID_SIZE))
 
 #define	DLS_STRIP_PADDING(pktsize, p) {			\
 	if (pktsize != 0) {				\
@@ -91,12 +71,9 @@ i_dls_link_constructor(void *buf, void *arg, int kmflag)
 	bzero(buf, sizeof (dls_link_t));
 
 	(void) snprintf(name, MAXNAMELEN, "dls_link_t_%p_hash", buf);
-	dlp->dl_impl_hash = mod_hash_create_idhash(name, IMPL_HASHSZ,
+	dlp->dl_str_hash = mod_hash_create_idhash(name, IMPL_HASHSZ,
 	    mod_hash_null_valdtor);
 
-	mutex_init(&dlp->dl_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&dlp->dl_promisc_lock, NULL, MUTEX_DEFAULT, NULL);
-	rw_init(&dlp->dl_impl_lock, NULL, RW_DEFAULT, NULL);
 	return (0);
 }
 
@@ -108,14 +85,12 @@ i_dls_link_destructor(void *buf, void *arg)
 
 	ASSERT(dlp->dl_ref == 0);
 	ASSERT(dlp->dl_mh == NULL);
+	ASSERT(dlp->dl_mah == NULL);
 	ASSERT(dlp->dl_unknowns == 0);
 
-	mod_hash_destroy_idhash(dlp->dl_impl_hash);
-	dlp->dl_impl_hash = NULL;
+	mod_hash_destroy_idhash(dlp->dl_str_hash);
+	dlp->dl_str_hash = NULL;
 
-	mutex_destroy(&dlp->dl_lock);
-	mutex_destroy(&dlp->dl_promisc_lock);
-	rw_destroy(&dlp->dl_impl_lock);
 }
 
 /*
@@ -195,8 +170,7 @@ i_dls_link_subchain(dls_link_t *dlp, mblk_t *mp, const mac_header_info_t *mhip,
 		 */
 		if (memcmp(mhip->mhi_daddr, cmhi.mhi_daddr, addr_size) != 0 ||
 		    memcmp(mhip->mhi_saddr, cmhi.mhi_saddr, addr_size) != 0 ||
-		    mhip->mhi_bindsap != cmhi.mhi_bindsap ||
-		    mhip->mhi_prom_looped != cmhi.mhi_prom_looped) {
+		    mhip->mhi_bindsap != cmhi.mhi_bindsap) {
 			/*
 			 * Note that we don't need to restore the padding.
 			 */
@@ -239,16 +213,34 @@ i_dls_link_subchain(dls_link_t *dlp, mblk_t *mp, const mac_header_info_t *mhip,
 	return (mp);
 }
 
-static void
-i_dls_head_hold(dls_head_t *dhp)
+/* ARGSUSED */
+static int
+i_dls_head_hold(mod_hash_key_t key, mod_hash_val_t val)
 {
-	atomic_inc_32(&dhp->dh_ref);
+	dls_head_t *dhp = (dls_head_t *)val;
+
+	/*
+	 * The lock order is  mod_hash's internal lock -> dh_lock as in the
+	 * call to i_dls_link_rx -> mod_hash_find_cb_rval -> i_dls_head_hold
+	 */
+	mutex_enter(&dhp->dh_lock);
+	if (dhp->dh_removing) {
+		mutex_exit(&dhp->dh_lock);
+		return (-1);
+	}
+	dhp->dh_ref++;
+	mutex_exit(&dhp->dh_lock);
+	return (0);
 }
 
-static void
+void
 i_dls_head_rele(dls_head_t *dhp)
 {
-	atomic_dec_32(&dhp->dh_ref);
+	mutex_enter(&dhp->dh_lock);
+	dhp->dh_ref--;
+	if (dhp->dh_ref == 0 && dhp->dh_removing != 0)
+		cv_broadcast(&dhp->dh_cv);
+	mutex_exit(&dhp->dh_lock);
 }
 
 static dls_head_t *
@@ -276,83 +268,86 @@ i_dls_head_free(dls_head_t *dhp)
  */
 static uint_t
 i_dls_link_rx_func(dls_link_t *dlp, mac_resource_handle_t mrh,
-    mac_header_info_t *mhip, mblk_t *mp, uint32_t sap, uint16_t vid,
+    mac_header_info_t *mhip, mblk_t *mp, uint32_t sap,
     boolean_t (*acceptfunc)())
 {
-	mod_hash_t	*hash = dlp->dl_impl_hash;
+	mod_hash_t	*hash = dlp->dl_str_hash;
 	mod_hash_key_t	key;
 	dls_head_t	*dhp;
-	dls_impl_t	*dip;
+	dld_str_t	*dsp;
 	mblk_t		*nmp;
-	dls_rx_t	di_rx;
-	void		*di_rx_arg;
+	dls_rx_t	ds_rx;
+	void		*ds_rx_arg;
 	uint_t		naccepted = 0;
+	int		rval;
 
 	/*
 	 * Construct a hash key from the VLAN identifier and the
-	 * DLSAP that represents dls_impl_t in promiscuous mode.
+	 * DLSAP that represents dld_str_t in promiscuous mode.
 	 */
-	key = MAKE_KEY(sap, vid);
+	key = MAKE_KEY(sap);
 
 	/*
-	 * Search the hash table for dls_impl_t eligible to receive
-	 * a packet chain for this DLSAP/VLAN combination.
+	 * Search the hash table for dld_str_t eligible to receive
+	 * a packet chain for this DLSAP/VLAN combination. The mod hash's
+	 * internal lock serializes find/insert/remove from the mod hash list.
+	 * Incrementing the dh_ref (while holding the mod hash lock) ensures
+	 * dls_link_remove will wait for the upcall to finish.
 	 */
-	rw_enter(&dlp->dl_impl_lock, RW_READER);
-	if (mod_hash_find(hash, key, (mod_hash_val_t *)&dhp) != 0) {
-		rw_exit(&dlp->dl_impl_lock);
+	if (mod_hash_find_cb_rval(hash, key, (mod_hash_val_t *)&dhp,
+	    i_dls_head_hold, &rval) != 0 || (rval != 0)) {
 		return (B_FALSE);
 	}
-	i_dls_head_hold(dhp);
-	rw_exit(&dlp->dl_impl_lock);
 
 	/*
-	 * Find dls_impl_t that will accept the sub-chain.
+	 * Find dld_str_t that will accept the sub-chain.
 	 */
-	for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp) {
-		if (!acceptfunc(dip, mhip, &di_rx, &di_rx_arg))
+	for (dsp = dhp->dh_list; dsp != NULL; dsp = dsp->ds_next) {
+		if (!acceptfunc(dsp, mhip, &ds_rx, &ds_rx_arg))
 			continue;
 
 		/*
 		 * We have at least one acceptor.
 		 */
-		naccepted ++;
+		naccepted++;
 
 		/*
-		 * There will normally be at least more dls_impl_t
+		 * There will normally be at least more dld_str_t
 		 * (since we've yet to check for non-promiscuous
-		 * dls_impl_t) so dup the sub-chain.
+		 * dld_str_t) so dup the sub-chain.
 		 */
 		if ((nmp = copymsgchain(mp)) != NULL)
-			di_rx(di_rx_arg, mrh, nmp, mhip);
+			ds_rx(ds_rx_arg, mrh, nmp, mhip);
 	}
 
 	/*
-	 * Release the hold on the dls_impl_t chain now that we have
+	 * Release the hold on the dld_str_t chain now that we have
 	 * finished walking it.
 	 */
 	i_dls_head_rele(dhp);
 	return (naccepted);
 }
 
-static void
-i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
+/* ARGSUSED */
+void
+i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
 {
 	dls_link_t			*dlp = arg;
-	mod_hash_t			*hash = dlp->dl_impl_hash;
+	mod_hash_t			*hash = dlp->dl_str_hash;
 	mblk_t				*nextp;
 	mac_header_info_t		mhi;
 	dls_head_t			*dhp;
-	dls_impl_t			*dip;
-	dls_impl_t			*ndip;
+	dld_str_t			*dsp;
+	dld_str_t			*ndsp;
 	mblk_t				*nmp;
 	mod_hash_key_t			key;
 	uint_t				npacket;
 	boolean_t			accepted;
-	dls_rx_t			di_rx, ndi_rx;
-	void				*di_rx_arg, *ndi_rx_arg;
+	dls_rx_t			ds_rx, nds_rx;
+	void				*ds_rx_arg, *nds_rx_arg;
 	uint16_t			vid;
-	int				err;
+	int				err, rval;
 
 	/*
 	 * Walk the packet chain.
@@ -384,11 +379,11 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 		if (mhi.mhi_istagged) {
 			/*
 			 * If it is tagged traffic, send it upstream to
-			 * all dls_impl_t which are attached to the physical
+			 * all dld_str_t which are attached to the physical
 			 * link and bound to SAP 0x8100.
 			 */
 			if (i_dls_link_rx_func(dlp, mrh, &mhi, mp,
-			    ETHERTYPE_VLAN, VLAN_ID_NONE, dls_accept) > 0) {
+			    ETHERTYPE_VLAN, dls_accept) > 0) {
 				accepted = B_TRUE;
 			}
 
@@ -413,33 +408,30 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 		 * Construct a hash key from the VLAN identifier and the
 		 * DLSAP.
 		 */
-		key = MAKE_KEY(mhi.mhi_bindsap, vid);
+		key = MAKE_KEY(mhi.mhi_bindsap);
 
 		/*
-		 * Search the has table for dls_impl_t eligible to receive
+		 * Search the has table for dld_str_t eligible to receive
 		 * a packet chain for this DLSAP/VLAN combination.
 		 */
-		rw_enter(&dlp->dl_impl_lock, RW_READER);
-		if (mod_hash_find(hash, key, (mod_hash_val_t *)&dhp) != 0) {
-			rw_exit(&dlp->dl_impl_lock);
+		if (mod_hash_find_cb_rval(hash, key, (mod_hash_val_t *)&dhp,
+		    i_dls_head_hold, &rval) != 0 || (rval != 0)) {
 			freemsgchain(mp);
 			goto loop;
 		}
-		i_dls_head_hold(dhp);
-		rw_exit(&dlp->dl_impl_lock);
 
 		/*
-		 * Find the first dls_impl_t that will accept the sub-chain.
+		 * Find the first dld_str_t that will accept the sub-chain.
 		 */
-		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp)
-			if (dls_accept(dip, &mhi, &di_rx, &di_rx_arg))
+		for (dsp = dhp->dh_list; dsp != NULL; dsp = dsp->ds_next)
+			if (dls_accept(dsp, &mhi, &ds_rx, &ds_rx_arg))
 				break;
 
 		/*
-		 * If we did not find any dls_impl_t willing to accept the
+		 * If we did not find any dld_str_t willing to accept the
 		 * sub-chain then throw it away.
 		 */
-		if (dip == NULL) {
+		if (dsp == NULL) {
 			i_dls_head_rele(dhp);
 			freemsgchain(mp);
 			goto loop;
@@ -451,43 +443,43 @@ i_dls_link_rx(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 		accepted = B_TRUE;
 		for (;;) {
 			/*
-			 * Find the next dls_impl_t that will accept the
+			 * Find the next dld_str_t that will accept the
 			 * sub-chain.
 			 */
-			for (ndip = dip->di_nextp; ndip != NULL;
-			    ndip = ndip->di_nextp)
-				if (dls_accept(ndip, &mhi, &ndi_rx,
-				    &ndi_rx_arg))
+			for (ndsp = dsp->ds_next; ndsp != NULL;
+			    ndsp = ndsp->ds_next)
+				if (dls_accept(ndsp, &mhi, &nds_rx,
+				    &nds_rx_arg))
 					break;
 
 			/*
-			 * If there are no more dls_impl_t that are willing
+			 * If there are no more dld_str_t that are willing
 			 * to accept the sub-chain then we don't need to dup
 			 * it before handing it to the current one.
 			 */
-			if (ndip == NULL) {
-				di_rx(di_rx_arg, mrh, mp, &mhi);
+			if (ndsp == NULL) {
+				ds_rx(ds_rx_arg, mrh, mp, &mhi);
 
 				/*
-				 * Since there are no more dls_impl_t, we're
+				 * Since there are no more dld_str_t, we're
 				 * done.
 				 */
 				break;
 			}
 
 			/*
-			 * There are more dls_impl_t so dup the sub-chain.
+			 * There are more dld_str_t so dup the sub-chain.
 			 */
 			if ((nmp = copymsgchain(mp)) != NULL)
-				di_rx(di_rx_arg, mrh, nmp, &mhi);
+				ds_rx(ds_rx_arg, mrh, nmp, &mhi);
 
-			dip = ndip;
-			di_rx = ndi_rx;
-			di_rx_arg = ndi_rx_arg;
+			dsp = ndsp;
+			ds_rx = nds_rx;
+			ds_rx_arg = nds_rx_arg;
 		}
 
 		/*
-		 * Release the hold on the dls_impl_t chain now that we have
+		 * Release the hold on the dld_str_t chain now that we have
 		 * finished walking it.
 		 */
 		i_dls_head_rele(dhp);
@@ -502,220 +494,119 @@ loop:
 	}
 }
 
-/*
- * Try to send mp up to the DLS_SAP_PROMISC listeners. Return B_TRUE if this
- * message is sent to any streams.
- */
-static uint_t
-i_dls_link_rx_common_promisc(dls_link_t *dlp, mac_resource_handle_t mrh,
-    mac_header_info_t *mhip, mblk_t *mp, uint16_t vid,
-    boolean_t (*acceptfunc)())
+/* ARGSUSED */
+void
+dls_rx_vlan_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
 {
-	uint_t naccepted;
-
-	naccepted = i_dls_link_rx_func(dlp, mrh, mhip, mp, DLS_SAP_PROMISC,
-	    vid, acceptfunc);
-
-	if (vid != VLAN_ID_NONE) {
-		naccepted += i_dls_link_rx_func(dlp, mrh, mhip, mp,
-		    DLS_SAP_PROMISC, VLAN_ID_NONE, acceptfunc);
-	}
-	return (naccepted);
-}
-
-static void
-i_dls_link_rx_common(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
-    boolean_t (*acceptfunc)())
-{
-	dls_link_t			*dlp = arg;
-	mod_hash_t			*hash = dlp->dl_impl_hash;
-	mblk_t				*nextp;
+	dld_str_t			*dsp = arg;
+	dls_link_t			*dlp = dsp->ds_dlp;
 	mac_header_info_t		mhi;
-	uint16_t			vid, vidkey, pri;
-	dls_head_t			*dhp;
-	dls_impl_t			*dip;
-	mblk_t				*nmp;
-	mod_hash_key_t			key;
-	uint_t				npacket;
-	uint32_t			sap;
-	boolean_t			accepted;
-	dls_rx_t			di_rx, fdi_rx;
-	void				*di_rx_arg, *fdi_rx_arg;
-	boolean_t			pass2;
+	dls_rx_t			ds_rx;
+	void				*ds_rx_arg;
 	int				err;
 
+	DLS_PREPARE_PKT(dlp, mp, &mhi, err);
+	if (err != 0)
+		goto drop;
+
 	/*
-	 * Walk the packet chain.
+	 * If there is promiscuous handle for vlan, we filter out the untagged
+	 * pkts and pkts that are not for the primary unicast address.
 	 */
-	for (; mp != NULL; mp = nextp) {
-		/*
-		 * Wipe the accepted state and the receive information of
-		 * the first eligible dls_impl_t.
-		 */
-		accepted = B_FALSE;
-		pass2 = B_FALSE;
-		fdi_rx = NULL;
-		fdi_rx_arg = NULL;
+	if (dsp->ds_vlan_mph != NULL) {
+		uint8_t prim_addr[MAXMACADDRLEN];
+		size_t	addr_length = dsp->ds_mip->mi_addr_length;
 
-		DLS_PREPARE_PKT(dlp, mp, &mhi, err);
-		if (err != 0) {
-			if (acceptfunc == dls_accept)
-				atomic_add_32(&(dlp->dl_unknowns), 1);
-			nextp = mp->b_next;
-			mp->b_next = NULL;
-			freemsg(mp);
-			continue;
-		}
+		if (!(mhi.mhi_istagged))
+			goto drop;
+		ASSERT(dsp->ds_mh != NULL);
+		mac_unicast_primary_get(dsp->ds_mh, (uint8_t *)prim_addr);
+		if (memcmp(mhi.mhi_daddr, prim_addr, addr_length) != 0)
+			goto drop;
 
-		/*
-		 * Grab the longest sub-chain we can process as a single
-		 * unit.
-		 */
-		nextp = i_dls_link_subchain(dlp, mp, &mhi, &npacket);
-		ASSERT(npacket != 0);
+		if (!dls_accept(dsp, &mhi, &ds_rx, &ds_rx_arg))
+			goto drop;
 
-		vid = VLAN_ID(mhi.mhi_tci);
-		pri = VLAN_PRI(mhi.mhi_tci);
-
-		vidkey = vid;
-
-		/*
-		 * Note that we need to first send to the dls_impl_t
-		 * in promiscuous mode in order to avoid the packet reordering
-		 * when snooping.
-		 */
-		if (i_dls_link_rx_common_promisc(dlp, mrh, &mhi, mp, vidkey,
-		    acceptfunc) > 0) {
-			accepted = B_TRUE;
-		}
-
-		/*
-		 * Non promisc case. Two passes:
-		 *   1. send tagged packets to ETHERTYPE_VLAN listeners
-		 *   2. send packets to listeners bound to the specific SAP.
-		 */
-		if (mhi.mhi_istagged) {
-			vidkey = VLAN_ID_NONE;
-			sap = ETHERTYPE_VLAN;
-		} else {
-			goto non_promisc_loop;
-		}
-non_promisc:
-		/*
-		 * Construct a hash key from the VLAN identifier and the
-		 * DLSAP.
-		 */
-		key = MAKE_KEY(sap, vidkey);
-
-		/*
-		 * Search the has table for dls_impl_t eligible to receive
-		 * a packet chain for this DLSAP/VLAN combination.
-		 */
-		rw_enter(&dlp->dl_impl_lock, RW_READER);
-		if (mod_hash_find(hash, key, (mod_hash_val_t *)&dhp) != 0) {
-			rw_exit(&dlp->dl_impl_lock);
-			goto non_promisc_loop;
-		}
-		i_dls_head_hold(dhp);
-		rw_exit(&dlp->dl_impl_lock);
-
-		/*
-		 * Find the first dls_impl_t that will accept the sub-chain.
-		 */
-		for (dip = dhp->dh_list; dip != NULL; dip = dip->di_nextp) {
-			if (!acceptfunc(dip, &mhi, &di_rx, &di_rx_arg))
-				continue;
-
-			accepted = B_TRUE;
-
-			/*
-			 * To avoid the extra copymsgchain(), if this
-			 * is the first eligible dls_impl_t, remember required
-			 * information and send up the message afterwards.
-			 */
-			if (fdi_rx == NULL) {
-				fdi_rx = di_rx;
-				fdi_rx_arg = di_rx_arg;
-				continue;
-			}
-
-			if ((nmp = copymsgchain(mp)) != NULL)
-				di_rx(di_rx_arg, mrh, nmp, &mhi);
-		}
-
-		/*
-		 * Release the hold on the dls_impl_t chain now that we have
-		 * finished walking it.
-		 */
-		i_dls_head_rele(dhp);
-
-non_promisc_loop:
-		/*
-		 * Don't pass the packets up again if:
-		 * - First pass is done and the packets are tagged and their:
-		 *	- VID and priority are both zero (invalid packets).
-		 *	- their sap is ETHERTYPE_VLAN and their VID is zero
-		 *	  (they have already been sent upstreams).
-		 *  - Second pass is done:
-		 */
-		if (pass2 || (mhi.mhi_istagged &&
-		    ((vid == VLAN_ID_NONE && pri == 0) ||
-		    (mhi.mhi_bindsap == ETHERTYPE_VLAN &&
-		    vid == VLAN_ID_NONE)))) {
-			/*
-			 * Send the message up to the first eligible dls_impl_t.
-			 */
-			if (fdi_rx != NULL)
-				fdi_rx(fdi_rx_arg, mrh, mp, &mhi);
-			else
-				freemsgchain(mp);
-		} else {
-			vidkey = vid;
-			sap = mhi.mhi_bindsap;
-			pass2 = B_TRUE;
-			goto non_promisc;
-		}
-
-		/*
-		 * If there were no acceptors then add the packet count to the
-		 * 'unknown' count.
-		 */
-		if (!accepted && (acceptfunc == dls_accept))
-			atomic_add_32(&(dlp->dl_unknowns), npacket);
+		ds_rx(ds_rx_arg, NULL, mp, &mhi);
+		return;
 	}
+
+drop:
+	atomic_add_32(&dlp->dl_unknowns, 1);
+	freemsg(mp);
+}
+
+/* ARGSUSED */
+void
+dls_rx_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
+{
+	dld_str_t			*dsp = arg;
+	dls_link_t			*dlp = dsp->ds_dlp;
+	mac_header_info_t		mhi;
+	dls_rx_t			ds_rx;
+	void				*ds_rx_arg;
+	int				err;
+	dls_head_t			*dhp;
+	mod_hash_key_t			key;
+
+	DLS_PREPARE_PKT(dlp, mp, &mhi, err);
+	if (err != 0)
+		goto drop;
+
+	/*
+	 * In order to filter out sap pkt that no dls channel listens, search
+	 * the hash table trying to find a dld_str_t eligible to receive the pkt
+	 */
+	if ((dsp->ds_promisc & DLS_PROMISC_SAP) == 0) {
+		key = MAKE_KEY(mhi.mhi_bindsap);
+		if (mod_hash_find(dsp->ds_dlp->dl_str_hash, key,
+		    (mod_hash_val_t *)&dhp) != 0)
+			goto drop;
+	}
+
+	if (!dls_accept_promisc(dsp, &mhi, &ds_rx, &ds_rx_arg, loopback))
+		goto drop;
+
+	ds_rx(ds_rx_arg, NULL, mp, &mhi);
+	return;
+
+drop:
+	atomic_add_32(&dlp->dl_unknowns, 1);
+	freemsg(mp);
 }
 
 static void
-i_dls_link_rx_promisc(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
+i_dls_link_destroy(dls_link_t *dlp)
 {
-	i_dls_link_rx_common(arg, mrh, mp, dls_accept);
-}
+	ASSERT(dlp->dl_nactive == 0);
+	ASSERT(dlp->dl_impl_count == 0);
+	ASSERT(dlp->dl_zone_ref == 0);
 
-void
-dls_link_txloop(void *arg, mblk_t *mp)
-{
-	i_dls_link_rx_common(arg, NULL, mp, dls_accept_loopback);
-}
+	/*
+	 * Free the structure back to the cache.
+	 */
+	if (dlp->dl_mch != NULL)
+		mac_client_close(dlp->dl_mch, 0);
 
-/*ARGSUSED*/
-static uint_t
-i_dls_link_walk(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
-{
-	boolean_t 	*promiscp = arg;
-	uint32_t	sap = KEY_SAP(key);
-
-	if (sap == DLS_SAP_PROMISC) {
-		*promiscp = B_TRUE;
-		return (MH_WALK_TERMINATE);
+	if (dlp->dl_mh != NULL) {
+		ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
+		mac_close(dlp->dl_mh);
 	}
 
-	return (MH_WALK_CONTINUE);
+	dlp->dl_mh = NULL;
+	dlp->dl_mch = NULL;
+	dlp->dl_mip = NULL;
+	dlp->dl_unknowns = 0;
+	kmem_cache_free(i_dls_link_cachep, dlp);
 }
 
 static int
 i_dls_link_create(const char *name, dls_link_t **dlpp)
 {
 	dls_link_t		*dlp;
+	int			err;
 
 	/*
 	 * Allocate a new dls_link_t structure.
@@ -728,32 +619,34 @@ i_dls_link_create(const char *name, dls_link_t **dlpp)
 	(void) strlcpy(dlp->dl_name, name, sizeof (dlp->dl_name));
 
 	/*
-	 * Initialize promiscuous bookkeeping fields.
+	 * First reference; hold open the MAC interface.
 	 */
-	dlp->dl_npromisc = 0;
-	dlp->dl_mth = NULL;
+	ASSERT(dlp->dl_mh == NULL);
+	err = mac_open(dlp->dl_name, &dlp->dl_mh);
+	if (err != 0)
+		goto bail;
+
+	ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
+	dlp->dl_mip = mac_info(dlp->dl_mh);
+
+	/* DLS is the "primary" MAC client */
+	ASSERT(dlp->dl_mch == NULL);
+
+	err = mac_client_open(dlp->dl_mh, &dlp->dl_mch, NULL,
+	    MAC_OPEN_FLAGS_TAG_DISABLE | MAC_OPEN_FLAGS_DISABLE_TX_VID_CHECK |
+	    MAC_OPEN_FLAGS_USE_DATALINK_NAME);
+	if (err != 0)
+		goto bail;
+
+	DTRACE_PROBE2(dls__primary__client, char *, dlp->dl_name, void *,
+	    dlp->dl_mch);
 
 	*dlpp = dlp;
 	return (0);
-}
 
-static void
-i_dls_link_destroy(dls_link_t *dlp)
-{
-	ASSERT(dlp->dl_npromisc == 0);
-	ASSERT(dlp->dl_nactive == 0);
-	ASSERT(dlp->dl_mth == NULL);
-	ASSERT(dlp->dl_macref == 0);
-	ASSERT(dlp->dl_mh == NULL);
-	ASSERT(dlp->dl_mip == NULL);
-	ASSERT(dlp->dl_impl_count == 0);
-	ASSERT(dlp->dl_mrh == NULL);
-
-	/*
-	 * Free the structure back to the cache.
-	 */
-	dlp->dl_unknowns = 0;
-	kmem_cache_free(i_dls_link_cachep, dlp);
+bail:
+	i_dls_link_destroy(dlp);
+	return (err);
 }
 
 /*
@@ -777,7 +670,6 @@ dls_link_init(void)
 	i_dls_link_hash = mod_hash_create_extended("dls_link_hash",
 	    IMPL_HASHSZ, mod_hash_null_keydtor, mod_hash_null_valdtor,
 	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
-	rw_init(&i_dls_link_lock, NULL, RW_DEFAULT, NULL);
 	i_dls_link_count = 0;
 }
 
@@ -796,7 +688,6 @@ dls_link_fini(void)
 	 * Destroy the hash table and associated lock.
 	 */
 	mod_hash_destroy_hash(i_dls_link_hash);
-	rw_destroy(&i_dls_link_lock);
 	return (0);
 }
 
@@ -804,32 +695,33 @@ dls_link_fini(void)
  * Exported functions.
  */
 
-int
-dls_link_hold(const char *name, dls_link_t **dlpp)
+static int
+dls_link_hold_common(const char *name, dls_link_t **dlpp, boolean_t create)
 {
 	dls_link_t		*dlp;
 	int			err;
 
 	/*
-	 * Look up a dls_link_t corresponding to the given mac_handle_t
-	 * in the global hash table. We need to hold i_dls_link_lock in
-	 * order to atomically find and insert a dls_link_t into the
-	 * hash table.
+	 * Look up a dls_link_t corresponding to the given macname in the
+	 * global hash table. The i_dls_link_hash itself is protected by the
+	 * mod_hash package's internal lock which synchronizes
+	 * find/insert/remove into the global mod_hash list. Assumes that
+	 * inserts and removes are single threaded on a per mac end point
+	 * by the mac perimeter.
 	 */
-	rw_enter(&i_dls_link_lock, RW_WRITER);
 	if ((err = mod_hash_find(i_dls_link_hash, (mod_hash_key_t)name,
 	    (mod_hash_val_t *)&dlp)) == 0)
 		goto done;
 
 	ASSERT(err == MH_ERR_NOTFOUND);
+	if (!create)
+		return (ENOENT);
 
 	/*
 	 * We didn't find anything so we need to create one.
 	 */
-	if ((err = i_dls_link_create(name, &dlp)) != 0) {
-		rw_exit(&i_dls_link_lock);
+	if ((err = i_dls_link_create(name, &dlp)) != 0)
 		return (err);
-	}
 
 	/*
 	 * Insert the dls_link_t.
@@ -838,18 +730,71 @@ dls_link_hold(const char *name, dls_link_t **dlpp)
 	    (mod_hash_val_t)dlp);
 	ASSERT(err == 0);
 
-	i_dls_link_count++;
+	atomic_add_32(&i_dls_link_count, 1);
 	ASSERT(i_dls_link_count != 0);
 
 done:
-
+	ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
 	/*
 	 * Bump the reference count and hand back the reference.
 	 */
 	dlp->dl_ref++;
 	*dlpp = dlp;
-	rw_exit(&i_dls_link_lock);
 	return (0);
+}
+
+int
+dls_link_hold_create(const char *name, dls_link_t **dlpp)
+{
+	return (dls_link_hold_common(name, dlpp, B_TRUE));
+}
+
+int
+dls_link_hold(const char *name, dls_link_t **dlpp)
+{
+	return (dls_link_hold_common(name, dlpp, B_FALSE));
+}
+
+dev_info_t *
+dls_link_devinfo(dev_t dev)
+{
+	dls_link_t	*dlp;
+	dev_info_t	*dip;
+	char	macname[MAXNAMELEN];
+	char	*drv;
+	mac_perim_handle_t	mph;
+
+	if ((drv = ddi_major_to_name(getmajor(dev))) == NULL)
+		return (NULL);
+	(void) snprintf(macname, MAXNAMELEN, "%s%d", drv, getminor(dev) - 1);
+
+	/*
+	 * The code below assumes that the name constructed above is the
+	 * macname. This is not the case for legacy devices. Currently this
+	 * is ok because this function is only called in the getinfo(9e) path,
+	 * which for a legacy device would directly end up in the driver's
+	 * getinfo, rather than here
+	 */
+	if (mac_perim_enter_by_macname(macname, &mph) != 0)
+		return (NULL);
+
+	if (dls_link_hold(macname, &dlp) != 0) {
+		mac_perim_exit(mph);
+		return (NULL);
+	}
+
+	dip = mac_devinfo_get(dlp->dl_mh);
+	dls_link_rele(dlp);
+	mac_perim_exit(mph);
+
+	return (dip);
+}
+
+dev_t
+dls_link_dev(dls_link_t *dlp)
+{
+	return (makedevice(ddi_driver_major(mac_devinfo_get(dlp->dl_mh)),
+	    mac_minor(dlp->dl_mh)));
 }
 
 void
@@ -857,105 +802,128 @@ dls_link_rele(dls_link_t *dlp)
 {
 	mod_hash_val_t	val;
 
-	rw_enter(&i_dls_link_lock, RW_WRITER);
-
+	ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
 	/*
 	 * Check if there are any more references.
 	 */
-	if (--dlp->dl_ref != 0) {
+	if (--dlp->dl_ref == 0) {
+		(void) mod_hash_remove(i_dls_link_hash,
+		    (mod_hash_key_t)dlp->dl_name, &val);
+		ASSERT(dlp == (dls_link_t *)val);
+
 		/*
-		 * There are more references so there's nothing more to do.
+		 * Destroy the dls_link_t.
 		 */
-		goto done;
+		i_dls_link_destroy(dlp);
+		ASSERT(i_dls_link_count > 0);
+		atomic_add_32(&i_dls_link_count, -1);
 	}
-
-	(void) mod_hash_remove(i_dls_link_hash,
-	    (mod_hash_key_t)dlp->dl_name, &val);
-	ASSERT(dlp == (dls_link_t *)val);
-
-	/*
-	 * Destroy the dls_link_t.
-	 */
-	i_dls_link_destroy(dlp);
-	ASSERT(i_dls_link_count > 0);
-	i_dls_link_count--;
-done:
-	rw_exit(&i_dls_link_lock);
 }
 
 int
-dls_mac_hold(dls_link_t *dlp)
+dls_link_rele_by_name(const char *name)
 {
-	mac_handle_t mh;
-	int err = 0;
+	dls_link_t		*dlp;
 
-	err = mac_open(dlp->dl_name, &mh);
+	if (mod_hash_find(i_dls_link_hash, (mod_hash_key_t)name,
+	    (mod_hash_val_t *)&dlp) != 0)
+		return (ENOENT);
 
-	mutex_enter(&dlp->dl_lock);
+	ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
 
-	ASSERT(IMPLY(dlp->dl_macref != 0, dlp->dl_mh != NULL));
-	ASSERT(IMPLY(dlp->dl_macref == 0, dlp->dl_mh == NULL));
-	if (err == 0) {
-		ASSERT(dlp->dl_mh == NULL || dlp->dl_mh == mh);
-		if (dlp->dl_mh == NULL) {
-			dlp->dl_mh = mh;
-			dlp->dl_mip = mac_info(mh);
-		}
-		dlp->dl_macref++;
+	/*
+	 * Must fail detach if mac client is busy.
+	 */
+	ASSERT(dlp->dl_ref > 0 && dlp->dl_mch != NULL);
+	if (mac_link_has_flows(dlp->dl_mch))
+		return (ENOTEMPTY);
+
+	dls_link_rele(dlp);
+	return (0);
+}
+
+int
+dls_link_setzid(const char *name, zoneid_t zid)
+{
+	dls_link_t	*dlp;
+	int		err = 0;
+	zoneid_t	old_zid;
+
+	if ((err = dls_link_hold_create(name, &dlp)) != 0)
+		return (err);
+
+	ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
+
+	if ((old_zid = dlp->dl_zid) == zid)
+		goto done;
+
+	/*
+	 * Check whether this dlp is used by its own zones, if yes,
+	 * we cannot change its zoneid.
+	 */
+	if (dlp->dl_zone_ref != 0) {
+		err = EBUSY;
+		goto done;
 	}
 
-	mutex_exit(&dlp->dl_lock);
+	if (zid == GLOBAL_ZONEID) {
+		/*
+		 * Move the link from the local zone to the global zone,
+		 * and release the reference to this link.  At the same time
+		 * reset the link's active state so that an aggregation is
+		 * allowed to be created over it.
+		 */
+		dlp->dl_zid = zid;
+		dls_mac_active_clear(dlp);
+		dls_link_rele(dlp);
+		goto done;
+	} else if (old_zid == GLOBAL_ZONEID) {
+		/*
+		 * Move the link from the global zone to the local zone,
+		 * and hold a reference to this link.  Also, set the link
+		 * to the "active" state so that the global zone is
+		 * not able to create an aggregation over this link.
+		 * TODO: revisit once we allow creating aggregations
+		 * within a local zone.
+		 */
+		if ((err = dls_mac_active_set(dlp)) != 0) {
+			if (err != ENXIO)
+				err = EBUSY;
+			goto done;
+		}
+		dlp->dl_zid = zid;
+		return (0);
+	} else {
+		/*
+		 * Move the link from a local zone to another local zone.
+		 */
+		dlp->dl_zid = zid;
+	}
+
+done:
+	dls_link_rele(dlp);
 	return (err);
 }
 
 void
-dls_mac_rele(dls_link_t *dlp)
+dls_link_add(dls_link_t *dlp, uint32_t sap, dld_str_t *dsp)
 {
-	mutex_enter(&dlp->dl_lock);
-	ASSERT(dlp->dl_mh != NULL);
-
-	mac_close(dlp->dl_mh);
-
-	if (--dlp->dl_macref == 0) {
-		dlp->dl_mh = NULL;
-		dlp->dl_mip = NULL;
-	}
-	mutex_exit(&dlp->dl_lock);
-}
-
-void
-dls_link_add(dls_link_t *dlp, uint32_t sap, dls_impl_t *dip)
-{
-	dls_vlan_t	*dvp = dip->di_dvp;
-	mod_hash_t	*hash = dlp->dl_impl_hash;
+	mod_hash_t	*hash = dlp->dl_str_hash;
 	mod_hash_key_t	key;
 	dls_head_t	*dhp;
-	dls_impl_t	*p;
-	mac_rx_t	rx;
+	dld_str_t	*p;
 	int		err;
-	boolean_t	promisc = B_FALSE;
+
+	ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
 
 	/*
-	 * Generate a hash key based on the sap and the VLAN id.
+	 * Generate a hash key based on the sap.
 	 */
-	key = MAKE_KEY(sap, dvp->dv_id);
-
-	/*
-	 * We need dl_lock here because we want to be able to walk
-	 * the hash table *and* set the mac rx func atomically. if
-	 * these two operations are separate, someone else could
-	 * insert/remove dls_impl_t from the hash table after we
-	 * drop the hash lock and this could cause our chosen rx
-	 * func to be incorrect. note that we cannot call mac_rx_add
-	 * when holding the hash lock because this can cause deadlock.
-	 */
-	mutex_enter(&dlp->dl_lock);
+	key = MAKE_KEY(sap);
 
 	/*
 	 * Search the table for a list head with this key.
 	 */
-	rw_enter(&dlp->dl_impl_lock, RW_WRITER);
-
 	if ((err = mod_hash_find(hash, key, (mod_hash_val_t *)&dhp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
 
@@ -965,94 +933,68 @@ dls_link_add(dls_link_t *dlp, uint32_t sap, dls_impl_t *dip)
 	}
 
 	/*
-	 * Add the dls_impl_t to the head of the list.
+	 * Add the dld_str_t to the head of the list. List walkers in
+	 * i_dls_link_rx_* bump up dh_ref to ensure the list does not change
+	 * while they walk the list. The membar below ensures that list walkers
+	 * see exactly the old list or the new list.
 	 */
-	ASSERT(dip->di_nextp == NULL);
+	ASSERT(dsp->ds_next == NULL);
 	p = dhp->dh_list;
-	dip->di_nextp = p;
-	dhp->dh_list = dip;
+	dsp->ds_next = p;
+
+	membar_producer();
+
+	dhp->dh_list = dsp;
 
 	/*
 	 * Save a pointer to the list head.
 	 */
-	dip->di_headp = dhp;
+	dsp->ds_head = dhp;
 	dlp->dl_impl_count++;
-
-	/*
-	 * Walk the bound dls_impl_t to see if there are any
-	 * in promiscuous 'all sap' mode.
-	 */
-	mod_hash_walk(hash, i_dls_link_walk, (void *)&promisc);
-	rw_exit(&dlp->dl_impl_lock);
-
-	/*
-	 * If there are then we need to use a receive routine
-	 * which will route packets to those dls_impl_t as well
-	 * as ones bound to the  DLSAP of the packet.
-	 */
-	if (promisc)
-		rx = i_dls_link_rx_promisc;
-	else
-		rx = i_dls_link_rx;
-
-	/* Replace the existing receive function if there is one. */
-	if (dlp->dl_mrh != NULL)
-		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_TRUE);
-	dlp->dl_mrh = mac_active_rx_add(dlp->dl_mh, rx, (void *)dlp);
-	mutex_exit(&dlp->dl_lock);
 }
 
 void
-dls_link_remove(dls_link_t *dlp, dls_impl_t *dip)
+dls_link_remove(dls_link_t *dlp, dld_str_t *dsp)
 {
-	mod_hash_t	*hash = dlp->dl_impl_hash;
-	dls_impl_t	**pp;
-	dls_impl_t	*p;
+	mod_hash_t	*hash = dlp->dl_str_hash;
+	dld_str_t	**pp;
+	dld_str_t	*p;
 	dls_head_t	*dhp;
-	mac_rx_t	rx;
+
+	ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
 
 	/*
-	 * We need dl_lock here because we want to be able to walk
-	 * the hash table *and* set the mac rx func atomically. if
-	 * these two operations are separate, someone else could
-	 * insert/remove dls_impl_t from the hash table after we
-	 * drop the hash lock and this could cause our chosen rx
-	 * func to be incorrect. note that we cannot call mac_rx_add
-	 * when holding the hash lock because this can cause deadlock.
+	 * We set dh_removing here to tell the receive callbacks not to pass
+	 * up packets anymore. Then wait till the current callbacks are done.
+	 * This happens either in the close path or in processing the
+	 * DL_UNBIND_REQ via a taskq thread, and it is ok to cv_wait in either.
+	 * The dh_ref ensures there aren't and there won't be any upcalls
+	 * walking or using the dh_list. The mod hash internal lock ensures
+	 * that the insert/remove of the dls_head_t itself synchronizes with
+	 * any i_dls_link_rx trying to locate it. The perimeter ensures that
+	 * there isn't another simultaneous dls_link_add/remove.
 	 */
-	mutex_enter(&dlp->dl_lock);
-	rw_enter(&dlp->dl_impl_lock, RW_WRITER);
+	dhp = dsp->ds_head;
+
+	mutex_enter(&dhp->dh_lock);
+	dhp->dh_removing = B_TRUE;
+	while (dhp->dh_ref != 0)
+		cv_wait(&dhp->dh_cv, &dhp->dh_lock);
+	mutex_exit(&dhp->dh_lock);
 
 	/*
-	 * Poll the hash table entry until all references have been dropped.
-	 * We need to drop all locks before sleeping because we don't want
-	 * the interrupt handler to block. We set di_removing here to
-	 * tell the receive callbacks not to pass up packets anymore.
-	 * This is only a hint to quicken the decrease of the refcnt so
-	 * the assignment need not be protected by any lock.
+	 * Walk the list and remove the dld_str_t.
 	 */
-	dhp = dip->di_headp;
-	dip->di_removing = B_TRUE;
-	while (dhp->dh_ref != 0) {
-		rw_exit(&dlp->dl_impl_lock);
-		mutex_exit(&dlp->dl_lock);
-		delay(drv_usectohz(1000));	/* 1ms delay */
-		mutex_enter(&dlp->dl_lock);
-		rw_enter(&dlp->dl_impl_lock, RW_WRITER);
-	}
-
-	/*
-	 * Walk the list and remove the dls_impl_t.
-	 */
-	for (pp = &dhp->dh_list; (p = *pp) != NULL; pp = &(p->di_nextp)) {
-		if (p == dip)
+	for (pp = &dhp->dh_list; (p = *pp) != NULL; pp = &(p->ds_next)) {
+		if (p == dsp)
 			break;
 	}
 	ASSERT(p != NULL);
-	*pp = p->di_nextp;
-	p->di_nextp = NULL;
+	*pp = p->ds_next;
+	p->ds_next = NULL;
+	p->ds_head = NULL;
 
-	ASSERT(dlp->dl_impl_count > 0);
+	ASSERT(dlp->dl_impl_count != 0);
 	dlp->dl_impl_count--;
 
 	if (dhp->dh_list == NULL) {
@@ -1064,41 +1006,11 @@ dls_link_remove(dls_link_t *dlp, dls_impl_t *dip)
 		(void) mod_hash_remove(hash, dhp->dh_key, &val);
 		ASSERT(dhp == (dls_head_t *)val);
 		i_dls_head_free(dhp);
-	}
-	dip->di_removing = B_FALSE;
-
-	/*
-	 * If there are no dls_impl_t then there's no need to register a
-	 * receive function with the mac.
-	 */
-	if (dlp->dl_impl_count == 0) {
-		rw_exit(&dlp->dl_impl_lock);
-		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_TRUE);
-		dlp->dl_mrh = NULL;
 	} else {
-		boolean_t promisc = B_FALSE;
-
-		/*
-		 * Walk the bound dls_impl_t to see if there are any
-		 * in promiscuous 'all sap' mode.
-		 */
-		mod_hash_walk(hash, i_dls_link_walk, (void *)&promisc);
-		rw_exit(&dlp->dl_impl_lock);
-
-		/*
-		 * If there are then we need to use a receive routine
-		 * which will route packets to those dls_impl_t as well
-		 * as ones bound to the  DLSAP of the packet.
-		 */
-		if (promisc)
-			rx = i_dls_link_rx_promisc;
-		else
-			rx = i_dls_link_rx;
-
-		mac_rx_remove(dlp->dl_mh, dlp->dl_mrh, B_TRUE);
-		dlp->dl_mrh = mac_active_rx_add(dlp->dl_mh, rx, (void *)dlp);
+		mutex_enter(&dhp->dh_lock);
+		dhp->dh_removing = B_FALSE;
+		mutex_exit(&dhp->dh_lock);
 	}
-	mutex_exit(&dlp->dl_lock);
 }
 
 int
@@ -1152,11 +1064,6 @@ dls_link_header_info(dls_link_t *dlp, mblk_t *mp, mac_header_info_t *mhip)
 		mhip->mhi_istagged = B_FALSE;
 		mhip->mhi_tci = 0;
 	}
-
-	/*
-	 * The messsage is looped back from the underlying driver.
-	 */
-	mhip->mhi_prom_looped = (mp->b_flag & MSGNOLOOP);
 
 	return (0);
 }

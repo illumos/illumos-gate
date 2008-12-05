@@ -109,11 +109,10 @@ static void		rge_m_stop(void *);
 static int		rge_m_promisc(void *, boolean_t);
 static int		rge_m_multicst(void *, boolean_t, const uint8_t *);
 static int		rge_m_unicst(void *, const uint8_t *);
-static void		rge_m_resources(void *);
 static void		rge_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t	rge_m_getcapab(void *, mac_capab_t, void *);
 
-#define	RGE_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
+#define	RGE_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
 
 static mac_callbacks_t rge_m_callbacks = {
 	RGE_M_CALLBACK_FLAGS,
@@ -124,7 +123,6 @@ static mac_callbacks_t rge_m_callbacks = {
 	rge_m_multicst,
 	rge_m_unicst,
 	rge_m_tx,
-	rge_m_resources,
 	rge_m_ioctl,
 	rge_m_getcapab
 };
@@ -1249,28 +1247,6 @@ rge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	}
 }
 
-static void
-rge_m_resources(void *arg)
-{
-	rge_t *rgep = arg;
-	mac_rx_fifo_t mrf;
-
-	mutex_enter(rgep->genlock);
-
-	/*
-	 * Register Rx rings as resources and save mac
-	 * resource id for future reference
-	 */
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = rge_chip_blank;
-	mrf.mrf_arg = (void *)rgep;
-	mrf.mrf_normal_blank_time = RGE_RX_INT_TIME;
-	mrf.mrf_normal_pkt_count = RGE_RX_INT_PKTS;
-	rgep->handle = mac_resource_add(rgep->mh, (mac_resource_t *)&mrf);
-
-	mutex_exit(rgep->genlock);
-}
-
 /* ARGSUSED */
 static boolean_t
 rge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
@@ -1302,12 +1278,6 @@ rge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		}
 		break;
 	}
-	case MAC_CAPAB_POLL:
-		/*
-		 * There's nothing for us to fill in, simply returning
-		 * B_TRUE stating that we support polling is sufficient.
-		 */
-		break;
 	default:
 		return (B_FALSE);
 	}

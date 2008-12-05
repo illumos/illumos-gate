@@ -55,18 +55,19 @@
 
 static uint16_t aggr_send_ip6_hdr_len(mblk_t *, ip6_t *);
 
-static uint_t
-aggr_send_port(aggr_grp_t *grp, mblk_t *mp)
+static uint64_t
+aggr_send_hash(aggr_grp_t *grp, mblk_t *mp)
 {
 	struct ether_header *ehp;
 	uint16_t sap;
 	uint_t skip_len;
 	uint8_t proto;
 	uint32_t policy = grp->lg_tx_policy;
-	uint32_t hash = 0;
+	uint64_t hash = 0;
 
 	ASSERT(IS_P2ALIGNED(mp->b_rptr, sizeof (uint16_t)));
 	ASSERT(MBLKL(mp) >= sizeof (struct ether_header));
+	ASSERT(RW_READ_HELD(&grp->lg_tx_lock));
 
 	/* compute MAC hash */
 
@@ -207,7 +208,7 @@ again:
 	}
 
 done:
-	return (hash % grp->lg_ntx_ports);
+	return (hash);
 }
 
 /*
@@ -216,8 +217,7 @@ done:
 void
 aggr_send_update_policy(aggr_grp_t *grp, uint32_t policy)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
 	grp->lg_tx_policy = policy;
 }
@@ -231,35 +231,63 @@ aggr_m_tx(void *arg, mblk_t *mp)
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port;
 	mblk_t *nextp;
-	const mac_txinfo_t *mtp;
+	mac_tx_cookie_t	cookie;
+	uint64_t hash;
+	void	*mytx_handle;
 
 	for (;;) {
-		AGGR_LACP_LOCK_READER(grp)
+		rw_enter(&grp->lg_tx_lock, RW_READER);
 		if (grp->lg_ntx_ports == 0) {
 			/*
 			 * We could have returned from aggr_m_start() before
 			 * the ports were actually attached. Drop the chain.
 			 */
-			AGGR_LACP_UNLOCK(grp)
+			rw_exit(&grp->lg_tx_lock);
 			freemsgchain(mp);
 			return (NULL);
 		}
+
 		nextp = mp->b_next;
 		mp->b_next = NULL;
 
-		port = grp->lg_tx_ports[aggr_send_port(grp, mp)];
-		ASSERT(port->lp_state == AGGR_PORT_STATE_ATTACHED);
+		hash = aggr_send_hash(grp, mp);
+		port = grp->lg_tx_ports[hash % grp->lg_ntx_ports];
 
 		/*
-		 * We store the transmit info pointer locally in case it
-		 * changes between loading mt_fn and mt_arg.
+		 * Bump the active Tx ref count so that the port won't
+		 * be deleted. The reference count will be dropped in mac_tx().
 		 */
-		mtp = port->lp_txinfo;
-		AGGR_LACP_UNLOCK(grp)
+		mytx_handle = mac_tx_hold(port->lp_mch);
+		rw_exit(&grp->lg_tx_lock);
 
-		if ((mp = mtp->mt_fn(mtp->mt_arg, mp)) != NULL) {
-			mp->b_next = nextp;
-			break;
+		if (mytx_handle == NULL) {
+			/*
+			 * The port is quiesced.
+			 */
+			freemsg(mp);
+		} else {
+			mblk_t	*ret_mp;
+
+			/*
+			 * It is fine that the port state changes now.
+			 * Set MAC_TX_NO_HOLD to inform mac_tx() not to bump
+			 * the active Tx ref again. Use hash as the hint so
+			 * to direct traffic to different TX rings. Note below
+			 * bit operation is needed to get the most benefit
+			 * from the mac_tx() hash algorithm.
+			 */
+			hash = (hash << 24 | hash << 16 | hash);
+			hash = (hash << 32 | hash);
+			cookie = mac_tx(port->lp_mch, mp, (uintptr_t)hash,
+			    MAC_TX_NO_ENQUEUE | MAC_TX_NO_HOLD, &ret_mp);
+
+			mac_tx_rele(port->lp_mch, mytx_handle);
+
+			if (cookie != NULL) {
+				ret_mp->b_next = nextp;
+				mp = ret_mp;
+				break;
+			}
 		}
 
 		if ((mp = nextp) == NULL)
@@ -276,6 +304,8 @@ aggr_send_port_enable(aggr_port_t *port)
 {
 	aggr_grp_t *grp = port->lp_grp;
 
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+
 	if (port->lp_tx_enabled || (port->lp_state !=
 	    AGGR_PORT_STATE_ATTACHED)) {
 		/* already enabled or port not yet attached */
@@ -285,6 +315,7 @@ aggr_send_port_enable(aggr_port_t *port)
 	/*
 	 * Add to group's array of tx ports.
 	 */
+	rw_enter(&grp->lg_tx_lock, RW_WRITER);
 	if (grp->lg_tx_ports_size < grp->lg_ntx_ports+1) {
 		/* current array too small */
 		aggr_port_t **new_ports;
@@ -308,6 +339,7 @@ aggr_send_port_enable(aggr_port_t *port)
 
 	grp->lg_tx_ports[grp->lg_ntx_ports++] = port;
 	port->lp_tx_idx = grp->lg_ntx_ports-1;
+	rw_exit(&grp->lg_tx_lock);
 
 	port->lp_tx_enabled = B_TRUE;
 }
@@ -321,13 +353,15 @@ aggr_send_port_disable(aggr_port_t *port)
 	uint_t idx, ntx;
 	aggr_grp_t *grp = port->lp_grp;
 
-	ASSERT(RW_WRITE_HELD(&port->lp_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	ASSERT(MAC_PERIM_HELD(port->lp_mh));
 
 	if (!port->lp_tx_enabled) {
 		/* not yet enabled */
 		return;
 	}
 
+	rw_enter(&grp->lg_tx_lock, RW_WRITER);
 	idx = port->lp_tx_idx;
 	ntx = grp->lg_ntx_ports;
 	ASSERT(idx < ntx);
@@ -347,6 +381,7 @@ aggr_send_port_disable(aggr_port_t *port)
 
 	port->lp_tx_idx = 0;
 	grp->lg_ntx_ports--;
+	rw_exit(&grp->lg_tx_lock);
 
 	port->lp_tx_enabled = B_FALSE;
 }

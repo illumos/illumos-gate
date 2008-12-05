@@ -96,6 +96,7 @@
 #include <inet/ip_if.h>
 #include <inet/ipp_common.h>
 #include <inet/ip_netinfo.h>
+#include <sys/squeue_impl.h>
 #include <sys/squeue.h>
 #include <inet/kssl/ksslapi.h>
 #include <sys/tsol/label.h>
@@ -124,8 +125,8 @@
  * The tcp data structure does not use any kind of lock for protecting
  * its state but instead uses 'squeues' for mutual exclusion from various
  * read and write side threads. To access a tcp member, the thread should
- * always be behind squeue (via squeue_enter, squeue_enter_nodrain, or
- * squeue_fill). Since the squeues allow a direct function call, caller
+ * always be behind squeue (via squeue_enter with flags as SQ_FILL, SQ_PROCESS,
+ * or SQ_NODRAIN). Since the squeues allow a direct function call, caller
  * can pass any tcp function having prototype of edesc_t as argument
  * (different from traditional STREAMs model where packets come in only
  * designated entry points). The list of functions that can be directly
@@ -251,15 +252,12 @@
 
 /*
  * Values for squeue switch:
- * 1: squeue_enter_nodrain
- * 2: squeue_enter
- * 3: squeue_fill
+ * 1: SQ_NODRAIN
+ * 2: SQ_PROCESS
+ * 3: SQ_FILL
  */
-int tcp_squeue_close = 2;	/* Setable in /etc/system */
-int tcp_squeue_wput = 2;
-
-squeue_func_t tcp_squeue_close_proc;
-squeue_func_t tcp_squeue_wput_proc;
+int tcp_squeue_wput = 2;	/* /etc/systems */
+int tcp_squeue_flag;
 
 /*
  * Macros for sodirect:
@@ -940,7 +938,7 @@ static int	tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 			tcph_t *tcph, uint_t ipvers, mblk_t *idmp);
 static int	tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 			tcph_t *tcph, mblk_t *idmp);
-static squeue_func_t tcp_squeue_switch(int);
+static int	tcp_squeue_switch(int);
 
 static int	tcp_open(queue_t *, dev_t *, int, int, cred_t *, boolean_t);
 static int	tcp_openv4(queue_t *, dev_t *, int, int, cred_t *);
@@ -1865,9 +1863,9 @@ tcp_time_wait_collector(void *arg)
 
 				TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 				mp = &tcp->tcp_closemp;
-				squeue_fill(connp->conn_sqp, mp,
+				SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
 				    tcp_timewait_output, connp,
-				    SQTAG_TCP_TIMEWAIT);
+				    SQ_FILL, SQTAG_TCP_TIMEWAIT);
 			}
 		} else {
 			mutex_enter(&connp->conn_lock);
@@ -1893,8 +1891,9 @@ tcp_time_wait_collector(void *arg)
 
 			TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 			mp = &tcp->tcp_closemp;
-			squeue_fill(connp->conn_sqp, mp,
-			    tcp_timewait_output, connp, 0);
+			SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
+			    tcp_timewait_output, connp,
+			    SQ_FILL, SQTAG_TCP_TIMEWAIT);
 		}
 		mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
 	}
@@ -2374,10 +2373,10 @@ finish:
 	 * queue.
 	 */
 	/*
-	 * We already have a ref on tcp so no need to do one before squeue_fill
+	 * We already have a ref on tcp so no need to do one before squeue_enter
 	 */
-	squeue_fill(eager->tcp_connp->conn_sqp, opt_mp,
-	    tcp_accept_finish, eager->tcp_connp, SQTAG_TCP_ACCEPT_FINISH);
+	SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, opt_mp, tcp_accept_finish,
+	    eager->tcp_connp, SQ_FILL, SQTAG_TCP_ACCEPT_FINISH);
 }
 
 /*
@@ -4048,8 +4047,8 @@ tcp_close(queue_t *q, int flags)
 
 	TCP_DEBUG_GETPCSTACK(tcp->tcmp_stk, 15);
 
-	(*tcp_squeue_close_proc)(connp->conn_sqp, mp,
-	    tcp_close_output, connp, SQTAG_IP_TCP_CLOSE);
+	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_close_output, connp,
+	    tcp_squeue_flag, SQTAG_IP_TCP_CLOSE);
 
 	mutex_enter(&tcp->tcp_closelock);
 	while (!tcp->tcp_closed) {
@@ -4074,9 +4073,9 @@ tcp_close(queue_t *q, int flags)
 				/* Entering squeue, bump ref count. */
 				CONN_INC_REF(connp);
 				bp = allocb_wait(0, BPRI_HI, STR_NOSIG, NULL);
-				squeue_enter(connp->conn_sqp, bp,
+				SQUEUE_ENTER_ONE(connp->conn_sqp, bp,
 				    tcp_linger_interrupted, connp,
-				    SQTAG_IP_TCP_CLOSE);
+				    tcp_squeue_flag, SQTAG_IP_TCP_CLOSE);
 				mutex_enter(&tcp->tcp_closelock);
 			}
 			break;
@@ -4625,6 +4624,11 @@ tcp_free(tcp_t *tcp)
 		tcp->tcp_ordrel_mp = NULL;
 	}
 
+	if (tcp->tcp_ordrel_mp != NULL) {
+		freeb(tcp->tcp_ordrel_mp);
+		tcp->tcp_ordrel_mp = NULL;
+	}
+
 	if (tcp->tcp_sack_info != NULL) {
 		if (tcp->tcp_notsack_list != NULL) {
 			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list);
@@ -4825,8 +4829,9 @@ tcp_drop_q0(tcp_t *tcp)
 
 	/* Mark the IRE created for this SYN request temporary */
 	tcp_ip_ire_mark_advice(eager);
-	squeue_fill(eager->tcp_connp->conn_sqp, mp,
-	    tcp_clean_death_wrapper, eager->tcp_connp, SQTAG_TCP_DROP_Q0);
+	SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, mp,
+	    tcp_clean_death_wrapper, eager->tcp_connp,
+	    SQ_FILL, SQTAG_TCP_DROP_Q0);
 
 	return (B_TRUE);
 }
@@ -5302,6 +5307,7 @@ tcp_get_ipsec_conn(tcp_t *tcp, squeue_t *sqp, mblk_t **mpp)
 	 * The caller already ensured that there is a sqp present.
 	 */
 	econnp->conn_sqp = new_sqp;
+	econnp->conn_initial_sqp = new_sqp;
 
 	if (connp->conn_policy != NULL) {
 		ipsec_in_t *ii;
@@ -5681,6 +5687,7 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 			goto error2;
 		ASSERT(econnp->conn_netstack == connp->conn_netstack);
 		econnp->conn_sqp = new_sqp;
+		econnp->conn_initial_sqp = new_sqp;
 	} else if ((mp->b_datap->db_struioflag & STRUIO_POLICY) != 0) {
 		/*
 		 * mp is updated in tcp_get_ipsec_conn().
@@ -6032,8 +6039,9 @@ error:
 	freemsg(mp1);
 	eager->tcp_closemp_used = B_TRUE;
 	TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
-	squeue_fill(econnp->conn_sqp, &eager->tcp_closemp, tcp_eager_kill,
-	    econnp, SQTAG_TCP_CONN_REQ_2);
+	mp1 = &eager->tcp_closemp;
+	SQUEUE_ENTER_ONE(econnp->conn_sqp, mp1, tcp_eager_kill,
+	    econnp, SQ_FILL, SQTAG_TCP_CONN_REQ_2);
 
 	/*
 	 * If a connection already exists, send the mp to that connections so
@@ -6056,8 +6064,8 @@ error:
 			CONN_DEC_REF(econnp);
 			freemsg(mp);
 		} else {
-			squeue_fill(econnp->conn_sqp, mp, tcp_input,
-			    econnp, SQTAG_TCP_CONN_REQ_1);
+			SQUEUE_ENTER_ONE(econnp->conn_sqp, mp,
+			    tcp_input, econnp, SQ_FILL, SQTAG_TCP_CONN_REQ_1);
 		}
 	} else {
 		/* Nobody wants this packet */
@@ -6149,8 +6157,8 @@ tcp_conn_request_unbound(void *arg, mblk_t *mp, void *arg2)
 done:
 	if (connp->conn_sqp != sqp) {
 		CONN_INC_REF(connp);
-		squeue_fill(connp->conn_sqp, mp,
-		    connp->conn_recv, connp, SQTAG_TCP_CONN_REQ_UNBOUND);
+		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, connp->conn_recv, connp,
+		    SQ_FILL, SQTAG_TCP_CONN_REQ_UNBOUND);
 	} else {
 		tcp_conn_request(connp, mp, sqp);
 	}
@@ -7217,8 +7225,8 @@ tcp_eager_blowoff(tcp_t	*listener, t_scalar_t seqnum)
 	CONN_INC_REF(eager->tcp_connp);
 	mutex_exit(&listener->tcp_eager_lock);
 	mp = &eager->tcp_closemp;
-	squeue_fill(eager->tcp_connp->conn_sqp, mp, tcp_eager_kill,
-	    eager->tcp_connp, SQTAG_TCP_EAGER_BLOWOFF);
+	SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, mp, tcp_eager_kill,
+	    eager->tcp_connp, SQ_FILL, SQTAG_TCP_EAGER_BLOWOFF);
 	return (B_TRUE);
 }
 
@@ -7245,9 +7253,9 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 				TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
 				CONN_INC_REF(eager->tcp_connp);
 				mp = &eager->tcp_closemp;
-				squeue_fill(eager->tcp_connp->conn_sqp, mp,
+				SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, mp,
 				    tcp_eager_kill, eager->tcp_connp,
-				    SQTAG_TCP_EAGER_CLEANUP);
+				    SQ_FILL, SQTAG_TCP_EAGER_CLEANUP);
 			}
 			eager = eager->tcp_eager_next_q;
 		}
@@ -7261,8 +7269,8 @@ tcp_eager_cleanup(tcp_t *listener, boolean_t q0_only)
 			TCP_DEBUG_GETPCSTACK(eager->tcmp_stk, 15);
 			CONN_INC_REF(eager->tcp_connp);
 			mp = &eager->tcp_closemp;
-			squeue_fill(eager->tcp_connp->conn_sqp, mp,
-			    tcp_eager_kill, eager->tcp_connp,
+			SQUEUE_ENTER_ONE(eager->tcp_connp->conn_sqp, mp,
+			    tcp_eager_kill, eager->tcp_connp, SQ_FILL,
 			    SQTAG_TCP_EAGER_CLEANUP_Q0);
 		}
 		eager = eager->tcp_eager_next_q0;
@@ -9785,6 +9793,7 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 		return (ENOSR);
 	}
 	connp->conn_sqp = IP_SQUEUE_GET(lbolt);
+	connp->conn_initial_sqp = connp->conn_sqp;
 	tcp = connp->conn_tcp;
 
 	q->q_ptr = WR(q)->q_ptr = connp;
@@ -12059,13 +12068,13 @@ enq:
  * on the conn structure associated so the tcp is guaranteed to exist
  * when we come here. We still need to check the state because it might
  * as well has been closed. The squeue processing function i.e. squeue_enter,
- * squeue_enter_nodrain, or squeue_drain is responsible for doing the
- * CONN_DEC_REF.
+ * is responsible for doing the CONN_DEC_REF.
  *
  * Apart from the default entry point, IP also sends packets directly to
  * tcp_rput_data for AF_INET fast path and tcp_conn_request for incoming
  * connections.
  */
+boolean_t tcp_outbound_squeue_switch = B_FALSE;
 void
 tcp_input(void *arg, mblk_t *mp, void *arg2)
 {
@@ -12102,10 +12111,33 @@ tcp_input(void *arg, mblk_t *mp, void *arg2)
 		return;
 	}
 
-	if (DB_TYPE(mp) == M_DATA)
-		tcp_rput_data(connp, mp, arg2);
-	else
+	if (DB_TYPE(mp) != M_DATA) {
 		tcp_rput_common(tcp, mp);
+		return;
+	}
+
+	if (mp->b_datap->db_struioflag & STRUIO_CONNECT) {
+		squeue_t	*final_sqp;
+
+		mp->b_datap->db_struioflag &= ~STRUIO_CONNECT;
+		final_sqp = (squeue_t *)DB_CKSUMSTART(mp);
+		DB_CKSUMSTART(mp) = 0;
+		if (tcp->tcp_state == TCPS_SYN_SENT &&
+		    connp->conn_final_sqp == NULL &&
+		    tcp_outbound_squeue_switch) {
+			ASSERT(connp->conn_initial_sqp == connp->conn_sqp);
+			connp->conn_final_sqp = final_sqp;
+			if (connp->conn_final_sqp != connp->conn_sqp) {
+				CONN_INC_REF(connp);
+				SQUEUE_SWITCH(connp, connp->conn_final_sqp);
+				SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
+				    tcp_rput_data, connp, ip_squeue_flag,
+				    SQTAG_CONNECT_FINISH);
+				return;
+			}
+		}
+	}
+	tcp_rput_data(connp, mp, arg2);
 }
 
 /*
@@ -14316,16 +14348,27 @@ process_ack:
 			CONN_INC_REF(listener->tcp_connp);
 			if (listener->tcp_connp->conn_sqp ==
 			    connp->conn_sqp) {
+				/*
+				 * We optimize by not calling an SQUEUE_ENTER
+				 * on the listener since we know that the
+				 * listener and eager squeues are the same.
+				 * We are able to make this check safely only
+				 * because neither the eager nor the listener
+				 * can change its squeue. Only an active connect
+				 * can change its squeue
+				 */
 				tcp_send_conn_ind(listener->tcp_connp, mp,
 				    listener->tcp_connp->conn_sqp);
 				CONN_DEC_REF(listener->tcp_connp);
 			} else if (!tcp->tcp_loopback) {
-				squeue_fill(listener->tcp_connp->conn_sqp, mp,
-				    tcp_send_conn_ind,
-				    listener->tcp_connp, SQTAG_TCP_CONN_IND);
+				SQUEUE_ENTER_ONE(listener->tcp_connp->conn_sqp,
+				    mp, tcp_send_conn_ind,
+				    listener->tcp_connp, SQ_FILL,
+				    SQTAG_TCP_CONN_IND);
 			} else {
-				squeue_enter(listener->tcp_connp->conn_sqp, mp,
-				    tcp_send_conn_ind, listener->tcp_connp,
+				SQUEUE_ENTER_ONE(listener->tcp_connp->conn_sqp,
+				    mp, tcp_send_conn_ind,
+				    listener->tcp_connp, SQ_PROCESS,
 				    SQTAG_TCP_CONN_IND);
 			}
 		}
@@ -15884,7 +15927,6 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 	return (mp);
 }
 
-
 /*
  * Handle a *T_BIND_REQ that has failed either due to a T_ERROR_ACK
  * or a "bad" IRE detected by tcp_adapt_ire.
@@ -16402,8 +16444,8 @@ tcp_rsrv(queue_t *q)
 	mutex_exit(&tcp->tcp_rsrv_mp_lock);
 
 	CONN_INC_REF(connp);
-	squeue_enter(connp->conn_sqp, mp, tcp_rsrv_input, connp,
-	    SQTAG_TCP_RSRV);
+	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_rsrv_input, connp,
+	    SQ_PROCESS, SQTAG_TCP_RSRV);
 }
 
 /*
@@ -18768,9 +18810,9 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 
 			/* Need to get inside the listener perimeter */
 			CONN_INC_REF(listener->tcp_connp);
-			squeue_fill(listener->tcp_connp->conn_sqp, mp1,
+			SQUEUE_ENTER_ONE(listener->tcp_connp->conn_sqp, mp1,
 			    tcp_send_pending, listener->tcp_connp,
-			    SQTAG_TCP_SEND_PENDING);
+			    SQ_FILL, SQTAG_TCP_SEND_PENDING);
 		}
 no_more_eagers:
 		tcp_eager_unlink(eager);
@@ -18781,10 +18823,13 @@ no_more_eagers:
 		 * but we still have an extra refs on eager (apart from the
 		 * usual tcp references). The ref was placed in tcp_rput_data
 		 * before sending the conn_ind in tcp_send_conn_ind.
-		 * The ref will be dropped in tcp_accept_finish().
+		 * The ref will be dropped in tcp_accept_finish(). As sockfs
+		 * has already established this tcp with it's own stream,
+		 * it's OK to set tcp_detached to B_FALSE.
 		 */
-		squeue_enter_nodrain(econnp->conn_sqp, opt_mp,
-		    tcp_accept_finish, econnp, SQTAG_TCP_ACCEPT_FINISH_Q0);
+		econnp->conn_tcp->tcp_detached = B_FALSE;
+		SQUEUE_ENTER_ONE(econnp->conn_sqp, opt_mp, tcp_accept_finish,
+		    econnp, SQ_NODRAIN, SQTAG_TCP_ACCEPT_FINISH_Q0);
 		return;
 	default:
 		mp = mi_tpi_err_ack_alloc(mp, TNOTSUPPORT, 0);
@@ -18916,7 +18961,6 @@ tcp_wput(queue_t *q, mblk_t *mp)
 	t_scalar_t type;
 	uchar_t *rptr;
 	struct iocblk	*iocp;
-	uint32_t	msize;
 	tcp_stack_t	*tcps = Q_TO_TCP(q)->tcp_tcps;
 
 	ASSERT(connp->conn_ref >= 2);
@@ -18926,18 +18970,16 @@ tcp_wput(queue_t *q, mblk_t *mp)
 		tcp = connp->conn_tcp;
 		ASSERT(tcp != NULL);
 
-		msize = msgdsize(mp);
-
 		mutex_enter(&tcp->tcp_non_sq_lock);
-		tcp->tcp_squeue_bytes += msize;
+		tcp->tcp_squeue_bytes += msgdsize(mp);
 		if (TCP_UNSENT_BYTES(tcp) > tcp->tcp_xmit_hiwater) {
 			tcp_setqfull(tcp);
 		}
 		mutex_exit(&tcp->tcp_non_sq_lock);
 
 		CONN_INC_REF(connp);
-		(*tcp_squeue_wput_proc)(connp->conn_sqp, mp,
-		    tcp_output, connp, SQTAG_TCP_OUTPUT);
+		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_output, connp,
+		    tcp_squeue_flag, SQTAG_TCP_OUTPUT);
 		return;
 
 	case M_CMD:
@@ -19030,8 +19072,8 @@ tcp_wput(queue_t *q, mblk_t *mp)
 	}
 
 	CONN_INC_REF(connp);
-	(*tcp_squeue_wput_proc)(connp->conn_sqp, mp,
-	    output_proc, connp, SQTAG_TCP_WPUT_OTHER);
+	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, output_proc, connp,
+	    tcp_squeue_flag, SQTAG_TCP_WPUT_OTHER);
 }
 
 /*
@@ -19503,34 +19545,27 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
 	    ntohs(ipha->ipha_length));
 
-	if (ILL_DLS_CAPABLE(ill)) {
-		/*
-		 * Send the packet directly to DLD, where it may be queued
-		 * depending on the availability of transmit resources at
-		 * the media layer.
-		 */
-		IP_DLS_ILL_TX(ill, ipha, mp, ipst, ire_fp_mp_len);
-	} else {
-		ill_t *out_ill = (ill_t *)ire->ire_stq->q_ptr;
-		DTRACE_PROBE4(ip4__physical__out__start,
-		    ill_t *, NULL, ill_t *, out_ill,
-		    ipha_t *, ipha, mblk_t *, mp);
-		FW_HOOKS(ipst->ips_ip4_physical_out_event,
-		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, out_ill, ipha, mp, mp, 0, ipst);
-		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+	DTRACE_PROBE4(ip4__physical__out__start,
+	    ill_t *, NULL, ill_t *, ill, ipha_t *, ipha, mblk_t *, mp);
+	FW_HOOKS(ipst->ips_ip4_physical_out_event,
+	    ipst->ips_ipv4firewall_physical_out,
+	    NULL, ill, ipha, mp, mp, 0, ipst);
+	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+	DTRACE_IP_FASTPATH(mp, ipha, ill, ipha, NULL);
 
-		if (mp != NULL) {
-			if (ipst->ips_ipobs_enabled) {
-				ipobs_hook(mp, IPOBS_HOOK_OUTBOUND,
-				    IP_REAL_ZONEID(connp->conn_zoneid, ipst),
-				    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len,
-				    ipst);
-			}
-			DTRACE_IP_FASTPATH(mp, ipha, out_ill, ipha, NULL);
-			putnext(ire->ire_stq, mp);
+	if (mp != NULL) {
+		if (ipst->ips_ipobs_enabled) {
+			zoneid_t szone;
+
+			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
+			    ipst, ALL_ZONES);
+			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
+			    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len, ipst);
 		}
+
+		ILL_SEND_TX(ill, ire, connp, mp, 0);
 	}
+
 	IRE_REFRELE(ire);
 }
 
@@ -21327,12 +21362,7 @@ tcp_multisend_data(tcp_t *tcp, ire_t *ire, const ill_t *ill, mblk_t *md_mp_head,
 	}
 
 	/* send it down */
-	if (ILL_DLS_CAPABLE(ill)) {
-		ill_dls_capab_t *ill_dls = ill->ill_dls_capab;
-		ill_dls->ill_tx(ill_dls->ill_tx_handle, md_mp_head);
-	} else {
-		putnext(ire->ire_stq, md_mp_head);
-	}
+	putnext(ire->ire_stq, md_mp_head);
 
 	/* we're done for TCP/IPv4 */
 	if (tcp->tcp_ipversion == IPV4_VERSION)
@@ -21478,10 +21508,12 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 	    IPPROTO_TCP, IP_SIMPLE_HDR_LENGTH, ntohs(ipha->ipha_length), cksum);
 
 	/*
-	 * Append LSO flag to DB_LSOFLAGS(mp) and set the mss to DB_LSOMSS(mp).
+	 * Append LSO flags and mss to the mp.
 	 */
-	DB_LSOFLAGS(mp) |= HW_LSO;
-	DB_LSOMSS(mp) = mss;
+	lso_info_set(mp, mss, HW_LSO);
+
+	ipha->ipha_fragment_offset_and_flags |=
+	    (uint32_t)htons(ire->ire_frag_flag);
 
 	ire_fp_mp = ire->ire_nce->nce_fp_mp;
 	ire_fp_mp_len = MBLKL(ire_fp_mp);
@@ -21496,34 +21528,25 @@ tcp_lsosend_data(tcp_t *tcp, mblk_t *mp, ire_t *ire, ill_t *ill, const int mss,
 	UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCOutOctets,
 	    ntohs(ipha->ipha_length));
 
-	if (ILL_DLS_CAPABLE(ill)) {
-		/*
-		 * Send the packet directly to DLD, where it may be queued
-		 * depending on the availability of transmit resources at
-		 * the media layer.
-		 */
-		IP_DLS_ILL_TX(ill, ipha, mp, ipst, ire_fp_mp_len);
-	} else {
-		ill_t *out_ill = (ill_t *)ire->ire_stq->q_ptr;
-		DTRACE_PROBE4(ip4__physical__out__start,
-		    ill_t *, NULL, ill_t *, out_ill,
-		    ipha_t *, ipha, mblk_t *, mp);
-		FW_HOOKS(ipst->ips_ip4_physical_out_event,
-		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, out_ill, ipha, mp, mp, 0, ipst);
-		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+	DTRACE_PROBE4(ip4__physical__out__start,
+	    ill_t *, NULL, ill_t *, ill, ipha_t *, ipha, mblk_t *, mp);
+	FW_HOOKS(ipst->ips_ip4_physical_out_event,
+	    ipst->ips_ipv4firewall_physical_out, NULL,
+	    ill, ipha, mp, mp, 0, ipst);
+	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+	DTRACE_IP_FASTPATH(mp, ipha, ill, ipha, NULL);
 
-		if (mp != NULL) {
-			if (ipst->ips_ipobs_enabled) {
-				zoneid_t szone = tcp->tcp_connp->conn_zoneid;
+	if (mp != NULL) {
+		if (ipst->ips_ipobs_enabled) {
+			zoneid_t szone;
 
-				ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
-				    ALL_ZONES, ill, tcp->tcp_ipversion,
-				    ire_fp_mp_len, ipst);
-			}
-			DTRACE_IP_FASTPATH(mp, ipha, out_ill, ipha, NULL);
-			putnext(ire->ire_stq, mp);
+			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
+			    ipst, ALL_ZONES);
+			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
+			    ALL_ZONES, ill, IPV4_VERSION, ire_fp_mp_len, ipst);
 		}
+
+		ILL_SEND_TX(ill, ire, tcp->tcp_connp, mp, 0);
 	}
 }
 
@@ -24921,9 +24944,6 @@ tcp_ddi_g_init(void)
 	/* Initialize the random number generator */
 	tcp_random_init();
 
-	tcp_squeue_wput_proc = tcp_squeue_switch(tcp_squeue_wput);
-	tcp_squeue_close_proc = tcp_squeue_switch(tcp_squeue_close);
-
 	/* A single callback independently of how many netstacks we have */
 	ip_squeue_init(tcp_squeue_add);
 
@@ -24931,6 +24951,8 @@ tcp_ddi_g_init(void)
 
 	tcp_taskq = taskq_create("tcp_taskq", 1, minclsyspri, 1, 1,
 	    TASKQ_PREPOPULATE);
+
+	tcp_squeue_flag = tcp_squeue_switch(tcp_squeue_wput);
 
 	/*
 	 * We want to be informed each time a stack is created or
@@ -25420,7 +25442,7 @@ tcp_ioctl_abort_handler(tcp_t *tcp, mblk_t *mp)
 		 * If we get here, we are already on the correct
 		 * squeue. This ioctl follows the following path
 		 * tcp_wput -> tcp_wput_ioctl -> tcp_ioctl_abort_conn
-		 * ->tcp_ioctl_abort->squeue_fill (if on a
+		 * ->tcp_ioctl_abort->squeue_enter (if on a
 		 * different squeue)
 		 */
 		int errcode;
@@ -25487,8 +25509,8 @@ startover:
 		listhead = listhead->b_next;
 		tcp = (tcp_t *)mp->b_prev;
 		mp->b_next = mp->b_prev = NULL;
-		squeue_fill(tcp->tcp_connp->conn_sqp, mp,
-		    tcp_input, tcp->tcp_connp, SQTAG_TCP_ABORT_BUCKET);
+		SQUEUE_ENTER_ONE(tcp->tcp_connp->conn_sqp, mp, tcp_input,
+		    tcp->tcp_connp, SQ_FILL, SQTAG_TCP_ABORT_BUCKET);
 	}
 
 	*count += nmatch;
@@ -25989,8 +26011,8 @@ tcp_timer_callback(void *arg)
 
 	tcpt = (tcp_timer_t *)mp->b_rptr;
 	connp = tcpt->connp;
-	squeue_fill(connp->conn_sqp, mp,
-	    tcp_timer_handler, connp, SQTAG_TCP_TIMER);
+	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_timer_handler, connp,
+	    SQ_FILL, SQTAG_TCP_TIMER);
 }
 
 static void
@@ -26486,6 +26508,7 @@ tcp_kstat_update(kstat_t *kp, int rw)
 		netstack_rele(ns);
 		return (-1);
 	}
+
 	tcpkp = (tcp_named_kstat_t *)kp->ks_data;
 
 	tcpkp->currEstab.value.ui32 = 0;
@@ -26583,8 +26606,8 @@ tcp_reinput(conn_t *connp, mblk_t *mp, squeue_t *sqp)
 	/* Already has an eager */
 	if ((mp->b_datap->db_struioflag & STRUIO_EAGER) != 0) {
 		TCP_STAT(tcps, tcp_reinput_syn);
-		squeue_enter(connp->conn_sqp, mp, connp->conn_recv,
-		    connp, SQTAG_TCP_REINPUT_EAGER);
+		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, connp->conn_recv, connp,
+		    SQ_PROCESS, SQTAG_TCP_REINPUT_EAGER);
 		return;
 	}
 
@@ -26609,21 +26632,21 @@ tcp_reinput(conn_t *connp, mblk_t *mp, squeue_t *sqp)
 		DB_CKSUMSTART(mp) = (intptr_t)sqp;
 	}
 
-	squeue_fill(connp->conn_sqp, mp, connp->conn_recv, connp,
-	    SQTAG_TCP_REINPUT);
+	SQUEUE_ENTER_ONE(connp->conn_sqp, mp, connp->conn_recv, connp,
+	    SQ_FILL, SQTAG_TCP_REINPUT);
 }
 
-static squeue_func_t
+static int
 tcp_squeue_switch(int val)
 {
-	squeue_func_t rval = squeue_fill;
+	int rval = SQ_FILL;
 
 	switch (val) {
 	case 1:
-		rval = squeue_enter_nodrain;
+		rval = SQ_NODRAIN;
 		break;
 	case 2:
-		rval = squeue_enter;
+		rval = SQ_PROCESS;
 		break;
 	default:
 		break;

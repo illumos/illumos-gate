@@ -1199,6 +1199,8 @@ stubs_base:
 	MODULE(dld,drv);
 	STUB(dld, dld_init_ops, nomod_void);
 	STUB(dld, dld_fini_ops, nomod_void);
+	STUB(dld, dld_ioc_register, nomod_einval);
+	STUB(dld, dld_ioc_unregister, nomod_void);
 	STUB(dld, dld_autopush, nomod_minus_one);
 	END_MODULE(dld);
 #endif
@@ -1210,12 +1212,15 @@ stubs_base:
  */
 #ifndef	DLS_MODULE
 	MODULE(dls,misc);
-	STUB(dls, dls_devnet_vid, nomod_zero);
 	STUB(dls, dls_devnet_mac, nomod_zero);
 	STUB(dls, dls_devnet_hold_tmp, nomod_einval);
 	STUB(dls, dls_devnet_rele_tmp, nomod_void);
+	STUB(dls, dls_devnet_hold_link, nomod_einval);
+	STUB(dls, dls_devnet_rele_link, nomod_void);
 	STUB(dls, dls_devnet_prop_task_wait, nomod_void);
 	STUB(dls, dls_mgmt_get_linkid, nomod_einval);
+	STUB(dls, dls_devnet_macname2linkid, nomod_einval);
+	STUB(dls, dls_mgmt_get_linkinfo, nomod_einval);
 	END_MODULE(dls);
 #endif
 

@@ -26,39 +26,43 @@
 #ifndef _LIBDLVNIC_H
 #define	_LIBDLVNIC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <libdladm.h>
+#include <libdladm_impl.h>
+#include <sys/mac_flow.h>
 #include <sys/vnic.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
-typedef struct dladm_vnic_attr_sys {
+typedef struct dladm_vnic_attr {
 	datalink_id_t		va_vnic_id;
 	datalink_id_t		va_link_id;
 	vnic_mac_addr_type_t	va_mac_addr_type;
-	uchar_t			va_mac_addr[ETHERADDRL];
 	uint_t			va_mac_len;
-} dladm_vnic_attr_sys_t;
+	uchar_t			va_mac_addr[MAXMACADDRLEN];
+	int			va_mac_slot;
+	uint_t			va_mac_prefix_len;
+	uint16_t		va_vid;
+	boolean_t		va_force;
+	boolean_t		va_hwrings;
+	mac_resource_props_t	va_resource_props;
+} dladm_vnic_attr_t;
 
-/*
- * Modification flags for dladm_vnic_modify().
- */
-#define	DLADM_VNIC_MODIFY_ADDR		0x01
+extern dladm_status_t	dladm_vnic_create(const char *, datalink_id_t,
+			    vnic_mac_addr_type_t, uchar_t *, int, int *,
+			    uint_t, uint16_t, datalink_id_t *,
+			    dladm_arg_list_t *, uint32_t);
 
-extern dladm_status_t dladm_vnic_create(const char *, datalink_id_t,
-    vnic_mac_addr_type_t, uchar_t *, int, uint_t *, uint32_t);
-extern dladm_status_t dladm_vnic_modify(datalink_id_t, uint32_t,
-    vnic_mac_addr_type_t, uint_t, uchar_t *, uint32_t);
-extern dladm_status_t dladm_vnic_delete(datalink_id_t, uint32_t);
-extern dladm_status_t dladm_vnic_info(datalink_id_t, dladm_vnic_attr_sys_t *,
-    uint32_t);
-extern dladm_status_t dladm_vnic_str2macaddrtype(const char *,
-    vnic_mac_addr_type_t *);
+extern dladm_status_t	dladm_vnic_delete(datalink_id_t, uint32_t);
+extern dladm_status_t	dladm_vnic_info(datalink_id_t, dladm_vnic_attr_t *,
+			    uint32_t);
+
+extern dladm_status_t	dladm_vnic_up(datalink_id_t, uint32_t);
+extern dladm_status_t	dladm_vnic_str2macaddrtype(const char *,
+			    vnic_mac_addr_type_t *);
 
 #ifdef	__cplusplus
 }

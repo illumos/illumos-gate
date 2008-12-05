@@ -64,8 +64,6 @@ static uint_t e1000g_intr_pciexpress(caddr_t);
 static uint_t e1000g_intr(caddr_t);
 static void e1000g_intr_work(struct e1000g *, uint32_t);
 #pragma inline(e1000g_intr_work)
-static uint32_t e1000g_get_itr(uint32_t, uint32_t, uint32_t);
-#pragma inline(e1000g_get_itr)
 static int e1000g_init(struct e1000g *);
 static int e1000g_start(struct e1000g *, boolean_t);
 static void e1000g_stop(struct e1000g *, boolean_t);
@@ -73,11 +71,6 @@ static int e1000g_m_start(void *);
 static void e1000g_m_stop(void *);
 static int e1000g_m_promisc(void *, boolean_t);
 static boolean_t e1000g_m_getcapab(void *, mac_capab_t, void *);
-static int e1000g_m_unicst(void *, const uint8_t *);
-static int e1000g_m_unicst_add(void *, mac_multi_addr_t *);
-static int e1000g_m_unicst_remove(void *, mac_addr_slot_t);
-static int e1000g_m_unicst_modify(void *, mac_multi_addr_t *);
-static int e1000g_m_unicst_get(void *, mac_multi_addr_t *);
 static int e1000g_m_multicst(void *, boolean_t, const uint8_t *);
 static void e1000g_m_ioctl(void *, queue_t *, mblk_t *);
 static int e1000g_m_setprop(void *, const char *, mac_prop_id_t,
@@ -98,7 +91,7 @@ static int e1000g_register_mac(struct e1000g *);
 static boolean_t e1000g_rx_drain(struct e1000g *);
 static boolean_t e1000g_tx_drain(struct e1000g *);
 static void e1000g_init_unicst(struct e1000g *);
-static int e1000g_unicst_set(struct e1000g *, const uint8_t *, mac_addr_slot_t);
+static int e1000g_unicst_set(struct e1000g *, const uint8_t *, int);
 
 /*
  * Local routines
@@ -172,10 +165,8 @@ mac_priv_prop_t e1000g_priv_props[] = {
 	{"_rx_intr_abs_delay", MAC_PROP_PERM_RW},
 	{"_intr_throttling_rate", MAC_PROP_PERM_RW},
 	{"_intr_adaptive", MAC_PROP_PERM_RW},
-	{"_tx_recycle_thresh", MAC_PROP_PERM_RW},
 	{"_adv_pause_cap", MAC_PROP_PERM_READ},
 	{"_adv_asym_pause_cap", MAC_PROP_PERM_READ},
-	{"_tx_recycle_num", MAC_PROP_PERM_RW}
 };
 #define	E1000G_MAX_PRIV_PROPS	\
 	(sizeof (e1000g_priv_props)/sizeof (mac_priv_prop_t))
@@ -245,9 +236,8 @@ static mac_callbacks_t e1000g_m_callbacks = {
 	e1000g_m_stop,
 	e1000g_m_promisc,
 	e1000g_m_multicst,
-	e1000g_m_unicst,
-	e1000g_m_tx,
 	NULL,
+	e1000g_m_tx,
 	e1000g_m_ioctl,
 	e1000g_m_getcapab,
 	NULL,
@@ -607,6 +597,7 @@ e1000g_register_mac(struct e1000g *Adapter)
 	mac->m_margin = VLAN_TAGSZ;
 	mac->m_priv_props = e1000g_priv_props;
 	mac->m_priv_prop_count = E1000G_MAX_PRIV_PROPS;
+	mac->m_v12n = MAC_VIRT_LEVEL1;
 
 	err = mac_register(mac, &Adapter->mh);
 	mac_free(mac);
@@ -935,17 +926,17 @@ e1000g_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	if (Adapter == NULL)
 		return (DDI_FAILURE);
 
+	rx_drain = e1000g_rx_drain(Adapter);
+	if (!rx_drain && !e1000g_force_detach)
+		return (DDI_FAILURE);
+
 	if (mac_unregister(Adapter->mh) != 0) {
 		e1000g_log(Adapter, CE_WARN, "Unregister MAC failed");
 		return (DDI_FAILURE);
 	}
 	Adapter->attach_progress &= ~ATTACH_PROGRESS_MAC;
 
-
-	if (Adapter->chip_state != E1000G_STOP)
-		e1000g_stop(Adapter, B_TRUE);
-
-	rx_drain = e1000g_rx_drain(Adapter);
+	ASSERT(Adapter->chip_state == E1000G_STOP);
 
 	/*
 	 * If e1000g_force_detach is enabled, driver detach is safe.
@@ -955,9 +946,6 @@ e1000g_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	 */
 	if (e1000g_force_detach) {
 		e1000g_free_priv_devi_node(Adapter, rx_drain);
-	} else {
-		if (!rx_drain)
-			return (DDI_FAILURE);
 	}
 
 	e1000g_unattach(devinfo, Adapter);
@@ -1122,6 +1110,8 @@ e1000g_init_locks(struct e1000g *Adapter)
 	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
 	mutex_init(&rx_ring->freelist_lock, NULL,
 	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
+	mutex_init(&rx_ring->recycle_lock, NULL,
+	    MUTEX_DRIVER, DDI_INTR_PRI(Adapter->intr_pri));
 }
 
 static void
@@ -1138,6 +1128,7 @@ e1000g_destroy_locks(struct e1000g *Adapter)
 	rx_ring = Adapter->rx_ring;
 	mutex_destroy(&rx_ring->rx_lock);
 	mutex_destroy(&rx_ring->freelist_lock);
+	mutex_destroy(&rx_ring->recycle_lock);
 
 	mutex_destroy(&Adapter->link_lock);
 	mutex_destroy(&Adapter->watchdog_lock);
@@ -1432,6 +1423,8 @@ e1000g_init(struct e1000g *Adapter)
 		goto init_fail;
 	}
 
+	Adapter->poll_mode = e1000g_poll_mode;
+
 	rw_exit(&Adapter->chip_lock);
 
 	return (DDI_SUCCESS);
@@ -1547,6 +1540,106 @@ e1000g_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 		qreply(q, mp);
 		break;
 	}
+}
+
+/*
+ * The default value of e1000g_poll_mode == 0 assumes that the NIC is
+ * capable of supporting only one interrupt and we shouldn't disable
+ * the physical interrupt. In this case we let the interrupt come and
+ * we queue the packets in the rx ring itself in case we are in polling
+ * mode (better latency but slightly lower performance and a very
+ * high intrrupt count in mpstat which is harmless).
+ *
+ * e1000g_poll_mode == 1 assumes that we have per Rx ring interrupt
+ * which can be disabled in poll mode. This gives better overall
+ * throughput (compared to the mode above), shows very low interrupt
+ * count but has slightly higher latency since we pick the packets when
+ * the poll thread does polling.
+ *
+ * Currently, this flag should be enabled only while doing performance
+ * measurement or when it can be guaranteed that entire NIC going
+ * in poll mode will not harm any traffic like cluster heartbeat etc.
+ */
+int e1000g_poll_mode = 0;
+
+/*
+ * Called from the upper layers when driver is in polling mode to
+ * pick up any queued packets. Care should be taken to not block
+ * this thread.
+ */
+static mblk_t *e1000g_poll_ring(void *arg, int bytes_to_pickup)
+{
+	e1000g_rx_ring_t	*rx_ring = (e1000g_rx_ring_t *)arg;
+	mblk_t			*mp = NULL;
+	mblk_t			*tail;
+	uint_t			sz = 0;
+	struct e1000g 		*adapter;
+
+	adapter = rx_ring->adapter;
+
+	mutex_enter(&rx_ring->rx_lock);
+	ASSERT(rx_ring->poll_flag);
+
+	/*
+	 * Get any packets that have arrived. Works only if we
+	 * actually disable the physical adapter/rx_ring interrupt.
+	 * (e1000g_poll_mode == 1). In case e1000g_poll_mode == 0,
+	 * packets will have already been added to the poll list
+	 * by the interrupt (see e1000g_intr_work()).
+	 */
+	if (adapter->poll_mode) {
+		mp = e1000g_receive(rx_ring, &tail, &sz);
+		if (mp != NULL) {
+			if (rx_ring->poll_list_head == NULL)
+				rx_ring->poll_list_head = mp;
+			else
+				rx_ring->poll_list_tail->b_next = mp;
+			rx_ring->poll_list_tail = tail;
+			rx_ring->poll_list_sz += sz;
+		}
+	}
+
+	mp = rx_ring->poll_list_head;
+	if (mp == NULL) {
+		mutex_exit(&rx_ring->rx_lock);
+		return (NULL);
+	}
+
+	/* Check if we can sendup the entire chain */
+	if (bytes_to_pickup >= rx_ring->poll_list_sz) {
+		mp = rx_ring->poll_list_head;
+		rx_ring->poll_list_head = NULL;
+		rx_ring->poll_list_tail = NULL;
+		rx_ring->poll_list_sz = 0;
+		mutex_exit(&rx_ring->rx_lock);
+		return (mp);
+	}
+
+	/*
+	 * We need to find out how much chain we can send up. We
+	 * are guaranteed that atleast one packet will go up since
+	 * we already checked that.
+	 */
+	tail = mp;
+	sz = 0;
+	while (mp != NULL) {
+		sz += MBLKL(mp);
+		if (sz > bytes_to_pickup) {
+			sz -= MBLKL(mp);
+			break;
+		}
+		tail = mp;
+		mp = mp->b_next;
+	}
+
+	mp = rx_ring->poll_list_head;
+	rx_ring->poll_list_head = tail->b_next;
+	if (rx_ring->poll_list_head == NULL)
+		rx_ring->poll_list_tail = NULL;
+	rx_ring->poll_list_sz -= sz;
+	tail->b_next = NULL;
+	mutex_exit(&rx_ring->rx_lock);
+	return (mp);
 }
 
 static int
@@ -1912,7 +2005,6 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 	struct e1000_hw *hw;
 	hw = &Adapter->shared;
 	e1000g_tx_ring_t *tx_ring = Adapter->tx_ring;
-	uint32_t itr;
 
 	Adapter->rx_pkt_cnt = 0;
 	Adapter->tx_pkt_cnt = 0;
@@ -1929,16 +2021,79 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 	}
 
 	if (icr & E1000_ICR_RXT0) {
-		mblk_t *mp;
+		mblk_t			*mp;
+		uint_t			sz = 0;
+		mblk_t			*tmp, *tail = NULL;
+		e1000g_rx_ring_t	*rx_ring;
 
-		mutex_enter(&Adapter->rx_ring->rx_lock);
-		mp = e1000g_receive(Adapter);
-		mutex_exit(&Adapter->rx_ring->rx_lock);
+		rx_ring = Adapter->rx_ring;
+		mutex_enter(&rx_ring->rx_lock);
 
+		/*
+		 * If the real interrupt for the Rx ring was
+		 * not disabled (e1000g_poll_mode == 0), then
+		 * we still pick up the packets and queue them
+		 * on Rx ring if we were in polling mode. this
+		 * enables the polling thread to pick up packets
+		 * really fast in polling mode and helps improve
+		 * latency.
+		 */
+		mp = e1000g_receive(rx_ring, &tail, &sz);
 		rw_exit(&Adapter->chip_lock);
 
-		if (mp != NULL)
-			mac_rx(Adapter->mh, Adapter->mrh, mp);
+		if (mp != NULL) {
+			ASSERT(tail != NULL);
+			if (!rx_ring->poll_flag) {
+				/*
+				 * If not polling, see if something was
+				 * already queued. Take care not to
+				 * reorder packets.
+				 */
+				if (rx_ring->poll_list_head == NULL) {
+					mutex_exit(&rx_ring->rx_lock);
+					mac_rx_ring(Adapter->mh, rx_ring->mrh,
+					    mp, rx_ring->ring_gen_num);
+				} else {
+					tmp = rx_ring->poll_list_head;
+					rx_ring->poll_list_head = NULL;
+					rx_ring->poll_list_tail->b_next = mp;
+					rx_ring->poll_list_tail = NULL;
+					rx_ring->poll_list_sz = 0;
+					mutex_exit(&rx_ring->rx_lock);
+					mac_rx_ring(Adapter->mh, rx_ring->mrh,
+					    tmp, rx_ring->ring_gen_num);
+				}
+			} else {
+				/*
+				 * We are in a polling mode. Put the
+				 * processed packets on the poll list.
+				 */
+				if (rx_ring->poll_list_head == NULL)
+					rx_ring->poll_list_head = mp;
+				else
+					rx_ring->poll_list_tail->b_next = mp;
+				rx_ring->poll_list_tail = tail;
+				rx_ring->poll_list_sz += sz;
+				mutex_exit(&rx_ring->rx_lock);
+			}
+		} else if (!rx_ring->poll_flag &&
+		    rx_ring->poll_list_head != NULL) {
+			/*
+			 * Nothing new has arrived (then why
+			 * was the interrupt raised??). Check
+			 * if something queued from the last
+			 * time.
+			 */
+			tmp = rx_ring->poll_list_head;
+			rx_ring->poll_list_head = NULL;
+			rx_ring->poll_list_tail = NULL;
+			rx_ring->poll_list_sz = 0;
+			mutex_exit(&rx_ring->rx_lock);
+			mac_rx_ring(Adapter->mh, rx_ring->mrh,
+			    tmp, rx_ring->ring_gen_num);
+		} else {
+			mutex_exit(&rx_ring->rx_lock);
+		}
 	} else
 		rw_exit(&Adapter->chip_lock);
 
@@ -1952,21 +2107,11 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 		E1000G_DEBUG_STAT(tx_ring->stat_recycle_intr);
 		rw_exit(&Adapter->chip_lock);
 
-		/* Schedule the re-transmit */
 		if (tx_ring->resched_needed &&
 		    (tx_ring->tbd_avail > DEFAULT_TX_UPDATE_THRESHOLD)) {
 			tx_ring->resched_needed = B_FALSE;
 			mac_tx_update(Adapter->mh);
 			E1000G_STAT(tx_ring->stat_reschedule);
-		}
-	}
-
-	if (Adapter->intr_adaptive) {
-		itr = e1000g_get_itr(Adapter->rx_pkt_cnt, Adapter->tx_pkt_cnt,
-		    Adapter->intr_throttling_rate);
-		if (itr) {
-			E1000_WRITE_REG(hw, E1000_ITR, itr);
-			Adapter->intr_throttling_rate = itr;
 		}
 	}
 
@@ -2040,40 +2185,6 @@ e1000g_intr_work(struct e1000g *Adapter, uint32_t icr)
 	}
 }
 
-static uint32_t
-e1000g_get_itr(uint32_t rx_packet, uint32_t tx_packet, uint32_t cur_itr)
-{
-	uint32_t new_itr;
-
-	/*
-	 * Determine a propper itr according to rx/tx packet count
-	 * per interrupt, the value of itr are based on document
-	 * and testing.
-	 */
-	if ((rx_packet < DEFAULT_INTR_PACKET_LOW) ||
-	    (tx_packet < DEFAULT_INTR_PACKET_LOW)) {
-		new_itr = DEFAULT_INTR_THROTTLING_LOW;
-		goto itr_done;
-	}
-	if ((rx_packet > DEFAULT_INTR_PACKET_HIGH) ||
-	    (tx_packet > DEFAULT_INTR_PACKET_HIGH)) {
-		new_itr = DEFAULT_INTR_THROTTLING_LOW;
-		goto itr_done;
-	}
-	if (cur_itr < DEFAULT_INTR_THROTTLING_HIGH) {
-		new_itr = cur_itr + (DEFAULT_INTR_THROTTLING_HIGH >> 2);
-		if (new_itr > DEFAULT_INTR_THROTTLING_HIGH)
-			new_itr = DEFAULT_INTR_THROTTLING_HIGH;
-	} else
-		new_itr = DEFAULT_INTR_THROTTLING_HIGH;
-
-itr_done:
-	if (cur_itr == new_itr)
-		return (0);
-	else
-		return (new_itr);
-}
-
 static void
 e1000g_init_unicst(struct e1000g *Adapter)
 {
@@ -2082,45 +2193,33 @@ e1000g_init_unicst(struct e1000g *Adapter)
 
 	hw = &Adapter->shared;
 
-	if (!Adapter->unicst_init) {
+	if (Adapter->init_count == 0) {
 		/* Initialize the multiple unicast addresses */
 		Adapter->unicst_total = MAX_NUM_UNICAST_ADDRESSES;
 
+		/* Workaround for an erratum of 82571 chipst */
 		if ((hw->mac.type == e1000_82571) &&
 		    (e1000_get_laa_state_82571(hw) == B_TRUE))
 			Adapter->unicst_total--;
 
-		Adapter->unicst_avail = Adapter->unicst_total - 1;
+		Adapter->unicst_avail = Adapter->unicst_total;
 
-		/* Store the default mac address */
-		e1000_rar_set(hw, hw->mac.addr, 0);
-		if ((hw->mac.type == e1000_82571) &&
-		    (e1000_get_laa_state_82571(hw) == B_TRUE))
-			e1000_rar_set(hw, hw->mac.addr, LAST_RAR_ENTRY);
-
-		bcopy(hw->mac.addr, Adapter->unicst_addr[0].mac.addr,
-		    ETHERADDRL);
-		Adapter->unicst_addr[0].mac.set = 1;
-
-		for (slot = 1; slot < Adapter->unicst_total; slot++)
-			Adapter->unicst_addr[slot].mac.set = 0;
-
-		Adapter->unicst_init = B_TRUE;
+		for (slot = 0; slot < Adapter->unicst_total; slot++) {
+			/* Clear both the flag and MAC address */
+			Adapter->unicst_addr[slot].reg.high = 0;
+			Adapter->unicst_addr[slot].reg.low = 0;
+		}
 	} else {
-		/* Recover the default mac address */
-		bcopy(Adapter->unicst_addr[0].mac.addr, hw->mac.addr,
-		    ETHERADDRL);
-
-		/* Store the default mac address */
-		e1000_rar_set(hw, hw->mac.addr, 0);
+		/* Workaround for an erratum of 82571 chipst */
 		if ((hw->mac.type == e1000_82571) &&
 		    (e1000_get_laa_state_82571(hw) == B_TRUE))
 			e1000_rar_set(hw, hw->mac.addr, LAST_RAR_ENTRY);
 
 		/* Re-configure the RAR registers */
-		for (slot = 1; slot < Adapter->unicst_total; slot++)
-			e1000_rar_set(hw,
-			    Adapter->unicst_addr[slot].mac.addr, slot);
+		for (slot = 0; slot < Adapter->unicst_total; slot++)
+			if (Adapter->unicst_addr[slot].mac.set == 1)
+				e1000_rar_set(hw,
+				    Adapter->unicst_addr[slot].mac.addr, slot);
 	}
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
@@ -2128,22 +2227,8 @@ e1000g_init_unicst(struct e1000g *Adapter)
 }
 
 static int
-e1000g_m_unicst(void *arg, const uint8_t *mac_addr)
-{
-	struct e1000g *Adapter;
-
-	Adapter = (struct e1000g *)arg;
-
-	/* Store the default MAC address */
-	bcopy(mac_addr, Adapter->shared.mac.addr, ETHERADDRL);
-
-	/* Set MAC address in address slot 0, which is the default address */
-	return (e1000g_unicst_set(Adapter, mac_addr, 0));
-}
-
-static int
 e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
-    mac_addr_slot_t slot)
+    int slot)
 {
 	struct e1000_hw *hw;
 
@@ -2166,14 +2251,36 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 		E1000_WRITE_REG(hw, E1000_RCTL, E1000_RCTL_RST);
 		msec_delay(5);
 	}
+	if (mac_addr == NULL) {
+		E1000_WRITE_REG_ARRAY(hw, E1000_RA, slot << 1, 0);
+		E1000_WRITE_FLUSH(hw);
+		E1000_WRITE_REG_ARRAY(hw, E1000_RA, (slot << 1) + 1, 0);
+		E1000_WRITE_FLUSH(hw);
+		/* Clear both the flag and MAC address */
+		Adapter->unicst_addr[slot].reg.high = 0;
+		Adapter->unicst_addr[slot].reg.low = 0;
+	} else {
+		bcopy(mac_addr, Adapter->unicst_addr[slot].mac.addr,
+		    ETHERADDRL);
+		e1000_rar_set(hw, (uint8_t *)mac_addr, slot);
+		Adapter->unicst_addr[slot].mac.set = 1;
+	}
 
-	bcopy(mac_addr, Adapter->unicst_addr[slot].mac.addr, ETHERADDRL);
-	e1000_rar_set(hw, (uint8_t *)mac_addr, slot);
-
+	/* Workaround for an erratum of 82571 chipst */
 	if (slot == 0) {
 		if ((hw->mac.type == e1000_82571) &&
 		    (e1000_get_laa_state_82571(hw) == B_TRUE))
-			e1000_rar_set(hw, (uint8_t *)mac_addr, LAST_RAR_ENTRY);
+			if (mac_addr == NULL) {
+				E1000_WRITE_REG_ARRAY(hw, E1000_RA,
+				    slot << 1, 0);
+				E1000_WRITE_FLUSH(hw);
+				E1000_WRITE_REG_ARRAY(hw, E1000_RA,
+				    (slot << 1) + 1, 0);
+				E1000_WRITE_FLUSH(hw);
+			} else {
+				e1000_rar_set(hw, (uint8_t *)mac_addr,
+				    LAST_RAR_ENTRY);
+			}
 	}
 
 	/*
@@ -2192,168 +2299,10 @@ e1000g_unicst_set(struct e1000g *Adapter, const uint8_t *mac_addr,
 	}
 
 	rw_exit(&Adapter->chip_lock);
-
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 		return (EIO);
 	}
-
-	return (0);
-}
-
-/*
- * e1000g_m_unicst_add() - will find an unused address slot, set the
- * address value to the one specified, reserve that slot and enable
- * the NIC to start filtering on the new MAC address.
- * Returns 0 on success.
- */
-static int
-e1000g_m_unicst_add(void *arg, mac_multi_addr_t *maddr)
-{
-	struct e1000g *Adapter = (struct e1000g *)arg;
-	mac_addr_slot_t slot;
-	int err;
-
-	if (mac_unicst_verify(Adapter->mh,
-	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE)
-		return (EINVAL);
-
-	rw_enter(&Adapter->chip_lock, RW_WRITER);
-	if (Adapter->unicst_avail == 0) {
-		/* no slots available */
-		rw_exit(&Adapter->chip_lock);
-		return (ENOSPC);
-	}
-
-	/*
-	 * Primary/default address is in slot 0. The next addresses
-	 * are the multiple MAC addresses. So multiple MAC address 0
-	 * is in slot 1, 1 in slot 2, and so on. So the first multiple
-	 * MAC address resides in slot 1.
-	 */
-	for (slot = 1; slot < Adapter->unicst_total; slot++) {
-		if (Adapter->unicst_addr[slot].mac.set == 0) {
-			Adapter->unicst_addr[slot].mac.set = 1;
-			break;
-		}
-	}
-
-	ASSERT((slot > 0) && (slot < Adapter->unicst_total));
-
-	Adapter->unicst_avail--;
-	rw_exit(&Adapter->chip_lock);
-
-	maddr->mma_slot = slot;
-
-	if ((err = e1000g_unicst_set(Adapter, maddr->mma_addr, slot)) != 0) {
-		rw_enter(&Adapter->chip_lock, RW_WRITER);
-		Adapter->unicst_addr[slot].mac.set = 0;
-		Adapter->unicst_avail++;
-		rw_exit(&Adapter->chip_lock);
-	}
-
-	return (err);
-}
-
-/*
- * e1000g_m_unicst_remove() - removes a MAC address that was added by a
- * call to e1000g_m_unicst_add(). The slot number that was returned in
- * e1000g_m_unicst_add() is passed in the call to remove the address.
- * Returns 0 on success.
- */
-static int
-e1000g_m_unicst_remove(void *arg, mac_addr_slot_t slot)
-{
-	struct e1000g *Adapter = (struct e1000g *)arg;
-	int err;
-
-	if ((slot <= 0) || (slot >= Adapter->unicst_total))
-		return (EINVAL);
-
-	rw_enter(&Adapter->chip_lock, RW_WRITER);
-	if (Adapter->unicst_addr[slot].mac.set == 1) {
-		Adapter->unicst_addr[slot].mac.set = 0;
-		Adapter->unicst_avail++;
-		rw_exit(&Adapter->chip_lock);
-
-		/* Copy the default address to the passed slot */
-		if ((err = e1000g_unicst_set(Adapter,
-		    Adapter->unicst_addr[0].mac.addr, slot)) != 0) {
-			rw_enter(&Adapter->chip_lock, RW_WRITER);
-			Adapter->unicst_addr[slot].mac.set = 1;
-			Adapter->unicst_avail--;
-			rw_exit(&Adapter->chip_lock);
-		}
-		return (err);
-	}
-	rw_exit(&Adapter->chip_lock);
-
-	return (EINVAL);
-}
-
-/*
- * e1000g_m_unicst_modify() - modifies the value of an address that
- * has been added by e1000g_m_unicst_add(). The new address, address
- * length and the slot number that was returned in the call to add
- * should be passed to e1000g_m_unicst_modify(). mma_flags should be
- * set to 0. Returns 0 on success.
- */
-static int
-e1000g_m_unicst_modify(void *arg, mac_multi_addr_t *maddr)
-{
-	struct e1000g *Adapter = (struct e1000g *)arg;
-	mac_addr_slot_t slot;
-
-	if (mac_unicst_verify(Adapter->mh,
-	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE)
-		return (EINVAL);
-
-	slot = maddr->mma_slot;
-
-	if ((slot <= 0) || (slot >= Adapter->unicst_total))
-		return (EINVAL);
-
-	rw_enter(&Adapter->chip_lock, RW_WRITER);
-	if (Adapter->unicst_addr[slot].mac.set == 1) {
-		rw_exit(&Adapter->chip_lock);
-
-		return (e1000g_unicst_set(Adapter, maddr->mma_addr, slot));
-	}
-	rw_exit(&Adapter->chip_lock);
-
-	return (EINVAL);
-}
-
-/*
- * e1000g_m_unicst_get() - will get the MAC address and all other
- * information related to the address slot passed in mac_multi_addr_t.
- * mma_flags should be set to 0 in the call.
- * On return, mma_flags can take the following values:
- * 1) MMAC_SLOT_UNUSED
- * 2) MMAC_SLOT_USED | MMAC_VENDOR_ADDR
- * 3) MMAC_SLOT_UNUSED | MMAC_VENDOR_ADDR
- * 4) MMAC_SLOT_USED
- */
-static int
-e1000g_m_unicst_get(void *arg, mac_multi_addr_t *maddr)
-{
-	struct e1000g *Adapter = (struct e1000g *)arg;
-	mac_addr_slot_t slot;
-
-	slot = maddr->mma_slot;
-
-	if ((slot <= 0) || (slot >= Adapter->unicst_total))
-		return (EINVAL);
-
-	rw_enter(&Adapter->chip_lock, RW_WRITER);
-	if (Adapter->unicst_addr[slot].mac.set == 1) {
-		bcopy(Adapter->unicst_addr[slot].mac.addr,
-		    maddr->mma_addr, ETHERADDRL);
-		maddr->mma_flags = MMAC_SLOT_USED;
-	} else {
-		maddr->mma_flags = MMAC_SLOT_UNUSED;
-	}
-	rw_exit(&Adapter->chip_lock);
 
 	return (0);
 }
@@ -2586,6 +2535,274 @@ e1000g_m_promisc(void *arg, boolean_t on)
 	return (0);
 }
 
+/*
+ * Entry points to enable and disable interrupts at the granularity of
+ * a group.
+ * Turns the poll_mode for the whole adapter on and off to enable or
+ * override the ring level polling control over the hardware interrupts.
+ */
+static int
+e1000g_rx_group_intr_enable(mac_intr_handle_t arg)
+{
+	struct e1000g		*adapter = (struct e1000g *)arg;
+	e1000g_rx_ring_t *rx_ring = adapter->rx_ring;
+
+	/*
+	 * Later interrupts at the granularity of the this ring will
+	 * invoke mac_rx() with NULL, indicating the need for another
+	 * software classification.
+	 * We have a single ring usable per adapter now, so we only need to
+	 * reset the rx handle for that one.
+	 * When more RX rings can be used, we should update each one of them.
+	 */
+	mutex_enter(&rx_ring->rx_lock);
+	rx_ring->mrh = NULL;
+	adapter->poll_mode = B_FALSE;
+	mutex_exit(&rx_ring->rx_lock);
+	return (0);
+}
+
+static int
+e1000g_rx_group_intr_disable(mac_intr_handle_t arg)
+{
+	struct e1000g *adapter = (struct e1000g *)arg;
+	e1000g_rx_ring_t *rx_ring = adapter->rx_ring;
+
+	mutex_enter(&rx_ring->rx_lock);
+
+	/*
+	 * Later interrupts at the granularity of the this ring will
+	 * invoke mac_rx() with the handle for this ring;
+	 */
+	adapter->poll_mode = B_TRUE;
+	rx_ring->mrh = rx_ring->mrh_init;
+	mutex_exit(&rx_ring->rx_lock);
+	return (0);
+}
+
+/*
+ * Entry points to enable and disable interrupts at the granularity of
+ * a ring.
+ * adapter poll_mode controls whether we actually proceed with hardware
+ * interrupt toggling.
+ */
+static int
+e1000g_rx_ring_intr_enable(mac_intr_handle_t intrh)
+{
+	e1000g_rx_ring_t	*rx_ring = (e1000g_rx_ring_t *)intrh;
+	struct e1000g 		*adapter = rx_ring->adapter;
+	struct e1000_hw 	*hw = &adapter->shared;
+	uint32_t		intr_mask;
+	boolean_t		poll_mode;
+
+	mutex_enter(&rx_ring->rx_lock);
+	rx_ring->poll_flag = 0;
+	poll_mode = adapter->poll_mode;
+	mutex_exit(&rx_ring->rx_lock);
+
+	if (poll_mode) {
+		/* Rx interrupt enabling for MSI and legacy */
+		intr_mask = E1000_READ_REG(hw, E1000_IMS);
+		intr_mask |= E1000_IMS_RXT0;
+		E1000_WRITE_REG(hw, E1000_IMS, intr_mask);
+		E1000_WRITE_FLUSH(hw);
+
+		/* Trigger a Rx interrupt to check Rx ring */
+		E1000_WRITE_REG(hw, E1000_ICS, E1000_IMS_RXT0);
+		E1000_WRITE_FLUSH(hw);
+	}
+	return (0);
+}
+
+static int
+e1000g_rx_ring_intr_disable(mac_intr_handle_t intrh)
+{
+	e1000g_rx_ring_t	*rx_ring = (e1000g_rx_ring_t *)intrh;
+	struct e1000g 		*adapter = rx_ring->adapter;
+	struct e1000_hw 	*hw = &adapter->shared;
+	boolean_t		poll_mode;
+
+	/*
+	 * Once the adapter can support per Rx ring interrupt,
+	 * we should disable the real interrupt instead of just setting
+	 * the flag.
+	 */
+	mutex_enter(&rx_ring->rx_lock);
+	rx_ring->poll_flag = 1;
+	poll_mode = adapter->poll_mode;
+	mutex_exit(&rx_ring->rx_lock);
+
+	if (poll_mode) {
+		/* Rx interrupt disabling for MSI and legacy */
+		E1000_WRITE_REG(hw, E1000_IMC, E1000_IMS_RXT0);
+		E1000_WRITE_FLUSH(hw);
+	}
+	return (0);
+}
+
+/*
+ * e1000g_unicst_find - Find the slot for the specified unicast address
+ */
+static int
+e1000g_unicst_find(struct e1000g *Adapter, const uint8_t *mac_addr)
+{
+	int slot;
+
+	ASSERT(mutex_owned(&Adapter->gen_lock));
+
+	for (slot = 0; slot < Adapter->unicst_total; slot++) {
+		if (Adapter->unicst_addr[slot].mac.set == 1) {
+			if (bcmp(Adapter->unicst_addr[slot].mac.addr,
+			    mac_addr, ETHERADDRL) == 0)
+				return (slot);
+		} else
+			continue;
+	}
+
+	return (-1);
+}
+
+/*
+ * Entry points to add and remove a MAC address to a ring group.
+ * The caller takes care of adding and removing the MAC addresses
+ * to the filter via these two routines.
+ */
+
+static int
+e1000g_addmac(void *arg, const uint8_t *mac_addr)
+{
+	struct e1000g *Adapter = (struct e1000g *)arg;
+	int slot;
+
+	mutex_enter(&Adapter->gen_lock);
+
+	if (e1000g_unicst_find(Adapter, mac_addr) != -1) {
+		/* The same address is already in slot */
+		mutex_exit(&Adapter->gen_lock);
+		return (0);
+	}
+
+	if (Adapter->unicst_avail == 0) {
+		/* no slots available */
+		mutex_exit(&Adapter->gen_lock);
+		return (ENOSPC);
+	}
+
+	/* Search for a free slot */
+	for (slot = 0; slot < Adapter->unicst_total; slot++) {
+		if (Adapter->unicst_addr[slot].mac.set == 0)
+			break;
+	}
+	ASSERT(slot < Adapter->unicst_total);
+
+	e1000g_unicst_set(Adapter, mac_addr, slot);
+	Adapter->unicst_avail--;
+
+	mutex_exit(&Adapter->gen_lock);
+
+	return (0);
+}
+
+static int
+e1000g_remmac(void *arg, const uint8_t *mac_addr)
+{
+	struct e1000g *Adapter = (struct e1000g *)arg;
+	int slot;
+
+	mutex_enter(&Adapter->gen_lock);
+
+	slot = e1000g_unicst_find(Adapter, mac_addr);
+	if (slot == -1) {
+		mutex_exit(&Adapter->gen_lock);
+		return (EINVAL);
+	}
+
+	ASSERT(Adapter->unicst_addr[slot].mac.set);
+
+	/* Clear this slot */
+	e1000g_unicst_set(Adapter, NULL, slot);
+	Adapter->unicst_avail++;
+
+	mutex_exit(&Adapter->gen_lock);
+
+	return (0);
+}
+
+static int
+e1000g_ring_start(mac_ring_driver_t rh, uint64_t mr_gen_num)
+{
+	e1000g_rx_ring_t *rx_ring = (e1000g_rx_ring_t *)rh;
+
+	mutex_enter(&rx_ring->rx_lock);
+	rx_ring->ring_gen_num = mr_gen_num;
+	mutex_exit(&rx_ring->rx_lock);
+	return (0);
+}
+
+/*
+ * Callback funtion for MAC layer to register all rings.
+ *
+ * The hardware supports a single group with currently only one ring
+ * available.
+ * Though not offering virtualization ability per se, exposing the
+ * group/ring still enables the polling and interrupt toggling.
+ */
+void
+e1000g_fill_ring(void *arg, mac_ring_type_t rtype, const int grp_index,
+    const int ring_index, mac_ring_info_t *infop, mac_ring_handle_t rh)
+{
+	struct e1000g *Adapter = (struct e1000g *)arg;
+	e1000g_rx_ring_t *rx_ring = Adapter->rx_ring;
+	mac_intr_t *mintr;
+
+	/*
+	 * We advertised only RX group/rings, so the MAC framework shouldn't
+	 * ask for any thing else.
+	 */
+	ASSERT(rtype == MAC_RING_TYPE_RX && grp_index == 0 && ring_index == 0);
+
+	rx_ring->mrh = rx_ring->mrh_init = rh;
+	infop->mri_driver = (mac_ring_driver_t)rx_ring;
+	infop->mri_start = e1000g_ring_start;
+	infop->mri_stop = NULL;
+	infop->mri_poll = e1000g_poll_ring;
+
+	/* Ring level interrupts */
+	mintr = &infop->mri_intr;
+	mintr->mi_handle = (mac_intr_handle_t)rx_ring;
+	mintr->mi_enable = e1000g_rx_ring_intr_enable;
+	mintr->mi_disable = e1000g_rx_ring_intr_disable;
+}
+
+static void
+e1000g_fill_group(void *arg, mac_ring_type_t rtype, const int grp_index,
+    mac_group_info_t *infop, mac_group_handle_t gh)
+{
+	struct e1000g *Adapter = (struct e1000g *)arg;
+	mac_intr_t *mintr;
+
+	/*
+	 * We advertised a single RX ring. Getting a request for anything else
+	 * signifies a bug in the MAC framework.
+	 */
+	ASSERT(rtype == MAC_RING_TYPE_RX && grp_index == 0);
+
+	Adapter->rx_group = gh;
+
+	infop->mgi_driver = (mac_group_driver_t)Adapter;
+	infop->mgi_start = NULL;
+	infop->mgi_stop = NULL;
+	infop->mgi_addmac = e1000g_addmac;
+	infop->mgi_remmac = e1000g_remmac;
+	infop->mgi_count = 1;
+
+	/* Group level interrupts */
+	mintr = &infop->mgi_intr;
+	mintr->mi_handle = (mac_intr_handle_t)Adapter;
+	mintr->mi_enable = e1000g_rx_group_intr_enable;
+	mintr->mi_disable = e1000g_rx_group_intr_disable;
+}
+
 static boolean_t
 e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
@@ -2602,34 +2819,6 @@ e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			return (B_FALSE);
 		break;
 	}
-	case MAC_CAPAB_POLL:
-		/*
-		 * There's nothing for us to fill in, simply returning
-		 * B_TRUE stating that we support polling is sufficient.
-		 */
-		break;
-
-	case MAC_CAPAB_MULTIADDRESS: {
-		multiaddress_capab_t *mmacp = cap_data;
-
-		/*
-		 * The number of MAC addresses made available by
-		 * this capability is one less than the total as
-		 * the primary address in slot 0 is counted in
-		 * the total.
-		 */
-		mmacp->maddr_naddr = Adapter->unicst_total - 1;
-		mmacp->maddr_naddrfree = Adapter->unicst_avail;
-		/* No multiple factory addresses, set mma_flag to 0 */
-		mmacp->maddr_flag = 0;
-		mmacp->maddr_handle = Adapter;
-		mmacp->maddr_add = e1000g_m_unicst_add;
-		mmacp->maddr_remove = e1000g_m_unicst_remove;
-		mmacp->maddr_modify = e1000g_m_unicst_modify;
-		mmacp->maddr_get = e1000g_m_unicst_get;
-		mmacp->maddr_reserve = NULL;
-		break;
-	}
 
 	case MAC_CAPAB_LSO: {
 		mac_capab_lso_t *cap_lso = cap_data;
@@ -2642,7 +2831,20 @@ e1000g_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			return (B_FALSE);
 		break;
 	}
+	case MAC_CAPAB_RINGS: {
+		mac_capab_rings_t *cap_rings = cap_data;
 
+		/* No TX rings exposed yet */
+		if (cap_rings->mr_type != MAC_RING_TYPE_RX)
+			return (B_FALSE);
+
+		cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+		cap_rings->mr_rnum = 1;
+		cap_rings->mr_gnum = 1;
+		cap_rings->mr_rget = e1000g_fill_ring;
+		cap_rings->mr_gget = e1000g_fill_group;
+		break;
+	}
 	default:
 		return (B_FALSE);
 	}
@@ -3124,32 +3326,6 @@ e1000g_set_priv_prop(struct e1000g *Adapter, const char *pr_name,
 		}
 		return (err);
 	}
-	if (strcmp(pr_name, "_tx_recycle_thresh") == 0) {
-		if (pr_val == NULL) {
-			err = EINVAL;
-			return (err);
-		}
-		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
-		if (result < MIN_TX_RECYCLE_THRESHOLD ||
-		    result > MAX_TX_RECYCLE_THRESHOLD)
-			err = EINVAL;
-		else
-			Adapter->tx_recycle_thresh = (uint32_t)result;
-		return (err);
-	}
-	if (strcmp(pr_name, "_tx_recycle_num") == 0) {
-		if (pr_val == NULL) {
-			err = EINVAL;
-			return (err);
-		}
-		(void) ddi_strtol(pr_val, (char **)NULL, 0, &result);
-		if (result < MIN_TX_RECYCLE_NUM ||
-		    result > MAX_TX_RECYCLE_NUM)
-			err = EINVAL;
-		else
-			Adapter->tx_recycle_num = (uint32_t)result;
-		return (err);
-	}
 	return (ENOTSUP);
 }
 
@@ -3233,18 +3409,6 @@ e1000g_get_priv_prop(struct e1000g *Adapter, const char *pr_name,
 	}
 	if (strcmp(pr_name, "_intr_adaptive") == 0) {
 		value = (is_default ? 1 : Adapter->intr_adaptive);
-		err = 0;
-		goto done;
-	}
-	if (strcmp(pr_name, "_tx_recycle_thresh") == 0) {
-		value = (is_default ? DEFAULT_TX_RECYCLE_THRESHOLD :
-		    Adapter->tx_recycle_thresh);
-		err = 0;
-		goto done;
-	}
-	if (strcmp(pr_name, "_tx_recycle_num") == 0) {
-		value = (is_default ? DEFAULT_TX_RECYCLE_NUM :
-		    Adapter->tx_recycle_num);
 		err = 0;
 		goto done;
 	}
@@ -3366,22 +3530,6 @@ e1000g_get_conf(struct e1000g *Adapter)
 	Adapter->intr_adaptive =
 	    (e1000g_get_prop(Adapter, "intr_adaptive", 0, 1, 1) == 1) ?
 	    B_TRUE : B_FALSE;
-
-	/*
-	 * Tx recycle threshold
-	 */
-	Adapter->tx_recycle_thresh =
-	    e1000g_get_prop(Adapter, "tx_recycle_thresh",
-	    MIN_TX_RECYCLE_THRESHOLD, MAX_TX_RECYCLE_THRESHOLD,
-	    DEFAULT_TX_RECYCLE_THRESHOLD);
-
-	/*
-	 * Tx recycle descriptor number
-	 */
-	Adapter->tx_recycle_num =
-	    e1000g_get_prop(Adapter, "tx_recycle_num",
-	    MIN_TX_RECYCLE_NUM, MAX_TX_RECYCLE_NUM,
-	    DEFAULT_TX_RECYCLE_NUM);
 
 	/*
 	 * Hardware checksum enable/disable parameter
@@ -3672,6 +3820,23 @@ e1000g_reset_link(struct e1000g *Adapter)
 }
 
 static void
+e1000g_timer_tx_resched(struct e1000g *Adapter)
+{
+	e1000g_tx_ring_t *tx_ring = Adapter->tx_ring;
+
+	if (tx_ring->resched_needed &&
+	    ((ddi_get_lbolt() - tx_ring->resched_timestamp) >
+	    drv_usectohz(1000000)) &&
+	    (Adapter->chip_state == E1000G_START) &&
+	    (tx_ring->tbd_avail >= DEFAULT_TX_NO_RESOURCE)) {
+		tx_ring->resched_needed = B_FALSE;
+		mac_tx_update(Adapter->mh);
+		E1000G_STAT(tx_ring->stat_reschedule);
+		E1000G_STAT(tx_ring->stat_timer_reschedule);
+	}
+}
+
+static void
 e1000g_local_timer(void *ws)
 {
 	struct e1000g *Adapter = (struct e1000g *)ws;
@@ -3683,10 +3848,11 @@ e1000g_local_timer(void *ws)
 
 	if (Adapter->chip_state == E1000G_ERROR) {
 		Adapter->reset_count++;
-		if (e1000g_global_reset(Adapter))
+		if (e1000g_global_reset(Adapter)) {
 			ddi_fm_service_impact(Adapter->dip,
 			    DDI_SERVICE_RESTORED);
-		else
+			e1000g_timer_tx_resched(Adapter);
+		} else
 			ddi_fm_service_impact(Adapter->dip,
 			    DDI_SERVICE_LOST);
 		return;
@@ -3697,10 +3863,11 @@ e1000g_local_timer(void *ws)
 		    "Tx stall detected. Activate automatic recovery.\n");
 		e1000g_fm_ereport(Adapter, DDI_FM_DEVICE_STALL);
 		Adapter->reset_count++;
-		if (e1000g_reset_adapter(Adapter))
+		if (e1000g_reset_adapter(Adapter)) {
 			ddi_fm_service_impact(Adapter->dip,
 			    DDI_SERVICE_RESTORED);
-		else
+			e1000g_timer_tx_resched(Adapter);
+		} else
 			ddi_fm_service_impact(Adapter->dip,
 			    DDI_SERVICE_LOST);
 		return;
@@ -3769,6 +3936,8 @@ e1000g_local_timer(void *ws)
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK)
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
+	else
+		e1000g_timer_tx_resched(Adapter);
 
 	restart_watchdog_timer(Adapter);
 }

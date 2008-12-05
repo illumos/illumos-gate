@@ -30,9 +30,8 @@
 #include <sys/types.h>
 #include <sys/modctl.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
+#include <sys/dld_impl.h>
 #include <sys/mac_ether.h>
-#include <sys/dls.h>
 #include <sys/ethernet.h>
 #include <sys/byteorder.h>
 #include <sys/strsun.h>

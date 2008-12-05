@@ -26,8 +26,6 @@
 #ifndef	_UDP_IMPL_H
 #define	_UDP_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * UDP implementation private declarations.  These interfaces are
  * used to build the IP module and are not meant to be accessed
@@ -159,7 +157,7 @@ typedef struct udp_fanout_s {
  * below IP and if the q_first is NULL, we optimize by not doing
  * the canput check
  */
-#define	DEV_Q_IS_FLOW_CTLED(dev_q)					\
+#define	DEV_Q_FLOW_BLOCKED(dev_q)					\
 	(((dev_q)->q_next != NULL || (dev_q)->q_first != NULL) &&	\
 	!canput(dev_q))
 
@@ -371,9 +369,7 @@ extern void	udp_quiesce_conn(conn_t *);
 extern void	udp_ddi_init(void);
 extern void	udp_ddi_destroy(void);
 extern void	udp_resume_bind(conn_t *, mblk_t *);
-extern void	udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr,
-		    socklen_t addrlen);
-extern void	udp_wput(queue_t *, mblk_t *);
+extern	void	udp_wput(queue_t *, mblk_t *);
 
 extern int	udp_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name,
     uchar_t *ptr);

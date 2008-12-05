@@ -142,6 +142,12 @@ extern "C" {
 #define	RESTRICT_TO_GROUP	0x1	/* Restrict to IPMP group */
 #define	RESTRICT_TO_ILL		0x2	/* Restrict to ILL */
 
+#ifdef DEBUG
+#define	ILL_MAC_PERIM_HELD(ill)	ill_mac_perim_held(ill)
+#else
+#define	ILL_MAC_PERIM_HELD(ill)
+#endif
+
 /* for ipif_resolver_up */
 enum ip_resolver_action {
 	Res_act_initial,		/* initial address establishment */
@@ -158,6 +164,7 @@ extern	void	ill_dlpi_done(ill_t *, t_uscalar_t);
 extern	boolean_t ill_dlpi_pending(ill_t *, t_uscalar_t);
 extern	void	ill_dlpi_send(ill_t *, mblk_t *);
 extern	void	ill_dlpi_send_deferred(ill_t *);
+extern	void	ill_capability_done(ill_t *);
 
 extern	mblk_t	*ill_dlur_gen(uchar_t *, uint_t, t_uscalar_t, t_scalar_t);
 extern  ill_t	*ill_group_lookup_on_ifindex(uint_t, boolean_t, ip_stack_t *);
@@ -208,9 +215,12 @@ extern	void	ill_untrace_ref(ill_t *);
 extern	boolean_t ill_down_start(queue_t *, mblk_t *);
 extern	ill_t	*ill_lookup_group_v6(const in6_addr_t *, zoneid_t,
     ip_stack_t *);
+
 extern	void	ill_capability_ack(ill_t *, mblk_t *);
 extern	void	ill_capability_probe(ill_t *);
-extern	void	ill_capability_reset(ill_t *);
+extern	void	ill_capability_reset(ill_t *, boolean_t);
+extern	void	ill_taskq_dispatch(ip_stack_t *);
+
 extern	void	ill_mtu_change(ire_t *, char *);
 extern void	ill_group_cleanup(ill_t *);
 extern int	ill_up_ipifs(ill_t *, queue_t *, mblk_t *);
@@ -281,10 +291,11 @@ extern	void	ipsq_current_start(ipsq_t *, ipif_t *, int);
 extern	void	ipsq_current_finish(ipsq_t *);
 extern	void	ipsq_enq(ipsq_t *, queue_t *, mblk_t *, ipsq_func_t, int,
     ill_t *);
-extern	boolean_t ipsq_enter(ill_t *, boolean_t);
+extern	boolean_t ipsq_enter(ill_t *, boolean_t, int);
 extern	ipsq_t	*ipsq_try_enter(ipif_t *, ill_t *, queue_t *, mblk_t *,
     ipsq_func_t, int, boolean_t);
 extern	void	ipsq_exit(ipsq_t *);
+extern	boolean_t ill_mac_perim_held(ill_t *);
 extern mblk_t	*ipsq_pending_mp_get(ipsq_t *, conn_t **);
 extern boolean_t ipsq_pending_mp_add(conn_t *, ipif_t *, queue_t *,
     mblk_t *, int);

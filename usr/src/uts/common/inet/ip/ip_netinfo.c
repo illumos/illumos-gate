@@ -1546,7 +1546,7 @@ ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 		if (inject->inj_isv6) {
 			ip_rput_v6(ill->ill_rq, packet->ni_packet);
 		} else {
-			ip_input(ill, NULL, packet->ni_packet, 0);
+			ip_input(ill, NULL, packet->ni_packet, NULL);
 		}
 		kmem_free(inject, sizeof (*inject));
 		ill_refrele(ill);

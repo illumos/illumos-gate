@@ -26,8 +26,6 @@
 #ifndef	_SYS_SOFTMAC_IMPL_H
 #define	_SYS_SOFTMAC_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/ethernet.h>
 #include <sys/taskq.h>
@@ -37,6 +35,9 @@
 #include <sys/stream.h>
 #include <sys/dlpi.h>
 #include <sys/mac.h>
+#include <sys/mac_provider.h>
+#include <sys/mac_client.h>
+#include <sys/mac_client_priv.h>
 #include <sys/mac_ether.h>
 
 #ifdef	__cplusplus
@@ -68,14 +69,20 @@ typedef struct softmac_lower_s {
 	boolean_t		sl_pending_ioctl;
 	mblk_t			*sl_ack_mp;
 
-	mac_resource_handle_t	sl_handle;
 	ldi_handle_t		sl_lh;
 } softmac_lower_t;
 
-enum softmac_state {
+typedef enum {
 	SOFTMAC_INITIALIZED,
 	SOFTMAC_READY
-};
+} softmac_lower_state_t;
+
+typedef enum {
+	SOFTMAC_UNINIT,
+	SOFTMAC_ATTACH_INPROG,
+	SOFTMAC_ATTACH_DONE,
+	SOFTMAC_DETACH_INPROG,
+} softmac_state_t;
 
 typedef struct softmac_dev_s {
 	dev_t	sd_dev;
@@ -86,8 +93,12 @@ typedef struct softmac_dev_s {
  */
 #define	SOFTMAC_GLDV3		0x01
 #define	SOFTMAC_NOSUPP		0x02
-#define	SOFTMAC_ATTACH_DONE	0x04
-#define	SOFTMAC_NEED_RECREATE	0x08
+#define	SOFTMAC_NEED_RECREATE	0x04
+#define	SOFTMAC_NOTIFY_QUIT	0x08
+
+#define	SMAC_NONZERO_NODECNT(softmac)		\
+	((softmac->smac_softmac[0] != NULL) +	\
+	(softmac->smac_softmac[1] != NULL))
 
 /*
  * The softmac structure allows all minor nodes (at most two, style-1 and
@@ -111,18 +122,14 @@ typedef struct softmac {
 	uint32_t	smac_cnt;	/* # of minor nodes for this device */
 
 	/*
-	 * The following fields are protected by softmac_hash_lock.
-	 */
-	/*
+	 * The following fields are protected by smac_mutex.
+	 *
 	 * The smac_hold_cnt field increases when softmac_hold_device() is
 	 * called to force the dls_vlan_t of the device to be created.  The
 	 * device pre-detach fails if this counter is not 0.
 	 */
+	softmac_state_t	smac_state;
 	uint32_t	smac_hold_cnt;
-
-	/*
-	 * The following fields are protected by smac_lock.
-	 */
 	kmutex_t	smac_mutex;
 	kcondvar_t	smac_cv;
 	uint32_t	smac_flags;
@@ -143,6 +150,16 @@ typedef struct softmac {
 	 * pre-detach.
 	 */
 	uint32_t	smac_attached_left;
+
+	/*
+	 * Thread handles the DL_NOTIFY_IND message from the lower stream.
+	 */
+	kthread_t	*smac_notify_thread;
+	/*
+	 * Head and tail of the DL_NOTIFY_IND messsages.
+	 */
+	mblk_t		*smac_notify_head;
+	mblk_t		*smac_notify_tail;
 
 	/*
 	 * The remaining fields are used to register the MAC for a legacy
@@ -177,11 +194,8 @@ typedef struct softmac {
 	dl_capab_mdt_t	smac_mdt_capab;
 	boolean_t	smac_mdt;
 
-	/*
-	 * The following fields are protected by smac_lock
-	 */
-	krwlock_t	smac_lock;
-	enum softmac_state	smac_state;
+	/* Following fields protected by the mac perimeter */
+	softmac_lower_state_t	smac_lower_state;
 	/* Lower stream structure */
 	softmac_lower_t	*smac_lower;
 } softmac_t;
@@ -192,9 +206,6 @@ typedef struct smac_ioc_start_s {
 
 #define	SMAC_IOC	('S' << 24 | 'M' << 16 | 'C' << 8)
 #define	SMAC_IOC_START	(SMAC_IOC | 0x01)
-
-#define	SOFTMAC_BLANK_TICKS	128
-#define	SOFTMAC_BLANK_PKT_COUNT	8
 
 extern dev_info_t		*softmac_dip;
 #define	SOFTMAC_DEV_NAME	"softmac"
@@ -217,9 +228,9 @@ extern int	softmac_m_unicst(void *, const uint8_t *);
 extern void	softmac_m_ioctl(void *, queue_t *, mblk_t *);
 extern int	softmac_m_stat(void *, uint_t, uint64_t *);
 extern mblk_t	*softmac_m_tx(void *, mblk_t *);
-extern void	softmac_m_resources(void *);
 extern int	softmac_proto_tx(softmac_lower_t *, mblk_t *, mblk_t **);
 extern void	softmac_ioctl_tx(softmac_lower_t *, mblk_t *, mblk_t **);
+extern void	softmac_notify_thread(void *);
 
 #ifdef	__cplusplus
 }

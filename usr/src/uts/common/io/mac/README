@@ -1,0 +1,80 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+This README describes the organization of the files and subdirectories
+that make up the misc/mac module.
+
+Changes to the sources should follow the layout and naming conventions
+adopted herein.
+
+Each functional component of the mac module is implemented in a separate
+source file. The external interfaces are declared in header files delivered
+under <sys>. The internal data structures and definitions are declared
+in header files internal to this directory.
+
+. Client Interface
+    This is the kernel programming interface for accessing L2 services as
+    a consumer.
+	. mac_client.c
+	. sys/mac_client.h:		APIs intended for external MAC consumers
+	. sys/mac_client_priv.h:	APIs for GLDv3 components only (dld,
+					dls, aggr, vnic, etc).
+	. mac_client_impl.h		Internals.
+
+. Provider Interface
+    This is the GLDv3 kernel driver interface. Functions and data structures
+    are used by L2 drivers to provide services to MAC consumers.
+	. mac_provider.c
+	. sys/mac_provider.h
+
+. MAC Type Plugins
+    The GLDv3 L2 supports multiple types of media control. Each type is
+    implemented as a plugin delivered in a separate file under the
+    plugin/ directory.
+    Add a new file to the plugin/ directory for introducing a new MAC type.
+
+. Core Component.
+    - Scheduling Engine:
+	. mac_datapath_setup.c:	Control path for the scheduler.
+	. mac_soft_ring.c,
+	  mac_soft_ring.h:	Fanout Soft Rings.
+	. mac_sched.c:		Data path
+	. mac_bcast.c		Data path and switching for broadcast and
+				multicast packets.
+	. mac_stat.c:		Statistics
+
+    - Classification Engine
+	mac_flow.c:		Flows and software classification:
+
+    - NICs Resources Management
+	. mac.c (this file also has other miscelanea)
+
+. Misc
+	. mac.c
+	. mac_util.c
+	. mac_ndd.c
+

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,13 +30,13 @@
 #ifndef	_SYS_VLAN_H
 #define	_SYS_VLAN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #define	VLAN_TAGSZ	4
+
+#define	VLAN_TPID	0x8100u
 
 #define	VLAN_ID_MASK	0x0fffu
 #define	VLAN_ID_SIZE	12

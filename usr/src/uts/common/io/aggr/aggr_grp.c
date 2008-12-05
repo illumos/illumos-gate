@@ -39,6 +39,7 @@
 #include <sys/sysmacros.h>
 #include <sys/conf.h>
 #include <sys/cmn_err.h>
+#include <sys/disp.h>
 #include <sys/list.h>
 #include <sys/ksynch.h>
 #include <sys/kmem.h>
@@ -52,6 +53,7 @@
 #include <sys/id_space.h>
 #include <sys/strsun.h>
 #include <sys/dlpi.h>
+#include <sys/mac_provider.h>
 #include <sys/dls.h>
 #include <sys/vlan.h>
 #include <sys/aggr.h>
@@ -63,7 +65,6 @@ static int aggr_m_promisc(void *, boolean_t);
 static int aggr_m_multicst(void *, boolean_t, const uint8_t *);
 static int aggr_m_unicst(void *, const uint8_t *);
 static int aggr_m_stat(void *, uint_t, uint64_t *);
-static void aggr_m_resources(void *);
 static void aggr_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t aggr_m_capab_get(void *, mac_capab_t, void *);
 static aggr_port_t *aggr_grp_port_lookup(aggr_grp_t *, datalink_id_t);
@@ -76,8 +77,20 @@ static uint_t aggr_grp_max_sdu(aggr_grp_t *);
 static uint32_t aggr_grp_max_margin(aggr_grp_t *);
 static boolean_t aggr_grp_sdu_check(aggr_grp_t *, aggr_port_t *);
 static boolean_t aggr_grp_margin_check(aggr_grp_t *, aggr_port_t *);
-static int aggr_grp_multicst(aggr_grp_t *grp, boolean_t add,
-    const uint8_t *addrp);
+
+static int aggr_add_pseudo_rx_group(aggr_port_t *, aggr_pseudo_rx_group_t *);
+static void aggr_rem_pseudo_rx_group(aggr_port_t *, aggr_pseudo_rx_group_t *);
+static int aggr_pseudo_disable_intr(mac_intr_handle_t);
+static int aggr_pseudo_enable_intr(mac_intr_handle_t);
+static int aggr_pseudo_start_ring(mac_ring_driver_t, uint64_t);
+static void aggr_pseudo_stop_ring(mac_ring_driver_t);
+static int aggr_addmac(void *, const uint8_t *);
+static int aggr_remmac(void *, const uint8_t *);
+static mblk_t *aggr_rx_poll(void *, int);
+static void aggr_fill_ring(void *, mac_ring_type_t, const int,
+    const int, mac_ring_info_t *, mac_ring_handle_t);
+static void aggr_fill_group(void *, mac_ring_type_t, const int,
+    mac_group_info_t *, mac_group_handle_t);
 
 static kmem_cache_t	*aggr_grp_cache;
 static mod_hash_t	*aggr_grp_hash;
@@ -87,10 +100,11 @@ static id_space_t	*key_ids;
 
 #define	GRP_HASHSZ		64
 #define	GRP_HASH_KEY(linkid)	((mod_hash_key_t)(uintptr_t)linkid)
+#define	AGGR_PORT_NAME_DELIMIT '-'
 
 static uchar_t aggr_zero_mac[] = {0, 0, 0, 0, 0, 0};
 
-#define	AGGR_M_CALLBACK_FLAGS	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB)
+#define	AGGR_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
 
 static mac_callbacks_t aggr_m_callbacks = {
 	AGGR_M_CALLBACK_FLAGS,
@@ -99,9 +113,8 @@ static mac_callbacks_t aggr_m_callbacks = {
 	aggr_m_stop,
 	aggr_m_promisc,
 	aggr_m_multicst,
-	aggr_m_unicst,
+	NULL,
 	aggr_m_tx,
-	aggr_m_resources,
 	aggr_m_ioctl,
 	aggr_m_capab_get
 };
@@ -113,11 +126,12 @@ aggr_grp_constructor(void *buf, void *arg, int kmflag)
 	aggr_grp_t *grp = buf;
 
 	bzero(grp, sizeof (*grp));
-	rw_init(&grp->lg_lock, NULL, RW_DRIVER, NULL);
-	rw_init(&grp->aggr.gl_lock, NULL, RW_DRIVER, NULL);
-
+	mutex_init(&grp->lg_lacp_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&grp->lg_lacp_cv, NULL, CV_DEFAULT, NULL);
+	rw_init(&grp->lg_tx_lock, NULL, RW_DRIVER, NULL);
+	mutex_init(&grp->lg_port_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&grp->lg_port_cv, NULL, CV_DEFAULT, NULL);
 	grp->lg_link_state = LINK_STATE_UNKNOWN;
-
 	return (0);
 }
 
@@ -132,8 +146,11 @@ aggr_grp_destructor(void *buf, void *arg)
 		    grp->lg_tx_ports_size * sizeof (aggr_port_t *));
 	}
 
-	rw_destroy(&grp->aggr.gl_lock);
-	rw_destroy(&grp->lg_lock);
+	mutex_destroy(&grp->lg_lacp_lock);
+	cv_destroy(&grp->lg_lacp_cv);
+	mutex_destroy(&grp->lg_port_lock);
+	cv_destroy(&grp->lg_port_cv);
+	rw_destroy(&grp->lg_tx_lock);
 }
 
 void
@@ -179,6 +196,51 @@ aggr_grp_count(void)
 }
 
 /*
+ * Since both aggr_port_notify_cb() and aggr_port_timer_thread() functions
+ * requires the mac perimeter, this function holds a reference of the aggr
+ * and aggr won't call mac_unregister() until this reference drops to 0.
+ */
+void
+aggr_grp_port_hold(aggr_port_t *port)
+{
+	aggr_grp_t	*grp = port->lp_grp;
+
+	AGGR_PORT_REFHOLD(port);
+	mutex_enter(&grp->lg_port_lock);
+	grp->lg_port_ref++;
+	mutex_exit(&grp->lg_port_lock);
+}
+
+/*
+ * Release the reference of the grp and inform aggr_grp_delete() calling
+ * mac_unregister() is now safe.
+ */
+void
+aggr_grp_port_rele(aggr_port_t *port)
+{
+	aggr_grp_t	*grp = port->lp_grp;
+
+	mutex_enter(&grp->lg_port_lock);
+	if (--grp->lg_port_ref == 0)
+		cv_signal(&grp->lg_port_cv);
+	mutex_exit(&grp->lg_port_lock);
+	AGGR_PORT_REFRELE(port);
+}
+
+/*
+ * Wait for the port's lacp timer thread and the port's notification callback
+ * to exit.
+ */
+void
+aggr_grp_port_wait(aggr_grp_t *grp)
+{
+	mutex_enter(&grp->lg_port_lock);
+	if (grp->lg_port_ref != 0)
+		cv_wait(&grp->lg_port_cv, &grp->lg_port_lock);
+	mutex_exit(&grp->lg_port_lock);
+}
+
+/*
  * Attach a port to a link aggregation group.
  *
  * A port is attached to a link aggregation group once its speed
@@ -193,9 +255,8 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 {
 	boolean_t link_state_changed = B_FALSE;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
-	ASSERT(RW_WRITE_HELD(&port->lp_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	ASSERT(MAC_PERIM_HELD(port->lp_mh));
 
 	if (port->lp_state == AGGR_PORT_STATE_ATTACHED)
 		return (B_FALSE);
@@ -251,7 +312,7 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 	/*
 	 * Set port's receive callback
 	 */
-	port->lp_mrh = mac_rx_add(port->lp_mh, aggr_recv_cb, (void *)port);
+	mac_rx_set(port->lp_mch, aggr_recv_cb, port);
 
 	/*
 	 * If LACP is OFF, the port can be used to send data as soon
@@ -270,28 +331,28 @@ aggr_grp_attach_port(aggr_grp_t *grp, aggr_port_t *port)
 }
 
 boolean_t
-aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port, boolean_t port_detach)
+aggr_grp_detach_port(aggr_grp_t *grp, aggr_port_t *port)
 {
 	boolean_t link_state_changed = B_FALSE;
 
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
-	ASSERT(RW_WRITE_HELD(&port->lp_lock));
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	ASSERT(MAC_PERIM_HELD(port->lp_mh));
 
+	/* update state */
 	if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
 		return (B_FALSE);
 
-	mac_rx_remove(port->lp_mh, port->lp_mrh, B_FALSE);
+	mac_rx_clear(port->lp_mch);
 
 	aggr_grp_multicst_port(port, B_FALSE);
 
 	if (grp->lg_lacp_mode == AGGR_LACP_OFF)
 		aggr_send_port_disable(port);
-	else if (port_detach)
+	else
 		aggr_lacp_port_detached(port);
 
-	/* update state */
 	port->lp_state = AGGR_PORT_STATE_STANDBY;
+
 	grp->lg_nattached_ports--;
 	if (grp->lg_nattached_ports == 0) {
 		/* the last attached MAC port of the group is being detached */
@@ -323,17 +384,15 @@ aggr_grp_update_ports_mac(aggr_grp_t *grp)
 {
 	aggr_port_t *cport;
 	boolean_t link_state_changed = B_FALSE;
+	mac_perim_handle_t mph;
 
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
-
-	if (grp->lg_closing)
-		return (link_state_changed);
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
 	for (cport = grp->lg_ports; cport != NULL;
 	    cport = cport->lp_next) {
-		rw_enter(&cport->lp_lock, RW_WRITER);
-		if (aggr_port_unicst(cport, grp->lg_addr) != 0) {
-			if (aggr_grp_detach_port(grp, cport, B_TRUE))
+		mac_perim_enter_by_mh(cport->lp_mh, &mph);
+		if (aggr_port_unicst(cport) != 0) {
+			if (aggr_grp_detach_port(grp, cport))
 				link_state_changed = B_TRUE;
 		} else {
 			/*
@@ -346,7 +405,7 @@ aggr_grp_update_ports_mac(aggr_grp_t *grp)
 			if (aggr_grp_attach_port(grp, cport))
 				link_state_changed = B_TRUE;
 		}
-		rw_exit(&cport->lp_lock);
+		mac_perim_exit(mph);
 	}
 	return (link_state_changed);
 }
@@ -365,9 +424,8 @@ void
 aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port,
     boolean_t *mac_addr_changedp, boolean_t *link_state_changedp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
-	ASSERT(RW_WRITE_HELD(&port->lp_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	ASSERT(MAC_PERIM_HELD(port->lp_mh));
 	ASSERT(mac_addr_changedp != NULL);
 	ASSERT(link_state_changedp != NULL);
 
@@ -394,9 +452,8 @@ aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port,
 		 * Update the actual port MAC address to the MAC address
 		 * of the group.
 		 */
-		if (aggr_port_unicst(port, grp->lg_addr) != 0) {
-			*link_state_changedp = aggr_grp_detach_port(grp, port,
-			    B_TRUE);
+		if (aggr_port_unicst(port) != 0) {
+			*link_state_changedp = aggr_grp_detach_port(grp, port);
 		} else {
 			/*
 			 * If a port was detached because of a previous
@@ -414,21 +471,25 @@ aggr_grp_port_mac_changed(aggr_grp_t *grp, aggr_port_t *port,
  * Add a port to a link aggregation group.
  */
 static int
-aggr_grp_add_port(aggr_grp_t *grp, datalink_id_t linkid, boolean_t force,
+aggr_grp_add_port(aggr_grp_t *grp, datalink_id_t port_linkid, boolean_t force,
     aggr_port_t **pp)
 {
 	aggr_port_t *port, **cport;
+	mac_perim_handle_t mph;
 	int err;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	/*
+	 * lg_mh could be NULL when the function is called during the creation
+	 * of the aggregation.
+	 */
+	ASSERT(grp->lg_mh == NULL || MAC_PERIM_HELD(grp->lg_mh));
 
 	/* create new port */
-	err = aggr_port_create(linkid, force, &port);
+	err = aggr_port_create(grp, port_linkid, force, &port);
 	if (err != 0)
 		return (err);
 
-	rw_enter(&port->lp_lock, RW_WRITER);
+	mac_perim_enter_by_mh(port->lp_mh, &mph);
 
 	/* add port to list of group constituent ports */
 	cport = &grp->lg_ports;
@@ -446,19 +507,238 @@ aggr_grp_add_port(aggr_grp_t *grp, datalink_id_t linkid, boolean_t force,
 	grp->lg_nports++;
 
 	aggr_lacp_init_port(port);
-
-	/*
-	 * Initialize the callback functions for this port. Note that this
-	 * can only be done after the lp_grp field is set.
-	 */
-	aggr_port_init_callbacks(port);
-
-	rw_exit(&port->lp_lock);
+	mac_perim_exit(mph);
 
 	if (pp != NULL)
 		*pp = port;
 
 	return (0);
+}
+
+/*
+ * Add a pseudo Rx ring for the given HW ring handle.
+ */
+static int
+aggr_add_pseudo_rx_ring(aggr_port_t *port,
+    aggr_pseudo_rx_group_t *rx_grp, mac_ring_handle_t hw_rh)
+{
+	aggr_pseudo_rx_ring_t	*ring;
+	int			err;
+	int			j;
+
+	for (j = 0; j < MAX_RINGS_PER_GROUP; j++) {
+		ring = rx_grp->arg_rings + j;
+		if (!(ring->arr_flags & MAC_PSEUDO_RING_INUSE))
+			break;
+	}
+
+	/*
+	 * No slot for this new Rx ring.
+	 */
+	if (j == MAX_RINGS_PER_GROUP)
+		return (EIO);
+
+	ring->arr_flags |= MAC_PSEUDO_RING_INUSE;
+	ring->arr_hw_rh = hw_rh;
+	ring->arr_port = port;
+	rx_grp->arg_ring_cnt++;
+
+	/*
+	 * The group is already registered, dynamically add a new ring to the
+	 * mac group.
+	 */
+	mac_hwring_setup(hw_rh, (mac_resource_handle_t)ring);
+	if ((err = mac_group_add_ring(rx_grp->arg_gh, j)) != 0) {
+		ring->arr_flags &= ~MAC_PSEUDO_RING_INUSE;
+		ring->arr_hw_rh = NULL;
+		ring->arr_port = NULL;
+		rx_grp->arg_ring_cnt--;
+		mac_hwring_teardown(hw_rh);
+	}
+	return (err);
+}
+
+/*
+ * Remove the pseudo Rx ring of the given HW ring handle.
+ */
+static void
+aggr_rem_pseudo_rx_ring(aggr_pseudo_rx_group_t *rx_grp, mac_ring_handle_t hw_rh)
+{
+	aggr_pseudo_rx_ring_t	*ring;
+	int			j;
+
+	for (j = 0; j < MAX_RINGS_PER_GROUP; j++) {
+		ring = rx_grp->arg_rings + j;
+		if (!(ring->arr_flags & MAC_PSEUDO_RING_INUSE) ||
+		    ring->arr_hw_rh != hw_rh) {
+			continue;
+		}
+
+		mac_group_rem_ring(rx_grp->arg_gh, ring->arr_rh);
+
+		ring->arr_flags &= ~MAC_PSEUDO_RING_INUSE;
+		ring->arr_hw_rh = NULL;
+		ring->arr_port = NULL;
+		rx_grp->arg_ring_cnt--;
+		mac_hwring_teardown(hw_rh);
+		break;
+	}
+}
+
+/*
+ * This function is called to create pseudo rings over the hardware rings of
+ * the underlying device. Note that there is a 1:1 mapping between the pseudo
+ * RX rings of the aggr and the hardware rings of the underlying port.
+ */
+static int
+aggr_add_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
+{
+	aggr_grp_t		*grp = port->lp_grp;
+	mac_ring_handle_t	hw_rh[MAX_RINGS_PER_GROUP];
+	aggr_unicst_addr_t	*addr, *a;
+	mac_perim_handle_t	pmph;
+	int			hw_rh_cnt, i = 0, j;
+	int			err = 0;
+
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	mac_perim_enter_by_mh(port->lp_mh, &pmph);
+
+	/*
+	 * This function must be called after the aggr registers its mac
+	 * and its RX group has been initialized.
+	 */
+	ASSERT(rx_grp->arg_gh != NULL);
+
+	/*
+	 * Get the list the the underlying HW rings.
+	 */
+	hw_rh_cnt = mac_hwrings_get(port->lp_mch, &port->lp_hwgh, hw_rh);
+
+	if (port->lp_hwgh != NULL) {
+		/*
+		 * Quiesce the HW ring and the mac srs on the ring. Note
+		 * that the HW ring will be restarted when the pseudo ring
+		 * is started. At that time all the packets will be
+		 * directly passed up to the pseudo RX ring and handled
+		 * by mac srs created over the pseudo RX ring.
+		 */
+		mac_rx_client_quiesce(port->lp_mch);
+		mac_srs_perm_quiesce(port->lp_mch, B_TRUE);
+	}
+
+	/*
+	 * Add all the unicast addresses to the newly added port.
+	 */
+	for (addr = rx_grp->arg_macaddr; addr != NULL; addr = addr->aua_next) {
+		if ((err = aggr_port_addmac(port, addr->aua_addr)) != 0)
+			break;
+	}
+
+	for (i = 0; err == 0 && i < hw_rh_cnt; i++)
+		err = aggr_add_pseudo_rx_ring(port, rx_grp, hw_rh[i]);
+
+	if (err != 0) {
+		for (j = 0; j < i; j++)
+			aggr_rem_pseudo_rx_ring(rx_grp, hw_rh[j]);
+
+		for (a = rx_grp->arg_macaddr; a != addr; a = a->aua_next)
+			aggr_port_remmac(port, a->aua_addr);
+
+		if (port->lp_hwgh != NULL) {
+			mac_srs_perm_quiesce(port->lp_mch, B_FALSE);
+			mac_rx_client_restart(port->lp_mch);
+			port->lp_hwgh = NULL;
+		}
+	} else {
+		port->lp_grp_added = B_TRUE;
+	}
+done:
+	mac_perim_exit(pmph);
+	return (err);
+}
+
+/*
+ * This function is called by aggr to remove pseudo RX rings over the
+ * HW rings of the underlying port.
+ */
+static void
+aggr_rem_pseudo_rx_group(aggr_port_t *port, aggr_pseudo_rx_group_t *rx_grp)
+{
+	aggr_grp_t		*grp = port->lp_grp;
+	mac_ring_handle_t	hw_rh[MAX_RINGS_PER_GROUP];
+	aggr_unicst_addr_t	*addr;
+	mac_group_handle_t	hwgh;
+	mac_perim_handle_t	pmph;
+	int			hw_rh_cnt, i;
+
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	mac_perim_enter_by_mh(port->lp_mh, &pmph);
+
+	if (!port->lp_grp_added)
+		goto done;
+
+	ASSERT(rx_grp->arg_gh != NULL);
+	hw_rh_cnt = mac_hwrings_get(port->lp_mch, &hwgh, hw_rh);
+
+	/*
+	 * If hw_rh_cnt is 0, it means that the underlying port does not
+	 * support RX rings. Directly return in this case.
+	 */
+	for (i = 0; i < hw_rh_cnt; i++)
+		aggr_rem_pseudo_rx_ring(rx_grp, hw_rh[i]);
+
+	for (addr = rx_grp->arg_macaddr; addr != NULL; addr = addr->aua_next)
+		aggr_port_remmac(port, addr->aua_addr);
+
+	if (port->lp_hwgh != NULL) {
+		port->lp_hwgh = NULL;
+
+		/*
+		 * First clear the permanent-quiesced flag of the RX srs then
+		 * restart the HW ring and the mac srs on the ring. Note that
+		 * the HW ring and associated SRS will soon been removed when
+		 * the port is removed from the aggr.
+		 */
+		mac_srs_perm_quiesce(port->lp_mch, B_FALSE);
+		mac_rx_client_restart(port->lp_mch);
+	}
+
+	port->lp_grp_added = B_FALSE;
+done:
+	mac_perim_exit(pmph);
+}
+
+static int
+aggr_pseudo_disable_intr(mac_intr_handle_t ih)
+{
+	aggr_pseudo_rx_ring_t *rr_ring = (aggr_pseudo_rx_ring_t *)ih;
+	return (mac_hwring_disable_intr(rr_ring->arr_hw_rh));
+}
+
+static int
+aggr_pseudo_enable_intr(mac_intr_handle_t ih)
+{
+	aggr_pseudo_rx_ring_t *rr_ring = (aggr_pseudo_rx_ring_t *)ih;
+	return (mac_hwring_enable_intr(rr_ring->arr_hw_rh));
+}
+
+static int
+aggr_pseudo_start_ring(mac_ring_driver_t arg, uint64_t mr_gen)
+{
+	aggr_pseudo_rx_ring_t *rr_ring = (aggr_pseudo_rx_ring_t *)arg;
+	int err;
+
+	err = mac_hwring_start(rr_ring->arr_hw_rh);
+	if (err == 0)
+		rr_ring->arr_gen = mr_gen;
+	return (err);
+}
+
+static void
+aggr_pseudo_stop_ring(mac_ring_driver_t arg)
+{
+	aggr_pseudo_rx_ring_t *rr_ring = (aggr_pseudo_rx_ring_t *)arg;
+	mac_hwring_stop(rr_ring->arr_hw_rh);
 }
 
 /*
@@ -472,6 +752,7 @@ aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port;
 	boolean_t link_state_changed = B_FALSE;
+	mac_perim_handle_t mph, pmph;
 
 	/* get group corresponding to linkid */
 	rw_enter(&aggr_grp_lock, RW_READER);
@@ -481,10 +762,12 @@ aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
 		return (ENOENT);
 	}
 	AGGR_GRP_REFHOLD(grp);
-	rw_exit(&aggr_grp_lock);
 
-	AGGR_LACP_LOCK_WRITER(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
+	/*
+	 * Hold the perimeter so that the aggregation won't be destroyed.
+	 */
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+	rw_exit(&aggr_grp_lock);
 
 	/* add the specified ports to group */
 	for (i = 0; i < nports; i++) {
@@ -504,29 +787,53 @@ aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
 			goto bail;
 		}
 
+		/*
+		 * Create the pseudo ring for each HW ring of the underlying
+		 * port.
+		 */
+		rc = aggr_add_pseudo_rx_group(port, &grp->lg_rx_group);
+		if (rc != 0)
+			goto bail;
+
+		mac_perim_enter_by_mh(port->lp_mh, &pmph);
+
+		/* set LACP mode */
+		aggr_port_lacp_set_mode(grp, port);
+
 		/* start port if group has already been started */
 		if (grp->lg_started) {
-			rw_enter(&port->lp_lock, RW_WRITER);
 			rc = aggr_port_start(port);
 			if (rc != 0) {
-				rw_exit(&port->lp_lock);
+				mac_perim_exit(pmph);
 				goto bail;
 			}
 
-			/* set port promiscuous mode */
-			rc = aggr_port_promisc(port, grp->lg_promisc);
-			if (rc != 0) {
-				rw_exit(&port->lp_lock);
-				goto bail;
+			/*
+			 * Turn on the promiscuous mode over the port when it
+			 * is requested to be turned on to receive the
+			 * non-primary address over a port, or the promiscous
+			 * mode is enabled over the aggr.
+			 */
+			if (grp->lg_promisc || port->lp_prom_addr != NULL) {
+				rc = aggr_port_promisc(port, B_TRUE);
+				if (rc != 0) {
+					mac_perim_exit(pmph);
+					goto bail;
+				}
 			}
-			rw_exit(&port->lp_lock);
 		}
+		mac_perim_exit(pmph);
 
 		/*
 		 * Attach each port if necessary.
 		 */
-		if (aggr_port_notify_link(grp, port, B_FALSE))
+		if (aggr_port_notify_link(grp, port))
 			link_state_changed = B_TRUE;
+
+		/*
+		 * Initialize the callback functions for this port.
+		 */
+		aggr_port_init_callbacks(port);
 	}
 
 	/* update the MAC address of the constituent ports */
@@ -539,64 +846,43 @@ aggr_grp_add_ports(datalink_id_t linkid, uint_t nports, boolean_t force,
 bail:
 	if (rc != 0) {
 		/* stop and remove ports that have been added */
-		for (i = 0; i < nadded && !grp->lg_closing; i++) {
+		for (i = 0; i < nadded; i++) {
 			port = aggr_grp_port_lookup(grp, ports[i].lp_linkid);
 			ASSERT(port != NULL);
 			if (grp->lg_started) {
-				rw_enter(&port->lp_lock, RW_WRITER);
+				mac_perim_enter_by_mh(port->lp_mh, &pmph);
+				(void) aggr_port_promisc(port, B_FALSE);
 				aggr_port_stop(port);
-				rw_exit(&port->lp_lock);
+				mac_perim_exit(pmph);
 			}
+			aggr_rem_pseudo_rx_group(port, &grp->lg_rx_group);
 			(void) aggr_grp_rem_port(grp, port, NULL, NULL);
 		}
 	}
 
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
-	if (rc == 0 && !grp->lg_closing)
+	if (rc == 0)
 		mac_resource_update(grp->lg_mh);
+	mac_perim_exit(mph);
 	AGGR_GRP_REFRELE(grp);
 	return (rc);
 }
 
-/*
- * Update properties of an existing link aggregation group.
- */
-int
-aggr_grp_modify(datalink_id_t linkid, aggr_grp_t *grp_arg, uint8_t update_mask,
-    uint32_t policy, boolean_t mac_fixed, const uchar_t *mac_addr,
-    aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer)
+static int
+aggr_grp_modify_common(aggr_grp_t *grp, uint8_t update_mask, uint32_t policy,
+    boolean_t mac_fixed, const uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
+    aggr_lacp_timer_t lacp_timer)
 {
-	int rc = 0;
-	aggr_grp_t *grp = NULL;
 	boolean_t mac_addr_changed = B_FALSE;
 	boolean_t link_state_changed = B_FALSE;
+	mac_perim_handle_t pmph;
 
-	if (grp_arg == NULL) {
-		/* get group corresponding to linkid */
-		rw_enter(&aggr_grp_lock, RW_READER);
-		if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(linkid),
-		    (mod_hash_val_t *)&grp) != 0) {
-			rc = ENOENT;
-			goto bail;
-		}
-		AGGR_LACP_LOCK_WRITER(grp);
-		rw_enter(&grp->lg_lock, RW_WRITER);
-	} else {
-		grp = grp_arg;
-		ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-		ASSERT(RW_WRITE_HELD(&grp->lg_lock));
-	}
-
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock) || RW_READ_HELD(&grp->lg_lock));
-	AGGR_GRP_REFHOLD(grp);
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
 	/* validate fixed address if specified */
 	if ((update_mask & AGGR_MODIFY_MAC) && mac_fixed &&
 	    ((bcmp(aggr_zero_mac, mac_addr, ETHERADDRL) == 0) ||
 	    (mac_addr[0] & 0x01))) {
-		rc = EINVAL;
-		goto bail;
+		return (EINVAL);
 	}
 
 	/* update policy if requested */
@@ -616,11 +902,11 @@ aggr_grp_modify(datalink_id_t linkid, aggr_grp_t *grp_arg, uint8_t update_mask,
 			/* switch from user-supplied to automatic */
 			aggr_port_t *port = grp->lg_ports;
 
-			rw_enter(&port->lp_lock, RW_WRITER);
+			mac_perim_enter_by_mh(port->lp_mh, &pmph);
 			bcopy(port->lp_addr, grp->lg_addr, ETHERADDRL);
 			grp->lg_mac_addr_port = port;
 			mac_addr_changed = B_TRUE;
-			rw_exit(&port->lp_lock);
+			mac_perim_exit(pmph);
 		}
 		grp->lg_addr_fixed = mac_fixed;
 	}
@@ -631,36 +917,51 @@ aggr_grp_modify(datalink_id_t linkid, aggr_grp_t *grp_arg, uint8_t update_mask,
 	if (update_mask & AGGR_MODIFY_LACP_MODE)
 		aggr_lacp_update_mode(grp, lacp_mode);
 
-	if ((update_mask & AGGR_MODIFY_LACP_TIMER) && !grp->lg_closing)
+	if (update_mask & AGGR_MODIFY_LACP_TIMER)
 		aggr_lacp_update_timer(grp, lacp_timer);
 
-bail:
-	if (grp != NULL && !grp->lg_closing) {
-		/*
-		 * If grp_arg is non-NULL, this function is called from
-		 * mac_unicst_set(), and the MAC_NOTE_UNICST notification
-		 * will be sent there.
-		 */
-		if ((grp_arg == NULL) && mac_addr_changed)
-			mac_unicst_update(grp->lg_mh, grp->lg_addr);
+	if (link_state_changed)
+		mac_link_update(grp->lg_mh, grp->lg_link_state);
 
-		if (link_state_changed)
-			mac_link_update(grp->lg_mh, grp->lg_link_state);
+	if (mac_addr_changed)
+		mac_unicst_update(grp->lg_mh, grp->lg_addr);
 
-	}
+	return (0);
+}
 
-	if (grp_arg == NULL) {
-		if (grp != NULL) {
-			rw_exit(&grp->lg_lock);
-			AGGR_LACP_UNLOCK(grp);
-		}
+/*
+ * Update properties of an existing link aggregation group.
+ */
+int
+aggr_grp_modify(datalink_id_t linkid, uint8_t update_mask, uint32_t policy,
+    boolean_t mac_fixed, const uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
+    aggr_lacp_timer_t lacp_timer)
+{
+	aggr_grp_t *grp = NULL;
+	mac_perim_handle_t mph;
+	int err;
+
+	/* get group corresponding to linkid */
+	rw_enter(&aggr_grp_lock, RW_READER);
+	if (mod_hash_find(aggr_grp_hash, GRP_HASH_KEY(linkid),
+	    (mod_hash_val_t *)&grp) != 0) {
 		rw_exit(&aggr_grp_lock);
+		return (ENOENT);
 	}
+	AGGR_GRP_REFHOLD(grp);
 
-	if (grp != NULL)
-		AGGR_GRP_REFRELE(grp);
+	/*
+	 * Hold the perimeter so that the aggregation won't be destroyed.
+	 */
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+	rw_exit(&aggr_grp_lock);
 
-	return (rc);
+	err = aggr_grp_modify_common(grp, update_mask, policy, mac_fixed,
+	    mac_addr, lacp_mode, lacp_timer);
+
+	mac_perim_exit(mph);
+	AGGR_GRP_REFRELE(grp);
+	return (err);
 }
 
 /*
@@ -676,6 +977,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	aggr_port_t *port;
 	mac_register_t *mac;
 	boolean_t link_state_changed;
+	mac_perim_handle_t mph;
 	int err;
 	int i;
 
@@ -695,9 +997,6 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 
 	grp = kmem_cache_alloc(aggr_grp_cache, KM_SLEEP);
 
-	AGGR_LACP_LOCK_WRITER(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
-
 	grp->lg_refs = 1;
 	grp->lg_closing = B_FALSE;
 	grp->lg_force = force;
@@ -707,6 +1006,11 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	grp->lg_link_duplex = LINK_DUPLEX_UNKNOWN;
 	grp->lg_started = B_FALSE;
 	grp->lg_promisc = B_FALSE;
+	grp->lg_lacp_done = B_FALSE;
+	grp->lg_lacp_head = grp->lg_lacp_tail = NULL;
+	grp->lg_lacp_rx_thread = thread_create(NULL, 0,
+	    aggr_lacp_rx_thread, grp, 0, &p0, TS_RUN, minclsyspri);
+	bzero(&grp->lg_rx_group, sizeof (aggr_pseudo_rx_group_t));
 	aggr_lacp_init_grp(grp);
 
 	/* add MAC ports to group */
@@ -723,7 +1027,6 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 		goto bail;
 	}
 	grp->lg_key = key;
-	grp->lg_mcst_list = NULL;
 
 	for (i = 0; i < nports; i++) {
 		err = aggr_grp_add_port(grp, ports[i].lp_linkid, force, NULL);
@@ -748,17 +1051,6 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 		grp->lg_mac_addr_port = grp->lg_ports;
 	}
 
-	/*
-	 * Update the MAC address of the constituent ports.
-	 * None of the port is attached at this time, the link state of the
-	 * aggregation will not change.
-	 */
-	link_state_changed = aggr_grp_update_ports_mac(grp);
-	ASSERT(!link_state_changed);
-
-	/* update outbound load balancing policy */
-	aggr_send_update_policy(grp, policy);
-
 	/* set the initial group capabilities */
 	aggr_grp_capab_set(grp);
 
@@ -775,6 +1067,7 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	mac->m_min_sdu = 0;
 	mac->m_max_sdu = grp->lg_max_sdu = aggr_grp_max_sdu(grp);
 	mac->m_margin = aggr_grp_max_margin(grp);
+	mac->m_v12n = MAC_VIRT_LEVEL1;
 	err = mac_register(mac, &grp->lg_mh);
 	mac_free(mac);
 	if (err != 0)
@@ -782,8 +1075,22 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 
 	if ((err = dls_devnet_create(grp->lg_mh, grp->lg_linkid)) != 0) {
 		(void) mac_unregister(grp->lg_mh);
+		grp->lg_mh = NULL;
 		goto bail;
 	}
+
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+
+	/*
+	 * Update the MAC address of the constituent ports.
+	 * None of the port is attached at this time, the link state of the
+	 * aggregation will not change.
+	 */
+	link_state_changed = aggr_grp_update_ports_mac(grp);
+	ASSERT(!link_state_changed);
+
+	/* update outbound load balancing policy */
+	aggr_send_update_policy(grp, policy);
 
 	/* set LACP mode */
 	aggr_lacp_set_mode(grp, lacp_mode, lacp_timer);
@@ -792,8 +1099,19 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	 * Attach each port if necessary.
 	 */
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		if (aggr_port_notify_link(grp, port, B_FALSE))
+		/*
+		 * Create the pseudo ring for each HW ring of the underlying
+		 * port. Note that this is done after the aggr registers the
+		 * mac.
+		 */
+		VERIFY(aggr_add_pseudo_rx_group(port, &grp->lg_rx_group) == 0);
+		if (aggr_port_notify_link(grp, port))
 			link_state_changed = B_TRUE;
+
+		/*
+		 * Initialize the callback functions for this port.
+		 */
+		aggr_port_init_callbacks(port);
 	}
 
 	if (link_state_changed)
@@ -805,31 +1123,35 @@ aggr_grp_create(datalink_id_t linkid, uint32_t key, uint_t nports,
 	ASSERT(err == 0);
 	aggr_grp_cnt++;
 
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
+	mac_perim_exit(mph);
 	rw_exit(&aggr_grp_lock);
 	return (0);
 
 bail:
-	if (grp != NULL) {
+
+	grp->lg_closing = B_TRUE;
+
+	port = grp->lg_ports;
+	while (port != NULL) {
 		aggr_port_t *cport;
 
-		grp->lg_closing = B_TRUE;
-
-		port = grp->lg_ports;
-		while (port != NULL) {
-			cport = port->lp_next;
-			aggr_port_delete(port);
-			port = cport;
-		}
-
-		rw_exit(&grp->lg_lock);
-		AGGR_LACP_UNLOCK(grp);
-
-		AGGR_GRP_REFRELE(grp);
+		cport = port->lp_next;
+		aggr_port_delete(port);
+		port = cport;
 	}
 
+	/*
+	 * Inform the lacp_rx thread to exit.
+	 */
+	mutex_enter(&grp->lg_lacp_lock);
+	grp->lg_lacp_done = B_TRUE;
+	cv_signal(&grp->lg_lacp_cv);
+	while (grp->lg_lacp_rx_thread != NULL)
+		cv_wait(&grp->lg_lacp_cv, &grp->lg_lacp_lock);
+	mutex_exit(&grp->lg_lacp_lock);
+
 	rw_exit(&aggr_grp_lock);
+	AGGR_GRP_REFRELE(grp);
 	return (err);
 }
 
@@ -841,7 +1163,7 @@ aggr_grp_port_lookup(aggr_grp_t *grp, datalink_id_t linkid)
 {
 	aggr_port_t *port;
 
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock) || RW_READ_HELD(&grp->lg_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
 		if (port->lp_linkid == linkid)
@@ -862,12 +1184,12 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	aggr_port_t **pport;
 	boolean_t mac_addr_changed = B_FALSE;
 	boolean_t link_state_changed = B_FALSE;
+	mac_perim_handle_t mph;
 	uint64_t val;
 	uint_t i;
 	uint_t stat;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 	ASSERT(grp->lg_nports > 1);
 	ASSERT(!grp->lg_closing);
 
@@ -881,9 +1203,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	}
 	*pport = port->lp_next;
 
-	atomic_add_32(&port->lp_closing, 1);
-
-	rw_enter(&port->lp_lock, RW_WRITER);
+	mac_perim_enter_by_mh(port->lp_mh, &mph);
 
 	/*
 	 * If the MAC address of the port being removed was assigned
@@ -900,7 +1220,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 		mac_addr_changed = B_TRUE;
 	}
 
-	link_state_changed = aggr_grp_detach_port(grp, port, B_FALSE);
+	link_state_changed = aggr_grp_detach_port(grp, port);
 
 	/*
 	 * Add the counter statistics of the ports while it was aggregated
@@ -909,7 +1229,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	 * value of the counter at the moment it was added to the
 	 * aggregation.
 	 */
-	for (i = 0; i < MAC_NSTAT && !grp->lg_closing; i++) {
+	for (i = 0; i < MAC_NSTAT; i++) {
 		stat = i + MAC_STAT_MIN;
 		if (!MAC_STAT_ISACOUNTER(stat))
 			continue;
@@ -917,7 +1237,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 		val -= port->lp_stat[i];
 		grp->lg_stat[i] += val;
 	}
-	for (i = 0; i < ETHER_NSTAT && !grp->lg_closing; i++) {
+	for (i = 0; i < ETHER_NSTAT; i++) {
 		stat = i + MACTYPE_STAT_MIN;
 		if (!ETHER_STAT_ISACOUNTER(stat))
 			continue;
@@ -927,8 +1247,7 @@ aggr_grp_rem_port(aggr_grp_t *grp, aggr_port_t *port,
 	}
 
 	grp->lg_nports--;
-
-	rw_exit(&port->lp_lock);
+	mac_perim_exit(mph);
 
 	aggr_port_delete(port);
 
@@ -960,6 +1279,7 @@ aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 	aggr_port_t *port;
 	boolean_t mac_addr_update = B_FALSE, mac_addr_changed;
 	boolean_t link_state_update = B_FALSE, link_state_changed;
+	mac_perim_handle_t mph, pmph;
 
 	/* get group corresponding to linkid */
 	rw_enter(&aggr_grp_lock, RW_READER);
@@ -969,10 +1289,12 @@ aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 		return (ENOENT);
 	}
 	AGGR_GRP_REFHOLD(grp);
-	rw_exit(&aggr_grp_lock);
 
-	AGGR_LACP_LOCK_WRITER(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
+	/*
+	 * Hold the perimeter so that the aggregation won't be destroyed.
+	 */
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+	rw_exit(&aggr_grp_lock);
 
 	/* we need to keep at least one port per group */
 	if (nports >= grp->lg_nports) {
@@ -989,20 +1311,51 @@ aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 		}
 	}
 
+	/* clear the promiscous mode for the specified ports */
+	for (i = 0; i < nports && rc == 0; i++) {
+		/* lookup port */
+		port = aggr_grp_port_lookup(grp, ports[i].lp_linkid);
+		ASSERT(port != NULL);
+
+		mac_perim_enter_by_mh(port->lp_mh, &pmph);
+		rc = aggr_port_promisc(port, B_FALSE);
+		mac_perim_exit(pmph);
+	}
+	if (rc != 0) {
+		for (i = 0; i < nports; i++) {
+			port = aggr_grp_port_lookup(grp,
+			    ports[i].lp_linkid);
+			ASSERT(port != NULL);
+
+			/*
+			 * Turn the promiscuous mode back on if it is required
+			 * to receive the non-primary address over a port, or
+			 * the promiscous mode is enabled over the aggr.
+			 */
+			mac_perim_enter_by_mh(port->lp_mh, &pmph);
+			if (port->lp_started && (grp->lg_promisc ||
+			    port->lp_prom_addr != NULL)) {
+				(void) aggr_port_promisc(port, B_TRUE);
+			}
+			mac_perim_exit(pmph);
+		}
+		goto bail;
+	}
+
 	/* remove the specified ports from group */
-	for (i = 0; i < nports && !grp->lg_closing; i++) {
+	for (i = 0; i < nports; i++) {
 		/* lookup port */
 		port = aggr_grp_port_lookup(grp, ports[i].lp_linkid);
 		ASSERT(port != NULL);
 
 		/* stop port if group has already been started */
 		if (grp->lg_started) {
-			rw_enter(&port->lp_lock, RW_WRITER);
-			aggr_lacp_port_detached(port);
+			mac_perim_enter_by_mh(port->lp_mh, &pmph);
 			aggr_port_stop(port);
-			rw_exit(&port->lp_lock);
+			mac_perim_exit(pmph);
 		}
 
+		aggr_rem_pseudo_rx_group(port, &grp->lg_rx_group);
 		/* remove port from group */
 		rc = aggr_grp_rem_port(grp, port, &mac_addr_changed,
 		    &link_state_changed);
@@ -1012,16 +1365,14 @@ aggr_grp_rem_ports(datalink_id_t linkid, uint_t nports, laioc_port_t *ports)
 	}
 
 bail:
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
-	if (!grp->lg_closing) {
-		if (mac_addr_update)
-			mac_unicst_update(grp->lg_mh, grp->lg_addr);
-		if (link_state_update)
-			mac_link_update(grp->lg_mh, grp->lg_link_state);
-		if (rc == 0)
-			mac_resource_update(grp->lg_mh);
-	}
+	if (mac_addr_update)
+		mac_unicst_update(grp->lg_mh, grp->lg_addr);
+	if (link_state_update)
+		mac_link_update(grp->lg_mh, grp->lg_link_state);
+	if (rc == 0)
+		mac_resource_update(grp->lg_mh);
+
+	mac_perim_exit(mph);
 	AGGR_GRP_REFRELE(grp);
 
 	return (rc);
@@ -1032,9 +1383,9 @@ aggr_grp_delete(datalink_id_t linkid)
 {
 	aggr_grp_t *grp = NULL;
 	aggr_port_t *port, *cport;
-	lg_mcst_addr_t *mcst, *mcst_nextp;
 	datalink_id_t tmpid;
 	mod_hash_val_t val;
+	mac_perim_handle_t mph, pmph;
 	int err;
 
 	rw_enter(&aggr_grp_lock, RW_WRITER);
@@ -1051,68 +1402,69 @@ aggr_grp_delete(datalink_id_t linkid)
 	 * aggr_m_stat() and thus has a kstat_hold() on the kstats that
 	 * dls_devnet_destroy() needs to delete.
 	 */
-	if ((err = dls_devnet_destroy(grp->lg_mh, &tmpid)) != 0) {
+	if ((err = dls_devnet_destroy(grp->lg_mh, &tmpid, B_TRUE)) != 0) {
 		rw_exit(&aggr_grp_lock);
 		return (err);
 	}
 	ASSERT(linkid == tmpid);
-
-	AGGR_LACP_LOCK_WRITER(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
 
 	/*
 	 * Unregister from the MAC service module. Since this can
 	 * fail if a client hasn't closed the MAC port, we gracefully
 	 * fail the operation.
 	 */
-	grp->lg_closing = B_TRUE;
 	if ((err = mac_disable(grp->lg_mh)) != 0) {
-		grp->lg_closing = B_FALSE;
-		rw_exit(&grp->lg_lock);
-		AGGR_LACP_UNLOCK(grp);
-
 		(void) dls_devnet_create(grp->lg_mh, linkid);
 		rw_exit(&aggr_grp_lock);
 		return (err);
 	}
-
-	/*
-	 * Free the list of multicast addresses.
-	 */
-	for (mcst = grp->lg_mcst_list; mcst != NULL; mcst = mcst_nextp) {
-		mcst_nextp = mcst->lg_mcst_nextp;
-		kmem_free(mcst, sizeof (lg_mcst_addr_t));
-	}
-	grp->lg_mcst_list = NULL;
-
-	/* detach and free MAC ports associated with group */
-	port = grp->lg_ports;
-	while (port != NULL) {
-		cport = port->lp_next;
-		rw_enter(&port->lp_lock, RW_WRITER);
-		aggr_lacp_port_detached(port);
-		if (grp->lg_started)
-			aggr_port_stop(port);
-		(void) aggr_grp_detach_port(grp, port, B_FALSE);
-		rw_exit(&port->lp_lock);
-		aggr_port_delete(port);
-		port = cport;
-	}
-
-	VERIFY(mac_unregister(grp->lg_mh) == 0);
-
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
-
 	(void) mod_hash_remove(aggr_grp_hash, GRP_HASH_KEY(linkid), &val);
 	ASSERT(grp == (aggr_grp_t *)val);
 
 	ASSERT(aggr_grp_cnt > 0);
 	aggr_grp_cnt--;
-
 	rw_exit(&aggr_grp_lock);
-	AGGR_GRP_REFRELE(grp);
 
+	/*
+	 * Inform the lacp_rx thread to exit.
+	 */
+	mutex_enter(&grp->lg_lacp_lock);
+	grp->lg_lacp_done = B_TRUE;
+	cv_signal(&grp->lg_lacp_cv);
+	while (grp->lg_lacp_rx_thread != NULL)
+		cv_wait(&grp->lg_lacp_cv, &grp->lg_lacp_lock);
+	mutex_exit(&grp->lg_lacp_lock);
+
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+
+	grp->lg_closing = B_TRUE;
+	/* detach and free MAC ports associated with group */
+	port = grp->lg_ports;
+	while (port != NULL) {
+		cport = port->lp_next;
+		mac_perim_enter_by_mh(port->lp_mh, &pmph);
+		if (grp->lg_started)
+			aggr_port_stop(port);
+		(void) aggr_grp_detach_port(grp, port);
+		mac_perim_exit(pmph);
+		aggr_rem_pseudo_rx_group(port, &grp->lg_rx_group);
+		aggr_port_delete(port);
+		port = cport;
+	}
+
+	mac_perim_exit(mph);
+
+	/*
+	 * Wait for the port's lacp timer thread and its notification callback
+	 * to exit before calling mac_unregister() since both needs to access
+	 * the mac perimeter of the grp.
+	 */
+	aggr_grp_port_wait(grp);
+
+	VERIFY(mac_unregister(grp->lg_mh) == 0);
+	grp->lg_mh = NULL;
+
+	AGGR_GRP_REFRELE(grp);
 	return (0);
 }
 
@@ -1120,6 +1472,7 @@ void
 aggr_grp_free(aggr_grp_t *grp)
 {
 	ASSERT(grp->lg_refs == 0);
+	ASSERT(grp->lg_port_ref == 0);
 	if (grp->lg_key > AGGR_MAX_KEY) {
 		id_free(key_ids, grp->lg_key);
 		grp->lg_key = 0;
@@ -1134,6 +1487,7 @@ aggr_grp_info(datalink_id_t linkid, void *fn_arg,
 {
 	aggr_grp_t	*grp;
 	aggr_port_t	*port;
+	mac_perim_handle_t mph, pmph;
 	int		rc = 0;
 
 	rw_enter(&aggr_grp_lock, RW_READER);
@@ -1143,8 +1497,10 @@ aggr_grp_info(datalink_id_t linkid, void *fn_arg,
 		rw_exit(&aggr_grp_lock);
 		return (ENOENT);
 	}
+	AGGR_GRP_REFHOLD(grp);
 
-	rw_enter(&grp->lg_lock, RW_READER);
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+	rw_exit(&aggr_grp_lock);
 
 	rc = new_grp_fn(fn_arg, grp->lg_linkid,
 	    (grp->lg_key > AGGR_MAX_KEY) ? 0 : grp->lg_key, grp->lg_addr,
@@ -1155,30 +1511,19 @@ aggr_grp_info(datalink_id_t linkid, void *fn_arg,
 		goto bail;
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		rw_enter(&port->lp_lock, RW_READER);
+		mac_perim_enter_by_mh(port->lp_mh, &pmph);
 		rc = new_port_fn(fn_arg, port->lp_linkid, port->lp_addr,
 		    port->lp_state, &port->lp_lacp.ActorOperPortState);
-		rw_exit(&port->lp_lock);
+		mac_perim_exit(pmph);
 
 		if (rc != 0)
 			goto bail;
 	}
 
 bail:
-	rw_exit(&grp->lg_lock);
-	rw_exit(&aggr_grp_lock);
+	mac_perim_exit(mph);
+	AGGR_GRP_REFRELE(grp);
 	return (rc);
-}
-
-static void
-aggr_m_resources(void *arg)
-{
-	aggr_grp_t *grp = arg;
-	aggr_port_t *port;
-
-	/* Call each port's m_resources function */
-	for (port = grp->lg_ports; port != NULL; port = port->lp_next)
-		mac_resources(port->lp_mh);
 }
 
 /*ARGSUSED*/
@@ -1230,10 +1575,11 @@ aggr_grp_stat(aggr_grp_t *grp, uint_t stat, uint64_t *val)
 static int
 aggr_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
-	aggr_grp_t	*grp = arg;
-	int		rval = 0;
+	aggr_grp_t		*grp = arg;
+	mac_perim_handle_t	mph;
+	int			rval = 0;
 
-	rw_enter(&grp->lg_lock, RW_READER);
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
@@ -1253,7 +1599,7 @@ aggr_m_stat(void *arg, uint_t stat, uint64_t *val)
 		rval = aggr_grp_stat(grp, stat, val);
 	}
 
-	rw_exit(&grp->lg_lock);
+	mac_perim_exit(mph);
 	return (rval);
 }
 
@@ -1262,9 +1608,9 @@ aggr_m_start(void *arg)
 {
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port;
+	mac_perim_handle_t mph, pmph;
 
-	AGGR_LACP_LOCK_WRITER(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 
 	/*
 	 * Attempts to start all configured members of the group.
@@ -1272,23 +1618,27 @@ aggr_m_start(void *arg)
 	 * is received.
 	 */
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		rw_enter(&port->lp_lock, RW_WRITER);
+		mac_perim_enter_by_mh(port->lp_mh, &pmph);
 		if (aggr_port_start(port) != 0) {
-			rw_exit(&port->lp_lock);
+			mac_perim_exit(pmph);
 			continue;
 		}
 
-		/* set port promiscuous mode */
-		if (aggr_port_promisc(port, grp->lg_promisc) != 0)
-			aggr_port_stop(port);
-		rw_exit(&port->lp_lock);
+		/*
+		 * Turn on the promiscuous mode if it is required to receive
+		 * the non-primary address over a port, or the promiscous
+		 * mode is enabled over the aggr.
+		 */
+		if (grp->lg_promisc || port->lp_prom_addr != NULL) {
+			if (aggr_port_promisc(port, B_TRUE) != 0)
+				aggr_port_stop(port);
+		}
+		mac_perim_exit(pmph);
 	}
 
 	grp->lg_started = B_TRUE;
 
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
-
+	mac_perim_exit(mph);
 	return (0);
 }
 
@@ -1297,21 +1647,22 @@ aggr_m_stop(void *arg)
 {
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port;
+	mac_perim_handle_t mph, pmph;
 
-	AGGR_LACP_LOCK_WRITER(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		rw_enter(&port->lp_lock, RW_WRITER);
-		aggr_lacp_port_detached(port);
+		mac_perim_enter_by_mh(port->lp_mh, &pmph);
+
+		/* reset port promiscuous mode */
+		(void) aggr_port_promisc(port, B_FALSE);
+
 		aggr_port_stop(port);
-		rw_exit(&port->lp_lock);
+		mac_perim_exit(pmph);
 	}
 
 	grp->lg_started = B_FALSE;
-
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
+	mac_perim_exit(mph);
 }
 
 static int
@@ -1320,10 +1671,10 @@ aggr_m_promisc(void *arg, boolean_t on)
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port;
 	boolean_t link_state_changed = B_FALSE;
+	mac_perim_handle_t mph, pmph;
 
-	AGGR_LACP_LOCK_WRITER(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
 	AGGR_GRP_REFHOLD(grp);
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 
 	ASSERT(!grp->lg_closing);
 
@@ -1331,25 +1682,30 @@ aggr_m_promisc(void *arg, boolean_t on)
 		goto bail;
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		rw_enter(&port->lp_lock, RW_WRITER);
+		int	err = 0;
+
+		mac_perim_enter_by_mh(port->lp_mh, &pmph);
 		AGGR_PORT_REFHOLD(port);
-		if (port->lp_started) {
-			if (aggr_port_promisc(port, on) != 0) {
-				if (aggr_grp_detach_port(grp, port, B_TRUE))
-					link_state_changed = B_TRUE;
-			} else {
-				/*
-				 * If a port was detached because of a previous
-				 * failure changing the promiscuity, the port
-				 * is reattached when it successfully changes
-				 * the promiscuity now, and this might cause
-				 * the link state of the aggregation to change.
-				 */
-				if (aggr_grp_attach_port(grp, port))
-					link_state_changed = B_TRUE;
-			}
+		if (!on && (port->lp_prom_addr == NULL))
+			err = aggr_port_promisc(port, B_FALSE);
+		else if (on && port->lp_started)
+			err = aggr_port_promisc(port, B_TRUE);
+
+		if (err != 0) {
+			if (aggr_grp_detach_port(grp, port))
+				link_state_changed = B_TRUE;
+		} else {
+			/*
+			 * If a port was detached because of a previous
+			 * failure changing the promiscuity, the port
+			 * is reattached when it successfully changes
+			 * the promiscuity now, and this might cause
+			 * the link state of the aggregation to change.
+			 */
+			if (aggr_grp_attach_port(grp, port))
+				link_state_changed = B_TRUE;
 		}
-		rw_exit(&port->lp_lock);
+		mac_perim_exit(pmph);
 		AGGR_PORT_REFRELE(port);
 	}
 
@@ -1359,11 +1715,47 @@ aggr_m_promisc(void *arg, boolean_t on)
 		mac_link_update(grp->lg_mh, grp->lg_link_state);
 
 bail:
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
+	mac_perim_exit(mph);
 	AGGR_GRP_REFRELE(grp);
 
 	return (0);
+}
+
+static void
+aggr_grp_port_rename(const char *new_name, void *arg)
+{
+	/*
+	 * aggr port's mac client name is the format of "aggr link name" plus
+	 * AGGR_PORT_NAME_DELIMIT plus "underneath link name".
+	 */
+	int aggr_len, link_len, clnt_name_len, i;
+	char *str_end, *str_st, *str_del;
+	char aggr_name[MAXNAMELEN];
+	char link_name[MAXNAMELEN];
+	char *clnt_name;
+	aggr_grp_t *aggr_grp = arg;
+	aggr_port_t *aggr_port = aggr_grp->lg_ports;
+
+	for (i = 0; i < aggr_grp->lg_nports; i++) {
+		clnt_name = mac_client_name(aggr_port->lp_mch);
+		clnt_name_len = strlen(clnt_name);
+		str_st = clnt_name;
+		str_end = &(clnt_name[clnt_name_len]);
+		str_del = strchr(str_st, AGGR_PORT_NAME_DELIMIT);
+		ASSERT(str_del != NULL);
+		aggr_len = (intptr_t)((uintptr_t)str_del - (uintptr_t)str_st);
+		link_len = (intptr_t)((uintptr_t)str_end - (uintptr_t)str_del);
+		bzero(aggr_name, MAXNAMELEN);
+		bzero(link_name, MAXNAMELEN);
+		bcopy(clnt_name, aggr_name, aggr_len);
+		bcopy(str_del, link_name, link_len + 1);
+		bzero(clnt_name, MAXNAMELEN);
+		(void) snprintf(clnt_name, MAXNAMELEN, "%s%s", new_name,
+		    link_name);
+
+		(void) mac_rename_primary(aggr_port->lp_mh, NULL);
+		aggr_port = aggr_port->lp_next;
+	}
 }
 
 /*
@@ -1381,51 +1773,245 @@ aggr_m_capab_get(void *arg, mac_capab_t cap, void *cap_data)
 		*hcksum_txflags = grp->lg_hcksum_txflags;
 		break;
 	}
-	case MAC_CAPAB_POLL:
-		/*
-		 * There's nothing for us to fill in, we simply return
-		 * B_TRUE or B_FALSE to represent the group's support
-		 * status for this capability.
-		 */
-		return (grp->lg_gldv3_polling);
 	case MAC_CAPAB_NO_NATIVEVLAN:
 		return (!grp->lg_vlan);
 	case MAC_CAPAB_NO_ZCOPY:
 		return (!grp->lg_zcopy);
+	case MAC_CAPAB_RINGS: {
+		mac_capab_rings_t *cap_rings = cap_data;
+
+		if (cap_rings->mr_type == MAC_RING_TYPE_RX) {
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+			cap_rings->mr_rnum = grp->lg_rx_group.arg_ring_cnt;
+			cap_rings->mr_rget = aggr_fill_ring;
+
+			/*
+			 * An aggregation advertises only one (pseudo) RX
+			 * group, which virtualizes the main/primary group of
+			 * the underlying devices.
+			 */
+			cap_rings->mr_gnum = 1;
+			cap_rings->mr_gget = aggr_fill_group;
+			cap_rings->mr_gaddring = NULL;
+			cap_rings->mr_gremring = NULL;
+		} else {
+			return (B_FALSE);
+		}
+		break;
+	}
+	case MAC_CAPAB_AGGR:
+	{
+		mac_capab_aggr_t *aggr_cap;
+
+		if (cap_data != NULL) {
+			aggr_cap = cap_data;
+			aggr_cap->mca_rename_fn = aggr_grp_port_rename;
+			aggr_cap->mca_unicst = aggr_m_unicst;
+		}
+		return (B_TRUE);
+	}
 	default:
 		return (B_FALSE);
 	}
 	return (B_TRUE);
 }
 
-static int
-aggr_grp_multicst(aggr_grp_t *grp, boolean_t add, const uint8_t *addrp)
+/*
+ * Callback funtion for MAC layer to register groups.
+ */
+static void
+aggr_fill_group(void *arg, mac_ring_type_t rtype, const int index,
+    mac_group_info_t *infop, mac_group_handle_t gh)
 {
-	lg_mcst_addr_t	*mcst, **ppmcst;
+	aggr_grp_t *grp = arg;
+	aggr_pseudo_rx_group_t *rx_group;
 
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(rtype == MAC_RING_TYPE_RX && index == 0);
+	rx_group = &grp->lg_rx_group;
+	rx_group->arg_gh = gh;
+	rx_group->arg_grp = grp;
 
-	for (ppmcst = &(grp->lg_mcst_list); (mcst = *ppmcst) != NULL;
-	    ppmcst = &(mcst->lg_mcst_nextp)) {
-		if (bcmp(mcst->lg_mcst_addr, addrp, MAXMACADDRLEN) == 0)
+	infop->mgi_driver = (mac_group_driver_t)rx_group;
+	infop->mgi_start = NULL;
+	infop->mgi_stop = NULL;
+	infop->mgi_addmac = aggr_addmac;
+	infop->mgi_remmac = aggr_remmac;
+	infop->mgi_count = rx_group->arg_ring_cnt;
+}
+
+/*
+ * Callback funtion for MAC layer to register all rings.
+ */
+static void
+aggr_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
+    const int index, mac_ring_info_t *infop, mac_ring_handle_t rh)
+{
+	aggr_grp_t	*grp = arg;
+
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		aggr_pseudo_rx_group_t	*rx_group = &grp->lg_rx_group;
+		aggr_pseudo_rx_ring_t	*rx_ring;
+		mac_intr_t		aggr_mac_intr;
+
+		ASSERT(rg_index == 0);
+
+		ASSERT((index >= 0) && (index < rx_group->arg_ring_cnt));
+		rx_ring = rx_group->arg_rings + index;
+		rx_ring->arr_rh = rh;
+
+		/*
+		 * Entrypoint to enable interrupt (disable poll) and
+		 * disable interrupt (enable poll).
+		 */
+		aggr_mac_intr.mi_handle = (mac_intr_handle_t)rx_ring;
+		aggr_mac_intr.mi_enable = aggr_pseudo_enable_intr;
+		aggr_mac_intr.mi_disable = aggr_pseudo_disable_intr;
+
+		infop->mri_driver = (mac_ring_driver_t)rx_ring;
+		infop->mri_start = aggr_pseudo_start_ring;
+		infop->mri_stop = aggr_pseudo_stop_ring;
+
+		infop->mri_intr = aggr_mac_intr;
+		infop->mri_poll = aggr_rx_poll;
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+static mblk_t *
+aggr_rx_poll(void *arg, int bytes_to_pickup)
+{
+	aggr_pseudo_rx_ring_t *rr_ring = arg;
+	aggr_port_t *port = rr_ring->arr_port;
+	aggr_grp_t *grp = port->lp_grp;
+	mblk_t *mp_chain, *mp, **mpp;
+
+	mp_chain = mac_hwring_poll(rr_ring->arr_hw_rh, bytes_to_pickup);
+
+	if (grp->lg_lacp_mode == AGGR_LACP_OFF)
+		return (mp_chain);
+
+	mpp = &mp_chain;
+	while ((mp = *mpp) != NULL) {
+		if (MBLKL(mp) >= sizeof (struct ether_header)) {
+			struct ether_header *ehp;
+
+			ehp = (struct ether_header *)mp->b_rptr;
+			if (ntohs(ehp->ether_type) == ETHERTYPE_SLOW) {
+				*mpp = mp->b_next;
+				mp->b_next = NULL;
+				aggr_recv_lacp(port,
+				    (mac_resource_handle_t)rr_ring, mp);
+				continue;
+			}
+		}
+
+		if (!port->lp_collector_enabled) {
+			*mpp = mp->b_next;
+			mp->b_next = NULL;
+			freemsg(mp);
+			continue;
+		}
+		mpp = &mp->b_next;
+	}
+	return (mp_chain);
+}
+
+static int
+aggr_addmac(void *arg, const uint8_t *mac_addr)
+{
+	aggr_pseudo_rx_group_t	*rx_group = (aggr_pseudo_rx_group_t *)arg;
+	aggr_unicst_addr_t	*addr, **pprev;
+	aggr_grp_t		*grp = rx_group->arg_grp;
+	aggr_port_t		*port, *p;
+	mac_perim_handle_t	mph;
+	int			err = 0;
+
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+
+	if (bcmp(mac_addr, grp->lg_addr, ETHERADDRL) == 0) {
+		mac_perim_exit(mph);
+		return (0);
+	}
+
+	/*
+	 * Insert this mac address into the list of mac addresses owned by
+	 * the aggregation pseudo group.
+	 */
+	pprev = &rx_group->arg_macaddr;
+	while ((addr = *pprev) != NULL) {
+		if (bcmp(mac_addr, addr->aua_addr, ETHERADDRL) == 0) {
+			mac_perim_exit(mph);
+			return (EEXIST);
+		}
+		pprev = &addr->aua_next;
+	}
+	addr = kmem_alloc(sizeof (aggr_unicst_addr_t), KM_SLEEP);
+	bcopy(mac_addr, addr->aua_addr, ETHERADDRL);
+	addr->aua_next = NULL;
+	*pprev = addr;
+
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next)
+		if ((err = aggr_port_addmac(port, mac_addr)) != 0)
 			break;
+
+	if (err != 0) {
+		for (p = grp->lg_ports; p != port; p = p->lp_next)
+			aggr_port_remmac(p, mac_addr);
+
+		*pprev = NULL;
+		kmem_free(addr, sizeof (aggr_unicst_addr_t));
 	}
 
-	if (add) {
-		if (mcst != NULL)
-			return (0);
-		mcst = kmem_zalloc(sizeof (lg_mcst_addr_t), KM_NOSLEEP);
-		if (mcst == NULL)
-			return (ENOMEM);
-		bcopy(addrp, mcst->lg_mcst_addr, MAXMACADDRLEN);
-		*ppmcst = mcst;
-	} else {
-		if (mcst == NULL)
-			return (ENOENT);
-		*ppmcst = mcst->lg_mcst_nextp;
-		kmem_free(mcst, sizeof (lg_mcst_addr_t));
+	mac_perim_exit(mph);
+	return (err);
+}
+
+static int
+aggr_remmac(void *arg, const uint8_t *mac_addr)
+{
+	aggr_pseudo_rx_group_t	*rx_group = (aggr_pseudo_rx_group_t *)arg;
+	aggr_unicst_addr_t	*addr, **pprev;
+	aggr_grp_t		*grp = rx_group->arg_grp;
+	aggr_port_t		*port;
+	mac_perim_handle_t	mph;
+	int			err = 0;
+
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+
+	if (bcmp(mac_addr, grp->lg_addr, ETHERADDRL) == 0) {
+		mac_perim_exit(mph);
+		return (0);
 	}
-	return (0);
+
+	/*
+	 * Insert this mac address into the list of mac addresses owned by
+	 * the aggregation pseudo group.
+	 */
+	pprev = &rx_group->arg_macaddr;
+	while ((addr = *pprev) != NULL) {
+		if (bcmp(mac_addr, addr->aua_addr, ETHERADDRL) != 0) {
+			pprev = &addr->aua_next;
+			continue;
+		}
+		break;
+	}
+	if (addr == NULL) {
+		mac_perim_exit(mph);
+		return (EINVAL);
+	}
+
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next)
+		aggr_port_remmac(port, mac_addr);
+
+	*pprev = addr->aua_next;
+	kmem_free(addr, sizeof (aggr_unicst_addr_t));
+
+	mac_perim_exit(mph);
+	return (err);
 }
 
 /*
@@ -1438,17 +2024,14 @@ void
 aggr_grp_multicst_port(aggr_port_t *port, boolean_t add)
 {
 	aggr_grp_t *grp = port->lp_grp;
-	lg_mcst_addr_t	*mcst;
 
-	ASSERT(RW_WRITE_HELD(&port->lp_lock));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock) || RW_READ_HELD(&grp->lg_lock));
+	ASSERT(MAC_PERIM_HELD(port->lp_mh));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
 	if (!port->lp_started)
 		return;
 
-	for (mcst = grp->lg_mcst_list; mcst != NULL;
-	    mcst = mcst->lg_mcst_nextp)
-		(void) aggr_port_multicst(port, add, mcst->lg_mcst_addr);
+	mac_multicast_refresh(grp->lg_mh, aggr_port_multicst, port, add);
 }
 
 static int
@@ -1456,19 +2039,18 @@ aggr_m_multicst(void *arg, boolean_t add, const uint8_t *addrp)
 {
 	aggr_grp_t *grp = arg;
 	aggr_port_t *port = NULL;
+	mac_perim_handle_t mph;
 	int err = 0, cerr;
 
-	rw_enter(&grp->lg_lock, RW_WRITER);
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
 		if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
 			continue;
 		cerr = aggr_port_multicst(port, add, addrp);
-		if (cerr == 0)
-			(void) aggr_grp_multicst(grp, add, addrp);
 		if (cerr != 0 && err == 0)
 			err = cerr;
 	}
-	rw_exit(&grp->lg_lock);
+	mac_perim_exit(mph);
 	return (err);
 }
 
@@ -1476,16 +2058,14 @@ static int
 aggr_m_unicst(void *arg, const uint8_t *macaddr)
 {
 	aggr_grp_t *grp = arg;
-	int rc;
+	mac_perim_handle_t mph;
+	int err;
 
-	AGGR_LACP_LOCK_WRITER(grp);
-	rw_enter(&grp->lg_lock, RW_WRITER);
-	rc = aggr_grp_modify(0, grp, AGGR_MODIFY_MAC, 0, B_TRUE, macaddr,
+	mac_perim_enter_by_mh(grp->lg_mh, &mph);
+	err = aggr_grp_modify_common(grp, AGGR_MODIFY_MAC, 0, B_TRUE, macaddr,
 	    0, 0);
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
-
-	return (rc);
+	mac_perim_exit(mph);
+	return (err);
 }
 
 /*
@@ -1498,11 +2078,10 @@ aggr_grp_capab_set(aggr_grp_t *grp)
 	uint32_t cksum;
 	aggr_port_t *port;
 
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(grp->lg_mh == NULL);
 	ASSERT(grp->lg_ports != NULL);
 
 	grp->lg_hcksum_txflags = (uint32_t)-1;
-	grp->lg_gldv3_polling = B_TRUE;
 	grp->lg_zcopy = B_TRUE;
 	grp->lg_vlan = B_TRUE;
 
@@ -1516,9 +2095,6 @@ aggr_grp_capab_set(aggr_grp_t *grp)
 
 		grp->lg_zcopy &=
 		    !mac_capab_get(port->lp_mh, MAC_CAPAB_NO_ZCOPY, NULL);
-
-		grp->lg_gldv3_polling &=
-		    mac_capab_get(port->lp_mh, MAC_CAPAB_POLL, NULL);
 	}
 }
 
@@ -1551,11 +2127,6 @@ aggr_grp_capab_check(aggr_grp_t *grp, aggr_port_t *port)
 		return (B_FALSE);
 	}
 
-	if (mac_capab_get(port->lp_mh, MAC_CAPAB_POLL, NULL) !=
-	    grp->lg_gldv3_polling) {
-		return (B_FALSE);
-	}
-
 	return (B_TRUE);
 }
 
@@ -1568,7 +2139,7 @@ aggr_grp_max_sdu(aggr_grp_t *grp)
 	uint_t max_sdu = (uint_t)-1;
 	aggr_port_t *port;
 
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(grp->lg_mh == NULL);
 	ASSERT(grp->lg_ports != NULL);
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
@@ -1605,7 +2176,7 @@ aggr_grp_max_margin(aggr_grp_t *grp)
 	uint32_t margin = UINT32_MAX;
 	aggr_port_t *port;
 
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(grp->lg_mh == NULL);
 	ASSERT(grp->lg_ports != NULL);
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {

@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *	http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "igb_sw.h"
 
@@ -42,7 +42,7 @@ static tx_control_block_t *igb_get_free_list(igb_tx_ring_t *);
 static void igb_get_hcksum_context(mblk_t *, hcksum_context_t *);
 static boolean_t igb_check_hcksum_context(igb_tx_ring_t *, hcksum_context_t *);
 static void igb_fill_hcksum_context(struct e1000_adv_tx_context_desc *,
-    hcksum_context_t *);
+    hcksum_context_t *, uint32_t);
 
 #ifndef IGB_DEBUG
 #pragma inline(igb_save_desc)
@@ -51,58 +51,14 @@ static void igb_fill_hcksum_context(struct e1000_adv_tx_context_desc *,
 #pragma inline(igb_fill_hcksum_context)
 #endif
 
-/*
- * igb_m_tx
- *
- * The GLDv3 interface to call driver's tx routine to transmit
- * the mblks.
- */
 mblk_t *
-igb_m_tx(void *arg, mblk_t *mp)
+igb_tx_ring_send(void *arg, mblk_t *mp)
 {
-	igb_t *igb = (igb_t *)arg;
-	mblk_t *next;
-	igb_tx_ring_t *tx_ring;
+	igb_tx_ring_t *tx_ring = (igb_tx_ring_t *)arg;
 
-	/*
-	 * If the adapter is suspended, or it is not started, or the link
-	 * is not up, the mblks are simply dropped.
-	 */
-	if (((igb->igb_state & IGB_SUSPENDED) != 0) ||
-	    ((igb->igb_state & IGB_STARTED) == 0) ||
-	    (igb->link_state != LINK_STATE_UP)) {
-		/* Free the mblk chain */
-		while (mp != NULL) {
-			next = mp->b_next;
-			mp->b_next = NULL;
+	ASSERT(tx_ring != NULL);
 
-			freemsg(mp);
-			mp = next;
-		}
-
-		return (NULL);
-	}
-
-	/*
-	 * Decide which tx ring is used to transmit the packets.
-	 * This needs to be updated later to fit the new interface
-	 * of the multiple rings support.
-	 */
-	tx_ring = &igb->tx_rings[0];
-
-	while (mp != NULL) {
-		next = mp->b_next;
-		mp->b_next = NULL;
-
-		if (!igb_tx(tx_ring, mp)) {
-			mp->b_next = next;
-			break;
-		}
-
-		mp = next;
-	}
-
-	return (mp);
+	return ((igb_tx(tx_ring, mp)) ? NULL : mp);
 }
 
 /*
@@ -671,7 +627,7 @@ igb_check_hcksum_context(igb_tx_ring_t *tx_ring, hcksum_context_t *hcksum)
  */
 static void
 igb_fill_hcksum_context(struct e1000_adv_tx_context_desc *ctx_tbd,
-    hcksum_context_t *hcksum)
+    hcksum_context_t *hcksum, uint32_t ring_index)
 {
 	/*
 	 * Fill the context descriptor with the checksum
@@ -708,7 +664,7 @@ igb_fill_hcksum_context(struct e1000_adv_tx_context_desc *ctx_tbd,
 	}
 
 	ctx_tbd->seqnum_seed = 0;
-	ctx_tbd->mss_l4len_idx = 0;
+	ctx_tbd->mss_l4len_idx = ring_index << 4;
 }
 
 /*
@@ -764,7 +720,8 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 			 * hardware checksum offload informations.
 			 */
 			igb_fill_hcksum_context(
-			    (struct e1000_adv_tx_context_desc *)tbd, hcksum);
+			    (struct e1000_adv_tx_context_desc *)tbd, hcksum,
+			    tx_ring->index);
 
 			index = NEXT_INDEX(index, 1, tx_ring->ring_size);
 			desc_num++;
@@ -843,6 +800,7 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 		if (hcksum_flags & HCK_PARTIALCKSUM)
 			first_tbd->read.olinfo_status |=
 			    E1000_TXD_POPTS_TXSM << 8;
+		first_tbd->read.olinfo_status |= tx_ring->index << 4;
 	}
 
 	/*
@@ -852,6 +810,8 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	ASSERT(tbd != NULL);
 	tbd->read.cmd_type_len |=
 	    E1000_ADVTXD_DCMD_EOP | E1000_ADVTXD_DCMD_RS;
+
+	IGB_DEBUG_STAT(tx_ring->stat_pkt_cnt);
 
 	/*
 	 * Sync the DMA buffer of the tx descriptor ring

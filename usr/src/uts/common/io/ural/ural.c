@@ -43,7 +43,7 @@
 #include <sys/modctl.h>
 #include <sys/devops.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
 #include <sys/net80211.h>
 #include <sys/net80211_proto.h>
@@ -295,7 +295,6 @@ static mac_callbacks_t ural_m_callbacks = {
 	ural_m_multicst,
 	ural_m_unicst,
 	ural_m_tx,
-	NULL,		/* mc_resources; */
 	ural_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,

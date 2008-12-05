@@ -29,13 +29,14 @@
 
 #include <sys/aggr.h>
 #include <sys/aggr_impl.h>
+#include <sys/priv_names.h>
 
 /*
  * Process a LAIOC_MODIFY request.
  */
 /* ARGSUSED */
 static int
-aggr_ioc_modify(void *karg, intptr_t arg, int mode, cred_t *cred)
+aggr_ioc_modify(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	laioc_modify_t *modify_arg = karg;
 	uint32_t policy;
@@ -68,8 +69,8 @@ aggr_ioc_modify(void *karg, intptr_t arg, int mode, cred_t *cred)
 		lacp_timer = modify_arg->lu_lacp_timer;
 	}
 
-	return (aggr_grp_modify(modify_arg->lu_linkid, NULL, modify_mask,
-	    policy, mac_fixed, mac_addr, lacp_mode, lacp_timer));
+	return (aggr_grp_modify(modify_arg->lu_linkid, modify_mask, policy,
+	    mac_fixed, mac_addr, lacp_mode, lacp_timer));
 }
 
 /*
@@ -77,7 +78,7 @@ aggr_ioc_modify(void *karg, intptr_t arg, int mode, cred_t *cred)
  */
 /* ARGSUSED */
 static int
-aggr_ioc_create(void *karg, intptr_t arg, int mode, cred_t *cred)
+aggr_ioc_create(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	laioc_create_t *create_arg = karg;
 	uint16_t nports;
@@ -122,7 +123,7 @@ done:
 
 /* ARGSUSED */
 static int
-aggr_ioc_delete(void *karg, intptr_t arg, int mode, cred_t *cred)
+aggr_ioc_delete(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	laioc_delete_t *delete_arg = karg;
 
@@ -191,7 +192,7 @@ aggr_ioc_info_new_port(void *arg, datalink_id_t linkid, uchar_t *mac,
 
 /*ARGSUSED*/
 static int
-aggr_ioc_info(void *karg, intptr_t arg, int mode, cred_t *cred)
+aggr_ioc_info(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	laioc_info_t *info_argp = karg;
 	datalink_id_t linkid;
@@ -249,30 +250,31 @@ done:
 
 /* ARGSUSED */
 static int
-aggr_ioc_add(void *karg, intptr_t arg, int mode, cred_t *cred)
+aggr_ioc_add(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	return (aggr_ioc_add_remove(karg, arg, LAIOC_ADD, mode));
 }
 
 /* ARGSUSED */
 static int
-aggr_ioc_remove(void *karg, intptr_t arg, int mode, cred_t *cred)
+aggr_ioc_remove(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	return (aggr_ioc_add_remove(karg, arg, LAIOC_REMOVE, mode));
 }
 
 static dld_ioc_info_t aggr_ioc_list[] = {
-	{LAIOC_CREATE, DLDCOPYIN | DLDDLCONFIG, sizeof (laioc_create_t),
-	    aggr_ioc_create},
-	{LAIOC_DELETE, DLDCOPYIN | DLDDLCONFIG, sizeof (laioc_delete_t),
-	    aggr_ioc_delete},
-	{LAIOC_INFO, DLDCOPYINOUT, sizeof (laioc_info_t), aggr_ioc_info},
-	{LAIOC_ADD, DLDCOPYIN | DLDDLCONFIG, sizeof (laioc_add_rem_t),
-	    aggr_ioc_add},
-	{LAIOC_REMOVE, DLDCOPYIN | DLDDLCONFIG, sizeof (laioc_add_rem_t),
-	    aggr_ioc_remove},
-	{LAIOC_MODIFY, DLDCOPYIN | DLDDLCONFIG, sizeof (laioc_modify_t),
-	    aggr_ioc_modify}
+	{LAIOC_CREATE, DLDCOPYIN, sizeof (laioc_create_t), aggr_ioc_create,
+	    {PRIV_SYS_DL_CONFIG}},
+	{LAIOC_DELETE, DLDCOPYIN, sizeof (laioc_delete_t), aggr_ioc_delete,
+	    {PRIV_SYS_DL_CONFIG}},
+	{LAIOC_INFO, DLDCOPYINOUT, sizeof (laioc_info_t), aggr_ioc_info,
+	    {NULL}},
+	{LAIOC_ADD, DLDCOPYIN, sizeof (laioc_add_rem_t), aggr_ioc_add,
+	    {PRIV_SYS_DL_CONFIG}},
+	{LAIOC_REMOVE, DLDCOPYIN, sizeof (laioc_add_rem_t), aggr_ioc_remove,
+	    {PRIV_SYS_DL_CONFIG}},
+	{LAIOC_MODIFY, DLDCOPYIN, sizeof (laioc_modify_t), aggr_ioc_modify,
+	    {PRIV_SYS_DL_CONFIG}}
 };
 
 int

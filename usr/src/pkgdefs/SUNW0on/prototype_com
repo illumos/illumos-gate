@@ -242,6 +242,7 @@ f none usr/lib/help/auths/locale/SmfCronStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfExAcctFlowStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfExAcctProcessStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfExAcctTaskStates.html 444 root bin
+f none usr/lib/help/auths/locale/SmfExAcctNetStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfInetdStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfManageHeader.html 444 root bin
@@ -267,6 +268,7 @@ f none usr/lib/help/auths/locale/SmfValueCoreadm.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctFlow.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctProcess.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueExAcctTask.html 444 root bin
+f none usr/lib/help/auths/locale/SmfValueExAcctNet.html 444 root bin
 f none usr/lib/help/auths/locale/SmfVtStates.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueHeader.html 444 root bin
 f none usr/lib/help/auths/locale/SmfValueInetd.html 444 root bin
@@ -344,6 +346,7 @@ f none usr/lib/help/profiles/locale/RtDeviceMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtExAcctFlow.html 444 root bin
 f none usr/lib/help/profiles/locale/RtExAcctProcess.html 444 root bin
 f none usr/lib/help/profiles/locale/RtExAcctTask.html 444 root bin
+f none usr/lib/help/profiles/locale/RtExAcctNet.html 444 root bin
 f none usr/lib/help/profiles/locale/RtPrntAdmin.html 444 root bin
 f none usr/lib/help/profiles/locale/RtConsUser.html 444 root bin
 f none usr/lib/help/profiles/locale/RtContractObserver.html 444 root bin

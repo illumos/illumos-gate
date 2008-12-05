@@ -31,14 +31,17 @@
 #include	<sys/mkdev.h>
 #include	<sys/modctl.h>
 #include	<sys/stat.h>
-#include	<sys/vlan.h>
-#include	<sys/mac.h>
 #include	<sys/dld_impl.h>
 #include	<sys/dls_impl.h>
 #include	<sys/softmac.h>
-#include 	<sys/vlan.h>
-#include	<sys/policy.h>
+#include	<sys/mac.h>
+#include	<sys/mac_ether.h>
+#include	<sys/mac_client.h>
+#include	<sys/mac_client_impl.h>
+#include	<sys/mac_client_priv.h>
 #include	<inet/common.h>
+#include	<sys/policy.h>
+#include	<sys/priv_names.h>
 
 static void	drv_init(void);
 static int	drv_fini(void);
@@ -150,6 +153,7 @@ drv_init(void)
 {
 	drv_secobj_init();
 	dld_str_init();
+
 	/*
 	 * Create a hash table for autopush configuration.
 	 */
@@ -179,7 +183,6 @@ drv_fini(void)
 	rw_enter(&dld_ap_hash_lock, RW_READER);
 	mod_hash_walk(dld_ap_hashp, drv_ap_exist, &exist);
 	rw_exit(&dld_ap_hash_lock);
-
 	if (exist)
 		return (EBUSY);
 
@@ -314,24 +317,33 @@ drv_open(dev_t *devp, int flag, int sflag, cred_t *credp)
  */
 /* ARGSUSED */
 static int
-drv_ioc_attr(void *karg, intptr_t arg, int mode, cred_t *cred)
+drv_ioc_attr(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	dld_ioc_attr_t		*diap = karg;
 	dls_dl_handle_t		dlh;
-	dls_vlan_t		*dvp;
+	dls_link_t		*dlp;
 	int			err;
+	mac_perim_handle_t	mph;
 
 	if ((err = dls_devnet_hold_tmp(diap->dia_linkid, &dlh)) != 0)
 		return (err);
 
-	if ((err = dls_vlan_hold(dls_devnet_mac(dlh),
-	    dls_devnet_vid(dlh), &dvp, B_FALSE, B_FALSE)) != 0) {
+	if ((err = mac_perim_enter_by_macname(
+	    dls_devnet_mac(dlh), &mph)) != 0) {
 		dls_devnet_rele_tmp(dlh);
 		return (err);
 	}
-	mac_sdu_get(dvp->dv_dlp->dl_mh, NULL, &diap->dia_max_sdu);
 
-	dls_vlan_rele(dvp);
+	if ((err = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0) {
+		mac_perim_exit(mph);
+		dls_devnet_rele_tmp(dlh);
+		return (err);
+	}
+
+	mac_sdu_get(dlp->dl_mh, NULL, &diap->dia_max_sdu);
+
+	dls_link_rele(dlp);
+	mac_perim_exit(mph);
 	dls_devnet_rele_tmp(dlh);
 
 	return (0);
@@ -342,7 +354,7 @@ drv_ioc_attr(void *karg, intptr_t arg, int mode, cred_t *cred)
  */
 /* ARGSUSED */
 static int
-drv_ioc_phys_attr(void *karg, intptr_t arg, int mode, cred_t *cred)
+drv_ioc_phys_attr(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	dld_ioc_phys_attr_t	*dipp = karg;
 	int			err;
@@ -387,64 +399,184 @@ drv_ioc_phys_attr(void *karg, intptr_t arg, int mode, cred_t *cred)
 	return (0);
 }
 
+/* ARGSUSED */
+static int
+drv_ioc_hwgrpget(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
+{
+	dld_ioc_hwgrpget_t	*hwgrpp = karg;
+	dld_hwgrpinfo_t		hwgrp, *hip;
+	mac_handle_t		mh = NULL;
+	int			i, err, grpnum;
+	uint_t			bytes_left;
+
+	hwgrpp->dih_n_groups = 0;
+	err = mac_open_by_linkid(hwgrpp->dih_linkid, &mh);
+	if (err != 0)
+		goto done;
+
+	hip = (dld_hwgrpinfo_t *)
+	    ((uchar_t *)arg + sizeof (dld_ioc_hwgrpget_t));
+	bytes_left = hwgrpp->dih_size;
+	grpnum = mac_hwgrp_num(mh);
+	for (i = 0; i < grpnum; i++) {
+		if (sizeof (dld_hwgrpinfo_t) > bytes_left) {
+			err = ENOSPC;
+			goto done;
+		}
+
+		bzero(&hwgrp, sizeof (hwgrp));
+		bcopy(mac_name(mh), hwgrp.dhi_link_name,
+		    sizeof (hwgrp.dhi_link_name));
+		mac_get_hwgrp_info(mh, i, &hwgrp.dhi_grp_num,
+		    &hwgrp.dhi_n_rings, &hwgrp.dhi_grp_type,
+		    &hwgrp.dhi_n_clnts, hwgrp.dhi_clnts);
+		if (copyout(&hwgrp, hip, sizeof (hwgrp)) != 0) {
+			err = EFAULT;
+			goto done;
+		}
+
+		hip++;
+		bytes_left -= sizeof (dld_hwgrpinfo_t);
+	}
+
+done:
+	if (mh != NULL)
+		dld_mac_close(mh);
+	if (err == 0)
+		hwgrpp->dih_n_groups = grpnum;
+	return (err);
+}
+
+/* ARGSUSED */
+static int
+drv_ioc_macaddrget(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
+{
+	dld_ioc_macaddrget_t	*magp = karg;
+	dld_macaddrinfo_t	mai, *maip;
+	mac_handle_t		mh = NULL;
+	int			i, err;
+	uint_t			bytes_left;
+	boolean_t		is_used;
+
+	magp->dig_count = 0;
+	err = mac_open_by_linkid(magp->dig_linkid, &mh);
+	if (err != 0)
+		goto done;
+
+	maip = (dld_macaddrinfo_t *)
+	    ((uchar_t *)arg + sizeof (dld_ioc_macaddrget_t));
+	bytes_left = magp->dig_size;
+
+	for (i = 0; i < mac_addr_factory_num(mh) + 1; i++) {
+		if (sizeof (dld_macaddrinfo_t) > bytes_left) {
+			err = ENOSPC;
+			goto done;
+		}
+
+		bzero(&mai, sizeof (mai));
+
+		if (i == 0) {
+			/* primary MAC address */
+			mac_unicast_primary_get(mh, mai.dmi_addr);
+			mai.dmi_addrlen = mac_addr_len(mh);
+			mac_unicast_primary_info(mh, mai.dmi_client_name,
+			    &is_used);
+		} else {
+			/* factory MAC address slot */
+			mac_addr_factory_value(mh, i, mai.dmi_addr,
+			    &mai.dmi_addrlen, mai.dmi_client_name, &is_used);
+		}
+
+		mai.dmi_slot = i;
+		if (is_used)
+			mai.dmi_flags |= DLDIOCMACADDR_USED;
+
+		if (copyout(&mai, maip, sizeof (mai)) != 0) {
+			err = EFAULT;
+			goto done;
+		}
+
+		maip++;
+		bytes_left -= sizeof (dld_macaddrinfo_t);
+	}
+
+done:
+	if (mh != NULL)
+		dld_mac_close(mh);
+	if (err == 0)
+		magp->dig_count = mac_addr_factory_num(mh) + 1;
+	return (err);
+}
+
 /*
- * DLDIOC_SETPROP
+ * DLDIOC_SET/GETPROP
  */
 static int
-drv_ioc_prop_common(dld_ioc_macprop_t *dipp, intptr_t arg, boolean_t set,
+drv_ioc_prop_common(dld_ioc_macprop_t *prop, intptr_t arg, boolean_t set,
     int mode)
 {
-	int		err = EINVAL;
-	size_t		dsize;
-	dld_ioc_macprop_t	*kdipp;
-	dls_dl_handle_t		dlh;
-	dls_vlan_t		*dvp;
-	datalink_id_t 		linkid;
+	int			err = EINVAL;
+	dls_dl_handle_t 	dlh = NULL;
+	dls_link_t		*dlp = NULL;
+	mac_perim_handle_t	mph = NULL;
 	mac_prop_t		macprop;
-	uchar_t			*cp;
-	struct dlautopush	*dlap;
-	dld_ioc_zid_t		*dzp;
+	dld_ioc_macprop_t	*kprop;
+	datalink_id_t		linkid;
+	uint_t			dsize;
+
 
 	/*
-	 * We only use pr_valsize from dipp, as the caller only did a
+	 * We only use pr_valsize from prop, as the caller only did a
 	 * copyin() for sizeof (dld_ioc_prop_t), which doesn't cover
 	 * the property data.  We copyin the full dld_ioc_prop_t
-	 * including the data into kdipp down below.
+	 * including the data into kprop down below.
 	 */
-	dsize = sizeof (dld_ioc_macprop_t) + dipp->pr_valsize - 1;
-	if (dsize < dipp->pr_valsize)
+	dsize = sizeof (dld_ioc_macprop_t) + prop->pr_valsize - 1;
+	if (dsize < prop->pr_valsize)
 		return (EINVAL);
 
 	/*
 	 * The property data is variable size, so we need to allocate
 	 * a buffer for kernel use as this data was not part of the
-	 * dipp allocation and copyin() done by the framework.
+	 * prop allocation and copyin() done by the framework.
 	 */
-	if ((kdipp = kmem_alloc(dsize, KM_NOSLEEP)) == NULL)
+	if ((kprop = kmem_alloc(dsize, KM_NOSLEEP)) == NULL)
 		return (ENOMEM);
-	if (ddi_copyin((void *)arg, kdipp, dsize, mode) != 0) {
+
+	if (ddi_copyin((void *)arg, kprop, dsize, mode) != 0) {
 		err = EFAULT;
 		goto done;
 	}
 
-	linkid = kdipp->pr_linkid;
+	linkid = kprop->pr_linkid;
+	if ((err = dls_devnet_hold_tmp(linkid, &dlh)) != 0)
+		goto done;
 
-	switch (dipp->pr_num) {
-	case MAC_PROP_ZONE:
+	if ((err = mac_perim_enter_by_macname(dls_devnet_mac(dlh),
+	    &mph)) != 0) {
+		goto done;
+	}
+
+	switch (kprop->pr_num) {
+	case MAC_PROP_ZONE: {
 		if (set) {
-			dzp = (dld_ioc_zid_t *)kdipp->pr_val;
+			dld_ioc_zid_t	*dzp = (dld_ioc_zid_t *)kprop->pr_val;
+
 			err = dls_devnet_setzid(dzp->diz_link, dzp->diz_zid);
 			goto done;
 		} else {
-			kdipp->pr_perm_flags = MAC_PROP_PERM_RW;
-			cp = (uchar_t *)kdipp->pr_val;
-			err = dls_devnet_getzid(linkid, (zoneid_t *)cp);
+			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
+			err = dls_devnet_getzid(linkid,
+			    (zoneid_t *)kprop->pr_val);
 			goto done;
 		}
-	case MAC_PROP_AUTOPUSH:
+	}
+	case MAC_PROP_AUTOPUSH: {
+		struct dlautopush	*dlap =
+		    (struct dlautopush *)kprop->pr_val;
+
 		if (set) {
-			if (dipp->pr_valsize != 0) {
-				dlap = (struct dlautopush *)kdipp->pr_val;
+			if (kprop->pr_valsize != 0) {
 				err = drv_ioc_setap(linkid, dlap);
 				goto done;
 			} else {
@@ -452,125 +584,73 @@ drv_ioc_prop_common(dld_ioc_macprop_t *dipp, intptr_t arg, boolean_t set,
 				goto done;
 			}
 		} else {
-			kdipp->pr_perm_flags = MAC_PROP_PERM_RW;
-			dlap = (struct dlautopush *)kdipp->pr_val;
+			kprop->pr_perm_flags = MAC_PROP_PERM_RW;
 			err = drv_ioc_getap(linkid, dlap);
 			goto done;
 		}
-
+	}
 	default:
 		break;
 	}
 
-	if ((err = dls_devnet_hold_tmp(linkid, &dlh)) != 0)
+	if ((err = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0)
 		goto done;
 
-	if ((err = dls_vlan_hold(dls_devnet_mac(dlh),
-	    dls_devnet_vid(dlh), &dvp, B_FALSE, B_FALSE)) != 0) {
-		dls_devnet_rele_tmp(dlh);
-		goto done;
-	}
-
-	macprop.mp_name = kdipp->pr_name;
-	macprop.mp_id = kdipp->pr_num;
-	macprop.mp_flags = kdipp->pr_flags;
+	macprop.mp_name = kprop->pr_name;
+	macprop.mp_id = kprop->pr_num;
+	macprop.mp_flags = kprop->pr_flags;
 
 	if (set) {
-		err = mac_set_prop(dvp->dv_dlp->dl_mh, &macprop,
-		    kdipp->pr_val, kdipp->pr_valsize);
+		err = mac_set_prop(dlp->dl_mh, &macprop, kprop->pr_val,
+		    kprop->pr_valsize);
 	} else {
-		kdipp->pr_perm_flags = MAC_PROP_PERM_RW;
-		err = mac_get_prop(dvp->dv_dlp->dl_mh, &macprop,
-		    kdipp->pr_val, kdipp->pr_valsize, &kdipp->pr_perm_flags);
+		kprop->pr_perm_flags = MAC_PROP_PERM_RW;
+		err = mac_get_prop(dlp->dl_mh, &macprop, kprop->pr_val,
+		    kprop->pr_valsize, &kprop->pr_perm_flags);
 	}
 
-	dls_vlan_rele(dvp);
-	dls_devnet_rele_tmp(dlh);
 done:
 	if (!set && err == 0 &&
-	    ddi_copyout(kdipp, (void *)arg, dsize, mode) != 0)
+	    ddi_copyout(kprop, (void *)arg, dsize, mode) != 0)
 		err = EFAULT;
-	kmem_free(kdipp, dsize);
+
+	if (dlp != NULL)
+		dls_link_rele(dlp);
+
+	if (mph != NULL) {
+		int32_t	cpuid;
+		void	*mdip = NULL;
+
+		if (dlp != NULL && set && err == 0) {
+			cpuid = mac_client_intr_cpu(dlp->dl_mch);
+			mdip = mac_get_devinfo(dlp->dl_mh);
+		}
+
+		mac_perim_exit(mph);
+
+		if (mdip != NULL)
+			mac_client_set_intr_cpu(mdip, dlp->dl_mch, cpuid);
+	}
+	if (dlh != NULL)
+		dls_devnet_rele_tmp(dlh);
+
+	if (kprop != NULL)
+		kmem_free(kprop, dsize);
 	return (err);
 }
 
 /* ARGSUSED */
 static int
-drv_ioc_setprop(void *karg, intptr_t arg, int mode, cred_t *cred)
+drv_ioc_setprop(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	return (drv_ioc_prop_common(karg, arg, B_TRUE, mode));
 }
 
 /* ARGSUSED */
 static int
-drv_ioc_getprop(void *karg, intptr_t arg, int mode, cred_t *cred)
+drv_ioc_getprop(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	return (drv_ioc_prop_common(karg, arg, B_FALSE, mode));
-}
-
-/*
- * DLDIOC_CREATE_VLAN
- */
-/* ARGSUSED */
-static int
-drv_ioc_create_vlan(void *karg, intptr_t arg, int mode, cred_t *cred)
-{
-	dld_ioc_create_vlan_t	*dicp = karg;
-
-	return (dls_devnet_create_vlan(dicp->dic_vlanid, dicp->dic_linkid,
-	    dicp->dic_vid, dicp->dic_force));
-}
-
-/*
- * DLDIOC_DELETE_VLAN
- */
-/* ARGSUSED */
-static int
-drv_ioc_delete_vlan(void *karg, intptr_t arg, int mode, cred_t *cred)
-{
-	dld_ioc_delete_vlan_t	*didp = karg;
-
-	return (dls_devnet_destroy_vlan(didp->did_linkid));
-}
-
-/*
- * DLDIOC_VLAN_ATTR
- */
-/* ARGSUSED */
-static int
-drv_ioc_vlan_attr(void *karg, intptr_t arg, int mode, cred_t *cred)
-{
-	dld_ioc_vlan_attr_t	*divp = karg;
-	dls_dl_handle_t		dlh;
-	uint16_t		vid;
-	dls_vlan_t		*dvp;
-	int			err;
-
-	/*
-	 * Hold this link to prevent it from being deleted.
-	 */
-	if ((err = dls_devnet_hold_tmp(divp->div_vlanid, &dlh)) != 0)
-		return (err);
-
-	if ((vid = dls_devnet_vid(dlh)) == VLAN_ID_NONE) {
-		dls_devnet_rele_tmp(dlh);
-		return (EINVAL);
-	}
-
-	err = dls_vlan_hold(dls_devnet_mac(dlh), vid, &dvp, B_FALSE, B_FALSE);
-	if (err != 0) {
-		dls_devnet_rele_tmp(dlh);
-		return (err);
-	}
-
-	divp->div_linkid = dls_devnet_linkid(dlh);
-	divp->div_implicit = !dls_devnet_is_explicit(dlh);
-	divp->div_vid = vid;
-	divp->div_force = dvp->dv_force;
-
-	dls_vlan_rele(dvp);
-	dls_devnet_rele_tmp(dlh);
-	return (0);
 }
 
 /*
@@ -581,7 +661,7 @@ drv_ioc_vlan_attr(void *karg, intptr_t arg, int mode, cred_t *cred)
  */
 /* ARGSUSED */
 static int
-drv_ioc_rename(void *karg, intptr_t arg, int mode, cred_t *cred)
+drv_ioc_rename(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	dld_ioc_rename_t	*dir = karg;
 	mod_hash_key_t		key;
@@ -719,11 +799,81 @@ drv_ioc_clrap(datalink_id_t linkid)
  */
 /* ARGSUSED */
 static int
-drv_ioc_doorserver(void *karg, intptr_t arg, int mode, cred_t *cred)
+drv_ioc_doorserver(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	dld_ioc_door_t	*did = karg;
 
 	return (dls_mgmt_door_set(did->did_start_door));
+}
+
+/*
+ * DLDIOC_USAGELOG
+ */
+/* ARGSUSED */
+static int
+drv_ioc_usagelog(void *karg, intptr_t arg, int mode, cred_t *cred,
+    int *rvalp)
+{
+	dld_ioc_usagelog_t	*log_info = (dld_ioc_usagelog_t *)karg;
+
+	if (log_info->ul_type < MAC_LOGTYPE_LINK ||
+	    log_info->ul_type > MAC_LOGTYPE_FLOW)
+		return (EINVAL);
+
+	if (log_info->ul_onoff)
+		mac_start_logusage(log_info->ul_type, log_info->ul_interval);
+	else
+		mac_stop_logusage(log_info->ul_type);
+	return (0);
+}
+
+/*
+ * Process a DLDIOC_ADDFLOW request.
+ */
+/* ARGSUSED */
+static int
+drv_ioc_addflow(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
+{
+	dld_ioc_addflow_t	*afp = karg;
+
+	return (dld_add_flow(afp->af_linkid, afp->af_name,
+	    &afp->af_flow_desc, &afp->af_resource_props));
+}
+
+/*
+ * Process a DLDIOC_REMOVEFLOW request.
+ */
+/* ARGSUSED */
+static int
+drv_ioc_removeflow(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
+{
+	dld_ioc_removeflow_t	*rfp = karg;
+
+	return (dld_remove_flow(rfp->rf_name));
+}
+
+/*
+ * Process a DLDIOC_MODIFYFLOW request.
+ */
+/* ARGSUSED */
+static int
+drv_ioc_modifyflow(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
+{
+	dld_ioc_modifyflow_t	*mfp = karg;
+
+	return (dld_modify_flow(mfp->mf_name, &mfp->mf_resource_props));
+}
+
+/*
+ * Process a DLDIOC_WALKFLOW request.
+ */
+/* ARGSUSED */
+static int
+drv_ioc_walkflow(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
+{
+	dld_ioc_walkflow_t	*wfp = karg;
+
+	return (dld_walk_flow(wfp, arg));
 }
 
 /*
@@ -809,7 +959,7 @@ drv_secobj_fini(void)
 
 /* ARGSUSED */
 static int
-drv_ioc_secobj_set(void *karg, intptr_t arg, int mode, cred_t *cred)
+drv_ioc_secobj_set(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	dld_ioc_secobj_set_t	*ssp = karg;
 	dld_secobj_t		*sobjp, *objp;
@@ -885,14 +1035,13 @@ drv_secobj_walker(mod_hash_key_t key, mod_hash_val_t *val, void *arg)
 
 /* ARGSUSED */
 static int
-drv_ioc_secobj_get(void *karg, intptr_t arg, int mode, cred_t *cred)
+drv_ioc_secobj_get(void *karg, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 {
 	dld_ioc_secobj_get_t	*sgp = karg;
 	dld_secobj_t		*sobjp, *objp;
 	int			err;
 
 	sobjp = &sgp->sg_obj;
-
 	if (sobjp->so_name[DLD_SECOBJ_NAME_MAX - 1] != '\0')
 		return (EINVAL);
 
@@ -932,7 +1081,8 @@ drv_ioc_secobj_get(void *karg, intptr_t arg, int mode, cred_t *cred)
 
 /* ARGSUSED */
 static int
-drv_ioc_secobj_unset(void *karg, intptr_t arg, int mode, cred_t *cred)
+drv_ioc_secobj_unset(void *karg, intptr_t arg, int mode, cred_t *cred,
+    int *rvalp)
 {
 	dld_ioc_secobj_unset_t	*sup = karg;
 	dld_secobj_t		*objp;
@@ -959,32 +1109,56 @@ drv_ioc_secobj_unset(void *karg, intptr_t arg, int mode, cred_t *cred)
 	return (0);
 }
 
+static int
+drv_check_policy(dld_ioc_info_t *info, cred_t *cred)
+{
+	int	i, err = 0;
+
+	for (i = 0; info->di_priv[i] != NULL && i < DLD_MAX_PRIV; i++) {
+		if ((err = secpolicy_dld_ioctl(cred, info->di_priv[i],
+		    "dld ioctl")) != 0) {
+			break;
+		}
+	}
+	if (err == 0)
+		return (0);
+
+	return (secpolicy_net_config(cred, B_FALSE));
+}
+
 static dld_ioc_info_t drv_ioc_list[] = {
 	{DLDIOC_ATTR, DLDCOPYINOUT, sizeof (dld_ioc_attr_t),
-	    drv_ioc_attr},
+	    drv_ioc_attr, {NULL}},
 	{DLDIOC_PHYS_ATTR, DLDCOPYINOUT, sizeof (dld_ioc_phys_attr_t),
-	    drv_ioc_phys_attr},
-	{DLDIOC_SECOBJ_SET, DLDCOPYIN | DLDDLCONFIG,
-	    sizeof (dld_ioc_secobj_set_t), drv_ioc_secobj_set},
-	{DLDIOC_SECOBJ_GET, DLDCOPYINOUT | DLDDLCONFIG,
-	    sizeof (dld_ioc_secobj_get_t), drv_ioc_secobj_get},
-	{DLDIOC_SECOBJ_UNSET, DLDCOPYIN | DLDDLCONFIG,
-	    sizeof (dld_ioc_secobj_unset_t), drv_ioc_secobj_unset},
-	{DLDIOC_CREATE_VLAN, DLDCOPYIN | DLDDLCONFIG,
-	    sizeof (dld_ioc_create_vlan_t), drv_ioc_create_vlan},
-	{DLDIOC_DELETE_VLAN, DLDCOPYIN | DLDDLCONFIG,
-	    sizeof (dld_ioc_delete_vlan_t),
-	    drv_ioc_delete_vlan},
-	{DLDIOC_VLAN_ATTR, DLDCOPYINOUT, sizeof (dld_ioc_vlan_attr_t),
-	    drv_ioc_vlan_attr},
-	{DLDIOC_DOORSERVER, DLDCOPYIN | DLDDLCONFIG, sizeof (dld_ioc_door_t),
-	    drv_ioc_doorserver},
-	{DLDIOC_RENAME, DLDCOPYIN | DLDDLCONFIG, sizeof (dld_ioc_rename_t),
-	    drv_ioc_rename},
+	    drv_ioc_phys_attr, {NULL}},
+	{DLDIOC_SECOBJ_SET, DLDCOPYIN, sizeof (dld_ioc_secobj_set_t),
+	    drv_ioc_secobj_set, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_SECOBJ_GET, DLDCOPYINOUT, sizeof (dld_ioc_secobj_get_t),
+	    drv_ioc_secobj_get, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_SECOBJ_UNSET, DLDCOPYIN, sizeof (dld_ioc_secobj_unset_t),
+	    drv_ioc_secobj_unset, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_DOORSERVER, DLDCOPYIN, sizeof (dld_ioc_door_t),
+	    drv_ioc_doorserver, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_RENAME, DLDCOPYIN, sizeof (dld_ioc_rename_t),
+	    drv_ioc_rename, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_MACADDRGET, DLDCOPYINOUT, sizeof (dld_ioc_macaddrget_t),
+	    drv_ioc_macaddrget, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_ADDFLOW, DLDCOPYIN, sizeof (dld_ioc_addflow_t),
+	    drv_ioc_addflow, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_REMOVEFLOW, DLDCOPYIN, sizeof (dld_ioc_removeflow_t),
+	    drv_ioc_removeflow, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_MODIFYFLOW, DLDCOPYIN, sizeof (dld_ioc_modifyflow_t),
+	    drv_ioc_modifyflow, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_WALKFLOW, DLDCOPYINOUT, sizeof (dld_ioc_walkflow_t),
+	    drv_ioc_walkflow, {NULL}},
+	{DLDIOC_USAGELOG, DLDCOPYIN, sizeof (dld_ioc_usagelog_t),
+	    drv_ioc_usagelog, {PRIV_SYS_DL_CONFIG}},
+	{DLDIOC_SETMACPROP, DLDCOPYIN, sizeof (dld_ioc_macprop_t),
+	    drv_ioc_setprop, {PRIV_SYS_DL_CONFIG}},
 	{DLDIOC_GETMACPROP, DLDCOPYIN, sizeof (dld_ioc_macprop_t),
-	    drv_ioc_getprop},
-	{DLDIOC_SETMACPROP, DLDCOPYIN | DLDDLCONFIG, sizeof (dld_ioc_macprop_t),
-	    drv_ioc_setprop}
+	    drv_ioc_getprop, {NULL}},
+	{DLDIOC_GETHWGRP, DLDCOPYINOUT, sizeof (dld_ioc_hwgrpget_t),
+	    drv_ioc_hwgrpget, {PRIV_SYS_DL_CONFIG}},
 };
 
 typedef struct dld_ioc_modentry {
@@ -1090,11 +1264,8 @@ drv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 	}
 
 	info = &dim->dim_list[i];
-
-	if ((info->di_flags & DLDDLCONFIG) && secpolicy_dl_config(cred) != 0) {
-		err = EPERM;
+	if ((err = drv_check_policy(info, cred)) != 0)
 		goto done;
-	}
 
 	sz = info->di_argsize;
 	if ((buf = kmem_zalloc(sz, KM_NOSLEEP)) == NULL) {
@@ -1108,7 +1279,7 @@ drv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred, int *rvalp)
 		goto done;
 	}
 
-	err = info->di_func(buf, arg, mode, cred);
+	err = info->di_func(buf, arg, mode, cred, rvalp);
 
 	if ((info->di_flags & DLDCOPYOUT) &&
 	    ddi_copyout(buf, (void *)arg, sz, mode) != 0 && err == 0)

@@ -3202,7 +3202,7 @@ tun_rdata_v4(queue_t *q, mblk_t *ipsec_mp, mblk_t *data_mp, tun_t *atp)
 	 */
 	pullup_len = hdrlen + (inner_v4 ? sizeof (ipha_t) : sizeof (ip6_t)) + 4;
 	if ((data_mp->b_wptr - data_mp->b_rptr) < pullup_len) {
-		if (!pullupmsg(data_mp, hdrlen + pullup_len)) {
+		if (!pullupmsg(data_mp, pullup_len)) {
 			atomic_add_32(&atp->tun_InErrors, 1);
 			atomic_add_32(&atp->tun_InDiscard, 1);
 			if (ipsec_mp != NULL)

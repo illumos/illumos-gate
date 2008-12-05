@@ -46,6 +46,7 @@
 #include <sys/atomic.h>
 #include <sys/policy.h>
 #include <sys/priv.h>
+#include <sys/taskq.h>
 
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -125,16 +126,17 @@
 #include <sys/tsol/tnet.h>
 
 #include <rpc/pmap_prot.h>
+#include <sys/squeue_impl.h>
 
 /*
  * Values for squeue switch:
- * IP_SQUEUE_ENTER_NODRAIN: squeue_enter_nodrain
- * IP_SQUEUE_ENTER: squeue_enter
- * IP_SQUEUE_FILL: squeue_fill
+ * IP_SQUEUE_ENTER_NODRAIN: SQ_NODRAIN
+ * IP_SQUEUE_ENTER: SQ_PROCESS
+ * IP_SQUEUE_FILL: SQ_FILL
  */
 int ip_squeue_enter = 2;	/* Setable in /etc/system */
 
-squeue_func_t ip_input_proc;
+int ip_squeue_flag;
 #define	SET_BPREV_FLAG(x)	((mblk_t *)(uintptr_t)(x))
 
 /*
@@ -391,6 +393,11 @@ void (*cl_inet_idlesa)(uint8_t, uint32_t, sa_family_t, in6_addr_t,
  * gcgrp_rwlock -> ire_lock
  * gcgrp_rwlock -> gcdb_lock
  *
+ * squeue(sq_lock), flow related (ft_lock, fe_lock) locking
+ *
+ * cpu_lock --> ill_lock --> sqset_lock --> sq_lock
+ * sq_lock -> conn_lock -> QLOCK(q)
+ * ill_lock -> ft_lock -> fe_lock
  *
  * Routing/forwarding table locking notes:
  *
@@ -730,7 +737,7 @@ static boolean_t	ip_source_route_included(ipha_t *);
 static void	ip_trash_ire_reclaim_stack(ip_stack_t *);
 
 static void	ip_wput_frag(ire_t *, mblk_t *, ip_pkt_t, uint32_t, uint32_t,
-		    zoneid_t, ip_stack_t *);
+		    zoneid_t, ip_stack_t *, conn_t *);
 static mblk_t	*ip_wput_frag_copyhdr(uchar_t *, int, int, ip_stack_t *);
 static void	ip_wput_local_options(ipha_t *, ip_stack_t *);
 static int	ip_wput_options(queue_t *, mblk_t *, ipha_t *, boolean_t,
@@ -763,17 +770,13 @@ static void	ip_multirt_bad_mtu(ire_t *, uint32_t);
 static int	ip_cgtp_filter_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 static int	ip_cgtp_filter_set(queue_t *, mblk_t *, char *,
     caddr_t, cred_t *);
-extern int	ip_squeue_bind_set(queue_t *q, mblk_t *mp, char *value,
-    caddr_t cp, cred_t *cr);
-extern int	ip_squeue_profile_set(queue_t *, mblk_t *, char *, caddr_t,
-    cred_t *);
 static int	ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
     caddr_t cp, cred_t *cr);
 static int	ip_int_set(queue_t *, mblk_t *, char *, caddr_t,
     cred_t *);
 static int	ipmp_hook_emulation_set(queue_t *, mblk_t *, char *, caddr_t,
     cred_t *);
-static squeue_func_t ip_squeue_switch(int);
+static int	ip_squeue_switch(int);
 
 static void	*ip_kstat_init(netstackid_t, ip_stack_t *);
 static void	ip_kstat_fini(netstackid_t, kstat_t *);
@@ -790,7 +793,7 @@ static mblk_t	*ip_tcp_input(mblk_t *, ipha_t *, ill_t *, boolean_t,
     ire_t *, mblk_t *, uint_t, queue_t *, ill_rx_ring_t *);
 
 static void	ip_rput_process_forward(queue_t *, mblk_t *, ire_t *,
-    ipha_t *, ill_t *, boolean_t);
+    ipha_t *, ill_t *, boolean_t, boolean_t);
 
 static void ipobs_init(ip_stack_t *);
 static void ipobs_fini(ip_stack_t *);
@@ -934,20 +937,14 @@ static ipndp_t	lcl_ndp_arr[] = {
 	    "ip_rput_pullups" },
 	{  ip_srcid_report,	NULL,		NULL,
 	    "ip_srcid_status" },
-	{ ip_param_generic_get, ip_squeue_profile_set,
-	    (caddr_t)&ip_squeue_profile, "ip_squeue_profile" },
-	{ ip_param_generic_get, ip_squeue_bind_set,
-	    (caddr_t)&ip_squeue_bind, "ip_squeue_bind" },
 	{ ip_param_generic_get, ip_input_proc_set,
 	    (caddr_t)&ip_squeue_enter, "ip_squeue_enter" },
 	{ ip_param_generic_get, ip_int_set,
 	    (caddr_t)&ip_squeue_fanout, "ip_squeue_fanout" },
-#define	IPNDP_CGTP_FILTER_OFFSET	11
+#define	IPNDP_CGTP_FILTER_OFFSET	9
 	{  ip_cgtp_filter_get,	ip_cgtp_filter_set, NULL,
 	    "ip_cgtp_filter" },
-	{ ip_param_generic_get, ip_int_set,
-	    (caddr_t)&ip_soft_rings_cnt, "ip_soft_rings_cnt" },
-#define	IPNDP_IPMP_HOOK_OFFSET	13
+#define	IPNDP_IPMP_HOOK_OFFSET		10
 	{  ip_param_generic_get, ipmp_hook_emulation_set, NULL,
 	    "ipmp_hook_emulation" },
 	{  ip_param_generic_get, ip_int_set, (caddr_t)&ip_debug,
@@ -2564,8 +2561,8 @@ icmp_inbound_error_fanout(queue_t *q, ill_t *ill, mblk_t *mp,
 
 		/* Have to change db_type after any pullupmsg */
 		DB_TYPE(mp) = M_CTL;
-		squeue_fill(connp->conn_sqp, first_mp, tcp_input,
-		    connp, SQTAG_TCP_INPUT_ICMP_ERR);
+		SQUEUE_ENTER_ONE(connp->conn_sqp, first_mp, tcp_input, connp,
+		    SQ_FILL, SQTAG_TCP_INPUT_ICMP_ERR);
 		return;
 
 	case IPPROTO_SCTP:
@@ -5367,34 +5364,13 @@ ip_modclose(ill_t *ill)
 	ipif_t	*ipif;
 	queue_t	*q = ill->ill_rq;
 	ip_stack_t	*ipst = ill->ill_ipst;
-	clock_t timeout;
 
 	/*
-	 * Wait for the ACKs of all deferred control messages to be processed.
-	 * In particular, we wait for a potential capability reset initiated
-	 * in ip_sioctl_plink() to complete before proceeding.
-	 *
-	 * Note: we wait for at most ip_modclose_ackwait_ms (by default 3000 ms)
-	 * in case the driver never replies.
+	 * The punlink prior to this may have initiated a capability
+	 * negotiation. But ipsq_enter will block until that finishes or
+	 * times out.
 	 */
-	timeout = lbolt + MSEC_TO_TICK(ip_modclose_ackwait_ms);
-	mutex_enter(&ill->ill_lock);
-	while (ill->ill_dlpi_pending != DL_PRIM_INVAL) {
-		if (cv_timedwait(&ill->ill_cv, &ill->ill_lock, timeout) < 0) {
-			/* Timeout */
-			break;
-		}
-	}
-	mutex_exit(&ill->ill_lock);
-
-	/*
-	 * Forcibly enter the ipsq after some delay. This is to take
-	 * care of the case when some ioctl does not complete because
-	 * we sent a control message to the driver and it did not
-	 * send us a reply. We want to be able to at least unplumb
-	 * and replumb rather than force the user to reboot the system.
-	 */
-	success = ipsq_enter(ill, B_FALSE);
+	success = ipsq_enter(ill, B_FALSE, NEW_OP);
 
 	/*
 	 * Open/close/push/pop is guaranteed to be single threaded
@@ -5661,33 +5637,6 @@ ip_conn_input(void *arg1, mblk_t *mp, void *arg2)
 	putnext(connp->conn_rq, mp);
 }
 
-/* Return the IP checksum for the IP header at "iph". */
-uint16_t
-ip_csum_hdr(ipha_t *ipha)
-{
-	uint16_t	*uph;
-	uint32_t	sum;
-	int		opt_len;
-
-	opt_len = (ipha->ipha_version_and_hdr_length & 0xF) -
-	    IP_SIMPLE_HDR_LENGTH_IN_WORDS;
-	uph = (uint16_t *)ipha;
-	sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
-	    uph[5] + uph[6] + uph[7] + uph[8] + uph[9];
-	if (opt_len > 0) {
-		do {
-			sum += uph[10];
-			sum += uph[11];
-			uph += 2;
-		} while (--opt_len);
-	}
-	sum = (sum & 0xFFFF) + (sum >> 16);
-	sum = ~(sum + (sum >> 16)) & 0xFFFF;
-	if (sum == 0xffff)
-		sum = 0;
-	return ((uint16_t)sum);
-}
-
 /*
  * Called when the module is about to be unloaded
  */
@@ -5741,6 +5690,11 @@ ip_stack_shutdown(netstackid_t stackid, void *arg)
 	 */
 	ipv4_hook_shutdown(ipst);
 	ipv6_hook_shutdown(ipst);
+
+	mutex_enter(&ipst->ips_capab_taskq_lock);
+	ipst->ips_capab_taskq_quit = B_TRUE;
+	cv_signal(&ipst->ips_capab_taskq_cv);
+	mutex_exit(&ipst->ips_capab_taskq_lock);
 }
 
 /*
@@ -5760,6 +5714,10 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	ipv4_hook_destroy(ipst);
 	ipv6_hook_destroy(ipst);
 	ip_net_destroy(ipst);
+
+	mutex_destroy(&ipst->ips_capab_taskq_lock);
+	cv_destroy(&ipst->ips_capab_taskq_cv);
+	list_destroy(&ipst->ips_capab_taskq_list);
 
 #ifdef NS_DEBUG
 	printf("ip_stack_fini(%p, stack %d)\n", (void *)ipst, stackid);
@@ -5882,7 +5840,7 @@ ip_thread_exit(void *phash)
 void
 ip_ddi_init(void)
 {
-	ip_input_proc = ip_squeue_switch(ip_squeue_enter);
+	ip_squeue_flag = ip_squeue_switch(ip_squeue_enter);
 
 	/*
 	 * For IP and TCP the minor numbers should start from 2 since we have 4
@@ -6042,6 +6000,16 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	ip_net_init(ipst, ns);
 	ipv4_hook_init(ipst);
 	ipv6_hook_init(ipst);
+
+	/*
+	 * Create the taskq dispatcher thread and initialize related stuff.
+	 */
+	ipst->ips_capab_taskq_thread = thread_create(NULL, 0,
+	    ill_taskq_dispatch, ipst, 0, &p0, TS_RUN, minclsyspri);
+	mutex_init(&ipst->ips_capab_taskq_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&ipst->ips_capab_taskq_cv, NULL, CV_DEFAULT, NULL);
+	list_create(&ipst->ips_capab_taskq_list, sizeof (mblk_t),
+	    offsetof(mblk_t, b_next));
 
 	return (ipst);
 }
@@ -6839,8 +6807,8 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 	BUMP_MIB(recv_ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	if (IPCL_IS_TCP(connp)) {
 		/* do not drain, certain use cases can blow the stack */
-		squeue_enter_nodrain(connp->conn_sqp, first_mp,
-		    connp->conn_recv, connp, SQTAG_IP_FANOUT_TCP);
+		SQUEUE_ENTER_ONE(connp->conn_sqp, first_mp, connp->conn_recv,
+		    connp, ip_squeue_flag, SQTAG_IP_FANOUT_TCP);
 	} else {
 		/* Not TCP; must be SOCK_RAW, IPPROTO_TCP */
 		(connp->conn_recv)(connp, first_mp, NULL);
@@ -7016,9 +6984,10 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 	if (CONN_INBOUND_POLICY_PRESENT(connp, ipss) || secure) {
 		first_mp = ipsec_check_inbound_policy(first_mp, connp, ipha,
 		    NULL, mctl_present);
+		/* Freed by ipsec_check_inbound_policy(). */
 		if (first_mp == NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-			return;	/* Freed by ipsec_check_inbound_policy(). */
+			return;
 		}
 	}
 	if (mctl_present)
@@ -9832,6 +9801,9 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	netstack_rele(ipst->ips_netstack);
 
 	connp->conn_zoneid = zoneid;
+	connp->conn_sqp = NULL;
+	connp->conn_initial_sqp = NULL;
+	connp->conn_final_sqp = NULL;
 
 	connp->conn_upq = q;
 	q->q_ptr = WR(q)->q_ptr = connp;
@@ -12977,6 +12949,7 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 	mblk_t		*mp1;
 	boolean_t	syn_present = B_FALSE;
 	tcph_t		*tcph;
+	uint_t		tcph_flags;
 	uint_t		ip_hdr_len;
 	ill_t		*ill = (ill_t *)q->q_ptr;
 	zoneid_t	zoneid = ire->ire_zoneid;
@@ -13121,6 +13094,9 @@ try_again:
 		goto no_conn;
 	}
 
+	tcph = (tcph_t *)&mp->b_rptr[ip_hdr_len];
+	tcph_flags = tcph->th_flags[0] & (TH_SYN|TH_ACK|TH_RST|TH_URG);
+
 	/*
 	 * TCP FAST PATH for AF_INET socket.
 	 *
@@ -13138,12 +13114,17 @@ try_again:
 	    !IPP_ENABLED(IPP_LOCAL_IN, ipst)) {
 		ASSERT(first_mp == mp);
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
-		SET_SQUEUE(mp, tcp_rput_data, connp);
+		if (tcph_flags != (TH_SYN | TH_ACK)) {
+			SET_SQUEUE(mp, tcp_rput_data, connp);
+			return (mp);
+		}
+		mp->b_datap->db_struioflag |= STRUIO_CONNECT;
+		DB_CKSUMSTART(mp) = (intptr_t)ip_squeue_get(ill_ring);
+		SET_SQUEUE(mp, tcp_input, connp);
 		return (mp);
 	}
 
-	tcph = (tcph_t *)&mp->b_rptr[ip_hdr_len];
-	if ((tcph->th_flags[0] & (TH_SYN|TH_ACK|TH_RST|TH_URG)) == TH_SYN) {
+	if (tcph_flags == TH_SYN) {
 		if (IPCL_IS_TCP(connp)) {
 			mp->b_datap->db_struioflag |= STRUIO_EAGER;
 			DB_CKSUMSTART(mp) =
@@ -13165,7 +13146,6 @@ try_again:
 			}
 			syn_present = B_TRUE;
 		}
-
 	}
 
 	if (IPCL_IS_TCP(connp) && IPCL_IS_BOUND(connp) && !syn_present) {
@@ -13903,6 +13883,12 @@ ip_check_multihome(void *addr, ire_t *ire, ill_t *ill)
 	return (NULL);
 }
 
+/*
+ *
+ * This is the fast forward path. If we are here, we dont need to
+ * worry about RSVP, CGTP, or TSol. Furthermore the ftable lookup
+ * needed to find the nexthop in this case is much simpler
+ */
 ire_t *
 ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 {
@@ -13928,6 +13914,12 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 		 */
 		ire_refrele(ire);
 		ire = ire_cache_lookup(dst, GLOBAL_ZONEID, NULL, ipst);
+		/*
+		 * ire_cache_lookup() can return ire of IRE_LOCAL in
+		 * transient cases. In such case, just drop the packet
+		 */
+		if (ire->ire_type != IRE_CACHE)
+			goto drop;
 	}
 
 	/*
@@ -13952,8 +13944,8 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	/* No ire cache of nexthop. So first create one  */
 	if (ire == NULL) {
 
-		ire = ire_forward(dst, &ret_action, NULL, NULL,
-		    NULL, ipst);
+		ire = ire_forward_simple(dst, &ret_action, ipst);
+
 		/*
 		 * We only come to ip_fast_forward if ip_cgtp_filter
 		 * is not set. So ire_forward() should not return with
@@ -14001,7 +13993,6 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	pkt_len = ntohs(ipha->ipha_length);
 	stq_ill = (ill_t *)ire->ire_stq->q_ptr;
 	if (!(stq_ill->ill_flags & ILLF_ROUTER) ||
-	    !(ill->ill_flags & ILLF_ROUTER) ||
 	    (ill == stq_ill) ||
 	    (ill->ill_group != NULL && ill->ill_group == stq_ill->ill_group) ||
 	    (ire->ire_nce == NULL) ||
@@ -14010,7 +14001,7 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	    ((hlen = MBLKL(fpmp)) > MBLKHEAD(mp)) ||
 	    ipha->ipha_ttl <= 1) {
 		ip_rput_process_forward(ill->ill_rq, mp, ire,
-		    ipha, ill, B_FALSE);
+		    ipha, ill, B_FALSE, B_TRUE);
 		return (ire);
 	}
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInForwDatagrams);
@@ -14048,34 +14039,33 @@ ip_fast_forward(ire_t *ire, ipaddr_t dst,  ill_t *ill, mblk_t *mp)
 	BUMP_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
 	UPDATE_MIB(stq_ill->ill_ip_mib, ipIfStatsHCOutOctets, pkt_len);
 
-	dev_q = ire->ire_stq->q_next;
-	if ((dev_q->q_next != NULL || dev_q->q_first != NULL) &&
-	    !canputnext(ire->ire_stq)) {
-		goto indiscard;
+	if (!ILL_DIRECT_CAPABLE(stq_ill) || DB_TYPE(mp) != M_DATA) {
+		dev_q = ire->ire_stq->q_next;
+		if (DEV_Q_FLOW_BLOCKED(dev_q))
+			goto indiscard;
 	}
-	if (ILL_DLS_CAPABLE(stq_ill)) {
-		/*
-		 * Send the packet directly to DLD, where it
-		 * may be queued depending on the availability
-		 * of transmit resources at the media layer.
-		 */
-		IP_DLS_ILL_TX(stq_ill, ipha, mp, ipst, hlen);
-	} else {
-		DTRACE_PROBE4(ip4__physical__out__start,
-		    ill_t *, NULL, ill_t *, stq_ill,
-		    ipha_t *, ipha, mblk_t *, mp);
-		FW_HOOKS(ipst->ips_ip4_physical_out_event,
-		    ipst->ips_ipv4firewall_physical_out,
-		    NULL, stq_ill, ipha, mp, mp, 0, ipst);
-		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
-		if (mp == NULL)
-			goto drop;
 
-		DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL, void_ip_t *,
-		    ipha, __dtrace_ipsr_ill_t *, stq_ill, ipha_t *, ipha,
-		    ip6_t *, NULL, int, 0);
+	DTRACE_PROBE4(ip4__physical__out__start,
+	    ill_t *, NULL, ill_t *, stq_ill, ipha_t *, ipha, mblk_t *, mp);
+	FW_HOOKS(ipst->ips_ip4_physical_out_event,
+	    ipst->ips_ipv4firewall_physical_out,
+	    NULL, stq_ill, ipha, mp, mp, 0, ipst);
+	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+	DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL, void_ip_t *,
+	    ipha, __dtrace_ipsr_ill_t *, stq_ill, ipha_t *, ipha,
+	    ip6_t *, NULL, int, 0);
 
-		putnext(ire->ire_stq, mp);
+	if (mp != NULL) {
+		if (ipst->ips_ipobs_enabled) {
+			zoneid_t szone;
+
+			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,
+			    ipst, ALL_ZONES);
+			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,
+			    ALL_ZONES, ill, IPV4_VERSION, hlen, ipst);
+		}
+
+		ILL_SEND_TX(stq_ill, ire, dst, mp, IP_DROP_ON_NO_DESC);
 	}
 	return (ire);
 
@@ -14096,7 +14086,7 @@ drop:
 
 static void
 ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
-    ill_t *ill, boolean_t ll_multicast)
+    ill_t *ill, boolean_t ll_multicast, boolean_t from_ip_fast_forward)
 {
 	ill_group_t	*ill_group;
 	ill_group_t	*ire_group;
@@ -14108,6 +14098,16 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 
 	mp->b_prev = NULL; /* ip_rput_noire sets incoming interface here */
 	mp->b_next = NULL; /* ip_rput_noire sets dst here */
+
+	/*
+	 * If the caller of this function is ip_fast_forward() skip the
+	 * next three checks as it does not apply.
+	 */
+	if (from_ip_fast_forward) {
+		ill_group = ill->ill_group;
+		ire_group = ((ill_t *)(ire->ire_rfq)->q_ptr)->ill_group;
+		goto skip;
+	}
 
 	if (ll_multicast != 0) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
@@ -14147,6 +14147,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	 * side-effect of that would be requiring an ire flush
 	 * whenever the ILLF_ROUTER flag changes.
 	 */
+skip:
 	if (((ill->ill_flags &
 	    ((ill_t *)ire->ire_stq->q_ptr)->ill_flags &
 	    ILLF_ROUTER) == 0) &&
@@ -14253,7 +14254,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	}
 sendit:
 	dev_q = ire->ire_stq->q_next;
-	if ((dev_q->q_next || dev_q->q_first) && !canput(dev_q)) {
+	if (DEV_Q_FLOW_BLOCKED(dev_q)) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 		freemsg(mp);
 		return;
@@ -14447,7 +14448,7 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 			ipha->ipha_hdr_checksum = 0;
 			ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
 			ip_rput_process_forward(q, mp, ire, ipha,
-			    ill, ll_multicast);
+			    ill, ll_multicast, B_FALSE);
 			ire_refrele(ire);
 			return (NULL);
 		}
@@ -14904,6 +14905,15 @@ ip_fix_dbref(ill_t *ill, mblk_t *mp)
 	return (mp1);
 }
 
+#define	ADD_TO_CHAIN(head, tail, cnt, mp) {    			\
+	if (tail != NULL)					\
+		tail->b_next = mp;				\
+	else							\
+		head = mp;					\
+	tail = mp;						\
+	cnt++;							\
+}
+
 /*
  * Direct read side procedure capable of dealing with chains. GLDv3 based
  * drivers call this function directly with mblk chains while STREAMS
@@ -14942,20 +14952,23 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 	mblk_t 			*head = NULL;
 	mblk_t			*tail = NULL;
 	mblk_t			*first_mp;
-	mblk_t 			*mp;
-	mblk_t			*dmp;
 	int			cnt = 0;
 	ip_stack_t		*ipst = ill->ill_ipst;
+	mblk_t			*mp;
+	mblk_t			*dmp;
+	uint8_t			tag;
 
 	ASSERT(mp_chain != NULL);
 	ASSERT(ill != NULL);
 
 	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_input_start: q %p", q);
 
+	tag = (ip_ring != NULL) ? SQTAG_IP_INPUT_RX_RING : SQTAG_IP_INPUT;
+
 #define	rptr	((uchar_t *)ipha)
 
 	while (mp_chain != NULL) {
-		first_mp = mp = mp_chain;
+		mp = mp_chain;
 		mp_chain = mp_chain->b_next;
 		mp->b_next = NULL;
 		ll_multicast = 0;
@@ -14987,6 +15000,15 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		 * Given the above assumption, there is no need to walk
 		 * down the entire mblk chain (which could have a
 		 * potential performance problem)
+		 *
+		 * The "(DB_REF(mp) > 1)" check was moved from ip_rput()
+		 * to here because of exclusive ip stacks and vnics.
+		 * Packets transmitted from exclusive stack over vnic
+		 * can have db_ref > 1 and when it gets looped back to
+		 * another vnic in a different zone, you have ip_input()
+		 * getting dblks with db_ref > 1. So if someone
+		 * complains of TCP performance under this scenario,
+		 * take a serious look here on the impact of copymsg().
 		 */
 
 		if (DB_REF(mp) > 1) {
@@ -15056,7 +15078,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			}
 		}
 
-		/* Make sure its an M_DATA and that its aligned */
+		/* Only M_DATA can come here and it is always aligned */
 		ASSERT(DB_TYPE(mp) == M_DATA);
 		ASSERT(DB_REF(mp) == 1 && OK_32PTR(mp->b_rptr));
 
@@ -15140,7 +15162,6 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 			continue;
 		}
 		dst = ipha->ipha_dst;
-
 		/*
 		 * Attach any necessary label information to
 		 * this packet
@@ -15194,16 +15215,18 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		    opt_len == 0 && ipha->ipha_protocol != IPPROTO_RSVP &&
 		    !ll_multicast && !CLASSD(dst) && ill->ill_dhcpinit == 0) {
 			if (ire == NULL)
-				ire = ire_cache_lookup(dst, ALL_ZONES, NULL,
-				    ipst);
-
-			/* incoming packet is for forwarding */
-			if (ire == NULL || (ire->ire_type & IRE_CACHE)) {
+				ire = ire_cache_lookup_simple(dst, ipst);
+			/*
+			 * Unless forwarding is enabled, dont call
+			 * ip_fast_forward(). Incoming packet is for forwarding
+			 */
+			if ((ill->ill_flags & ILLF_ROUTER) &&
+			    (ire == NULL || (ire->ire_type & IRE_CACHE))) {
 				ire = ip_fast_forward(ire, dst, ill, mp);
 				continue;
 			}
 			/* incoming packet is for local consumption */
-			if (ire->ire_type & IRE_LOCAL)
+			if ((ire != NULL) && (ire->ire_type & IRE_LOCAL))
 				goto local;
 		}
 
@@ -15363,7 +15386,7 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain,
 		} else if (ire->ire_stq != NULL) {
 			/* fowarding? */
 			ip_rput_process_forward(q, mp, ire, ipha, ill,
-			    ll_multicast);
+			    ll_multicast, B_FALSE);
 			/* ip_rput_process_forward consumed the packet */
 			continue;
 		}
@@ -15414,8 +15437,8 @@ local:
 					 * changes.
 					 */
 					IP_STAT(ipst, ip_input_multi_squeue);
-					squeue_enter_chain(curr_sqp, head,
-					    tail, cnt, SQTAG_IP_INPUT);
+					SQUEUE_ENTER(curr_sqp, head,
+					    tail, cnt, SQ_PROCESS, tag);
 					curr_sqp = GET_SQUEUE(mp);
 					head = mp;
 					tail = mp;
@@ -15444,33 +15467,231 @@ local:
 		ire_refrele(ire);
 
 	if (head != NULL)
-		squeue_enter_chain(curr_sqp, head, tail, cnt, SQTAG_IP_INPUT);
-
-	/*
-	 * This code is there just to make netperf/ttcp look good.
-	 *
-	 * Its possible that after being in polling mode (and having cleared
-	 * the backlog), squeues have turned the interrupt frequency higher
-	 * to improve latency at the expense of more CPU utilization (less
-	 * packets per interrupts or more number of interrupts). Workloads
-	 * like ttcp/netperf do manage to tickle polling once in a while
-	 * but for the remaining time, stay in higher interrupt mode since
-	 * their packet arrival rate is pretty uniform and this shows up
-	 * as higher CPU utilization. Since people care about CPU utilization
-	 * while running netperf/ttcp, turn the interrupt frequency back to
-	 * normal/default if polling has not been used in ip_poll_normal_ticks.
-	 */
-	if (ip_ring != NULL && (ip_ring->rr_poll_state & ILL_POLLING)) {
-		if (lbolt >= (ip_ring->rr_poll_time + ip_poll_normal_ticks)) {
-			ip_ring->rr_poll_state &= ~ILL_POLLING;
-			ip_ring->rr_blank(ip_ring->rr_handle,
-			    ip_ring->rr_normal_blank_time,
-			    ip_ring->rr_normal_pkt_cnt);
-		}
-		}
+		SQUEUE_ENTER(curr_sqp, head, tail, cnt, SQ_PROCESS, tag);
 
 	TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
 	    "ip_input_end: q %p (%S)", q, "end");
+#undef  rptr
+}
+
+/*
+ * ip_accept_tcp() - This function is called by the squeue when it retrieves
+ * a chain of packets in the poll mode. The packets have gone through the
+ * data link processing but not IP processing. For performance and latency
+ * reasons, the squeue wants to process the chain in line instead of feeding
+ * it back via ip_input path.
+ *
+ * So this is a light weight function which checks to see if the packets
+ * retrived are indeed TCP packets (TCP squeue always polls TCP soft ring
+ * but we still do the paranoid check) meant for local machine and we don't
+ * have labels etc enabled. Packets that meet the criterion are returned to
+ * the squeue and processed inline while the rest go via ip_input path.
+ */
+/*ARGSUSED*/
+mblk_t *
+ip_accept_tcp(ill_t *ill, ill_rx_ring_t *ip_ring, squeue_t *target_sqp,
+    mblk_t *mp_chain, mblk_t **last, uint_t *cnt)
+{
+	mblk_t 		*mp;
+	ipaddr_t	dst = NULL;
+	ipaddr_t	prev_dst;
+	ire_t		*ire = NULL;
+	ipha_t		*ipha;
+	uint_t		pkt_len;
+	ssize_t		len;
+	uint_t		opt_len;
+	queue_t		*q = ill->ill_rq;
+	squeue_t	*curr_sqp;
+	mblk_t 		*ahead = NULL;	/* Accepted head */
+	mblk_t		*atail = NULL;	/* Accepted tail */
+	uint_t		acnt = 0;	/* Accepted count */
+	mblk_t		*utail = NULL;	/* Unaccepted head */
+	mblk_t		*uhead = NULL;	/* Unaccepted tail */
+	uint_t		ucnt = 0;	/* Unaccepted cnt */
+	ip_stack_t	*ipst = ill->ill_ipst;
+
+	*cnt = 0;
+
+	ASSERT(ill != NULL);
+	ASSERT(ip_ring != NULL);
+
+	TRACE_1(TR_FAC_IP, TR_IP_RPUT_START, "ip_accept_tcp: q %p", q);
+
+#define	rptr	((uchar_t *)ipha)
+
+	while (mp_chain != NULL) {
+		mp = mp_chain;
+		mp_chain = mp_chain->b_next;
+		mp->b_next = NULL;
+
+		/*
+		 * We do ire caching from one iteration to
+		 * another. In the event the packet chain contains
+		 * all packets from the same dst, this caching saves
+		 * an ire_cache_lookup for each of the succeeding
+		 * packets in a packet chain.
+		 */
+		prev_dst = dst;
+
+		ipha = (ipha_t *)mp->b_rptr;
+		len = mp->b_wptr - rptr;
+
+		ASSERT(!MBLK_RX_FANOUT_SLOWPATH(mp, ipha));
+
+		/*
+		 * If it is a non TCP packet, or doesn't have H/W cksum,
+		 * or doesn't have min len, reject.
+		 */
+		if ((ipha->ipha_protocol != IPPROTO_TCP) || (len <
+		    (IP_SIMPLE_HDR_LENGTH + TCP_MIN_HEADER_LENGTH))) {
+			ADD_TO_CHAIN(uhead, utail, ucnt, mp);
+			continue;
+		}
+
+		pkt_len = ntohs(ipha->ipha_length);
+		if (len != pkt_len) {
+			if (len > pkt_len) {
+				mp->b_wptr = rptr + pkt_len;
+			} else {
+				ADD_TO_CHAIN(uhead, utail, ucnt, mp);
+				continue;
+			}
+		}
+
+		opt_len = ipha->ipha_version_and_hdr_length -
+		    IP_SIMPLE_HDR_VERSION;
+		dst = ipha->ipha_dst;
+
+		/* IP version bad or there are IP options */
+		if (opt_len && (!ip_rput_multimblk_ipoptions(q, ill,
+		    mp, &ipha, &dst, ipst)))
+			continue;
+
+		if (is_system_labeled() || (ill->ill_dhcpinit != 0) ||
+		    (ipst->ips_ip_cgtp_filter &&
+		    ipst->ips_ip_cgtp_filter_ops != NULL)) {
+			ADD_TO_CHAIN(uhead, utail, ucnt, mp);
+			continue;
+		}
+
+		/*
+		 * Reuse the cached ire only if the ipha_dst of the previous
+		 * packet is the same as the current packet AND it is not
+		 * INADDR_ANY.
+		 */
+		if (!(dst == prev_dst && dst != INADDR_ANY) &&
+		    (ire != NULL)) {
+			ire_refrele(ire);
+			ire = NULL;
+		}
+
+		if (ire == NULL)
+			ire = ire_cache_lookup_simple(dst, ipst);
+
+		/*
+		 * Unless forwarding is enabled, dont call
+		 * ip_fast_forward(). Incoming packet is for forwarding
+		 */
+		if ((ill->ill_flags & ILLF_ROUTER) &&
+		    (ire == NULL || (ire->ire_type & IRE_CACHE))) {
+
+			DTRACE_PROBE4(ip4__physical__in__start,
+			    ill_t *, ill, ill_t *, NULL,
+			    ipha_t *, ipha, mblk_t *, mp);
+
+			FW_HOOKS(ipst->ips_ip4_physical_in_event,
+			    ipst->ips_ipv4firewall_physical_in,
+			    ill, NULL, ipha, mp, mp, 0, ipst);
+
+			DTRACE_PROBE1(ip4__physical__in__end, mblk_t *, mp);
+
+			BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInReceives);
+			UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets,
+			    pkt_len);
+
+			ire = ip_fast_forward(ire, dst, ill, mp);
+			continue;
+		}
+
+		/* incoming packet is for local consumption */
+		if ((ire != NULL) && (ire->ire_type & IRE_LOCAL))
+			goto local_accept;
+
+		/*
+		 * Disable ire caching for anything more complex
+		 * than the simple fast path case we checked for above.
+		 */
+		if (ire != NULL) {
+			ire_refrele(ire);
+			ire = NULL;
+		}
+
+		ire = ire_cache_lookup(dst, ALL_ZONES, MBLK_GETLABEL(mp),
+		    ipst);
+		if (ire == NULL || ire->ire_type == IRE_BROADCAST ||
+		    ire->ire_stq != NULL) {
+			ADD_TO_CHAIN(uhead, utail, ucnt, mp);
+			if (ire != NULL) {
+				ire_refrele(ire);
+				ire = NULL;
+			}
+			continue;
+		}
+
+local_accept:
+
+		if (ire->ire_rfq != q) {
+			ADD_TO_CHAIN(uhead, utail, ucnt, mp);
+			if (ire != NULL) {
+				ire_refrele(ire);
+				ire = NULL;
+			}
+			continue;
+		}
+
+		/*
+		 * The event for packets being received from a 'physical'
+		 * interface is placed after validation of the source and/or
+		 * destination address as being local so that packets can be
+		 * redirected to loopback addresses using ipnat.
+		 */
+		DTRACE_PROBE4(ip4__physical__in__start,
+		    ill_t *, ill, ill_t *, NULL,
+		    ipha_t *, ipha, mblk_t *, mp);
+
+		FW_HOOKS(ipst->ips_ip4_physical_in_event,
+		    ipst->ips_ipv4firewall_physical_in,
+		    ill, NULL, ipha, mp, mp, 0, ipst);
+
+		DTRACE_PROBE1(ip4__physical__in__end, mblk_t *, mp);
+
+		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInReceives);
+		UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInOctets, pkt_len);
+
+		if ((mp = ip_tcp_input(mp, ipha, ill, B_FALSE, ire, mp,
+		    0, q, ip_ring)) != NULL) {
+			if ((curr_sqp = GET_SQUEUE(mp)) == target_sqp) {
+				ADD_TO_CHAIN(ahead, atail, acnt, mp);
+			} else {
+				SQUEUE_ENTER(curr_sqp, mp, mp, 1,
+				    SQ_FILL, SQTAG_IP_INPUT);
+			}
+		}
+	}
+
+	if (ire != NULL)
+		ire_refrele(ire);
+
+	if (uhead != NULL)
+		ip_input(ill, ip_ring, uhead, NULL);
+
+	if (ahead != NULL) {
+		*last = atail;
+		*cnt = acnt;
+		return (ahead);
+	}
+
+	return (NULL);
 #undef  rptr
 }
 
@@ -15770,11 +15991,18 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			}
 			freemsg(mp);	/* Don't want to pass this up */
 			return;
-
-		case DL_CAPABILITY_REQ:
 		case DL_CONTROL_REQ:
+			ip1dbg(("ip_rput_dlpi_writer: got DL_ERROR_ACK for "
+			    "DL_CONTROL_REQ\n"));
 			ill_dlpi_done(ill, dlea->dl_error_primitive);
-			ill->ill_dlpi_capab_state = IDS_FAILED;
+			freemsg(mp);
+			return;
+		case DL_CAPABILITY_REQ:
+			ip1dbg(("ip_rput_dlpi_writer: got DL_ERROR_ACK for "
+			    "DL_CAPABILITY REQ\n"));
+			if (ill->ill_dlpi_capab_state == IDCS_PROBE_SENT)
+				ill->ill_dlpi_capab_state = IDCS_FAILED;
+			ill_capability_done(ill);
 			freemsg(mp);
 			return;
 		}
@@ -15814,19 +16042,14 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			    dlea->dl_errno, dlea->dl_unix_errno);
 		break;
 	case DL_CAPABILITY_ACK:
-		/* Call a routine to handle this one. */
-		ill_dlpi_done(ill, DL_CAPABILITY_REQ);
 		ill_capability_ack(ill, mp);
-
 		/*
-		 * If the ack is due to renegotiation, we will need to send
-		 * a new CAPABILITY_REQ to start the renegotiation.
+		 * The message has been handed off to ill_capability_ack
+		 * and must not be freed below
 		 */
-		if (ill->ill_capab_reneg) {
-			ill->ill_capab_reneg = B_FALSE;
-			ill_capability_probe(ill);
-		}
+		mp = NULL;
 		break;
+
 	case DL_CONTROL_ACK:
 		/* We treat all of these as "fire and forget" */
 		ill_dlpi_done(ill, DL_CONTROL_REQ);
@@ -16117,10 +16340,9 @@ ip_rput_dlpi_writer(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 			 * and the renegotiation has not been started yet;
 			 * nothing needs to be done in this case.
 			 */
-			if (ill->ill_dlpi_capab_state != IDS_UNKNOWN) {
-				ill_capability_reset(ill);
-				ill->ill_capab_reneg = B_TRUE;
-			}
+			ipsq_current_start(ipsq, ill->ill_ipif, 0);
+			ill_capability_reset(ill, B_TRUE);
+			ipsq_current_finish(ipsq);
 			break;
 		default:
 			ip0dbg(("ip_rput_dlpi_writer: unknown notification "
@@ -16661,7 +16883,8 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 				max_frag -= secopt_size;
 		}
 
-		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0, GLOBAL_ZONEID, ipst);
+		ip_wput_frag(ire, mp, IB_PKT, max_frag, 0,
+		    GLOBAL_ZONEID, ipst, NULL);
 		ip2dbg(("ip_rput_forward:sent to ip_wput_frag\n"));
 		return;
 	}
@@ -16677,7 +16900,7 @@ ip_rput_forward(ire_t *ire, ipha_t *ipha, mblk_t *mp, ill_t *in_ill)
 
 	mp->b_prev = (mblk_t *)IPP_FWD_OUT;
 	ip1dbg(("ip_rput_forward: Calling ip_xmit_v4\n"));
-	(void) ip_xmit_v4(mp, ire, NULL, B_FALSE);
+	(void) ip_xmit_v4(mp, ire, NULL, B_FALSE, NULL);
 	/* ip_xmit_v4 always consumes the packet */
 	return;
 
@@ -17049,9 +17272,12 @@ ip_fanout_proto_again(mblk_t *ipsec_mp, ill_t *ill, ill_t *recv_ill, ire_t *ire)
 				mp = ip_tcp_input(mp, ipha, ill, B_TRUE,
 				    ire, ipsec_mp, 0, ill->ill_rq, NULL);
 				IRE_REFRELE(ire);
-				if (mp != NULL)
-					squeue_enter_chain(GET_SQUEUE(mp), mp,
-					    mp, 1, SQTAG_IP_PROTO_AGAIN);
+				if (mp != NULL) {
+
+					SQUEUE_ENTER(GET_SQUEUE(mp), mp,
+					    mp, 1, SQ_PROCESS,
+					    SQTAG_IP_PROTO_AGAIN);
+				}
 				break;
 			case IPPROTO_SCTP:
 				if (!ire_need_rele)
@@ -21721,7 +21947,7 @@ conn_set_held_ipif(conn_t *connp, ipif_t **ipifp, ipif_t *ipif)
  */
 static void
 ip_wput_ire_fragmentit(mblk_t *ipsec_mp, ire_t *ire, zoneid_t zoneid,
-    ip_stack_t *ipst)
+    ip_stack_t *ipst, conn_t *connp)
 {
 	ipha_t		*ipha;
 	mblk_t		*mp;
@@ -21779,7 +22005,7 @@ ip_wput_ire_fragmentit(mblk_t *ipsec_mp, ire_t *ire, zoneid_t zoneid,
 	    ip_source_route_included(ipha)) || CLASSD(ipha->ipha_dst));
 
 	ip_wput_frag(ire, ipsec_mp, OB_PKT, max_frag,
-	    (dont_use ? 0 : frag_flag), zoneid, ipst);
+	    (dont_use ? 0 : frag_flag), zoneid, ipst, connp);
 }
 
 /*
@@ -22502,9 +22728,9 @@ another:;
 		queue_t *dev_q = stq->q_next;
 
 		/* flow controlled */
-		if ((dev_q->q_next || dev_q->q_first) &&
-		    !canput(dev_q))
+		if (DEV_Q_FLOW_BLOCKED(dev_q))
 			goto blocked;
+
 		if ((PROTO == IPPROTO_UDP) &&
 		    (ip_hdr_included != IP_HDR_INCLUDED)) {
 			hlen = (V_HLEN & 0xF) << 2;
@@ -22685,6 +22911,7 @@ another:;
 		    ipst->ips_ipv4firewall_physical_out,
 		    NULL, ire->ire_ipif->ipif_ill, ipha, mp, mp, 0, ipst);
 		DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);
+
 		if (mp == NULL)
 			goto release_ire_and_ill;
 
@@ -22703,7 +22930,9 @@ another:;
 		}
 		mp->b_prev = SET_BPREV_FLAG(IPP_LOCAL_OUT);
 		DTRACE_PROBE2(ip__xmit__1, mblk_t *, mp, ire_t *, ire);
-		pktxmit_state = ip_xmit_v4(mp, ire, NULL, B_TRUE);
+
+		pktxmit_state = ip_xmit_v4(mp, ire, NULL, B_TRUE, connp);
+
 		if ((pktxmit_state == SEND_FAILED) ||
 		    (pktxmit_state == LLHDR_RESLV_FAILED)) {
 			ip2dbg(("ip_wput_ire: ip_xmit_v4 failed"
@@ -22976,10 +23205,9 @@ broadcast:
 #endif
 				sctph->sh_chksum = sctp_cksum(mp, hlen);
 		} else {
-			queue_t *dev_q = stq->q_next;
+			queue_t	*dev_q = stq->q_next;
 
-			if ((dev_q->q_next || dev_q->q_first) &&
-			    !canput(dev_q)) {
+			if (DEV_Q_FLOW_BLOCKED(dev_q)) {
 blocked:
 				ipha->ipha_ident = ip_hdr_included;
 				/*
@@ -23314,7 +23542,7 @@ checksumoptions:
 				DTRACE_PROBE2(ip__xmit__2,
 				    mblk_t *, mp, ire_t *, ire);
 				pktxmit_state = ip_xmit_v4(mp, ire,
-				    NULL, B_TRUE);
+				    NULL, B_TRUE, connp);
 				if ((pktxmit_state == SEND_FAILED) ||
 				    (pktxmit_state == LLHDR_RESLV_FAILED)) {
 release_ire_and_ill_2:
@@ -23471,13 +23699,14 @@ fragmentit:
 					    "ip_wput_ire_end: q %p (%S)",
 					    q, "last fragmentation");
 					ip_wput_ire_fragmentit(mp, ire,
-					    zoneid, ipst);
+					    zoneid, ipst, connp);
 					ire_refrele(ire);
 					if (conn_outgoing_ill != NULL)
 						ill_refrele(conn_outgoing_ill);
 					return;
 				}
-				ip_wput_ire_fragmentit(mp, ire, zoneid, ipst);
+				ip_wput_ire_fragmentit(mp, ire,
+				    zoneid, ipst, connp);
 			}
 		}
 	} else {
@@ -24195,7 +24424,7 @@ pbuf_panic:
  */
 static void
 ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
-    uint32_t frag_flag, zoneid_t zoneid, ip_stack_t *ipst)
+    uint32_t frag_flag, zoneid_t zoneid, ip_stack_t *ipst, conn_t *connp)
 {
 	int		i1;
 	mblk_t		*ll_hdr_mp;
@@ -24253,7 +24482,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	 */
 	if (ire->ire_nce && ire->ire_nce->nce_state != ND_REACHABLE) {
 		/* If nce_state is ND_INITIAL, trigger ARP query */
-		(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE);
+		(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE, NULL);
 		ip1dbg(("ip_wput_frag: mac address for ire is unresolved"
 		    " -  dropping packet\n"));
 		BUMP_MIB(mibptr, ipIfStatsOutFragFails);
@@ -24622,7 +24851,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 			    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, out_ill,
 			    ipha_t *, ipha, ip6_t *, NULL, int, 0);
 
-			putnext(q, xmit_mp);
+			ILL_SEND_TX(out_ill, ire, connp, xmit_mp, 0);
 
 			BUMP_MIB(out_ill->ill_ip_mib, ipIfStatsHCOutTransmits);
 			UPDATE_MIB(out_ill->ill_ip_mib,
@@ -24932,7 +25161,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 				    __dtrace_ipsr_ill_t *, out_ill, ipha_t *,
 				    ipha, ip6_t *, NULL, int, 0);
 
-				putnext(q, xmit_mp);
+				ILL_SEND_TX(out_ill, ire, connp, xmit_mp, 0);
 
 				BUMP_MIB(out_ill->ill_ip_mib,
 				    ipIfStatsHCOutTransmits);
@@ -26286,7 +26515,8 @@ send:
 			    "fragmented accelerated packet!\n"));
 			freemsg(ipsec_mp);
 		} else {
-			ip_wput_ire_fragmentit(ipsec_mp, ire, zoneid, ipst);
+			ip_wput_ire_fragmentit(ipsec_mp, ire,
+			    zoneid, ipst, NULL);
 		}
 		if (ire_need_rele)
 			ire_refrele(ire);
@@ -26461,7 +26691,7 @@ send:
 			 * Call ip_xmit_v4() to trigger ARP query
 			 * in case the nce_state is ND_INITIAL
 			 */
-			(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE);
+			(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE, NULL);
 			goto drop_pkt;
 		}
 
@@ -26477,7 +26707,7 @@ send:
 
 		ip1dbg(("ip_wput_ipsec_out: calling ip_xmit_v4\n"));
 		pktxmit_state = ip_xmit_v4(mp, ire,
-		    (io->ipsec_out_accelerated ? io : NULL), B_FALSE);
+		    (io->ipsec_out_accelerated ? io : NULL), B_FALSE, NULL);
 
 		if ((pktxmit_state ==  SEND_FAILED) ||
 		    (pktxmit_state == LLHDR_RESLV_FAILED)) {
@@ -27588,9 +27818,9 @@ nak:
 				 */
 				ASSERT(ipsq != NULL);
 				CONN_INC_REF(connp);
-				squeue_fill(connp->conn_sqp, mp,
+				SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
 				    ip_resume_tcp_bind, connp,
-				    SQTAG_BIND_RETRY);
+				    SQ_FILL, SQTAG_BIND_RETRY);
 			} else if (IPCL_IS_UDP(connp)) {
 				/*
 				 * In the case of UDP endpoint we
@@ -28053,7 +28283,7 @@ nak:
 		/*
 		 * send out queued packets.
 		 */
-		(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE);
+		(void) ip_xmit_v4(NULL, ire, NULL, B_FALSE, NULL);
 
 		IRE_REFRELE(ire);
 		return;
@@ -28555,6 +28785,25 @@ ip_wsrv(queue_t *q)
 	conn_drain_tail(connp, B_FALSE);
 
 	connp->conn_did_putbq = 0;
+}
+
+/*
+ * Callback to disable flow control in IP.
+ *
+ * This is a mac client callback added when the DLD_CAPAB_DIRECT capability
+ * is enabled.
+ *
+ * When MAC_TX() is not able to send any more packets, dld sets its queue
+ * to QFULL and enable the STREAMS flow control. Later, when the underlying
+ * driver is able to continue to send packets, it calls mac_tx_(ring_)update()
+ * function and wakes up corresponding mac worker threads, which in turn
+ * calls this callback function, and disables flow control.
+ */
+/* ARGSUSED */
+void
+ill_flow_enable(void *ill, ip_mac_tx_cookie_t cookie)
+{
+	qenable(((ill_t *)ill)->ill_wq);
 }
 
 /*
@@ -29280,17 +29529,17 @@ ip_cgtp_filter_is_registered(netstackid_t stackid)
 	return (ret);
 }
 
-static squeue_func_t
+static int
 ip_squeue_switch(int val)
 {
-	squeue_func_t rval = squeue_fill;
+	int rval = SQ_FILL;
 
 	switch (val) {
 	case IP_SQUEUE_ENTER_NODRAIN:
-		rval = squeue_enter_nodrain;
+		rval = SQ_NODRAIN;
 		break;
 	case IP_SQUEUE_ENTER:
-		rval = squeue_enter;
+		rval = SQ_PROCESS;
 		break;
 	default:
 		break;
@@ -29312,7 +29561,7 @@ ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
 	if (ddi_strtol(value, NULL, 10, &new_value) != 0)
 		return (EINVAL);
 
-	ip_input_proc = ip_squeue_switch(new_value);
+	ip_squeue_flag = ip_squeue_switch(new_value);
 	*v = new_value;
 	return (0);
 }
@@ -29983,7 +30232,8 @@ ip_fanout_sctp_raw(mblk_t *mp, ill_t *recv_ill, ipha_t *ipha, boolean_t isv4,
  *	  ip_wput_frag can call this function.
  */
 ipxmit_state_t
-ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
+ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io,
+    boolean_t flow_ctl_enabled, conn_t *connp)
 {
 	nce_t		*arpce;
 	ipha_t		*ipha;
@@ -30069,7 +30319,8 @@ ip_xmit_v4(mblk_t *mp, ire_t *ire, ipsec_out_t *io, boolean_t flow_ctl_enabled)
 					    ipha_t *, ipha, ip6_t *, NULL, int,
 					    0);
 
-					putnext(q, first_mp);
+					ILL_SEND_TX(out_ill,
+					    ire, connp, first_mp, 0);
 				} else {
 					BUMP_MIB(out_ill->ill_ip_mib,
 					    ipIfStatsOutDiscards);

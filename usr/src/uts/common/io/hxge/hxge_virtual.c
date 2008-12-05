@@ -36,7 +36,6 @@ static void hxge_set_hw_dma_config(p_hxge_t);
 static void hxge_set_hw_class_config(p_hxge_t);
 static void hxge_ldgv_setup(p_hxge_ldg_t *ldgp, p_hxge_ldv_t *ldvp, uint8_t ldv,
 	uint8_t endldg, int *ngrps);
-static hxge_status_t hxge_mmac_init(p_hxge_t);
 
 extern uint16_t hxge_rcr_timeout;
 extern uint16_t hxge_rcr_threshold;
@@ -894,34 +893,10 @@ hxge_intr_mask_mgmt_set(p_hxge_t hxgep, boolean_t on)
 static hxge_status_t
 hxge_get_mac_addr_properties(p_hxge_t hxgep)
 {
-	uint32_t	num_macs;
-	hxge_status_t	status;
-
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "==> hxge_get_mac_addr_properties "));
 
 	(void) hxge_pfc_mac_addrs_get(hxgep);
 	hxgep->ouraddr = hxgep->factaddr;
-
-	/*
-	 * Get the number of MAC addresses the Hydra supports per blade.
-	 */
-	if (hxge_pfc_num_macs_get(hxgep, &num_macs) == HXGE_OK) {
-		hxgep->hxge_mmac_info.num_mmac = (uint8_t)num_macs;
-	} else {
-		HXGE_ERROR_MSG((NULL, HXGE_ERR_CTL,
-		    "hxge_get_mac_addr_properties: get macs failed"));
-		return (HXGE_ERROR);
-	}
-
-	/*
-	 * Initialize alt. mac addr. in the mac pool
-	 */
-	status = hxge_mmac_init(hxgep);
-	if (status != HXGE_OK) {
-		HXGE_ERROR_MSG((NULL, HXGE_ERR_CTL,
-		    "hxge_get_mac_addr_properties: init mmac failed"));
-		return (HXGE_ERROR);
-	}
 
 	HXGE_DEBUG_MSG((hxgep, DDI_CTL, "<== hxge_get_mac_addr_properties "));
 	return (HXGE_OK);
@@ -970,50 +945,4 @@ hxge_ldgv_setup(p_hxge_ldg_t *ldgp, p_hxge_ldv_t *ldvp, uint8_t ldv,
 	    (*ldgp)->ldg, (*ldgp)->nldvs, ldv, ldvp, endldg, *ngrps));
 
 	HXGE_DEBUG_MSG((NULL, INT_CTL, "<== hxge_ldgv_setup"));
-}
-
-/*
- * Note: This function assumes the following distribution of mac
- * addresses for a hydra blade:
- *
- *      -------------
- *    0|            |0 - local-mac-address for blade
- *      -------------
- *     |            |1 - Start of alt. mac addr. for blade
- *     |            |
- *     |            |
- *     |            |15
- *     --------------
- */
-
-static hxge_status_t
-hxge_mmac_init(p_hxge_t hxgep)
-{
-	int slot;
-	hxge_mmac_t *mmac_info;
-
-	mmac_info = (hxge_mmac_t *)&hxgep->hxge_mmac_info;
-
-	/* Set flags for unique MAC */
-	mmac_info->mac_pool[0].flags |= MMAC_SLOT_USED | MMAC_VENDOR_ADDR;
-	mmac_info->num_factory_mmac = 1;
-
-	/*
-	 * Skip the factory/default address which is in slot 0.
-	 * Initialze all other mac addr. to "AVAILABLE" state.
-	 * Clear flags of all alternate MAC slots.
-	 */
-	for (slot = 1; slot < mmac_info->num_mmac; slot++) {
-		(void) hpi_pfc_clear_mac_address(hxgep->hpi_handle, slot);
-		mmac_info->mac_pool[slot].flags = 0;
-	}
-
-	/* Exclude the factory mac address */
-	mmac_info->naddrfree = mmac_info->num_mmac - 1;
-
-	/* Initialize the first two parameters for mmac kstat */
-	hxgep->statsp->mmac_stats.mmac_max_cnt = mmac_info->num_mmac;
-	hxgep->statsp->mmac_stats.mmac_avail_cnt = mmac_info->naddrfree;
-
-	return (HXGE_OK);
 }

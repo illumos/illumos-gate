@@ -35,6 +35,7 @@
 #include <sys/modctl.h>
 #include <sys/conf.h>
 #include <sys/mac.h>
+#include <sys/mac_impl.h> /* XXXXBOW - remove, included for mac_fix_cksum() */
 #include <sys/dlpi.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
@@ -247,7 +248,7 @@ xnb_software_csum(xnb_t *xnbp, mblk_t *mp)
 	(void) hcksum_assoc(mp, NULL, NULL, 0, 0, 0, 0,
 	    HCK_FULLCKSUM, KM_NOSLEEP);
 
-	return (vnic_fix_cksum(mp));
+	return (mac_fix_cksum(mp));
 }
 
 mblk_t *

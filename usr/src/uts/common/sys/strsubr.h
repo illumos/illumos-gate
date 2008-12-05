@@ -30,8 +30,6 @@
 #ifndef _SYS_STRSUBR_H
 #define	_SYS_STRSUBR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.17 */
-
 /*
  * WARNING:
  * Everything in this file is private, belonging to the
@@ -1238,6 +1236,8 @@ extern int hcksum_assoc(mblk_t *, struct multidata_s *, struct pdesc_s  *,
     uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int);
 extern void hcksum_retrieve(mblk_t *, struct multidata_s *, struct pdesc_s *,
     uint32_t *, uint32_t *, uint32_t *, uint32_t *, uint32_t *);
+extern void lso_info_set(mblk_t *, uint32_t, uint32_t);
+extern void lso_info_get(mblk_t *, uint32_t *, uint32_t *);
 extern unsigned int bcksum(uchar_t *, int, unsigned int);
 extern boolean_t is_vmloaned_mblk(mblk_t *, struct multidata_s *,
     struct pdesc_s *);

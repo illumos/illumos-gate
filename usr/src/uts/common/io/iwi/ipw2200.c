@@ -48,7 +48,7 @@
 #include <sys/modctl.h>
 #include <sys/devops.h>
 #include <sys/dlpi.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_wifi.h>
 #include <sys/varargs.h>
 #include <sys/pci.h>
@@ -207,7 +207,6 @@ mac_callbacks_t	ipw2200_m_callbacks = {
 	ipw2200_m_multicst,
 	ipw2200_m_unicst,
 	ipw2200_m_tx,
-	NULL,
 	ipw2200_m_ioctl
 };
 

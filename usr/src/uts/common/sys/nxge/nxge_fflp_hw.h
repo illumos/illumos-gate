@@ -18,7 +18,6 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -32,6 +31,7 @@ extern "C" {
 #endif
 
 #include <nxge_defs.h>
+
 
 /* FZC_FFLP Offsets */
 #define	    FFLP_ENET_VLAN_TBL_REG	(FZC_FFLP + 0x00000)
@@ -1284,6 +1284,7 @@ typedef struct tcam_entry {
  * before this header file.
  * Need to move these includes to impl files ...
  */
+
 #include <netinet/in.h>
 
 typedef union flow_template {

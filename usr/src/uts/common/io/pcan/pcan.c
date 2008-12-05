@@ -46,7 +46,7 @@
 #include <sys/pccard.h>
 #include <sys/pci.h>
 #include <sys/policy.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/stream.h>
 #include <inet/common.h>
 #include <inet/nd.h>
@@ -104,7 +104,6 @@ mac_callbacks_t pcan_m_callbacks = {
 	pcan_sdmulti,
 	pcan_saddr,
 	pcan_tx,
-	NULL,
 	pcan_ioctl
 };
 

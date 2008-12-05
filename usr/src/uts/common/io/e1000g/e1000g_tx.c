@@ -20,7 +20,7 @@
 
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDLv1.
+ * Use is subject to license terms.
  */
 
 /*
@@ -211,8 +211,7 @@ e1000g_send(struct e1000g *Adapter, mblk_t *mp)
 	 * Descriptors... As you may run short of them before getting any
 	 * transmit interrupt...
 	 */
-	if (tx_ring->resched_needed ||
-	    (tx_ring->tbd_avail < Adapter->tx_recycle_thresh)) {
+	if (tx_ring->tbd_avail < DEFAULT_TX_NO_RESOURCE) {
 		(void) e1000g_recycle(tx_ring);
 		E1000G_DEBUG_STAT(tx_ring->stat_recycle);
 
@@ -406,6 +405,7 @@ tx_send_failed:
 	 * Enable Transmit interrupts, so that the interrupt routine can
 	 * call mac_tx_update() when transmit descriptors become available.
 	 */
+	tx_ring->resched_timestamp = ddi_get_lbolt();
 	tx_ring->resched_needed = B_TRUE;
 	if (!Adapter->tx_intr_enable)
 		e1000g_mask_tx_interrupt(Adapter);
@@ -434,6 +434,7 @@ tx_no_resource:
 	 * Enable Transmit interrupts, so that the interrupt routine can
 	 * call mac_tx_update() when transmit descriptors become available.
 	 */
+	tx_ring->resched_timestamp = ddi_get_lbolt();
 	tx_ring->resched_needed = B_TRUE;
 	if (!Adapter->tx_intr_enable)
 		e1000g_mask_tx_interrupt(Adapter);
@@ -449,8 +450,13 @@ e1000g_retrieve_context(mblk_t *mp, context_data_t *cur_context,
 	uintptr_t ip_start;
 	uintptr_t tcp_start;
 	mblk_t *nmp;
+	uint32_t lsoflags;
+	uint32_t mss;
 
 	bzero(cur_context, sizeof (context_data_t));
+
+	/* first check lso information */
+	lso_info_get(mp, &mss, &lsoflags);
 
 	/* retrieve checksum info */
 	hcksum_retrieve(mp, NULL, NULL, &cur_context->cksum_start,
@@ -464,45 +470,48 @@ e1000g_retrieve_context(mblk_t *mp, context_data_t *cur_context,
 		cur_context->ether_header_size =
 		    sizeof (struct ether_header);
 
-	if (cur_context->cksum_flags & HW_LSO) {
-		if ((cur_context->mss = DB_LSOMSS(mp)) != 0) {
-			/* free the invaid packet */
-			if (!((cur_context->cksum_flags & HCK_PARTIALCKSUM) &&
-			    (cur_context->cksum_flags & HCK_IPV4_HDRCKSUM))) {
-				return (B_FALSE);
-			}
-			cur_context->lso_flag = B_TRUE;
-			/*
-			 * Some fields are cleared for the hardware to fill
-			 * in. We don't assume Ethernet header, IP header and
-			 * TCP header are always in the same mblk fragment,
-			 * while we assume each header is always within one
-			 * mblk fragment and Ethernet header is always in the
-			 * first mblk fragment.
-			 */
-			nmp = mp;
-			ip_start = (uintptr_t)(nmp->b_rptr)
-			    + cur_context->ether_header_size;
-			if (ip_start >= (uintptr_t)(nmp->b_wptr)) {
-				ip_start = (uintptr_t)nmp->b_cont->b_rptr
-				    + (ip_start - (uintptr_t)(nmp->b_wptr));
-				nmp = nmp->b_cont;
-			}
-			tcp_start = ip_start +
-			    IPH_HDR_LENGTH((ipha_t *)ip_start);
-			if (tcp_start >= (uintptr_t)(nmp->b_wptr)) {
-				tcp_start = (uintptr_t)nmp->b_cont->b_rptr
-				    + (tcp_start - (uintptr_t)(nmp->b_wptr));
-				nmp = nmp->b_cont;
-			}
-			cur_context->hdr_len = cur_context->ether_header_size
-			    + IPH_HDR_LENGTH((ipha_t *)ip_start)
-			    + TCP_HDR_LENGTH((tcph_t *)tcp_start);
-			((ipha_t *)ip_start)->ipha_length = 0;
-			((ipha_t *)ip_start)->ipha_hdr_checksum = 0;
-			/* calculate the TCP packet payload length */
-			cur_context->pay_len = msg_size - cur_context->hdr_len;
+	if (lsoflags & HW_LSO) {
+		ASSERT(mss != 0);
+
+		/* free the invalid packet */
+		if (mss == 0 ||
+		    !((cur_context->cksum_flags & HCK_PARTIALCKSUM) &&
+		    (cur_context->cksum_flags & HCK_IPV4_HDRCKSUM))) {
+			return (B_FALSE);
 		}
+		cur_context->mss = (uint16_t)mss;
+		cur_context->lso_flag = B_TRUE;
+
+		/*
+		 * Some fields are cleared for the hardware to fill
+		 * in. We don't assume Ethernet header, IP header and
+		 * TCP header are always in the same mblk fragment,
+		 * while we assume each header is always within one
+		 * mblk fragment and Ethernet header is always in the
+		 * first mblk fragment.
+		 */
+		nmp = mp;
+		ip_start = (uintptr_t)(nmp->b_rptr)
+		    + cur_context->ether_header_size;
+		if (ip_start >= (uintptr_t)(nmp->b_wptr)) {
+			ip_start = (uintptr_t)nmp->b_cont->b_rptr
+			    + (ip_start - (uintptr_t)(nmp->b_wptr));
+			nmp = nmp->b_cont;
+		}
+		tcp_start = ip_start +
+		    IPH_HDR_LENGTH((ipha_t *)ip_start);
+		if (tcp_start >= (uintptr_t)(nmp->b_wptr)) {
+			tcp_start = (uintptr_t)nmp->b_cont->b_rptr
+			    + (tcp_start - (uintptr_t)(nmp->b_wptr));
+			nmp = nmp->b_cont;
+		}
+		cur_context->hdr_len = cur_context->ether_header_size
+		    + IPH_HDR_LENGTH((ipha_t *)ip_start)
+		    + TCP_HDR_LENGTH((tcph_t *)tcp_start);
+		((ipha_t *)ip_start)->ipha_length = 0;
+		((ipha_t *)ip_start)->ipha_hdr_checksum = 0;
+		/* calculate the TCP packet payload length */
+		cur_context->pay_len = msg_size - cur_context->hdr_len;
 	}
 	return (B_TRUE);
 }
@@ -816,7 +825,6 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 	return (desc_count);
 }
 
-
 /*
  * e1000g_tx_setup - setup tx data structures
  *
@@ -955,7 +963,6 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	mblk_t *nmp;
 	struct e1000_tx_desc *descriptor;
 	int desc_count;
-	int is_intr;
 
 	/*
 	 * This function will examine each TxSwPacket in the 'used' queue
@@ -972,13 +979,6 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 		return (0);
 	}
 
-	is_intr = servicing_interrupt();
-
-	if (is_intr)
-		mutex_enter(&tx_ring->usedlist_lock);
-	else if (mutex_tryenter(&tx_ring->usedlist_lock) == 0)
-		return (0);
-
 	desc_count = 0;
 	QUEUE_INIT_LIST(&pending_list);
 
@@ -987,7 +987,6 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	    0, 0, DDI_DMA_SYNC_FORKERNEL);
 	if (e1000g_check_dma_handle(
 	    tx_ring->tbd_dma_handle) != DDI_FM_OK) {
-		mutex_exit(&tx_ring->usedlist_lock);
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
 		Adapter->chip_state = E1000G_ERROR;
 		return (0);
@@ -996,6 +995,7 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	/*
 	 * While there are still TxSwPackets in the used queue check them
 	 */
+	mutex_enter(&tx_ring->usedlist_lock);
 	while ((packet =
 	    (p_tx_sw_packet_t)QUEUE_GET_HEAD(&tx_ring->used_list)) != NULL) {
 
@@ -1030,9 +1030,6 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 				    descriptor + 1;
 
 			desc_count += packet->num_desc;
-
-			if (is_intr && (desc_count >= Adapter->tx_recycle_num))
-				break;
 		} else {
 			/*
 			 * Found a sw packet that the e1000g is not done

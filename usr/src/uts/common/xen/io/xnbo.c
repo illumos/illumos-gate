@@ -34,8 +34,12 @@
 #include "xnb.h"
 
 #include <sys/sunddi.h>
+#include <sys/ddi.h>
 #include <sys/modctl.h>
 #include <sys/strsubr.h>
+#include <sys/mac_client.h>
+#include <sys/mac_provider.h>
+#include <sys/mac_client_priv.h>
 #include <sys/mac.h>
 #include <net/if.h>
 #include <sys/dlpi.h>
@@ -45,9 +49,9 @@
 
 typedef struct xnbo {
 	mac_handle_t		o_mh;
-	mac_rx_handle_t		o_mrh;
-	const mac_txinfo_t	*o_mtx;
-	mac_notify_handle_t	o_mnh;
+	mac_client_handle_t	o_mch;
+	mac_unicast_handle_t	o_mah;
+	mac_promisc_handle_t	o_mphp;
 	boolean_t		o_running;
 	boolean_t		o_promiscuous;
 	uint32_t		o_hcksum_capab;
@@ -70,11 +74,9 @@ xnbo_to_mac(xnb_t *xnbp, mblk_t *mp)
 		goto fail;
 	}
 
-	mp = xnbop->o_mtx->mt_fn(xnbop->o_mtx->mt_arg, mp);
-
-	if (mp != NULL) {
+	if (mac_tx(xnbop->o_mch, mp, 0,
+	    MAC_DROP_ON_NO_DESC, NULL) != NULL) {
 		xnbp->xnb_stat_mac_full++;
-		goto fail;
 	}
 
 	return;
@@ -156,7 +158,8 @@ xnbo_cksum_to_peer(xnb_t *xnbp, mblk_t *mp)
  */
 /*ARGSUSED*/
 static void
-xnbo_from_mac(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
+xnbo_from_mac(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
 {
 	xnb_t *xnbp = arg;
 
@@ -173,7 +176,8 @@ xnbo_from_mac(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
  */
 /*ARGSUSED*/
 static void
-xnbo_from_mac_filter(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
+xnbo_from_mac_filter(void *arg, mac_resource_handle_t mrh, mblk_t *mp,
+    boolean_t loopback)
 {
 	xnb_t *xnbp = arg;
 	xnbo_t *xnbop = xnbp->xnb_flavour_data;
@@ -216,23 +220,10 @@ xnbo_from_mac_filter(void *arg, mac_resource_handle_t mrh, mblk_t *mp)
 #undef	ADD
 
 	if (keep_head != NULL)
-		xnbo_from_mac(xnbp, mrh, keep_head);
+		xnbo_from_mac(xnbp, mrh, keep_head, B_FALSE);
 
 	if (free_head != NULL)
 		freemsgchain(free_head);
-}
-
-static void
-xnbo_notify(void *arg, mac_notify_type_t type)
-{
-	xnb_t *xnbp = arg;
-	xnbo_t *xnbop = xnbp->xnb_flavour_data;
-
-	switch (type) {
-	case MAC_NOTE_PROMISC:
-		xnbop->o_mtx = mac_tx_get(xnbop->o_mh);
-		break;
-	}
 }
 
 static boolean_t
@@ -242,8 +233,10 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	int err, need_rx_filter, need_setphysaddr, need_promiscuous;
 	const mac_info_t *mi;
 	char *xsname;
-	void (*rx_fn)(void *, mac_resource_handle_t, mblk_t *);
+	void (*rx_fn)(void *, mac_resource_handle_t, mblk_t *, boolean_t);
+	struct ether_addr ea;
 	uint_t max_sdu;
+	mac_diag_t diag;
 
 	xsname = xvdi_get_xsname(xnbp->xnb_devinfo);
 
@@ -279,8 +272,22 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 		return (B_FALSE);
 	}
 
-	xnbop->o_mnh = mac_notify_add(xnbop->o_mh, xnbo_notify, xnbp);
-	ASSERT(xnbop->o_mnh != NULL);
+	if (mac_client_open(xnbop->o_mh, &xnbop->o_mch, NULL,
+	    MAC_OPEN_FLAGS_USE_DATALINK_NAME) != 0) {
+		cmn_err(CE_WARN, "xnbo_open_mac: "
+		    "error (%d) opening mac client", err);
+		xnbo_close_mac(xnbop);
+		return (B_FALSE);
+	}
+
+	err = mac_unicast_primary_add(xnbop->o_mch, &xnbop->o_mah, &diag);
+	if (err != 0) {
+		cmn_err(CE_WARN, "xnbo_open_mac: "
+		    "failed to get the primary MAC address of "
+		    "%s: %d", mac, err);
+		xnbo_close_mac(xnbop);
+		return (B_FALSE);
+	}
 
 	/*
 	 * Should the receive path filter packets from the downstream
@@ -294,11 +301,27 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	else
 		rx_fn = xnbo_from_mac;
 
-	xnbop->o_mrh = mac_rx_add(xnbop->o_mh, rx_fn, xnbp);
-	ASSERT(xnbop->o_mrh != NULL);
-
-	xnbop->o_mtx = mac_tx_get(xnbop->o_mh);
-	ASSERT(xnbop->o_mtx != NULL);
+	/*
+	 * Should we set the underlying NIC into promiscuous mode? The
+	 * default is "no".
+	 */
+	if (xenbus_scanf(XBT_NULL, xsname,
+	    "SUNW-need-promiscuous", "%d", &need_promiscuous) != 0)
+		need_promiscuous = 0;
+	if (need_promiscuous == 0) {
+		mac_rx_set(xnbop->o_mch, rx_fn, xnbp);
+	} else {
+		err = mac_promisc_add(xnbop->o_mch, MAC_CLIENT_PROMISC_ALL,
+		    rx_fn, xnbp, &xnbop->o_mphp, MAC_PROMISC_FLAGS_NO_TX_LOOP);
+		if (err != 0) {
+			cmn_err(CE_WARN, "xnbo_open_mac: "
+			    "cannot enable promiscuous mode of %s: %d",
+			    mac, err);
+			xnbo_close_mac(xnbop);
+			return (B_FALSE);
+		}
+		xnbop->o_promiscuous = B_TRUE;
+	}
 
 	if (!mac_capab_get(xnbop->o_mh, MAC_CAPAB_HCKSUM,
 	    &xnbop->o_hcksum_capab))
@@ -312,45 +335,17 @@ xnbo_open_mac(xnb_t *xnbp, char *mac)
 	    "SUNW-need-set-physaddr", "%d", &need_setphysaddr) != 0)
 		need_setphysaddr = 0;
 	if (need_setphysaddr > 0) {
-		struct ether_addr ea;
-
-		err = mac_unicst_set(xnbop->o_mh, xnbp->xnb_mac_addr);
+		err = mac_unicast_primary_set(xnbop->o_mh, xnbp->xnb_mac_addr);
 		/* Warn, but continue on. */
 		if (err != 0) {
 			bcopy(xnbp->xnb_mac_addr, ea.ether_addr_octet,
 			    ETHERADDRL);
 			cmn_err(CE_WARN, "xnbo_open_mac: "
 			    "cannot set MAC address of %s to "
-			    "%s: %d", mac, ether_sprintf(&ea),
-			    err);
+			    "%s: %d", mac, ether_sprintf(&ea), err);
 		}
 	}
 
-	/*
-	 * Should we set the underlying NIC into promiscuous mode? The
-	 * default is "no".
-	 */
-	if (xenbus_scanf(XBT_NULL, xsname,
-	    "SUNW-need-promiscuous", "%d", &need_promiscuous) != 0)
-		need_promiscuous = 0;
-	if (need_promiscuous > 0) {
-		err = mac_promisc_set(xnbop->o_mh, B_TRUE, MAC_DEVPROMISC);
-		if (err != 0) {
-			cmn_err(CE_WARN, "xnbo_open_mac: "
-			    "cannot enable promiscuous mode of %s: %d",
-			    mac, err);
-			xnbo_close_mac(xnbop);
-			return (B_FALSE);
-		}
-		xnbop->o_promiscuous = B_TRUE;
-	}
-
-	if ((err = mac_start(xnbop->o_mh)) != 0) {
-		cmn_err(CE_WARN, "xnbo_open_mac: "
-		    "cannot start mac device (%d)", err);
-		xnbo_close_mac(xnbop);
-		return (B_FALSE);
-	}
 	xnbop->o_running = B_TRUE;
 
 	return (B_TRUE);
@@ -385,26 +380,24 @@ xnbo_close_mac(xnbo_t *xnbop)
 		return;
 
 	if (xnbop->o_running) {
-		mac_stop(xnbop->o_mh);
 		xnbop->o_running = B_FALSE;
 	}
 
 	if (xnbop->o_promiscuous) {
-		(void) mac_promisc_set(xnbop->o_mh, B_FALSE,
-		    MAC_DEVPROMISC);
+		(void) mac_promisc_remove(xnbop->o_mphp);
 		xnbop->o_promiscuous = B_FALSE;
+	} else {
+		mac_rx_clear(xnbop->o_mch);
 	}
 
-	xnbop->o_mtx = NULL;
-
-	if (xnbop->o_mrh != NULL) {
-		mac_rx_remove(xnbop->o_mh, xnbop->o_mrh, B_TRUE);
-		xnbop->o_mrh = NULL;
+	if (xnbop->o_mah != NULL) {
+		(void) mac_unicast_remove(xnbop->o_mch, xnbop->o_mah);
+		xnbop->o_mah = NULL;
 	}
 
-	if (xnbop->o_mnh != NULL) {
-		mac_notify_remove(xnbop->o_mh, xnbop->o_mnh);
-		xnbop->o_mnh = NULL;
+	if (xnbop->o_mch != NULL) {
+		mac_client_close(xnbop->o_mch, 0);
+		xnbop->o_mch = NULL;
 	}
 
 	mac_close(xnbop->o_mh);
@@ -453,8 +446,9 @@ xnbo_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	xnbop = kmem_zalloc(sizeof (*xnbop), KM_SLEEP);
 
 	xnbop->o_mh = NULL;
-	xnbop->o_mrh = NULL;
-	xnbop->o_mtx = NULL;
+	xnbop->o_mch = NULL;
+	xnbop->o_mah = NULL;
+	xnbop->o_mphp = NULL;
 	xnbop->o_running = B_FALSE;
 	xnbop->o_hcksum_capab = 0;
 

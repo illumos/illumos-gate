@@ -23,22 +23,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Data-Link Services Module
  */
 
-#include <sys/types.h>
-#include <sys/sysmacros.h>
-#include <sys/atomic.h>
-#include <sys/kstat.h>
-#include <sys/vlan.h>
-#include <sys/mac.h>
+#include <sys/dld_impl.h>
 #include <sys/mac_ether.h>
-#include <sys/ctype.h>
-#include <sys/dls.h>
-#include <sys/dls_impl.h>
 
 static mac_stat_info_t	i_dls_si[] = {
 	{ MAC_STAT_IFSPEED, "ifspeed", KSTAT_DATA_UINT64, 0 },
@@ -66,34 +56,17 @@ static mac_stat_info_t	i_dls_si[] = {
 #define	STAT_INFO_COUNT	(sizeof (i_dls_si) / sizeof (i_dls_si[0]))
 
 /*
- * Private functions.
- */
-
-static int
-i_dls_mac_stat_update(kstat_t *ksp, int rw)
-{
-	dls_vlan_t	*dvp = ksp->ks_private;
-
-	return (dls_stat_update(ksp, dvp, rw));
-}
-
-/*
  * Exported functions.
  */
 int
-dls_stat_update(kstat_t *ksp, dls_vlan_t *dvp, int rw)
+dls_stat_update(kstat_t *ksp, dls_link_t *dlp, int rw)
 {
-	dls_link_t	*dlp = dvp->dv_dlp;
 	kstat_named_t	*knp;
 	uint_t		i;
 	uint64_t	val;
-	int		err;
 
 	if (rw != KSTAT_READ)
 		return (EACCES);
-
-	if ((err = dls_mac_hold(dlp)) != 0)
-		return (err);
 
 	knp = (kstat_named_t *)ksp->ks_data;
 	for (i = 0; i < STAT_INFO_COUNT; i++) {
@@ -124,7 +97,6 @@ dls_stat_update(kstat_t *ksp, dls_vlan_t *dvp, int rw)
 	}
 	knp++;
 	knp->value.ui32 = dlp->dl_unknowns;
-	dls_mac_rele(dlp);
 
 	return (0);
 }
@@ -157,46 +129,4 @@ dls_stat_create(const char *module, int instance, const char *name,
 	kstat_install(ksp);
 	*kspp = ksp;
 	return (0);
-}
-
-void
-dls_mac_stat_create(dls_vlan_t *dvp)
-{
-	kstat_t		*ksp = NULL;
-	major_t		major;
-
-	/*
-	 * Create the legacy kstats to provide backward compatibility.
-	 * These kstats need to be created even when this link does not
-	 * have a link name, i.e., when the VLAN is accessed using its
-	 * /dev node.
-	 *
-	 * Note that we only need to create the legacy kstats for GLDv3
-	 * physical links, aggregation links which are created using
-	 * the 'key' option, and any VLAN links created over them.
-	 * This can be determined by checking its dv_ppa.
-	 */
-	ASSERT(dvp->dv_ksp == NULL);
-	if (dvp->dv_ppa >= MAC_MAX_MINOR)
-		return;
-
-	major = getmajor(dvp->dv_dev);
-	ASSERT(GLDV3_DRV(major) && (dvp->dv_ksp == NULL));
-
-	if (dls_stat_create(ddi_major_to_name(major),
-	    dvp->dv_id * 1000 + dvp->dv_ppa, NULL,
-	    i_dls_mac_stat_update, dvp, &ksp) != 0) {
-		return;
-	}
-	ASSERT(ksp != NULL);
-	dvp->dv_ksp = ksp;
-}
-
-void
-dls_mac_stat_destroy(dls_vlan_t *dvp)
-{
-	if (dvp->dv_ksp != NULL) {
-		kstat_delete(dvp->dv_ksp);
-		dvp->dv_ksp = NULL;
-	}
 }

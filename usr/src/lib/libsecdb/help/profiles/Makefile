@@ -38,6 +38,7 @@ HTMLENTS = \
 	RtExAcctFlow.html \
 	RtExAcctProcess.html \
 	RtExAcctTask.html \
+	RtExAcctNet.html \
 	RtLogMngmnt.html \
 	RtDeviceMngmnt.html \
 	RtDeviceSecurity.html \

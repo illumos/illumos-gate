@@ -1838,29 +1838,13 @@ bge_nvmem_id(bge_t *bgep)
 static void
 bge_init_recv_rule(bge_t *bgep)
 {
-	bge_recv_rule_t *rulep;
+	bge_recv_rule_t *rulep = bgep->recv_rules;
 	uint32_t i;
 
 	/*
-	 * receive rule: direct all TCP traffic to ring RULE_MATCH_TO_RING
-	 * 1. to direct UDP traffic, set:
-	 * 	rulep->control = RULE_PROTO_CONTROL;
-	 * 	rulep->mask_value = RULE_UDP_MASK_VALUE;
-	 * 2. to direct ICMP traffic, set:
-	 * 	rulep->control = RULE_PROTO_CONTROL;
-	 * 	rulep->mask_value = RULE_ICMP_MASK_VALUE;
-	 * 3. to direct traffic by source ip, set:
-	 * 	rulep->control = RULE_SIP_CONTROL;
-	 * 	rulep->mask_value = RULE_SIP_MASK_VALUE;
+	 * Initialize receive rule registers.
+	 * Note that rules may persist across each bge_m_start/stop() call.
 	 */
-	rulep = bgep->recv_rules;
-	rulep->control = RULE_PROTO_CONTROL;
-	rulep->mask_value = RULE_TCP_MASK_VALUE;
-
-	/*
-	 * set receive rule registers
-	 */
-	rulep = bgep->recv_rules;
 	for (i = 0; i < RECV_RULES_NUM_MAX; i++, rulep++) {
 		bge_reg_put32(bgep, RECV_RULE_MASK_REG(i), rulep->mask_value);
 		bge_reg_put32(bgep, RECV_RULE_CONTROL_REG(i), rulep->control);
@@ -2871,10 +2855,11 @@ bge_chip_sync(bge_t *bgep)
 			}
 			bge_reg_put32(bgep, MAC_TX_RANDOM_BACKOFF_REG, fill);
 			bge_reg_put64(bgep, MAC_ADDRESS_REG(j), macaddr);
-		}
 
-		BGE_DEBUG(("bge_chip_sync($%p) setting MAC address %012llx",
-			(void *)bgep, macaddr));
+			BGE_DEBUG(("bge_chip_sync($%p) "
+			    "setting MAC address %012llx",
+			    (void *)bgep, macaddr));
+		}
 #ifdef BGE_IPMI_ASF
 	}
 #endif
@@ -5515,14 +5500,25 @@ bge_chip_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp, struct iocblk *iocp)
 	/* NOTREACHED */
 }
 
+/* ARGSUSED */
 void
-bge_chip_blank(void *arg, time_t ticks, uint_t count)
+bge_chip_blank(void *arg, time_t ticks, uint_t count, int flag)
 {
-	bge_t *bgep = arg;
+	recv_ring_t *rrp = arg;
+	bge_t *bgep = rrp->bgep;
 
 	mutex_enter(bgep->genlock);
+	rrp->poll_flag = flag;
+#ifdef NOT_YET
+	/*
+	 * XXX-Sunay: Since most broadcom cards support only one
+	 * interrupt but multiple rx rings, we can't disable the
+	 * physical interrupt. This need to be done via capability
+	 * negotiation depending on the NIC.
+	 */
 	bge_reg_put32(bgep, RCV_COALESCE_TICKS_REG, ticks);
 	bge_reg_put32(bgep, RCV_COALESCE_MAX_BD_REG, count);
+#endif
 	if (bge_check_acc_handle(bgep, bgep->io_handle) != DDI_FM_OK)
 		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_UNAFFECTED);
 	mutex_exit(bgep->genlock);

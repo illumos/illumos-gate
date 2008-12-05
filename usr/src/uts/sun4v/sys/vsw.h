@@ -40,6 +40,7 @@ extern "C" {
 #include <sys/vio_mailbox.h>
 #include <sys/vnet_common.h>
 #include <sys/ethernet.h>
+#include <sys/mac_client.h>
 #include <sys/vio_util.h>
 #include <sys/vgen_stats.h>
 #include <sys/vsw_ldc.h>
@@ -57,57 +58,6 @@ extern "C" {
 #define	VSW_PHYSDEV		1	/* physical device associated */
 #define	VSW_VNETPORT		2	/* port connected to vnet (over ldc) */
 #define	VSW_LOCALDEV		4	/* vsw configured as an eth interface */
-
-/*
- * Vsw queue -- largely modeled after squeue
- *
- * VSW_QUEUE_RUNNING, vqueue thread for queue is running.
- * VSW_QUEUE_DRAINED, vqueue thread has drained current work and is exiting.
- * VSW_QUEUE_STOP, request for the vqueue thread to stop.
- * VSW_QUEUE_STOPPED, vqueue thread is not running.
- */
-#define	VSW_QUEUE_RUNNING	0x01
-#define	VSW_QUEUE_DRAINED	0x02
-#define	VSW_QUEUE_STOP		0x04
-#define	VSW_QUEUE_STOPPED	0x08
-
-typedef struct vsw_queue_s {
-	kmutex_t	vq_lock;	/* Lock, before using any member. */
-	kcondvar_t	vq_cv;		/* Async threads block on. */
-	uint32_t	vq_state;	/* State flags. */
-
-	mblk_t		*vq_first;	/* First mblk chain or NULL. */
-	mblk_t		*vq_last;	/* Last mblk chain. */
-
-	processorid_t	vq_bind;	/* Process to bind to */
-	kthread_t	*vq_worker;	/* Queue's thread */
-} vsw_queue_t;
-
-/*
- * VSW MAC Ring Resources.
- *	MAC Ring resource is composed of this state structure and
- *	a kernel thread to perform the processing of the ring.
- */
-typedef struct vsw_mac_ring_s {
-	uint32_t	ring_state;
-
-	mac_blank_t	ring_blank;
-	void		*ring_arg;
-
-	vsw_queue_t	*ring_vqp;
-	struct vsw	*ring_vswp;
-} vsw_mac_ring_t;
-
-/*
- * Maximum Ring Resources.
- */
-#define	VSW_MAC_RX_RINGS	0x40
-
-/*
- * States for entry in ring table.
- */
-#define	VSW_MAC_RING_FREE	1
-#define	VSW_MAC_RING_INUSE	2
 
 /*
  * Number of hash chains in the multicast forwarding database.
@@ -139,6 +89,15 @@ typedef struct vsw_mac_ring_s {
 #define	VSW_PRI_ETH_DEFINED(vswp)	((vswp)->pri_num_types != 0)
 
 /*
+ * vlan-id information.
+ */
+typedef struct vsw_vlanid {
+	uint16_t		vl_vid;		/* vlan-id */
+	mac_unicast_handle_t	vl_muh;		/* mac unicast handle */
+	boolean_t		vl_set;		/* set? */
+} vsw_vlanid_t;
+
+/*
  * vsw instance state information.
  */
 typedef struct	vsw {
@@ -147,9 +106,7 @@ typedef struct	vsw {
 	uint64_t		regprop;	/* "reg" property */
 	struct vsw		*next;		/* next in list */
 	char			physname[LIFNAMSIZ];	/* phys-dev */
-	uint8_t			smode[NUM_SMODES];	/* switching mode */
-	int			smode_idx;	/* curr pos in smode array */
-	int			smode_num;	/* # of modes specified */
+	uint8_t			smode;		/* switching mode */
 	kmutex_t		swtmout_lock;	/* setup switching tmout lock */
 	boolean_t		swtmout_enabled; /* setup switching tmout on */
 	timeout_id_t		swtmout_id;	/* setup switching tmout id */
@@ -174,24 +131,16 @@ typedef struct	vsw {
 					vsw_port_t *, mac_resource_handle_t);
 
 	/* mac layer */
-	krwlock_t		mac_rwlock;	/* protect fields below */
+	kmutex_t		mac_lock;	/* protect mh */
 	mac_handle_t		mh;
-	mac_rx_handle_t		mrh;
-	multiaddress_capab_t	maddr;		/* Multiple uni addr capable */
-	const mac_txinfo_t	*txinfo;	/* MAC tx routine */
-	boolean_t		mstarted;	/* Mac Started? */
-	boolean_t		mresources;	/* Mac Resources cb? */
+	krwlock_t		maccl_rwlock;	/* protect fields below */
+	mac_client_handle_t	mch;		/* mac client handle */
+	mac_unicast_handle_t	muh;		/* mac unicast handle */
 
-	/*
-	 * MAC Ring Resources.
-	 */
-	kmutex_t		mac_ring_lock;	/* Lock for the table. */
-	uint32_t		mac_ring_tbl_sz;
-	vsw_mac_ring_t		*mac_ring_tbl;	/* Mac ring table. */
-
-	kmutex_t		hw_lock;	/* sync access to HW */
 	boolean_t		recfg_reqd;	/* Reconfig of addrs needed */
-	int			promisc_cnt;
+
+	/* mac layer switching flag */
+	boolean_t		mac_cl_switching;
 
 	/* Machine Description updates  */
 	mdeg_node_spec_t	*inst_spec;
@@ -204,8 +153,7 @@ typedef struct	vsw {
 	krwlock_t		if_lockrw;
 	uint8_t			if_state;	/* interface state */
 
-	mac_addr_slot_t		addr_slot;	/* Unicast address slot */
-	int			addr_set;	/* Addr set where */
+	boolean_t		addr_set;	/* is addr set to HW */
 
 	/* multicast addresses when configured as eth interface */
 	kmutex_t		mca_lock;	/* multicast lock */
@@ -216,7 +164,7 @@ typedef struct	vsw {
 	vio_mblk_pool_t		*pri_tx_vmp;	/* tx priority mblk pool */
 	uint16_t		default_vlan_id; /* default vlan id */
 	uint16_t		pvid;	/* port vlan id (untagged) */
-	uint16_t		*vids;	/* vlan ids (tagged) */
+	vsw_vlanid_t		*vids;	/* vlan ids (tagged) */
 	uint16_t		nvids;	/* # of vids */
 	uint32_t		vids_size; /* size alloc'd for vids list */
 

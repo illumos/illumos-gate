@@ -942,15 +942,18 @@ nxge_fzc_rdc_tbl_unbind(p_nxge_t nxge, int rdc_tbl)
 	NXGE_DEBUG_MSG((nxge, DMA_CTL, "==> nxge_fzc_rdc_tbl_unbind(%d)",
 	    rdc_tbl));
 
+	MUTEX_ENTER(&nhd->lock);
 	table = &nhd->rdc_tbl[rdc_tbl];
 	if (table->nxge != (uintptr_t)nxge) {
 		NXGE_ERROR_MSG((nxge, DMA_CTL,
 		    "nxge_fzc_rdc_tbl_unbind(%d): func%d not owner",
 		    nxge->function_num, rdc_tbl));
+		MUTEX_EXIT(&nhd->lock);
 		return (EINVAL);
 	} else {
 		bzero(table, sizeof (*table));
 	}
+	MUTEX_EXIT(&nhd->lock);
 
 	NXGE_DEBUG_MSG((nxge, DMA_CTL, "<== nxge_fzc_rdc_tbl_unbind(%d)",
 	    rdc_tbl));

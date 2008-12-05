@@ -36,7 +36,7 @@
 #include	<sys/kmem.h>
 #include	<sys/modctl.h>
 #include	<sys/conf.h>
-#include	<sys/mac.h>
+#include	<sys/mac_provider.h>
 #include	<sys/mac_ether.h>
 #include	<sys/ddi.h>
 #include	<sys/sunddi.h>

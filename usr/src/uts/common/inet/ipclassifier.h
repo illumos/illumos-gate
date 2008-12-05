@@ -26,8 +26,6 @@
 #ifndef	_INET_IPCLASSIFIER_H
 #define	_INET_IPCLASSIFIER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -222,10 +220,13 @@ struct conn_s {
 		conn_recvslla : 1,		/* IP_RECVSLLA option */
 		conn_mdt_ok : 1,		/* MDT is permitted */
 		conn_nexthop_set : 1,
-		conn_allzones : 1,		/* SO_ALLZONES */
+		conn_allzones : 1;		/* SO_ALLZONES */
 
+	unsigned int
 		conn_lso_ok : 1;		/* LSO is usable */
 
+	squeue_t	*conn_initial_sqp;	/* Squeue at open time */
+	squeue_t	*conn_final_sqp;	/* Squeue after connect */
 	ill_t		*conn_nofailover_ill;	/* Failover ill */
 	ill_t		*conn_dhcpinit_ill;	/* IP_DHCPINIT_IF */
 	ipsec_latch_t	*conn_latch;		/* latched state */
@@ -286,8 +287,8 @@ struct conn_s {
 	int		conn_orig_bound_ifindex; /* BOUND_IF before MOVE */
 	int		conn_orig_multicast_ifindex;
 						/* IPv6 MC IF before MOVE */
-	struct conn_s 	*conn_drain_next;	/* Next conn in drain list */
-	struct conn_s	*conn_drain_prev;	/* Prev conn in drain list */
+	struct	conn_s	*conn_drain_next;	/* Next conn in drain list */
+	struct	conn_s	*conn_drain_prev;	/* Prev conn in drain list */
 	idl_t		*conn_idl;		/* Ptr to the drain list head */
 	mblk_t		*conn_ipsec_opt_mp;	/* ipsec option mblk */
 	uint32_t	conn_src_preferences;	/* prefs for src addr select */
@@ -499,6 +500,7 @@ struct connf_s {
 	(connp)->conn_ports = ports;					\
 	(connp)->conn_send = ip_output;					\
 	(connp)->conn_sqp = IP_SQUEUE_GET(lbolt);			\
+	(connp)->conn_initial_sqp = (connp)->conn_sqp;			\
 }
 
 #define	IPCL_TCP_EAGER_INIT_V6(connp, protocol, src, rem, ports) {	\
@@ -508,6 +510,7 @@ struct connf_s {
 	(connp)->conn_ports = ports;					\
 	(connp)->conn_send = ip_output_v6;				\
 	(connp)->conn_sqp = IP_SQUEUE_GET(lbolt);			\
+	(connp)->conn_initial_sqp = (connp)->conn_sqp;			\
 }
 
 #define	IPCL_UDP_HASH(lport, ipst)	\

@@ -37,6 +37,7 @@
 #include <libintl.h>
 #include <net/if_types.h>
 #include <net/if_dl.h>
+#include <sys/dld.h>
 #include <libdllink.h>
 #include <libdlvlan.h>
 #include <libdlaggr.h>
@@ -1110,7 +1111,7 @@ dladm_aggr_create(const char *name, uint16_t key, uint32_t nports,
 	for (i = 0; i < nports; i++) {
 		if ((dladm_datalink_id2info(ports[i].lp_linkid, NULL,
 		    &class, &media, NULL, 0) != DLADM_STATUS_OK) ||
-		    (class != DATALINK_CLASS_PHYS) && (media != DL_ETHER)) {
+		    !((class == DATALINK_CLASS_PHYS) && (media == DL_ETHER))) {
 			return (DLADM_STATUS_BADARG);
 		}
 	}

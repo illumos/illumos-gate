@@ -35,8 +35,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IEEE 802.11 generic handler
  */
@@ -47,6 +45,7 @@
 #include <sys/modctl.h>
 #include <sys/stropts.h>
 #include <sys/door.h>
+#include <sys/mac_provider.h>
 #include "net80211_impl.h"
 
 uint32_t ieee80211_debug = 0x0;	/* debug msg flags */

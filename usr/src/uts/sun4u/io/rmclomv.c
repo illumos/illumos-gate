@@ -61,7 +61,6 @@
 #define	CPU_SIGNATURE_DELAY_TIME	5000000	 /* 5 secs, in microsecs */
 
 extern void	pmugpio_watchdog_pat();
-static clock_t	timesync_interval;
 
 extern int	watchdog_activated;
 static int	last_watchdog_msg = 1;
@@ -117,6 +116,10 @@ static uint_t rmc_set_watchdog_timer(uint_t timeoutval);
 static uint_t rmc_clear_watchdog_timer(void);
 static void send_watchdog_msg(int msg);
 static void plat_timesync(void *arg);
+
+static kmutex_t		timesync_lock;
+static clock_t		timesync_interval = 0;
+static timeout_id_t	timesync_tid = 0;
 
 /*
  * Driver entry points
@@ -310,6 +313,7 @@ _init(void)
 	mutex_init(&rmclomv_refresh_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&rmclomv_cache_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&rmclomv_state_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&timesync_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&rmclomv_checkrmc_sig_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&rmclomv_refresh_sig_cv, NULL, CV_DRIVER, NULL);
 
@@ -344,6 +348,7 @@ _fini(void)
 		return (error);
 	cv_destroy(&rmclomv_refresh_sig_cv);
 	cv_destroy(&rmclomv_checkrmc_sig_cv);
+	mutex_destroy(&timesync_lock);
 	mutex_destroy(&rmclomv_state_lock);
 	mutex_destroy(&rmclomv_cache_lock);
 	mutex_destroy(&rmclomv_refresh_lock);
@@ -479,8 +484,9 @@ rmclomv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 rmclomv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	int	instance;
-	int	err;
+	timeout_id_t	tid;
+	int		instance;
+	int		err;
 
 	switch (cmd) {
 	case DDI_DETACH:
@@ -501,6 +507,13 @@ rmclomv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		rmclomv_refresh_destroy();
 		rmclomv_reset_cache(NULL, NULL, NULL);
 		ddi_remove_minor_node(dip, NULL);
+
+		mutex_enter(&timesync_lock);
+		tid = timesync_tid;
+		timesync_tid = 0;
+		timesync_interval = 0;
+		mutex_exit(&timesync_lock);
+		(void) untimeout(tid);
 
 		/* Forget the dev info */
 		rmclomv_dip = NULL;
@@ -3419,7 +3432,10 @@ plat_timesync(void *arg)
 
 	(void) rmc_comm_request_nowait(&request, 0);
 
-	(void) timeout(plat_timesync, NULL, timesync_interval);
+	mutex_enter(&timesync_lock);
+	if (timesync_interval != 0)
+		timesync_tid = timeout(plat_timesync, NULL, timesync_interval);
+	mutex_exit(&timesync_lock);
 }
 
 /*

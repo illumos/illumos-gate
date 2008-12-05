@@ -53,7 +53,7 @@
 #include <sys/machsystm.h>
 #include <sys/modctl.h>
 #include <sys/modhash.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/taskq.h>
 #include <sys/note.h>
@@ -80,9 +80,9 @@ extern int vsw_hio_cleanup_delay;
 
 /* Functions imported from other files */
 extern int vsw_send_msg(vsw_ldc_t *, void *, int, boolean_t);
-extern int vsw_set_hw(vsw_t *, vsw_port_t *, int);
-extern int vsw_unset_hw(vsw_t *, vsw_port_t *, int);
 extern void vsw_hio_port_reset(vsw_port_t *portp, boolean_t immediate);
+extern void vsw_port_mac_reconfig(vsw_port_t *portp, boolean_t update_vlans,
+    uint16_t new_pvid, vsw_vlanid_t *new_vids, int new_nvids);
 
 /* Functions exported to other files */
 void vsw_hio_init(vsw_t *vswp);
@@ -104,10 +104,23 @@ static int vsw_send_dds_msg(vsw_ldc_t *ldcp, uint8_t dds_subclass,
     uint64_t cookie, uint64_t macaddr, uint32_t req_id);
 static int vsw_send_dds_resp_msg(vsw_ldc_t *ldcp, vio_dds_msg_t *dmsg, int ack);
 static int vsw_hio_send_delshare_msg(vsw_share_t *vsharep);
-static int vsw_hio_bind_macaddr(vsw_share_t *vsharep);
-static void vsw_hio_unbind_macaddr(vsw_share_t *vsharep);
 static boolean_t vsw_hio_reboot_callb(void *arg, int code);
 static boolean_t vsw_hio_panic_callb(void *arg, int code);
+
+/*
+ * Locking strategy for HybridIO is followed as below:
+ *
+ *	- As the Shares are associated with a network device, the
+ *	  the global lock('vswp>mac_lock') is used for all Shares
+ *	  related operations.
+ *	- The 'port->maccl_rwlock' is used to synchronize only the
+ *	  the operations that operate on that port's mac client. That
+ *	  is, the share_bind and unbind operations only.
+ *
+ *	- The locking hierarchy follows that the global mac_lock is
+ *	  acquired first and then the ports mac client lock(maccl_rwlock)
+ */
+
 
 static kstat_t *vsw_hio_setup_kstats(char *ks_mod, char *ks_name, vsw_t *vswp);
 static void vsw_hio_destroy_kstats(vsw_t *vswp);
@@ -122,32 +135,23 @@ void
 vsw_hio_init(vsw_t *vswp)
 {
 	vsw_hio_t	*hiop = &vswp->vhio;
+	int		num_shares;
 	int		i;
-	int		rv;
 
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
 	D1(vswp, "%s:enter\n", __func__);
-	mutex_enter(&vswp->hw_lock);
 	if (vsw_hio_enabled == B_FALSE) {
-		mutex_exit(&vswp->hw_lock);
 		return;
 	}
 
 	vswp->hio_capable = B_FALSE;
-	rv = mac_capab_get(vswp->mh, MAC_CAPAB_SHARES, &hiop->vh_scapab);
-	if (rv == B_FALSE) {
+	num_shares = mac_share_capable(vswp->mh);
+	if (num_shares == 0) {
 		D2(vswp, "%s: %s is not HybridIO capable\n", __func__,
 		    vswp->physname);
-		mutex_exit(&vswp->hw_lock);
 		return;
 	}
-	rv = mac_capab_get(vswp->mh, MAC_CAPAB_RINGS, &hiop->vh_rcapab);
-	if (rv == B_FALSE) {
-		DWARN(vswp, "%s: %s has no RINGS capability\n", __func__,
-		    vswp->physname);
-		mutex_exit(&vswp->hw_lock);
-		return;
-	}
-	hiop->vh_num_shares = hiop->vh_scapab.ms_snum;
+	hiop->vh_num_shares = num_shares;
 	hiop->vh_shares = kmem_zalloc((sizeof (vsw_share_t) *
 	    hiop->vh_num_shares), KM_SLEEP);
 	for (i = 0; i < hiop->vh_num_shares; i++) {
@@ -176,7 +180,6 @@ vsw_hio_init(vsw_t *vswp)
 	D2(vswp, "%s: %s is HybridIO capable num_shares=%d\n", __func__,
 	    vswp->physname, hiop->vh_num_shares);
 	D1(vswp, "%s:exit\n", __func__);
-	mutex_exit(&vswp->hw_lock);
 }
 
 /*
@@ -187,13 +190,9 @@ vsw_hio_init(vsw_t *vswp)
 static vsw_share_t *
 vsw_hio_alloc_share(vsw_t *vswp, vsw_ldc_t *ldcp)
 {
-	vsw_hio_t	*hiop = &vswp->vhio;
-	mac_capab_share_t *hcapab = &hiop->vh_scapab;
 	vsw_share_t	*vsharep;
 	vsw_port_t	*portp = ldcp->ldc_port;
 	uint64_t	ldc_id = ldcp->ldc_id;
-	uint32_t	rmin, rmax;
-	uint64_t	rmap;
 	int		rv;
 
 	D1(vswp, "%s:enter\n", __func__);
@@ -202,98 +201,23 @@ vsw_hio_alloc_share(vsw_t *vswp, vsw_ldc_t *ldcp)
 		/* No free shares available */
 		return (NULL);
 	}
-	/*
-	 * Allocate a Share - it will come with rings/groups
-	 * already assigned to it.
-	 */
-	rv = hcapab->ms_salloc(hcapab->ms_handle, ldc_id,
-	    &vsharep->vs_cookie, &vsharep->vs_shdl);
+
+	WRITE_ENTER(&portp->maccl_rwlock);
+	rv = mac_share_bind(portp->p_mch, ldc_id, &vsharep->vs_cookie);
+	RW_EXIT(&portp->maccl_rwlock);
 	if (rv != 0) {
-		D2(vswp, "Alloc a share failed for ldc=0x%lx rv=%d",
-		    ldc_id, rv);
 		return (NULL);
 	}
-
-	/*
-	 * Query the RX group number to bind the port's
-	 * MAC address to it.
-	 */
-	hcapab->ms_squery(vsharep->vs_shdl, MAC_RING_TYPE_RX,
-	    &rmin, &rmax, &rmap, &vsharep->vs_gnum);
 
 	/* Cache some useful info */
 	vsharep->vs_ldcid = ldcp->ldc_id;
 	vsharep->vs_macaddr = vnet_macaddr_strtoul(
 	    portp->p_macaddr.ether_addr_octet);
 	vsharep->vs_portp = ldcp->ldc_port;
-
-	/* Bind the Guest's MAC address */
-	rv = vsw_hio_bind_macaddr(vsharep);
-	if (rv != 0) {
-		/* something went wrong, cleanup */
-		hcapab->ms_sfree(vsharep->vs_shdl);
-		return (NULL);
-	}
-
 	vsharep->vs_state |= VSW_SHARE_ASSIGNED;
 
 	D1(vswp, "%s:exit\n", __func__);
 	return (vsharep);
-}
-
-/*
- * vsw_hio_bind_macaddr -- Remove the port's MAC address from the
- *	physdev and bind it to the Share's RX group.
- */
-static int
-vsw_hio_bind_macaddr(vsw_share_t *vsharep)
-{
-	vsw_t		*vswp = vsharep->vs_vswp;
-	vsw_port_t	*portp = vsharep->vs_portp;
-	mac_capab_rings_t *rcapab = &vswp->vhio.vh_rcapab;
-	mac_group_info_t *ginfop = &vsharep->vs_rxginfo;
-	int		rv;
-
-	/* Get the RX groupinfo */
-	rcapab->mr_gget(rcapab->mr_handle, MAC_RING_TYPE_RX,
-	    vsharep->vs_gnum, &vsharep->vs_rxginfo, NULL);
-
-	/* Unset the MAC address first */
-	if (portp->addr_set != VSW_ADDR_UNSET) {
-		(void) vsw_unset_hw(vswp, portp, VSW_VNETPORT);
-	}
-
-	/* Bind the MAC address to the RX group */
-	rv = ginfop->mrg_addmac(ginfop->mrg_driver,
-	    (uint8_t *)&portp->p_macaddr.ether_addr_octet);
-	if (rv != 0) {
-		/* Restore the address back as it was */
-		(void) vsw_set_hw(vswp, portp, VSW_VNETPORT);
-		return (rv);
-	}
-	return (0);
-}
-
-/*
- * vsw_hio_unbind_macaddr -- Unbind the port's MAC address and restore
- *	it back as it was before.
- */
-static void
-vsw_hio_unbind_macaddr(vsw_share_t *vsharep)
-{
-	vsw_t		*vswp = vsharep->vs_vswp;
-	vsw_port_t	*portp = vsharep->vs_portp;
-	mac_group_info_t *ginfop = &vsharep->vs_rxginfo;
-
-	if (portp == NULL) {
-		return;
-	}
-	/* Unbind the MAC address from the RX group */
-	(void) ginfop->mrg_remmac(ginfop->mrg_driver,
-	    (uint8_t *)&portp->p_macaddr.ether_addr_octet);
-
-	/* Program the MAC address back */
-	(void) vsw_set_hw(vswp, portp, VSW_VNETPORT);
 }
 
 /*
@@ -380,16 +304,13 @@ static void
 vsw_hio_free_share(vsw_share_t *vsharep)
 {
 	vsw_t		*vswp = vsharep->vs_vswp;
-	vsw_hio_t	*hiop = &vswp->vhio;
-	mac_capab_share_t *hcapab = &hiop->vh_scapab;
+	vsw_port_t	*portp = vsharep->vs_portp;
 
 	D1(vswp, "%s:enter\n", __func__);
 
-	/* First unbind the MAC address and restore it back */
-	vsw_hio_unbind_macaddr(vsharep);
-
-	/* free share */
-	hcapab->ms_sfree(vsharep->vs_shdl);
+	WRITE_ENTER(&portp->maccl_rwlock);
+	mac_share_unbind(portp->p_mch);
+	RW_EXIT(&portp->maccl_rwlock);
 	vsharep->vs_state = VSW_SHARE_FREE;
 	vsharep->vs_macaddr = 0;
 
@@ -455,7 +376,7 @@ vsw_hio_free_all_shares(vsw_t *vswp, boolean_t reboot)
 	 * HybridIO.
 	 */
 	READ_ENTER(&plist->lockrw);
-	mutex_enter(&vswp->hw_lock);
+	mutex_enter(&vswp->mac_lock);
 	/*
 	 * first clear the hio_capable flag so that no more
 	 * HybridIO operations are initiated.
@@ -515,9 +436,9 @@ vsw_hio_free_all_shares(vsw_t *vswp, boolean_t reboot)
 		 * This delay is also needed for the port reset to
 		 * release the Hybrid resource.
 		 */
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		drv_usecwait(vsw_hio_cleanup_delay);
-		mutex_enter(&vswp->hw_lock);
+		mutex_enter(&vswp->mac_lock);
 		max_retries--;
 	} while ((free_shares < hiop->vh_num_shares) && (max_retries > 0));
 
@@ -532,7 +453,7 @@ vsw_hio_free_all_shares(vsw_t *vswp, boolean_t reboot)
 	kmem_free(hiop->vh_shares, sizeof (vsw_share_t) * hiop->vh_num_shares);
 	hiop->vh_shares = NULL;
 	hiop->vh_num_shares = 0;
-	mutex_exit(&vswp->hw_lock);
+	mutex_exit(&vswp->mac_lock);
 	RW_EXIT(&plist->lockrw);
 	D1(vswp, "%s:exit\n", __func__);
 }
@@ -560,12 +481,12 @@ vsw_hio_start_ports(vsw_t *vswp)
 		}
 
 		reset = B_FALSE;
-		mutex_enter(&vswp->hw_lock);
+		mutex_enter(&vswp->mac_lock);
 		vsharep = vsw_hio_find_vshare_port(vswp, portp);
 		if (vsharep == NULL) {
 			reset = B_TRUE;
 		}
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 
 		if (reset == B_TRUE) {
 			/* Cause a rest to trigger HybridIO setup */
@@ -586,9 +507,9 @@ vsw_hio_start(vsw_t *vswp, vsw_ldc_t *ldcp)
 	int		rv;
 
 	D1(vswp, "%s:enter ldc=0x%lx", __func__, ldcp->ldc_id);
-	mutex_enter(&vswp->hw_lock);
+	mutex_enter(&vswp->mac_lock);
 	if (vswp->hio_capable == B_FALSE) {
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		D2(vswp, "%s:not HIO capable", __func__);
 		return;
 	}
@@ -596,14 +517,14 @@ vsw_hio_start(vsw_t *vswp, vsw_ldc_t *ldcp)
 	/* Verify if a share was already allocated */
 	vsharep = vsw_hio_find_vshare_ldcid(vswp, ldcp->ldc_id);
 	if (vsharep != NULL) {
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		D2(vswp, "%s:Share already allocated to ldc=0x%lx",
 		    __func__, ldcp->ldc_id);
 		return;
 	}
 	vsharep = vsw_hio_alloc_share(vswp, ldcp);
 	if (vsharep == NULL) {
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		D2(vswp, "%s: no Share available for ldc=0x%lx",
 		    __func__, ldcp->ldc_id);
 		return;
@@ -616,12 +537,12 @@ vsw_hio_start(vsw_t *vswp, vsw_ldc_t *ldcp)
 		 * Failed to send a DDS message, so cleanup now.
 		 */
 		vsw_hio_free_share(vsharep);
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		return;
 	}
 	vsharep->vs_state &= ~VSW_SHARE_DDS_ACKD;
 	vsharep->vs_state |= VSW_SHARE_DDS_SENT;
-	mutex_exit(&vswp->hw_lock);
+	mutex_exit(&vswp->mac_lock);
 
 	/* DERR only to print by default */
 	DERR(vswp, "Share allocated for ldc_id=0x%lx Cookie=0x%lX",
@@ -640,16 +561,16 @@ vsw_hio_stop(vsw_t *vswp, vsw_ldc_t *ldcp)
 
 	D1(vswp, "%s:enter ldc=0x%lx", __func__, ldcp->ldc_id);
 
-	mutex_enter(&vswp->hw_lock);
+	mutex_enter(&vswp->mac_lock);
 	vsharep = vsw_hio_find_vshare_ldcid(vswp, ldcp->ldc_id);
 	if (vsharep == NULL) {
 		D1(vswp, "%s:no share found for ldc=0x%lx",
 		    __func__, ldcp->ldc_id);
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		return;
 	}
 	vsw_hio_free_share(vsharep);
-	mutex_exit(&vswp->hw_lock);
+	mutex_exit(&vswp->mac_lock);
 
 	D1(vswp, "%s:exit ldc=0x%lx", __func__, ldcp->ldc_id);
 }
@@ -669,12 +590,12 @@ vsw_hio_send_delshare_msg(vsw_share_t *vsharep)
 	uint64_t	macaddr = vsharep->vs_macaddr;
 	int		rv;
 
-	ASSERT(MUTEX_HELD(&vswp->hw_lock));
-	mutex_exit(&vswp->hw_lock);
+	ASSERT(MUTEX_HELD(&vswp->mac_lock));
+	mutex_exit(&vswp->mac_lock);
 
 	portp = vsharep->vs_portp;
 	if (portp == NULL) {
-		mutex_enter(&vswp->hw_lock);
+		mutex_enter(&vswp->mac_lock);
 		return (0);
 	}
 
@@ -683,7 +604,7 @@ vsw_hio_send_delshare_msg(vsw_share_t *vsharep)
 	ldcp = ldcl->head;
 	if ((ldcp == NULL) || (ldcp->ldc_id != vsharep->vs_ldcid)) {
 		RW_EXIT(&ldcl->lockrw);
-		mutex_enter(&vswp->hw_lock);
+		mutex_enter(&vswp->mac_lock);
 		return (0);
 	}
 	req_id = VSW_DDS_NEXT_REQID(vsharep);
@@ -691,7 +612,7 @@ vsw_hio_send_delshare_msg(vsw_share_t *vsharep)
 	    cookie, macaddr, req_id);
 
 	RW_EXIT(&ldcl->lockrw);
-	mutex_enter(&vswp->hw_lock);
+	mutex_enter(&vswp->mac_lock);
 	if (rv == 0) {
 		vsharep->vs_state &= ~VSW_SHARE_DDS_ACKD;
 		vsharep->vs_state |= VSW_SHARE_DDS_SENT;
@@ -740,14 +661,14 @@ vsw_process_dds_msg(vsw_t *vswp, vsw_ldc_t *ldcp, void *msg)
 		/* discard */
 		return;
 	}
-	mutex_enter(&vswp->hw_lock);
+	mutex_enter(&vswp->mac_lock);
 	/*
 	 * We expect to receive DDS messages only from guests that
 	 * have HybridIO started.
 	 */
 	vsharep = vsw_hio_find_vshare_ldcid(vswp, ldcp->ldc_id);
 	if (vsharep == NULL) {
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		return;
 	}
 
@@ -816,7 +737,7 @@ vsw_process_dds_msg(vsw_t *vswp, vsw_ldc_t *ldcp, void *msg)
 		    __func__, dmsg->dds_subclass);
 		break;
 	}
-	mutex_exit(&vswp->hw_lock);
+	mutex_exit(&vswp->mac_lock);
 	D1(vswp, "%s:exit ldc=0x%lx\n", __func__, ldcp->ldc_id);
 }
 
@@ -857,8 +778,12 @@ vsw_hio_port_update(vsw_port_t *portp, boolean_t hio_enabled)
 		/* Hybrid Mode is disabled, so stop HybridIO */
 		vsw_hio_stop_port(portp);
 		portp->p_hio_enabled = B_FALSE;
+
+		vsw_port_mac_reconfig(portp, B_FALSE, 0, NULL, 0);
 	} else {
 		portp->p_hio_enabled =  B_TRUE;
+		vsw_port_mac_reconfig(portp, B_FALSE, 0, NULL, 0);
+
 		/* reset the port to initiate HybridIO setup */
 		vsw_hio_port_reset(portp, B_FALSE);
 	}
@@ -877,16 +802,16 @@ vsw_hio_stop_port(vsw_port_t *portp)
 	int max_retries = vsw_hio_max_cleanup_retries;
 
 	D1(vswp, "%s:enter\n", __func__);
-	mutex_enter(&vswp->hw_lock);
+	mutex_enter(&vswp->mac_lock);
 
 	if (vswp->hio_capable == B_FALSE) {
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		return;
 	}
 
 	vsharep = vsw_hio_find_vshare_port(vswp, portp);
 	if (vsharep == NULL) {
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		return;
 	}
 
@@ -925,9 +850,9 @@ vsw_hio_stop_port(vsw_port_t *portp)
 		 * messages come and get processed, that is, shares
 		 * get freed.
 		 */
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 		drv_usecwait(vsw_hio_cleanup_delay);
-		mutex_enter(&vswp->hw_lock);
+		mutex_enter(&vswp->mac_lock);
 
 		/* Check if the share still assigned to this port */
 		if ((vsharep->vs_portp != portp) ||
@@ -937,7 +862,7 @@ vsw_hio_stop_port(vsw_port_t *portp)
 		max_retries--;
 	} while ((vsharep->vs_state != VSW_SHARE_FREE) && (max_retries > 0));
 
-	mutex_exit(&vswp->hw_lock);
+	mutex_exit(&vswp->mac_lock);
 	D1(vswp, "%s:exit\n", __func__);
 }
 
@@ -1111,7 +1036,7 @@ vsw_hio_kstats_update(kstat_t *ksp, int rw)
 			return (0);
 		}
 
-		mutex_enter(&vswp->hw_lock);
+		mutex_enter(&vswp->mac_lock);
 		hiokp->hio_num_shares.value.ul = (uint32_t)hiop->vh_num_shares;
 		for (i = 0; i < hiop->vh_num_shares; i++) {
 			hiokp->share[i].assigned.value.ul =
@@ -1119,7 +1044,7 @@ vsw_hio_kstats_update(kstat_t *ksp, int rw)
 			hiokp->share[i].state.value.ul =
 			    hiop->vh_shares[i].vs_state;
 		}
-		mutex_exit(&vswp->hw_lock);
+		mutex_exit(&vswp->mac_lock);
 	} else {
 		return (EACCES);
 	}

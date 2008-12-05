@@ -101,6 +101,8 @@ static ire_t   	*ire_round_robin(irb_t *, zoneid_t, ire_ftable_args_t *,
 static void		ire_del_host_redir(ire_t *, char *);
 static boolean_t	ire_find_best_route(struct radix_node *, void *);
 static int	ip_send_align_hcksum_flags(mblk_t *, ill_t *);
+static ire_t	*ire_ftable_lookup_simple(ipaddr_t,
+	ire_t **, zoneid_t,  int, ip_stack_t *);
 
 /*
  * Lookup a route in forwarding table. A specific lookup is indicated by
@@ -406,6 +408,157 @@ found_ire_held:
 	return (ire);
 }
 
+/*
+ * This function is called by
+ * ip_fast_forward->ire_forward_simple
+ * The optimizations of this function over ire_ftable_lookup are:
+ *	o removing unnecessary flag matching
+ *	o doing longest prefix match instead of overloading it further
+ *	  with the unnecessary "best_prefix_match"
+ *	o Does not do round robin of default route for every packet
+ *	o inlines code of ire_ctable_lookup to look for nexthop cache
+ *	  entry before calling ire_route_lookup
+ */
+static ire_t *
+ire_ftable_lookup_simple(ipaddr_t addr,
+    ire_t **pire, zoneid_t zoneid, int flags,
+    ip_stack_t *ipst)
+{
+	ire_t *ire = NULL;
+	ire_t *tmp_ire = NULL;
+	struct rt_sockaddr rdst;
+	struct rt_entry *rt;
+	irb_t *irb_ptr;
+	ire_t *save_ire;
+	int match_flags;
+
+	rdst.rt_sin_len = sizeof (rdst);
+	rdst.rt_sin_family = AF_INET;
+	rdst.rt_sin_addr.s_addr = addr;
+
+	/*
+	 * This is basically inlining  a simpler version of ire_match_args
+	 */
+	RADIX_NODE_HEAD_RLOCK(ipst->ips_ip_ftable);
+
+	rt = (struct rt_entry *)ipst->ips_ip_ftable->rnh_matchaddr_args(&rdst,
+	    ipst->ips_ip_ftable, NULL, NULL);
+
+	if (rt == NULL) {
+		RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
+		return (NULL);
+	}
+	irb_ptr = &rt->rt_irb;
+	if (irb_ptr == NULL || irb_ptr->irb_ire_cnt == 0) {
+		RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
+		return (NULL);
+	}
+
+	rw_enter(&irb_ptr->irb_lock, RW_READER);
+	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
+		if (ire->ire_zoneid == zoneid)
+			break;
+	}
+
+	if (ire == NULL || (ire->ire_marks & IRE_MARK_CONDEMNED)) {
+		rw_exit(&irb_ptr->irb_lock);
+		RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
+		return (NULL);
+	}
+	/* we have a ire that matches */
+	if (ire != NULL)
+		IRE_REFHOLD(ire);
+	rw_exit(&irb_ptr->irb_lock);
+	RADIX_NODE_HEAD_UNLOCK(ipst->ips_ip_ftable);
+
+	if ((flags & MATCH_IRE_RJ_BHOLE) &&
+	    (ire->ire_flags & (RTF_BLACKHOLE | RTF_REJECT))) {
+		return (ire);
+	}
+	/*
+	 * At this point, IRE that was found must be an IRE_FORWARDTABLE
+	 * type.  If this is a recursive lookup and an IRE_INTERFACE type was
+	 * found, return that.  If it was some other IRE_FORWARDTABLE type of
+	 * IRE (one of the prefix types), then it is necessary to fill in the
+	 * parent IRE pointed to by pire, and then lookup the gateway address of
+	 * the parent.  For backwards compatiblity, if this lookup returns an
+	 * IRE other than a IRE_CACHETABLE or IRE_INTERFACE, then one more level
+	 * of lookup is done.
+	 */
+	match_flags = MATCH_IRE_DSTONLY;
+
+	if (ire->ire_type & IRE_INTERFACE)
+		return (ire);
+	*pire = ire;
+	/*
+	 * If we can't find an IRE_INTERFACE or the caller has not
+	 * asked for pire, we need to REFRELE the save_ire.
+	 */
+	save_ire = ire;
+
+	/*
+	 * Currently MATCH_IRE_ILL is never used with
+	 * (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT) while
+	 * sending out packets as MATCH_IRE_ILL is used only
+	 * for communicating with on-link hosts. We can't assert
+	 * that here as RTM_GET calls this function with
+	 * MATCH_IRE_ILL | MATCH_IRE_DEFAULT | MATCH_IRE_RECURSIVE.
+	 * We have already used the MATCH_IRE_ILL in determining
+	 * the right prefix route at this point. To match the
+	 * behavior of how we locate routes while sending out
+	 * packets, we don't want to use MATCH_IRE_ILL below
+	 * while locating the interface route.
+	 *
+	 * ire_ftable_lookup may end up with an incomplete IRE_CACHE
+	 * entry for the gateway (i.e., one for which the
+	 * ire_nce->nce_state is not yet ND_REACHABLE). If the caller
+	 * has specified MATCH_IRE_COMPLETE, such entries will not
+	 * be returned; instead, we return the IF_RESOLVER ire.
+	 */
+
+	if (ire->ire_ipif == NULL) {
+		tmp_ire = ire;
+		/*
+		 * Look to see if the nexthop entry is in the
+		 * cachetable (I am inlining a simpler ire_cache_lookup
+		 * here).
+		 */
+		ire = ire_cache_lookup_simple(ire->ire_gateway_addr, ipst);
+		if (ire == NULL) {
+			/* Try ire_route_lookup */
+			ire = tmp_ire;
+		} else {
+			goto solved;
+		}
+	}
+	if (ire->ire_ipif != NULL)
+		match_flags |= MATCH_IRE_ILL_GROUP;
+
+	ire = ire_route_lookup(ire->ire_gateway_addr, 0,
+	    0, 0, ire->ire_ipif, NULL, zoneid, NULL, match_flags, ipst);
+solved:
+	DTRACE_PROBE2(ftable__route__lookup1, (ire_t *), ire,
+	    (ire_t *), save_ire);
+	if (ire == NULL) {
+		/*
+		 * Do not release the parent ire if MATCH_IRE_PARENT
+		 * is set. Also return it via ire.
+		 */
+		ire_refrele(save_ire);
+		*pire = NULL;
+		return (ire);
+	}
+	if (ire->ire_type & (IRE_CACHETABLE | IRE_INTERFACE)) {
+		/*
+		 * If the caller did not ask for pire, release
+		 * it now.
+		 */
+		if (pire == NULL) {
+			ire_refrele(save_ire);
+		}
+	}
+	return (ire);
+}
 
 /*
  * Find an IRE_OFFSUBNET IRE entry for the multicast address 'group'
@@ -1085,6 +1238,246 @@ icmp_err_ret:
 		ire_refrele(ire);
 	}
 	return (NULL);
+}
+
+/*
+ * Since caller is ip_fast_forward, there is no CGTP or Tsol test
+ * Also we dont call ftable lookup with MATCH_IRE_PARENT
+ */
+
+ire_t *
+ire_forward_simple(ipaddr_t dst, enum ire_forward_action *ret_action,
+    ip_stack_t *ipst)
+{
+	ipaddr_t gw = 0;
+	ire_t	*ire = NULL;
+	ire_t   *sire = NULL, *save_ire;
+	ill_t *dst_ill = NULL;
+	int error;
+	zoneid_t zoneid;
+	ipif_t *src_ipif = NULL;
+	mblk_t *res_mp;
+	ushort_t ire_marks = 0;
+
+	zoneid = GLOBAL_ZONEID;
+
+
+	ire = ire_ftable_lookup_simple(dst, &sire, zoneid,
+	    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
+	    MATCH_IRE_RJ_BHOLE, ipst);
+
+	if (ire == NULL) {
+		ip_rts_change(RTM_MISS, dst, 0, 0, 0, 0, 0, 0, RTA_DST, ipst);
+		goto icmp_err_ret;
+	}
+
+	/*
+	 * Verify that the returned IRE does not have either
+	 * the RTF_REJECT or RTF_BLACKHOLE flags set and that the IRE is
+	 * either an IRE_CACHE, IRE_IF_NORESOLVER or IRE_IF_RESOLVER.
+	 */
+	if ((ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE))) {
+		ASSERT(ire->ire_type & (IRE_CACHE | IRE_INTERFACE));
+		ip3dbg(("ire 0x%p is not cache/resolver/noresolver\n",
+		    (void *)ire));
+		goto icmp_err_ret;
+	}
+
+	/*
+	 * If we already have a fully resolved IRE CACHE of the
+	 * nexthop router, just hand over the cache entry
+	 * and we are done.
+	 */
+
+	if (ire->ire_type & IRE_CACHE) {
+
+		/*
+		 * If we are using this ire cache entry as a
+		 * gateway to forward packets, chances are we
+		 * will be using it again. So turn off
+		 * the temporary flag, thus reducing its
+		 * chances of getting deleted frequently.
+		 */
+		if (ire->ire_marks & IRE_MARK_TEMPORARY) {
+			irb_t *irb = ire->ire_bucket;
+			rw_enter(&irb->irb_lock, RW_WRITER);
+			ire->ire_marks &= ~IRE_MARK_TEMPORARY;
+			irb->irb_tmp_ire_cnt--;
+			rw_exit(&irb->irb_lock);
+		}
+
+		if (sire != NULL) {
+			UPDATE_OB_PKT_COUNT(sire);
+			ire_refrele(sire);
+		}
+		*ret_action = Forward_ok;
+		return (ire);
+	}
+	/*
+	 * Increment the ire_ob_pkt_count field for ire if it is an
+	 * INTERFACE (IF_RESOLVER or IF_NORESOLVER) IRE type, and
+	 * increment the same for the parent IRE, sire, if it is some
+	 * sort of prefix IRE (which includes DEFAULT, PREFIX, and HOST).
+	 */
+	if ((ire->ire_type & IRE_INTERFACE) != 0) {
+		UPDATE_OB_PKT_COUNT(ire);
+		ire->ire_last_used_time = lbolt;
+	}
+
+	/*
+	 * sire must be either IRE_CACHETABLE OR IRE_INTERFACE type
+	 */
+	if (sire != NULL) {
+		gw = sire->ire_gateway_addr;
+		ASSERT((sire->ire_type &
+		    (IRE_CACHETABLE | IRE_INTERFACE)) == 0);
+		UPDATE_OB_PKT_COUNT(sire);
+	}
+
+	/* Obtain dst_ill */
+	dst_ill = ip_newroute_get_dst_ill(ire->ire_ipif->ipif_ill);
+	if (dst_ill == NULL) {
+		ip2dbg(("ire_forward no dst ill; ire 0x%p\n",
+		    (void *)ire));
+		goto icmp_err_ret;
+	}
+
+	ASSERT(src_ipif == NULL);
+	/* Now obtain the src_ipif */
+	src_ipif = ire_forward_src_ipif(dst, sire, ire, dst_ill,
+	    zoneid, &ire_marks);
+	if (src_ipif == NULL)
+		goto icmp_err_ret;
+
+	switch (ire->ire_type) {
+	case IRE_IF_NORESOLVER:
+		/* create ire_cache for ire_addr endpoint */
+	case IRE_IF_RESOLVER:
+		/*
+		 * We have the IRE_IF_RESOLVER of the nexthop gateway
+		 * and now need to build a IRE_CACHE for it.
+		 * In this case, we have the following :
+		 *
+		 * 1) src_ipif - used for getting a source address.
+		 *
+		 * 2) dst_ill - from which we derive ire_stq/ire_rfq. This
+		 *    means packets using the IRE_CACHE that we will build
+		 *    here will go out on dst_ill.
+		 *
+		 * 3) sire may or may not be NULL. But, the IRE_CACHE that is
+		 *    to be created will only be tied to the IRE_INTERFACE
+		 *    that was derived from the ire_ihandle field.
+		 *
+		 *    If sire is non-NULL, it means the destination is
+		 *    off-link and we will first create the IRE_CACHE for the
+		 *    gateway.
+		 */
+		res_mp = dst_ill->ill_resolver_mp;
+		if (ire->ire_type == IRE_IF_RESOLVER &&
+		    (!OK_RESOLVER_MP(res_mp))) {
+			ire_refrele(ire);
+			ire = NULL;
+			goto out;
+		}
+		/*
+		 * To be at this point in the code with a non-zero gw
+		 * means that dst is reachable through a gateway that
+		 * we have never resolved.  By changing dst to the gw
+		 * addr we resolve the gateway first.
+		 */
+		if (gw != INADDR_ANY) {
+			/*
+			 * The source ipif that was determined above was
+			 * relative to the destination address, not the
+			 * gateway's. If src_ipif was not taken out of
+			 * the IRE_IF_RESOLVER entry, we'll need to call
+			 * ipif_select_source() again.
+			 */
+			if (src_ipif != ire->ire_ipif) {
+				ipif_refrele(src_ipif);
+				src_ipif = ipif_select_source(dst_ill,
+				    gw, zoneid);
+				if (src_ipif == NULL)
+					goto icmp_err_ret;
+			}
+			dst = gw;
+			gw = INADDR_ANY;
+		}
+
+		if (ire->ire_type == IRE_IF_NORESOLVER)
+			dst = ire->ire_addr; /* ire_cache for tunnel endpoint */
+
+		save_ire = ire;
+		/*
+		 * create an incomplete IRE_CACHE.
+		 * An areq_mp will be generated in ire_arpresolve() for
+		 * RESOLVER interfaces.
+		 */
+		ire = ire_create(
+		    (uchar_t *)&dst,		/* dest address */
+		    (uchar_t *)&ip_g_all_ones,	/* mask */
+		    (uchar_t *)&src_ipif->ipif_src_addr, /* src addr */
+		    (uchar_t *)&gw,		/* gateway address */
+		    (save_ire->ire_type == IRE_IF_RESOLVER ?  NULL:
+		    &save_ire->ire_max_frag),
+		    NULL,
+		    dst_ill->ill_rq,		/* recv-from queue */
+		    dst_ill->ill_wq,		/* send-to queue */
+		    IRE_CACHE,			/* IRE type */
+		    src_ipif,
+		    ire->ire_mask,		/* Parent mask */
+		    0,
+		    ire->ire_ihandle,	/* Interface handle */
+		    0,
+		    &(ire->ire_uinfo),
+		    NULL,
+		    NULL,
+		    ipst);
+		ip1dbg(("incomplete ire_cache 0x%p\n", (void *)ire));
+		if (ire != NULL) {
+			ire->ire_marks |= ire_marks;
+			/* add the incomplete ire: */
+			error = ire_add(&ire, NULL, NULL, NULL, B_TRUE);
+			if (error == 0 && ire != NULL) {
+				ire->ire_max_frag = save_ire->ire_max_frag;
+				ip1dbg(("setting max_frag to %d in ire 0x%p\n",
+				    ire->ire_max_frag, (void *)ire));
+			} else {
+				ire_refrele(save_ire);
+				goto icmp_err_ret;
+			}
+		}
+
+		ire_refrele(save_ire);
+		break;
+	default:
+		break;
+	}
+
+out:
+	*ret_action = Forward_ok;
+	if (sire != NULL)
+		ire_refrele(sire);
+	if (dst_ill != NULL)
+		ill_refrele(dst_ill);
+	if (src_ipif != NULL)
+		ipif_refrele(src_ipif);
+	return (ire);
+icmp_err_ret:
+	*ret_action = Forward_ret_icmp_err;
+	if (src_ipif != NULL)
+		ipif_refrele(src_ipif);
+	if (dst_ill != NULL)
+		ill_refrele(dst_ill);
+	if (sire != NULL)
+		ire_refrele(sire);
+	if (ire != NULL) {
+		if (ire->ire_flags & RTF_BLACKHOLE)
+			*ret_action = Forward_blackhole;
+		ire_refrele(ire);
+	}
+	/* caller needs to send icmp error message */
+	return (NULL);
 
 }
 
@@ -1439,7 +1832,7 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 	 * if necessary and send it once ready.
 	 */
 
-	value = ip_xmit_v4(mp, ire_cache, NULL, B_FALSE);
+	value = ip_xmit_v4(mp, ire_cache, NULL, B_FALSE, NULL);
 cleanup:
 	ire_refrele(ire_cache);
 	/*

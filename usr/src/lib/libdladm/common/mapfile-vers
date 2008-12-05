@@ -35,7 +35,6 @@ SUNWprivate_1.1 {
 	dladm_valid_linkname;
 	dladm_mac_walk;
 	dladm_init_linkprop;
-	dladm_get_single_mac_stat;
 	dladm_get_linkprop;
 	dladm_set_linkprop;
 	dladm_walk_linkprop;
@@ -44,6 +43,8 @@ SUNWprivate_1.1 {
 	dladm_set_secobj;
 	dladm_unset_secobj;
 	dladm_walk_secobj;
+	dladm_bw2str;
+	dladm_str2bw;
 	dladm_secobjclass2str;
 	dladm_str2secobjclass;
 	dladm_aggr_up;
@@ -118,12 +119,60 @@ SUNWprivate_1.1 {
 	dladm_wlan_wpa_set_key;
 	dladm_wlan_wpa_set_mlme;
 	dladm_vnic_create;
-	dladm_vnic_modify;
 	dladm_vnic_delete;
 	dladm_vnic_info;
 	dladm_vnic_str2macaddrtype;
-	dladm_kstat_value;
+	dladm_vnic_up;
+	dladm_walk_macaddr;
+	dladm_walk_hwgrp;
+	dladm_pri2str;
+	dladm_str2pri;
+	dladm_start_usagelog;
+	dladm_stop_usagelog;
+	dladm_walk_usage_res;
+	dladm_walk_usage_time;
+	dladm_usage_summary;
+	dladm_usage_dates;
+
+	dladm_flow_add;
+	dladm_flow_remove;
+	dladm_flow_parse_db;
+	dladm_walk_flow;
+	dladm_flow_init;
+	dladm_flow_info;
+	dladm_prefixlen2mask;
+	dladm_mask2prefixlen;
+	dladm_str2proto;
+	dladm_proto2str;
+
+	dladm_free_attrs;
+	dladm_parse_flow_attrs;
+
+	dladm_flow_attr_ip2str;
+	dladm_flow_attr_proto2str;
+	dladm_flow_attr_port2str;
+	dladm_flow_attr_dsfield2str;
+
+	dladm_free_props;
+	dladm_parse_link_props;
+	dladm_get_linkprop;
+	dladm_set_linkprop;
+	dladm_walk_linkprop;
+	dladm_parse_flow_props;
+	dladm_get_flowprop;
+	dladm_set_flowprop;
+	dladm_walk_flowprop;
+
 	dladm_parselink;
+
+	dladm_continuous;
+	dladm_kstat_lookup;
+	dladm_get_stats;
+	dladm_kstat_value;
+	dladm_get_single_mac_stat;
+	dladm_stats_total;
+	dladm_stats_diff;
+
     local:
 	*;
 };

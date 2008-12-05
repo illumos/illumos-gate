@@ -1228,10 +1228,8 @@ hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 #ifdef  HXGE_DEBUG
 	HXGE_DEBUG_MSG((hxgep, RX_CTL,
 	    "==> hxge_rx_pkts_vring:calling mac_rx (NEMO) "
-	    "LEN %d mp $%p mp->b_next $%p rcrp $%p "
-	    "mac_handle $%p",
-	    (mp->b_wptr - mp->b_rptr), mp, mp->b_next,
-	    rcrp, rcrp->rcr_mac_handle));
+	    "LEN %d mp $%p mp->b_next $%p rcrp $%p",
+	    (mp->b_wptr - mp->b_rptr), mp, mp->b_next, rcrp));
 	HXGE_DEBUG_MSG((hxgep, RX_CTL,
 	    "==> hxge_rx_pkts_vring: dump packets "
 	    "(mp $%p b_rptr $%p b_wptr $%p):\n %s",
@@ -1257,7 +1255,7 @@ hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL,
 	    "==> hxge_rx_pkts_vring: send packet to stack"));
-	mac_rx(hxgep->mach, rcrp->rcr_mac_handle, mp);
+	mac_rx(hxgep->mach, NULL, mp);
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "<== hxge_rx_pkts_vring"));
 }

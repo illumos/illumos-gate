@@ -177,7 +177,6 @@ static mac_callbacks_t mxfe_m_callbacks = {
 	mxfe_m_multicst,
 	mxfe_m_unicst,
 	mxfe_m_tx,
-	NULL,		/* mc_resources */
 	NULL,		/* mc_ioctl */
 	NULL,		/* mc_getcapab */
 	NULL,		/* mc_open */

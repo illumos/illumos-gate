@@ -30,8 +30,6 @@
 #ifndef _SYS_STREAM_H
 #define	_SYS_STREAM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 11.44	*/
-
 /*
  * For source compatibility
  */
@@ -414,6 +412,7 @@ typedef	struct	bcache {
 #define	STRUIO_ZCNOTIFY	0x10	/* notify stream head when mblk acked */
 #define	STRUIO_EAGER	0x20	/* new eager; db_cksumstart has squeue to use */
 #define	STRUIO_POLICY	0x40	/* new eager when IPsec is enabled */
+#define	STRUIO_CONNECT	0x80	/* conn did a connect */
 
 /*
  * Message flags.  These are interpreted by the stream head.

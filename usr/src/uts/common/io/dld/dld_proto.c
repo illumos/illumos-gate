@@ -23,32 +23,19 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Data-Link Driver
  */
-
-#include <sys/types.h>
-#include <sys/debug.h>
 #include <sys/sysmacros.h>
-#include <sys/stream.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-#include <sys/strsun.h>
-#include <sys/cpuvar.h>
-#include <sys/dlpi.h>
-#include <netinet/in.h>
-#include <sys/sdt.h>
 #include <sys/strsubr.h>
+#include <sys/strsun.h>
 #include <sys/vlan.h>
-#include <sys/mac.h>
-#include <sys/dls.h>
-#include <sys/dld.h>
 #include <sys/dld_impl.h>
-#include <sys/dls_soft_ring.h>
+#include <sys/mac_client.h>
+#include <sys/mac_client_impl.h>
+#include <sys/mac_client_priv.h>
 
-typedef boolean_t proto_reqfunc_t(dld_str_t *, union DL_primitives *, mblk_t *);
+typedef void proto_reqfunc_t(dld_str_t *, mblk_t *);
 
 static proto_reqfunc_t proto_info_req, proto_attach_req, proto_detach_req,
     proto_bind_req, proto_unbind_req, proto_promiscon_req, proto_promiscoff_req,
@@ -56,13 +43,8 @@ static proto_reqfunc_t proto_info_req, proto_attach_req, proto_detach_req,
     proto_setphysaddr_req, proto_udqos_req, proto_req, proto_capability_req,
     proto_notify_req, proto_passive_req;
 
-static void proto_poll_disable(dld_str_t *);
-static boolean_t proto_poll_enable(dld_str_t *, dl_capab_dls_t *);
-
-static void proto_soft_ring_disable(dld_str_t *);
-static boolean_t proto_soft_ring_enable(dld_str_t *, dl_capab_dls_t *);
-static boolean_t proto_capability_advertise(dld_str_t *, mblk_t *);
-static void proto_change_soft_ring_fanout(dld_str_t *, int);
+static void proto_capability_advertise(dld_str_t *, mblk_t *);
+static int dld_capab_poll_disable(dld_str_t *, dld_capab_poll_t *);
 
 #define	DL_ACK_PENDING(state) \
 	((state) == DL_ATTACH_PENDING || \
@@ -79,70 +61,72 @@ static void proto_change_soft_ring_fanout(dld_str_t *, int);
  * by the above primitives.
  */
 void
-dld_wput_proto_nondata(dld_str_t *dsp, mblk_t *mp)
+dld_proto(dld_str_t *dsp, mblk_t *mp)
 {
-	union DL_primitives	*udlp;
 	t_uscalar_t		prim;
 
-	ASSERT(MBLKL(mp) >= sizeof (t_uscalar_t));
-
-	udlp = (union DL_primitives *)mp->b_rptr;
-	prim = udlp->dl_primitive;
+	if (MBLKL(mp) < sizeof (t_uscalar_t)) {
+		freemsg(mp);
+		return;
+	}
+	prim = ((union DL_primitives *)mp->b_rptr)->dl_primitive;
 
 	switch (prim) {
 	case DL_INFO_REQ:
-		(void) proto_info_req(dsp, udlp, mp);
+		proto_info_req(dsp, mp);
 		break;
 	case DL_BIND_REQ:
-		(void) proto_bind_req(dsp, udlp, mp);
+		proto_bind_req(dsp, mp);
 		break;
 	case DL_UNBIND_REQ:
-		(void) proto_unbind_req(dsp, udlp, mp);
+		proto_unbind_req(dsp, mp);
+		break;
+	case DL_UNITDATA_REQ:
+		proto_unitdata_req(dsp, mp);
 		break;
 	case DL_UDQOS_REQ:
-		(void) proto_udqos_req(dsp, udlp, mp);
+		proto_udqos_req(dsp, mp);
 		break;
 	case DL_ATTACH_REQ:
-		(void) proto_attach_req(dsp, udlp, mp);
+		proto_attach_req(dsp, mp);
 		break;
 	case DL_DETACH_REQ:
-		(void) proto_detach_req(dsp, udlp, mp);
+		proto_detach_req(dsp, mp);
 		break;
 	case DL_ENABMULTI_REQ:
-		(void) proto_enabmulti_req(dsp, udlp, mp);
+		proto_enabmulti_req(dsp, mp);
 		break;
 	case DL_DISABMULTI_REQ:
-		(void) proto_disabmulti_req(dsp, udlp, mp);
+		proto_disabmulti_req(dsp, mp);
 		break;
 	case DL_PROMISCON_REQ:
-		(void) proto_promiscon_req(dsp, udlp, mp);
+		proto_promiscon_req(dsp, mp);
 		break;
 	case DL_PROMISCOFF_REQ:
-		(void) proto_promiscoff_req(dsp, udlp, mp);
+		proto_promiscoff_req(dsp, mp);
 		break;
 	case DL_PHYS_ADDR_REQ:
-		(void) proto_physaddr_req(dsp, udlp, mp);
+		proto_physaddr_req(dsp, mp);
 		break;
 	case DL_SET_PHYS_ADDR_REQ:
-		(void) proto_setphysaddr_req(dsp, udlp, mp);
+		proto_setphysaddr_req(dsp, mp);
 		break;
 	case DL_NOTIFY_REQ:
-		(void) proto_notify_req(dsp, udlp, mp);
+		proto_notify_req(dsp, mp);
 		break;
 	case DL_CAPABILITY_REQ:
-		(void) proto_capability_req(dsp, udlp, mp);
+		proto_capability_req(dsp, mp);
 		break;
 	case DL_PASSIVE_REQ:
-		(void) proto_passive_req(dsp, udlp, mp);
+		proto_passive_req(dsp, mp);
 		break;
 	default:
-		(void) proto_req(dsp, udlp, mp);
+		proto_req(dsp, mp);
 		break;
 	}
 }
 
 #define	NEG(x)	-(x)
-
 typedef struct dl_info_ack_wrapper {
 	dl_info_ack_t		dl_info;
 	uint8_t			dl_addr[MAXMACADDRLEN + sizeof (uint16_t)];
@@ -154,9 +138,8 @@ typedef struct dl_info_ack_wrapper {
 /*
  * DL_INFO_REQ
  */
-/*ARGSUSED*/
-static boolean_t
-proto_info_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_info_req(dld_str_t *dsp, mblk_t *mp)
 {
 	dl_info_ack_wrapper_t	*dlwp;
 	dl_info_ack_t		*dlp;
@@ -176,9 +159,7 @@ proto_info_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	 */
 	if ((mp = mexchange(q, mp, sizeof (dl_info_ack_wrapper_t),
 	    M_PCPROTO, 0)) == NULL)
-		return (B_FALSE);
-
-	rw_enter(&dsp->ds_lock, RW_READER);
+		return;
 
 	bzero(mp->b_rptr, sizeof (dl_info_ack_wrapper_t));
 	dlwp = (dl_info_ack_wrapper_t *)mp->b_rptr;
@@ -307,7 +288,8 @@ proto_info_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		 */
 		dlp->dl_addr_offset = (uintptr_t)addr - (uintptr_t)dlp;
 		if (addr_length > 0)
-			bcopy(dsp->ds_curr_addr, addr, addr_length);
+			mac_unicast_primary_get(dsp->ds_mh, addr);
+
 		*(uint16_t *)(addr + addr_length) = dsp->ds_sap;
 	}
 
@@ -319,24 +301,19 @@ done:
 	ASSERT(IMPLY(dlp->dl_brdcst_addr_offset != 0,
 	    dlp->dl_brdcst_addr_length != 0));
 
-	rw_exit(&dsp->ds_lock);
-
 	qreply(q, mp);
-	return (B_TRUE);
 }
 
 /*
  * DL_ATTACH_REQ
  */
-static boolean_t
-proto_attach_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_attach_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_attach_req_t	*dlp = (dl_attach_req_t *)udlp;
+	dl_attach_req_t	*dlp = (dl_attach_req_t *)mp->b_rptr;
 	int		err = 0;
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (MBLKL(mp) < sizeof (dl_attach_req_t) ||
 	    dlp->dl_ppa < 0 || dsp->ds_style == DL_STYLE1) {
@@ -366,24 +343,21 @@ proto_attach_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 	ASSERT(dsp->ds_dlstate == DL_UNBOUND);
-	rw_exit(&dsp->ds_lock);
-
 	dlokack(q, mp, DL_ATTACH_REQ);
-	return (B_TRUE);
+	return;
+
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_ATTACH_REQ, dl_err, (t_uscalar_t)err);
-	return (B_FALSE);
 }
 
-/*ARGSUSED*/
-static boolean_t
-proto_detach_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+/*
+ * DL_DETACH_REQ
+ */
+static void
+proto_detach_req(dld_str_t *dsp, mblk_t *mp)
 {
 	queue_t		*q = dsp->ds_wq;
 	t_uscalar_t	dl_err;
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (MBLKL(mp) < sizeof (dl_detach_req_t)) {
 		dl_err = DL_BADPRIM;
@@ -400,37 +374,34 @@ proto_detach_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
+	ASSERT(dsp->ds_datathr_cnt == 0);
 	dsp->ds_dlstate = DL_DETACH_PENDING;
-	dld_str_detach(dsp);
 
-	rw_exit(&dsp->ds_lock);
+	dld_str_detach(dsp);
 	dlokack(dsp->ds_wq, mp, DL_DETACH_REQ);
-	return (B_TRUE);
+	return;
+
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_DETACH_REQ, dl_err, 0);
-	return (B_FALSE);
 }
 
 /*
  * DL_BIND_REQ
  */
-static boolean_t
-proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_bind_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_bind_req_t	*dlp = (dl_bind_req_t *)udlp;
+	dl_bind_req_t	*dlp = (dl_bind_req_t *)mp->b_rptr;
 	int		err = 0;
 	uint8_t		dlsap_addr[MAXMACADDRLEN + sizeof (uint16_t)];
 	uint_t		dlsap_addr_length;
 	t_uscalar_t	dl_err;
 	t_scalar_t	sap;
 	queue_t		*q = dsp->ds_wq;
+	mac_perim_handle_t	mph;
+	void		*mdip;
+	int32_t		intr_cpu;
 
-	/*
-	 * Because control message processing is serialized, we don't need
-	 * to hold any locks to read any fields of dsp; we only need ds_lock
-	 * to update the ds_dlstate, ds_sap and ds_passivestate fields.
-	 */
 	if (MBLKL(mp) < sizeof (dl_bind_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
@@ -451,24 +422,26 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
+	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
+
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED &&
-	    !dls_active_set(dsp->ds_dc)) {
+	    ((err = dls_active_set(dsp)) != 0)) {
 		dl_err = DL_SYSERR;
-		err = EBUSY;
-		goto failed;
+		goto failed2;
 	}
 
+	dsp->ds_dlstate = DL_BIND_PENDING;
 	/*
 	 * Set the receive callback.
 	 */
-	dls_rx_set(dsp->ds_dc, (dsp->ds_mode == DLD_RAW) ?
+	dls_rx_set(dsp, (dsp->ds_mode == DLD_RAW) ?
 	    dld_str_rx_raw : dld_str_rx_unitdata, dsp);
 
 	/*
 	 * Bind the channel such that it can receive packets.
 	 */
 	sap = dlp->dl_sap;
-	err = dls_bind(dsp->ds_dc, sap);
+	err = dls_bind(dsp, sap);
 	if (err != 0) {
 		switch (err) {
 		case EINVAL:
@@ -480,17 +453,28 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			break;
 		}
 
+		dsp->ds_dlstate = DL_UNBOUND;
 		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-			dls_active_clear(dsp->ds_dc);
-
-		goto failed;
+			dls_active_clear(dsp);
+		goto failed2;
 	}
+
+	intr_cpu = mac_client_intr_cpu(dsp->ds_mch);
+	mdip = mac_get_devinfo(dsp->ds_mh);
+	mac_perim_exit(mph);
+
+	/*
+	 * We do this after we get out of the perim to avoid deadlocks
+	 * etc. since part of mac_client_retarget_intr is to walk the
+	 * device tree in order to find and retarget the interrupts.
+	 */
+	mac_client_set_intr_cpu(mdip, dsp->ds_mch, intr_cpu);
 
 	/*
 	 * Copy in MAC address.
 	 */
 	dlsap_addr_length = dsp->ds_mip->mi_addr_length;
-	bcopy(dsp->ds_curr_addr, dlsap_addr, dlsap_addr_length);
+	mac_unicast_primary_get(dsp->ds_mh, dlsap_addr);
 
 	/*
 	 * Copy in the SAP.
@@ -498,37 +482,28 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	*(uint16_t *)(dlsap_addr + dlsap_addr_length) = sap;
 	dlsap_addr_length += sizeof (uint16_t);
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-
 	dsp->ds_dlstate = DL_IDLE;
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 		dsp->ds_passivestate = DLD_ACTIVE;
-	dsp->ds_sap = sap;
-
-	if (dsp->ds_mode == DLD_FASTPATH)
-		dsp->ds_tx = str_mdata_fastpath_put;
-	else if (dsp->ds_mode == DLD_RAW)
-		dsp->ds_tx = str_mdata_raw_put;
-	dsp->ds_unitdata_tx = dld_wput_proto_data;
-
-	rw_exit(&dsp->ds_lock);
 
 	dlbindack(q, mp, sap, dlsap_addr, dlsap_addr_length, 0, 0);
-	return (B_TRUE);
+	return;
+
+failed2:
+	mac_perim_exit(mph);
 failed:
 	dlerrorack(q, mp, DL_BIND_REQ, dl_err, (t_uscalar_t)err);
-	return (B_FALSE);
 }
 
 /*
  * DL_UNBIND_REQ
  */
-/*ARGSUSED*/
-static boolean_t
-proto_unbind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_unbind_req(dld_str_t *dsp, mblk_t *mp)
 {
 	queue_t		*q = dsp->ds_wq;
 	t_uscalar_t	dl_err;
+	mac_perim_handle_t	mph;
 
 	if (MBLKL(mp) < sizeof (dl_unbind_req_t)) {
 		dl_err = DL_BADPRIM;
@@ -540,32 +515,27 @@ proto_unbind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
-	/*
-	 * Flush any remaining packets scheduled for transmission.
-	 */
-	dld_tx_flush(dsp);
+	mutex_enter(&dsp->ds_lock);
+	while (dsp->ds_datathr_cnt != 0)
+		cv_wait(&dsp->ds_datathr_cv, &dsp->ds_lock);
 
+	dsp->ds_dlstate = DL_UNBIND_PENDING;
+	mutex_exit(&dsp->ds_lock);
+
+	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
 	/*
 	 * Unbind the channel to stop packets being received.
 	 */
-	dls_unbind(dsp->ds_dc);
-
-	/*
-	 * Clear the receive callback.
-	 */
-	dls_rx_set(dsp->ds_dc, NULL, NULL);
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
+	if (dls_unbind(dsp) != 0) {
+		dl_err = DL_OUTSTATE;
+		mac_perim_exit(mph);
+		goto failed;
+	}
 
 	/*
 	 * Disable polling mode, if it is enabled.
 	 */
-	proto_poll_disable(dsp);
-
-	/*
-	 * If soft rings were enabled, the workers should be quiesced.
-	 */
-	dls_soft_ring_disable(dsp->ds_dc);
+	(void) dld_capab_poll_disable(dsp, NULL);
 
 	/*
 	 * Clear LSO flags.
@@ -574,38 +544,37 @@ proto_unbind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	dsp->ds_lso_max = 0;
 
 	/*
+	 * Clear the receive callback.
+	 */
+	dls_rx_set(dsp, NULL, NULL);
+	dsp->ds_direct = B_FALSE;
+
+	/*
 	 * Set the mode back to the default (unitdata).
 	 */
 	dsp->ds_mode = DLD_UNITDATA;
 	dsp->ds_dlstate = DL_UNBOUND;
-	DLD_TX_QUIESCE(dsp);
-	rw_exit(&dsp->ds_lock);
 
-	dlokack(q, mp, DL_UNBIND_REQ);
-
-	return (B_TRUE);
+	mac_perim_exit(mph);
+	dlokack(dsp->ds_wq, mp, DL_UNBIND_REQ);
+	return;
 failed:
 	dlerrorack(q, mp, DL_UNBIND_REQ, dl_err, 0);
-	return (B_FALSE);
 }
 
 /*
  * DL_PROMISCON_REQ
  */
-static boolean_t
-proto_promiscon_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_promiscon_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_promiscon_req_t *dlp = (dl_promiscon_req_t *)udlp;
+	dl_promiscon_req_t *dlp = (dl_promiscon_req_t *)mp->b_rptr;
 	int		err = 0;
 	t_uscalar_t	dl_err;
-	uint32_t	promisc;
+	uint32_t	promisc_saved;
 	queue_t		*q = dsp->ds_wq;
+	mac_perim_handle_t	mph;
 
-	/*
-	 * Because control message processing is serialized, we don't need
-	 * to hold any locks to read any fields of dsp; we only need ds_lock
-	 * to update the ds_promisc and ds_passivestate fields.
-	 */
 	if (MBLKL(mp) < sizeof (dl_promiscon_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
@@ -617,70 +586,73 @@ proto_promiscon_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
+	promisc_saved = dsp->ds_promisc;
 	switch (dlp->dl_level) {
 	case DL_PROMISC_SAP:
-		promisc = DLS_PROMISC_SAP;
+		dsp->ds_promisc |= DLS_PROMISC_SAP;
 		break;
+
 	case DL_PROMISC_MULTI:
-		promisc = DLS_PROMISC_MULTI;
+		dsp->ds_promisc |= DLS_PROMISC_MULTI;
 		break;
+
 	case DL_PROMISC_PHYS:
-		promisc = DLS_PROMISC_PHYS;
+		dsp->ds_promisc |= DLS_PROMISC_PHYS;
 		break;
+
 	default:
 		dl_err = DL_NOTSUPPORTED;
 		goto failed;
 	}
 
+	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
+
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED &&
-	    !dls_active_set(dsp->ds_dc)) {
+	    ((err = dls_active_set(dsp)) != 0)) {
+		dsp->ds_promisc = promisc_saved;
 		dl_err = DL_SYSERR;
-		err = EBUSY;
-		goto failed;
+		goto failed2;
 	}
 
 	/*
 	 * Adjust channel promiscuity.
 	 */
-	promisc = (dsp->ds_promisc | promisc);
-	err = dls_promisc(dsp->ds_dc, promisc);
+	err = dls_promisc(dsp, promisc_saved);
+
 	if (err != 0) {
 		dl_err = DL_SYSERR;
+		dsp->ds_promisc = promisc_saved;
 		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-			dls_active_clear(dsp->ds_dc);
-		goto failed;
+			dls_active_clear(dsp);
+		goto failed2;
 	}
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
+	mac_perim_exit(mph);
+
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 		dsp->ds_passivestate = DLD_ACTIVE;
-	dsp->ds_promisc = promisc;
-	rw_exit(&dsp->ds_lock);
-
 	dlokack(q, mp, DL_PROMISCON_REQ);
-	return (B_TRUE);
+	return;
+
+failed2:
+	mac_perim_exit(mph);
 failed:
 	dlerrorack(q, mp, DL_PROMISCON_REQ, dl_err, (t_uscalar_t)err);
-	return (B_FALSE);
 }
 
 /*
  * DL_PROMISCOFF_REQ
  */
-static boolean_t
-proto_promiscoff_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_promiscoff_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_promiscoff_req_t *dlp = (dl_promiscoff_req_t *)udlp;
+	dl_promiscoff_req_t *dlp = (dl_promiscoff_req_t *)mp->b_rptr;
 	int		err = 0;
 	t_uscalar_t	dl_err;
-	uint32_t	promisc;
+	uint32_t	promisc_saved;
 	queue_t		*q = dsp->ds_wq;
+	mac_perim_handle_t	mph;
 
-	/*
-	 * Because control messages processing is serialized, we don't need
-	 * to hold any lock to read any field of dsp; we hold ds_lock to
-	 * update the ds_promisc field.
-	 */
 	if (MBLKL(mp) < sizeof (dl_promiscoff_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
@@ -692,60 +664,66 @@ proto_promiscoff_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
+	promisc_saved = dsp->ds_promisc;
 	switch (dlp->dl_level) {
 	case DL_PROMISC_SAP:
-		promisc = DLS_PROMISC_SAP;
+		if (!(dsp->ds_promisc & DLS_PROMISC_SAP)) {
+			dl_err = DL_NOTENAB;
+			goto failed;
+		}
+		dsp->ds_promisc &= ~DLS_PROMISC_SAP;
 		break;
+
 	case DL_PROMISC_MULTI:
-		promisc = DLS_PROMISC_MULTI;
+		if (!(dsp->ds_promisc & DLS_PROMISC_MULTI)) {
+			dl_err = DL_NOTENAB;
+			goto failed;
+		}
+		dsp->ds_promisc &= ~DLS_PROMISC_MULTI;
 		break;
+
 	case DL_PROMISC_PHYS:
-		promisc = DLS_PROMISC_PHYS;
+		if (!(dsp->ds_promisc & DLS_PROMISC_PHYS)) {
+			dl_err = DL_NOTENAB;
+			goto failed;
+		}
+		dsp->ds_promisc &= ~DLS_PROMISC_PHYS;
 		break;
+
 	default:
 		dl_err = DL_NOTSUPPORTED;
 		goto failed;
 	}
 
-	if (!(dsp->ds_promisc & promisc)) {
-		dl_err = DL_NOTENAB;
-		goto failed;
-	}
+	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
+	/*
+	 * Adjust channel promiscuity.
+	 */
+	err = dls_promisc(dsp, promisc_saved);
+	mac_perim_exit(mph);
 
-	promisc = (dsp->ds_promisc & ~promisc);
-	err = dls_promisc(dsp->ds_dc, promisc);
 	if (err != 0) {
 		dl_err = DL_SYSERR;
 		goto failed;
 	}
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-	dsp->ds_promisc = promisc;
-	rw_exit(&dsp->ds_lock);
-
 	dlokack(q, mp, DL_PROMISCOFF_REQ);
-	return (B_TRUE);
+	return;
 failed:
 	dlerrorack(q, mp, DL_PROMISCOFF_REQ, dl_err, (t_uscalar_t)err);
-	return (B_FALSE);
 }
 
 /*
  * DL_ENABMULTI_REQ
  */
-static boolean_t
-proto_enabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_enabmulti_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_enabmulti_req_t *dlp = (dl_enabmulti_req_t *)udlp;
+	dl_enabmulti_req_t *dlp = (dl_enabmulti_req_t *)mp->b_rptr;
 	int		err = 0;
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
+	mac_perim_handle_t	mph;
 
-	/*
-	 * Because control messages processing is serialized, we don't need
-	 * to hold any lock to read any field of dsp; we hold ds_lock to
-	 * update the ds_passivestate field.
-	 */
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
 		dl_err = DL_OUTSTATE;
@@ -759,14 +737,16 @@ proto_enabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
+	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
+
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED &&
-	    !dls_active_set(dsp->ds_dc)) {
+	    ((err = dls_active_set(dsp)) != 0)) {
 		dl_err = DL_SYSERR;
-		err = EBUSY;
-		goto failed;
+		goto failed2;
 	}
 
-	err = dls_multicst_add(dsp->ds_dc, mp->b_rptr + dlp->dl_addr_offset);
+	err = dls_multicst_add(dsp, mp->b_rptr + dlp->dl_addr_offset);
+
 	if (err != 0) {
 		switch (err) {
 		case EINVAL:
@@ -781,40 +761,37 @@ proto_enabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			dl_err = DL_SYSERR;
 			break;
 		}
-
 		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-			dls_active_clear(dsp->ds_dc);
+			dls_active_clear(dsp);
 
-		goto failed;
+		goto failed2;
 	}
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
+	mac_perim_exit(mph);
+
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 		dsp->ds_passivestate = DLD_ACTIVE;
-	rw_exit(&dsp->ds_lock);
-
 	dlokack(q, mp, DL_ENABMULTI_REQ);
-	return (B_TRUE);
+	return;
+
+failed2:
+	mac_perim_exit(mph);
 failed:
 	dlerrorack(q, mp, DL_ENABMULTI_REQ, dl_err, (t_uscalar_t)err);
-	return (B_FALSE);
 }
 
 /*
  * DL_DISABMULTI_REQ
  */
-static boolean_t
-proto_disabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_disabmulti_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_disabmulti_req_t *dlp = (dl_disabmulti_req_t *)udlp;
+	dl_disabmulti_req_t *dlp = (dl_disabmulti_req_t *)mp->b_rptr;
 	int		err = 0;
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
+	mac_perim_handle_t	mph;
 
-	/*
-	 * Because control messages processing is serialized, we don't need
-	 * to hold any lock to read any field of dsp.
-	 */
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
 		dl_err = DL_OUTSTATE;
@@ -828,44 +805,45 @@ proto_disabmulti_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
-	err = dls_multicst_remove(dsp->ds_dc, mp->b_rptr + dlp->dl_addr_offset);
+	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
+	err = dls_multicst_remove(dsp, mp->b_rptr + dlp->dl_addr_offset);
+	mac_perim_exit(mph);
+
 	if (err != 0) {
-		switch (err) {
+	switch (err) {
 		case EINVAL:
 			dl_err = DL_BADADDR;
 			err = 0;
 			break;
+
 		case ENOENT:
 			dl_err = DL_NOTENAB;
 			err = 0;
 			break;
+
 		default:
 			dl_err = DL_SYSERR;
 			break;
 		}
 		goto failed;
 	}
-
 	dlokack(q, mp, DL_DISABMULTI_REQ);
-	return (B_TRUE);
+	return;
 failed:
 	dlerrorack(q, mp, DL_DISABMULTI_REQ, dl_err, (t_uscalar_t)err);
-	return (B_FALSE);
 }
 
 /*
  * DL_PHYS_ADDR_REQ
  */
-static boolean_t
-proto_physaddr_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_physaddr_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_phys_addr_req_t *dlp = (dl_phys_addr_req_t *)udlp;
+	dl_phys_addr_req_t *dlp = (dl_phys_addr_req_t *)mp->b_rptr;
 	queue_t		*q = dsp->ds_wq;
 	t_uscalar_t	dl_err;
 	char		*addr;
 	uint_t		addr_length;
-
-	rw_enter(&dsp->ds_lock, RW_READER);
 
 	if (MBLKL(mp) < sizeof (dl_phys_addr_req_t)) {
 		dl_err = DL_BADPRIM;
@@ -886,50 +864,34 @@ proto_physaddr_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 
 	addr_length = dsp->ds_mip->mi_addr_length;
 	if (addr_length > 0) {
-		addr = kmem_alloc(addr_length, KM_NOSLEEP);
-		if (addr == NULL) {
-			rw_exit(&dsp->ds_lock);
-			merror(q, mp, ENOSR);
-			return (B_FALSE);
-		}
+		addr = kmem_alloc(addr_length, KM_SLEEP);
+		if (dlp->dl_addr_type == DL_CURR_PHYS_ADDR)
+			mac_unicast_primary_get(dsp->ds_mh, (uint8_t *)addr);
+		else
+			bcopy(dsp->ds_mip->mi_unicst_addr, addr, addr_length);
 
-		/*
-		 * Copy out the address before we drop the lock; we don't
-		 * want to call dlphysaddrack() while holding ds_lock.
-		 */
-		bcopy((dlp->dl_addr_type == DL_CURR_PHYS_ADDR) ?
-		    dsp->ds_curr_addr : dsp->ds_fact_addr, addr, addr_length);
-
-		rw_exit(&dsp->ds_lock);
 		dlphysaddrack(q, mp, addr, (t_uscalar_t)addr_length);
 		kmem_free(addr, addr_length);
 	} else {
-		rw_exit(&dsp->ds_lock);
 		dlphysaddrack(q, mp, NULL, 0);
 	}
-	return (B_TRUE);
+	return;
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_PHYS_ADDR_REQ, dl_err, 0);
-	return (B_FALSE);
 }
 
 /*
  * DL_SET_PHYS_ADDR_REQ
  */
-static boolean_t
-proto_setphysaddr_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_setphysaddr_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_set_phys_addr_req_t *dlp = (dl_set_phys_addr_req_t *)udlp;
+	dl_set_phys_addr_req_t *dlp = (dl_set_phys_addr_req_t *)mp->b_rptr;
 	int		err = 0;
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
+	mac_perim_handle_t	mph;
 
-	/*
-	 * Because control message processing is serialized, we don't need
-	 * to hold any locks to read any fields of dsp; we only need ds_lock
-	 * to update the ds_passivestate field.
-	 */
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
 		dl_err = DL_OUTSTATE;
@@ -943,14 +905,16 @@ proto_setphysaddr_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
+	mac_perim_enter_by_mh(dsp->ds_mh, &mph);
+
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED &&
-	    !dls_active_set(dsp->ds_dc)) {
+	    ((err = dls_active_set(dsp)) != 0)) {
 		dl_err = DL_SYSERR;
-		err = EBUSY;
-		goto failed;
+		goto failed2;
 	}
 
-	err = mac_unicst_set(dsp->ds_mh, mp->b_rptr + dlp->dl_addr_offset);
+	err = mac_unicast_primary_set(dsp->ds_mh,
+	    mp->b_rptr + dlp->dl_addr_offset);
 	if (err != 0) {
 		switch (err) {
 		case EINVAL:
@@ -962,32 +926,33 @@ proto_setphysaddr_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			dl_err = DL_SYSERR;
 			break;
 		}
-
 		if (dsp->ds_passivestate == DLD_UNINITIALIZED)
-			dls_active_clear(dsp->ds_dc);
+			dls_active_clear(dsp);
 
-		goto failed;
+		goto failed2;
+
 	}
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
+	mac_perim_exit(mph);
+
 	if (dsp->ds_passivestate == DLD_UNINITIALIZED)
 		dsp->ds_passivestate = DLD_ACTIVE;
-	rw_exit(&dsp->ds_lock);
-
 	dlokack(q, mp, DL_SET_PHYS_ADDR_REQ);
-	return (B_TRUE);
+	return;
+
+failed2:
+	mac_perim_exit(mph);
 failed:
 	dlerrorack(q, mp, DL_SET_PHYS_ADDR_REQ, dl_err, (t_uscalar_t)err);
-	return (B_FALSE);
 }
 
 /*
  * DL_UDQOS_REQ
  */
-static boolean_t
-proto_udqos_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_udqos_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_udqos_req_t *dlp = (dl_udqos_req_t *)udlp;
+	dl_udqos_req_t *dlp = (dl_udqos_req_t *)mp->b_rptr;
 	dl_qos_cl_sel1_t *selp;
 	int		off, len;
 	t_uscalar_t	dl_err;
@@ -1013,21 +978,11 @@ proto_udqos_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		goto failed;
 	}
 
-	if (dsp->ds_dlstate == DL_UNATTACHED ||
-	    DL_ACK_PENDING(dsp->ds_dlstate)) {
-		dl_err = DL_OUTSTATE;
-		goto failed;
-	}
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 	dsp->ds_pri = selp->dl_priority;
-	rw_exit(&dsp->ds_lock);
-
 	dlokack(q, mp, DL_UDQOS_REQ);
-	return (B_TRUE);
+	return;
 failed:
 	dlerrorack(q, mp, DL_UDQOS_REQ, dl_err, 0);
-	return (B_FALSE);
 }
 
 static boolean_t
@@ -1047,18 +1002,15 @@ check_ip_above(queue_t *q)
 /*
  * DL_CAPABILITY_REQ
  */
-/*ARGSUSED*/
-static boolean_t
-proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_capability_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_capability_req_t *dlp = (dl_capability_req_t *)udlp;
+	dl_capability_req_t *dlp = (dl_capability_req_t *)mp->b_rptr;
 	dl_capability_sub_t *sp;
 	size_t		size, len;
 	offset_t	off, end;
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (MBLKL(mp) < sizeof (dl_capability_req_t)) {
 		dl_err = DL_BADPRIM;
@@ -1077,8 +1029,8 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	 * support. Otherwise we enable the set of capabilities requested.
 	 */
 	if (dlp->dl_sub_length == 0) {
-		/* callee drops lock */
-		return (proto_capability_advertise(dsp, mp));
+		proto_capability_advertise(dsp, mp);
+		return;
 	}
 
 	if (!MBLKIN(mp, dlp->dl_sub_offset, dlp->dl_sub_length)) {
@@ -1122,137 +1074,37 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			break;
 		}
 
-		/*
-		 * Large segment offload. (LSO)
-		 */
-		case DL_CAPAB_LSO: {
-			dl_capab_lso_t *lsop;
-			dl_capab_lso_t lso;
+		case DL_CAPAB_DLD: {
+			dl_capab_dld_t	*dldp;
+			dl_capab_dld_t	dld;
 
-			lsop = (dl_capab_lso_t *)&sp[1];
+			dldp = (dl_capab_dld_t *)&sp[1];
 			/*
 			 * Copy for alignment.
 			 */
-			bcopy(lsop, &lso, sizeof (dl_capab_lso_t));
-			dlcapabsetqid(&(lso.lso_mid), dsp->ds_rq);
-			bcopy(&lso, lsop, sizeof (dl_capab_lso_t));
-			break;
-		}
-
-		/*
-		 * IP polling interface.
-		 */
-		case DL_CAPAB_POLL: {
-			dl_capab_dls_t *pollp;
-			dl_capab_dls_t	poll;
-
-			pollp = (dl_capab_dls_t *)&sp[1];
-			/*
-			 * Copy for alignment.
-			 */
-			bcopy(pollp, &poll, sizeof (dl_capab_dls_t));
-
-			switch (poll.dls_flags) {
-			default:
-				/*FALLTHRU*/
-			case POLL_DISABLE:
-				proto_poll_disable(dsp);
-				break;
-
-			case POLL_ENABLE:
-				ASSERT(!(dld_opt & DLD_OPT_NO_POLL));
-
-				/*
-				 * Make sure polling is disabled.
-				 */
-				proto_poll_disable(dsp);
-
-				/*
-				 * Note that only IP should enable POLL.
-				 */
-				if (check_ip_above(dsp->ds_rq) &&
-				    proto_poll_enable(dsp, &poll)) {
-					bzero(&poll, sizeof (dl_capab_dls_t));
-					poll.dls_flags = POLL_ENABLE;
-				} else {
-					bzero(&poll, sizeof (dl_capab_dls_t));
-					poll.dls_flags = POLL_DISABLE;
-				}
-				break;
-			}
-
-			dlcapabsetqid(&(poll.dls_mid), dsp->ds_rq);
-			bcopy(&poll, pollp, sizeof (dl_capab_dls_t));
-			break;
-		}
-		case DL_CAPAB_SOFT_RING: {
-			dl_capab_dls_t *soft_ringp;
-			dl_capab_dls_t soft_ring;
-
-			soft_ringp = (dl_capab_dls_t *)&sp[1];
-			/*
-			 * Copy for alignment.
-			 */
-			bcopy(soft_ringp, &soft_ring,
-			    sizeof (dl_capab_dls_t));
-
-			switch (soft_ring.dls_flags) {
-			default:
-				/*FALLTHRU*/
-			case SOFT_RING_DISABLE:
-				proto_soft_ring_disable(dsp);
-				break;
-
-			case SOFT_RING_ENABLE:
-				ASSERT(!(dld_opt & DLD_OPT_NO_SOFTRING));
-				/*
-				 * Make sure soft_ring is disabled.
-				 */
-				proto_soft_ring_disable(dsp);
-
-				/*
-				 * Note that only IP can enable soft ring.
-				 */
-				if (check_ip_above(dsp->ds_rq) &&
-				    proto_soft_ring_enable(dsp, &soft_ring)) {
-					bzero(&soft_ring,
-					    sizeof (dl_capab_dls_t));
-					soft_ring.dls_flags = SOFT_RING_ENABLE;
-				} else {
-					bzero(&soft_ring,
-					    sizeof (dl_capab_dls_t));
-					soft_ring.dls_flags = SOFT_RING_DISABLE;
-				}
-				break;
-			}
-
-			dlcapabsetqid(&(soft_ring.dls_mid), dsp->ds_rq);
-			bcopy(&soft_ring, soft_ringp,
-			    sizeof (dl_capab_dls_t));
+			bcopy(dldp, &dld, sizeof (dl_capab_dld_t));
+			dlcapabsetqid(&(dld.dld_mid), dsp->ds_rq);
+			bcopy(&dld, dldp, sizeof (dl_capab_dld_t));
 			break;
 		}
 		default:
 			break;
 		}
-
 		off += size;
 	}
-	rw_exit(&dsp->ds_lock);
 	qreply(q, mp);
-	return (B_TRUE);
+	return;
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_CAPABILITY_REQ, dl_err, 0);
-	return (B_FALSE);
 }
 
 /*
  * DL_NOTIFY_REQ
  */
-static boolean_t
-proto_notify_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_notify_req(dld_str_t *dsp, mblk_t *mp)
 {
-	dl_notify_req_t	*dlp = (dl_notify_req_t *)udlp;
+	dl_notify_req_t	*dlp = (dl_notify_req_t *)mp->b_rptr;
 	t_uscalar_t	dl_err;
 	queue_t		*q = dsp->ds_wq;
 	uint_t		note =
@@ -1263,8 +1115,6 @@ proto_notify_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	    DL_NOTE_LINK_DOWN |
 	    DL_NOTE_CAPAB_RENEG |
 	    DL_NOTE_SPEED;
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (MBLKL(mp) < sizeof (dl_notify_req_t)) {
 		dl_err = DL_BADPRIM;
@@ -1283,7 +1133,6 @@ proto_notify_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	 * Cache the notifications that are being enabled.
 	 */
 	dsp->ds_notifications = dlp->dl_notifications & note;
-	rw_exit(&dsp->ds_lock);
 	/*
 	 * The ACK carries all notifications regardless of which set is
 	 * being enabled.
@@ -1291,27 +1140,21 @@ proto_notify_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	dlnotifyack(q, mp, note);
 
 	/*
-	 * Solicit DL_NOTIFY_IND messages for each enabled notification.
+	 * Generate DL_NOTIFY_IND messages for each enabled notification.
 	 */
-	rw_enter(&dsp->ds_lock, RW_READER);
 	if (dsp->ds_notifications != 0) {
-		rw_exit(&dsp->ds_lock);
 		dld_str_notify_ind(dsp);
-	} else {
-		rw_exit(&dsp->ds_lock);
 	}
-	return (B_TRUE);
+	return;
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(q, mp, DL_NOTIFY_REQ, dl_err, 0);
-	return (B_FALSE);
 }
 
 /*
- * DL_UNITDATA_REQ
+ * DL_UINTDATA_REQ
  */
 void
-dld_wput_proto_data(dld_str_t *dsp, mblk_t *mp)
+proto_unitdata_req(dld_str_t *dsp, mblk_t *mp)
 {
 	queue_t			*q = dsp->ds_wq;
 	dl_unitdata_req_t	*dlp = (dl_unitdata_req_t *)mp->b_rptr;
@@ -1326,9 +1169,18 @@ dld_wput_proto_data(dld_str_t *dsp, mblk_t *mp)
 	uint_t			max_sdu;
 
 	if (MBLKL(mp) < sizeof (dl_unitdata_req_t) || mp->b_cont == NULL) {
-		dl_err = DL_BADPRIM;
-		goto failed;
+		dlerrorack(q, mp, DL_UNITDATA_REQ, DL_BADPRIM, 0);
+		return;
 	}
+
+	mutex_enter(&dsp->ds_lock);
+	if (dsp->ds_dlstate != DL_IDLE) {
+		mutex_exit(&dsp->ds_lock);
+		dlerrorack(q, mp, DL_UNITDATA_REQ, DL_OUTSTATE, 0);
+		return;
+	}
+	DLD_DATATHR_INC(dsp);
+	mutex_exit(&dsp->ds_lock);
 
 	addr_length = dsp->ds_mip->mi_addr_length;
 
@@ -1367,7 +1219,7 @@ dld_wput_proto_data(dld_str_t *dsp, mblk_t *mp)
 	/*
 	 * Build a packet header.
 	 */
-	if ((bp = dls_header(dsp->ds_dc, addr, sap, dlp->dl_priority.dl_max,
+	if ((bp = dls_header(dsp, addr, sap, dlp->dl_priority.dl_max,
 	    &payload)) == NULL) {
 		dl_err = DL_BADADDR;
 		goto failed;
@@ -1390,30 +1242,35 @@ dld_wput_proto_data(dld_str_t *dsp, mblk_t *mp)
 	 */
 	ASSERT(bp->b_cont == NULL);
 	bp->b_cont = payload;
-	dld_tx_single(dsp, bp);
+
+	/*
+	 * No lock can be held across modules and putnext()'s,
+	 * which can happen here with the call from DLD_TX().
+	 */
+	if (DLD_TX(dsp, bp, 0, 0) != NULL) {
+		/* flow-controlled */
+		DLD_SETQFULL(dsp);
+	}
+	DLD_DATATHR_DCR(dsp);
 	return;
+
 failed:
 	dlerrorack(q, mp, DL_UNITDATA_REQ, dl_err, 0);
+	DLD_DATATHR_DCR(dsp);
 	return;
 
 baddata:
 	dluderrorind(q, mp, (void *)addr, len, DL_BADDATA, 0);
+	DLD_DATATHR_DCR(dsp);
 }
 
 /*
  * DL_PASSIVE_REQ
  */
-/* ARGSUSED */
-static boolean_t
-proto_passive_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_passive_req(dld_str_t *dsp, mblk_t *mp)
 {
 	t_uscalar_t dl_err;
-
-	/*
-	 * READER lock is enough because ds_passivestate can only be changed
-	 * as the result of non-data message processing.
-	 */
-	rw_enter(&dsp->ds_lock, RW_READER);
 
 	/*
 	 * If we've already become active by issuing an active primitive,
@@ -1430,209 +1287,281 @@ proto_passive_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	}
 
 	dsp->ds_passivestate = DLD_PASSIVE;
-	rw_exit(&dsp->ds_lock);
 	dlokack(dsp->ds_wq, mp, DL_PASSIVE_REQ);
-	return (B_TRUE);
+	return;
 failed:
-	rw_exit(&dsp->ds_lock);
 	dlerrorack(dsp->ds_wq, mp, DL_PASSIVE_REQ, dl_err, 0);
-	return (B_FALSE);
 }
+
 
 /*
  * Catch-all handler.
  */
-static boolean_t
-proto_req(dld_str_t *dsp, union DL_primitives *dlp, mblk_t *mp)
+static void
+proto_req(dld_str_t *dsp, mblk_t *mp)
 {
+	union DL_primitives	*dlp = (union DL_primitives *)mp->b_rptr;
+
 	dlerrorack(dsp->ds_wq, mp, dlp->dl_primitive, DL_UNSUPPORTED, 0);
-	return (B_FALSE);
 }
 
-static void
-proto_poll_disable(dld_str_t *dsp)
+static int
+dld_capab_perim(dld_str_t *dsp, void *data, uint_t flags)
 {
-	mac_handle_t	mh;
+	switch (flags) {
+	case DLD_ENABLE:
+		mac_perim_enter_by_mh(dsp->ds_mh, (mac_perim_handle_t *)data);
+		return (0);
 
-	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
+	case DLD_DISABLE:
+		mac_perim_exit((mac_perim_handle_t)data);
+		return (0);
 
-	if (!dsp->ds_polling)
-		return;
-
-	/*
-	 * It should be impossible to enable raw mode if polling is turned on.
-	 */
-	ASSERT(dsp->ds_mode != DLD_RAW);
-
-	/*
-	 * Reset the resource_add callback.
-	 */
-	mh = dls_mac(dsp->ds_dc);
-	mac_resource_set(mh, NULL, NULL);
-	mac_resources(mh);
-
-	/*
-	 * Set receive function back to default.
-	 */
-	dls_rx_set(dsp->ds_dc, (dsp->ds_mode == DLD_FASTPATH) ?
-	    dld_str_rx_fastpath : dld_str_rx_unitdata, dsp);
-
-	/*
-	 * Note that polling is disabled.
-	 */
-	dsp->ds_polling = B_FALSE;
-}
-
-static boolean_t
-proto_poll_enable(dld_str_t *dsp, dl_capab_dls_t *pollp)
-{
-	mac_handle_t	mh;
-
-	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
-	ASSERT(!dsp->ds_polling);
-
-	/*
-	 * We cannot enable polling if raw mode
-	 * has been enabled.
-	 */
-	if (dsp->ds_mode == DLD_RAW)
-		return (B_FALSE);
-
-	mh = dls_mac(dsp->ds_dc);
-
-	/*
-	 * Register resources.
-	 */
-	mac_resource_set(mh, (mac_resource_add_t)pollp->dls_ring_add,
-	    (void *)pollp->dls_rx_handle);
-
-	mac_resources(mh);
-
-	/*
-	 * Set the upstream receive function.
-	 */
-	dls_rx_set(dsp->ds_dc, (dls_rx_t)pollp->dls_rx,
-	    (void *)pollp->dls_rx_handle);
-
-	/*
-	 * Note that polling is enabled. This prevents further DLIOCHDRINFO
-	 * ioctls from overwriting the receive function pointer.
-	 */
-	dsp->ds_polling = B_TRUE;
-	return (B_TRUE);
-}
-
-static void
-proto_soft_ring_disable(dld_str_t *dsp)
-{
-	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
-
-	if (!dsp->ds_soft_ring)
-		return;
-
-	/*
-	 * It should be impossible to enable raw mode if soft_ring is turned on.
-	 */
-	ASSERT(dsp->ds_mode != DLD_RAW);
-	proto_change_soft_ring_fanout(dsp, SOFT_RING_NONE);
-	/*
-	 * Note that fanout is disabled.
-	 */
-	dsp->ds_soft_ring = B_FALSE;
-}
-
-static boolean_t
-proto_soft_ring_enable(dld_str_t *dsp, dl_capab_dls_t *soft_ringp)
-{
-	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
-	ASSERT(!dsp->ds_soft_ring);
-
-	/*
-	 * We cannot enable soft_ring if raw mode
-	 * has been enabled.
-	 */
-	if (dsp->ds_mode == DLD_RAW)
-		return (B_FALSE);
-
-	if (dls_soft_ring_enable(dsp->ds_dc, soft_ringp) == B_FALSE)
-		return (B_FALSE);
-
-	dsp->ds_soft_ring = B_TRUE;
-	return (B_TRUE);
-}
-
-static void
-proto_change_soft_ring_fanout(dld_str_t *dsp, int type)
-{
-	dls_channel_t	dc = dsp->ds_dc;
-
-	if (type == SOFT_RING_NONE) {
-		dls_rx_set(dc, (dsp->ds_mode == DLD_FASTPATH) ?
-		    dld_str_rx_fastpath : dld_str_rx_unitdata, dsp);
-	} else if (type != SOFT_RING_NONE) {
-		dls_rx_set(dc, (dls_rx_t)dls_soft_ring_fanout, dc);
+	case DLD_QUERY:
+		return (mac_perim_held(dsp->ds_mh));
 	}
+	return (0);
+}
+
+static int
+dld_capab_direct(dld_str_t *dsp, void *data, uint_t flags)
+{
+	dld_capab_direct_t	*direct = data;
+
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
+
+	switch (flags) {
+	case DLD_ENABLE:
+		dls_rx_set(dsp, (dls_rx_t)direct->di_rx_cf,
+		    direct->di_rx_ch);
+		/*
+		 * TODO: XXXGopi
+		 *
+		 * Direct pointer to functions in the MAC layer
+		 * should be passed here:
+		 *
+		 * 1) pass mac_tx() and mac_client_handle instead
+		 * of str_mdata_fastpath_put() and dld_str_t. But
+		 * not done presently because of some VLAN
+		 * processing stuff in str_mdata_fastpath_put().
+		 *
+		 * 2) pass a MAC layer callback instead of
+		 * dld_flow_ctl_callb().
+		 */
+		direct->di_tx_df = (uintptr_t)str_mdata_fastpath_put;
+		direct->di_tx_dh = dsp;
+
+		direct->di_tx_cb_df = (uintptr_t)mac_client_tx_notify;
+		direct->di_tx_cb_dh = dsp->ds_mch;
+		dsp->ds_direct = B_TRUE;
+
+		return (0);
+
+	case DLD_DISABLE:
+		dls_rx_set(dsp, (dsp->ds_mode == DLD_FASTPATH) ?
+		    dld_str_rx_fastpath : dld_str_rx_unitdata, (void *)dsp);
+		dsp->ds_direct = B_FALSE;
+
+		return (0);
+	}
+	return (ENOTSUP);
+}
+
+/*
+ * dld_capab_poll_enable()
+ *
+ * This function is misnamed. All polling  and fanouts are run out of the
+ * lower mac (in case of VNIC and the only mac in case of NICs). The
+ * availability of Rx ring and promiscous mode is all taken care between
+ * the soft ring set (mac_srs), the Rx ring, and S/W classifier. Any
+ * fanout necessary is done by the soft rings that are part of the
+ * mac_srs (by default mac_srs sends the packets up via a TCP and
+ * non TCP soft ring).
+ *
+ * The mac_srs (or its associated soft rings) always store the ill_rx_ring
+ * (the cookie returned when they registered with IP during plumb) as their
+ * 2nd argument which is passed up as mac_resource_handle_t. The upcall
+ * function and 1st argument is what the caller registered when they
+ * called mac_rx_classify_flow_add() to register the flow. For VNIC,
+ * the function is vnic_rx and argument is vnic_t. For regular NIC
+ * case, it mac_rx_default and mac_handle_t. As explained above, the
+ * mac_srs (or its soft ring) will add the ill_rx_ring (mac_resource_handle_t)
+ * from its stored 2nd argument.
+ */
+static int
+dld_capab_poll_enable(dld_str_t *dsp, dld_capab_poll_t *poll)
+{
+	if (dsp->ds_polling)
+		return (EINVAL);
+
+	if ((dld_opt & DLD_OPT_NO_POLL) != 0 || dsp->ds_mode == DLD_RAW)
+		return (ENOTSUP);
+
+	/*
+	 * Enable client polling if and only if DLS bypass is possible.
+	 * Special cases like VLANs need DLS processing in the Rx data path.
+	 * In such a case we can neither allow the client (IP) to directly
+	 * poll the softring (since DLS processing hasn't been done) nor can
+	 * we allow DLS bypass.
+	 */
+	if (!mac_rx_bypass_set(dsp->ds_mch, dsp->ds_rx, dsp->ds_rx_arg))
+		return (ENOTSUP);
+
+	/*
+	 * Register soft ring resources. This will come in handy later if
+	 * the user decides to modify CPU bindings to use more CPUs for the
+	 * device in which case we will switch to fanout using soft rings.
+	 */
+	mac_resource_set_common(dsp->ds_mch,
+	    (mac_resource_add_t)poll->poll_ring_add_cf,
+	    (mac_resource_remove_t)poll->poll_ring_remove_cf,
+	    (mac_resource_quiesce_t)poll->poll_ring_quiesce_cf,
+	    (mac_resource_restart_t)poll->poll_ring_restart_cf,
+	    (mac_resource_bind_t)poll->poll_ring_bind_cf,
+	    poll->poll_ring_ch);
+
+	mac_client_poll_enable(dsp->ds_mch);
+
+	dsp->ds_polling = B_TRUE;
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+dld_capab_poll_disable(dld_str_t *dsp, dld_capab_poll_t *poll)
+{
+	if (!dsp->ds_polling)
+		return (EINVAL);
+
+	mac_client_poll_disable(dsp->ds_mch);
+	mac_resource_set(dsp->ds_mch, NULL, NULL);
+
+	dsp->ds_polling = B_FALSE;
+	return (0);
+}
+
+static int
+dld_capab_poll(dld_str_t *dsp, void *data, uint_t flags)
+{
+	dld_capab_poll_t	*poll = data;
+
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
+
+	switch (flags) {
+	case DLD_ENABLE:
+		return (dld_capab_poll_enable(dsp, poll));
+	case DLD_DISABLE:
+		return (dld_capab_poll_disable(dsp, poll));
+	}
+	return (ENOTSUP);
+}
+
+static int
+dld_capab_lso(dld_str_t *dsp, void *data, uint_t flags)
+{
+	dld_capab_lso_t		*lso = data;
+
+	ASSERT(MAC_PERIM_HELD(dsp->ds_mh));
+
+	switch (flags) {
+	case DLD_ENABLE: {
+		mac_capab_lso_t		mac_lso;
+
+		/*
+		 * Check if LSO is supported on this MAC & enable LSO
+		 * accordingly.
+		 */
+		if (mac_capab_get(dsp->ds_mh, MAC_CAPAB_LSO, &mac_lso)) {
+			lso->lso_max = mac_lso.lso_basic_tcp_ipv4.lso_max;
+			lso->lso_flags = 0;
+			/* translate the flag for mac clients */
+			if ((mac_lso.lso_flags & LSO_TX_BASIC_TCP_IPV4) != 0)
+				lso->lso_flags |= DLD_LSO_TX_BASIC_TCP_IPV4;
+			dsp->ds_lso = B_TRUE;
+			dsp->ds_lso_max = lso->lso_max;
+		} else {
+			dsp->ds_lso = B_FALSE;
+			dsp->ds_lso_max = 0;
+			return (ENOTSUP);
+		}
+		return (0);
+	}
+	case DLD_DISABLE: {
+		dsp->ds_lso = B_FALSE;
+		dsp->ds_lso_max = 0;
+		return (0);
+	}
+	}
+	return (ENOTSUP);
+}
+
+static int
+dld_capab(dld_str_t *dsp, uint_t type, void *data, uint_t flags)
+{
+	int	err;
+
+	/*
+	 * Don't enable direct callback capabilities unless the caller is
+	 * the IP client. When a module is inserted in a stream (_I_INSERT)
+	 * the stack initiates capability disable, but due to races, the
+	 * module insertion may complete before the capability disable
+	 * completes. So we limit the check to DLD_ENABLE case.
+	 */
+	if ((flags == DLD_ENABLE && type != DLD_CAPAB_PERIM) &&
+	    (dsp->ds_sap != ETHERTYPE_IP || !check_ip_above(dsp->ds_rq))) {
+		return (ENOTSUP);
+	}
+
+	switch (type) {
+	case DLD_CAPAB_DIRECT:
+		err = dld_capab_direct(dsp, data, flags);
+		break;
+
+	case DLD_CAPAB_POLL:
+		err =  dld_capab_poll(dsp, data, flags);
+		break;
+
+	case DLD_CAPAB_PERIM:
+		err = dld_capab_perim(dsp, data, flags);
+		break;
+
+	case DLD_CAPAB_LSO:
+		err = dld_capab_lso(dsp, data, flags);
+		break;
+
+	default:
+		err = ENOTSUP;
+		break;
+	}
+
+	return (err);
 }
 
 /*
  * DL_CAPABILITY_ACK/DL_ERROR_ACK
  */
-static boolean_t
+static void
 proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 {
 	dl_capability_ack_t	*dlap;
 	dl_capability_sub_t	*dlsp;
 	size_t			subsize;
-	dl_capab_dls_t		poll;
-	dl_capab_dls_t		soft_ring;
+	dl_capab_dld_t		dld;
 	dl_capab_hcksum_t	hcksum;
-	dl_capab_lso_t		lso;
 	dl_capab_zerocopy_t	zcopy;
 	uint8_t			*ptr;
 	queue_t			*q = dsp->ds_wq;
 	mblk_t			*mp1;
-	boolean_t		is_vlan = (dsp->ds_vid != VLAN_ID_NONE);
-	boolean_t		poll_capable = B_FALSE;
-	boolean_t		soft_ring_capable = B_FALSE;
+	boolean_t		is_vlan;
 	boolean_t		hcksum_capable = B_FALSE;
 	boolean_t		zcopy_capable = B_FALSE;
-	boolean_t		lso_capable = B_FALSE;
-	mac_capab_lso_t		mac_lso;
-
-	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
+	boolean_t		dld_capable = B_FALSE;
 
 	/*
 	 * Initially assume no capabilities.
 	 */
 	subsize = 0;
-
-	/*
-	 * Check if soft ring can be enabled on this interface. Note that we
-	 * do not enable softring on any legacy drivers, because doing that
-	 * would hurt the performance if the legacy driver has its own taskq
-	 * implementation. Further, most high-performance legacy drivers do
-	 * have their own taskq implementation.
-	 *
-	 * If advertising DL_CAPAB_SOFT_RING has not been explicitly disabled,
-	 * reserve space for that capability.
-	 */
-	if (!mac_is_legacy(dsp->ds_mh) && !(dld_opt & DLD_OPT_NO_SOFTRING)) {
-		soft_ring_capable = B_TRUE;
-		subsize += sizeof (dl_capability_sub_t) +
-		    sizeof (dl_capab_dls_t);
-	}
-
-	/*
-	 * Check if polling can be enabled on this interface.
-	 * If advertising DL_CAPAB_POLL has not been explicitly disabled
-	 * then reserve space for that capability.
-	 */
-	if (mac_capab_get(dsp->ds_mh, MAC_CAPAB_POLL, NULL) &&
-	    !(dld_opt & DLD_OPT_NO_POLL) && !is_vlan) {
-		poll_capable = B_TRUE;
-		subsize += sizeof (dl_capability_sub_t) +
-		    sizeof (dl_capab_dls_t);
-	}
+	is_vlan = (mac_client_vid(dsp->ds_mch) != VLAN_ID_NONE);
 
 	/*
 	 * Check if checksum offload is supported on this MAC.  Don't
@@ -1652,16 +1581,6 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	}
 
 	/*
-	 * Check if LSO is supported on this MAC, then reserve space for
-	 * the DL_CAPAB_LSO capability.
-	 */
-	if (mac_capab_get(dsp->ds_mh, MAC_CAPAB_LSO, &mac_lso)) {
-		lso_capable = B_TRUE;
-		subsize += sizeof (dl_capability_sub_t) +
-		    sizeof (dl_capab_lso_t);
-	}
-
-	/*
 	 * Check if zerocopy is supported on this interface.
 	 * If advertising DL_CAPAB_ZEROCOPY has not been explicitly disabled
 	 * then reserve space for that capability.
@@ -1674,14 +1593,22 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	}
 
 	/*
+	 * Direct capability negotiation interface between IP and DLD
+	 */
+	if (dsp->ds_sap == ETHERTYPE_IP && check_ip_above(dsp->ds_rq)) {
+		dld_capable = B_TRUE;
+		subsize += sizeof (dl_capability_sub_t) +
+		    sizeof (dl_capab_dld_t);
+	}
+
+	/*
 	 * If there are no capabilities to advertise or if we
 	 * can't allocate a response, send a DL_ERROR_ACK.
 	 */
 	if ((mp1 = reallocb(mp,
 	    sizeof (dl_capability_ack_t) + subsize, 0)) == NULL) {
-		rw_exit(&dsp->ds_lock);
 		dlerrorack(q, mp, DL_CAPABILITY_REQ, DL_NOTSUPPORTED, 0);
-		return (B_FALSE);
+		return;
 	}
 
 	mp = mp1;
@@ -1693,56 +1620,6 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	dlap->dl_sub_offset = sizeof (dl_capability_ack_t);
 	dlap->dl_sub_length = subsize;
 	ptr = (uint8_t *)&dlap[1];
-
-	/*
-	 * IP polling interface.
-	 */
-	if (poll_capable) {
-		/*
-		 * Attempt to disable just in case this is a re-negotiation;
-		 * READER lock is enough because ds_polling can only be
-		 * changed as the result of non-data message processing.
-		 */
-		proto_poll_disable(dsp);
-
-		dlsp = (dl_capability_sub_t *)ptr;
-
-		dlsp->dl_cap = DL_CAPAB_POLL;
-		dlsp->dl_length = sizeof (dl_capab_dls_t);
-		ptr += sizeof (dl_capability_sub_t);
-
-		bzero(&poll, sizeof (dl_capab_dls_t));
-		poll.dls_version = POLL_VERSION_1;
-		poll.dls_flags = POLL_CAPABLE;
-		poll.dls_tx_handle = (uintptr_t)dsp;
-		poll.dls_tx = (uintptr_t)str_mdata_fastpath_put;
-		dlcapabsetqid(&(poll.dls_mid), dsp->ds_rq);
-		bcopy(&poll, ptr, sizeof (dl_capab_dls_t));
-		ptr += sizeof (dl_capab_dls_t);
-	}
-
-
-	if (soft_ring_capable) {
-		dlsp = (dl_capability_sub_t *)ptr;
-
-		dlsp->dl_cap = DL_CAPAB_SOFT_RING;
-		dlsp->dl_length = sizeof (dl_capab_dls_t);
-		ptr += sizeof (dl_capability_sub_t);
-
-		bzero(&soft_ring, sizeof (dl_capab_dls_t));
-		soft_ring.dls_version = SOFT_RING_VERSION_1;
-		soft_ring.dls_flags = SOFT_RING_CAPABLE;
-		soft_ring.dls_tx_handle = (uintptr_t)dsp;
-		soft_ring.dls_tx = (uintptr_t)str_mdata_fastpath_put;
-		soft_ring.dls_ring_change_status =
-		    (uintptr_t)proto_change_soft_ring_fanout;
-		soft_ring.dls_ring_bind = (uintptr_t)soft_ring_bind;
-		soft_ring.dls_ring_unbind = (uintptr_t)soft_ring_unbind;
-
-		dlcapabsetqid(&(soft_ring.dls_mid), dsp->ds_rq);
-		bcopy(&soft_ring, ptr, sizeof (dl_capab_dls_t));
-		ptr += sizeof (dl_capab_dls_t);
-	}
 
 	/*
 	 * TCP/IP checksum offload.
@@ -1758,32 +1635,6 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 		dlcapabsetqid(&(hcksum.hcksum_mid), dsp->ds_rq);
 		bcopy(&hcksum, ptr, sizeof (dl_capab_hcksum_t));
 		ptr += sizeof (dl_capab_hcksum_t);
-	}
-
-	/*
-	 * Large segment offload. (LSO)
-	 */
-	if (lso_capable) {
-		dlsp = (dl_capability_sub_t *)ptr;
-
-		dlsp->dl_cap = DL_CAPAB_LSO;
-		dlsp->dl_length = sizeof (dl_capab_lso_t);
-		ptr += sizeof (dl_capability_sub_t);
-
-		lso.lso_version = LSO_VERSION_1;
-		lso.lso_flags = mac_lso.lso_flags;
-		lso.lso_max = mac_lso.lso_basic_tcp_ipv4.lso_max;
-
-		/* Simply enable LSO with DLD */
-		dsp->ds_lso = B_TRUE;
-		dsp->ds_lso_max = lso.lso_max;
-
-		dlcapabsetqid(&(lso.lso_mid), dsp->ds_rq);
-		bcopy(&lso, ptr, sizeof (dl_capab_lso_t));
-		ptr += sizeof (dl_capab_lso_t);
-	} else {
-		dsp->ds_lso = B_FALSE;
-		dsp->ds_lso_max = 0;
 	}
 
 	/*
@@ -1805,11 +1656,28 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 		ptr += sizeof (dl_capab_zerocopy_t);
 	}
 
-	ASSERT(ptr == mp->b_rptr + sizeof (dl_capability_ack_t) + subsize);
+	/*
+	 * Direct capability negotiation interface between IP and DLD.
+	 * Refer to dld.h for details.
+	 */
+	if (dld_capable) {
+		dlsp = (dl_capability_sub_t *)ptr;
+		dlsp->dl_cap = DL_CAPAB_DLD;
+		dlsp->dl_length = sizeof (dl_capab_dld_t);
+		ptr += sizeof (dl_capability_sub_t);
 
-	rw_exit(&dsp->ds_lock);
+		bzero(&dld, sizeof (dl_capab_dld_t));
+		dld.dld_version = DLD_CURRENT_VERSION;
+		dld.dld_capab = (uintptr_t)dld_capab;
+		dld.dld_capab_handle = (uintptr_t)dsp;
+
+		dlcapabsetqid(&(dld.dld_mid), dsp->ds_rq);
+		bcopy(&dld, ptr, sizeof (dl_capab_dld_t));
+		ptr += sizeof (dl_capab_dld_t);
+	}
+
+	ASSERT(ptr == mp->b_rptr + sizeof (dl_capability_ack_t) + subsize);
 	qreply(q, mp);
-	return (B_TRUE);
 }
 
 /*
@@ -1819,8 +1687,5 @@ void
 dld_capabilities_disable(dld_str_t *dsp)
 {
 	if (dsp->ds_polling)
-		proto_poll_disable(dsp);
-
-	if (dsp->ds_soft_ring)
-		proto_soft_ring_disable(dsp);
+		(void) dld_capab_poll_disable(dsp, NULL);
 }

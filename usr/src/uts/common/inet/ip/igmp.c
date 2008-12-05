@@ -24,8 +24,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Internet Group Management Protocol (IGMP) routines.
  * Multicast Listener Discovery Protocol (MLD) routines.
@@ -1439,7 +1437,7 @@ igmp_timeout_handler(void *arg)
 		if (!ill_waiter_inc(ill))
 			continue;
 		rw_exit(&ipst->ips_ill_g_lock);
-		success = ipsq_enter(ill, B_TRUE);
+		success = ipsq_enter(ill, B_TRUE, NEW_OP);
 		if (success) {
 			next = igmp_timeout_handler_per_ill(ill);
 			if (next < global_next)
@@ -1682,7 +1680,7 @@ mld_timeout_handler(void *arg)
 		if (!ill_waiter_inc(ill))
 			continue;
 		rw_exit(&ipst->ips_ill_g_lock);
-		success = ipsq_enter(ill, B_TRUE);
+		success = ipsq_enter(ill, B_TRUE, NEW_OP);
 		if (success) {
 			next = mld_timeout_handler_per_ill(ill);
 			if (next < global_next)

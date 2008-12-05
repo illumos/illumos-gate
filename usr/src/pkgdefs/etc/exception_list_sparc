@@ -78,21 +78,33 @@ usr/include/sys/dld.h			sparc
 usr/include/sys/dld_impl.h		sparc
 usr/include/sys/dld_ioc.h		sparc
 usr/include/sys/dls.h			sparc
+usr/include/sys/dls_mgmt.h		sparc
 usr/include/sys/dls_impl.h		sparc
 usr/include/sys/mac.h			sparc
+usr/include/sys/mac_client.h		sparc
+usr/include/sys/mac_client_impl.h	sparc
+usr/include/sys/mac_flow.h		sparc
+usr/include/sys/mac_flow_impl.h		sparc
 usr/include/sys/mac_impl.h		sparc
+usr/include/sys/mac_provider.h		sparc
+usr/include/sys/mac_soft_ring.h		sparc
 #
 # Private GLDv3 userland libraries and headers
 #
+usr/include/sys/vnic.h		sparc
+usr/include/sys/vnic_impl.h	sparc
 usr/include/libdladm.h		sparc
 usr/include/libdladm_impl.h	sparc
 usr/include/libdllink.h		sparc
 usr/include/libdlaggr.h		sparc
+usr/include/libdlflow.h		sparc
+usr/include/libdlflow_impl.h	sparc
 usr/include/libdlwlan.h		sparc
 usr/include/libdlwlan_impl.h	sparc
 usr/include/libdlvnic.h		sparc
 usr/include/libdlvlan.h		sparc
 usr/include/libdlmgmt.h		sparc
+usr/include/libdlstat.h		sparc
 lib/libdladm.so			sparc
 lib/llib-ldladm.ln		sparc
 lib/sparcv9/libdladm.so		sparc
@@ -531,6 +543,7 @@ lib/llib-lmeta.ln			sparc
 # non-public pci header
 #
 usr/include/sys/pci_impl.h		sparc
+usr/include/sys/pci_tools.h		sparc
 #
 # Exception list for RCM project, included by librcm and rcm_daemon
 #

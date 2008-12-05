@@ -278,6 +278,12 @@ extern "C" {
  */
 #define	NXGE_MAX_VRS			8
 
+/*
+ * TDC groups are used exclusively for the purpose of Hybrid I/O
+ * TX needs one group for each VR
+ */
+#define	NXGE_MAX_TDC_GROUPS		(NXGE_MAX_VRS)
+
 /* Max. RDC table groups */
 #define	NXGE_MAX_RDC_GROUPS		8
 #define	NXGE_MAX_RDCS			16

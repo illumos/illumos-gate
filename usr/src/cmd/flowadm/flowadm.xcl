@@ -1,0 +1,113 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+msgid  "--"
+msgid  "--,"
+msgid  ""
+msgid  " "
+msgid  "%-*s"
+msgid  "%-10llu"
+msgid  "%-12llu"
+msgid  "%-12s"
+msgid  "%-12s%-10s%-12s%-8s%-10s%-12s%-8s\n"
+msgid  "%-8llu"
+msgid  "%-8llu\n"
+msgid  "%d"
+msgid  "%s"
+msgid  "%s "
+msgid  "%s,"
+msgid  "%s/%d  "
+msgid  "%s: "
+msgid  "%s=\"%s\""
+msgid  ","
+msgid  "/"
+msgid  "0x%x"
+msgid  ": %s\n"
+msgid  ":d:R:t"
+msgid  ":p:R:t"
+msgid  ":p:cPl:o:"
+msgid  "?"
+msgid  "ATTR"
+msgid  "DEFAULT"
+msgid  "FLOW"
+msgid  "ICMPV6"
+msgid  "ICMPv6"
+msgid  "IERRORS"
+msgid  "IPACKETS"
+msgid  "LINK"
+msgid  "NAME"
+msgid  "OBYTES"
+msgid  "OERRORS"
+msgid  "OPACKETS"
+msgid  "POSSIBLE"
+msgid  "PROPERTY"
+msgid  "RBYTES"
+msgid  "SCTP"
+msgid  "TCP"
+msgid  "UDP"
+msgid  "VALUE"
+msgid  "add-flow"
+msgid  "all"
+msgid  "attr"
+msgid  "default"
+msgid  "dsfield"
+msgid  "dsfield_mask"
+msgid  "flow"
+msgid  "flow,property,value,default,possible"
+msgid  "icmp"
+msgid  "icmpv6"
+msgid  "init-flow"
+msgid  "interval"
+msgid  "link"
+msgid  "local_ip"
+msgid  "local_port"
+msgid  "name"
+msgid  "name,link,attr,value"
+msgid  "net_rawaccess"
+msgid  "parseable"
+msgid  "possible"
+msgid  "prop"
+msgid  "property"
+msgid  "psSi:l:o:"
+msgid  "remote_ip"
+msgid  "remove-flow"
+msgid  "reset"
+msgid  "reset-flowprop"
+msgid  "root-dir"
+msgid  "sctp"
+msgid  "set"
+msgid  "set-flowprop"
+msgid  "show-flow"
+msgid  "show-flowprop"
+msgid  "show-usage"
+msgid  "statistics"
+msgid  "sys_net_config"
+msgid  "tR:l:a:p:"
+msgid  "tcp"
+msgid  "tdps:e:f:"
+msgid  "temporary"
+msgid  "transport"
+msgid  "udp"
+msgid  "value"

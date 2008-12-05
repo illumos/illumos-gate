@@ -98,6 +98,7 @@
 #include <inet/udp_impl.h>
 #include <inet/rawip_impl.h>
 #include <inet/rts_impl.h>
+#include <sys/squeue_impl.h>
 #include <sys/squeue.h>
 
 #include <sys/tsol/label.h>
@@ -108,7 +109,7 @@
 /* Temporary; for CR 6451644 work-around */
 #include <sys/ethernet.h>
 
-extern squeue_func_t ip_input_proc;
+extern int ip_squeue_flag;
 
 /*
  * Naming conventions:
@@ -887,8 +888,8 @@ icmp_inbound_error_fanout_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			goto drop_pkt;
 		}
 
-		squeue_fill(connp->conn_sqp, first_mp, tcp_input,
-		    connp, SQTAG_TCP6_INPUT_ICMP_ERR);
+		SQUEUE_ENTER_ONE(connp->conn_sqp, first_mp, tcp_input, connp,
+		    SQ_FILL, SQTAG_TCP6_INPUT_ICMP_ERR);
 		return;
 
 	}
@@ -2538,8 +2539,9 @@ ip_bind_connected_resume_v6(ipsq_t *ipsq, queue_t *q, mblk_t *mp,
 	if (mp != NULL) {
 		if (IPCL_IS_TCP(connp)) {
 			CONN_INC_REF(connp);
-			squeue_fill(connp->conn_sqp, mp, ip_resume_tcp_bind,
-			    connp, SQTAG_TCP_RPUTOTHER);
+			SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
+			    ip_resume_tcp_bind, connp, SQ_FILL,
+			    SQTAG_TCP_RPUTOTHER);
 		} else if (IPCL_IS_UDP(connp)) {
 			udp_resume_bind(connp, mp);
 		} else {
@@ -3637,8 +3639,8 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 
 	BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInDelivers);
 	if (IPCL_IS_TCP(connp)) {
-		(*ip_input_proc)(connp->conn_sqp, first_mp,
-		    connp->conn_recv, connp, SQTAG_IP6_TCP_INPUT);
+		SQUEUE_ENTER_ONE(connp->conn_sqp, first_mp, connp->conn_recv,
+		    connp, ip_squeue_flag, SQTAG_IP6_TCP_INPUT);
 	} else {
 		/* SOCK_RAW, IPPROTO_TCP case */
 		(connp->conn_recv)(connp, first_mp, NULL);
@@ -11072,7 +11074,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 
 		/* Driver is flow-controlling? */
 		if (!IP_FLOW_CONTROLLED_ULP(nexthdr) &&
-		    ((dev_q->q_next || dev_q->q_first) && !canput(dev_q))) {
+		    DEV_Q_FLOW_BLOCKED(dev_q)) {
 			/*
 			 * Queue packet if we have an conn to give back
 			 * pressure.  We can't queue packets intended for
@@ -12140,8 +12142,9 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 				    "connp %p (ENOMEM)\n", (void *)connp));
 			} else {
 				CONN_INC_REF(connp);
-				squeue_fill(connp->conn_sqp, mdimp, tcp_input,
-				    connp, SQTAG_TCP_INPUT_MCTL);
+				SQUEUE_ENTER_ONE(connp->conn_sqp, mdimp,
+				    tcp_input, connp, SQ_FILL,
+				    SQTAG_TCP_INPUT_MCTL);
 			}
 		}
 
@@ -12576,34 +12579,8 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 		}
 	} else {
 		/*
-		 * Queue packet if we have an conn to give back pressure.
-		 * We can't queue packets intended for hardware acceleration
-		 * since we've tossed that state already. If the packet is
-		 * being fed back from ire_send_v6, we don't know the
-		 * position in the queue to enqueue the packet and we discard
-		 * the packet.
+		 * Can't apply backpressure, just discard the packet.
 		 */
-		if (ipst->ips_ip_output_queue && (connp != NULL) &&
-		    (io == NULL) && (caller != IRE_SEND)) {
-			if (caller == IP_WSRV) {
-				connp->conn_did_putbq = 1;
-				(void) putbq(connp->conn_wq, mp);
-				conn_drain_insert(connp);
-				/*
-				 * caller == IP_WSRV implies we are
-				 * the service thread, and the
-				 * queue is already noenabled.
-				 * The check for canput and
-				 * the putbq is not atomic.
-				 * So we need to check again.
-				 */
-				if (canput(stq->q_next))
-					connp->conn_did_putbq = 0;
-			} else {
-				(void) putq(connp->conn_wq, mp);
-			}
-			return;
-		}
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsOutDiscards);
 		freemsg(mp);
 		return;

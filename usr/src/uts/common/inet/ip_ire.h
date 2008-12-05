@@ -235,6 +235,7 @@ extern	void	ire_atomic_end(irb_t *irb_ptr, ire_t *ire);
 extern	void	ire_cache_count(ire_t *, char *);
 extern	ire_t	*ire_cache_lookup(ipaddr_t, zoneid_t,
     const struct ts_label_s *, ip_stack_t *);
+extern	ire_t	*ire_cache_lookup_simple(ipaddr_t, ip_stack_t *);
 extern	ire_t	*ire_cache_lookup_v6(const in6_addr_t *, zoneid_t,
     const struct ts_label_s *, ip_stack_t *);
 extern	void	ire_cache_reclaim(ire_t *, char *);

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Datalink management routines.
  */
@@ -38,10 +36,16 @@
 #include <sys/kstat.h>
 #include <sys/vnode.h>
 #include <sys/cmn_err.h>
-#include <sys/vlan.h>
 #include <sys/softmac.h>
 #include <sys/dls.h>
 #include <sys/dls_impl.h>
+
+/*
+ * This vanity name management module is treated as part of the GLD framework
+ * and we don't hold any GLD framework lock across a call to any mac
+ * function that needs to acquire the mac perimeter. The hierarchy is
+ * mac perimeter -> framework locks
+ */
 
 static kmem_cache_t	*i_dls_devnet_cachep;
 static kmutex_t		i_dls_mgmt_lock;
@@ -56,25 +60,22 @@ boolean_t		devnet_need_rebuild;
 /* Upcall door handle */
 static door_handle_t	dls_mgmt_dh = NULL;
 
+#define	DD_CONDEMNED	0x1
+
 /*
- * This structure is used to keep the <linkid, macname, vid> mapping.
+ * This structure is used to keep the <linkid, macname> mapping.
  */
 typedef struct dls_devnet_s {
-	datalink_id_t	dd_vlanid;
 	datalink_id_t	dd_linkid;
 	char		dd_mac[MAXNAMELEN];
-	uint16_t	dd_vid;
-	char		dd_spa[MAXSPALEN];
-	boolean_t	dd_explicit;
 	kstat_t		*dd_ksp;
-
 	uint32_t	dd_ref;
 
 	kmutex_t	dd_mutex;
 	kcondvar_t	dd_cv;
 	uint32_t	dd_tref;
+	uint_t		dd_flags;
 
-	kmutex_t	dd_zid_mutex;
 	zoneid_t	dd_zid;
 
 	boolean_t	dd_prop_loaded;
@@ -90,7 +91,6 @@ i_dls_devnet_constructor(void *buf, void *arg, int kmflag)
 
 	bzero(buf, sizeof (dls_devnet_t));
 	mutex_init(&ddp->dd_mutex, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&ddp->dd_zid_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&ddp->dd_cv, NULL, CV_DEFAULT, NULL);
 	return (0);
 }
@@ -104,9 +104,7 @@ i_dls_devnet_destructor(void *buf, void *arg)
 	ASSERT(ddp->dd_ksp == NULL);
 	ASSERT(ddp->dd_ref == 0);
 	ASSERT(ddp->dd_tref == 0);
-	ASSERT(!ddp->dd_explicit);
 	mutex_destroy(&ddp->dd_mutex);
-	mutex_destroy(&ddp->dd_zid_mutex);
 	cv_destroy(&ddp->dd_cv);
 }
 
@@ -128,13 +126,13 @@ dls_mgmt_init(void)
 	ASSERT(i_dls_devnet_cachep != NULL);
 
 	/*
-	 * Create a hash table, keyed by dd_vlanid, of dls_devnet_t.
+	 * Create a hash table, keyed by dd_linkid, of dls_devnet_t.
 	 */
 	i_dls_devnet_id_hash = mod_hash_create_idhash("dls_devnet_id_hash",
 	    VLAN_HASHSZ, mod_hash_null_valdtor);
 
 	/*
-	 * Create a hash table, keyed by dd_spa.
+	 * Create a hash table, keyed by dd_mac
 	 */
 	i_dls_devnet_hash = mod_hash_create_extended("dls_devnet_hash",
 	    VLAN_HASHSZ, mod_hash_null_keydtor, mod_hash_null_valdtor,
@@ -310,7 +308,6 @@ done:
  *		        registration of its mac
  *     - class		datalink class
  *     - media type	media type; DL_OTHER means unknown
- *     - vid		VLAN ID (for VLANs)
  *     - persist	whether to persist the datalink
  */
 int
@@ -546,7 +543,7 @@ dls_devnet_prop_task(void *arg)
 {
 	dls_devnet_t		*ddp = arg;
 
-	(void) dls_mgmt_linkprop_init(ddp->dd_vlanid);
+	(void) dls_mgmt_linkprop_init(ddp->dd_linkid);
 
 	mutex_enter(&ddp->dd_mutex);
 	ddp->dd_prop_loaded = B_TRUE;
@@ -567,48 +564,6 @@ dls_devnet_prop_task_wait(dls_dl_handle_t ddp)
 	mutex_exit(&ddp->dd_mutex);
 }
 
-/*
- * Hold the vanity naming structure (dls_devnet_t) temporarily.  The request to
- * delete the dls_devnet_t will wait until the temporary reference is released.
- */
-int
-dls_devnet_hold_tmp(datalink_id_t linkid, dls_dl_handle_t *ddhp)
-{
-	dls_devnet_t		*ddp;
-	dls_dev_handle_t	ddh = NULL;
-	dev_t			phydev = 0;
-	int			err;
-
-	/*
-	 * Hold this link to prevent it being detached (if physical link).
-	 */
-	if (dls_mgmt_get_phydev(linkid, &phydev) == 0)
-		(void) softmac_hold_device(phydev, &ddh);
-
-	rw_enter(&i_dls_devnet_lock, RW_READER);
-	if ((err = mod_hash_find(i_dls_devnet_id_hash,
-	    (mod_hash_key_t)(uintptr_t)linkid, (mod_hash_val_t *)&ddp)) != 0) {
-		ASSERT(err == MH_ERR_NOTFOUND);
-		rw_exit(&i_dls_devnet_lock);
-		softmac_rele_device(ddh);
-		return (ENOENT);
-	}
-
-	/*
-	 * At least one reference was held when this datalink was created.
-	 */
-	ASSERT(ddp->dd_ref > 0);
-	mutex_enter(&ddp->dd_mutex);
-	ddp->dd_tref++;
-	mutex_exit(&ddp->dd_mutex);
-	rw_exit(&i_dls_devnet_lock);
-	softmac_rele_device(ddh);
-
-done:
-	*ddhp = ddp;
-	return (0);
-}
-
 void
 dls_devnet_rele_tmp(dls_dl_handle_t dlh)
 {
@@ -619,6 +574,38 @@ dls_devnet_rele_tmp(dls_dl_handle_t dlh)
 	if (--ddp->dd_tref == 0)
 		cv_signal(&ddp->dd_cv);
 	mutex_exit(&ddp->dd_mutex);
+}
+
+int
+dls_devnet_hold_link(datalink_id_t linkid, dls_dl_handle_t *ddhp,
+    dls_link_t **dlpp)
+{
+	dls_dl_handle_t	dlh;
+	dls_link_t	*dlp;
+	int		err;
+
+	if ((err = dls_devnet_hold_tmp(linkid, &dlh)) != 0)
+		return (err);
+
+	if ((err = dls_link_hold(dls_devnet_mac(dlh), &dlp)) != 0) {
+		dls_devnet_rele_tmp(dlh);
+		return (err);
+	}
+
+	ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
+
+	*ddhp = dlh;
+	*dlpp = dlp;
+	return (0);
+}
+
+void
+dls_devnet_rele_link(dls_dl_handle_t dlh, dls_link_t *dlp)
+{
+	ASSERT(MAC_PERIM_HELD(dlp->dl_mh));
+
+	dls_link_rele(dlp);
+	dls_devnet_rele_tmp(dlh);
 }
 
 /*
@@ -632,15 +619,23 @@ static int
 dls_devnet_stat_update(kstat_t *ksp, int rw)
 {
 	dls_devnet_t	*ddp = ksp->ks_private;
-	dls_vlan_t	*dvp;
+	dls_link_t	*dlp;
 	int		err;
+	mac_perim_handle_t	mph;
 
-	err = dls_vlan_hold(ddp->dd_mac, ddp->dd_vid, &dvp, B_FALSE, B_FALSE);
+	err = mac_perim_enter_by_macname(ddp->dd_mac, &mph);
 	if (err != 0)
 		return (err);
 
-	err = dls_stat_update(ksp, dvp, rw);
-	dls_vlan_rele(dvp);
+	err = dls_link_hold(ddp->dd_mac, &dlp);
+	if (err != 0) {
+		mac_perim_exit(mph);
+		return (err);
+	}
+
+	err = dls_stat_update(ksp, dlp, rw);
+	dls_link_rele(dlp);
+	mac_perim_exit(mph);
 	return (err);
 }
 
@@ -653,7 +648,7 @@ dls_devnet_stat_create(dls_devnet_t *ddp)
 	char	link[MAXLINKNAMELEN];
 	kstat_t	*ksp;
 
-	if ((dls_mgmt_get_linkinfo(ddp->dd_vlanid, link,
+	if ((dls_mgmt_get_linkinfo(ddp->dd_linkid, link,
 	    NULL, NULL, NULL)) != 0) {
 		return;
 	}
@@ -704,114 +699,53 @@ dls_devnet_stat_rename(dls_devnet_t *ddp, const char *link)
 }
 
 /*
- * Associate a linkid with a given link (identified by <macname/vid>)
- *
- * Several cases:
- * a. implicit VLAN creation: (non-NULL "vlan")
- * b. explicit VLAN creation: (NULL "vlan")
- * c. explicit non-VLAN creation:
- *    (NULL "vlan" and linkid could be INVALID_LINKID if the physical device
- *    was created before the daemon was started)
+ * Associate a linkid with a given link (identified by macname)
  */
 static int
-dls_devnet_set(const char *macname, uint16_t vid,
-    datalink_id_t vlan_linkid, datalink_id_t linkid, const char *vlan,
-    dls_devnet_t **ddpp)
+dls_devnet_set(const char *macname, datalink_id_t linkid, dls_devnet_t **ddpp)
 {
 	dls_devnet_t		*ddp = NULL;
-	char			spa[MAXSPALEN];
-	boolean_t		explicit = (vlan == NULL);
 	datalink_class_t	class;
 	int			err;
 
-	ASSERT(vid != VLAN_ID_NONE || explicit);
-	ASSERT(vlan_linkid != DATALINK_INVALID_LINKID || !explicit ||
-	    vid == VLAN_ID_NONE);
-
-	(void) snprintf(spa, MAXSPALEN, "%s/%d", macname, vid);
 	rw_enter(&i_dls_devnet_lock, RW_WRITER);
 	if ((err = mod_hash_find(i_dls_devnet_hash,
-	    (mod_hash_key_t)spa, (mod_hash_val_t *)&ddp)) == 0) {
-		char	link[MAXLINKNAMELEN];
-
-		if (explicit) {
-			if ((vid != VLAN_ID_NONE) ||
-			    (ddp->dd_vlanid != DATALINK_INVALID_LINKID)) {
-				err = EEXIST;
-				goto done;
-			}
-
-			/*
-			 * This might be a physical link that has already
-			 * been created, but which does not have a vlan_linkid
-			 * because dlmgmtd was not running when it was created.
-			 */
-			if ((err = dls_mgmt_get_linkinfo(vlan_linkid, NULL,
-			    &class, NULL, NULL)) != 0) {
-				goto done;
-			}
-
-			if (class != DATALINK_CLASS_PHYS) {
-				err = EINVAL;
-				goto done;
-			}
-
-			goto newphys;
-		}
-
-		/*
-		 * Implicit VLAN, but the same name has already
-		 * been associated with another linkid.  Check if the name
-		 * of that link matches the given VLAN name.
-		 */
-		ASSERT(vid != VLAN_ID_NONE);
-		if ((err = dls_mgmt_get_linkinfo(ddp->dd_vlanid, link,
-		    NULL, NULL, NULL)) != 0) {
-			goto done;
-		}
-
-		if (strcmp(link, vlan) != 0) {
+	    (mod_hash_key_t)macname, (mod_hash_val_t *)&ddp)) == 0) {
+		if (ddp->dd_linkid != DATALINK_INVALID_LINKID) {
 			err = EEXIST;
 			goto done;
 		}
 
 		/*
-		 * This is not an implicit created VLAN any more, return
-		 * this existing datalink.
+		 * This might be a physical link that has already
+		 * been created, but which does not have a linkid
+		 * because dlmgmtd was not running when it was created.
 		 */
-		ASSERT(ddp->dd_ref > 0);
-		ddp->dd_ref++;
-		goto done;
-	}
+		if ((err = dls_mgmt_get_linkinfo(linkid, NULL,
+		    &class, NULL, NULL)) != 0) {
+			goto done;
+		}
 
-	/*
-	 * Request the daemon to create a new vlan_linkid for this implicitly
-	 * created vlan.
-	 */
-	if (!explicit && ((err = dls_mgmt_create(vlan, 0,
-	    DATALINK_CLASS_VLAN, DL_ETHER, B_FALSE, &vlan_linkid)) != 0)) {
-		goto done;
-	}
+		if (class != DATALINK_CLASS_PHYS) {
+			err = EINVAL;
+			goto done;
+		}
 
+		goto newphys;
+	}
 	ddp = kmem_cache_alloc(i_dls_devnet_cachep, KM_SLEEP);
-	ddp->dd_vid = vid;
-	ddp->dd_explicit = explicit;
 	ddp->dd_tref = 0;
 	ddp->dd_ref++;
 	ddp->dd_zid = GLOBAL_ZONEID;
 	(void) strncpy(ddp->dd_mac, macname, MAXNAMELEN);
-	(void) snprintf(ddp->dd_spa, MAXSPALEN, "%s/%d", macname, vid);
 	VERIFY(mod_hash_insert(i_dls_devnet_hash,
-	    (mod_hash_key_t)ddp->dd_spa, (mod_hash_val_t)ddp) == 0);
+	    (mod_hash_key_t)ddp->dd_mac, (mod_hash_val_t)ddp) == 0);
 
 newphys:
-
-	ddp->dd_vlanid = vlan_linkid;
-	if (ddp->dd_vlanid != DATALINK_INVALID_LINKID) {
+	if (linkid != DATALINK_INVALID_LINKID) {
 		ddp->dd_linkid = linkid;
-
 		VERIFY(mod_hash_insert(i_dls_devnet_id_hash,
-		    (mod_hash_key_t)(uintptr_t)vlan_linkid,
+		    (mod_hash_key_t)(uintptr_t)linkid,
 		    (mod_hash_val_t)ddp) == 0);
 		devnet_need_rebuild = B_TRUE;
 		dls_devnet_stat_create(ddp);
@@ -832,90 +766,83 @@ done:
 	return (err);
 }
 
-static void
-dls_devnet_unset_common(dls_devnet_t *ddp)
-{
-	mod_hash_val_t	val;
-
-	ASSERT(RW_WRITE_HELD(&i_dls_devnet_lock));
-
-	ASSERT(ddp->dd_ref == 0);
-
-	/*
-	 * Remove this dls_devnet_t from the hash table.
-	 */
-	VERIFY(mod_hash_remove(i_dls_devnet_hash,
-	    (mod_hash_key_t)ddp->dd_spa, &val) == 0);
-
-	if (ddp->dd_vlanid != DATALINK_INVALID_LINKID) {
-		VERIFY(mod_hash_remove(i_dls_devnet_id_hash,
-		    (mod_hash_key_t)(uintptr_t)ddp->dd_vlanid, &val) == 0);
-
-		dls_devnet_stat_destroy(ddp);
-		devnet_need_rebuild = B_TRUE;
-	}
-
-	/*
-	 * Wait until all temporary references are released.
-	 */
-	mutex_enter(&ddp->dd_mutex);
-	while ((ddp->dd_tref != 0) || (ddp->dd_prop_taskid != NULL))
-		cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
-
-	ddp->dd_prop_loaded = B_FALSE;
-	mutex_exit(&ddp->dd_mutex);
-
-	if (!ddp->dd_explicit) {
-		ASSERT(ddp->dd_vid != VLAN_ID_NONE);
-		ASSERT(ddp->dd_vlanid != DATALINK_INVALID_LINKID);
-		(void) dls_mgmt_destroy(ddp->dd_vlanid, B_FALSE);
-	}
-
-	ddp->dd_vlanid = DATALINK_INVALID_LINKID;
-	ddp->dd_zid = GLOBAL_ZONEID;
-	ddp->dd_explicit = B_FALSE;
-	kmem_cache_free(i_dls_devnet_cachep, ddp);
-}
-
 /*
- * Disassociate a linkid with a given link (identified by <macname/vid>)
+ * Disassociate a linkid with a given link (identified by macname)
+ * This waits until temporary references to the dls_devnet_t are gone.
  */
 static int
-dls_devnet_unset(const char *macname, uint16_t vid, datalink_id_t *id)
+dls_devnet_unset(const char *macname, datalink_id_t *id, boolean_t wait)
 {
 	dls_devnet_t	*ddp;
-	char		spa[MAXSPALEN];
 	int		err;
-
-	(void) snprintf(spa, MAXSPALEN, "%s/%d", macname, vid);
+	mod_hash_val_t	val;
 
 	rw_enter(&i_dls_devnet_lock, RW_WRITER);
 	if ((err = mod_hash_find(i_dls_devnet_hash,
-	    (mod_hash_key_t)spa, (mod_hash_val_t *)&ddp)) != 0) {
+	    (mod_hash_key_t)macname, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
 		rw_exit(&i_dls_devnet_lock);
 		return (ENOENT);
 	}
 
-	ASSERT(ddp->dd_ref != 0);
+	mutex_enter(&ddp->dd_mutex);
 
-	if (ddp->dd_ref != 1) {
+	/*
+	 * Make sure downcalls into softmac_create or softmac_destroy from
+	 * devfs don't cv_wait on any devfs related condition for fear of
+	 * deadlock. Return EBUSY if the asynchronous thread started for
+	 * property loading as part of the post attach hasn't yet completed.
+	 */
+	ASSERT(ddp->dd_ref != 0);
+	if ((ddp->dd_ref != 1) || (!wait &&
+	    (ddp->dd_tref != 0 || ddp->dd_prop_taskid != NULL))) {
+		mutex_exit(&ddp->dd_mutex);
 		rw_exit(&i_dls_devnet_lock);
 		return (EBUSY);
 	}
 
+	ddp->dd_flags |= DD_CONDEMNED;
 	ddp->dd_ref--;
+	*id = ddp->dd_linkid;
 
-	if (id != NULL)
-		*id = ddp->dd_vlanid;
+	/*
+	 * Remove this dls_devnet_t from the hash table.
+	 */
+	VERIFY(mod_hash_remove(i_dls_devnet_hash,
+	    (mod_hash_key_t)ddp->dd_mac, &val) == 0);
 
-	dls_devnet_unset_common(ddp);
+	if (ddp->dd_linkid != DATALINK_INVALID_LINKID) {
+		VERIFY(mod_hash_remove(i_dls_devnet_id_hash,
+		    (mod_hash_key_t)(uintptr_t)ddp->dd_linkid, &val) == 0);
+
+		dls_devnet_stat_destroy(ddp);
+		devnet_need_rebuild = B_TRUE;
+	}
 	rw_exit(&i_dls_devnet_lock);
+
+	if (wait) {
+		/*
+		 * Wait until all temporary references are released.
+		 */
+		while ((ddp->dd_tref != 0) || (ddp->dd_prop_taskid != NULL))
+			cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
+	} else {
+		ASSERT(ddp->dd_tref == 0 && ddp->dd_prop_taskid == NULL);
+	}
+
+	ddp->dd_prop_loaded = B_FALSE;
+	ddp->dd_linkid = DATALINK_INVALID_LINKID;
+	ddp->dd_zid = GLOBAL_ZONEID;
+	ddp->dd_flags = 0;
+	mutex_exit(&ddp->dd_mutex);
+	kmem_cache_free(i_dls_devnet_cachep, ddp);
+
 	return (0);
 }
 
 static int
-dls_devnet_hold(datalink_id_t linkid, dls_devnet_t **ddpp)
+dls_devnet_hold_common(datalink_id_t linkid, dls_devnet_t **ddpp,
+    boolean_t tmp_hold)
 {
 	dls_devnet_t		*ddp;
 	dev_t			phydev = 0;
@@ -938,38 +865,69 @@ dls_devnet_hold(datalink_id_t linkid, dls_devnet_t **ddpp)
 		return (ENOENT);
 	}
 
+	mutex_enter(&ddp->dd_mutex);
 	ASSERT(ddp->dd_ref > 0);
-	ddp->dd_ref++;
+	if (ddp->dd_flags & DD_CONDEMNED) {
+		mutex_exit(&ddp->dd_mutex);
+		rw_exit(&i_dls_devnet_lock);
+		softmac_rele_device(ddh);
+		return (ENOENT);
+	}
+	if (tmp_hold)
+		ddp->dd_tref++;
+	else
+		ddp->dd_ref++;
+	mutex_exit(&ddp->dd_mutex);
 	rw_exit(&i_dls_devnet_lock);
+
 	softmac_rele_device(ddh);
 
-done:
 	*ddpp = ddp;
 	return (0);
+}
+
+int
+dls_devnet_hold(datalink_id_t linkid, dls_devnet_t **ddpp)
+{
+	return (dls_devnet_hold_common(linkid, ddpp, B_FALSE));
+}
+
+/*
+ * Hold the vanity naming structure (dls_devnet_t) temporarily.  The request to
+ * delete the dls_devnet_t will wait until the temporary reference is released.
+ */
+int
+dls_devnet_hold_tmp(datalink_id_t linkid, dls_devnet_t **ddpp)
+{
+	return (dls_devnet_hold_common(linkid, ddpp, B_TRUE));
 }
 
 /*
  * This funtion is called when a DLS client tries to open a device node.
  * This dev_t could a result of a /dev/net node access (returned by
  * devnet_create_rvp->dls_devnet_open()) or a direct /dev node access.
- * In both cases, this function returns 0. In the first case, bump the
- * reference count of the dls_devnet_t structure, so that it will not be
- * freed when devnet_inactive_callback->dls_devnet_close() is called
- * (Note that devnet_inactive_callback() is called right after dld_open,
- * not when the /dev/net access is done). In the second case, ddhp would
- * be NULL.
- *
- * To undo this function, call dls_devnet_close() in the first case, and call
- * dls_vlan_rele() in the second case.
+ * In both cases, this function bumps up the reference count of the
+ * dls_devnet_t structure. The reference is held as long as the device node
+ * is open. In the case of /dev/net while it is true that the initial reference
+ * is held when the devnet_create_rvp->dls_devnet_open call happens, this
+ * initial reference is released immediately in devnet_inactive_callback ->
+ * dls_devnet_close(). (Note that devnet_inactive_callback() is called right
+ * after dld_open completes, not when the /dev/net node is being closed).
+ * To undo this function, call dls_devnet_rele()
  */
 int
-dls_devnet_open_by_dev(dev_t dev, dls_vlan_t **dvpp, dls_dl_handle_t *ddhp)
+dls_devnet_hold_by_dev(dev_t dev, dls_dl_handle_t *ddhp)
 {
+	char			name[MAXNAMELEN];
+	char			*drv;
 	dls_dev_handle_t	ddh = NULL;
-	char			spa[MAXSPALEN];
 	dls_devnet_t		*ddp;
-	dls_vlan_t		*dvp;
 	int			err;
+
+	if ((drv = ddi_major_to_name(getmajor(dev))) == NULL)
+		return (EINVAL);
+
+	(void) snprintf(name, MAXNAMELEN, "%s%d", drv, getminor(dev) - 1);
 
 	/*
 	 * Hold this link to prevent it being detached in case of a
@@ -978,64 +936,49 @@ dls_devnet_open_by_dev(dev_t dev, dls_vlan_t **dvpp, dls_dl_handle_t *ddhp)
 	if (getminor(dev) - 1 < MAC_MAX_MINOR)
 		(void) softmac_hold_device(dev, &ddh);
 
-	/*
-	 * Found the dls_vlan_t with the given dev.
-	 */
-	err = dls_vlan_hold_by_dev(dev, &dvp);
-	softmac_rele_device(ddh);
-
-	if (err != 0)
-		return (err);
-
-	(void) snprintf(spa, MAXSPALEN, "%s/%d",
-	    dvp->dv_dlp->dl_name, dvp->dv_id);
-
 	rw_enter(&i_dls_devnet_lock, RW_WRITER);
 	if ((err = mod_hash_find(i_dls_devnet_hash,
-	    (mod_hash_key_t)spa, (mod_hash_val_t *)&ddp)) != 0) {
+	    (mod_hash_key_t)name, (mod_hash_val_t *)&ddp)) != 0) {
 		ASSERT(err == MH_ERR_NOTFOUND);
 		rw_exit(&i_dls_devnet_lock);
-		*ddhp = NULL;
-		*dvpp = dvp;
-		return (0);
+		softmac_rele_device(ddh);
+		return (ENOENT);
 	}
-
+	mutex_enter(&ddp->dd_mutex);
 	ASSERT(ddp->dd_ref > 0);
+	if (ddp->dd_flags & DD_CONDEMNED) {
+		mutex_exit(&ddp->dd_mutex);
+		rw_exit(&i_dls_devnet_lock);
+		softmac_rele_device(ddh);
+		return (ENOENT);
+	}
 	ddp->dd_ref++;
+	mutex_exit(&ddp->dd_mutex);
 	rw_exit(&i_dls_devnet_lock);
+
+	softmac_rele_device(ddh);
+
 	*ddhp = ddp;
-	*dvpp = dvp;
 	return (0);
 }
 
-static void
+void
 dls_devnet_rele(dls_devnet_t *ddp)
 {
-	rw_enter(&i_dls_devnet_lock, RW_WRITER);
-	ASSERT(ddp->dd_ref != 0);
-	if (--ddp->dd_ref != 0) {
-		rw_exit(&i_dls_devnet_lock);
-		return;
-	}
-	/*
-	 * This should only happen for implicitly-created VLAN.
-	 */
-	ASSERT(ddp->dd_vid != VLAN_ID_NONE);
-	dls_devnet_unset_common(ddp);
-	rw_exit(&i_dls_devnet_lock);
+	mutex_enter(&ddp->dd_mutex);
+	ASSERT(ddp->dd_ref > 1);
+	ddp->dd_ref--;
+	mutex_exit(&ddp->dd_mutex);
 }
 
 static int
-dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp, zoneid_t zid)
+dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp)
 {
-	char			link_under[MAXLINKNAMELEN];
 	char			drv[MAXLINKNAMELEN];
 	uint_t			ppa;
 	major_t			major;
 	dev_t			phy_dev, tmp_dev;
-	uint_t			vid;
 	datalink_id_t		linkid;
-	dls_devnet_t		*ddp;
 	dls_dev_handle_t	ddh;
 	int			err;
 
@@ -1056,35 +999,8 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp, zoneid_t zid)
 	if (ddi_parse(link, drv, &ppa) != DDI_SUCCESS)
 		return (ENOENT);
 
-	if ((vid = DLS_PPA2VID(ppa)) > VLAN_ID_MAX)
-		return (ENOENT);
-
-	ppa = (uint_t)DLS_PPA2INST(ppa);
-	(void) snprintf(link_under, sizeof (link_under), "%s%d", drv, ppa);
-
-	if (vid != VLAN_ID_NONE) {
-		/*
-		 * Only global zone can implicitly create a VLAN.
-		 */
-		if (zid != GLOBAL_ZONEID)
-			return (ENOENT);
-
-		/*
-		 * This is potentially an implicitly-created VLAN. Hold the
-		 * link this VLAN is created on.
-		 */
-		if (dls_mgmt_get_linkid(link_under, &linkid) == 0 &&
-		    dls_devnet_hold_tmp(linkid, &ddp) == 0) {
-			if (ddp->dd_vid != VLAN_ID_NONE) {
-				dls_devnet_rele_tmp(ddp);
-				return (ENOENT);
-			}
-			goto implicit;
-		}
-	}
-
 	/*
-	 * If this link (or the link that an implicit vlan is created on)
+	 * If this link:
 	 * (a) is a physical device, (b) this is the first boot, (c) the MAC
 	 * is not registered yet, and (d) we cannot find its linkid, then the
 	 * linkname is the same as the devname.
@@ -1102,7 +1018,7 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp, zoneid_t zid)
 	 * At this time, the MAC should be registered, check its phy_dev using
 	 * the given name.
 	 */
-	if ((err = dls_mgmt_get_linkid(link_under, &linkid)) != 0 ||
+	if ((err = dls_mgmt_get_linkid(link, &linkid)) != 0 ||
 	    (err = dls_mgmt_get_phydev(linkid, &tmp_dev)) != 0) {
 		softmac_rele_device(ddh);
 		return (err);
@@ -1112,33 +1028,28 @@ dls_devnet_hold_by_name(const char *link, dls_devnet_t **ddpp, zoneid_t zid)
 		return (ENOENT);
 	}
 
-	if (vid == VLAN_ID_NONE) {
-		/*
-		 * For non-VLAN, we are done.
-		 */
-		err = dls_devnet_hold(linkid, ddpp);
-		softmac_rele_device(ddh);
-		return (err);
-	}
-
-	/*
-	 * If this is an implicit VLAN, temporarily hold this non-VLAN.
-	 */
-	VERIFY(dls_devnet_hold_tmp(linkid, &ddp) == 0);
+	err = dls_devnet_hold(linkid, ddpp);
 	softmac_rele_device(ddh);
-	ASSERT(ddp->dd_vid == VLAN_ID_NONE);
-
-	/*
-	 * Again, this is potentially an implicitly-created VLAN.
-	 */
-
-implicit:
-	ASSERT(vid != VLAN_ID_NONE);
-	err = dls_devnet_set(ddp->dd_mac, vid, DATALINK_INVALID_LINKID,
-	    linkid, link, ddpp);
-	dls_devnet_rele_tmp(ddp);
 	return (err);
 }
+
+int
+dls_devnet_macname2linkid(const char *macname, datalink_id_t *linkidp)
+{
+	dls_devnet_t	*ddp;
+
+	rw_enter(&i_dls_devnet_lock, RW_READER);
+	if (mod_hash_find(i_dls_devnet_hash, (mod_hash_key_t)macname,
+	    (mod_hash_val_t *)&ddp) != 0) {
+		rw_exit(&i_dls_devnet_lock);
+		return (ENOENT);
+	}
+
+	*linkidp = ddp->dd_linkid;
+	rw_exit(&i_dls_devnet_lock);
+	return (0);
+}
+
 
 /*
  * Get linkid for the given dev.
@@ -1146,29 +1057,14 @@ implicit:
 int
 dls_devnet_dev2linkid(dev_t dev, datalink_id_t *linkidp)
 {
-	dls_vlan_t	*dvp;
-	dls_devnet_t	*ddp;
-	char		spa[MAXSPALEN];
-	int		err;
+	char	macname[MAXNAMELEN];
+	char	*drv;
 
-	if ((err = dls_vlan_hold_by_dev(dev, &dvp)) != 0)
-		return (err);
+	if ((drv = ddi_major_to_name(getmajor(dev))) == NULL)
+		return (EINVAL);
 
-	(void) snprintf(spa, MAXSPALEN, "%s/%d",
-	    dvp->dv_dlp->dl_name, dvp->dv_id);
-
-	rw_enter(&i_dls_devnet_lock, RW_READER);
-	if (mod_hash_find(i_dls_devnet_hash, (mod_hash_key_t)spa,
-	    (mod_hash_val_t *)&ddp) != 0) {
-		rw_exit(&i_dls_devnet_lock);
-		dls_vlan_rele(dvp);
-		return (ENOENT);
-	}
-
-	*linkidp = ddp->dd_vlanid;
-	rw_exit(&i_dls_devnet_lock);
-	dls_vlan_rele(dvp);
-	return (0);
+	(void) snprintf(macname, MAXNAMELEN, "%s%d", drv, getminor(dev) - 1);
+	return (dls_devnet_macname2linkid(macname, linkidp));
 }
 
 /*
@@ -1213,6 +1109,7 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	int			err = 0;
 	dev_t			phydev = 0;
 	dls_devnet_t		*ddp;
+	mac_perim_handle_t	mph = NULL;
 	mac_handle_t		mh;
 	mod_hash_val_t		val;
 
@@ -1232,6 +1129,14 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	if (dls_mgmt_get_phydev(id1, &phydev) == 0)
 		(void) softmac_hold_device(phydev, &ddh);
 
+	/*
+	 * The framework does not hold hold locks across calls to the
+	 * mac perimeter, hence enter the perimeter first. This also waits
+	 * for the property loading to finish.
+	 */
+	if ((err = mac_perim_enter_by_linkid(id1, &mph)) != 0)
+		goto done;
+
 	rw_enter(&i_dls_devnet_lock, RW_WRITER);
 	if ((err = mod_hash_find(i_dls_devnet_id_hash,
 	    (mod_hash_key_t)(uintptr_t)id1, (mod_hash_val_t *)&ddp)) != 0) {
@@ -1241,41 +1146,21 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	}
 
 	/*
-	 * Let the property loading thread finish.
-	 * Unfortunately, we have to drop i_dls_devnet_lock temporarily
-	 * to avoid deadlocks, and ensure ddp is still in the hash after
-	 * reacquiring it. Observe lock order as well.
-	 */
-	mutex_enter(&ddp->dd_mutex);
-	if (ddp->dd_prop_taskid != NULL) {
-		rw_exit(&i_dls_devnet_lock);
-		while (ddp->dd_prop_taskid != NULL)
-			cv_wait(&ddp->dd_cv, &ddp->dd_mutex);
-		mutex_exit(&ddp->dd_mutex);
-		rw_enter(&i_dls_devnet_lock, RW_WRITER);
-
-		if ((err = mod_hash_find(i_dls_devnet_id_hash,
-		    (mod_hash_key_t)(uintptr_t)id1,
-		    (mod_hash_val_t *)&ddp)) != 0) {
-			ASSERT(err == MH_ERR_NOTFOUND);
-			err = ENOENT;
-			goto done;
-		}
-	} else {
-		mutex_exit(&ddp->dd_mutex);
-	}
-
-	/*
 	 * Return EBUSY if any applications have this link open.
 	 */
-	if ((ddp->dd_explicit && ddp->dd_ref > 1) ||
-	    (!ddp->dd_explicit && ddp->dd_ref > 0)) {
+	if (ddp->dd_ref > 1) {
 		err = EBUSY;
 		goto done;
 	}
 
 	if (id2 == DATALINK_INVALID_LINKID) {
 		(void) strlcpy(linkname, link, sizeof (linkname));
+
+		/* rename mac client name and its flow if exists */
+		if ((err = mac_open(ddp->dd_mac, &mh)) != 0)
+			goto done;
+		(void) mac_rename_primary(mh, link);
+		mac_close(mh);
 		goto done;
 	}
 
@@ -1294,7 +1179,7 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	/*
 	 * We release the reference of the MAC which mac_open() is
 	 * holding. Note that this mac will not be unregistered
-	 * because the physical device is hold.
+	 * because the physical device is held.
 	 */
 	mac_close(mh);
 
@@ -1302,7 +1187,7 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	 * Check if there is any other MAC clients, if not, hold this mac
 	 * exclusively until we are done.
 	 */
-	if ((err = mac_hold_exclusive(mh)) != 0)
+	if ((err = mac_mark_exclusive(mh)) != 0)
 		goto done;
 
 	/*
@@ -1310,23 +1195,25 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	 */
 	if ((err = mod_hash_find(i_dls_devnet_id_hash,
 	    (mod_hash_key_t)(uintptr_t)id2, &val)) != MH_ERR_NOTFOUND) {
-		mac_rele_exclusive(mh);
+		mac_unmark_exclusive(mh);
 		err = EEXIST;
 		goto done;
 	}
 
 	err = dls_mgmt_get_linkinfo(id2, linkname, NULL, NULL, NULL);
 	if (err != 0) {
-		mac_rele_exclusive(mh);
+		mac_unmark_exclusive(mh);
 		goto done;
 	}
 
 	(void) mod_hash_remove(i_dls_devnet_id_hash,
 	    (mod_hash_key_t)(uintptr_t)id1, &val);
 
-	ddp->dd_vlanid = id2;
+	ddp->dd_linkid = id2;
 	(void) mod_hash_insert(i_dls_devnet_id_hash,
-	    (mod_hash_key_t)(uintptr_t)ddp->dd_vlanid, (mod_hash_val_t)ddp);
+	    (mod_hash_key_t)(uintptr_t)ddp->dd_linkid, (mod_hash_val_t)ddp);
+
+	mac_unmark_exclusive(mh);
 
 	/* load properties for new id */
 	mutex_enter(&ddp->dd_mutex);
@@ -1334,8 +1221,6 @@ dls_devnet_rename(datalink_id_t id1, datalink_id_t id2, const char *link)
 	ddp->dd_prop_taskid = taskq_dispatch(system_taskq,
 	    dls_devnet_prop_task, ddp, TQ_SLEEP);
 	mutex_exit(&ddp->dd_mutex);
-
-	mac_rele_exclusive(mh);
 
 done:
 	/*
@@ -1345,6 +1230,8 @@ done:
 		dls_devnet_stat_rename(ddp, linkname);
 
 	rw_exit(&i_dls_devnet_lock);
+	if (mph != NULL)
+		mac_perim_exit(mph);
 	softmac_rele_device(ddh);
 	return (err);
 }
@@ -1355,26 +1242,30 @@ dls_devnet_setzid(const char *link, zoneid_t zid)
 	dls_devnet_t	*ddp;
 	int		err;
 	zoneid_t	old_zid;
+	mac_perim_handle_t	mph;
 
-	if ((err = dls_devnet_hold_by_name(link, &ddp, GLOBAL_ZONEID)) != 0)
+	if ((err = dls_devnet_hold_by_name(link, &ddp)) != 0)
 		return (err);
 
-	mutex_enter(&ddp->dd_zid_mutex);
+	err = mac_perim_enter_by_macname(ddp->dd_mac, &mph);
+	if (err != 0)
+		return (err);
+
 	if ((old_zid = ddp->dd_zid) == zid) {
-		mutex_exit(&ddp->dd_zid_mutex);
+		mac_perim_exit(mph);
 		dls_devnet_rele(ddp);
 		return (0);
 	}
 
-	if ((err = dls_vlan_setzid(ddp->dd_mac, ddp->dd_vid, zid)) != 0) {
-		mutex_exit(&ddp->dd_zid_mutex);
+	if ((err = dls_link_setzid(ddp->dd_mac, zid)) != 0) {
+		mac_perim_exit(mph);
 		dls_devnet_rele(ddp);
 		return (err);
 	}
 
 	ddp->dd_zid = zid;
 	devnet_need_rebuild = B_TRUE;
-	mutex_exit(&ddp->dd_zid_mutex);
+	mac_perim_exit(mph);
 
 	/*
 	 * Keep this open reference only if it belonged to the global zone
@@ -1402,9 +1293,7 @@ dls_devnet_getzid(datalink_id_t linkid, zoneid_t *zidp)
 	if ((err = dls_devnet_hold_tmp(linkid, &ddp)) != 0)
 		return (err);
 
-	mutex_enter(&ddp->dd_zid_mutex);
 	*zidp = ddp->dd_zid;
-	mutex_exit(&ddp->dd_zid_mutex);
 
 	dls_devnet_rele_tmp(ddp);
 	return (0);
@@ -1417,12 +1306,15 @@ int
 dls_devnet_open(const char *link, dls_dl_handle_t *dhp, dev_t *devp)
 {
 	dls_devnet_t	*ddp;
-	dls_vlan_t	*dvp;
+	dls_link_t	*dlp;
 	zoneid_t	zid = getzoneid();
 	int		err;
+	mac_perim_handle_t	mph;
 
-	if ((err = dls_devnet_hold_by_name(link, &ddp, zid)) != 0)
+	if ((err = dls_devnet_hold_by_name(link, &ddp)) != 0)
 		return (err);
+
+	dls_devnet_prop_task_wait(ddp);
 
 	/*
 	 * Opening a link that does not belong to the current non-global zone
@@ -1433,16 +1325,22 @@ dls_devnet_open(const char *link, dls_dl_handle_t *dhp, dev_t *devp)
 		return (ENOENT);
 	}
 
-	err = dls_vlan_hold(ddp->dd_mac, ddp->dd_vid, &dvp, B_FALSE, B_TRUE);
+	err = mac_perim_enter_by_macname(ddp->dd_mac, &mph);
 	if (err != 0) {
 		dls_devnet_rele(ddp);
 		return (err);
 	}
 
-	dls_devnet_prop_task_wait(ddp);
+	err = dls_link_hold_create(ddp->dd_mac, &dlp);
+	mac_perim_exit(mph);
+
+	if (err != 0) {
+		dls_devnet_rele(ddp);
+		return (err);
+	}
 
 	*dhp = ddp;
-	*devp = dvp->dv_dev;
+	*devp = dls_link_dev(dlp);
 	return (0);
 }
 
@@ -1453,15 +1351,20 @@ void
 dls_devnet_close(dls_dl_handle_t dlh)
 {
 	dls_devnet_t	*ddp = dlh;
-	dls_vlan_t	*dvp;
+	dls_link_t	*dlp;
+	mac_perim_handle_t	mph;
+
+	VERIFY(mac_perim_enter_by_macname(ddp->dd_mac, &mph) == 0);
+	VERIFY(dls_link_hold(ddp->dd_mac, &dlp) == 0);
 
 	/*
-	 * The VLAN is hold in dls_open_devnet_link().
+	 * One rele for the hold placed in dls_devnet_open, another for
+	 * the hold done just above
 	 */
-	VERIFY((dls_vlan_hold(ddp->dd_mac, ddp->dd_vid, &dvp, B_FALSE,
-	    B_FALSE)) == 0);
-	dls_vlan_rele(dvp);
-	dls_vlan_rele(dvp);
+	dls_link_rele(dlp);
+	dls_link_rele(dlp);
+	mac_perim_exit(mph);
+
 	dls_devnet_rele(ddp);
 }
 
@@ -1481,15 +1384,27 @@ dls_devnet_rebuild()
 int
 dls_devnet_create(mac_handle_t mh, datalink_id_t linkid)
 {
+	dls_link_t	*dlp;
 	int		err;
+	mac_perim_handle_t mph;
 
-	if ((err = dls_vlan_create(mac_name(mh), 0, B_FALSE)) != 0)
+	mac_perim_enter_by_mh(mh, &mph);
+
+	/*
+	 * Make this association before we call dls_link_hold_create as
+	 * we need to use the linkid to get the user name for the link
+	 * when we create the MAC client.
+	 */
+	if ((err = dls_devnet_set(mac_name(mh), linkid, NULL)) != 0) {
+		mac_perim_exit(mph);
 		return (err);
-
-	err = dls_devnet_set(mac_name(mh), 0, linkid, linkid, NULL, NULL);
-	if (err != 0)
-		(void) dls_vlan_destroy(mac_name(mh), 0);
-
+	}
+	if ((err = dls_link_hold_create(mac_name(mh), &dlp)) != 0) {
+		(void) dls_devnet_unset(mac_name(mh), &linkid, B_TRUE);
+		mac_perim_exit(mph);
+		return (err);
+	}
+	mac_perim_exit(mph);
 	return (err);
 }
 
@@ -1503,112 +1418,29 @@ int
 dls_devnet_recreate(mac_handle_t mh, datalink_id_t linkid)
 {
 	ASSERT(linkid != DATALINK_INVALID_LINKID);
-	return (dls_devnet_set(mac_name(mh), 0, linkid, linkid, NULL, NULL));
+	return (dls_devnet_set(mac_name(mh), linkid, NULL));
 }
 
 int
-dls_devnet_destroy(mac_handle_t mh, datalink_id_t *idp)
+dls_devnet_destroy(mac_handle_t mh, datalink_id_t *idp, boolean_t wait)
 {
-	int		err;
+	int			err;
+	mac_perim_handle_t	mph;
 
 	*idp = DATALINK_INVALID_LINKID;
-	err = dls_devnet_unset(mac_name(mh), 0, idp);
+	err = dls_devnet_unset(mac_name(mh), idp, wait);
 	if (err != 0 && err != ENOENT)
 		return (err);
 
-	if ((err = dls_vlan_destroy(mac_name(mh), 0)) == 0)
+	mac_perim_enter_by_mh(mh, &mph);
+	err = dls_link_rele_by_name(mac_name(mh));
+	mac_perim_exit(mph);
+
+	if (err == 0)
 		return (0);
 
-	(void) dls_devnet_set(mac_name(mh), 0, *idp, *idp, NULL, NULL);
+	(void) dls_devnet_set(mac_name(mh), *idp, NULL);
 	return (err);
-}
-
-int
-dls_devnet_create_vlan(datalink_id_t vlanid, datalink_id_t linkid,
-    uint16_t vid, boolean_t force)
-{
-	dls_devnet_t	*lnddp, *ddp;
-	dls_vlan_t	*dvp;
-	int		err;
-
-	/*
-	 * Hold the link the VLAN is being created on (which must not be a
-	 * VLAN).
-	 */
-	ASSERT(vid != VLAN_ID_NONE);
-	if ((err = dls_devnet_hold_tmp(linkid, &lnddp)) != 0)
-		return (err);
-
-	if (lnddp->dd_vid != VLAN_ID_NONE) {
-		err = EINVAL;
-		goto done;
-	}
-
-	/*
-	 * A new link.
-	 */
-	err = dls_devnet_set(lnddp->dd_mac, vid, vlanid, linkid, NULL, &ddp);
-	if (err != 0)
-		goto done;
-
-	/*
-	 * Hold the dls_vlan_t (and create it if needed).
-	 */
-	err = dls_vlan_hold(ddp->dd_mac, ddp->dd_vid, &dvp, force, B_TRUE);
-	if (err != 0)
-		VERIFY(dls_devnet_unset(lnddp->dd_mac, vid, NULL) == 0);
-
-done:
-	dls_devnet_rele_tmp(lnddp);
-	return (err);
-}
-
-int
-dls_devnet_destroy_vlan(datalink_id_t vlanid)
-{
-	char		macname[MAXNAMELEN];
-	uint16_t	vid;
-	dls_devnet_t	*ddp;
-	dls_vlan_t	*dvp;
-	int		err;
-
-	if ((err = dls_devnet_hold_tmp(vlanid, &ddp)) != 0)
-		return (err);
-
-	if (ddp->dd_vid == VLAN_ID_NONE) {
-		dls_devnet_rele_tmp(ddp);
-		return (EINVAL);
-	}
-
-	if (!ddp->dd_explicit) {
-		dls_devnet_rele_tmp(ddp);
-		return (EBUSY);
-	}
-
-	(void) strncpy(macname, ddp->dd_mac, MAXNAMELEN);
-	vid = ddp->dd_vid;
-
-	/*
-	 * It is safe to release the temporary reference we just held, as the
-	 * reference from VLAN creation is still held.
-	 */
-	dls_devnet_rele_tmp(ddp);
-
-	if ((err = dls_devnet_unset(macname, vid, NULL)) != 0)
-		return (err);
-
-	/*
-	 * This VLAN has already been held as the result of VLAN creation.
-	 */
-	VERIFY(dls_vlan_hold(macname, vid, &dvp, B_FALSE, B_FALSE) == 0);
-
-	/*
-	 * Release the reference which was held when this VLAN was created,
-	 * and the reference which was just held.
-	 */
-	dls_vlan_rele(dvp);
-	dls_vlan_rele(dvp);
-	return (0);
 }
 
 const char *
@@ -1617,20 +1449,8 @@ dls_devnet_mac(dls_dl_handle_t ddh)
 	return (ddh->dd_mac);
 }
 
-uint16_t
-dls_devnet_vid(dls_dl_handle_t ddh)
-{
-	return (ddh->dd_vid);
-}
-
 datalink_id_t
 dls_devnet_linkid(dls_dl_handle_t ddh)
 {
 	return (ddh->dd_linkid);
-}
-
-boolean_t
-dls_devnet_is_explicit(dls_dl_handle_t ddh)
-{
-	return (ddh->dd_explicit);
 }

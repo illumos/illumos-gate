@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -53,6 +52,8 @@ d none etc 755 root sys
 d none etc/dladm 755 dladm sys
 e preserve etc/dladm/secobj.conf 600 dladm sys
 e preserve etc/dladm/datalink.conf 644 dladm sys
+e preserve etc/dladm/flowadm.conf 644 dladm sys
+e preserve etc/dladm/flowprop.conf 644 dladm sys
 d none etc/default 755 root sys
 e dhcpagent etc/default/dhcpagent 644 root sys
 e preserve etc/default/inetinit 644 root sys
@@ -74,3 +75,4 @@ e sock2path etc/inet/sock2path 444 root sys
 s none etc/sock2path=./inet/sock2path
 d none sbin 755 root sys
 f none sbin/dladm 555 root bin
+f none sbin/flowadm 555 root bin

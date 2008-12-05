@@ -55,10 +55,6 @@ typedef struct vsw_share {
 	uint64_t	vs_macaddr;	/* Associated MAC addr */
 	uint64_t	vs_cookie;	/* Share Cookie from alloc_share */
 
-	/* physdev's share related info */
-	mac_share_handle_t	vs_shdl;	/* HIO share handle */
-	mac_group_info_t	vs_rxginfo;	/* RX group info */
-	uint64_t		vs_gnum;	/* RX group number */
 } vsw_share_t;
 
 #define	VSW_SHARE_FREE		0x0
@@ -68,11 +64,8 @@ typedef struct vsw_share {
 
 /* Hybrid related info */
 typedef struct vsw_hio {
-	mac_capab_rings_t	vh_rcapab;	/* Rings capability data */
-	mac_capab_share_t	vh_scapab;	/* Share capability data */
-	vsw_share_t		*vh_shares;	/* Array of Shares */
 	uint32_t		vh_num_shares;	/* Number of shares available */
-
+	vsw_share_t		*vh_shares;	/* Array of Shares */
 	uint32_t		vh_kstat_size;	/* size for the whole kstats */
 	vsw_hio_kstats_t	*vh_kstatsp;	/* stats for vsw hio */
 	kstat_t			*vh_ksp;	/* kstats */

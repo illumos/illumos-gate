@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/acctctl.h>
 #include <unistd.h>
@@ -32,6 +30,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <limits.h>
+#include <libdllink.h>
 #include <libscf.h>
 #include <pwd.h>
 #include <auth_attr.h>
@@ -47,6 +46,7 @@
 #define	FMRI_FLOW_ACCT	"svc:/system/extended-accounting:flow"
 #define	FMRI_PROC_ACCT	"svc:/system/extended-accounting:process"
 #define	FMRI_TASK_ACCT	"svc:/system/extended-accounting:task"
+#define	FMRI_NET_ACCT	"svc:/system/extended-accounting:net"
 
 #define	NELEM(x)	(sizeof (x)) / (sizeof (x[0]))
 
@@ -134,13 +134,14 @@ aconf_setup(const char *fmri)
 	}
 
 	/*
-	 * Flow accounting is not available in non-global zones and
+	 * Net/Flow accounting is not available in non-global zones and
 	 * the service instance should therefore never be 'enabled' in
 	 * non-global zones.  This is enforced by acctadm(1M), but there is
 	 * nothing that prevents someone from calling svcadm enable directly,
 	 * so we handle that case here by disabling the instance.
 	 */
-	if (type == AC_FLOW && getzoneid() != GLOBAL_ZONEID) {
+	if ((type == AC_FLOW || type == AC_NET) &&
+	    getzoneid() != GLOBAL_ZONEID) {
 		(void) smf_disable_instance(fmri, 0);
 		warn(gettext("%s accounting cannot be configured in "
 		    "non-global zones\n"), ac_type_name(type));
@@ -210,6 +211,19 @@ aconf_setup(const char *fmri)
 		ret = SMF_EXIT_ERR_FATAL;
 	}
 	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_SYS_ACCT, NULL);
+
+	if (state == AC_ON && type == AC_NET) {
+		/*
+		 * Start logging.
+		 */
+		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_SYS_DL_CONFIG,
+		    NULL);
+		(void) dladm_start_usagelog(strncmp(tracked, "basic",
+		    strlen("basic")) == 0 ? DLADM_LOGTYPE_LINK :
+		    DLADM_LOGTYPE_FLOW, 20);
+		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_SYS_DL_CONFIG,
+		    NULL);
+	}
 out:
 	aconf_scf_fini();
 	return (ret);
@@ -219,7 +233,7 @@ void
 aconf_print(FILE *fp, int types)
 {
 	acctconf_t ac;
-	int print_order[] = { AC_TASK, AC_PROC, AC_FLOW };
+	int print_order[] = { AC_TASK, AC_PROC, AC_FLOW, AC_NET };
 	int i;
 
 	for (i = 0; i < NELEM(print_order); i++) {
@@ -277,6 +291,21 @@ aconf_print_type(acctconf_t *acp, FILE *fp, int type)
 		    acp->tracked);
 		(void) fprintf(fp,
 		    gettext("   Untracked flow resources: %s\n"),
+		    acp->untracked);
+		break;
+	case AC_NET:
+		(void) fprintf(fp,
+		    gettext("            Net accounting: %s\n"),
+		    acp->state == AC_ON ?
+		    gettext("active") : gettext("inactive"));
+		(void) fprintf(fp,
+		    gettext("       Net accounting file: %s\n"),
+		    acp->file);
+		(void) fprintf(fp,
+		    gettext("     Tracked net resources: %s\n"),
+		    acp->tracked);
+		(void) fprintf(fp,
+		    gettext("   Untracked net resources: %s\n"),
 		    acp->untracked);
 		break;
 	}
@@ -369,6 +398,8 @@ aconf_type2fmri(int type)
 		return (FMRI_TASK_ACCT);
 	case AC_FLOW:
 		return (FMRI_FLOW_ACCT);
+	case AC_NET:
+		return (FMRI_NET_ACCT);
 	default:
 		die(gettext("invalid type %d\n"), type);
 	}
@@ -385,6 +416,8 @@ aconf_fmri2type(const char *fmri)
 		return (AC_TASK);
 	else if (strcmp(fmri, FMRI_FLOW_ACCT) == 0)
 		return (AC_FLOW);
+	else if (strcmp(fmri, FMRI_NET_ACCT) == 0)
+		return (AC_NET);
 	else
 		return (-1);
 }

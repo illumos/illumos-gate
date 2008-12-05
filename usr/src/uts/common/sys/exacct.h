@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_EXACCT_H
 #define	_SYS_EXACCT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/task.h>
@@ -175,6 +173,7 @@ extern int exacct_tag_task(ac_info_t *, task_t *, void *, size_t, int);
 extern int exacct_tag_proc(ac_info_t *, pid_t, taskid_t, void *, size_t, int,
     const char *);
 extern void exacct_commit_flow(void *);
+extern int exacct_commit_netinfo(void *, int);
 extern void exacct_init(void);
 extern void *exacct_create_header(size_t *);
 extern int exacct_write_header(ac_info_t *, void *, size_t);
@@ -192,6 +191,9 @@ extern int exacct_assemble_flow_usage(ac_info_t *, flow_usage_t *,
     int (*)(ac_info_t *, void *, size_t, void *, size_t, size_t *),
     void *, size_t, size_t *);
 extern void exacct_move_mstate(proc_t *, task_t *, task_t *);
+extern int exacct_assemble_net_usage(ac_info_t *, void *,
+    int (*)(ac_info_t *, void *, size_t, void *, size_t, size_t *),
+    void *, size_t, size_t *, int);
 extern taskq_t *exacct_queue;
 extern kmem_cache_t *exacct_object_cache;
 #endif /* _KERNEL */

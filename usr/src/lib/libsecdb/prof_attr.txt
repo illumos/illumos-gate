@@ -44,6 +44,7 @@ DHCP Management:::Manage the DHCP service:auths=solaris.dhcpmgr.*;help=RtDHCPMng
 Extended Accounting Flow Management:::Manage the Flow Extended Accounting service:auths=solaris.smf.manage.extended-accounting.flow,solaris.smf.value.extended-accounting.flow;profiles=acctadm;help=RtExActtFlow.html
 Extended Accounting Process Management:::Manage the Process Extended Accounting service:auths=solaris.smf.manage.extended-accounting.process,solaris.smf.value.extended-accounting.process;profiles=acctadm;hep=RtExAcctProcess.html
 Extended Accounting Task Management:::Manage the Task Extended Accounting service:auths=solaris.smf.manage.extended-accounting.task,solaris.smf.value.extended-accounting.task;profiles=acctadm;help=RtExAcctTask.html
+Extended Accounting Net Management:::Manage the Net Extended Accounting service:auths=solaris.smf.manage.extended-accounting.net,solaris.smf.value.extended-accounting.net;profiles=acctadm;help=RtExActtNet.html
 File System Management:::Manage, mount, share file systems:profiles=SMB Management,VSCAN Management,SMBFS Management;auths=solaris.smf.manage.autofs,solaris.smf.manage.shares.*,solaris.smf.value.shares.*;help=RtFileSysMngmnt.html
 File System Security:::Manage file system security attributes:help=RtFileSysSecurity.html
 HAL Management:::Manage HAL SMF service:auths=solaris.smf.manage.hal;help=RtHALMngmnt.html

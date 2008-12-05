@@ -89,12 +89,21 @@ usr/include/sys/dld.h			i386
 usr/include/sys/dld_impl.h		i386
 usr/include/sys/dld_ioc.h		i386
 usr/include/sys/dls.h			i386
+usr/include/sys/dls_mgmt.h		i386
 usr/include/sys/dls_impl.h		i386
 usr/include/sys/mac.h			i386
+usr/include/sys/mac_client.h		i386
+usr/include/sys/mac_client_impl.h	i386
+usr/include/sys/mac_flow.h		i386
+usr/include/sys/mac_flow_impl.h		i386
 usr/include/sys/mac_impl.h		i386
+usr/include/sys/mac_provider.h		i386
+usr/include/sys/mac_soft_ring.h		i386
 #
 # Private GLDv3 userland libraries and headers
 #
+usr/include/sys/vnic.h		i386
+usr/include/sys/vnic_impl.h	i386
 usr/include/libdladm.h		i386
 usr/include/libdladm_impl.h	i386
 usr/include/libdllink.h		i386
@@ -102,8 +111,11 @@ usr/include/libdlaggr.h		i386
 usr/include/libdlwlan.h		i386
 usr/include/libdlwlan_impl.h	i386
 usr/include/libdlvnic.h		i386
+usr/include/libdlflow.h		i386
+usr/include/libdlflow_impl.h	i386
 usr/include/libdlvlan.h		i386
 usr/include/libdlmgmt.h		i386
+usr/include/libdlstat.h		i386
 lib/libdladm.so			i386
 lib/llib-ldladm.ln		i386
 lib/amd64/libdladm.so		i386
@@ -528,6 +540,7 @@ lib/llib-lmeta.ln			i386
 # non-public pci header
 #
 usr/include/sys/pci_impl.h		i386
+usr/include/sys/pci_tools.h		i386
 #
 # Exception list for RCM project, included by librcm and rcm_daemon
 #

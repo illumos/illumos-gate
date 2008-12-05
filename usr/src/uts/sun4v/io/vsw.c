@@ -53,12 +53,12 @@
 #include <sys/machsystm.h>
 #include <sys/modctl.h>
 #include <sys/modhash.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/taskq.h>
 #include <sys/note.h>
 #include <sys/mach_descrip.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mdeg.h>
 #include <sys/ldc.h>
 #include <sys/vsw_fdb.h>
@@ -78,7 +78,7 @@
 static	int vsw_attach(dev_info_t *, ddi_attach_cmd_t);
 static	int vsw_detach(dev_info_t *, ddi_detach_cmd_t);
 static	int vsw_get_md_physname(vsw_t *, md_t *, mde_cookie_t, char *);
-static	int vsw_get_md_smodes(vsw_t *, md_t *, mde_cookie_t, uint8_t *, int *);
+static	int vsw_get_md_smodes(vsw_t *, md_t *, mde_cookie_t, uint8_t *);
 
 /* MDEG routines */
 static	int vsw_mdeg_register(vsw_t *vswp);
@@ -88,7 +88,7 @@ static	int vsw_port_mdeg_cb(void *cb_argp, mdeg_result_t *);
 static	int vsw_get_initial_md_properties(vsw_t *vswp, md_t *, mde_cookie_t);
 static	int vsw_read_mdprops(vsw_t *vswp);
 static	void vsw_vlan_read_ids(void *arg, int type, md_t *mdp,
-	mde_cookie_t node, uint16_t *pvidp, uint16_t **vidspp,
+	mde_cookie_t node, uint16_t *pvidp, vsw_vlanid_t **vidspp,
 	uint16_t *nvidsp, uint16_t *default_idp);
 static	int vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
 	md_t *mdp, mde_cookie_t *node);
@@ -99,6 +99,8 @@ static	void vsw_mtu_read(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 static	int vsw_mtu_update(vsw_t *vswp, uint32_t mtu);
 static	void vsw_update_md_prop(vsw_t *, md_t *, mde_cookie_t);
 static void vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr);
+static boolean_t vsw_cmp_vids(vsw_vlanid_t *vids1,
+	vsw_vlanid_t *vids2, int nvids);
 
 /* Mac driver related routines */
 static int vsw_mac_register(vsw_t *);
@@ -132,13 +134,9 @@ static int vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 	md_t *prev_mdp, mde_cookie_t prev_mdex);
 extern	int vsw_port_attach(vsw_port_t *port);
 extern vsw_port_t *vsw_lookup_port(vsw_t *vswp, int p_instance);
-extern int vsw_mac_attach(vsw_t *vswp);
-extern void vsw_mac_detach(vsw_t *vswp);
 extern int vsw_mac_open(vsw_t *vswp);
 extern void vsw_mac_close(vsw_t *vswp);
-extern int vsw_set_hw(vsw_t *, vsw_port_t *, int);
-extern int vsw_unset_hw(vsw_t *, vsw_port_t *, int);
-extern void vsw_reconfig_hw(vsw_t *);
+extern void vsw_mac_cleanup_ports(vsw_t *vswp);
 extern void vsw_unset_addrs(vsw_t *vswp);
 extern void vsw_setup_layer2_post_process(vsw_t *vswp);
 extern void vsw_create_vlans(void *arg, int type);
@@ -150,6 +148,16 @@ extern uint32_t vsw_vlan_frame_untag(void *arg, int type, mblk_t **np,
 	mblk_t **npt);
 extern mblk_t *vsw_vlan_frame_pretag(void *arg, int type, mblk_t *mp);
 extern void vsw_hio_cleanup(vsw_t *vswp);
+extern void vsw_hio_start_ports(vsw_t *vswp);
+extern void vsw_hio_port_update(vsw_port_t *portp, boolean_t hio_enabled);
+extern int vsw_mac_multicast_add(vsw_t *, vsw_port_t *, mcst_addr_t *, int);
+extern void vsw_mac_multicast_remove(vsw_t *, vsw_port_t *, mcst_addr_t *, int);
+extern void vsw_mac_port_reconfig_vlans(vsw_port_t *portp, uint16_t new_pvid,
+    vsw_vlanid_t *new_vids, int new_nvids);
+extern int vsw_mac_client_init(vsw_t *vswp, vsw_port_t *port, int type);
+extern void vsw_mac_client_cleanup(vsw_t *vswp, vsw_port_t *port, int type);
+extern void vsw_if_mac_reconfig(vsw_t *vswp, boolean_t update_vlans,
+    uint16_t new_pvid, vsw_vlanid_t *new_vids, int new_nvids);
 extern void vsw_reset_ports(vsw_t *vswp);
 extern void vsw_port_reset(vsw_port_t *portp);
 void vsw_hio_port_update(vsw_port_t *portp, boolean_t hio_enabled);
@@ -222,16 +230,6 @@ uint32_t vsw_publish_macaddr_count = 3;
 boolean_t vsw_hio_enabled = B_TRUE;	/* Enable/disable HybridIO */
 int vsw_hio_max_cleanup_retries = 10;	/* Max retries for HybridIO cleanp */
 int vsw_hio_cleanup_delay = 10000;	/* 10ms */
-
-/*
- * External tunables.
- */
-/*
- * Enable/disable thread per ring. This is a mode selection
- * that is done a vsw driver attach time.
- */
-boolean_t vsw_multi_ring_enable = B_FALSE;
-int vsw_mac_rx_rings = VSW_MAC_RX_RINGS;
 
 /* Number of transmit descriptors -  must be power of 2 */
 uint32_t vsw_ntxds = VSW_RING_NUM_EL;
@@ -543,11 +541,11 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vswp->instance = instance;
 	ddi_set_driver_private(dip, (caddr_t)vswp);
 
-	mutex_init(&vswp->hw_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&vswp->mac_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vswp->mca_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vswp->swtmout_lock, NULL, MUTEX_DRIVER, NULL);
+	rw_init(&vswp->maccl_rwlock, NULL, RW_DRIVER, NULL);
 	rw_init(&vswp->if_lockrw, NULL, RW_DRIVER, NULL);
-	rw_init(&vswp->mac_rwlock, NULL, RW_DRIVER, NULL);
 	rw_init(&vswp->mfdbrw, NULL, RW_DRIVER, NULL);
 	rw_init(&vswp->plist.lockrw, NULL, RW_DRIVER, NULL);
 
@@ -669,10 +667,9 @@ vsw_attach_fail:
 	if (progress & PROG_swmode) {
 		vsw_stop_switching_timeout(vswp);
 		vsw_hio_cleanup(vswp);
-		WRITE_ENTER(&vswp->mac_rwlock);
-		vsw_mac_detach(vswp);
+		mutex_enter(&vswp->mac_lock);
 		vsw_mac_close(vswp);
-		RW_EXIT(&vswp->mac_rwlock);
+		mutex_exit(&vswp->mac_lock);
 	}
 
 	if (progress & PROG_taskq)
@@ -697,11 +694,11 @@ vsw_attach_fail:
 	if (progress & PROG_locks) {
 		rw_destroy(&vswp->plist.lockrw);
 		rw_destroy(&vswp->mfdbrw);
-		rw_destroy(&vswp->mac_rwlock);
 		rw_destroy(&vswp->if_lockrw);
+		rw_destroy(&vswp->maccl_rwlock);
 		mutex_destroy(&vswp->swtmout_lock);
 		mutex_destroy(&vswp->mca_lock);
-		mutex_destroy(&vswp->hw_lock);
+		mutex_destroy(&vswp->mac_lock);
 	}
 
 	ddi_soft_state_free(vsw_state, instance);
@@ -736,6 +733,9 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/* Stop any pending timeout to setup switching mode. */
 	vsw_stop_switching_timeout(vswp);
 
+	/* Cleanup the interface's mac client */
+	vsw_mac_client_cleanup(vswp, NULL, VSW_LOCALDEV);
+
 	if (vswp->if_state & VSW_IF_REG) {
 		if (vsw_mac_unregister(vswp) != 0) {
 			cmn_err(CE_WARN, "!vsw%d: Unable to detach from "
@@ -746,13 +746,8 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	vsw_mdeg_unregister(vswp);
 
-	/* remove mac layer callback */
-	WRITE_ENTER(&vswp->mac_rwlock);
-	if ((vswp->mh != NULL) && (vswp->mrh != NULL)) {
-		mac_rx_remove(vswp->mh, vswp->mrh, B_TRUE);
-		vswp->mrh = NULL;
-	}
-	RW_EXIT(&vswp->mac_rwlock);
+	/* cleanup HybridIO */
+	vsw_hio_cleanup(vswp);
 
 	if (vsw_detach_ports(vswp) != 0) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to unconfigure ports",
@@ -762,24 +757,19 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	rw_destroy(&vswp->if_lockrw);
 
-	/* cleanup HybridIO */
-	vsw_hio_cleanup(vswp);
-
-	mutex_destroy(&vswp->hw_lock);
+	vsw_mac_cleanup_ports(vswp);
 
 	/*
 	 * Now that the ports have been deleted, stop and close
 	 * the physical device.
 	 */
-	WRITE_ENTER(&vswp->mac_rwlock);
-
-	vsw_mac_detach(vswp);
+	mutex_enter(&vswp->mac_lock);
 	vsw_mac_close(vswp);
+	mutex_exit(&vswp->mac_lock);
 
-	RW_EXIT(&vswp->mac_rwlock);
-
-	rw_destroy(&vswp->mac_rwlock);
+	mutex_destroy(&vswp->mac_lock);
 	mutex_destroy(&vswp->swtmout_lock);
+	rw_destroy(&vswp->maccl_rwlock);
 
 	/*
 	 * Destroy any free pools that may still exist.
@@ -936,15 +926,12 @@ vsw_get_md_physname(vsw_t *vswp, md_t *mdp, mde_cookie_t node, char *name)
 /*
  * Read the 'vsw-switch-mode' property from the specified MD node.
  *
- * Returns 0 on success and the number of modes found in 'found',
- * otherwise returns 1.
+ * Returns 0 on success, otherwise returns 1.
  */
 static int
-vsw_get_md_smodes(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
-						uint8_t *modes, int *found)
+vsw_get_md_smodes(vsw_t *vswp, md_t *mdp, mde_cookie_t node, uint8_t *mode)
 {
 	int		len = 0;
-	int		smode_num = 0;
 	char		*smode = NULL;
 	char		*curr_mode = NULL;
 
@@ -956,7 +943,6 @@ vsw_get_md_smodes(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 	 * first item in list.
 	 */
 	len = 0;
-	smode_num = 0;
 	if (md_get_prop_data(mdp, node, smode_propname,
 	    (uint8_t **)(&smode), &len) != 0) {
 		/*
@@ -965,7 +951,6 @@ vsw_get_md_smodes(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 		 */
 		cmn_err(CE_WARN, "!vsw%d: Unable to get switch mode property"
 		    " from the MD", vswp->instance);
-		*found = 0;
 		return (1);
 	}
 
@@ -979,25 +964,24 @@ vsw_get_md_smodes(vsw_t *vswp, md_t *mdp, mde_cookie_t node,
 	 * 'routed'	 - layer 3 (i.e. IP) routing, underlying HW
 	 *			in non-promiscuous mode.
 	 */
-	while ((curr_mode < (smode + len)) && (smode_num < NUM_SMODES)) {
+	while (curr_mode < (smode + len)) {
 		D2(vswp, "%s: curr_mode = [%s]", __func__, curr_mode);
 		if (strcmp(curr_mode, "switched") == 0) {
-			modes[smode_num++] = VSW_LAYER2;
+			*mode = VSW_LAYER2;
 		} else if (strcmp(curr_mode, "promiscuous") == 0) {
-			modes[smode_num++] = VSW_LAYER2_PROMISC;
+			*mode = VSW_LAYER2 | VSW_LAYER2_PROMISC;
 		} else if (strcmp(curr_mode, "routed") == 0) {
-			modes[smode_num++] = VSW_LAYER3;
+			*mode = VSW_LAYER3;
 		} else {
-			DWARN(vswp, "%s: Unknown switch mode %s, "
-			    "setting to default 'switched' mode",
-			    __func__, curr_mode);
-			modes[smode_num++] = VSW_LAYER2;
+			cmn_err(CE_WARN, "!vsw%d: Unknown switch mode %s, "
+			    "setting to default switched mode",
+			    vswp->instance, curr_mode);
+			*mode = VSW_LAYER2;
 		}
 		curr_mode += strlen(curr_mode) + 1;
 	}
-	*found = smode_num;
 
-	D2(vswp, "%s: %d modes found", __func__, smode_num);
+	D2(vswp, "%s: %d mode", __func__, *mode);
 
 	D1(vswp, "%s: exit", __func__);
 
@@ -1082,16 +1066,16 @@ vsw_m_stat(void *arg, uint_t stat, uint64_t *val)
 
 	D1(vswp, "%s: enter", __func__);
 
-	WRITE_ENTER(&vswp->mac_rwlock);
+	mutex_enter(&vswp->mac_lock);
 	if (vswp->mh == NULL) {
-		RW_EXIT(&vswp->mac_rwlock);
+		mutex_exit(&vswp->mac_lock);
 		return (EINVAL);
 	}
 
 	/* return stats from underlying device */
 	*val = mac_stat_get(vswp->mh, stat);
 
-	RW_EXIT(&vswp->mac_rwlock);
+	mutex_exit(&vswp->mac_lock);
 
 	return (0);
 }
@@ -1107,14 +1091,8 @@ vsw_m_stop(void *arg)
 	vswp->if_state &= ~VSW_IF_UP;
 	RW_EXIT(&vswp->if_lockrw);
 
-	mutex_enter(&vswp->hw_lock);
-
-	(void) vsw_unset_hw(vswp, NULL, VSW_LOCALDEV);
-
-	if (vswp->recfg_reqd)
-		vsw_reconfig_hw(vswp);
-
-	mutex_exit(&vswp->hw_lock);
+	/* Cleanup and close the mac client */
+	vsw_mac_client_cleanup(vswp, NULL, VSW_LOCALDEV);
 
 	D1(vswp, "%s: exit (state = %d)", __func__, vswp->if_state);
 }
@@ -1122,6 +1100,7 @@ vsw_m_stop(void *arg)
 static int
 vsw_m_start(void *arg)
 {
+	int		rv;
 	vsw_t		*vswp = (vsw_t *)arg;
 
 	D1(vswp, "%s: enter", __func__);
@@ -1143,9 +1122,13 @@ vsw_m_start(void *arg)
 
 	/* if in layer2 mode, program unicast address. */
 	if (vswp->mh != NULL) {
-		mutex_enter(&vswp->hw_lock);
-		(void) vsw_set_hw(vswp, NULL, VSW_LOCALDEV);
-		mutex_exit(&vswp->hw_lock);
+		/* Init a mac client and program addresses */
+		rv = vsw_mac_client_init(vswp, NULL, VSW_LOCALDEV);
+		if (rv != 0) {
+			cmn_err(CE_NOTE,
+			    "!vsw%d: failed to program interface "
+			    "unicast address\n", vswp->instance);
+		}
 	}
 
 	RW_EXIT(&vswp->if_lockrw);
@@ -1211,29 +1194,21 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 			 * Call into the underlying driver to program the
 			 * address into HW.
 			 */
-			WRITE_ENTER(&vswp->mac_rwlock);
-			if (vswp->mh != NULL) {
-				ret = mac_multicst_add(vswp->mh, mca);
-				if (ret != 0) {
-					cmn_err(CE_NOTE, "!vsw%d: unable to "
-					    "add multicast address",
-					    vswp->instance);
-					RW_EXIT(&vswp->mac_rwlock);
-					(void) vsw_del_mcst(vswp,
-					    VSW_LOCALDEV, addr, NULL);
-					kmem_free(mcst_p, sizeof (*mcst_p));
-					return (ret);
-				}
-				mcst_p->mac_added = B_TRUE;
+			ret = vsw_mac_multicast_add(vswp, NULL, mcst_p,
+			    VSW_LOCALDEV);
+			if (ret != 0) {
+				(void) vsw_del_mcst(vswp,
+				    VSW_LOCALDEV, addr, NULL);
+				kmem_free(mcst_p, sizeof (*mcst_p));
+				return (ret);
 			}
-			RW_EXIT(&vswp->mac_rwlock);
 
 			mutex_enter(&vswp->mca_lock);
 			mcst_p->nextp = vswp->mcap;
 			vswp->mcap = mcst_p;
 			mutex_exit(&vswp->mca_lock);
 		} else {
-			cmn_err(CE_NOTE, "!vsw%d: unable to add multicast "
+			cmn_err(CE_WARN, "!vsw%d: unable to add multicast "
 			    "address", vswp->instance);
 		}
 		return (ret);
@@ -1252,12 +1227,7 @@ vsw_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 		mcst_p = vsw_del_addr(VSW_LOCALDEV, vswp, addr);
 		ASSERT(mcst_p != NULL);
 
-		WRITE_ENTER(&vswp->mac_rwlock);
-		if (vswp->mh != NULL && mcst_p->mac_added) {
-			(void) mac_multicst_remove(vswp->mh, mca);
-			mcst_p->mac_added = B_FALSE;
-		}
-		RW_EXIT(&vswp->mac_rwlock);
+		vsw_mac_multicast_remove(vswp, NULL, mcst_p, VSW_LOCALDEV);
 		kmem_free(mcst_p, sizeof (*mcst_p));
 	}
 
@@ -1685,8 +1655,7 @@ vsw_readmd_exit:
 static int
 vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 {
-	int		i;
-	uint64_t 	macaddr = 0;
+	uint64_t	macaddr = 0;
 
 	D1(vswp, "%s: enter", __func__);
 
@@ -1703,17 +1672,12 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 
 	vsw_save_lmacaddr(vswp, macaddr);
 
-	if (vsw_get_md_smodes(vswp, mdp, node, vswp->smode, &vswp->smode_num)) {
+	if (vsw_get_md_smodes(vswp, mdp, node, &vswp->smode)) {
 		DWARN(vswp, "%s: Unable to read %s property from MD, "
 		    "defaulting to 'switched' mode",
 		    __func__, smode_propname);
 
-		for (i = 0; i < NUM_SMODES; i++)
-			vswp->smode[i] = VSW_LAYER2;
-
-		vswp->smode_num = NUM_SMODES;
-	} else {
-		ASSERT(vswp->smode_num != 0);
+		vswp->smode = VSW_LAYER2;
 	}
 
 	/* read mtu */
@@ -1751,7 +1715,7 @@ vsw_get_initial_md_properties(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
  */
 static void
 vsw_vlan_read_ids(void *arg, int type, md_t *mdp, mde_cookie_t node,
-	uint16_t *pvidp, uint16_t **vidspp, uint16_t *nvidsp,
+	uint16_t *pvidp, vsw_vlanid_t **vidspp, uint16_t *nvidsp,
 	uint16_t *default_idp)
 {
 	vsw_t		*vswp;
@@ -1823,11 +1787,12 @@ vsw_vlan_read_ids(void *arg, int type, md_t *mdp, mde_cookie_t node,
 
 	if (nvids != 0) {
 		D2(vswp, "%s: %s(%d): ", __func__, vid_propname, inst);
-		vids_size = sizeof (uint16_t) * nvids;
+		vids_size = sizeof (vsw_vlanid_t) * nvids;
 		*vidspp = kmem_zalloc(vids_size, KM_SLEEP);
 		for (i = 0; i < nvids; i++) {
-			(*vidspp)[i] = data[i] & 0xFFFF;
-			D2(vswp, " %d ", (*vidspp)[i]);
+			(*vidspp)[i].vl_vid = data[i] & 0xFFFF;
+			(*vidspp)[i].vl_set = B_FALSE;
+			D2(vswp, " %d ", (*vidspp)[i].vl_vid);
 		}
 		D2(vswp, "\n");
 	}
@@ -1959,35 +1924,6 @@ vsw_mtu_update(vsw_t *vswp, uint32_t mtu)
 
 		RW_EXIT(&vswp->if_lockrw);
 
-		WRITE_ENTER(&vswp->mac_rwlock);
-
-		if (vswp->mh == 0) {
-			/*
-			 * Physical device is not available yet; mtu will be
-			 * updated after we open it successfully, as we have
-			 * saved the new mtu.
-			 */
-			D2(vswp, "%s: Physical device:%s is not "
-			    "available yet; can't update its mtu\n",
-			    __func__, vswp->physname);
-
-		} else {
-
-			/*
-			 * Stop and restart to enable the
-			 * new mtu in the physical device.
-			 */
-			vsw_mac_detach(vswp);
-			rv = vsw_mac_attach(vswp);
-			if (rv != 0) {
-				RW_EXIT(&vswp->mac_rwlock);
-				return (EIO);
-			}
-
-		}
-
-		RW_EXIT(&vswp->mac_rwlock);
-
 		/* Reset ports to renegotiate with the new mtu */
 		vsw_reset_ports(vswp);
 
@@ -2014,8 +1950,8 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	char		physname[LIFNAMSIZ];
 	char		drv[LIFNAMSIZ];
 	uint_t		ddi_instance;
-	uint8_t		new_smode[NUM_SMODES];
-	int		i, smode_num = 0;
+	uint8_t		new_smode;
+	int		i;
 	uint64_t 	macaddr = 0;
 	enum		{MD_init = 0x1,
 				MD_physname = 0x2,
@@ -2025,7 +1961,7 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 				MD_mtu = 0x20} updated;
 	int		rv;
 	uint16_t	pvid;
-	uint16_t	*vids;
+	vsw_vlanid_t	*vids;
 	uint16_t	nvids;
 	uint32_t	mtu;
 
@@ -2099,25 +2035,16 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	/*
 	 * Check if switching modes have changed.
 	 */
-	if (vsw_get_md_smodes(vswp, mdp, node,
-	    new_smode, &smode_num)) {
+	if (vsw_get_md_smodes(vswp, mdp, node, &new_smode)) {
 		cmn_err(CE_WARN, "!vsw%d: Unable to read %s property from MD",
 		    vswp->instance, smode_propname);
 		goto fail_reconf;
 	} else {
-		ASSERT(smode_num != 0);
-		if (smode_num != vswp->smode_num) {
-			D2(vswp, "%s: number of modes changed from %d to %d",
-			    __func__, vswp->smode_num, smode_num);
-		}
+		if (new_smode != vswp->smode) {
+			D2(vswp, "%s: switching mode changed from %d to %d",
+			    __func__, vswp->smode, new_smode);
 
-		for (i = 0; i < smode_num; i++) {
-			if (new_smode[i] != vswp->smode[i]) {
-				D2(vswp, "%s: mode changed from %d to %d",
-				    __func__, vswp->smode[i], new_smode[i]);
-				updated |= MD_smode;
-				break;
-			}
+			updated |= MD_smode;
 		}
 	}
 
@@ -2129,7 +2056,7 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	if ((pvid != vswp->pvid) ||		/* pvid changed? */
 	    (nvids != vswp->nvids) ||		/* # of vids changed? */
 	    ((nvids != 0) && (vswp->nvids != 0) &&	/* vids changed? */
-	    bcmp(vids, vswp->vids, sizeof (uint16_t) * nvids))) {
+	    !vsw_cmp_vids(vids, vswp->vids, nvids))) {
 		updated |= MD_vlans;
 	}
 
@@ -2149,7 +2076,7 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	 * Now make any changes which are needed...
 	 */
 
-	if (updated & (MD_physname | MD_smode)) {
+	if (updated & (MD_physname | MD_smode | MD_mtu)) {
 
 		/*
 		 * Stop any pending timeout to setup switching mode.
@@ -2161,19 +2088,17 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 
 		/*
 		 * Remove unicst, mcst addrs of vsw interface
-		 * and ports from the physdev.
+		 * and ports from the physdev. This also closes
+		 * the corresponding mac clients.
 		 */
 		vsw_unset_addrs(vswp);
 
 		/*
 		 * Stop, detach and close the old device..
 		 */
-		WRITE_ENTER(&vswp->mac_rwlock);
-
-		vsw_mac_detach(vswp);
+		mutex_enter(&vswp->mac_lock);
 		vsw_mac_close(vswp);
-
-		RW_EXIT(&vswp->mac_rwlock);
+		mutex_exit(&vswp->mac_lock);
 
 		/*
 		 * Update phys name.
@@ -2189,11 +2114,15 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		 * Update array with the new switch mode values.
 		 */
 		if (updated & MD_smode) {
-			for (i = 0; i < smode_num; i++)
-				vswp->smode[i] = new_smode[i];
+			vswp->smode = new_smode;
+		}
 
-			vswp->smode_num = smode_num;
-			vswp->smode_idx = 0;
+		/* Update mtu */
+		if (updated & MD_mtu) {
+			rv = vsw_mtu_update(vswp, mtu);
+			if (rv != 0) {
+				goto fail_update;
+			}
 		}
 
 		/*
@@ -2237,24 +2166,9 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 
 		READ_ENTER(&vswp->if_lockrw);
 		if (vswp->if_state & VSW_IF_UP) {
+			/* reconfigure with new address */
+			vsw_if_mac_reconfig(vswp, B_FALSE, 0, NULL, 0);
 
-			mutex_enter(&vswp->hw_lock);
-			/*
-			 * Remove old mac address of vsw interface
-			 * from the physdev
-			 */
-			(void) vsw_unset_hw(vswp, NULL, VSW_LOCALDEV);
-			/*
-			 * Program new mac address of vsw interface
-			 * in the physdev
-			 */
-			rv = vsw_set_hw(vswp, NULL, VSW_LOCALDEV);
-			mutex_exit(&vswp->hw_lock);
-			if (rv != 0) {
-				cmn_err(CE_NOTE,
-				    "!vsw%d: failed to program interface "
-				    "unicast address\n", vswp->instance);
-			}
 			/*
 			 * Notify the MAC layer of the changed address.
 			 */
@@ -2270,32 +2184,24 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		/* Remove existing vlan ids from the hash table. */
 		vsw_vlan_remove_ids(vswp, VSW_LOCALDEV);
 
-		/* save the new vlan ids */
-		vswp->pvid = pvid;
-		if (vswp->nvids != 0) {
-			kmem_free(vswp->vids, sizeof (uint16_t) * vswp->nvids);
-			vswp->nvids = 0;
-		}
-		if (nvids != 0) {
-			vswp->nvids = nvids;
+		if (vswp->if_state & VSW_IF_UP) {
+			vsw_if_mac_reconfig(vswp, B_TRUE, pvid, vids, nvids);
+		} else {
+			if (vswp->nvids != 0) {
+				kmem_free(vswp->vids,
+				    sizeof (vsw_vlanid_t) * vswp->nvids);
+			}
 			vswp->vids = vids;
+			vswp->nvids = nvids;
+			vswp->pvid = pvid;
 		}
 
 		/* add these new vlan ids into hash table */
 		vsw_vlan_add_ids(vswp, VSW_LOCALDEV);
 	} else {
 		if (nvids != 0) {
-			kmem_free(vids, sizeof (uint16_t) * nvids);
+			kmem_free(vids, sizeof (vsw_vlanid_t) * nvids);
 		}
-	}
-
-	if (updated & MD_mtu) {
-
-		rv = vsw_mtu_update(vswp, mtu);
-		if (rv != 0) {
-			goto fail_update;
-		}
-
 	}
 
 	return;
@@ -2397,7 +2303,7 @@ vsw_port_read_props(vsw_port_t *portp, vsw_t *vswp,
 	/* now update all properties into the port */
 	portp->p_vswp = vswp;
 	portp->p_instance = inst;
-	portp->addr_set = VSW_ADDR_UNSET;
+	portp->addr_set = B_FALSE;
 	ether_copy(&ea, &portp->p_macaddr);
 	if (nchan > VSW_PORT_MAX_LDCS) {
 		D2(vswp, "%s: using first of %d ldc ids",
@@ -2466,7 +2372,7 @@ vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 	vsw_port_t	*portp;
 	boolean_t	updated_vlans = B_FALSE;
 	uint16_t	pvid;
-	uint16_t	*vids;
+	vsw_vlanid_t	*vids;
 	uint16_t	nvids;
 	uint64_t	val;
 	boolean_t	hio_enabled = B_FALSE;
@@ -2503,7 +2409,7 @@ vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 	if ((pvid != portp->pvid) ||		/* pvid changed? */
 	    (nvids != portp->nvids) ||		/* # of vids changed? */
 	    ((nvids != 0) && (portp->nvids != 0) &&	/* vids changed? */
-	    bcmp(vids, portp->vids, sizeof (uint16_t) * nvids))) {
+	    !vsw_cmp_vids(vids, portp->vids, nvids))) {
 		updated_vlans = B_TRUE;
 	}
 
@@ -2512,20 +2418,8 @@ vsw_port_update(vsw_t *vswp, md_t *curr_mdp, mde_cookie_t curr_mdex,
 		/* Remove existing vlan ids from the hash table. */
 		vsw_vlan_remove_ids(portp, VSW_VNETPORT);
 
-		/* save the new vlan ids */
-		portp->pvid = pvid;
-		if (portp->nvids != 0) {
-			kmem_free(portp->vids,
-			    sizeof (uint16_t) * portp->nvids);
-			portp->nvids = 0;
-		}
-		if (nvids != 0) {
-			portp->vids = kmem_zalloc(sizeof (uint16_t) *
-			    nvids, KM_SLEEP);
-			bcopy(vids, portp->vids, sizeof (uint16_t) * nvids);
-			portp->nvids = nvids;
-			kmem_free(vids, sizeof (uint16_t) * nvids);
-		}
+		/* Reconfigure vlans with network device */
+		vsw_mac_port_reconfig_vlans(portp, pvid, vids, nvids);
 
 		/* add these new vlan ids into hash table */
 		vsw_vlan_add_ids(portp, VSW_VNETPORT);
@@ -2627,4 +2521,24 @@ vsw_save_lmacaddr(vsw_t *vswp, uint64_t macaddr)
 		macaddr >>= 8;
 	}
 	RW_EXIT(&vswp->if_lockrw);
+}
+
+/* Compare VLAN ids, array size expected to be same. */
+static boolean_t
+vsw_cmp_vids(vsw_vlanid_t *vids1, vsw_vlanid_t *vids2, int nvids)
+{
+	int i, j;
+	uint16_t vid;
+
+	for (i = 0; i < nvids; i++) {
+		vid = vids1[i].vl_vid;
+		for (j = 0; j < nvids; j++) {
+			if (vid == vids2[i].vl_vid)
+				break;
+		}
+		if (j == nvids) {
+			return (B_FALSE);
+		}
+	}
+	return (B_TRUE);
 }

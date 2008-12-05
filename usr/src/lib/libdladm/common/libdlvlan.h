@@ -26,8 +26,6 @@
 #ifndef _LIBDLVLAN_H
 #define	_LIBDLVLAN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file includes structures, macros and routines used by VLAN link
  * administration.
@@ -43,13 +41,13 @@ typedef struct dladm_vlan_attr {
 	uint16_t	dv_vid;
 	datalink_id_t	dv_linkid;
 	boolean_t	dv_force;
-	boolean_t	dv_implicit;
 } dladm_vlan_attr_t;
 
 extern dladm_status_t	dladm_vlan_info(datalink_id_t, dladm_vlan_attr_t *,
 			    uint32_t);
 extern dladm_status_t	dladm_vlan_create(const char *, datalink_id_t,
-			    uint16_t, uint32_t);
+			    uint16_t, dladm_arg_list_t *, uint32_t,
+			    datalink_id_t *);
 extern dladm_status_t	dladm_vlan_delete(datalink_id_t, uint32_t);
 extern dladm_status_t	dladm_vlan_up(datalink_id_t);
 

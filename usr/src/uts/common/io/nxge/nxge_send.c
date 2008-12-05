@@ -40,8 +40,6 @@ static void nxge_hcksum_retrieve(mblk_t *,
     uint32_t *, uint32_t *);
 static uint32_t nxge_csgen(uint16_t *, int);
 
-extern void nxge_txdma_freemsg_task(p_tx_ring_t ringp);
-
 extern uint32_t		nxge_reclaim_pending;
 extern uint32_t 	nxge_bcopy_thresh;
 extern uint32_t 	nxge_dvma_thresh;
@@ -51,18 +49,116 @@ extern uint32_t		nxge_tx_intr_thres;
 extern uint32_t		nxge_tx_max_gathers;
 extern uint32_t		nxge_tx_tiny_pack;
 extern uint32_t		nxge_tx_use_bcopy;
-extern uint32_t		nxge_tx_lb_policy;
-extern uint32_t		nxge_no_tx_lb;
 extern nxge_tx_mode_t	nxge_tx_scheme;
 uint32_t		nxge_lso_kick_cnt = 2;
 
-typedef struct _mac_tx_hint {
-	uint16_t	sap;
-	uint16_t	vid;
-	void		*hash;
-} mac_tx_hint_t, *p_mac_tx_hint_t;
 
-int nxge_tx_lb_ring_1(p_mblk_t, uint32_t, p_mac_tx_hint_t);
+void
+nxge_tx_ring_task(void *arg)
+{
+	p_tx_ring_t	ring = (p_tx_ring_t)arg;
+
+	MUTEX_ENTER(&ring->lock);
+	(void) nxge_txdma_reclaim(ring->nxgep, ring, 0);
+	MUTEX_EXIT(&ring->lock);
+
+	if (!isLDOMguest(ring->nxgep) && !ring->tx_ring_offline)
+		mac_tx_ring_update(ring->nxgep->mach, ring->tx_ring_handle);
+#if defined(sun4v)
+	else {
+		nxge_hio_data_t *nhd =
+		    (nxge_hio_data_t *)ring->nxgep->nxge_hw_p->hio;
+		nx_vio_fp_t *vio = &nhd->hio.vio;
+
+		/* Call back vnet. */
+		if (vio->cb.vio_net_tx_update) {
+			(*vio->cb.vio_net_tx_update)(ring->nxgep->hio_vr->vhp);
+		}
+	}
+#endif
+}
+
+static void
+nxge_tx_ring_dispatch(p_tx_ring_t ring)
+{
+	/*
+	 * Kick the ring task to reclaim some buffers.
+	 */
+	(void) ddi_taskq_dispatch(ring->taskq,
+	    nxge_tx_ring_task, (void *)ring, DDI_SLEEP);
+}
+
+mblk_t *
+nxge_tx_ring_send(void *arg, mblk_t *mp)
+{
+	p_nxge_ring_handle_t	nrhp = (p_nxge_ring_handle_t)arg;
+	p_nxge_t		nxgep;
+	p_tx_ring_t		tx_ring_p;
+	int			status, channel;
+
+	ASSERT(nrhp != NULL);
+	nxgep = nrhp->nxgep;
+	channel = nxgep->pt_config.hw_config.tdc.start + nrhp->index;
+	tx_ring_p = nxgep->tx_rings->rings[channel];
+
+	ASSERT(nxgep == tx_ring_p->nxgep);
+
+#ifdef DEBUG
+	if (isLDOMservice(nxgep)) {
+		ASSERT(!tx_ring_p->tx_ring_offline);
+	}
+#endif
+
+	status = nxge_start(nxgep, tx_ring_p, mp);
+	if (status) {
+		nxge_tx_ring_dispatch(tx_ring_p);
+		return (mp);
+	}
+
+	return ((mblk_t *)NULL);
+}
+
+#if defined(sun4v)
+
+/*
+ * nxge_m_tx() is needed for Hybrid I/O operation of the vnet in
+ *	the guest domain.  See CR 6778758 for long term solution.
+ */
+
+mblk_t *
+nxge_m_tx(void *arg, mblk_t *mp)
+{
+	p_nxge_t		nxgep = (p_nxge_t)arg;
+	mblk_t			*next;
+	p_tx_ring_t		tx_ring_p;
+	int			status;
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_m_tx"));
+
+	/*
+	 * Get the default ring handle.
+	 */
+	tx_ring_p = nxgep->tx_rings->rings[0];
+
+	while (mp != NULL) {
+		next = mp->b_next;
+		mp->b_next = NULL;
+
+		status = nxge_start(nxgep, tx_ring_p, mp);
+		if (status != 0) {
+			mp->b_next = next;
+			nxge_tx_ring_dispatch(tx_ring_p);
+			return (mp);
+		}
+
+		mp = next;
+	}
+
+	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_m_tx"));
+	return ((mblk_t *)NULL);
+}
+
+#endif
 
 int
 nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
@@ -305,8 +401,6 @@ start_again:
 				    tx_ring_p->tdc));
 				goto nxge_start_fail_lso;
 			} else {
-				boolean_t skip_sched = B_FALSE;
-
 				cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
 				tdc_stats->tx_no_desc++;
 
@@ -316,16 +410,10 @@ start_again:
 						(void) atomic_swap_32(
 						    &tx_ring_p->tx_ring_offline,
 						    NXGE_TX_RING_OFFLINED);
-						skip_sched = B_TRUE;
 					}
 				}
 
 				MUTEX_EXIT(&tx_ring_p->lock);
-				if (nxgep->resched_needed &&
-				    !nxgep->resched_running && !skip_sched) {
-					nxgep->resched_running = B_TRUE;
-					ddi_trigger_softintr(nxgep->resched_id);
-				}
 				status = 1;
 				goto nxge_start_fail1;
 			}
@@ -1012,10 +1100,7 @@ nxge_start_control_header_only:
 
 	MUTEX_EXIT(&tx_ring_p->lock);
 
-	nxge_txdma_freemsg_task(tx_ring_p);
-
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_start"));
-
 	return (status);
 
 nxge_start_fail_lso:
@@ -1105,8 +1190,6 @@ nxge_start_fail2:
 			    tx_ring_p->tx_wrap_mask);
 
 		}
-
-		nxgep->resched_needed = B_TRUE;
 	}
 
 	if (isLDOMservice(nxgep)) {
@@ -1123,299 +1206,8 @@ nxge_start_fail1:
 	/* Add FMA to check the access handle nxge_hregh */
 
 	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_start"));
-
 	return (status);
 }
-
-int
-nxge_serial_tx(mblk_t *mp, void *arg)
-{
-	p_tx_ring_t		tx_ring_p = (p_tx_ring_t)arg;
-	p_nxge_t		nxgep = tx_ring_p->nxgep;
-	int			status = 0;
-
-	if (isLDOMservice(nxgep)) {
-		if (tx_ring_p->tx_ring_offline) {
-			freemsg(mp);
-			return (status);
-		}
-	}
-
-	status = nxge_start(nxgep, tx_ring_p, mp);
-	return (status);
-}
-
-boolean_t
-nxge_send(p_nxge_t nxgep, mblk_t *mp, p_mac_tx_hint_t hp)
-{
-	p_tx_ring_t 		*tx_rings;
-	uint8_t			ring_index;
-	p_tx_ring_t		tx_ring_p;
-	nxge_grp_t		*group;
-
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_send"));
-
-	ASSERT(mp->b_next == NULL);
-
-	group = nxgep->tx_set.group[0];	/* The default group */
-	ring_index = nxge_tx_lb_ring_1(mp, group->count, hp);
-
-	tx_rings = nxgep->tx_rings->rings;
-	tx_ring_p = tx_rings[group->legend[ring_index]];
-
-	if (isLDOMservice(nxgep)) {
-		if (tx_ring_p->tx_ring_offline) {
-			/*
-			 * OFFLINE means that it is in the process of being
-			 * shared - that is, it has been claimed by the HIO
-			 * code, but hasn't been unlinked from <group> yet.
-			 * So in this case use the first TDC, which always
-			 * belongs to the service domain and can't be shared.
-			 */
-			ring_index = 0;
-			tx_ring_p = tx_rings[group->legend[ring_index]];
-		}
-	}
-
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "count %d, tx_rings[%d] = %p",
-	    (int)group->count, group->legend[ring_index], tx_ring_p));
-
-	switch (nxge_tx_scheme) {
-	case NXGE_USE_START:
-		if (nxge_start(nxgep, tx_ring_p, mp)) {
-			NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_send: failed "
-			    "ring index %d", ring_index));
-			return (B_FALSE);
-		}
-		break;
-
-	case NXGE_USE_SERIAL:
-	default:
-		nxge_serialize_enter(tx_ring_p->serial, mp);
-		break;
-	}
-
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "<== nxge_send: ring index %d",
-	    ring_index));
-
-	return (B_TRUE);
-}
-
-/*
- * nxge_m_tx() - send a chain of packets
- */
-mblk_t *
-nxge_m_tx(void *arg, mblk_t *mp)
-{
-	p_nxge_t 		nxgep = (p_nxge_t)arg;
-	mblk_t 			*next;
-	mac_tx_hint_t		hint;
-
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "==> nxge_m_tx"));
-
-	if ((!(nxgep->drv_state & STATE_HW_INITIALIZED)) ||
-	    (nxgep->nxge_mac_state != NXGE_MAC_STARTED)) {
-		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		    "==> nxge_m_tx: hardware not initialized"));
-		NXGE_DEBUG_MSG((nxgep, DDI_CTL,
-		    "<== nxge_m_tx"));
-		freemsgchain(mp);
-		mp = NULL;
-		return (mp);
-	}
-
-	hint.hash =  NULL;
-	hint.vid =  0;
-	hint.sap =  0;
-
-	while (mp != NULL) {
-		next = mp->b_next;
-		mp->b_next = NULL;
-
-		/*
-		 * Until Nemo tx resource works, the mac driver
-		 * does the load balancing based on TCP port,
-		 * or CPU. For debugging, we use a system
-		 * configurable parameter.
-		 */
-		if (!nxge_send(nxgep, mp, &hint)) {
-			mp->b_next = next;
-			break;
-		}
-
-		mp = next;
-
-		NXGE_DEBUG_MSG((NULL, TX_CTL,
-		    "==> nxge_m_tx: (go back to loop) mp $%p next $%p",
-		    mp, next));
-	}
-
-	NXGE_DEBUG_MSG((nxgep, DDI_CTL, "<== nxge_m_tx"));
-	return (mp);
-}
-
-int
-nxge_tx_lb_ring_1(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
-{
-	uint8_t 		ring_index = 0;
-	uint8_t 		*tcp_port;
-	p_mblk_t 		nmp;
-	size_t 			mblk_len;
-	size_t 			iph_len;
-	size_t 			hdrs_size;
-	uint8_t			hdrs_buf[sizeof (struct  ether_vlan_header) +
-	    IP_MAX_HDR_LENGTH + sizeof (uint32_t)];
-				/*
-				 * allocate space big enough to cover
-				 * the max ip header length and the first
-				 * 4 bytes of the TCP/IP header.
-				 */
-
-	boolean_t		qos = B_FALSE;
-	ushort_t		eth_type;
-	size_t 			eth_hdr_size;
-
-	NXGE_DEBUG_MSG((NULL, TX_CTL, "==> nxge_tx_lb_ring"));
-
-	if (hp->vid) {
-		qos = B_TRUE;
-	}
-	switch (nxge_tx_lb_policy) {
-	case NXGE_TX_LB_TCPUDP: /* default IPv4 TCP/UDP */
-	default:
-		tcp_port = mp->b_rptr;
-		eth_type = ntohs(((struct ether_header *)tcp_port)->ether_type);
-		if (eth_type == VLAN_ETHERTYPE) {
-			eth_type = ntohs(((struct ether_vlan_header *)
-			    tcp_port)->ether_type);
-			eth_hdr_size = sizeof (struct ether_vlan_header);
-		} else {
-			eth_hdr_size = sizeof (struct ether_header);
-		}
-
-		if (!nxge_no_tx_lb && !qos && eth_type == ETHERTYPE_IP) {
-			nmp = mp;
-			mblk_len = MBLKL(nmp);
-			tcp_port = NULL;
-			if (mblk_len > eth_hdr_size + sizeof (uint8_t)) {
-				tcp_port = nmp->b_rptr + eth_hdr_size;
-				mblk_len -= eth_hdr_size;
-				iph_len = ((*tcp_port) & 0x0f) << 2;
-				if (mblk_len > (iph_len + sizeof (uint32_t))) {
-					tcp_port = nmp->b_rptr;
-				} else {
-					tcp_port = NULL;
-				}
-			}
-			if (tcp_port == NULL) {
-				hdrs_size = 0;
-				while ((nmp) && (hdrs_size <
-				    sizeof (hdrs_buf))) {
-					mblk_len = MBLKL(nmp);
-					if (mblk_len >=
-					    (sizeof (hdrs_buf) - hdrs_size))
-						mblk_len = sizeof (hdrs_buf) -
-						    hdrs_size;
-					bcopy(nmp->b_rptr,
-					    &hdrs_buf[hdrs_size], mblk_len);
-					hdrs_size += mblk_len;
-					nmp = nmp->b_cont;
-				}
-				tcp_port = hdrs_buf;
-			}
-			tcp_port += eth_hdr_size;
-			if (!(tcp_port[6] & 0x3f) && !(tcp_port[7] & 0xff)) {
-				switch (tcp_port[9]) {
-				case IPPROTO_TCP:
-				case IPPROTO_UDP:
-				case IPPROTO_ESP:
-					tcp_port += ((*tcp_port) & 0x0f) << 2;
-					ring_index =
-					    ((tcp_port[0] ^
-					    tcp_port[1] ^
-					    tcp_port[2] ^
-					    tcp_port[3]) % maxtdcs);
-					break;
-
-				case IPPROTO_AH:
-					/* SPI starts at the 4th byte */
-					tcp_port += ((*tcp_port) & 0x0f) << 2;
-					ring_index =
-					    ((tcp_port[4] ^
-					    tcp_port[5] ^
-					    tcp_port[6] ^
-					    tcp_port[7]) % maxtdcs);
-					break;
-
-				default:
-					ring_index = tcp_port[19] % maxtdcs;
-					break;
-				}
-			} else { /* fragmented packet */
-				ring_index = tcp_port[19] % maxtdcs;
-			}
-		} else {
-			ring_index = mp->b_band % maxtdcs;
-		}
-		break;
-
-	case NXGE_TX_LB_HASH:
-		if (hp->hash) {
-#if defined(__i386)
-			ring_index = ((uint32_t)(hp->hash) % maxtdcs);
-#else
-			ring_index = ((uint64_t)(hp->hash) % maxtdcs);
-#endif
-		} else {
-			ring_index = mp->b_band % maxtdcs;
-		}
-		break;
-
-	case NXGE_TX_LB_DEST_MAC: /* Use destination MAC address */
-		tcp_port = mp->b_rptr;
-		ring_index = tcp_port[5] % maxtdcs;
-		break;
-	}
-
-	NXGE_DEBUG_MSG((NULL, TX_CTL, "<== nxge_tx_lb_ring"));
-
-	return (ring_index);
-}
-
-uint_t
-nxge_reschedule(caddr_t arg)
-{
-	p_nxge_t nxgep;
-
-	nxgep = (p_nxge_t)arg;
-
-	NXGE_DEBUG_MSG((nxgep, TX_CTL, "==> nxge_reschedule"));
-
-	if (nxgep->nxge_mac_state == NXGE_MAC_STARTED &&
-	    nxgep->resched_needed) {
-		if (!isLDOMguest(nxgep))
-			mac_tx_update(nxgep->mach);
-#if defined(sun4v)
-		else {		/* isLDOMguest(nxgep) */
-			nxge_hio_data_t *nhd = (nxge_hio_data_t *)
-			    nxgep->nxge_hw_p->hio;
-			nx_vio_fp_t *vio = &nhd->hio.vio;
-
-			/* Call back vnet. */
-			if (vio->cb.vio_net_tx_update) {
-				(*vio->cb.vio_net_tx_update)
-				    (nxgep->hio_vr->vhp);
-			}
-		}
-#endif
-		nxgep->resched_needed = B_FALSE;
-		nxgep->resched_running = B_FALSE;
-	}
-
-	NXGE_DEBUG_MSG((NULL, TX_CTL, "<== nxge_reschedule"));
-	return (DDI_INTR_CLAIMED);
-}
-
 
 /* Software LSO starts here */
 static void

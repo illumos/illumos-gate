@@ -71,7 +71,7 @@ extern "C" {
 #include <sys/fm/util.h>
 #include <sys/fm/io/ddi.h>
 
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 
 #ifdef __amd64
@@ -397,6 +397,13 @@ typedef struct buff_ring {
 	void			*spare[4];	/* padding		*/
 } buff_ring_t;					/* 0x100 (256) bytes	*/
 
+typedef struct bge_multi_mac {
+	int		naddr;		/* total supported addresses */
+	int		naddrfree;	/* free addresses slots */
+	ether_addr_t	mac_addr[MAC_ADDRESS_REGS_MAX];
+	boolean_t	mac_addr_set[MAC_ADDRESS_REGS_MAX];
+} bge_multi_mac_t;
+
 /*
  * Software Receive (Return) Ring Control Block
  * There's one of these for each receiver return ring (up to 16).
@@ -418,7 +425,6 @@ typedef struct recv_ring {
 	volatile uint16_t	*prod_index_p;	/* (const) ptr to h/w	*/
 						/* "producer index"	*/
 						/* (in status block)	*/
-
 	/*
 	 * The rx_lock must be held when updating the h/w consumer index
 	 * mailbox register (*chip_mbox_reg), or the s/w consumer index
@@ -428,9 +434,15 @@ typedef struct recv_ring {
 						/* index mailbox offset	*/
 	kmutex_t		rx_lock[1];	/* serialize receive	*/
 	uint64_t		rx_next;	/* next slot to examine	*/
-	mac_resource_handle_t	handle;		/* per ring cookie	*/
-						/* ("producer index")	*/
+
+	mac_ring_handle_t	ring_handle;
+	mac_group_handle_t	ring_group_handle;
+	uint64_t		ring_gen_num;
+	bge_rule_info_t		*mac_addr_rule;
+	uint8_t			mac_addr_val[ETHERADDRL];
+	int			poll_flag;	/* Polling flag		*/
 } recv_ring_t;					/* 0x90 (144) bytes	*/
+
 
 /*
  * Send packet structure
@@ -528,6 +540,7 @@ typedef struct send_ring {
 
 	sw_sbd_t		*sw_sbds; 	/* software descriptors	*/
 	uint64_t		mac_resid;	/* special per resource id */
+	uint64_t		pushed_bytes;
 } send_ring_t;					/* 0x100 (256) bytes	*/
 
 typedef struct {
@@ -760,6 +773,8 @@ typedef struct bge {
 	 * Note: they're not necessarily all used.
 	 */
 	buff_ring_t		buff[BGE_BUFF_RINGS_MAX]; /*  3*0x0100	*/
+
+	/* may be obsoleted */
 	recv_ring_t		recv[BGE_RECV_RINGS_MAX]; /* 16*0x0090	*/
 	send_ring_t		send[BGE_SEND_RINGS_MAX]; /* 16*0x0100	*/
 
@@ -1158,7 +1173,8 @@ int bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive);
 int bge_chip_reset(bge_t *bgep, boolean_t enable_dma);
 int bge_chip_sync(bge_t *bgep);
 #endif
-void bge_chip_blank(void *arg, time_t ticks, uint_t count);
+void bge_chip_blank(void *arg, time_t ticks, uint_t count, int flag);
+extern mblk_t *bge_poll_ring(void *, int);
 uint_t bge_chip_factotum(caddr_t arg);
 void bge_chip_cyclic(void *arg);
 enum ioc_reply bge_chip_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp,
@@ -1222,6 +1238,7 @@ void bge_receive(bge_t *bgep, bge_status_t *bsp);
 
 /* bge_send.c */
 mblk_t *bge_m_tx(void *arg, mblk_t *mp);
+mblk_t *bge_ring_tx(void *arg, mblk_t *mp);
 void bge_recycle(bge_t *bgep, bge_status_t *bsp);
 uint_t bge_send_drain(caddr_t arg);
 

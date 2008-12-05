@@ -27,8 +27,10 @@
 #define	_SYS_AGGR_IMPL_H
 
 #include <sys/types.h>
-#include <sys/mac.h>
 #include <sys/mac_ether.h>
+#include <sys/mac_provider.h>
+#include <sys/mac_client.h>
+#include <sys/mac_client_priv.h>
 #include <sys/aggr_lacp.h>
 
 #ifdef	__cplusplus
@@ -44,6 +46,33 @@ extern "C" {
 #define	AGGR_MODIFY_MAC			0x02
 #define	AGGR_MODIFY_LACP_MODE		0x04
 #define	AGGR_MODIFY_LACP_TIMER		0x08
+
+/*
+ * Possible value of aggr_rseudo_rx_ring_t.arr_flags. Set when the ring entry
+ * in the pseudo RX group is used.
+ */
+#define	MAC_PSEUDO_RING_INUSE	0x01
+
+typedef struct aggr_unicst_addr_s {
+	uint8_t				aua_addr[ETHERADDRL];
+	struct aggr_unicst_addr_s	*aua_next;
+} aggr_unicst_addr_t;
+
+typedef struct aggr_pseudo_rx_ring_s {
+	mac_ring_handle_t	arr_rh;	/* filled in by aggr_fill_ring() */
+	struct aggr_port_s	*arr_port;
+	mac_ring_handle_t	arr_hw_rh;
+	uint_t			arr_flags;
+	uint64_t		arr_gen;
+} aggr_pseudo_rx_ring_t;
+
+typedef struct aggr_pseudo_rx_group_s {
+	struct aggr_grp_s	*arg_grp; /* filled in by aggr_fill_group() */
+	mac_group_handle_t	arg_gh;   /* filled in by aggr_fill_group() */
+	aggr_unicst_addr_t	*arg_macaddr;
+	aggr_pseudo_rx_ring_t	arg_rings[MAX_RINGS_PER_GROUP];
+	uint_t			arg_ring_cnt;
+} aggr_pseudo_rx_group_t;
 
 /*
  * A link aggregation MAC port.
@@ -63,13 +92,13 @@ typedef struct aggr_port_s {
 			lp_collector_enabled : 1,
 			lp_promisc_on : 1,
 			lp_no_link_update : 1,
-			lp_pad_bits : 27;
-	uint32_t	lp_closing;
+			lp_grp_added : 1,
+			lp_closing : 1,
+			lp_pad_bits : 25;
 	mac_handle_t	lp_mh;
+	mac_client_handle_t lp_mch;
 	const mac_info_t *lp_mip;
 	mac_notify_handle_t lp_mnh;
-	mac_rx_handle_t	lp_mrh;
-	krwlock_t	lp_lock;
 	uint_t		lp_tx_idx;		/* idx in group's tx array */
 	uint64_t	lp_ifspeed;
 	link_state_t	lp_link_state;
@@ -78,15 +107,15 @@ typedef struct aggr_port_s {
 	uint64_t	lp_ether_stat[ETHER_NSTAT];
 	aggr_lacp_port_t lp_lacp;		/* LACP state */
 	lacp_stats_t	lp_lacp_stats;
-	const mac_txinfo_t *lp_txinfo;
 	uint32_t	lp_margin;
-} aggr_port_t;
+	mac_promisc_handle_t lp_mphp;
+	mac_unicast_handle_t lp_mah;
 
-typedef struct lg_mcst_addr_s	lg_mcst_addr_t;
-struct lg_mcst_addr_s {
-	lg_mcst_addr_t	*lg_mcst_nextp;
-	uint8_t		lg_mcst_addr[MAXMACADDRLEN];
-};
+	/* List of non-primary addresses that requires promiscous mode set */
+	aggr_unicst_addr_t	*lp_prom_addr;
+	/* handle of the underlying HW RX group */
+	mac_group_handle_t	lp_hwgh;
+} aggr_port_t;
 
 /*
  * A link aggregation group.
@@ -105,7 +134,6 @@ struct lg_mcst_addr_s {
  *
  */
 typedef struct aggr_grp_s {
-	krwlock_t	lg_lock;
 	datalink_id_t	lg_linkid;
 	uint16_t	lg_key;			/* key (group port number) */
 	uint32_t	lg_refs;		/* refcount */
@@ -116,16 +144,15 @@ typedef struct aggr_grp_s {
 			lg_addr_fixed : 1,	/* fixed MAC address? */
 			lg_started : 1,		/* group started? */
 			lg_promisc : 1,		/* in promiscuous mode? */
-			lg_gldv3_polling : 1,
 			lg_zcopy : 1,
 			lg_vlan : 1,
 			lg_force : 1,
-			lg_pad_bits : 8;
+			lg_pad_bits : 9;
 	aggr_port_t	*lg_ports;		/* list of configured ports */
 	aggr_port_t	*lg_mac_addr_port;
 	mac_handle_t	lg_mh;
-	uint_t		lg_rx_resources;
 	uint_t		lg_nattached_ports;
+	krwlock_t	lg_tx_lock;
 	uint_t		lg_ntx_ports;
 	aggr_port_t	**lg_tx_ports;		/* array of tx ports */
 	uint_t		lg_tx_ports_size;	/* size of lg_tx_ports */
@@ -140,14 +167,32 @@ typedef struct aggr_grp_s {
 	uint32_t	lg_hcksum_txflags;
 	uint_t		lg_max_sdu;
 	uint32_t	lg_margin;
-	lg_mcst_addr_t	*lg_mcst_list; /* A list of multicast addresses */
-} aggr_grp_t;
 
-#define	AGGR_LACP_LOCK_WRITER(grp) rw_enter(&(grp)->aggr.gl_lock, RW_WRITER);
-#define	AGGR_LACP_UNLOCK(grp)	rw_exit(&(grp)->aggr.gl_lock);
-#define	AGGR_LACP_LOCK_HELD_WRITER(grp)	RW_WRITE_HELD(&(grp)->aggr.gl_lock)
-#define	AGGR_LACP_LOCK_READER(grp) rw_enter(&(grp)->aggr.gl_lock, RW_READER);
-#define	AGGR_LACP_LOCK_HELD_READER(grp) RW_READ_HELD(&(grp)->aggr.gl_lock)
+	/*
+	 * The following fields are used by the LACP packets processing.
+	 * Specifically, as the LACP packets processing is not performance
+	 * critical, all LACP packets will be handled by a dedicated thread
+	 * instead of in the mac_rx() call. This is to avoid the dead lock
+	 * with mac_unicast_remove(), which holding the mac perimeter of the
+	 * aggr, and wait for the mr_refcnt of the RX ring to drop to zero.
+	 */
+	kmutex_t	lg_lacp_lock;
+	kcondvar_t	lg_lacp_cv;
+	mblk_t		*lg_lacp_head;
+	mblk_t		*lg_lacp_tail;
+	kthread_t	*lg_lacp_rx_thread;
+	boolean_t	lg_lacp_done;
+	aggr_pseudo_rx_group_t	lg_rx_group;
+
+	/*
+	 * The following fields are used by aggr to wait for all the
+	 * aggr_port_notify_cb() and aggr_port_timer_thread() to finish
+	 * before it calls mac_unregister() when the aggr is deleted.
+	 */
+	kmutex_t	lg_port_lock;
+	kcondvar_t	lg_port_cv;
+	int		lg_port_ref;
+} aggr_grp_t;
 
 #define	AGGR_GRP_REFHOLD(grp) {			\
 	atomic_add_32(&(grp)->lg_refs, 1);	\
@@ -195,33 +240,34 @@ extern int aggr_grp_info(datalink_id_t, void *, aggr_grp_info_new_grp_fn_t,
     aggr_grp_info_new_port_fn_t);
 extern void aggr_grp_notify(aggr_grp_t *, uint32_t);
 extern boolean_t aggr_grp_attach_port(aggr_grp_t *, aggr_port_t *);
-extern boolean_t aggr_grp_detach_port(aggr_grp_t *, aggr_port_t *, boolean_t);
+extern boolean_t aggr_grp_detach_port(aggr_grp_t *, aggr_port_t *);
 extern void aggr_grp_port_mac_changed(aggr_grp_t *, aggr_port_t *,
     boolean_t *, boolean_t *);
 extern int aggr_grp_add_ports(datalink_id_t, uint_t, boolean_t,
     laioc_port_t *);
 extern int aggr_grp_rem_ports(datalink_id_t, uint_t, laioc_port_t *);
 extern boolean_t aggr_grp_update_ports_mac(aggr_grp_t *);
-extern int aggr_grp_modify(datalink_id_t, aggr_grp_t *, uint8_t, uint32_t,
-    boolean_t, const uchar_t *, aggr_lacp_mode_t, aggr_lacp_timer_t);
+extern int aggr_grp_modify(datalink_id_t, uint8_t, uint32_t, boolean_t,
+    const uchar_t *, aggr_lacp_mode_t, aggr_lacp_timer_t);
 extern void aggr_grp_multicst_port(aggr_port_t *, boolean_t);
 extern uint_t aggr_grp_count(void);
 
 extern void aggr_port_init(void);
 extern void aggr_port_fini(void);
-extern int aggr_port_create(const datalink_id_t, boolean_t, aggr_port_t **);
+extern int aggr_port_create(aggr_grp_t *, const datalink_id_t, boolean_t,
+    aggr_port_t **);
 extern void aggr_port_delete(aggr_port_t *);
 extern void aggr_port_free(aggr_port_t *);
 extern int aggr_port_start(aggr_port_t *);
 extern void aggr_port_stop(aggr_port_t *);
 extern int aggr_port_promisc(aggr_port_t *, boolean_t);
-extern int aggr_port_unicst(aggr_port_t *, uint8_t *);
+extern int aggr_port_unicst(aggr_port_t *);
 extern int aggr_port_multicst(void *, boolean_t, const uint8_t *);
 extern uint64_t aggr_port_stat(aggr_port_t *, uint_t);
-extern boolean_t aggr_port_notify_link(aggr_grp_t *, aggr_port_t *, boolean_t);
+extern boolean_t aggr_port_notify_link(aggr_grp_t *, aggr_port_t *);
 extern void aggr_port_init_callbacks(aggr_port_t *);
 
-extern void aggr_recv_cb(void *, mac_resource_handle_t, mblk_t *);
+extern void aggr_recv_cb(void *, mac_resource_handle_t, mblk_t *, boolean_t);
 
 extern mblk_t *aggr_m_tx(void *, mblk_t *);
 extern void aggr_send_port_enable(aggr_port_t *);
@@ -236,10 +282,20 @@ extern void aggr_lacp_set_mode(aggr_grp_t *, aggr_lacp_mode_t,
     aggr_lacp_timer_t);
 extern void aggr_lacp_update_mode(aggr_grp_t *, aggr_lacp_mode_t);
 extern void aggr_lacp_update_timer(aggr_grp_t *, aggr_lacp_timer_t);
-extern void aggr_lacp_rx(aggr_port_t *, mblk_t *);
+extern void aggr_lacp_rx_enqueue(aggr_port_t *, mblk_t *);
 extern void aggr_lacp_port_attached(aggr_port_t *);
 extern void aggr_lacp_port_detached(aggr_port_t *);
-extern void aggr_lacp_policy_changed(aggr_grp_t *);
+extern void aggr_port_lacp_set_mode(aggr_grp_t *, aggr_port_t *);
+
+extern void aggr_lacp_rx_thread(void *);
+extern void aggr_recv_lacp(aggr_port_t *, mac_resource_handle_t, mblk_t *);
+
+extern void aggr_grp_port_hold(aggr_port_t *);
+extern void aggr_grp_port_rele(aggr_port_t *);
+extern void aggr_grp_port_wait(aggr_grp_t *);
+
+extern int aggr_port_addmac(aggr_port_t *, const uint8_t *);
+extern void aggr_port_remmac(aggr_port_t *, const uint8_t *);
 
 #endif	/* _KERNEL */
 

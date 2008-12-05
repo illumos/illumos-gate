@@ -36,17 +36,16 @@ extern "C" {
 #define	MAXLINELEN		1024
 #define	BUFLEN(lim, ptr)	(((lim) > (ptr)) ? ((lim) - (ptr)) : 0)
 
-typedef struct val_desc {
-	char		*vd_name;
-	uintptr_t	vd_val;
-} val_desc_t;
-
-#define	VALCNT(vals)	(sizeof ((vals)) / sizeof (val_desc_t))
-
 extern dladm_status_t	dladm_errno2status(int);
 extern dladm_status_t   i_dladm_rw_db(const char *, mode_t,
 			    dladm_status_t (*)(void *, FILE *, FILE *),
 			    void *, boolean_t);
+
+extern const char	*dladm_pri2str(mac_priority_level_t, char *);
+extern dladm_status_t	dladm_str2pri(char *, mac_priority_level_t *);
+extern dladm_status_t	dladm_parse_args(char *, dladm_arg_list_t **,
+			    boolean_t);
+extern void		dladm_free_args(dladm_arg_list_t *);
 
 /*
  * Link attributes persisted by dlmgmtd.
@@ -65,10 +64,63 @@ extern dladm_status_t   i_dladm_rw_db(const char *, mode_t,
 #define	FPORTS		"portnames"	/* string */
 #define	FPOLICY		"policy"	/* uint64_t */
 #define	FFIXMACADDR	"fix_macaddr"	/* boolean_t */
-#define	FMACADDR	"macaddr"	/* string */
 #define	FFORCE		"force"		/* boolean_t */
 #define	FLACPMODE	"lacp_mode"	/* uint64_t */
 #define	FLACPTIMER	"lacp_timer"	/* uint64_t */
+
+/*
+ * Set for VNICs only
+ */
+#define	FMADDRTYPE	"maddrtype"	/* uint64_t */
+#define	FMADDRLEN	"maddrlen"	/* uint64_t */
+#define	FMADDRSLOT	"maddrslot"	/* uint64_t */
+#define	FMADDRPREFIXLEN	"maddrpreflen"	/* uint64_t */
+#define	FHWRINGS	"hwrings"	/* boolean_t */
+
+/*
+ * Common fields
+ */
+#define	FMACADDR	"macaddr"	/* string */
+
+/*
+ * Data structures used for implementing temporary properties
+ */
+
+typedef struct val_desc {
+	char		*vd_name;
+	uintptr_t	vd_val;
+} val_desc_t;
+
+#define	VALCNT(vals)	(sizeof ((vals)) / sizeof (val_desc_t))
+
+extern dladm_status_t	dladm_link_proplist_extract(dladm_arg_list_t *,
+			    mac_resource_props_t *);
+
+extern dladm_status_t	dladm_flow_proplist_extract(dladm_arg_list_t *,
+			    mac_resource_props_t *);
+
+/*
+ * The prop extract() callback.
+ *
+ * rp_extract extracts the kernel structure from the val_desc_t created
+ * by the pd_check function.
+ */
+typedef	dladm_status_t	rp_extractf_t(val_desc_t *propval, void *arg,
+				uint_t cnt);
+extern rp_extractf_t	do_extract_maxbw, do_extract_priority,
+			do_extract_cpus;
+
+typedef struct resource_prop_s {
+	/*
+	 * resource property name
+	 */
+	char		*rp_name;
+
+	/*
+	 * callback to extract kernel structure
+	 */
+	rp_extractf_t	*rp_extract;
+} resource_prop_t;
 
 #ifdef	__cplusplus
 }

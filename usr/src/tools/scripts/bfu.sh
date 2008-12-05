@@ -666,7 +666,7 @@ inetd_conf_svm_hack() {
 }
 
 upgrade_aggr_and_linkprop () {
-	# Since aggregation.conf and linkprop.conf are upgraded by
+	# Since aggregation.conf and linkprop.conf are upgraded by 
 	# SUNWcnetr's postinstall script, put the relevant portions of the
 	# postinstall script here, modified to rename the old files instead
 	# of removing them.
@@ -754,6 +754,30 @@ upgrade_aggr_and_linkprop () {
 		done
 		mv $ORIG $ORIG.bak
 	fi
+}
+
+upgrade_vlan () {
+	# Convert hostname.*** and zonecfg vlan configurations
+	UPGRADE_SCRIPT=/var/svc/profile/upgrade_datalink
+
+	for ifname in $host_ifs $zone_ifs
+	do
+		phys=`echo $ifname | sed "s/[0-9]*$//"`
+		devnum=`echo $ifname | sed "s/$phys//g"`
+		if [ "$phys$devnum" != $ifname -o \
+		    -n "`echo $devnum | tr -d '[0-9]'`" ]; then
+			echo "skipping invalid interface $ifname"
+			continue
+		fi
+
+		vid=`expr $devnum / 1000`
+		inst=`expr $devnum % 1000`
+
+		if [ "$vid" != "0" ]; then
+			echo dladm create-vlan -l $phys$inst -v $vid $ifname \
+			    >> $rootprefix$UPGRADE_SCRIPT
+		fi
+	done
 }
 
 # Update aac.conf for set legacy-name-enable properly
@@ -1171,6 +1195,24 @@ migrate_acctadm_conf()
 		if [ $ACCTADM_TASK_ENABLE = "yes" -o \
 		    $ACCTADM_TASK_FILE != "none" -o \
 		    $ACCTADM_TASK_TRACKED != "none" ]; then
+			svcadm enable $fmri
+		fi
+
+		fmri="svc:/system/extended-accounting:net"
+		svccfg -s $fmri setprop config/file = \
+		    ${ACCTADM_NET_FILE:="none"}
+		svccfg -s $fmri setprop config/tracked = \
+		    ${ACCTADM_NET_TRACKED:="none"}
+		svccfg -s $fmri setprop config/untracked = \
+		    ${ACCTADM_NET_UNTRACKED:="extended"}
+		if [ ${ACCTADM_NET_ENABLE:="no"} = "yes" ]; then
+			svccfg -s $fmri setprop config/enabled = "true"
+		else
+			svccfg -s $fmri setprop config/enabled = "false"
+		fi
+		if [ $ACCTADM_NET_ENABLE = "yes" -o \
+		    $ACCTADM_NET_FILE != "none" -o \
+		    $ACCTADM_NET_TRACKED != "none" ]; then
 			svcadm enable $fmri
 		fi
 
@@ -4762,6 +4804,28 @@ then
 	fi
 
 	#
+	# save vlans associated with zones to be upgraded 
+	# to the new dladm based format
+	#
+	flowadm_status="old"
+	if [[ ! -f $root/sbin/flowadm ]] && \
+	    archive_file_exists generic.sbin "sbin/flowadm"; then
+		flowadm_status="new"
+		host_ifs=`ls -1 $rootprefix/etc | egrep -e \
+	  	  '^hostname.|^hostname6.|^dhcp.'|  cut -d . -f2 | sort -u` 
+		zones=`zoneadm list -c | grep -v global`
+		for zone in $zones
+		do
+			zonecfg -z $zone info ip-type | grep exclusive \
+			    >/dev/null
+			if [ $? -eq 0 ]; then
+				zif=`zonecfg -z $zone info net | \
+				    grep physical | nawk '{print $2}'`
+				zone_ifs="$zone_ifs $zif"
+			fi
+		done
+	fi
+	#
 	# Stop sendmail so that mail doesn't bounce during the interval
 	# where /etc/mail/aliases is (effectively) empty.
 	#
@@ -7593,6 +7657,7 @@ mondo_loop() {
 	#
 	rm -f $root/usr/lib/rcm/modules/SUNW_vlan_rcm.so
 	rm -f $root/usr/lib/rcm/modules/SUNW_aggr_rcm.so
+	rm -f $root/usr/lib/rcm/modules/SUNW_vnic_rcm.so
 	rm -f $root/kernel/drv/softmac
 	rm -f $root/kernel/drv/sparcv9/softmac
 	rm -f $root/kernel/drv/amd64/softmac
@@ -8075,6 +8140,11 @@ mondo_loop() {
 				chgrp sys $aggr_old
 				rm -rf $rootprefix/etc/dladm
 			fi
+		fi
+
+		# upgrade hostname and zones based vlans to dladm 
+		if [[ $flowadm_status == "new" ]]; then
+			upgrade_vlan
 		fi
 
 		# The global zone needs to have its /dev/dld symlink created

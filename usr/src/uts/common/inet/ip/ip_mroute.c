@@ -28,8 +28,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Procedures for the kernel part of DVMRP,
  * a Distance-Vector Multicast Routing Protocol.
@@ -683,7 +681,7 @@ ip_mrouter_done(mblk_t *mp, ip_stack_t *ipst)
 					vifp->v_marks &= ~VIF_MARK_GOOD;
 					vifp->v_marks |= VIF_MARK_CONDEMNED;
 					mutex_exit(&(vifp)->v_lock);
-					suc = ipsq_enter(ill, B_FALSE);
+					suc = ipsq_enter(ill, B_FALSE, NEW_OP);
 					ipsq = ill->ill_phyint->phyint_ipsq;
 				} else {
 					ipsq = ipsq_try_enter(ipif, NULL,

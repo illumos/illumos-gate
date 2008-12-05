@@ -222,11 +222,6 @@ softmac_close(queue_t *rq)
 	slp->sl_softmac = NULL;
 	slp->sl_lh = NULL;
 
-	/*
-	 * slp->sl_handle could be non-NULL if it is in the aggregation.
-	 */
-	slp->sl_handle = (mac_resource_handle_t)NULL;
-
 	ASSERT(slp->sl_ack_mp == NULL);
 	ASSERT(slp->sl_ctl_inprogress == B_FALSE);
 	ASSERT(slp->sl_pending_prim == DL_PRIM_INVAL);
@@ -266,6 +261,16 @@ softmac_rput(queue_t *rq, mblk_t *mp)
 		}
 
 		/*
+		 * If this message is looped back from the legacy devices,
+		 * drop it as the Nemo framework will be responsible for
+		 * looping it back by the mac_txloop() function.
+		 */
+		if (mp->b_flag & MSGNOLOOP) {
+			freemsg(mp);
+			return;
+		}
+
+		/*
 		 * This is the most common case.
 		 */
 		if (DB_REF(mp) == 1) {
@@ -276,7 +281,7 @@ softmac_rput(queue_t *rq, mblk_t *mp)
 			 * is reset to NULL when DL_CAPAB_POLL is
 			 * disabled.
 			 */
-			mac_rx(slp->sl_softmac->smac_mh, slp->sl_handle, mp);
+			mac_rx(slp->sl_softmac->smac_mh, NULL, mp);
 			return;
 		} else {
 			softmac_rput_process_data(slp, mp);

@@ -26,7 +26,9 @@
 
 #include "bge_impl.h"
 #include <sys/sdt.h>
+#include <sys/mac_provider.h>
 #include <sys/mac.h>
+#include <sys/mac_flow.h>
 
 /*
  * This is the string displayed by modinfo, etc.
@@ -52,6 +54,7 @@ static char default_mtu[] = "default_mtu";
 
 static int bge_add_intrs(bge_t *, int);
 static void bge_rem_intrs(bge_t *);
+static int bge_unicst_set(void *, const uint8_t *, int);
 
 /*
  * Describes the chip's DMA engine
@@ -104,16 +107,10 @@ static int		bge_m_start(void *);
 static void		bge_m_stop(void *);
 static int		bge_m_promisc(void *, boolean_t);
 static int		bge_m_multicst(void *, boolean_t, const uint8_t *);
-static int		bge_m_unicst(void *, const uint8_t *);
-static void		bge_m_resources(void *);
 static void		bge_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t	bge_m_getcapab(void *, mac_capab_t, void *);
 static int		bge_unicst_set(void *, const uint8_t *,
-    mac_addr_slot_t);
-static int		bge_m_unicst_add(void *, mac_multi_addr_t *);
-static int		bge_m_unicst_remove(void *, mac_addr_slot_t);
-static int		bge_m_unicst_modify(void *, mac_multi_addr_t *);
-static int		bge_m_unicst_get(void *, mac_multi_addr_t *);
+    int);
 static int		bge_m_setprop(void *, const char *, mac_prop_id_t,
     uint_t, const void *);
 static int		bge_m_getprop(void *, const char *, mac_prop_id_t,
@@ -123,8 +120,7 @@ static int		bge_set_priv_prop(bge_t *, const char *, uint_t,
 static int		bge_get_priv_prop(bge_t *, const char *, uint_t,
     uint_t, void *);
 
-#define	BGE_M_CALLBACK_FLAGS\
-	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+#define	BGE_M_CALLBACK_FLAGS (MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
 static mac_callbacks_t bge_m_callbacks = {
 	BGE_M_CALLBACK_FLAGS,
@@ -133,9 +129,8 @@ static mac_callbacks_t bge_m_callbacks = {
 	bge_m_stop,
 	bge_m_promisc,
 	bge_m_multicst,
-	bge_m_unicst,
+	NULL,
 	bge_m_tx,
-	bge_m_resources,
 	bge_m_ioctl,
 	bge_m_getcapab,
 	NULL,
@@ -152,6 +147,7 @@ mac_priv_prop_t bge_priv_prop[] = {
 #define	BGE_MAX_PRIV_PROPS \
 	(sizeof (bge_priv_prop) / sizeof (mac_priv_prop_t))
 
+uint8_t zero_addr[6] = {0, 0, 0, 0, 0, 0};
 /*
  * ========== Transmit and receive ring reinitialisation ==========
  */
@@ -590,23 +586,10 @@ bge_m_start(void *arg)
 }
 
 /*
- *	bge_m_unicst() -- set the physical network address
- */
-static int
-bge_m_unicst(void *arg, const uint8_t *macaddr)
-{
-	/*
-	 * Request to set address in
-	 * address slot 0, i.e., default address
-	 */
-	return (bge_unicst_set(arg, macaddr, 0));
-}
-
-/*
  *	bge_unicst_set() -- set the physical network address
  */
 static int
-bge_unicst_set(void *arg, const uint8_t *macaddr, mac_addr_slot_t slot)
+bge_unicst_set(void *arg, const uint8_t *macaddr, int slot)
 {
 	bge_t *bgep = arg;		/* private device info	*/
 
@@ -687,160 +670,6 @@ bge_unicst_set(void *arg, const uint8_t *macaddr, mac_addr_slot_t slot)
 		ddi_fm_service_impact(bgep->devinfo, DDI_SERVICE_DEGRADED);
 		mutex_exit(bgep->genlock);
 		return (EIO);
-	}
-	mutex_exit(bgep->genlock);
-
-	return (0);
-}
-
-/*
- * The following four routines are used as callbacks for multiple MAC
- * address support:
- *    -  bge_m_unicst_add(void *, mac_multi_addr_t *);
- *    -  bge_m_unicst_remove(void *, mac_addr_slot_t);
- *    -  bge_m_unicst_modify(void *, mac_multi_addr_t *);
- *    -  bge_m_unicst_get(void *, mac_multi_addr_t *);
- */
-
-/*
- * bge_m_unicst_add() - will find an unused address slot, set the
- * address value to the one specified, reserve that slot and enable
- * the NIC to start filtering on the new MAC address.
- * address slot. Returns 0 on success.
- */
-static int
-bge_m_unicst_add(void *arg, mac_multi_addr_t *maddr)
-{
-	bge_t *bgep = arg;		/* private device info	*/
-	mac_addr_slot_t slot;
-	int err;
-
-	if (mac_unicst_verify(bgep->mh,
-	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE)
-		return (EINVAL);
-
-	mutex_enter(bgep->genlock);
-	if (bgep->unicst_addr_avail == 0) {
-		/* no slots available */
-		mutex_exit(bgep->genlock);
-		return (ENOSPC);
-	}
-
-	/*
-	 * Primary/default address is in slot 0. The next three
-	 * addresses are the multiple MAC addresses. So multiple
-	 * MAC address 0 is in slot 1, 1 in slot 2, and so on.
-	 * So the first multiple MAC address resides in slot 1.
-	 */
-	for (slot = 1; slot < bgep->unicst_addr_total; slot++) {
-		if (bgep->curr_addr[slot].set == B_FALSE) {
-			bgep->curr_addr[slot].set = B_TRUE;
-			break;
-		}
-	}
-
-	ASSERT(slot < bgep->unicst_addr_total);
-	bgep->unicst_addr_avail--;
-	mutex_exit(bgep->genlock);
-	maddr->mma_slot = slot;
-
-	if ((err = bge_unicst_set(bgep, maddr->mma_addr, slot)) != 0) {
-		mutex_enter(bgep->genlock);
-		bgep->curr_addr[slot].set = B_FALSE;
-		bgep->unicst_addr_avail++;
-		mutex_exit(bgep->genlock);
-	}
-	return (err);
-}
-
-/*
- * bge_m_unicst_remove() - removes a MAC address that was added by a
- * call to bge_m_unicst_add(). The slot number that was returned in
- * add() is passed in the call to remove the address.
- * Returns 0 on success.
- */
-static int
-bge_m_unicst_remove(void *arg, mac_addr_slot_t slot)
-{
-	bge_t *bgep = arg;		/* private device info	*/
-
-	if (slot <= 0 || slot >= bgep->unicst_addr_total)
-		return (EINVAL);
-
-	mutex_enter(bgep->genlock);
-	if (bgep->curr_addr[slot].set == B_TRUE) {
-		bgep->curr_addr[slot].set = B_FALSE;
-		bgep->unicst_addr_avail++;
-		mutex_exit(bgep->genlock);
-		/*
-		 * Copy the default address to the passed slot
-		 */
-		return (bge_unicst_set(bgep, bgep->curr_addr[0].addr, slot));
-	}
-	mutex_exit(bgep->genlock);
-	return (EINVAL);
-}
-
-/*
- * bge_m_unicst_modify() - modifies the value of an address that
- * has been added by bge_m_unicst_add(). The new address, address
- * length and the slot number that was returned in the call to add
- * should be passed to bge_m_unicst_modify(). mma_flags should be
- * set to 0. Returns 0 on success.
- */
-static int
-bge_m_unicst_modify(void *arg, mac_multi_addr_t *maddr)
-{
-	bge_t *bgep = arg;		/* private device info	*/
-	mac_addr_slot_t slot;
-
-	if (mac_unicst_verify(bgep->mh,
-	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE)
-		return (EINVAL);
-
-	slot = maddr->mma_slot;
-
-	if (slot <= 0 || slot >= bgep->unicst_addr_total)
-		return (EINVAL);
-
-	mutex_enter(bgep->genlock);
-	if (bgep->curr_addr[slot].set == B_TRUE) {
-		mutex_exit(bgep->genlock);
-		return (bge_unicst_set(bgep, maddr->mma_addr, slot));
-	}
-	mutex_exit(bgep->genlock);
-
-	return (EINVAL);
-}
-
-/*
- * bge_m_unicst_get() - will get the MAC address and all other
- * information related to the address slot passed in mac_multi_addr_t.
- * mma_flags should be set to 0 in the call.
- * On return, mma_flags can take the following values:
- * 1) MMAC_SLOT_UNUSED
- * 2) MMAC_SLOT_USED | MMAC_VENDOR_ADDR
- * 3) MMAC_SLOT_UNUSED | MMAC_VENDOR_ADDR
- * 4) MMAC_SLOT_USED
- */
-static int
-bge_m_unicst_get(void *arg, mac_multi_addr_t *maddr)
-{
-	bge_t *bgep = arg;		/* private device info	*/
-	mac_addr_slot_t slot;
-
-	slot = maddr->mma_slot;
-
-	if (slot <= 0 || slot >= bgep->unicst_addr_total)
-		return (EINVAL);
-
-	mutex_enter(bgep->genlock);
-	if (bgep->curr_addr[slot].set == B_TRUE) {
-		ethaddr_copy(bgep->curr_addr[slot].addr,
-		    maddr->mma_addr);
-		maddr->mma_flags = MMAC_SLOT_USED;
-	} else {
-		maddr->mma_flags = MMAC_SLOT_UNUSED;
 	}
 	mutex_exit(bgep->genlock);
 
@@ -1576,6 +1405,295 @@ bge_m_promisc(void *arg, boolean_t on)
 	return (0);
 }
 
+/*
+ * Find the slot for the specified unicast address
+ */
+int
+bge_unicst_find(bge_t *bgep, const uint8_t *mac_addr)
+{
+	int slot;
+
+	ASSERT(mutex_owned(bgep->genlock));
+
+	for (slot = 0; slot < bgep->unicst_addr_total; slot++) {
+		if (bcmp(bgep->curr_addr[slot].addr, mac_addr, ETHERADDRL) == 0)
+			return (slot);
+	}
+
+	return (-1);
+}
+
+/*
+ * Programs the classifier to start steering packets matching 'mac_addr' to the
+ * specified ring 'arg'.
+ */
+static int
+bge_addmac(void *arg, const uint8_t *mac_addr)
+{
+	recv_ring_t *rrp = (recv_ring_t *)arg;
+	bge_t		*bgep = rrp->bgep;
+	bge_recv_rule_t	*rulep = bgep->recv_rules;
+	bge_rule_info_t	*rinfop = NULL;
+	uint8_t		ring = (uint8_t)(rrp - bgep->recv) + 1;
+	int		i;
+	uint16_t	tmp16;
+	uint32_t	tmp32;
+	int		slot;
+	int		err;
+
+	mutex_enter(bgep->genlock);
+	if (bgep->unicst_addr_avail == 0) {
+		mutex_exit(bgep->genlock);
+		return (ENOSPC);
+	}
+
+	/*
+	 * First add the unicast address to a available slot.
+	 */
+	slot = bge_unicst_find(bgep, mac_addr);
+	ASSERT(slot == -1);
+
+	for (slot = 0; slot < bgep->unicst_addr_total; slot++) {
+		if (!bgep->curr_addr[slot].set) {
+			bgep->curr_addr[slot].set = B_TRUE;
+			break;
+		}
+	}
+
+	ASSERT(slot < bgep->unicst_addr_total);
+	bgep->unicst_addr_avail--;
+	mutex_exit(bgep->genlock);
+
+	if ((err = bge_unicst_set(bgep, mac_addr, slot)) != 0)
+		goto fail;
+
+	/* A rule is already here. Deny this.  */
+	if (rrp->mac_addr_rule != NULL) {
+		err = ether_cmp(mac_addr, rrp->mac_addr_val) ? EEXIST : EBUSY;
+		goto fail;
+	}
+
+	/*
+	 * Allocate a bge_rule_info_t to keep track of which rule slots
+	 * are being used.
+	 */
+	rinfop = kmem_zalloc(sizeof (bge_rule_info_t), KM_NOSLEEP);
+	if (rinfop == NULL) {
+		err = ENOMEM;
+		goto fail;
+	}
+
+	/*
+	 * Look for the starting slot to place the rules.
+	 * The two slots we reserve must be contiguous.
+	 */
+	for (i = 0; i + 1 < RECV_RULES_NUM_MAX; i++)
+		if ((rulep[i].control & RECV_RULE_CTL_ENABLE) == 0 &&
+		    (rulep[i+1].control & RECV_RULE_CTL_ENABLE) == 0)
+			break;
+
+	ASSERT(i + 1 < RECV_RULES_NUM_MAX);
+
+	bcopy(mac_addr, &tmp32, sizeof (tmp32));
+	rulep[i].mask_value = ntohl(tmp32);
+	rulep[i].control = RULE_DEST_MAC_1(ring) | RECV_RULE_CTL_AND;
+	bge_reg_put32(bgep, RECV_RULE_MASK_REG(i), rulep[i].mask_value);
+	bge_reg_put32(bgep, RECV_RULE_CONTROL_REG(i), rulep[i].control);
+
+	bcopy(mac_addr + 4, &tmp16, sizeof (tmp16));
+	rulep[i+1].mask_value = 0xffff0000 | ntohs(tmp16);
+	rulep[i+1].control = RULE_DEST_MAC_2(ring);
+	bge_reg_put32(bgep, RECV_RULE_MASK_REG(i+1), rulep[i+1].mask_value);
+	bge_reg_put32(bgep, RECV_RULE_CONTROL_REG(i+1), rulep[i+1].control);
+	rinfop->start = i;
+	rinfop->count = 2;
+
+	rrp->mac_addr_rule = rinfop;
+	bcopy(mac_addr, rrp->mac_addr_val, ETHERADDRL);
+
+	return (0);
+
+fail:
+	/* Clear the address just set */
+	(void) bge_unicst_set(bgep, zero_addr, slot);
+	mutex_enter(bgep->genlock);
+	bgep->curr_addr[slot].set = B_FALSE;
+	bgep->unicst_addr_avail++;
+	mutex_exit(bgep->genlock);
+
+	return (err);
+}
+
+/*
+ * Stop classifying packets matching the MAC address to the specified ring.
+ */
+static int
+bge_remmac(void *arg, const uint8_t *mac_addr)
+{
+	recv_ring_t	*rrp = (recv_ring_t *)arg;
+	bge_t		*bgep = rrp->bgep;
+	bge_recv_rule_t *rulep = bgep->recv_rules;
+	bge_rule_info_t *rinfop = rrp->mac_addr_rule;
+	int		start;
+	int		slot;
+	int		err;
+
+	/*
+	 * Remove the MAC address from its slot.
+	 */
+	mutex_enter(bgep->genlock);
+	slot = bge_unicst_find(bgep, mac_addr);
+	if (slot == -1) {
+		mutex_exit(bgep->genlock);
+		return (EINVAL);
+	}
+
+	ASSERT(bgep->curr_addr[slot].set);
+	mutex_exit(bgep->genlock);
+
+	if ((err = bge_unicst_set(bgep, zero_addr, slot)) != 0)
+		return (err);
+
+	if (rinfop == NULL || ether_cmp(mac_addr, rrp->mac_addr_val) != 0)
+		return (EINVAL);
+
+	start = rinfop->start;
+	rulep[start].mask_value = 0;
+	rulep[start].control = 0;
+	bge_reg_put32(bgep, RECV_RULE_MASK_REG(start), rulep[start].mask_value);
+	bge_reg_put32(bgep, RECV_RULE_CONTROL_REG(start), rulep[start].control);
+	start++;
+	rulep[start].mask_value = 0;
+	rulep[start].control = 0;
+	bge_reg_put32(bgep, RECV_RULE_MASK_REG(start), rulep[start].mask_value);
+	bge_reg_put32(bgep, RECV_RULE_CONTROL_REG(start), rulep[start].control);
+
+	kmem_free(rinfop, sizeof (bge_rule_info_t));
+	rrp->mac_addr_rule = NULL;
+	bzero(rrp->mac_addr_val, ETHERADDRL);
+
+	mutex_enter(bgep->genlock);
+	bgep->curr_addr[slot].set = B_FALSE;
+	bgep->unicst_addr_avail++;
+	mutex_exit(bgep->genlock);
+
+	return (0);
+}
+
+static int
+bge_flag_intr_enable(mac_intr_handle_t ih)
+{
+	recv_ring_t *rrp = (recv_ring_t *)ih;
+	bge_t *bgep = rrp->bgep;
+
+	mutex_enter(bgep->genlock);
+	rrp->poll_flag = 0;
+	mutex_exit(bgep->genlock);
+
+	return (0);
+}
+
+static int
+bge_flag_intr_disable(mac_intr_handle_t ih)
+{
+	recv_ring_t *rrp = (recv_ring_t *)ih;
+	bge_t *bgep = rrp->bgep;
+
+	mutex_enter(bgep->genlock);
+	rrp->poll_flag = 1;
+	mutex_exit(bgep->genlock);
+
+	return (0);
+}
+
+static int
+bge_ring_start(mac_ring_driver_t rh, uint64_t mr_gen_num)
+{
+	recv_ring_t *rx_ring;
+
+	rx_ring = (recv_ring_t *)rh;
+	mutex_enter(rx_ring->rx_lock);
+	rx_ring->ring_gen_num = mr_gen_num;
+	mutex_exit(rx_ring->rx_lock);
+	return (0);
+}
+
+
+/*
+ * Callback funtion for MAC layer to register all rings
+ * for given ring_group, noted by rg_index.
+ */
+void
+bge_fill_ring(void *arg, mac_ring_type_t rtype, const int rg_index,
+    const int index, mac_ring_info_t *infop, mac_ring_handle_t rh)
+{
+	bge_t *bgep = arg;
+	mac_intr_t *mintr;
+
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		recv_ring_t *rx_ring;
+		ASSERT(rg_index >= 0 && rg_index < MIN(bgep->chipid.rx_rings,
+		    MAC_ADDRESS_REGS_MAX) && index == 0);
+
+		rx_ring = &bgep->recv[rg_index];
+		rx_ring->ring_handle = rh;
+
+		infop->mri_driver = (mac_ring_driver_t)rx_ring;
+		infop->mri_start = bge_ring_start;
+		infop->mri_stop = NULL;
+		infop->mri_poll = bge_poll_ring;
+
+		mintr = &infop->mri_intr;
+		mintr->mi_handle = (mac_intr_handle_t)rx_ring;
+		mintr->mi_enable = bge_flag_intr_enable;
+		mintr->mi_disable = bge_flag_intr_disable;
+
+		break;
+	}
+	case MAC_RING_TYPE_TX:
+	default:
+		ASSERT(0);
+		break;
+	}
+}
+
+/*
+ * Fill infop passed as argument
+ * fill in respective ring_group info
+ * Each group has a single ring in it. We keep it simple
+ * and use the same internal handle for rings and groups.
+ */
+void
+bge_fill_group(void *arg, mac_ring_type_t rtype, const int rg_index,
+	mac_group_info_t *infop, mac_group_handle_t gh)
+{
+	bge_t *bgep = arg;
+
+	switch (rtype) {
+	case MAC_RING_TYPE_RX: {
+		recv_ring_t *rx_ring;
+
+		ASSERT(rg_index >= 0 && rg_index < MIN(bgep->chipid.rx_rings,
+		    MAC_ADDRESS_REGS_MAX));
+		rx_ring = &bgep->recv[rg_index];
+		rx_ring->ring_group_handle = gh;
+
+		infop->mgi_driver = (mac_group_driver_t)rx_ring;
+		infop->mgi_start = NULL;
+		infop->mgi_stop = NULL;
+		infop->mgi_addmac = bge_addmac;
+		infop->mgi_remmac = bge_remmac;
+		infop->mgi_count = 1;
+		break;
+	}
+	case MAC_RING_TYPE_TX:
+	default:
+		ASSERT(0);
+		break;
+	}
+}
+
 /*ARGSUSED*/
 static boolean_t
 bge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
@@ -1589,38 +1707,20 @@ bge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 		*txflags = HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM;
 		break;
 	}
+	case MAC_CAPAB_RINGS: {
+		mac_capab_rings_t *cap_rings = cap_data;
 
-	case MAC_CAPAB_POLL:
-		/*
-		 * There's nothing for us to fill in, simply returning
-		 * B_TRUE stating that we support polling is sufficient.
-		 */
-		break;
+		/* Temporarily disable multiple tx rings. */
+		if (cap_rings->mr_type != MAC_RING_TYPE_RX)
+			return (B_FALSE);
 
-	case MAC_CAPAB_MULTIADDRESS: {
-		multiaddress_capab_t	*mmacp = cap_data;
-
-		mutex_enter(bgep->genlock);
-		/*
-		 * The number of MAC addresses made available by
-		 * this capability is one less than the total as
-		 * the primary address in slot 0 is counted in
-		 * the total.
-		 */
-		mmacp->maddr_naddr = bgep->unicst_addr_total - 1;
-		mmacp->maddr_naddrfree = bgep->unicst_addr_avail;
-		/* No multiple factory addresses, set mma_flag to 0 */
-		mmacp->maddr_flag = 0;
-		mmacp->maddr_handle = bgep;
-		mmacp->maddr_add = bge_m_unicst_add;
-		mmacp->maddr_remove = bge_m_unicst_remove;
-		mmacp->maddr_modify = bge_m_unicst_modify;
-		mmacp->maddr_get = bge_m_unicst_get;
-		mmacp->maddr_reserve = NULL;
-		mutex_exit(bgep->genlock);
+		cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+		cap_rings->mr_rnum = cap_rings->mr_gnum =
+		    MIN(bgep->chipid.rx_rings, MAC_ADDRESS_REGS_MAX);
+		cap_rings->mr_rget = bge_fill_ring;
+		cap_rings->mr_gget = bge_fill_group;
 		break;
 	}
-
 	default:
 		return (B_FALSE);
 	}
@@ -1887,43 +1987,6 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		qreply(wq, mp);
 		break;
 	}
-}
-
-static void
-bge_resources_add(bge_t *bgep, time_t time, uint_t pkt_cnt)
-{
-
-	recv_ring_t *rrp;
-	mac_rx_fifo_t mrf;
-	int ring;
-
-	/*
-	 * Register Rx rings as resources and save mac
-	 * resource id for future reference
-	 */
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = bge_chip_blank;
-	mrf.mrf_arg = (void *)bgep;
-	mrf.mrf_normal_blank_time = time;
-	mrf.mrf_normal_pkt_count = pkt_cnt;
-
-	for (ring = 0; ring < bgep->chipid.rx_rings; ring++) {
-		rrp = &bgep->recv[ring];
-		rrp->handle = mac_resource_add(bgep->mh,
-		    (mac_resource_t *)&mrf);
-	}
-}
-
-static void
-bge_m_resources(void *arg)
-{
-	bge_t *bgep = arg;
-
-	mutex_enter(bgep->genlock);
-
-	bge_resources_add(bgep, bgep->chipid.rx_ticks_norm,
-	    bgep->chipid.rx_count_norm);
-	mutex_exit(bgep->genlock);
 }
 
 /*
@@ -3404,29 +3467,23 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Determine whether to override the chip's own MAC address
 	 */
 	bge_find_mac_address(bgep, cidp);
-	ethaddr_copy(cidp->vendor_addr.addr, bgep->curr_addr[0].addr);
-	bgep->curr_addr[0].set = B_TRUE;
 
 	bgep->unicst_addr_total = MAC_ADDRESS_REGS_MAX;
-	/*
-	 * Address available is one less than MAX
-	 * as primary address is not advertised
-	 * as a multiple MAC address.
-	 */
-	bgep->unicst_addr_avail = MAC_ADDRESS_REGS_MAX - 1;
+	bgep->unicst_addr_avail = MAC_ADDRESS_REGS_MAX;
 
 	if ((macp = mac_alloc(MAC_VERSION)) == NULL)
 		goto attach_fail;
 	macp->m_type_ident = MAC_PLUGIN_IDENT_ETHER;
 	macp->m_driver = bgep;
 	macp->m_dip = devinfo;
-	macp->m_src_addr = bgep->curr_addr[0].addr;
+	macp->m_src_addr = cidp->vendor_addr.addr;
 	macp->m_callbacks = &bge_m_callbacks;
 	macp->m_min_sdu = 0;
 	macp->m_max_sdu = cidp->ethmax_size - sizeof (struct ether_header);
 	macp->m_margin = VLAN_TAGSZ;
 	macp->m_priv_props = bge_priv_prop;
 	macp->m_priv_prop_count = BGE_MAX_PRIV_PROPS;
+	macp->m_v12n = MAC_VIRT_LEVEL1;
 
 	/*
 	 * Finally, we're ready to register ourselves with the MAC layer

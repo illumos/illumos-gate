@@ -36,6 +36,8 @@ extern "C" {
 #define	NIU_MAJOR_VER		1
 #define	NIU_MINOR_VER		1
 
+#if defined(sun4v)
+
 /*
  * NIU HV API v1.0 definitions
  */
@@ -43,6 +45,8 @@ extern "C" {
 #define	N2NIU_RX_LP_INFO		0x143
 #define	N2NIU_TX_LP_CONF		0x144
 #define	N2NIU_TX_LP_INFO		0x145
+
+#endif /* defined(sun4v) */
 
 #ifndef _ASM
 
@@ -81,8 +85,7 @@ extern "C" {
 #include	<sys/netlb.h>
 
 #include	<sys/ddi_intr.h>
-#include 	<sys/mac.h>
-#include	<sys/mac_impl.h>
+#include 	<sys/mac_provider.h>
 #include	<sys/mac_ether.h>
 
 #if	defined(sun4v)
@@ -611,7 +614,6 @@ struct _nxge_ldg_t {
 	uint8_t			ldg;		/* logical group number */
 	uint8_t			vldg_index;
 	boolean_t		arm;
-	boolean_t		interrupted;
 	uint16_t		ldg_timer;	/* counter */
 	uint8_t			func;
 	uint8_t			vector;
@@ -749,6 +751,13 @@ typedef struct _nxge_mmac_stats_t {
 	struct ether_addr mmac_avail_pool[16];
 } nxge_mmac_stats_t, *p_nxge_mmac_stats_t;
 
+/*
+ * Copied from mac.h. Should be cleaned up by driver.
+ */
+#define	MMAC_SLOT_USED		0x1   /* address slot used */
+#define	MMAC_VENDOR_ADDR	0x2   /* address returned is vendor supplied */
+
+
 #define	NXGE_MAX_MMAC_ADDRS	32
 #define	NXGE_NUM_MMAC_ADDRS	8
 #define	NXGE_NUM_OF_PORTS_QUAD	4
@@ -885,6 +894,8 @@ void nxge_hw_set_mac_modes(p_nxge_t);
 
 /* nxge_send.c. */
 uint_t nxge_reschedule(caddr_t);
+mblk_t *nxge_tx_ring_send(void *, mblk_t *);
+int nxge_start(p_nxge_t, p_tx_ring_t, p_mblk_t);
 
 /* nxge_rxdma.c */
 nxge_status_t nxge_rxdma_cfg_rdcgrp_default_rdc(p_nxge_t,
@@ -1050,6 +1061,8 @@ int nxge_get_nports(p_nxge_t);
 
 void nxge_free_buf(buf_alloc_type_t, uint64_t, uint32_t);
 
+#if defined(sun4v)
+
 uint64_t hv_niu_rx_logical_page_conf(uint64_t, uint64_t,
 	uint64_t, uint64_t);
 #pragma weak	hv_niu_rx_logical_page_conf
@@ -1130,6 +1143,8 @@ uint64_t hv_niu_vrrx_to_logical_dev(uint32_t cookie, uint64_t v_chidx,
 uint64_t hv_niu_vrtx_to_logical_dev(uint32_t cookie, uint64_t v_chidx,
     uint64_t *ldn);
 #pragma weak	hv_niu_vrtx_to_logical_dev
+
+#endif /* defined(sun4v) */
 
 #ifdef NXGE_DEBUG
 char *nxge_dump_packet(char *, int);

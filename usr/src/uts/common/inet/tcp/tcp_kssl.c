@@ -53,6 +53,7 @@
 #include <inet/ipdrop.h>
 #include <inet/tcp_impl.h>
 
+#include <sys/squeue_impl.h>
 #include <sys/squeue.h>
 #include <inet/kssl/ksslapi.h>
 
@@ -70,7 +71,7 @@ static void	tcp_kssl_input_asynch(void *, mblk_t *, void *);
 extern void	tcp_output(void *, mblk_t *, void *);
 extern void	tcp_send_conn_ind(void *, mblk_t *, void *);
 
-extern squeue_func_t tcp_squeue_wput_proc;
+extern int tcp_squeue_flag;
 
 /*
  * tcp_rput_data() calls this routine for all packet destined to a
@@ -205,10 +206,10 @@ tcp_kssl_input(tcp_t *tcp, mblk_t *mp)
 					    listener->tcp_connp->conn_sqp);
 					CONN_DEC_REF(listener->tcp_connp);
 				} else {
-					squeue_fill(
+					SQUEUE_ENTER_ONE(
 					    listener->tcp_connp->conn_sqp,
 					    ind_mp, tcp_send_conn_ind,
-					    listener->tcp_connp,
+					    listener->tcp_connp, SQ_FILL,
 					    SQTAG_TCP_CONN_IND);
 				}
 			}
@@ -294,11 +295,11 @@ no_can_do:
 					    listener->tcp_connp->conn_sqp);
 					CONN_DEC_REF(listener->tcp_connp);
 				} else {
-					squeue_fill(
+					SQUEUE_ENTER_ONE(
 					    listener->tcp_connp->conn_sqp,
 					    ind_mp, tcp_send_conn_ind,
 					    listener->tcp_connp,
-					    SQTAG_TCP_CONN_IND);
+					    SQ_FILL, SQTAG_TCP_CONN_IND);
 				}
 			}
 			if (mp != NULL)
@@ -343,8 +344,8 @@ tcp_kssl_input_callback(void *arg, mblk_t *mp, kssl_cmd_t kssl_cmd)
 			mutex_exit(&tcp->tcp_non_sq_lock);
 		}
 		CONN_INC_REF(connp);
-		(*tcp_squeue_wput_proc)(connp->conn_sqp, mp,
-		    tcp_output, connp, SQTAG_TCP_OUTPUT);
+		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_output, connp,
+		    tcp_squeue_flag, SQTAG_TCP_OUTPUT);
 
 	/* FALLTHROUGH */
 	case KSSL_CMD_NONE:
@@ -375,8 +376,8 @@ tcp_kssl_input_callback(void *arg, mblk_t *mp, kssl_cmd_t kssl_cmd)
 	 */
 	if ((sqmp = allocb(1, BPRI_MED)) != NULL) {
 		CONN_INC_REF(connp);
-		squeue_fill(connp->conn_sqp, sqmp, tcp_kssl_input_asynch,
-		    connp, SQTAG_TCP_KSSL_INPUT);
+		SQUEUE_ENTER_ONE(connp->conn_sqp, sqmp, tcp_kssl_input_asynch,
+		    connp, SQ_FILL, SQTAG_TCP_KSSL_INPUT);
 	} else {
 		DTRACE_PROBE(kssl_err__allocb_failed);
 	}

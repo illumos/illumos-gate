@@ -13,6 +13,7 @@
 #include "ifconfig.h"
 #include <compat.h>
 #include <libdlpi.h>
+#include <libdllink.h>
 #include <inet/ip.h>
 #include <inet/ipsec_impl.h>
 
@@ -4499,7 +4500,11 @@ static boolean_t
 ni_entry(const char *linkname, void *arg)
 {
 	dlpi_handle_t	dh;
+	datalink_class_t class;
 
+	(void) dladm_name2info(linkname, NULL, NULL, &class, NULL);
+	if (class == DATALINK_CLASS_ETHERSTUB)
+		return (_B_FALSE);
 	if (dlpi_open(linkname, &dh, 0) != DLPI_SUCCESS)
 		return (_B_FALSE);
 

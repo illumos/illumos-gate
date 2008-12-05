@@ -36,9 +36,9 @@
 #ifndef	_AFEIMPL_H
 #define	_AFEIMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	_KERNEL
+
+#include	<sys/mac_provider.h>
 
 /*
  * Compile time tunables.

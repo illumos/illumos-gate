@@ -4277,6 +4277,37 @@ ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid, const ts_label_t *tsl,
 	return (NULL);
 }
 
+ire_t *
+ire_cache_lookup_simple(ipaddr_t dst, ip_stack_t *ipst)
+{
+	irb_t *irb_ptr;
+	ire_t *ire;
+
+	/*
+	 * Lets look for an ire in the cachetable whose
+	 * ire_addr matches the destination.
+	 * Since we are being called by forwarding fastpath
+	 * no need to check for Trusted Solaris label.
+	 */
+	irb_ptr = &ipst->ips_ip_cache_table[IRE_ADDR_HASH(
+	    dst, ipst->ips_ip_cache_table_size)];
+	rw_enter(&irb_ptr->irb_lock, RW_READER);
+	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
+		if (ire->ire_marks & (IRE_MARK_CONDEMNED |
+		    IRE_MARK_HIDDEN | IRE_MARK_PRIVATE_ADDR)) {
+			continue;
+		}
+		if (ire->ire_addr == dst) {
+			IRE_REFHOLD(ire);
+			rw_exit(&irb_ptr->irb_lock);
+			return (ire);
+		}
+	}
+	rw_exit(&irb_ptr->irb_lock);
+	return (NULL);
+}
+
+
 /*
  * Locate the interface ire that is tied to the cache ire 'cire' via
  * cire->ire_ihandle.

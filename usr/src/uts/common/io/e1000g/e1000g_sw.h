@@ -54,7 +54,7 @@ extern "C" {
 #include <sys/kstat.h>
 #include <sys/modctl.h>
 #include <sys/errno.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ether.h>
 #include <sys/vlan.h>
 #include <sys/ddi.h>
@@ -114,8 +114,6 @@ extern "C" {
 #define	MAX_INTR_THROTTLING		65535
 #define	MAX_RX_BCOPY_THRESHOLD		E1000_RX_BUFFER_SIZE_2K
 #define	MAX_TX_BCOPY_THRESHOLD		E1000_TX_BUFFER_SIZE_2K
-#define	MAX_TX_RECYCLE_THRESHOLD	MAX_NUM_TX_DESCRIPTOR
-#define	MAX_TX_RECYCLE_NUM		MAX_NUM_TX_DESCRIPTOR
 
 #define	MIN_NUM_TX_DESCRIPTOR		80
 #define	MIN_NUM_RX_DESCRIPTOR		80
@@ -129,8 +127,6 @@ extern "C" {
 #define	MIN_INTR_THROTTLING		0
 #define	MIN_RX_BCOPY_THRESHOLD		0
 #define	MIN_TX_BCOPY_THRESHOLD		ETHERMIN
-#define	MIN_TX_RECYCLE_THRESHOLD	0
-#define	MIN_TX_RECYCLE_NUM		MAX_TX_DESC_PER_PACKET
 
 #define	DEFAULT_NUM_RX_DESCRIPTOR	2048
 #define	DEFAULT_NUM_TX_DESCRIPTOR	2048
@@ -143,13 +139,11 @@ extern "C" {
 #define	MIN_INTR_PER_SEC		3000
 #define	DEFAULT_INTR_PACKET_LOW		5
 #define	DEFAULT_INTR_PACKET_HIGH	128
-#define	DEFAULT_TX_RECYCLE_THRESHOLD	512
 #else
 #define	MAX_INTR_PER_SEC		15000
 #define	MIN_INTR_PER_SEC		4000
 #define	DEFAULT_INTR_PACKET_LOW		10
 #define	DEFAULT_INTR_PACKET_HIGH	48
-#define	DEFAULT_TX_RECYCLE_THRESHOLD	DEFAULT_TX_NO_RESOURCE
 #endif
 
 #define	DEFAULT_RX_INTR_DELAY		0
@@ -162,7 +156,6 @@ extern "C" {
 
 #define	DEFAULT_RX_BCOPY_THRESHOLD	128
 #define	DEFAULT_TX_BCOPY_THRESHOLD	512
-#define	DEFAULT_TX_RECYCLE_NUM		64
 #define	DEFAULT_TX_UPDATE_THRESHOLD	256
 #define	DEFAULT_TX_NO_RESOURCE		MAX_TX_DESC_PER_PACKET
 
@@ -400,6 +393,14 @@ extern "C" {
 				((PSINGLE_LIST_LINK)(_LH2)->Flink); \
 		} \
 		(_LH1)->Blink = ((PSINGLE_LIST_LINK)(_LH2)->Blink); \
+	}
+
+
+#define	QUEUE_SWITCH(_LH1, _LH2)					\
+	if ((_LH2)->Flink) { 						\
+		(_LH1)->Flink = (_LH2)->Flink;				\
+		(_LH1)->Blink = (_LH2)->Blink;				\
+		(_LH2)->Flink = (_LH2)->Blink = (PSINGLE_LIST_LINK)0;	\
 	}
 
 /*
@@ -717,6 +718,7 @@ typedef struct _e1000g_tx_ring {
 	 * reschedule when tx resource is available
 	 */
 	boolean_t resched_needed;
+	clock_t resched_timestamp;
 	uint32_t stall_watchdog;
 	uint32_t recycle_fail;
 	mblk_list_t mblks;
@@ -727,6 +729,7 @@ typedef struct _e1000g_tx_ring {
 	uint32_t stat_no_desc;
 	uint32_t stat_send_fail;
 	uint32_t stat_reschedule;
+	uint32_t stat_timer_reschedule;
 	uint32_t stat_over_size;
 #ifdef E1000G_DEBUG
 	uint32_t stat_under_size;
@@ -752,6 +755,7 @@ typedef struct _e1000g_tx_ring {
 typedef struct _e1000g_rx_ring {
 	kmutex_t rx_lock;
 	kmutex_t freelist_lock;
+	kmutex_t recycle_lock;
 	/*
 	 * Descriptor queue definitions
 	 */
@@ -768,13 +772,23 @@ typedef struct _e1000g_rx_ring {
 	p_rx_sw_packet_t packet_area;
 	LIST_DESCRIBER recv_list;
 	LIST_DESCRIBER free_list;
+	LIST_DESCRIBER recycle_list;
 
 	p_rx_sw_packet_t pending_list;
 	uint32_t pending_count;
 	uint32_t avail_freepkt;
+	uint32_t recycle_freepkt;
 	uint32_t rx_mblk_len;
 	mblk_t *rx_mblk;
 	mblk_t *rx_mblk_tail;
+	mac_ring_handle_t mrh;
+	mac_ring_handle_t mrh_init;
+	uint64_t ring_gen_num;
+	mblk_t *poll_list_head;
+	mblk_t *poll_list_tail;
+	uint_t poll_list_sz;
+	boolean_t poll_flag;
+
 	/*
 	 * Statistics
 	 */
@@ -833,8 +847,6 @@ typedef struct e1000g {
 
 	boolean_t intr_adaptive;
 	boolean_t tx_intr_enable;
-	uint32_t tx_recycle_thresh;
-	uint32_t tx_recycle_num;
 	uint32_t tx_intr_delay;
 	uint32_t tx_intr_abs_delay;
 	uint32_t rx_intr_delay;
@@ -853,6 +865,9 @@ typedef struct e1000g {
 
 	e1000g_rx_ring_t rx_ring[1];
 	e1000g_tx_ring_t tx_ring[1];
+	mac_group_handle_t rx_group;
+
+	kmutex_t gen_lock; /* General lock for the whole struct e1000g */
 
 	/*
 	 * Rx and Tx packet count for interrupt adaptive setting
@@ -908,6 +923,8 @@ typedef struct e1000g {
 	ddi_softint_handle_t tx_softint_handle;
 
 	kstat_t *e1000g_ksp;
+
+	boolean_t poll_mode;
 
 	uint16_t phy_ctrl;		/* contents of PHY_CTRL */
 	uint16_t phy_status;		/* contents of PHY_STATUS */
@@ -980,7 +997,7 @@ void e1000g_free_tx_swpkt(p_tx_sw_packet_t packet);
 void e1000g_tx_freemsg(e1000g_tx_ring_t *tx_ring);
 uint_t e1000g_tx_softint_worker(caddr_t arg1, caddr_t arg2);
 mblk_t *e1000g_m_tx(void *arg, mblk_t *mp);
-mblk_t *e1000g_receive(struct e1000g *Adapter);
+mblk_t *e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t *sz);
 void e1000g_rxfree_func(p_rx_sw_packet_t packet);
 
 int e1000g_m_stat(void *arg, uint_t stat, uint64_t *val);
@@ -1008,6 +1025,7 @@ extern boolean_t e1000g_force_detach;
 extern uint32_t e1000g_mblks_pending;
 extern krwlock_t e1000g_rx_detach_lock;
 extern private_devi_list_t *e1000g_private_devi_list;
+extern int e1000g_poll_mode;
 
 #ifdef __cplusplus
 }

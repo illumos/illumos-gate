@@ -29,8 +29,10 @@
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
+#include <sys/callb.h>
 #include <sys/conf.h>
 #include <sys/cmn_err.h>
+#include <sys/disp.h>
 #include <sys/list.h>
 #include <sys/ksynch.h>
 #include <sys/kmem.h>
@@ -97,8 +99,8 @@ typedef struct lacp_sel_ports {
 static lacp_sel_ports_t *sel_ports = NULL;
 static kmutex_t lacp_sel_lock;
 
-static void periodic_timer_pop_locked(aggr_port_t *);
 static void periodic_timer_pop(void *);
+static void periodic_timer_pop_handler(aggr_port_t *);
 static void lacp_xmit_sm(aggr_port_t *);
 static void lacp_periodic_sm(aggr_port_t *);
 static void fill_lacp_pdu(aggr_port_t *, lacp_t *);
@@ -108,16 +110,18 @@ static void lacp_off(aggr_port_t *);
 static boolean_t valid_lacp_pdu(aggr_port_t *, lacp_t *);
 static void lacp_receive_sm(aggr_port_t *, lacp_t *);
 static void aggr_set_coll_dist(aggr_port_t *, boolean_t);
-static void aggr_set_coll_dist_locked(aggr_port_t *, boolean_t);
 static void start_wait_while_timer(aggr_port_t *);
 static void stop_wait_while_timer(aggr_port_t *);
 static void lacp_reset_port(aggr_port_t *);
 static void stop_current_while_timer(aggr_port_t *);
 static void current_while_timer_pop(void *);
+static void current_while_timer_pop_handler(aggr_port_t *);
 static void update_default_selected(aggr_port_t *);
 static boolean_t update_selected(aggr_port_t *, lacp_t *);
 static boolean_t lacp_sel_ports_add(aggr_port_t *);
 static void lacp_sel_ports_del(aggr_port_t *);
+static void wait_while_timer_pop(void *);
+static void wait_while_timer_pop_handler(aggr_port_t *);
 
 void
 aggr_lacp_init(void)
@@ -132,13 +136,96 @@ aggr_lacp_fini(void)
 }
 
 /*
+ * The following functions are used for handling LACP timers.
+ *
+ * Note that we cannot fully rely on the aggr's mac perimeter in the timeout
+ * handler routine, otherwise it may cause deadlock with the untimeout() call
+ * which is usually called with the mac perimeter held. Instead, a
+ * lacp_timer_lock mutex is introduced, which protects a bitwise flag
+ * (lacp_timer_bits). This flag is set/cleared by timeout()/stop_timer()
+ * routines and is checked by a dedicated thread, that executes the real
+ * timeout operation.
+ */
+static void
+aggr_port_timer_thread(void *arg)
+{
+	aggr_port_t		*port = arg;
+	aggr_lacp_port_t	*pl = &port->lp_lacp;
+	aggr_grp_t		*grp = port->lp_grp;
+	uint32_t		lacp_timer_bits;
+	mac_perim_handle_t	mph;
+	callb_cpr_t		cprinfo;
+
+	CALLB_CPR_INIT(&cprinfo, &pl->lacp_timer_lock, callb_generic_cpr,
+	    "aggr_port_timer_thread");
+
+	mutex_enter(&pl->lacp_timer_lock);
+
+	for (;;) {
+
+		if ((lacp_timer_bits = pl->lacp_timer_bits) == 0) {
+			CALLB_CPR_SAFE_BEGIN(&cprinfo);
+			cv_wait(&pl->lacp_timer_cv, &pl->lacp_timer_lock);
+			CALLB_CPR_SAFE_END(&cprinfo, &pl->lacp_timer_lock);
+			continue;
+		}
+		pl->lacp_timer_bits = 0;
+
+		if (lacp_timer_bits & LACP_THREAD_EXIT)
+			break;
+
+		if (lacp_timer_bits & LACP_PERIODIC_TIMEOUT)
+			pl->periodic_timer.id = 0;
+		if (lacp_timer_bits & LACP_WAIT_WHILE_TIMEOUT)
+			pl->wait_while_timer.id = 0;
+		if (lacp_timer_bits & LACP_CURRENT_WHILE_TIMEOUT)
+			pl->current_while_timer.id = 0;
+
+		mutex_exit(&pl->lacp_timer_lock);
+
+		mac_perim_enter_by_mh(grp->lg_mh, &mph);
+		if (port->lp_closing) {
+			mac_perim_exit(mph);
+			mutex_enter(&pl->lacp_timer_lock);
+			break;
+		}
+
+		if (lacp_timer_bits & LACP_PERIODIC_TIMEOUT)
+			periodic_timer_pop_handler(port);
+		if (lacp_timer_bits & LACP_WAIT_WHILE_TIMEOUT)
+			wait_while_timer_pop_handler(port);
+		if (lacp_timer_bits & LACP_CURRENT_WHILE_TIMEOUT)
+			current_while_timer_pop_handler(port);
+		mac_perim_exit(mph);
+
+		mutex_enter(&pl->lacp_timer_lock);
+		if (pl->lacp_timer_bits & LACP_THREAD_EXIT)
+			break;
+	}
+
+	pl->lacp_timer_bits = 0;
+	pl->lacp_timer_thread = NULL;
+	cv_broadcast(&pl->lacp_timer_cv);
+
+	/* CALLB_CPR_EXIT drops the lock */
+	CALLB_CPR_EXIT(&cprinfo);
+
+	/*
+	 * Release the reference of the grp so aggr_grp_delete() can call
+	 * mac_unregister() safely.
+	 */
+	aggr_grp_port_rele(port);
+	thread_exit();
+}
+
+/*
  * Set the port LACP state to SELECTED. Returns B_FALSE if the operation
  * could not be performed due to a memory allocation error, B_TRUE otherwise.
  */
 static boolean_t
 lacp_port_select(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	if (!lacp_sel_ports_add(portp))
 		return (B_FALSE);
@@ -152,7 +239,9 @@ lacp_port_select(aggr_port_t *portp)
 static void
 lacp_port_unselect(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	aggr_grp_t	*grp = portp->lp_grp;
+
+	ASSERT((grp->lg_mh == NULL) || MAC_PERIM_HELD(grp->lg_mh));
 
 	lacp_sel_ports_del(portp);
 	portp->lp_lacp.sm.selected = AGGR_UNSELECTED;
@@ -180,9 +269,8 @@ aggr_lacp_init_port(aggr_port_t *portp)
 	aggr_grp_t *aggrp = portp->lp_grp;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(aggrp));
-	ASSERT(RW_LOCK_HELD(&aggrp->lg_lock));
-	ASSERT(RW_LOCK_HELD(&portp->lp_lock));
+	ASSERT(aggrp->lg_mh == NULL || MAC_PERIM_HELD(aggrp->lg_mh));
+	ASSERT(MAC_PERIM_HELD(portp->lp_mh));
 
 	/* actor port # */
 	pl->ActorPortNumber = portp->lp_portid;
@@ -251,6 +339,25 @@ aggr_lacp_init_port(aggr_port_t *portp)
 
 	pl->wait_while_timer.id = 0;
 	pl->wait_while_timer.val = AGGREGATE_WAIT_TIME;
+
+	pl->lacp_timer_bits = 0;
+
+	mutex_init(&pl->lacp_timer_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&pl->lacp_timer_cv, NULL, CV_DRIVER, NULL);
+
+	pl->lacp_timer_thread = thread_create(NULL, 0, aggr_port_timer_thread,
+	    portp, 0, &p0, TS_RUN, minclsyspri);
+
+	/*
+	 * Hold a reference of the grp and the port and this reference will
+	 * be release when the thread exits.
+	 *
+	 * The reference on the port is used for aggr_port_delete() to
+	 * continue without waiting for the thread to exit; the reference
+	 * on the grp is used for aggr_grp_delete() to wait for the thread
+	 * to exit before calling mac_unregister().
+	 */
+	aggr_grp_port_hold(portp);
 }
 
 /*
@@ -264,7 +371,7 @@ lacp_reset_port(aggr_port_t *portp)
 {
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	pl->NTT = B_FALSE;			/* need to transmit */
 
@@ -306,8 +413,8 @@ lacp_reset_port(aggr_port_t *portp)
 static void
 aggr_lacp_mcast_on(aggr_port_t *port)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(port->lp_grp));
-	ASSERT(RW_WRITE_HELD(&port->lp_lock));
+	ASSERT(MAC_PERIM_HELD(port->lp_grp->lg_mh));
+	ASSERT(MAC_PERIM_HELD(port->lp_mh));
 
 	if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
 		return;
@@ -319,8 +426,8 @@ aggr_lacp_mcast_on(aggr_port_t *port)
 static void
 aggr_lacp_mcast_off(aggr_port_t *port)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(port->lp_grp));
-	ASSERT(RW_WRITE_HELD(&port->lp_lock));
+	ASSERT(MAC_PERIM_HELD(port->lp_grp->lg_mh));
+	ASSERT(MAC_PERIM_HELD(port->lp_mh));
 
 	if (port->lp_state != AGGR_PORT_STATE_ATTACHED)
 		return;
@@ -332,26 +439,35 @@ aggr_lacp_mcast_off(aggr_port_t *port)
 static void
 start_periodic_timer(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	if (portp->lp_lacp.periodic_timer.id == 0) {
-		portp->lp_lacp.periodic_timer.id =
-		    timeout(periodic_timer_pop, portp,
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
+
+	mutex_enter(&pl->lacp_timer_lock);
+	if (pl->periodic_timer.id == 0) {
+		pl->periodic_timer.id = timeout(periodic_timer_pop, portp,
 		    drv_usectohz(1000000 * portp->lp_lacp.periodic_timer.val));
 	}
+	mutex_exit(&pl->lacp_timer_lock);
 }
 
 static void
 stop_periodic_timer(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
+	timeout_id_t id;
 
-	if (portp->lp_lacp.periodic_timer.id != 0) {
-		AGGR_LACP_UNLOCK(portp->lp_grp);
-		(void) untimeout(portp->lp_lacp.periodic_timer.id);
-		AGGR_LACP_LOCK_WRITER(portp->lp_grp);
-		portp->lp_lacp.periodic_timer.id = 0;
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
+
+	mutex_enter(&pl->lacp_timer_lock);
+	if ((id = pl->periodic_timer.id) != 0) {
+		pl->lacp_timer_bits &= ~LACP_PERIODIC_TIMEOUT;
+		pl->periodic_timer.id = 0;
 	}
+	mutex_exit(&pl->lacp_timer_lock);
+
+	if (id != 0)
+		(void) untimeout(id);
 }
 
 /*
@@ -360,13 +476,29 @@ stop_periodic_timer(aggr_port_t *portp)
  * LACPDU. We then set the periodic state and let
  * the periodic state machine restart the timer.
  */
-
 static void
-periodic_timer_pop_locked(aggr_port_t *portp)
+periodic_timer_pop(void *data)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	aggr_port_t *portp = data;
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	portp->lp_lacp.periodic_timer.id = NULL;
+	mutex_enter(&pl->lacp_timer_lock);
+	pl->lacp_timer_bits |= LACP_PERIODIC_TIMEOUT;
+	cv_broadcast(&pl->lacp_timer_cv);
+	mutex_exit(&pl->lacp_timer_lock);
+}
+
+/*
+ * When the timer pops, we arrive here to
+ * clear out LACPDU count as well as transmit an
+ * LACPDU. We then set the periodic state and let
+ * the periodic state machine restart the timer.
+ */
+static void
+periodic_timer_pop_handler(aggr_port_t *portp)
+{
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
+
 	portp->lp_lacp_stats.LACPDUsTx = 0;
 
 	/* current timestamp */
@@ -390,19 +522,6 @@ periodic_timer_pop_locked(aggr_port_t *portp)
 	lacp_periodic_sm(portp);
 }
 
-static void
-periodic_timer_pop(void *data)
-{
-	aggr_port_t *portp = data;
-
-	if (portp->lp_closing)
-		return;
-
-	AGGR_LACP_LOCK_WRITER(portp->lp_grp);
-	periodic_timer_pop_locked(portp);
-	AGGR_LACP_UNLOCK(portp->lp_grp);
-}
-
 /*
  * Invoked from:
  *	- startup upon aggregation
@@ -417,7 +536,7 @@ lacp_periodic_sm(aggr_port_t *portp)
 	lacp_periodic_state_t oldstate = portp->lp_lacp.sm.periodic_state;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on) {
@@ -465,7 +584,7 @@ lacp_periodic_sm(aggr_port_t *portp)
 		 * a LACPDU.
 		 */
 		stop_periodic_timer(portp);
-		periodic_timer_pop_locked(portp);
+		periodic_timer_pop_handler(portp);
 	}
 
 	/* Rearm timer with value provided by partner */
@@ -483,9 +602,8 @@ lacp_xmit_sm(aggr_port_t *portp)
 	size_t	len;
 	mblk_t  *mp;
 	hrtime_t now, elapsed;
-	const mac_txinfo_t *mtp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on || !pl->NTT || !portp->lp_started)
@@ -534,12 +652,7 @@ lacp_xmit_sm(aggr_port_t *portp)
 	fill_lacp_pdu(portp,
 	    (lacp_t *)(mp->b_rptr + sizeof (struct ether_header)));
 
-	/*
-	 * Store the transmit info pointer locally in case it changes between
-	 * loading mt_fn and mt_arg.
-	 */
-	mtp = portp->lp_txinfo;
-	mtp->mt_fn(mtp->mt_arg, mp);
+	(void) mac_tx(portp->lp_mch, mp, 0, MAC_DROP_ON_NO_DESC, NULL);
 
 	pl->NTT = B_FALSE;
 	portp->lp_lacp_stats.LACPDUsTx++;
@@ -563,14 +676,13 @@ fill_lacp_pdu(aggr_port_t *portp, lacp_t *lacp)
 {
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 	aggr_grp_t *aggrp = portp->lp_grp;
+	mac_perim_handle_t pmph;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(aggrp->lg_mh));
+	mac_perim_enter_by_mh(portp->lp_mh, &pmph);
 
 	lacp->subtype = LACP_SUBTYPE;
 	lacp->version = LACP_VERSION;
-
-	rw_enter(&aggrp->lg_lock, RW_READER);
-	rw_enter(&portp->lp_lock, RW_READER);
 
 	/*
 	 * Actor Information
@@ -609,8 +721,7 @@ fill_lacp_pdu(aggr_port_t *portp, lacp_t *lacp)
 	lacp->tlv_terminator = TERMINATOR_TLV;
 	lacp->terminator_len = 0x0;
 
-	rw_exit(&portp->lp_lock);
-	rw_exit(&aggrp->lg_lock);
+	mac_perim_exit(pmph);
 }
 
 /*
@@ -633,7 +744,7 @@ lacp_mux_sm(aggr_port_t *portp)
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 	lacp_mux_state_t oldstate = pl->sm.mux_state;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(aggrp));
+	ASSERT(MAC_PERIM_HELD(aggrp->lg_mh));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on) {
@@ -788,29 +899,28 @@ again:
 } /* lacp_mux_sm */
 
 
-static void
+static int
 receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 {
 	marker_pdu_t		*markerp = (marker_pdu_t *)mp->b_rptr;
-	const mac_txinfo_t	*mtp;
 
-	AGGR_LACP_LOCK_WRITER(portp->lp_grp);
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	AGGR_LACP_DBG(("trunk link: (%d): MARKER PDU received:\n",
 	    portp->lp_linkid));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!portp->lp_lacp.sm.lacp_on)
-		goto bail;
+		return (-1);
 
 	if (MBLKL(mp) < sizeof (marker_pdu_t))
-		goto bail;
+		return (-1);
 
 	if (markerp->version != MARKER_VERSION) {
 		AGGR_LACP_DBG(("trunk link (%d): Malformed MARKER PDU: "
 		    "version = %d does not match s/w version %d\n",
 		    portp->lp_linkid, markerp->version, MARKER_VERSION));
-		goto bail;
+		return (-1);
 	}
 
 	if (markerp->tlv_marker == MARKER_RESPONSE_TLV) {
@@ -818,21 +928,21 @@ receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 		AGGR_LACP_DBG(("trunk link (%d): MARKER RESPONSE PDU: "
 		    " MARKER TLV = %d - We don't send out info type!\n",
 		    portp->lp_linkid, markerp->tlv_marker));
-		goto bail;
+		return (-1);
 	}
 
 	if (markerp->tlv_marker != MARKER_INFO_TLV) {
 		AGGR_LACP_DBG(("trunk link (%d): Malformed MARKER PDU: "
 		    " MARKER TLV = %d \n", portp->lp_linkid,
 		    markerp->tlv_marker));
-		goto bail;
+		return (-1);
 	}
 
 	if (markerp->marker_len != MARKER_INFO_RESPONSE_LENGTH) {
 		AGGR_LACP_DBG(("trunk link (%d): Malformed MARKER PDU: "
 		    " MARKER length = %d \n", portp->lp_linkid,
 		    markerp->marker_len));
-		goto bail;
+		return (-1);
 	}
 
 	if (markerp->requestor_port != portp->lp_lacp.PartnerOperPortNum) {
@@ -840,7 +950,7 @@ receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 		    " MARKER Port %d not equal to Partner port %d\n",
 		    portp->lp_linkid, markerp->requestor_port,
 		    portp->lp_lacp.PartnerOperPortNum));
-		goto bail;
+		return (-1);
 	}
 
 	if (ether_cmp(&markerp->system_id,
@@ -848,7 +958,7 @@ receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 		AGGR_LACP_DBG(("trunk link (%d): MARKER PDU: "
 		    " MARKER MAC not equal to Partner MAC\n",
 		    portp->lp_linkid));
-		goto bail;
+		return (-1);
 	}
 
 	/*
@@ -861,22 +971,8 @@ receive_marker_pdu(aggr_port_t *portp, mblk_t *mp)
 	ASSERT(MBLKHEAD(mp) >= sizeof (struct ether_header));
 	mp->b_rptr -= sizeof (struct ether_header);
 	fill_lacp_ether(portp, (struct ether_header *)mp->b_rptr);
-
-	/*
-	 * Store the transmit info pointer locally in case it changes between
-	 * loading mt_fn and mt_arg.
-	 */
-	mtp = portp->lp_txinfo;
-	AGGR_LACP_UNLOCK(portp->lp_grp);
-
-	mtp->mt_fn(mtp->mt_arg, mp);
-	return;
-
-bail:
-	AGGR_LACP_UNLOCK(portp->lp_grp);
-	freemsg(mp);
+	return (0);
 }
-
 
 /*
  * Update the LACP mode (off, active, or passive) of the specified group.
@@ -887,8 +983,8 @@ aggr_lacp_update_mode(aggr_grp_t *grp, aggr_lacp_mode_t mode)
 	aggr_lacp_mode_t old_mode = grp->lg_lacp_mode;
 	aggr_port_t *port;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	ASSERT(!grp->lg_closing);
 
 	if (mode == old_mode)
 		return;
@@ -904,20 +1000,12 @@ aggr_lacp_update_mode(aggr_grp_t *grp, aggr_lacp_mode_t mode)
 			/* OFF -> {PASSIVE,ACTIVE} */
 			/* turn OFF Collector_Distributor */
 			aggr_set_coll_dist(port, B_FALSE);
-			rw_enter(&port->lp_lock, RW_WRITER);
 			lacp_on(port);
-			if (port->lp_state == AGGR_PORT_STATE_ATTACHED)
-				aggr_lacp_port_attached(port);
-			rw_exit(&port->lp_lock);
 		} else if (mode == AGGR_LACP_OFF) {
 			/* {PASSIVE,ACTIVE} -> OFF */
-			rw_enter(&port->lp_lock, RW_WRITER);
 			lacp_off(port);
-			rw_exit(&port->lp_lock);
-			if (!grp->lg_closing) {
-				/* Turn ON Collector_Distributor */
-				aggr_set_coll_dist(port, B_TRUE);
-			}
+			/* Turn ON Collector_Distributor */
+			aggr_set_coll_dist(port, B_TRUE);
 		} else {
 			/* PASSIVE->ACTIVE or ACTIVE->PASSIVE */
 			port->lp_lacp.sm.begin = B_TRUE;
@@ -928,9 +1016,6 @@ aggr_lacp_update_mode(aggr_grp_t *grp, aggr_lacp_mode_t mode)
 			lacp_receive_sm(port, NULL);
 			lacp_mux_sm(port);
 		}
-
-		if (grp->lg_closing)
-			break;
 	}
 }
 
@@ -943,8 +1028,7 @@ aggr_lacp_update_timer(aggr_grp_t *grp, aggr_lacp_timer_t timer)
 {
 	aggr_port_t *port;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
 	if (timer == grp->aggr.PeriodicTimer)
 		return;
@@ -958,6 +1042,32 @@ aggr_lacp_update_timer(aggr_grp_t *grp, aggr_lacp_timer_t timer)
 	}
 }
 
+void
+aggr_port_lacp_set_mode(aggr_grp_t *grp, aggr_port_t *port)
+{
+	aggr_lacp_mode_t	mode;
+	aggr_lacp_timer_t	timer;
+
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+
+	mode = grp->lg_lacp_mode;
+	timer = grp->aggr.PeriodicTimer;
+
+	port->lp_lacp.ActorAdminPortState.bit.activity =
+	    port->lp_lacp.ActorOperPortState.bit.activity =
+	    (mode == AGGR_LACP_ACTIVE);
+
+	port->lp_lacp.ActorAdminPortState.bit.timeout =
+	    port->lp_lacp.ActorOperPortState.bit.timeout =
+	    (timer == AGGR_LACP_TIMER_SHORT);
+
+	if (mode == AGGR_LACP_OFF) {
+		/* Turn ON Collector_Distributor */
+		aggr_set_coll_dist(port, B_TRUE);
+	} else { /* LACP_ACTIVE/PASSIVE */
+		lacp_on(port);
+	}
+}
 
 /*
  * Sets the initial LACP mode (off, active, passive) and LACP timer
@@ -969,30 +1079,13 @@ aggr_lacp_set_mode(aggr_grp_t *grp, aggr_lacp_mode_t mode,
 {
 	aggr_port_t *port;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
 
 	grp->lg_lacp_mode = mode;
 	grp->aggr.PeriodicTimer = timer;
 
-	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
-		port->lp_lacp.ActorAdminPortState.bit.activity =
-		    port->lp_lacp.ActorOperPortState.bit.activity =
-		    (mode == AGGR_LACP_ACTIVE);
-
-		port->lp_lacp.ActorAdminPortState.bit.timeout =
-		    port->lp_lacp.ActorOperPortState.bit.timeout =
-		    (timer == AGGR_LACP_TIMER_SHORT);
-
-		if (grp->lg_lacp_mode == AGGR_LACP_OFF) {
-			/* Turn ON Collector_Distributor */
-			aggr_set_coll_dist(port, B_TRUE);
-		} else { /* LACP_ACTIVE/PASSIVE */
-			rw_enter(&port->lp_lock, RW_WRITER);
-			lacp_on(port);
-			rw_exit(&port->lp_lock);
-		}
-	}
+	for (port = grp->lg_ports; port != NULL; port = port->lp_next)
+		aggr_port_lacp_set_mode(grp, port);
 }
 
 /*
@@ -1148,7 +1241,7 @@ lacp_selection_logic(aggr_port_t *portp)
 	boolean_t reset_mac = B_FALSE;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(aggrp));
+	ASSERT(MAC_PERIM_HELD(aggrp->lg_mh));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on) {
@@ -1377,47 +1470,65 @@ static void
 wait_while_timer_pop(void *data)
 {
 	aggr_port_t *portp = data;
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	if (portp->lp_closing)
-		return;
+	mutex_enter(&pl->lacp_timer_lock);
+	pl->lacp_timer_bits |= LACP_WAIT_WHILE_TIMEOUT;
+	cv_broadcast(&pl->lacp_timer_cv);
+	mutex_exit(&pl->lacp_timer_lock);
+}
 
-	AGGR_LACP_LOCK_WRITER(portp->lp_grp);
+/*
+ * wait_while_timer_pop_handler - When the timer pops, we arrive here to
+ *			set ready_n and trigger the selection logic.
+ */
+static void
+wait_while_timer_pop_handler(aggr_port_t *portp)
+{
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	AGGR_LACP_DBG(("trunk link:(%d): wait_while_timer pop \n",
 	    portp->lp_linkid));
-	portp->lp_lacp.wait_while_timer.id = 0;
 	portp->lp_lacp.sm.ready_n = B_TRUE;
 
 	lacp_selection_logic(portp);
-	AGGR_LACP_UNLOCK(portp->lp_grp);
 }
 
 static void
 start_wait_while_timer(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	if (portp->lp_lacp.wait_while_timer.id == 0) {
-		portp->lp_lacp.wait_while_timer.id =
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
+
+	mutex_enter(&pl->lacp_timer_lock);
+	if (pl->wait_while_timer.id == 0) {
+		pl->wait_while_timer.id =
 		    timeout(wait_while_timer_pop, portp,
 		    drv_usectohz(1000000 *
 		    portp->lp_lacp.wait_while_timer.val));
 	}
+	mutex_exit(&pl->lacp_timer_lock);
 }
 
 
 static void
-stop_wait_while_timer(portp)
-aggr_port_t *portp;
+stop_wait_while_timer(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
+	timeout_id_t id;
 
-	if (portp->lp_lacp.wait_while_timer.id != 0) {
-		AGGR_LACP_UNLOCK(portp->lp_grp);
-		(void) untimeout(portp->lp_lacp.wait_while_timer.id);
-		AGGR_LACP_LOCK_WRITER(portp->lp_grp);
-		portp->lp_lacp.wait_while_timer.id = 0;
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
+
+	mutex_enter(&pl->lacp_timer_lock);
+	if ((id = pl->wait_while_timer.id) != 0) {
+		pl->lacp_timer_bits &= ~LACP_WAIT_WHILE_TIMEOUT;
+		pl->wait_while_timer.id = 0;
 	}
+	mutex_exit(&pl->lacp_timer_lock);
+
+	if (id != 0)
+		(void) untimeout(id);
 }
 
 /*
@@ -1432,52 +1543,30 @@ aggr_lacp_port_attached(aggr_port_t *portp)
 	aggr_grp_t *grp = portp->lp_grp;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	ASSERT(MAC_PERIM_HELD(portp->lp_mh));
 	ASSERT(portp->lp_state == AGGR_PORT_STATE_ATTACHED);
-	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
 
 	AGGR_LACP_DBG(("aggr_lacp_port_attached: port %d\n",
 	    portp->lp_linkid));
 
 	portp->lp_lacp.sm.port_enabled = B_TRUE;	/* link on */
 
-	if (grp->lg_lacp_mode == AGGR_LACP_OFF) {
-		pl->ActorAdminPortState.bit.activity =
-		    pl->ActorOperPortState.bit.activity = B_FALSE;
-
-		/* Turn ON Collector_Distributor */
-		aggr_set_coll_dist_locked(portp, B_TRUE);
-
+	if (grp->lg_lacp_mode == AGGR_LACP_OFF)
 		return;
-	}
-
-	pl->ActorAdminPortState.bit.activity =
-	    pl->ActorOperPortState.bit.activity =
-	    (grp->lg_lacp_mode == AGGR_LACP_ACTIVE);
-
-	pl->ActorAdminPortState.bit.timeout =
-	    pl->ActorOperPortState.bit.timeout =
-	    (grp->aggr.PeriodicTimer == AGGR_LACP_TIMER_SHORT);
 
 	pl->sm.lacp_enabled = B_TRUE;
 	pl->ActorOperPortState.bit.aggregation = B_TRUE;
 	pl->sm.begin = B_TRUE;
 
-	if (!pl->sm.lacp_on) {
-		/* Turn OFF Collector_Distributor */
-		aggr_set_coll_dist_locked(portp, B_FALSE);
+	lacp_receive_sm(portp, NULL);
+	lacp_mux_sm(portp);
 
-		lacp_on(portp);
-	} else {
-		lacp_receive_sm(portp, NULL);
-		lacp_mux_sm(portp);
+	/* Enable Multicast Slow Protocol address */
+	aggr_lacp_mcast_on(portp);
 
-		/* Enable Multicast Slow Protocol address */
-		aggr_lacp_mcast_on(portp);
-
-		/* periodic_sm is started up from the receive machine */
-		lacp_selection_logic(portp);
-	}
+	/* periodic_sm is started up from the receive machine */
+	lacp_selection_logic(portp);
 }
 
 /*
@@ -1489,8 +1578,8 @@ aggr_lacp_port_detached(aggr_port_t *portp)
 {
 	aggr_grp_t *grp = portp->lp_grp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+	ASSERT(MAC_PERIM_HELD(portp->lp_mh));
 
 	AGGR_LACP_DBG(("aggr_lacp_port_detached: port %d\n",
 	    portp->lp_linkid));
@@ -1500,24 +1589,22 @@ aggr_lacp_port_detached(aggr_port_t *portp)
 	if (grp->lg_lacp_mode == AGGR_LACP_OFF)
 		return;
 
-	/* Disable Slow Protocol PDUs */
-	lacp_off(portp);
+	portp->lp_lacp.sm.lacp_enabled = B_FALSE;
+	lacp_selection_logic(portp);
+	lacp_mux_sm(portp);
+	lacp_periodic_sm(portp);
+
+	/*
+	 * Disable Slow Protocol Timers.
+	 */
+	stop_periodic_timer(portp);
+	stop_current_while_timer(portp);
+	stop_wait_while_timer(portp);
+
+	/* Disable Multicast Slow Protocol address */
+	aggr_lacp_mcast_off(portp);
+	aggr_set_coll_dist(portp, B_FALSE);
 }
-
-
-/*
- * Invoked after the outbound port selection policy has been changed.
- */
-void
-aggr_lacp_policy_changed(aggr_grp_t *grp)
-{
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
-
-	/* suspend transmission for CollectorMaxDelay time */
-	delay(grp->aggr.CollectorMaxDelay * 10);
-}
-
 
 /*
  * Enable Slow Protocol LACP and Marker PDUs.
@@ -1525,9 +1612,12 @@ aggr_lacp_policy_changed(aggr_grp_t *grp)
 static void
 lacp_on(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
-	ASSERT(RW_WRITE_HELD(&portp->lp_grp->lg_lock));
-	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
+	mac_perim_handle_t mph;
+
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
+
+	mac_perim_enter_by_mh(portp->lp_mh, &mph);
 
 	/*
 	 * Reset the state machines and Partner operational
@@ -1535,67 +1625,69 @@ lacp_on(aggr_port_t *portp)
 	 * our link state.
 	 */
 	lacp_reset_port(portp);
-	portp->lp_lacp.sm.lacp_on = B_TRUE;
+	pl->sm.lacp_on = B_TRUE;
 
 	AGGR_LACP_DBG(("lacp_on:(%d): \n", portp->lp_linkid));
+
+	if (portp->lp_state == AGGR_PORT_STATE_ATTACHED) {
+		pl->sm.port_enabled = B_TRUE;
+		pl->sm.lacp_enabled = B_TRUE;
+		pl->ActorOperPortState.bit.aggregation = B_TRUE;
+	}
 
 	lacp_receive_sm(portp, NULL);
 	lacp_mux_sm(portp);
 
-	if (portp->lp_state != AGGR_PORT_STATE_ATTACHED)
-		return;
+	if (portp->lp_state == AGGR_PORT_STATE_ATTACHED) {
+		/* Enable Multicast Slow Protocol address */
+		aggr_lacp_mcast_on(portp);
 
-	/* Enable Multicast Slow Protocol address */
-	aggr_lacp_mcast_on(portp);
-
-	/* periodic_sm is started up from the receive machine */
-	lacp_selection_logic(portp);
+		/* periodic_sm is started up from the receive machine */
+		lacp_selection_logic(portp);
+	}
+done:
+	mac_perim_exit(mph);
 } /* lacp_on */
-
 
 /* Disable Slow Protocol LACP and Marker PDUs */
 static void
 lacp_off(aggr_port_t *portp)
 {
-	aggr_grp_t *grp = portp->lp_grp;
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
+	mac_perim_handle_t mph;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
-	ASSERT(RW_WRITE_HELD(&grp->lg_lock));
-	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
+	mac_perim_enter_by_mh(portp->lp_mh, &mph);
 
-	portp->lp_lacp.sm.lacp_on = B_FALSE;
+	pl->sm.lacp_on = B_FALSE;
 
 	AGGR_LACP_DBG(("lacp_off:(%d): \n", portp->lp_linkid));
 
-	/*
-	 * Disable Slow Protocol Timers.  We must temporarily release
-	 * the group and port locks to avoid deadlocks. Make sure that
-	 * neither the port nor group are closing after re-acquiring
-	 * their locks.
-	 */
-	rw_exit(&portp->lp_lock);
-	rw_exit(&grp->lg_lock);
+	if (portp->lp_state == AGGR_PORT_STATE_ATTACHED) {
+		/*
+		 * Disable Slow Protocol Timers.
+		 */
+		stop_periodic_timer(portp);
+		stop_current_while_timer(portp);
+		stop_wait_while_timer(portp);
 
-	stop_periodic_timer(portp);
-	stop_current_while_timer(portp);
-	stop_wait_while_timer(portp);
+		/* Disable Multicast Slow Protocol address */
+		aggr_lacp_mcast_off(portp);
 
-	rw_enter(&grp->lg_lock, RW_WRITER);
-	rw_enter(&portp->lp_lock, RW_WRITER);
-
-	if (!portp->lp_closing && !grp->lg_closing) {
-		lacp_mux_sm(portp);
-		lacp_periodic_sm(portp);
-		lacp_selection_logic(portp);
+		pl->sm.port_enabled = B_FALSE;
+		pl->sm.lacp_enabled = B_FALSE;
+		pl->ActorOperPortState.bit.aggregation = B_FALSE;
 	}
 
-	/* Turn OFF Collector_Distributor */
-	aggr_set_coll_dist_locked(portp, B_FALSE);
+	lacp_mux_sm(portp);
+	lacp_periodic_sm(portp);
+	lacp_selection_logic(portp);
 
-	/* Disable Multicast Slow Protocol address */
-	aggr_lacp_mcast_off(portp);
+	/* Turn OFF Collector_Distributor */
+	aggr_set_coll_dist(portp, B_FALSE);
 
 	lacp_reset_port(portp);
+	mac_perim_exit(mph);
 }
 
 
@@ -1627,60 +1719,70 @@ valid_lacp_pdu(aggr_port_t *portp, lacp_t *lacp)
 static void
 start_current_while_timer(aggr_port_t *portp, uint_t time)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	if (portp->lp_lacp.current_while_timer.id == 0) {
-		if (time > 0) {
-			portp->lp_lacp.current_while_timer.val = time;
-		} else if (portp->lp_lacp.ActorOperPortState.bit.timeout) {
-			portp->lp_lacp.current_while_timer.val =
-			    SHORT_TIMEOUT_TIME;
-		} else {
-			portp->lp_lacp.current_while_timer.val =
-			    LONG_TIMEOUT_TIME;
-		}
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
-		portp->lp_lacp.current_while_timer.id =
+	mutex_enter(&pl->lacp_timer_lock);
+	if (pl->current_while_timer.id == 0) {
+		if (time > 0)
+			pl->current_while_timer.val = time;
+		else if (pl->ActorOperPortState.bit.timeout)
+			pl->current_while_timer.val = SHORT_TIMEOUT_TIME;
+		else
+			pl->current_while_timer.val = LONG_TIMEOUT_TIME;
+
+		pl->current_while_timer.id =
 		    timeout(current_while_timer_pop, portp,
 		    drv_usectohz((clock_t)1000000 *
 		    (clock_t)portp->lp_lacp.current_while_timer.val));
 	}
+	mutex_exit(&pl->lacp_timer_lock);
 }
 
 
 static void
 stop_current_while_timer(aggr_port_t *portp)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
+	timeout_id_t id;
 
-	if (portp->lp_lacp.current_while_timer.id != 0) {
-		AGGR_LACP_UNLOCK(portp->lp_grp);
-		(void) untimeout(portp->lp_lacp.current_while_timer.id);
-		AGGR_LACP_LOCK_WRITER(portp->lp_grp);
-		portp->lp_lacp.current_while_timer.id = 0;
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
+
+	mutex_enter(&pl->lacp_timer_lock);
+	if ((id = pl->current_while_timer.id) != 0) {
+		pl->lacp_timer_bits &= ~LACP_CURRENT_WHILE_TIMEOUT;
+		pl->current_while_timer.id = 0;
 	}
-}
+	mutex_exit(&pl->lacp_timer_lock);
 
+	if (id != 0)
+		(void) untimeout(id);
+}
 
 static void
 current_while_timer_pop(void *data)
 {
 	aggr_port_t *portp = (aggr_port_t *)data;
+	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	if (portp->lp_closing)
-		return;
+	mutex_enter(&pl->lacp_timer_lock);
+	pl->lacp_timer_bits |= LACP_CURRENT_WHILE_TIMEOUT;
+	cv_broadcast(&pl->lacp_timer_cv);
+	mutex_exit(&pl->lacp_timer_lock);
+}
 
-	AGGR_LACP_LOCK_WRITER(portp->lp_grp);
+static void
+current_while_timer_pop_handler(aggr_port_t *portp)
+{
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	AGGR_LACP_DBG(("trunk link:(%d): current_while_timer "
 	    "pop id=%p\n", portp->lp_linkid,
 	    portp->lp_lacp.current_while_timer.id));
 
-	portp->lp_lacp.current_while_timer.id = 0;
 	lacp_receive_sm(portp, NULL);
-	AGGR_LACP_UNLOCK(portp->lp_grp);
 }
-
 
 /*
  * record_Default - Simply copies over administrative values
@@ -1692,7 +1794,7 @@ record_Default(aggr_port_t *portp)
 {
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	pl->PartnerOperPortNum = pl->PartnerAdminPortNum;
 	pl->PartnerOperPortPriority = pl->PartnerAdminPortPriority;
@@ -1713,7 +1815,7 @@ record_PDU(aggr_port_t *portp, lacp_t *lacp)
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 	uint8_t save_sync;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(aggrp->lg_mh));
 
 	/*
 	 * Partner Information
@@ -1780,7 +1882,7 @@ update_selected(aggr_port_t *portp, lacp_t *lacp)
 {
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	if ((pl->PartnerOperPortNum != ntohs(lacp->actor_info.port)) ||
 	    (pl->PartnerOperPortPriority !=
@@ -1814,7 +1916,7 @@ update_default_selected(aggr_port_t *portp)
 {
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	if ((pl->PartnerAdminPortNum != pl->PartnerOperPortNum) ||
 	    (pl->PartnerOperPortPriority != pl->PartnerAdminPortPriority) ||
@@ -1844,7 +1946,7 @@ update_NTT(aggr_port_t *portp, lacp_t *lacp)
 	aggr_grp_t *aggrp = portp->lp_grp;
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(aggrp->lg_mh));
 
 	if ((pl->ActorPortNumber != ntohs(lacp->partner_info.port)) ||
 	    (pl->ActorPortPriority !=
@@ -1890,7 +1992,7 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 	aggr_lacp_port_t *pl = &portp->lp_lacp;
 	lacp_receive_state_t oldstate = pl->sm.receive_state;
 
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
+	ASSERT(MAC_PERIM_HELD(portp->lp_grp->lg_mh));
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on)
@@ -1917,7 +2019,6 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 	    (pl->current_while_timer.id == 0)) {
 		pl->sm.receive_state = LACP_DEFAULTED;
 	}
-
 
 	if (!((lacp && (oldstate == LACP_CURRENT) &&
 	    (pl->sm.receive_state == LACP_CURRENT)))) {
@@ -2068,28 +2169,19 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 static void
 aggr_set_coll_dist(aggr_port_t *portp, boolean_t enable)
 {
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
-	rw_enter(&portp->lp_lock, RW_WRITER);
-	aggr_set_coll_dist_locked(portp, enable);
-	rw_exit(&portp->lp_lock);
-}
-
-static void
-aggr_set_coll_dist_locked(aggr_port_t *portp, boolean_t enable)
-{
-	ASSERT(AGGR_LACP_LOCK_HELD_WRITER(portp->lp_grp));
-	ASSERT(RW_WRITE_HELD(&portp->lp_lock));
+	mac_perim_handle_t mph;
 
 	AGGR_LACP_DBG(("AGGR_SET_COLL_DIST_TYPE: (%d) %s\n",
 	    portp->lp_linkid, enable ? "ENABLED" : "DISABLED"));
 
+	mac_perim_enter_by_mh(portp->lp_mh, &mph);
 	if (!enable) {
 		/*
 		 * Turn OFF Collector_Distributor.
 		 */
 		portp->lp_collector_enabled = B_FALSE;
 		aggr_send_port_disable(portp);
-		return;
+		goto done;
 	}
 
 	/*
@@ -2102,14 +2194,21 @@ aggr_set_coll_dist_locked(aggr_port_t *portp, boolean_t enable)
 		portp->lp_collector_enabled = B_TRUE;
 		aggr_send_port_enable(portp);
 	}
+
+done:
+	mac_perim_exit(mph);
 }
 
 /*
- * Process a received Marker or LACPDU.
+ * Because the LACP packet processing needs to enter the aggr's mac perimeter
+ * and that would potentially cause a deadlock with the thread in which the
+ * grp/port is deleted, we defer the packet process to a worker thread. Here
+ * we only enqueue the received Marker or LACPDU for later processing.
  */
 void
-aggr_lacp_rx(aggr_port_t *portp, mblk_t *dmp)
+aggr_lacp_rx_enqueue(aggr_port_t *portp, mblk_t *dmp)
 {
+	aggr_grp_t *grp = portp->lp_grp;
 	lacp_t	*lacp;
 
 	dmp->b_rptr += sizeof (struct ether_header);
@@ -2120,34 +2219,143 @@ aggr_lacp_rx(aggr_port_t *portp, mblk_t *dmp)
 	}
 
 	lacp = (lacp_t *)dmp->b_rptr;
+	if (lacp->subtype != LACP_SUBTYPE && lacp->subtype != MARKER_SUBTYPE) {
+		AGGR_LACP_DBG(("aggr_lacp_rx_enqueue: (%d): "
+		    "Unknown Slow Protocol type %d\n",
+		    portp->lp_linkid, lacp->subtype));
+		freemsg(dmp);
+		return;
+	}
 
+	mutex_enter(&grp->lg_lacp_lock);
+
+	/*
+	 * If the lg_lacp_done is set, this aggregation is in the process of
+	 * being deleted, return directly.
+	 */
+	if (grp->lg_lacp_done) {
+		mutex_exit(&grp->lg_lacp_lock);
+		freemsg(dmp);
+		return;
+	}
+
+	if (grp->lg_lacp_tail == NULL) {
+		grp->lg_lacp_head = grp->lg_lacp_tail = dmp;
+	} else {
+		grp->lg_lacp_tail->b_next = dmp;
+		grp->lg_lacp_tail = dmp;
+	}
+
+	/*
+	 * Hold a reference of the port so that the port won't be freed when it
+	 * is removed from the aggr. The b_prev field is borrowed to save the
+	 * port information.
+	 */
+	AGGR_PORT_REFHOLD(portp);
+	dmp->b_prev = (mblk_t *)portp;
+	cv_broadcast(&grp->lg_lacp_cv);
+	mutex_exit(&grp->lg_lacp_lock);
+}
+
+static void
+aggr_lacp_rx(mblk_t *dmp)
+{
+	aggr_port_t *portp = (aggr_port_t *)dmp->b_prev;
+	mac_perim_handle_t mph;
+	lacp_t	*lacp;
+
+	dmp->b_prev = NULL;
+
+	mac_perim_enter_by_mh(portp->lp_grp->lg_mh, &mph);
+	if (portp->lp_closing)
+		goto done;
+
+	lacp = (lacp_t *)dmp->b_rptr;
 	switch (lacp->subtype) {
 	case LACP_SUBTYPE:
 		AGGR_LACP_DBG(("aggr_lacp_rx:(%d): LACPDU received.\n",
 		    portp->lp_linkid));
 
-		AGGR_LACP_LOCK_WRITER(portp->lp_grp);
 		if (!portp->lp_lacp.sm.lacp_on) {
-			AGGR_LACP_UNLOCK(portp->lp_grp);
 			break;
 		}
 		lacp_receive_sm(portp, lacp);
-		AGGR_LACP_UNLOCK(portp->lp_grp);
 		break;
 
 	case MARKER_SUBTYPE:
 		AGGR_LACP_DBG(("aggr_lacp_rx:(%d): Marker Packet received.\n",
 		    portp->lp_linkid));
 
-		(void) receive_marker_pdu(portp, dmp);
-		break;
+		if (receive_marker_pdu(portp, dmp) != 0)
+			break;
 
-	default:
-		AGGR_LACP_DBG(("aggr_lacp_rx: (%d): "
-		    "Unknown Slow Protocol type %d\n",
-		    portp->lp_linkid, lacp->subtype));
-		break;
+		(void) mac_tx(portp->lp_mch, dmp, 0, MAC_DROP_ON_NO_DESC, NULL);
+		mac_perim_exit(mph);
+		AGGR_PORT_REFRELE(portp);
+		return;
 	}
 
+done:
+	mac_perim_exit(mph);
+	AGGR_PORT_REFRELE(portp);
 	freemsg(dmp);
+}
+
+void
+aggr_lacp_rx_thread(void *arg)
+{
+	callb_cpr_t	cprinfo;
+	aggr_grp_t	*grp = (aggr_grp_t *)arg;
+	aggr_port_t	*port;
+	mblk_t		*mp, *nextmp;
+
+	CALLB_CPR_INIT(&cprinfo, &grp->lg_lacp_lock, callb_generic_cpr,
+	    "aggr_lacp_rx_thread");
+
+	mutex_enter(&grp->lg_lacp_lock);
+
+	/*
+	 * Quit the thread if the grp is deleted.
+	 */
+	while (!grp->lg_lacp_done) {
+		if ((mp = grp->lg_lacp_head) == NULL) {
+			CALLB_CPR_SAFE_BEGIN(&cprinfo);
+			cv_wait(&grp->lg_lacp_cv, &grp->lg_lacp_lock);
+			CALLB_CPR_SAFE_END(&cprinfo, &grp->lg_lacp_lock);
+			continue;
+		}
+
+		grp->lg_lacp_head = grp->lg_lacp_tail = NULL;
+		mutex_exit(&grp->lg_lacp_lock);
+
+		while (mp != NULL) {
+			nextmp = mp->b_next;
+			mp->b_next = NULL;
+			aggr_lacp_rx(mp);
+			mp = nextmp;
+		}
+		mutex_enter(&grp->lg_lacp_lock);
+	}
+
+	/*
+	 * The grp is being destroyed, simply free all of the LACP messages
+	 * left in the queue which did not have the chance to be processed.
+	 * We cannot use freemsgchain() here since we need to clear the
+	 * b_prev field.
+	 */
+	while ((mp = grp->lg_lacp_head) != NULL) {
+		port = (aggr_port_t *)mp->b_prev;
+		AGGR_PORT_REFRELE(port);
+		nextmp = mp->b_next;
+		mp->b_next = NULL;
+		mp->b_prev = NULL;
+		freemsg(mp);
+		mp = nextmp;
+	}
+
+	grp->lg_lacp_head = grp->lg_lacp_tail = NULL;
+	grp->lg_lacp_rx_thread = NULL;
+	cv_broadcast(&grp->lg_lacp_cv);
+	CALLB_CPR_EXIT(&cprinfo);
+	thread_exit();
 }

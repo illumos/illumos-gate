@@ -132,7 +132,7 @@
 #include <sys/sunddi.h>
 #include <sys/pci.h>
 #include <sys/errno.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/dlpi.h>
 #include <sys/ethernet.h>
 #include <sys/list.h>
@@ -232,7 +232,6 @@ static mac_callbacks_t ath_m_callbacks = {
 	ath_m_multicst,
 	ath_m_unicst,
 	ath_m_tx,
-	NULL,		/* mc_resources; */
 	ath_m_ioctl,
 	NULL,		/* mc_getcapab */
 	NULL,

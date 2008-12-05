@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/acctctl.h>
 #include <assert.h>
 #include <stdio.h>
@@ -33,6 +31,7 @@
 #include <string.h>
 #include <errno.h>
 #include <libintl.h>
+#include <libdllink.h>
 #include <locale.h>
 #include <priv.h>
 #include <libscf.h>
@@ -44,12 +43,12 @@
 
 static const char USAGE[] = "\
 Usage:\n\
-    acctadm [ {process | task | flow} ]\n\
+    acctadm [ {process | task | flow | net} ]\n\
     acctadm -s\n\
-    acctadm -r [ {process | task | flow} ]\n\
-    acctadm -x|-E|-D {process | task | flow}\n\
-    acctadm -f filename {process | task | flow}\n\
-    acctadm -e resources -d resources {process | task | flow}\n";
+    acctadm -r [ {process | task | flow | net} ]\n\
+    acctadm -x|-E|-D {process | task | flow | net}\n\
+    acctadm -f filename {process | task | flow | net}\n\
+    acctadm -e resources -d resources {process | task | flow | net}\n";
 
 static const char OPTS[] = "rsxf:e:d:ED";
 
@@ -77,6 +76,7 @@ setup_privs()
 
 	(void) priv_addset(privset, PRIV_SYS_ACCT);
 	(void) priv_addset(privset, PRIV_FILE_DAC_WRITE);
+	(void) priv_addset(privset, PRIV_SYS_DL_CONFIG);
 	(void) priv_delset(privset, PRIV_FILE_LINK_ANY);
 	(void) priv_delset(privset, PRIV_PROC_EXEC);
 	(void) priv_delset(privset, PRIV_PROC_FORK);
@@ -98,10 +98,11 @@ setup_privs()
 		die(gettext("cannot setup privileges"));
 
 	/*
-	 * Turn off the sys_acct and file_dac_write privileges until needed.
+	 * Turn off the sys_acct, file_dac_write and dl_config privileges
+	 * until needed.
 	 */
 	(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_FILE_DAC_WRITE,
-	    PRIV_SYS_ACCT, NULL);
+	    PRIV_SYS_ACCT, PRIV_SYS_DL_CONFIG, NULL);
 }
 
 int
@@ -183,7 +184,7 @@ main(int argc, char *argv[])
 		if (!(disabled || enabled || Dflg || Eflg || file || sflg ||
 		    xflg))
 			(void) priv_set(PRIV_OFF, PRIV_PERMITTED,
-			    PRIV_SYS_ACCT, NULL);
+			    PRIV_SYS_ACCT, PRIV_SYS_DL_CONFIG, NULL);
 
 		if (optind < argc) {
 			if (typestr != NULL) {
@@ -203,20 +204,34 @@ main(int argc, char *argv[])
 			type |= AC_TASK;
 		else if (strcmp(typestr, "flow") == 0)
 			type |= AC_FLOW;
+		else if (strcmp(typestr, "net") == 0)
+			type |= AC_NET;
 		else {
 			warn(gettext("unknown accounting type -- %s\n"),
 			    typestr);
 			usage();
 		}
 	} else
-		type = AC_PROC | AC_TASK | AC_FLOW;
+		type = AC_PROC | AC_TASK | AC_FLOW | AC_NET;
 
+	/*
+	 * Drop the DL config privilege if we are not working with
+	 * net.
+	 */
+	if ((type & AC_NET) == 0) {
+		(void) priv_set(PRIV_OFF, PRIV_PERMITTED,
+		    PRIV_SYS_DL_CONFIG, NULL);
+	}
 	/*
 	 * check for invalid options
 	 */
 	if (optcnt > 1)
 		usage();
 
+	/*
+	 * XXX For AC_NET, enabled/disabled should only be "basic" or
+	 * "extended" - need to check it here.
+	 */
 	if ((enabled || disabled) && (rflg || Dflg || sflg || xflg || Eflg))
 		usage();
 
@@ -253,9 +268,10 @@ main(int argc, char *argv[])
 		return (E_ERROR);
 	}
 
-	assert(type == AC_PROC || type == AC_TASK || type == AC_FLOW);
+	assert(type == AC_PROC || type == AC_TASK || type == AC_FLOW ||
+	    type == AC_NET);
 
-	if (type == AC_FLOW && getzoneid() != GLOBAL_ZONEID)
+	if ((type == AC_FLOW || type == AC_NET) && getzoneid() != GLOBAL_ZONEID)
 		die(gettext("%s accounting cannot be configured in "
 		    "non-global zones\n"), ac_type_name(type));
 
@@ -277,6 +293,18 @@ main(int argc, char *argv[])
 		/*
 		 * Turn off the specified accounting and close its file
 		 */
+
+		/*
+		 * Stop net logging before turning it off so that the last
+		 * set of logs can be written.
+		 */
+		if (type & AC_NET) {
+			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+			    PRIV_SYS_DL_CONFIG, NULL);
+			(void) dladm_stop_usagelog(DLADM_LOGTYPE_FLOW);
+			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+			    PRIV_SYS_DL_CONFIG, NULL);
+		}
 		state = AC_OFF;
 
 		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_SYS_ACCT, NULL);
@@ -311,8 +339,22 @@ main(int argc, char *argv[])
 			free(buf);
 			die(gettext("cannot obtain list of resources\n"));
 		}
-		if (disabled)
+		if (disabled) {
+			/*
+			 * Stop net logging before turning it off so that the
+			 * last set of logs can be written.
+			 */
+			if (type & AC_NET) {
+				(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+				    PRIV_SYS_DL_CONFIG, NULL);
+				(void) dladm_stop_usagelog(strncmp(disabled,
+				    "basic", strlen("basic")) == 0 ?
+				    DLADM_LOGTYPE_LINK : DLADM_LOGTYPE_FLOW);
+				(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+				    PRIV_SYS_DL_CONFIG, NULL);
+			}
 			str2buf(buf, disabled, AC_OFF, type);
+		}
 		if (enabled)
 			str2buf(buf, enabled, AC_ON, type);
 
@@ -332,6 +374,24 @@ main(int argc, char *argv[])
 		if (aconf_set_string(AC_PROP_UNTRACKED, untracked) == -1)
 			die(gettext("cannot update %s property\n"),
 			    AC_PROP_UNTRACKED);
+		/*
+		 * We will enable net logging after turning it on so that
+		 * it can immediately start writing log.
+		 */
+		if (type & AC_NET && enabled != NULL) {
+			/*
+			 * Default logging interval for AC_NET is 20.
+			 * XXX need to find the right place to
+			 * configure it.
+			 */
+			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+			    PRIV_SYS_DL_CONFIG, NULL);
+			(void) dladm_start_usagelog(strncmp(enabled, "basic",
+			    strlen("basic")) == 0 ? DLADM_LOGTYPE_LINK :
+			    DLADM_LOGTYPE_FLOW, 20);
+			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+			    PRIV_SYS_DL_CONFIG, NULL);
+		}
 		free(tracked);
 		free(untracked);
 		free(buf);
@@ -365,6 +425,18 @@ main(int argc, char *argv[])
 		/*
 		 * Disable accounting
 		 */
+
+		/*
+		 * Stop net logging before turning it off so that the last
+		 * set of logs can be written.
+		 */
+		if (type & AC_NET) {
+			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+			    PRIV_SYS_DL_CONFIG, NULL);
+			(void) dladm_stop_usagelog(DLADM_LOGTYPE_FLOW);
+			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+			    PRIV_SYS_DL_CONFIG, NULL);
+		}
 		state = AC_OFF;
 
 		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_SYS_ACCT, NULL);
@@ -395,6 +467,17 @@ main(int argc, char *argv[])
 			die(gettext("cannot update %s property\n"),
 			    AC_PROP_STATE);
 		modified++;
+		if (type & AC_NET) {
+			/*
+			 * Default logging interval for AC_NET is 20,
+			 * XXX need to find the right place to configure it.
+			 */
+			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
+			    PRIV_SYS_DL_CONFIG, NULL);
+			(void) dladm_start_usagelog(DLADM_LOGTYPE_FLOW, 20);
+			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
+			    PRIV_SYS_DL_CONFIG, NULL);
+		}
 	}
 	(void) priv_set(PRIV_OFF, PRIV_PERMITTED, PRIV_SYS_ACCT, NULL);
 

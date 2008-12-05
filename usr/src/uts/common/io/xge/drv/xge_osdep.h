@@ -37,8 +37,6 @@
 #ifndef _SYS_XGE_OSDEP_H
 #define	_SYS_XGE_OSDEP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/varargs.h>

@@ -40,6 +40,7 @@ extern "C" {
 #ifdef _KERNEL
 
 #include <sys/sdt.h>
+#include <sys/dld.h>
 
 #define	IP_MOD_ID		5701
 
@@ -359,7 +360,7 @@ typedef struct ip_mdt_info_s {
 	ill->ill_mdt_capab->ill_mdt_on != 0)
 
 #define	ILL_LSO_CAPABLE(ill)		\
-	(((ill)->ill_capabilities & ILL_CAPAB_LSO) != 0)
+	(((ill)->ill_capabilities & ILL_CAPAB_DLD_LSO) != 0)
 
 /*
  * ioctl identifier and structure for Large Segment Offload
@@ -378,12 +379,11 @@ typedef struct ip_lso_info_s {
 #define	ILL_LSO_USABLE(ill)						\
 	(ILL_LSO_CAPABLE(ill) &&					\
 	ill->ill_lso_capab != NULL &&					\
-	ill->ill_lso_capab->ill_lso_version == LSO_VERSION_1 &&		\
 	ill->ill_lso_capab->ill_lso_on != 0)
 
 #define	ILL_LSO_TCP_USABLE(ill)						\
 	(ILL_LSO_USABLE(ill) &&						\
-	ill->ill_lso_capab->ill_lso_flags & LSO_TX_BASIC_TCP_IPV4)
+	ill->ill_lso_capab->ill_lso_flags & DLD_LSO_TX_BASIC_TCP_IPV4)
 
 /*
  * Macro that determines whether or not a given CONN may be considered
@@ -497,42 +497,35 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 	(connp)->conn_udp->udp_drain_qfull :				\
 	!canputnext((connp)->conn_rq))
 
-#define	ILL_DLS_CAPABLE(ill)	\
-	(((ill)->ill_capabilities &		\
-	(ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING)) != 0)
+/* Macro that follows definitions of flags for mac_tx() (see mac_client.h) */
+#define	IP_DROP_ON_NO_DESC	0x01	/* Equivalent to MAC_DROP_ON_NO_DESC */
 
-/*
- * Macro that hands off one or more messages directly to DLD
- * when the interface is marked with ILL_CAPAB_POLL.
- */
-#define	IP_DLS_ILL_TX(ill, ipha, mp, ipst, hlen) {			\
-	ill_dls_capab_t *ill_dls = ill->ill_dls_capab;			\
-	ASSERT(ILL_DLS_CAPABLE(ill));					\
-	ASSERT(ill_dls != NULL);					\
-	ASSERT(ill_dls->ill_tx != NULL);				\
-	ASSERT(ill_dls->ill_tx_handle != NULL);				\
-	DTRACE_PROBE4(ip4__physical__out__start,			\
-	    ill_t *, NULL, ill_t *, ill,				\
-	    ipha_t *, ipha, mblk_t *, mp);				\
-	FW_HOOKS(ipst->ips_ip4_physical_out_event,			\
-	    ipst->ips_ipv4firewall_physical_out,			\
-	    NULL, ill, ipha, mp, mp, 0, ipst);				\
-	DTRACE_PROBE1(ip4__physical__out__end, mblk_t *, mp);		\
-	if (mp != NULL) {						\
-		if (ipst->ips_ipobs_enabled) {				\
-			zoneid_t szone;					\
-									\
-			szone = ip_get_zoneid_v4(ipha->ipha_src, mp,	\
-			    ipst, ALL_ZONES);				\
-			ipobs_hook(mp, IPOBS_HOOK_OUTBOUND, szone,	\
-			    ALL_ZONES, ill, IPV4_VERSION, hlen, ipst);	\
-		}							\
-		DTRACE_IP7(send, mblk_t *, mp, conn_t *, NULL,		\
-		    void_ip_t *, ipha, __dtrace_ipsr_ill_t *, ill,	\
-		    ipha_t *, ipha, ip6_t *, NULL, int,	0);		\
-		ill_dls->ill_tx(ill_dls->ill_tx_handle, mp);		\
-	}								\
+#define	ILL_DIRECT_CAPABLE(ill)						\
+	(((ill)->ill_capabilities & ILL_CAPAB_DLD_DIRECT) != 0)
+
+#define	ILL_SEND_TX(ill, ire, hint, mp, flag) {			\
+	if (ILL_DIRECT_CAPABLE(ill) && DB_TYPE(mp) == M_DATA) {	\
+		ill_dld_direct_t *idd;				\
+								\
+		idd = &(ill)->ill_dld_capab->idc_direct;	\
+		/*						\
+		 * Send the packet directly to DLD, where it	\
+		 * may be queued depending on the availability	\
+		 * of transmit resources at the media layer.	\
+		 * Ignore the returned value for the time being \
+		 * In future, we may want to take this into	\
+		 * account and flow control the TCP.		\
+		 */						\
+		(void) idd->idd_tx_df(idd->idd_tx_dh, mp,	\
+		    (uintptr_t)(hint), flag);			\
+	} else {						\
+		putnext((ire)->ire_stq, mp);			\
+	}							\
 }
+
+#define	MBLK_RX_FANOUT_SLOWPATH(mp, ipha)				\
+	(DB_TYPE(mp) != M_DATA || DB_REF(mp) != 1 || !OK_32PTR(ipha) || \
+	(((uchar_t *)ipha + IP_SIMPLE_HDR_LENGTH) >= (mp)->b_wptr))
 
 /*
  * In non-global zone exclusive IP stacks, data structures such as IRE
@@ -548,6 +541,7 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 extern int	ip_wput_frag_mdt_min;
 extern boolean_t ip_can_frag_mdt(mblk_t *, ssize_t, ssize_t);
 extern mblk_t   *ip_prepend_zoneid(mblk_t *, zoneid_t, ip_stack_t *);
+extern void ill_flow_enable(void *, ip_mac_tx_cookie_t);
 extern zoneid_t	ip_get_zoneid_v4(ipaddr_t, mblk_t *, ip_stack_t *, zoneid_t);
 extern zoneid_t	ip_get_zoneid_v6(in6_addr_t *, mblk_t *, const ill_t *,
     ip_stack_t *, zoneid_t);

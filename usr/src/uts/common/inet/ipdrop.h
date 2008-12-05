@@ -124,7 +124,6 @@ struct ip_dropstats {
 };
 
 #endif /* _KERNEL */
-
 #ifdef	__cplusplus
 }
 #endif

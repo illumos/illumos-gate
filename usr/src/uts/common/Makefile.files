@@ -174,6 +174,7 @@ GENUNIX_OBJS +=	\
 		inet_ntop.o	\
 		instance.o	\
 		ioctl.o		\
+		ip_cksum.o	\
 		issetugid.o	\
 		ippconf.o	\
 		kcpc.o		\
@@ -265,6 +266,7 @@ GENUNIX_OBJS +=	\
 		sidsys.o	\
 		sched.o		\
 		schedctl.o	\
+		sctp_crc32.o	\
 		seg_dev.o	\
 		seg_kp.o	\
 		seg_kpm.o	\
@@ -474,7 +476,7 @@ IP_ICMP_OBJS =	icmp.o icmp_opt_data.o
 IP_RTS_OBJS =	rts.o rts_opt_data.o
 IP_TCP_OBJS =	tcp.o tcp_fusion.o tcp_kssl.o tcp_opt_data.o tcp_sack.o
 IP_UDP_OBJS =	udp.o udp_opt_data.o
-IP_SCTP_OBJS =	sctp_crc32.o sctp.o sctp_opt_data.o sctp_output.o \
+IP_SCTP_OBJS =	sctp.o sctp_opt_data.o sctp_output.o \
 		sctp_init.o sctp_input.o sctp_cookie.o \
 		sctp_conn.o sctp_error.o sctp_snmp.o \
 		sctp_param.o sctp_shutdown.o sctp_common.o \
@@ -483,7 +485,7 @@ IP_SCTP_OBJS =	sctp_crc32.o sctp.o sctp_opt_data.o sctp_output.o \
 		sctp_addr.o tn_ipopt.o tnet.o ip_netinfo.o
 
 IP_OBJS +=	igmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
-		ip_cksum.o ip_if.o ip_ire.o ip_listutils.o ip_mroute.o \
+		ip_if.o ip_ire.o ip_listutils.o ip_mroute.o \
 		ip_multi.o ip_ndp.o ip_opt_data.o ip_rts.o ip_srcid.o \
 		ipddi.o ipdrop.o mi.o nd.o optcom.o snmpcom.o ipsec_loader.o \
 		spd.o ipclassifier.o inet_common.o ip_squeue.o squeue.o \
@@ -560,14 +562,15 @@ CLONE_OBJS +=	clone.o
 
 CN_OBJS +=	cons.o
 
-DLD_OBJS +=	dld_drv.o dld_proto.o dld_str.o
+DLD_OBJS +=	dld_drv.o dld_proto.o dld_str.o dld_flow.o
 
-DLS_OBJS +=	dls.o dls_link.o dls_mod.o dls_stat.o dls_vlan.o \
-		dls_soft_ring.o dls_mgmt.o
+DLS_OBJS +=	dls.o dls_link.o dls_mod.o dls_stat.o dls_mgmt.o
 
 GLD_OBJS +=     gld.o gldutil.o
 
-MAC_OBJS +=     mac.o mac_mod.o mac_stat.o mac_ndd.o
+MAC_OBJS +=     mac.o  mac_bcast.o mac_client.o mac_datapath_setup.o mac_flow.o \
+		mac_hio.o mac_mod.o mac_ndd.o mac_provider.o mac_sched.o \
+		mac_soft_ring.o mac_stat.o mac_util.o
 
 MAC_ETHER_OBJS +=	mac_ether.o
 
@@ -578,8 +581,6 @@ MAC_IB_OBJS +=		mac_ib.o
 AGGR_OBJS +=	aggr_dev.o aggr_ctl.o aggr_grp.o aggr_port.o \
 		aggr_send.o aggr_recv.o aggr_lacp.o
 
-VNIC_OBJS +=	vnic_ctl.o vnic_dev.o vnic_bcast.o vnic_cl.o
-
 SOFTMAC_OBJS += softmac_main.o softmac_ctl.o softmac_capab.o \
 		softmac_dev.o softmac_stat.o softmac_pkt.o
 
@@ -587,6 +588,8 @@ NET80211_OBJS += net80211.o net80211_proto.o net80211_input.o \
 		 net80211_output.o net80211_node.o net80211_crypto.o \
 		 net80211_crypto_none.o net80211_crypto_wep.o net80211_ioctl.o \
 		 net80211_crypto_tkip.o net80211_crypto_ccmp.o
+
+VNIC_OBJS +=	vnic_ctl.o vnic_dev.o
 
 IB_OBJS +=	ibnex.o ibnex_ioctl.o
 
@@ -1724,18 +1727,17 @@ IXGBE_OBJS =    ixgbe_82598.o ixgbe_api.o ixgbe_common.o        \
 #
 #	NIU 10G/1G driver module
 #
-NXGE_OBJS =	nxge_mac.o nxge_ipp.o nxge_rxdma.o 		\
-		nxge_txdma.o nxge_txc.o	nxge_main.o		\
+NXGE_OBJS =	nxge_mac.o nxge_ipp.o nxge_rxdma.o		\
+		nxge_txdma.o nxge_txc.o nxge_main.o		\
 		nxge_hw.o nxge_fzc.o nxge_virtual.o		\
 		nxge_send.o nxge_classify.o nxge_fflp.o		\
 		nxge_fflp_hash.o nxge_ndd.o nxge_kstats.o	\
-		nxge_zcp.o nxge_fm.o nxge_espc.o		\
-		nxge_serialize.o nxge_hv.o			\
+		nxge_zcp.o nxge_fm.o nxge_espc.o nxge_hv.o	\
 		nxge_hio.o nxge_hio_guest.o nxge_intr.o
 
 NXGE_NPI_OBJS =	\
-		npi.o npi_mac.o	npi_ipp.o			\
-		npi_txdma.o npi_rxdma.o	npi_txc.o		\
+		npi.o npi_mac.o npi_ipp.o			\
+		npi_txdma.o npi_rxdma.o npi_txc.o		\
 		npi_zcp.o npi_espc.o npi_fflp.o			\
 		npi_vir.o
 

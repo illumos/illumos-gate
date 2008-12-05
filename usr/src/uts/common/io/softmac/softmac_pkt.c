@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/strsubr.h>
 #include <inet/led.h>
 #include <sys/softmac_impl.h>
@@ -69,40 +67,6 @@ softmac_m_tx(void *arg, mblk_t *mp)
 	return (mp);
 }
 
-/*ARGSUSED*/
-static void
-softmac_blank(void *arg, time_t ticks, uint_t count)
-{
-}
-
-void
-softmac_m_resources(void *arg)
-{
-	softmac_t	*softmac = arg;
-	softmac_lower_t	*slp = softmac->smac_lower;
-	mac_rx_fifo_t	mrf;
-
-	ASSERT((softmac->smac_state == SOFTMAC_READY) && (slp != NULL));
-
-	/*
-	 * Register rx resources and save resource handle for future reference.
-	 * Note that the mac_resources() function must be called when the lower
-	 * stream is plumbed.
-	 */
-
-	mutex_enter(&slp->sl_mutex);
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = softmac_blank;
-	mrf.mrf_arg = slp;
-	mrf.mrf_normal_blank_time = SOFTMAC_BLANK_TICKS;
-	mrf.mrf_normal_pkt_count = SOFTMAC_BLANK_PKT_COUNT;
-
-	slp->sl_handle =
-	    mac_resource_add(softmac->smac_mh, (mac_resource_t *)&mrf);
-
-	mutex_exit(&slp->sl_mutex);
-}
 
 void
 softmac_rput_process_data(softmac_lower_t *slp, mblk_t *mp)
@@ -125,7 +89,7 @@ softmac_rput_process_data(softmac_lower_t *slp, mblk_t *mp)
 		mp = tmp;
 	}
 
-	mac_rx(slp->sl_softmac->smac_mh, slp->sl_handle, mp);
+	mac_rx(slp->sl_softmac->smac_mh, NULL, mp);
 	return;
 
 failed:

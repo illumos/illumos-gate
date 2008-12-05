@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../../Makefile.cmd
 
@@ -51,6 +49,7 @@ COMMON_MOD_SRC = \
 	$(COMMON)/swap_rcm.c \
 	$(COMMON)/network_rcm.c \
 	$(COMMON)/vlan_rcm.c \
+	$(COMMON)/vnic_rcm.c \
 	$(COMMON)/aggr_rcm.c \
 	$(COMMON)/ip_rcm.c \
 	$(COMMON)/cluster_rcm.c \
@@ -71,6 +70,7 @@ COMMON_MOD_OBJ = \
 	swap_rcm.o \
 	network_rcm.o \
 	vlan_rcm.o \
+	vnic_rcm.o \
 	aggr_rcm.o \
 	ip_rcm.o \
 	cluster_rcm.o \
@@ -89,6 +89,7 @@ COMMON_RCM_MODS = \
 	SUNW_swap_rcm.so \
 	SUNW_network_rcm.so \
 	SUNW_vlan_rcm.so \
+	SUNW_vnic_rcm.so \
 	SUNW_aggr_rcm.so \
 	SUNW_ip_rcm.so \
 	SUNW_cluster_rcm.so \
@@ -121,6 +122,7 @@ SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool
 SUNW_svm_rcm.so	:= LDLIBS_MODULES += -L$(ROOT)/usr/lib -lmeta
 SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_vlan_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
+SUNW_vnic_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_aggr_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil -ldladm
 SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil

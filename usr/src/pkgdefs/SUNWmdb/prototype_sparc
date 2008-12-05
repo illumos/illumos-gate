@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 !include prototype_com
 
@@ -53,6 +52,7 @@ f none usr/lib/mdb/kvm/sparcv9/isp.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/krtld.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/lofs.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/logindmux.so 555 root sys
+f none usr/lib/mdb/kvm/sparcv9/mac.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/md.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/mdb_ks.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/mpt.so 555 root sys

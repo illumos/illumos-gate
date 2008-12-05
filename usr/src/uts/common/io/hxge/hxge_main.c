@@ -151,13 +151,8 @@ static int hxge_m_unicst(void *, const uint8_t *);
 static int hxge_m_multicst(void *, boolean_t, const uint8_t *);
 static int hxge_m_promisc(void *, boolean_t);
 static void hxge_m_ioctl(void *, queue_t *, mblk_t *);
-static void hxge_m_resources(void *);
 static hxge_status_t hxge_mac_register(p_hxge_t hxgep);
 
-static int hxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr);
-static int hxge_m_mmac_remove(void *arg, mac_addr_slot_t slot);
-static int hxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr);
-static int hxge_m_mmac_get(void *arg, mac_multi_addr_t *maddr);
 static boolean_t hxge_m_getcapab(void *, mac_capab_t, void *);
 static boolean_t hxge_param_locked(mac_prop_id_t pr_num);
 static int hxge_m_setprop(void *barg, const char *pr_name, mac_prop_id_t pr_num,
@@ -196,7 +191,7 @@ mac_priv_prop_t hxge_priv_props[] = {
 #define	MAX_DUMP_SZ 256
 
 #define	HXGE_M_CALLBACK_FLAGS	\
-	(MC_RESOURCES | MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
 extern mblk_t *hxge_m_tx(void *arg, mblk_t *mp);
 extern hxge_status_t hxge_pfc_set_default_mac_addr(p_hxge_t hxgep);
@@ -210,7 +205,6 @@ static mac_callbacks_t hxge_m_callbacks = {
 	hxge_m_multicst,
 	hxge_m_unicst,
 	hxge_m_tx,
-	hxge_m_resources,
 	hxge_m_ioctl,
 	hxge_m_getcapab,
 	NULL,
@@ -2697,386 +2691,17 @@ hxge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	HXGE_DEBUG_MSG((hxgep, NEMO_CTL, "<== hxge_m_ioctl"));
 }
 
-extern void hxge_rx_hw_blank(void *arg, time_t ticks, uint_t count);
-
-static void
-hxge_m_resources(void *arg)
-{
-	p_hxge_t hxgep = arg;
-	mac_rx_fifo_t mrf;
-	p_rx_rcr_rings_t rcr_rings;
-	p_rx_rcr_ring_t *rcr_p;
-	p_rx_rcr_ring_t rcrp;
-	uint32_t i, ndmas;
-	int status;
-
-	HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_m_resources"));
-
-	MUTEX_ENTER(hxgep->genlock);
-
-	if (!(hxgep->drv_state & STATE_HW_INITIALIZED)) {
-		status = hxge_init(hxgep);
-		if (status != HXGE_OK) {
-			HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_m_resources: "
-			    "hxge_init failed"));
-			MUTEX_EXIT(hxgep->genlock);
-			return;
-		}
-	}
-
-	mrf.mrf_type = MAC_RX_FIFO;
-	mrf.mrf_blank = hxge_rx_hw_blank;
-	mrf.mrf_arg = (void *)hxgep;
-
-	mrf.mrf_normal_blank_time = RXDMA_RCR_TO_DEFAULT;
-	mrf.mrf_normal_pkt_count = RXDMA_RCR_PTHRES_DEFAULT;
-
-	rcr_rings = hxgep->rx_rcr_rings;
-	rcr_p = rcr_rings->rcr_rings;
-	ndmas = rcr_rings->ndmas;
-
-	/*
-	 * Export our receive resources to the MAC layer.
-	 */
-	for (i = 0; i < ndmas; i++) {
-		rcrp = (void *)(p_rx_rcr_ring_t)rcr_p[i];
-		rcrp->rcr_mac_handle =
-		    mac_resource_add(hxgep->mach, (mac_resource_t *)&mrf);
-
-		HXGE_DEBUG_MSG((hxgep, RX_CTL,
-		    "==> hxge_m_resources: vdma %d dma %d "
-		    "rcrptr 0x%016llx mac_handle 0x%016llx",
-		    i, rcrp->rdc, rcr_p[i], rcrp->rcr_mac_handle));
-	}
-
-	MUTEX_EXIT(hxgep->genlock);
-
-	HXGE_DEBUG_MSG((hxgep, RX_CTL, "<== hxge_m_resources"));
-}
-
-/*
- * Set an alternate MAC address
- */
-static int
-hxge_altmac_set(p_hxge_t hxgep, uint8_t *maddr, mac_addr_slot_t slot)
-{
-	uint64_t	address;
-	uint64_t	tmp;
-	hpi_status_t	status;
-	uint8_t		addrn;
-	int		i;
-
-	/*
-	 * Convert a byte array to a 48 bit value.
-	 * Need to check endianess if in doubt
-	 */
-	address = 0;
-	for (i = 0; i < ETHERADDRL; i++) {
-		tmp = maddr[i];
-		address <<= 8;
-		address |= tmp;
-	}
-
-	addrn = (uint8_t)slot;
-	status = hpi_pfc_set_mac_address(hxgep->hpi_handle, addrn, address);
-	if (status != HPI_SUCCESS)
-		return (EIO);
-
-	return (0);
-}
-
-static void
-hxge_mmac_kstat_update(p_hxge_t hxgep, mac_addr_slot_t slot)
-{
-	p_hxge_mmac_stats_t	mmac_stats;
-	int			i;
-	hxge_mmac_t		*mmac_info;
-
-	mmac_info = &hxgep->hxge_mmac_info;
-	mmac_stats = &hxgep->statsp->mmac_stats;
-	mmac_stats->mmac_max_cnt = mmac_info->num_mmac;
-	mmac_stats->mmac_avail_cnt = mmac_info->naddrfree;
-
-	for (i = 0; i < ETHERADDRL; i++) {
-		mmac_stats->mmac_avail_pool[slot].ether_addr_octet[i] =
-		    mmac_info->mac_pool[slot].addr[(ETHERADDRL - 1) - i];
-	}
-}
-
-/*
- * Find an unused address slot, set the address value to the one specified,
- * enable the port to start filtering on the new MAC address.
- * Returns: 0 on success.
- */
-int
-hxge_m_mmac_add(void *arg, mac_multi_addr_t *maddr)
-{
-	p_hxge_t	hxgep = arg;
-	mac_addr_slot_t	slot;
-	hxge_mmac_t	*mmac_info;
-	int		err;
-	hxge_status_t	status;
-
-	mutex_enter(hxgep->genlock);
-
-	/*
-	 * Make sure that hxge is initialized, if _start() has
-	 * not been called.
-	 */
-	if (!(hxgep->drv_state & STATE_HW_INITIALIZED)) {
-		status = hxge_init(hxgep);
-		if (status != HXGE_OK) {
-			mutex_exit(hxgep->genlock);
-			return (ENXIO);
-		}
-	}
-
-	mmac_info = &hxgep->hxge_mmac_info;
-	if (mmac_info->naddrfree == 0) {
-		mutex_exit(hxgep->genlock);
-		return (ENOSPC);
-	}
-
-	if (!mac_unicst_verify(hxgep->mach, maddr->mma_addr,
-	    maddr->mma_addrlen)) {
-		mutex_exit(hxgep->genlock);
-		return (EINVAL);
-	}
-
-	/*
-	 * Search for the first available slot. Because naddrfree
-	 * is not zero, we are guaranteed to find one.
-	 * Slot 0 is for unique (primary) MAC.  The first alternate
-	 * MAC slot is slot 1.
-	 */
-	for (slot = 1; slot < mmac_info->num_mmac; slot++) {
-		if (!(mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED))
-			break;
-	}
-
-	ASSERT(slot < mmac_info->num_mmac);
-	if ((err = hxge_altmac_set(hxgep, maddr->mma_addr, slot)) != 0) {
-		mutex_exit(hxgep->genlock);
-		return (err);
-	}
-	bcopy(maddr->mma_addr, mmac_info->mac_pool[slot].addr, ETHERADDRL);
-	mmac_info->mac_pool[slot].flags |= MMAC_SLOT_USED;
-	mmac_info->naddrfree--;
-	hxge_mmac_kstat_update(hxgep, slot);
-
-	maddr->mma_slot = slot;
-
-	mutex_exit(hxgep->genlock);
-	return (0);
-}
-
-/*
- * Remove the specified mac address and update
- * the h/w not to filter the mac address anymore.
- * Returns: 0, on success.
- */
-int
-hxge_m_mmac_remove(void *arg, mac_addr_slot_t slot)
-{
-	p_hxge_t	hxgep = arg;
-	hxge_mmac_t	*mmac_info;
-	int		err = 0;
-	hxge_status_t	status;
-
-	mutex_enter(hxgep->genlock);
-
-	/*
-	 * Make sure that hxge is initialized, if _start() has
-	 * not been called.
-	 */
-	if (!(hxgep->drv_state & STATE_HW_INITIALIZED)) {
-		status = hxge_init(hxgep);
-		if (status != HXGE_OK) {
-			mutex_exit(hxgep->genlock);
-			return (ENXIO);
-		}
-	}
-
-	mmac_info = &hxgep->hxge_mmac_info;
-	if (slot <= 0 || slot >= mmac_info->num_mmac) {
-		mutex_exit(hxgep->genlock);
-		return (EINVAL);
-	}
-
-	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
-		if (hpi_pfc_mac_addr_disable(hxgep->hpi_handle, slot) ==
-		    HPI_SUCCESS) {
-			mmac_info->mac_pool[slot].flags &= ~MMAC_SLOT_USED;
-			mmac_info->naddrfree++;
-			/*
-			 * Clear mac_pool[slot].addr so that kstat shows 0
-			 * alternate MAC address if the slot is not used.
-			 */
-			bzero(mmac_info->mac_pool[slot].addr, ETHERADDRL);
-			hxge_mmac_kstat_update(hxgep, slot);
-		} else {
-			err = EIO;
-		}
-	} else {
-		err = EINVAL;
-	}
-
-	mutex_exit(hxgep->genlock);
-	return (err);
-}
-
-/*
- * Modify a mac address added by hxge_mmac_add().
- * Returns: 0, on success.
- */
-int
-hxge_m_mmac_modify(void *arg, mac_multi_addr_t *maddr)
-{
-	p_hxge_t	hxgep = arg;
-	mac_addr_slot_t	slot;
-	hxge_mmac_t	*mmac_info;
-	int		err = 0;
-	hxge_status_t	status;
-
-	if (!mac_unicst_verify(hxgep->mach, maddr->mma_addr,
-	    maddr->mma_addrlen))
-		return (EINVAL);
-
-	slot = maddr->mma_slot;
-
-	mutex_enter(hxgep->genlock);
-
-	/*
-	 * Make sure that hxge is initialized, if _start() has
-	 * not been called.
-	 */
-	if (!(hxgep->drv_state & STATE_HW_INITIALIZED)) {
-		status = hxge_init(hxgep);
-		if (status != HXGE_OK) {
-			mutex_exit(hxgep->genlock);
-			return (ENXIO);
-		}
-	}
-
-	mmac_info = &hxgep->hxge_mmac_info;
-	if (slot <= 0 || slot >= mmac_info->num_mmac) {
-		mutex_exit(hxgep->genlock);
-		return (EINVAL);
-	}
-
-	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
-		if ((err = hxge_altmac_set(hxgep, maddr->mma_addr,
-		    slot)) == 0) {
-			bcopy(maddr->mma_addr, mmac_info->mac_pool[slot].addr,
-			    ETHERADDRL);
-			hxge_mmac_kstat_update(hxgep, slot);
-		}
-	} else {
-		err = EINVAL;
-	}
-
-	mutex_exit(hxgep->genlock);
-	return (err);
-}
-
-/*
- * static int
- * hxge_m_mmac_get() - Get the MAC address and other information
- *	related to the slot.  mma_flags should be set to 0 in the call.
- *	Note: although kstat shows MAC address as zero when a slot is
- *	not used, Crossbow expects hxge_m_mmac_get to copy factory MAC
- *	to the caller as long as the slot is not using a user MAC address.
- *	The following table shows the rules,
- *
- *     					USED    VENDOR    mma_addr
- *	------------------------------------------------------------
- *	(1) Slot uses a user MAC:	yes      no     user MAC
- *	(2) Slot uses a factory MAC:    yes      yes    factory MAC
- *	(3) Slot is not used but is
- *	     factory MAC capable:	no       yes    factory MAC
- *	(4) Slot is not used and is
- *	     not factory MAC capable:   no       no	0
- *	------------------------------------------------------------
- */
-int
-hxge_m_mmac_get(void *arg, mac_multi_addr_t *maddr)
-{
-	hxge_t		*hxgep = arg;
-	mac_addr_slot_t	slot;
-	hxge_mmac_t	*mmac_info;
-	hxge_status_t	status;
-
-	slot = maddr->mma_slot;
-
-	mutex_enter(hxgep->genlock);
-
-	/*
-	 * Make sure that hxge is initialized, if _start() has
-	 * not been called.
-	 */
-	if (!(hxgep->drv_state & STATE_HW_INITIALIZED)) {
-		status = hxge_init(hxgep);
-		if (status != HXGE_OK) {
-			mutex_exit(hxgep->genlock);
-			return (ENXIO);
-		}
-	}
-
-	mmac_info = &hxgep->hxge_mmac_info;
-	if (slot <= 0 || slot >= mmac_info->num_mmac) {
-		mutex_exit(hxgep->genlock);
-		return (EINVAL);
-	}
-
-	maddr->mma_flags = 0;
-	if (mmac_info->mac_pool[slot].flags & MMAC_SLOT_USED) {
-		maddr->mma_flags |= MMAC_SLOT_USED;
-		bcopy(mmac_info->mac_pool[slot].addr,
-		    maddr->mma_addr, ETHERADDRL);
-		maddr->mma_addrlen = ETHERADDRL;
-	}
-
-	mutex_exit(hxgep->genlock);
-	return (0);
-}
-
 /*ARGSUSED*/
 boolean_t
 hxge_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 {
-	p_hxge_t		hxgep = (p_hxge_t)arg;
 	uint32_t		*txflags = cap_data;
-	multiaddress_capab_t	*mmacp = cap_data;
 
 	switch (cap) {
 	case MAC_CAPAB_HCKSUM:
 		*txflags = HCKSUM_INET_PARTIAL;
 		break;
 
-	case MAC_CAPAB_POLL:
-		/*
-		 * There's nothing for us to fill in, simply returning B_TRUE
-		 * stating that we support polling is sufficient.
-		 */
-		break;
-
-	case MAC_CAPAB_MULTIADDRESS:
-		/*
-		 * The number of MAC addresses made available by
-		 * this capability is one less than the total as
-		 * the primary address in slot 0 is counted in
-		 * the total.
-		 */
-		mmacp->maddr_naddr = PFC_N_MAC_ADDRESSES - 1;
-		mmacp->maddr_naddrfree = hxgep->hxge_mmac_info.naddrfree;
-		mmacp->maddr_flag = 0;	/* No multiple factory macs */
-		mmacp->maddr_handle = hxgep;
-		mmacp->maddr_add = hxge_m_mmac_add;
-		mmacp->maddr_remove = hxge_m_mmac_remove;
-		mmacp->maddr_modify = hxge_m_mmac_modify;
-		mmacp->maddr_get = hxge_m_mmac_get;
-		mmacp->maddr_reserve = NULL;	/* No multiple factory macs */
-		break;
 	default:
 		return (B_FALSE);
 	}

@@ -60,6 +60,8 @@ static void igb_setup_tx(igb_t *);
 static void igb_setup_rx_ring(igb_rx_ring_t *);
 static void igb_setup_tx_ring(igb_tx_ring_t *);
 static void igb_setup_rss(igb_t *);
+static void igb_setup_mac_rss_classify(igb_t *);
+static void igb_setup_mac_classify(igb_t *);
 static void igb_init_unicst(igb_t *);
 static void igb_setup_multicst(igb_t *);
 static void igb_get_phy_state(igb_t *);
@@ -93,10 +95,11 @@ static void igb_setup_adapter_msix(igb_t *);
 static uint_t igb_intr_legacy(void *, void *);
 static uint_t igb_intr_msi(void *, void *);
 static uint_t igb_intr_rx(void *, void *);
+static uint_t igb_intr_tx(void *, void *);
 static uint_t igb_intr_tx_other(void *, void *);
 static void igb_intr_rx_work(igb_rx_ring_t *);
 static void igb_intr_tx_work(igb_tx_ring_t *);
-static void igb_intr_other_work(igb_t *);
+static void igb_intr_link_work(igb_t *);
 static void igb_get_driver_control(struct e1000_hw *);
 static void igb_release_driver_control(struct e1000_hw *);
 
@@ -175,13 +178,11 @@ static mac_callbacks_t igb_m_callbacks = {
 	igb_m_stop,
 	igb_m_promisc,
 	igb_m_multicst,
-	igb_m_unicst,
-	igb_m_tx,
+	NULL,
 	NULL,
 	igb_m_ioctl,
 	igb_m_getcapab
 };
-
 
 /*
  * Module Initialization Functions
@@ -339,7 +340,7 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * interrupts are allocated.
 	 */
 	if (igb_alloc_rings(igb) != IGB_SUCCESS) {
-		igb_error(igb, "Failed to allocate rx and tx rings");
+		igb_error(igb, "Failed to allocate rx/tx rings or groups");
 		goto attach_fail;
 	}
 	igb->attach_progress |= ATTACH_PROGRESS_ALLOC_RINGS;
@@ -378,10 +379,13 @@ igb_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	/*
 	 * Initialize chipset hardware
 	 */
+	mutex_enter(&igb->gen_lock);
 	if (igb_init(igb) != IGB_SUCCESS) {
+		mutex_exit(&igb->gen_lock);
 		igb_error(igb, "Failed to initialize adapter");
 		goto attach_fail;
 	}
+	mutex_exit(&igb->gen_lock);
 	igb->attach_progress |= ATTACH_PROGRESS_INIT;
 
 	/*
@@ -710,6 +714,7 @@ igb_register_mac(igb_t *igb)
 	mac->m_max_sdu = igb->max_frame_size -
 	    sizeof (struct ether_vlan_header) - ETHERFCSL;
 	mac->m_margin = VLAN_TAGSZ;
+	mac->m_v12n = MAC_VIRT_LEVEL1;
 
 	status = mac_register(mac, &igb->mac_hdl);
 
@@ -1019,7 +1024,7 @@ igb_init(igb_t *igb)
 	uint32_t pba;
 	uint32_t high_water;
 
-	mutex_enter(&igb->gen_lock);
+	ASSERT(mutex_owned(&igb->gen_lock));
 
 	/*
 	 * Reset chipset to put the hardware in a known state
@@ -1121,7 +1126,6 @@ igb_init(igb_t *igb)
 		goto init_fail;
 	}
 
-	mutex_exit(&igb->gen_lock);
 	return (IGB_SUCCESS);
 
 init_fail:
@@ -1130,8 +1134,6 @@ init_fail:
 	 */
 	if (e1000_check_reset_block(hw) == E1000_SUCCESS)
 		(void) e1000_phy_hw_reset(hw);
-
-	mutex_exit(&igb->gen_lock);
 
 	ddi_fm_service_impact(igb->dip, DDI_SERVICE_LOST);
 
@@ -1541,9 +1543,12 @@ igb_start(igb_t *igb)
 	/*
 	 * Start the chipset hardware
 	 */
-	if (igb_chip_start(igb) != IGB_SUCCESS) {
-		igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
-		goto start_failure;
+	if (!(igb->attach_progress & ATTACH_PROGRESS_INIT)) {
+		if (igb_init(igb) != IGB_SUCCESS) {
+			igb_fm_ereport(igb, DDI_FM_DEVICE_INVAL_STATE);
+			goto start_failure;
+		}
+		igb->attach_progress |= ATTACH_PROGRESS_INIT;
 	}
 
 	/*
@@ -1590,6 +1595,8 @@ igb_stop(igb_t *igb)
 	int i;
 
 	ASSERT(mutex_owned(&igb->gen_lock));
+
+	igb->attach_progress &= ~ ATTACH_PROGRESS_INIT;
 
 	/*
 	 * Disable the adapter interrupts
@@ -1656,6 +1663,23 @@ igb_alloc_rings(igb_t *igb)
 		return (IGB_FAILURE);
 	}
 
+	/*
+	 * Allocate memory space for rx ring groups
+	 */
+	igb->rx_groups = kmem_zalloc(
+	    sizeof (igb_rx_group_t) * igb->num_rx_groups,
+	    KM_NOSLEEP);
+
+	if (igb->rx_groups == NULL) {
+		kmem_free(igb->rx_rings,
+		    sizeof (igb_rx_ring_t) * igb->num_rx_rings);
+		kmem_free(igb->tx_rings,
+		    sizeof (igb_tx_ring_t) * igb->num_tx_rings);
+		igb->rx_rings = NULL;
+		igb->tx_rings = NULL;
+		return (IGB_FAILURE);
+	}
+
 	return (IGB_SUCCESS);
 }
 
@@ -1675,6 +1699,12 @@ igb_free_rings(igb_t *igb)
 		kmem_free(igb->tx_rings,
 		    sizeof (igb_tx_ring_t) * igb->num_tx_rings);
 		igb->tx_rings = NULL;
+	}
+
+	if (igb->rx_groups != NULL) {
+		kmem_free(igb->rx_groups,
+		    sizeof (igb_rx_group_t) * igb->num_rx_groups);
+		igb->rx_groups = NULL;
 	}
 }
 
@@ -1782,8 +1812,10 @@ static void
 igb_setup_rx(igb_t *igb)
 {
 	igb_rx_ring_t *rx_ring;
+	igb_rx_group_t *rx_group;
 	struct e1000_hw *hw = &igb->hw;
 	uint32_t reg_val;
+	uint32_t ring_per_group;
 	int i;
 
 	/*
@@ -1804,12 +1836,24 @@ igb_setup_rx(igb_t *igb)
 
 	E1000_WRITE_REG(hw, E1000_RCTL, reg_val);
 
+	for (i = 0; i < igb->num_rx_groups; i++) {
+		rx_group = &igb->rx_groups[i];
+		rx_group->index = i;
+		rx_group->igb = igb;
+	}
+
 	/*
 	 * igb_setup_rx_ring must be called after configuring RCTL
 	 */
+	ring_per_group = igb->num_rx_rings / igb->num_rx_groups;
 	for (i = 0; i < igb->num_rx_rings; i++) {
 		rx_ring = &igb->rx_rings[i];
 		igb_setup_rx_ring(rx_ring);
+
+		/*
+		 * Map a ring to a group by assigning a group index
+		 */
+		rx_ring->group_index = i / ring_per_group;
 	}
 
 	/*
@@ -1829,10 +1873,32 @@ igb_setup_rx(igb_t *igb)
 	}
 
 	/*
-	 * Setup RSS for multiple receive queues
+	 * Setup classify and RSS for multiple receive queues
 	 */
-	if (igb->num_rx_rings > 1)
-		igb_setup_rss(igb);
+	switch (igb->vmdq_mode) {
+	case E1000_VMDQ_OFF:
+		/*
+		 * One ring group, only RSS is needed when more than
+		 * one ring enabled.
+		 */
+		if (igb->num_rx_rings > 1)
+			igb_setup_rss(igb);
+		break;
+	case E1000_VMDQ_MAC:
+		/*
+		 * Multiple groups, each group has one ring,
+		 * only the MAC classification is needed.
+		 */
+		igb_setup_mac_classify(igb);
+		break;
+	case E1000_VMDQ_MAC_RSS:
+		/*
+		 * Multiple groups and multiple rings, both
+		 * MAC classification and RSS are needed.
+		 */
+		igb_setup_mac_rss_classify(igb);
+		break;
+	}
 }
 
 static void
@@ -1847,6 +1913,7 @@ igb_setup_tx_ring(igb_tx_ring_t *tx_ring)
 
 	ASSERT(mutex_owned(&tx_ring->tx_lock));
 	ASSERT(mutex_owned(&igb->gen_lock));
+
 
 	/*
 	 * Initialize the length register
@@ -1920,6 +1987,14 @@ igb_setup_tx_ring(igb_tx_ring_t *tx_ring)
 	} else {
 		ASSERT(tx_ring->tcb_free == tx_ring->free_list_size);
 	}
+
+	/*
+	 * Enable specific tx ring, it is required by multiple tx
+	 * ring support.
+	 */
+	reg_val = E1000_READ_REG(hw, E1000_TXDCTL(tx_ring->index));
+	reg_val |= E1000_TXDCTL_QUEUE_ENABLE;
+	E1000_WRITE_REG(hw, E1000_TXDCTL(tx_ring->index), reg_val);
 
 	/*
 	 * Initialize hardware checksum offload settings
@@ -2036,6 +2111,117 @@ igb_setup_rss(igb_t *igb)
 }
 
 /*
+ * igb_setup_mac_rss_classify - Setup MAC classification and rss
+ */
+static void
+igb_setup_mac_rss_classify(igb_t *igb)
+{
+	struct e1000_hw *hw = &igb->hw;
+	uint32_t i, mrqc, vmdctl, rxcsum;
+	uint32_t ring_per_group;
+	int shift_group0, shift_group1;
+	uint32_t random;
+	union e1000_reta {
+		uint32_t	dword;
+		uint8_t		bytes[4];
+	} reta;
+
+	ring_per_group = igb->num_rx_rings / igb->num_rx_groups;
+
+	/* Setup the Redirection Table, it is shared between two groups */
+	shift_group0 = 2;
+	shift_group1 = 6;
+	for (i = 0; i < (32 * 4); i++) {
+		reta.bytes[i & 3] = ((i % ring_per_group) << shift_group0) |
+		    ((ring_per_group + (i % ring_per_group)) << shift_group1);
+		if ((i & 3) == 3) {
+			E1000_WRITE_REG(hw,
+			    (E1000_RETA(0) + (i & ~3)), reta.dword);
+		}
+	}
+
+	/* Fill out hash function seeds */
+	for (i = 0; i < 10; i++) {
+		(void) random_get_pseudo_bytes((uint8_t *)&random,
+		    sizeof (uint32_t));
+		E1000_WRITE_REG(hw, E1000_RSSRK(i), random);
+	}
+
+	/*
+	 * Setup the Multiple Receive Queue Control register,
+	 * enable VMDq based on packet destination MAC address and RSS.
+	 */
+	mrqc = E1000_MRQC_ENABLE_VMDQ_MAC_RSS_GROUP;
+	mrqc |= (E1000_MRQC_RSS_FIELD_IPV4 |
+	    E1000_MRQC_RSS_FIELD_IPV4_TCP |
+	    E1000_MRQC_RSS_FIELD_IPV6 |
+	    E1000_MRQC_RSS_FIELD_IPV6_TCP |
+	    E1000_MRQC_RSS_FIELD_IPV4_UDP |
+	    E1000_MRQC_RSS_FIELD_IPV6_UDP |
+	    E1000_MRQC_RSS_FIELD_IPV6_UDP_EX |
+	    E1000_MRQC_RSS_FIELD_IPV6_TCP_EX);
+
+	E1000_WRITE_REG(hw, E1000_MRQC, mrqc);
+
+
+	/* Define the default group and default queues */
+	vmdctl = E1000_VMDQ_MAC_GROUP_DEFAULT_QUEUE;
+	E1000_WRITE_REG(hw, E1000_VMD_CTL, vmdctl);
+
+	/*
+	 * Disable Packet Checksum to enable RSS for multiple receive queues.
+	 *
+	 * The Packet Checksum is not ethernet CRC. It is another kind of
+	 * checksum offloading provided by the 82575 chipset besides the IP
+	 * header checksum offloading and the TCP/UDP checksum offloading.
+	 * The Packet Checksum is by default computed over the entire packet
+	 * from the first byte of the DA through the last byte of the CRC,
+	 * including the Ethernet and IP headers.
+	 *
+	 * It is a hardware limitation that Packet Checksum is mutually
+	 * exclusive with RSS.
+	 */
+	rxcsum = E1000_READ_REG(hw, E1000_RXCSUM);
+	rxcsum |= E1000_RXCSUM_PCSD;
+	E1000_WRITE_REG(hw, E1000_RXCSUM, rxcsum);
+}
+
+/*
+ * igb_setup_mac_classify - Setup MAC classification feature
+ */
+static void
+igb_setup_mac_classify(igb_t *igb)
+{
+	struct e1000_hw *hw = &igb->hw;
+	uint32_t mrqc, rxcsum;
+
+	/*
+	 * Setup the Multiple Receive Queue Control register,
+	 * enable VMDq based on packet destination MAC address.
+	 */
+	mrqc = E1000_MRQC_ENABLE_VMDQ_MAC_GROUP;
+	E1000_WRITE_REG(hw, E1000_MRQC, mrqc);
+
+	/*
+	 * Disable Packet Checksum to enable RSS for multiple receive queues.
+	 *
+	 * The Packet Checksum is not ethernet CRC. It is another kind of
+	 * checksum offloading provided by the 82575 chipset besides the IP
+	 * header checksum offloading and the TCP/UDP checksum offloading.
+	 * The Packet Checksum is by default computed over the entire packet
+	 * from the first byte of the DA through the last byte of the CRC,
+	 * including the Ethernet and IP headers.
+	 *
+	 * It is a hardware limitation that Packet Checksum is mutually
+	 * exclusive with RSS.
+	 */
+	rxcsum = E1000_READ_REG(hw, E1000_RXCSUM);
+	rxcsum |= E1000_RXCSUM_PCSD;
+	E1000_WRITE_REG(hw, E1000_RXCSUM, rxcsum);
+
+}
+
+/*
  * igb_init_unicst - Initialize the unicast addresses
  */
 static void
@@ -2049,41 +2235,39 @@ igb_init_unicst(igb_t *igb)
 	 *
 	 * 1. Chipset is initialized the first time
 	 *    Initialize the multiple unicast addresses, and
-	 *    save the default mac address.
+	 *    save the default MAC address.
 	 *
 	 * 2. Chipset is reset
 	 *    Recover the multiple unicast addresses from the
 	 *    software data structure to the RAR registers.
 	 */
+
+	/*
+	 * Clear the default MAC address in the RAR0 rgister,
+	 * which is loaded from EEPROM when system boot or chipreset,
+	 * this will cause the conficts with add_mac/rem_mac entry
+	 * points when VMDq is enabled. For this reason, the RAR0
+	 * must be cleared for both cases mentioned above.
+	 */
+	e1000_rar_clear(hw, 0);
+
 	if (!igb->unicst_init) {
+
 		/* Initialize the multiple unicast addresses */
 		igb->unicst_total = MAX_NUM_UNICAST_ADDRESSES;
+		igb->unicst_avail = igb->unicst_total;
 
-		igb->unicst_avail = igb->unicst_total - 1;
-
-		/* Store the default mac address */
-		e1000_rar_set(hw, hw->mac.addr, 0);
-
-		bcopy(hw->mac.addr, igb->unicst_addr[0].mac.addr,
-		    ETHERADDRL);
-		igb->unicst_addr[0].mac.set = 1;
-
-		for (slot = 1; slot < igb->unicst_total; slot++)
+		for (slot = 0; slot < igb->unicst_total; slot++)
 			igb->unicst_addr[slot].mac.set = 0;
 
 		igb->unicst_init = B_TRUE;
 	} else {
-		/* Recover the default mac address */
-		bcopy(igb->unicst_addr[0].mac.addr, hw->mac.addr,
-		    ETHERADDRL);
-
-		/* Store the default mac address */
-		e1000_rar_set(hw, hw->mac.addr, 0);
-
 		/* Re-configure the RAR registers */
-		for (slot = 1; slot < igb->unicst_total; slot++)
-			e1000_rar_set(hw,
-			    igb->unicst_addr[slot].mac.addr, slot);
+		for (slot = 0; slot < igb->unicst_total; slot++) {
+			e1000_rar_set_vmdq(hw, igb->unicst_addr[slot].mac.addr,
+			    slot, igb->vmdq_mode,
+			    igb->unicst_addr[slot].mac.group_index);
+		}
 	}
 
 	if (igb_check_acc_handle(igb->osdep.reg_handle) != DDI_FM_OK)
@@ -2091,11 +2275,30 @@ igb_init_unicst(igb_t *igb)
 }
 
 /*
+ * igb_unicst_find - Find the slot for the specified unicast address
+ */
+int
+igb_unicst_find(igb_t *igb, const uint8_t *mac_addr)
+{
+	int slot;
+
+	ASSERT(mutex_owned(&igb->gen_lock));
+
+	for (slot = 0; slot < igb->unicst_total; slot++) {
+		if (bcmp(igb->unicst_addr[slot].mac.addr,
+		    mac_addr, ETHERADDRL) == 0)
+			return (slot);
+	}
+
+	return (-1);
+}
+
+/*
  * igb_unicst_set - Set the unicast address to the specified slot
  */
 int
 igb_unicst_set(igb_t *igb, const uint8_t *mac_addr,
-    mac_addr_slot_t slot)
+    int slot)
 {
 	struct e1000_hw *hw = &igb->hw;
 
@@ -2232,6 +2435,8 @@ igb_get_conf(igb_t *igb)
 	struct e1000_hw *hw = &igb->hw;
 	uint32_t default_mtu;
 	uint32_t flow_control;
+	uint32_t ring_per_group;
+	int i;
 
 	/*
 	 * igb driver supports the following user configurations:
@@ -2299,15 +2504,65 @@ igb_get_conf(igb_t *igb)
 	/*
 	 * Multiple rings configurations
 	 */
-	igb->num_tx_rings = igb_get_prop(igb, PROP_TX_QUEUE_NUM,
-	    MIN_TX_QUEUE_NUM, MAX_TX_QUEUE_NUM, DEFAULT_TX_QUEUE_NUM);
 	igb->tx_ring_size = igb_get_prop(igb, PROP_TX_RING_SIZE,
 	    MIN_TX_RING_SIZE, MAX_TX_RING_SIZE, DEFAULT_TX_RING_SIZE);
-
-	igb->num_rx_rings = igb_get_prop(igb, PROP_RX_QUEUE_NUM,
-	    MIN_RX_QUEUE_NUM, MAX_RX_QUEUE_NUM, DEFAULT_RX_QUEUE_NUM);
 	igb->rx_ring_size = igb_get_prop(igb, PROP_RX_RING_SIZE,
 	    MIN_RX_RING_SIZE, MAX_RX_RING_SIZE, DEFAULT_RX_RING_SIZE);
+
+	igb->mr_enable = igb_get_prop(igb, PROP_MR_ENABLE, 0, 1, 1);
+	igb->num_rx_groups = igb_get_prop(igb, PROP_RX_GROUP_NUM,
+	    MIN_RX_GROUP_NUM, MAX_RX_GROUP_NUM, DEFAULT_RX_GROUP_NUM);
+
+	if (igb->mr_enable) {
+		igb->num_tx_rings = DEFAULT_TX_QUEUE_NUM;
+		igb->num_rx_rings = DEFAULT_RX_QUEUE_NUM;
+	} else {
+		igb->num_tx_rings = 1;
+		igb->num_rx_rings = 1;
+
+		if (igb->num_rx_groups > 1) {
+			igb_error(igb,
+			    "Invalid rx groups number. Please enable multiple "
+			    "rings first");
+			igb->num_rx_groups = 1;
+		}
+	}
+
+	/*
+	 * Check the divisibility between rx rings and rx groups.
+	 */
+	for (i = igb->num_rx_groups; i > 0; i--) {
+		if ((igb->num_rx_rings % i) == 0)
+			break;
+	}
+	if (i != igb->num_rx_groups) {
+		igb_error(igb,
+		    "Invalid rx groups number. Downgrade the rx group "
+		    "number to %d.", i);
+		igb->num_rx_groups = i;
+	}
+
+	/*
+	 * Get the ring number per group.
+	 */
+	ring_per_group = igb->num_rx_rings / igb->num_rx_groups;
+
+	if (igb->num_rx_groups == 1) {
+		/*
+		 * One rx ring group, the rx ring number is num_rx_rings.
+		 */
+		igb->vmdq_mode = E1000_VMDQ_OFF;
+	} else if (ring_per_group == 1) {
+		/*
+		 * Multiple rx groups, each group has one rx ring.
+		 */
+		igb->vmdq_mode = E1000_VMDQ_MAC;
+	} else {
+		/*
+		 * Multiple groups and multiple rings.
+		 */
+		igb->vmdq_mode = E1000_VMDQ_MAC_RSS;
+	}
 
 	/*
 	 * Tunable used to force an interrupt type. The only use is
@@ -2861,6 +3116,7 @@ igb_enable_adapter_interrupts(igb_t *igb)
 		/* Interrupt enabling for MSI-X */
 		E1000_WRITE_REG(hw, E1000_EIMS, igb->eims_mask);
 		E1000_WRITE_REG(hw, E1000_EIAC, igb->eims_mask);
+		igb->ims_mask = E1000_IMS_LSC;
 		E1000_WRITE_REG(hw, E1000_IMS, E1000_IMS_LSC);
 
 		/* Enable MSI-X PBA support */
@@ -2873,6 +3129,7 @@ igb_enable_adapter_interrupts(igb_t *igb)
 		E1000_WRITE_REG(hw, E1000_CTRL_EXT, reg);
 	} else {
 		/* Interrupt enabling for MSI and legacy */
+		igb->ims_mask = IMS_ENABLE_MASK;
 		E1000_WRITE_REG(hw, E1000_IMS, IMS_ENABLE_MASK);
 	}
 
@@ -3176,11 +3433,12 @@ igb_intr_rx_work(igb_rx_ring_t *rx_ring)
 	mblk_t *mp;
 
 	mutex_enter(&rx_ring->rx_lock);
-	mp = igb_rx(rx_ring);
+	mp = igb_rx(rx_ring, IGB_NO_POLL);
 	mutex_exit(&rx_ring->rx_lock);
 
 	if (mp != NULL)
-		mac_rx(rx_ring->igb->mac_hdl, NULL, mp);
+		mac_rx_ring(rx_ring->igb->mac_hdl, rx_ring->ring_handle, mp,
+		    rx_ring->ring_gen_num);
 }
 
 #pragma inline(igb_intr_tx_work)
@@ -3197,17 +3455,17 @@ igb_intr_tx_work(igb_tx_ring_t *tx_ring)
 	if (tx_ring->reschedule &&
 	    (tx_ring->tbd_free >= tx_ring->resched_thresh)) {
 		tx_ring->reschedule = B_FALSE;
-		mac_tx_update(tx_ring->igb->mac_hdl);
+		mac_tx_ring_update(tx_ring->igb->mac_hdl, tx_ring->ring_handle);
 		IGB_DEBUG_STAT(tx_ring->stat_reschedule);
 	}
 }
 
-#pragma inline(igb_intr_other_work)
+#pragma inline(igb_intr_link_work)
 /*
- * igb_intr_other_work - other processing of ISR
+ * igb_intr_link_work - link-status-change processing of ISR
  */
 static void
-igb_intr_other_work(igb_t *igb)
+igb_intr_link_work(igb_t *igb)
 {
 	boolean_t link_changed;
 
@@ -3273,7 +3531,7 @@ igb_intr_legacy(void *arg1, void *arg2)
 		ASSERT(igb->num_tx_rings == 1);
 
 		if (icr & E1000_ICR_RXT0) {
-			mp = igb_rx(&igb->rx_rings[0]);
+			mp = igb_rx(&igb->rx_rings[0], IGB_NO_POLL);
 		}
 
 		if (icr & E1000_ICR_TXDW) {
@@ -3320,7 +3578,7 @@ igb_intr_legacy(void *arg1, void *arg2)
 
 	if (tx_reschedule)  {
 		tx_ring->reschedule = B_FALSE;
-		mac_tx_update(igb->mac_hdl);
+		mac_tx_ring_update(igb->mac_hdl, tx_ring->ring_handle);
 		IGB_DEBUG_STAT(tx_ring->stat_reschedule);
 	}
 
@@ -3359,7 +3617,7 @@ igb_intr_msi(void *arg1, void *arg2)
 	}
 
 	if (icr & E1000_ICR_LSC) {
-		igb_intr_other_work(igb);
+		igb_intr_link_work(igb);
 	}
 
 	return (DDI_INTR_CLAIMED);
@@ -3385,10 +3643,27 @@ igb_intr_rx(void *arg1, void *arg2)
 }
 
 /*
+ * igb_intr_tx - Interrupt handler for tx
+ */
+static uint_t
+igb_intr_tx(void *arg1, void *arg2)
+{
+	igb_tx_ring_t *tx_ring = (igb_tx_ring_t *)arg1;
+
+	_NOTE(ARGUNUSED(arg2));
+
+	/*
+	 * Only used via MSI-X vector so don't check cause bits
+	 * and only clean the given ring.
+	 */
+	igb_intr_tx_work(tx_ring);
+
+	return (DDI_INTR_CLAIMED);
+}
+
+/*
  * igb_intr_tx_other - Interrupt handler for both tx and other
  *
- * Always look for Tx cleanup work.  Only look for other work if the right
- * bits are set in the Interrupt Cause Register.
  */
 static uint_t
 igb_intr_tx_other(void *arg1, void *arg2)
@@ -3401,17 +3676,18 @@ igb_intr_tx_other(void *arg1, void *arg2)
 	icr = E1000_READ_REG(&igb->hw, E1000_ICR);
 
 	/*
-	 * Always look for Tx cleanup work.  We don't have separate
-	 * transmit vectors, so we have only one tx ring enabled.
+	 * Look for tx reclaiming work first. Remember, in the
+	 * case of only interrupt sharing, only one tx ring is
+	 * used
 	 */
-	ASSERT(igb->num_tx_rings == 1);
 	igb_intr_tx_work(&igb->tx_rings[0]);
 
 	/*
-	 * Check for "other" causes.
+	 * Need check cause bits and only link change will
+	 * be processed
 	 */
 	if (icr & E1000_ICR_LSC) {
-		igb_intr_other_work(igb);
+		igb_intr_link_work(igb);
 	}
 
 	return (DDI_INTR_CLAIMED);
@@ -3504,22 +3780,11 @@ static int
 igb_alloc_intr_handles(igb_t *igb, int intr_type)
 {
 	dev_info_t *devinfo;
-	int request, count, avail, actual;
-	int rx_rings, minimum;
+	int orig, request, count, avail, actual;
+	int diff, minimum;
 	int rc;
 
 	devinfo = igb->dip;
-
-	/*
-	 * Currently only 1 tx ring is supported. More tx rings
-	 * will be supported with future enhancement.
-	 */
-	if (igb->num_tx_rings > 1) {
-		igb->num_tx_rings = 1;
-		igb_log(igb,
-		    "Use only 1 MSI-X vector for tx, "
-		    "force tx queue number to 1");
-	}
 
 	switch (intr_type) {
 	case DDI_INTR_TYPE_FIXED:
@@ -3536,12 +3801,12 @@ igb_alloc_intr_handles(igb_t *igb, int intr_type)
 
 	case DDI_INTR_TYPE_MSIX:
 		/*
-		 * Best number of vectors for the adapter is
-		 * # rx rings + # tx rings + 1 for other
-		 * But currently we only support number of vectors of
-		 * # rx rings + 1 for tx & other
+		 * Number of vectors for the adapter is
+		 * # rx rings + # tx rings
+		 * One of tx vectors is for tx & other
 		 */
-		request = igb->num_rx_rings + 1;
+		request = igb->num_rx_rings + igb->num_tx_rings;
+		orig = request;
 		minimum = 2;
 		IGB_DEBUGLOG_0(igb, "interrupt type: MSI-X");
 		break;
@@ -3613,15 +3878,24 @@ igb_alloc_intr_handles(igb_t *igb, int intr_type)
 	}
 
 	/*
-	 * For MSI-X, actual might force us to reduce number of rx rings
+	 * For MSI-X, actual might force us to reduce number of tx & rx rings
 	 */
-	if (intr_type == DDI_INTR_TYPE_MSIX) {
-		rx_rings = actual - 1;
-		if (rx_rings < igb->num_rx_rings) {
+	if ((intr_type == DDI_INTR_TYPE_MSIX) && (orig > actual)) {
+		diff = orig - actual;
+		if (diff < igb->num_tx_rings) {
+			igb_log(igb,
+			    "MSI-X vectors force Tx queue number to %d",
+			    igb->num_tx_rings - diff);
+			igb->num_tx_rings -= diff;
+		} else {
+			igb_log(igb,
+			    "MSI-X vectors force Tx queue number to 1");
+			igb->num_tx_rings = 1;
+
 			igb_log(igb,
 			    "MSI-X vectors force Rx queue number to %d",
-			    rx_rings);
-			igb->num_rx_rings = rx_rings;
+			    actual - 1);
+			igb->num_rx_rings = actual - 1;
 		}
 	}
 
@@ -3662,6 +3936,7 @@ static int
 igb_add_intr_handlers(igb_t *igb)
 {
 	igb_rx_ring_t *rx_ring;
+	igb_tx_ring_t *tx_ring;
 	int vector;
 	int rc;
 	int i;
@@ -3671,14 +3946,17 @@ igb_add_intr_handlers(igb_t *igb)
 	switch (igb->intr_type) {
 	case DDI_INTR_TYPE_MSIX:
 		/* Add interrupt handler for tx + other */
+		tx_ring = &igb->tx_rings[0];
 		rc = ddi_intr_add_handler(igb->htable[vector],
 		    (ddi_intr_handler_t *)igb_intr_tx_other,
 		    (void *)igb, NULL);
+
 		if (rc != DDI_SUCCESS) {
 			igb_log(igb,
 			    "Add tx/other interrupt handler failed: %d", rc);
 			return (IGB_FAILURE);
 		}
+		tx_ring->intr_vector = vector;
 		vector++;
 
 		/* Add interrupt handler for each rx ring */
@@ -3704,6 +3982,31 @@ igb_add_intr_handlers(igb_t *igb)
 
 			vector++;
 		}
+
+		/* Add interrupt handler for each tx ring from 2nd ring */
+		for (i = 1; i < igb->num_tx_rings; i++) {
+			tx_ring = &igb->tx_rings[i];
+
+			rc = ddi_intr_add_handler(igb->htable[vector],
+			    (ddi_intr_handler_t *)igb_intr_tx,
+			    (void *)tx_ring, NULL);
+
+			if (rc != DDI_SUCCESS) {
+				igb_log(igb,
+				    "Add tx interrupt handler failed. "
+				    "return: %d, tx ring: %d", rc, i);
+				for (vector--; vector >= 0; vector--) {
+					(void) ddi_intr_remove_handler(
+					    igb->htable[vector]);
+				}
+				return (IGB_FAILURE);
+			}
+
+			tx_ring->intr_vector = vector;
+
+			vector++;
+		}
+
 		break;
 
 	case DDI_INTR_TYPE_MSI:
@@ -3764,19 +4067,34 @@ igb_setup_adapter_msix(igb_t *igb)
 	struct e1000_hw *hw = &igb->hw;
 
 	/*
-	 * Set vector for Tx + Other causes
-	 * NOTE assumption that there is only one of these and it is vector 0
+	 * Set vector for other causes, NOTE assumption that it is vector 0
 	 */
 	vector = 0;
+
 	igb->eims_mask = E1000_EICR_TX_QUEUE0 | E1000_EICR_OTHER;
 	E1000_WRITE_REG(hw, E1000_MSIXBM(vector), igb->eims_mask);
-
 	vector++;
+
 	for (i = 0; i < igb->num_rx_rings; i++) {
 		/*
 		 * Set vector for each rx ring
 		 */
 		eims = (E1000_EICR_RX_QUEUE0 << i);
+		E1000_WRITE_REG(hw, E1000_MSIXBM(vector), eims);
+
+		/*
+		 * Accumulate bits to enable in igb_enable_adapter_interrupts()
+		 */
+		igb->eims_mask |= eims;
+
+		vector++;
+	}
+
+	for (i = 1; i < igb->num_tx_rings; i++) {
+		/*
+		 * Set vector for each tx ring from 2nd tx ring
+		 */
+		eims = (E1000_EICR_TX_QUEUE0 << i);
 		E1000_WRITE_REG(hw, E1000_MSIXBM(vector), eims);
 
 		/*

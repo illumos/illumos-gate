@@ -26,8 +26,6 @@
 #ifndef _SYS_IB_CLIENTS_IBD_H
 #define	_SYS_IB_CLIENTS_IBD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -96,7 +94,7 @@ typedef struct ipoib_pgrh {
 #include <sys/ib/ibtl/ibti.h>
 #include <sys/ib/ib_pkt_hdrs.h>
 #include <sys/list.h>
-#include <sys/mac.h>
+#include <sys/mac_provider.h>
 #include <sys/mac_ib.h>
 #include <sys/modhash.h>
 

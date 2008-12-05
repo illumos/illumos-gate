@@ -69,7 +69,7 @@
 #include	<sys/ddi_implfuncs.h>
 
 #include	<sys/dld.h>
-#include	<sys/mac.h>
+#include	<sys/mac_client.h>
 
 /*
  * Debug Macros

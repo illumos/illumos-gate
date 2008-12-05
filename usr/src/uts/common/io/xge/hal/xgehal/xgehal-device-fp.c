@@ -21,6 +21,11 @@
  * Copyright (c) 2002-2006 Neterion, Inc.
  */
 
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #ifdef XGE_DEBUG_FP
 #include "xgehal-device.h"
 #endif
@@ -444,7 +449,9 @@ xge_hal_device_poll_rx_channels(xge_hal_device_t *hldev, int *got_rx)
 		if (hldev->terminating)
 			return XGE_HAL_OK;
 		channel	= xge_container_of(item, xge_hal_channel_t,	item);
-		(void) xge_hal_device_poll_rx_channel(channel, got_rx);
+		if (!(channel->flags & XGE_HAL_CHANNEL_FLAG_USE_RX_POLLING)) {
+			(void) xge_hal_device_poll_rx_channel(channel, got_rx);
+		}
 	}
 
 	return XGE_HAL_OK;
@@ -480,6 +487,21 @@ xge_hal_device_poll_tx_channels(xge_hal_device_t *hldev, int *got_tx)
 	}
 
 	return XGE_HAL_OK;
+}
+
+/**
+ *
+ */
+__HAL_STATIC_DEVICE	__HAL_INLINE_DEVICE	void
+xge_hal_device_rx_channel_enable_polling(xge_hal_channel_t *channel)
+{
+	channel->flags |= XGE_HAL_CHANNEL_FLAG_USE_RX_POLLING;
+}
+
+__HAL_STATIC_DEVICE	__HAL_INLINE_DEVICE	void
+xge_hal_device_rx_channel_disable_polling(xge_hal_channel_t *channel)
+{
+	channel->flags &= ~XGE_HAL_CHANNEL_FLAG_USE_RX_POLLING;
 }
 
 /**

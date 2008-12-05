@@ -39,6 +39,13 @@
 	(rdc + nxgep->pt_config.hw_config.start_rdc)
 
 /*
+ * XXX: This is a tunable to limit the number of packets each interrupt
+ * handles.  0 (default) means that each interrupt takes as much packets
+ * as it finds.
+ */
+extern int	nxge_max_intr_pkts;
+
+/*
  * Globals: tunable parameters (/etc/system or adb)
  *
  */
@@ -115,7 +122,7 @@ nxge_status_t nxge_disable_rxdma_channel(p_nxge_t, uint16_t);
 
 static p_rx_msg_t nxge_allocb(size_t, uint32_t, p_nxge_dma_common_t);
 static void nxge_freeb(p_rx_msg_t);
-static void nxge_rx_pkts_vring(p_nxge_t, uint_t, rx_dma_ctl_stat_t);
+static mblk_t *nxge_rx_pkts_vring(p_nxge_t, uint_t, rx_dma_ctl_stat_t);
 static nxge_status_t nxge_rx_err_evnts(p_nxge_t, int, rx_dma_ctl_stat_t);
 
 static nxge_status_t nxge_rxdma_handle_port_errors(p_nxge_t,
@@ -137,8 +144,10 @@ nxge_status_t
 nxge_init_rxdma_channels(p_nxge_t nxgep)
 {
 	nxge_grp_set_t	*set = &nxgep->rx_set;
-	int		i, count, rdc, channel;
+	int		i, count, channel;
 	nxge_grp_t	*group;
+	dc_map_t	map;
+	int		dev_gindex;
 
 	NXGE_DEBUG_MSG((nxgep, MEM2_CTL, "==> nxge_init_rxdma_channels"));
 
@@ -158,9 +167,11 @@ nxge_init_rxdma_channels(p_nxge_t nxgep)
 	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
 		if ((1 << i) & set->lg.map) {
 			group = set->group[i];
-
+			dev_gindex =
+			    nxgep->pt_config.hw_config.def_mac_rxdma_grpid + i;
+			map = nxgep->pt_config.rdc_grps[dev_gindex].map;
 			for (channel = 0; channel < NXGE_MAX_RDCS; channel++) {
-				if ((1 << channel) & group->map) {
+				if ((1 << channel) & map) {
 					if ((nxge_grp_dc_add(nxgep,
 					    group, VP_BOUND_RX, channel)))
 						goto init_rxdma_channels_exit;
@@ -178,15 +189,16 @@ init_rxdma_channels_exit:
 	for (i = 0, count = 0; i < NXGE_LOGICAL_GROUP_MAX; i++) {
 		if ((1 << i) & set->lg.map) {
 			group = set->group[i];
-
-			for (rdc = 0; rdc < NXGE_MAX_RDCS; rdc++) {
-				if ((1 << rdc) & group->map) {
+			dev_gindex =
+			    nxgep->pt_config.hw_config.def_mac_rxdma_grpid + i;
+			map = nxgep->pt_config.rdc_grps[dev_gindex].map;
+			for (channel = 0; channel < NXGE_MAX_RDCS; channel++) {
+				if ((1 << channel) & map) {
 					nxge_grp_dc_remove(nxgep,
-					    VP_BOUND_RX, rdc);
+					    VP_BOUND_RX, channel);
 				}
 			}
 		}
-
 		if (++count == set->lg.count)
 			break;
 	}
@@ -1175,35 +1187,6 @@ nxge_rxdma_regs_dump(p_nxge_t nxgep, int rdc)
 	    "<== nxge_rxdma_regs_dump: rdc rdc %d", rdc));
 }
 
-void
-nxge_rxdma_stop(p_nxge_t nxgep)
-{
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rxdma_stop"));
-
-	(void) nxge_link_monitor(nxgep, LINK_MONITOR_STOP);
-	(void) nxge_rx_mac_disable(nxgep);
-	(void) nxge_rxdma_hw_mode(nxgep, NXGE_DMA_STOP);
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rxdma_stop"));
-}
-
-void
-nxge_rxdma_stop_reinit(p_nxge_t nxgep)
-{
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rxdma_stop_reinit"));
-
-	(void) nxge_rxdma_stop(nxgep);
-	(void) nxge_uninit_rxdma_channels(nxgep);
-	(void) nxge_init_rxdma_channels(nxgep);
-
-#ifndef	AXIS_DEBUG_LB
-	(void) nxge_xcvr_init(nxgep);
-	(void) nxge_link_monitor(nxgep, LINK_MONITOR_START);
-#endif
-	(void) nxge_rx_mac_enable(nxgep);
-
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rxdma_stop_reinit"));
-}
-
 nxge_status_t
 nxge_rxdma_hw_mode(p_nxge_t nxgep, boolean_t enable)
 {
@@ -1438,11 +1421,53 @@ nxge_rxdma_fixup_channel_fail:
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rxdma_fixup_channel"));
 }
 
-/* ARGSUSED */
+/*
+ * Convert an absolute RDC number to a Receive Buffer Ring index.  That is,
+ * map <channel> to an index into nxgep->rx_rbr_rings.
+ * (device ring index -> port ring index)
+ */
 int
 nxge_rxdma_get_ring_index(p_nxge_t nxgep, uint16_t channel)
 {
-	return (channel);
+	int			i, ndmas;
+	uint16_t		rdc;
+	p_rx_rbr_rings_t	rx_rbr_rings;
+	p_rx_rbr_ring_t		*rbr_rings;
+
+	NXGE_DEBUG_MSG((nxgep, RX_CTL,
+	    "==> nxge_rxdma_get_ring_index: channel %d", channel));
+
+	rx_rbr_rings = nxgep->rx_rbr_rings;
+	if (rx_rbr_rings == NULL) {
+		NXGE_DEBUG_MSG((nxgep, RX_CTL,
+		    "<== nxge_rxdma_get_ring_index: NULL ring pointer"));
+		return (-1);
+	}
+	ndmas = rx_rbr_rings->ndmas;
+	if (!ndmas) {
+		NXGE_DEBUG_MSG((nxgep, RX_CTL,
+		    "<== nxge_rxdma_get_ring_index: no channel"));
+		return (-1);
+	}
+
+	NXGE_DEBUG_MSG((nxgep, RX_CTL,
+	    "==> nxge_rxdma_get_ring_index (ndmas %d)", ndmas));
+
+	rbr_rings = rx_rbr_rings->rbr_rings;
+	for (i = 0; i < ndmas; i++) {
+		rdc = rbr_rings[i]->rdc;
+		if (channel == rdc) {
+			NXGE_DEBUG_MSG((nxgep, RX_CTL,
+			    "==> nxge_rxdma_get_rbr_ring: channel %d "
+			    "(index %d) ring %d", channel, i, rbr_rings[i]));
+			return (i);
+		}
+	}
+
+	NXGE_DEBUG_MSG((nxgep, RX_CTL,
+	    "<== nxge_rxdma_get_rbr_ring_index: not found"));
+
+	return (-1);
 }
 
 p_rx_rbr_ring_t
@@ -1792,11 +1817,12 @@ nxge_rx_intr(void *arg1, void *arg2)
 	uint8_t			channel;
 	npi_handle_t		handle;
 	rx_dma_ctl_stat_t	cs;
+	p_rx_rcr_ring_t		rcr_ring;
+	mblk_t			*mp;
 
 #ifdef	NXGE_DEBUG
 	rxdma_cfig1_t		cfg;
 #endif
-	uint_t 			serviced = DDI_INTR_UNCLAIMED;
 
 	if (ldvp == NULL) {
 		NXGE_DEBUG_MSG((NULL, INT_CTL,
@@ -1826,11 +1852,37 @@ nxge_rx_intr(void *arg1, void *arg2)
 	 * receive dma channel.
 	 */
 	handle = NXGE_DEV_NPI_HANDLE(nxgep);
+
+	rcr_ring = nxgep->rx_rcr_rings->rcr_rings[ldvp->vdma_index];
+
+	/*
+	 * The RCR ring lock must be held when packets
+	 * are being processed and the hardware registers are
+	 * being read or written to prevent race condition
+	 * among the interrupt thread, the polling thread
+	 * (will cause fatal errors such as rcrincon bit set)
+	 * and the setting of the poll_flag.
+	 */
+	MUTEX_ENTER(&rcr_ring->lock);
+
 	/*
 	 * Get the control and status for this channel.
 	 */
 	channel = ldvp->channel;
 	ldgp = ldvp->ldgp;
+
+	if (!isLDOMguest(nxgep)) {
+		if (!nxgep->rx_channel_started[channel]) {
+			NXGE_DEBUG_MSG((nxgep, INT_CTL,
+			    "<== nxge_rx_intr: channel is not started"));
+			MUTEX_EXIT(&rcr_ring->lock);
+			return (DDI_INTR_CLAIMED);
+		}
+	}
+
+	ASSERT(rcr_ring->ldgp == ldgp);
+	ASSERT(rcr_ring->ldvp == ldvp);
+
 	RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, channel, &cs.value);
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_intr:channel %d "
@@ -1840,15 +1892,13 @@ nxge_rx_intr(void *arg1, void *arg2)
 	    cs.bits.hdw.rcrto,
 	    cs.bits.hdw.rcrthres));
 
-	nxge_rx_pkts_vring(nxgep, ldvp->vdma_index, cs);
-	serviced = DDI_INTR_CLAIMED;
+	mp = nxge_rx_pkts_vring(nxgep, ldvp->vdma_index, cs);
 
 	/* error events. */
 	if (cs.value & RX_DMA_CTL_STAT_ERROR) {
 		(void) nxge_rx_err_evnts(nxgep, channel, cs);
 	}
 
-nxge_intr_exit:
 	/*
 	 * Enable the mailbox update interrupt if we want
 	 * to use mailbox. We probably don't need to use
@@ -1856,40 +1906,82 @@ nxge_intr_exit:
 	 * Also write 1 to rcrthres and rcrto to clear
 	 * these two edge triggered bits.
 	 */
-
 	cs.value &= RX_DMA_CTL_STAT_WR1C;
-	cs.bits.hdw.mex = 1;
+	cs.bits.hdw.mex = rcr_ring->poll_flag ? 0 : 1;
 	RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
 	    cs.value);
 
 	/*
-	 * Rearm this logical group if this is a single device
-	 * group.
+	 * If the polling mode is enabled, disable the interrupt.
 	 */
-	if (ldgp->nldvs == 1) {
-		ldgimgm_t		mgm;
-		mgm.value = 0;
-		mgm.bits.ldw.arm = 1;
-		mgm.bits.ldw.timer = ldgp->ldg_timer;
-		if (isLDOMguest(nxgep)) {
-			nxge_hio_ldgimgn(nxgep, ldgp);
-		} else {
+	if (rcr_ring->poll_flag) {
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_rx_intr: rdc %d ldgp $%p ldvp $%p "
+		    "(disabling interrupts)", channel, ldgp, ldvp));
+		/*
+		 * Disarm this logical group if this is a single device
+		 * group.
+		 */
+		if (ldgp->nldvs == 1) {
+			ldgimgm_t mgm;
+			mgm.value = 0;
+			mgm.bits.ldw.arm = 0;
 			NXGE_REG_WR64(handle,
-			    LDGIMGN_REG + LDSV_OFFSET(ldgp->ldg),
-			    mgm.value);
+			    LDGIMGN_REG + LDSV_OFFSET(ldgp->ldg), mgm.value);
 		}
-	}
+	} else {
+		/*
+		 * Rearm this logical group if this is a single device group.
+		 */
+		if (ldgp->nldvs == 1) {
+			if (isLDOMguest(nxgep)) {
+				nxge_hio_ldgimgn(nxgep, ldgp);
+			} else {
+				ldgimgm_t mgm;
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rx_intr: serviced %d",
-	    serviced));
-	return (serviced);
+				mgm.value = 0;
+				mgm.bits.ldw.arm = 1;
+				mgm.bits.ldw.timer = ldgp->ldg_timer;
+
+				NXGE_REG_WR64(handle,
+				    LDGIMGN_REG + LDSV_OFFSET(ldgp->ldg),
+				    mgm.value);
+			}
+		}
+
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_rx_intr: rdc %d ldgp $%p "
+		    "exiting ISR (and call mac_rx_ring)", channel, ldgp));
+	}
+	MUTEX_EXIT(&rcr_ring->lock);
+
+	if (mp) {
+		if (!isLDOMguest(nxgep))
+			mac_rx_ring(nxgep->mach, rcr_ring->rcr_mac_handle, mp,
+			    rcr_ring->rcr_gen_num);
+#if defined(sun4v)
+		else {			/* isLDOMguest(nxgep) */
+			nxge_hio_data_t *nhd = (nxge_hio_data_t *)
+			    nxgep->nxge_hw_p->hio;
+			nx_vio_fp_t *vio = &nhd->hio.vio;
+
+			if (vio->cb.vio_net_rx_cb) {
+				(*vio->cb.vio_net_rx_cb)
+				    (nxgep->hio_vr->vhp, mp);
+			}
+		}
+#endif
+	}
+	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rx_intr: DDI_INTR_CLAIMED"));
+	return (DDI_INTR_CLAIMED);
 }
 
 /*
  * Process the packets received in the specified logical device
  * and pass up a chain of message blocks to the upper layer.
+ * The RCR ring lock must be held before calling this function.
  */
-static void
+static mblk_t *
 nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, rx_dma_ctl_stat_t cs)
 {
 	p_mblk_t		mp;
@@ -1897,15 +1989,14 @@ nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, rx_dma_ctl_stat_t cs)
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts_vring"));
 	rcrp = nxgep->rx_rcr_rings->rcr_rings[vindex];
-	if (rcrp->poll_flag) {
-		/* It is in the poll mode */
-		return;
-	}
 
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+	    "==> nxge_rx_pkts_vring: (calling nxge_rx_pkts)rdc %d "
+	    "rcr_mac_handle $%p ", rcrp->rdc, rcrp->rcr_mac_handle));
 	if ((mp = nxge_rx_pkts(nxgep, rcrp, cs, -1)) == NULL) {
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		    "<== nxge_rx_pkts_vring: no mp"));
-		return;
+		return (NULL);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts_vring: $%p",
@@ -1947,21 +2038,11 @@ nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, rx_dma_ctl_stat_t cs)
 			    mp->b_next->b_wptr - mp->b_next->b_rptr)));
 		}
 #endif
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+	    "<== nxge_rx_pkts_vring: returning rdc %d rcr_mac_handle $%p ",
+	    rcrp->rdc, rcrp->rcr_mac_handle));
 
-	if (!isLDOMguest(nxgep))
-		mac_rx(nxgep->mach, rcrp->rcr_mac_handle, mp);
-#if defined(sun4v)
-	else {			/* isLDOMguest(nxgep) */
-		nxge_hio_data_t *nhd = (nxge_hio_data_t *)
-		    nxgep->nxge_hw_p->hio;
-		nx_vio_fp_t *vio = &nhd->hio.vio;
-
-		if (vio->cb.vio_net_rx_cb) {
-			(*vio->cb.vio_net_rx_cb)
-			    (nxgep->hio_vr->vhp, mp);
-		}
-	}
-#endif
+	return (mp);
 }
 
 
@@ -1978,6 +2059,7 @@ nxge_rx_pkts_vring(p_nxge_t nxgep, uint_t vindex, rx_dma_ctl_stat_t cs)
  * a hardware control status register will be updated with the number of
  * packets were removed from the hardware queue.
  *
+ * The RCR ring lock is held when entering this function.
  */
 static mblk_t *
 nxge_rx_pkts(p_nxge_t nxgep, p_rx_rcr_ring_t rcr_p, rx_dma_ctl_stat_t cs,
@@ -1998,7 +2080,7 @@ nxge_rx_pkts(p_nxge_t nxgep, p_rx_rcr_ring_t rcr_p, rx_dma_ctl_stat_t cs,
 	npi_status_t		rs = NPI_SUCCESS;
 #endif
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "==> nxge_rx_pkts: "
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL, "==> nxge_rx_pkts: "
 	    "channel %d", rcr_p->rdc));
 
 	if (!(nxgep->drv_state & STATE_HW_INITIALIZED)) {
@@ -2032,7 +2114,7 @@ nxge_rx_pkts(p_nxge_t nxgep, p_rx_rcr_ring_t rcr_p, rx_dma_ctl_stat_t cs,
 
 
 	if (!qlen) {
-		NXGE_DEBUG_MSG((nxgep, RX_CTL,
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
 		    "==> nxge_rx_pkts:rcr channel %d "
 		    "qlen %d (no pkts)", channel, qlen));
 
@@ -2140,6 +2222,13 @@ nxge_rx_pkts(p_nxge_t nxgep, p_rx_rcr_ring_t rcr_p, rx_dma_ctl_stat_t cs,
 		    (totallen >= bytes_to_pickup)) {
 			break;
 		}
+
+		/* limit the number of packets for interrupt */
+		if (!(rcr_p->poll_flag)) {
+			if (npkt_read == nxge_max_intr_pkts) {
+				break;
+			}
+		}
 	}
 
 	rcr_p->rcr_desc_rd_head_pp = rcr_desc_rd_head_pp;
@@ -2174,7 +2263,9 @@ nxge_rx_pkts(p_nxge_t nxgep, p_rx_rcr_ring_t rcr_p, rx_dma_ctl_stat_t cs,
 	 * read.
 	 */
 
-	NXGE_DEBUG_MSG((nxgep, RX_CTL, "<== nxge_rx_pkts"));
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL, "<== nxge_rx_pkts: return"
+	    "channel %d", rcr_p->rdc));
+
 	return (head_mp);
 }
 
@@ -2280,7 +2371,7 @@ nxge_receive_packet(p_nxge_t nxgep,
 	}
 
 	/*
-	 * Sofware workaround for BMAC hardware limitation that allows
+	 * Software workaround for BMAC hardware limitation that allows
 	 * maxframe size of 1526, instead of 1522 for non-jumbo and 0x2406
 	 * instead of 0x2400 for jumbo.
 	 */
@@ -2318,7 +2409,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 		    hdr_size));
 	}
 
-	MUTEX_ENTER(&rcr_p->lock);
 	MUTEX_ENTER(&rx_rbr_p->lock);
 
 	NXGE_DEBUG_MSG((nxgep, RX_CTL,
@@ -2344,7 +2434,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	if (status != NXGE_OK) {
 		MUTEX_EXIT(&rx_rbr_p->lock);
-		MUTEX_EXIT(&rcr_p->lock);
 		NXGE_DEBUG_MSG((nxgep, RX_CTL,
 		    "<== nxge_receive_packet: found vaddr failed %d",
 		    status));
@@ -2392,7 +2481,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 		break;
 	default:
 		MUTEX_EXIT(&rx_rbr_p->lock);
-		MUTEX_EXIT(&rcr_p->lock);
 		return;
 	}
 
@@ -2558,7 +2646,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 			}
 
 			MUTEX_EXIT(&rx_rbr_p->lock);
-			MUTEX_EXIT(&rcr_p->lock);
 			nxge_freeb(rx_msg_p);
 			return;
 		}
@@ -2643,7 +2730,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 			rx_msg_p->free = B_TRUE;
 		}
 		MUTEX_EXIT(&rx_rbr_p->lock);
-		MUTEX_EXIT(&rcr_p->lock);
 		nxge_freeb(rx_msg_p);
 		return;
 	}
@@ -2657,7 +2743,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 	rcr_p->rcvd_pkt_bytes = bytes_read;
 
 	MUTEX_EXIT(&rx_rbr_p->lock);
-	MUTEX_EXIT(&rcr_p->lock);
 
 	if (rx_msg_p->free && rx_msg_p->rx_use_bcopy) {
 		atomic_inc_32(&rx_msg_p->ref_cnt);
@@ -2682,8 +2767,6 @@ nxge_receive_packet(p_nxge_t nxgep,
 
 	if (is_valid && !multi) {
 		/*
-		 * Update hardware checksuming.
-		 *
 		 * If the checksum flag nxge_chksum_offload
 		 * is 1, TCP and UDP packets can be sent
 		 * up with good checksum. If the checksum flag
@@ -2726,6 +2809,177 @@ nxge_receive_packet(p_nxge_t nxgep,
 	    "multi %d nmp 0x%016llx *mp 0x%016llx *mp_cont 0x%016llx",
 	    *multi_p, nmp, *mp, *mp_cont));
 }
+
+/*
+ * Enable polling for a ring. Interrupt for the ring is disabled when
+ * the nxge interrupt comes (see nxge_rx_intr).
+ */
+int
+nxge_enable_poll(void *arg)
+{
+	p_nxge_ring_handle_t	ring_handle = (p_nxge_ring_handle_t)arg;
+	p_rx_rcr_ring_t		ringp;
+	p_nxge_t		nxgep;
+	p_nxge_ldg_t		ldgp;
+	uint32_t		channel;
+
+	if (ring_handle == NULL) {
+		return (0);
+	}
+
+	nxgep = ring_handle->nxgep;
+	channel = nxgep->pt_config.hw_config.start_rdc + ring_handle->index;
+	ringp = nxgep->rx_rcr_rings->rcr_rings[channel];
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+	    "==> nxge_enable_poll: rdc %d ", ringp->rdc));
+	ldgp = ringp->ldgp;
+	if (ldgp == NULL) {
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_enable_poll: rdc %d NULL ldgp: no change",
+		    ringp->rdc));
+		return (0);
+	}
+
+	MUTEX_ENTER(&ringp->lock);
+	/* enable polling */
+	if (ringp->poll_flag == 0) {
+		ringp->poll_flag = 1;
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_enable_poll: rdc %d set poll flag to 1",
+		    ringp->rdc));
+	}
+
+	MUTEX_EXIT(&ringp->lock);
+	return (0);
+}
+/*
+ * Disable polling for a ring and enable its interrupt.
+ */
+int
+nxge_disable_poll(void *arg)
+{
+	p_nxge_ring_handle_t	ring_handle = (p_nxge_ring_handle_t)arg;
+	p_rx_rcr_ring_t		ringp;
+	p_nxge_t		nxgep;
+	uint32_t		channel;
+
+	if (ring_handle == NULL) {
+		return (0);
+	}
+
+	nxgep = ring_handle->nxgep;
+	channel = nxgep->pt_config.hw_config.start_rdc + ring_handle->index;
+	ringp = nxgep->rx_rcr_rings->rcr_rings[channel];
+
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+	    "==> nxge_disable_poll: rdc %d poll_flag %d", ringp->rdc));
+
+	MUTEX_ENTER(&ringp->lock);
+
+	/* disable polling: enable interrupt */
+	if (ringp->poll_flag) {
+		npi_handle_t		handle;
+		rx_dma_ctl_stat_t	cs;
+		uint8_t			channel;
+		p_nxge_ldg_t		ldgp;
+
+		/*
+		 * Get the control and status for this channel.
+		 */
+		handle = NXGE_DEV_NPI_HANDLE(nxgep);
+		channel = ringp->rdc;
+		RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG,
+		    channel, &cs.value);
+
+		/*
+		 * Enable mailbox update
+		 * Since packets were not read and the hardware uses
+		 * bits pktread and ptrread to update the queue
+		 * length, we need to set both bits to 0.
+		 */
+		cs.bits.ldw.pktread = 0;
+		cs.bits.ldw.ptrread = 0;
+		cs.bits.hdw.mex = 1;
+		RXDMA_REG_WRITE64(handle, RX_DMA_CTL_STAT_REG, channel,
+		    cs.value);
+
+		/*
+		 * Rearm this logical group if this is a single device
+		 * group.
+		 */
+		ldgp = ringp->ldgp;
+		if (ldgp == NULL) {
+			ringp->poll_flag = 0;
+			MUTEX_EXIT(&ringp->lock);
+			NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+			    "==> nxge_disable_poll: no ldgp rdc %d "
+			    "(still set poll to 0", ringp->rdc));
+			return (0);
+		}
+		NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+		    "==> nxge_disable_poll: rdc %d ldgp $%p (enable intr)",
+		    ringp->rdc, ldgp));
+		if (ldgp->nldvs == 1) {
+			ldgimgm_t	mgm;
+			mgm.value = 0;
+			mgm.bits.ldw.arm = 1;
+			mgm.bits.ldw.timer = ldgp->ldg_timer;
+			NXGE_REG_WR64(handle,
+			    LDGIMGN_REG + LDSV_OFFSET(ldgp->ldg), mgm.value);
+		}
+		ringp->poll_flag = 0;
+	}
+
+	MUTEX_EXIT(&ringp->lock);
+	return (0);
+}
+
+/*
+ * Poll 'bytes_to_pickup' bytes of message from the rx ring.
+ */
+mblk_t *
+nxge_rx_poll(void *arg, int bytes_to_pickup)
+{
+	p_nxge_ring_handle_t	ring_handle = (p_nxge_ring_handle_t)arg;
+	p_rx_rcr_ring_t		rcr_p;
+	p_nxge_t		nxgep;
+	npi_handle_t		handle;
+	rx_dma_ctl_stat_t	cs;
+	mblk_t			*mblk;
+	p_nxge_ldv_t		ldvp;
+	uint32_t		channel;
+
+	nxgep = ring_handle->nxgep;
+
+	/*
+	 * Get the control and status for this channel.
+	 */
+	handle = NXGE_DEV_NPI_HANDLE(nxgep);
+	channel = nxgep->pt_config.hw_config.start_rdc + ring_handle->index;
+	rcr_p = nxgep->rx_rcr_rings->rcr_rings[channel];
+	MUTEX_ENTER(&rcr_p->lock);
+	ASSERT(rcr_p->poll_flag == 1);
+
+	RXDMA_REG_READ64(handle, RX_DMA_CTL_STAT_REG, rcr_p->rdc, &cs.value);
+
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+	    "==> nxge_rx_poll: calling nxge_rx_pkts: rdc %d poll_flag %d",
+	    rcr_p->rdc, rcr_p->poll_flag));
+	mblk = nxge_rx_pkts(nxgep, rcr_p, cs, bytes_to_pickup);
+
+	ldvp = rcr_p->ldvp;
+	/* error events. */
+	if (ldvp && (cs.value & RX_DMA_CTL_STAT_ERROR)) {
+		(void) nxge_rx_err_evnts(nxgep, ldvp->vdma_index, cs);
+	}
+
+	MUTEX_EXIT(&rcr_p->lock);
+
+	NXGE_DEBUG_MSG((nxgep, NXGE_ERR_CTL,
+	    "<== nxge_rx_poll: rdc %d mblk $%p", rcr_p->rdc, mblk));
+	return (mblk);
+}
+
 
 /*ARGSUSED*/
 static nxge_status_t
@@ -4231,6 +4485,7 @@ nxge_rxdma_stop_channel(p_nxge_t nxgep, uint16_t channel)
 	 * Make sure channel is disabled.
 	 */
 	status = nxge_disable_rxdma_channel(nxgep, channel);
+
 	if (status != NXGE_OK) {
 		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
 		    " nxge_rxdma_stop_channel: "

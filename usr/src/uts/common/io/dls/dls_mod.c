@@ -23,18 +23,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Data-Link Services Module
  */
 
-#include	<sys/types.h>
 #include	<sys/modctl.h>
-#include	<sys/mac.h>
-
-#include	<sys/dls.h>
-#include	<sys/dls_impl.h>
+#include	<sys/dld_impl.h>
 
 static struct modlmisc		i_dls_modlmisc = {
 	&mod_miscops,
@@ -54,8 +48,6 @@ static struct modlinkage	i_dls_modlinkage = {
 static void
 i_dls_mod_init(void)
 {
-	dls_init();
-	dls_vlan_init();
 	dls_link_init();
 	dls_mgmt_init();
 }
@@ -69,13 +61,6 @@ i_dls_mod_fini(void)
 		return (err);
 
 	dls_mgmt_fini();
-
-	err = dls_vlan_fini();
-	ASSERT(err == 0);
-
-	err = dls_fini();
-	ASSERT(err == 0);
-
 	return (0);
 }
 

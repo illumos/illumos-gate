@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= dladm
@@ -35,6 +34,7 @@ ROOTCFGFILES=	$(CFGFILES:%=$(ROOTCFGDIR)/%)
 include ../Makefile.cmd
 
 XGETFLAGS += -a -x $(PROG).xcl
+LDLIBS += -L$(ROOT)/lib -lsocket
 LDLIBS += -ldladm -ldlpi -lkstat -lsecdb -lbsm -linetutil -ldevinfo
 
 $(ROOTCFGFILES) := OWNER= dladm

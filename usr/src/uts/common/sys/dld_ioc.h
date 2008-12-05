@@ -77,18 +77,22 @@ extern "C" {
  * DLDCOPYIN or DLDCOPYOUT flags are set so that every di_func()
  * callback function does not need to copyin/out its own data.
  */
-typedef int (dld_ioc_func_t)(void *, intptr_t, int, cred_t *);
+
+/* Maximum number of Privileges */
+#define	DLD_MAX_PRIV	16
+
+typedef int (dld_ioc_func_t)(void *, intptr_t, int, cred_t *, int *);
 typedef struct dld_ioc_info {
 	uint_t		di_cmd;
 	uint_t		di_flags;
 	size_t		di_argsize;
 	dld_ioc_func_t	*di_func;
+	const char	*di_priv[DLD_MAX_PRIV];
 } dld_ioc_info_t;
 
 /* Values for di_flags */
 #define	DLDCOPYIN	0x00000001 /* copyin di_argsize amount of data */
 #define	DLDCOPYOUT	0x00000002 /* copyout di_argsize amount of data */
-#define	DLDDLCONFIG	0x00000004 /* ioctl requires PRIV_SYS_DL_CONFIG */
 #define	DLDCOPYINOUT	(DLDCOPYIN | DLDCOPYOUT)
 
 #define	DLDIOCCNT(l)	(sizeof (l) / sizeof (dld_ioc_info_t))

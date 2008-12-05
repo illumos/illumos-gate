@@ -1,19 +1,17 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at:
- *      http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When using or redistributing this file, you may do so under the
- * License only. No other modification of this header is permitted.
- *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -22,11 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms of the CDDL.
+ * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 #include "ixgbe_sw.h"
 
@@ -103,16 +103,24 @@ ixgbe_m_stat(void *arg, uint_t stat, uint64_t *val)
 		break;
 
 	case MAC_STAT_RBYTES:
-		for (i = 0; i < 16; i++)
-			ixgbe_ks->tor.value.ui64 +=
+		ixgbe_ks->tor.value.ui64 = 0;
+		for (i = 0; i < 16; i++) {
+			ixgbe_ks->qbrc[i].value.ui64 +=
 			    IXGBE_READ_REG(hw, IXGBE_QBRC(i));
+			ixgbe_ks->tor.value.ui64 +=
+			    ixgbe_ks->qbrc[i].value.ui64;
+		}
 		*val = ixgbe_ks->tor.value.ui64;
 		break;
 
 	case MAC_STAT_OBYTES:
-		for (i = 0; i < 16; i++)
-			ixgbe_ks->tot.value.ui64 +=
+		ixgbe_ks->tot.value.ui64 = 0;
+		for (i = 0; i < 16; i++) {
+			ixgbe_ks->qbtc[i].value.ui64 +=
 			    IXGBE_READ_REG(hw, IXGBE_QBTC(i));
+			ixgbe_ks->tot.value.ui64 +=
+			    ixgbe_ks->qbtc[i].value.ui64;
+		}
 		*val = ixgbe_ks->tot.value.ui64;
 		break;
 
@@ -412,37 +420,6 @@ ixgbe_m_multicst(void *arg, boolean_t add, const uint8_t *mcst_addr)
 }
 
 /*
- * Set a new device unicast address.
- */
-int
-ixgbe_m_unicst(void *arg, const uint8_t *mac_addr)
-{
-	ixgbe_t *ixgbe = (ixgbe_t *)arg;
-	int result;
-
-	mutex_enter(&ixgbe->gen_lock);
-
-	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (ECANCELED);
-	}
-
-	/*
-	 * Store the new MAC address.
-	 */
-	bcopy(mac_addr, ixgbe->hw.mac.addr, ETHERADDRL);
-
-	/*
-	 * Set MAC address in address slot 0, which is the default address.
-	 */
-	result = ixgbe_unicst_set(ixgbe, mac_addr, 0);
-
-	mutex_exit(&ixgbe->gen_lock);
-
-	return (result);
-}
-
-/*
  * Pass on M_IOCTL messages passed to the DLD, and support
  * private IOCTLs for debugging and ndd.
  */
@@ -511,191 +488,6 @@ ixgbe_m_ioctl(void *arg, queue_t *q, mblk_t *mp)
 	}
 }
 
-
-/*
- * Find an unused address slot, set the address to it, reserve
- * this slot and enable the device to start filtering on the
- * new address.
- */
-int
-ixgbe_m_unicst_add(void *arg, mac_multi_addr_t *maddr)
-{
-	ixgbe_t *ixgbe = (ixgbe_t *)arg;
-	mac_addr_slot_t slot;
-	int err;
-
-	mutex_enter(&ixgbe->gen_lock);
-
-	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (ECANCELED);
-	}
-
-	if (mac_unicst_verify(ixgbe->mac_hdl,
-	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (EINVAL);
-	}
-
-	if (ixgbe->unicst_avail == 0) {
-		/* no slots available */
-		mutex_exit(&ixgbe->gen_lock);
-		return (ENOSPC);
-	}
-
-	/*
-	 * Primary/default address is in slot 0. The next addresses
-	 * are the multiple MAC addresses. So multiple MAC address 0
-	 * is in slot 1, 1 in slot 2, and so on. So the first multiple
-	 * MAC address resides in slot 1.
-	 */
-	for (slot = 1; slot < ixgbe->unicst_total; slot++) {
-		if (ixgbe->unicst_addr[slot].mac.set == 0)
-			break;
-	}
-
-	ASSERT((slot > 0) && (slot < ixgbe->unicst_total));
-
-	maddr->mma_slot = slot;
-
-	if ((err = ixgbe_unicst_set(ixgbe, maddr->mma_addr, slot)) == 0) {
-		ixgbe->unicst_addr[slot].mac.set = 1;
-		ixgbe->unicst_avail--;
-	}
-
-	mutex_exit(&ixgbe->gen_lock);
-
-	return (err);
-}
-
-/*
- * Removes a MAC address that was added before.
- */
-int
-ixgbe_m_unicst_remove(void *arg, mac_addr_slot_t slot)
-{
-	ixgbe_t *ixgbe = (ixgbe_t *)arg;
-	int err;
-
-	mutex_enter(&ixgbe->gen_lock);
-
-	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (ECANCELED);
-	}
-
-	if ((slot <= 0) || (slot >= ixgbe->unicst_total)) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (EINVAL);
-	}
-
-	if (ixgbe->unicst_addr[slot].mac.set == 1) {
-		/*
-		 * Copy the default address to the passed slot
-		 */
-		if ((err = ixgbe_unicst_set(ixgbe,
-		    ixgbe->unicst_addr[0].mac.addr, slot)) == 0) {
-			ixgbe->unicst_addr[slot].mac.set = 0;
-			ixgbe->unicst_avail++;
-		}
-
-		mutex_exit(&ixgbe->gen_lock);
-
-		return (err);
-	}
-
-	mutex_exit(&ixgbe->gen_lock);
-
-	return (EINVAL);
-}
-
-/*
- * Modifies the value of an address that has been added before.
- * The new address length and the slot number that was returned
- * in the call to add should be passed in. mma_flags should be
- * set to 0.
- * Returns 0 on success.
- */
-int
-ixgbe_m_unicst_modify(void *arg, mac_multi_addr_t *maddr)
-{
-	ixgbe_t *ixgbe = (ixgbe_t *)arg;
-	mac_addr_slot_t slot;
-	int err;
-
-	mutex_enter(&ixgbe->gen_lock);
-
-	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (ECANCELED);
-	}
-
-	if (mac_unicst_verify(ixgbe->mac_hdl,
-	    maddr->mma_addr, maddr->mma_addrlen) == B_FALSE) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (EINVAL);
-	}
-
-	slot = maddr->mma_slot;
-
-	if ((slot <= 0) || (slot >= ixgbe->unicst_total)) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (EINVAL);
-	}
-
-	if (ixgbe->unicst_addr[slot].mac.set == 1) {
-		err = ixgbe_unicst_set(ixgbe, maddr->mma_addr, slot);
-		mutex_exit(&ixgbe->gen_lock);
-		return (err);
-	}
-
-	mutex_exit(&ixgbe->gen_lock);
-
-	return (EINVAL);
-}
-
-/*
- * Get the MAC address and all other information related to
- * the address slot passed in mac_multi_addr_t.
- * mma_flags should be set to 0 in the call.
- * On return, mma_flags can take the following values:
- * 1) MMAC_SLOT_UNUSED
- * 2) MMAC_SLOT_USED | MMAC_VENDOR_ADDR
- * 3) MMAC_SLOT_UNUSED | MMAC_VENDOR_ADDR
- * 4) MMAC_SLOT_USED
- */
-int
-ixgbe_m_unicst_get(void *arg, mac_multi_addr_t *maddr)
-{
-	ixgbe_t *ixgbe = (ixgbe_t *)arg;
-	mac_addr_slot_t slot;
-
-	mutex_enter(&ixgbe->gen_lock);
-
-	if (ixgbe->ixgbe_state & IXGBE_SUSPENDED) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (ECANCELED);
-	}
-
-	slot = maddr->mma_slot;
-
-	if ((slot <= 0) || (slot >= ixgbe->unicst_total)) {
-		mutex_exit(&ixgbe->gen_lock);
-		return (EINVAL);
-	}
-	if (ixgbe->unicst_addr[slot].mac.set == 1) {
-		bcopy(ixgbe->unicst_addr[slot].mac.addr,
-		    maddr->mma_addr, ETHERADDRL);
-		maddr->mma_flags = MMAC_SLOT_USED;
-	} else {
-		maddr->mma_flags = MMAC_SLOT_UNUSED;
-	}
-
-	mutex_exit(&ixgbe->gen_lock);
-
-	return (0);
-}
-
 /*
  * Obtain the MAC's capabilities and associated data from
  * the driver.
@@ -732,25 +524,29 @@ ixgbe_m_getcapab(void *arg, mac_capab_t cap, void *cap_data)
 			return (B_FALSE);
 		}
 	}
-	case MAC_CAPAB_MULTIADDRESS: {
-		multiaddress_capab_t *mmacp = cap_data;
+	case MAC_CAPAB_RINGS: {
+		mac_capab_rings_t *cap_rings = cap_data;
 
-		/*
-		 * The number of MAC addresses made available by
-		 * this capability is one less than the total as
-		 * the primary address in slot 0 is counted in
-		 * the total.
-		 */
-		mmacp->maddr_naddr = ixgbe->unicst_total - 1;
-		mmacp->maddr_naddrfree = ixgbe->unicst_avail;
-		/* No multiple factory addresses, set mma_flag to 0 */
-		mmacp->maddr_flag = 0;
-		mmacp->maddr_handle = ixgbe;
-		mmacp->maddr_add = ixgbe_m_unicst_add;
-		mmacp->maddr_remove = ixgbe_m_unicst_remove;
-		mmacp->maddr_modify = ixgbe_m_unicst_modify;
-		mmacp->maddr_get = ixgbe_m_unicst_get;
-		mmacp->maddr_reserve = NULL;
+		switch (cap_rings->mr_type) {
+		case MAC_RING_TYPE_RX:
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+			cap_rings->mr_rnum = ixgbe->num_rx_rings;
+			cap_rings->mr_gnum = ixgbe->num_rx_groups;
+			cap_rings->mr_rget = ixgbe_fill_ring;
+			cap_rings->mr_gget = ixgbe_fill_group;
+			cap_rings->mr_gaddring = NULL;
+			cap_rings->mr_gremring = NULL;
+			break;
+		case MAC_RING_TYPE_TX:
+			cap_rings->mr_group_type = MAC_GROUP_TYPE_STATIC;
+			cap_rings->mr_rnum = ixgbe->num_tx_rings;
+			cap_rings->mr_gnum = 0;
+			cap_rings->mr_rget = ixgbe_fill_ring;
+			cap_rings->mr_gget = NULL;
+			break;
+		default:
+			break;
+		}
 		break;
 	}
 	default:

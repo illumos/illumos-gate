@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/nxge/nxge_impl.h>
 
 /*
@@ -221,7 +219,6 @@ nxge_intr(void *arg1, void *arg2)
 		NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr(%d): #ldvs %d "
 		    " #intrs %d", i, nldvs, nintrs));
 		/* Get this group's flag bits.  */
-		t_ldgp->interrupted = B_FALSE;
 		rs = npi_ldsv_ldfs_get(handle, t_ldgp->ldg,
 		    &vector0, &vector1, &vector2);
 		if (rs) {
@@ -235,7 +232,6 @@ nxge_intr(void *arg1, void *arg2)
 		NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr: "
 		    "vector0 0x%llx vector1 0x%llx vector2 0x%llx",
 		    vector0, vector1, vector2));
-		t_ldgp->interrupted = B_TRUE;
 		nldvs = t_ldgp->nldvs;
 		for (j = 0; j < nldvs; j++, t_ldvp++) {
 			/*
@@ -261,12 +257,10 @@ nxge_intr(void *arg1, void *arg2)
 	t_ldgp = ldgp;
 	for (i = 0; i < nintrs; i++, t_ldgp++) {
 		/* rearm group interrupts */
-		if (t_ldgp->interrupted) {
-			NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr: arm "
-			    "group %d", t_ldgp->ldg));
-			(void) npi_intr_ldg_mgmt_set(handle, t_ldgp->ldg,
-			    t_ldgp->arm, t_ldgp->ldg_timer);
-		}
+		NXGE_DEBUG_MSG((nxgep, INT_CTL, "==> nxge_intr: arm "
+		    "group %d", t_ldgp->ldg));
+		(void) npi_intr_ldg_mgmt_set(handle, t_ldgp->ldg,
+		    t_ldgp->arm, t_ldgp->ldg_timer);
 	}
 
 	NXGE_DEBUG_MSG((nxgep, INT_CTL, "<== nxge_intr: serviced 0x%x",

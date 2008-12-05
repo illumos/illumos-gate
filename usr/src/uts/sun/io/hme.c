@@ -44,7 +44,7 @@
 #include	<sys/pattr.h>
 #include	<sys/dlpi.h>
 #include	<sys/strsubr.h>
-#include	<sys/mac.h>
+#include	<sys/mac_provider.h>
 #include	<sys/mac_ether.h>
 #include	<sys/ethernet.h>
 #include	<sys/vlan.h>
@@ -487,7 +487,6 @@ static mac_callbacks_t hme_m_callbacks = {
 	hme_m_multicst,
 	hme_m_unicst,
 	hme_m_tx,
-	NULL,
 	hme_m_ioctl,
 	hme_m_getcapab,
 };
