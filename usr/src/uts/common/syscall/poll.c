@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,8 +31,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/isa_defs.h>
@@ -546,7 +544,7 @@ poll_common(pollfd_t *fds, nfds_t nfds, timespec_t *tsp, k_sigset_t *ksetp)
 			rval = -1;
 		else
 			rval = cv_waituntil_sig(&pcp->pc_cv, &pcp->pc_lock,
-				rqtp, timecheck);
+			    rqtp, timecheck);
 		mutex_exit(&pcp->pc_lock);
 		/*
 		 * If we have received a signal or timed out
@@ -808,8 +806,8 @@ retry:
 					if (pevents) {
 						struct plist *t;
 						t = kmem_zalloc(
-							sizeof (struct plist),
-							    KM_SLEEP);
+						    sizeof (struct plist),
+						    KM_SLEEP);
 						t->pp = pkevp->portkev_port;
 						t->pevents = pevents;
 						if (plhead == NULL) {
@@ -996,6 +994,11 @@ pcacheset_cmp(pollfd_t *current, pollfd_t *cached, pollfd_t *newlist, int n)
 	int    ix;
 
 	for (ix = 0; ix < n; ix++) {
+		/* Prefetch 64 bytes worth of 8-byte elements */
+		if ((ix & 0x7) == 0) {
+			prefetch64((caddr_t)&current[ix + 8]);
+			prefetch64((caddr_t)&cached[ix + 8]);
+		}
 		if (current[ix].fd == cached[ix].fd) {
 			/*
 			 * Filter out invalid poll events while we are in
@@ -1600,11 +1603,11 @@ pcacheset_resolve(pollstate_t *ps, nfds_t nfds, int *fdcntp, int which)
 			if (current[count].events & ~VALID_POLL_EVENTS) {
 				if (newlist != NULL) {
 					newlist[count].events =
-						current[count].events &=
-							VALID_POLL_EVENTS;
+					    current[count].events &=
+					    VALID_POLL_EVENTS;
 				} else {
 					current[count].events &=
-						VALID_POLL_EVENTS;
+					    VALID_POLL_EVENTS;
 				}
 			}
 			/*
@@ -1631,7 +1634,7 @@ pcacheset_resolve(pollstate_t *ps, nfds_t nfds, int *fdcntp, int which)
 							pcache_update_xref(pcp,
 							    tmpfd, (ssize_t)i,
 							    which);
-						    break;
+							break;
 						}
 					}
 					ASSERT(i <= old_nfds);
@@ -1736,7 +1739,7 @@ pcacheset_resolve(pollstate_t *ps, nfds_t nfds, int *fdcntp, int which)
 			/* filter out invalid events */
 			if (current[i].events & ~VALID_POLL_EVENTS) {
 				newlist[i].events = current[i].events =
-				current[i].events & VALID_POLL_EVENTS;
+				    current[i].events & VALID_POLL_EVENTS;
 			}
 			if ((fd = current[i].fd) < 0) {
 				current[i].revents = 0;
@@ -2135,7 +2138,7 @@ pcacheset_cache_list(pollstate_t *ps, pollfd_t *fds, int *fdcntp, int which)
 		 */
 		if (pollfdp[i].events & ~VALID_POLL_EVENTS) {
 			newfdlist[i].events = pollfdp[i].events =
-			pollfdp[i].events & VALID_POLL_EVENTS;
+			    pollfdp[i].events & VALID_POLL_EVENTS;
 		}
 		if (fd < 0) {
 			pollfdp[i].revents = 0;

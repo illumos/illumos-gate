@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /
 / Inline functions for the x86 kernel running on the hypervisor
@@ -100,4 +98,13 @@
  */
 	.inline	__rdtsc_insn, 0
 	rdtsc
+	.end
+
+/
+/ prefetch 64 bytes
+/
+	.inline	prefetch64, 4
+	movl  (%esp), %eax
+	prefetcht0 (%eax)
+	prefetcht0 32(%eax)
 	.end

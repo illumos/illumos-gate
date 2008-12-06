@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ASM_CPU_H
 #define	_ASM_CPU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -111,6 +109,27 @@ extern __inline__ void __swapgs(void)
 #endif /* !__xpv */
 
 #endif	/* __amd64 */
+
+#endif	/* !__lint && __GNUC__ */
+
+#if !defined(__lint) && defined(__GNUC__)
+
+#if defined(__i386) || defined(__amd64)
+
+/*
+ * prefetch 64 bytes
+ */
+
+extern __inline__ void prefetch64(caddr_t addr)
+{
+	__asm__ __volatile__(
+	    "prefetcht0 (%0)"
+	    "prefetcht0 32(%0)"
+	    : /* no output */
+	    : "r" (addr));
+}
+
+#endif	/* __i386 || __amd64 */
 
 #endif	/* !__lint && __GNUC__ */
 

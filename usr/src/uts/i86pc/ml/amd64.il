@@ -177,3 +177,12 @@
 	xorl	%eax, %eax
 	bsrw	%di, %ax
 	.end
+
+/
+/ prefetch 64 bytes
+/
+	.inline	prefetch64,8
+	prefetcht0 (%rdi)
+	prefetcht0 32(%rdi)
+	.end
+

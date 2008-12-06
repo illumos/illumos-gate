@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ASM_FLUSH_H
 #define	_ASM_FLUSH_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 
@@ -44,8 +42,25 @@ doflush(void *addr)
 	__asm__ __volatile__(
 	    "andn	%0, 3, %0\n\t"
 	    "flush	%0\n\t"
-	: "=r" (addr)
-	: "0" (addr));
+	    : "=r" (addr)
+	    : "0" (addr));
+#else
+#error	"port me"
+#endif
+}
+
+#endif	/* !__lint && __GNUC__ */
+
+#if !defined(__lint) && defined(__GNUC__)
+
+extern __inline__ void
+prefetch64(caddr_t addr)
+{
+#if defined(__sparcv9)
+	__asm__ __volatile__(
+	    "prefetch	[%0], #n_writes\n\t"
+	    : /* no output */
+	    : "0" (addr));
 #else
 #error	"port me"
 #endif

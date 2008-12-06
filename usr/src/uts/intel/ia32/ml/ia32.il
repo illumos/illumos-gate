@@ -184,3 +184,12 @@
 	rep			/ our compiler doesn't support "pause" yet,
 	nop			/ so we're using "F3 90" opcode directly
 	.end
+
+/
+/ prefetch 64 bytes
+/
+	.inline	prefetch64,4
+	movl	(%esp), %eax
+	prefetcht0 (%eax)
+	prefetcht0 32(%eax)
+	.end

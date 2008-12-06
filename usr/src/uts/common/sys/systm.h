@@ -246,6 +246,7 @@ extern void longjmp(label_t *)
 #pragma unknown_control_flow(setjmp)
 #endif
 
+void prefetch64(caddr_t);
 caddr_t caller(void);
 caddr_t callee(void);
 int getpcstack(pc_t *, int);

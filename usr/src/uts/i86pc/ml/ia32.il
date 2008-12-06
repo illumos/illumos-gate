@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /
 / Inline functions specific to the i86pc kernel running on bare metal.
 /
@@ -178,3 +176,13 @@
 	movw	(%esp), %cx
 	bsrw	%cx, %ax
 	.end
+
+/
+/ prefetch 64 bytes
+/
+	.inline	prefetch64,4
+	movl  (%esp), %eax
+	prefetcht0 (%eax)
+	prefetcht0 32(%eax)
+	.end
+
