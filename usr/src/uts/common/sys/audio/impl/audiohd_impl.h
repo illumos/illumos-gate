@@ -134,6 +134,12 @@ extern "C" {
 #define	AUDIOHD_PIN_CON_JACK	0
 #define	AUDIOHD_PIN_CON_FIXED	0x2
 #define	AUDIOHD_PIN_CONTP_MASK	0x3
+#define	AUDIOHD_PIN_VREF_L1	0x20
+#define	AUDIOHD_PIN_VREF_L2	0x10
+#define	AUDIOHD_PIN_VREF_L3	0x04
+#define	AUDIOHD_PIN_VREF_L4	0x02
+#define	AUDIOHD_PIN_VREF_OFF	8
+#define	AUDIOHD_PIN_VREF_MASK	0xff
 
 #define	AUDIOHD_VERB_ADDR_OFF	28
 #define	AUDIOHD_VERB_NID_OFF	20
@@ -374,8 +380,8 @@ extern "C" {
 /*
  * 4-bit verbs
  */
-#define	AUDIOHDC_VERB_GET_CONVERTER_FMT		0xa
-#define	AUDIOHDC_VERB_SET_CONVERTER_FMT		0x2
+#define	AUDIOHDC_VERB_GET_CONV_FMT		0xa
+#define	AUDIOHDC_VERB_SET_CONV_FMT		0x2
 
 #define	AUDIOHDC_VERB_GET_AMP_MUTE		0xb
 #define	AUDIOHDC_VERB_SET_AMP_MUTE		0x3
@@ -673,6 +679,8 @@ struct audiohd_pin {
 	wid_t		gain_wid;	/* node for gain control */
 	int		gain_dir;	/* _OUTPUT/_INPUT */
 	uint32_t	gain_bits;
+
+	uint8_t		vrefvalue;	/* value of VRef */
 
 	enum audiohda_device_type	device;
 	uint32_t	cap;

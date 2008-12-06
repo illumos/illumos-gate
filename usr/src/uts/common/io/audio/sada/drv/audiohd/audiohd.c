@@ -1546,7 +1546,7 @@ audiohd_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 					break;
 				(void) audioha_codec_4bit_verb_get(statep,
 				    caddr, ostream->dac_wid,
-				    AUDIOHDC_VERB_SET_CONVERTER_FMT,
+				    AUDIOHDC_VERB_SET_CONV_FMT,
 				    AUDIOHD_FMT_PCMOUT);
 				ostream = ostream->next_stream;
 			}
@@ -1568,7 +1568,7 @@ audiohd_ad_set_format(audiohdl_t ahandle, int stream, int dir,
 					break;
 				(void) audioha_codec_4bit_verb_get(statep,
 				    caddr, istream->adc_wid,
-				    AUDIOHDC_VERB_SET_CONVERTER_FMT,
+				    AUDIOHDC_VERB_SET_CONV_FMT,
 				    AUDIOHD_FMT_PCMOUT);
 				istream = istream->next_stream;
 			}
@@ -2576,7 +2576,7 @@ audiohd_get_pin_config(audiohd_widget_t *widget)
 	int		caddr = codec->index;
 	wid_t		wid = widget->wid_wid;
 	uint32_t	cap, config, pinctrl;
-	uint8_t		urctrl;
+	uint8_t		urctrl, vrefbits;
 
 	cap = audioha_codec_verb_get(statep, caddr, wid,
 	    AUDIOHDC_VERB_GET_PARAM, AUDIOHDC_PAR_PIN_CAP);
@@ -2603,6 +2603,19 @@ audiohd_get_pin_config(audiohd_widget_t *widget)
 	pin->config = config;
 	pin->num = 0;
 	pin->finish = 0;
+	/*
+	 * get the voltage reference state supported by the pin
+	 * from high level to low level
+	 */
+	vrefbits = (cap >> AUDIOHD_PIN_VREF_OFF) & AUDIOHD_PIN_VREF_MASK;
+	if (vrefbits & AUDIOHD_PIN_VREF_L1)
+		pin->vrefvalue = 0x5;
+	else if (vrefbits & AUDIOHD_PIN_VREF_L2)
+		pin->vrefvalue = 0x4;
+	else if (vrefbits & AUDIOHD_PIN_VREF_L3)
+		pin->vrefvalue = 0x2;
+	else
+		pin->vrefvalue = 0x1;
 
 	pin->seq = config & AUDIOHD_PIN_SEQ_MASK;
 	pin->assoc = (config & AUDIOHD_PIN_ASO_MASK) >> AUDIOHD_PIN_ASO_OFF;
@@ -3353,6 +3366,7 @@ audiohd_finish_output_path(hda_codec_t *codec)
 			    AUDIOHDC_VERB_GET_PIN_CTRL, 0);
 			(void) audioha_codec_verb_get(statep, caddr, wid,
 			    AUDIOHDC_VERB_SET_PIN_CTRL, (lTmp |
+			    pin->vrefvalue |
 			    AUDIOHDC_PIN_CONTROL_OUT_ENABLE |
 			    AUDIOHDC_PIN_CONTROL_HP_ENABLE) &
 			    ~ AUDIOHDC_PIN_CONTROL_IN_ENABLE);
@@ -4354,7 +4368,7 @@ audiohd_init_ports(audiohd_state_t *statep)
 	audiohd_widget_t		*widget;
 	audiohd_pin_t			*pin;
 	uint_t				inputs, outputs;
-	int				i, index, pinnums = 0;
+	int				i;
 	uint32_t			ctrl;
 	uint8_t				ctrl8;
 
@@ -4369,10 +4383,9 @@ audiohd_init_ports(audiohd_state_t *statep)
 		return (DDI_FAILURE);
 
 	if (codec->ostream) {
-		index = 0;
 		outputs = 0;
 		ostream = codec->ostream;
-		while (ostream && pinnums < AUDIOHD_PIN_NUMS) {
+		while (ostream) {
 			ostream->in_use = 1;
 			for (i = 0; i < ostream->pin_nums; i++) {
 				widget = codec->widget[ostream->pin_wid[i]];
@@ -4392,17 +4405,23 @@ audiohd_init_ports(audiohd_state_t *statep)
 					    ostream->dac_wid,
 					    AUDIOHDC_VERB_SET_SPDIF_LCONTROL,
 					    ctrl8);
-					if (pinnums++ == AUDIOHD_PIN_NUMS)
-						break;
-				} else {
-					if (index < AUDIOHD_PIN_NUMS-1) {
-					pin->sada_porttype = g_outport[index]|
+				} else if (pin->device == DTYPE_LINEOUT) {
+					pin->sada_porttype = AUDIO_LINE_OUT |
 					    AUDIOHD_SADA_OUTPUT;
-					outputs |= g_outport[index];
-					index++;
-					if (pinnums++ == AUDIOHD_PIN_NUMS)
-						break;
-					}
+					outputs |= AUDIO_LINE_OUT;
+				} else if (pin->device == DTYPE_SPEAKER) {
+					pin->sada_porttype = AUDIO_SPEAKER |
+					    AUDIOHD_SADA_OUTPUT;
+					outputs |= AUDIO_SPEAKER;
+
+				} else if (pin->device == DTYPE_HP_OUT) {
+					pin->sada_porttype = AUDIO_HEADPHONE |
+					    AUDIOHD_SADA_OUTPUT;
+					outputs |= AUDIO_HEADPHONE;
+				} else {
+					pin->sada_porttype = AUDIO_AUX1_OUT |
+					    AUDIOHD_SADA_OUTPUT;
+					outputs |= AUDIO_AUX1_OUT;
 				}
 			}
 			ostream = ostream->next_stream;
@@ -4954,12 +4973,11 @@ audiohd_set_port(audiohd_state_t *statep, int dir, int port)
 					if ((AUDIOHD_SADA_OUTPUT |
 					    g_outport[i]) ==
 					    pin->sada_porttype)
-						break;
+						AUDIOHD_ENABLE_PIN_OUT(statep,
+						    caddr,
+						    pin->wid);
 					pin = pin->next;
 				}
-				if (pin)
-					AUDIOHD_ENABLE_PIN_OUT(statep, caddr,
-					    pin->wid);
 			} else if (statep->hda_out_ports & g_outport[i]) {
 				tmp_port &= ~(g_outport[i]);
 				pin = codec->first_pin;
@@ -4967,12 +4985,11 @@ audiohd_set_port(audiohd_state_t *statep, int dir, int port)
 					if ((AUDIOHD_SADA_OUTPUT |
 					    g_outport[i]) ==
 					    pin->sada_porttype)
-						break;
+						AUDIOHD_DISABLE_PIN_OUT(statep,
+						    caddr,
+						    pin->wid);
 					pin = pin->next;
 				}
-				if (pin)
-					AUDIOHD_DISABLE_PIN_OUT(statep, caddr,
-					    pin->wid);
 			}
 		}
 		if (port & AUDIO_SPDIF_OUT) {
@@ -4981,12 +4998,10 @@ audiohd_set_port(audiohd_state_t *statep, int dir, int port)
 			while (pin) {
 				if ((AUDIOHD_SADA_OUTPUT | AUDIO_SPDIF_OUT) ==
 				    pin->sada_porttype)
-					break;
+					AUDIOHD_ENABLE_PIN_OUT(statep, caddr,
+					    pin->wid);
 				pin = pin->next;
 			}
-			if (pin)
-				AUDIOHD_ENABLE_PIN_OUT(statep, caddr,
-				    pin->wid);
 
 		} else if (statep->hda_out_ports & AUDIO_SPDIF_OUT) {
 			tmp_port &= ~(AUDIO_SPDIF_OUT);
@@ -4994,12 +5009,10 @@ audiohd_set_port(audiohd_state_t *statep, int dir, int port)
 			while (pin) {
 				if ((AUDIOHD_SADA_OUTPUT | AUDIO_SPDIF_OUT) ==
 				    pin->sada_porttype)
-					break;
+					AUDIOHD_DISABLE_PIN_OUT(statep, caddr,
+					    pin->wid);
 				pin = pin->next;
 			}
-			if (pin)
-				AUDIOHD_DISABLE_PIN_OUT(statep, caddr,
-				    pin->wid);
 		}
 		statep->hda_out_ports = tmp_port;
 		return (DDI_SUCCESS);
