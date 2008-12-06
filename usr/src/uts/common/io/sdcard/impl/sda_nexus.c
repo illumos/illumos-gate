@@ -147,7 +147,7 @@ sda_nexus_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		ndip = ndi_devi_find(dip, ddi_node_name(child_dip), addr);
 		if (ndip && (ndip != child_dip)) {
 			sda_slot_err(slot, "Duplicate device node found "
-			    "(%s@%d)", ddi_node_name(ndip), addr);
+			    "(%s@%s)", ddi_node_name(ndip), addr);
 		}
 
 		/*
