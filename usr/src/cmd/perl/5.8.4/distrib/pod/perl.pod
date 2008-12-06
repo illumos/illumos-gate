@@ -344,8 +344,6 @@ See attributes(5) for descriptions of the  following  attributes:
     | Availability                | SUNWperl583core             |
     |                             | SUNWperl583usr              |
     |                             | SUNWperl583man              |
-    |                             | SUNWpl5u SUNWpl5v SUNWpl5p  |
-    |                             | SUNWpl5m                    |
     |_____________________________|_____________________________|
     | Interface Stability         |                             |
     |_____________________________|_____________________________|
@@ -408,13 +406,6 @@ several system utilities.  The Perl package names are as follows:
      SUNWperl583core    Perl 5.8.4 (Core files)
      SUNWperl583usr     Perl 5.8.4 (Non-core files)
      SUNWperl583man     Perl 5.8.4 (Manual pages)
-
-Solaris 10 also ships with the 5.6.1 version of Perl that was included in
-Solaris 9.  If you are upgrading your system and wish to continue
-to use Perl 5.6.1 as the default Perl version you should refer to the
-L<perlsolaris> manpage for details of how to do this.  Note that you should
-upgrade your installation to use Perl 5.8.4 as soon as is practicable, as
-Perl 5.6.1 may be removed in a future release.
 
 The Perl motto is "There's more than one way to do it."  Divining
 how many more is left as an exercise to the reader.

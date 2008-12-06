@@ -20,14 +20,13 @@
 # CDDL HEADER END
 #
 
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 use strict;
 use File::Find ();
-require v5.6.1;
+require v5.8.4;
 
 use vars qw/$f_flg *name *dir @execlist $basedir @opt_e @exclude/;
 *name   = *File::Find::name;

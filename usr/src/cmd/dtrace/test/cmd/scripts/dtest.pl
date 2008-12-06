@@ -24,9 +24,8 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
-require 5.6.1;
+require 5.8.4;
 
 use File::Find;
 use File::Basename;

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -30,7 +30,7 @@
 #
 
 
-require 5.6.1;
+require 5.8.4;
 use strict;
 use warnings;
 use Carp;

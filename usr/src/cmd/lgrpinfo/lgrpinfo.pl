@@ -24,14 +24,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
 # lgrpinfo: display information about locality groups.
 #
 
-require 5.6.1;
+require 5.8.4;
 use warnings;
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling auto_version);

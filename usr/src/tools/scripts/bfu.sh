@@ -3319,56 +3319,6 @@ remove_initd_links()
 }
 
 #
-# Remove the old 5.005_03 version of perl.
-#
-remove_perl_500503()
-{
-	# Packages to remove.
-	typeset -r perl_pkgs='SUNWopl5m SUNWopl5p SUNWopl5u'
-	typeset pkg
-
-	#
-	# First, attempt to remove the packages cleanly if possible.
-	#
-	printf 'Removing perl 5.005_03 packages'
-	for pkg in $perl_pkgs
-	do
-		if pkginfo $pkgroot -q $pkg; then
-			printf ' %s' $pkg
-			pkgrm $pkgroot -n $pkg >/dev/null 2>&1
-		fi
-	done
-	printf '\n'
-
-	#
-	# In case that didn't work, do it manually.
-	#
-	printf 'Removing perl 5.005_03 from %s/var/sadm/install/contents' \
-	    $rootprefix
-	for pkg in $PKGS
-	do
-		printf ' %s' $pkg
-		if [ -d $rootprefix/var/sadm/pkg/$pkg ]; then
-			rm -rf $rootprefix/var/sadm/pkg/$pkg
-			grep -vw $pkg $rootprefix/var/sadm/install/contents > \
-			    /tmp/contents.$$
-			cp /tmp/contents.$$ /var/sadm/install/contents.$$
-			rm /tmp/contents.$$
-		fi
-	done
-	printf '\n'
-
-	#
-	# Remove any remaining 5.005_03 files,
-	#
-	printf 'Removing perl 5.005_03 from %s/perl5\n' $usr
-
-	# Directories.
-	rm -rf $usr/perl5/5.00503
-	rm -rf $usr/perl5/site_perl/5.005
-}
-
-#
 # Remove Wildcat (aka Sun Fire Link)
 #
 remove_eof_wildcat()
@@ -3527,114 +3477,58 @@ remove_eof_bind8()
 }
 
 #
-# Remove the 5.8.3 version of perl.
+# Remove the 5.6.1 version of perl.
 #
-remove_perl_583()
+remove_perl_561()
 {
-	#
-	# Copy perl 5.8.3 into the new 5.8.4 locations.  This will preserve
-	# any add-on modules that might have been installed, and any 5.8.3
-	# core files that get copied over will be replaced by the new 5.8.4
-	# versions when the cpio archives are subsequently extracted.
-	#
-	printf 'Preserving user-installed perl modules...\n'
-	mkdir -p $usr/perl5/5.8.4
-	cp -rp $usr/perl5/5.8.3/* \
-	    $usr/perl5/5.8.4
-	mkdir -p $usr/perl5/site_perl/5.8.4
-	cp -rp $usr/perl5/site_perl/5.8.3/* \
-	    $usr/perl5/site_perl/5.8.4
-	mkdir -p $usr/perl5/vendor_perl/5.8.4
-	cp -rp $usr/perl5/vendor_perl/5.8.3/* \
-	    $usr/perl5/vendor_perl/5.8.4
 
-	#
-	# Update the #! lines in any scripts in /usr/perl5/5.8.4/bin to refer
-	# to 5.8.4 instead of 5.8.3.  Take care to edit only scripts.
-	#
-	typeset bindir="$usr/perl5/5.8.4/bin"
-	typeset script
-	for script in $(ls $bindir); do
-		script="$bindir/$script"
-		if [[ $script = "$usr/perl5/5.8.4/bin/perl5.8.3" ]]; then
-			rm -f $script
-		elif file $script | \
-		    egrep -s 'executable .*perl .*script'; then
-			sed -e \
-			    's!/usr/perl5/5.8.3/bin/perl!/usr/perl5/5.8.4/bin/perl!g' \
-			    < $script > $script.tmp
-			mv -f $script.tmp $script
-		fi
-	done
+        #
+        # Packages to remove.
+        #
+        typeset -r perl_pkgs='SUNWpl5m SUNWpl5p SUNWpl5u SUNWpl5v'
 
-	#
-	# Packages to remove.
-	#
-	typeset -r perl_pkgs='SUNWperl583man SUNWperl583usr SUNWperl583root'
+        #
+        # First, attempt to remove the packages cleanly if possible.
+        #
+        typeset pkg
+        printf 'Removing perl 5.6.1 packages'
+        for pkg in $perl_pkgs
+        do
+                if pkginfo $pkgroot -q $pkg; then
+                        printf ' %s' $pkg
+                        pkgrm $pkgroot -n $pkg >/dev/null 2>&1
+                fi
+        done
+        printf '\n'
 
-	#
-	# First, attempt to remove the packages cleanly if possible.
-	#
-	typeset pkg
-	printf 'Removing perl 5.8.3 packages'
-	for pkg in $perl_pkgs
-	do
-		if pkginfo $pkgroot -q $pkg; then
-			printf ' %s' $pkg
-			pkgrm $pkgroot -n $pkg >/dev/null 2>&1
-		fi
-	done
-	printf '\n'
+        #
+        # In case that didn't work, do it manually.
+        #
+        printf 'Removing perl 5.6.1 from %s/var/sadm/install/contents' \
+            $rootprefix
+        for pkg in $PKGS
+        do
+                printf ' %s' $pkg
+                if [ -d $rootprefix/var/sadm/pkg/$pkg ]; then
+                        rm -rf $rootprefix/var/sadm/pkg/$pkg
+                        grep -vw $pkg $rootprefix/var/sadm/install/contents > \
+                            /tmp/contents.$$
+                        cp /tmp/contents.$$ /var/sadm/install/contents.$$
+                        rm /tmp/contents.$$
+                fi
+        done
+        printf '\n'
 
-	#
-	# In case that didn't work, do it manually.
-	#
-	printf 'Removing perl 5.8.3 from %s/var/sadm/install/contents' \
-	    $rootprefix
-	for pkg in $PKGS
-	do
-		printf ' %s' $pkg
-		if [ -d $rootprefix/var/sadm/pkg/$pkg ]; then
-			rm -rf $rootprefix/var/sadm/pkg/$pkg
-			grep -vw $pkg $rootprefix/var/sadm/install/contents > \
-			    /tmp/contents.$$
-			cp /tmp/contents.$$ /var/sadm/install/contents.$$
-			rm /tmp/contents.$$
-		fi
-	done
-	printf '\n'
+        #
+        # Remove any remaining 5.6.1 files,
+        #
+        printf 'Removing perl 5.6.1 from %s/perl5\n' $usr
 
-	#
-	# Remove any remaining 5.8.3 files,
-	# and fix up the symlinks if necessary.
-	#
-	printf 'Removing perl 5.8.3 from %s/perl5\n' $usr
-
-	# Directories.
-	rm -rf $usr/perl5/5.8.3
-	rm -rf $usr/perl5/site_perl/5.8.3
-	rm -rf $usr/perl5/vendor_perl/5.8.3
-
-	# bin symlink.
-	rm -f $usr/perl5/bin
-	ln -s ./5.8.4/bin $usr/perl5/bin
-
-	# pod symlink.
-	rm -f $usr/perl5/pod
-	ln -s ./5.8.4/lib/pod $usr/perl5/pod
-
-	#
-	# man symlink.  In earlier S10 builds the man symlink mistakenly points
-	# to the 5.6.1 manpages, instead of 5.8.3.  Fix to point to 5.8.4.
-	#
-	rm -f $usr/perl5/man
-	ln -s ./5.8.4/man $usr/perl5/man
-
-	# Symlink /bin/perl to 5.8.4.
-	rm -f $usr/bin/perl
-	ln -s ../perl5/5.8.4/bin/perl $usr/bin/perl
+        # Directories.
+        rm -rf $usr/perl5/5.6.1
+        rm -rf $usr/perl5/site_perl/5.6.1
+        rm -rf $usr/perl5/vendor_perl/5.6.1
 }
-
 #
 # Remove FNS/XFN packages
 #
@@ -6329,20 +6223,10 @@ mondo_loop() {
 	rm -f $usr/include/sys/cg8var.h
 
 	#
-	# Remove perl 5.005_03.  If this is a backwards bfu,
-	# it will be extracted again by cpio.
+	# Remove perl 5.6.1
 	#
-	if [[ -d $usr/perl5/5.00503 ]]; then
-		remove_perl_500503
-	fi
-
-	#
-	# Remove perl 5.8.3, but only if the generic.usr archive contains 5.8.4.
-	# If this is a backwards bfu, 5.8.3 will be extracted again by cpio.
-	#
-	if [[ -d $usr/perl5/5.8.3 ]] && $ZCAT $cpiodir/generic.usr$ZFIX | \
-	    cpio -it 2>/dev/null |  egrep -s '^usr/perl5/5.8.4/'; then
-		remove_perl_583
+	if [[ -d $usr/perl5/5.6.1 ]]; then
+		remove_perl_561
 	fi
 
 	#
