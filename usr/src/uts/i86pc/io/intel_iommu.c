@@ -2395,12 +2395,14 @@ dmar_check_boot_option(char *opt, int *var)
 	if ((len = do_bsys_getproplen(NULL, opt)) > 0) {
 		boot_option = kmem_alloc(len, KM_SLEEP);
 		(void) do_bsys_getprop(NULL, opt, boot_option);
-		if (strcmp(boot_option, "yes") == 0) {
-			cmn_err(CE_CONT, "\"%s=yes\" was set\n",
+		if (strcmp(boot_option, "yes") == 0 ||
+		    strcmp(boot_option, "true") == 0) {
+			cmn_err(CE_CONT, "\"%s=true\" was set\n",
 			    opt);
 			*var = 1;
-		} else if (strcmp(boot_option, "no") == 0) {
-			cmn_err(CE_CONT, "\"%s=no\" was set\n",
+		} else if (strcmp(boot_option, "no") == 0 ||
+		    strcmp(boot_option, "false") == 0) {
+			cmn_err(CE_CONT, "\"%s=false\" was set\n",
 			    opt);
 			*var = 0;
 		}

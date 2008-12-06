@@ -150,8 +150,6 @@ static char hostid_file[] = "/etc/hostid";
 #endif
 
 void *gfx_devinfo_list;
-int startup_amd_iommu_disable;
-char *startup_amd_iommu_disable_list;
 
 /*
  * XXX make declaration below "static" when drivers no longer use this
@@ -2018,30 +2016,6 @@ load_tod_module(char *todmod)
 		halt("Can't load TOD module");
 }
 
-#if !defined(__xpv)
-static void
-get_amd_iommu_boot_props(void)
-{
-	int len;
-	char *disable;
-
-	if ((len = do_bsys_getproplen(NULL, "amd-iommu")) > 0) {
-		disable = kmem_zalloc(len, KM_SLEEP);
-		(void) do_bsys_getprop(NULL, "amd-iommu", disable);
-		if (strcmp(disable, "no") == 0) {
-			startup_amd_iommu_disable = 1;
-		}
-		kmem_free(disable, len);
-	}
-
-	if ((len = do_bsys_getproplen(NULL, "amd-iommu-disable-list")) > 0) {
-		startup_amd_iommu_disable_list = kmem_zalloc(len, KM_SLEEP);
-		(void) do_bsys_getprop(NULL, "amd-iommu-disable-list",
-		    startup_amd_iommu_disable_list);
-	}
-}
-#endif
-
 static void
 startup_end(void)
 {
@@ -2133,8 +2107,6 @@ startup_end(void)
 	}
 
 #if !defined(__xpv)
-	get_amd_iommu_boot_props();
-
 	if (modload("drv", "amd_iommu") < 0) {
 		PRM_POINT("No AMD IOMMU present\n");
 	} else if (ddi_hold_installed_driver(ddi_name_to_major(

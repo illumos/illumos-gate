@@ -130,8 +130,6 @@ _init(void)
 		return (error);
 	}
 
-	amd_iommu_read_boot_props();
-
 	if (amd_iommu_acpi_init() != DDI_SUCCESS) {
 		if (amd_iommu_debug) {
 			cmn_err(CE_WARN, "%s: _init: ACPI init failed.",
@@ -141,10 +139,17 @@ _init(void)
 		return (ENOTSUP);
 	}
 
+	amd_iommu_read_boot_props();
+
 	if (amd_iommu_page_table_hash_init(&amd_iommu_page_table_hash)
 	    != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s: _init: Page table hash init failed.",
 		    amd_iommu_modname);
+		if (amd_iommu_disable_list) {
+			kmem_free(amd_iommu_disable_list,
+			    strlen(amd_iommu_disable_list) + 1);
+			amd_iommu_disable_list = NULL;
+		}
 		amd_iommu_acpi_fini();
 		ddi_soft_state_fini(&amd_iommu_statep);
 		amd_iommu_statep = NULL;
@@ -156,6 +161,11 @@ _init(void)
 		cmn_err(CE_WARN, "%s: _init: mod_install failed.",
 		    amd_iommu_modname);
 		amd_iommu_page_table_hash_fini(&amd_iommu_page_table_hash);
+		if (amd_iommu_disable_list) {
+			kmem_free(amd_iommu_disable_list,
+			    strlen(amd_iommu_disable_list) + 1);
+			amd_iommu_disable_list = NULL;
+		}
 		amd_iommu_acpi_fini();
 		ddi_soft_state_fini(&amd_iommu_statep);
 		amd_iommu_statep = NULL;
@@ -183,13 +193,14 @@ _fini(void)
 		return (error);
 
 	amd_iommu_page_table_hash_fini(&amd_iommu_page_table_hash);
-	amd_iommu_acpi_fini();
-	ddi_soft_state_fini(&amd_iommu_statep);
-	amd_iommu_statep = NULL;
 	if (amd_iommu_disable_list) {
 		kmem_free(amd_iommu_disable_list,
 		    strlen(amd_iommu_disable_list) + 1);
+		amd_iommu_disable_list = NULL;
 	}
+	amd_iommu_acpi_fini();
+	ddi_soft_state_fini(&amd_iommu_statep);
+	amd_iommu_statep = NULL;
 
 	return (0);
 }

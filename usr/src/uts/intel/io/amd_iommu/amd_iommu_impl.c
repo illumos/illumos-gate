@@ -1821,8 +1821,33 @@ amd_iommu_reg_set64_workaround(uint64_t *regp, uint32_t bits, uint64_t value)
 void
 amd_iommu_read_boot_props(void)
 {
-	amd_iommu_disable = startup_amd_iommu_disable;
-	amd_iommu_disable_list = startup_amd_iommu_disable_list;
+	char *propval;
+
+	/*
+	 * if "amd-iommu = no/false" boot property is set,
+	 * ignore AMD iommu
+	 */
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "amd-iommu", &propval) == DDI_SUCCESS) {
+		if (strcmp(propval, "no") == 0 ||
+		    strcmp(propval, "false") == 0) {
+			amd_iommu_disable = 1;
+		}
+		ddi_prop_free(propval);
+	}
+
+	/*
+	 * Copy the list of drivers for which IOMMU is disabled by user.
+	 */
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
+	    DDI_PROP_DONTPASS, "amd-iommu-disable-list", &propval)
+	    == DDI_SUCCESS) {
+		amd_iommu_disable_list = kmem_alloc(strlen(propval) + 1,
+		    KM_SLEEP);
+		(void) strcpy(amd_iommu_disable_list, propval);
+		ddi_prop_free(propval);
+	}
+
 }
 
 void

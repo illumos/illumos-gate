@@ -192,8 +192,6 @@ extern char obp_bootpath[BO_MAXOBJNAME];
 extern char svm_bootpath[BO_MAXOBJNAME];
 
 extern void *gfx_devinfo_list;
-extern int startup_amd_iommu_disable;
-extern char *startup_amd_iommu_disable_list;
 
 extern dev_t getrootdev(void);
 extern void getfsname(char *, char *, size_t);

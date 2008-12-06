@@ -287,7 +287,8 @@ parse_dmar_rmrr(dmar_acpi_unit_head_t *head)
 	 * for each rmrr, limiaddr must > baseaddr
 	 */
 	if (rmrr->rm_baseaddr >= rmrr->rm_limiaddr) {
-		cmn_err(CE_WARN, "parse_dmar_rmrr: buggy rmrr,"
+		cmn_err(CE_NOTE, "Invalid BIOS RMRR: Disabling Intel IOMMU");
+		cmn_err(CE_WARN, "!invalid rmrr,"
 		    " baseaddr = 0x%" PRIx64
 		    ", limiaddr = 0x%" PRIx64 "",
 		    rmrr->rm_baseaddr, rmrr->rm_limiaddr);
@@ -607,12 +608,14 @@ intel_iommu_probe_and_parse(void)
 	if ((len = do_bsys_getproplen(NULL, "print-dmar-acpi")) > 0) {
 		opt = kmem_alloc(len, KM_SLEEP);
 		(void) do_bsys_getprop(NULL, "print-dmar-acpi", opt);
-		if (strcmp(opt, "yes") == 0) {
+		if (strcmp(opt, "yes") == 0 ||
+		    strcmp(opt, "true") == 0) {
 			intel_dmar_acpi_debug = 1;
-			cmn_err(CE_CONT, "\"print-dmar-acpi=yes\" was set\n");
-		} else if (strcmp(opt, "no") == 0) {
+			cmn_err(CE_CONT, "\"print-dmar-acpi=true\" was set\n");
+		} else if (strcmp(opt, "no") == 0 ||
+		    strcmp(opt, "false") == 0) {
 			intel_dmar_acpi_debug = 0;
-			cmn_err(CE_CONT, "\"print-dmar-acpi=no\" was set\n");
+			cmn_err(CE_CONT, "\"print-dmar-acpi=false\" was set\n");
 		}
 		kmem_free(opt, len);
 	}
