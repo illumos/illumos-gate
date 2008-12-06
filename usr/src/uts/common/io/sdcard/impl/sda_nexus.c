@@ -130,7 +130,7 @@ sda_nexus_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 
 		if ((slot = ddi_get_parent_data(child_dip)) == NULL) {
 			sda_slot_err(NULL, "Parent data struct missing!");
-			return (DDI_FAILURE);
+			return (DDI_NOT_WELL_FORMED);
 		}
 
 		/*
@@ -146,7 +146,8 @@ sda_nexus_bus_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		 */
 		ndip = ndi_devi_find(dip, ddi_node_name(child_dip), addr);
 		if (ndip && (ndip != child_dip)) {
-			return (DDI_NOT_WELL_FORMED);
+			sda_slot_err(slot, "Duplicate device node found "
+			    "(%s@%d)", ddi_node_name(ndip), addr);
 		}
 
 		/*
@@ -410,6 +411,7 @@ sda_nexus_remove(sda_slot_t *slot)
 	ndi_devi_enter(pdip, &circ);
 	if ((cdip = slot->s_dip) != NULL) {
 		reap = B_TRUE;
+
 		mutex_enter(&(DEVI(cdip))->devi_lock);
 		DEVI_SET_DEVICE_REMOVED(cdip);
 		mutex_exit(&(DEVI(cdip))->devi_lock);
@@ -439,15 +441,17 @@ sda_nexus_reap(void *arg)
 	ndi_devi_enter(pdip, &circ);
 	sda_slot_enter(slot);
 
-	if (((cdip = slot->s_dip) != NULL) && DEVI_IS_DEVICE_REMOVED(cdip)) {
+	cdip = slot->s_dip;
+
+	if ((cdip != NULL) && DEVI_IS_DEVICE_REMOVED(cdip)) {
 
 		sda_slot_exit(slot);
-		(void) ddi_deviname(cdip, devnm);
-		(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
 
 		if (i_ddi_node_state(cdip) < DS_INITIALIZED) {
 			rv = ddi_remove_child(cdip, 0);
 		} else {
+			(void) ddi_deviname(cdip, devnm);
+			(void) devfs_clean(pdip, devnm + 1, DV_CLEAN_FORCE);
 			rv = ndi_devi_unconfig_one(pdip, devnm + 1, NULL,
 			    NDI_DEVI_REMOVE | NDI_UNCONFIG);
 		}
@@ -461,10 +465,10 @@ sda_nexus_reap(void *arg)
 			return;
 		}
 		sda_slot_enter(slot);
-	}
 
-	if (slot->s_dip == cdip) {
-		slot->s_dip = NULL;
+		if (slot->s_dip == cdip) {
+			slot->s_dip = NULL;
+		}
 	}
 	sda_slot_exit(slot);
 

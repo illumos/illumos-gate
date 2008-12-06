@@ -230,7 +230,12 @@ sda_cmd_submit(sda_slot_t *slot, sda_cmd_t *cmdp, void (*done)(sda_cmd_t *))
 		return;
 	}
 
-	list_insert_tail(&slot->s_cmdlist, c);
+	/* Initialization commands go to the head of the class */
+	if (c->c_flags & SDA_CMDF_INIT) {
+		list_insert_head(&slot->s_cmdlist, c);
+	} else {
+		list_insert_tail(&slot->s_cmdlist, c);
+	}
 	sda_slot_exit(slot);
 
 	sda_slot_wakeup(slot);

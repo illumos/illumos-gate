@@ -115,7 +115,6 @@ sda_host_t *
 sda_host_alloc(dev_info_t *dip, int nslot, sda_ops_t *ops, ddi_dma_attr_t *dma)
 {
 	sda_host_t	*h;
-	int		i;
 
 	if (ops->so_version != SDA_OPS_VERSION) {
 		return (NULL);
@@ -128,7 +127,7 @@ sda_host_alloc(dev_info_t *dip, int nslot, sda_ops_t *ops, ddi_dma_attr_t *dma)
 	h->h_dip = dip;
 
 	/* initialize each slot */
-	for (i = 0; i < nslot; i++) {
+	for (int i = 0; i < nslot; i++) {
 		sda_slot_t *slot = &h->h_slots[i];
 
 		slot->s_hostp = h;
@@ -144,9 +143,7 @@ sda_host_alloc(dev_info_t *dip, int nslot, sda_ops_t *ops, ddi_dma_attr_t *dma)
 void
 sda_host_free(sda_host_t *h)
 {
-	int	i;
-
-	for (i = 0; i < h->h_nslot; i++) {
+	for (int i = 0; i < h->h_nslot; i++) {
 		sda_slot_fini(&h->h_slots[i]);
 	}
 
@@ -163,12 +160,10 @@ sda_host_set_private(sda_host_t *h, int num, void *private)
 int
 sda_host_attach(sda_host_t *h)
 {
-	int	i;
-
 	/*
 	 * Attach slots.
 	 */
-	for (i = 0; i < h->h_nslot; i++) {
+	for (int i = 0; i < h->h_nslot; i++) {
 
 		sda_slot_attach(&h->h_slots[i]);
 
@@ -189,8 +184,6 @@ sda_host_attach(sda_host_t *h)
 void
 sda_host_detach(sda_host_t *h)
 {
-	int	i;
-
 	/*
 	 * Unregister nexus minor nodes.
 	 */
@@ -199,8 +192,24 @@ sda_host_detach(sda_host_t *h)
 	/*
 	 * Detach slots.
 	 */
-	for (i = 0; i < h->h_nslot; i++) {
+	for (int i = 0; i < h->h_nslot; i++) {
 		sda_slot_detach(&h->h_slots[i]);
+	}
+}
+
+void
+sda_host_suspend(sda_host_t *h)
+{
+	for (int i = 0; i < h->h_nslot; i++) {
+		sda_slot_suspend(&h->h_slots[i]);
+	}
+}
+
+void
+sda_host_resume(sda_host_t *h)
+{
+	for (int i = 0; i < h->h_nslot; i++) {
+		sda_slot_resume(&h->h_slots[i]);
 	}
 }
 

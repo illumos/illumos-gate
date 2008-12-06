@@ -314,6 +314,8 @@ void sda_host_free(sda_host_t *);
 void sda_host_set_private(sda_host_t *, int, void *);
 int sda_host_attach(sda_host_t *);
 void sda_host_detach(sda_host_t *);
+void sda_host_suspend(sda_host_t *);
+void sda_host_resume(sda_host_t *);
 void sda_host_detect(sda_host_t *, int);
 void sda_host_fault(sda_host_t *, int, sda_fault_t);
 void sda_host_transfer(sda_host_t *, int, sda_err_t);

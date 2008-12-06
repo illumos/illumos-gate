@@ -60,6 +60,7 @@ static struct dev_ops sdcard_devops = {
 	NULL,	/* cb_ops */
 	NULL,	/* bus_ops */
 	NULL,	/* power */
+	NULL,	/* quiesce */
 };
 
 static struct modldrv modldrv = {

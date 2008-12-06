@@ -53,6 +53,7 @@ struct sda_slot {
 	int		s_slot_num;
 	boolean_t	s_inserted;
 	boolean_t	s_failed;
+
 	uint8_t		s_num_io;
 	uint32_t	s_cur_ocr;		/* current ocr */
 
@@ -70,6 +71,7 @@ struct sda_slot {
 	/* these are protected by the evlock */
 	boolean_t	s_wake;			/* wake up thread */
 	boolean_t	s_detach;		/* detach in progress */
+	boolean_t	s_suspend;		/* host has DDI_SUSPENDed */
 	boolean_t	s_detect;		/* detect event occurred */
 	sda_fault_t	s_fault;
 	boolean_t	s_xfrdone;		/* transfer event occurred */
@@ -116,8 +118,8 @@ struct sda_slot {
 	/*
 	 * Asynch. threads.
 	 */
-	kt_did_t	s_thrid;	/* processing thread id */
-	ddi_taskq_t	*s_tq;		/* insert taskq */
+	ddi_taskq_t	*s_hp_tq;	/* insert taskq */
+	ddi_taskq_t	*s_main_tq;	/* main processing taskq */
 
 	/*
 	 * Timestamping for cfgadm benefit.
@@ -161,6 +163,7 @@ _NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_lock, sda_slot::s_circular))
 _NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_wake))
 _NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_detach))
 _NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_detect))
+_NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_suspend))
 _NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_fault))
 _NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_xfrdone))
 _NOTE(MUTEX_PROTECTS_DATA(sda_slot::s_evlock, sda_slot::s_errno))
@@ -256,6 +259,8 @@ void sda_slot_exit(sda_slot_t *);
 boolean_t sda_slot_owned(sda_slot_t *);
 void sda_slot_attach(sda_slot_t *);
 void sda_slot_detach(sda_slot_t *);
+void sda_slot_suspend(sda_slot_t *);
+void sda_slot_resume(sda_slot_t *);
 void sda_slot_reset(sda_slot_t *);
 void sda_slot_wakeup(sda_slot_t *);
 void sda_slot_detect(sda_slot_t *);

@@ -79,6 +79,7 @@ struct sdhost {
 
 static int sdhost_attach(dev_info_t *, ddi_attach_cmd_t);
 static int sdhost_detach(dev_info_t *, ddi_detach_cmd_t);
+static int sdhost_quiesce(dev_info_t *);
 static int sdhost_suspend(dev_info_t *);
 static int sdhost_resume(dev_info_t *);
 
@@ -113,7 +114,7 @@ static struct dev_ops sdhost_dev_ops = {
 	NULL,				/* devo_cb_ops */
 	NULL,				/* devo_bus_ops */
 	NULL,				/* devo_power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	sdhost_quiesce,			/* devo_quiesce */
 };
 
 static struct modldrv sdhost_modldrv = {
@@ -226,6 +227,7 @@ sdhost_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	uint8_t			slotinfo;
 	uint8_t			bar;
 	int			i;
+	int			rv;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -328,7 +330,15 @@ sdhost_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Enable device interrupts at the DDI layer.
 	 */
-	(void) ddi_intr_enable(shp->sh_ihandle);
+	if (shp->sh_icap & DDI_INTR_FLAG_BLOCK) {
+		rv = ddi_intr_block_enable(&shp->sh_ihandle, 1);
+	} else {
+		rv = ddi_intr_enable(shp->sh_ihandle);
+	}
+	if (rv != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Failed enabling interrupts");
+		goto failed;
+	}
 
 	/*
 	 * Mark the slots online with the framework.  This will cause
@@ -336,7 +346,11 @@ sdhost_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	if (sda_host_attach(shp->sh_host) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "Failed attaching to SDA framework");
-		(void) ddi_intr_disable(shp->sh_ihandle);
+		if (shp->sh_icap & DDI_INTR_FLAG_BLOCK) {
+			(void) ddi_intr_block_disable(&shp->sh_ihandle, 1);
+		} else {
+			(void) ddi_intr_disable(shp->sh_ihandle);
+		}
 		goto failed;
 	}
 
@@ -372,8 +386,6 @@ sdhost_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 
 	shp = ddi_get_driver_private(dip);
-	if (shp == NULL)
-		return (DDI_FAILURE);
 
 	/*
 	 * Take host offline with the framework.
@@ -384,7 +396,11 @@ sdhost_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 * Tear down interrupts.
 	 */
 	if (shp->sh_ihandle != NULL) {
-		(void) ddi_intr_disable(shp->sh_ihandle);
+		if (shp->sh_icap & DDI_INTR_FLAG_BLOCK) {
+			(void) ddi_intr_block_disable(&shp->sh_ihandle, 1);
+		} else {
+			(void) ddi_intr_disable(shp->sh_ihandle);
+		}
 		(void) ddi_intr_remove_handler(shp->sh_ihandle);
 		(void) ddi_intr_free(shp->sh_ihandle);
 	}
@@ -400,6 +416,25 @@ sdhost_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 }
 
 int
+sdhost_quiesce(dev_info_t *dip)
+{
+	sdhost_t	*shp;
+	sdslot_t	*ss;
+
+	shp = ddi_get_driver_private(dip);
+
+	/* reset each slot separately */
+	for (int i = 0; i < shp->sh_numslots; i++) {
+		ss = &shp->sh_slots[i];
+		if (ss->ss_acch == NULL)
+			continue;
+
+		(void) sdhost_soft_reset(ss, SOFT_RESET_ALL);
+	}
+	return (DDI_SUCCESS);
+}
+
+int
 sdhost_suspend(dev_info_t *dip)
 {
 	sdhost_t	*shp;
@@ -407,11 +442,8 @@ sdhost_suspend(dev_info_t *dip)
 	int		i;
 
 	shp = ddi_get_driver_private(dip);
-	if (shp == NULL)
-		return (DDI_FAILURE);
 
-	/* disable the interrupts */
-	(void) ddi_intr_disable(shp->sh_ihandle);
+	sda_host_suspend(shp->sh_host);
 
 	for (i = 0; i < shp->sh_numslots; i++) {
 		ss = &shp->sh_slots[i];
@@ -432,8 +464,6 @@ sdhost_resume(dev_info_t *dip)
 	int		i;
 
 	shp = ddi_get_driver_private(dip);
-	if (shp == NULL)
-		return (DDI_FAILURE);
 
 	for (i = 0; i < shp->sh_numslots; i++) {
 		ss = &shp->sh_slots[i];
@@ -444,14 +474,8 @@ sdhost_resume(dev_info_t *dip)
 		mutex_exit(&ss->ss_lock);
 	}
 
-	/* re-enable the interrupts */
-	(void) ddi_intr_enable(shp->sh_ihandle);
+	sda_host_resume(shp->sh_host);
 
-	/* kick off a new card detect task */
-	for (i = 0; i < shp->sh_numslots; i++) {
-		ss = &shp->sh_slots[i];
-		sda_host_detect(ss->ss_host, ss->ss_num);
-	}
 	return (DDI_SUCCESS);
 }
 
@@ -931,6 +955,7 @@ sdhost_init_slot(dev_info_t *dip, sdhost_t *shp, int num, int bar)
 
 	if (ddi_regs_map_setup(dip, bar, &ss->ss_regva, 0, 0, &sdhost_regattr,
 	    &ss->ss_acch) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Failed to map registers!");
 		return (DDI_FAILURE);
 	}
 
@@ -1083,6 +1108,7 @@ sdhost_wait_cmd(sdslot_t *ss, sda_cmd_t *cmdp)
 {
 	int		i;
 	uint16_t	errs;
+	sda_err_t	rv;
 
 	/*
 	 * Worst case for 100kHz timeout is 2msec (200 clocks), we add
@@ -1116,20 +1142,29 @@ sdhost_wait_cmd(sdslot_t *ss, sda_cmd_t *cmdp)
 
 			/* command timeout isn't a host failure */
 			if ((errs & ERR_CMD_TMO) == ERR_CMD_TMO) {
-				return (SDA_ETIME);
-			}
-
-			if ((errs & ERR_CMD_CRC) == ERR_CMD_CRC) {
-				return (SDA_ECRC7);
+				rv = SDA_ETIME;
+			} else if ((errs & ERR_CMD_CRC) == ERR_CMD_CRC) {
+				rv = SDA_ECRC7;
 			} else {
-				return (SDA_EPROTO);
+				rv = SDA_EPROTO;
 			}
+			goto error;
 		}
 
 		drv_usecwait(5);
 	}
 
-	return (SDA_ETIME);
+	rv = SDA_ETIME;
+
+error:
+	/*
+	 * NB: We need to soft reset the CMD and DAT
+	 * lines after a failure of this sort.
+	 */
+	(void) sdhost_soft_reset(ss, SOFT_RESET_CMD);
+	(void) sdhost_soft_reset(ss, SOFT_RESET_DAT);
+
+	return (rv);
 }
 
 sda_err_t
@@ -1282,7 +1317,6 @@ sdhost_getprop(void *arg, sda_prop_t prop, uint32_t *val)
 		mutex_exit(&ss->ss_lock);
 		return (SDA_ESUSPENDED);
 	}
-
 	switch (prop) {
 	case SDA_PROP_INSERTED:
 		if (CHECK_STATE(ss, CARD_INSERTED)) {

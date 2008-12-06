@@ -271,11 +271,7 @@ wbsd_detach(dev_info_t *dip)
 {
 	wbsd_t	*wp;
 
-	if ((wp = ddi_get_driver_private(dip)) == NULL) {
-		cmn_err(CE_WARN, "Unable to get soft state");
-		return (DDI_FAILURE);
-	}
-
+	wp = ddi_get_driver_private(dip);
 
 	sda_host_detach(wp->w_host);
 
@@ -297,10 +293,10 @@ wbsd_suspend(dev_info_t *dip)
 {
 	wbsd_t	*wp;
 
-	if ((wp = ddi_get_driver_private(dip)) == NULL) {
-		cmn_err(CE_WARN, "Unable to get soft state");
-		return (DDI_FAILURE);
-	}
+	wp = ddi_get_driver_private(dip);
+
+	sda_host_suspend(wp->w_host);
+
 	mutex_enter(&wp->w_lock);
 	wp->w_suspended = B_TRUE;
 	wbsd_halt_hw(wp);
@@ -314,17 +310,14 @@ wbsd_resume(dev_info_t *dip)
 {
 	wbsd_t	*wp;
 
-	if ((wp = ddi_get_driver_private(dip)) == NULL) {
-		cmn_err(CE_WARN, "Unable to get soft state");
-		return (DDI_FAILURE);
-	}
+	wp = ddi_get_driver_private(dip);
 
 	mutex_enter(&wp->w_lock);
 	wp->w_suspended = B_FALSE;
 	wbsd_reset_hw(wp);
 	mutex_exit(&wp->w_lock);
 
-	sda_host_detect(wp->w_host, 0);
+	sda_host_resume(wp->w_host);
 
 	return (DDI_SUCCESS);
 }

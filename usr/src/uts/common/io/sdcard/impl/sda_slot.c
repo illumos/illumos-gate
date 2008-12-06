@@ -32,9 +32,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/thread.h>
-#include <sys/proc.h>
-#include <sys/callb.h>
 #include <sys/sysmacros.h>
 #include <sys/cpuvar.h>
 #include <sys/cmn_err.h>
@@ -157,7 +154,8 @@ sda_slot_halt(sda_slot_t *slot)
 {
 	sda_slot_enter(slot);
 	slot->s_ops.so_halt(slot->s_prv);
-	drv_usecwait(1000);	/* we need to wait 1 msec for power down */
+	/* We need to wait 1 msec for power down. */
+	drv_usecwait(1000);
 	sda_slot_exit(slot);
 }
 
@@ -408,7 +406,7 @@ sda_slot_handle_detect(sda_slot_t *slot)
 		 * another task, to avoid deadlock as the task may
 		 * need to dispatch commands.
 		 */
-		(void) ddi_taskq_dispatch(slot->s_tq, sda_slot_insert, slot,
+		(void) ddi_taskq_dispatch(slot->s_hp_tq, sda_slot_insert, slot,
 		    DDI_SLEEP);
 	} else {
 
@@ -497,14 +495,13 @@ sda_slot_attach(sda_slot_t *slot)
 {
 	sda_host_t	*h = slot->s_hostp;
 	char		name[16];
-	kthread_t	*thr;
 	uint32_t	cap;
 
 	/*
-	 * We have both a thread and a taskq.  The taskq is used for
+	 * We have two taskqs.  The first taskq is used for
 	 * card initialization.
 	 *
-	 * The thread is used for the main processing loop.
+	 * The second is used for the main processing loop.
 	 *
 	 * The reason for a separate taskq is that initialization
 	 * needs to acquire locks which may be held by the slot
@@ -516,19 +513,30 @@ sda_slot_attach(sda_slot_t *slot)
 
 	sda_slot_enter(slot);
 
-	(void) snprintf(name, sizeof (name), "slot_%d_tq", slot->s_slot_num);
-	slot->s_tq = ddi_taskq_create(h->h_dip, name, 1, TASKQ_DEFAULTPRI, 0);
-	if (slot->s_tq == NULL) {
+	(void) snprintf(name, sizeof (name), "slot_%d_hp_tq",
+	    slot->s_slot_num);
+	slot->s_hp_tq = ddi_taskq_create(h->h_dip, name, 1,
+	    TASKQ_DEFAULTPRI, 0);
+	if (slot->s_hp_tq == NULL) {
 		/* Generally, this failure should never occur */
-		sda_slot_err(slot, "Unable to create slot taskq");
+		sda_slot_err(slot, "Unable to create hotplug slot taskq");
 		sda_slot_exit(slot);
 		return;
 	}
 
 	/* create the main processing thread */
-	thr = thread_create(NULL, 0, sda_slot_thread, slot, 0, &p0, TS_RUN,
-	    minclsyspri);
-	slot->s_thrid = thr->t_did;
+	(void) snprintf(name, sizeof (name), "slot_%d_main_tq",
+	    slot->s_slot_num);
+	slot->s_main_tq = ddi_taskq_create(h->h_dip, name, 1,
+	    TASKQ_DEFAULTPRI, 0);
+	if (slot->s_main_tq == NULL) {
+		/* Generally, this failure should never occur */
+		sda_slot_err(slot, "Unable to create main slot taskq");
+		sda_slot_exit(slot);
+		return;
+	}
+	(void) ddi_taskq_dispatch(slot->s_main_tq, sda_slot_thread, slot,
+	    DDI_SLEEP);
 
 	/*
 	 * Determine slot capabilities.
@@ -560,33 +568,52 @@ sda_slot_detach(sda_slot_t *slot)
 	/*
 	 * Shut down the thread.
 	 */
-	if (slot->s_thrid) {
-		mutex_enter(&slot->s_evlock);
-		slot->s_detach = B_TRUE;
-		cv_broadcast(&slot->s_evcv);
-		mutex_exit(&slot->s_evlock);
-	}
-	thread_join(slot->s_thrid);
+	mutex_enter(&slot->s_evlock);
+	slot->s_detach = B_TRUE;
+	cv_broadcast(&slot->s_evcv);
+	mutex_exit(&slot->s_evlock);
 
 	/*
-	 * Nuke the taskq. We do this after killing the
-	 * thread, to ensure that the thread doesn't try to
-	 * dispatch to it.
+	 * Nuke the taskqs. We do this after stopping the background
+	 * thread to avoid deadlock.
 	 */
-	if (slot->s_tq)
-		ddi_taskq_destroy(slot->s_tq);
+	if (slot->s_main_tq)
+		ddi_taskq_destroy(slot->s_main_tq);
+	if (slot->s_hp_tq)
+		ddi_taskq_destroy(slot->s_hp_tq);
+}
+
+void
+sda_slot_suspend(sda_slot_t *slot)
+{
+	mutex_enter(&slot->s_evlock);
+	slot->s_suspend = B_TRUE;
+	cv_broadcast(&slot->s_evcv);
+	mutex_exit(&slot->s_evlock);
+	ddi_taskq_wait(slot->s_main_tq);
+}
+
+void
+sda_slot_resume(sda_slot_t *slot)
+{
+	mutex_enter(&slot->s_evlock);
+	slot->s_suspend = B_FALSE;
+	/*
+	 * A card change event may have occurred, and in any case we need
+	 * to reinitialize the card.
+	 */
+	slot->s_detect = B_TRUE;
+	mutex_exit(&slot->s_evlock);
+
+	/* Start up a new instance of the main processing task. */
+	(void) ddi_taskq_dispatch(slot->s_main_tq, sda_slot_thread, slot,
+	    DDI_SLEEP);
 }
 
 void
 sda_slot_thread(void *arg)
 {
 	sda_slot_t	*slot = arg;
-#ifndef	__lock_lint
-	callb_cpr_t	cprinfo;
-
-	CALLB_CPR_INIT(&cprinfo, &slot->s_evlock, callb_generic_cpr,
-	    "sda_slot_thread");
-#endif
 
 	for (;;) {
 		sda_cmd_t	*cmdp;
@@ -611,7 +638,15 @@ sda_slot_thread(void *arg)
 		}
 
 		if (slot->s_detach) {
-			/* parent is detaching the slot, bail out */
+			/* Parent is detaching the slot, bail out. */
+			break;
+		}
+
+		if ((slot->s_suspend) && (slot->s_xfrp == NULL)) {
+			/*
+			 * Host wants to suspend, but don't do it if
+			 * we have a transfer outstanding.
+			 */
 			break;
 		}
 
@@ -651,8 +686,8 @@ sda_slot_thread(void *arg)
 			 * Do not sleep while holding the evlock.  If this
 			 * fails, we'll just try again the next cycle.
 			 */
-			(void) ddi_taskq_dispatch(slot->s_tq, sda_nexus_reap,
-			    slot, DDI_NOSLEEP);
+			(void) ddi_taskq_dispatch(slot->s_hp_tq,
+			    sda_nexus_reap, slot, DDI_NOSLEEP);
 		}
 
 		if ((slot->s_xfrp != NULL) && (gethrtime() > slot->s_xfrtmo)) {
@@ -667,7 +702,11 @@ sda_slot_thread(void *arg)
 			continue;
 		}
 
-		if (!slot->s_wake) {
+		/*
+		 * If the slot has suspended, then we can't process
+		 * any new commands yet.
+		 */
+		if ((slot->s_suspend) || (!slot->s_wake)) {
 
 			/*
 			 * We use a timed wait if we are waiting for a
@@ -676,22 +715,15 @@ sda_slot_thread(void *arg)
 			 * avoid the timed wait to avoid waking CPU
 			 * (power savings.)
 			 */
-#ifndef	__lock_lint
-			CALLB_CPR_SAFE_BEGIN(&cprinfo);
-#endif
 
 			if ((slot->s_xfrp != NULL) || (slot->s_reap)) {
-				/* wait 3 sec (reap attempts) */
-
+				/* Wait 3 sec (reap attempts). */
 				(void) cv_timedwait(&slot->s_evcv,
 				    &slot->s_evlock,
 				    ddi_get_lbolt() + drv_usectohz(3000000));
 			} else {
 				(void) cv_wait(&slot->s_evcv, &slot->s_evlock);
 			}
-#ifndef	__lock_lint
-			CALLB_CPR_SAFE_END(&cprinfo, &slot->s_evlock);
-#endif
 
 			mutex_exit(&slot->s_evlock);
 			continue;
@@ -714,13 +746,25 @@ sda_slot_thread(void *arg)
 		 * We're awake now, so look for work to do.  First
 		 * acquire access to the slot.
 		 */
-
 		sda_slot_enter(slot);
+
 
 		/*
 		 * If no more commands to process, go back to sleep.
 		 */
 		if ((cmdp = list_head(&slot->s_cmdlist)) == NULL) {
+			sda_slot_exit(slot);
+			continue;
+		}
+
+		/*
+		 * If the current command is not an initialization
+		 * command, but we are initializing, go back to sleep.
+		 * (This happens potentially during a card reset or
+		 * suspend/resume cycle, where the card has not been
+		 * removed, but a reset is in progress.)
+		 */
+		if (slot->s_init && !(cmdp->sc_flags & SDA_CMDF_INIT)) {
 			sda_slot_exit(slot);
 			continue;
 		}
@@ -776,16 +820,11 @@ sda_slot_thread(void *arg)
 		 * must break context.  But doing it this way prevents
 		 * a critical race on card removal.
 		 *
-		 * During initialization, we reject any commands that
-		 * are not from the initialization code.  This does
-		 * have the side effect of removing them.
-		 *
 		 * Note that we don't resubmit memory to the device if
 		 * it isn't flagged as ready (e.g. if the wrong device
 		 * was inserted!)
 		 */
-		if (((!slot->s_ready) && (cmdp->sc_flags & SDA_CMDF_MEM)) ||
-		    (slot->s_init && !(cmdp->sc_flags & SDA_CMDF_INIT))) {
+		if ((!slot->s_ready) && (cmdp->sc_flags & SDA_CMDF_MEM)) {
 			rv = SDA_ENODEV;
 			if (!slot->s_warn) {
 				sda_slot_err(slot,
@@ -839,13 +878,7 @@ sda_slot_thread(void *arg)
 		sda_cmd_notify(cmdp, SDA_CMDF_BUSY, rv);
 	}
 
-#ifdef	__lock_lint
 	mutex_exit(&slot->s_evlock);
-#else
-	CALLB_CPR_EXIT(&cprinfo);
-#endif
-
-	thread_exit();
 }
 
 void

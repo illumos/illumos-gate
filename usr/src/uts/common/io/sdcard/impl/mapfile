@@ -34,6 +34,8 @@
 		sda_host_attach;
 		sda_host_detach;
 		sda_host_detect;
+		sda_host_suspend;
+		sda_host_resume;
 		sda_host_set_private;
 		sda_host_transfer;
 		sda_host_fault;

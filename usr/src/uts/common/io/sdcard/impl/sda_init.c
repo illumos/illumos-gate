@@ -414,12 +414,10 @@ sda_init_clock(sda_slot_t *slot, uint32_t hz)
 		return;
 	}
 
-	if ((rv = sda_getprop(slot, SDA_PROP_CLOCK, &act)) == SDA_EOK) {
-		sda_slot_debug(slot, "Clock set to %u Hz (requested %u Hz)",
-		    act, hz);
-	} else {
-		sda_slot_debug(slot, "Clock frequency unknown (good luck).");
-	}
+	rv = sda_getprop(slot, SDA_PROP_CLOCK, &act);
+	sda_slot_debug(slot,
+	    rv == SDA_EOK ? "Clock set to %u Hz (requested %u Hz)" :
+	    "Clock frequency unknown (good luck).", act, hz);
 
 	/*
 	 * For now, just wait 10msec for clocks to stabilize to the
