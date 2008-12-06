@@ -29,6 +29,7 @@
 
 #include <sys/types.h>
 #include <sys/types.h>
+#include <sys/note.h>
 #include <sys/conf.h>
 #include <sys/scsi/adapters/blk2scsa.h>
 #include <sys/ddi.h>
@@ -462,6 +463,7 @@ sda_mem_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 int
 sda_mem_quiesce(dev_info_t *dip)
 {
+	_NOTE(ARGUNUSED(dip));
 	/* no work to do */
 	return (DDI_SUCCESS);
 }
