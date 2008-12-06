@@ -629,7 +629,7 @@ q_getdevctlpath(char *devpath, int *devcnt)
 	struct dirent	*dirp = NULL;
 	DIR		*dp = NULL;
 	char		*ptr = NULL;
-	int		err;
+	int		err = 0;
 	int		testopen;
 
 	if (lstat(devpath, &statbuf) < 0) {
