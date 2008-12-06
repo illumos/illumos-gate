@@ -1482,9 +1482,11 @@ acpi_drv_cbat_notify(ACPI_HANDLE hdl, UINT32 val, void *ctx)
 		 */
 		bif_changed = acpi_drv_update_present(devp);
 
-		/* Omit events sent by empty battery slot */
 		if (devp->present == 0) {
-			break;
+			if (acpi_drv_psr_devp == devp) {
+				acpi_drv_set_psr(NULL);
+			}
+			goto done;
 		}
 
 		if (acpi_drv_update_bst(bp) != ACPI_DRV_OK) {
@@ -1495,19 +1497,6 @@ acpi_drv_cbat_notify(ACPI_HANDLE hdl, UINT32 val, void *ctx)
 		bst = &bp->bst_cache;
 		eval = bst->bst_rem_cap;
 
-		/*
-		 * Keep tracking the current power source device
-		 *
-		 * Note: Even no battery plugged, some system
-		 * send out 0x80 ACPI event. So make sure the battery
-		 * is present first.
-		 */
-		if (devp->present == 0) {
-			if (acpi_drv_psr_devp == devp) {
-				acpi_drv_set_psr(NULL);
-			}
-			break;
-		}
 		if (bst->bst_state & BST_FLAG_DISCHARGING) {
 			acpi_drv_set_psr(devp);
 		}
@@ -1565,6 +1554,7 @@ acpi_drv_cbat_notify(ACPI_HANDLE hdl, UINT32 val, void *ctx)
 			}
 		}
 
+done:
 		acpi_drv_gen_sysevent(devp, ESC_PWRCTL_STATE_CHANGE, 0);
 		pollwakeup(&acpi_drv_pollhead, ACPI_DRV_EVENTS);
 		break;
