@@ -332,6 +332,7 @@ typedef enum iscsi_cmd_text_stage {
 #define	ISCSI_CMD_MISCFLAG_INTERNAL	0x1
 #define	ISCSI_CMD_MISCFLAG_FREE		0x2
 #define	ISCSI_CMD_MISCFLAG_STUCK	0x4
+#define	ISCSI_CMD_MISCFLAG_XARQ 	0x8
 
 /*
  * iSCSI cmd/pkt Structure

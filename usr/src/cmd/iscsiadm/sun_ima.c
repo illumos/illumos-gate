@@ -1072,7 +1072,11 @@ IMA_STATUS SUN_IMA_RemoveTargetParam(
 		    "ISCSI_CHAP_CLEAR ioctl failed, errno: %d", errno);
 	}
 
-	/* Issue ISCSI_AUTH_CLEAR ioctl */
+	/*
+	 * Issue ISCSI_AUTH_CLEAR ioctl, in which the authentication information
+	 * is removed and the target that is not discovered by initiator
+	 * is removed from the memory. So this ioctl should be called at last
+	 */
 	(void) memset(&auth_p, 0, sizeof (iscsi_auth_props_t));
 	auth_p.a_vers = ISCSI_INTERFACE_VERSION;
 	auth_p.a_oid = (uint32_t)targetOid.objectSequenceNumber;

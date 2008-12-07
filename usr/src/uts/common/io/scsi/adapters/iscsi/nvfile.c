@@ -927,15 +927,15 @@ nvf_flush(void)
 	/*
 	 * duplicate data so access isn't blocked while writing to disk
 	 */
-	mutex_enter(&nvf_lock);
+	rw_enter(&nvf_list_lock, RW_READER);
 	rval = nvlist_dup(nvf_list, &tmpnvl, KM_SLEEP);
 	if (rval != 0) {
 		cmn_err(CE_NOTE, "!iscsi persistent store failed to "
 		    "duplicate nvf_list (%d)", rval);
-		mutex_exit(&nvf_lock);
+		rw_exit(&nvf_list_lock);
 		return (B_FALSE);
 	}
-	mutex_exit(&nvf_lock);
+	rw_exit(&nvf_list_lock);
 
 	/*
 	 * pack duplicated list to get ready for file write

@@ -661,6 +661,7 @@ iscsi_rx_process_cmd_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 	uint32_t		dlength		= 0;
 	struct scsi_arq_status	*arqstat	= NULL;
 	size_t			senselen	= 0;
+	int			statuslen	= 0;
 
 	/* make sure we get status in order */
 	if (icp->conn_expstatsn == ntohl(issrhp->statsn)) {
@@ -820,16 +821,18 @@ iscsi_rx_process_cmd_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 
 				arqstat->sts_rqpkt_reason = CMD_CMPLT;
 
+				statuslen = icmdp->cmd_un.scsi.statuslen;
+
 				if (senselen == 0) {
 					/* auto request sense failed */
 					arqstat->sts_rqpkt_status.sts_chk = 1;
 					arqstat->sts_rqpkt_resid =
-					    sizeof (struct scsi_extended_sense);
+					    statuslen;
 				} else if (senselen <
-				    sizeof (struct scsi_extended_sense)) {
+				    statuslen) {
 					/* auto request sense short */
 					arqstat->sts_rqpkt_resid =
-					    sizeof (struct scsi_extended_sense)
+					    statuslen
 					    - senselen;
 				} else {
 					/* auto request sense complete */
@@ -838,9 +841,14 @@ iscsi_rx_process_cmd_rsp(iscsi_conn_t *icp, iscsi_hdr_t *ihp, char *data)
 				arqstat->sts_rqpkt_statistics = 0;
 				pkt->pkt_state |= STATE_ARQ_DONE;
 
+				if (icmdp->cmd_misc_flags &
+				    ISCSI_CMD_MISCFLAG_XARQ) {
+					pkt->pkt_state |= STATE_XARQ_DONE;
+				}
+
 				/* copy auto request sense */
 				dlength = min(senselen,
-				    sizeof (struct scsi_extended_sense));
+				    statuslen);
 				if (dlength) {
 					bcopy(&data[2], (uchar_t *)&arqstat->
 					    sts_sensedata, dlength);
