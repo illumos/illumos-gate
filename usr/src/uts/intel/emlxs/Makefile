@@ -22,11 +22,9 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#	This makefile drives the production of the fct driver for 
-#	COMSTAR.
-
+# This makefile drives the production of the emlxs driver kernel module.
 #
-#	Path to the base of the uts directory tree (usually /usr/src/uts).
+# Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE		= ../../
 COMMON_BASE	= ../../../common
@@ -73,12 +71,12 @@ LINTTAGS                += $(EMLXS_LFLAGS) -DEMLXS_ARCH=\"$(CLASS)\"
 #
 MODSTUBS_DIR	 = $(OBJS_DIR)
 
-INC_PATH	+= -I$(UTSBASE)/common/io/fibre-channel/fca/emlxs
 INC_PATH	+= -I$(ROOT)/usr/include
 INC_PATH	+= -I$(UTSBASE)/common/sys
 INC_PATH	+= -I$(COMMON_BASE)/bignum
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca
+INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/emlxs
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/impl
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/ulp
 

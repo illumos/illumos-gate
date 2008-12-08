@@ -22,15 +22,9 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident "@(#)Makefile 1.10	08/07/25 SMI"
+# This makefile drives the production of qlc driver kernel module.
 #
-# This makefile drives the production of fcp driver kernel module.
-#
-# i86pc architecture dependent
-#
-
-#
-#	Path to the base of the uts directory tree (usually /usr/src/uts).
+# Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
 
@@ -62,7 +56,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 INC_PATH	+= -I$(ROOT)/usr/include
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/ulp
-INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca
+INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/fca/qlc
 INC_PATH	+= -I$(UTSBASE)/common/sys/fibre-channel/impl
 
 LDFLAGS		+= -dy -Nmisc/fctl

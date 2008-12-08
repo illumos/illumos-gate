@@ -34,7 +34,7 @@ include ../../../Makefile.module
 
 CPPFLAGS += -I$(SRC)/uts/common
 CPPFLAGS += -I$(SRC)/uts/common/sys/fibre-channel
-CPPFLAGS += -I$(SRC)/uts/common/sys/fibre-channel/fca  
+CPPFLAGS += -I$(SRC)/uts/common/sys/fibre-channel/fca/qlc
 CPPFLAGS += -I$(SRC)/uts/common/sys/fibre-channel/impl
 
 LINTFLAGS +=  -erroff=E_STATIC_UNUSED -erroff=E_FUNC_SET_NOT_USED

@@ -28,7 +28,7 @@ MDBTGT = kvm
 
 MODSRCS = emlxs.c
 
-EMLXSBASE = ../../../../../uts/common/io/fibre-channel/fca/emlxs
+EMLXSBASE = ../../../../../uts/common/sys/fibre-channel/fca/emlxs
 
 include ../../../../Makefile.cmd
 include ../../../../Makefile.cmd.64

@@ -25,7 +25,7 @@
  */
 
 
-#include "emlxs.h"
+#include <emlxs.h>
 
 /* Timer period in seconds */
 #define	EMLXS_TIMER_PERIOD		1	/* secs */

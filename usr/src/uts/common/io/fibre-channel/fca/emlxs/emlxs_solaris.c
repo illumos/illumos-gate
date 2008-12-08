@@ -1674,10 +1674,10 @@ emlxs_bind_port(dev_info_t *dip, fc_fca_port_info_t *port_info,
 	    vpd->fw_version, vpd->fw_label);
 
 #ifdef i386
-		sprintf(port_info->pi_attrs.option_rom_version,
+		(void) sprintf(port_info->pi_attrs.option_rom_version,
 		    "Boot:%s", vpd->boot_version);
 #else   /* sparc */
-		sprintf(port_info->pi_attrs.option_rom_version,
+		(void) sprintf(port_info->pi_attrs.option_rom_version,
 		    "Boot:%s Fcode:%s",
 		    vpd->boot_version, vpd->fcode_version);
 #endif  /* i386 */

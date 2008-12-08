@@ -22,14 +22,9 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# This makefile drives the production of qlc_fw_2400 firmware module.
 #
-# This makefile drives the production of qlc driver kernel module.
-#
-# intel architecture dependent
-#
-
-#
-#	Path to the base of the uts directory tree (usually /usr/src/uts).
+# Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
 
