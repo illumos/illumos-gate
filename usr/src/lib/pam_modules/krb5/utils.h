@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _UTILS_H
 #define	_UTILS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -60,7 +58,6 @@ int get_pw_uid(char *, uid_t *);
 int get_pw_gid(char *, gid_t *);
 int get_kmd_kuser(krb5_context, const char *, char *, int);
 int key_in_keytab(const char *, int);
-int set_active_user(char *, uid_t *, gid_t *);
 
 #ifdef	__cplusplus
 }

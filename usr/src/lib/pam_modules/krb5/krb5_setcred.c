@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libintl.h>
 #include <security/pam_appl.h>
 #include <security/pam_modules.h>
@@ -349,15 +347,14 @@ attempt_refresh_cred(
 /*
  * This code will update the credential matching "server" in the user's
  * credential cache.  The flag may be set to one of:
- * PAM_ESTABLISH_CRED - If we have new credentials then create a new cred cache
- *  with these credentials else return failure.
- * PAM_REINITIALIZE_CRED - Destroy current cred cache and create a new one.
+ * PAM_REINITIALIZE_CRED/PAM_ESTABLISH_CRED - If we have new credentials then
+ *     create a new cred cache with these credentials else return failure.
  * PAM_REFRESH_CRED - If we have new credentials then create a new cred cache
  *  with these credentials else attempt to renew the credentials.
  *
- * Note for the PAM_ESTABLISH_CRED and PAM_REFRESH_CRED flags that if a new
- * credential does exist from the previous auth pass then this will overwrite
- * any existing credentials in the credential cache.
+ * Note for any of the flags that if a new credential does exist from the
+ * previous auth pass then this will overwrite any existing credentials in the
+ * credential cache.
  */
 static krb5_error_code
 krb5_renew_tgt(
@@ -370,6 +367,7 @@ krb5_renew_tgt(
 	krb5_creds	creds;
 	krb5_creds	*renewed_cred = NULL;
 	char		*client_name = NULL;
+	char		*username = NULL;
 
 #define	my_creds	(kmd->initcreds)
 
@@ -401,8 +399,22 @@ krb5_renew_tgt(
 		    "PAM-KRB5 (setcred): User not in cred "
 		    "cache (%s)", error_message((errcode_t)retval));
 
-	if ((retval == KRB5_FCC_NOFILE) &&
-	    (flag & (PAM_ESTABLISH_CRED|PAM_REINITIALIZE_CRED))) {
+	/*
+	 * We got here either with the ESTABLISH | REINIT | REFRESH flag and
+	 * auth_status returns SUCCESS or REFRESH and auth_status failure.
+	 *
+	 * Rules:
+	 * - If the prior auth pass was successful then store the new
+	 * credentials in the cache, regardless of which flag.
+	 *
+	 * - Else if REFRESH flag is used and there are no new
+	 * credentials then attempt to refresh the existing credentials.
+	 *
+	 * - Note, refresh will not work if "R" flag is not set in
+	 * original credential.  We don't want to 2nd guess the
+	 * intention of the person who created the existing credential.
+	 */
+	if (kmd->auth_status == PAM_SUCCESS) {
 		/*
 		 * Create a fresh ccache, and store the credentials
 		 * we got from pam_authenticate()
@@ -413,16 +425,30 @@ krb5_renew_tgt(
 			    "PAM-KRB5 (setcred): krb5_cc_initialize "
 			    "failed: %s",
 			    error_message((errcode_t)retval));
-			goto cleanup_creds;
 		} else if ((retval = krb5_cc_store_cred(kmd->kcontext,
 		    kmd->ccache, &my_creds)) != 0) {
 			__pam_log(LOG_AUTH | LOG_DEBUG,
 			    "PAM-KRB5 (setcred): krb5_cc_store_cred "
 			    "failed: %s",
 			    error_message((errcode_t)retval));
-			goto cleanup_creds;
 		}
-	} else if (retval) {
+	} else if ((retval == 0) && (flag & PAM_REFRESH_CRED)) {
+		/*
+		 * If we only wanted to refresh the creds but failed
+		 * due to expiration, lack of "R" flag, or other
+		 * problems, return an error.
+		 */
+		if (retval = krb5_get_credentials_renew(kmd->kcontext,
+		    0, kmd->ccache, &creds, &renewed_cred)) {
+			if (kmd->debug) {
+				__pam_log(LOG_AUTH | LOG_DEBUG,
+				    "PAM-KRB5 (setcred): "
+				    "krb5_get_credentials"
+				    "_renew(update) failed: %s",
+				    error_message((errcode_t)retval));
+			}
+		}
+	} else {
 		/*
 		 * We failed to get the user's credentials.
 		 * This might be due to permission error on the cache,
@@ -433,77 +459,6 @@ krb5_renew_tgt(
 		    " for %s (%s)",
 		    client_name ? client_name : "(unknown)",
 		    error_message((errcode_t)retval));
-
-	} else if (flag & PAM_REINITIALIZE_CRED) {
-		/*
-		 * This destroys the credential cache, and stores a new
-		 * krbtgt with updated startime, endtime and renewable
-		 * lifetime.
-		 */
-		creds.times.starttime = my_creds.times.starttime;
-		creds.times.endtime = my_creds.times.endtime;
-		creds.times.renew_till = my_creds.times.renew_till;
-		if ((retval = krb5_get_credentials_renew(kmd->kcontext, 0,
-		    kmd->ccache, &creds, &renewed_cred))) {
-			if (kmd->debug)
-				__pam_log(LOG_AUTH | LOG_DEBUG,
-				    "PAM-KRB5 (setcred): krb5_get_credentials",
-				    "_renew(reinitialize) failed: %s",
-				    error_message((errcode_t)retval));
-			/* perhaps the tgt lifetime has expired */
-			if ((retval = krb5_cc_initialize(kmd->kcontext,
-			    kmd->ccache, me)) != 0) {
-				goto cleanup_creds;
-			} else if ((retval = krb5_cc_store_cred(kmd->kcontext,
-			    kmd->ccache, &my_creds)) != 0) {
-				goto cleanup_creds;
-			}
-		}
-	} else {
-		/*
-		 * Default credentials already exist, update them if possible.
-		 * We got here either with the ESTABLISH or REFRESH flag.
-		 *
-		 * Rules:
-		 * - If the prior auth pass was successful then store the new
-		 * credentials in the cache, regardless of which flag.
-		 *
-		 * - Else if REFRESH flag is used and there are no new
-		 * credentials then attempt to refresh the existing credentials.
-		 *
-		 * - Note, refresh will not work if "R" flag is not set in
-		 * original credential.  We don't want to 2nd guess the
-		 * intention of the person who created the existing credential.
-		 */
-		if ((kmd->auth_status != PAM_SUCCESS) &&
-		    (flag & PAM_REFRESH_CRED)) {
-			/*
-			 * If we only wanted to refresh the creds but failed
-			 * due to expiration, lack of "R" flag, or other
-			 * problems, return an error.
-			 */
-			if (retval = krb5_get_credentials_renew(kmd->kcontext,
-			    0, kmd->ccache, &creds, &renewed_cred)) {
-				if (kmd->debug)
-					__pam_log(LOG_AUTH | LOG_DEBUG,
-					    "PAM-KRB5 (setcred): "
-					    "krb5_get_credentials"
-					    "_renew(update) failed: %s",
-					    error_message((errcode_t)retval));
-				goto cleanup_creds;
-			}
-		} else {
-			/*
-			 * If we have new creds, add them to the cache.
-			 */
-			if ((retval = krb5_cc_initialize(kmd->kcontext,
-			    kmd->ccache, me)) != 0) {
-				goto cleanup_creds;
-			} else if ((retval = krb5_cc_store_cred(kmd->kcontext,
-			    kmd->ccache, &my_creds)) != 0) {
-				goto cleanup_creds;
-			}
-		}
 	}
 
 cleanup_creds:
@@ -518,7 +473,7 @@ cleanup_creds:
 		if (!kmd->env || strstr(kmd->env, "FILE:")) {
 			uid_t uuid;
 			gid_t ugid;
-			char *username = NULL, *tmpname = NULL;
+			char *tmpname = NULL;
 			char *filepath = NULL;
 
 			username = strdup(client_name);
@@ -567,8 +522,18 @@ cleanup_creds:
 				}
 			}
 
-			if (!(filepath = strchr(kmd->env, ':')) ||
-			    !(filepath+1)) {
+			/*
+			 * We know at this point that kmd->env must start
+			 * with the literal string "FILE:".  Set filepath
+			 * character string to point to ":"
+			 */
+
+			filepath = strchr(kmd->env, ':');
+
+			/*
+			 * Now check if first char after ":" is null char
+			 */
+			if (filepath[1] == '\0') {
 				__pam_log(LOG_AUTH | LOG_ERR,
 				    "PAM-KRB5 (setcred): Invalid pathname "
 				    "for credential cache of user `%s'",
@@ -583,8 +548,6 @@ cleanup_creds:
 					    "`%s' failed for FILE=%s",
 					    username, filepath);
 			}
-
-			free(username);
 		}
 	}
 
@@ -614,6 +577,9 @@ error:
 
 	if (client_name != NULL)
 		free(client_name);
+
+	if (username)
+		free(username);
 
 	krb5_free_cred_contents(kmd->kcontext, &creds);
 
