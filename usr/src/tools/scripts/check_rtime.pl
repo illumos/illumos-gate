@@ -157,6 +157,7 @@ $SkipUnusedSearchPath = qr{
 	/usr/sfw/lib.*\ from\ .*libipsecutil.so.1 |		# dlopen()
 	/usr/platform/.*rsmlib.*\ from\ .*librsm.so.2 |		# dlopen()
 	\$ORIGIN.*\ from\ .*fcode.so |				# dlopen()
+	/opt/VRTSvxvm/lib.*\ from\ .*libdiskmgt\.so\.1 |	# dlopen()
 	/usr/platform/.*\ from\ .*/usr/platform |		# picl
 	/usr/lib/picl/.*\ from\ .*/usr/platform |		# picl
 	/usr/platform/.*\ from\ .*/usr/lib/picl |		# picl
