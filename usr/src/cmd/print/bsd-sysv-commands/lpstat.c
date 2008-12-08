@@ -710,68 +710,105 @@ job_query(char *request, int (*report)(papi_job_t, int, int),
 	int result = 0;
 	papi_status_t status;
 	papi_service_t svc = NULL;
-	char *printer = NULL;
+	char *printer = request;
 	int32_t id = -1;
+	int flag1 = 0;
+	int flag = 1;
+	int print_flag = 0;
 
-	get_printer_id(request, &printer, &id);
+	do {
+		status = papiServiceCreate(&svc, printer, NULL, NULL,
+			    cli_auth_callback, encryption, NULL);
 
-	status = papiServiceCreate(&svc, printer, NULL, NULL, cli_auth_callback,
-					encryption, NULL);
-	if (status != PAPI_OK) {
-		fprintf(stderr, gettext(
-			"Failed to contact service for %s: %s\n"),
-			(printer ? printer : "all"),
-			verbose_papi_message(svc, status));
-		return (-1);
-	}
+		if ((status == PAPI_OK) && (printer != NULL))
+			print_flag = 1;
 
-	if (printer == NULL) { /* all */
-		char **interest = interest_list(svc);
-
-		if (interest != NULL) {
-			int i;
-
-			for (i = 0; interest[i] != NULL; i++)
-				result += job_query(interest[i], report,
-						encryption, show_rank, verbose);
-		}
-	} else if (id == -1) { /* a printer */
-		papi_job_t *jobs = NULL;
-
-		status = papiPrinterListJobs(svc, printer, NULL, 0, 0, &jobs);
+		/* <name>-# printer name does not exist */
 		if (status != PAPI_OK) {
-			fprintf(stderr, gettext(
-				"Failed to get job list: %s\n"),
-				verbose_papi_message(svc, status));
-			papiServiceDestroy(svc);
-			return (-1);
+			/*
+			 * Check if <name>-# is a request-id
+			 * Once this check is done flag1 is set
+			 */
+			if (flag1 == 1)
+				break;
+
+			get_printer_id(printer, &printer, &id);
+
+			status = papiServiceCreate(&svc, printer, NULL, NULL,
+				    cli_auth_callback, encryption, NULL);
+
+			if (status != PAPI_OK) {
+				fprintf(stderr, gettext(
+				    "Failed to contact service for %s: %s\n"),
+				    (printer ? printer : "all"),
+				    verbose_papi_message(svc, status));
+				return (-1);
+			}
 		}
 
-		if (jobs != NULL) {
-			int i;
+		if (printer == NULL) { /* all */
+			char **interest = interest_list(svc);
 
-			for (i = 0; jobs[i] != NULL; i++)
-				result += report(jobs[i], show_rank, verbose);
+			if (interest != NULL) {
+				int i;
+
+				for (i = 0; interest[i] != NULL; i++)
+					result += job_query(interest[i], report,
+						    encryption, show_rank, verbose);
+			}
+		} else if (id == -1) { /* a printer */
+			papi_job_t *jobs = NULL;
+
+			status = papiPrinterListJobs(svc, printer, NULL,
+				    0, 0, &jobs);
+			if (status != PAPI_OK) {
+				fprintf(stderr, gettext(
+				    "Failed to get job list: %s\n"),
+				    verbose_papi_message(svc, status));
+				papiServiceDestroy(svc);
+				return (-1);
+			}
+
+			if (jobs != NULL) {
+				int i;
+
+				for (i = 0; jobs[i] != NULL; i++)
+					result += report(jobs[i],
+						    show_rank, verbose);
+			}
+
+			papiJobListFree(jobs);
+		} else {	/* a job */
+			papi_job_t job = NULL;
+
+			/* Once a job has been found stop processing */
+			flag = 0;
+
+			status = papiJobQuery(svc, printer, id, NULL, &job);
+			if (status != PAPI_OK) {
+				if (!print_flag)
+					fprintf(stderr, gettext(
+					    "Failed to get job info for %s: %s\n"),
+					    request, verbose_papi_message(svc, status));
+				papiServiceDestroy(svc);
+				return (-1);
+			}
+
+			if (job != NULL)
+				result = report(job, show_rank, verbose);
+
+			papiJobFree(job);
 		}
 
-		papiJobListFree(jobs);
-	} else {	/* a job */
-		papi_job_t job = NULL;
-
-		status = papiJobQuery(svc, printer, id, NULL, &job);
-		if (status != PAPI_OK) {
-			fprintf(stderr, gettext(
-				"Failed to get job info for %s: %s\n"),
-				request, verbose_papi_message(svc, status));
-			papiServiceDestroy(svc);
-			return (-1);
+		if (flag) {
+			id = -1;
+			get_printer_id(printer, &printer, &id);
+			if (id == -1)
+				flag = 0;
+			else
+				flag1 = 1;
 		}
-
-		if (job != NULL)
-			result = report(job, show_rank, verbose);
-
-		papiJobFree(job);
-	}
+	} while (flag);
 
 	papiServiceDestroy(svc);
 
