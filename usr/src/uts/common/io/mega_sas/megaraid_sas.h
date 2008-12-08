@@ -51,8 +51,8 @@ extern "C" {
 /*
  * MegaRAID SAS Driver meta data
  */
-#define	MEGASAS_VERSION				"LSIv1.27"
-#define	MEGASAS_RELDATE				"Sept 4, 2008"
+#define	MEGASAS_VERSION				"LSIv1.28"
+#define	MEGASAS_RELDATE				"Dec 4, 2008"
 
 #define	MEGASAS_TRUE				1
 #define	MEGASAS_FALSE				0

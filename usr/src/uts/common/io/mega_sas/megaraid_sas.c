@@ -2949,6 +2949,9 @@ megasas_softintr(struct megasas_instance *instance)
 					    "aborted_aen returned"));
 				} else {
 					service_mfi_aen(instance, cmd);
+
+					atomic_add_16(&instance->fw_outstanding,
+					    (-1));
 				}
 			} else {
 				complete_cmd_in_sync_mode(instance, cmd);
