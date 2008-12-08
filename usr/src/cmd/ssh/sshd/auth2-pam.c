@@ -7,8 +7,6 @@
 
 RCSID("$Id: auth2-pam.c,v 1.14 2002/06/28 16:48:12 mouring Exp $");
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef USE_PAM
 #include <security/pam_appl.h>
 
@@ -36,6 +34,8 @@ extern Authmethod method_kbdint;
 extern Authmethod method_passwd;
 
 #define SSHD_PAM_KBDINT_SVC "sshd-kbdint"
+/* Maximum attempts for changing expired password */
+#define DEF_ATTEMPTS 3
 
 static int do_pam_conv_kbd_int(int num_msg, 
     struct pam_message **msg, struct pam_response **resp, 
@@ -131,7 +131,22 @@ do_pam_kbdint(Authctxt *authctxt)
 			(void) setreuid(authctxt->pw->pw_uid, -1);
 			debug2("kbd-int: changing expired password");
 			where = "changing authentication tokens (password)";
-			retval = pam_chauthtok(pamh, PAM_CHANGE_EXPIRED_AUTHTOK);
+			/*
+			 * Depending on error returned from pam_chauthtok, we
+			 * need to try to change password a few times before
+			 * we error out and return.
+			 */
+			int tries = 0;
+			while ((retval = pam_chauthtok(pamh,
+			    PAM_CHANGE_EXPIRED_AUTHTOK)) != PAM_SUCCESS) {
+				if (tries++ < DEF_ATTEMPTS) {
+					if ((retval == PAM_AUTHTOK_ERR) ||
+					    (retval == PAM_TRY_AGAIN)) {
+						continue;
+					}
+				}
+				break;
+			}
 			audit_sshd_chauthtok(retval, authctxt->pw->pw_uid,
 				authctxt->pw->pw_gid);
 			(void) setreuid(0, -1);
