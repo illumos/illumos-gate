@@ -76,8 +76,11 @@ dm_scsi_error(int err, int status,
 			 */
 			serr->se_senkey = serr->se_sense[2] & 0x0f;
 		}
-		char_to_int64((signed char *)serr->se_sense + 3, 4,
-		    (int64_t *)&serr->se_resid);
+		if (serr->se_resid == -1) {
+			/* get resid from sense bytes if not already have it */
+			char_to_int64((signed char *)serr->se_sense + 3, 4,
+			    (int64_t *)&serr->se_resid);
+		}
 		serr->se_flags |= serr->se_sense[0] & 0x80 ?
 		    DRV_SE_SEN_VALID : 0;
 		serr->se_flags |= serr->se_sense[2] & 0x20 ?
@@ -337,6 +340,7 @@ dm_ioctl(int cmd, void *arg)
 	if (cmd == USCSICMD) {
 		rc = dm_chk_uscsi_error(rc, arg, err);
 	} else if (rc != 0) {
+		serr->se_resid = -1;
 		dm_get_mtstat(~DRV_SAVE_STAT);
 		dm_get_mt_error(err);
 	}

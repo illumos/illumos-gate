@@ -1230,7 +1230,7 @@ drv_wtm(uint64_t count)
 		drv->drv_flags |= (DRV_TERM_FILE | DRV_TM);
 	}
 	TRACE((MMS_DEBUG, "Wrote %lld tapemarks", count - serr->se_resid));
-	if (serr->se_resid == 0) {
+	if (rc == 0 && serr->se_resid == 0) {
 		rc = 0;
 	}
 	return (rc);
@@ -1565,7 +1565,6 @@ drv_log_sense(uchar_t *buf, int len, int page_control, int page_code)
 	uchar_t		cdb[] =
 	    { 0x4d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 	char		dumpbuf[1024];
-
 
 	(void) memset(&us, 0, sizeof (us));
 	us.uscsi_flags = USCSI_READ;
@@ -1904,7 +1903,7 @@ drv_get_serial_num(char *ser)
 	us.uscsi_cdblen = sizeof (cdb);
 	us.uscsi_timeout = drv->drv_timeout->drv_short_timeout;
 	us.uscsi_bufaddr = (char *)drv->drv_iobuf;
-	us.uscsi_buflen = 16;
+	us.uscsi_buflen = MMS_READ_SER_NUM_BUF_LEN;
 
 	TRACE((MMS_DEBUG, "Inquiry - Serial number"));
 	if (dm_uscsi(&us)) {
@@ -1993,6 +1992,8 @@ drv_set_compression(int comp)
 		TRACE((MMS_DEBUG, "Mode sense data:\n%s", dumpbuf));
 
 		drv->drv_iobuf[26] = 1;
+		drv->drv_iobuf[0] = 0;
+		drv->drv_iobuf[1] = 0;
 		(void) mms_trace_dump((char *)drv->drv_iobuf, 28, dumpbuf,
 		    sizeof (dumpbuf));
 		TRACE((MMS_DEBUG, "Mode select data:\n%s", dumpbuf));
@@ -2209,7 +2210,8 @@ drv_set_density(int den)
 	 * Set density
 	 */
 	drv->drv_iobuf[4] = den;
-
+	drv->drv_iobuf[0] = 0;
+	drv->drv_iobuf[1] = 0;
 	(void) mms_trace_dump((char *)drv->drv_iobuf, 12, dumpbuf,
 	    sizeof (dumpbuf));
 	TRACE((MMS_DEBUG, "Mode select data:\n%s", dumpbuf));

@@ -445,8 +445,6 @@ mm_notify_event_rules(mm_data_t	*mm_data) {
 			    notify_wka != NULL;
 			    notify_wka = next_notify_wka) {
 				pthread_mutex_lock(&notify_wka->wka_local_lock);
-				pthread_mutex_unlock(&notify_data->
-				    mm_wka_mutex);
 				if (strcmp(notify_wka->wka_conn.cci_uuid,
 				    PQgetvalue(notify_results, 0, 0)) == 0) {
 
@@ -466,9 +464,6 @@ mm_notify_event_rules(mm_data_t	*mm_data) {
 						event_buf = NULL;
 					}
 				}
-
-				pthread_mutex_lock(&notify_data->
-				    mm_wka_mutex);
 				next_notify_wka =
 				    mms_list_next(&notify_data->mm_wka_list,
 				    notify_wka);
@@ -635,7 +630,6 @@ notify_etable(int etable) {
 	    notify_wka != NULL;
 	    notify_wka = next_notify_wka) {
 		pthread_mutex_lock(&notify_wka->wka_local_lock);
-		pthread_mutex_unlock(&notify_data->mm_wka_mutex);
 
 		for (i = 0; i < num_clients; i ++) {
 			cur_uuid = PQgetvalue(client_results, i, 0);
@@ -646,7 +640,6 @@ notify_etable(int etable) {
 				    event_results);
 			}
 		}
-		pthread_mutex_lock(&notify_data->mm_wka_mutex);
 		next_notify_wka = mms_list_next(&notify_data->mm_wka_list,
 		    notify_wka);
 		pthread_mutex_unlock(&notify_wka->wka_local_lock);
@@ -1660,7 +1653,6 @@ notify_send(notify_cmd_t *event)
 	    notify_wka = next_notify_wka) {
 
 		pthread_mutex_lock(&notify_wka->wka_local_lock);
-		pthread_mutex_unlock(&notify_data->mm_wka_mutex);
 
 		if (print_message)
 			mms_trace(MMS_INFO, "examining a client, %s",
@@ -1707,8 +1699,6 @@ notify_send(notify_cmd_t *event)
 			mms_trace(MMS_DEVP,
 			    "client has no notification settings");
 		}
-
-		pthread_mutex_lock(&notify_data->mm_wka_mutex);
 		next_notify_wka = mms_list_next(&notify_data->mm_wka_list,
 		    notify_wka);
 		pthread_mutex_unlock(&notify_wka->wka_local_lock);

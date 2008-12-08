@@ -2252,8 +2252,6 @@ mm_remove_clients(mm_data_t *mm_data, mm_db_t *db)
 		remove = 0;
 		pthread_mutex_lock(&data->mm_wka_mutex);
 		mms_list_foreach(&mm_data->mm_wka_list, mm_wka) {
-			pthread_mutex_unlock(&data->mm_wka_mutex);
-
 			/* mms_trace(MMS_INFO," Checking a wka"); */
 			if (mm_wka->wka_remove) {
 				remove = 1;
@@ -2266,22 +2264,19 @@ mm_remove_clients(mm_data_t *mm_data, mm_db_t *db)
 				    mm_wka->mm_wka_conn->mms_fd);
 
 				remove = 1;
-				pthread_mutex_lock(&data->mm_wka_mutex);
 				break;
 			}
-
-			pthread_mutex_lock(&data->mm_wka_mutex);
 		}
 
 		pthread_mutex_unlock(&data->mm_wka_mutex);
 
 		if (remove) {
 			/* Destroy the wka */
-			pthread_mutex_lock(&mm_wka->wka_local_lock);
-
 			pthread_mutex_lock(&data->mm_wka_mutex);
+			pthread_mutex_lock(&mm_wka->wka_local_lock);
 			mms_list_remove(&mm_data->mm_wka_list, mm_wka);
 			pthread_mutex_unlock(&data->mm_wka_mutex);
+			pthread_mutex_unlock(&mm_wka->wka_local_lock);
 
 
 			/* Remove commands associated with this wka */

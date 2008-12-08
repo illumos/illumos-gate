@@ -646,7 +646,7 @@ mm_dmp_config_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 			delete_dm_config(mm_wka, &mm_wka->mm_data->mm_db);
 
 			mms_trace(MMS_ERR, "DEBUG CONFIG "	\
-			    "MMS_ERROR");
+			    "ERROR");
 			/*
 			 * cmd->cmd_remove = 1;
 			 * mm_sql_db_err_rsp_new(cmd, db);

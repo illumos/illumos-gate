@@ -380,7 +380,7 @@ mms_sym_t	mms_sym_tab[] = {
 	"text", TEXT,
 	"unacceptable", UNACCEPTABLE,
 	"arguments", ARGUMENTS,
-	"error", MMS_ERROR,
+	"error", ERROR,
 	"accepted", ACCEPTED,
 	"attrlist", ATTRLIST,
 	"reqid", REQID,
@@ -893,7 +893,7 @@ uchar_t	*mms_token_flags = mms_tokflags;
 %token	MMS_WELCOME SERVERNAME MMS_UNWELCOME XMPX_CANCEL
 %token	ID CANCELLED CANCELED SUCCESS INTERMEDIATE LOCTEXT RESPONSE
 %token  TEXT UNACCEPTABLE ACTION ADD CHANGE
-%token	ARGUMENTS MMS_ERROR ACCEPTED ATTRLIST ACCEPT REQID CANCEL RESPOND
+%token	ARGUMENTS ERROR ACCEPTED ATTRLIST ACCEPT REQID CANCEL RESPOND
 %token	CPSET CPUNSET CPATTRIBUTE CPREPORT CPREPORTMODE CPTYPE
 %token	CPRESET CPEXIT CPSTART PARTIAL FULL XMPM_PRIVATE
 %token	ALL FROMSLOT TOSLOT CPSCAN CPSHOW DEALLOCATE EJECT CARTID CART
@@ -3475,7 +3475,7 @@ severity_clause
 		}
 	;
 
-severity: EMERGENCY | ALERT | CRITICAL | MMS_ERROR | WARNING | NOTICE
+severity: EMERGENCY | ALERT | CRITICAL | ERROR | WARNING | NOTICE
 	| INFORMATION | DEBUG | DEVELOPER
 	| STRING
 		{
@@ -5857,7 +5857,7 @@ response_cmd
 					yyerror("cancelled is incompatible "
 					    "with text");
 				}
-			} else if (MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+			} else if (MMS_PAR_CHK_FLAG(ERROR)) {
 				if (MMS_PAR_CHK_FLAG(TEXT)) {
 					yyerror("error is incompatible "
 					    "with text");
@@ -5894,7 +5894,7 @@ response_arg
 			    MMS_PAR_CHK_FLAG(SUCCESS) ||
 			    MMS_PAR_CHK_FLAG(INTERMEDIATE) ||
 			    MMS_PAR_CHK_FLAG(CANCELLED) ||
-			    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+			    MMS_PAR_CHK_FLAG(ERROR)) {
 				yyerror("unacceptable is incompatible with "
 				    "accepted, intermediate,"
 				    "success, cancelled and error");
@@ -5909,7 +5909,7 @@ response_arg
 			    MMS_PAR_CHK_FLAG(SUCCESS) ||
 			    MMS_PAR_CHK_FLAG(INTERMEDIATE) ||
 			    MMS_PAR_CHK_FLAG(CANCELLED) ||
-			    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+			    MMS_PAR_CHK_FLAG(ERROR)) {
 				yyerror("accepted is incompatible with "
 				    "unacceptable, intermediate,"
 				    "success, cancelled and error");
@@ -5924,7 +5924,7 @@ response_arg
 			    MMS_PAR_CHK_FLAG(ACCEPTED) ||
 			    MMS_PAR_CHK_FLAG(INTERMEDIATE) ||
 			    MMS_PAR_CHK_FLAG(CANCELLED) ||
-			    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+			    MMS_PAR_CHK_FLAG(ERROR)) {
 				yyerror("success is incompatible with "
 				    "unacceptable, intermediate,"
 				    "accepted, cancelled and error");
@@ -5939,7 +5939,7 @@ response_arg
 			    MMS_PAR_CHK_FLAG(ACCEPTED) ||
 			    MMS_PAR_CHK_FLAG(SUCCESS) ||
 			    MMS_PAR_CHK_FLAG(CANCELLED) ||
-			    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+			    MMS_PAR_CHK_FLAG(ERROR)) {
 				yyerror("intermediate is incompatible with "
 				    "unacceptable, success, "
 				    "accepted, cancelled and error");
@@ -5955,7 +5955,7 @@ response_arg
 			    MMS_PAR_CHK_FLAG(INTERMEDIATE) ||
 			    MMS_PAR_CHK_FLAG(ACCEPTED) ||
 			    MMS_PAR_CHK_FLAG(SUCCESS) ||
-			    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+			    MMS_PAR_CHK_FLAG(ERROR)) {
 				yyerror("cancelled is incompatible with "
 				    "unacceptable, intermediate,"
 				    "accepted, cancelled and error");
@@ -5971,7 +5971,7 @@ response_arg
 				    MMS_PAR_CHK_FLAG(SUCCESS) ||
 				    MMS_PAR_CHK_FLAG(INTERMEDIATE) ||
 				    MMS_PAR_CHK_FLAG(CANCELLED) ||
-				    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+				    MMS_PAR_CHK_FLAG(ERROR)) {
 					yyerror
 					    ("unacceptable is incompatible "
 					    "with "
@@ -5987,7 +5987,7 @@ response_arg
 				    MMS_PAR_CHK_FLAG(SUCCESS) ||
 				    MMS_PAR_CHK_FLAG(INTERMEDIATE) ||
 				    MMS_PAR_CHK_FLAG(CANCELLED) ||
-				    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+				    MMS_PAR_CHK_FLAG(ERROR)) {
 					yyerror
 					    ("accepted is incompatible with "
 					    "unacceptable, intermediate,"
@@ -6002,7 +6002,7 @@ response_arg
 				    MMS_PAR_CHK_FLAG(INTERMEDIATE) ||
 				    MMS_PAR_CHK_FLAG(ACCEPTED) ||
 				    MMS_PAR_CHK_FLAG(CANCELLED) ||
-				    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+				    MMS_PAR_CHK_FLAG(ERROR)) {
 					yyerror
 					    ("success is incompatible with "
 					    "unacceptable, intermediate,"
@@ -6018,7 +6018,7 @@ response_arg
 				    MMS_PAR_CHK_FLAG(SUCCESS) ||
 				    MMS_PAR_CHK_FLAG(ACCEPTED) ||
 				    MMS_PAR_CHK_FLAG(CANCELLED) ||
-				    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+				    MMS_PAR_CHK_FLAG(ERROR)) {
 					yyerror
 					    ("intermediate is incompatible "
 					    "with unacceptable, success,"
@@ -6034,7 +6034,7 @@ response_arg
 				    MMS_PAR_CHK_FLAG(ACCEPTED) ||
 				    MMS_PAR_CHK_FLAG(INTERMEDIATE) ||
 				    MMS_PAR_CHK_FLAG(SUCCESS) ||
-				    MMS_PAR_CHK_FLAG(MMS_ERROR)) {
+				    MMS_PAR_CHK_FLAG(ERROR)) {
 					yyerror("cancelled is incompatible "
 					    "with "
 					    "unacceptable, intermediate,"
@@ -6053,14 +6053,14 @@ response_arg
 				YYERROR;
 			}
 		}
-	| MMS_ERROR '[' err_class_spec
+	| ERROR '[' err_class_spec
 		{
 			/* Looking for an error code */
 			mms_pwka->par_wka_flags |= MMS_PW_ERROR_CODE;
 		}
 	  err_code_spec ']'
 		{
-			MMS_PAR_CHK_DUP(MMS_ERROR);
+			MMS_PAR_CHK_DUP(ERROR);
 			if (MMS_PAR_CHK_FLAG(UNACCEPTABLE) ||
 			    MMS_PAR_CHK_FLAG(ACCEPTED) ||
 			    MMS_PAR_CHK_FLAG(INTERMEDIATE) ||
