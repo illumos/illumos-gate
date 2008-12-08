@@ -53,6 +53,7 @@
 #include <libdlwlan.h>
 #include <libdlvlan.h>
 #include <libdlvnic.h>
+#include <libdlether.h>
 #include <libinetutil.h>
 #include <bsm/adt.h>
 #include <bsm/adt_event.h>
@@ -290,14 +291,8 @@ static const char	*get_linkstate(const char *, boolean_t, char *);
 static const char	*get_linkduplex(const char *, boolean_t, char *);
 
 static int	show_etherprop(datalink_id_t, void *);
-static void	show_ether_xprop(datalink_id_t, void *);
-static boolean_t get_speed_duplex(datalink_id_t, const char *, char *,
-    char *, boolean_t);
-static char 	*pause_str(int, int);
+static void	show_ether_xprop(void *, dladm_ether_info_t *);
 static boolean_t	link_is_ether(const char *, datalink_id_t *);
-
-#define	IS_FDX	0x10
-#define	IS_HDX	0x01
 
 static boolean_t str2int(const char *, int *);
 static void	die(const char *, ...);
@@ -485,6 +480,8 @@ static const struct option etherstub_lopts[] = {
 /*
  * structures for 'dladm show-ether'
  */
+static const char *ptype[] = {LEI_ATTR_NAMES};
+
 typedef struct ether_fields_buf_s
 {
 	char	eth_link[15];
@@ -5492,6 +5489,10 @@ linkprop_is_supported(datalink_id_t  linkid, const char *propname,
 	dladm_status_t	status;
 	uint_t		valcnt = DLADM_MAX_PROP_VALCNT;
 
+	/* if used with -p flag, always print output */
+	if (statep->ls_proplist != NULL)
+		return (B_TRUE);
+
 	status = dladm_get_linkprop(linkid, DLADM_PROP_VAL_DEFAULT,
 	    propname, statep->ls_propvals, &valcnt);
 
@@ -6569,12 +6570,9 @@ static int
 show_etherprop(datalink_id_t linkid, void *arg)
 {
 	print_ether_state_t	*statep = arg;
-	char			buf[DLADM_STRSIZE];
-	int			speed;
-	uint64_t		s;
-	uint32_t		autoneg, pause, asmpause, adv_rf, cap_rf, lp_rf;
 	ether_fields_buf_t	ebuf;
-	char			speed_unit = 'M';
+	dladm_ether_info_t	eattr;
+	dladm_status_t		status;
 
 	bzero(&ebuf, sizeof (ether_fields_buf_t));
 	if (dladm_datalink_id2info(linkid, NULL, NULL, NULL,
@@ -6586,52 +6584,34 @@ show_etherprop(datalink_id_t linkid, void *arg)
 		print_header(&statep->es_print);
 		statep->es_header = B_TRUE;
 	}
-	(void) snprintf(ebuf.eth_ptype, sizeof (ebuf.eth_ptype),
-	    "%s", "current");
 
-	(void) dladm_get_single_mac_stat(linkid, "link_autoneg",
-	    KSTAT_DATA_UINT32, &autoneg);
-	(void) snprintf(ebuf.eth_autoneg, sizeof (ebuf.eth_autoneg),
-	    "%s", (autoneg ? "yes" : "no"));
+	status = dladm_ether_info(linkid, &eattr);
+	if (status != DLADM_STATUS_OK)
+		goto cleanup;
 
-	(void) dladm_get_single_mac_stat(linkid, "link_pause",
-	    KSTAT_DATA_UINT32, &pause);
-	(void) dladm_get_single_mac_stat(linkid, "link_asmpause",
-	    KSTAT_DATA_UINT32, &asmpause);
-	(void) snprintf(ebuf.eth_pause, sizeof (ebuf.eth_pause),
-	    "%s", pause_str(pause, asmpause));
+	(void) strlcpy(ebuf.eth_ptype, "current", sizeof (ebuf.eth_ptype));
 
-	(void) dladm_get_single_mac_stat(linkid, "ifspeed",
-	    KSTAT_DATA_UINT64, &s);
-	speed = (int)(s/1000000ull);
-
-	if (speed >= 1000) {
-		speed = speed/1000;
-		speed_unit = 'G';
-	}
-	(void) get_linkduplex(ebuf.eth_link, B_TRUE, buf);
-	(void) snprintf(ebuf.eth_spdx, sizeof (ebuf.eth_spdx), "%d%c-%c",
-	    speed, speed_unit, buf[0]);
-
-	(void) get_linkstate(ebuf.eth_link, B_TRUE, buf);
-	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state),
-	    "%s", buf);
-
-	(void) dladm_get_single_mac_stat(linkid, "adv_rem_fault",
-	    KSTAT_DATA_UINT32, &adv_rf);
-	(void) dladm_get_single_mac_stat(linkid, "cap_rem_fault",
-	    KSTAT_DATA_UINT32, &cap_rf);
-	(void) dladm_get_single_mac_stat(linkid, "lp_rem_fault",
-	    KSTAT_DATA_UINT32, &lp_rf);
-	(void) snprintf(ebuf.eth_rem_fault, sizeof (ebuf.eth_rem_fault),
-	    "%s", (adv_rf == 0 && lp_rf == 0 ? "none" : "fault"));
+	(void) dladm_ether_autoneg2str(ebuf.eth_autoneg,
+	    sizeof (ebuf.eth_autoneg), &eattr, CURRENT);
+	(void) dladm_ether_pause2str(ebuf.eth_pause,
+	    sizeof (ebuf.eth_pause), &eattr, CURRENT);
+	(void) dladm_ether_spdx2str(ebuf.eth_spdx,
+	    sizeof (ebuf.eth_spdx), &eattr, CURRENT);
+	(void) strlcpy(ebuf.eth_state,
+	    dladm_linkstate2str(eattr.lei_state, ebuf.eth_state),
+	    sizeof (ebuf.eth_state));
+	(void) strlcpy(ebuf.eth_rem_fault,
+	    (eattr.lei_attr[CURRENT].le_fault ? "fault" : "none"),
+	    sizeof (ebuf.eth_rem_fault));
 
 	dladm_print_output(&statep->es_print, statep->es_parseable,
 	    dladm_print_field, &ebuf);
 
 	if (statep->es_extended)
-		show_ether_xprop(linkid, arg);
+		show_ether_xprop(arg, &eattr);
 
+cleanup:
+	dladm_ether_info_done(&eattr);
 	return (DLADM_WALK_CONTINUE);
 }
 
@@ -6815,165 +6795,29 @@ die_opterr(int opt, int opterr, const char *usage)
 }
 
 static void
-show_ether_xprop(datalink_id_t linkid, void *arg)
+show_ether_xprop(void *arg, dladm_ether_info_t *eattr)
 {
 	print_ether_state_t	*statep = arg;
-	char			buf[DLADM_STRSIZE];
-	uint32_t		autoneg, pause, asmpause, adv_rf, cap_rf, lp_rf;
-	boolean_t		add_comma, r1;
 	ether_fields_buf_t	ebuf;
+	int			i;
 
-	/* capable */
-	bzero(&ebuf, sizeof (ebuf));
-	(void) snprintf(ebuf.eth_link, sizeof (ebuf.eth_link), "");
-
-	(void) snprintf(ebuf.eth_ptype, sizeof (ebuf.eth_ptype),
-	    "%s", "capable");
-	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state), "");
-
-	(void) dladm_get_single_mac_stat(linkid, "cap_autoneg",
-	    KSTAT_DATA_UINT32, &autoneg);
-	(void) snprintf(ebuf.eth_autoneg, sizeof (ebuf.eth_autoneg),
-	    "%s", (autoneg ? "yes" : "no"));
-
-	add_comma = B_FALSE;
-	bzero(buf, sizeof (buf));
-	r1 = get_speed_duplex(linkid, "cap_1000", buf, "1G", B_FALSE);
-	if (r1)
-		add_comma = B_TRUE;
-	r1 = get_speed_duplex(linkid, "cap_100", buf, "100M", add_comma);
-	if (r1)
-		add_comma = B_TRUE;
-	r1 = get_speed_duplex(linkid, "cap_10", buf, "10M", add_comma);
-	add_comma = B_FALSE;
-	(void) snprintf(ebuf.eth_spdx, sizeof (ebuf.eth_spdx), "%s", buf);
-
-	(void) dladm_get_single_mac_stat(linkid, "cap_pause",
-	    KSTAT_DATA_UINT32, &pause);
-	(void) dladm_get_single_mac_stat(linkid, "cap_asmpause",
-	    KSTAT_DATA_UINT32, &asmpause);
-	(void) snprintf(ebuf.eth_pause, sizeof (ebuf.eth_pause),
-	    "%s", pause_str(pause, asmpause));
-
-	(void) dladm_get_single_mac_stat(linkid, "adv_rem_fault",
-	    KSTAT_DATA_UINT32, &adv_rf);
-	(void) dladm_get_single_mac_stat(linkid, "cap_rem_fault",
-	    KSTAT_DATA_UINT32, &cap_rf);
-	(void) dladm_get_single_mac_stat(linkid, "lp_rem_fault",
-	    KSTAT_DATA_UINT32, &lp_rf);
-
-	(void) snprintf(ebuf.eth_rem_fault, sizeof (ebuf.eth_rem_fault),
-	    "%s", (cap_rf ? "yes" : "no"));
-
-	dladm_print_output(&statep->es_print, statep->es_parseable,
-	    dladm_print_field, &ebuf);
-
-	/* advertised */
-	bzero(&ebuf, sizeof (ebuf));
-	(void) snprintf(ebuf.eth_ptype, sizeof (ebuf.eth_ptype),
-	    "%s", "adv");
-	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state), "");
-
-	(void) dladm_get_single_mac_stat(linkid, "adv_cap_autoneg",
-	    KSTAT_DATA_UINT32, &autoneg);
-	(void) snprintf(ebuf.eth_autoneg, sizeof (ebuf.eth_autoneg),
-	    "%s", (autoneg ? "yes" : "no"));
-
-	add_comma = B_FALSE;
-	bzero(buf, sizeof (buf));
-	r1 = get_speed_duplex(linkid, "adv_cap_1000", buf, "1G", add_comma);
-	if (r1)
-		add_comma = B_TRUE;
-	r1 = get_speed_duplex(linkid, "adv_cap_100", buf, "100M", add_comma);
-	if (r1)
-		add_comma = B_TRUE;
-	r1 = get_speed_duplex(linkid, "adv_cap_10", buf, "10M", add_comma);
-	add_comma = B_FALSE;
-	(void) snprintf(ebuf.eth_spdx, sizeof (ebuf.eth_spdx), "%s", buf);
-
-	(void) dladm_get_single_mac_stat(linkid, "adv_cap_pause",
-	    KSTAT_DATA_UINT32, &pause);
-	(void) dladm_get_single_mac_stat(linkid, "adv_cap_asmpause",
-	    KSTAT_DATA_UINT32, &asmpause);
-	(void) snprintf(ebuf.eth_pause, sizeof (ebuf.eth_pause),
-	    "%s", pause_str(pause, asmpause));
-
-	(void) snprintf(ebuf.eth_rem_fault, sizeof (ebuf.eth_rem_fault),
-	    "%s", (adv_rf ? "fault" : "none"));
-
-	dladm_print_output(&statep->es_print, statep->es_parseable,
-	    dladm_print_field, &ebuf);
-
-	/* peeradv */
-	bzero(&ebuf, sizeof (ebuf));
-	(void) snprintf(ebuf.eth_ptype, sizeof (ebuf.eth_ptype),
-	    "%s", "peeradv");
-	(void) snprintf(ebuf.eth_state, sizeof (ebuf.eth_state), "");
-
-	(void) dladm_get_single_mac_stat(linkid, "lp_cap_autoneg",
-	    KSTAT_DATA_UINT32, &autoneg);
-	(void) snprintf(ebuf.eth_autoneg, sizeof (ebuf.eth_autoneg),
-	    "%s", (autoneg ? "yes" : "no"));
-
-	add_comma = B_FALSE;
-	bzero(buf, sizeof (buf));
-	r1 = get_speed_duplex(linkid, "lp_cap_1000", buf, "1G", add_comma);
-	if (r1)
-		add_comma = B_TRUE;
-	r1 = get_speed_duplex(linkid, "lp_cap_100", buf, "100M", add_comma);
-	if (r1)
-		add_comma = B_TRUE;
-	r1 = get_speed_duplex(linkid, "lp_cap_10", buf, "10M", add_comma);
-	(void) snprintf(ebuf.eth_spdx, sizeof (ebuf.eth_spdx), "%s", buf);
-
-	(void) dladm_get_single_mac_stat(linkid, "lp_cap_pause",
-	    KSTAT_DATA_UINT32, &pause);
-	(void) dladm_get_single_mac_stat(linkid, "lp_cap_asmpause",
-	    KSTAT_DATA_UINT32, &asmpause);
-	(void) snprintf(ebuf.eth_pause, sizeof (ebuf.eth_pause),
-	    "%s", pause_str(pause, asmpause));
-
-	(void) snprintf(ebuf.eth_rem_fault, sizeof (ebuf.eth_rem_fault),
-	    "%s", (lp_rf ? "fault" : "none"));
-
-	dladm_print_output(&statep->es_print, statep->es_parseable,
-	    dladm_print_field, &ebuf);
-}
-
-static boolean_t
-get_speed_duplex(datalink_id_t linkid, const char *mii_prop_prefix,
-    char *spbuf, char *sp, boolean_t add_comma)
-{
-	int speed, duplex = 0;
-	boolean_t ret = B_FALSE;
-	char mii_prop[DLADM_STRSIZE];
-
-	(void) snprintf(mii_prop, DLADM_STRSIZE, "%sfdx", mii_prop_prefix);
-	(void) dladm_get_single_mac_stat(linkid, mii_prop, KSTAT_DATA_UINT32,
-	    &speed);
-	if (speed) {
-		ret = B_TRUE;
-		duplex  |= IS_FDX;
+	for (i = CAPABLE; i <= PEERADV; i++)  {
+		bzero(&ebuf, sizeof (ebuf));
+		(void) strlcpy(ebuf.eth_ptype, ptype[i],
+		    sizeof (ebuf.eth_ptype));
+		(void) dladm_ether_autoneg2str(ebuf.eth_autoneg,
+		    sizeof (ebuf.eth_autoneg), eattr, i);
+		(void) dladm_ether_spdx2str(ebuf.eth_spdx,
+		    sizeof (ebuf.eth_spdx), eattr, i);
+		(void) dladm_ether_pause2str(ebuf.eth_pause,
+		    sizeof (ebuf.eth_pause), eattr, i);
+		(void) strlcpy(ebuf.eth_rem_fault,
+		    (eattr->lei_attr[i].le_fault ? "fault" : "none"),
+		    sizeof (ebuf.eth_rem_fault));
+		dladm_print_output(&statep->es_print, statep->es_parseable,
+		    dladm_print_field, &ebuf);
 	}
-	(void) snprintf(mii_prop, DLADM_STRSIZE, "%shdx", mii_prop_prefix);
-	(void) dladm_get_single_mac_stat(linkid, mii_prop,
-	    KSTAT_DATA_UINT32, &speed);
-	if (speed) {
-		ret = B_TRUE;
-		duplex |= IS_HDX;
-	}
-	if (ret) {
-		if (add_comma)
-			(void) strncat(spbuf, ",", DLADM_STRSIZE);
-		(void) strncat(spbuf, sp, DLADM_STRSIZE);
-		if ((duplex & (IS_FDX|IS_HDX)) == (IS_FDX|IS_HDX))
-			(void) strncat(spbuf, "-fh", DLADM_STRSIZE);
-		else if (duplex & IS_FDX)
-			(void) strncat(spbuf, "-f", DLADM_STRSIZE);
-		else if (duplex & IS_HDX)
-			(void) strncat(spbuf, "-h", DLADM_STRSIZE);
-	}
-	return (ret);
+
 }
 
 static void
@@ -7006,16 +6850,6 @@ print_header(print_state_t *ps)
 		print_field(ps, pf[i], pf[i]->pf_header, B_FALSE);
 	}
 	(void) putchar('\n');
-}
-
-static char *
-pause_str(int pause, int asmpause)
-{
-	if (pause == 1)
-		return ("bi");
-	if (asmpause == 1)
-		return ("tx");
-	return ("none");
 }
 
 static boolean_t

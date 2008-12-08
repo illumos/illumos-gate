@@ -2358,16 +2358,10 @@ i_dladm_status_get(prop_desc_t *pdp, datalink_id_t linkid,
 {
 	link_state_t		link_state;
 	dladm_status_t		status;
-	uchar_t 		*cp;
-	dld_ioc_macprop_t	*dip;
 
-	dip = i_dladm_get_public_prop(linkid, pdp->pd_name, flags,
-	    &status, perm_flags);
+	status = i_dladm_get_state(linkid, &link_state);
 	if (status != DLADM_STATUS_OK)
 		return (status);
-
-	cp = (uchar_t *)dip->pr_val;
-	(void) memcpy(&link_state, cp, sizeof (link_state));
 
 	switch (link_state) {
 	case LINK_STATE_UP:
@@ -2381,7 +2375,7 @@ i_dladm_status_get(prop_desc_t *pdp, datalink_id_t linkid,
 		break;
 	}
 	*val_cnt = 1;
-	free(dip);
+	*perm_flags = MAC_PROP_PERM_READ;
 	return (DLADM_STATUS_OK);
 }
 
@@ -2954,4 +2948,19 @@ dladm_perm2str(uint_t perm, char *buf)
 	    ((perm & MAC_PROP_PERM_READ) != 0) ? 'r' : '-',
 	    ((perm & MAC_PROP_PERM_WRITE) != 0) ? 'w' : '-');
 	return (buf);
+}
+
+dladm_status_t
+i_dladm_get_state(datalink_id_t linkid, link_state_t *state)
+{
+	dld_ioc_macprop_t	*dip;
+	dladm_status_t		status;
+	uint_t			perms;
+
+	dip = i_dladm_get_public_prop(linkid, "state", 0, &status, &perms);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+	(void) memcpy(state, dip->pr_val, sizeof (*state));
+	free(dip);
+	return (status);
 }

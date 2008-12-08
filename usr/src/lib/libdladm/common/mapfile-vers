@@ -173,6 +173,11 @@ SUNWprivate_1.1 {
 	dladm_stats_total;
 	dladm_stats_diff;
 
+	dladm_ether_info;
+	dladm_ether_autoneg2str;
+	dladm_ether_pause2str;
+	dladm_ether_spdx2str;
+	dladm_ether_info_done;
     local:
 	*;
 };

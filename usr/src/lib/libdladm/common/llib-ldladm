@@ -34,3 +34,4 @@
 #include <libdlmgmt.h>
 #include <libdlflow.h>
 #include <libdlstat.h>
+#include <libdlether.h>

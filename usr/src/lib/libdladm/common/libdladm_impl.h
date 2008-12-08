@@ -40,6 +40,7 @@ extern dladm_status_t	dladm_errno2status(int);
 extern dladm_status_t   i_dladm_rw_db(const char *, mode_t,
 			    dladm_status_t (*)(void *, FILE *, FILE *),
 			    void *, boolean_t);
+extern dladm_status_t	i_dladm_get_state(datalink_id_t, link_state_t *);
 
 extern const char	*dladm_pri2str(mac_priority_level_t, char *);
 extern dladm_status_t	dladm_str2pri(char *, mac_priority_level_t *);

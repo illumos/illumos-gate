@@ -105,6 +105,7 @@ usr/include/sys/mac_soft_ring.h		i386
 usr/include/sys/vnic.h		i386
 usr/include/sys/vnic_impl.h	i386
 usr/include/libdladm.h		i386
+usr/include/libdlether.h	i386
 usr/include/libdladm_impl.h	i386
 usr/include/libdllink.h		i386
 usr/include/libdlaggr.h		i386
