@@ -7274,6 +7274,28 @@ mondo_loop() {
 	rm -f $root/kernel/strmod/amd64/pfil
 	rm -f $root/usr/sbin/pfild
 
+	# Remove nsmb and smbfs modules from old locations
+	# Also remove new locations of kmdb stuff for BFU
+	# from newer to older build ("backward BFU").
+	# These will be reinstalled from the archive.
+	# old locations:
+	rm -f $root/kernel/kmdb/nsmb
+	rm -f $root/kernel/kmdb/smbfs
+	rm -f $root/kernel/kmdb/amd64/nsmb
+	rm -f $root/kernel/kmdb/amd64/smbfs
+	rm -f $root/kernel/kmdb/sparcv9/nsmb
+	rm -f $root/kernel/kmdb/sparcv9/smbfs
+	rm -f $usr/kernel/sys/smbfs
+	rm -f $usr/kernel/sys/amd64/smbfs
+	rm -f $usr/kernel/sys/sparcv9/smbfs
+	# new locations:
+	rm -f $usr/kernel/kmdb/nsmb
+	rm -f $usr/kernel/kmdb/smbfs
+	rm -f $usr/kernel/kmdb/amd64/nsmb
+	rm -f $usr/kernel/kmdb/amd64/smbfs
+	rm -f $usr/kernel/kmdb/sparcv9/nsmb
+	rm -f $usr/kernel/kmdb/sparcv9/smbfs
+
 	# Remove obsolete atomic_prim.h file.
 	rm -f $usr/include/v9/sys/atomic_prim.h
 
