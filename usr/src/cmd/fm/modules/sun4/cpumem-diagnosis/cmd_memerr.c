@@ -163,7 +163,8 @@ ce_thresh_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 	cmd_dimm_dirty(hdl, dimm);
 
 	cp = fmd_case_open(hdl, NULL);
-	dflt = cmd_dimm_create_fault(hdl, dimm, "fault.memory.dimm",
+	dflt = cmd_dimm_create_fault(hdl, dimm,
+	    "fault.memory.dimm-page-retires-excessive",
 	    CMD_FLTMAXCONF);
 	fmd_case_add_suspect(hdl, cp, dflt);
 	fmd_case_solve(hdl, cp);
@@ -387,7 +388,8 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 		if (i - upos_pairs >= 2) {
 			/* Rule 4A Violation. */
 			flt = cmd_dimm_create_fault(hdl,
-			    dimm, "fault.memory.dimm", CMD_FLTMAXCONF);
+			    dimm, "fault.memory.dimm-ue-imminent",
+			    CMD_FLTMAXCONF);
 			for (j = upos_pairs; j < i; j++) {
 				fmd_case_add_ereport(hdl,
 				    dimm->dimm_case.cc_cp,
@@ -455,8 +457,8 @@ mq_check(fmd_hdl_t *hdl, cmd_dimm_t *dimm)
 					 * unit positions are not the same,
 					 * then we have a rule 4B violation.
 					 */
-					flt = cmd_dimm_create_fault(hdl,
-					    dimm, "fault.memory.dimm",
+					flt = cmd_dimm_create_fault(hdl, dimm,
+					    "fault.memory.dram-ue-imminent",
 					    CMD_FLTMAXCONF);
 					fmd_case_add_ereport(hdl,
 					    dimm->dimm_case.cc_cp,
