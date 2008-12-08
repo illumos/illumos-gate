@@ -4273,12 +4273,11 @@ done:
 static int
 detach_func(int argc, char *argv[])
 {
-	int lockfd;
+	int lockfd = -1;
 	int err, arg;
 	char zonepath[MAXPATHLEN];
 	char cmdbuf[MAXPATHLEN];
 	char precmdbuf[MAXPATHLEN];
-	zone_dochandle_t handle;
 	boolean_t execute = B_TRUE;
 	boolean_t brand_help = B_FALSE;
 	brand_handle_t bh = NULL;
@@ -4343,18 +4342,6 @@ detach_func(int argc, char *argv[])
 		return (Z_ERR);
 	}
 
-	if ((handle = zonecfg_init_handle()) == NULL) {
-		zperror(cmd_to_str(CMD_DETACH), B_TRUE);
-		return (Z_ERR);
-	}
-
-	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
-		errno = err;
-		zperror(cmd_to_str(CMD_DETACH), B_TRUE);
-		zonecfg_fini_handle(handle);
-		return (Z_ERR);
-	}
-
 	/* Fetch the detach and predetach hooks from the brand configuration. */
 	if ((bh = brand_open(target_brand)) == NULL) {
 		zerror(gettext("missing or invalid brand"));
@@ -4388,7 +4375,6 @@ detach_func(int argc, char *argv[])
 	if (execute && zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
 		zerror(gettext("another %s may have an operation in progress."),
 		    "zoneadm");
-		zonecfg_fini_handle(handle);
 		return (Z_ERR);
 	}
 
@@ -4398,8 +4384,13 @@ detach_func(int argc, char *argv[])
 		if (subproc_status(gettext("brand-specific predetach"),
 		    status, B_FALSE) != ZONE_SUBPROC_OK) {
 
-			if (execute)
+			if (execute) {
+				assert(lockfd >= 0);
 				zonecfg_release_lock_file(target_zone, lockfd);
+				lockfd = -1;
+			}
+
+			assert(lockfd == -1);
 			return (Z_ERR);
 		}
 	}
@@ -4412,16 +4403,24 @@ detach_func(int argc, char *argv[])
 			if (status == ZONE_SUBPROC_USAGE && !brand_help)
 				sub_usage(SHELP_DETACH, CMD_DETACH);
 
-			if (execute)
+			if (execute) {
+				assert(lockfd >= 0);
 				zonecfg_release_lock_file(target_zone, lockfd);
+				lockfd = -1;
+			}
 
+			assert(lockfd == -1);
 			return (Z_ERR);
 		}
 
 	} else {
+		zone_dochandle_t handle;
+
 		/* If just help, we're done since there is no brand help. */
-		if (brand_help)
+		if (brand_help) {
+			assert(lockfd == -1);
 			return (Z_OK);
+		}
 
 		/*
 		 * Run the built-in detach support.  Just generate a simple
@@ -4446,19 +4445,17 @@ detach_func(int argc, char *argv[])
 		if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
 			errno = err;
 			zperror(cmd_to_str(CMD_DETACH), B_TRUE);
-			zonecfg_fini_handle(handle);
-			goto done;
-		}
 
-		if ((err = zonecfg_detach_save(handle,
+		} else if ((err = zonecfg_detach_save(handle,
 		    (execute ? 0 : ZONE_DRY_RUN))) != Z_OK) {
 			errno = err;
 			zperror(gettext("saving the detach manifest failed"),
 			    B_TRUE);
-			goto done;
 		}
 
 		zonecfg_fini_handle(handle);
+		if (err != Z_OK)
+			goto done;
 	}
 
 	/*
@@ -4472,10 +4469,13 @@ detach_func(int argc, char *argv[])
 	}
 
 done:
-	zonecfg_fini_handle(handle);
-	if (execute)
+	if (execute) {
+		assert(lockfd >= 0);
 		zonecfg_release_lock_file(target_zone, lockfd);
+		lockfd = -1;
+	}
 
+	assert(lockfd == -1);
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
 
@@ -4611,7 +4611,7 @@ done:
 static int
 attach_func(int argc, char *argv[])
 {
-	int lockfd;
+	int lockfd = -1;
 	int err, arg;
 	boolean_t force = B_FALSE;
 	zone_dochandle_t handle;
@@ -4689,19 +4689,6 @@ attach_func(int argc, char *argv[])
 			    gettext("could not get zone path"));
 			return (Z_ERR);
 		}
-
-		if ((handle = zonecfg_init_handle()) == NULL) {
-			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
-			return (Z_ERR);
-		}
-
-		if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
-			errno = err;
-			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
-			zonecfg_fini_handle(handle);
-			return (Z_ERR);
-		}
-
 	} else {
 		if (dryrun_get_brand(manifest_path, tmpmanifest,
 		    sizeof (tmpmanifest)) != Z_OK)
@@ -4752,52 +4739,69 @@ attach_func(int argc, char *argv[])
 		if (zonecfg_grab_lock_file(target_zone, &lockfd) != Z_OK) {
 			zerror(gettext("another %s may have an operation in "
 			    "progress."), "zoneadm");
-			zonecfg_fini_handle(handle);
 			return (Z_ERR);
 		}
 	}
 
-	if (force)
-		goto done;
+	if (!force) {
+		/*
+		 * Not a force-attach, so we need to actually do the work.
+		 */
+		if (cmdbuf[0] != '\0') {
+			/* Run the attach hook */
+			status = do_subproc_interactive(cmdbuf);
+			if ((status = subproc_status(gettext("brand-specific "
+			    "attach"), status, B_FALSE)) != ZONE_SUBPROC_OK) {
+				if (status == ZONE_SUBPROC_USAGE && !brand_help)
+					sub_usage(SHELP_ATTACH, CMD_ATTACH);
 
-	if (cmdbuf[0] != '\0') {
-		/* Run the attach hook */
-		status = do_subproc_interactive(cmdbuf);
-		if ((status = subproc_status(gettext("brand-specific attach"),
-		    status, B_FALSE)) != ZONE_SUBPROC_OK) {
-			if (status == ZONE_SUBPROC_USAGE && !brand_help)
-				sub_usage(SHELP_ATTACH, CMD_ATTACH);
+				if (execute && !brand_help) {
+					assert(lockfd >= 0);
+					zonecfg_release_lock_file(target_zone,
+					    lockfd);
+					lockfd = -1;
+				}
 
-			if (execute && !brand_help)
-				zonecfg_release_lock_file(target_zone, lockfd);
-
-			return (Z_ERR);
+				assert(lockfd == -1);
+				return (Z_ERR);
+			}
 		}
 
+		/*
+		 * Else run the built-in attach support.
+		 * This is a no-op since there is nothing to validate.
+		 */
+
+		/* If dry-run or help, then we're done. */
+		if (!execute || brand_help) {
+			if (!execute)
+				(void) unlink(tmpmanifest);
+			assert(lockfd == -1);
+			return (Z_OK);
+		}
 	}
 
-	/*
-	 * Else run the built-in attach support.
-	 * This is a no-op since there is nothing to validate.
-	 */
-
-	/* If dry-run or help, then we're done. */
-	if (!execute || brand_help) {
-		if (!execute)
-			(void) unlink(tmpmanifest);
-		return (Z_OK);
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		err = Z_ERR;
+	} else if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		zonecfg_fini_handle(handle);
+	} else {
+		zonecfg_rm_detached(handle, force);
+		zonecfg_fini_handle(handle);
 	}
 
-done:
-	zonecfg_rm_detached(handle, force);
-
-	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
+	if (err == Z_OK &&
+	    (err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
 		errno = err;
 		zperror(gettext("could not reset state"), B_TRUE);
 	}
 
-	zonecfg_fini_handle(handle);
+	assert(lockfd >= 0);
 	zonecfg_release_lock_file(target_zone, lockfd);
+	lockfd = -1;
 
 	/* If we have a brand postattach hook, run it. */
 	if (err == Z_OK && !force && postcmdbuf[0] != '\0') {
@@ -4810,10 +4814,10 @@ done:
 				zperror(gettext("could not reset state"),
 				    B_TRUE);
 			}
-			return (Z_ERR);
 		}
 	}
 
+	assert(lockfd == -1);
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }
 
