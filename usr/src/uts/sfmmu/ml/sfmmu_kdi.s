@@ -138,7 +138,7 @@ bspage:	/* TTE_PAGE_SHIFT in %g5 */				\
  *	uint64_t blkpap = hmebpa + HMEBP_HBLK;
  *	uint64_t blkpa;
  *
- *	while ((blkpa = lddphys(blkpap)) != NULL) {
+ *	while ((blkpa = lddphys(blkpap)) != HMEBLK_ENDPA) {
  *		if (lddphys(blkpa + HMEBLK_TAG) == hblktag) {
  *			if ((sfmmu_t *)lddphys(blkpa + HMEBLK_TAG + 8) ==
  *			    sfmmup)
@@ -163,8 +163,8 @@ bspage:	/* TTE_PAGE_SHIFT in %g5 */				\
 search_loop:								\
 	ldxa	[%g4]ASI_MEM, %g4;					\
 	cmp	%g4, HMEBLK_ENDPA;					\
-	be,pn	%xcc, search_done;					\
-	nop;								\
+	be,a,pn	%xcc, search_done;					\
+	clr 	%g4;							\
 									\
 	add	%g4, HMEBLK_TAG, %g4;	/* %g4 is now hmeblk PA */	\
 	ldxa	[%g4]ASI_MEM, %g6;					\
