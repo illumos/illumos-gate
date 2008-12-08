@@ -16,8 +16,6 @@
 
 /* $OpenBSD: sftp-client.c,v 1.76 2007/01/22 11:32:50 djm Exp $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /* XXX: memleaks */
 /* XXX: signed vs unsigned */
 /* XXX: remove all logging, only return status codes */
@@ -788,7 +786,7 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 	if (a == NULL)
 		return(-1);
 
-	/* XXX: should we preserve set[ug]id? */
+	/* Do not preserve set[ug]id here, as we do not preserve ownership */
 	if (a->flags & SSH2_FILEXFER_ATTR_PERMISSIONS)
 		mode = a->perm & 0777;
 	else

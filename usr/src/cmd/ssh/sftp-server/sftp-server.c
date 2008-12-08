@@ -16,8 +16,6 @@
 
 /* $OpenBSD: sftp-server.c,v 1.71 2007/01/03 07:22:36 stevesk Exp $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "includes.h"
 
 #include <sys/types.h>
@@ -723,7 +721,7 @@ process_setstat(void)
 	}
 	if (a->flags & SSH2_FILEXFER_ATTR_PERMISSIONS) {
 		log("set \"%s\" mode %04o", name, a->perm);
-		ret = chmod(name, a->perm & 0777);
+		ret = chmod(name, a->perm & 07777);
 		if (ret == -1)
 			status = errno_to_portable(errno);
 	}
@@ -777,9 +775,9 @@ process_fsetstat(void)
 		if (a->flags & SSH2_FILEXFER_ATTR_PERMISSIONS) {
 			log("set \"%s\" mode %04o", name, a->perm);
 #ifdef HAVE_FCHMOD
-			ret = fchmod(fd, a->perm & 0777);
+			ret = fchmod(fd, a->perm & 07777);
 #else
-			ret = chmod(name, a->perm & 0777);
+			ret = chmod(name, a->perm & 07777);
 #endif
 			if (ret == -1)
 				status = errno_to_portable(errno);
