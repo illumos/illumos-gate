@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -43,29 +41,31 @@
  * to the number of bytes requested and will be reset to actual number
  * of bytes returned.
  *
- * Return 0 on success, -1 on error.
+ * Return 0 on success and errno on error.
  */
 int
 pkcs11_read_data(char *filename, void **dbuf, size_t *dlen)
 {
-	int	fd;
+	int	fd = -1;
 	struct stat statbuf;
 	boolean_t plain_file;
 	void	*filebuf = NULL;
 	size_t	filesize = 0;
+	int ret = 0;
 
 	if (filename == NULL || dbuf == NULL || dlen == NULL)
 		return (-1);
 
 	if ((fd = open(filename, O_RDONLY | O_NONBLOCK)) == -1) {
+		ret = errno;
 		cryptoerror(LOG_STDERR, gettext("cannot open %s"), filename);
-		return (-1);
+		goto error;
 	}
 
 	if (fstat(fd, &statbuf) == -1) {
+		ret = errno;
 		cryptoerror(LOG_STDERR, gettext("cannot stat %s"), filename);
-		(void) close(fd);
-		return (-1);
+		goto error;
 	}
 
 	if (S_ISREG(statbuf.st_mode)) {
@@ -92,46 +92,46 @@ pkcs11_read_data(char *filename, void **dbuf, size_t *dlen)
 	}
 
 	if ((filebuf = malloc(filesize)) == NULL) {
-		int	err = errno;
-		cryptoerror(LOG_STDERR, gettext("malloc: %s"), strerror(err));
-		(void) close(fd);
-		return (-1);
+		ret = errno;
+		cryptoerror(LOG_STDERR, gettext("malloc: %s"), strerror(ret));
+		goto error;
 	}
 
 	if (plain_file) {
 		/* either it got read or it didn't */
 		if (read(fd, filebuf, filesize) != filesize) {
-			int	err = errno;
+			ret = errno;
 			cryptoerror(LOG_STDERR,
 			    gettext("error reading file %s: %s"), filename,
-			    strerror(err));
-			(void) close(fd);
-			return (-1);
+			    strerror(ret));
+			goto error;
 		}
 	} else {
 		/* reading from special file may need some coaxing */
 		char	*marker = (char *)filebuf;
 		size_t	left = filesize;
 		ssize_t	nread;
-		int	err;
 
 		for (/* */; left > 0; marker += nread, left -= nread) {
 			/* keep reading it's going well */
 			nread = read(fd, marker, left);
-			if (nread > 0 || (nread == 0 && errno == EINTR))
+			if (nread > 0 || (nread == 0 && errno == EINTR)) {
+				errno = 0;
 				continue;
+			}
 
 			/* might have to be good enough for caller */
 			if (nread == 0 && errno == EAGAIN)
 				break;
 
 			/* anything else is an error */
-			err = errno;
-			cryptoerror(LOG_STDERR,
-			    gettext("error reading file %s: %s"), filename,
-			    strerror(err));
-			(void) close(fd);
-			return (-1);
+			if (errno) {
+				ret = errno;
+				cryptoerror(LOG_STDERR,
+				    gettext("error reading file %s: %s"),
+				    filename, strerror(ret));
+				goto error;
+			}
 		}
 		/* reset to actual number of bytes read */
 		filesize -= left;
@@ -141,4 +141,10 @@ pkcs11_read_data(char *filename, void **dbuf, size_t *dlen)
 	*dbuf = filebuf;
 	*dlen = filesize;
 	return (0);
+
+error:
+	if (fd != -1)
+		(void) close(fd);
+
+	return (ret);
 }

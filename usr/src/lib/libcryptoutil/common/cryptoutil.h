@@ -26,8 +26,6 @@
 #ifndef _CRYPTOUTIL_H
 #define	_CRYPTOUTIL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -113,6 +111,8 @@ typedef struct uentrylist {
 extern void cryptodebug(const char *fmt, ...);
 extern void cryptoerror(int priority, const char *fmt, ...);
 extern void cryptodebug_init(const char *prefix);
+extern void cryptoerror_off();
+extern void cryptoerror_on();
 
 extern const char *pkcs11_mech2str(CK_MECHANISM_TYPE mech);
 extern CK_RV pkcs11_str2mech(char *mech_str, CK_MECHANISM_TYPE_PTR mech);
@@ -125,6 +125,8 @@ extern void free_uentry(uentry_t *);
 extern uentry_t *getent_uef(char *);
 
 extern void tohexstr(uchar_t *bytes, size_t blen, char *hexstr, size_t hexlen);
+extern int hexstr_to_bytes(char *hexstr, size_t hexlen, uchar_t **bytes,
+    size_t *blen);
 extern CK_RV pkcs11_mech2keytype(CK_MECHANISM_TYPE mech_type,
     CK_KEY_TYPE *ktype);
 extern CK_RV pkcs11_mech2keygen(CK_MECHANISM_TYPE mech_type,

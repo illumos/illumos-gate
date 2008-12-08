@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * digest.c
  *
@@ -430,7 +428,7 @@ execute_cmd(char *algo_str, int filecount, char **filelist, boolean_t mac_cmd)
 				    0, B_FALSE);
 			}
 
-			if (status == -1 || keylen == 0 || pkeydata == NULL) {
+			if (status != 0 || keylen == 0 || pkeydata == NULL) {
 				cryptoerror(LOG_STDERR,
 				    Kflag ? gettext("invalid passphrase.") :
 				    gettext("invalid key."));

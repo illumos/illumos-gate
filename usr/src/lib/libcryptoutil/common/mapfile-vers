@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUNWprivate {
     global:
@@ -31,6 +29,8 @@ SUNWprivate {
 	cryptodebug;
 	cryptodebug_init;
 	cryptoerror;
+	cryptoerror_off;
+	cryptoerror_on;
 	free_uentry;
 	free_uentrylist;
 	free_umechlist;
@@ -38,6 +38,7 @@ SUNWprivate {
 	get_fullpath;
 	get_metaslot_info;
 	get_pkcs11conf_info;
+	hexstr_to_bytes;
 	pkcs11_default_token;
 	pkcs11_get_pass;
 	pkcs11_mech2keytype;

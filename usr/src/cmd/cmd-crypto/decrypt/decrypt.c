@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * decrypt.c
  *
@@ -487,7 +485,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 			    (size_t *)&keysize, 0, B_FALSE);
 		}
 
-		if (status == -1 || keysize == 0L) {
+		if (status != 0 || keysize == 0L) {
 			cryptoerror(LOG_STDERR,
 			    Kflag ? gettext("invalid password.") :
 			    gettext("invalid key."));
