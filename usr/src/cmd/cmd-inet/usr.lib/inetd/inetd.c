@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * NOTES: To be expanded.
  *
@@ -230,6 +228,9 @@ static char			*conf_file = NULL;
 
 /* Auditing session handle */
 static adt_session_data_t	*audit_handle;
+
+/* Number of pending connections */
+static size_t			tlx_pending_counter;
 
 static void uds_fini(void);
 static int uds_init(void);
@@ -3057,14 +3058,33 @@ prefork_failure:
 }
 
 static int
+pending_connections(instance_t *instance, proto_info_t *pi)
+{
+	if (instance->config->basic->istlx) {
+		tlx_info_t *tl = (tlx_info_t *)pi;
+
+		return (uu_list_numnodes(tl->conn_ind_queue) != 0);
+	} else {
+		return (0);
+	}
+}
+
+static int
 accept_connection(instance_t *instance, proto_info_t *pi)
 {
 	int		fd;
 	socklen_t	size;
 
 	if (instance->config->basic->istlx) {
+		tlx_info_t *tl = (tlx_info_t *)pi;
+		tlx_pending_counter = \
+		    tlx_pending_counter - uu_list_numnodes(tl->conn_ind_queue);
+
 		fd = tlx_accept(instance->fmri, (tlx_info_t *)pi,
 		    &(instance->remote_addr));
+
+		tlx_pending_counter = \
+		    tlx_pending_counter + uu_list_numnodes(tl->conn_ind_queue);
 	} else {
 		size = sizeof (instance->remote_addr);
 		fd = accept(pi->listen_fd,
@@ -3326,8 +3346,9 @@ process_network_events(void)
 
 		for (pi = uu_list_first(cfg->proto_list); pi != NULL;
 		    pi = uu_list_next(cfg->proto_list, pi)) {
-			if ((pi->listen_fd != -1) &&
-			    isset_pollfd(pi->listen_fd)) {
+			if (((pi->listen_fd != -1) &&
+			    isset_pollfd(pi->listen_fd)) ||
+			    pending_connections(instance, pi)) {
 				if (cfg->iswait) {
 					process_wait_request(instance, pi);
 				} else {
@@ -3371,7 +3392,10 @@ event_loop(void)
 	for (;;) {
 		int	pret = -1;
 
-		timeout = iu_earliest_timer(timer_queue);
+		if (tlx_pending_counter != 0)
+			timeout = 0;
+		else
+			timeout = iu_earliest_timer(timer_queue);
 
 		if (!got_sigterm && !refresh_inetd_requested) {
 			pret = poll(poll_fds, num_pollfds, timeout);
