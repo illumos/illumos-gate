@@ -25,13 +25,12 @@
 #
 # This makefile drives the production of fcp driver kernel module.
 #
-# i86pc architecture dependent
-#
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
+ARCHDIR:sh = cd ..; basename `pwd`
 
 #
 #	Define the module and object file sets.
@@ -40,26 +39,23 @@ MODULE		= fcp
 OBJECTS		= $(FCP_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(FCP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR     = $(UTSBASE)/common/io/fibre-channel/ulp/
+CONF_SRCDIR     = $(UTSBASE)/common/io/fibre-channel/ulp
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/Makefile.uts
-include $(UTSBASE)/sparc/Makefile.sparc
+include ../Makefile.$(ARCHDIR)
 
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
+ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
-#	header file directories
+#	Overrides
 #
-INC_PATH	+= -I$(ROOT)/usr/include
-
 LDFLAGS		+= -dy -Nmisc/fctl -Nmisc/scsi
 
 #
@@ -84,9 +80,6 @@ clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
-warlock:
-	@echo warlock is not supported
-
 modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
@@ -96,4 +89,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sparc/Makefile.targ
+include ../Makefile.targ

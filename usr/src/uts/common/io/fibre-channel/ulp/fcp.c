@@ -53,7 +53,7 @@
  * Discovery Process
  * =================
  *
- *    The discovery process is a major function of FCP.  In order to help
+ *    The discovery process is a major function of FCP.	 In order to help
  * understand that function a flow diagram is given here.  This diagram
  * doesn't claim to cover all the cases and the events that can occur during
  * the discovery process nor the subtleties of the code.  The code paths shown
@@ -92,19 +92,19 @@
  *				|	|
  *				v	v
  *			+-------------------------+
- *			|   fcp_statec_callback   |
+ *			|   fcp_statec_callback	  |
  *			+-------------------------+
  *				    |
  *				    |
  *				    v
  *			+-------------------------+
- *			|    fcp_handle_devices   |
+ *			|    fcp_handle_devices	  |
  *			+-------------------------+
  *				    |
  *				    |
  *				    v
  *			+-------------------------+
- *			|   fcp_handle_mapflags   |
+ *			|   fcp_handle_mapflags	  |
  *			+-------------------------+
  *				    |
  *				    |
@@ -124,7 +124,7 @@
  *
  *
  *			+-------------------------+
- *			|    fcp_icmd_callback    |
+ *			|    fcp_icmd_callback	  |
  *   fp/fctl module --->|			  |
  *			| callback for PLOGI and  |
  *			| PRLI.			  |
@@ -150,37 +150,37 @@
  *
  *
  *			    +-------------------------+
- *   fp/fctl module ------->|    fcp_scsi_callback    |
+ *   fp/fctl module ------->|	 fcp_scsi_callback    |
  *			    +-------------------------+
  *					|
  *					|
  *					|
  *	Receive REPORT_LUN reply       /-\	Receive INQUIRY PAGE83 reply
- *		  _ _ _ _ _ _ _ _ _ _ /   \_ _ _ _ _ _ _ _ _ _ _ _
- *		 |		      \   /			  |
+ *		  _ _ _ _ _ _ _ _ _ _ /	  \_ _ _ _ _ _ _ _ _ _ _ _
+ *		 |		      \	  /			  |
  *		 |		       \-/			  |
  *		 |			|			  |
  *		 | Receive INQUIRY reply|			  |
  *		 |			|			  |
  *		 v			v			  v
  * +------------------------+ +----------------------+ +----------------------+
- * |  fcp_handle_reportlun  | |  fcp_handle_inquiry  | |  fcp_handle_page83   |
+ * |  fcp_handle_reportlun  | |	 fcp_handle_inquiry  | |  fcp_handle_page83   |
  * |(Called for each Target)| | (Called for each LUN)| |(Called for each LUN) |
  * +------------------------+ +----------------------+ +----------------------+
- *		 |		        |			  |
- *		 |		        |			  |
- *		 |		        |			  |
- *		 v		        v			  |
+ *		 |			|			  |
+ *		 |			|			  |
+ *		 |			|			  |
+ *		 v			v			  |
  *     +-----------------+	+-----------------+		  |
- *     |  fcp_send_scsi  |	|  fcp_send_scsi  |		  |
+ *     |  fcp_send_scsi	 |	|  fcp_send_scsi  |		  |
  *     |		 |	|		  |		  |
- *     |     INQUIRY     |	| INQUIRY PAGE83  |		  |
+ *     |     INQUIRY	 |	| INQUIRY PAGE83  |		  |
  *     |  (To each LUN)	 |	+-----------------+		  |
  *     +-----------------+					  |
  *								  |
  *								  v
  *						      +------------------------+
- *						      |  fcp_call_finish_init  |
+ *						      |	 fcp_call_finish_init  |
  *						      +------------------------+
  *								  |
  *								  v
@@ -191,29 +191,29 @@
  *								  |
  *			   All LUNs scanned			 /-\
  *			       _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ __ /   \
- *		              |					\   /
+ *			      |					\   /
  *			      |					 \-/
  *			      v					  |
  *		     +------------------+			  |
- *		     |  fcp_finish_tgt  |			  |
+ *		     |	fcp_finish_tgt	|			  |
  *		     +------------------+			  |
  *			      |	  Target Not Offline and	  |
- *  Target Not Offline and    |   not marked and tgt_node_state   |
+ *  Target Not Offline and    |	  not marked and tgt_node_state	  |
  *  marked		     /-\  not FCP_TGT_NODE_ON_DEMAND	  |
- *		_ _ _ _ _ _ /   \_ _ _ _ _ _ _ _		  |
- *	       |	    \   /		|		  |
+ *		_ _ _ _ _ _ /	\_ _ _ _ _ _ _ _		  |
+ *	       |	    \	/		|		  |
  *	       |	     \-/		|		  |
  *	       v				v		  |
  * +----------------------------+     +-------------------+	  |
- * |	 fcp_offline_target	|     |  fcp_create_luns  |	  |
+ * |	 fcp_offline_target	|     |	 fcp_create_luns  |	  |
  * |				|     +-------------------+	  |
  * | A structure fcp_tgt_elem	|		|		  |
  * | is created and queued in	|		v		  |
  * | the FCP port list		|     +-------------------+	  |
- * | port_offline_tgts.  It	|     |  fcp_pass_to_hp   |	  |
- * | will be unqueued by the    |     |			  |	  |
- * | watchdog timer.		|     | Called for each   |	  |
- * +----------------------------+     | LUN. Dispatches   |	  |
+ * | port_offline_tgts.	 It	|     |	 fcp_pass_to_hp	  |	  |
+ * | will be unqueued by the	|     |			  |	  |
+ * | watchdog timer.		|     | Called for each	  |	  |
+ * +----------------------------+     | LUN. Dispatches	  |	  |
  *		  |		      | fcp_hp_task	  |	  |
  *		  |		      +-------------------+	  |
  *		  |				|		  |
@@ -262,12 +262,12 @@
  *				     |
  *				     v
  *			+-------------------------+
- *			|     fcp_trigger_lun     |
+ *			|     fcp_trigger_lun	  |
  *			+-------------------------+
  *				     |
  *				     |
  *				     v
- *		   Bring offline    /-\  Bring online
+ *		   Bring offline    /-\	 Bring online
  *		  _ _ _ _ _ _ _ _ _/   \_ _ _ _ _ _ _ _ _ _
  *		 |		   \   /		   |
  *		 |		    \-/			   |
@@ -287,12 +287,12 @@
  *						|  fcp_online_child	|
  *						|			|
  *						| Set device online	|
- *						| using NDI or MDI. 	|
+ *						| using NDI or MDI.	|
  *						+-----------------------+
  *
  * ............................................................................
  *
- * STEP 5: The watchdog timer expires.  The watch dog timer does much more that
+ * STEP 5: The watchdog timer expires.	The watch dog timer does much more that
  *	   what is described here.  We only show the target offline path.
  *
  *
@@ -624,21 +624,21 @@ static void fcp_add_one_mask(char *curr_pwwn, uint32_t lun_id,
 static int fcp_should_mask(la_wwn_t *wwn, uint32_t lun_id);
 static void fcp_cleanup_blacklist(struct fcp_black_list_entry **lun_blacklist);
 
-extern struct mod_ops 	mod_driverops;
+extern struct mod_ops	mod_driverops;
 /*
  * This variable is defined in modctl.c and set to '1' after the root driver
  * and fs are loaded.  It serves as an indication that the root filesystem can
  * be used.
  */
-extern int 		modrootloaded;
+extern int		modrootloaded;
 /*
  * This table contains strings associated with the SCSI sense key codes.  It
  * is used by FCP to print a clear explanation of the code returned in the
  * sense information by a device.
  */
-extern char 		*sense_keys[];
+extern char		*sense_keys[];
 /*
- * This device is created by the SCSI pseudo nexus driver (SCSI vHCI).  It is
+ * This device is created by the SCSI pseudo nexus driver (SCSI vHCI).	It is
  * under this device that the paths to a physical device are created when
  * MPxIO is used.
  */
@@ -666,8 +666,8 @@ extern dev_info_t	*scsi_vhci_dip;
 #define	CONF_WWN_PROP	(char *)fcp_conf_wwn_prop
 #define	OBP_BOOT_WWN	(char *)fcp_obp_boot_wwn
 #define	MANUAL_CFG_ONLY	(char *)fcp_manual_config_only
-#define	INIT_PORT_PROP  (char *)fcp_init_port_prop
-#define	TGT_PORT_PROP   (char *)fcp_tgt_port_prop
+#define	INIT_PORT_PROP	(char *)fcp_init_port_prop
+#define	TGT_PORT_PROP	(char *)fcp_tgt_port_prop
 #define	LUN_BLACKLIST_PROP	(char *)fcp_lun_blacklist_prop
 /*
  * Short hand macros.
@@ -678,49 +678,49 @@ extern dev_info_t	*scsi_vhci_dip;
 /*
  * Driver private macros
  */
-#define	FCP_ATOB(x)	(((x) >= '0' && (x) <= '9') ? ((x) - '0') :\
-			((x) >= 'a' && (x) <= 'f') ?\
+#define	FCP_ATOB(x)	(((x) >= '0' && (x) <= '9') ? ((x) - '0') :	\
+			((x) >= 'a' && (x) <= 'f') ?			\
 			((x) - 'a' + 10) : ((x) - 'A' + 10))
 
 #define	FCP_MAX(a, b)	((a) > (b) ? (a) : (b))
 
-#define	FCP_N_NDI_EVENTS \
+#define	FCP_N_NDI_EVENTS						\
 	(sizeof (fcp_ndi_event_defs) / sizeof (ndi_event_definition_t))
 
-#define	FCP_LINK_STATE_CHANGED(p, c)\
+#define	FCP_LINK_STATE_CHANGED(p, c)			\
 	((p)->port_link_cnt != (c)->ipkt_link_cnt)
 
-#define	FCP_TGT_STATE_CHANGED(t, c)\
+#define	FCP_TGT_STATE_CHANGED(t, c)			\
 	((t)->tgt_change_cnt != (c)->ipkt_change_cnt)
 
-#define	FCP_STATE_CHANGED(p, t, c)\
+#define	FCP_STATE_CHANGED(p, t, c)		\
 	(FCP_TGT_STATE_CHANGED(t, c))
 
-#define	FCP_MUST_RETRY(fpkt)\
-	((fpkt)->pkt_state == FC_PKT_LOCAL_BSY ||\
-	(fpkt)->pkt_state == FC_PKT_LOCAL_RJT ||\
-	(fpkt)->pkt_state == FC_PKT_TRAN_BSY ||\
-	(fpkt)->pkt_state == FC_PKT_ELS_IN_PROGRESS ||\
-	(fpkt)->pkt_state == FC_PKT_NPORT_BSY ||\
-	(fpkt)->pkt_state == FC_PKT_FABRIC_BSY ||\
-	(fpkt)->pkt_state == FC_PKT_PORT_OFFLINE ||\
+#define	FCP_MUST_RETRY(fpkt)				\
+	((fpkt)->pkt_state == FC_PKT_LOCAL_BSY ||	\
+	(fpkt)->pkt_state == FC_PKT_LOCAL_RJT ||	\
+	(fpkt)->pkt_state == FC_PKT_TRAN_BSY ||	\
+	(fpkt)->pkt_state == FC_PKT_ELS_IN_PROGRESS ||	\
+	(fpkt)->pkt_state == FC_PKT_NPORT_BSY ||	\
+	(fpkt)->pkt_state == FC_PKT_FABRIC_BSY ||	\
+	(fpkt)->pkt_state == FC_PKT_PORT_OFFLINE ||	\
 	(fpkt)->pkt_reason == FC_REASON_OFFLINE)
 
-#define	FCP_SENSE_REPORTLUN_CHANGED(es)\
-	((es)->es_key == KEY_UNIT_ATTENTION &&\
-	(es)->es_add_code == 0x3f &&\
+#define	FCP_SENSE_REPORTLUN_CHANGED(es)		\
+	((es)->es_key == KEY_UNIT_ATTENTION &&	\
+	(es)->es_add_code == 0x3f &&		\
 	(es)->es_qual_code == 0x0e)
 
-#define	FCP_SENSE_NO_LUN(es)\
-	((es)->es_key == KEY_ILLEGAL_REQUEST &&\
-	(es)->es_add_code == 0x25 &&\
+#define	FCP_SENSE_NO_LUN(es)			\
+	((es)->es_key == KEY_ILLEGAL_REQUEST &&	\
+	(es)->es_add_code == 0x25 &&		\
 	(es)->es_qual_code == 0x0)
 
-#define	FCP_VERSION		"1.185"
+#define	FCP_VERSION		"1.186"
 #define	FCP_NAME_VERSION	"SunFC FCP v" FCP_VERSION
 
-#define	FCP_NUM_ELEMENTS(array)\
-		(sizeof (array) / sizeof ((array)[0]))
+#define	FCP_NUM_ELEMENTS(array)			\
+	(sizeof (array) / sizeof ((array)[0]))
 
 /*
  * Debugging, Error reporting, and tracing
@@ -770,23 +770,23 @@ extern dev_info_t	*scsi_vhci_dip;
 /*
  * Log contents to both system messages file and trace buffer
  */
-#define	FCP_MSG_BUF_LEVEL_1	(FCP_LEVEL_1 | FC_TRACE_LOG_BUF |\
+#define	FCP_MSG_BUF_LEVEL_1	(FCP_LEVEL_1 | FC_TRACE_LOG_BUF |	\
 				FC_TRACE_LOG_MSG)
-#define	FCP_MSG_BUF_LEVEL_2	(FCP_LEVEL_2 | FC_TRACE_LOG_BUF |\
+#define	FCP_MSG_BUF_LEVEL_2	(FCP_LEVEL_2 | FC_TRACE_LOG_BUF |	\
 				FC_TRACE_LOG_MSG)
-#define	FCP_MSG_BUF_LEVEL_3	(FCP_LEVEL_3 | FC_TRACE_LOG_BUF |\
+#define	FCP_MSG_BUF_LEVEL_3	(FCP_LEVEL_3 | FC_TRACE_LOG_BUF |	\
 				FC_TRACE_LOG_MSG)
-#define	FCP_MSG_BUF_LEVEL_4	(FCP_LEVEL_4 | FC_TRACE_LOG_BUF |\
+#define	FCP_MSG_BUF_LEVEL_4	(FCP_LEVEL_4 | FC_TRACE_LOG_BUF |	\
 				FC_TRACE_LOG_MSG)
-#define	FCP_MSG_BUF_LEVEL_5	(FCP_LEVEL_5 | FC_TRACE_LOG_BUF |\
+#define	FCP_MSG_BUF_LEVEL_5	(FCP_LEVEL_5 | FC_TRACE_LOG_BUF |	\
 				FC_TRACE_LOG_MSG)
-#define	FCP_MSG_BUF_LEVEL_6	(FCP_LEVEL_6 | FC_TRACE_LOG_BUF |\
+#define	FCP_MSG_BUF_LEVEL_6	(FCP_LEVEL_6 | FC_TRACE_LOG_BUF |	\
 				FC_TRACE_LOG_MSG)
-#define	FCP_MSG_BUF_LEVEL_7	(FCP_LEVEL_7 | FC_TRACE_LOG_BUF |\
+#define	FCP_MSG_BUF_LEVEL_7	(FCP_LEVEL_7 | FC_TRACE_LOG_BUF |	\
 				FC_TRACE_LOG_MSG)
-#define	FCP_MSG_BUF_LEVEL_8	(FCP_LEVEL_8 | FC_TRACE_LOG_BUF |\
+#define	FCP_MSG_BUF_LEVEL_8	(FCP_LEVEL_8 | FC_TRACE_LOG_BUF |	\
 				FC_TRACE_LOG_MSG)
-#define	FCP_MSG_BUF_LEVEL_9	(FCP_LEVEL_9 | FC_TRACE_LOG_BUF |\
+#define	FCP_MSG_BUF_LEVEL_9	(FCP_LEVEL_9 | FC_TRACE_LOG_BUF |	\
 				FC_TRACE_LOG_MSG)
 #ifdef DEBUG
 #define	FCP_DTRACE	fc_trace_debug
@@ -864,14 +864,14 @@ static fc_ulp_modinfo_t fcp_modinfo = {
 };
 
 #ifdef	DEBUG
-#define	FCP_TRACE_DEFAULT 	(FC_TRACE_LOG_MASK | FCP_LEVEL_1 |\
-				FCP_LEVEL_2 | FCP_LEVEL_3 |\
-				FCP_LEVEL_4 | FCP_LEVEL_5 |\
+#define	FCP_TRACE_DEFAULT	(FC_TRACE_LOG_MASK | FCP_LEVEL_1 |	\
+				FCP_LEVEL_2 | FCP_LEVEL_3 |		\
+				FCP_LEVEL_4 | FCP_LEVEL_5 |		\
 				FCP_LEVEL_6 | FCP_LEVEL_7)
 #else
-#define	FCP_TRACE_DEFAULT 	(FC_TRACE_LOG_MASK | FCP_LEVEL_1 |\
-				FCP_LEVEL_2 | FCP_LEVEL_3 |\
-				FCP_LEVEL_4 | FCP_LEVEL_5 |\
+#define	FCP_TRACE_DEFAULT	(FC_TRACE_LOG_MASK | FCP_LEVEL_1 |	\
+				FCP_LEVEL_2 | FCP_LEVEL_3 |		\
+				FCP_LEVEL_4 | FCP_LEVEL_5 |		\
 				FCP_LEVEL_6 | FCP_LEVEL_7)
 #endif
 
@@ -890,7 +890,7 @@ static int		fcp_max_bus_config_retries	= 4;
 static int		fcp_lun_ready_retry = 300;
 /*
  * The value assigned to the following variable has changed several times due
- * to a problem with the data underruns reporting of some firmware(s).  The
+ * to a problem with the data underruns reporting of some firmware(s).	The
  * current value of 50 gives a timeout value of 25 seconds for a max number
  * of 256 LUNs.
  */
@@ -914,8 +914,8 @@ static int		fcp_max_target_retries = 50;
  * fcp_watchdog_timeout
  *
  *	Increment value of the variable fcp_watchdog_time as well as the
- *	the timeout value of the watchdog timer.  The unit is 1 second.  It
- *	is strange that this is not a #define but a variable since the code
+ *	the timeout value of the watchdog timer.  The unit is 1 second.	 It
+ *	is strange that this is not a #define	but a variable since the code
  *	never changes this value.  The reason why it can be said that the
  *	unit is 1 second is because the number of ticks for the watchdog
  *	timer is determined like this:
@@ -969,11 +969,11 @@ const char		*fcp_init_port_prop = "initiator-port";
 const char		*fcp_tgt_port_prop = "target-port";
 const char		*fcp_lun_blacklist_prop = "pwwn-lun-blacklist";
 
-static struct fcp_port 	*fcp_port_head = NULL;
+static struct fcp_port	*fcp_port_head = NULL;
 static ddi_eventcookie_t	fcp_insert_eid;
 static ddi_eventcookie_t	fcp_remove_eid;
 
-static ndi_event_definition_t   fcp_ndi_event_defs[] = {
+static ndi_event_definition_t	fcp_ndi_event_defs[] = {
 	{ FCP_EVENT_TAG_INSERT, FCAL_INSERT_EVENT, EPL_KERNEL },
 	{ FCP_EVENT_TAG_REMOVE, FCAL_REMOVE_EVENT, EPL_INTERRUPT }
 };
@@ -1037,7 +1037,7 @@ static uchar_t fcp_alpa_to_switch[] = {
 	0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
-static caddr_t pid = "SESS01          ";
+static caddr_t pid = "SESS01	      ";
 
 #if	!defined(lint)
 
@@ -1067,14 +1067,14 @@ _NOTE(SCHEME_PROTECTS_DATA("Unshared",
 
 char *fcp_symmetric_disk_table[] = {
 	"SEAGATE ST",
-	"IBM     DDYFT",
-	"SUNW    SUNWGS",	/* Daktari enclosure */
-	"SUN     SENA",		/* SES device */
-	"SUN     SESS01"	/* VICOM SVE box */
+	"IBM	 DDYFT",
+	"SUNW	 SUNWGS",	/* Daktari enclosure */
+	"SUN	 SENA",		/* SES device */
+	"SUN	 SESS01"	/* VICOM SVE box */
 };
 
 int fcp_symmetric_disk_table_size =
-    sizeof (fcp_symmetric_disk_table)/sizeof (char *);
+	sizeof (fcp_symmetric_disk_table)/sizeof (char *);
 
 /*
  * The _init(9e) return value should be that of mod_install(9f). Under
@@ -1225,7 +1225,7 @@ fcp_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	int	res = DDI_SUCCESS;
 
 	FCP_DTRACE(fcp_logq, "fcp", fcp_trace,
-	    FCP_BUF_LEVEL_8, 0,  "module detach: cmd=0x%x", cmd);
+	    FCP_BUF_LEVEL_8, 0,	 "module detach: cmd=0x%x", cmd);
 
 	if (cmd == DDI_DETACH) {
 		/*
@@ -1248,7 +1248,7 @@ fcp_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		}
 	}
 	FCP_DTRACE(fcp_logq, "fcp", fcp_trace,
-	    FCP_BUF_LEVEL_8, 0,  "module detach returning %d", res);
+	    FCP_BUF_LEVEL_8, 0,	 "module detach returning %d", res);
 
 	return (res);
 }
@@ -1311,19 +1311,19 @@ fcp_close(dev_t dev, int flag, int otype, cred_t *credp)
 
 /*
  * fcp_ioctl
- * 	Entry point for the FCP ioctls
+ *	Entry point for the FCP ioctls
  *
  * Input:
  *	See ioctl(9E)
  *
  * Output:
- *      See ioctl(9E)
+ *	See ioctl(9E)
  *
  * Returns:
- *      See ioctl(9E)
+ *	See ioctl(9E)
  *
  * Context:
- *      Kernel context.
+ *	Kernel context.
  */
 /* ARGSUSED */
 static int
@@ -1344,23 +1344,23 @@ fcp_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 	case FCP_TGT_CREATE:
 	case FCP_TGT_DELETE:
 		ret = fcp_setup_device_data_ioctl(cmd,
-				(struct fcp_ioctl *)data, mode, rval);
+		    (struct fcp_ioctl *)data, mode, rval);
 		break;
 
 	case FCP_TGT_SEND_SCSI:
 		mutex_enter(&fcp_ioctl_mutex);
 		ret = fcp_setup_scsi_ioctl(
-				(struct fcp_scsi_cmd *)data, mode, rval);
+		    (struct fcp_scsi_cmd *)data, mode, rval);
 		mutex_exit(&fcp_ioctl_mutex);
 		break;
 
 	case FCP_STATE_COUNT:
 		ret = fcp_get_statec_count((struct fcp_ioctl *)data,
-							mode, rval);
+		    mode, rval);
 		break;
 	case FCP_GET_TARGET_MAPPINGS:
 		ret = fcp_get_target_mappings((struct fcp_ioctl *)data,
-							mode, rval);
+		    mode, rval);
 		break;
 	default:
 		fcp_log(CE_WARN, NULL,
@@ -1374,8 +1374,8 @@ fcp_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
 
 /*
  * fcp_setup_device_data_ioctl
- * 	Setup handler for the "device data" style of
- *	ioctl for FCP.  See "fcp_util.h" for data structure
+ *	Setup handler for the "device data" style of
+ *	ioctl for FCP.	See "fcp_util.h" for data structure
  *	definition.
  *
  * Input:
@@ -1384,14 +1384,14 @@ fcp_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp,
  *	mode	= See ioctl(9E)
  *
  * Output:
- *      data	= ioctl data
+ *	data	= ioctl data
  *	rval	= return value - see ioctl(9E)
  *
  * Returns:
- *      See ioctl(9E)
+ *	See ioctl(9E)
  *
  * Context:
- *      Kernel context.
+ *	Kernel context.
  */
 /* ARGSUSED */
 static int
@@ -1399,12 +1399,12 @@ fcp_setup_device_data_ioctl(int cmd, struct fcp_ioctl *data, int mode,
     int *rval)
 {
 	struct fcp_port	*pptr;
-	struct 	device_data 	*dev_data;
+	struct	device_data	*dev_data;
 	uint32_t		link_cnt;
 	la_wwn_t		*wwn_ptr = NULL;
 	struct fcp_tgt		*ptgt = NULL;
 	struct fcp_lun		*plun = NULL;
-	int 			i, error;
+	int			i, error;
 	struct fcp_ioctl	fioctl;
 
 #ifdef	_MULTI_DATAMODEL
@@ -1444,10 +1444,11 @@ fcp_setup_device_data_ioctl(int cmd, struct fcp_ioctl *data, int mode,
 	mutex_enter(&fcp_global_mutex);
 	pptr = fcp_port_head;
 	while (pptr) {
-		if (pptr->port_instance == (uint32_t)fioctl.fp_minor)
+		if (pptr->port_instance == (uint32_t)fioctl.fp_minor) {
 			break;
-		else
+		} else {
 			pptr = pptr->port_next;
+		}
 	}
 	mutex_exit(&fcp_global_mutex);
 	if (pptr == NULL) {
@@ -1473,21 +1474,21 @@ fcp_setup_device_data_ioctl(int cmd, struct fcp_ioctl *data, int mode,
 	if (cmd == FCP_TGT_INQUIRY) {
 		wwn_ptr = (la_wwn_t *)&(dev_data[0].dev_pwwn);
 		if (bcmp(wwn_ptr->raw_wwn, pptr->port_pwwn.raw_wwn,
-			sizeof (wwn_ptr->raw_wwn)) == 0) {
+		    sizeof (wwn_ptr->raw_wwn)) == 0) {
 			/* This ioctl is requesting INQ info of local HBA */
 			mutex_exit(&pptr->port_mutex);
 			dev_data[0].dev0_type = DTYPE_UNKNOWN;
 			dev_data[0].dev_status = 0;
 			if (ddi_copyout(dev_data, fioctl.list,
-				(sizeof (struct device_data)) * fioctl.listlen,
-				mode)) {
+			    (sizeof (struct device_data)) * fioctl.listlen,
+			    mode)) {
 				kmem_free(dev_data,
-				sizeof (*dev_data) * fioctl.listlen);
+				    sizeof (*dev_data) * fioctl.listlen);
 				return (EFAULT);
 			}
 			kmem_free(dev_data,
 			    sizeof (*dev_data) * fioctl.listlen);
-#ifdef  _MULTI_DATAMODEL
+#ifdef	_MULTI_DATAMODEL
 			switch (ddi_model_convert_from(mode & FMODELS)) {
 			case DDI_MODEL_ILP32: {
 				struct fcp32_ioctl f32_ioctl;
@@ -1495,25 +1496,25 @@ fcp_setup_device_data_ioctl(int cmd, struct fcp_ioctl *data, int mode,
 				f32_ioctl.listlen = fioctl.listlen;
 				f32_ioctl.list = (caddr32_t)(long)fioctl.list;
 				if (ddi_copyout((void *)&f32_ioctl,
-					(void *)data,
-					sizeof (struct fcp32_ioctl), mode)) {
+				    (void *)data,
+				    sizeof (struct fcp32_ioctl), mode)) {
 					return (EFAULT);
 				}
 				break;
 			}
 			case DDI_MODEL_NONE:
 				if (ddi_copyout((void *)&fioctl, (void *)data,
-					sizeof (struct fcp_ioctl), mode)) {
+				    sizeof (struct fcp_ioctl), mode)) {
 					return (EFAULT);
 				}
 				break;
 			}
-#else   /* _MULTI_DATAMODEL */
+#else	/* _MULTI_DATAMODEL */
 			if (ddi_copyout((void *)&fioctl, (void *)data,
-				sizeof (struct fcp_ioctl), mode)) {
+			    sizeof (struct fcp_ioctl), mode)) {
 				return (EFAULT);
 			}
-#endif  /* _MULTI_DATAMODEL */
+#endif	/* _MULTI_DATAMODEL */
 			return (0);
 		}
 	}
@@ -1618,7 +1619,7 @@ fcp_setup_device_data_ioctl(int cmd, struct fcp_ioctl *data, int mode,
 				    wwn_ptr->raw_wwn);
 
 				if (dev_data[i].dev_status != 0) {
-					char 	buf[25];
+					char	buf[25];
 
 					for (i = 0; i < FC_WWN_SIZE; i++) {
 						(void) sprintf(&buf[i << 1],
@@ -1701,7 +1702,7 @@ fcp_setup_device_data_ioctl(int cmd, struct fcp_ioctl *data, int mode,
 /* ARGSUSED */
 static int
 fcp_get_target_mappings(struct fcp_ioctl *data,
-	int mode, int *rval)
+    int mode, int *rval)
 {
 	struct fcp_port	    *pptr;
 	fc_hba_target_mappings_t    *mappings;
@@ -1751,16 +1752,17 @@ fcp_get_target_mappings(struct fcp_ioctl *data,
 	mutex_enter(&fcp_global_mutex);
 	pptr = fcp_port_head;
 	while (pptr) {
-		if (pptr->port_instance == (uint32_t)fioctl.fp_minor)
+		if (pptr->port_instance == (uint32_t)fioctl.fp_minor) {
 			break;
-		else
+		} else {
 			pptr = pptr->port_next;
+		}
 	}
 	mutex_exit(&fcp_global_mutex);
 	if (pptr == NULL) {
-	    cmn_err(CE_NOTE, "target mappings: unknown instance number : %d",
+		cmn_err(CE_NOTE, "target mappings: unknown instance number: %d",
 		    fioctl.fp_minor);
-	    return (ENXIO);
+		return (ENXIO);
 	}
 
 
@@ -1769,15 +1771,15 @@ fcp_get_target_mappings(struct fcp_ioctl *data,
 
 	/* Now calculate how many mapping entries will fit */
 	listlen = fioctl.listlen + sizeof (fc_hba_mapping_entry_t)
-		- sizeof (fc_hba_target_mappings_t);
+	    - sizeof (fc_hba_target_mappings_t);
 	if (listlen <= 0) {
-	    cmn_err(CE_NOTE, "target mappings: Insufficient buffer");
-	    return (ENXIO);
+		cmn_err(CE_NOTE, "target mappings: Insufficient buffer");
+		return (ENXIO);
 	}
 	listlen = listlen / sizeof (fc_hba_mapping_entry_t);
 
 	if ((mappings = kmem_zalloc(mappingSize, KM_SLEEP)) == NULL) {
-	    return (ENOMEM);
+		return (ENOMEM);
 	}
 	mappings->version = FC_HBA_TARGET_MAPPINGS_VERSION;
 
@@ -1787,77 +1789,86 @@ fcp_get_target_mappings(struct fcp_ioctl *data,
 	mutex_enter(&pptr->port_mutex);
 	/* Loop through all targets on this port */
 	for (i = 0; i < FCP_NUM_HASH; i++) {
-	    for (ptgt = pptr->port_tgt_hash_table[i]; ptgt != NULL;
+		for (ptgt = pptr->port_tgt_hash_table[i]; ptgt != NULL;
 		    ptgt = ptgt->tgt_next) {
 
 
-		/* Loop through all LUNs on this target */
-		for (plun = ptgt->tgt_lun; plun != NULL;
-			plun = plun->lun_next) {
-		    if (plun->lun_state & FCP_LUN_OFFLINE) {
-			continue;
-		    }
+			/* Loop through all LUNs on this target */
+			for (plun = ptgt->tgt_lun; plun != NULL;
+			    plun = plun->lun_next) {
+				if (plun->lun_state & FCP_LUN_OFFLINE) {
+					continue;
+				}
 
-		    path = fcp_get_lun_path(plun);
-		    if (path == NULL) {
-			continue;
-		    }
+				path = fcp_get_lun_path(plun);
+				if (path == NULL) {
+					continue;
+				}
 
-		    if (mapIndex >= listlen) {
-			mapIndex ++;
-			kmem_free(path, MAXPATHLEN);
-			continue;
-		    }
-		    map = &mappings->entries[mapIndex++];
-		    bcopy(path, map->targetDriver, sizeof (map->targetDriver));
-		    map->d_id = ptgt->tgt_d_id;
-		    map->busNumber = 0;
-		    map->targetNumber = ptgt->tgt_d_id;
-		    map->osLUN = plun->lun_num;
+				if (mapIndex >= listlen) {
+					mapIndex ++;
+					kmem_free(path, MAXPATHLEN);
+					continue;
+				}
+				map = &mappings->entries[mapIndex++];
+				bcopy(path, map->targetDriver,
+				    sizeof (map->targetDriver));
+				map->d_id = ptgt->tgt_d_id;
+				map->busNumber = 0;
+				map->targetNumber = ptgt->tgt_d_id;
+				map->osLUN = plun->lun_num;
 
-			/*
-			 * We had swapped lun when we stored it in
-			 * lun_addr. We need to swap it back before
-			 * returning it to user land
-			 */
+				/*
+				 * We had swapped lun when we stored it in
+				 * lun_addr. We need to swap it back before
+				 * returning it to user land
+				 */
 
-		    sam_lun_addr.ent_addr_0 = BE_16(plun->lun_addr.ent_addr_0);
-		    sam_lun_addr.ent_addr_1 = BE_16(plun->lun_addr.ent_addr_1);
-		    sam_lun_addr.ent_addr_2 = BE_16(plun->lun_addr.ent_addr_2);
-		    sam_lun_addr.ent_addr_3 = BE_16(plun->lun_addr.ent_addr_3);
+				sam_lun_addr.ent_addr_0 =
+				    BE_16(plun->lun_addr.ent_addr_0);
+				sam_lun_addr.ent_addr_1 =
+				    BE_16(plun->lun_addr.ent_addr_1);
+				sam_lun_addr.ent_addr_2 =
+				    BE_16(plun->lun_addr.ent_addr_2);
+				sam_lun_addr.ent_addr_3 =
+				    BE_16(plun->lun_addr.ent_addr_3);
 
-		    bcopy(&sam_lun_addr, &map->samLUN, FCP_LUN_SIZE);
+				bcopy(&sam_lun_addr, &map->samLUN,
+				    FCP_LUN_SIZE);
+				bcopy(ptgt->tgt_node_wwn.raw_wwn,
+				    map->NodeWWN.raw_wwn, sizeof (la_wwn_t));
+				bcopy(ptgt->tgt_port_wwn.raw_wwn,
+				    map->PortWWN.raw_wwn, sizeof (la_wwn_t));
 
-		    bcopy(ptgt->tgt_node_wwn.raw_wwn, map->NodeWWN.raw_wwn,
-			sizeof (la_wwn_t));
-		    bcopy(ptgt->tgt_port_wwn.raw_wwn, map->PortWWN.raw_wwn,
-			sizeof (la_wwn_t));
+				if (plun->lun_guid) {
 
-		    if (plun->lun_guid) {
+					/* convert ascii wwn to bytes */
+					fcp_ascii_to_wwn(plun->lun_guid,
+					    map->guid, sizeof (map->guid));
 
-			/* convert ascii wwn to bytes */
-			fcp_ascii_to_wwn(plun->lun_guid, map->guid,
-			    sizeof (map->guid));
-
-			if ((sizeof (map->guid)) < plun->lun_guid_size/2) {
-				cmn_err(CE_WARN, "fcp_get_target_mappings:"
-					"guid copy space insufficient."
-					"Copy Truncation - "
-					"available %d; need %d",
-					(int)sizeof (map->guid),
-					(int)plun->lun_guid_size/2);
+					if ((sizeof (map->guid)) <
+					    plun->lun_guid_size / 2) {
+						cmn_err(CE_WARN,
+						    "fcp_get_target_mappings:"
+						    "guid copy space "
+						    "insufficient."
+						    "Copy Truncation - "
+						    "available %d; need %d",
+						    (int)sizeof (map->guid),
+						    (int)
+						    plun->lun_guid_size / 2);
+					}
+				}
+				kmem_free(path, MAXPATHLEN);
 			}
-		    }
-		    kmem_free(path, MAXPATHLEN);
 		}
-	    }
 	}
 	mutex_exit(&pptr->port_mutex);
 	mappings->numLuns = mapIndex;
 
 	if (ddi_copyout(mappings, fioctl.list, mappingSize, mode)) {
-	    kmem_free(mappings, mappingSize);
-	    return (EFAULT);
+		kmem_free(mappings, mappingSize);
+		return (EFAULT);
 	}
 	kmem_free(mappings, mappingSize);
 
@@ -1895,8 +1906,8 @@ fcp_get_target_mappings(struct fcp_ioctl *data,
 
 /*
  * fcp_setup_scsi_ioctl
- * 	Setup handler for the "scsi passthru" style of
- *	ioctl for FCP.  See "fcp_util.h" for data structure
+ *	Setup handler for the "scsi passthru" style of
+ *	ioctl for FCP.	See "fcp_util.h" for data structure
  *	definition.
  *
  * Input:
@@ -1904,11 +1915,11 @@ fcp_get_target_mappings(struct fcp_ioctl *data,
  *	mode	= See ioctl(9E)
  *
  * Output:
- *      u_fscsi	= ioctl data (user address space)
+ *	u_fscsi	= ioctl data (user address space)
  *	rval	= return value - see ioctl(9E)
  *
  * Returns:
- *      0	= OK
+ *	0	= OK
  *	EAGAIN	= See errno.h
  *	EBUSY	= See errno.h
  *	EFAULT	= See errno.h
@@ -1919,12 +1930,12 @@ fcp_get_target_mappings(struct fcp_ioctl *data,
  *	ENXIO	= See errno.h
  *
  * Context:
- *      Kernel context.
+ *	Kernel context.
  */
 /* ARGSUSED */
 static int
 fcp_setup_scsi_ioctl(struct fcp_scsi_cmd *u_fscsi,
-	int mode, int *rval)
+    int mode, int *rval)
 {
 	int			ret		= 0;
 	int			temp_ret;
@@ -1940,7 +1951,7 @@ fcp_setup_scsi_ioctl(struct fcp_scsi_cmd *u_fscsi,
 	 * Get fcp_scsi_cmd array element from user address space
 	 */
 	if ((ret = fcp_copyin_scsi_cmd((caddr_t)u_fscsi, &k_fscsi, mode))
-		!= 0) {
+	    != 0) {
 		return (ret);
 	}
 
@@ -1967,8 +1978,8 @@ fcp_setup_scsi_ioctl(struct fcp_scsi_cmd *u_fscsi,
 		k_rqbufaddr  = kmem_alloc(k_fscsi.scsi_rqlen,  KM_NOSLEEP);
 
 		if (k_cdbbufaddr == NULL ||
-		    k_bufaddr    == NULL ||
-		    k_rqbufaddr  == NULL) {
+		    k_bufaddr	 == NULL ||
+		    k_rqbufaddr	 == NULL) {
 			ret = ENOMEM;
 		}
 	}
@@ -1983,19 +1994,19 @@ fcp_setup_scsi_ioctl(struct fcp_scsi_cmd *u_fscsi,
 		u_rqbufaddr  = k_fscsi.scsi_rqbufaddr;
 
 		if (ddi_copyin(u_cdbbufaddr,
-				k_cdbbufaddr,
-				k_fscsi.scsi_cdblen,
-				mode)) {
+		    k_cdbbufaddr,
+		    k_fscsi.scsi_cdblen,
+		    mode)) {
 			ret = EFAULT;
 		} else if (ddi_copyin(u_bufaddr,
-				k_bufaddr,
-				k_fscsi.scsi_buflen,
-				mode)) {
+		    k_bufaddr,
+		    k_fscsi.scsi_buflen,
+		    mode)) {
 			ret = EFAULT;
 		} else if (ddi_copyin(u_rqbufaddr,
-				k_rqbufaddr,
-				k_fscsi.scsi_rqlen,
-				mode)) {
+		    k_rqbufaddr,
+		    k_fscsi.scsi_rqlen,
+		    mode)) {
 			ret = EFAULT;
 		}
 	}
@@ -2030,19 +2041,19 @@ fcp_setup_scsi_ioctl(struct fcp_scsi_cmd *u_fscsi,
 	 */
 	if (ret == 0) {
 		if (ddi_copyout(k_cdbbufaddr,
-				u_cdbbufaddr,
-				k_fscsi.scsi_cdblen,
-				mode)) {
+		    u_cdbbufaddr,
+		    k_fscsi.scsi_cdblen,
+		    mode)) {
 			ret = EFAULT;
 		} else if (ddi_copyout(k_bufaddr,
-				u_bufaddr,
-				k_fscsi.scsi_buflen,
-				mode)) {
+		    u_bufaddr,
+		    k_fscsi.scsi_buflen,
+		    mode)) {
 			ret = EFAULT;
 		} else if (ddi_copyout(k_rqbufaddr,
-				u_rqbufaddr,
-				k_fscsi.scsi_rqlen,
-				mode)) {
+		    u_rqbufaddr,
+		    k_fscsi.scsi_rqlen,
+		    mode)) {
 			ret = EFAULT;
 		}
 	}
@@ -2085,14 +2096,14 @@ fcp_setup_scsi_ioctl(struct fcp_scsi_cmd *u_fscsi,
  *	mode		= See ioctl(9E) and ddi_copyin(9F)
  *
  * Output:
- *      fscsi		= to address (kernel address space)
+ *	fscsi		= to address (kernel address space)
  *
  * Returns:
- *      0	= OK
+ *	0	= OK
  *	EFAULT	= Error
  *
  * Context:
- *      Kernel context.
+ *	Kernel context.
  */
 static int
 fcp_copyin_scsi_cmd(caddr_t base_addr, struct fcp_scsi_cmd *fscsi, int mode)
@@ -2106,9 +2117,9 @@ fcp_copyin_scsi_cmd(caddr_t base_addr, struct fcp_scsi_cmd *fscsi, int mode)
 		 * Copy data from user address space
 		 */
 		if (ddi_copyin((void *)base_addr,
-				&f32scsi,
-				sizeof (struct fcp32_scsi_cmd),
-				mode)) {
+		    &f32scsi,
+		    sizeof (struct fcp32_scsi_cmd),
+		    mode)) {
 			return (EFAULT);
 		}
 		/*
@@ -2121,9 +2132,9 @@ fcp_copyin_scsi_cmd(caddr_t base_addr, struct fcp_scsi_cmd *fscsi, int mode)
 		 * Copy data from user address space
 		 */
 		if (ddi_copyin((void *)base_addr,
-				fscsi,
-				sizeof (struct fcp_scsi_cmd),
-				mode)) {
+		    fscsi,
+		    sizeof (struct fcp_scsi_cmd),
+		    mode)) {
 			return (EFAULT);
 		}
 		break;
@@ -2133,9 +2144,9 @@ fcp_copyin_scsi_cmd(caddr_t base_addr, struct fcp_scsi_cmd *fscsi, int mode)
 	 * Copy data from user address space
 	 */
 	if (ddi_copyin((void *)base_addr,
-			fscsi,
-			sizeof (struct fcp_scsi_cmd),
-			mode)) {
+	    fscsi,
+	    sizeof (struct fcp_scsi_cmd),
+	    mode)) {
 		return (EFAULT);
 	}
 #endif	/* _MULTI_DATAMODEL */
@@ -2150,18 +2161,18 @@ fcp_copyin_scsi_cmd(caddr_t base_addr, struct fcp_scsi_cmd *fscsi, int mode)
  *	The data may be in 32 bit or 64 bit modes.
  *
  * Input:
- *      fscsi		= to address (kernel address space)
+ *	fscsi		= to address (kernel address space)
  *	mode		= See ioctl(9E) and ddi_copyin(9F)
  *
  * Output:
  *	base_addr	= from address (user address space)
  *
  * Returns:
- *      0	= OK
+ *	0	= OK
  *	EFAULT	= Error
  *
  * Context:
- *      Kernel context.
+ *	Kernel context.
  */
 static int
 fcp_copyout_scsi_cmd(struct fcp_scsi_cmd *fscsi, caddr_t base_addr, int mode)
@@ -2179,9 +2190,9 @@ fcp_copyout_scsi_cmd(struct fcp_scsi_cmd *fscsi, caddr_t base_addr, int mode)
 		 * Copy data to user address space
 		 */
 		if (ddi_copyout(&f32scsi,
-				(void *)base_addr,
-				sizeof (struct fcp32_scsi_cmd),
-				mode)) {
+		    (void *)base_addr,
+		    sizeof (struct fcp32_scsi_cmd),
+		    mode)) {
 			return (EFAULT);
 		}
 		break;
@@ -2190,9 +2201,9 @@ fcp_copyout_scsi_cmd(struct fcp_scsi_cmd *fscsi, caddr_t base_addr, int mode)
 		 * Copy data to user address space
 		 */
 		if (ddi_copyout(fscsi,
-				(void *)base_addr,
-				sizeof (struct fcp_scsi_cmd),
-				mode)) {
+		    (void *)base_addr,
+		    sizeof (struct fcp_scsi_cmd),
+		    mode)) {
 			return (EFAULT);
 		}
 		break;
@@ -2202,9 +2213,9 @@ fcp_copyout_scsi_cmd(struct fcp_scsi_cmd *fscsi, caddr_t base_addr, int mode)
 	 * Copy data to user address space
 	 */
 	if (ddi_copyout(fscsi,
-			(void *)base_addr,
-			sizeof (struct fcp_scsi_cmd),
-			mode)) {
+	    (void *)base_addr,
+	    sizeof (struct fcp_scsi_cmd),
+	    mode)) {
 		return (EFAULT);
 	}
 #endif	/* _MULTI_DATAMODEL */
@@ -2218,13 +2229,13 @@ fcp_copyout_scsi_cmd(struct fcp_scsi_cmd *fscsi, caddr_t base_addr, int mode)
  *	Sends the SCSI command in blocking mode.
  *
  * Input:
- *      fscsi		= SCSI command data structure
+ *	fscsi		= SCSI command data structure
  *
  * Output:
- *      fscsi		= SCSI command data structure
+ *	fscsi		= SCSI command data structure
  *
  * Returns:
- *      0	= OK
+ *	0	= OK
  *	EAGAIN	= See errno.h
  *	EBUSY	= See errno.h
  *	EINTR	= See errno.h
@@ -2234,7 +2245,7 @@ fcp_copyout_scsi_cmd(struct fcp_scsi_cmd *fscsi, caddr_t base_addr, int mode)
  *	ENXIO	= See errno.h
  *
  * Context:
- *      Kernel context.
+ *	Kernel context.
  */
 static int
 fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
@@ -2281,9 +2292,9 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 	scsi_cmd = ((uint8_t *)fscsi->scsi_cdbbufaddr)[0];
 	ret = EINVAL;
 	for (cmd_index = 0;
-		cmd_index < FCP_NUM_ELEMENTS(scsi_ioctl_list) &&
-		ret != 0;
-		cmd_index++) {
+	    cmd_index < FCP_NUM_ELEMENTS(scsi_ioctl_list) &&
+	    ret != 0;
+	    cmd_index++) {
 		/*
 		 * First byte of CDB is the SCSI command
 		 */
@@ -2297,7 +2308,8 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 	 */
 	if (fscsi->scsi_flags != FCP_SCSI_READ) {
 		ret = EINVAL;
-	} else if (fscsi->scsi_cdblen > FCP_CDB_SIZE) { /* no larger than */
+	} else if (fscsi->scsi_cdblen > FCP_CDB_SIZE) {
+		/* no larger than */
 		ret = EINVAL;
 	}
 
@@ -2314,10 +2326,11 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 		pptr = fcp_port_head;
 		while (pptr) {
 			if (pptr->port_instance ==
-					(uint32_t)fscsi->scsi_fc_port_num)
+			    (uint32_t)fscsi->scsi_fc_port_num) {
 				break;
-			else
+			} else {
 				pptr = pptr->port_next;
+			}
 		}
 
 		if (pptr == NULL) {
@@ -2351,7 +2364,7 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 			 * Will port accept DMA?
 			 */
 			nodma = (pptr->port_fcp_dma == FC_NO_DVMA_SPACE)
-					? 1 : 0;
+			    ? 1 : 0;
 
 			/*
 			 * If init or offline, device not known
@@ -2360,8 +2373,8 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 			 * NOT obviously provide reliable data about
 			 * devices until it is complete
 			 */
-			if (pptr->port_state &    (FCP_STATE_INIT |
-						    FCP_STATE_OFFLINE)) {
+			if (pptr->port_state &	  (FCP_STATE_INIT |
+			    FCP_STATE_OFFLINE)) {
 				ret = ENXIO;
 			} else if (pptr->port_state & FCP_STATE_ONLINING) {
 				ret = EBUSY;
@@ -2374,7 +2387,7 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 				 */
 				wwn_ptr = (la_wwn_t *)&(fscsi->scsi_fc_pwwn);
 				ptgt = fcp_lookup_target(pptr,
-						(uchar_t *)wwn_ptr);
+				    (uchar_t *)wwn_ptr);
 
 				/*
 				 * If target not found,
@@ -2416,15 +2429,15 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 					 * then target can not be used
 					 */
 					if (ptgt->tgt_state &
-						(FCP_TGT_MARK |
-						FCP_TGT_BUSY)) {
+					    (FCP_TGT_MARK |
+					    FCP_TGT_BUSY)) {
 						ret = EBUSY;
 					} else {
 						/*
 						 * Mark target as busy
 						 */
 						ptgt->tgt_state |=
-							FCP_TGT_BUSY;
+						    FCP_TGT_BUSY;
 					}
 
 					/*
@@ -2526,7 +2539,7 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 
 		fpkt = icmd->ipkt_fpkt;
 
-		fpkt->pkt_tran_flags    = FC_TRAN_CLASS3 | FC_TRAN_INTR;
+		fpkt->pkt_tran_flags	= FC_TRAN_CLASS3 | FC_TRAN_INTR;
 		fpkt->pkt_tran_type	= FC_PKT_FCP_READ; /* only rd for now */
 		fpkt->pkt_timeout	= fscsi->scsi_timeout;
 
@@ -2585,7 +2598,7 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 
 		scsi_cdb = (union scsi_cdb *)fcmd->fcp_cdb;
 		bcopy((char *)fscsi->scsi_cdbbufaddr, (char *)scsi_cdb,
-			fscsi->scsi_cdblen);
+		    fscsi->scsi_cdblen);
 
 		if (!nodma) {
 			FCP_CP_OUT((uint8_t *)fcmd, fpkt->pkt_cmd,
@@ -2602,8 +2615,8 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 			if (!FCP_TGT_STATE_CHANGED(ptgt, icmd)) {
 				mutex_exit(&ptgt->tgt_mutex);
 				fscsi->scsi_fc_status = xport_retval =
-					fc_ulp_transport(pptr->port_fp_handle,
-					fpkt);
+				    fc_ulp_transport(pptr->port_fp_handle,
+				    fpkt);
 				if (fscsi->scsi_fc_status != FC_SUCCESS) {
 					ret = EIO;
 				}
@@ -2755,7 +2768,7 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 			 * device register.
 			 *
 			 * The response (and request sense) will be in the
-			 * correct byte order.  No special copy is necessary.
+			 * correct byte order.	No special copy is necessary.
 			 */
 
 			if (buf_len) {
@@ -2765,8 +2778,8 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 				    buf_len);
 			}
 			bcopy((void *)rsp_sense,
-				(void *)fscsi->scsi_rqbufaddr,
-				sense_len);
+			    (void *)fscsi->scsi_rqbufaddr,
+			    sense_len);
 		}
 	}
 
@@ -2810,7 +2823,7 @@ fcp_send_scsi_ioctl(struct fcp_scsi_cmd *fscsi)
 
 static int
 fcp_is_reconfig_needed(struct fcp_tgt *ptgt,
-	fc_packet_t	*fpkt)
+    fc_packet_t	*fpkt)
 {
 	uchar_t			*lun_string;
 	uint16_t		lun_num, i;
@@ -2819,7 +2832,7 @@ fcp_is_reconfig_needed(struct fcp_tgt *ptgt,
 	int			num_masked_luns;
 	int			lun_buflen;
 	struct fcp_lun	*plun	= NULL;
-	struct fcp_reportlun_resp 	*report_lun;
+	struct fcp_reportlun_resp	*report_lun;
 	uint8_t			reconfig_needed = FALSE;
 	uint8_t			lun_exists = FALSE;
 
@@ -2853,7 +2866,7 @@ fcp_is_reconfig_needed(struct fcp_tgt *ptgt,
 	/* Scan each lun to see if we have masked it. */
 	num_masked_luns = 0;
 	if (fcp_lun_blacklist != NULL) {
-		for (i = 0; i < num_luns; i++) {
+		for (i = 0; i < actual_luns; i++) {
 			lun_string = (uchar_t *)&(report_lun->lun_string[i]);
 			switch (lun_string[0] & 0xC0) {
 			case FCP_LUN_ADDRESSING:
@@ -2959,8 +2972,8 @@ fcp_symmetric_device_probe(struct fcp_lun *plun)
  *
  * INPUT:
  *   fcp_ioctl.fp_minor -> The minor # of the fp port
- *   fcp_ioctl.listlen  -> 1
- *   fcp_ioctl.list     -> Pointer to a 32 bit integer
+ *   fcp_ioctl.listlen	-> 1
+ *   fcp_ioctl.list	-> Pointer to a 32 bit integer
  */
 /*ARGSUSED2*/
 static int
@@ -2972,14 +2985,15 @@ fcp_get_statec_count(struct fcp_ioctl *data, int mode, int *rval)
 	struct fcp_port	*pptr = NULL;
 
 	if ((ret = fcp_copyin_fcp_ioctl_data(data, mode, rval, &fioctl,
-			    &pptr)) != 0) {
+	    &pptr)) != 0) {
 		return (ret);
 	}
 
 	ASSERT(pptr != NULL);
 
-	if (fioctl.listlen != 1)
+	if (fioctl.listlen != 1) {
 		return (EINVAL);
+	}
 
 	mutex_enter(&pptr->port_mutex);
 	if (pptr->port_state & FCP_STATE_OFFLINE) {
@@ -3087,15 +3101,17 @@ fcp_copyin_fcp_ioctl_data(struct fcp_ioctl *data, int mode, int *rval,
 	mutex_enter(&fcp_global_mutex);
 	t_pptr = fcp_port_head;
 	while (t_pptr) {
-		if (t_pptr->port_instance == (uint32_t)fioctl->fp_minor)
+		if (t_pptr->port_instance == (uint32_t)fioctl->fp_minor) {
 			break;
-		else
+		} else {
 			t_pptr = t_pptr->port_next;
+		}
 	}
 	*pptr = t_pptr;
 	mutex_exit(&fcp_global_mutex);
-	if (t_pptr == NULL)
+	if (t_pptr == NULL) {
 		return (ENXIO);
+	}
 
 	return (0);
 }
@@ -3125,7 +3141,7 @@ fcp_port_create_tgt(struct fcp_port *pptr, la_wwn_t *pwwn, int *ret_val,
     int *fc_status, int *fc_pkt_state, int *fc_pkt_reason, int *fc_pkt_action)
 {
 	struct fcp_tgt	*ptgt = NULL;
-	fc_portmap_t 		devlist;
+	fc_portmap_t		devlist;
 	int			lcount;
 	int			error;
 
@@ -3212,7 +3228,7 @@ fcp_port_create_tgt(struct fcp_port *pptr, la_wwn_t *pwwn, int *ret_val,
  *		 ENOMEM
  *		 EIO
  *
- *      Context: User context.
+ *	Context: User context.
  */
 static int
 fcp_tgt_send_plogi(struct fcp_tgt *ptgt, int *fc_status, int *fc_pkt_state,
@@ -3355,7 +3371,7 @@ fcp_tgt_send_prli(struct fcp_tgt *ptgt, int *fc_status, int *fc_pkt_state,
  *
  * Return Value: None
  *
- *      Context: User context only.
+ *	Context: User context only.
  */
 static void
 fcp_ipkt_sema_init(struct fcp_ipkt *icmd)
@@ -3374,7 +3390,7 @@ fcp_ipkt_sema_init(struct fcp_ipkt *icmd)
 /*
  *     Function: fcp_ipkt_sema_wait
  *
- *  Description: Wait on the semaphore embedded in the internal packet.  The
+ *  Description: Wait on the semaphore embedded in the internal packet.	 The
  *		 semaphore is released in the callback.
  *
  *     Argument: icmd	Internal packet to wait on for completion.
@@ -3384,7 +3400,7 @@ fcp_ipkt_sema_init(struct fcp_ipkt *icmd)
  *		 EBUSY
  *		 EAGAIN
  *
- *      Context: User context only.
+ *	Context: User context only.
  *
  * This function does a conversion between the field pkt_state of the fc_packet
  * embedded in the internal packet (icmd) and the code it returns.
@@ -3462,7 +3478,7 @@ fcp_ipkt_sema_wait(struct fcp_ipkt *icmd)
  *
  * Return Value: None
  *
- *      Context: User context only
+ *	Context: User context only
  */
 static void
 fcp_ipkt_sema_callback(struct fc_packet *fpkt)
@@ -3489,7 +3505,7 @@ fcp_ipkt_sema_callback(struct fc_packet *fpkt)
  *
  * Return Value: None
  *
- *      Context: User context only
+ *	Context: User context only
  */
 static void
 fcp_ipkt_sema_cleanup(struct fcp_ipkt *icmd)
@@ -3729,10 +3745,11 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 
 		/* get our child's DIP */
 		ASSERT(pptr != NULL);
-		if (is_mpxio)
+		if (is_mpxio) {
 			mdi_devi_enter(pptr->port_dip, &circ);
-		else
+		} else {
 			ndi_devi_enter(pptr->port_dip, &circ);
+		}
 		devi_entered = 1;
 
 		if ((cdip = ndi_devi_find(pptr->port_dip, ndi_nm,
@@ -3783,8 +3800,8 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 		struct fcp_lun	*plun;
 		child_info_t		*cip = CIP(cdip);
 		int			all = 1;
-		struct fcp_lun 	*tplun;
-		struct fcp_tgt 	*ptgt;
+		struct fcp_lun	*tplun;
+		struct fcp_tgt	*ptgt;
 
 		ASSERT(pptr != NULL);
 		ASSERT(cdip != NULL);
@@ -3811,10 +3828,11 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 			flag = NDI_DEVI_REMOVE;
 		}
 
-		if (is_mpxio)
+		if (is_mpxio) {
 			mdi_devi_exit(pptr->port_dip, circ);
-		else
+		} else {
 			ndi_devi_exit(pptr->port_dip, circ);
+		}
 		devi_entered = 0;
 
 		*rval = fcp_pass_to_hp_and_wait(pptr, plun, cip,
@@ -3847,7 +3865,7 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 			 * can reconfigure the device.
 			 */
 			if (FC_TOP_EXTERNAL(pptr->port_topology) &&
-				    fcp_enable_auto_configuration) {
+			    fcp_enable_auto_configuration) {
 				ptgt->tgt_manual_config_only = 1;
 			}
 		}
@@ -3887,10 +3905,11 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 		plun->lun_state |= FCP_LUN_ONLINING;
 		mutex_exit(&LUN_TGT->tgt_mutex);
 
-		if (is_mpxio)
+		if (is_mpxio) {
 			mdi_devi_exit(pptr->port_dip, circ);
-		else
+		} else {
 			ndi_devi_exit(pptr->port_dip, circ);
+		}
 		devi_entered = 0;
 
 		*rval = fcp_pass_to_hp_and_wait(pptr, plun, cip,
@@ -4045,7 +4064,7 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 			}
 		} else {
 			int	i;
-			char 	buf[25];
+			char	buf[25];
 
 			for (i = 0; i < FC_WWN_SIZE; i++) {
 				(void) sprintf(&buf[i << 1], "%02x", bytes[i]);
@@ -4139,10 +4158,11 @@ fcp_port_ioctl(opaque_t ulph, opaque_t port_handle, dev_t dev, int cmd,
 
 	/* all done -- clean up and return */
 out:	if (devi_entered) {
-		if (is_mpxio)
+		if (is_mpxio) {
 			mdi_devi_exit(pptr->port_dip, circ);
-		else
+		} else {
 			ndi_devi_exit(pptr->port_dip, circ);
+		}
 	}
 
 	if (dcp != NULL) {
@@ -4554,7 +4574,7 @@ fcp_statec_callback(opaque_t ulph, opaque_t port_handle,
  *
  * Return Value: None
  *
- *        Notes: The pptr->port_mutex must be held.
+ *	  Notes: The pptr->port_mutex must be held.
  */
 static void
 fcp_handle_devices(struct fcp_port *pptr, fc_portmap_t devlist[],
@@ -4579,7 +4599,7 @@ fcp_handle_devices(struct fcp_port *pptr, fc_portmap_t devlist[],
 	 * one provided by the caller which is the list of the remote ports
 	 * currently reachable).  It checks if any of them was already
 	 * known by looking for the corresponding target structure based on
-	 * the world wide name.  If a target is part of the list it is tagged
+	 * the world wide name.	 If a target is part of the list it is tagged
 	 * (ptgt->tgt_aux_state = FCP_TGT_TAGGED).
 	 *
 	 * Old comment
@@ -4656,8 +4676,9 @@ fcp_handle_devices(struct fcp_port *pptr, fc_portmap_t devlist[],
 		 * (perhaps even same) state change will be encountered
 		 * later in the list.
 		 */
-		if (map_entry->map_flags & PORT_DEVICE_DUPLICATE_MAP_ENTRY)
+		if (map_entry->map_flags & PORT_DEVICE_DUPLICATE_MAP_ENTRY) {
 			continue;
+		}
 
 		/* get ptr to this map entry in our port's list (if any) */
 		ptgt = fcp_lookup_target(pptr,
@@ -4702,7 +4723,7 @@ fcp_handle_devices(struct fcp_port *pptr, fc_portmap_t devlist[],
 			    cause) == TRUE) {
 
 				FCP_TGT_TRACE(ptgt, map_tag[i],
-					    FCP_TGT_TRACE_2);
+				    FCP_TGT_TRACE_2);
 				check_finish_init++;
 			}
 			break;
@@ -4724,7 +4745,7 @@ fcp_handle_devices(struct fcp_port *pptr, fc_portmap_t devlist[],
 					mutex_enter(&ptgt->tgt_mutex);
 					while (ptgt->tgt_ipkt_cnt ||
 					    fcp_outstanding_lun_cmds(ptgt)
-						== FC_SUCCESS) {
+					    == FC_SUCCESS) {
 						mutex_exit(&ptgt->tgt_mutex);
 						delay(drv_usectohz(1000000));
 						mutex_enter(&ptgt->tgt_mutex);
@@ -4812,7 +4833,7 @@ fcp_handle_devices(struct fcp_port *pptr, fc_portmap_t devlist[],
  * Return Value: TRUE	Failed
  *		 FALSE	Succeeded
  *
- *        Notes: pptr->port_mutex must be owned.
+ *	  Notes: pptr->port_mutex must be owned.
  */
 static int
 fcp_handle_mapflags(struct fcp_port	*pptr, struct fcp_tgt	*ptgt,
@@ -4877,8 +4898,8 @@ fcp_handle_mapflags(struct fcp_port	*pptr, struct fcp_tgt	*ptgt,
 		 * determine if there are any tape LUNs on this target
 		 */
 		for (pseq_lun = ptgt->tgt_lun;
-			pseq_lun != NULL;
-			pseq_lun = pseq_lun->lun_next) {
+		    pseq_lun != NULL;
+		    pseq_lun = pseq_lun->lun_next) {
 			if ((pseq_lun->lun_type == DTYPE_SEQUENTIAL) &&
 			    !(pseq_lun->lun_state & FCP_LUN_OFFLINE)) {
 				fcp_update_tgt_state(ptgt, FCP_RESET,
@@ -5288,9 +5309,9 @@ fcp_offline_all(struct fcp_port *pptr, int lcount, int cause)
 /*
  *     Function: fcp_update_tgt_state
  *
- *  Description: This function updates the field tgt_state of a target.  That
+ *  Description: This function updates the field tgt_state of a target.	 That
  *		 field is a bitmap and which bit can be set or reset
- *		 individually.  The action applied to the target state is also
+ *		 individually.	The action applied to the target state is also
  *		 applied to all the LUNs belonging to the target (provided the
  *		 LUN is not offline).  A side effect of applying the state
  *		 modification to the target and the LUNs is the field tgt_trace
@@ -5303,7 +5324,7 @@ fcp_offline_all(struct fcp_port *pptr, int lcount, int cause)
  *
  * Return Value: None
  *
- *      Context: Interrupt, Kernel or User context.
+ *	Context: Interrupt, Kernel or User context.
  *		 The mutex of the target (ptgt->tgt_mutex) must be owned when
  *		 calling this function.
  */
@@ -5351,7 +5372,7 @@ fcp_update_tgt_state(struct fcp_tgt *ptgt, int flag, uint32_t state)
  *
  * Return Value: None
  *
- *      Context: Interrupt, Kernel or User context.
+ *	Context: Interrupt, Kernel or User context.
  *		 The mutex of the target (ptgt->tgt_mutex) must be owned when
  *		 calling this function.
  */
@@ -5363,8 +5384,11 @@ fcp_update_lun_state(struct fcp_lun *plun, int flag, uint32_t state)
 	ASSERT(mutex_owned(&ptgt->tgt_mutex));
 
 	if (!(plun->lun_state & FCP_TGT_OFFLINE)) {
-		flag == FCP_SET ? (plun->lun_state |= state) :
-		    (plun->lun_state &= ~state);
+		if (flag == FCP_SET) {
+			plun->lun_state |= state;
+		} else {
+			plun->lun_state &= ~state;
+		}
 	}
 }
 
@@ -5387,7 +5411,7 @@ fcp_update_lun_state(struct fcp_lun *plun, int flag, uint32_t state)
  * Return Value: NULL		Not found.
  *		 Not NULL	Pointer to the fcp_port structure.
  *
- *      Context: Interrupt, Kernel or User context.
+ *	Context: Interrupt, Kernel or User context.
  */
 static struct fcp_port *
 fcp_get_port(opaque_t port_handle)
@@ -5565,7 +5589,7 @@ fcp_unsol_prli(struct fcp_port *pptr, fc_unsol_buf_t *buf)
 /*
  *     Function: fcp_icmd_alloc
  *
- *  Description: This function allocated a fcp_ipkt structure.  The pkt_comp
+ *  Description: This function allocated a fcp_ipkt structure.	The pkt_comp
  *		 field is initialized to fcp_icmd_callback.  Sometimes it is
  *		 modified by the caller (such as fcp_send_scsi).  The
  *		 structure is also tied to the state of the line and of the
@@ -5640,7 +5664,7 @@ fcp_icmd_alloc(struct fcp_port *pptr, struct fcp_tgt *ptgt, int cmd_len,
 	/* get ptr to fpkt substruct and fill it in */
 	fpkt = icmd->ipkt_fpkt;
 	fpkt->pkt_data_cookie = (ddi_dma_cookie_t *)((caddr_t)icmd +
-					    sizeof (struct fcp_ipkt));
+	    sizeof (struct fcp_ipkt));
 
 	if (ptgt != NULL) {
 		icmd->ipkt_tgt = ptgt;
@@ -5975,7 +5999,7 @@ fcp_free_dma(struct fcp_port *pptr, struct fcp_ipkt *icmd)
  * Return Value: NULL		No target found
  *		 Not NULL	Target structure
  *
- *      Context: Interrupt context.
+ *	Context: Interrupt context.
  *		 The mutex pptr->port_mutex must be owned.
  */
 /* ARGSUSED */
@@ -6192,8 +6216,10 @@ fcp_icmd_callback(fc_packet_t *fpkt)
 			 * consider lun 0 as device not connected if it is
 			 * offlined or newly allocated
 			 */
-			if (plun->lun_state & FCP_LUN_OFFLINE || lun0_newalloc)
+			if ((plun->lun_state & FCP_LUN_OFFLINE) ||
+			    lun0_newalloc) {
 				plun->lun_state |= FCP_LUN_DEVICE_NOT_CONNECTED;
+			}
 			plun->lun_state |= (FCP_LUN_BUSY | FCP_LUN_MARK);
 			plun->lun_state &= ~FCP_LUN_OFFLINE;
 			ptgt->tgt_lun_cnt = 1;
@@ -6354,7 +6380,7 @@ fcp_send_scsi(struct fcp_lun *plun, uchar_t opcode, int alloc_len,
 {
 	int			nodma;
 	struct fcp_ipkt		*icmd;
-	struct fcp_tgt 		*ptgt;
+	struct fcp_tgt		*ptgt;
 	struct fcp_port		*pptr;
 	fc_frame_hdr_t		*hp;
 	fc_packet_t		*fpkt;
@@ -6535,7 +6561,7 @@ fcp_check_reportlun(struct fcp_rsp *rsp, fc_packet_t *fpkt)
 	int				rval = DDI_FAILURE;
 	struct scsi_extended_sense	sense_info, *sense;
 	struct fcp_ipkt		*icmd = (struct fcp_ipkt *)
-					    fpkt->pkt_ulp_private;
+	    fpkt->pkt_ulp_private;
 	struct fcp_tgt		*ptgt = icmd->ipkt_tgt;
 	struct fcp_port		*pptr = ptgt->tgt_port;
 
@@ -6682,7 +6708,7 @@ fcp_check_reportlun(struct fcp_rsp *rsp, fc_packet_t *fpkt)
 			if (ptgt->tgt_tid == NULL) {
 				timeout_id_t	tid;
 				/*
-				 * REPORT LUN data has changed.  Kick off
+				 * REPORT LUN data has changed.	 Kick off
 				 * rediscovery
 				 */
 				tid = timeout(fcp_reconfigure_luns,
@@ -6724,7 +6750,7 @@ fcp_check_reportlun(struct fcp_rsp *rsp, fc_packet_t *fpkt)
  *
  *  Description: This is the callback routine set by fcp_send_scsi() after
  *		 it calls fcp_icmd_alloc().  The SCSI command completed here
- *		 and autogenerated by FCP are:  REPORT_LUN, INQUIRY and
+ *		 and autogenerated by FCP are:	REPORT_LUN, INQUIRY and
  *		 INQUIRY_PAGE83.
  *
  *     Argument: *fpkt	 FC packet used to convey the command
@@ -6735,7 +6761,7 @@ static void
 fcp_scsi_callback(fc_packet_t *fpkt)
 {
 	struct fcp_ipkt	*icmd = (struct fcp_ipkt *)
-				    fpkt->pkt_ulp_private;
+	    fpkt->pkt_ulp_private;
 	struct fcp_rsp_info	fcp_rsp_err, *bep;
 	struct fcp_port	*pptr;
 	struct fcp_tgt	*ptgt;
@@ -6769,8 +6795,8 @@ fcp_scsi_callback(fc_packet_t *fpkt)
 	 * in this case.
 	 */
 	if ((plun->lun_guid_size == 0) &&
-		(icmd->ipkt_opcode == SCMD_INQUIRY_PAGE83) &&
-		(fcp_symmetric_device_probe(plun) == 0)) {
+	    (icmd->ipkt_opcode == SCMD_INQUIRY_PAGE83) &&
+	    (fcp_symmetric_device_probe(plun) == 0)) {
 
 		char ascii_wwn[FC_WWN_SIZE*2+1];
 		fcp_wwn_to_ascii(&ptgt->tgt_node_wwn.raw_wwn[0], ascii_wwn);
@@ -7017,7 +7043,7 @@ static void
 fcp_retry_scsi_cmd(fc_packet_t *fpkt)
 {
 	struct fcp_ipkt	*icmd = (struct fcp_ipkt *)
-				    fpkt->pkt_ulp_private;
+	    fpkt->pkt_ulp_private;
 	struct fcp_tgt	*ptgt = icmd->ipkt_tgt;
 	struct fcp_port	*pptr = ptgt->tgt_port;
 
@@ -7089,25 +7115,25 @@ fcp_handle_page83(fc_packet_t *fpkt, struct fcp_ipkt *icmd,
 		FCP_LUN_TRACE(plun, FCP_LUN_TRACE_7);
 
 		FCP_CP_IN(fpkt->pkt_data, dev_id_page, fpkt->pkt_data_acc,
-			    SCMD_MAX_INQUIRY_PAGE83_SIZE);
+		    SCMD_MAX_INQUIRY_PAGE83_SIZE);
 
 		FCP_TRACE(fcp_logq, pptr->port_instbuf,
-			    fcp_trace, FCP_BUF_LEVEL_5, 0,
-			    "fcp_handle_page83: port=%d, tgt D_ID=0x%x, "
-			    "dtype=0x%x, lun num=%x",
-			    pptr->port_instance, ptgt->tgt_d_id,
-			    dev_id_page[0], plun->lun_num);
+		    fcp_trace, FCP_BUF_LEVEL_5, 0,
+		    "fcp_handle_page83: port=%d, tgt D_ID=0x%x, "
+		    "dtype=0x%x, lun num=%x",
+		    pptr->port_instance, ptgt->tgt_d_id,
+		    dev_id_page[0], plun->lun_num);
 
 		ret = ddi_devid_scsi_encode(
-			DEVID_SCSI_ENCODE_VERSION_LATEST,
-			NULL, 		/* driver name */
-			(unsigned char *) &plun->lun_inq, /* standard inquiry */
-			sizeof (plun->lun_inq), /* size of standard inquiry */
-			NULL,		/* page 80 data */
-			0,		/* page 80 len */
-			dev_id_page,	/* page 83 data */
-			SCMD_MAX_INQUIRY_PAGE83_SIZE, /* page 83 data len */
-			&devid);
+		    DEVID_SCSI_ENCODE_VERSION_LATEST,
+		    NULL,		/* driver name */
+		    (unsigned char *) &plun->lun_inq, /* standard inquiry */
+		    sizeof (plun->lun_inq), /* size of standard inquiry */
+		    NULL,		/* page 80 data */
+		    0,		/* page 80 len */
+		    dev_id_page,	/* page 83 data */
+		    SCMD_MAX_INQUIRY_PAGE83_SIZE, /* page 83 data len */
+		    &devid);
 
 		if (ret == DDI_SUCCESS) {
 
@@ -7145,10 +7171,10 @@ fcp_handle_page83(fc_packet_t *fpkt, struct fcp_ipkt *icmd,
 					    KM_NOSLEEP);
 
 					if (plun->lun_old_guid) {
-					/*
-					 * The alloc was successful then
-					 * let's do the copy.
-					 */
+						/*
+						 * The alloc was successful then
+						 * let's do the copy.
+						 */
 						bcopy(plun->lun_guid,
 						    plun->lun_old_guid, len);
 					} else {
@@ -7218,12 +7244,12 @@ fcp_handle_page83(fc_packet_t *fpkt, struct fcp_ipkt *icmd,
 			fail = 1;
 		}
 		FCP_TRACE(fcp_logq, pptr->port_instbuf,
-			    fcp_trace, FCP_BUF_LEVEL_2, 0,
-			    "!Devid page cmd failed. "
-			    "fpkt_state: %x fpkt_reason: %x",
-			    "ignore_page83: %d",
-			    fpkt->pkt_state, fpkt->pkt_reason,
-			    ignore_page83_data);
+		    fcp_trace, FCP_BUF_LEVEL_2, 0,
+		    "!Devid page cmd failed. "
+		    "fpkt_state: %x fpkt_reason: %x",
+		    "ignore_page83: %d",
+		    fpkt->pkt_state, fpkt->pkt_reason,
+		    ignore_page83_data);
 	}
 
 	mutex_enter(&pptr->port_mutex);
@@ -7515,7 +7541,7 @@ fcp_handle_reportlun(fc_packet_t *fpkt, struct fcp_ipkt *icmd)
 		FCP_TRACE(fcp_logq, pptr->port_instbuf,
 		    fcp_trace, FCP_BUF_LEVEL_5, 0,
 		    "Target=%x:%x:%x:%x:%x:%x:%x:%x"
-		    "    Number of LUNs lost=%x",
+		    "	 Number of LUNs lost=%x",
 		    ptgt->tgt_port_wwn.raw_wwn[0],
 		    ptgt->tgt_port_wwn.raw_wwn[1],
 		    ptgt->tgt_port_wwn.raw_wwn[2],
@@ -7570,15 +7596,17 @@ fcp_handle_reportlun(fc_packet_t *fpkt, struct fcp_ipkt *icmd)
 				 * set disappear flag when device was connected
 				 */
 				if (!(plun->lun_state &
-					FCP_LUN_DEVICE_NOT_CONNECTED))
+				    FCP_LUN_DEVICE_NOT_CONNECTED)) {
 					plun->lun_state |= FCP_LUN_DISAPPEARED;
+				}
 				mutex_exit(&ptgt->tgt_mutex);
 				mutex_exit(&pptr->port_mutex);
 				if (!(plun->lun_state &
-					FCP_LUN_DEVICE_NOT_CONNECTED))
+				    FCP_LUN_DEVICE_NOT_CONNECTED)) {
 					fcp_log(CE_NOTE, pptr->port_dip,
 					    "!Lun=%x for target=%x disappeared",
 					    plun->lun_num, ptgt->tgt_d_id);
+				}
 				mutex_enter(&ptgt->tgt_mutex);
 			} else {
 				FCP_TRACE(fcp_logq, pptr->port_instbuf,
@@ -7599,9 +7627,10 @@ fcp_handle_reportlun(fc_packet_t *fpkt, struct fcp_ipkt *icmd)
 			 * clear FCP_LUN_DEVICE_NOT_CONNECTED when lun 0
 			 * actually exists in REPORT_LUN response
 			 */
-			if (plun->lun_state & FCP_LUN_DEVICE_NOT_CONNECTED)
+			if (plun->lun_state & FCP_LUN_DEVICE_NOT_CONNECTED) {
 				plun->lun_state &=
-					~FCP_LUN_DEVICE_NOT_CONNECTED;
+				    ~FCP_LUN_DEVICE_NOT_CONNECTED;
+			}
 			if (offline || plun->lun_num == 0) {
 				if (plun->lun_state & FCP_LUN_DISAPPEARED)  {
 					plun->lun_state &= ~FCP_LUN_DISAPPEARED;
@@ -7778,7 +7807,7 @@ static int
 fcp_finish_tgt(struct fcp_port *pptr, struct fcp_tgt *ptgt,
     int link_cnt, int tgt_cnt, int cause)
 {
-	int 	rval = 1;
+	int	rval = 1;
 	ASSERT(pptr != NULL);
 	ASSERT(ptgt != NULL);
 
@@ -7932,7 +7961,7 @@ fcp_create_luns(struct fcp_tgt *ptgt, int link_cnt, int tgt_cnt, int cause)
 		}
 
 		if (plun->lun_state & FCP_LUN_INIT &&
-			    !(plun->lun_state & FCP_LUN_CHANGED)) {
+		    !(plun->lun_state & FCP_LUN_CHANGED)) {
 			continue;
 		}
 
@@ -7984,7 +8013,7 @@ fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip, int online,
 	int			rval = NDI_FAILURE;
 	int			circ;
 	child_info_t		*ccip;
-	struct fcp_port 	*pptr = plun->lun_tgt->tgt_port;
+	struct fcp_port		*pptr = plun->lun_tgt->tgt_port;
 	int			is_mpxio = pptr->port_mpxio;
 	dev_info_t		*cdip, *pdip;
 	char			*devname;
@@ -8008,10 +8037,11 @@ fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip, int online,
 
 	if (online == FCP_MPXIO_PATH_CLEAR_BUSY ||
 	    online == FCP_MPXIO_PATH_SET_BUSY) {
-		if (plun->lun_mpxio)
+		if (plun->lun_mpxio) {
 			rval = fcp_update_mpxio_path(plun, cip, online);
-		else
+		} else {
 			rval = NDI_SUCCESS;
+		}
 		return (rval);
 	}
 
@@ -8022,10 +8052,11 @@ fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip, int online,
 	ASSERT(!servicing_interrupt());
 	if (online == FCP_OFFLINE) {
 		if (plun->lun_mpxio == 0) {
-			if (plun->lun_cip == cip)
+			if (plun->lun_cip == cip) {
 				cdip = DIP(plun->lun_cip);
-			else
+			} else {
 				cdip = DIP(cip);
+			}
 		} else if ((plun->lun_cip == cip) && plun->lun_cip) {
 			cdip = mdi_pi_get_client(PIP(plun->lun_cip));
 		} else if ((plun->lun_cip != cip) && cip) {
@@ -8071,10 +8102,11 @@ fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip, int online,
 		return (NDI_FAILURE);
 	}
 
-	if (is_mpxio)
+	if (is_mpxio) {
 		mdi_devi_enter(pptr->port_dip, &circ);
-	else
+	} else {
 		ndi_devi_enter(pptr->port_dip, &circ);
+	}
 
 	mutex_enter(&pptr->port_mutex);
 	mutex_enter(&plun->lun_mutex);
@@ -8106,10 +8138,11 @@ fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip, int online,
 fail:	mutex_exit(&plun->lun_mutex);
 	mutex_exit(&pptr->port_mutex);
 
-	if (is_mpxio)
+	if (is_mpxio) {
 		mdi_devi_exit(pptr->port_dip, circ);
-	else
+	} else {
 		ndi_devi_exit(pptr->port_dip, circ);
+	}
 
 	fc_ulp_idle_port(pptr->port_fp_handle);
 
@@ -8262,8 +8295,8 @@ fcp_prepare_offline_lun(struct fcp_lun *plun, int link_cnt, int tgt_cnt)
 		    FCP_MPXIO_PATH_CLEAR_BUSY, link_cnt, tgt_cnt,
 		    0, 0)) {
 			fcp_log(CE_NOTE, LUN_PORT->port_dip,
-				"Can not ENABLE LUN; D_ID=%x, LUN=%x",
-				LUN_TGT->tgt_d_id, plun->lun_num);
+			    "Can not ENABLE LUN; D_ID=%x, LUN=%x",
+			    LUN_TGT->tgt_d_id, plun->lun_num);
 		}
 		/*
 		 * Intimate MPxIO that the lun is now marked for offline
@@ -8308,9 +8341,9 @@ fcp_offline_lun_now(struct fcp_lun *plun, int link_cnt, int tgt_cnt,
 static void
 fcp_scan_offline_luns(struct fcp_port *pptr)
 {
-	struct fcp_lun_elem 	*elem;
-	struct fcp_lun_elem 	*prev;
-	struct fcp_lun_elem 	*next;
+	struct fcp_lun_elem	*elem;
+	struct fcp_lun_elem	*prev;
+	struct fcp_lun_elem	*next;
 
 	ASSERT(MUTEX_HELD(&pptr->port_mutex));
 
@@ -8319,7 +8352,7 @@ fcp_scan_offline_luns(struct fcp_port *pptr)
 	while (elem) {
 		next = elem->next;
 		if (elem->time <= fcp_watchdog_time) {
-			int 			changed = 1;
+			int			changed = 1;
 			struct fcp_tgt	*ptgt = elem->plun->lun_tgt;
 
 			mutex_enter(&ptgt->tgt_mutex);
@@ -8353,9 +8386,9 @@ fcp_scan_offline_luns(struct fcp_port *pptr)
 static void
 fcp_scan_offline_tgts(struct fcp_port *pptr)
 {
-	struct fcp_tgt_elem 	*elem;
-	struct fcp_tgt_elem 	*prev;
-	struct fcp_tgt_elem 	*next;
+	struct fcp_tgt_elem	*elem;
+	struct fcp_tgt_elem	*prev;
+	struct fcp_tgt_elem	*next;
 
 	ASSERT(MUTEX_HELD(&pptr->port_mutex));
 
@@ -8364,7 +8397,7 @@ fcp_scan_offline_tgts(struct fcp_port *pptr)
 	while (elem) {
 		next = elem->next;
 		if (elem->time <= fcp_watchdog_time) {
-			int 			changed = 1;
+			int			changed = 1;
 			struct fcp_tgt	*ptgt = elem->ptgt;
 
 			if (ptgt->tgt_change_cnt == elem->tgt_cnt) {
@@ -8590,13 +8623,13 @@ static void
 fcp_complete_pkt(fc_packet_t *fpkt)
 {
 	int			error = 0;
-	struct fcp_pkt 	*cmd = (struct fcp_pkt *)
-				    fpkt->pkt_ulp_private;
-	struct scsi_pkt 	*pkt = cmd->cmd_pkt;
-	struct fcp_port 	*pptr = ADDR2FCP(&pkt->pkt_address);
-	struct fcp_lun 	*plun;
-	struct fcp_tgt 	*ptgt;
-	struct fcp_rsp 		*rsp;
+	struct fcp_pkt	*cmd = (struct fcp_pkt *)
+	    fpkt->pkt_ulp_private;
+	struct scsi_pkt		*pkt = cmd->cmd_pkt;
+	struct fcp_port		*pptr = ADDR2FCP(&pkt->pkt_address);
+	struct fcp_lun	*plun;
+	struct fcp_tgt	*ptgt;
+	struct fcp_rsp		*rsp;
 	struct scsi_address	save;
 
 #ifdef	DEBUG
@@ -8709,12 +8742,12 @@ fcp_complete_pkt(fc_packet_t *fpkt)
 		 * See if we got a SCSI error with sense data
 		 */
 		if (rsp->fcp_u.fcp_status.sense_len_set) {
-			uchar_t 			rqlen;
-			caddr_t 			sense_from;
+			uchar_t				rqlen;
+			caddr_t				sense_from;
 			child_info_t			*cip;
 			timeout_id_t			tid;
-			struct scsi_arq_status 		*arq;
-			struct scsi_extended_sense 	*sense_to;
+			struct scsi_arq_status		*arq;
+			struct scsi_extended_sense	*sense_to;
 
 			arq = (struct scsi_arq_status *)pkt->pkt_scbp;
 			sense_to = &arq->sts_sensedata;
@@ -8866,7 +8899,7 @@ fcp_complete_pkt(fc_packet_t *fpkt)
 
 		case FC_PKT_PORT_OFFLINE: {
 			dev_info_t	*cdip = NULL;
-			caddr_t 	ptr;
+			caddr_t		ptr;
 
 			if (fpkt->pkt_reason == FC_REASON_LOGIN_REQUIRED) {
 				FCP_DTRACE(fcp_logq, pptr->port_instbuf,
@@ -8905,7 +8938,7 @@ fcp_complete_pkt(fc_packet_t *fpkt)
 
 			if ((plun->lun_type == DTYPE_SEQUENTIAL) ||
 			    (plun->lun_type == DTYPE_CHANGER)) {
-				pkt->pkt_reason = CMD_CMPLT;    /* Lie */
+				pkt->pkt_reason = CMD_CMPLT;	/* Lie */
 				ptr = (caddr_t)pkt->pkt_scbp;
 				if (ptr) {
 					*ptr = STATUS_BUSY;
@@ -9097,7 +9130,7 @@ fcp_validate_fcp_response(struct fcp_rsp *rsp, struct fcp_port *pptr)
 /*
  * This is called when there is a change the in device state. The case we're
  * handling here is, if the d_id s does not match, offline this tgt and online
- * a new tgt with the new d_id.  called from fcp_handle_devices with
+ * a new tgt with the new d_id.	 called from fcp_handle_devices with
  * port_mutex held.
  */
 static int
@@ -9148,7 +9181,7 @@ fcp_device_changed(struct fcp_port *pptr, struct fcp_tgt *ptgt,
  * Return Value: NULL		Failed
  *		 Not NULL	Succeeded
  *
- *      Context: Kernel context
+ *	Context: Kernel context
  */
 static struct fcp_lun *
 fcp_alloc_lun(struct fcp_tgt *ptgt)
@@ -9184,7 +9217,7 @@ fcp_alloc_lun(struct fcp_tgt *ptgt)
  *
  * Return Value: None
  *
- *      Context: Kernel context.
+ *	Context: Kernel context.
  */
 static void
 fcp_dealloc_lun(struct fcp_lun *plun)
@@ -9218,14 +9251,14 @@ fcp_dealloc_lun(struct fcp_lun *plun)
  * Return Value: NULL		Failed
  *		 Not NULL	Succeeded
  *
- *      Context: Kernel context.
+ *	Context: Kernel context.
  */
 static struct fcp_tgt *
 fcp_alloc_tgt(struct fcp_port *pptr, fc_portmap_t *map_entry, int link_cnt)
 {
 	int			hash;
 	uchar_t			*wwn;
-	struct fcp_tgt 	*ptgt;
+	struct fcp_tgt	*ptgt;
 
 	ptgt = kmem_zalloc(sizeof (*ptgt), KM_NOSLEEP);
 	if (ptgt != NULL) {
@@ -9281,7 +9314,7 @@ fcp_alloc_tgt(struct fcp_port *pptr, fc_portmap_t *map_entry, int link_cnt)
  *
  * Return Value: None
  *
- *      Context: Kernel context.
+ *	Context: Kernel context.
  */
 static void
 fcp_dealloc_tgt(struct fcp_tgt *ptgt)
@@ -9302,7 +9335,7 @@ fcp_dealloc_tgt(struct fcp_tgt *ptgt)
  *
  *	Since Photon IB is single threaded, STATUS_BUSY is common
  *	in a 4+initiator environment. Make sure the total time
- * 	spent on retries (including command timeout) does not
+ *	spent on retries (including command timeout) does not
  *	60 seconds
  */
 static void
@@ -9545,9 +9578,9 @@ fcp_do_ns_registry(struct fcp_port *pptr, uint32_t s_id)
 	 * Perform the Name Server Registration for SCSI_FCP FC4 Type.
 	 */
 	if (fc_ulp_port_ns(pptr->port_fp_handle, NULL, &ns_cmd)) {
-	    fcp_log(CE_WARN, pptr->port_dip,
+		fcp_log(CE_WARN, pptr->port_dip,
 		    "!ns_registry: failed name server registration");
-	    return (1);
+		return (1);
 	}
 
 	return (0);
@@ -9575,7 +9608,7 @@ fcp_do_ns_registry(struct fcp_port *pptr, uint32_t s_id)
  * Return Value: DDI_SUCCESS
  *		 DDI_FAILURE
  *
- *      Context: User and Kernel context.
+ *	Context: User and Kernel context.
  */
 /*ARGSUSED*/
 int
@@ -9588,7 +9621,7 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 	int			hba_attached = FALSE;
 	int			soft_state_linked = FALSE;
 	int			event_bind = FALSE;
-	struct fcp_port 	*pptr;
+	struct fcp_port		*pptr;
 	fc_portmap_t		*tmp_list = NULL;
 	uint32_t		max_cnt, alloc_cnt;
 	uchar_t			*boot_wwn = NULL;
@@ -9630,9 +9663,9 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 	 * set to 1, otherwise disable manual configuration.
 	 */
 	if ((manual_cfg = ddi_prop_get_int(DDI_DEV_T_ANY, pptr->port_dip,
-		DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
-		MANUAL_CFG_ONLY,
-		    -1)) != -1) {
+	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS,
+	    MANUAL_CFG_ONLY,
+	    -1)) != -1) {
 		if (manual_cfg == 1) {
 			char	*pathname;
 			pathname = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
@@ -9658,11 +9691,11 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(pptr->port_state))
 
 	pptr->port_dmacookie_sz = (pptr->port_data_dma_attr.dma_attr_sgllen *
-				    sizeof (ddi_dma_cookie_t));
+	    sizeof (ddi_dma_cookie_t));
 
 	/*
-	 * The two mutexes of fcp_port are initialized.  The variable
-	 * mutex_initted is incremented to remember that fact.  That variable
+	 * The two mutexes of fcp_port are initialized.	 The variable
+	 * mutex_initted is incremented to remember that fact.	That variable
 	 * is checked when the routine fails and the mutexes have to be
 	 * destroyed.
 	 */
@@ -9858,7 +9891,7 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 
 		/*
 		 * At this point we are going to build a list of all the ports
-		 * that	can be reached through this local port.  It looks like
+		 * that	can be reached through this local port.	 It looks like
 		 * we cannot handle more than FCP_MAX_DEVICES per local port
 		 * (128).
 		 */
@@ -9878,7 +9911,7 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 		 * However, if we are connected to a Fabric, a name server
 		 * request may be sent to get the list of FCP capable ports.
 		 * It should be noted that is the case the request is
-		 * synchronous.  This means we are stuck here till the name
+		 * synchronous.	 This means we are stuck here till the name
 		 * server replies.  A lot of things can change during that time
 		 * and including, may be, being called on
 		 * fcp_statec_callback() for different reasons. I'm not sure
@@ -9894,7 +9927,7 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 			(void) fc_ulp_error(res, &msg);
 
 			/*
-			 * this  just means the transport is
+			 * this	 just means the transport is
 			 * busy perhaps building a portmap so,
 			 * for now, succeed this port attach
 			 * when the transport has a new map,
@@ -9972,7 +10005,7 @@ fail:
 
 	if (pptr->port_ndi_event_defs) {
 		(void) kmem_free(pptr->port_ndi_event_defs,
-			sizeof (fcp_ndi_event_defs));
+		    sizeof (fcp_ndi_event_defs));
 	}
 
 	/*
@@ -9995,7 +10028,7 @@ fail:
 
 	/*
 	 * We check soft_state_linked, because it is incremented right before
-	 * we call increment fcp_watchdog_init.  Therefore, we know if
+	 * we call increment fcp_watchdog_init.	 Therefore, we know if
 	 * soft_state_linked is still FALSE, we do not want to decrement
 	 * fcp_watchdog_init or possibly call untimeout.
 	 */
@@ -10157,7 +10190,7 @@ fcp_cleanup_port(struct fcp_port *pptr, int instance)
 		scsi_hba_tran_free(pptr->port_tran);
 	}
 
-#ifdef  KSTATS_CODE
+#ifdef	KSTATS_CODE
 	/* clean up kstats */
 	if (pptr->fcp_ksp != NULL) {
 		kstat_delete(pptr->fcp_ksp);
@@ -10178,7 +10211,7 @@ fcp_cleanup_port(struct fcp_port *pptr, int instance)
  *  Description: This function allocates and initializes the resources required
  *		 to build a scsi_pkt structure the target driver.  The result
  *		 of the allocation and initialization will be cached in the
- *		 memory cache.  As DMA resources may be allocated here, that
+ *		 memory cache.	As DMA resources may be allocated here, that
  *		 means DMA resources will be tied up in the cache manager.
  *		 This is a tradeoff that has been made for performance reasons.
  *
@@ -10193,64 +10226,64 @@ fcp_cleanup_port(struct fcp_port *pptr, int instance)
  *
  * If the returned value is 0, the buffer is initialized like this:
  *
- *                  +================================+
- *           +----> |	      struct scsi_pkt        |
- *           |      |				     |
- *           | +--- | pkt_ha_private		     |
- *           | |    |				     |
- *           | |    +================================+
- *           | |
- *           | |    +================================+
- *           | +--> |       struct fcp_pkt           | <---------+
- *           |      |                                |           |
- *           +----- | cmd_pkt                        |           |
- *                  |                     cmd_fp_pkt | ---+      |
- *        +-------->| cmd_fcp_rsp[]                  |    |      |
- *        |    +--->| cmd_fcp_cmd[]                  |    |      |
- *        |    |    |--------------------------------|    |      |
- *        |    |    |	      struct fc_packet       | <--+      |
- *        |    |    |				     |           |
- *        |    |    |                pkt_ulp_private | ----------+
- *        |    |    |                pkt_fca_private | -----+
- *        |    |    |                pkt_data_cookie | ---+ |
- *        |    |    | pkt_cmdlen                     |    | |
- *        |    |(a) | pkt_rsplen                     |    | |
- *        |    +----| .......... pkt_cmd ........... | ---|-|---------------+
- *        |     (b) |                 pkt_cmd_cookie | ---|-|----------+    |
- *        +---------| .......... pkt_resp .......... | ---|-|------+   |    |
- *                  |                pkt_resp_cookie | ---|-|--+   |   |    |
- *                  | pkt_cmd_dma                    |    | |  |   |   |    |
- *                  | pkt_cmd_acc                    |    | |  |   |   |    |
- *                  +================================+    | |  |   |   |    |
- *                  |         dma_cookies            | <--+ |  |   |   |    |
- *                  |				     |      |  |   |   |    |
- *                  +================================+      |  |   |   |    |
- *                  |         fca_private            | <----+  |   |   |    |
- *                  |				     |         |   |   |    |
- *                  +================================+         |   |   |    |
- *                                                             |   |   |    |
- *                                                             |   |   |    |
- *                  +================================+   (d)   |   |   |    |
- *                  |        fcp_resp cookies        | <-------+   |   |    |
- *                  |				     |             |   |    |
- *                  +================================+             |   |    |
- *                                                                 |   |    |
- *                  +================================+   (d)       |   |    |
- *                  |		fcp_resp	     | <-----------+   |    |
- *                  |   (DMA resources associated)   |                 |    |
- *                  +================================+                 |    |
- *                                                                     |    |
- *                                                                     |    |
- *                                                                     |    |
- *                  +================================+   (c)           |    |
- *                  |	     fcp_cmd cookies         | <---------------+    |
- *                  |                                |                      |
- *                  +================================+                      |
- *                                                                          |
- *                  +================================+   (c)                |
- *                  |            fcp_cmd             | <--------------------+
- *                  |   (DMA resources associated)   |
- *                  +================================+
+ *		    +================================+
+ *	     +----> |	      struct scsi_pkt	     |
+ *	     |	    |				     |
+ *	     | +--- | pkt_ha_private		     |
+ *	     | |    |				     |
+ *	     | |    +================================+
+ *	     | |
+ *	     | |    +================================+
+ *	     | +--> |	    struct fcp_pkt	     | <---------+
+ *	     |	    |				     |		 |
+ *	     +----- | cmd_pkt			     |		 |
+ *		    |			  cmd_fp_pkt | ---+	 |
+ *	  +-------->| cmd_fcp_rsp[]		     |	  |	 |
+ *	  |    +--->| cmd_fcp_cmd[]		     |	  |	 |
+ *	  |    |    |--------------------------------|	  |	 |
+ *	  |    |    |	      struct fc_packet	     | <--+	 |
+ *	  |    |    |				     |		 |
+ *	  |    |    |		     pkt_ulp_private | ----------+
+ *	  |    |    |		     pkt_fca_private | -----+
+ *	  |    |    |		     pkt_data_cookie | ---+ |
+ *	  |    |    | pkt_cmdlen		     |	  | |
+ *	  |    |(a) | pkt_rsplen		     |	  | |
+ *	  |    +----| .......... pkt_cmd ........... | ---|-|---------------+
+ *	  |	(b) |		      pkt_cmd_cookie | ---|-|----------+    |
+ *	  +---------| .......... pkt_resp .......... | ---|-|------+   |    |
+ *		    |		     pkt_resp_cookie | ---|-|--+   |   |    |
+ *		    | pkt_cmd_dma		     |	  | |  |   |   |    |
+ *		    | pkt_cmd_acc		     |	  | |  |   |   |    |
+ *		    +================================+	  | |  |   |   |    |
+ *		    |	      dma_cookies	     | <--+ |  |   |   |    |
+ *		    |				     |	    |  |   |   |    |
+ *		    +================================+	    |  |   |   |    |
+ *		    |	      fca_private	     | <----+  |   |   |    |
+ *		    |				     |	       |   |   |    |
+ *		    +================================+	       |   |   |    |
+ *							       |   |   |    |
+ *							       |   |   |    |
+ *		    +================================+	 (d)   |   |   |    |
+ *		    |	     fcp_resp cookies	     | <-------+   |   |    |
+ *		    |				     |		   |   |    |
+ *		    +================================+		   |   |    |
+ *								   |   |    |
+ *		    +================================+	 (d)	   |   |    |
+ *		    |		fcp_resp	     | <-----------+   |    |
+ *		    |	(DMA resources associated)   |		       |    |
+ *		    +================================+		       |    |
+ *								       |    |
+ *								       |    |
+ *								       |    |
+ *		    +================================+	 (c)	       |    |
+ *		    |	     fcp_cmd cookies	     | <---------------+    |
+ *		    |				     |			    |
+ *		    +================================+			    |
+ *									    |
+ *		    +================================+	 (c)		    |
+ *		    |		 fcp_cmd	     | <--------------------+
+ *		    |	(DMA resources associated)   |
+ *		    +================================+
  *
  * (a) Only if DMA is NOT used for the FCP_CMD buffer.
  * (b) Only if DMA is NOT used for the FCP_RESP buffer
@@ -10259,7 +10292,7 @@ fcp_cleanup_port(struct fcp_port *pptr, int instance)
  */
 static int
 fcp_kmem_cache_constructor(struct scsi_pkt *pkt, scsi_hba_tran_t *tran,
-	int kmflags)
+    int kmflags)
 {
 	struct fcp_pkt	*cmd;
 	struct fcp_port	*pptr;
@@ -10291,7 +10324,7 @@ fcp_kmem_cache_constructor(struct scsi_pkt *pkt, scsi_hba_tran_t *tran,
 		 * fcp_resp.  The transfer of information will be done by
 		 * bcopy.
 		 * The naming of the flags (that is actually a value) is
-		 * unfortunate.  FC_NO_DVMA_SPACE doesn't mean "NO VIRTUAL
+		 * unfortunate.	 FC_NO_DVMA_SPACE doesn't mean "NO VIRTUAL
 		 * DMA" but instead "NO DMA".
 		 */
 		fpkt->pkt_resp_acc = fpkt->pkt_cmd_acc = NULL;
@@ -10324,7 +10357,7 @@ fcp_kmem_cache_constructor(struct scsi_pkt *pkt, scsi_hba_tran_t *tran,
  *
  * Return Value: None
  *
- *      Context: kernel
+ *	Context: kernel
  */
 static void
 fcp_kmem_cache_destructor(struct scsi_pkt *pkt, scsi_hba_tran_t *tran)
@@ -10350,7 +10383,7 @@ fcp_kmem_cache_destructor(struct scsi_pkt *pkt, scsi_hba_tran_t *tran)
  *  Description: This function allocated an FCP_CMD and FCP_RESP buffer that
  *		 will be DMAed by the HBA.  The buffer is allocated applying
  *		 the DMA requirements for the HBA.  The buffers allocated will
- *		 also be bound.  DMA resources are allocated in the process.
+ *		 also be bound.	 DMA resources are allocated in the process.
  *		 They will be released by fcp_free_cmd_resp().
  *
  *     Argument: *pptr	FCP port.
@@ -10361,7 +10394,7 @@ fcp_kmem_cache_destructor(struct scsi_pkt *pkt, scsi_hba_tran_t *tran)
  * Return Value: FC_FAILURE
  *		 FC_SUCCESS
  *
- *      Context: User or Kernel context only if flags == KM_SLEEP.
+ *	Context: User or Kernel context only if flags == KM_SLEEP.
  *		 Interrupt context if the KM_SLEEP is not specified.
  */
 static int
@@ -10371,7 +10404,7 @@ fcp_alloc_cmd_resp(struct fcp_port *pptr, fc_packet_t *fpkt, int flags)
 	int			cmd_len;
 	int			resp_len;
 	ulong_t			real_len;
-	int 			(*cb) (caddr_t);
+	int			(*cb) (caddr_t);
 	ddi_dma_cookie_t	pkt_cookie;
 	ddi_dma_cookie_t	*cp;
 	uint32_t		cnt;
@@ -10550,7 +10583,7 @@ fcp_alloc_cmd_resp(struct fcp_port *pptr, fc_packet_t *fpkt, int flags)
  *
  *  Description: This function releases the FCP_CMD and FCP_RESP buffer
  *		 allocated by fcp_alloc_cmd_resp() and all the resources
- *		 associated with them.  That includes the DMA resources and the
+ *		 associated with them.	That includes the DMA resources and the
  *		 buffer allocated for the cookies of each one of them.
  *
  *     Argument: *pptr		FCP port context.
@@ -10559,7 +10592,7 @@ fcp_alloc_cmd_resp(struct fcp_port *pptr, fc_packet_t *fpkt, int flags)
  *
  * Return Value: None
  *
- *      Context: Interrupt, User and Kernel context.
+ *	Context: Interrupt, User and Kernel context.
  */
 /* ARGSUSED */
 static void
@@ -10610,7 +10643,7 @@ fcp_phys_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	struct fcp_tgt	*ptgt;
 	struct fcp_lun	*plun;
 	struct fcp_port	*pptr = (struct fcp_port *)
-				    hba_tran->tran_hba_private;
+	    hba_tran->tran_hba_private;
 
 	ASSERT(pptr != NULL);
 
@@ -10710,7 +10743,7 @@ fcp_virt_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	struct fcp_tgt	*ptgt;
 	struct fcp_lun	*plun;
 	struct fcp_port	*pptr = (struct fcp_port *)
-				    hba_tran->tran_hba_private;
+	    hba_tran->tran_hba_private;
 	child_info_t		*cip;
 
 	ASSERT(pptr != NULL);
@@ -10806,7 +10839,7 @@ fcp_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
     scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
 	struct fcp_port	*pptr = (struct fcp_port *)
-				    hba_tran->tran_hba_private;
+	    hba_tran->tran_hba_private;
 	int			rval;
 
 	ASSERT(pptr != NULL);
@@ -10832,7 +10865,7 @@ fcp_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
     scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
 	struct fcp_lun	*plun = hba_tran->tran_tgt_private;
-	struct fcp_tgt 	*ptgt;
+	struct fcp_tgt	*ptgt;
 
 	FCP_DTRACE(fcp_logq, LUN_PORT->port_instbuf,
 	    fcp_trace, FCP_BUF_LEVEL_8, 0,
@@ -10904,8 +10937,9 @@ fcp_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		mutex_exit(&ptgt->tgt_mutex);
 		mutex_exit(&pptr->port_mutex);
 
-		if (cmd->cmd_fp_pkt->pkt_pd == NULL)
+		if (cmd->cmd_fp_pkt->pkt_pd == NULL) {
 			pkt->pkt_reason = CMD_DEV_GONE;
+		}
 
 		return (TRAN_FATAL_ERROR);
 	}
@@ -10916,11 +10950,11 @@ fcp_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 	 * block, fail or defer requests - send them down right away.
 	 * NOTE: If we are in panic (i.e. trying to dump), we can't
 	 * assume we have been suspended.  There is hardware such as
-	 * the v880 that doesn't do PM.  Thus, the check for
+	 * the v880 that doesn't do PM.	 Thus, the check for
 	 * ddi_in_panic.
 	 *
 	 * If FCP_STATE_IN_CB_DEVC is set, devices are in the process
-	 * of changing.  So, if we can queue the packet, do it.  Eventually,
+	 * of changing.	 So, if we can queue the packet, do it.	 Eventually,
 	 * either the device will have gone away or changed and we can fail
 	 * the request, or we can proceed if the device didn't change.
 	 *
@@ -10945,8 +10979,8 @@ fcp_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		 *	(The port is coming up))
 		 *
 		 * We check to see if the any of the flags FLAG_NOINTR or
-		 * FLAG_NOQUEUE is set.  If one of them is set the value
-		 * returned will be TRAN_BUSY.  If not, the request is queued.
+		 * FLAG_NOQUEUE is set.	 If one of them is set the value
+		 * returned will be TRAN_BUSY.	If not, the request is queued.
 		 */
 		mutex_exit(&ptgt->tgt_mutex);
 		mutex_exit(&pptr->port_mutex);
@@ -11080,9 +11114,9 @@ static int
 fcp_scsi_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
 	int tgt_cnt;
-	struct fcp_port  	*pptr = ADDR2FCP(ap);
-	struct fcp_lun 	*plun = ADDR2LUN(ap);
-	struct fcp_tgt 	*ptgt = plun->lun_tgt;
+	struct fcp_port		*pptr = ADDR2FCP(ap);
+	struct fcp_lun	*plun = ADDR2LUN(ap);
+	struct fcp_tgt	*ptgt = plun->lun_tgt;
 
 	if (pkt == NULL) {
 		if (ptgt) {
@@ -11103,10 +11137,10 @@ fcp_scsi_abort(struct scsi_address *ap, struct scsi_pkt *pkt)
 int
 fcp_scsi_reset(struct scsi_address *ap, int level)
 {
-	int 			rval = 0;
-	struct fcp_port  	*pptr = ADDR2FCP(ap);
-	struct fcp_lun 	*plun = ADDR2LUN(ap);
-	struct fcp_tgt 	*ptgt = plun->lun_tgt;
+	int			rval = 0;
+	struct fcp_port		*pptr = ADDR2FCP(ap);
+	struct fcp_lun	*plun = ADDR2LUN(ap);
+	struct fcp_tgt	*ptgt = plun->lun_tgt;
 
 	if (level == RESET_ALL) {
 		if (fcp_linkreset(pptr, ap, KM_NOSLEEP) == FC_SUCCESS) {
@@ -11157,7 +11191,7 @@ fcp_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
  *
  *  Description: This function sets up the scsi_pkt structure passed by the
  *		 caller. This function assumes fcp_pkt_constructor has been
- *		 called previously for the packet passed by the caller.  If
+ *		 called previously for the packet passed by the caller.	 If
  *		 successful this call will have the following results:
  *
  *		   - The resources needed that will be constant through out
@@ -11175,7 +11209,7 @@ fcp_scsi_setcap(struct scsi_address *ap, char *cap, int value, int whom)
  * Return Value: 0	Success
  *		 !0	Failure
  *
- *      Context: Kernel context or interrupt context
+ *	Context: Kernel context or interrupt context
  */
 /* ARGSUSED */
 static int
@@ -11183,11 +11217,11 @@ fcp_pkt_setup(struct scsi_pkt *pkt,
     int (*callback)(caddr_t arg),
     caddr_t arg)
 {
-	struct fcp_pkt 	*cmd;
+	struct fcp_pkt	*cmd;
 	struct fcp_port	*pptr;
-	struct fcp_lun 	*plun;
-	struct fcp_tgt 	*ptgt;
-	int 		kf;
+	struct fcp_lun	*plun;
+	struct fcp_tgt	*ptgt;
+	int		kf;
 	fc_packet_t	*fpkt;
 	fc_frame_hdr_t	*hp;
 
@@ -11281,7 +11315,7 @@ fcp_pkt_setup(struct scsi_pkt *pkt,
  *
  * Return Value: None
  *
- *      Context: User, Kernel or Interrupt context.
+ *	Context: User, Kernel or Interrupt context.
  */
 static void
 fcp_pkt_teardown(struct scsi_pkt *pkt)
@@ -11419,9 +11453,9 @@ fcp_reset_target(struct scsi_address *ap, int level)
 {
 	int			rval = FC_FAILURE;
 	char			lun_id[25];
-	struct fcp_port  	*pptr = ADDR2FCP(ap);
-	struct fcp_lun 	*plun = ADDR2LUN(ap);
-	struct fcp_tgt 	*ptgt = plun->lun_tgt;
+	struct fcp_port		*pptr = ADDR2FCP(ap);
+	struct fcp_lun	*plun = ADDR2LUN(ap);
+	struct fcp_tgt	*ptgt = plun->lun_tgt;
 	struct scsi_pkt		*pkt;
 	struct fcp_pkt	*cmd;
 	struct fcp_rsp		*rsp;
@@ -11529,7 +11563,7 @@ fcp_reset_target(struct scsi_address *ap, int level)
 
 		case 1:
 			fcp_log(CE_WARN, pptr->port_dip,
-			    "!FCP: Reset to WWN  0x%08x%08x %s failed,"
+			    "!FCP: Reset to WWN	 0x%08x%08x %s failed,"
 			    " response code=%x",
 			    *((int *)&ptgt->tgt_port_wwn.raw_wwn[0]),
 			    *((int *)&ptgt->tgt_port_wwn.raw_wwn[4]), lun_id,
@@ -11552,7 +11586,7 @@ fcp_reset_target(struct scsi_address *ap, int level)
 
 		default:
 			fcp_log(CE_WARN, pptr->port_dip,
-			    "!FCP: Reset to WWN  0x%08x%08x %s failed",
+			    "!FCP: Reset to WWN	 0x%08x%08x %s failed",
 			    *((int *)&ptgt->tgt_port_wwn.raw_wwn[0]),
 			    *((int *)&ptgt->tgt_port_wwn.raw_wwn[4]), lun_id);
 			break;
@@ -11608,11 +11642,11 @@ static int
 fcp_commoncap(struct scsi_address *ap, char *cap,
     int val, int tgtonly, int doset)
 {
-	struct fcp_port 	*pptr = ADDR2FCP(ap);
-	struct fcp_lun 	*plun = ADDR2LUN(ap);
-	struct fcp_tgt 	*ptgt = plun->lun_tgt;
-	int 			cidx;
-	int 			rval = FALSE;
+	struct fcp_port		*pptr = ADDR2FCP(ap);
+	struct fcp_lun	*plun = ADDR2LUN(ap);
+	struct fcp_tgt	*ptgt = plun->lun_tgt;
+	int			cidx;
+	int			rval = FALSE;
 
 	if (cap == (char *)0) {
 		FCP_TRACE(fcp_logq, pptr->port_instbuf,
@@ -11900,9 +11934,9 @@ fcp_scsi_get_bus_addr(struct scsi_device *sd, char *name, int len)
 static int
 fcp_linkreset(struct fcp_port *pptr, struct scsi_address *ap, int sleep)
 {
-	la_wwn_t 		wwn;
-	struct fcp_lun 	*plun;
-	struct fcp_tgt 	*ptgt;
+	la_wwn_t		wwn;
+	struct fcp_lun	*plun;
+	struct fcp_tgt	*ptgt;
 
 	/* disable restart of lip if we're suspended */
 	mutex_enter(&pptr->port_mutex);
@@ -11924,7 +11958,7 @@ fcp_linkreset(struct fcp_port *pptr, struct scsi_address *ap, int sleep)
 	}
 
 	FCP_DTRACE(fcp_logq, pptr->port_instbuf,
-		    fcp_trace, FCP_BUF_LEVEL_8, 0, "Forcing link reset");
+	    fcp_trace, FCP_BUF_LEVEL_8, 0, "Forcing link reset");
 
 	/*
 	 * If ap == NULL assume local link reset.
@@ -12001,7 +12035,7 @@ fcp_handle_port_resume(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 	mutex_enter(&fcp_global_mutex);
 	if (fcp_watchdog_init++ == 0) {
 		fcp_watchdog_tick = fcp_watchdog_timeout *
-			drv_usectohz(1000000);
+		    drv_usectohz(1000000);
 		fcp_watchdog_id = timeout(fcp_watch,
 		    NULL, fcp_watchdog_tick);
 	}
@@ -12158,15 +12192,15 @@ fcp_process_elem(struct fcp_hp_elem *elem, int result)
 static void
 fcp_hp_task(void *arg)
 {
-	struct fcp_hp_elem 	*elem = (struct fcp_hp_elem *)arg;
-	struct fcp_lun 	*plun = elem->lun;
-	struct fcp_port 	*pptr = elem->port;
+	struct fcp_hp_elem	*elem = (struct fcp_hp_elem *)arg;
+	struct fcp_lun	*plun = elem->lun;
+	struct fcp_port		*pptr = elem->port;
 	int			result;
 
 	ASSERT(elem->what == FCP_ONLINE ||
-		elem->what == FCP_OFFLINE ||
-		elem->what == FCP_MPXIO_PATH_CLEAR_BUSY ||
-		elem->what == FCP_MPXIO_PATH_SET_BUSY);
+	    elem->what == FCP_OFFLINE ||
+	    elem->what == FCP_MPXIO_PATH_CLEAR_BUSY ||
+	    elem->what == FCP_MPXIO_PATH_SET_BUSY);
 
 	mutex_enter(&pptr->port_mutex);
 	mutex_enter(&plun->lun_mutex);
@@ -12223,7 +12257,7 @@ static int
 fcp_is_dip_present(struct fcp_lun *plun, dev_info_t *cdip)
 {
 	int		rval = FC_FAILURE;
-	dev_info_t 	*pdip;
+	dev_info_t	*pdip;
 	struct dev_info	*dip;
 	int		circular;
 
@@ -12283,7 +12317,7 @@ fcp_is_child_present(struct fcp_lun *plun, child_info_t *cip)
  * Return Value: NULL if it failed
  *		 dev_info_t structure address if it succeeded
  *
- *      Context: Kernel context
+ *	Context: Kernel context
  */
 static dev_info_t *
 fcp_create_dip(struct fcp_lun *plun, int link_cnt, int tgt_cnt)
@@ -12308,20 +12342,22 @@ fcp_create_dip(struct fcp_lun *plun, int link_cnt, int tgt_cnt)
 	/* get the 'scsi-binding-set' property */
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
 	    DDI_PROP_NOTPROM | DDI_PROP_DONTPASS, "scsi-binding-set",
-	    &scsi_binding_set) != DDI_PROP_SUCCESS)
+	    &scsi_binding_set) != DDI_PROP_SUCCESS) {
 		scsi_binding_set = NULL;
+	}
 
 	/* determine the node name and compatible */
 	scsi_hba_nodename_compatible_get(&plun->lun_inq, scsi_binding_set,
 	    plun->lun_inq.inq_dtype, NULL, &nname, &compatible, &ncompatible);
-	if (scsi_binding_set)
+	if (scsi_binding_set) {
 		ddi_prop_free(scsi_binding_set);
+	}
 
 	if (nname == NULL) {
 #ifdef	DEBUG
 		cmn_err(CE_WARN, "%s%d: no driver for "
 		    "device @w%02x%02x%02x%02x%02x%02x%02x%02x,%d:"
-		    "    compatible: %s",
+		    "	 compatible: %s",
 		    ddi_driver_name(pdip), ddi_get_instance(pdip),
 		    ptgt->tgt_port_wwn.raw_wwn[0],
 		    ptgt->tgt_port_wwn.raw_wwn[1],
@@ -12348,7 +12384,7 @@ fcp_create_dip(struct fcp_lun *plun, int link_cnt, int tgt_cnt)
 	 * Refer to bug: 4764752
 	 */
 	if (old_dip && (cdip != old_dip ||
-			plun->lun_state & FCP_LUN_CHANGED)) {
+	    plun->lun_state & FCP_LUN_CHANGED)) {
 		plun->lun_state &= ~(FCP_LUN_INIT);
 		mutex_exit(&plun->lun_mutex);
 		mutex_exit(&pptr->port_mutex);
@@ -12476,7 +12512,7 @@ end_of_fcp_create_dip:
  * Return Value: NULL if it failed
  *		 mdi_pathinfo_t structure address if it succeeded
  *
- *      Context: Kernel context
+ *	Context: Kernel context
  */
 static mdi_pathinfo_t *
 fcp_create_pip(struct fcp_lun *plun, int lcount, int tcount)
@@ -12511,7 +12547,7 @@ fcp_create_pip(struct fcp_lun *plun, int lcount, int tcount)
 #ifdef	DEBUG
 		cmn_err(CE_WARN, "fcp_create_dip: %s%d: no driver for "
 		    "device @w%02x%02x%02x%02x%02x%02x%02x%02x,%d:"
-		    "    compatible: %s",
+		    "	 compatible: %s",
 		    ddi_driver_name(pdip), ddi_get_instance(pdip),
 		    ptgt->tgt_port_wwn.raw_wwn[0],
 		    ptgt->tgt_port_wwn.raw_wwn[1],
@@ -12538,7 +12574,7 @@ fcp_create_pip(struct fcp_lun *plun, int lcount, int tcount)
 	 * Refer to bug: 4764752
 	 */
 	if (old_pip && (pip != old_pip ||
-			plun->lun_state & FCP_LUN_CHANGED)) {
+	    plun->lun_state & FCP_LUN_CHANGED)) {
 		plun->lun_state &= ~(FCP_LUN_INIT);
 		mutex_exit(&plun->lun_mutex);
 		mutex_exit(&pptr->port_mutex);
@@ -12573,9 +12609,10 @@ fcp_create_pip(struct fcp_lun *plun, int lcount, int tcount)
 	 * MAXNAMELEN(currently 255 bytes).
 	 */
 
-	for (i = 0; i < FC_WWN_SIZE; i++)
+	for (i = 0; i < FC_WWN_SIZE; i++) {
 		(void) sprintf(&buf[i << 1], "%02x",
 		    ptgt->tgt_port_wwn.raw_wwn[i]);
+	}
 
 	(void) snprintf(uaddr, MAXNAMELEN, "w%s,%x",
 	    buf, plun->lun_num);
@@ -12695,8 +12732,8 @@ fcp_find_existing_dip(struct fcp_lun *plun, dev_info_t *pdip, caddr_t name)
 	uint_t			nwords;
 	uint32_t		tgt_id;
 	int			*words;
-	dev_info_t 		*cdip;
-	dev_info_t 		*ndip;
+	dev_info_t		*cdip;
+	dev_info_t		*ndip;
 	struct fcp_tgt	*ptgt = plun->lun_tgt;
 	struct fcp_port	*pptr = ptgt->tgt_port;
 	int			circular;
@@ -12776,7 +12813,7 @@ fcp_find_existing_dip(struct fcp_lun *plun, dev_info_t *pdip, caddr_t name)
 		if (!FC_TOP_EXTERNAL(pptr->port_topology) &&
 		    ptgt->tgt_hard_addr != 0) {
 			tgt_id =
-			(uint32_t)fcp_alpa_to_switch[ptgt->tgt_hard_addr];
+			    (uint32_t)fcp_alpa_to_switch[ptgt->tgt_hard_addr];
 		} else {
 			tgt_id = ptgt->tgt_d_id;
 		}
@@ -12816,7 +12853,7 @@ fcp_find_existing_dip(struct fcp_lun *plun, dev_info_t *pdip, caddr_t name)
 static int
 fcp_is_pip_present(struct fcp_lun *plun, mdi_pathinfo_t *pip)
 {
-	dev_info_t 	*pdip;
+	dev_info_t	*pdip;
 	char		buf[MAXNAMELEN];
 	char		uaddr[MAXNAMELEN];
 	int		rval = FC_FAILURE;
@@ -12893,7 +12930,7 @@ fcp_online_child(struct fcp_lun *plun, child_info_t *cip, int lcount,
     int tcount, int flags, int *circ)
 {
 	int			rval;
-	struct fcp_port 	*pptr = plun->lun_tgt->tgt_port;
+	struct fcp_port		*pptr = plun->lun_tgt->tgt_port;
 	struct fcp_tgt	*ptgt = plun->lun_tgt;
 	dev_info_t		*cdip = NULL;
 
@@ -12927,10 +12964,11 @@ again:
 		 * hurt either (as the node would already have been
 		 * in CF2)
 		 */
-		if (!i_ddi_devi_attached(ddi_get_parent(cdip)))
+		if (!i_ddi_devi_attached(ddi_get_parent(cdip))) {
 			rval = ndi_devi_bind_driver(cdip, flags);
-		else
+		} else {
 			rval = ndi_devi_online(cdip, flags);
+		}
 		/*
 		 * We log the message into trace buffer if the device
 		 * is "ses" and into syslog for any other device
@@ -13065,7 +13103,7 @@ fcp_offline_child(struct fcp_lun *plun, child_info_t *cip, int lcount,
     int tcount, int flags, int *circ)
 {
 	int rval;
-	struct fcp_port 	*pptr = plun->lun_tgt->tgt_port;
+	struct fcp_port		*pptr = plun->lun_tgt->tgt_port;
 	struct fcp_tgt	*ptgt = plun->lun_tgt;
 	dev_info_t		*cdip;
 
@@ -13146,8 +13184,9 @@ fcp_offline_child(struct fcp_lun *plun, child_info_t *cip, int lcount,
 			 * of the LUN with the new guid.
 			 * Otherwise remove our reference to child node.
 			 */
-			if (plun->lun_cip == cip)
+			if (plun->lun_cip == cip) {
 				plun->lun_cip = NULL;
+			}
 			if (plun->lun_old_guid) {
 				kmem_free(plun->lun_old_guid,
 				    plun->lun_old_guid_size);
@@ -13211,10 +13250,10 @@ fcp_watch(void *arg)
 	struct fcp_port	*pptr;
 	struct fcp_ipkt	*icmd;
 	struct fcp_ipkt	*nicmd;
-	struct fcp_pkt 	*cmd;
-	struct fcp_pkt 	*ncmd;
-	struct fcp_pkt 	*tail;
-	struct fcp_pkt 	*pcmd;
+	struct fcp_pkt	*cmd;
+	struct fcp_pkt	*ncmd;
+	struct fcp_pkt	*tail;
+	struct fcp_pkt	*pcmd;
 	struct fcp_pkt	*save_head;
 	struct fcp_port	*save_port;
 
@@ -13304,8 +13343,9 @@ fcp_watch(void *arg)
 			if (cmd == pptr->port_pkt_tail) {
 				ASSERT(cmd->cmd_next == NULL);
 				pptr->port_pkt_tail = pcmd;
-				if (pcmd)
+				if (pcmd) {
 					pcmd->cmd_next = NULL;
+				}
 			}
 			cmd->cmd_next = NULL;
 
@@ -13323,8 +13363,8 @@ fcp_watch(void *arg)
 
 			if (cmd->cmd_fp_pkt->pkt_timeout ==
 			    FCP_INVALID_TIMEOUT) {
-				struct scsi_pkt 	*pkt = cmd->cmd_pkt;
-				struct fcp_lun 	*plun;
+				struct scsi_pkt		*pkt = cmd->cmd_pkt;
+				struct fcp_lun	*plun;
 				struct fcp_tgt	*ptgt;
 
 				plun = ADDR2LUN(&pkt->pkt_address);
@@ -13353,7 +13393,7 @@ fcp_watch(void *arg)
 				 */
 				break;
 			}
-end_of_loop:
+		end_of_loop:
 			/*
 			 * Scan only upto the previously known tail pointer
 			 * to avoid excessive processing - lots of new packets
@@ -13382,13 +13422,13 @@ end_of_loop:
 				pptr->port_ipkt_list = icmd->ipkt_next;
 				if (pptr->port_ipkt_list) {
 					pptr->port_ipkt_list->ipkt_prev =
-						NULL;
+					    NULL;
 				}
 			} else {
 				icmd->ipkt_prev->ipkt_next = icmd->ipkt_next;
 				if (icmd->ipkt_next) {
 					icmd->ipkt_next->ipkt_prev =
-						icmd->ipkt_prev;
+					    icmd->ipkt_prev;
 				}
 			}
 			icmd->ipkt_next = NULL;
@@ -13423,7 +13463,7 @@ end_of_loop:
 					mutex_exit(&ptgt->tgt_mutex);
 					mutex_exit(&pptr->port_mutex);
 					switch (icmd->ipkt_opcode) {
-					int rval;
+						int rval;
 					case LA_ELS_PLOGI:
 						if ((rval = fc_ulp_login(
 						    pptr->port_fp_handle,
@@ -13497,7 +13537,7 @@ end_of_loop:
 		mutex_exit(&pptr->port_mutex);
 		mutex_enter(&fcp_global_mutex);
 
-end_of_watchdog:
+	end_of_watchdog:
 		/*
 		 * Bail out early before getting into trouble
 		 */
@@ -13597,11 +13637,11 @@ static void
 fcp_abort_all(struct fcp_port *pptr, struct fcp_tgt *ttgt,
     struct fcp_lun *rlun, int tgt_cnt)
 {
-	int 			rval;
-	struct fcp_lun 	*tlun, *nlun;
-	struct fcp_pkt 	*pcmd = NULL, *ncmd = NULL,
-				*cmd = NULL, *head = NULL,
-				*tail = NULL;
+	int			rval;
+	struct fcp_lun	*tlun, *nlun;
+	struct fcp_pkt	*pcmd = NULL, *ncmd = NULL,
+	    *cmd = NULL, *head = NULL,
+	    *tail = NULL;
 
 	mutex_enter(&pptr->port_pkt_mutex);
 	for (cmd = pptr->port_pkt_head; cmd != NULL; cmd = ncmd) {
@@ -13625,8 +13665,9 @@ fcp_abort_all(struct fcp_port *pptr, struct fcp_tgt *ttgt,
 		if (pptr->port_pkt_tail == cmd) {
 			ASSERT(cmd->cmd_next == NULL);
 			pptr->port_pkt_tail = pcmd;
-			if (pcmd != NULL)
+			if (pcmd != NULL) {
 				pcmd->cmd_next = NULL;
+			}
 		}
 
 		if (head == NULL) {
@@ -13664,8 +13705,9 @@ fcp_abort_all(struct fcp_port *pptr, struct fcp_tgt *ttgt,
 	 * work is easy, just return.
 	 */
 
-	if (pptr->port_reset_action == FC_RESET_RETURN_ALL)
+	if (pptr->port_reset_action == FC_RESET_RETURN_ALL) {
 		return;
+	}
 
 	/*
 	 * For RESET_LUN get hold of target pointer
@@ -13750,16 +13792,16 @@ fcp_abort_all(struct fcp_port *pptr, struct fcp_tgt *ttgt,
 					mutex_enter(&pptr->port_pkt_mutex);
 					if (pptr->port_pkt_head) {
 						ASSERT(pptr->port_pkt_tail
-								!= NULL);
+						    != NULL);
 						pptr->port_pkt_tail->cmd_next
 						    = cmd;
 						pptr->port_pkt_tail = cmd;
 					} else {
 						ASSERT(pptr->port_pkt_tail
-								== NULL);
+						    == NULL);
 						pptr->port_pkt_head =
-							pptr->port_pkt_tail
-								= cmd;
+						    pptr->port_pkt_tail
+						    = cmd;
 					}
 					cmd->cmd_next = NULL;
 					mutex_exit(&pptr->port_pkt_mutex);
@@ -13868,7 +13910,7 @@ fcp_lookup_lun(struct fcp_port *pptr, uchar_t *wwn, uint16_t lun)
  *		 *cmd		FCP packet.
  *		 *plun		LUN the command will be sent to.
  *
- *      Context: User, Kernel and Interrupt context.
+ *	Context: User, Kernel and Interrupt context.
  */
 static void
 fcp_prepare_pkt(struct fcp_port *pptr, struct fcp_pkt *cmd,
@@ -13876,7 +13918,7 @@ fcp_prepare_pkt(struct fcp_port *pptr, struct fcp_pkt *cmd,
 {
 	fc_packet_t		*fpkt = cmd->cmd_fp_pkt;
 	struct fcp_tgt		*ptgt = plun->lun_tgt;
-	struct fcp_cmd 		*fcmd = &cmd->cmd_fcp_cmd;
+	struct fcp_cmd		*fcmd = &cmd->cmd_fcp_cmd;
 
 	ASSERT(cmd->cmd_pkt->pkt_comp ||
 	    (cmd->cmd_pkt->pkt_flags & FLAG_NOINTR));
@@ -14140,7 +14182,7 @@ fcp_pass_to_hp_and_wait(struct fcp_port *pptr, struct fcp_lun *plun,
  *
  * memory acquired in NOSLEEP mode
  * NOTE: if wait is set to 1 then the caller is responsible for waiting on
- *       for the hp daemon to process the request and is responsible for
+ *	 for the hp daemon to process the request and is responsible for
  *	 freeing the element
  */
 static struct fcp_hp_elem *
@@ -14186,8 +14228,9 @@ fcp_pass_to_hp(struct fcp_port *pptr, struct fcp_lun *plun,
 	if (taskq_dispatch(DEVI(pdip)->devi_taskq, fcp_hp_task,
 	    (void *)elem, KM_NOSLEEP) == NULL) {
 		mutex_enter(&plun->lun_mutex);
-		if (elem->what == FCP_ONLINE || elem->what == FCP_OFFLINE)
+		if (elem->what == FCP_ONLINE || elem->what == FCP_OFFLINE) {
 			plun->lun_event_count--;
+		}
 		mutex_exit(&plun->lun_mutex);
 		kmem_free(elem, sizeof (*elem));
 		return (0);
@@ -14201,8 +14244,8 @@ static void
 fcp_retransport_cmd(struct fcp_port *pptr, struct fcp_pkt *cmd)
 {
 	int			rval;
-	struct scsi_address 	*ap;
-	struct fcp_lun 	*plun;
+	struct scsi_address	*ap;
+	struct fcp_lun	*plun;
 	struct fcp_tgt	*ptgt;
 	fc_packet_t	*fpkt;
 
@@ -14301,7 +14344,7 @@ fcp_fail_cmd(struct fcp_pkt *cmd, uchar_t reason, uint_t statistics)
  *
  * Return Value: None
  *
- *      Context: User, Kernel and Interrupt context.
+ *	Context: User, Kernel and Interrupt context.
  */
 static void
 fcp_queue_pkt(struct fcp_port *pptr, struct fcp_pkt *cmd)
@@ -14357,7 +14400,7 @@ fcp_queue_pkt(struct fcp_port *pptr, struct fcp_pkt *cmd)
  *
  * Return Value: None
  *
- *      Context: User, Kernel and Interrupt context.
+ *	Context: User, Kernel and Interrupt context.
  *		 The mutex pptr->port_mutex must be held.
  */
 static void
@@ -14406,7 +14449,7 @@ fcp_call_finish_init_held(struct fcp_port *pptr, struct fcp_tgt *ptgt,
     int lcount, int tcount, int cause)
 {
 	int	finish_init = 0;
-	int 	finish_tgt = 0;
+	int	finish_tgt = 0;
 	int	do_finish_init = 0;
 	int	rval = FCP_NO_CHANGE;
 
@@ -14489,9 +14532,9 @@ static void
 fcp_reconfigure_luns(void * tgt_handle)
 {
 	uint32_t		dev_cnt;
-	fc_portmap_t 		*devlist;
-	struct fcp_tgt 	*ptgt = (struct fcp_tgt *)tgt_handle;
-	struct fcp_port 	*pptr = ptgt->tgt_port;
+	fc_portmap_t		*devlist;
+	struct fcp_tgt	*ptgt = (struct fcp_tgt *)tgt_handle;
+	struct fcp_port		*pptr = ptgt->tgt_port;
 
 	/*
 	 * If the timer that fires this off got canceled too late, the
@@ -14540,8 +14583,8 @@ fcp_reconfigure_luns(void * tgt_handle)
 static void
 fcp_free_targets(struct fcp_port *pptr)
 {
-	int 			i;
-	struct fcp_tgt 	*ptgt;
+	int			i;
+	struct fcp_tgt	*ptgt;
 
 	mutex_enter(&pptr->port_mutex);
 	for (i = 0; i < FCP_NUM_HASH; i++) {
@@ -14560,7 +14603,7 @@ fcp_free_targets(struct fcp_port *pptr)
 static void
 fcp_free_target(struct fcp_tgt *ptgt)
 {
-	struct fcp_lun 	*plun;
+	struct fcp_lun	*plun;
 	timeout_id_t		tid;
 
 	mutex_enter(&ptgt->tgt_mutex);
@@ -14603,17 +14646,18 @@ fcp_free_target(struct fcp_tgt *ptgt)
  * Return Value: 0	Not retryable
  *		 1	Retryable
  *
- *      Context: User, Kernel and Interrupt context
+ *	Context: User, Kernel and Interrupt context
  */
 static int
 fcp_is_retryable(struct fcp_ipkt *icmd)
 {
 	if (icmd->ipkt_port->port_state & (FCP_STATE_SUSPENDED |
-	    FCP_STATE_DETACHING | FCP_STATE_POWER_DOWN))
+	    FCP_STATE_DETACHING | FCP_STATE_POWER_DOWN)) {
 		return (0);
+	}
 
 	return (((fcp_watchdog_time + icmd->ipkt_fpkt->pkt_timeout) <
-		    icmd->ipkt_port->port_deadline) ? 1 : 0);
+	    icmd->ipkt_port->port_deadline) ? 1 : 0);
 }
 
 /*
@@ -14628,7 +14672,7 @@ fcp_is_retryable(struct fcp_ipkt *icmd)
  *		 EBUSY
  *		 EINVAL
  *
- *      Context: User and Kernel context
+ *	Context: User and Kernel context
  */
 static int
 fcp_create_on_demand(struct fcp_port *pptr, uchar_t *pwwn)
@@ -14636,11 +14680,11 @@ fcp_create_on_demand(struct fcp_port *pptr, uchar_t *pwwn)
 	int			wait_ms;
 	int			tcount;
 	int			lcount;
-	int 			ret;
+	int			ret;
 	int			error;
-	int 			rval = EIO;
-	int 			ntries;
-	fc_portmap_t 		*devlist;
+	int			rval = EIO;
+	int			ntries;
+	fc_portmap_t		*devlist;
 	opaque_t		pd;
 	struct fcp_lun		*plun;
 	struct fcp_tgt		*ptgt;
@@ -14721,8 +14765,8 @@ fcp_create_on_demand(struct fcp_port *pptr, uchar_t *pwwn)
 	 * 0 so the device will get configured.
 	 */
 	if (FC_TOP_EXTERNAL(pptr->port_topology) &&
-		fcp_enable_auto_configuration &&
-		    ptgt->tgt_manual_config_only == 1) {
+	    fcp_enable_auto_configuration &&
+	    ptgt->tgt_manual_config_only == 1) {
 		old_manual = 1;
 		ptgt->tgt_manual_config_only = 0;
 	}
@@ -14737,7 +14781,7 @@ fcp_create_on_demand(struct fcp_port *pptr, uchar_t *pwwn)
 	if (fcp_handle_mapflags(pptr, ptgt, devlist, lcount,
 	    tcount, FCP_CAUSE_USER_CREATE) == TRUE) {
 		if (FC_TOP_EXTERNAL(pptr->port_topology) &&
-			fcp_enable_auto_configuration && old_manual) {
+		    fcp_enable_auto_configuration && old_manual) {
 			mutex_enter(&ptgt->tgt_mutex);
 			ptgt->tgt_manual_config_only = 1;
 			mutex_exit(&ptgt->tgt_mutex);
@@ -14816,7 +14860,7 @@ fcp_create_on_demand(struct fcp_port *pptr, uchar_t *pwwn)
 
 	if (rval) {
 		if (FC_TOP_EXTERNAL(pptr->port_topology) &&
-			fcp_enable_auto_configuration && old_manual) {
+		    fcp_enable_auto_configuration && old_manual) {
 			ptgt->tgt_manual_config_only = 1;
 		}
 		mutex_exit(&ptgt->tgt_mutex);
@@ -14866,8 +14910,8 @@ fcp_create_on_demand(struct fcp_port *pptr, uchar_t *pwwn)
 			mutex_exit(&ptgt->tgt_mutex);
 
 			rval = fcp_pass_to_hp_and_wait(pptr, plun, cip,
-				FCP_ONLINE, lcount, tcount,
-				NDI_ONLINE_ATTACH);
+			    FCP_ONLINE, lcount, tcount,
+			    NDI_ONLINE_ATTACH);
 			if (rval != NDI_SUCCESS) {
 				FCP_TRACE(fcp_logq,
 				    pptr->port_instbuf, fcp_trace,
@@ -14879,7 +14923,7 @@ fcp_create_on_demand(struct fcp_port *pptr, uchar_t *pwwn)
 			} else {
 				mutex_enter(&LUN_TGT->tgt_mutex);
 				plun->lun_state &= ~(FCP_LUN_OFFLINE |
-					FCP_LUN_BUSY);
+				    FCP_LUN_BUSY);
 				mutex_exit(&LUN_TGT->tgt_mutex);
 			}
 			mutex_enter(&ptgt->tgt_mutex);
@@ -14892,7 +14936,7 @@ fcp_create_on_demand(struct fcp_port *pptr, uchar_t *pwwn)
 	kmem_free(devlist, sizeof (*devlist));
 
 	if (FC_TOP_EXTERNAL(pptr->port_topology) &&
-		fcp_enable_auto_configuration && old_manual) {
+	    fcp_enable_auto_configuration && old_manual) {
 		mutex_enter(&ptgt->tgt_mutex);
 		/* if successful then set manual to 0 */
 		if (rval == 0) {
@@ -14942,12 +14986,12 @@ static void
 fcp_print_error(fc_packet_t *fpkt)
 {
 	struct fcp_ipkt	*icmd = (struct fcp_ipkt *)
-				    fpkt->pkt_ulp_private;
+	    fpkt->pkt_ulp_private;
 	struct fcp_port	*pptr;
 	struct fcp_tgt	*ptgt;
 	struct fcp_lun	*plun;
-	caddr_t 		buf;
-	int 			scsi_cmd = 0;
+	caddr_t			buf;
+	int			scsi_cmd = 0;
 
 	ptgt = icmd->ipkt_tgt;
 	plun = icmd->ipkt_lun;
@@ -15101,7 +15145,7 @@ fcp_handle_ipkt_errors(struct fcp_port *pptr, struct fcp_tgt *ptgt,
     struct fcp_ipkt *icmd, int rval, caddr_t op)
 {
 	int	ret = DDI_FAILURE;
-	char 	*error;
+	char	*error;
 
 	switch (rval) {
 	case FC_DEVICE_BUSY_NEW_RSCN:
@@ -15227,9 +15271,9 @@ static fc_portmap_t *
 fcp_construct_map(struct fcp_port *pptr, uint32_t *dev_cnt)
 {
 	int			i;
-	fc_portmap_t 		*devlist;
-	fc_portmap_t 		*devptr = NULL;
-	struct fcp_tgt 	*ptgt;
+	fc_portmap_t		*devlist;
+	fc_portmap_t		*devptr = NULL;
+	struct fcp_tgt	*ptgt;
 
 	mutex_enter(&pptr->port_mutex);
 	for (i = 0, *dev_cnt = 0; i < FCP_NUM_HASH; i++) {
@@ -15368,22 +15412,22 @@ fcp_get_lun_path(struct fcp_lun *plun) {
 	dev_info_t	*dip = NULL;
 	char	*path = NULL;
 	if (plun == NULL) {
-	    return (NULL);
+		return (NULL);
 	}
 	if (plun->lun_mpxio == 0) {
-	    dip = DIP(plun->lun_cip);
+		dip = DIP(plun->lun_cip);
 	} else {
-	    dip = mdi_pi_get_client(PIP(plun->lun_cip));
+		dip = mdi_pi_get_client(PIP(plun->lun_cip));
 	}
 	if (dip == NULL) {
-	    return (NULL);
+		return (NULL);
 	}
 	if (ddi_get_instance(dip) < 0) {
-	    return (NULL);
+		return (NULL);
 	}
 	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 	if (path == NULL) {
-	    return (NULL);
+		return (NULL);
 	}
 
 	(void) ddi_pathname(dip, path);
@@ -15408,12 +15452,14 @@ fcp_scsi_bus_config(dev_info_t *parent, uint_t flag,
 	struct fcp_port *pptr = fcp_dip2port(parent);
 
 	reset_delay = (int64_t)(USEC_TO_TICK(FCP_INIT_WAIT_TIMEOUT)) -
-		(lbolt64 - pptr->port_attach_time);
-	if (reset_delay < 0)
+	    (lbolt64 - pptr->port_attach_time);
+	if (reset_delay < 0) {
 		reset_delay = 0;
+	}
 
-	if (fcp_bus_config_debug)
+	if (fcp_bus_config_debug) {
 		flag |= NDI_DEVI_DEBUG;
+	}
 
 	switch (op) {
 	case BUS_CONFIG_ONE:
@@ -15422,11 +15468,12 @@ fcp_scsi_bus_config(dev_info_t *parent, uint_t flag,
 		 * the fabric devices are available for root
 		 */
 		while (retry++ < fcp_max_bus_config_retries) {
-			rval =  (ndi_busop_bus_config(parent,
-				    flag | NDI_MDI_FALLBACK, op,
-				    arg, childp, (clock_t)reset_delay));
-			if (rval == 0)
+			rval =	(ndi_busop_bus_config(parent,
+			    flag | NDI_MDI_FALLBACK, op,
+			    arg, childp, (clock_t)reset_delay));
+			if (rval == 0) {
 				return (rval);
+			}
 		}
 
 		/*
@@ -15469,8 +15516,9 @@ static int
 fcp_scsi_bus_unconfig(dev_info_t *parent, uint_t flag,
     ddi_bus_config_op_t op, void *arg)
 {
-	if (fcp_bus_config_debug)
+	if (fcp_bus_config_debug) {
 		flag |= NDI_DEVI_DEBUG;
+	}
 
 	return (ndi_busop_bus_unconfig(parent, flag, op, arg));
 }
@@ -15525,8 +15573,8 @@ fcp_copy_guid_2_lun_block(struct fcp_lun *plun, char *guidp)
 		plun->lun_guid = kmem_zalloc(len, KM_NOSLEEP);
 		if (plun->lun_guid == NULL) {
 			cmn_err(CE_WARN, "fcp_copy_guid_2_lun_block:"
-				"Unable to allocate"
-				"Memory for GUID!!! size %d", len);
+			    "Unable to allocate"
+			    "Memory for GUID!!! size %d", len);
 			retval = 1;
 		} else {
 			plun->lun_guid_size = len;
@@ -15553,7 +15601,7 @@ fcp_reconfig_wait(struct fcp_port *pptr)
 	clock_t		reconfig_start, wait_timeout;
 
 	/*
-	 * Quick check.  If pptr->port_tmp_cnt is 0, there is no
+	 * Quick check.	 If pptr->port_tmp_cnt is 0, there is no
 	 * reconfiguration in progress.
 	 */
 
@@ -15575,7 +15623,7 @@ fcp_reconfig_wait(struct fcp_port *pptr)
 	mutex_enter(&pptr->port_mutex);
 
 	while (((ddi_get_lbolt() - reconfig_start) < wait_timeout) &&
-		pptr->port_tmp_cnt) {
+	    pptr->port_tmp_cnt) {
 
 		(void) cv_timedwait(&pptr->port_config_cv, &pptr->port_mutex,
 		    reconfig_start + wait_timeout);
@@ -15665,7 +15713,7 @@ fcp_read_blacklist(dev_info_t *dip,
 static void
 fcp_mask_pwwn_lun(char *curr_pwwn, char *curr_lun,
     struct fcp_black_list_entry **pplun_blacklist) {
-	int 		idx			= 0;
+	int		idx			= 0;
 	uint32_t	offset			= 0;
 	unsigned long	lun_id			= 0;
 	char		lunid_buf[16];
@@ -15697,8 +15745,8 @@ fcp_mask_pwwn_lun(char *curr_pwwn, char *curr_lun,
 			break;
 		}
 		if (idx == 0) {	/* ignore ' ' or ',' or '\0' */
-			offset++;
-			continue;
+		    offset++;
+		    continue;
 		}
 
 		bcopy(curr_lun + offset, lunid_buf, idx);
@@ -15759,10 +15807,13 @@ fcp_should_mask(la_wwn_t *wwn, uint32_t lun_id) {
 				remote_port->masked++;
 				if (remote_port->masked == 1) {
 					fcp_log(CE_NOTE, NULL, "LUN %d of port "
-	"%02x%02x%02x%02x%02x%02x%02x%02x is masked due to black listing.\n",
-	lun_id, wwn->raw_wwn[0], wwn->raw_wwn[1], wwn->raw_wwn[2],
-	wwn->raw_wwn[3], wwn->raw_wwn[4], wwn->raw_wwn[5], wwn->raw_wwn[6],
-	wwn->raw_wwn[7]);
+					    "%02x%02x%02x%02x%02x%02x%02x%02x "
+					    "is masked due to black listing.\n",
+					    lun_id, wwn->raw_wwn[0],
+					    wwn->raw_wwn[1], wwn->raw_wwn[2],
+					    wwn->raw_wwn[3], wwn->raw_wwn[4],
+					    wwn->raw_wwn[5], wwn->raw_wwn[6],
+					    wwn->raw_wwn[7]);
 				}
 				return (TRUE);
 			}
