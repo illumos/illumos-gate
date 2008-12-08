@@ -32,8 +32,6 @@
 #ifndef	_MYPROPOSAL_H
 #define	_MYPROPOSAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,12 +42,9 @@ extern "C" {
 
 #define	KEX_DEFAULT_PK_ALG	"ssh-rsa,ssh-dss"
 
-#define	KEX_DEFAULT_ENCRYPT \
-	"aes128-ctr,aes128-cbc,arcfour,3des-cbc,blowfish-cbc," \
-	"aes192-ctr,aes192-cbc,aes256-ctr,aes256-cbc"
+#define	KEX_DEFAULT_ENCRYPT	"aes128-ctr,arcfour,aes192-ctr,aes256-ctr"
 
-#define	KEX_DEFAULT_MAC \
-	"hmac-md5,hmac-sha1,hmac-sha1-96,hmac-md5-96"
+#define	KEX_DEFAULT_MAC		"hmac-md5,hmac-sha1,hmac-sha1-96,hmac-md5-96"
 
 #define	KEX_DEFAULT_COMP	"none,zlib"
 #define	KEX_DEFAULT_LANG	""

@@ -1146,16 +1146,7 @@ packet_read_poll2(u_int32_t *seqnr_p)
 		cp = buffer_ptr(&incoming_packet);
 		packet_length = GET_32BIT(cp);
 		if (packet_length < 1 + 4 || packet_length > 256 * 1024) {
-			error("bad packet length %d; i/o counters "
-			    "%llu/%llu", packet_length,
-			    p_read.blocks * block_size,
-			    p_send.blocks * block_size);
-			error("decrypted %d bytes follows:\n", block_size);
-			buffer_dump(&incoming_packet);
-			packet_disconnect("Bad packet length %d, i/o counters "
-			    "%llu/%llu.", packet_length,
-			    p_read.blocks * block_size,
-			    p_send.blocks * block_size);
+			packet_disconnect("Bad packet length.");
 		}
 		DBG(debug("input: packet len %u", packet_length + 4));
 		buffer_consume(&input, block_size);
@@ -1165,8 +1156,7 @@ packet_read_poll2(u_int32_t *seqnr_p)
 	DBG(debug("partial packet %d, still need %d, maclen %d", block_size,
 	    need, maclen));
 	if (need % block_size != 0)
-		fatal("padding error: need %d block %d mod %d",
-		    need, block_size, need % block_size);
+		packet_disconnect("Bad packet length.");
 	/*
 	 * check if the entire packet has been received and
 	 * decrypt into incoming_packet

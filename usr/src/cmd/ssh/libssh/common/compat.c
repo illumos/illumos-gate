@@ -22,14 +22,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #include "includes.h"
 RCSID("$OpenBSD: compat.c,v 1.65 2002/09/27 10:42:09 mickey Exp $");
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "buffer.h"
 #include "packet.h"
@@ -109,6 +107,8 @@ compat_datafellows(const char *version)
 					SSH_BUG_LOCALES_NOT_LANGTAGS|SSH_OLD_FORWARD_ADDR},
 		{ "Sun_SSH_1.1*",	SSH_OLD_FORWARD_ADDR},
 		{ "Sun_SSH_1.2*",	0 },
+		{ "Sun_SSH_1.3*",	0 },
+		{ "Sun_SSH_*",		0 },
 		{ "*MindTerm*",		0 },
 		{ "2.1.0*",		SSH_BUG_SIGBLOB|SSH_BUG_HMAC|
 					SSH_OLD_SESSIONID|SSH_BUG_DEBUG|
