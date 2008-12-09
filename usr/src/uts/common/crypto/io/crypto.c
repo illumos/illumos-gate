@@ -1027,6 +1027,7 @@ static int
 get_all_mechanism_info(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_get_all_mechanism_info, get_all_mech);
+	/* LINTED E_FUNC_SET_NOT_USED */
 	STRUCT_DECL(crypto_mechanism_info, mi);
 	crypto_mech_name_t mech_name;
 	crypto_mech_type_t mech_type;
