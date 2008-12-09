@@ -633,8 +633,10 @@ report_job(papi_job_t job, int show_rank, int verbose)
 	char date[24];
 	char request[26];
 	char *user = "unknown";
+	char *host = NULL;
 	int32_t size = 0;
 	int32_t jstate = 0;
+	char User[50];
 
 	char *destination = "unknown";
 	int32_t id = -1;
@@ -644,6 +646,14 @@ report_job(papi_job_t job, int show_rank, int verbose)
 
 	if ((users != NULL) && (match_user(user, users) < 0))
 		return (0);
+
+	(void) papiAttributeListGetString(attrs, NULL,
+	    "job-originating-host-name", &host);
+
+	if (host)
+		snprintf(User, sizeof (User), "%s@%s", user, host);
+	else
+		snprintf(User, sizeof (User), "%s", user);
 
 	(void) papiAttributeListGetInteger(attrs, NULL, "job-k-octets", &size);
 	size *= 1024;	/* for the approximate byte size */
@@ -670,9 +680,9 @@ report_job(papi_job_t job, int show_rank, int verbose)
 		rank++;
 
 		printf("%3d %-21s %-14s %7ld %s",
-			rank, request, user, size, date);
+		    rank, request, User, size, date);
 	} else
-		printf("%-23s %-14s %7ld   %s", request, user, size, date);
+		printf("%-23s %-14s %7ld   %s", request, User, size, date);
 
 	(void) papiAttributeListGetInteger(attrs, NULL,
 				"job-state", &jstate);
