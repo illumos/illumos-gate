@@ -154,6 +154,9 @@ typedef struct ahci_port {
 	 */
 	int			ahciport_reset_in_progress;
 
+	/* Taskq for handling event */
+	ddi_taskq_t		*ahciport_event_taskq;
+
 	/* This is for error recovery handler */
 	ahci_event_arg_t	*ahciport_event_args;
 
@@ -179,6 +182,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 				    ahci_port_t::ahciport_reset_in_progress))
 _NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
 				    ahci_port_t::ahciport_mop_in_progress))
+_NOTE(MUTEX_PROTECTS_DATA(ahci_port_t::ahciport_mutex,
+				    ahci_port_t::ahciport_event_taskq))
 
 typedef struct ahci_ctl {
 	dev_info_t		*ahcictl_dip;
@@ -242,9 +247,6 @@ typedef struct ahci_ctl {
 	size_t			ahcictl_intr_size; /* Size of intr array */
 	uint_t			ahcictl_intr_pri;  /* Intr priority */
 	int			ahcictl_intr_cap;  /* Intr capabilities */
-
-	/* Taskq for handling event */
-	ddi_taskq_t		*ahcictl_event_taskq;
 } ahci_ctl_t;
 
 /* Warlock annotation */
@@ -314,9 +316,8 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCI_ATTACH_STATE_INTR_ADDED		(0x1 << 4)
 #define	AHCI_ATTACH_STATE_MUTEX_INIT		(0x1 << 5)
 #define	AHCI_ATTACH_STATE_PORT_ALLOC		(0x1 << 6)
-#define	AHCI_ATTACH_STATE_ERR_RECV_TASKQ	(0x1 << 7)
-#define	AHCI_ATTACH_STATE_HW_INIT		(0x1 << 8)
-#define	AHCI_ATTACH_STATE_TIMEOUT_ENABLED	(0x1 << 9)
+#define	AHCI_ATTACH_STATE_HW_INIT		(0x1 << 7)
+#define	AHCI_ATTACH_STATE_TIMEOUT_ENABLED	(0x1 << 8)
 
 /* Interval used for delay */
 #define	AHCI_10MS_TICKS	(drv_usectohz(10000))	/* ticks in 10 ms */

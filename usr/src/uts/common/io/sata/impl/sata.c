@@ -129,7 +129,7 @@ static	void sata_inject_pkt_fault(sata_pkt_t *, int *, int);
 
 #define	LEGACY_HWID_LEN	64	/* Model (40) + Serial (20) + pad */
 
-static char sata_rev_tag[] = {"1.41"};
+static char sata_rev_tag[] = {"1.42"};
 
 /*
  * SATA cb_ops functions
@@ -415,10 +415,13 @@ static 	char sata_log_buf[256];
 int	sata_write_cache = 1;		/* enabled */
 
 /* Default write cache setting for SATA ATAPI CD/DVD */
-int 	sata_atapicdvd_write_cache = 1; /* enabled */
+int	sata_atapicdvd_write_cache = 1; /* enabled */
 
 /* Default write cache setting for SATA ATAPI tape */
 int	sata_atapitape_write_cache = 1; /* enabled */
+
+/* Default write cache setting for SATA ATAPI disk */
+int	sata_atapidisk_write_cache = 1;	/* enabled */
 
 /*
  * Linked list of HBA instances
@@ -2425,6 +2428,11 @@ sata_scsi_reset(struct scsi_address *ap, int level)
  * Supported capabilities for ATAPI TAPE devices:
  * auto-rqsense		(always supported)
  * dma_max
+ * max-cdb-length
+ *
+ * Supported capabilities for SATA ATAPI hard disks:
+ * auto-rqsense		(always supported)
+ * interconnect-type	(INTERCONNECT_SATA)
  * max-cdb-length
  *
  * Request for other capabilities is rejected as unsupported.
@@ -7022,7 +7030,7 @@ sata_build_lsense_page_30(
 /*
  * Start command for ATAPI device.
  * This function processes scsi_pkt requests.
- * Now only CD/DVD and tape devices are supported.
+ * Now CD/DVD, tape and ATAPI disk devices are supported.
  * Most commands are packet without any translation into Packet Command.
  * Some may be trapped and executed as SATA commands (not clear which one).
  *
@@ -7071,6 +7079,7 @@ sata_txlt_atapi(sata_pkt_txlate_t *spx)
 	 * Commands sent via PACKET command include:
 	 *	MMC command set for ATAPI CD/DVD device
 	 *	SSC command set for ATAPI TAPE device
+	 *	SBC command set for ATAPI disk device
 	 *
 	 */
 
@@ -8606,7 +8615,7 @@ sata_create_target_node(dev_info_t *dip, sata_hba_inst_t *sata_hba_inst,
 		goto fail;
 	}
 
-	if (sdinfo->satadrv_type == SATA_DTYPE_ATAPICD) {
+	if (sdinfo->satadrv_type & SATA_DTYPE_ATAPI) {
 		/*
 		 * Add "variant" property
 		 */
@@ -8973,13 +8982,15 @@ sata_initialize_device(sata_hba_inst_t *sata_hba_inst,
  * determined by sata_atapicdvd_write_cache static variable.
  * ATAPI tape devices have write cache default is determined by
  * sata_atapitape_write_cache static variable.
+ * ATAPI disk devices have write cache default is determined by
+ * sata_atapidisk_write_cache static variable.
  * 1 - enable
  * 0 - disable
  * any other value - current drive setting
  *
- * Although there is not reason to disable write cache on CD/DVD devices
- * and tape devices, the default setting control is provided for the maximun
- * flexibility.
+ * Although there is not reason to disable write cache on CD/DVD devices,
+ * tape devices and ATAPI disk devices, the default setting control is provided
+ * for the maximun flexibility.
  *
  * In the future, it may be overridden by the
  * disk-write-cache-enable property setting, if it is defined.
@@ -9006,7 +9017,7 @@ sata_init_write_cache_mode(sata_drive_info_t *sdinfo)
 		else if (sata_atapicdvd_write_cache == 0)
 			sdinfo->satadrv_settings &= ~SATA_DEV_WRITE_CACHE;
 		/*
-		 * When sata_write_cache value is not 0 or 1,
+		 * When sata_atapicdvd_write_cache value is not 0 or 1,
 		 * a current setting of the drive's write cache is used.
 		 */
 		break;
@@ -9016,7 +9027,17 @@ sata_init_write_cache_mode(sata_drive_info_t *sdinfo)
 		else if (sata_atapitape_write_cache == 0)
 			sdinfo->satadrv_settings &= ~SATA_DEV_WRITE_CACHE;
 		/*
-		 * When sata_write_cache value is not 0 or 1,
+		 * When sata_atapitape_write_cache value is not 0 or 1,
+		 * a current setting of the drive's write cache is used.
+		 */
+		break;
+	case SATA_DTYPE_ATAPIDISK:
+		if (sata_atapidisk_write_cache == 1)
+			sdinfo->satadrv_settings |= SATA_DEV_WRITE_CACHE;
+		else if (sata_atapidisk_write_cache == 0)
+			sdinfo->satadrv_settings &= ~SATA_DEV_WRITE_CACHE;
+		/*
+		 * When sata_atapidisk_write_cache value is not 0 or 1,
 		 * a current setting of the drive's write cache is used.
 		 */
 		break;
@@ -9415,6 +9436,9 @@ sata_identify_device(sata_hba_inst_t *sata_hba_inst,
 		case SATA_ATAPI_SQACC_DEV:
 			sdinfo->satadrv_type = SATA_DTYPE_ATAPITAPE;
 			break;
+		case SATA_ATAPI_DIRACC_DEV:
+			sdinfo->satadrv_type = SATA_DTYPE_ATAPIDISK;
+			break;
 		default:
 			sdinfo->satadrv_type = SATA_DTYPE_UNKNOWN;
 		}
@@ -9498,6 +9522,10 @@ sata_show_drive_info(sata_hba_inst_t *sata_hba_inst,
 
 	case SATA_DTYPE_ATAPITAPE:
 		(void) sprintf(msg_buf, "SATA tape (ATAPI) device at");
+		break;
+
+	case SATA_DTYPE_ATAPIDISK:
+		(void) sprintf(msg_buf, "SATA disk (ATAPI) device at");
 		break;
 
 	case SATA_DTYPE_UNKNOWN:
@@ -12370,6 +12398,7 @@ sata_cfgadm_state(sata_hba_inst_t *sata_hba_inst, int32_t port,
 	case SATA_DTYPE_ATADISK:
 	case SATA_DTYPE_ATAPICD:
 	case SATA_DTYPE_ATAPITAPE:
+	case SATA_DTYPE_ATAPIDISK:
 	{
 		dev_info_t *tdip = NULL;
 		dev_info_t *dip = NULL;
@@ -12516,6 +12545,7 @@ sata_ioctl_get_ap_type(sata_hba_inst_t *sata_hba_inst,
 		break;
 
 	case SATA_DTYPE_ATADISK:
+	case SATA_DTYPE_ATAPIDISK:
 		ap_type = "disk";
 		break;
 
@@ -12908,6 +12938,7 @@ sata_set_drive_features(sata_hba_inst_t *sata_hba_inst,
 		break;
 	case SATA_DTYPE_ATAPICD:
 	case SATA_DTYPE_ATAPITAPE:
+	case SATA_DTYPE_ATAPIDISK:
 		/*  Set Removable Media Status Notification, if necessary */
 		if ((new_sdinfo.satadrv_id.ai_cmdset83 &
 		    SATA_RM_STATUS_NOTIFIC) != 0 && restore != 0) {

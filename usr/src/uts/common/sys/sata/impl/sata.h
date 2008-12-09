@@ -154,6 +154,7 @@ struct sata_cport_info {
 						 * SATA_DTYPE_ATADISK
 						 * SATA_DTYPE_ATAPICD
 						 * SATA_DTYPE_ATAPITAPE
+						 * SATA_DTYPE_ATAPIDISK
 						 * SATA_DTYPE_PMULT
 						 * SATA_DTYPE_UNKNOWN
 						 */
@@ -210,6 +211,7 @@ struct sata_drive_info {
 						 * SATA_DTYPE_ATADISK
 						 * SATA_DTYPE_ATAPICD
 						 * SATA_DTYPE_ATAPITAPE
+						 * SATA_DTYPE_ATAPIDISK
 						 */
 	uint32_t	satadrv_type;
 
@@ -291,6 +293,7 @@ struct sata_pmport_info {
 						 * SATA_DTYPE_ATADISK
 						 * SATA_DTYPE_ATAPICD
 						 * SATA_DTYPE_ATAPITAPE
+						 * SATA_DTYPE_ATAPIDISK
 						 * SATA_DTYPE_UNKNOWN
 						 */
 	uint32_t	pmport_dev_type;
@@ -329,7 +332,8 @@ typedef	struct sata_pmport_info sata_pmport_info_t;
  */
 #define	SATA_VALID_DEV_TYPE	(SATA_DTYPE_ATADISK | \
 				SATA_DTYPE_ATAPICD | \
-				SATA_DTYPE_ATAPITAPE)
+				SATA_DTYPE_ATAPITAPE | \
+				SATA_DTYPE_ATAPIDISK)
 
 /*
  * Device feature_support (satadrv_features_support)
@@ -764,7 +768,7 @@ typedef struct sata_atapi_cmd {
 
 #endif
 
-/* sata_rev_tag 1.41 */
+/* sata_rev_tag 1.42 */
 
 #ifdef	__cplusplus
 }

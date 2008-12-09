@@ -100,6 +100,7 @@ static	void ahci_uninitialize_controller(ahci_ctl_t *);
 static	int ahci_initialize_port(ahci_ctl_t *, ahci_port_t *, uint8_t);
 static	int ahci_config_space_init(ahci_ctl_t *);
 
+static	void ahci_drain_ports_taskq(ahci_ctl_t *);
 static	void ahci_disable_interface_pm(ahci_ctl_t *, uint8_t);
 static	int ahci_start_port(ahci_ctl_t *, ahci_port_t *, uint8_t);
 static	void ahci_find_dev_signature(ahci_ctl_t *, ahci_port_t *, uint8_t);
@@ -766,18 +767,6 @@ intr_done:
 	attach_state |= AHCI_ATTACH_STATE_PORT_ALLOC;
 
 	/*
-	 * A taskq is created for dealing with events
-	 */
-	if ((ahci_ctlp->ahcictl_event_taskq = ddi_taskq_create(dip,
-	    "ahci_event_handle_taskq", 1, TASKQ_DEFAULTPRI, 0)) == NULL) {
-		cmn_err(CE_WARN, "!ahci%d: ddi_taskq_create failed for event "
-		    "handle", instance);
-		goto err_out;
-	}
-
-	attach_state |= AHCI_ATTACH_STATE_ERR_RECV_TASKQ;
-
-	/*
 	 * Initialize the controller and ports.
 	 */
 	status = ahci_initialize_controller(ahci_ctlp);
@@ -818,10 +807,6 @@ err_out:
 
 	if (attach_state & AHCI_ATTACH_STATE_HW_INIT) {
 		ahci_uninitialize_controller(ahci_ctlp);
-	}
-
-	if (attach_state & AHCI_ATTACH_STATE_ERR_RECV_TASKQ) {
-		ddi_taskq_destroy(ahci_ctlp->ahcictl_event_taskq);
 	}
 
 	if (attach_state & AHCI_ATTACH_STATE_PORT_ALLOC) {
@@ -897,9 +882,6 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/* remove the interrupts */
 		ahci_rem_intrs(ahci_ctlp);
 
-		/* destroy the taskq */
-		ddi_taskq_destroy(ahci_ctlp->ahcictl_event_taskq);
-
 		/* deallocate the ports structures */
 		ahci_dealloc_ports_state(ahci_ctlp);
 
@@ -943,7 +925,7 @@ ahci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/*
 		 * drain the taskq
 		 */
-		ddi_taskq_wait(ahci_ctlp->ahcictl_event_taskq);
+		ahci_drain_ports_taskq(ahci_ctlp);
 
 		/*
 		 * Disable the interrupts and stop all the ports.
@@ -1198,8 +1180,9 @@ ahci_tran_probe_port(dev_info_t *dip, sata_device_t *sd)
 	case SATA_DTYPE_ATAPI:
 		/*
 		 * HBA driver only knows it's an ATAPI device, and don't know
-		 * it's CD/DVD or tape because the ATAPI device type need to
-		 * be determined by checking IDENTIFY PACKET DEVICE data
+		 * it's CD/DVD, tape or ATAPI disk because the ATAPI device
+		 * type need to be determined by checking IDENTIFY PACKET
+		 * DEVICE data
 		 */
 		sd->satadev_type = SATA_DTYPE_ATAPI;
 		AHCIDBG1(AHCIDBG_INFO, ahci_ctlp,
@@ -1499,7 +1482,7 @@ ahci_do_sync_start(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp,
 		if (satapkt &&						\
 		    (satapkt->satapkt_op_mode & SATA_OPMODE_SYNCH) &&	\
 		    ! (satapkt->satapkt_op_mode & SATA_OPMODE_POLLING))	\
-			cv_signal(&ahci_portp->ahciport_cv);		\
+			cv_broadcast(&ahci_portp->ahciport_cv);		\
 	}
 
 /*
@@ -2709,6 +2692,28 @@ ahci_dealloc_ports_state(ahci_ctl_t *ahci_ctlp)
 }
 
 /*
+ * Drain the taskq.
+ */
+static void
+ahci_drain_ports_taskq(ahci_ctl_t *ahci_ctlp)
+{
+	ahci_port_t *ahci_portp;
+	int port;
+
+	for (port = 0; port < ahci_ctlp->ahcictl_num_ports; port++) {
+		if (!AHCI_PORT_IMPLEMENTED(ahci_ctlp, port)) {
+			continue;
+		}
+
+		ahci_portp = ahci_ctlp->ahcictl_ports[port];
+
+		mutex_enter(&ahci_portp->ahciport_mutex);
+		ddi_taskq_wait(ahci_portp->ahciport_event_taskq);
+		mutex_exit(&ahci_portp->ahciport_mutex);
+	}
+}
+
+/*
  * Initialize the controller and all ports. And then try to start the ports
  * if there are devices attached.
  *
@@ -3883,7 +3888,9 @@ ahci_start_port(ahci_ctl_t *ahci_ctlp, ahci_port_t *ahci_portp, uint8_t port)
 static int
 ahci_alloc_port_state(ahci_ctl_t *ahci_ctlp, uint8_t port)
 {
+	dev_info_t *dip = ahci_ctlp->ahcictl_dip;
 	ahci_port_t *ahci_portp;
+	char taskq_name[64] = "event_handle_taskq";
 
 	ahci_portp =
 	    (ahci_port_t *)kmem_zalloc(sizeof (ahci_port_t), KM_SLEEP);
@@ -3912,15 +3919,31 @@ ahci_alloc_port_state(ahci_ctl_t *ahci_ctlp, uint8_t port)
 		goto err_case2;
 	}
 
+	(void) snprintf(taskq_name + strlen(taskq_name),
+	    sizeof (taskq_name) - strlen(taskq_name),
+	    "_port%d", port);
+
+	/* Create the taskq for the port */
+	if ((ahci_portp->ahciport_event_taskq = ddi_taskq_create(dip,
+	    taskq_name, 2, TASKQ_DEFAULTPRI, 0)) == NULL) {
+		cmn_err(CE_WARN, "!ahci%d: ddi_taskq_create failed for event "
+		    "handle", ddi_get_instance(ahci_ctlp->ahcictl_dip));
+		goto err_case3;
+	}
+
+	/* Allocate the argument for the taskq */
 	ahci_portp->ahciport_event_args =
 	    kmem_zalloc(sizeof (ahci_event_arg_t), KM_SLEEP);
 
 	if (ahci_portp->ahciport_event_args == NULL)
-		goto err_case3;
+		goto err_case4;
 
 	mutex_exit(&ahci_portp->ahciport_mutex);
 
 	return (AHCI_SUCCESS);
+
+err_case4:
+	ddi_taskq_destroy(ahci_portp->ahciport_event_taskq);
 
 err_case3:
 	ahci_dealloc_cmd_list(ahci_ctlp, ahci_portp);
@@ -3954,6 +3977,7 @@ ahci_dealloc_port_state(ahci_ctl_t *ahci_ctlp, uint8_t port)
 	mutex_enter(&ahci_portp->ahciport_mutex);
 	kmem_free(ahci_portp->ahciport_event_args, sizeof (ahci_event_arg_t));
 	ahci_portp->ahciport_event_args = NULL;
+	ddi_taskq_destroy(ahci_portp->ahciport_event_taskq);
 	ahci_dealloc_cmd_list(ahci_ctlp, ahci_portp);
 	ahci_dealloc_rcvd_fis(ahci_portp);
 	mutex_exit(&ahci_portp->ahciport_mutex);
@@ -5373,6 +5397,14 @@ ahci_intr_fatal_error(ahci_ctl_t *ahci_ctlp,
 		goto out0;
 	}
 
+	if (intr_status & AHCI_INTR_STATUS_TFES) {
+		task_file_status = ddi_get32(ahci_ctlp->ahcictl_ahci_acc_handle,
+		    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
+		AHCIDBG2(AHCIDBG_INTR|AHCIDBG_ERRS, ahci_ctlp,
+		    "ahci_intr_fatal_error: port %d "
+		    "task_file_status = 0x%x", port, task_file_status);
+	}
+
 	if (NON_NCQ_CMD_IN_PROGRESS(ahci_portp)) {
 		/*
 		 * Read PxCMD.CCS to determine the slot that the HBA
@@ -5389,13 +5421,6 @@ ahci_intr_fatal_error(ahci_ctl_t *ahci_ctlp,
 		    "fatal error occurred for port %d", spkt, port);
 
 		if (intr_status & AHCI_INTR_STATUS_TFES) {
-			task_file_status = ddi_get32(
-			    ahci_ctlp->ahcictl_ahci_acc_handle,
-			    (uint32_t *)AHCI_PORT_PxTFD(ahci_ctlp, port));
-			AHCIDBG2(AHCIDBG_INTR|AHCIDBG_ERRS, ahci_ctlp,
-			    "ahci_intr_fatal_error: port %d "
-			    "task_file_status = 0x%x", port, task_file_status);
-
 			err_byte = (task_file_status & AHCI_TFD_ERR_MASK)
 			    >> AHCI_TFD_ERR_SHIFT;
 
@@ -5431,7 +5456,7 @@ out1:
 	args->ahciea_event = intr_status;
 
 	/* Start the taskq to handle error recovery */
-	if ((ddi_taskq_dispatch(ahci_ctlp->ahcictl_event_taskq,
+	if ((ddi_taskq_dispatch(ahci_portp->ahciport_event_taskq,
 	    ahci_events_handler,
 	    (void *)args, DDI_NOSLEEP)) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "!ahci%d: ahci start taskq for event handler "
@@ -6211,10 +6236,11 @@ ahci_mop_commands(ahci_ctl_t *ahci_ctlp,
 		 * Please note that the command is always sent down in Slot 0
 		 */
 		err_retri_cmd_in_progress = 1;
-		AHCIDBG1(AHCIDBG_ERRS|AHCIDBG_NCQ, ahci_ctlp,
+		AHCIDBG2(AHCIDBG_ERRS|AHCIDBG_NCQ, ahci_ctlp,
 		    "ahci_mop_commands is called for port %d while "
 		    "REQUEST SENSE or READ LOG EXT for error retrieval "
-		    "is being executed", ahci_portp->ahciport_port_num);
+		    "is being executed slot_status = 0x%x",
+		    ahci_portp->ahciport_port_num, slot_status);
 		ASSERT(ahci_portp->ahciport_mop_in_progress > 1);
 		ASSERT(slot_status == 0x1);
 	}
@@ -6761,7 +6787,7 @@ next:
 		    "command or READ LOG EXT command for error data retrieval "
 		    "failed", port);
 		ASSERT(slot_status == 0x1);
-		ASSERT(failed_slot == 0x1);
+		ASSERT(failed_slot == 0);
 		ASSERT(spkt->satapkt_cmd.satacmd_acdb[0] ==
 		    SCMD_REQUEST_SENSE ||
 		    spkt->satapkt_cmd.satacmd_cmd_reg ==
@@ -6842,7 +6868,7 @@ ahci_events_handler(void *args)
 	event = ahci_event_arg->ahciea_event;
 	port = ahci_portp->ahciport_port_num;
 
-	AHCIDBG2(AHCIDBG_ENTRY|AHCIDBG_INTR, ahci_ctlp,
+	AHCIDBG2(AHCIDBG_ENTRY|AHCIDBG_INTR|AHCIDBG_ERRS, ahci_ctlp,
 	    "ahci_events_handler enter: port %d intr_status = 0x%x",
 	    port, event);
 
@@ -7072,8 +7098,9 @@ ahci_watchdog_handler(ahci_ctl_t *ahci_ctlp)
 				if (watched_cycles <= max_life_cycles)
 					goto next;
 
-				AHCIDBG1(AHCIDBG_ERRS, ahci_ctlp,
-				    "the current slot is %d", current_slot);
+				AHCIDBG1(AHCIDBG_ERRS|AHCIDBG_TIMEOUT,
+				    ahci_ctlp, "the current slot is %d",
+				    current_slot);
 				/*
 				 * We need to check whether the HBA has
 				 * begun to execute the command, if not,
