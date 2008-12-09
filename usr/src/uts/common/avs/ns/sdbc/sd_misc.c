@@ -265,13 +265,6 @@ _sdbc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	_dm_process_vars_t local_dm_process_vars;
 	struct buf bp;
 
-#ifdef DEBUG
-	int instance = ddi_get_instance(dip);
-
-	cmn_err(CE_WARN, "sdbc: _sdbc_attach %p cmd %d, instance %d",
-	    (void *)dip, cmd, instance);
-#endif
-
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
 
@@ -486,9 +479,6 @@ sdbcinit(void)
 	sdbc_inited = 0;
 
 	(void) strncpy(sdbc_version, _VERSION_, sizeof (sdbc_version));
-#ifdef DEBUG
-	cmn_err(CE_NOTE, "SDBC: initializing sdbc version %s", sdbc_version);
-#endif
 
 	mutex_init(&_sd_cache_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&_sdbc_config_lock, NULL, MUTEX_DRIVER, NULL);

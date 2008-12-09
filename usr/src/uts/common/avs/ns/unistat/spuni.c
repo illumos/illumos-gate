@@ -62,18 +62,12 @@ static struct modlinkage spuni_modlinkage = {
 int
 _init(void)
 {
-#ifdef DEBUG
-	cmn_err(CE_NOTE, "spuni: initializing Storage Product Unistat v1.01");
-#endif
 	return (mod_install(&spuni_modlinkage));
 }
 
 int
 _fini(void)
 {
-#ifdef DEBUG
-	cmn_err(CE_NOTE, "spuni: unloading Storage Product Unistat v1.01");
-#endif
 	return (mod_remove(&spuni_modlinkage));
 }
 

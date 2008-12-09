@@ -248,10 +248,6 @@ rdcattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	(void) strncpy(sndr_version, _VERSION_, sizeof (sndr_version));
 
-#ifdef DEBUG
-	cmn_err(CE_NOTE, "SNDR: initializing version %d.%d  %s", sndr_major_rev,
-		sndr_minor_rev, sndr_version);
-#endif
 	instance = ddi_get_instance(dip);
 	rdc_dip = dip;
 
@@ -298,11 +294,6 @@ rdcattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	case RDC_BMP_AUTO:		/* 0 */
 		break;
 	case RDC_BMP_ALWAYS:		/* 1 */
-#ifdef DEBUG
-		cmn_err(CE_NOTE, "SNDR bitmap mode override");
-		cmn_err(CE_CONT,
-			"SNDR: bitmaps will be written for every write I/O\n");
-#endif
 		break;
 	case RDC_BMP_NEVER:		/* 2 */
 		cmn_err(CE_NOTE, "SNDR bitmap mode override");
