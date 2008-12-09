@@ -4614,6 +4614,7 @@ removeTargetParam(int operandLen, char *operand[], int *funcRet)
 						    " with MPxIO disabled,"
 						    " not allowed to remove"
 						    " boot sess param"));
+						ret = 1;
 						continue;
 					}
 
