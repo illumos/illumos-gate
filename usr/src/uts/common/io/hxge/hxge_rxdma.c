@@ -89,7 +89,8 @@ static hxge_status_t hxge_rxdma_start_channel(p_hxge_t hxgep, uint16_t channel,
 	int n_init_kick);
 static hxge_status_t hxge_rxdma_stop_channel(p_hxge_t hxgep, uint16_t channel);
 static mblk_t *hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
-	p_rx_rcr_ring_t	*rcr_p, rdc_stat_t cs);
+	p_rx_rcr_ring_t	*rcr_p, rdc_stat_t cs,
+	uint16_t *nptrs, uint16_t *npkts);
 static void hxge_receive_packet(p_hxge_t hxgep, p_rx_rcr_ring_t rcr_p,
 	p_rcr_entry_t rcr_desc_rd_head_p, boolean_t *multi_p,
 	mblk_t ** mp, mblk_t ** mp_cont, uint32_t *invalid_rcr_entry);
@@ -98,7 +99,8 @@ static hxge_status_t hxge_disable_rxdma_channel(p_hxge_t hxgep,
 static p_rx_msg_t hxge_allocb(size_t, uint32_t, p_hxge_dma_common_t);
 static void hxge_freeb(p_rx_msg_t);
 static void hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex,
-    p_hxge_ldv_t ldvp, rdc_stat_t cs);
+	p_hxge_ldv_t ldvp, rdc_stat_t cs,
+	uint16_t *nptrs, uint16_t *npkts);
 static hxge_status_t hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index,
 	p_hxge_ldv_t ldvp, rdc_stat_t cs);
 static hxge_status_t hxge_rxbuf_index_info_init(p_hxge_t hxgep,
@@ -1132,6 +1134,7 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	uint8_t			channel;
 	hpi_handle_t		handle;
 	rdc_stat_t		cs;
+	uint16_t		nptrs = 0, npkts = 0;
 	uint_t			serviced = DDI_INTR_UNCLAIMED;
 
 	if (ldvp == NULL) {
@@ -1165,12 +1168,16 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	channel = ldvp->channel;
 	ldgp = ldvp->ldgp;
 	RXDMA_REG_READ64(handle, RDC_STAT, channel, &cs.value);
+	cs.bits.ptrread = 0;
+	cs.bits.pktread = 0;
+	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "==> hxge_rx_intr:channel %d "
 	    "cs 0x%016llx rcrto 0x%x rcrthres %x",
 	    channel, cs.value, cs.bits.rcr_to, cs.bits.rcr_thres));
 
-	hxge_rx_pkts_vring(hxgep, ldvp->vdma_index, ldvp, cs);
+	hxge_rx_pkts_vring(hxgep, ldvp->vdma_index, ldvp, cs,
+	    &nptrs, &npkts);
 	serviced = DDI_INTR_CLAIMED;
 
 	/* error events. */
@@ -1187,9 +1194,11 @@ hxge_intr_exit:
 	 */
 	cs.value &= RDC_STAT_WR1C;
 	cs.bits.mex = 1;
-	cs.bits.ptrread = 0;
-	cs.bits.pktread = 0;
+	cs.bits.ptrread = nptrs;
+	cs.bits.pktread = (npkts > 1) ? (npkts - 1) : 0;
 	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
+
+	hpi_rxdma_rdc_rcr_flush(handle, channel);
 
 	/*
 	 * Rearm this logical group if this is a single device group.
@@ -1212,13 +1221,14 @@ hxge_intr_exit:
 
 static void
 hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
-    rdc_stat_t cs)
+    rdc_stat_t cs, uint16_t *nptrs, uint16_t *npkts)
 {
 	p_mblk_t		mp;
 	p_rx_rcr_ring_t		rcrp;
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "==> hxge_rx_pkts_vring"));
-	if ((mp = hxge_rx_pkts(hxgep, vindex, ldvp, &rcrp, cs)) == NULL) {
+	if ((mp = hxge_rx_pkts(hxgep, vindex, ldvp, &rcrp, cs,
+	    nptrs, npkts)) == NULL) {
 		HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
 		    "<== hxge_rx_pkts_vring: no mp"));
 		return;
@@ -1263,7 +1273,7 @@ hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 /*ARGSUSED*/
 mblk_t *
 hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
-    p_rx_rcr_ring_t *rcrp, rdc_stat_t cs)
+    p_rx_rcr_ring_t *rcrp, rdc_stat_t cs, uint16_t *nptrs, uint16_t *npkts)
 {
 	hpi_handle_t		handle;
 	uint8_t			channel;
@@ -1282,7 +1292,6 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	p_rxdma_mailbox_t	mboxp;
 	uint64_t		rcr_head_index, rcr_tail_index;
 	uint64_t		rcr_tail;
-	uint64_t		value;
 	rdc_rcr_tail_t		rcr_tail_reg;
 	p_hxge_rx_ring_stats_t	rdc_stats;
 
@@ -1458,16 +1467,8 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 		    channel, rcr_cfg_b.value);
 	}
 
-	cs.bits.pktread = npkt_read;
-	cs.bits.ptrread = nrcr_read;
-	value = cs.value;
-	cs.value &= 0xffffffffULL;
-	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
-
-	cs.value = value & ~0xffffffffULL;
-	cs.bits.pktread = 0;
-	cs.bits.ptrread = 0;
-	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
+	*nptrs = nrcr_read;
+	*npkts = npkt_read;
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
 	    "==> hxge_rx_pkts: EXIT: rcr channel %d "

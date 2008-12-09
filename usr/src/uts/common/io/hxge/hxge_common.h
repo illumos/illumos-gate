@@ -56,7 +56,7 @@ extern "C" {
 #define	HXGE_RCR_MAX		65504			/* 2^16 - 32 */
 
 #if defined(__sparc)
-#define	HXGE_RCR_SZ 		HXGE_RCR_MAX
+#define	HXGE_RCR_SZ 		HXGE_RBR_RBB_DEFAULT * (8192 / 512)
 #else
 #define	HXGE_RCR_SZ 		HXGE_RBR_RBB_DEFAULT * (4096 / 256)
 #endif

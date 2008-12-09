@@ -159,8 +159,6 @@ extern "C" {
 				RDC_STAT_RBR_PRE_EMPTY | 	\
 				RDC_STAT_RBR_PRE_PAR |		\
 				RDC_STAT_RCR_SHA_PAR |		\
-				RDC_STAT_RCR_TO | 		\
-				RDC_STAT_RCR_THRES |		\
 				RDC_STAT_RBR_CPL |		\
 				RDC_STAT_PEU_ERR)
 

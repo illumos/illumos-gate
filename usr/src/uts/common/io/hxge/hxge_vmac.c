@@ -215,6 +215,12 @@ hxge_rx_vmac_enable(p_hxge_t hxgep)
 
 	HXGE_DEBUG_MSG((hxgep, MAC_CTL, "==> hxge_rx_vmac_enable"));
 
+	/*
+	 * Because of hardware bug document with CR6770577, need
+	 * reprogram max framesize when enabling/disabling RX
+	 * vmac.  Max framesize is programed here in
+	 * hxge_rx_vmac_init().
+	 */
 	rv = hxge_rx_vmac_init(hxgep);
 	if (rv != HXGE_OK)
 		return (rv);
@@ -238,6 +244,15 @@ hxge_rx_vmac_disable(p_hxge_t hxgep)
 	hpi_handle_t	handle = hxgep->hpi_handle;
 
 	HXGE_DEBUG_MSG((hxgep, MAC_CTL, "==> hxge_rx_vmac_disable"));
+
+	/*
+	 * Because of hardware bug document with CR6770577, need
+	 * reprogram max framesize when enabling/disabling RX
+	 * vmac.  Max framesize is programed here in
+	 * hxge_rx_vmac_init().
+	 */
+	(void) hpi_vmac_rx_set_framesize(HXGE_DEV_HPI_HANDLE(hxgep),
+	    (uint16_t)0);
 
 	rv = hpi_vmac_rx_config(handle, DISABLE, CFG_VMAC_RX_EN, 0);
 
