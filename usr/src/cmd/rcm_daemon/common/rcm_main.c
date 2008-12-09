@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Reconfiguration Coordination Daemon
@@ -349,6 +347,14 @@ main(int argc, char **argv)
 	 * but stdin/stdout/stderr.
 	 */
 	closefrom(3);
+
+	/*
+	 * When rcm_daemon is started by the caller, it will inherit the
+	 * signal block mask.  We unblock all signals to make sure the
+	 * signal handling will work normally.
+	 */
+	(void) sigfillset(&mask);
+	(void) thr_sigsetmask(SIG_UNBLOCK, &mask, NULL);
 
 	/*
 	 * block SIGUSR1, use it for killing specific threads
