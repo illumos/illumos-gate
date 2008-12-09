@@ -3447,6 +3447,7 @@ page_hashin(page_t *pp, vnode_t *vp, u_offset_t offset, kmutex_t *hold)
 	int		rc;
 
 	ASSERT(MUTEX_NOT_HELD(page_vnode_mutex(vp)));
+	ASSERT(pp->p_fsdata == 0 || panicstr);
 
 	TRACE_3(TR_FAC_VM, TR_PAGE_HASHIN,
 	    "page_hashin:pp %p vp %p offset %llx",
@@ -3515,6 +3516,7 @@ page_do_hashout(page_t *pp)
 	PP_CLRSWAP(pp);
 	pp->p_vnode = NULL;
 	pp->p_offset = (u_offset_t)-1;
+	pp->p_fsdata = 0;
 }
 
 /*
@@ -4571,6 +4573,9 @@ page_relocate_hash(page_t *pp_new, page_t *pp_old)
 
 	page_do_relocate_hash(pp_new, pp_old);
 
+	/* The following comment preserved from page_flip(). */
+	pp_new->p_fsdata = pp_old->p_fsdata;
+	pp_old->p_fsdata = 0;
 	mutex_exit(vphm);
 	mutex_exit(phm);
 
@@ -4584,9 +4589,6 @@ page_relocate_hash(page_t *pp_new, page_t *pp_old)
 	pp_new->p_cowcnt = pp_old->p_cowcnt;
 	pp_old->p_lckcnt = pp_old->p_cowcnt = 0;
 
-	/* The following comment preserved from page_flip(). */
-	/* XXX - Do we need to protect fsdata? */
-	pp_new->p_fsdata = pp_old->p_fsdata;
 }
 
 /*
