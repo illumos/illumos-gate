@@ -1609,7 +1609,9 @@ pl2303_bulkout_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	    req->bulk_completion_reason,
 	    data_len);
 
-	if (req->bulk_completion_reason && (data_len > 0)) {
+	/* Re-send data only when port is open */
+	if ((plp->pl_port_state == PL2303_PORT_OPEN) &&
+	    req->bulk_completion_reason && (data_len > 0)) {
 		pl2303_put_head(&plp->pl_tx_mp, data);
 		req->bulk_data = NULL;
 	}
