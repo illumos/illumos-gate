@@ -1236,10 +1236,6 @@
 @ MSG_ARG_T_OPAR	"("
 @ MSG_ARG_T_CPAR	")"
 
-# File and pathname strings
-
-@ MSG_FIL_LIBSTAB	"libldstab.so.1"
-
 # Environment variable strings
 
 @ MSG_LD_RUN_PATH	"LD_RUN_PATH"

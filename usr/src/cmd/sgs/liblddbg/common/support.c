@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"msg.h"
 #include	"_debug.h"
@@ -36,12 +35,17 @@ Dbg_support_req(Lm_list *lml, const char *define, int flag)
 	if (DBG_NOTCLASS(DBG_C_SUPPORT))
 		return;
 
-	if (flag == DBG_SUP_ENVIRON)
+	switch (flag) {
+	case DBG_SUP_ENVIRON:
 		str = MSG_INTL(MSG_SUP_REQ_ENV);
-	else if (flag == DBG_SUP_CMDLINE)
+		break;
+	case DBG_SUP_CMDLINE:
 		str = MSG_INTL(MSG_SUP_REQ_CMD);
-	else
-		str = MSG_INTL(MSG_SUP_REQ_DEF);
+		break;
+	default:
+		str = MSG_ORIG(MSG_STR_EMPTY);
+		break;
+	}
 
 	dbg_print(lml, MSG_ORIG(MSG_STR_EMPTY));
 	dbg_print(lml, MSG_INTL(MSG_SUP_REQ), define, str);
@@ -54,6 +58,15 @@ Dbg_support_load(Lm_list *lml, const char *obj, const char *func)
 		return;
 
 	dbg_print(lml, MSG_INTL(MSG_SUP_ROUTINE), obj, func);
+}
+
+void
+Dbg_support_vnone(Lm_list *lml, const char *obj)
+{
+	if (DBG_NOTCLASS(DBG_C_SUPPORT))
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_SUP_VNONE), obj);
 }
 
 void

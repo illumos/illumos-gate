@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/messages/Makefile.com
@@ -44,16 +42,15 @@ MSGFMT=		msgfmt
 # is formatted as a message text source file (.msg) - see gencat(1).
 
 POFILES=	ld		ldd		libld		liblddbg \
-		libldstab	librtld		rtld		libelf \
-		ldprof		libcrle		crle		moe \
-		pvs 		elfdump		elfedit		lari
+		librtld		rtld		libelf		ldprof \
+		libcrle		crle		moe		pvs \
+		elfdump		elfedit		elfwrap		lari
 
 # These message files are generated as a side effect of generating the
 # elfedit messages. Otherwise they are the same thing as POFILES
 POFILES_ELFEDIT_MODULES = \
 		elfedit_cap 	elfedit_dyn	elfedit_ehdr	elfedit_phdr \
-		elfedit_shdr 	elfedit_str	elfedit_sym	elfedit_syminfo\
-		lari
+		elfedit_shdr 	elfedit_str	elfedit_sym	elfedit_syminfo
 
 
 # Define a local version of the message catalog.  Test using: LANG=piglatin

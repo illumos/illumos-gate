@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  *	  All Rights Reserved
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "gelf.h"
 #include "inc.h"
@@ -47,7 +45,7 @@ static int pad_symtab;	/* # of bytes by which to pad symbol table */
  *
  * ld(1) accesses archives by mmapping them into memory. If the mapped
  * objects have the proper alignment, we can access them directly. If the
- * alignment is wrong, elflib "slides" them so that they are also accessible.
+ * alignment is wrong, libelf "slides" them so that they are also accessible.
  * This  is expensive in time (to copy memory) and space (it causes swap
  * to be allocated by the system to back the now-modified pages). Hence, we
  * really want to ensure that the alignment is right.
@@ -74,7 +72,7 @@ static int pad_symtab;	/* # of bytes by which to pad symbol table */
 static long mklong_tab(int *);
 static char *trimslash(char *s);
 
-static long mksymtab(ARFILEP **, Cmd_info *, int *);
+static long mksymtab(ARFILEP **, int *);
 static int writesymtab(char *, long, ARFILEP *);
 static void savename(char *);
 static void savelongname(ARFILE *, char *);
@@ -90,10 +88,6 @@ static int sizeofnewarchive(int, int);
 static int search_sym_tab(ARFILE *, Elf *, Elf_Scn *,
 	long *, ARFILEP **, int *);
 
-#ifdef BROWSER
-static void sbrowser_search_stab(Elf *, int, int, char *);
-#endif
-
 
 int
 getaf(Cmd_info *cmd_info)
@@ -104,7 +98,7 @@ getaf(Cmd_info *cmd_info)
 
 	if (elf_version(EV_CURRENT) == EV_NONE) {
 		error_message(ELF_VERSION_ERROR,
-		LIBELF_ERROR, elf_errmsg(-1));
+		    LIBELF_ERROR, elf_errmsg(-1));
 		exit(1);
 	}
 
@@ -115,7 +109,7 @@ getaf(Cmd_info *cmd_info)
 		} else {
 			/* problem other than "does not exist" */
 			error_message(SYS_OPEN_ERROR,
-			SYSTEM_ERROR, strerror(errno), arnam);
+			    SYSTEM_ERROR, strerror(errno), arnam);
 			exit(1);
 		}
 	}
@@ -125,10 +119,10 @@ getaf(Cmd_info *cmd_info)
 
 	if (elf_kind(cmd_info->arf) != ELF_K_AR) {
 		error_message(NOT_ARCHIVE_ERROR,
-		PLAIN_ERROR, (char *)0, arnam);
+		    PLAIN_ERROR, (char *)0, arnam);
 		if (opt_FLAG(cmd_info, a_FLAG) || opt_FLAG(cmd_info, b_FLAG))
-		    error_message(USAGE_06_ERROR,
-		    PLAIN_ERROR, (char *)0, cmd_info->ponam);
+			error_message(USAGE_06_ERROR,
+			    PLAIN_ERROR, (char *)0, cmd_info->ponam);
 		exit(1);
 	}
 	return (fd);
@@ -173,9 +167,9 @@ recover_padding(Elf *elf, ARFILE *file)
 		return;
 
 	/*
-	 * elflib always puts the section header array at the end
+	 * libelf always puts the section header array at the end
 	 * of the object, and all of our compilers and other tools
-	 * use elflib or follow this convention. So, it is extremely
+	 * use libelf or follow this convention. So, it is extremely
 	 * likely that the section header array is at the end of this
 	 * object: Find the address at the end of the array and compare
 	 * it to the archive ar_size. If they are within PADSZ bytes, then
@@ -183,7 +177,7 @@ recover_padding(Elf *elf, ARFILE *file)
 	 * that no ELF section can fit into PADSZ bytes).
 	 */
 	extent = gelf_getehdr(elf, &ehdr)
-		? (ehdr.e_shoff + (ehdr.e_shnum * ehdr.e_shentsize)) : 0;
+	    ? (ehdr.e_shoff + (ehdr.e_shnum * ehdr.e_shentsize)) : 0;
 	padding = file->ar_size - extent;
 
 	if ((padding < 0) || (padding >= PADSZ)) {
@@ -260,15 +254,15 @@ getfile(Cmd_info *cmd_info)
 
 	if ((mem_header = elf_getarhdr(elf)) == NULL) {
 		error_message(ELF_MALARCHIVE_ERROR,
-		LIBELF_ERROR, elf_errmsg(-1),
-		arnam, elf_getbase(elf));
+		    LIBELF_ERROR, elf_errmsg(-1),
+		    arnam, elf_getbase(elf));
 		exit(1);
 	}
 
 	/* zip past special members like the symbol and string table members */
 
 	while (strncmp(mem_header->ar_name, "/", 1) == 0 ||
-		strncmp(mem_header->ar_name, "//", 2) == 0) {
+	    strncmp(mem_header->ar_name, "//", 2) == 0) {
 		(void) elf_next(elf);
 		(void) elf_end(elf);
 		if ((elf = elf_begin(fd, ELF_C_READ, arf)) == 0)
@@ -276,8 +270,8 @@ getfile(Cmd_info *cmd_info)
 			/* the archive is empty or have hit the end */
 		if ((mem_header = elf_getarhdr(elf)) == NULL) {
 			error_message(ELF_MALARCHIVE_ERROR,
-			LIBELF_ERROR, elf_errmsg(-1),
-			arnam, elf_getbase(elf));
+			    LIBELF_ERROR, elf_errmsg(-1),
+			    arnam, elf_getbase(elf));
 			exit(0);
 		}
 	}
@@ -298,7 +292,7 @@ getfile(Cmd_info *cmd_info)
 	    = malloc(strlen(mem_header->ar_name) + 1))
 	    == NULL) {
 		error_message(MALLOC_ERROR,
-		PLAIN_ERROR, (char *)0);
+		    PLAIN_ERROR, (char *)0);
 		exit(1);
 	}
 	(void) strcpy(file->ar_longname, mem_header->ar_name);
@@ -306,13 +300,13 @@ getfile(Cmd_info *cmd_info)
 	    = malloc(strlen(mem_header->ar_rawname) + 1))
 	    == NULL) {
 		error_message(MALLOC_ERROR,
-		PLAIN_ERROR, (char *)0);
+		    PLAIN_ERROR, (char *)0);
 		exit(1);
 	}
 	tmp_rawname = mem_header->ar_rawname;
 	file_rawname = file->ar_rawname;
 	while (!isspace(*tmp_rawname) &&
-		((*file_rawname = *tmp_rawname) != '\0')) {
+	    ((*file_rawname = *tmp_rawname) != '\0')) {
 		file_rawname++;
 		tmp_rawname++;
 	}
@@ -333,7 +327,7 @@ getfile(Cmd_info *cmd_info)
 		    == NULL) {
 			if (ptr != 0) {
 				error_message(ELF_RAWFILE_ERROR,
-				LIBELF_ERROR, elf_errmsg(-1));
+				    LIBELF_ERROR, elf_errmsg(-1));
 				exit(1);
 			}
 		}
@@ -357,7 +351,7 @@ newfile(void)
 		if ((buffer = (ARFILE *) calloc(CHUNK, sizeof (ARFILE)))
 		    == NULL) {
 			error_message(MALLOC_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 			exit(1);
 		}
 		count = CHUNK;
@@ -404,7 +398,7 @@ trim(char *s)
 
 
 static long
-mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
+mksymtab(ARFILEP **symlist, int *found_obj)
 {
 	ARFILE	*fptr;
 	long	mem_offset = 0;
@@ -415,10 +409,6 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 	long nsyms = 0;
 	int class = 0;
 	Elf_Data *data;
-	char *sbshstr;
-	char *sbshstrtp;
-	int sbstabsect = -1;
-	int sbstabstrsect = -1;
 	int num_errs = 0;
 
 	newfd = 0;
@@ -434,22 +424,21 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 			if ((newfd  =
 			    open(fptr->ar_pathname, O_RDONLY)) == -1) {
 				error_message(SYS_OPEN_ERROR,
-				SYSTEM_ERROR, strerror(errno),
-				fptr->ar_pathname);
+				    SYSTEM_ERROR, strerror(errno),
+				    fptr->ar_pathname);
 				num_errs++;
 				continue;
 			}
 
 			if ((elf = elf_begin(newfd,
-					ELF_C_READ,
-					(Elf *)0)) == 0) {
+			    ELF_C_READ, (Elf *)0)) == 0) {
 				if (fptr->ar_pathname != NULL)
 					error_message(ELF_BEGIN_02_ERROR,
-					LIBELF_ERROR, elf_errmsg(-1),
-					fptr->ar_pathname);
+					    LIBELF_ERROR, elf_errmsg(-1),
+					    fptr->ar_pathname);
 				else
 					error_message(ELF_BEGIN_03_ERROR,
-					LIBELF_ERROR, elf_errmsg(-1));
+					    LIBELF_ERROR, elf_errmsg(-1));
 				(void) close(newfd);
 				newfd = 0;
 				num_errs++;
@@ -458,11 +447,11 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 			if (elf_kind(elf) == ELF_K_AR) {
 				if (fptr->ar_pathname != NULL)
 					error_message(ARCHIVE_IN_ARCHIVE_ERROR,
-					PLAIN_ERROR, (char *)0,
-					fptr->ar_pathname);
+					    PLAIN_ERROR, (char *)0,
+					    fptr->ar_pathname);
 				else
 					error_message(ARCHIVE_USAGE_ERROR,
-					PLAIN_ERROR, (char *)0);
+					    PLAIN_ERROR, (char *)0);
 				if (newfd) {
 					(void) close(newfd);
 					newfd = 0;
@@ -472,7 +461,7 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 			}
 		} else {
 			error_message(INTERNAL_01_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 			exit(1);
 		}
 		if (gelf_getehdr(elf, &ehdr) != 0) {
@@ -484,11 +473,11 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 			if (scn == NULL) {
 				if (fptr->ar_pathname != NULL)
 					error_message(ELF_GETSCN_01_ERROR,
-					LIBELF_ERROR, elf_errmsg(-1),
-					fptr->ar_pathname);
+					    LIBELF_ERROR, elf_errmsg(-1),
+					    fptr->ar_pathname);
 				else
 					error_message(ELF_GETSCN_02_ERROR,
-					LIBELF_ERROR, elf_errmsg(-1));
+					    LIBELF_ERROR, elf_errmsg(-1));
 				num_errs++;
 				if (newfd) {
 					(void) close(newfd);
@@ -503,11 +492,11 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 			if (data == NULL) {
 				if (fptr->ar_pathname != NULL)
 					error_message(ELF_GETDATA_01_ERROR,
-					LIBELF_ERROR, elf_errmsg(-1),
-					fptr->ar_pathname);
+					    LIBELF_ERROR, elf_errmsg(-1),
+					    fptr->ar_pathname);
 				else
 					error_message(ELF_GETDATA_02_ERROR,
-					LIBELF_ERROR, elf_errmsg(-1));
+					    LIBELF_ERROR, elf_errmsg(-1));
 				num_errs++;
 				if (newfd) {
 					(void) close(newfd);
@@ -519,11 +508,11 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 			if (data->d_size == 0) {
 				if (fptr->ar_pathname != NULL)
 					error_message(W_ELF_NO_DATA_01_ERROR,
-					PLAIN_ERROR, (char *)0,
-					fptr->ar_pathname);
+					    PLAIN_ERROR, (char *)0,
+					    fptr->ar_pathname);
 				else
 					error_message(W_ELF_NO_DATA_02_ERROR,
-					PLAIN_ERROR, (char *)0);
+					    PLAIN_ERROR, (char *)0);
 				if (newfd) {
 					(void) close(newfd);
 					newfd = 0;
@@ -532,7 +521,6 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 				num_errs++;
 				continue;
 			}
-			sbshstr = (char *)data->d_buf;
 
 			/* loop through sections to find symbol table */
 			scn = 0;
@@ -541,13 +529,15 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 				if (gelf_getshdr(scn, &shdr) == NULL) {
 					if (fptr->ar_pathname != NULL)
 						error_message(
-						ELF_GETDATA_01_ERROR,
-						LIBELF_ERROR, elf_errmsg(-1),
-						fptr->ar_pathname);
+						    ELF_GETDATA_01_ERROR,
+						    LIBELF_ERROR,
+						    elf_errmsg(-1),
+						    fptr->ar_pathname);
 					else
 						error_message(
-						ELF_GETDATA_02_ERROR,
-						LIBELF_ERROR, elf_errmsg(-1));
+						    ELF_GETDATA_02_ERROR,
+						    LIBELF_ERROR,
+						    elf_errmsg(-1));
 					if (newfd) {
 						(void) close(newfd);
 						newfd = 0;
@@ -558,49 +548,16 @@ mksymtab(ARFILEP **symlist, Cmd_info *cmd_info, int *found_obj)
 				}
 				*found_obj = 1;
 				if (shdr.sh_type == SHT_SYMTAB)
-				    if (search_sym_tab(fptr, elf,
-						scn,
-						&nsyms,
-						symlist,
-						&num_errs) == -1) {
-					if (newfd) {
-						(void) close(newfd);
-						newfd = 0;
+					if (search_sym_tab(fptr, elf,
+					    scn, &nsyms, symlist,
+					    &num_errs) == -1) {
+						if (newfd) {
+							(void) close(newfd);
+							newfd = 0;
+						}
+						continue;
 					}
-					continue;
-				    }
-#ifdef BROWSER
-				/*
-				 * XX64:  sbrowser_search_stab() currently gets
-				 *	confused by sb-tabs in v9.  at this
-				 *	point, no one knows what v9 sb-tabs are
-				 *	supposed to look like.
-				 */
-/*				if (shdr.sh_name != 0) { */
-				if ((class == ELFCLASS32) &&
-				    (shdr.sh_name != 0)) {
-					sbshstrtp = (char *)
-						((long)sbshstr + shdr.sh_name);
-					if (strcmp(sbshstrtp, ".stab") == 0) {
-						sbstabsect = elf_ndxscn(scn);
-					} else if (strcmp(sbshstrtp,
-							".stabstr") == 0) {
-						sbstabstrsect = elf_ndxscn(scn);
-					}
-				}
-#endif
 			}
-#ifdef BROWSER
-			if (sbstabsect != -1 || sbstabstrsect != -1) {
-				sbrowser_search_stab(
-					elf,
-					sbstabsect,
-					sbstabstrsect,
-					cmd_info->arnam);
-				sbstabsect = -1;
-				sbstabstrsect = -1;
-			}
-#endif
 		}
 		mem_offset += sizeof (struct ar_hdr) + fptr->ar_size;
 		if (fptr->ar_size & 01)
@@ -647,7 +604,7 @@ writesymtab(char *dst, long nsyms, ARFILEP *symlist)
 	sym_tab_size += pad_symtab;
 
 	(void) sprintf(buf1, FORMAT, SYMDIRNAME, time(0), (unsigned)0,
-		(unsigned)0, (unsigned)0, (long)sym_tab_size, ARFMAG);
+	    (unsigned)0, (unsigned)0, (long)sym_tab_size, ARFMAG);
 
 	if (strlen(buf1) != sizeof (struct ar_hdr)) {
 		error_message(INTERNAL_02_ERROR);
@@ -718,10 +675,9 @@ savename(char *symbol)
 	diff = 0;
 	if (str_base == (char *)0) {
 		/* no space allocated yet */
-		if ((str_base = malloc((unsigned)str_length))
-		    == NULL) {
+		if ((str_base = malloc((unsigned)str_length)) == NULL) {
 			error_message(MALLOC_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 			exit(1);
 		}
 		str_top = str_base;
@@ -735,11 +691,12 @@ savename(char *symbol)
 
 		do
 			str_length += BUFSIZ * 2;
-		while (str_top > str_base + str_length);
+		while (str_top > str_base + str_length)
+			;
 		if ((str_base = (char *)realloc(str_base, str_length)) ==
 		    NULL) {
 			error_message(MALLOC_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 			exit(1);
 		}
 		/*
@@ -748,8 +705,7 @@ savename(char *symbol)
 		diff = str_base - old_base;
 		p += diff;
 	}
-	for (i = 0, s = symbol;
-		i < strlen(symbol) && *s != '\0'; i++) {
+	for (i = 0, s = symbol; i < strlen(symbol) && *s != '\0'; i++) {
 		*p++ = *s++;
 	}
 	*p++ = '\0';
@@ -773,7 +729,7 @@ savelongname(ARFILE *fptr, char *ptr_index)
 		if ((str_base1 = malloc((unsigned)str_length))
 		    == NULL) {
 			error_message(MALLOC_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 			exit(1);
 		}
 		str_top1 = str_base1;
@@ -795,11 +751,12 @@ savelongname(ARFILE *fptr, char *ptr_index)
 
 		do
 			str_length += BUFSIZ * 2;
-		while (str_top1 > str_base1 + str_length);
+		while (str_top1 > str_base1 + str_length)
+			;
 		if ((str_base1 = (char *)realloc(str_base1, str_length))
 		    == NULL) {
 			error_message(MALLOC_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 			exit(1);
 		}
 		/*
@@ -809,8 +766,7 @@ savelongname(ARFILE *fptr, char *ptr_index)
 		p += diff;
 	}
 	for (i = 0, s = fptr->ar_longname;
-		i < strlen(fptr->ar_longname) && *s != '\0';
-		i++) {
+	    i < strlen(fptr->ar_longname) && *s != '\0'; i++) {
 		*p++ = *s++;
 	}
 	*p++ = '/';
@@ -836,7 +792,7 @@ writefile(Cmd_info *cmd_info)
 	int found_obj = 0;
 
 	long_tab_size = mklong_tab(&longnames);
-	nsyms = mksymtab(&symlist, cmd_info, &found_obj);
+	nsyms = mksymtab(&symlist, &found_obj);
 
 	for (i = 0; signum[i]; i++)
 		/* started writing, cannot interrupt */
@@ -845,14 +801,13 @@ writefile(Cmd_info *cmd_info)
 
 	/* Is this a new archive? */
 	if ((access(cmd_info->arnam,  0)  < 0) && (errno == ENOENT)) {
-	    new_archive = 1;
-	    if (!opt_FLAG(cmd_info, c_FLAG)) {
-		error_message(BER_MES_CREATE_ERROR,
-		PLAIN_ERROR, (char *)0, cmd_info->arnam);
-	    }
-	}
-	else
-	    new_archive = 0;
+		new_archive = 1;
+		if (!opt_FLAG(cmd_info, c_FLAG)) {
+			error_message(BER_MES_CREATE_ERROR,
+			    PLAIN_ERROR, (char *)0, cmd_info->arnam);
+		}
+	} else
+		new_archive = 0;
 
 	/*
 	 * Calculate the size of the new archive
@@ -876,7 +831,7 @@ writefile(Cmd_info *cmd_info)
 	}
 	if (dst == NULL) {
 		return writelargefile(cmd_info, long_tab_size,
-			longnames, symlist, nsyms, found_obj, new_archive);
+		    longnames, symlist, nsyms, found_obj, new_archive);
 	}
 
 	(void) memcpy(tmp_dst, ARMAG, SARMAG);
@@ -890,8 +845,8 @@ writefile(Cmd_info *cmd_info)
 
 	if (longnames) {
 		(void) sprintf(tmp_dst, FORMAT, LONGDIRNAME, time(0),
-			(unsigned)0, (unsigned)0, (unsigned)0,
-			(long)long_tab_size, ARFMAG);
+		    (unsigned)0, (unsigned)0, (unsigned)0,
+		    (long)long_tab_size, ARFMAG);
 		tmp_dst += sizeof (struct ar_hdr);
 		(void) memcpy(tmp_dst, str_base1, str_top1 - str_base1);
 		tmp_dst += str_top1 - str_base1;
@@ -913,7 +868,7 @@ writefile(Cmd_info *cmd_info)
 		}
 		if (strlen(fptr->ar_longname) <= (unsigned)SNAME-2)
 			(void) sprintf(tmp_dst, FNFORMAT,
-					trimslash(fptr->ar_longname));
+			    trimslash(fptr->ar_longname));
 		else
 			(void) sprintf(tmp_dst, FNFORMAT, fptr->ar_name);
 		(void) sprintf(tmp_dst+16, TLFORMAT, fptr->ar_date,
@@ -936,19 +891,18 @@ writefile(Cmd_info *cmd_info)
 				    fptr->ar_longname);
 				exit(1);
 			} else {
-				if (fread(tmp_dst,
-				    sizeof (char),
+				if (fread(tmp_dst, sizeof (char),
 				    fptr->ar_size, f) != fptr->ar_size) {
 					error_message(SYS_READ_ERROR,
-					SYSTEM_ERROR, strerror(errno),
-					fptr->ar_longname);
+					    SYSTEM_ERROR, strerror(errno),
+					    fptr->ar_longname);
 					exit(1);
 				}
 			}
 			(void) fclose(f);
 		} else {
 			(void) memcpy(tmp_dst, fptr->ar_contents,
-				fptr->ar_size);
+			    fptr->ar_size);
 			if (fptr->ar_flag & F_MALLOCED) {
 				(void) free(fptr->ar_contents);
 				fptr->ar_flag &= ~(F_MALLOCED);
@@ -986,7 +940,7 @@ writefile(Cmd_info *cmd_info)
 		nfd = creat(name, 0666);
 		if (nfd == -1) {
 			error_message(SYS_CREATE_01_ERROR,
-			SYSTEM_ERROR, strerror(errno), name);
+			    SYSTEM_ERROR, strerror(errno), name);
 			exit(1);
 		}
 	} else {
@@ -996,23 +950,22 @@ writefile(Cmd_info *cmd_info)
 		nfd = open(name, O_RDWR|O_TRUNC);
 		if (nfd == -1) {
 			error_message(SYS_WRITE_02_ERROR,
-			SYSTEM_ERROR, strerror(errno), name);
+			    SYSTEM_ERROR, strerror(errno), name);
 			exit(1);
 		}
 	}
 #ifndef XPG4
 	if (opt_FLAG(cmd_info, v_FLAG)) {
-	    error_message(BER_MES_WRITE_ERROR,
-	    PLAIN_ERROR, (char *)0,
-	    cmd_info->arnam);
+		error_message(BER_MES_WRITE_ERROR,
+		    PLAIN_ERROR, (char *)0, cmd_info->arnam);
 	}
 #endif
 	if (write(nfd, dst, arsize) != arsize) {
 		error_message(SYS_WRITE_04_ERROR,
-			SYSTEM_ERROR, strerror(errno), name);
+		    SYSTEM_ERROR, strerror(errno), name);
 		if (!new_archive)
 			error_message(WARN_USER_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 		exit(2);
 	}
 	return (dst);
@@ -1053,109 +1006,6 @@ sputl(long n, char *cp)
 	*cp++ = n & 255;
 }
 
-#ifdef BROWSER
-
-static void
-sbrowser_search_stab(Elf *elf, int stabid, int stabstrid, char *arnam)
-{
-	Elf_Scn		*stab_scn;
-	Elf_Scn		*stabstr_scn;
-	Elf_Data	*data;
-	struct nlist	*np;
-	struct nlist	*stabtab;
-	char		*stabstrtab;
-	char		*stabstroff;
-	char		*symname;
-	int		prevstabstrsz;
-	GElf_Xword	nstab;
-	GElf_Shdr	shdr;
-
-	/* use the .stab and stabstr section index to find the data buffer */
-	if (stabid == -1) {
-		error_message(SBROW_01_ERROR,
-		PLAIN_ERROR, (char *)0);
-		return;
-	}
-	stab_scn = elf_getscn(elf, (size_t)stabid);
-	if (stab_scn == NULL) {
-		error_message(ELF_GETDATA_02_ERROR,
-		LIBELF_ERROR, elf_errmsg(-1));
-		return;
-	}
-
-	(void) gelf_getshdr(stab_scn, &shdr);
-	/*
-	 * Zero length .stab sections have been produced by some compilers so
-	 * ignore the section if this is the case.
-	 */
-	if ((nstab = shdr.sh_size / shdr.sh_entsize) == 0)
-		return;
-
-	if (stabstrid == -1) {
-		error_message(SBROW_02_ERROR,
-		PLAIN_ERROR, (char *)0);
-		return;
-	}
-	stabstr_scn = elf_getscn(elf, (size_t)stabstrid);
-	if (stabstr_scn == NULL) {
-		error_message(ELF_GETDATA_02_ERROR,
-		LIBELF_ERROR, elf_errmsg(-1));
-		return;
-	}
-	if (gelf_getshdr(stabstr_scn, &shdr) == NULL) {
-		error_message(ELF_GETDATA_02_ERROR,
-		LIBELF_ERROR, elf_errmsg(-1));
-		return;
-	}
-	if (shdr.sh_size == 0) {
-		error_message(SBROW_03_ERROR,
-		PLAIN_ERROR, (char *)0);
-		return;
-	}
-
-	data = 0;
-	data = elf_getdata(stabstr_scn, data);
-	if (data == NULL) {
-		error_message(ELF_GETDATA_02_ERROR,
-		LIBELF_ERROR, elf_errmsg(-1));
-		return;
-	}
-	if (data->d_size == 0) {
-		error_message(SBROW_02_ERROR,
-		PLAIN_ERROR, (char *)0);
-		return;
-	}
-	stabstrtab = (char *)data->d_buf;
-	data = 0;
-	data = elf_getdata(stab_scn, data);
-	if (data == NULL) {
-		error_message(ELF_GETDATA_02_ERROR,
-		LIBELF_ERROR, elf_errmsg(-1));
-		return;
-	}
-	if (data->d_size == 0) {
-		error_message(SBROW_03_ERROR,
-		PLAIN_ERROR, (char *)0);
-		return;
-	}
-	stabtab = (struct nlist *)data->d_buf;
-	stabstroff = stabstrtab;
-	prevstabstrsz = 0;
-	for (np = stabtab; np < &stabtab[nstab]; np++) {
-		if (np->n_type == 0) {
-			stabstroff += prevstabstrsz;
-			prevstabstrsz = np->n_value;
-		}
-		symname = stabstroff + np->n_un.n_strx;
-		if (np->n_type == 0x48) {
-			sbfocus_symbol(&sb_data, arnam, "-a", symname);
-		}
-	}
-}
-#endif
-
-
-
 static int
 search_sym_tab(ARFILE *fptr, Elf *elf, Elf_Scn *scn,
 	long *nsyms, ARFILEP **symlist, int *num_errs)
@@ -1177,11 +1027,11 @@ search_sym_tab(ARFILE *fptr, Elf *elf, Elf_Scn *scn,
 	if (str_scn == NULL) {
 		if (fname != NULL)
 			error_message(ELF_GETDATA_01_ERROR,
-			LIBELF_ERROR, elf_errmsg(-1),
-			fname);
+			    LIBELF_ERROR, elf_errmsg(-1),
+			    fname);
 		else
 			error_message(ELF_GETDATA_02_ERROR,
-			LIBELF_ERROR, elf_errmsg(-1));
+			    LIBELF_ERROR, elf_errmsg(-1));
 		(*num_errs)++;
 		return (-1);
 	}
@@ -1189,7 +1039,7 @@ search_sym_tab(ARFILE *fptr, Elf *elf, Elf_Scn *scn,
 	no_of_symbols = shdr.sh_size / shdr.sh_entsize;
 	if (no_of_symbols == -1) {
 		error_message(SYMTAB_01_ERROR,
-		PLAIN_ERROR, (char *)0);
+		    PLAIN_ERROR, (char *)0);
 		return (-1);
 	}
 
@@ -1198,10 +1048,10 @@ search_sym_tab(ARFILE *fptr, Elf *elf, Elf_Scn *scn,
 	if (str_shtype == -1) {
 		if (fname != NULL)
 			error_message(ELF_GETDATA_01_ERROR,
-			LIBELF_ERROR, elf_errmsg(-1), fname);
+			    LIBELF_ERROR, elf_errmsg(-1), fname);
 		else
 			error_message(ELF_GETDATA_02_ERROR,
-			LIBELF_ERROR, elf_errmsg(-1));
+			    LIBELF_ERROR, elf_errmsg(-1));
 		(*num_errs)++;
 		return (-1);
 	}
@@ -1213,44 +1063,44 @@ search_sym_tab(ARFILE *fptr, Elf *elf, Elf_Scn *scn,
 	if (str_shtype != SHT_STRTAB) {
 		if (fname != NULL)
 			error_message(SYMTAB_02_ERROR,
-			PLAIN_ERROR, (char *)0,
-			fname);
+			    PLAIN_ERROR, (char *)0,
+			    fname);
 		else
 			error_message(SYMTAB_03_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 		return (0);
 	}
 	str_data = 0;
 	if ((str_data = elf_getdata(str_scn, str_data)) == 0) {
 		if (fname != NULL)
 			error_message(SYMTAB_04_ERROR,
-			PLAIN_ERROR, (char *)0,
-			fname);
+			    PLAIN_ERROR, (char *)0,
+			    fname);
 		else
 			error_message(SYMTAB_05_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 		return (0);
 	}
 	if (str_data->d_size == 0) {
 		if (fname != NULL)
 			error_message(SYMTAB_06_ERROR,
-			PLAIN_ERROR, (char *)0,
-			fname);
+			    PLAIN_ERROR, (char *)0,
+			    fname);
 		else
 			error_message(SYMTAB_07_ERROR,
-			PLAIN_ERROR, (char *)0);
+			    PLAIN_ERROR, (char *)0);
 		return (0);
 	}
 	sym_data = 0;
 	if ((sym_data = elf_getdata(scn, sym_data)) == NULL) {
 		if (fname != NULL)
 			error_message(ELF_01_ERROR,
-			LIBELF_ERROR, elf_errmsg(-1),
-			fname, elf_errmsg(-1));
+			    LIBELF_ERROR, elf_errmsg(-1),
+			    fname, elf_errmsg(-1));
 		else
 			error_message(ELF_02_ERROR,
-			LIBELF_ERROR, elf_errmsg(-1),
-			elf_errmsg(-1));
+			    LIBELF_ERROR, elf_errmsg(-1),
+			    elf_errmsg(-1));
 		return (0);
 	}
 
@@ -1262,14 +1112,14 @@ search_sym_tab(ARFILE *fptr, Elf *elf, Elf_Scn *scn,
 		symname = (char *)(str_data->d_buf) + sym.st_name;
 
 		if (((GELF_ST_BIND(sym.st_info) == STB_GLOBAL) ||
-			(GELF_ST_BIND(sym.st_info) == STB_WEAK)) &&
-			(sym.st_shndx != SHN_UNDEF)) {
+		    (GELF_ST_BIND(sym.st_info) == STB_WEAK)) &&
+		    (sym.st_shndx != SHN_UNDEF)) {
 			if (!syms_left) {
 				sym_ptr = malloc((SYMCHUNK+1)
-						* sizeof (ARFILEP));
+				    * sizeof (ARFILEP));
 				if (sym_ptr == NULL) {
 					error_message(MALLOC_ERROR,
-					PLAIN_ERROR, (char *)0);
+					    PLAIN_ERROR, (char *)0);
 					exit(1);
 				}
 				syms_left = SYMCHUNK;
@@ -1380,7 +1230,7 @@ static void
 arwrite(char *name, int nfd, char *dst, int size) {
 	if (write(nfd, dst, size) != size) {
 		error_message(SYS_WRITE_04_ERROR,
-			SYSTEM_ERROR, strerror(errno), name);
+		    SYSTEM_ERROR, strerror(errno), name);
 		exit(2);
 	}
 }
@@ -1493,14 +1343,14 @@ writelargefile(Cmd_info *cmd_info, long long_tab_size, int longnames,
 		nfd = open(name, O_RDWR|O_CREAT|O_LARGEFILE, 0666);
 		if (nfd == -1) {
 			error_message(SYS_CREATE_01_ERROR,
-			SYSTEM_ERROR, strerror(errno), name);
+			    SYSTEM_ERROR, strerror(errno), name);
 			exit(1);
 		}
 	} else {
 		nfd = open(new_name, O_RDWR|O_CREAT|O_LARGEFILE, 0666);
 		if (nfd == -1) {
 			error_message(SYS_WRITE_02_ERROR,
-			SYSTEM_ERROR, strerror(errno), name);
+			    SYSTEM_ERROR, strerror(errno), name);
 			exit(1);
 		}
 	}
@@ -1523,17 +1373,17 @@ writelargefile(Cmd_info *cmd_info, long long_tab_size, int longnames,
 
 	if (longnames) {
 		(void) sprintf(tmp_dst, FORMAT, LONGDIRNAME, time(0),
-			(unsigned)0, (unsigned)0, (unsigned)0,
-			(long)long_tab_size, ARFMAG);
+		    (unsigned)0, (unsigned)0, (unsigned)0,
+		    (long)long_tab_size, ARFMAG);
 		tmp_dst += sizeof (struct ar_hdr);
 		(void) memcpy(tmp_dst, str_base1, str_top1 - str_base1);
 		tmp_dst += str_top1 - str_base1;
 	}
 #ifndef XPG4
 	if (opt_FLAG(cmd_info, v_FLAG)) {
-	    error_message(BER_MES_WRITE_ERROR,
-	    PLAIN_ERROR, (char *)0,
-	    cmd_info->arnam);
+		error_message(BER_MES_WRITE_ERROR,
+		    PLAIN_ERROR, (char *)0,
+		    cmd_info->arnam);
 	}
 #endif
 	arwrite(name, nfd, dst, (int)(tmp_dst - dst));
@@ -1545,7 +1395,7 @@ writelargefile(Cmd_info *cmd_info, long long_tab_size, int longnames,
 		}
 		if (strlen(fptr->ar_longname) <= (unsigned)SNAME-2)
 			(void) sprintf(dst, FNFORMAT,
-					trimslash(fptr->ar_longname));
+			    trimslash(fptr->ar_longname));
 		else
 			(void) sprintf(dst, FNFORMAT, fptr->ar_name);
 		(void) sprintf(dst+16, TLFORMAT, fptr->ar_date,
@@ -1564,22 +1414,22 @@ writelargefile(Cmd_info *cmd_info, long long_tab_size, int longnames,
 			}
 			if (f == NULL) {
 				error_message(SYS_OPEN_ERROR,
-				SYSTEM_ERROR, strerror(errno),
-				fptr->ar_longname);
+				    SYSTEM_ERROR, strerror(errno),
+				    fptr->ar_longname);
 				exit(1);
 			} else {
 				if ((fptr->ar_contents = (char *)
 				    malloc(ROUNDUP(stbuf.st_size))) == NULL) {
 					error_message(MALLOC_ERROR,
-					PLAIN_ERROR, (char *)0);
+					    PLAIN_ERROR, (char *)0);
 					exit(1);
 				}
 				if (fread(fptr->ar_contents,
 				    sizeof (char),
 				    stbuf.st_size, f) != stbuf.st_size) {
 					error_message(SYS_READ_ERROR,
-					SYSTEM_ERROR, strerror(errno),
-					fptr->ar_longname);
+					    SYSTEM_ERROR, strerror(errno),
+					    fptr->ar_longname);
 					exit(1);
 				}
 			}

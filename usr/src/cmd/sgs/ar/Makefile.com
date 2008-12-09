@@ -29,7 +29,7 @@ XPG4PROG=	ar
 include		$(SRC)/cmd/Makefile.cmd
 
 COMOBJS=	main.o		file.o		cmd.o		global.o \
-		message.o	sbfocus_enter.o
+		message.o
 
 POFILE=		../ar.po
 
@@ -37,7 +37,7 @@ OBJS=		$(COMOBJS:%=objs/%)
 XPG4OBJS=	$(COMOBJS:%=objs.xpg4/%)
 
 LLDFLAGS =	'-R$$ORIGIN/../../lib'
-CPPFLAGS=	-I../../include -DBROWSER $(CPPFLAGS.master)
+CPPFLAGS=	-I../../include $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 C99MODE=	$(C99_ENABLE)
 

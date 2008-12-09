@@ -640,7 +640,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			}
 
 			/*
-			 * We deteremine what the 'got reference'
+			 * We determine what the 'got reference'
 			 * model (if required) is at this point.  This
 			 * needs to be done before tls_fixup() since
 			 * it may 'transition' our instructions.

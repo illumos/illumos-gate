@@ -1028,7 +1028,7 @@ struct group_desc {
  * Indexes into the ld_support_funcs[] table.
  */
 typedef enum {
-	LDS_VERSION = 0,
+	LDS_VERSION = 0,	/* Must be first and have value 0 */
 	LDS_INPUT_DONE,
 	LDS_START,
 	LDS_ATEXIT,

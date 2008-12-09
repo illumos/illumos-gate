@@ -59,7 +59,6 @@ extern "C" {
  */
 #define	DBG_SUP_ENVIRON		1
 #define	DBG_SUP_CMDLINE		2
-#define	DBG_SUP_DEFAULT		3
 
 #define	DBG_CONF_IGNORE		1	/* configuration processing errors */
 #define	DBG_CONF_VERSION	2
@@ -353,6 +352,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_support_action	Dbg64_support_action
 #define	Dbg_support_load	Dbg64_support_load
 #define	Dbg_support_req		Dbg64_support_req
+#define	Dbg_support_vnone	Dbg64_support_vnone
 
 #define	Dbg_syminfo_entry	Dbg64_syminfo_entry
 #define	Dbg_syminfo_title	Dbg64_syminfo_title
@@ -558,6 +558,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_support_action	Dbg32_support_action
 #define	Dbg_support_load	Dbg32_support_load
 #define	Dbg_support_req		Dbg32_support_req
+#define	Dbg_support_vnone	Dbg32_support_vnone
 
 #define	Dbg_syminfo_entry	Dbg32_syminfo_entry
 #define	Dbg_syminfo_title	Dbg32_syminfo_title
@@ -802,6 +803,7 @@ extern	void	Dbg_support_action(Lm_list *, const char *, const char *,
 		    Support_ndx, const char *);
 extern	void	Dbg_support_load(Lm_list *, const char *, const char *);
 extern	void	Dbg_support_req(Lm_list *, const char *, int);
+extern	void	Dbg_support_vnone(Lm_list *, const char *);
 
 extern	void	Dbg_syminfo_entry(Lm_list *, Word, Syminfo *, Sym *,
 		    const char *, Dyn *);

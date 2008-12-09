@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 pics/%.o:	../common/%.c
@@ -53,12 +51,8 @@ include		$(SRC)/cmd/sgs/Makefile.targ
 
 # Derived source and header files (messaging).
 
-catalog:	$(BLTMESG)
+catalog:
 
-chkmsg:		$(SRCS)
-		sh $(CHKMSG) $(CHKMSGFLAGS) $(SRCS)
+chkmsg:
 
-$(BLTDEFS) + \
-$(BLTDATA) + \
-$(BLTMESG) :	$(SGSMSGALL)
-		$(SGSMSG) $(SGSMSGFLAGS) $(SGSMSGALL)
+package:

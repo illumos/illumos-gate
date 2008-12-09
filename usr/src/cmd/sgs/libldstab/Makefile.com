@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libldstab.a
@@ -30,9 +28,8 @@ VERS=		.1
 
 COMOBJS=	stab.o
 DUPOBJS+=
-BLTOBJ=		msg.o
 
-OBJECTS=	$(BLTOBJ) $(COMOBJS) $(DUPOBJS)
+OBJECTS=	$(COMOBJS) $(DUPOBJS)
 
 include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
@@ -59,21 +56,10 @@ XXXFLAGS=
 $(DYNLIB) :=	XXXFLAGS= $(USE_PROTO)
 DYNFLAGS +=	$(XXXFLAGS)
 
-BLTDEFS=	msg.h
-BLTDATA=	msg.c
-BLTMESG=	$(SGSMSGDIR)/libldstab
-
-BLTFILES=	$(BLTDEFS) $(BLTDATA) $(BLTMESG)
-
-SGSMSGCOM=	../common/libldstab.msg
-SGSMSGALL=	$(SGSMSGCOM)
-SGSMSGTARG=	$(SGSMSGCOM)
-SGSMSGFLAGS +=	-h $(BLTDEFS) -d $(BLTDATA) -m $(BLTMESG) -n libldstab_msg
-
-SRCS=		$(COMOBJS:%.o=../common/%.c) $(BLTDATA)
+SRCS=		$(COMOBJS:%.o=../common/%.c)
 LINTSRCS=	$(SRCS)
 
-CLEANFILES +=	$(LINTOUTS) $(BLTFILES)
+CLEANFILES +=	$(LINTOUTS)
 CLOBBERFILES +=	$(DYNLIB)
 
 ROOTDYNLIB=	$(DYNLIB:%=$(ROOTLIBDIR)/%)

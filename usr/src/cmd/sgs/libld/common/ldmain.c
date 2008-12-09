@@ -111,7 +111,6 @@ ld_main(int argc, char **argv, Half mach)
 {
 	char		*sgs_support;	/* SGS_SUPPORT environment string */
 	Half		etype;
-	int		suplib = 0;
 	Ofl_desc	*ofl;
 
 	/*
@@ -165,10 +164,9 @@ ld_main(int argc, char **argv, Half mach)
 		return (0);
 
 	/*
-	 * Determine whether any support libraries been loaded (either through
-	 * the SGS_SUPPORT environment variable and/or through the -S option).
-	 * By default the support library libldstab.so.1 is loaded provided the
-	 * user hasn't specified their own -S libraries.
+	 * Determine whether any support libraries should be loaded,
+	 * (either through the SGS_SUPPORT environment variable and/or
+	 * through the -S option).
 	 */
 #if	defined(_LP64)
 	if ((sgs_support = getenv(MSG_ORIG(MSG_SGS_SUPPORT_64))) == NULL)
@@ -186,11 +184,6 @@ ld_main(int argc, char **argv, Half mach)
 		    DBG_SUP_ENVIRON));
 		if ((lib = strtok_r(sgs_support, sep, &lasts)) != NULL) {
 			do {
-				if (strcmp(lib,
-				    MSG_ORIG(MSG_FIL_LIBSTAB)) == 0) {
-					if (suplib++)
-						continue;
-				}
 				if (ld_sup_loadso(ofl, lib) == S_ERROR)
 					return (ld_exit(ofl));
 
@@ -208,17 +201,8 @@ ld_main(int argc, char **argv, Half mach)
 			if (ld_sup_loadso(ofl, lib) == S_ERROR)
 				return (ld_exit(ofl));
 		}
-		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
-	} else {
-		if (suplib == 0) {
-			DBG_CALL(Dbg_support_req(ofl->ofl_lml,
-			    MSG_ORIG(MSG_FIL_LIBSTAB), DBG_SUP_DEFAULT));
-			if (ld_sup_loadso(ofl, MSG_ORIG(MSG_FIL_LIBSTAB)) ==
-			    S_ERROR)
-				return (ld_exit(ofl));
-		}
-		DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 	}
+	DBG_CALL(Dbg_util_nl(ofl->ofl_lml, DBG_NL_STD));
 
 	DBG_CALL(Dbg_ent_print(ofl->ofl_lml, ofl->ofl_dehdr->e_machine,
 	    &ofl->ofl_ents, (ofl->ofl_flags & FLG_OF_DYNAMIC) != 0));

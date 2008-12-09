@@ -628,12 +628,12 @@
 @ MSG_SUP_REQ		"support object request=%s  (%s)"
 @ MSG_SUP_REQ_ENV	"supplied via SGS_SUPPORT"
 @ MSG_SUP_REQ_CMD	"supplied via -S"
-@ MSG_SUP_REQ_DEF	"default"
 
 @ MSG_SUP_ROUTINE	"  support object=%s:  provides routine %s"
 
 @ MSG_SUP_CALLING_1	"  calling routine=%s (%s)"
 @ MSG_SUP_CALLING_2	"  calling routine=%s (%s)  %s=%s"
+@ MSG_SUP_VNONE		"  unloading object=%s: version=LD_SUP_VNONE"
 @ MSG_SUP_OUTFILE	"output file"
 @ MSG_SUP_INFILE	"input file"
 @ MSG_SUP_INSEC		"input section"

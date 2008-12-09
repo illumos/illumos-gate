@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<dlfcn.h>
@@ -86,21 +84,40 @@ ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 		    support[interface].sup_name)) == NULL)
 			continue;
 
-		if ((flp = libld_malloc(sizeof (Func_list))) == NULL)
-			return (S_ERROR);
-
-		flp->fl_obj = obj;
-		flp->fl_fptr = fptr;
 		DBG_CALL(Dbg_support_load(ofl->ofl_lml, obj,
 		    support[interface].sup_name));
 
 		if (interface == LDS_VERSION) {
-			DBG_CALL(Dbg_support_action(ofl->ofl_lml, flp->fl_obj,
+			DBG_CALL(Dbg_support_action(ofl->ofl_lml, obj,
 			    support[LDS_VERSION].sup_name, LDS_VERSION, 0));
 
-			version = ((uint_t(*)())flp->fl_fptr)(LD_SUP_VCURRENT);
-			if ((version == LD_SUP_VNONE) ||
-			    (version > LD_SUP_VCURRENT)) {
+			version = ((uint_t(*)())fptr)(LD_SUP_VCURRENT);
+
+			/*
+			 * If version is LD_SUP_VNONE, unload the support
+			 * library and act as if it was never requested.
+			 * This provides the support library with a mechanism
+			 * for opting out of the process.
+			 *
+			 * Note that this depends on LDS_VERSION being the
+			 * first item in support[]. If this were not true,
+			 * then other functions from the library might be
+			 * entered into the function lists, and unloading
+			 * the object would cause corruption.
+			 */
+			assert(LDS_VERSION == 0);
+			if (version == LD_SUP_VNONE) {
+				DBG_CALL(Dbg_support_vnone(ofl->ofl_lml,
+				    obj));
+				(void) dlclose(handle);
+				return (1);
+			}
+
+			/*
+			 * If the support library has a version higher
+			 * than we support, we are unable to accept it.
+			 */
+			if (version > LD_SUP_VCURRENT) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_SUP_BADVERSION),
 				    LD_SUP_VCURRENT, version);
@@ -108,6 +125,14 @@ ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 				return (S_ERROR);
 			}
 		}
+
+
+		if ((flp = libld_malloc(sizeof (Func_list))) == NULL) {
+			(void) dlclose(handle);
+			return (S_ERROR);
+		}
+		flp->fl_obj = obj;
+		flp->fl_fptr = fptr;
 		flp->fl_version = version;
 		if (list_appendc(&support[interface].sup_funcs, flp) == 0)
 			return (S_ERROR);
