@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CPU_H
 #define	_SYS_CPU_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Include generic bustype cookies.
@@ -71,6 +69,22 @@ extern int vac;
 #pragma	weak	cpu_smt_pause
 extern  void	cpu_smt_pause();
 #define	SMT_PAUSE()	{ if (&cpu_smt_pause) cpu_smt_pause(); }
+
+/*
+ * used to preload L2 cache
+ */
+#if !defined(__lint) && defined(__GNUC__)
+
+extern __inline__ void
+prefetch64(caddr_t addr)
+{
+	__asm__ __volatile__(
+	    "prefetch	[%0], #n_writes\n\t"
+	    : "=r" (addr)
+	    : "0" (addr));
+}
+
+#endif	/* !__lint && __GNUC__ */
 
 #endif /* defined(_KERNEL) && !defined(_ASM) */
 

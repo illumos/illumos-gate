@@ -123,7 +123,7 @@ extern __inline__ void __swapgs(void)
 extern __inline__ void prefetch64(caddr_t addr)
 {
 	__asm__ __volatile__(
-	    "prefetcht0 (%0)"
+	    "prefetcht0 (%0);"
 	    "prefetcht0 32(%0)"
 	    : /* no output */
 	    : "r" (addr));

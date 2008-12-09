@@ -51,23 +51,6 @@ doflush(void *addr)
 
 #endif	/* !__lint && __GNUC__ */
 
-#if !defined(__lint) && defined(__GNUC__)
-
-extern __inline__ void
-prefetch64(caddr_t addr)
-{
-#if defined(__sparcv9)
-	__asm__ __volatile__(
-	    "prefetch	[%0], #n_writes\n\t"
-	    : /* no output */
-	    : "0" (addr));
-#else
-#error	"port me"
-#endif
-}
-
-#endif	/* !__lint && __GNUC__ */
-
 #ifdef	__cplusplus
 }
 #endif

@@ -54,6 +54,7 @@
 #include <sys/rctl.h>
 #include <sys/port_impl.h>
 #include <sys/schedctl.h>
+#include <sys/cpu.h>
 
 #define	NPHLOCKS	64	/* Number of locks; must be power of 2 */
 #define	PHLOCKADDR(php)	&plocks[(((uintptr_t)(php)) >> 8) & (NPHLOCKS - 1)]
