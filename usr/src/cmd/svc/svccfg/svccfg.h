@@ -55,6 +55,7 @@ extern "C" {
 #define	SCI_FORCE	0x20		/* Override-import. */
 #define	SCI_KEEP	0x40		/* Don't delete when SCI_FORCEing */
 #define	SCI_NOSNAP	0x80		/* Don't take last-import snapshot */
+#define	SCI_DELAYENABLE	0x100		/* Delay the general/enable property */
 
 /* Flags for lscf_service_export() */
 #define	SCE_ALL_VALUES	0x01		/* Include all property values */
@@ -244,6 +245,7 @@ typedef struct scf_callback {
 	int		sc_service;	/* True if sc_parent is a service. */
 	uint_t		sc_flags;
 	pgroup_t	*sc_general;	/* pointer to general property group */
+	property_t	*sc_enable;	/* pointer to enable property */
 
 	const char	*sc_source_fmri;
 	const char	*sc_target_fmri;

@@ -1500,6 +1500,79 @@ stash_scferror(scf_callback_t *cbp)
 	return (stash_scferror_err(cbp, scf_error()));
 }
 
+/*
+ * Create or update a snapshot of inst.  snap is a required scratch object.
+ *
+ * Returns
+ *   0 - success
+ *   ECONNABORTED - repository connection broken
+ *   EPERM - permission denied
+ *   ENOSPC - configd is out of resources
+ *   ECANCELED - inst was deleted
+ *   -1 - unknown libscf error (message printed)
+ */
+static int
+take_snap(scf_instance_t *inst, const char *name, scf_snapshot_t *snap)
+{
+again:
+	if (scf_instance_get_snapshot(inst, name, snap) == 0) {
+		if (_scf_snapshot_take_attach(inst, snap) != 0) {
+			switch (scf_error()) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+			case SCF_ERROR_PERMISSION_DENIED:
+			case SCF_ERROR_NO_RESOURCES:
+				return (scferror2errno(scf_error()));
+
+			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_INVALID_ARGUMENT:
+			default:
+				bad_error("_scf_snapshot_take_attach",
+				    scf_error());
+			}
+		}
+	} else {
+		switch (scf_error()) {
+		case SCF_ERROR_NOT_FOUND:
+			break;
+
+		case SCF_ERROR_DELETED:
+		case SCF_ERROR_CONNECTION_BROKEN:
+			return (scferror2errno(scf_error()));
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_INVALID_ARGUMENT:
+		case SCF_ERROR_NOT_SET:
+		default:
+			bad_error("scf_instance_get_snapshot", scf_error());
+		}
+
+		if (_scf_snapshot_take_new(inst, name, snap) != 0) {
+			switch (scf_error()) {
+			case SCF_ERROR_EXISTS:
+				goto again;
+
+			case SCF_ERROR_CONNECTION_BROKEN:
+			case SCF_ERROR_NO_RESOURCES:
+			case SCF_ERROR_PERMISSION_DENIED:
+				return (scferror2errno(scf_error()));
+
+			default:
+				scfwarn();
+				return (-1);
+
+			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_INTERNAL:
+			case SCF_ERROR_INVALID_ARGUMENT:
+			case SCF_ERROR_HANDLE_MISMATCH:
+				bad_error("_scf_snapshot_take_new",
+				    scf_error());
+			}
+		}
+	}
+
+	return (0);
+}
 
 /*
  * Import.  These functions import a bundle into the repository.
@@ -1527,9 +1600,12 @@ lscf_property_import(void *v, void *pvt)
 	scf_value_t *val;
 	scf_type_t tp;
 
-	if (lcbdata->sc_flags & SCI_NOENABLED &&
-	    strcmp(p->sc_property_name, SCF_PROPERTY_ENABLED) == 0)
+	if ((lcbdata->sc_flags & SCI_NOENABLED ||
+	    lcbdata->sc_flags & SCI_DELAYENABLE) &&
+	    strcmp(p->sc_property_name, SCF_PROPERTY_ENABLED) == 0) {
+		lcbdata->sc_enable = p;
 		return (UU_WALK_NEXT);
+	}
 
 	entr = scf_entry_create(lcbdata->sc_handle);
 	if (entr == NULL) {
@@ -1796,6 +1872,7 @@ props:
 	cbdata.sc_parent = imp_pg;
 	cbdata.sc_flags = lcbdata->sc_flags;
 	cbdata.sc_trans = imp_tx;
+	cbdata.sc_enable = NULL;
 
 	if (scf_transaction_start(imp_tx, imp_pg) != 0) {
 		switch (scf_error()) {
@@ -1837,6 +1914,54 @@ props:
 			lcbdata->sc_err = EBUSY;
 		}
 		return (UU_WALK_ERROR);
+	}
+
+	if ((lcbdata->sc_flags & SCI_DELAYENABLE) && cbdata.sc_enable) {
+		cbdata.sc_flags = cbdata.sc_flags & (~SCI_DELAYENABLE);
+
+		/*
+		 * take the snapshot running snapshot then
+		 * import the stored general/enable property
+		 */
+		r = take_snap(ent, snap_running, imp_rsnap);
+		switch (r) {
+		case 0:
+			break;
+
+		case ECONNABORTED:
+			warn(gettext("Could not take %s snapshot on import "
+			    "(repository connection broken).\n"),
+			    snap_running);
+			lcbdata->sc_err = r;
+			return (UU_WALK_ERROR);
+		case ECANCELED:
+			warn(emsg_deleted);
+			lcbdata->sc_err = r;
+			return (UU_WALK_ERROR);
+
+		case EPERM:
+			warn(gettext("Could not take %s snapshot "
+			    "(permission denied).\n"), snap_running);
+			lcbdata->sc_err = r;
+			return (UU_WALK_ERROR);
+
+		case ENOSPC:
+			warn(gettext("Could not take %s snapshot"
+			    "(repository server out of resources).\n"),
+			    snap_running);
+			lcbdata->sc_err = r;
+			return (UU_WALK_ERROR);
+
+		default:
+			bad_error("take_snap", r);
+		}
+
+		r = lscf_property_import(cbdata.sc_enable, &cbdata);
+		if (r != UU_WALK_NEXT) {
+			if (r != UU_WALK_ERROR)
+				bad_error("lscf_property_import", r);
+			return (EINVAL);
+		}
 	}
 
 	r = scf_transaction_commit(imp_tx);
@@ -1915,7 +2040,8 @@ lscf_import_instance_pgs(scf_instance_t *inst, const char *target_fmri,
 	cbdata.sc_handle = scf_instance_handle(inst);
 	cbdata.sc_parent = inst;
 	cbdata.sc_service = 0;
-	cbdata.sc_general = 0;
+	cbdata.sc_general = NULL;
+	cbdata.sc_enable = NULL;
 	cbdata.sc_flags = flags;
 	cbdata.sc_source_fmri = iinst->sc_fmri;
 	cbdata.sc_target_fmri = target_fmri;
@@ -1930,6 +2056,15 @@ lscf_import_instance_pgs(scf_instance_t *inst, const char *target_fmri,
 
 	if ((flags & SCI_GENERALLAST) && cbdata.sc_general) {
 		cbdata.sc_flags = flags & (~SCI_GENERALLAST);
+		/*
+		 * If importing with the SCI_NOENABLED flag then
+		 * skip the delay, but if not then add the delay
+		 * of the enable property.
+		 */
+		if (!(cbdata.sc_flags & SCI_NOENABLED)) {
+			cbdata.sc_flags |= SCI_DELAYENABLE;
+		}
+
 		if (entity_pgroup_import(cbdata.sc_general, &cbdata)
 		    != UU_WALK_NEXT)
 			return (cbdata.sc_err);
@@ -5000,80 +5135,6 @@ upgrade_props(void *ent, scf_snaplevel_t *running, scf_snaplevel_t *snpl,
 		report_pg_diffs(pg, rpg, ient->sc_fmri, 1);
 		internal_pgroup_free(rpg);
 		rpg = NULL;
-	}
-
-	return (0);
-}
-
-/*
- * Create or update a snapshot of inst.  snap is a required scratch object.
- *
- * Returns
- *   0 - success
- *   ECONNABORTED - repository connection broken
- *   EPERM - permission denied
- *   ENOSPC - configd is out of resources
- *   ECANCELED - inst was deleted
- *   -1 - unknown libscf error (message printed)
- */
-static int
-take_snap(scf_instance_t *inst, const char *name, scf_snapshot_t *snap)
-{
-again:
-	if (scf_instance_get_snapshot(inst, name, snap) == 0) {
-		if (_scf_snapshot_take_attach(inst, snap) != 0) {
-			switch (scf_error()) {
-			case SCF_ERROR_CONNECTION_BROKEN:
-			case SCF_ERROR_PERMISSION_DENIED:
-			case SCF_ERROR_NO_RESOURCES:
-				return (scferror2errno(scf_error()));
-
-			case SCF_ERROR_NOT_SET:
-			case SCF_ERROR_INVALID_ARGUMENT:
-			default:
-				bad_error("_scf_snapshot_take_attach",
-				    scf_error());
-			}
-		}
-	} else {
-		switch (scf_error()) {
-		case SCF_ERROR_NOT_FOUND:
-			break;
-
-		case SCF_ERROR_DELETED:
-		case SCF_ERROR_CONNECTION_BROKEN:
-			return (scferror2errno(scf_error()));
-
-		case SCF_ERROR_HANDLE_MISMATCH:
-		case SCF_ERROR_NOT_BOUND:
-		case SCF_ERROR_INVALID_ARGUMENT:
-		case SCF_ERROR_NOT_SET:
-		default:
-			bad_error("scf_instance_get_snapshot", scf_error());
-		}
-
-		if (_scf_snapshot_take_new(inst, name, snap) != 0) {
-			switch (scf_error()) {
-			case SCF_ERROR_EXISTS:
-				goto again;
-
-			case SCF_ERROR_CONNECTION_BROKEN:
-			case SCF_ERROR_NO_RESOURCES:
-			case SCF_ERROR_PERMISSION_DENIED:
-				return (scferror2errno(scf_error()));
-
-			default:
-				scfwarn();
-				return (-1);
-
-			case SCF_ERROR_NOT_SET:
-			case SCF_ERROR_INTERNAL:
-			case SCF_ERROR_INVALID_ARGUMENT:
-			case SCF_ERROR_HANDLE_MISMATCH:
-				bad_error("_scf_snapshot_take_new",
-				    scf_error());
-			}
-		}
 	}
 
 	return (0);
