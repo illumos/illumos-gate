@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_CRYPTO_API_H
 #define	_SYS_CRYPTO_API_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -391,6 +389,8 @@ extern int crypto_bufcall_free(crypto_bc_t bc);
 extern int crypto_bufcall(crypto_bc_t bc, void (*func)(void *arg), void *arg);
 extern int crypto_unbufcall(crypto_bc_t bc);
 
+#endif	/* _KERNEL */
+
 /*
  * To obtain the list of key size ranges supported by a mechanism.
  */
@@ -408,10 +408,22 @@ typedef struct crypto_mechanism_info {
 	crypto_mech_usage_t mi_usage;
 } crypto_mechanism_info_t;
 
+#ifdef	_KERNEL
+#ifdef	_SYSCALL32
+
+typedef struct crypto_mechanism_info32 {
+	size32_t mi_min_key_size;
+	size32_t mi_max_key_size;
+	crypto_keysize_unit_t mi_keysize_unit; /* for mi_xxx_key_size */
+	crypto_mech_usage_t mi_usage;
+} crypto_mechanism_info32_t;
+
+#endif	/* _SYSCALL32 */
+#endif	/* _KERNEL */
+
 extern int crypto_get_all_mech_info(crypto_mech_type_t,
     crypto_mechanism_info_t **, uint_t *, int);
-
-#endif	/* _KERNEL */
+extern void crypto_free_all_mech_info(crypto_mechanism_info_t *, uint_t);
 
 #ifdef	__cplusplus
 }

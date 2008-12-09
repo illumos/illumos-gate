@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*
  * lofi (loopback file) driver - allows you to attach a file to a device,
  * which can then be accessed through that device. The simple model is that
@@ -90,11 +89,19 @@
  *
  *	Pass-through ioctls on block devices. You can (though it's not
  *	documented), give lofi a block device as a file name. Then we shouldn't
- *	need to fake a geometry. But this is also silly unless you're replacing
- *	metadisk.
+ *	need to fake a geometry, however, it may be relevant if you're replacing
+ *	metadisk, or using lofi to get crypto.
+ *	It makes sense to do lofiadm -c aes -a /dev/dsk/c0t0d0s4 /dev/lofi/1
+ *	and then in /etc/vfstab have an entry for /dev/lofi/1 as /export/home.
+ *	In fact this even makes sense if you have lofi "above" metadisk.
  *
- *	Encryption. tpm would like this. Apparently Windows 2000 has it, and
- *	so does Linux.
+ * Encryption:
+ *	Each lofi device can have its own symmetric key and cipher.
+ *	They are passed to us by lofiadm(1m) in the correct format for use
+ *	with the misc/kcf crypto_* routines.
+ *
+ *	Each block has its own IV, that is calculated in lofi_blk_mech(), based
+ *	on the "master" key held in the lsp and the block number of the buffer.
  */
 
 #include <sys/types.h>
@@ -123,12 +130,37 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/zmod.h>
+#include <sys/crypto/common.h>
+#include <sys/crypto/api.h>
+
+/*
+ * The basis for CRYOFF is derived from usr/src/uts/common/sys/fs/ufs_fs.h.
+ * Crypto metadata, if it exists, is located at the end of the boot block
+ * (BBOFF + BBSIZE, which is SBOFF).  The super block and everything after
+ * is offset by the size of the crypto metadata which is handled by
+ * lsp->ls_crypto_offset.
+ */
+#define	CRYOFF	((off_t)8192)
 
 #define	NBLOCKS_PROP_NAME	"Nblocks"
 #define	SIZE_PROP_NAME		"Size"
 
-static dev_info_t *lofi_dip;
-static void	*lofi_statep;
+#define	SETUP_C_DATA(cd, buf, len) 		\
+	(cd).cd_format = CRYPTO_DATA_RAW;	\
+	(cd).cd_offset = 0;			\
+	(cd).cd_miscdata = NULL;		\
+	(cd).cd_length = (len);			\
+	(cd).cd_raw.iov_base = (buf);		\
+	(cd).cd_raw.iov_len = (len);
+
+#define	UIO_CHECK(uio)	\
+	if (((uio)->uio_loffset % DEV_BSIZE) != 0 || \
+	    ((uio)->uio_resid % DEV_BSIZE) != 0) { \
+		return (EINVAL); \
+	}
+
+static dev_info_t *lofi_dip = NULL;
+static void *lofi_statep = NULL;
 static kmutex_t lofi_lock;		/* state lock */
 
 /*
@@ -147,6 +179,7 @@ static int lofi_taskq_maxalloc = 104857600 / DEV_BSIZE;
 static int lofi_taskq_nthreads = 4;	/* # of taskq threads per device */
 
 uint32_t lofi_max_files = LOFI_MAX_FILES;
+const char lofi_crypto_magic[6] = LOFI_CRYPTO_MAGIC;
 
 static int gzip_decompress(void *src, size_t srclen, void *dst,
 	size_t *destlen, int level);
@@ -224,11 +257,50 @@ mark_closed(struct lofi_state *lsp, int otyp)
 }
 
 static void
+lofi_free_crypto(struct lofi_state *lsp)
+{
+	ASSERT(mutex_owned(&lofi_lock));
+
+	if (lsp->ls_crypto_enabled) {
+		/*
+		 * Clean up the crypto state so that it doesn't hang around
+		 * in memory after we are done with it.
+		 */
+		bzero(lsp->ls_key.ck_data,
+		    CRYPTO_BITS2BYTES(lsp->ls_key.ck_length));
+		kmem_free(lsp->ls_key.ck_data,
+		    CRYPTO_BITS2BYTES(lsp->ls_key.ck_length));
+		lsp->ls_key.ck_data = NULL;
+		lsp->ls_key.ck_length = 0;
+
+		if (lsp->ls_mech.cm_param != NULL) {
+			kmem_free(lsp->ls_mech.cm_param,
+			    lsp->ls_mech.cm_param_len);
+			lsp->ls_mech.cm_param = NULL;
+			lsp->ls_mech.cm_param_len = 0;
+		}
+
+		if (lsp->ls_iv_mech.cm_param != NULL) {
+			kmem_free(lsp->ls_iv_mech.cm_param,
+			    lsp->ls_iv_mech.cm_param_len);
+			lsp->ls_iv_mech.cm_param = NULL;
+			lsp->ls_iv_mech.cm_param_len = 0;
+		}
+
+		mutex_destroy(&lsp->ls_crypto_lock);
+	}
+}
+
+static void
 lofi_free_handle(dev_t dev, minor_t minor, struct lofi_state *lsp,
     cred_t *credp)
 {
 	dev_t	newdev;
 	char	namebuf[50];
+
+	ASSERT(mutex_owned(&lofi_lock));
+
+	lofi_free_crypto(lsp);
 
 	if (lsp->ls_vp) {
 		(void) VOP_CLOSE(lsp->ls_vp, lsp->ls_openflag,
@@ -340,18 +412,243 @@ lofi_close(dev_t dev, int flag, int otyp, struct cred *credp)
 	return (0);
 }
 
+/*
+ * Sets the mechanism's initialization vector (IV) if one is needed.
+ * The IV is computed from the data block number.  lsp->ls_mech is
+ * altered so that:
+ *	lsp->ls_mech.cm_param_len is set to the IV len.
+ *	lsp->ls_mech.cm_param is set to the IV.
+ */
+static int
+lofi_blk_mech(struct lofi_state *lsp, longlong_t lblkno)
+{
+	int	ret;
+	crypto_data_t cdata;
+	char	*iv;
+	size_t	iv_len;
+	size_t	min;
+	void	*data;
+	size_t	datasz;
+
+	ASSERT(mutex_owned(&lsp->ls_crypto_lock));
+
+	if (lsp == NULL)
+		return (CRYPTO_DEVICE_ERROR);
+
+	/* lsp->ls_mech.cm_param{_len} has already been set for static iv */
+	if (lsp->ls_iv_type == IVM_NONE) {
+		return (CRYPTO_SUCCESS);
+	}
+
+	/*
+	 * if kmem already alloced from previous call and it's the same size
+	 * we need now, just recycle it; allocate new kmem only if we have to
+	 */
+	if (lsp->ls_mech.cm_param == NULL ||
+	    lsp->ls_mech.cm_param_len != lsp->ls_iv_len) {
+		iv_len = lsp->ls_iv_len;
+		iv = kmem_zalloc(iv_len, KM_SLEEP);
+	} else {
+		iv_len = lsp->ls_mech.cm_param_len;
+		iv = lsp->ls_mech.cm_param;
+		bzero(iv, iv_len);
+	}
+
+	switch (lsp->ls_iv_type) {
+	case IVM_ENC_BLKNO:
+		/* iv is not static, lblkno changes each time */
+		data = &lblkno;
+		datasz = sizeof (lblkno);
+		break;
+	default:
+		data = 0;
+		datasz = 0;
+		break;
+	}
+
+	/*
+	 * write blkno into the iv buffer padded on the left in case
+	 * blkno ever grows bigger than its current longlong_t size
+	 * or a variation other than blkno is used for the iv data
+	 */
+	min = MIN(datasz, iv_len);
+	bcopy(data, iv + (iv_len - min), min);
+
+	/* encrypt the data in-place to get the IV */
+	SETUP_C_DATA(cdata, iv, iv_len);
+
+	ret = crypto_encrypt(&lsp->ls_iv_mech, &cdata, &lsp->ls_key,
+	    NULL, NULL, NULL);
+	if (ret != CRYPTO_SUCCESS) {
+		cmn_err(CE_WARN, "failed to create iv for block %lld: (0x%x)",
+		    lblkno, ret);
+		if (lsp->ls_mech.cm_param != iv)
+			kmem_free(iv, iv_len);
+		return (ret);
+	}
+
+	/* clean up the iv from the last computation */
+	if (lsp->ls_mech.cm_param != NULL && lsp->ls_mech.cm_param != iv)
+		kmem_free(lsp->ls_mech.cm_param, lsp->ls_mech.cm_param_len);
+	lsp->ls_mech.cm_param_len = iv_len;
+	lsp->ls_mech.cm_param = iv;
+
+	return (CRYPTO_SUCCESS);
+}
+
+/*
+ * Performs encryption and decryption of a chunk of data of size "len",
+ * one DEV_BSIZE block at a time.  "len" is assumed to be a multiple of
+ * DEV_BSIZE.
+ */
+static int
+lofi_crypto(struct lofi_state *lsp, struct buf *bp, caddr_t plaintext,
+    caddr_t ciphertext, size_t len, boolean_t op_encrypt)
+{
+	crypto_data_t cdata;
+	crypto_data_t wdata;
+	int ret;
+	longlong_t lblkno = bp->b_lblkno;
+
+	mutex_enter(&lsp->ls_crypto_lock);
+
+	/*
+	 * though we could encrypt/decrypt entire "len" chunk of data, we need
+	 * to break it into DEV_BSIZE pieces to capture blkno incrementing
+	 */
+	SETUP_C_DATA(cdata, plaintext, len);
+	cdata.cd_length = DEV_BSIZE;
+	if (ciphertext != NULL) {		/* not in-place crypto */
+		SETUP_C_DATA(wdata, ciphertext, len);
+		wdata.cd_length = DEV_BSIZE;
+	}
+
+	do {
+		ret = lofi_blk_mech(lsp, lblkno);
+		if (ret != CRYPTO_SUCCESS)
+			continue;
+
+		if (op_encrypt) {
+			ret = crypto_encrypt(&lsp->ls_mech, &cdata,
+			    &lsp->ls_key, NULL,
+			    ((ciphertext != NULL) ? &wdata : NULL), NULL);
+		} else {
+			ret = crypto_decrypt(&lsp->ls_mech, &cdata,
+			    &lsp->ls_key, NULL,
+			    ((ciphertext != NULL) ? &wdata : NULL), NULL);
+		}
+
+		cdata.cd_offset += DEV_BSIZE;
+		if (ciphertext != NULL)
+			wdata.cd_offset += DEV_BSIZE;
+		lblkno++;
+	} while (ret == CRYPTO_SUCCESS && cdata.cd_offset < len);
+
+	mutex_exit(&lsp->ls_crypto_lock);
+
+	if (ret != CRYPTO_SUCCESS) {
+		cmn_err(CE_WARN, "%s failed for block %lld:  (0x%x)",
+		    op_encrypt ? "crypto_encrypt()" : "crypto_decrypt()",
+		    lblkno, ret);
+	}
+
+	return (ret);
+}
+
+#define	RDWR_RAW	1
+#define	RDWR_BCOPY	2
+
+static int
+lofi_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
+    struct lofi_state *lsp, size_t len, int method, caddr_t bcopy_locn)
+{
+	ssize_t resid;
+	int isread;
+	int error;
+
+	/*
+	 * Handles reads/writes for both plain and encrypted lofi
+	 * Note:  offset is already shifted by lsp->ls_crypto_offset
+	 * when it gets here.
+	 */
+
+	isread = bp->b_flags & B_READ;
+	if (isread) {
+		if (method == RDWR_BCOPY) {
+			/* DO NOT update bp->b_resid for bcopy */
+			bcopy(bcopy_locn, bufaddr, len);
+			error = 0;
+		} else {		/* RDWR_RAW */
+			error = vn_rdwr(UIO_READ, lsp->ls_vp, bufaddr, len,
+			    offset, UIO_SYSSPACE, 0, RLIM64_INFINITY, kcred,
+			    &resid);
+			bp->b_resid = resid;
+		}
+		if (lsp->ls_crypto_enabled && error == 0) {
+			if (lofi_crypto(lsp, bp, bufaddr, NULL, len,
+			    B_FALSE) != CRYPTO_SUCCESS) {
+				/*
+				 * XXX: original code didn't set residual
+				 * back to len because no error was expected
+				 * from bcopy() if encryption is not enabled
+				 */
+				if (method != RDWR_BCOPY)
+					bp->b_resid = len;
+				error = EIO;
+			}
+		}
+		return (error);
+	} else {
+		void *iobuf = bufaddr;
+
+		if (lsp->ls_crypto_enabled) {
+			/* don't do in-place crypto to keep bufaddr intact */
+			iobuf = kmem_alloc(len, KM_SLEEP);
+			if (lofi_crypto(lsp, bp, bufaddr, iobuf, len,
+			    B_TRUE) != CRYPTO_SUCCESS) {
+				kmem_free(iobuf, len);
+				if (method != RDWR_BCOPY)
+					bp->b_resid = len;
+				return (EIO);
+			}
+		}
+		if (method == RDWR_BCOPY) {
+			/* DO NOT update bp->b_resid for bcopy */
+			bcopy(iobuf, bcopy_locn, len);
+			error = 0;
+		} else {		/* RDWR_RAW */
+			error = vn_rdwr(UIO_WRITE, lsp->ls_vp, iobuf, len,
+			    offset, UIO_SYSSPACE, 0, RLIM64_INFINITY, kcred,
+			    &resid);
+			bp->b_resid = resid;
+		}
+		if (lsp->ls_crypto_enabled) {
+			kmem_free(iobuf, len);
+		}
+		return (error);
+	}
+}
+
 static int
 lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
-	struct lofi_state *lsp)
+    struct lofi_state *lsp)
 {
 	int error;
 	offset_t alignedoffset, mapoffset;
 	size_t	xfersize;
 	int	isread;
-	int 	smflags;
+	int	smflags;
 	caddr_t	mapaddr;
 	size_t	len;
 	enum seg_rw srw;
+	int	save_error;
+
+	/*
+	 * Note:  offset is already shifted by lsp->ls_crypto_offset
+	 * when it gets here.
+	 */
+	if (lsp->ls_crypto_enabled)
+		ASSERT(lsp->ls_vp_comp_size == lsp->ls_vp_size);
 
 	/*
 	 * segmap always gives us an 8K (MAXBSIZE) chunk, aligned on
@@ -362,6 +659,25 @@ lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
 	 * segmap'd chunk. So we have to compensate for that with
 	 * 'mapoffset'. Subsequent chunks always start off at the
 	 * beginning, and the last is capped by b_resid
+	 *
+	 * Visually, where "|" represents page map boundaries:
+	 *   alignedoffset (mapaddr begins at this segmap boundary)
+	 *    |   offset (from beginning of file)
+	 *    |    |	   len
+	 *    v    v	    v
+	 * ===|====X========|====...======|========X====|====
+	 *	   /-------------...---------------/
+	 *		^ bp->b_bcount/bp->b_resid at start
+	 *    /----/--------/----...------/--------/
+	 *	^	^	^   ^		^
+	 *	|	|	|   |		nth xfersize (<= MAXBSIZE)
+	 *	|	|	2nd thru n-1st xfersize (= MAXBSIZE)
+	 *	|	1st xfersize (<= MAXBSIZE)
+	 *    mapoffset (offset into 1st segmap, non-0 1st time, 0 thereafter)
+	 *
+	 * Notes: "alignedoffset" is "offset" rounded down to nearest
+	 * MAXBSIZE boundary.  "len" is next page boundary of size
+	 * MAXBSIZE after "alignedoffset".
 	 */
 	mapoffset = offset & MAXBOFFSET;
 	alignedoffset = offset - mapoffset;
@@ -371,7 +687,7 @@ lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
 	do {
 		xfersize = MIN(lsp->ls_vp_comp_size - offset,
 		    MIN(MAXBSIZE - mapoffset, bp->b_resid));
-		len = roundup(mapoffset + xfersize, PAGESIZE);
+		len = roundup(mapoffset + xfersize, MAXBSIZE);
 		mapaddr = segmap_getmapflt(segkmap, lsp->ls_vp,
 		    alignedoffset, MAXBSIZE, 1, srw);
 		/*
@@ -392,6 +708,14 @@ lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
 				error = EIO;
 			break;
 		}
+		/* error may be non-zero for encrypted lofi */
+		error = lofi_rdwr(bufaddr, 0, bp, lsp, xfersize,
+		    RDWR_BCOPY, mapaddr + mapoffset);
+		if (error == 0) {
+			bp->b_resid -= xfersize;
+			bufaddr += xfersize;
+			offset += xfersize;
+		}
 		smflags = 0;
 		if (isread) {
 			smflags |= SM_FREE;
@@ -403,17 +727,15 @@ lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
 			 */
 			if (mapoffset == 0 && xfersize == MAXBSIZE)
 				smflags |= SM_DONTNEED;
-			bcopy(mapaddr + mapoffset, bufaddr, xfersize);
 		} else {
-			smflags |= SM_WRITE;
-			bcopy(bufaddr, mapaddr + mapoffset, xfersize);
+			if (error == 0)		/* write back good pages */
+				smflags |= SM_WRITE;
 		}
-		bp->b_resid -= xfersize;
-		bufaddr += xfersize;
-		offset += xfersize;
 		(void) segmap_fault(kas.a_hat, segkmap, mapaddr,
 		    len, F_SOFTUNLOCK, srw);
-		error = segmap_release(segkmap, mapaddr, smflags);
+		save_error = segmap_release(segkmap, mapaddr, smflags);
+		if (error == 0)
+			error = save_error;
 		/* only the first map may start partial */
 		mapoffset = 0;
 		alignedoffset += MAXBSIZE;
@@ -444,19 +766,17 @@ lofi_strategy_task(void *arg)
 	struct buf *bp = (struct buf *)arg;
 	int error;
 	struct lofi_state *lsp;
-	uint64_t sblkno, eblkno, cmpbytes;
-	offset_t offset, sblkoff, eblkoff;
-	u_offset_t salign, ealign;
-	u_offset_t sdiff;
-	uint32_t comp_data_sz;
-	caddr_t bufaddr;
-	unsigned char *compressed_seg = NULL, *cmpbuf;
-	unsigned char *uncompressed_seg = NULL;
-	lofi_compress_info_t *li;
-	size_t oblkcount, xfersize;
-	unsigned long seglen;
+	offset_t offset;
+	caddr_t	bufaddr;
+	size_t	len;
+	size_t	xfersize;
+	boolean_t bufinited = B_FALSE;
 
 	lsp = ddi_get_soft_state(lofi_statep, getminor(bp->b_edev));
+	if (lsp == NULL) {
+		error = ENXIO;
+		goto errout;
+	}
 	if (lsp->ls_kstat) {
 		mutex_enter(lsp->ls_kstat->ks_lock);
 		kstat_waitq_to_runq(KSTAT_IO_PTR(lsp->ls_kstat));
@@ -464,32 +784,53 @@ lofi_strategy_task(void *arg)
 	}
 	bp_mapin(bp);
 	bufaddr = bp->b_un.b_addr;
+#ifdef _LP64
 	offset = bp->b_lblkno * DEV_BSIZE;	/* offset within file */
+#else
+	offset = bp->b_blkno * DEV_BSIZE;	/* offset within file */
+#endif /* _LP64 */
+	if (lsp->ls_crypto_enabled) {
+		/* encrypted data really begins after crypto header */
+		offset += lsp->ls_crypto_offset;
+	}
+	len = bp->b_bcount;
+	bufinited = B_TRUE;
+
+	if (lsp->ls_vp == NULL || lsp->ls_vp_closereq) {
+		error = EIO;
+		goto errout;
+	}
 
 	/*
 	 * We used to always use vn_rdwr here, but we cannot do that because
 	 * we might decide to read or write from the the underlying
 	 * file during this call, which would be a deadlock because
 	 * we have the rw_lock. So instead we page, unless it's not
-	 * mapable or it's a character device.
+	 * mapable or it's a character device or it's an encrypted lofi.
 	 */
-	if (lsp->ls_vp == NULL || lsp->ls_vp_closereq) {
-		error = EIO;
-	} else if (((lsp->ls_vp->v_flag & VNOMAP) == 0) &&
-	    (lsp->ls_vp->v_type != VCHR)) {
+	if ((lsp->ls_vp->v_flag & VNOMAP) || (lsp->ls_vp->v_type == VCHR) ||
+	    lsp->ls_crypto_enabled) {
+		error = lofi_rdwr(bufaddr, offset, bp, lsp, len, RDWR_RAW,
+		    NULL);
+	} else if (lsp->ls_uncomp_seg_sz == 0) {
+		error = lofi_mapped_rdwr(bufaddr, offset, bp, lsp);
+	} else {
+		unsigned char *compressed_seg = NULL, *cmpbuf;
+		unsigned char *uncompressed_seg = NULL;
+		lofi_compress_info_t *li;
+		size_t oblkcount;
+		unsigned long seglen;
+		uint64_t sblkno, eblkno, cmpbytes;
+		offset_t sblkoff, eblkoff;
+		u_offset_t salign, ealign;
+		u_offset_t sdiff;
+		uint32_t comp_data_sz;
 		uint64_t i;
-
-		/*
-		 * Handle uncompressed files with a regular read
-		 */
-		if (lsp->ls_uncomp_seg_sz == 0) {
-			error = lofi_mapped_rdwr(bufaddr, offset, bp, lsp);
-			goto done;
-		}
 
 		/*
 		 * From here on we're dealing primarily with compressed files
 		 */
+		ASSERT(!lsp->ls_crypto_enabled);
 
 		/*
 		 * Compressed files can only be read from and
@@ -629,26 +970,15 @@ lofi_strategy_task(void *arg)
 			if (bp->b_resid == 0)
 				break;
 		}
-	} else {
-		ssize_t	resid;
-		enum uio_rw rw;
-
-		if (bp->b_flags & B_READ)
-			rw = UIO_READ;
-		else
-			rw = UIO_WRITE;
-		error = vn_rdwr(rw, lsp->ls_vp, bufaddr, bp->b_bcount,
-		    offset, UIO_SYSSPACE, 0, RLIM64_INFINITY, kcred, &resid);
-		bp->b_resid = resid;
-	}
-
 done:
-	if (compressed_seg != NULL)
-		kmem_free(compressed_seg, comp_data_sz);
-	if (uncompressed_seg != NULL)
-		kmem_free(uncompressed_seg, lsp->ls_uncomp_seg_sz);
+		if (compressed_seg != NULL)
+			kmem_free(compressed_seg, comp_data_sz);
+		if (uncompressed_seg != NULL)
+			kmem_free(uncompressed_seg, lsp->ls_uncomp_seg_sz);
+	} /* end of handling compressed files */
 
-	if (lsp->ls_kstat) {
+errout:
+	if (bufinited && lsp->ls_kstat) {
 		size_t n_done = bp->b_bcount - bp->b_resid;
 		kstat_io_t *kioptr;
 
@@ -692,6 +1022,12 @@ lofi_strategy(struct buf *bp)
 	 * queues were incredibly easy so they win.
 	 */
 	lsp = ddi_get_soft_state(lofi_statep, getminor(bp->b_edev));
+	if (lsp == NULL) {
+		bioerror(bp, ENXIO);
+		biodone(bp);
+		return (0);
+	}
+
 	mutex_enter(&lsp->ls_vp_lock);
 	if (lsp->ls_vp == NULL || lsp->ls_vp_closereq) {
 		bioerror(bp, EIO);
@@ -700,7 +1036,15 @@ lofi_strategy(struct buf *bp)
 		return (0);
 	}
 
+#ifdef _LP64
 	offset = bp->b_lblkno * DEV_BSIZE;	/* offset within file */
+#else
+	offset = bp->b_blkno * DEV_BSIZE;	/* offset within file */
+#endif /* _LP64 */
+	if (lsp->ls_crypto_enabled) {
+		/* encrypted data really begins after crypto header */
+		offset += lsp->ls_crypto_offset;
+	}
 	if (offset == lsp->ls_vp_size) {
 		/* EOF */
 		if ((bp->b_flags & B_READ) != 0) {
@@ -738,6 +1082,7 @@ lofi_read(dev_t dev, struct uio *uio, struct cred *credp)
 {
 	if (getminor(dev) == 0)
 		return (EINVAL);
+	UIO_CHECK(uio);
 	return (physio(lofi_strategy, NULL, dev, B_READ, minphys, uio));
 }
 
@@ -747,6 +1092,7 @@ lofi_write(dev_t dev, struct uio *uio, struct cred *credp)
 {
 	if (getminor(dev) == 0)
 		return (EINVAL);
+	UIO_CHECK(uio);
 	return (physio(lofi_strategy, NULL, dev, B_WRITE, minphys, uio));
 }
 
@@ -756,6 +1102,7 @@ lofi_aread(dev_t dev, struct aio_req *aio, struct cred *credp)
 {
 	if (getminor(dev) == 0)
 		return (EINVAL);
+	UIO_CHECK(aio->aio_uio);
 	return (aphysio(lofi_strategy, anocancel, dev, B_READ, minphys, aio));
 }
 
@@ -765,6 +1112,7 @@ lofi_awrite(dev_t dev, struct aio_req *aio, struct cred *credp)
 {
 	if (getminor(dev) == 0)
 		return (EINVAL);
+	UIO_CHECK(aio->aio_uio);
 	return (aphysio(lofi_strategy, anocancel, dev, B_WRITE, minphys, aio));
 }
 
@@ -827,6 +1175,19 @@ lofi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 }
 
 /*
+ * With addition of encryption, be careful that encryption key is wiped before
+ * kernel memory structures are freed, and also that key is not accidentally
+ * passed out into userland structures.
+ */
+static void
+free_lofi_ioctl(struct lofi_ioctl *klip)
+{
+	/* Make sure this encryption key doesn't stick around */
+	bzero(klip->li_key, sizeof (klip->li_key));
+	kmem_free(klip, sizeof (struct lofi_ioctl));
+}
+
+/*
  * These two just simplify the rest of the ioctls that need to copyin/out
  * the lofi_ioctl structure.
  */
@@ -839,16 +1200,18 @@ copy_in_lofi_ioctl(const struct lofi_ioctl *ulip, int flag)
 	klip = kmem_alloc(sizeof (struct lofi_ioctl), KM_SLEEP);
 	error = ddi_copyin(ulip, klip, sizeof (struct lofi_ioctl), flag);
 	if (error) {
-		kmem_free(klip, sizeof (struct lofi_ioctl));
+		free_lofi_ioctl(klip);
 		return (NULL);
 	}
 
 	/* make sure filename is always null-terminated */
-	klip->li_filename[MAXPATHLEN - 1] = '\0';
+	klip->li_filename[MAXPATHLEN-1] = '\0';
 
 	/* validate minor number */
 	if (klip->li_minor > lofi_max_files) {
-		kmem_free(klip, sizeof (struct lofi_ioctl));
+		free_lofi_ioctl(klip);
+		cmn_err(CE_WARN, "attempt to map more than lofi_max_files (%d)",
+		    lofi_max_files);
 		return (NULL);
 	}
 	return (klip);
@@ -860,16 +1223,23 @@ copy_out_lofi_ioctl(const struct lofi_ioctl *klip, struct lofi_ioctl *ulip,
 {
 	int	error;
 
+	/*
+	 * NOTE: Do NOT copy the crypto_key_t "back" to userland.
+	 * This ensures that an attacker can't trivially find the
+	 * key for a mapping just by issuing the ioctl.
+	 *
+	 * It can still be found by poking around in kmem with mdb(1),
+	 * but there is no point in making it easy when the info isn't
+	 * of any use in this direction anyway.
+	 *
+	 * Either way we don't actually have the raw key stored in
+	 * a form that we can get it anyway, since we just used it
+	 * to create a ctx template and didn't keep "the original".
+	 */
 	error = ddi_copyout(klip, ulip, sizeof (struct lofi_ioctl), flag);
 	if (error)
 		return (EFAULT);
 	return (0);
-}
-
-void
-free_lofi_ioctl(struct lofi_ioctl *klip)
-{
-	kmem_free(klip, sizeof (struct lofi_ioctl));
 }
 
 /*
@@ -924,6 +1294,8 @@ valid_filename(const char *filename)
 static void
 fake_disk_geometry(struct lofi_state *lsp)
 {
+	u_offset_t dsize = lsp->ls_vp_size - lsp->ls_crypto_offset;
+
 	/* dk_geom - see dkio(7I) */
 	/*
 	 * dkg_ncyl _could_ be set to one here (one big cylinder with gobs
@@ -936,10 +1308,10 @@ fake_disk_geometry(struct lofi_state *lsp)
 	 * for a small file, or so many on a big file that you waste space
 	 * for backup superblocks or cylinder group structures.
 	 */
-	if (lsp->ls_vp_size < (2 * 1024 * 1024)) /* floppy? */
-		lsp->ls_dkg.dkg_ncyl = lsp->ls_vp_size / (100 * 1024);
+	if (dsize < (2 * 1024 * 1024)) /* floppy? */
+		lsp->ls_dkg.dkg_ncyl = dsize / (100 * 1024);
 	else
-		lsp->ls_dkg.dkg_ncyl = lsp->ls_vp_size / (300 * 1024);
+		lsp->ls_dkg.dkg_ncyl = dsize / (300 * 1024);
 	/* in case file file is < 100k */
 	if (lsp->ls_dkg.dkg_ncyl == 0)
 		lsp->ls_dkg.dkg_ncyl = 1;
@@ -953,8 +1325,7 @@ fake_disk_geometry(struct lofi_state *lsp)
 	lsp->ls_dkg.dkg_apc = 0;
 	lsp->ls_dkg.dkg_rpm = 7200;
 	lsp->ls_dkg.dkg_pcyl = lsp->ls_dkg.dkg_ncyl + lsp->ls_dkg.dkg_acyl;
-	lsp->ls_dkg.dkg_nsect = lsp->ls_vp_size /
-	    (DEV_BSIZE * lsp->ls_dkg.dkg_ncyl);
+	lsp->ls_dkg.dkg_nsect = dsize / (DEV_BSIZE * lsp->ls_dkg.dkg_ncyl);
 	lsp->ls_dkg.dkg_write_reinstruct = 0;
 	lsp->ls_dkg.dkg_read_reinstruct = 0;
 
@@ -1116,7 +1487,7 @@ lofi_map_compressed_file(struct lofi_state *lsp, char *buf)
 
 /*
  * Check to see if the passed in signature is a valid
- * one. If it is valid, return the index into
+ * one.  If it is valid, return the index into
  * lofi_compress_table.
  *
  * Return -1 if it is invalid
@@ -1154,10 +1525,12 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	int zalloced = 0;
 	dev_t	newdev;
 	char	namebuf[50];
-	char 	buf[DEV_BSIZE];
-	char 	*tbuf;
+	char	buf[DEV_BSIZE];
+	char	crybuf[DEV_BSIZE];
 	ssize_t	resid;
-	enum uio_rw rw;
+	boolean_t need_vn_close = B_FALSE;
+	boolean_t keycopied = B_FALSE;
+	boolean_t need_size_update = B_FALSE;
 
 	klip = copy_in_lofi_ioctl(ulip, ioctl_flag);
 	if (klip == NULL)
@@ -1215,22 +1588,24 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 			goto out;
 		}
 	}
+	need_vn_close = B_TRUE;
+
 	vattr.va_mask = AT_SIZE;
 	error = VOP_GETATTR(vp, &vattr, 0, credp, NULL);
 	if (error) {
-		goto closeout;
+		goto out;
 	}
 	/* the file needs to be a multiple of the block size */
 	if ((vattr.va_size % DEV_BSIZE) != 0) {
 		error = EINVAL;
-		goto closeout;
+		goto out;
 	}
 	newdev = makedevice(getmajor(dev), newminor);
 	Size_prop_val = vattr.va_size;
 	if ((ddi_prop_update_int64(newdev, lofi_dip,
 	    SIZE_PROP_NAME, Size_prop_val)) != DDI_PROP_SUCCESS) {
 		error = EINVAL;
-		goto closeout;
+		goto out;
 	}
 	Nblocks_prop_val = vattr.va_size / DEV_BSIZE;
 	if ((ddi_prop_update_int64(newdev, lofi_dip,
@@ -1314,41 +1689,224 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	klip->li_minor = newminor;
 
 	/*
-	 * Read the file signature to check if it is compressed.
-	 * 'rw' is set to read since only reads are allowed to
-	 * a compressed file.
+	 * Initialize crypto details for encrypted lofi
 	 */
-	rw = UIO_READ;
-	error = vn_rdwr(rw, lsp->ls_vp, buf, DEV_BSIZE, 0, UIO_SYSSPACE,
-	    0, RLIM64_INFINITY, kcred, &resid);
+	if (klip->li_crypto_enabled) {
+		int ret;
 
+		mutex_init(&lsp->ls_crypto_lock, NULL, MUTEX_DRIVER, NULL);
+
+		lsp->ls_mech.cm_type = crypto_mech2id(klip->li_cipher);
+		if (lsp->ls_mech.cm_type == CRYPTO_MECH_INVALID) {
+			cmn_err(CE_WARN, "invalid cipher %s requested for %s",
+			    klip->li_cipher, lsp->ls_filename);
+			error = EINVAL;
+			goto propout;
+		}
+
+		/* this is just initialization here */
+		lsp->ls_mech.cm_param = NULL;
+		lsp->ls_mech.cm_param_len = 0;
+
+		lsp->ls_iv_type = klip->li_iv_type;
+		lsp->ls_iv_mech.cm_type = crypto_mech2id(klip->li_iv_cipher);
+		if (lsp->ls_iv_mech.cm_type == CRYPTO_MECH_INVALID) {
+			cmn_err(CE_WARN, "invalid iv cipher %s requested"
+			    " for %s", klip->li_iv_cipher, lsp->ls_filename);
+			error = EINVAL;
+			goto propout;
+		}
+
+		/* iv mech must itself take a null iv */
+		lsp->ls_iv_mech.cm_param = NULL;
+		lsp->ls_iv_mech.cm_param_len = 0;
+		lsp->ls_iv_len = klip->li_iv_len;
+
+		/*
+		 * Create ctx using li_cipher & the raw li_key after checking
+		 * that it isn't a weak key.
+		 */
+		lsp->ls_key.ck_format = CRYPTO_KEY_RAW;
+		lsp->ls_key.ck_length = klip->li_key_len;
+		lsp->ls_key.ck_data = kmem_alloc(
+		    CRYPTO_BITS2BYTES(lsp->ls_key.ck_length), KM_SLEEP);
+		bcopy(klip->li_key, lsp->ls_key.ck_data,
+		    CRYPTO_BITS2BYTES(lsp->ls_key.ck_length));
+		keycopied = B_TRUE;
+
+		ret = crypto_key_check(&lsp->ls_mech, &lsp->ls_key);
+		if (ret != CRYPTO_SUCCESS) {
+			error = EINVAL;
+			cmn_err(CE_WARN, "weak key check failed for cipher "
+			    "%s on file %s (0x%x)", klip->li_cipher,
+			    lsp->ls_filename, ret);
+			goto propout;
+		}
+	}
+	lsp->ls_crypto_enabled = klip->li_crypto_enabled;
+
+	/*
+	 * Read the file signature to check if it is compressed or encrypted.
+	 * Crypto signature is in a different location; both areas should
+	 * read to keep compression and encryption mutually exclusive.
+	 */
+	if (lsp->ls_crypto_enabled) {
+		error = vn_rdwr(UIO_READ, lsp->ls_vp, crybuf, DEV_BSIZE,
+		    CRYOFF, UIO_SYSSPACE, 0, RLIM64_INFINITY, kcred, &resid);
+		if (error != 0)
+			goto propout;
+	}
+	error = vn_rdwr(UIO_READ, lsp->ls_vp, buf, DEV_BSIZE, 0, UIO_SYSSPACE,
+	    0, RLIM64_INFINITY, kcred, &resid);
 	if (error != 0)
 		goto propout;
 
-	tbuf = buf;
+	/* initialize these variables for all lofi files */
 	lsp->ls_uncomp_seg_sz = 0;
 	lsp->ls_vp_comp_size = lsp->ls_vp_size;
 	lsp->ls_comp_algorithm[0] = '\0';
 
-	compress_index = lofi_compress_select(tbuf);
-	if (compress_index != -1) {
+	/* encrypted lofi reads/writes shifted by crypto metadata size */
+	lsp->ls_crypto_offset = 0;
+
+	/* this is a compressed lofi */
+	if ((compress_index = lofi_compress_select(buf)) != -1) {
+
+		/* compression and encryption are mutually exclusive */
+		if (klip->li_crypto_enabled) {
+			error = ENOTSUP;
+			goto propout;
+		}
+
+		/* initialize compression info for compressed lofi */
 		lsp->ls_comp_algorithm_index = compress_index;
 		(void) strlcpy(lsp->ls_comp_algorithm,
 		    lofi_compress_table[compress_index].l_name,
 		    sizeof (lsp->ls_comp_algorithm));
+
 		error = lofi_map_compressed_file(lsp, buf);
 		if (error != 0)
 			goto propout;
+		need_size_update = B_TRUE;
 
+	/* this is an encrypted lofi */
+	} else if (strncmp(crybuf, lofi_crypto_magic,
+	    sizeof (lofi_crypto_magic)) == 0) {
+
+		char *marker = crybuf;
+
+		/*
+		 * This is the case where the header in the lofi image is
+		 * already initialized to indicate it is encrypted.
+		 * There is another case (see below) where encryption is
+		 * requested but the lofi image has never been used yet,
+		 * so the header needs to be written with encryption magic.
+		 */
+
+		/* indicate this must be an encrypted lofi due to magic */
+		klip->li_crypto_enabled = B_TRUE;
+
+		/*
+		 * The encryption header information is laid out this way:
+		 *	6 bytes:	hex "CFLOFI"
+		 *	2 bytes:	version = 0 ... for now
+		 *	96 bytes:	reserved1 (not implemented yet)
+		 *	4 bytes:	data_sector = 2 ... for now
+		 *	more...		not implemented yet
+		 */
+
+		/* copy the magic */
+		bcopy(marker, lsp->ls_crypto.magic,
+		    sizeof (lsp->ls_crypto.magic));
+		marker += sizeof (lsp->ls_crypto.magic);
+
+		/* read the encryption version number */
+		bcopy(marker, &(lsp->ls_crypto.version),
+		    sizeof (lsp->ls_crypto.version));
+		lsp->ls_crypto.version = ntohs(lsp->ls_crypto.version);
+		marker += sizeof (lsp->ls_crypto.version);
+
+		/* read a chunk of reserved data */
+		bcopy(marker, lsp->ls_crypto.reserved1,
+		    sizeof (lsp->ls_crypto.reserved1));
+		marker += sizeof (lsp->ls_crypto.reserved1);
+
+		/* read block number where encrypted data begins */
+		bcopy(marker, &(lsp->ls_crypto.data_sector),
+		    sizeof (lsp->ls_crypto.data_sector));
+		lsp->ls_crypto.data_sector = ntohl(lsp->ls_crypto.data_sector);
+		marker += sizeof (lsp->ls_crypto.data_sector);
+
+		/* and ignore the rest until it is implemented */
+
+		lsp->ls_crypto_offset = lsp->ls_crypto.data_sector * DEV_BSIZE;
+		need_size_update = B_TRUE;
+
+	/* neither compressed nor encrypted, BUT could be new encrypted lofi */
+	} else if (klip->li_crypto_enabled) {
+
+		/*
+		 * This is the case where encryption was requested but the
+		 * appears to be entirely blank where the encryption header
+		 * would have been in the lofi image.  If it is blank,
+		 * assume it is a brand new lofi image and initialize the
+		 * header area with encryption magic and current version
+		 * header data.  If it is not blank, that's an error.
+		 */
+		int	i;
+		char	*marker;
+		struct crypto_meta	chead;
+
+		for (i = 0; i < sizeof (struct crypto_meta); i++)
+			if (crybuf[i] != '\0')
+				break;
+		if (i != sizeof (struct crypto_meta)) {
+			error = EINVAL;
+			goto propout;
+		}
+
+		/* nothing there, initialize as encrypted lofi */
+		marker = crybuf;
+		bcopy(lofi_crypto_magic, marker, sizeof (lofi_crypto_magic));
+		marker += sizeof (lofi_crypto_magic);
+		chead.version = htons(LOFI_CRYPTO_VERSION);
+		bcopy(&(chead.version), marker, sizeof (chead.version));
+		marker += sizeof (chead.version);
+		marker += sizeof (chead.reserved1);
+		chead.data_sector = htonl(LOFI_CRYPTO_DATA_SECTOR);
+		bcopy(&(chead.data_sector), marker, sizeof (chead.data_sector));
+
+		/* write the header */
+		error = vn_rdwr(UIO_WRITE, lsp->ls_vp, crybuf, DEV_BSIZE,
+		    CRYOFF, UIO_SYSSPACE, 0, RLIM64_INFINITY, kcred, &resid);
+		if (error != 0)
+			goto propout;
+
+		/* fix things up so it looks like we read this info */
+		bcopy(lofi_crypto_magic, lsp->ls_crypto.magic,
+		    sizeof (lofi_crypto_magic));
+		lsp->ls_crypto.version = LOFI_CRYPTO_VERSION;
+		lsp->ls_crypto.data_sector = LOFI_CRYPTO_DATA_SECTOR;
+
+		lsp->ls_crypto_offset = lsp->ls_crypto.data_sector * DEV_BSIZE;
+		need_size_update = B_TRUE;
+	}
+
+	/*
+	 * Either lsp->ls_vp_size or lsp->ls_crypto_offset changed;
+	 * for encrypted lofi, advertise that it is somewhat shorter
+	 * due to embedded crypto metadata section
+	 */
+	if (need_size_update) {
 		/* update DDI properties */
-		Size_prop_val = lsp->ls_vp_size;
+		Size_prop_val = lsp->ls_vp_size - lsp->ls_crypto_offset;
 		if ((ddi_prop_update_int64(newdev, lofi_dip, SIZE_PROP_NAME,
 		    Size_prop_val)) != DDI_PROP_SUCCESS) {
 			error = EINVAL;
 			goto propout;
 		}
-
-		Nblocks_prop_val = lsp->ls_vp_size / DEV_BSIZE;
+		Nblocks_prop_val =
+		    (lsp->ls_vp_size - lsp->ls_crypto_offset) / DEV_BSIZE;
 		if ((ddi_prop_update_int64(newdev, lofi_dip, NBLOCKS_PROP_NAME,
 		    Nblocks_prop_val)) != DDI_PROP_SUCCESS) {
 			error = EINVAL;
@@ -1363,14 +1921,27 @@ lofi_map_file(dev_t dev, struct lofi_ioctl *ulip, int pickminor,
 	return (0);
 
 propout:
-	(void) ddi_prop_remove(newdev, lofi_dip, SIZE_PROP_NAME);
-	(void) ddi_prop_remove(newdev, lofi_dip, NBLOCKS_PROP_NAME);
-closeout:
-	(void) VOP_CLOSE(vp, flag, 1, 0, credp, NULL);
-	VN_RELE(vp);
-out:
+	if (keycopied) {
+		bzero(lsp->ls_key.ck_data,
+		    CRYPTO_BITS2BYTES(lsp->ls_key.ck_length));
+		kmem_free(lsp->ls_key.ck_data,
+		    CRYPTO_BITS2BYTES(lsp->ls_key.ck_length));
+		lsp->ls_key.ck_data = NULL;
+		lsp->ls_key.ck_length = 0;
+	}
+
 	if (zalloced)
 		ddi_soft_state_free(lofi_statep, newminor);
+
+	(void) ddi_prop_remove(newdev, lofi_dip, SIZE_PROP_NAME);
+	(void) ddi_prop_remove(newdev, lofi_dip, NBLOCKS_PROP_NAME);
+
+out:
+	if (need_vn_close) {
+		(void) VOP_CLOSE(vp, flag, 1, 0, credp, NULL);
+		VN_RELE(vp);
+	}
+
 	mutex_exit(&lofi_lock);
 	free_lofi_ioctl(klip);
 	return (error);
@@ -1424,14 +1995,24 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 	 *
 	 * This is complicated by the fact that we may have outstanding
 	 * dispatched I/Os.  Rather than having a single mutex to serialize all
-	 * I/O, we keep a count of the number of outstanding I/O requests, as
-	 * well as a flag to indicate that no new I/Os should be dispatched.
+	 * I/O, we keep a count of the number of outstanding I/O requests
+	 * (ls_vp_iocount), as well as a flag to indicate that no new I/Os
+	 * should be dispatched (ls_vp_closereq).
+	 *
 	 * We set the flag, wait for the number of outstanding I/Os to reach 0,
 	 * and then close the underlying vnode.
 	 */
-
 	if (is_opened(lsp)) {
 		if (klip->li_force) {
+			/*
+			 * XXX: the section marked here should probably be
+			 * carefully incorporated into lofi_free_handle();
+			 * afterward just replace this section with:
+			 *	lofi_free_handle(dev, minor, lsp, credp);
+			 * and clean up lofi_unmap_file() a bit more
+			 */
+			lofi_free_crypto(lsp);
+
 			mutex_enter(&lsp->ls_vp_lock);
 			lsp->ls_vp_closereq = B_TRUE;
 			while (lsp->ls_vp_iocount > 0)
@@ -1442,8 +2023,12 @@ lofi_unmap_file(dev_t dev, struct lofi_ioctl *ulip, int byfilename,
 			lsp->ls_vp = NULL;
 			cv_broadcast(&lsp->ls_vp_cv);
 			mutex_exit(&lsp->ls_vp_lock);
-			mutex_exit(&lofi_lock);
+			/*
+			 * XXX: to here
+			 */
+
 			klip->li_minor = minor;
+			mutex_exit(&lofi_lock);
 			(void) copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 			free_lofi_ioctl(klip);
 			return (0);
@@ -1504,6 +2089,7 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 		(void) strcpy(klip->li_filename, lsp->ls_filename);
 		(void) strlcpy(klip->li_algorithm, lsp->ls_comp_algorithm,
 		    sizeof (klip->li_algorithm));
+		klip->li_crypto_enabled = lsp->ls_crypto_enabled;
 		mutex_exit(&lofi_lock);
 		error = copy_out_lofi_ioctl(klip, ulip, ioctl_flag);
 		free_lofi_ioctl(klip);
@@ -1511,6 +2097,7 @@ lofi_get_info(dev_t dev, struct lofi_ioctl *ulip, int which,
 	case LOFI_GET_MINOR:
 		mutex_enter(&lofi_lock);
 		klip->li_minor = file_to_minor(klip->li_filename);
+		/* caller should not depend on klip->li_crypto_enabled here */
 		mutex_exit(&lofi_lock);
 		if (klip->li_minor == 0) {
 			free_lofi_ioctl(klip);
@@ -1557,10 +2144,6 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 	enum dkio_state dkstate;
 	struct lofi_state *lsp;
 	minor_t	minor;
-
-#ifdef lint
-	credp = credp;
-#endif
 
 	minor = getminor(dev);
 	/* lofi ioctls only apply to the master device */
@@ -1724,7 +2307,7 @@ static struct dev_ops lofi_ops = {
 	&lofi_cb_ops,		/* driver operations */
 	NULL,			/* no bus operations */
 	NULL,			/* power */
-	ddi_quiesce_not_needed,		/* quiesce */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 static struct modldrv modldrv = {

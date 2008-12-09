@@ -48,21 +48,75 @@
 #include <libgen.h>
 #include <ctype.h>
 #include <dlfcn.h>
+#include <limits.h>
+#include <security/cryptoki.h>
+#include <cryptoutil.h>
+#include <sys/crypto/ioctl.h>
+#include <sys/crypto/ioctladmin.h>
 #include "utils.h"
 
+/* Only need the IV len #defines out of these files, nothing else. */
+#include <aes/aes_impl.h>
+#include <des/des_impl.h>
+#include <blowfish/blowfish_impl.h>
+
 static const char USAGE[] =
-	"Usage: %s -a file [ device ]\n"
+	"Usage: %s -a file [ device ] "
+	" [-c aes-128-cbc|aes-192-cbc|aes-256-cbc|des3-cbc|blowfish-cbc]"
+	" [-e] [-k keyfile] [-T [token]:[manuf]:[serial]:key]\n"
 	"       %s -d file | device\n"
 	"       %s -C [algorithm] [-s segment_size] file\n"
 	"       %s -U file\n"
 	"       %s [ file | device ]\n";
 
-static const char *pname;
-static int	addflag = 0;
-static int	deleteflag = 0;
-static int	errflag = 0;
-static int	compressflag = 0;
-static int 	uncompressflag = 0;
+typedef struct token_spec {
+	char	*name;
+	char	*mfr;
+	char	*serno;
+	char	*key;
+} token_spec_t;
+
+typedef struct mech_alias {
+	char	*alias;
+	CK_MECHANISM_TYPE type;
+	char	*name;		/* for ioctl */
+	char	*iv_name;	/* for ioctl */
+	size_t	iv_len;		/* for ioctl */
+	iv_method_t iv_type;	/* for ioctl */
+	size_t	min_keysize;	/* in bytes */
+	size_t	max_keysize;	/* in bytes */
+	token_spec_t *token;
+	CK_SLOT_ID slot;
+} mech_alias_t;
+
+static mech_alias_t mech_aliases[] = {
+	/* Preferred one should always be listed first. */
+	{ "aes-256-cbc", CKM_AES_CBC, "CKM_AES_CBC", "CKM_AES_ECB", AES_IV_LEN,
+	    IVM_ENC_BLKNO, ULONG_MAX, 0L, NULL, (CK_SLOT_ID) -1 },
+	{ "aes-192-cbc", CKM_AES_CBC, "CKM_AES_CBC", "CKM_AES_ECB", AES_IV_LEN,
+	    IVM_ENC_BLKNO, ULONG_MAX, 0L, NULL, (CK_SLOT_ID) -1 },
+	{ "aes-128-cbc", CKM_AES_CBC, "CKM_AES_CBC", "CKM_AES_ECB", AES_IV_LEN,
+	    IVM_ENC_BLKNO, ULONG_MAX, 0L, NULL, (CK_SLOT_ID) -1 },
+	{ "des3-cbc", CKM_DES3_CBC, "CKM_DES3_CBC", "CKM_DES3_ECB", DES_IV_LEN,
+	    IVM_ENC_BLKNO, ULONG_MAX, 0L, NULL, (CK_SLOT_ID)-1 },
+	{ "blowfish-cbc", CKM_BLOWFISH_CBC, "CKM_BLOWFISH_CBC",
+	    "CKM_BLOWFISH_ECB", BLOWFISH_IV_LEN, IVM_ENC_BLKNO, ULONG_MAX,
+	    0L, NULL, (CK_SLOT_ID)-1 }
+	/*
+	 * A cipher without an iv requirement would look like this:
+	 * { "aes-xex", CKM_AES_XEX, "CKM_AES_XEX", NULL, 0,
+	 *    IVM_NONE, ULONG_MAX, 0L, NULL, (CK_SLOT_ID)-1 }
+	 */
+};
+
+int	mech_aliases_count = (sizeof (mech_aliases) / sizeof (mech_alias_t));
+
+/* Preferred cipher, if one isn't specified on command line. */
+#define	DEFAULT_CIPHER	(&mech_aliases[0])
+
+#define	DEFAULT_CIPHER_NUM	64	/* guess # kernel ciphers available */
+#define	DEFAULT_MECHINFO_NUM	16	/* guess # kernel mechs available */
+#define	MIN_PASSLEN		8	/* min acceptable passphrase size */
 
 static int gzip_compress(void *src, size_t srclen, void *dst,
 	size_t *destlen, int level);
@@ -73,9 +127,9 @@ lofi_compress_info_t lofi_compress_table[LOFI_COMPRESS_FUNCTIONS] = {
 	{NULL,	gzip_compress,	9, 	"gzip-9"}
 };
 
+/* For displaying lofi mappings */
 #define	FORMAT 			"%-20s     %-30s	%s\n"
-#define	NONE			"-"
-#define	COMPRESS		"Compressed"
+
 #define	COMPRESS_ALGORITHM	"gzip"
 #define	COMPRESS_THRESHOLD	2048
 #define	SEGSIZE			131072
@@ -115,52 +169,11 @@ static int gzip_compress(void *src, size_t srclen, void *dst,
 	return (0);
 }
 
-/*
- * Print the list of all the mappings. Including a header.
- */
 static void
-print_mappings(int fd)
+usage(const char *pname)
 {
-	struct lofi_ioctl li;
-	int	minor;
-	int	maxminor;
-	char	path[MAXPATHLEN];
-	char	options[MAXPATHLEN];
-
-	li.li_minor = 0;
-	if (ioctl(fd, LOFI_GET_MAXMINOR, &li) == -1) {
-		perror("ioctl");
-		exit(E_ERROR);
-	}
-
-	maxminor = li.li_minor;
-
-	(void) printf(FORMAT, "Block Device", "File", "Options");
-	for (minor = 1; minor <= maxminor; minor++) {
-		li.li_minor = minor;
-		if (ioctl(fd, LOFI_GET_FILENAME, &li) == -1) {
-			if (errno == ENXIO)
-				continue;
-			perror("ioctl");
-			break;
-		}
-		(void) snprintf(path, sizeof (path), "/dev/%s/%d",
-		    LOFI_BLOCK_NAME, minor);
-		if (li.li_algorithm[0] == '\0')
-			(void) snprintf(options, sizeof (options), "%s", NONE);
-		else
-			(void) snprintf(options, sizeof (options),
-			    COMPRESS "(%s)", li.li_algorithm);
-
-		(void) printf(FORMAT, path, li.li_filename, options);
-	}
-}
-
-static void
-usage(void)
-{
-	(void) fprintf(stderr, gettext(USAGE), pname, pname,
-	    pname, pname, pname);
+	(void) fprintf(stderr, gettext(USAGE), pname, pname, pname,
+	    pname, pname);
 	exit(E_USAGE);
 }
 
@@ -203,7 +216,6 @@ wait_until_dev_complete(int minor)
 	char	charpath[MAXPATHLEN];
 	di_devlink_handle_t hdl;
 
-
 	(void) snprintf(blkpath, sizeof (blkpath), "/dev/%s/%d",
 	    LOFI_BLOCK_NAME, minor);
 	(void) snprintf(charpath, sizeof (charpath), "/dev/%s/%d",
@@ -224,19 +236,13 @@ wait_until_dev_complete(int minor)
 	 * only fail if the caller is non-root. In that case, wait for
 	 * link creation via sysevents.
 	 */
-	cursleep = 0;
-	while (cursleep < maxsleep) {
-		if ((stat64(blkpath, &buf) == -1) ||
-		    (stat64(charpath, &buf) == -1)) {
-			(void) sleep(sleeptime);
-			cursleep += sleeptime;
-			continue;
-		}
-		return;
+	for (cursleep = 0; cursleep < maxsleep; cursleep += sleeptime) {
+		if (stat64(blkpath, &buf) == 0 && stat64(charpath, &buf) == 0)
+			return;
+		(void) sleep(sleeptime);
 	}
 
 	/* one last try */
-
 out:
 	if (stat64(blkpath, &buf) == -1) {
 		die(gettext("%s was not created"), blkpath);
@@ -247,48 +253,89 @@ out:
 }
 
 /*
+ * Map the file and return the minor number the driver picked for the file
+ * DO NOT use this function if the filename is actually the device name.
+ */
+static int
+lofi_map_file(int lfd, struct lofi_ioctl li, const char *filename)
+{
+	int	minor;
+
+	li.li_minor = 0;
+	(void) strlcpy(li.li_filename, filename, sizeof (li.li_filename));
+	minor = ioctl(lfd, LOFI_MAP_FILE, &li);
+	if (minor == -1) {
+		if (errno == ENOTSUP)
+			warn(gettext("encrypting compressed files is "
+			    "unsupported"));
+		die(gettext("could not map file %s"), filename);
+	}
+	wait_until_dev_complete(minor);
+	return (minor);
+}
+
+/*
  * Add a device association. If devicename is NULL, let the driver
  * pick a device.
  */
 static void
 add_mapping(int lfd, const char *devicename, const char *filename,
-    int *minor_created, int suppress)
+    mech_alias_t *cipher, const char *rkey, size_t rksz)
 {
 	struct lofi_ioctl li;
-	int	minor;
+
+	li.li_crypto_enabled = B_FALSE;
+	if (cipher != NULL) {
+		/* set up encryption for mapped file */
+		li.li_crypto_enabled = B_TRUE;
+		(void) strlcpy(li.li_cipher, cipher->name,
+		    sizeof (li.li_cipher));
+		if (rksz > sizeof (li.li_key)) {
+			die(gettext("key too large"));
+		}
+		bcopy(rkey, li.li_key, rksz);
+		li.li_key_len = rksz << 3;	/* convert to bits */
+
+		li.li_iv_type = cipher->iv_type;
+		li.li_iv_len = cipher->iv_len;	/* 0 when no iv needed */
+		switch (cipher->iv_type) {
+		case IVM_ENC_BLKNO:
+			(void) strlcpy(li.li_iv_cipher, cipher->iv_name,
+			    sizeof (li.li_iv_cipher));
+			break;
+		case IVM_NONE:
+			/* FALLTHROUGH */
+		default:
+			break;
+		}
+	}
 
 	if (devicename == NULL) {
-		/* pick one */
-		li.li_minor = 0;
-		(void) strlcpy(li.li_filename, filename,
-		    sizeof (li.li_filename));
-		minor = ioctl(lfd, LOFI_MAP_FILE, &li);
-		if (minor == -1) {
-			die(gettext("could not map file %s"), filename);
-		}
-		wait_until_dev_complete(minor);
-		/* print one picked */
-		if (!suppress)
-			(void) printf("/dev/%s/%d\n", LOFI_BLOCK_NAME, minor);
+		int	minor;
 
-		/* fill in the minor if needed */
-		if (minor_created != NULL) {
-			*minor_created = minor;
-		}
+		/* pick one via the driver */
+		minor = lofi_map_file(lfd, li, filename);
+		/* if mapping succeeds, print the one picked */
+		(void) printf("/dev/%s/%d\n", LOFI_BLOCK_NAME, minor);
 		return;
 	}
+
 	/* use device we were given */
-	minor = name_to_minor(devicename);
-	if (minor == 0) {
+	li.li_minor = name_to_minor(devicename);
+	if (li.li_minor == 0) {
 		die(gettext("malformed device name %s\n"), devicename);
 	}
 	(void) strlcpy(li.li_filename, filename, sizeof (li.li_filename));
-	li.li_minor = minor;
+
+	/* if device is already in use li.li_minor won't change */
 	if (ioctl(lfd, LOFI_MAP_FILE_MINOR, &li) == -1) {
+		if (errno == ENOTSUP)
+			warn(gettext("encrypting compressed files is "
+			    "unsupported"));
 		die(gettext("could not map file %s to %s"), filename,
 		    devicename);
 	}
-	wait_until_dev_complete(minor);
+	wait_until_dev_complete(li.li_minor);
 }
 
 /*
@@ -325,6 +372,9 @@ delete_mapping(int lfd, const char *devicename, const char *filename,
 	}
 }
 
+/*
+ * Show filename given devicename, or devicename given filename.
+ */
 static void
 print_one_mapping(int lfd, const char *devicename, const char *filename)
 {
@@ -354,6 +404,762 @@ print_one_mapping(int lfd, const char *devicename, const char *filename)
 }
 
 /*
+ * Print the list of all the mappings, including a header.
+ */
+static void
+print_mappings(int fd)
+{
+	struct lofi_ioctl li;
+	int	minor;
+	int	maxminor;
+	char	path[MAXPATHLEN];
+	char	options[MAXPATHLEN];
+
+	li.li_minor = 0;
+	if (ioctl(fd, LOFI_GET_MAXMINOR, &li) == -1) {
+		die("ioctl");
+	}
+	maxminor = li.li_minor;
+
+	(void) printf(FORMAT, gettext("Block Device"), gettext("File"),
+	    gettext("Options"));
+	for (minor = 1; minor <= maxminor; minor++) {
+		li.li_minor = minor;
+		if (ioctl(fd, LOFI_GET_FILENAME, &li) == -1) {
+			if (errno == ENXIO)
+				continue;
+			warn("ioctl");
+			break;
+		}
+		(void) snprintf(path, sizeof (path), "/dev/%s/%d",
+		    LOFI_BLOCK_NAME, minor);
+		/*
+		 * Encrypted lofi and compressed lofi are mutually exclusive.
+		 */
+		if (li.li_crypto_enabled)
+			(void) snprintf(options, sizeof (options),
+			    gettext("Encrypted"));
+		else if (li.li_algorithm[0] != '\0')
+			(void) snprintf(options, sizeof (options),
+			    gettext("Compressed(%s)"), li.li_algorithm);
+		else
+			(void) snprintf(options, sizeof (options), "-");
+
+		(void) printf(FORMAT, path, li.li_filename, options);
+	}
+}
+
+/*
+ * Verify the cipher selected by user.
+ */
+static mech_alias_t *
+ciph2mech(const char *alias)
+{
+	int	i;
+
+	for (i = 0; i < mech_aliases_count; i++) {
+		if (strcasecmp(alias, mech_aliases[i].alias) == 0)
+			return (&mech_aliases[i]);
+	}
+	return (NULL);
+}
+
+/*
+ * Verify user selected cipher is also available in kernel.
+ *
+ * While traversing kernel list of mechs, if the cipher is supported in the
+ * kernel for both encryption and decryption, it also picks up the min/max
+ * key size.
+ */
+static boolean_t
+kernel_cipher_check(mech_alias_t *cipher)
+{
+	boolean_t ciph_ok = B_FALSE;
+	boolean_t iv_ok = B_FALSE;
+	int	i;
+	int	count;
+	crypto_get_mechanism_list_t *kciphers = NULL;
+	crypto_get_all_mechanism_info_t *kinfo = NULL;
+	int	fd = -1;
+	size_t	keymin;
+	size_t	keymax;
+
+	/* if cipher doesn't need iv generating mech, bypass that check now */
+	if (cipher->iv_name == NULL)
+		iv_ok = B_TRUE;
+
+	/* allocate some space for the list of kernel ciphers */
+	count = DEFAULT_CIPHER_NUM;
+	kciphers = malloc(sizeof (crypto_get_mechanism_list_t) +
+	    sizeof (crypto_mech_name_t) * (count - 1));
+	if (kciphers == NULL)
+		die(gettext("failed to allocate memory for list of "
+		    "kernel mechanisms"));
+	kciphers->ml_count = count;
+
+	/* query crypto device to get list of kernel ciphers */
+	if ((fd = open("/dev/crypto", O_RDWR)) == -1) {
+		warn(gettext("failed to open %s"), "/dev/crypto");
+		goto kcc_out;
+	}
+
+	if (ioctl(fd, CRYPTO_GET_MECHANISM_LIST, kciphers) == -1) {
+		warn(gettext("CRYPTO_GET_MECHANISM_LIST ioctl failed"));
+		goto kcc_out;
+	}
+
+	if (kciphers->ml_return_value == CRYPTO_BUFFER_TOO_SMALL) {
+		count = kciphers->ml_count;
+		free(kciphers);
+		kciphers = malloc(sizeof (crypto_get_mechanism_list_t) +
+		    sizeof (crypto_mech_name_t) * (count - 1));
+		if (kciphers == NULL) {
+			warn(gettext("failed to allocate memory for list of "
+			    "kernel mechanisms"));
+			goto kcc_out;
+		}
+		kciphers->ml_count = count;
+
+		if (ioctl(fd, CRYPTO_GET_MECHANISM_LIST, kciphers) == -1) {
+			warn(gettext("CRYPTO_GET_MECHANISM_LIST ioctl failed"));
+			goto kcc_out;
+		}
+	}
+
+	if (kciphers->ml_return_value != CRYPTO_SUCCESS) {
+		warn(gettext(
+		    "CRYPTO_GET_MECHANISM_LIST ioctl return value = %d\n"),
+		    kciphers->ml_return_value);
+		goto kcc_out;
+	}
+
+	/*
+	 * scan list of kernel ciphers looking for the selected one and if
+	 * it needs an iv generated using another cipher, also look for that
+	 * additional cipher to be used for generating the iv
+	 */
+	count = kciphers->ml_count;
+	for (i = 0; i < count && !(ciph_ok && iv_ok); i++) {
+		if (!ciph_ok &&
+		    strcasecmp(cipher->name, kciphers->ml_list[i]) == 0)
+			ciph_ok = B_TRUE;
+		if (!iv_ok &&
+		    strcasecmp(cipher->iv_name, kciphers->ml_list[i]) == 0)
+			iv_ok = B_TRUE;
+	}
+	free(kciphers);
+	kciphers = NULL;
+
+	if (!ciph_ok)
+		warn(gettext("%s mechanism not supported in kernel\n"),
+		    cipher->name);
+	if (!iv_ok)
+		warn(gettext("%s mechanism not supported in kernel\n"),
+		    cipher->iv_name);
+
+	if (ciph_ok) {
+		/* Get the details about the user selected cipher */
+		count = DEFAULT_MECHINFO_NUM;
+		kinfo = malloc(sizeof (crypto_get_all_mechanism_info_t) +
+		    sizeof (crypto_mechanism_info_t) * (count - 1));
+		if (kinfo == NULL) {
+			warn(gettext("failed to allocate memory for "
+			    "kernel mechanism info"));
+			goto kcc_out;
+		}
+		kinfo->mi_count = count;
+		(void) strlcpy(kinfo->mi_mechanism_name, cipher->name,
+		    CRYPTO_MAX_MECH_NAME);
+
+		if (ioctl(fd, CRYPTO_GET_ALL_MECHANISM_INFO, kinfo) == -1) {
+			warn(gettext(
+			    "CRYPTO_GET_ALL_MECHANISM_INFO ioctl failed"));
+			goto kcc_out;
+		}
+
+		if (kinfo->mi_return_value == CRYPTO_BUFFER_TOO_SMALL) {
+			count = kinfo->mi_count;
+			free(kinfo);
+			kinfo = malloc(
+			    sizeof (crypto_get_all_mechanism_info_t) +
+			    sizeof (crypto_mechanism_info_t) * (count - 1));
+			if (kinfo == NULL) {
+				warn(gettext("failed to allocate memory for "
+				    "kernel mechanism info"));
+				goto kcc_out;
+			}
+			kinfo->mi_count = count;
+			(void) strlcpy(kinfo->mi_mechanism_name, cipher->name,
+			    CRYPTO_MAX_MECH_NAME);
+
+			if (ioctl(fd, CRYPTO_GET_ALL_MECHANISM_INFO, kinfo) ==
+			    -1) {
+				warn(gettext("CRYPTO_GET_ALL_MECHANISM_INFO "
+				    "ioctl failed"));
+				goto kcc_out;
+			}
+		}
+
+		if (kinfo->mi_return_value != CRYPTO_SUCCESS) {
+			warn(gettext("CRYPTO_GET_ALL_MECHANISM_INFO ioctl "
+			    "return value = %d\n"), kinfo->mi_return_value);
+			goto kcc_out;
+		}
+
+		/* Set key min and max size */
+		count = kinfo->mi_count;
+		i = 0;
+		if (i < count) {
+			keymin = kinfo->mi_list[i].mi_min_key_size;
+			keymax = kinfo->mi_list[i].mi_max_key_size;
+			if (kinfo->mi_list[i].mi_keysize_unit &
+			    CRYPTO_KEYSIZE_UNIT_IN_BITS) {
+				keymin = CRYPTO_BITS2BYTES(keymin);
+				keymax = CRYPTO_BITS2BYTES(keymax);
+
+			}
+			cipher->min_keysize = keymin;
+			cipher->max_keysize = keymax;
+		}
+		free(kinfo);
+		kinfo = NULL;
+
+		if (i == count) {
+			(void) close(fd);
+			die(gettext(
+			    "failed to find usable %s kernel mechanism, "
+			    "use \"cryptoadm list -m\" to find available "
+			    "mechanisms\n"),
+			    cipher->name);
+		}
+	}
+
+	/* Note: key min/max, unit size, usage for iv cipher are not checked. */
+
+	return (ciph_ok && iv_ok);
+
+kcc_out:
+	if (kinfo != NULL)
+		free(kinfo);
+	if (kciphers != NULL)
+		free(kciphers);
+	if (fd != -1)
+		(void) close(fd);
+	return (B_FALSE);
+}
+
+/*
+ * Break up token spec into its components (non-destructive)
+ */
+static token_spec_t *
+parsetoken(char *spec)
+{
+#define	FLD_NAME	0
+#define	FLD_MANUF	1
+#define	FLD_SERIAL	2
+#define	FLD_LABEL	3
+#define	NFIELDS		4
+#define	nullfield(i)	((field[(i)+1] - field[(i)]) <= 1)
+#define	copyfield(fld, i)	\
+		{							\
+			int	n;					\
+			(fld) = NULL;					\
+			if ((n = (field[(i)+1] - field[(i)])) > 1) {	\
+				if (((fld) = malloc(n)) != NULL) {	\
+					(void) strncpy((fld), field[(i)], n); \
+					((fld))[n - 1] = '\0';		\
+				}					\
+			}						\
+		}
+
+	int	i;
+	char	*field[NFIELDS + 1];	/* +1 to catch extra delimiters */
+	token_spec_t *ti = NULL;
+
+	if (spec == NULL)
+		return (NULL);
+
+	/*
+	 * Correct format is "[name]:[manuf]:[serial]:key". Can't use
+	 * strtok because it treats ":::key" and "key:::" and "key" all
+	 * as the same thing, and we can't have the :s compressed away.
+	 */
+	field[0] = spec;
+	for (i = 1; i < NFIELDS + 1; i++) {
+		field[i] = strchr(field[i-1], ':');
+		if (field[i] == NULL)
+			break;
+		field[i]++;
+	}
+	if (i < NFIELDS)		/* not enough fields */
+		return (NULL);
+	if (field[NFIELDS] != NULL)	/* too many fields */
+		return (NULL);
+	field[NFIELDS] = strchr(field[NFIELDS-1], '\0') + 1;
+
+	/* key label can't be empty */
+	if (nullfield(FLD_LABEL))
+		return (NULL);
+
+	ti = malloc(sizeof (token_spec_t));
+	if (ti == NULL)
+		return (NULL);
+
+	copyfield(ti->name, FLD_NAME);
+	copyfield(ti->mfr, FLD_MANUF);
+	copyfield(ti->serno, FLD_SERIAL);
+	copyfield(ti->key, FLD_LABEL);
+
+	/*
+	 * If token specified and it only contains a key label, then
+	 * search all tokens for the key, otherwise only those with
+	 * matching name, mfr, and serno are used.
+	 */
+	/*
+	 * That's how we'd like it to be, however, if only the key label
+	 * is specified, default to using softtoken.  It's easier.
+	 */
+	if (ti->name == NULL && ti->mfr == NULL && ti->serno == NULL)
+		ti->name = strdup(pkcs11_default_token());
+	return (ti);
+}
+
+/*
+ * PBE the passphrase into a raw key
+ */
+static void
+getkeyfromuser(mech_alias_t *cipher, char **raw_key, size_t *raw_key_sz)
+{
+	CK_SESSION_HANDLE sess;
+	CK_RV	rv;
+	char	*pass = NULL;
+	size_t	passlen = 0;
+	void	*salt = NULL;	/* don't use NULL, see note on salt below */
+	size_t	saltlen = 0;
+	CK_KEY_TYPE ktype;
+	void	*kvalue;
+	size_t	klen;
+
+	/* did init_crypto find a slot that supports this cipher? */
+	if (cipher->slot == (CK_SLOT_ID)-1 || cipher->max_keysize == 0) {
+		rv = CKR_MECHANISM_INVALID;
+		goto cleanup;
+	}
+
+	rv = pkcs11_mech2keytype(cipher->type, &ktype);
+	if (rv != CKR_OK)
+		goto cleanup;
+
+	/*
+	 * use the passphrase to generate a PBE PKCS#5 secret key and
+	 * retrieve the raw key data to eventually pass it to the kernel;
+	 */
+	rv = C_OpenSession(cipher->slot, CKF_SERIAL_SESSION, NULL, NULL, &sess);
+	if (rv != CKR_OK)
+		goto cleanup;
+
+	/* get user passphrase with 8 byte minimum */
+	if (pkcs11_get_pass(NULL, &pass, &passlen, MIN_PASSLEN, B_TRUE) < 0) {
+		die(gettext("passphrases do not match\n"));
+	}
+
+	/*
+	 * salt should not be NULL, or else pkcs11_PasswdToKey() will
+	 * complain about CKR_MECHANISM_PARAM_INVALID; the following is
+	 * to make up for not having a salt until a proper one is used
+	 */
+	salt = pass;
+	saltlen = passlen;
+
+	klen = cipher->max_keysize;
+	rv = pkcs11_PasswdToKey(sess, pass, passlen, salt, saltlen, ktype,
+	    cipher->max_keysize, &kvalue, &klen);
+
+	(void) C_CloseSession(sess);
+
+	if (rv != CKR_OK) {
+		goto cleanup;
+	}
+
+	/* assert(klen == cipher->max_keysize); */
+	*raw_key_sz = klen;
+	*raw_key = (char *)kvalue;
+	return;
+
+cleanup:
+	die(gettext("failed to generate %s key from passphrase: %s"),
+	    cipher->alias, pkcs11_strerror(rv));
+}
+
+/*
+ * Read raw key from file; also handles ephemeral keys.
+ */
+void
+getkeyfromfile(const char *pathname, mech_alias_t *cipher, char **key,
+    size_t *ksz)
+{
+	int	fd;
+	struct stat sbuf;
+	boolean_t notplain = B_FALSE;
+	ssize_t	cursz;
+	ssize_t	nread;
+
+	/* ephemeral keys are just random data */
+	if (pathname == NULL) {
+		*ksz = cipher->max_keysize;
+		*key = malloc(*ksz);
+		if (*key == NULL)
+			die(gettext("failed to allocate memory for"
+			    " ephemeral key"));
+		if (pkcs11_random_data(*key, *ksz) < 0) {
+			free(*key);
+			die(gettext("failed to get enough random data"));
+		}
+		return;
+	}
+
+	/*
+	 * If the remaining section of code didn't also check for secure keyfile
+	 * permissions and whether the key is within cipher min and max lengths,
+	 * (or, if those things moved out of this block), we could have had:
+	 *	if (pkcs11_read_data(pathname, key, ksz) < 0)
+	 *		handle_error();
+	 */
+
+	if ((fd = open(pathname, O_RDONLY, 0)) == -1)
+		die(gettext("open of keyfile (%s) failed"), pathname);
+
+	if (fstat(fd, &sbuf) == -1)
+		die(gettext("fstat of keyfile (%s) failed"), pathname);
+
+	if (S_ISREG(sbuf.st_mode)) {
+		if ((sbuf.st_mode & (S_IWGRP | S_IWOTH)) != 0)
+			die(gettext("insecure permissions on keyfile %s\n"),
+			    pathname);
+
+		*ksz = sbuf.st_size;
+		if (*ksz < cipher->min_keysize || cipher->max_keysize < *ksz) {
+			warn(gettext("%s: invalid keysize: %d\n"),
+			    pathname, (int)*ksz);
+			die(gettext("\t%d <= keysize <= %d\n"),
+			    cipher->min_keysize, cipher->max_keysize);
+		}
+	} else {
+		*ksz = cipher->max_keysize;
+		notplain = B_TRUE;
+	}
+
+	*key = malloc(*ksz);
+	if (*key == NULL)
+		die(gettext("failed to allocate memory for key from file"));
+
+	for (cursz = 0, nread = 0; cursz < *ksz; cursz += nread) {
+		nread = read(fd, *key, *ksz);
+		if (nread > 0)
+			continue;
+		/*
+		 * nread == 0.  If it's not a regular file we were trying to
+		 * get the maximum keysize of data possible for this cipher.
+		 * But if we've got at least the minimum keysize of data,
+		 * round down to the nearest keysize unit and call it good.
+		 * If we haven't met the minimum keysize, that's an error.
+		 * If it's a regular file, nread = 0 is also an error.
+		 */
+		if (nread == 0 && notplain && cursz >= cipher->min_keysize) {
+			*ksz = (cursz / cipher->min_keysize) *
+			    cipher->min_keysize;
+			break;
+		}
+		die(gettext("%s: can't read all keybytes"), pathname);
+	}
+	(void) close(fd);
+}
+
+/*
+ * Read the raw key from token, or from a file that was wrapped with a
+ * key from token
+ */
+void
+getkeyfromtoken(CK_SESSION_HANDLE sess,
+    token_spec_t *token, const char *keyfile, mech_alias_t *cipher,
+    char **raw_key, size_t *raw_key_sz)
+{
+	CK_RV	rv = CKR_OK;
+	CK_BBOOL trueval = B_TRUE;
+	CK_OBJECT_CLASS kclass;		/* secret key or RSA private key */
+	CK_KEY_TYPE ktype;		/* from selected cipher or CKK_RSA */
+	CK_KEY_TYPE raw_ktype;		/* from selected cipher */
+	CK_ATTRIBUTE	key_tmpl[] = {
+		{ CKA_CLASS, NULL, 0 },	/* re-used for token key and unwrap */
+		{ CKA_KEY_TYPE, NULL, 0 },	/* ditto */
+		{ CKA_LABEL, NULL, 0 },
+		{ CKA_TOKEN, NULL, 0 },
+		{ CKA_PRIVATE, NULL, 0 }
+	    };
+	CK_ULONG attrs = sizeof (key_tmpl) / sizeof (CK_ATTRIBUTE);
+	int	i;
+	char	*pass = NULL;
+	size_t	passlen = 0;
+	CK_OBJECT_HANDLE obj, rawobj;
+	CK_ULONG num_objs = 1;		/* just want to find 1 token key */
+	CK_MECHANISM unwrap = { CKM_RSA_PKCS, NULL, 0 };
+	char	*rkey;
+	size_t	rksz;
+
+	if (token == NULL || token->key == NULL)
+		return;
+
+	/* did init_crypto find a slot that supports this cipher? */
+	if (cipher->slot == (CK_SLOT_ID)-1 || cipher->max_keysize == 0) {
+		die(gettext("failed to find any cryptographic provider, "
+		    "use \"cryptoadm list -p\" to find providers: %s\n"),
+		    pkcs11_strerror(CKR_MECHANISM_INVALID));
+	}
+
+	if (pkcs11_get_pass(token->name, &pass, &passlen, 0, B_FALSE) < 0)
+		die(gettext("unable to get passphrase"));
+
+	/* use passphrase to login to token */
+	if (pass != NULL && passlen > 0) {
+		rv = C_Login(sess, CKU_USER, (CK_UTF8CHAR_PTR)pass, passlen);
+		if (rv != CKR_OK) {
+			die(gettext("cannot login to the token %s: %s\n"),
+			    token->name, pkcs11_strerror(rv));
+		}
+	}
+
+	rv = pkcs11_mech2keytype(cipher->type, &raw_ktype);
+	if (rv != CKR_OK) {
+		die(gettext("failed to get key type for cipher %s: %s\n"),
+		    cipher->name, pkcs11_strerror(rv));
+	}
+
+	/*
+	 * If no keyfile was given, then the token key is secret key to
+	 * be used for encryption/decryption.  Otherwise, the keyfile
+	 * contains a wrapped secret key, and the token is actually the
+	 * unwrapping RSA private key.
+	 */
+	if (keyfile == NULL) {
+		kclass = CKO_SECRET_KEY;
+		ktype = raw_ktype;
+	} else {
+		kclass = CKO_PRIVATE_KEY;
+		ktype = CKK_RSA;
+	}
+
+	/* Find the key in the token first */
+	for (i = 0; i < attrs; i++) {
+		switch (key_tmpl[i].type) {
+		case CKA_CLASS:
+			key_tmpl[i].pValue = &kclass;
+			key_tmpl[i].ulValueLen = sizeof (kclass);
+			break;
+		case CKA_KEY_TYPE:
+			key_tmpl[i].pValue = &ktype;
+			key_tmpl[i].ulValueLen = sizeof (ktype);
+			break;
+		case CKA_LABEL:
+			key_tmpl[i].pValue = token->key;
+			key_tmpl[i].ulValueLen = strlen(token->key);
+			break;
+		case CKA_TOKEN:
+			key_tmpl[i].pValue = &trueval;
+			key_tmpl[i].ulValueLen = sizeof (trueval);
+			break;
+		case CKA_PRIVATE:
+			key_tmpl[i].pValue = &trueval;
+			key_tmpl[i].ulValueLen = sizeof (trueval);
+			break;
+		default:
+			break;
+		}
+	}
+	rv = C_FindObjectsInit(sess, key_tmpl, attrs);
+	if (rv != CKR_OK)
+		die(gettext("cannot find key %s: %s\n"), token->key,
+		    pkcs11_strerror(rv));
+	rv = C_FindObjects(sess, &obj, 1, &num_objs);
+	(void) C_FindObjectsFinal(sess);
+
+	if (num_objs == 0) {
+		die(gettext("cannot find key %s\n"), token->key);
+	} else if (rv != CKR_OK) {
+		die(gettext("cannot find key %s: %s\n"), token->key,
+		    pkcs11_strerror(rv));
+	}
+
+	/*
+	 * No keyfile means when token key is found, convert it to raw key,
+	 * and done.  Otherwise still need do an unwrap to create yet another
+	 * obj and that needs to be converted to raw key before we're done.
+	 */
+	if (keyfile == NULL) {
+		/* obj contains raw key, extract it */
+		rv = pkcs11_ObjectToKey(sess, obj, (void **)&rkey, &rksz,
+		    B_FALSE);
+		if (rv != CKR_OK) {
+			die(gettext("failed to get key value for %s"
+			    " from token %s, %s\n"), token->key,
+			    token->name, pkcs11_strerror(rv));
+		}
+	} else {
+		getkeyfromfile(keyfile, cipher, &rkey, &rksz);
+
+		/*
+		 * Got the wrapping RSA obj and the wrapped key from file.
+		 * Unwrap the key from file with RSA obj to get rawkey obj.
+		 */
+
+		/* re-use the first two attributes of key_tmpl */
+		kclass = CKO_SECRET_KEY;
+		ktype = raw_ktype;
+
+		rv = C_UnwrapKey(sess, &unwrap, obj, (CK_BYTE_PTR)rkey,
+		    rksz, key_tmpl, 2, &rawobj);
+		if (rv != CKR_OK) {
+			die(gettext("failed to unwrap key in keyfile %s,"
+			    " %s\n"), keyfile, pkcs11_strerror(rv));
+		}
+		/* rawobj contains raw key, extract it */
+		rv = pkcs11_ObjectToKey(sess, rawobj, (void **)&rkey, &rksz,
+		    B_TRUE);
+		if (rv != CKR_OK) {
+			die(gettext("failed to get unwrapped key value for"
+			    " key in keyfile %s, %s\n"), keyfile,
+			    pkcs11_strerror(rv));
+		}
+	}
+
+	/* validate raw key size */
+	if (rksz < cipher->min_keysize || cipher->max_keysize < rksz) {
+		warn(gettext("%s: invalid keysize: %d\n"), keyfile, (int)rksz);
+		die(gettext("\t%d <= keysize <= %d\n"), cipher->min_keysize,
+		    cipher->max_keysize);
+	}
+
+	*raw_key_sz = rksz;
+	*raw_key = (char *)rkey;
+}
+
+/*
+ * Set up cipher key limits and verify PKCS#11 can be done
+ * match_token_cipher is the function pointer used by
+ * pkcs11_GetCriteriaSession() init_crypto.
+ */
+boolean_t
+match_token_cipher(CK_SLOT_ID slot_id, void *args, CK_RV *rv)
+{
+	token_spec_t *token;
+	mech_alias_t *cipher;
+	CK_TOKEN_INFO tokinfo;
+	CK_MECHANISM_INFO mechinfo;
+	boolean_t token_match;
+
+	/*
+	 * While traversing slot list, pick up the following info per slot:
+	 * - if token specified, whether it matches this slot's token info
+	 * - if the slot supports the PKCS#5 PBKD2 cipher
+	 *
+	 * If the user said on the command line
+	 *	-T tok:mfr:ser:lab -k keyfile
+	 *	-c cipher -T tok:mfr:ser:lab -k keyfile
+	 * the given cipher or the default cipher apply to keyfile,
+	 * If the user said instead
+	 *	-T tok:mfr:ser:lab
+	 *	-c cipher -T tok:mfr:ser:lab
+	 * the key named "lab" may or may not agree with the given
+	 * cipher or the default cipher.  In those cases, cipher will
+	 * be overridden with the actual cipher type of the key "lab".
+	 */
+	*rv = CKR_FUNCTION_FAILED;
+
+	if (args == NULL) {
+		return (B_FALSE);
+	}
+
+	cipher = (mech_alias_t *)args;
+	token = cipher->token;
+
+	if (C_GetMechanismInfo(slot_id, cipher->type, &mechinfo) != CKR_OK) {
+		return (B_FALSE);
+	}
+
+	if (token == NULL) {
+		if (C_GetMechanismInfo(slot_id, CKM_PKCS5_PBKD2, &mechinfo) !=
+		    CKR_OK) {
+			return (B_FALSE);
+		}
+		goto foundit;
+	}
+
+	/* does the token match the token spec? */
+	if (token->key == NULL || (C_GetTokenInfo(slot_id, &tokinfo) != CKR_OK))
+		return (B_FALSE);
+
+	token_match = B_TRUE;
+
+	if (token->name != NULL && (token->name)[0] != '\0' &&
+	    strncmp((char *)token->name, (char *)tokinfo.label,
+	    TOKEN_LABEL_SIZE) != 0)
+		token_match = B_FALSE;
+	if (token->mfr != NULL && (token->mfr)[0] != '\0' &&
+	    strncmp((char *)token->mfr, (char *)tokinfo.manufacturerID,
+	    TOKEN_MANUFACTURER_SIZE) != 0)
+		token_match = B_FALSE;
+	if (token->serno != NULL && (token->serno)[0] != '\0' &&
+	    strncmp((char *)token->serno, (char *)tokinfo.serialNumber,
+	    TOKEN_SERIAL_SIZE) != 0)
+		token_match = B_FALSE;
+
+	if (!token_match)
+		return (B_FALSE);
+
+foundit:
+	cipher->slot = slot_id;
+	return (B_TRUE);
+}
+
+/*
+ * Clean up crypto loose ends
+ */
+static void
+end_crypto(CK_SESSION_HANDLE sess)
+{
+	(void) C_CloseSession(sess);
+	(void) C_Finalize(NULL);
+}
+
+/*
+ * Set up crypto, opening session on slot that matches token and cipher
+ */
+static void
+init_crypto(token_spec_t *token, mech_alias_t *cipher,
+    CK_SESSION_HANDLE_PTR sess)
+{
+	CK_RV	rv;
+
+	cipher->token = token;
+
+	/* Turn off Metaslot so that we can see actual tokens */
+	if (setenv("METASLOT_ENABLED", "false", 1) < 0) {
+		die(gettext("could not disable Metaslot"));
+	}
+
+	rv = pkcs11_GetCriteriaSession(match_token_cipher, (void *)cipher,
+	    sess);
+	if (rv != CKR_OK) {
+		end_crypto(*sess);
+		if (rv == CKR_HOST_MEMORY) {
+			die("malloc");
+		}
+		die(gettext("failed to find any cryptographic provider, "
+		    "use \"cryptoadm list -p\" to find providers: %s\n"),
+		    pkcs11_strerror(rv));
+	}
+}
+
+/*
  * Uncompress a file.
  *
  * First map the file in to establish a device
@@ -372,6 +1178,7 @@ lofi_uncompress(int lfd, const char *filename)
 	char buf[MAXBSIZE];
 	char devicename[32];
 	char tmpfilename[MAXPATHLEN];
+	char *x;
 	char *dir = NULL;
 	char *file = NULL;
 	int minor = 0;
@@ -396,7 +1203,7 @@ lofi_uncompress(int lfd, const char *filename)
 	if (statbuf.st_size == 0)
 		return;
 
-	add_mapping(lfd, NULL, filename, &minor, 1);
+	minor = lofi_map_file(lfd, li, filename);
 	(void) snprintf(devicename, sizeof (devicename), "/dev/%s/%d",
 	    LOFI_BLOCK_NAME, minor);
 
@@ -412,18 +1219,20 @@ lofi_uncompress(int lfd, const char *filename)
 		die(gettext("open: %s"), filename);
 	}
 	/* Create a temp file in the same directory */
-	dir = strdup(filename);
-	dir = dirname(dir);
-	file = strdup(filename);
-	file = basename(file);
+	x = strdup(filename);
+	dir = strdup(dirname(x));
+	free(x);
+	x = strdup(filename);
+	file = strdup(basename(x));
+	free(x);
 	(void) snprintf(tmpfilename, sizeof (tmpfilename),
 	    "%s/.%sXXXXXX", dir, file);
+	free(dir);
+	free(file);
 
 	if ((uncompfd = mkstemp64(tmpfilename)) == -1) {
 		(void) close(compfd);
 		delete_mapping(lfd, devicename, filename, B_TRUE);
-		free(dir);
-		free(file);
 		die("%s could not be uncompressed\n", filename);
 	}
 
@@ -437,8 +1246,6 @@ lofi_uncompress(int lfd, const char *filename)
 		(void) close(compfd);
 		(void) close(uncompfd);
 		delete_mapping(lfd, devicename, filename, B_TRUE);
-		free(dir);
-		free(file);
 		die("%s could not be uncompressed\n", filename);
 	}
 
@@ -457,8 +1264,6 @@ lofi_uncompress(int lfd, const char *filename)
 
 	(void) close(compfd);
 	(void) close(uncompfd);
-	free(dir);
-	free(file);
 
 	/* Delete the mapping */
 	delete_mapping(lfd, devicename, filename, B_TRUE);
@@ -490,6 +1295,7 @@ lofi_compress(int *lfd, const char *filename, int compress_index,
 	char tmpfilename[MAXPATHLEN];
 	char comp_filename[MAXPATHLEN];
 	char algorithm[MAXALGLEN];
+	char *x;
 	char *dir = NULL, *file = NULL;
 	uchar_t *uncompressed_seg = NULL;
 	uchar_t *compressed_seg = NULL;
@@ -573,14 +1379,18 @@ lofi_compress(int *lfd, const char *filename, int compress_index,
 	 * Create temporary files in the same directory that
 	 * will hold the intermediate data
 	 */
-	dir = strdup(filename);
-	dir = dirname(dir);
-	file = strdup(filename);
-	file = basename(file);
+	x = strdup(filename);
+	dir = strdup(dirname(x));
+	free(x);
+	x = strdup(filename);
+	file = strdup(basename(x));
+	free(x);
 	(void) snprintf(tmpfilename, sizeof (tmpfilename),
 	    "%s/.%sXXXXXX", dir, file);
 	(void) snprintf(comp_filename, sizeof (comp_filename),
 	    "%s/.%sXXXXXX", dir, file);
+	free(dir);
+	free(file);
 
 	if ((tfd = mkstemp64(tmpfilename)) == -1)
 		goto cleanup;
@@ -781,10 +1591,6 @@ cleanup:
 		free(compressed_seg);
 	if (uncompressed_seg != NULL)
 		free(uncompressed_seg);
-	if (dir != NULL)
-		free(dir);
-	if (file != NULL)
-		free(file);
 	if (index != NULL)
 		free(index);
 	if (compfd != -1)
@@ -820,7 +1626,7 @@ check_file_validity(const char *filename)
 {
 	struct stat64 buf;
 	int 	error;
-	int	fd = -1;
+	int	fd;
 
 	fd = open64(filename, O_RDONLY);
 	if (fd == -1) {
@@ -894,21 +1700,34 @@ main(int argc, char *argv[])
 	uint32_t segsize = SEGSIZE;
 	static char *lofictl = "/dev/" LOFI_CTL_NAME;
 	boolean_t force = B_FALSE;
-	char	realfilename[MAXPATHLEN];
+	const char *pname;
+	boolean_t errflag = B_FALSE;
+	boolean_t addflag = B_FALSE;
+	boolean_t deleteflag = B_FALSE;
+	boolean_t ephflag = B_FALSE;
+	boolean_t compressflag = B_FALSE;
+	boolean_t uncompressflag = B_FALSE;
+	/* the next two work together for -c, -k, -T, -e options only */
+	boolean_t need_crypto = B_FALSE;	/* if any -c, -k, -T, -e */
+	boolean_t cipher_only = B_TRUE;		/* if -c only */
+	const char *keyfile = NULL;
+	mech_alias_t *cipher = NULL;
+	token_spec_t *token = NULL;
+	char	*rkey = NULL;
+	size_t	rksz = 0;
+	char realfilename[MAXPATHLEN];
 
 	pname = getpname(argv[0]);
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((c = getopt(argc, argv, "a:C:d:s:U:f")) != EOF) {
+	while ((c = getopt(argc, argv, "a:c:Cd:efk:o:s:T:U")) != EOF) {
 		switch (c) {
 		case 'a':
-			addflag = 1;
+			addflag = B_TRUE;
 			if ((filename = realpath(optarg, realfilename)) == NULL)
 				die("%s", optarg);
-			check_file_validity(filename);
-
 			if (((argc - optind) > 0) && (*argv[optind] != '-')) {
 				/* optional device */
 				devicename = argv[optind];
@@ -916,39 +1735,26 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'C':
-			compressflag = 1;
-
-			if (((argc - optind) > 0) &&
-			    (*optarg == '-')) {
-				check_algorithm_validity(algname,
-				    &compress_index);
-				optind--;
-				break;
-			} else if (((argc - optind) == 1) &&
-			    (*argv[optind] != '-')) {
-				algname = optarg;
-				if ((filename = realpath(argv[optind],
-				    realfilename)) == NULL)
-					die("%s", argv[optind]);
+			compressflag = B_TRUE;
+			if (((argc - optind) > 1) && (*argv[optind] != '-')) {
+				/* optional algorithm */
+				algname = argv[optind];
 				optind++;
-			} else if (((argc - optind) > 1) &&
-			    (*argv[optind] == '-')) {
-				algname = optarg;
-				check_algorithm_validity(algname,
-				    &compress_index);
-				break;
-			} else {
-				if ((filename = realpath(optarg,
-				    realfilename)) == NULL)
-					die("%s", optarg);
 			}
-
-			check_file_validity(filename);
 			check_algorithm_validity(algname, &compress_index);
 			break;
+		case 'c':
+			/* is the chosen cipher allowed? */
+			if ((cipher = ciph2mech(optarg)) == NULL) {
+				errflag = B_TRUE;
+				warn(gettext("cipher %s not allowed\n"),
+				    optarg);
+			}
+			need_crypto = B_TRUE;
+			/* cipher_only is already set */
+			break;
 		case 'd':
-			deleteflag = 1;
-
+			deleteflag = B_TRUE;
 			minor = name_to_minor(optarg);
 			if (minor != 0)
 				devicename = optarg;
@@ -958,61 +1764,96 @@ main(int argc, char *argv[])
 					die("%s", optarg);
 			}
 			break;
+		case 'e':
+			ephflag = B_TRUE;
+			need_crypto = B_TRUE;
+			cipher_only = B_FALSE;	/* need to unset cipher_only */
+			break;
 		case 'f':
 			force = B_TRUE;
 			break;
+		case 'k':
+			keyfile = optarg;
+			need_crypto = B_TRUE;
+			cipher_only = B_FALSE;	/* need to unset cipher_only */
+			break;
 		case 's':
 			segsize = convert_to_num(optarg);
-
 			if (segsize == 0 || segsize % DEV_BSIZE)
 				die(gettext("segment size %s is invalid "
 				    "or not a multiple of minimum block "
 				    "size %ld\n"), optarg, DEV_BSIZE);
-
-			if ((filename = realpath(argv[optind],
-			    realfilename)) == NULL)
-				die("%s", argv[optind]);
-			check_file_validity(filename);
-			optind++;
+			break;
+		case 'T':
+			if ((token = parsetoken(optarg)) == NULL) {
+				errflag = B_TRUE;
+				warn(
+				    gettext("invalid token key specifier %s\n"),
+				    optarg);
+			}
+			need_crypto = B_TRUE;
+			cipher_only = B_FALSE;	/* need to unset cipher_only */
 			break;
 		case 'U':
-			uncompressflag = 1;
-			if ((filename = realpath(optarg, realfilename)) == NULL)
-				die("%s", optarg);
-			check_file_validity(filename);
+			uncompressflag = B_TRUE;
 			break;
 		case '?':
 		default:
-			errflag = 1;
+			errflag = B_TRUE;
 			break;
 		}
 	}
+
+	/* Check for mutually exclusive combinations of options */
 	if (errflag ||
 	    (addflag && deleteflag) ||
+	    (!addflag && need_crypto) ||
 	    ((compressflag || uncompressflag) && (addflag || deleteflag)))
-		usage();
+		usage(pname);
+
+	/* ephemeral key, and key from either file or token are incompatible */
+	if (ephflag && (keyfile != NULL || token != NULL)) {
+		die(gettext("ephemeral key cannot be used with keyfile"
+		    " or token key\n"));
+	}
+
+	/*
+	 * "-c" but no "-k", "-T", "-e", or "-T -k" means derive key from
+	 * command line passphrase
+	 */
 
 	switch (argc - optind) {
 	case 0: /* no more args */
+		if (compressflag || uncompressflag)	/* needs filename */
+			usage(pname);
 		break;
-	case 1: /* one arg without options means print the association */
+	case 1:
 		if (addflag || deleteflag)
-			usage();
-		if (compressflag || uncompressflag)
-			usage();
-		minor = name_to_minor(argv[optind]);
-		if (minor != 0)
-			devicename = argv[optind];
-		else {
+			usage(pname);
+		/* one arg means compress/uncompress the file ... */
+		if (compressflag || uncompressflag) {
 			if ((filename = realpath(argv[optind],
 			    realfilename)) == NULL)
 				die("%s", argv[optind]);
+		/* ... or without options means print the association */
+		} else {
+			minor = name_to_minor(argv[optind]);
+			if (minor != 0)
+				devicename = argv[optind];
+			else {
+				if ((filename = realpath(argv[optind],
+				    realfilename)) == NULL)
+					die("%s", argv[optind]);
+			}
 		}
 		break;
 	default:
-		usage();
+		usage(pname);
 		break;
 	}
+
+	if (addflag || compressflag || uncompressflag)
+		check_file_validity(filename);
 
 	if (filename && !valid_abspath(filename))
 		exit(E_ERROR);
@@ -1022,9 +1863,7 @@ main(int argc, char *argv[])
 	 * absolute path, it exists and is a regular file. We don't yet
 	 * know that the device name is ok or not.
 	 */
-	/*
-	 * Now to the real work.
-	 */
+
 	openflag = O_EXCL;
 	if (addflag || deleteflag || compressflag || uncompressflag)
 		openflag |= O_RDWR;
@@ -1040,8 +1879,51 @@ main(int argc, char *argv[])
 		}
 		/*NOTREACHED*/
 	}
+
+	/*
+	 * No passphrase is needed for ephemeral key, or when key is
+	 * in a file and not wrapped by another key from a token.
+	 * However, a passphrase is needed in these cases:
+	 * 1. cipher with no ephemeral key, key file, or token,
+	 *    in which case the passphrase is used to build the key
+	 * 2. token with an optional cipher or optional key file,
+	 *    in which case the passphrase unlocks the token
+	 * If only the cipher is specified, reconfirm the passphrase
+	 * to ensure the user hasn't mis-entered it.  Otherwise, the
+	 * token will enforce the token passphrase.
+	 */
+	if (need_crypto) {
+		CK_SESSION_HANDLE	sess;
+
+		/* pick a cipher if none specified */
+		if (cipher == NULL)
+			cipher = DEFAULT_CIPHER;
+
+		if (!kernel_cipher_check(cipher))
+			die(gettext(
+			    "use \"cryptoadm list -m\" to find available "
+			    "mechanisms\n"));
+
+		init_crypto(token, cipher, &sess);
+
+		if (cipher_only) {
+			getkeyfromuser(cipher, &rkey, &rksz);
+		} else if (token != NULL) {
+			getkeyfromtoken(sess, token, keyfile, cipher,
+			    &rkey, &rksz);
+		} else {
+			/* this also handles ephemeral keys */
+			getkeyfromfile(keyfile, cipher, &rkey, &rksz);
+		}
+
+		end_crypto(sess);
+	}
+
+	/*
+	 * Now to the real work.
+	 */
 	if (addflag)
-		add_mapping(lfd, devicename, filename, NULL, 0);
+		add_mapping(lfd, devicename, filename, cipher, rkey, rksz);
 	else if (compressflag)
 		lofi_compress(&lfd, filename, compress_index, segsize);
 	else if (uncompressflag)

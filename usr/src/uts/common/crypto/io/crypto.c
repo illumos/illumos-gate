@@ -921,6 +921,191 @@ out:
 }
 
 /*
+ * This ioctl returns an array of crypto_mech_name_t entries.
+ * It lists all the PKCS#11 mechanisms available in the kernel.
+ */
+/* ARGSUSED */
+static int
+get_mechanism_list(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	STRUCT_DECL(crypto_get_mechanism_list, get_list);
+	crypto_mech_name_t *entries;
+	size_t copyout_size;
+	uint_t req_count;
+	uint_t count;
+	ulong_t offset;
+	int error = 0;
+
+	STRUCT_INIT(get_list, mode);
+
+	if (copyin(arg, STRUCT_BUF(get_list), STRUCT_SIZE(get_list)) != 0) {
+		return (EFAULT);
+	}
+
+	entries = crypto_get_mech_list(&count, KM_SLEEP);
+
+	/* Number of entries caller thinks we have */
+	req_count = STRUCT_FGET(get_list, ml_count);
+
+	STRUCT_FSET(get_list, ml_count, count);
+	STRUCT_FSET(get_list, ml_return_value, CRYPTO_SUCCESS);
+
+	/* check if buffer is too small */
+	if (count > req_count) {
+		STRUCT_FSET(get_list, ml_return_value, CRYPTO_BUFFER_TOO_SMALL);
+	}
+
+	/* copyout the first stuff */
+	if (copyout(STRUCT_BUF(get_list), arg, STRUCT_SIZE(get_list)) != 0) {
+		error = EFAULT;
+	}
+
+	/*
+	 * If only requesting number of entries or buffer too small or an
+	 * error occurred, stop here
+	 */
+	if (req_count == 0 || count > req_count || error != 0) {
+		goto out;
+	}
+
+	copyout_size = count * sizeof (crypto_mech_name_t);
+
+	/* copyout entries */
+	offset = (ulong_t)STRUCT_FADDR(get_list, ml_list);
+	offset -= (ulong_t)STRUCT_BUF(get_list);
+	if (copyout(entries, arg + offset, copyout_size) != 0) {
+		error = EFAULT;
+	}
+
+out:
+	crypto_free_mech_list(entries, count);
+	return (error);
+}
+
+/*
+ * Copyout kernel array of mech_infos to user space.
+ */
+/* ARGSUSED */
+static int
+copyout_mechinfos(int mode, caddr_t out, uint_t count,
+    crypto_mechanism_info_t *k_minfos, caddr_t u_minfos)
+{
+	STRUCT_DECL(crypto_mechanism_info, mi);
+	caddr_t p;
+	size_t len;
+	int i;
+
+	if (count == 0)
+		return (0);
+
+	STRUCT_INIT(mi, mode);
+
+	len = count * STRUCT_SIZE(mi);
+
+	ASSERT(u_minfos != NULL);
+	p = u_minfos;
+	for (i = 0; i < count; i++) {
+		STRUCT_FSET(mi, mi_min_key_size, k_minfos[i].mi_min_key_size);
+		STRUCT_FSET(mi, mi_max_key_size, k_minfos[i].mi_max_key_size);
+		STRUCT_FSET(mi, mi_keysize_unit, k_minfos[i].mi_keysize_unit);
+		STRUCT_FSET(mi, mi_usage, k_minfos[i].mi_usage);
+		bcopy(STRUCT_BUF(mi), p, STRUCT_SIZE(mi));
+		p += STRUCT_SIZE(mi);
+	}
+
+	if (copyout(u_minfos, out, len) != 0)
+		return (EFAULT);
+
+	return (0);
+}
+
+/*
+ * This ioctl returns information for the specified mechanism.
+ */
+/* ARGSUSED */
+static int
+get_all_mechanism_info(dev_t dev, caddr_t arg, int mode, int *rval)
+{
+	STRUCT_DECL(crypto_get_all_mechanism_info, get_all_mech);
+	STRUCT_DECL(crypto_mechanism_info, mi);
+	crypto_mech_name_t mech_name;
+	crypto_mech_type_t mech_type;
+	crypto_mechanism_info_t *mech_infos = NULL;
+	uint_t num_mech_infos = 0;
+	uint_t req_count;
+	caddr_t u_minfos;
+	ulong_t offset;
+	int error = 0;
+	int rv;
+
+	STRUCT_INIT(get_all_mech, mode);
+	STRUCT_INIT(mi, mode);
+
+	if (copyin(arg, STRUCT_BUF(get_all_mech),
+	    STRUCT_SIZE(get_all_mech)) != 0) {
+		return (EFAULT);
+	}
+
+	(void) strncpy(mech_name, STRUCT_FGET(get_all_mech, mi_mechanism_name),
+	    CRYPTO_MAX_MECH_NAME);
+	mech_type = crypto_mech2id(mech_name);
+
+	if (mech_type == CRYPTO_MECH_INVALID) {
+		rv = CRYPTO_ARGUMENTS_BAD;
+		goto out1;
+	}
+
+	rv = crypto_get_all_mech_info(mech_type, &mech_infos, &num_mech_infos,
+	    KM_SLEEP);
+	if (rv != CRYPTO_SUCCESS) {
+		goto out1;
+	}
+	/* rv is CRYPTO_SUCCESS at this point */
+
+	/* Number of entries caller thinks we have */
+	req_count = STRUCT_FGET(get_all_mech, mi_count);
+
+	STRUCT_FSET(get_all_mech, mi_count, num_mech_infos);
+
+	/* check if buffer is too small */
+	if (num_mech_infos > req_count) {
+		rv = CRYPTO_BUFFER_TOO_SMALL;
+	}
+
+out1:
+	STRUCT_FSET(get_all_mech, mi_return_value, rv);
+
+	/* copy the first part */
+	if (copyout(STRUCT_BUF(get_all_mech), arg,
+	    STRUCT_SIZE(get_all_mech)) != 0) {
+		error = EFAULT;
+	}
+
+	/*
+	 * If only requesting number of entries, or there are no entries,
+	 * or rv is not CRYPTO_SUCCESS due to buffer too small or some other
+	 * crypto error, or an error occurred with copyout, stop here
+	 */
+	if (req_count == 0 || num_mech_infos == 0 || rv != CRYPTO_SUCCESS ||
+	    error != 0) {
+		goto out2;
+	}
+
+	/* copyout mech_infos */
+	offset = (ulong_t)STRUCT_FADDR(get_all_mech, mi_list);
+	offset -= (ulong_t)STRUCT_BUF(get_all_mech);
+
+	u_minfos = kmem_alloc(num_mech_infos * STRUCT_SIZE(mi), KM_SLEEP);
+	error = copyout_mechinfos(mode, arg + offset, num_mech_infos,
+	    mech_infos, u_minfos);
+	kmem_free(u_minfos, num_mech_infos * STRUCT_SIZE(mi));
+out2:
+	if (mech_infos != NULL)
+		crypto_free_all_mech_info(mech_infos, num_mech_infos);
+	return (error);
+}
+
+/*
  * Side-effects:
  *  1. This routine stores provider descriptor pointers in an array
  *     and increments each descriptor's reference count.  The array
@@ -6275,6 +6460,12 @@ crypto_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *c,
 
 	case CRYPTO_GET_MECHANISM_NUMBER:
 		return (get_mechanism_number(dev, ARG, mode, rval));
+
+	case CRYPTO_GET_MECHANISM_LIST:
+		return (get_mechanism_list(dev, ARG, mode, rval));
+
+	case CRYPTO_GET_ALL_MECHANISM_INFO:
+		return (get_all_mechanism_info(dev, ARG, mode, rval));
 
 	case CRYPTO_GET_PROVIDER_LIST:
 		return (get_provider_list(dev, ARG, mode, rval));

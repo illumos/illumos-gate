@@ -33,6 +33,7 @@
 #include <sys/vtoc.h>
 #include <sys/dkio.h>
 #include <sys/vnode.h>
+#include <sys/crypto/api.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -86,9 +87,12 @@ extern "C" {
  *
  *	li.li_minor = minor_number;
  *	ioctl(ld, LOFI_GET_FILENAME, &li);
+ *	filename = li.li_filename;
+ *	encrypted = li.li_crypto_enabled;
  *
  *	strcpy(li.li_filename, "somefilename");
  *	ioctl(ld, LOFI_GET_MINOR, &li);
+ *	minor = li.li_minor;
  *
  *	li.li_minor = 0;
  *	ioctl(ld, LOFI_GET_MAXMINOR, &li);
@@ -114,12 +118,28 @@ extern "C" {
  *
  */
 
+typedef enum	iv_method {
+	IVM_NONE,	/* no iv needed, iv is null */
+	IVM_ENC_BLKNO	/* iv is logical block no. encrypted */
+} iv_method_t;
+
 struct lofi_ioctl {
 	uint32_t 	li_minor;
 	boolean_t	li_force;
 	boolean_t	li_cleanup;
 	char	li_filename[MAXPATHLEN];
+
+	/* the following fields are required for compression support */
 	char	li_algorithm[MAXALGLEN];
+
+	/* the following fields are required for encryption support */
+	boolean_t	li_crypto_enabled;
+	crypto_mech_name_t	li_cipher;	/* for data */
+	uint32_t	li_key_len;		/* for data */
+	char		li_key[56];	/* for data: max 448-bit Blowfish key */
+	crypto_mech_name_t	li_iv_cipher;	/* for iv derivation */
+	uint32_t	li_iv_len;		/* for iv derivation */
+	iv_method_t	li_iv_type;		/* for iv derivation */
 };
 
 #define	LOFI_IOC_BASE		(('L' << 16) | ('F' << 8))
@@ -154,6 +174,27 @@ extern uint32_t lofi_max_files;
 #define	V_ISLOFIABLE(vtype) \
 	((vtype == VREG) || (vtype == VBLK) || (vtype == VCHR))
 
+/*
+ * Need exactly 6 bytes to identify encrypted lofi image
+ */
+extern const char lofi_crypto_magic[6];
+#define	LOFI_CRYPTO_MAGIC	{ 'C', 'F', 'L', 'O', 'F', 'I' }
+#define	LOFI_CRYPTO_VERSION	((uint16_t)0)
+#define	LOFI_CRYPTO_DATA_SECTOR	((uint32_t)16)		/* for version 0 */
+
+/*
+ * Crypto metadata for encrypted lofi images
+ * The fields here only satisfy initial implementation requirements.
+ */
+struct crypto_meta {
+	char		magic[6];		/* LOFI_CRYPTO_MAGIC */
+	uint16_t	version;		/* version of encrypted lofi */
+	char		reserved1[96];		/* future use */
+	uint32_t	data_sector;		/* start of data area */
+	char		pad[404];		/* end on DEV_BSIZE bdry */
+	/* second header block is not defined at this time */
+};
+
 struct lofi_state {
 	char		*ls_filename;	/* filename to open */
 	size_t		ls_filename_sz;
@@ -187,6 +228,19 @@ struct lofi_state {
 	caddr_t		ls_comp_index_data; /* index pages loaded from file */
 	uint32_t	ls_comp_index_data_sz;
 	u_offset_t	ls_vp_comp_size; /* actual compressed file size */
+
+	/* the following fields are required for encryption support */
+	boolean_t		ls_crypto_enabled;
+	u_offset_t		ls_crypto_offset;	/* crypto meta size */
+	struct crypto_meta	ls_crypto;
+	crypto_mechanism_t	ls_mech;	/* for data encr/decr */
+	crypto_key_t		ls_key;		/* for data encr/decr */
+	crypto_mechanism_t	ls_iv_mech;	/* for iv derivation */
+	size_t			ls_iv_len;	/* for iv derivation */
+	iv_method_t		ls_iv_type;	/* for iv derivation */
+	kmutex_t		ls_crypto_lock;
+	crypto_ctx_template_t	ls_ctx_tmpl;
+
 };
 
 #endif	/* _KERNEL */

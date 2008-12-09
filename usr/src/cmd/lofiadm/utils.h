@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_UTILS_H
 #define	_UTILS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libintl.h>
 
@@ -38,9 +36,12 @@ extern "C" {
 #define	E_ERROR		1		/* Exit status for error */
 #define	E_USAGE		2		/* Exit status for usage error */
 
+extern void warn(const char *, ...);
 extern void die(const char *, ...);
+
 extern const char *getpname(const char *);
 extern int valid_abspath(const char *);
+
 extern void *openlib(const char *);
 extern void closelib();
 

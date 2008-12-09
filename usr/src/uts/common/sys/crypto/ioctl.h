@@ -20,20 +20,19 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_CRYPTO_IOCTL_H
 #define	_SYS_CRYPTO_IOCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/crypto/api.h>
 #include <sys/crypto/spi.h>
 #include <sys/crypto/common.h>
 
@@ -1437,6 +1436,45 @@ typedef struct crypto_nostore_derive_key32 {
 #define	CRYPTO_NOSTORE_GENERATE_KEY		CRYPTO(127)
 #define	CRYPTO_NOSTORE_GENERATE_KEY_PAIR	CRYPTO(128)
 #define	CRYPTO_NOSTORE_DERIVE_KEY		CRYPTO(129)
+
+/*
+ * Mechanism Ioctls
+ */
+
+typedef struct crypto_get_mechanism_list {
+	uint_t			ml_return_value;
+	uint_t			ml_count;
+	crypto_mech_name_t	ml_list[1];
+} crypto_get_mechanism_list_t;
+
+typedef struct crypto_get_all_mechanism_info {
+	uint_t			mi_return_value;
+	crypto_mech_name_t	mi_mechanism_name;
+	uint_t			mi_count;
+	crypto_mechanism_info_t	mi_list[1];
+} crypto_get_all_mechanism_info_t;
+
+#ifdef	_KERNEL
+#ifdef	_SYSCALL32
+
+typedef struct crypto_get_mechanism_list32 {
+	uint32_t		ml_return_value;
+	uint32_t		ml_count;
+	crypto_mech_name_t	ml_list[1];
+} crypto_get_mechanism_list32_t;
+
+typedef struct crypto_get_all_mechanism_info32 {
+	uint32_t		mi_return_value;
+	crypto_mech_name_t	mi_mechanism_name;
+	uint32_t		mi_count;
+	crypto_mechanism_info32_t mi_list[1];
+} crypto_get_all_mechanism_info32_t;
+
+#endif	/* _SYSCALL32 */
+#endif	/* _KERNEL */
+
+#define	CRYPTO_GET_MECHANISM_LIST		CRYPTO(140)
+#define	CRYPTO_GET_ALL_MECHANISM_INFO		CRYPTO(141)
 
 #ifdef	__cplusplus
 }

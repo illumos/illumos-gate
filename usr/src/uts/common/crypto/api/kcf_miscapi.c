@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -694,6 +692,17 @@ bail:
 	*mech_infos = infos;
 	*num_mech_infos = ninfos;
 	return (rv);
+}
+
+/*
+ * Frees the array of mechanism infos previously allocated by
+ * crypto_get_all_mech_info().
+ */
+void
+crypto_free_all_mech_info(crypto_mechanism_info_t *mech_infos, uint_t count)
+{
+	if ((mech_infos != NULL) && (count > 0))
+		kmem_free(mech_infos, count * sizeof (crypto_mechanism_info_t));
 }
 
 /*

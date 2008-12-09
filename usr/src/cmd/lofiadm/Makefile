@@ -20,10 +20,8 @@
 #
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG= lofiadm
@@ -33,7 +31,8 @@ POFILES= $(OBJS:%.o=%.po)
 
 include ../Makefile.cmd
 
-LDLIBS += -ldevinfo
+CPPFLAGS += -I $(SRC)/common/crypto
+LDLIBS += -ldevinfo -lpkcs11 -lcryptoutil
 
 .KEEP_STATE:
 
