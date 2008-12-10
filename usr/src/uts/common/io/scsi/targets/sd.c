@@ -22569,10 +22569,17 @@ sd_check_media(dev_t dev, enum dkio_state state)
 	opaque_t		token = NULL;
 	int			rval = 0;
 	sd_ssc_t		*ssc;
+	dev_t			sub_dev;
 
 	if ((un = ddi_get_soft_state(sd_state, SDUNIT(dev))) == NULL) {
 		return (ENXIO);
 	}
+
+	/*
+	 * sub_dev is used when submitting request to scsi watch.
+	 * All submissions are unified to use same device number.
+	 */
+	sub_dev = sd_make_device(SD_DEVINFO(un));
 
 	SD_TRACE(SD_LOG_COMMON, un, "sd_check_media: entry\n");
 
@@ -22607,7 +22614,7 @@ sd_check_media(dev_t dev, enum dkio_state state)
 
 		token = scsi_watch_request_submit(SD_SCSI_DEVP(un),
 		    sd_check_media_time, SENSE_LENGTH, sd_media_watch_cb,
-		    (caddr_t)dev);
+		    (caddr_t)sub_dev);
 
 		sd_pm_exit(un);
 
@@ -22737,17 +22744,22 @@ sd_check_media(dev_t dev, enum dkio_state state)
 done:
 	sd_ssc_fini(ssc);
 	un->un_f_watcht_stopped = FALSE;
+	if (token != NULL && un->un_swr_token != NULL) {
 		/*
 		 * Use of this local token and the mutex ensures that we avoid
 		 * some race conditions associated with terminating the
 		 * scsi watch.
 		 */
-	if (token) {
-		un->un_swr_token = (opaque_t)NULL;
+		token = un->un_swr_token;
 		mutex_exit(SD_MUTEX(un));
 		(void) scsi_watch_request_terminate(token,
 		    SCSI_WATCH_TERMINATE_WAIT);
-		mutex_enter(SD_MUTEX(un));
+		if (scsi_watch_get_ref_count(token) == 0) {
+			mutex_enter(SD_MUTEX(un));
+			un->un_swr_token = (opaque_t)NULL;
+		} else {
+			mutex_enter(SD_MUTEX(un));
+		}
 	}
 
 	/*

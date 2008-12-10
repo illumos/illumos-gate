@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * generic scsi device watch
  */
@@ -961,4 +959,37 @@ done:
 		sw_cpr_flag = 1;
 	}
 	mutex_exit(&cpr_mutex);
+}
+
+/*
+ * scsi_watch_get_ref_count
+ * called by clients to query the reference count for a given token.
+ * return the number of reference count or 0 if the given token is
+ * not found.
+ */
+int
+scsi_watch_get_ref_count(opaque_t token)
+{
+	struct scsi_watch_request *swr =
+	    (struct scsi_watch_request *)token;
+	struct scsi_watch_request *sswr;
+	int rval = 0;
+
+	SW_DEBUG((dev_info_t *)NULL, sw_label, SCSI_DEBUG,
+	    "scsi_watch_get_ref_count: Entering(0x%p) ...\n",
+	    (void *)swr);
+	mutex_enter(&sw.sw_mutex);
+
+	sswr = sw.sw_head;
+	while (sswr) {
+		if (sswr == swr) {
+			rval = swr->swr_ref;
+			mutex_exit(&sw.sw_mutex);
+			return (rval);
+		}
+		sswr = sswr->swr_next;
+	}
+
+	mutex_exit(&sw.sw_mutex);
+	return (rval);
 }

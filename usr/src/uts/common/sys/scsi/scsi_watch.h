@@ -26,8 +26,6 @@
 #ifndef	_SYS_SCSI_SCSI_WATCH_H
 #define	_SYS_SCSI_SCSI_WATCH_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -60,6 +58,7 @@ opaque_t scsi_watch_request_submit(struct scsi_device *devp,
 	    int interval, int sense_length,
 	    int (*callback)(), caddr_t cb_arg);
 int	scsi_watch_request_terminate(opaque_t token, int flags);
+int	scsi_watch_get_ref_count(opaque_t token);
 void	scsi_watch_resume(opaque_t token);
 void	scsi_watch_suspend(opaque_t token);
 
