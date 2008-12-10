@@ -20,8 +20,6 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
@@ -34,21 +32,36 @@ do
 	if [ ! -f $dest ] ; then
 		cp $src $dest
 	else
-		# get the first real entry and trim whitespace
+		# Carry on the CDDL header and comments stuff in $src
+		egrep '^#' $src > /tmp/i.$$
 
-		awk '/^\/dev/ { print $1 }' $dest > /tmp/i.$$
-		if [ "`cat /tmp/i.$$`" != "/dev/pts" ]; then
-			sed '/^\/dev\/pts$/d' $dest > /tmp/i.$$
-			ed -s /tmp/i.$$ << EOF
-/^\/dev/i
-/dev/pts
-.
-w
-q
-EOF
-			mv /tmp/i.$$ $dest
-		fi
+		SRC_DEVS=`awk '/^\/dev/ { print $1 }' $src`
+		for src_dev in $SRC_DEVS; do
+			#
+			# If $dest contains an entry that has the same device
+			# as $src_dev, copy the entry in $dest.
+			# Otherwise, copy the new one in $src.
+			# This loop maintains the device order in $src.
+			#
 
+			file=$src
+			egrep "^$src_dev" $dest > /dev/null &&
+			    file=$dest
+
+			egrep "^$src_dev" $file >> /tmp/i.$$
+		done
+
+		DEST_DEVS=`awk '/^\/dev/ { print $1 }' $dest`
+		for dest_dev in $DEST_DEVS; do
+			#
+			# For entries that are not found in $src,
+			# append them to the target file.
+			#
+			egrep "^$dest_dev" /tmp/i.$$ > /dev/null ||
+			     egrep "^$dest_dev" $dest >> /tmp/i.$$
+		done	 
+
+		mv /tmp/i.$$ $dest
 	fi
 done
 
