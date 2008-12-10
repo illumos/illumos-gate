@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _CMD_MODLOAD_ADDREM_H
 #define	_CMD_MODLOAD_ADDREM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/modctl.h>
 #include <device_info.h>
@@ -142,6 +140,8 @@ extern int aliases_paths_exist(char *);
 extern int update_driver_aliases(char *, char *);
 extern int unique_driver_name(char *, char *, int *);
 extern int unique_drv_alias(char *);
+extern int check_duplicate_driver_alias(char *, char *);
+extern int trim_duplicate_aliases(char *, char *, char **);
 extern int get_max_major(char *);
 extern void get_modid(char *, int *);
 extern int config_driver(char *, major_t, char *, char *, int, int);

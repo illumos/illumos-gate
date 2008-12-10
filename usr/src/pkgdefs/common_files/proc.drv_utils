@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -20,8 +20,6 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # proc.drv_utils -- common code for driver add/remove
@@ -135,28 +133,9 @@ pkg_drvadd() {
 			fi
 			CMD="${CMD} -${OPT} \"${OPTARG}\""
 			;;
-		# only use the aliases which aren't already in
-		# etc/driver_aliases
-		i)	TMPALIAS=`echo ${OPTARG} | /usr/bin/sed -e "s/'//g"`
-			ALIASDIR="${BASEDIR}"/etc/driver_aliases
-			FOUND=0
-			for I in ${TMPALIAS}; do
-				/usr/bin/egrep -s "^${DRV}[  ]+${I}" ${ALIASDIR}
-				if [ $? -ne 0 ]; then
-					if [ ${CHECK_ADD} -eq 1 ]; then
-						CMD="${CMD} -a"
-						CHECK_ADD=0
-					fi
-					if [ ${FOUND} -eq 0 ]; then
-						CMD="${CMD} -i '"
-						FOUND=1
-					fi
-					CMD="${CMD} ${I}"
-				fi
-			done
-			if [ ${FOUND} -ne 0 ]; then
-				CMD="${CMD}'"
-			fi
+		# update_drv accepts adding an existing alias without complaint
+		i)
+			CMD="${CMD} -${OPT} '${OPTARG}'"
 			;;
 		\?)	echo "pkg_drvadd(): Unsupported option -${OPT}"
 			return

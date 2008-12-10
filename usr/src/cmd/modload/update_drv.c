@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <locale.h>
 #include <stdlib.h>
@@ -94,9 +92,10 @@ main(int argc, char *argv[])
 	int	l_flag = 0;		/* -l option */
 	int	m_flag = 0;		/* -m option */
 	char	*perms = NULL;
-	char	*aliases = 0;
+	char	*aliases = NULL;
 	char	*basedir = NULL;
 	char	*policy = NULL;
+	char	*aliases2 = NULL;
 	char	*priv = NULL;
 	char	*driver_name;
 	int	found;
@@ -298,27 +297,42 @@ main(int argc, char *argv[])
 
 			major_num = (major_t)found;
 
-			/* check if the alias is unique */
-			if ((error = aliases_unique(aliases)) == ERROR) {
+			/*
+			 * To ease the nuisance of using update_drv
+			 * in packaging scripts, do not require that
+			 * existing driver aliases be trimmed from
+			 * the command line.  If an invocation asks
+			 * to add an alias and it's already there,
+			 * drive on.  We implement this by removing
+			 * duplicates now and add the remainder.
+			 */
+			error = trim_duplicate_aliases(driver_name,
+			    aliases, &aliases2);
+			if (error == ERROR) {
 				exit_unlock();
-
 				return (error);
 			}
+
+			/*
+			 * if the list of aliases to be added is
+			 * now empty, we're done.
+			 */
+			if (aliases2 == NULL)
+				goto done;
 
 			/*
 			 * unless force_flag is specified check that
 			 * path-oriented aliases we are adding exist
 			 */
-			if ((force_flag == 0) &&
-			    ((error = aliases_paths_exist(aliases)) == ERROR)) {
+			if ((force_flag == 0) && ((error =
+			    aliases_paths_exist(aliases2)) == ERROR)) {
 				exit_unlock();
-
 				return (error);
 			}
 
 			/* update the file */
 			if ((error = update_driver_aliases(driver_name,
-			    aliases)) == ERROR) {
+			    aliases2)) == ERROR) {
 				exit_unlock();
 				return (error);
 			}
@@ -330,13 +344,15 @@ main(int argc, char *argv[])
 			if (update_conf) {
 				cleanup_flag |= CLEAN_DRV_ALIAS;
 				if (config_driver(driver_name, major_num,
-				    aliases, NULL, cleanup_flag,
+				    aliases2, NULL, cleanup_flag,
 				    verbose_flag) == ERROR) {
 					err_exit();
 				}
 			}
 
 		}
+
+done:
 		if (update_conf && (i_flag || policy != NULL)) {
 			/* load the driver */
 			load_driver(driver_name, verbose_flag);
@@ -474,7 +490,6 @@ main(int argc, char *argv[])
 		}
 		load_driver(driver_name, verbose_flag);
 	}
-
 
 	exit_unlock();
 

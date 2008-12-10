@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +31,7 @@
 #include <libintl.h>
 #include <wait.h>
 #include <string.h>
+#include <strings.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -60,34 +59,34 @@ log_minorperm_error(minorperm_err_t err, int key)
 	switch (err) {
 	case MP_FOPEN_ERR:
 		(void) fprintf(stderr, gettext(ERR_CANT_ACCESS_FILE),
-			MINOR_PERM_FILE);
+		    MINOR_PERM_FILE);
 		break;
 	case MP_FCLOSE_ERR:
 		(void) fprintf(stderr, gettext(ERR_NO_UPDATE),
-			MINOR_PERM_FILE);
+		    MINOR_PERM_FILE);
 		(void) fprintf(stderr, gettext(ERR_NO_MEM));
 		break;
 	case MP_IGNORING_LINE_ERR:
 		(void) fprintf(stderr, gettext(ERR_NO_UPDATE),
-			MINOR_PERM_FILE);
+		    MINOR_PERM_FILE);
 		break;
 	case MP_ALLOC_ERR:
 		(void) fprintf(stderr, gettext(ERR_NO_UPDATE),
-			MINOR_PERM_FILE);
+		    MINOR_PERM_FILE);
 		(void) fprintf(stderr, gettext(ERR_NO_MEM));
 		break;
 	case MP_NVLIST_ERR:
 		(void) fprintf(stderr, gettext(ERR_NO_UPDATE),
-			MINOR_PERM_FILE);
+		    MINOR_PERM_FILE);
 		(void) fprintf(stderr, gettext(ERR_NO_MEM));
 		break;
 	case MP_CANT_FIND_USER_ERR:
 		(void) fprintf(stderr, gettext(ERR_NO_UPDATE),
-			MINOR_PERM_FILE);
+		    MINOR_PERM_FILE);
 		break;
 	case MP_CANT_FIND_GROUP_ERR:
 		(void) fprintf(stderr, gettext(ERR_NO_UPDATE),
-			MINOR_PERM_FILE);
+		    MINOR_PERM_FILE);
 		break;
 	}
 }
@@ -796,7 +795,7 @@ remove_entry(
 	    access(device_policy, F_OK) == 0) {
 		if (delete_plcy_entry(device_policy, driver_name) == ERROR) {
 			(void) fprintf(stderr, gettext(ERR_DEL_ENTRY),
-				driver_name, device_policy);
+			    driver_name, device_policy);
 		}
 	}
 	if ((c_flag & CLEAN_DRV_PRIV) != 0 &&
@@ -804,7 +803,7 @@ remove_entry(
 		if (delete_entry(extra_privs, driver_name, ":", NULL) ==
 		    ERROR) {
 			(void) fprintf(stderr, gettext(ERR_DEL_ENTRY),
-				driver_name, extra_privs);
+			    driver_name, extra_privs);
 		}
 	}
 }
@@ -916,7 +915,7 @@ build_filenames(char *basedir)
 		(void) sprintf(minor_perm, "%s%s", basedir, MINOR_PERM);
 		(void) sprintf(name_to_major, "%s%s", basedir, NAM_TO_MAJ);
 		(void) sprintf(rem_name_to_major, "%s%s", basedir,
-				REM_NAM_TO_MAJ);
+		    REM_NAM_TO_MAJ);
 		(void) sprintf(add_rem_lock, "%s%s", basedir, ADD_REM_LOCK);
 		(void) sprintf(tmphold, "%s%s", basedir, TMPHOLD);
 		(void) sprintf(devfs_root, "%s%s", basedir, DEVFS_ROOT);
@@ -951,7 +950,7 @@ exec_command(char *path, char *cmdline[MAX_CMD_LINE])
 			waitstat = waitpid(pid, (int *)&stat_loc, 0);
 
 		} while ((!WIFEXITED(stat_loc) &&
-			!WIFSIGNALED(stat_loc)) || (waitstat == 0));
+		    !WIFSIGNALED(stat_loc)) || (waitstat == 0));
 
 		exit_status = WEXITSTATUS(stat_loc);
 
@@ -1061,7 +1060,7 @@ load_driver(char *driver_name, int verbose_flag)
 	if (exec_status != NOERR) {
 		/* no clean : name and major number are bound */
 		(void) fprintf(stderr, gettext(ERR_CONFIG),
-			driver_name);
+		    driver_name);
 	}
 }
 
@@ -1129,7 +1128,6 @@ update_minor_entry(char *driver_name, char *perm_list)
 	char own[OPT_LEN + 1], grp[OPT_LEN + 1];
 	int status = NOERR, i;
 	char *newfile, *tptr;
-	extern void bzero();
 
 	if ((fp = fopen(minor_perm, "r")) == NULL) {
 		perror(NULL);
@@ -1622,7 +1620,6 @@ unique_drv_alias(char *drv_alias)
 		(void) fprintf(stderr, gettext(ERR_CANT_OPEN), driver_aliases);
 		return (ERROR);
 	}
-
 }
 
 
@@ -1658,6 +1655,142 @@ unique_driver_name(char *driver_name, char *file_name,
 	return (ret);
 }
 
+/*
+ * returns:
+ *	SUCCESS - not an existing driver alias
+ *	NOT_UNIQUE - matching driver alias exists
+ *	ERROR - an error occurred
+ */
+int
+check_duplicate_driver_alias(char *driver_name, char *drv_alias)
+{
+	FILE *fp;
+	char drv[FILENAME_MAX + 1];
+	char line[MAX_N2M_ALIAS_LINE + 1], *cp;
+	char alias[FILENAME_MAX + 1];
+	char *a;
+	int status = SUCCESS;
+
+	if ((fp = fopen(driver_aliases, "r")) == NULL) {
+		perror(NULL);
+		(void) fprintf(stderr, gettext(ERR_CANT_OPEN), driver_aliases);
+		return (ERROR);
+	}
+
+	while (fgets(line, sizeof (line), fp) != 0) {
+		/* cut off comments starting with '#' */
+		if ((cp = strchr(line, '#')) != NULL)
+			*cp = '\0';
+		/* ignore comment or blank lines */
+		if (is_blank(line))
+			continue;
+		/* sanity-check */
+		if (sscanf(line, "%s %s", drv, alias) != 2)
+			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
+			    driver_aliases, line);
+
+		/* unquote for compare */
+		if ((*alias == '"') &&
+		    (*(alias + strlen(alias) - 1) == '"')) {
+			a = &alias[1];
+			alias[strlen(alias) - 1] = '\0';
+		} else
+			a = alias;
+
+		if ((strcmp(drv_alias, a) == 0) &&
+		    (strcmp(drv, driver_name) == 0)) {
+			status = NOT_UNIQUE;
+		}
+
+		if ((strcmp(drv_alias, drv) == 0) ||
+		    ((strcmp(drv_alias, a) == 0) &&
+		    (strcmp(drv, driver_name) != 0))) {
+			(void) fprintf(stderr,
+			    gettext(ERR_ALIAS_IN_USE),
+			    drv_alias);
+			status = ERROR;
+			goto done;
+		}
+	}
+
+done:
+	(void) fclose(fp);
+	return (status);
+}
+
+int
+trim_duplicate_aliases(char *driver_name, char *aliases, char **aliases2p)
+{
+	char *current_head;
+	char *previous_head;
+	char *one_entry;
+	char *aliases2;
+	int rv, len;
+	int n = 0;
+
+	*aliases2p = NULL;
+	len = strlen(aliases) + 1;
+
+	one_entry = calloc(len, 1);
+	aliases2 = calloc(len, 1);
+	if (one_entry == NULL || aliases2 == NULL) {
+		(void) fprintf(stderr, gettext(ERR_NO_MEM));
+		return (ERROR);
+	}
+
+	previous_head = aliases;
+
+	do {
+		(void) bzero(one_entry, len);
+		current_head = get_entry(previous_head, one_entry, ' ', 1);
+		previous_head = current_head;
+
+		rv = check_duplicate_driver_alias(driver_name, one_entry);
+		switch (rv) {
+		case SUCCESS:
+			/* not an existing driver alias: add it */
+			if (n > 0) {
+				if (strlcat(aliases2, " ", len) >= len)
+					goto err;
+			}
+			if (strlcat(aliases2, one_entry, len) >= len)
+				goto err;
+			n++;
+			break;
+		case NOT_UNIQUE:
+			/* matching driver alias exists: do not add it */
+			break;
+		case ERROR:
+			/* error reading the alias file */
+			goto err;
+		default:
+			goto err;
+		}
+
+		if (!is_token(one_entry)) {
+			(void) fprintf(stderr, gettext(ERR_BAD_TOK),
+			    "-i", one_entry);
+			goto err;
+		}
+	} while (*current_head != '\0');
+
+	/*
+	 * If all the aliases listed are already
+	 * present we actually have none to do.
+	 */
+	if (n == 0) {
+		free(aliases2);
+	} else {
+		*aliases2p = aliases2;
+	}
+	free(one_entry);
+	return (NOERR);
+
+err:
+	free(aliases2);
+	free(one_entry);
+	return (ERROR);
+}
 
 int
 check_space_within_quote(char *str)
@@ -1786,8 +1919,8 @@ update_name_to_major(char *driver_name, major_t *major_num, int server)
 			 */
 			if ((max_dev == ERROR) && (tmp == ERROR)) {
 				(void) fprintf(stderr,
-					gettext(ERR_CANT_ACCESS_FILE),
-					name_to_major);
+				    gettext(ERR_CANT_ACCESS_FILE),
+				    name_to_major);
 				return (ERROR);
 			}
 
