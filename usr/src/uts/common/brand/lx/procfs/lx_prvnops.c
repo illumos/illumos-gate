@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * lxpr_vnops.c:  Vnode operations for the lx /proc file system
@@ -1759,8 +1757,6 @@ static void
 lxpr_read_uptime(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 {
 	cpu_t *cp, *cpstart;
-	pid_t p;
-	proc_t *init_proc;
 	int pools_enabled;
 	ulong_t idle_cum = 0;
 	ulong_t cpu_count = 0;
@@ -1798,12 +1794,8 @@ lxpr_read_uptime(lxpr_node_t *lxpnp, lxpr_uiobuf_t *uiobuf)
 	} while (cp != cpstart);
 	mutex_exit(&cpu_lock);
 
-	/* Getting the Zone init process startup time */
-	mutex_enter(&pidlock);
-	p = curproc->p_zone->zone_proc_initpid;
-	init_proc = prfind(p);
-	birthtime = init_proc->p_mstart;
-	mutex_exit(&pidlock);
+	/* Getting the Zone zsched process startup time */
+	birthtime = LXPTOZ(lxpnp)->zone_zsched->p_mstart;
 	up_cs = (gethrtime() - birthtime) / centi_sec;
 	up_s = up_cs / 100;
 	up_cs %= 100;
