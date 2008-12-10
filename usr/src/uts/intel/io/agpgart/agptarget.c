@@ -870,7 +870,7 @@ static struct dev_ops agp_target_ops = {
 	&agp_target_cb_ops,	/* devo_cb_ops */
 	0,			/* devo_bus_ops */
 	0,			/* devo_power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 static  struct modldrv modldrv = {
