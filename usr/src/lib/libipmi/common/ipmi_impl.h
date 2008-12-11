@@ -26,8 +26,6 @@
 #ifndef	_IPMI_IMPL_H
 #define	_IPMI_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <libipmi.h>
 
@@ -80,6 +78,7 @@ struct ipmi_handle {
 	char			ih_errbuf[1024];
 	ipmi_list_t		ih_users;
 	ipmi_hash_t		*ih_entities;
+	int			ih_completion;
 };
 
 /*

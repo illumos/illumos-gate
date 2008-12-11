@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libipmi.h>
 #include <string.h>
 
@@ -121,25 +119,25 @@ static struct ipmi_err_conv {
 ipmi_cmd_t *
 ipmi_send(ipmi_handle_t *ihp, ipmi_cmd_t *cmd)
 {
-	int completion;
 	int i;
 
 	if (ihp->ih_transport->it_send(ihp->ih_tdata, cmd, &ihp->ih_response,
-	    &completion) != 0)
+	    &ihp->ih_completion) != 0)
 		return (NULL);
 
-	if (completion != 0) {
+	if (ihp->ih_completion != 0) {
 		for (i = 0; i < IPMI_ERROR_COUNT; i++) {
-			if (completion == ipmi_errtable[i].bmc_err) {
+			if (ihp->ih_completion == ipmi_errtable[i].bmc_err) {
 				(void) ipmi_set_error(ihp,
 				    ipmi_errtable[i].ipmi_err,
-				    "IPMI completion code 0x%x", completion);
+				    "IPMI completion code 0x%x",
+				    ihp->ih_completion);
 				return (NULL);
 			}
 		}
 
 		(void) ipmi_set_error(ihp, EIPMI_UNKNOWN,
-		    "IPMI completion code 0x%x", completion);
+		    "IPMI completion code 0x%x", ihp->ih_completion);
 		return (NULL);
 	}
 

@@ -22,19 +22,20 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	libipmi.a
 VERS=		.1
 
 OBJECTS=	ipmi_bmc.o	\
 		ipmi_entity.o	\
+		ipmi_event.o	\
 		ipmi_fru.o	\
 		ipmi_hash.o	\
+		ipmi_lan.o	\
 		ipmi_list.o	\
 		ipmi_misc.o	\
-		ipmi_sel.o	\
 		ipmi_sdr.o	\
+		ipmi_sel.o	\
 		ipmi_sensor.o	\
 		ipmi_sunoem.o	\
 		ipmi_tables.o	\

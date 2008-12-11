@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libipmi.h>
 #include <stddef.h>
 #include <string.h>
@@ -206,7 +204,7 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 	id = IPMI_SDR_FIRST;
 	while (id != IPMI_SDR_LAST) {
 		if ((sdr = ipmi_sdr_get(ihp, id, &id)) == NULL)
-			return (-1);
+			goto error;
 
 		/*
 		 * Extract the name from the record-specific data.
@@ -326,12 +324,12 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 
 		if ((ent = ipmi_zalloc(ihp,
 		    sizeof (ipmi_sdr_cache_ent_t))) == NULL)
-			return (-1);
+			goto error;
 
 		len = sdr->is_length + offsetof(ipmi_sdr_t, is_record);
 		if ((ent->isc_sdr = ipmi_alloc(ihp, len)) == NULL) {
 			ipmi_free(ihp, ent);
-			return (-1);
+			goto error;
 		}
 		bcopy(sdr, ent->isc_sdr, len);
 
@@ -340,7 +338,7 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 			    NULL) {
 				ipmi_free(ihp, ent->isc_sdr);
 				ipmi_free(ihp, ent);
-				return (-1);
+				goto error;
 			}
 
 			ipmi_decode_string(type, namelen, name, ent->isc_name);
@@ -364,6 +362,11 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 	}
 
 	return (0);
+
+error:
+	ipmi_sdr_clear(ihp);
+	ipmi_entity_clear(ihp);
+	return (-1);
 }
 
 /*

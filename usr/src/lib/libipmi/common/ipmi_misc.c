@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libipmi.h>
 #include <stdio.h>
 #include <string.h>
@@ -119,4 +117,34 @@ ipmi_firmware_version(ipmi_handle_t *ihp)
 		return (NULL);
 
 	return (ihp->ih_firmware_rev);
+}
+
+ipmi_channel_info_t *
+ipmi_get_channel_info(ipmi_handle_t *ihp, int number)
+{
+	ipmi_cmd_t cmd, *rsp;
+	uint8_t channel;
+
+	if (number > 0xF) {
+		(void) ipmi_set_error(ihp, EIPMI_INVALID_REQUEST, NULL);
+		return (NULL);
+	}
+
+	channel = (uint8_t)number;
+
+	cmd.ic_netfn = IPMI_NETFN_APP;
+	cmd.ic_lun = 0;
+	cmd.ic_cmd = IPMI_CMD_GET_CHANNEL_INFO;
+	cmd.ic_data = &channel;
+	cmd.ic_dlen = sizeof (channel);
+
+	if ((rsp = ipmi_send(ihp, &cmd)) == NULL)
+		return (NULL);
+
+	if (rsp->ic_dlen < sizeof (ipmi_channel_info_t)) {
+		(void) ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH, NULL);
+		return (NULL);
+	}
+
+	return (rsp->ic_data);
 }

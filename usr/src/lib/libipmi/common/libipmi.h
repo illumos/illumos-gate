@@ -26,8 +26,6 @@
 #ifndef	_LIBIPMI_H
 #define	_LIBIPMI_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/bmc_intf.h>
 #include <sys/byteorder.h>
 #include <sys/sysmacros.h>
@@ -57,6 +55,7 @@ typedef struct ipmi_handle ipmi_handle_t;
 #define	IPMI_NETFN_APP			BMC_NETFN_APP
 #define	IPMI_NETFN_STORAGE		BMC_NETFN_STORAGE
 #define	IPMI_NETFN_SE			BMC_NETFN_SE
+#define	IPMI_NETFN_TRANSPORT		0x0C
 #define	IPMI_NETFN_OEM			0x2e
 
 /*
@@ -84,7 +83,10 @@ typedef enum {
 	EIPMI_BUSY,			/* service processor is busy */
 	EIPMI_NOSPACE,			/* service processor is out of space */
 	EIPMI_UNAVAILABLE,		/* service processor is unavailable */
-	EIPMI_ACCESS			/* insufficient privileges */
+	EIPMI_ACCESS,			/* insufficient privileges */
+	EIPMI_BADPARAM,			/* parameter is not supported */
+	EIPMI_READONLY,			/* attempt to write read-only param */
+	EIPMI_WRITEONLY			/* attempt to read write-only param */
 } ipmi_errno_t;
 
 /*
@@ -152,6 +154,111 @@ ipmi_deviceid_t *ipmi_get_deviceid(ipmi_handle_t *);
 	((dp)->id_manufacturer[2] << 16))
 
 const char *ipmi_firmware_version(ipmi_handle_t *);
+
+/*
+ * Get Channel Info.  See section 22.24.
+ */
+typedef struct ipmi_channel_info {
+	DECL_BITFIELD2(
+	    ici_number		:4,
+	    __reserved1		:4);
+	DECL_BITFIELD2(
+	    ici_medium		:7,
+	    __reserved2		:1);
+	DECL_BITFIELD2(
+	    ici_protocol	:5,
+	    __reserved3		:3);
+	DECL_BITFIELD3(
+	    ici_session_count	:6,
+	    ici_single_session	:1,
+	    ici_multi_Session	:1);
+	uint8_t		ici_vendor[3];
+	uint8_t		ici_auxinfo[2];
+} ipmi_channel_info_t;
+
+#define	IPMI_CMD_GET_CHANNEL_INFO	0x42
+
+/*
+ * Channel Numbers.  See section 6.3.
+ */
+#define	IPMI_CHANNEL_PRIMARY		0x0
+#define	IPMI_CHANNEL_MIN		0x1
+#define	IPMI_CHANNEL_MAX		0xB
+#define	IPMI_CHANNEL_CURRENT		0xE
+#define	IPMI_CHANNEL_SYSTEM		0xF
+
+extern ipmi_channel_info_t *ipmi_get_channel_info(ipmi_handle_t *, int);
+
+/*
+ * Channel Protocol Types.  See section 6.4.
+ */
+#define	IPMI_PROTOCOL_IPMB		0x1
+#define	IPMI_PROTOCOL_ICMB		0x2
+#define	IPMI_PROTOCOL_SMBUS		0x4
+#define	IPMI_PROTOCOL_KCS		0x5
+#define	IPMI_PROTOCOL_SMIC		0x6
+#define	IPMI_PROTOCOL_BT10		0x7
+#define	IPMI_PROTOCOL_BT15		0x8
+#define	IPMI_PROTOCOL_TMODE		0x9
+#define	IPMI_PROTOCOL_OEM1		0xC
+#define	IPMI_PROTOCOL_OEM2		0xD
+#define	IPMI_PROTOCOL_OEM3		0xE
+#define	IPMI_PROTOCOL_OEM4		0xF
+
+/*
+ * Channel Medium Types.  See section 6.5.
+ */
+#define	IPMI_MEDIUM_IPMB		0x1
+#define	IPMI_MEDIUM_ICMB10		0x2
+#define	IPMI_MEDIUM_ICMB09		0x3
+#define	IPMI_MEDIUM_8023LAN		0x4
+#define	IPMI_MEDIUM_RS232		0x5
+#define	IPMI_MEDIUM_OTHERLAN		0x6
+#define	IPMI_MEDIUM_PCISMBUS		0x7
+#define	IPMI_MEDIUM_SMBUS10		0x8
+#define	IPMI_MEDIUM_SMBUS20		0x9
+#define	IPMI_MEDIUM_USB1		0xA
+#define	IPMI_MEDIUM_USB2		0xB
+#define	IPMI_MEDIUM_SYSTEM		0xC
+
+/*
+ * LAN Configuration.  See section 23.  While the underlying mechanism is
+ * implemented via a sequence of get/set parameter commands, we assume that
+ * consumers prefer to get and set information in chunks, and therefore expose
+ * the configuration as a structure, with some of the less useful fields
+ * removed.  When making changes, the consumer specifies which fields to apply
+ * along with the structure the library takes care of the rest of the work.
+ *
+ * This can be expanded in the future as needed.
+ */
+
+typedef struct ipmi_lan_config {
+	boolean_t	ilc_set_in_progress;
+	uint32_t	ilc_ipaddr;
+	uint8_t		ilc_ipaddr_source;
+	uint8_t		ilc_macaddr[6];
+	uint32_t	ilc_subnet;
+	uint32_t	ilc_gateway_addr;
+} ipmi_lan_config_t;
+
+#define	IPMI_LAN_SRC_UNSPECIFIED	0x0
+#define	IPMI_LAN_SRC_STATIC		0x1
+#define	IPMI_LAN_SRC_DHCP		0x2
+#define	IPMI_LAN_SRC_BIOS		0x3
+#define	IPMI_LAN_SRC_OTHER		0x4
+
+#define	IPMI_LAN_SET_IPADDR		0x01
+#define	IPMI_LAN_SET_IPADDR_SOURCE	0x02
+#define	IPMI_LAN_SET_MACADDR		0x04
+#define	IPMI_LAN_SET_SUBNET		0x08
+#define	IPMI_LAN_SET_GATEWAY_ADDR	0x10
+
+#define	IPMI_CMD_SET_LAN_CONFIG		0x01
+#define	IPMI_CMD_GET_LAN_CONFIG		0x02
+
+extern int ipmi_lan_get_config(ipmi_handle_t *, int,
+    ipmi_lan_config_t *);
+extern int ipmi_lan_set_config(ipmi_handle_t *, int, ipmi_lan_config_t *, int);
 
 /*
  * SEL (System Event Log) commands.  Currently the library only provides
@@ -239,6 +346,25 @@ typedef struct ipmi_sel_oem {
 	uint8_t		isel_oem_type;
 	uint8_t		isel_oem_data[13];
 } ipmi_sel_oem_t;
+
+/*
+ * 29.3 Platform Event Message Command.
+ */
+typedef struct ipmi_platform_event_message {
+	uint8_t		ipem_generator;
+	uint8_t		ipem_rev;
+	uint8_t		ipem_sensor_type;
+	uint8_t		ipem_sensor_num;
+	DECL_BITFIELD2(
+	    ipem_event_type	:7,
+	    ipem_event_dir	:1);
+	uint8_t		ipem_event_data[3];
+} ipmi_platform_event_message_t;
+
+#define	IPMI_CMD_PLATFORM_EVENT_MESSAGE	0x02
+
+extern int ipmi_event_platform_message(ipmi_handle_t *,
+    ipmi_platform_event_message_t *);
 
 /*
  * 29.7 Event Data Field Formats.  Consumers can cast the data field of the
