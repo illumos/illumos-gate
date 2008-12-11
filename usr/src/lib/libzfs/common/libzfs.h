@@ -264,9 +264,15 @@ typedef enum {
 	ZPOOL_STATUS_HOSTID_MISMATCH,	/* last accessed by another system */
 	ZPOOL_STATUS_IO_FAILURE_WAIT,	/* failed I/O, failmode 'wait' */
 	ZPOOL_STATUS_IO_FAILURE_CONTINUE, /* failed I/O, failmode 'continue' */
+	ZPOOL_STATUS_BAD_LOG,		/* cannot read log chain(s) */
+
+	/*
+	 * These faults have no corresponding message ID.  At the time we are
+	 * checking the status, the original reason for the FMA fault (I/O or
+	 * checksum errors) has been lost.
+	 */
 	ZPOOL_STATUS_FAULTED_DEV_R,	/* faulted device with replicas */
 	ZPOOL_STATUS_FAULTED_DEV_NR,	/* faulted device with no replicas */
-	ZPOOL_STATUS_BAD_LOG,		/* cannot read log chain(s) */
 
 	/*
 	 * The following are not faults per se, but still an error possibly
