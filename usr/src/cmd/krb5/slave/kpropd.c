@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * 
  * All rights reserved.
@@ -144,12 +144,13 @@ void	doit
 	(int);
 krb5_error_code	do_iprop(kdb_log_context *log_ctx);
 
+/* Solaris Kerberos */
 void	kerberos_authenticate
 	(krb5_context,
 		   int,
 		   krb5_principal *,
 		   krb5_enctype *,
-		   struct sockaddr_storage);
+		   struct sockaddr_storage *);
 krb5_boolean authorized_principal
 	(krb5_context,
     		   krb5_principal,
@@ -549,7 +550,8 @@ void doit(fd)
 	/*
 	 * Now do the authentication
 	 */
-	kerberos_authenticate(doit_context, fd, &client, &etype, from);
+	/* Solaris Kerberos */
+	kerberos_authenticate(doit_context, fd, &client, &etype, &from);
 
 	if (!authorized_principal(doit_context, client, etype)) {
 		char	*name;
@@ -1300,13 +1302,14 @@ void PRS(argc,argv)
 /*
  * Figure out who's calling on the other end of the connection....
  */
+/* Solaris Kerberos */
 void
 kerberos_authenticate(context, fd, clientp, etype, ss)
     krb5_context 	  context;
     int		 	  fd;
     krb5_principal	* clientp;
     krb5_enctype	* etype;
-    struct sockaddr_storage	  ss;
+    struct sockaddr_storage	* ss;
 {
     krb5_error_code	  retval;
     krb5_ticket		* ticket;
@@ -1317,7 +1320,8 @@ kerberos_authenticate(context, fd, clientp, etype, ss)
     /*
      * Set recv_addr and send_addr
      */
-    if (cvtkaddr(&ss, &sender_addr) == NULL) {
+    /* Solaris Kerberos */
+    if (cvtkaddr(ss, &sender_addr) == NULL) {
 	com_err(progname, errno, 
 		gettext("while converting socket address"));
 	exit(1);
