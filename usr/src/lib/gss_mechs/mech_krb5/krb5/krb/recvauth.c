@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -241,6 +241,8 @@ cleanup:;
     if (retval) {
 	if (local_authcon) {
 	    krb5_auth_con_free(context, *auth_context);
+	    /* Solaris Kerberos */
+	    *auth_context = NULL;
 	} else if (local_rcache && rcache != NULL) {
 	    /* Solaris Kerberos */
 	    (void) krb5_rc_close(context, rcache);
