@@ -1168,8 +1168,20 @@ int vio_net_resource_reg(mac_register_t *macp, vio_net_res_type_t type,
 	vnetp = vnet_headp;
 	while (vnetp != NULL) {
 		if (VNET_MATCH_RES(vresp, vnetp)) {
-			WRITE_ENTER(&vnetp->vrwlock);
 			vresp->vnetp = vnetp;
+
+			/* Setup kstats for hio resource */
+			if (vresp->type == VIO_NET_RES_HYBRID) {
+				vresp->ksp = vnet_hio_setup_kstats(DRV_NAME,
+				    "hio", vresp);
+				if (vresp->ksp == NULL) {
+					cmn_err(CE_NOTE, "!vnet%d: Cannot "
+					    "create kstats for hio resource",
+					    vnetp->instance);
+				}
+			}
+
+			WRITE_ENTER(&vnetp->vrwlock);
 			vresp->nextp = vnetp->vres_list;
 			vnetp->vres_list = vresp;
 			RW_EXIT(&vnetp->vrwlock);
@@ -1182,16 +1194,6 @@ int vio_net_resource_reg(mac_register_t *macp, vio_net_res_type_t type,
 		DWARN(NULL, "No vnet instance");
 		kmem_free(vresp, sizeof (vnet_res_t));
 		return (ENXIO);
-	}
-
-	/* Setup kstats for hio resource */
-	if (vresp->type == VIO_NET_RES_HYBRID) {
-		vresp->ksp = vnet_hio_setup_kstats(DRV_NAME, "hio", vresp);
-		if (vresp->ksp == NULL) {
-			DWARN(NULL, "Cannot create kstats for hio resource");
-			kmem_free(vresp, sizeof (vnet_res_t));
-			return (ENXIO);
-		}
 	}
 
 	*vhp = vresp;
