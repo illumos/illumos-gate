@@ -39,7 +39,8 @@
 extern "C" {
 #endif
 
-extern ses_node_t *ses_node_get(topo_mod_t *, tnode_t *);
+extern ses_node_t *ses_node_lock(topo_mod_t *, tnode_t *);
+extern void ses_node_unlock(topo_mod_t *, tnode_t *);
 
 extern int ses_node_enum_facility(topo_mod_t *, tnode_t *, topo_version_t,
     nvlist_t *, nvlist_t **);
@@ -53,11 +54,13 @@ typedef struct ses_enum_target {
 	struct timeval		set_snaptime;
 	char			*set_devpath;
 	int			set_refcount;
+	pthread_mutex_t		set_lock;
 } ses_enum_target_t;
 
 #define	TOPO_PGROUP_SES		"ses"
 #define	TOPO_PROP_NODE_ID	"node-id"
 #define	TOPO_PROP_TARGET_PATH	"target-path"
+#define	TOPO_PROP_SAS_ADDR	"sas-address"
 
 #ifndef	NDEBUG
 #define	verify(x)	assert(x)

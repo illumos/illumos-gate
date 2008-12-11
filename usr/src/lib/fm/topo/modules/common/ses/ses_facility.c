@@ -152,7 +152,7 @@ ses_indicator_mode(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	    &altprop) != 0)
 		altprop = NULL;
 
-	if ((np = ses_node_get(mod, tn)) == NULL) {
+	if ((np = ses_node_lock(mod, tn)) == NULL) {
 		topo_mod_dprintf(mod, "failed to lookup ses node in 'mode' "
 		    "method\n");
 		return (-1);
@@ -166,13 +166,15 @@ ses_indicator_mode(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		    &mode) != 0) {
 			topo_mod_dprintf(mod, "invalid type for indicator "
 			    "mode property");
-			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+			(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
+			goto error;
 		}
 
 		if (mode != TOPO_LED_STATE_OFF && mode != TOPO_LED_STATE_ON) {
 			topo_mod_dprintf(mod, "invalid indicator mode %d\n",
 			    mode);
-			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+			(void) topo_mod_seterrno(mod, EMOD_NVL_INVAL);
+			goto error;
 		}
 
 		nvl = NULL;
@@ -180,14 +182,15 @@ ses_indicator_mode(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		    nvlist_add_boolean_value(nvl, propname,
 		    mode == TOPO_LED_STATE_ON ? B_TRUE : B_FALSE) != 0) {
 			nvlist_free(nvl);
-			return (topo_mod_seterrno(mod, EMOD_NOMEM));
+			(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+			goto error;
 		}
 
 		if (ses_node_ctl(np, SES_CTL_OP_SETPROP, nvl) != 0) {
 			topo_mod_dprintf(mod, "failed to set indicator: %s\n",
 			    ses_errmsg());
 			nvlist_free(nvl);
-			return (-1);
+			goto error;
 		}
 
 		nvlist_free(nvl);
@@ -197,7 +200,8 @@ ses_indicator_mode(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		    propname, &current) != 0) {
 			topo_mod_dprintf(mod, "failed to lookup %s in node "
 			    "properties\n", propname);
-			return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
+			(void) topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP);
+			goto error;
 		}
 
 		if (altprop != NULL && nvlist_lookup_boolean_value(props,
@@ -214,11 +218,17 @@ ses_indicator_mode(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_TYPE, TOPO_TYPE_UINT32) != 0 ||
 	    nvlist_add_uint32(nvl, TOPO_PROP_VAL_VAL, mode) != 0) {
 		nvlist_free(nvl);
-		return (topo_mod_seterrno(mod, EMOD_NOMEM));
+		(void) topo_mod_seterrno(mod, EMOD_NOMEM);
+		goto error;
 	}
 
+	ses_node_unlock(mod, tn);
 	*out = nvl;
 	return (0);
+
+error:
+	ses_node_unlock(mod, tn);
+	return (-1);
 }
 
 /*
@@ -253,7 +263,7 @@ ses_sensor_reading(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	    &multiplier) != 0)
 		multiplier = 1;
 
-	if ((np = ses_node_get(mod, tn)) == NULL) {
+	if ((np = ses_node_lock(mod, tn)) == NULL) {
 		topo_mod_dprintf(mod, "failed to lookup ses node in 'mode' "
 		    "method\n");
 		return (-1);
@@ -267,8 +277,11 @@ ses_sensor_reading(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	} else {
 		topo_mod_dprintf(mod, "failed to lookup %s in node "
 		    "properties\n", prop);
+		ses_node_unlock(mod, tn);
 		return (topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP));
 	}
+
+	ses_node_unlock(mod, tn);
 
 	nvl = NULL;
 	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
@@ -304,18 +317,21 @@ ses_sensor_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	ses_node_t *np;
 	char *prop;
 
-	if ((np = ses_node_get(mod, tn)) == NULL) {
+	if (nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args) != 0) {
+		topo_mod_dprintf(mod,
+		    "invalid arguments to 'state' method\n");
+		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+	}
+
+	if ((np = ses_node_lock(mod, tn)) == NULL) {
 		topo_mod_dprintf(mod, "failed to lookup ses node in 'mode' "
 		    "method\n");
 		return (-1);
 	}
 	verify((props = ses_node_props(np)) != NULL);
 
-	if (nvlist_lookup_nvlist(in, TOPO_PROP_ARGS, &args) != 0) {
-		topo_mod_dprintf(mod,
-		    "invalid arguments to 'state' method\n");
-		return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
-	}
+	if (nvlist_lookup_uint64(props, SES_PROP_STATUS_CODE, &status) != 0)
+		status = SES_ESC_UNSUPPORTED;
 
 	if (nvlist_lookup_uint64(props, SES_PROP_STATUS_CODE, &status) != 0)
 		status = SES_ESC_UNSUPPORTED;
@@ -352,6 +368,8 @@ ses_sensor_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		    SES_PROP_CRIT_OVER, &value) == 0 && value)
 			state |= TOPO_SENSOR_STATE_THRESH_UPPER_CRIT;
 	}
+
+	ses_node_unlock(mod, tn);
 
 	nvl = NULL;
 	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
@@ -392,7 +410,7 @@ ses_psu_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	uint32_t state;
 	ses_node_t *np;
 
-	if ((np = ses_node_get(mod, tn)) == NULL) {
+	if ((np = ses_node_lock(mod, tn)) == NULL) {
 		topo_mod_dprintf(mod, "failed to lookup ses node in 'mode' "
 		    "method\n");
 		return (-1);
@@ -415,6 +433,8 @@ ses_psu_state(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	    (nvlist_lookup_boolean_value(props, SES_PSU_PROP_DC_OVER_CURRENT,
 	    &value) == 0 && value))
 		state |= TOPO_SENSOR_STATE_POWER_SUPPLY_INPUT_RANGE_PRES;
+
+	ses_node_unlock(mod, tn);
 
 	nvl = NULL;
 	if (topo_mod_nvalloc(mod, &nvl, NV_UNIQUE_NAME) != 0 ||
@@ -748,7 +768,7 @@ ses_node_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	uint64_t type, nodeid;
 	ses_sensor_desc_t sd = { 0 };
 
-	if ((np = ses_node_get(mod, tn)) == NULL)
+	if ((np = ses_node_lock(mod, tn)) == NULL)
 		return (-1);
 
 	assert(ses_node_type(np) == SES_NODE_ELEMENT);
@@ -757,8 +777,10 @@ ses_node_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	verify(nvlist_lookup_uint64(props, SES_PROP_ELEMENT_TYPE, &type) == 0);
 
 	if (type != SES_ET_DEVICE && type != SES_ET_ARRAY_DEVICE &&
-	    type != SES_ET_COOLING && type != SES_ET_POWER_SUPPLY)
+	    type != SES_ET_COOLING && type != SES_ET_POWER_SUPPLY) {
+		ses_node_unlock(mod, tn);
 		return (0);
+	}
 
 	/*
 	 * Every element supports an 'ident' indicator.  All elements also
@@ -767,7 +789,7 @@ ses_node_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	 */
 	if (ses_add_indicator(mod, tn, nodeid, TOPO_LED_TYPE_LOCATE, "ident",
 	    SES_PROP_IDENT, NULL) != 0)
-		return (-1);
+		goto error;
 
 	switch (type) {
 	case SES_ET_DEVICE:
@@ -783,7 +805,7 @@ ses_node_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		    "ok2rm", SES_PROP_RMV, SES_PROP_RMV) != 0 ||
 		    ses_add_discrete(mod, tn, nodeid, "fault",
 		    SES_DEV_PROP_FAULT_SENSED) != 0)
-			return (-1);
+			goto error;
 		break;
 
 	case SES_ET_COOLING:
@@ -799,7 +821,7 @@ ses_node_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		    ses_add_sensor(mod, tn, nodeid, "speed", &sd) != 0 ||
 		    ses_add_discrete(mod, tn, nodeid, "fault",
 		    SES_PROP_OFF) != 0)
-			return (-1);
+			goto error;
 		break;
 
 	case SES_ET_POWER_SUPPLY:
@@ -813,17 +835,22 @@ ses_node_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 		 */
 		if (ses_add_indicator(mod, tn, nodeid, TOPO_LED_TYPE_SERVICE,
 		    "fail", SES_PROP_FAIL, NULL) != 0)
-			return (-1);
+			goto error;
 
 		if (ses_add_psu_status(mod, tn, nodeid) != 0)
-			return (-1);
+			goto error;
 		break;
 
 	default:
 		return (0);
 	}
 
+	ses_node_unlock(mod, tn);
 	return (0);
+
+error:
+	ses_node_unlock(mod, tn);
+	return (-1);
 }
 
 /*
@@ -926,7 +953,7 @@ ses_enc_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	nvlist_t *aprops;
 	uint64_t type, nodeid;
 
-	if ((np = ses_node_get(mod, tn)) == NULL)
+	if ((np = ses_node_lock(mod, tn)) == NULL)
 		return (-1);
 
 	assert(ses_node_type(np) == SES_NODE_ENCLOSURE);
@@ -940,7 +967,7 @@ ses_enc_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 	    ses_add_indicator(mod, tn, nodeid, TOPO_LED_TYPE_SERVICE, "fail",
 	    SES_PROP_FAIL_REQ, SES_PROP_FAIL) != 0 ||
 	    ses_add_discrete(mod, tn, nodeid, "fault", SES_PROP_FAIL) != 0)
-		return (-1);
+		goto error;
 
 	/*
 	 * Environmental sensors (temperature, voltage, current).  We have no
@@ -960,8 +987,13 @@ ses_enc_enum_facility(topo_mod_t *mod, tnode_t *tn, topo_version_t vers,
 			continue;
 
 		if (ses_add_enclosure_sensors(mod, tn, agg, type) != 0)
-			return (-1);
+			goto error;
 	}
 
+	ses_node_unlock(mod, tn);
 	return (0);
+
+error:
+	ses_node_unlock(mod, tn);
+	return (-1);
 }

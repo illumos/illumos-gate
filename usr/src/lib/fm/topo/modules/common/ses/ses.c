@@ -43,7 +43,7 @@
 #define	SES_SNAP_FREQ		1000	/* in milliseconds */
 
 #define	SES_STATUS_UNAVAIL(s)	\
-	((s) == SES_ESC_UNSUPPORTED || (s) >= SES_ESC_UNKNOWN)
+	((s) == SES_ESC_UNSUPPORTED || (s) >= SES_ESC_NOT_INSTALLED)
 
 /*
  * Because multiple SES targets can be part of a single chassis, we construct
@@ -53,10 +53,15 @@
  * ses_enum_enclosure_t, which contains a set of ses targets, and a list of all
  * nodes found so far.
  */
+typedef struct ses_alt_node {
+	topo_list_t		san_link;
+	ses_node_t		*san_node;
+} ses_alt_node_t;
 
 typedef struct ses_enum_node {
 	topo_list_t		sen_link;
 	ses_node_t		*sen_node;
+	topo_list_t		sen_alt_nodes;
 	uint64_t		sen_type;
 	uint64_t		sen_instance;
 	ses_enum_target_t	*sen_target;
@@ -130,11 +135,17 @@ ses_data_free(ses_enum_data_t *sdp)
 	ses_enum_chassis_t *cp;
 	ses_enum_node_t *np;
 	ses_enum_target_t *tp;
+	ses_alt_node_t *ap;
 
 	while ((cp = topo_list_next(&sdp->sed_chassis)) != NULL) {
 		topo_list_delete(&sdp->sed_chassis, cp);
 
 		while ((np = topo_list_next(&cp->sec_nodes)) != NULL) {
+			while ((ap = topo_list_next(&np->sen_alt_nodes)) !=
+			    NULL) {
+				topo_list_delete(&np->sen_alt_nodes, ap);
+				topo_mod_free(mod, ap, sizeof (ses_alt_node_t));
+			}
 			topo_list_delete(&cp->sec_nodes, np);
 			topo_mod_free(mod, np, sizeof (ses_enum_node_t));
 		}
@@ -262,7 +273,7 @@ ses_contains(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
  * some defined bounds.
  */
 ses_node_t *
-ses_node_get(topo_mod_t *mod, tnode_t *tn)
+ses_node_lock(topo_mod_t *mod, tnode_t *tn)
 {
 	struct timeval tv;
 	ses_enum_target_t *tp = topo_node_getspecific(tn);
@@ -276,6 +287,8 @@ ses_node_get(topo_mod_t *mod, tnode_t *tn)
 		(void) topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP);
 		return (NULL);
 	}
+
+	(void) pthread_mutex_lock(&tp->set_lock);
 
 	/*
 	 * Determine if we need to take a new snapshot.
@@ -305,6 +318,7 @@ ses_node_get(topo_mod_t *mod, tnode_t *tn)
 			 */
 			ses_snap_rele(snap);
 			(void) topo_mod_seterrno(mod, EMOD_METHOD_NOTSUP);
+			(void) pthread_mutex_unlock(&tp->set_lock);
 			return (NULL);
 		} else {
 			ses_snap_rele(tp->set_snap);
@@ -322,6 +336,17 @@ ses_node_get(topo_mod_t *mod, tnode_t *tn)
 	return (np);
 }
 
+/*ARGSUSED*/
+void
+ses_node_unlock(topo_mod_t *mod, tnode_t *tn)
+{
+	ses_enum_target_t *tp = topo_node_getspecific(tn);
+
+	verify(tp != NULL);
+
+	(void) pthread_mutex_unlock(&tp->set_lock);
+}
+
 /*
  * Determine if the element is present.
  */
@@ -335,12 +360,14 @@ ses_present(topo_mod_t *mod, tnode_t *tn, topo_version_t version,
 	nvlist_t *props, *nvl;
 	uint64_t status;
 
-	if ((np = ses_node_get(mod, tn)) == NULL)
+	if ((np = ses_node_lock(mod, tn)) == NULL)
 		return (-1);
 
 	verify((props = ses_node_props(np)) != NULL);
 	verify(nvlist_lookup_uint64(props,
 	    SES_PROP_STATUS_CODE, &status) == 0);
+
+	ses_node_unlock(mod, tn);
 
 	present = (status != SES_ESC_NOT_INSTALLED);
 
@@ -453,11 +480,11 @@ ses_set_standard_props(topo_mod_t *mod, tnode_t *tn, nvlist_t *auth,
 /*
  * Callback to add a disk to a given bay.  We first check the status-code to
  * determine if a disk is present, ignoring those that aren't in an appropriate
- * state.  We then scan the sas-phys array to determine the attached SAS
- * address.   We create a disk node regardless of whether the SES target is SAS
- * and supports the necessary pages.  If we do find a SAS address, we correlate
- * this to the corresponding Solaris device node to fill in the rest of the
- * data.
+ * state.  We then scan the parent bay node's SAS address array to determine
+ * possible attached SAS addresses.  We create a disk node if the disk is not
+ * SAS or the SES target does not support the necessary pages for this; if we
+ * find the SAS address, we create a disk node and also correlate it with
+ * the corresponding Solaris device node to fill in the rest of the data.
  */
 static int
 ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
@@ -466,8 +493,8 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	uint64_t status;
 	nvlist_t **sas;
 	uint_t s, nsas;
-	uint64_t addr;
-	char buf[17];
+	char **paths;
+	int err;
 
 	/*
 	 * Skip devices that are not in a present (and possibly damaged) state.
@@ -487,7 +514,7 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	/*
 	 * Create the disk range.
 	 */
-	if (topo_node_range_create(mod, pnode, DISK, 0, 1) != 0) {
+	if (topo_node_range_create(mod, pnode, DISK, 0, 0) != 0) {
 		topo_mod_dprintf(mod,
 		    "topo_node_create_range() failed: %s",
 		    topo_mod_errmsg(mod));
@@ -503,20 +530,96 @@ ses_create_disk(ses_enum_data_t *sdp, tnode_t *pnode, nvlist_t *props)
 	    &sas, &nsas) != 0)
 		return (0);
 
+	if (topo_prop_get_string_array(pnode, TOPO_PGROUP_SES,
+	    TOPO_PROP_SAS_ADDR, &paths, &nsas, &err) != 0)
+		return (0);
+
+	err = 0;
+
 	for (s = 0; s < nsas; s++) {
-		verify(nvlist_lookup_uint64(sas[s],
-		    SES_SAS_PROP_ADDR, &addr) == 0);
-		if (addr == 0)
-			continue;
-
-		(void) snprintf(buf, sizeof (buf), "%llx", addr);
-
-		if (disk_declare_addr(mod, pnode, &sdp->sed_disks,
-		    buf) != 0)
-			return (-1);
+		if (disk_declare_addr(mod, pnode,
+		    &sdp->sed_disks, paths[s]) != 0 &&
+		    topo_mod_errno(mod) != EMOD_NODE_BOUND) {
+			err = -1;
+			break;
+		}
 	}
 
-	return (0);
+	for (s = 0; s < nsas; s++)
+		topo_mod_free(mod, paths[s], strlen(paths[s]) + 1);
+	topo_mod_free(mod, paths, nsas * sizeof (char *));
+
+	return (err);
+}
+
+static int
+ses_add_bay_props(topo_mod_t *mod, tnode_t *tn, ses_enum_node_t *snp)
+{
+	ses_alt_node_t *ap;
+	ses_node_t *np;
+	nvlist_t *props;
+
+	nvlist_t **phys;
+	uint_t i, j, n_phys, all_phys = 0;
+	char **paths;
+	uint64_t addr;
+	size_t len;
+	int terr, err = -1;
+
+	for (ap = topo_list_next(&snp->sen_alt_nodes); ap != NULL;
+	    ap = topo_list_next(ap)) {
+		np = ap->san_node;
+		props = ses_node_props(np);
+
+		if (nvlist_lookup_nvlist_array(props, SES_SAS_PROP_PHYS,
+		    &phys, &n_phys) != 0)
+			continue;
+
+		all_phys += n_phys;
+	}
+
+	if (all_phys == 0)
+		return (0);
+
+	if ((paths = topo_mod_zalloc(mod, all_phys * sizeof (char *))) == NULL)
+		return (-1);
+
+	for (i = 0, ap = topo_list_next(&snp->sen_alt_nodes); ap != NULL;
+	    ap = topo_list_next(ap)) {
+		np = ap->san_node;
+		props = ses_node_props(np);
+
+		if (nvlist_lookup_nvlist_array(props, SES_SAS_PROP_PHYS,
+		    &phys, &n_phys) != 0)
+			continue;
+
+		for (j = 0; j < n_phys; j++) {
+			if (nvlist_lookup_uint64(phys[j], SES_SAS_PROP_ADDR,
+			    &addr) != 0)
+				continue;
+
+			len = snprintf(NULL, 0, "%016llx", addr) + 1;
+			if ((paths[i] = topo_mod_alloc(mod, len)) == NULL)
+				goto error;
+
+			(void) snprintf(paths[i], len, "%016llx", addr);
+
+			++i;
+		}
+	}
+
+	err = topo_prop_set_string_array(tn, TOPO_PGROUP_SES,
+	    TOPO_PROP_SAS_ADDR, TOPO_PROP_IMMUTABLE,
+	    (const char **)paths, i, &terr);
+	if (err != 0)
+		err = topo_mod_seterrno(mod, terr);
+
+error:
+	for (i = 0; i < all_phys && paths[i] != NULL; i++)
+		topo_mod_free(mod, paths[i], strlen(paths[i]) + 1);
+	topo_mod_free(mod, paths, all_phys * sizeof (char *));
+
+	return (err);
 }
 
 /*
@@ -618,6 +721,9 @@ ses_create_generic(ses_enum_data_t *sdp, ses_enum_node_t *snp,
 		goto error;
 
 	if (strcmp(nodename, "bay") == 0) {
+		if (ses_add_bay_props(mod, tn, snp) != 0)
+			goto error;
+
 		if (ses_create_disk(sdp, tn, props) != 0)
 			goto error;
 
@@ -907,6 +1013,7 @@ ses_enum_gather(ses_node_t *np, void *data)
 	topo_mod_t *mod = sdp->sed_mod;
 	ses_enum_chassis_t *cp;
 	ses_enum_node_t *snp;
+	ses_alt_node_t *sap;
 	char *csn;
 	uint64_t instance, type;
 	uint64_t prevstatus, status;
@@ -1033,6 +1140,13 @@ ses_enum_gather(ses_node_t *np, void *data)
 				snp->sen_target = sdp->sed_target;
 			}
 
+			if ((sap = topo_mod_zalloc(mod,
+			    sizeof (ses_alt_node_t))) == NULL)
+				goto error;
+
+			sap->san_node = np;
+			topo_list_append(&snp->sen_alt_nodes, sap);
+
 			return (SES_WALK_ACTION_CONTINUE);
 		}
 
@@ -1040,12 +1154,20 @@ ses_enum_gather(ses_node_t *np, void *data)
 		    sizeof (ses_enum_node_t))) == NULL)
 			goto error;
 
+		if ((sap = topo_mod_zalloc(mod,
+		    sizeof (ses_alt_node_t))) == NULL) {
+			topo_mod_free(mod, snp, sizeof (ses_enum_node_t));
+			goto error;
+		}
+
 		topo_mod_dprintf(mod, "%s: adding node (%llu, %llu)",
 		    sdp->sed_name, type, instance);
 		snp->sen_node = np;
 		snp->sen_type = type;
 		snp->sen_instance = instance;
 		snp->sen_target = sdp->sed_target;
+		sap->san_node = np;
+		topo_list_append(&snp->sen_alt_nodes, sap);
 		topo_list_append(&cp->sec_nodes, snp);
 
 		if (type == SES_ET_DEVICE)
@@ -1094,6 +1216,8 @@ ses_process_dir(const char *dirpath, ses_enum_data_t *sdp)
 		if ((stp = topo_mod_zalloc(mod,
 		    sizeof (ses_enum_target_t))) == NULL)
 			goto error;
+
+		(void) pthread_mutex_init(&stp->set_lock, NULL);
 
 		(void) snprintf(path, sizeof (path), "%s/%s", dirpath,
 		    dp->d_name);
