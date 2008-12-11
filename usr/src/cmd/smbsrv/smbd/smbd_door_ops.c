@@ -31,7 +31,6 @@
 #include <strings.h>
 #include <smbsrv/smb_common_door.h>
 #include <smbsrv/smb_token.h>
-#include <smbsrv/mlsvc_util.h>
 #include <smbsrv/libmlsvc.h>
 #include "smbd.h"
 
@@ -373,19 +372,18 @@ smb_dop_get_dcinfo(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
 {
 	char *rbuf = NULL;
-	smb_ntdomain_t *ret_ntdomain_info = NULL;
+	smb_domain_t dinfo;
 
 	*err = SMB_DR_OP_SUCCESS;
 	*rbufsize = 0;
 
-	ret_ntdomain_info = smb_getdomaininfo(0);
-	if (ret_ntdomain_info == NULL) {
+	if (!smb_domain_getinfo(&dinfo)) {
 		*err = SMB_DR_OP_ERR_EMPTYBUF;
 		return (NULL);
 	}
 
-	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, ret_ntdomain_info,
-	    xdr_smb_dr_domain_t, rbufsize)) == NULL) {
+	if ((rbuf = smb_dr_encode_string(SMB_DR_OP_SUCCESS, dinfo.d_dc,
+	    rbufsize)) == NULL) {
 		*err = SMB_DR_OP_ERR_ENCODE;
 		*rbufsize = 0;
 	}

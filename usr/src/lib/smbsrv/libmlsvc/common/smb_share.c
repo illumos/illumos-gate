@@ -48,6 +48,8 @@
 
 #define	SMB_SHR_ERROR_THRESHOLD		3
 
+#define	SMB_SHR_CSC_BUFSZ		64
+
 /*
  * Cache functions and vars
  */
@@ -106,7 +108,9 @@ static void smb_shr_cache_freent(HT_ITEM *);
 static void *smb_shr_sa_loadall(void *);
 static void smb_shr_sa_loadgrp(sa_group_t);
 static uint32_t smb_shr_sa_load(sa_share_t, sa_resource_t);
+static uint32_t smb_shr_sa_loadbyname(char *);
 static uint32_t smb_shr_sa_get(sa_share_t, sa_resource_t, smb_share_t *);
+static void smb_shr_sa_csc_option(const char *, smb_share_t *);
 
 /*
  * share publishing
@@ -153,36 +157,24 @@ static void smb_shr_unpublish(const char *, const char *);
 /*
  * Utility/helper functions
  */
+static uint32_t smb_shr_lookup(char *, smb_share_t *);
 static uint32_t smb_shr_addipc(void);
 static void smb_shr_set_oemname(smb_share_t *);
 
 /*
- * Starts the publisher thread and another thread which
- * populates the share cache by share information stored
- * by sharemgr
+ * Creates and initializes the cache and starts the publisher
+ * thread.
  */
 int
 smb_shr_start(void)
 {
-	pthread_t load_thr;
-	pthread_attr_t tattr;
-	int rc;
-
-	if ((rc = smb_shr_publisher_start()) != 0)
-		return (rc);
-
 	if (smb_shr_cache_create() != NERR_Success)
 		return (ENOMEM);
 
 	if (smb_shr_addipc() != NERR_Success)
 		return (ENOMEM);
 
-	(void) pthread_attr_init(&tattr);
-	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
-	rc = pthread_create(&load_thr, &tattr, smb_shr_sa_loadall, 0);
-	(void) pthread_attr_destroy(&tattr);
-
-	return (rc);
+	return (smb_shr_publisher_start());
 }
 
 void
@@ -190,6 +182,25 @@ smb_shr_stop(void)
 {
 	smb_shr_cache_destroy();
 	smb_shr_publisher_stop();
+}
+
+/*
+ * Launches a thread to populate the share cache by share information
+ * stored in sharemgr
+ */
+int
+smb_shr_load(void)
+{
+	pthread_t load_thr;
+	pthread_attr_t tattr;
+	int rc;
+
+	(void) pthread_attr_init(&tattr);
+	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
+	rc = pthread_create(&load_thr, &tattr, smb_shr_sa_loadall, 0);
+	(void) pthread_attr_destroy(&tattr);
+
+	return (rc);
 }
 
 /*
@@ -425,25 +436,23 @@ smb_shr_rename(char *from_name, char *to_name)
 /*
  * Load the information for the specified share into the supplied share
  * info structure.
+ *
+ * First looks up the cache to see if the specified share exists, if there
+ * is a miss then it looks up sharemgr.
  */
 uint32_t
 smb_shr_get(char *sharename, smb_share_t *si)
 {
-	smb_share_t *cached_si;
-	uint32_t status = NERR_NetNameNotFound;
+	uint32_t status;
 
 	if (sharename == NULL || *sharename == '\0')
 		return (NERR_NetNameNotFound);
 
-	if (smb_shr_cache_lock(SMB_SHR_CACHE_RDLOCK) == NERR_Success) {
-		cached_si = smb_shr_cache_findent(sharename);
-		if (cached_si != NULL) {
-			bcopy(cached_si, si, sizeof (smb_share_t));
-			status = NERR_Success;
-		}
+	if ((status = smb_shr_lookup(sharename, si)) == NERR_Success)
+		return (status);
 
-		smb_shr_cache_unlock();
-	}
+	if ((status = smb_shr_sa_loadbyname(sharename)) == NERR_Success)
+		status = smb_shr_lookup(sharename, si);
 
 	return (status);
 }
@@ -461,6 +470,7 @@ smb_shr_modify(smb_share_t *new_si)
 	smb_share_t *si;
 	boolean_t adc_changed = B_FALSE;
 	char old_container[MAXPATHLEN];
+	uint32_t cscopt;
 	uint32_t access;
 
 	assert(new_si != NULL);
@@ -491,6 +501,10 @@ smb_shr_modify(smb_share_t *new_si)
 		(void) strlcpy(si->shr_container, new_si->shr_container,
 		    sizeof (si->shr_container));
 	}
+
+	cscopt = (new_si->shr_flags & SMB_SHRF_CSC_MASK);
+	si->shr_flags &= ~SMB_SHRF_CSC_MASK;
+	si->shr_flags |= cscopt;
 
 	access = (new_si->shr_flags & SMB_SHRF_ACC_ALL);
 	si->shr_flags |= access;
@@ -782,6 +796,32 @@ smb_shr_list(int offset, smb_shrlist_t *list)
  */
 
 /*
+ * Looks up the given share in the cache and return
+ * the info in 'si'
+ */
+static uint32_t
+smb_shr_lookup(char *sharename, smb_share_t *si)
+{
+	smb_share_t *cached_si;
+	uint32_t status = NERR_NetNameNotFound;
+
+	if (sharename == NULL || *sharename == '\0')
+		return (NERR_NetNameNotFound);
+
+	if (smb_shr_cache_lock(SMB_SHR_CACHE_RDLOCK) == NERR_Success) {
+		cached_si = smb_shr_cache_findent(sharename);
+		if (cached_si != NULL) {
+			bcopy(cached_si, si, sizeof (smb_share_t));
+			status = NERR_Success;
+		}
+
+		smb_shr_cache_unlock();
+	}
+
+	return (status);
+}
+
+/*
  * Add IPC$ to the cache upon startup.
  */
 static uint32_t
@@ -923,22 +963,11 @@ static uint32_t
 smb_shr_cache_lock(int mode)
 {
 	(void) mutex_lock(&smb_shr_cache.sc_mtx);
-	switch (smb_shr_cache.sc_state) {
-	case SMB_SHR_CACHE_STATE_CREATED:
-		smb_shr_cache.sc_nops++;
-		break;
-
-	case SMB_SHR_CACHE_STATE_DESTROYING:
+	if (smb_shr_cache.sc_state != SMB_SHR_CACHE_STATE_CREATED) {
 		(void) mutex_unlock(&smb_shr_cache.sc_mtx);
 		return (NERR_InternalError);
-
-	case SMB_SHR_CACHE_STATE_NONE:
-	default:
-		assert(0);
-		(void) mutex_unlock(&smb_shr_cache.sc_mtx);
-		return (NERR_InternalError);
-
 	}
+	smb_shr_cache.sc_nops++;
 	(void) mutex_unlock(&smb_shr_cache.sc_mtx);
 
 	/*
@@ -1172,12 +1201,28 @@ smb_shr_sa_loadgrp(sa_group_t group)
 
 /*
  * Load a share definition from sharemgr and add it to the cache.
+ * If the share is already in the cache then it doesn't do anything.
+ *
+ * This function does not report duplicate shares as error since
+ * a share might have been added by smb_shr_get() while load is
+ * in progress.
  */
 static uint32_t
 smb_shr_sa_load(sa_share_t share, sa_resource_t resource)
 {
 	smb_share_t si;
+	char *sharename;
 	uint32_t status;
+	boolean_t loaded;
+
+	if ((sharename = sa_get_resource_attr(resource, "name")) == NULL)
+		return (NERR_InternalError);
+
+	loaded = smb_shr_exists(sharename);
+	sa_free_attr_string(sharename);
+
+	if (loaded)
+		return (NERR_Success);
 
 	if ((status = smb_shr_sa_get(share, resource, &si)) != NERR_Success) {
 		syslog(LOG_DEBUG, "share: failed to load %s (%d)",
@@ -1185,7 +1230,8 @@ smb_shr_sa_load(sa_share_t share, sa_resource_t resource)
 		return (status);
 	}
 
-	if ((status = smb_shr_add(&si)) != NERR_Success) {
+	status = smb_shr_add(&si);
+	if ((status != NERR_Success) && (status != NERR_DuplicateShare)) {
 		syslog(LOG_DEBUG, "share: failed to cache %s (%d)",
 		    si.shr_name, status);
 		return (status);
@@ -1239,11 +1285,19 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 	if (opts == NULL)
 		return (NERR_Success);
 
-	prop = (sa_property_t)sa_get_property(opts, SMB_SHROPT_AD_CONTAINER);
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_AD_CONTAINER);
 	if (prop != NULL) {
 		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
 			(void) strlcpy(si->shr_container, val,
 			    sizeof (si->shr_container));
+			free(val);
+		}
+	}
+
+	prop = (sa_property_t)sa_get_property(opts, SHOPT_CSC);
+	if (prop != NULL) {
+		if ((val = sa_get_property_attr(prop, "value")) != NULL) {
+			smb_shr_sa_csc_option(val, si);
 			free(val);
 		}
 	}
@@ -1280,6 +1334,95 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 
 	sa_free_derived_optionset(opts);
 	return (NERR_Success);
+}
+
+/*
+ * Map a client-side caching (CSC) option to the appropriate share
+ * flag.  Only one option is allowed; an error will be logged if
+ * multiple options have been specified.  We don't need to do anything
+ * about multiple values here because the SRVSVC will not recognize
+ * a value containing multiple flags and will return the default value.
+ *
+ * If the option value is not recognized, it will be ignored: invalid
+ * values will typically be caught and rejected by sharemgr.
+ */
+static void
+smb_shr_sa_csc_option(const char *value, smb_share_t *si)
+{
+	struct {
+		char *value;
+		uint32_t flag;
+	} cscopt[] = {
+		{ "disabled",	SMB_SHRF_CSC_DISABLED },
+		{ "manual",	SMB_SHRF_CSC_MANUAL },
+		{ "auto",	SMB_SHRF_CSC_AUTO },
+		{ "vdo",	SMB_SHRF_CSC_VDO }
+	};
+
+	char buf[SMB_SHR_CSC_BUFSZ];
+	smb_ctxbuf_t ctx;
+	int i;
+
+	for (i = 0; i < (sizeof (cscopt) / sizeof (cscopt[0])); ++i) {
+		if (strcasecmp(value, cscopt[i].value) == 0) {
+			si->shr_flags |= cscopt[i].flag;
+			break;
+		}
+	}
+
+	switch (si->shr_flags & SMB_SHRF_CSC_MASK) {
+	case 0:
+	case SMB_SHRF_CSC_DISABLED:
+	case SMB_SHRF_CSC_MANUAL:
+	case SMB_SHRF_CSC_AUTO:
+	case SMB_SHRF_CSC_VDO:
+		break;
+
+	default:
+		(void) smb_ctxbuf_init(&ctx, (uint8_t *)buf, SMB_SHR_CSC_BUFSZ);
+
+		for (i = 0; i < (sizeof (cscopt) / sizeof (cscopt[0])); ++i) {
+			if (si->shr_flags & cscopt[i].flag)
+				(void) smb_ctxbuf_printf(&ctx, " %s",
+				    cscopt[i].value);
+		}
+
+		syslog(LOG_ERR, "csc option conflict:%s", buf);
+		break;
+	}
+}
+
+/*
+ * looks up sharemgr for the given share (resource) and loads
+ * the definition into cache if lookup is successful
+ */
+static uint32_t
+smb_shr_sa_loadbyname(char *sharename)
+{
+	sa_handle_t handle;
+	sa_share_t share;
+	sa_resource_t resource;
+	uint32_t status;
+
+	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL)
+		return (NERR_InternalError);
+
+	resource = sa_find_resource(handle, sharename);
+	if (resource == NULL) {
+		sa_fini(handle);
+		return (NERR_NetNameNotFound);
+	}
+
+	share = sa_get_resource_parent(resource);
+	if (share == NULL) {
+		sa_fini(handle);
+		return (NERR_InternalError);
+	}
+
+	status = smb_shr_sa_load(share, resource);
+
+	sa_fini(handle);
+	return (status);
 }
 
 /*

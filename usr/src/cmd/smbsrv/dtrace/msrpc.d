@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)msrpc.d	1.5	08/08/07 SMI"
-
 /*
  * Usage:	./msrpc.d -p `pgrep smbd`
  *
@@ -101,7 +99,6 @@ END
  * SmbSessionSetupX, SmbLogoffX
  * SmbTreeConnect, SmbTreeDisconnect
  */
-smb_session*:entry,
 smb_tree*:entry,
 smb_com_*:entry,
 smb_com_*:return,
@@ -118,7 +115,6 @@ door_ki_upcall:entry
 }
 
 smb_com_session_setup_andx:return,
-smb_session*:return,
 smb_user*:return,
 smb_tree*:return,
 smb_opipe_open:return,
@@ -133,14 +129,18 @@ sdt:smbsrv::smb-sessionsetup-clntinfo
 {
 	clnt = (netr_client_t *)arg0;
 
-	printf("domain=%s\n\n", stringof(clnt->domain));
-	printf("username=%s\n\n", stringof(clnt->username));
+	printf("domain\\username=%s\\%s\n\n",
+	    stringof(clnt->domain),
+	    stringof(clnt->username));
 }
 
 smb_tree_connect:entry
 {
+	sr = (smb_request_t *)arg0;
+
 	printf("share=%s service=%s",
-	    stringof(arg3), stringof(arg4));
+	    stringof(sr->arg.tcon.path),
+	    stringof(sr->arg.tcon.service));
 }
 
 smb_com_logoff_andx:return
@@ -169,15 +169,15 @@ smbsr_errno:return
 /*
  * MSRPC activity.
  */
-pid$target::mlrpc_s_bind:entry,
-pid$target::mlrpc_s_bind:return,
-pid$target::mlrpc_s_request:entry,
-pid$target::mlrpc_s_request:return
+pid$target::ndr_svc_bind:entry,
+pid$target::ndr_svc_bind:return,
+pid$target::ndr_svc_request:entry,
+pid$target::ndr_svc_request:return
 {
 }
 
 pid$target::smb_trace:entry,
-pid$target::mlndo_trace:entry
+pid$target::ndo_trace:entry
 {
 	printf("%s", copyinstr(arg0));
 }
@@ -379,7 +379,7 @@ pid$target::smbrdr_tree_connect:entry
 	    copyinstr(arg2));
 }
 
-pid$target::mlsvc_open_pipe:entry
+pid$target::smbrdr_open_pipe:entry
 {
 	printf("%s %s %s %s",
 	    copyinstr(arg0),
@@ -388,13 +388,13 @@ pid$target::mlsvc_open_pipe:entry
 	    copyinstr(arg3));
 }
 
-pid$target::mlsvc_close_pipe:entry
+pid$target::smbrdr_close_pipe:entry
 {
 }
 
 pid$target::smbrdr_tree_connect:return,
-pid$target::mlsvc_open_pipe:return,
-pid$target::mlsvc_close_pipe:return
+pid$target::smbrdr_open_pipe:return,
+pid$target::smbrdr_close_pipe:return
 {
 	printf("%d", arg1);
 }

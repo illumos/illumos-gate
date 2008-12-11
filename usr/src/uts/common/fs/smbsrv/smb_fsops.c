@@ -354,6 +354,11 @@ smb_fsop_create(
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
 	is_stream = smb_stream_parse_name(name, fname, sname);
+	if (is_stream == -1) {
+		kmem_free(fname, MAXNAMELEN);
+		kmem_free(sname, MAXNAMELEN);
+		return (EINVAL);
+	}
 
 	if (is_stream)
 		namep = fname;
@@ -698,7 +703,13 @@ smb_fsop_remove(
 	if (dir_snode->flags & NODE_XATTR_DIR) {
 		rc = smb_vop_stream_remove(dir_snode->dir_snode->vp,
 		    name, flags, cr);
-	} else if (smb_stream_parse_name(name, fname, sname)) {
+	} else if ((rc = smb_stream_parse_name(name, fname, sname)) != 0) {
+		if (rc == -1) {
+			kmem_free(fname, MAXNAMELEN);
+			kmem_free(sname, MAXNAMELEN);
+			return (EINVAL);
+		}
+
 		/*
 		 * It is assumed that "name" corresponds to the path
 		 * passed in by the client, and no need of suppressing
@@ -1690,7 +1701,13 @@ smb_fsop_lookup_name(
 	fname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 	sname = kmem_alloc(MAXNAMELEN, KM_SLEEP);
 
-	if (smb_stream_parse_name(name, fname, sname)) {
+	if ((rc = smb_stream_parse_name(name, fname, sname)) != 0) {
+		if (rc == -1) {
+			kmem_free(fname, MAXNAMELEN);
+			kmem_free(sname, MAXNAMELEN);
+			return (EINVAL);
+		}
+
 		/*
 		 * Look up the unnamed stream (i.e. fname).
 		 * Unmangle processing will be done on fname

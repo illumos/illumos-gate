@@ -45,7 +45,7 @@ LIBSRCS = $(LIBOBJS:%.o=$(SRCDIR)/%.c)
 lintcheck := SRCS = $(LIBSRCS)
 
 LIBS =		$(DYNLIB)
-LDLIBS +=	-lshare -lnsl -lscf -lumem -lc
+LDLIBS +=	-lshare -ldlpi -lnsl -lscf -lumem -lc
 all install := LDLIBS += -lxml2
 
 CFLAGS +=	$(CCVERBOSE)

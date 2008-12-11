@@ -31,13 +31,11 @@
  * SVCCTL access is restricted to administrators: members of the
  * Domain Admins or Administrators groups.
  */
+
 #include <stdio.h>
 #include <strings.h>
-
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/nmpipes.h>
-#include <smbsrv/mlsvc_util.h>
-
 #include "svcctl_scm.h"
 
 #define	SVCCTL_OPENSVC_OP_UNIMPLEMENTED(S)	\
@@ -47,17 +45,17 @@
 	((S) & SERVICE_STOP)		||	\
 	((S) & SERVICE_ENUMERATE_DEPENDENTS)
 
-static int svcctl_s_Close(void *, struct mlrpc_xaction *);
-static int svcctl_s_OpenManager(void *, struct mlrpc_xaction *);
-static int svcctl_s_OpenService(void *, struct mlrpc_xaction *);
-static int svcctl_s_QueryServiceStatus(void *, struct mlrpc_xaction *);
-static int svcctl_s_QueryServiceConfig(void *, struct mlrpc_xaction *);
-static int svcctl_s_EnumServicesStatus(void *, struct mlrpc_xaction *);
-static int svcctl_s_GetServiceDisplayNameW(void *, struct mlrpc_xaction *);
-static int svcctl_s_GetServiceKeyNameW(void *, struct mlrpc_xaction *);
-static int svcctl_s_QueryServiceConfig2W(void *, struct mlrpc_xaction *);
+static int svcctl_s_Close(void *, ndr_xa_t *);
+static int svcctl_s_OpenManager(void *, ndr_xa_t *);
+static int svcctl_s_OpenService(void *, ndr_xa_t *);
+static int svcctl_s_QueryServiceStatus(void *, ndr_xa_t *);
+static int svcctl_s_QueryServiceConfig(void *, ndr_xa_t *);
+static int svcctl_s_EnumServicesStatus(void *, ndr_xa_t *);
+static int svcctl_s_GetServiceDisplayNameW(void *, ndr_xa_t *);
+static int svcctl_s_GetServiceKeyNameW(void *, ndr_xa_t *);
+static int svcctl_s_QueryServiceConfig2W(void *, ndr_xa_t *);
 
-static mlrpc_stub_table_t svcctl_stub_table[] = {
+static ndr_stub_table_t svcctl_stub_table[] = {
 	{ svcctl_s_Close,		SVCCTL_OPNUM_Close },
 	{ svcctl_s_OpenManager,		SVCCTL_OPNUM_OpenManager },
 	{ svcctl_s_OpenService,		SVCCTL_OPNUM_OpenService },
@@ -71,13 +69,13 @@ static mlrpc_stub_table_t svcctl_stub_table[] = {
 	{0}
 };
 
-static mlrpc_service_t svcctl_service = {
+static ndr_service_t svcctl_service = {
 	"SVCCTL",			/* name */
 	"Service Control Services",	/* desc */
 	"\\svcctl",			/* endpoint */
 	PIPE_NTSVCS,			/* sec_addr_port */
-	"367abb81-9844-35f1-ad3298f038001003", 2,	/* abstract */
-	"8a885d04-1ceb-11c9-9fe808002b104860", 2,	/* transfer */
+	"367abb81-9844-35f1-ad32-98f038001003", 2,	/* abstract */
+	NDR_TRANSFER_SYNTAX_UUID,		2,	/* transfer */
 	0,				/* no bind_instance_size */
 	0,				/* no bind_req() */
 	0,				/* no unbind_and_close() */
@@ -96,7 +94,7 @@ static mlrpc_service_t svcctl_service = {
 void
 svcctl_initialize(void)
 {
-	(void) mlrpc_register_service(&svcctl_service);
+	(void) ndr_svc_register(&svcctl_service);
 }
 
 /*
@@ -286,7 +284,7 @@ svcctl_svc_hdalloc(ndr_xa_t *mxa, ndr_hdid_t *mgr_id, char *svc_name)
  *	ERROR_INVALID_HANDLE
  */
 static int
-svcctl_s_Close(void *arg, struct mlrpc_xaction *mxa)
+svcctl_s_Close(void *arg, ndr_xa_t *mxa)
 {
 	struct svcctl_Close *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
@@ -295,7 +293,7 @@ svcctl_s_Close(void *arg, struct mlrpc_xaction *mxa)
 
 	bzero(&param->result_handle, sizeof (svcctl_handle_t));
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -312,7 +310,7 @@ svcctl_s_Close(void *arg, struct mlrpc_xaction *mxa)
  * On success, returns a handle for use with subsequent svcctl requests.
  */
 static int
-svcctl_s_OpenManager(void *arg, struct mlrpc_xaction *mxa)
+svcctl_s_OpenManager(void *arg, ndr_xa_t *mxa)
 {
 	struct svcctl_OpenManager *param = arg;
 	ndr_hdid_t *id = NULL;
@@ -323,7 +321,7 @@ svcctl_s_OpenManager(void *arg, struct mlrpc_xaction *mxa)
 	if ((rc == 0) || (param->desired_access & SC_MANAGER_LOCK) != 0) {
 		bzero(&param->handle, sizeof (svcctl_handle_t));
 		param->status = ERROR_ACCESS_DENIED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	id = svcctl_mgr_hdalloc(mxa);
@@ -335,7 +333,7 @@ svcctl_s_OpenManager(void *arg, struct mlrpc_xaction *mxa)
 		param->status = ERROR_ACCESS_DENIED;
 	}
 
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -350,7 +348,7 @@ svcctl_s_OpenManager(void *arg, struct mlrpc_xaction *mxa)
  *	ERROR_CALL_NOT_IMPLEMENTED
  */
 static int
-svcctl_s_OpenService(void *arg, struct mlrpc_xaction *mxa)
+svcctl_s_OpenService(void *arg, ndr_xa_t *mxa)
 {
 	struct svcctl_OpenService *param = arg;
 	ndr_hdid_t *mgrid = (ndr_hdid_t *)&param->manager_handle;
@@ -368,14 +366,14 @@ svcctl_s_OpenService(void *arg, struct mlrpc_xaction *mxa)
 	if (unimplemented_operations) {
 		bzero(&param->service_handle, sizeof (svcctl_handle_t));
 		param->status = ERROR_CALL_NOT_IMPLEMENTED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	hd = svcctl_hdlookup(mxa, mgrid, SVCCTL_MANAGER_CONTEXT);
 	if (hd == NULL) {
 		bzero(&param->service_handle, sizeof (svcctl_handle_t));
 		param->status = ERROR_INVALID_HANDLE;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	mgr_ctx = ((svcctl_context_t *)hd->nh_data)->c_ctx.uc_mgr;
@@ -383,7 +381,7 @@ svcctl_s_OpenService(void *arg, struct mlrpc_xaction *mxa)
 	if (status != ERROR_SUCCESS) {
 		bzero(&param->service_handle, sizeof (svcctl_handle_t));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	id = svcctl_svc_hdalloc(mxa, mgrid, svc_name);
@@ -395,7 +393,7 @@ svcctl_s_OpenService(void *arg, struct mlrpc_xaction *mxa)
 		param->status = ERROR_ACCESS_DENIED;
 	}
 
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -406,7 +404,7 @@ svcctl_s_OpenService(void *arg, struct mlrpc_xaction *mxa)
  *	ERROR_INVALID_HANDLE
  */
 static int
-svcctl_s_QueryServiceStatus(void *arg, struct mlrpc_xaction *mxa)
+svcctl_s_QueryServiceStatus(void *arg, ndr_xa_t *mxa)
 {
 	struct svcctl_QueryServiceStatus *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->service_handle;
@@ -419,7 +417,7 @@ svcctl_s_QueryServiceStatus(void *arg, struct mlrpc_xaction *mxa)
 	if (hd == NULL) {
 		bzero(param, sizeof (struct svcctl_QueryServiceStatus));
 		param->status = ERROR_INVALID_HANDLE;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	svc_ctx = ((svcctl_context_t *)hd->nh_data)->c_ctx.uc_svc;
@@ -427,14 +425,14 @@ svcctl_s_QueryServiceStatus(void *arg, struct mlrpc_xaction *mxa)
 	if (mgr_ctx == NULL) {
 		bzero(param, sizeof (struct svcctl_QueryServiceConfig));
 		param->status = ERROR_INVALID_HANDLE;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	svc = svcctl_scm_find_service(mgr_ctx, svc_ctx->sc_svcname);
 	if (svc == NULL || svc->sn_state == NULL) {
 		bzero(param, sizeof (struct svcctl_QueryServiceConfig));
 		param->status = ERROR_SERVICE_DOES_NOT_EXIST;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->service_status.service_type = SERVICE_WIN32_SHARE_PROCESS;
@@ -446,7 +444,7 @@ svcctl_s_QueryServiceStatus(void *arg, struct mlrpc_xaction *mxa)
 	param->service_status.wait_hint = 0;
 
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -462,7 +460,7 @@ svcctl_s_QueryServiceStatus(void *arg, struct mlrpc_xaction *mxa)
  *	ERROR_NOT_ENOUGH_MEMORY
  */
 static int
-svcctl_s_EnumServicesStatus(void *arg, struct mlrpc_xaction *mxa)
+svcctl_s_EnumServicesStatus(void *arg, ndr_xa_t *mxa)
 {
 	struct svcctl_EnumServicesStatus *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->manager_handle;
@@ -473,24 +471,26 @@ svcctl_s_EnumServicesStatus(void *arg, struct mlrpc_xaction *mxa)
 	hd = svcctl_hdlookup(mxa, id, SVCCTL_MANAGER_CONTEXT);
 	if (hd == NULL) {
 		bzero(param, sizeof (struct svcctl_EnumServicesStatus));
-		param->services = MLRPC_HEAP_STRSAVE(mxa, "");
+		param->services = NDR_STRDUP(mxa, "");
 		param->status = ERROR_INVALID_HANDLE;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	mgr_ctx = ((svcctl_context_t *)hd->nh_data)->c_ctx.uc_mgr;
 	if (svcctl_scm_refresh(mgr_ctx) != 0) {
 		bzero(param, sizeof (struct svcctl_EnumServicesStatus));
+		param->services = NDR_STRDUP(mxa, "");
 		param->status = ERROR_INVALID_DATA;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	input_bufsize = param->buf_size;
-	param->services = MLRPC_HEAP_MALLOC(mxa, input_bufsize);
+	param->services = NDR_MALLOC(mxa, input_bufsize);
 	if (param->services == NULL) {
 		bzero(param, sizeof (struct svcctl_EnumServicesStatus));
+		param->services = NDR_STRDUP(mxa, "");
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 	bzero(param->services, input_bufsize);
 
@@ -499,7 +499,7 @@ svcctl_s_EnumServicesStatus(void *arg, struct mlrpc_xaction *mxa)
 		param->svc_num = 0;
 		param->resume_handle = 0;
 		param->status = ERROR_MORE_DATA;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	svcctl_scm_enum_services(mgr_ctx, param->services);
@@ -509,7 +509,7 @@ svcctl_s_EnumServicesStatus(void *arg, struct mlrpc_xaction *mxa)
 	param->svc_num = mgr_ctx->mc_scf_numsvcs;
 	param->resume_handle = 0;
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -520,7 +520,7 @@ svcctl_s_EnumServicesStatus(void *arg, struct mlrpc_xaction *mxa)
  *	ERROR_INVALID_HANDLE
  */
 static int
-svcctl_s_QueryServiceConfig(void *arg, struct mlrpc_xaction *mxa)
+svcctl_s_QueryServiceConfig(void *arg, ndr_xa_t *mxa)
 {
 	struct svcctl_QueryServiceConfig *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->service_handle;
@@ -535,7 +535,7 @@ svcctl_s_QueryServiceConfig(void *arg, struct mlrpc_xaction *mxa)
 	if (hd == NULL) {
 		bzero(param, sizeof (struct svcctl_QueryServiceConfig));
 		param->status = ERROR_INVALID_HANDLE;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	svc_ctx = ((svcctl_context_t *)hd->nh_data)->c_ctx.uc_svc;
@@ -543,26 +543,26 @@ svcctl_s_QueryServiceConfig(void *arg, struct mlrpc_xaction *mxa)
 	if (mgr_ctx == NULL) {
 		bzero(param, sizeof (struct svcctl_QueryServiceConfig));
 		param->status = ERROR_INVALID_HANDLE;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	svc = svcctl_scm_find_service(mgr_ctx, svc_ctx->sc_svcname);
 	if (svc == NULL || svc->sn_fmri == NULL) {
 		bzero(param, sizeof (struct svcctl_QueryServiceConfig));
 		param->status = ERROR_SERVICE_DOES_NOT_EXIST;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	cfg = &param->service_cfg;
 	cfg->service_type = SERVICE_WIN32_SHARE_PROCESS;
 	cfg->start_type = SERVICE_AUTO_START;
 	cfg->error_control = SERVICE_AUTO_START;
-	cfg->binary_pathname = MLRPC_HEAP_STRSAVE(mxa, "");
-	cfg->loadorder_group = MLRPC_HEAP_STRSAVE(mxa, "");
+	cfg->binary_pathname = NDR_STRDUP(mxa, "");
+	cfg->loadorder_group = NDR_STRDUP(mxa, "");
 	cfg->tag_id = 0;
-	cfg->dependencies = MLRPC_HEAP_STRSAVE(mxa, "");
-	cfg->service_startname = MLRPC_HEAP_STRSAVE(mxa, "");
-	cfg->display_name = MLRPC_HEAP_STRSAVE(mxa, svc->sn_fmri);
+	cfg->dependencies = NDR_STRDUP(mxa, "");
+	cfg->service_startname = NDR_STRDUP(mxa, "");
+	cfg->display_name = NDR_STRDUP(mxa, svc->sn_fmri);
 
 	bytes_needed = sizeof (svc_config_t);
 	bytes_needed += SVCCTL_WNSTRLEN((const char *)cfg->binary_pathname);
@@ -575,12 +575,12 @@ svcctl_s_QueryServiceConfig(void *arg, struct mlrpc_xaction *mxa)
 		bzero(param, sizeof (struct svcctl_QueryServiceConfig));
 		param->cfg_bytes = bytes_needed;
 		param->status = ERROR_MORE_DATA;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->cfg_bytes = bytes_needed;
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -592,7 +592,7 @@ svcctl_s_QueryServiceConfig(void *arg, struct mlrpc_xaction *mxa)
  *	ERROR_SERVICE_DOES_NOT_EXIST
  */
 static int
-svcctl_s_GetServiceDisplayNameW(void *arg, struct mlrpc_xaction *mxa)
+svcctl_s_GetServiceDisplayNameW(void *arg, ndr_xa_t *mxa)
 {
 	struct svcctl_GetServiceDisplayNameW *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->manager_handle;
@@ -603,31 +603,31 @@ svcctl_s_GetServiceDisplayNameW(void *arg, struct mlrpc_xaction *mxa)
 	hd = svcctl_hdlookup(mxa, id, SVCCTL_MANAGER_CONTEXT);
 	if (hd == NULL) {
 		bzero(param, sizeof (struct svcctl_GetServiceDisplayNameW));
-		param->display_name = MLRPC_HEAP_STRSAVE(mxa, "");
+		param->display_name = NDR_STRDUP(mxa, "");
 		param->status = ERROR_INVALID_HANDLE;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	mgr_ctx = ((svcctl_context_t *)hd->nh_data)->c_ctx.uc_mgr;
 	svc = svcctl_scm_find_service(mgr_ctx, (char *)param->service_name);
 	if (svc == NULL || svc->sn_fmri == NULL) {
 		bzero(param, sizeof (struct svcctl_GetServiceDisplayNameW));
-		param->display_name = MLRPC_HEAP_STRSAVE(mxa, "");
+		param->display_name = NDR_STRDUP(mxa, "");
 		param->status = ERROR_SERVICE_DOES_NOT_EXIST;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
-	param->display_name = MLRPC_HEAP_STRSAVE(mxa, svc->sn_fmri);
+	param->display_name = NDR_STRDUP(mxa, svc->sn_fmri);
 	if (param->display_name == NULL) {
 		bzero(param, sizeof (struct svcctl_GetServiceDisplayNameW));
-		param->display_name = MLRPC_HEAP_STRSAVE(mxa, "");
+		param->display_name = NDR_STRDUP(mxa, "");
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->buf_size = strlen(svc->sn_fmri);
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -639,7 +639,7 @@ svcctl_s_GetServiceDisplayNameW(void *arg, struct mlrpc_xaction *mxa)
  *	ERROR_SERVICE_DOES_NOT_EXIST
  */
 static int
-svcctl_s_GetServiceKeyNameW(void *arg, struct mlrpc_xaction *mxa)
+svcctl_s_GetServiceKeyNameW(void *arg, ndr_xa_t *mxa)
 {
 	struct svcctl_GetServiceKeyNameW *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->manager_handle;
@@ -650,31 +650,31 @@ svcctl_s_GetServiceKeyNameW(void *arg, struct mlrpc_xaction *mxa)
 	hd = svcctl_hdlookup(mxa, id, SVCCTL_MANAGER_CONTEXT);
 	if (hd == NULL) {
 		bzero(param, sizeof (struct svcctl_GetServiceKeyNameW));
-		param->key_name = MLRPC_HEAP_STRSAVE(mxa, "");
+		param->key_name = NDR_STRDUP(mxa, "");
 		param->status = ERROR_INVALID_HANDLE;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	mgr_ctx = ((svcctl_context_t *)hd->nh_data)->c_ctx.uc_mgr;
 	svc = svcctl_scm_find_service(mgr_ctx, (char *)param->service_name);
 	if (svc == NULL || svc->sn_name == NULL) {
 		bzero(param, sizeof (struct svcctl_GetServiceKeyNameW));
-		param->key_name = MLRPC_HEAP_STRSAVE(mxa, "");
+		param->key_name = NDR_STRDUP(mxa, "");
 		param->status = ERROR_SERVICE_DOES_NOT_EXIST;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
-	param->key_name = MLRPC_HEAP_STRSAVE(mxa, svc->sn_name);
+	param->key_name = NDR_STRDUP(mxa, svc->sn_name);
 	if (param->key_name == NULL) {
 		bzero(param, sizeof (struct svcctl_GetServiceKeyNameW));
-		param->key_name = MLRPC_HEAP_STRSAVE(mxa, "");
+		param->key_name = NDR_STRDUP(mxa, "");
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->buf_size = strlen(svc->sn_name);
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -687,7 +687,7 @@ svcctl_s_GetServiceKeyNameW(void *arg, struct mlrpc_xaction *mxa)
  *	ERROR_NOT_ENOUGH_MEMORY
  */
 static int
-svcctl_s_QueryServiceConfig2W(void *arg, struct mlrpc_xaction *mxa)
+svcctl_s_QueryServiceConfig2W(void *arg, ndr_xa_t *mxa)
 {
 	struct svcctl_QueryServiceConfig2W *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->service_handle;
@@ -705,17 +705,18 @@ svcctl_s_QueryServiceConfig2W(void *arg, struct mlrpc_xaction *mxa)
 	hd = svcctl_hdlookup(mxa, id, SVCCTL_SERVICE_CONTEXT);
 	if (hd == NULL) {
 		bzero(param, sizeof (struct svcctl_QueryServiceConfig2W));
-		param->buffer = MLRPC_HEAP_STRSAVE(mxa, "");
+		param->buffer = NDR_STRDUP(mxa, "");
 		param->status = ERROR_INVALID_HANDLE;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	input_bufsize = param->buf_size;
-	param->buffer = MLRPC_HEAP_MALLOC(mxa, input_bufsize);
+	param->buffer = NDR_MALLOC(mxa, input_bufsize);
 	if (param->buffer == NULL) {
 		bzero(param, sizeof (struct svcctl_QueryServiceConfig2W));
+		param->buffer = NDR_STRDUP(mxa, "");
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 	bzero(param->buffer, input_bufsize);
 
@@ -741,7 +742,7 @@ svcctl_s_QueryServiceConfig2W(void *arg, struct mlrpc_xaction *mxa)
 		if (input_bufsize <= bytes_needed) {
 			param->bytes_needed = bytes_needed;
 			param->status = ERROR_MORE_DATA;
-			return (MLRPC_DRC_OK);
+			return (NDR_DRC_OK);
 		}
 
 		offset = sizeof (svc_description_t);
@@ -771,11 +772,11 @@ svcctl_s_QueryServiceConfig2W(void *arg, struct mlrpc_xaction *mxa)
 
 	if (status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct svcctl_QueryServiceConfig2W));
-		param->buffer = MLRPC_HEAP_STRSAVE(mxa, "");
+		param->buffer = NDR_STRDUP(mxa, "");
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }

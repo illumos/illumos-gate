@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/cpuvar.h>
@@ -42,7 +39,6 @@
 
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb.h>
-#include <smbsrv/mlsvc.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_kstat.h>
 

@@ -109,7 +109,9 @@ typedef struct sdb_logon {
 #define	SDB_SLCK_WRITE  2
 
 struct sdb_session {
-	smb_ntdomain_t di;
+	char srv_name[MAXHOSTNAMELEN];
+	uint32_t srv_ipaddr;
+	char domain[MAXHOSTNAMELEN];
 	char scope[SMB_PI_MAX_SCOPE];
 	char native_os[SMB_PI_MAX_NATIVE_OS];
 	char native_lanman[SMB_PI_MAX_LANMAN];
@@ -199,7 +201,7 @@ int nb_session_request(int, char *, char *, char *, char *);
 /*
  * smbrdr_session.c
  */
-int smbrdr_negotiate(char *);
+int smbrdr_negotiate(char *, char *);
 struct sdb_session *smbrdr_session_lock(char *, char *, int);
 void smbrdr_session_unlock(struct sdb_session *);
 

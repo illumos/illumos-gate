@@ -49,10 +49,17 @@ extern "C" {
 #endif
 
 /*
- * The following 4 macros are mainly for sharemgr use
+ * Share-specific client-side caching (CSC) options:
+ * disabled	The client MUST NOT cache any files from this share.
+ * manual	The client should not automatically cache every file that it
+ *		opens from this share.
+ * auto		The client may cache every file that it opens from this share.
+ * vdo		The client may cache every file that it opens from this share
+ *		and satisfy file requests from its local cache.
  */
-#define	SMB_SHROPT_AD_CONTAINER	"ad-container"
-#define	SMB_SHROPT_NAME		"name"	/* name is a pseudo property */
+#define	SHOPT_AD_CONTAINER	"ad-container"
+#define	SHOPT_NAME		"name"	/* name is a pseudo property */
+#define	SHOPT_CSC		"csc"	/* client-side caching (CSC) options */
 /* next three properties use access-list a al NFS */
 #define	SHOPT_RO		"ro"	/* share is read-only */
 #define	SHOPT_RW		"rw"	/* share defaults to read-write */
@@ -86,12 +93,16 @@ extern "C" {
  * SMB_SHRF_PERM	Permanent share
  * SMB_SHRF_AUTOHOME	Autohome share.
  * SMB_SHRF_LONGNAME	Share name in OEM is longer than 13 chars
- * SMB_SHRF_ADMIN	Admin share
+ * SMB_SHRF_CSC_DISABLED	Client-side caching is disabled for this share
+ * SMB_SHRF_CSC_MANUAL	Manual client-side caching is allowed
+ * SMB_SHRF_CSC_AUTO	Automatic client-side caching (CSC) is allowed
+ * SMB_SHRF_CSC_VDO	Automatic CSC and local cache lookup is allowed
  * SMB_SHRF_ACC_OPEN	No restrictions set
  * SMB_SHRF_ACC_NONE	"none" property set
  * SMB_SHRF_ACC_RO	"ro" (readonly) property set
  * SMB_SHRF_ACC_RW	"rw" (read/write) property set
  * SMB_SHRF_ACC_ALL	All of the access bits
+ * SMB_SHRF_ADMIN	Admin share
  *
  * All autohome shares are transient but not all transient shares are autohome.
  * IPC$ and drive letter shares (e.g. d$, e$, etc) are transient but
@@ -101,7 +112,12 @@ extern "C" {
 #define	SMB_SHRF_PERM		0x0002
 #define	SMB_SHRF_AUTOHOME	0x0004
 #define	SMB_SHRF_LONGNAME	0x0008
-#define	SMB_SHRF_ADMIN		0x0010
+
+#define	SMB_SHRF_CSC_MASK	0x00F0
+#define	SMB_SHRF_CSC_DISABLED	0x0010
+#define	SMB_SHRF_CSC_MANUAL	0x0020
+#define	SMB_SHRF_CSC_AUTO	0x0040
+#define	SMB_SHRF_CSC_VDO	0x0080
 
 /* Access Flags */
 #define	SMB_SHRF_ACC_OPEN	0x0000
@@ -109,6 +125,8 @@ extern "C" {
 #define	SMB_SHRF_ACC_RO		0x0200
 #define	SMB_SHRF_ACC_RW		0x0400
 #define	SMB_SHRF_ACC_ALL	0x0F00
+
+#define	SMB_SHRF_ADMIN		0x1000
 
 
 /*
@@ -182,6 +200,7 @@ typedef struct smb_enumshare_info {
  */
 int smb_shr_start(void);
 void smb_shr_stop(void);
+int smb_shr_load(void);
 void smb_shr_iterinit(smb_shriter_t *);
 smb_share_t *smb_shr_iterate(smb_shriter_t *);
 void smb_shr_list(int, smb_shrlist_t *);

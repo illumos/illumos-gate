@@ -18,58 +18,44 @@
  *
  * CDDL HEADER END
  */
-
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-/*
- * basic API declarations for share management
- */
+#ifndef _SMBSRV_MLSVC_H
+#define	_SMBSRV_MLSVC_H
 
-#ifndef _LIBSHARE_SMB_H
-#define	_LIBSHARE_SMB_H
+#include <smbsrv/ndl/netlogon.ndl>
 
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <smbsrv/smb_share.h>
+int smb_dclocator_init(void);
+void dssetup_initialize(void);
+void srvsvc_initialize(void);
+void wkssvc_initialize(void);
+void lsarpc_initialize(void);
+void logr_initialize(void);
+void netr_initialize(void);
+void samr_initialize(void);
+void svcctl_initialize(void);
+void winreg_initialize(void);
+int srvsvc_gettime(unsigned long *);
+void msgsvcsend_initialize(void);
+void spoolss_initialize(void);
 
-/*
- * defined options types. These should be in a file rather than
- * compiled in. Until there is a plugin mechanism to add new types,
- * this is sufficient.
- */
-#define	OPT_TYPE_ANY		0
-#define	OPT_TYPE_STRING		1
-#define	OPT_TYPE_BOOLEAN	2
-#define	OPT_TYPE_NUMBER		3
-#define	OPT_TYPE_PATH		4
-#define	OPT_TYPE_PROTOCOL	5
-#define	OPT_TYPE_NAME		6
-#define	OPT_TYPE_ACCLIST	7
-#define	OPT_TYPE_CSC		8
+int netr_open(char *, char *, mlsvc_handle_t *);
+int netr_close(mlsvc_handle_t *);
+DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);
+int netr_setup_authenticator(netr_info_t *, struct netr_authenticator *,
+    struct netr_authenticator *);
+DWORD netr_validate_chain(netr_info_t *, struct netr_authenticator *);
 
-struct option_defs {
-	char *tag;
-	int type;
-	int share;	/* share only option */
-	int (*check)(char *);
-};
-
-/*
- * Sharectl property refresh types. Bit mask to indicate which type(s)
- * of refresh might be needed on the service(s).
- */
-
-#define	SMB_REFRESH_RESTART	0x0001	/* restart smb/server */
-#define	SMB_REFRESH_REFRESH	0x0002	/* refresh smb/server */
-
-
-#ifdef	__cplusplus
+#ifdef __cplusplus
 }
 #endif
 
-#endif /* _LIBSHARE_SMB_H */
+
+#endif /* _SMBSRV_MLSVC_H */

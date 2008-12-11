@@ -564,9 +564,16 @@ smb_smf_get_opaque_property(smb_scfhandle_t *handle, char *propname,
 }
 
 /*
- * smb_smf_restart_service()
- *
- * Restarts SMB SMF service.
+ * Put the smb service into maintenance mode.
+ */
+int
+smb_smf_maintenance_mode(void)
+{
+	return (smf_maintain_instance(SMBD_DEFAULT_INSTANCE_FMRI, 0));
+}
+
+/*
+ * Restart the smb service.
  */
 int
 smb_smf_restart_service(void)

@@ -231,87 +231,138 @@ smb_sattr_check(smb_attr_t *ap, char *name, unsigned short sattr)
 	return (B_TRUE);
 }
 
-
 /*
  * smb_stream_parse_name
  *
- * calling function is responsible for passing valid buffers with
- * adequate sizes.
+ *  path
+ *	a NULL terminated pathname string which could be a
+ *	stream path. If it's a stream path it should be in one
+ *	in one of the following formats:
+ *	- [pathname/]last_component:stream_name
+ *	- [pathname/]last_component:stream_name:$DATA
  *
- *  path	    is a NULL terminated string which could be a
- *		    stream path. If it's a stream path it could be
- *		    in one of the following formats:
- *			  . path:stream
- *			  . path:stream:$DATA
- *		    unnamed stream is part of the path and there is
- *			    exactly one ':' in between the unamed and name
- *		    streams
+ *  last_component - MAXNAMELEN bytes
+ *	will contain the unamed stream portion upon successful return.
+ *	This is the portion between last '\' and the first ':'
  *
- *  u_stream_name   will contain the unamed stream portion upon
- *		    successful return.
- *		    this is the portion between last '\' and
- *		    the first ':'
- *
- *  stream_name	    will contain the named stream portion upon
- *		    successful return.
- *		    this is the portion between the first ':' and the
- *		    end of the 'name' string.
+ *  stream - MAXNAMELEN bytes
+ *	will contain the named stream portion upon successful return.
+ *	This is the portion between ':' and the end of 'path' string
+ *	(including the starting ':')
  *
  *  '::' - is a non-stream and is commonly used by Windows to designate
  *   the unamed stream in the form "::$DATA"
  *
- * on return the named stream always has a ":$DATA" appended if there
- * isn't one already
+ * On successful return the named stream always has type ":$DATA",
+ * i.e. 'stream' contains :<stream_name>:$DATA
  *
  * Return Codes:
- *
- *	0	- given path doesn't contain any streams
- *	1	- given path had a stream
+ *	 0 - given path doesn't contain a stream name
+ *	 1 - given path contains a valid stream name
+ *	-1 - given path contains an invalid stream name
  */
 int
-smb_stream_parse_name(char *path, char *u_stream_name,
-    char *stream_name)
+smb_stream_parse_name(char *path, char *last_component, char *stream)
+{
+	char *sname, *stype, *last_comp;
+
+	if ((path == NULL) || (!smb_is_stream_name(path)))
+		return (0);
+
+	if (smb_validate_stream_name(path) != NT_STATUS_SUCCESS)
+		return (-1);
+
+	ASSERT(last_component);
+	ASSERT(stream);
+
+	last_comp = strrchr(path, '\\');
+	last_comp = (last_comp == NULL) ? path : last_comp + 1;
+	(void) strlcpy(last_component, last_comp, MAXNAMELEN);
+
+	sname = strchr(last_component, ':');
+	(void) strlcpy(stream, sname, MAXNAMELEN);
+	*sname = '\0';
+
+	stype = strchr(stream + 1, ':');
+	if (stype == NULL)
+		(void) strlcat(stream, ":$DATA", MAXNAMELEN);
+	else
+		(void) utf8_strupr(stype);
+
+	return (1);
+}
+
+/*
+ * smb_is_stream_name
+ *
+ * Determines if 'path' specifies a named stream.
+ *
+ * path is a NULL terminated string which could be a stream path.
+ * [pathname/]last_component[:stream_name[:stream_type]]
+ *
+ * - If there is no colon in the path or it's the last char
+ *   then it's not a stream name
+ *
+ * - '::' is a non-stream and is commonly used by Windows to designate
+ *   the unamed stream in the form "::$DATA"
+ */
+boolean_t
+smb_is_stream_name(char *path)
 {
 	char *colonp;
-	char *slashp;
 
-	if (path == 0)
-		return (0);
+	if (path == NULL)
+		return (B_FALSE);
 
-	/*
-	 * if there is no colon in the path or it's the last char
-	 * then it's not a stream name
-	 */
 	colonp = strchr(path, ':');
-	if ((colonp == 0) || (*(colonp+1) == 0))
-		return (0);
+	if ((colonp == NULL) || (*(colonp+1) == '\0'))
+		return (B_FALSE);
 
-	/* "::" always means the unamed stream */
 	if (strstr(path, "::"))
-		return (0);
+		return (B_FALSE);
 
-	if (stream_name) {
-		/*
-		 * stream name is the portion between ':' and the
-		 * end of 'path' string (including the starting ':')
-		 */
-		(void) strcpy(stream_name, colonp);
+	return (B_TRUE);
+}
 
-		if (strstr(stream_name, ":$DATA") == 0)
-			(void) strcat(stream_name, ":$DATA");
+/*
+ * smb_validate_stream_name
+ *
+ * NT_STATUS_SUCCESS will be returned if:
+ * - path is a NULL terminated string specifying a valid stream name
+ *   and a valid (or omitted) stream_type
+ *   [pathname/]last_component:stream_name[:stream_type]
+ *
+ * NT_STATUS_OBJECT_NAME_INVALID will be returned if:
+ * - the path is not a stream name (smb_is_stream_name() fails)
+ * - the stream_type is specified but not valid. Only type $DATA is
+ *   supported, where $DATA is case-insensitive.
+ *
+ * For example:
+ *    [pathname/]last_component:stream_name:$DATA - ok
+ *    [pathname/]last_component:stream_name:$DaTa - ok
+ *    [pathname/]last_component:stream_name - ok
+ *    [pathname/]last_component:stream_name: - invalid
+ *    [pathname/]last_component:stream_name:$ - invalid
+ */
+uint32_t
+smb_validate_stream_name(char *path)
+{
+	char *stream_name, *stream_type;
+
+	if (!smb_is_stream_name(path))
+		return (NT_STATUS_OBJECT_NAME_INVALID);
+
+	stream_name = strchr(path, ':');
+	if (stream_name == NULL)
+		return (NT_STATUS_OBJECT_NAME_INVALID);
+
+	stream_type = strchr(stream_name + 1, ':');
+	if ((stream_type != NULL) &&
+	    (strcasecmp(stream_type, ":$DATA") != 0)) {
+		return (NT_STATUS_OBJECT_NAME_INVALID);
 	}
 
-	if (u_stream_name) {
-		/*
-		 * uname stream is the portion between last '\'
-		 * and the ':'
-		 */
-		slashp = strrchr(path, '\\');
-		slashp = (slashp == 0) ? path : slashp + 1;
-		/*LINTED E_PTRDIFF_OVERFLOW*/
-		(void) strlcpy(u_stream_name, slashp, colonp - slashp + 1);
-	}
-	return (1);
+	return (NT_STATUS_SUCCESS);
 }
 
 int

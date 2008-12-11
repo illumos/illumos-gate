@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 LIBRARY =	libmlrpc.a
 VERS =		.1
@@ -47,7 +45,7 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS +=	-lsmb -lc
+LDLIBS +=	-lsmb -luuid -lc
 
 CPPFLAGS += $(INCS) -D_REENTRANT
 

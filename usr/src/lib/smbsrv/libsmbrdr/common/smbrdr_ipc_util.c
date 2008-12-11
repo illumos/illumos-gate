@@ -35,7 +35,6 @@
 #include <synch.h>
 
 #include <smbsrv/libsmbrdr.h>
-#include <smbsrv/mlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbrdr.h>
 #include <smbrdr_ipc_util.h>
@@ -168,26 +167,4 @@ smbrdr_ipc_get_passwd()
 	passwd = ipc_info.passwd;
 	(void) rw_unlock(&smbrdr_ipc_lock);
 	return (passwd);
-}
-
-/*
- * smbrdr_ipc_skip_lsa_query
- *
- * Determine whether LSA monitor should skip the LSA query due to the
- * incomplete authentication information if IPC is configured to be
- * authenticated.
- */
-int
-smbrdr_ipc_skip_lsa_query()
-{
-	char *user;
-	unsigned char *pwd;
-
-
-	(void) rw_rdlock(&smbrdr_ipc_lock);
-	user = ipc_info.user;
-	pwd = ipc_info.passwd;
-	(void) rw_unlock(&smbrdr_ipc_lock);
-
-	return (!(*user && *pwd));
 }

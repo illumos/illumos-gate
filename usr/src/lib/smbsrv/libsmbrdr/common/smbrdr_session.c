@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module provides the netbios and SMB negotiation, connect and
  * disconnect interface.
@@ -47,9 +45,8 @@
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/cifs.h>
-
 #include <smbsrv/ntstatus.h>
-#include <smbsrv/mlsvc.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbrdr.h>
 #include <smbrdr_ipc_util.h>
 
@@ -65,9 +62,9 @@ static struct sdb_session session_table[MLSVC_DOMAIN_MAX];
 static mutex_t smbrdr_screate_mtx;
 static uint32_t session_id = 0;
 
-static struct sdb_session *smbrdr_session_init(smb_ntdomain_t *);
+static struct sdb_session *smbrdr_session_init(char *, char *);
 static int smbrdr_trnsprt_connect(struct sdb_session *, uint16_t);
-static int smbrdr_session_connect(smb_ntdomain_t *);
+static int smbrdr_session_connect(char *, char *);
 static int smbrdr_smb_negotiate(struct sdb_session *);
 static int smbrdr_echo(struct sdb_session *);
 static void smbrdr_session_disconnect(struct sdb_session *, int);
@@ -122,17 +119,10 @@ mlsvc_disconnect(char *server)
  */
 /*ARGSUSED*/
 int
-smbrdr_negotiate(char *domain)
+smbrdr_negotiate(char *domain_controller, char *domain)
 {
 	struct sdb_session *session = 0;
-	smb_ntdomain_t *di;
-	int retry = 1;
-	int res = 0;
-
-	if ((di = smb_getdomaininfo(0)) == NULL) {
-		syslog(LOG_DEBUG, "smbrdr_negotiate: cannot access domain");
-		return (-1);
-	}
+	int rc;
 
 	/*
 	 * The mutex is to make session lookup and create atomic
@@ -140,39 +130,28 @@ smbrdr_negotiate(char *domain)
 	 * server.
 	 */
 	(void) mutex_lock(&smbrdr_screate_mtx);
-	while (retry > 0) {
-		session = smbrdr_session_lock(di->server, 0, SDB_SLCK_WRITE);
-		if (session != 0) {
-			if (nb_keep_alive(session->sock, session->port) == 0) {
-				/* session is good, use it */
-				smbrdr_session_unlock(session);
-				break;
-			} else {
-				/* stale session */
-				session->state = SDB_SSTATE_STALE;
-				smbrdr_session_unlock(session);
-			}
-		}
+	session = smbrdr_session_lock(domain_controller, 0, SDB_SLCK_WRITE);
+	if (session != 0) {
+		if (nb_keep_alive(session->sock, session->port) == 0) {
+			/* session is good, use it */
+			smbrdr_session_unlock(session);
+			rc = 0;
+			goto done;
 
-		if (smbrdr_session_connect(di) != 0) {
-			if (retry > 0) {
-				di = smb_getdomaininfo(0);
-				if (di == NULL) {
-					res = -1;
-					break;
-				}
-				retry--;
-			}
 		} else {
-			/* session is created */
-			retry = 0;
+			/* stale session */
+			session->state = SDB_SSTATE_STALE;
+			smbrdr_session_unlock(session);
 		}
 	}
+
+	rc = smbrdr_session_connect(domain_controller, domain);
+done:
 	(void) mutex_unlock(&smbrdr_screate_mtx);
 
-	if (di == NULL)
+	if (rc != 0)
 		syslog(LOG_DEBUG, "smbrdr_negotiate: cannot access domain");
-	return (res);
+	return (rc);
 }
 
 /*
@@ -185,7 +164,7 @@ smbrdr_negotiate(char *domain)
  * to the the domain. A null pointer is returned if the connect fails.
  */
 static int
-smbrdr_session_connect(smb_ntdomain_t *di)
+smbrdr_session_connect(char *domain_controller, char *domain)
 {
 	struct sdb_session *session;
 	uint16_t port;
@@ -196,7 +175,8 @@ smbrdr_session_connect(smb_ntdomain_t *di)
 	 * be accessible until it's established otherwise another thread
 	 * might get access to a session which is not fully established.
 	 */
-	if ((session = smbrdr_session_init(di)) == NULL) {
+	if ((session = smbrdr_session_init(domain_controller, domain))
+	    == NULL) {
 		syslog(LOG_DEBUG, "smbrdr_session_init failed");
 		return (-1);
 	}
@@ -261,7 +241,7 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 
 	bzero(&sin, sizeof (struct sockaddr_in));
 	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = sess->di.ipaddr;
+	sin.sin_addr.s_addr = sess->srv_ipaddr;
 	sin.sin_port = htons(port);
 
 	if ((rc = connect(sock, (struct sockaddr *)&sin, sizeof (sin))) < 0) {
@@ -272,7 +252,7 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 		return (-1);
 	}
 
-	(void) mts_mbstowcs(unicode_server_name, sess->di.server,
+	(void) mts_mbstowcs(unicode_server_name, sess->srv_name,
 	    SMB_PI_MAX_DOMAIN);
 	rc = unicodestooems(server_name, unicode_server_name,
 	    SMB_PI_MAX_DOMAIN, cpid);
@@ -390,7 +370,7 @@ smbrdr_smb_negotiate(struct sdb_session *sess)
 	    (sess->secmode & NEGOTIATE_SECURITY_SIGNATURES_ENABLED)) {
 		sess->sign_ctx.ssc_flags |= SMB_SCF_REQUIRED;
 		syslog(LOG_DEBUG, "smbrdr: %s: signing required",
-		    sess->di.server);
+		    sess->srv_name);
 	}
 
 	sess->state = SDB_SSTATE_NEGOTIATED;
@@ -408,13 +388,24 @@ smbrdr_smb_negotiate(struct sdb_session *sess)
  *            the pointer.
  */
 static struct sdb_session *
-smbrdr_session_init(smb_ntdomain_t *di)
+smbrdr_session_init(char *domain_controller, char *domain)
 {
 	struct sdb_session *session = NULL;
-	int i;
+	uint32_t ipaddr;
+	int i, rc;
+	struct hostent *h;
 
-	if (di == NULL)
+	if (domain_controller == NULL || domain == NULL)
 		return (NULL);
+
+	if ((h = smb_gethostbyname(domain_controller, &rc)) == NULL) {
+		syslog(LOG_DEBUG, "smbrdr: failed to resolve %s to IP (%d)",
+		    domain_controller, rc);
+		return (NULL);
+	}
+
+	(void) memcpy(&ipaddr, h->h_addr, h->h_length);
+	freehostent(h);
 
 	for (i = 0; i < MLSVC_DOMAIN_MAX; ++i) {
 		session = &session_table[i];
@@ -422,9 +413,13 @@ smbrdr_session_init(smb_ntdomain_t *di)
 		(void) rw_wrlock(&session->rwl);
 		if (session->state == SDB_SSTATE_START) {
 			smbrdr_session_clear(session);
-			bcopy(di, &session->di, sizeof (smb_ntdomain_t));
-			(void) utf8_strupr(session->di.domain);
-			(void) utf8_strupr(session->di.server);
+			(void) strlcpy(session->srv_name, domain_controller,
+			    MAXHOSTNAMELEN);
+			(void) utf8_strupr(session->srv_name);
+
+			session->srv_ipaddr = ipaddr;
+			(void) strlcpy(session->domain, domain, MAXHOSTNAMELEN);
+			(void) utf8_strupr(session->domain);
 
 			(void) smb_config_getstr(SMB_CI_NBSCOPE, session->scope,
 			    sizeof (session->scope));
@@ -538,7 +533,7 @@ smbrdr_session_lock(char *server, char *username, int lmode)
 		    (void) rw_wrlock(&session->rwl);
 
 		if ((session->state == SDB_SSTATE_NEGOTIATED) &&
-		    (strcasecmp(session->di.server, server) == 0)) {
+		    (strcasecmp(session->srv_name, server) == 0)) {
 			if (username) {
 				if (strcasecmp(username,
 				    session->logon.username) == 0)
@@ -557,35 +552,34 @@ smbrdr_session_lock(char *server, char *username, int lmode)
 }
 
 /*
- * mlsvc_session_native_values
+ * smbrdr_session_info
  *
- * Given a file id (i.e. a named pipe fid), return the remote native
- * OS and LM values for the associated session.
+ * Return session information related to the specified
+ * named pipe (fid).
  */
 int
-mlsvc_session_native_values(int fid, int *remote_os,
-    int *remote_lm, int *pdc_type)
+smbrdr_session_info(int fid, smbrdr_session_info_t *si)
 {
 	struct sdb_session *session;
 	struct sdb_netuse *netuse;
 	struct sdb_ofile *ofile;
 
-	if (remote_os == NULL || remote_lm == NULL)
+	if (si == NULL)
 		return (-1);
 
-	if ((ofile = smbrdr_ofile_get(fid)) == 0) {
+	if ((ofile = smbrdr_ofile_get(fid)) == NULL) {
 		syslog(LOG_DEBUG,
-		    "mlsvc_session_native_values: unknown file (%d)", fid);
+		    "smbrdr_session_info: unknown file (%d)", fid);
 		return (-1);
 	}
 
 	netuse = ofile->netuse;
 	session = netuse->session;
 
-	*remote_os = session->remote_os;
-	*remote_lm = session->remote_lm;
-	if (pdc_type)
-		*pdc_type = session->pdc_type;
+	si->si_server_os = session->remote_os;
+	si->si_server_lm = session->remote_lm;
+	si->si_dc_type = session->pdc_type;
+
 	smbrdr_ofile_put(ofile);
 	return (0);
 }
@@ -609,13 +603,13 @@ smbrdr_dump_sessions(void)
 		(void) rw_rdlock(&session->rwl);
 		if (session->state != SDB_SSTATE_START) {
 			(void) inet_ntop(AF_INET,
-			    (const void *)(&session->di.ipaddr),
+			    (const void *)(&session->srv_ipaddr),
 			    ipstr, sizeof (ipstr));
 
 			syslog(LOG_DEBUG, "session[%d]: state=%d",
 			    i, session->state);
 			syslog(LOG_DEBUG, "session[%d]: %s %s (%s)", i,
-			    session->di.domain, session->di.server, ipstr);
+			    session->domain, session->srv_name, ipstr);
 			syslog(LOG_DEBUG, "session[%d]: %s %s (sock=%d)", i,
 			    session->native_os, session->native_lanman,
 			    session->sock);

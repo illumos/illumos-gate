@@ -42,11 +42,10 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libsmbns.h>
-#include <smbsrv/mlsvc_util.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/netlogon.ndl>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smbinfo.h>
-#include <smbsrv/mlsvc.h>
 #include <smbsrv/netrauth.h>
 
 #define	NETR_SESSKEY_ZEROBUF_SZ		4
@@ -127,28 +126,11 @@ netlogon_auth(char *server, mlsvc_handle_t *netr_handle, DWORD flags)
 int
 netr_open(char *server, char *domain, mlsvc_handle_t *netr_handle)
 {
-	int fid;
-	int remote_os = 0;
-	int remote_lm = 0;
-	int server_pdc;
 	char *user = smbrdr_ipc_get_user();
 
-	if (mlsvc_logon(server, domain, user) != 0)
+	if (ndr_rpc_bind(netr_handle, server, domain, user, "NETR") < 0)
 		return (-1);
 
-	fid = mlsvc_open_pipe(server, domain, user, "\\NETLOGON");
-	if (fid < 0)
-		return (-1);
-
-	if (mlsvc_rpc_bind(netr_handle, fid, "NETR") < 0) {
-		(void) mlsvc_close_pipe(fid);
-		return (-1);
-	}
-
-	(void) mlsvc_session_native_values(fid, &remote_os, &remote_lm,
-	    &server_pdc);
-	netr_handle->context->server_os = remote_os;
-	netr_handle->context->server_pdc = server_pdc;
 	return (0);
 }
 
@@ -160,8 +142,7 @@ netr_open(char *server, char *domain, mlsvc_handle_t *netr_handle)
 int
 netr_close(mlsvc_handle_t *netr_handle)
 {
-	(void) mlsvc_close_pipe(netr_handle->context->fid);
-	free(netr_handle->context);
+	ndr_rpc_unbind(netr_handle);
 	return (0);
 }
 
@@ -172,9 +153,7 @@ static int
 netr_server_req_challenge(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 {
 	struct netr_ServerReqChallenge arg;
-	mlrpc_heapref_t heap;
 	int opnum;
-	int rc;
 
 	bzero(&arg, sizeof (struct netr_ServerReqChallenge));
 	opnum = NETR_OPNUM_ServerReqChallenge;
@@ -185,21 +164,20 @@ netr_server_req_challenge(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	(void) memcpy(&arg.client_challenge, &netr_info->client_challenge,
 	    sizeof (struct netr_credential));
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(netr_handle->context, opnum, &arg, &heap);
-	if (rc == 0) {
-		if (arg.status != 0) {
-			mlsvc_rpc_report_status(opnum, arg.status);
-			rc = -1;
-		} else {
-			(void) memcpy(&netr_info->server_challenge,
-			    &arg.server_challenge,
-			    sizeof (struct netr_credential));
-		}
+	if (ndr_rpc_call(netr_handle, opnum, &arg) != 0)
+		return (-1);
+
+	if (arg.status != 0) {
+		ndr_rpc_status(netr_handle, opnum, arg.status);
+		ndr_rpc_release(netr_handle);
+		return (-1);
 	}
 
-	mlsvc_rpc_free(netr_handle->context, &heap);
-	return (rc);
+	(void) memcpy(&netr_info->server_challenge, &arg.server_challenge,
+	    sizeof (struct netr_credential));
+
+	ndr_rpc_release(netr_handle);
+	return (0);
 }
 
 /*
@@ -209,7 +187,6 @@ static int
 netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 {
 	struct netr_ServerAuthenticate2 arg;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int rc;
 	char account_name[NETBIOS_NAME_SZ * 2];
@@ -229,7 +206,7 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	arg.hostname = (unsigned char *)netr_info->hostname;
 	arg.negotiate_flags = NETR_NEGOTIATE_BASE_FLAGS;
 
-	if (netr_handle->context->server_os != NATIVE_OS_WINNT) {
+	if (ndr_rpc_server_os(netr_handle) != NATIVE_OS_WINNT) {
 		arg.negotiate_flags |= NETR_NEGOTIATE_STRONGKEY_FLAG;
 		if (netr_gen_skey128(netr_info) != SMBAUTH_SUCCESS)
 			return (-1);
@@ -253,21 +230,19 @@ netr_server_authenticate2(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	(void) memcpy(&arg.client_credential, &netr_info->client_credential,
 	    sizeof (struct netr_credential));
 
-	(void) mlsvc_rpc_init(&heap);
+	if (ndr_rpc_call(netr_handle, opnum, &arg) != 0)
+		return (-1);
 
-	rc = mlsvc_rpc_call(netr_handle->context, opnum, &arg, &heap);
-	if (rc == 0) {
-		if (arg.status != 0) {
-			mlsvc_rpc_report_status(opnum, arg.status);
-			rc = -1;
-		} else {
-			rc = memcmp(&netr_info->server_credential,
-			    &arg.server_credential,
-			    sizeof (struct netr_credential));
-		}
+	if (arg.status != 0) {
+		ndr_rpc_status(netr_handle, opnum, arg.status);
+		ndr_rpc_release(netr_handle);
+		return (-1);
 	}
 
-	mlsvc_rpc_free(netr_handle->context, &heap);
+	rc = memcmp(&netr_info->server_credential, &arg.server_credential,
+	    sizeof (struct netr_credential));
+
+	ndr_rpc_release(netr_handle);
 	return (rc);
 }
 
@@ -502,9 +477,7 @@ int
 netr_server_password_set(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 {
 	struct netr_PasswordSet  arg;
-	mlrpc_heapref_t heap;
 	int opnum;
-	int rc;
 	BYTE new_password[NETR_OWF_PASSWORD_SZ];
 	char account_name[NETBIOS_NAME_SZ * 2];
 
@@ -538,11 +511,12 @@ netr_server_password_set(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 	(void) memcpy(&arg.uas_new_password, &new_password,
 	    NETR_OWF_PASSWORD_SZ);
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(netr_handle->context, opnum, &arg, &heap);
-	if ((rc != 0) || (arg.status != 0)) {
-		mlsvc_rpc_report_status(opnum, arg.status);
-		mlsvc_rpc_free(netr_handle->context, &heap);
+	if (ndr_rpc_call(netr_handle, opnum, &arg) != 0)
+		return (-1);
+
+	if (arg.status != 0) {
+		ndr_rpc_status(netr_handle, opnum, arg.status);
+		ndr_rpc_release(netr_handle);
 		return (-1);
 	}
 
@@ -564,7 +538,7 @@ netr_server_password_set(mlsvc_handle_t *netr_handle, netr_info_t *netr_info)
 		    NETR_OWF_PASSWORD_SZ);
 	}
 
-	mlsvc_rpc_free(netr_handle->context, &heap);
+	ndr_rpc_release(netr_handle);
 	return (0);
 }
 

@@ -39,7 +39,7 @@
 
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_token.h>
-#include <smbsrv/lsalib.h>
+#include <lsalib.h>
 
 extern uint32_t netlogon_logon(netr_client_t *clnt, smb_userinfo_t *uinfo);
 static uint32_t smb_logon_domain(netr_client_t *clnt, smb_userinfo_t *uinfo);

@@ -55,7 +55,6 @@ extern "C" {
 #include <smbsrv/smb_xdr.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_vops.h>
-#include <smbsrv/mlsvc.h>
 
 struct smb_request;
 struct smb_server;
@@ -1311,6 +1310,7 @@ typedef struct smb_request {
 		int		pwdlen;
 		char		*password;
 		uint16_t	flags;
+		uint16_t	optional_support;
 	    } tcon;
 
 	    struct open_param {

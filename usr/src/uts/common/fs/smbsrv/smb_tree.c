@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_tree.c	1.5	08/08/07 SMI"
-
 /*
  * General Structures Layout
  * -------------------------
@@ -173,7 +171,6 @@
 #include <sys/varargs.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/lmerr.h>
-#include <smbsrv/mlsvc.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_share.h>
@@ -402,6 +399,29 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 		}
 	}
 
+	/*
+	 * Set up the OptionalSupport for this share.
+	 */
+	sr->arg.tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
+
+	switch (si->shr_flags & SMB_SHRF_CSC_MASK) {
+	case SMB_SHRF_CSC_DISABLED:
+		sr->arg.tcon.optional_support |= SMB_CSC_CACHE_NONE;
+		break;
+	case SMB_SHRF_CSC_AUTO:
+		sr->arg.tcon.optional_support |= SMB_CSC_CACHE_AUTO_REINT;
+		break;
+	case SMB_SHRF_CSC_VDO:
+		sr->arg.tcon.optional_support |= SMB_CSC_CACHE_VDO;
+		break;
+	case SMB_SHRF_CSC_MANUAL:
+	default:
+		/*
+		 * Default to SMB_CSC_CACHE_MANUAL_REINT.
+		 */
+		break;
+	}
+
 	hostaccess = si->shr_access_value & SMB_SHRF_ACC_ALL;
 
 	if (hostaccess == SMB_SHRF_ACC_RO) {
@@ -466,6 +486,8 @@ smb_tree_connect_ipc(smb_request_t *sr, const char *name)
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED, ERRSRV, ERRaccess);
 		return (NULL);
 	}
+
+	sr->arg.tcon.optional_support = SMB_SUPPORT_SEARCH_BITS;
 
 	tree = smb_tree_alloc(user, name, name, STYPE_IPC, NULL);
 	if (tree == NULL) {

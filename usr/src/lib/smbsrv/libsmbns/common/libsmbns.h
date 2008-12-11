@@ -69,6 +69,7 @@ typedef enum smb_adjoin_status {
 	SMB_ADJOIN_ERR_WRITE_KEYTAB,
 	SMB_ADJOIN_ERR_IDMAP_SET_DOMAIN,
 	SMB_ADJOIN_ERR_IDMAP_REFRESH,
+	SMB_ADJOIN_ERR_COMMIT_KEYTAB,
 	SMB_ADJOIN_NUM_STATUS
 } smb_adjoin_status_t;
 
@@ -88,13 +89,14 @@ extern int smb_ads_add_share(smb_ads_handle_t *, const char *, const char *,
     const char *);
 extern smb_adjoin_status_t smb_ads_join(char *, char *, char *, char *, int);
 extern char *smb_adjoin_report_err(smb_adjoin_status_t);
-extern int smb_ads_domain_change_cleanup(char *);
+extern boolean_t smb_ads_lookup_msdcs(char *, char *, char *, uint32_t);
 
 /* DYNDNS functions */
-extern void dns_msgid_init(void);
+extern int dyndns_start(void);
+extern void dyndns_stop(void);
 extern int dyndns_update(char *);
-extern int dyndns_update_core(char *);
-extern int dyndns_clear_rev_zone(char *);
+extern void dyndns_update_zones(void);
+extern void dyndns_clear_zones(void);
 
 /* Kerberos initialization function */
 extern int smb_kinit(char *, char *);
@@ -102,14 +104,13 @@ extern int smb_ccache_init(char *, char *);
 extern void smb_ccache_remove(char *);
 
 /* NETBIOS Functions */
-extern int smb_msdcs_lookup_ads(char *, char *);
 extern int smb_netbios_start(void);
 extern void smb_netbios_shutdown(void);
 extern void smb_netbios_name_reconfig(void);
 
 /* Browser Functions */
 extern void smb_browser_reconfig(void);
-extern void smb_browser_netlogon(char *);
+extern boolean_t smb_browser_netlogon(char *, char *, uint32_t);
 
 
 #ifdef	__cplusplus

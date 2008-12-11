@@ -41,6 +41,7 @@
 #include <sys/types.h>
 #include <libscf.h>
 #include <assert.h>
+#include <uuid/uuid.h>
 #include <smbsrv/libsmb.h>
 
 typedef struct smb_cfg_param {
@@ -82,6 +83,9 @@ static smb_cfg_param_t smb_cfg_table[] =
 	{SMB_CI_DOMAIN_SID, "domain_sid", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_DOMAIN_MEMB, "domain_member", SCF_TYPE_BOOLEAN, 0},
 	{SMB_CI_DOMAIN_NAME, "domain_name", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_DOMAIN_FQDN, "fqdn", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_DOMAIN_FOREST, "forest", SCF_TYPE_ASTRING, 0},
+	{SMB_CI_DOMAIN_GUID, "domain_guid", SCF_TYPE_ASTRING, 0},
 	{SMB_CI_DOMAIN_SRV, "pdc", SCF_TYPE_ASTRING, 0},
 
 	/* WINS configuration */
@@ -92,8 +96,6 @@ static smb_cfg_param_t smb_cfg_table[] =
 	/* RPC services configuration */
 	{SMB_CI_SRVSVC_SHRSET_ENABLE, "srvsvc_sharesetinfo_enable",
 	    SCF_TYPE_BOOLEAN, 0},
-	{SMB_CI_MLRPC_KALIVE, "mlrpc_keep_alive_interval",
-	    SCF_TYPE_INTEGER, 0},
 
 	/* Kmod specific configuration */
 	{SMB_CI_MAX_WORKERS, "max_workers", SCF_TYPE_INTEGER, 0},
@@ -755,4 +757,23 @@ smb_config_getent(smb_cfg_id_t id)
 
 	assert(0);
 	return (NULL);
+}
+
+void
+smb_config_getdomaininfo(char *domain, char *fqdn, char *forest, char *guid)
+{
+	(void) smb_config_getstr(SMB_CI_DOMAIN_NAME, domain, NETBIOS_NAME_SZ);
+	(void) smb_config_getstr(SMB_CI_DOMAIN_FQDN, fqdn, MAXHOSTNAMELEN);
+	(void) smb_config_getstr(SMB_CI_DOMAIN_FOREST, forest, MAXHOSTNAMELEN);
+	(void) smb_config_getstr(SMB_CI_DOMAIN_GUID, guid,
+	    UUID_PRINTABLE_STRING_LENGTH);
+}
+
+void
+smb_config_setdomaininfo(char *domain, char *fqdn, char *forest, char *guid)
+{
+	(void) smb_config_setstr(SMB_CI_DOMAIN_NAME, domain);
+	(void) smb_config_setstr(SMB_CI_DOMAIN_FQDN, fqdn);
+	(void) smb_config_setstr(SMB_CI_DOMAIN_FOREST, forest);
+	(void) smb_config_setstr(SMB_CI_DOMAIN_GUID, guid);
 }

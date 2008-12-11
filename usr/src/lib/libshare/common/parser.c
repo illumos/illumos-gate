@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -41,7 +39,7 @@
  */
 
 char *
-get_token(char *string)
+_sa_get_token(char *string)
 {
 	static char *orig = NULL;
 	static char *curp;

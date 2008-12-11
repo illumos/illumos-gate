@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This script is used to setup the Kerberos client by
 # supplying information about the Kerberos realm and kdc.
 #
@@ -1076,7 +1074,7 @@ function addDNSRR {
 		# Non-fatal, we should carry-on as clients may resolve to
 		# different servers and the client could already exist there.
 		#
-		printf "$(gettext "Warning: wasn't able to create DNS records for client").\n"
+		printf "$(gettext "Warning: unable to create DNS records for client").\n"
 		printf "$(gettext "This could mean that '%s' is not included as a 'nameserver' in the /etc/resolv.conf file or some other type of error").\n" $dc
 	fi
 }
@@ -1088,13 +1086,13 @@ function setSMB {
 
 	printf "%s" $newpw | $KSMB -d $domain -s $server
 	if [[ $? -ne 0 ]]; then
-		printf "$(gettext "Warning: wasn't able to set %s domain, server, and password information").\n" $smbFMRI
+		printf "$(gettext "Warning: unable to set %s domain, server and password information").\n" $smbFMRI
 		return
 	fi
 
-	svcadm refresh $smbFMRI > /dev/null 2>&1
+	svcadm restart $smbFMRI > /dev/null 2>&1
 	if [[ $? -ne 0 ]]; then
-		printf "$(gettext "Warning: wasn't able to set refresh %s domain, server, and password information").\n" $smbFMRI
+		printf "$(gettext "Warning: unable to restart %s").\n" $smbFMRI
 	fi
 }
 

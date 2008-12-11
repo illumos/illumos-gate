@@ -1513,7 +1513,7 @@ err:
 		sa_free_attr_string(sectype);
 	if (options != NULL)
 		sa_free_derived_optionset(options);
-	return (buff);
+	return (NULL);
 }
 
 /*

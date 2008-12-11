@@ -23,8 +23,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _MLRPCPDU_NDL_
-#define _MLRPCPDU_NDL_
+#ifndef _RPCPDU_NDL_
+#define _RPCPDU_NDL_
 
 #include "ndrtypes.ndl"
 
@@ -39,6 +39,8 @@
 #else
 #define _NO_REORDER_
 #endif
+
+#define NDR_TRANSFER_SYNTAX_UUID	"8a885d04-1ceb-11c9-9fe8-08002b104860"
 
 /*
  * UUID (Universal Unique IDentifier)
@@ -77,22 +79,23 @@ typedef struct ndr_uuid ndr_uuid_t;
  *                    3=IBM
  * 16-31  reserved
  */
-#define MLRPC_REPLAB_CHAR_MASK		0x0F	/* low nibble of intg_char */
-#define MLRPC_REPLAB_CHAR_ASCII		0x00	/* ASCII */
-#define MLRPC_REPLAB_CHAR_EBCDIC	0x01	/* EBCDIC (never happen) */
-#define MLRPC_REPLAB_INTG_MASK		0xF0	/* hi nibble of intg_char */
-#define MLRPC_REPLAB_INTG_BIG_ENDIAN	0x00	/* big endian */
-#define MLRPC_REPLAB_INTG_LITTLE_ENDIAN	0x10	/* little endian (x86) */
-#define MLRPC_REPLAB_FLOAT_IEEE		0x00
-#define MLRPC_REPLAB_FLOAT_VAX		0x01
-#define MLRPC_REPLAB_FLOAT_CRAY		0x02
-#define MLRPC_REPLAB_FLOAT_IBM		0x03
+#define NDR_REPLAB_CHAR_MASK		0x0F	/* low nibble of intg_char */
+#define NDR_REPLAB_CHAR_ASCII		0x00	/* ASCII */
+#define NDR_REPLAB_CHAR_EBCDIC		0x01	/* EBCDIC (never happen) */
+#define NDR_REPLAB_INTG_MASK		0xF0	/* hi nibble of intg_char */
+#define NDR_REPLAB_INTG_BIG_ENDIAN	0x00	/* big endian */
+#define NDR_REPLAB_INTG_LITTLE_ENDIAN	0x10	/* little endian (x86) */
+#define NDR_REPLAB_FLOAT_IEEE		0x00
+#define NDR_REPLAB_FLOAT_VAX		0x01
+#define NDR_REPLAB_FLOAT_CRAY		0x02
+#define NDR_REPLAB_FLOAT_IBM		0x03
 
-struct mlrpc_representation_label {
+struct ndr_representation_label {
 	BYTE		intg_char_rep;		/* integer and charset */
 	BYTE		float_rep;
 	BYTE		_spare[2];
 };
+typedef struct ndr_representation_label	ndr_replab_t;
 
 
 
@@ -102,41 +105,41 @@ struct mlrpc_representation_label {
  * (X/Open CAE Spec 12.1)
  */
 
-#define MLRPC_PTYPE_REQUEST		0x00	/* CO/CL */
-#define MLRPC_PTYPE_PING		0x01	/*    CL */
-#define MLRPC_PTYPE_RESPONSE		0x02	/* CO/CL */
-#define MLRPC_PTYPE_FAULT		0x03	/* CL/CL */
-#define MLRPC_PTYPE_WORKING		0x04	/*    CL */
-#define MLRPC_PTYPE_NOCALL		0x05	/*    CL */
-#define MLRPC_PTYPE_REJECT		0x06	/*    CL */
-#define MLRPC_PTYPE_ACK			0x07	/*    CL */
-#define MLRPC_PTYPE_CL_CANCEL		0x08	/*    CL */
-#define MLRPC_PTYPE_FACK		0x09	/*    CL */
-#define MLRPC_PTYPE_CANCEL_ACK		0x0A	/*    CL */
-#define MLRPC_PTYPE_BIND		0x0B	/* CO    */
-#define MLRPC_PTYPE_BIND_ACK		0x0C	/* CO    */
-#define MLRPC_PTYPE_BIND_NAK		0x0D	/* CO    */
-#define MLRPC_PTYPE_ALTER_CONTEXT	0x0E	/* CO    */
-#define MLRPC_PTYPE_ALTER_CONTEXT_RESP	0x0F	/* CO    */
+#define NDR_PTYPE_REQUEST		0x00	/* CO/CL */
+#define NDR_PTYPE_PING			0x01	/*    CL */
+#define NDR_PTYPE_RESPONSE		0x02	/* CO/CL */
+#define NDR_PTYPE_FAULT			0x03	/* CL/CL */
+#define NDR_PTYPE_WORKING		0x04	/*    CL */
+#define NDR_PTYPE_NOCALL		0x05	/*    CL */
+#define NDR_PTYPE_REJECT		0x06	/*    CL */
+#define NDR_PTYPE_ACK			0x07	/*    CL */
+#define NDR_PTYPE_CL_CANCEL		0x08	/*    CL */
+#define NDR_PTYPE_FACK			0x09	/*    CL */
+#define NDR_PTYPE_CANCEL_ACK		0x0A	/*    CL */
+#define NDR_PTYPE_BIND			0x0B	/* CO    */
+#define NDR_PTYPE_BIND_ACK		0x0C	/* CO    */
+#define NDR_PTYPE_BIND_NAK		0x0D	/* CO    */
+#define NDR_PTYPE_ALTER_CONTEXT		0x0E	/* CO    */
+#define NDR_PTYPE_ALTER_CONTEXT_RESP	0x0F	/* CO    */
 						/* 0x10 missing from DCE/RPC */
-#define MLRPC_PTYPE_SHUTDOWN		0x11	/* CO    */
-#define MLRPC_PTYPE_CO_CANCEL		0x12	/* CO    */
-#define MLRPC_PTYPE_ORPHANED		0x13	/* CO    */
+#define NDR_PTYPE_SHUTDOWN		0x11	/* CO    */
+#define NDR_PTYPE_CO_CANCEL		0x12	/* CO    */
+#define NDR_PTYPE_ORPHANED		0x13	/* CO    */
 
 /*
  * Flags in the RPC header for Connection-oriented PDU data types
  * (X/Open CAE Spec 12.6.3.1)
  */
-#define MLRPC_PFC_FIRST_FRAG		0x01	/* First fragment */
-#define MLRPC_PFC_LAST_FRAG		0x02	/* Last framgent */
-#define MLRPC_PFC_PENDING_CANCEL	0x04	/* Cancel was pending@sender*/
-#define MLRPC_PFC_RESERVED_1		0x08	/* */
-#define MLRPC_PFC_CONC_MPX		0x10	/* supports concurrent muxing
+#define NDR_PFC_FIRST_FRAG		0x01	/* First fragment */
+#define NDR_PFC_LAST_FRAG		0x02	/* Last framgent */
+#define NDR_PFC_PENDING_CANCEL		0x04	/* Cancel was pending@sender*/
+#define NDR_PFC_RESERVED_1		0x08	/* */
+#define NDR_PFC_CONC_MPX		0x10	/* supports concurrent muxing
 						 * of single connection */
-#define MLRPC_PFC_DID_NOT_EXECUTE	0x20	/* for PTYPE_FAULT, guarantee
+#define NDR_PFC_DID_NOT_EXECUTE		0x20	/* for PTYPE_FAULT, guarantee
 						 * call did not execute */
-#define MLRPC_PFC_MAYBE			0x40	/* "maybe" semantics req'ed*/
-#define MLRPC_PFC_OBJECT_UUID		0x80	/* */
+#define NDR_PFC_MAYBE			0x40	/* "maybe" semantics req'ed*/
+#define NDR_PFC_OBJECT_UUID		0x80	/* */
 
 
 /*
@@ -148,9 +151,9 @@ _NO_REORDER_
 struct ndr_common_header {
 	BYTE		rpc_vers;	/* 00:01 5 */
 	BYTE		rpc_vers_minor;	/* 01:01 0 */
-	BYTE		ptype;		/* 02:01 MLRPC_PTYPE_... */
-	BYTE		pfc_flags;	/* 03:01 MLRPC_PFC_... */
-	struct mlrpc_representation_label
+	BYTE		ptype;		/* 02:01 NDR_PTYPE_... */
+	BYTE		pfc_flags;	/* 03:01 NDR_PFC_... */
+	struct ndr_representation_label
 			packed_drep;	/* 04:04 NDR representation label */
 	WORD		frag_length;	/* 08:02 total length of frag */
 	WORD		auth_length;	/* 10:02 length of auth_value */
@@ -165,82 +168,82 @@ EXTERNTYPEINFO(ndr_common_header)
  * A plethora of supporting types, only defined the ones we need
  * (X/Open CAE Spec 12.6.3.1)
  */
-typedef WORD	mlrpc_p_context_id_t;
+typedef WORD	ndr_p_context_id_t;
 
 _NO_REORDER_
-struct mlrpc_p_syntax_id {
+struct ndr_p_syntax_id {
 	ndr_uuid_t	if_uuid;
 	DWORD		if_version;
 };
-typedef struct mlrpc_p_syntax_id	mlrpc_p_syntax_id_t;
+typedef struct ndr_p_syntax_id	ndr_p_syntax_id_t;
 
 _NO_REORDER_
-struct mlrpc_p_cont_elem {
-	mlrpc_p_context_id_t	p_cont_id;
+struct ndr_p_cont_elem {
+	ndr_p_context_id_t	p_cont_id;
 	BYTE			n_transfer_syn;
 	BYTE			_reserved;
-	mlrpc_p_syntax_id_t	abstract_syntax;
+	ndr_p_syntax_id_t	abstract_syntax;
     /*SIZE_IS(n_transfer_syn)*/
-	mlrpc_p_syntax_id_t	transfer_syntaxes[1];
+	ndr_p_syntax_id_t	transfer_syntaxes[1];
 };
-typedef struct mlrpc_p_cont_elem	mlrpc_p_cont_elem_t;
-EXTERNTYPEINFO(mlrpc_p_cont_elem)
+typedef struct ndr_p_cont_elem	ndr_p_cont_elem_t;
+EXTERNTYPEINFO(ndr_p_cont_elem)
 
 _NO_REORDER_
-struct mlrpc_p_cont_list {
+struct ndr_p_cont_list {
 	BYTE		n_context_elem;
 	BYTE		_reserved;
 	WORD		_reserved2;
     /*SIZE_IS(n_context_elem)*/
-	mlrpc_p_cont_elem_t p_cont_elem[1];
+	ndr_p_cont_elem_t p_cont_elem[1];
 };
-typedef struct mlrpc_p_cont_list	mlrpc_p_cont_list_t;
-EXTERNTYPEINFO(mlrpc_p_cont_list)
+typedef struct ndr_p_cont_list	ndr_p_cont_list_t;
+EXTERNTYPEINFO(ndr_p_cont_list)
 
-typedef WORD	mlrpc_p_cont_def_result_t;
-#define MLRPC_PCDR_ACCEPTANCE		0
-#define MLRPC_PCDR_USER_REJECTION	1
-#define MLRPC_PCDR_PROVIDER_REJECTION	2
+typedef WORD	ndr_p_cont_def_result_t;
+#define NDR_PCDR_ACCEPTANCE					0
+#define NDR_PCDR_USER_REJECTION					1
+#define NDR_PCDR_PROVIDER_REJECTION				2
 
-typedef WORD	mlrpc_p_provider_reason_t;
-#define MLRPC_PPR_REASON_NOT_SPECIFIED		0
-#define MLRPC_PPR_ABSTRACT_SYNTAX_NOT_SUPPORTED	1
-#define MLRPC_PPR_PROPOSED_TRANSFER_SYNTAXES_NOT_SUPPORTED 2
-#define MLRPC_PPR_LOCAL_LIMIT_EXCEEDED		3
+typedef WORD	ndr_p_provider_reason_t;
+#define NDR_PPR_REASON_NOT_SPECIFIED				0
+#define NDR_PPR_ABSTRACT_SYNTAX_NOT_SUPPORTED			1
+#define NDR_PPR_PROPOSED_TRANSFER_SYNTAXES_NOT_SUPPORTED	2
+#define NDR_PPR_LOCAL_LIMIT_EXCEEDED				3
 
 
 _NO_REORDER_
-struct mlrpc_p_result {
-	mlrpc_p_cont_def_result_t	result;		/* MLRPC_PCDR_... */
-	mlrpc_p_provider_reason_t	reason;		/* MLRPC_PPR_... */
-	mlrpc_p_syntax_id_t		transfer_syntax; /* 0-fill if 
+struct ndr_p_result {
+	ndr_p_cont_def_result_t	result;		/* NDR_PCDR_... */
+	ndr_p_provider_reason_t	reason;		/* NDR_PPR_... */
+	ndr_p_syntax_id_t		transfer_syntax; /* 0-fill if 
 							  * result!=ACCEPT*/
 };
-typedef struct mlrpc_p_result		mlrpc_p_result_t;
-EXTERNTYPEINFO(mlrpc_p_result)
+typedef struct ndr_p_result		ndr_p_result_t;
+EXTERNTYPEINFO(ndr_p_result)
 
 _NO_REORDER_
-struct mlrpc_p_result_list {
+struct ndr_p_result_list {
 	BYTE		n_results;
 	BYTE		reserved;
 	WORD		reserved2;
     /*SIZE_IS(n_results)*/
-	mlrpc_p_result_t p_results[1];
+	ndr_p_result_t p_results[1];
 };
-typedef struct mlrpc_p_result_list	mlrpc_p_result_list_t;
-EXTERNTYPEINFO(mlrpc_p_result_list)
+typedef struct ndr_p_result_list	ndr_p_result_list_t;
+EXTERNTYPEINFO(ndr_p_result_list)
 
-#define MLRPC_PORT_ANY_MAX_PORT_SPEC	30
+#define NDR_PORT_ANY_MAX_PORT_SPEC	30
 _NO_REORDER_
-struct mlrpc_port_any {
+struct ndr_port_any {
 	WORD		length;		/* always 18 */
     /*SIZE_IS(length)*/
-	BYTE		port_spec[MLRPC_PORT_ANY_MAX_PORT_SPEC];
+	BYTE		port_spec[NDR_PORT_ANY_MAX_PORT_SPEC];
 					/* \PIPE\ntsvcs */
 	/* We cheat by using 18, and pad on the right with zeroes */
 };
-typedef struct mlrpc_port_any		mlrpc_port_any_t;
-EXTERNTYPEINFO(mlrpc_port_any)
+typedef struct ndr_port_any		ndr_port_any_t;
+EXTERNTYPEINFO(ndr_port_any)
 
 
 /*
@@ -258,7 +261,7 @@ struct ndr_alter_context_hdr {
 	/* 
 	 * Presentation context list (see bind hdr comments).
 	 */
-	mlrpc_p_cont_list_t p_context_elem;	/* 24: */
+	ndr_p_cont_list_t p_context_elem;	/* 24: */
 
 	/* optional authentication verifier if auth_length != 0 */
 	/* auth_verifier_co_t auth_verifier; */
@@ -283,12 +286,12 @@ struct ndr_alter_context_rsp_hdr {
 	WORD max_xmit_frag;		/* 16:02 ignored */
 	WORD max_recv_frag;		/* 18:02 ignored */
 	DWORD assoc_group_id;		/* 20:04 ignored */
-	mlrpc_port_any_t sec_addr;	/* 24:20 ignored */
+	ndr_port_any_t sec_addr;	/* 24:20 ignored */
 
 	/* 
 	 * Presentation context list (see bind hdr comments).
 	 */
-	mlrpc_p_result_list_t p_result_list; /* 44:nn */
+	ndr_p_result_list_t p_result_list; /* 44:nn */
 
 	/* optional authentication verifier if auth_length != 0 */
 	/* auth_verifier_co_t auth_verifier; */
@@ -310,7 +313,7 @@ struct ndr_bind_hdr {
 					/* 24: */
 
 	/* presentation, a variable**2 list, of presentation contexts */
-	mlrpc_p_cont_list_t p_context_elem;
+	ndr_p_cont_list_t p_context_elem;
 
 	/*
 	 * This could be followed by more transfer_syntaxes[] for the
@@ -344,9 +347,9 @@ struct ndr_bind_ack_hdr {
 	WORD		max_xmit_frag;	/* 16:02 max xmit frag size, bytes */
 	WORD		max_recv_frag;	/* 18:02 max recv frag size, bytes */
 	DWORD		assoc_group_id;	/* 20:04 association group */
-	mlrpc_port_any_t sec_addr;	/* 24:20 */
+	ndr_port_any_t	sec_addr;	/* 24:20 */
 
-	mlrpc_p_result_list_t p_result_list; /* 44:nn */
+	ndr_p_result_list_t p_result_list; /* 44:nn */
 	/* This could be followed by more. See bind_hdr above */
 
 	/* optional authentication verifier iff auth_length != 0 */
@@ -358,7 +361,7 @@ typedef struct ndr_bind_ack_hdr	ndr_bind_ack_hdr_t;
 /*
  * Request PDU (0x00)
  ****************************************************************
- * Two flavors, selected based on MLRPC_PFC_OBJECT_UUID in hdr.pfc_flags
+ * Two flavors, selected based on PFC_OBJECT_UUID in hdr.pfc_flags
  *	one without the "object" (flag clear)
  *	one with the "object" (flag set)
  * (X/Open CAE Spec 12.6.4.9)
@@ -370,7 +373,7 @@ struct ndr_request_hdr {
 
 	/* needed for request, response, or fault */
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
-	mlrpc_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
+	ndr_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
 	WORD		opnum;		/* 22:02 op number w/i interface */
 
 	/* optional field if PFC_OBJECT_UUID, not present */
@@ -390,7 +393,7 @@ struct ndr_request_hdr_with_object {
 
 	/* needed for request, response, or fault */
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
-	mlrpc_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
+	ndr_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
 	WORD		opnum;		/* 22:02 op number w/i interface */
 
 	/* optional field if PFC_OBJECT_UUID, is present */
@@ -405,12 +408,11 @@ struct ndr_request_hdr_with_object {
 };
 
 
-
 /*
- * Hack for response header sizing and multi-fragment responses.
+ * Convenient for response header sizing and multi-fragment responses.
  * We know the header is going to be 24 bytes.
  */
-#define MLRPC_RSP_HDR_SIZE			24
+#define NDR_RSP_HDR_SIZE			24
 
 
 /*
@@ -424,7 +426,7 @@ struct ndr_response_hdr {
 
 	/* needed for request, response, or fault */
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
-	mlrpc_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
+	ndr_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
 
 	/* needed for response or fault */
 	BYTE		cancel_count;	/* 22:01 cancel count */
@@ -439,7 +441,6 @@ struct ndr_response_hdr {
 typedef struct ndr_response_hdr	ndr_response_hdr_t;
 
 
-
 /*
  * Fault PDU (0x03)
  * (X/Open CAE Spec 12.6.4.7)
@@ -450,7 +451,7 @@ struct ndr_fault_hdr {
 	ndr_common_header_t	common_hdr; /* 00:16 (see above) */
 
 	DWORD		alloc_hint;	/* 16:04 allocation hint */
-	mlrpc_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
+	ndr_p_context_id_t p_cont_id;	/* 20:02 pres context, i.e. data rep */
 
 	/* needed for response or fault */
 	BYTE		cancel_count;	/* 22:01 cancel count */
@@ -471,25 +472,23 @@ typedef struct ndr_fault_hdr	ndr_fault_hdr_t;
 
 
 /* Fault status code (X/Open CAE Spec Appendix E) */
-#define MLRPC_FAULT_NCA_RPC_VERSION_MISMATCH	0x1c000008	/* CO/CL */
-#define MLRPC_FAULT_NCA_UNSPEC_REJECT		0x1c000009	/* CO/CL */
-#define MLRPC_FAULT_NCA_S_BAD_ACTID		0x1c00000A	/*    CL */
-#define MLRPC_FAULT_NCA_WHO_ARE_YOU_FAILED	0x1c00000B	/*    CL */
-#define MLRPC_FAULT_NCA_MANAGER_NOT_ENTERED	0x1c00000C	/* CO/CL */
-#define MLRPC_FAULT_NCA_OP_RNG_ERROR		0x1c010002	/* CO/CL */
-#define MLRPC_FAULT_NCA_UNK_IF			0x1c010003	/* CO/CL */
-#define MLRPC_FAULT_NCA_WRONG_BOOT_TIME		0x1c010006	/*    CL */
-#define MLRPC_FAULT_NCA_S_YOU_CRASHED		0x1c010009	/*    CL */
-#define MLRPC_FAULT_NCA_PROTO_ERROR		0x1c01000B	/* CO/CL */
-#define MLRPC_FAULT_NCA_OUT_ARGS_TOO_BIG	0x1c010013	/* CO/CL */
-#define MLRPC_FAULT_NCA_SERVER_TOO_BUSY		0x1c010014	/* CO/CL */
-#define MLRPC_FAULT_NCA_UNSUPPORTED_TYPE	0x1c010017	/* CO/CL */
-#define MLRPC_FAULT_NCA_INVALID_PRES_CONTEXT_ID	0x1c00001c	/* CO    */
-#define MLRPC_FAULT_NCA_UNSUPPORTED_AUTHN_LEVEL	0x1c00001d	/* CO/CL */
-#define MLRPC_FAULT_NCA_INVALID_CHECKSUM	0x1c00001f	/* CO/CL */
-#define MLRPC_FAULT_NCA_INVALID_CRC		0x1c000020	/* CO/CL */
-
-
+#define NDR_FAULT_NCA_RPC_VERSION_MISMATCH	0x1c000008	/* CO/CL */
+#define NDR_FAULT_NCA_UNSPEC_REJECT		0x1c000009	/* CO/CL */
+#define NDR_FAULT_NCA_S_BAD_ACTID		0x1c00000A	/*    CL */
+#define NDR_FAULT_NCA_WHO_ARE_YOU_FAILED	0x1c00000B	/*    CL */
+#define NDR_FAULT_NCA_MANAGER_NOT_ENTERED	0x1c00000C	/* CO/CL */
+#define NDR_FAULT_NCA_OP_RNG_ERROR		0x1c010002	/* CO/CL */
+#define NDR_FAULT_NCA_UNK_IF			0x1c010003	/* CO/CL */
+#define NDR_FAULT_NCA_WRONG_BOOT_TIME		0x1c010006	/*    CL */
+#define NDR_FAULT_NCA_S_YOU_CRASHED		0x1c010009	/*    CL */
+#define NDR_FAULT_NCA_PROTO_ERROR		0x1c01000B	/* CO/CL */
+#define NDR_FAULT_NCA_OUT_ARGS_TOO_BIG		0x1c010013	/* CO/CL */
+#define NDR_FAULT_NCA_SERVER_TOO_BUSY		0x1c010014	/* CO/CL */
+#define NDR_FAULT_NCA_UNSUPPORTED_TYPE		0x1c010017	/* CO/CL */
+#define NDR_FAULT_NCA_INVALID_PRES_CONTEXT_ID	0x1c00001c	/* CO    */
+#define NDR_FAULT_NCA_UNSUPPORTED_AUTHN_LEVEL	0x1c00001d	/* CO/CL */
+#define NDR_FAULT_NCA_INVALID_CHECKSUM		0x1c00001f	/* CO/CL */
+#define NDR_FAULT_NCA_INVALID_CRC		0x1c000020	/* CO/CL */
 
 
 /*
@@ -497,41 +496,41 @@ typedef struct ndr_fault_hdr	ndr_fault_hdr_t;
  ****************************************************************
  */
 
-#define MLRPC_PTYPE_COMMON		999
-#define MLRPC_PTYPE_REQUEST_WITH	998
+#define NDR_PTYPE_COMMON		999
+#define NDR_PTYPE_REQUEST_WITH		998
 
 
 INTERFACE(0)
 union ndr_hdr {
-    CASE(MLRPC_PTYPE_COMMON)	/* exceeds BYTE range, obtains common hdr */
+    CASE(NDR_PTYPE_COMMON)	/* exceeds BYTE range, obtains common hdr */
 	struct ndr_common_header		common_hdr;
 
-    CASE(MLRPC_PTYPE_BIND)
+    CASE(NDR_PTYPE_BIND)
 	struct ndr_bind_hdr			bind_hdr;
 
-    CASE(MLRPC_PTYPE_BIND_ACK)
+    CASE(NDR_PTYPE_BIND_ACK)
 	struct ndr_bind_ack_hdr			bind_ack_hdr;
 
-    CASE(MLRPC_PTYPE_REQUEST)
+    CASE(NDR_PTYPE_REQUEST)
 	struct ndr_request_hdr			request_hdr;
 
-    CASE(MLRPC_PTYPE_REQUEST_WITH)	/* exceeds BYTE range, ... */
+    CASE(NDR_PTYPE_REQUEST_WITH)	/* exceeds BYTE range, ... */
 	struct ndr_request_hdr_with_object	request_hdr_with;
 
-    CASE(MLRPC_PTYPE_RESPONSE)
+    CASE(NDR_PTYPE_RESPONSE)
 	struct ndr_response_hdr			response_hdr;
 
-    CASE(MLRPC_PTYPE_ALTER_CONTEXT)
+    CASE(NDR_PTYPE_ALTER_CONTEXT)
 	struct ndr_alter_context_hdr		alter_context_hdr;
 
-    CASE(MLRPC_PTYPE_ALTER_CONTEXT_RESP)
+    CASE(NDR_PTYPE_ALTER_CONTEXT_RESP)
 	struct ndr_alter_context_rsp_hdr	alter_context_rsp_hdr;
 
-    CASE(MLRPC_PTYPE_FAULT)
+    CASE(NDR_PTYPE_FAULT)
 	struct ndr_fault_hdr			fault_hdr;
 };
 typedef union ndr_hdr	ndr_hdr_t;
 EXTERNTYPEINFO(ndr_hdr)
 
-#endif /* _MLRPCPDU_NDL_ */
+#endif /* _RPCPDU_NDL_ */
 

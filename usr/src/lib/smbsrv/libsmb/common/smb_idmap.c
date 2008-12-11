@@ -24,9 +24,20 @@
  */
 
 #include <strings.h>
+#include <synch.h>
 #include <smbsrv/libsmb.h>
 
-static idmap_handle_t *idmap_clnt_hdl = NULL;
+#define	SMB_IDMAP_STATE_INIT	1
+#define	SMB_IDMAP_STATE_FINI	2
+
+typedef struct smb_idmap_handle {
+	idmap_handle_t	*sih_handle;
+	int		sih_state;
+	rwlock_t	sih_rwl;
+} smb_idmap_handle_t;
+
+static smb_idmap_handle_t smb_idmaph;
+
 static int smb_idmap_batch_binsid(smb_idmap_batch_t *sib);
 
 /*
@@ -40,16 +51,22 @@ smb_idmap_start(void)
 {
 	idmap_stat stat;
 
-	if (idmap_clnt_hdl)
+	(void) rw_wrlock(&smb_idmaph.sih_rwl);
+	if (smb_idmaph.sih_state == SMB_IDMAP_STATE_INIT) {
+		(void) rw_unlock(&smb_idmaph.sih_rwl);
 		return (0);
+	}
 
-	stat = idmap_init(&idmap_clnt_hdl);
+	stat = idmap_init(&smb_idmaph.sih_handle);
 	if (stat < 0) {
+		(void) rw_unlock(&smb_idmaph.sih_rwl);
 		syslog(LOG_ERR, "smb_idmap_start: idmap_init failed (%s)",
 		    idmap_stat2string(NULL, stat));
 		return (-1);
 	}
 
+	smb_idmaph.sih_state = SMB_IDMAP_STATE_INIT;
+	(void) rw_unlock(&smb_idmaph.sih_rwl);
 	return (0);
 }
 
@@ -62,10 +79,12 @@ smb_idmap_start(void)
 void
 smb_idmap_stop(void)
 {
-	if (idmap_clnt_hdl) {
-		(void) idmap_fini(idmap_clnt_hdl);
-		idmap_clnt_hdl = NULL;
+	(void) rw_wrlock(&smb_idmaph.sih_rwl);
+	if (smb_idmaph.sih_state == SMB_IDMAP_STATE_INIT) {
+		(void) idmap_fini(smb_idmaph.sih_handle);
+		smb_idmaph.sih_state = SMB_IDMAP_STATE_FINI;
 	}
+	(void) rw_unlock(&smb_idmaph.sih_rwl);
 }
 
 /*
@@ -77,13 +96,26 @@ smb_idmap_stop(void)
 int
 smb_idmap_restart(void)
 {
-	smb_idmap_stop();
-	if (smb_idmap_start() != 0) {
-		syslog(LOG_ERR, "smb_idmap_restart: smb_idmap_start failed");
+	idmap_stat stat;
+	int rc = 0;
+
+	(void) rw_wrlock(&smb_idmaph.sih_rwl);
+	if (smb_idmaph.sih_state == SMB_IDMAP_STATE_FINI) {
+		(void) rw_unlock(&smb_idmaph.sih_rwl);
 		return (-1);
 	}
 
-	return (0);
+	(void) idmap_fini(smb_idmaph.sih_handle);
+
+	stat = idmap_init(&smb_idmaph.sih_handle);
+	if (stat < 0) {
+		syslog(LOG_ERR, "smb_idmap_restart: idmap_init failed (%s)",
+		    idmap_stat2string(NULL, stat));
+		rc = -1;
+	}
+
+	(void) rw_unlock(&smb_idmaph.sih_rwl);
+	return (rc);
 }
 
 /*
@@ -173,8 +205,16 @@ smb_idmap_batch_create(smb_idmap_batch_t *sib, uint16_t nmap, int flags)
 	if (!sib)
 		return (IDMAP_ERR_ARG);
 
+	(void) rw_rdlock(&smb_idmaph.sih_rwl);
+	if (smb_idmaph.sih_state != SMB_IDMAP_STATE_INIT) {
+		(void) rw_unlock(&smb_idmaph.sih_rwl);
+		return (IDMAP_ERR_OTHER);
+	}
+
 	bzero(sib, sizeof (smb_idmap_batch_t));
-	stat = idmap_get_create(idmap_clnt_hdl, &sib->sib_idmaph);
+	stat = idmap_get_create(smb_idmaph.sih_handle, &sib->sib_idmaph);
+	(void) rw_unlock(&smb_idmaph.sih_rwl);
+
 	if (stat != IDMAP_SUCCESS)
 		return (stat);
 

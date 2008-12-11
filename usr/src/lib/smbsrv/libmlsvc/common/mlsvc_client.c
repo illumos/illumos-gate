@@ -23,162 +23,291 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Context functions to support the RPC interface library.
+ * Client NDR RPC interface.
  */
 
 #include <sys/errno.h>
 #include <strings.h>
-
+#include <assert.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
-#include <smbsrv/ndr.h>
-#include <smbsrv/mlrpc.h>
-#include <smbsrv/mlsvc_util.h>
+#include <smbsrv/libmlrpc.h>
+#include <smbsrv/libmlsvc.h>
 
-static int mlsvc_xa_init(struct mlrpc_client *, struct mlrpc_xaction *,
-    mlrpc_heap_t *);
-static int mlsvc_xa_exchange(struct mlrpc_client *, struct mlrpc_xaction *);
-static int mlsvc_xa_read(struct mlrpc_client *, struct mlrpc_xaction *);
-static int mlsvc_xa_preserve(struct mlrpc_client *, struct mlrpc_xaction *,
-    mlrpc_heapref_t *);
-static int mlsvc_xa_destruct(struct mlrpc_client *, struct mlrpc_xaction *);
-static void mlsvc_xa_release(struct mlrpc_client *, mlrpc_heapref_t *heapref);
+static int ndr_xa_init(ndr_client_t *, ndr_xa_t *);
+static int ndr_xa_exchange(ndr_client_t *, ndr_xa_t *);
+static int ndr_xa_read(ndr_client_t *, ndr_xa_t *);
+static void ndr_xa_preserve(ndr_client_t *, ndr_xa_t *);
+static void ndr_xa_destruct(ndr_client_t *, ndr_xa_t *);
+static void ndr_xa_release(ndr_client_t *);
 
 /*
- * mlsvc_rpc_bind
+ * This call must be made to initialize an RPC client structure and bind
+ * to the remote service before any RPCs can be exchanged with that service.
  *
- * This the entry point for all client RPC services. This call must be
- * made to initialize an RPC context structure and bind to the remote
- * service before any RPCs can be exchanged with that service. The
- * descriptor is a wrapper that is used to associate an RPC handle with
- * the context data for that specific instance of the interface. The
- * handle is zeroed to ensure that it doesn't look like a valid handle.
- * The context handle is assigned to point at the RPC handle so that we
- * know when to free the context. As each handle is initialized it will
- * include a pointer to this context but only when we close this initial
- * RPC handle can the context be freed.
+ * The mlsvc_handle_t is a wrapper that is used to associate an RPC handle
+ * with the client context for an instance of the interface.  The handle
+ * is zeroed to ensure that it doesn't look like a valid handle -
+ * handle content is provided by the remove service.
  *
- * On success, return a pointer to the descriptor. Otherwise return a
- * null pointer.
+ * The client points to this top-level handle so that we know when to
+ * unbind and teardown the connection.  As each handle is initialized it
+ * will inherit a reference to the client context.
  */
 int
-mlsvc_rpc_bind(mlsvc_handle_t *desc, int fid, char *service)
+ndr_rpc_bind(mlsvc_handle_t *handle, char *server, char *domain,
+    char *username, const char *service)
 {
-	struct mlsvc_rpc_context *context;
-	int rc;
+	ndr_client_t		*clnt;
+	ndr_service_t		*svc;
+	smbrdr_session_info_t	si;
+	int			fid;
+	int			rc;
 
-	bzero(&desc->handle, sizeof (ms_handle_t));
-
-	context = malloc(sizeof (struct mlsvc_rpc_context));
-	if ((desc->context = context) == NULL)
+	if (handle == NULL || server == NULL ||
+	    domain == NULL || username == NULL)
 		return (-1);
 
-	bzero(context, sizeof (struct mlsvc_rpc_context));
-	context->cli.context = context;
+	if ((svc = ndr_svc_lookup_name(service)) == NULL)
+		return (-1);
 
-	mlrpc_binding_pool_initialize(&context->cli.binding_list,
-	    context->binding_pool, CTXT_N_BINDING_POOL);
+	if ((clnt = malloc(sizeof (ndr_client_t))) == NULL)
+		return (-1);
 
-	context->fid = fid;
-	context->handle = &desc->handle;
-	context->cli.xa_init = mlsvc_xa_init;
-	context->cli.xa_exchange = mlsvc_xa_exchange;
-	context->cli.xa_read = mlsvc_xa_read;
-	context->cli.xa_preserve = mlsvc_xa_preserve;
-	context->cli.xa_destruct = mlsvc_xa_destruct;
-	context->cli.xa_release = mlsvc_xa_release;
-
-	rc = mlrpc_c_bind(&context->cli, service, &context->binding);
-	if (MLRPC_DRC_IS_FAULT(rc)) {
-		free(context);
-		desc->context = NULL;
+	fid = smbrdr_open_pipe(server, domain, username, svc->endpoint);
+	if (fid < 0) {
+		free(clnt);
 		return (-1);
 	}
 
-	return (rc);
-}
+	bzero(clnt, sizeof (ndr_client_t));
+	clnt->handle = &handle->handle;
+	clnt->fid = fid;
 
-/*
- * mlsvc_rpc_init
- *
- * This function must be called by client side applications before
- * calling mlsvc_rpc_call to allocate a heap. The heap must be
- * destroyed by either calling mlrpc_heap_destroy or mlsvc_rpc_free.
- * Use mlrpc_heap_destroy if mlsvc_rpc_call has not yet been called.
- * Otherwise use mlsvc_rpc_free.
- *
- * Returns 0 on success. Otherwise returns -1 to indicate an error.
- */
-int
-mlsvc_rpc_init(mlrpc_heapref_t *heapref)
-{
-	bzero(heapref, sizeof (mlrpc_heapref_t));
+	ndr_svc_binding_pool_init(&clnt->binding_list,
+	    clnt->binding_pool, NDR_N_BINDING_POOL);
 
-	if ((heapref->heap = mlrpc_heap_create()) == NULL)
+	clnt->xa_init = ndr_xa_init;
+	clnt->xa_exchange = ndr_xa_exchange;
+	clnt->xa_read = ndr_xa_read;
+	clnt->xa_preserve = ndr_xa_preserve;
+	clnt->xa_destruct = ndr_xa_destruct;
+	clnt->xa_release = ndr_xa_release;
+
+	(void) smbrdr_session_info(fid, &si);
+	bzero(&handle->handle, sizeof (ndr_hdid_t));
+	handle->clnt = clnt;
+	handle->remote_os = si.si_server_os;
+
+	if (ndr_rpc_get_heap(handle) == NULL) {
+		free(clnt);
 		return (-1);
+	}
+
+	rc = ndr_clnt_bind(clnt, service, &clnt->binding);
+	if (NDR_DRC_IS_FAULT(rc)) {
+		(void) smbrdr_close_pipe(fid);
+		ndr_heap_destroy(clnt->heap);
+		free(clnt);
+		handle->clnt = NULL;
+		return (-1);
+	}
 
 	return (0);
 }
 
 /*
- * mlsvc_rpc_call
+ * Unbind and close the pipe to an RPC service.
  *
- * This function should be called by the client RPC interface functions
- * to make an RPC call. The remote service is identified by the context
- * handle, which should have been initialized with by mlsvc_rpc_bind.
- */
-int
-mlsvc_rpc_call(struct mlsvc_rpc_context *context, int opnum, void *params,
-    mlrpc_heapref_t *heapref)
-{
-	return (mlrpc_c_call(context->binding, opnum, params, heapref));
-}
-
-/*
- * mlsvc_rpc_free
+ * If the heap has been preserved we need to go through an xa release.
+ * The heap is preserved during an RPC call because that's where data
+ * returned from the server is stored.
  *
- * This function should be called by the client RPC interface functions
- * to free the heap after an RPC call returns.
+ * Otherwise we destroy the heap directly.
  */
 void
-mlsvc_rpc_free(struct mlsvc_rpc_context *context, mlrpc_heapref_t *heapref)
+ndr_rpc_unbind(mlsvc_handle_t *handle)
 {
-	mlrpc_c_free_heap(context->binding, heapref);
+	ndr_client_t *clnt = handle->clnt;
+
+	if (clnt->heap_preserved)
+		ndr_clnt_free_heap(clnt);
+	else
+		ndr_heap_destroy(clnt->heap);
+
+	(void) smbrdr_close_pipe(clnt->fid);
+	free(handle->clnt);
+	bzero(handle, sizeof (mlsvc_handle_t));
 }
 
 /*
- * The following functions provide the callback interface in the
- * context handle.
+ * Call the RPC function identified by opnum.  The remote service is
+ * identified by the handle, which should have been initialized by
+ * ndr_rpc_bind.
+ *
+ * If the RPC call is successful (returns 0), the caller must call
+ * ndr_rpc_release to release the heap.  Otherwise, we release the
+ * heap here.
  */
-/*ARGSUSED*/
-static int
-mlsvc_xa_init(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa,
-    mlrpc_heap_t *heap)
+int
+ndr_rpc_call(mlsvc_handle_t *handle, int opnum, void *params)
 {
-	struct mlndr_stream *recv_mlnds = &mxa->recv_mlnds;
-	struct mlndr_stream *send_mlnds = &mxa->send_mlnds;
+	ndr_client_t *clnt = handle->clnt;
+	int rc;
 
-	/*
-	 * If the caller hasn't provided a heap, create one here.
-	 */
-	if (heap == 0) {
-		if ((heap = mlrpc_heap_create()) == 0)
+	if (ndr_rpc_get_heap(handle) == NULL)
+		return (-1);
+
+	rc = ndr_clnt_call(clnt->binding, opnum, params);
+
+	if (NDR_DRC_IS_FAULT(rc)) {
+		ndr_rpc_release(handle);
+		return (-1);
+	}
+
+	return (0);
+}
+
+/*
+ * Returns the Native-OS of the RPC server.
+ */
+int
+ndr_rpc_server_os(mlsvc_handle_t *handle)
+{
+	return (handle->remote_os);
+}
+
+void *
+ndr_rpc_malloc(mlsvc_handle_t *handle, size_t size)
+{
+	ndr_heap_t *heap;
+
+	if ((heap = ndr_rpc_get_heap(handle)) == NULL)
+		return (NULL);
+
+	return (ndr_heap_malloc(heap, size));
+}
+
+ndr_heap_t *
+ndr_rpc_get_heap(mlsvc_handle_t *handle)
+{
+	ndr_client_t *clnt = handle->clnt;
+
+	if (clnt->heap == NULL)
+		clnt->heap = ndr_heap_create();
+
+	return (clnt->heap);
+}
+
+/*
+ * Must be called by RPC clients to free the heap after a successful RPC
+ * call, i.e. ndr_rpc_call returned 0.  The caller should take a copy
+ * of any data returned by the RPC prior to calling this function because
+ * returned data is in the heap.
+ */
+void
+ndr_rpc_release(mlsvc_handle_t *handle)
+{
+	ndr_client_t *clnt = handle->clnt;
+
+	if (clnt->heap_preserved)
+		ndr_clnt_free_heap(clnt);
+	else
+		ndr_heap_destroy(clnt->heap);
+
+	clnt->heap = NULL;
+}
+
+/*
+ * Returns true if the handle is null.
+ * Otherwise returns false.
+ */
+boolean_t
+ndr_is_null_handle(mlsvc_handle_t *handle)
+{
+	static ndr_hdid_t zero_handle;
+
+	if (handle == NULL || handle->clnt == NULL)
+		return (B_TRUE);
+
+	if (!memcmp(&handle->handle, &zero_handle, sizeof (ndr_hdid_t)))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+/*
+ * Returns true if the handle is the top level bind handle.
+ * Otherwise returns false.
+ */
+boolean_t
+ndr_is_bind_handle(mlsvc_handle_t *handle)
+{
+	return (handle->clnt->handle == &handle->handle);
+}
+
+/*
+ * Pass the client reference from parent to child.
+ */
+void
+ndr_inherit_handle(mlsvc_handle_t *child, mlsvc_handle_t *parent)
+{
+	child->clnt = parent->clnt;
+	child->remote_os = parent->remote_os;
+}
+
+void
+ndr_rpc_status(mlsvc_handle_t *handle, int opnum, DWORD status)
+{
+	ndr_service_t *svc;
+	char *name = "NDR RPC";
+	char *s = "unknown";
+
+	if (status == 0)
+		s = "success";
+	else if (NT_SC_IS_ERROR(status))
+		s = "error";
+	else if (NT_SC_IS_WARNING(status))
+		s = "warning";
+	else if (NT_SC_IS_INFO(status))
+		s = "info";
+
+	if (handle) {
+		svc = handle->clnt->binding->service;
+		name = svc->name;
+	}
+
+	smb_tracef("%s[0x%02x]: %s: %s (0x%08x)",
+	    name, opnum, s, xlate_nt_status(status), status);
+}
+
+/*
+ * The following functions provide the client callback interface.
+ * If the caller hasn't provided a heap, create one here.
+ */
+static int
+ndr_xa_init(ndr_client_t *clnt, ndr_xa_t *mxa)
+{
+	ndr_stream_t *recv_nds = &mxa->recv_nds;
+	ndr_stream_t *send_nds = &mxa->send_nds;
+	ndr_heap_t *heap = clnt->heap;
+
+	if (heap == NULL) {
+		if ((heap = ndr_heap_create()) == NULL)
 			return (-1);
+
+		clnt->heap = heap;
 	}
 
 	mxa->heap = heap;
 
-	mlnds_initialize(send_mlnds, 0, NDR_MODE_CALL_SEND, heap);
-	mlnds_initialize(recv_mlnds, 16 * 1024, NDR_MODE_RETURN_RECV, heap);
+	nds_initialize(send_nds, 0, NDR_MODE_CALL_SEND, heap);
+	nds_initialize(recv_nds, 16 * 1024, NDR_MODE_RETURN_RECV, heap);
 	return (0);
 }
 
 /*
- * mlsvc_xa_exchange
- *
  * This is the entry pointy for an RPC client call exchange with
  * a server, which will result in an smbrdr SmbTransact request.
  *
@@ -186,28 +315,26 @@ mlsvc_xa_init(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa,
  * we record as the PDU size, or a negative error code.
  */
 static int
-mlsvc_xa_exchange(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa)
+ndr_xa_exchange(ndr_client_t *clnt, ndr_xa_t *mxa)
 {
-	struct mlsvc_rpc_context *context = mcli->context;
-	struct mlndr_stream *recv_mlnds = &mxa->recv_mlnds;
-	struct mlndr_stream *send_mlnds = &mxa->send_mlnds;
-	int rc;
+	ndr_stream_t *recv_nds = &mxa->recv_nds;
+	ndr_stream_t *send_nds = &mxa->send_nds;
+	int nbytes;
 
-	rc = smbrdr_transact(context->fid,
-	    (char *)send_mlnds->pdu_base_offset, send_mlnds->pdu_size,
-	    (char *)recv_mlnds->pdu_base_offset, recv_mlnds->pdu_max_size);
+	nbytes = smbrdr_transact(clnt->fid,
+	    (char *)send_nds->pdu_base_offset, send_nds->pdu_size,
+	    (char *)recv_nds->pdu_base_offset, recv_nds->pdu_max_size);
 
-	if (rc < 0)
-		recv_mlnds->pdu_size = 0;
-	else
-		recv_mlnds->pdu_size = rc;
+	if (nbytes < 0) {
+		recv_nds->pdu_size = 0;
+		return (-1);
+	}
 
-	return (rc);
+	recv_nds->pdu_size = nbytes;
+	return (nbytes);
 }
 
 /*
- * mlsvc_xa_read
- *
  * This entry point will be invoked if the xa-exchange response contained
  * only the first fragment of a multi-fragment response.  The RPC client
  * code will then make repeated xa-read requests to obtain the remaining
@@ -218,91 +345,70 @@ mlsvc_xa_exchange(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa)
  * code.
  */
 static int
-mlsvc_xa_read(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa)
+ndr_xa_read(ndr_client_t *clnt, ndr_xa_t *mxa)
 {
-	struct mlsvc_rpc_context *context = mcli->context;
-	struct mlndr_stream *mlnds = &mxa->recv_mlnds;
+	ndr_stream_t *nds = &mxa->recv_nds;
 	int len;
-	int rc;
+	int nbytes;
 
-	if ((len = (mlnds->pdu_max_size - mlnds->pdu_size)) < 0)
+	if ((len = (nds->pdu_max_size - nds->pdu_size)) < 0)
 		return (-1);
 
-	rc = smbrdr_readx(context->fid,
-	    (char *)mlnds->pdu_base_offset + mlnds->pdu_size, len);
+	nbytes = smbrdr_readx(clnt->fid,
+	    (char *)nds->pdu_base_offset + nds->pdu_size, len);
 
-	if (rc < 0)
+	if (nbytes < 0)
 		return (-1);
 
-	mlnds->pdu_size += rc;
+	nds->pdu_size += nbytes;
 
-	if (mlnds->pdu_size > mlnds->pdu_max_size) {
-		mlnds->pdu_size = mlnds->pdu_max_size;
+	if (nds->pdu_size > nds->pdu_max_size) {
+		nds->pdu_size = nds->pdu_max_size;
 		return (-1);
 	}
 
-	return (rc);
+	return (nbytes);
 }
 
 /*
- * mlsvc_xa_preserve
- *
- * This function is called to preserve the heap. We save a reference
- * to the heap and set the mxa heap pointer to null so that the heap
- * will not be discarded when mlsvc_xa_destruct is called.
+ * Preserve the heap so that the client application has access to data
+ * returned from the server after an RPC call.
  */
-/*ARGSUSED*/
-static int
-mlsvc_xa_preserve(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa,
-    mlrpc_heapref_t *heapref)
-{
-	heapref->state = MLRPC_HRST_PRESERVED;
-	heapref->heap = mxa->heap;
-	heapref->recv_pdu_buf = (char *)mxa->recv_mlnds.pdu_base_addr;
-	heapref->send_pdu_buf = (char *)mxa->send_mlnds.pdu_base_addr;
-
-	mxa->heap = NULL;
-	return (0);
-}
-
-/*
- * mlsvc_xa_destruct
- *
- * This function is called to dispose of the heap. If the heap has
- * been preserved via mlsvc_xa_preserve, the mxa heap pointer will
- * be null and we assume that the heap will be released later via
- * a call to mlsvc_xa_release. Otherwise we free the memory here.
- */
-/*ARGSUSED*/
-static int
-mlsvc_xa_destruct(struct mlrpc_client *mcli, struct mlrpc_xaction *mxa)
-{
-	if (mxa->heap) {
-		mlnds_destruct(&mxa->recv_mlnds);
-		mlnds_destruct(&mxa->send_mlnds);
-		mlrpc_heap_destroy(mxa->heap);
-	}
-
-	return (0);
-}
-
-/*
- * mlsvc_xa_release
- *
- * This function is called, via some indirection, as a result of a
- * call to mlsvc_rpc_free. This is where we free the heap memory
- * that was preserved during an RPC call.
- */
-/*ARGSUSED*/
 static void
-mlsvc_xa_release(struct mlrpc_client *mcli, mlrpc_heapref_t *heapref)
+ndr_xa_preserve(ndr_client_t *clnt, ndr_xa_t *mxa)
 {
-	if (heapref == NULL)
-		return;
+	assert(clnt->heap == mxa->heap);
 
-	if (heapref->state == MLRPC_HRST_PRESERVED) {
-		free(heapref->recv_pdu_buf);
-		free(heapref->send_pdu_buf);
-		mlrpc_heap_destroy(heapref->heap);
+	clnt->heap_preserved = B_TRUE;
+	mxa->heap = NULL;
+}
+
+/*
+ * Dispose of the transaction streams.  If the heap has not been
+ * preserved, we can destroy it here.
+ */
+static void
+ndr_xa_destruct(ndr_client_t *clnt, ndr_xa_t *mxa)
+{
+	nds_destruct(&mxa->recv_nds);
+	nds_destruct(&mxa->send_nds);
+
+	if (!clnt->heap_preserved) {
+		ndr_heap_destroy(mxa->heap);
+		mxa->heap = NULL;
+		clnt->heap = NULL;
+	}
+}
+
+/*
+ * Dispose of a preserved heap.
+ */
+static void
+ndr_xa_release(ndr_client_t *clnt)
+{
+	if (clnt->heap_preserved) {
+		ndr_heap_destroy(clnt->heap);
+		clnt->heap = NULL;
+		clnt->heap_preserved = B_FALSE;
 	}
 }

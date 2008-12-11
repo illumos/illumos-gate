@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_BROWSER_H_
 #define	_BROWSER_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NetBIOS name types describe the functionality of the registration.
@@ -181,6 +179,12 @@ extern "C" {
  */
 #define	NETLOGON_PROTO_NETLOGON			0x01
 #define	NETLOGON_PROTO_SAMLOGON			0x02
+
+typedef struct smb_ntdomain_t {
+	char 		n_domain[SMB_PI_MAX_DOMAIN];
+	char 		n_name[SMB_PI_MAX_DOMAIN];
+	uint32_t	n_ipaddr;
+} smb_ntdomain_t;
 
 #ifdef __cplusplus
 }

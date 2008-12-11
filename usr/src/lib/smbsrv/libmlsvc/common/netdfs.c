@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Net DFS server side RPC service.
@@ -38,7 +36,7 @@
 #include <smbsrv/lmdfs.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/nterror.h>
-#include <smbsrv/mlrpc.h>
+#include <smbsrv/libmlrpc.h>
 #include <smbsrv/ndl/netdfs.ndl>
 
 typedef struct {
@@ -48,22 +46,22 @@ typedef struct {
 	char *buf;
 } netdfs_unc_t;
 
-static int netdfs_unc_parse(struct mlrpc_xaction *, const char *,
+static int netdfs_unc_parse(ndr_xa_t *, const char *,
     netdfs_unc_t *);
 
-static int netdfs_s_getver(void *, struct mlrpc_xaction *);
-static int netdfs_s_add(void *, struct mlrpc_xaction *);
-static int netdfs_s_remove(void *, struct mlrpc_xaction *);
-static int netdfs_s_setinfo(void *, struct mlrpc_xaction *);
-static int netdfs_s_getinfo(void *, struct mlrpc_xaction *);
-static int netdfs_s_enum(void *, struct mlrpc_xaction *);
-static int netdfs_s_move(void *, struct mlrpc_xaction *);
-static int netdfs_s_rename(void *, struct mlrpc_xaction *);
-static int netdfs_s_addstdroot(void *, struct mlrpc_xaction *);
-static int netdfs_s_remstdroot(void *, struct mlrpc_xaction *);
-static int netdfs_s_enumex(void *, struct mlrpc_xaction *);
+static int netdfs_s_getver(void *, ndr_xa_t *);
+static int netdfs_s_add(void *, ndr_xa_t *);
+static int netdfs_s_remove(void *, ndr_xa_t *);
+static int netdfs_s_setinfo(void *, ndr_xa_t *);
+static int netdfs_s_getinfo(void *, ndr_xa_t *);
+static int netdfs_s_enum(void *, ndr_xa_t *);
+static int netdfs_s_move(void *, ndr_xa_t *);
+static int netdfs_s_rename(void *, ndr_xa_t *);
+static int netdfs_s_addstdroot(void *, ndr_xa_t *);
+static int netdfs_s_remstdroot(void *, ndr_xa_t *);
+static int netdfs_s_enumex(void *, ndr_xa_t *);
 
-static mlrpc_stub_table_t netdfs_stub_table[] = {
+static ndr_stub_table_t netdfs_stub_table[] = {
 	{ netdfs_s_getver,	NETDFS_OPNUM_GETVER },
 	{ netdfs_s_add,		NETDFS_OPNUM_ADD },
 	{ netdfs_s_remove,	NETDFS_OPNUM_REMOVE },
@@ -78,7 +76,7 @@ static mlrpc_stub_table_t netdfs_stub_table[] = {
 	{0}
 };
 
-static mlrpc_service_t netdfs_service = {
+static ndr_service_t netdfs_service = {
 	"NETDFS",			/* name */
 	"DFS",				/* desc */
 	"\\dfs",			/* endpoint */
@@ -103,7 +101,7 @@ static mlrpc_service_t netdfs_service = {
 void
 netdfs_initialize(void)
 {
-	(void) mlrpc_register_service(&netdfs_service);
+	(void) ndr_svc_register(&netdfs_service);
 }
 
 /*
@@ -115,12 +113,12 @@ netdfs_initialize(void)
  */
 /*ARGSUSED*/
 static int
-netdfs_s_getver(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_getver(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_getver *param = arg;
 
 	param->version = DFS_MANAGER_VERSION_W2K3;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -128,7 +126,7 @@ netdfs_s_getver(void *arg, struct mlrpc_xaction *mxa)
  * dfs_path.
  */
 static int
-netdfs_s_add(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_add(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_add *param = arg;
 	netdfs_unc_t unc;
@@ -138,7 +136,7 @@ netdfs_s_add(void *arg, struct mlrpc_xaction *mxa)
 	    param->share == NULL) {
 		bzero(param, sizeof (struct netdfs_add));
 		param->status = ERROR_INVALID_PARAMETER;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (netdfs_unc_parse(mxa, (char *)param->dfs_path, &unc) != 0) {
@@ -154,12 +152,12 @@ netdfs_s_add(void *arg, struct mlrpc_xaction *mxa)
 	if (param->status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct netdfs_add));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	bzero(param, sizeof (struct netdfs_add));
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -170,7 +168,7 @@ netdfs_s_add(void *arg, struct mlrpc_xaction *mxa)
  * the volume from the DFS.
  */
 static int
-netdfs_s_remove(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_remove(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_remove *param = arg;
 	netdfs_unc_t unc;
@@ -180,7 +178,7 @@ netdfs_s_remove(void *arg, struct mlrpc_xaction *mxa)
 	    param->share == NULL) {
 		bzero(param, sizeof (struct netdfs_remove));
 		param->status = ERROR_INVALID_PARAMETER;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (netdfs_unc_parse(mxa, (char *)param->dfs_path, &unc) != 0) {
@@ -196,12 +194,12 @@ netdfs_s_remove(void *arg, struct mlrpc_xaction *mxa)
 	if (param->status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct netdfs_remove));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	bzero(param, sizeof (struct netdfs_remove));
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -213,7 +211,7 @@ netdfs_s_remove(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netdfs_s_setinfo(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_setinfo(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_setinfo *param = arg;
 	netdfs_unc_t unc;
@@ -222,7 +220,7 @@ netdfs_s_setinfo(void *arg, struct mlrpc_xaction *mxa)
 	if (param->dfs_path == NULL) {
 		bzero(param, sizeof (struct netdfs_setinfo));
 		param->status = ERROR_INVALID_PARAMETER;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (netdfs_unc_parse(mxa, (char *)param->dfs_path, &unc) != 0) {
@@ -235,7 +233,7 @@ netdfs_s_setinfo(void *arg, struct mlrpc_xaction *mxa)
 	if (param->status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct netdfs_setinfo));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	switch (param->info.level) {
@@ -247,12 +245,12 @@ netdfs_s_setinfo(void *arg, struct mlrpc_xaction *mxa)
 	default:
 		bzero(param, sizeof (struct netdfs_setinfo));
 		param->status = ERROR_INVALID_LEVEL;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	bzero(param, sizeof (struct netdfs_setinfo));
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -265,7 +263,7 @@ netdfs_s_setinfo(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netdfs_s_getinfo(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_getinfo(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_getinfo *param = arg;
 	netdfs_unc_t unc;
@@ -274,7 +272,7 @@ netdfs_s_getinfo(void *arg, struct mlrpc_xaction *mxa)
 	if (param->dfs_path == NULL) {
 		bzero(param, sizeof (struct netdfs_getinfo));
 		param->status = ERROR_INVALID_PARAMETER;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (netdfs_unc_parse(mxa, (char *)param->dfs_path, &unc) != 0) {
@@ -287,7 +285,7 @@ netdfs_s_getinfo(void *arg, struct mlrpc_xaction *mxa)
 	if (param->status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct netdfs_getinfo));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	switch (param->level) {
@@ -305,12 +303,12 @@ netdfs_s_getinfo(void *arg, struct mlrpc_xaction *mxa)
 	default:
 		bzero(param, sizeof (struct netdfs_getinfo));
 		param->status = ERROR_INVALID_LEVEL;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	bzero(param, sizeof (struct netdfs_getinfo));
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -322,7 +320,7 @@ netdfs_s_getinfo(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netdfs_s_enum(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_enum(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_enum *param = arg;
 
@@ -335,12 +333,12 @@ netdfs_s_enum(void *arg, struct mlrpc_xaction *mxa)
 	default:
 		(void) bzero(param, sizeof (struct netdfs_enum));
 		param->status = ERROR_INVALID_LEVEL;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	(void) bzero(param, sizeof (struct netdfs_enum));
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -349,19 +347,19 @@ netdfs_s_enum(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netdfs_s_move(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_move(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_move *param = arg;
 
 	if (param->dfs_path == NULL || param->new_path == NULL) {
 		bzero(param, sizeof (struct netdfs_move));
 		param->status = ERROR_INVALID_PARAMETER;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	bzero(param, sizeof (struct netdfs_move));
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -369,19 +367,19 @@ netdfs_s_move(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netdfs_s_rename(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_rename(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_rename *param = arg;
 
 	if (param->dfs_path == NULL || param->new_path == NULL) {
 		bzero(param, sizeof (struct netdfs_rename));
 		param->status = ERROR_INVALID_PARAMETER;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	bzero(param, sizeof (struct netdfs_rename));
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -389,13 +387,13 @@ netdfs_s_rename(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netdfs_s_addstdroot(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_addstdroot(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_addstdroot *param = arg;
 
 	bzero(param, sizeof (struct netdfs_addstdroot));
 	param->status = ERROR_INVALID_PARAMETER;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -403,13 +401,13 @@ netdfs_s_addstdroot(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netdfs_s_remstdroot(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_remstdroot(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_remstdroot *param = arg;
 
 	bzero(param, sizeof (struct netdfs_remstdroot));
 	param->status = ERROR_INVALID_PARAMETER;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -420,7 +418,7 @@ netdfs_s_remstdroot(void *arg, struct mlrpc_xaction *mxa)
  * Valid levels are 1-3, 300.
  */
 static int
-netdfs_s_enumex(void *arg, struct mlrpc_xaction *mxa)
+netdfs_s_enumex(void *arg, ndr_xa_t *mxa)
 {
 	struct netdfs_enumex *param = arg;
 	netdfs_unc_t unc;
@@ -429,11 +427,11 @@ netdfs_s_enumex(void *arg, struct mlrpc_xaction *mxa)
 	if (param->dfs_path == NULL) {
 		bzero(param, sizeof (struct netdfs_enumex));
 		param->status = ERROR_INVALID_PARAMETER;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (param->resume_handle == NULL)
-		param->resume_handle = MLRPC_HEAP_NEW(mxa, DWORD);
+		param->resume_handle = NDR_NEW(mxa, DWORD);
 
 	if (param->resume_handle)
 		*(param->resume_handle) = 0;
@@ -451,19 +449,19 @@ netdfs_s_enumex(void *arg, struct mlrpc_xaction *mxa)
 	if (param->status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct netdfs_enumex));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
-	param->info = MLRPC_HEAP_NEW(mxa, struct netdfs_enum_info);
+	param->info = NDR_NEW(mxa, struct netdfs_enum_info);
 	if (param->info == NULL) {
 		bzero(param, sizeof (struct netdfs_enumex));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	bzero(param->info, sizeof (struct netdfs_enumex));
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -473,14 +471,14 @@ netdfs_s_enumex(void *arg, struct mlrpc_xaction *mxa)
  * Returns 0 on success, otherwise -1 to indicate an error.
  */
 static int
-netdfs_unc_parse(struct mlrpc_xaction *mxa, const char *path, netdfs_unc_t *unc)
+netdfs_unc_parse(ndr_xa_t *mxa, const char *path, netdfs_unc_t *unc)
 {
 	char *p;
 
 	if (path == NULL || unc == NULL)
 		return (-1);
 
-	if ((unc->buf = MLRPC_HEAP_STRSAVE(mxa, (char *)path)) == NULL)
+	if ((unc->buf = NDR_STRDUP(mxa, (char *)path)) == NULL)
 		return (-1);
 
 	if ((p = strchr(unc->buf, '\n')) != NULL)

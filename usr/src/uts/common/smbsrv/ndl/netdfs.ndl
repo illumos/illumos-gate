@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NETDFS_NDL_
 #define	_NETDFS_NDL_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NT Distributed File Service (NETDFS) RPC interface definition.
@@ -35,10 +33,10 @@
 #include "ndrtypes.ndl"
 
 
-#define	NETDFS_ABSTRACT_UUID		"4fc742e0-4a10-11cf-827300aa004ae673"
+#define	NETDFS_ABSTRACT_UUID		"4fc742e0-4a10-11cf-8273-00aa004ae673"
 #define	NETDFS_ABSTRACT_VERS		3
 
-#define	NETDFS_TRANSFER_UUID		"8a885d04-1ceb-11c9-9fe808002b104860"
+#define	NETDFS_TRANSFER_UUID		"8a885d04-1ceb-11c9-9fe8-08002b104860"
 #define	NETDFS_TRANSFER_VERS		2
 
 #define	NETDFS_OPNUM_GETVER		0x00

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -58,15 +56,30 @@ static struct sa_proto_handle sa_proto_handle;
 void proto_plugin_fini();
 
 /*
+ * Returns true if name is "." or "..", otherwise returns false.
+ */
+static boolean_t
+proto_is_dot_or_dotdot(const char *name)
+{
+	if (*name != '.')
+		return (B_FALSE);
+
+	if ((name[1] == '\0') || (name[1] == '.' && name[2] == '\0'))
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+/*
  * proto_plugin_init()
  *
  * Initialize the protocol specific plugin modules.
  *
- * Walk /usr/lib/fs/\* for libshare_*.so modules. That is,
- * /usr/lib/fs/nfs/libshare_nfs.so. The protocol specific directory
- * would have a modules with name libshare_<proto>.so. If one is
- * found, initialize it and add to the internal list of
- * protocols. These are used for protocol specific operations.
+ * Walk /usr/lib/fs/\* for libshare_*.so modules, for example,
+ * /usr/lib/fs/nfs/libshare_nfs.so. A protocol specific directory
+ * would have modules with names of the form libshare_<proto>.so.
+ * For each protocol found, initialize it and add it to the internal
+ * list of protocols. These are used for protocol specific operations.
  */
 
 int
@@ -80,60 +93,69 @@ proto_plugin_init()
 	struct dirent *dent;
 	int ret = SA_OK;
 	struct stat st;
-
-	/*
-	 * Should walk "/usr/lib/fs/" for files of the form:
-	 * libshare_*.so
-	 */
-	dir = opendir(SA_LIB_DIR);
-	if (dir != NULL) {
-		while (ret == SA_OK && (dent = readdir(dir)) != NULL) {
-			char path[MAXPATHLEN];
-			char isa[MAXISALEN];
+	char isa[MAXISALEN];
 
 #if defined(_LP64)
-			if (sysinfo(SI_ARCHITECTURE_64, isa, MAXISALEN) == -1)
-				isa[0] = '\0';
+	if (sysinfo(SI_ARCHITECTURE_64, isa, MAXISALEN) == -1)
+		isa[0] = '\0';
 #else
-			isa[0] = '\0';
+	isa[0] = '\0';
 #endif
-			(void) snprintf(path, MAXPATHLEN,
-			    "%s/%s/%s/libshare_%s.so.1", SA_LIB_DIR,
-			    dent->d_name, isa, dent->d_name);
-			/*
-			 * If file doesn't exist, don't try to map it
-			 */
-			if (stat(path, &st) < 0)
-				continue;
 
-			dlhandle = dlopen(path, RTLD_FIRST|RTLD_LAZY);
-			if (dlhandle != NULL) {
-				plugin_ops = (struct sa_plugin_ops *)
-				    dlsym(dlhandle, "sa_plugin_ops");
-				proto = (struct sa_proto_plugin *)
-				    calloc(1, sizeof (struct sa_proto_plugin));
-				if (proto != NULL) {
-					proto->plugin_ops = plugin_ops;
-					proto->plugin_handle = dlhandle;
-					num_protos++;
-					proto->plugin_next = sap_proto_list;
-					sap_proto_list = proto;
-				} else {
-					ret = SA_NO_MEMORY;
-					/* Don't leak a dlhandle */
-					(void) dlclose(dlhandle);
-					break;
-				}
-			} else {
-				(void) fprintf(stderr,
-				    dgettext(TEXT_DOMAIN,
-				    "Error in plugin for protocol %s: %s\n"),
-				    dent->d_name, dlerror());
-			}
+	if ((dir = opendir(SA_LIB_DIR)) == NULL)
+		return (SA_OK);
+
+	while ((dent = readdir(dir)) != NULL) {
+		char path[MAXPATHLEN];
+
+		if (proto_is_dot_or_dotdot(dent->d_name))
+			continue;
+
+		(void) snprintf(path, MAXPATHLEN,
+		    "%s/%s/%s/libshare_%s.so.1", SA_LIB_DIR,
+		    dent->d_name, isa, dent->d_name);
+
+		/*
+		 * If file doesn't exist, don't try to map it
+		 */
+		if (stat(path, &st) < 0)
+			continue;
+
+		if ((dlhandle = dlopen(path, RTLD_FIRST|RTLD_LAZY)) == NULL) {
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+			    "Error in plugin for protocol %s: %s\n"),
+			    dent->d_name, dlerror());
+			continue;
 		}
-		(void) closedir(dir);
+
+		plugin_ops = (struct sa_plugin_ops *)
+		    dlsym(dlhandle, "sa_plugin_ops");
+		if (plugin_ops == NULL) {
+			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+			    "Error in plugin ops for protocol %s: %s\n"),
+			    dent->d_name, dlerror());
+			(void) dlclose(dlhandle);
+			continue;
+		}
+
+		proto = (struct sa_proto_plugin *)
+		    calloc(1, sizeof (struct sa_proto_plugin));
+		if (proto == NULL) {
+			(void) dlclose(dlhandle);
+			ret = SA_NO_MEMORY;
+			continue;
+		}
+
+		proto->plugin_ops = plugin_ops;
+		proto->plugin_handle = dlhandle;
+		num_protos++;
+		proto->plugin_next = sap_proto_list;
+		sap_proto_list = proto;
 	}
-	if (ret == SA_OK) {
+
+	(void) closedir(dir);
+
+	if (num_protos != 0) {
 		sa_proto_handle.sa_proto =
 		    (char **)calloc(num_protos, sizeof (char *));
 		sa_proto_handle.sa_ops =

@@ -97,17 +97,7 @@
 #define	SVCCTL_OPNUM_ValidatePnPService		0x35
 #define	SVCCTL_OPNUM_OpenServiceStatusHandle	0x36
 
-/*
- * Standard opaque 20 byte RPC handle.
- */
-struct svcctl_handle {
-	DWORD hand1;
-	DWORD hand2;
-	WORD  hand3[2];
-	BYTE  hand4[8];
-};
-
-typedef struct svcctl_handle svcctl_handle_t;
+CONTEXT_HANDLE(svcctl_handle) svcctl_handle_t;
 
 /*
  * The svc_status (SERVICE_STATUS) structure contains information about a

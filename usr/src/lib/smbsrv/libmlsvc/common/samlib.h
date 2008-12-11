@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_SAMLIB_H
 #define	_SMBSRV_SAMLIB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Prototypes for the SAM library and RPC client side library interface.
  * There are two levels of interface defined here: sam_xxx and samr_xxx.
@@ -38,7 +36,6 @@
  */
 
 #include <smbsrv/ndl/samrpc.ndl>
-#include <smbsrv/mlsvc_util.h>
 
 
 #ifdef __cplusplus

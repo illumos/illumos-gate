@@ -349,7 +349,7 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 	/*
 	 * stream files not allowed
 	 */
-	if (smb_stream_parse_name(path, NULL, NULL)) {
+	if (smb_is_stream_name(path)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 		    ERRDOS, ERROR_INVALID_NAME);
 		return (SDRC_ERROR);

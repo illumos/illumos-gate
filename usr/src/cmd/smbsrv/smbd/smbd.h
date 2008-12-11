@@ -45,9 +45,8 @@ extern void smbd_opipe_dsrv_stop(void);
 extern int smb_share_dsrv_start(void);
 extern void smb_share_dsrv_stop(void);
 
-extern int smb_netlogon_init(void);
-extern void smb_set_netlogon_cred(void);
-extern int smbd_locate_dc_start(char *);
+extern boolean_t smbd_set_netlogon_cred(void);
+extern int smbd_locate_dc_start(void);
 
 extern smb_token_t *smbd_user_auth_logon(netr_client_t *);
 extern void smbd_user_nonauth_logon(uint32_t);
@@ -55,6 +54,7 @@ extern void smbd_user_auth_logoff(uint32_t);
 extern uint32_t smbd_join(smb_joininfo_t *);
 
 extern int smbd_ioctl(int, smb_io_t *);
+extern void smbd_set_secmode(int);
 
 typedef struct smbd {
 	const char	*s_version;	/* smbd version string */
@@ -64,14 +64,14 @@ typedef struct smbd {
 	gid_t		s_gid;		/* GID of current daemon */
 	int		s_fg;		/* Run in foreground */
 	int		s_drv_fd;	/* Handle for SMB kernel driver */
-	int		s_shutdown_flag; /* Fields for shutdown control */
-	int		s_sigval;
+	boolean_t	s_shutting_down; /* shutdown control */
+	volatile uint_t	s_sigval;
+	volatile uint_t	s_refreshes;
 	boolean_t	s_kbound;	/* B_TRUE if bound to kernel */
 	int		s_door_lmshr;
 	int		s_door_srv;
 	int		s_door_opipe;
 	int		s_secmode;	/* Current security mode */
-	smb_kmod_cfg_t	s_kcfg;		/* Current Kernel configuration */
 } smbd_t;
 
 #ifdef __cplusplus

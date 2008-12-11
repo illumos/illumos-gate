@@ -220,8 +220,15 @@ smb_delete_single_file(smb_request_t *sr, smb_error_t *err)
 {
 	smb_fqi_t *fqi;
 	smb_attr_t ret_attr;
+	uint32_t status;
 
 	fqi = &sr->arg.dirop.fqi;
+
+	status = smb_validate_object_name(fqi->path, 0);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_delete_error(err, status, ERRDOS, ERROR_INVALID_NAME);
+		return (-1);
+	}
 
 	if (smb_fsop_lookup_name(sr, sr->user_cr, 0, sr->tid_tree->t_snode,
 	    fqi->dir_snode, fqi->last_comp, &fqi->last_snode, &ret_attr) != 0) {

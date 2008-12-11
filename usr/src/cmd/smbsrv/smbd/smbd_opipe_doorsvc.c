@@ -23,9 +23,6 @@
  * Use is subject to license terms.
  */
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <strings.h>
 #include <stdlib.h>
@@ -39,10 +36,7 @@
 #include <pthread.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/mlrpc.h>
 #include <smbsrv/libmlrpc.h>
-#include <smbsrv/mlsvc.h>
-#include <smbsrv/mlsvc_util.h>
 
 
 static int smbd_opipe_fd = -1;
@@ -128,7 +122,7 @@ smbd_opipe_dispatch(void *cookie, char *argp, size_t arg_size,
 
 	switch (hdr.oh_op) {
 	case SMB_OPIPE_OPEN:
-		hdr.oh_status = ndr_s_open(hdr.oh_fid, data, datalen);
+		hdr.oh_status = ndr_pipe_open(hdr.oh_fid, data, datalen);
 
 		hdr.oh_datalen = 0;
 		hdr.oh_resid = 0;
@@ -136,7 +130,7 @@ smbd_opipe_dispatch(void *cookie, char *argp, size_t arg_size,
 		break;
 
 	case SMB_OPIPE_CLOSE:
-		hdr.oh_status = ndr_s_close(hdr.oh_fid);
+		hdr.oh_status = ndr_pipe_close(hdr.oh_fid);
 
 		hdr.oh_datalen = 0;
 		hdr.oh_resid = 0;
@@ -147,7 +141,7 @@ smbd_opipe_dispatch(void *cookie, char *argp, size_t arg_size,
 		data = (uint8_t *)buf + hdr_size;
 		datalen = hdr.oh_datalen;
 
-		hdr.oh_status = ndr_s_read(hdr.oh_fid, data, &datalen,
+		hdr.oh_status = ndr_pipe_read(hdr.oh_fid, data, &datalen,
 		    &hdr.oh_resid);
 
 		hdr.oh_datalen = datalen;
@@ -155,7 +149,7 @@ smbd_opipe_dispatch(void *cookie, char *argp, size_t arg_size,
 		break;
 
 	case SMB_OPIPE_WRITE:
-		hdr.oh_status = ndr_s_write(hdr.oh_fid, data, datalen);
+		hdr.oh_status = ndr_pipe_write(hdr.oh_fid, data, datalen);
 
 		hdr.oh_datalen = 0;
 		hdr.oh_resid = 0;

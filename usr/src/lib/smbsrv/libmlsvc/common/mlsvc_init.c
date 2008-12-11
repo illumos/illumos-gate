@@ -35,17 +35,7 @@
 #include <smbsrv/smb_common_door.h>
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlsvc.h>
-
-void dssetup_initialize(void);
-void srvsvc_initialize(void);
-void wkssvc_initialize(void);
-void lsarpc_initialize(void);
-void logr_initialize(void);
-void netr_initialize(void);
-void samr_initialize(void);
-void svcctl_initialize(void);
-void winreg_initialize(void);
-int srvsvc_gettime(unsigned long *);
+#include <mlsvc.h>
 
 static void *mlsvc_keepalive(void *);
 
@@ -61,7 +51,7 @@ static int mlsvc_door_fd = -1;
 static mutex_t mlsvc_fd_mutex;
 
 /*
- * All mlrpc initialization is invoked from here.
+ * All NDR RPC service initialization is invoked from here.
  * Returns 0 upon success.  Otherwise, returns -1.
  */
 int
@@ -69,6 +59,9 @@ mlsvc_init(void)
 {
 	pthread_attr_t tattr;
 	int rc;
+
+	if ((rc = smb_dclocator_init()) != 0)
+		return (rc);
 
 	srvsvc_initialize();
 	wkssvc_initialize();
@@ -79,6 +72,8 @@ mlsvc_init(void)
 	svcctl_initialize();
 	winreg_initialize();
 	logr_initialize();
+	msgsvcsend_initialize();
+	spoolss_initialize();
 
 	(void) pthread_attr_init(&tattr);
 	(void) pthread_attr_setdetachstate(&tattr, PTHREAD_CREATE_DETACHED);
@@ -93,17 +88,12 @@ static void *
 mlsvc_keepalive(void *arg)
 {
 	unsigned long t;
-	nt_domain_t *domain;
 
 	for (;;) {
 		(void) sleep(MLSVC_KEEPALIVE_INTERVAL);
 
-		if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
-			domain = nt_domain_lookupbytype(NT_DOMAIN_PRIMARY);
-			if (domain == NULL)
-				(void) lsa_query_primary_domain_info();
+		if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN)
 			(void) srvsvc_gettime(&t);
-		}
 	}
 
 	/*NOTREACHED*/

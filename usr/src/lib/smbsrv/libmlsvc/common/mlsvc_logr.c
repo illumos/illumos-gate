@@ -33,9 +33,10 @@
 #include <netdb.h>
 
 #include <smbsrv/libsmb.h>
+#include <smbsrv/libmlrpc.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/nmpipes.h>
-#include <smbsrv/mlsvc_util.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/eventlog.ndl>
 
 #define	FWD	+1
@@ -155,13 +156,13 @@ typedef struct log_info {
 #define	LOGR_KEY			"LogrOpen"
 
 
-static int logr_s_EventLogClose(void *, struct mlrpc_xaction *);
-static int logr_s_EventLogQueryCount(void *, struct mlrpc_xaction *);
-static int logr_s_EventLogGetOldestRec(void *, struct mlrpc_xaction *);
-static int logr_s_EventLogOpen(void *, struct mlrpc_xaction *);
-static int logr_s_EventLogRead(void *, struct mlrpc_xaction *);
+static int logr_s_EventLogClose(void *, ndr_xa_t *);
+static int logr_s_EventLogQueryCount(void *, ndr_xa_t *);
+static int logr_s_EventLogGetOldestRec(void *, ndr_xa_t *);
+static int logr_s_EventLogOpen(void *, ndr_xa_t *);
+static int logr_s_EventLogRead(void *, ndr_xa_t *);
 
-static mlrpc_stub_table_t logr_stub_table[] = {
+static ndr_stub_table_t logr_stub_table[] = {
 	{ logr_s_EventLogClose,		LOGR_OPNUM_EventLogClose },
 	{ logr_s_EventLogQueryCount,	LOGR_OPNUM_EventLogQueryCount },
 	{ logr_s_EventLogGetOldestRec,	LOGR_OPNUM_EventLogGetOldestRec },
@@ -170,13 +171,13 @@ static mlrpc_stub_table_t logr_stub_table[] = {
 	{0}
 };
 
-static mlrpc_service_t logr_service = {
+static ndr_service_t logr_service = {
 	"LOGR",				/* name */
 	"Event Log Service",		/* desc */
 	"\\eventlog",			/* endpoint */
 	PIPE_NTSVCS,			/* sec_addr_port */
-	"82273fdc-e32a-18c3-3f78827929dc23ea", 0,	/* abstract */
-	"8a885d04-1ceb-11c9-9fe808002b104860", 2,	/* transfer */
+	"82273fdc-e32a-18c3-3f78-827929dc23ea", 0,	/* abstract */
+	NDR_TRANSFER_SYNTAX_UUID,		2,	/* transfer */
 	0,				/* no bind_instance_size */
 	0,				/* no bind_req() */
 	0,				/* no unbind_and_close() */
@@ -222,7 +223,7 @@ logr_initialize(void)
 	(void) mts_mbstowcs(wcs_srcname, logr_sysname, len);
 	srcname_len = len * sizeof (mts_wchar_t);
 
-	(void) mlrpc_register_service(&logr_service);
+	(void) ndr_svc_register(&logr_service);
 }
 
 /*
@@ -233,7 +234,7 @@ logr_initialize(void)
  * handle for the client.
  */
 static int
-logr_s_EventLogClose(void *arg, struct mlrpc_xaction *mxa)
+logr_s_EventLogClose(void *arg, ndr_xa_t *mxa)
 {
 	struct logr_EventLogClose *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
@@ -242,7 +243,7 @@ logr_s_EventLogClose(void *arg, struct mlrpc_xaction *mxa)
 	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
 		bzero(&param->result_handle, sizeof (logr_handle_t));
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	free(hd->nh_data);
@@ -250,7 +251,7 @@ logr_s_EventLogClose(void *arg, struct mlrpc_xaction *mxa)
 
 	bzero(&param->result_handle, sizeof (logr_handle_t));
 	param->status = NT_STATUS_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -260,13 +261,13 @@ logr_s_EventLogClose(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-logr_s_EventLogOpen(void *arg, struct mlrpc_xaction *mxa)
+logr_s_EventLogOpen(void *arg, ndr_xa_t *mxa)
 {
 	struct logr_EventLogOpen *param = arg;
 
 	bzero(&param->handle, sizeof (logr_handle_t));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -289,7 +290,7 @@ logr_get_snapshot(void)
  * call.
  */
 static int
-logr_s_EventLogQueryCount(void *arg, struct mlrpc_xaction *mxa)
+logr_s_EventLogQueryCount(void *arg, ndr_xa_t *mxa)
 {
 	struct logr_EventLogQueryCount *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
@@ -298,18 +299,18 @@ logr_s_EventLogQueryCount(void *arg, struct mlrpc_xaction *mxa)
 
 	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if ((data = logr_get_snapshot()) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	hd->nh_data = data;
 	param->rec_num = data->tot_recnum;
 	param->status = NT_STATUS_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -318,7 +319,7 @@ logr_s_EventLogQueryCount(void *arg, struct mlrpc_xaction *mxa)
  * Return oldest record number in the snapshot as result of RPC call.
  */
 static int
-logr_s_EventLogGetOldestRec(void *arg, struct mlrpc_xaction *mxa)
+logr_s_EventLogGetOldestRec(void *arg, ndr_xa_t *mxa)
 {
 	struct logr_EventLogGetOldestRec *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
@@ -327,13 +328,13 @@ logr_s_EventLogGetOldestRec(void *arg, struct mlrpc_xaction *mxa)
 
 	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	data = (read_data_t *)hd->nh_data;
 	param->oldest_rec = data->log.ix - data->tot_recnum;
 	param->status = NT_STATUS_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -424,7 +425,7 @@ set_logrec(log_entry_t *le, DWORD recno, logr_record_t *rec)
  * read log entries in chronological or reverse chronological order.
  */
 static int
-logr_s_EventLogRead(void *arg, struct mlrpc_xaction *mxa)
+logr_s_EventLogRead(void *arg, ndr_xa_t *mxa)
 {
 	struct logr_EventLogRead *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
@@ -438,14 +439,14 @@ logr_s_EventLogRead(void *arg, struct mlrpc_xaction *mxa)
 
 	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	rdata = (read_data_t *)hd->nh_data;
 	if (rdata == NULL) {
 		if ((rdata = logr_get_snapshot()) == NULL) {
 			param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
-			return (MLRPC_DRC_OK);
+			return (NDR_DRC_OK);
 		}
 
 		hd->nh_data = rdata;
@@ -485,7 +486,7 @@ logr_s_EventLogRead(void *arg, struct mlrpc_xaction *mxa)
 		param->sent_size = 0;
 		param->unknown = 0;
 		param->status = NT_SC_ERROR(NT_STATUS_END_OF_FILE);
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	buf = (param->read_flags & EVENTLOG_SEEK_READ)
@@ -505,7 +506,7 @@ logr_s_EventLogRead(void *arg, struct mlrpc_xaction *mxa)
 	param->sent_size = sizeof (logr_record_t) * ent_remain;
 	param->unknown = 0;
 	param->status = NT_STATUS_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*

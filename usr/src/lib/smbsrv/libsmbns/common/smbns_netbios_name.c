@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Description:
  *
@@ -4581,7 +4579,8 @@ smb_netbios_name_config(void)
 		return;
 
 	do {
-		if (ni.ni_nic.nic_smbflags & SMB_NICF_NBEXCL)
+		if ((ni.ni_nic.nic_smbflags & SMB_NICF_NBEXCL) ||
+		    (ni.ni_nic.nic_smbflags & SMB_NICF_ALIAS))
 			continue;
 
 		smb_init_name_struct((unsigned char *)ni.ni_nic.nic_host,

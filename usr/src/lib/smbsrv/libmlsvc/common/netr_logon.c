@@ -34,40 +34,36 @@
 #include <alloca.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <thread.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
+#include <smbsrv/libmlrpc.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/netlogon.ndl>
-#include <smbsrv/mlsvc_util.h>
-#include <smbsrv/mlsvc.h>
 #include <smbsrv/netrauth.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smbinfo.h>
-#include <smbsrv/mlrpc.h>
 #include <smbsrv/smb_token.h>
+#include <mlsvc.h>
 
-extern int netr_open(char *server, char *domain, mlsvc_handle_t *netr_handle);
-extern int netr_close(mlsvc_handle_t *netr_handle);
-extern DWORD netlogon_auth(char *server, mlsvc_handle_t *netr_handle,
-    DWORD flags);
-extern int netr_setup_authenticator(netr_info_t *, struct netr_authenticator *,
-    struct netr_authenticator *);
-extern DWORD netr_validate_chain(netr_info_t *, struct netr_authenticator *);
-
+static DWORD netlogon_logon_private(netr_client_t *, smb_userinfo_t *);
 static DWORD netr_server_samlogon(mlsvc_handle_t *, netr_info_t *, char *,
     netr_client_t *, smb_userinfo_t *);
 static void netr_invalidate_chain(void);
 static void netr_interactive_samlogon(netr_info_t *, netr_client_t *,
     struct netr_logon_info1 *);
-static void netr_network_samlogon(mlrpc_heap_t *, netr_info_t *,
+static void netr_network_samlogon(ndr_heap_t *, netr_info_t *,
     netr_client_t *, struct netr_logon_info2 *);
-static void netr_setup_identity(mlrpc_heap_t *, netr_client_t *,
+static void netr_setup_identity(ndr_heap_t *, netr_client_t *,
     netr_logon_id_t *);
 
 /*
  * Shared with netr_auth.c
  */
 extern netr_info_t netr_global_info;
+
+static mutex_t netlogon_logon_mutex;
 
 /*
  * netlogon_logon
@@ -87,19 +83,32 @@ extern netr_info_t netr_global_info;
 DWORD
 netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 {
+	DWORD status;
+
+	(void) mutex_lock(&netlogon_logon_mutex);
+
+	status = netlogon_logon_private(clnt, user_info);
+
+	(void) mutex_unlock(&netlogon_logon_mutex);
+	return (status);
+}
+
+static DWORD
+netlogon_logon_private(netr_client_t *clnt, smb_userinfo_t *user_info)
+{
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 	char server[NETBIOS_NAME_SZ * 2];
 	mlsvc_handle_t netr_handle;
-	smb_ntdomain_t *di;
+	smb_domain_t di;
 	DWORD status;
 	int retries = 0, server_changed = 0;
 
 	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 
-	if ((di = smb_getdomaininfo(0)) == NULL)
+	if (!smb_domain_getinfo(&di))
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	if ((mlsvc_echo(di->server)) < 0) {
+	if ((mlsvc_echo(di.d_dc)) < 0) {
 		/*
 		 * We had a session to the DC but it's not responding.
 		 * So drop the credential chain.
@@ -109,13 +118,13 @@ netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 	}
 
 	do {
-		status = netr_open(di->server, di->domain, &netr_handle);
+		status = netr_open(di.d_dc, di.d_nbdomain, &netr_handle);
 		if (status != 0)
 			return (status);
 
-		if (di->server && (*netr_global_info.server != '\0')) {
+		if (di.d_dc && (*netr_global_info.server != '\0')) {
 			(void) snprintf(server, sizeof (server),
-			    "\\\\%s", di->server);
+			    "\\\\%s", di.d_dc);
 			server_changed = strncasecmp(netr_global_info.server,
 			    server, strlen(server));
 		}
@@ -123,7 +132,7 @@ netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 		if (server_changed ||
 		    (netr_global_info.flags & NETR_FLG_VALID) == 0 ||
 		    !smb_match_netlogon_seqnum()) {
-			status = netlogon_auth(di->server, &netr_handle,
+			status = netlogon_auth(di.d_dc, &netr_handle,
 			    NETR_FLG_NULL);
 
 			if (status != 0) {
@@ -135,7 +144,7 @@ netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
 		}
 
 		status = netr_server_samlogon(&netr_handle,
-		    &netr_global_info, di->server, clnt, user_info);
+		    &netr_global_info, di.d_dc, clnt, user_info);
 
 		(void) netr_close(&netr_handle);
 	} while (status == NT_STATUS_INSUFFICIENT_LOGON_INFO && retries++ < 3);
@@ -269,32 +278,35 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 	struct netr_logon_info1 info1;
 	struct netr_logon_info2 info2;
 	struct netr_validation_info3 *info3;
-	mlrpc_heapref_t heap;
+	ndr_heap_t *heap;
 	int opnum;
 	int rc, len;
 	DWORD status;
 
 	bzero(&arg, sizeof (struct netr_SamLogon));
 	opnum = NETR_OPNUM_SamLogon;
-	(void) mlsvc_rpc_init(&heap);
 
 	/*
 	 * Should we get the server and hostname from netr_info?
 	 */
-	len = strlen(server) + 4;
-	arg.servername = alloca(len);
-	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 
-	arg.hostname = alloca(NETBIOS_NAME_SZ);
-	rc = smb_getnetbiosname((char *)arg.hostname, NETBIOS_NAME_SZ);
-	if (rc != 0) {
-		mlrpc_heap_destroy(heap.heap);
+	len = strlen(server) + 4;
+	arg.servername = ndr_rpc_malloc(netr_handle, len);
+	arg.hostname = ndr_rpc_malloc(netr_handle, NETBIOS_NAME_SZ);
+	if (arg.servername == NULL || arg.hostname == NULL) {
+		ndr_rpc_release(netr_handle);
+		return (NT_STATUS_INTERNAL_ERROR);
+	}
+
+	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
+	if (smb_getnetbiosname((char *)arg.hostname, NETBIOS_NAME_SZ) != 0) {
+		ndr_rpc_release(netr_handle);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
 	rc = netr_setup_authenticator(netr_info, &auth, &ret_auth);
 	if (rc != SMBAUTH_SUCCESS) {
-		mlrpc_heap_destroy(heap.heap);
+		ndr_rpc_release(netr_handle);
 		return (NT_STATUS_INTERNAL_ERROR);
 	}
 
@@ -304,25 +316,27 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 	arg.logon_info.logon_level = clnt->logon_level;
 	arg.logon_info.switch_value = clnt->logon_level;
 
+	heap = ndr_rpc_get_heap(netr_handle);
+
 	switch (clnt->logon_level) {
 	case NETR_INTERACTIVE_LOGON:
-		netr_setup_identity(heap.heap, clnt, &info1.identity);
+		netr_setup_identity(heap, clnt, &info1.identity);
 		netr_interactive_samlogon(netr_info, clnt, &info1);
 		arg.logon_info.ru.info1 = &info1;
 		break;
 
 	case NETR_NETWORK_LOGON:
-		netr_setup_identity(heap.heap, clnt, &info2.identity);
-		netr_network_samlogon(heap.heap, netr_info, clnt, &info2);
+		netr_setup_identity(heap, clnt, &info2.identity);
+		netr_network_samlogon(heap, netr_info, clnt, &info2);
 		arg.logon_info.ru.info2 = &info2;
 		break;
 
 	default:
-		mlrpc_heap_destroy(heap.heap);
+		ndr_rpc_release(netr_handle);
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	rc = mlsvc_rpc_call(netr_handle->context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(netr_handle, opnum, &arg);
 	if (rc != 0) {
 		bzero(netr_info, sizeof (netr_info_t));
 		status = NT_STATUS_INVALID_PARAMETER;
@@ -340,7 +354,7 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 	} else {
 		status = netr_validate_chain(netr_info, arg.ret_auth);
 		if (status == NT_STATUS_INSUFFICIENT_LOGON_INFO) {
-			mlsvc_rpc_free(netr_handle->context, &heap);
+			ndr_rpc_release(netr_handle);
 			return (status);
 		}
 
@@ -348,7 +362,7 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 		status = netr_setup_userinfo(info3, user_info, clnt, netr_info);
 	}
 
-	mlsvc_rpc_free(netr_handle->context, &heap);
+	ndr_rpc_release(netr_handle);
 	return (status);
 }
 
@@ -392,7 +406,7 @@ netr_interactive_samlogon(netr_info_t *netr_info, netr_client_t *clnt,
  */
 /*ARGSUSED*/
 static void
-netr_network_samlogon(mlrpc_heap_t *heap, netr_info_t *netr_info,
+netr_network_samlogon(ndr_heap_t *heap, netr_info_t *netr_info,
     netr_client_t *clnt, struct netr_logon_info2 *info2)
 {
 	uint32_t len;
@@ -401,15 +415,15 @@ netr_network_samlogon(mlrpc_heap_t *heap, netr_info_t *netr_info,
 	    8);
 
 	if ((len = clnt->nt_password.nt_password_len) != 0) {
-		mlrpc_heap_mkvcb(heap, clnt->nt_password.nt_password_val, len,
-		    (mlrpc_vcbuf_t *)&info2->nt_response);
+		ndr_heap_mkvcb(heap, clnt->nt_password.nt_password_val, len,
+		    (ndr_vcbuf_t *)&info2->nt_response);
 	} else {
 		bzero(&info2->nt_response, sizeof (netr_vcbuf_t));
 	}
 
 	if ((len = clnt->lm_password.lm_password_len) != 0) {
-		mlrpc_heap_mkvcb(heap, clnt->lm_password.lm_password_val, len,
-		    (mlrpc_vcbuf_t *)&info2->lm_response);
+		ndr_heap_mkvcb(heap, clnt->lm_password.lm_password_val, len,
+		    (ndr_vcbuf_t *)&info2->lm_response);
 	} else {
 		bzero(&info2->lm_response, sizeof (netr_vcbuf_t));
 	}
@@ -541,10 +555,13 @@ netr_invalidate_chain(void)
  * Increment it before each use.
  */
 static void
-netr_setup_identity(mlrpc_heap_t *heap, netr_client_t *clnt,
+netr_setup_identity(ndr_heap_t *heap, netr_client_t *clnt,
     netr_logon_id_t *identity)
 {
-	static DWORD logon_id;
+	static mutex_t logon_id_mutex;
+	static uint32_t logon_id;
+
+	(void) mutex_lock(&logon_id_mutex);
 
 	if (logon_id == 0)
 		logon_id = 0xDCD0;
@@ -552,21 +569,23 @@ netr_setup_identity(mlrpc_heap_t *heap, netr_client_t *clnt,
 	++logon_id;
 	clnt->logon_id = logon_id;
 
+	(void) mutex_unlock(&logon_id_mutex);
+
 	identity->parameter_control = 0;
 	identity->logon_id.LowPart = logon_id;
 	identity->logon_id.HighPart = 0;
 
-	mlrpc_heap_mkvcs(heap, clnt->domain,
-	    (mlrpc_vcstr_t *)&identity->domain_name);
+	ndr_heap_mkvcs(heap, clnt->domain,
+	    (ndr_vcstr_t *)&identity->domain_name);
 
-	mlrpc_heap_mkvcs(heap, clnt->username,
-	    (mlrpc_vcstr_t *)&identity->username);
+	ndr_heap_mkvcs(heap, clnt->username,
+	    (ndr_vcstr_t *)&identity->username);
 
 	/*
 	 * Some systems prefix the client workstation name with \\.
 	 * It doesn't seem to make any difference whether it's there
 	 * or not.
 	 */
-	mlrpc_heap_mkvcs(heap, clnt->workstation,
-	    (mlrpc_vcstr_t *)&identity->workstation);
+	ndr_heap_mkvcs(heap, clnt->workstation,
+	    (ndr_vcstr_t *)&identity->workstation);
 }

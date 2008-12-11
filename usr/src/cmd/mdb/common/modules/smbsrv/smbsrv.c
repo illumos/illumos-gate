@@ -26,7 +26,6 @@
 #include <sys/mdb_modapi.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb.h>
-#include <smbsrv/mlsvc.h>
 #include <smbsrv/smb_ktypes.h>
 
 #define	SMB_DCMD_INDENT		2

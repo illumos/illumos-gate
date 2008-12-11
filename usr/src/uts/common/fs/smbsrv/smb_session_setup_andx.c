@@ -251,9 +251,7 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	char *native_lanman = "";
 	char *hostname = sr->sr_cfg->skc_hostname;
 	char *nbdomain = sr->sr_cfg->skc_nbdomain;
-#ifdef FIX_6765156
 	char *fqdn = sr->sr_cfg->skc_fqdn;
-#endif
 	smb_token_t *usr_token = NULL;
 	smb_user_t *user = NULL;
 	int security = sr->sr_cfg->skc_secmode;
@@ -396,17 +394,7 @@ smb_com_session_setup_andx(smb_request_t *sr)
 			kmem_free(cs_password, cs_pwlen + 1);
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
 		return (SDRC_ERROR);
-#ifndef FIX_6765156
-	} else if (utf8_strcasecmp(userdomain, hostname) == 0) {
-		/*
-		 * When domain name is equal to hostname, it means
-		 * the user is local even if system is running in
-		 * domain mode, so perform a local logon.
-		 */
-		clnt_info.flags |= NETR_CFLG_LOCAL;
-#endif
 	} else if (security == SMB_SECMODE_DOMAIN) {
-#ifdef FIX_6765156
 		/*
 		 * If the system is running in domain mode, domain
 		 * authentication will be performed only when the client
@@ -419,9 +407,6 @@ smb_com_session_setup_andx(smb_request_t *sr)
 			clnt_info.flags |= NETR_CFLG_DOMAIN;
 		else
 			clnt_info.flags |= NETR_CFLG_LOCAL;
-#else
-		clnt_info.flags |= NETR_CFLG_DOMAIN;
-#endif
 	} else if (security == SMB_SECMODE_WORKGRP) {
 		clnt_info.flags |= NETR_CFLG_LOCAL;
 	}

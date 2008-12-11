@@ -113,12 +113,6 @@ extern "C" {
 #define	SMB_PI_KEEP_ALIVE_MIN		(90 * 60)
 #define	SMB_LM_COMPATIBILITY_DEFAULT_LEV 3
 
-/*
- * This is max networks multiply by canonical address for IPv4
- * This needs a fix for IPv4
- */
-#define	MAX_EXCLUDE_LIST_LEN	(SMB_PI_MAX_NETWORKS * INET_ADDRSTRLEN)
-
 typedef struct smb_kmod_cfg {
 	uint32_t skc_maxworkers;
 	uint32_t skc_maxconnections;

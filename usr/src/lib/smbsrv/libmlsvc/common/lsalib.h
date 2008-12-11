@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_LSALIB_H
 #define	_SMBSRV_LSALIB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Prototypes for the LSA library and RPC client side library interface.
  * There are two levels of interface defined here: lsa_xxx and lsar_xxx.
@@ -38,7 +36,7 @@
  */
 
 #include <smbsrv/ndl/lsarpc.ndl>
-#include <smbsrv/mlsvc_util.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/smb_sid.h>
 
 
@@ -46,20 +44,13 @@
 extern "C" {
 #endif
 
-
 /*
  * lsalib.c
  */
-uint32_t lsa_lookup_name(char *, char *, uint16_t, smb_userinfo_t *);
-uint32_t lsa_lookup_sid(smb_sid_t *, smb_userinfo_t *);
-
-int lsa_lookup_privs(char *server,
-    char *account_name,
-    char *target_name,
-    smb_userinfo_t *user_info);
-
-int lsa_test(char *server, char *account_name);
-
+extern uint32_t lsa_lookup_name(char *, uint16_t, smb_userinfo_t *);
+extern uint32_t lsa_lookup_sid(smb_sid_t *, smb_userinfo_t *);
+extern int lsa_lookup_privs(char *, char *, smb_userinfo_t *);
+extern int lsa_test(char *, char *);
 
 /*
  * lsar_open.c
@@ -86,7 +77,8 @@ int lsar_close(mlsvc_handle_t *lsa_handle);
  */
 int lsar_query_security_desc(mlsvc_handle_t *lsa_handle);
 
-DWORD lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass);
+DWORD lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass,
+    lsa_info_t *);
 
 uint32_t lsar_lookup_names(mlsvc_handle_t *lsa_handle,
     char *name,
@@ -103,7 +95,7 @@ int lsar_enum_accounts(mlsvc_handle_t *lsa_handle,
     struct mslsa_EnumAccountBuf *accounts);
 
 DWORD lsar_enum_trusted_domains(mlsvc_handle_t *lsa_handle,
-    DWORD *enum_context);
+    DWORD *enum_context, lsa_info_t *);
 
 int lsar_enum_privs_account(mlsvc_handle_t *account_handle,
     smb_userinfo_t *user_info);

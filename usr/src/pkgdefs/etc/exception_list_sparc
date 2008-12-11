@@ -1099,13 +1099,9 @@ usr/include/smbsrv/libsmbrdr.h		sparc
 usr/include/smbsrv/lm.h			sparc
 usr/include/smbsrv/lmdfs.h		sparc
 usr/include/smbsrv/lmerr.h		sparc
-usr/include/smbsrv/lsalib.h		sparc
 usr/include/smbsrv/mac_cifs.h		sparc
 usr/include/smbsrv/mailslot.h		sparc
 usr/include/smbsrv/mbuf.h		sparc
-usr/include/smbsrv/mlrpc.h		sparc
-usr/include/smbsrv/mlsvc.h		sparc
-usr/include/smbsrv/mlsvc_util.h		sparc
 usr/include/smbsrv/msgbuf.h		sparc
 usr/include/smbsrv/ndr.h		sparc
 usr/include/smbsrv/netbios.h		sparc
@@ -1117,7 +1113,6 @@ usr/include/smbsrv/ntifs.h		sparc
 usr/include/smbsrv/ntlocale.h		sparc
 usr/include/smbsrv/ntstatus.h		sparc
 usr/include/smbsrv/oem.h		sparc
-usr/include/smbsrv/samlib.h		sparc
 usr/include/smbsrv/smb.h		sparc
 usr/include/smbsrv/smb_common_door.h	sparc
 usr/include/smbsrv/smb_door_svc.h	sparc
@@ -1151,6 +1146,7 @@ usr/include/smbsrv/ndl/dssetup.ndl	sparc
 usr/include/smbsrv/ndl/eventlog.ndl	sparc
 usr/include/smbsrv/ndl/llsrpc.ndl	sparc
 usr/include/smbsrv/ndl/lsarpc.ndl	sparc
+usr/include/smbsrv/ndl/msgsvc.ndl	sparc
 usr/include/smbsrv/ndl/ndrtypes.ndl	sparc
 usr/include/smbsrv/ndl/netdfs.ndl	sparc
 usr/include/smbsrv/ndl/netlogon.ndl	sparc

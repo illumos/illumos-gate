@@ -464,8 +464,9 @@ unsigned short smb_worker_getnum();
 void smb_preset_delete_on_close(struct smb_ofile *file);
 void smb_commit_delete_on_close(struct smb_ofile *file);
 
-int smb_stream_parse_name(char *name, char *u_stream_name,
-    char *stream_name);
+boolean_t smb_is_stream_name(char *);
+uint32_t smb_validate_stream_name(char *);
+int smb_stream_parse_name(char *, char *, char *);
 
 DWORD smb_trans2_set_information(struct smb_request *sr,
     smb_trans2_setinfo_t *info,

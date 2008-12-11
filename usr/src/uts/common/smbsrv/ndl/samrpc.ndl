@@ -26,8 +26,6 @@
 #ifndef _MLSVC_SAM_NDL_
 #define _MLSVC_SAM_NDL_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Security Accounts Manager RPC (SAMR) interface definition.
  */
@@ -176,7 +174,7 @@ typedef struct samr_string samr_string_t;
 /*
  * Alternative varying/conformant string definition - for
  * non-null terminated strings. This definition must match
- * mlrpc_vcbuf_t.
+ * ndr_vcbuf_t.
  */
 struct samr_vcb {
 	/*
@@ -196,21 +194,7 @@ struct samr_vcbuf {
 };
 typedef struct samr_vcbuf samr_vcbuf_t;
 
-
-/*
- * Handles appear to be a 20 byte object with the top 4 bytes all zero.
- * Handles may have some internal structure but this should work since
- * we always treat it as an opaque handle. They do appear to contain a
- * sequence number which is incremented when new handle is issued.
-*/
-
-struct samr_handle {
-	DWORD hand1;
-	DWORD hand2;
-	WORD  hand3[2];
-	BYTE  hand4[8];
-};
-typedef struct samr_handle samr_handle_t;
+CONTEXT_HANDLE(samr_handle) samr_handle_t;
 
 /*
  * A long long, i.e. 64-bit, value.

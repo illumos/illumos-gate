@@ -31,7 +31,6 @@
 #include <sys/policy.h>
 #include <sys/cmn_err.h>
 #include <smbsrv/smb_incl.h>
-#include <smbsrv/mlsvc.h>
 #include <smbsrv/smb_door_svc.h>
 #include <smbsrv/smb_ioctl.h>
 #include <smbsrv/smb_kproto.h>

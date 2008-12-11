@@ -23,54 +23,47 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SMBSRV_WINTYPES_H
-#define	_SMBSRV_WINTYPES_H
-
-#include <sys/types.h>
+#ifndef _MSGSVC_NDL_
+#define	_MSGSVC_NDL_
 
 /*
- * Standard win32 types and definitions.
+ * Message Service
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "ndrtypes.ndl"
 
-#ifndef UNSIGNED_TYPES_DEFINED
-#define	UNSIGNED_TYPES_DEFINED
+#define	MSGSVCSEND_OPNUM_NetrSendMessage	0x00
 
-typedef	uint8_t BYTE;
-typedef	uint16_t WORD;
-typedef	uint32_t DWORD;
-typedef	uint8_t *LPTSTR;
-typedef	uint8_t *LPBYTE;
-typedef	uint16_t *LPWORD;
-typedef	uint32_t *LPDWORD;
+struct msgsvc_uuid {
+	DWORD	data1;
+	WORD	data2;
+	WORD	data3;
+	BYTE	data4[8];
+};
+typedef struct msgsvc_uuid msgsvc_uuid_t;
 
-#endif /* UNSIGNED_TYPES_DEFINED */
+OPERATION(MSGSVCSEND_OPNUM_NetrSendMessage)
+struct msgsvcsend_NetrSendMessage {
+	IN	msgsvc_uuid_t handle;
+	IN	LPTSTR from;
+	IN	LPTSTR to;
+	IN	LPTSTR text;
+	OUT	DWORD status;
+};
+typedef struct msgsvcsend_NetrSendMessage msgsvcsend_NetrSendMessage_t;
 
-
-#ifndef ANY_SIZE_ARRAY
-#define	ANY_SIZE_ARRAY  1
-#endif /* ANY_SIZE_ARRAY */
 
 /*
- * Opaque context handle.
+ ***********************************************************************
+ * MSGSVC interface definiton.
+ ***********************************************************************
  */
-#ifndef CONTEXT_HANDLE
-#define	CONTEXT_HANDLE(NAME)	\
-	struct NAME {		\
-		DWORD data1;    \
-		DWORD data2;    \
-		WORD  data3[2]; \
-		BYTE  data4[8];	\
-	};			\
-	typedef struct NAME
-#endif /* CONTEXT_HANDLE */
+INTERFACE(0)
+union msgsvcsend_interface {
+	CASE(MSGSVCSEND_OPNUM_NetrSendMessage)
+		struct msgsvcsend_NetrSendMessage NetrSendMessage;
+};
+typedef union msgsvcsend_interface msgsvcsend_interface_t;
+EXTERNTYPEINFO(msgsvcsend_interface)
 
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* _SMBSRV_WINTYPES_H */
+#endif /* _MSGSVC_NDL_ */

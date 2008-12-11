@@ -47,7 +47,6 @@
  * are identical to TRANS2_QUERY_PATH_INFORMATION.
  */
 
-#include <smbsrv/mlsvc.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>

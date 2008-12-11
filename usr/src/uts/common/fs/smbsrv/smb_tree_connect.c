@@ -70,6 +70,7 @@ smb_pre_tree_connect(smb_request_t *sr)
 	    &sr->arg.tcon.password, &sr->arg.tcon.service);
 
 	sr->arg.tcon.flags = 0;
+	sr->arg.tcon.optional_support = 0;
 
 	DTRACE_SMB_2(op__TreeConnect__start, smb_request_t *, sr,
 	    struct tcon *, &sr->arg.tcon);
@@ -131,9 +132,18 @@ smb_com_tree_connect(smb_request_t *sr)
  * connect arrives, a user level security mode server must nevertheless
  * validate the client's credentials.
  *
- * Path follows UNC style syntax, that is to say it is encoded as
- * \\server\share and indicates the name of the resource to which the
- * client wishes to connect.
+ * Flags (prefix with TREE_CONNECT_ANDX_):
+ * ==========================  ========================================
+ * 0x0001 DISCONECT_TID        The tree specified by TID in the SMB header
+ *                             should be disconnected - disconnect errors
+ *                             should be ignored.
+ *
+ * 0x0004 EXTENDED_SIGNATURES  Client request for signing key protection.
+ *
+ * 0x0008 EXTENDED_RESPONSE    Client request for extended information.
+ *
+ * Path follows UNC style syntax (\\server\share) and indicates the name
+ * of the resource to which the client wishes to connect.
  *
  * Because Password may be an authentication response, it is a variable
  * length field with the length specified by PasswordLength.   If
@@ -156,10 +166,6 @@ smb_com_tree_connect(smb_request_t *sr)
  * IPC       named pipe                MICROSOFT NETWORKS 3.0
  * COMM      communications device     MICROSOFT NETWORKS 3.0
  * ?????     any type of device        MICROSOFT NETWORKS 3.0
- *
- * If bit0 of Flags is set, the tree connection to Tid in the SMB header
- * should be disconnected.  If this tree disconnect fails, the error should
- * be ignored.
  *
  * If the negotiated dialect is earlier than DOS LANMAN2.1, the response to
  * this SMB is:
@@ -192,12 +198,26 @@ smb_com_tree_connect(smb_request_t *sr)
  * NativeFileSystem is the name of the filesystem; values to be expected
  * include FAT, NTFS, etc.
  *
- * OptionalSupport bits has the encoding:
+ * OptionalSupport:
+ * ==============================  ==========================
+ * 0x0001 SMB_SUPPORT_SEARCH_BITS  The server supports the use of Search
+ *                                 Attributes in client requests.
+ * 0x0002 SMB_SHARE_IS_IN_DFS      The share is managed by DFS.
+ * 0x000C SMB_CSC_MASK             Offline-caching mask - see CSC flags.
+ * 0x0010 SMB_UNIQUE_FILE_NAME     The server uses long names and does not
+ *                                 support short names.  Indicator for
+ *                                 clients directory/name-space caching.
+ * 0x0020 SMB_EXTENDED_SIGNATURES  The server will use signing key protection.
  *
- * Name                           Encoding   Description
- * =============================  =========  ==========================
- * SMB_SUPPORT_SEARCH_BITS        0x0001
- * SMB_SHARE_IS_IN_DFS            0x0002
+ * Client-side caching (offline files):
+ * ==============================  ==========================
+ * 0x0000 SMB_CSC_CACHE_MANUAL_REINT Clients may cache files for offline use
+ *                                 but automatic file-by-file reintegration
+ *                                 is not allowed.
+ * 0x0004 SMB_CSC_CACHE_AUTO_REINT Automatic file-by-file reintegration is
+ *                                 allowed.
+ * 0x0008 SMB_CSC_CACHE_VDO        File opens do not need to be flowed.
+ * 0x000C SMB_CSC_CACHE_NONE       CSC is disabled for this share.
  *
  * Some servers negotiate "DOS LANMAN2.1" dialect or later and still send
  * the "downlevel" (i.e. wordcount==2) response.  Valid AndX following
@@ -243,6 +263,8 @@ smb_pre_tree_connect_andx(smb_request_t *sr)
 		sr->arg.tcon.password = (char *)pwbuf;
 	}
 
+	sr->arg.tcon.optional_support = 0;
+
 	DTRACE_SMB_2(op__TreeConnectX__start, smb_request_t *, sr,
 	    struct tcon *, &sr->arg.tcon);
 
@@ -286,7 +308,7 @@ smb_com_tree_connect_andx(smb_request_t *sr)
 		    (char)3,		/* wct */
 		    sr->andx_com,
 		    (short)64,
-		    (short)SMB_TREE_SUPPORT_SEARCH_BITS,
+		    sr->arg.tcon.optional_support,
 		    VAR_BCC,
 		    service,
 		    sr,

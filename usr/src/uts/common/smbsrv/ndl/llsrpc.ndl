@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MLSVC_LLSR_NDL_
 #define _MLSVC_LLSR_NDL_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * LLSRPC interface.
@@ -60,10 +57,7 @@
 #define LLSR_OPNUM_Unknown50		0x50
 
 
-struct llsr_handle {
-	DWORD opaque[5];
-};
-typedef struct llsr_handle llsr_handle_t;
+CONTEXT_HANDLE(llsr_handle) llsr_handle_t;
 
 
 OPERATION(LLSR_OPNUM_Open)

@@ -35,7 +35,6 @@ extern "C" {
 #include <arpa/inet.h>
 #include <net/if.h>
 #include <netdb.h>
-
 #include <stdlib.h>
 #include <libscf.h>
 #include <libshare.h>
@@ -61,6 +60,8 @@ extern "C" {
 #define	SMB_VARRUN_DIR "/var/run/smb"
 #define	SMB_CCACHE_FILE "ccache"
 #define	SMB_CCACHE_PATH SMB_VARRUN_DIR "/" SMB_CCACHE_FILE
+
+
 
 /* Max value length of all SMB properties */
 #define	MAX_VALUE_BUFLEN	512
@@ -104,6 +105,9 @@ typedef enum {
 	SMB_CI_DOMAIN_SID,
 	SMB_CI_DOMAIN_MEMB,
 	SMB_CI_DOMAIN_NAME,
+	SMB_CI_DOMAIN_FQDN,
+	SMB_CI_DOMAIN_FOREST,
+	SMB_CI_DOMAIN_GUID,
 	SMB_CI_DOMAIN_SRV,
 
 	SMB_CI_WINS_SRV1,
@@ -111,7 +115,6 @@ typedef enum {
 	SMB_CI_WINS_EXCL,
 
 	SMB_CI_SRVSVC_SHRSET_ENABLE,
-	SMB_CI_MLRPC_KALIVE,
 
 	SMB_CI_MAX_WORKERS,
 	SMB_CI_MAX_CONNECTIONS,
@@ -158,6 +161,7 @@ extern int smb_smf_get_opaque_property(smb_scfhandle_t *, char *,
     void *, size_t);
 extern int smb_smf_create_service_pgroup(smb_scfhandle_t *, char *);
 extern int smb_smf_restart_service(void);
+extern int smb_smf_maintenance_mode(void);
 
 /* Configuration management functions  */
 extern int smb_config_get(smb_cfg_id_t, char *, int);
@@ -179,6 +183,7 @@ extern int smb_config_get_secmode(void);
 extern int smb_config_set_secmode(int);
 extern int smb_config_set_idmap_domain(char *);
 extern int smb_config_refresh_idmap(void);
+
 
 extern void smb_load_kconfig(smb_kmod_cfg_t *kcfg);
 extern uint32_t smb_crc_gen(uint8_t *, size_t);
@@ -208,30 +213,11 @@ extern bool_t xdr_smb_dr_joininfo_t(XDR *, smb_joininfo_t *);
 
 extern int nt_domain_init(char *, uint32_t);
 
-/* Following set of functions, manipulate WINS server configuration */
-extern int smb_wins_allow_list(char *config_list, char *allow_list);
-extern int smb_wins_exclude_list(char *config_list, char *exclude_list);
-extern boolean_t smb_wins_is_excluded(in_addr_t ipaddr,
-    ipaddr_t *exclude_list, int nexclude);
-extern void smb_wins_build_list(char *buf, uint32_t iplist[], int max_naddr);
-extern int smb_wins_iplist(char *list, uint32_t iplist[], int max_naddr);
-
-/*
- * Information on a particular domain: the domain name, the
- * name of a controller (PDC or BDC) and it's ip address.
- */
-typedef struct smb_ntdomain {
-	char domain[SMB_PI_MAX_DOMAIN];
-	char server[SMB_PI_MAX_DOMAIN];
-	uint32_t ipaddr;
-} smb_ntdomain_t;
-
-/* SMB domain information management functions */
-extern smb_ntdomain_t *smb_getdomaininfo(uint32_t);
-extern void smb_setdomaininfo(char *, char *, uint32_t);
-extern void smb_logdomaininfo(smb_ntdomain_t *);
-extern uint32_t smb_get_dcinfo(smb_ntdomain_t *);
-extern bool_t xdr_smb_dr_domain_t(XDR *, smb_ntdomain_t *);
+extern void smb_config_getdomaininfo(char *domain, char *fqdn, char *forest,
+    char *guid);
+extern void smb_config_setdomaininfo(char *domain, char *fqdn, char *forest,
+    char *guid);
+extern uint32_t smb_get_dcinfo(char *, uint32_t, uint32_t *);
 
 /*
  * buffer context structure. This is used to keep track of the buffer
@@ -261,17 +247,19 @@ extern int smb_idmap_restart(void);
 extern void hexdump(unsigned char *, int);
 extern size_t bintohex(const char *, size_t, char *, size_t);
 extern size_t hextobin(const char *, size_t, char *, size_t);
-extern char *trim_whitespace(char *buf);
+extern char *strstrip(char *, const char *);
+extern char *strtrim(char *, const char *);
+extern char *trim_whitespace(char *);
 extern void randomize(char *, unsigned);
 extern void rand_hash(unsigned char *, size_t, unsigned char *, size_t);
 
-extern int smb_resolve_netbiosname(char *, char *, size_t);
-extern int smb_resolve_fqdn(char *, char *, size_t);
 extern int smb_getdomainname(char *, size_t);
 extern int smb_getfqdomainname(char *, size_t);
 extern int smb_gethostname(char *, size_t, int);
 extern int smb_getfqhostname(char *, size_t);
 extern int smb_getnetbiosname(char *, size_t);
+extern struct hostent *smb_gethostbyname(const char *, int *);
+extern struct hostent *smb_gethostbyaddr(const char *, int, int, int *);
 
 #define	SMB_SAMACCT_MAXLEN	(NETBIOS_NAME_SZ + 1)
 extern int smb_getsamaccount(char *, size_t);

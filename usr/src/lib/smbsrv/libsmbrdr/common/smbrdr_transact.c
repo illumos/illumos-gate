@@ -23,10 +23,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * SMB transaction functions to support MLRPC.
+ * SMB transaction functions.
  */
 
 #include <syslog.h>

@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_SMB_KRB5_H
 #define	_SMBSRV_SMB_KRB5_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <gssapi/gssapi.h>
 #include <kerberosv5/krb5.h>
 
@@ -35,7 +33,8 @@
 extern "C" {
 #endif
 
-#define	SMBNS_KRB5_KEYTAB "/etc/krb5/krb5.keytab"
+#define	SMBNS_KRB5_KEYTAB	"/etc/krb5/krb5.keytab"
+#define	SMBNS_KRB5_KEYTAB_TMP	"/etc/krb5/krb5.keytab.tmp.XXXXXX"
 
 /* core set of SPNs */
 typedef enum smb_krb5_spn_idx {
@@ -68,9 +67,7 @@ int smb_krb5_get_principals(char *domain, krb5_context ctx,
 void smb_krb5_free_principals(krb5_context ctx, krb5_principal *krb5princs,
     size_t num);
 int smb_krb5_setpwd(krb5_context ctx, krb5_principal princ, char *passwd);
-int smb_krb5_remove_keytab_entries(krb5_context ctx, krb5_principal *princs,
-    char *fname);
-int smb_krb5_update_keytab_entries(krb5_context ctx, krb5_principal *princs,
+int smb_krb5_add_keytab_entries(krb5_context ctx, krb5_principal *princs,
     char *fname, krb5_kvno kvno, char *passwd, krb5_enctype *enctypes,
     int enctype_count);
 boolean_t smb_krb5_find_keytab_entries(const char *fqhn, char *fname);

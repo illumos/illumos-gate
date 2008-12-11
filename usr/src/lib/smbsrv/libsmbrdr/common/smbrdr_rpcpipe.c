@@ -67,13 +67,13 @@ static int mlsvc_pipe_recon_tries = 3;
 
 
 /*
- * mlsvc_open_pipe
+ * smbrdr_open_pipe
  *
  * Open an RPC pipe on hostname. On success, return the fid. Otherwise
  * returns a -ve error code.
  */
 int
-mlsvc_open_pipe(char *hostname, char *domain, char *username, char *pipename)
+smbrdr_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 {
 	struct sdb_netuse *netuse;
 	struct sdb_ofile *ofile;
@@ -82,6 +82,9 @@ mlsvc_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 	int retry;
 	struct timespec st;
 	int i;
+
+	if (mlsvc_logon(hostname, domain, username) != 0)
+		return (-1);
 
 	/*
 	 * If a stale session is detected, we will attempt to establish a new
@@ -166,12 +169,12 @@ mlsvc_open_pipe(char *hostname, char *domain, char *username, char *pipename)
 }
 
 /*
- * mlsvc_close_pipe
+ * smbrdr_close_pipe
  *
  * Close the named pipe represented by fid.
  */
 int
-mlsvc_close_pipe(int fid)
+smbrdr_close_pipe(int fid)
 {
 	struct sdb_ofile *ofile;
 	unsigned short tid;
@@ -255,7 +258,7 @@ smbrdr_ofile_get(int fid)
  * smbrdr_ofile_end_of_share
  *
  * This function can be used when closing a share to ensure that all
- * ofiles resources are released. Don't call mlsvc_close_pipe because
+ * ofiles resources are released. Don't call smbrdr_close_pipe because
  * that will call mlsvc_smb_tdcon and we don't know what state
  * the share is in. The server will probably close all files anyway.
  * We are more interested in releasing the ofile resources.

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * vscand Daemon Program
  */
@@ -47,6 +45,7 @@
 #include <stdarg.h>
 #include <libscf.h>
 #include <signal.h>
+#include <atomic.h>
 #include <libintl.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -64,7 +63,8 @@
 
 static int vscand_fg = 0; /* daemon by default */
 static vs_daemon_state_t vscand_state = VS_STATE_INIT;
-static int vscand_sigval = 0;
+static volatile uint_t vscand_sigval = 0;
+static volatile uint_t vscand_n_refresh = 0;
 static int vscand_kdrv_fd = -1;
 static pthread_mutex_t vscand_cfg_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t vscand_cfg_cv;
@@ -123,13 +123,16 @@ _umem_logging_init(void)
 
 
 /*
- * vs_sig_handler
+ * vscand_sig_handler
  */
 static void
 vscand_sig_handler(int sig)
 {
 	if (vscand_sigval == 0)
-		vscand_sigval = sig;
+		(void) atomic_swap_uint(&vscand_sigval, sig);
+
+	if (sig == SIGHUP)
+		atomic_inc_uint(&vscand_n_refresh);
 }
 
 
@@ -238,23 +241,23 @@ main(int argc, char **argv)
 
 	/* Wait here until shutdown */
 	while (vscand_state == VS_STATE_RUNNING) {
-		if (vscand_sigval == 0)
+		if (vscand_sigval == 0 && vscand_n_refresh == 0)
 			(void) sigsuspend(&set);
 
-		sigval = vscand_sigval;
-		vscand_sigval = 0;
+		sigval = atomic_swap_uint(&vscand_sigval, 0);
 
 		switch (sigval) {
 		case 0:
 		case SIGPIPE:
-			break;
 		case SIGHUP:
-			(void) pthread_cond_signal(&vscand_cfg_cv);
 			break;
 		default:
 			vscand_state = VS_STATE_SHUTDOWN;
 			break;
 		}
+
+		if (atomic_swap_uint(&vscand_n_refresh, 0) != 0)
+			(void) pthread_cond_signal(&vscand_cfg_cv);
 	}
 
 	vscand_fini();

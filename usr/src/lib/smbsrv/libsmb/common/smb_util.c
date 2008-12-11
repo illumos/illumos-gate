@@ -194,6 +194,69 @@ hextobin(const char *hexbuf, size_t hexlen,
 }
 
 /*
+ * Trim leading and trailing characters in the set defined by class
+ * from a buffer containing a null-terminated string.
+ * For example, if the input buffer contained "ABtext23" and class
+ * contains "ABC123", the buffer will contain "text" on return.
+ *
+ * This function modifies the contents of buf in place and returns
+ * a pointer to buf.
+ */
+char *
+strtrim(char *buf, const char *class)
+{
+	char *p = buf;
+	char *q = buf;
+
+	if (buf == NULL)
+		return (NULL);
+
+	p += strspn(p, class);
+
+	if (p != buf) {
+		while ((*q = *p++) != '\0')
+			++q;
+	}
+
+	while (q != buf) {
+		--q;
+		if (strspn(q, class) == 0)
+			return (buf);
+		*q = '\0';
+	}
+
+	return (buf);
+}
+
+/*
+ * Strip the characters in the set defined by class from a buffer
+ * containing a null-terminated string.
+ * For example, if the input buffer contained "XYA 1textZ string3"
+ * and class contains "123XYZ", the buffer will contain "A text string"
+ * on return.
+ *
+ * This function modifies the contents of buf in place and returns
+ * a pointer to buf.
+ */
+char *
+strstrip(char *buf, const char *class)
+{
+	char *p = buf;
+	char *q = buf;
+
+	if (buf == NULL)
+		return (NULL);
+
+	while (*p) {
+		p += strspn(p, class);
+		*q++ = *p++;
+	}
+
+	*q = '\0';
+	return (buf);
+}
+
+/*
  * trim_whitespace
  *
  * Trim leading and trailing whitespace chars (as defined by isspace)

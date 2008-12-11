@@ -57,24 +57,8 @@
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * MLRPC server-side library processing. This is where we decode the
- * request header to figure out what type of request is being made,
- * call the server stub, if appropriate, and build the response header.
- */
-
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/mbuf.h>
-
-/*
- * Fragment size (5680: NT style). Tuning parameter
- * used during development of multiple fragment support.
- */
-
-#define	MLRPC_FRAG_SIZE 5680
-#define	MLRPC_RSP_HDR_SIZE 24
 
 /*
  * smb_mbuf_get

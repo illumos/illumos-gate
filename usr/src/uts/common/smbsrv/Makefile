@@ -44,13 +44,9 @@ HDRS=	alloc.h			\
 	lm.h			\
 	lmdfs.h			\
 	lmerr.h			\
-	lsalib.h		\
 	mac_cifs.h		\
 	mailslot.h		\
 	mbuf.h			\
-	mlrpc.h			\
-	mlsvc.h			\
-	mlsvc_util.h		\
 	msgbuf.h		\
 	ndr.h			\
 	netbios.h		\
@@ -63,7 +59,6 @@ HDRS=	alloc.h			\
 	smb_sid.h		\
 	ntstatus.h		\
 	oem.h			\
-	samlib.h		\
 	smb.h			\
 	smb_common_door.h	\
 	smb_door_svc.h		\
@@ -93,6 +88,7 @@ NDLHDRS= dssetup.ndl		\
 	eventlog.ndl		\
 	llsrpc.ndl		\
 	lsarpc.ndl		\
+	msgsvc.ndl		\
 	ndrtypes.ndl		\
 	netdfs.ndl		\
 	netlogon.ndl		\

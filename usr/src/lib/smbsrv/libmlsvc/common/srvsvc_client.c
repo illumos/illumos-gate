@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)srvsvc_client.c	1.3	08/07/16 SMI"
-
 /*
  * Server Service (srvsvc) client side RPC library interface. The
  * srvsvc interface allows a client to query a server for information
@@ -42,10 +40,10 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ndl/srvsvc.ndl>
-#include <smbsrv/mlsvc_util.h>
 
 /*
  * Information level for NetShareGetInfo.
@@ -55,61 +53,40 @@ DWORD srvsvc_info_level = 1;
 static int srvsvc_net_remote_tod(char *, char *, struct timeval *, struct tm *);
 
 /*
- * Ensure that an appropriate session and logon exists for the srvsvc
- * client calls. Open and bind the RPC interface.
+ * Bind to the the SRVSVC.
  *
  * If username argument is NULL, an anonymous connection will be established.
  * Otherwise, an authenticated connection will be established.
- *
- * On success 0 is returned. Otherwise a -ve error code.
  */
 static int
-srvsvc_open(char *server, char *domain, char *username,
-    mlsvc_handle_t *handle, mlrpc_heapref_t *heapref)
+srvsvc_open(char *server, char *domain, char *username, mlsvc_handle_t *handle)
 {
-	smb_ntdomain_t *di;
-	int fid;
-	int rc;
+	smb_domain_t di;
 
 	if (server == NULL || domain == NULL) {
-		if ((di = smb_getdomaininfo(0)) == NULL)
+		if (!smb_domain_getinfo(&di))
 			return (-1);
 
-		server = di->server;
-		domain = di->domain;
+		server = di.d_dc;
+		domain = di.d_nbdomain;
 	}
 
 	if (username == NULL)
 		username = MLSVC_ANON_USER;
 
-	rc = mlsvc_logon(server, domain, username);
-
-	if (rc != 0)
+	if (ndr_rpc_bind(handle, server, domain, username, "SRVSVC") < 0)
 		return (-1);
 
-	fid = mlsvc_open_pipe(server, domain, username, "\\srvsvc");
-	if (fid < 0)
-		return (-1);
-
-	if ((rc = mlsvc_rpc_bind(handle, fid, "SRVSVC")) < 0) {
-		(void) mlsvc_close_pipe(fid);
-		return (rc);
-	}
-
-	rc = mlsvc_rpc_init(heapref);
-	return (rc);
+	return (0);
 }
 
 /*
- * Close the srvsvc pipe and free the associated context. This function
- * should only be called if the open was successful.
+ * Unbind the SRVSVC connection.
  */
-void
-srvsvc_close(mlsvc_handle_t *handle, mlrpc_heapref_t *heapref)
+static void
+srvsvc_close(mlsvc_handle_t *handle)
 {
-	mlsvc_rpc_free(handle->context, heapref);
-	(void) mlsvc_close_pipe(handle->context->fid);
-	free(handle->context);
+	ndr_rpc_unbind(handle);
 }
 
 /*
@@ -122,7 +99,6 @@ srvsvc_net_share_get_info(char *server, char *domain, char *netname)
 {
 	struct mlsm_NetShareGetInfo arg;
 	mlsvc_handle_t handle;
-	mlrpc_heapref_t heap;
 	int rc;
 	int opnum;
 	struct mslm_NetShareGetInfo0 *info0;
@@ -137,17 +113,16 @@ srvsvc_net_share_get_info(char *server, char *domain, char *netname)
 	if (srvsvc_info_level == 2)
 		user = smbrdr_ipc_get_user();
 
-	rc = srvsvc_open(server, domain, user, &handle, &heap);
-	if (rc != 0)
+	if (srvsvc_open(server, domain, user, &handle) != 0)
 		return (-1);
 
 	opnum = SRVSVC_OPNUM_NetShareGetInfo;
 	bzero(&arg, sizeof (struct mlsm_NetShareGetInfo));
 
 	len = strlen(server) + 4;
-	arg.servername = mlrpc_heap_malloc(heap.heap, len);
+	arg.servername = ndr_rpc_malloc(&handle, len);
 	if (arg.servername == NULL) {
-		srvsvc_close(&handle, &heap);
+		srvsvc_close(&handle);
 		return (-1);
 	}
 
@@ -155,9 +130,9 @@ srvsvc_net_share_get_info(char *server, char *domain, char *netname)
 	arg.netname = (LPTSTR)netname;
 	arg.level = srvsvc_info_level; /* share information level */
 
-	rc = mlsvc_rpc_call(handle.context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(&handle, opnum, &arg);
 	if ((rc != 0) || (arg.status != 0)) {
-		srvsvc_close(&handle, &heap);
+		srvsvc_close(&handle);
 		return (-1);
 	}
 
@@ -202,7 +177,7 @@ srvsvc_net_share_get_info(char *server, char *domain, char *netname)
 		break;
 	}
 
-	srvsvc_close(&handle, &heap);
+	srvsvc_close(&handle);
 	return (0);
 }
 
@@ -215,7 +190,6 @@ srvsvc_net_session_enum(char *server, char *domain, char *netname)
 {
 	struct mslm_NetSessionEnum arg;
 	mlsvc_handle_t handle;
-	mlrpc_heapref_t heap;
 	int rc;
 	int opnum;
 	struct mslm_infonres infonres;
@@ -226,7 +200,7 @@ srvsvc_net_session_enum(char *server, char *domain, char *netname)
 	if (netname == NULL)
 		return (-1);
 
-	rc = srvsvc_open(server, domain, user, &handle, &heap);
+	rc = srvsvc_open(server, domain, user, &handle);
 	if (rc != 0)
 		return (-1);
 
@@ -234,9 +208,9 @@ srvsvc_net_session_enum(char *server, char *domain, char *netname)
 	bzero(&arg, sizeof (struct mslm_NetSessionEnum));
 
 	len = strlen(server) + 4;
-	arg.servername = mlrpc_heap_malloc(heap.heap, len);
+	arg.servername = ndr_rpc_malloc(&handle, len);
 	if (arg.servername == NULL) {
-		srvsvc_close(&handle, &heap);
+		srvsvc_close(&handle);
 		return (-1);
 	}
 
@@ -249,9 +223,9 @@ srvsvc_net_session_enum(char *server, char *domain, char *netname)
 	arg.resume_handle = 0;
 	arg.pref_max_len = 0xFFFFFFFF;
 
-	rc = mlsvc_rpc_call(handle.context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(&handle, opnum, &arg);
 	if ((rc != 0) || (arg.status != 0)) {
-		srvsvc_close(&handle, &heap);
+		srvsvc_close(&handle);
 		return (-1);
 	}
 
@@ -266,7 +240,7 @@ srvsvc_net_session_enum(char *server, char *domain, char *netname)
 	smb_tracef("srvsvc sesi1_itime=%u", nsi1->sesi1_itime);
 	smb_tracef("srvsvc sesi1_uflags=%u", nsi1->sesi1_uflags);
 
-	srvsvc_close(&handle, &heap);
+	srvsvc_close(&handle);
 	return (0);
 }
 
@@ -280,7 +254,6 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 {
 	struct mslm_NetConnectEnum arg;
 	mlsvc_handle_t handle;
-	mlrpc_heapref_t heap;
 	int rc;
 	int opnum;
 	struct mslm_NetConnectInfo1 info1;
@@ -292,7 +265,7 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 	if (netname == NULL)
 		return (-1);
 
-	rc = srvsvc_open(server, domain, user, &handle, &heap);
+	rc = srvsvc_open(server, domain, user, &handle);
 	if (rc != 0)
 		return (-1);
 
@@ -300,9 +273,9 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 	bzero(&arg, sizeof (struct mslm_NetConnectEnum));
 
 	len = strlen(server) + 4;
-	arg.servername = mlrpc_heap_malloc(heap.heap, len);
+	arg.servername = ndr_rpc_malloc(&handle, len);
 	if (arg.servername == NULL) {
-		srvsvc_close(&handle, &heap);
+		srvsvc_close(&handle);
 		return (-1);
 	}
 
@@ -325,16 +298,16 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 		info1.ci1 = 0;
 		break;
 	default:
-		srvsvc_close(&handle, &heap);
+		srvsvc_close(&handle);
 		return (-1);
 	}
 
 	arg.resume_handle = 0;
 	arg.pref_max_len = 0xFFFFFFFF;
 
-	rc = mlsvc_rpc_call(handle.context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(&handle, opnum, &arg);
 	if ((rc != 0) || (arg.status != 0)) {
-		srvsvc_close(&handle, &heap);
+		srvsvc_close(&handle);
 		return (-1);
 	}
 
@@ -370,7 +343,7 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 		break;
 	}
 
-	srvsvc_close(&handle, &heap);
+	srvsvc_close(&handle);
 	return (0);
 }
 
@@ -380,15 +353,15 @@ srvsvc_net_connect_enum(char *server, char *domain, char *netname, int level)
 void
 srvsvc_timesync(void)
 {
-	smb_ntdomain_t *di;
+	smb_domain_t di;
 	struct timeval tv;
 	struct tm tm;
 	time_t tsecs;
 
-	if ((di = smb_getdomaininfo(0)) == NULL)
+	if (!smb_domain_getinfo(&di))
 		return;
 
-	if (srvsvc_net_remote_tod(di->server, di->domain, &tv, &tm) != 0)
+	if (srvsvc_net_remote_tod(di.d_dc, di.d_nbdomain, &tv, &tm) != 0)
 		return;
 
 	if (settimeofday(&tv, 0))
@@ -405,14 +378,14 @@ srvsvc_timesync(void)
 int
 srvsvc_gettime(unsigned long *t)
 {
-	smb_ntdomain_t *di;
+	smb_domain_t di;
 	struct timeval tv;
 	struct tm tm;
 
-	if ((di = smb_getdomaininfo(0)) == NULL)
+	if (!smb_domain_getinfo(&di))
 		return (-1);
 
-	if (srvsvc_net_remote_tod(di->server, di->domain, &tv, &tm) != 0)
+	if (srvsvc_net_remote_tod(di.d_dc, di.d_nbdomain, &tv, &tm) != 0)
 		return (-1);
 
 	*t = tv.tv_sec;
@@ -455,13 +428,12 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 	struct mslm_NetRemoteTOD arg;
 	struct mslm_TIME_OF_DAY_INFO *tod;
 	mlsvc_handle_t handle;
-	mlrpc_heapref_t heap;
 	int rc;
 	int opnum;
 	int len;
 	char *user = smbrdr_ipc_get_user();
 
-	rc = srvsvc_open(server, domain, user, &handle, &heap);
+	rc = srvsvc_open(server, domain, user, &handle);
 	if (rc != 0)
 		return (-1);
 
@@ -469,17 +441,17 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 	bzero(&arg, sizeof (struct mslm_NetRemoteTOD));
 
 	len = strlen(server) + 4;
-	arg.servername = mlrpc_heap_malloc(heap.heap, len);
+	arg.servername = ndr_rpc_malloc(&handle, len);
 	if (arg.servername == NULL) {
-		srvsvc_close(&handle, &heap);
+		srvsvc_close(&handle);
 		return (-1);
 	}
 
 	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 
-	rc = mlsvc_rpc_call(handle.context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(&handle, opnum, &arg);
 	if ((rc != 0) || (arg.status != 0)) {
-		srvsvc_close(&handle, &heap);
+		srvsvc_close(&handle);
 		return (-1);
 	}
 
@@ -510,20 +482,20 @@ srvsvc_net_remote_tod(char *server, char *domain, struct timeval *tv,
 		smb_tracef("NetRemoteTOD from %s: %s", server, timebuf);
 	}
 
-	srvsvc_close(&handle, &heap);
+	srvsvc_close(&handle);
 	return (0);
 }
 
 void
 srvsvc_net_test(char *server, char *domain, char *netname)
 {
-	smb_ntdomain_t *di;
+	smb_domain_t di;
 
 	(void) smb_tracef("%s %s %s", server, domain, netname);
 
-	if ((di = smb_getdomaininfo(0)) != NULL) {
-		server = di->server;
-		domain = di->domain;
+	if (smb_domain_getinfo(&di)) {
+		server = di.d_dc;
+		domain = di.d_nbdomain;
 	}
 
 	(void) srvsvc_net_share_get_info(server, domain, netname);

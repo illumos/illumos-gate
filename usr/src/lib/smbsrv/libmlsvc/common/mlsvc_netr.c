@@ -32,20 +32,20 @@
 #include <strings.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/mlsvc_util.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/netlogon.ndl>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/nterror.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/netrauth.h>
 
-static int netr_s_ServerReqChallenge(void *, struct mlrpc_xaction *);
-static int netr_s_ServerAuthenticate2(void *, struct mlrpc_xaction *);
-static int netr_s_ServerPasswordSet(void *, struct mlrpc_xaction *);
-static int netr_s_SamLogon(void *, struct mlrpc_xaction *);
-static int netr_s_SamLogoff(void *, struct mlrpc_xaction *);
+static int netr_s_ServerReqChallenge(void *, ndr_xa_t *);
+static int netr_s_ServerAuthenticate2(void *, ndr_xa_t *);
+static int netr_s_ServerPasswordSet(void *, ndr_xa_t *);
+static int netr_s_SamLogon(void *, ndr_xa_t *);
+static int netr_s_SamLogoff(void *, ndr_xa_t *);
 
-static mlrpc_stub_table_t netr_stub_table[] = {
+static ndr_stub_table_t netr_stub_table[] = {
 	{ netr_s_ServerReqChallenge,	NETR_OPNUM_ServerReqChallenge },
 	{ netr_s_ServerAuthenticate2,	NETR_OPNUM_ServerAuthenticate2 },
 	{ netr_s_ServerPasswordSet,	NETR_OPNUM_ServerPasswordSet },
@@ -54,13 +54,13 @@ static mlrpc_stub_table_t netr_stub_table[] = {
 	{0}
 };
 
-static mlrpc_service_t netr_service = {
+static ndr_service_t netr_service = {
 	"NETR",				/* name */
 	"NetLogon",			/* desc */
 	"\\netlogon",			/* endpoint */
 	PIPE_LSASS,			/* sec_addr_port */
-	"12345678-1234-abcd-ef0001234567cffb", 1,	/* abstract */
-	"8a885d04-1ceb-11c9-9fe808002b104860", 2,	/* transfer */
+	"12345678-1234-abcd-ef00-01234567cffb", 1,	/* abstract */
+	NDR_TRANSFER_SYNTAX_UUID,		2,	/* transfer */
 	0,				/* no bind_instance_size */
 	0,				/* no bind_req() */
 	0,				/* no unbind_and_close() */
@@ -79,7 +79,7 @@ static mlrpc_service_t netr_service = {
 void
 netr_initialize(void)
 {
-	(void) mlrpc_register_service(&netr_service);
+	(void) ndr_svc_register(&netr_service);
 }
 
 /*
@@ -87,13 +87,13 @@ netr_initialize(void)
  */
 /*ARGSUSED*/
 static int
-netr_s_ServerReqChallenge(void *arg, struct mlrpc_xaction *mxa)
+netr_s_ServerReqChallenge(void *arg, ndr_xa_t *mxa)
 {
 	struct netr_ServerReqChallenge *param = arg;
 
 	bzero(param, sizeof (struct netr_ServerReqChallenge));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -101,13 +101,13 @@ netr_s_ServerReqChallenge(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netr_s_ServerAuthenticate2(void *arg, struct mlrpc_xaction *mxa)
+netr_s_ServerAuthenticate2(void *arg, ndr_xa_t *mxa)
 {
 	struct netr_ServerAuthenticate2 *param = arg;
 
 	bzero(param, sizeof (struct netr_ServerAuthenticate2));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -115,13 +115,13 @@ netr_s_ServerAuthenticate2(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netr_s_ServerPasswordSet(void *arg, struct mlrpc_xaction *mxa)
+netr_s_ServerPasswordSet(void *arg, ndr_xa_t *mxa)
 {
 	struct netr_PasswordSet *param = arg;
 
 	bzero(param, sizeof (struct netr_PasswordSet));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -129,13 +129,13 @@ netr_s_ServerPasswordSet(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netr_s_SamLogon(void *arg, struct mlrpc_xaction *mxa)
+netr_s_SamLogon(void *arg, ndr_xa_t *mxa)
 {
 	struct netr_SamLogon *param = arg;
 
 	bzero(param, sizeof (struct netr_SamLogon));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -143,13 +143,13 @@ netr_s_SamLogon(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-netr_s_SamLogoff(void *arg, struct mlrpc_xaction *mxa)
+netr_s_SamLogoff(void *arg, ndr_xa_t *mxa)
 {
 	struct netr_SamLogoff *param = arg;
 
 	bzero(param, sizeof (struct netr_SamLogoff));
 	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*

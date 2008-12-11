@@ -281,9 +281,39 @@ extern "C" {
 #define	Windows_for_Workgroups_3_1a 10 /* Windows for Workgroups Version 1.0 */
 #define	NT_LM_0_12		11  /* The SMB protocol designed for NT */
 
-/* SMB_TREE_CONNECT_ANDX flags */
-#define	SMB_TREE_SUPPORT_SEARCH_BITS	0x01
-#define	SMB_TREE_SHARE_IS_IN_DFS	0x02
+/*
+ * SMB_TREE_CONNECT_ANDX OptionalSupport flags
+ *
+ * SMB_SUPPORT_SEARCH_BITS    The server supports SearchAttributes.
+ * SMB_SHARE_IS_IN_DFS        The share is managed by DFS.
+ * SMB_CSC_MASK               Offline-caching mask - see CSC values.
+ * SMB_UNIQUE_FILE_NAME       The server uses long names and does not support
+ *                            short names.  This indicates to clients that
+ *                            they may perform directory name-space caching.
+ * SMB_EXTENDED_SIGNATURES    The server will use signing key protection.
+ *
+ * SMB_CSC_CACHE_MANUAL_REINT Clients are allowed to cache files for offline
+ *                            use as requested by users but automatic
+ *                            file-by-file reintegration is not allowed.
+ * SMB_CSC_CACHE_AUTO_REINT   Clients are allowed to automatically cache
+ *                            files for offline use and file-by-file
+ *                            reintegration is allowed.
+ * SMB_CSC_CACHE_VDO          Clients are allowed to automatically cache files
+ *                            for offline use, file-by-file reintegration is
+ *                            allowed and clients are permitted to work from
+ *                            their local cache even while offline.
+ * SMB_CSC_CACHE_NONE         Client-side caching is disabled for this share.
+ */
+#define	SMB_SUPPORT_SEARCH_BITS		0x0001
+#define	SMB_SHARE_IS_IN_DFS		0x0002
+#define	SMB_CSC_MASK			0x000C
+#define	SMB_UNIQUE_FILE_NAME		0x0010
+#define	SMB_EXTENDED_SIGNATURES		0x0020
+
+#define	SMB_CSC_CACHE_MANUAL_REINT	0x0000
+#define	SMB_CSC_CACHE_AUTO_REINT	0x0004
+#define	SMB_CSC_CACHE_VDO		0x0008
+#define	SMB_CSC_CACHE_NONE		0x000C
 
 /*
  * The subcommand codes, placed in SETUP[0], for named pipe operations are:

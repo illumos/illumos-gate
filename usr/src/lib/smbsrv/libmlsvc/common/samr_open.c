@@ -42,12 +42,12 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
+#include <smbsrv/libmlrpc.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ntaccess.h>
-#include <smbsrv/samlib.h>
-#include <smbsrv/mlrpc.h>
-#include <smbsrv/mlsvc.h>
+#include <samlib.h>
 
 /*LINTED E_STATIC_UNUSED*/
 static DWORD samr_connect1(char *, char *, char *, DWORD, mlsvc_handle_t *);
@@ -58,11 +58,9 @@ static DWORD samr_connect4(char *, char *, char *, DWORD, mlsvc_handle_t *);
 /*
  * samr_open
  *
- * This is a wrapper round samr_connect to ensure that we connect using
- * the appropriate session and logon.  We default to the resource domain
- * information if the caller doesn't supply a server name and a domain
- * name.  We store the remote server's native OS type - we may need it
- * due to differences between platforms like NT and Windows 2000.
+ * Wrapper round samr_connect to ensure that we connect using the server
+ * and domain.  We default to the resource domain if the caller doesn't
+ * supply a server name and a domain name.
  *
  * If username argument is NULL, an anonymous connection will be established.
  * Otherwise, an authenticated connection will be established.
@@ -73,32 +71,21 @@ int
 samr_open(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
-	smb_ntdomain_t *di;
-	int remote_os;
-	int remote_lm;
+	smb_domain_t di;
 	int rc;
 
 	if (server == NULL || domain == NULL) {
-		if ((di = smb_getdomaininfo(0)) == NULL)
+		if (!smb_domain_getinfo(&di))
 			return (-1);
 
-		server = di->server;
-		domain = di->domain;
+		server = di.d_dc;
+		domain = di.d_nbdomain;
 	}
 
 	if (username == NULL)
 		username = MLSVC_ANON_USER;
-	rc = mlsvc_logon(server, domain, username);
-
-	if (rc != 0)
-		return (-1);
 
 	rc = samr_connect(server, domain, username, access_mask, samr_handle);
-	if (rc == 0) {
-		(void) mlsvc_session_native_values(samr_handle->context->fid,
-		    &remote_os, &remote_lm, 0);
-		samr_handle->context->server_os = remote_os;
-	}
 	return (rc);
 }
 
@@ -118,26 +105,11 @@ samr_connect(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
 	DWORD status;
-	int remote_os;
-	int remote_lm;
-	int fid;
-	int rc = 0;
 
-	if (server == NULL || domain == NULL ||
-	    username == NULL || samr_handle == NULL)
+	if (ndr_rpc_bind(samr_handle, server, domain, username, "SAMR") < 0)
 		return (-1);
 
-	if ((fid = mlsvc_open_pipe(server, domain, username, "\\samr")) < 0)
-		return (-1);
-
-	if (mlsvc_rpc_bind(samr_handle, fid, "SAMR") < 0) {
-		(void) mlsvc_close_pipe(fid);
-		return (-1);
-	}
-
-	(void) mlsvc_session_native_values(fid, &remote_os, &remote_lm, 0);
-
-	switch (remote_os) {
+	switch (ndr_rpc_server_os(samr_handle)) {
 	case NATIVE_OS_NT5_1:
 		status = samr_connect4(server, domain, username, access_mask,
 		    samr_handle);
@@ -156,11 +128,11 @@ samr_connect(char *server, char *domain, char *username, DWORD access_mask,
 	}
 
 	if (status != NT_STATUS_SUCCESS) {
-		(void) mlsvc_close_pipe(fid);
-		free(samr_handle->context);
-		rc = -1;
+		ndr_rpc_unbind(samr_handle);
+		return (-1);
 	}
-	return (rc);
+
+	return (0);
 }
 
 /*
@@ -178,7 +150,6 @@ samr_connect1(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
 	struct samr_ConnectAnon arg;
-	mlrpc_heapref_t heapref;
 	int opnum;
 	DWORD status;
 
@@ -186,25 +157,23 @@ samr_connect1(char *server, char *domain, char *username, DWORD access_mask,
 	opnum = SAMR_OPNUM_ConnectAnon;
 	status = NT_STATUS_SUCCESS;
 
-	(void) mlsvc_rpc_init(&heapref);
-	arg.servername = (DWORD *)mlrpc_heap_malloc(heapref.heap,
-	    sizeof (DWORD));
+	arg.servername = ndr_rpc_malloc(samr_handle, sizeof (DWORD));
 	*(arg.servername) = 0x0001005c;
 	arg.access_mask = access_mask;
 
-	if (mlsvc_rpc_call(samr_handle->context, opnum, &arg, &heapref) != 0) {
+	if (ndr_rpc_call(samr_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_UNSUCCESSFUL;
 	} else if (arg.status != 0) {
 		status = NT_SC_VALUE(arg.status);
 	} else {
 		(void) memcpy(&samr_handle->handle, &arg.handle,
-		    sizeof (ms_handle_t));
+		    sizeof (ndr_hdid_t));
 
-		if (mlsvc_is_null_handle(samr_handle))
+		if (ndr_is_null_handle(samr_handle))
 			status = NT_STATUS_INVALID_HANDLE;
 	}
 
-	mlsvc_rpc_free(samr_handle->context, &heapref);
+	ndr_rpc_release(samr_handle);
 	return (status);
 }
 
@@ -224,7 +193,6 @@ samr_connect2(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
 	struct samr_Connect arg;
-	mlrpc_heapref_t heapref;
 	int opnum;
 	DWORD status;
 	int len;
@@ -233,25 +201,24 @@ samr_connect2(char *server, char *domain, char *username, DWORD access_mask,
 	opnum = SAMR_OPNUM_Connect;
 	status = NT_STATUS_SUCCESS;
 
-	(void) mlsvc_rpc_init(&heapref);
 	len = strlen(server) + 4;
-	arg.servername = mlrpc_heap_malloc(heapref.heap, len);
+	arg.servername = ndr_rpc_malloc(samr_handle, len);
 	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 	arg.access_mask = access_mask;
 
-	if (mlsvc_rpc_call(samr_handle->context, opnum, &arg, &heapref) != 0) {
+	if (ndr_rpc_call(samr_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_UNSUCCESSFUL;
 	} else if (arg.status != 0) {
 		status = NT_SC_VALUE(arg.status);
 	} else {
 		(void) memcpy(&samr_handle->handle, &arg.handle,
-		    sizeof (ms_handle_t));
+		    sizeof (ndr_hdid_t));
 
-		if (mlsvc_is_null_handle(samr_handle))
+		if (ndr_is_null_handle(samr_handle))
 			status = NT_STATUS_INVALID_HANDLE;
 	}
 
-	mlsvc_rpc_free(samr_handle->context, &heapref);
+	ndr_rpc_release(samr_handle);
 	return (status);
 }
 
@@ -266,7 +233,6 @@ samr_connect3(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
 	struct samr_Connect3 arg;
-	mlrpc_heapref_t heapref;
 	int opnum;
 	DWORD status;
 	int len;
@@ -275,26 +241,25 @@ samr_connect3(char *server, char *domain, char *username, DWORD access_mask,
 	opnum = SAMR_OPNUM_Connect3;
 	status = NT_STATUS_SUCCESS;
 
-	(void) mlsvc_rpc_init(&heapref);
 	len = strlen(server) + 4;
-	arg.servername = mlrpc_heap_malloc(heapref.heap, len);
+	arg.servername = ndr_rpc_malloc(samr_handle, len);
 	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 	arg.unknown_02 = 0x00000002;
 	arg.access_mask = access_mask;
 
-	if (mlsvc_rpc_call(samr_handle->context, opnum, &arg, &heapref) != 0) {
+	if (ndr_rpc_call(samr_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_UNSUCCESSFUL;
 	} else if (arg.status != 0) {
 		status = NT_SC_VALUE(arg.status);
 	} else {
 		(void) memcpy(&samr_handle->handle, &arg.handle,
-		    sizeof (ms_handle_t));
+		    sizeof (ndr_hdid_t));
 
-		if (mlsvc_is_null_handle(samr_handle))
+		if (ndr_is_null_handle(samr_handle))
 			status = NT_STATUS_INVALID_HANDLE;
 	}
 
-	mlsvc_rpc_free(samr_handle->context, &heapref);
+	ndr_rpc_release(samr_handle);
 	return (status);
 }
 
@@ -315,31 +280,26 @@ samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
     mlsvc_handle_t *samr_handle)
 {
 	struct samr_Connect4 arg;
-	mlrpc_heapref_t heapref;
-	char dns_name[MAXHOSTNAMELEN];
 	int len;
 	int opnum;
 	DWORD status;
+	smb_domain_t dinfo;
 
 	bzero(&arg, sizeof (struct samr_Connect4));
 	opnum = SAMR_OPNUM_Connect;
 	status = NT_STATUS_SUCCESS;
 
-	if (smb_resolve_fqdn(domain, dns_name, MAXHOSTNAMELEN) != 1)
-		return (NT_STATUS_UNSUCCESSFUL);
+	if (!smb_domain_getinfo(&dinfo))
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	(void) mlsvc_rpc_init(&heapref);
+	len = strlen(server) + strlen(dinfo.d_fqdomain) + 4;
+	arg.servername = ndr_rpc_malloc(samr_handle, len);
 
-	if (strlen(dns_name) > 0) {
-		len = strlen(server) + strlen(dns_name) + 4;
-		arg.servername = mlrpc_heap_malloc(heapref.heap, len);
+	if (*dinfo.d_fqdomain != '\0')
 		(void) snprintf((char *)arg.servername, len, "\\\\%s.%s",
-		    server, dns_name);
-	} else {
-		len = strlen(server) + 4;
-		arg.servername = mlrpc_heap_malloc(heapref.heap, len);
+		    server, dinfo.d_fqdomain);
+	else
 		(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
-	}
 
 	arg.access_mask = SAM_ENUM_LOCAL_DOMAIN;
 	arg.unknown2_00000001 = 0x00000001;
@@ -347,21 +307,20 @@ samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
 	arg.unknown4_00000003 = 0x00000003;
 	arg.unknown5_00000000 = 0x00000000;
 
-	if (mlsvc_rpc_call(samr_handle->context, opnum, &arg, &heapref) != 0) {
+	if (ndr_rpc_call(samr_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_UNSUCCESSFUL;
 	} else if (arg.status != 0) {
 		status = NT_SC_VALUE(arg.status);
 	} else {
 
 		(void) memcpy(&samr_handle->handle, &arg.handle,
-		    sizeof (ms_handle_t));
+		    sizeof (ndr_hdid_t));
 
-		if (mlsvc_is_null_handle(samr_handle))
+		if (ndr_is_null_handle(samr_handle))
 			status = NT_STATUS_INVALID_HANDLE;
 	}
 
-	mlsvc_rpc_free(samr_handle->context, &heapref);
-
+	ndr_rpc_release(samr_handle);
 	return (status);
 }
 
@@ -370,38 +329,30 @@ samr_connect4(char *server, char *domain, char *username, DWORD access_mask,
  * samr_close_handle
  *
  * This is function closes any valid handle, i.e. sam, domain, user etc.
- * Just to be safe we check for, and reject, null handles. The handle
- * returned by the SAM server is all null. If the handle being closed is
- * the top level connect handle, we also close the pipe. Then we zero
- * out the handle to invalidate it. Things go badly if you attempt to
- * use an invalid handle, i.e. the DC crashes.
+ * If the handle being closed is the top level connect handle, we unbind.
+ * Then we zero out the handle to invalidate it.
  */
 int
-samr_close_handle(mlsvc_handle_t *desc)
+samr_close_handle(mlsvc_handle_t *samr_handle)
 {
 	struct samr_CloseHandle arg;
-	mlrpc_heapref_t heap;
 	int opnum;
-	int rc;
 
-	if (mlsvc_is_null_handle(desc))
+	if (ndr_is_null_handle(samr_handle))
 		return (-1);
 
 	opnum = SAMR_OPNUM_CloseHandle;
 	bzero(&arg, sizeof (struct samr_CloseHandle));
-	(void) memcpy(&arg.handle, &desc->handle, sizeof (ms_handle_t));
+	(void) memcpy(&arg.handle, &samr_handle->handle, sizeof (ndr_hdid_t));
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(desc->context, opnum, &arg, &heap);
-	mlsvc_rpc_free(desc->context, &heap);
+	(void) ndr_rpc_call(samr_handle, opnum, &arg);
+	ndr_rpc_release(samr_handle);
 
-	if (desc->context->handle == &desc->handle) {
-		(void) mlsvc_close_pipe(desc->context->fid);
-		free(desc->context);
-	}
+	if (ndr_is_bind_handle(samr_handle))
+		ndr_rpc_unbind(samr_handle);
 
-	bzero(desc, sizeof (mlsvc_handle_t));
-	return (rc);
+	bzero(samr_handle, sizeof (mlsvc_handle_t));
+	return (0);
 }
 
 /*
@@ -416,42 +367,40 @@ samr_open_domain(mlsvc_handle_t *samr_handle, DWORD access_mask,
     struct samr_sid *sid, mlsvc_handle_t *domain_handle)
 {
 	struct samr_OpenDomain arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	DWORD status;
 
-	if (mlsvc_is_null_handle(samr_handle) ||
-	    sid == 0 || domain_handle == 0) {
+	if (ndr_is_null_handle(samr_handle) ||
+	    sid == NULL || domain_handle == NULL) {
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	context = samr_handle->context;
 	opnum = SAMR_OPNUM_OpenDomain;
 	bzero(&arg, sizeof (struct samr_OpenDomain));
-	(void) memcpy(&arg.handle, &samr_handle->handle, sizeof (ms_handle_t));
+	(void) memcpy(&arg.handle, &samr_handle->handle, sizeof (ndr_hdid_t));
 
 	arg.access_mask = access_mask;
 	arg.sid = sid;
 
-	(void) mlsvc_rpc_init(&heap);
-	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+	if (ndr_rpc_call(samr_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_UNSUCCESSFUL;
 	} else if (arg.status != 0) {
 		status = arg.status;
 	} else {
 		status = NT_STATUS_SUCCESS;
+		ndr_inherit_handle(domain_handle, samr_handle);
+
 		(void) memcpy(&domain_handle->handle, &arg.domain_handle,
-		    sizeof (ms_handle_t));
-		domain_handle->context = context;
-		if (mlsvc_is_null_handle(domain_handle))
+		    sizeof (ndr_hdid_t));
+
+		if (ndr_is_null_handle(domain_handle))
 			status = NT_STATUS_INVALID_HANDLE;
 	}
 
 	if (status != NT_STATUS_SUCCESS)
-		mlsvc_rpc_report_status(opnum, status);
+		ndr_rpc_status(samr_handle, opnum, status);
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(samr_handle);
 	return (status);
 }
 
@@ -469,39 +418,35 @@ samr_open_user(mlsvc_handle_t *domain_handle, DWORD access_mask, DWORD rid,
     mlsvc_handle_t *user_handle)
 {
 	struct samr_OpenUser arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
-	int opnum, rc;
+	int opnum;
 	DWORD status = NT_STATUS_SUCCESS;
 
-	if (mlsvc_is_null_handle(domain_handle) || user_handle == NULL)
+	if (ndr_is_null_handle(domain_handle) || user_handle == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	context = domain_handle->context;
 	opnum = SAMR_OPNUM_OpenUser;
 	bzero(&arg, sizeof (struct samr_OpenUser));
 	(void) memcpy(&arg.handle, &domain_handle->handle,
-	    sizeof (ms_handle_t));
+	    sizeof (ndr_hdid_t));
 	arg.access_mask = access_mask;
 	arg.rid = rid;
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
-	if (rc != 0) {
+	if (ndr_rpc_call(domain_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_UNSUCCESSFUL;
 	} else if (arg.status != 0) {
-		mlsvc_rpc_report_status(opnum, arg.status);
+		ndr_rpc_status(domain_handle, opnum, arg.status);
 		status = NT_SC_VALUE(arg.status);
 	} else {
-		(void) memcpy(&user_handle->handle, &arg.user_handle,
-		    sizeof (ms_handle_t));
-		user_handle->context = context;
+		ndr_inherit_handle(user_handle, domain_handle);
 
-		if (mlsvc_is_null_handle(user_handle))
+		(void) memcpy(&user_handle->handle, &arg.user_handle,
+		    sizeof (ndr_hdid_t));
+
+		if (ndr_is_null_handle(user_handle))
 			status = NT_STATUS_INVALID_HANDLE;
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(domain_handle);
 	return (status);
 }
 
@@ -514,31 +459,27 @@ DWORD
 samr_delete_user(mlsvc_handle_t *user_handle)
 {
 	struct samr_DeleteUser arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	DWORD status;
 
-	if (mlsvc_is_null_handle(user_handle))
+	if (ndr_is_null_handle(user_handle))
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	context = user_handle->context;
 	opnum = SAMR_OPNUM_DeleteUser;
 	bzero(&arg, sizeof (struct samr_DeleteUser));
 	(void) memcpy(&arg.user_handle, &user_handle->handle,
-	    sizeof (ms_handle_t));
+	    sizeof (ndr_hdid_t));
 
-	(void) mlsvc_rpc_init(&heap);
-	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+	if (ndr_rpc_call(user_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
 	} else if (arg.status != 0) {
-		mlsvc_rpc_report_status(opnum, arg.status);
+		ndr_rpc_status(user_handle, opnum, arg.status);
 		status = NT_SC_VALUE(arg.status);
 	} else {
 		status = 0;
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(user_handle);
 	return (status);
 }
 
@@ -558,39 +499,36 @@ samr_open_group(
 	mlsvc_handle_t *group_handle)
 {
 	struct samr_OpenGroup arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int rc;
 
-	if (mlsvc_is_null_handle(domain_handle) || group_handle == 0)
+	if (ndr_is_null_handle(domain_handle) || group_handle == NULL)
 		return (-1);
 
-	context = domain_handle->context;
 	opnum = SAMR_OPNUM_OpenGroup;
 	bzero(&arg, sizeof (struct samr_OpenUser));
 	(void) memcpy(&arg.handle, &domain_handle->handle,
-	    sizeof (ms_handle_t));
+	    sizeof (ndr_hdid_t));
 	arg.access_mask = SAM_LOOKUP_INFORMATION | SAM_ACCESS_USER_READ;
 	arg.rid = rid;
 
-	(void) mlsvc_rpc_init(&heap);
+	if ((rc = ndr_rpc_call(domain_handle, opnum, &arg)) != 0)
+		return (-1);
 
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
-	if (rc == 0) {
-		if (arg.status != 0) {
-			mlsvc_rpc_report_status(opnum, arg.status);
+	if (arg.status != 0) {
+		ndr_rpc_status(domain_handle, opnum, arg.status);
+		rc = -1;
+	} else {
+		ndr_inherit_handle(group_handle, domain_handle);
+
+		(void) memcpy(&group_handle->handle, &arg.group_handle,
+		    sizeof (ndr_hdid_t));
+
+		if (ndr_is_null_handle(group_handle))
 			rc = -1;
-		} else {
-			(void) memcpy(&group_handle->handle, &arg.group_handle,
-			    sizeof (ms_handle_t));
-			group_handle->context = context;
-			if (mlsvc_is_null_handle(group_handle))
-				rc = -1;
-		}
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(domain_handle);
 	return (rc);
 }
 
@@ -614,31 +552,29 @@ samr_create_user(mlsvc_handle_t *domain_handle, char *username,
     DWORD account_flags, DWORD *rid, mlsvc_handle_t *user_handle)
 {
 	struct samr_CreateUser arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
+	ndr_heap_t *heap;
 	int opnum;
 	int rc;
 	DWORD status = 0;
 
-	if (mlsvc_is_null_handle(domain_handle) ||
+	if (ndr_is_null_handle(domain_handle) ||
 	    username == NULL || rid == NULL) {
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
-	context = domain_handle->context;
 	opnum = SAMR_OPNUM_CreateUser;
 
 	bzero(&arg, sizeof (struct samr_CreateUser));
 	(void) memcpy(&arg.handle, &domain_handle->handle,
-	    sizeof (ms_handle_t));
+	    sizeof (ndr_hdid_t));
 
-	(void) mlsvc_rpc_init(&heap);
-	mlrpc_heap_mkvcs(heap.heap, username, (mlrpc_vcstr_t *)&arg.username);
+	heap = ndr_rpc_get_heap(domain_handle);
+	ndr_heap_mkvcs(heap, username, (ndr_vcstr_t *)&arg.username);
 
 	arg.account_flags = account_flags;
 	arg.unknown_e00500b0 = 0xE00500B0;
 
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(domain_handle, opnum, &arg);
 	if (rc != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
 	} else if (arg.status != 0) {
@@ -649,17 +585,19 @@ samr_create_user(mlsvc_handle_t *domain_handle, char *username,
 			    xlate_nt_status(status));
 		}
 	} else {
+		ndr_inherit_handle(user_handle, domain_handle);
+
 		(void) memcpy(&user_handle->handle, &arg.user_handle,
-		    sizeof (ms_handle_t));
-		user_handle->context = context;
+		    sizeof (ndr_hdid_t));
+
 		*rid = arg.rid;
 
-		if (mlsvc_is_null_handle(user_handle))
+		if (ndr_is_null_handle(user_handle))
 			status = NT_STATUS_INVALID_HANDLE;
 		else
 			status = 0;
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(domain_handle);
 	return (status);
 }

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smbd_main.c	1.13	08/08/05 SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/ioccom.h>
@@ -37,12 +35,12 @@
 #include <fcntl.h>
 #include <wait.h>
 #include <signal.h>
+#include <atomic.h>
 #include <libscf.h>
 #include <limits.h>
 #include <priv_utils.h>
 #include <door.h>
 #include <errno.h>
-#include <syslog.h>
 #include <pthread.h>
 #include <time.h>
 #include <libscf.h>
@@ -59,7 +57,6 @@
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libmlsvc.h>
-
 #include "smbd.h"
 
 #define	DRV_DEVICE_PATH	"/devices/pseudo/smbsrv@0:smbsrv"
@@ -113,7 +110,7 @@ main(int argc, char *argv[])
 	sigset_t		set;
 	uid_t			uid;
 	int			pfd = -1;
-	int			sigval;
+	uint_t			sigval;
 
 	smbd.s_pname = basename(argv[0]);
 	openlog(smbd.s_pname, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
@@ -184,12 +181,11 @@ main(int argc, char *argv[])
 
 	(void) atexit(smbd_service_fini);
 
-	while (!smbd.s_shutdown_flag) {
-		if (smbd.s_sigval == 0)
+	while (!smbd.s_shutting_down) {
+		if (smbd.s_sigval == 0 && smbd.s_refreshes == 0)
 			(void) sigsuspend(&set);
 
-		sigval = smbd.s_sigval;
-		smbd.s_sigval = 0;
+		sigval = atomic_swap_uint(&smbd.s_sigval, 0);
 
 		switch (sigval) {
 		case 0:
@@ -197,9 +193,7 @@ main(int argc, char *argv[])
 			break;
 
 		case SIGHUP:
-			/* Refresh config was triggered */
-			if (smbd.s_fg)
-				smbd_report("reconfiguration requested");
+			syslog(LOG_DEBUG, "refresh requested");
 			(void) pthread_cond_signal(&refresh_cond);
 			break;
 
@@ -207,7 +201,7 @@ main(int argc, char *argv[])
 			/*
 			 * Typically SIGINT or SIGTERM.
 			 */
-			smbd.s_shutdown_flag = 1;
+			smbd.s_shutting_down = B_TRUE;
 			break;
 		}
 	}
@@ -330,8 +324,7 @@ static int
 smbd_service_init(void)
 {
 	int	rc;
-	char	resource_domain[SMB_PI_MAX_DOMAIN];
-	char	fqdn[MAXHOSTNAMELEN];
+	char	nb_domain[NETBIOS_NAME_SZ];
 
 	smbd.s_drv_fd = -1;
 
@@ -360,7 +353,7 @@ smbd_service_init(void)
 	if (smb_nicmon_start(SMBD_DEFAULT_INSTANCE_FMRI) != 0)
 		smbd_report("NIC monitoring failed to start");
 
-	dns_msgid_init();
+	(void) dyndns_start();
 	smbrdr_init();
 
 	if (smb_netbios_start() != 0)
@@ -368,13 +361,8 @@ smbd_service_init(void)
 	else
 		smbd_report("NetBIOS services started");
 
-	if (smb_netlogon_init() != 0) {
-		smbd_report("netlogon initialization failed");
-		return (1);
-	}
-
-	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
-	(void) utf8_strupr(resource_domain);
+	(void) smb_getdomainname(nb_domain, NETBIOS_NAME_SZ);
+	(void) utf8_strupr(nb_domain);
 
 	/* Get the ID map client handle */
 	if ((rc = smb_idmap_start()) != 0) {
@@ -383,7 +371,7 @@ smbd_service_init(void)
 	}
 
 	smbd.s_secmode = smb_config_get_secmode();
-	if ((rc = nt_domain_init(resource_domain, smbd.s_secmode)) != 0) {
+	if ((rc = nt_domain_init(nb_domain, smbd.s_secmode)) != 0) {
 		if (rc == SMB_DOMAIN_NOMACHINE_SID) {
 			smbd_report(
 			    "no machine SID: check idmap configuration");
@@ -398,7 +386,7 @@ smbd_service_init(void)
 	}
 
 	if (smbd.s_secmode == SMB_SECMODE_DOMAIN)
-		if (smbd_locate_dc_start(resource_domain) != 0)
+		if (smbd_locate_dc_start() != 0)
 			smbd_report("dc discovery failed %s", strerror(errno));
 
 	smbd.s_door_srv = smb_door_srv_start();
@@ -408,8 +396,7 @@ smbd_service_init(void)
 	if ((rc = smbd_refresh_init()) != 0)
 		return (rc);
 
-	if (smb_getfqdomainname(fqdn, MAXHOSTNAMELEN) == 0)
-		(void) dyndns_update_core(fqdn);
+	dyndns_update_zones();
 
 	(void) smbd_localtime_init();
 
@@ -434,9 +421,14 @@ smbd_service_init(void)
 		smbd_report("share initialization failed");
 	}
 
-	rc = smbd_kernel_bind();
-	if (rc != 0) {
+	if ((rc = smbd_kernel_bind()) != 0) {
 		smbd_report("kernel bind error: %s", strerror(errno));
+		return (rc);
+	}
+
+	if ((rc = smb_shr_load()) != 0) {
+		smbd_report("failed to start loading shares: %s",
+		    strerror(errno));
 		return (rc);
 	}
 
@@ -458,6 +450,7 @@ smbd_service_fini(void)
 	smb_door_srv_stop();
 	smb_share_dsrv_stop();
 	smb_shr_stop();
+	dyndns_stop();
 	smb_nicmon_stop();
 	smb_idmap_stop();
 	smb_lgrp_stop();
@@ -521,17 +514,23 @@ static void *
 smbd_refresh_monitor(void *arg)
 {
 	smb_io_t	smb_io;
-	size_t		len;
-	char		*new_dom;
-	int		new_secmod;
-	char		*old_dom;
-	char		fqdn[MAXHOSTNAMELEN];
-	int		rc = 0;
 
 	bzero(&smb_io, sizeof (smb_io));
 
-	(void) pthread_mutex_lock(&refresh_mutex);
-	while (pthread_cond_wait(&refresh_cond, &refresh_mutex) == 0) {
+	while (!smbd.s_shutting_down) {
+		(void) pthread_mutex_lock(&refresh_mutex);
+		while ((atomic_swap_uint(&smbd.s_refreshes, 0) == 0) &&
+		    (!smbd.s_shutting_down))
+			(void) pthread_cond_wait(&refresh_cond, &refresh_mutex);
+		(void) pthread_mutex_unlock(&refresh_mutex);
+
+		if (smbd.s_shutting_down) {
+			syslog(LOG_DEBUG, "shutting down");
+			exit(SMF_EXIT_OK);
+		}
+
+		syslog(LOG_DEBUG, "refresh");
+
 		/*
 		 * We've been woken up by a refresh event so go do
 		 * what is necessary.
@@ -539,14 +538,13 @@ smbd_refresh_monitor(void *arg)
 		smb_ads_refresh();
 		smb_ccache_remove(SMB_CCACHE_PATH);
 
-		if ((rc = smb_getfqdomainname(fqdn, MAXHOSTNAMELEN)) != 0)
-			smbd_report("failed to get fully qualified domainname");
-
-		if (rc == 0)
-			/* Clear rev zone before creating if list */
-			if (dyndns_clear_rev_zone(fqdn) != 0)
-				smbd_report("failed to clear DNS reverse "
-				    "lookup zone");
+		/*
+		 * Start the dyndns thread, if required.
+		 * Clear the DNS zones for the existing interfaces
+		 * before updating the NIC interface list.
+		 */
+		(void) dyndns_start();
+		dyndns_clear_zones();
 
 		/* re-initialize NIC table */
 		if (smb_nic_init() != 0)
@@ -554,42 +552,64 @@ smbd_refresh_monitor(void *arg)
 
 		smb_netbios_name_reconfig();
 		smb_browser_reconfig();
+		dyndns_update_zones();
 
-		if (rc == 0)
-			if (dyndns_update_core(fqdn) != 0)
-				smbd_report("failed to update dynamic DNS");
-
-		smb_set_netlogon_cred();
-
-		smb_load_kconfig(&smb_io.sio_data.cfg);
-		new_dom = smb_io.sio_data.cfg.skc_nbdomain;
-		old_dom = smbd.s_kcfg.skc_nbdomain;
-		len = strlen(old_dom);
-		new_secmod = smb_config_get_secmode();
-		if ((len != strlen(new_dom)) ||
-		    (strncasecmp(new_dom, old_dom, len)) ||
-		    (new_secmod != smbd.s_secmode) ||
-		    (smbd.s_drv_fd == -1)) {
+		if (smbd_set_netlogon_cred()) {
 			/*
-			 * The active sessions have to be disconnected.
+			 * Restart required because the domain changed
+			 * or the credential chain setup failed.
 			 */
-			smbd_kernel_unbind();
+			if (smb_smf_restart_service() != 0) {
+				syslog(LOG_ERR,
+				    "unable to restart smb service. "
+				    "Run 'svcs -xv smb/server' for more "
+				    "information.");
+				smbd.s_shutting_down = B_TRUE;
+				exit(SMF_EXIT_OK);
+			}
+
+			break;
+		}
+
+		if (smbd.s_drv_fd == -1) {
 			if (smbd_kernel_bind()) {
 				smbd_report("kernel bind error: %s",
 				    strerror(errno));
+			} else {
+				(void) smb_shr_load();
 			}
 			continue;
 		}
 
-		bcopy(&smb_io.sio_data.cfg, &smbd.s_kcfg, sizeof (smbd.s_kcfg));
+		(void) smb_shr_load();
+
+		smb_load_kconfig(&smb_io.sio_data.cfg);
+
 		if (smbd_ioctl(SMB_IOC_CONFIG, &smb_io) < 0) {
 			smbd_report("configuration update ioctl: %s",
 			    strerror(errno));
 		}
 	}
+
 	return (NULL);
 }
 
+void
+smbd_set_secmode(int secmode)
+{
+	switch (secmode) {
+	case SMB_SECMODE_WORKGRP:
+	case SMB_SECMODE_DOMAIN:
+		(void) smb_config_set_secmode(secmode);
+		smbd.s_secmode = secmode;
+		break;
+
+	default:
+		syslog(LOG_ERR, "invalid security mode: %d", secmode);
+		syslog(LOG_ERR, "entering maintenance mode");
+		(void) smb_smf_maintenance_mode();
+	}
+}
 
 /*
  * If the door has already been opened by another process (non-zero pid
@@ -635,16 +655,15 @@ smbd_kernel_bind(void)
 
 	bzero(&smb_io, sizeof (smb_io));
 
-	if (smbd.s_drv_fd != -1)
-		(void) close(smbd.s_drv_fd);
+	smbd_kernel_unbind();
 
 	if ((smbd.s_drv_fd = open(DRV_DEVICE_PATH, 0)) < 0) {
 		smbd.s_drv_fd = -1;
 		return (errno);
 	}
 
-	smb_load_kconfig(&smbd.s_kcfg);
-	bcopy(&smbd.s_kcfg, &smb_io.sio_data.cfg, sizeof (smb_io.sio_data.cfg));
+	smb_load_kconfig(&smb_io.sio_data.cfg);
+
 	if (smbd_ioctl(SMB_IOC_CONFIG, &smb_io) < 0) {
 		(void) close(smbd.s_drv_fd);
 		smbd.s_drv_fd = -1;
@@ -805,7 +824,17 @@ static void
 smbd_sig_handler(int sigval)
 {
 	if (smbd.s_sigval == 0)
-		smbd.s_sigval = sigval;
+		(void) atomic_swap_uint(&smbd.s_sigval, sigval);
+
+	if (sigval == SIGHUP) {
+		atomic_inc_uint(&smbd.s_refreshes);
+		(void) pthread_cond_signal(&refresh_cond);
+	}
+
+	if (sigval == SIGINT || sigval == SIGTERM) {
+		smbd.s_shutting_down = B_TRUE;
+		(void) pthread_cond_signal(&refresh_cond);
+	}
 }
 
 /*

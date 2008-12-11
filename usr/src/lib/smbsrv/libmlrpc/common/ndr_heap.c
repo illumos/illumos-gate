@@ -24,7 +24,7 @@
  */
 
 /*
- * MLRPC heap management. The heap is used for temporary storage by
+ * NDR heap management. The heap is used for temporary storage by
  * both the client and server side library routines.  In order to
  * support the different requirements of the various RPCs, the heap
  * can grow dynamically if required.  We start with a single block
@@ -47,40 +47,41 @@
 #include <sys/uio.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/mlrpc.h>
+#include <smbsrv/libmlrpc.h>
+#include <smbsrv/smb_sid.h>
 
 /*
  * Allocate a heap structure and the first heap block.  For many RPC
  * operations this will be the only time we need to malloc memory
  * in this instance of the heap.  The only point of note here is that
  * we put the heap management data in the first block to avoid a
- * second malloc. Make sure that sizeof(mlrpc_heap_t) is smaller
- * than MLRPC_HEAP_BLKSZ.
+ * second malloc. Make sure that sizeof(ndr_heap_t) is smaller
+ * than NDR_HEAP_BLKSZ.
  *
  * Note that the heap management data is at the start of the first block.
  *
  * Returns a pointer to the newly created heap, which is used like an
  * opaque handle with the rest of the heap management interface..
  */
-mlrpc_heap_t *
-mlrpc_heap_create(void)
+ndr_heap_t *
+ndr_heap_create(void)
 {
-	mlrpc_heap_t *heap;
+	ndr_heap_t *heap;
 	char *base;
 
-	if ((base = (char *)malloc(MLRPC_HEAP_BLKSZ)) == NULL)
+	if ((base = (char *)malloc(NDR_HEAP_BLKSZ)) == NULL)
 		return (NULL);
 
 	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	heap = (mlrpc_heap_t *)base;
-	bzero(heap, sizeof (mlrpc_heap_t));
+	heap = (ndr_heap_t *)base;
+	bzero(heap, sizeof (ndr_heap_t));
 
-	heap->iovcnt = MLRPC_HEAP_MAXIOV;
+	heap->iovcnt = NDR_HEAP_MAXIOV;
 	heap->iov = heap->iovec;
 	heap->iov->iov_base = base;
-	heap->iov->iov_len = sizeof (mlrpc_heap_t);
-	heap->top = base + MLRPC_HEAP_BLKSZ;
-	heap->next = base + sizeof (mlrpc_heap_t);
+	heap->iov->iov_len = sizeof (ndr_heap_t);
+	heap->top = base + NDR_HEAP_BLKSZ;
+	heap->next = base + sizeof (ndr_heap_t);
 
 	return (heap);
 }
@@ -94,13 +95,13 @@ mlrpc_heap_create(void)
  * is deleted last.
  */
 void
-mlrpc_heap_destroy(mlrpc_heap_t *heap)
+ndr_heap_destroy(ndr_heap_t *heap)
 {
 	int i;
 	char *p;
 
 	if (heap) {
-		for (i = 1; i < MLRPC_HEAP_MAXIOV; ++i) {
+		for (i = 1; i < NDR_HEAP_MAXIOV; ++i) {
 			if ((p = heap->iovec[i].iov_base) != NULL)
 				free(p);
 		}
@@ -120,14 +121,12 @@ mlrpc_heap_destroy(mlrpc_heap_t *heap)
  * returned.  Otherwise a null pointer is returned.
  */
 void *
-mlrpc_heap_malloc(mlrpc_heap_t *heap, unsigned size)
+ndr_heap_malloc(ndr_heap_t *heap, unsigned size)
 {
 	char *p;
-	int align;
 	int incr_size;
 
-	align = (4 - size) & 3;
-	size += align;
+	size += NDR_ALIGN4(size);
 
 	if (heap == NULL || size == 0)
 		return (NULL);
@@ -138,7 +137,7 @@ mlrpc_heap_malloc(mlrpc_heap_t *heap, unsigned size)
 		if ((heap->iovcnt == 0) || ((--heap->iovcnt) == 0))
 			return (NULL);
 
-		incr_size = (size < MLRPC_HEAP_BLKSZ) ? MLRPC_HEAP_BLKSZ : size;
+		incr_size = (size < NDR_HEAP_BLKSZ) ? NDR_HEAP_BLKSZ : size;
 
 		if ((p = (char *)malloc(incr_size)) == NULL)
 			return (NULL);
@@ -158,7 +157,7 @@ mlrpc_heap_malloc(mlrpc_heap_t *heap, unsigned size)
  * Convenience function to do heap strdup.
  */
 void *
-mlrpc_heap_strsave(mlrpc_heap_t *heap, char *s)
+ndr_heap_strdup(ndr_heap_t *heap, const char *s)
 {
 	int len;
 	void *p;
@@ -172,10 +171,28 @@ mlrpc_heap_strsave(mlrpc_heap_t *heap, char *s)
 	if ((len = strlen(s)) == 0)
 		return ("");
 
-	if ((p = mlrpc_heap_malloc(heap, len+1)) != NULL)
+	if ((p = ndr_heap_malloc(heap, len+1)) != NULL)
 		(void) strcpy((char *)p, s);
 
 	return (p);
+}
+
+/*
+ * Make an ndr_mstring_t from a regular string.
+ */
+int
+ndr_heap_mstring(ndr_heap_t *heap, const char *s, ndr_mstring_t *out)
+{
+	if (s == NULL || out == NULL)
+		return (-1);
+
+	out->length = mts_wcequiv_strlen(s);
+	out->allosize = out->length + sizeof (mts_wchar_t);
+
+	if ((out->str = ndr_heap_strdup(heap, s)) == NULL)
+		return (-1);
+
+	return (0);
 }
 
 /*
@@ -188,16 +205,16 @@ mlrpc_heap_strsave(mlrpc_heap_t *heap, char *s)
  * aware that this is really a string.
  */
 void
-mlrpc_heap_mkvcs(mlrpc_heap_t *heap, char *s, mlrpc_vcstr_t *vc)
+ndr_heap_mkvcs(ndr_heap_t *heap, char *s, ndr_vcstr_t *vc)
 {
 	int mlen;
 
 	vc->wclen = mts_wcequiv_strlen(s);
 	vc->wcsize = vc->wclen;
 
-	mlen = sizeof (struct mlrpc_vcs) + vc->wcsize + sizeof (mts_wchar_t);
+	mlen = sizeof (ndr_vcs_t) + vc->wcsize + sizeof (mts_wchar_t);
 
-	vc->vcs = mlrpc_heap_malloc(heap, mlen);
+	vc->vcs = ndr_heap_malloc(heap, mlen);
 
 	if (vc->vcs) {
 		vc->vcs->vc_first_is = 0;
@@ -208,22 +225,22 @@ mlrpc_heap_mkvcs(mlrpc_heap_t *heap, char *s, mlrpc_vcstr_t *vc)
 }
 
 void
-mlrpc_heap_mkvcb(mlrpc_heap_t *heap, uint8_t *data, uint32_t datalen,
-    mlrpc_vcbuf_t *vcbuf)
+ndr_heap_mkvcb(ndr_heap_t *heap, uint8_t *data, uint32_t datalen,
+    ndr_vcbuf_t *vcbuf)
 {
 	int mlen;
 
 	if (data == NULL || datalen == 0) {
-		bzero(vcbuf, sizeof (mlrpc_vcbuf_t));
+		bzero(vcbuf, sizeof (ndr_vcbuf_t));
 		return;
 	}
 
 	vcbuf->len = datalen;
 	vcbuf->size = datalen;
 
-	mlen = sizeof (mlrpc_vcbuf_t) + datalen;
+	mlen = sizeof (ndr_vcbuf_t) + datalen;
 
-	vcbuf->vcb = mlrpc_heap_malloc(heap, mlen);
+	vcbuf->vcb = ndr_heap_malloc(heap, mlen);
 
 	if (vcbuf->vcb) {
 		vcbuf->vcb->vc_first_is = 0;
@@ -232,27 +249,48 @@ mlrpc_heap_mkvcb(mlrpc_heap_t *heap, uint8_t *data, uint32_t datalen,
 	}
 }
 
+/*
+ * Duplcate a SID in the heap.
+ */
+smb_sid_t *
+ndr_heap_siddup(ndr_heap_t *heap, smb_sid_t *sid)
+{
+	smb_sid_t *new_sid;
+	unsigned size;
+
+	if (sid == NULL)
+		return (NULL);
+
+	size = smb_sid_len(sid);
+
+	if ((new_sid = ndr_heap_malloc(heap, size)) == NULL)
+		return (NULL);
+
+	bcopy(sid, new_sid, size);
+	return (new_sid);
+}
+
 int
-mlrpc_heap_used(mlrpc_heap_t *heap)
+ndr_heap_used(ndr_heap_t *heap)
 {
 	int used = 0;
 	int i;
 
-	for (i = 0; i < MLRPC_HEAP_MAXIOV; ++i)
+	for (i = 0; i < NDR_HEAP_MAXIOV; ++i)
 		used += heap->iovec[i].iov_len;
 
 	return (used);
 }
 
 int
-mlrpc_heap_avail(mlrpc_heap_t *heap)
+ndr_heap_avail(ndr_heap_t *heap)
 {
 	int avail;
 	int count;
 
 	count = (heap->iovcnt == 0) ? 0 : (heap->iovcnt - 1);
 
-	avail = count * MLRPC_HEAP_BLKSZ;
+	avail = count * NDR_HEAP_BLKSZ;
 	avail += (heap->top - heap->next);
 
 	return (avail);

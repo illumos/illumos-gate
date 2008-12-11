@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MLSVC_SPOOLSS_NDL_
 #define _MLSVC_SPOOLSS_NDL_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Printing and Spooling RPC interface definition.
@@ -82,13 +80,7 @@
 #define SPOOLSS_OPNUM_OpenPrinter2			0x45
 
 
-/*
- * The private handle definition for this interface.
- */
-struct spoolss_handle {
-	DWORD data[5];
-};
-typedef struct spoolss_handle spoolss_handle_t;
+CONTEXT_HANDLE(spoolss_handle) spoolss_handle_t;
 
 
 OPERATION(SPOOLSS_OPNUM_OpenPrinter)

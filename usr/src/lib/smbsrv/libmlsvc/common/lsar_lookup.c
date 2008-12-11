@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Local Security Authority RPC (LSARPC) library interface functions for
  * query, lookup and enumeration calls.
@@ -40,9 +38,9 @@
 #include <smbsrv/ntaccess.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ntlocale.h>
-#include <smbsrv/lsalib.h>
 #include <smbsrv/string.h>
-#include <smbsrv/mlsvc.h>
+#include <smbsrv/libmlsvc.h>
+#include <lsalib.h>
 
 /*
  * The maximum number of bytes we are prepared to deal with in a
@@ -59,6 +57,14 @@ typedef struct lookup_name_table {
 	mslsa_string_t name[8];
 } lookup_name_table_t;
 
+static void lsar_set_nt_domaininfo(smb_sid_t *, char *, lsa_nt_domaininfo_t *);
+static void lsar_set_primary_domaininfo(smb_sid_t *, char *, lsa_info_t *);
+static void lsar_set_account_domaininfo(smb_sid_t *, char *, lsa_info_t *);
+static void lsar_set_dns_domaininfo(smb_sid_t *, char *, char *, char *,
+	mslsa_guid_t *, lsa_info_t *);
+static void lsar_set_trusted_domainlist(struct mslsa_EnumTrustedDomainBuf *,
+    lsa_info_t *);
+
 /*
  * lsar_query_security_desc
  *
@@ -68,22 +74,19 @@ int
 lsar_query_security_desc(mlsvc_handle_t *lsa_handle)
 {
 	struct mslsa_QuerySecurityObject arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int rc;
 	int opnum;
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_QuerySecurityObject;
 
 	bzero(&arg, sizeof (struct mslsa_QuerySecurityObject));
 	(void) memcpy(&arg.handle, lsa_handle, sizeof (mslsa_handle_t));
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
-	mlsvc_rpc_free(context, &heap);
+	rc = ndr_rpc_call(lsa_handle, opnum, &arg);
+	ndr_rpc_release(lsa_handle);
 	return (rc);
 }
+
 
 /*
  * lsar_query_info_policy
@@ -102,54 +105,63 @@ lsar_query_security_desc(mlsvc_handle_t *lsa_handle)
  * user_info will not have been updated.
  */
 DWORD
-lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass)
+lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass,
+    lsa_info_t *info)
 {
 	struct mslsa_QueryInfoPolicy arg;
-	struct mlsvc_rpc_context *context;
 	struct mslsa_PrimaryDomainInfo *pd_info;
 	struct mslsa_AccountDomainInfo *ad_info;
-	mlrpc_heapref_t heap;
-	nt_domain_t *nt_new_dp;
+	struct mslsa_DnsDomainInfo *dns_info;
 	int opnum;
 	DWORD status;
 
-	if (lsa_handle == 0)
+
+	if (lsa_handle == NULL || info == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_QueryInfoPolicy;
 
+	bzero(info, sizeof (lsa_info_t));
 	bzero(&arg, sizeof (struct mslsa_QueryInfoPolicy));
 	(void) memcpy(&arg.handle, lsa_handle, sizeof (mslsa_handle_t));
+
 	arg.info_class = infoClass;
 
-	(void) mlsvc_rpc_init(&heap);
-	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
 	} else if (arg.status != 0) {
-		mlsvc_rpc_report_status(opnum, arg.status);
+		ndr_rpc_status(lsa_handle, opnum, arg.status);
 		status = NT_SC_VALUE(arg.status);
 	} else {
+
 		switch (infoClass) {
 		case MSLSA_POLICY_PRIMARY_DOMAIN_INFO:
-			pd_info = &arg.info->ru.pd_info;
+			pd_info = &arg.ru.pd_info;
 
-			nt_domain_flush(NT_DOMAIN_PRIMARY);
-			nt_new_dp = nt_domain_new(NT_DOMAIN_PRIMARY,
-			    (char *)pd_info->name.str,
-			    (smb_sid_t *)pd_info->sid);
-			(void) nt_domain_add(nt_new_dp);
+			lsar_set_primary_domaininfo((smb_sid_t *)pd_info->sid,
+			    (char *)pd_info->name.str, info);
+
 			status = NT_STATUS_SUCCESS;
 			break;
 
 		case MSLSA_POLICY_ACCOUNT_DOMAIN_INFO:
-			ad_info = &arg.info->ru.ad_info;
+			ad_info = &arg.ru.ad_info;
 
-			nt_domain_flush(NT_DOMAIN_ACCOUNT);
-			nt_new_dp = nt_domain_new(NT_DOMAIN_ACCOUNT,
-			    (char *)ad_info->name.str,
-			    (smb_sid_t *)ad_info->sid);
-			(void) nt_domain_add(nt_new_dp);
+			lsar_set_account_domaininfo((smb_sid_t *)ad_info->sid,
+			    (char *)ad_info->name.str, info);
+
+			status = NT_STATUS_SUCCESS;
+			break;
+
+		case MSLSA_POLICY_DNS_DOMAIN_INFO:
+			dns_info = &arg.ru.dns_info;
+
+			lsar_set_dns_domaininfo((smb_sid_t *)dns_info->sid,
+			    (char *)dns_info->nb_domain.str,
+			    (char *)dns_info->dns_domain.str,
+			    (char *)dns_info->forest.str,
+			    &dns_info->guid,
+			    info);
 			status = NT_STATUS_SUCCESS;
 			break;
 
@@ -159,7 +171,7 @@ lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass)
 		}
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (status);
 }
 
@@ -179,8 +191,6 @@ uint32_t
 lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
     smb_userinfo_t *user_info)
 {
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int index;
 	uint32_t status;
@@ -197,7 +207,6 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 	bzero(user_info, sizeof (smb_userinfo_t));
 	user_info->sid_name_use = SidTypeUnknown;
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_LookupNames;
 
 	bzero(&arg, sizeof (struct mslsa_LookupNames));
@@ -215,7 +224,7 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 	 * Note: NT returns an error if the mapped_count is non-zero
 	 * when the RPC is called.
 	 */
-	if (context->server_os == NATIVE_OS_WIN2000) {
+	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_WIN2000) {
 		/*
 		 * Windows 2000 doesn't like an LSA lookup for
 		 * DOMAIN\Administrator.
@@ -238,11 +247,10 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 	name_table.name[0].allosize = length;
 	name_table.name[0].str = (unsigned char *)name;
 
-	(void) mlsvc_rpc_init(&heap);
-	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
 	} else if (arg.status != 0) {
-		mlsvc_rpc_report_status(opnum, arg.status);
+		ndr_rpc_status(lsa_handle, opnum, arg.status);
 		status = NT_SC_VALUE(arg.status);
 	} else if (arg.mapped_count == 0) {
 		user_info->sid_name_use = SidTypeInvalid;
@@ -251,7 +259,7 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 		rid_entry = &arg.translated_sids.rids[0];
 		user_info->sid_name_use = rid_entry->sid_name_use;
 		user_info->rid = rid_entry->rid;
-		user_info->name = MEM_STRDUP("mlrpc", name);
+		user_info->name = MEM_STRDUP("ndr", name);
 
 		if ((index = rid_entry->domain_index) == -1) {
 			user_info->domain_sid = 0;
@@ -261,7 +269,7 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 			    &arg.domain_table->entries[index];
 			user_info->domain_sid = smb_sid_dup(
 			    (smb_sid_t *)domain_entry->domain_sid);
-			user_info->domain_name = MEM_STRDUP("mlrpc",
+			user_info->domain_name = MEM_STRDUP("ndr",
 			    (const char *)
 			    domain_entry->domain_name.str);
 			user_info->user_sid = smb_sid_splice(
@@ -270,7 +278,7 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 		status = NT_STATUS_SUCCESS;
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (status);
 }
 
@@ -291,8 +299,6 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	struct mslsa_lup_sid_entry sid_entry;
 	struct mslsa_name_entry *name_entry;
 	struct mslsa_domain_entry *domain_entry;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int index;
 	uint32_t status;
@@ -300,7 +306,6 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	if (lsa_handle == NULL || sid == NULL || user_info == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_LookupSids;
 
 	bzero(&arg, sizeof (struct mslsa_LookupSids));
@@ -311,14 +316,13 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	arg.lup_sid_table.n_entry = 1;
 	arg.lup_sid_table.entries = &sid_entry;
 
-	(void) mlsvc_rpc_init(&heap);
-	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
 	} else if (arg.mapped_count == 0) {
 		user_info->sid_name_use = SidTypeInvalid;
 		status = NT_STATUS_NONE_MAPPED;
 	} else if (arg.status != 0) {
-		mlsvc_rpc_report_status(opnum, arg.status);
+		ndr_rpc_status(lsa_handle, opnum, arg.status);
 		status = NT_SC_VALUE(arg.status);
 	} else {
 		name_entry = &arg.name_table.entries[0];
@@ -331,7 +335,7 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 			user_info->rid =
 			    sid->SubAuthority[sid->SubAuthCount - 1];
 
-			user_info->name = MEM_STRDUP("mlrpc",
+			user_info->name = MEM_STRDUP("ndr",
 			    (const char *)name_entry->name.str);
 		}
 
@@ -345,14 +349,14 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 			user_info->domain_sid = smb_sid_dup(
 			    (smb_sid_t *)domain_entry->domain_sid);
 
-			user_info->domain_name = MEM_STRDUP("mlrpc",
+			user_info->domain_name = MEM_STRDUP("ndr",
 			    (const char *)
 			    domain_entry->domain_name.str);
 		}
 		status = NT_STATUS_SUCCESS;
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (status);
 }
 
@@ -375,8 +379,6 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 {
 	struct mslsa_EnumerateAccounts arg;
 	struct mslsa_AccountInfo *info;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int rc;
 	DWORD n_entries;
@@ -389,7 +391,6 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 	accounts->entries_read = 0;
 	accounts->info = 0;
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_EnumerateAccounts;
 
 	bzero(&arg, sizeof (struct mslsa_EnumerateAccounts));
@@ -397,15 +398,13 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 	arg.enum_context = *enum_context;
 	arg.max_length = MLSVC_MAX_RESPONSE_LEN;
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(lsa_handle, opnum, &arg);
 	if (rc == 0) {
 		if (arg.status != 0) {
 			if ((arg.status & 0x00FFFFFF) == MLSVC_NO_MORE_DATA) {
 				*enum_context = arg.enum_context;
 			} else {
-				mlsvc_rpc_report_status(opnum,
-				    (DWORD)arg.status);
+				ndr_rpc_status(lsa_handle, opnum, arg.status);
 				rc = -1;
 			}
 		} else if (arg.enum_buf->entries_read != 0) {
@@ -413,7 +412,7 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 			nbytes = n_entries * sizeof (struct mslsa_AccountInfo);
 
 			if ((info = malloc(nbytes)) == NULL) {
-				mlsvc_rpc_free(context, &heap);
+				ndr_rpc_release(lsa_handle);
 				return (-1);
 			}
 
@@ -427,7 +426,7 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
 		}
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (rc);
 }
 
@@ -447,27 +446,25 @@ lsar_enum_accounts(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
  * the trusted domains.
  */
 DWORD
-lsar_enum_trusted_domains(mlsvc_handle_t *lsa_handle, DWORD *enum_context)
+lsar_enum_trusted_domains(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
+    lsa_info_t *info)
 {
 	struct mslsa_EnumTrustedDomain arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
-	nt_domain_t *nt_new_dp;
 	int opnum;
 	DWORD status;
-	DWORD n_entries;
-	DWORD i;
 
-	context = lsa_handle->context;
+	if (info == NULL)
+		return (NT_STATUS_INVALID_PARAMETER);
+
 	opnum = LSARPC_OPNUM_EnumTrustedDomain;
 
+	bzero(info, sizeof (lsa_info_t));
 	bzero(&arg, sizeof (struct mslsa_EnumTrustedDomain));
 	(void) memcpy(&arg.handle, lsa_handle, sizeof (mslsa_handle_t));
 	arg.enum_context = *enum_context;
 	arg.max_length = MLSVC_MAX_RESPONSE_LEN;
 
-	(void) mlsvc_rpc_init(&heap);
-	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
 	} else if (arg.status != 0) {
 		*enum_context = arg.enum_context;
@@ -478,28 +475,17 @@ lsar_enum_trusted_domains(mlsvc_handle_t *lsa_handle, DWORD *enum_context)
 		 * which is not an error.
 		 */
 		if (status != MLSVC_NO_MORE_DATA)
-			mlsvc_rpc_report_status(opnum, arg.status);
+			ndr_rpc_status(lsa_handle, opnum, arg.status);
 	} else if (arg.enum_buf->entries_read == 0) {
 		*enum_context = arg.enum_context;
 		status = 0;
 	} else {
-		nt_domain_flush(NT_DOMAIN_TRUSTED);
-		n_entries = arg.enum_buf->entries_read;
-
-		for (i = 0; i < n_entries; ++i) {
-			nt_new_dp = nt_domain_new(
-			    NT_DOMAIN_TRUSTED,
-			    (char *)arg.enum_buf->info[i].name.str,
-			    (smb_sid_t *)arg.enum_buf->info[i].sid);
-
-			(void) nt_domain_add(nt_new_dp);
-		}
-
+		lsar_set_trusted_domainlist(arg.enum_buf, info);
 		*enum_context = arg.enum_context;
 		status = 0;
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (status);
 }
 
@@ -514,25 +500,21 @@ lsar_enum_privs_account(mlsvc_handle_t *account_handle,
     smb_userinfo_t *user_info)
 {
 	struct mslsa_EnumPrivsAccount arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int rc;
 
-	context = account_handle->context;
 	opnum = LSARPC_OPNUM_EnumPrivsAccount;
 
 	bzero(&arg, sizeof (struct mslsa_EnumPrivsAccount));
 	(void) memcpy(&arg.account_handle, &account_handle->handle,
 	    sizeof (mslsa_handle_t));
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(account_handle, opnum, &arg);
 	if ((rc == 0) && (arg.status != 0)) {
-		mlsvc_rpc_report_status(opnum, (DWORD)arg.status);
+		ndr_rpc_status(account_handle, opnum, arg.status);
 		rc = -1;
 	}
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(account_handle);
 	return (rc);
 }
 
@@ -550,8 +532,6 @@ lsar_lookup_priv_value(mlsvc_handle_t *lsa_handle, char *name,
     struct ms_luid *luid)
 {
 	struct mslsa_LookupPrivValue arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int rc;
 	size_t length;
@@ -559,22 +539,20 @@ lsar_lookup_priv_value(mlsvc_handle_t *lsa_handle, char *name,
 	if (lsa_handle == NULL || name == NULL || luid == NULL)
 		return (-1);
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_LookupPrivValue;
 
 	bzero(&arg, sizeof (struct mslsa_LookupPrivValue));
 	(void) memcpy(&arg.handle, lsa_handle, sizeof (mslsa_handle_t));
 
 	length = mts_wcequiv_strlen(name);
-	if (context->server_os == NATIVE_OS_WIN2000)
+	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_WIN2000)
 		length += sizeof (mts_wchar_t);
 
 	arg.name.length = length;
 	arg.name.allosize = length;
 	arg.name.str = (unsigned char *)name;
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(lsa_handle, opnum, &arg);
 	if (rc == 0) {
 		if (arg.status != 0)
 			rc = -1;
@@ -582,7 +560,7 @@ lsar_lookup_priv_value(mlsvc_handle_t *lsa_handle, char *name,
 			(void) memcpy(luid, &arg.luid, sizeof (struct ms_luid));
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (rc);
 }
 
@@ -599,23 +577,19 @@ lsar_lookup_priv_name(mlsvc_handle_t *lsa_handle, struct ms_luid *luid,
     char *name, int namelen)
 {
 	struct mslsa_LookupPrivName arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int rc;
 
 	if (lsa_handle == NULL || luid == NULL || name == NULL)
 		return (-1);
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_LookupPrivName;
 
 	bzero(&arg, sizeof (struct mslsa_LookupPrivName));
 	(void) memcpy(&arg.handle, lsa_handle, sizeof (mslsa_handle_t));
 	(void) memcpy(&arg.luid, luid, sizeof (struct ms_luid));
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
+	rc = ndr_rpc_call(lsa_handle, opnum, &arg);
 	if (rc == 0) {
 		if (arg.status != 0)
 			rc = -1;
@@ -624,7 +598,7 @@ lsar_lookup_priv_name(mlsvc_handle_t *lsa_handle, struct ms_luid *luid,
 			    namelen);
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (rc);
 }
 
@@ -646,8 +620,6 @@ lsar_lookup_priv_display_name(mlsvc_handle_t *lsa_handle, char *name,
     char *display_name, int display_len)
 {
 	struct mslsa_LookupPrivDisplayName arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	size_t length;
 	DWORD status;
@@ -655,7 +627,6 @@ lsar_lookup_priv_display_name(mlsvc_handle_t *lsa_handle, char *name,
 	if (lsa_handle == NULL || name == NULL || display_name == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_LookupPrivDisplayName;
 
 	bzero(&arg, sizeof (struct mslsa_LookupPrivDisplayName));
@@ -669,9 +640,7 @@ lsar_lookup_priv_display_name(mlsvc_handle_t *lsa_handle, char *name,
 	arg.client_language = MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US);
 	arg.default_language = MAKELANGID(LANG_ENGLISH, SUBLANG_NEUTRAL);
 
-	(void) mlsvc_rpc_init(&heap);
-
-	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0)
+	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0)
 		status = NT_STATUS_INVALID_PARAMETER;
 #if 0
 	else if (arg.status != 0)
@@ -683,7 +652,7 @@ lsar_lookup_priv_display_name(mlsvc_handle_t *lsa_handle, char *name,
 		status = NT_STATUS_SUCCESS;
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (status);
 }
 
@@ -698,8 +667,6 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	struct lsar_name_entry2 *name_entry;
 	struct mslsa_lup_sid_entry sid_entry;
 	struct mslsa_domain_entry *domain_entry;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int index;
 	DWORD status;
@@ -707,10 +674,9 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	if (lsa_handle == NULL || sid == NULL || user_info == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_LookupSids2;
 
-	if (context->server_os != NATIVE_OS_WIN2000)
+	if (ndr_rpc_server_os(lsa_handle) != NATIVE_OS_WIN2000)
 		return (NT_STATUS_REVISION_MISMATCH);
 
 	bzero(&arg, sizeof (struct lsar_lookup_sids2));
@@ -722,15 +688,13 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	arg.lookup_level = MSLSA_LOOKUP_LEVEL_1;
 	arg.requested_count = arg.lup_sid_table.n_entry;
 
-	(void) mlsvc_rpc_init(&heap);
-
-	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
 	} else if (arg.mapped_count == 0) {
 		user_info->sid_name_use = SidTypeInvalid;
 		status = NT_STATUS_NONE_MAPPED;
 	} else if (arg.status != 0) {
-		mlsvc_rpc_report_status(opnum, arg.status);
+		ndr_rpc_status(lsa_handle, opnum, arg.status);
 		status = NT_SC_VALUE(arg.status);
 	} else {
 		name_entry = &arg.name_table.entries[0];
@@ -743,7 +707,7 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 			user_info->rid =
 			    sid->SubAuthority[sid->SubAuthCount - 1];
 
-			user_info->name = MEM_STRDUP("mlrpc",
+			user_info->name = MEM_STRDUP("ndr",
 			    (char const *)name_entry->name.str);
 
 		}
@@ -757,13 +721,13 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 			user_info->domain_sid = smb_sid_dup(
 			    (smb_sid_t *)domain_entry->domain_sid);
 
-			user_info->domain_name = MEM_STRDUP("mlrpc",
+			user_info->domain_name = MEM_STRDUP("ndr",
 			    (char const *)domain_entry->domain_name.str);
 		}
 		status = NT_STATUS_SUCCESS;
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (status);
 }
 
@@ -788,8 +752,6 @@ uint32_t
 lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
     smb_userinfo_t *user_info)
 {
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
 	int opnum;
 	int index;
 	struct lsar_LookupNames2 arg;
@@ -805,10 +767,9 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 	bzero(user_info, sizeof (smb_userinfo_t));
 	user_info->sid_name_use = SidTypeUnknown;
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_LookupNames2;
 
-	if (context->server_os != NATIVE_OS_WIN2000)
+	if (ndr_rpc_server_os(lsa_handle) != NATIVE_OS_WIN2000)
 		return (NT_STATUS_REVISION_MISMATCH);
 
 	bzero(&arg, sizeof (struct lsar_LookupNames2));
@@ -824,12 +785,10 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 	name_table.name[0].allosize = length;
 	name_table.name[0].str = (unsigned char *)name;
 
-	(void) mlsvc_rpc_init(&heap);
-
-	if (mlsvc_rpc_call(context, opnum, &arg, &heap) != 0) {
+	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
 	} else if (arg.status != 0) {
-		mlsvc_rpc_report_status(opnum, arg.status);
+		ndr_rpc_status(lsa_handle, opnum, arg.status);
 		status = NT_SC_VALUE(arg.status);
 	} else if (arg.mapped_count == 0) {
 		user_info->sid_name_use = SidTypeInvalid;
@@ -838,7 +797,7 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 		rid_entry = &arg.translated_sids.rids[0];
 		user_info->sid_name_use = rid_entry->sid_name_use;
 		user_info->rid = rid_entry->rid;
-		user_info->name = MEM_STRDUP("mlrpc", name);
+		user_info->name = MEM_STRDUP("ndr", name);
 
 		if ((index = rid_entry->domain_index) == -1) {
 			user_info->domain_sid = 0;
@@ -849,7 +808,7 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 			user_info->domain_sid = smb_sid_dup(
 			    (smb_sid_t *)domain_entry->domain_sid);
 
-			user_info->domain_name = MEM_STRDUP("mlrpc",
+			user_info->domain_name = MEM_STRDUP("ndr",
 			    (char const *)domain_entry->domain_name.str);
 			user_info->user_sid = smb_sid_splice(
 			    user_info->domain_sid, user_info->rid);
@@ -857,24 +816,95 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 		status = NT_STATUS_SUCCESS;
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (status);
 }
-
-void
-mlsvc_rpc_report_status(int opnum, DWORD status)
+static void
+lsar_set_nt_domaininfo(smb_sid_t *sid, char *nb_domain,
+    lsa_nt_domaininfo_t *info)
 {
-	char *s = "unknown";
+	if (sid == NULL || nb_domain == NULL || info == NULL)
+		return;
 
-	if (status == 0)
-		s = "success";
-	else if (NT_SC_IS_ERROR(status))
-		s = "error";
-	else if (NT_SC_IS_WARNING(status))
-		s = "warning";
-	else if (NT_SC_IS_INFO(status))
-		s = "info";
+	info->n_sid = smb_sid_dup(sid);
+	(void) strlcpy(info->n_domain, nb_domain, NETBIOS_NAME_SZ);
+}
 
-	smb_tracef("mlrpc[0x%02x]: %s: %s (0x%08x)",
-	    opnum, s, xlate_nt_status(status), status);
+static void
+lsar_set_primary_domaininfo(smb_sid_t *sid, char *nb_domain,
+    lsa_info_t *info)
+{
+	lsa_nt_domaininfo_t *di;
+
+	if (sid == NULL || nb_domain == NULL || info == NULL)
+		return;
+
+	info->i_type = LSA_INFO_PRIMARY_DOMAIN;
+	di = &info->i_domain.di_primary;
+	lsar_set_nt_domaininfo(sid, nb_domain, di);
+}
+
+static void
+lsar_set_account_domaininfo(smb_sid_t *sid, char *nb_domain,
+    lsa_info_t *info)
+{
+	lsa_nt_domaininfo_t *di;
+
+	if (sid == NULL || nb_domain == NULL || info == NULL)
+		return;
+
+	info->i_type = LSA_INFO_ACCOUNT_DOMAIN;
+	di = &info->i_domain.di_account;
+	lsar_set_nt_domaininfo(sid, nb_domain, di);
+}
+
+static void
+lsar_set_dns_domaininfo(smb_sid_t *sid, char *nb_domain, char *fq_domain,
+    char *forest, mslsa_guid_t *guid, lsa_info_t *info)
+{
+	lsa_dns_domaininfo_t *di;
+
+	if (sid == NULL || nb_domain == NULL || fq_domain == NULL ||
+	    forest == NULL)
+		return;
+
+	if (guid == NULL || info == NULL)
+		return;
+
+	info->i_type = LSA_INFO_DNS_DOMAIN;
+	di = &info->i_domain.di_dns;
+	di->d_sid = smb_sid_dup(sid);
+	(void) strlcpy(di->d_nbdomain, nb_domain, NETBIOS_NAME_SZ);
+	(void) strlcpy(di->d_fqdomain, fq_domain, MAXHOSTNAMELEN);
+	(void) strlcpy(di->d_forest, forest, MAXHOSTNAMELEN);
+	(void) bcopy(guid, &di->d_guid, sizeof (mslsa_guid_t));
+}
+
+static void
+lsar_set_trusted_domainlist(struct mslsa_EnumTrustedDomainBuf *enum_buf,
+    lsa_info_t *info)
+{
+	int i;
+	lsa_trusted_domainlist_t *list;
+
+	if (info == NULL)
+		return;
+
+	if (enum_buf == NULL || enum_buf->entries_read == 0)
+		return;
+
+	info->i_type = LSA_INFO_TRUSTED_DOMAINS;
+	list = &info->i_domain.di_trust;
+	list->t_domains = malloc(enum_buf->entries_read *
+	    sizeof (lsa_nt_domaininfo_t));
+	if (list->t_domains == NULL) {
+		list->t_num = 0;
+	} else {
+		list->t_num = enum_buf->entries_read;
+		for (i = 0; i < list->t_num; i++)
+			lsar_set_nt_domaininfo(
+			    (smb_sid_t *)enum_buf->info[i].sid,
+			    (char *)enum_buf->info[i].name.str,
+			    &list->t_domains[i]);
+	}
 }

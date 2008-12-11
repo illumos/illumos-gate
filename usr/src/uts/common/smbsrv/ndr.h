@@ -26,8 +26,6 @@
 #ifndef _SMBSRV_NDR_H
 #define	_SMBSRV_NDR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Network Data Representation (NDR) is a compatible subset of DCE RPC
  * and MSRPC NDR.  NDR is used to move parameters consisting of
@@ -46,6 +44,8 @@
 #include <syslog.h>
 #include <stdlib.h>
 #include <string.h>
+#include <smbsrv/wintypes.h>
+#include <smbsrv/ndl/rpcpdu.ndl>
 #include <smbsrv/smb_i18n.h>
 #endif
 
@@ -146,27 +146,26 @@ extern "C" {
 #define	NDR_F_CONFORMANT	0x1000	/* struct conforming (var-size tail) */
 #define	NDR_F_VARYING		0x2000	/* not implemented */
 
-struct mlrpc_heap;
-struct mlndr_stream;
+struct ndr_heap;
+struct ndr_stream;
 struct ndr_reference;
-struct ndr_typeinfo;
 
-struct ndr_typeinfo {
+typedef struct ndr_typeinfo {
 	unsigned char		version;	/* sanity check */
 	unsigned char		alignment;	/* mask */
 	unsigned short		type_flags;	/* NDR_F_... */
-	int			(*ndr_func)(struct ndr_reference *encl_ref);
+	int			(*ndr_func)(struct ndr_reference *);
 	unsigned short		pdu_size_fixed_part;
 	unsigned short		pdu_size_variable_part;
 	unsigned short		c_size_fixed_part;
 	unsigned short		c_size_variable_part;
-};
+} ndr_typeinfo_t;
 
-struct ndr_reference {
+typedef struct ndr_reference {
 	struct ndr_reference	*next;		/* queue list (outer only) */
 	struct ndr_reference	*enclosing;	/* e.g. struct for this memb */
-	struct mlndr_stream	*stream;	/* root of NDR */
-	struct ndr_typeinfo	*ti;		/* type of data referenced */
+	struct ndr_stream	*stream;	/* root of NDR */
+	ndr_typeinfo_t		*ti;		/* type of data referenced */
 	char			*name;		/* name of this member */
 	unsigned long		pdu_offset;	/* referent in stub data */
 	char			*datum;		/* referent in local memory */
@@ -180,73 +179,54 @@ struct ndr_reference {
 	unsigned long		switch_is;	/* union arg selector */
 	unsigned long		dimension_is;	/* fixed-len array size */
 	unsigned long		pdu_end_offset;	/* offset for limit of PDU */
-};
+} ndr_ref_t;
 
 /*
- * For all operations, the mlndr_stream, which is the root of NDR processing,
- * is the primary object.  When available, the appropriate ndr_reference
+ * For all operations, the ndr_stream, which is the root of NDR processing,
+ * is the primary object.  When available, the appropriate ndr_ref_t
  * is passed, NULL otherwise.  Functions that return 'int' should return
  * TRUE (!0) or FALSE (0).  When functions return FALSE, including
- * mlndo_malloc() returning NULL, they should set the stream->error to an
+ * ndo_malloc() returning NULL, they should set the stream->error to an
  * appropriate indicator of what went wrong.
  *
- * Functions mlndo_get_pdu(), mlndo_put_pdu(), and mlndo_pad_pdu() must
+ * Functions ndo_get_pdu(), ndo_put_pdu(), and ndo_pad_pdu() must
  * never grow the PDU data.  A request for out-of-bounds data is an error.
  * The swap_bytes flag is 1 if NDR knows that the byte-order in the PDU
- * is different from the local system.  mlndo_pad_pdu() advised that the
+ * is different from the local system.  ndo_pad_pdu() advised that the
  * affected bytes should be zero filled.
  */
-struct mlndr_stream_ops {
-	char *(*mlndo_malloc)(struct mlndr_stream *, unsigned,
-	    struct ndr_reference *);
+typedef struct ndr_stream_ops {
+	char *(*ndo_malloc)(struct ndr_stream *, unsigned, ndr_ref_t *);
+	int (*ndo_free)(struct ndr_stream *, char *, ndr_ref_t *);
+	int (*ndo_grow_pdu)(struct ndr_stream *, unsigned long, ndr_ref_t *);
+	int (*ndo_pad_pdu)(struct ndr_stream *, unsigned long,
+	    unsigned long, ndr_ref_t *);
+	int (*ndo_get_pdu)(struct ndr_stream *, unsigned long,
+	    unsigned long, char *, int, ndr_ref_t *);
+	int (*ndo_put_pdu)(struct ndr_stream *, unsigned long,
+	    unsigned long, char *, int, ndr_ref_t *);
+	void (*ndo_tattle)(struct ndr_stream *, char *, ndr_ref_t *);
+	void (*ndo_tattle_error)(struct ndr_stream *, ndr_ref_t *);
+	int (*ndo_reset)(struct ndr_stream *);
+	void (*ndo_destruct)(struct ndr_stream *);
+} ndr_stream_ops_t;
 
-	int (*mlndo_free)(struct mlndr_stream *, char *,
-	    struct ndr_reference *);
-
-	int (*mlndo_grow_pdu)(struct mlndr_stream *, unsigned long,
-	    struct ndr_reference *);
-
-	int (*mlndo_pad_pdu)(struct mlndr_stream *, unsigned long,
-	    unsigned long, struct ndr_reference *);
-
-	int (*mlndo_get_pdu)(struct mlndr_stream *, unsigned long,
-	    unsigned long, char *, int, struct ndr_reference *);
-
-	int (*mlndo_put_pdu)(struct mlndr_stream *, unsigned long,
-	    unsigned long, char *, int, struct ndr_reference *);
-
-	void (*mlndo_tattle)(struct mlndr_stream *, char *,
-	    struct ndr_reference *);
-
-	void (*mlndo_tattle_error)(struct mlndr_stream *,
-	    struct ndr_reference *);
-
-	int (*mlndo_reset)(struct mlndr_stream *);
-	void (*mlndo_destruct)(struct mlndr_stream *);
-};
-
-#define	MLNDS_MALLOC(MLNDS, LEN, REF) \
-	(*(MLNDS)->mlndo->mlndo_malloc)(MLNDS, LEN, REF)
-
-#define	MLNDS_GROW_PDU(MLNDS, WANT_END_OFF, REF) \
-	(*(MLNDS)->mlndo->mlndo_grow_pdu)(MLNDS, WANT_END_OFF, REF)
-#define	MLNDS_PAD_PDU(MLNDS, PDU_OFFSET, N_BYTES, REF) \
-	(*(MLNDS)->mlndo->mlndo_pad_pdu)(MLNDS, PDU_OFFSET, N_BYTES, REF)
-#define	MLNDS_GET_PDU(MLNDS, PDU_OFFSET, N_BYTES, BUF, SWAP, REF) \
-	(*(MLNDS)->mlndo->mlndo_get_pdu)(MLNDS, PDU_OFFSET, N_BYTES, BUF, \
-	SWAP, REF)
-#define	MLNDS_PUT_PDU(MLNDS, PDU_OFFSET, N_BYTES, BUF, SWAP, REF) \
-	(*(MLNDS)->mlndo->mlndo_put_pdu)(MLNDS, PDU_OFFSET, N_BYTES, BUF, \
-	SWAP, REF)
-
-#define	MLNDS_TATTLE(MLNDS, WHAT, REF) \
-	(*(MLNDS)->mlndo->mlndo_tattle)(MLNDS, WHAT, REF)
-#define	MLNDS_TATTLE_ERROR(MLNDS, WHAT, REF) \
-	(*(MLNDS)->mlndo->mlndo_tattle_error)(MLNDS, REF)
-#define	MLNDS_RESET(MLNDS) \
-	(*(MLNDS)->mlndo->mlndo_reset)(MLNDS)
-#define	MLNDS_DESTRUCT(MLNDS) \
-	(*(MLNDS)->mlndo->mlndo_destruct)(MLNDS)
+#define	NDS_MALLOC(NDS, LEN, REF) \
+	(*(NDS)->ndo->ndo_malloc)(NDS, LEN, REF)
+#define	NDS_GROW_PDU(NDS, WANT_END_OFF, REF) \
+	(*(NDS)->ndo->ndo_grow_pdu)(NDS, WANT_END_OFF, REF)
+#define	NDS_PAD_PDU(NDS, PDU_OFFSET, N_BYTES, REF) \
+	(*(NDS)->ndo->ndo_pad_pdu)(NDS, PDU_OFFSET, N_BYTES, REF)
+#define	NDS_GET_PDU(NDS, PDU_OFFSET, N_BYTES, BUF, SWAP, REF) \
+	(*(NDS)->ndo->ndo_get_pdu)(NDS, PDU_OFFSET, N_BYTES, BUF, SWAP, REF)
+#define	NDS_PUT_PDU(NDS, PDU_OFFSET, N_BYTES, BUF, SWAP, REF) \
+	(*(NDS)->ndo->ndo_put_pdu)(NDS, PDU_OFFSET, N_BYTES, BUF, SWAP, REF)
+#define	NDS_TATTLE(NDS, WHAT, REF) \
+	(*(NDS)->ndo->ndo_tattle)(NDS, WHAT, REF)
+#define	NDS_TATTLE_ERROR(NDS, WHAT, REF) \
+	(*(NDS)->ndo->ndo_tattle_error)(NDS, REF)
+#define	NDS_RESET(NDS)		(*(NDS)->ndo->ndo_reset)(NDS)
+#define	NDS_DESTRUCT(NDS)	(*(NDS)->ndo->ndo_destruct)(NDS)
 
 typedef struct ndr_frag {
 	struct ndr_frag *next;
@@ -262,7 +242,7 @@ typedef struct ndr_fraglist {
 	uint32_t	nfrag;
 } ndr_fraglist_t;
 
-struct mlndr_stream {
+typedef struct ndr_stream {
 	unsigned long		pdu_size;
 	unsigned long		pdu_max_size;
 	unsigned long		pdu_base_offset;
@@ -270,7 +250,7 @@ struct mlndr_stream {
 	unsigned char		*pdu_base_addr;
 
 	ndr_fraglist_t		frags;
-	struct mlndr_stream_ops *mlndo;
+	ndr_stream_ops_t	*ndo;
 
 	unsigned char		m_op;
 	unsigned char		dir;
@@ -279,12 +259,11 @@ struct mlndr_stream {
 	short			error;
 	short			error_ref;
 
-	struct ndr_reference *outer_queue_head;
-	struct ndr_reference **outer_queue_tailp;
-	struct ndr_reference *outer_current;
-	struct mlrpc_heap *heap;
-};
-
+	ndr_ref_t *outer_queue_head;
+	ndr_ref_t **outer_queue_tailp;
+	ndr_ref_t *outer_current;
+	struct ndr_heap *heap;
+} ndr_stream_t;
 
 #define	NDR_M_OP_NONE		0x00
 #define	NDR_M_OP_MARSHALL	0x01	/* data moving from datum to PDU */
@@ -299,17 +278,17 @@ struct mlndr_stream {
 #define	NDR_MODE_RETURN_SEND	(NDR_M_OP_MARSHALL + NDR_DIR_OUT)
 #define	NDR_MODE_RETURN_RECV	(NDR_M_OP_UNMARSHALL + NDR_DIR_OUT)
 
-#define	NDR_MODE_TO_M_OP(MODE)	((MODE)&0x0F)
-#define	NDR_MODE_TO_DIR(MODE)	((MODE)&0xF0)
+#define	NDR_MODE_TO_M_OP(MODE)	((MODE) & 0x0F)
+#define	NDR_MODE_TO_DIR(MODE)	((MODE) & 0xF0)
 #define	NDR_M_OP_AND_DIR_TO_MODE(M_OP, DIR)	((M_OP)|(DIR))
 
-#define	NDR_MODE_MATCH(MLNDS, MODE) \
-	(NDR_M_OP_AND_DIR_TO_MODE((MLNDS)->m_op, (MLNDS)->dir) == (MODE))
+#define	NDR_MODE_MATCH(NDS, MODE) \
+	(NDR_M_OP_AND_DIR_TO_MODE((NDS)->m_op, (NDS)->dir) == (MODE))
 
-#define	MLNDS_F_NONE		0x00
-#define	MLNDS_F_NOTERM		0x01	/* strings are not null terminated */
-#define	MLNDS_SETF(S, F)	((S)->flags |= (F))
-#define	MLNDS_CLEARF(S, F)	((S)->flags &= ~(F))
+#define	NDS_F_NONE		0x00
+#define	NDS_F_NOTERM		0x01	/* strings are not null terminated */
+#define	NDS_SETF(S, F)		((S)->flags |= (F))
+#define	NDS_CLEARF(S, F)	((S)->flags &= ~(F))
 
 #define	NDR_ERR_MALLOC_FAILED		-1
 #define	NDR_ERR_M_OP_INVALID		-2
@@ -341,10 +320,10 @@ struct mlndr_stream {
 #define	NDR_SET_ERROR(REF, ERROR)			\
 	((REF)->stream->error = (ERROR),		\
 	(REF)->stream->error_ref = __LINE__,		\
-	MLNDS_TATTLE_ERROR((REF)->stream, 0, REF))
+	NDS_TATTLE_ERROR((REF)->stream, 0, REF))
 
 #define	NDR_TATTLE(REF, WHAT) \
-	(*(REF)->stream->mlndo->mlndo_tattle)((REF)->stream, WHAT, REF)
+	(*(REF)->stream->ndo->ndo_tattle)((REF)->stream, WHAT, REF)
 
 #define	MEMBER_STR(MEMBER) #MEMBER
 
@@ -359,7 +338,7 @@ struct mlndr_stream {
 		myref.inner_flags = ARGFLAGS;				\
 		myref.ti = &ndt_##TYPE;					\
 		myref.ARGMEM = ARGVAL;					\
-		if (!mlndr_inner(&myref))				\
+		if (!ndr_inner(&myref))					\
 			return (0);					\
 	}
 
@@ -396,7 +375,7 @@ struct mlndr_stream {
 		myref.inner_flags = ARGFLAGS;				\
 		myref.ti = &ndt_##TYPE;					\
 		myref.ARGMEM = ARGVAL;					\
-		if (!mlndr_topmost(&myref))				\
+		if (!ndr_topmost(&myref))				\
 			return (0);					\
 	}
 
@@ -441,7 +420,7 @@ struct mlndr_stream {
 		myref.inner_flags = ARGFLAGS;				\
 		myref.ti = &ndt_##TYPE;					\
 		myref.ARGMEM = ARGVAL;					\
-		if (!mlndr_params(&myref))				\
+		if (!ndr_params(&myref))				\
 			return (0);					\
 	}
 
@@ -452,39 +431,35 @@ struct mlndr_stream {
 #define	NDR_STRING_DIM		1
 #define	NDR_ANYSIZE_DIM		1
 
-int mlndo_process(struct mlndr_stream *, struct ndr_typeinfo *, char *);
-int mlndo_operation(struct mlndr_stream *, struct ndr_typeinfo *,
-    int opnum, char *);
-void mlndo_printf(struct mlndr_stream *, struct ndr_reference *,
-    const char *, ...);
-void mlndo_trace(const char *);
-void mlndo_fmt(struct mlndr_stream *, struct ndr_reference *, char *);
+int ndo_process(struct ndr_stream *, ndr_typeinfo_t *, char *);
+int ndo_operation(struct ndr_stream *, ndr_typeinfo_t *, int opnum, char *);
+void ndo_printf(struct ndr_stream *, ndr_ref_t *, const char *, ...);
+void ndo_trace(const char *);
+void ndo_fmt(struct ndr_stream *, ndr_ref_t *, char *);
 
-int mlndr_params(struct ndr_reference *);
-int mlndr_topmost(struct ndr_reference *);
-int mlndr_run_outer_queue(struct mlndr_stream *);
-int mlndr_outer(struct ndr_reference *);
-int mlndr_outer_fixed(struct ndr_reference *);
-int mlndr_outer_fixed_array(struct ndr_reference *);
-int mlndr_outer_conformant_array(struct ndr_reference *);
-int mlndr_outer_conformant_construct(struct ndr_reference *);
-int mlndr_size_is(struct ndr_reference *);
-int mlndr_outer_string(struct ndr_reference *);
-int mlndr_outer_peek_sizing(struct ndr_reference *, unsigned,
-    unsigned long *);
-int mlndr_outer_poke_sizing(struct ndr_reference *, unsigned,
-    unsigned long *);
-int mlndr_outer_align(struct ndr_reference *);
-int mlndr_outer_grow(struct ndr_reference *, unsigned);
-int mlndr_inner(struct ndr_reference *);
-int mlndr_inner_pointer(struct ndr_reference *);
-int mlndr_inner_reference(struct ndr_reference *);
-int mlndr_inner_array(struct ndr_reference *);
+int ndr_params(ndr_ref_t *);
+int ndr_topmost(ndr_ref_t *);
+int ndr_run_outer_queue(struct ndr_stream *);
+int ndr_outer(ndr_ref_t *);
+int ndr_outer_fixed(ndr_ref_t *);
+int ndr_outer_fixed_array(ndr_ref_t *);
+int ndr_outer_conformant_array(ndr_ref_t *);
+int ndr_outer_conformant_construct(ndr_ref_t *);
+int ndr_size_is(ndr_ref_t *);
+int ndr_outer_string(ndr_ref_t *);
+int ndr_outer_peek_sizing(ndr_ref_t *, unsigned, unsigned long *);
+int ndr_outer_poke_sizing(ndr_ref_t *, unsigned, unsigned long *);
+int ndr_outer_align(ndr_ref_t *);
+int ndr_outer_grow(ndr_ref_t *, unsigned);
+int ndr_inner(ndr_ref_t *);
+int ndr_inner_pointer(ndr_ref_t *);
+int ndr_inner_reference(ndr_ref_t *);
+int ndr_inner_array(ndr_ref_t *);
 
-size_t ndr_mbstowcs(struct mlndr_stream *, mts_wchar_t *, const char *, size_t);
-int ndr_mbtowc(struct mlndr_stream *, mts_wchar_t *, const char *, size_t);
+size_t ndr_mbstowcs(struct ndr_stream *, mts_wchar_t *, const char *, size_t);
+int ndr_mbtowc(struct ndr_stream *, mts_wchar_t *, const char *, size_t);
 
-void mlnds_bswap(void *src, void *dst, size_t len);
+void nds_bswap(void *src, void *dst, size_t len);
 
 #ifdef __cplusplus
 }

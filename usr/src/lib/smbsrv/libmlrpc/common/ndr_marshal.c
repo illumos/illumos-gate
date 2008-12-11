@@ -27,62 +27,61 @@
 #include <sys/param.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/ndr.h>
-#include <smbsrv/mlrpc.h>
+#include <smbsrv/libmlrpc.h>
 
 #ifdef _BIG_ENDIAN
-static const int mlrpc_native_byte_order = MLRPC_REPLAB_INTG_BIG_ENDIAN;
+static const int ndr_native_byte_order = NDR_REPLAB_INTG_BIG_ENDIAN;
 #else
-static const int mlrpc_native_byte_order = MLRPC_REPLAB_INTG_LITTLE_ENDIAN;
+static const int ndr_native_byte_order = NDR_REPLAB_INTG_LITTLE_ENDIAN;
 #endif
 
 int
-mlrpc_encode_decode_common(struct mlrpc_xaction *mxa, int mode, unsigned opnum,
-    struct ndr_typeinfo *ti, void *datum)
+ndr_encode_decode_common(ndr_xa_t *mxa, int mode, unsigned opnum,
+    ndr_typeinfo_t *ti, void *datum)
 {
-	struct mlndr_stream	*mlnds;
-	int			m_op = NDR_MODE_TO_M_OP(mode);
-	int			rc;
+	ndr_stream_t	*nds;
+	int		m_op = NDR_MODE_TO_M_OP(mode);
+	int		rc;
 
 	if (m_op == NDR_M_OP_MARSHALL)
-		mlnds = &mxa->send_mlnds;
+		nds = &mxa->send_nds;
 	else
-		mlnds = &mxa->recv_mlnds;
+		nds = &mxa->recv_nds;
 
 	/*
-	 * Make sure that mlnds is in the correct mode
+	 * Make sure that nds is in the correct mode
 	 */
-	if (!NDR_MODE_MATCH(mlnds, mode))
-		return (MLRPC_DRC_FAULT_MODE_MISMATCH);
+	if (!NDR_MODE_MATCH(nds, mode))
+		return (NDR_DRC_FAULT_MODE_MISMATCH);
 
 	/*
 	 * Perform the (un)marshalling
 	 */
-	if (mlndo_operation(mlnds, ti, opnum, datum))
-		return (MLRPC_DRC_OK);
+	if (ndo_operation(nds, ti, opnum, datum))
+		return (NDR_DRC_OK);
 
-	switch (mlnds->error) {
+	switch (nds->error) {
 	case NDR_ERR_MALLOC_FAILED:
-		rc = MLRPC_DRC_FAULT_OUT_OF_MEMORY;
+		rc = NDR_DRC_FAULT_OUT_OF_MEMORY;
 		break;
 
 	case NDR_ERR_SWITCH_VALUE_INVALID:
-		rc = MLRPC_DRC_FAULT_PARAM_0_INVALID;
+		rc = NDR_DRC_FAULT_PARAM_0_INVALID;
 		break;
 
 	case NDR_ERR_UNDERFLOW:
-		rc = MLRPC_DRC_FAULT_RECEIVED_RUNT;
+		rc = NDR_DRC_FAULT_RECEIVED_RUNT;
 		break;
 
 	case NDR_ERR_GROW_FAILED:
-		rc = MLRPC_DRC_FAULT_ENCODE_TOO_BIG;
+		rc = NDR_DRC_FAULT_ENCODE_TOO_BIG;
 		break;
 
 	default:
 		if (m_op == NDR_M_OP_MARSHALL)
-			rc = MLRPC_DRC_FAULT_ENCODE_FAILED;
+			rc = NDR_DRC_FAULT_ENCODE_FAILED;
 		else
-			rc = MLRPC_DRC_FAULT_DECODE_FAILED;
+			rc = NDR_DRC_FAULT_DECODE_FAILED;
 		break;
 	}
 
@@ -90,167 +89,167 @@ mlrpc_encode_decode_common(struct mlrpc_xaction *mxa, int mode, unsigned opnum,
 }
 
 int
-mlrpc_decode_call(struct mlrpc_xaction *mxa, void *params)
+ndr_decode_call(ndr_xa_t *mxa, void *params)
 {
 	int rc;
 
-	rc = mlrpc_encode_decode_common(mxa, NDR_MODE_CALL_RECV,
+	rc = ndr_encode_decode_common(mxa, NDR_MODE_CALL_RECV,
 	    mxa->opnum, mxa->binding->service->interface_ti, params);
 
-	return (rc + MLRPC_PTYPE_REQUEST);
+	return (rc + NDR_PTYPE_REQUEST);
 }
 
 int
-mlrpc_encode_return(struct mlrpc_xaction *mxa, void *params)
+ndr_encode_return(ndr_xa_t *mxa, void *params)
 {
 	int rc;
 
-	rc = mlrpc_encode_decode_common(mxa, NDR_MODE_RETURN_SEND,
+	rc = ndr_encode_decode_common(mxa, NDR_MODE_RETURN_SEND,
 	    mxa->opnum, mxa->binding->service->interface_ti, params);
 
-	return (rc + MLRPC_PTYPE_RESPONSE);
+	return (rc + NDR_PTYPE_RESPONSE);
 }
 
 int
-mlrpc_encode_call(struct mlrpc_xaction *mxa, void *params)
+ndr_encode_call(ndr_xa_t *mxa, void *params)
 {
 	int rc;
 
-	rc = mlrpc_encode_decode_common(mxa, NDR_MODE_CALL_SEND,
+	rc = ndr_encode_decode_common(mxa, NDR_MODE_CALL_SEND,
 	    mxa->opnum, mxa->binding->service->interface_ti, params);
 
-	return (rc + MLRPC_PTYPE_REQUEST);
+	return (rc + NDR_PTYPE_REQUEST);
 }
 
 int
-mlrpc_decode_return(struct mlrpc_xaction *mxa, void *params)
+ndr_decode_return(ndr_xa_t *mxa, void *params)
 {
 	int rc;
 
-	rc = mlrpc_encode_decode_common(mxa, NDR_MODE_RETURN_RECV,
+	rc = ndr_encode_decode_common(mxa, NDR_MODE_RETURN_RECV,
 	    mxa->opnum, mxa->binding->service->interface_ti, params);
 
-	return (rc + MLRPC_PTYPE_RESPONSE);
+	return (rc + NDR_PTYPE_RESPONSE);
 }
 
 int
-mlrpc_decode_pdu_hdr(struct mlrpc_xaction *mxa)
+ndr_decode_pdu_hdr(ndr_xa_t *mxa)
 {
-	ndr_common_header_t *hdr = &mxa->recv_hdr.common_hdr;
-	struct mlndr_stream 	*mlnds = &mxa->recv_mlnds;
+	ndr_common_header_t	*hdr = &mxa->recv_hdr.common_hdr;
+	ndr_stream_t		*nds = &mxa->recv_nds;
 	int			ptype;
 	int			rc;
 	int			charset;
 	int			byte_order;
 
-	if (mlnds->m_op != NDR_M_OP_UNMARSHALL)
-		return (MLRPC_DRC_FAULT_MODE_MISMATCH + 0xFF);
+	if (nds->m_op != NDR_M_OP_UNMARSHALL)
+		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_MODE_MISMATCH));
 
 	/*
 	 * All PDU headers are at least this big
 	 */
-	rc = MLNDS_GROW_PDU(mlnds, sizeof (ndr_common_header_t), 0);
+	rc = NDS_GROW_PDU(nds, sizeof (ndr_common_header_t), 0);
 	if (!rc)
-		return (MLRPC_DRC_FAULT_RECEIVED_RUNT + 0xFF);
+		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_RECEIVED_RUNT));
 
 	/*
 	 * Peek at the first eight bytes to figure out what we're doing.
 	 */
-	rc = MLNDS_GET_PDU(mlnds, 0, 8, (char *)hdr, 0, 0);
+	rc = NDS_GET_PDU(nds, 0, 8, (char *)hdr, 0, 0);
 	if (!rc)
-		return (MLRPC_DRC_FAULT_DECODE_FAILED + 0xFF);
+		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_DECODE_FAILED));
 
 	/*
 	 * Verify the protocol version.
 	 */
 	if ((hdr->rpc_vers != 5) || (hdr->rpc_vers_minor != 0))
-		return (MLRPC_DRC_FAULT_DECODE_FAILED + 0xFF);
+		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_DECODE_FAILED));
 
 	/*
 	 * Check for ASCII as the character set.  This is an ASCII
 	 * versus EBCDIC option and has nothing to do with Unicode.
 	 */
-	charset = hdr->packed_drep.intg_char_rep & MLRPC_REPLAB_CHAR_MASK;
-	if (charset != MLRPC_REPLAB_CHAR_ASCII)
-		return (MLRPC_DRC_FAULT_DECODE_FAILED + 0xFF);
+	charset = hdr->packed_drep.intg_char_rep & NDR_REPLAB_CHAR_MASK;
+	if (charset != NDR_REPLAB_CHAR_ASCII)
+		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_DECODE_FAILED));
 
 	/*
 	 * Set the byte swap flag if the PDU byte-order
 	 * is different from the local byte-order.
 	 */
-	byte_order = hdr->packed_drep.intg_char_rep & MLRPC_REPLAB_INTG_MASK;
-	mlnds->swap = (byte_order != mlrpc_native_byte_order) ? 1 : 0;
+	byte_order = hdr->packed_drep.intg_char_rep & NDR_REPLAB_INTG_MASK;
+	nds->swap = (byte_order != ndr_native_byte_order) ? 1 : 0;
 
 	ptype = hdr->ptype;
-	if (ptype == MLRPC_PTYPE_REQUEST &&
-	    (hdr->pfc_flags & MLRPC_PFC_OBJECT_UUID) != 0) {
-		ptype = MLRPC_PTYPE_REQUEST_WITH;	/* fake for sizing */
+	if (ptype == NDR_PTYPE_REQUEST &&
+	    (hdr->pfc_flags & NDR_PFC_OBJECT_UUID) != 0) {
+		ptype = NDR_PTYPE_REQUEST_WITH;	/* fake for sizing */
 	}
 
 	mxa->ptype = hdr->ptype;
 
-	rc = mlrpc_encode_decode_common(mxa,
-	    NDR_M_OP_AND_DIR_TO_MODE(mlnds->m_op, mlnds->dir),
+	rc = ndr_encode_decode_common(mxa,
+	    NDR_M_OP_AND_DIR_TO_MODE(nds->m_op, nds->dir),
 	    ptype, &TYPEINFO(ndr_hdr), hdr);
 
-	return (rc + 0xFF);
+	return (NDR_DRC_PTYPE_RPCHDR(rc));
 }
 
 /*
- * Decode an RPC fragment header.  Use mlrpc_decode_pdu_hdr() to process
+ * Decode an RPC fragment header.  Use ndr_decode_pdu_hdr() to process
  * the first fragment header then this function to process additional
  * fragment headers.
  */
 void
-mlrpc_decode_frag_hdr(struct mlndr_stream *mlnds, ndr_common_header_t *hdr)
+ndr_decode_frag_hdr(ndr_stream_t *nds, ndr_common_header_t *hdr)
 {
 	ndr_common_header_t *tmp;
 	uint8_t *pdu;
 	int byte_order;
 
-	pdu = (uint8_t *)mlnds->pdu_base_offset + mlnds->pdu_scan_offset;
-	bcopy(pdu, hdr, MLRPC_RSP_HDR_SIZE);
+	pdu = (uint8_t *)nds->pdu_base_offset + nds->pdu_scan_offset;
+	bcopy(pdu, hdr, NDR_RSP_HDR_SIZE);
 
 	/*
 	 * Swap non-byte fields if the PDU byte-order
 	 * is different from the local byte-order.
 	 */
-	byte_order = hdr->packed_drep.intg_char_rep & MLRPC_REPLAB_INTG_MASK;
+	byte_order = hdr->packed_drep.intg_char_rep & NDR_REPLAB_INTG_MASK;
 
-	if (byte_order != mlrpc_native_byte_order) {
+	if (byte_order != ndr_native_byte_order) {
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
 		tmp = (ndr_common_header_t *)pdu;
 
-		mlnds_bswap(&tmp->frag_length, &hdr->frag_length,
+		nds_bswap(&tmp->frag_length, &hdr->frag_length,
 		    sizeof (WORD));
-		mlnds_bswap(&tmp->auth_length, &hdr->auth_length,
+		nds_bswap(&tmp->auth_length, &hdr->auth_length,
 		    sizeof (WORD));
-		mlnds_bswap(&tmp->call_id, &hdr->call_id, sizeof (DWORD));
+		nds_bswap(&tmp->call_id, &hdr->call_id, sizeof (DWORD));
 	}
 }
 
 int
-mlrpc_encode_pdu_hdr(struct mlrpc_xaction *mxa)
+ndr_encode_pdu_hdr(ndr_xa_t *mxa)
 {
-	ndr_common_header_t *hdr = &mxa->send_hdr.common_hdr;
-	struct mlndr_stream 	*mlnds = &mxa->send_mlnds;
+	ndr_common_header_t	*hdr = &mxa->send_hdr.common_hdr;
+	ndr_stream_t		*nds = &mxa->send_nds;
 	int			ptype;
 	int			rc;
 
-	if (mlnds->m_op != NDR_M_OP_MARSHALL)
-		return (MLRPC_DRC_FAULT_MODE_MISMATCH + 0xFF);
+	if (nds->m_op != NDR_M_OP_MARSHALL)
+		return (NDR_DRC_PTYPE_RPCHDR(NDR_DRC_FAULT_MODE_MISMATCH));
 
 	ptype = hdr->ptype;
-	if (ptype == MLRPC_PTYPE_REQUEST &&
-	    (hdr->pfc_flags & MLRPC_PFC_OBJECT_UUID) != 0) {
-		ptype = MLRPC_PTYPE_REQUEST_WITH;	/* fake for sizing */
+	if (ptype == NDR_PTYPE_REQUEST &&
+	    (hdr->pfc_flags & NDR_PFC_OBJECT_UUID) != 0) {
+		ptype = NDR_PTYPE_REQUEST_WITH;	/* fake for sizing */
 	}
 
-	rc = mlrpc_encode_decode_common(mxa,
-	    NDR_M_OP_AND_DIR_TO_MODE(mlnds->m_op, mlnds->dir),
+	rc = ndr_encode_decode_common(mxa,
+	    NDR_M_OP_AND_DIR_TO_MODE(nds->m_op, nds->dir),
 	    ptype, &TYPEINFO(ndr_hdr), hdr);
 
-	return (rc + 0xFF);
+	return (NDR_DRC_PTYPE_RPCHDR(rc));
 }
 
 /*
@@ -263,12 +262,12 @@ extern struct ndr_typeinfo ndt__uchar;
 extern struct ndr_typeinfo ndt__ushort;
 extern struct ndr_typeinfo ndt__ulong;
 
-int mlndr__ndr_bind_ack_hdr(struct ndr_reference *encl_ref);
-struct ndr_typeinfo ndt__ndr_bind_ack_hdr = {
+int ndr__ndr_bind_ack_hdr(ndr_ref_t *encl_ref);
+ndr_typeinfo_t ndt__ndr_bind_ack_hdr = {
     1,		/* NDR version */
     3,		/* alignment */
     NDR_F_STRUCT,	/* flags */
-    mlndr__ndr_bind_ack_hdr,	/* ndr_func */
+    ndr__ndr_bind_ack_hdr,	/* ndr_func */
     68,		/* pdu_size_fixed_part */
     0,		/* pdu_size_variable_part */
     68,		/* c_size_fixed_part */
@@ -279,12 +278,12 @@ struct ndr_typeinfo ndt__ndr_bind_ack_hdr = {
  * [_no_reorder]
  */
 int
-mlndr__ndr_bind_ack_hdr(struct ndr_reference *encl_ref)
+ndr__ndr_bind_ack_hdr(ndr_ref_t *encl_ref)
 {
-	struct mlndr_stream 	*mlnds = encl_ref->stream;
+	ndr_stream_t		*nds = encl_ref->stream;
 	struct ndr_bind_ack_hdr	*val = /*LINTED E_BAD_PTR_CAST_ALIGN*/
 	    (struct ndr_bind_ack_hdr *)encl_ref->datum;
-	struct ndr_reference	myref;
+	ndr_ref_t		myref;
 	unsigned long		offset;
 
 	bzero(&myref, sizeof (myref));
@@ -301,7 +300,7 @@ mlndr__ndr_bind_ack_hdr(struct ndr_reference *encl_ref)
 	/* port any is the conformant culprit */
 	offset = 24UL;
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		val->sec_addr.length =
 		    strlen((char *)val->sec_addr.port_spec) + 1;
@@ -321,9 +320,9 @@ mlndr__ndr_bind_ack_hdr(struct ndr_reference *encl_ref)
 
 	offset += 2;
 	offset += val->sec_addr.length;
-	offset += (4 - offset) & 3;
+	offset += NDR_ALIGN4(offset);
 
-	NDR_MEMBER(_mlrpc_p_result_list, p_result_list, offset);
+	NDR_MEMBER(_ndr_p_result_list, p_result_list, offset);
 	return (1);
 }
 
@@ -331,7 +330,7 @@ mlndr__ndr_bind_ack_hdr(struct ndr_reference *encl_ref)
  * Assume a single presentation context element in the result list.
  */
 unsigned
-mlrpc_bind_ack_hdr_size(struct mlrpc_xaction *mxa)
+ndr_bind_ack_hdr_size(ndr_xa_t *mxa)
 {
 	ndr_bind_ack_hdr_t *bahdr = &mxa->send_hdr.bind_ack_hdr;
 	unsigned	offset;
@@ -344,8 +343,8 @@ mlrpc_bind_ack_hdr_size(struct mlrpc_xaction *mxa)
 
 	offset += 2;
 	offset += length;
-	offset += (4 - offset) & 3;
-	offset += sizeof (mlrpc_p_result_list_t);
+	offset += NDR_ALIGN4(offset);
+	offset += sizeof (ndr_p_result_list_t);
 	return (offset);
 }
 
@@ -355,12 +354,12 @@ mlrpc_bind_ack_hdr_size(struct mlrpc_xaction *mxa)
  * Alter context response headers have an interior conformant array,
  * which is inconsistent with IDL/NDR rules.
  */
-int mlndr__ndr_alter_context_rsp_hdr(struct ndr_reference *encl_ref);
-struct ndr_typeinfo ndt__ndr_alter_context_rsp_hdr = {
+int ndr__ndr_alter_context_rsp_hdr(ndr_ref_t *encl_ref);
+ndr_typeinfo_t ndt__ndr_alter_context_rsp_hdr = {
     1,			/* NDR version */
     3,			/* alignment */
     NDR_F_STRUCT,	/* flags */
-    mlndr__ndr_alter_context_rsp_hdr,	/* ndr_func */
+    ndr__ndr_alter_context_rsp_hdr,	/* ndr_func */
     56,			/* pdu_size_fixed_part */
     0,			/* pdu_size_variable_part */
     56,			/* c_size_fixed_part */
@@ -371,12 +370,12 @@ struct ndr_typeinfo ndt__ndr_alter_context_rsp_hdr = {
  * [_no_reorder]
  */
 int
-mlndr__ndr_alter_context_rsp_hdr(struct ndr_reference *encl_ref)
+ndr__ndr_alter_context_rsp_hdr(ndr_ref_t *encl_ref)
 {
-	struct mlndr_stream 	*mlnds = encl_ref->stream;
+	ndr_stream_t		*nds = encl_ref->stream;
 	ndr_alter_context_rsp_hdr_t *val = /*LINTED E_BAD_PTR_CAST_ALIGN*/
 	    (ndr_alter_context_rsp_hdr_t *)encl_ref->datum;
-	struct ndr_reference	myref;
+	ndr_ref_t		myref;
 	unsigned long		offset;
 
 	bzero(&myref, sizeof (myref));
@@ -392,7 +391,7 @@ mlndr__ndr_alter_context_rsp_hdr(struct ndr_reference *encl_ref)
 
 	offset = 24UL;	/* offset of sec_addr */
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		val->sec_addr.length = 0;
 		break;
@@ -410,9 +409,9 @@ mlndr__ndr_alter_context_rsp_hdr(struct ndr_reference *encl_ref)
 	    offset+2UL, val->sec_addr.length);
 
 	offset += 2;	/* sizeof (sec_addr.length) */
-	offset += (4 - offset) & 3;
+	offset += NDR_ALIGN4(offset);
 
-	NDR_MEMBER(_mlrpc_p_result_list, p_result_list, offset);
+	NDR_MEMBER(_ndr_p_result_list, p_result_list, offset);
 	return (1);
 }
 
@@ -420,13 +419,13 @@ mlndr__ndr_alter_context_rsp_hdr(struct ndr_reference *encl_ref)
  * Assume a single presentation context element in the result list.
  */
 unsigned
-mlrpc_alter_context_rsp_hdr_size(void)
+ndr_alter_context_rsp_hdr_size(void)
 {
 	unsigned	offset;
 
 	offset = 24UL;	/* offset of sec_addr */
 	offset += 2;	/* sizeof (sec_addr.length) */
-	offset += (4 - offset) & 3;
-	offset += sizeof (mlrpc_p_result_list_t);
+	offset += NDR_ALIGN4(offset);
+	offset += sizeof (ndr_p_result_list_t);
 	return (offset);
 }

@@ -38,8 +38,8 @@
 
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/ntaccess.h>
-#include <smbsrv/lsalib.h>
-#include <smbsrv/samlib.h>
+#include <lsalib.h>
+#include <samlib.h>
 
 /*
  * Valid values for the OEM OWF password encryption.
@@ -48,6 +48,9 @@
 #define	SAM_KEYLEN		16
 
 extern DWORD samr_set_user_info(mlsvc_handle_t *, smb_auth_info_t *);
+
+static struct samr_sid *sam_get_domain_sid(mlsvc_handle_t *, char *, char *,
+    smb_userinfo_t *);
 
 /*
  * sam_create_trust_account
@@ -132,36 +135,7 @@ sam_create_account(char *server, char *domain_name, char *account_name,
 		return (status);
 	}
 
-	if (samr_handle.context->server_os == NATIVE_OS_WIN2000) {
-		nt_domain_t *ntdp;
-
-		if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
-			(void) lsa_query_account_domain_info();
-			if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
-				(void) samr_close_handle(&samr_handle);
-				status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
-				smb_tracef("SamCreateAccount[%s\\%s]: %s",
-				    domain_name, account_name,
-				    xlate_nt_status(status));
-				mlsvc_free_user_info(user_info);
-				return (status);
-			}
-		}
-
-		sid = (struct samr_sid *)ntdp->sid;
-	} else {
-		if (samr_lookup_domain(&samr_handle,
-		    domain_name, user_info) != 0) {
-			(void) samr_close_handle(&samr_handle);
-			smb_tracef("SamCreateAccount[%s]: lookup failed",
-			    account_name);
-
-			mlsvc_free_user_info(user_info);
-			return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
-		}
-
-		sid = (struct samr_sid *)user_info->domain_sid;
-	}
+	sid = sam_get_domain_sid(&samr_handle, server, domain_name, user_info);
 
 	status = samr_open_domain(&samr_handle,
 	    SAM_DOMAIN_CREATE_ACCOUNT, sid, &domain_handle);
@@ -191,6 +165,7 @@ sam_create_account(char *server, char *domain_name, char *account_name,
 
 	(void) samr_close_handle(&samr_handle);
 	mlsvc_free_user_info(user_info);
+	free(sid);
 	return (status);
 }
 
@@ -248,29 +223,7 @@ sam_delete_account(char *server, char *domain_name, char *account_name)
 		return (NT_STATUS_OPEN_FAILED);
 	}
 
-	if (samr_handle.context->server_os == NATIVE_OS_WIN2000) {
-		nt_domain_t *ntdp;
-
-		if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
-			(void) lsa_query_account_domain_info();
-			if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
-
-				(void) samr_close_handle(&samr_handle);
-				return (NT_STATUS_NO_SUCH_DOMAIN);
-			}
-		}
-
-		sid = (struct samr_sid *)ntdp->sid;
-	} else {
-		if (samr_lookup_domain(
-		    &samr_handle, domain_name, user_info) != 0) {
-			(void) samr_close_handle(&samr_handle);
-			mlsvc_free_user_info(user_info);
-			return (NT_STATUS_NO_SUCH_DOMAIN);
-		}
-
-		sid = (struct samr_sid *)user_info->domain_sid;
-	}
+	sid = sam_get_domain_sid(&samr_handle, server, domain_name, user_info);
 
 	status = samr_open_domain(&samr_handle, SAM_LOOKUP_INFORMATION,
 	    sid, &domain_handle);
@@ -296,6 +249,7 @@ sam_delete_account(char *server, char *domain_name, char *account_name)
 
 	(void) samr_close_handle(&samr_handle);
 	mlsvc_free_user_info(user_info);
+	free(sid);
 	return (status);
 }
 
@@ -331,28 +285,7 @@ sam_check_user(char *server, char *domain_name, char *account_name)
 		return (NT_STATUS_OPEN_FAILED);
 	}
 
-	if (samr_handle.context->server_os == NATIVE_OS_WIN2000) {
-		nt_domain_t *ntdp;
-
-		if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
-			(void) lsa_query_account_domain_info();
-			if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
-				(void) samr_close_handle(&samr_handle);
-				return (NT_STATUS_NO_SUCH_DOMAIN);
-			}
-		}
-
-		sid = (struct samr_sid *)ntdp->sid;
-	} else {
-		if (samr_lookup_domain(&samr_handle, domain_name, user_info)
-		    != 0) {
-			(void) samr_close_handle(&samr_handle);
-			mlsvc_free_user_info(user_info);
-			return (NT_STATUS_NO_SUCH_DOMAIN);
-		}
-
-		sid = (struct samr_sid *)user_info->domain_sid;
-	}
+	sid = sam_get_domain_sid(&samr_handle, server, domain_name, user_info);
 
 	status = samr_open_domain(&samr_handle, SAM_LOOKUP_INFORMATION, sid,
 	    &domain_handle);
@@ -384,6 +317,7 @@ sam_check_user(char *server, char *domain_name, char *account_name)
 
 	(void) samr_close_handle(&samr_handle);
 	mlsvc_free_user_info(user_info);
+	free(sid);
 	return (status);
 }
 
@@ -479,7 +413,8 @@ sam_get_local_domains(char *server, char *domain_name)
  *
  * Generate an OEM password.
  */
-int sam_oem_password(oem_password_t *oem_password, unsigned char *new_password,
+int
+sam_oem_password(oem_password_t *oem_password, unsigned char *new_password,
     unsigned char *old_password)
 {
 	mts_wchar_t *unicode_password;
@@ -503,4 +438,35 @@ int sam_oem_password(oem_password_t *oem_password, unsigned char *new_password,
 	    old_password, SAM_KEYLEN);
 
 	return (0);
+}
+
+static struct samr_sid *
+sam_get_domain_sid(mlsvc_handle_t *samr_handle, char *server, char *domain_name,
+    smb_userinfo_t *user_info)
+{
+	struct samr_sid *sid;
+
+	if (ndr_rpc_server_os(samr_handle) == NATIVE_OS_WIN2000) {
+		nt_domain_t *ntdp;
+		lsa_info_t account_domain;
+
+		if ((ntdp = nt_domain_lookup_name(domain_name)) == 0) {
+			if (lsa_query_account_domain_info(server,
+			    domain_name, &account_domain) != NT_STATUS_SUCCESS)
+				return (NULL);
+
+			sid = (struct samr_sid *)
+			    account_domain.i_domain.di_account.n_sid;
+		} else {
+			sid = (struct samr_sid *)smb_sid_dup(ntdp->sid);
+		}
+	} else {
+		if (samr_lookup_domain(samr_handle, domain_name, user_info)
+		    != 0)
+			return (NULL);
+
+		sid = (struct samr_sid *)smb_sid_dup(user_info->domain_sid);
+	}
+
+	return (sid);
 }

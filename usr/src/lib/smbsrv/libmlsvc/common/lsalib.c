@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This module provides the high level interface to the LSA RPC functions.
  */
@@ -39,7 +37,7 @@
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/libsmbrdr.h>
-#include <smbsrv/lsalib.h>
+#include <lsalib.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_token.h>
@@ -83,14 +81,14 @@ static int lsa_list_accounts(mlsvc_handle_t *);
  * first does a domain lookup and then a local lookup.
  */
 uint32_t
-lsa_lookup_name(char *server, char *account, uint16_t sid_type,
+lsa_lookup_name(char *account, uint16_t sid_type,
     smb_userinfo_t *ainfo)
 {
-	nt_domain_t *dominfo;
 	int lookup_mode;
 	char *name;
 	char *domain;
 	uint32_t status = NT_STATUS_NONE_MAPPED;
+	smb_domain_t dinfo;
 
 	(void) strsubst(account, '\\', '/');
 	name = strchr(account, '/');
@@ -113,15 +111,20 @@ lsa_lookup_name(char *server, char *account, uint16_t sid_type,
 		return (lsa_lookup_name_local(domain, name, sid_type, ainfo));
 
 	case MLSVC_LOOKUP_DOMAIN:
-		return (lsa_lookup_name_domain(server, domain, name, ainfo));
+		if (!smb_domain_getinfo(&dinfo))
+			return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+
+		return (lsa_lookup_name_domain(dinfo.d_dc, dinfo.d_nbdomain,
+		    name, ainfo));
 
 	default:
 		/* lookup the name in domain */
-		dominfo = nt_domain_lookupbytype(NT_DOMAIN_PRIMARY);
-		if (dominfo == NULL)
-			return (NT_STATUS_INTERNAL_ERROR);
-		status = lsa_lookup_name_domain(server, dominfo->name, name,
-		    ainfo);
+		if (!smb_domain_getinfo(&dinfo))
+			return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+
+		status = lsa_lookup_name_domain(dinfo.d_dc, dinfo.d_nbdomain,
+		    name, ainfo);
+
 		if (status != NT_STATUS_NONE_MAPPED)
 			return (status);
 
@@ -157,20 +160,23 @@ lsa_lookup_sid(smb_sid_t *sid, smb_userinfo_t *ainfo)
  * should query the database to obtain a reference to the primary
  * domain information.
  *
+ * The requested information will be returned via 'info' argument.
+ * Caller must call lsa_free_info() when done.
+ *
  * Returns NT status codes.
  */
 DWORD
-lsa_query_primary_domain_info(void)
+lsa_query_primary_domain_info(char *server, char *domain, lsa_info_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
 	char *user = smbrdr_ipc_get_user();
 
-	if ((lsar_open(NULL, NULL, user, &domain_handle)) != 0)
+	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
 	status = lsar_query_info_policy(&domain_handle,
-	    MSLSA_POLICY_PRIMARY_DOMAIN_INFO);
+	    MSLSA_POLICY_PRIMARY_DOMAIN_INFO, info);
 
 	(void) lsar_close(&domain_handle);
 	return (status);
@@ -185,20 +191,51 @@ lsa_query_primary_domain_info(void)
  * should query the database to obtain a reference to the account
  * domain information.
  *
+ * The requested information will be returned via 'info' argument.
+ * Caller must invoke lsa_free_info() to when done.
+ *
  * Returns NT status codes.
  */
 DWORD
-lsa_query_account_domain_info(void)
+lsa_query_account_domain_info(char *server, char *domain, lsa_info_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD status;
 	char *user = smbrdr_ipc_get_user();
 
-	if ((lsar_open(NULL, NULL, user, &domain_handle)) != 0)
+	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
 	status = lsar_query_info_policy(&domain_handle,
-	    MSLSA_POLICY_ACCOUNT_DOMAIN_INFO);
+	    MSLSA_POLICY_ACCOUNT_DOMAIN_INFO, info);
+
+	(void) lsar_close(&domain_handle);
+	return (status);
+}
+
+/*
+ * lsa_query_dns_domain_info
+ *
+ * Obtains the DNS domain info from the specified server
+ * (domain controller).
+ *
+ * The requested information will be returned via 'info' argument.
+ * Caller must call lsa_free_info() when done.
+ *
+ * Returns NT status codes.
+ */
+DWORD
+lsa_query_dns_domain_info(char *server, char *domain, lsa_info_t *info)
+{
+	mlsvc_handle_t domain_handle;
+	DWORD status;
+	char *user = smbrdr_ipc_get_user();
+
+	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+
+	status = lsar_query_info_policy(&domain_handle,
+	    MSLSA_POLICY_DNS_DOMAIN_INFO, info);
 
 	(void) lsar_close(&domain_handle);
 	return (status);
@@ -212,22 +249,25 @@ lsa_query_account_domain_info(void)
  * lsar_enum_trusted_domains call. The caller should query the database
  * to obtain a reference to the trusted domain information.
  *
+ * The requested information will be returned via 'info' argument.
+ * Caller must call lsa_free_info() when done.
+ *
  * Returns NT status codes.
  */
 DWORD
-lsa_enum_trusted_domains(void)
+lsa_enum_trusted_domains(char *server, char *domain, lsa_info_t *info)
 {
 	mlsvc_handle_t domain_handle;
 	DWORD enum_context;
 	DWORD status;
 	char *user = smbrdr_ipc_get_user();
 
-	if ((lsar_open(NULL, NULL, user, &domain_handle)) != 0)
+	if ((lsar_open(server, domain, user, &domain_handle)) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
 	enum_context = 0;
 
-	status = lsar_enum_trusted_domains(&domain_handle, &enum_context);
+	status = lsar_enum_trusted_domains(&domain_handle, &enum_context, info);
 	if (status == MLSVC_NO_MORE_DATA) {
 		/*
 		 * MLSVC_NO_MORE_DATA indicates that we
@@ -238,6 +278,43 @@ lsa_enum_trusted_domains(void)
 
 	(void) lsar_close(&domain_handle);
 	return (status);
+}
+
+/*
+ * lsa_free_info
+ */
+void
+lsa_free_info(lsa_info_t *info)
+{
+	lsa_trusted_domainlist_t *list;
+	int i;
+
+	if (!info)
+		return;
+
+	switch (info->i_type) {
+	case LSA_INFO_PRIMARY_DOMAIN:
+		smb_sid_free(info->i_domain.di_primary.n_sid);
+		break;
+
+	case LSA_INFO_ACCOUNT_DOMAIN:
+		smb_sid_free(info->i_domain.di_account.n_sid);
+		break;
+
+	case LSA_INFO_DNS_DOMAIN:
+		smb_sid_free(info->i_domain.di_dns.d_sid);
+		break;
+
+	case LSA_INFO_TRUSTED_DOMAINS:
+		list = &info->i_domain.di_trust;
+		for (i = 0; i < list->t_num; i++)
+			smb_sid_free(list->t_domains[i].n_sid);
+		free(list->t_domains);
+		break;
+
+	case LSA_INFO_NONE:
+		break;
+	}
 }
 
 /*
@@ -395,15 +472,15 @@ lsa_test_lookup(char *name)
 	smb_userinfo_t *user_info;
 	smb_sid_t *sid;
 	DWORD status;
-	smb_ntdomain_t *di;
+	smb_domain_t di;
 
-	if ((di = smb_getdomaininfo(0)) == 0)
+	if (!smb_domain_getinfo(&di))
 		return;
 
 	user_info = mlsvc_alloc_user_info();
 
 	if (lsa_lookup_name_builtin(name, user_info) != 0) {
-		status = lsa_lookup_name_domain(di->server, di->domain, name,
+		status = lsa_lookup_name_domain(di.d_dc, di.d_nbdomain, name,
 		    user_info);
 
 		if (status == 0) {
@@ -433,14 +510,19 @@ lsa_test_lookup(char *name)
  */
 /*ARGSUSED*/
 int
-lsa_lookup_privs(char *server, char *account_name, char *target_name,
+lsa_lookup_privs(char *account_name, char *target_name,
     smb_userinfo_t *user_info)
 {
 	mlsvc_handle_t domain_handle;
 	int rc;
 	char *user = smbrdr_ipc_get_user();
+	smb_domain_t dinfo;
 
-	if ((lsar_open(NULL, NULL, user, &domain_handle)) != 0)
+	if (!smb_domain_getinfo(&dinfo))
+		return (-1);
+
+	if ((lsar_open(dinfo.d_dc, dinfo.d_nbdomain, user,
+	    &domain_handle)) != 0)
 		return (-1);
 
 	rc = lsa_list_accounts(&domain_handle);
@@ -489,19 +571,17 @@ lsa_list_privs(char *server, char *domain)
  * lsa_test
  *
  * LSA test routine: open and close the LSA interface.
- * TBD: the parameters should be server and domain.
  *
  * On success 0 is returned. Otherwise a -ve error code.
  */
-/*ARGSUSED*/
 int
-lsa_test(char *server, char *account_name)
+lsa_test(char *server, char *domain)
 {
 	mlsvc_handle_t domain_handle;
 	int rc;
 	char *user = smbrdr_ipc_get_user();
 
-	rc = lsar_open(NULL, NULL, user, &domain_handle);
+	rc = lsar_open(server, domain, user, &domain_handle);
 	if (rc != 0)
 		return (-1);
 
@@ -731,8 +811,12 @@ lsa_lookup_sid_domain(smb_sid_t *sid, smb_userinfo_t *ainfo)
 	mlsvc_handle_t domain_handle;
 	char *user = smbrdr_ipc_get_user();
 	uint32_t status;
+	smb_domain_t dinfo;
 
-	if (lsar_open(NULL, NULL, user, &domain_handle) != 0)
+	if (!smb_domain_getinfo(&dinfo))
+		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
+
+	if (lsar_open(dinfo.d_dc, dinfo.d_nbdomain, user, &domain_handle) != 0)
 		return (NT_STATUS_INVALID_PARAMETER);
 
 	status = lsar_lookup_sids2(&domain_handle,

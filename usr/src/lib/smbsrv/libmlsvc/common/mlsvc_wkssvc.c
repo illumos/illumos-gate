@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <netdb.h>
 #include <sys/types.h>
 #include <string.h>
@@ -35,25 +33,24 @@
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/nterror.h>
 #include <smbsrv/lmerr.h>
-#include <smbsrv/mlsvc_util.h>
 #include <smbsrv/ndl/srvsvc.ndl>
 
-static int wkssvc_s_NetWkstaGetInfo(void *, struct mlrpc_xaction *);
-static int wkssvc_s_NetWkstaTransportEnum(void *, struct mlrpc_xaction *);
+static int wkssvc_s_NetWkstaGetInfo(void *, ndr_xa_t *);
+static int wkssvc_s_NetWkstaTransportEnum(void *, ndr_xa_t *);
 
-static mlrpc_stub_table_t wkssvc_stub_table[] = {
+static ndr_stub_table_t wkssvc_stub_table[] = {
 	{ wkssvc_s_NetWkstaGetInfo,	WKSSVC_OPNUM_NetWkstaGetInfo },
 	{ wkssvc_s_NetWkstaTransportEnum, WKSSVC_OPNUM_NetWkstaTransportEnum },
 	{0}
 };
 
-static mlrpc_service_t wkssvc_service = {
+static ndr_service_t wkssvc_service = {
 	"Workstation",			/* name (WKSSVC or WKSTA) */
 	"Workstation services",		/* desc */
 	"\\wkssvc",			/* endpoint */
 	PIPE_NTSVCS,			/* sec_addr_port */
-	"6bffd098-a112-3610-983346c3f87e345a", 1,	/* abstract */
-	"8a885d04-1ceb-11c9-9fe808002b104860", 2,	/* transfer */
+	"6bffd098-a112-3610-9833-46c3f87e345a", 1,	/* abstract */
+	NDR_TRANSFER_SYNTAX_UUID,		2,	/* transfer */
 	0,				/* no bind_instance_size */
 	0,				/* no bind_req() */
 	0,				/* no unbind_and_close() */
@@ -65,14 +62,14 @@ static mlrpc_service_t wkssvc_service = {
 void
 wkssvc_initialize(void)
 {
-	(void) mlrpc_register_service(&wkssvc_service);
+	(void) ndr_svc_register(&wkssvc_service);
 }
 
 /*
  * WKSSVC NetWkstaGetInfo
  */
 static int
-wkssvc_s_NetWkstaGetInfo(void *arg, struct mlrpc_xaction *mxa)
+wkssvc_s_NetWkstaGetInfo(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetWkstaGetInfo *param = arg;
 	mslm_NetWkstaGetInfo_rb *rb;
@@ -85,17 +82,17 @@ wkssvc_s_NetWkstaGetInfo(void *arg, struct mlrpc_xaction *mxa)
 
 	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
 
-	rb = MLRPC_HEAP_NEW(mxa, mslm_NetWkstaGetInfo_rb);
+	rb = NDR_NEW(mxa, mslm_NetWkstaGetInfo_rb);
 
 	if ((rc = smb_getnetbiosname(hostname, MAXHOSTNAMELEN)) == 0) {
-		name = MLRPC_HEAP_STRSAVE(mxa, hostname);
-		domain = MLRPC_HEAP_STRSAVE(mxa, resource_domain);
+		name = NDR_STRDUP(mxa, hostname);
+		domain = NDR_STRDUP(mxa, resource_domain);
 	}
 
 	if ((rc != 0) || (rb == NULL) || (name == NULL) || (domain == NULL)) {
 		bzero(param, sizeof (struct mslm_NetWkstaGetInfo));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->result.level = param->level;
@@ -161,14 +158,14 @@ wkssvc_s_NetWkstaGetInfo(void *arg, struct mlrpc_xaction *mxa)
 		param->status = status;
 	}
 
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
  * WKSSVC NetWkstaTransportEnum
  */
 static int
-wkssvc_s_NetWkstaTransportEnum(void *arg, struct mlrpc_xaction *mxa)
+wkssvc_s_NetWkstaTransportEnum(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetWkstaTransportEnum *param = arg;
 	struct mslm_NetWkstaTransportCtr0 *info0;
@@ -176,8 +173,8 @@ wkssvc_s_NetWkstaTransportEnum(void *arg, struct mlrpc_xaction *mxa)
 
 	switch (param->info.level) {
 	case 0:
-		info0 = MLRPC_HEAP_NEW(mxa, struct mslm_NetWkstaTransportCtr0);
-		ti0 = MLRPC_HEAP_NEW(mxa, struct mslm_NetWkstaTransportInfo0);
+		info0 = NDR_NEW(mxa, struct mslm_NetWkstaTransportCtr0);
+		ti0 = NDR_NEW(mxa, struct mslm_NetWkstaTransportInfo0);
 
 		if (info0 == NULL || ti0 == NULL) {
 			bzero(param, sizeof (struct mslm_NetWkstaGetInfo));
@@ -207,5 +204,5 @@ wkssvc_s_NetWkstaTransportEnum(void *arg, struct mlrpc_xaction *mxa)
 		param->status = ERROR_INVALID_LEVEL;
 	}
 
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }

@@ -2,34 +2,32 @@
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
 
- CDDL HEADER START
+CDDL HEADER START
 
-	The contents of this file are subject to the terms of the
-	Common Development and Distribution License (the "License").
-	You may not use this file except in compliance with the License.
+The contents of this file are subject to the terms of the
+Common Development and Distribution License (the "License").
+You may not use this file except in compliance with the License.
 
-	You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
-	or http://www.opensolaris.org/os/licensing.
-	See the License for the specific language governing permissions
-	and limitations under the License.
+You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+or http://www.opensolaris.org/os/licensing.
+See the License for the specific language governing permissions
+and limitations under the License.
 
-	When distributing Covered Code, include this CDDL HEADER in each
-	file and include the License file at usr/src/OPENSOLARIS.LICENSE.
-	If applicable, add the following below this CDDL HEADER, with the
-	fields enclosed by brackets "[]" replaced with your own identifying
-	information: Portions Copyright [yyyy] [name of copyright owner]
+When distributing Covered Code, include this CDDL HEADER in each
+file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+If applicable, add the following below this CDDL HEADER, with the
+fields enclosed by brackets "[]" replaced with your own identifying
+information: Portions Copyright [yyyy] [name of copyright owner]
 
- CDDL HEADER END
+CDDL HEADER END
 
-	Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
-	Use is subject to license terms.
+Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
 
-	ident	"%Z%%M%	%I%	%E% SMI"
-
-	NOTE:  This service manifest is not editable; its contents will
-	be overwritten by package or patch operations, including
-	operating system upgrade.  Make customizations in a different
-	file.
+NOTE:  This service manifest is not editable; its contents will
+be overwritten by package or patch operations, including
+operating system upgrade.  Make customizations in a different
+file.
 
 -->
 
@@ -142,6 +140,12 @@
 			value='false' override='true'/>
 		<propval name='domain_name' type='astring'
 			value='WORKGROUP' override='true'/>
+		<propval name='fqdn' type='astring'
+			value='' override='true'/>
+		<propval name='forest' type='astring'
+			value='' override='true'/>
+		<propval name='domain_guid' type='astring'
+			value='' override='true'/>
 		<propval name='pdc' type='astring'
 			value='' override='true'/>
 		<propval name='wins_server_1' type='astring'
@@ -152,8 +156,6 @@
 			value='' override='true'/>
 		<propval name='srvsvc_sharesetinfo_enable' type='boolean'
 			value='false' override='true'/>
-		<propval name='mlrpc_keep_alive_interval' type='integer'
-			value='30' override='true'/>
 		<propval name='max_workers' type='integer'
 			value='64' override='true'/>
 		<propval name='max_connections' type='integer'

@@ -80,6 +80,7 @@
 #define	NULL_MSGCHK(msg)	((msg) ? (msg) : "NULL")
 
 #define	SMB_NIC_MAXIFS		256
+#define	SMB_NIC_MAXEXCLLIST_LEN	512
 
 typedef struct smb_hostifs {
 	list_node_t if_lnd;
@@ -124,6 +125,8 @@ static int smb_nic_dbdelhost(const char *);
 static int smb_nic_dbsetinfo(sqlite *);
 
 static int smb_nic_getinfo(char *, smb_nic_t *);
+static boolean_t smb_nic_nbt_exclude(const smb_nic_t *, const char **, int);
+static int smb_nic_nbt_get_exclude_list(char *, char **, int);
 
 /* This is the list we will monitor */
 static smb_niclist_t smb_niclist;
@@ -391,9 +394,9 @@ smb_nic_list_create(void)
 	smb_hostifs_t *iflist;
 	smb_nic_t *nc;
 	char *ifname;
-	char excludestr[MAX_EXCLUDE_LIST_LEN];
-	ipaddr_t exclude[SMB_PI_MAX_NETWORKS];
-	int nexclude;
+	char excludestr[SMB_NIC_MAXEXCLLIST_LEN];
+	char *exclude[SMB_PI_MAX_NETWORKS];
+	int nexclude = 0;
 	int i;
 
 	if (smb_nic_hlist_create(&hlist) < 0)
@@ -409,9 +412,12 @@ smb_nic_list_create(void)
 		return (-1);
 	}
 
-	(void) smb_config_getstr(SMB_CI_WINS_EXCL, excludestr,
-	    sizeof (excludestr));
-	nexclude = smb_wins_iplist(excludestr, exclude, SMB_PI_MAX_NETWORKS);
+	*excludestr = '\0';
+	(void) smb_config_getstr(SMB_CI_WINS_EXCL,
+	    excludestr, sizeof (excludestr));
+
+	nexclude = smb_nic_nbt_get_exclude_list(excludestr,
+	    exclude, SMB_PI_MAX_NETWORKS);
 
 	nc = smb_niclist.nl_nics;
 	iflist = list_head(&hlist.h_list);
@@ -432,8 +438,8 @@ smb_nic_list_create(void)
 			if (strchr(ifname, ':'))
 				nc->nic_smbflags |= SMB_NICF_ALIAS;
 
-			if (smb_wins_is_excluded(nc->nic_ip,
-			    (ipaddr_t *)exclude, nexclude))
+			if (smb_nic_nbt_exclude(nc,
+			    (const char **)exclude, nexclude))
 				nc->nic_smbflags |= SMB_NICF_NBEXCL;
 
 			smb_niclist.nl_cnt++;
@@ -1072,4 +1078,67 @@ smb_nic_dbsetinfo(sqlite *db)
 	}
 
 	return (rc);
+}
+
+/*
+ * smb_nic_nbt_get_exclude_list
+ *
+ * Construct an array containing list of i/f names on which NetBIOS traffic is
+ * to be disabled, from a string containing a list of comma separated i/f names.
+ *
+ * Returns the number of i/f on which NetBIOS traffic is to be disabled.
+ */
+static int
+smb_nic_nbt_get_exclude_list(char *excludestr, char **iflist, int max_nifs)
+{
+	int n = 0;
+	char *entry;
+
+	bzero(iflist, SMB_PI_MAX_NETWORKS * sizeof (char *));
+
+	(void) trim_whitespace(excludestr);
+	(void) strcanon(excludestr, ",");
+
+	if (*excludestr == '\0')
+		return (0);
+
+	while (((iflist[n] = strsep(&excludestr, ",")) != NULL) &&
+	    (n < max_nifs)) {
+		entry = iflist[n];
+		if (*entry == '\0')
+			continue;
+		n++;
+	}
+
+	return (n);
+}
+
+/*
+ * smb_nic_nbt_exclude
+ *
+ * Check to see if the given interface name should send NetBIOS traffic or not.
+ *
+ * Returns TRUE if NetBIOS traffic is disabled on an interface name.
+ * Returns FALSE otherwise.
+ */
+static boolean_t
+smb_nic_nbt_exclude(const smb_nic_t *nc, const char **exclude_list,
+    int nexclude)
+{
+	char buf[INET6_ADDRSTRLEN];
+	const char *ifname = nc->nic_ifname;
+	int i;
+
+	if (inet_ntop(AF_INET, &nc->nic_ip, buf, INET6_ADDRSTRLEN) == NULL)
+		buf[0] = '\0';
+
+	for (i = 0; i < nexclude; i++) {
+		if (strcmp(ifname, exclude_list[i]) == 0)
+			return (B_TRUE);
+
+		if ((buf[0] != '\0') && (strcmp(buf, exclude_list[i]) == 0))
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
 }

@@ -23,10 +23,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * SMB ReadX functions to support MLRPC.
+ * SMB ReadX functions.
  */
 
 #include <syslog.h>
@@ -150,7 +148,7 @@ smbrdr_readx(int fid, char *in_buf, int in_len)
  *
  * Decode the response from the SMB_COM_READ_ANDX request. The payload
  * of the response is appended to the end of SmbTransact response data
- * in the MLRPC receive buffer.
+ * in the RPC receive buffer.
  *
  * Return -1 on error, 0 upon success.
  */

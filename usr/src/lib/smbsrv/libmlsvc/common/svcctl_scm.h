@@ -28,8 +28,9 @@
 
 #include <libuutil.h>
 #include <smbsrv/libsmb.h>
+#include <smbsrv/libmlrpc.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/nterror.h>
-#include <smbsrv/mlrpc.h>
 #include <smbsrv/winsvc.h>
 #include <smbsrv/ndl/svcctl.ndl>
 

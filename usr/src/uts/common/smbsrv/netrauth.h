@@ -34,7 +34,6 @@
 
 #include <sys/types.h>
 #include <smbsrv/wintypes.h>
-#include <smbsrv/mlsvc.h>
 #include <smbsrv/netbios.h>
 
 #ifndef _KERNEL
@@ -94,6 +93,10 @@ typedef struct netr_session_key {
 #define	NETR_FLG_VALID		0x00000001
 #define	NETR_FLG_INIT		0x00000002
 
+/*
+ * 32-byte machine account password (null-terminated)
+ */
+#define	NETR_MACHINE_ACCT_PASSWD_MAX	32 + 1
 
 typedef struct netr_info {
 	DWORD flags;
@@ -104,7 +107,7 @@ typedef struct netr_info {
 	netr_cred_t client_credential;
 	netr_cred_t server_credential;
 	netr_session_key_t session_key;
-	BYTE password[MLSVC_MACHINE_ACCT_PASSWD_MAX];
+	BYTE password[NETR_MACHINE_ACCT_PASSWD_MAX];
 	time_t timestamp;
 } netr_info_t;
 

@@ -26,8 +26,6 @@
 #ifndef _MLSVC_WINREG_NDL_
 #define _MLSVC_WINREG_NDL_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Windows Registry (WINREG) RPC interface definition.
  *
@@ -113,13 +111,7 @@
 #define WINREG_ACCESS_KEY64		0x00000100
 #define WINREG_ACCESS_KEY32		0x00000200
 
-struct winreg_handle {
-	DWORD hand1;
-	DWORD hand2;
-	WORD  hand3[2];
-	BYTE  hand4[8];
-};
-typedef struct winreg_handle winreg_handle_t;
+CONTEXT_HANDLE(winreg_handle) winreg_handle_t;
 
 struct winreg_string_desc {
 	WORD	length;

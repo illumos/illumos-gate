@@ -2320,57 +2320,6 @@ smb_ads_gen_machine_passwd(char *machine_passwd, int bufsz)
 }
 
 /*
- * smb_ads_domain_change_cleanup
- *
- * If we're attempting to join the system to a new domain, the keys for
- * the host principal regarding the old domain should be removed from
- * Kerberos keytab. Also, the smb_ads_cached_host_info cache should be cleared.
- *
- * newdom is fully-qualified domain name.  It can be set to empty string
- * if user attempts to switch to workgroup mode.
- */
-int
-smb_ads_domain_change_cleanup(char *newdom)
-{
-	char origdom[MAXHOSTNAMELEN];
-	krb5_context ctx = NULL;
-	krb5_principal krb5princs[SMBKRB5_SPN_IDX_MAX];
-	int rc;
-
-	if (smb_getfqdomainname(origdom, MAXHOSTNAMELEN)) {
-		if (smb_getdomainname(origdom, MAXHOSTNAMELEN) == 0)
-			if (strncasecmp(origdom, newdom, strlen(origdom)))
-				smb_ads_free_cached_host();
-
-		return (0);
-	}
-
-	if (utf8_strcasecmp(origdom, newdom) == 0)
-		return (0);
-
-	smb_ads_free_cached_host();
-
-	if (smb_krb5_ctx_init(&ctx) != 0)
-		return (-1);
-
-	if (smb_krb5_get_principals(origdom, ctx, krb5princs) != 0) {
-		smb_krb5_ctx_fini(ctx);
-		return (-1);
-
-	}
-
-	rc = smb_krb5_remove_keytab_entries(ctx, krb5princs,
-	    SMBNS_KRB5_KEYTAB);
-
-	smb_krb5_free_principals(ctx, krb5princs, SMBKRB5_SPN_IDX_MAX);
-	smb_krb5_ctx_fini(ctx);
-
-	return (rc);
-}
-
-
-
-/*
  * smb_ads_join
  *
  * Besides the NT-4 style domain join (using MS-RPC), CIFS server also
@@ -2409,6 +2358,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	int dclevel, num;
 	smb_ads_qstat_t qstat;
 	char dn[SMB_ADS_DN_MAX];
+	char *tmpfile;
 
 	/*
 	 * Call library functions that can be used to get
@@ -2512,21 +2462,13 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 		encptr = pre_w2k8enctypes;
 	}
 
-	if (smb_krb5_update_keytab_entries(ctx, krb5princs, SMBNS_KRB5_KEYTAB,
+	tmpfile = mktemp(SMBNS_KRB5_KEYTAB_TMP);
+	if (tmpfile == NULL)
+		tmpfile = SMBNS_KRB5_KEYTAB_TMP;
+
+	if (smb_krb5_add_keytab_entries(ctx, krb5princs, tmpfile,
 	    kvno, machine_passwd, encptr, num) != 0) {
 		rc = SMB_ADJOIN_ERR_WRITE_KEYTAB;
-		goto adjoin_cleanup;
-	}
-
-	/* Set IDMAP config */
-	if (smb_config_set_idmap_domain(ah->domain) != 0) {
-		rc = SMB_ADJOIN_ERR_IDMAP_SET_DOMAIN;
-		goto adjoin_cleanup;
-	}
-
-	/* Refresh IDMAP service */
-	if (smb_config_refresh_idmap() != 0) {
-		rc = SMB_ADJOIN_ERR_IDMAP_REFRESH;
 		goto adjoin_cleanup;
 	}
 
@@ -2540,6 +2482,26 @@ adjoin_cleanup:
 			smb_krb5_free_principals(ctx, krb5princs,
 			    SMBKRB5_SPN_IDX_MAX);
 		smb_krb5_ctx_fini(ctx);
+	}
+
+	/* commit keytab file */
+	if (rc == SMB_ADJOIN_SUCCESS) {
+		if (rename(tmpfile, SMBNS_KRB5_KEYTAB) != 0) {
+			(void) unlink(tmpfile);
+			rc = SMB_ADJOIN_ERR_COMMIT_KEYTAB;
+		} else {
+			/* Set IDMAP config */
+			if (smb_config_set_idmap_domain(ah->domain) != 0) {
+				rc = SMB_ADJOIN_ERR_IDMAP_SET_DOMAIN;
+			} else {
+
+				/* Refresh IDMAP service */
+				if (smb_config_refresh_idmap() != 0)
+					rc = SMB_ADJOIN_ERR_IDMAP_REFRESH;
+			}
+		}
+	} else {
+		(void) unlink(tmpfile);
 	}
 
 	smb_ads_close(ah);
@@ -2755,4 +2717,45 @@ smb_ads_select_dc(smb_ads_host_list_t *hlist)
 		return (hentry);
 
 	return (NULL);
+}
+
+/*
+ * smb_ads_lookup_msdcs
+ *
+ * If server argument is set, try to locate the specified DC.
+ * If it is set to empty string, locate any DCs in the specified domain.
+ * Returns the discovered DC via buf.
+ *
+ * fqdn	  - fully-qualified domain name
+ * server - fully-qualifed hostname of a DC
+ * buf    - the hostname of the discovered DC
+ */
+boolean_t
+smb_ads_lookup_msdcs(char *fqdn, char *server, char *buf, uint32_t buflen)
+{
+	smb_ads_host_info_t *hinfo = NULL;
+	char *p;
+	struct in_addr addr;
+	char *sought_host;
+
+	if (!fqdn || !buf)
+		return (B_FALSE);
+
+	*buf = '\0';
+	sought_host = (*server == 0 ? NULL : server);
+	if ((hinfo = smb_ads_find_host(fqdn, sought_host)) == NULL)
+		return (B_FALSE);
+
+	addr.s_addr = hinfo->ip_addr;
+	syslog(LOG_DEBUG, "msdcsLookupADS: %s [%s]", hinfo->name,
+	    inet_ntoa(addr));
+
+	(void) strlcpy(buf, hinfo->name, buflen);
+	/*
+	 * Remove the domain extension
+	 */
+	if ((p = strchr(buf, '.')) != 0)
+		*p = '\0';
+
+	return (B_TRUE);
 }

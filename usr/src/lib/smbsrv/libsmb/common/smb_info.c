@@ -23,6 +23,7 @@
  * Use is subject to license terms.
  */
 
+#include <assert.h>
 #include <sys/types.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -39,91 +40,12 @@
 #include <arpa/nameser.h>
 #include <resolv.h>
 #include <sys/sockio.h>
+#include <sys/socket.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/netbios.h>
 #include <smbsrv/libsmb.h>
 
-static smb_ntdomain_t smbpdc_cache;
-static mutex_t smbpdc_mtx;
-static cond_t smbpdc_cv;
 static mutex_t seqnum_mtx;
-
-extern int getdomainname(char *, int);
-
-/*
- * smb_getdomaininfo
- *
- * Returns a pointer to the cached domain data. The caller can specify
- * whether or not he is prepared to wait if the cache is not yet valid
- * and for how long. The specified timeout is in seconds.
- */
-smb_ntdomain_t *
-smb_getdomaininfo(uint32_t timeout)
-{
-	timestruc_t to;
-	int err;
-
-	if (timeout != 0) {
-		(void) mutex_lock(&smbpdc_mtx);
-		while (smbpdc_cache.ipaddr == 0) {
-			to.tv_sec = timeout;
-			to.tv_nsec = 0;
-			err = cond_reltimedwait(&smbpdc_cv, &smbpdc_mtx, &to);
-			if (err == ETIME)
-				break;
-		}
-		(void) mutex_unlock(&smbpdc_mtx);
-	}
-
-	if (smbpdc_cache.ipaddr != 0)
-		return (&smbpdc_cache);
-	else
-		return (0);
-}
-
-void
-smb_logdomaininfo(smb_ntdomain_t *di)
-{
-	char ipstr[16];
-
-	(void) inet_ntop(AF_INET, (const void *)&di->ipaddr, ipstr,
-	    sizeof (ipstr));
-	syslog(LOG_DEBUG, "smbd: %s (%s:%s)", di->domain, di->server, ipstr);
-}
-
-/*
- * smb_setdomaininfo
- *
- * Set the information for the specified domain. If the information is
- * non-null, the notification event is raised to wakeup any threads
- * blocking on the cache.
- */
-void
-smb_setdomaininfo(char *domain, char *server, uint32_t ipaddr)
-{
-	char *p;
-
-	(void) mutex_lock(&smbpdc_mtx);
-	bzero(&smbpdc_cache, sizeof (smb_ntdomain_t));
-	if (domain && server && ipaddr) {
-		(void) strlcpy(smbpdc_cache.domain, domain, SMB_PI_MAX_DOMAIN);
-		(void) strlcpy(smbpdc_cache.server, server, SMB_PI_MAX_DOMAIN);
-
-		/*
-		 * Remove DNS domain name extension
-		 * to avoid confusing NetBIOS.
-		 */
-		if ((p = strchr(smbpdc_cache.domain, '.')) != 0)
-			*p = '\0';
-
-		if ((p = strchr(smbpdc_cache.server, '.')) != 0)
-			*p = '\0';
-
-		smbpdc_cache.ipaddr = ipaddr;
-		(void) cond_broadcast(&smbpdc_cv);
-	}
-	(void) mutex_unlock(&smbpdc_mtx);
-}
 
 void
 smb_load_kconfig(smb_kmod_cfg_t *kcfg)
@@ -259,35 +181,6 @@ smb_getfqhostname(char *buf, size_t buflen)
 }
 
 /*
- * smb_resolve_netbiosname
- *
- * Convert the fully-qualified domain name (i.e. fqdn) to a NETBIOS name.
- * Upon success, the NETBIOS name will be returned via buf parameter.
- * Returns 0 upon success.  Otherwise, returns -1.
- */
-int
-smb_resolve_netbiosname(char *fqdn, char *buf, size_t buflen)
-{
-	char *p;
-
-	if (!buf)
-		return (-1);
-
-	*buf = '\0';
-	if (!fqdn)
-		return (-1);
-
-	(void) strlcpy(buf, fqdn, buflen);
-	if ((p = strchr(buf, '.')) != NULL)
-		*p = 0;
-
-	if (strlen(buf) >= NETBIOS_NAME_SZ)
-		buf[NETBIOS_NAME_SZ - 1] = '\0';
-
-	return (0);
-}
-
-/*
  * smb_getdomainname
  *
  * Returns NETBIOS name of the domain if the system is in domain
@@ -297,20 +190,17 @@ smb_resolve_netbiosname(char *fqdn, char *buf, size_t buflen)
 int
 smb_getdomainname(char *buf, size_t buflen)
 {
-	char domain[MAXHOSTNAMELEN];
 	int rc;
 
 	if (buf == NULL || buflen == 0)
 		return (-1);
 
 	*buf = '\0';
-	rc = smb_config_getstr(SMB_CI_DOMAIN_NAME, domain,
-	    sizeof (domain));
+	rc = smb_config_getstr(SMB_CI_DOMAIN_NAME, buf, buflen);
 
-	if ((rc != SMBD_SMF_OK) || (*domain == '\0'))
+	if ((rc != SMBD_SMF_OK) || (*buf == '\0'))
 		return (-1);
 
-	(void) smb_resolve_netbiosname(domain, buf, buflen);
 	return (0);
 }
 
@@ -346,105 +236,42 @@ smb_getdomainsid(void)
 }
 
 /*
- * smb_resolve_fqdn
- *
- * Converts the NETBIOS name of the domain (i.e. nbt_domain) to a fully
- * qualified domain name. The domain from either the domain field or
- * search list field of the /etc/resolv.conf will be returned via the
- * buf parameter if the first label of the domain matches the given
- * NETBIOS name.
- *
- * Returns -1 upon error. If a match is found, returns 1. Otherwise,
- * returns 0.
- */
-int
-smb_resolve_fqdn(char *nbt_domain, char *buf, size_t buflen)
-{
-	struct __res_state res_state;
-	int i, found = 0;
-	char *p;
-	int dlen;
-
-	if (!buf)
-		return (-1);
-
-	*buf = '\0';
-	if (!nbt_domain)
-		return (-1);
-
-	bzero(&res_state, sizeof (struct __res_state));
-	if (res_ninit(&res_state))
-		return (-1);
-
-	if (*nbt_domain == '\0') {
-		if (*res_state.defdname == '\0') {
-			res_ndestroy(&res_state);
-			return (0);
-		}
-
-		(void) strlcpy(buf, res_state.defdname, buflen);
-		res_ndestroy(&res_state);
-		return (1);
-	}
-
-	dlen = strlen(nbt_domain);
-	if (!strncasecmp(nbt_domain, res_state.defdname, dlen)) {
-		(void) strlcpy(buf, res_state.defdname, buflen);
-		res_ndestroy(&res_state);
-		return (1);
-	}
-
-	for (i = 0; (p = res_state.dnsrch[i]) != NULL; i++) {
-		if (!strncasecmp(nbt_domain, p, dlen)) {
-			(void) strlcpy(buf, p, buflen);
-			found = 1;
-			break;
-		}
-
-	}
-
-	res_ndestroy(&res_state);
-	return (found);
-}
-
-/*
  * smb_getfqdomainname
  *
- * If the domain_name property value is FQDN, it will be returned.
- * In domain mode, the domain from either the domain field or
- * search list field of the /etc/resolv.conf will be returned via the
- * buf parameter if the first label of the domain matches the
- * domain_name property. In workgroup mode, it returns the local
- * domain.
+ * In the system is in domain mode, the dns_domain property value
+ * is returned. Otherwise, it returns the local domain obtained via
+ * resolver.
  *
  * Returns 0 upon success.  Otherwise, returns -1.
  */
 int
 smb_getfqdomainname(char *buf, size_t buflen)
 {
-	char domain[MAXHOSTNAMELEN];
-	int rc = 0;
+	struct __res_state res_state;
+	int rc;
 
 	if (buf == NULL || buflen == 0)
 		return (-1);
 
 	*buf = '\0';
 	if (smb_config_get_secmode() == SMB_SECMODE_DOMAIN) {
-		rc = smb_config_getstr(SMB_CI_DOMAIN_NAME, domain,
-		    sizeof (domain));
+		rc = smb_config_getstr(SMB_CI_DOMAIN_FQDN, buf, buflen);
 
-		if ((rc != SMBD_SMF_OK) || (*domain == '\0'))
+		if ((rc != SMBD_SMF_OK) || (*buf == '\0'))
+			return (-1);
+	} else {
+		bzero(&res_state, sizeof (struct __res_state));
+		if (res_ninit(&res_state))
 			return (-1);
 
-		if (strchr(domain, '.') == NULL) {
-			if (smb_resolve_fqdn(domain, buf, buflen) != 1)
-				rc = -1;
-		} else {
-			(void) strlcpy(buf, domain, buflen);
+		if (*res_state.defdname == '\0') {
+			res_ndestroy(&res_state);
+			return (-1);
 		}
-	} else {
-		if (smb_resolve_fqdn("", buf, buflen) != 1)
-			rc = -1;
+
+		(void) strlcpy(buf, res_state.defdname, buflen);
+		res_ndestroy(&res_state);
+		rc = 0;
 	}
 
 	return (rc);
@@ -645,4 +472,48 @@ smb_get_nameservers(struct in_addr *ips, int sz)
 	syslog(LOG_DEBUG, "NS Found %d name servers\n", i);
 	res_ndestroy(&res_state);
 	return (i);
+}
+
+/*
+ * smb_gethostbyname
+ *
+ * Looks up a host by the given name. The host entry can come
+ * from any of the sources for hosts specified in the
+ * /etc/nsswitch.conf and the NetBIOS cache.
+ *
+ * XXX Invokes nbt_name_resolve API once the NBTD is integrated
+ * to look in the NetBIOS cache if getipnodebyname fails.
+ *
+ * Caller should invoke freehostent to free the returned hostent.
+ */
+struct hostent *
+smb_gethostbyname(const char *name, int *err_num)
+{
+	struct hostent *h;
+
+	h = getipnodebyname(name, AF_INET, 0, err_num);
+
+	return (h);
+}
+
+/*
+ * smb_gethostbyaddr
+ *
+ * Looks up a host by the given IP address. The host entry can come
+ * from any of the sources for hosts specified in the
+ * /etc/nsswitch.conf and the NetBIOS cache.
+ *
+ * XXX Invokes nbt API to resolve name by IP once the NBTD is integrated
+ * to look in the NetBIOS cache if getipnodebyaddr fails.
+ *
+ * Caller should invoke freehostent to free the returned hostent.
+ */
+struct hostent *
+smb_gethostbyaddr(const char *addr, int len, int type, int *err_num)
+{
+	struct hostent *h;
+
+	h = getipnodebyaddr(addr, len, type, err_num);
+
+	return (h);
 }

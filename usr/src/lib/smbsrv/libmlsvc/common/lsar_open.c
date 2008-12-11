@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Local Security Authority RPC (LSARPC) library interface functions for
@@ -35,19 +33,17 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libsmbrdr.h>
-#include <smbsrv/mlsvc.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/ntaccess.h>
 #include <smbsrv/ntstatus.h>
-#include <smbsrv/lsalib.h>
+#include <lsalib.h>
 
 /*
  * lsar_open
  *
  * This is a wrapper round lsar_open_policy2 to ensure that we connect
- * using the appropriate session and logon. We default to the resource
- * domain information if the caller didn't supply a server name and a
- * domain name.
+ * using the appropriate domain information.
  *
  * If username argument is NULL, an anonymous connection will be established.
  * Otherwise, an authenticated connection will be established.
@@ -57,38 +53,14 @@
 int lsar_open(char *server, char *domain, char *username,
     mlsvc_handle_t *domain_handle)
 {
-	smb_ntdomain_t *di;
-	int remote_os;
-	int remote_lm;
-	int rc;
-
-	if (server == NULL || domain == NULL) {
-		if ((di = smb_getdomaininfo(0)) == NULL)
-			return (-1);
-
-		server = di->server;
-		domain = di->domain;
-	}
+	if (server == NULL || domain == NULL)
+		return (-1);
 
 	if (username == NULL)
 		username = MLSVC_ANON_USER;
 
-	rc = mlsvc_logon(server, domain, username);
-
-	if (rc != 0)
-		return (-1);
-
-	rc = lsar_open_policy2(server, domain, username, domain_handle);
-	if (rc == 0) {
-		if (mlsvc_session_native_values(domain_handle->context->fid,
-		    &remote_os, &remote_lm, 0) != 0)
-			remote_os = NATIVE_OS_UNKNOWN;
-
-		domain_handle->context->server_os = remote_os;
-	}
-	return (rc);
+	return (lsar_open_policy2(server, domain, username, domain_handle));
 }
-
 
 /*
  * lsar_open_policy2
@@ -106,48 +78,33 @@ int lsar_open(char *server, char *domain, char *username,
  *
  * Returns 0 on success. Otherwise non-zero to indicate a failure.
  */
-int lsar_open_policy2(char *server, char *domain, char *username,
+int
+lsar_open_policy2(char *server, char *domain, char *username,
     mlsvc_handle_t *lsa_handle)
 {
 	struct mslsa_OpenPolicy2 arg;
-	mlrpc_heapref_t heap;
-	int rc;
 	int opnum;
-	int fid;
-	int remote_os;
-	int remote_lm;
 	int len;
+	int rc;
 
-	if (server == NULL || domain == NULL ||
-	    username == NULL || lsa_handle == NULL)
+	rc = ndr_rpc_bind(lsa_handle, server, domain, username, "LSARPC");
+	if (rc != 0)
 		return (-1);
-
-	fid = mlsvc_open_pipe(server, domain, username, "\\lsarpc");
-	if (fid < 0)
-		return (-1);
-
-	if ((rc = mlsvc_rpc_bind(lsa_handle, fid, "LSARPC")) < 0) {
-		(void) mlsvc_close_pipe(fid);
-		return (rc);
-	}
 
 	opnum = LSARPC_OPNUM_OpenPolicy2;
 	bzero(&arg, sizeof (struct mslsa_OpenPolicy2));
 
 	len = strlen(server) + 4;
-	arg.servername = malloc(len);
+	arg.servername = ndr_rpc_malloc(lsa_handle, len);
 	if (arg.servername == NULL) {
-		(void) mlsvc_close_pipe(fid);
-		free(lsa_handle->context);
+		ndr_rpc_unbind(lsa_handle);
 		return (-1);
 	}
 
 	(void) snprintf((char *)arg.servername, len, "\\\\%s", server);
 	arg.attributes.length = sizeof (struct mslsa_object_attributes);
 
-	(void) mlsvc_session_native_values(fid, &remote_os, &remote_lm, 0);
-
-	if (remote_os == NATIVE_OS_NT5_0) {
+	if (ndr_rpc_server_os(lsa_handle) == NATIVE_OS_NT5_0) {
 		arg.desiredAccess = MAXIMUM_ALLOWED;
 	} else {
 		arg.desiredAccess = GENERIC_EXECUTE
@@ -156,28 +113,25 @@ int lsar_open_policy2(char *server, char *domain, char *username,
 		    | POLICY_LOOKUP_NAMES;
 	}
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(lsa_handle->context, opnum, &arg, &heap);
-	if (rc == 0) {
-		if (arg.status != 0) {
+	if ((rc = ndr_rpc_call(lsa_handle, opnum, &arg)) != 0) {
+		ndr_rpc_unbind(lsa_handle);
+		return (-1);
+	}
+
+	if (arg.status != 0) {
+		rc = -1;
+	} else {
+		(void) memcpy(&lsa_handle->handle, &arg.domain_handle,
+		    sizeof (ndr_hdid_t));
+
+		if (ndr_is_null_handle(lsa_handle))
 			rc = -1;
-		} else {
-			(void) memcpy(&lsa_handle->handle, &arg.domain_handle,
-			    sizeof (mslsa_handle_t));
-
-			if (mlsvc_is_null_handle(lsa_handle))
-				rc = -1;
-		}
 	}
 
-	mlsvc_rpc_free(lsa_handle->context, &heap);
-	free(arg.servername);
+	ndr_rpc_release(lsa_handle);
 
-	if (rc != 0) {
-		(void) mlsvc_close_pipe(fid);
-		free(lsa_handle->context);
-	}
-
+	if (rc != 0)
+		ndr_rpc_unbind(lsa_handle);
 	return (rc);
 }
 
@@ -197,16 +151,12 @@ lsar_open_account(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
     mlsvc_handle_t *lsa_account_handle)
 {
 	struct mslsa_OpenAccount arg;
-	struct mlsvc_rpc_context *context;
-	mlrpc_heapref_t heap;
-	int rc;
 	int opnum;
+	int rc;
 
-	if (mlsvc_is_null_handle(lsa_handle) ||
-	    sid == NULL || lsa_account_handle == NULL)
+	if (ndr_is_null_handle(lsa_handle) || sid == NULL)
 		return (-1);
 
-	context = lsa_handle->context;
 	opnum = LSARPC_OPNUM_OpenAccount;
 	bzero(&arg, sizeof (struct mslsa_OpenAccount));
 
@@ -220,23 +170,22 @@ lsar_open_account(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 #endif
 	    | POLICY_VIEW_LOCAL_INFORMATION;
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(context, opnum, &arg, &heap);
-	if (rc == 0) {
-		if (arg.status != 0) {
+	if ((rc = ndr_rpc_call(lsa_handle, opnum, &arg)) != 0)
+		return (-1);
+
+	if (arg.status != 0) {
+		rc = -1;
+	} else {
+		ndr_inherit_handle(lsa_account_handle, lsa_handle);
+
+		(void) memcpy(&lsa_account_handle->handle,
+		    &arg.account_handle, sizeof (ndr_hdid_t));
+
+		if (ndr_is_null_handle(lsa_account_handle))
 			rc = -1;
-		} else {
-			lsa_account_handle->context = context;
-
-			(void) memcpy(&lsa_account_handle->handle,
-			    &arg.account_handle, sizeof (mslsa_handle_t));
-
-			if (mlsvc_is_null_handle(lsa_account_handle))
-				rc = -1;
-		}
 	}
 
-	mlsvc_rpc_free(context, &heap);
+	ndr_rpc_release(lsa_handle);
 	return (rc);
 }
 
@@ -247,8 +196,7 @@ lsar_open_account(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
  * must be a valid handle obtained via a call to lsar_open_policy2 or
  * lsar_open_account. On success the handle will be zeroed out to
  * ensure that it is not used again. If this is the top level handle
- * (i.e. the one obtained via lsar_open_policy2) the pipe is closed
- * and the context is freed.
+ * (i.e. the one obtained via lsar_open_policy2) the pipe is closed.
  *
  * Returns 0 on success. Otherwise non-zero to indicate a failure.
  */
@@ -256,26 +204,21 @@ int
 lsar_close(mlsvc_handle_t *lsa_handle)
 {
 	struct mslsa_CloseHandle arg;
-	mlrpc_heapref_t heap;
-	int rc;
 	int opnum;
 
-	if (mlsvc_is_null_handle(lsa_handle))
+	if (ndr_is_null_handle(lsa_handle))
 		return (-1);
 
 	opnum = LSARPC_OPNUM_CloseHandle;
 	bzero(&arg, sizeof (struct mslsa_CloseHandle));
 	(void) memcpy(&arg.handle, lsa_handle, sizeof (mslsa_handle_t));
 
-	(void) mlsvc_rpc_init(&heap);
-	rc = mlsvc_rpc_call(lsa_handle->context, opnum, &arg, &heap);
-	mlsvc_rpc_free(lsa_handle->context, &heap);
+	(void) ndr_rpc_call(lsa_handle, opnum, &arg);
+	ndr_rpc_release(lsa_handle);
 
-	if (lsa_handle->context->handle == &lsa_handle->handle) {
-		(void) mlsvc_close_pipe(lsa_handle->context->fid);
-		free(lsa_handle->context);
-	}
+	if (ndr_is_bind_handle(lsa_handle))
+		ndr_rpc_unbind(lsa_handle);
 
 	bzero(lsa_handle, sizeof (mlsvc_handle_t));
-	return (rc);
+	return (0);
 }

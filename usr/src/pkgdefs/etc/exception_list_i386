@@ -1001,13 +1001,9 @@ usr/include/smbsrv/libsmbrdr.h		i386
 usr/include/smbsrv/lm.h			i386
 usr/include/smbsrv/lmdfs.h		i386
 usr/include/smbsrv/lmerr.h		i386
-usr/include/smbsrv/lsalib.h		i386
 usr/include/smbsrv/mac_cifs.h		i386
 usr/include/smbsrv/mailslot.h		i386
 usr/include/smbsrv/mbuf.h		i386
-usr/include/smbsrv/mlrpc.h		i386
-usr/include/smbsrv/mlsvc.h		i386
-usr/include/smbsrv/mlsvc_util.h		i386
 usr/include/smbsrv/msgbuf.h		i386
 usr/include/smbsrv/ndr.h		i386
 usr/include/smbsrv/netbios.h		i386
@@ -1019,7 +1015,6 @@ usr/include/smbsrv/ntifs.h		i386
 usr/include/smbsrv/ntlocale.h		i386
 usr/include/smbsrv/ntstatus.h		i386
 usr/include/smbsrv/oem.h		i386
-usr/include/smbsrv/samlib.h		i386
 usr/include/smbsrv/smb.h		i386
 usr/include/smbsrv/smb_common_door.h	i386
 usr/include/smbsrv/smb_door_svc.h	i386
@@ -1053,6 +1048,7 @@ usr/include/smbsrv/ndl/dssetup.ndl	i386
 usr/include/smbsrv/ndl/eventlog.ndl	i386
 usr/include/smbsrv/ndl/llsrpc.ndl	i386
 usr/include/smbsrv/ndl/lsarpc.ndl	i386
+usr/include/smbsrv/ndl/msgsvc.ndl	i386
 usr/include/smbsrv/ndl/ndrtypes.ndl	i386
 usr/include/smbsrv/ndl/netdfs.ndl	i386
 usr/include/smbsrv/ndl/netlogon.ndl	i386

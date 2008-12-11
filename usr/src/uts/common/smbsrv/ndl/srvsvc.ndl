@@ -26,8 +26,6 @@
 #ifndef _MLSVC_LANMAN_NDL_
 #define _MLSVC_LANMAN_NDL_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * LanMan RPC (WKSSVC and SRVSVC) interface definitions.
  */
@@ -497,6 +495,8 @@ struct mslm_NetFileClose {
  *         of resource and a comment.
  *  502    Sets information about the shared resource, including
  *         the name, type, permissions, number of connections etc.
+ *  503    Contains information about the shared resource;
+ *         identical to 502 except for the addition of a servername.
  *  1004   Specifies a comment for the shared resource.
  *  1005   Specifies a set of flags describing the shared resource.
  *  1006   Specifies the maximum number of concurrent connections
@@ -542,17 +542,22 @@ struct mslm_NetFileClose {
  *         appear as SHI1005_FLAGS_ENFORCE_NAMESPACE_ACCESS.
  ***********************************************************************
  */
+
+#define	CSC_MASK		0x30
+#define	CSC_CACHE_MANUAL_REINT	0x00
+#define	CSC_CACHE_AUTO_REINT	0x10
+#define	CSC_CACHE_VDO		0x20
+#define	CSC_CACHE_NONE		0x30
+
 struct mslm_NetShareGetInfo0 {
 	LPTSTR shi0_netname;
 };
-
 
 struct mslm_NetShareGetInfo1 {
 	LPTSTR shi1_netname;
 	DWORD shi1_type; /* type of resource such as IPC$ */
 	LPTSTR shi1_comment;
 };
-
 
 struct mslm_NetShareGetInfo2 {
 	LPTSTR shi2_netname;
@@ -585,8 +590,30 @@ struct mslm_NetShareGetInfo502 {
 	DWORD shi502_security_descriptor;
 };
 
+struct mslm_NetShareGetInfo503 {
+	LPTSTR shi503_netname;
+	DWORD shi503_type;
+	LPTSTR shi503_comment;
+	DWORD shi503_permissions;
+	DWORD shi503_max_uses;
+	DWORD shi503_current_uses;
+	LPTSTR shi503_path;
+	LPTSTR shi503_passwd;
+	LPTSTR shi503_servername;
+	DWORD shi503_reserved;
+	DWORD shi503_security_descriptor;
+};
+
+struct mslm_NetShareGetInfo1004 {
+	LPTSTR shi1004_comment;
+};
+
 struct mslm_NetShareGetInfo1005 {
 	DWORD shi1005_flags;
+};
+
+struct mslm_NetShareGetInfo1006 {
+	DWORD shi1006_max_uses;
 };
 
 union mlsm_NetShareGetInfoResUnion {
@@ -595,7 +622,9 @@ union mlsm_NetShareGetInfoResUnion {
 	CASE(2)		struct mslm_NetShareGetInfo2 *info2;
 	CASE(501)	struct mslm_NetShareGetInfo501 *info501;
 	CASE(502)	struct mslm_NetShareGetInfo502 *info502;
+	CASE(1004)	struct mslm_NetShareGetInfo1004 *info1004;
 	CASE(1005)	struct mslm_NetShareGetInfo1005 *info1005;
+	CASE(1006)	struct mslm_NetShareGetInfo1006 *info1006;
 	DEFAULT	char *nullptr;
 };
 
@@ -1272,7 +1301,7 @@ struct mslm_NetGetFileSecurity {
 	
 	/*
 	 * Right now, we can't send back SD of the requested object
-	 * in MLRPC code, so we just reply with access denied error
+	 * in RPC code, so we just reply with access denied error
 	 * code. Thus, this output declaration is only valid in this
 	 * case i.e., it's not complete.
 	 * It looks like:

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -49,8 +47,6 @@ static int smb_krb5_open_wrfile(krb5_context ctx, char *fname,
 static int smb_krb5_ktadd(krb5_context ctx, krb5_keytab kt,
     const krb5_principal princ, krb5_enctype enctype, krb5_kvno kvno,
     const char *pw);
-static krb5_error_code smb_krb5_ktremove(krb5_context ctx, krb5_keytab kt,
-    const krb5_principal princ);
 
 /*
  * smb_krb5_get_spn
@@ -301,60 +297,23 @@ smb_krb5_open_wrfile(krb5_context ctx, char *fname, krb5_keytab *kt)
 }
 
 /*
- * smb_krb5_remove_keytab_entries
- *
- * Remove the keys from the keytab for the specified principal.
- */
-int
-smb_krb5_remove_keytab_entries(krb5_context ctx, krb5_principal *princs,
-    char *fname)
-{
-	krb5_keytab kt = NULL;
-	int rc = 0, i;
-	krb5_error_code code;
-
-	if (smb_krb5_open_wrfile(ctx, fname, &kt) != 0)
-		return (-1);
-
-	for (i = 0; i < SMBKRB5_SPN_IDX_MAX; i++) {
-		if ((code = smb_krb5_ktremove(ctx, kt, princs[i])) != 0) {
-			syslog(LOG_ERR, "smb_krb5_remove_keytab_entries: %s",
-			    error_message(code));
-			rc = -1;
-			break;
-		}
-	}
-
-	krb5_kt_close(ctx, kt);
-	return (rc);
-}
-
-/*
- * smb_krb5_update_keytab_entries
+ * smb_krb5_add_keytab_entries
  *
  * Update the keys for the specified principal in the keytab.
  * Returns 0 on success.  Otherwise, returns -1.
  */
 int
-smb_krb5_update_keytab_entries(krb5_context ctx, krb5_principal *princs,
+smb_krb5_add_keytab_entries(krb5_context ctx, krb5_principal *princs,
     char *fname, krb5_kvno kvno, char *passwd, krb5_enctype *enctypes,
     int enctype_count)
 {
 	krb5_keytab kt = NULL;
 	int i, j;
-	krb5_error_code code;
 
 	if (smb_krb5_open_wrfile(ctx, fname, &kt) != 0)
 		return (-1);
 
 	for (j = 0; j < SMBKRB5_SPN_IDX_MAX; j++) {
-		if ((code = smb_krb5_ktremove(ctx, kt, princs[j])) != 0) {
-			syslog(LOG_ERR, "smb_krb5_update_keytab_entries: %s",
-			    error_message(code));
-			krb5_kt_close(ctx, kt);
-			return (-1);
-		}
-
 		for (i = 0; i < enctype_count; i++) {
 			if (smb_krb5_ktadd(ctx, kt, princs[j], enctypes[i],
 			    kvno, passwd) != 0) {
@@ -410,69 +369,6 @@ smb_krb5_find_keytab_entries(const char *fqhn, char *fname)
 	krb5_free_principal(ctx, princ);
 	smb_krb5_ctx_fini(ctx);
 	return (found);
-}
-
-/*
- * smb_krb5_ktremove
- *
- * Removes the old entries for the specified principal from the keytab.
- *
- * Returns 0 upon success. Otherwise, returns KRB5 error code.
- */
-static krb5_error_code
-smb_krb5_ktremove(krb5_context ctx, krb5_keytab kt, const krb5_principal princ)
-{
-	krb5_keytab_entry entry;
-	krb5_kt_cursor cursor;
-	int code;
-
-	code = krb5_kt_get_entry(ctx, kt, princ, 0, 0, &entry);
-	if (code != 0) {
-		if (code == ENOENT || code == KRB5_KT_NOTFOUND)
-			return (0);
-
-		return (code);
-	}
-
-	krb5_kt_free_entry(ctx, &entry);
-
-	if ((code = krb5_kt_start_seq_get(ctx, kt, &cursor)) != 0)
-		return (code);
-
-	while ((code = krb5_kt_next_entry(ctx, kt, &entry, &cursor)) == 0) {
-		if (krb5_principal_compare(ctx, princ, entry.principal)) {
-
-			code = krb5_kt_end_seq_get(ctx, kt, &cursor);
-			if (code != 0) {
-				krb5_kt_free_entry(ctx, &entry);
-				return (code);
-			}
-
-			code = krb5_kt_remove_entry(ctx, kt, &entry);
-			if (code != 0) {
-				krb5_kt_free_entry(ctx, &entry);
-				return (code);
-			}
-
-			code = krb5_kt_start_seq_get(ctx, kt, &cursor);
-			if (code != 0) {
-				krb5_kt_free_entry(ctx, &entry);
-				return (code);
-			}
-
-		}
-		krb5_kt_free_entry(ctx, &entry);
-	}
-
-	if (code && code != KRB5_KT_END) {
-		(void) krb5_kt_end_seq_get(ctx, kt, &cursor);
-		return (code);
-	}
-
-	if ((code = krb5_kt_end_seq_get(ctx, kt, &cursor)))
-		return (code);
-
-	return (0);
 }
 
 /*

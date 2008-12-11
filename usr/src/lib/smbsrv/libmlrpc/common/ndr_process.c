@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Network Data Representation (NDR) is a compatible subset of the DCE RPC
  * and MSRPC NDR.  NDR is used to move parameters consisting of
@@ -39,7 +37,7 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/string.h>
-#include <smbsrv/ndr.h>
+#include <smbsrv/libmlrpc.h>
 
 #define	NDR_STRING_MAX		256
 
@@ -48,7 +46,7 @@
 #define	NDR_IS_STRING(T)	\
 	(((T)->type_flags & NDR_F_TYPEOP_MASK) == NDR_F_STRING)
 
-extern struct ndr_typeinfo ndt_s_wchar;
+extern ndr_typeinfo_t ndt_s_wchar;
 
 /*
  * The following synopsis describes the terms TOP-MOST, OUTER and INNER.
@@ -128,24 +126,24 @@ extern struct ndr_typeinfo ndt_s_wchar;
  *
  * NDR_REFERENCE
  *
- * The primary object for NDR is the struct ndr_reference.
+ * The primary object for NDR is the ndr_ref_t.
  *
- * An ndr_reference indicates the local datum (i.e. native "C" data
+ * An ndr reference indicates the local datum (i.e. native "C" data
  * format), and the element within the Stub Data (contained within the
- * RPC PDU (protocol data unit).  An ndr_reference also indicates,
+ * RPC PDU (protocol data unit).  An ndr reference also indicates,
  * largely as a debugging aid, something about the type of the
  * element/datum, and the enclosing construct for the element. The
- * ndr_reference's are typically allocated on the stack as locals,
- * and the chain of ndr_reference.enclosing references is in reverse
+ * ndr reference's are typically allocated on the stack as locals,
+ * and the chain of ndr-reference.enclosing references is in reverse
  * order of the call graph.
  *
- * The ndr_reference.datum is a pointer to the local memory that
- * contains/receives the value. The ndr_reference.pdu_offset indicates
+ * The ndr-reference.datum is a pointer to the local memory that
+ * contains/receives the value. The ndr-reference.pdu_offset indicates
  * where in the Stub Data the value is to be stored/retrieved.
  *
- * The ndr_reference also contains various parameters to the NDR
- * process, such as ndr_reference.size_is, which indicates the size
- * of variable length data, or ndr_reference.switch_is, which
+ * The ndr-reference also contains various parameters to the NDR
+ * process, such as ndr-reference.size_is, which indicates the size
+ * of variable length data, or ndr-reference.switch_is, which
  * indicates the arm of a union to use.
  *
  * QUEUE OF OUTER REFERENCES
@@ -158,13 +156,13 @@ extern struct ndr_typeinfo ndt_s_wchar;
  * Stub Data until we know the size of all its predecessors.
  *
  * This is managed using the queue of OUTER references.  The queue is
- * anchored in mlndr_stream.outer_queue_head.  At any time,
- * mlndr_stream.outer_queue_tailp indicates where to put the
- * ndr_reference for the next encountered pointer.
+ * anchored in ndr_stream.outer_queue_head.  At any time,
+ * ndr_stream.outer_queue_tailp indicates where to put the
+ * ndr-reference for the next encountered pointer.
  *
  * Refer to the example above as we illustrate the queue here.  In these
  * illustrations, the queue entries are not the data structures themselves.
- * Rather, they are ndr_reference entries which **refer** to the data
+ * Rather, they are ndr-reference entries which **refer** to the data
  * structures in both the PDU and local memory.
  *
  * During some point in the processing, the queue looks like this:
@@ -187,9 +185,8 @@ extern struct ndr_typeinfo ndt_s_wchar;
  *   outer_queue_head --> list#1 --> list#2 --> "foo" --0
  *   outer_queue_tailp ------------------------------&
  *
- * Upon the completion of list#1, the processing continues by moving
- * to mlndr_stream.outer_current->next, and the tail is set to this
- * outer member:
+ * Upon the completion of list#1, the processing continues by moving to
+ * ndr_stream.outer_current->next, and the tail is set to this outer member:
  *
  *   outer_current ------------------v
  *   outer_queue_head --> list#1 --> list#2 --> "foo" --0
@@ -225,8 +222,8 @@ extern struct ndr_typeinfo ndt_s_wchar;
  * processed as an aid to debugging.
  */
 
-static struct ndr_reference *mlndr_enter_outer_queue(struct ndr_reference *);
-extern int mlndr__ulong(struct ndr_reference *);
+static ndr_ref_t *ndr_enter_outer_queue(ndr_ref_t *);
+extern int ndr__ulong(ndr_ref_t *);
 
 /*
  * TOP-MOST ELEMENTS
@@ -242,28 +239,26 @@ extern int mlndr__ulong(struct ndr_reference *);
  * top-most member, and commence the outer_queue processing.
  */
 int
-mlndo_process(struct mlndr_stream *mlnds, struct ndr_typeinfo *ti,
-    char *datum)
+ndo_process(ndr_stream_t *nds, ndr_typeinfo_t *ti, char *datum)
 {
-	struct ndr_reference	myref;
+	ndr_ref_t	myref;
 
 	bzero(&myref, sizeof (myref));
-	myref.stream = mlnds;
+	myref.stream = nds;
 	myref.datum = datum;
 	myref.name = "PROCESS";
 	myref.ti = ti;
 
-	return (mlndr_topmost(&myref));
+	return (ndr_topmost(&myref));
 }
 
 int
-mlndo_operation(struct mlndr_stream *mlnds, struct ndr_typeinfo *ti,
-    int opnum, char *datum)
+ndo_operation(ndr_stream_t *nds, ndr_typeinfo_t *ti, int opnum, char *datum)
 {
-	struct ndr_reference	myref;
+	ndr_ref_t	myref;
 
 	bzero(&myref, sizeof (myref));
-	myref.stream = mlnds;
+	myref.stream = nds;
 	myref.datum = datum;
 	myref.name = "OPERATION";
 	myref.ti = ti;
@@ -279,22 +274,22 @@ mlndo_operation(struct mlndr_stream *mlnds, struct ndr_typeinfo *ti,
 }
 
 int
-mlndr_params(struct ndr_reference *params_ref)
+ndr_params(ndr_ref_t *params_ref)
 {
-	struct ndr_typeinfo *ti = params_ref->ti;
+	ndr_typeinfo_t *ti = params_ref->ti;
 
 	if (ti->type_flags == NDR_F_OPERATION)
 		return (*ti->ndr_func) (params_ref);
 	else
-		return (mlndr_topmost(params_ref));
+		return (ndr_topmost(params_ref));
 }
 
 int
-mlndr_topmost(struct ndr_reference *top_ref)
+ndr_topmost(ndr_ref_t *top_ref)
 {
-	struct mlndr_stream *mlnds;
-	struct ndr_typeinfo *ti;
-	struct ndr_reference *outer_ref = 0;
+	ndr_stream_t *nds;
+	ndr_typeinfo_t *ti;
+	ndr_ref_t *outer_ref = 0;
 	int	is_varlen;
 	int	is_string;
 	int	error;
@@ -306,14 +301,14 @@ mlndr_topmost(struct ndr_reference *top_ref)
 	assert(top_ref->stream);
 	assert(top_ref->ti);
 
-	mlnds = top_ref->stream;
+	nds = top_ref->stream;
 	ti = top_ref->ti;
 
 	is_varlen = ti->pdu_size_variable_part;
 	is_string = NDR_IS_STRING(ti);
 
-	assert(mlnds->outer_queue_tailp && !*mlnds->outer_queue_tailp);
-	assert(!mlnds->outer_current);
+	assert(nds->outer_queue_tailp && !*nds->outer_queue_tailp);
+	assert(!nds->outer_current);
 
 	params = top_ref->inner_flags & NDR_F_PARAMS_MASK;
 
@@ -358,14 +353,14 @@ mlndr_topmost(struct ndr_reference *top_ref)
 		return (0);
 	}
 
-	outer_ref = mlndr_enter_outer_queue(top_ref);
+	outer_ref = ndr_enter_outer_queue(top_ref);
 	if (!outer_ref)
 		return (0);	/* error already set */
 
 	/*
 	 * Hand-craft the first OUTER construct and directly call
-	 * mlndr_inner(). Then, run the outer_queue. We do this
-	 * because mlndr_outer() wants to malloc() memory for
+	 * ndr_inner(). Then, run the outer_queue. We do this
+	 * because ndr_outer() wants to malloc() memory for
 	 * the construct, and we already have the memory.
 	 */
 
@@ -375,44 +370,43 @@ mlndr_topmost(struct ndr_reference *top_ref)
 	outer_ref->datum = top_ref->datum;
 
 	/* All outer constructs start on a mod4 (longword) boundary */
-	if (!mlndr_outer_align(outer_ref))
+	if (!ndr_outer_align(outer_ref))
 		return (0);		/* error already set */
 
 	/* Regardless of what it is, this is where it starts */
-	outer_ref->pdu_offset = mlnds->pdu_scan_offset;
+	outer_ref->pdu_offset = nds->pdu_scan_offset;
 
-	rc = mlndr_outer_grow(outer_ref, n_fixed);
+	rc = ndr_outer_grow(outer_ref, n_fixed);
 	if (!rc)
 		return (0);		/* error already set */
 
 	outer_ref->pdu_end_offset = outer_ref->pdu_offset + n_fixed;
 
 	/* set-up outer_current, as though run_outer_queue() was doing it */
-	mlnds->outer_current = outer_ref;
-	mlnds->outer_queue_tailp = &mlnds->outer_current->next;
-	mlnds->pdu_scan_offset = outer_ref->pdu_end_offset;
+	nds->outer_current = outer_ref;
+	nds->outer_queue_tailp = &nds->outer_current->next;
+	nds->pdu_scan_offset = outer_ref->pdu_end_offset;
 
 	/* do the topmost member */
-	rc = mlndr_inner(outer_ref);
+	rc = ndr_inner(outer_ref);
 	if (!rc)
 		return (0);		/* error already set */
 
-	mlnds->pdu_scan_offset = outer_ref->pdu_end_offset;
+	nds->pdu_scan_offset = outer_ref->pdu_end_offset;
 
 	/* advance, as though run_outer_queue() was doing it */
-	mlnds->outer_current = mlnds->outer_current->next;
-	return (mlndr_run_outer_queue(mlnds));
+	nds->outer_current = nds->outer_current->next;
+	return (ndr_run_outer_queue(nds));
 }
 
-static struct ndr_reference *
-mlndr_enter_outer_queue(struct ndr_reference *arg_ref)
+static ndr_ref_t *
+ndr_enter_outer_queue(ndr_ref_t *arg_ref)
 {
-	struct mlndr_stream	*mlnds = arg_ref->stream;
-	struct ndr_reference	*outer_ref;
+	ndr_stream_t	*nds = arg_ref->stream;
+	ndr_ref_t	*outer_ref;
 
 	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	outer_ref = (struct ndr_reference *)
-	    MLNDS_MALLOC(mlnds, sizeof (*outer_ref), arg_ref);
+	outer_ref = (ndr_ref_t *)NDS_MALLOC(nds, sizeof (*outer_ref), arg_ref);
 	if (!outer_ref) {
 		NDR_SET_ERROR(arg_ref, NDR_ERR_MALLOC_FAILED);
 		return (0);
@@ -423,28 +417,28 @@ mlndr_enter_outer_queue(struct ndr_reference *arg_ref)
 	/* move advice in inner_flags to outer_flags */
 	outer_ref->outer_flags = arg_ref->inner_flags & NDR_F_PARAMS_MASK;
 	outer_ref->inner_flags = 0;
-	outer_ref->enclosing = mlnds->outer_current;
+	outer_ref->enclosing = nds->outer_current;
 	outer_ref->backptr = 0;
 	outer_ref->datum = 0;
 
-	assert(mlnds->outer_queue_tailp);
+	assert(nds->outer_queue_tailp);
 
-	outer_ref->next = *mlnds->outer_queue_tailp;
-	*mlnds->outer_queue_tailp = outer_ref;
-	mlnds->outer_queue_tailp = &outer_ref->next;
+	outer_ref->next = *nds->outer_queue_tailp;
+	*nds->outer_queue_tailp = outer_ref;
+	nds->outer_queue_tailp = &outer_ref->next;
 	return (outer_ref);
 }
 
 int
-mlndr_run_outer_queue(struct mlndr_stream *mlnds)
+ndr_run_outer_queue(ndr_stream_t *nds)
 {
-	while (mlnds->outer_current) {
-		mlnds->outer_queue_tailp = &mlnds->outer_current->next;
+	while (nds->outer_current) {
+		nds->outer_queue_tailp = &nds->outer_current->next;
 
-		if (!mlndr_outer(mlnds->outer_current))
+		if (!ndr_outer(nds->outer_current))
 			return (0);
 
-		mlnds->outer_current = mlnds->outer_current->next;
+		nds->outer_current = nds->outer_current->next;
 	}
 
 	return (1);
@@ -590,10 +584,10 @@ mlndr_run_outer_queue(struct mlndr_stream *mlnds)
  * implemented, we probably won't need the strings special case.
  */
 int
-mlndr_outer(struct ndr_reference *outer_ref)
+ndr_outer(ndr_ref_t *outer_ref)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	struct ndr_typeinfo 	*ti = outer_ref->ti;
+	ndr_stream_t 	*nds = outer_ref->stream;
+	ndr_typeinfo_t	*ti = outer_ref->ti;
 	int	is_varlen = ti->pdu_size_variable_part;
 	int	is_union = NDR_IS_UNION(ti);
 	int	is_string = NDR_IS_STRING(ti);
@@ -605,11 +599,11 @@ mlndr_outer(struct ndr_reference *outer_ref)
 	NDR_TATTLE(outer_ref, "--OUTER--");
 
 	/* All outer constructs start on a mod4 (longword) boundary */
-	if (!mlndr_outer_align(outer_ref))
+	if (!ndr_outer_align(outer_ref))
 		return (0);		/* error already set */
 
 	/* Regardless of what it is, this is where it starts */
-	outer_ref->pdu_offset = mlnds->pdu_scan_offset;
+	outer_ref->pdu_offset = nds->pdu_scan_offset;
 
 	if (is_union) {
 		error = NDR_ERR_OUTER_UNION_ILLEGAL;
@@ -620,11 +614,11 @@ mlndr_outer(struct ndr_reference *outer_ref)
 	switch (params) {
 	case NDR_F_NONE:
 		if (is_string)
-			return (mlndr_outer_string(outer_ref));
+			return (ndr_outer_string(outer_ref));
 		if (is_varlen)
-			return (mlndr_outer_conformant_construct(outer_ref));
+			return (ndr_outer_conformant_construct(outer_ref));
 
-		return (mlndr_outer_fixed(outer_ref));
+		return (ndr_outer_fixed(outer_ref));
 		break;
 
 	case NDR_F_SIZE_IS:
@@ -635,9 +629,9 @@ mlndr_outer(struct ndr_reference *outer_ref)
 		}
 
 		if (params == NDR_F_SIZE_IS)
-			return (mlndr_outer_conformant_array(outer_ref));
+			return (ndr_outer_conformant_array(outer_ref));
 		else
-			return (mlndr_outer_fixed_array(outer_ref));
+			return (ndr_outer_fixed_array(outer_ref));
 		break;
 
 	default:
@@ -654,11 +648,11 @@ mlndr_outer(struct ndr_reference *outer_ref)
 }
 
 int
-mlndr_outer_fixed(struct ndr_reference *outer_ref)
+ndr_outer_fixed(ndr_ref_t *outer_ref)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	struct ndr_typeinfo 	*ti = outer_ref->ti;
-	struct ndr_reference	myref;
+	ndr_stream_t	*nds = outer_ref->stream;
+	ndr_typeinfo_t	*ti = outer_ref->ti;
+	ndr_ref_t	myref;
 	char 		*valp = NULL;
 	int		is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
@@ -692,11 +686,11 @@ mlndr_outer_fixed(struct ndr_reference *outer_ref)
 	/* similar sum to determine how much local memory is required */
 	n_alloc = n_fixed + n_variable;
 
-	rc = mlndr_outer_grow(outer_ref, n_pdu_total);
+	rc = ndr_outer_grow(outer_ref, n_pdu_total);
 	if (!rc)
 		return (rc);		/* error already set */
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		valp = outer_ref->datum;
 		assert(valp);
@@ -706,7 +700,7 @@ mlndr_outer_fixed(struct ndr_reference *outer_ref)
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
-		valp = MLNDS_MALLOC(mlnds, n_alloc, outer_ref);
+		valp = NDS_MALLOC(nds, n_alloc, outer_ref);
 		if (!valp) {
 			NDR_SET_ERROR(outer_ref, NDR_ERR_MALLOC_FAILED);
 			return (0);
@@ -722,7 +716,7 @@ mlndr_outer_fixed(struct ndr_reference *outer_ref)
 	}
 
 	bzero(&myref, sizeof (myref));
-	myref.stream = mlnds;
+	myref.stream = nds;
 	myref.enclosing = outer_ref;
 	myref.ti = outer_ref->ti;
 	myref.datum = outer_ref->datum;
@@ -733,20 +727,20 @@ mlndr_outer_fixed(struct ndr_reference *outer_ref)
 	myref.pdu_offset = outer_ref->pdu_offset;
 	outer_ref->pdu_end_offset = outer_ref->pdu_offset + n_pdu_total;
 
-	rc = mlndr_inner(&myref);
+	rc = ndr_inner(&myref);
 	if (!rc)
 		return (rc);		/* error already set */
 
-	mlnds->pdu_scan_offset = outer_ref->pdu_end_offset;
+	nds->pdu_scan_offset = outer_ref->pdu_end_offset;
 	return (1);
 }
 
 int
-mlndr_outer_fixed_array(struct ndr_reference *outer_ref)
+ndr_outer_fixed_array(ndr_ref_t *outer_ref)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	struct ndr_typeinfo 	*ti = outer_ref->ti;
-	struct ndr_reference	myref;
+	ndr_stream_t	*nds = outer_ref->stream;
+	ndr_typeinfo_t	*ti = outer_ref->ti;
+	ndr_ref_t	myref;
 	char 		*valp = NULL;
 	int		is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
@@ -780,11 +774,11 @@ mlndr_outer_fixed_array(struct ndr_reference *outer_ref)
 	/* similar sum to determine how much local memory is required */
 	n_alloc = n_fixed + n_variable;
 
-	rc = mlndr_outer_grow(outer_ref, n_pdu_total);
+	rc = ndr_outer_grow(outer_ref, n_pdu_total);
 	if (!rc)
 		return (rc);		/* error already set */
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		valp = outer_ref->datum;
 		assert(valp);
@@ -794,7 +788,7 @@ mlndr_outer_fixed_array(struct ndr_reference *outer_ref)
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
-		valp = MLNDS_MALLOC(mlnds, n_alloc, outer_ref);
+		valp = NDS_MALLOC(nds, n_alloc, outer_ref);
 		if (!valp) {
 			NDR_SET_ERROR(outer_ref, NDR_ERR_MALLOC_FAILED);
 			return (0);
@@ -810,7 +804,7 @@ mlndr_outer_fixed_array(struct ndr_reference *outer_ref)
 	}
 
 	bzero(&myref, sizeof (myref));
-	myref.stream = mlnds;
+	myref.stream = nds;
 	myref.enclosing = outer_ref;
 	myref.ti = outer_ref->ti;
 	myref.datum = outer_ref->datum;
@@ -822,20 +816,20 @@ mlndr_outer_fixed_array(struct ndr_reference *outer_ref)
 	myref.pdu_offset = outer_ref->pdu_offset;
 	outer_ref->pdu_end_offset = outer_ref->pdu_offset + n_pdu_total;
 
-	rc = mlndr_inner(&myref);
+	rc = ndr_inner(&myref);
 	if (!rc)
 		return (rc);		/* error already set */
 
-	mlnds->pdu_scan_offset = outer_ref->pdu_end_offset;
+	nds->pdu_scan_offset = outer_ref->pdu_end_offset;
 	return (1);
 }
 
 int
-mlndr_outer_conformant_array(struct ndr_reference *outer_ref)
+ndr_outer_conformant_array(ndr_ref_t *outer_ref)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	struct ndr_typeinfo 	*ti = outer_ref->ti;
-	struct ndr_reference	myref;
+	ndr_stream_t	*nds = outer_ref->stream;
+	ndr_typeinfo_t	*ti = outer_ref->ti;
+	ndr_ref_t	myref;
 	char 		*valp = NULL;
 	int		is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
@@ -870,14 +864,14 @@ mlndr_outer_conformant_array(struct ndr_reference *outer_ref)
 	/* similar sum to determine how much local memory is required */
 	n_alloc = n_fixed + n_variable;
 
-	rc = mlndr_outer_grow(outer_ref, n_pdu_total);
+	rc = ndr_outer_grow(outer_ref, n_pdu_total);
 	if (!rc)
 		return (rc);		/* error already set */
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		size_is = outer_ref->size_is;
-		rc = mlndr_outer_poke_sizing(outer_ref, 0, &size_is);
+		rc = ndr_outer_poke_sizing(outer_ref, 0, &size_is);
 		if (!rc)
 			return (0);	/* error already set */
 
@@ -889,7 +883,7 @@ mlndr_outer_conformant_array(struct ndr_reference *outer_ref)
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
-		rc = mlndr_outer_peek_sizing(outer_ref, 0, &size_is);
+		rc = ndr_outer_peek_sizing(outer_ref, 0, &size_is);
 		if (!rc)
 			return (0);	/* error already set */
 
@@ -900,7 +894,7 @@ mlndr_outer_conformant_array(struct ndr_reference *outer_ref)
 		}
 
 		if (size_is > 0) {
-			valp = MLNDS_MALLOC(mlnds, n_alloc, outer_ref);
+			valp = NDS_MALLOC(nds, n_alloc, outer_ref);
 			if (!valp) {
 				NDR_SET_ERROR(outer_ref, NDR_ERR_MALLOC_FAILED);
 				return (0);
@@ -923,7 +917,7 @@ mlndr_outer_conformant_array(struct ndr_reference *outer_ref)
 
 	if (size_is > 0) {
 		bzero(&myref, sizeof (myref));
-		myref.stream = mlnds;
+		myref.stream = nds;
 		myref.enclosing = outer_ref;
 		myref.ti = outer_ref->ti;
 		myref.datum = outer_ref->datum;
@@ -937,21 +931,21 @@ mlndr_outer_conformant_array(struct ndr_reference *outer_ref)
 
 		myref.pdu_offset = outer_ref->pdu_offset + 4;
 
-		rc = mlndr_inner(&myref);
+		rc = ndr_inner(&myref);
 		if (!rc)
 			return (rc);		/* error already set */
 	}
 
-	mlnds->pdu_scan_offset = outer_ref->pdu_end_offset;
+	nds->pdu_scan_offset = outer_ref->pdu_end_offset;
 	return (1);
 }
 
 int
-mlndr_outer_conformant_construct(struct ndr_reference *outer_ref)
+ndr_outer_conformant_construct(ndr_ref_t *outer_ref)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	struct ndr_typeinfo 	*ti = outer_ref->ti;
-	struct ndr_reference	myref;
+	ndr_stream_t	*nds = outer_ref->stream;
+	ndr_typeinfo_t	*ti = outer_ref->ti;
+	ndr_ref_t	myref;
 	char 		*valp = NULL;
 	int		is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
@@ -986,19 +980,19 @@ mlndr_outer_conformant_construct(struct ndr_reference *outer_ref)
 	n_alloc = n_fixed + n_variable;
 
 	/* For the moment, grow enough for the fixed-size part */
-	rc = mlndr_outer_grow(outer_ref, n_pdu_total);
+	rc = ndr_outer_grow(outer_ref, n_pdu_total);
 	if (!rc)
 		return (rc);		/* error already set */
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		/*
 		 * We don't know the size yet. We have to wait for
 		 * it. Proceed with the fixed-size part, and await
-		 * the call to mlndr_size_is().
+		 * the call to ndr_size_is().
 		 */
 		size_is = 0;
-		rc = mlndr_outer_poke_sizing(outer_ref, 0, &size_is);
+		rc = ndr_outer_poke_sizing(outer_ref, 0, &size_is);
 		if (!rc)
 			return (0);	/* error already set */
 
@@ -1014,9 +1008,9 @@ mlndr_outer_conformant_construct(struct ndr_reference *outer_ref)
 		 * We know the size of the variable part because
 		 * of the CONFORMANT header. We will verify
 		 * the header against the [size_is(X)] advice
-		 * later when mlndr_size_is() is called.
+		 * later when ndr_size_is() is called.
 		 */
-		rc = mlndr_outer_peek_sizing(outer_ref, 0, &size_is);
+		rc = ndr_outer_peek_sizing(outer_ref, 0, &size_is);
 		if (!rc)
 			return (0);	/* error already set */
 
@@ -1025,13 +1019,13 @@ mlndr_outer_conformant_construct(struct ndr_reference *outer_ref)
 		n_pdu_total = n_hdr + n_fixed + n_variable;
 		n_alloc = n_fixed + n_variable;
 
-		rc = mlndr_outer_grow(outer_ref, n_pdu_total);
+		rc = ndr_outer_grow(outer_ref, n_pdu_total);
 		if (!rc)
 			return (rc);		/* error already set */
 
 		outer_ref->size_is = size_is; /* verified later */
 
-		valp = MLNDS_MALLOC(mlnds, n_alloc, outer_ref);
+		valp = NDS_MALLOC(nds, n_alloc, outer_ref);
 		if (!valp) {
 			NDR_SET_ERROR(outer_ref, NDR_ERR_MALLOC_FAILED);
 			return (0);
@@ -1051,7 +1045,7 @@ mlndr_outer_conformant_construct(struct ndr_reference *outer_ref)
 	outer_ref->inner_flags = NDR_F_NONE;   /* indicate pending */
 
 	bzero(&myref, sizeof (myref));
-	myref.stream = mlnds;
+	myref.stream = nds;
 	myref.enclosing = outer_ref;
 	myref.ti = outer_ref->ti;
 	myref.datum = outer_ref->datum;
@@ -1062,11 +1056,11 @@ mlndr_outer_conformant_construct(struct ndr_reference *outer_ref)
 
 	myref.pdu_offset = outer_ref->pdu_offset + 4;
 
-	rc = mlndr_inner(&myref);
+	rc = ndr_inner(&myref);
 	if (!rc)
 		return (rc);		/* error already set */
 
-	mlnds->pdu_scan_offset = outer_ref->pdu_end_offset;
+	nds->pdu_scan_offset = outer_ref->pdu_end_offset;
 
 	if (outer_ref->inner_flags != NDR_F_SIZE_IS) {
 		NDR_SET_ERROR(&myref, NDR_ERR_SIZE_IS_MISMATCH_AFTER);
@@ -1077,11 +1071,11 @@ mlndr_outer_conformant_construct(struct ndr_reference *outer_ref)
 }
 
 int
-mlndr_size_is(struct ndr_reference *ref)
+ndr_size_is(ndr_ref_t *ref)
 {
-	struct mlndr_stream 	*mlnds = ref->stream;
-	struct ndr_reference 	*outer_ref = mlnds->outer_current;
-	struct ndr_typeinfo 	*ti = outer_ref->ti;
+	ndr_stream_t 		*nds = ref->stream;
+	ndr_ref_t 		*outer_ref = nds->outer_current;
+	ndr_typeinfo_t		*ti = outer_ref->ti;
 	unsigned long		size_is;
 	int			rc;
 	unsigned		n_hdr;
@@ -1102,30 +1096,30 @@ mlndr_size_is(struct ndr_reference *ref)
 		return (0);
 	}
 
-	/* repeat metrics, see mlndr_conformant_construct() above */
+	/* repeat metrics, see ndr_conformant_construct() above */
 	n_hdr = 4;
 	n_fixed = ti->pdu_size_fixed_part;
 	n_variable = size_is * ti->pdu_size_variable_part;
 	n_pdu_total = n_hdr + n_fixed + n_variable;
 
-	rc = mlndr_outer_grow(outer_ref, n_pdu_total);
+	rc = ndr_outer_grow(outer_ref, n_pdu_total);
 	if (!rc)
 		return (rc);		/* error already set */
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		/*
 		 * We have to set the sizing header and extend
 		 * the size of the PDU (already done).
 		 */
-		rc = mlndr_outer_poke_sizing(outer_ref, 0, &size_is);
+		rc = ndr_outer_poke_sizing(outer_ref, 0, &size_is);
 		if (!rc)
 			return (0);	/* error already set */
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
 		/*
-		 * Allocation done during mlndr_conformant_construct().
+		 * Allocation done during ndr_conformant_construct().
 		 * All we are doing here is verifying that the
 		 * intended size (ref->size_is) matches the sizing header.
 		 */
@@ -1146,11 +1140,11 @@ mlndr_size_is(struct ndr_reference *ref)
 }
 
 int
-mlndr_outer_string(struct ndr_reference *outer_ref)
+ndr_outer_string(ndr_ref_t *outer_ref)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	struct ndr_typeinfo 	*ti = outer_ref->ti;
-	struct ndr_reference	myref;
+	ndr_stream_t	*nds = outer_ref->stream;
+	ndr_typeinfo_t 	*ti = outer_ref->ti;
+	ndr_ref_t	myref;
 	char 		*valp = NULL;
 	unsigned	is_varlen = ti->pdu_size_variable_part;
 	int		is_union = NDR_IS_UNION(ti);
@@ -1179,10 +1173,10 @@ mlndr_outer_string(struct ndr_reference *outer_ref)
 	/* fixed part -- exactly none of these */
 	n_fixed = 0;
 
-	if (!mlndr_outer_grow(outer_ref, n_hdr))
+	if (!ndr_outer_grow(outer_ref, n_hdr))
 		return (0);		/* error already set */
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		valp = outer_ref->datum;
 		assert(valp);
@@ -1227,21 +1221,21 @@ mlndr_outer_string(struct ndr_reference *outer_ref)
 
 		first_is = 0;
 
-		if (mlnds->flags & MLNDS_F_NOTERM)
+		if (nds->flags & NDS_F_NOTERM)
 			length_is = size_is - 1;
 		else
 			length_is = size_is;
 
-		if (!mlndr_outer_poke_sizing(outer_ref, 0, &size_is) ||
-		    !mlndr_outer_poke_sizing(outer_ref, 4, &first_is) ||
-		    !mlndr_outer_poke_sizing(outer_ref, 8, &length_is))
+		if (!ndr_outer_poke_sizing(outer_ref, 0, &size_is) ||
+		    !ndr_outer_poke_sizing(outer_ref, 4, &first_is) ||
+		    !ndr_outer_poke_sizing(outer_ref, 8, &length_is))
 			return (0);		/* error already set */
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
-		if (!mlndr_outer_peek_sizing(outer_ref, 0, &size_is) ||
-		    !mlndr_outer_peek_sizing(outer_ref, 4, &first_is) ||
-		    !mlndr_outer_peek_sizing(outer_ref, 8, &length_is))
+		if (!ndr_outer_peek_sizing(outer_ref, 0, &size_is) ||
+		    !ndr_outer_peek_sizing(outer_ref, 4, &first_is) ||
+		    !ndr_outer_peek_sizing(outer_ref, 8, &length_is))
 			return (0);		/* error already set */
 
 		/*
@@ -1276,7 +1270,7 @@ mlndr_outer_string(struct ndr_reference *outer_ref)
 			n_alloc = (size_is + 1) * is_varlen;
 		}
 
-		valp = MLNDS_MALLOC(mlnds, n_alloc, outer_ref);
+		valp = NDS_MALLOC(nds, n_alloc, outer_ref);
 		if (!valp) {
 			NDR_SET_ERROR(outer_ref, NDR_ERR_MALLOC_FAILED);
 			return (0);
@@ -1311,13 +1305,13 @@ mlndr_outer_string(struct ndr_reference *outer_ref)
 	/* similar sum to determine how much local memory is required */
 	n_alloc = n_fixed + n_variable;
 
-	rc = mlndr_outer_grow(outer_ref, n_pdu_total);
+	rc = ndr_outer_grow(outer_ref, n_pdu_total);
 	if (!rc)
 		return (rc);		/* error already set */
 
 	if (length_is > 0) {
 		bzero(&myref, sizeof (myref));
-		myref.stream = mlnds;
+		myref.stream = nds;
 		myref.enclosing = outer_ref;
 		myref.ti = outer_ref->ti;
 		myref.datum = outer_ref->datum;
@@ -1326,7 +1320,7 @@ mlndr_outer_string(struct ndr_reference *outer_ref)
 		myref.inner_flags = NDR_F_NONE;
 
 		/*
-		 * Set up size_is and strlen_is for mlndr_s_wchar.
+		 * Set up size_is and strlen_is for ndr_s_wchar.
 		 */
 		myref.size_is = size_is;
 		myref.strlen_is = length_is;
@@ -1338,45 +1332,45 @@ mlndr_outer_string(struct ndr_reference *outer_ref)
 	 * Don't try to decode empty strings.
 	 */
 	if ((size_is == 0) && (first_is == 0) && (length_is == 0)) {
-		mlnds->pdu_scan_offset = outer_ref->pdu_end_offset;
+		nds->pdu_scan_offset = outer_ref->pdu_end_offset;
 		return (1);
 	}
 
 	if ((size_is != 0) && (length_is != 0)) {
-		rc = mlndr_inner(&myref);
+		rc = ndr_inner(&myref);
 		if (!rc)
 			return (rc);		/* error already set */
 	}
 
-	mlnds->pdu_scan_offset = outer_ref->pdu_end_offset;
+	nds->pdu_scan_offset = outer_ref->pdu_end_offset;
 	return (1);
 }
 
 int
-mlndr_outer_peek_sizing(struct ndr_reference *outer_ref, unsigned offset,
+ndr_outer_peek_sizing(ndr_ref_t *outer_ref, unsigned offset,
     unsigned long *sizing_p)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	unsigned long		pdu_offset;
-	int			rc;
+	ndr_stream_t 	*nds = outer_ref->stream;
+	unsigned long	pdu_offset;
+	int		rc;
 
 	pdu_offset = outer_ref->pdu_offset + offset;
 
-	if (pdu_offset < mlnds->outer_current->pdu_offset ||
-	    pdu_offset > mlnds->outer_current->pdu_end_offset ||
-	    pdu_offset+4 > mlnds->outer_current->pdu_end_offset) {
+	if (pdu_offset < nds->outer_current->pdu_offset ||
+	    pdu_offset > nds->outer_current->pdu_end_offset ||
+	    pdu_offset+4 > nds->outer_current->pdu_end_offset) {
 		NDR_SET_ERROR(outer_ref, NDR_ERR_BOUNDS_CHECK);
 		return (0);
 	}
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		NDR_SET_ERROR(outer_ref, NDR_ERR_UNIMPLEMENTED);
 		return (0);
 
 	case NDR_M_OP_UNMARSHALL:
-		rc = MLNDS_GET_PDU(mlnds, pdu_offset, 4, (char *)sizing_p,
-		    mlnds->swap, outer_ref);
+		rc = NDS_GET_PDU(nds, pdu_offset, 4, (char *)sizing_p,
+		    nds->swap, outer_ref);
 		break;
 
 	default:
@@ -1388,26 +1382,26 @@ mlndr_outer_peek_sizing(struct ndr_reference *outer_ref, unsigned offset,
 }
 
 int
-mlndr_outer_poke_sizing(struct ndr_reference *outer_ref, unsigned offset,
+ndr_outer_poke_sizing(ndr_ref_t *outer_ref, unsigned offset,
     unsigned long *sizing_p)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	unsigned long		pdu_offset;
-	int			rc;
+	ndr_stream_t 	*nds = outer_ref->stream;
+	unsigned long	pdu_offset;
+	int		rc;
 
 	pdu_offset = outer_ref->pdu_offset + offset;
 
-	if (pdu_offset < mlnds->outer_current->pdu_offset ||
-	    pdu_offset > mlnds->outer_current->pdu_end_offset ||
-	    pdu_offset+4 > mlnds->outer_current->pdu_end_offset) {
+	if (pdu_offset < nds->outer_current->pdu_offset ||
+	    pdu_offset > nds->outer_current->pdu_end_offset ||
+	    pdu_offset+4 > nds->outer_current->pdu_end_offset) {
 		NDR_SET_ERROR(outer_ref, NDR_ERR_BOUNDS_CHECK);
 		return (0);
 	}
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
-		rc = MLNDS_PUT_PDU(mlnds, pdu_offset, 4, (char *)sizing_p,
-		    mlnds->swap, outer_ref);
+		rc = NDS_PUT_PDU(nds, pdu_offset, 4, (char *)sizing_p,
+		    nds->swap, outer_ref);
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
@@ -1428,30 +1422,29 @@ mlndr_outer_poke_sizing(struct ndr_reference *outer_ref, unsigned offset,
  * packed alignment.  Strings appear to be dword aligned.
  */
 int
-mlndr_outer_align(struct ndr_reference *outer_ref)
+ndr_outer_align(ndr_ref_t *outer_ref)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	int			rc;
-	unsigned		n_pad;
-	unsigned		align;
+	ndr_stream_t 	*nds = outer_ref->stream;
+	int		rc;
+	unsigned	n_pad;
+	unsigned	align;
 
 	if (outer_ref->packed_alignment && outer_ref->ti != &ndt_s_wchar) {
 		align = outer_ref->ti->alignment;
-		n_pad = ((align + 1) - mlnds->pdu_scan_offset) & align;
+		n_pad = ((align + 1) - nds->pdu_scan_offset) & align;
 	} else {
-		n_pad = (4 - mlnds->pdu_scan_offset) & 3;
+		n_pad = NDR_ALIGN4(nds->pdu_scan_offset);
 	}
 
 	if (n_pad == 0)
 		return (1);	/* already aligned, often the case */
 
-	if (!mlndr_outer_grow(outer_ref, n_pad))
+	if (!ndr_outer_grow(outer_ref, n_pad))
 		return (0);	/* error already set */
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
-		rc = MLNDS_PAD_PDU(mlnds,
-		    mlnds->pdu_scan_offset, n_pad, outer_ref);
+		rc = NDS_PAD_PDU(nds, nds->pdu_scan_offset, n_pad, outer_ref);
 		if (!rc) {
 			NDR_SET_ERROR(outer_ref, NDR_ERR_PAD_FAILED);
 			return (0);
@@ -1466,28 +1459,28 @@ mlndr_outer_align(struct ndr_reference *outer_ref)
 		return (0);
 	}
 
-	mlnds->pdu_scan_offset += n_pad;
+	nds->pdu_scan_offset += n_pad;
 	return (1);
 }
 
 int
-mlndr_outer_grow(struct ndr_reference *outer_ref, unsigned n_total)
+ndr_outer_grow(ndr_ref_t *outer_ref, unsigned n_total)
 {
-	struct mlndr_stream 	*mlnds = outer_ref->stream;
-	unsigned long		pdu_want_size;
-	int			rc, is_ok = 0;
+	ndr_stream_t 	*nds = outer_ref->stream;
+	unsigned long	pdu_want_size;
+	int		rc, is_ok = 0;
 
-	pdu_want_size = mlnds->pdu_scan_offset + n_total;
+	pdu_want_size = nds->pdu_scan_offset + n_total;
 
-	if (pdu_want_size <= mlnds->pdu_max_size) {
+	if (pdu_want_size <= nds->pdu_max_size) {
 		is_ok = 1;
 	}
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		if (is_ok)
 			break;
-		rc = MLNDS_GROW_PDU(mlnds, pdu_want_size, outer_ref);
+		rc = NDS_GROW_PDU(nds, pdu_want_size, outer_ref);
 		if (!rc) {
 			NDR_SET_ERROR(outer_ref, NDR_ERR_GROW_FAILED);
 			return (0);
@@ -1505,8 +1498,8 @@ mlndr_outer_grow(struct ndr_reference *outer_ref, unsigned n_total)
 		return (0);
 	}
 
-	if (mlnds->pdu_size < pdu_want_size)
-		mlnds->pdu_size = pdu_want_size;
+	if (nds->pdu_size < pdu_want_size)
+		nds->pdu_size = pdu_want_size;
 
 	outer_ref->pdu_end_offset = pdu_want_size;
 	return (1);
@@ -1518,7 +1511,7 @@ mlndr_outer_grow(struct ndr_reference *outer_ref, unsigned n_total)
  * The local datum (arg_ref->datum) already exists, there is no need to
  * malloc() it.  The datum should point at a member of a structure.
  *
- * For the most part, mlndr_inner() and its helpers are just a sanity
+ * For the most part, ndr_inner() and its helpers are just a sanity
  * check.  The underlying ti->ndr_func() could be called immediately
  * for non-pointer elements.  For the sake of robustness, we detect
  * run-time errors here.  Most of the situations this protects against
@@ -1527,9 +1520,9 @@ mlndr_outer_grow(struct ndr_reference *outer_ref, unsigned n_total)
  * place to work from for debugging.
  */
 int
-mlndr_inner(struct ndr_reference *arg_ref)
+ndr_inner(ndr_ref_t *arg_ref)
 {
-	struct ndr_typeinfo 	*ti = arg_ref->ti;
+	ndr_typeinfo_t 	*ti = arg_ref->ti;
 	int	is_varlen = ti->pdu_size_variable_part;
 	int	is_union = NDR_IS_UNION(ti);
 	int	error = NDR_ERR_INNER_PARAMS_BAD;
@@ -1559,11 +1552,11 @@ mlndr_inner(struct ndr_reference *arg_ref)
 			break;
 		}
 		if (params & NDR_F_IS_POINTER)
-			return (mlndr_inner_pointer(arg_ref));
+			return (ndr_inner_pointer(arg_ref));
 		else if (params & NDR_F_IS_REFERENCE)
-			return (mlndr_inner_reference(arg_ref));
+			return (ndr_inner_reference(arg_ref));
 		else
-			return (mlndr_inner_array(arg_ref));
+			return (ndr_inner_array(arg_ref));
 		break;
 
 	case NDR_F_IS_POINTER:	/* type is pointer to one something */
@@ -1571,7 +1564,7 @@ mlndr_inner(struct ndr_reference *arg_ref)
 			error = NDR_ERR_ARRAY_UNION_ILLEGAL;
 			break;
 		}
-		return (mlndr_inner_pointer(arg_ref));
+		return (ndr_inner_pointer(arg_ref));
 		break;
 
 	case NDR_F_IS_REFERENCE:	/* type is pointer to one something */
@@ -1579,7 +1572,7 @@ mlndr_inner(struct ndr_reference *arg_ref)
 			error = NDR_ERR_ARRAY_UNION_ILLEGAL;
 			break;
 		}
-		return (mlndr_inner_reference(arg_ref));
+		return (ndr_inner_reference(arg_ref));
 		break;
 
 	case NDR_F_SWITCH_IS:
@@ -1604,19 +1597,19 @@ mlndr_inner(struct ndr_reference *arg_ref)
 }
 
 int
-mlndr_inner_pointer(struct ndr_reference *arg_ref)
+ndr_inner_pointer(ndr_ref_t *arg_ref)
 {
-	struct mlndr_stream 	*mlnds = arg_ref->stream;
+	ndr_stream_t	*nds = arg_ref->stream;
 	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	char 			**valpp = (char **)arg_ref->datum;
-	struct ndr_reference 	*outer_ref;
+	char 		**valpp = (char **)arg_ref->datum;
+	ndr_ref_t 	*outer_ref;
 
-	if (!mlndr__ulong(arg_ref))
+	if (!ndr__ulong(arg_ref))
 		return (0);	/* error */
 	if (!*valpp)
 		return (1);	/* NULL pointer */
 
-	outer_ref = mlndr_enter_outer_queue(arg_ref);
+	outer_ref = ndr_enter_outer_queue(arg_ref);
 	if (!outer_ref)
 		return (0);	/* error already set */
 
@@ -1632,7 +1625,7 @@ mlndr_inner_pointer(struct ndr_reference *arg_ref)
 
 	outer_ref->backptr = valpp;
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		outer_ref->datum = *valpp;
 		break;
@@ -1652,14 +1645,14 @@ mlndr_inner_pointer(struct ndr_reference *arg_ref)
 }
 
 int
-mlndr_inner_reference(struct ndr_reference *arg_ref)
+ndr_inner_reference(ndr_ref_t *arg_ref)
 {
-	struct mlndr_stream	*mlnds = arg_ref->stream;
+	ndr_stream_t	*nds = arg_ref->stream;
 	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	char			**valpp = (char **)arg_ref->datum;
-	struct ndr_reference	*outer_ref;
+	char		**valpp = (char **)arg_ref->datum;
+	ndr_ref_t	*outer_ref;
 
-	outer_ref = mlndr_enter_outer_queue(arg_ref);
+	outer_ref = ndr_enter_outer_queue(arg_ref);
 	if (!outer_ref)
 		return (0);	/* error already set */
 
@@ -1675,7 +1668,7 @@ mlndr_inner_reference(struct ndr_reference *arg_ref)
 
 	outer_ref->backptr = valpp;
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
 		outer_ref->datum = *valpp;
 		break;
@@ -1695,10 +1688,10 @@ mlndr_inner_reference(struct ndr_reference *arg_ref)
 }
 
 int
-mlndr_inner_array(struct ndr_reference *encl_ref)
+ndr_inner_array(ndr_ref_t *encl_ref)
 {
-	struct ndr_typeinfo	*ti = encl_ref->ti;
-	struct ndr_reference	myref;
+	ndr_typeinfo_t		*ti = encl_ref->ti;
+	ndr_ref_t		myref;
 	unsigned long		pdu_offset = encl_ref->pdu_offset;
 	unsigned long		n_elem;
 	unsigned long		i;
@@ -1706,7 +1699,7 @@ mlndr_inner_array(struct ndr_reference *encl_ref)
 
 	if (encl_ref->inner_flags & NDR_F_SIZE_IS) {
 		/* now is the time to check/set size */
-		if (!mlndr_size_is(encl_ref))
+		if (!ndr_size_is(encl_ref))
 			return (0);	/* error already set */
 		n_elem = encl_ref->size_is;
 	} else {
@@ -1727,7 +1720,7 @@ mlndr_inner_array(struct ndr_reference *encl_ref)
 		myref.pdu_offset = pdu_offset + i * ti->pdu_size_fixed_part;
 		myref.datum = encl_ref->datum + i * ti->c_size_fixed_part;
 
-		if (!mlndr_inner(&myref))
+		if (!ndr_inner(&myref))
 			return (0);
 	}
 
@@ -1739,47 +1732,43 @@ mlndr_inner_array(struct ndr_reference *encl_ref)
  * BASIC TYPES
  */
 #define	MAKE_BASIC_TYPE_BASE(TYPE, SIZE) \
-    extern int mlndr_##TYPE(struct ndr_reference *encl_ref); \
-    struct ndr_typeinfo ndt_##TYPE = { \
+    extern int ndr_##TYPE(struct ndr_reference *encl_ref); \
+    ndr_typeinfo_t ndt_##TYPE = { \
 	1,		/* NDR version */ \
 	(SIZE)-1,	/* alignment */ \
 	NDR_F_NONE,	/* flags */ \
-	mlndr_##TYPE,	/* ndr_func */ \
+	ndr_##TYPE,	/* ndr_func */ \
 	SIZE,		/* pdu_size_fixed_part */ \
 	0,		/* pdu_size_variable_part */ \
 	SIZE,		/* c_size_fixed_part */ \
 	0,		/* c_size_variable_part */ \
 	}; \
-    int mlndr_##TYPE(struct ndr_reference *ref) { \
-	return (mlndr_basic_integer(ref, SIZE)); \
+    int ndr_##TYPE(struct ndr_reference *ref) { \
+	return (ndr_basic_integer(ref, SIZE)); \
 }
 
 #define	MAKE_BASIC_TYPE_STRING(TYPE, SIZE) \
-    extern int mlndr_s##TYPE(struct ndr_reference *encl_ref); \
-    struct ndr_typeinfo ndt_s##TYPE = { \
+    extern int ndr_s##TYPE(struct ndr_reference *encl_ref); \
+    ndr_typeinfo_t ndt_s##TYPE = { \
 	1,		/* NDR version */ \
 	(SIZE)-1,	/* alignment */ \
 	NDR_F_STRING,	/* flags */ \
-	mlndr_s##TYPE,	/* ndr_func */ \
+	ndr_s##TYPE,	/* ndr_func */ \
 	0,		/* pdu_size_fixed_part */ \
 	SIZE,		/* pdu_size_variable_part */ \
 	0,		/* c_size_fixed_part */ \
 	SIZE,		/* c_size_variable_part */ \
 	}; \
-    int mlndr_s##TYPE(struct ndr_reference *ref) { \
-	return (mlndr_string_basic_integer(ref, &ndt_##TYPE)); \
+    int ndr_s##TYPE(struct ndr_reference *ref) { \
+	return (ndr_string_basic_integer(ref, &ndt_##TYPE)); \
 }
 
 #define	MAKE_BASIC_TYPE(TYPE, SIZE) \
 	MAKE_BASIC_TYPE_BASE(TYPE, SIZE) \
 	MAKE_BASIC_TYPE_STRING(TYPE, SIZE)
 
-extern int
-mlndr_basic_integer(struct ndr_reference *ref, unsigned size);
-
-extern int
-mlndr_string_basic_integer(struct ndr_reference *encl_ref,
-    struct ndr_typeinfo *type_under);
+int ndr_basic_integer(ndr_ref_t *, unsigned);
+int ndr_string_basic_integer(ndr_ref_t *, ndr_typeinfo_t *);
 
 
 MAKE_BASIC_TYPE(_char, 1)
@@ -1792,21 +1781,21 @@ MAKE_BASIC_TYPE(_ulong, 4)
 MAKE_BASIC_TYPE_BASE(_wchar, 2)
 
 int
-mlndr_basic_integer(struct ndr_reference *ref, unsigned size)
+ndr_basic_integer(ndr_ref_t *ref, unsigned size)
 {
-	struct mlndr_stream 	*mlnds = ref->stream;
-	char 			*valp = (char *)ref->datum;
-	int			rc;
+	ndr_stream_t 	*nds = ref->stream;
+	char 		*valp = (char *)ref->datum;
+	int		rc;
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case NDR_M_OP_MARSHALL:
-		rc = MLNDS_PUT_PDU(mlnds, ref->pdu_offset, size,
-		    valp, mlnds->swap, ref);
+		rc = NDS_PUT_PDU(nds, ref->pdu_offset, size,
+		    valp, nds->swap, ref);
 		break;
 
 	case NDR_M_OP_UNMARSHALL:
-		rc = MLNDS_GET_PDU(mlnds, ref->pdu_offset, size,
-		    valp, mlnds->swap, ref);
+		rc = NDS_GET_PDU(nds, ref->pdu_offset, size,
+		    valp, nds->swap, ref);
 		break;
 
 	default:
@@ -1818,13 +1807,12 @@ mlndr_basic_integer(struct ndr_reference *ref, unsigned size)
 }
 
 int
-mlndr_string_basic_integer(struct ndr_reference *encl_ref,
-    struct ndr_typeinfo *type_under)
+ndr_string_basic_integer(ndr_ref_t *encl_ref, ndr_typeinfo_t *type_under)
 {
 	unsigned long		pdu_offset = encl_ref->pdu_offset;
 	unsigned		size = type_under->pdu_size_fixed_part;
 	char			*valp;
-	struct ndr_reference	myref;
+	ndr_ref_t		myref;
 	unsigned long		i;
 	long			sense = 0;
 	char			name[30];
@@ -1845,7 +1833,7 @@ mlndr_string_basic_integer(struct ndr_reference *encl_ref,
 		valp = encl_ref->datum + i * size;
 		myref.datum = valp;
 
-		if (!mlndr_inner(&myref))
+		if (!ndr_inner(&myref))
 			return (0);
 
 		switch (size) {
@@ -1864,12 +1852,12 @@ mlndr_string_basic_integer(struct ndr_reference *encl_ref,
 }
 
 
-extern int mlndr_s_wchar(struct ndr_reference *encl_ref);
-struct ndr_typeinfo ndt_s_wchar = {
+extern int ndr_s_wchar(ndr_ref_t *encl_ref);
+ndr_typeinfo_t ndt_s_wchar = {
 	1,		/* NDR version */
 	2-1,		/* alignment */
 	NDR_F_STRING,	/* flags */
-	mlndr_s_wchar,	/* ndr_func */
+	ndr_s_wchar,	/* ndr_func */
 	0,		/* pdu_size_fixed_part */
 	2,		/* pdu_size_variable_part */
 	0,		/* c_size_fixed_part */
@@ -1889,23 +1877,23 @@ struct ndr_typeinfo ndt_s_wchar = {
  * null character. It now looks like NT does not always terminate
  * RPC Unicode strings and the terminating null is a side effect
  * of field alignment. So now we rely on the strlen_is (set up in
- * mlndr_outer_string) of the enclosing reference. This may or may
+ * ndr_outer_string) of the enclosing reference. This may or may
  * not include the null but it doesn't matter, the algorithm will
  * get it right.
  */
 int
-mlndr_s_wchar(struct ndr_reference *encl_ref)
+ndr_s_wchar(ndr_ref_t *encl_ref)
 {
-	struct mlndr_stream 	*mlnds = encl_ref->stream;
+	ndr_stream_t		*nds = encl_ref->stream;
 	unsigned short		wide_char;
 	char 			*valp;
-	struct ndr_reference	myref;
+	ndr_ref_t		myref;
 	unsigned long		i;
 	char			name[30];
 	int			count;
 	int			char_count = 0;
 
-	if (mlnds->m_op == NDR_M_OP_UNMARSHALL) {
+	if (nds->m_op == NDR_M_OP_UNMARSHALL) {
 		/*
 		 * To avoid problems with zero length strings
 		 * we can just null terminate here and be done.
@@ -1932,7 +1920,7 @@ mlndr_s_wchar(struct ndr_reference *encl_ref)
 	for (i = 0; i < NDR_STRING_MAX; i++) {
 		(void) sprintf(name, "[%lu]", i);
 
-		if (mlnds->m_op == NDR_M_OP_MARSHALL) {
+		if (nds->m_op == NDR_M_OP_MARSHALL) {
 			count = mts_mbtowc((mts_wchar_t *)&wide_char, valp,
 			    MTS_MB_CHAR_MAX);
 			if (count < 0) {
@@ -1951,10 +1939,10 @@ mlndr_s_wchar(struct ndr_reference *encl_ref)
 			}
 		}
 
-		if (!mlndr_inner(&myref))
+		if (!ndr_inner(&myref))
 			return (0);
 
-		if (mlnds->m_op == NDR_M_OP_UNMARSHALL) {
+		if (nds->m_op == NDR_M_OP_UNMARSHALL) {
 			count = mts_wctomb(valp, wide_char);
 
 			if ((++char_count) == encl_ref->strlen_is) {
@@ -1984,14 +1972,14 @@ mlndr_s_wchar(struct ndr_reference *encl_ref)
  * multibyte character is encountered.
  */
 size_t
-ndr_mbstowcs(struct mlndr_stream *mlnds, mts_wchar_t *wcs, const char *mbs,
+ndr_mbstowcs(ndr_stream_t *nds, mts_wchar_t *wcs, const char *mbs,
     size_t nwchars)
 {
 	mts_wchar_t *start = wcs;
 	int nbytes;
 
 	while (nwchars--) {
-		nbytes = ndr_mbtowc(mlnds, wcs, mbs, MTS_MB_CHAR_MAX);
+		nbytes = ndr_mbtowc(nds, wcs, mbs, MTS_MB_CHAR_MAX);
 		if (nbytes < 0) {
 			*wcs = 0;
 			return ((size_t)-1);
@@ -2016,8 +2004,8 @@ ndr_mbstowcs(struct mlndr_stream *mlnds, mts_wchar_t *wcs, const char *mbs,
  */
 /*ARGSUSED*/
 int
-ndr_mbtowc(struct mlndr_stream *mlnds, mts_wchar_t *wcharp,
-    const char *mbchar, size_t nbytes)
+ndr_mbtowc(ndr_stream_t *nds, mts_wchar_t *wcharp, const char *mbchar,
+    size_t nbytes)
 {
 	int rc;
 
@@ -2025,7 +2013,7 @@ ndr_mbtowc(struct mlndr_stream *mlnds, mts_wchar_t *wcharp,
 		return (rc);
 
 #ifdef _BIG_ENDIAN
-	if (mlnds == NULL || NDR_MODE_MATCH(mlnds, NDR_MODE_RETURN_SEND))
+	if (nds == NULL || NDR_MODE_MATCH(nds, NDR_MODE_RETURN_SEND))
 		*wcharp = BSWAP_16(*wcharp);
 #endif
 

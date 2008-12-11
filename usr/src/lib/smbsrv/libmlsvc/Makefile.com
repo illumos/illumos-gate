@@ -34,6 +34,7 @@ OBJS_COMMON =		\
 	lsar_lookup.o	\
 	lsar_open.o	\
 	mlsvc_client.o	\
+	mlsvc_domain.o	\
 	mlsvc_init.o	\
 	mlsvc_logr.o	\
 	mlsvc_lsa.o	\
@@ -43,6 +44,7 @@ OBJS_COMMON =		\
 	mlsvc_util.o	\
 	mlsvc_winreg.o	\
 	mlsvc_wkssvc.o	\
+	msgsvc_svc.o	\
 	netdfs.o	\
 	netr_auth.o	\
 	netr_logon.o	\
@@ -52,6 +54,7 @@ OBJS_COMMON =		\
 	smb_autohome.o	\
 	smb_logon.o	\
 	smb_share.o	\
+	spoolss_svc.o	\
 	srvsvc_client.o	\
 	svcctl_scm.o	\
 	svcctl_svc.o
@@ -61,6 +64,7 @@ NDLLIST =		\
 	dssetup		\
 	eventlog	\
 	lsarpc		\
+	msgsvc		\
 	netdfs		\
 	netlogon	\
 	samrpc		\
@@ -77,8 +81,10 @@ include ../../Makefile.lib
 INCS += -I$(SRC)/common/smbsrv
 
 LDLIBS +=	$(MACH_LDLIBS)
-LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lnsl -lpkcs11 -lscf	\
+LDLIBS += -lmlrpc -lsmbrdr -lsmb -lsmbns -lshare -lresolv -lnsl -lpkcs11 -lscf	\
 	-luutil -lc
+
+CPPFLAGS += $(INCS) -D_REENTRANT
 
 SRCS=   $(OBJS_COMMON:%.o=$(SRCDIR)/%.c)        	\
         $(OBJS_SHARED:%.o=$(SRC)/common/smbsrv/%.c)

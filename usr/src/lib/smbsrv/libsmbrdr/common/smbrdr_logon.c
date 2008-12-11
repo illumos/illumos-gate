@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SMB session logon and logoff functions. See CIFS section 4.1.
  */
@@ -39,7 +37,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <smbsrv/wintypes.h>
 #include <smbsrv/libsmbrdr.h>
+#include <smbsrv/libmlsvc.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smb.h>
 #include <smbrdr_ipc_util.h>
@@ -53,8 +53,7 @@ static boolean_t smbrdr_logon_validate(char *server, char *username);
 static struct sdb_logon *smbrdr_logon_init(struct sdb_session *session,
     char *username, unsigned char *pwd);
 static int smbrdr_logon_user(char *server, char *username, unsigned char *pwd);
-static int smbrdr_authenticate(char *primary_domain, char *account_name,
-    unsigned char *pwd);
+static int smbrdr_authenticate(char *, char *, char *, unsigned char *);
 
 /*
  * mlsvc_logon
@@ -89,7 +88,7 @@ smbrdr_anonymous_logon(char *domain_controller, char *domain_name)
 	if (smbrdr_logon_validate(domain_controller, MLSVC_ANON_USER))
 		return (0);
 
-	if (smbrdr_negotiate(domain_name) != 0) {
+	if (smbrdr_negotiate(domain_controller, domain_name) != 0) {
 		syslog(LOG_DEBUG, "smbrdr_anonymous_logon: negotiate failed");
 		return (-1);
 	}
@@ -151,12 +150,13 @@ smbrdr_auth_logon(char *domain_controller, char *domain_name, char *username)
 	if (smbrdr_logon_validate(domain_controller, username))
 		return (0);
 
-	if (smbrdr_negotiate(domain_name) != 0) {
+	if (smbrdr_negotiate(domain_controller, domain_name) != 0) {
 		syslog(LOG_DEBUG, "smbrdr_auth_logon: negotiate failed");
 		return (-1);
 	}
 
-	erc = smbrdr_authenticate(domain_name, username, pwd_hash);
+	erc = smbrdr_authenticate(domain_controller, domain_name, username,
+	    pwd_hash);
 	return ((erc == AUTH_USER_GRANT) ? 0 : -1);
 }
 
@@ -172,44 +172,17 @@ smbrdr_auth_logon(char *domain_controller, char *domain_name, char *username)
  * (<0) Error
  */
 static int
-smbrdr_authenticate(char *primary_domain, char *account_name,
-    unsigned char *pwd)
+smbrdr_authenticate(char *domain_controller, char *primary_domain,
+    char *account_name, unsigned char *pwd)
 {
-	smb_ntdomain_t *di;
-
 	if (pwd == NULL)
 		return (AUTH_USER_GRANT | AUTH_IPC_ONLY_GRANT);
-
-
-	if ((di = smb_getdomaininfo(0)) == 0) {
-		syslog(LOG_DEBUG, "smbrdr_authenticate[%s]: %s", account_name,
-		    xlate_nt_status(NT_STATUS_CANT_ACCESS_DOMAIN_INFO));
-		return (-1);
-	}
 
 	/*
 	 * Ensure that the domain name is uppercase.
 	 */
 	(void) utf8_strupr(primary_domain);
-
-	/*
-	 * We can only authenticate a user via a controller in the user's
-	 * primary domain. If the user's domain name doesn't match the
-	 * authenticating server's domain, reject the request before we
-	 * create a logon entry for the user. Although the logon will be
-	 * denied eventually, we don't want a logon structure for a user
-	 * in the resource domain that is pointing to a session structure
-	 * for the account domain. If this happened to be our resource
-	 * domain user, we would not be able to use that account to connect
-	 * to the resource domain.
-	 */
-	if (strcasecmp(di->domain, primary_domain)) {
-		syslog(LOG_DEBUG, "smbrdr_authenticate: %s\\%s: invalid domain",
-		    primary_domain, account_name);
-		return (-2);
-	}
-
-	return (smbrdr_logon_user(di->server, account_name, pwd));
+	return (smbrdr_logon_user(domain_controller, account_name, pwd));
 }
 
 /*
@@ -231,11 +204,11 @@ smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
 	struct sdb_session *session;
 	struct sdb_logon *logon;
 	struct sdb_logon old_logon;
+	int ret;
 
 	if ((server == NULL) || (username == NULL) ||
-	    ((strcmp(username, MLSVC_ANON_USER) != 0) && (pwd == NULL))) {
+	    ((strcmp(username, MLSVC_ANON_USER) != 0) && (pwd == NULL)))
 		return (-1);
-	}
 
 	session = smbrdr_session_lock(server, 0, SDB_SLCK_WRITE);
 	if (session == NULL) {
@@ -273,16 +246,18 @@ smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
 		return (-1);
 	}
 
+
+	ret = (logon->type == SDB_LOGON_GUEST)
+	    ? AUTH_GUEST_GRANT : AUTH_USER_GRANT;
+
 	session->logon = *logon;
 	free(logon);
 
-	if (old_logon.type != SDB_LOGON_NONE) {
+	if (old_logon.type != SDB_LOGON_NONE)
 		(void) smbrdr_logoffx(&old_logon);
-	}
 
 	smbrdr_session_unlock(session);
-	return ((logon->type == SDB_LOGON_GUEST)
-	    ? AUTH_GUEST_GRANT : AUTH_USER_GRANT);
+	return (ret);
 }
 
 
@@ -383,7 +358,7 @@ smbrdr_session_setupx(struct sdb_logon *logon)
 		    session->native_lanman);	/* NativeLanMan */
 	} else {
 		data_bytes += strlen_fn(logon->username) + null_size;
-		data_bytes += strlen_fn(session->di.domain) + null_size;
+		data_bytes += strlen_fn(session->domain) + null_size;
 
 		rc = smb_msgbuf_encode(mb, "bb.wwwwlwwllw#c#cuuu.u.",
 		    13,				/* smb_wct */
@@ -403,7 +378,7 @@ smbrdr_session_setupx(struct sdb_logon *logon)
 		    logon->auth.cs_len,		/* cs length spec */
 		    logon->auth.cs,		/* CaseSensitivePassword */
 		    logon->username,		/* AccountName */
-		    session->di.domain,		/* PrimaryDomain */
+		    session->domain,		/* PrimaryDomain */
 		    session->native_os,		/* NativeOS */
 		    session->native_lanman);	/* NativeLanMan */
 	}
@@ -584,7 +559,7 @@ smbrdr_logon_init(struct sdb_session *session, char *username,
 	} else {
 		logon->type = SDB_LOGON_USER;
 		rc = smb_auth_set_info(username, 0, pwd,
-		    session->di.domain, session->challenge_key,
+		    session->domain, session->challenge_key,
 		    session->challenge_len, smbrdr_lmcompl, &logon->auth);
 
 		if (rc != 0) {

@@ -249,13 +249,19 @@ smb_join(smb_joininfo_t *jdi)
  *	    domain information.
  */
 uint32_t
-smb_get_dcinfo(smb_ntdomain_t *dc_info)
+smb_get_dcinfo(char *namebuf, uint32_t namebuflen, uint32_t *ipaddr)
 {
 	door_arg_t arg;
 	char *buf;
 	size_t len;
 	int opcode = SMB_DR_GET_DCINFO;
-	int fd, rc = NT_STATUS_SUCCESS;
+	int fd;
+	char *srvname = NULL;
+	struct hostent *h;
+	int error_num;
+
+	assert((namebuf != NULL) && (namebuflen != 0));
+	*namebuf = '\0';
 
 	if ((fd = open(SMB_DR_SVC_NAME, O_RDONLY)) < 0)
 		return (NT_STATUS_INTERNAL_ERROR);
@@ -270,15 +276,23 @@ smb_get_dcinfo(smb_ntdomain_t *dc_info)
 	if (smb_dr_clnt_call(fd, &arg) == 0) {
 		buf = arg.rbuf + SMB_DR_DATA_OFFSET;
 		len = arg.rsize - SMB_DR_DATA_OFFSET;
-		rc = smb_dr_decode_common(buf, len, xdr_smb_dr_domain_t,
-		    dc_info);
-		if (rc != 0)
-			rc = NT_STATUS_INTERNAL_ERROR;
+		srvname = smb_dr_decode_string(buf, len);
 	}
 
 	smb_dr_clnt_cleanup(&arg);
 	(void) close(fd);
-	return (rc);
+
+	if (srvname) {
+		(void) strlcpy(namebuf, srvname, namebuflen);
+		if ((h = smb_gethostbyname(srvname, &error_num)) == NULL) {
+			*ipaddr = 0;
+		} else {
+			(void) memcpy(ipaddr, h->h_addr, h->h_length);
+			freehostent(h);
+		}
+		xdr_free(xdr_string, (char *)&srvname);
+	}
+	return (NT_STATUS_SUCCESS);
 }
 
 bool_t
@@ -299,19 +313,5 @@ xdr_smb_dr_joininfo_t(XDR *xdrs, smb_joininfo_t *objp)
 	if (!xdr_uint32_t(xdrs, &objp->mode))
 		return (FALSE);
 
-	return (TRUE);
-}
-
-bool_t
-xdr_smb_dr_domain_t(XDR *xdrs, smb_ntdomain_t *objp)
-{
-	if (!xdr_vector(xdrs, (char *)objp->domain, SMB_PI_MAX_DOMAIN,
-	    sizeof (char), (xdrproc_t)xdr_char))
-		return (FALSE);
-	if (!xdr_vector(xdrs, (char *)objp->server, SMB_PI_MAX_DOMAIN,
-	    sizeof (char), (xdrproc_t)xdr_char))
-		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->ipaddr))
-		return (FALSE);
 	return (TRUE);
 }

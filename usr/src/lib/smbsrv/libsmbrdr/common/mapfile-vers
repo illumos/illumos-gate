@@ -22,18 +22,14 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUNWprivate {
     global:
-	mlsvc_close_pipe;
 	mlsvc_disconnect;
 	mlsvc_echo;
 	mlsvc_logon;
-	mlsvc_open_pipe;
-	mlsvc_session_native_values;
 	mlsvc_user_getauth;
+	smbrdr_close_pipe;
 	smbrdr_dump_netuse;
 	smbrdr_dump_ofiles;
 	smbrdr_dump_sessions;
@@ -42,9 +38,10 @@ SUNWprivate {
 	smbrdr_ipc_get_user;
 	smbrdr_ipc_rollback;
 	smbrdr_ipc_set;
-	smbrdr_ipc_skip_lsa_query;
 	smbrdr_ipc_get_passwd;
+	smbrdr_open_pipe;
 	smbrdr_readx;
+	smbrdr_session_info;
 	smbrdr_transact;
     local:
 	*;

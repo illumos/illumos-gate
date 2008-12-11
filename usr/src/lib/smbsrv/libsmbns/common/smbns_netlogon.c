@@ -60,7 +60,13 @@ static void smb_netlogon_send(struct name_entry *name, char *domain,
 static void smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr);
 static int smb_better_dc(uint32_t cur_ip, uint32_t new_ip);
 
-static char resource_domain[SMB_PI_MAX_DOMAIN];
+/*
+ * ntdomain_info
+ * Temporary. It should be removed once NBTD is integrated.
+ */
+extern smb_ntdomain_t ntdomain_info;
+extern mutex_t ntdomain_mtx;
+extern cond_t ntdomain_cv;
 
 /*
  * smb_netlogon_request
@@ -81,17 +87,20 @@ smb_netlogon_request(struct name_entry *server, int protocol, char *domain)
 	if (domain == NULL || *domain == '\0')
 		return;
 
-	(void) strlcpy(resource_domain, domain, sizeof (resource_domain));
+	(void) mutex_lock(&ntdomain_mtx);
+	(void) strlcpy(ntdomain_info.n_domain, domain,
+	    sizeof (ntdomain_info.n_domain));
+	(void) mutex_unlock(&ntdomain_mtx);
 
-	ntdp = nt_domain_lookup_name(resource_domain);
+	ntdp = nt_domain_lookup_name(domain);
 	if (ntdp && (protocol == NETLOGON_PROTO_SAMLOGON))
 		smb_netlogon_samlogon(server,
 		    MAILSLOT_NETLOGON_SAMLOGON_RDC,
-		    resource_domain);
+		    domain);
 	else
 		smb_netlogon_query(server,
 		    MAILSLOT_NETLOGON_RDC,
-		    resource_domain);
+		    domain);
 }
 
 /*
@@ -211,12 +220,15 @@ smb_netlogon_receive(struct datagram *datagram,
 	syslog(LOG_DEBUG, "DC Offer Dom=%s PDC=%s From=%s",
 	    domain, primary, src_name);
 
-	if (strcasecmp(domain, resource_domain)) {
+	(void) mutex_lock(&ntdomain_mtx);
+	if (strcasecmp(domain, ntdomain_info.n_domain)) {
 		syslog(LOG_DEBUG, "NetLogonResponse: other domain "
-		    "%s, requested %s", domain, resource_domain);
+		    "%s, requested %s", domain, ntdomain_info.n_domain);
 		smb_msgbuf_term(&mb);
+		(void) mutex_unlock(&ntdomain_mtx);
 		return;
 	}
+	(void) mutex_unlock(&ntdomain_mtx);
 
 	for (i = 0; i < sizeof (netlogon_opt)/sizeof (netlogon_opt[0]); ++i) {
 		if (strcasecmp(netlogon_opt[i].mailslot, mailbox) == 0) {
@@ -446,8 +458,8 @@ smb_netlogon_send(struct name_entry *name,
 			dest_dup = smb_netbios_name_dup(dest, 1);
 			smb_name_unlock_name(dest);
 			if (dest_dup) {
-				(void) smb_netbios_datagram_send(name, dest_dup,
-				    buffer, count);
+				(void) smb_netbios_datagram_send(name,
+				    dest_dup, buffer, count);
 				free(dest_dup);
 			}
 		} else {
@@ -467,7 +479,6 @@ static void
 smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr)
 {
 	static int initialized = 0;
-	smb_ntdomain_t *pi;
 	uint32_t ipaddr;
 	uint32_t prefer_ipaddr = 0;
 	char ipstr[16];
@@ -489,27 +500,34 @@ smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr)
 		}
 	}
 
+	(void) mutex_lock(&ntdomain_mtx);
 	syslog(LOG_DEBUG, "DC Offer [%s]: %s [%s]",
-	    resource_domain, src_name, srcip);
+	    ntdomain_info.n_domain, src_name, srcip);
 
-	if ((pi = smb_getdomaininfo(0)) != 0) {
-		if (prefer_ipaddr != 0 && prefer_ipaddr == pi->ipaddr) {
+	if (ntdomain_info.n_ipaddr != 0) {
+		if (prefer_ipaddr != 0 && prefer_ipaddr ==
+		    ntdomain_info.n_ipaddr) {
 			syslog(LOG_DEBUG, "DC for %s: %s [%s]",
-			    resource_domain, src_name, srcip);
+			    ntdomain_info.n_domain, src_name, srcip);
+			(void) mutex_unlock(&ntdomain_mtx);
 			return;
 		}
 
-		ipaddr = pi->ipaddr;
+		ipaddr = ntdomain_info.n_ipaddr;
 	} else
 		ipaddr = 0;
 
 	if (smb_better_dc(ipaddr, src_ipaddr) ||
 	    (prefer_ipaddr != 0 && prefer_ipaddr == src_ipaddr)) {
-		smb_setdomaininfo(resource_domain, src_name,
-		    src_ipaddr);
+		/* set nbtd cache */
+		(void) strlcpy(ntdomain_info.n_name, src_name,
+		    SMB_PI_MAX_DOMAIN);
+		ntdomain_info.n_ipaddr = src_ipaddr;
+		(void) cond_broadcast(&ntdomain_cv);
 		syslog(LOG_DEBUG, "DC discovered for %s: %s [%s]",
-		    resource_domain, src_name, srcip);
+		    ntdomain_info.n_domain, src_name, srcip);
 	}
+	(void) mutex_unlock(&ntdomain_mtx);
 }
 
 static int
@@ -531,55 +549,4 @@ smb_better_dc(uint32_t cur_ip, uint32_t new_ip)
 	 * Otherwise, just keep the old one.
 	 */
 	return (0);
-}
-
-/*
- * smb_msdcs_lookup_ads
- *
- * Try to find a domain controller in ADS.
- *
- * Parameter:
- *    nbt_domain - NETBIOS name of the domain
- *    server - the ADS server to be sought.
- *
- * Returns 1 if a domain controller was found and its name and IP address
- * have been updated. Otherwise returns 0.
- */
-int
-smb_msdcs_lookup_ads(char *nbt_domain, char *server)
-{
-	smb_ads_host_info_t *hinfo = NULL;
-	char ads_domain[MAXHOSTNAMELEN];
-	char *p;
-	char *nbt_hostname;
-	struct in_addr addr;
-
-	if (!nbt_domain)
-		return (0);
-
-	(void) strlcpy(resource_domain, nbt_domain, SMB_PI_MAX_DOMAIN);
-	if (smb_resolve_fqdn(nbt_domain, ads_domain, MAXHOSTNAMELEN) != 1)
-		return (0);
-
-	if ((hinfo = smb_ads_find_host(ads_domain, server)) == NULL) {
-		syslog(LOG_DEBUG, "msdcsLookupADS: unable to find host");
-		return (0);
-	}
-
-	addr.s_addr = hinfo->ip_addr;
-	syslog(LOG_DEBUG, "msdcsLookupADS: %s [%s]", hinfo->name,
-	    inet_ntoa(addr));
-
-	/*
-	 * Remove the domain extension - the
-	 * NetBIOS browser can't handle it.
-	 */
-	nbt_hostname = strdup(hinfo->name);
-	if ((p = strchr(nbt_hostname, '.')) != 0)
-		*p = '\0';
-
-	smb_netlogon_rdc_rsp(nbt_hostname, hinfo->ip_addr);
-	free(nbt_hostname);
-
-	return (1);
 }

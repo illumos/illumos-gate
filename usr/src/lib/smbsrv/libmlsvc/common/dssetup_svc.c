@@ -35,7 +35,6 @@
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/mlsvc_util.h>
 #include <smbsrv/ndl/dssetup.ndl>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smbinfo.h>
@@ -48,19 +47,19 @@ static uint32_t dssetup_member_server(ds_primary_domain_info_t *, ndr_xa_t *);
 static uint32_t dssetup_standalone_server(ds_primary_domain_info_t *,
     ndr_xa_t *);
 
-static mlrpc_stub_table_t dssetup_stub_table[] = {
+static ndr_stub_table_t dssetup_stub_table[] = {
 	{ dssetup_DsRoleGetPrimaryDomainInfo,
 	    DSSETUP_OPNUM_DsRoleGetPrimaryDomainInfo },
 	{0}
 };
 
-static mlrpc_service_t dssetup_service = {
+static ndr_service_t dssetup_service = {
 	"DSSETUP",			/* name */
 	"Active Directory Setup",	/* desc */
 	"\\lsarpc",			/* endpoint */
 	PIPE_LSASS,			/* sec_addr_port */
-	"3919286a-b10c-11d0-9ba800c04fd92ef5", 0,	/* abstract */
-	"8a885d04-1ceb-11c9-9fe808002b104860", 2,	/* transfer */
+	"3919286a-b10c-11d0-9ba8-00c04fd92ef5",	0,	/* abstract */
+	NDR_TRANSFER_SYNTAX_UUID,		2,	/* transfer */
 	0,				/* no bind_instance_size */
 	0,				/* no bind_req() */
 	0,				/* no unbind_and_close() */
@@ -83,7 +82,7 @@ void
 dssetup_initialize(void)
 {
 	dssetup_clear_domain_info();
-	(void) mlrpc_register_service(&dssetup_service);
+	(void) ndr_svc_register(&dssetup_service);
 }
 
 void
@@ -111,7 +110,7 @@ dssetup_DsRoleGetPrimaryDomainInfo(void *arg, ndr_xa_t *mxa)
 	uint32_t status;
 	int security_mode;
 
-	info = MLRPC_HEAP_MALLOC(mxa, sizeof (dssetup_GetPrimaryDomainInfo_t));
+	info = NDR_MALLOC(mxa, sizeof (dssetup_GetPrimaryDomainInfo_t));
 	if (info == NULL) {
 		status = NT_STATUS_NO_MEMORY;
 	} else if (param->level != DS_ROLE_BASIC_INFORMATION) {
@@ -136,7 +135,7 @@ dssetup_DsRoleGetPrimaryDomainInfo(void *arg, ndr_xa_t *mxa)
 		param->status = NT_STATUS_SUCCESS;
 	}
 
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -169,11 +168,9 @@ dssetup_member_server(ds_primary_domain_info_t *info, ndr_xa_t *mxa)
 
 	if (ds_info.flags & DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT) {
 		info->flags = DS_ROLE_PRIMARY_DOMAIN_GUID_PRESENT;
-		info->nt_domain = MLRPC_HEAP_STRSAVE(mxa,
-		    (char *)ds_info.nt_domain);
-		info->dns_domain = MLRPC_HEAP_STRSAVE(mxa,
-		    (char *)ds_info.dns_domain);
-		info->forest = MLRPC_HEAP_STRSAVE(mxa, (char *)ds_info.forest);
+		info->nt_domain = NDR_STRDUP(mxa, (char *)ds_info.nt_domain);
+		info->dns_domain = NDR_STRDUP(mxa, (char *)ds_info.dns_domain);
+		info->forest = NDR_STRDUP(mxa, (char *)ds_info.forest);
 		bcopy(&ds_info.domain_guid, &info->domain_guid,
 		    sizeof (ndr_uuid_t));
 	} else {
@@ -190,9 +187,9 @@ dssetup_member_server(ds_primary_domain_info_t *info, ndr_xa_t *mxa)
 		(void) utf8_strlwr(dns_domain);
 
 		info->flags = 0;
-		info->nt_domain = MLRPC_HEAP_STRSAVE(mxa, nt_domain);
-		info->dns_domain = MLRPC_HEAP_STRSAVE(mxa, dns_domain);
-		info->forest = MLRPC_HEAP_STRSAVE(mxa, dns_domain);
+		info->nt_domain = NDR_STRDUP(mxa, nt_domain);
+		info->dns_domain = NDR_STRDUP(mxa, dns_domain);
+		info->forest = NDR_STRDUP(mxa, dns_domain);
 		bzero(&info->domain_guid, sizeof (ndr_uuid_t));
 	}
 
@@ -224,7 +221,7 @@ dssetup_standalone_server(ds_primary_domain_info_t *info, ndr_xa_t *mxa)
 	if (smb_getdomainname(nt_domain, MAXHOSTNAMELEN) != 0)
 		return (NT_STATUS_CANT_ACCESS_DOMAIN_INFO);
 
-	info->nt_domain = MLRPC_HEAP_STRSAVE(mxa, nt_domain);
+	info->nt_domain = NDR_STRDUP(mxa, nt_domain);
 	if (info->nt_domain == NULL)
 		return (NT_STATUS_NO_MEMORY);
 

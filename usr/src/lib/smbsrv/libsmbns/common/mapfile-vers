@@ -25,17 +25,18 @@
 
 SUNWprivate {
     global:
-	dns_msgid_init;
-	dyndns_clear_rev_zone;
+	dyndns_clear_zones;
+	dyndns_start;
+	dyndns_stop;
 	dyndns_update;
-	dyndns_update_core;
+	dyndns_update_zones;
 	smb_adjoin_report_err;
 	smb_ads_add_share;
 	smb_ads_build_unc_name;
 	smb_ads_close;
-	smb_ads_domain_change_cleanup;
 	smb_ads_init;
 	smb_ads_join;
+	smb_ads_lookup_msdcs;
 	smb_ads_lookup_share;
 	smb_ads_open;
 	smb_ads_publish_share;
@@ -46,7 +47,6 @@ SUNWprivate {
 	smb_ccache_init;
 	smb_ccache_remove;
 	smb_kinit;
-	smb_msdcs_lookup_ads;
 	smb_netbios_name_reconfig;
 	smb_netbios_start;
 	smb_netbios_shutdown;

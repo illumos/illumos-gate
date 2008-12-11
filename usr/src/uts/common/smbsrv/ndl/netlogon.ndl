@@ -79,7 +79,7 @@ typedef struct netr_string netr_string_t;
 /*
  * Alternative varying/conformant string definition - for
  * non-null terminated strings. This definition must match
- * mlrpc_vcbuf_t.
+ * ndr_vcbuf_t.
  */
 struct netr_vcs {
 	/*

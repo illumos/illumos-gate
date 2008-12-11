@@ -23,19 +23,17 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * MLRPC server-side NDR stream (PDU) operations. Stream operations
- * should return TRUE (non-zero) on success or FALSE (zero or a null
- * pointer) on failure. When an operation returns FALSE, including
- * mlndo_malloc() returning NULL, it should set the mlnds->error to
- * indicate what went wrong.
+ * Server-side NDR stream (PDU) operations. Stream operations should
+ * return TRUE (non-zero) on success or FALSE (zero or a null pointer)
+ * on failure. When an operation returns FALSE, including ndo_malloc()
+ * returning NULL, it should set the nds->error to indicate what went
+ * wrong.
  *
- * When available, the relevant ndr_reference is passed to the
+ * When available, the relevant ndr reference is passed to the
  * operation but keep in mind that it may be a null pointer.
  *
- * Functions mlndo_get_pdu(), mlndo_put_pdu(), and mlndo_pad_pdu()
+ * Functions ndo_get_pdu(), ndo_put_pdu(), and ndo_pad_pdu()
  * must never grow the PDU data. A request for out-of-bounds data is
  * an error. The swap_bytes flag is 1 if NDR knows that the byte-
  * order in the PDU is different from the local system.
@@ -51,8 +49,7 @@
 #include <assert.h>
 
 #include <smbsrv/libsmb.h>
-#include <smbsrv/mlrpc.h>
-#include <smbsrv/ndr.h>
+#include <smbsrv/libmlrpc.h>
 #include <smbsrv/ntstatus.h>
 
 #define	NDOBUFSZ		128
@@ -63,41 +60,39 @@
 	(((N) + NDR_PDU_BLOCK_SIZE) & ~NDR_PDU_BLOCK_MASK)
 #define	NDR_PDU_MAX_SIZE		(64*1024*1024)
 
-static char *mlndo_malloc(struct mlndr_stream *, unsigned,
-    struct ndr_reference *);
-static int mlndo_free(struct mlndr_stream *, char *, struct ndr_reference *);
-static int mlndo_grow_pdu(struct mlndr_stream *, unsigned long,
-    struct ndr_reference *);
-static int mlndo_pad_pdu(struct mlndr_stream *, unsigned long, unsigned long,
-    struct ndr_reference *);
-static int mlndo_get_pdu(struct mlndr_stream *, unsigned long, unsigned long,
-    char *, int, struct ndr_reference *);
-static int mlndo_put_pdu(struct mlndr_stream *, unsigned long, unsigned long,
-    char *, int, struct ndr_reference *);
-static void mlndo_tattle(struct mlndr_stream *, char *, struct ndr_reference *);
-static void mlndo_tattle_error(struct mlndr_stream *, struct ndr_reference *);
-static int mlndo_reset(struct mlndr_stream *);
-static void mlndo_destruct(struct mlndr_stream *);
-static void mlndo_hexfmt(uint8_t *, int, int, char *, int);
+static char *ndo_malloc(ndr_stream_t *, unsigned, ndr_ref_t *);
+static int ndo_free(ndr_stream_t *, char *, ndr_ref_t *);
+static int ndo_grow_pdu(ndr_stream_t *, unsigned long, ndr_ref_t *);
+static int ndo_pad_pdu(ndr_stream_t *, unsigned long, unsigned long,
+    ndr_ref_t *);
+static int ndo_get_pdu(ndr_stream_t *, unsigned long, unsigned long,
+    char *, int, ndr_ref_t *);
+static int ndo_put_pdu(ndr_stream_t *, unsigned long, unsigned long,
+    char *, int, ndr_ref_t *);
+static void ndo_tattle(ndr_stream_t *, char *, ndr_ref_t *);
+static void ndo_tattle_error(ndr_stream_t *, ndr_ref_t *);
+static int ndo_reset(ndr_stream_t *);
+static void ndo_destruct(ndr_stream_t *);
+static void ndo_hexfmt(uint8_t *, int, int, char *, int);
 
 /*
- * The mlndr stream operations table.
+ * The ndr stream operations table.
  */
-static struct mlndr_stream_ops mlnds_ops = {
-    mlndo_malloc,
-    mlndo_free,
-    mlndo_grow_pdu,
-    mlndo_pad_pdu,
-    mlndo_get_pdu,
-    mlndo_put_pdu,
-    mlndo_tattle,
-    mlndo_tattle_error,
-    mlndo_reset,
-    mlndo_destruct
+static ndr_stream_ops_t nds_ops = {
+    ndo_malloc,
+    ndo_free,
+    ndo_grow_pdu,
+    ndo_pad_pdu,
+    ndo_get_pdu,
+    ndo_put_pdu,
+    ndo_tattle,
+    ndo_tattle_error,
+    ndo_reset,
+    ndo_destruct
 };
 
 /*
- * mlnds_bswap
+ * nds_bswap
  *
  * Copies len bytes from src to dst such that dst contains the bytes
  * from src in reverse order.
@@ -106,7 +101,7 @@ static struct mlndr_stream_ops mlnds_ops = {
  * length must be non-zero and a power of 2.
  */
 void
-mlnds_bswap(void *srcbuf, void *dstbuf, size_t len)
+nds_bswap(void *srcbuf, void *dstbuf, size_t len)
 {
 	uint8_t *src = (uint8_t *)srcbuf;
 	uint8_t *dst = (uint8_t *)dstbuf;
@@ -120,45 +115,45 @@ mlnds_bswap(void *srcbuf, void *dstbuf, size_t len)
 }
 
 /*
- * mlnds_initialize
+ * nds_initialize
  *
  * Initialize a stream. Sets up the PDU parameters and assigns the stream
  * operations and the reference to the heap. An external heap is provided
  * to the stream, rather than each stream creating its own heap.
  */
 void
-mlnds_initialize(struct mlndr_stream *mlnds, unsigned pdu_size_hint,
-    int composite_op, mlrpc_heap_t *heap)
+nds_initialize(ndr_stream_t *nds, unsigned pdu_size_hint,
+    int composite_op, ndr_heap_t *heap)
 {
 	unsigned size;
 
-	assert(mlnds);
+	assert(nds);
 	assert(heap);
 
-	bzero(mlnds, sizeof (*mlnds));
+	bzero(nds, sizeof (*nds));
 
 	if (pdu_size_hint > NDR_PDU_MAX_SIZE)
 		return;
 
 	size = (pdu_size_hint == 0) ? NDR_PDU_BLOCK_SIZE : pdu_size_hint;
-	mlnds->pdu_base_addr = malloc(size);
-	assert(mlnds->pdu_base_addr);
+	nds->pdu_base_addr = malloc(size);
+	assert(nds->pdu_base_addr);
 
-	mlnds->pdu_max_size = size;
-	mlnds->pdu_size = 0;
-	mlnds->pdu_base_offset = (unsigned long)mlnds->pdu_base_addr;
+	nds->pdu_max_size = size;
+	nds->pdu_size = 0;
+	nds->pdu_base_offset = (unsigned long)nds->pdu_base_addr;
 
-	mlnds->mlndo = &mlnds_ops;
-	mlnds->heap = (struct mlrpc_heap *)heap;
+	nds->ndo = &nds_ops;
+	nds->heap = (struct ndr_heap *)heap;
 
-	mlnds->m_op = composite_op & 0x0F;
-	mlnds->dir  = composite_op & 0xF0;
+	nds->m_op = NDR_MODE_TO_M_OP(composite_op);
+	nds->dir  = NDR_MODE_TO_DIR(composite_op);
 
-	mlnds->outer_queue_tailp = &mlnds->outer_queue_head;
+	nds->outer_queue_tailp = &nds->outer_queue_head;
 }
 
 void
-mlnds_finalize(struct mlndr_stream *mlnds, ndr_fraglist_t *frags)
+nds_finalize(ndr_stream_t *nds, ndr_fraglist_t *frags)
 {
 	iovec_t *iov;
 	ndr_frag_t *frag;
@@ -166,20 +161,20 @@ mlnds_finalize(struct mlndr_stream *mlnds, ndr_fraglist_t *frags)
 
 	bzero(frags, sizeof (ndr_fraglist_t));
 
-	for (frag = mlnds->frags.head; frag; frag = frag->next)
+	for (frag = nds->frags.head; frag; frag = frag->next)
 		size += frag->len;
 
 	if (size == 0 || size >= NDR_PDU_MAX_SIZE)
 		return;
 
-	frags->iov = malloc(mlnds->frags.nfrag * sizeof (iovec_t));
+	frags->iov = malloc(nds->frags.nfrag * sizeof (iovec_t));
 	if (frags->iov == NULL)
 		return;
 
-	frags->head = mlnds->frags.head;
-	frags->tail = mlnds->frags.tail;
-	frags->nfrag = mlnds->frags.nfrag;
-	bzero(&mlnds->frags, sizeof (ndr_fraglist_t));
+	frags->head = nds->frags.head;
+	frags->tail = nds->frags.tail;
+	frags->nfrag = nds->frags.nfrag;
+	bzero(&nds->frags, sizeof (ndr_fraglist_t));
 
 	frags->uio.uio_iov = frags->iov;
 	frags->uio.uio_iovcnt = frags->nfrag;
@@ -196,44 +191,43 @@ mlnds_finalize(struct mlndr_stream *mlnds, ndr_fraglist_t *frags)
 }
 
 /*
- * mlnds_destruct
+ * nds_destruct
  *
  * Destroy a stream. This is an external interface to provide access to
  * the stream's destruct operation.
  */
 void
-mlnds_destruct(struct mlndr_stream *mlnds)
+nds_destruct(ndr_stream_t *nds)
 {
-	MLNDS_DESTRUCT(mlnds);
+	NDS_DESTRUCT(nds);
 }
 
 /*
- * mlndo_malloc
+ * ndo_malloc
  *
  * Allocate memory from the stream heap.
  */
 /*ARGSUSED*/
 static char *
-mlndo_malloc(struct mlndr_stream *mlnds, unsigned len,
-    struct ndr_reference *ref)
+ndo_malloc(ndr_stream_t *nds, unsigned len, ndr_ref_t *ref)
 {
-	return (mlrpc_heap_malloc((mlrpc_heap_t *)mlnds->heap, len));
+	return (ndr_heap_malloc((ndr_heap_t *)nds->heap, len));
 }
 
 /*
- * mlndo_free
+ * ndo_free
  *
  * Always succeeds: cannot free individual stream allocations.
  */
 /*ARGSUSED*/
 static int
-mlndo_free(struct mlndr_stream *mlnds, char *p, struct ndr_reference *ref)
+ndo_free(ndr_stream_t *nds, char *p, ndr_ref_t *ref)
 {
 	return (1);
 }
 
 /*
- * mlndo_grow_pdu
+ * ndo_grow_pdu
  *
  * This is the only place that should change the size of the PDU. If the
  * desired offset is beyond the current PDU size, we realloc the PDU
@@ -244,15 +238,14 @@ mlndo_free(struct mlndr_stream *mlnds, char *p, struct ndr_reference *ref)
  * Returns 1 to indicate success. Otherwise 0 to indicate failure.
  */
 static int
-mlndo_grow_pdu(struct mlndr_stream *mlnds, unsigned long want_end_offset,
-    struct ndr_reference *ref)
+ndo_grow_pdu(ndr_stream_t *nds, unsigned long want_end_offset, ndr_ref_t *ref)
 {
 	unsigned char *pdu_addr;
 	unsigned pdu_max_size;
 
-	mlndo_printf(mlnds, ref, "grow %d", want_end_offset);
+	ndo_printf(nds, ref, "grow %d", want_end_offset);
 
-	pdu_max_size = mlnds->pdu_max_size;
+	pdu_max_size = nds->pdu_max_size;
 
 	if (want_end_offset > pdu_max_size) {
 		pdu_max_size = NDR_PDU_ALIGN(want_end_offset);
@@ -260,36 +253,36 @@ mlndo_grow_pdu(struct mlndr_stream *mlnds, unsigned long want_end_offset,
 		if (pdu_max_size >= NDR_PDU_MAX_SIZE)
 			return (0);
 
-		pdu_addr = realloc(mlnds->pdu_base_addr, pdu_max_size);
+		pdu_addr = realloc(nds->pdu_base_addr, pdu_max_size);
 		if (pdu_addr == 0)
 			return (0);
 
-		mlnds->pdu_max_size = pdu_max_size;
-		mlnds->pdu_base_addr = pdu_addr;
-		mlnds->pdu_base_offset = (unsigned long)pdu_addr;
+		nds->pdu_max_size = pdu_max_size;
+		nds->pdu_base_addr = pdu_addr;
+		nds->pdu_base_offset = (unsigned long)pdu_addr;
 	}
 
-	mlnds->pdu_size = want_end_offset;
+	nds->pdu_size = want_end_offset;
 	return (1);
 }
 
 static int
-mlndo_pad_pdu(struct mlndr_stream *mlnds, unsigned long pdu_offset,
-    unsigned long n_bytes, struct ndr_reference *ref)
+ndo_pad_pdu(ndr_stream_t *nds, unsigned long pdu_offset,
+    unsigned long n_bytes, ndr_ref_t *ref)
 {
 	unsigned char *data;
 
-	data = (unsigned char *)mlnds->pdu_base_offset;
+	data = (unsigned char *)nds->pdu_base_offset;
 	data += pdu_offset;
 
-	mlndo_printf(mlnds, ref, "pad %d@%-3d", n_bytes, pdu_offset);
+	ndo_printf(nds, ref, "pad %d@%-3d", n_bytes, pdu_offset);
 
 	bzero(data, n_bytes);
 	return (1);
 }
 
 /*
- * mlndo_get_pdu
+ * ndo_get_pdu
  *
  * The swap flag is 1 if NDR knows that the byte-order in the PDU
  * is different from the local system.
@@ -297,50 +290,48 @@ mlndo_pad_pdu(struct mlndr_stream *mlnds, unsigned long pdu_offset,
  * Returns 1 on success or 0 to indicate failure.
  */
 static int
-mlndo_get_pdu(struct mlndr_stream *mlnds, unsigned long pdu_offset,
-    unsigned long n_bytes, char *buf, int swap_bytes,
-    struct ndr_reference *ref)
+ndo_get_pdu(ndr_stream_t *nds, unsigned long pdu_offset,
+    unsigned long n_bytes, char *buf, int swap_bytes, ndr_ref_t *ref)
 {
 	unsigned char *data;
 	char hexbuf[NDOBUFSZ];
 
-	data = (unsigned char *)mlnds->pdu_base_offset;
+	data = (unsigned char *)nds->pdu_base_offset;
 	data += pdu_offset;
 
-	mlndo_hexfmt(data, n_bytes, swap_bytes, hexbuf, NDOBUFSZ);
+	ndo_hexfmt(data, n_bytes, swap_bytes, hexbuf, NDOBUFSZ);
 
-	mlndo_printf(mlnds, ref, "get %d@%-3d = %s",
+	ndo_printf(nds, ref, "get %d@%-3d = %s",
 	    n_bytes, pdu_offset, hexbuf);
 
 	if (!swap_bytes)
 		bcopy(data, buf, n_bytes);
 	else
-		mlnds_bswap(data, (unsigned char *)buf, n_bytes);
+		nds_bswap(data, (unsigned char *)buf, n_bytes);
 
 	return (1);
 }
 
 /*
- * mlndo_put_pdu
+ * ndo_put_pdu
  *
  * This is a receiver makes right protocol. So we do not need
  * to be concerned about the byte-order of an outgoing PDU.
  */
 /*ARGSUSED*/
 static int
-mlndo_put_pdu(struct mlndr_stream *mlnds, unsigned long pdu_offset,
-    unsigned long n_bytes, char *buf, int swap_bytes,
-    struct ndr_reference *ref)
+ndo_put_pdu(ndr_stream_t *nds, unsigned long pdu_offset,
+    unsigned long n_bytes, char *buf, int swap_bytes, ndr_ref_t *ref)
 {
 	unsigned char *data;
 	char hexbuf[NDOBUFSZ];
 
-	data = (unsigned char *)mlnds->pdu_base_offset;
+	data = (unsigned char *)nds->pdu_base_offset;
 	data += pdu_offset;
 
-	mlndo_hexfmt((uint8_t *)buf, n_bytes, 0, hexbuf, NDOBUFSZ);
+	ndo_hexfmt((uint8_t *)buf, n_bytes, 0, hexbuf, NDOBUFSZ);
 
-	mlndo_printf(mlnds, ref, "put %d@%-3d = %s",
+	ndo_printf(nds, ref, "put %d@%-3d = %s",
 	    n_bytes, pdu_offset, hexbuf);
 
 	bcopy(buf, data, n_bytes);
@@ -348,89 +339,90 @@ mlndo_put_pdu(struct mlndr_stream *mlnds, unsigned long pdu_offset,
 }
 
 static void
-mlndo_tattle(struct mlndr_stream *mlnds, char *what,
-    struct ndr_reference *ref)
+ndo_tattle(ndr_stream_t *nds, char *what, ndr_ref_t *ref)
 {
-	mlndo_printf(mlnds, ref, what);
+	ndo_printf(nds, ref, what);
 }
 
 static void
-mlndo_tattle_error(struct mlndr_stream *mlnds, struct ndr_reference *ref)
+ndo_tattle_error(ndr_stream_t *nds, ndr_ref_t *ref)
 {
 	unsigned char *data;
 	char hexbuf[NDOBUFSZ];
 
-	data = (unsigned char *)mlnds->pdu_base_offset;
+	data = (unsigned char *)nds->pdu_base_offset;
 	if (ref)
 		data += ref->pdu_offset;
 	else
-		data += mlnds->pdu_scan_offset;
+		data += nds->pdu_scan_offset;
 
-	mlndo_hexfmt(data, 16, 0, hexbuf, NDOBUFSZ);
+	ndo_hexfmt(data, 16, 0, hexbuf, NDOBUFSZ);
 
-	mlndo_printf(mlnds, ref, "ERROR=%d REF=%d OFFSET=%d SIZE=%d/%d",
-	    mlnds->error, mlnds->error_ref, mlnds->pdu_scan_offset,
-	    mlnds->pdu_size, mlnds->pdu_max_size);
-	mlndo_printf(mlnds, ref, "      %s", hexbuf);
+	ndo_printf(nds, ref, "ERROR=%d REF=%d OFFSET=%d SIZE=%d/%d",
+	    nds->error, nds->error_ref, nds->pdu_scan_offset,
+	    nds->pdu_size, nds->pdu_max_size);
+	ndo_printf(nds, ref, "      %s", hexbuf);
 }
 
 /*
- * mlndo_reset
+ * ndo_reset
  *
  * Reset a stream: zap the outer_queue. We don't need to tamper
  * with the stream heap: it's handled externally to the stream.
  */
 static int
-mlndo_reset(struct mlndr_stream *mlnds)
+ndo_reset(ndr_stream_t *nds)
 {
-	mlndo_printf(mlnds, 0, "reset");
+	ndo_printf(nds, 0, "reset");
 
-	mlnds->pdu_size = 0;
-	mlnds->pdu_scan_offset = 0;
-	mlnds->outer_queue_head = 0;
-	mlnds->outer_current = 0;
-	mlnds->outer_queue_tailp = &mlnds->outer_queue_head;
+	nds->pdu_size = 0;
+	nds->pdu_scan_offset = 0;
+	nds->outer_queue_head = 0;
+	nds->outer_current = 0;
+	nds->outer_queue_tailp = &nds->outer_queue_head;
 
 	return (1);
 }
 
 /*
- * mlndo_destruct
+ * ndo_destruct
  *
  * Destruct a stream: zap the outer_queue.
  * Note: heap management (creation/destruction) is external to the stream.
  */
 static void
-mlndo_destruct(struct mlndr_stream *mlnds)
+ndo_destruct(ndr_stream_t *nds)
 {
 	ndr_frag_t *frag;
 
-	mlndo_printf(mlnds, 0, "destruct");
+	ndo_printf(nds, 0, "destruct");
 
-	if (mlnds->pdu_base_addr != NULL) {
-		free(mlnds->pdu_base_addr);
-		mlnds->pdu_base_addr = NULL;
-		mlnds->pdu_base_offset = 0;
+	if (nds == NULL)
+		return;
+
+	if (nds->pdu_base_addr != NULL) {
+		free(nds->pdu_base_addr);
+		nds->pdu_base_addr = NULL;
+		nds->pdu_base_offset = 0;
 	}
 
-	while ((frag = mlnds->frags.head) != NULL) {
-		mlnds->frags.head = frag->next;
+	while ((frag = nds->frags.head) != NULL) {
+		nds->frags.head = frag->next;
 		free(frag);
 	}
 
-	bzero(&mlnds->frags, sizeof (ndr_fraglist_t));
+	bzero(&nds->frags, sizeof (ndr_fraglist_t));
 
-	mlnds->outer_queue_head = 0;
-	mlnds->outer_current = 0;
-	mlnds->outer_queue_tailp = &mlnds->outer_queue_head;
+	nds->outer_queue_head = 0;
+	nds->outer_current = 0;
+	nds->outer_queue_tailp = &nds->outer_queue_head;
 }
 
 /*
  * Printf style formatting for NDR operations.
  */
 void
-mlndo_printf(struct mlndr_stream *mlnds, struct ndr_reference *ref,
-    const char *fmt, ...)
+ndo_printf(ndr_stream_t *nds, ndr_ref_t *ref, const char *fmt, ...)
 {
 	va_list ap;
 	char buf[NDOBUFSZ];
@@ -439,10 +431,10 @@ mlndo_printf(struct mlndr_stream *mlnds, struct ndr_reference *ref,
 	(void) vsnprintf(buf, NDOBUFSZ, fmt, ap);
 	va_end(ap);
 
-	if (mlnds)
-		mlndo_fmt(mlnds, ref, buf);
+	if (nds)
+		ndo_fmt(nds, ref, buf);
 	else
-		mlndo_trace(buf);
+		ndo_trace(buf);
 }
 
 /*
@@ -459,22 +451,22 @@ mlndo_printf(struct mlndr_stream *mlnds, struct ndr_reference *ref,
  *	{05}    Value
  */
 void
-mlndo_fmt(struct mlndr_stream *mlnds, struct ndr_reference *ref, char *note)
+ndo_fmt(ndr_stream_t *nds, ndr_ref_t *ref, char *note)
 {
-	struct ndr_reference *p;
-	int			indent;
-	char			ref_name[NDOBUFSZ];
-	char			buf[NDOBUFSZ];
-	int			m_op_c = '?', dir_c = '?';
+	ndr_ref_t	*p;
+	int		indent;
+	char		ref_name[NDOBUFSZ];
+	char		buf[NDOBUFSZ];
+	int		m_op_c = '?', dir_c = '?';
 
-	switch (mlnds->m_op) {
+	switch (nds->m_op) {
 	case 0:				m_op_c = '-';	break;
 	case NDR_M_OP_MARSHALL:		m_op_c = 'M';	break;
 	case NDR_M_OP_UNMARSHALL:	m_op_c = 'U';	break;
 	default:			m_op_c = '?';	break;
 	}
 
-	switch (mlnds->dir) {
+	switch (nds->dir) {
 	case 0:				dir_c = '-';	break;
 	case NDR_DIR_IN:		dir_c = 'I';	break;
 	case NDR_DIR_OUT:		dir_c = 'O';	break;
@@ -501,12 +493,12 @@ mlndo_fmt(struct mlndr_stream *mlnds, struct ndr_reference *ref, char *note)
 	    "....+....+....+....+....+....",
 	    20 - indent, ref_name, note);
 
-	mlndo_trace(buf);
+	ndo_trace(buf);
 }
 
 /*ARGSUSED*/
 void
-mlndo_trace(const char *s)
+ndo_trace(const char *s)
 {
 	/*
 	 * Temporary fbt for dtrace until user space sdt enabled.
@@ -522,7 +514,7 @@ mlndo_trace(const char *s)
  * be inserted before the closing brace.
  */
 static void
-mlndo_hexfmt(uint8_t *data, int size, int swap_bytes, char *buf, int len)
+ndo_hexfmt(uint8_t *data, int size, int swap_bytes, char *buf, int len)
 {
 	char *p = buf;
 	int interp = 1;

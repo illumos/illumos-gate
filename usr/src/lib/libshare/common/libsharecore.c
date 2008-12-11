@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * core library for common functions across all config store types
  * and file systems to be exported. This includes legacy dfstab/sharetab
@@ -45,7 +43,7 @@
 #include "libshare.h"
 #include "libshare_impl.h"
 #include <fcntl.h>
-#include <sys/stat.h>
+#include <thread.h>
 #include <grp.h>
 #include <limits.h>
 #include <sys/param.h>
@@ -70,6 +68,8 @@ static char *notice[DFSTAB_NOTICE_LINES] =	{
 /* will be much smaller, but this handles bad syntax in the file */
 #define	MAXARGSFORSHARE	256
 
+static mutex_t sharetab_lock = DEFAULTMUTEX;
+
 /* used internally only */
 typedef
 struct sharelist {
@@ -85,7 +85,7 @@ struct sharelist {
     int lineno;
 } xfs_sharelist_t;
 static void parse_dfstab(sa_handle_t, char *, xmlNodePtr);
-extern char *get_token(char *);
+extern char *_sa_get_token(char *);
 static void dfs_free_list(xfs_sharelist_t *);
 /* prototypes */
 void getlegacyconfig(sa_handle_t, char *, xmlNodePtr *);
@@ -247,9 +247,9 @@ getdfstab(FILE *dfs)
 			}
 			item->lineno = line;
 			item->origline = strdup(buff);
-			(void) get_token(NULL); /* reset to new pointers */
+			(void) _sa_get_token(NULL); /* reset to new pointers */
 			argc = 0;
-			while ((token = get_token(bp)) != NULL) {
+			while ((token = _sa_get_token(bp)) != NULL) {
 				if (argc < MAXARGSFORSHARE)
 					args[argc++] = token;
 			}
@@ -1361,10 +1361,16 @@ get_share_list(int *errp)
 	if ((fp = fopen(SHARETAB, "r")) != NULL) {
 		struct share	*sharetab_entry;
 
+		(void) lockf(fileno(fp), F_LOCK, 0);
+		(void) mutex_lock(&sharetab_lock);
+
 		while (getshare(fp, &sharetab_entry) > 0) {
 			newp = alloc_sharelist();
-			if (newp == NULL)
+			if (newp == NULL) {
+				(void) mutex_unlock(&sharetab_lock);
+				(void) lockf(fileno(fp), F_ULOCK, 0);
 				goto err;
+			}
 
 			/*
 			 * Link into the list here so we don't leak
@@ -1379,21 +1385,21 @@ get_share_list(int *errp)
 			}
 
 			newp->path = strdup(sharetab_entry->sh_path);
-			if (newp->path == NULL)
-				goto err;
 			newp->resource = strdup(sharetab_entry->sh_res);
-			if (newp->resource == NULL)
-				goto err;
 			newp->fstype = strdup(sharetab_entry->sh_fstype);
-			if (newp->fstype == NULL)
-				goto err;
 			newp->options = strdup(sharetab_entry->sh_opts);
-			if (newp->options == NULL)
-				goto err;
 			newp->description = strdup(sharetab_entry->sh_descr);
-			if (newp->description == NULL)
+
+			if (newp->path == NULL || newp->resource == NULL ||
+			    newp->fstype == NULL || newp->options == NULL ||
+			    newp->description == NULL) {
+				(void) mutex_unlock(&sharetab_lock);
+				(void) lockf(fileno(fp), F_ULOCK, 0);
 				goto err;
+			}
 		}
+
+		(void) mutex_unlock(&sharetab_lock);
 		(void) lockf(fileno(fp), F_ULOCK, 0);
 		(void) fclose(fp);
 	} else {

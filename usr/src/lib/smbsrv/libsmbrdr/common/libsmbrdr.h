@@ -26,13 +26,17 @@
 #ifndef	_LIBSMBRDR_H
 #define	_LIBSMBRDR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <smbsrv/libsmb.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+typedef struct smbrdr_session_info {
+	int si_server_os;
+	int si_server_lm;
+	int si_dc_type;
+} smbrdr_session_info_t;
 
 /*
  * Redirector IPC functions
@@ -44,7 +48,6 @@ extern "C" {
 extern void smbrdr_ipc_set(char *, unsigned char *);
 extern void smbrdr_ipc_commit(void);
 extern void smbrdr_ipc_rollback(void);
-extern int smbrdr_ipc_skip_lsa_query(void);
 extern char *smbrdr_ipc_get_user(void);
 extern unsigned char *smbrdr_ipc_get_passwd(void);
 
@@ -55,14 +58,14 @@ extern int mlsvc_logon(char *, char *, char *);
 extern int smbrdr_readx(int, char *, int);
 
 
-/* Redirector rpcpipe functions */
-extern int mlsvc_open_pipe(char *, char *, char *, char *);
-extern int mlsvc_close_pipe(int);
+/* Redirector named pipe functions */
+extern int smbrdr_open_pipe(char *, char *, char *, char *);
+extern int smbrdr_close_pipe(int);
 
 
 /* Redirector session functions */
 extern void smbrdr_init(void);
-extern int mlsvc_session_native_values(int, int *, int *, int *);
+extern int smbrdr_session_info(int, smbrdr_session_info_t *);
 extern int mlsvc_echo(char *);
 extern void mlsvc_disconnect(char *);
 

@@ -28,7 +28,9 @@ SUNWprivate {
     global:
 	dssetup_clear_domain_info;
 	lsa_enum_trusted_domains;
+	lsa_free_info;
 	lsa_query_account_domain_info;
+	lsa_query_dns_domain_info;
 	lsa_query_primary_domain_info;
 	mlsvc_get_door_fd;
 	mlsvc_get_num_users;
@@ -42,6 +44,8 @@ SUNWprivate {
 	mlsvc_set_share;
 	smb_autohome_add;
 	smb_autohome_remove;
+	smb_domain_getinfo;
+	smb_locate_dc;
 	smb_logon;
 	smb_shr_add;
 	smb_shr_chkname;
@@ -51,6 +55,7 @@ SUNWprivate {
 	smb_shr_iterate;
 	smb_shr_iterinit;
 	smb_shr_list;
+	smb_shr_load;
 	smb_shr_modify;
 	smb_shr_remove;
 	smb_shr_rename;

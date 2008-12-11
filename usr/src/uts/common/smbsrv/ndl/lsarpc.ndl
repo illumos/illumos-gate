@@ -26,8 +26,6 @@
 #ifndef _MLSVC_LSA_NDL_
 #define _MLSVC_LSA_NDL_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  ***********************************************************************
  * Local Security Authority RPC (LSARPC) interface definition.
@@ -171,15 +169,7 @@ struct mslsa_string_desc {
 };
 typedef struct mslsa_string_desc mslsa_string_t;
 
-
-struct mslsa_handle {
-	DWORD hand1;
-	DWORD hand2;
-	WORD  hand3[2];
-	BYTE  hand4[8];
-};
-typedef struct mslsa_handle	mslsa_handle_t;
-
+CONTEXT_HANDLE(mslsa_handle) mslsa_handle_t;
 
 struct mslsa_luid {
 	DWORD low_part;
@@ -187,6 +177,13 @@ struct mslsa_luid {
 };
 typedef struct mslsa_luid mslsa_luid_t;
 
+struct mslsa_guid {
+	DWORD	data1;
+	WORD	data2;
+	WORD	data3;
+	BYTE	data4[8];
+};
+typedef struct mslsa_guid mslsa_guid_t;
 
 /*
  ***********************************************************************
@@ -546,7 +543,7 @@ struct mslsa_LookupNames {
 #define MSLSA_POLICY_DB_INFO			9
 #define MSLSA_POLICY_AUDIT_SET_INFO		10
 #define MSLSA_POLICY_AUDIT_QUERY_INFO		11
-#define MSLSA_POLICY_DNS_INFO			12
+#define MSLSA_POLICY_DNS_DOMAIN_INFO		12
 
 #define	LSA_ROLE_STANDALONE_WORKSTATION		0
 #define	LSA_ROLE_MEMBER_WORKSTATION		1
@@ -589,15 +586,33 @@ struct mslsa_ServerRoleInfo {
 	DWORD pad;
 };
 
+struct mslsa_DnsDomainInfo {
+	struct mslsa_string_desc nb_domain;
+	struct mslsa_string_desc dns_domain;
+	struct mslsa_string_desc forest;
+	struct mslsa_guid guid;
+	struct mslsa_sid *sid;
+};
+
 union mslsa_PolicyInfoResUnion {
 	CASE(2) struct mslsa_AuditEventsInfo audit_events;
 	CASE(3) struct mslsa_PrimaryDomainInfo pd_info;
 	CASE(5) struct mslsa_AccountDomainInfo ad_info;
 	CASE(6) struct mslsa_ServerRoleInfo server_role;
+	CASE(12) struct mslsa_DnsDomainInfo dns_info;
 	DEFAULT	char *nullptr;
 };
 
-struct mslsa_PolicyInfo {
+/*
+ * This structure needs to be declared, even though it can't be used in
+ * mslsa_QueryInfoPolicy, in order to get the appropriate size to calculate
+ * the correct fixup offsets.  If ndrgen did the right thing,
+ * mslsa_PolicyInfoRes would be one of the out parameters.  However, if
+ * we do it that way, the switch_value isn't known early enough to do
+ * the fixup calculation.  So it all has to go in mslsa_QueryInfoPolicy.
+ */
+struct mslsa_PolicyInfoRes {
+	DWORD address;
 	WORD switch_value;
     SWITCH(switch_value)
 	union mslsa_PolicyInfoResUnion ru;
@@ -607,9 +622,18 @@ OPERATION(LSARPC_OPNUM_QueryInfoPolicy)
 struct mslsa_QueryInfoPolicy {
 	IN	mslsa_handle_t handle;
 	IN	WORD info_class;
-	OUT	struct mslsa_PolicyInfo *info;
+	/*
+	 * Can't use this form because we need to include members explicitly.
+	 * OUT	struct mslsa_PolicyInfoRes result;
+	 */
+	OUT	DWORD address;
+	OUT	WORD switch_value;
+    SWITCH(switch_value)
+	OUT	union mslsa_PolicyInfoResUnion ru;
 	OUT	DWORD status;
 };
+
+
 
 /*
  ***********************************************************************
@@ -629,7 +653,8 @@ struct mslsa_OpenAccount {
 };
 
 
-/*
+
+ /*
  ***********************************************************************
  * EnumPrivilegesAccount.
  *

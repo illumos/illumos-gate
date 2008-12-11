@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _MLSVC_LOGR_NDL_
 #define _MLSVC_LOGR_NDL_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  ***********************************************************************
@@ -47,14 +45,8 @@
 #define LOGR_INFOLEN	200
 #define LOGR_RECBUFLEN	0x4000
 
-struct logr_handle {
-	DWORD hand1;
-	DWORD hand2;
-	WORD  hand3[2];
-	BYTE  hand4[8];
-};
 
-typedef struct logr_handle logr_handle_t;
+CONTEXT_HANDLE(logr_handle) logr_handle_t;
 
 
 struct logr_string {

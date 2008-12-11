@@ -33,7 +33,6 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <stdlib.h>
-
 #include <sys/time.h>
 #include <sys/systm.h>
 
@@ -41,12 +40,10 @@
 #include <smbsrv/libsmbrdr.h>
 #include <smbsrv/libsmbns.h>
 #include <smbsrv/libmlsvc.h>
-
 #include <smbsrv/smbinfo.h>
-#include <smbsrv/lsalib.h>
-#include <smbsrv/samlib.h>
-#include <smbsrv/mlsvc_util.h>
-#include <smbsrv/mlsvc.h>
+#include <lsalib.h>
+#include <samlib.h>
+#include <smbsrv/netrauth.h>
 
 /* Domain join support (using MS-RPC) */
 static boolean_t mlsvc_ntjoin_support = B_FALSE;
@@ -111,7 +108,7 @@ mlsvc_lookup_name(char *account, smb_sid_t **sid, uint16_t *sid_type)
 	if ((ainfo = mlsvc_alloc_user_info()) == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
-	status = lsa_lookup_name(NULL, account, *sid_type, ainfo);
+	status = lsa_lookup_name(account, *sid_type, ainfo);
 	if (status == NT_STATUS_SUCCESS) {
 		*sid = ainfo->user_sid;
 		ainfo->user_sid = NULL;
@@ -261,74 +258,6 @@ mlsvc_setadmin_user_info(smb_userinfo_t *user_info)
 	}
 }
 
-/*
- * mlsvc_string_save
- *
- * This is a convenience function to prepare strings for an RPC call.
- * An ms_string_t is set up with the appropriate lengths and str is
- * set up to point to a copy of the original string on the heap. The
- * macro MLRPC_HEAP_STRSAVE is an alias for mlrpc_heap_strsave, which
- * extends the heap and copies the string into the new area.
- */
-int
-mlsvc_string_save(ms_string_t *ms, char *str, struct mlrpc_xaction *mxa)
-{
-	if (str == NULL)
-		return (0);
-
-	ms->length = mts_wcequiv_strlen(str);
-	ms->allosize = ms->length + sizeof (mts_wchar_t);
-
-	if ((ms->str = MLRPC_HEAP_STRSAVE(mxa, str)) == NULL)
-		return (0);
-
-	return (1);
-}
-
-/*
- * mlsvc_sid_save
- *
- * Expand the heap and copy the sid into the new area.
- * Returns a pointer to the copy of the sid on the heap.
- */
-smb_sid_t *
-mlsvc_sid_save(smb_sid_t *sid, struct mlrpc_xaction *mxa)
-{
-	smb_sid_t *heap_sid;
-	unsigned size;
-
-	if (sid == NULL)
-		return (NULL);
-
-	size = smb_sid_len(sid);
-
-	if ((heap_sid = (smb_sid_t *)MLRPC_HEAP_MALLOC(mxa, size)) == NULL)
-		return (0);
-
-	bcopy(sid, heap_sid, size);
-	return (heap_sid);
-}
-
-/*
- * mlsvc_is_null_handle
- *
- * Check a handle against a null handle. Returns 1 if the handle is
- * null. Otherwise returns 0.
- */
-int
-mlsvc_is_null_handle(mlsvc_handle_t *handle)
-{
-	static ms_handle_t zero_handle;
-
-	if (handle == NULL || handle->context == NULL)
-		return (1);
-
-	if (!memcmp(&handle->handle, &zero_handle, sizeof (ms_handle_t)))
-		return (1);
-
-	return (0);
-}
-
 DWORD
 mlsvc_netlogon(char *server, char *domain)
 {
@@ -352,58 +281,40 @@ mlsvc_netlogon(char *server, char *domain)
  * Returns NT status codes.
  */
 DWORD
-mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
+mlsvc_join(smb_domain_t *dinfo, char *user, char *plain_text)
 {
 	smb_auth_info_t auth;
-	smb_ntdomain_t *di;
 	int erc;
 	DWORD status;
-	char machine_passwd[MLSVC_MACHINE_ACCT_PASSWD_MAX];
-	char fqdn[MAXHOSTNAMELEN];
+	char machine_passwd[NETR_MACHINE_ACCT_PASSWD_MAX];
 
 	machine_passwd[0] = '\0';
 
 	/*
 	 * Ensure that the domain name is uppercase.
 	 */
-	(void) utf8_strupr(domain);
+	(void) utf8_strupr(dinfo->d_nbdomain);
 
-	/*
-	 * There is no point continuing if the domain information is
-	 * not available. Wait for up to 10 seconds and then give up.
-	 */
-	if ((di = smb_getdomaininfo(10)) == 0) {
-		status = NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
-		return (status);
-	}
-
-	if (strcasecmp(domain, di->domain) != 0) {
-		status = NT_STATUS_INVALID_PARAMETER;
-		return (status);
-	}
-
-	erc = mlsvc_logon(server, domain, plain_user);
+	erc = mlsvc_logon(dinfo->d_dc, dinfo->d_nbdomain, user);
 
 	if (erc == AUTH_USER_GRANT) {
 		if (mlsvc_ntjoin_support == B_FALSE) {
-			if (smb_resolve_fqdn(domain, fqdn, MAXHOSTNAMELEN) != 1)
-				return (NT_STATUS_INVALID_PARAMETER);
 
-			if (smb_ads_join(fqdn, plain_user, plain_text,
+			if (smb_ads_join(dinfo->d_fqdomain, user, plain_text,
 			    machine_passwd, sizeof (machine_passwd))
 			    == SMB_ADJOIN_SUCCESS)
 				status = NT_STATUS_SUCCESS;
 			else
 				status = NT_STATUS_UNSUCCESSFUL;
 		} else {
-			if (mlsvc_user_getauth(server, plain_user, &auth)
+			if (mlsvc_user_getauth(dinfo->d_dc, user, &auth)
 			    != 0) {
 				status = NT_STATUS_INVALID_PARAMETER;
 				return (status);
 			}
 
-			status = sam_create_trust_account(server, domain,
-			    &auth);
+			status = sam_create_trust_account(dinfo->d_dc,
+			    dinfo->d_nbdomain, &auth);
 			if (status == NT_STATUS_SUCCESS) {
 				(void) smb_getnetbiosname(machine_passwd,
 				    sizeof (machine_passwd));
@@ -412,12 +323,12 @@ mlsvc_join(char *server, char *domain, char *plain_user, char *plain_text)
 		}
 
 		if (status == NT_STATUS_SUCCESS) {
-			erc = smb_setdomainprops(NULL, server,
+			erc = smb_setdomainprops(NULL, dinfo->d_dc,
 			    machine_passwd);
 			if (erc != 0)
 				return (NT_STATUS_UNSUCCESSFUL);
 
-			status = mlsvc_netlogon(server, domain);
+			status = mlsvc_netlogon(dinfo->d_dc, dinfo->d_nbdomain);
 		}
 	} else {
 		status = NT_STATUS_LOGON_FAILURE;

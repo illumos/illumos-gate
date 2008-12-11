@@ -55,8 +55,6 @@
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/cifs.h>
 #include <smbsrv/netrauth.h>
-#include <smbsrv/mlsvc.h>
-#include <smbsrv/mlsvc_util.h>
 #include <smbsrv/ndl/srvsvc.ndl>
 #include <smbsrv/smb_common_door.h>
 
@@ -83,31 +81,31 @@ typedef struct srvsvc_enum {
 	uint32_t se_n_read;
 } srvsvc_enum_t;
 
-static DWORD srvsvc_NetFileEnum2(struct mlrpc_xaction *,
+static DWORD srvsvc_NetFileEnum2(ndr_xa_t *,
     struct mslm_NetFileEnum *);
-static DWORD srvsvc_NetFileEnum3(struct mlrpc_xaction *,
+static DWORD srvsvc_NetFileEnum3(ndr_xa_t *,
     struct mslm_NetFileEnum *);
 
 static DWORD mlsvc_NetSessionEnumLevel0(struct mslm_infonres *, DWORD,
-    struct mlrpc_xaction *);
+    ndr_xa_t *);
 static DWORD mlsvc_NetSessionEnumLevel1(struct mslm_infonres *, DWORD,
-    struct mlrpc_xaction *);
+    ndr_xa_t *);
 
-static DWORD mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *,
+static DWORD mlsvc_NetShareEnumLevel0(ndr_xa_t *,
     struct mslm_infonres *, srvsvc_enum_t *, int);
-static DWORD mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *,
+static DWORD mlsvc_NetShareEnumLevel1(ndr_xa_t *,
     struct mslm_infonres *, srvsvc_enum_t *, int);
-static DWORD mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *,
+static DWORD mlsvc_NetShareEnumLevel2(ndr_xa_t *,
     struct mslm_infonres *, srvsvc_enum_t *, int);
-static DWORD mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *,
+static DWORD mlsvc_NetShareEnumLevel501(ndr_xa_t *,
     struct mslm_infonres *, srvsvc_enum_t *, int);
-static DWORD mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *,
+static DWORD mlsvc_NetShareEnumLevel502(ndr_xa_t *,
     struct mslm_infonres *, srvsvc_enum_t *, int);
-static DWORD mlsvc_NetShareEnumCommon(struct mlrpc_xaction *,
+static DWORD mlsvc_NetShareEnumCommon(ndr_xa_t *,
     srvsvc_enum_t *, smb_share_t *, void *);
-static boolean_t srvsvc_add_autohome(struct mlrpc_xaction *, srvsvc_enum_t *,
+static boolean_t srvsvc_add_autohome(ndr_xa_t *, srvsvc_enum_t *,
     void *);
-static char *srvsvc_share_mkpath(struct mlrpc_xaction *, char *);
+static char *srvsvc_share_mkpath(ndr_xa_t *, char *);
 
 static uint32_t srvsvc_estimate_objcnt(uint32_t, uint32_t, uint32_t);
 
@@ -116,15 +114,15 @@ static uint32_t srvsvc_sa_delete(char *);
 
 static char empty_string[1];
 
-static mlrpc_stub_table_t srvsvc_stub_table[];
+static ndr_stub_table_t srvsvc_stub_table[];
 
-static mlrpc_service_t srvsvc_service = {
+static ndr_service_t srvsvc_service = {
 	"SRVSVC",			/* name */
 	"Server services",		/* desc */
 	"\\srvsvc",			/* endpoint */
 	PIPE_NTSVCS,			/* sec_addr_port */
-	"4b324fc8-1670-01d3-12785a47bf6ee188", 3,	/* abstract */
-	"8a885d04-1ceb-11c9-9fe808002b104860", 2,	/* transfer */
+	"4b324fc8-1670-01d3-1278-5a47bf6ee188", 3,	/* abstract */
+	NDR_TRANSFER_SYNTAX_UUID,		2,	/* transfer */
 	0,				/* no bind_instance_size */
 	0,				/* no bind_req() */
 	0,				/* no unbind_and_close() */
@@ -143,7 +141,7 @@ static mlrpc_service_t srvsvc_service = {
 void
 srvsvc_initialize(void)
 {
-	(void) mlrpc_register_service(&srvsvc_service);
+	(void) ndr_svc_register(&srvsvc_service);
 }
 
 /*
@@ -153,13 +151,13 @@ srvsvc_initialize(void)
  * Current level 0 and level 1 connection info are supported.
  *
  * Level 1 request is made by 'srvmgr' (Server Manager)
- * utility of NT Server part of NT Domain to MLRPC server
+ * utility of NT Server part of NT Domain to RPC server
  * while double click of share info icon. These values
- * are currectly virtual to MLRPC client and does't
+ * are currectly virtual to RPC client and does't
  * reflect the real state of server.
  */
 static int
-srvsvc_s_NetConnectEnum(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetConnectEnum(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetConnectEnum *param = arg;
 	struct mslm_NetConnectInfoBuf0 *ci0;
@@ -169,7 +167,7 @@ srvsvc_s_NetConnectEnum(void *arg, struct mlrpc_xaction *mxa)
 	status = ERROR_SUCCESS;
 	switch (param->info.level) {
 	case 0:
-		ci0 = MLRPC_HEAP_NEW(mxa, struct mslm_NetConnectInfoBuf0);
+		ci0 = NDR_NEW(mxa, struct mslm_NetConnectInfoBuf0);
 		if (ci0 == 0) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
@@ -177,7 +175,7 @@ srvsvc_s_NetConnectEnum(void *arg, struct mlrpc_xaction *mxa)
 		ci0->coni0_id = 0x17;
 
 		param->info.ru.info0
-		    = MLRPC_HEAP_NEW(mxa, struct mslm_NetConnectInfo0);
+		    = NDR_NEW(mxa, struct mslm_NetConnectInfo0);
 
 		if (param->info.ru.info0 == 0) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
@@ -191,7 +189,7 @@ srvsvc_s_NetConnectEnum(void *arg, struct mlrpc_xaction *mxa)
 		break;
 
 	case 1:
-		ci1 = MLRPC_HEAP_NEW(mxa, struct mslm_NetConnectInfoBuf1);
+		ci1 = NDR_NEW(mxa, struct mslm_NetConnectInfoBuf1);
 		if (ci1 == 0) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
@@ -202,12 +200,12 @@ srvsvc_s_NetConnectEnum(void *arg, struct mlrpc_xaction *mxa)
 		ci1->coni1_num_users = 1;
 		ci1->coni1_time = 16;
 		ci1->coni1_username =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, "Administrator");
+		    (unsigned char *)NDR_STRDUP(mxa, "Administrator");
 
 		ci1->coni1_netname =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, "IPC$");
+		    (unsigned char *)NDR_STRDUP(mxa, "IPC$");
 
-		param->info.ru.info1 = MLRPC_HEAP_NEW(mxa,
+		param->info.ru.info1 = NDR_NEW(mxa,
 		    struct mslm_NetConnectInfo1);
 
 		if (param->info.ru.info1 == 0) {
@@ -230,7 +228,7 @@ srvsvc_s_NetConnectEnum(void *arg, struct mlrpc_xaction *mxa)
 		bzero(param, sizeof (struct mslm_NetConnectEnum));
 
 	param->status = status;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -286,7 +284,7 @@ srvsvc_s_NetConnectEnum(void *arg, struct mlrpc_xaction *mxa)
  * NERR_BufTooSmall         The supplied buffer is too small.
  */
 static int
-srvsvc_s_NetFileEnum(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetFileEnum(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetFileEnum *param = arg;
 	DWORD status;
@@ -294,7 +292,7 @@ srvsvc_s_NetFileEnum(void *arg, struct mlrpc_xaction *mxa)
 	if (!ndr_is_admin(mxa)) {
 		bzero(param, sizeof (struct mslm_NetFileEnum));
 		param->status = ERROR_ACCESS_DENIED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	switch (param->info.switch_value) {
@@ -318,14 +316,14 @@ srvsvc_s_NetFileEnum(void *arg, struct mlrpc_xaction *mxa)
 	if (status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct mslm_NetFileEnum));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (param->resume_handle)
 		*param->resume_handle = 0;
 
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -335,11 +333,11 @@ srvsvc_s_NetFileEnum(void *arg, struct mlrpc_xaction *mxa)
  * fields have been set up.
  */
 static DWORD
-srvsvc_NetFileEnum2(struct mlrpc_xaction *mxa, struct mslm_NetFileEnum *param)
+srvsvc_NetFileEnum2(ndr_xa_t *mxa, struct mslm_NetFileEnum *param)
 {
 	struct mslm_NetFileInfoBuf2 *fi2;
 
-	fi2 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfoBuf2);
+	fi2 = NDR_NEW(mxa, struct mslm_NetFileInfoBuf2);
 	if (fi2 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -349,7 +347,7 @@ srvsvc_NetFileEnum2(struct mlrpc_xaction *mxa, struct mslm_NetFileEnum *param)
 	 */
 	fi2->fi2_id = 0xF5;
 
-	param->info.ru.info2 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfo2);
+	param->info.ru.info2 = NDR_NEW(mxa, struct mslm_NetFileInfo2);
 	if (param->info.ru.info3 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -366,11 +364,11 @@ srvsvc_NetFileEnum2(struct mlrpc_xaction *mxa, struct mslm_NetFileEnum *param)
  * fields have been set up.
  */
 static DWORD
-srvsvc_NetFileEnum3(struct mlrpc_xaction *mxa, struct mslm_NetFileEnum *param)
+srvsvc_NetFileEnum3(ndr_xa_t *mxa, struct mslm_NetFileEnum *param)
 {
 	struct mslm_NetFileInfoBuf3 *fi3;
 
-	fi3 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfoBuf3);
+	fi3 = NDR_NEW(mxa, struct mslm_NetFileInfoBuf3);
 	if (fi3 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -381,11 +379,11 @@ srvsvc_NetFileEnum3(struct mlrpc_xaction *mxa, struct mslm_NetFileEnum *param)
 	fi3->fi3_permissions = 0x23;
 	fi3->fi3_num_locks = 0;
 	fi3->fi3_pathname =
-	    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, "\\PIPE\\srvsvc");
+	    (unsigned char *)NDR_STRDUP(mxa, "\\PIPE\\srvsvc");
 	fi3->fi3_username =
-	    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, "Administrator");
+	    (unsigned char *)NDR_STRDUP(mxa, "Administrator");
 
-	param->info.ru.info3 = MLRPC_HEAP_NEW(mxa, struct mslm_NetFileInfo3);
+	param->info.ru.info3 = NDR_NEW(mxa, struct mslm_NetFileInfo3);
 	if (param->info.ru.info3 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -413,33 +411,29 @@ srvsvc_NetFileEnum3(struct mlrpc_xaction *mxa, struct mslm_NetFileEnum *param)
  * The NetFileClose2 MSDN page has the right error code.
  */
 static int
-srvsvc_s_NetFileClose(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetFileClose(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetFileClose *param = arg;
 
 	if (!ndr_is_admin(mxa)) {
 		bzero(param, sizeof (struct mslm_NetFileClose));
 		param->status = ERROR_ACCESS_DENIED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	bzero(param, sizeof (struct mslm_NetFileClose));
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 
 /*
  * srvsvc_s_NetShareGetInfo
  *
- * This call is made by Windows2000 to get share information. There are
- * probably other information levels but these are the only ones I've
- * seen so far.
- *
  * Returns Win32 error codes.
  */
 static int
-srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetShareGetInfo(void *arg, ndr_xa_t *mxa)
 {
 	struct mlsm_NetShareGetInfo *param = arg;
 	struct mslm_NetShareGetInfo0 *info0;
@@ -447,7 +441,9 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 	struct mslm_NetShareGetInfo2 *info2;
 	struct mslm_NetShareGetInfo501 *info501;
 	struct mslm_NetShareGetInfo502 *info502;
+	struct mslm_NetShareGetInfo1004 *info1004;
 	struct mslm_NetShareGetInfo1005 *info1005;
+	struct mslm_NetShareGetInfo1006 *info1006;
 	smb_share_t si;
 	char shr_comment[SMB_SHARE_CMNT_MAX];
 	DWORD status;
@@ -456,7 +452,7 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 	if (status != NERR_Success) {
 		bzero(param, sizeof (struct mlsm_NetShareGetInfo));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (strlen(si.shr_cmnt))
@@ -468,14 +464,14 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 
 	switch (param->level) {
 	case 0:
-		info0 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo0);
+		info0 = NDR_NEW(mxa, struct mslm_NetShareGetInfo0);
 		if (info0 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
 
 		info0->shi0_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
+		    = (unsigned char *)NDR_STRDUP(mxa, si.shr_name);
 		if (info0->shi0_netname == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
@@ -485,16 +481,16 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 		break;
 
 	case 1:
-		info1 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo1);
+		info1 = NDR_NEW(mxa, struct mslm_NetShareGetInfo1);
 		if (info1 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
 
 		info1->shi1_netname =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
+		    (unsigned char *)NDR_STRDUP(mxa, si.shr_name);
 		info1->shi1_comment =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		    (unsigned char *)NDR_STRDUP(mxa, shr_comment);
 		if (info1->shi1_netname == NULL ||
 		    info1->shi1_comment == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
@@ -506,16 +502,16 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 		break;
 
 	case 2:
-		info2 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo2);
+		info2 = NDR_NEW(mxa, struct mslm_NetShareGetInfo2);
 		if (info2 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
 
 		info2->shi2_netname =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
+		    (unsigned char *)NDR_STRDUP(mxa, si.shr_name);
 		info2->shi2_comment =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		    (unsigned char *)NDR_STRDUP(mxa, shr_comment);
 		if (info2->shi2_netname == NULL ||
 		    info2->shi2_comment == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
@@ -532,30 +528,73 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 		param->result.ru.info2 = info2;
 		break;
 
+	case 1004:
+		info1004 = NDR_NEW(mxa, struct mslm_NetShareGetInfo1004);
+		if (info1004 == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			break;
+		}
+
+		info1004->shi1004_comment =
+		    (unsigned char *)NDR_STRDUP(mxa, shr_comment);
+		if (info1004->shi1004_comment == NULL)
+			status = ERROR_NOT_ENOUGH_MEMORY;
+		break;
+
 	case 1005:
-		info1005 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo1005);
+		info1005 = NDR_NEW(mxa, struct mslm_NetShareGetInfo1005);
 		if (info1005 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
+
 		info1005->shi1005_flags = 0;
+
+		switch (si.shr_flags & SMB_SHRF_CSC_MASK) {
+		case SMB_SHRF_CSC_DISABLED:
+			info1005->shi1005_flags |= CSC_CACHE_NONE;
+			break;
+		case SMB_SHRF_CSC_AUTO:
+			info1005->shi1005_flags |= CSC_CACHE_AUTO_REINT;
+			break;
+		case SMB_SHRF_CSC_VDO:
+			info1005->shi1005_flags |= CSC_CACHE_VDO;
+			break;
+		case SMB_SHRF_CSC_MANUAL:
+		default:
+			/*
+			 * Default to CSC_CACHE_MANUAL_REINT.
+			 */
+			break;
+		}
+
 		param->result.ru.info1005 = info1005;
+		break;
+
+	case 1006:
+		info1006 = NDR_NEW(mxa, struct mslm_NetShareGetInfo1006);
+		if (info1006 == NULL) {
+			status = ERROR_NOT_ENOUGH_MEMORY;
+			break;
+		}
+		info1006->shi1006_max_uses = SHI_USES_UNLIMITED;
+		param->result.ru.info1006 = info1006;
 		break;
 
 	case 501:
 		/*
 		 * Level 501 provides level 1 information.
 		 */
-		info501 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo501);
+		info501 = NDR_NEW(mxa, struct mslm_NetShareGetInfo501);
 		if (info501 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
 
 		info501->shi501_netname =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
+		    (unsigned char *)NDR_STRDUP(mxa, si.shr_name);
 		info501->shi501_comment =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		    (unsigned char *)NDR_STRDUP(mxa, shr_comment);
 		if (info501->shi501_netname == NULL ||
 		    info501->shi501_comment == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
@@ -573,16 +612,16 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 		 * security descriptor. We don't support security
 		 * descriptors on shares yet.
 		 */
-		info502 = MLRPC_HEAP_NEW(mxa, struct mslm_NetShareGetInfo502);
+		info502 = NDR_NEW(mxa, struct mslm_NetShareGetInfo502);
 		if (info502 == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
 			break;
 		}
 
 		info502->shi502_netname =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si.shr_name);
+		    (unsigned char *)NDR_STRDUP(mxa, si.shr_name);
 		info502->shi502_comment =
-		    (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		    (unsigned char *)NDR_STRDUP(mxa, shr_comment);
 		if (info502->shi502_netname == NULL ||
 		    info502->shi502_comment == NULL) {
 			status = ERROR_NOT_ENOUGH_MEMORY;
@@ -612,7 +651,7 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
 		param->result.switch_value = param->level;
 
 	param->status = status;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 
@@ -625,12 +664,12 @@ srvsvc_s_NetShareGetInfo(void *arg, struct mlrpc_xaction *mxa)
  * Returns Win32 error codes.
  */
 static int
-srvsvc_s_NetShareSetInfo(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetShareSetInfo(void *arg, ndr_xa_t *mxa)
 {
 	struct mlsm_NetShareSetInfo *param = arg;
 
 	(void) memset(param, 0, sizeof (struct mlsm_NetShareSetInfo));
-	param->parm_err_ptr = (DWORD)(uintptr_t)MLRPC_HEAP_MALLOC(mxa,
+	param->parm_err_ptr = (DWORD)(uintptr_t)NDR_MALLOC(mxa,
 	    sizeof (DWORD));
 	param->parm_err = 0;
 
@@ -639,7 +678,7 @@ srvsvc_s_NetShareSetInfo(void *arg, struct mlrpc_xaction *mxa)
 	else
 		param->status = ERROR_ACCESS_DENIED;
 
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -667,18 +706,18 @@ srvsvc_s_NetShareSetInfo(void *arg, struct mlrpc_xaction *mxa)
  * NERR_UserNotFound        The user name could not be found.
  */
 static int
-srvsvc_s_NetSessionEnum(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetSessionEnum(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetSessionEnum *param = arg;
 	struct mslm_infonres *infonres;
 	DWORD status;
 	DWORD n_sessions;
 
-	infonres = MLRPC_HEAP_NEW(mxa, struct mslm_infonres);
+	infonres = NDR_NEW(mxa, struct mslm_infonres);
 	if (infonres == 0) {
 		bzero(param, sizeof (struct mslm_NetSessionEnum));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	infonres->entriesread = 0;
@@ -707,13 +746,13 @@ srvsvc_s_NetSessionEnum(void *arg, struct mlrpc_xaction *mxa)
 	if (status != 0) {
 		bzero(param, sizeof (struct mslm_NetSessionEnum));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->resume_handle = 0;
 	param->total_entries = infonres->entriesread;
 	param->status = status;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -724,7 +763,7 @@ srvsvc_s_NetSessionEnum(void *arg, struct mlrpc_xaction *mxa)
 /*ARGSUSED*/
 static DWORD
 mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
-    struct mlrpc_xaction *mxa)
+    ndr_xa_t *mxa)
 {
 	struct mslm_SESSION_INFO_0 *info0;
 	smb_dr_ulist_t *ulist;
@@ -733,7 +772,7 @@ mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
 	char ipaddr_buf[INET_ADDRSTRLEN];
 	int i, offset, cnt, total;
 
-	info0 = MLRPC_HEAP_NEWN(mxa, struct mslm_SESSION_INFO_0, n_sessions);
+	info0 = NDR_NEWN(mxa, struct mslm_SESSION_INFO_0, n_sessions);
 	if (info0 == 0)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -765,7 +804,7 @@ mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
 				workstation = ipaddr_buf;
 			}
 
-			info0[total].sesi0_cname = MLRPC_HEAP_STRSAVE(mxa,
+			info0[total].sesi0_cname = NDR_STRDUP(mxa,
 			    workstation);
 			if (info0[total].sesi0_cname == 0) {
 				smb_dr_ulist_free(ulist);
@@ -794,7 +833,7 @@ mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
 /*ARGSUSED*/
 static DWORD
 mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
-    struct mlrpc_xaction *mxa)
+    ndr_xa_t *mxa)
 {
 	struct mslm_SESSION_INFO_1 *info1;
 	smb_dr_ulist_t *ulist;
@@ -804,7 +843,7 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
 	char ipaddr_buf[INET_ADDRSTRLEN];
 	int i, offset, cnt, total;
 
-	info1 = MLRPC_HEAP_NEWN(mxa, struct mslm_SESSION_INFO_1, n_sessions);
+	info1 = NDR_NEWN(mxa, struct mslm_SESSION_INFO_1, n_sessions);
 	if (info1 == 0)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -839,9 +878,9 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
 			if ((account = user->oc_account) == 0)
 				account = "Unknown";
 
-			info1[total].sesi1_cname = MLRPC_HEAP_STRSAVE(mxa,
+			info1[total].sesi1_cname = NDR_STRDUP(mxa,
 			    workstation);
-			info1[total].sesi1_uname = MLRPC_HEAP_STRSAVE(mxa,
+			info1[total].sesi1_uname = NDR_STRDUP(mxa,
 			    account);
 
 			if (info1[total].sesi1_cname == 0 ||
@@ -888,17 +927,17 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
  *                          computer name.
  */
 static int
-srvsvc_s_NetSessionDel(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetSessionDel(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetSessionDel *param = arg;
 
 	if (!ndr_is_poweruser(mxa)) {
 		param->status = ERROR_ACCESS_DENIED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -916,7 +955,7 @@ srvsvc_s_NetSessionDel(void *arg, struct mlrpc_xaction *mxa)
  *
  */
 static int
-srvsvc_s_NetServerGetInfo(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetServerGetInfo(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetServerGetInfo *param = arg;
 	struct mslm_SERVER_INFO_100 *info100;
@@ -938,14 +977,14 @@ netservergetinfo_no_memory:
 
 	switch (param->level) {
 	case 100:
-		info100 = MLRPC_HEAP_NEW(mxa, struct mslm_SERVER_INFO_100);
+		info100 = NDR_NEW(mxa, struct mslm_SERVER_INFO_100);
 		if (info100 == 0)
 			goto netservergetinfo_no_memory;
 
 		bzero(info100, sizeof (struct mslm_SERVER_INFO_100));
 		info100->sv100_platform_id = SV_PLATFORM_ID_NT;
 		info100->sv100_name
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, hostname);
+		    = (unsigned char *)NDR_STRDUP(mxa, hostname);
 
 		if (info100->sv100_name == 0)
 			goto netservergetinfo_no_memory;
@@ -954,7 +993,7 @@ netservergetinfo_no_memory:
 		break;
 
 	case 101:
-		info101 = MLRPC_HEAP_NEW(mxa, struct mslm_SERVER_INFO_101);
+		info101 = NDR_NEW(mxa, struct mslm_SERVER_INFO_101);
 		if (info101 == 0)
 			goto netservergetinfo_no_memory;
 
@@ -964,10 +1003,10 @@ netservergetinfo_no_memory:
 		info101->sv101_version_minor = 0;
 		info101->sv101_type = SV_TYPE_SENT_BY_ME;
 		info101->sv101_name
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, hostname);
+		    = (unsigned char *)NDR_STRDUP(mxa, hostname);
 
 		info101->sv101_comment
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, sys_comment);
+		    = (unsigned char *)NDR_STRDUP(mxa, sys_comment);
 
 		if (info101->sv101_name == 0 || info101->sv101_comment == 0)
 			goto netservergetinfo_no_memory;
@@ -976,7 +1015,7 @@ netservergetinfo_no_memory:
 		break;
 
 	case 102:
-		info102 = MLRPC_HEAP_NEW(mxa, struct mslm_SERVER_INFO_102);
+		info102 = NDR_NEW(mxa, struct mslm_SERVER_INFO_102);
 		if (info102 == 0)
 			goto netservergetinfo_no_memory;
 
@@ -986,10 +1025,10 @@ netservergetinfo_no_memory:
 		info102->sv102_version_minor = 0;
 		info102->sv102_type = SV_TYPE_SENT_BY_ME;
 		info102->sv102_name
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, hostname);
+		    = (unsigned char *)NDR_STRDUP(mxa, hostname);
 
 		info102->sv102_comment
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, sys_comment);
+		    = (unsigned char *)NDR_STRDUP(mxa, sys_comment);
 
 		/*
 		 * The following level 102 fields are defaulted to zero
@@ -1013,12 +1052,12 @@ netservergetinfo_no_memory:
 		bzero(&param->result,
 		    sizeof (struct mslm_NetServerGetInfo_result));
 		param->status = ERROR_ACCESS_DENIED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->result.level = param->level;
 	param->status = (ERROR_SUCCESS);
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -1050,7 +1089,7 @@ netservergetinfo_no_memory:
  * (0.0001) second.
  */
 static int
-srvsvc_s_NetRemoteTOD(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetRemoteTOD(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetRemoteTOD *param = arg;
 	struct mslm_TIME_OF_DAY_INFO *tod;
@@ -1060,7 +1099,7 @@ srvsvc_s_NetRemoteTOD(void *arg, struct mlrpc_xaction *mxa)
 	(void) gettimeofday(&time_val, 0);
 	(void) gmtime_r(&time_val.tv_sec, &tm);
 
-	tod = MLRPC_HEAP_NEW(mxa, struct mslm_TIME_OF_DAY_INFO);
+	tod = NDR_NEW(mxa, struct mslm_TIME_OF_DAY_INFO);
 	if (tod == NULL) {
 		bzero(param, sizeof (struct mslm_NetRemoteTOD));
 		return (ERROR_NOT_ENOUGH_MEMORY);
@@ -1082,7 +1121,7 @@ srvsvc_s_NetRemoteTOD(void *arg, struct mlrpc_xaction *mxa)
 
 	param->bufptr = tod;
 	param->status = ERROR_SUCCESS;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -1099,7 +1138,7 @@ srvsvc_s_NetRemoteTOD(void *arg, struct mlrpc_xaction *mxa)
  */
 /*ARGSUSED*/
 static int
-srvsvc_s_NetNameValidate(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetNameValidate(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetNameValidate *param = arg;
 	char *name;
@@ -1107,7 +1146,7 @@ srvsvc_s_NetNameValidate(void *arg, struct mlrpc_xaction *mxa)
 
 	if ((name = (char *)param->pathname) == NULL) {
 		param->status = ERROR_INVALID_PARAMETER;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	len = strlen(name);
@@ -1115,7 +1154,7 @@ srvsvc_s_NetNameValidate(void *arg, struct mlrpc_xaction *mxa)
 	if ((param->flags == 0 && len > 81) ||
 	    (param->flags == 0x80000000 && len > 13)) {
 		param->status = ERROR_INVALID_NAME;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	switch (param->type) {
@@ -1146,7 +1185,7 @@ srvsvc_s_NetNameValidate(void *arg, struct mlrpc_xaction *mxa)
 		break;
 	}
 
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -1169,7 +1208,7 @@ srvsvc_s_NetNameValidate(void *arg, struct mlrpc_xaction *mxa)
  * Returns Win32 error codes.
  */
 static int
-srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetShareAdd(void *arg, ndr_xa_t *mxa)
 {
 	static DWORD parm_err = 0;
 	DWORD parm_stat;
@@ -1183,7 +1222,7 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 	if (!ndr_is_poweruser(mxa)) {
 		bzero(param, sizeof (struct mslm_NetShareAdd));
 		param->status = ERROR_ACCESS_DENIED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	switch (param->level) {
@@ -1198,19 +1237,19 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 	default:
 		bzero(param, sizeof (struct mslm_NetShareAdd));
 		param->status = ERROR_ACCESS_DENIED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (info2->shi2_netname == 0 || info2->shi2_path == 0) {
 		bzero(param, sizeof (struct mslm_NetShareAdd));
 		param->status = NERR_NetNameNotFound;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (smb_shr_is_restricted((char *)info2->shi2_netname)) {
 		bzero(param, sizeof (struct mslm_NetShareAdd));
 		param->status = ERROR_ACCESS_DENIED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (info2->shi2_remark == 0)
@@ -1229,13 +1268,13 @@ srvsvc_s_NetShareAdd(void *arg, struct mlrpc_xaction *mxa)
 		param->status = parm_stat;
 		param->parm_err
 		    = (native_os == NATIVE_OS_WIN95) ? 0 : &parm_err;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->status = srvsvc_sa_add((char *)info2->shi2_netname, realpath,
 	    (char *)info2->shi2_remark);
 	param->parm_err = (native_os == NATIVE_OS_WIN95) ? 0 : &parm_err;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -1273,18 +1312,18 @@ srvsvc_estimate_objcnt(uint32_t prefmaxlen, uint32_t n_obj, uint32_t obj_size)
  * Level 502: level 2 + security descriptor.
  */
 static int
-srvsvc_s_NetShareEnum(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetShareEnum(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetShareEnum *param = arg;
 	struct mslm_infonres *infonres;
 	srvsvc_enum_t se;
 	DWORD status;
 
-	infonres = MLRPC_HEAP_NEW(mxa, struct mslm_infonres);
+	infonres = NDR_NEW(mxa, struct mslm_infonres);
 	if (infonres == NULL) {
 		bzero(param, sizeof (struct mslm_NetShareEnum));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	infonres->entriesread = 0;
@@ -1336,14 +1375,14 @@ srvsvc_s_NetShareEnum(void *arg, struct mlrpc_xaction *mxa)
 	if (status != 0) {
 		bzero(param, sizeof (struct mslm_NetShareEnum));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (se.se_n_enum == 0) {
 		if (param->resume_handle)
 			*param->resume_handle = 0;
 		param->status = ERROR_SUCCESS;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (param->resume_handle &&
@@ -1358,7 +1397,7 @@ srvsvc_s_NetShareEnum(void *arg, struct mlrpc_xaction *mxa)
 
 	param->totalentries = se.se_n_total;
 	param->status = status;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -1379,18 +1418,18 @@ srvsvc_s_NetShareEnum(void *arg, struct mlrpc_xaction *mxa)
  * place to resume.  The resume_handle is similar to the readdir cookie.
  */
 static int
-srvsvc_s_NetShareEnumSticky(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetShareEnumSticky(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetShareEnum *param = arg;
 	struct mslm_infonres *infonres;
 	srvsvc_enum_t se;
 	DWORD status;
 
-	infonres = MLRPC_HEAP_NEW(mxa, struct mslm_infonres);
+	infonres = NDR_NEW(mxa, struct mslm_infonres);
 	if (infonres == NULL) {
 		bzero(param, sizeof (struct mslm_NetShareEnum));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	infonres->entriesread = 0;
@@ -1438,14 +1477,14 @@ srvsvc_s_NetShareEnumSticky(void *arg, struct mlrpc_xaction *mxa)
 	if (status != ERROR_SUCCESS) {
 		bzero(param, sizeof (struct mslm_NetShareEnum));
 		param->status = status;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (se.se_n_enum == 0) {
 		if (param->resume_handle)
 			*param->resume_handle = 0;
 		param->status = ERROR_SUCCESS;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	if (param->resume_handle &&
@@ -1460,14 +1499,14 @@ srvsvc_s_NetShareEnumSticky(void *arg, struct mlrpc_xaction *mxa)
 
 	param->totalentries = se.se_n_total;
 	param->status = status;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
  * NetShareEnum Level 0
  */
 static DWORD
-mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
+mlsvc_NetShareEnumLevel0(ndr_xa_t *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_0 *info0;
@@ -1480,7 +1519,7 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
-	info0 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_0, se->se_n_enum);
+	info0 = NDR_NEWN(mxa, struct mslm_SHARE_INFO_0, se->se_n_enum);
 	if (info0 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -1527,7 +1566,7 @@ mlsvc_NetShareEnumLevel0(struct mlrpc_xaction *mxa,
  * NetShareEnum Level 1
  */
 static DWORD
-mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
+mlsvc_NetShareEnumLevel1(ndr_xa_t *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_1 *info1;
@@ -1540,7 +1579,7 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
-	info1 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_1, se->se_n_enum);
+	info1 = NDR_NEWN(mxa, struct mslm_SHARE_INFO_1, se->se_n_enum);
 	if (info1 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -1587,7 +1626,7 @@ mlsvc_NetShareEnumLevel1(struct mlrpc_xaction *mxa,
  * NetShareEnum Level 2
  */
 static DWORD
-mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
+mlsvc_NetShareEnumLevel2(ndr_xa_t *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_2 *info2;
@@ -1600,7 +1639,7 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
-	info2 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_2, se->se_n_enum);
+	info2 = NDR_NEWN(mxa, struct mslm_SHARE_INFO_2, se->se_n_enum);
 	if (info2 == 0)
 		return (ERROR_NOT_ENOUGH_MEMORY);
 
@@ -1647,7 +1686,7 @@ mlsvc_NetShareEnumLevel2(struct mlrpc_xaction *mxa,
  * NetShareEnum Level 501
  */
 static DWORD
-mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
+mlsvc_NetShareEnumLevel501(ndr_xa_t *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_501 *info501;
@@ -1660,7 +1699,7 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
-	info501 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_501,
+	info501 = NDR_NEWN(mxa, struct mslm_SHARE_INFO_501,
 	    se->se_n_enum);
 	if (info501 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
@@ -1708,7 +1747,7 @@ mlsvc_NetShareEnumLevel501(struct mlrpc_xaction *mxa,
  * NetShareEnum Level 502
  */
 static DWORD
-mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
+mlsvc_NetShareEnumLevel502(ndr_xa_t *mxa,
     struct mslm_infonres *infonres, srvsvc_enum_t *se, int sticky)
 {
 	struct mslm_SHARE_INFO_502 *info502;
@@ -1721,7 +1760,7 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
 	if (se->se_n_enum == 0)
 		return (ERROR_SUCCESS);
 
-	info502 = MLRPC_HEAP_NEWN(mxa, struct mslm_SHARE_INFO_502,
+	info502 = NDR_NEWN(mxa, struct mslm_SHARE_INFO_502,
 	    se->se_n_enum);
 	if (info502 == NULL)
 		return (ERROR_NOT_ENOUGH_MEMORY);
@@ -1781,7 +1820,7 @@ mlsvc_NetShareEnumLevel502(struct mlrpc_xaction *mxa,
  *	ERROR_INVALID_LEVEL
  */
 static DWORD
-mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
+mlsvc_NetShareEnumCommon(ndr_xa_t *mxa, srvsvc_enum_t *se,
     smb_share_t *si, void *infop)
 {
 	struct mslm_SHARE_INFO_0 *info0;
@@ -1801,7 +1840,7 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	case 0:
 		info0 = (struct mslm_SHARE_INFO_0 *)infop;
 		info0[i].shi0_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
+		    = (unsigned char *)NDR_STRDUP(mxa, si->shr_name);
 
 		if (info0[i].shi0_netname == NULL)
 			return (ERROR_NOT_ENOUGH_MEMORY);
@@ -1810,10 +1849,10 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	case 1:
 		info1 = (struct mslm_SHARE_INFO_1 *)infop;
 		info1[i].shi1_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
+		    = (unsigned char *)NDR_STRDUP(mxa, si->shr_name);
 
 		info1[i].shi1_remark
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		    = (unsigned char *)NDR_STRDUP(mxa, shr_comment);
 
 		info1[i].shi1_type = si->shr_type;
 
@@ -1824,10 +1863,10 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	case 2:
 		info2 = (struct mslm_SHARE_INFO_2 *)infop;
 		info2[i].shi2_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
+		    = (unsigned char *)NDR_STRDUP(mxa, si->shr_name);
 
 		info2[i].shi2_remark
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		    = (unsigned char *)NDR_STRDUP(mxa, shr_comment);
 
 		info2[i].shi2_path
 		    = (unsigned char *)srvsvc_share_mkpath(mxa, si->shr_path);
@@ -1837,7 +1876,7 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 		info2[i].shi2_max_uses = SHI_USES_UNLIMITED;
 		info2[i].shi2_current_uses = 0;
 		info2[i].shi2_passwd
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, empty_string);
+		    = (unsigned char *)NDR_STRDUP(mxa, empty_string);
 
 		if (!info2[i].shi2_netname || !info2[i].shi2_remark ||
 		    !info2[i].shi2_passwd || !info2[i].shi2_path)
@@ -1848,10 +1887,10 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	case 501:
 		info501 = (struct mslm_SHARE_INFO_501 *)infop;
 		info501[i].shi501_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
+		    = (unsigned char *)NDR_STRDUP(mxa, si->shr_name);
 
 		info501[i].shi501_remark
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		    = (unsigned char *)NDR_STRDUP(mxa, shr_comment);
 
 		info501[i].shi501_type = si->shr_type;
 		info501[i].shi501_flags = 0;
@@ -1863,10 +1902,10 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 	case 502:
 		info502 = (struct mslm_SHARE_INFO_502 *)infop;
 		info502[i].shi502_netname
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, si->shr_name);
+		    = (unsigned char *)NDR_STRDUP(mxa, si->shr_name);
 
 		info502[i].shi502_remark
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, shr_comment);
+		    = (unsigned char *)NDR_STRDUP(mxa, shr_comment);
 
 		info502[i].shi502_path
 		    = (unsigned char *)srvsvc_share_mkpath(mxa, si->shr_path);
@@ -1876,7 +1915,7 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
 		info502[i].shi502_max_uses = SHI_USES_UNLIMITED;
 		info502[i].shi502_current_uses = 0;
 		info502[i].shi502_passwd
-		    = (unsigned char *)MLRPC_HEAP_STRSAVE(mxa, empty_string);
+		    = (unsigned char *)NDR_STRDUP(mxa, empty_string);
 
 		info502[i].shi502_reserved = 0;
 		info502[i].shi502_security_descriptor = 0;
@@ -1900,10 +1939,10 @@ mlsvc_NetShareEnumCommon(struct mlrpc_xaction *mxa, srvsvc_enum_t *se,
  * share to avoid duplicates.
  */
 static boolean_t
-srvsvc_add_autohome(struct mlrpc_xaction *mxa, srvsvc_enum_t *se, void *infop)
+srvsvc_add_autohome(ndr_xa_t *mxa, srvsvc_enum_t *se, void *infop)
 {
-	smb_opipe_context_t *svc = &mxa->context->svc_ctx;
-	char *username = svc->oc_account;
+	smb_opipe_context_t *ctx = &mxa->pipe->np_ctx;
+	char *username = ctx->oc_account;
 	smb_share_t si;
 	DWORD status;
 
@@ -1936,7 +1975,7 @@ srvsvc_add_autohome(struct mlrpc_xaction *mxa, srvsvc_enum_t *se, void *infop)
  * could be a null pointer if the heap allocation fails.
  */
 static char *
-srvsvc_share_mkpath(struct mlrpc_xaction *mxa, char *path)
+srvsvc_share_mkpath(ndr_xa_t *mxa, char *path)
 {
 	char tmpbuf[MAXPATHLEN];
 	char *p;
@@ -1951,7 +1990,7 @@ srvsvc_share_mkpath(struct mlrpc_xaction *mxa, char *path)
 	(void) snprintf(tmpbuf, MAXPATHLEN, "%c:/%s", 'B', p);
 	(void) strsubst(tmpbuf, '/', '\\');
 
-	return (MLRPC_HEAP_STRSAVE(mxa, tmpbuf));
+	return (NDR_STRDUP(mxa, tmpbuf));
 }
 
 /*
@@ -1967,18 +2006,18 @@ srvsvc_share_mkpath(struct mlrpc_xaction *mxa, char *path)
  * Returns Win32 error codes.
  */
 static int
-srvsvc_s_NetShareDel(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetShareDel(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetShareDel *param = arg;
 
 	if (!ndr_is_poweruser(mxa) ||
 	    smb_shr_is_restricted((char *)param->netname)) {
 		param->status = ERROR_ACCESS_DENIED;
-		return (MLRPC_DRC_OK);
+		return (NDR_DRC_OK);
 	}
 
 	param->status = srvsvc_sa_delete((char *)param->netname);
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -1987,17 +2026,17 @@ srvsvc_s_NetShareDel(void *arg, struct mlrpc_xaction *mxa)
  * Get security descriptor of the requested file/folder
  *
  * Right now, just returns ERROR_ACCESS_DENIED, because we cannot
- * get the requested SD here in MLRPC code.
+ * get the requested SD here in RPC code.
  */
 /*ARGSUSED*/
 static int
-srvsvc_s_NetGetFileSecurity(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetGetFileSecurity(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetGetFileSecurity *param = arg;
 
 	param->length = 0;
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -2006,16 +2045,16 @@ srvsvc_s_NetGetFileSecurity(void *arg, struct mlrpc_xaction *mxa)
  * Set the given security descriptor for the requested file/folder
  *
  * Right now, just returns ERROR_ACCESS_DENIED, because we cannot
- * set the requested SD here in MLRPC code.
+ * set the requested SD here in RPC code.
  */
 /*ARGSUSED*/
 static int
-srvsvc_s_NetSetFileSecurity(void *arg, struct mlrpc_xaction *mxa)
+srvsvc_s_NetSetFileSecurity(void *arg, ndr_xa_t *mxa)
 {
 	struct mslm_NetSetFileSecurity *param = arg;
 
 	param->status = ERROR_ACCESS_DENIED;
-	return (MLRPC_DRC_OK);
+	return (NDR_DRC_OK);
 }
 
 /*
@@ -2125,7 +2164,7 @@ srvsvc_sa_delete(char *sharename)
 	return (status);
 }
 
-static mlrpc_stub_table_t srvsvc_stub_table[] = {
+static ndr_stub_table_t srvsvc_stub_table[] = {
 	{ srvsvc_s_NetConnectEnum,	SRVSVC_OPNUM_NetConnectEnum },
 	{ srvsvc_s_NetFileEnum,		SRVSVC_OPNUM_NetFileEnum },
 	{ srvsvc_s_NetFileClose,	SRVSVC_OPNUM_NetFileClose },
