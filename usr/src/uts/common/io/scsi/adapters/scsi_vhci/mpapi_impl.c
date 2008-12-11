@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SNIA Multipath Management API implementation
  */
@@ -3346,9 +3344,14 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 	 * Get the vlun through the following process;
 	 * ADDR2VLUN(ap) doesn't give the scsi_vhci lun
 	 */
-	psd = ap->a_hba_tran->tran_sd;
+	if (ap->a_hba_tran->tran_hba_flags & SCSI_HBA_ADDR_COMPLEX)
+		psd = scsi_address_device(ap);
+	else if (ap->a_hba_tran->tran_hba_flags & SCSI_HBA_TRAN_CLONE)
+		psd = ap->a_hba_tran->tran_sd;
+	else
+		psd = NULL;
 	inqbuf = (unsigned char *)psd->sd_inq;
-	pip = (mdi_pathinfo_t *)(uintptr_t)(psd->sd_private);
+	pip = (mdi_pathinfo_t *)(uintptr_t)(psd->sd_pathinfo);
 	svp = (scsi_vhci_priv_t *)mdi_pi_get_vhci_private(pip);
 	vlun = svp->svp_svl;
 

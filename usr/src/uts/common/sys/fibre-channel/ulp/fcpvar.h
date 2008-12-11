@@ -1293,11 +1293,12 @@ typedef struct fcp_black_list_entry {
 	int				masked;
 } fcp_black_list_entry_t;
 
-#define	ADDR2FCP(ap)	(struct fcp_port *) \
-				((ap)->a_hba_tran->tran_hba_private)
-#define	ADDR2LUN(ap)	(struct fcp_lun *)((ap)->a_hba_tran->tran_tgt_private)
+#define	ADDR2FCP(ap)	((struct fcp_port *) \
+			    ((ap)->a_hba_tran->tran_hba_private))
+#define	ADDR2LUN(ap)	((struct fcp_lun *) \
+			scsi_device_hba_private_get(scsi_address_device(ap)))
 #define	CMD2PKT(cmd)	((cmd)->cmd_pkt)
-#define	PKT2CMD(pkt)	((struct fcp_pkt *)pkt->pkt_ha_private)
+#define	PKT2CMD(pkt)	((struct fcp_pkt *)((pkt)->pkt_ha_private))
 
 /*
  * timeout values

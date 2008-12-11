@@ -101,9 +101,12 @@ extern int vhci_debug;
 
 #define	VHCI_PKT_PRIV_SIZE		2
 
-#define	ADDR2VHCI(ap)	(struct scsi_vhci *)((ap)->a_hba_tran->tran_hba_private)
-#define	ADDR2VLUN(ap)	(scsi_vhci_lun_t *)((ap)->a_hba_tran->tran_tgt_private)
-#define	ADDR2DIP(ap)	(dev_info_t *)((ap)->a_hba_tran->tran_sd->sd_dev)
+#define	ADDR2VHCI(ap)	((struct scsi_vhci *) \
+			((ap)->a_hba_tran->tran_hba_private))
+#define	ADDR2VLUN(ap)	(scsi_vhci_lun_t *) \
+			(scsi_device_hba_private_get(scsi_address_device(ap)))
+#define	ADDR2DIP(ap)	((dev_info_t *)(scsi_address_device(ap)->sd_dev))
+
 #define	HBAPKT2VHCIPKT(pkt) (pkt->pkt_private)
 #define	TGTPKT2VHCIPKT(pkt) (pkt->pkt_ha_private)
 #define	VHCIPKT2HBAPKT(pkt) (pkt->pkt_hba_pkt)

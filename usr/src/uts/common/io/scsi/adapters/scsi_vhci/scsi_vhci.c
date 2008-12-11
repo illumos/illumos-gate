@@ -91,6 +91,8 @@ static int vhci_uscsi_retry_count = 180;
 /* uscsi_restart_sense timeout id in case it needs to get canceled */
 static timeout_id_t vhci_restart_timeid = 0;
 
+static int	vhci_bus_config_debug = 0;
+
 /*
  * Bidirectional map of 'target-port' to port id <pid> for support of
  * iostat(1M) '-Xx' and '-Yx' output.
@@ -146,6 +148,8 @@ static int vhci_scsi_bus_power(dev_info_t *, void *, pm_bus_power_op_t,
     void *, void *);
 static int vhci_scsi_bus_config(dev_info_t *, uint_t, ddi_bus_config_op_t,
     void *, dev_info_t **);
+static int vhci_scsi_bus_unconfig(dev_info_t *, uint_t, ddi_bus_config_op_t,
+    void *);
 
 /*
  * functions registered with the mpxio framework via mdi_vhci_ops_t
@@ -664,7 +668,6 @@ vhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vhci->vhci_instance	= instance;
 
 	tran->tran_hba_private	= vhci;
-	tran->tran_tgt_private	= NULL;
 	tran->tran_tgt_init	= vhci_scsi_tgt_init;
 	tran->tran_tgt_probe	= NULL;
 	tran->tran_tgt_free	= vhci_scsi_tgt_free;
@@ -697,6 +700,7 @@ vhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	tran->tran_bus_power = vhci_scsi_bus_power;
 
 	tran->tran_bus_config = vhci_scsi_bus_config;
+	tran->tran_bus_unconfig	= vhci_scsi_bus_unconfig;
 
 	/*
 	 * Attach this instance with the mpxio framework
@@ -721,7 +725,7 @@ vhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * It expects those fileds to be non-zero.
 	 */
 	if (scsi_hba_attach_setup(dip, &scsi_alloc_attr, tran,
-	    SCSI_HBA_TRAN_CLONE) != DDI_SUCCESS) {
+	    SCSI_HBA_ADDR_COMPLEX) != DDI_SUCCESS) {
 		VHCI_DEBUG(1, (CE_NOTE, dip, "!vhci_attach:"
 		    "hba attach failed\n"));
 		goto attach_fail;
@@ -1041,7 +1045,8 @@ vhci_scsi_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	ASSERT(vlun != NULL);
 	ddi_prop_free(guid);
-	hba_tran->tran_tgt_private = vlun;
+
+	scsi_device_hba_private_set(sd, vlun);
 
 	return (DDI_SUCCESS);
 }
@@ -1501,12 +1506,10 @@ vhci_recovery_reset(scsi_vhci_lun_t *vlun, struct scsi_address *ap,
 /*
  * Note: The scsi_address passed to this routine could be the scsi_address
  * for the virtual device or the physical device. No assumptions should be
- * made in this routine about the ap structure and a_hba_tran->tran_tgt_private
- * field of ap can not be assumed to be the vhci structure.
- * Further note that the child dip would be the dip of the ssd node irrespective
- * of the scsi_address passed.
+ * made in this routine about the contents of the ap structure.
+ * Further, note that the child dip would be the dip of the ssd node regardless
+ * of the scsi_address passed in.
  */
-
 static int
 vhci_scsi_reset_target(struct scsi_address *ap, int level, uint8_t select_path)
 {
@@ -3983,23 +3986,56 @@ vhci_pathinfo_init(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	psd = kmem_zalloc(sizeof (*psd), KM_SLEEP);
 	mutex_init(&psd->sd_mutex, NULL, MUTEX_DRIVER, NULL);
 
-	/*
-	 * Clone transport structure if requested, so
-	 * Self enumerating HBAs always need to use cloning
-	 */
-
-	if (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
+	if (hba->tran_hba_flags & SCSI_HBA_ADDR_COMPLEX) {
+		/*
+		 * For a SCSI_HBA_ADDR_COMPLEX transport we store a pointer to
+		 * scsi_device in the scsi_address structure.  This allows an
+		 * an HBA driver to find its scsi_device(9S) and
+		 * per-scsi_device(9S) HBA private data given a
+		 * scsi_address(9S) by using scsi_address_device(9F) and
+		 * scsi_device_hba_private_get(9F)).
+		 */
+		psd->sd_address.a.a_sd = psd;
+	} else if (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
+		/*
+		 * Clone transport structure if requested, so
+		 * Self enumerating HBAs always need to use cloning
+		 */
 		scsi_hba_tran_t	*clone =
 		    kmem_alloc(sizeof (scsi_hba_tran_t), KM_SLEEP);
 		bcopy(hba, clone, sizeof (scsi_hba_tran_t));
 		hba = clone;
 		hba->tran_sd = psd;
 	} else {
-		ASSERT(hba->tran_sd == NULL);
+		/*
+		 * SPI pHCI unit-address. If we ever need to support this
+		 * we could set a.spi.a_target/a.spi.a_lun based on pathinfo
+		 * node unit-address properties.  For now we fail...
+		 */
+		goto failure;
 	}
+
 	psd->sd_dev = tgt_dip;
 	psd->sd_address.a_hba_tran = hba;
+
+	/*
+	 * Mark scsi_device as being associated with a pathinfo node. For
+	 * a scsi_device structure associated with a devinfo node,
+	 * scsi_ctlops_initchild sets this field to NULL.
+	 */
+	psd->sd_pathinfo = pip;
+
+	/*
+	 * LEGACY: sd_private: set for older mpxio-capable pHCI drivers with
+	 * too much scsi_vhci/mdi/ndi knowledge. Remove this code when all
+	 * mpxio-capable pHCI drivers use SCSA enumeration services (or at
+	 * least have been changed to use sd_pathinfo instead).
+	 */
 	psd->sd_private = (caddr_t)pip;
+
+	/* See scsi_hba.c for info on sd_tran_safe kludge */
+	psd->sd_tran_safe = hba;
+
 	svp->svp_psd = psd;
 	mdi_pi_set_vhci_private(pip, (caddr_t)svp);
 
@@ -4035,7 +4071,7 @@ failure:
 		cv_destroy(&svp->svp_cv);
 		kmem_free(svp, sizeof (*svp));
 	}
-	if (hba && hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE)
+	if (hba && (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE))
 		kmem_free(hba, sizeof (scsi_hba_tran_t));
 
 	if (vlun_alloced)
@@ -4076,12 +4112,15 @@ vhci_pathinfo_uninit(dev_info_t *vdip, mdi_pathinfo_t *pip, int flags)
 	psd = svp->svp_psd;
 	ASSERT(psd != NULL);
 
-	if (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
+	if (hba->tran_hba_flags & SCSI_HBA_ADDR_COMPLEX) {
+		/* Verify plumbing */
+		ASSERT(psd->sd_address.a_hba_tran == hba);
+		ASSERT(psd->sd_address.a.a_sd == psd);
+	} else if (hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE) {
+		/* Switch to cloned scsi_hba_tran(9S) structure */
 		hba = psd->sd_address.a_hba_tran;
 		ASSERT(hba->tran_hba_flags & SCSI_HBA_TRAN_CLONE);
 		ASSERT(hba->tran_sd == psd);
-	} else {
-		ASSERT(hba->tran_sd == NULL);
 	}
 
 	if (hba->tran_tgt_free != NULL) {
@@ -7248,9 +7287,8 @@ vhci_lun_free(dev_info_t *tgt_dip)
 	 * initialization so check if the sd is NULL.
 	 */
 	if (sd != NULL)
-		sd->sd_address.a_hba_tran->tran_tgt_private = NULL;
+		scsi_device_hba_private_set(sd, NULL);
 }
-
 
 int
 vhci_do_scsi_cmd(struct scsi_pkt *pkt)
@@ -8058,6 +8096,9 @@ vhci_scsi_bus_config(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
 {
 	char *guid;
 
+	if (vhci_bus_config_debug)
+		flags |= NDI_DEVI_DEBUG;
+
 	if (op == BUS_CONFIG_ONE || op == BUS_UNCONFIG_ONE)
 		guid = vhci_devnm_to_guid((char *)arg);
 	else
@@ -8068,6 +8109,16 @@ vhci_scsi_bus_config(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
 		return (NDI_SUCCESS);
 	else
 		return (NDI_FAILURE);
+}
+
+static int
+vhci_scsi_bus_unconfig(dev_info_t *pdip, uint_t flags, ddi_bus_config_op_t op,
+    void *arg)
+{
+	if (vhci_bus_config_debug)
+		flags |= NDI_DEVI_DEBUG;
+
+	return (ndi_busop_bus_unconfig(pdip, flags, op, arg));
 }
 
 /*

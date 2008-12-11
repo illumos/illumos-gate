@@ -65,9 +65,9 @@ struct scsi_hba_tran {
 
 	/*
 	 * The following two fields are only used in the SCSI_HBA_TRAN_CLONE
-	 * case.
+	 * case. Consider using SCSI_HBA_ADDR_COMPLEX instead.
 	 */
-	void		*tran_tgt_private;	/* target-specific info */
+	void			*tran_tgt_private;
 	struct scsi_device	*tran_sd;
 
 	/*
@@ -76,7 +76,7 @@ struct scsi_hba_tran {
 	int		(*tran_tgt_init)(
 				dev_info_t		*hba_dip,
 				dev_info_t		*tgt_dip,
-				scsi_hba_tran_t		*hba_tran,
+				scsi_hba_tran_t		*tran,
 				struct scsi_device	*sd);
 
 	int		(*tran_tgt_probe)(
@@ -86,7 +86,7 @@ struct scsi_hba_tran {
 	void		(*tran_tgt_free)(
 				dev_info_t		*hba_dip,
 				dev_info_t		*tgt_dip,
-				scsi_hba_tran_t		*hba_tran,
+				scsi_hba_tran_t		*tran,
 				struct scsi_device	*sd);
 
 	int		(*tran_start)(
@@ -143,12 +143,12 @@ struct scsi_hba_tran {
 				caddr_t			arg);
 
 	int		(*tran_get_bus_addr)(
-				struct scsi_device	*devp,
+				struct scsi_device	*sd,
 				char			*name,
 				int			len);
 
 	int		(*tran_get_name)(
-				struct scsi_device	*devp,
+				struct scsi_device	*sd,
 				char			*name,
 				int			len);
 
@@ -274,7 +274,7 @@ struct scsi_hba_tran {
 
 	/*
 	 * An fm_capable HBA driver can set tran_fm_capable prior to
-	 * scsi_hba_attach_setup().  If not set, SCSA provides a default
+	 * scsi_hba_attach_setup(). If not set, SCSA provides a default
 	 * implementation.
 	 */
 	int		tran_fm_capable;
@@ -291,7 +291,6 @@ struct scsi_hba_tran {
 };
 size_t	scsi_hba_tran_size();			/* private */
 
-
 #ifdef __lock_lint
 _NOTE(SCHEME_PROTECTS_DATA("stable data",
 	scsi_hba_tran::tran_sd
@@ -301,7 +300,7 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data",
 	scsi_hba_tran::tran_pkt_cache_ptr))
 /*
  * we only modify the dma atributes (like dma_attr_granular) upon
- * attach and in response to a setcap.  It is also up to the target
+ * attach and in response to a setcap. It is also up to the target
  * driver to not have any outstanding I/Os when it is changing the
  * capabilities of the transport.
  */
@@ -334,14 +333,14 @@ void		scsi_hba_fini(
 int		scsi_hba_attach(
 				dev_info_t		*hba_dip,
 				ddi_dma_lim_t		*hba_lim,
-				scsi_hba_tran_t		*hba_tran,
+				scsi_hba_tran_t		*tran,
 				int			flags,
 				void			*hba_options);
 
 int		scsi_hba_attach_setup(
 				dev_info_t		*hba_dip,
 				ddi_dma_attr_t		*hba_dma_attr,
-				scsi_hba_tran_t		*hba_tran,
+				scsi_hba_tran_t		*tran,
 				int			flags);
 
 int		scsi_hba_detach(
@@ -352,16 +351,16 @@ scsi_hba_tran_t	*scsi_hba_tran_alloc(
 				int			flags);
 
 int		scsi_tran_ext_alloc(
-				scsi_hba_tran_t		*hba_tran,
+				scsi_hba_tran_t		*tran,
 				size_t			length,
 				int			flags);
 
 void		scsi_tran_ext_free(
-				scsi_hba_tran_t		*hba_tran,
+				scsi_hba_tran_t		*tran,
 				size_t			length);
 
 void		scsi_hba_tran_free(
-				scsi_hba_tran_t		*hba_tran);
+				scsi_hba_tran_t		*tran);
 
 int		scsi_hba_probe(
 				struct scsi_device	*sd,
@@ -370,7 +369,7 @@ int		scsi_hba_probe(
 char			*scsi_get_device_type_string(
 				char			*prop_name,
 				dev_info_t		*hba_dip,
-				struct scsi_device	*devp);
+				struct scsi_device	*sd);
 
 int		scsi_get_scsi_maxluns(
 				struct scsi_device	*sd);
@@ -381,7 +380,7 @@ int		scsi_get_scsi_options(
 
 int		scsi_get_device_type_scsi_options(
 				dev_info_t		*hba_dip,
-				struct scsi_device	*devp,
+				struct scsi_device	*sd,
 				int			default_scsi_options);
 
 struct scsi_pkt	*scsi_hba_pkt_alloc(
@@ -439,7 +438,7 @@ void		scsi_hba_nodename_compatible_free(
 
 
 int		scsi_hba_prop_update_inqstring(
-				struct scsi_device	*devp,
+				struct scsi_device	*sd,
 				char			*name,
 				char			*data,
 				size_t			len);
@@ -447,18 +446,36 @@ int		scsi_hba_prop_update_inqstring(
 /*
  * Flags for scsi_hba_attach
  *
- * SCSI_HBA_TRAN_CLONE		TRAN_CLONE is a KLUDGE to address current
+ * SCSI_HBA_ADDR_SPI		The host adapter driver wants the
+ *				scsi_address(9S) structure to be maintained
+ *				in legacy SPI 'a_target'/'a_lun' form (default).
+ *
+ * SCSI_HBA_ADDR_COMPLEX	The host adapter has a complex unit-address
+ *				space, and the HBA driver wants to maintain
+ *				per-scsi_device(9S) HBA private data using
+ *				scsi_address_device(9F) and
+ *				scsi_device_hba_private_[gs]et(9F).  The HBA
+ *				driver must maintain a private representation
+ *				of the scsi_device(9S) unit-address - typically
+ *				established during tran_tgt_init(9F) based on
+ *				property values.
+ *
+ * SCSI_HBA_TRAN_CLONE		Consider using SCSI_HBA_ADDR_COMPLEX instead.
+ *				SCSI_HBA_TRAN_CLONE is a KLUDGE to address
  *				limitations of the scsi_address(9S) structure
  *				via duplication of scsi_hba_tran(9S) and
- *				introduction of tran_tgt_private.
+ *				use of tran_tgt_private.
  */
-#define	SCSI_HBA_TRAN_CLONE	0x01		/* clone scsi_hba_tran_t */
-						/* structure per target */
+#define	SCSI_HBA_TRAN_CLONE	0x01		/* clone scsi_hba_tran(9S) */
+						/* structure per scsi_device */
 #define	SCSI_HBA_TRAN_ALLOC	0x02		/* set if scsi_hba_tran_alloc */
 						/* is called */
 #define	SCSI_HBA_TRAN_CDB	0x04		/* allocate cdb */
 #define	SCSI_HBA_TRAN_SCB	0x08		/* allocate sense */
 #define	SCSI_HBA_TRAN_FMSCSA	0x10		/* using common ddi_fm_* */
+
+#define	SCSI_HBA_ADDR_SPI	0x20		/* scsi_address in SPI form */
+#define	SCSI_HBA_ADDR_COMPLEX	0x40		/* scsi_address is COMPLEX */
 
 /*
  * Flags for scsi_hba allocation functions

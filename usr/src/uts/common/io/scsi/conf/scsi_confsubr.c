@@ -31,7 +31,6 @@
  * which might need to change as other interconnect evolve.
  */
 
-
 #include <sys/scsi/scsi.h>
 #include <sys/modctl.h>
 #include <sys/bitmap.h>
@@ -222,8 +221,7 @@ scsi_slave_do_rqsense(struct scsi_device *devp, int (*callback)())
 	/*
 	 * prepare rqsense packet
 	 */
-	rq_bp = scsi_alloc_consistent_buf(ROUTE,
-	    (struct buf *)NULL,
+	rq_bp = scsi_alloc_consistent_buf(ROUTE, (struct buf *)NULL,
 	    (uint_t)SENSE_LENGTH, B_READ, callback, NULL);
 	if (rq_bp == NULL) {
 		rval = SCSIPROBE_NOMEM;
@@ -450,8 +448,7 @@ int
 scsi_probe(struct scsi_device *devp, int (*callback)())
 {
 	int ret;
-	scsi_hba_tran_t		*hba_tran = devp->sd_address.a_hba_tran;
-
+	scsi_hba_tran_t		*tran = devp->sd_address.a_hba_tran;
 
 	if (scsi_check_ss2_LUN_limit(devp) != 0) {
 		/*
@@ -461,8 +458,8 @@ scsi_probe(struct scsi_device *devp, int (*callback)())
 		return (SCSIPROBE_NORESP);	/* skip probing this one */
 	}
 
-	if (hba_tran->tran_tgt_probe != NULL) {
-		ret = (*hba_tran->tran_tgt_probe)(devp, callback);
+	if (tran->tran_tgt_probe != NULL) {
+		ret = (*tran->tran_tgt_probe)(devp, callback);
 	} else {
 		ret = scsi_hba_probe(devp, callback);
 	}
@@ -738,37 +735,58 @@ out:
 	return (rval);
 }
 
-
-#define	A_TO_TRAN(ap)	(ap->a_hba_tran)
+/*
+ * Convert from a scsi_device structure pointer to a scsi_hba_tran structure
+ * pointer. The correct way to do this is
+ *
+ *	#define	DEVP_TO_TRAN(devp)	((devp)->sd_address.a_hba_tran)
+ *
+ * however we have some consumers that place their own vector in a_hba_tran. To
+ * avoid problems, we implement this using the sd_tran_safe. See
+ * scsi_hba_initchild for more details.
+ */
+#define	DEVP_TO_TRAN(devp)	((devp)->sd_tran_safe)
 
 /*
- * Function to get target and lun identifiers from HBA driver.
+ * Function to get human readable REPORTDEV addressing information from
+ * scsi address structure for SPI when tran_get_bus_addr is not implemented.
  */
 int
-scsi_get_bus_addr(struct scsi_device *devp, char *name, int len)
+scsi_get_bus_addr(struct scsi_device *devp, char *ba, int len)
 {
-	struct scsi_address *ap = &devp->sd_address;
+	struct scsi_address	*ap;
 
-	if ((A_TO_TRAN(ap)->tran_get_bus_addr) == NULL) {
-		(void) sprintf(name, "%x,%x", ap->a_target, ap->a_lun);
-		return (1);
-	}
-	return (*A_TO_TRAN(ap)->tran_get_bus_addr)(devp, name, len);
+	/* use tran_get_bus_addr interface if it is defined */
+	if (DEVP_TO_TRAN(devp)->tran_get_bus_addr)
+		return ((*DEVP_TO_TRAN(devp)->tran_get_bus_addr)
+		    (devp, ba, len));
+
+	ap = &devp->sd_address;
+	(void) snprintf(ba, len, "target %x lun %x", ap->a_target, ap->a_lun);
+	return (1);
 }
 
 /*
- * Function to get name from HBA driver.
+ * scsi_set_name: using properties, return "unit-address" string.
+ *
+ * Function to get "unit-address" in "name@unit-address" /devices path
+ * 'name' form from the unit-address properties on a node.
+ *
+ * NOTE: a better name for this function would be scsi_get_unit_address.
  */
 int
-scsi_get_name(struct scsi_device *devp, char *name, int len)
+scsi_get_name(struct scsi_device *devp, char *ua, int len)
 {
-	struct scsi_address *ap = &devp->sd_address;
+	struct scsi_address	*ap;
 
-	if ((A_TO_TRAN(ap)->tran_get_name) == NULL) {
-		(void) sprintf(name, "%x,%x", ap->a_target, ap->a_lun);
-		return (1);
-	}
-	return (*A_TO_TRAN(ap)->tran_get_name)(devp, name, len);
+	/* use tran_get_name interface if it is defined */
+	if (DEVP_TO_TRAN(devp)->tran_get_name)
+		return ((*DEVP_TO_TRAN(devp)->tran_get_name)
+		    (devp, ua, len));
+
+	ap = &devp->sd_address;
+	(void) snprintf(ua, len, "%x,%x", ap->a_target, ap->a_lun);
+	return (1);
 }
 
 void
@@ -889,9 +907,35 @@ get_inquiry_prop_len(char *property, size_t length)
 	return (retval);
 }
 
+/*
+ * Interfaces associated with SCSI_HBA_ADDR_COMPLEX
+ * per-scsi_device HBA private data support.
+ */
+struct scsi_device *
+scsi_address_device(struct scsi_address *sa)
+{
+	ASSERT(sa->a_hba_tran->tran_hba_flags & SCSI_HBA_ADDR_COMPLEX);
+	return (sa->a.a_sd);
+}
+
+void
+scsi_device_hba_private_set(struct scsi_device *sd, void *data)
+{
+	ASSERT(sd->sd_address.a_hba_tran->tran_hba_flags &
+	    SCSI_HBA_ADDR_COMPLEX);
+	sd->sd_hba_private = data;
+}
+
+void *
+scsi_device_hba_private_get(struct scsi_device *sd)
+{
+	ASSERT(sd->sd_address.a_hba_tran->tran_hba_flags &
+	    SCSI_HBA_ADDR_COMPLEX);
+	return (sd->sd_hba_private);
+}
 
 /*
- * this routine is called from the start of scsi_probe() if a tgt/LUN to be
+ * This routine is called from the start of scsi_probe() if a tgt/LUN to be
  * probed *may* be a request to probe a strictly SCSI-2 target (with respect
  * to LUNs) -- and this probe may be for a LUN number greater than 7,
  * which can cause a hardware hang
@@ -1004,7 +1048,7 @@ scsi_establish_LUN_limit(struct scsi_device *devp)
 		/*
 		 * this can't possibly be a node we want to look at, since
 		 * either LUN is greater than 0, target is greater than or
-		 * eqaual to 16, device type
+		 * equal to 16, device type
 		 * is not processor, or SCSI level is not SCSI-2,
 		 * so don't bother checking for a strictly SCSI-2
 		 * (only 8 LUN) target

@@ -9715,7 +9715,6 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 	/* link in the transport structure then fill it in */
 	pptr->port_tran = tran;
 	tran->tran_hba_private		= pptr;
-	tran->tran_tgt_private		= NULL;
 	tran->tran_tgt_init		= fcp_scsi_tgt_init;
 	tran->tran_tgt_probe		= NULL;
 	tran->tran_tgt_free		= fcp_scsi_tgt_free;
@@ -9777,7 +9776,7 @@ fcp_handle_port_attach(opaque_t ulph, fc_ulp_port_info_t *pinfo,
 	event_bind++;	/* Checked in fail case */
 
 	if (scsi_hba_attach_setup(pptr->port_dip, &pptr->port_data_dma_attr,
-	    tran, SCSI_HBA_TRAN_CLONE | SCSI_HBA_TRAN_SCB)
+	    tran, SCSI_HBA_ADDR_COMPLEX | SCSI_HBA_TRAN_SCB)
 	    != DDI_SUCCESS) {
 		fcp_log(CE_WARN, pptr->port_dip,
 		    "!fcp%d: scsi_hba_attach_setup failed", instance);
@@ -10723,7 +10722,7 @@ fcp_phys_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	mutex_enter(&ptgt->tgt_mutex);
 	plun->lun_tgt_count++;
-	hba_tran->tran_tgt_private = plun;
+	scsi_device_hba_private_set(sd, plun);
 	plun->lun_state |= FCP_SCSI_LUN_TGT_INIT;
 	plun->lun_tran = hba_tran;
 	mutex_exit(&ptgt->tgt_mutex);
@@ -10754,7 +10753,7 @@ fcp_virt_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 	    " (tgt_dip %p)", ddi_get_name(tgt_dip),
 	    ddi_get_instance(tgt_dip), hba_dip, tgt_dip);
 
-	cip = (child_info_t *)sd->sd_private;
+	cip = (child_info_t *)sd->sd_pathinfo;
 	if (cip == NULL) {
 		FCP_DTRACE(fcp_logq, pptr->port_instbuf,
 		    fcp_trace, FCP_BUF_LEVEL_8, 0,
@@ -10818,7 +10817,7 @@ fcp_virt_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 
 	mutex_enter(&ptgt->tgt_mutex);
 	plun->lun_tgt_count++;
-	hba_tran->tran_tgt_private = plun;
+	scsi_device_hba_private_set(sd, plun);
 	plun->lun_state |= FCP_SCSI_LUN_TGT_INIT;
 	plun->lun_tran = hba_tran;
 	mutex_exit(&ptgt->tgt_mutex);
@@ -10864,7 +10863,7 @@ static void
 fcp_scsi_tgt_free(dev_info_t *hba_dip, dev_info_t *tgt_dip,
     scsi_hba_tran_t *hba_tran, struct scsi_device *sd)
 {
-	struct fcp_lun	*plun = hba_tran->tran_tgt_private;
+	struct fcp_lun	*plun = scsi_device_hba_private_get(sd);
 	struct fcp_tgt	*ptgt;
 
 	FCP_DTRACE(fcp_logq, LUN_PORT->port_instbuf,

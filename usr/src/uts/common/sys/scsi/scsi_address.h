@@ -35,42 +35,83 @@ extern "C" {
 /*
  * SCSI address definition.
  *
- * A scsi_address structure stores the host routing and device unit-address
- * information necessary to reference a specific SCSI target device logical
- * unit function.
+ * A scsi_address(9S) structure stores the host adapter routing and
+ * scsi_device(9S) unit-address routing information necessary to reference
+ * a specific SCSI target device logical unit function.
  *
- * The host routing information is stored in the scsi_hba_tran(9S) structure
- * pointed to by the a_hba_tran field.
+ * Host adapter routing information is stored in the scsi_hba_tran(9S)
+ * structure, pointed to by the scsi_address(9S) 'a_hba_tran' field.
  *
- * The device unit-address information is SCSA's representation of the
- * "@unit-address" portion of a SCSI target driver device node in the
- * /devices tree.  Separate components of the device unit-address information
- * define the target address and the logical unit address of a target.
- * In general, device unit-address information is used exclusively by the
- * host adapter driver (the exception being target drivers communicating
- * with SCSI Parallel Interconnect (SPI) SCSI-1 devices that embed SCSI
- * logical unit addressing in the CDB).
+ * The scsi_device(9S) unit-address routing information (i.e. SCSA's
+ * representation of leaf disk/tape driver's "@unit-address" portion of
+ * a /devices path) is maintained in three different forms:
  *
- * Thus the a_target and a_lun fields are for compatibility purposes only.
- * They are not defined in SCSI-3.  SCSI-3 target drivers which need to
- * communicate with SPI SCSI-1 devices that embed logical unit addresses in
- * the CDB should obtain target and logical unit addresses from the device's
- * properties (SCSI_ADDR_PROP_TARGET and SCSI_ADDR_PROP_LUN).
+ * SCSI_HBA_ADDR_SPI: In SCSI_HBA_ADDR_SPI mode (default), the SCSA
+ *	framework, during initialization, places unit-address property
+ *	information, converted to numeric form, directly into the
+ *	'a_target' and 'a_lun' fields of the scsi_address(9S) structure
+ *	(embedded in the scsi_device(9S) structure). To maintain
+ *	per-scsi_device(9S) state, host adapter drivers often use
+ *	'a_target' and 'a_lun' to index into a large fixed array
+ *	(limited by the drivers idea of maximum supported target and
+ *	lun).
  *
- * a_sublun is reserved for internal use only and is never part of DDI
- * (scsi_address(9S)).
+ *	NOTE: a_sublun is reserved for internal use only and has never
+ *	been part of DDI scsi_address(9S).
+ *
+ * SCSI_HBA_ADDR_COMPLEX: The host adapter driver will maintain
+ *	per-unit-address/per-scsi_device(9S) HBA private state by using
+ *	scsi_device_hba_private_set(9F) during tran_tgt_init(9E) (using
+ *	property interfaces to obtain/convert unit-address information into
+ *	a host adapter private form).  In SCSI_HBA_ADDR_COMPLEX mode, the SCSA
+ *	framework, prior to tran_tgt_init(9E), places a pointer to the
+ *	scsi_device(9S) in the 'a.a_sd' scsi_address(9S) field, and uses
+ *	'sd_hba_private' to store per-scsi_device hba private data.
+ *
+ * SCSI_HBA_TRAN_CLONE: SCSI_HBA_TRAN_CLONE is an older method for
+ *	supporting devices with non-SPI unit-address. It is still
+ *	supported, but its use is discouraged. From a unit-address
+ *	perspective, operation is similar to SCSI_HBA_ADDR_COMPLEX, but
+ *	per-scsi_device(9S) state is supported via 'cloning' of the
+ *	scsi_hba_tran(9S) structure (to provide a per-scsi_device(9S)
+ *	version of 'tran_tgt_private'/'tran_sd' accessible via
+ *	'a_hba_tran').
+ *
+ * NOTE: Compatible evolution of SCSA is constrained by the fact that the
+ * scsi_address(9S) structure is embedded at the base of the scsi_device(9S)
+ * structure, and is structure copied into the base of each allocated
+ * scsi_pkt(9S) structure.
+ *
+ * In general, device unit-address information is used exclusively by
+ * the host adapter driver (the exception being target drivers
+ * communicating with SCSI Parallel Interconnect (SPI) SCSI-1 devices
+ * that embed SCSI logical unit addressing in the CDB). Target drivers
+ * which need to communicate with SPI SCSI-1 devices that embed logical
+ * unit addresses in the CDB must obtain target and logical unit
+ * addresses from the device's properties (SCSI_ADDR_PROP_TARGET and
+ * SCSI_ADDR_PROP_LUN).
  */
 struct scsi_address {
-	struct scsi_hba_tran	*a_hba_tran;	/* Transport vectors */
-	ushort_t		a_target;	/* Target identifier */
-	uchar_t			a_lun;		/* Lun on that Target */
-	uchar_t			a_sublun;	/* Sublun on that Lun */
-						/* Not used */
+	struct scsi_hba_tran	*a_hba_tran;	/* Transport vector */
+	union {
+		struct {			/* SPI: */
+			ushort_t a_target;	/* ua target */
+			uchar_t	 a_lun;		/* ua lun on target */
+			uchar_t	 _a_sublun;	/* (private) */
+		} spi;
+		struct scsi_device *a_sd;	/* COMPLEX: (private) */
+	} a;					/* device unit-adddress info */
 };
+#define	a_target	a.spi.a_target
+#define	a_lun		a.spi.a_lun
+#define	a_sublun	a.spi._a_sublun
 
 /* Device unit-address property names */
 #define	SCSI_ADDR_PROP_TARGET		"target"
 #define	SCSI_ADDR_PROP_LUN		"lun"
+#define	SCSI_ADDR_PROP_TARGET_UA	"target-ua"	/* string */
+#define	SCSI_ADDR_PROP_LUN64		"lun64"
+#define	SCSI_ADDR_PROP_SFUNC		"sfunc"
 
 /*
  * Normalized representation of a scsi_lun (with SCSI-2 lun positioned
