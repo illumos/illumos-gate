@@ -56,14 +56,29 @@ struct	sockaddr_un {
 	char		sun_path[108];		/* path name (gag) */
 };
 
+#if (!defined(_XOPEN_SOURCE) && !defined(_POSIX_C_SOURCE)) || \
+    defined(__EXTENSIONS__)
 /*
  * NOTE: If we ever go to BSD-style sun_len + sun_family, this macro needs to
  * change.
  *
- * Also, include a strlen() prototype.
+ * Also, include a strlen() prototype, and we have to protect it w.r.t.
+ * UNIX{98,03}.  And because there's strlen, we need size_t as well.
  */
+#if !defined(_SIZE_T) || __cplusplus >= 199711L
+#define	_SIZE_T
+#if defined(_LP64) || defined(_I32LPx)
+typedef	ulong_t	size_t;		/* size of something in bytes */
+#else
+typedef	uint_t	size_t;		/* (historical version) */
+#endif
+#endif	/* _SIZE_T */
+
 extern size_t strlen(const char *);
+
 #define	SUN_LEN(su)	(sizeof (sa_family_t) + strlen((su)->sun_path))
+
+#endif	/* (!defined(_XOPEN_SOURCE) && !defined(_POSIX_C_SOURCE)) || ... */
 
 #ifdef _KERNEL
 int	unp_discard();
