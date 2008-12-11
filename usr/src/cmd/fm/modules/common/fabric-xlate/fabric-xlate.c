@@ -23,10 +23,9 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <assert.h>
 #include <stddef.h>
+#include <errno.h>
 #include <strings.h>
 #include <fm/fmd_api.h>
 #include <fm/libtopo.h>
@@ -165,7 +164,7 @@ static void fab_fire_to_data(fmd_hdl_t *hdl, nvlist_t *nvl, fab_data_t *data);
 /* Common functions for sending translated ereports */
 static int fab_prep_basic_erpt(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *erpt,
     boolean_t isRC);
-static void fab_get_rcpath(fmd_hdl_t *hdl, nvlist_t *nvl, char *rcpath);
+static boolean_t fab_get_rcpath(fmd_hdl_t *hdl, nvlist_t *nvl, char *rcpath);
 static char *fab_find_addr(fmd_hdl_t *hdl, nvlist_t *nvl, uint64_t addr);
 static char *fab_find_bdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf);
 static void fab_send_tgt_erpt(fmd_hdl_t *hdl, fab_data_t *data,
@@ -597,9 +596,7 @@ fab_prep_basic_erpt(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *erpt,
 	 * only by fab_prep_fake_rc_erpt.  See the fab_pciex_fake_rc_erpt_tbl
 	 * comments for more information.
 	 */
-	if (isRC) {
-		fab_get_rcpath(hdl, nvl, rcpath);
-
+	if (isRC && fab_get_rcpath(hdl, nvl, rcpath)) {
 		/* Create the correct PCIe RC new_detector aka FMRI */
 		(void) nvlist_remove(new_detector, FM_FMRI_DEV_PATH,
 		    DATA_TYPE_STRING);
@@ -690,7 +687,7 @@ fab_send_tgt_erpt(fmd_hdl_t *hdl, fab_data_t *data, const char *class,
 		    fab_buf, tgt_addr);
 		fmd_xprt_post(hdl, fab_fmd_xprt, erpt, 0);
 		if (fmd_xprt_error(hdl, fab_fmd_xprt))
-			fmd_hdl_debug(hdl, "Failed to send Target PCI ereport");
+			goto done;
 	} else {
 		fmd_hdl_debug(hdl, "Cannot find Target FMRI addr:0x%llx",
 		    tgt_addr);
@@ -698,7 +695,7 @@ fab_send_tgt_erpt(fmd_hdl_t *hdl, fab_data_t *data, const char *class,
 
 	return;
 done:
-	fmd_hdl_debug(hdl, "Failed  to send Target PCI ereport\n");
+	fmd_hdl_debug(hdl, "Failed to send Target PCI ereport\n");
 }
 
 static void
@@ -1144,14 +1141,14 @@ fab_prep_pcie_rc_erpt(fmd_hdl_t *hdl, fab_data_t *data, nvlist_t *erpt,
 		return (-1);
 
 	/* Only send a FE Msg if the 1st UE error is FE */
-	if (strcmp(class, PCIEX_RC_FE_MSG) == 0)
+	if (STRCMP(class, PCIEX_RC_FE_MSG))
 		if (!(status & PCIE_AER_RE_STS_FIRST_UC_FATAL))
 			return (-1);
 		else
 			isFE = 1;
 
 	/* Only send a NFE Msg is the 1st UE error is NFE */
-	if (strcmp(class, PCIEX_RC_NFE_MSG) == 0)
+	if (STRCMP(class, PCIEX_RC_NFE_MSG))
 		if (status & PCIE_AER_RE_STS_FIRST_UC_FATAL)
 			return (-1);
 		else
@@ -1172,7 +1169,7 @@ fab_prep_pcie_rc_erpt(fmd_hdl_t *hdl, fab_data_t *data, nvlist_t *erpt,
 		    data->pcie_rp_ue_src_id);
 		(void) nvlist_add_boolean_value(erpt, PCIEX_SRC_VALID, B_TRUE);
 	}
-	if ((strcmp(class, PCIEX_RC_CE_MSG) == 0) && data->pcie_rp_ce_src_id) {
+	if (STRCMP(class, PCIEX_RC_CE_MSG) && data->pcie_rp_ce_src_id) {
 		(void) nvlist_add_uint16(erpt, PCIEX_SRC_ID,
 		    data->pcie_rp_ce_src_id);
 		(void) nvlist_add_boolean_value(erpt, PCIEX_SRC_VALID, B_TRUE);
@@ -1243,7 +1240,7 @@ fab_xlate_fire_ce(fmd_hdl_t *hdl, fab_data_t *data, nvlist_t *erpt,
 	uint64_t	reg;
 
 	for (entry = fab_fire_pec_ce_tbl; entry->err_class; entry++) {
-		if (strcmp(class, entry->err_class) == 0)
+		if (STRCMP(class, entry->err_class))
 			goto send;
 	}
 
@@ -1273,7 +1270,7 @@ fab_xlate_fire_ue(fmd_hdl_t *hdl, fab_data_t *data, nvlist_t *erpt,
 	pcie_tlp_hdr_t	*hdr;
 
 	for (entry = fab_fire_pec_ue_tbl; entry->err_class; entry++) {
-		if (strcmp(class, entry->err_class) == 0)
+		if (STRCMP(class, entry->err_class))
 			goto send;
 	}
 
@@ -1362,7 +1359,7 @@ fab_xlate_fire_oe(fmd_hdl_t *hdl, fab_data_t *data, nvlist_t *erpt,
 	uint64_t	reg;
 
 	for (entry = fab_fire_pec_oe_tbl; entry->err_class; entry++) {
-		if (strcmp(class, entry->err_class) == 0)
+		if (STRCMP(class, entry->err_class))
 			goto send;
 	}
 
@@ -1425,7 +1422,7 @@ fab_xlate_fire_dmc(fmd_hdl_t *hdl, fab_data_t *data, nvlist_t *erpt,
 
 	for (entry = fab_fire_dmc_tbl; entry->err_class; entry++) {
 		fmd_hdl_debug(hdl, "Matching %s\n", entry->err_class);
-		if ((strcmp(class, entry->err_class) == 0) &&
+		if (STRCMP(class, entry->err_class) &&
 		    nvlist_lookup_boolean(erpt, "primary"))
 				goto send;
 	}
@@ -1551,19 +1548,128 @@ fab_update_topo(fmd_hdl_t *hdl)
 	fab_valid_topo = 1;
 }
 
+#define	FAB_HC2DEV_QUERY_SIZE_MIN 160
+#define	FAB_HC2DEV_QUERY_SIZE(sz) \
+	((sz + FAB_HC2DEV_QUERY_SIZE_MIN) * sizeof (char))
+
+static boolean_t
+fab_hc2dev(fmd_hdl_t *hdl, nvlist_t *detector, char **dev_path,
+    uint_t *dev_path_size) {
+	xmlXPathObjectPtr xpathObj;
+	xmlNodeSetPtr	nodes;
+	char 		*query, *query_end, *temp;
+	uint_t 		i, size;
+	size_t		query_size = 0;
+	nvlist_t	**hcl;
+
+	if (nvlist_lookup_nvlist_array(detector, FM_FMRI_HC_LIST, &hcl,
+		&size) != 0)
+		goto fail;
+
+	for (i = 0; i < size; i++) {
+		if (nvlist_lookup_string(hcl[i], FM_FMRI_HC_NAME, &temp) != 0)
+			goto fail;
+		query_size += strlen(temp);
+		if (nvlist_lookup_string(hcl[i], FM_FMRI_HC_ID, &temp) != 0)
+			goto fail;
+		query_size += strlen(temp);
+		/* Adjust for '=' and '/' later */
+		query_size += 2;
+	}
+
+	query = fmd_hdl_alloc(hdl, FAB_HC2DEV_QUERY_SIZE(query_size),
+	    FMD_SLEEP);
+	(void) sprintf(query, "//propval[@name='resource' and "
+	    "contains(substring(@value, string-length(@value) - %d), '",
+	    query_size);
+
+	query_end = query;
+	query_end += strlen(query);
+
+	for (i = 0; i < size; i++) {
+		(void) nvlist_lookup_string(hcl[i], FM_FMRI_HC_NAME, &temp);
+		(void) snprintf(query_end, query_size, "%s=", temp);
+		query_end += strlen(temp) + 1;
+		(void) nvlist_lookup_string(hcl[i], FM_FMRI_HC_ID, &temp);
+		(void) snprintf(query_end, query_size, "%s", temp);
+		query_end += strlen(temp);
+		if (i != (size - 1)) {
+			(void) sprintf(query_end++, "/");
+		}
+	}
+
+	(void) sprintf(query_end, "')]/parent::*/following-sibling::*/"
+	    "propval[@name='dev']/@value");
+
+	fmd_hdl_debug(hdl, "xpathObj query %s\n", query);
+
+	xpathObj = xmlXPathEvalExpression((const xmlChar *)query,
+	    fab_xpathCtx);
+	fmd_hdl_free(hdl, query, FAB_HC2DEV_QUERY_SIZE(query_size));
+
+	fmd_hdl_debug(hdl, "xpathObj 0x%p type %d\n", xpathObj,
+	    xpathObj->type);
+	nodes = xpathObj->nodesetval;
+
+	if (nodes) {
+		temp = (char *)xmlNodeGetContent(nodes->nodeTab[0]);
+		fmd_hdl_debug(hdl, "HC Dev Path: %s\n", temp);
+		*dev_path_size = strlen(temp) + 1;
+		*dev_path = fmd_hdl_alloc(hdl, *dev_path_size, FMD_SLEEP);
+		(void) strcpy(*dev_path,
+		    (char *)xmlNodeGetContent(nodes->nodeTab[0]));
+		return (B_TRUE);
+	}
+fail:
+	return (B_FALSE);
+}
+
 /* ARGSUSED */
-static void
+static boolean_t
 fab_get_rcpath(fmd_hdl_t *hdl, nvlist_t *nvl, char *rcpath) {
 	nvlist_t	*detector;
-	char		*path;
-	int		i;
+	char		*path, *scheme;
+	uint_t		size;
 
-	(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &detector);
-	(void) nvlist_lookup_string(detector, FM_FMRI_DEV_PATH, &path);
-	(void) strncpy(rcpath, path, FM_MAX_CLASS);
-	for (i = 1; (i < FM_MAX_CLASS) && (rcpath[i] != '/') &&
-	    (rcpath[i] != '\0'); i++);
-	rcpath[i] = '\0';
+	if (nvlist_lookup_nvlist(nvl, FM_EREPORT_DETECTOR, &detector) != 0)
+		goto fail;
+	if (nvlist_lookup_string(detector, FM_FMRI_SCHEME, &scheme) != 0)
+		goto fail;
+
+	if (STRCMP(scheme, FM_FMRI_SCHEME_DEV)) {
+		if (nvlist_lookup_string(detector, FM_FMRI_DEV_PATH,
+			&path) != 0)
+			goto fail;
+		(void) strncpy(rcpath, path, FM_MAX_CLASS);
+	} else if (STRCMP(scheme, FM_FMRI_SCHEME_HC)) {
+		/*
+		 * This should only occur for ereports that come from the RC
+		 * itself.  In this case convert HC scheme to dev path.
+		 */
+		if (fab_hc2dev(hdl, detector, &path, &size)) {
+			(void) strncpy(rcpath, path, FM_MAX_CLASS);
+			fmd_hdl_free(hdl, path, size);
+		} else {
+			goto fail;
+		}
+	} else {
+		return (B_FALSE);
+	}
+
+	/*
+	 * Extract the RC path by taking the first device in the dev path
+	 *
+	 * /pci@0,0/pci8086,3605@2/pci8086,3500@0/pci8086,3514@1/pci8086,105e@0
+	 * - to -
+	 * /pci@0,0
+	 */
+	path = strchr(rcpath + 1, '/');
+	if (path)
+		path[0] = '\0';
+
+	return (B_TRUE);
+fail:
+	return (B_FALSE);
 }
 
 static char *
@@ -1580,7 +1686,8 @@ fab_find_bdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf) {
 		fn = (bdf & PCIE_REQ_ID_FUNC_MASK) >> PCIE_REQ_ID_FUNC_SHIFT;
 	}
 
-	fab_get_rcpath(hdl, nvl, rcpath);
+	if (!fab_get_rcpath(hdl, nvl, rcpath))
+		goto fail;
 
 	/*
 	 * Explanation of the XSL XPATH Query
@@ -1602,16 +1709,19 @@ fab_find_bdf(fmd_hdl_t *hdl, nvlist_t *nvl, pcie_req_id_t bdf) {
 	    "/parent::*/following-sibling::*[@name='io']/propval[@name='dev']/"
 	    "@value", bus, dev, fn, bus, dev, fn, rcpath);
 
+	fmd_hdl_debug(hdl, "xpathObj query %s\n", query);
+
 	xpathObj = xmlXPathEvalExpression((const xmlChar *)query, fab_xpathCtx);
 
 	fmd_hdl_debug(hdl, "xpathObj 0x%p type %d\n", xpathObj, xpathObj->type);
-	fmd_hdl_debug(hdl, "xpathObj query %s\n", query);
+
 	nodes = xpathObj->nodesetval;
 	if (nodes) {
 		fmd_hdl_debug(hdl, "BDF Dev Path: %s\n",
 		    xmlNodeGetContent(nodes->nodeTab[0]));
 		return ((char *)xmlNodeGetContent(nodes->nodeTab[0]));
 	}
+fail:
 	return (NULL);
 }
 
@@ -1628,17 +1738,20 @@ fab_find_addr(fmd_hdl_t *hdl, nvlist_t *nvl, uint64_t addr) {
 	uint64_t low, hi;
 	char rcpath[255];
 
-	fab_get_rcpath(hdl, nvl, rcpath);
+	if (!fab_get_rcpath(hdl, nvl, rcpath))
+		goto fail;
 
 	(void) snprintf(query, sizeof (query), "//propval["
 	    "@name='ASRU' and contains(@value, '%s')]/"
 	    "parent::*/following-sibling::*[@name='pci']/"
 	    "propval[@name='assigned-addresses']", rcpath);
 
+	fmd_hdl_debug(hdl, "xpathObj query %s\n", query);
+
 	xpathObj = xmlXPathEvalExpression((const xmlChar *)query, fab_xpathCtx);
 
 	fmd_hdl_debug(hdl, "xpathObj 0x%p type %d\n", xpathObj, xpathObj->type);
-	fmd_hdl_debug(hdl, "xpathObj query %s\n", query);
+
 	nodes = xpathObj->nodesetval;
 	size = (nodes) ? nodes->nodeNr : 0;
 
@@ -1667,7 +1780,7 @@ fab_find_addr(fmd_hdl_t *hdl, nvlist_t *nvl, uint64_t addr) {
 			}
 		}
 	}
-	return (NULL);
+	goto fail;
 
 found:
 	/* Traverse up the xml tree and back down to find the right propgroup */
@@ -1677,7 +1790,7 @@ found:
 		    STRCMP(GET_PROP(devNode, "name"), "io"))
 			goto propgroup;
 	}
-	return (NULL);
+	goto fail;
 
 propgroup:
 	/* Retrive the "dev" propval and return */
@@ -1689,6 +1802,7 @@ propgroup:
 			return (GET_PROP(devNode, "value"));
 		}
 	}
+fail:
 	return (NULL);
 }
 
@@ -1716,7 +1830,7 @@ fab_pr(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl) {
 		int arri;
 
 
-		if (strcmp(name, FM_CLASS) == 0)
+		if (STRCMP(name, FM_CLASS))
 			continue; /* already printed by caller */
 
 		fmd_hdl_debug(hdl, " %s=", name);
