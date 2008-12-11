@@ -19,17 +19,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # usr/src/lib/pam_modules/krb5/Makefile.com
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	pam_krb5.a
 VERS=		.1
 
-include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 
 PRIV_OBJ=	krb5_authenticate.o \
 		krb5_setcred.o \
@@ -41,6 +39,7 @@ PRIV_OBJ=	krb5_authenticate.o \
 OBJECTS=	$(PRIV_OBJ)
 
 include 	../../Makefile.pam_modules
+include $(SRC)/lib/gss_mechs/mech_krb5/Makefile.mech_krb5
 
 CPPFLAGS +=	-I../../../gss_mechs/mech_krb5/include \
 		-I$(SRC)/uts/common/gssapi/include/ \
