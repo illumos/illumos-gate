@@ -1146,18 +1146,27 @@ iscsi_sess_state_logged_in(iscsi_sess_t *isp, iscsi_sess_event_t event)
 				    "!iscsi session(%u) %s offline\n",
 				    isp->sess_oid, isp->sess_name);
 			}
+			/*
+			 * An enumeration may also in progress
+			 * in the same session. Release the
+			 * sess_state_mutex to avoid deadlock
+			 *
+			 * During the process of offlining the LUNs
+			 * our ic thread might be calling back into
+			 * the driver via a target driver failure
+			 * path to do a reset or something
+			 * we need to release the sess_state_mutex
+			 * while we are killing these threads so
+			 * they don't get deadlocked.
+			 */
+			mutex_exit(&isp->sess_state_mutex);
 			iscsi_sess_offline_luns(isp);
+			iscsi_thread_destroy(isp->sess_ic_thread);
+		} else {
+			mutex_exit(&isp->sess_state_mutex);
+			iscsi_thread_destroy(isp->sess_ic_thread);
 		}
 
-		/*
-		 * During the process of offlining the LUNs our ic
-		 * thread might be calling back into the driver via
-		 * a target driver failure path to do a reset or something
-		 * we need to release the sess_state_mutex while we
-		 * are killing these threads to they don't get deadlocked.
-		 */
-		mutex_exit(&isp->sess_state_mutex);
-		iscsi_thread_destroy(isp->sess_ic_thread);
 		mutex_enter(&isp->sess_state_mutex);
 		break;
 
@@ -1319,18 +1328,27 @@ iscsi_sess_state_in_flush(iscsi_sess_t *isp, iscsi_sess_event_t event)
 				    "!iscsi session(%u) %s offline\n",
 				    isp->sess_oid, isp->sess_name);
 			}
+			/*
+			 * An enumeration may also in progress
+			 * in the same session. Release the
+			 * sess_state_mutex to avoid deadlock
+			 *
+			 * During the process of offlining the LUNs
+			 * our ic thread might be calling back into
+			 * the driver via a target driver failure
+			 * path to do a reset or something
+			 * we need to release the sess_state_mutex
+			 * while we are killing these threads so
+			 * they don't get deadlocked.
+			 */
+			mutex_exit(&isp->sess_state_mutex);
 			iscsi_sess_offline_luns(isp);
+			iscsi_thread_destroy(isp->sess_ic_thread);
+		} else {
+			mutex_exit(&isp->sess_state_mutex);
+			iscsi_thread_destroy(isp->sess_ic_thread);
 		}
 
-		/*
-		 * During the process of offlining the LUNs our ic
-		 * thread might be calling back into the driver via
-		 * a target driver failure path to do a reset or something
-		 * we need to release the sess_state_mutex while we
-		 * are killing these threads to they don't get deadlocked.
-		 */
-		mutex_exit(&isp->sess_state_mutex);
-		iscsi_thread_destroy(isp->sess_ic_thread);
 		mutex_enter(&isp->sess_state_mutex);
 		break;
 
