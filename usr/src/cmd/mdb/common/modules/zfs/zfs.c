@@ -1493,6 +1493,52 @@ spa_verify(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static int
+spa_print_aux(spa_aux_vdev_t *sav, uint_t flags, mdb_arg_t *v,
+    const char *name)
+{
+	uintptr_t *aux;
+	size_t len;
+	int ret, i;
+
+	/*
+	 * Iterate over aux vdevs and print those out as well.  This is a
+	 * little annoying because we don't have a root vdev to pass to ::vdev.
+	 * Instead, we print a single line and then call it for each child
+	 * vdev.
+	 */
+	if (sav->sav_count != 0) {
+		v[1].a_type = MDB_TYPE_STRING;
+		v[1].a_un.a_str = "-d";
+		v[2].a_type = MDB_TYPE_IMMEDIATE;
+		v[2].a_un.a_val = 2;
+
+		len = sav->sav_count * sizeof (uintptr_t);
+		aux = mdb_alloc(len, UM_SLEEP);
+		if (mdb_vread(aux, len,
+		    (uintptr_t)sav->sav_vdevs) == -1) {
+			mdb_free(aux, len);
+			mdb_warn("failed to read l2cache vdevs at %p",
+			    sav->sav_vdevs);
+			return (DCMD_ERR);
+		}
+
+		mdb_printf("%-?s %-9s %-12s %s\n", "-", "-", "-", name);
+
+		for (i = 0; i < sav->sav_count; i++) {
+			ret = mdb_call_dcmd("vdev", aux[i], flags, 3, v);
+			if (ret != DCMD_OK) {
+				mdb_free(aux, len);
+				return (ret);
+			}
+		}
+
+		mdb_free(aux, len);
+	}
+
+	return (0);
+}
+
 /*
  * ::spa_vdevs
  *
@@ -1509,9 +1555,7 @@ spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	spa_t spa;
 	mdb_arg_t v[3];
 	int errors = FALSE;
-	int ret, i;
-	uintptr_t *aux;
-	size_t len;
+	int ret;
 
 	if (mdb_getopts(argc, argv,
 	    'e', MDB_OPT_SETBITS, TRUE, &errors,
@@ -1542,40 +1586,9 @@ spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (ret != DCMD_OK)
 		return (ret);
 
-	/*
-	 * Iterate over cache devices and print those out as well.  This is a
-	 * little annoying because we don't have a root vdev to pass to ::vdev.
-	 * Instead, we print a single 'cache' line and then call it for each
-	 * child vdev.
-	 */
-	if (spa.spa_l2cache.sav_count != 0) {
-		v[1].a_type = MDB_TYPE_STRING;
-		v[1].a_un.a_str = "-d";
-		v[2].a_type = MDB_TYPE_IMMEDIATE;
-		v[2].a_un.a_val = 2;
-
-		len = spa.spa_l2cache.sav_count * sizeof (uintptr_t);
-		aux = mdb_alloc(len, UM_SLEEP);
-		if (mdb_vread(aux, len,
-		    (uintptr_t)spa.spa_l2cache.sav_vdevs) == -1) {
-			mdb_free(aux, len);
-			mdb_warn("failed to read l2cache vdevs at %p",
-			    spa.spa_l2cache.sav_vdevs);
-			return (DCMD_ERR);
-		}
-
-		mdb_printf("%-?s %-9s %-12s cache\n", "-", "-", "-");
-
-		for (i = 0; i < spa.spa_l2cache.sav_count; i++) {
-			ret = mdb_call_dcmd("vdev", aux[i], flags, 3, v);
-			if (ret != DCMD_OK) {
-				mdb_free(aux, len);
-				return (ret);
-			}
-		}
-
-		mdb_free(aux, len);
-	}
+	if (spa_print_aux(&spa.spa_l2cache, flags, v, "cache") != 0 ||
+	    spa_print_aux(&spa.spa_spares, flags, v, "spares") != 0)
+		return (DCMD_ERR);
 
 	return (DCMD_OK);
 }
