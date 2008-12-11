@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SBD_IOCTL_H
 #define	_SBD_IOCTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef	_ASM
 #include <sys/types.h>
@@ -617,6 +615,7 @@ typedef struct {
 #define	EOPL_FMEM_SCF_ERR	5029	/* SCF error */
 #define	EOPL_MIXED_CPU		5030
 	/* Cannot add SPARC64-VI to domain booted with all SPARC64-VII CPUs */
+#define	EOPL_FMEM_SCF_OFFLINE	5031	/* SCF OFFLINE */
 
 #ifdef	__cplusplus
 }

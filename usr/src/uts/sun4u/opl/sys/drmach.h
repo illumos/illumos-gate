@@ -26,8 +26,6 @@
 #ifndef _SYS_DRMACH_H_
 #define	_SYS_DRMACH_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -85,6 +83,7 @@ extern "C" {
 #define	SCF_STATUS_MODE_SWITCH	0x000c
 #define	SCF_STATUS_CMD_COMPLETE	0x0002
 #define	SCF_STATUS_CMD_L_PARITY	0x0001
+#define	SCF_STATUS_EX_ONLINE	0x20000000
 
 #define	SCF_RETRY_CNT		15
 
@@ -190,6 +189,8 @@ typedef struct {
 	int8_t	scf_rsv4[4];
 	uint8_t	scf_tdata[16];
 	uint8_t	scf_rdata[16];
+	int8_t	scf_rsv5[36];
+	int32_t	scf_status_ex;
 } drmach_scf_regs_t;
 
 

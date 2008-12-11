@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is through cpp before being used as
@@ -280,6 +278,17 @@ drmach_fmem_exec_script(caddr_t critical, int size)
 	ldx	[%o0 + SCF_TD], %l1
 	ldx	[%o0 + SCF_TD+8], %l2
 	ldx	[%o0 + DELAY], %l5
+
+	/* check if SCF is ONLINE */
+	add	%l0, SCF_STATUS_EX, %o1
+	lduwa	[%o1]ASI_IO, %o2
+	sethi	%hi(SCF_STATUS_EX_ONLINE), %o3
+	btst	%o2, %o3
+	bne	%xcc, 6f
+	 nop
+	set	EOPL_FMEM_SCF_OFFLINE, %o4
+	ba	1b
+	 nop
 
 	/* check if SCF is busy */
 	add	%l0, SCF_COMMAND, %o1
