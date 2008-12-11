@@ -18,9 +18,10 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
 # 
 
 PROG= installgrub
@@ -35,17 +36,11 @@ include ../Makefile.com
 
 CPPFLAGS += -I$(SRC)/uts/i86pc -I$(SRC)/uts/intel -I$(SRC)/uts/common
 
-i386_CFLAGS += -D_LARGEFILE64_SOURCE
-i386_CFLAGS += -D_FILE_OFFSET_BITS=64
-
-LDLIBS += -lfdisk
-
 LINTFLAGS += \
 	-erroff=E_BAD_PTR_CAST_ALIGN \
 	-erroff=E_STATIC_UNUSED \
 	-erroff=E_FUNC_RET_MAYBE_IGNORED \
-	-erroff=E_FUNC_RET_MAYBE_IGNORED2 \
-	-xerroff=E_NAME_DEF_NOT_USED2
+	-erroff=E_FUNC_RET_MAYBE_IGNORED2
 
 .KEEP_STATE:
 

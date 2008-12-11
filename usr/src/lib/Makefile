@@ -270,8 +270,6 @@ sparc_SUBDIRS= .WAIT	\
 	libpcp		\
 	libtsalarm
 
-i386_SUBDIRS= libfdisk
-
 FM_sparc_DEPLIBS= libpri
 
 fm:			\
@@ -351,8 +349,6 @@ MSGSUBDIRS += \
 sparc_MSGSUBDIRS=	\
 	libprtdiag	\
 	libprtdiag_psr
-
-i386_MSGSUBDIRS= libfdisk
 
 HDRSUBDIRS=		\
 	auditd_plugins	\
@@ -480,8 +476,6 @@ sparc_HDRSUBDIRS=	\
 	libdscp		\
 	libpri		\
 	storage
-
-i386_HDRSUBDIRS= libfdisk
 
 all :=		TARGET= all
 check :=	TARGET= check

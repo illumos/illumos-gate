@@ -1146,7 +1146,6 @@ xdf_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	case DKIOCSMBOOT:
 	case DKIOCGETEFI:
 	case DKIOCSETEFI:
-	case DKIOCSETEXTPART:
 	case DKIOCPARTITION: {
 		int rc;
 

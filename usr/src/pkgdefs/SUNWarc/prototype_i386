@@ -167,5 +167,3 @@ s none usr/ccs/lib/amd64/values-xpg6.o=../../../lib/amd64/values-xpg6.o
 d none usr/lib/scsi/amd64 755 root bin
 f none usr/lib/scsi/amd64/llib-lscsi.ln 644 root bin
 f none usr/lib/scsi/amd64/llib-lses.ln 644 root bin
-s none usr/lib/llib-lfdisk=../../lib/llib-lfdisk
-s none usr/lib/llib-lfdisk.ln=../../lib/llib-lfdisk.ln

@@ -46,7 +46,6 @@
 #
 # SUNWhea
 #
-f none usr/include/libfdisk.h 644 root bin
 f none usr/include/asm/atomic.h 644 root bin
 f none usr/include/asm/bitmap.h 644 root bin
 f none usr/include/asm/byteorder.h 644 root bin

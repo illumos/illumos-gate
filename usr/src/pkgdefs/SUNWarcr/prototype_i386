@@ -100,5 +100,3 @@ f none lib/amd64/llib-lumem.ln 644 root bin
 f none lib/amd64/llib-luuid.ln 644 root bin
 f none lib/amd64/llib-luutil.ln 644 root bin
 f none lib/amd64/llib-lxnet.ln 644 root bin
-f none lib/llib-lfdisk 644 root bin
-f none lib/llib-lfdisk.ln 644 root bin

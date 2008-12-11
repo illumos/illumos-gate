@@ -915,8 +915,6 @@ $(ROOT)/usr/lib/libefi.so.1:=		REALPATH=../../lib/libefi.so.1
 $(ROOT)/usr/lib/libefi.so:=		REALPATH=../../lib/libefi.so.1
 $(ROOT)/usr/lib/libelf.so.1:=		REALPATH=../../lib/libelf.so.1
 $(ROOT)/usr/lib/libelf.so:=		REALPATH=../../lib/libelf.so.1
-$(ROOT)/usr/lib/libfdisk.so.1:=		REALPATH=../../lib/libfdisk.so.1
-$(ROOT)/usr/lib/libfdisk.so:=		REALPATH=../../lib/libfdisk.so.1
 $(ROOT)/usr/lib/libgen.so.1:=		REALPATH=../../lib/libgen.so.1
 $(ROOT)/usr/lib/libgen.so:=		REALPATH=../../lib/libgen.so.1
 $(ROOT)/usr/lib/libinetcfg.so.1:=	REALPATH=../../lib/libinetcfg.so.1
@@ -1041,8 +1039,6 @@ $(ROOT)/usr/lib/llib-lefi.ln:=		REALPATH=../../lib/llib-lefi.ln
 $(ROOT)/usr/lib/llib-lefi:=		REALPATH=../../lib/llib-lefi
 $(ROOT)/usr/lib/llib-lelf.ln:=		REALPATH=../../lib/llib-lelf.ln
 $(ROOT)/usr/lib/llib-lelf:=		REALPATH=../../lib/llib-lelf
-$(ROOT)/usr/lib/llib-lfdisk.ln:=	REALPATH=../../lib/llib-lfdisk.ln
-$(ROOT)/usr/lib/llib-lfdisk:=		REALPATH=../../lib/llib-lfdisk
 $(ROOT)/usr/lib/llib-lgen.ln:=		REALPATH=../../lib/llib-lgen.ln
 $(ROOT)/usr/lib/llib-lgen:=		REALPATH=../../lib/llib-lgen
 $(ROOT)/usr/lib/llib-linetcfg.ln:=	REALPATH=../../lib/llib-linetcfg.ln
@@ -1465,14 +1461,7 @@ $(ROOT)/usr/lib/$(MACH64)/nss_nisplus.so.1:= \
 $(ROOT)/usr/lib/$(MACH64)/nss_user.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_user.so.1
 
-i386_SYM.USRLIB= \
-	/usr/lib/libfdisk.so \
-	/usr/lib/libfdisk.so.1 \
-	/usr/lib/llib-lfdisk \
-	/usr/lib/llib-lfdisk.ln
-
 SYM.USRLIB= \
-	$($(MACH)_SYM.USRLIB)	\
 	/lib/libposix4.so \
 	/lib/libposix4.so.1 \
 	/lib/llib-lposix4 \

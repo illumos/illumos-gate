@@ -93,17 +93,9 @@ extern "C" {
 
 #elif defined(_SUNOS_VTOC_16)
 
-/*
- * XXX - NSDMAP has multiple definitions, one more in cmlb_impl.h
- * If they are coalesced into one, this definition will follow suit.
- * FDISK partitions - 4 primary and MAX_EXT_PARTS number of Extended
- * Partitions.
- */
-#define	FDISK_PARTS		(FD_NUMPART + MAX_EXT_PARTS)
-
 #define	SDUNIT_SHIFT	6
 #define	SDPART_MASK	63
-#define	NSDMAP		(NDKMAP + FDISK_PARTS + 1)
+#define	NSDMAP		(NDKMAP + FD_NUMPART + 1)
 
 #else
 #error "No VTOC format defined."

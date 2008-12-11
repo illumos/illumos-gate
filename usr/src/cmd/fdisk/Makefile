@@ -22,7 +22,7 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"@(#)Makefile	1.13	08/06/09 SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #       Makefile for fdisk
@@ -36,12 +36,7 @@ include ../Makefile.cmd
 
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
-LDLIBS_i386= -lfdisk
-LDLIBS_sparc=
-LDLIBS += -ladm -lefi $(LDLIBS_$(MACH))
-
-i386_CFLAGS += -D_LARGEFILE64_SOURCE
-i386_CFLAGS += -D_FILE_OFFSET_BITS=64
+LDLIBS += -ladm -lefi
 
 all:	$(ROOTFS_PROG)
 

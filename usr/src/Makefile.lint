@@ -469,8 +469,7 @@ i386_SUBDIRS= \
 	cmd/rtc \
 	cmd/ucodeadm \
 	lib/brand/lx \
-	lib/cfgadm_plugins/sata \
-	lib/libfdisk
+	lib/cfgadm_plugins/sata
 
 sparc_SUBDIRS= \
 	cmd/datadm \
