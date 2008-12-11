@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -100,6 +98,14 @@ daemonize_init(void)
 	rlim.rlim_max = RLIM_INFINITY;
 
 	(void) setrlimit(RLIMIT_CORE, &rlim);
+
+	/*
+	 * Claim all the file descriptors we can.
+	 */
+	if (getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
+		rlim.rlim_cur = rlim.rlim_max;
+		(void) setrlimit(RLIMIT_NOFILE, &rlim);
+	}
 
 	/*
 	 * Reset all of our privilege sets to the minimum set of required
@@ -227,11 +233,12 @@ main(int argc, char *argv[])
 
 	if (opt_V) {
 #ifdef DEBUG
-		(void) printf("%s: version %s (DEBUG)\n",
+		const char *debug = " (DEBUG)";
 #else
-		(void) printf("%s: version %s\n",
+		const char *debug = "";
 #endif
-		    argv[0], _fmd_version);
+		(void) printf("%s: version %s%s\n",
+		    argv[0], _fmd_version, debug);
 		return (FMD_EXIT_SUCCESS);
 	}
 
