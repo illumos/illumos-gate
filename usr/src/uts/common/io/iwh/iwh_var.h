@@ -197,6 +197,7 @@ typedef struct iwh_softc {
 #define	IWH_F_READY		(1 << 10)
 #define	IWH_F_PUT_SEG		(1 << 11)
 #define	IWH_F_QUIESCED		(1 << 12)
+#define	IWH_F_LAZY_RESUME	(1 << 13)
 
 #define	IWH_SUCCESS		0
 #define	IWH_FAIL		EIO

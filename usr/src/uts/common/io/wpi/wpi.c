@@ -414,13 +414,14 @@ wpi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		sc = ddi_get_soft_state(wpi_soft_state_p,
 		    ddi_get_instance(dip));
 		ASSERT(sc != NULL);
+		if (sc->sc_flags & WPI_F_RUNNING)
+			(void) wpi_init(sc);
+
 		mutex_enter(&sc->sc_glock);
 		sc->sc_flags &= ~WPI_F_SUSPEND;
+		sc->sc_flags |= WPI_F_LAZY_RESUME;
 		mutex_exit(&sc->sc_glock);
-		if (sc->sc_flags & WPI_F_RUNNING) {
-			(void) wpi_init(sc);
-			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
-		}
+
 		WPI_DBG((WPI_DEBUG_RESUME, "wpi: resume \n"));
 		return (DDI_SUCCESS);
 	default:
@@ -698,12 +699,14 @@ wpi_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 		break;
 	case DDI_SUSPEND:
-		if (sc->sc_flags & WPI_F_RUNNING) {
-			wpi_stop(sc);
-		}
 		mutex_enter(&sc->sc_glock);
 		sc->sc_flags |= WPI_F_SUSPEND;
 		mutex_exit(&sc->sc_glock);
+
+		if (sc->sc_flags & WPI_F_RUNNING) {
+			wpi_stop(sc);
+		}
+
 		WPI_DBG((WPI_DEBUG_RESUME, "wpi: suspend \n"));
 		return (DDI_SUCCESS);
 	default:
@@ -2279,6 +2282,14 @@ wpi_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 	ieee80211com_t	*ic = &sc->sc_ic;
 	int		err;
 
+	mutex_enter(&sc->sc_glock);
+	if (sc->sc_flags & (WPI_F_SUSPEND | WPI_F_HW_ERR_RECOVER)) {
+		miocnak(wq, mp, 0, ENXIO);
+		mutex_exit(&sc->sc_glock);
+		return;
+	}
+	mutex_exit(&sc->sc_glock);
+
 	err = ieee80211_ioctl(ic, wq, mp);
 	if (err == ENETRESET) {
 		/*
@@ -2323,6 +2334,13 @@ wpi_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_name,
 	int		err;
 	wpi_sc_t	*sc = (wpi_sc_t *)arg;
 	ieee80211com_t  *ic = &sc->sc_ic;
+
+	mutex_enter(&sc->sc_glock);
+	if (sc->sc_flags & (WPI_F_SUSPEND | WPI_F_HW_ERR_RECOVER)) {
+		mutex_exit(&sc->sc_glock);
+		return (ENXIO);
+	}
+	mutex_exit(&sc->sc_glock);
 
 	err = ieee80211_setprop(ic, pr_name, wldp_pr_name,
 	    wldp_length, wldp_buf);
@@ -2559,6 +2577,22 @@ wpi_thread(wpi_sc_t *sc)
 			mutex_enter(&sc->sc_mt_lock);
 		}
 
+		if (ic->ic_mach && (sc->sc_flags & WPI_F_LAZY_RESUME)) {
+			WPI_DBG((WPI_DEBUG_RESUME,
+			    "wpi_thread(): "
+			    "lazy resume\n"));
+			sc->sc_flags &= ~WPI_F_LAZY_RESUME;
+			mutex_exit(&sc->sc_mt_lock);
+			/*
+			 * NB: under WPA mode, this call hangs (door problem?)
+			 * when called in wpi_attach() and wpi_detach() while
+			 * system is in the procedure of CPR. To be safe, let
+			 * the thread do this.
+			 */
+			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+			mutex_enter(&sc->sc_mt_lock);
+		}
+
 		/*
 		 * scan next channel
 		 */
@@ -2572,7 +2606,8 @@ wpi_thread(wpi_sc_t *sc)
 			sc->sc_scan_next--;
 			mutex_exit(&sc->sc_mt_lock);
 			delay(drv_usectohz(200000));
-			ieee80211_next_scan(ic);
+			if (sc->sc_flags & WPI_F_SCANNING)
+				ieee80211_next_scan(ic);
 			mutex_enter(&sc->sc_mt_lock);
 		}
 

@@ -425,7 +425,7 @@ iwh_dbg(uint32_t flags, const char *fmt, ...)
 
 	if (flags & iwh_dbg_flags) {
 		va_start(ap, fmt);
-		vcmn_err(CE_WARN, fmt, ap);
+		vcmn_err(CE_NOTE, fmt, ap);
 		va_end(ap);
 	}
 }
@@ -454,13 +454,14 @@ iwh_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		sc = ddi_get_soft_state(iwh_soft_state_p,
 		    ddi_get_instance(dip));
 		ASSERT(sc != NULL);
+		if (sc->sc_flags & IWH_F_RUNNING)
+			(void) iwh_init(sc);
+
 		mutex_enter(&sc->sc_glock);
 		sc->sc_flags &= ~IWH_F_SUSPEND;
+		sc->sc_flags |= IWH_F_LAZY_RESUME;
 		mutex_exit(&sc->sc_glock);
-		if (sc->sc_flags & IWH_F_RUNNING) {
-			(void) iwh_init(sc);
-			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
-		}
+
 		IWH_DBG((IWH_DEBUG_RESUME, "iwh: resume\n"));
 		return (DDI_SUCCESS);
 	default:
@@ -881,12 +882,14 @@ iwh_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 		break;
 	case DDI_SUSPEND:
-		if (sc->sc_flags & IWH_F_RUNNING) {
-			iwh_stop(sc);
-		}
 		mutex_enter(&sc->sc_glock);
 		sc->sc_flags |= IWH_F_SUSPEND;
 		mutex_exit(&sc->sc_glock);
+
+		if (sc->sc_flags & IWH_F_RUNNING) {
+			iwh_stop(sc);
+		}
+
 		IWH_DBG((IWH_DEBUG_RESUME, "iwh: suspend\n"));
 		return (DDI_SUCCESS);
 	default:
@@ -3129,6 +3132,13 @@ iwh_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 	ieee80211com_t	*ic = &sc->sc_ic;
 	int		err;
 
+	mutex_enter(&sc->sc_glock);
+	if (sc->sc_flags & (IWH_F_SUSPEND | IWH_F_HW_ERR_RECOVER)) {
+		miocnak(wq, mp, 0, ENXIO);
+		mutex_exit(&sc->sc_glock);
+		return;
+	}
+	mutex_exit(&sc->sc_glock);
 
 	err = ieee80211_ioctl(ic, wq, mp);
 	if (ENETRESET == err) {
@@ -3417,6 +3427,22 @@ iwh_thread(iwh_sc_t *sc)
 			mutex_enter(&sc->sc_mt_lock);
 		}
 
+		if (ic->ic_mach && (sc->sc_flags & IWH_F_LAZY_RESUME)) {
+			IWH_DBG((IWH_DEBUG_RESUME,
+			    "iwh_thread(): "
+			    "lazy resume\n"));
+			sc->sc_flags &= ~IWH_F_LAZY_RESUME;
+			mutex_exit(&sc->sc_mt_lock);
+			/*
+			 * NB: under WPA mode, this call hangs (door problem?)
+			 * when called in iwh_attach() and iwh_detach() while
+			 * system is in the procedure of CPR. To be safe, let
+			 * the thread do this.
+			 */
+			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+			mutex_enter(&sc->sc_mt_lock);
+		}
+
 		if (ic->ic_mach &&
 		    (sc->sc_flags & IWH_F_SCANNING) && sc->sc_scan_pending) {
 			IWH_DBG((IWH_DEBUG_SCAN,
@@ -3426,7 +3452,8 @@ iwh_thread(iwh_sc_t *sc)
 			sc->sc_scan_pending--;
 			mutex_exit(&sc->sc_mt_lock);
 			delay(drv_usectohz(200000));
-			ieee80211_next_scan(ic);
+			if (sc->sc_flags & IWH_F_SCANNING)
+				ieee80211_next_scan(ic);
 			mutex_enter(&sc->sc_mt_lock);
 		}
 

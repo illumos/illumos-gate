@@ -469,13 +469,14 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		sc = ddi_get_soft_state(iwk_soft_state_p,
 		    ddi_get_instance(dip));
 		ASSERT(sc != NULL);
+		if (sc->sc_flags & IWK_F_RUNNING)
+			(void) iwk_init(sc);
+
 		mutex_enter(&sc->sc_glock);
 		sc->sc_flags &= ~IWK_F_SUSPEND;
+		sc->sc_flags |= IWK_F_LAZY_RESUME;
 		mutex_exit(&sc->sc_glock);
-		if (sc->sc_flags & IWK_F_RUNNING) {
-			(void) iwk_init(sc);
-			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
-		}
+
 		IWK_DBG((IWK_DEBUG_RESUME, "iwk: resume\n"));
 		return (DDI_SUCCESS);
 	default:
@@ -827,12 +828,13 @@ iwk_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	case DDI_DETACH:
 		break;
 	case DDI_SUSPEND:
-		if (sc->sc_flags & IWK_F_RUNNING) {
-			iwk_stop(sc);
-		}
 		mutex_enter(&sc->sc_glock);
 		sc->sc_flags |= IWK_F_SUSPEND;
 		mutex_exit(&sc->sc_glock);
+		if (sc->sc_flags & IWK_F_RUNNING) {
+			iwk_stop(sc);
+		}
+
 		IWK_DBG((IWK_DEBUG_RESUME, "iwk: suspend\n"));
 		return (DDI_SUCCESS);
 	default:
@@ -2740,6 +2742,14 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 	ieee80211com_t	*ic = &sc->sc_ic;
 	int		err;
 
+	mutex_enter(&sc->sc_glock);
+	if (sc->sc_flags & (IWK_F_SUSPEND | IWK_F_HW_ERR_RECOVER)) {
+		miocnak(wq, mp, 0, ENXIO);
+		mutex_exit(&sc->sc_glock);
+		return;
+	}
+	mutex_exit(&sc->sc_glock);
+
 	err = ieee80211_ioctl(ic, wq, mp);
 
 	if (err == ENETRESET) {
@@ -2785,6 +2795,13 @@ iwk_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
 	int		err;
 	iwk_sc_t	*sc = (iwk_sc_t *)arg;
 	ieee80211com_t	*ic = &sc->sc_ic;
+
+	mutex_enter(&sc->sc_glock);
+	if (sc->sc_flags & (IWK_F_SUSPEND | IWK_F_HW_ERR_RECOVER)) {
+		mutex_exit(&sc->sc_glock);
+		return (ENXIO);
+	}
+	mutex_exit(&sc->sc_glock);
 
 	err = ieee80211_setprop(ic, pr_name, wldp_pr_num, wldp_length,
 	    wldp_buf);
@@ -3020,17 +3037,32 @@ iwk_thread(iwk_sc_t *sc)
 			mutex_enter(&sc->sc_mt_lock);
 		}
 
+		if (ic->ic_mach && (sc->sc_flags & IWK_F_LAZY_RESUME)) {
+			IWK_DBG((IWK_DEBUG_RESUME,
+			    "iwk_thread(): "
+			    "lazy resume\n"));
+			sc->sc_flags &= ~IWK_F_LAZY_RESUME;
+			mutex_exit(&sc->sc_mt_lock);
+			/*
+			 * NB: under WPA mode, this call hangs (door problem?)
+			 * when called in iwk_attach() and iwk_detach() while
+			 * system is in the procedure of CPR. To be safe, let
+			 * the thread do this.
+			 */
+			ieee80211_new_state(&sc->sc_ic, IEEE80211_S_INIT, -1);
+			mutex_enter(&sc->sc_mt_lock);
+		}
+
 		if (ic->ic_mach &&
 		    (sc->sc_flags & IWK_F_SCANNING) && sc->sc_scan_pending) {
-
 			IWK_DBG((IWK_DEBUG_SCAN,
 			    "iwk_thread(): "
 			    "wait for probe response\n"));
-
 			sc->sc_scan_pending--;
 			mutex_exit(&sc->sc_mt_lock);
 			delay(drv_usectohz(200000));
-			ieee80211_next_scan(ic);
+			if (sc->sc_flags & IWK_F_SCANNING)
+				ieee80211_next_scan(ic);
 			mutex_enter(&sc->sc_mt_lock);
 		}
 

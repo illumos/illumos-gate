@@ -214,6 +214,7 @@ typedef struct wpi_softc {
 #define	WPI_F_RADIO_OFF		(1 << 7)
 #define	WPI_F_SCANNING		(1 << 8)
 #define	WPI_F_QUIESCED		(1 << 9)
+#define	WPI_F_LAZY_RESUME	(1 << 10)
 
 #define	WPI_SUCCESS		0
 #define	WPI_FAIL		(EIO)
