@@ -187,6 +187,21 @@ static const cma_subscriber_t cma_subrs[] = {
 	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
 	    cma_cpu_hc_retire },
 #elif defined(sun4v)
+	/*
+	 * The following are PI sun4v faults
+	 */
+	{ "fault.memory.memlink", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.memlink-uc", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.memlink-failover", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.dimm-ue-imminent", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.dram-ue-imminent", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
+	{ "fault.memory.dimm-page-retires-excessive", FM_FMRI_SCHEME_HC,
+	    FM_HC_SCHEME_VERSION, NULL },
 	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
 	{ "fault.memory.dimm", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,

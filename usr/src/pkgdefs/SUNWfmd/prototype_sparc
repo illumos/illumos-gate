@@ -125,6 +125,8 @@ f none usr/platform/sun4v/lib/fm/eft/n2niu_xfp.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/n2piu.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/vfncx.eft 444 root bin
 f none usr/platform/sun4v/lib/fm/eft/zambezi.eft 444 root bin
+f none usr/platform/sun4v/lib/fm/eft/gcpu.eft 444 root bin
+f none usr/platform/sun4v/lib/fm/eft/gmem.eft 444 root bin
 d none usr/platform/sun4v/lib/fm/fmd 755 root bin
 d none usr/platform/sun4v/lib/fm/fmd/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.so 555 root bin
@@ -133,6 +135,8 @@ f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-retire.so 555 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-retire.conf 644 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/etm.so 555 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/etm.conf 644 root bin
+f none usr/platform/sun4v/lib/fm/fmd/plugins/generic-mem.so 555 root bin
+f none usr/platform/sun4v/lib/fm/fmd/plugins/generic-mem.conf 644 root bin
 d none usr/platform/sun4v/lib/fm/topo 755 root bin
 d none usr/platform/sun4v/lib/fm/topo/maps 755 root bin
 f none usr/platform/sun4v/lib/fm/topo/maps/sun4v-hc-topology.xml 444 root bin

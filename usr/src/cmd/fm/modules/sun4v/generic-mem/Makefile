@@ -23,6 +23,39 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS = etm cpumem-diagnosis cpumem-retire generic-mem
+CLASS = arch
+ARCH = sun4v
+MODULE = generic-mem
+GENERIC_MEM = ../../sun4v/$(MODULE)
 
-include ../../Makefile.subdirs
+SRCS = \
+	gmem_main.c \
+	gmem_mem.c \
+	gmem_dimm.c \
+	gmem_memerr.c \
+	gmem_page.c \
+	gmem_state.c \
+	gmem_fmri.c \
+	gmem_util.c
+
+include ../../Makefile.plugin
+
+INCDIRS += \
+	$(SRC)/uts/sun4 \
+	$(SRC)/uts/sparc/v9 \
+	$(SRC)/uts/sun4v \
+	$(ROOT)/usr/platform/sun4v/include \
+	$(GENERIC_MEM)
+
+GMEM_VERSION = "1.0"
+
+LDLIBS += -L$(ROOTLIB)/fm -ltopo
+LDFLAGS += -R/usr/lib/fm
+CPPFLAGS += $(INCDIRS:%=-I%) -DGMEM_VERSION='$(GMEM_VERSION)' -D$(ARCH)
+
+%.o: $(GENERIC_MEM)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+%.ln: $(GENERIC_MEM)/%.c
+	$(LINT.c) -c $<
