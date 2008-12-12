@@ -147,11 +147,14 @@ static	dmd_wcr_t	*dmd_wcr_p;
 static	dmd_stat_t	*dmd_stat_p;
 static	major_t		dmd_major;
 static	int		dmd_next_ord = DMD_FIRST_DEV_ORDINAL;
-#ifdef	DEBUG
-static	int	dmd_debug = 1;
-#else
-static	int	dmd_debug = 0;
-#endif
+
+/*
+ * To turn dmd_debug messages on, set dmd_debug to 1 by doing:
+ * echo 'dmd_debug/W 1' | mdb -kw
+ * or add the following to /etc/system and reboot:
+ * set dmd:dmd_debug=1
+ */
+int		dmd_debug = 0;
 /*
  * State variables
  */
