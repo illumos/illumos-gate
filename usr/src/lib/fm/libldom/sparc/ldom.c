@@ -681,10 +681,10 @@ ldom_get_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 	uint64_t	tok;	/* opaque PRI token */
 	uint32_t	type = 0;
 
-	(void) ldom_get_type(lhp, &type);
-	if (VALID_LDOM_TYPE(type) == 0) {
+	if (ldom_get_type(lhp, &type) != 0) {
 		return (-1);
 	}
+
 	if ((type & LDOM_TYPE_CONTROL) != 0) {
 		/* Get the pri from Zeus first. If failed, get it from libpri */
 		if ((rv = ldmsvcs_get_core_md(lhp, buf)) < 1) {
@@ -697,8 +697,10 @@ ldom_get_core_md(ldom_hdl_t *lhp, uint64_t **buf)
 			xmpp_start();
 		}
 	} else {
-		/* get the local MD */
-		rv = get_local_core_md(lhp, buf);
+		/* get the pruned PRI from the libpri */
+		(void) pthread_mutex_lock(&ldom_pri_lock);
+		rv = ldom_pri_get(PRI_GET, &tok, buf, lhp->allocp, lhp->freep);
+		(void) pthread_mutex_unlock(&ldom_pri_lock);
 	}
 
 	return (rv);

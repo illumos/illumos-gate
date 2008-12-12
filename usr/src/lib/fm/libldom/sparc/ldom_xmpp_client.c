@@ -24,7 +24,7 @@
  */
 
 /*
- * ldom_xmpp_client.c	Extensible Messaging and Presence Protocol
+ * ldom_xmpp_client.c	Extensible Messaging and Presence Protocol (XMPP)
  *
  * Implement an xmpp client to subscribe for domain events from the ldmd.
  * Notify fmd module clients upon receiving the events.
@@ -571,8 +571,16 @@ load_SSL_lib()
 	if (xmpp_dl != NULL)
 		return (0);
 
-	if ((xmpp_dl = dlopen("/usr/sfw/lib/libssl.so", RTLD_NOW)) == NULL)
-		return (-1);
+	/*
+	 * If the libssl.so in not in the default path, attempt to open it
+	 * under /usr/sfw/lib.
+	 */
+	xmpp_dl = dlopen("libssl.so", RTLD_NOW);
+	if (xmpp_dl == NULL) {
+		xmpp_dl = dlopen("/usr/sfw/lib/libssl.so", RTLD_NOW);
+		if (xmpp_dl == NULL)
+			return (-1);
+	}
 
 	FUNCTION_ADD(SSL_load_error_strings_f, SSL_load_error_strings_pt,
 	    xmpp_dl, "SSL_load_error_strings", ret);
