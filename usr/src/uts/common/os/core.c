@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -64,6 +62,7 @@
 #include <sys/stat.h>
 #include <sys/zone.h>
 #include <sys/contract/process_impl.h>
+#include <sys/ddi.h>
 
 /*
  * Processes running within a zone potentially dump core in 3 locations,
@@ -723,7 +722,7 @@ core(int sig, int ext)
 		if (rp != NULL) {
 			fp_process = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 			error1 = expand_string(refstr_value(rp),
-				fp_process, MAXPATHLEN, p->p_cred);
+			    fp_process, MAXPATHLEN, p->p_cred);
 			if (error1 == 0)
 				error1 = do_core(fp_process, sig, CORE_PROC,
 				    my_cg);
@@ -771,6 +770,12 @@ core(int sig, int ext)
 uint_t	core_chunk = 32;
 
 /*
+ * The delay between core_write() calls, in microseconds.  The default
+ * matches one "normal" clock tick, or 10 milliseconds.
+ */
+clock_t	core_delay_usec = 10000;
+
+/*
  * Common code to core dump process memory.  The core_seg routine does i/o
  * using core_write() below, and so it has the same failure semantics.
  */
@@ -794,7 +799,7 @@ core_seg(proc_t *p, vnode_t *vp, offset_t offset, caddr_t addr, size_t size,
 		 * single write and cause pageout to stop running.
 		 */
 		if (len > (size_t)core_chunk * PAGESIZE)
-		    len = (size_t)core_chunk * PAGESIZE;
+			len = (size_t)core_chunk * PAGESIZE;
 
 		err = core_write(vp, UIO_USERSPACE,
 		    offset + (size_t)(base - addr), base, len, rlimit, credp);
@@ -804,7 +809,7 @@ core_seg(proc_t *p, vnode_t *vp, offset_t offset, caddr_t addr, size_t size,
 			 * Give pageout a chance to run.
 			 * Also allow core dumping to be interruptible.
 			 */
-			err = delay_sig(1);
+			err = delay_sig(drv_usectohz(core_delay_usec));
 		}
 		if (err)
 			return (err);
