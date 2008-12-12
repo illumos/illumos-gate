@@ -21,10 +21,8 @@
 #
 # uts/intel/lx_ptm/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the lx_ptm driver
 #
@@ -42,7 +40,7 @@ UTSBASE	= ../..
 MODULE		= lx_ptm
 OBJECTS		= $(LX_PTM_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LX_PTM_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/brand/lx/io
 
 #

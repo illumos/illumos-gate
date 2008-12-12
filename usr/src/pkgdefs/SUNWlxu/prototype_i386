@@ -20,17 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-
-#
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"@(#)prototype_i386	1.23	06/06/22 SMI"
 #
 
 #
@@ -47,8 +38,48 @@ i pkginfo
 i copyright
 i depend
 
-# The user library
+# The kernel brand module
 d none usr 0755 root sys
+d none usr/kernel 0755 root sys
+d none usr/kernel/brand 0755 root sys
+f none usr/kernel/brand/lx_brand 0755 root sys
+d none usr/kernel/brand/amd64 0755 root sys
+f none usr/kernel/brand/amd64/lx_brand 0755 root sys
+
+# generic driver dirs
+d none usr/kernel/drv 755 root sys
+d none usr/kernel/drv/amd64 755 root sys
+d none usr/kernel/dtrace/amd64 755 root sys
+
+# Brand syscall tracing
+f none usr/kernel/drv/lx_systrace 755 root sys
+f none usr/kernel/drv/lx_systrace.conf 644 root sys
+f none usr/kernel/drv/amd64/lx_systrace 755 root sys
+d none usr/kernel/dtrace 755 root sys
+l none usr/kernel/dtrace/lx_systrace=../../kernel/drv/lx_systrace
+l none usr/kernel/dtrace/amd64/lx_systrace=../../../kernel/drv/amd64/lx_systrace
+
+# Brand drivers
+f none usr/kernel/drv/lx_ptm 755 root sys
+f none usr/kernel/drv/lx_ptm.conf 644 root sys
+f none usr/kernel/drv/amd64/lx_ptm 755 root sys
+f none usr/kernel/drv/lx_audio 755 root sys
+f none usr/kernel/drv/lx_audio.conf 644 root sys
+f none usr/kernel/drv/amd64/lx_audio 755 root sys
+
+# supporting modules: ldterm and lxprocfs
+d none usr/kernel/strmod 0755 root sys
+f none usr/kernel/strmod/ldlinux 0755 root sys
+d none usr/kernel/strmod/amd64 0755 root sys
+f none usr/kernel/strmod/amd64/ldlinux 0755 root sys
+d none usr/kernel/fs 0755 root sys
+f none usr/kernel/fs/lx_afs 0755 root sys
+f none usr/kernel/fs/lx_proc 0755 root sys
+d none usr/kernel/fs/amd64 0755 root sys
+f none usr/kernel/fs/amd64/lx_afs 0755 root sys
+f none usr/kernel/fs/amd64/lx_proc 0755 root sys
+
+# The user library
 d none usr/lib 0755 root bin
 f none usr/lib/lx_brand.so.1 0755 root bin
 

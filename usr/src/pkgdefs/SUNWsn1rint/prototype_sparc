@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Fake Solaris N-1 Brand
 #
@@ -32,7 +30,14 @@
 #
 !include prototype_com
 
-# the kernel brand module
+#
+# The kernel brand module
+# Normally, brand modules are delivered via /usr/kernel because they are not
+# required for boot.  However, the sn1 brand syscall emulation module must be
+# delivered via /platform on SPARC because it depends on platform-specific
+# kernel data structures (specifically the machcpu_t) and we don't currently
+# support loading platform-specific kernel modules from /usr/platform.
+#
 d none platform 0755 root sys
 d none platform/sun4u 0755 root sys
 d none platform/sun4u/kernel 0755 root sys

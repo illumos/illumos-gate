@@ -21,10 +21,8 @@
 #
 # uts/intel/ldlinux/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the ldlinux streams kernel
 #	module.
@@ -43,7 +41,7 @@ UTSBASE	= ../..
 MODULE		= ldlinux
 OBJECTS		= $(LDLINUX_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LDLINUX_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_STRMOD_DIR)/$(MODULE)
+ROOTMODULE	= $(USR_STRMOD_DIR)/$(MODULE)
 
 #
 #	Include common rules.

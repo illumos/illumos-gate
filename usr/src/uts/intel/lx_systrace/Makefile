@@ -19,18 +19,17 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 UTSBASE	= ../..
 
 MODULE		= lx_systrace
 OBJECTS		= $(LX_SYSTRACE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LX_SYSTRACE_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-ROOTLINK	= $(ROOT_DTRACE_DIR)/$(MODULE)
+ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
+ROOTLINK	= $(USR_DTRACE_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/brand/lx/dtrace
 
 include $(UTSBASE)/intel/Makefile.intel
@@ -68,7 +67,7 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-$(ROOTLINK):	$(ROOT_DTRACE_DIR) $(ROOTMODULE)
+$(ROOTLINK):	$(USR_DTRACE_DIR) $(ROOTMODULE)
 	-$(RM) $@; ln $(ROOTMODULE) $@
 
 include $(UTSBASE)/intel/Makefile.targ

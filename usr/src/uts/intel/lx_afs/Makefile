@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -48,7 +46,7 @@ UTSBASE	= ../..
 MODULE		= lx_afs
 OBJECTS		= $(LX_AUTOFS_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LX_AUTOFS_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_FS_DIR)/$(MODULE)
+ROOTMODULE	= $(USR_FS_DIR)/$(MODULE)
 
 INC_PATH	+= -I$(UTSBASE)/common/brand/lx
 

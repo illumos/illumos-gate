@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the kernel component of
 #	the lx brand
@@ -44,7 +42,7 @@ LX_CMN		= $(SRC)/common/brand/lx
 MODULE		= lx_brand
 OBJECTS		= $(LX_BRAND_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LX_BRAND_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_BRAND_DIR)/$(MODULE)
+ROOTMODULE	= $(USR_BRAND_DIR)/$(MODULE)
 
 #
 #	Include common rules.

@@ -21,10 +21,8 @@
 #
 # uts/intel/lx_audio/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the lx_audio driver
 #
@@ -42,7 +40,7 @@ UTSBASE	= ../..
 MODULE		= lx_audio
 OBJECTS		= $(LX_AUDIO_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LX_AUDIO_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+ROOTMODULE	= $(USR_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/brand/lx/io
 
 #

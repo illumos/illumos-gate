@@ -40,7 +40,7 @@ OFFSETS_H =	$(OBJS_DIR)/sn1_offsets.h
 OFFSETS_SRC =	$(SN1_BASE)/sn1_offsets.in
 OBJECTS =	$(SN1_BRAND_OBJS:%=$(OBJS_DIR)/%)
 LINTS =		$(SN1_BRAND_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE =	$(ROOT_BRAND_DIR)/$(MODULE)
+ROOTMODULE =	$(USR_BRAND_DIR)/$(MODULE)
 
 #
 #	Include common rules.

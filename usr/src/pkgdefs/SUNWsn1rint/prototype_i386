@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Fake Solaris N-1 Brand
 #
@@ -31,10 +29,3 @@
 # Include ISA independent files (prototype_com)
 #
 !include prototype_com
-
-# the kernel brand module
-d none kernel 0755 root sys
-d none kernel/brand 0755 root sys
-f none kernel/brand/sn1_brand 0755 root sys
-d none kernel/brand/amd64 0755 root sys
-f none kernel/brand/amd64/sn1_brand 0755 root sys

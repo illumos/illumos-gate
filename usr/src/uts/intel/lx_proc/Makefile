@@ -21,10 +21,8 @@
 #
 # uts/intel/lx_proc/Makefile
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the lxproc file system
 #	kernel module.
@@ -48,7 +46,7 @@ LX_CMN		= $(SRC)/common/brand/lx
 MODULE		= lx_proc
 OBJECTS		= $(LX_PROC_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LX_PROC_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_FS_DIR)/$(MODULE)
+ROOTMODULE	= $(USR_FS_DIR)/$(MODULE)
 
 INC_PATH	+= -I$(UTSBASE)/common/brand/lx -I$(LX_CMN)
 

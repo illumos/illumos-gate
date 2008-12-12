@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -44,43 +42,3 @@ i depend
 d none etc 755 root sys
 d none etc/zones 755 root sys
 f none etc/zones/SUNWlx.xml 444 root bin
-
-# The kernel brand module
-d none kernel 0755 root sys
-d none kernel/brand 0755 root sys
-f none kernel/brand/lx_brand 0755 root sys
-d none kernel/brand/amd64 0755 root sys
-f none kernel/brand/amd64/lx_brand 0755 root sys
-
-# generic driver dirs
-d none kernel/drv 755 root sys
-d none kernel/drv/amd64 755 root sys
-d none kernel/dtrace/amd64 755 root sys
-
-# Brand syscall tracing
-f none kernel/drv/lx_systrace 755 root sys
-f none kernel/drv/lx_systrace.conf 644 root sys
-f none kernel/drv/amd64/lx_systrace 755 root sys
-d none kernel/dtrace 755 root sys
-l none kernel/dtrace/lx_systrace=../../kernel/drv/lx_systrace
-l none kernel/dtrace/amd64/lx_systrace=../../../kernel/drv/amd64/lx_systrace
-
-# Brand drivers
-f none kernel/drv/lx_ptm 755 root sys
-f none kernel/drv/lx_ptm.conf 644 root sys
-f none kernel/drv/amd64/lx_ptm 755 root sys
-f none kernel/drv/lx_audio 755 root sys
-f none kernel/drv/lx_audio.conf 644 root sys
-f none kernel/drv/amd64/lx_audio 755 root sys
-
-# supporting modules: ldterm and lxprocfs
-d none kernel/strmod 0755 root sys
-f none kernel/strmod/ldlinux 0755 root sys
-d none kernel/strmod/amd64 0755 root sys
-f none kernel/strmod/amd64/ldlinux 0755 root sys
-d none kernel/fs 0755 root sys
-f none kernel/fs/lx_afs 0755 root sys
-f none kernel/fs/lx_proc 0755 root sys
-d none kernel/fs/amd64 0755 root sys
-f none kernel/fs/amd64/lx_afs 0755 root sys
-f none kernel/fs/amd64/lx_proc 0755 root sys
