@@ -213,9 +213,10 @@ ipnet_if_init(void)
 	netstack_next_init(&nh);
 	while ((ns = netstack_next(&nh)) != NULL) {
 		ips = ns->netstack_ipnet;
-		if ((ret = ipnet_populate_if(ips->ips_ndv4, ips, B_FALSE)) != 0)
-			break;
-		if ((ret = ipnet_populate_if(ips->ips_ndv6, ips, B_TRUE)) != 0)
+		if ((ret = ipnet_populate_if(ips->ips_ndv4, ips, B_FALSE)) == 0)
+			ret = ipnet_populate_if(ips->ips_ndv6, ips, B_TRUE);
+		netstack_rele(ns);
+		if (ret != 0)
 			break;
 	}
 	netstack_next_fini(&nh);
@@ -284,29 +285,38 @@ static void
 ipnet_register_netihook(ipnet_stack_t *ips)
 {
 	int		ret;
-	netstackid_t	stackid = ips->ips_netstack->netstack_stackid;
+	zoneid_t	zoneid;
+	netid_t		netid;
 
 	HOOK_INIT(ips->ips_nicevents, ipnet_nicevent_cb, "ipnet_nicevents",
 	    ips);
 
 	/*
-	 * The ipnet device depends on ip and is registered in the netstack
-	 * framework after ip so the call to net_lookup_impl() cannot fail.
+	 * It is possible for an exclusive stack to be in the process of
+	 * shutting down here, and the netid and protocol lookups could fail
+	 * in that case.
 	 */
-	ips->ips_ndv4 = net_protocol_lookup(stackid, NHF_INET);
-	ips->ips_ndv6 = net_protocol_lookup(stackid, NHF_INET6);
+	zoneid = netstackid_to_zoneid(ips->ips_netstack->netstack_stackid);
+	if ((netid = net_zoneidtonetid(zoneid)) == -1)
+		return;
 
-	ret = net_hook_register(ips->ips_ndv4, NH_NIC_EVENTS,
-	    ips->ips_nicevents);
-	if (ret != 0) {
-		cmn_err(CE_WARN, "ipnet_register_netihook: net_register_hook() "
-		    "failed for v4 stack instance %d: %d", stackid, ret);
+	if ((ips->ips_ndv4 = net_protocol_lookup(netid, NHF_INET)) != NULL) {
+		if ((ret = net_hook_register(ips->ips_ndv4, NH_NIC_EVENTS,
+		    ips->ips_nicevents)) != 0) {
+			VERIFY(net_protocol_release(ips->ips_ndv4) == 0);
+			ips->ips_ndv4 = NULL;
+			cmn_err(CE_WARN, "unable to register IPv4 netinfo hooks"
+			    " in zone %d: %d", zoneid, ret);
+		}
 	}
-	ret = net_hook_register(ips->ips_ndv6, NH_NIC_EVENTS,
-	    ips->ips_nicevents);
-	if (ret != 0) {
-		cmn_err(CE_WARN, "ipnet_register_netihook: net_register_hook() "
-		    "failed for v6 stack instance %d: %d", stackid, ret);
+	if ((ips->ips_ndv6 = net_protocol_lookup(netid, NHF_INET6)) != NULL) {
+		if ((ret = net_hook_register(ips->ips_ndv6, NH_NIC_EVENTS,
+		    ips->ips_nicevents)) != 0) {
+			VERIFY(net_protocol_release(ips->ips_ndv6) == 0);
+			ips->ips_ndv6 = NULL;
+			cmn_err(CE_WARN, "unable to register IPv6 netinfo hooks"
+			    " in zone %d: %d", zoneid, ret);
+		}
 	}
 }
 
@@ -326,6 +336,18 @@ ipnet_populate_if(net_handle_t nd, ipnet_stack_t *ips, boolean_t isv6)
 	boolean_t		new_if = B_FALSE;
 	uint64_t		ifflags;
 	int			ret = 0;
+
+	/*
+	 * If ipnet_register_netihook() was unable to initialize this
+	 * stack's net_handle_t, then we cannot populate any interface
+	 * information.  This usually happens when we attempted to
+	 * grab a net_handle_t as a stack was shutting down.  We don't
+	 * want to fail the entire _init() operation because of a
+	 * stack shutdown (other stacks will continue to work just
+	 * fine), so we silently return success here.
+	 */
+	if (nd == NULL)
+		return (0);
 
 	/*
 	 * Make sure we're not processing NIC events during the
