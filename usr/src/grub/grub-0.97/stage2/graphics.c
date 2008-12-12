@@ -36,7 +36,20 @@ int saved_videomode;
 unsigned char *font8x16;
 
 int graphics_inited = 0;
+
+#define	PALETTE_REDSHIFT	16
+#define	PALETTE_GREENSHIFT	8
+#define	PALETTE_COLORMASK	63
+
+#define	PALETTE_NCOLORS		16
+
+#define	PALETTE_RED(entry)	((entry) >> PALETTE_REDSHIFT)
+#define	PALETTE_GREEN(entry)	(((entry) >> PALETTE_GREENSHIFT) & \
+				    PALETTE_COLORMASK)
+#define	PALETTE_BLUE(entry)	((entry) & PALETTE_COLORMASK)
+
 static char splashimage[64];
+static int splash_palette[PALETTE_NCOLORS];
 
 #define	HPIXELS		640
 #define	VPIXELS		480
@@ -87,7 +100,9 @@ static color_state graphics_color_state = COLOR_STATE_STANDARD;
 
 /* graphics local functions */
 static void graphics_setxy(int col, int row);
-static void graphics_scroll();
+static void graphics_scroll(void);
+static void draw_xbmlogo(void);
+static int read_image(char *);
 
 /* FIXME: where do these really belong? */
 static inline void outb(unsigned short port, unsigned char val)
@@ -122,21 +137,40 @@ char *graphics_get_splash(void) {
  * mode.  */
 int graphics_init()
 {
+    int image_read, index, color;
+
     if (!graphics_inited) {
         saved_videomode = set_videomode(0x12);
     }
 
+    font8x16 = (unsigned char*)graphics_get_font();
+
+    image_read = read_image(splashimage);
+
     /*
-     * XXX this is known not to reset the image
-     * properly in the case of failure
+     * Set VGA palette color 0 to be the system background color, 15 to be the
+     * system foreground color, and 17 to be the system border color.
+     *
+     * If the splashimage was read successfully, program the palette with
+     * its new colors; if not, set them to the background color.
      */
-    if (!read_image(splashimage)) {
-        set_videomode(saved_videomode);
-        grub_printf("failed to read image\n");
-        return 0;
+
+    graphics_set_palette(0, PALETTE_RED(background), PALETTE_GREEN(background),
+	PALETTE_BLUE(background));
+
+    for (index = 1; index < 15; index++) {
+	color = (image_read ? splash_palette[index] : background);
+	graphics_set_palette(index, PALETTE_RED(color),
+	    PALETTE_GREEN(color), PALETTE_BLUE(color));
     }
 
-    font8x16 = (unsigned char*)graphics_get_font();
+    graphics_set_palette(15, PALETTE_RED(foreground),
+	 PALETTE_GREEN(foreground), PALETTE_BLUE(foreground));
+
+    graphics_set_palette(0x11, PALETTE_RED(border), PALETTE_GREEN(border),
+	PALETTE_BLUE(border));
+
+    draw_xbmlogo();
 
     graphics_inited = 1;
 
@@ -275,8 +309,7 @@ int graphics_setcursor (int on) {
     return 1;
 }
 
-void
-draw_xbmlogo(void)
+static void draw_xbmlogo(void)
 {
     unsigned char mask;
     unsigned xbm_index = 0, xbm_incr;
@@ -321,7 +354,7 @@ draw_xbmlogo(void)
  * Format of splashscreen is an XPM (can be gzipped) with up to 15 colors and
  * is assumed to be of the proper screen dimensions.
  */
-int read_image(char *s)
+static int read_image(char *s)
 {
     char buf[32], pal[16];
     unsigned char c, base, mask;
@@ -332,6 +365,7 @@ int read_image(char *s)
 
     /* read XPM header - must match memcmp string PRECISELY. */
     if (!grub_read((char*)&buf, 10) || grub_memcmp(buf, "/* XPM */\n", 10)) {
+	errnum = ERR_NOTXPM;
         grub_close();
         return 0;
     }
@@ -383,18 +417,6 @@ int read_image(char *s)
             break;
     }
 
-    /*
-     * Allow 15 specified palette colors (indices 1 - 15) at most.
-     *
-     * One would expect that this should be 14 allowing for foreground
-     * and background, but there are a number of 15 color graphics in
-     * use that shouldn't break with this check.
-     */
-    if (colors > 15) {
-	grub_close();
-	return 0;
-    }
-
     /* eat rest of line - assumes chars per pixel is one */
     while (grub_read(&c, 1) && c != '"')
         ;
@@ -425,17 +447,33 @@ int read_image(char *s)
                 buf[len++] = c;
         }
 
+	/*
+	 * The RGB hex digits should be six characters in length.
+	 *
+	 * If the color field contains anything other than six
+	 * characters, such as "None" to denote a transparent color,
+	 * ignore it.
+	 */
         if (len == 6) {
             int r = ((hex(buf[0]) << 4) | hex(buf[1])) >> 2;
             int g = ((hex(buf[2]) << 4) | hex(buf[3])) >> 2;
             int b = ((hex(buf[4]) << 4) | hex(buf[5])) >> 2;
 
+	    if (idx > 14) {
+		errnum = ERR_TOOMANYCOLORS;
+		grub_close();
+		return 0;
+	    }
+
             pal[idx] = base;
-            graphics_set_palette(idx, r, g, b);
-            ++idx;
+	    splash_palette[idx++] = 
+		((r & PALETTE_COLORMASK) << PALETTE_REDSHIFT) |
+		((g & PALETTE_COLORMASK) << PALETTE_GREENSHIFT) |
+		(b & PALETTE_COLORMASK);
         }
     }
 
+    colors = idx - 1;	/* actual number of colors used in XPM image */
     x = y = len = 0;
 
     /* clear (zero out) all four planes of the framebuffer */
@@ -447,6 +485,7 @@ int read_image(char *s)
 	/* exit on EOF, otherwise skip characters until an initial '"' */
         while (1) {
             if (!grub_read(&c, 1)) {
+		errnum = ERR_CORRUPTXPM;
                 grub_close();
                 return 0;
             }
@@ -456,11 +495,16 @@ int read_image(char *s)
 
 	/* read characters until we hit an EOF or a terminating '"' */
         while (grub_read(&c, 1) && c != '"') {
+	    int pixel = 0;
 
-	    /* look up specified pixel color in palette */
-            for (i = 1; i < 15; i++)
+	    /*
+	     * Look up the specified pixel color in the palette; the
+	     * pixel will not be drawn if its color cannot be found or
+	     * if no colors were specified in the XPM image itself.
+	     */
+            for (i = 1; i <= colors; i++)
                 if (pal[i] == c) {
-                    c = i;
+                    pixel = i;
                     break;
                 }
 
@@ -476,15 +520,18 @@ int read_image(char *s)
 	     * Pixels are represented by set bits in a byte, in the order
 	     * left-to-right (e.g. pixel 0 is 0x80, pixel 7 is 1.)
 	     */
-            mask = 0x80 >> (x & 7);
-            if (c & 1)
-                s1[len + (x >> 3)] |= mask;
-            if (c & 2)
-                s2[len + (x >> 3)] |= mask;
-            if (c & 4)
-                s4[len + (x >> 3)] |= mask;
-            if (c & 8)
-                s8[len + (x >> 3)] |= mask;
+	    if (pixel != 0) {
+		mask = 0x80 >> (x & 7);
+
+		if (pixel & 1)
+		    s1[len + (x >> 3)] |= mask;
+		if (pixel & 2)
+		    s2[len + (x >> 3)] |= mask;
+		if (pixel & 4)
+		    s4[len + (x >> 3)] |= mask;
+		if (pixel & 8)
+		    s8[len + (x >> 3)] |= mask;
+	    }
 
 	    /*
 	     * Increment "x"; if we hit pixel HPIXELS, wrap to the start of the
@@ -503,19 +550,6 @@ int read_image(char *s)
     }
 
     grub_close();
-
-    /*
-     * Set BIOS palette color 0 to be the system background color, 15 to be the
-     * system foreground color, and 17 to be the system border color.
-     */
-    graphics_set_palette(0, (background >> 16), (background >> 8) & 63, 
-                background & 63);
-    graphics_set_palette(15, (foreground >> 16), (foreground >> 8) & 63, 
-                foreground & 63);
-    graphics_set_palette(0x11, (border >> 16), (border >> 8) & 63, 
-                         border & 63);
-
-    draw_xbmlogo();
 
     return 1;
 }

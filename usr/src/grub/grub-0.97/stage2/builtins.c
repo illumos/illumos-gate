@@ -1070,7 +1070,7 @@ static int splashimage_func(char *arg, int flags) {
 	    break;
 	}
     }
-    
+
     graphics_set_splash(splashimage);
 
     if (flags == BUILTIN_CMDLINE && graphics_inited) {
@@ -1084,8 +1084,11 @@ static int splashimage_func(char *arg, int flags) {
 	graphics_cls();
     }
 
-    /* FIXME: should we be explicitly switching the terminal as a 
-     * side effect here? */
+    /* 
+     * This call does not explicitly initialize graphics mode, but rather
+     * simply sets the terminal type unless we're in command line mode and
+     * call this function while in terminal mode.
+     */
     terminal_func("graphics", flags);
 
     reset_term = 0;
@@ -5240,7 +5243,7 @@ terminal_func (char *arg, int flags)
  end:
   current_term = term_table + default_term;
   current_term->flags = term_flags;
-  
+
   if (lines)
     max_lines = lines;
   else

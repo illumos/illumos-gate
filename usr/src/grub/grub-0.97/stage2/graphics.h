@@ -27,7 +27,6 @@
 /* function prototypes */
 char *graphics_get_splash(void);
 
-int read_image(char *s);
 void graphics_cursor(int set);
 
 /* function prototypes for asm functions */
