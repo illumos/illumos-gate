@@ -176,10 +176,10 @@ global_zone_only_files="
 	boot/solaris/devicedb/master
 	boot/solaris/filelist.ramdisk
 	etc/aggregation.conf
-	etc/dladm/*
 	etc/bootrc
 	etc/crypto/kcf.conf
 	etc/devlink.tab
+	etc/dladm/*
 	etc/driver_aliases
 	etc/driver_classes
 	etc/lvm/devpath
@@ -205,23 +205,28 @@ global_zone_only_files="
 	etc/ppp/pap-secrets
 	etc/security/device_policy
 	etc/security/extra_privs
+	etc/security/tsol/devalloc_defaults
+	etc/security/tsol/label_encodings
+	etc/security/tsol/relabel
 	etc/security/tsol/tnrhdb
 	etc/security/tsol/tnrhtp
 	etc/security/tsol/tnzonecfg
-	etc/security/tsol/label_encodings
-	etc/security/tsol/relabel
-	etc/security/tsol/devalloc_defaults
 	etc/system
 	etc/zones/index
 	kernel/drv/aac.conf
 	kernel/drv/elxl.conf
+	kernel/drv/emlxs.conf
+	kernel/drv/fp.conf
+	kernel/drv/iscsi.conf
 	kernel/drv/md.conf
+	kernel/drv/mpt.conf
 	kernel/drv/options.conf
+	kernel/drv/qlc.conf
 	kernel/drv/ra.conf
 	kernel/drv/scsa2usb.conf
 	kernel/drv/scsi_vhci.conf
 	kernel/drv/sd.conf
-	kernel/drv/mpt.conf
+	kernel/drv/ssd.conf
 	platform/*/kernel/drv/*ppm.conf
 	platform/i86pc/kernel/drv/aha.conf
 	platform/i86pc/kernel/drv/asy.conf
