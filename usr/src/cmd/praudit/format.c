@@ -2628,7 +2628,20 @@ pa_error(const uchar_t err, char *buf, size_t buflen)
 
 /*
  * -----------------------------------------------------------------------
- * pa_retval()   :  convert the return token return value code.
+ * pa_retval()  :  convert the return token return value code.
+ *
+ * input	: err, for kernel success 0, or
+ *			failure errno: 0 > & < sys_nerr.
+ *			for userland success ADT_SUCCESS (0) or
+ *			failure ADT_FAILURE (-1).
+ *		pa_error() above has already converted err.
+ *
+ *		: retval, for kernel arbitrary return value for success, or
+ *			failure: -1.
+ *			for userland,
+ *			>= ADT_FAIL_VALUE < ADT_FAIL_PAM, an adt message code;
+ *			>= ADT_FAIL_PAM, a pam_strerror value;
+ *			< ADT_FAIL_VALUE, supposed to be an errno.
  *
  * output	: buf string representing return token error code.
  *
@@ -2637,7 +2650,19 @@ pa_error(const uchar_t err, char *buf, size_t buflen)
 void
 pa_retval(const uchar_t err, const int32_t retval, char *buf, size_t buflen)
 {
-	struct msg_text	*msglist = &adt_msg_text[ADT_LIST_FAIL_VALUE];
+	struct msg_text *msglist;
+	char *emsg;
+
+	/* success or kernel failure */
+	if (((char)err == ADT_SUCCESS) ||
+	    (retval < 0)) {
+
+		(void) snprintf(buf, buflen, "%d", retval);
+		return;
+	}
+
+	/* userland failure */
+	msglist = &adt_msg_text[ADT_LIST_FAIL_VALUE];
 
 	if ((retval + msglist->ml_offset >= msglist->ml_min_index) &&
 	    (retval + msglist->ml_offset <= msglist->ml_max_index)) {
@@ -2647,21 +2672,17 @@ pa_retval(const uchar_t err, const int32_t retval, char *buf, size_t buflen)
 		    buflen);
 	} else if ((retval >= ADT_FAIL_PAM) &&
 	    (retval < ADT_FAIL_PAM + PAM_TOTAL_ERRNUM)) {
+
 		(void) strlcpy(buf, pam_strerror(NULL, retval - ADT_FAIL_PAM),
 		    buflen);
-	} else if ((char)err == ADT_FAILURE) {
-		char *emsg = strerror(retval);
+	} else if ((emsg = strerror(retval)) != NULL) {
 
-		if (emsg != NULL) {
-			(void) strlcpy(buf, emsg, buflen);
-		} else {
-			(void) snprintf(buf, buflen, "%d", retval);
-		}
+		(void) strlcpy(buf, emsg, buflen);
 	} else {
+
 		(void) snprintf(buf, buflen, "%d", retval);
 	}
 }
-
 
 /*
  * -----------------------------------------------------------------------
