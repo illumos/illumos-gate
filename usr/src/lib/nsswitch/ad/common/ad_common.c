@@ -62,7 +62,8 @@ nssad_cfg_discover_props(const char *domain, ad_disc_t ad_ctx,
 		return (-1);
 	if (props->domain_controller == NULL)
 		props->domain_controller =
-		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE);
+		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE,
+		    NULL);
 	return (0);
 }
 

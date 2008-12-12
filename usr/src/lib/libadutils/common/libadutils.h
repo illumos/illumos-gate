@@ -135,6 +135,9 @@ extern adutils_rc	adutils_ad_alloc(adutils_ad_t **new_ad,
 extern void		adutils_ad_free(adutils_ad_t **ad);
 extern adutils_rc	adutils_add_ds(adutils_ad_t *ad,
 				const char *host, int port);
+extern adutils_rc	adutils_add_domain(adutils_ad_t *ad,
+				const char *domain_name,
+				const char *domain_sid);
 extern void		adutils_set_log(int pri, bool_t syslog,
 				bool_t degraded);
 extern void		adutils_freeresult(adutils_result_t **result);
@@ -169,6 +172,12 @@ extern void		adutils_lookup_batch_release(
 				adutils_query_state_t **state);
 extern const char	*adutils_lookup_batch_getdefdomain(
 				adutils_query_state_t *state);
+extern int		adutils_lookup_check_domain(
+				adutils_query_state_t *state,
+				const char *domain);
+extern int		adutils_lookup_check_sid_prefix(
+				adutils_query_state_t *state,
+				const char *sid);
 
 #ifdef	__cplusplus
 }

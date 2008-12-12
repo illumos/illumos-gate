@@ -1801,15 +1801,15 @@ out:
 	return (retcode);
 }
 
-/*
- * Batch AD lookups
- */
-idmap_retcode
-ad_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
-		idmap_ids_res *result)
+
+
+static int
+ad_lookup_batch_int(lookup_state_t *state, idmap_mapping_batch *batch,
+		idmap_ids_res *result, int index, int *num_processed)
 {
 	idmap_retcode	retcode;
-	int		i, add, type, is_wuser, is_user;
+	int		i,  num_queued, type, is_wuser, is_user;
+	int		next_request;
 	int		retries = 0, eunixtype;
 	char		**unixname;
 	idmap_mapping	*req;
@@ -1817,6 +1817,8 @@ ad_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 	idmap_query_state_t	*qs = NULL;
 	idmap_how	*how;
 	char		**dn, **attr, **value;
+
+	*num_processed = 0;
 
 	/*
 	 * Since req->id2.idtype is unused, we will use it here
@@ -1829,42 +1831,33 @@ ad_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
 	 * be an option if req->id2.idtype cannot be re-used in
 	 * future.
 	 */
-
-	if (state->ad_nqueries == 0)
-		return (IDMAP_SUCCESS);
-
-	for (i = 0; i < batch->idmap_mapping_batch_len; i++) {
-		req = &batch->idmap_mapping_batch_val[i];
-		res = &result->ids.ids_val[i];
-
-		/* Skip if not marked for AD lookup or already in error. */
-		if (!(req->direction & _IDMAP_F_LOOKUP_AD) ||
-		    res->retcode != IDMAP_SUCCESS)
-			continue;
-
-		/* Init status */
-		res->retcode = IDMAP_ERR_RETRIABLE_NET_ERR;
-	}
-
 retry:
-	RDLOCK_CONFIG();
-	retcode = idmap_lookup_batch_start(_idmapdstate.ad, state->ad_nqueries,
-	    &qs);
-	UNLOCK_CONFIG();
+	retcode = idmap_lookup_batch_start(_idmapdstate.ads[index],
+	    state->ad_nqueries, &qs);
 	if (retcode != IDMAP_SUCCESS) {
 		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR &&
 		    retries++ < ADUTILS_DEF_NUM_RETRIES)
 			goto retry;
 		degrade_svc(1, "failed to create batch for AD lookup");
-		goto out;
+			goto out;
 	}
+	num_queued = 0;
 
 	restore_svc();
 
-	idmap_lookup_batch_set_unixattr(qs, state->ad_unixuser_attr,
-	    state->ad_unixgroup_attr);
+	if (index == 0) {
+		/*
+		 * Directory based name mapping is only performed within the
+		 * joined forest (index == 0).  We don't trust other "trusted"
+		 * forests to provide DS-based name mapping information because
+		 * AD's definition of "cross-forest trust" does not encompass
+		 * this sort of behavior.
+		 */
+		idmap_lookup_batch_set_unixattr(qs,
+		    state->ad_unixuser_attr, state->ad_unixgroup_attr);
+	}
 
-	for (i = 0, add = 0; i < batch->idmap_mapping_batch_len; i++) {
+	for (i = 0; i < batch->idmap_mapping_batch_len; i++) {
 		req = &batch->idmap_mapping_batch_val[i];
 		res = &result->ids.ids_val[i];
 		how = &res->info.how;
@@ -1872,8 +1865,9 @@ retry:
 		retcode = IDMAP_SUCCESS;
 		req->id2.idtype = IDMAP_NONE;
 
-		/* Skip if not marked for AD lookup */
-		if (!(req->direction & _IDMAP_F_LOOKUP_AD))
+		/* Skip if not marked for this AD lookup */
+		if (!(req->direction & _IDMAP_F_LOOKUP_AD) ||
+		    (req->direction & _IDMAP_F_LOOKUP_OTHER_AD))
 			continue;
 
 		if (res->retcode != IDMAP_ERR_RETRIABLE_NET_ERR)
@@ -1899,7 +1893,7 @@ retry:
 					unixname = &req->id2name;
 				}
 			}
-			add = 1;
+
 			if (unixname != NULL) {
 				/*
 				 * Get how info for DS-based name
@@ -1925,6 +1919,8 @@ retry:
 				    &req->id1domain : NULL,
 				    (int *)&req->id2.idtype, unixname,
 				    &res->retcode);
+				if (retcode == IDMAP_SUCCESS)
+					num_queued++;
 			} else {
 				/* Lookup AD by winname */
 				assert(req->id1name != NULL);
@@ -1937,6 +1933,8 @@ retry:
 				    &req->id1.idmap_id_u.sid.rid,
 				    (int *)&req->id2.idtype, unixname,
 				    &res->retcode);
+				if (retcode == IDMAP_SUCCESS)
+					num_queued++;
 			}
 
 		} else if (IS_REQUEST_UID(*req) || IS_REQUEST_GID(*req)) {
@@ -1945,7 +1943,7 @@ retry:
 
 			if (res->id.idmap_id_u.sid.prefix != NULL &&
 			    req->id2name != NULL) {
-				/* Already have SID and winname -- done */
+				/* Already have SID and winname. done */
 				res->retcode = IDMAP_SUCCESS;
 				continue;
 			}
@@ -1958,7 +1956,7 @@ retry:
 				 * we are not retrieving unixname from
 				 * AD.
 				 */
-				add = 1;
+
 				retcode = idmap_sid2name_batch_add1(
 				    qs, res->id.idmap_id_u.sid.prefix,
 				    &res->id.idmap_id_u.sid.rid,
@@ -1967,6 +1965,8 @@ retry:
 				    &req->id2name,
 				    &req->id2domain, (int *)&req->id2.idtype,
 				    NULL, &res->retcode);
+				if (retcode == IDMAP_SUCCESS)
+					num_queued++;
 			} else if (req->id2name != NULL) {
 				/*
 				 * winname but no SID -- lookup AD by
@@ -1975,7 +1975,6 @@ retry:
 				 * we are not retrieving unixname from
 				 * AD.
 				 */
-				add = 1;
 				retcode = idmap_name2sid_batch_add1(
 				    qs, req->id2name, req->id2domain,
 				    _IDMAP_T_UNDEF,
@@ -1984,10 +1983,12 @@ retry:
 				    &res->id.idmap_id_u.sid.rid,
 				    (int *)&req->id2.idtype, NULL,
 				    &res->retcode);
+				if (retcode == IDMAP_SUCCESS)
+					num_queued++;
 			} else if (req->id1name != NULL) {
 				/*
-				 * No SID and no winname but we've unixname --
-				 * lookup AD by unixname to get SID.
+				 * No SID and no winname but we've unixname.
+				 * Lookup AD by unixname to get SID.
 				 */
 				is_user = (IS_REQUEST_UID(*req)) ? 1 : 0;
 				if (res->id.idtype == IDMAP_USID)
@@ -1996,7 +1997,7 @@ retry:
 					is_wuser = 0;
 				else
 					is_wuser = is_user;
-				add = 1;
+
 				idmap_info_free(&res->info);
 				res->info.src = IDMAP_MAP_SRC_NEW;
 				how->map_type = IDMAP_MAP_TYPE_DS_AD;
@@ -2009,17 +2010,25 @@ retry:
 				    &res->id.idmap_id_u.sid.rid,
 				    &req->id2name, &req->id2domain,
 				    (int *)&req->id2.idtype, &res->retcode);
+				if (retcode == IDMAP_SUCCESS)
+					num_queued++;
 			}
 		}
-		if (retcode != IDMAP_SUCCESS) {
+
+		if (retcode == IDMAP_ERR_DOMAIN_NOTFOUND) {
+			req->direction |= _IDMAP_F_LOOKUP_OTHER_AD;
+			retcode = IDMAP_SUCCESS;
+		} else if (retcode != IDMAP_SUCCESS) {
 			idmap_lookup_release_batch(&qs);
+			num_queued = 0;
+			next_request = i + 1;
 			break;
 		}
-	}
+	} /* End of for loop */
 
 	if (retcode == IDMAP_SUCCESS) {
 		/* add keeps track if we added an entry to the batch */
-		if (add)
+		if (num_queued > 0)
 			retcode = idmap_lookup_batch_end(&qs);
 		else
 			idmap_lookup_release_batch(&qs);
@@ -2031,6 +2040,16 @@ retry:
 	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
 		degrade_svc(1, "some AD lookups timed out repeatedly");
 
+	if (retcode != IDMAP_SUCCESS) {
+		/* Mark any unproccessed requests for an other AD */
+		for (i = next_request; i < batch->idmap_mapping_batch_len;
+		    i++) {
+			req = &batch->idmap_mapping_batch_val[i];
+			req->direction |= _IDMAP_F_LOOKUP_OTHER_AD;
+
+		}
+	}
+
 	if (retcode != IDMAP_SUCCESS)
 		idmapdlog(LOG_NOTICE, "Failed to batch AD lookup requests");
 
@@ -2041,8 +2060,8 @@ out:
 	 * 2. Reset req->id2.idtype to IDMAP_NONE
 	 * 3. If batch_start or batch_add failed then set the status
 	 *    of each request marked for AD lookup to that error.
-	 * 4. Evaluate the type of the AD object (i.e. user or group) and
-	 *    update the idtype in request.
+	 * 4. Evaluate the type of the AD object (i.e. user or group)
+	 *    and update the idtype in request.
 	 */
 	for (i = 0; i < batch->idmap_mapping_batch_len; i++) {
 		req = &batch->idmap_mapping_batch_val[i];
@@ -2050,23 +2069,25 @@ out:
 		req->id2.idtype = IDMAP_NONE;
 		res = &result->ids.ids_val[i];
 		how = &res->info.how;
-		if (!(req->direction & _IDMAP_F_LOOKUP_AD))
+		if (!(req->direction & _IDMAP_F_LOOKUP_AD) ||
+		    (req->direction & _IDMAP_F_LOOKUP_OTHER_AD))
 			continue;
+
+		/* Count number processed */
+		(*num_processed)++;
 
 		/* Reset AD lookup flag */
 		req->direction &= ~(_IDMAP_F_LOOKUP_AD);
 
 		/*
-		 * If batch_start or batch_add failed then set the status
-		 * of each request marked for AD lookup to that error.
+		 * If batch_start or batch_add failed then set the
+		 * status of each request marked for AD lookup to
+		 * that error.
 		 */
 		if (retcode != IDMAP_SUCCESS) {
 			res->retcode = retcode;
 			continue;
 		}
-
-		if (!add)
-			continue;
 
 		if (res->retcode == IDMAP_ERR_NOTFOUND) {
 			/* Nothing found - remove the preset info */
@@ -2083,11 +2104,13 @@ out:
 					res->id.idtype = IDMAP_UID;
 				req->id1.idtype = IDMAP_USID;
 				break;
+
 			case _IDMAP_T_GROUP:
 				if (res->id.idtype == IDMAP_POSIXID)
 					res->id.idtype = IDMAP_GID;
 				req->id1.idtype = IDMAP_GSID;
 				break;
+
 			default:
 				res->retcode = IDMAP_ERR_SID;
 				break;
@@ -2107,11 +2130,12 @@ out:
 				    req->id2name == NULL && /* no winname */
 				    req->id1name != NULL) /* unixname */
 					/*
-					 * If AD lookup by unixname failed
-					 * with non fatal error then clear
-					 * the error (i.e set res->retcode
-					 * to success). This allows the next
-					 * pass to process other mapping
+					 * If AD lookup by unixname
+					 * failed with non fatal error
+					 * then clear the error (ie set
+					 * res->retcode to success).
+					 * This allows the next pass to
+					 * process other mapping
 					 * mechanisms for this request.
 					 */
 					res->retcode = IDMAP_SUCCESS;
@@ -2123,16 +2147,104 @@ out:
 				if (res->id.idtype == IDMAP_SID)
 					res->id.idtype = IDMAP_USID;
 				break;
+
 			case _IDMAP_T_GROUP:
 				if (res->id.idtype == IDMAP_SID)
 					res->id.idtype = IDMAP_GSID;
 				break;
+
 			default:
 				res->retcode = IDMAP_ERR_SID;
 				break;
 			}
 		}
 	}
+
+	return (retcode);
+}
+
+
+
+/*
+ * Batch AD lookups
+ */
+idmap_retcode
+ad_lookup_batch(lookup_state_t *state, idmap_mapping_batch *batch,
+		idmap_ids_res *result)
+{
+	idmap_retcode	retcode;
+	int		i, j;
+	idmap_mapping	*req;
+	idmap_id_res	*res;
+	int		num_queries;
+	int		num_processed;
+
+	if (state->ad_nqueries == 0)
+		return (IDMAP_SUCCESS);
+
+	for (i = 0; i < batch->idmap_mapping_batch_len; i++) {
+		req = &batch->idmap_mapping_batch_val[i];
+		res = &result->ids.ids_val[i];
+
+		/* Skip if not marked for AD lookup or already in error. */
+		if (!(req->direction & _IDMAP_F_LOOKUP_AD) ||
+		    res->retcode != IDMAP_SUCCESS)
+			continue;
+
+		/* Init status */
+		res->retcode = IDMAP_ERR_RETRIABLE_NET_ERR;
+	}
+
+	RDLOCK_CONFIG();
+	num_queries = state->ad_nqueries;
+	if (_idmapdstate.num_ads > 0) {
+		for (i = 0; i < _idmapdstate.num_ads && num_queries > 0; i++) {
+
+			retcode = ad_lookup_batch_int(state, batch, result, i,
+			    &num_processed);
+			num_queries -= num_processed;
+
+			if (num_queries > 0) {
+				for (j = 0; j < batch->idmap_mapping_batch_len;
+				    j++) {
+					req =
+					    &batch->idmap_mapping_batch_val[j];
+					res = &result->ids.ids_val[j];
+					if (!(req->direction &
+					    _IDMAP_F_LOOKUP_AD))
+						continue;
+					/*
+					 * Reset the other AD lookup flag so
+					 * that we can try the next AD
+					 */
+					req->direction &=
+					    ~(_IDMAP_F_LOOKUP_OTHER_AD);
+
+					if ((i + 1) >= _idmapdstate.num_ads) {
+						/*
+						 * There are no more ADs to try
+						 */
+						req->direction &=
+						    ~(_IDMAP_F_LOOKUP_AD);
+						res->retcode =
+						    IDMAP_ERR_DOMAIN_NOTFOUND;
+					}
+				}
+			}
+		}
+	} else {
+		/* Case of no ADs */
+		retcode = IDMAP_ERR_NO_ACTIVEDIRECTORY;
+		for (i = 0; i < batch->idmap_mapping_batch_len; i++) {
+			req = &batch->idmap_mapping_batch_val[i];
+			res = &result->ids.ids_val[i];
+			if (!(req->direction & _IDMAP_F_LOOKUP_AD))
+				continue;
+			req->direction &= ~(_IDMAP_F_LOOKUP_AD);
+			res->retcode = IDMAP_ERR_NO_ACTIVEDIRECTORY;
+		}
+	}
+	UNLOCK_CONFIG();
 
 	/* AD lookups done. Reset state->ad_nqueries and return */
 	state->ad_nqueries = 0;
@@ -2238,7 +2350,7 @@ sid2pid_first_pass(lookup_state_t *state, idmap_mapping *req,
 			goto out;
 
 		if (ALLOW_WK_OR_LOCAL_SIDS_ONLY(req)) {
-			retcode = IDMAP_ERR_NONEGENERATED;
+			retcode = IDMAP_ERR_NONE_GENERATED;
 			goto out;
 		}
 	}
@@ -2249,7 +2361,7 @@ sid2pid_first_pass(lookup_state_t *state, idmap_mapping *req,
 		goto out;
 
 	if (DO_NOT_ALLOC_NEW_ID_MAPPING(req) || AVOID_NAMESERVICE(req)) {
-		retcode = IDMAP_ERR_NONEGENERATED;
+		retcode = IDMAP_ERR_NONE_GENERATED;
 		goto out;
 	}
 
@@ -3588,42 +3700,70 @@ ad_lookup_by_winname(lookup_state_t *state,
 		char **sidprefix, idmap_rid_t *rid, int *wintype,
 		char **unixname)
 {
-	int			retries = 0;
+	int			retries;
 	idmap_query_state_t	*qs = NULL;
 	idmap_retcode		rc, retcode;
+	int			i;
+	int			found_ad = 0;
 
-retry:
 	RDLOCK_CONFIG();
-	retcode = idmap_lookup_batch_start(_idmapdstate.ad, 1, &qs);
-	UNLOCK_CONFIG();
-	if (retcode != IDMAP_SUCCESS) {
-		if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR &&
-		    retries++ < ADUTILS_DEF_NUM_RETRIES)
-			goto retry;
-		degrade_svc(1, "failed to create request for AD lookup "
-		    "by winname");
-		return (retcode);
+	if (_idmapdstate.num_ads > 0) {
+		for (i = 0; i < _idmapdstate.num_ads && !found_ad; i++) {
+			retries = 0;
+retry:
+			retcode = idmap_lookup_batch_start(_idmapdstate.ads[i],
+			    1, &qs);
+			if (retcode != IDMAP_SUCCESS) {
+				if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR &&
+				    retries++ < ADUTILS_DEF_NUM_RETRIES)
+					goto retry;
+				degrade_svc(1, "failed to create request for "
+				    "AD lookup by winname");
+				return (retcode);
+			}
+
+			restore_svc();
+
+			if (state != NULL && i == 0) {
+				/*
+				 * Directory based name mapping is only
+				 * performed within the joined forest (i == 0).
+				 * We don't trust other "trusted" forests to
+				 * provide DS-based name mapping information
+				 * because AD's definition of "cross-forest
+				 * trust" does not encompass this sort of
+				 * behavior.
+				 */
+				idmap_lookup_batch_set_unixattr(qs,
+				    state->ad_unixuser_attr,
+				    state->ad_unixgroup_attr);
+			}
+
+			retcode = idmap_name2sid_batch_add1(qs, name, domain,
+			    eunixtype, dn, attr, value, canonname, sidprefix,
+			    rid, wintype, unixname, &rc);
+			if (retcode == IDMAP_ERR_DOMAIN_NOTFOUND) {
+				idmap_lookup_release_batch(&qs);
+				continue;
+			}
+			found_ad = 1;
+			if (retcode != IDMAP_SUCCESS)
+				idmap_lookup_release_batch(&qs);
+			else
+				retcode = idmap_lookup_batch_end(&qs);
+
+			if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR &&
+			    retries++ < ADUTILS_DEF_NUM_RETRIES)
+				goto retry;
+			else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
+				degrade_svc(1,
+				    "some AD lookups timed out repeatedly");
+		}
+	} else {
+		/* No AD case */
+		retcode = IDMAP_ERR_NO_ACTIVEDIRECTORY;
 	}
-
-	restore_svc();
-
-	if (state != NULL)
-		idmap_lookup_batch_set_unixattr(qs, state->ad_unixuser_attr,
-		    state->ad_unixgroup_attr);
-
-	retcode = idmap_name2sid_batch_add1(qs, name, domain, eunixtype,
-	    dn, attr, value, canonname, sidprefix, rid, wintype, unixname, &rc);
-
-	if (retcode != IDMAP_SUCCESS)
-		idmap_lookup_release_batch(&qs);
-	else
-		retcode = idmap_lookup_batch_end(&qs);
-
-	if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR &&
-	    retries++ < ADUTILS_DEF_NUM_RETRIES)
-		goto retry;
-	else if (retcode == IDMAP_ERR_RETRIABLE_NET_ERR)
-		degrade_svc(1, "some AD lookups timed out repeatedly");
+	UNLOCK_CONFIG();
 
 	if (retcode != IDMAP_SUCCESS) {
 		idmapdlog(LOG_NOTICE, "AD lookup by winname failed");
@@ -3989,7 +4129,7 @@ pid2sid_first_pass(lookup_state_t *state, idmap_mapping *req,
 	}
 
 	if (DO_NOT_ALLOC_NEW_ID_MAPPING(req)) {
-		retcode = IDMAP_ERR_NONEGENERATED;
+		retcode = IDMAP_ERR_NONE_GENERATED;
 		goto out;
 	}
 

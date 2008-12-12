@@ -66,6 +66,7 @@ static binary_attrs_t binattrs[] = {
 	{NULL, NULL}
 };
 
+
 void
 adutils_set_log(int pri, bool_t syslog, bool_t degraded)
 {
@@ -73,6 +74,7 @@ adutils_set_log(int pri, bool_t syslog, bool_t degraded)
 	idmap_log_syslog(syslog);
 	idmap_log_degraded(degraded);
 }
+
 
 /*
  * Turn "foo.bar.com" into "dc=foo,dc=bar,dc=com"
@@ -84,6 +86,7 @@ adutils_dns2dn(const char *dns)
 	int	nameparts;
 	return (ldap_dns_to_dn((char *)dns, &nameparts));
 }
+
 
 /*
  * Turn "dc=foo,dc=bar,dc=com" into "foo.bar.com"; ignores any other
@@ -632,6 +635,8 @@ adutils_ad_free(adutils_ad_t **ad)
 	(void) pthread_mutex_unlock(&(*ad)->lock);
 	(void) pthread_mutex_destroy(&(*ad)->lock);
 
+	if ((*ad)->known_domains)
+		free((*ad)->known_domains);
 	free((*ad)->dflt_w2k_dom);
 	free(*ad);
 
@@ -761,7 +766,8 @@ retry:
 	 * around the wrong number of times.
 	 */
 	for (;;) {
-		if (adh != NULL && adh->ld != NULL && !adh->dead)
+		if (adh != NULL && adh->owner == ad && adh->ld != NULL &&
+		    !adh->dead)
 			break;
 		if (adh == NULL || (adh = adh->next) == NULL)
 			adh = host_head;
@@ -919,6 +925,88 @@ delete_ds(adutils_ad_t *ad, const char *host, int port)
 	}
 
 }
+/*
+ * Add known domain name and domain SID to AD configuration.
+ */
+
+adutils_rc
+adutils_add_domain(adutils_ad_t *ad, const char *domain, const char *sid)
+{
+	struct known_domain *new;
+	int num = ad->num_known_domains;
+
+	ad->num_known_domains++;
+	new = realloc(ad->known_domains,
+	    sizeof (struct known_domain) * ad->num_known_domains);
+	if (new != NULL) {
+		ad->known_domains = new;
+		(void) strlcpy(ad->known_domains[num].name, domain,
+		    sizeof (ad->known_domains[num].name));
+		(void) strlcpy(ad->known_domains[num].sid, sid,
+		    sizeof (ad->known_domains[num].sid));
+		return (ADUTILS_SUCCESS);
+	} else {
+		if (ad->known_domains != NULL) {
+			free(ad->known_domains);
+			ad->known_domains = NULL;
+		}
+		ad->num_known_domains = 0;
+		return (ADUTILS_ERR_MEMORY);
+	}
+}
+
+
+/*
+ * Check that this AD supports this domain.
+ * If there are no known domains assume that the
+ * domain is supported by this AD.
+ *
+ * Returns 1 if this domain is supported by this AD
+ * else returns 0;
+ */
+
+int
+adutils_lookup_check_domain(adutils_query_state_t *qs, const char *domain)
+{
+	adutils_ad_t *ad = qs->qadh->owner;
+	int i, err;
+
+	for (i = 0; i < ad->num_known_domains; i++) {
+		if (u8_strcmp(domain, ad->known_domains[i].name, 0,
+		    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err) == 0 &&
+		    err == 0)
+			return (1);
+	}
+
+	return ((i == 0) ? 1 : 0);
+}
+
+
+/*
+ * Check that this AD supports the SID prefix.
+ * The SID prefix should match the domain SID.
+ * If there are no known domains assume that the
+ * SID prefix is supported by this AD.
+ *
+ * Returns 1 if this sid prefix is supported by this AD
+ * else returns 0;
+ */
+
+int
+adutils_lookup_check_sid_prefix(adutils_query_state_t *qs, const char *sid)
+{
+	adutils_ad_t *ad = qs->qadh->owner;
+	int i;
+
+
+	for (i = 0; i < ad->num_known_domains; i++) {
+		if (strcmp(sid, ad->known_domains[i].sid) == 0)
+			return (1);
+	}
+
+	return ((i == 0) ? 1 : 0);
+}
+
 
 adutils_rc
 adutils_lookup_batch_start(adutils_ad_t *ad, int nqueries,
@@ -964,9 +1052,9 @@ adutils_lookup_batch_start(adutils_ad_t *ad, int nqueries,
 
 	new_state->ref_cnt = 1;
 	new_state->qadh = adh;
-	new_state->qcount = nqueries;
+	new_state->qsize = nqueries;
 	new_state->qadh_gen = adh->generation;
-	new_state->qlastsent = 0;
+	new_state->qcount = 0;
 	new_state->ldap_res_search_cb = ldap_res_search_cb;
 	new_state->ldap_res_search_argp = ldap_res_search_argp;
 	(void) pthread_cond_init(&new_state->cv, NULL);
@@ -1588,8 +1676,10 @@ adutils_lookup_batch_add(adutils_query_state_t *state,
 	struct timeval	tv;
 	adutils_q_t	*q;
 
-	qid = atomic_inc_32_nv(&state->qlastsent) - 1;
+	qid = atomic_inc_32_nv(&state->qcount) - 1;
 	q = &(state->queries[qid]);
+
+	assert(qid < state->qsize);
 
 	/*
 	 * Remember the expected domain so we can check the results

@@ -37,11 +37,14 @@ SUNWprivate {
 	adutils_lookup_batch_end;
 	adutils_lookup_batch_release;
 	adutils_lookup_batch_getdefdomain;
+	adutils_lookup_check_domain;
+	adutils_lookup_check_sid_prefix;
 	adutils_dn2dns;
 	adutils_reap_idle_connections;
 	adutils_ad_alloc;
 	adutils_ad_free;
 	adutils_add_ds;
+	adutils_add_domain;
 	adutils_set_log;
     local:
 	*;

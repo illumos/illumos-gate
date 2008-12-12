@@ -103,11 +103,15 @@ load_config()
 void
 reload_ad()
 {
-	int		i;
-	adutils_ad_t	*old;
-	adutils_ad_t	*new;
-
+	int		i, j;
+	adutils_ad_t	**new_ads = NULL;
+	adutils_ad_t	**old_ads;
+	int		new_num_ads;
+	int		old_num_ads;
 	idmap_pg_config_t *pgcfg = &_idmapdstate.cfg->pgcfg;
+	idmap_trustedforest_t *trustfor = pgcfg->trusted_forests;
+	int		num_trustfor = pgcfg->num_trusted_forests;
+	ad_disc_domainsinforest_t *domain_in_forest;
 
 	if (pgcfg->global_catalog == NULL ||
 	    pgcfg->global_catalog[0].host[0] == '\0') {
@@ -122,36 +126,109 @@ reload_ad()
 		return;
 	}
 
-	old = _idmapdstate.ad;
+	old_ads = _idmapdstate.ads;
+	old_num_ads = _idmapdstate.num_ads;
 
-	if (adutils_ad_alloc(&new, pgcfg->default_domain,
+	new_num_ads = 1 + num_trustfor;
+	new_ads = calloc(new_num_ads, sizeof (adutils_ad_t *));
+	if (new_ads == NULL) {
+		degrade_svc(0, "could not allocate AD context array "
+		    "(out of memory)");
+		return;
+	}
+
+	if (adutils_ad_alloc(&new_ads[0], pgcfg->default_domain,
 	    ADUTILS_AD_GLOBAL_CATALOG) != ADUTILS_SUCCESS) {
-		degrade_svc(0, "could not initialize AD context");
+		free(new_ads);
+		degrade_svc(0, "could not initialize AD context "
+		    "(out of memory)");
 		return;
 	}
 
 	for (i = 0; pgcfg->global_catalog[i].host[0] != '\0'; i++) {
-		if (idmap_add_ds(new,
+		if (idmap_add_ds(new_ads[0],
 		    pgcfg->global_catalog[i].host,
 		    pgcfg->global_catalog[i].port) != 0) {
-			adutils_ad_free(&new);
-			degrade_svc(0, "could not initialize AD GC context");
+			adutils_ad_free(&new_ads[0]);
+			free(new_ads);
+			degrade_svc(0, "could not set AD hosts "
+			    "(out of memory)");
 			return;
 		}
 	}
 
-	_idmapdstate.ad = new;
+	if (pgcfg->domains_in_forest != NULL) {
+		for (i = 0; pgcfg->domains_in_forest[i].domain[0] != '\0';
+		    i++) {
+			if (adutils_add_domain(new_ads[0],
+			    pgcfg->domains_in_forest[i].domain,
+			    pgcfg->domains_in_forest[i].sid) != 0) {
+				adutils_ad_free(&new_ads[0]);
+				free(new_ads);
+				degrade_svc(0, "could not set AD domains "
+				    "(out of memory)");
+				return;
+			}
+		}
+	}
 
-	if (old != NULL)
-		adutils_ad_free(&old);
+	for (i = 0; i < num_trustfor; i++) {
+		if (adutils_ad_alloc(&new_ads[i + 1], NULL,
+		    ADUTILS_AD_GLOBAL_CATALOG) != ADUTILS_SUCCESS) {
+			degrade_svc(0, "could not initialize trusted AD "
+			    "context (out of memory)");
+				new_num_ads = i + 1;
+				goto out;
+		}
+		for (j = 0; trustfor[i].global_catalog[j].host[0] != '\0';
+		    j++) {
+			if (idmap_add_ds(new_ads[i + 1],
+			    trustfor[i].global_catalog[j].host,
+			    trustfor[i].global_catalog[j].port) != 0) {
+				adutils_ad_free(&new_ads[i + 1]);
+				degrade_svc(0, "could not set trusted "
+				    "AD hosts (out of memory)");
+				new_num_ads = i + 1;
+				goto out;
+			}
+		}
+		for (j = 0; trustfor[i].domains_in_forest[j].domain[0] != '\0';
+		    j++) {
+			domain_in_forest = &trustfor[i].domains_in_forest[j];
+			/* Only add domains which are marked */
+			if (domain_in_forest->trusted) {
+				if (adutils_add_domain(new_ads[i + 1],
+				    domain_in_forest->domain,
+				    domain_in_forest->sid) != 0) {
+					adutils_ad_free(&new_ads[i + 1]);
+					degrade_svc(0, "could not set trusted "
+					    "AD domains (out of memory)");
+					new_num_ads = i + 1;
+					goto out;
+				}
+			}
+		}
+	}
+
+out:
+	_idmapdstate.ads = new_ads;
+	_idmapdstate.num_ads = new_num_ads;
+
+
+	if (old_ads != NULL) {
+		for (i = 0; i < old_num_ads; i++)
+			adutils_ad_free(&old_ads[i]);
+		free(old_ads);
+	}
 }
 
 
 void
 print_idmapdstate()
 {
-	int i;
+	int i, j;
 	idmap_pg_config_t *pgcfg;
+	idmap_trustedforest_t *tf;
 
 	RDLOCK_CONFIG();
 
@@ -188,6 +265,43 @@ print_idmapdstate()
 			    pgcfg->global_catalog[i].host,
 			    pgcfg->global_catalog[i].port);
 	}
+	if (pgcfg->domains_in_forest == NULL ||
+	    pgcfg->domains_in_forest[0].domain[0] == '\0') {
+		idmapdlog(LOG_DEBUG, "No domains in forest %s known",
+		    CHECK_NULL(pgcfg->forest_name));
+	} else {
+		for (i = 0; pgcfg->domains_in_forest[i].domain[0] != '\0'; i++)
+			idmapdlog(LOG_DEBUG, "domains in forest %s = %s",
+			    CHECK_NULL(pgcfg->forest_name),
+			    pgcfg->domains_in_forest[i].domain);
+	}
+	if (pgcfg->trusted_domains == NULL ||
+	    pgcfg->trusted_domains[0].domain[0] == '\0') {
+		idmapdlog(LOG_DEBUG, "No trusted domains known");
+	} else {
+		for (i = 0; pgcfg->trusted_domains[i].domain[0] != '\0'; i++)
+			idmapdlog(LOG_DEBUG, "trusted domain = %s",
+			    pgcfg->trusted_domains[i].domain);
+	}
+
+	for (i = 0; i < pgcfg->num_trusted_forests; i++) {
+		tf = &pgcfg->trusted_forests[i];
+		for (j = 0; tf->global_catalog[j].host[0] != '\0'; j++)
+			idmapdlog(LOG_DEBUG,
+			    "trusted forest %s global_catalog=%s port=%d",
+			    tf->forest_name,
+			    tf->global_catalog[j].host,
+			    tf->global_catalog[j].port);
+		for (j = 0; tf->domains_in_forest[j].domain[0] != '\0'; j++) {
+			if (tf->domains_in_forest[j].trusted) {
+				idmapdlog(LOG_DEBUG,
+				    "trusted forest %s domain=%s",
+				    tf->forest_name,
+				    tf->domains_in_forest[j].domain);
+			}
+		}
+	}
+
 	idmapdlog(LOG_DEBUG, "ds_name_mapping_enabled=%s",
 	    (pgcfg->ds_name_mapping_enabled == TRUE) ? "true" : "false");
 	idmapdlog(LOG_DEBUG, "ad_unixuser_attr=%s",

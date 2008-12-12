@@ -99,8 +99,8 @@ typedef struct idmap_q {
 /* Batch context structure; typedef is in header file */
 struct idmap_query_state {
 	adutils_query_state_t	*qs;
-	int			qcount;		/* how many queries */
-	uint32_t		qlastsent;
+	int			qsize;		/* Queue size */
+	uint32_t		qcount;		/* Number of queued requests */
 	const char		*ad_unixuser_attr;
 	const char		*ad_unixgroup_attr;
 	idmap_q_t		queries[1];	/* array of query results */
@@ -192,8 +192,7 @@ idmap_lookup_batch_start(adutils_ad_t *ad, int nqueries,
 
 	*state = NULL;
 
-	if (ad == NULL)
-		return (IDMAP_ERR_INTERNAL);
+	assert(ad != NULL);
 
 	new_state = calloc(1, sizeof (idmap_query_state_t) +
 	    (nqueries - 1) * sizeof (idmap_q_t));
@@ -207,7 +206,7 @@ idmap_lookup_batch_start(adutils_ad_t *ad, int nqueries,
 		return (map_adrc2idmaprc(rc));
 	}
 
-	new_state->qcount = nqueries;
+	new_state->qsize = nqueries;
 	*state = new_state;
 	return (IDMAP_SUCCESS);
 }
@@ -626,8 +625,10 @@ idmap_batch_add1(idmap_query_state_t *state, const char *filter,
 		NULL
 	};
 
-	qid = atomic_inc_32_nv(&state->qlastsent) - 1;
+	qid = atomic_inc_32_nv(&state->qcount) - 1;
 	q = &(state->queries[qid]);
+
+	assert(qid < state->qsize);
 
 	/*
 	 * Remember the expected canonname, domainname and unix type
@@ -745,8 +746,7 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 			*strchr(ecanonname, '@') = '\0';
 		} else {
 			/* 'name' not qualified and dname not given */
-			dname = adutils_lookup_batch_getdefdomain(
-			    state->qs);
+			dname = adutils_lookup_batch_getdefdomain(state->qs);
 			assert(dname != NULL);
 			if (*dname == '\0') {
 				free(ecanonname);
@@ -763,6 +763,12 @@ idmap_name2sid_batch_add1(idmap_query_state_t *state,
 			free(ecanonname);
 			return (IDMAP_ERR_MEMORY);
 		}
+	}
+
+	if (!adutils_lookup_check_domain(state->qs, dname)) {
+		free(ecanonname);
+		free(edomain);
+		return (IDMAP_ERR_DOMAIN_NOTFOUND);
 	}
 
 	s_name = sanitize_for_ldap_filter(name);
@@ -813,6 +819,9 @@ idmap_sid2name_batch_add1(idmap_query_state_t *state,
 	 * the name of the SID and whether it is a user, a group or a
 	 * computer.
 	 */
+
+	if (!adutils_lookup_check_sid_prefix(state->qs, sid))
+		return (IDMAP_ERR_DOMAIN_NOTFOUND);
 
 	ret = adutils_txtsid2hexbinsid(sid, rid, &cbinsid[0], sizeof (cbinsid));
 	if (ret != 0)

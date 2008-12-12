@@ -23,13 +23,11 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <ldap.h>
 #include <sasl/sasl.h>
 #include <libintl.h>
-#include <strings.h>
 #include <strings.h>
 
 #include "idmap_impl.h"
@@ -249,7 +247,7 @@ idmap_init_ad(idmap_nm_handle_t *p)
 		goto cleanup;
 	}
 
-	dc = ad_disc_get_DomainController(ad_ctx, AD_DISC_GLOBAL);
+	dc = ad_disc_get_DomainController(ad_ctx, AD_DISC_GLOBAL, NULL);
 	if (dc == NULL) {
 		rc = IDMAP_ERR_ARG;
 		idmapdlog(LOG_ERR,

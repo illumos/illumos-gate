@@ -79,7 +79,8 @@ typedef struct idmapd_state {
 	gid_t		limit_gid;
 	int		new_eph_db;	/* was the ephem ID db [re-]created? */
 	bool_t		eph_map_unres_sids;
-	adutils_ad_t	*ad;
+	int		num_ads;
+	adutils_ad_t	**ads;
 } idmapd_state_t;
 extern idmapd_state_t	_idmapdstate;
 
@@ -178,6 +179,9 @@ typedef struct msg_table {
 #define	_IDMAP_F_EXP_EPH_UID		0x00000010
 /* Same as above. Used for sid2gid request */
 #define	_IDMAP_F_EXP_EPH_GID		0x00000020
+/* This request is not valid for the current forest */
+#define	_IDMAP_F_LOOKUP_OTHER_AD	0x00000040
+
 
 /*
  * Check if we are done. If so, subsequent passes can be skipped

@@ -98,6 +98,8 @@ SUNWprivate {
 	ad_disc_get_DomainName;
 	ad_disc_set_DomainName;
 	ad_disc_compare_ds;
+	ad_disc_compare_trusteddomains;
+	ad_disc_compare_domainsinforest;
 	ad_disc_SubnetChanged;
 	ad_disc_get_GlobalCatalog;
 	ad_disc_set_GlobalCatalog;
@@ -109,6 +111,8 @@ SUNWprivate {
 	ad_disc_set_SiteName;
 	ad_disc_refresh;
 	ad_disc_get_SiteName;
+	ad_disc_get_TrustedDomains;
+	ad_disc_get_DomainsInForest;
     local:
 	*;
 };

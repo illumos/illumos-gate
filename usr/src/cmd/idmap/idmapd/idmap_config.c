@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Config routines common to idmap(1M) and idmapd(1M)
@@ -41,6 +40,7 @@
 #include <pthread.h>
 #include <port.h>
 #include <net/route.h>
+#include <sys/u8_textprep.h>
 #include "addisc.h"
 
 #define	MACHINE_SID_LEN		(9 + 3 * 11)
@@ -507,6 +507,12 @@ destruction:
 	return (rc);
 }
 
+
+
+/*
+ * This function updates a boolean value.
+ * If nothing has changed it returns 0 else 1
+ */
 static int
 update_bool(bool_t *value, bool_t *new, char *name)
 {
@@ -518,6 +524,11 @@ update_bool(bool_t *value, bool_t *new, char *name)
 	return (1);
 }
 
+
+/*
+ * This function updates a string value.
+ * If nothing has changed it returns 0 else 1
+ */
 static int
 update_string(char **value, char **new, char *name)
 {
@@ -538,6 +549,11 @@ update_string(char **value, char **new, char *name)
 	return (1);
 }
 
+
+/*
+ * This function updates a directory service structure.
+ * If nothing has changed it returns 0 else 1
+ */
 static int
 update_dirs(idmap_ad_disc_ds_t **value, idmap_ad_disc_ds_t **new, char *name)
 {
@@ -554,7 +570,7 @@ update_dirs(idmap_ad_disc_ds_t **value, idmap_ad_disc_ds_t **new, char *name)
 		return (0);
 	}
 
-	if (*value)
+	if (*value != NULL)
 		free(*value);
 
 	*value = *new;
@@ -570,6 +586,221 @@ update_dirs(idmap_ad_disc_ds_t **value, idmap_ad_disc_ds_t **new, char *name)
 	for (i = 0; (*value)[i].host[0] != '\0'; i++)
 		idmapdlog(LOG_INFO, "change %s=%s port=%d", name,
 		    (*value)[i].host, (*value)[i].port);
+	return (1);
+}
+
+/*
+ * This function updates a trusted domains structure.
+ * If nothing has changed it returns 0 else 1
+ */
+static int
+update_trusted_domains(ad_disc_trusteddomains_t **value,
+			ad_disc_trusteddomains_t **new, char *name)
+{
+	int i;
+
+	if (*value == *new)
+		/* Nothing to do */
+		return (0);
+
+	if (*value != NULL && *new != NULL &&
+	    ad_disc_compare_trusteddomains(*value, *new) == 0) {
+		free(*new);
+		*new = NULL;
+		return (0);
+	}
+
+	if (*value != NULL)
+		free(*value);
+
+	*value = *new;
+	*new = NULL;
+
+	if (*value == NULL) {
+		/* We're unsetting this DS property */
+		idmapdlog(LOG_INFO, "change %s=<none>", name);
+		return (1);
+	}
+
+	/* List all the new domains */
+	for (i = 0; (*value)[i].domain[0] != '\0'; i++)
+		idmapdlog(LOG_INFO, "change %s=%s direction=%s", name,
+		    (*value)[i].domain,
+		    (*value)[i].direction == 3 ? "bi-directional" : "inbound");
+	return (1);
+}
+
+
+/*
+ * This function updates a domains in a forest structure.
+ * If nothing has changed it returns 0 else 1
+ */
+static int
+update_domains_in_forest(ad_disc_domainsinforest_t **value,
+			ad_disc_domainsinforest_t **new, char *name)
+{
+	int i;
+
+	if (*value == *new)
+		/* Nothing to do */
+		return (0);
+
+	if (*value != NULL && *new != NULL &&
+	    ad_disc_compare_domainsinforest(*value, *new) == 0) {
+		free(*new);
+		*new = NULL;
+		return (0);
+	}
+
+	if (*value != NULL)
+		free(*value);
+
+	*value = *new;
+	*new = NULL;
+
+	if (*value == NULL) {
+		/* We're unsetting this DS property */
+		idmapdlog(LOG_INFO, "change %s=<none>", name);
+		return (1);
+	}
+
+	/* List all the new domains */
+	for (i = 0; (*value)[i].domain[0] != '\0'; i++)
+		idmapdlog(LOG_INFO, "change %s=%s", name,
+		    (*value)[i].domain);
+	return (1);
+}
+
+
+static void
+free_trusted_forests(idmap_trustedforest_t **value, int *num_values)
+{
+	int i;
+
+	for (i = 0; i < *num_values; i++) {
+		free((*value)[i].forest_name);
+		free((*value)[i].global_catalog);
+		free((*value)[i].domains_in_forest);
+	}
+	free(*value);
+	*value = NULL;
+	*num_values = 0;
+}
+
+
+static int
+compare_trusteddomainsinforest(ad_disc_domainsinforest_t *df1,
+			ad_disc_domainsinforest_t *df2)
+{
+	int	i, j;
+	int	num_df1 = 0;
+	int	num_df2 = 0;
+	int	match;
+	int	err;
+
+	for (i = 0; df1[i].domain[0] != '\0'; i++)
+		if (df1[i].trusted)
+			num_df1++;
+
+	for (j = 0; df2[j].domain[0] != '\0'; j++)
+		if (df2[j].trusted)
+			num_df2++;
+
+	if (num_df1 != num_df2)
+		return (1);
+
+	for (i = 0; df1[i].domain[0] != '\0'; i++) {
+		if (df1[i].trusted) {
+			match = FALSE;
+			for (j = 0; df2[j].domain[0] != '\0'; j++) {
+				if (df2[j].trusted &&
+				    u8_strcmp(df1[i].domain, df2[i].domain, 0,
+				    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err)
+				    == 0 && err == 0 &&
+				    strcmp(df1[i].sid, df2[i].sid) == 0) {
+					match = TRUE;
+					break;
+				}
+			}
+			if (!match)
+				return (1);
+		}
+	}
+	return (0);
+}
+
+
+
+/*
+ * This function updates trusted forest structure.
+ * If nothing has changed it returns 0 else 1
+ */
+static int
+update_trusted_forest(idmap_trustedforest_t **value, int *num_value,
+			idmap_trustedforest_t **new, int *num_new, char *name)
+{
+	int i, j;
+	int match;
+
+	if (*value == *new)
+		/* Nothing to do */
+		return (0);
+
+	if (*value != NULL && *new != NULL) {
+		if (*num_value != *num_new)
+			goto not_equal;
+		for (i = 0; i < *num_value; i++) {
+			match = FALSE;
+			for (j = 0; j < *num_new; j++) {
+				if (strcmp((*value)[i].forest_name,
+				    (*new)[j].forest_name) == 0 &&
+				    ad_disc_compare_ds(
+				    (*value)[i].global_catalog,
+				    (*new)[i].global_catalog) == 0 &&
+				    compare_trusteddomainsinforest(
+				    (*value)[i].domains_in_forest,
+				    (*new)[i].domains_in_forest) == 0) {
+					match = TRUE;
+					break;
+				}
+			}
+			if (!match)
+				goto not_equal;
+		}
+		free_trusted_forests(new, num_new);
+		return (0);
+	}
+not_equal:
+	if (*value != NULL)
+		free_trusted_forests(value, num_value);
+	*value = *new;
+	*num_value = *num_new;
+	*new = NULL;
+	*num_new = 0;
+
+	if (*value == NULL) {
+		/* We're unsetting this DS property */
+		idmapdlog(LOG_INFO, "change %s=<none>", name);
+		return (1);
+	}
+
+	/* List all the trusted forests */
+	for (i = 0; i < *num_value; i++) {
+		for (j = 0; (*value)[i].domains_in_forest[j].domain[0] != '\0';
+		    j++) {
+			/* List trusted Domains in the forest. */
+			if ((*value)[i].domains_in_forest[j].trusted)
+				idmapdlog(LOG_INFO, "change %s=%s domain=%s",
+				    name, (*value)[i].forest_name,
+				    (*value)[i].domains_in_forest[j].domain);
+		}
+		/* List the hosts */
+		for (j = 0; (*value)[i].global_catalog[j].host[0] != '\0'; j++)
+			idmapdlog(LOG_INFO, "change %s=%s host=%s port=%d",
+			    name, (*value)[i].forest_name,
+			    (*value)[i].global_catalog[j].host,
+			    (*value)[i].global_catalog[j].port);
+	}
 	return (1);
 }
 
@@ -863,9 +1094,11 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	    &pgcfg->domain_name);
 	if (rc != 0)
 		errors++;
-	else
+	else {
 		(void) ad_disc_set_DomainName(handles->ad_ctx,
 		    pgcfg->domain_name);
+		pgcfg->domain_name_auto_disc = FALSE;
+	}
 
 	rc = get_val_astring(handles, "default_domain",
 	    &pgcfg->default_domain);
@@ -932,16 +1165,20 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	    &pgcfg->domain_controller);
 	if (rc != 0)
 		errors++;
-	else
+	else {
 		(void) ad_disc_set_DomainController(handles->ad_ctx,
 		    pgcfg->domain_controller);
+		pgcfg->domain_controller_auto_disc = FALSE;
+	}
 
 	rc = get_val_astring(handles, "forest_name", &pgcfg->forest_name);
 	if (rc != 0)
 		errors++;
-	else
+	else {
 		(void) ad_disc_set_ForestName(handles->ad_ctx,
 		    pgcfg->forest_name);
+		pgcfg->forest_name_auto_disc = FALSE;
+	}
 
 	rc = get_val_astring(handles, "site_name", &pgcfg->site_name);
 	if (rc != 0)
@@ -954,9 +1191,11 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	    &pgcfg->global_catalog);
 	if (rc != 0)
 		errors++;
-	else
+	else {
 		(void) ad_disc_set_GlobalCatalog(handles->ad_ctx,
 		    pgcfg->global_catalog);
+		pgcfg->global_catalog_auto_disc = FALSE;
+	}
 
 	/*
 	 * Read directory-based name mappings related SMF properties
@@ -1017,6 +1256,7 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 
 }
 
+
 /*
  * This is the half of idmap_cfg_load() that auto-discovers values of
  * discoverable properties that weren't already set via SMF properties.
@@ -1029,28 +1269,173 @@ void
 idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 {
 	ad_disc_t ad_ctx = handles->ad_ctx;
+	ad_disc_t trusted_ctx;
+	int i, j, k, l;
+	char *forestname;
+	int num_trusteddomains;
+	int new_forest;
+	int err;
+	char *trusteddomain;
+	idmap_ad_disc_ds_t *globalcatalog;
+	idmap_trustedforest_t *trustedforests;
+	ad_disc_domainsinforest_t *domainsinforest;
 
 	ad_disc_refresh(ad_ctx);
 
 	if (pgcfg->default_domain == NULL)
-		pgcfg->default_domain = ad_disc_get_DomainName(ad_ctx);
+		pgcfg->default_domain = ad_disc_get_DomainName(ad_ctx,
+		    NULL);
 
 	if (pgcfg->domain_name == NULL)
-		pgcfg->domain_name = ad_disc_get_DomainName(ad_ctx);
+		pgcfg->domain_name = ad_disc_get_DomainName(ad_ctx,
+		    &pgcfg->domain_name_auto_disc);
 
 	if (pgcfg->domain_controller == NULL)
 		pgcfg->domain_controller =
-		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE);
+		    ad_disc_get_DomainController(ad_ctx, AD_DISC_PREFER_SITE,
+		    &pgcfg->domain_controller_auto_disc);
 
 	if (pgcfg->forest_name == NULL)
-		pgcfg->forest_name = ad_disc_get_ForestName(ad_ctx);
+		pgcfg->forest_name = ad_disc_get_ForestName(ad_ctx,
+		    &pgcfg->forest_name_auto_disc);
 
 	if (pgcfg->site_name == NULL)
-		pgcfg->site_name = ad_disc_get_SiteName(ad_ctx);
+		pgcfg->site_name = ad_disc_get_SiteName(ad_ctx,
+		    &pgcfg->site_name_auto_disc);
 
 	if (pgcfg->global_catalog == NULL)
 		pgcfg->global_catalog =
-		    ad_disc_get_GlobalCatalog(ad_ctx, AD_DISC_PREFER_SITE);
+		    ad_disc_get_GlobalCatalog(ad_ctx, AD_DISC_PREFER_SITE,
+		    &pgcfg->global_catalog_auto_disc);
+
+	pgcfg->domains_in_forest =
+	    ad_disc_get_DomainsInForest(ad_ctx, NULL);
+
+	pgcfg->trusted_domains =
+	    ad_disc_get_TrustedDomains(ad_ctx, NULL);
+
+	if (pgcfg->forest_name != NULL && pgcfg->trusted_domains != NULL &&
+	    pgcfg->trusted_domains[0].domain[0] != '\0') {
+		/*
+		 * We have trusted domains.  We need to go through every
+		 * one and find its forest. If it is a new forest we then need
+		 * to find its Global Catalog and the domains in the forest
+		 */
+		for (i = 0; pgcfg->trusted_domains[i].domain[0] != '\0'; i++)
+			continue;
+		num_trusteddomains = i;
+
+		trustedforests = calloc(num_trusteddomains,
+		    sizeof (idmap_trustedforest_t));
+		j = 0;
+		for (i = 0; pgcfg->trusted_domains[i].domain[0] != '\0'; i++) {
+			trusteddomain = pgcfg->trusted_domains[i].domain;
+			trusted_ctx = ad_disc_init();
+			ad_disc_set_DomainName(trusted_ctx,
+			    trusteddomain);
+			forestname =
+			    ad_disc_get_ForestName(trusted_ctx, NULL);
+			if (forestname == NULL) {
+				idmapdlog(LOG_DEBUG, "unable to discover "
+				    "Forest Name for the trusted domain %s",
+				    trusteddomain);
+				ad_disc_fini(trusted_ctx);
+				continue;
+			}
+
+			if (strcasecmp(forestname, pgcfg->forest_name) == 0) {
+				/*
+				 * Ignore the domain as it is part of
+				 * the primary forest
+				 */
+				free(forestname);
+				ad_disc_fini(trusted_ctx);
+				continue;
+			}
+
+			/* Is this a new forest? */
+			new_forest = TRUE;
+			for (k = 0; k < j; k++) {
+				if (strcasecmp(forestname,
+				    trustedforests[k].forest_name) == 0) {
+					new_forest = FALSE;
+					domainsinforest =
+					    trustedforests[k].domains_in_forest;
+					break;
+				}
+			}
+			if (!new_forest) {
+				/* Mark the domain as trusted */
+				for (l = 0;
+				    domainsinforest[l].domain[0] != '\0'; l++) {
+					if (u8_strcmp(trusteddomain,
+					    domainsinforest[l].domain, 0,
+					    U8_STRCMP_CI_LOWER,
+					    U8_UNICODE_LATEST, &err) == 0 &&
+					    err == 0) {
+						domainsinforest[l].trusted =
+						    TRUE;
+						break;
+					}
+				}
+				free(forestname);
+				ad_disc_fini(trusted_ctx);
+				continue;
+			}
+
+			/*
+			 * Get the Global Catalog and the domains in
+			 * this new forest.
+			 */
+			globalcatalog =
+			    ad_disc_get_GlobalCatalog(trusted_ctx,
+			    AD_DISC_PREFER_SITE, NULL);
+			if (globalcatalog == NULL) {
+				idmapdlog(LOG_DEBUG,
+				    "unable to discover Global "
+				    "Catalog for the trusted domain %s",
+				    trusteddomain);
+				free(forestname);
+				ad_disc_fini(trusted_ctx);
+				continue;
+			}
+			domainsinforest =
+			    ad_disc_get_DomainsInForest(trusted_ctx,
+			    NULL);
+			if (domainsinforest == NULL) {
+				idmapdlog(LOG_DEBUG,
+				    "unable to discover Domains in the Forest "
+				    "for the trusted domain %s",
+				    trusteddomain);
+				free(globalcatalog);
+				free(forestname);
+				ad_disc_fini(trusted_ctx);
+				continue;
+			}
+
+			trustedforests[j].forest_name = forestname;
+			trustedforests[j].global_catalog = globalcatalog;
+			trustedforests[j].domains_in_forest = domainsinforest;
+			j++;
+			/* Mark the domain as trusted */
+			for (l = 0; domainsinforest[l].domain[0] != '\0';
+			    l++) {
+				if (u8_strcmp(trusteddomain,
+				    domainsinforest[l].domain, 0,
+				    U8_STRCMP_CI_LOWER,
+				    U8_UNICODE_LATEST, &err) == 0 &&
+				    err == 0) {
+					domainsinforest[l].trusted = TRUE;
+					break;
+				}
+			}
+			ad_disc_fini(trusted_ctx);
+		}
+		if (j > 0) {
+			pgcfg->num_trusted_forests = j;
+			pgcfg->trusted_forests = trustedforests;
+		}
+	}
 
 	if (pgcfg->domain_name == NULL)
 		idmapdlog(LOG_DEBUG, "unable to discover Domain Name");
@@ -1062,7 +1447,13 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 		idmapdlog(LOG_DEBUG, "unable to discover Site Name");
 	if (pgcfg->global_catalog == NULL)
 		idmapdlog(LOG_DEBUG, "unable to discover Global Catalog");
+	if (pgcfg->domains_in_forest == NULL)
+		idmapdlog(LOG_DEBUG,
+		    "unable to discover Domains in the Forest");
+	if (pgcfg->trusted_domains == NULL)
+		idmapdlog(LOG_DEBUG, "unable to discover Trusted Domains");
 }
+
 
 /*
  * idmap_cfg_load() is called at startup, and periodically via the
@@ -1093,6 +1484,7 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	int rc = 0;
 	int errors = 0;
 	int changed = 0;
+	int ad_reload_required = 0;
 	idmap_pg_config_t new_pgcfg, *live_pgcfg;
 
 	live_pgcfg = &cfg->pgcfg;
@@ -1141,30 +1533,55 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 
 	changed += update_string(&live_pgcfg->domain_name,
 	    &new_pgcfg.domain_name, "domain_name");
+	live_pgcfg->domain_name_auto_disc = new_pgcfg.domain_name_auto_disc;
 
 	changed += update_dirs(&live_pgcfg->domain_controller,
 	    &new_pgcfg.domain_controller, "domain_controller");
+	live_pgcfg->domain_controller_auto_disc =
+	    new_pgcfg.domain_controller_auto_disc;
 
 	changed += update_string(&live_pgcfg->forest_name,
 	    &new_pgcfg.forest_name, "forest_name");
+	live_pgcfg->forest_name_auto_disc = new_pgcfg.forest_name_auto_disc;
 
 	changed += update_string(&live_pgcfg->site_name,
 	    &new_pgcfg.site_name, "site_name");
+	live_pgcfg->site_name_auto_disc = new_pgcfg.site_name_auto_disc;
 
 	if (update_dirs(&live_pgcfg->global_catalog,
 	    &new_pgcfg.global_catalog, "global_catalog")) {
 		changed++;
-		/*
-		 * Right now we only update the ad_t used for AD lookups
-		 * when the GC list is updated.  When we add mixed
-		 * ds-based mapping we'll also need to update the ad_t
-		 * used to talk to the domain, not just the one used to
-		 * talk to the GC.
-		 */
 		if (live_pgcfg->global_catalog != NULL &&
 		    live_pgcfg->global_catalog[0].host[0] != '\0')
-			reload_ad();
+			ad_reload_required = TRUE;
 	}
+	live_pgcfg->global_catalog_auto_disc =
+	    new_pgcfg.global_catalog_auto_disc;
+
+	if (update_domains_in_forest(&live_pgcfg->domains_in_forest,
+	    &new_pgcfg.domains_in_forest, "domains_in_forest")) {
+		changed++;
+		ad_reload_required = TRUE;
+	}
+
+	if (update_trusted_domains(&live_pgcfg->trusted_domains,
+	    &new_pgcfg.trusted_domains, "trusted_domains")) {
+		changed++;
+		if (live_pgcfg->trusted_domains != NULL &&
+		    live_pgcfg->trusted_domains[0].domain[0] != '\0')
+			ad_reload_required = TRUE;
+	}
+
+	if (update_trusted_forest(&live_pgcfg->trusted_forests,
+	    &live_pgcfg->num_trusted_forests, &new_pgcfg.trusted_forests,
+	    &new_pgcfg.num_trusted_forests, "trusted_forest")) {
+		changed++;
+		if (live_pgcfg->trusted_forests != NULL)
+			ad_reload_required = TRUE;
+	}
+
+	if (ad_reload_required)
+		reload_ad();
 
 	idmap_cfg_unload(&new_pgcfg);
 
@@ -1292,6 +1709,14 @@ idmap_cfg_unload(idmap_pg_config_t *pgcfg)
 		free(pgcfg->global_catalog);
 		pgcfg->global_catalog = NULL;
 	}
+	if (pgcfg->trusted_domains) {
+		free(pgcfg->trusted_domains);
+		pgcfg->trusted_domains = NULL;
+	}
+	if (pgcfg->trusted_forests)
+		free_trusted_forests(&pgcfg->trusted_forests,
+		    &pgcfg->num_trusted_forests);
+
 	if (pgcfg->ad_unixuser_attr) {
 		free(pgcfg->ad_unixuser_attr);
 		pgcfg->ad_unixuser_attr = NULL;

@@ -43,6 +43,14 @@ extern "C" {
 #define	ADUTILS_SEARCH_TIMEOUT	3
 #define	ADUTILS_LDAP_OPEN_TIMEOUT	1
 
+/*
+ * Maximum string SID size. 4 bytes for "S-1-", 15 for 2^48 (max authority),
+ * another '-', and ridcount (max 15) 10-digit RIDs plus '-' in between, plus
+ * a null.
+ */
+#define	MAXSID				185
+#define	MAXDOMAINNAME			256
+
 typedef struct adutils_sid {
 	uchar_t		version;
 	uchar_t		sub_authority_count;
@@ -52,10 +60,17 @@ typedef struct adutils_sid {
 
 struct adutils_host;
 
+struct known_domain {
+	char		name[MAXDOMAINNAME];
+	char		sid[MAXSID];
+};
+
 
 /* A set of DSs for a given AD partition */
 struct adutils_ad {
 	char			*dflt_w2k_dom;	/* used to qualify bare names */
+	int			num_known_domains;
+	struct known_domain	*known_domains;
 	pthread_mutex_t		lock;
 	uint32_t		ref;
 	struct adutils_host	*last_adh;
@@ -124,10 +139,10 @@ typedef struct adutils_q {
 /* Batch context structure */
 struct adutils_query_state {
 	struct adutils_query_state	*next;
-	int			qcount;		/* how many queries */
+	int			qsize;		/* Size of queries */
 	int			ref_cnt;	/* reference count */
 	pthread_cond_t		cv;		/* Condition wait variable */
-	uint32_t		qlastsent;
+	uint32_t		qcount;		/* Number of items queued */
 	uint32_t		qinflight;	/* how many queries in flight */
 	uint16_t		qdead;		/* oops, lost LDAP connection */
 	adutils_host_t		*qadh;		/* LDAP connection */

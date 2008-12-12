@@ -26,7 +26,6 @@
 #ifndef _IDMAP_CONFIG_H
 #define	_IDMAP_CONFIG_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "idmap.h"
 #include "addisc.h"
@@ -53,6 +52,15 @@ typedef struct idmap_cfg_handles {
 /*
  * This structure stores AD and AD-related configuration
  */
+typedef struct idmap_trustedforest {
+	char		*forest_name;
+	idmap_ad_disc_ds_t
+			*global_catalog;	/* global catalog hosts */
+	ad_disc_domainsinforest_t
+			*domains_in_forest;
+} idmap_trustedforest_t;
+
+
 typedef struct idmap_pg_config {
 	uint64_t	list_size_limit;
 	/*
@@ -65,16 +73,29 @@ typedef struct idmap_pg_config {
 	 * track its procedence separately.  The dflt_dom_set_in_smf
 	 * field does just that.
 	 */
-	bool_t		dflt_dom_set_in_smf;
-	char		*default_domain;	/* default domain name */
-	char		*domain_name;		/* AD domain name */
 	char		*machine_sid;		/* machine sid */
-	idmap_ad_disc_ds_t	*domain_controller;
-						/* domain controller hosts */
+	char		*default_domain;	/* default domain name */
+	bool_t		dflt_dom_set_in_smf;
+	char		*domain_name;		/* AD domain name */
+	int		domain_name_auto_disc;
+	idmap_ad_disc_ds_t
+			*domain_controller;	/* domain controller hosts */
+	int		domain_controller_auto_disc;
 	char		*forest_name;		/* forest name */
+	int		forest_name_auto_disc;
 	char		*site_name;		/* site name */
-	idmap_ad_disc_ds_t	*global_catalog;
-						/* global catalog hosts */
+	int		site_name_auto_disc;
+	idmap_ad_disc_ds_t
+			*global_catalog;	/* global catalog hosts */
+	int		global_catalog_auto_disc;
+	ad_disc_domainsinforest_t
+			*domains_in_forest;
+	ad_disc_trusteddomains_t
+			*trusted_domains;	/* Trusted Domains */
+	int		num_trusted_forests;
+	idmap_trustedforest_t
+			*trusted_forests;	/* Array of trusted forests */
+
 	/*
 	 * Following properties are associated with directory-based
 	 * name-mappings.

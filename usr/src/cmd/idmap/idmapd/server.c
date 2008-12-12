@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Service routines
@@ -996,7 +995,6 @@ idmap_get_prop_1_svc(idmap_prop_type request,
 		idmap_prop_res *result, struct svc_req *rqstp)
 {
 	idmap_pg_config_t *pgcfg;
-	ad_disc_t ad_ctx;
 
 	/* Init */
 	(void) memset(result, 0, sizeof (*result));
@@ -1007,7 +1005,7 @@ idmap_get_prop_1_svc(idmap_prop_type request,
 
 	/* Just shortcuts: */
 	pgcfg = &_idmapdstate.cfg->pgcfg;
-	ad_ctx = _idmapdstate.cfg->handles.ad_ctx;
+
 
 	switch (request) {
 	case PROP_LIST_SIZE_LIMIT:
@@ -1023,7 +1021,7 @@ idmap_get_prop_1_svc(idmap_prop_type request,
 		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
 		    pgcfg->domain_name);
 		result->auto_discovered =
-		    ad_ctx->domain_name.type == AD_TYPE_AUTO ? TRUE : FALSE;
+		    pgcfg->domain_name_auto_disc;
 		break;
 	case PROP_MACHINE_SID:
 		result->auto_discovered = FALSE;
@@ -1036,32 +1034,24 @@ idmap_get_prop_1_svc(idmap_prop_type request,
 			    pgcfg->domain_controller,
 			    sizeof (idmap_ad_disc_ds_t));
 		}
-		result->auto_discovered =
-		    ad_ctx->domain_controller.type == AD_TYPE_AUTO
-		    ? TRUE : FALSE;
+		result->auto_discovered = pgcfg->domain_controller_auto_disc;
 		break;
 	case PROP_FOREST_NAME:
 		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
 		    pgcfg->forest_name);
-		result->auto_discovered =
-		    ad_ctx->forest_name.type == AD_TYPE_AUTO
-		    ? TRUE : FALSE;
+		result->auto_discovered = pgcfg->forest_name_auto_disc;
 		break;
 	case PROP_SITE_NAME:
 		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
 		    pgcfg->site_name);
-		result->auto_discovered =
-		    ad_ctx->site_name.type == AD_TYPE_AUTO
-		    ? TRUE : FALSE;
+		result->auto_discovered = pgcfg->site_name_auto_disc;
 		break;
 	case PROP_GLOBAL_CATALOG:
 		if (pgcfg->global_catalog != NULL) {
 			(void) memcpy(&result->value.idmap_prop_val_u.dsval,
 			    pgcfg->global_catalog, sizeof (idmap_ad_disc_ds_t));
 		}
-		result->auto_discovered =
-		    ad_ctx->global_catalog.type == AD_TYPE_AUTO
-		    ? TRUE : FALSE;
+		result->auto_discovered = pgcfg->global_catalog_auto_disc;
 		break;
 	case PROP_AD_UNIXUSER_ATTR:
 		STRDUP_CHECK(result->value.idmap_prop_val_u.utf8val,
