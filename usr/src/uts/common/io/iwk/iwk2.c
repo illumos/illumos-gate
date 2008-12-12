@@ -2827,15 +2827,15 @@ iwk_m_stat(void *arg, uint_t stat, uint64_t *val)
 {
 	iwk_sc_t	*sc  = (iwk_sc_t *)arg;
 	ieee80211com_t	*ic = &sc->sc_ic;
-	ieee80211_node_t *in = ic->ic_bss;
-	struct ieee80211_rateset *rs = &in->in_rates;
+	ieee80211_node_t *in;
 
 	mutex_enter(&sc->sc_glock);
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
+		in = ic->ic_bss;
 		*val = ((ic->ic_fixed_rate == IEEE80211_FIXED_RATE_NONE) ?
-		    (rs->ir_rates[in->in_txrate] & IEEE80211_RATE_VAL)
-		    : ic->ic_fixed_rate) /2 * 1000000;
+		    IEEE80211_RATE(in->in_txrate) :
+		    ic->ic_fixed_rate) / 2 * 1000000;
 		break;
 	case MAC_STAT_NOXMTBUF:
 		*val = sc->sc_tx_nobuf;
