@@ -105,6 +105,8 @@ static int
 gt_enter_maint(scf_handle_t *h, graph_vertex_t *v,
     restarter_instance_state_t old_state, restarter_error_t rerr)
 {
+	int to_offline = v->gv_flags & GV_TOOFFLINE;
+
 	/*
 	 * If the service was running, propagate a stop event.  If the
 	 * service was not running the maintenance transition may satisfy
@@ -114,15 +116,20 @@ gt_enter_maint(scf_handle_t *h, graph_vertex_t *v,
 	 * flag are special because they can expose new subtree leaves so
 	 * propagate the offline to the instance dependencies.
 	 */
+
+	/* instance transitioning to maintenance is considered disabled */
+	v->gv_flags &= ~GV_TODISABLE;
+	v->gv_flags &= ~GV_TOOFFLINE;
+
 	if (gt_running(old_state)) {
 		/*
 		 * Handle state change during instance disabling.
 		 * Propagate offline to the new exposed leaves.
 		 */
-		if (v->gv_flags & GV_TOOFFLINE) {
-			v->gv_flags &= ~GV_TOOFFLINE;
+		if (to_offline) {
 			log_framework(LOG_DEBUG, "%s removed from subtree\n",
 			    v->gv_name);
+
 			graph_offline_subtree_leaves(v, (void *)h);
 		}
 
@@ -146,6 +153,10 @@ static int
 gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
     restarter_instance_state_t old_state, restarter_error_t rerr)
 {
+	int to_offline = v->gv_flags & GV_TOOFFLINE;
+
+	v->gv_flags &= ~GV_TOOFFLINE;
+
 	/*
 	 * If the instance should be enabled, see if we can start it.
 	 * Otherwise send a disable command.
@@ -153,7 +164,7 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
 	 * remains offline until the disable process completes.
 	 */
 	if (v->gv_flags & GV_ENABLED) {
-		if (!(v->gv_flags & GV_TOOFFLINE))
+		if (to_offline == 0)
 			graph_start_if_satisfied(v);
 	} else {
 		if (gt_running(old_state) && v->gv_post_disable_f)
@@ -176,10 +187,10 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
 		 * Handle state change during instance disabling.
 		 * Propagate offline to the new exposed leaves.
 		 */
-		if (v->gv_flags & GV_TOOFFLINE) {
-			v->gv_flags &= ~GV_TOOFFLINE;
+		if (to_offline) {
 			log_framework(LOG_DEBUG, "%s removed from subtree\n",
 			    v->gv_name);
+
 			graph_offline_subtree_leaves(v, (void *)h);
 		}
 
@@ -187,6 +198,13 @@ gt_enter_offline(scf_handle_t *h, graph_vertex_t *v,
 		    v->gv_name);
 
 		graph_transition_propagate(v, PROPAGATE_STOP, rerr);
+
+		/*
+		 * The offline transition may satisfy require_any/restart
+		 * dependencies and should be propagated to determine
+		 * whether new dependents are satisfiable.
+		 */
+		graph_transition_propagate(v, PROPAGATE_SAT, rerr);
 	} else {
 		log_framework(LOG_DEBUG, "Propagating offline of %s.\n",
 		    v->gv_name);
@@ -203,6 +221,10 @@ static int
 gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
     restarter_instance_state_t old_state, restarter_error_t rerr)
 {
+	int to_offline = v->gv_flags & GV_TOOFFLINE;
+
+	v->gv_flags &= ~GV_TODISABLE;
+	v->gv_flags &= ~GV_TOOFFLINE;
 
 	/*
 	 * If the instance should be disabled, no problem.  Otherwise,
@@ -228,14 +250,7 @@ gt_enter_disabled(scf_handle_t *h, graph_vertex_t *v,
 		 * case we've just disabled an instance that was part of a
 		 * subtree.
 		 */
-		if (v->gv_flags & GV_TOOFFLINE) {
-			/*
-			 * If the vertex is in the subtree and is transitionning
-			 * to DISABLED then remove the GV_TODISABLE flag also.
-			 */
-			v->gv_flags &= ~GV_TODISABLE;
-			v->gv_flags &= ~GV_TOOFFLINE;
-
+		if (to_offline) {
 			log_framework(LOG_DEBUG, "%s removed from subtree\n",
 			    v->gv_name);
 

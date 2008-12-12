@@ -1267,6 +1267,9 @@ optional_all_satisfied(graph_vertex_t *groupv, boolean_t satbility)
 			if (v->gv_state == RESTARTER_STATE_MAINT)
 				continue;
 
+			if (v->gv_flags & GV_TOOFFLINE)
+				continue;
+
 			any_qualified = B_TRUE;
 			if (v->gv_state == RESTARTER_STATE_OFFLINE) {
 				/*
@@ -1317,6 +1320,9 @@ optional_all_satisfied(graph_vertex_t *groupv, boolean_t satbility)
 					continue;
 
 				if (v2->gv_state == RESTARTER_STATE_MAINT)
+					continue;
+
+				if (v2->gv_flags & GV_TOOFFLINE)
 					continue;
 
 				svc_any_qualified = B_TRUE;
@@ -1532,18 +1538,16 @@ dependency_satisfied(graph_vertex_t *v, boolean_t satbility)
 			return (-1);
 		}
 
+		/*
+		 * Any vertex with the GV_TOOFFLINE flag set is guaranteed
+		 * to have its dependencies unsatisfiable.
+		 */
+		if (v->gv_flags & GV_TOOFFLINE)
+			return (-1);
+
 		switch (v->gv_state) {
 		case RESTARTER_STATE_ONLINE:
 		case RESTARTER_STATE_DEGRADED:
-			/*
-			 * An instance that goes offline because one of its
-			 * dependencies is in the process of being disabled,
-			 * should not be able to return online yet. Those
-			 * instances have the GV_TOOFFLINE flag and they can
-			 * not be used to satisfy dependency.
-			 */
-			if (v->gv_flags & GV_TOOFFLINE)
-				return (0);
 			return (1);
 
 		case RESTARTER_STATE_OFFLINE:
@@ -1906,6 +1910,9 @@ graph_enable_by_vertex(graph_vertex_t *vertex, int enable, int admin)
 	/* remember which vertex to disable... */
 	vertex->gv_flags |= GV_TODISABLE;
 
+	log_framework(LOG_DEBUG, "Marking in-subtree vertices before "
+	    "disabling %s.\n", vertex->gv_name);
+
 	/* set GV_TOOFFLINE for its dependents */
 	r = uu_list_walk(vertex->gv_dependents, (uu_walk_fn_t *)mark_subtree,
 	    NULL, 0);
@@ -1945,8 +1952,12 @@ graph_enable_by_vertex(graph_vertex_t *vertex, int enable, int admin)
 		 * done, but we can only offline the leaves here. An
 		 * instance is a leaf when all its dependents are down.
 		 */
-		if (insubtree_dependents_down(v) == B_TRUE)
+		if (insubtree_dependents_down(v) == B_TRUE) {
+			log_framework(LOG_DEBUG, "Offlining in-subtree "
+			    "instance %s for %s.\n",
+			    v->gv_name, vertex->gv_name);
 			offline_vertex(v);
+		}
 	}
 }
 
@@ -5077,10 +5088,11 @@ mark_subtree(graph_edge_t *e, void *arg)
 		break;
 	case GVT_GROUP:
 		/*
-		 * Skip all excluded dependencies and decide whether to offline
-		 * the service based on restart_on attribute.
+		 * Skip all excluded and optional_all dependencies and decide
+		 * whether to offline the service based on restart_on attribute.
 		 */
 		if (v->gv_depgroup == DEPGRP_EXCLUDE_ALL ||
+		    v->gv_depgroup == DEPGRP_OPTIONAL_ALL ||
 		    v->gv_restart < RERR_RESTART)
 			return (UU_WALK_NEXT);
 		break;
