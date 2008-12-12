@@ -19,18 +19,15 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
-SDP4_SOCK_ENTRY="        2       2       257       /dev/sdp"
-SDP6_SOCK_ENTRY="        26      2       257       /dev/sdp"
+SDP4_SOCK_ENTRY="	2	2	257	socksdp"
+SDP6_SOCK_ENTRY="	26	2	257	socksdp"
 
 EXIT=0
 

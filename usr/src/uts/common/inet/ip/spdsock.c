@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -55,6 +53,7 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/mi.h>
+#include <inet/proto_set.h>
 #include <inet/nd.h>
 #include <inet/ip_if.h>
 #include <inet/tun.h>
@@ -3199,7 +3198,7 @@ spdsock_opt_set(queue_t *q, uint_t mgmt_flags, int level, int name,
 			if (*i1 > spds->spds_max_buf)
 				return (ENOBUFS);
 			RD(q)->q_hiwat = *i1;
-			(void) mi_set_sth_hiwat(RD(q), *i1);
+			(void) proto_set_rx_hiwat(RD(q), NULL, *i1);
 			break;
 		}
 		break;
@@ -3407,7 +3406,7 @@ spdsock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	oq->q_lowat = spds->spds_xmit_lowat;
 
 	qprocson(q);
-	(void) mi_set_sth_hiwat(q, spds->spds_recv_hiwat);
+	(void) proto_set_rx_hiwat(q, NULL, spds->spds_recv_hiwat);
 
 	*devp = makedevice(getmajor(*devp), ss->spdsock_minor);
 	return (0);

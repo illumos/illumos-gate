@@ -2771,7 +2771,7 @@ typedef struct ip_pktinfo {
 #define	ILL_LOOKUP_FAILED	1	/* Used as error code */
 #define	IPIF_LOOKUP_FAILED	2	/* Used as error code */
 
-#define	ILL_CAN_LOOKUP(ill) 						\
+#define	ILL_CAN_LOOKUP(ill)						\
 	(!((ill)->ill_state_flags & (ILL_CONDEMNED | ILL_CHANGING)) ||	\
 	IAM_WRITER_ILL(ill))
 
@@ -2781,7 +2781,7 @@ typedef struct ip_pktinfo {
 #define	ILL_CAN_LOOKUP_WALKER(ill)	\
 	(!((ill)->ill_state_flags & ILL_CONDEMNED))
 
-#define	IPIF_CAN_LOOKUP(ipif)						\
+#define	IPIF_CAN_LOOKUP(ipif)	\
 	(!((ipif)->ipif_state_flags & (IPIF_CONDEMNED | IPIF_CHANGING)) || \
 	IAM_WRITER_IPIF(ipif))
 
@@ -3166,11 +3166,15 @@ extern void	icmp_unreachable(queue_t *, mblk_t *, uint8_t, zoneid_t,
     ip_stack_t *);
 extern mblk_t	*ip_add_info(mblk_t *, ill_t *, uint_t, zoneid_t, ip_stack_t *);
 extern mblk_t	*ip_bind_v4(queue_t *, mblk_t *, conn_t *);
-extern int	ip_bind_connected(conn_t *, mblk_t *, ipaddr_t *, uint16_t,
-    ipaddr_t, uint16_t, boolean_t, boolean_t, boolean_t, boolean_t);
-extern boolean_t ip_bind_ipsec_policy_set(conn_t *, mblk_t *);
-extern int	ip_bind_laddr(conn_t *, mblk_t *, ipaddr_t, uint16_t,
-    boolean_t, boolean_t, boolean_t);
+extern	boolean_t ip_bind_ipsec_policy_set(conn_t *, mblk_t *);
+extern	int	ip_bind_laddr_v4(conn_t *, mblk_t **, uint8_t, ipaddr_t,
+    uint16_t, boolean_t);
+extern	int	ip_proto_bind_laddr_v4(conn_t *, mblk_t **, uint8_t, ipaddr_t,
+    uint16_t, boolean_t);
+extern	int	ip_proto_bind_connected_v4(conn_t *, mblk_t **,
+    uint8_t, ipaddr_t *, uint16_t, ipaddr_t, uint16_t, boolean_t, boolean_t);
+extern	int	ip_bind_connected_v4(conn_t *, mblk_t **, uint8_t, ipaddr_t *,
+    uint16_t, ipaddr_t, uint16_t, boolean_t, boolean_t);
 extern uint_t	ip_cksum(mblk_t *, int, uint32_t);
 extern int	ip_close(queue_t *, int);
 extern uint16_t	ip_csum_hdr(ipha_t *);
@@ -3308,7 +3312,7 @@ extern boolean_t ip_md_hcksum_attr(struct multidata_s *, struct pdesc_s *,
 			uint32_t, uint32_t, uint32_t, uint32_t);
 extern boolean_t ip_md_zcopy_attr(struct multidata_s *, struct pdesc_s *,
 			uint_t);
-extern mblk_t	*ip_unbind(queue_t *, mblk_t *);
+extern	void	ip_unbind(conn_t *connp);
 
 extern phyint_t *phyint_lookup_group(char *, boolean_t, ip_stack_t *);
 extern phyint_t *phyint_lookup_group_ifindex(uint_t, ip_stack_t *);
@@ -3577,7 +3581,6 @@ extern void ip_squeue_quiesce_ring(ill_t *, ill_rx_ring_t *);
 extern void ip_squeue_restart_ring(ill_t *, ill_rx_ring_t *);
 extern void ip_squeue_clean_all(ill_t *);
 
-extern void ip_resume_tcp_bind(void *, mblk_t *, void *);
 extern void tcp_wput(queue_t *, mblk_t *);
 
 extern int	ip_fill_mtuinfo(struct in6_addr *, in_port_t,
@@ -3635,6 +3638,8 @@ typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 #define	SQTAG_IP_INPUT_RX_RING		39
 #define	SQTAG_SQUEUE_CHANGE		40
 #define	SQTAG_CONNECT_FINISH		41
+#define	SQTAG_SYNCHRONOUS_OP		42
+#define	SQTAG_TCP_SHUTDOWN_OUTPUT	43
 
 #define	NOT_OVER_IP(ip_wq)	\
 	(ip_wq->q_next != NULL ||	\
@@ -3643,6 +3648,7 @@ typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 	    IP_MOD_NAME) != 0 ||	\
 	    ip_wq->q_qinfo->qi_minfo->mi_idnum != IP_MOD_ID)
 
+#define	PROTO_FLOW_CNTRLD(connp)	(connp->conn_flow_cntrld)
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

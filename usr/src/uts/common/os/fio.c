@@ -23,11 +23,9 @@
 /*	All Rights Reserved */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysmacros.h>
@@ -1167,11 +1165,8 @@ f_getfl(int fd, int *flagp)
 
 			/*
 			 * BSD fcntl() FASYNC compatibility.
-			 *
-			 * SCTP doesn't have an associated stream and thus
-			 * doesn't store flags on it.
 			 */
-			if ((vp->v_type == VSOCK) && (vp->v_stream != NULL))
+			if (vp->v_type == VSOCK)
 				flag |= sock_getfasync(vp);
 			*flagp = flag;
 			error = 0;

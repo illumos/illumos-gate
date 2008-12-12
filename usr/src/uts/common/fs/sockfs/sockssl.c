@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,8 +41,9 @@
 #include <sys/sockio.h>
 #include <sys/socketvar.h>
 
-#include <inet/kssl/ksslapi.h>
+#include <fs/sockfs/socktpi.h>
 
+#include <inet/kssl/ksslapi.h>
 
 /*
  * This routine is registered with the stream head to be called by kstrgetmsg()
@@ -61,7 +60,7 @@ strsock_kssl_input(vnode_t *vp, mblk_t *mp,
 		strsigset_t *allmsgsigs, strpollset_t *pollwakeups)
 {
 	struct sonode *so = VTOSO(vp);
-	kssl_ctx_t kssl_ctx = so->so_kssl_ctx;
+	kssl_ctx_t kssl_ctx = SOTOTPI(so)->sti_kssl_ctx;
 	kssl_cmd_t kssl_cmd;
 	mblk_t *out;
 
@@ -101,7 +100,7 @@ strsock_kssl_output(vnode_t *vp, mblk_t *mp,
 		strsigset_t *allmsgsigs, strpollset_t *pollwakeups)
 {
 	struct sonode *so = VTOSO(vp);
-	kssl_ctx_t kssl_ctx = so->so_kssl_ctx;
+	kssl_ctx_t kssl_ctx = SOTOTPI(so)->sti_kssl_ctx;
 	mblk_t *recmp;
 
 	dprintso(so, 1, ("strsock_kssl_output(%p, %p)\n",

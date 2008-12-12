@@ -31,7 +31,7 @@ extern "C" {
 #endif
 
 #include <sys/idm/idm_transport.h>
-
+#include <sys/ksocket.h>
 /*
  * Define TCP window size (send and receive buffer sizes)
  */
@@ -41,7 +41,7 @@ extern "C" {
 
 /* sockets-specific portion of idm_svc_t */
 typedef struct idm_so_svc_s {
-	struct sonode		*is_so;
+	ksocket_t		is_so;
 	kthread_t		*is_thread;
 	kt_did_t		is_thread_did;
 	boolean_t		is_thread_running;
@@ -49,7 +49,7 @@ typedef struct idm_so_svc_s {
 
 /* sockets-specific portion of idm_conn_t */
 typedef struct idm_so_conn_s {
-	struct sonode		*ic_so;
+	ksocket_t		ic_so;
 
 	kthread_t		*ic_tx_thread;
 	kt_did_t		ic_tx_thread_did;
@@ -68,24 +68,24 @@ void idm_so_fini();
 
 /* Socket functions */
 
-struct sonode *
+ksocket_t
 idm_socreate(int domain, int type, int protocol);
 
-void idm_soshutdown(struct sonode *so);
+void idm_soshutdown(ksocket_t so);
 
-void idm_sodestroy(struct sonode *so);
+void idm_sodestroy(ksocket_t so);
 
 int idm_get_ipaddr(idm_addr_list_t **);
 
-int idm_sorecv(struct sonode *so, void *msg, size_t len);
+int idm_sorecv(ksocket_t so, void *msg, size_t len);
 
-int idm_sosendto(struct sonode *so, void *buff, size_t len,
+int idm_sosendto(ksocket_t so, void *buff, size_t len,
     struct sockaddr *name, socklen_t namelen);
 
-int idm_iov_sosend(struct sonode *so, iovec_t *iop, int iovlen,
+int idm_iov_sosend(ksocket_t so, iovec_t *iop, int iovlen,
     size_t total_len);
 
-int idm_iov_sorecv(struct sonode *so, iovec_t *iop, int iovlen,
+int idm_iov_sorecv(ksocket_t so, iovec_t *iop, int iovlen,
     size_t total_len);
 
 void idm_sotx_thread(void *arg);

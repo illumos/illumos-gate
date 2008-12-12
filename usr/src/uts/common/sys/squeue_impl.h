@@ -102,6 +102,7 @@ struct squeue_s {
 	clock_t		sq_curr_time;	/* Current tick (lbolt) */
 	kcondvar_t	sq_worker_cv;	/* cond var. worker thread blocks on */
 	kcondvar_t	sq_poll_cv;	/* cond variable poll_thr waits on */
+	kcondvar_t	sq_synch_cv;	/* cond var. synch thread waits on */
 	kcondvar_t	sq_ctrlop_done_cv; /* cond variable for ctrl ops */
 	clock_t		sq_wait;	/* lbolts to wait after a fill() */
 	timeout_id_t	sq_tid;		/* timer id of pending timeout() */
@@ -163,6 +164,7 @@ struct squeue_s {
 
 #define	SQS_POLL_RESTART_DONE	0x01000000
 #define	SQS_POLL_THR_QUIESCE	0x02000000
+#define	SQS_PAUSE		0x04000000 /* The squeue has been paused */
 
 #define	SQS_WORKER_THR_CONTROL          \
 	(SQS_POLL_QUIESCE | SQS_POLL_RESTART | SQS_POLL_CLEANUP)

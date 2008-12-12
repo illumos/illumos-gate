@@ -1240,3 +1240,142 @@ squeue_getprivate(squeue_t *sqp, sqprivate_t p)
 
 	return (&sqp->sq_private[p]);
 }
+
+/* ARGSUSED */
+void
+squeue_wakeup_conn(void *arg, mblk_t *mp, void *arg2)
+{
+	conn_t *connp = (conn_t *)arg;
+	squeue_t *sqp = connp->conn_sqp;
+
+	/*
+	 * Mark the squeue as paused before waking up the thread stuck
+	 * in squeue_synch_enter().
+	 */
+	mutex_enter(&sqp->sq_lock);
+	sqp->sq_state |= SQS_PAUSE;
+
+	/*
+	 * Notify the thread that it's OK to proceed; that is done by
+	 * clearing the MSGWAITSYNC flag. The synch thread will free the mblk.
+	 */
+	ASSERT(mp->b_flag & MSGWAITSYNC);
+	mp->b_flag &= ~MSGWAITSYNC;
+	cv_broadcast(&connp->conn_sq_cv);
+
+	/*
+	 * We are doing something on behalf of another thread, so we have to
+	 * pause and wait until it finishes.
+	 */
+	while (sqp->sq_state & SQS_PAUSE) {
+		cv_wait(&sqp->sq_synch_cv, &sqp->sq_lock);
+	}
+	mutex_exit(&sqp->sq_lock);
+}
+
+/* ARGSUSED */
+int
+squeue_synch_enter(squeue_t *sqp, void *arg, uint8_t tag)
+{
+	conn_t *connp = (conn_t *)arg;
+
+	mutex_enter(&sqp->sq_lock);
+	if (sqp->sq_first == NULL && !(sqp->sq_state & SQS_PROC)) {
+		/*
+		 * We are OK to proceed if the squeue is empty, and
+		 * no one owns the squeue.
+		 *
+		 * The caller won't own the squeue as this is called from the
+		 * application.
+		 */
+		ASSERT(sqp->sq_run == NULL);
+
+		sqp->sq_state |= SQS_PROC;
+		sqp->sq_run = curthread;
+		mutex_exit(&sqp->sq_lock);
+
+#if SQUEUE_DEBUG
+		sqp->sq_curmp = NULL;
+		sqp->sq_curproc = NULL;
+		sqp->sq_connp = connp;
+#endif
+		connp->conn_on_sqp = B_TRUE;
+		return (0);
+	} else {
+		mblk_t  *mp;
+
+		mp = allocb(0, BPRI_MED);
+		if (mp == NULL) {
+			mutex_exit(&sqp->sq_lock);
+			return (ENOMEM);
+		}
+
+		/*
+		 * We mark the mblk as awaiting synchronous squeue access
+		 * by setting the MSGWAITSYNC flag. Once squeue_wakeup_conn
+		 * fires, MSGWAITSYNC is cleared, at which point we know we
+		 * have exclusive access.
+		 */
+		mp->b_flag |= MSGWAITSYNC;
+
+		CONN_INC_REF(connp);
+		SET_SQUEUE(mp, squeue_wakeup_conn, connp);
+		ENQUEUE_CHAIN(sqp, mp, mp, 1);
+
+		ASSERT(sqp->sq_run != curthread);
+
+		/* Wait until the enqueued mblk get processed. */
+		while (mp->b_flag & MSGWAITSYNC)
+			cv_wait(&connp->conn_sq_cv, &sqp->sq_lock);
+		mutex_exit(&sqp->sq_lock);
+
+		freeb(mp);
+
+		return (0);
+	}
+}
+
+/* ARGSUSED */
+void
+squeue_synch_exit(squeue_t *sqp, void *arg)
+{
+	conn_t	*connp = (conn_t *)arg;
+
+	mutex_enter(&sqp->sq_lock);
+	if (sqp->sq_run == curthread) {
+		ASSERT(sqp->sq_state & SQS_PROC);
+
+		sqp->sq_state &= ~SQS_PROC;
+		sqp->sq_run = NULL;
+		connp->conn_on_sqp = B_FALSE;
+
+		if (sqp->sq_first == NULL) {
+			mutex_exit(&sqp->sq_lock);
+		} else {
+			/*
+			 * If this was a normal thread, then it would
+			 * (most likely) continue processing the pending
+			 * requests. Since the just completed operation
+			 * was executed synchronously, the thread should
+			 * not be delayed. To compensate, wake up the
+			 * worker thread right away when there are outstanding
+			 * requests.
+			 */
+			sqp->sq_awaken = lbolt;
+			cv_signal(&sqp->sq_worker_cv);
+			mutex_exit(&sqp->sq_lock);
+		}
+	} else {
+		/*
+		 * The caller doesn't own the squeue, clear the SQS_PAUSE flag,
+		 * and wake up the squeue owner, such that owner can continue
+		 * processing.
+		 */
+		ASSERT(sqp->sq_state & SQS_PAUSE);
+		sqp->sq_state &= ~SQS_PAUSE;
+
+		/* There should be only one thread blocking on sq_synch_cv. */
+		cv_signal(&sqp->sq_synch_cv);
+		mutex_exit(&sqp->sq_lock);
+	}
+}

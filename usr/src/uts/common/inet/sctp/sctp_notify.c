@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -39,9 +37,12 @@
 #include <netinet/sctp.h>
 
 #include <inet/common.h>
+#include <inet/ipclassifier.h>
 #include <inet/ip.h>
+
 #include "sctp_impl.h"
 
+/* ARGSUSED */
 static void
 sctp_notify(sctp_t *sctp, mblk_t *emp, size_t len)
 {
@@ -49,6 +50,7 @@ sctp_notify(sctp_t *sctp, mblk_t *emp, size_t len)
 	mblk_t *mp;
 	sctp_faddr_t *fp;
 	int32_t rwnd = 0;
+	int error;
 
 	if ((mp = allocb(sizeof (*tudi) + sizeof (void *) +
 		sizeof (struct sockaddr_in6), BPRI_HI)) == NULL) {
@@ -108,7 +110,13 @@ sctp_notify(sctp_t *sctp, mblk_t *emp, size_t len)
 	ASSERT(len == rwnd);
 #endif
 
-	rwnd = sctp->sctp_ulp_recv(sctp->sctp_ulpd, mp, SCTP_NOTIFICATION);
+	/*
+	 * Override b_flag for SCTP sockfs internal use
+	 */
+	mp->b_flag = (short)SCTP_NOTIFICATION;
+
+	rwnd = sctp->sctp_ulp_recv(sctp->sctp_ulpd, mp, msgdsize(mp), 0,
+	    &error, NULL);
 	if (rwnd > sctp->sctp_rwnd) {
 		sctp->sctp_rwnd = rwnd;
 	}

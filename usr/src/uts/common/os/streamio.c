@@ -77,6 +77,7 @@
 #include <sys/policy.h>
 #include <sys/dld.h>
 #include <sys/zone.h>
+#include <sys/sodirect.h>
 
 /*
  * This define helps improve the readability of streams code while
@@ -1110,50 +1111,7 @@ strget(struct stdata *stp, queue_t *q, struct uio *uiop, int first,
 	}
 
 	bp = getq_noenab(q, rbytes);
-	if (bp != NULL && (bp->b_datap->db_flags & DBLK_UIOA)) {
-		/*
-		 * A uioa flaged mblk_t chain, already uio processed,
-		 * add it to the sodirect uioa pending free list.
-		 *
-		 * Note, a b_cont chain headed by a DBLK_UIOA enable
-		 * mblk_t must have all mblk_t(s) DBLK_UIOA enabled.
-		 */
-		mblk_t	*bpt = sodp->sod_uioaft;
-
-		ASSERT(sodp != NULL);
-		ASSERT(msgdsize(bp) == sodp->sod_uioa.uioa_mbytes);
-
-		/*
-		 * Add first mblk_t of "bp" chain to current sodirect uioa
-		 * free list tail mblk_t, if any, else empty list so new head.
-		 */
-		if (bpt == NULL)
-			sodp->sod_uioafh = bp;
-		else
-			bpt->b_cont = bp;
-
-		/*
-		 * Walk mblk_t "bp" chain to find tail and adjust rptr of
-		 * each to reflect that uioamove() has consumed all data.
-		 */
-		bpt = bp;
-		for (;;) {
-			bpt->b_rptr = bpt->b_wptr;
-			if (bpt->b_cont == NULL)
-				break;
-			bpt = bpt->b_cont;
-
-			ASSERT(bpt->b_datap->db_flags & DBLK_UIOA);
-		}
-		/* New sodirect uioa free list tail */
-		sodp->sod_uioaft = bpt;
-
-		/* Only 1 strget() with data returned per uioa_t */
-		if (sodp->sod_uioa.uioa_state & UIOA_ENABLED) {
-			sodp->sod_uioa.uioa_state &= UIOA_CLR;
-			sodp->sod_uioa.uioa_state |= UIOA_FINI;
-		}
-	}
+	sod_uioa_mblk_done(sodp, bp);
 
 	return (bp);
 }

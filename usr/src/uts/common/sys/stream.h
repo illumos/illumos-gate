@@ -425,6 +425,7 @@ typedef	struct	bcache {
 #define	MSGMARKNEXT	0x10	/* Private: first byte of next msg marked */
 #define	MSGNOTMARKNEXT	0x20	/* Private: ... not marked */
 #define	MSGHASREF	0x40	/* Private: message has reference to owner */
+#define	MSGWAITSYNC	0x80	/* Private: waiting for sync squeue enter */
 
 /*
  * Streams message types.

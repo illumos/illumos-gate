@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SOCKFS_NL7C_H
 #define	_SYS_SOCKFS_NL7C_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -39,8 +37,17 @@ extern "C" {
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 
+
 /*
- * NL7C (uint64_t)(struct sonode).so_nl7c_flags:
+ * NCA_DEV	NCA device
+ *
+ * NCA_INET_DEV	TPI device for the INET based transport that NCA will use.
+ */
+#define	NCA_DEV		"/dev/nca"
+#define	NCA_INET_DEV	"/dev/tcp"
+
+/*
+ * NL7C (uint64_t)(sotpi_info_t).sti_nl7c_flags:
  */
 
 #define	NL7C_ENABLED	0x00000001 /* NL7C enabled socket */
@@ -70,6 +77,10 @@ int		nl7c_data(struct sonode *, uio_t *);
 void		nl7c_urifree(struct sonode *);
 void		nl7c_close(struct sonode *);
 boolean_t	nl7c_parse(struct sonode *, boolean_t, boolean_t *);
+
+extern		void *nl7c_lookup_addr(void *, t_uscalar_t);
+extern		void *nl7c_add_addr(void *, t_uscalar_t);
+extern		void nl7c_listener_addr(void *, struct sonode *);
 
 #ifdef	__cplusplus
 }

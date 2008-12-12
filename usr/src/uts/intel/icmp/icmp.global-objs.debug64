@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 cb_inet_devops
 fsw
@@ -30,5 +29,8 @@ inet_dev_info
 inet_devops
 modldrv
 modlinkage
+modlsockmod
 modlstrmod
 netdev_privs
+smodpriv
+smodreg

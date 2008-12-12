@@ -32,6 +32,7 @@
 #include <sys/conf.h>
 #include <sys/cred.h>
 #include <sys/kmem.h>
+#include <sys/kmem_impl.h>
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
 #include <sys/vnode.h>
@@ -45,6 +46,7 @@
 #include <sys/stream.h>
 #include <sys/strsubr.h>
 #include <sys/strsun.h>
+#include <sys/suntpi.h>
 #include <sys/ddi.h>
 #include <sys/esunddi.h>
 #include <sys/flock.h>
@@ -80,6 +82,10 @@
 #include <fs/sockfs/nl7curi.h>
 
 #include <inet/kssl/ksslapi.h>
+
+#include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/socktpi.h>
+#include <fs/sockfs/socktpi_impl.h>
 
 /*
  * Possible failures when memory can't be allocated. The documented behavior:
@@ -170,12 +176,28 @@ int xnet_skip_checks = 0;
 int xnet_check_print = 0;
 int xnet_truncate_print = 0;
 
+static void sotpi_destroy(struct sonode *);
+static struct sonode *sotpi_create(struct sockparams *, int, int, int, int,
+    int, int *, cred_t *cr);
+
+static boolean_t	sotpi_info_create(struct sonode *, int);
+static void		sotpi_info_init(struct sonode *);
+static void 		sotpi_info_fini(struct sonode *);
+static void 		sotpi_info_destroy(struct sonode *);
+
+/*
+ * Do direct function call to the transport layer below; this would
+ * also allow the transport to utilize read-side synchronous stream
+ * interface if necessary.  This is a /etc/system tunable that must
+ * not be modified on a running system.  By default this is enabled
+ * for performance reasons and may be disabled for debugging purposes.
+ */
+boolean_t socktpi_direct = B_TRUE;
+
+static struct kmem_cache *socktpi_cache, *socktpi_unix_cache;
+
 extern	void sigintr(k_sigset_t *, int);
 extern	void sigunintr(k_sigset_t *);
-
-extern	void *nl7c_lookup_addr(void *, t_uscalar_t);
-extern	void *nl7c_add_addr(void *, t_uscalar_t);
-extern	void nl7c_listener_addr(void *, struct sonode *);
 
 /* Sockets acting as an in-kernel SSL proxy */
 extern mblk_t	*strsock_kssl_input(vnode_t *, mblk_t *, strwakeup_t *,
@@ -189,62 +211,198 @@ extern int	sodput(sodirect_t *, mblk_t *);
 extern void	sodwakeup(sodirect_t *);
 
 /* TPI sockfs sonode operations */
-static int	sotpi_accept(struct sonode *, int, struct sonode **);
-static int	sotpi_bind(struct sonode *, struct sockaddr *, socklen_t,
+int 		sotpi_init(struct sonode *, struct sonode *, struct cred *,
 		    int);
+static int	sotpi_accept(struct sonode *, int, struct cred *,
+		    struct sonode **);
+static int	sotpi_bind(struct sonode *, struct sockaddr *, socklen_t,
+		    int, struct cred *);
+static int	sotpi_listen(struct sonode *, int, struct cred *);
 static int	sotpi_connect(struct sonode *, const struct sockaddr *,
-		    socklen_t, int, int);
-static int	sotpi_listen(struct sonode *, int);
+		    socklen_t, int, int, struct cred *);
+extern int	sotpi_recvmsg(struct sonode *, struct nmsghdr *,
+		    struct uio *, struct cred *);
 static int	sotpi_sendmsg(struct sonode *, struct nmsghdr *,
-		    struct uio *);
-static int	sotpi_shutdown(struct sonode *, int);
-static int	sotpi_getsockname(struct sonode *);
+		    struct uio *, struct cred *);
+static int	sotpi_sendmblk(struct sonode *, struct nmsghdr *, int,
+		    struct cred *, mblk_t **);
 static int	sosend_dgramcmsg(struct sonode *, struct sockaddr *, socklen_t,
 		    struct uio *, void *, t_uscalar_t, int);
 static int	sodgram_direct(struct sonode *, struct sockaddr *,
 		    socklen_t, struct uio *, int);
+extern int	sotpi_getpeername(struct sonode *, struct sockaddr *,
+		    socklen_t *, boolean_t, struct cred *);
+static int	sotpi_getsockname(struct sonode *, struct sockaddr *,
+		    socklen_t *, struct cred *);
+static int	sotpi_shutdown(struct sonode *, int, struct cred *);
+extern int	sotpi_getsockopt(struct sonode *, int, int, void *,
+		    socklen_t *, int, struct cred *);
+extern int	sotpi_setsockopt(struct sonode *, int, int, const void *,
+		    socklen_t, struct cred *);
+static int 	sotpi_ioctl(struct sonode *, int, intptr_t, int, struct cred *,
+		    int32_t *);
+static int 	socktpi_plumbioctl(struct vnode *, int, intptr_t, int,
+		    struct cred *, int32_t *);
+static int 	sotpi_poll(struct sonode *, short, int, short *,
+		    struct pollhead **);
+static int 	sotpi_close(struct sonode *, int, struct cred *);
+
+static int	i_sotpi_info_constructor(sotpi_info_t *);
+static void 	i_sotpi_info_destructor(sotpi_info_t *);
 
 sonodeops_t sotpi_sonodeops = {
+	sotpi_init,		/* sop_init		*/
 	sotpi_accept,		/* sop_accept		*/
 	sotpi_bind,		/* sop_bind		*/
 	sotpi_listen,		/* sop_listen		*/
 	sotpi_connect,		/* sop_connect		*/
 	sotpi_recvmsg,		/* sop_recvmsg		*/
 	sotpi_sendmsg,		/* sop_sendmsg		*/
+	sotpi_sendmblk,		/* sop_sendmblk		*/
 	sotpi_getpeername,	/* sop_getpeername	*/
 	sotpi_getsockname,	/* sop_getsockname	*/
 	sotpi_shutdown,		/* sop_shutdown		*/
 	sotpi_getsockopt,	/* sop_getsockopt	*/
-	sotpi_setsockopt	/* sop_setsockopt	*/
+	sotpi_setsockopt,	/* sop_setsockopt	*/
+	sotpi_ioctl,		/* sop_ioctl		*/
+	sotpi_poll,		/* sop_poll		*/
+	sotpi_close,		/* sop_close		*/
 };
+
+/*
+ * Return a TPI socket vnode.
+ *
+ * Note that sockets assume that the driver will clone (either itself
+ * or by using the clone driver) i.e. a socket() call will always
+ * result in a new vnode being created.
+ */
 
 /*
  * Common create code for socket and accept. If tso is set the values
  * from that node is used instead of issuing a T_INFO_REQ.
- *
- * Assumes that the caller has a VN_HOLD on accessvp.
- * The VN_RELE will occur either when sotpi_create() fails or when
- * the returned sonode is freed.
  */
-struct sonode *
-sotpi_create(vnode_t *accessvp, int domain, int type, int protocol, int version,
-    struct sonode *tso, int *errorp)
+
+/* ARGSUSED */
+static struct sonode *
+sotpi_create(struct sockparams *sp, int family, int type, int protocol,
+    int version, int sflags, int *errorp, cred_t *cr)
 {
 	struct sonode	*so;
-	vnode_t		*vp;
-	int		flags, error;
+	kmem_cache_t 	*cp;
+	int		sfamily = family;
 
-	ASSERT(accessvp != NULL);
-	vp = makesockvp(accessvp, domain, type, protocol);
-	ASSERT(vp != NULL);
-	so = VTOSO(vp);
+	ASSERT(sp->sp_sdev_info.sd_vnode != NULL);
 
-	flags = FREAD|FWRITE;
+	if (family == AF_NCA) {
+		/*
+		 * The request is for an NCA socket so for NL7C use the
+		 * INET domain instead and mark NL7C_AF_NCA below.
+		 */
+		family = AF_INET;
+		/*
+		 * NL7C is not supported in the non-global zone,
+		 * we enforce this restriction here.
+		 */
+		if (getzoneid() != GLOBAL_ZONEID) {
+			*errorp = ENOTSUP;
+			return (NULL);
+		}
+	}
 
-	if ((type == SOCK_STREAM || type == SOCK_DGRAM) &&
-	    (domain == AF_INET || domain == AF_INET6) &&
-	    (protocol == IPPROTO_TCP || protocol == IPPROTO_UDP ||
-	    protocol == IPPROTO_IP)) {
+	/*
+	 * to be compatible with old tpi socket implementation ignore
+	 * sleep flag (sflags) passed in
+	 */
+	cp = (family == AF_UNIX) ? socktpi_unix_cache : socktpi_cache;
+	so = kmem_cache_alloc(cp, KM_SLEEP);
+	if (so == NULL) {
+		*errorp = ENOMEM;
+		return (NULL);
+	}
+
+	sonode_init(so, sp, family, type, protocol, &sotpi_sonodeops);
+	sotpi_info_init(so);
+
+	if (sfamily == AF_NCA) {
+		SOTOTPI(so)->sti_nl7c_flags = NL7C_AF_NCA;
+	}
+
+	if (version == SOV_DEFAULT)
+		version = so_default_version;
+
+	so->so_version = (short)version;
+	*errorp = 0;
+
+	return (so);
+}
+
+static void
+sotpi_destroy(struct sonode *so)
+{
+	kmem_cache_t *cp;
+	struct sockparams *origsp;
+
+	/*
+	 * If there is a new dealloc function (ie. smod_destroy_func),
+	 * then it should check the correctness of the ops.
+	 */
+
+	ASSERT(so->so_ops == &sotpi_sonodeops);
+
+	origsp = SOTOTPI(so)->sti_orig_sp;
+
+	sotpi_info_fini(so);
+
+	if (so->so_state & SS_FALLBACK_COMP) {
+		/*
+		 * A fallback happend, which means that a sotpi_info_t struct
+		 * was allocated (as opposed to being allocated from the TPI
+		 * sonode cache. Therefore we explicitly free the struct
+		 * here.
+		 */
+		sotpi_info_destroy(so);
+		ASSERT(origsp != NULL);
+
+		origsp->sp_smod_info->smod_sock_destroy_func(so);
+		SOCKPARAMS_DEC_REF(origsp);
+	} else {
+		sonode_fini(so);
+		cp = (so->so_family == AF_UNIX) ? socktpi_unix_cache :
+		    socktpi_cache;
+		kmem_cache_free(cp, so);
+	}
+}
+
+/* ARGSUSED1 */
+int
+sotpi_init(struct sonode *so, struct sonode *tso, struct cred *cr, int flags)
+{
+	major_t maj;
+	dev_t newdev;
+	struct vnode *vp;
+	int error = 0;
+	struct stdata *stp;
+
+	sotpi_info_t *sti = SOTOTPI(so);
+
+	dprint(1, ("sotpi_init()\n"));
+
+	/*
+	 * over write the sleep flag passed in but that is ok
+	 * as tpi socket does not honor sleep flag.
+	 */
+	flags |= FREAD|FWRITE;
+
+	/*
+	 * Record in so_flag that it is a clone.
+	 */
+	if (getmajor(sti->sti_dev) == clone_major)
+		so->so_flag |= SOCLONE;
+
+	if ((so->so_type == SOCK_STREAM || so->so_type == SOCK_DGRAM) &&
+	    (so->so_family == AF_INET || so->so_family == AF_INET6) &&
+	    (so->so_protocol == IPPROTO_TCP || so->so_protocol == IPPROTO_UDP ||
+	    so->so_protocol == IPPROTO_IP)) {
 		/* Tell tcp or udp that it's talking to sockets */
 		flags |= SO_SOCKSTR;
 
@@ -253,25 +411,25 @@ sotpi_create(vnode_t *accessvp, int domain, int type, int protocol, int version,
 		 * make direct calls between sockfs and transport.
 		 * The final decision is left to socktpi_open().
 		 */
-		so->so_state |= SS_DIRECT;
+		sti->sti_direct = 1;
 
 		ASSERT(so->so_type != SOCK_DGRAM || tso == NULL);
 		if (so->so_type == SOCK_STREAM && tso != NULL) {
-			if (tso->so_state & SS_DIRECT) {
+			if (SOTOTPI(tso)->sti_direct) {
 				/*
-				 * Inherit SS_DIRECT from listener and pass
+				 * Inherit sti_direct from listener and pass
 				 * SO_ACCEPTOR open flag to tcp, indicating
 				 * that this is an accept fast-path instance.
 				 */
 				flags |= SO_ACCEPTOR;
 			} else {
 				/*
-				 * SS_DIRECT is not set on listener, meaning
+				 * sti_direct is not set on listener, meaning
 				 * that the listener has been converted from
 				 * a socket to a stream.  Ensure that the
 				 * acceptor inherits these settings.
 				 */
-				so->so_state &= ~SS_DIRECT;
+				sti->sti_direct = 0;
 				flags &= ~SO_SOCKSTR;
 			}
 		}
@@ -284,30 +442,157 @@ sotpi_create(vnode_t *accessvp, int domain, int type, int protocol, int version,
 		flags |= SO_SOCKSTR;
 	}
 
-	/* Initialize the kernel SSL proxy fields */
-	so->so_kssl_type = KSSL_NO_PROXY;
-	so->so_kssl_ent = NULL;
-	so->so_kssl_ctx = NULL;
+	vp = SOTOV(so);
+	newdev = vp->v_rdev;
+	maj = getmajor(newdev);
+	ASSERT(STREAMSTAB(maj));
 
-	if (error = socktpi_open(&vp, flags, CRED(), NULL)) {
-		VN_RELE(vp);
-		*errorp = error;
-		return (NULL);
+	error = stropen(vp, &newdev, flags, cr);
+
+	stp = vp->v_stream;
+	if (error == 0) {
+		if (so->so_flag & SOCLONE)
+			ASSERT(newdev != vp->v_rdev);
+		mutex_enter(&so->so_lock);
+		sti->sti_dev = newdev;
+		vp->v_rdev = newdev;
+		mutex_exit(&so->so_lock);
+
+		if (stp->sd_flag & STRISTTY) {
+			/*
+			 * this is a post SVR4 tty driver - a socket can not
+			 * be a controlling terminal. Fail the open.
+			 */
+			(void) sotpi_close(so, flags, cr);
+			return (ENOTTY);	/* XXX */
+		}
+
+		ASSERT(stp->sd_wrq != NULL);
+		sti->sti_provinfo = tpi_findprov(stp->sd_wrq);
+
+		/*
+		 * If caller is interested in doing direct function call
+		 * interface to/from transport module, probe the module
+		 * directly beneath the streamhead to see if it qualifies.
+		 *
+		 * We turn off the direct interface when qualifications fail.
+		 * In the acceptor case, we simply turn off the sti_direct
+		 * flag on the socket. We do the fallback after the accept
+		 * has completed, before the new socket is returned to the
+		 * application.
+		 */
+		if (sti->sti_direct) {
+			queue_t *tq = stp->sd_wrq->q_next;
+
+			/*
+			 * sti_direct is currently supported and tested
+			 * only for tcp/udp; this is the main reason to
+			 * have the following assertions.
+			 */
+			ASSERT(so->so_family == AF_INET ||
+			    so->so_family == AF_INET6);
+			ASSERT(so->so_protocol == IPPROTO_UDP ||
+			    so->so_protocol == IPPROTO_TCP ||
+			    so->so_protocol == IPPROTO_IP);
+			ASSERT(so->so_type == SOCK_DGRAM ||
+			    so->so_type == SOCK_STREAM);
+
+			/*
+			 * Abort direct call interface if the module directly
+			 * underneath the stream head is not defined with the
+			 * _D_DIRECT flag.  This could happen in the tcp or
+			 * udp case, when some other module is autopushed
+			 * above it, or for some reasons the expected module
+			 * isn't purely D_MP (which is the main requirement).
+			 *
+			 * Else, SS_DIRECT is valid. If the read-side Q has
+			 * _QSODIRECT set then and uioasync is enabled then
+			 * set SS_SODIRECT to enable sodirect.
+			 */
+			if (!socktpi_direct || !(tq->q_flag & _QDIRECT) ||
+			    !(_OTHERQ(tq)->q_flag & _QDIRECT)) {
+				int rval;
+
+				/* Continue on without direct calls */
+				sti->sti_direct = 0;
+
+				/*
+				 * Cannot issue ioctl on fallback socket since
+				 * there is no conn associated with the queue.
+				 * The fallback downcall will notify the proto
+				 * of the change.
+				 */
+				if (!(flags & SO_ACCEPTOR) &&
+				    !(flags & SO_FALLBACK)) {
+					if ((error = strioctl(vp,
+					    _SIOCSOCKFALLBACK, 0, 0, K_TO_K,
+					    cr, &rval)) != 0) {
+						(void) sotpi_close(so, flags,
+						    cr);
+						return (error);
+					}
+				}
+			} else if ((_OTHERQ(tq)->q_flag & _QSODIRECT) &&
+			    uioasync.enabled) {
+				/* Enable sodirect */
+				so->so_state |= SS_SODIRECT;
+			}
+		}
+
+		if (flags & SO_FALLBACK) {
+			/*
+			 * The stream created does not have a conn.
+			 * do stream set up after conn has been assigned
+			 */
+			return (error);
+		}
+		if (error = so_strinit(so, tso)) {
+			(void) sotpi_close(so, flags, cr);
+			return (error);
+		}
+
+		/* Wildcard */
+		if (so->so_protocol != so->so_sockparams->sp_protocol) {
+			int protocol = so->so_protocol;
+			/*
+			 * Issue SO_PROTOTYPE setsockopt.
+			 */
+			error = sotpi_setsockopt(so, SOL_SOCKET, SO_PROTOTYPE,
+			    &protocol, (t_uscalar_t)sizeof (protocol), cr);
+			if (error != 0) {
+				(void) sotpi_close(so, flags, cr);
+				/*
+				 * Setsockopt often fails with ENOPROTOOPT but
+				 * socket() should fail with
+				 * EPROTONOSUPPORT/EPROTOTYPE.
+				 */
+				return (EPROTONOSUPPORT);
+			}
+		}
+
+	} else {
+		/*
+		 * While the same socket can not be reopened (unlike specfs)
+		 * the stream head sets STREOPENFAIL when the autopush fails.
+		 */
+		if ((stp != NULL) &&
+		    (stp->sd_flag & STREOPENFAIL)) {
+			/*
+			 * Open failed part way through.
+			 */
+			mutex_enter(&stp->sd_lock);
+			stp->sd_flag &= ~STREOPENFAIL;
+			mutex_exit(&stp->sd_lock);
+			(void) sotpi_close(so, flags, cr);
+			return (error);
+			/*NOTREACHED*/
+		}
+		ASSERT(stp == NULL);
 	}
-
-	if (error = so_strinit(so, tso)) {
-		(void) VOP_CLOSE(vp, 0, 1, 0, CRED(), NULL);
-		VN_RELE(vp);
-		*errorp = error;
-		return (NULL);
-	}
-
-	if (version == SOV_DEFAULT)
-		version = so_default_version;
-
-	so->so_version = (short)version;
-
-	return (so);
+	TRACE_4(TR_FAC_SOCKFS, TR_SOCKFS_OPEN,
+	    "sockfs open:maj %d vp %p so %p error %d",
+	    maj, vp, so, error);
+	return (error);
 }
 
 /*
@@ -318,15 +603,16 @@ sotpi_create(vnode_t *accessvp, int domain, int type, int protocol, int version,
 static void
 so_automatic_bind(struct sonode *so)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
 	ASSERT(so->so_family == AF_INET || so->so_family == AF_INET6);
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 	ASSERT(!(so->so_state & SS_ISBOUND));
-	ASSERT(so->so_unbind_mp);
+	ASSERT(sti->sti_unbind_mp);
 
-	ASSERT(so->so_laddr_len <= so->so_laddr_maxlen);
-	bzero(so->so_laddr_sa, so->so_laddr_len);
-	so->so_laddr_sa->sa_family = so->so_family;
+	ASSERT(sti->sti_laddr_len <= sti->sti_laddr_maxlen);
+	bzero(sti->sti_laddr_sa, sti->sti_laddr_len);
+	sti->sti_laddr_sa->sa_family = so->so_family;
 	so->so_state |= SS_ISBOUND;
 }
 
@@ -353,9 +639,10 @@ so_automatic_bind(struct sonode *so)
  * - it is a SOCK_STREAM/SOCK_SEQPACKET that has not been connected
  *   and no listen() has been done.
  */
+/* ARGSUSED */
 static int
 sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
-    socklen_t namelen, int backlog, int flags)
+    socklen_t namelen, int backlog, int flags, struct cred *cr)
 {
 	struct T_bind_req	bind_req;
 	struct T_bind_ack	*bind_ack;
@@ -370,6 +657,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	t_scalar_t		PRIM_type = O_T_BIND_REQ;
 	boolean_t		tcp_udp_xport;
 	void			*nl7c = NULL;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("sotpi_bindlisten(%p, %p, %d, %d, 0x%x) %s\n",
 	    (void *)so, (void *)name, namelen, backlog, flags,
@@ -390,10 +678,10 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	 * before binding. This message allocated when the socket is
 	 * created  but it might be have been consumed.
 	 */
-	if (so->so_unbind_mp == NULL) {
+	if (sti->sti_unbind_mp == NULL) {
 		dprintso(so, 1, ("sobind: allocating unbind_req\n"));
 		/* NOTE: holding so_lock while sleeping */
-		so->so_unbind_mp =
+		sti->sti_unbind_mp =
 		    soallocproto(sizeof (struct T_unbind_req), _ALLOC_SLEEP);
 	}
 
@@ -405,17 +693,17 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 		ASSERT(name == NULL && namelen == 0);
 
 		if (so->so_family == AF_UNIX) {
-			ASSERT(so->so_ux_bound_vp);
-			addr = &so->so_ux_laddr;
-			addrlen = (t_uscalar_t)sizeof (so->so_ux_laddr);
+			ASSERT(sti->sti_ux_bound_vp);
+			addr = &sti->sti_ux_laddr;
+			addrlen = (t_uscalar_t)sizeof (sti->sti_ux_laddr);
 			dprintso(so, 1, ("sobind rebind UNIX: addrlen %d, "
 			    "addr 0x%p, vp %p\n",
 			    addrlen,
 			    (void *)((struct so_ux_addr *)addr)->soua_vp,
-			    (void *)so->so_ux_bound_vp));
+			    (void *)sti->sti_ux_bound_vp));
 		} else {
-			addr = so->so_laddr_sa;
-			addrlen = (t_uscalar_t)so->so_laddr_len;
+			addr = sti->sti_laddr_sa;
+			addrlen = (t_uscalar_t)sti->sti_laddr_len;
 		}
 	} else if (flags & _SOBIND_UNSPEC) {
 		ASSERT(name == NULL && namelen == 0);
@@ -436,21 +724,21 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			 * Use an address with same size as struct sockaddr
 			 * just like BSD.
 			 */
-			so->so_laddr_len =
+			sti->sti_laddr_len =
 			    (socklen_t)sizeof (struct sockaddr);
-			ASSERT(so->so_laddr_len <= so->so_laddr_maxlen);
-			bzero(so->so_laddr_sa, so->so_laddr_len);
-			so->so_laddr_sa->sa_family = so->so_family;
+			ASSERT(sti->sti_laddr_len <= sti->sti_laddr_maxlen);
+			bzero(sti->sti_laddr_sa, sti->sti_laddr_len);
+			sti->sti_laddr_sa->sa_family = so->so_family;
 
 			/*
 			 * Pass down an address with the implicit bind
 			 * magic number and the rest all zeros.
 			 * The transport will return a unique address.
 			 */
-			so->so_ux_laddr.soua_vp = NULL;
-			so->so_ux_laddr.soua_magic = SOU_MAGIC_IMPLICIT;
-			addr = &so->so_ux_laddr;
-			addrlen = (t_uscalar_t)sizeof (so->so_ux_laddr);
+			sti->sti_ux_laddr.soua_vp = NULL;
+			sti->sti_ux_laddr.soua_magic = SOU_MAGIC_IMPLICIT;
+			addr = &sti->sti_ux_laddr;
+			addrlen = (t_uscalar_t)sizeof (sti->sti_ux_laddr);
 			break;
 
 		case AF_INET:
@@ -459,12 +747,12 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			 * An unspecified bind in TPI has a NULL address.
 			 * Set the address in sockfs to have the sa_family.
 			 */
-			so->so_laddr_len = (so->so_family == AF_INET) ?
+			sti->sti_laddr_len = (so->so_family == AF_INET) ?
 			    (socklen_t)sizeof (sin_t) :
 			    (socklen_t)sizeof (sin6_t);
-			ASSERT(so->so_laddr_len <= so->so_laddr_maxlen);
-			bzero(so->so_laddr_sa, so->so_laddr_len);
-			so->so_laddr_sa->sa_family = so->so_family;
+			ASSERT(sti->sti_laddr_len <= sti->sti_laddr_maxlen);
+			bzero(sti->sti_laddr_sa, sti->sti_laddr_len);
+			sti->sti_laddr_sa->sa_family = so->so_family;
 			addr = NULL;
 			addrlen = 0;
 			break;
@@ -478,8 +766,8 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			 * protocol families. For example, AF_X25 does not
 			 * have a family field.
 			 */
-			bzero(so->so_laddr_sa, so->so_laddr_len);
-			so->so_laddr_len = 0;	/* XXX correct? */
+			bzero(sti->sti_laddr_sa, sti->sti_laddr_len);
+			sti->sti_laddr_len = 0;	/* XXX correct? */
 			addr = NULL;
 			addrlen = 0;
 			break;
@@ -525,6 +813,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 				goto done;
 			}
 		}
+
 		/* X/Open requires this check */
 		if ((so->so_state & SS_CANTSENDMORE) && !xnet_skip_checks) {
 			if (xnet_check_print) {
@@ -656,7 +945,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			break;
 		}
 
-		if (namelen > (t_uscalar_t)so->so_laddr_maxlen) {
+		if (namelen > (t_uscalar_t)sti->sti_laddr_maxlen) {
 			error = ENAMETOOLONG;
 			eprintsoline(so, error);
 			goto done;
@@ -664,26 +953,26 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 		/*
 		 * Save local address.
 		 */
-		so->so_laddr_len = (socklen_t)namelen;
-		ASSERT(so->so_laddr_len <= so->so_laddr_maxlen);
-		bcopy(name, so->so_laddr_sa, namelen);
+		sti->sti_laddr_len = (socklen_t)namelen;
+		ASSERT(sti->sti_laddr_len <= sti->sti_laddr_maxlen);
+		bcopy(name, sti->sti_laddr_sa, namelen);
 
-		addr = so->so_laddr_sa;
-		addrlen = (t_uscalar_t)so->so_laddr_len;
+		addr = sti->sti_laddr_sa;
+		addrlen = (t_uscalar_t)sti->sti_laddr_len;
 		switch (so->so_family) {
 		case AF_INET6:
 		case AF_INET:
 			break;
 		case AF_UNIX: {
 			struct sockaddr_un *soun =
-			    (struct sockaddr_un *)so->so_laddr_sa;
+			    (struct sockaddr_un *)sti->sti_laddr_sa;
 			struct vnode *vp, *rvp;
 			struct vattr vattr;
 
-			ASSERT(so->so_ux_bound_vp == NULL);
+			ASSERT(sti->sti_ux_bound_vp == NULL);
 			/*
 			 * Create vnode for the specified path name.
-			 * Keep vnode held with a reference in so_ux_bound_vp.
+			 * Keep vnode held with a reference in sti_ux_bound_vp.
 			 * Use the vnode pointer as the address used in the
 			 * bind with the transport.
 			 *
@@ -691,7 +980,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			 * not observe the umask.
 			 */
 			/* MAXPATHLEN + soun_family + nul termination */
-			if (so->so_laddr_len >
+			if (sti->sti_laddr_len >
 			    (socklen_t)(MAXPATHLEN + sizeof (short) + 1)) {
 				error = ENAMETOOLONG;
 				eprintsoline(so, error);
@@ -712,7 +1001,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			/*
 			 * Establish pointer from the underlying filesystem
 			 * vnode to the socket node.
-			 * so_ux_bound_vp and v_stream->sd_vnode form the
+			 * sti_ux_bound_vp and v_stream->sd_vnode form the
 			 * cross-linkage between the underlying filesystem
 			 * node and the socket node.
 			 */
@@ -726,7 +1015,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			ASSERT(SOTOV(so)->v_stream);
 			mutex_enter(&vp->v_lock);
 			vp->v_stream = SOTOV(so)->v_stream;
-			so->so_ux_bound_vp = vp;
+			sti->sti_ux_bound_vp = vp;
 			mutex_exit(&vp->v_lock);
 
 			/*
@@ -734,13 +1023,14 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			 * (together with the magic number to avoid conflicts
 			 * with implicit binds) in the transport provider.
 			 */
-			so->so_ux_laddr.soua_vp = (void *)so->so_ux_bound_vp;
-			so->so_ux_laddr.soua_magic = SOU_MAGIC_EXPLICIT;
-			addr = &so->so_ux_laddr;
-			addrlen = (t_uscalar_t)sizeof (so->so_ux_laddr);
+			sti->sti_ux_laddr.soua_vp =
+			    (void *)sti->sti_ux_bound_vp;
+			sti->sti_ux_laddr.soua_magic = SOU_MAGIC_EXPLICIT;
+			addr = &sti->sti_ux_laddr;
+			addrlen = (t_uscalar_t)sizeof (sti->sti_ux_laddr);
 			dprintso(so, 1, ("sobind UNIX: addrlen %d, addr %p\n",
 			    addrlen,
-			    ((struct so_ux_addr *)addr)->soua_vp));
+			    (void *)((struct so_ux_addr *)addr)->soua_vp));
 			break;
 		}
 		} /* end switch (so->so_family) */
@@ -771,14 +1061,14 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	if (nl7c_enabled && ((addr != NULL &&
 	    (so->so_family == AF_INET || so->so_family == AF_INET6) &&
 	    (nl7c = nl7c_lookup_addr(addr, addrlen))) ||
-	    so->so_nl7c_flags == NL7C_AF_NCA)) {
+	    sti->sti_nl7c_flags == NL7C_AF_NCA)) {
 		/*
 		 * NL7C is not supported in non-global zones,
 		 * we enforce this restriction here.
 		 */
 		if (so->so_zoneid == GLOBAL_ZONEID) {
 			/* An NL7C socket, mark it */
-			so->so_nl7c_flags |= NL7C_ENABLED;
+			sti->sti_nl7c_flags |= NL7C_ENABLED;
 			if (nl7c == NULL) {
 				/*
 				 * Was an AF_NCA bind() so add it to the
@@ -789,6 +1079,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 		} else
 			nl7c = NULL;
 	}
+
 	/*
 	 * We send a T_BIND_REQ for TCP/UDP since we know it supports it,
 	 * for other transports we will send in a O_T_BIND_REQ.
@@ -804,9 +1095,9 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	/* NOTE: holding so_lock while sleeping */
 	mp = soallocproto2(&bind_req, sizeof (bind_req),
 	    addr, addrlen, 0, _ALLOC_SLEEP);
-	so->so_state &= ~SS_LADDR_VALID;
+	sti->sti_laddr_valid = 0;
 
-	/* Done using so_laddr_sa - can drop the lock */
+	/* Done using sti_laddr_sa - can drop the lock */
 	mutex_exit(&so->so_lock);
 
 	/*
@@ -820,13 +1111,15 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	    (so->so_family == AF_INET || so->so_family == AF_INET6) &&
 	    so->so_type == SOCK_STREAM) {
 
-		if (so->so_kssl_ent != NULL) {
-			kssl_release_ent(so->so_kssl_ent, so, so->so_kssl_type);
-			so->so_kssl_ent = NULL;
+		if (sti->sti_kssl_ent != NULL) {
+			kssl_release_ent(sti->sti_kssl_ent, so,
+			    sti->sti_kssl_type);
+			sti->sti_kssl_ent = NULL;
 		}
 
-		so->so_kssl_type = kssl_check_proxy(mp, so, &so->so_kssl_ent);
-		switch (so->so_kssl_type) {
+		sti->sti_kssl_type = kssl_check_proxy(mp, so,
+		    &sti->sti_kssl_ent);
+		switch (sti->sti_kssl_type) {
 		case KSSL_NO_PROXY:
 			break;
 
@@ -865,11 +1158,11 @@ skip_transport:
 	/* Mark as bound. This will be undone if we detect errors below. */
 	if (flags & _SOBIND_NOXLATE) {
 		ASSERT(so->so_family == AF_UNIX);
-		so->so_state |= SS_FADDR_NOXLATE;
+		sti->sti_faddr_noxlate = 1;
 	}
 	ASSERT(!(so->so_state & SS_ISBOUND) || (flags & _SOBIND_REBIND));
 	so->so_state |= SS_ISBOUND;
-	ASSERT(so->so_unbind_mp);
+	ASSERT(sti->sti_unbind_mp);
 
 	/* note that we've already set SS_ACCEPTCONN above */
 
@@ -879,7 +1172,7 @@ skip_transport:
 	 * in return.
 	 */
 	addrlen = (t_uscalar_t)(so->so_family == AF_UNIX ?
-	    sizeof (so->so_ux_laddr) : so->so_laddr_len);
+	    sizeof (sti->sti_ux_laddr) : sti->sti_laddr_len);
 
 	bind_ack = (struct T_bind_ack *)mp->b_rptr;
 	/*
@@ -965,7 +1258,7 @@ skip_transport:
 			sin_t *rname, *aname;
 
 			rname = (sin_t *)addr;
-			aname = (sin_t *)so->so_laddr_sa;
+			aname = (sin_t *)sti->sti_laddr_sa;
 
 			/*
 			 * Take advantage of the alignment
@@ -990,7 +1283,7 @@ skip_transport:
 				 */
 				if (aname->sin_port == 0)
 					aname->sin_port = rname->sin_port;
-				so->so_state |= SS_LADDR_VALID;
+				sti->sti_laddr_valid = 1;
 				break;
 			}
 			if (aname->sin_port != 0 &&
@@ -1031,31 +1324,31 @@ skip_transport:
 			break;
 		}
 		case AF_UNIX:
-			if (bcmp(addr, &so->so_ux_laddr, addrlen) != 0) {
+			if (bcmp(addr, &sti->sti_ux_laddr, addrlen) != 0) {
 				freemsg(mp);
 				error = EADDRINUSE;
 				eprintsoline(so, error);
 				eprintso(so,
 				    ("addrlen %d, addr 0x%x, vp %p\n",
 				    addrlen, *((int *)addr),
-				    (void *)so->so_ux_bound_vp));
+				    (void *)sti->sti_ux_bound_vp));
 				goto done;
 			}
-			so->so_state |= SS_LADDR_VALID;
+			sti->sti_laddr_valid = 1;
 			break;
 		default:
 			/*
 			 * NOTE: This assumes that addresses can be
 			 * byte-compared for equivalence.
 			 */
-			if (bcmp(addr, so->so_laddr_sa, addrlen) != 0) {
+			if (bcmp(addr, sti->sti_laddr_sa, addrlen) != 0) {
 				freemsg(mp);
 				error = EADDRINUSE;
 				eprintsoline(so, error);
 				goto done;
 			}
 			/*
-			 * Don't mark SS_LADDR_VALID, as we cannot be
+			 * Don't mark sti_laddr_valid, as we cannot be
 			 * sure that the returned address is the real
 			 * bound address when talking to an unknown
 			 * transport.
@@ -1071,8 +1364,8 @@ skip_transport:
 		 * caching info here is much better performance than
 		 * a TPI/STREAMS trip to the transport for getsockname.
 		 * Any which can't for some reason _must_ _not_ set
-		 * LADDR_VALID here for the caching version of getsockname
-		 * to not break;
+		 * sti_laddr_valid here for the caching version of
+		 * getsockname to not break;
 		 */
 		switch (so->so_family) {
 		case AF_UNIX:
@@ -1080,18 +1373,18 @@ skip_transport:
 			 * Record the address bound with the transport
 			 * for use by socketpair.
 			 */
-			bcopy(addr, &so->so_ux_laddr, addrlen);
-			so->so_state |= SS_LADDR_VALID;
+			bcopy(addr, &sti->sti_ux_laddr, addrlen);
+			sti->sti_laddr_valid = 1;
 			break;
 		case AF_INET:
 		case AF_INET6:
-			ASSERT(so->so_laddr_len <= so->so_laddr_maxlen);
-			bcopy(addr, so->so_laddr_sa, so->so_laddr_len);
-			so->so_state |= SS_LADDR_VALID;
+			ASSERT(sti->sti_laddr_len <= sti->sti_laddr_maxlen);
+			bcopy(addr, sti->sti_laddr_sa, sti->sti_laddr_len);
+			sti->sti_laddr_valid = 1;
 			break;
 		default:
 			/*
-			 * Don't mark SS_LADDR_VALID, as we cannot be
+			 * Don't mark sti_laddr_valid, as we cannot be
 			 * sure that the returned address is the real
 			 * bound address when talking to an unknown
 			 * transport.
@@ -1131,7 +1424,6 @@ done:
 		so_unlock_single(so, SOLOCKED);
 		mutex_exit(&so->so_lock);
 	} else {
-		/* If the caller held the lock don't release it here */
 		ASSERT(MUTEX_HELD(&so->so_lock));
 		ASSERT(so->so_flag & SOLOCKED);
 	}
@@ -1141,13 +1433,13 @@ done:
 /* bind the socket */
 static int
 sotpi_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
-    int flags)
+    int flags, struct cred *cr)
 {
 	if ((flags & _SOBIND_SOCKETPAIR) == 0)
-		return (sotpi_bindlisten(so, name, namelen, 0, flags));
+		return (sotpi_bindlisten(so, name, namelen, 0, flags, cr));
 
 	flags &= ~_SOBIND_SOCKETPAIR;
-	return (sotpi_bindlisten(so, name, namelen, 1, flags));
+	return (sotpi_bindlisten(so, name, namelen, 1, flags, cr));
 }
 
 /*
@@ -1162,6 +1454,7 @@ sotpi_unbind(struct sonode *so, int flags)
 	struct T_unbind_req	unbind_req;
 	int			error = 0;
 	mblk_t			*mp;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("sotpi_unbind(%p, 0x%x) %s\n",
 	    (void *)so, flags, pr_state(so->so_state, so->so_mode)));
@@ -1211,26 +1504,26 @@ sotpi_unbind(struct sonode *so, int flags)
 		 */
 		vnode_t *vp;
 
-		if ((vp = so->so_ux_bound_vp) != NULL) {
+		if ((vp = sti->sti_ux_bound_vp) != NULL) {
 
 			/* Undo any SSL proxy setup */
 			if ((so->so_family == AF_INET ||
 			    so->so_family == AF_INET6) &&
 			    (so->so_type == SOCK_STREAM) &&
-			    (so->so_kssl_ent != NULL)) {
-				kssl_release_ent(so->so_kssl_ent, so,
-				    so->so_kssl_type);
-				so->so_kssl_ent = NULL;
-				so->so_kssl_type = KSSL_NO_PROXY;
+			    (sti->sti_kssl_ent != NULL)) {
+				kssl_release_ent(sti->sti_kssl_ent, so,
+				    sti->sti_kssl_type);
+				sti->sti_kssl_ent = NULL;
+				sti->sti_kssl_type = KSSL_NO_PROXY;
 			}
-
-			so->so_ux_bound_vp = NULL;
+			sti->sti_ux_bound_vp = NULL;
 			vn_rele_stream(vp);
 		}
 		/* Clear out address */
-		so->so_laddr_len = 0;
+		sti->sti_laddr_len = 0;
 	}
-	so->so_state &= ~(SS_ISBOUND|SS_ACCEPTCONN|SS_LADDR_VALID);
+	so->so_state &= ~(SS_ISBOUND|SS_ACCEPTCONN);
+	sti->sti_laddr_valid = 0;
 
 done:
 
@@ -1246,15 +1539,17 @@ done:
  * For TPI conforming transports this has to first unbind with the transport
  * and then bind again using the new backlog.
  */
+/* ARGSUSED */
 int
-sotpi_listen(struct sonode *so, int backlog)
+sotpi_listen(struct sonode *so, int backlog, struct cred *cr)
 {
 	int		error = 0;
+	sotpi_info_t	*sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("sotpi_listen(%p, %d) %s\n",
 	    (void *)so, backlog, pr_state(so->so_state, so->so_mode)));
 
-	if (so->so_serv_type == T_CLTS)
+	if (sti->sti_serv_type == T_CLTS)
 		return (EOPNOTSUPP);
 
 	/*
@@ -1276,24 +1571,6 @@ sotpi_listen(struct sonode *so, int backlog)
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
 
-	if (backlog < 0)
-		backlog = 0;
-	/*
-	 * Use the same qlimit as in BSD. BSD checks the qlimit
-	 * before queuing the next connection implying that a
-	 * listen(sock, 0) allows one connection to be queued.
-	 * BSD also uses 1.5 times the requested backlog.
-	 *
-	 * XNS Issue 4 required a strict interpretation of the backlog.
-	 * This has been waived subsequently for Issue 4 and the change
-	 * incorporated in XNS Issue 5. So we aren't required to do
-	 * anything special for XPG apps.
-	 */
-	if (backlog >= (INT_MAX - 1) / 3)
-		backlog = INT_MAX;
-	else
-		backlog = backlog * 3 / 2 + 1;
-
 	/*
 	 * If the listen doesn't change the backlog we do nothing.
 	 * This avoids an EPROTO error from the transport.
@@ -1311,7 +1588,7 @@ sotpi_listen(struct sonode *so, int backlog)
 			goto done;
 		}
 		error = sotpi_bindlisten(so, NULL, 0, backlog,
-		    _SOBIND_UNSPEC|_SOBIND_LOCK_HELD|_SOBIND_LISTEN);
+		    _SOBIND_UNSPEC|_SOBIND_LOCK_HELD|_SOBIND_LISTEN, cr);
 	} else if (backlog > 0) {
 		/*
 		 * AF_INET{,6} hack to avoid losing the port.
@@ -1327,7 +1604,7 @@ sotpi_listen(struct sonode *so, int backlog)
 				goto done;
 		}
 		error = sotpi_bindlisten(so, NULL, 0, backlog,
-		    _SOBIND_REBIND|_SOBIND_LOCK_HELD|_SOBIND_LISTEN);
+		    _SOBIND_REBIND|_SOBIND_LOCK_HELD|_SOBIND_LISTEN, cr);
 	} else {
 		so->so_state |= SS_ACCEPTCONN;
 		so->so_backlog = backlog;
@@ -1349,7 +1626,7 @@ done:
  * the current use of sodisconnect(seqno == -1) is only for shutdown
  * so there is no point (and potentially incorrect) to unbind.
  */
-int
+static int
 sodisconnect(struct sonode *so, t_scalar_t seqno, int flags)
 {
 	struct T_discon_req	discon_req;
@@ -1406,8 +1683,9 @@ sodisconnect(struct sonode *so, t_scalar_t seqno, int flags)
 	 * is allowed to complete. However, it is not possible to
 	 * assert that SS_ISCONNECTED|SS_ISCONNECTING are set.
 	 */
-	so->so_state &=
-	    ~(SS_ISCONNECTED|SS_ISCONNECTING|SS_LADDR_VALID|SS_FADDR_VALID);
+	so->so_state &= ~(SS_ISCONNECTED|SS_ISCONNECTING);
+	SOTOTPI(so)->sti_laddr_valid = 0;
+	SOTOTPI(so)->sti_faddr_valid = 0;
 done:
 	if (!(flags & _SODISCONNECT_LOCK_HELD)) {
 		so_unlock_single(so, SOLOCKED);
@@ -1420,8 +1698,10 @@ done:
 	return (error);
 }
 
+/* ARGSUSED */
 int
-sotpi_accept(struct sonode *so, int fflag, struct sonode **nsop)
+sotpi_accept(struct sonode *so, int fflag, struct cred *cr,
+    struct sonode **nsop)
 {
 	struct T_conn_ind	*conn_ind;
 	struct T_conn_res	*conn_res;
@@ -1436,6 +1716,8 @@ sotpi_accept(struct sonode *so, int fflag, struct sonode **nsop)
 	t_scalar_t		PRIM_type;
 	t_scalar_t		SEQ_number;
 	size_t			sinlen;
+	sotpi_info_t		*sti = SOTOTPI(so);
+	sotpi_info_t		*nsti;
 
 	dprintso(so, 1, ("sotpi_accept(%p, 0x%x, %p) %s\n",
 	    (void *)so, fflag, (void *)nsop,
@@ -1454,7 +1736,7 @@ again:
 	if ((error = sowaitconnind(so, fflag, &mp)) != 0)
 		goto e_bad;
 
-	ASSERT(mp);
+	ASSERT(mp != NULL);
 	conn_ind = (struct T_conn_ind *)mp->b_rptr;
 	ctxmp = mp->b_cont;
 
@@ -1475,8 +1757,7 @@ again:
 	switch (so->so_family) {
 	case AF_INET:
 	case AF_INET6:
-		if ((optlen == sizeof (intptr_t)) &&
-		    ((so->so_state & SS_DIRECT) != 0)) {
+		if ((optlen == sizeof (intptr_t)) && (sti->sti_direct != 0)) {
 			bcopy(mp->b_rptr + conn_ind->OPT_offset,
 			    &opt, conn_ind->OPT_length);
 		} else {
@@ -1489,7 +1770,7 @@ again:
 			 * problems when sockfs sends a normal T_CONN_RES
 			 * message down the new stream.
 			 */
-			if (so->so_state & SS_DIRECT) {
+			if (sti->sti_direct) {
 				int rval;
 				/*
 				 * For consistency we inform tcp to disable
@@ -1498,7 +1779,7 @@ again:
 				 * because no data will ever travel upstream
 				 * on the listening socket.
 				 */
-				so->so_state &= ~SS_DIRECT;
+				sti->sti_direct = 0;
 				(void) strioctl(SOTOV(so), _SIOCSOCKFALLBACK,
 				    0, 0, K_TO_K, CRED(), &rval);
 			}
@@ -1519,7 +1800,7 @@ again:
 			}
 		}
 		if (so->so_family == AF_UNIX) {
-			if (!(so->so_state & SS_FADDR_NOXLATE)) {
+			if (!sti->sti_faddr_noxlate) {
 				src = NULL;
 				srclen = 0;
 			}
@@ -1533,9 +1814,7 @@ again:
 	/*
 	 * Create the new socket.
 	 */
-	VN_HOLD(so->so_accessvp);
-	nso = sotpi_create(so->so_accessvp, so->so_family, so->so_type,
-	    so->so_protocol, so->so_version, so, &error);
+	nso = socket_newconn(so, NULL, NULL, SOCKET_SLEEP, &error);
 	if (nso == NULL) {
 		ASSERT(error != 0);
 		/*
@@ -1549,6 +1828,7 @@ again:
 		goto e_disc_unl;
 	}
 	nvp = SOTOV(nso);
+	nsti = SOTOTPI(nso);
 
 	/*
 	 * If the transport sent up an SSL connection context, then attach
@@ -1561,7 +1841,7 @@ again:
 		 * This kssl_ctx_t is already held for us by the transport.
 		 * So, we don't need to do a kssl_hold_ctx() here.
 		 */
-		nso->so_kssl_ctx = *((kssl_ctx_t *)ctxmp->b_rptr);
+		nsti->sti_kssl_ctx = *((kssl_ctx_t *)ctxmp->b_rptr);
 		freemsg(ctxmp);
 		mp->b_cont = NULL;
 		strsetrwputdatahooks(nvp, strsock_kssl_input,
@@ -1572,7 +1852,6 @@ again:
 			mutex_enter(nso->so_direct->sod_lockp);
 			SOD_DISABLE(nso->so_direct);
 			mutex_exit(nso->so_direct->sod_lockp);
-			nso->so_direct = NULL;
 		}
 	}
 #ifdef DEBUG
@@ -1591,16 +1870,16 @@ again:
 	 * NOTE: AF_UNIX NUL termination is ensured by the sender's
 	 * copyin_name().
 	 */
-	if (srclen > (t_uscalar_t)nso->so_faddr_maxlen) {
+	if (srclen > (t_uscalar_t)nsti->sti_faddr_maxlen) {
 		error = EINVAL;
 		freemsg(mp);
 		eprintsoline(so, error);
 		goto disconnect_vp_unlocked;
 	}
-	nso->so_faddr_len = (socklen_t)srclen;
-	ASSERT(so->so_faddr_len <= so->so_faddr_maxlen);
-	bcopy(src, nso->so_faddr_sa, srclen);
-	nso->so_state |= SS_FADDR_VALID;
+	nsti->sti_faddr_len = (socklen_t)srclen;
+	ASSERT(sti->sti_faddr_len <= sti->sti_faddr_maxlen);
+	bcopy(src, nsti->sti_faddr_sa, srclen);
+	nsti->sti_faddr_valid = 1;
 
 	if ((DB_REF(mp) > 1) || MBLKSIZE(mp) <
 	    (sizeof (struct T_conn_res) + sizeof (intptr_t))) {
@@ -1654,7 +1933,8 @@ again:
 		mutex_exit(&nso->so_lock);
 	} else {
 		/* Perform NULL bind with the transport provider. */
-		if ((error = sotpi_bind(nso, NULL, 0, _SOBIND_UNSPEC)) != 0) {
+		if ((error = sotpi_bind(nso, NULL, 0, _SOBIND_UNSPEC,
+		    cr)) != 0) {
 			ASSERT(error != ENOBUFS);
 			freemsg(mp);
 			eprintsoline(nso, error);
@@ -1671,7 +1951,8 @@ again:
 	 * can access the new socket thus we relax the locking.
 	 */
 	nso->so_pgrp = so->so_pgrp;
-	nso->so_state |= so->so_state & (SS_ASYNC|SS_FADDR_NOXLATE);
+	nso->so_state |= so->so_state & SS_ASYNC;
+	nsti->sti_faddr_noxlate = sti->sti_faddr_noxlate;
 
 	if (nso->so_pgrp != 0) {
 		if ((error = so_set_events(nso, nvp, CRED())) != 0) {
@@ -1695,7 +1976,12 @@ again:
 	if (nso->so_options & SO_LINGER)
 		nso->so_linger = so->so_linger;
 
-	if ((so->so_state & SS_DIRECT) != 0) {
+	/*
+	 * Note that the following sti_direct code path should be
+	 * removed once we are confident that the direct sockets
+	 * do not result in any degradation.
+	 */
+	if (sti->sti_direct) {
 
 		ASSERT(opt != NULL);
 
@@ -1731,22 +2017,23 @@ again:
 
 			sin = (sin_t *)(ack_mp->b_rptr +
 			    sizeof (struct T_ok_ack));
-			bcopy(sin, nso->so_laddr_sa, sizeof (sin_t));
-			nso->so_laddr_len = sizeof (sin_t);
+			bcopy(sin, nsti->sti_laddr_sa, sizeof (sin_t));
+			nsti->sti_laddr_len = sizeof (sin_t);
 		} else {
 			sin6_t *sin6;
 
 			sin6 = (sin6_t *)(ack_mp->b_rptr +
 			    sizeof (struct T_ok_ack));
-			bcopy(sin6, nso->so_laddr_sa, sizeof (sin6_t));
-			nso->so_laddr_len = sizeof (sin6_t);
+			bcopy(sin6, nsti->sti_laddr_sa, sizeof (sin6_t));
+			nsti->sti_laddr_len = sizeof (sin6_t);
 		}
 		freemsg(ack_mp);
 
-		nso->so_state |= SS_ISCONNECTED | SS_LADDR_VALID;
-		nso->so_priv = opt;
+		nso->so_state |= SS_ISCONNECTED;
+		nso->so_proto_handle = (sock_lower_handle_t)opt;
+		nsti->sti_laddr_valid = 1;
 
-		if (so->so_nl7c_flags & NL7C_ENABLED) {
+		if (sti->sti_nl7c_flags & NL7C_ENABLED) {
 			/*
 			 * A NL7C marked listen()er so the new socket
 			 * inherits the listen()er's NL7C state, except
@@ -1755,14 +2042,15 @@ again:
 			 * Only call NL7C to process the new socket if
 			 * the listen socket allows blocking i/o.
 			 */
-			nso->so_nl7c_flags = so->so_nl7c_flags & (~NL7C_POLLIN);
+			nsti->sti_nl7c_flags =
+			    sti->sti_nl7c_flags & (~NL7C_POLLIN);
 			if (so->so_state & (SS_NONBLOCK|SS_NDELAY)) {
 				/*
 				 * Nonblocking accept() just make it
 				 * persist to defer processing to the
 				 * read-side syscall (e.g. read).
 				 */
-				nso->so_nl7c_flags |= NL7C_SOPERSIST;
+				nsti->sti_nl7c_flags |= NL7C_SOPERSIST;
 			} else if (nl7c_process(nso, B_FALSE)) {
 				/*
 				 * NL7C has completed processing on the
@@ -1782,12 +2070,12 @@ again:
 
 		/*
 		 * It's possible, through the use of autopush for example,
-		 * that the acceptor stream may not support SS_DIRECT
-		 * semantics. If the new socket does not support SS_DIRECT
+		 * that the acceptor stream may not support sti_direct
+		 * semantics. If the new socket does not support sti_direct
 		 * we issue a _SIOCSOCKFALLBACK to inform the transport
 		 * as we would in the I_PUSH case.
 		 */
-		if (!(nso->so_state & SS_DIRECT)) {
+		if (nsti->sti_direct == 0) {
 			int	rval;
 
 			if ((error = strioctl(SOTOV(nso), _SIOCSOCKFALLBACK,
@@ -1842,7 +2130,7 @@ again:
 		conn_res->PRIM_type = O_T_CONN_RES;
 		PRIM_type = O_T_CONN_RES;
 	} else {
-		conn_res->ACCEPTOR_id = nso->so_acceptor_id;
+		conn_res->ACCEPTOR_id = nsti->sti_acceptor_id;
 		conn_res->PRIM_type = T_CONN_RES;
 		PRIM_type = T_CONN_RES;
 	}
@@ -1871,27 +2159,28 @@ again:
 	 * If there is a sin/sin6 appended onto the T_OK_ACK use
 	 * that to set the local address. If this is not present
 	 * then we zero out the address and don't set the
-	 * SS_LADDR_VALID bit. For AF_UNIX endpoints we copy over
+	 * sti_laddr_valid bit. For AF_UNIX endpoints we copy over
 	 * the pathname from the listening socket.
 	 */
 	sinlen = (nso->so_family == AF_INET) ? sizeof (sin_t) : sizeof (sin6_t);
 	if ((nso->so_family == AF_INET) || (nso->so_family == AF_INET6) &&
 	    MBLKL(ack_mp) == (sizeof (struct T_ok_ack) + sinlen)) {
 		ack_mp->b_rptr += sizeof (struct T_ok_ack);
-		bcopy(ack_mp->b_rptr, nso->so_laddr_sa, sinlen);
-		nso->so_laddr_len = sinlen;
-		nso->so_state |= SS_LADDR_VALID;
+		bcopy(ack_mp->b_rptr, nsti->sti_laddr_sa, sinlen);
+		nsti->sti_laddr_len = sinlen;
+		nsti->sti_laddr_valid = 1;
 	} else if (nso->so_family == AF_UNIX) {
 		ASSERT(so->so_family == AF_UNIX);
-		nso->so_laddr_len = so->so_laddr_len;
-		ASSERT(nso->so_laddr_len <= nso->so_laddr_maxlen);
-		bcopy(so->so_laddr_sa, nso->so_laddr_sa, nso->so_laddr_len);
-		nso->so_state |= SS_LADDR_VALID;
+		nsti->sti_laddr_len = sti->sti_laddr_len;
+		ASSERT(nsti->sti_laddr_len <= nsti->sti_laddr_maxlen);
+		bcopy(sti->sti_laddr_sa, nsti->sti_laddr_sa,
+		    nsti->sti_laddr_len);
+		nsti->sti_laddr_valid = 1;
 	} else {
-		nso->so_laddr_len = so->so_laddr_len;
-		ASSERT(nso->so_laddr_len <= nso->so_laddr_maxlen);
-		bzero(nso->so_laddr_sa, nso->so_addr_size);
-		nso->so_laddr_sa->sa_family = nso->so_family;
+		nsti->sti_laddr_len = sti->sti_laddr_len;
+		ASSERT(nsti->sti_laddr_len <= nsti->sti_laddr_maxlen);
+		bzero(nsti->sti_laddr_sa, nsti->sti_addr_size);
+		nsti->sti_laddr_sa->sa_family = nso->so_family;
 	}
 	freemsg(ack_mp);
 
@@ -1953,7 +2242,8 @@ sotpi_connect(struct sonode *so,
 	const struct sockaddr *name,
 	socklen_t namelen,
 	int fflag,
-	int flags)
+	int flags,
+	struct cred *cr)
 {
 	struct T_conn_req	conn_req;
 	int			error = 0;
@@ -1963,6 +2253,7 @@ sotpi_connect(struct sonode *so,
 	void			*addr;
 	socklen_t		addrlen;
 	boolean_t		need_unlock;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("sotpi_connect(%p, %p, %d, 0x%x, 0x%x) %s\n",
 	    (void *)so, (void *)name, namelen, fflag, flags,
@@ -1971,13 +2262,13 @@ sotpi_connect(struct sonode *so,
 	/*
 	 * Preallocate the T_CONN_REQ mblk before grabbing SOLOCKED to
 	 * avoid sleeping for memory with SOLOCKED held.
-	 * We know that the T_CONN_REQ can't be larger than 2 * so_faddr_maxlen
+	 * We know that the T_CONN_REQ can't be larger than 2 * sti_faddr_maxlen
 	 * + sizeof (struct T_opthdr).
 	 * (the AF_UNIX so_ux_addr_xlate() does not make the address
-	 * exceed so_faddr_maxlen).
+	 * exceed sti_faddr_maxlen).
 	 */
 	mp = soallocproto(sizeof (struct T_conn_req) +
-	    2 * so->so_faddr_maxlen + sizeof (struct T_opthdr), _ALLOC_INTR);
+	    2 * sti->sti_faddr_maxlen + sizeof (struct T_opthdr), _ALLOC_INTR);
 	if (mp == NULL) {
 		/*
 		 * Connect can not fail with ENOBUFS. A signal was
@@ -2001,12 +2292,12 @@ sotpi_connect(struct sonode *so,
 	so_lock_single(so);	/* Set SOLOCKED */
 	need_unlock = B_TRUE;
 
-	if (so->so_unbind_mp == NULL) {
+	if (sti->sti_unbind_mp == NULL) {
 		dprintso(so, 1, ("sotpi_connect: allocating unbind_req\n"));
 		/* NOTE: holding so_lock while sleeping */
-		so->so_unbind_mp =
+		sti->sti_unbind_mp =
 		    soallocproto(sizeof (struct T_unbind_req), _ALLOC_INTR);
-		if (so->so_unbind_mp == NULL) {
+		if (sti->sti_unbind_mp == NULL) {
 			error = EINTR;
 			goto done;
 		}
@@ -2034,7 +2325,7 @@ sotpi_connect(struct sonode *so,
 			so_automatic_bind(so);
 		} else {
 			error = sotpi_bind(so, NULL, 0,
-			    _SOBIND_UNSPEC|_SOBIND_LOCK_HELD);
+			    _SOBIND_UNSPEC|_SOBIND_LOCK_HELD, cr);
 			if (error)
 				goto done;
 		}
@@ -2088,17 +2379,19 @@ sotpi_connect(struct sonode *so,
 				    _SODISCONNECT_LOCK_HELD);
 			} else {
 				so->so_state &=
-				    ~(SS_ISCONNECTED | SS_ISCONNECTING |
-				    SS_FADDR_VALID);
-				so->so_faddr_len = 0;
+				    ~(SS_ISCONNECTED | SS_ISCONNECTING);
+				sti->sti_faddr_valid = 0;
+				sti->sti_faddr_len = 0;
 			}
 
+			/* Remove SOLOCKED since setsockopt will grab it */
 			so_unlock_single(so, SOLOCKED);
 			mutex_exit(&so->so_lock);
 
 			val = 0;
-			(void) sotpi_setsockopt(so, SOL_SOCKET, SO_DGRAM_ERRIND,
-			    &val, (t_uscalar_t)sizeof (val));
+			(void) sotpi_setsockopt(so, SOL_SOCKET,
+			    SO_DGRAM_ERRIND, &val, (t_uscalar_t)sizeof (val),
+			    cr);
 
 			mutex_enter(&so->so_lock);
 			so_lock_single(so);	/* Set SOLOCKED */
@@ -2112,7 +2405,7 @@ sotpi_connect(struct sonode *so,
 		goto done;
 	}
 	/*
-	 * Mark the socket if so_faddr_sa represents the transport level
+	 * Mark the socket if sti_faddr_sa represents the transport level
 	 * address.
 	 */
 	if (flags & _SOCONNECT_NOXLATE) {
@@ -2126,7 +2419,7 @@ sotpi_connect(struct sonode *so,
 		soaddr_ux = (struct sockaddr_ux *)name;
 		name = (struct sockaddr *)&soaddr_ux->sou_addr;
 		namelen = sizeof (soaddr_ux->sou_addr);
-		so->so_state |= SS_FADDR_NOXLATE;
+		sti->sti_faddr_noxlate = 1;
 	}
 
 	/*
@@ -2141,46 +2434,46 @@ sotpi_connect(struct sonode *so,
 	 * transport providers that do not support TI_GETPEERNAME.
 	 * Also used for cached foreign address for TCP and UDP.
 	 */
-	if (namelen > (t_uscalar_t)so->so_faddr_maxlen) {
+	if (namelen > (t_uscalar_t)sti->sti_faddr_maxlen) {
 		error = EINVAL;
 		goto done;
 	}
-	so->so_faddr_len = (socklen_t)namelen;
-	ASSERT(so->so_faddr_len <= so->so_faddr_maxlen);
-	bcopy(name, so->so_faddr_sa, namelen);
-	so->so_state |= SS_FADDR_VALID;
+	sti->sti_faddr_len = (socklen_t)namelen;
+	ASSERT(sti->sti_faddr_len <= sti->sti_faddr_maxlen);
+	bcopy(name, sti->sti_faddr_sa, namelen);
+	sti->sti_faddr_valid = 1;
 
 	if (so->so_family == AF_UNIX) {
-		if (so->so_state & SS_FADDR_NOXLATE) {
+		if (sti->sti_faddr_noxlate) {
 			/*
 			 * Already have a transport internal address. Do not
 			 * pass any (transport internal) source address.
 			 */
-			addr = so->so_faddr_sa;
-			addrlen = (t_uscalar_t)so->so_faddr_len;
+			addr = sti->sti_faddr_sa;
+			addrlen = (t_uscalar_t)sti->sti_faddr_len;
 			src = NULL;
 			srclen = 0;
 		} else {
 			/*
 			 * Pass the sockaddr_un source address as an option
 			 * and translate the remote address.
-			 * Holding so_lock thus so_laddr_sa can not change.
+			 * Holding so_lock thus sti_laddr_sa can not change.
 			 */
-			src = so->so_laddr_sa;
-			srclen = (t_uscalar_t)so->so_laddr_len;
+			src = sti->sti_laddr_sa;
+			srclen = (t_uscalar_t)sti->sti_laddr_len;
 			dprintso(so, 1,
 			    ("sotpi_connect UNIX: srclen %d, src %p\n",
 			    srclen, src));
 			error = so_ux_addr_xlate(so,
-			    so->so_faddr_sa, (socklen_t)so->so_faddr_len,
+			    sti->sti_faddr_sa, (socklen_t)sti->sti_faddr_len,
 			    (flags & _SOCONNECT_XPG4_2),
 			    &addr, &addrlen);
 			if (error)
 				goto bad;
 		}
 	} else {
-		addr = so->so_faddr_sa;
-		addrlen = (t_uscalar_t)so->so_faddr_len;
+		addr = sti->sti_faddr_sa;
+		addrlen = (t_uscalar_t)sti->sti_faddr_len;
 		src = NULL;
 		srclen = 0;
 	}
@@ -2209,7 +2502,7 @@ sotpi_connect(struct sonode *so,
 
 		val = 1;
 		(void) sotpi_setsockopt(so, SOL_SOCKET, SO_DGRAM_ERRIND,
-		    &val, (t_uscalar_t)sizeof (val));
+		    &val, (t_uscalar_t)sizeof (val), cr);
 
 		mutex_enter(&so->so_lock);
 		so_lock_single(so);	/* Set SOLOCKED */
@@ -2225,8 +2518,8 @@ sotpi_connect(struct sonode *so,
 		 */
 		fflag = 0;
 		ASSERT(so->so_family != AF_UNIX);
-		so->so_state &= ~SS_LADDR_VALID;
-	} else if (so->so_laddr_len != 0) {
+		sti->sti_laddr_valid = 0;
+	} else if (sti->sti_laddr_len != 0) {
 		/*
 		 * If the local address or port was "any" then it may be
 		 * changed by the transport as a result of the
@@ -2234,21 +2527,22 @@ sotpi_connect(struct sonode *so,
 		 */
 		switch (so->so_family) {
 		case AF_INET:
-			ASSERT(so->so_laddr_len == (socklen_t)sizeof (sin_t));
-			if (((sin_t *)so->so_laddr_sa)->sin_addr.s_addr ==
+			ASSERT(sti->sti_laddr_len == (socklen_t)sizeof (sin_t));
+			if (((sin_t *)sti->sti_laddr_sa)->sin_addr.s_addr ==
 			    INADDR_ANY ||
-			    ((sin_t *)so->so_laddr_sa)->sin_port == 0)
-				so->so_state &= ~SS_LADDR_VALID;
+			    ((sin_t *)sti->sti_laddr_sa)->sin_port == 0)
+				sti->sti_laddr_valid = 0;
 			break;
 
 		case AF_INET6:
-			ASSERT(so->so_laddr_len == (socklen_t)sizeof (sin6_t));
+			ASSERT(sti->sti_laddr_len ==
+			    (socklen_t)sizeof (sin6_t));
 			if (IN6_IS_ADDR_UNSPECIFIED(
-			    &((sin6_t *)so->so_laddr_sa) ->sin6_addr) ||
+			    &((sin6_t *)sti->sti_laddr_sa) ->sin6_addr) ||
 			    IN6_IS_ADDR_V4MAPPED_ANY(
-			    &((sin6_t *)so->so_laddr_sa)->sin6_addr) ||
-			    ((sin6_t *)so->so_laddr_sa)->sin6_port == 0)
-				so->so_state &= ~SS_LADDR_VALID;
+			    &((sin6_t *)sti->sti_laddr_sa)->sin6_addr) ||
+			    ((sin6_t *)sti->sti_laddr_sa)->sin6_port == 0)
+				sti->sti_laddr_valid = 0;
 			break;
 
 		default:
@@ -2337,30 +2631,18 @@ done:
 	case EISCONN:
 	case EINTR:
 		/* Non-fatal errors */
-		so->so_state &= ~SS_LADDR_VALID;
+		sti->sti_laddr_valid = 0;
 		/* FALLTHRU */
 	case 0:
 		break;
-
-	case EHOSTUNREACH:
-		if (flags & _SOCONNECT_XPG4_2) {
-			/*
-			 * X/Open specification contains a requirement that
-			 * ENETUNREACH be returned but does not require
-			 * EHOSTUNREACH. In order to keep the test suite
-			 * happy we mess with the errno here.
-			 */
-			error = ENETUNREACH;
-		}
-		/* FALLTHRU */
-
 	default:
 		ASSERT(need_unlock);
 		/*
 		 * Fatal errors: clear SS_ISCONNECTING in case it was set,
 		 * and invalidate local-address cache
 		 */
-		so->so_state &= ~(SS_ISCONNECTING | SS_LADDR_VALID);
+		so->so_state &= ~SS_ISCONNECTING;
+		sti->sti_laddr_valid = 0;
 		/* A discon_ind might have already unbound us */
 		if ((flags & _SOCONNECT_DID_BIND) &&
 		    (so->so_state & SS_ISBOUND)) {
@@ -2379,18 +2661,20 @@ done:
 	mutex_exit(&so->so_lock);
 	return (error);
 
-so_bad:	error = sogeterr(so);
+so_bad:	error = sogeterr(so, B_TRUE);
 bad:	eprintsoline(so, error);
 	goto done;
 }
 
+/* ARGSUSED */
 int
-sotpi_shutdown(struct sonode *so, int how)
+sotpi_shutdown(struct sonode *so, int how, struct cred *cr)
 {
 	struct T_ordrel_req	ordrel_req;
 	mblk_t			*mp;
 	uint_t			old_state, state_change;
 	int			error = 0;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("sotpi_shutdown(%p, %d) %s\n",
 	    (void *)so, how, pr_state(so->so_state, so->so_mode)));
@@ -2523,14 +2807,14 @@ sotpi_shutdown(struct sonode *so, int how)
 		 * For SunOS 4.X compatibility we tell the other end
 		 * that we are unable to receive at this point.
 		 */
-		if (so->so_family == AF_UNIX && so->so_serv_type != T_CLTS)
+		if (so->so_family == AF_UNIX && sti->sti_serv_type != T_CLTS)
 			so_unix_close(so);
 
-		if (so->so_serv_type == T_COTS)
+		if (sti->sti_serv_type == T_COTS)
 			error = sodisconnect(so, -1, _SODISCONNECT_LOCK_HELD);
 	}
 	if ((state_change & SS_CANTSENDMORE) &&
-	    (so->so_serv_type == T_COTS_ORD)) {
+	    (sti->sti_serv_type == T_COTS_ORD)) {
 		/* Send an orderly release */
 		ordrel_req.PRIM_type = T_ORDREL_REQ;
 
@@ -2582,6 +2866,7 @@ so_unix_close(struct sonode *so)
 	int		error;
 	struct T_opthdr	toh;
 	mblk_t		*mp;
+	sotpi_info_t	*sti = SOTOTPI(so);
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
@@ -2632,35 +2917,35 @@ so_unix_close(struct sonode *so)
 		/*
 		 * Length and family checks.
 		 */
-		error = so_addr_verify(so, so->so_faddr_sa,
-		    (t_uscalar_t)so->so_faddr_len);
+		error = so_addr_verify(so, sti->sti_faddr_sa,
+		    (t_uscalar_t)sti->sti_faddr_len);
 		if (error) {
 			eprintsoline(so, error);
 			return;
 		}
-		if (so->so_state & SS_FADDR_NOXLATE) {
+		if (sti->sti_faddr_noxlate) {
 			/*
 			 * Already have a transport internal address. Do not
 			 * pass any (transport internal) source address.
 			 */
-			addr = so->so_faddr_sa;
-			addrlen = (t_uscalar_t)so->so_faddr_len;
+			addr = sti->sti_faddr_sa;
+			addrlen = (t_uscalar_t)sti->sti_faddr_len;
 			src = NULL;
 			srclen = 0;
 		} else {
 			/*
 			 * Pass the sockaddr_un source address as an option
 			 * and translate the remote address.
-			 * Holding so_lock thus so_laddr_sa can not change.
+			 * Holding so_lock thus sti_laddr_sa can not change.
 			 */
-			src = so->so_laddr_sa;
-			srclen = (socklen_t)so->so_laddr_len;
+			src = sti->sti_laddr_sa;
+			srclen = (socklen_t)sti->sti_laddr_len;
 			dprintso(so, 1,
 			    ("so_ux_close: srclen %d, src %p\n",
 			    srclen, src));
 			error = so_ux_addr_xlate(so,
-			    so->so_faddr_sa,
-			    (socklen_t)so->so_faddr_len, 0,
+			    sti->sti_faddr_sa,
+			    (socklen_t)sti->sti_faddr_len, 0,
 			    &addr, &addrlen);
 			if (error) {
 				eprintsoline(so, error);
@@ -2717,93 +3002,6 @@ so_unix_close(struct sonode *so)
 }
 
 /*
- * Handle recv* calls that set MSG_OOB or MSG_OOB together with MSG_PEEK.
- */
-int
-sorecvoob(struct sonode *so, struct nmsghdr *msg, struct uio *uiop, int flags)
-{
-	mblk_t		*mp, *nmp;
-	int		error;
-
-	dprintso(so, 1, ("sorecvoob(%p, %p, 0x%x)\n",
-	    (void *)so, (void *)msg, flags));
-
-	/*
-	 * There is never any oob data with addresses or control since
-	 * the T_EXDATA_IND does not carry any options.
-	 */
-	msg->msg_controllen = 0;
-	msg->msg_namelen = 0;
-
-	mutex_enter(&so->so_lock);
-	ASSERT(so_verify_oobstate(so));
-	if ((so->so_options & SO_OOBINLINE) ||
-	    (so->so_state & (SS_OOBPEND|SS_HADOOBDATA)) != SS_OOBPEND) {
-		dprintso(so, 1, ("sorecvoob: inline or data consumed\n"));
-		mutex_exit(&so->so_lock);
-		return (EINVAL);
-	}
-	if (!(so->so_state & SS_HAVEOOBDATA)) {
-		dprintso(so, 1, ("sorecvoob: no data yet\n"));
-		mutex_exit(&so->so_lock);
-		return (EWOULDBLOCK);
-	}
-	ASSERT(so->so_oobmsg != NULL);
-	mp = so->so_oobmsg;
-	if (flags & MSG_PEEK) {
-		/*
-		 * Since recv* can not return ENOBUFS we can not use dupmsg.
-		 * Instead we revert to the consolidation private
-		 * allocb_wait plus bcopy.
-		 */
-		mblk_t *mp1;
-
-		mp1 = allocb_wait(msgdsize(mp), BPRI_MED, STR_NOSIG, NULL);
-		ASSERT(mp1);
-
-		while (mp != NULL) {
-			ssize_t size;
-
-			size = MBLKL(mp);
-			bcopy(mp->b_rptr, mp1->b_wptr, size);
-			mp1->b_wptr += size;
-			ASSERT(mp1->b_wptr <= mp1->b_datap->db_lim);
-			mp = mp->b_cont;
-		}
-		mp = mp1;
-	} else {
-		/*
-		 * Update the state indicating that the data has been consumed.
-		 * Keep SS_OOBPEND set until data is consumed past the mark.
-		 */
-		so->so_oobmsg = NULL;
-		so->so_state ^= SS_HAVEOOBDATA|SS_HADOOBDATA;
-	}
-	dprintso(so, 1,
-	    ("after recvoob(%p): counts %d/%d state %s\n",
-	    (void *)so, so->so_oobsigcnt,
-	    so->so_oobcnt, pr_state(so->so_state, so->so_mode)));
-	ASSERT(so_verify_oobstate(so));
-	mutex_exit(&so->so_lock);
-
-	error = 0;
-	nmp = mp;
-	while (nmp != NULL && uiop->uio_resid > 0) {
-		ssize_t n = MBLKL(nmp);
-
-		n = MIN(n, uiop->uio_resid);
-		if (n > 0)
-			error = uiomove(nmp->b_rptr, n,
-			    UIO_READ, uiop);
-		if (error)
-			break;
-		nmp = nmp->b_cont;
-	}
-	freemsg(mp);
-	return (error);
-}
-
-/*
  * Called by sotpi_recvmsg when reading a non-zero amount of data.
  * In addition, the caller typically verifies that there is some
  * potential state to clear by checking
@@ -2811,7 +3009,7 @@ sorecvoob(struct sonode *so, struct nmsghdr *msg, struct uio *uiop, int flags)
  * before calling this routine.
  * Note that such a check can be made without holding so_lock since
  * sotpi_recvmsg is single-threaded (using SOREADLOCKED) and only sotpi_recvmsg
- * decrements so_oobsigcnt.
+ * decrements sti_oobsigcnt.
  *
  * When data is read *after* the point that all pending
  * oob data has been consumed the oob indication is cleared.
@@ -2823,13 +3021,15 @@ sorecvoob(struct sonode *so, struct nmsghdr *msg, struct uio *uiop, int flags)
 static void
 sorecv_update_oobstate(struct sonode *so)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
+
 	mutex_enter(&so->so_lock);
 	ASSERT(so_verify_oobstate(so));
 	dprintso(so, 1,
 	    ("sorecv_update_oobstate: counts %d/%d state %s\n",
-	    so->so_oobsigcnt,
-	    so->so_oobcnt, pr_state(so->so_state, so->so_mode)));
-	if (so->so_oobsigcnt == 0) {
+	    sti->sti_oobsigcnt,
+	    sti->sti_oobcnt, pr_state(so->so_state, so->so_mode)));
+	if (sti->sti_oobsigcnt == 0) {
 		/* No more pending oob indications */
 		so->so_state &= ~(SS_OOBPEND|SS_HAVEOOBDATA|SS_RCVATMARK);
 		freemsg(so->so_oobmsg);
@@ -2845,10 +3045,11 @@ sorecv_update_oobstate(struct sonode *so)
 static int
 nl7c_sorecv(struct sonode *so, mblk_t **rmp, uio_t *uiop, rval_t *rp)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
 	int	error = 0;
 	mblk_t *tmp = NULL;
 	mblk_t *pmp = NULL;
-	mblk_t *nmp = so->so_nl7c_rcv_mp;
+	mblk_t *nmp = sti->sti_nl7c_rcv_mp;
 
 	ASSERT(nmp != NULL);
 
@@ -2889,25 +3090,24 @@ nl7c_sorecv(struct sonode *so, mblk_t **rmp, uio_t *uiop, rval_t *rp)
 	if (pmp != NULL) {
 		/* Free any mblk_t(s) which we have consumed */
 		pmp->b_cont = NULL;
-		freemsg(so->so_nl7c_rcv_mp);
+		freemsg(sti->sti_nl7c_rcv_mp);
 	}
-	if ((so->so_nl7c_rcv_mp = nmp) == NULL) {
+	if ((sti->sti_nl7c_rcv_mp = nmp) == NULL) {
 		/* Last mblk_t so return the saved kstrgetmsg() rval/error */
 		if (error == 0) {
-			rval_t	*p = (rval_t *)&so->so_nl7c_rcv_rval;
+			rval_t	*p = (rval_t *)&sti->sti_nl7c_rcv_rval;
 
 			error = p->r_v.r_v2;
 			p->r_v.r_v2 = 0;
 		}
-		rp->r_vals = so->so_nl7c_rcv_rval;
-		so->so_nl7c_rcv_rval = 0;
+		rp->r_vals = sti->sti_nl7c_rcv_rval;
+		sti->sti_nl7c_rcv_rval = 0;
 	} else {
 		/* More mblk_t(s) to process so no rval to return */
 		rp->r_vals = 0;
 	}
 	return (error);
 }
-
 /*
  * Receive the next message on the queue.
  * If msg_controllen is non-zero when called the caller is interested in
@@ -2917,8 +3117,10 @@ nl7c_sorecv(struct sonode *so, mblk_t **rmp, uio_t *uiop, rval_t *rp)
  * The routine returns with msg_control and msg_name pointing to
  * kmem_alloc'ed memory which the caller has to free.
  */
+/* ARGSUSED */
 int
-sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
+sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
+    struct cred *cr)
 {
 	union T_primitives	*tpr;
 	mblk_t			*mp;
@@ -2932,10 +3134,10 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	rval_t			rval;
 	int			flags;
 	clock_t			timout;
-	int			first;
 	int			error = 0;
+	int			reterr = 0;
 	struct uio		*suiop = NULL;
-	sodirect_t		*sodp = so->so_direct;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	flags = msg->msg_flags;
 	msg->msg_flags = 0;
@@ -2943,6 +3145,12 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	dprintso(so, 1, ("sotpi_recvmsg(%p, %p, 0x%x) state %s err %d\n",
 	    (void *)so, (void *)msg, flags,
 	    pr_state(so->so_state, so->so_mode), so->so_error));
+
+	if (so->so_version == SOV_STREAM) {
+		so_update_attrs(so, SOACC);
+		/* The imaginary "sockmod" has been popped - act as a stream */
+		return (strread(SOTOV(so), uiop, cr));
+	}
 
 	/*
 	 * If we are not connected because we have never been connected
@@ -2970,8 +3178,12 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		/* Check that the transport supports OOB */
 		if (!(so->so_mode & SM_EXDATA))
 			return (EOPNOTSUPP);
-		return (sorecvoob(so, msg, uiop, flags));
+		so_update_attrs(so, SOACC);
+		return (sorecvoob(so, msg, uiop, flags,
+		    (so->so_options & SO_OOBINLINE)));
 	}
+
+	so_update_attrs(so, SOACC);
 
 	/*
 	 * Set msg_controllen and msg_namelen to zero here to make it
@@ -2989,31 +3201,32 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	/*
 	 * If an NL7C enabled socket and not waiting for write data.
 	 */
-	if ((so->so_nl7c_flags & (NL7C_ENABLED | NL7C_WAITWRITE)) ==
+	if ((sti->sti_nl7c_flags & (NL7C_ENABLED | NL7C_WAITWRITE)) ==
 	    NL7C_ENABLED) {
-		if (so->so_nl7c_uri) {
+		if (sti->sti_nl7c_uri) {
 			/* Close uri processing for a previous request */
 			nl7c_close(so);
 		}
-		if ((so_state & SS_CANTRCVMORE) && so->so_nl7c_rcv_mp == NULL) {
+		if ((so_state & SS_CANTRCVMORE) &&
+		    sti->sti_nl7c_rcv_mp == NULL) {
 			/* Nothing to process, EOF */
 			mutex_exit(&so->so_lock);
 			return (0);
-		} else if (so->so_nl7c_flags & NL7C_SOPERSIST) {
+		} else if (sti->sti_nl7c_flags & NL7C_SOPERSIST) {
 			/* Persistent NL7C socket, try to process request */
 			boolean_t ret;
 
 			ret = nl7c_process(so,
 			    (so->so_state & (SS_NONBLOCK|SS_NDELAY)));
-			rval.r_vals = so->so_nl7c_rcv_rval;
+			rval.r_vals = sti->sti_nl7c_rcv_rval;
 			error = rval.r_v.r_v2;
 			if (error) {
 				/* Error of some sort, return it */
 				mutex_exit(&so->so_lock);
 				return (error);
 			}
-			if (so->so_nl7c_flags &&
-			    ! (so->so_nl7c_flags & NL7C_WAITWRITE)) {
+			if (sti->sti_nl7c_flags &&
+			    ! (sti->sti_nl7c_flags & NL7C_WAITWRITE)) {
 				/*
 				 * Still an NL7C socket and no data
 				 * to pass up to the caller.
@@ -3031,7 +3244,7 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 			/*
 			 * Not persistent so no further NL7C processing.
 			 */
-			so->so_nl7c_flags = 0;
+			sti->sti_nl7c_flags = 0;
 		}
 	}
 	/*
@@ -3081,84 +3294,23 @@ sotpi_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	else
 		timout = -1;
 	opflag = pflag;
-	first = 1;
 
-	if (uiop->uio_resid >= uioasync.mincnt &&
-	    sodp != NULL && (sodp->sod_state & SOD_ENABLED) &&
-	    uioasync.enabled && !(flags & MSG_PEEK) &&
-	    !(so_state & SS_CANTRCVMORE)) {
-		/*
-		 * Big enough I/O for uioa min setup and an sodirect socket
-		 * and sodirect enabled and uioa enabled and I/O will be done
-		 * and not EOF so initialize the sodirect_t uioa_t with "uiop".
-		 */
-		mutex_enter(sodp->sod_lockp);
-		if (!uioainit(uiop, &sodp->sod_uioa)) {
-			/*
-			 * Successful uioainit() so the uio_t part of the
-			 * uioa_t will be used for all uio_t work to follow,
-			 * we save the original "uiop" in "suiop".
-			 */
-			suiop = uiop;
-			uiop = (uio_t *)&sodp->sod_uioa;
-			/*
-			 * Before returning to the caller the passed in uio_t
-			 * "uiop" will be updated via a call to uioafini()
-			 * below.
-			 *
-			 * Note, the uioa.uioa_state isn't set to UIOA_ENABLED
-			 * here as first we have to uioamove() any currently
-			 * queued M_DATA mblk_t(s) so it will be done in
-			 * kstrgetmsg().
-			 */
-		}
-		/*
-		 * In either uioainit() success or not case note the number
-		 * of uio bytes the caller wants for sod framework and/or
-		 * transport (e.g. TCP) strategy.
-		 */
-		sodp->sod_want = uiop->uio_resid;
-		mutex_exit(sodp->sod_lockp);
-	} else if (sodp != NULL && (sodp->sod_state & SOD_ENABLED)) {
-		/*
-		 * No uioa but still using sodirect so note the number of
-		 * uio bytes the caller wants for sodirect framework and/or
-		 * transport (e.g. TCP) strategy.
-		 *
-		 * Note, sod_lockp not held, only writer is in this function
-		 * and only one thread at a time so not needed just to init.
-		 */
-		sodp->sod_want = uiop->uio_resid;
-	}
+	suiop = sod_rcv_init(so, flags, &uiop);
 retry:
 	saved_resid = uiop->uio_resid;
 	pri = 0;
 	mp = NULL;
-	if (so->so_nl7c_rcv_mp != NULL) {
+	if (sti->sti_nl7c_rcv_mp != NULL) {
 		/* Already kstrgetmsg()ed saved mblk(s) from NL7C */
 		error = nl7c_sorecv(so, &mp, uiop, &rval);
 	} else {
 		error = kstrgetmsg(SOTOV(so), &mp, uiop, &pri, &pflag,
 		    timout, &rval);
 	}
-	if (error) {
-		switch (error) {
-		case EINTR:
-		case EWOULDBLOCK:
-			if (!first)
-				error = 0;
-			break;
-		case ETIME:
-			/* Returned from kstrgetmsg when timeout expires */
-			if (!first)
-				error = 0;
-			else
-				error = EWOULDBLOCK;
-			break;
-		default:
-			eprintsoline(so, error);
-			break;
-		}
+	if (error != 0) {
+		/* kstrgetmsg returns ETIME when timeout expires */
+		if (error == ETIME)
+			error = EWOULDBLOCK;
 		goto out;
 	}
 	/*
@@ -3198,7 +3350,6 @@ retry:
 		if ((flags & MSG_WAITALL) && !(msg->msg_flags & MSG_EOR) &&
 		    uiop->uio_resid != saved_resid && uiop->uio_resid > 0) {
 			mutex_exit(&so->so_lock);
-			first = 0;
 			pflag = opflag | MSG_NOMARK;
 			goto retry;
 		}
@@ -3238,7 +3389,6 @@ retry:
 		if ((flags & MSG_WAITALL) && !(msg->msg_flags & MSG_EOR) &&
 		    uiop->uio_resid != saved_resid && uiop->uio_resid > 0) {
 			mutex_exit(&so->so_lock);
-			first = 0;
 			pflag = opflag | MSG_NOMARK;
 			goto retry;
 		}
@@ -3436,7 +3586,6 @@ retry:
 		    controllen == 0 &&
 		    uiop->uio_resid != saved_resid && uiop->uio_resid > 0) {
 			mutex_exit(&so->so_lock);
-			first = 0;
 			pflag = opflag | MSG_NOMARK;
 			goto retry;
 		}
@@ -3446,7 +3595,7 @@ retry:
 		dprintso(so, 1,
 		    ("sotpi_recvmsg: EXDATA_IND counts %d/%d consumed %ld "
 		    "state %s\n",
-		    so->so_oobsigcnt, so->so_oobcnt,
+		    sti->sti_oobsigcnt, sti->sti_oobcnt,
 		    saved_resid - uiop->uio_resid,
 		    pr_state(so->so_state, so->so_mode)));
 		/*
@@ -3476,8 +3625,8 @@ retry:
 			dprintso(so, 1,
 			    ("sotpi_recvmsg: consume EXDATA_IND "
 			    "counts %d/%d state %s\n",
-			    so->so_oobsigcnt,
-			    so->so_oobcnt,
+			    sti->sti_oobsigcnt,
+			    sti->sti_oobcnt,
 			    pr_state(so->so_state, so->so_mode)));
 
 			pflag = MSG_ANY | MSG_DELAYERROR;
@@ -3516,11 +3665,11 @@ retry:
 		 */
 		mutex_enter(&so->so_lock);
 		ASSERT(so_verify_oobstate(so));
-		ASSERT(so->so_oobsigcnt >= so->so_oobcnt);
-		ASSERT(so->so_oobsigcnt > 0);
-		so->so_oobsigcnt--;
-		ASSERT(so->so_oobcnt > 0);
-		so->so_oobcnt--;
+		ASSERT(sti->sti_oobsigcnt >= sti->sti_oobcnt);
+		ASSERT(sti->sti_oobsigcnt > 0);
+		sti->sti_oobsigcnt--;
+		ASSERT(sti->sti_oobcnt > 0);
+		sti->sti_oobcnt--;
 		/*
 		 * Since the T_EXDATA_IND has been removed from the stream
 		 * head, but we have not read data past the mark,
@@ -3533,12 +3682,14 @@ retry:
 		mutex_exit(&so->so_lock);
 		dprintso(so, 1,
 		    ("sotpi_recvmsg: retry EXDATA_IND counts %d/%d state %s\n",
-		    so->so_oobsigcnt, so->so_oobcnt,
+		    sti->sti_oobsigcnt, sti->sti_oobcnt,
 		    pr_state(so->so_state, so->so_mode)));
 		pflag = opflag;
 		goto retry;
 	}
 	default:
+		cmn_err(CE_CONT, "sotpi_recvmsg: so %p prim %d mp %p\n",
+		    (void *)so, tpr->type, (void *)mp);
 		ASSERT(0);
 		freemsg(mp);
 		error = EPROTO;
@@ -3549,35 +3700,13 @@ retry:
 out:
 	mutex_enter(&so->so_lock);
 out_locked:
-	if (sodp != NULL) {
-		/* Finish any sodirect and uioa processing */
-		mutex_enter(sodp->sod_lockp);
-		if (suiop != NULL) {
-			/* Finish any uioa_t processing */
-			int ret;
-
-			ASSERT(uiop == (uio_t *)&sodp->sod_uioa);
-			ret = uioafini(suiop, (uioa_t *)uiop);
-			if (error == 0 && ret != 0) {
-				/* If no error yet, set it */
-				error = ret;
-			}
-			if ((mp = sodp->sod_uioafh) != NULL) {
-				sodp->sod_uioafh = NULL;
-				sodp->sod_uioaft = NULL;
-				freemsg(mp);
-			}
-		}
-		ASSERT(sodp->sod_uioafh == NULL);
-		if (!(sodp->sod_state & SOD_WAKE_NOT)) {
-			/* Awoke */
-			sodp->sod_state &= SOD_WAKE_CLR;
-			sodp->sod_state |= SOD_WAKE_NOT;
-		}
-		/* Last, clear sod_want value */
-		sodp->sod_want = 0;
-		mutex_exit(sodp->sod_lockp);
+	if (so->so_direct != NULL) {
+		mutex_enter(so->so_direct->sod_lockp);
+		reterr = sod_rcv_done(so, suiop, uiop);
+		mutex_exit(so->so_direct->sod_lockp);
 	}
+	if (reterr != 0 && error == 0)
+		error = reterr;
 	so_unlock_read(so);	/* Clear SOREADLOCKED */
 	mutex_exit(&so->so_lock);
 	return (error);
@@ -3605,12 +3734,13 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 	t_uscalar_t		optlen;
 	void			*fds;
 	int			fdlen;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	ASSERT(name && namelen);
 	ASSERT(control && controllen);
 
 	len = uiop->uio_resid;
-	if (len > (ssize_t)so->so_tidu_size) {
+	if (len > (ssize_t)sti->sti_tidu_size) {
 		return (EMSGSIZE);
 	}
 
@@ -3630,7 +3760,7 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 		return (error);
 	}
 	if (so->so_family == AF_UNIX) {
-		if (so->so_state & SS_FADDR_NOXLATE) {
+		if (sti->sti_faddr_noxlate) {
 			/*
 			 * Already have a transport internal address. Do not
 			 * pass any (transport internal) source address.
@@ -3644,14 +3774,14 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 			 * Pass the sockaddr_un source address as an option
 			 * and translate the remote address.
 			 *
-			 * Note that this code does not prevent so_laddr_sa
+			 * Note that this code does not prevent sti_laddr_sa
 			 * from changing while it is being used. Thus
 			 * if an unbind+bind occurs concurrently with this
 			 * send the peer might see a partially new and a
 			 * partially old "from" address.
 			 */
-			src = so->so_laddr_sa;
-			srclen = (t_uscalar_t)so->so_laddr_len;
+			src = sti->sti_laddr_sa;
+			srclen = (t_uscalar_t)sti->sti_laddr_len;
 			dprintso(so, 1,
 			    ("sosend_dgramcmsg UNIX: srclen %d, src %p\n",
 			    srclen, src));
@@ -3762,24 +3892,20 @@ sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
  * Assumes caller has verified that SS_ISCONNECTED is set.
  */
 static int
-sosend_svccmsg(struct sonode *so,
-		struct uio *uiop,
-		int more,
-		void *control,
-		t_uscalar_t controllen,
-		int flags)
+sosend_svccmsg(struct sonode *so, struct uio *uiop, int more, void *control,
+    t_uscalar_t controllen, int flags)
 {
 	struct T_optdata_req	tdr;
 	mblk_t			*mp;
 	int			error;
 	ssize_t			iosize;
-	int			first = 1;
 	int			size;
 	struct fdbuf		*fdbuf;
 	t_uscalar_t		optlen;
 	void			*fds;
 	int			fdlen;
 	struct T_opthdr		toh;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	dprintso(so, 1,
 	    ("sosend_svccmsg: resid %ld bytes\n", uiop->uio_resid));
@@ -3801,7 +3927,7 @@ sosend_svccmsg(struct sonode *so,
 		 * Error for transports with zero tidu_size.
 		 */
 		tdr.PRIM_type = T_OPTDATA_REQ;
-		iosize = so->so_tidu_size;
+		iosize = sti->sti_tidu_size;
 		if (iosize <= 0)
 			return (EMSGSIZE);
 		if (uiop->uio_resid > iosize) {
@@ -3843,7 +3969,7 @@ sosend_svccmsg(struct sonode *so,
 				 * Caught a signal waiting for memory.
 				 * Let send* return EINTR.
 				 */
-				return (first ? EINTR : 0);
+				return (EINTR);
 			}
 		}
 		soappendmsg(mp, &tdr, sizeof (tdr));
@@ -3869,13 +3995,10 @@ sosend_svccmsg(struct sonode *so,
 		error = kstrputmsg(SOTOV(so), mp, uiop, iosize,
 		    0, MSG_BAND, 0);
 		if (error) {
-			if (!first && error == EWOULDBLOCK)
-				return (0);
 			eprintsoline(so, error);
 			return (error);
 		}
 		control = NULL;
-		first = 0;
 		if (uiop->uio_resid > 0) {
 			/*
 			 * Recheck for fatal errors. Fail write even though
@@ -3883,13 +4006,12 @@ sosend_svccmsg(struct sonode *so,
 			 * with strwrite semantics and BSD sockets semantics.
 			 */
 			if (so->so_state & SS_CANTSENDMORE) {
-				tsignal(curthread, SIGPIPE);
 				eprintsoline(so, error);
 				return (EPIPE);
 			}
 			if (so->so_error != 0) {
 				mutex_enter(&so->so_lock);
-				error = sogeterr(so);
+				error = sogeterr(so, B_TRUE);
 				mutex_exit(&so->so_lock);
 				if (error != 0) {
 					eprintsoline(so, error);
@@ -3920,11 +4042,12 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 	void			*src;
 	socklen_t		srclen;
 	ssize_t			len;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	ASSERT(name != NULL && namelen != 0);
 
 	len = uiop->uio_resid;
-	if (len > so->so_tidu_size) {
+	if (len > sti->sti_tidu_size) {
 		error = EMSGSIZE;
 		goto done;
 	}
@@ -3934,11 +4057,11 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 	if (error != 0)
 		goto done;
 
-	if (so->so_state & SS_DIRECT)
+	if (sti->sti_direct)
 		return (sodgram_direct(so, name, namelen, uiop, flags));
 
 	if (so->so_family == AF_UNIX) {
-		if (so->so_state & SS_FADDR_NOXLATE) {
+		if (sti->sti_faddr_noxlate) {
 			/*
 			 * Already have a transport internal address. Do not
 			 * pass any (transport internal) source address.
@@ -3952,14 +4075,14 @@ sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
 			 * Pass the sockaddr_un source address as an option
 			 * and translate the remote address.
 			 *
-			 * Note that this code does not prevent so_laddr_sa
+			 * Note that this code does not prevent sti_laddr_sa
 			 * from changing while it is being used. Thus
 			 * if an unbind+bind occurs concurrently with this
 			 * send the peer might see a partially new and a
 			 * partially old "from" address.
 			 */
-			src = so->so_laddr_sa;
-			srclen = (socklen_t)so->so_laddr_len;
+			src = sti->sti_laddr_sa;
+			srclen = (socklen_t)sti->sti_laddr_len;
 			dprintso(so, 1,
 			    ("sosend_dgram UNIX: srclen %d, src %p\n",
 			    srclen, src));
@@ -4048,17 +4171,14 @@ done:
  * Assumes caller has verified that SS_ISCONNECTED is set.
  */
 int
-sosend_svc(struct sonode *so,
-	struct uio *uiop,
-	t_scalar_t prim,
-	int more,
-	int sflag)
+sosend_svc(struct sonode *so, struct uio *uiop, t_scalar_t prim, int more,
+    int sflag)
 {
 	struct T_data_req	tdr;
 	mblk_t			*mp;
 	int			error;
 	ssize_t			iosize;
-	int			first = 1;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	dprintso(so, 1,
 	    ("sosend_svc: %p, resid %ld bytes, prim %d, sflag 0x%x\n",
@@ -4077,7 +4197,7 @@ sosend_svc(struct sonode *so,
 		 * Error for transports with zero tidu_size.
 		 */
 		tdr.PRIM_type = prim;
-		iosize = so->so_tidu_size;
+		iosize = sti->sti_tidu_size;
 		if (iosize <= 0)
 			return (EMSGSIZE);
 		if (uiop->uio_resid > iosize) {
@@ -4097,21 +4217,15 @@ sosend_svc(struct sonode *so,
 			 * Caught a signal waiting for memory.
 			 * Let send* return EINTR.
 			 */
-			if (first)
-				return (EINTR);
-			else
-				return (0);
+			return (EINTR);
 		}
 
 		error = kstrputmsg(SOTOV(so), mp, uiop, iosize,
 		    0, sflag | MSG_BAND, 0);
 		if (error) {
-			if (!first && error == EWOULDBLOCK)
-				return (0);
 			eprintsoline(so, error);
 			return (error);
 		}
-		first = 0;
 		if (uiop->uio_resid > 0) {
 			/*
 			 * Recheck for fatal errors. Fail write even though
@@ -4119,13 +4233,12 @@ sosend_svc(struct sonode *so,
 			 * with strwrite semantics and BSD sockets semantics.
 			 */
 			if (so->so_state & SS_CANTSENDMORE) {
-				tsignal(curthread, SIGPIPE);
 				eprintsoline(so, error);
 				return (EPIPE);
 			}
 			if (so->so_error != 0) {
 				mutex_enter(&so->so_lock);
-				error = sogeterr(so);
+				error = sogeterr(so, B_TRUE);
 				mutex_exit(&so->so_lock);
 				if (error != 0) {
 					eprintsoline(so, error);
@@ -4145,7 +4258,8 @@ sosend_svc(struct sonode *so,
  * after sending the message.
  */
 static int
-sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
+sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
+    struct cred *cr)
 {
 	int		so_state;
 	int		so_mode;
@@ -4154,22 +4268,28 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	t_uscalar_t	namelen;
 	int		dontroute;
 	int		flags;
+	sotpi_info_t	*sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("sotpi_sendmsg(%p, %p, 0x%x) state %s, error %d\n",
 	    (void *)so, (void *)msg, msg->msg_flags,
 	    pr_state(so->so_state, so->so_mode), so->so_error));
+
+	if (so->so_version == SOV_STREAM) {
+		/* The imaginary "sockmod" has been popped - act as a stream */
+		so_update_attrs(so, SOMOD);
+		return (strwrite(SOTOV(so), uiop, cr));
+	}
 
 	mutex_enter(&so->so_lock);
 	so_state = so->so_state;
 
 	if (so_state & SS_CANTSENDMORE) {
 		mutex_exit(&so->so_lock);
-		tsignal(curthread, SIGPIPE);
 		return (EPIPE);
 	}
 
 	if (so->so_error != 0) {
-		error = sogeterr(so);
+		error = sogeterr(so, B_TRUE);
 		if (error != 0) {
 			mutex_exit(&so->so_lock);
 			return (error);
@@ -4194,15 +4314,15 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 			namelen = 0;
 		} else {
 			/*
-			 * Note that this code does not prevent so_faddr_sa
+			 * Note that this code does not prevent sti_faddr_sa
 			 * from changing while it is being used. Thus
 			 * if an "unconnect"+connect occurs concurrently with
 			 * this send the datagram might be delivered to a
 			 * garbaled address.
 			 */
-			ASSERT(so->so_faddr_sa);
-			name = so->so_faddr_sa;
-			namelen = (t_uscalar_t)so->so_faddr_len;
+			ASSERT(sti->sti_faddr_sa);
+			name = sti->sti_faddr_sa;
+			namelen = (t_uscalar_t)sti->sti_faddr_len;
 		}
 	} else {
 		if (!(so_state & SS_ISCONNECTED) &&
@@ -4227,7 +4347,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		if (!(so_state & SS_ISBOUND)) {
 			so_lock_single(so);	/* Set SOLOCKED */
 			error = sotpi_bind(so, NULL, 0,
-			    _SOBIND_UNSPEC|_SOBIND_LOCK_HELD);
+			    _SOBIND_UNSPEC|_SOBIND_LOCK_HELD, cr);
 			so_unlock_single(so, SOLOCKED);
 			if (error) {
 				mutex_exit(&so->so_lock);
@@ -4243,20 +4363,20 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		 * If sending to some other address discard the delayed
 		 * error indication.
 		 */
-		if (so->so_delayed_error) {
+		if (sti->sti_delayed_error) {
 			struct T_uderror_ind	*tudi;
 			void			*addr;
 			t_uscalar_t		addrlen;
 			boolean_t		match = B_FALSE;
 
-			ASSERT(so->so_eaddr_mp);
-			error = so->so_delayed_error;
-			so->so_delayed_error = 0;
-			tudi = (struct T_uderror_ind *)so->so_eaddr_mp->b_rptr;
+			ASSERT(sti->sti_eaddr_mp);
+			error = sti->sti_delayed_error;
+			sti->sti_delayed_error = 0;
+			tudi =
+			    (struct T_uderror_ind *)sti->sti_eaddr_mp->b_rptr;
 			addrlen = tudi->DEST_length;
-			addr = sogetoff(so->so_eaddr_mp,
-			    tudi->DEST_offset,
-			    addrlen, 1);
+			addr = sogetoff(sti->sti_eaddr_mp,
+			    tudi->DEST_offset, addrlen, 1);
 			ASSERT(addr);	/* Checked by strsock_proto */
 			switch (so->so_family) {
 			case AF_INET: {
@@ -4292,8 +4412,8 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 					match = B_TRUE;
 			}
 			if (match) {
-				freemsg(so->so_eaddr_mp);
-				so->so_eaddr_mp = NULL;
+				freemsg(sti->sti_eaddr_mp);
+				sti->sti_eaddr_mp = NULL;
 				mutex_exit(&so->so_lock);
 #ifdef DEBUG
 				dprintso(so, 0,
@@ -4303,8 +4423,8 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 #endif /* DEBUG */
 				return (error);
 			}
-			freemsg(so->so_eaddr_mp);
-			so->so_eaddr_mp = NULL;
+			freemsg(sti->sti_eaddr_mp);
+			sti->sti_eaddr_mp = NULL;
 		}
 	}
 	mutex_exit(&so->so_lock);
@@ -4316,7 +4436,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 
 		val = 1;
 		error = sotpi_setsockopt(so, SOL_SOCKET, SO_DONTROUTE,
-		    &val, (t_uscalar_t)sizeof (val));
+		    &val, (t_uscalar_t)sizeof (val), cr);
 		if (error)
 			return (error);
 		dontroute = 1;
@@ -4328,6 +4448,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	}
 	if (msg->msg_controllen != 0) {
 		if (!(so_mode & SM_CONNREQUIRED)) {
+			so_update_attrs(so, SOMOD);
 			error = sosend_dgramcmsg(so, name, namelen, uiop,
 			    msg->msg_control, msg->msg_controllen, flags);
 		} else {
@@ -4336,6 +4457,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 				error = EOPNOTSUPP;
 				goto done;
 			}
+			so_update_attrs(so, SOMOD);
 			error = sosend_svccmsg(so, uiop,
 			    !(flags & MSG_EOR),
 			    msg->msg_control, msg->msg_controllen,
@@ -4344,6 +4466,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		goto done;
 	}
 
+	so_update_attrs(so, SOMOD);
 	if (!(so_mode & SM_CONNREQUIRED)) {
 		/*
 		 * If there is no SO_DONTROUTE to turn off return immediately
@@ -4368,20 +4491,25 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		} else {
 			if (so_mode & SM_BYTESTREAM) {
 				/* Byte stream transport - use write */
-
 				dprintso(so, 1, ("sotpi_sendmsg: write\n"));
+
+				/* Send M_DATA messages */
+				if ((sti->sti_nl7c_flags & NL7C_ENABLED) &&
+				    (error = nl7c_data(so, uiop)) >= 0) {
+					/* NL7C consumed the data */
+					return (error);
+				}
 				/*
 				 * If there is no SO_DONTROUTE to turn off,
-				 * SS_DIRECT is on, and there is no flow
+				 * sti_direct is on, and there is no flow
 				 * control, we can take the fast path.
 				 */
-				if (!dontroute &&
-				    (so_state & SS_DIRECT) &&
+				if (!dontroute && sti->sti_direct != 0 &&
 				    canputnext(SOTOV(so)->v_stream->sd_wrq)) {
 					return (sostream_direct(so, uiop,
-					    NULL, CRED()));
+					    NULL, cr));
 				}
-				error = strwrite(SOTOV(so), uiop, CRED());
+				error = strwrite(SOTOV(so), uiop, cr);
 				goto done;
 			}
 			prim = T_DATA_REQ;
@@ -4404,8 +4532,125 @@ done:
 
 		val = 0;
 		(void) sotpi_setsockopt(so, SOL_SOCKET, SO_DONTROUTE,
-		    &val, (t_uscalar_t)sizeof (val));
+		    &val, (t_uscalar_t)sizeof (val), cr);
 	}
+	return (error);
+}
+
+/*
+ * kstrwritemp() has very similar semantics as that of strwrite().
+ * The main difference is it obtains mblks from the caller and also
+ * does not do any copy as done in strwrite() from user buffers to
+ * kernel buffers.
+ *
+ * Currently, this routine is used by sendfile to send data allocated
+ * within the kernel without any copying. This interface does not use the
+ * synchronous stream interface as synch. stream interface implies
+ * copying.
+ */
+int
+kstrwritemp(struct vnode *vp, mblk_t *mp, ushort_t fmode)
+{
+	struct stdata *stp;
+	struct queue *wqp;
+	mblk_t *newmp;
+	char waitflag;
+	int tempmode;
+	int error = 0;
+	int done = 0;
+	struct sonode *so;
+	boolean_t direct;
+
+	ASSERT(vp->v_stream);
+	stp = vp->v_stream;
+
+	so = VTOSO(vp);
+	direct = _SOTOTPI(so)->sti_direct;
+
+	/*
+	 * This is the sockfs direct fast path. canputnext() need
+	 * not be accurate so we don't grab the sd_lock here. If
+	 * we get flow-controlled, we grab sd_lock just before the
+	 * do..while loop below to emulate what strwrite() does.
+	 */
+	wqp = stp->sd_wrq;
+	if (canputnext(wqp) && direct &&
+	    !(stp->sd_flag & (STWRERR|STRHUP|STPLEX))) {
+		return (sostream_direct(so, NULL, mp, CRED()));
+	} else if (stp->sd_flag & (STWRERR|STRHUP|STPLEX)) {
+		/* Fast check of flags before acquiring the lock */
+		mutex_enter(&stp->sd_lock);
+		error = strgeterr(stp, STWRERR|STRHUP|STPLEX, 0);
+		mutex_exit(&stp->sd_lock);
+		if (error != 0) {
+			if (!(stp->sd_flag & STPLEX) &&
+			    (stp->sd_wput_opt & SW_SIGPIPE)) {
+				error = EPIPE;
+			}
+			return (error);
+		}
+	}
+
+	waitflag = WRITEWAIT;
+	if (stp->sd_flag & OLDNDELAY)
+		tempmode = fmode & ~FNDELAY;
+	else
+		tempmode = fmode;
+
+	mutex_enter(&stp->sd_lock);
+	do {
+		if (canputnext(wqp)) {
+			mutex_exit(&stp->sd_lock);
+			if (stp->sd_wputdatafunc != NULL) {
+				newmp = (stp->sd_wputdatafunc)(vp, mp, NULL,
+				    NULL, NULL, NULL);
+				if (newmp == NULL) {
+					/* The caller will free mp */
+					return (ECOMM);
+				}
+				mp = newmp;
+			}
+			putnext(wqp, mp);
+			return (0);
+		}
+		error = strwaitq(stp, waitflag, (ssize_t)0, tempmode, -1,
+		    &done);
+	} while (error == 0 && !done);
+
+	mutex_exit(&stp->sd_lock);
+	/*
+	 * EAGAIN tells the application to try again. ENOMEM
+	 * is returned only if the memory allocation size
+	 * exceeds the physical limits of the system. ENOMEM
+	 * can't be true here.
+	 */
+	if (error == ENOMEM)
+		error = EAGAIN;
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+sotpi_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
+    struct cred *cr, mblk_t **mpp)
+{
+	int error;
+
+	if (so->so_family != AF_INET && so->so_family != AF_INET6)
+		return (EAFNOSUPPORT);
+
+	if (so->so_state & SS_CANTSENDMORE)
+		return (EPIPE);
+
+	if (so->so_type != SOCK_STREAM)
+		return (EOPNOTSUPP);
+
+	if ((so->so_state & SS_ISCONNECTED) == 0)
+		return (ENOTCONN);
+
+	error = kstrwritemp(so->so_vnode, *mpp, fflag);
+	if (error == 0)
+		*mpp = NULL;
 	return (error);
 }
 
@@ -4429,6 +4674,7 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 	queue_t			*udp_wq;
 	boolean_t		connected;
 	mblk_t			*mpdata = NULL;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	ASSERT(name != NULL && namelen != 0);
 	ASSERT(!(so->so_mode & SM_CONNREQUIRED));
@@ -4438,7 +4684,7 @@ sodgram_direct(struct sonode *so, struct sockaddr *name,
 
 	/* Caller checked for proper length */
 	len = uiop->uio_resid;
-	ASSERT(len <= so->so_tidu_size);
+	ASSERT(len <= sti->sti_tidu_size);
 
 	/* Length and family checks have been done by caller */
 	ASSERT(name->sa_family == so->so_family);
@@ -4640,22 +4886,34 @@ slow_send:
 }
 
 /*
- * Update so_faddr by asking the transport (unless AF_UNIX).
+ * Update sti_faddr by asking the transport (unless AF_UNIX).
  */
+/* ARGSUSED */
 int
-sotpi_getpeername(struct sonode *so)
+sotpi_getpeername(struct sonode *so, struct sockaddr *name, socklen_t *namelen,
+    boolean_t accept, struct cred *cr)
 {
 	struct strbuf	strbuf;
 	int		error = 0, res;
 	void		*addr;
 	t_uscalar_t	addrlen;
 	k_sigset_t	smask;
+	sotpi_info_t	*sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("sotpi_getpeername(%p) %s\n",
 	    (void *)so, pr_state(so->so_state, so->so_mode)));
 
+	ASSERT(*namelen > 0);
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
+
+	if (accept) {
+		bcopy(sti->sti_faddr_sa, name,
+		    MIN(*namelen, sti->sti_faddr_len));
+		*namelen = sti->sti_faddr_noxlate ? 0: sti->sti_faddr_len;
+		goto done;
+	}
+
 	if (!(so->so_state & SS_ISCONNECTED)) {
 		error = ENOTCONN;
 		goto done;
@@ -4668,27 +4926,39 @@ sotpi_getpeername(struct sonode *so)
 		}
 		goto done;
 	}
+
+	if (sti->sti_faddr_valid) {
+		bcopy(sti->sti_faddr_sa, name,
+		    MIN(*namelen, sti->sti_faddr_len));
+		*namelen = sti->sti_faddr_noxlate ? 0: sti->sti_faddr_len;
+		goto done;
+	}
+
 #ifdef DEBUG
 	dprintso(so, 1, ("sotpi_getpeername (local): %s\n",
-	    pr_addr(so->so_family, so->so_faddr_sa,
-	    (t_uscalar_t)so->so_faddr_len)));
+	    pr_addr(so->so_family, sti->sti_faddr_sa,
+	    (t_uscalar_t)sti->sti_faddr_len)));
 #endif /* DEBUG */
 
 	if (so->so_family == AF_UNIX) {
 		/* Transport has different name space - return local info */
+		if (sti->sti_faddr_noxlate)
+			*namelen = 0;
 		error = 0;
 		goto done;
 	}
 
-	ASSERT(so->so_faddr_sa);
+	ASSERT(so->so_family != AF_UNIX && sti->sti_faddr_noxlate == 0);
+
+	ASSERT(sti->sti_faddr_sa);
 	/* Allocate local buffer to use with ioctl */
-	addrlen = (t_uscalar_t)so->so_faddr_maxlen;
+	addrlen = (t_uscalar_t)sti->sti_faddr_maxlen;
 	mutex_exit(&so->so_lock);
 	addr = kmem_alloc(addrlen, KM_SLEEP);
 
 	/*
 	 * Issue TI_GETPEERNAME with signals masked.
-	 * Put the result in so_faddr_sa so that getpeername works after
+	 * Put the result in sti_faddr_sa so that getpeername works after
 	 * a shutdown(output).
 	 * If the ioctl fails (e.g. due to a ECONNRESET) the error is reposted
 	 * back to the socket.
@@ -4699,16 +4969,16 @@ sotpi_getpeername(struct sonode *so)
 
 	sigintr(&smask, 0);
 	res = 0;
-	ASSERT(CRED());
+	ASSERT(cr);
 	error = strioctl(SOTOV(so), TI_GETPEERNAME, (intptr_t)&strbuf,
-	    0, K_TO_K, CRED(), &res);
+	    0, K_TO_K, cr, &res);
 	sigunintr(&smask);
 
 	mutex_enter(&so->so_lock);
 	/*
 	 * If there is an error record the error in so_error put don't fail
 	 * the getpeername. Instead fallback on the recorded
-	 * so->so_faddr_sa.
+	 * sti->sti_faddr_sa.
 	 */
 	if (error) {
 		/*
@@ -4732,16 +5002,19 @@ sotpi_getpeername(struct sonode *so)
 		error = 0;
 	} else if (res == 0 && strbuf.len > 0 &&
 	    (so->so_state & SS_ISCONNECTED)) {
-		ASSERT(strbuf.len <= (int)so->so_faddr_maxlen);
-		so->so_faddr_len = (socklen_t)strbuf.len;
-		bcopy(addr, so->so_faddr_sa, so->so_faddr_len);
-		so->so_state |= SS_FADDR_VALID;
+		ASSERT(strbuf.len <= (int)sti->sti_faddr_maxlen);
+		sti->sti_faddr_len = (socklen_t)strbuf.len;
+		bcopy(addr, sti->sti_faddr_sa, sti->sti_faddr_len);
+		sti->sti_faddr_valid = 1;
+
+		bcopy(addr, name, MIN(*namelen, sti->sti_faddr_len));
+		*namelen = sti->sti_faddr_len;
 	}
 	kmem_free(addr, addrlen);
 #ifdef DEBUG
 	dprintso(so, 1, ("sotpi_getpeername (tp): %s\n",
-	    pr_addr(so->so_family, so->so_faddr_sa,
-	    (t_uscalar_t)so->so_faddr_len)));
+	    pr_addr(so->so_family, sti->sti_faddr_sa,
+	    (t_uscalar_t)sti->sti_faddr_len)));
 #endif /* DEBUG */
 done:
 	so_unlock_single(so, SOLOCKED);
@@ -4750,42 +5023,39 @@ done:
 }
 
 /*
- * Update so_laddr by asking the transport (unless AF_UNIX).
+ * Update sti_laddr by asking the transport (unless AF_UNIX).
  */
 int
-sotpi_getsockname(struct sonode *so)
+sotpi_getsockname(struct sonode *so, struct sockaddr *name, socklen_t *namelen,
+    struct cred *cr)
 {
 	struct strbuf	strbuf;
 	int		error = 0, res;
 	void		*addr;
 	t_uscalar_t	addrlen;
 	k_sigset_t	smask;
+	sotpi_info_t	*sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("sotpi_getsockname(%p) %s\n",
 	    (void *)so, pr_state(so->so_state, so->so_mode)));
 
+	ASSERT(*namelen > 0);
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
-	if (!(so->so_state & SS_ISBOUND) && so->so_family != AF_UNIX) {
-		/* Return an all zero address except for the family */
-		if (so->so_family == AF_INET)
-			so->so_laddr_len = (socklen_t)sizeof (sin_t);
-		else if (so->so_family == AF_INET6)
-			so->so_laddr_len = (socklen_t)sizeof (sin6_t);
-		ASSERT(so->so_laddr_len <= so->so_laddr_maxlen);
-		bzero(so->so_laddr_sa, so->so_laddr_len);
-		/*
-		 * Can not assume there is a sa_family for all
-		 * protocol families.
-		 */
-		if (so->so_family == AF_INET || so->so_family == AF_INET6)
-			so->so_laddr_sa->sa_family = so->so_family;
-	}
+
 #ifdef DEBUG
+
 	dprintso(so, 1, ("sotpi_getsockname (local): %s\n",
-	    pr_addr(so->so_family, so->so_laddr_sa,
-	    (t_uscalar_t)so->so_laddr_len)));
+	    pr_addr(so->so_family, sti->sti_laddr_sa,
+	    (t_uscalar_t)sti->sti_laddr_len)));
 #endif /* DEBUG */
+	if (sti->sti_laddr_valid) {
+		bcopy(sti->sti_laddr_sa, name,
+		    MIN(*namelen, sti->sti_laddr_len));
+		*namelen = sti->sti_laddr_len;
+		goto done;
+	}
+
 	if (so->so_family == AF_UNIX) {
 		/* Transport has different name space - return local info */
 		error = 0;
@@ -4796,14 +5066,15 @@ sotpi_getsockname(struct sonode *so)
 		error = 0;
 		goto done;
 	}
+
 	/* Allocate local buffer to use with ioctl */
-	addrlen = (t_uscalar_t)so->so_laddr_maxlen;
+	addrlen = (t_uscalar_t)sti->sti_laddr_maxlen;
 	mutex_exit(&so->so_lock);
 	addr = kmem_alloc(addrlen, KM_SLEEP);
 
 	/*
 	 * Issue TI_GETMYNAME with signals masked.
-	 * Put the result in so_laddr_sa so that getsockname works after
+	 * Put the result in sti_laddr_sa so that getsockname works after
 	 * a shutdown(output).
 	 * If the ioctl fails (e.g. due to a ECONNRESET) the error is reposted
 	 * back to the socket.
@@ -4814,16 +5085,16 @@ sotpi_getsockname(struct sonode *so)
 
 	sigintr(&smask, 0);
 	res = 0;
-	ASSERT(CRED());
+	ASSERT(cr);
 	error = strioctl(SOTOV(so), TI_GETMYNAME, (intptr_t)&strbuf,
-	    0, K_TO_K, CRED(), &res);
+	    0, K_TO_K, cr, &res);
 	sigunintr(&smask);
 
 	mutex_enter(&so->so_lock);
 	/*
 	 * If there is an error record the error in so_error put don't fail
 	 * the getsockname. Instead fallback on the recorded
-	 * so->so_laddr_sa.
+	 * sti->sti_laddr_sa.
 	 */
 	if (error) {
 		/*
@@ -4844,16 +5115,19 @@ sotpi_getsockname(struct sonode *so)
 		error = 0;
 	} else if (res == 0 && strbuf.len > 0 &&
 	    (so->so_state & SS_ISBOUND)) {
-		ASSERT(strbuf.len <= (int)so->so_laddr_maxlen);
-		so->so_laddr_len = (socklen_t)strbuf.len;
-		bcopy(addr, so->so_laddr_sa, so->so_laddr_len);
-		so->so_state |= SS_LADDR_VALID;
+		ASSERT(strbuf.len <= (int)sti->sti_laddr_maxlen);
+		sti->sti_laddr_len = (socklen_t)strbuf.len;
+		bcopy(addr, sti->sti_laddr_sa, sti->sti_laddr_len);
+		sti->sti_laddr_valid = 1;
+
+		bcopy(addr, name, MIN(sti->sti_laddr_len, *namelen));
+		*namelen = sti->sti_laddr_len;
 	}
 	kmem_free(addr, addrlen);
 #ifdef DEBUG
 	dprintso(so, 1, ("sotpi_getsockname (tp): %s\n",
-	    pr_addr(so->so_family, so->so_laddr_sa,
-	    (t_uscalar_t)so->so_laddr_len)));
+	    pr_addr(so->so_family, sti->sti_laddr_sa,
+	    (t_uscalar_t)sti->sti_laddr_len)));
 #endif /* DEBUG */
 done:
 	so_unlock_single(so, SOLOCKED);
@@ -4868,9 +5142,10 @@ done:
  *
  * On the return most *optlenp bytes are copied to optval.
  */
+/* ARGSUSED */
 int
 sotpi_getsockopt(struct sonode *so, int level, int option_name,
-		void *optval, socklen_t *optlenp, int flags)
+		void *optval, socklen_t *optlenp, int flags, struct cred *cr)
 {
 	struct T_optmgmt_req	optmgmt_req;
 	struct T_optmgmt_ack	*optmgmt_ack;
@@ -4882,6 +5157,8 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 	t_uscalar_t		maxlen = *optlenp;
 	t_uscalar_t		len;
 	uint32_t		value;
+	struct timeval		tmo_val; /* used for SO_RCVTIMEO, SO_SNDTIMEO */
+	struct so_snd_bufinfo	snd_bufinfo;	/* used for zero copy */
 
 	dprintso(so, 1, ("sotpi_getsockopt(%p, 0x%x, 0x%x, %p, %p) %s\n",
 	    (void *)so, level, option_name, optval, (void *)optlenp,
@@ -4914,8 +5191,6 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 #ifdef notyet
 		case SO_SNDLOWAT:
 		case SO_RCVLOWAT:
-		case SO_SNDTIMEO:
-		case SO_RCVTIMEO:
 #endif /* notyet */
 		case SO_DOMAIN:
 		case SO_DGRAM_ERRIND:
@@ -4925,8 +5200,24 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 				goto done2;
 			}
 			break;
+		case SO_RCVTIMEO:
+		case SO_SNDTIMEO:
+			if (maxlen < (t_uscalar_t)sizeof (struct timeval)) {
+				error = EINVAL;
+				eprintsoline(so, error);
+				goto done2;
+			}
+			break;
 		case SO_LINGER:
 			if (maxlen < (t_uscalar_t)sizeof (struct linger)) {
+				error = EINVAL;
+				eprintsoline(so, error);
+				goto done2;
+			}
+			break;
+		case SO_SND_BUFINFO:
+			if (maxlen < (t_uscalar_t)
+			    sizeof (struct so_snd_bufinfo)) {
 				error = EINVAL;
 				eprintsoline(so, error);
 				goto done2;
@@ -4943,7 +5234,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 			goto copyout; /* No need to issue T_SVR4_OPTMGMT_REQ */
 
 		case SO_ERROR:
-			value = sogeterr(so);
+			value = sogeterr(so, B_TRUE);
 			option = &value;
 			goto copyout; /* No need to issue T_SVR4_OPTMGMT_REQ */
 
@@ -5072,15 +5363,33 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 			value = so->so_rcvlowat;
 			option = &value;
 			break;
-		case SO_SNDTIMEO:
-			value = so->so_sndtimeo;
-			option = &value;
-			break;
-		case SO_RCVTIMEO:
-			value = so->so_rcvtimeo;
-			option = &value;
-			break;
 #endif /* notyet */
+		case SO_SNDTIMEO:
+		case SO_RCVTIMEO: {
+			clock_t val;
+			if (option_name == SO_RCVTIMEO)
+				val = drv_hztousec(so->so_rcvtimeo);
+			else
+				val = drv_hztousec(so->so_sndtimeo);
+			tmo_val.tv_sec = val / (1000 * 1000);
+			tmo_val.tv_usec = val % (1000 * 1000);
+			option = &tmo_val;
+			len = (t_uscalar_t)sizeof (struct timeval);
+			break;
+		}
+		case SO_SND_BUFINFO: {
+			snd_bufinfo.sbi_wroff =
+			    (so->so_proto_props).sopp_wroff;
+			snd_bufinfo.sbi_maxblk =
+			    (so->so_proto_props).sopp_maxblk;
+			snd_bufinfo.sbi_maxpsz =
+			    (so->so_proto_props).sopp_maxpsz;
+			snd_bufinfo.sbi_tail =
+			    (so->so_proto_props).sopp_tail;
+			option = &snd_bufinfo;
+			len = (t_uscalar_t)sizeof (struct so_snd_bufinfo);
+			break;
+		}
 		}
 	}
 
@@ -5159,6 +5468,7 @@ done:
 done2:
 	so_unlock_single(so, SOLOCKED);
 	mutex_exit(&so->so_lock);
+
 	return (error);
 }
 
@@ -5168,9 +5478,10 @@ done2:
  * SOL_SOCKET options will not fail just because the T_SVR4_OPTMGMT_REQ fails -
  * setsockopt has to work even if the transport does not support the option.
  */
+/* ARGSUSED */
 int
 sotpi_setsockopt(struct sonode *so, int level, int option_name,
-	const void *optval, t_uscalar_t optlen)
+	const void *optval, t_uscalar_t optlen, struct cred *cr)
 {
 	struct T_optmgmt_req	optmgmt_req;
 	struct opthdr		oh;
@@ -5182,19 +5493,12 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 	    (void *)so, level, option_name, optval, optlen,
 	    pr_state(so->so_state, so->so_mode)));
 
-
 	/* X/Open requires this check */
 	if ((so->so_state & SS_CANTSENDMORE) && !xnet_skip_checks) {
 		if (xnet_check_print)
 			printf("sockfs: X/Open setsockopt check => EINVAL\n");
 		return (EINVAL);
 	}
-
-	/* Caller allocates aligned optval, or passes null */
-	ASSERT(((uintptr_t)optval & (sizeof (t_scalar_t) - 1)) == 0);
-	/* If optval is null optlen is 0, and vice-versa */
-	ASSERT(optval != NULL || optlen == 0);
-	ASSERT(optlen != 0 || optval == NULL);
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
@@ -5207,8 +5511,9 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 	 */
 	if ((level == SOL_SOCKET || level == IPPROTO_TCP) &&
 	    (so->so_family == AF_INET || so->so_family == AF_INET6) &&
-	    (so->so_version == SOV_SOCKSTREAM) && (so->so_priv != NULL)) {
-		tcp_t		*tcp = so->so_priv;
+	    (so->so_version == SOV_SOCKSTREAM) &&
+	    (so->so_proto_handle != NULL)) {
+		tcp_t		*tcp = (tcp_t *)so->so_proto_handle;
 		boolean_t	onoff;
 
 #define	intvalue	(*(int32_t *)optval)
@@ -5231,6 +5536,18 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 				}
 				ASSERT(optval);
 				onoff = intvalue != 0;
+				handled = B_TRUE;
+				break;
+			case SO_SNDTIMEO:
+			case SO_RCVTIMEO:
+				if (optlen !=
+				    (t_uscalar_t)sizeof (struct timeval)) {
+					error = EINVAL;
+					eprintsoline(so, error);
+					mutex_enter(&so->so_lock);
+					goto done2;
+				}
+				ASSERT(optval);
 				handled = B_TRUE;
 				break;
 			case SO_LINGER:
@@ -5373,7 +5690,7 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 	mutex_enter(&so->so_lock);
 	if (error) {
 		eprintsoline(so, error);
-		goto done;
+		goto done2;
 	}
 	error = sowaitprim(so, T_SVR4_OPTMGMT_REQ, T_OPTMGMT_ACK,
 	    (t_uscalar_t)sizeof (struct T_optmgmt_ack), &mp, 0);
@@ -5406,11 +5723,19 @@ done:
 #ifdef notyet
 		case SO_SNDLOWAT:
 		case SO_RCVLOWAT:
-		case SO_SNDTIMEO:
-		case SO_RCVTIMEO:
 #endif /* notyet */
 		case SO_DGRAM_ERRIND:
 			if (optlen != (t_uscalar_t)sizeof (int32_t)) {
+				error = EINVAL;
+				eprintsoline(so, error);
+				goto done2;
+			}
+			ASSERT(optval);
+			handled = B_TRUE;
+			break;
+		case SO_SNDTIMEO:
+		case SO_RCVTIMEO:
+			if (optlen != (t_uscalar_t)sizeof (struct timeval)) {
 				error = EINVAL;
 				eprintsoline(so, error);
 				goto done2;
@@ -5474,19 +5799,19 @@ done:
 		case SO_DGRAM_ERRIND:
 			if (intvalue != 0) {
 				dprintso(so, 1,
-				    ("sotpi_setsockopt: setting 0x%x\n",
+				    ("socket_setsockopt: setting 0x%x\n",
 				    option_name));
 				so->so_options |= option_name;
 			} else {
 				dprintso(so, 1,
-				    ("sotpi_setsockopt: clearing 0x%x\n",
+				    ("socket_setsockopt: clearing 0x%x\n",
 				    option_name));
 				so->so_options &= ~option_name;
 			}
 			break;
 		/*
 		 * The following options are only returned by us when the
-		 * T_SVR4_OPTMGMT_REQ fails.
+		 * transport layer fails.
 		 * XXX XPG 4.2 applications retrieve SO_RCVBUF from sockfs
 		 * since the transport might adjust the value and not
 		 * return exactly what was set by the application.
@@ -5496,6 +5821,9 @@ done:
 			break;
 		case SO_RCVBUF:
 			so->so_rcvbuf = intvalue;
+			break;
+		case SO_RCVPSH:
+			so->so_rcv_timer_interval = intvalue;
 			break;
 #ifdef notyet
 		/*
@@ -5508,13 +5836,17 @@ done:
 		case SO_RCVLOWAT:
 			so->so_rcvlowat = intvalue;
 			break;
-		case SO_SNDTIMEO:
-			so->so_sndtimeo = intvalue;
-			break;
-		case SO_RCVTIMEO:
-			so->so_rcvtimeo = intvalue;
-			break;
 #endif /* notyet */
+		case SO_SNDTIMEO:
+		case SO_RCVTIMEO: {
+			struct timeval *tl = (struct timeval *)optval;
+			clock_t val = tl->tv_sec * 1000 * 1000 + tl->tv_usec;
+			if (option_name == SO_RCVTIMEO)
+				so->so_rcvtimeo = drv_usectohz(val);
+			else
+				so->so_sndtimeo = drv_usectohz(val);
+			break;
+		}
 		}
 #undef	intvalue
 
@@ -5529,8 +5861,1121 @@ done:
 		}
 	}
 done2:
-ret:
 	so_unlock_single(so, SOLOCKED);
 	mutex_exit(&so->so_lock);
 	return (error);
+}
+
+/* ARGSUSED */
+int
+sotpi_close(struct sonode *so, int flag, struct cred *cr)
+{
+	struct vnode *vp = SOTOV(so);
+	dev_t dev;
+	int error = 0;
+	sotpi_info_t *sti = SOTOTPI(so);
+
+	dprintso(so, 1, ("sotpi_close(%p, %x) %s\n",
+	    (void *)vp, flag, pr_state(so->so_state, so->so_mode)));
+
+	dev = sti->sti_dev;
+
+	ASSERT(STREAMSTAB(getmajor(dev)));
+
+	mutex_enter(&so->so_lock);
+	so_lock_single(so);	/* Set SOLOCKED */
+
+	/*
+	 * Only call NL7C's close on last open reference.
+	 */
+	if (sti->sti_nl7c_flags & NL7C_ENABLED) {
+		sti->sti_nl7c_flags = 0;
+		nl7c_close(so);
+	}
+
+	/*
+	 * Only call the close routine when the last open reference through
+	 * any [s, v]node goes away.
+	 */
+	if (vp->v_stream != NULL) {
+		vnode_t *ux_vp;
+
+		if (so->so_family == AF_UNIX) {
+			/* Could avoid this when CANTSENDMORE for !dgram */
+			so_unix_close(so);
+		}
+
+		mutex_exit(&so->so_lock);
+		/*
+		 * Disassemble the linkage from the AF_UNIX underlying file
+		 * system vnode to this socket (by atomically clearing
+		 * v_stream in vn_rele_stream) before strclose clears sd_vnode
+		 * and frees the stream head.
+		 */
+		if ((ux_vp = sti->sti_ux_bound_vp) != NULL) {
+			ASSERT(ux_vp->v_stream);
+			sti->sti_ux_bound_vp = NULL;
+			vn_rele_stream(ux_vp);
+		}
+		if (so->so_family == AF_INET || so->so_family == AF_INET6) {
+			strsetrwputdatahooks(SOTOV(so), NULL, NULL);
+			if (sti->sti_kssl_ent != NULL) {
+				kssl_release_ent(sti->sti_kssl_ent, so,
+				    sti->sti_kssl_type);
+				sti->sti_kssl_ent = NULL;
+			}
+			if (sti->sti_kssl_ctx != NULL) {
+				kssl_release_ctx(sti->sti_kssl_ctx);
+				sti->sti_kssl_ctx = NULL;
+			}
+			sti->sti_kssl_type = KSSL_NO_PROXY;
+		}
+		error = strclose(vp, flag, cr);
+		vp->v_stream = NULL;
+		mutex_enter(&so->so_lock);
+	}
+
+	/*
+	 * Flush the T_DISCON_IND on sti_discon_ind_mp.
+	 */
+	so_flush_discon_ind(so);
+
+	so_unlock_single(so, SOLOCKED);
+	mutex_exit(&so->so_lock);
+
+	/*
+	 * Needed for STREAMs.
+	 * Decrement the device driver's reference count for streams
+	 * opened via the clone dip. The driver was held in clone_open().
+	 * The absence of clone_close() forces this asymmetry.
+	 */
+	if (so->so_flag & SOCLONE)
+		ddi_rele_driver(getmajor(dev));
+
+	return (error);
+}
+
+static int
+sotpi_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
+    struct cred *cr, int32_t *rvalp)
+{
+	struct vnode *vp = SOTOV(so);
+	sotpi_info_t *sti = SOTOTPI(so);
+	int error = 0;
+
+	dprintso(so, 0, ("sotpi_ioctl: cmd 0x%x, arg 0x%lx, state %s\n",
+	    cmd, arg, pr_state(so->so_state, so->so_mode)));
+
+	switch (cmd) {
+	case _I_INSERT:
+	case _I_REMOVE:
+		/*
+		 * Since there's no compelling reason to support these ioctls
+		 * on sockets, and doing so would increase the complexity
+		 * markedly, prevent it.
+		 */
+		return (EOPNOTSUPP);
+
+	case I_FIND:
+	case I_LIST:
+	case I_LOOK:
+	case I_POP:
+	case I_PUSH:
+		/*
+		 * To prevent races and inconsistencies between the actual
+		 * state of the stream and the state according to the sonode,
+		 * we serialize all operations which modify or operate on the
+		 * list of modules on the socket's stream.
+		 */
+		mutex_enter(&sti->sti_plumb_lock);
+		error = socktpi_plumbioctl(vp, cmd, arg, mode, cr, rvalp);
+		mutex_exit(&sti->sti_plumb_lock);
+		return (error);
+
+	default:
+		if (so->so_version != SOV_STREAM)
+			break;
+
+		/*
+		 * The imaginary "sockmod" has been popped; act as a stream.
+		 */
+		return (strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp));
+	}
+
+	ASSERT(so->so_version != SOV_STREAM);
+
+	/*
+	 * Process socket-specific ioctls.
+	 */
+	switch (cmd) {
+	case FIONBIO: {
+		int32_t value;
+
+		if (so_copyin((void *)arg, &value, sizeof (int32_t),
+		    (mode & (int)FKIOCTL)))
+			return (EFAULT);
+
+		mutex_enter(&so->so_lock);
+		if (value) {
+			so->so_state |= SS_NDELAY;
+		} else {
+			so->so_state &= ~SS_NDELAY;
+		}
+		mutex_exit(&so->so_lock);
+		return (0);
+	}
+
+	case FIOASYNC: {
+		int32_t value;
+
+		if (so_copyin((void *)arg, &value, sizeof (int32_t),
+		    (mode & (int)FKIOCTL)))
+			return (EFAULT);
+
+		mutex_enter(&so->so_lock);
+		/*
+		 * SS_ASYNC flag not already set correctly?
+		 * (!value != !(so->so_state & SS_ASYNC))
+		 * but some engineers find that too hard to read.
+		 */
+		if (value == 0 && (so->so_state & SS_ASYNC) != 0 ||
+		    value != 0 && (so->so_state & SS_ASYNC) == 0)
+			error = so_flip_async(so, vp, mode, cr);
+		mutex_exit(&so->so_lock);
+		return (error);
+	}
+
+	case SIOCSPGRP:
+	case FIOSETOWN: {
+		pid_t pgrp;
+
+		if (so_copyin((void *)arg, &pgrp, sizeof (pid_t),
+		    (mode & (int)FKIOCTL)))
+			return (EFAULT);
+
+		mutex_enter(&so->so_lock);
+		dprintso(so, 1, ("setown: new %d old %d\n", pgrp, so->so_pgrp));
+		/* Any change? */
+		if (pgrp != so->so_pgrp)
+			error = so_set_siggrp(so, vp, pgrp, mode, cr);
+		mutex_exit(&so->so_lock);
+		return (error);
+	}
+	case SIOCGPGRP:
+	case FIOGETOWN:
+		if (so_copyout(&so->so_pgrp, (void *)arg,
+		    sizeof (pid_t), (mode & (int)FKIOCTL)))
+			return (EFAULT);
+		return (0);
+
+	case SIOCATMARK: {
+		int retval;
+		uint_t so_state;
+
+		/*
+		 * strwaitmark has a finite timeout after which it
+		 * returns -1 if the mark state is undetermined.
+		 * In order to avoid any race between the mark state
+		 * in sockfs and the mark state in the stream head this
+		 * routine loops until the mark state can be determined
+		 * (or the urgent data indication has been removed by some
+		 * other thread).
+		 */
+		do {
+			mutex_enter(&so->so_lock);
+			so_state = so->so_state;
+			mutex_exit(&so->so_lock);
+			if (so_state & SS_RCVATMARK) {
+				retval = 1;
+			} else if (!(so_state & SS_OOBPEND)) {
+				/*
+				 * No SIGURG has been generated -- there is no
+				 * pending or present urgent data. Thus can't
+				 * possibly be at the mark.
+				 */
+				retval = 0;
+			} else {
+				/*
+				 * Have the stream head wait until there is
+				 * either some messages on the read queue, or
+				 * STRATMARK or STRNOTATMARK gets set. The
+				 * STRNOTATMARK flag is used so that the
+				 * transport can send up a MSGNOTMARKNEXT
+				 * M_DATA to indicate that it is not
+				 * at the mark and additional data is not about
+				 * to be send upstream.
+				 *
+				 * If the mark state is undetermined this will
+				 * return -1 and we will loop rechecking the
+				 * socket state.
+				 */
+				retval = strwaitmark(vp);
+			}
+		} while (retval == -1);
+
+		if (so_copyout(&retval, (void *)arg, sizeof (int),
+		    (mode & (int)FKIOCTL)))
+			return (EFAULT);
+		return (0);
+	}
+
+	case I_FDINSERT:
+	case I_SENDFD:
+	case I_RECVFD:
+	case I_ATMARK:
+	case _SIOCSOCKFALLBACK:
+		/*
+		 * These ioctls do not apply to sockets. I_FDINSERT can be
+		 * used to send M_PROTO messages without modifying the socket
+		 * state. I_SENDFD/RECVFD should not be used for socket file
+		 * descriptor passing since they assume a twisted stream.
+		 * SIOCATMARK must be used instead of I_ATMARK.
+		 *
+		 * _SIOCSOCKFALLBACK from an application should never be
+		 * processed.  It is only generated by socktpi_open() or
+		 * in response to I_POP or I_PUSH.
+		 */
+#ifdef DEBUG
+		zcmn_err(getzoneid(), CE_WARN,
+		    "Unsupported STREAMS ioctl 0x%x on socket. "
+		    "Pid = %d\n", cmd, curproc->p_pid);
+#endif /* DEBUG */
+		return (EOPNOTSUPP);
+
+	case _I_GETPEERCRED:
+		if ((mode & FKIOCTL) == 0)
+			return (EINVAL);
+
+		mutex_enter(&so->so_lock);
+		if ((so->so_mode & SM_CONNREQUIRED) == 0) {
+			error = ENOTSUP;
+		} else if ((so->so_state & SS_ISCONNECTED) == 0) {
+			error = ENOTCONN;
+		} else if (so->so_peercred != NULL) {
+			k_peercred_t *kp = (k_peercred_t *)arg;
+			kp->pc_cr = so->so_peercred;
+			kp->pc_cpid = so->so_cpid;
+			crhold(so->so_peercred);
+		} else {
+			error = EINVAL;
+		}
+		mutex_exit(&so->so_lock);
+		return (error);
+
+	default:
+		/*
+		 * Do the higher-order bits of the ioctl cmd indicate
+		 * that it is an I_* streams ioctl?
+		 */
+		if ((cmd & 0xffffff00U) == STR &&
+		    so->so_version == SOV_SOCKBSD) {
+#ifdef DEBUG
+			zcmn_err(getzoneid(), CE_WARN,
+			    "Unsupported STREAMS ioctl 0x%x on socket. "
+			    "Pid = %d\n", cmd, 	curproc->p_pid);
+#endif /* DEBUG */
+			return (EOPNOTSUPP);
+		}
+		return (strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp));
+	}
+}
+
+/*
+ * Handle plumbing-related ioctls.
+ */
+static int
+socktpi_plumbioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
+    struct cred *cr, int32_t *rvalp)
+{
+	static const char sockmod_name[] = "sockmod";
+	struct sonode	*so = VTOSO(vp);
+	char		mname[FMNAMESZ + 1];
+	int		error;
+	sotpi_info_t	*sti = SOTOTPI(so);
+
+	ASSERT(MUTEX_HELD(&sti->sti_plumb_lock));
+
+	if (so->so_version == SOV_SOCKBSD)
+		return (EOPNOTSUPP);
+
+	if (so->so_version == SOV_STREAM) {
+		/*
+		 * The imaginary "sockmod" has been popped - act as a stream.
+		 * If this is a push of sockmod then change back to a socket.
+		 */
+		if (cmd == I_PUSH) {
+			error = ((mode & FKIOCTL) ? copystr : copyinstr)(
+			    (void *)arg, mname, sizeof (mname), NULL);
+
+			if (error == 0 && strcmp(mname, sockmod_name) == 0) {
+				dprintso(so, 0, ("socktpi_ioctl: going to "
+				    "socket version\n"));
+				so_stream2sock(so);
+				return (0);
+			}
+		}
+		return (strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp));
+	}
+
+	switch (cmd) {
+	case I_PUSH:
+		if (sti->sti_direct) {
+			mutex_enter(&so->so_lock);
+			so_lock_single(so);
+			mutex_exit(&so->so_lock);
+
+			error = strioctl(vp, _SIOCSOCKFALLBACK, 0, 0, K_TO_K,
+			    CRED(), rvalp);
+
+			mutex_enter(&so->so_lock);
+			if (error == 0)
+				sti->sti_direct = 0;
+			so_unlock_single(so, SOLOCKED);
+			mutex_exit(&so->so_lock);
+
+			if (error != 0)
+				return (error);
+		}
+
+		error = strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp);
+		if (error == 0)
+			sti->sti_pushcnt++;
+		return (error);
+
+	case I_POP:
+		if (sti->sti_pushcnt == 0) {
+			/* Emulate sockmod being popped */
+			dprintso(so, 0,
+			    ("socktpi_ioctl: going to STREAMS version\n"));
+			return (so_sock2stream(so));
+		}
+
+		error = strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp);
+		if (error == 0)
+			sti->sti_pushcnt--;
+		return (error);
+
+	case I_LIST: {
+		struct str_mlist *kmlistp, *umlistp;
+		struct str_list	kstrlist;
+		ssize_t		kstrlistsize;
+		int		i, nmods;
+
+		STRUCT_DECL(str_list, ustrlist);
+		STRUCT_INIT(ustrlist, mode);
+
+		if (arg == NULL) {
+			error = strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp);
+			if (error == 0)
+				(*rvalp)++;	/* Add one for sockmod */
+			return (error);
+		}
+
+		error = so_copyin((void *)arg, STRUCT_BUF(ustrlist),
+		    STRUCT_SIZE(ustrlist), mode & FKIOCTL);
+		if (error != 0)
+			return (error);
+
+		nmods = STRUCT_FGET(ustrlist, sl_nmods);
+		if (nmods <= 0)
+			return (EINVAL);
+		/*
+		 * Ceiling nmods at nstrpush to prevent someone from
+		 * maliciously consuming lots of kernel memory.
+		 */
+		nmods = MIN(nmods, nstrpush);
+
+		kstrlistsize = (nmods + 1) * sizeof (struct str_mlist);
+		kstrlist.sl_nmods = nmods;
+		kstrlist.sl_modlist = kmem_zalloc(kstrlistsize, KM_SLEEP);
+
+		error = strioctl(vp, cmd, (intptr_t)&kstrlist, mode, K_TO_K,
+		    cr, rvalp);
+		if (error != 0)
+			goto done;
+
+		/*
+		 * Considering the module list as a 0-based array of sl_nmods
+		 * modules, sockmod should conceptually exist at slot
+		 * sti_pushcnt.  Insert sockmod at this location by sliding all
+		 * of the module names after so_pushcnt over by one.  We know
+		 * that there will be room to do this since we allocated
+		 * sl_modlist with an additional slot.
+		 */
+		for (i = kstrlist.sl_nmods; i > sti->sti_pushcnt; i--)
+			kstrlist.sl_modlist[i] = kstrlist.sl_modlist[i - 1];
+
+		(void) strcpy(kstrlist.sl_modlist[i].l_name, sockmod_name);
+		kstrlist.sl_nmods++;
+
+		/*
+		 * Copy all of the entries out to ustrlist.
+		 */
+		kmlistp = kstrlist.sl_modlist;
+		umlistp = STRUCT_FGETP(ustrlist, sl_modlist);
+		for (i = 0; i < nmods && i < kstrlist.sl_nmods; i++) {
+			error = so_copyout(kmlistp++, umlistp++,
+			    sizeof (struct str_mlist), mode & FKIOCTL);
+			if (error != 0)
+				goto done;
+		}
+
+		error = so_copyout(&i, (void *)arg, sizeof (int32_t),
+		    mode & FKIOCTL);
+		if (error == 0)
+			*rvalp = 0;
+	done:
+		kmem_free(kstrlist.sl_modlist, kstrlistsize);
+		return (error);
+	}
+	case I_LOOK:
+		if (sti->sti_pushcnt == 0) {
+			return (so_copyout(sockmod_name, (void *)arg,
+			    sizeof (sockmod_name), mode & FKIOCTL));
+		}
+		return (strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp));
+
+	case I_FIND:
+		error = strioctl(vp, cmd, arg, mode, U_TO_K, cr, rvalp);
+		if (error && error != EINVAL)
+			return (error);
+
+		/* if not found and string was sockmod return 1 */
+		if (*rvalp == 0 || error == EINVAL) {
+			error = ((mode & FKIOCTL) ? copystr : copyinstr)(
+			    (void *)arg, mname, sizeof (mname), NULL);
+			if (error == ENAMETOOLONG)
+				error = EINVAL;
+
+			if (error == 0 && strcmp(mname, sockmod_name) == 0)
+				*rvalp = 1;
+		}
+		return (error);
+
+	default:
+		panic("socktpi_plumbioctl: unknown ioctl %d", cmd);
+		break;
+	}
+
+	return (0);
+}
+
+/*
+ * Wrapper around the streams poll routine that implements socket poll
+ * semantics.
+ * The sockfs never calls pollwakeup itself - the stream head take care
+ * of all pollwakeups. Since sockfs never holds so_lock when calling the
+ * stream head there can never be a deadlock due to holding so_lock across
+ * pollwakeup and acquiring so_lock in this routine.
+ *
+ * However, since the performance of VOP_POLL is critical we avoid
+ * acquiring so_lock here. This is based on two assumptions:
+ *  - The poll implementation holds locks to serialize the VOP_POLL call
+ *    and a pollwakeup for the same pollhead. This ensures that should
+ *    e.g. so_state change during a socktpi_poll call the pollwakeup
+ *    (which strsock_* and strrput conspire to issue) is issued after
+ *    the state change. Thus the pollwakeup will block until VOP_POLL has
+ *    returned and then wake up poll and have it call VOP_POLL again.
+ *  - The reading of so_state without holding so_lock does not result in
+ *    stale data that is older than the latest state change that has dropped
+ *    so_lock. This is ensured by the mutex_exit issuing the appropriate
+ *    memory barrier to force the data into the coherency domain.
+ */
+static int
+sotpi_poll(
+	struct sonode	*so,
+	short		events,
+	int		anyyet,
+	short		*reventsp,
+	struct pollhead **phpp)
+{
+	short origevents = events;
+	struct vnode *vp = SOTOV(so);
+	int error;
+	int so_state = so->so_state;	/* snapshot */
+	sotpi_info_t *sti = SOTOTPI(so);
+
+	dprintso(so, 0, ("socktpi_poll(%p): state %s err %d\n",
+	    (void *)vp, pr_state(so_state, so->so_mode), so->so_error));
+
+	ASSERT(vp->v_type == VSOCK);
+	ASSERT(vp->v_stream != NULL);
+
+	if (so->so_version == SOV_STREAM) {
+		/* The imaginary "sockmod" has been popped - act as a stream */
+		return (strpoll(vp->v_stream, events, anyyet,
+		    reventsp, phpp));
+	}
+
+	if (!(so_state & SS_ISCONNECTED) &&
+	    (so->so_mode & SM_CONNREQUIRED)) {
+		/* Not connected yet - turn off write side events */
+		events &= ~(POLLOUT|POLLWRBAND);
+	}
+	/*
+	 * Check for errors without calling strpoll if the caller wants them.
+	 * In sockets the errors are represented as input/output events
+	 * and there is no need to ask the stream head for this information.
+	 */
+	if (so->so_error != 0 &&
+	    ((POLLIN|POLLRDNORM|POLLOUT) & origevents)  != 0) {
+		*reventsp = (POLLIN|POLLRDNORM|POLLOUT) & origevents;
+		return (0);
+	}
+	/*
+	 * Ignore M_PROTO only messages such as the T_EXDATA_IND messages.
+	 * These message with only an M_PROTO/M_PCPROTO part and no M_DATA
+	 * will not trigger a POLLIN event with POLLRDDATA set.
+	 * The handling of urgent data (causing POLLRDBAND) is done by
+	 * inspecting SS_OOBPEND below.
+	 */
+	events |= POLLRDDATA;
+
+	/*
+	 * After shutdown(output) a stream head write error is set.
+	 * However, we should not return output events.
+	 */
+	events |= POLLNOERR;
+	error = strpoll(vp->v_stream, events, anyyet,
+	    reventsp, phpp);
+	if (error)
+		return (error);
+
+	ASSERT(!(*reventsp & POLLERR));
+
+	/*
+	 * Notes on T_CONN_IND handling for sockets.
+	 *
+	 * If strpoll() returned without events, SR_POLLIN is guaranteed
+	 * to be set, ensuring any subsequent strrput() runs pollwakeup().
+	 *
+	 * Since the so_lock is not held, soqueueconnind() may have run
+	 * and a T_CONN_IND may be waiting. We now check for any queued
+	 * T_CONN_IND msgs on sti_conn_ind_head and set appropriate events
+	 * to ensure poll returns.
+	 *
+	 * However:
+	 * If the T_CONN_IND hasn't arrived by the time strpoll() returns,
+	 * when strrput() does run for an arriving M_PROTO with T_CONN_IND
+	 * the following actions will occur; taken together they ensure the
+	 * syscall will return.
+	 *
+	 * 1. If a socket, soqueueconnind() will queue the T_CONN_IND but if
+	 *    the accept() was run on a non-blocking socket sowaitconnind()
+	 *    may have already returned EWOULDBLOCK, so not be waiting to
+	 *    process the message. Additionally socktpi_poll() has probably
+	 *    proceeded past the sti_conn_ind_head check below.
+	 * 2. strrput() runs pollwakeup()->pollnotify()->cv_signal() to wake
+	 *    this thread,  however that could occur before poll_common()
+	 *    has entered cv_wait.
+	 * 3. pollnotify() sets T_POLLWAKE, while holding the pc_lock.
+	 *
+	 * Before proceeding to cv_wait() in poll_common() for an event,
+	 * poll_common() atomically checks for T_POLLWAKE under the pc_lock,
+	 * and if set, re-calls strpoll() to ensure the late arriving
+	 * T_CONN_IND is recognized, and pollsys() returns.
+	 */
+
+	if (sti->sti_conn_ind_head != NULL)
+		*reventsp |= (POLLIN|POLLRDNORM) & events;
+
+	if (so->so_state & SS_OOBPEND)
+		*reventsp |= POLLRDBAND & events;
+
+	if (sti->sti_nl7c_rcv_mp != NULL) {
+		*reventsp |= (POLLIN|POLLRDNORM) & events;
+	}
+	if ((sti->sti_nl7c_flags & NL7C_ENABLED) &&
+	    ((POLLIN|POLLRDNORM) & *reventsp)) {
+		sti->sti_nl7c_flags |= NL7C_POLLIN;
+	}
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+socktpi_constructor(void *buf, void *cdrarg, int kmflags)
+{
+	sotpi_sonode_t *st = (sotpi_sonode_t *)buf;
+	int error = 0;
+
+	error = sonode_constructor(buf, cdrarg, kmflags);
+	if (error != 0)
+		return (error);
+
+	error = i_sotpi_info_constructor(&st->st_info);
+	if (error != 0)
+		sonode_destructor(buf, cdrarg);
+
+	st->st_sonode.so_priv = &st->st_info;
+
+	return (error);
+}
+
+/*ARGSUSED1*/
+static void
+socktpi_destructor(void *buf, void *cdrarg)
+{
+	sotpi_sonode_t *st = (sotpi_sonode_t *)buf;
+
+	ASSERT(st->st_sonode.so_priv == &st->st_info);
+	st->st_sonode.so_priv = NULL;
+
+	i_sotpi_info_destructor(&st->st_info);
+	sonode_destructor(buf, cdrarg);
+}
+
+static int
+socktpi_unix_constructor(void *buf, void *cdrarg, int kmflags)
+{
+	int retval;
+
+	if ((retval = socktpi_constructor(buf, cdrarg, kmflags)) == 0) {
+		struct sonode *so = (struct sonode *)buf;
+		sotpi_info_t *sti = SOTOTPI(so);
+
+		mutex_enter(&socklist.sl_lock);
+
+		sti->sti_next_so = socklist.sl_list;
+		sti->sti_prev_so = NULL;
+		if (sti->sti_next_so != NULL)
+			SOTOTPI(sti->sti_next_so)->sti_prev_so = so;
+		socklist.sl_list = so;
+
+		mutex_exit(&socklist.sl_lock);
+
+	}
+	return (retval);
+}
+
+static void
+socktpi_unix_destructor(void *buf, void *cdrarg)
+{
+	struct sonode	*so = (struct sonode *)buf;
+	sotpi_info_t	*sti = SOTOTPI(so);
+
+	mutex_enter(&socklist.sl_lock);
+
+	if (sti->sti_next_so != NULL)
+		SOTOTPI(sti->sti_next_so)->sti_prev_so = sti->sti_prev_so;
+	if (sti->sti_prev_so != NULL)
+		SOTOTPI(sti->sti_prev_so)->sti_next_so = sti->sti_next_so;
+	else
+		socklist.sl_list = sti->sti_next_so;
+
+	mutex_exit(&socklist.sl_lock);
+
+	socktpi_destructor(buf, cdrarg);
+}
+
+int
+socktpi_init(void)
+{
+	/*
+	 * Create sonode caches.  We create a special one for AF_UNIX so
+	 * that we can track them for netstat(1m).
+	 */
+	socktpi_cache = kmem_cache_create("socktpi_cache",
+	    sizeof (struct sotpi_sonode), 0, socktpi_constructor,
+	    socktpi_destructor, NULL, NULL, NULL, 0);
+
+	socktpi_unix_cache = kmem_cache_create("socktpi_unix_cache",
+	    sizeof (struct sotpi_sonode), 0, socktpi_unix_constructor,
+	    socktpi_unix_destructor, NULL, NULL, NULL, 0);
+
+	return (0);
+}
+
+/*
+ * Given a non-TPI sonode, allocate and prep it to be ready for TPI.
+ *
+ * Caller must still update state and mode using sotpi_update_state().
+ *
+ * Returns the STREAM queue that the protocol should use.
+ */
+queue_t *
+sotpi_convert_sonode(struct sonode *so, struct sockparams *newsp,
+    boolean_t *direct, struct cred *cr)
+{
+	sotpi_info_t *sti;
+	struct sockparams *origsp = so->so_sockparams;
+	sock_lower_handle_t handle = so->so_proto_handle;
+	uint_t old_state = so->so_state;
+	struct stdata *stp;
+	struct vnode *vp;
+	queue_t *q;
+
+	*direct = B_FALSE;
+	so->so_sockparams = newsp;
+	/*
+	 * Allocate and initalize fields required by TPI.
+	 */
+	(void) sotpi_info_create(so, KM_SLEEP);
+	sotpi_info_init(so);
+
+	if (sotpi_init(so, NULL, cr, SO_FALLBACK) != 0) {
+		sotpi_info_fini(so);
+		sotpi_info_destroy(so);
+		so->so_state = old_state;
+		return (NULL);
+	}
+	ASSERT(handle == so->so_proto_handle);
+	sti = SOTOTPI(so);
+	if (sti->sti_direct != 0)
+		*direct = B_TRUE;
+
+	/*
+	 * Keep the original sp around so we can properly dispose of the
+	 * sonode when the socket is being closed.
+	 */
+	sti->sti_orig_sp = origsp;
+
+	so_basic_strinit(so);	/* skips the T_CAPABILITY_REQ */
+	so_alloc_addr(so, so->so_max_addr_len);
+
+	/*
+	 * If the application has done a SIOCSPGRP, make sure the
+	 * STREAM head is aware. This needs to take place before
+	 * the protocol start sending up messages. Otherwise we
+	 * might miss to generate SIGPOLL.
+	 *
+	 * It is possible that the application will receive duplicate
+	 * signals if some were already generated for either data or
+	 * connection indications.
+	 */
+	if (so->so_pgrp != 0) {
+		mutex_enter(&so->so_lock);
+		if (so_set_events(so, so->so_vnode, cr) != 0)
+			so->so_pgrp = 0;
+		mutex_exit(&so->so_lock);
+	}
+
+	/*
+	 * Determine which queue to use.
+	 */
+	vp = SOTOV(so);
+	stp = vp->v_stream;
+	ASSERT(stp != NULL);
+	q = stp->sd_wrq->q_next;
+
+	/*
+	 * Skip any modules that may have been auto pushed when the device
+	 * was opened
+	 */
+	while (q->q_next != NULL)
+		q = q->q_next;
+	q = _RD(q);
+
+	return (q);
+}
+
+void
+sotpi_update_state(struct sonode *so, struct T_capability_ack *tcap,
+    struct sockaddr *laddr, socklen_t laddrlen, struct sockaddr *faddr,
+    socklen_t faddrlen, short opts)
+{
+	sotpi_info_t *sti = SOTOTPI(so);
+
+	so_proc_tcapability_ack(so, tcap);
+
+	so->so_options |= opts;
+
+	/*
+	 * Determine whether the foreign and local address are valid
+	 */
+	if (laddrlen != 0) {
+		ASSERT(laddrlen <= sti->sti_laddr_maxlen);
+		sti->sti_laddr_len = laddrlen;
+		bcopy(laddr, sti->sti_laddr_sa, laddrlen);
+		sti->sti_laddr_valid = (so->so_state & SS_ISBOUND);
+	}
+
+	if (faddrlen != 0) {
+		ASSERT(faddrlen <= sti->sti_faddr_maxlen);
+		sti->sti_faddr_len = faddrlen;
+		bcopy(faddr, sti->sti_faddr_sa, faddrlen);
+		sti->sti_faddr_valid = (so->so_state & SS_ISCONNECTED);
+	}
+
+}
+
+/*
+ * Allocate enough space to cache the local and foreign addresses.
+ */
+void
+so_alloc_addr(struct sonode *so, t_uscalar_t maxlen)
+{
+	sotpi_info_t *sti = SOTOTPI(so);
+
+	ASSERT(sti->sti_laddr_sa == NULL && sti->sti_faddr_sa == NULL);
+	ASSERT(sti->sti_laddr_len == 0 && sti->sti_faddr_len == 0);
+	sti->sti_laddr_maxlen = sti->sti_faddr_maxlen =
+	    P2ROUNDUP(maxlen, KMEM_ALIGN);
+	so->so_max_addr_len = sti->sti_laddr_maxlen;
+	sti->sti_laddr_sa = kmem_alloc(sti->sti_laddr_maxlen * 2, KM_SLEEP);
+	sti->sti_faddr_sa = (struct sockaddr *)((caddr_t)sti->sti_laddr_sa
+	    + sti->sti_laddr_maxlen);
+
+	if (so->so_family == AF_UNIX) {
+		/*
+		 * Initialize AF_UNIX related fields.
+		 */
+		bzero(&sti->sti_ux_laddr, sizeof (sti->sti_ux_laddr));
+		bzero(&sti->sti_ux_faddr, sizeof (sti->sti_ux_faddr));
+	}
+}
+
+
+sotpi_info_t *
+sotpi_sototpi(struct sonode *so)
+{
+	sotpi_info_t *sti;
+
+	if (so == NULL)
+		return (NULL);
+
+	sti = (sotpi_info_t *)so->so_priv;
+
+	ASSERT(sti != NULL);
+	ASSERT(sti->sti_magic == SOTPI_INFO_MAGIC);
+
+	return (sti);
+}
+
+static int
+i_sotpi_info_constructor(sotpi_info_t *sti)
+{
+	sti->sti_magic		= SOTPI_INFO_MAGIC;
+	sti->sti_ack_mp		= NULL;
+	sti->sti_discon_ind_mp	= NULL;
+	sti->sti_ux_bound_vp	= NULL;
+	sti->sti_unbind_mp	= NULL;
+
+	sti->sti_conn_ind_head	= NULL;
+	sti->sti_conn_ind_tail	= NULL;
+
+	sti->sti_laddr_sa	= NULL;
+	sti->sti_faddr_sa	= NULL;
+
+	sti->sti_nl7c_flags	= 0;
+	sti->sti_nl7c_uri	= NULL;
+	sti->sti_nl7c_rcv_mp	= NULL;
+
+	mutex_init(&sti->sti_plumb_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&sti->sti_ack_cv, NULL, CV_DEFAULT, NULL);
+
+	return (0);
+}
+
+static void
+i_sotpi_info_destructor(sotpi_info_t *sti)
+{
+	ASSERT(sti->sti_magic == SOTPI_INFO_MAGIC);
+	ASSERT(sti->sti_ack_mp == NULL);
+	ASSERT(sti->sti_discon_ind_mp == NULL);
+	ASSERT(sti->sti_ux_bound_vp == NULL);
+	ASSERT(sti->sti_unbind_mp == NULL);
+
+	ASSERT(sti->sti_conn_ind_head == NULL);
+	ASSERT(sti->sti_conn_ind_tail == NULL);
+
+	ASSERT(sti->sti_laddr_sa == NULL);
+	ASSERT(sti->sti_faddr_sa == NULL);
+
+	ASSERT(sti->sti_nl7c_flags == 0);
+	ASSERT(sti->sti_nl7c_uri == NULL);
+	ASSERT(sti->sti_nl7c_rcv_mp == NULL);
+
+	mutex_destroy(&sti->sti_plumb_lock);
+	cv_destroy(&sti->sti_ack_cv);
+}
+
+/*
+ * Creates and attaches TPI information to the given sonode
+ */
+static boolean_t
+sotpi_info_create(struct sonode *so, int kmflags)
+{
+	sotpi_info_t *sti;
+
+	ASSERT(so->so_priv == NULL);
+
+	if ((sti = kmem_zalloc(sizeof (*sti), kmflags)) == NULL)
+		return (B_FALSE);
+
+	if (i_sotpi_info_constructor(sti) != 0) {
+		kmem_free(sti, sizeof (*sti));
+		return (B_FALSE);
+	}
+
+	so->so_priv = (void *)sti;
+	return (B_TRUE);
+}
+
+/*
+ * Initializes the TPI information.
+ */
+static void
+sotpi_info_init(struct sonode *so)
+{
+	struct vnode *vp = SOTOV(so);
+	sotpi_info_t *sti = SOTOTPI(so);
+	time_t now;
+
+	sti->sti_dev 	= so->so_sockparams->sp_sdev_info.sd_vnode->v_rdev;
+	vp->v_rdev	= sti->sti_dev;
+
+	sti->sti_orig_sp = NULL;
+
+	sti->sti_pushcnt = 0;
+
+	now = gethrestime_sec();
+	sti->sti_atime	= now;
+	sti->sti_mtime	= now;
+	sti->sti_ctime	= now;
+
+	sti->sti_eaddr_mp = NULL;
+	sti->sti_delayed_error = 0;
+
+	sti->sti_provinfo = NULL;
+
+	sti->sti_oobcnt = 0;
+	sti->sti_oobsigcnt = 0;
+
+	ASSERT(sti->sti_laddr_sa == NULL && sti->sti_faddr_sa == NULL);
+
+	sti->sti_laddr_sa	= 0;
+	sti->sti_faddr_sa	= 0;
+	sti->sti_laddr_maxlen = sti->sti_faddr_maxlen = 0;
+	sti->sti_laddr_len = sti->sti_faddr_len = 0;
+
+	sti->sti_laddr_valid = 0;
+	sti->sti_faddr_valid = 0;
+	sti->sti_faddr_noxlate = 0;
+
+	sti->sti_direct = 0;
+
+	ASSERT(sti->sti_ack_mp == NULL);
+	ASSERT(sti->sti_ux_bound_vp == NULL);
+	ASSERT(sti->sti_unbind_mp == NULL);
+
+	ASSERT(sti->sti_conn_ind_head == NULL);
+	ASSERT(sti->sti_conn_ind_tail == NULL);
+
+	/* Initialize the kernel SSL proxy fields */
+	sti->sti_kssl_type = KSSL_NO_PROXY;
+	sti->sti_kssl_ent = NULL;
+	sti->sti_kssl_ctx = NULL;
+}
+
+/*
+ * Given a sonode, grab the TPI info and free any data.
+ */
+static void
+sotpi_info_fini(struct sonode *so)
+{
+	sotpi_info_t *sti = SOTOTPI(so);
+	mblk_t *mp;
+
+	ASSERT(sti->sti_discon_ind_mp == NULL);
+
+	if ((mp = sti->sti_conn_ind_head) != NULL) {
+		mblk_t *mp1;
+
+		while (mp) {
+			mp1 = mp->b_next;
+			mp->b_next = NULL;
+			freemsg(mp);
+			mp = mp1;
+		}
+		sti->sti_conn_ind_head = sti->sti_conn_ind_tail = NULL;
+	}
+
+	/*
+	 * Protect so->so_[lf]addr_sa so that sockfs_snapshot() can safely
+	 * indirect them.  It also uses so_count as a validity test.
+	 */
+	mutex_enter(&so->so_lock);
+
+	if (sti->sti_laddr_sa) {
+		ASSERT((caddr_t)sti->sti_faddr_sa ==
+		    (caddr_t)sti->sti_laddr_sa + sti->sti_laddr_maxlen);
+		ASSERT(sti->sti_faddr_maxlen == sti->sti_laddr_maxlen);
+		sti->sti_laddr_valid = 0;
+		sti->sti_faddr_valid = 0;
+		kmem_free(sti->sti_laddr_sa, sti->sti_laddr_maxlen * 2);
+		sti->sti_laddr_sa = NULL;
+		sti->sti_laddr_len = sti->sti_laddr_maxlen = 0;
+		sti->sti_faddr_sa = NULL;
+		sti->sti_faddr_len = sti->sti_faddr_maxlen = 0;
+	}
+
+	mutex_exit(&so->so_lock);
+
+	if ((mp = sti->sti_eaddr_mp) != NULL) {
+		freemsg(mp);
+		sti->sti_eaddr_mp = NULL;
+		sti->sti_delayed_error = 0;
+	}
+
+	if ((mp = sti->sti_ack_mp) != NULL) {
+		freemsg(mp);
+		sti->sti_ack_mp = NULL;
+	}
+
+	if ((mp = sti->sti_nl7c_rcv_mp) != NULL) {
+		sti->sti_nl7c_rcv_mp = NULL;
+		freemsg(mp);
+	}
+	sti->sti_nl7c_rcv_rval = 0;
+	if (sti->sti_nl7c_uri != NULL) {
+		nl7c_urifree(so);
+		/* urifree() cleared nl7c_uri */
+	}
+	if (sti->sti_nl7c_flags) {
+		sti->sti_nl7c_flags = 0;
+	}
+
+	ASSERT(sti->sti_ux_bound_vp == NULL);
+	if ((mp = sti->sti_unbind_mp) != NULL) {
+		freemsg(mp);
+		sti->sti_unbind_mp = NULL;
+	}
+}
+
+/*
+ * Destroys the TPI information attached to a sonode.
+ */
+static void
+sotpi_info_destroy(struct sonode *so)
+{
+	sotpi_info_t *sti = SOTOTPI(so);
+
+	i_sotpi_info_destructor(sti);
+	kmem_free(sti, sizeof (*sti));
+
+	so->so_priv = NULL;
+}
+
+/*
+ * Create the global sotpi socket module entry. It will never be free.
+ */
+smod_info_t *
+sotpi_smod_create(void)
+{
+	smod_info_t *smodp;
+
+	smodp = kmem_zalloc(sizeof (*smodp), KM_SLEEP);
+	smodp->smod_name = kmem_zalloc(strlen(SOTPI_SMOD_NAME), + 1);
+	(void *)strcpy(smodp->smod_name, SOTPI_SMOD_NAME);
+	/*
+	 * Initilization the refcnt to 1 so it will never be free.
+	 */
+	smodp->smod_refcnt = 1;
+	smodp->smod_uc_version = SOCK_UC_VERSION;
+	smodp->smod_dc_version = SOCK_DC_VERSION;
+	smodp->smod_sock_create_func = &sotpi_create;
+	smodp->smod_sock_destroy_func = &sotpi_destroy;
+	return (smodp);
 }

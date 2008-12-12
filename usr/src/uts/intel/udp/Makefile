@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,10 +21,8 @@
 #
 # uts/intel/udp/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the udp driver kernel module.
 #
@@ -44,7 +41,7 @@ MODULE		= udp
 OBJECTS		= $(UDP_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(UDP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-ROOTLINK	= $(ROOT_STRMOD_DIR)/$(MODULE)
+ROOTLINK	= $(ROOT_STRMOD_DIR)/$(MODULE) $(ROOT_SOCK_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/inet/udp
 
 #
@@ -67,9 +64,9 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 
 #
-#	depends on ip
+#	depends on ip and sockfs
 #
-LDFLAGS		+= -dy -Ndrv/ip
+LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs
 
 #
 #	Default build targets.
@@ -92,7 +89,7 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
 
-$(ROOTLINK):	$(ROOT_STRMOD_DIR) $(ROOTMODULE)
+$(ROOTLINK):	$(ROOT_STRMOD_DIR) $(ROOT_SOCK_DIR) $(ROOTMODULE)
 	-$(RM) $@; ln $(ROOTMODULE) $@
 
 #

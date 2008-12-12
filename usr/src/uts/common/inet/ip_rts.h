@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_IP_RTS_H
 #define	_INET_IP_RTS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -72,8 +70,9 @@ extern	void	rts_fill_msg_v6(int, int, const in6_addr_t *,
 
 extern	size_t	rts_header_msg_size(int);
 
-extern	void	rts_queue_input(mblk_t *, queue_t *, sa_family_t,
-    ip_stack_t *);
+extern	void	rts_queue_input(mblk_t *, conn_t *, sa_family_t, ip_stack_t *);
+
+extern int ip_rts_request_common(queue_t *q, mblk_t *mp, conn_t *, cred_t *);
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

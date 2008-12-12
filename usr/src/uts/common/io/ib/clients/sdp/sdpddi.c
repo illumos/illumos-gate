@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/modctl.h>
@@ -182,8 +181,11 @@ sdp_gen_ioctl(queue_t *q, mblk_t *mp)
 	/* LINTED */
 	iocp = (struct iocblk *)mp->b_rptr;
 	switch (iocp->ioc_cmd) {
+			uintptr_t send_enable;
 		case SIOCSENABLESDP:
 			bcopy(mp->b_cont->b_rptr, &enable, sizeof (int));
+
+			send_enable = enable;
 
 			/*
 			 * Check for root privs.
@@ -202,7 +204,8 @@ sdp_gen_ioctl(queue_t *q, mblk_t *mp)
 			 * action of enabling/disabling sdp is simply acked.
 			 */
 			rw_enter(&sdp_transport_lock, RW_READER);
-			if ((enable == 1) && (sdp_transport_handle == NULL) &&
+			if ((send_enable == 1) &&
+			    (sdp_transport_handle == NULL) &&
 			    (priv == B_TRUE)) {
 				/* Initialize sdpib transport driver */
 				rw_exit(&sdp_transport_lock);
@@ -215,21 +218,20 @@ sdp_gen_ioctl(queue_t *q, mblk_t *mp)
 					enable = 0;
 					goto done;
 				}
-				(void) sdp_ioctl(NULL, iocp->ioc_cmd, &enable,
-				    CRED());
-			} else if ((enable == 0) &&
-			    (sdp_transport_handle != NULL) &&
-			    (priv == B_TRUE)) {
-				(void) sdp_ioctl(NULL, iocp->ioc_cmd, &enable,
-				    CRED());
-				(void) ldi_close(sdp_transport_handle,
-				    FNDELAY, kcred);
-				sdp_transport_handle = NULL;
+				(void) ldi_ioctl(sdp_transport_handle,
+				    iocp->ioc_cmd, (intptr_t)&send_enable,
+				    FKIOCTL, CRED(), (int *)&enable);
+			} else if (sdp_transport_handle != NULL) {
+				(void) ldi_ioctl(sdp_transport_handle,
+				    iocp->ioc_cmd, (intptr_t)&send_enable,
+				    FKIOCTL, CRED(), (int *)&enable);
+				if (send_enable == 0 && priv == B_TRUE) {
+					(void) ldi_close(sdp_transport_handle,
+					    FNDELAY, kcred);
+					sdp_transport_handle = NULL;
+				}
 			} else {
-				ret = sdp_ioctl(NULL, iocp->ioc_cmd, &enable,
-				    CRED());
-				if (ret == EINVAL)
-					enable = 0;
+				enable = 0;
 			}
 			rw_exit(&sdp_transport_lock);
 

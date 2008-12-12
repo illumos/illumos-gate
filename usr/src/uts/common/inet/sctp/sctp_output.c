@@ -288,6 +288,13 @@ sctp_sendmsg(sctp_t *sctp, mblk_t *mp, int flags)
 	}
 	sctp->sctp_unsent += msg_len;
 	BUMP_LOCAL(sctp->sctp_msgcount);
+	/*
+	 * Notify sockfs if the tx queue is full.
+	 */
+	if (SCTP_TXQ_LEN(sctp) >= sctp->sctp_xmit_hiwater) {
+		sctp->sctp_txq_full = 1;
+		sctp->sctp_ulp_xmitted(sctp->sctp_ulpd, B_TRUE);
+	}
 	if (sctp->sctp_state == SCTPS_ESTABLISHED)
 		sctp_output(sctp, UINT_MAX);
 process_sendq:
@@ -366,10 +373,8 @@ nextmsg:
 			 * Update ULP the amount of queued data, which is
 			 * sent-unack'ed + unsent.
 			 */
-			if (!SCTP_IS_DETACHED(sctp)) {
-				sctp->sctp_ulp_xmitted(sctp->sctp_ulpd,
-				    sctp->sctp_unacked + sctp->sctp_unsent);
-			}
+			if (!SCTP_IS_DETACHED(sctp))
+				SCTP_TXQ_UPDATE(sctp);
 			sctp_sendfail_event(sctp, mdblk, 0, B_FALSE);
 			goto try_next;
 		}
@@ -875,10 +880,8 @@ chunkified:
 		 * Update ULP the amount of queued data, which is
 		 * sent-unack'ed + unsent.
 		 */
-		if (!SCTP_IS_DETACHED(sctp)) {
-			sctp->sctp_ulp_xmitted(sctp->sctp_ulpd,
-			    sctp->sctp_unacked + sctp->sctp_unsent);
-		}
+		if (!SCTP_IS_DETACHED(sctp))
+			SCTP_TXQ_UPDATE(sctp);
 		sctp_sendfail_event(sctp, meta, 0, B_TRUE);
 next_msg:
 		meta = tmp_meta;
@@ -1541,10 +1544,8 @@ ftsn_done:
 		 * Update ULP the amount of queued data, which is
 		 * sent-unack'ed + unsent.
 		 */
-		if (!SCTP_IS_DETACHED(sctp)) {
-			sctp->sctp_ulp_xmitted(sctp->sctp_ulpd,
-			    sctp->sctp_unacked + sctp->sctp_unsent);
-		}
+		if (!SCTP_IS_DETACHED(sctp))
+			SCTP_TXQ_UPDATE(sctp);
 	}
 }
 

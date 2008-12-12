@@ -19,12 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains common code for handling Options Management requests.
@@ -38,6 +36,7 @@
 #define	_SUN_TPI_VERSION 2
 #include <sys/tihdr.h>
 #include <sys/socket.h>
+#include <sys/socketvar.h>
 #include <sys/ddi.h>
 #include <sys/debug.h>		/* for ASSERT */
 #include <sys/policy.h>
@@ -52,6 +51,8 @@
 #include "optcom.h"
 
 #include <inet/optcom.h>
+#include <inet/ipclassifier.h>
+#include <inet/proto_set.h>
 
 /*
  * Function prototypes
@@ -69,7 +70,6 @@ static void do_opt_current(queue_t *, struct T_opthdr *, uchar_t **,
 static int do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
     uint_t optset_context, uchar_t **resptrp, t_uscalar_t *worst_statusp,
     cred_t *, optdb_obj_t *dbobjp, mblk_t *first_mp);
-static opdes_t *opt_chk_lookup(t_uscalar_t, t_uscalar_t, opdes_t *, uint_t);
 static boolean_t opt_level_valid(t_uscalar_t, optlevel_t *, uint_t);
 static size_t opt_level_allopts_lengths(t_uscalar_t, opdes_t *, uint_t);
 static boolean_t opt_length_ok(opdes_t *, struct T_opthdr *);
@@ -186,6 +186,9 @@ optcom_err_ack(queue_t *q, mblk_t *mp, t_scalar_t t_error, int sys_error)
  * the sq framework arranges to restart this operation and passes control to
  * the restart function ip_restart_optmgmt() which in turn calls
  * svr4_optcom_req() or tpi_optcom_req() to restart the option processing.
+ *
+ * XXX Remove the asynchronous behavior of svr_optcom_req() and
+ * tpi_optcom_req().
  */
 int
 svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
@@ -214,6 +217,7 @@ svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 	boolean_t	pass_to_next = B_FALSE;
 	struct T_optmgmt_ack *toa;
 	struct T_optmgmt_req *tor;
+	int error;
 
 	/*
 	 * Allocate M_CTL and prepend to the packet for restarting this
@@ -409,85 +413,17 @@ no_mem:;
 		if (opt->name == T_ALLOPT)
 			goto bad_opt;
 
-		/* Find the option in the opt_arr. */
-		if ((optd = opt_chk_lookup(opt->level, opt->name,
-		    opt_arr, opt_arr_cnt)) == NULL) {
-			/*
-			 * Not found, that is a bad thing if
-			 * the caller is a tpi provider
-			 */
-			if (topmost_tpiprovider)
-				goto bad_opt;
-			else
-				continue; /* skip unmodified */
-		}
-
-		/* Additional checks dependent on operation. */
-		switch (tor->MGMT_flags) {
-		case T_NEGOTIATE:
-			if (!OA_WRITE_OR_EXECUTE(optd, cr)) {
-				/* can't negotiate option */
-				if (!(OA_MATCHED_PRIV(optd, cr)) &&
-				    OA_WX_ANYPRIV(optd)) {
-					/*
-					 * not privileged but privilege
-					 * will help negotiate option.
-					 */
-					optcom_err_ack(q, mp, TACCES, 0);
-					return (0);
-				} else
-					goto bad_opt;
-			}
-			/*
-			 * Verify size for options
-			 * Note: For retaining compatibility with historical
-			 * behavior, variable lengths options will have their
-			 * length verified in the setfn() processing.
-			 * In order to be compatible with SunOS 4.X we return
-			 * EINVAL errors for bad lengths.
-			 */
-			if (!(optd->opdes_props & OP_VARLEN)) {
-				/* fixed length - size must match */
-				if (opt->len != optd->opdes_size) {
-					optcom_err_ack(q, mp, TSYSERR, EINVAL);
-					return (0);
-				}
-			}
-			break;
-
-		case T_CHECK:
-			if (!OA_RWX_ANYPRIV(optd))
-				/* any of "rwx" permission but not not none */
-				goto bad_opt;
-			/*
-			 * XXX Since T_CURRENT was not there in TLI and the
-			 * official TLI inspired TPI standard, getsockopt()
-			 * API uses T_CHECK (for T_CURRENT semantics)
-			 * The following fallthru makes sense because of its
-			 * historical use as semantic equivalent to T_CURRENT.
-			 */
-			/* FALLTHRU */
-		case T_CURRENT:
-			if (!OA_READ_PERMISSION(optd, cr)) {
-				/* can't read option value */
-				if (!(OA_MATCHED_PRIV(optd, cr)) &&
-				    OA_R_ANYPRIV(optd)) {
-					/*
-					 * not privileged but privilege
-					 * will help in reading option value.
-					 */
-					optcom_err_ack(q, mp, TACCES, 0);
-					return (0);
-				} else
-					goto bad_opt;
-			}
-			break;
-
-		default:
-			optcom_err_ack(q, mp, TBADFLAG, 0);
+		error = proto_opt_check(opt->level, opt->name, opt->len, NULL,
+		    opt_arr, opt_arr_cnt, topmost_tpiprovider,
+		    tor->MGMT_flags == T_NEGOTIATE, tor->MGMT_flags == T_CHECK,
+		    cr);
+		if (error < 0) {
+			optcom_err_ack(q, mp, -error, 0);
+			return (0);
+		} else if (error > 0) {
+			optcom_err_ack(q, mp, TSYSERR, error);
 			return (0);
 		}
-		/* We liked it.  Keep going. */
 	} /* end for loop scanning option buffer */
 
 	/* Now complete the operation as required. */
@@ -609,7 +545,7 @@ restart:
 			 * non-fatal by svr4_optcom_req() and are
 			 * returned by setfn() when it is passed an
 			 * option it does not handle. Since the option
-			 * passed opt_chk_lookup(), it is implied that
+			 * passed proto_opt_lookup(), it is implied that
 			 * it is valid but was either handled upstream
 			 * or will be handled downstream.
 			 */
@@ -892,7 +828,7 @@ process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 
 		/* Find the option in the opt_arr. */
 		if (opt->name != T_ALLOPT) {
-			optd = opt_chk_lookup(opt->level, opt->name,
+			optd = proto_opt_lookup(opt->level, opt->name,
 			    opt_arr, opt_arr_cnt);
 			if (optd == NULL) {
 				/*
@@ -972,7 +908,7 @@ process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 		case T_CURRENT:
 
 			/*
-			 * The opt_chk_lookup() routine call above approved of
+			 * The proto_opt_lookup() routine call above approved of
 			 * this option so we can work on the status for it
 			 * based on the permissions for the operation. (This
 			 * can override any status for it set at higher levels)
@@ -1044,7 +980,7 @@ process_topthdrs_first_pass(mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp,
 				}
 			}
 			/*
-			 * The opt_chk_lookup()  routine above() approved of
+			 * The proto_opt_lookup()  routine above() approved of
 			 * this option so we can work on the status for it based
 			 * on the permissions for the operation. (This can
 			 * override anything set at a higher level).
@@ -1309,7 +1245,7 @@ do_opt_default(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 		/*
 		 * lookup the option in the table and fill default value
 		 */
-		optd = opt_chk_lookup(reqopt->level, reqopt->name,
+		optd = proto_opt_lookup(reqopt->level, reqopt->name,
 		    opt_arr, opt_arr_cnt);
 
 		if (optd == NULL) {
@@ -1609,8 +1545,7 @@ do_opt_current(queue_t *q, struct T_opthdr *reqopt, uchar_t **resptrp,
 	}
 }
 
-
-
+/* ARGSUSED */
 static int
 do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
     uint_t optset_context, uchar_t **resptrp, t_uscalar_t *worst_statusp,
@@ -1819,7 +1754,6 @@ do_opt_check_or_negotiate(queue_t *q, struct T_opthdr *reqopt,
  *   Then delete "ignored" options from option buffer and return success.
  *
  */
-
 int
 tpi_optcom_buf(queue_t *q, mblk_t *mp, t_scalar_t *opt_lenp,
     t_scalar_t opt_offset, cred_t *cr, optdb_obj_t *dbobjp,
@@ -1890,7 +1824,7 @@ tpi_optcom_buf(queue_t *q, mblk_t *mp, t_scalar_t *opt_lenp,
 		}
 
 		/* Find the option in the opt_arr. */
-		optd = opt_chk_lookup(opt->level, opt->name,
+		optd = proto_opt_lookup(opt->level, opt->name,
 		    opt_arr, opt_arr_cnt);
 
 		if (optd == NULL) {
@@ -2041,21 +1975,6 @@ error_ret:
 	if (copy_mp_head != NULL)
 		freeb(copy_mp_head);
 	return (error);
-}
-
-static opdes_t *
-opt_chk_lookup(t_uscalar_t level, t_uscalar_t name, opdes_t *opt_arr,
-    uint_t opt_arr_cnt)
-{
-	opdes_t		*optd;
-
-	for (optd = opt_arr; optd < &opt_arr[opt_arr_cnt];
-	    optd++) {
-		if (level == (uint_t)optd->opdes_level &&
-		    name == (uint_t)optd->opdes_name)
-			return (optd);
-	}
-	return (NULL);
 }
 
 static boolean_t
@@ -2286,4 +2205,69 @@ optcom_pkt_set(uchar_t *invalp, uint_t inlen, boolean_t sticky,
 	*optbufp = optbuf;
 	*optlenp = inlen + reservelen;
 	return (0);
+}
+
+int
+process_auxiliary_options(conn_t *connp, void *control, t_uscalar_t controllen,
+    void *optbuf, optdb_obj_t *dbobjp, int (*opt_set_fn)(conn_t *, uint_t, int,
+    int, uint_t, uchar_t *, uint_t *, uchar_t *, void *, cred_t *))
+{
+	struct cmsghdr *cmsg;
+	opdes_t *optd;
+	t_uscalar_t outlen;
+	int error = EOPNOTSUPP;
+	t_uscalar_t len;
+	uint_t opt_arr_cnt = dbobjp->odb_opt_arr_cnt;
+	opdes_t *opt_arr = dbobjp->odb_opt_des_arr;
+
+	for (cmsg = (struct cmsghdr *)control;
+	    CMSG_VALID(cmsg, control, (uintptr_t)control + controllen);
+	    cmsg = CMSG_NEXT(cmsg)) {
+
+		len = (t_uscalar_t)CMSG_CONTENTLEN(cmsg);
+		/* Find the option in the opt_arr. */
+		optd = proto_opt_lookup(cmsg->cmsg_level, cmsg->cmsg_type,
+		    opt_arr, opt_arr_cnt);
+		if (optd == NULL) {
+			return (EINVAL);
+		}
+		if (OA_READONLY_PERMISSION(optd, connp->conn_cred)) {
+			return (EACCES);
+		}
+		if (OA_MATCHED_PRIV(optd, connp->conn_cred)) {
+			/*
+			 * For privileged options, we DO perform
+			 * access checks as is common sense
+			 */
+			if (!OA_WX_ANYPRIV(optd)) {
+				return (EACCES);
+			}
+		} else {
+			/*
+			 * For non privileged, we fail instead following
+			 * "ignore" semantics dictated by XTI spec for
+			 * permissions problems.
+			 */
+			if (!OA_WX_NOPRIV(optd)) { /* nopriv */
+				return (EACCES);
+			}
+		}
+		error = opt_set_fn(connp, SETFN_UD_NEGOTIATE, optd->opdes_level,
+		    optd->opdes_name, len, (uchar_t *)CMSG_CONTENT(cmsg),
+		    &outlen, (uchar_t *)CMSG_CONTENT(cmsg), (void *)optbuf,
+		    connp->conn_cred);
+		if (error > 0) {
+			return (error);
+		} else if (outlen > len) {
+			return (EINVAL);
+		} else {
+			/*
+			 * error can be -ve if the protocol wants to
+			 * pass the option to IP. We donot pass auxiliary
+			 * options to IP.
+			 */
+			error = 0;
+		}
+	}
+	return (error);
 }

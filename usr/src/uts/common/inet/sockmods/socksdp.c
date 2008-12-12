@@ -30,13 +30,15 @@
 #include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/vfs.h>
-#include <sys/vfs_opreg.h>
 #include <sys/vnode.h>
 #include <sys/debug.h>
 #include <sys/errno.h>
 #include <sys/stropts.h>
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
+
+#include <sys/filio.h>
+#include <sys/sockio.h>
 
 #include <sys/project.h>
 #include <sys/tihdr.h>
@@ -50,22 +52,37 @@
 
 #include <inet/sdp_itf.h>
 #include "socksdp.h"
+#include <fs/sockfs/sockcommon.h>
 
 /*
  * SDP sockfs sonode operations
  */
-static int sosdp_accept(struct sonode *, int, struct sonode **);
-static int sosdp_listen(struct sonode *, int);
+static int sosdp_init(struct sonode *, struct sonode *, struct cred *, int);
+static int sosdp_accept(struct sonode *, int, struct cred *, struct sonode **);
+static int sosdp_bind(struct sonode *, struct sockaddr *, socklen_t, int,
+    struct cred *);
+static int sosdp_listen(struct sonode *, int, struct cred *);
 static int sosdp_connect(struct sonode *, const struct sockaddr *, socklen_t,
-    int, int);
-static int sosdp_sendmsg(struct sonode *, struct nmsghdr *, struct uio *);
-static int sosdp_getpeername(struct sonode *);
-static int sosdp_getsockname(struct sonode *);
-static int sosdp_shutdown(struct sonode *, int);
+    int, int, struct cred *);
+static int sosdp_recvmsg(struct sonode *, struct nmsghdr *, struct uio *,
+    struct cred *);
+static int sosdp_sendmsg(struct sonode *, struct nmsghdr *, struct uio *,
+    struct cred *);
+static int sosdp_getpeername(struct sonode *, struct sockaddr *, socklen_t *,
+    boolean_t, struct cred *);
+static int sosdp_getsockname(struct sonode *, struct sockaddr *, socklen_t *,
+    struct cred *);
+static int sosdp_shutdown(struct sonode *, int, struct cred *);
 static int sosdp_getsockopt(struct sonode *, int, int, void *, socklen_t *,
-    int);
+    int, struct cred *);
 static int sosdp_setsockopt(struct sonode *, int, int, const void *,
-    socklen_t);
+    socklen_t, struct cred *);
+static int sosdp_ioctl(struct sonode *, int, intptr_t, int, struct cred *,
+    int32_t *);
+static int sosdp_poll(struct sonode *, short, int, short *,
+    struct pollhead **);
+static int sosdp_close(struct sonode *, int, struct cred *);
+void sosdp_fini(struct sonode *, struct cred *);
 
 
 /*
@@ -80,20 +97,23 @@ static void sdp_sock_xmitted(void *handle, int txqueued);
 static void sdp_sock_urgdata(void *handle);
 static void sdp_sock_ordrel(void *handle);
 
-static kmem_cache_t *sosdp_sockcache;
-
 sonodeops_t sosdp_sonodeops = {
-	sosdp_accept,		/* sop_accept	*/
-	sosdp_bind,		/* sop_bind	*/
-	sosdp_listen,		/* sop_listen	*/
-	sosdp_connect,		/* sop_connect	*/
-	sosdp_recvmsg,		/* sop_recvmsg	*/
-	sosdp_sendmsg,		/* sop_sendmsg	*/
-	sosdp_getpeername,	/* sop_getpeername */
-	sosdp_getsockname,	/* sop_getsockname */
-	sosdp_shutdown,	/* sop_shutdown */
-	sosdp_getsockopt,	/* sop_getsockopt */
-	sosdp_setsockopt	/* sop_setsockopt */
+	sosdp_init,			/* sop_init	*/
+	sosdp_accept,			/* sop_accept	*/
+	sosdp_bind,			/* sop_bind	*/
+	sosdp_listen,			/* sop_listen	*/
+	sosdp_connect,			/* sop_connect	*/
+	sosdp_recvmsg,			/* sop_recvmsg	*/
+	sosdp_sendmsg,			/* sop_sendmsg	*/
+	so_sendmblk_notsupp,		/* sop_sendmblk */
+	sosdp_getpeername,		/* sop_getpeername */
+	sosdp_getsockname,		/* sop_getsockname */
+	sosdp_shutdown,			/* sop_shutdown */
+	sosdp_getsockopt,		/* sop_getsockopt */
+	sosdp_setsockopt,		/* sop_setsockopt */
+	sosdp_ioctl,			/* sop_ioctl	*/
+	sosdp_poll,			/* sop_poll	*/
+	sosdp_close,			/* sop_close	*/
 };
 
 sdp_upcalls_t sosdp_sock_upcalls = {
@@ -107,320 +127,57 @@ sdp_upcalls_t sosdp_sock_upcalls = {
 	sdp_sock_ordrel,
 };
 
-
-/*ARGSUSED*/
+/* ARGSUSED */
 static int
-sosdp_sock_constructor(void *buf, void *cdrarg, int kmflags)
+sosdp_init(struct sonode *so, struct sonode *pso, struct cred *cr, int flags)
 {
-	struct sdp_sonode *ss = buf;
-	struct sonode *so = &ss->ss_so;
-	struct vnode *vp;
+	int error = 0;
+	sdp_sockbuf_limits_t sbl;
+	sdp_upcalls_t *upcalls;
 
-	ss->ss_type		= SOSDP_SOCKET;
-	so->so_oobmsg		= NULL;
-	so->so_ack_mp		= NULL;
-	so->so_conn_ind_head	= NULL;
-	so->so_conn_ind_tail	= NULL;
-	so->so_discon_ind_mp	= NULL;
-	so->so_ux_bound_vp	= NULL;
-	so->so_unbind_mp	= NULL;
-	so->so_ops		= NULL;
-	so->so_accessvp		= NULL;
-	so->so_priv = NULL;
+	if (pso != NULL) {
+		/* passive open, just inherit settings from parent */
 
-	so->so_nl7c_flags	= 0;
-	so->so_nl7c_uri		= NULL;
-	so->so_nl7c_rcv_mp	= NULL;
-
-	so->so_direct		= NULL;
-
-	vp = vn_alloc(kmflags);
-	if (vp == NULL) {
-		return (-1);
-	}
-	so->so_vnode = vp;
-
-	vn_setops(vp, socksdp_vnodeops);
-	vp->v_data = (caddr_t)so;
-
-	mutex_init(&so->so_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&so->so_plumb_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&so->so_state_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&so->so_ack_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&so->so_connind_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&so->so_want_cv, NULL, CV_DEFAULT, NULL);
-	return (0);
-}
-
-/*ARGSUSED*/
-static void
-sosdp_sock_destructor(void *buf, void *cdrarg)
-{
-	struct sdp_sonode *ss = buf;
-	struct sonode *so = &ss->ss_so;
-	struct vnode *vp = SOTOV(so);
-
-	ASSERT(so->so_direct == NULL);
-
-	ASSERT(so->so_nl7c_flags == 0);
-	ASSERT(so->so_nl7c_uri == NULL);
-	ASSERT(so->so_nl7c_rcv_mp == NULL);
-
-	ASSERT(so->so_oobmsg == NULL);
-	ASSERT(so->so_ack_mp == NULL);
-	ASSERT(so->so_conn_ind_head == NULL);
-	ASSERT(so->so_conn_ind_tail == NULL);
-	ASSERT(so->so_discon_ind_mp == NULL);
-	ASSERT(so->so_ux_bound_vp == NULL);
-	ASSERT(so->so_unbind_mp == NULL);
-	ASSERT(so->so_ops == NULL || so->so_ops == &sosdp_sonodeops);
-
-	ASSERT(vn_matchops(vp, socksdp_vnodeops));
-	ASSERT(vp->v_data == (caddr_t)so);
-
-	vn_free(vp);
-
-	mutex_destroy(&so->so_lock);
-	mutex_destroy(&so->so_plumb_lock);
-	cv_destroy(&so->so_state_cv);
-	cv_destroy(&so->so_ack_cv);
-	cv_destroy(&so->so_connind_cv);
-	cv_destroy(&so->so_want_cv);
-}
-
-
-int
-sosdp_init(void)
-{
-	int error;
-
-	error = vn_make_ops("socksdp", socksdp_vnodeops_template,
-	    &socksdp_vnodeops);
-	if (error != 0) {
-		cmn_err(CE_WARN, "sosdp_init: bad vnode ops template");
-		return (error);
-	}
-
-	sosdp_sockcache = kmem_cache_create("sdpsock",
-	    sizeof (struct sdp_sonode), 0, sosdp_sock_constructor,
-	    sosdp_sock_destructor, NULL, NULL, NULL, 0);
-	return (0);
-}
-
-static struct vnode *
-sosdp_makevp(struct vnode *accessvp, int domain, int type, int protocol,
-    int kmflags)
-{
-	struct sdp_sonode *ss;
-	struct sonode *so;
-	struct vnode *vp;
-	time_t now;
-
-	ss = kmem_cache_alloc(sosdp_sockcache, kmflags);
-	if (ss == NULL) {
-		return (NULL);
-	}
-	so = &ss->ss_so;
-	so->so_cache = sosdp_sockcache;
-	so->so_obj = ss;
-	vp = SOTOV(so);
-	now = gethrestime_sec();
-
-	so->so_flag	= 0;
-	so->so_accessvp = accessvp;
-	so->so_dev = accessvp->v_rdev;
-
-	so->so_state	= 0;
-	so->so_mode	= 0;
-
-	so->so_fsid	= sockdev;
-	so->so_atime	= now;
-	so->so_mtime	= now;
-	so->so_ctime	= now;
-	so->so_count	= 0;
-
-	so->so_family	= domain;
-	so->so_type	= type;
-	so->so_protocol	= protocol;
-	so->so_pushcnt	= 0;
-
-	so->so_options	= 0;
-	so->so_linger.l_onoff   = 0;
-	so->so_linger.l_linger = 0;
-	so->so_sndbuf	= 0;
-	so->so_rcvbuf	= 0;
-	so->so_error	= 0;
-	so->so_delayed_error = 0;
-
-	ASSERT(so->so_oobmsg == NULL);
-	so->so_oobcnt	= 0;
-	so->so_oobsigcnt = 0;
-	so->so_pgrp	= 0;
-	so->so_provinfo = NULL;
-
-	so->so_laddr_sa	= (struct sockaddr *)&ss->ss_laddr;
-	so->so_faddr_sa	= (struct sockaddr *)&ss->ss_faddr;
-	so->so_laddr_maxlen = so->so_faddr_maxlen = sizeof (ss->ss_laddr);
-	so->so_laddr_len = so->so_faddr_len = 0;
-	so->so_eaddr_mp = NULL;
-	so->so_delayed_error = 0;
-
-	so->so_peercred = NULL;
-
-	ASSERT(so->so_ack_mp == NULL);
-	ASSERT(so->so_conn_ind_head == NULL);
-	ASSERT(so->so_conn_ind_tail == NULL);
-	ASSERT(so->so_ux_bound_vp == NULL);
-	ASSERT(so->so_unbind_mp == NULL);
-
-	vn_reinit(vp);
-	vp->v_vfsp	= rootvfs;
-	vp->v_type	= VSOCK;
-	vp->v_rdev	= so->so_dev;
-
-	so->so_ops	= &sosdp_sonodeops;
-
-	ss->ss_rxqueued = 0;
-	bzero(&ss->ss_poll_list, sizeof (ss->ss_poll_list));
-
-	vn_exists(vp);
-	return (vp);
-}
-
-/*
- * Creates a sdp socket data structure.
- * tso is non-NULL if it's passive open.
- */
-struct sonode *
-sosdp_create(vnode_t *accessvp, int domain, int type, int protocol,
-    int version, struct sonode *tso, int *errorp)
-{
-	struct sonode *so;
-	vnode_t *vp;
-	int error;
-	int soflags;
-	cred_t *cr;
-
-	dprint(4, ("Inside sosdp_create: domain:%d proto:%d type:%d",
-	    domain, protocol, type));
-
-	if (is_system_labeled()) {
-		*errorp = EOPNOTSUPP;
-		return (NULL);
-	}
-
-	if (version == SOV_STREAM) {
-		*errorp = EINVAL;
-		return (NULL);
-	}
-	ASSERT(accessvp != NULL);
-
-	/*
-	 * We only support one type of SDP socket.  Let sotpi_create()
-	 * handle all other cases, such as raw socket.
-	 */
-	if (!(domain == AF_INET || domain == AF_INET6) ||
-	    !(type == SOCK_STREAM)) {
-		return (sotpi_create(accessvp, domain, type, protocol, version,
-		    NULL, errorp));
-	}
-
-	if (tso == NULL) {
-		vp = sosdp_makevp(accessvp, domain, type, protocol, KM_SLEEP);
-		ASSERT(vp != NULL);
-
-		soflags = FREAD | FWRITE;
-	} else {
-		vp = sosdp_makevp(accessvp, domain, type, protocol,
-		    KM_NOSLEEP);
-		if (vp == NULL) {
-			/*
-			 * sosdp_makevp() only fails when there is no memory.
-			 */
-			*errorp = ENOMEM;
-			return (NULL);
-		}
-		soflags = FREAD | FWRITE | SO_ACCEPTOR;
-	}
-	/*
-	 * This function may be called in interrupt context, and CRED()
-	 * will be NULL.  In this case, pass in kcred to VOP_OPEN().
-	 */
-	if ((cr = CRED()) == NULL)
-		cr = kcred;
-	if ((error = VOP_OPEN(&vp, soflags, cr, NULL)) != 0) {
-		VN_RELE(vp);
-		*errorp = error;
-		return (NULL);
-	}
-	so = VTOSO(vp);
-
-	dprint(2, ("sosdp_create: %p domain %d type %d\n", (void *)so,
-	    domain, type));
-
-	if (version == SOV_DEFAULT) {
-		version = so_default_version;
-	}
-	so->so_version = (short)version;
-
-	return (so);
-}
-
-/*
- * Free SDP socket data structure.
- * Closes incoming connections which were never accepted, frees
- * resources.
- */
-void
-sosdp_free(struct sonode *so)
-{
-	struct sonode *nso;
-	mblk_t *mp;
-
-	dprint(3, ("sosdp_free: so:%p priv:%p", (void *)so, so->so_priv));
-
-	mutex_enter(&so->so_lock);
-
-	/*
-	 * Need to clear these out so that sockfree() doesn't think that
-	 * there's memory in need of free'ing.
-	 */
-	so->so_laddr_sa = so->so_faddr_sa = NULL;
-	so->so_laddr_len = so->so_laddr_maxlen = 0;
-	so->so_faddr_len = so->so_faddr_maxlen = 0;
-
-	while ((mp = so->so_conn_ind_head) != NULL) {
-		so->so_conn_ind_head = mp->b_next;
-		mutex_exit(&so->so_lock);
-		mp->b_next = NULL;
-		nso = *(struct sonode **)mp->b_rptr;
-
-		(void) VOP_CLOSE(SOTOV(nso), 0, 1, 0, CRED(), NULL);
-		vn_invalid(SOTOV(nso));
-		VN_RELE(SOTOV(nso));
-
-		freeb(mp);
 		mutex_enter(&so->so_lock);
-	}
-	so->so_conn_ind_tail = NULL;
-	so->so_state &= ~SS_HASCONNIND;
-	mutex_exit(&so->so_lock);
 
-	sockfree(so);
+		so->so_state |= (SS_ISBOUND | SS_ISCONNECTED |
+		    (pso->so_state & SS_ASYNC));
+		sosdp_so_inherit(pso, so);
+		so->so_proto_props = pso->so_proto_props;
+
+		mutex_exit(&so->so_lock);
+
+		return (0);
+	}
+
+	upcalls = &sosdp_sock_upcalls;
+
+	so->so_proto_handle = (sock_lower_handle_t)sdp_create(so, NULL,
+	    so->so_family, SDP_CAN_BLOCK, upcalls, &sbl, cr, &error);
+	if (so->so_proto_handle == NULL)
+		return (ENOMEM);
+
+	so->so_rcvbuf = sbl.sbl_rxbuf;
+	so->so_rcvlowat = sbl.sbl_rxlowat;
+	so->so_sndbuf = sbl.sbl_txbuf;
+	so->so_sndlowat = sbl.sbl_txlowat;
+
+	return (error);
 }
 
 /*
  * Accept incoming connection.
  */
+/* ARGSUSED */
 static int
-sosdp_accept(struct sonode *lso, int fflag, struct sonode **nsop)
+sosdp_accept(struct sonode *lso, int fflag, struct cred *cr,
+    struct sonode **nsop)
 {
 	int error = 0;
-	mblk_t *mp;
 	struct sonode *nso;
 
-	dprint(3, ("sosdp_accept: so:%p priv:%p", (void *)lso,
-	    lso->so_priv));
+	dprint(3, ("sosdp_accept: so:%p so_proto_handle:%p", (void *)lso,
+	    (void *)lso->so_proto_handle));
 
 	if (!(lso->so_state & SS_ACCEPTCONN)) {
 		/*
@@ -429,50 +186,36 @@ sosdp_accept(struct sonode *lso, int fflag, struct sonode **nsop)
 		eprintsoline(lso, EINVAL);
 		return (EINVAL);
 	}
-
 	/*
 	 * Returns right away if socket is nonblocking.
 	 */
-	error = sowaitconnind(lso, fflag, &mp);
+	error = so_acceptq_dequeue(lso, (fflag & (FNONBLOCK|FNDELAY)), &nso);
 	if (error != 0) {
 		eprintsoline(lso, error);
-		dprint(4, ("sosdp_accept: failed <%d>:lso:%p prv:%p",
-		    error, (void *)lso, lso->so_priv));
+		dprint(4, ("sosdp_accept: failed %d:lso:%p so_proto_handle:%p",
+		    error, (void *)lso, (void *)lso->so_proto_handle));
 		return (error);
 	}
-	nso = *(struct sonode **)mp->b_rptr;
-	freeb(mp);
-
-	mutex_enter(&lso->so_lock);
-	ASSERT(SOTOSDO(lso)->ss_rxqueued > 0);
-	--SOTOSDO(lso)->ss_rxqueued;
-	mutex_exit(&lso->so_lock);
-
-
-	/*
-	 * accept() needs remote address right away.
-	 */
-	(void) sosdp_getpeername(nso);
 
 	dprint(2, ("sosdp_accept: new %p\n", (void *)nso));
-
 	*nsop = nso;
+
 	return (0);
 }
 
 /*
  * Bind local endpoint.
  */
+/* ARGSUSED */
 int
 sosdp_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
-    int flags)
+    int flags, struct cred *cr)
 {
-	int error = 0;
+	int	error = 0;
 
 	if (!(flags & _SOBIND_LOCK_HELD)) {
 		mutex_enter(&so->so_lock);
 		so_lock_single(so);	/* Set SOLOCKED */
-		/* LINTED - statement has no conseq */
 	} else {
 		ASSERT(MUTEX_HELD(&so->so_lock));
 		ASSERT(so->so_flag & SOLOCKED);
@@ -487,6 +230,7 @@ sosdp_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 		eprintsoline(so, error);
 		goto done;
 	}
+
 	/*
 	 * X/Open requires this check
 	 */
@@ -496,16 +240,17 @@ sosdp_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 	}
 
 	/*
-	 * Protocol module does address family checks.
+	 * Protocol module does address family checks
 	 */
 	mutex_exit(&so->so_lock);
 
-	error = sdp_bind(so->so_priv, name, namelen);
+	error = sdp_bind((struct sdp_conn_struct_t *)so->so_proto_handle,
+	    name, namelen);
 
 	mutex_enter(&so->so_lock);
+
 	if (error == 0) {
 		so->so_state |= SS_ISBOUND;
-		/* LINTED - statement has no conseq */
 	} else {
 		eprintsoline(so, error);
 	}
@@ -513,7 +258,6 @@ done:
 	if (!(flags & _SOBIND_LOCK_HELD)) {
 		so_unlock_single(so, SOLOCKED);
 		mutex_exit(&so->so_lock);
-		/* LINTED - statement has no conseq */
 	} else {
 		/* If the caller held the lock don't release it here */
 		ASSERT(MUTEX_HELD(&so->so_lock));
@@ -525,11 +269,11 @@ done:
 /*
  * Turn socket into a listen socket.
  */
+/* ARGSUSED */
 static int
-sosdp_listen(struct sonode *so, int backlog)
+sosdp_listen(struct sonode *so, int backlog, struct cred *cr)
 {
 	int error = 0;
-
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);
@@ -541,30 +285,9 @@ sosdp_listen(struct sonode *so, int backlog)
 	if (so->so_state & (SS_ISCONNECTING | SS_ISCONNECTED |
 	    SS_ISDISCONNECTING | SS_CANTRCVMORE | SS_CANTSENDMORE)) {
 		error = EINVAL;
-		eprintsoline(so, error);
+		eprintsoline(so, EINVAL);
 		goto done;
 	}
-
-	if (backlog < 0) {
-		backlog = 0;
-	}
-
-	/*
-	 * Use the same qlimit as in BSD. BSD checks the qlimit
-	 * before queuing the next connection implying that a
-	 * listen(sock, 0) allows one connection to be queued.
-	 * BSD also uses 1.5 times the requested backlog.
-	 *
-	 * XNS Issue 4 required a strict interpretation of the backlog.
-	 * This has been waived subsequently for Issue 4 and the change
-	 * incorporated in XNS Issue 5. So we aren't required to do
-	 * anything special for XPG apps.
-	 */
-	if (backlog >= (INT_MAX - 1) / 3)
-		backlog = INT_MAX;
-	else
-		backlog = backlog * 3 / 2 + 1;
-
 	/*
 	 * If listen() is only called to change backlog, we don't
 	 * need to notify protocol module.
@@ -576,13 +299,13 @@ sosdp_listen(struct sonode *so, int backlog)
 
 	mutex_exit(&so->so_lock);
 
-	error = sdp_listen(so->so_priv, backlog);
+	error = sdp_listen((struct sdp_conn_struct_t *)so->so_proto_handle,
+	    backlog);
 
 	mutex_enter(&so->so_lock);
 	if (error == 0) {
-		so->so_state |= (SS_ACCEPTCONN|SS_ISBOUND);
+		so->so_state |= (SS_ACCEPTCONN | SS_ISBOUND);
 		so->so_backlog = backlog;
-		/* LINTED - statement has no conseq */
 	} else {
 		eprintsoline(so, error);
 	}
@@ -599,13 +322,9 @@ done:
 /*ARGSUSED*/
 static int
 sosdp_connect(struct sonode *so, const struct sockaddr *name,
-    socklen_t namelen, int fflag, int flags)
+    socklen_t namelen, int fflag, int flags, struct cred *cr)
 {
-	int error;
-
-	ASSERT(so->so_type == SOCK_STREAM);
-	dprint(3, ("sosdp_connect: so:%p priv:%p", (void *)so,
-	    so->so_priv));
+	int error = 0;
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);
@@ -627,10 +346,10 @@ sosdp_connect(struct sonode *so, const struct sockaddr *name,
 	}
 
 	/*
-	 * Check for failure of an earlier call
+	 * check for failure of an earlier call
 	 */
 	if (so->so_error != 0) {
-		error = sogeterr(so);
+		error = sogeterr(so, B_TRUE);
 		eprintsoline(so, error);
 		goto done;
 	}
@@ -647,24 +366,27 @@ sosdp_connect(struct sonode *so, const struct sockaddr *name,
 		goto done;
 	}
 	if (name == NULL || namelen == 0) {
-		error = EINVAL;
-		eprintsoline(so, error);
+		eprintsoline(so, EINVAL);
 		goto done;
 	}
 	soisconnecting(so);
-
 	mutex_exit(&so->so_lock);
 
-	error = sdp_connect(so->so_priv, name, namelen);
+	error = sdp_connect((struct sdp_conn_struct_t *)so->so_proto_handle,
+	    name, namelen);
+
 	mutex_enter(&so->so_lock);
 	if (error == 0) {
 		/*
 		 * Allow other threads to access the socket
 		 */
-		error = sosdp_waitconnected(so, fflag);
-		dprint(4, ("sosdp_connect: wait on so:%p priv:%p failed:%d",
-		    (void *)so,	so->so_priv, error));
+		error = sowaitconnected(so, fflag, 0);
+		dprint(4,
+		    ("sosdp_connect: wait on so:%p "
+		    "so_proto_handle:%p failed:%d",
+		    (void *)so,	(void *)so->so_proto_handle, error));
 	}
+
 	switch (error) {
 	case 0:
 	case EINPROGRESS:
@@ -684,12 +406,13 @@ done:
 	return (error);
 }
 
-
 /*
  * Receive data.
  */
+/* ARGSUSED */
 int
-sosdp_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
+sosdp_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
+    struct cred *cr)
 {
 	int flags, error = 0;
 	int size;
@@ -735,7 +458,9 @@ sosdp_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 		if (uiop->uio_fmode & (FNDELAY|FNONBLOCK)) {
 			flags |= MSG_DONTWAIT;
 		}
-		error = sdp_recv(so->so_priv, msg, size, flags, uiop);
+		error = sdp_recv(
+		    (struct sdp_conn_struct_t *)so->so_proto_handle, msg,
+		    size, flags, uiop);
 	} else {
 		msg->msg_controllen = 0;
 		msg->msg_namelen = 0;
@@ -750,8 +475,10 @@ done:
 /*
  * Send message.
  */
+/* ARGSUSED */
 static int
-sosdp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
+sosdp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
+    struct cred *cr)
 {
 	int flags;
 	ssize_t count;
@@ -759,8 +486,8 @@ sosdp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 
 	ASSERT(so->so_type == SOCK_STREAM);
 
-	dprint(4, ("sosdp_sendmsg: so:%p priv:%p",
-	    (void *)so, so->so_priv));
+	dprint(4, ("sosdp_sendmsg: so:%p so_proto_handle:%p",
+	    (void *)so, (void *)so->so_proto_handle));
 
 	flags = msg->msg_flags;
 
@@ -771,12 +498,11 @@ sosdp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	mutex_enter(&so->so_lock);
 	if (so->so_state & SS_CANTSENDMORE) {
 		mutex_exit(&so->so_lock);
-		tsignal(curthread, SIGPIPE);
 		return (EPIPE);
 	}
 
 	if (so->so_error != 0) {
-		error = sogeterr(so);
+		error = sogeterr(so, B_TRUE);
 		mutex_exit(&so->so_lock);
 		return (error);
 	}
@@ -794,93 +520,83 @@ sosdp_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	}
 
 	mutex_exit(&so->so_lock);
-	error = sdp_send(so->so_priv, msg, count, flags, uiop);
-	if (error == 0)
-		return (0);
+	error = sdp_send((struct sdp_conn_struct_t *)so->so_proto_handle,
+	    msg, count, flags, uiop);
 
-	mutex_enter(&so->so_lock);
-	if ((error == EPIPE) && (so->so_state & SS_CANTSENDMORE)) {
-		/*
-		 * We received shutdown between the time lock was
-		 * lifted and call to sdp_sendmsg().
-		 */
-		mutex_exit(&so->so_lock);
-		tsignal(curthread, SIGPIPE);
-		return (EPIPE);
-	}
-	mutex_exit(&so->so_lock);
 	return (error);
 }
-
 
 /*
  * Get address of remote node.
  */
+/* ARGSUSED */
 static int
-sosdp_getpeername(struct sonode *so)
+sosdp_getpeername(struct sonode *so, struct sockaddr *addr, socklen_t *addrlen,
+    boolean_t accept, struct cred *cr)
 {
-	int error;
 
-
-	if (!(so->so_state & SS_ISCONNECTED)) {
-		error = ENOTCONN;
+	if (!accept && !(so->so_state & SS_ISCONNECTED)) {
+		return (ENOTCONN);
 	} else {
-		error = sdp_getpeername(so->so_priv, so->so_faddr_sa,
-		    &so->so_faddr_len);
+		return (sdp_getpeername(
+		    (struct sdp_conn_struct_t *)so->so_proto_handle,
+		    addr, addrlen));
 	}
-	return (error);
 }
 
 /*
  * Get local address.
  */
+/* ARGSUSED */
 static int
-sosdp_getsockname(struct sonode *so)
+sosdp_getsockname(struct sonode *so, struct sockaddr *addr, socklen_t *addrlen,
+    struct cred *cr)
 {
-	int error;
-
 	mutex_enter(&so->so_lock);
+
 	if (!(so->so_state & SS_ISBOUND)) {
 		/*
 		 * Zero address, except for address family
 		 */
-		bzero(so->so_laddr_sa, so->so_laddr_maxlen);
-
-		so->so_laddr_len = (so->so_family == AF_INET6) ?
-		    sizeof (struct sockaddr_in6) : sizeof (struct sockaddr_in);
-		so->so_laddr_sa->sa_family = so->so_family;
-		error = 0;
+		if (so->so_family == AF_INET || so->so_family == AF_INET6) {
+			bzero(addr, *addrlen);
+			*addrlen = (so->so_family == AF_INET6) ?
+			    sizeof (struct sockaddr_in6) :
+			    sizeof (struct sockaddr_in);
+			addr->sa_family = so->so_family;
+		}
 		mutex_exit(&so->so_lock);
+		return (0);
 	} else {
 		mutex_exit(&so->so_lock);
-
-		error = sdp_getsockname(so->so_priv, so->so_laddr_sa,
-		    &so->so_laddr_len);
+		return (sdp_getsockname(
+		    (struct sdp_conn_struct_t *)so->so_proto_handle,
+		    addr, addrlen));
 	}
-
-	return (error);
 }
 
 /*
  * Called from shutdown().
  */
+/* ARGSUSED */
 static int
-sosdp_shutdown(struct sonode *so, int how)
+sosdp_shutdown(struct sonode *so, int how, struct cred *cr)
 {
-	struct sdp_sonode *ss = SOTOSDO(so);
 	uint_t state_change;
 	int error = 0;
-	short wakesig = 0;
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);
-
 	/*
 	 * Record the current state and then perform any state changes.
 	 * Then use the difference between the old and new states to
 	 * determine which needs to be done.
 	 */
 	state_change = so->so_state;
+	if (!(state_change & SS_ISCONNECTED)) {
+		error = ENOTCONN;
+		goto done;
+	}
 
 	switch (how) {
 	case SHUT_RD:
@@ -900,21 +616,16 @@ sosdp_shutdown(struct sonode *so, int how)
 
 	state_change = so->so_state & ~state_change;
 
-	if (state_change & SS_CANTRCVMORE) {
-		wakesig = POLLIN|POLLRDNORM;
-		sosdp_sendsig(ss, SDPSIG_READ);
-	}
 	if (state_change & SS_CANTSENDMORE) {
-		wakesig |= POLLOUT;
 		so->so_state |= SS_ISDISCONNECTING;
 	}
-	mutex_exit(&so->so_lock);
-
-	pollwakeup(&ss->ss_poll_list, wakesig);
+	so_notify_shutdown(so);
 
 	if (state_change & SS_CANTSENDMORE) {
-		error = sdp_shutdown(so->so_priv, how);
+		error = sdp_shutdown(
+		    (struct sdp_conn_struct_t *)so->so_proto_handle, how);
 	}
+
 	mutex_enter(&so->so_lock);
 done:
 	so_unlock_single(so, SOLOCKED);
@@ -935,7 +646,7 @@ done:
 /*ARGSUSED*/
 static int
 sosdp_getsockopt(struct sonode *so, int level, int option_name,
-    void *optval, socklen_t *optlenp, int flags)
+    void *optval, socklen_t *optlenp, int flags, struct cred *cr)
 {
 	int error = 0;
 	void *option = NULL;
@@ -987,7 +698,7 @@ sosdp_getsockopt(struct sonode *so, int level, int option_name,
 			goto copyout;
 
 		case SO_ERROR:
-			value = sogeterr(so);
+			value = sogeterr(so, B_TRUE);
 			goto copyout;
 
 		case SO_ACCEPTCONN:
@@ -1045,7 +756,8 @@ sosdp_getsockopt(struct sonode *so, int level, int option_name,
 	}
 	optlen = maxlen;
 	mutex_exit(&so->so_lock);
-	error = sdp_get_opt(so->so_priv, level, option_name, optbuf, &optlen);
+	error = sdp_get_opt((struct sdp_conn_struct_t *)so->so_proto_handle,
+	    level, option_name, optbuf, &optlen);
 	mutex_enter(&so->so_lock);
 	ASSERT(optlen <= maxlen);
 	if (error != 0) {
@@ -1078,43 +790,35 @@ done:
 /*
  * Set socket options
  */
+/* ARGSUSED */
 static int
 sosdp_setsockopt(struct sonode *so, int level, int option_name,
-    const void *optval, t_uscalar_t optlen)
+    const void *optval, t_uscalar_t optlen, struct cred *cr)
 {
-	int error;
 	void *conn = NULL;
+	int error = 0;
 
-
-	/* X/Open requires this check */
 	if (so->so_state & SS_CANTSENDMORE) {
 		return (EINVAL);
-	}
-
-	/* Caller allocates aligned optval, or passes null */
-	ASSERT(((uintptr_t)optval & (sizeof (t_scalar_t) - 1)) == 0);
-
-	/* No SDP options should be zero-length */
-	if (optlen == 0) {
-		error = EINVAL;
-		eprintsoline(so, error);
-		return (error);
 	}
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);
 
 	if (so->so_type == SOCK_STREAM) {
-		conn = so->so_priv;
+		conn = (void *)so->so_proto_handle;
 	}
 
 	dprint(2, ("sosdp_setsockopt (%d) - conn %p %d %d \n",
 	    so->so_type, conn, level, option_name));
+
 	if (conn != NULL) {
 		mutex_exit(&so->so_lock);
-		error = sdp_set_opt(conn, level, option_name, optval, optlen);
+		error = sdp_set_opt((struct sdp_conn_struct_t *)conn, level,
+		    option_name, optval, optlen);
 		mutex_enter(&so->so_lock);
 	}
+
 	/*
 	 * Check for SOL_SOCKET options and record their values.
 	 * If we know about a SOL_SOCKET parameter and the transport
@@ -1244,6 +948,239 @@ done:
 	return (error);
 }
 
+/* ARGSUSED */
+static int
+sosdp_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
+    struct cred *cr, int32_t *rvalp)
+{
+	int32_t value;
+	int error, intval;
+	pid_t pid;
+
+	/* handle socket specific ioctls */
+	switch (cmd) {
+	case FIONBIO:
+		if (so_copyin((void *)arg, &value, sizeof (int32_t),
+		    (mode & (int)FKIOCTL))) {
+			return (EFAULT);
+		}
+		mutex_enter(&so->so_lock);
+		if (value != 0) {
+			so->so_state |= SS_NDELAY;
+		} else {
+			so->so_state &= ~SS_NDELAY;
+		}
+		mutex_exit(&so->so_lock);
+		return (0);
+
+	case FIOASYNC:
+		if (so_copyin((void *)arg, &value, sizeof (int32_t),
+		    (mode & (int)FKIOCTL))) {
+			return (EFAULT);
+		}
+		mutex_enter(&so->so_lock);
+
+		if (value) {
+			/* Turn on SIGIO */
+			so->so_state |= SS_ASYNC;
+		} else {
+			/* Turn off SIGIO */
+			so->so_state &= ~SS_ASYNC;
+		}
+		mutex_exit(&so->so_lock);
+		return (0);
+
+	case SIOCSPGRP:
+	case FIOSETOWN:
+		if (so_copyin((void *)arg, &pid, sizeof (pid_t),
+		    (mode & (int)FKIOCTL))) {
+			return (EFAULT);
+		}
+		mutex_enter(&so->so_lock);
+
+		error = (pid != so->so_pgrp) ? socket_chgpgrp(so, pid) : 0;
+		mutex_exit(&so->so_lock);
+		return (error);
+
+	case SIOCGPGRP:
+	case FIOGETOWN:
+		if (so_copyout(&so->so_pgrp, (void *)arg,
+		    sizeof (pid_t), (mode & (int)FKIOCTL)))
+			return (EFAULT);
+		return (0);
+
+	case SIOCATMARK:
+		intval = 0;
+		error = sdp_ioctl(
+		    (struct sdp_conn_struct_t *)so->so_proto_handle, cmd,
+		    &intval, cr);
+		if (so_copyout(&intval, (void *)arg, sizeof (int),
+		    (mode & (int)FKIOCTL)))
+			return (EFAULT);
+		return (0);
+
+
+	case SIOCSENABLESDP: {
+		int32_t enable;
+
+		/*
+		 * System wide enable SDP
+		 */
+
+		if (so_copyin((void *)arg, &enable, sizeof (int32_t),
+		    mode & (int)FKIOCTL))
+			return (EFAULT);
+
+		error = sdp_ioctl(
+		    (struct sdp_conn_struct_t *)so->so_proto_handle, cmd,
+		    &enable, cr);
+		if (so_copyout(&enable, (void *)arg,
+		    sizeof (int32_t), (mode & (int)FKIOCTL)))
+			return (EFAULT);
+		return (0);
+	}
+		/* from strioctl */
+	case FIONREAD:
+		/*
+		 * Return number of bytes of data in all data messages
+		 * in queue in "arg".
+		 * For stream socket, amount of available data.
+		 */
+		if (so->so_state & SS_ACCEPTCONN) {
+			intval = 0;
+		} else {
+			mutex_enter(&so->so_lock);
+			intval = sdp_polldata(
+			    (struct sdp_conn_struct_t *)so->so_proto_handle,
+			    SDP_READ);
+			mutex_exit(&so->so_lock);
+		}
+		if (so_copyout(&intval, (void *)arg, sizeof (intval),
+		    (mode & (int)FKIOCTL)))
+			return (EFAULT);
+		return (0);
+	default:
+		return (EINVAL);
+	}
+}
+
+/*
+ * Check socktpi_poll() on why so_lock is not held in this function.
+ */
+static int
+sosdp_poll(struct sonode *so, short events, int anyyet, short *reventsp,
+    struct pollhead **phpp)
+{
+	short origevents = events;
+	int so_state;
+
+	so_state = so->so_state;
+
+	ASSERT(so->so_version != SOV_STREAM);
+
+	if (!(so_state & SS_ISCONNECTED) && (so->so_type == SOCK_STREAM)) {
+		/*
+		 * Not connected yet - turn off write side events
+		 */
+		events &= ~(POLLOUT|POLLWRBAND);
+	}
+
+	/*
+	 * Check for errors
+	 */
+	if (so->so_error != 0 &&
+	    ((POLLIN|POLLRDNORM|POLLOUT) & origevents)  != 0) {
+		*reventsp = (POLLIN|POLLRDNORM|POLLOUT) & origevents;
+		return (0);
+	}
+
+	*reventsp = 0;
+
+	/*
+	 * Don't mark socket as writable until TX queued data is
+	 * below watermark.
+	 */
+	if (so->so_type == SOCK_STREAM) {
+		if (sdp_polldata(
+		    (struct sdp_conn_struct_t *)so->so_proto_handle,
+		    SDP_XMIT)) {
+			*reventsp |= POLLOUT & events;
+		}
+	} else {
+		*reventsp = 0;
+		goto done;
+	}
+
+	if (sdp_polldata((struct sdp_conn_struct_t *)so->so_proto_handle,
+	    SDP_READ)) {
+		*reventsp |= (POLLIN|POLLRDNORM) & events;
+	}
+
+	if ((so_state & SS_CANTRCVMORE) || (so->so_acceptq_head != NULL)) {
+		*reventsp |= (POLLIN|POLLRDNORM) & events;
+	}
+
+done:
+	if (!*reventsp && !anyyet) {
+		*phpp = &so->so_poll_list;
+	}
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+sosdp_close(struct sonode *so, int flag, struct cred *cr)
+{
+	int error = 0;
+
+	mutex_enter(&so->so_lock);
+	so_lock_single(so);
+	/*
+	 * Need to set flags as there might be ops in progress on
+	 * this socket.
+	 *
+	 * If socket already disconnected/disconnecting,
+	 * don't send signal (again).
+	 */
+	soisdisconnected(so, 0);
+	mutex_exit(&so->so_lock);
+
+	/*
+	 * Initiate connection shutdown.
+	 */
+	error = sdp_disconnect((struct sdp_conn_struct_t *)so->so_proto_handle,
+	    flag);
+
+	mutex_enter(&so->so_lock);
+	so_unlock_single(so, SOLOCKED);
+	so_notify_disconnected(so, error);
+
+	return (error);
+}
+
+/* ARGSUSED */
+void
+sosdp_fini(struct sonode *so, struct cred *cr)
+{
+	dprint(3, ("sosdp_fini: so:%p so_proto_handle:%p", (void *)so,
+	    (void *)so->so_proto_handle));
+
+	ASSERT(so->so_ops == &sosdp_sonodeops);
+
+	if (so->so_proto_handle != NULL)
+		sdp_close((struct sdp_conn_struct_t *)so->so_proto_handle);
+	so->so_proto_handle = NULL;
+
+	mutex_enter(&so->so_lock);
+
+	so_acceptq_flush(so);
+
+	mutex_exit(&so->so_lock);
+
+	sonode_fini(so);
+}
+
 /*
  * Upcalls from SDP
  */
@@ -1254,83 +1191,37 @@ done:
 static void *
 sdp_sock_newconn(void *parenthandle, void *connind)
 {
-	struct sdp_sonode *lss = parenthandle;
-	struct sonode *lso = &lss->ss_so;
+	struct sonode *lso = parenthandle;
 	struct sonode *nso;
-	struct sdp_sonode *nss;
-	mblk_t *mp;
 	int error;
 
 	ASSERT(lso->so_state & SS_ACCEPTCONN);
-	ASSERT(lso->so_priv != NULL); /* closed conn */
+	ASSERT(lso->so_proto_handle != NULL); /* closed conn */
 	ASSERT(lso->so_type == SOCK_STREAM);
 
-	dprint(3, ("sosdp_newconn A: so:%p priv:%p", (void *)lso,
-	    lso->so_priv));
+	dprint(3, ("sosdp_newconn A: so:%p so_proto_handle:%p", (void *)lso,
+	    (void *)lso->so_proto_handle));
 
 	/*
 	 * Check current # of queued conns against backlog
 	 */
-	if (lss->ss_rxqueued >= lso->so_backlog) {
+	if (lso->so_rcv_queued >= lso->so_backlog) {
 		return (NULL);
 	}
 
-	/*
-	 * Need to create a new socket.
-	 */
-	mp = allocb(sizeof (connind), BPRI_MED);
-	if (mp == NULL) {
-		eprintsoline(lso, ENOMEM);
-		return (NULL);
-	}
-	DB_TYPE(mp) = M_PROTO;
-
-	VN_HOLD(lso->so_accessvp);
-	nso = sosdp_create(lso->so_accessvp, lso->so_family, lso->so_type,
-	    lso->so_protocol, lso->so_version, lso, &error);
+	nso = socket_newconn(lso, connind, NULL, SOCKET_NOSLEEP, &error);
 	if (nso == NULL) {
-		VN_RELE(lso->so_accessvp);
-		freeb(mp);
 		eprintsoline(lso, error);
 		return (NULL);
 	}
 
 	dprint(2, ("sdp_stream_newconn: new %p\n", (void *)nso));
-	nss = SOTOSDO(nso);
 
-	/*
-	 * Inherit socket properties
-	 */
-	mutex_enter(&lso->so_lock);
-	mutex_enter(&nso->so_lock);
-
-	nso->so_state |= (SS_ISBOUND | SS_ISCONNECTED |
-	    (lso->so_state & SS_ASYNC));
-	sosdp_so_inherit(lss, nss);
-	nso->so_priv = connind;
-
-	mutex_exit(&nso->so_lock);
-
-	++lss->ss_rxqueued;
-	mutex_exit(&lso->so_lock);
-
-	/*
-	 * Copy pointer to new socket to connind queue message
-	 */
-	*(struct sonode **)mp->b_wptr = nso;
-	mp->b_wptr += sizeof (nso);
-
-	/*
-	 * Wake people who're waiting incoming conns. Note that
-	 * soqueueconnind gets so_lock.
-	 */
-	soqueueconnind(lso, mp);
-	pollwakeup(&lss->ss_poll_list, POLLIN|POLLRDNORM);
+	(void) so_acceptq_enqueue(lso, nso);
 
 	mutex_enter(&lso->so_lock);
-	sosdp_sendsig(lss, SDPSIG_READ);
-	mutex_exit(&lso->so_lock);
-	return (nss);
+	so_notify_newconn(lso);
+	return (nso);
 }
 
 /*
@@ -1339,26 +1230,19 @@ sdp_sock_newconn(void *parenthandle, void *connind)
 static void
 sdp_sock_connected(void *handle)
 {
-	struct sdp_sonode *ss = handle;
-	struct sonode *so = &ss->ss_so;
+	struct sonode *so = handle;
 
 	ASSERT(so->so_type == SOCK_STREAM);
-	dprint(3, ("sosdp_connected C: so:%p priv:%p", (void *)so,
-	    so->so_priv));
+	dprint(3, ("sosdp_connected C: so:%p so_proto_handle:%p", (void *)so,
+	    (void *)so->so_proto_handle));
 
 	mutex_enter(&so->so_lock);
-	ASSERT(so->so_priv); /* closed conn */
+	ASSERT(so->so_proto_handle); /* closed conn */
 
 	ASSERT(!(so->so_state & SS_ACCEPTCONN));
 	soisconnected(so);
 
-	sosdp_sendsig(ss, SDPSIG_WRITE);
-	mutex_exit(&so->so_lock);
-
-	/*
-	 * Wake ones who're waiting for conn to become established.
-	 */
-	pollwakeup(&ss->ss_poll_list, POLLOUT);
+	so_notify_connected(so);
 }
 
 /*
@@ -1368,32 +1252,17 @@ sdp_sock_connected(void *handle)
 static void
 sdp_sock_disconnected(void *handle, int error)
 {
-	int event = 0;
-	struct sdp_sonode *ss = handle;
-	struct sonode *so = &ss->ss_so;
+	struct sonode *so = handle;
 
 	ASSERT(so->so_type == SOCK_STREAM);
-	dprint(2, ("sosdp_disconnected C: so:%p priv:%p error:%d",
-	    (void *)so, so->so_priv, error));
+	dprint(2, ("sosdp_disconnected C: so:%p so_proto_handle:%p error:%d",
+	    (void *)so, (void *)so->so_proto_handle, error));
 
 	mutex_enter(&so->so_lock);
-	ASSERT(so->so_priv != NULL); /* closed conn */
-
-	/*
-	 * If socket is already disconnected/disconnecting,
-	 * don't (re)send signal.
-	 */
-	if (!(so->so_state & SS_CANTRCVMORE))
-		event |= SDPSIG_READ;
-	if (!(so->so_state & SS_CANTSENDMORE))
-		event |= SDPSIG_WRITE;
-	if (event != 0)
-		sosdp_sendsig(ss, event);
+	ASSERT(so->so_proto_handle != NULL); /* closed conn */
 
 	soisdisconnected(so, error);
-	mutex_exit(&so->so_lock);
-
-	pollwakeup(&ss->ss_poll_list, POLLIN|POLLRDNORM|POLLOUT);
+	so_notify_disconnected(so, error);
 }
 
 /*
@@ -1403,15 +1272,12 @@ sdp_sock_disconnected(void *handle, int error)
 static int
 sdp_sock_recv(void *handle, mblk_t *mp, int flags)
 {
-	struct sdp_sonode *ss = handle;
-	struct sonode *so = &ss->ss_so;
+	struct sonode *so = handle;
 
 	ASSERT(so->so_type == SOCK_STREAM);
 
 	mutex_enter(&so->so_lock);
-	sosdp_sendsig(ss, SDPSIG_READ);
-	mutex_exit(&so->so_lock);
-	pollwakeup(&ss->ss_poll_list, POLLIN|POLLRDNORM);
+	so_notify_data(so, 0);
 
 	return (so->so_rcvbuf);
 }
@@ -1422,13 +1288,12 @@ sdp_sock_recv(void *handle, mblk_t *mp, int flags)
 static void
 sdp_sock_xmitted(void *handle, int writeable)
 {
-	struct sdp_sonode *ss = handle;
-	struct sonode *so = &ss->ss_so;
+	struct sonode *so = handle;
 
-	dprint(4, ("sosdp_sock_xmitted: so:%p priv:%p txq:%d",
-	    (void *)so, so->so_priv, writeable));
+	dprint(4, ("sosdp_sock_xmitted: so:%p so_proto_handle:%p txq:%d",
+	    (void *)so, (void *)so->so_proto_handle, writeable));
 	mutex_enter(&so->so_lock);
-	ASSERT(so->so_priv != NULL); /* closed conn */
+	ASSERT(so->so_proto_handle != NULL); /* closed conn */
 
 
 	/*
@@ -1436,9 +1301,7 @@ sdp_sock_xmitted(void *handle, int writeable)
 	 * watermark.
 	 */
 	if (!writeable) {
-		sosdp_sendsig(ss, SDPSIG_WRITE);
-		mutex_exit(&so->so_lock);
-		pollwakeup(&ss->ss_poll_list, POLLOUT);
+		so_notify_writable(so);
 	} else {
 		mutex_exit(&so->so_lock);
 	}
@@ -1451,16 +1314,14 @@ sdp_sock_xmitted(void *handle, int writeable)
 static void
 sdp_sock_urgdata(void *handle)
 {
-	struct sdp_sonode *ss = handle;
+	struct sonode *so = handle;
 
-	ASSERT(ss->ss_so.so_type == SOCK_STREAM);
+	ASSERT(so->so_type == SOCK_STREAM);
 
-	mutex_enter(&ss->ss_so.so_lock);
+	mutex_enter(&so->so_lock);
 
-	ASSERT(ss->ss_so.so_priv != NULL); /* closed conn */
-	sosdp_sendsig(ss, SDPSIG_URG);
-
-	mutex_exit(&ss->ss_so.so_lock);
+	ASSERT(so->so_proto_handle != NULL); /* closed conn */
+	so_notify_oobsig(so);
 }
 
 /*
@@ -1469,31 +1330,26 @@ sdp_sock_urgdata(void *handle)
 static void
 sdp_sock_ordrel(void *handle)
 {
-	struct sdp_sonode *ss = handle;
-	/* LINTED */
-	struct sonode *so = &ss->ss_so;
+	struct sonode *so = handle;
 
-	ASSERT(ss->ss_so.so_type == SOCK_STREAM);
+	ASSERT(so->so_type == SOCK_STREAM);
 
-	dprint(4, ("sdp_sock_ordrel : so:%p, priv:%p",
-	    (void *)so, so->so_priv));
-	mutex_enter(&ss->ss_so.so_lock);
-	socantrcvmore(&ss->ss_so);
-	mutex_exit(&ss->ss_so.so_lock);
-	pollwakeup(&ss->ss_poll_list, POLLIN|POLLRDNORM);
+	dprint(4, ("sdp_sock_ordrel : so:%p, so_proto_handle:%p",
+	    (void *)so, (void *)so->so_proto_handle));
+	mutex_enter(&so->so_lock);
+	socantrcvmore(so);
+	so_notify_eof(so);
 }
 
 static void
 sdp_sock_connfail(void *handle, int error)
 {
+	struct sonode *so = handle;
 
-	struct sdp_sonode *ss = handle;
-	struct sonode *so = &ss->ss_so;
-
-	dprint(3, ("sosdp_conn Failed: so:%p priv:%p", (void *)so,
-	    so->so_priv));
+	dprint(3, ("sosdp_conn Failed: so:%p so_proto_handle:%p", (void *)so,
+	    (void *)so->so_proto_handle));
 	mutex_enter(&so->so_lock);
-	ASSERT(so->so_priv != NULL); /* closed conn */
+	ASSERT(so->so_proto_handle != NULL); /* closed conn */
 	so->so_state &= ~(SS_ISCONNECTING|SS_ISCONNECTED|SS_ISDISCONNECTING);
 	so->so_error = (ushort_t)error;
 	mutex_exit(&so->so_lock);

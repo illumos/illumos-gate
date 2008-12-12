@@ -35,6 +35,7 @@
 #include <sys/fs/snode.h>
 #include <sys/fs/dv_node.h>
 #include <sys/vnode.h>
+#include <sys/ksocket.h>
 #undef mem_free /* XXX Remove this after we convert everything to kmem_alloc */
 
 #include <smbsrv/smb_vops.h>
@@ -103,58 +104,19 @@ smb_net_fini(void)
  * smb_iov_sorecv:	Receive data into an iovec from a socket
  */
 
-struct sonode *
+ksocket_t
 smb_socreate(int domain, int type, int protocol)
 {
-	vnode_t		*dvp		= NULL;
-	vnode_t		*vp		= NULL;
-	struct snode	*csp		= NULL;
-	int		err		= 0;
-	major_t		maj;
+	ksocket_t	sock;
+	int		err = 0;
 
-	if ((vp = solookup(domain, type, protocol, NULL, &err)) == NULL) {
+	err = ksocket_socket(&sock, domain, type, protocol, KSOCKET_SLEEP,
+	    CRED());
 
-		/*
-		 * solookup calls sogetvp if the vp is not found in the cache.
-		 * Since the call to sogetvp is hardwired to use USERSPACE
-		 * and declared static we'll do the work here instead.
-		 */
-		err = lookupname(type == SOCK_STREAM ? "/dev/tcp" : "/dev/udp",
-		    UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
-		if (err)
-			return (NULL);
-
-		/* Check that it is the correct vnode */
-		if (vp->v_type != VCHR) {
-			VN_RELE(vp);
-			return (NULL);
-		}
-
-		csp = VTOS(VTOS(vp)->s_commonvp);
-		if (!(csp->s_flag & SDIPSET)) {
-			char    *pathname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-			err = ddi_dev_pathname(vp->v_rdev, S_IFCHR,
-			    pathname);
-			if (err == 0) {
-				err = devfs_lookupname(pathname, NULLVPP,
-				    &dvp);
-			}
-			VN_RELE(vp);
-			kmem_free(pathname, MAXPATHLEN);
-			if (err != 0) {
-				return (NULL);
-			}
-			vp = dvp;
-		}
-
-		maj = getmajor(vp->v_rdev);
-		if (!STREAMSTAB(maj)) {
-			VN_RELE(vp);
-			return (NULL);
-		}
-	}
-
-	return (socreate(vp, domain, type, protocol, SOV_DEFAULT, NULL, &err));
+	if (err != 0)
+		return (NULL);
+	else
+		return (sock);
 }
 
 /*
@@ -165,9 +127,9 @@ smb_socreate(int domain, int type, int protocol)
  * regain control of a thread stuck in smb_sorecv.
  */
 void
-smb_soshutdown(struct sonode *so)
+smb_soshutdown(ksocket_t so)
 {
-	(void) soshutdown(so, SHUT_RDWR);
+	(void) ksocket_shutdown(so, SHUT_RDWR, CRED());
 }
 
 /*
@@ -177,82 +139,27 @@ smb_soshutdown(struct sonode *so)
  * behavior will result.
  */
 void
-smb_sodestroy(struct sonode *so)
+smb_sodestroy(ksocket_t so)
 {
-	vnode_t *vp = SOTOV(so);
-
-	(void) VOP_CLOSE(vp, 0, 1, 0, kcred, NULL);
-	VN_RELE(vp);
+	(void) ksocket_close(so, CRED());
 }
 
 int
-smb_sorecv(struct sonode *so, void *msg, size_t len)
+smb_sorecv(ksocket_t so, void *msg, size_t len)
 {
-	iovec_t iov;
+	size_t recvd;
 	int err;
 
 	ASSERT(so != NULL);
 	ASSERT(len != 0);
 
-	/*
-	 * Fill in iovec and receive data
-	 */
-	iov.iov_base = msg;
-	iov.iov_len = len;
-
-	if ((err = smb_iov_sorecv(so, &iov, 1, len)) != 0) {
+	if ((err = ksocket_recv(so, msg, len, MSG_WAITALL, &recvd,
+	    CRED())) != 0) {
 		return (err);
 	}
 
 	/* Successful receive */
-	return (0);
-}
-
-/*
- * smb_iov_sorecv - Receives an iovec from a connection
- *
- * This function gets the data asked for from the socket.  It will return
- * only when all the requested data has been retrieved or if an error
- * occurs.
- *
- * Returns 0 for success, the socket errno value if sorecvmsg fails, and
- * -1 if sorecvmsg returns success but uio_resid != 0
- */
-int
-smb_iov_sorecv(struct sonode *so, iovec_t *iop, int iovlen, size_t total_len)
-{
-	struct msghdr		msg;
-	struct uio		uio;
-	int			error;
-
-	ASSERT(iop != NULL);
-
-	/* Initialization of the message header. */
-	bzero(&msg, sizeof (msg));
-	msg.msg_iov	= iop;
-	msg.msg_flags	= MSG_WAITALL;
-	msg.msg_iovlen	= iovlen;
-
-	/* Initialization of the uio structure. */
-	bzero(&uio, sizeof (uio));
-	uio.uio_iov	= iop;
-	uio.uio_iovcnt	= iovlen;
-	uio.uio_segflg	= UIO_SYSSPACE;
-	uio.uio_resid	= total_len;
-
-	if ((error = sorecvmsg(so, &msg, &uio)) == 0) {
-		/* Received data */
-		if (uio.uio_resid == 0) {
-			/* All requested data received.  Success */
-			return (0);
-		} else {
-			/* Not all data was sent.  Failure */
-			return (-1);
-		}
-	}
-
-	/* Receive failed */
-	return (error);
+	return ((recvd == len) ? 0 : -1);
 }
 
 /*
@@ -327,13 +234,12 @@ smb_net_txr_free(smb_txreq_t *txr)
  *	queued and the routine returns immediately.
  */
 int
-smb_net_txr_send(struct sonode *so, smb_txlst_t *txl, smb_txreq_t *txr)
+smb_net_txr_send(ksocket_t so, smb_txlst_t *txl, smb_txreq_t *txr)
 {
 	list_t		local;
 	int		rc = 0;
-	iovec_t		iov;
-	struct msghdr	msg;
-	struct uio	uio;
+	size_t		sent = 0;
+	size_t		len;
 
 	ASSERT(txl->tl_magic == SMB_TXLST_MAGIC);
 
@@ -355,25 +261,11 @@ smb_net_txr_send(struct sonode *so, smb_txlst_t *txl, smb_txreq_t *txr)
 			ASSERT(txr->tr_magic == SMB_TXREQ_MAGIC);
 			list_remove(&local, txr);
 
-			iov.iov_base = (void *)txr->tr_buf;
-			iov.iov_len = txr->tr_len;
-
-			bzero(&msg, sizeof (msg));
-			msg.msg_iov	= &iov;
-			msg.msg_flags	= MSG_WAITALL;
-			msg.msg_iovlen	= 1;
-
-			bzero(&uio, sizeof (uio));
-			uio.uio_iov	= &iov;
-			uio.uio_iovcnt	= 1;
-			uio.uio_segflg	= UIO_SYSSPACE;
-			uio.uio_resid	= txr->tr_len;
-
-			rc = sosendmsg(so, &msg, &uio);
-
+			len = txr->tr_len;
+			rc = ksocket_send(so, txr->tr_buf, txr->tr_len,
+			    MSG_WAITALL, &sent, CRED());
 			smb_net_txr_free(txr);
-
-			if ((rc == 0) && (uio.uio_resid == 0))
+			if ((rc == 0) && (sent == len))
 				continue;
 
 			if (rc == 0)

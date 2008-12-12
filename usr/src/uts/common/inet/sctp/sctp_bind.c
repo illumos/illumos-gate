@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/stream.h>
@@ -174,12 +172,16 @@ sctp_bind(sctp_t *sctp, struct sockaddr *sa, socklen_t len)
 	int		err = 0;
 
 	ASSERT(sctp != NULL);
-	ASSERT(sa);
 
 	RUN_SCTP(sctp);
 
-	if (sctp->sctp_state > SCTPS_BOUND ||
-	    (sctp->sctp_connp->conn_state_flags & CONN_CLOSING)) {
+	if ((sctp->sctp_state >= SCTPS_BOUND) ||
+	    (sctp->sctp_connp->conn_state_flags & CONN_CLOSING) ||
+	    (sa == NULL || len == 0)) {
+		/*
+		 * Multiple binds not allowed for any SCTP socket
+		 * Also binding with null address is not supported.
+		 */
 		err = EINVAL;
 		goto done;
 	}

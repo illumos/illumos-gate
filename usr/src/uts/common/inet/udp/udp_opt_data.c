@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -85,9 +83,11 @@ opdes_t	udp_opt_arr[] = {
 { SO_PROTOTYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 
 { IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
-	(OP_PASSNEXT|OP_VARLEN|OP_NODEFAULT), 40, -1 /* not initialized */ },
+	(OP_PASSNEXT|OP_VARLEN|OP_NODEFAULT),
+	IP_MAX_OPT_LENGTH + IP_ADDR_LEN, -1 /* not initialized */ },
 { T_IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
-	(OP_PASSNEXT|OP_VARLEN|OP_NODEFAULT), 40, -1 /* not initialized */ },
+	(OP_PASSNEXT|OP_VARLEN|OP_NODEFAULT),
+	IP_MAX_OPT_LENGTH + IP_ADDR_LEN, -1 /* not initialized */ },
 
 { IP_TOS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 { T_IP_TOS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
@@ -318,8 +318,8 @@ uint_t udp_max_optsize; /* initialized when UDP driver is loaded */
 
 optdb_obj_t udp_opt_obj = {
 	udp_opt_default,	/* UDP default value function pointer */
-	udp_opt_get,		/* UDP get function pointer */
-	udp_opt_set,		/* UDP set function pointer */
+	udp_tpi_opt_get,	/* UDP get function pointer */
+	udp_tpi_opt_set,	/* UDP set function pointer */
 	B_TRUE,			/* UDP is tpi provider */
 	UDP_OPT_ARR_CNT,	/* UDP option database count of entries */
 	udp_opt_arr,		/* UDP option database */

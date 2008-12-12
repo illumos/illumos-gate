@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -27,14 +27,13 @@
 #ifndef	_INET_OPTCOM_H
 #define	_INET_OPTCOM_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 #if defined(_KERNEL) && defined(__STDC__)
 
+#include <inet/ipclassifier.h>
 /* Options Description Structure */
 typedef struct opdes_s {
 	t_uscalar_t	opdes_name;	/* option name */
@@ -139,6 +138,10 @@ typedef struct opdes_s {
 #define	OA_NO_PERMISSION(x, c)		(OA_MATCHED_PRIV((x), (c)) ? \
 		((x)->opdes_access_priv == 0) : ((x)->opdes_access_nopriv == 0))
 
+#define	PASS_OPT_TO_IP(connp)		\
+	if (IPCL_IS_NONSTR(connp))	\
+		return (-EINVAL)
+
 /*
  * Other properties set in opdes_props field.
  */
@@ -216,6 +219,10 @@ extern int  tpi_optcom_buf(queue_t *, mblk_t *, t_scalar_t *, t_scalar_t,
 extern t_uscalar_t optcom_max_optsize(opdes_t *, uint_t);
 extern int optcom_pkt_set(uchar_t *, uint_t, boolean_t, uchar_t **, uint_t *,
     uint_t);
+
+extern int process_auxiliary_options(conn_t *, void *, t_uscalar_t,
+    void *, optdb_obj_t *, int (*)(conn_t *, uint_t, int, int, uint_t,
+    uchar_t *, uint_t *, uchar_t *, void *, cred_t *));
 
 #endif	/* defined(_KERNEL) && defined(__STDC__) */
 

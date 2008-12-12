@@ -329,6 +329,7 @@ CHKHDRS=			\
 	kmem_impl.h		\
 	kobj.h			\
 	kobj_impl.h		\
+	ksocket.h		\
 	kstat.h			\
 	kstr.h			\
 	ksyms.h			\
@@ -503,6 +504,7 @@ CHKHDRS=			\
 	sobject.h		\
 	socket.h		\
 	socket_impl.h		\
+	socket_proto.h		\
 	socketvar.h		\
 	sockio.h		\
 	sodirect.h		\

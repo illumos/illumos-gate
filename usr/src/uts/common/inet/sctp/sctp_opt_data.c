@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -1386,8 +1384,11 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			}
 			us = (struct sctp_uc_swap *)invalp;
 			sctp->sctp_ulpd = us->sus_handle;
+			sctp->sctp_upcalls = us->sus_upcalls;
+#if 0
 			bcopy(us->sus_upcalls, &sctp->sctp_upcalls,
 			    sizeof (sctp_upcalls_t));
+#endif
 			break;
 		}
 		case SCTP_PRSCTP:

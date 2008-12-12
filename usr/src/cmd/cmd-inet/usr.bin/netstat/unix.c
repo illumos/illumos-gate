@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +35,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * code for netstat's -k option
@@ -130,8 +127,8 @@ print_kn(kstat_t *ksp)
 
 	(void) printf("\nActive UNIX domain sockets\n");
 	(void) printf("%-8.8s %-10.10s %8.8s %8.8s  "
-			"Local Addr      Remote Addr\n",
-			"Address", "Type", "Vnode", "Conn");
+	    "Local Addr      Remote Addr\n",
+	    "Address", "Type", "Vnode", "Conn");
 
 	/* for each sockinfo structure, display what we need:		*/
 	for (i = 0; i < ksp->ks_ndata; i++) {
@@ -164,13 +161,13 @@ print_kn(kstat_t *ksp)
 		if ((psi->si_state & SS_ISBOUND) &&
 		    strlen(psi->si_laddr_sun_path) != 0 &&
 		    psi->si_laddr_soa_len != 0) {
-			if (psi->si_state & SS_FADDR_NOXLATE) {
+			if (psi->si_faddr_noxlate) {
 				(void) printf(" (socketpair)  ");
 			} else {
 				if (psi->si_laddr_soa_len >
-					sizeof (psi->si_laddr_family))
+				    sizeof (psi->si_laddr_family))
 					(void) printf("%s ",
-						psi->si_laddr_sun_path);
+					    psi->si_laddr_sun_path);
 				else
 					(void) printf("               ");
 			}
@@ -182,13 +179,13 @@ print_kn(kstat_t *ksp)
 		    strlen(psi->si_faddr_sun_path) != 0 &&
 		    psi->si_faddr_soa_len != 0) {
 
-			if (psi->si_state & SS_FADDR_NOXLATE) {
+			if (psi->si_faddr_noxlate) {
 				(void) printf(" (socketpair)  ");
 			} else {
 				if (psi->si_faddr_soa_len >
-					sizeof (psi->si_faddr_family))
+				    sizeof (psi->si_faddr_family))
 					(void) printf("%s ",
-							psi->si_faddr_sun_path);
+					    psi->si_faddr_sun_path);
 				else
 					(void) printf("               ");
 			}

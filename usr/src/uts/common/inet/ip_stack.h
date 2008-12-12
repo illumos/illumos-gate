@@ -425,6 +425,8 @@ struct ip_stack {
 	kmutex_t		ips_ipobs_cb_lock;
 	uint_t			ips_ipobs_cb_nwalkers;
 	kcondvar_t		ips_ipobs_cb_cv;
+
+	struct __ldi_ident	*ips_ldi_ident;
 };
 typedef struct ip_stack ip_stack_t;
 

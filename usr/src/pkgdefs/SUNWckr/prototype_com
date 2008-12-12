@@ -134,6 +134,7 @@ d none kernel/misc 755 root sys
 d none kernel/sched 755 root sys
 d none kernel/strmod 755 root sys
 d none kernel/sys 755 root sys
+d none kernel/socketmod 755 root sys
 d none lib 755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin

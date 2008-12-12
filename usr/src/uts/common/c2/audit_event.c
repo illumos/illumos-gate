@@ -72,6 +72,8 @@
 #include <sys/tihdr.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/vfs_opreg.h>
+#include <fs/sockfs/sockcommon.h>
 #include <netinet/in.h>
 #include <sys/ddi.h>
 #include <sys/port_impl.h>
@@ -3328,7 +3330,6 @@ auf_accept(
 	char so_laddr[sizeof (struct sockaddr_in6)];
 	char so_faddr[sizeof (struct sockaddr_in6)];
 	int err;
-	int len;
 	short so_family, so_type;
 	int add_sock_token = 0;
 
@@ -3374,28 +3375,17 @@ auf_accept(
 		 * XXX - what about other socket types for AF_INET (e.g. DGRAM)
 		 */
 		if (so->so_type == SOCK_STREAM) {
+			socklen_t len;
 
 			bzero((void *)so_laddr, sizeof (so_laddr));
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
-			/*
-			 * no local address then need to get it from lower
-			 * levels. only put out record on first read ala
-			 * AUE_WRITE.
-			 */
-			if (so->so_state & SS_ISBOUND) {
-				/* only done once on a connection */
-				(void) SOP_GETSOCKNAME(so);
-				(void) SOP_GETPEERNAME(so);
-
-				/* get local and foreign addresses */
-				mutex_enter(&so->so_lock);
-				len = min(so->so_laddr_len, sizeof (so_laddr));
-				bcopy(so->so_laddr_sa, so_laddr, len);
-				len = min(so->so_faddr_len, sizeof (so_faddr));
-				bcopy(so->so_faddr_sa, so_faddr, len);
-				mutex_exit(&so->so_lock);
-			}
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
+			len = sizeof (so_faddr);
+			(void) socket_getpeername(so,
+			    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 
 			add_sock_token = 1;
 		}
@@ -3434,7 +3424,7 @@ auf_bind(struct t_audit_data *tad, int error, rval_t *rvp)
 	char so_laddr[sizeof (struct sockaddr_in6)];
 	char so_faddr[sizeof (struct sockaddr_in6)];
 	int err, fd;
-	int len;
+	socklen_t len;
 	short so_family, so_type;
 	int add_sock_token = 0;
 
@@ -3466,17 +3456,10 @@ auf_bind(struct t_audit_data *tad, int error, rval_t *rvp)
 	case AF_INET6:
 
 		bzero(so_faddr, sizeof (so_faddr));
+		len = sizeof (so_faddr);
 
-		if (so->so_state & SS_ISBOUND) {
-			/* only done once on a connection */
-			(void) SOP_GETSOCKNAME(so);
-		}
-
-		mutex_enter(&so->so_lock);
-		len = min(so->so_laddr_len, sizeof (so_laddr));
-		bcopy(so->so_laddr_sa, so_laddr, len);
-		mutex_exit(&so->so_lock);
-
+		(void) socket_getpeername(so,
+		    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 		add_sock_token = 1;
 
 		break;
@@ -3517,7 +3500,7 @@ auf_connect(struct t_audit_data *tad, int error, rval_t *rval)
 	char so_laddr[sizeof (struct sockaddr_in6)];
 	char so_faddr[sizeof (struct sockaddr_in6)];
 	int err, fd;
-	int len;
+	socklen_t len;
 	short so_family, so_type;
 	int add_sock_token = 0;
 
@@ -3539,24 +3522,14 @@ auf_connect(struct t_audit_data *tad, int error, rval_t *rval)
 	switch (so_family) {
 	case AF_INET:
 	case AF_INET6:
-		/*
-		 * no local address then need to get it from lower
-		 * levels.
-		 */
-		if (so->so_state & SS_ISBOUND) {
-			/* only done once on a connection */
-			(void) SOP_GETSOCKNAME(so);
-			(void) SOP_GETPEERNAME(so);
-		}
 
 		bzero(so_laddr, sizeof (so_laddr));
 		bzero(so_faddr, sizeof (so_faddr));
 
-		mutex_enter(&so->so_lock);
-		len = min(so->so_laddr_len, sizeof (so_laddr));
-		bcopy(so->so_laddr_sa, so_laddr, len);
+		len = sizeof (so_laddr);
+		(void) socket_getsockname(so, (struct sockaddr *)so_laddr,
+		    &len, CRED());
 		if (error) {
-			mutex_exit(&so->so_lock);
 			if (uap->addr == NULL)
 				break;
 			if (uap->len <= 0)
@@ -3569,9 +3542,9 @@ auf_connect(struct t_audit_data *tad, int error, rval_t *rval)
 #endif
 		} else {
 			/* sanity check on length */
-			len = min(so->so_faddr_len, sizeof (so_faddr));
-			bcopy(so->so_faddr_sa, so_faddr, len);
-			mutex_exit(&so->so_lock);
+			len = sizeof (so_faddr);
+			(void) socket_getpeername(so,
+			    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 		}
 
 		add_sock_token = 1;
@@ -3614,7 +3587,7 @@ aus_shutdown(struct t_audit_data *tad)
 	char so_laddr[sizeof (struct sockaddr_in6)];
 	char so_faddr[sizeof (struct sockaddr_in6)];
 	int err, fd;
-	int len;
+	socklen_t len;
 	short so_family, so_type;
 	int add_sock_token = 0;
 	file_t *fp;				/* unix domain sockets */
@@ -3641,23 +3614,12 @@ aus_shutdown(struct t_audit_data *tad)
 		bzero(so_laddr, sizeof (so_laddr));
 		bzero(so_faddr, sizeof (so_faddr));
 
-		if (so->so_state & SS_ISBOUND) {
-			/*
-			 * no local address then need to get it from lower
-			 * levels.
-			 */
-			if (so->so_laddr_len == 0)
-				(void) SOP_GETSOCKNAME(so);
-			if (so->so_faddr_len == 0)
-				(void) SOP_GETPEERNAME(so);
-		}
-
-		mutex_enter(&so->so_lock);
-		len = min(so->so_laddr_len, sizeof (so_laddr));
-		bcopy(so->so_laddr_sa, so_laddr, len);
-		len = min(so->so_faddr_len, sizeof (so_faddr));
-		bcopy(so->so_faddr_sa, so_faddr, len);
-		mutex_exit(&so->so_lock);
+		len = sizeof (so_laddr);
+		(void) socket_getsockname(so,
+		    (struct sockaddr *)so_laddr, &len, CRED());
+		len = sizeof (so_faddr);
+		(void) socket_getpeername(so,
+		    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 
 		add_sock_token = 1;
 
@@ -3721,7 +3683,7 @@ auf_setsockopt(struct t_audit_data *tad, int error, rval_t *rval)
 	char so_faddr[sizeof (struct sockaddr_in6)];
 	char		val[AU_BUFSIZE];
 	int		err, fd;
-	int		len;
+	socklen_t	len;
 	short so_family, so_type;
 	int		add_sock_token = 0;
 	file_t *fp;				/* unix domain sockets */
@@ -3751,24 +3713,16 @@ auf_setsockopt(struct t_audit_data *tad, int error, rval_t *rval)
 	switch (so_family) {
 	case AF_INET:
 	case AF_INET6:
-
 		bzero((void *)so_laddr, sizeof (so_laddr));
 		bzero((void *)so_faddr, sizeof (so_faddr));
 
-		if (so->so_state & SS_ISBOUND) {
-			if (so->so_laddr_len == 0)
-				(void) SOP_GETSOCKNAME(so);
-			if (so->so_faddr_len == 0)
-				(void) SOP_GETPEERNAME(so);
-		}
-
 		/* get local and foreign addresses */
-		mutex_enter(&so->so_lock);
-		len = min(so->so_laddr_len, sizeof (so_laddr));
-		bcopy(so->so_laddr_sa, so_laddr, len);
-		len = min(so->so_faddr_len, sizeof (so_faddr));
-		bcopy(so->so_faddr_sa, so_faddr, len);
-		mutex_exit(&so->so_lock);
+		len = sizeof (so_laddr);
+		(void) socket_getsockname(so, (struct sockaddr *)so_laddr,
+		    &len, CRED());
+		len = sizeof (so_faddr);
+		(void) socket_getpeername(so, (struct sockaddr *)so_faddr,
+		    &len, B_FALSE, CRED());
 
 		add_sock_token = 1;
 
@@ -3892,7 +3846,7 @@ auf_recvmsg(
 	int err;
 	char so_laddr[sizeof (struct sockaddr_in6)];
 	char so_faddr[sizeof (struct sockaddr_in6)];
-	int len;
+	socklen_t len;
 	file_t *fp;				/* unix domain sockets */
 	struct f_audit_data *fad;		/* unix domain sockets */
 	short so_family, so_type;
@@ -3942,10 +3896,9 @@ auf_recvmsg(
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
 			/* get local address */
-			mutex_enter(&so->so_lock);
-			len = min(so->so_laddr_len, sizeof (so_laddr));
-			bcopy(so->so_laddr_sa, so_laddr, len);
-			mutex_exit(&so->so_lock);
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
 
 			/* get peer address */
 			STRUCT_INIT(msg, get_udatamodel());
@@ -3995,21 +3948,13 @@ auf_recvmsg(
 			bzero((void *)so_laddr, sizeof (so_laddr));
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
-			if (so->so_state & SS_ISBOUND) {
-
-				if (so->so_laddr_len == 0)
-					(void) SOP_GETSOCKNAME(so);
-				if (so->so_faddr_len == 0)
-					(void) SOP_GETPEERNAME(so);
-
-				/* get local and foreign addresses */
-				mutex_enter(&so->so_lock);
-				len = min(so->so_laddr_len, sizeof (so_laddr));
-				bcopy(so->so_laddr_sa, so_laddr, len);
-				len = min(so->so_faddr_len, sizeof (so_faddr));
-				bcopy(so->so_faddr_sa, so_faddr, len);
-				mutex_exit(&so->so_lock);
-			}
+			/* get local and foreign addresses */
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
+			len = sizeof (so_faddr);
+			(void) socket_getpeername(so,
+			    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 
 			add_sock_token = 1;
 		}
@@ -4103,7 +4048,7 @@ auf_recvfrom(
 	int		fd;
 	short so_family, so_type;
 	int add_sock_token = 0;
-	int len;
+	socklen_t len;
 	int err;
 	struct file *fp;
 	struct f_audit_data *fad;		/* unix domain sockets */
@@ -4149,10 +4094,9 @@ auf_recvfrom(
 			add_sock_token = 1;
 
 			/* get local address */
-			mutex_enter(&so->so_lock);
-			len = min(so->so_laddr_len, sizeof (so_laddr));
-			bcopy(so->so_laddr_sa, so_laddr, len);
-			mutex_exit(&so->so_lock);
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
 
 			/* get peer address */
 			bzero((void *)so_faddr, sizeof (so_faddr));
@@ -4206,21 +4150,13 @@ auf_recvfrom(
 			bzero((void *)so_laddr, sizeof (so_laddr));
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
-			if (so->so_state & SS_ISBOUND) {
-
-				if (so->so_laddr_len == 0)
-					(void) SOP_GETSOCKNAME(so);
-				if (so->so_faddr_len == 0)
-					(void) SOP_GETPEERNAME(so);
-
-				/* get local and foreign addresses */
-				mutex_enter(&so->so_lock);
-				len = min(so->so_laddr_len, sizeof (so_laddr));
-				bcopy(so->so_laddr_sa, so_laddr, len);
-				len = min(so->so_faddr_len, sizeof (so_faddr));
-				bcopy(so->so_faddr_sa, so_faddr, len);
-				mutex_exit(&so->so_lock);
-			}
+			/* get local and foreign addresses */
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
+			len = sizeof (so_faddr);
+			(void) socket_getpeername(so,
+			    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 
 			add_sock_token = 1;
 		}
@@ -4306,7 +4242,7 @@ auf_sendmsg(struct t_audit_data *tad, int error, rval_t *rval)
 	int		fd;
 	short so_family, so_type;
 	int		add_sock_token = 0;
-	int		len;
+	socklen_t	len;
 	struct file	*fp;
 	struct f_audit_data *fad;
 	caddr_t		msg_name;
@@ -4351,10 +4287,9 @@ auf_sendmsg(struct t_audit_data *tad, int error, rval_t *rval)
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
 			/* get local address */
-			mutex_enter(&so->so_lock);
-			len = min(so->so_laddr_len, sizeof (so_laddr));
-			bcopy(so->so_laddr_sa, so_laddr, len);
-			mutex_exit(&so->so_lock);
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
 
 			/* get peer address */
 			STRUCT_INIT(msg, get_udatamodel());
@@ -4405,21 +4340,13 @@ auf_sendmsg(struct t_audit_data *tad, int error, rval_t *rval)
 			bzero((void *)so_laddr, sizeof (so_laddr));
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
-			if (so->so_state & SS_ISBOUND) {
-
-				if (so->so_laddr_len == 0)
-					(void) SOP_GETSOCKNAME(so);
-				if (so->so_faddr_len == 0)
-					(void) SOP_GETPEERNAME(so);
-
-				/* get local and foreign addresses */
-				mutex_enter(&so->so_lock);
-				len = min(so->so_laddr_len, sizeof (so_laddr));
-				bcopy(so->so_laddr_sa, so_laddr, len);
-				len = min(so->so_faddr_len, sizeof (so_faddr));
-				bcopy(so->so_faddr_sa, so_faddr, len);
-				mutex_exit(&so->so_lock);
-			}
+			/* get local and foreign addresses */
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
+			len = sizeof (so_faddr);
+			(void) socket_getpeername(so,
+			    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 
 			add_sock_token = 1;
 		}
@@ -4506,7 +4433,7 @@ auf_sendto(struct t_audit_data *tad, int error, rval_t *rval)
 	socklen_t	tolen;
 	int		err;
 	int		fd;
-	int		len;
+	socklen_t	len;
 	short so_family, so_type;
 	int		add_sock_token = 0;
 	struct file	*fp;
@@ -4556,10 +4483,9 @@ auf_sendto(struct t_audit_data *tad, int error, rval_t *rval)
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
 			/* get local address */
-			mutex_enter(&so->so_lock);
-			len = min(so->so_laddr_len, sizeof (so_laddr));
-			bcopy(so->so_laddr_sa, so_laddr, len);
-			mutex_exit(&so->so_lock);
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
 
 			/* get peer address */
 
@@ -4610,21 +4536,13 @@ auf_sendto(struct t_audit_data *tad, int error, rval_t *rval)
 			bzero((void *)so_laddr, sizeof (so_laddr));
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
-			if (so->so_state & SS_ISBOUND) {
-
-				if (so->so_laddr_len == 0)
-					(void) SOP_GETSOCKNAME(so);
-				if (so->so_faddr_len == 0)
-					(void) SOP_GETPEERNAME(so);
-
-				/* get local and foreign addresses */
-				mutex_enter(&so->so_lock);
-				len = min(so->so_laddr_len, sizeof (so_laddr));
-				bcopy(so->so_laddr_sa, so_laddr, len);
-				len = min(so->so_faddr_len, sizeof (so_faddr));
-				bcopy(so->so_faddr_sa, so_faddr, len);
-				mutex_exit(&so->so_lock);
-			}
+			/* get local and foreign addresses */
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
+			len = sizeof (so_faddr);
+			(void) socket_getpeername(so,
+			    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 
 			add_sock_token = 1;
 		}
@@ -5394,7 +5312,7 @@ auf_recv(tad, error, rval)
 	struct f_audit_data *fad;
 	int fd;
 	int err;
-	int len;
+	socklen_t len;
 	short so_family, so_type;
 	register struct a {
 		long	fd;
@@ -5457,17 +5375,13 @@ auf_recv(tad, error, rval)
 			bzero((void *)so_laddr, sizeof (so_laddr));
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
-			/* only done once on a connection */
-			(void) SOP_GETSOCKNAME(so);
-			(void) SOP_GETPEERNAME(so);
-
 			/* get local and foreign addresses */
-			mutex_enter(&so->so_lock);
-			len = min(so->so_laddr_len, sizeof (so_laddr));
-			bcopy(so->so_laddr_sa, so_laddr, len);
-			len = min(so->so_faddr_len, sizeof (so_faddr));
-			bcopy(so->so_faddr_sa, so_faddr, len);
-			mutex_exit(&so->so_lock);
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
+			len = sizeof (so_faddr);
+			(void) socket_getpeername(so,
+			    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 
 			/*
 			 * only way to drop out of switch. Note that we
@@ -5532,7 +5446,7 @@ auf_send(tad, error, rval)
 	struct f_audit_data *fad;
 	int fd;
 	int err;
-	int len;
+	socklen_t len;
 	short so_family, so_type;
 	register struct a {
 		long	fd;
@@ -5597,17 +5511,13 @@ auf_send(tad, error, rval)
 			bzero((void *)so_laddr, sizeof (so_laddr));
 			bzero((void *)so_faddr, sizeof (so_faddr));
 
-			/* only done once on a connection */
-			(void) SOP_GETSOCKNAME(so);
-			(void) SOP_GETPEERNAME(so);
-
 			/* get local and foreign addresses */
-			mutex_enter(&so->so_lock);
-			len = min(so->so_laddr_len, sizeof (so_laddr));
-			bcopy(so->so_laddr_sa, so_laddr, len);
-			len = min(so->so_faddr_len, sizeof (so_faddr));
-			bcopy(so->so_faddr_sa, so_faddr, len);
-			mutex_exit(&so->so_lock);
+			len = sizeof (so_laddr);
+			(void) socket_getsockname(so,
+			    (struct sockaddr *)so_laddr, &len, CRED());
+			len = sizeof (so_faddr);
+			(void) socket_getpeername(so,
+			    (struct sockaddr *)so_faddr, &len, B_FALSE, CRED());
 
 			/*
 			 * only way to drop out of switch. Note that we

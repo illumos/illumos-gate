@@ -73,6 +73,9 @@
 #include <c2/audit.h>
 
 #include <fs/sockfs/nl7c.h>
+#include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/socktpi.h>
+#include <fs/sockfs/socktpi_impl.h>
 
 /*
  * Macros that operate on struct cmsghdr.
@@ -88,18 +91,16 @@
 	((uintptr_t)(cmsg) + (cmsg)->cmsg_len <= (uintptr_t)(end)))
 #define	SO_LOCK_WAKEUP_TIME	3000	/* Wakeup time in milliseconds */
 
-static struct kmem_cache *socktpi_cache, *socktpi_unix_cache;
-struct kmem_cache *socktpi_sod_cache;
-
 dev_t sockdev;	/* For fsid in getattr */
 int sockfs_defer_nl7c_init = 0;
-struct sockparams *sphead;
-krwlock_t splist_lock;
 
 struct socklist socklist;
 
+struct kmem_cache *socket_cache;
+
 static int sockfs_update(kstat_t *, int);
 static int sockfs_snapshot(kstat_t *, void *, int);
+extern smod_info_t *sotpi_smod_create(void);
 
 extern void sendfile_init();
 
@@ -124,7 +125,7 @@ struct k_sockinfo {
  * Translate from a device pathname (e.g. "/dev/tcp") to a vnode.
  * Returns with the vnode held.
  */
-static int
+int
 sogetvp(char *devpath, vnode_t **vpp, int uioflag)
 {
 	struct snode *csp;
@@ -133,6 +134,7 @@ sogetvp(char *devpath, vnode_t **vpp, int uioflag)
 	int error;
 
 	ASSERT(uioflag == UIO_SYSSPACE || uioflag == UIO_USERSPACE);
+
 	/*
 	 * Lookup the underlying filesystem vnode.
 	 */
@@ -179,382 +181,6 @@ sogetvp(char *devpath, vnode_t **vpp, int uioflag)
 }
 
 /*
- * Add or delete (latter if devpath is NULL) an enter to the sockparams
- * table. If devpathlen is zero the devpath with not be kmem_freed. Otherwise
- * this routine assumes that the caller has kmem_alloced devpath/devpathlen
- * for this routine to consume.
- * The zero devpathlen could be used if the kernel wants to create entries
- * itself by calling sockconfig(1,2,3, "/dev/tcp", 0);
- */
-int
-soconfig(int domain, int type, int protocol,
-    char *devpath, int devpathlen)
-{
-	struct sockparams **spp;
-	struct sockparams *sp;
-	int error = 0;
-
-	dprint(0, ("soconfig(%d,%d,%d,%s,%d)\n",
-	    domain, type, protocol, devpath, devpathlen));
-
-	if (sockfs_defer_nl7c_init) {
-		nl7c_init();
-		sockfs_defer_nl7c_init = 0;
-	}
-
-	/*
-	 * Look for an existing match.
-	 */
-	rw_enter(&splist_lock, RW_WRITER);
-	for (spp = &sphead; (sp = *spp) != NULL; spp = &sp->sp_next) {
-		if (sp->sp_domain == domain &&
-		    sp->sp_type == type &&
-		    sp->sp_protocol == protocol) {
-			break;
-		}
-	}
-	if (devpath == NULL) {
-		ASSERT(devpathlen == 0);
-
-		/* Delete existing entry */
-		if (sp == NULL) {
-			error = ENXIO;
-			goto done;
-		}
-		/* Unlink and free existing entry */
-		*spp = sp->sp_next;
-		ASSERT(sp->sp_vnode);
-		VN_RELE(sp->sp_vnode);
-		if (sp->sp_devpathlen != 0)
-			kmem_free(sp->sp_devpath, sp->sp_devpathlen);
-		kmem_free(sp, sizeof (*sp));
-	} else {
-		vnode_t *vp;
-
-		/* Add new entry */
-		if (sp != NULL) {
-			error = EEXIST;
-			goto done;
-		}
-
-		error = sogetvp(devpath, &vp, UIO_SYSSPACE);
-		if (error) {
-			dprint(0, ("soconfig: vp %s failed with %d\n",
-			    devpath, error));
-			goto done;
-		}
-
-		dprint(0, ("soconfig: %s => vp %p, dev 0x%lx\n",
-		    devpath, (void *)vp, vp->v_rdev));
-
-		sp = kmem_alloc(sizeof (*sp), KM_SLEEP);
-		sp->sp_domain = domain;
-		sp->sp_type = type;
-		sp->sp_protocol = protocol;
-		sp->sp_devpath = devpath;
-		sp->sp_devpathlen = devpathlen;
-		sp->sp_vnode = vp;
-		sp->sp_next = NULL;
-		*spp = sp;
-	}
-done:
-	rw_exit(&splist_lock);
-	if (error) {
-		if (devpath != NULL)
-			kmem_free(devpath, devpathlen);
-#ifdef SOCK_DEBUG
-		eprintline(error);
-#endif /* SOCK_DEBUG */
-	}
-	return (error);
-}
-
-/*
- * Lookup an entry in the sockparams list based on the triple.
- * If no entry is found and devpath is not NULL translate devpath to a
- * vnode. Note that devpath is a pointer to a user address!
- * Returns with the vnode held.
- *
- * When this routine uses devpath it does not create an entry in the sockparams
- * list since this routine can run on behalf of any user and one user
- * should not be able to effect the transport used by another user.
- *
- * In order to return the correct error this routine has to do wildcard scans
- * of the list. The errors are (in decreasing precedence):
- *	EAFNOSUPPORT - address family not in list
- *	EPROTONOSUPPORT - address family supported but not protocol.
- *	EPROTOTYPE - address family and protocol supported but not socket type.
- */
-vnode_t *
-solookup(int domain, int type, int protocol, char *devpath, int *errorp)
-{
-	struct sockparams *sp;
-	int error;
-	vnode_t *vp;
-
-	rw_enter(&splist_lock, RW_READER);
-	for (sp = sphead; sp != NULL; sp = sp->sp_next) {
-		if (sp->sp_domain == domain &&
-		    sp->sp_type == type &&
-		    sp->sp_protocol == protocol) {
-			break;
-		}
-	}
-	if (sp == NULL) {
-		dprint(0, ("solookup(%d,%d,%d) not found\n",
-		    domain, type, protocol));
-		if (devpath == NULL) {
-			/* Determine correct error code */
-			int found = 0;
-
-			for (sp = sphead; sp != NULL; sp = sp->sp_next) {
-				if (sp->sp_domain == domain && found < 1)
-					found = 1;
-				if (sp->sp_domain == domain &&
-				    sp->sp_protocol == protocol && found < 2)
-					found = 2;
-			}
-			rw_exit(&splist_lock);
-			switch (found) {
-			case 0:
-				*errorp = EAFNOSUPPORT;
-				break;
-			case 1:
-				*errorp = EPROTONOSUPPORT;
-				break;
-			case 2:
-				*errorp = EPROTOTYPE;
-				break;
-			}
-			return (NULL);
-		}
-		rw_exit(&splist_lock);
-
-		/*
-		 * Return vp based on devpath.
-		 * Do not enter into table to avoid random users
-		 * modifying the sockparams list.
-		 */
-		error = sogetvp(devpath, &vp, UIO_USERSPACE);
-		if (error) {
-			dprint(0, ("solookup: vp %p failed with %d\n",
-			    (void *)devpath, error));
-			*errorp = EPROTONOSUPPORT;
-			return (NULL);
-		}
-		dprint(0, ("solookup: %p => vp %p, dev 0x%lx\n",
-		    (void *)devpath, (void *)vp, vp->v_rdev));
-
-		return (vp);
-	}
-	dprint(0, ("solookup(%d,%d,%d) vp %p devpath %s\n",
-	    domain, type, protocol, (void *)sp->sp_vnode, sp->sp_devpath));
-
-	vp = sp->sp_vnode;
-	VN_HOLD(vp);
-	rw_exit(&splist_lock);
-	return (vp);
-}
-
-/*
- * Return a socket vnode.
- *
- * Assumes that the caller is "passing" an VN_HOLD for accessvp i.e.
- * when the socket is freed a VN_RELE will take place.
- *
- * Note that sockets assume that the driver will clone (either itself
- * or by using the clone driver) i.e. a socket() call will always
- * result in a new vnode being created.
- */
-struct vnode *
-makesockvp(struct vnode *accessvp, int domain, int type, int protocol)
-{
-	kmem_cache_t *cp;
-	struct sonode *so;
-	struct vnode *vp;
-	time_t now;
-	dev_t dev;
-
-	cp = (domain == AF_UNIX) ? socktpi_unix_cache : socktpi_cache;
-	so = kmem_cache_alloc(cp, KM_SLEEP);
-	so->so_cache = cp;
-	so->so_obj = so;
-	vp = SOTOV(so);
-	now = gethrestime_sec();
-
-	so->so_flag	= 0;
-	ASSERT(so->so_accessvp == NULL);
-	so->so_accessvp	= accessvp;
-	dev = accessvp->v_rdev;
-
-	/*
-	 * Record in so_flag that it is a clone.
-	 */
-	if (getmajor(dev) == clone_major) {
-		so->so_flag |= SOCLONE;
-	}
-	so->so_dev = dev;
-
-	so->so_state	= 0;
-	so->so_mode	= 0;
-
-	so->so_fsid	= sockdev;
-	so->so_atime	= now;
-	so->so_mtime	= now;
-	so->so_ctime	= now;		/* Never modified */
-	so->so_count	= 0;
-
-	so->so_family	= (short)domain;
-	so->so_type	= (short)type;
-	so->so_protocol	= (short)protocol;
-	so->so_pushcnt	= 0;
-
-	so->so_options	= 0;
-	so->so_linger.l_onoff	= 0;
-	so->so_linger.l_linger = 0;
-	so->so_sndbuf	= 0;
-	so->so_rcvbuf	= 0;
-	so->so_sndlowat	= 0;
-	so->so_rcvlowat	= 0;
-#ifdef notyet
-	so->so_sndtimeo	= 0;
-	so->so_rcvtimeo	= 0;
-#endif /* notyet */
-	so->so_error	= 0;
-	so->so_delayed_error = 0;
-
-	ASSERT(so->so_oobmsg == NULL);
-	so->so_oobcnt	= 0;
-	so->so_oobsigcnt = 0;
-	so->so_pgrp	= 0;
-	so->so_provinfo = NULL;
-
-	ASSERT(so->so_laddr_sa == NULL && so->so_faddr_sa == NULL);
-	so->so_laddr_len = so->so_faddr_len = 0;
-	so->so_laddr_maxlen = so->so_faddr_maxlen = 0;
-	so->so_eaddr_mp = NULL;
-	so->so_priv = NULL;
-
-	so->so_peercred = NULL;
-
-	ASSERT(so->so_ack_mp == NULL);
-	ASSERT(so->so_conn_ind_head == NULL);
-	ASSERT(so->so_conn_ind_tail == NULL);
-	ASSERT(so->so_ux_bound_vp == NULL);
-	ASSERT(so->so_unbind_mp == NULL);
-
-	vn_reinit(vp);
-	vp->v_vfsp	= rootvfs;
-	vp->v_type	= VSOCK;
-	vp->v_rdev	= so->so_dev;
-	vn_exists(vp);
-
-	return (vp);
-}
-
-void
-sockfree(struct sonode *so)
-{
-	mblk_t *mp;
-	vnode_t *vp;
-
-	ASSERT(so->so_count == 0);
-	ASSERT(so->so_accessvp);
-	ASSERT(so->so_discon_ind_mp == NULL);
-
-	vp = so->so_accessvp;
-	VN_RELE(vp);
-
-	/*
-	 * Protect so->so_[lf]addr_sa so that sockfs_snapshot() can safely
-	 * indirect them.  It also uses so_accessvp as a validity test.
-	 */
-	mutex_enter(&so->so_lock);
-
-	so->so_accessvp = NULL;
-
-	if (so->so_laddr_sa) {
-		ASSERT((caddr_t)so->so_faddr_sa ==
-		    (caddr_t)so->so_laddr_sa + so->so_laddr_maxlen);
-		ASSERT(so->so_faddr_maxlen == so->so_laddr_maxlen);
-		so->so_state &= ~(SS_LADDR_VALID | SS_FADDR_VALID);
-		kmem_free(so->so_laddr_sa, so->so_laddr_maxlen * 2);
-		so->so_laddr_sa = NULL;
-		so->so_laddr_len = so->so_laddr_maxlen = 0;
-		so->so_faddr_sa = NULL;
-		so->so_faddr_len = so->so_faddr_maxlen = 0;
-	}
-
-	mutex_exit(&so->so_lock);
-
-	if ((mp = so->so_eaddr_mp) != NULL) {
-		freemsg(mp);
-		so->so_eaddr_mp = NULL;
-		so->so_delayed_error = 0;
-	}
-	if ((mp = so->so_ack_mp) != NULL) {
-		freemsg(mp);
-		so->so_ack_mp = NULL;
-	}
-	if ((mp = so->so_conn_ind_head) != NULL) {
-		mblk_t *mp1;
-
-		while (mp) {
-			mp1 = mp->b_next;
-			mp->b_next = NULL;
-			freemsg(mp);
-			mp = mp1;
-		}
-		so->so_conn_ind_head = so->so_conn_ind_tail = NULL;
-		so->so_state &= ~SS_HASCONNIND;
-	}
-#ifdef DEBUG
-	mutex_enter(&so->so_lock);
-	ASSERT(so_verify_oobstate(so));
-	mutex_exit(&so->so_lock);
-#endif /* DEBUG */
-	if ((mp = so->so_oobmsg) != NULL) {
-		freemsg(mp);
-		so->so_oobmsg = NULL;
-		so->so_state &= ~(SS_OOBPEND|SS_HAVEOOBDATA|SS_HADOOBDATA);
-	}
-
-	if ((mp = so->so_nl7c_rcv_mp) != NULL) {
-		so->so_nl7c_rcv_mp = NULL;
-		freemsg(mp);
-	}
-	so->so_nl7c_rcv_rval = 0;
-	if (so->so_nl7c_uri != NULL) {
-		nl7c_urifree(so);
-		/* urifree() cleared nl7c_uri */
-	}
-	if (so->so_nl7c_flags) {
-		so->so_nl7c_flags = 0;
-	}
-
-	if (so->so_direct != NULL) {
-		sodirect_t *sodp = so->so_direct;
-
-		ASSERT(sodp->sod_uioafh == NULL);
-
-		so->so_direct = NULL;
-		kmem_cache_free(socktpi_sod_cache, sodp);
-	}
-
-	ASSERT(so->so_ux_bound_vp == NULL);
-	if ((mp = so->so_unbind_mp) != NULL) {
-		freemsg(mp);
-		so->so_unbind_mp = NULL;
-	}
-	vn_invalid(SOTOV(so));
-
-	if (so->so_peercred != NULL)
-		crfree(so->so_peercred);
-
-	kmem_cache_free(so->so_cache, so->so_obj);
-}
-
-/*
  * Update the accessed, updated, or changed times in an sonode
  * with the current time.
  *
@@ -569,133 +195,20 @@ so_update_attrs(struct sonode *so, int flag)
 {
 	time_t now = gethrestime_sec();
 
+	if (SOCK_IS_NONSTR(so))
+		return;
+
 	mutex_enter(&so->so_lock);
 	so->so_flag |= flag;
 	if (flag & SOACC)
-		so->so_atime = now;
+		SOTOTPI(so)->sti_atime = now;
 	if (flag & SOMOD)
-		so->so_mtime = now;
+		SOTOTPI(so)->sti_mtime = now;
 	mutex_exit(&so->so_lock);
 }
 
-/*ARGSUSED*/
-static int
-socktpi_constructor(void *buf, void *cdrarg, int kmflags)
-{
-	struct sonode *so = buf;
-	struct vnode *vp;
-
-	vp = so->so_vnode = vn_alloc(kmflags);
-	if (vp == NULL) {
-		return (-1);
-	}
-	vn_setops(vp, socktpi_vnodeops);
-	vp->v_data = so;
-
-	so->so_direct		= NULL;
-
-	so->so_nl7c_flags	= 0;
-	so->so_nl7c_uri		= NULL;
-	so->so_nl7c_rcv_mp	= NULL;
-
-	so->so_oobmsg		= NULL;
-	so->so_ack_mp		= NULL;
-	so->so_conn_ind_head	= NULL;
-	so->so_conn_ind_tail	= NULL;
-	so->so_discon_ind_mp	= NULL;
-	so->so_ux_bound_vp	= NULL;
-	so->so_unbind_mp	= NULL;
-	so->so_accessvp		= NULL;
-	so->so_laddr_sa		= NULL;
-	so->so_faddr_sa		= NULL;
-	so->so_ops		= &sotpi_sonodeops;
-
-	mutex_init(&so->so_lock, NULL, MUTEX_DEFAULT, NULL);
-	mutex_init(&so->so_plumb_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&so->so_state_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&so->so_ack_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&so->so_connind_cv, NULL, CV_DEFAULT, NULL);
-	cv_init(&so->so_want_cv, NULL, CV_DEFAULT, NULL);
-
-	return (0);
-}
-
-/*ARGSUSED1*/
-static void
-socktpi_destructor(void *buf, void *cdrarg)
-{
-	struct sonode *so = buf;
-	struct vnode *vp = SOTOV(so);
-
-	ASSERT(so->so_direct == NULL);
-
-	ASSERT(so->so_nl7c_flags == 0);
-	ASSERT(so->so_nl7c_uri == NULL);
-	ASSERT(so->so_nl7c_rcv_mp == NULL);
-
-	ASSERT(so->so_oobmsg == NULL);
-	ASSERT(so->so_ack_mp == NULL);
-	ASSERT(so->so_conn_ind_head == NULL);
-	ASSERT(so->so_conn_ind_tail == NULL);
-	ASSERT(so->so_discon_ind_mp == NULL);
-	ASSERT(so->so_ux_bound_vp == NULL);
-	ASSERT(so->so_unbind_mp == NULL);
-	ASSERT(so->so_ops == &sotpi_sonodeops);
-
-	ASSERT(vn_matchops(vp, socktpi_vnodeops));
-	ASSERT(vp->v_data == so);
-
-	vn_free(vp);
-
-	mutex_destroy(&so->so_lock);
-	mutex_destroy(&so->so_plumb_lock);
-	cv_destroy(&so->so_state_cv);
-	cv_destroy(&so->so_ack_cv);
-	cv_destroy(&so->so_connind_cv);
-	cv_destroy(&so->so_want_cv);
-}
-
-static int
-socktpi_unix_constructor(void *buf, void *cdrarg, int kmflags)
-{
-	int retval;
-
-	if ((retval = socktpi_constructor(buf, cdrarg, kmflags)) == 0) {
-		struct sonode *so = (struct sonode *)buf;
-
-		mutex_enter(&socklist.sl_lock);
-
-		so->so_next = socklist.sl_list;
-		so->so_prev = NULL;
-		if (so->so_next != NULL)
-			so->so_next->so_prev = so;
-		socklist.sl_list = so;
-
-		mutex_exit(&socklist.sl_lock);
-
-	}
-	return (retval);
-}
-
-static void
-socktpi_unix_destructor(void *buf, void *cdrarg)
-{
-	struct sonode	*so	= (struct sonode *)buf;
-
-	mutex_enter(&socklist.sl_lock);
-
-	if (so->so_next != NULL)
-		so->so_next->so_prev = so->so_prev;
-	if (so->so_prev != NULL)
-		so->so_prev->so_next = so->so_next;
-	else
-		socklist.sl_list = so->so_next;
-
-	mutex_exit(&socklist.sl_lock);
-
-	socktpi_destructor(buf, cdrarg);
-}
-
+extern so_create_func_t sock_comm_create_function;
+extern so_destroy_func_t sock_comm_destroy_function;
 /*
  * Init function called when sockfs is loaded.
  */
@@ -716,21 +229,20 @@ sockinit(int fstype, char *name)
 		return (error);
 	}
 
-	error = vn_make_ops(name, socktpi_vnodeops_template, &socktpi_vnodeops);
+	error = vn_make_ops(name, socket_vnodeops_template,
+	    &socket_vnodeops);
 	if (error != 0) {
-		err_str = "sockinit: bad sock vnode ops template";
+		err_str = "sockinit: bad socket vnode ops template";
 		/* vn_make_ops() does not reset socktpi_vnodeops on failure. */
-		socktpi_vnodeops = NULL;
+		socket_vnodeops = NULL;
 		goto failure;
 	}
 
-	error = sosctp_init();
-	if (error != 0) {
-		err_str = NULL;
-		goto failure;
-	}
+	socket_cache = kmem_cache_create("socket_cache",
+	    sizeof (struct sonode), 0, sonode_constructor,
+	    sonode_destructor, NULL, NULL, NULL, 0);
 
-	error = sosdp_init();
+	error = socktpi_init();
 	if (error != 0) {
 		err_str = NULL;
 		goto failure;
@@ -743,21 +255,18 @@ sockinit(int fstype, char *name)
 	}
 
 	/*
-	 * Create sonode caches.  We create a special one for AF_UNIX so
-	 * that we can track them for netstat(1m).
+	 * Set up the default create and destroy functions
 	 */
-	socktpi_cache = kmem_cache_create("socktpi_cache",
-	    sizeof (struct sonode), 0, socktpi_constructor,
-	    socktpi_destructor, NULL, NULL, NULL, 0);
-
-	socktpi_unix_cache = kmem_cache_create("socktpi_unix_cache",
-	    sizeof (struct sonode), 0, socktpi_unix_constructor,
-	    socktpi_unix_destructor, NULL, NULL, NULL, 0);
+	sock_comm_create_function = socket_sonode_create;
+	sock_comm_destroy_function = socket_sonode_destroy;
 
 	/*
 	 * Build initial list mapping socket parameters to vnode.
 	 */
-	rw_init(&splist_lock, NULL, RW_DEFAULT, NULL);
+	smod_init();
+	smod_add(sotpi_smod_create());
+
+	sockparams_init();
 
 	/*
 	 * If sockets are needed before init runs /sbin/soconfig
@@ -786,8 +295,8 @@ sockinit(int fstype, char *name)
 
 failure:
 	(void) vfs_freevfsops_by_type(fstype);
-	if (socktpi_vnodeops != NULL)
-		vn_freevnodeops(socktpi_vnodeops);
+	if (socket_vnodeops != NULL)
+		vn_freevnodeops(socket_vnodeops);
 	if (err_str != NULL)
 		zcmn_err(GLOBAL_ZONEID, CE_WARN, err_str);
 	return (error);
@@ -820,15 +329,18 @@ so_unlock_single(struct sonode *so, int flag)
 	ASSERT(flag & (SOLOCKED|SOASYNC_UNBIND));
 	ASSERT((flag & ~(SOLOCKED|SOASYNC_UNBIND)) == 0);
 	ASSERT(so->so_flag & flag);
-
 	/*
-	 * Process the T_DISCON_IND on so_discon_ind_mp.
+	 * Process the T_DISCON_IND on sti_discon_ind_mp.
 	 *
 	 * Call to so_drain_discon_ind will result in so_lock
 	 * being dropped and re-acquired later.
 	 */
-	if (so->so_discon_ind_mp != NULL)
-		so_drain_discon_ind(so);
+	if (!SOCK_IS_NONSTR(so)) {
+		sotpi_info_t *sti = SOTOTPI(so);
+
+		if (sti->sti_discon_ind_mp != NULL)
+			so_drain_discon_ind(so);
+	}
 
 	if (so->so_flag & SOWANT)
 		cv_broadcast(&so->so_want_cv);
@@ -1076,7 +588,7 @@ so_addr_verify(struct sonode *so, const struct sockaddr *name,
 		break;
 	}
 	case AF_UNIX:
-		if (so->so_state & SS_FADDR_NOXLATE) {
+		if (SOTOTPI(so)->sti_faddr_noxlate) {
 			return (0);
 		}
 		if (namelen < (socklen_t)sizeof (short)) {
@@ -1122,13 +634,14 @@ so_ux_addr_xlate(struct sonode *so, struct sockaddr *name,
 	vnode_t			*vp;
 	void			*addr;
 	socklen_t		addrlen;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("so_ux_addr_xlate(%p, %p, %d, %d)\n",
 	    (void *)so, (void *)name, namelen, checkaccess));
 
 	ASSERT(name != NULL);
 	ASSERT(so->so_family == AF_UNIX);
-	ASSERT(!(so->so_state & SS_FADDR_NOXLATE));
+	ASSERT(!sti->sti_faddr_noxlate);
 	ASSERT(namelen >= (socklen_t)sizeof (short));
 	ASSERT(name->sa_family == AF_UNIX);
 	soun = (struct sockaddr_un *)name;
@@ -1147,10 +660,10 @@ so_ux_addr_xlate(struct sonode *so, struct sockaddr *name,
 	 * closed by the time the T_CONN_REQ or T_UNIDATA_REQ reaches the
 	 * transport the message will get an error or be dropped.
 	 */
-	so->so_ux_faddr.soua_vp = vp;
-	so->so_ux_faddr.soua_magic = SOU_MAGIC_EXPLICIT;
-	addr = &so->so_ux_faddr;
-	addrlen = (socklen_t)sizeof (so->so_ux_faddr);
+	sti->sti_ux_faddr.soua_vp = vp;
+	sti->sti_ux_faddr.soua_magic = SOU_MAGIC_EXPLICIT;
+	addr = &sti->sti_ux_faddr;
+	addrlen = (socklen_t)sizeof (sti->sti_ux_faddr);
 	dprintso(so, 1, ("ux_xlate UNIX: addrlen %d, vp %p\n",
 	    addrlen, (void *)vp));
 	VN_RELE(vp);
@@ -2007,8 +1520,6 @@ pr_state(uint_t state, uint_t mode)
 		(void) strcat(buf, "ASYNC ");
 	if (state & SS_ACCEPTCONN)
 		(void) strcat(buf, "ACCEPTCONN ");
-	if (state & SS_HASCONNIND)
-		(void) strcat(buf, "HASCONNIND ");
 	if (state & SS_SAVEDEOR)
 		(void) strcat(buf, "SAVEDEOR ");
 
@@ -2020,9 +1531,6 @@ pr_state(uint_t state, uint_t mode)
 		(void) strcat(buf, "HAVEOOBDATA ");
 	if (state & SS_HADOOBDATA)
 		(void) strcat(buf, "HADOOBDATA ");
-
-	if (state & SS_FADDR_NOXLATE)
-		(void) strcat(buf, "FADDR_NOXLATE ");
 
 	if (mode & SM_PRIV)
 		(void) strcat(buf, "PRIV ");
@@ -2102,6 +1610,8 @@ pr_addr(int family, struct sockaddr *addr, t_uscalar_t addrlen)
 int
 so_verify_oobstate(struct sonode *so)
 {
+	boolean_t havemark;
+
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	/*
@@ -2120,28 +1630,29 @@ so_verify_oobstate(struct sonode *so)
 	case SS_HADOOBDATA:
 		break;
 	default:
-		printf("Bad oob state 1 (%p): counts %d/%d state %s\n",
-		    (void *)so, so->so_oobsigcnt,
-		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		printf("Bad oob state 1 (%p): state %s\n",
+		    (void *)so, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
 
 	/* SS_RCVATMARK should only be set when SS_OOBPEND is set */
 	if ((so->so_state & (SS_RCVATMARK|SS_OOBPEND)) == SS_RCVATMARK) {
-		printf("Bad oob state 2 (%p): counts %d/%d state %s\n",
-		    (void *)so, so->so_oobsigcnt,
-		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		printf("Bad oob state 2 (%p): state %s\n",
+		    (void *)so, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
 
 	/*
-	 * (so_oobsigcnt != 0 or SS_RCVATMARK) iff SS_OOBPEND
+	 * (havemark != 0 or SS_RCVATMARK) iff SS_OOBPEND
+	 * For TPI, the presence of a "mark" is indicated by sti_oobsigcnt.
 	 */
-	if (!EQUIV((so->so_oobsigcnt != 0) || (so->so_state & SS_RCVATMARK),
+	havemark = (SOCK_IS_NONSTR(so)) ? so->so_oobmark > 0 :
+	    SOTOTPI(so)->sti_oobsigcnt > 0;
+
+	if (!EQUIV(havemark || (so->so_state & SS_RCVATMARK),
 	    so->so_state & SS_OOBPEND)) {
-		printf("Bad oob state 3 (%p): counts %d/%d state %s\n",
-		    (void *)so, so->so_oobsigcnt,
-		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		printf("Bad oob state 3 (%p): state %s\n",
+		    (void *)so, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
 
@@ -2150,21 +1661,23 @@ so_verify_oobstate(struct sonode *so)
 	 */
 	if (!(so->so_options & SO_OOBINLINE) &&
 	    !EQUIV(so->so_oobmsg != NULL, so->so_state & SS_HAVEOOBDATA)) {
-		printf("Bad oob state 4 (%p): counts %d/%d state %s\n",
-		    (void *)so, so->so_oobsigcnt,
-		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		printf("Bad oob state 4 (%p): state %s\n",
+		    (void *)so, pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
-	if (so->so_oobsigcnt < so->so_oobcnt) {
+
+	if (!SOCK_IS_NONSTR(so) &&
+	    SOTOTPI(so)->sti_oobsigcnt < SOTOTPI(so)->sti_oobcnt) {
 		printf("Bad oob state 5 (%p): counts %d/%d state %s\n",
-		    (void *)so, so->so_oobsigcnt,
-		    so->so_oobcnt, pr_state(so->so_state, so->so_mode));
+		    (void *)so, SOTOTPI(so)->sti_oobsigcnt,
+		    SOTOTPI(so)->sti_oobcnt,
+		    pr_state(so->so_state, so->so_mode));
 		return (0);
 	}
+
 	return (1);
 }
 #undef	EQUIV
-
 #endif /* DEBUG */
 
 /* initialize sockfs zone specific kstat related items			*/
@@ -2224,8 +1737,8 @@ sockfs_update(kstat_t *ksp, int rw)
 		return (EACCES);
 	}
 
-	for (so = socklist.sl_list; so != NULL; so = so->so_next) {
-		if (so->so_accessvp != NULL && so->so_zoneid == myzoneid) {
+	for (so = socklist.sl_list; so != NULL; so = SOTOTPI(so)->sti_next_so) {
+		if (so->so_count != 0 && so->so_zoneid == myzoneid) {
 			nactive++;
 		}
 	}
@@ -2243,6 +1756,7 @@ sockfs_snapshot(kstat_t *ksp, void *buf, int rw)
 	struct k_sockinfo	*pksi;	/* where we put sockinfo data	*/
 	t_uscalar_t		sn_len;	/* soa_len			*/
 	zoneid_t		myzoneid = (zoneid_t)(uintptr_t)ksp->ks_private;
+	sotpi_info_t 		*sti;
 
 	ASSERT((zoneid_t)(uintptr_t)ksp->ks_private == getzoneid());
 
@@ -2257,9 +1771,10 @@ sockfs_snapshot(kstat_t *ksp, void *buf, int rw)
 	 * info into buf, in k_sockinfo format.
 	 */
 	pksi = (struct k_sockinfo *)buf;
-	for (ns = 0, so = socklist.sl_list; so != NULL; so = so->so_next) {
+	ns = 0;
+	for (so = socklist.sl_list; so != NULL; so = SOTOTPI(so)->sti_next_so) {
 		/* only stuff active sonodes and the same zone:		*/
-		if (so->so_accessvp == NULL || so->so_zoneid != myzoneid) {
+		if (so->so_count == 0 || so->so_zoneid != myzoneid) {
 			continue;
 		}
 
@@ -2271,50 +1786,54 @@ sockfs_snapshot(kstat_t *ksp, void *buf, int rw)
 			break;
 		}
 
+		sti = SOTOTPI(so);
 		/* copy important info into buf:			*/
 		pksi->ks_si.si_size = sizeof (struct k_sockinfo);
 		pksi->ks_si.si_family = so->so_family;
 		pksi->ks_si.si_type = so->so_type;
 		pksi->ks_si.si_flag = so->so_flag;
 		pksi->ks_si.si_state = so->so_state;
-		pksi->ks_si.si_serv_type = so->so_serv_type;
-		pksi->ks_si.si_ux_laddr_sou_magic = so->so_ux_laddr.soua_magic;
-		pksi->ks_si.si_ux_faddr_sou_magic = so->so_ux_faddr.soua_magic;
-		pksi->ks_si.si_laddr_soa_len = so->so_laddr.soa_len;
-		pksi->ks_si.si_faddr_soa_len = so->so_faddr.soa_len;
+		pksi->ks_si.si_serv_type = sti->sti_serv_type;
+		pksi->ks_si.si_ux_laddr_sou_magic =
+		    sti->sti_ux_laddr.soua_magic;
+		pksi->ks_si.si_ux_faddr_sou_magic =
+		    sti->sti_ux_faddr.soua_magic;
+		pksi->ks_si.si_laddr_soa_len = sti->sti_laddr.soa_len;
+		pksi->ks_si.si_faddr_soa_len = sti->sti_faddr.soa_len;
 		pksi->ks_si.si_szoneid = so->so_zoneid;
+		pksi->ks_si.si_faddr_noxlate = sti->sti_faddr_noxlate;
 
 		mutex_enter(&so->so_lock);
 
-		if (so->so_laddr_sa != NULL) {
-			ASSERT(so->so_laddr_sa->sa_data != NULL);
-			sn_len = so->so_laddr_len;
+		if (sti->sti_laddr_sa != NULL) {
+			ASSERT(sti->sti_laddr_sa->sa_data != NULL);
+			sn_len = sti->sti_laddr_len;
 			ASSERT(sn_len <= sizeof (short) +
 			    sizeof (pksi->ks_si.si_laddr_sun_path));
 
 			pksi->ks_si.si_laddr_family =
-			    so->so_laddr_sa->sa_family;
+			    sti->sti_laddr_sa->sa_family;
 			if (sn_len != 0) {
 				/* AF_UNIX socket names are NULL terminated */
 				(void) strncpy(pksi->ks_si.si_laddr_sun_path,
-				    so->so_laddr_sa->sa_data,
+				    sti->sti_laddr_sa->sa_data,
 				    sizeof (pksi->ks_si.si_laddr_sun_path));
 				sn_len = strlen(pksi->ks_si.si_laddr_sun_path);
 			}
 			pksi->ks_si.si_laddr_sun_path[sn_len] = 0;
 		}
 
-		if (so->so_faddr_sa != NULL) {
-			ASSERT(so->so_faddr_sa->sa_data != NULL);
-			sn_len = so->so_faddr_len;
+		if (sti->sti_faddr_sa != NULL) {
+			ASSERT(sti->sti_faddr_sa->sa_data != NULL);
+			sn_len = sti->sti_faddr_len;
 			ASSERT(sn_len <= sizeof (short) +
 			    sizeof (pksi->ks_si.si_faddr_sun_path));
 
 			pksi->ks_si.si_faddr_family =
-			    so->so_faddr_sa->sa_family;
+			    sti->sti_faddr_sa->sa_family;
 			if (sn_len != 0) {
 				(void) strncpy(pksi->ks_si.si_faddr_sun_path,
-				    so->so_faddr_sa->sa_data,
+				    sti->sti_faddr_sa->sa_data,
 				    sizeof (pksi->ks_si.si_faddr_sun_path));
 				sn_len = strlen(pksi->ks_si.si_faddr_sun_path);
 			}
@@ -2325,9 +1844,9 @@ sockfs_snapshot(kstat_t *ksp, void *buf, int rw)
 
 		(void) sprintf(pksi->ks_straddr[0], "%p", (void *)so);
 		(void) sprintf(pksi->ks_straddr[1], "%p",
-		    (void *)so->so_ux_laddr.soua_vp);
+		    (void *)sti->sti_ux_laddr.soua_vp);
 		(void) sprintf(pksi->ks_straddr[2], "%p",
-		    (void *)so->so_ux_faddr.soua_vp);
+		    (void *)sti->sti_ux_faddr.soua_vp);
 
 		ns++;
 		pksi++;
@@ -2388,4 +1907,24 @@ out:
 		*err = 0;
 		return (cnt);
 	}
+}
+
+int
+so_copyin(const void *from, void *to, size_t size, int fromkernel)
+{
+	if (fromkernel) {
+		bcopy(from, to, size);
+		return (0);
+	}
+	return (xcopyin(from, to, size));
+}
+
+int
+so_copyout(const void *from, void *to, size_t size, int tokernel)
+{
+	if (tokernel) {
+		bcopy(from, to, size);
+		return (0);
+	}
+	return (xcopyout(from, to, size));
 }

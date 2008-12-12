@@ -279,13 +279,13 @@ sctp_clean_death(sctp_t *sctp, int err)
 		if (sctp->sctp_xmit_head || sctp->sctp_xmit_unsent) {
 			sctp_regift_xmitlist(sctp);
 		}
-		if (sctp->sctp_ulp_disconnected(sctp->sctp_ulpd, err)) {
+		if (sctp->sctp_ulp_disconnected(sctp->sctp_ulpd, 0, err)) {
 			/*
 			 * Socket is gone, detach.
 			 */
 			sctp->sctp_detached = B_TRUE;
 			sctp->sctp_ulpd = NULL;
-			bzero(&sctp->sctp_upcalls, sizeof (sctp_upcalls_t));
+			sctp->sctp_upcalls = NULL;
 		}
 	}
 
@@ -447,7 +447,7 @@ sctp_close(sctp_t *sctp)
 	RUN_SCTP(sctp);
 	sctp->sctp_detached = 1;
 	sctp->sctp_ulpd = NULL;
-	bzero(&sctp->sctp_upcalls, sizeof (sctp_upcalls_t));
+	sctp->sctp_upcalls = NULL;
 	bzero(&sctp->sctp_events, sizeof (sctp->sctp_events));
 
 	/* If the graceful shutdown has not been completed, just return. */
@@ -1341,8 +1341,8 @@ sctp_icmp_error_ipv6(sctp_t *sctp, mblk_t *mp)
  * If parent pointer is passed in, inherit settings from it.
  */
 sctp_t *
-sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
-    const sctp_upcalls_t *sctp_upcalls, sctp_sockbuf_limits_t *sbl,
+sctp_create(void *ulpd, sctp_t *parent, int family, int flags,
+    sock_upcalls_t *upcalls, sctp_sockbuf_limits_t *sbl,
     cred_t *credp)
 {
 	sctp_t		*sctp, *psctp;
@@ -1507,12 +1507,11 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 	sctp->sctp_adv_pap = sctp->sctp_lastack_rxd;
 
 	/* Information required by upper layer */
-	if (sctp_ulpd != NULL) {
-		sctp->sctp_ulpd = sctp_ulpd;
+	if (ulpd != NULL) {
+		sctp->sctp_ulpd = ulpd;
 
-		ASSERT(sctp_upcalls != NULL);
-		bcopy(sctp_upcalls, &sctp->sctp_upcalls,
-		    sizeof (sctp_upcalls_t));
+		ASSERT(upcalls != NULL);
+		sctp->sctp_upcalls = upcalls;
 		ASSERT(sbl != NULL);
 		/* Fill in the socket buffer limits for sctpsockfs */
 		sbl->sbl_txlowat = sctp->sctp_xmit_lowater;
@@ -1520,8 +1519,8 @@ sctp_create(void *sctp_ulpd, sctp_t *parent, int family, int flags,
 		sbl->sbl_rxbuf = sctp->sctp_rwnd;
 		sbl->sbl_rxlowat = SCTP_RECV_LOWATER;
 	}
-	/* If no sctp_ulpd, must be creating the default sctp */
-	ASSERT(sctp_ulpd != NULL || sctps->sctps_gsctp == NULL);
+	/* If no ulpd, must be creating the default sctp */
+	ASSERT(ulpd != NULL || sctps->sctps_gsctp == NULL);
 
 	/* Insert this in the global list. */
 	SCTP_LINK(sctp, sctps);

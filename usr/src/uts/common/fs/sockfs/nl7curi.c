@@ -33,6 +33,7 @@
 #include <sys/sendfile.h>
 #include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/nl7curi.h>
+#include <fs/sockfs/socktpi_impl.h>
 
 #include <inet/common.h>
 #include <inet/ip.h>
@@ -1017,9 +1018,10 @@ next:
 void
 nl7c_urifree(struct sonode *so)
 {
-	uri_desc_t *uri = (uri_desc_t *)so->so_nl7c_uri;
+	sotpi_info_t *sti = SOTOTPI(so);
+	uri_desc_t *uri = (uri_desc_t *)sti->sti_nl7c_uri;
 
-	so->so_nl7c_uri = NULL;
+	sti->sti_nl7c_uri = NULL;
 	if (uri->hash != URI_TEMP) {
 		uri_delete(uri);
 		mutex_enter(&uri->proclock);
@@ -1109,7 +1111,8 @@ pass:
 int
 nl7c_data(struct sonode *so, uio_t *uio)
 {
-	uri_desc_t	*uri = (uri_desc_t *)so->so_nl7c_uri;
+	sotpi_info_t	*sti = SOTOTPI(so);
+	uri_desc_t	*uri = (uri_desc_t *)sti->sti_nl7c_uri;
 	iovec_t		*iov;
 	int		cnt;
 	int		sz = uio->uio_resid;
@@ -1123,13 +1126,13 @@ nl7c_data(struct sonode *so, uio_t *uio)
 
 	if (uri == NULL) {
 		/* Socket & NL7C out of sync, disable NL7C */
-		so->so_nl7c_flags = 0;
+		sti->sti_nl7c_flags = 0;
 		nl7c_uri_NULL1++;
 		return (-1);
 	}
 
-	if (so->so_nl7c_flags & NL7C_WAITWRITE) {
-		so->so_nl7c_flags &= ~NL7C_WAITWRITE;
+	if (sti->sti_nl7c_flags & NL7C_WAITWRITE) {
+		sti->sti_nl7c_flags &= ~NL7C_WAITWRITE;
 		first = B_TRUE;
 	} else {
 		first = B_FALSE;
@@ -1191,9 +1194,9 @@ nl7c_data(struct sonode *so, uio_t *uio)
 		 * so close the URI processing for this so.
 		 */
 		nl7c_close(so);
-		if (! (so->so_nl7c_flags & NL7C_SOPERSIST)) {
+		if (! (sti->sti_nl7c_flags & NL7C_SOPERSIST)) {
 			/* Not a persistent connection */
-			so->so_nl7c_flags = 0;
+			sti->sti_nl7c_flags = 0;
 		}
 	}
 
@@ -1203,7 +1206,7 @@ fail:
 	if (alloc != NULL) {
 		kmem_free(alloc, sz);
 	}
-	so->so_nl7c_flags = 0;
+	sti->sti_nl7c_flags = 0;
 	nl7c_urifree(so);
 
 	return (error);
@@ -1275,7 +1278,8 @@ int
 nl7c_sendfilev(struct sonode *so, u_offset_t *fileoff, sendfilevec_t *sfvp,
 	int sfvc, ssize_t *xfer)
 {
-	uri_desc_t	*uri = (uri_desc_t *)so->so_nl7c_uri;
+	sotpi_info_t	*sti = SOTOTPI(so);
+	uri_desc_t	*uri = (uri_desc_t *)sti->sti_nl7c_uri;
 	file_t		*fp = NULL;
 	vnode_t		*vp = NULL;
 	char		*data = NULL;
@@ -1294,13 +1298,13 @@ nl7c_sendfilev(struct sonode *so, u_offset_t *fileoff, sendfilevec_t *sfvp,
 
 	if (uri == NULL) {
 		/* Socket & NL7C out of sync, disable NL7C */
-		so->so_nl7c_flags = 0;
+		sti->sti_nl7c_flags = 0;
 		nl7c_uri_NULL2++;
 		return (0);
 	}
 
-	if (so->so_nl7c_flags & NL7C_WAITWRITE)
-		so->so_nl7c_flags &= ~NL7C_WAITWRITE;
+	if (sti->sti_nl7c_flags & NL7C_WAITWRITE)
+		sti->sti_nl7c_flags &= ~NL7C_WAITWRITE;
 
 	while (sfvc-- > 0) {
 		/*
@@ -1435,15 +1439,18 @@ nl7c_sendfilev(struct sonode *so, u_offset_t *fileoff, sendfilevec_t *sfvp,
 		 * so close the URI processing for this so.
 		 */
 		nl7c_close(so);
-		if (! (so->so_nl7c_flags & NL7C_SOPERSIST)) {
+		if (! (sti->sti_nl7c_flags & NL7C_SOPERSIST)) {
 			/* Not a persistent connection */
-			so->so_nl7c_flags = 0;
+			sti->sti_nl7c_flags = 0;
 		}
 	}
 
 	return (0);
 
 fail:
+	if (error == EPIPE)
+		tsignal(curthread, SIGPIPE);
+
 	if (alloc != NULL)
 		kmem_free(data, len);
 
@@ -1457,7 +1464,7 @@ fail:
 		atomic_add_64(&nl7c_uri_bytes, total_count);
 	}
 
-	so->so_nl7c_flags = 0;
+	sti->sti_nl7c_flags = 0;
 	nl7c_urifree(so);
 
 	return (error);
@@ -1472,7 +1479,8 @@ fail:
 void
 nl7c_close(struct sonode *so)
 {
-	uri_desc_t *uri = (uri_desc_t *)so->so_nl7c_uri;
+	sotpi_info_t	*sti = SOTOTPI(so);
+	uri_desc_t 	*uri = (uri_desc_t *)sti->sti_nl7c_uri;
 
 	if (uri == NULL) {
 		/*
@@ -1484,7 +1492,7 @@ nl7c_close(struct sonode *so)
 		}
 		return;
 	}
-	so->so_nl7c_uri = NULL;
+	sti->sti_nl7c_uri = NULL;
 	if (uri->hash != URI_TEMP) {
 		mutex_enter(&uri->proclock);
 		uri->proc = NULL;
@@ -1679,7 +1687,6 @@ kstrwritempnoqwait(struct vnode *vp, mblk_t *mp)
 		if (error != 0) {
 			if (!(stp->sd_flag & STPLEX) &&
 			    (stp->sd_wput_opt & SW_SIGPIPE)) {
-				tsignal(curthread, SIGPIPE);
 				error = EPIPE;
 			}
 			return (error);
@@ -1700,7 +1707,7 @@ uri_rd_response(struct sonode *so,
     boolean_t first)
 {
 	vnode_t		*vp = SOTOV(so);
-	int		max_mblk = (int)((tcp_t *)so->so_priv)->tcp_mss;
+	int		max_mblk = (int)vp->v_stream->sd_maxblk;
 	int		wsz;
 	mblk_t		*mp, *wmp, *persist;
 	int		write_bytes;
@@ -1934,8 +1941,9 @@ static char pchars[] = {
 boolean_t
 nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret)
 {
-	char	*cp = (char *)so->so_nl7c_rcv_mp->b_rptr;
-	char	*ep = (char *)so->so_nl7c_rcv_mp->b_wptr;
+	sotpi_info_t *sti = SOTOTPI(so);
+	char	*cp = (char *)sti->sti_nl7c_rcv_mp->b_rptr;
+	char	*ep = (char *)sti->sti_nl7c_rcv_mp->b_wptr;
 	char	*get = "GET ";
 	char	*post = "POST ";
 	char	c;
@@ -1945,7 +1953,7 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret)
 	mblk_t	*reqmp;
 	uint32_t hv = 0;
 
-	if ((reqmp = dupb(so->so_nl7c_rcv_mp)) == NULL) {
+	if ((reqmp = dupb(sti->sti_nl7c_rcv_mp)) == NULL) {
 		nl7c_uri_pass_dupbfail++;
 		goto pass;
 	}
@@ -1965,7 +1973,7 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret)
 	/*
 	 * Set request time to current time.
 	 */
-	so->so_nl7c_rtime = gethrestime_sec();
+	sti->sti_nl7c_rtime = gethrestime_sec();
 
 	/*
 	 * Parse the Request-Line for the URI.
@@ -2043,7 +2051,7 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret)
 	}
 
 	if (uri->hash == URI_TEMP) {
-		if (so->so_nl7c_flags & NL7C_SOPERSIST) {
+		if (sti->sti_nl7c_flags & NL7C_SOPERSIST) {
 			/* Temporary URI so skip hash processing */
 			nl7c_uri_request++;
 			nl7c_uri_temp++;
@@ -2073,10 +2081,10 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret)
 		 * We have the response cached, update recv mblk rptr
 		 * to reflect the data consumed in parse.
 		 */
-		mblk_t	*mp = so->so_nl7c_rcv_mp;
+		mblk_t	*mp = sti->sti_nl7c_rcv_mp;
 
 		if (cp == (char *)mp->b_wptr) {
-			so->so_nl7c_rcv_mp = mp->b_cont;
+			sti->sti_nl7c_rcv_mp = mp->b_cont;
 			mp->b_cont = NULL;
 			freeb(mp);
 		} else {
@@ -2094,12 +2102,12 @@ nl7c_parse(struct sonode *so, boolean_t nonblocking, boolean_t *ret)
 			if (so->so_family == AF_INET) {
 				/* Only support IPv4 addrs */
 				faddr = ((struct sockaddr_in *)
-				    so->so_faddr_sa) ->sin_addr.s_addr;
+				    sti->sti_faddr_sa) ->sin_addr.s_addr;
 			} else {
 				faddr = 0;
 			}
 			/* XXX need to pass response type, e.g. 200, 304 */
-			nl7c_logd_log(ruri, uri, so->so_nl7c_rtime, faddr);
+			nl7c_logd_log(ruri, uri, sti->sti_nl7c_rtime, faddr);
 		}
 		/*
 		 * Release reference on request URI, send the response out
@@ -2125,11 +2133,11 @@ temp:
 	 * read-side processing is suspended (so the next read() gets
 	 * the request data) until a write() is processed by NL7C.
 	 *
-	 * Note, so->so_nl7c_uri now owns the REF_INIT() ref.
+	 * Note, sti->sti_nl7c_uri now owns the REF_INIT() ref.
 	 */
 	uri->proc = so;
-	so->so_nl7c_uri = uri;
-	so->so_nl7c_flags |= NL7C_WAITWRITE;
+	sti->sti_nl7c_uri = uri;
+	sti->sti_nl7c_flags |= NL7C_WAITWRITE;
 	*ret = B_FALSE;
 	return (B_FALSE);
 
@@ -2147,7 +2155,7 @@ pass:
 	if (uri) {
 		REF_RELE(uri);
 	}
-	so->so_nl7c_flags = 0;
+	sti->sti_nl7c_flags = 0;
 	*ret = B_FALSE;
 	return (B_FALSE);
 }

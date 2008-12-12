@@ -30,6 +30,8 @@
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/udp_impl.h>
+#include <sys/strsubr.h>
+#include <sys/socketvar.h>
 
 #define	INET_NAME	"udp"
 #define	INET_MODDESC	"UDP dummy STREAMS module"
@@ -38,6 +40,9 @@
 #define	INET_MODSTRTAB	dummymodinfo
 #define	INET_DEVSTRTAB	udpinfov4
 #define	INET_MODMTFLAGS	D_MP
+#define	INET_SOCKDESC	"UDP socket module"
+#define	INET_SOCK_PROTO_CREATE_FUNC	(*udp_create)
+#define	INET_SOCK_PROTO_FB_FUNC		(*udp_fallback)
 /*
  * We define both synchronous STREAMS and sockfs direct-access
  * mode for UDP module instance, because it is autopushed on

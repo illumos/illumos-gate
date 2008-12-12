@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -152,8 +150,11 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	acceptor->sctp_rwnd = listener->sctp_rwnd;
 	acceptor->sctp_irwnd = acceptor->sctp_rwnd;
 	acceptor->sctp_pd_point = acceptor->sctp_rwnd;
+	acceptor->sctp_upcalls = listener->sctp_upcalls;
+#if 0
 	bcopy(&listener->sctp_upcalls, &acceptor->sctp_upcalls,
 	    sizeof (sctp_upcalls_t));
+#endif
 
 	return (0);
 }
@@ -169,6 +170,7 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 	int	err;
 	conn_t	*connp, *econnp;
 	sctp_stack_t	*sctps;
+	struct sock_proto_props sopp;
 
 	/*
 	 * No need to check for duplicate as this is the listener
@@ -292,22 +294,25 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 
 	/* Connection established, so send up the conn_ind */
 	if ((eager->sctp_ulpd = sctp->sctp_ulp_newconn(sctp->sctp_ulpd,
-	    eager)) == NULL) {
+	    (sock_lower_handle_t)eager, NULL, NULL, 0,
+	    &eager->sctp_upcalls)) == NULL) {
 		sctp_close_eager(eager);
 		BUMP_MIB(&sctps->sctps_mib, sctpListenDrop);
 		return (NULL);
 	}
 	ASSERT(SCTP_IS_DETACHED(eager));
 	eager->sctp_detached = B_FALSE;
+	bzero(&sopp, sizeof (sopp));
+	sopp.sopp_flags = SOCKOPT_MAXBLK|SOCKOPT_WROFF;
+	sopp.sopp_maxblk = strmsgsz;
 	if (eager->sctp_family == AF_INET) {
-		eager->sctp_ulp_prop(eager->sctp_ulpd,
-		    sctps->sctps_wroff_xtra + sizeof (sctp_data_hdr_t) +
-		    sctp->sctp_hdr_len, strmsgsz);
+		sopp.sopp_wroff = sctps->sctps_wroff_xtra +
+		    sizeof (sctp_data_hdr_t) + sctp->sctp_hdr_len;
 	} else {
-		eager->sctp_ulp_prop(eager->sctp_ulpd,
-		    sctps->sctps_wroff_xtra + sizeof (sctp_data_hdr_t) +
-		    sctp->sctp_hdr6_len, strmsgsz);
+		sopp.sopp_wroff = sctps->sctps_wroff_xtra +
+		    sizeof (sctp_data_hdr_t) + sctp->sctp_hdr6_len;
 	}
+	eager->sctp_ulp_prop(eager->sctp_ulpd, &sopp);
 	return (eager);
 }
 
@@ -333,6 +338,7 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 	int		err;
 	sctp_faddr_t	*cur_fp;
 	sctp_stack_t	*sctps = sctp->sctp_sctps;
+	struct sock_proto_props sopp;
 
 	/*
 	 * Determine packet type based on type of address passed in
@@ -599,9 +605,11 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		BUMP_LOCAL(sctp->sctp_opkts);
 
 notify_ulp:
-		sctp->sctp_ulp_prop(sctp->sctp_ulpd,
-		    sctps->sctps_wroff_xtra + hdrlen + sizeof (sctp_data_hdr_t),
-		    0);
+		bzero(&sopp, sizeof (sopp));
+		sopp.sopp_flags = SOCKOPT_WROFF;
+		sopp.sopp_wroff = sctps->sctps_wroff_xtra + hdrlen +
+		    sizeof (sctp_data_hdr_t);
+		sctp->sctp_ulp_prop(sctp->sctp_ulpd, &sopp);
 
 		return (0);
 	default:

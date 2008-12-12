@@ -30,6 +30,8 @@
 #include <sys/netstack.h>
 #include <inet/ip.h>
 #include <inet/ipdrop.h>
+#include <sys/sunddi.h>
+#include <sys/sunldi.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -232,6 +234,7 @@ struct tcp_stack {
 	uint32_t	tcps_rst_cnt;
 	/* The number of RST not sent because of the rate limit. */
 	uint32_t	tcps_rst_unsent;
+	ldi_ident_t	tcps_ldi_ident;
 };
 typedef struct tcp_stack tcp_stack_t;
 

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -165,7 +163,7 @@ sctp_shutdown_received(sctp_t *sctp, sctp_chunk_hdr_t *sch, boolean_t crwsd,
 
 	/* Don't allow sending new data */
 	if (!SCTP_IS_DETACHED(sctp) && !sctp->sctp_ulp_discon_done) {
-		sctp->sctp_ulp_disconnecting(sctp->sctp_ulpd);
+		sctp->sctp_ulp_opctl(sctp->sctp_ulpd, SOCK_OPCTL_SHUT_SEND, 0);
 		sctp->sctp_ulp_discon_done = B_TRUE;
 	}
 

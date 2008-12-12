@@ -634,11 +634,10 @@ smb_session_message(smb_session_t *session)
  * Port will be SSN_SRVC_TCP_PORT or SMB_SRVC_TCP_PORT.
  */
 smb_session_t *
-smb_session_create(struct sonode *new_so, uint16_t port, smb_server_t *sv)
+smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv)
 {
-	uint32_t		ipaddr;
-	uint32_t		local_ipaddr;
 	struct sockaddr_in	sin;
+	socklen_t		slen;
 	smb_session_t		*session;
 
 	session = kmem_cache_alloc(sv->si_cache_session, KM_SLEEP);
@@ -670,13 +669,18 @@ smb_session_create(struct sonode *new_so, uint16_t port, smb_server_t *sv)
 	smb_rwx_init(&session->s_lock);
 
 	if (new_so) {
-		bcopy(new_so->so_faddr_sa, &sin, new_so->so_faddr_len);
-		ipaddr = sin.sin_addr.s_addr;
-		bcopy(new_so->so_laddr_sa, &sin, new_so->so_faddr_len);
-		local_ipaddr = sin.sin_addr.s_addr;
+		slen = sizeof (sin);
+
+		(void) ksocket_getsockname(new_so, (struct sockaddr *)&sin,
+		    &slen, CRED());
+		session->local_ipaddr = sin.sin_addr.s_addr;
+
+		slen = sizeof (sin);
+		(void) ksocket_getpeername(new_so, (struct sockaddr *)&sin,
+		    &slen, CRED());
+		session->ipaddr = sin.sin_addr.s_addr;
+
 		session->s_local_port = port;
-		session->ipaddr = ipaddr;
-		session->local_ipaddr = local_ipaddr;
 		session->sock = new_so;
 	}
 

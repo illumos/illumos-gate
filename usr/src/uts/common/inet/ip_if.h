@@ -234,8 +234,11 @@ extern	ipif_t	*ipif_getby_indexes(uint_t, uint_t, boolean_t, ip_stack_t *);
 extern	void	ipif_init(ip_stack_t *);
 extern	ipif_t	*ipif_lookup_addr(ipaddr_t, ill_t *, zoneid_t, queue_t *,
     mblk_t *, ipsq_func_t, int *, ip_stack_t *);
+extern	boolean_t ip_addr_exists(ipaddr_t, zoneid_t, ip_stack_t *);
 extern	ipif_t	*ipif_lookup_addr_v6(const in6_addr_t *, ill_t *, zoneid_t,
     queue_t *, mblk_t *, ipsq_func_t, int *, ip_stack_t *);
+extern  boolean_t ip_addr_exists_v6(const in6_addr_t *, zoneid_t,
+    ip_stack_t *);
 extern	zoneid_t ipif_lookup_addr_zoneid(ipaddr_t, ill_t *, ip_stack_t *);
 extern	zoneid_t ipif_lookup_addr_zoneid_v6(const in6_addr_t *, ill_t *,
     ip_stack_t *);

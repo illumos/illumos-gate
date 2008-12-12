@@ -46,6 +46,8 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/vnode.h>
 #include <sys/cred.h>
+#include <netinet/in.h>
+#include <sys/ksocket.h>
 #include <sys/fem.h>
 #include <sys/door.h>
 #include <smbsrv/smb.h>
@@ -683,7 +685,7 @@ typedef struct smb_session {
 	uint32_t		capabilities;
 	struct smb_sign		signing;
 
-	struct sonode		*sock;
+	ksocket_t		sock;
 
 	smb_slist_t		s_req_list;
 	smb_llist_t		s_xa_list;
@@ -1453,7 +1455,7 @@ typedef struct {
 typedef struct {
 	kthread_t		*ld_kth;
 	kt_did_t		ld_ktdid;
-	struct sonode		*ld_so;
+	ksocket_t		ld_so;
 	struct sockaddr_in	ld_sin;
 	smb_session_list_t	ld_session_list;
 } smb_listener_daemon_t;

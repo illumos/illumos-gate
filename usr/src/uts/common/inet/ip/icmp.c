@@ -43,7 +43,9 @@
 #include <sys/zone.h>
 #include <sys/time.h>
 
+#include <sys/sockio.h>
 #include <sys/socket.h>
+#include <sys/socketvar.h>
 #include <sys/isa_defs.h>
 #include <sys/suntpi.h>
 #include <sys/xti_inet.h>
@@ -58,7 +60,7 @@
 #include <inet/common.h>
 #include <inet/ip.h>
 #include <inet/ip6.h>
-#include <inet/mi.h>
+#include <inet/proto_set.h>
 #include <inet/nd.h>
 #include <inet/optcom.h>
 #include <inet/snmpcom.h>
@@ -78,6 +80,7 @@
 #include <inet/ip_if.h>
 
 #include <inet/ip_impl.h>
+#include <sys/disp.h>
 
 /*
  * Synchronization notes:
@@ -99,41 +102,34 @@
  */
 
 static void	icmp_addr_req(queue_t *q, mblk_t *mp);
-static void	icmp_bind(queue_t *q, mblk_t *mp);
-static void	icmp_bind_proto(queue_t *q);
-static void	icmp_bind_result(conn_t *, mblk_t *);
-static void	icmp_bind_ack(conn_t *, mblk_t *mp);
-static void	icmp_bind_error(conn_t *, mblk_t *mp);
+static void	icmp_tpi_bind(queue_t *q, mblk_t *mp);
+static int	icmp_bind_proto(conn_t *connp);
 static int	icmp_build_hdrs(icmp_t *icmp);
 static void	icmp_capability_req(queue_t *q, mblk_t *mp);
-static int	icmp_close(queue_t *q);
-static void	icmp_connect(queue_t *q, mblk_t *mp);
-static void	icmp_disconnect(queue_t *q, mblk_t *mp);
+static int	icmp_close(queue_t *q, int flags);
+static void	icmp_tpi_connect(queue_t *q, mblk_t *mp);
+static void	icmp_tpi_disconnect(queue_t *q, mblk_t *mp);
 static void	icmp_err_ack(queue_t *q, mblk_t *mp, t_scalar_t t_error,
 		    int sys_error);
 static void	icmp_err_ack_prim(queue_t *q, mblk_t *mp, t_scalar_t primitive,
 		    t_scalar_t t_error, int sys_error);
-static void	icmp_icmp_error(queue_t *q, mblk_t *mp);
-static void	icmp_icmp_error_ipv6(queue_t *q, mblk_t *mp);
+static void	icmp_icmp_error(conn_t *connp, mblk_t *mp);
+static void	icmp_icmp_error_ipv6(conn_t *connp, mblk_t *mp);
 static void	icmp_info_req(queue_t *q, mblk_t *mp);
 static void	icmp_input(void *, mblk_t *, void *);
-static mblk_t	*icmp_ip_bind_mp(icmp_t *icmp, t_scalar_t bind_prim,
-		    t_scalar_t addr_length, in_port_t);
-static int	icmp_open(queue_t *q, dev_t *devp, int flag, int sflag,
-		    cred_t *credp, boolean_t isv6);
+static conn_t 	*icmp_open(int family, cred_t *credp, int *err, int flags);
 static int	icmp_openv4(queue_t *q, dev_t *devp, int flag, int sflag,
 		    cred_t *credp);
 static int	icmp_openv6(queue_t *q, dev_t *devp, int flag, int sflag,
 		    cred_t *credp);
-static void	icmp_output(queue_t *q, mblk_t *mp);
 static int	icmp_unitdata_opt_process(queue_t *q, mblk_t *mp,
 		    int *errorp, void *thisdg_attrs);
 static boolean_t icmp_opt_allow_udr_set(t_scalar_t level, t_scalar_t name);
-int		icmp_opt_set(queue_t *q, uint_t optset_context,
+int		icmp_opt_set(conn_t *connp, uint_t optset_context,
 		    int level, int name, uint_t inlen,
 		    uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
-		    void *thisdg_attrs, cred_t *cr, mblk_t *mblk);
-int		icmp_opt_get(queue_t *q, int level, int name,
+		    void *thisdg_attrs, cred_t *cr);
+int		icmp_opt_get(conn_t *connp, int level, int name,
 		    uchar_t *ptr);
 static int	icmp_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
 static boolean_t icmp_param_register(IDP *ndp, icmpparam_t *icmppa, int cnt);
@@ -144,10 +140,13 @@ static int	icmp_snmp_set(queue_t *q, t_scalar_t level, t_scalar_t name,
 static int	icmp_status_report(queue_t *q, mblk_t *mp, caddr_t cp,
 		    cred_t *cr);
 static void	icmp_ud_err(queue_t *q, mblk_t *mp, t_scalar_t err);
-static void	icmp_unbind(queue_t *q, mblk_t *mp);
+static void	icmp_tpi_unbind(queue_t *q, mblk_t *mp);
 static void	icmp_wput(queue_t *q, mblk_t *mp);
-static void	icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6,
-		    t_scalar_t tudr_optlen);
+static void	icmp_wput_fallback(queue_t *q, mblk_t *mp);
+static int	raw_ip_send_data_v6(queue_t *q, conn_t *connp, mblk_t *mp,
+		    sin6_t *sin6, ip6_pkt_t *ipp);
+static int	raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp,
+		    ipaddr_t v4dst, ip4_pkt_t *pktinfop);
 static void	icmp_wput_other(queue_t *q, mblk_t *mp);
 static void	icmp_wput_iocdata(queue_t *q, mblk_t *mp);
 static void	icmp_wput_restricted(queue_t *q, mblk_t *mp);
@@ -158,7 +157,16 @@ static void	rawip_stack_fini(netstackid_t stackid, void *arg);
 static void	*rawip_kstat_init(netstackid_t stackid);
 static void	rawip_kstat_fini(netstackid_t stackid, kstat_t *ksp);
 static int	rawip_kstat_update(kstat_t *kp, int rw);
+static void	rawip_stack_shutdown(netstackid_t stackid, void *arg);
+static int	rawip_do_getsockname(icmp_t *icmp, struct sockaddr *sa,
+		    uint_t *salenp);
+static int	rawip_do_getpeername(icmp_t *icmp, struct sockaddr *sa,
+		    uint_t *salenp);
 
+int		rawip_getsockname(sock_lower_handle_t, struct sockaddr *,
+		    socklen_t *, cred_t *);
+int		rawip_getpeername(sock_lower_handle_t, struct sockaddr *,
+		    socklen_t *, cred_t *);
 
 static struct module_info icmp_mod_info =  {
 	5707, "icmp", 1, INFPSZ, 512, 128
@@ -177,7 +185,12 @@ static struct qinit icmprinitv6 = {
 };
 
 static struct qinit icmpwinit = {
-	(pfi_t)icmp_wput, (pfi_t)ip_wsrv, NULL, NULL, NULL, &icmp_mod_info
+	(pfi_t)icmp_wput, NULL, NULL, NULL, NULL, &icmp_mod_info
+};
+
+/* ICMP entry point during fallback */
+static struct qinit icmp_fallback_sock_winit = {
+	(pfi_t)icmp_wput_fallback, NULL, NULL, NULL, NULL, &icmp_mod_info
 };
 
 /* For AF_INET aka /dev/icmp */
@@ -233,6 +246,11 @@ static icmpparam_t	icmp_param_arr[] = {
 #define	is_recv_hiwat			is_param_arr[6].icmp_param_value
 #define	is_max_buf			is_param_arr[7].icmp_param_value
 
+static int rawip_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len);
+static int rawip_do_connect(conn_t *connp, const struct sockaddr *sa,
+    socklen_t len);
+static void rawip_post_ip_bind_connect(icmp_t *icmp, mblk_t *ire_mp, int error);
+
 /*
  * This routine is called to handle each O_T_BIND_REQ/T_BIND_REQ message
  * passed to icmp_wput.
@@ -241,14 +259,17 @@ static icmpparam_t	icmp_param_arr[] = {
  * message is returned by ip_bind_v4/v6.
  */
 static void
-icmp_bind(queue_t *q, mblk_t *mp)
+icmp_tpi_bind(queue_t *q, mblk_t *mp)
 {
+	int	error;
+	struct sockaddr *sa;
+	struct T_bind_req *tbr;
+	socklen_t	len;
 	sin_t	*sin;
 	sin6_t	*sin6;
-	mblk_t	*mp1;
-	struct T_bind_req	*tbr;
-	icmp_t	*icmp;
+	icmp_t		*icmp;
 	conn_t	*connp = Q_TO_CONN(q);
+	mblk_t *mp1;
 
 	icmp = connp->conn_icmp;
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tbr)) {
@@ -258,12 +279,14 @@ icmp_bind(queue_t *q, mblk_t *mp)
 		icmp_err_ack(q, mp, TPROTO, 0);
 		return;
 	}
+
 	if (icmp->icmp_state != TS_UNBND) {
 		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
 		    "icmp_bind: bad state, %d", icmp->icmp_state);
 		icmp_err_ack(q, mp, TOUTSTATE, 0);
 		return;
 	}
+
 	/*
 	 * Reallocate the message to make sure we have enough room for an
 	 * address and the protocol type.
@@ -274,9 +297,13 @@ icmp_bind(queue_t *q, mblk_t *mp)
 		return;
 	}
 	mp = mp1;
+
+	/* Reset the message type in preparation for shipping it back. */
+	DB_TYPE(mp) = M_PCPROTO;
 	tbr = (struct T_bind_req *)mp->b_rptr;
-	switch (tbr->ADDR_length) {
-	case 0:			/* Generic request */
+	len = tbr->ADDR_length;
+	switch (len) {
+	case 0:	/* request for a generic port */
 		tbr->ADDR_offset = sizeof (struct T_bind_req);
 		if (icmp->icmp_family == AF_INET) {
 			tbr->ADDR_length = sizeof (sin_t);
@@ -284,6 +311,8 @@ icmp_bind(queue_t *q, mblk_t *mp)
 			*sin = sin_null;
 			sin->sin_family = AF_INET;
 			mp->b_wptr = (uchar_t *)&sin[1];
+			sa = (struct sockaddr *)sin;
+			len = sizeof (sin_t);
 		} else {
 			ASSERT(icmp->icmp_family == AF_INET6);
 			tbr->ADDR_length = sizeof (sin6_t);
@@ -291,44 +320,57 @@ icmp_bind(queue_t *q, mblk_t *mp)
 			*sin6 = sin6_null;
 			sin6->sin6_family = AF_INET6;
 			mp->b_wptr = (uchar_t *)&sin6[1];
+			sa = (struct sockaddr *)sin6;
+			len = sizeof (sin6_t);
 		}
 		break;
-	case sizeof (sin_t):	/* Complete IP address */
-		sin = (sin_t *)mi_offset_param(mp, tbr->ADDR_offset,
+
+	case sizeof (sin_t):	/* Complete IPv4 address */
+		sa = (struct sockaddr *)mi_offset_param(mp, tbr->ADDR_offset,
 		    sizeof (sin_t));
-		if (sin == NULL || !OK_32PTR((char *)sin)) {
-			icmp_err_ack(q, mp, TSYSERR, EINVAL);
-			return;
-		}
-		if (icmp->icmp_family != AF_INET ||
-		    sin->sin_family != AF_INET) {
-			icmp_err_ack(q, mp, TSYSERR, EAFNOSUPPORT);
-			return;
-		}
 		break;
-	case sizeof (sin6_t):	/* Complete IP address */
-		sin6 = (sin6_t *)mi_offset_param(mp, tbr->ADDR_offset,
-		    sizeof (sin6_t));
-		if (sin6 == NULL || !OK_32PTR((char *)sin6)) {
-			icmp_err_ack(q, mp, TSYSERR, EINVAL);
-			return;
-		}
-		if (icmp->icmp_family != AF_INET6 ||
-		    sin6->sin6_family != AF_INET6) {
-			icmp_err_ack(q, mp, TSYSERR, EAFNOSUPPORT);
-			return;
-		}
-		/* No support for mapped addresses on raw sockets */
-		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-			icmp_err_ack(q, mp, TSYSERR, EADDRNOTAVAIL);
-			return;
-		}
+
+	case sizeof (sin6_t):	/* Complete IPv6 address */
+		sa = (struct sockaddr *)mi_offset_param(mp,
+		    tbr->ADDR_offset, sizeof (sin6_t));
 		break;
+
 	default:
 		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
 		    "icmp_bind: bad ADDR_length %d", tbr->ADDR_length);
 		icmp_err_ack(q, mp, TBADADDR, 0);
 		return;
+	}
+
+	error = rawip_do_bind(connp, sa, len);
+done:
+	ASSERT(mp->b_cont == NULL);
+	if (error != 0) {
+		if (error > 0) {
+			icmp_err_ack(q, mp, TSYSERR, error);
+		} else {
+			icmp_err_ack(q, mp, -error, 0);
+		}
+	} else {
+		tbr->PRIM_type = T_BIND_ACK;
+		qreply(q, mp);
+	}
+}
+
+static int
+rawip_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len)
+{
+	sin_t		*sin;
+	sin6_t		*sin6;
+	icmp_t		*icmp;
+	int		error = 0;
+	mblk_t		*ire_mp;
+
+
+	icmp = connp->conn_icmp;
+
+	if (sa == NULL || !OK_32PTR((char *)sa)) {
+		return (EINVAL);
 	}
 
 	/*
@@ -338,24 +380,53 @@ icmp_bind(queue_t *q, mblk_t *mp)
 	 */
 	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 	if (icmp->icmp_state != TS_UNBND || icmp->icmp_pending_op != -1) {
-		rw_exit(&icmp->icmp_rwlock);
-		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-		    "icmp_bind: bad state, %d", icmp->icmp_state);
-		icmp_err_ack(q, mp, TOUTSTATE, 0);
-		return;
+		error = -TOUTSTATE;
+		goto done;
 	}
 
-	icmp->icmp_pending_op = tbr->PRIM_type;
+	ASSERT(len != 0);
+	switch (len) {
+	case sizeof (sin_t):    /* Complete IPv4 address */
+		sin = (sin_t *)sa;
+		if (sin->sin_family != AF_INET ||
+		    icmp->icmp_family != AF_INET) {
+			/* TSYSERR, EAFNOSUPPORT */
+			error = EAFNOSUPPORT;
+			goto done;
+		}
+		break;
+	case sizeof (sin6_t): /* Complete IPv6 address */
+		sin6 = (sin6_t *)sa;
+		if (sin6->sin6_family != AF_INET6 ||
+		    icmp->icmp_family != AF_INET6) {
+			/* TSYSERR, EAFNOSUPPORT */
+			error = EAFNOSUPPORT;
+			goto done;
+		}
+		/* No support for mapped addresses on raw sockets */
+		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+			/* TSYSERR, EADDRNOTAVAIL */
+			error = EADDRNOTAVAIL;
+			goto done;
+		}
+		break;
+
+	default:
+		/* TBADADDR */
+		error = EADDRNOTAVAIL;
+		goto done;
+	}
+
+	icmp->icmp_pending_op = T_BIND_REQ;
+	icmp->icmp_state = TS_IDLE;
 
 	/*
 	 * Copy the source address into our icmp structure.  This address
 	 * may still be zero; if so, ip will fill in the correct address
 	 * each time an outbound packet is passed to it.
 	 * If we are binding to a broadcast or multicast address then
-	 * icmp_bind_ack will clear the source address when it receives
-	 * the T_BIND_ACK.
+	 * rawip_post_ip_bind_connect will clear the source address.
 	 */
-	icmp->icmp_state = TS_IDLE;
 
 	if (icmp->icmp_family == AF_INET) {
 		ASSERT(sin != NULL);
@@ -378,147 +449,136 @@ icmp_bind(queue_t *q, mblk_t *mp)
 		error = icmp_build_hdrs(icmp);
 		if (error != 0) {
 			icmp->icmp_pending_op = -1;
-			rw_exit(&icmp->icmp_rwlock);
-			icmp_err_ack(q, mp, TSYSERR, error);
-			return;
+			/*
+			 * TSYSERR
+			 */
+			goto done;
 		}
 	}
-	/*
-	 * Place protocol type in the O_T_BIND_REQ/T_BIND_REQ following
-	 * the address.
-	 */
-	*mp->b_wptr++ = icmp->icmp_proto;
+
+	ire_mp = NULL;
 	if (!(V6_OR_V4_INADDR_ANY(icmp->icmp_v6src))) {
 		/*
-		 * Append a request for an IRE if src not 0 (INADDR_ANY)
+		 * request an IRE if src not 0 (INADDR_ANY)
 		 */
-		mp->b_cont = allocb(sizeof (ire_t), BPRI_HI);
-		if (!mp->b_cont) {
+		ire_mp = allocb(sizeof (ire_t), BPRI_HI);
+		if (ire_mp == NULL) {
 			icmp->icmp_pending_op = -1;
-			rw_exit(&icmp->icmp_rwlock);
-			icmp_err_ack(q, mp, TSYSERR, ENOMEM);
-			return;
+			error = ENOMEM;
+			goto done;
 		}
-		mp->b_cont->b_wptr += sizeof (ire_t);
-		mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
+		DB_TYPE(ire_mp) = IRE_DB_REQ_TYPE;
+	}
+done:
+	rw_exit(&icmp->icmp_rwlock);
+	if (error != 0)
+		return (error);
+
+	if (icmp->icmp_family == AF_INET6) {
+		error = ip_proto_bind_laddr_v6(connp, &ire_mp, icmp->icmp_proto,
+		    &sin6->sin6_addr, sin6->sin6_port, B_TRUE);
+	} else {
+		error = ip_proto_bind_laddr_v4(connp, &ire_mp, icmp->icmp_proto,
+		    sin->sin_addr.s_addr, sin->sin_port, B_TRUE);
+	}
+	rawip_post_ip_bind_connect(icmp, ire_mp, error);
+	return (error);
+}
+
+static void
+rawip_post_ip_bind_connect(icmp_t *icmp, mblk_t *ire_mp, int error)
+{
+	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
+	if (icmp->icmp_state == TS_UNBND) {
+		/*
+		 * not yet bound - bind sent by icmp_bind_proto.
+		 */
+		rw_exit(&icmp->icmp_rwlock);
+		return;
+	}
+	ASSERT(icmp->icmp_pending_op != -1);
+	icmp->icmp_pending_op = -1;
+
+	if (error != 0) {
+		if (icmp->icmp_state == TS_DATA_XFER) {
+			/* Connect failed */
+			/* Revert back to the bound source */
+			icmp->icmp_v6src = icmp->icmp_bound_v6src;
+			icmp->icmp_state = TS_IDLE;
+			if (icmp->icmp_family == AF_INET6)
+				(void) icmp_build_hdrs(icmp);
+		} else {
+			V6_SET_ZERO(icmp->icmp_v6src);
+			V6_SET_ZERO(icmp->icmp_bound_v6src);
+			icmp->icmp_state = TS_UNBND;
+			if (icmp->icmp_family == AF_INET6)
+				(void) icmp_build_hdrs(icmp);
+		}
+	} else {
+		if (ire_mp != NULL && ire_mp->b_datap->db_type == IRE_DB_TYPE) {
+			ire_t *ire;
+
+			ire = (ire_t *)ire_mp->b_rptr;
+			/*
+			 * If a broadcast/multicast address was bound set
+			 * the source address to 0.
+			 * This ensures no datagrams with broadcast address
+			 * as source address are emitted (which would violate
+			 * RFC1122 - Hosts requirements)
+			 * Note: we get IRE_BROADCAST for IPv6
+			 * to "mark" a multicast local address.
+			 */
+
+
+			if (ire->ire_type == IRE_BROADCAST &&
+			    icmp->icmp_state != TS_DATA_XFER) {
+				/*
+				 * This was just a local bind to a
+				 * MC/broadcast addr
+				 */
+				V6_SET_ZERO(icmp->icmp_v6src);
+				if (icmp->icmp_family == AF_INET6)
+					(void) icmp_build_hdrs(icmp);
+			}
+		}
+
 	}
 	rw_exit(&icmp->icmp_rwlock);
-
-	/* Pass the O_T_BIND_REQ/T_BIND_REQ to ip. */
-	if (icmp->icmp_family == AF_INET6)
-		mp = ip_bind_v6(q, mp, connp, NULL);
-	else
-		mp = ip_bind_v4(q, mp, connp);
-
-	/* The above return NULL if the bind needs to be deferred */
-	if (mp != NULL)
-		icmp_bind_result(connp, mp);
-	else
-		CONN_INC_REF(connp);
+	if (ire_mp != NULL)
+		freeb(ire_mp);
 }
 
 /*
  * Send message to IP to just bind to the protocol.
  */
-static void
-icmp_bind_proto(queue_t *q)
+static int
+icmp_bind_proto(conn_t *connp)
 {
-	mblk_t	*mp;
-	struct T_bind_req	*tbr;
 	icmp_t	*icmp;
-	conn_t	*connp = Q_TO_CONN(q);
+	int	error;
 
 	icmp = connp->conn_icmp;
 
-	mp = allocb(sizeof (struct T_bind_req) + sizeof (sin6_t) + 1,
-	    BPRI_MED);
-	if (!mp) {
-		return;
-	}
-	mp->b_datap->db_type = M_PROTO;
-	tbr = (struct T_bind_req *)mp->b_rptr;
-	tbr->PRIM_type = O_T_BIND_REQ; /* change to T_BIND_REQ ? */
-	tbr->ADDR_offset = sizeof (struct T_bind_req);
-
-	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
-	if (icmp->icmp_ipversion == IPV4_VERSION) {
-		sin_t	*sin;
-
-		tbr->ADDR_length = sizeof (sin_t);
-		sin = (sin_t *)&tbr[1];
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		mp->b_wptr = (uchar_t *)&sin[1];
-	} else {
-		sin6_t	*sin6;
-
-		ASSERT(icmp->icmp_ipversion == IPV6_VERSION);
-		tbr->ADDR_length = sizeof (sin6_t);
-		sin6 = (sin6_t *)&tbr[1];
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-		mp->b_wptr = (uchar_t *)&sin6[1];
-	}
-
-	/* Place protocol type in the O_T_BIND_REQ following the address. */
-	*mp->b_wptr++ = icmp->icmp_proto;
-	rw_exit(&icmp->icmp_rwlock);
-
-	/* Pass the O_T_BIND_REQ to ip. */
 	if (icmp->icmp_family == AF_INET6)
-		mp = ip_bind_v6(q, mp, connp, NULL);
+		error = ip_proto_bind_laddr_v6(connp, NULL, icmp->icmp_proto,
+		    &sin6_null.sin6_addr, 0, B_TRUE);
 	else
-		mp = ip_bind_v4(q, mp, connp);
+		error = ip_proto_bind_laddr_v4(connp, NULL, icmp->icmp_proto,
+		    sin_null.sin_addr.s_addr, 0, B_TRUE);
 
-	/* The above return NULL if the bind needs to be deferred */
-	if (mp != NULL)
-		icmp_bind_result(connp, mp);
-	else
-		CONN_INC_REF(connp);
+	rawip_post_ip_bind_connect(icmp, NULL, error);
+	return (error);
 }
 
-/*
- * This is called from ip_wput_nondata to handle the results of a
- * deferred RAWIP bind.  It is called once the bind has been completed.
- */
-void
-rawip_resume_bind(conn_t *connp, mblk_t *mp)
-{
-	ASSERT(connp != NULL && IPCL_IS_RAWIP(connp));
-
-	icmp_bind_result(connp, mp);
-
-	CONN_OPER_PENDING_DONE(connp);
-}
-
-/*
- * This routine handles each T_CONN_REQ message passed to icmp.  It
- * associates a default destination address with the stream.
- *
- * This routine sends down a T_BIND_REQ to IP with the following mblks:
- *	T_BIND_REQ	- specifying local and remote address.
- *	IRE_DB_REQ_TYPE	- to get an IRE back containing ire_type and src
- *	T_OK_ACK	- for the T_CONN_REQ
- *	T_CONN_CON	- to keep the TPI user happy
- *
- * The connect completes in icmp_bind_result.
- * When a T_BIND_ACK is received information is extracted from the IRE
- * and the two appended messages are sent to the TPI user.
- * Should icmp_bind_result receive T_ERROR_ACK for the T_BIND_REQ it will
- * convert it to an error ack for the appropriate primitive.
- */
 static void
-icmp_connect(queue_t *q, mblk_t *mp)
+icmp_tpi_connect(queue_t *q, mblk_t *mp)
 {
-	sin_t	*sin;
-	sin6_t	*sin6;
-	mblk_t	*mp1, *mp2;
+	conn_t	*connp = Q_TO_CONN(q);
 	struct T_conn_req	*tcr;
 	icmp_t	*icmp;
-	ipaddr_t	v4dst;
-	in6_addr_t	v6dst;
-	uint32_t	flowinfo;
-	conn_t	*connp = Q_TO_CONN(q);
+	struct sockaddr *sa;
+	socklen_t len;
+	int error;
 
 	icmp = connp->conn_icmp;
 	tcr = (struct T_conn_req *)mp->b_rptr;
@@ -533,54 +593,111 @@ icmp_connect(queue_t *q, mblk_t *mp)
 		return;
 	}
 
-	switch (tcr->DEST_length) {
+	len = tcr->DEST_length;
+
+	switch (len) {
 	default:
 		icmp_err_ack(q, mp, TBADADDR, 0);
 		return;
-
 	case sizeof (sin_t):
-		sin = (sin_t *)mi_offset_param(mp, tcr->DEST_offset,
+		sa = (struct sockaddr *)mi_offset_param(mp, tcr->DEST_offset,
 		    sizeof (sin_t));
-		if (sin == NULL || !OK_32PTR((char *)sin)) {
-			icmp_err_ack(q, mp, TSYSERR, EINVAL);
-			return;
-		}
-		if (icmp->icmp_family != AF_INET ||
-		    sin->sin_family != AF_INET) {
-			icmp_err_ack(q, mp, TSYSERR, EAFNOSUPPORT);
-			return;
-		}
-		v4dst = sin->sin_addr.s_addr;
-		IN6_IPADDR_TO_V4MAPPED(v4dst, &v6dst);
-		ASSERT(icmp->icmp_ipversion == IPV4_VERSION);
-		icmp->icmp_max_hdr_len = IP_SIMPLE_HDR_LENGTH +
-		    icmp->icmp_ip_snd_options_len;
 		break;
-
 	case sizeof (sin6_t):
-		sin6 = (sin6_t *)mi_offset_param(mp, tcr->DEST_offset,
-		    sizeof (sin6_t));
-		if (sin6 == NULL || !OK_32PTR((char *)sin6)) {
-			icmp_err_ack(q, mp, TSYSERR, EINVAL);
-			return;
-		}
-		if (icmp->icmp_family != AF_INET6 ||
-		    sin6->sin6_family != AF_INET6) {
-			icmp_err_ack(q, mp, TSYSERR, EAFNOSUPPORT);
-			return;
-		}
-		/* No support for mapped addresses on raw sockets */
-		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-			icmp_err_ack(q, mp, TSYSERR, EADDRNOTAVAIL);
-			return;
-		}
-		v6dst = sin6->sin6_addr;
-		ASSERT(icmp->icmp_ipversion == IPV6_VERSION);
-		icmp->icmp_max_hdr_len = icmp->icmp_sticky_hdrs_len;
-		flowinfo = sin6->sin6_flowinfo;
+		sa = (struct sockaddr *)mi_offset_param(mp,
+		    tcr->DEST_offset, sizeof (sin6_t));
 		break;
 	}
-	if (icmp->icmp_ipversion == IPV4_VERSION) {
+
+	error = proto_verify_ip_addr(icmp->icmp_family, sa, len);
+	if (error != 0) {
+		icmp_err_ack(q, mp, TSYSERR, error);
+		return;
+	}
+
+	error = rawip_do_connect(connp, sa, len);
+	if (error != 0) {
+		if (error < 0) {
+			icmp_err_ack(q, mp, -error, 0);
+		} else {
+			icmp_err_ack(q, mp, 0, error);
+		}
+	} else {
+		mblk_t *mp1;
+
+		/*
+		 * We have to send a connection confirmation to
+		 * keep TLI happy.
+		 */
+		if (icmp->icmp_family == AF_INET) {
+			mp1 = mi_tpi_conn_con(NULL, (char *)sa,
+			    sizeof (sin_t), NULL, 0);
+		} else {
+			ASSERT(icmp->icmp_family == AF_INET6);
+			mp1 = mi_tpi_conn_con(NULL, (char *)sa,
+			    sizeof (sin6_t), NULL, 0);
+		}
+		if (mp1 == NULL) {
+			rw_exit(&icmp->icmp_rwlock);
+			icmp_err_ack(q, mp, TSYSERR, ENOMEM);
+			return;
+		}
+
+		/*
+		 * Send ok_ack for T_CONN_REQ
+		 */
+		mp = mi_tpi_ok_ack_alloc(mp);
+		if (mp == NULL) {
+			/* Unable to reuse the T_CONN_REQ for the ack. */
+			freemsg(mp1);
+			icmp_err_ack_prim(q, mp1, T_CONN_REQ, TSYSERR, ENOMEM);
+			return;
+		}
+		putnext(connp->conn_rq, mp);
+		putnext(connp->conn_rq, mp1);
+	}
+}
+
+static int
+rawip_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len)
+{
+	icmp_t	*icmp;
+	sin_t	*sin;
+	sin6_t	*sin6;
+	mblk_t  *ire_mp;
+	int	error;
+	ipaddr_t	v4dst;
+	in6_addr_t	v6dst;
+
+	icmp = connp->conn_icmp;
+
+	if (sa == NULL || !OK_32PTR((char *)sa)) {
+		return (EINVAL);
+	}
+
+	ire_mp = allocb(sizeof (ire_t), BPRI_HI);
+	if (ire_mp == NULL)
+		return (ENOMEM);
+	DB_TYPE(ire_mp) = IRE_DB_REQ_TYPE;
+
+
+	ASSERT(sa != NULL && len != 0);
+
+	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
+	if (icmp->icmp_state == TS_UNBND || icmp->icmp_pending_op != -1) {
+		rw_exit(&icmp->icmp_rwlock);
+		freeb(ire_mp);
+		return (-TOUTSTATE);
+	}
+
+	switch (len) {
+	case sizeof (sin_t):
+		sin = (sin_t *)sa;
+
+		ASSERT(icmp->icmp_family == AF_INET);
+		ASSERT(icmp->icmp_ipversion == IPV4_VERSION);
+
+		v4dst = sin->sin_addr.s_addr;
 		/*
 		 * Interpret a zero destination to mean loopback.
 		 * Update the T_CONN_REQ (sin/sin6) since it is used to
@@ -588,15 +705,16 @@ icmp_connect(queue_t *q, mblk_t *mp)
 		 */
 		if (v4dst == INADDR_ANY) {
 			v4dst = htonl(INADDR_LOOPBACK);
-			IN6_IPADDR_TO_V4MAPPED(v4dst, &v6dst);
-			if (icmp->icmp_family == AF_INET) {
-				sin->sin_addr.s_addr = v4dst;
-			} else {
-				sin6->sin6_addr = v6dst;
-			}
 		}
-		icmp->icmp_v6dst = v6dst;
-		icmp->icmp_flowinfo = 0;
+
+		IN6_IPADDR_TO_V4MAPPED(v4dst, &v6dst);
+		ASSERT(icmp->icmp_ipversion == IPV4_VERSION);
+		icmp->icmp_max_hdr_len = IP_SIMPLE_HDR_LENGTH +
+		    icmp->icmp_ip_snd_options_len;
+		icmp->icmp_v6dst.sin6_addr = v6dst;
+		icmp->icmp_v6dst.sin6_family = AF_INET6;
+		icmp->icmp_v6dst.sin6_flowinfo = 0;
+		icmp->icmp_v6dst.sin6_port = 0;
 
 		/*
 		 * If the destination address is multicast and
@@ -610,35 +728,42 @@ icmp_connect(queue_t *q, mblk_t *mp)
 			IN6_IPADDR_TO_V4MAPPED(icmp->icmp_multicast_if_addr,
 			    &icmp->icmp_v6src);
 		}
-	} else {
+		break;
+	case sizeof (sin6_t):
+		sin6 = (sin6_t *)sa;
+
+		/* No support for mapped addresses on raw sockets */
+		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+			rw_exit(&icmp->icmp_rwlock);
+			freeb(ire_mp);
+			return (EADDRNOTAVAIL);
+		}
+
 		ASSERT(icmp->icmp_ipversion == IPV6_VERSION);
+		ASSERT(icmp->icmp_family == AF_INET6);
+
+		icmp->icmp_max_hdr_len = icmp->icmp_sticky_hdrs_len;
+
+		icmp->icmp_v6dst = *sin6;
+		icmp->icmp_v6dst.sin6_port = 0;
+
 		/*
 		 * Interpret a zero destination to mean loopback.
 		 * Update the T_CONN_REQ (sin/sin6) since it is used to
 		 * generate the T_CONN_CON.
 		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&v6dst)) {
-			v6dst = ipv6_loopback;
-			sin6->sin6_addr = v6dst;
+		if (IN6_IS_ADDR_UNSPECIFIED(&icmp->icmp_v6dst.sin6_addr)) {
+			icmp->icmp_v6dst.sin6_addr = ipv6_loopback;
 		}
-		icmp->icmp_v6dst = v6dst;
-		icmp->icmp_flowinfo = flowinfo;
 		/*
 		 * If the destination address is multicast and
 		 * an outgoing multicast interface has been set,
 		 * then the ip bind logic will pick the correct source
 		 * address (i.e. matching the outgoing multicast interface).
 		 */
+		break;
 	}
 
-	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
-	if (icmp->icmp_state == TS_UNBND || icmp->icmp_pending_op != -1) {
-		rw_exit(&icmp->icmp_rwlock);
-		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-		    "icmp_connect: bad state, %d", icmp->icmp_state);
-		icmp_err_ack(q, mp, TOUTSTATE, 0);
-		return;
-	}
 	icmp->icmp_pending_op = T_CONN_REQ;
 
 	if (icmp->icmp_state == TS_DATA_XFER) {
@@ -647,74 +772,22 @@ icmp_connect(queue_t *q, mblk_t *mp)
 		icmp->icmp_state = TS_IDLE;
 	}
 
-	/*
-	 * Send down bind to IP to verify that there is a route
-	 * and to determine the source address.
-	 * This will come back as T_BIND_ACK with an IRE_DB_TYPE in rput.
-	 */
-	if (icmp->icmp_family == AF_INET) {
-		mp1 = icmp_ip_bind_mp(icmp, O_T_BIND_REQ, sizeof (ipa_conn_t),
-		    sin->sin_port);
-	} else {
-		ASSERT(icmp->icmp_family == AF_INET6);
-		mp1 = icmp_ip_bind_mp(icmp, O_T_BIND_REQ, sizeof (ipa6_conn_t),
-		    sin6->sin6_port);
-	}
-	if (mp1 == NULL) {
-		icmp->icmp_pending_op = -1;
-		rw_exit(&icmp->icmp_rwlock);
-		icmp_err_ack(q, mp, TSYSERR, ENOMEM);
-		return;
-	}
-
-	/*
-	 * We also have to send a connection confirmation to
-	 * keep TLI happy. Prepare it for icmp_bind_result.
-	 */
-	if (icmp->icmp_family == AF_INET) {
-		mp2 = mi_tpi_conn_con(NULL, (char *)sin, sizeof (*sin), NULL,
-		    0);
-	} else {
-		ASSERT(icmp->icmp_family == AF_INET6);
-		mp2 = mi_tpi_conn_con(NULL, (char *)sin6, sizeof (*sin6), NULL,
-		    0);
-	}
-	if (mp2 == NULL) {
-		freemsg(mp1);
-		icmp->icmp_pending_op = -1;
-		rw_exit(&icmp->icmp_rwlock);
-		icmp_err_ack(q, mp, TSYSERR, ENOMEM);
-		return;
-	}
-
-	mp = mi_tpi_ok_ack_alloc(mp);
-	if (mp == NULL) {
-		/* Unable to reuse the T_CONN_REQ for the ack. */
-		freemsg(mp2);
-		icmp->icmp_pending_op = -1;
-		rw_exit(&icmp->icmp_rwlock);
-		icmp_err_ack_prim(q, mp1, T_CONN_REQ, TSYSERR, ENOMEM);
-		return;
-	}
-
 	icmp->icmp_state = TS_DATA_XFER;
 	rw_exit(&icmp->icmp_rwlock);
 
-	/* Hang onto the T_OK_ACK and T_CONN_CON for later. */
-	linkb(mp1, mp);
-	linkb(mp1, mp2);
-
-	mblk_setcred(mp1, connp->conn_cred);
-	if (icmp->icmp_family == AF_INET)
-		mp1 = ip_bind_v4(q, mp1, connp);
-	else
-		mp1 = ip_bind_v6(q, mp1, connp, NULL);
-
-	/* The above return NULL if the bind needs to be deferred */
-	if (mp1 != NULL)
-		icmp_bind_result(connp, mp1);
-	else
-		CONN_INC_REF(connp);
+	if (icmp->icmp_family == AF_INET6) {
+		error = ip_proto_bind_connected_v6(connp, &ire_mp,
+		    icmp->icmp_proto, &icmp->icmp_v6src, 0,
+		    &icmp->icmp_v6dst.sin6_addr,
+		    NULL, sin6->sin6_port, B_TRUE, B_TRUE);
+	} else {
+		error = ip_proto_bind_connected_v4(connp, &ire_mp,
+		    icmp->icmp_proto, &V4_PART_OF_V6(icmp->icmp_v6src), 0,
+		    V4_PART_OF_V6(icmp->icmp_v6dst.sin6_addr), sin->sin_port,
+		    B_TRUE, B_TRUE);
+	}
+	rawip_post_ip_bind_connect(icmp, ire_mp, error);
+	return (error);
 }
 
 static void
@@ -733,6 +806,7 @@ icmp_close_free(conn_t *connp)
 		kmem_free(icmp->icmp_filter, sizeof (icmp6_filter_t));
 		icmp->icmp_filter = NULL;
 	}
+
 	/* Free memory associated with sticky options */
 	if (icmp->icmp_sticky_hdrs_len != 0) {
 		kmem_free(icmp->icmp_sticky_hdrs,
@@ -754,16 +828,18 @@ icmp_close_free(conn_t *connp)
 }
 
 static int
-icmp_close(queue_t *q)
+rawip_do_close(conn_t *connp)
 {
-	conn_t	*connp = (conn_t *)q->q_ptr;
-
 	ASSERT(connp != NULL && IPCL_IS_RAWIP(connp));
 
 	ip_quiesce_conn(connp);
 
-	qprocsoff(connp->conn_rq);
+	if (!IPCL_IS_NONSTR(connp)) {
+		qprocsoff(connp->conn_rq);
+	}
 
+	ASSERT(connp->conn_icmp->icmp_fallback_queue_head == NULL &&
+	    connp->conn_icmp->icmp_fallback_queue_tail == NULL);
 	icmp_close_free(connp);
 
 	/*
@@ -778,11 +854,36 @@ icmp_close(queue_t *q)
 	 */
 	ASSERT(connp->conn_ref == 1);
 
-	inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
+	if (!IPCL_IS_NONSTR(connp)) {
+		inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
+	} else {
+		ip_close_helper_stream(connp);
+	}
 
 	connp->conn_ref--;
 	ipcl_conn_destroy(connp);
 
+	return (0);
+}
+
+static int
+icmp_close(queue_t *q, int flags)
+{
+	conn_t  *connp;
+
+	if (flags & SO_FALLBACK) {
+		/*
+		 * stream is being closed while in fallback
+		 * simply free the resources that were allocated
+		 */
+		inet_minor_free(WR(q)->q_ptr, (dev_t)(RD(q)->q_ptr));
+		qprocsoff(q);
+		goto done;
+	}
+
+	connp = Q_TO_CONN(q);
+	(void) rawip_do_close(connp);
+done:
 	q->q_ptr = WR(q)->q_ptr = NULL;
 	return (0);
 }
@@ -793,88 +894,102 @@ icmp_close(queue_t *q)
  * in sending a T_BIND_REQ to IP to restore the binding to just
  * the local address.
  *
- * This routine sends down a T_BIND_REQ to IP with the following mblks:
- *	T_BIND_REQ	- specifying just the local address.
- *	T_OK_ACK	- for the T_DISCON_REQ
- *
- * The disconnect completes in icmp_bind_result.
- * When a T_BIND_ACK is received the appended T_OK_ACK is sent to the TPI user.
- * Should icmp_bind_result receive T_ERROR_ACK for the T_BIND_REQ it will
- * convert it to an error ack for the appropriate primitive.
+ * The disconnect completes in rawip_post_ip_bind_connect.
  */
-static void
-icmp_disconnect(queue_t *q, mblk_t *mp)
+static int
+icmp_do_disconnect(conn_t *connp)
 {
 	icmp_t	*icmp;
-	mblk_t	*mp1;
-	conn_t	*connp = Q_TO_CONN(q);
+	mblk_t	*ire_mp;
+	int error;
 
 	icmp = connp->conn_icmp;
 	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 	if (icmp->icmp_state != TS_DATA_XFER || icmp->icmp_pending_op != -1) {
 		rw_exit(&icmp->icmp_rwlock);
-		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-		    "icmp_disconnect: bad state, %d", icmp->icmp_state);
-		icmp_err_ack(q, mp, TOUTSTATE, 0);
-		return;
+		return (-TOUTSTATE);
 	}
 	icmp->icmp_pending_op = T_DISCON_REQ;
 	icmp->icmp_v6src = icmp->icmp_bound_v6src;
 	icmp->icmp_state = TS_IDLE;
 
-	/*
-	 * Send down bind to IP to remove the full binding and revert
-	 * to the local address binding.
-	 */
-	if (icmp->icmp_family == AF_INET) {
-		mp1 = icmp_ip_bind_mp(icmp, O_T_BIND_REQ, sizeof (sin_t), 0);
-	} else {
-		ASSERT(icmp->icmp_family == AF_INET6);
-		mp1 = icmp_ip_bind_mp(icmp, O_T_BIND_REQ, sizeof (sin6_t), 0);
-	}
-	if (mp1 == NULL) {
-		icmp->icmp_pending_op = -1;
-		rw_exit(&icmp->icmp_rwlock);
-		icmp_err_ack(q, mp, TSYSERR, ENOMEM);
-		return;
-	}
-	mp = mi_tpi_ok_ack_alloc(mp);
-	if (mp == NULL) {
-		/* Unable to reuse the T_DISCON_REQ for the ack. */
-		icmp->icmp_pending_op = -1;
-		rw_exit(&icmp->icmp_rwlock);
-		icmp_err_ack_prim(q, mp1, T_DISCON_REQ, TSYSERR, ENOMEM);
-		return;
-	}
 
 	if (icmp->icmp_family == AF_INET6) {
-		int error;
-
 		/* Rebuild the header template */
 		error = icmp_build_hdrs(icmp);
 		if (error != 0) {
 			icmp->icmp_pending_op = -1;
 			rw_exit(&icmp->icmp_rwlock);
-			icmp_err_ack_prim(q, mp, T_DISCON_REQ, TSYSERR, error);
-			freemsg(mp1);
-			return;
+			return (error);
 		}
 	}
 
 	rw_exit(&icmp->icmp_rwlock);
-	/* Append the T_OK_ACK to the T_BIND_REQ for icmp_bind_result */
-	linkb(mp1, mp);
+	ire_mp = allocb(sizeof (ire_t), BPRI_HI);
+	if (ire_mp == NULL) {
+		return (ENOMEM);
+	}
 
-	if (icmp->icmp_family == AF_INET6)
-		mp1 = ip_bind_v6(q, mp1, connp, NULL);
-	else
-		mp1 = ip_bind_v4(q, mp1, connp);
+	if (icmp->icmp_family == AF_INET6) {
+		error = ip_proto_bind_laddr_v6(connp, &ire_mp, icmp->icmp_proto,
+		    &icmp->icmp_bound_v6src, 0, B_TRUE);
+	} else {
 
-	/* The above return NULL if the bind needs to be deferred */
-	if (mp1 != NULL)
-		icmp_bind_result(connp, mp1);
-	else
-		CONN_INC_REF(connp);
+		error = ip_proto_bind_laddr_v4(connp, &ire_mp, icmp->icmp_proto,
+		    V4_PART_OF_V6(icmp->icmp_bound_v6src), 0, B_TRUE);
+	}
+
+	rawip_post_ip_bind_connect(icmp, ire_mp, error);
+
+	return (error);
+}
+
+static void
+icmp_tpi_disconnect(queue_t *q, mblk_t *mp)
+{
+	conn_t	*connp = Q_TO_CONN(q);
+	int	error;
+
+	/*
+	 * Allocate the largest primitive we need to send back
+	 * T_error_ack is > than T_ok_ack
+	 */
+	mp = reallocb(mp, sizeof (struct T_error_ack), 1);
+	if (mp == NULL) {
+		/* Unable to reuse the T_DISCON_REQ for the ack. */
+		icmp_err_ack_prim(q, mp, T_DISCON_REQ, TSYSERR, ENOMEM);
+		return;
+	}
+
+	error = icmp_do_disconnect(connp);
+
+	if (error != 0) {
+		if (error > 0) {
+			icmp_err_ack(q, mp, 0, error);
+		} else {
+			icmp_err_ack(q, mp, -error, 0);
+		}
+	} else {
+		mp = mi_tpi_ok_ack_alloc(mp);
+		ASSERT(mp != NULL);
+		qreply(q, mp);
+	}
+
+}
+
+static int
+icmp_disconnect(conn_t *connp)
+{
+	int	error;
+	icmp_t	*icmp = connp->conn_icmp;
+
+	icmp->icmp_dgram_errind = B_FALSE;
+
+	error = icmp_do_disconnect(connp);
+
+	if (error < 0)
+		error = proto_tlitosyserr(-error);
+	return (error);
 }
 
 /* This routine creates a T_ERROR_ACK message and passes it upstream. */
@@ -905,22 +1020,20 @@ icmp_err_ack_prim(queue_t *q, mblk_t *mp, t_scalar_t primitive,
 /*
  * icmp_icmp_error is called by icmp_input to process ICMP
  * messages passed up by IP.
- * Generates the appropriate T_UDERROR_IND for permanent
- * (non-transient) errors.
+ * Generates the appropriate permanent (non-transient) errors.
  * Assumes that IP has pulled up everything up to and including
  * the ICMP header.
  */
 static void
-icmp_icmp_error(queue_t *q, mblk_t *mp)
+icmp_icmp_error(conn_t *connp, mblk_t *mp)
 {
 	icmph_t *icmph;
 	ipha_t	*ipha;
 	int	iph_hdr_length;
 	sin_t	sin;
-	sin6_t	sin6;
 	mblk_t	*mp1;
 	int	error = 0;
-	icmp_t	*icmp = Q_TO_ICMP(q);
+	icmp_t	*icmp = connp->conn_icmp;
 
 	ipha = (ipha_t *)mp->b_rptr;
 
@@ -928,10 +1041,19 @@ icmp_icmp_error(queue_t *q, mblk_t *mp)
 
 	if (IPH_HDR_VERSION(ipha) != IPV4_VERSION) {
 		ASSERT(IPH_HDR_VERSION(ipha) == IPV6_VERSION);
-		icmp_icmp_error_ipv6(q, mp);
+		icmp_icmp_error_ipv6(connp, mp);
 		return;
 	}
-	ASSERT(IPH_HDR_VERSION(ipha) == IPV4_VERSION);
+
+	/*
+	 * icmp does not support v4 mapped addresses
+	 * so we can never be here for a V6 socket
+	 * i.e. icmp_family == AF_INET6
+	 */
+	ASSERT((IPH_HDR_VERSION(ipha) == IPV4_VERSION) &&
+	    (icmp->icmp_family == AF_INET));
+
+	ASSERT(icmp->icmp_family == AF_INET);
 
 	/* Skip past the outer IP and ICMP headers */
 	iph_hdr_length = IPH_HDR_LENGTH(ipha);
@@ -974,25 +1096,32 @@ icmp_icmp_error(queue_t *q, mblk_t *mp)
 		return;
 	}
 
-	switch (icmp->icmp_family) {
-	case AF_INET:
-		sin = sin_null;
-		sin.sin_family = AF_INET;
-		sin.sin_addr.s_addr = ipha->ipha_dst;
-		mp1 = mi_tpi_uderror_ind((char *)&sin, sizeof (sin_t), NULL, 0,
-		    error);
-		break;
-	case AF_INET6:
-		sin6 = sin6_null;
-		sin6.sin6_family = AF_INET6;
-		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &sin6.sin6_addr);
+	sin = sin_null;
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = ipha->ipha_dst;
+	if (IPCL_IS_NONSTR(connp)) {
+		rw_enter(&icmp->icmp_rwlock, RW_WRITER);
+		if (icmp->icmp_state == TS_DATA_XFER) {
+			if (sin.sin_addr.s_addr ==
+			    V4_PART_OF_V6(icmp->icmp_v6dst.sin6_addr)) {
+				rw_exit(&icmp->icmp_rwlock);
+				(*connp->conn_upcalls->su_set_error)
+				    (connp->conn_upper_handle, error);
+				goto done;
+			}
+		} else {
+			icmp->icmp_delayed_error = error;
+			*((sin_t *)&icmp->icmp_delayed_addr) = sin;
+		}
+		rw_exit(&icmp->icmp_rwlock);
+	} else {
 
-		mp1 = mi_tpi_uderror_ind((char *)&sin6, sizeof (sin6_t),
-		    NULL, 0, error);
-		break;
+		mp1 = mi_tpi_uderror_ind((char *)&sin, sizeof (sin_t), NULL,
+		    0, error);
+		if (mp1 != NULL)
+			putnext(connp->conn_rq, mp1);
 	}
-	if (mp1)
-		putnext(q, mp1);
+done:
 	freemsg(mp);
 }
 
@@ -1004,7 +1133,7 @@ icmp_icmp_error(queue_t *q, mblk_t *mp)
  * as the ICMPv6 header.
  */
 static void
-icmp_icmp_error_ipv6(queue_t *q, mblk_t *mp)
+icmp_icmp_error_ipv6(conn_t *connp, mblk_t *mp)
 {
 	icmp6_t		*icmp6;
 	ip6_t		*ip6h, *outer_ip6h;
@@ -1013,7 +1142,7 @@ icmp_icmp_error_ipv6(queue_t *q, mblk_t *mp)
 	sin6_t		sin6;
 	mblk_t		*mp1;
 	int		error = 0;
-	icmp_t		*icmp = Q_TO_ICMP(q);
+	icmp_t		*icmp = connp->conn_icmp;
 
 	outer_ip6h = (ip6_t *)mp->b_rptr;
 	if (outer_ip6h->ip6_nxt != IPPROTO_ICMPV6)
@@ -1085,7 +1214,7 @@ icmp_icmp_error_ipv6(queue_t *q, mblk_t *mp)
 		sin6 = (sin6_t *)&tudi[1];
 		bzero(sin6, sizeof (sin6_t));
 		sin6->sin6_family = AF_INET6;
-		sin6->sin6_addr = icmp->icmp_v6dst;
+		sin6->sin6_addr = icmp->icmp_v6dst.sin6_addr;
 
 		toh = (struct T_opthdr *)&sin6[1];
 		toh->level = IPPROTO_IPV6;
@@ -1103,7 +1232,14 @@ icmp_icmp_error_ipv6(queue_t *q, mblk_t *mp)
 		 * message.  Free it, then send our empty message.
 		 */
 		freemsg(mp);
-		putnext(q, newmp);
+		if (!IPCL_IS_NONSTR(connp)) {
+			putnext(connp->conn_rq, newmp);
+		} else {
+			(*connp->conn_upcalls->su_recv)
+			    (connp->conn_upper_handle, newmp, 0, 0, &error,
+			    NULL);
+			ASSERT(error == 0);
+		}
 		return;
 	}
 	case ICMP6_TIME_EXCEEDED:
@@ -1138,10 +1274,29 @@ icmp_icmp_error_ipv6(queue_t *q, mblk_t *mp)
 	sin6.sin6_addr = ip6h->ip6_dst;
 	sin6.sin6_flowinfo = ip6h->ip6_vcf & ~IPV6_VERS_AND_FLOW_MASK;
 
-	mp1 = mi_tpi_uderror_ind((char *)&sin6, sizeof (sin6_t), NULL, 0,
-	    error);
-	if (mp1)
-		putnext(q, mp1);
+	if (IPCL_IS_NONSTR(connp)) {
+		rw_enter(&icmp->icmp_rwlock, RW_WRITER);
+		if (icmp->icmp_state == TS_DATA_XFER) {
+			if (IN6_ARE_ADDR_EQUAL(&sin6.sin6_addr,
+			    &icmp->icmp_v6dst.sin6_addr)) {
+				rw_exit(&icmp->icmp_rwlock);
+				(*connp->conn_upcalls->su_set_error)
+				    (connp->conn_upper_handle, error);
+				goto done;
+			}
+		} else {
+			icmp->icmp_delayed_error = error;
+			*((sin6_t *)&icmp->icmp_delayed_addr) = sin6;
+		}
+		rw_exit(&icmp->icmp_rwlock);
+	} else {
+
+		mp1 = mi_tpi_uderror_ind((char *)&sin6, sizeof (sin6_t),
+		    NULL, 0, error);
+		if (mp1 != NULL)
+			putnext(connp->conn_rq, mp1);
+	}
+done:
 	freemsg(mp);
 }
 
@@ -1249,6 +1404,18 @@ icmp_copy_info(struct T_info_ack *tap, icmp_t *icmp)
 	tap->OPT_size = icmp_max_optsize;
 }
 
+static void
+icmp_do_capability_ack(icmp_t *icmp, struct T_capability_ack *tcap,
+    t_uscalar_t cap_bits1)
+{
+	tcap->CAP_bits1 = 0;
+
+	if (cap_bits1 & TC1_INFO) {
+		icmp_copy_info(&tcap->INFO_ack, icmp);
+		tcap->CAP_bits1 |= TC1_INFO;
+	}
+}
+
 /*
  * This routine responds to T_CAPABILITY_REQ messages.  It is called by
  * icmp_wput.  Much of the T_CAPABILITY_ACK information is copied from
@@ -1270,12 +1437,8 @@ icmp_capability_req(queue_t *q, mblk_t *mp)
 		return;
 
 	tcap = (struct T_capability_ack *)mp->b_rptr;
-	tcap->CAP_bits1 = 0;
 
-	if (cap_bits1 & TC1_INFO) {
-		icmp_copy_info(&tcap->INFO_ack, icmp);
-		tcap->CAP_bits1 |= TC1_INFO;
-	}
+	icmp_do_capability_ack(icmp, tcap, cap_bits1);
 
 	qreply(q, mp);
 }
@@ -1298,174 +1461,17 @@ icmp_info_req(queue_t *q, mblk_t *mp)
 	qreply(q, mp);
 }
 
-/*
- * IP recognizes seven kinds of bind requests:
- *
- * - A zero-length address binds only to the protocol number.
- *
- * - A 4-byte address is treated as a request to
- * validate that the address is a valid local IPv4
- * address, appropriate for an application to bind to.
- * IP does the verification, but does not make any note
- * of the address at this time.
- *
- * - A 16-byte address contains is treated as a request
- * to validate a local IPv6 address, as the 4-byte
- * address case above.
- *
- * - A 16-byte sockaddr_in to validate the local IPv4 address and also
- * use it for the inbound fanout of packets.
- *
- * - A 24-byte sockaddr_in6 to validate the local IPv6 address and also
- * use it for the inbound fanout of packets.
- *
- * - A 12-byte address (ipa_conn_t) containing complete IPv4 fanout
- * information consisting of local and remote addresses
- * and ports (unused for raw sockets).  In this case, the addresses are both
- * validated as appropriate for this operation, and, if
- * so, the information is retained for use in the
- * inbound fanout.
- *
- * - A 36-byte address address (ipa6_conn_t) containing complete IPv6
- * fanout information, like the 12-byte case above.
- *
- * IP will also fill in the IRE request mblk with information
- * regarding our peer.  In all cases, we notify IP of our protocol
- * type by appending a single protocol byte to the bind request.
- */
-static mblk_t *
-icmp_ip_bind_mp(icmp_t *icmp, t_scalar_t bind_prim, t_scalar_t addr_length,
-    in_port_t fport)
-{
-	char	*cp;
-	mblk_t	*mp;
-	struct T_bind_req *tbr;
-	ipa_conn_t	*ac;
-	ipa6_conn_t	*ac6;
-	sin_t		*sin;
-	sin6_t		*sin6;
-
-	ASSERT(bind_prim == O_T_BIND_REQ || bind_prim == T_BIND_REQ);
-	ASSERT(RW_LOCK_HELD(&icmp->icmp_rwlock));
-	mp = allocb(sizeof (*tbr) + addr_length + 1, BPRI_HI);
-	if (mp == NULL)
-		return (NULL);
-	mp->b_datap->db_type = M_PROTO;
-	tbr = (struct T_bind_req *)mp->b_rptr;
-	tbr->PRIM_type = bind_prim;
-	tbr->ADDR_offset = sizeof (*tbr);
-	tbr->CONIND_number = 0;
-	tbr->ADDR_length = addr_length;
-	cp = (char *)&tbr[1];
-	switch (addr_length) {
-	case sizeof (ipa_conn_t):
-		ASSERT(icmp->icmp_family == AF_INET);
-		/* Append a request for an IRE */
-		mp->b_cont = allocb(sizeof (ire_t), BPRI_HI);
-		if (mp->b_cont == NULL) {
-			freemsg(mp);
-			return (NULL);
-		}
-		mp->b_cont->b_wptr += sizeof (ire_t);
-		mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
-
-		/* cp known to be 32 bit aligned */
-		ac = (ipa_conn_t *)cp;
-		ac->ac_laddr = V4_PART_OF_V6(icmp->icmp_v6src);
-		ac->ac_faddr = V4_PART_OF_V6(icmp->icmp_v6dst);
-		ac->ac_fport = fport;
-		ac->ac_lport = 0;
-		break;
-
-	case sizeof (ipa6_conn_t):
-		ASSERT(icmp->icmp_family == AF_INET6);
-		/* Append a request for an IRE */
-		mp->b_cont = allocb(sizeof (ire_t), BPRI_HI);
-		if (mp->b_cont == NULL) {
-			freemsg(mp);
-			return (NULL);
-		}
-		mp->b_cont->b_wptr += sizeof (ire_t);
-		mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
-
-		/* cp known to be 32 bit aligned */
-		ac6 = (ipa6_conn_t *)cp;
-		ac6->ac6_laddr = icmp->icmp_v6src;
-		ac6->ac6_faddr = icmp->icmp_v6dst;
-		ac6->ac6_fport = fport;
-		ac6->ac6_lport = 0;
-		break;
-
-	case sizeof (sin_t):
-		ASSERT(icmp->icmp_family == AF_INET);
-		/* Append a request for an IRE */
-		mp->b_cont = allocb(sizeof (ire_t), BPRI_HI);
-		if (!mp->b_cont) {
-			freemsg(mp);
-			return (NULL);
-		}
-		mp->b_cont->b_wptr += sizeof (ire_t);
-		mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
-
-		sin = (sin_t *)cp;
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		sin->sin_addr.s_addr = V4_PART_OF_V6(icmp->icmp_bound_v6src);
-		break;
-
-	case sizeof (sin6_t):
-		ASSERT(icmp->icmp_family == AF_INET6);
-		/* Append a request for an IRE */
-		mp->b_cont = allocb(sizeof (ire_t), BPRI_HI);
-		if (!mp->b_cont) {
-			freemsg(mp);
-			return (NULL);
-		}
-		mp->b_cont->b_wptr += sizeof (ire_t);
-		mp->b_cont->b_datap->db_type = IRE_DB_REQ_TYPE;
-
-		sin6 = (sin6_t *)cp;
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_addr = icmp->icmp_bound_v6src;
-		break;
-	}
-	/* Add protocol number to end */
-	cp[addr_length] = icmp->icmp_proto;
-	mp->b_wptr = (uchar_t *)&cp[addr_length + 1];
-	return (mp);
-}
-
 /* For /dev/icmp aka AF_INET open */
 static int
-icmp_openv4(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+icmp_tpi_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
+    int family)
 {
-	return (icmp_open(q, devp, flag, sflag, credp, B_FALSE));
-}
-
-/* For /dev/icmp6 aka AF_INET6 open */
-static int
-icmp_openv6(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
-{
-	return (icmp_open(q, devp, flag, sflag, credp, B_TRUE));
-}
-
-/*
- * This is the open routine for icmp.  It allocates a icmp_t structure for
- * the stream and, on the first open of the module, creates an ND table.
- */
-/*ARGSUSED2*/
-static int
-icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
-    boolean_t isv6)
-{
-	int	err;
-	icmp_t	*icmp;
 	conn_t *connp;
 	dev_t	conn_dev;
-	zoneid_t zoneid;
-	netstack_t *ns;
 	icmp_stack_t *is;
+	int	error;
+
+	conn_dev = NULL;
 
 	/* If the stream is already open, return immediately. */
 	if (q->q_ptr != NULL)
@@ -1474,6 +1480,112 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	if (sflag == MODOPEN)
 		return (EINVAL);
 
+	/*
+	 * Since ICMP is not used so heavily, allocating from the small
+	 * arena should be sufficient.
+	 */
+	if ((conn_dev = inet_minor_alloc(ip_minor_arena_sa)) == 0) {
+		return (EBUSY);
+	}
+
+	if (flag & SO_FALLBACK) {
+		/*
+		 * Non streams socket needs a stream to fallback to
+		 */
+		RD(q)->q_ptr = (void *)conn_dev;
+		WR(q)->q_qinfo = &icmp_fallback_sock_winit;
+		WR(q)->q_ptr = (void *)ip_minor_arena_sa;
+		qprocson(q);
+		return (0);
+	}
+
+	connp = icmp_open(family, credp, &error, KM_SLEEP);
+	if (connp == NULL) {
+		ASSERT(error != NULL);
+		inet_minor_free(ip_minor_arena_sa, connp->conn_dev);
+		return (error);
+	}
+
+	*devp = makedevice(getemajor(*devp), (minor_t)conn_dev);
+	connp->conn_dev = conn_dev;
+	connp->conn_minor_arena = ip_minor_arena_sa;
+
+	is = connp->conn_icmp->icmp_is;
+
+	/*
+	 * Initialize the icmp_t structure for this stream.
+	 */
+	q->q_ptr = connp;
+	WR(q)->q_ptr = connp;
+	connp->conn_rq = q;
+	connp->conn_wq = WR(q);
+
+	if (connp->conn_icmp->icmp_family == AF_INET6) {
+		/* Build initial header template for transmit */
+		rw_enter(&connp->conn_icmp->icmp_rwlock, RW_WRITER);
+		if ((error = icmp_build_hdrs(connp->conn_icmp)) != 0) {
+			rw_exit(&connp->conn_icmp->icmp_rwlock);
+			inet_minor_free(ip_minor_arena_sa, connp->conn_dev);
+			ipcl_conn_destroy(connp);
+			return (error);
+		}
+		rw_exit(&connp->conn_icmp->icmp_rwlock);
+	}
+
+
+	q->q_hiwat = is->is_recv_hiwat;
+	WR(q)->q_hiwat = is->is_xmit_hiwat;
+	WR(q)->q_lowat = is->is_xmit_lowat;
+
+	qprocson(q);
+
+	/* Set the Stream head write offset. */
+	(void) proto_set_tx_wroff(q, connp,
+	    connp->conn_icmp->icmp_max_hdr_len + is->is_wroff_extra);
+	(void) proto_set_rx_hiwat(connp->conn_rq, connp, q->q_hiwat);
+
+	mutex_enter(&connp->conn_lock);
+	connp->conn_state_flags &= ~CONN_INCIPIENT;
+	mutex_exit(&connp->conn_lock);
+
+	return (0);
+}
+
+/* For /dev/icmp4 aka AF_INET open */
+static int
+icmp_openv4(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	return (icmp_tpi_open(q, devp, flag, sflag, credp, AF_INET));
+}
+
+/* For /dev/icmp6 aka AF_INET6 open */
+static int
+icmp_openv6(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+{
+	return (icmp_tpi_open(q, devp, flag, sflag, credp, AF_INET6));
+}
+
+/*
+ * This is the open routine for icmp.  It allocates a icmp_t structure for
+ * the stream and, on the first open of the module, creates an ND table.
+ */
+/* ARGSUSED */
+static conn_t *
+icmp_open(int family, cred_t *credp, int *err, int flags)
+{
+	icmp_t	*icmp;
+	conn_t *connp;
+	zoneid_t zoneid;
+	netstack_t *ns;
+	icmp_stack_t *is;
+	boolean_t isv6 = B_FALSE;
+
+	*err = secpolicy_net_icmpaccess(credp);
+	if (*err != 0)
+		return (NULL);
+
+	if (family == AF_INET6)
+		isv6 = B_TRUE;
 	ns = netstack_find_by_cred(credp);
 	ASSERT(ns != NULL);
 	is = ns->netstack_icmp;
@@ -1488,34 +1600,17 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 	else
 		zoneid = crgetzoneid(credp);
 
-	/*
-	 * Since ICMP is not used so heavily, allocating from the small
-	 * arena should be sufficient.
-	 */
-	if ((conn_dev = inet_minor_alloc(ip_minor_arena_sa)) == 0) {
-		netstack_rele(ns);
-		return (EBUSY);
-	}
-	*devp = makedevice(getemajor(*devp), (minor_t)conn_dev);
+	ASSERT(flags == KM_SLEEP || flags == KM_NOSLEEP);
 
-	connp = ipcl_conn_create(IPCL_RAWIPCONN, KM_SLEEP, ns);
-	connp->conn_dev = conn_dev;
-	connp->conn_minor_arena = ip_minor_arena_sa;
+	connp = ipcl_conn_create(IPCL_RAWIPCONN, flags, ns);
 	icmp = connp->conn_icmp;
+	icmp->icmp_v6dst = sin6_null;
 
 	/*
 	 * ipcl_conn_create did a netstack_hold. Undo the hold that was
 	 * done by netstack_find_by_cred()
 	 */
 	netstack_rele(ns);
-
-	/*
-	 * Initialize the icmp_t structure for this stream.
-	 */
-	q->q_ptr = connp;
-	WR(q)->q_ptr = connp;
-	connp->conn_rq = q;
-	connp->conn_wq = WR(q);
 
 	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 	ASSERT(connp->conn_ulp == IPPROTO_ICMP);
@@ -1561,37 +1656,14 @@ icmp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 
 	icmp->icmp_is = is;
 
-	q->q_hiwat = is->is_recv_hiwat;
-	WR(q)->q_hiwat = is->is_xmit_hiwat;
-	WR(q)->q_lowat = is->is_xmit_lowat;
-
 	connp->conn_recv = icmp_input;
 	crhold(credp);
 	connp->conn_cred = credp;
 
-	mutex_enter(&connp->conn_lock);
-	connp->conn_state_flags &= ~CONN_INCIPIENT;
-	mutex_exit(&connp->conn_lock);
-
-	qprocson(q);
-
-	if (icmp->icmp_family == AF_INET6) {
-		/* Build initial header template for transmit */
-		if ((err = icmp_build_hdrs(icmp)) != 0) {
-			rw_exit(&icmp->icmp_rwlock);
-			qprocsoff(q);
-			ipcl_conn_destroy(connp);
-			return (err);
-		}
-	}
 	rw_exit(&icmp->icmp_rwlock);
 
-	/* Set the Stream head write offset. */
-	(void) mi_set_sth_wroff(q,
-	    icmp->icmp_max_hdr_len + is->is_wroff_extra);
-	(void) mi_set_sth_hiwat(q, q->q_hiwat);
-
-	return (0);
+	connp->conn_flow_cntrld = B_FALSE;
+	return (connp);
 }
 
 /*
@@ -1657,14 +1729,15 @@ icmp_opt_default(queue_t *q, int level, int name, uchar_t *ptr)
  * It returns the size of the option retrieved.
  */
 int
-icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
+icmp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 {
-	conn_t	*connp = Q_TO_CONN(q);
-	icmp_t	*icmp = connp->conn_icmp;
-	icmp_stack_t *is = icmp->icmp_is;
-	int	*i1 = (int *)ptr;
+	icmp_t		*icmp = connp->conn_icmp;
+	icmp_stack_t	*is = icmp->icmp_is;
+	int		*i1 = (int *)ptr;
 	ip6_pkt_t	*ipp = &icmp->icmp_sticky_ipp;
+	int		ret = 0;
 
+	ASSERT(RW_READ_HELD(&icmp->icmp_rwlock));
 	switch (level) {
 	case SOL_SOCKET:
 		switch (name) {
@@ -1696,12 +1769,12 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 			break;
 
 		case SO_SNDBUF:
-			ASSERT(q->q_hiwat <= INT_MAX);
-			*i1 = (int)q->q_hiwat;
+			ASSERT(icmp->icmp_xmit_hiwat <= INT_MAX);
+			*i1 = icmp->icmp_xmit_hiwat;
 			break;
 		case SO_RCVBUF:
-			ASSERT(RD(q)->q_hiwat <= INT_MAX);
-			*i1 = (int)RD(q)->q_hiwat;
+			ASSERT(icmp->icmp_recv_hiwat <= INT_MAX);
+			*i1 = icmp->icmp_recv_hiwat;
 			break;
 		case SO_DGRAM_ERRIND:
 			*i1 = icmp->icmp_dgram_errind;
@@ -1726,21 +1799,25 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 		 * case SO_ALLZONES:
 		 */
 		default:
-			return (-1);
+			ret = -1;
+			goto done;
 		}
 		break;
 	case IPPROTO_IP:
 		/*
 		 * Only allow IPv4 option processing on IPv4 sockets.
 		 */
-		if (icmp->icmp_family != AF_INET)
-			return (-1);
+		if (icmp->icmp_family != AF_INET) {
+			ret = -1;
+			goto done;
+		}
 
 		switch (name) {
 		case IP_OPTIONS:
 		case T_IP_OPTIONS:
 			/* Options are passed up with each packet */
-			return (0);
+			ret = 0;
+			goto done;
 		case IP_HDRINCL:
 			*i1 = (int)icmp->icmp_hdrincl;
 			break;
@@ -1754,13 +1831,16 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 		case IP_MULTICAST_IF:
 			/* 0 address if not set */
 			*(ipaddr_t *)ptr = icmp->icmp_multicast_if_addr;
-			return (sizeof (ipaddr_t));
+			ret = sizeof (ipaddr_t);
+			goto done;
 		case IP_MULTICAST_TTL:
 			*(uchar_t *)ptr = icmp->icmp_multicast_ttl;
-			return (sizeof (uchar_t));
+			ret = sizeof (uchar_t);
+			goto done;
 		case IP_MULTICAST_LOOP:
 			*ptr = connp->conn_multicast_loop;
-			return (sizeof (uint8_t));
+			ret = sizeof (uint8_t);
+			goto done;
 		case IP_BOUND_IF:
 			/* Zero if not set */
 			*i1 = icmp->icmp_bound_if;
@@ -1768,12 +1848,12 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 		case IP_UNSPEC_SRC:
 			*ptr = icmp->icmp_unspec_source;
 			break;	/* goto sizeof (int) option return */
-		case IP_BROADCAST_TTL:
-			*(uchar_t *)ptr = connp->conn_broadcast_ttl;
-			return (sizeof (uchar_t));
 		case IP_RECVIF:
 			*ptr = icmp->icmp_recvif;
 			break;	/* goto sizeof (int) option return */
+		case IP_BROADCAST_TTL:
+			*(uchar_t *)ptr = connp->conn_broadcast_ttl;
+			return (sizeof (uchar_t));
 		case IP_RECVPKTINFO:
 			/*
 			 * This also handles IP_PKTINFO.
@@ -1784,7 +1864,8 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 			 * error for IP_PKTINFO as it's not supported as a
 			 * sticky option.
 			 */
-			return (-EINVAL);
+			ret = -EINVAL;
+			goto done;
 		/*
 		 * Cannot "get" the value of following options
 		 * at this level. Action is same as "default" to
@@ -1815,15 +1896,18 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 		 * case IP_NEXTHOP:
 		 */
 		default:
-			return (-1);
+			ret = -1;
+			goto done;
 		}
 		break;
 	case IPPROTO_IPV6:
 		/*
 		 * Only allow IPv6 option processing on native IPv6 sockets.
 		 */
-		if (icmp->icmp_family != AF_INET6)
-			return (-1);
+		if (icmp->icmp_family != AF_INET6) {
+			ret = -1;
+			goto done;
+		}
 		switch (name) {
 		case IPV6_UNICAST_HOPS:
 			*i1 = (unsigned int)icmp->icmp_ttl;
@@ -1850,8 +1934,10 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 			 * Return offset or -1 if no checksum offset.
 			 * Does not apply to IPPROTO_ICMPV6
 			 */
-			if (icmp->icmp_proto == IPPROTO_ICMPV6)
-				return (-1);
+			if (icmp->icmp_proto == IPPROTO_ICMPV6) {
+				ret = -1;
+				goto done;
+			}
 
 			if (icmp->icmp_raw_checksum) {
 				*i1 = icmp->icmp_checksum_off;
@@ -1868,7 +1954,8 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 		case MCAST_JOIN_SOURCE_GROUP:
 		case MCAST_LEAVE_SOURCE_GROUP:
 			/* cannot "get" the value for these */
-			return (-1);
+			ret = -1;
+			goto done;
 		case IPV6_RECVPKTINFO:
 			*i1 = icmp->icmp_ip_recvpktinfo;
 			break;
@@ -1912,7 +1999,8 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 				pkti->ipi6_addr = ipp->ipp_addr;
 			else
 				pkti->ipi6_addr = ipv6_all_zeros;
-			return (sizeof (struct in6_pktinfo));
+			ret = sizeof (struct in6_pktinfo);
+			goto done;
 		}
 		case IPV6_NEXTHOP: {
 			sin6_t *sin6 = (sin6_t *)ptr;
@@ -1922,7 +2010,8 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 			*sin6 = sin6_null;
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_addr = ipp->ipp_nexthop;
-			return (sizeof (sin6_t));
+			ret = (sizeof (sin6_t));
+			goto done;
 		}
 		case IPV6_HOPOPTS:
 			if (!(ipp->ipp_fields & IPPF_HOPOPTS))
@@ -1937,28 +2026,38 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 				ptr[1] = (ipp->ipp_hopoptslen -
 				    icmp->icmp_label_len_v6 + 7) / 8 - 1;
 			}
-			return (ipp->ipp_hopoptslen - icmp->icmp_label_len_v6);
+			ret = (ipp->ipp_hopoptslen - icmp->icmp_label_len_v6);
+			goto done;
 		case IPV6_RTHDRDSTOPTS:
 			if (!(ipp->ipp_fields & IPPF_RTDSTOPTS))
 				return (0);
 			bcopy(ipp->ipp_rtdstopts, ptr, ipp->ipp_rtdstoptslen);
-			return (ipp->ipp_rtdstoptslen);
+			ret = ipp->ipp_rtdstoptslen;
+			goto done;
 		case IPV6_RTHDR:
 			if (!(ipp->ipp_fields & IPPF_RTHDR))
 				return (0);
 			bcopy(ipp->ipp_rthdr, ptr, ipp->ipp_rthdrlen);
-			return (ipp->ipp_rthdrlen);
+			ret = ipp->ipp_rthdrlen;
+			goto done;
 		case IPV6_DSTOPTS:
-			if (!(ipp->ipp_fields & IPPF_DSTOPTS))
-				return (0);
+			if (!(ipp->ipp_fields & IPPF_DSTOPTS)) {
+				ret = 0;
+				goto done;
+			}
 			bcopy(ipp->ipp_dstopts, ptr, ipp->ipp_dstoptslen);
-			return (ipp->ipp_dstoptslen);
+			ret = ipp->ipp_dstoptslen;
+			goto done;
 		case IPV6_PATHMTU:
-			if (!(ipp->ipp_fields & IPPF_PATHMTU))
-				return (0);
-
-			return (ip_fill_mtuinfo(&icmp->icmp_v6dst, 0,
-			    (struct ip6_mtuinfo *)ptr, is->is_netstack));
+			if (!(ipp->ipp_fields & IPPF_PATHMTU)) {
+				ret = 0;
+			} else {
+				ret = ip_fill_mtuinfo(
+				    &icmp->icmp_v6dst.sin6_addr, 0,
+				    (struct ip6_mtuinfo *)ptr,
+				    is->is_netstack);
+			}
+			goto done;
 		case IPV6_TCLASS:
 			if (ipp->ipp_fields & IPPF_TCLASS)
 				*i1 = ipp->ipp_tclass;
@@ -1967,18 +2066,21 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 				    IPV6_DEFAULT_VERS_AND_FLOW);
 			break;
 		default:
-			return (-1);
+			ret = -1;
+			goto done;
 		}
 		break;
 	case IPPROTO_ICMPV6:
 		/*
 		 * Only allow IPv6 option processing on native IPv6 sockets.
 		 */
-		if (icmp->icmp_family != AF_INET6)
-			return (-1);
+		if (icmp->icmp_family != AF_INET6) {
+			ret = -1;
+		}
 
-		if (icmp->icmp_proto != IPPROTO_ICMPV6)
-			return (-1);
+		if (icmp->icmp_proto != IPPROTO_ICMPV6) {
+			ret = -1;
+		}
 
 		switch (name) {
 		case ICMP6_FILTER:
@@ -1989,14 +2091,19 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
 				(void) bcopy(icmp->icmp_filter, ptr,
 				    sizeof (icmp6_filter_t));
 			}
-			return (sizeof (icmp6_filter_t));
+			ret = sizeof (icmp6_filter_t);
+			goto done;
 		default:
-			return (-1);
+			ret = -1;
+			goto done;
 		}
 	default:
-		return (-1);
+		ret = -1;
+		goto done;
 	}
-	return (sizeof (int));
+	ret = sizeof (int);
+done:
+	return (ret);
 }
 
 /*
@@ -2004,84 +2111,36 @@ icmp_opt_get_locked(queue_t *q, int level, int name, uchar_t *ptr)
  * It returns the size of the option retrieved.
  */
 int
-icmp_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
+icmp_tpi_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 {
-	icmp_t  *icmp = Q_TO_ICMP(q);
+	conn_t  *connp = Q_TO_CONN(q);
+	icmp_t	*icmp = connp->conn_icmp;
 	int 	err;
 
 	rw_enter(&icmp->icmp_rwlock, RW_READER);
-	err = icmp_opt_get_locked(q, level, name, ptr);
+	err = icmp_opt_get(connp, level, name, ptr);
 	rw_exit(&icmp->icmp_rwlock);
 	return (err);
 }
 
-
-/* This routine sets socket options. */
-/* ARGSUSED */
 int
-icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
-    uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
-    void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
+icmp_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
+    uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp, cred_t *cr,
+    void *thisdg_attrs, boolean_t checkonly)
 {
-	conn_t	*connp = Q_TO_CONN(q);
-	icmp_t	*icmp = connp->conn_icmp;
-	icmp_stack_t *is = icmp->icmp_is;
+
 	int	*i1 = (int *)invalp;
 	boolean_t onoff = (*i1 == 0) ? 0 : 1;
-	boolean_t checkonly;
+	icmp_t *icmp = connp->conn_icmp;
+	icmp_stack_t *is = icmp->icmp_is;
 	int	error;
 
-	switch (optset_context) {
-	case SETFN_OPTCOM_CHECKONLY:
-		checkonly = B_TRUE;
-		/*
-		 * Note: Implies T_CHECK semantics for T_OPTCOM_REQ
-		 * inlen != 0 implies value supplied and
-		 * 	we have to "pretend" to set it.
-		 * inlen == 0 implies that there is no
-		 * 	value part in T_CHECK request and just validation
-		 * done elsewhere should be enough, we just return here.
-		 */
-		if (inlen == 0) {
-			*outlenp = 0;
-			return (0);
-		}
-		break;
-	case SETFN_OPTCOM_NEGOTIATE:
-		checkonly = B_FALSE;
-		break;
-	case SETFN_UD_NEGOTIATE:
-	case SETFN_CONN_NEGOTIATE:
-		checkonly = B_FALSE;
-		/*
-		 * Negotiating local and "association-related" options
-		 * through T_UNITDATA_REQ.
-		 *
-		 * Following routine can filter out ones we do not
-		 * want to be "set" this way.
-		 */
-		if (!icmp_opt_allow_udr_set(level, name)) {
-			*outlenp = 0;
-			return (EINVAL);
-		}
-		break;
-	default:
-		/*
-		 * We should never get here
-		 */
-		*outlenp = 0;
-		return (EINVAL);
-	}
-
-	ASSERT((optset_context != SETFN_OPTCOM_CHECKONLY) ||
-	    (optset_context == SETFN_OPTCOM_CHECKONLY && inlen != 0));
-
+	ASSERT(RW_WRITE_HELD(&icmp->icmp_rwlock));
 	/*
 	 * For fixed length options, no sanity check
 	 * of passed in length is done. It is assumed *_optcom_req()
 	 * routines do the right thing.
 	 */
-
 	switch (level) {
 	case SOL_SOCKET:
 		switch (name) {
@@ -2161,12 +2220,14 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 
 			/* Drop lock across the bind operation */
 			rw_exit(&icmp->icmp_rwlock);
-			icmp_bind_proto(q);
+			(void) icmp_bind_proto(connp);
 			rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 			return (0);
 		case SO_REUSEADDR:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_reuseaddr = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 
 		/*
@@ -2174,16 +2235,22 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 		 * but are only meaningful to IP.
 		 */
 		case SO_DONTROUTE:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_dontroute = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case SO_USELOOPBACK:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_useloopback = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case SO_BROADCAST:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_broadcast = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 
 		case SO_SNDBUF:
@@ -2192,7 +2259,10 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 				return (ENOBUFS);
 			}
 			if (!checkonly) {
-				q->q_hiwat = *i1;
+				if (!IPCL_IS_NONSTR(connp)) {
+					connp->conn_wq->q_hiwat = *i1;
+				}
+				icmp->icmp_xmit_hiwat = *i1;
 			}
 			break;
 		case SO_RCVBUF:
@@ -2201,9 +2271,10 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 				return (ENOBUFS);
 			}
 			if (!checkonly) {
-				RD(q)->q_hiwat = *i1;
+				icmp->icmp_recv_hiwat = *i1;
 				rw_exit(&icmp->icmp_rwlock);
-				(void) mi_set_sth_hiwat(RD(q), *i1);
+				(void) proto_set_rx_hiwat(connp->conn_rq, connp,
+				    *i1);
 				rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 			}
 			break;
@@ -2273,8 +2344,9 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			icmp->icmp_max_hdr_len = IP_SIMPLE_HDR_LENGTH +
 			    icmp->icmp_ip_snd_options_len;
 			rw_exit(&icmp->icmp_rwlock);
-			(void) mi_set_sth_wroff(RD(q), icmp->icmp_max_hdr_len +
-			    is->is_wroff_extra);
+			(void) proto_set_tx_wroff(connp->conn_rq == NULL ? NULL:
+			    RD(connp->conn_rq), connp,
+			    icmp->icmp_max_hdr_len + is->is_wroff_extra);
 			rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 			break;
 		case IP_HDRINCL:
@@ -2297,8 +2369,10 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			 * TODO should check OPTMGMT reply and undo this if
 			 * there is an error.
 			 */
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_multicast_if_addr = *i1;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IP_MULTICAST_TTL:
 			if (!checkonly)
@@ -2308,23 +2382,29 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			if (!checkonly) {
 				connp->conn_multicast_loop =
 				    (*invalp == 0) ? 0 : 1;
+				PASS_OPT_TO_IP(connp);
 			}
 			break;
 		case IP_BOUND_IF:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_bound_if = *i1;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IP_UNSPEC_SRC:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_unspec_source = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IP_BROADCAST_TTL:
 			if (!checkonly)
 				connp->conn_broadcast_ttl = *invalp;
 			break;
 		case IP_RECVIF:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_recvif = onoff;
+			}
 			/*
 			 * pass to ip
 			 */
@@ -2354,8 +2434,9 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			}
 
 
-			if (inlen != sizeof (struct in_pktinfo))
+			if (inlen != sizeof (struct in_pktinfo)) {
 				return (EINVAL);
+			}
 
 			if ((attr_pktinfop = (ip4_pkt_t *)thisdg_attrs)
 			    == NULL) {
@@ -2436,8 +2517,10 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 
 		switch (name) {
 		case IPV6_MULTICAST_IF:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_multicast_if_index = *i1;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IPV6_UNICAST_HOPS:
 			/* -1 means use default */
@@ -2492,8 +2575,10 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 				*outlenp = 0;
 				return (EINVAL);
 			}
-			if (!checkonly)
+			if (!checkonly) {
 				connp->conn_multicast_loop = *i1;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IPV6_CHECKSUM:
 			/*
@@ -2544,51 +2629,71 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			 */
 			return (-EINVAL);
 		case IPV6_BOUND_IF:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_bound_if = *i1;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IPV6_UNSPEC_SRC:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_unspec_source = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IPV6_RECVTCLASS:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_ipv6_recvtclass = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		/*
 		 * Set boolean switches for ancillary data delivery
 		 */
 		case IPV6_RECVPKTINFO:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_ip_recvpktinfo = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IPV6_RECVPATHMTU:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_ipv6_recvpathmtu = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IPV6_RECVHOPLIMIT:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_ipv6_recvhoplimit = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IPV6_RECVHOPOPTS:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_ipv6_recvhopopts = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IPV6_RECVDSTOPTS:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_ipv6_recvdstopts = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case _OLD_IPV6_RECVDSTOPTS:
 			if (!checkonly)
 				icmp->icmp_old_ipv6_recvdstopts = onoff;
 			break;
 		case IPV6_RECVRTHDRDSTOPTS:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_ipv6_recvrtdstopts = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		case IPV6_RECVRTHDR:
-			if (!checkonly)
+			if (!checkonly) {
 				icmp->icmp_ipv6_recvrthdr = onoff;
+				PASS_OPT_TO_IP(connp);
+			}
 			break;
 		/*
 		 * Set sticky options or ancillary data.
@@ -2601,8 +2706,10 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			 * in ip_opt_set(). For ancillary data the
 			 * source address is checked in ip_wput_v6.
 			 */
-			if (inlen != 0 && inlen != sizeof (struct in6_pktinfo))
+			if (inlen != 0 && inlen !=
+			    sizeof (struct in6_pktinfo)) {
 				return (EINVAL);
+			}
 			if (checkonly)
 				break;
 
@@ -2630,6 +2737,7 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 				error = icmp_build_hdrs(icmp);
 				if (error != 0)
 					return (error);
+				PASS_OPT_TO_IP(connp);
 			}
 			break;
 		case IPV6_HOPLIMIT:
@@ -2660,8 +2768,9 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			 * IPV6_RECVTCLASS accepts -1 as use kernel default
 			 * and [0, 255] as the actualy traffic class.
 			 */
-			if (inlen != 0 && inlen != sizeof (int))
+			if (inlen != 0 && inlen != sizeof (int)) {
 				return (EINVAL);
+			}
 			if (checkonly)
 				break;
 
@@ -2691,8 +2800,9 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			 * IP will verify that the nexthop is reachable
 			 * and fail for sticky options.
 			 */
-			if (inlen != 0 && inlen != sizeof (sin6_t))
+			if (inlen != 0 && inlen != sizeof (sin6_t)) {
 				return (EINVAL);
+			}
 			if (checkonly)
 				break;
 
@@ -2702,10 +2812,12 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			} else {
 				sin6_t *sin6 = (sin6_t *)invalp;
 
-				if (sin6->sin6_family != AF_INET6)
+				if (sin6->sin6_family != AF_INET6) {
 					return (EAFNOSUPPORT);
-				if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
+				}
+				if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 					return (EADDRNOTAVAIL);
+				}
 				ipp->ipp_nexthop = sin6->sin6_addr;
 				if (!IN6_IS_ADDR_UNSPECIFIED(
 				    &ipp->ipp_nexthop))
@@ -2717,6 +2829,7 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 				error = icmp_build_hdrs(icmp);
 				if (error != 0)
 					return (error);
+				PASS_OPT_TO_IP(connp);
 			}
 			break;
 		case IPV6_HOPOPTS: {
@@ -2726,8 +2839,9 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 			 * eight bytes, and matching size passed in.
 			 */
 			if (inlen != 0 &&
-			    inlen != (8 * (hopts->ip6h_len + 1)))
+			    inlen != (8 * (hopts->ip6h_len + 1))) {
 				return (EINVAL);
+			}
 
 			if (checkonly)
 				break;
@@ -2974,23 +3088,89 @@ icmp_opt_set_locked(queue_t *q, uint_t optset_context, int level, int name,
 	*outlenp = inlen;
 	return (0);
 }
+
 /* This routine sets socket options. */
 /* ARGSUSED */
 int
-icmp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
+icmp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
+    uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
+    void *thisdg_attrs, cred_t *cr)
+{
+	boolean_t checkonly;
+	int	error;
+
+	error = 0;
+	switch (optset_context) {
+	case SETFN_OPTCOM_CHECKONLY:
+		checkonly = B_TRUE;
+		/*
+		 * Note: Implies T_CHECK semantics for T_OPTCOM_REQ
+		 * inlen != 0 implies value supplied and
+		 * 	we have to "pretend" to set it.
+		 * inlen == 0 implies that there is no
+		 * 	value part in T_CHECK request and just validation
+		 * done elsewhere should be enough, we just return here.
+		 */
+		if (inlen == 0) {
+			*outlenp = 0;
+			error = 0;
+			goto done;
+		}
+		break;
+	case SETFN_OPTCOM_NEGOTIATE:
+		checkonly = B_FALSE;
+		break;
+	case SETFN_UD_NEGOTIATE:
+	case SETFN_CONN_NEGOTIATE:
+		checkonly = B_FALSE;
+		/*
+		 * Negotiating local and "association-related" options
+		 * through T_UNITDATA_REQ.
+		 *
+		 * Following routine can filter out ones we do not
+		 * want to be "set" this way.
+		 */
+		if (!icmp_opt_allow_udr_set(level, name)) {
+			*outlenp = 0;
+			error = EINVAL;
+			goto done;
+		}
+		break;
+	default:
+		/*
+		 * We should never get here
+		 */
+		*outlenp = 0;
+		error = EINVAL;
+		goto done;
+	}
+
+	ASSERT((optset_context != SETFN_OPTCOM_CHECKONLY) ||
+	    (optset_context == SETFN_OPTCOM_CHECKONLY && inlen != 0));
+	error = icmp_do_opt_set(connp, level, name, inlen, invalp, outlenp,
+	    outvalp, cr, thisdg_attrs, checkonly);
+
+done:
+	return (error);
+}
+
+/* This routine sets socket options. */
+/* ARGSUSED */
+int
+icmp_tpi_opt_set(queue_t *q, uint_t optset_context, int level, int name,
     uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
     void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
 {
+	conn_t	*connp =  Q_TO_CONN(q);
 	icmp_t	*icmp;
-	int	err;
+	int error;
 
-	icmp = Q_TO_ICMP(q);
-
+	icmp = connp->conn_icmp;
 	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
-	err = icmp_opt_set_locked(q, optset_context, level, name, inlen, invalp,
-	    outlenp, outvalp, thisdg_attrs, cr, mblk);
+	error = icmp_opt_set(connp, optset_context, level, name, inlen, invalp,
+	    outlenp, outvalp, thisdg_attrs, cr);
 	rw_exit(&icmp->icmp_rwlock);
-	return (err);
+	return (error);
 }
 
 /*
@@ -3055,7 +3235,8 @@ icmp_build_hdrs(icmp_t *icmp)
 	if (hdrs_len > icmp->icmp_max_hdr_len) {
 		icmp->icmp_max_hdr_len = hdrs_len;
 		rw_exit(&icmp->icmp_rwlock);
-		(void) mi_set_sth_wroff(icmp->icmp_connp->conn_rq,
+		(void) proto_set_tx_wroff(icmp->icmp_connp->conn_rq,
+		    icmp->icmp_connp,
 		    icmp->icmp_max_hdr_len + is->is_wroff_extra);
 		rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 	}
@@ -3123,6 +3304,33 @@ icmp_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp, cred_t *cr)
 	icmppa->icmp_param_value = new_value;
 	return (0);
 }
+static void
+icmp_queue_fallback(icmp_t *icmp, mblk_t *mp)
+{
+	ASSERT(MUTEX_HELD(&icmp->icmp_recv_lock));
+	if (IPCL_IS_NONSTR(icmp->icmp_connp)) {
+		/*
+		 * fallback has started but messages have not been moved yet
+		 */
+		if (icmp->icmp_fallback_queue_head == NULL) {
+			ASSERT(icmp->icmp_fallback_queue_tail == NULL);
+			icmp->icmp_fallback_queue_head = mp;
+			icmp->icmp_fallback_queue_tail = mp;
+		} else {
+			ASSERT(icmp->icmp_fallback_queue_tail != NULL);
+			icmp->icmp_fallback_queue_tail->b_next = mp;
+			icmp->icmp_fallback_queue_tail = mp;
+		}
+		mutex_exit(&icmp->icmp_recv_lock);
+	} else {
+		/*
+		 * no more fallbacks possible, ok to drop lock.
+		 */
+		mutex_exit(&icmp->icmp_recv_lock);
+		putnext(icmp->icmp_connp->conn_rq, mp);
+	}
+}
+
 /*ARGSUSED2*/
 static void
 icmp_input(void *arg1, mblk_t *mp, void *arg2)
@@ -3148,6 +3356,7 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 	uint_t			icmp_opt = 0;
 	boolean_t		icmp_ipv6_recvhoplimit = B_FALSE;
 	uint_t			hopstrip;
+	int			error;
 
 	ASSERT(connp->conn_flags & IPCL_RAWIPCONN);
 
@@ -3189,7 +3398,7 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 			/*
 			 * ICMP messages.
 			 */
-			icmp_icmp_error(connp->conn_rq, mp);
+			icmp_icmp_error(connp, mp);
 			return;
 		}
 	}
@@ -3388,8 +3597,7 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 			freeb(options_mp);
 
 		BUMP_MIB(&is->is_rawip_mib, rawipInDatagrams);
-		putnext(connp->conn_rq, mp);
-		return;
+		goto deliver;
 	}
 
 	/*
@@ -3707,7 +3915,7 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 			udi_size -= toh->len;
 		}
 		if (icmp->icmp_timestamp) {
-			struct	T_opthdr *toh;
+			struct  T_opthdr *toh;
 
 			toh = (struct T_opthdr *)dstopt;
 			toh->level = SOL_SOCKET;
@@ -3723,6 +3931,7 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 			dstopt = (uchar_t *)toh + toh->len;
 			udi_size -= toh->len;
 		}
+
 		if (icmp_opt & IPPF_HOPOPTS) {
 			struct T_opthdr *toh;
 
@@ -3792,235 +4001,37 @@ icmp_input(void *arg1, mblk_t *mp, void *arg2)
 		ASSERT(udi_size == 0);
 	}
 	BUMP_MIB(&is->is_rawip_mib, rawipInDatagrams);
-	putnext(connp->conn_rq, mp);
-}
 
-/*
- * Handle the results of a T_BIND_REQ whether deferred by IP or handled
- * immediately.
- */
-static void
-icmp_bind_result(conn_t *connp, mblk_t *mp)
-{
-	struct T_error_ack	*tea;
-
-	switch (mp->b_datap->db_type) {
-	case M_PROTO:
-	case M_PCPROTO:
-		/* M_PROTO messages contain some type of TPI message. */
-		if ((mp->b_wptr - mp->b_rptr) < sizeof (t_scalar_t)) {
-			freemsg(mp);
-			return;
-		}
-		tea = (struct T_error_ack *)mp->b_rptr;
-
-		switch (tea->PRIM_type) {
-		case T_ERROR_ACK:
-			switch (tea->ERROR_prim) {
-			case O_T_BIND_REQ:
-			case T_BIND_REQ:
-				icmp_bind_error(connp, mp);
-				return;
-			default:
-				break;
-			}
-			ASSERT(0);
-			freemsg(mp);
-			return;
-
-		case T_BIND_ACK:
-			icmp_bind_ack(connp, mp);
-			return;
-
-		default:
-			break;
-		}
-		freemsg(mp);
-		return;
-	default:
-		/* FIXME: other cases? */
-		ASSERT(0);
-		freemsg(mp);
-		return;
-	}
-}
-
-/*
- * Process a T_BIND_ACK
- */
-static void
-icmp_bind_ack(conn_t *connp, mblk_t *mp)
-{
-	icmp_t	*icmp = connp->conn_icmp;
-	mblk_t	*mp1;
-	ire_t	*ire;
-	struct T_bind_ack *tba;
-	uchar_t *addrp;
-	ipa_conn_t	*ac;
-	ipa6_conn_t	*ac6;
-
-	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
-	/*
-	 * We know if headers are included or not so we can
-	 * safely do this.
-	 */
-	if (icmp->icmp_state == TS_UNBND) {
-		/*
-		 * TPI has not yet bound - bind sent by
-		 * icmp_bind_proto.
-		 */
-		freemsg(mp);
-		rw_exit(&icmp->icmp_rwlock);
-		return;
-	}
-	ASSERT(icmp->icmp_pending_op != -1);
-
-	/*
-	 * If a broadcast/multicast address was bound set
-	 * the source address to 0.
-	 * This ensures no datagrams with broadcast address
-	 * as source address are emitted (which would violate
-	 * RFC1122 - Hosts requirements)
-	 *
-	 * Note that when connecting the returned IRE is
-	 * for the destination address and we only perform
-	 * the broadcast check for the source address (it
-	 * is OK to connect to a broadcast/multicast address.)
-	 */
-	mp1 = mp->b_cont;
-	if (mp1 != NULL && mp1->b_datap->db_type == IRE_DB_TYPE) {
-		ire = (ire_t *)mp1->b_rptr;
-
-		/*
-		 * Note: we get IRE_BROADCAST for IPv6 to "mark" a multicast
-		 * local address.
-		 */
-		if (ire->ire_type == IRE_BROADCAST &&
-		    icmp->icmp_state != TS_DATA_XFER) {
-			ASSERT(icmp->icmp_pending_op == T_BIND_REQ ||
-			    icmp->icmp_pending_op == O_T_BIND_REQ);
-			/* This was just a local bind to a MC/broadcast addr */
-			V6_SET_ZERO(icmp->icmp_v6src);
-			if (icmp->icmp_family == AF_INET6)
-				(void) icmp_build_hdrs(icmp);
-		} else if (V6_OR_V4_INADDR_ANY(icmp->icmp_v6src)) {
-			/*
-			 * Local address not yet set - pick it from the
-			 * T_bind_ack
-			 */
-			tba = (struct T_bind_ack *)mp->b_rptr;
-			addrp = &mp->b_rptr[tba->ADDR_offset];
-			switch (icmp->icmp_family) {
-			case AF_INET:
-				if (tba->ADDR_length == sizeof (ipa_conn_t)) {
-					ac = (ipa_conn_t *)addrp;
-				} else {
-					ASSERT(tba->ADDR_length ==
-					    sizeof (ipa_conn_x_t));
-					ac = &((ipa_conn_x_t *)addrp)->acx_conn;
+deliver:
+	if (IPCL_IS_NONSTR(connp)) {
+		if ((*connp->conn_upcalls->su_recv)
+		    (connp->conn_upper_handle, mp, msgdsize(mp), 0, &error,
+		    NULL) < 0) {
+			mutex_enter(&icmp->icmp_recv_lock);
+			if (error == ENOSPC) {
+				/*
+				 * let's confirm while holding the lock
+				 */
+				if ((*connp->conn_upcalls->su_recv)
+				    (connp->conn_upper_handle, NULL, 0, 0,
+				    &error, NULL) < 0) {
+					if (error == ENOSPC) {
+						connp->conn_flow_cntrld =
+						    B_TRUE;
+					} else {
+						ASSERT(error == EOPNOTSUPP);
+					}
 				}
-				IN6_IPADDR_TO_V4MAPPED(ac->ac_laddr,
-				    &icmp->icmp_v6src);
-				break;
-			case AF_INET6:
-				if (tba->ADDR_length == sizeof (ipa6_conn_t)) {
-					ac6 = (ipa6_conn_t *)addrp;
-				} else {
-					ASSERT(tba->ADDR_length ==
-					    sizeof (ipa6_conn_x_t));
-					ac6 = &((ipa6_conn_x_t *)
-					    addrp)->ac6x_conn;
-				}
-				icmp->icmp_v6src = ac6->ac6_laddr;
-				(void) icmp_build_hdrs(icmp);
+				mutex_exit(&icmp->icmp_recv_lock);
+			} else {
+				ASSERT(error == EOPNOTSUPP);
+				icmp_queue_fallback(icmp, mp);
 			}
 		}
-		mp1 = mp1->b_cont;
+	} else {
+		putnext(connp->conn_rq, mp);
 	}
-	icmp->icmp_pending_op = -1;
-	rw_exit(&icmp->icmp_rwlock);
-	/*
-	 * Look for one or more appended ACK message added by
-	 * icmp_connect or icmp_disconnect.
-	 * If none found just send up the T_BIND_ACK.
-	 * icmp_connect has appended a T_OK_ACK and a
-	 * T_CONN_CON.
-	 * icmp_disconnect has appended a T_OK_ACK.
-	 */
-	if (mp1 != NULL) {
-		if (mp->b_cont == mp1)
-			mp->b_cont = NULL;
-		else {
-			ASSERT(mp->b_cont->b_cont == mp1);
-			mp->b_cont->b_cont = NULL;
-		}
-		freemsg(mp);
-		mp = mp1;
-		while (mp != NULL) {
-			mp1 = mp->b_cont;
-			mp->b_cont = NULL;
-			putnext(connp->conn_rq, mp);
-			mp = mp1;
-		}
-		return;
-	}
-	freemsg(mp->b_cont);
-	mp->b_cont = NULL;
-	putnext(connp->conn_rq, mp);
-}
-
-static void
-icmp_bind_error(conn_t *connp, mblk_t *mp)
-{
-	icmp_t	*icmp = connp->conn_icmp;
-	struct T_error_ack *tea;
-
-	tea = (struct T_error_ack *)mp->b_rptr;
-	/*
-	 * If our O_T_BIND_REQ/T_BIND_REQ fails,
-	 * clear out the source address before
-	 * passing the message upstream.
-	 * If this was caused by a T_CONN_REQ
-	 * revert back to bound state.
-	 */
-	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
-	if (icmp->icmp_state == TS_UNBND) {
-		/*
-		 * TPI has not yet bound - bind sent by icmp_bind_proto.
-		 */
-		freemsg(mp);
-		rw_exit(&icmp->icmp_rwlock);
-		return;
-	}
-	ASSERT(icmp->icmp_pending_op != -1);
-	tea->ERROR_prim = icmp->icmp_pending_op;
-	icmp->icmp_pending_op = -1;
-
-	switch (tea->ERROR_prim) {
-	case T_CONN_REQ:
-		ASSERT(icmp->icmp_state == TS_DATA_XFER);
-		/* Connect failed */
-		/* Revert back to the bound source */
-		icmp->icmp_v6src = icmp->icmp_bound_v6src;
-		icmp->icmp_state = TS_IDLE;
-		if (icmp->icmp_family == AF_INET6)
-			(void) icmp_build_hdrs(icmp);
-		break;
-
-	case T_DISCON_REQ:
-	case T_BIND_REQ:
-	case O_T_BIND_REQ:
-		V6_SET_ZERO(icmp->icmp_v6src);
-		V6_SET_ZERO(icmp->icmp_bound_v6src);
-		icmp->icmp_state = TS_UNBND;
-		if (icmp->icmp_family == AF_INET6)
-			(void) icmp_build_hdrs(icmp);
-		break;
-	default:
-		break;
-	}
-	rw_exit(&icmp->icmp_rwlock);
-	putnext(connp->conn_rq, mp);
+	ASSERT(MUTEX_NOT_HELD(&icmp->icmp_recv_lock));
 }
 
 /*
@@ -4121,7 +4132,8 @@ icmp_status_report(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr)
 
 			(void) mi_mpprintf(mp, MI_COL_PTRFMT_STR "%s %s %s",
 			    (void *)icmp,
-			    inet_ntop(AF_INET6, &icmp->icmp_v6dst, faddrbuf,
+			    inet_ntop(AF_INET6, &icmp->icmp_v6dst.sin6_addr,
+			    faddrbuf,
 			    sizeof (faddrbuf)),
 			    inet_ntop(AF_INET6, &icmp->icmp_v6src, laddrbuf,
 			    sizeof (laddrbuf)),
@@ -4152,32 +4164,26 @@ icmp_ud_err(queue_t *q, mblk_t *mp, t_scalar_t err)
 	freemsg(mp);
 }
 
-/*
- * This routine is called by icmp_wput to handle T_UNBIND_REQ messages.
- * After some error checking, the message is passed downstream to ip.
- */
-static void
-icmp_unbind(queue_t *q, mblk_t *mp)
+
+static int
+rawip_do_unbind(conn_t *connp)
 {
-	icmp_t	*icmp = Q_TO_ICMP(q);
+	icmp_t *icmp = connp->conn_icmp;
 
 	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
 	/* If a bind has not been done, we can't unbind. */
 	if (icmp->icmp_state == TS_UNBND || icmp->icmp_pending_op != -1) {
 		rw_exit(&icmp->icmp_rwlock);
-		icmp_err_ack(q, mp, TOUTSTATE, 0);
-		return;
+		return (-TOUTSTATE);
 	}
 	icmp->icmp_pending_op = T_UNBIND_REQ;
 	rw_exit(&icmp->icmp_rwlock);
 
 	/*
-	 * Pass the unbind to IP; T_UNBIND_REQ is larger than T_OK_ACK
-	 * and therefore ip_unbind must never return NULL.
+	 * Call ip to unbind
 	 */
-	mp = ip_unbind(q, mp);
-	ASSERT(mp != NULL);
-	ASSERT(((struct T_ok_ack *)mp->b_rptr)->PRIM_type == T_OK_ACK);
+
+	ip_unbind(connp);
 
 	/*
 	 * Once we're unbound from IP, the pending operation may be cleared
@@ -4191,17 +4197,54 @@ icmp_unbind(queue_t *q, mblk_t *mp)
 	if (icmp->icmp_family == AF_INET6)
 		(void) icmp_build_hdrs(icmp);
 	rw_exit(&icmp->icmp_rwlock);
+	return (0);
+}
 
+/*
+ * This routine is called by icmp_wput to handle T_UNBIND_REQ messages.
+ * After some error checking, the message is passed downstream to ip.
+ */
+static void
+icmp_tpi_unbind(queue_t *q, mblk_t *mp)
+{
+	conn_t	*connp = Q_TO_CONN(q);
+	int	error;
+
+	ASSERT(mp->b_cont == NULL);
+	error = rawip_do_unbind(connp);
+	if (error) {
+		if (error < 0) {
+			icmp_err_ack(q, mp, -error, 0);
+		} else {
+			icmp_err_ack(q, mp, 0, error);
+		}
+		return;
+	}
+
+	/*
+	 * Convert mp into a T_OK_ACK
+	 */
+
+	mp = mi_tpi_ok_ack_alloc(mp);
+
+	/*
+	 * should not happen in practice... T_OK_ACK is smaller than the
+	 * original message.
+	 */
+	ASSERT(mp != NULL);
+	ASSERT(((struct T_ok_ack *)mp->b_rptr)->PRIM_type == T_OK_ACK);
 	qreply(q, mp);
 }
+
 
 /*
  * Process IPv4 packets that already include an IP header.
  * Used when IP_HDRINCL has been set (implicit for IPPROTO_RAW and
  * IPPROTO_IGMP).
  */
-static void
-icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp, ip4_pkt_t *pktinfop)
+static int
+icmp_wput_hdrincl(queue_t *q, conn_t *connp, mblk_t *mp, icmp_t *icmp,
+    ip4_pkt_t *pktinfop)
 {
 	icmp_stack_t *is = icmp->icmp_is;
 	ipha_t	*ipha;
@@ -4210,7 +4253,6 @@ icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp, ip4_pkt_t *pktinfop)
 	mblk_t	*mp1;
 	uint_t	pkt_len;
 	ip_opt_info_t optinfo;
-	conn_t	*connp = icmp->icmp_connp;
 
 	optinfo.ip_opt_flags = 0;
 	optinfo.ip_opt_ill_index = 0;
@@ -4221,7 +4263,7 @@ icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp, ip4_pkt_t *pktinfop)
 			ASSERT(icmp != NULL);
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 			freemsg(mp);
-			return;
+			return (0);
 		}
 		ipha = (ipha_t *)mp->b_rptr;
 	}
@@ -4266,7 +4308,7 @@ icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp, ip4_pkt_t *pktinfop)
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
 				freemsg(mp);
-				return;
+				return (0);
 			}
 			ipha = (ipha_t *)mp->b_rptr;
 		}
@@ -4278,13 +4320,11 @@ icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp, ip4_pkt_t *pktinfop)
 		pkt_len = ntohs(ipha->ipha_length)
 		    + icmp->icmp_ip_snd_options_len;
 		if (pkt_len > IP_MAXPACKET) {
-			icmp_ud_err(q, mp, EMSGSIZE);
-			return;
+			return (EMSGSIZE);
 		}
 		if (!(mp1 = allocb(ip_hdr_length + is->is_wroff_extra +
 		    tp_hdr_len, BPRI_LO))) {
-			icmp_ud_err(q, mp, ENOMEM);
-			return;
+			return (ENOMEM);
 		}
 		mp1->b_rptr += is->is_wroff_extra;
 		mp1->b_wptr = mp1->b_rptr + ip_hdr_length;
@@ -4329,10 +4369,11 @@ icmp_wput_hdrincl(queue_t *q, mblk_t *mp, icmp_t *icmp, ip4_pkt_t *pktinfop)
 
 	mblk_setcred(mp, connp->conn_cred);
 	ip_output_options(connp, mp, q, IP_WPUT, &optinfo);
+	return (0);
 }
 
-static boolean_t
-icmp_update_label(queue_t *q, icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
+static int
+icmp_update_label(icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
 {
 	int err;
 	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
@@ -4351,13 +4392,12 @@ icmp_update_label(queue_t *q, icmp_t *icmp, mblk_t *mp, ipaddr_t dst)
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 		DTRACE_PROBE4(
 		    tx__ip__log__drop__updatelabel__icmp,
-		    char *, "queue(1) failed to update options(2) on mp(3)",
-		    queue_t *, q, char *, opt_storage, mblk_t *, mp);
-		icmp_ud_err(q, mp, err);
-		return (B_FALSE);
+		    char *, "icmp(1) failed to update options(2) on mp(3)",
+		    icmp_t *, icmp, char *, opt_storage, mblk_t *, mp);
+		return (err);
 	}
 	IN6_IPADDR_TO_V4MAPPED(dst, &icmp->icmp_v6lastdst);
-	return (B_TRUE);
+	return (0);
 }
 
 /*
@@ -4371,7 +4411,6 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	uchar_t	*rptr = mp->b_rptr;
 	ipha_t	*ipha;
 	mblk_t	*mp1;
-	int	ip_hdr_length;
 #define	tudr ((struct T_unitdata_req *)rptr)
 	size_t	ip_len;
 	conn_t	*connp = Q_TO_CONN(q);
@@ -4382,7 +4421,12 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	ipaddr_t	v4dst;
 	ip4_pkt_t	pktinfo;
 	ip4_pkt_t	*pktinfop = &pktinfo;
-	ip_opt_info_t	optinfo;
+	ip6_pkt_t	ipp_s;  /* For ancillary data options */
+	ip6_pkt_t	*ipp = &ipp_s;
+	int error;
+
+	ipp->ipp_fields = 0;
+	ipp->ipp_sticky_ignored = 0;
 
 	switch (mp->b_datap->db_type) {
 	case M_DATA:
@@ -4406,11 +4450,17 @@ icmp_wput(queue_t *q, mblk_t *mp)
 			if (is_system_labeled() &&
 			    (!IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6lastdst) ||
 			    V4_PART_OF_V6(icmp->icmp_v6lastdst) !=
-			    ipha->ipha_dst) &&
-			    !icmp_update_label(q, icmp, mp, ipha->ipha_dst)) {
-				return;
+			    ipha->ipha_dst)) {
+				error = icmp_update_label(icmp, mp,
+				    ipha->ipha_dst);
+				if (error != 0) {
+					icmp_ud_err(q, mp, error);
+					return;
+				}
 			}
-			icmp_wput_hdrincl(q, mp, icmp, NULL);
+			error = icmp_wput_hdrincl(q, connp, mp, icmp, NULL);
+			if (error != 0)
+				icmp_ud_err(q, mp, error);
 			return;
 		}
 		freemsg(mp);
@@ -4432,14 +4482,6 @@ icmp_wput(queue_t *q, mblk_t *mp)
 
 	/* Handle T_UNITDATA_REQ messages here. */
 
-
-
-	if (icmp->icmp_state == TS_UNBND) {
-		/* If a port has not been bound to the stream, fail. */
-		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
-		icmp_ud_err(q, mp, EPROTO);
-		return;
-	}
 	mp1 = mp->b_cont;
 	if (mp1 == NULL) {
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
@@ -4475,8 +4517,22 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		 * Destination is a native IPv6 address.
 		 * Send out an IPv6 format packet.
 		 */
-		icmp_wput_ipv6(q, mp, sin6, tudr->OPT_length);
-		return;
+		if (tudr->OPT_length != 0) {
+			int error;
+
+			error = 0;
+			if (icmp_unitdata_opt_process(q, mp, &error,
+			    (void *)ipp) < 0) {
+				/* failure */
+				BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+				icmp_ud_err(q, mp, error);
+				return;
+			}
+			ASSERT(error == 0);
+		}
+
+		error = raw_ip_send_data_v6(q, connp, mp1, sin6, ipp);
+		goto done;
 
 	case AF_INET:
 		sin = (sin_t *)&rptr[tudr->DEST_offset];
@@ -4497,9 +4553,6 @@ icmp_wput(queue_t *q, mblk_t *mp)
 
 	pktinfop->ip4_ill_index = 0;
 	pktinfop->ip4_addr = INADDR_ANY;
-	optinfo.ip_opt_flags = 0;
-	optinfo.ip_opt_ill_index = 0;
-
 
 	/*
 	 * If options passed in, feed it for verification and handling
@@ -4522,7 +4575,48 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		 * OPT_length/offset now potentially modified
 		 * and contain option setting results
 		 */
+	}
 
+	error = raw_ip_send_data_v4(q, connp, mp1, v4dst, pktinfop);
+done:
+	if (error != 0) {
+		icmp_ud_err(q, mp, error);
+		return;
+	} else {
+		mp->b_cont = NULL;
+		freeb(mp);
+	}
+}
+
+
+/* ARGSUSED */
+static void
+icmp_wput_fallback(queue_t *q, mblk_t *mp)
+{
+#ifdef DEBUG
+	cmn_err(CE_CONT, "icmp_wput_fallback: Message during fallback \n");
+#endif
+	freemsg(mp);
+}
+
+static int
+raw_ip_send_data_v4(queue_t *q, conn_t *connp, mblk_t *mp, ipaddr_t v4dst,
+    ip4_pkt_t *pktinfop)
+{
+	ipha_t	*ipha;
+	size_t	ip_len;
+	icmp_t	*icmp = connp->conn_icmp;
+	icmp_stack_t *is = icmp->icmp_is;
+	int	ip_hdr_length;
+	ip_opt_info_t	optinfo;
+
+	optinfo.ip_opt_flags = 0;
+	optinfo.ip_opt_ill_index = 0;
+
+	if (icmp->icmp_state == TS_UNBND) {
+		/* If a port has not been bound to the stream, fail. */
+		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+		return (EPROTO);
 	}
 
 	if (v4dst == INADDR_ANY)
@@ -4531,35 +4625,34 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	/* Check if our saved options are valid; update if not */
 	if (is_system_labeled() &&
 	    (!IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6lastdst) ||
-	    V4_PART_OF_V6(icmp->icmp_v6lastdst) != v4dst) &&
-	    !icmp_update_label(q, icmp, mp, v4dst)) {
-		return;
+	    V4_PART_OF_V6(icmp->icmp_v6lastdst) != v4dst)) {
+		int error = icmp_update_label(icmp, mp, v4dst);
+
+		if (error != 0)
+			return (error);
 	}
 
 	/* Protocol 255 contains full IP headers */
-	if (icmp->icmp_hdrincl) {
-		freeb(mp);
-		icmp_wput_hdrincl(q, mp1, icmp, pktinfop);
-		return;
-	}
-
+	if (icmp->icmp_hdrincl)
+		return (icmp_wput_hdrincl(q, connp, mp, icmp, pktinfop));
 
 	/* Add an IP header */
 	ip_hdr_length = IP_SIMPLE_HDR_LENGTH + icmp->icmp_ip_snd_options_len;
-	ipha = (ipha_t *)&mp1->b_rptr[-ip_hdr_length];
-	if ((uchar_t *)ipha < mp1->b_datap->db_base ||
-	    mp1->b_datap->db_ref != 1 ||
+	ipha = (ipha_t *)&mp->b_rptr[-ip_hdr_length];
+	if ((uchar_t *)ipha < mp->b_datap->db_base ||
+	    mp->b_datap->db_ref != 1 ||
 	    !OK_32PTR(ipha)) {
+		mblk_t	*mp1;
 		if (!(mp1 = allocb(ip_hdr_length + is->is_wroff_extra,
 		    BPRI_LO))) {
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
-			icmp_ud_err(q, mp, ENOMEM);
-			return;
+			return (ENOMEM);
 		}
-		mp1->b_cont = mp->b_cont;
+		mp1->b_cont = mp;
 		ipha = (ipha_t *)mp1->b_datap->db_lim;
 		mp1->b_wptr = (uchar_t *)ipha;
 		ipha = (ipha_t *)((uchar_t *)ipha - ip_hdr_length);
+		mp = mp1;
 	}
 #ifdef	_BIG_ENDIAN
 	/* Set version, header length, and tos */
@@ -4604,11 +4697,11 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	ipha->ipha_ident = IP_HDR_INCLUDED;
 
 	/* Finish common formatting of the packet. */
-	mp1->b_rptr = (uchar_t *)ipha;
+	mp->b_rptr = (uchar_t *)ipha;
 
-	ip_len = mp1->b_wptr - (uchar_t *)ipha;
-	if (mp1->b_cont != NULL)
-		ip_len += msgdsize(mp1->b_cont);
+	ip_len = mp->b_wptr - (uchar_t *)ipha;
+	if (mp->b_cont != NULL)
+		ip_len += msgdsize(mp->b_cont);
 
 	/*
 	 * Set the length into the IP header.
@@ -4618,13 +4711,11 @@ icmp_wput(queue_t *q, mblk_t *mp)
 	 */
 	if (ip_len > IP_MAXPACKET) {
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
-		icmp_ud_err(q, mp, EMSGSIZE);
-		return;
+		return (EMSGSIZE);
 	}
 	ipha->ipha_length = htons((uint16_t)ip_len);
 	/*
-	 * Copy in the destination address from the T_UNITDATA
-	 * request
+	 * Copy in the destination address request
 	 */
 	ipha->ipha_dst = v4dst;
 
@@ -4645,16 +4736,14 @@ icmp_wput(queue_t *q, mblk_t *mp)
 		(void) ip_massage_options(ipha, is->is_netstack);
 	}
 
-	freeb(mp);
 	BUMP_MIB(&is->is_rawip_mib, rawipOutDatagrams);
-	mblk_setcred(mp1, connp->conn_cred);
-	ip_output_options(Q_TO_CONN(q), mp1, q, IP_WPUT, &optinfo);
-#undef	ipha
-#undef tudr
+	mblk_setcred(mp, connp->conn_cred);
+	ip_output_options(connp, mp, q, IP_WPUT, &optinfo);
+	return (0);
 }
 
-static boolean_t
-icmp_update_label_v6(queue_t *wq, icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
+static int
+icmp_update_label_v6(icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
 {
 	int err;
 	uchar_t opt_storage[TSOL_MAX_IPV6_OPTION];
@@ -4672,33 +4761,30 @@ icmp_update_label_v6(queue_t *wq, icmp_t *icmp, mblk_t *mp, in6_addr_t *dst)
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
 		DTRACE_PROBE4(
 		    tx__ip__log__drop__updatelabel__icmp6,
-		    char *, "queue(1) failed to update options(2) on mp(3)",
-		    queue_t *, wq, char *, opt_storage, mblk_t *, mp);
-		icmp_ud_err(wq, mp, err);
-		return (B_FALSE);
+		    char *, "icmp(1) failed to update options(2) on mp(3)",
+		    icmp_t *, icmp, char *, opt_storage, mblk_t *, mp);
+		return (err);
 	}
 
 	icmp->icmp_v6lastdst = *dst;
-	return (B_TRUE);
+	return (0);
 }
 
 /*
- * icmp_wput_ipv6():
+ * raw_ip_send_data_v6():
  * Assumes that icmp_wput did some sanity checking on the destination
  * address, but that the label may not yet be correct.
  */
-void
-icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
+static int
+raw_ip_send_data_v6(queue_t *q, conn_t *connp, mblk_t *mp, sin6_t *sin6,
+    ip6_pkt_t *ipp)
 {
 	ip6_t			*ip6h;
-	ip6i_t			*ip6i;	/* mp1->b_rptr even if no ip6i_t */
-	mblk_t			*mp1;
+	ip6i_t			*ip6i;	/* mp->b_rptr even if no ip6i_t */
 	int			ip_hdr_len = IPV6_HDR_LEN;
 	size_t			ip_len;
-	icmp_t			*icmp = Q_TO_ICMP(q);
+	icmp_t			*icmp = connp->conn_icmp;
 	icmp_stack_t		*is = icmp->icmp_is;
-	ip6_pkt_t		ipp_s;	/* For ancillary data options */
-	ip6_pkt_t		*ipp = &ipp_s;
 	ip6_pkt_t		*tipp;
 	uint32_t		csum = 0;
 	uint_t			ignore = 0;
@@ -4716,30 +4802,10 @@ icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
 	 */
 	if (IN6_IS_ADDR_V4MAPPED(&icmp->icmp_v6src)) {
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
-		icmp_ud_err(q, mp, EADDRNOTAVAIL);
-		return;
+		return (EADDRNOTAVAIL);
 	}
 
-	ipp->ipp_fields = 0;
-	ipp->ipp_sticky_ignored = 0;
-
-	/*
-	 * If TPI options passed in, feed it for verification and handling
-	 */
-	if (tudr_optlen != 0) {
-		int error;
-
-		if (icmp_unitdata_opt_process(q, mp, &error,
-		    (void *)ipp) < 0) {
-			/* failure */
-			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
-			icmp_ud_err(q, mp, error);
-			return;
-		}
-		ignore = ipp->ipp_sticky_ignored;
-		ASSERT(error == 0);
-	}
-
+	ignore = ipp->ipp_sticky_ignored;
 	if (sin6->sin6_scope_id != 0 &&
 	    IN6_IS_ADDR_LINKSCOPE(&sin6->sin6_addr)) {
 		/*
@@ -4763,9 +4829,12 @@ icmp_wput_ipv6(queue_t *q, mblk_t *mp, sin6_t *sin6, t_scalar_t tudr_optlen)
 	 * avoid blowing up our stack here.
 	 */
 	if (is_system_labeled() &&
-	    !IN6_ARE_ADDR_EQUAL(&icmp->icmp_v6lastdst, &ip6_dst) &&
-	    !icmp_update_label_v6(q, icmp, mp, &ip6_dst)) {
-		return;
+	    !IN6_ARE_ADDR_EQUAL(&icmp->icmp_v6lastdst, &ip6_dst)) {
+		int error = 0;
+
+		error = icmp_update_label_v6(icmp, mp, &ip6_dst);
+		if (error != 0)
+			return (error);
 	}
 
 	/*
@@ -4933,28 +5002,30 @@ no_options:
 		ip_hdr_len += sizeof (ip6i_t);
 
 	/* check/fix buffer config, setup pointers into it */
-	mp1 = mp->b_cont;
-	ip6h = (ip6_t *)&mp1->b_rptr[-ip_hdr_len];
-	if ((mp1->b_datap->db_ref != 1) ||
-	    ((unsigned char *)ip6h < mp1->b_datap->db_base) ||
+	ip6h = (ip6_t *)&mp->b_rptr[-ip_hdr_len];
+	if ((mp->b_datap->db_ref != 1) ||
+	    ((unsigned char *)ip6h < mp->b_datap->db_base) ||
 	    !OK_32PTR(ip6h)) {
+		mblk_t	*mp1;
+
 		/* Try to get everything in a single mblk next time */
 		if (ip_hdr_len > icmp->icmp_max_hdr_len) {
 			icmp->icmp_max_hdr_len = ip_hdr_len;
-			(void) mi_set_sth_wroff(RD(q),
+
+			(void) proto_set_tx_wroff(q == NULL ? NULL:RD(q), connp,
 			    icmp->icmp_max_hdr_len + is->is_wroff_extra);
 		}
 		mp1 = allocb(ip_hdr_len + is->is_wroff_extra, BPRI_LO);
 		if (!mp1) {
 			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
-			icmp_ud_err(q, mp, ENOMEM);
-			return;
+			return (ENOMEM);
 		}
-		mp1->b_cont = mp->b_cont;
+		mp1->b_cont = mp;
 		mp1->b_wptr = mp1->b_datap->db_lim;
 		ip6h = (ip6_t *)(mp1->b_wptr - ip_hdr_len);
+		mp = mp1;
 	}
-	mp1->b_rptr = (unsigned char *)ip6h;
+	mp->b_rptr = (unsigned char *)ip6h;
 	ip6i = (ip6i_t *)ip6h;
 
 #define	ANCIL_OR_STICKY_PTR(f) ((is_sticky & f) ? &icmp->icmp_sticky_ipp : ipp)
@@ -5140,27 +5211,25 @@ no_options:
 		 * We know that all extension headers will be in the same mblk
 		 * as the IPv6 header.
 		 */
-		rth = ip_find_rthdr_v6(ip6h, mp1->b_wptr);
+		rth = ip_find_rthdr_v6(ip6h, mp->b_wptr);
 		if (rth != NULL && rth->ip6r_segleft != 0) {
 			if (rth->ip6r_type != IPV6_RTHDR_TYPE_0) {
 				/*
 				 * Drop packet - only support Type 0 routing.
 				 * Notify the application as well.
 				 */
-				icmp_ud_err(q, mp, EPROTO);
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
-				return;
+				return (EPROTO);
 			}
 			/*
 			 * rth->ip6r_len is twice the number of
 			 * addresses in the header
 			 */
 			if (rth->ip6r_len & 0x1) {
-				icmp_ud_err(q, mp, EPROTO);
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
-				return;
+				return (EPROTO);
 			}
 			/*
 			 * Shuffle the routing header and ip6_dst
@@ -5176,17 +5245,16 @@ no_options:
 			 * for subsequent hops.
 			 */
 			if (IN6_IS_ADDR_V4MAPPED(&ip6h->ip6_dst)) {
-				icmp_ud_err(q, mp, EADDRNOTAVAIL);
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
-				return;
+				return (EADDRNOTAVAIL);
 			}
 		}
 	}
 
-	ip_len = mp1->b_wptr - (uchar_t *)ip6h - IPV6_HDR_LEN;
-	if (mp1->b_cont != NULL)
-		ip_len += msgdsize(mp1->b_cont);
+	ip_len = mp->b_wptr - (uchar_t *)ip6h - IPV6_HDR_LEN;
+	if (mp->b_cont != NULL)
+		ip_len += msgdsize(mp->b_cont);
 
 	/*
 	 * Set the length into the IP header.
@@ -5196,11 +5264,10 @@ no_options:
 	 */
 	if (ip_len > IP_MAXPACKET) {
 		BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
-		icmp_ud_err(q, mp, EMSGSIZE);
-		return;
+		return (EMSGSIZE);
 	}
 	if (icmp->icmp_proto == IPPROTO_ICMPV6 || icmp->icmp_raw_checksum) {
-		uint_t	cksum_off;	/* From ip6i == mp1->b_rptr */
+		uint_t	cksum_off;	/* From ip6i == mp->b_rptr */
 		uint16_t *cksum_ptr;
 		uint_t	ext_hdrs_len;
 
@@ -5216,14 +5283,14 @@ no_options:
 		 * Note: ICMPv6 must always checksum the packet.
 		 */
 		cksum_off = ip_hdr_len + icmp->icmp_checksum_off;
-		if (cksum_off + sizeof (uint16_t) > mp1->b_wptr - mp1->b_rptr) {
-			if (!pullupmsg(mp1, cksum_off + sizeof (uint16_t))) {
+		if (cksum_off + sizeof (uint16_t) > mp->b_wptr - mp->b_rptr) {
+			if (!pullupmsg(mp, cksum_off + sizeof (uint16_t))) {
 				BUMP_MIB(&is->is_rawip_mib,
 				    rawipOutErrors);
 				freemsg(mp);
-				return;
+				return (0);
 			}
-			ip6i = (ip6i_t *)mp1->b_rptr;
+			ip6i = (ip6i_t *)mp->b_rptr;
 			if (ip6i->ip6i_nxt == IPPROTO_RAW)
 				ip6h = (ip6_t *)&ip6i[1];
 			else
@@ -5244,11 +5311,10 @@ no_options:
 #endif
 	ip6h->ip6_plen = (uint16_t)ip_len;
 
-	freeb(mp);
-
 	/* We're done. Pass the packet to IP */
 	BUMP_MIB(&is->is_rawip_mib, rawipOutDatagrams);
-	ip_output_v6(icmp->icmp_connp, mp1, q, IP_WPUT);
+	ip_output_v6(icmp->icmp_connp, mp, q, IP_WPUT);
+	return (0);
 }
 
 static void
@@ -5281,10 +5347,10 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 			return;
 		case O_T_BIND_REQ:
 		case T_BIND_REQ:
-			icmp_bind(q, mp);
+			icmp_tpi_bind(q, mp);
 			return;
 		case T_CONN_REQ:
-			icmp_connect(q, mp);
+			icmp_tpi_connect(q, mp);
 			return;
 		case T_CAPABILITY_REQ:
 			icmp_capability_req(q, mp);
@@ -5301,7 +5367,7 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 			icmp_ud_err(q, mp, EADDRNOTAVAIL);
 			return;
 		case T_UNBIND_REQ:
-			icmp_unbind(q, mp);
+			icmp_tpi_unbind(q, mp);
 			return;
 
 		case T_SVR4_OPTMGMT_REQ:
@@ -5319,7 +5385,7 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 			return;
 
 		case T_DISCON_REQ:
-			icmp_disconnect(q, mp);
+			icmp_tpi_disconnect(q, mp);
 			return;
 
 		/* The following TPI message is not supported by icmp. */
@@ -5375,6 +5441,15 @@ icmp_wput_other(queue_t *q, mblk_t *mp)
 				return;
 			}
 			break;
+		case _SIOCSOCKFALLBACK:
+			/*
+			 * socket is falling back to be a
+			 * streams socket. Nothing  to do
+			 */
+			iocp->ioc_count = 0;
+			iocp->ioc_rval = 0;
+			qreply(q, mp);
+			return;
 		default:
 			break;
 		}
@@ -5398,10 +5473,8 @@ icmp_wput_iocdata(queue_t *q, mblk_t *mp)
 	mblk_t	*mp1;
 	STRUCT_HANDLE(strbuf, sb);
 	icmp_t	*icmp;
-	in6_addr_t	v6addr;
-	ipaddr_t	v4addr;
-	uint32_t	flowinfo = 0;
-	int		addrlen;
+	uint_t	addrlen;
+	uint_t	error;
 
 	/* Make sure it is one of ours. */
 	switch (((struct iocblk *)mp->b_rptr)->ioc_cmd) {
@@ -5458,81 +5531,34 @@ icmp_wput_iocdata(queue_t *q, mblk_t *mp)
 		mi_copy_done(q, mp, EINVAL);
 		return;
 	}
+
+	mp1 = mi_copyout_alloc(q, mp, STRUCT_FGETP(sb, buf), addrlen, B_TRUE);
+
+	if (mp1 == NULL)
+		return;
+
+	rw_enter(&icmp->icmp_rwlock, RW_READER);
 	switch (((struct iocblk *)mp->b_rptr)->ioc_cmd) {
 	case TI_GETMYNAME:
-		if (icmp->icmp_family == AF_INET) {
-			ASSERT(icmp->icmp_ipversion == IPV4_VERSION);
-			if (!IN6_IS_ADDR_V4MAPPED_ANY(&icmp->icmp_v6src) &&
-			    !IN6_IS_ADDR_UNSPECIFIED(&icmp->icmp_v6src)) {
-				v4addr = V4_PART_OF_V6(icmp->icmp_v6src);
-			} else {
-				/*
-				 * INADDR_ANY
-				 * icmp_v6src is not set, we might be bound to
-				 * broadcast/multicast. Use icmp_bound_v6src as
-				 * local address instead (that could
-				 * also still be INADDR_ANY)
-				 */
-				v4addr = V4_PART_OF_V6(icmp->icmp_bound_v6src);
-			}
-		} else {
-			/* icmp->icmp_family == AF_INET6 */
-			if (!IN6_IS_ADDR_UNSPECIFIED(&icmp->icmp_v6src)) {
-				v6addr = icmp->icmp_v6src;
-			} else {
-				/*
-				 * UNSPECIFIED
-				 * icmp_v6src is not set, we might be bound to
-				 * broadcast/multicast. Use icmp_bound_v6src as
-				 * local address instead (that could
-				 * also still be UNSPECIFIED)
-				 */
-				v6addr = icmp->icmp_bound_v6src;
-			}
-		}
+		error = rawip_do_getsockname(icmp, (void *)mp1->b_rptr,
+		    &addrlen);
 		break;
 	case TI_GETPEERNAME:
-		if (icmp->icmp_family == AF_INET) {
-			ASSERT(icmp->icmp_ipversion == IPV4_VERSION);
-			v4addr = V4_PART_OF_V6(icmp->icmp_v6dst);
-		} else {
-			/* icmp->icmp_family == AF_INET6) */
-			v6addr = icmp->icmp_v6dst;
-			flowinfo = icmp->icmp_flowinfo;
-		}
+		error = rawip_do_getpeername(icmp, (void *)mp1->b_rptr,
+		    &addrlen);
 		break;
-	default:
-		mi_copy_done(q, mp, EPROTO);
-		return;
 	}
-	mp1 = mi_copyout_alloc(q, mp, STRUCT_FGETP(sb, buf), addrlen, B_TRUE);
-	if (!mp1)
-		return;
+	rw_exit(&icmp->icmp_rwlock);
 
-	if (icmp->icmp_family == AF_INET) {
-		sin_t *sin;
-
-		STRUCT_FSET(sb, len, (int)sizeof (sin_t));
-		sin = (sin_t *)mp1->b_rptr;
-		mp1->b_wptr = (uchar_t *)&sin[1];
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		sin->sin_addr.s_addr = v4addr;
+	if (error != 0) {
+		mi_copy_done(q, mp, error);
 	} else {
-		/* icmp->icmp_family == AF_INET6 */
-		sin6_t *sin6;
+		mp1->b_wptr += addrlen;
+		STRUCT_FSET(sb, len, addrlen);
 
-		ASSERT(icmp->icmp_family == AF_INET6);
-		STRUCT_FSET(sb, len, (int)sizeof (sin6_t));
-		sin6 = (sin6_t *)mp1->b_rptr;
-		mp1->b_wptr = (uchar_t *)&sin6[1];
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_flowinfo = flowinfo;
-		sin6->sin6_addr = v6addr;
+		/* Copy out the address */
+		mi_copyout(q, mp);
 	}
-	/* Copy out the address */
-	mi_copyout(q, mp);
 }
 
 static int
@@ -5565,7 +5591,7 @@ icmp_unitdata_opt_process(queue_t *q, mblk_t *mp, int *errorp,
 }
 
 void
-icmp_ddi_init(void)
+icmp_ddi_g_init(void)
 {
 	icmp_max_optsize = optcom_max_optsize(icmp_opt_obj.odb_opt_des_arr,
 	    icmp_opt_obj.odb_opt_arr_cnt);
@@ -5579,10 +5605,12 @@ icmp_ddi_init(void)
 }
 
 void
-icmp_ddi_destroy(void)
+icmp_ddi_g_destroy(void)
 {
 	netstack_unregister(NS_ICMP);
 }
+
+#define	INET_NAME	"ip"
 
 /*
  * Initialize the ICMP stack instance.
@@ -5592,6 +5620,8 @@ rawip_stack_init(netstackid_t stackid, netstack_t *ns)
 {
 	icmp_stack_t	*is;
 	icmpparam_t	*pa;
+	int		error = 0;
+	major_t		major;
 
 	is = (icmp_stack_t *)kmem_zalloc(sizeof (*is), KM_SLEEP);
 	is->is_netstack = ns;
@@ -5603,6 +5633,10 @@ rawip_stack_init(netstackid_t stackid, netstack_t *ns)
 	(void) icmp_param_register(&is->is_nd,
 	    is->is_param_arr, A_CNT(icmp_param_arr));
 	is->is_ksp = rawip_kstat_init(stackid);
+
+	major = mod_name_to_major(INET_NAME);
+	error = ldi_ident_from_major(major, &is->is_ldi_ident);
+	ASSERT(error == 0);
 	return (is);
 }
 
@@ -5620,6 +5654,7 @@ rawip_stack_fini(netstackid_t stackid, void *arg)
 
 	rawip_kstat_fini(stackid, is->is_ksp);
 	is->is_ksp = NULL;
+	ldi_ident_release(is->is_ldi_ident);
 	kmem_free(is, sizeof (*is));
 }
 
@@ -5691,3 +5726,848 @@ rawip_kstat_update(kstat_t *ksp, int rw)
 	netstack_rele(ns);
 	return (0);
 }
+
+/* ARGSUSED */
+int
+rawip_accept(sock_lower_handle_t lproto_handle,
+    sock_lower_handle_t eproto_handle, sock_upper_handle_t sock_handle,
+    cred_t *cr)
+{
+	return (EOPNOTSUPP);
+}
+
+/* ARGSUSED */
+int
+rawip_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
+    socklen_t len, cred_t *cr)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+	int error;
+
+	/* Binding to a NULL address really means unbind */
+	if (sa == NULL)
+		error = rawip_do_unbind(connp);
+	else
+		error = rawip_do_bind(connp, sa, len);
+
+	if (error < 0) {
+		if (error == -TOUTSTATE)
+			error = EINVAL;
+		else
+			error = proto_tlitosyserr(-error);
+	}
+	return (error);
+}
+
+static int
+rawip_implicit_bind(conn_t *connp)
+{
+	sin6_t sin6addr;
+	sin_t *sin;
+	sin6_t *sin6;
+	socklen_t len;
+	int error;
+
+	if (connp->conn_icmp->icmp_family == AF_INET) {
+		len = sizeof (struct sockaddr_in);
+		sin = (sin_t *)&sin6addr;
+		*sin = sin_null;
+		sin->sin_family = AF_INET;
+		sin->sin_addr.s_addr = INADDR_ANY;
+	} else {
+		ASSERT(connp->conn_icmp->icmp_family == AF_INET6);
+		len = sizeof (sin6_t);
+		sin6 = (sin6_t *)&sin6addr;
+		*sin6 = sin6_null;
+		sin6->sin6_family = AF_INET6;
+		V6_SET_ZERO(sin6->sin6_addr);
+	}
+
+	error = rawip_do_bind(connp, (struct sockaddr *)&sin6addr, len);
+
+	return ((error < 0) ? proto_tlitosyserr(-error) : error);
+}
+
+static int
+rawip_unbind(conn_t *connp)
+{
+	int error;
+
+	error = rawip_do_unbind(connp);
+	if (error < 0) {
+		error = proto_tlitosyserr(-error);
+	}
+	return (error);
+}
+
+/* ARGSUSED */
+int
+rawip_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
+{
+	return (EOPNOTSUPP);
+}
+
+/* ARGSUSED */
+int
+rawip_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
+    socklen_t len, sock_connid_t *id, cred_t *cr)
+{
+	conn_t	*connp = (conn_t *)proto_handle;
+	icmp_t *icmp = connp->conn_icmp;
+	int	error;
+	boolean_t did_bind = B_FALSE;
+
+	if (sa == NULL) {
+		/*
+		 * Disconnect
+		 * Make sure we are connected
+		 */
+		if (icmp->icmp_state != TS_DATA_XFER)
+			return (EINVAL);
+
+		error = icmp_disconnect(connp);
+		return (error);
+	}
+
+	error = proto_verify_ip_addr(icmp->icmp_family, sa, len);
+	if (error != 0)
+		return (error);
+
+	/* do an implicit bind if necessary */
+	if (icmp->icmp_state == TS_UNBND) {
+		error = rawip_implicit_bind(connp);
+		/*
+		 * We could be racing with an actual bind, in which case
+		 * we would see EPROTO. We cross our fingers and try
+		 * to connect.
+		 */
+		if (!(error == 0 || error == EPROTO))
+			return (error);
+		did_bind = B_TRUE;
+	}
+
+	/*
+	 * set SO_DGRAM_ERRIND
+	 */
+	icmp->icmp_dgram_errind = B_TRUE;
+
+	error = rawip_do_connect(connp, sa, len);
+
+	if (error != 0 && did_bind) {
+		int unbind_err;
+
+		unbind_err = rawip_unbind(connp);
+		ASSERT(unbind_err == 0);
+	}
+
+	if (error == 0) {
+		*id = 0;
+		(*connp->conn_upcalls->su_connected)
+		    (connp->conn_upper_handle, 0, NULL, -1);
+	} else if (error < 0) {
+		error = proto_tlitosyserr(-error);
+	}
+	return (error);
+}
+
+/* ARGSUSED */
+void
+rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
+    boolean_t direct_sockfs, so_proto_quiesced_cb_t quiesced_cb)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+	icmp_t	*icmp;
+	struct T_capability_ack tca;
+	struct sockaddr_in6 laddr, faddr;
+	socklen_t laddrlen, faddrlen;
+	short opts;
+	struct stroptions *stropt;
+	mblk_t *stropt_mp;
+	int error;
+
+	icmp = connp->conn_icmp;
+
+	stropt_mp = allocb_wait(sizeof (*stropt), BPRI_HI, STR_NOSIG, NULL);
+
+	/*
+	 * setup the fallback stream that was allocated
+	 */
+	connp->conn_dev = (dev_t)RD(q)->q_ptr;
+	connp->conn_minor_arena = WR(q)->q_ptr;
+
+	RD(q)->q_ptr = WR(q)->q_ptr = connp;
+
+	WR(q)->q_qinfo = &icmpwinit;
+
+	connp->conn_rq = RD(q);
+	connp->conn_wq = WR(q);
+
+	/* Notify stream head about options before sending up data */
+	stropt_mp->b_datap->db_type = M_SETOPTS;
+	stropt_mp->b_wptr += sizeof (*stropt);
+	stropt = (struct stroptions *)stropt_mp->b_rptr;
+	stropt->so_flags = SO_WROFF | SO_HIWAT;
+	stropt->so_wroff =
+	    (ushort_t)(icmp->icmp_max_hdr_len + icmp->icmp_is->is_wroff_extra);
+	stropt->so_hiwat = icmp->icmp_recv_hiwat;
+	putnext(RD(q), stropt_mp);
+
+	/*
+	 * free helper stream
+	 */
+	ip_close_helper_stream(connp);
+
+	/*
+	 * Collect the information needed to sync with the sonode
+	 */
+	icmp_do_capability_ack(icmp, &tca, TC1_INFO);
+
+	laddrlen = faddrlen = sizeof (sin6_t);
+	(void) rawip_getsockname((sock_lower_handle_t)connp,
+	    (struct sockaddr *)&laddr, &laddrlen, NULL);
+	error = rawip_getpeername((sock_lower_handle_t)connp,
+	    (struct sockaddr *)&faddr, &faddrlen, NULL);
+	if (error != 0)
+		faddrlen = 0;
+	opts = 0;
+	if (icmp->icmp_dgram_errind)
+		opts |= SO_DGRAM_ERRIND;
+	if (icmp->icmp_dontroute)
+		opts |= SO_DONTROUTE;
+
+	/*
+	 * Once we grab the drain lock, no data will be send up
+	 * to the socket. So we notify the socket that the endpoint
+	 * is quiescent and it's therefore safe move data from
+	 * the socket to the stream head.
+	 */
+	(*quiesced_cb)(connp->conn_upper_handle, q, &tca,
+	    (struct sockaddr *)&laddr, laddrlen,
+	    (struct sockaddr *)&faddr, faddrlen, opts);
+
+	/*
+	 * push up any packets that were queued in icmp_t
+	 */
+
+	mutex_enter(&icmp->icmp_recv_lock);
+	while (icmp->icmp_fallback_queue_head != NULL) {
+		mblk_t	*mp;
+
+		mp = icmp->icmp_fallback_queue_head;
+		icmp->icmp_fallback_queue_head = mp->b_next;
+		mp->b_next = NULL;
+		mutex_exit(&icmp->icmp_recv_lock);
+		putnext(RD(q), mp);
+		mutex_enter(&icmp->icmp_recv_lock);
+	}
+	icmp->icmp_fallback_queue_tail = icmp->icmp_fallback_queue_head;
+	/*
+	 * No longer a streams less socket
+	 */
+	connp->conn_flags &= ~IPCL_NONSTR;
+	mutex_exit(&icmp->icmp_recv_lock);
+	ASSERT(icmp->icmp_fallback_queue_head == NULL &&
+	    icmp->icmp_fallback_queue_tail == NULL);
+
+	ASSERT(connp->conn_ref >= 1);
+}
+
+/* ARGSUSED */
+sock_lower_handle_t
+rawip_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
+    uint_t *smodep, int *errorp, int flags, cred_t *credp)
+{
+	conn_t *connp;
+
+	if (type != SOCK_RAW || (family != AF_INET && family != AF_INET6)) {
+		*errorp = EPROTONOSUPPORT;
+		return (NULL);
+	}
+
+	connp = icmp_open(family, credp, errorp, flags);
+	if (connp != NULL) {
+		icmp_stack_t *is;
+
+		is = connp->conn_icmp->icmp_is;
+		connp->conn_flags |= IPCL_NONSTR;
+
+		if (connp->conn_icmp->icmp_family == AF_INET6) {
+			/* Build initial header template for transmit */
+			rw_enter(&connp->conn_icmp->icmp_rwlock, RW_WRITER);
+			if ((*errorp =
+			    icmp_build_hdrs(connp->conn_icmp)) != 0) {
+				rw_exit(&connp->conn_icmp->icmp_rwlock);
+				ipcl_conn_destroy(connp);
+				return (NULL);
+			}
+			rw_exit(&connp->conn_icmp->icmp_rwlock);
+		}
+
+		connp->conn_icmp->icmp_recv_hiwat = is->is_recv_hiwat;
+		connp->conn_icmp->icmp_xmit_hiwat = is->is_xmit_hiwat;
+
+		if ((*errorp = ip_create_helper_stream(connp,
+		    is->is_ldi_ident)) != 0) {
+			cmn_err(CE_CONT, "create of IP helper stream failed\n");
+			(void) rawip_do_close(connp);
+			return (NULL);
+		}
+
+		mutex_enter(&connp->conn_lock);
+		connp->conn_state_flags &= ~CONN_INCIPIENT;
+		mutex_exit(&connp->conn_lock);
+		*sock_downcalls = &sock_rawip_downcalls;
+		*smodep = SM_ATOMIC;
+	} else {
+		ASSERT(*errorp != 0);
+	}
+
+	return ((sock_lower_handle_t)connp);
+}
+
+/* ARGSUSED */
+void
+rawip_activate(sock_lower_handle_t proto_handle,
+    sock_upper_handle_t sock_handle, sock_upcalls_t *sock_upcalls, int flags,
+    cred_t *cr)
+{
+	conn_t 			*connp = (conn_t *)proto_handle;
+	icmp_stack_t 		*is = connp->conn_icmp->icmp_is;
+	struct sock_proto_props sopp;
+
+	connp->conn_upcalls = sock_upcalls;
+	connp->conn_upper_handle = sock_handle;
+
+	sopp.sopp_flags = SOCKOPT_WROFF | SOCKOPT_RCVHIWAT | SOCKOPT_RCVLOWAT |
+	    SOCKOPT_MAXBLK | SOCKOPT_MAXPSZ | SOCKOPT_MINPSZ;
+	sopp.sopp_wroff = connp->conn_icmp->icmp_max_hdr_len +
+	    is->is_wroff_extra;
+	sopp.sopp_rxhiwat = is->is_recv_hiwat;
+	sopp.sopp_rxlowat = icmp_mod_info.mi_lowat;
+	sopp.sopp_maxblk = INFPSZ;
+	sopp.sopp_maxpsz = IP_MAXPACKET;
+	sopp.sopp_minpsz = (icmp_mod_info.mi_minpsz == 1) ? 0 :
+	    icmp_mod_info.mi_minpsz;
+
+	(*connp->conn_upcalls->su_set_proto_props)
+	    (connp->conn_upper_handle, &sopp);
+}
+
+static int
+rawip_do_getsockname(icmp_t *icmp, struct sockaddr *sa, uint_t *salenp)
+{
+	sin_t	*sin = (sin_t *)sa;
+	sin6_t	*sin6 = (sin6_t *)sa;
+
+	ASSERT(icmp != NULL);
+	ASSERT(RW_LOCK_HELD(&icmp->icmp_rwlock));
+
+	switch (icmp->icmp_family) {
+	case AF_INET:
+		ASSERT(icmp->icmp_ipversion == IPV4_VERSION);
+		if (*salenp < sizeof (sin_t))
+			return (EINVAL);
+
+		*salenp = sizeof (sin_t);
+		*sin = sin_null;
+		sin->sin_family = AF_INET;
+		if (icmp->icmp_state == TS_UNBND) {
+			break;
+		}
+
+		if (!IN6_IS_ADDR_V4MAPPED_ANY(&icmp->icmp_v6src) &&
+		    !IN6_IS_ADDR_UNSPECIFIED(&icmp->icmp_v6src)) {
+			sin->sin_addr.s_addr = V4_PART_OF_V6(icmp->icmp_v6src);
+		} else {
+			/*
+			 * INADDR_ANY
+			 * icmp_v6src is not set, we might be bound to
+			 * broadcast/multicast. Use icmp_bound_v6src as
+			 * local address instead (that could
+			 * also still be INADDR_ANY)
+			 */
+			sin->sin_addr.s_addr =
+			    V4_PART_OF_V6(icmp->icmp_bound_v6src);
+		}
+		break;
+	case AF_INET6:
+
+		if (*salenp < sizeof (sin6_t))
+			return (EINVAL);
+
+		*salenp = sizeof (sin6_t);
+		*sin6 = sin6_null;
+		sin6->sin6_family = AF_INET6;
+		if (icmp->icmp_state == TS_UNBND) {
+			break;
+		}
+		if (!IN6_IS_ADDR_UNSPECIFIED(&icmp->icmp_v6src)) {
+			sin6->sin6_addr = icmp->icmp_v6src;
+		} else {
+			/*
+			 * UNSPECIFIED
+			 * icmp_v6src is not set, we might be bound to
+			 * broadcast/multicast. Use icmp_bound_v6src as
+			 * local address instead (that could
+			 * also still be UNSPECIFIED)
+			 */
+
+			sin6->sin6_addr = icmp->icmp_bound_v6src;
+		}
+		break;
+	}
+	return (0);
+}
+
+static int
+rawip_do_getpeername(icmp_t *icmp, struct sockaddr *sa, uint_t *salenp)
+{
+	sin_t   *sin = (sin_t *)sa;
+	sin6_t  *sin6 = (sin6_t *)sa;
+
+	ASSERT(icmp != NULL);
+	ASSERT(RW_LOCK_HELD(&icmp->icmp_rwlock));
+
+	if (icmp->icmp_state != TS_DATA_XFER)
+		return (ENOTCONN);
+
+	sa->sa_family = icmp->icmp_family;
+	switch (icmp->icmp_family) {
+	case AF_INET:
+		ASSERT(icmp->icmp_ipversion == IPV4_VERSION);
+
+		if (*salenp < sizeof (sin_t))
+			return (EINVAL);
+
+		*salenp = sizeof (sin_t);
+		*sin = sin_null;
+		sin->sin_family = AF_INET;
+		sin->sin_addr.s_addr =
+		    V4_PART_OF_V6(icmp->icmp_v6dst.sin6_addr);
+		break;
+	case AF_INET6:
+		if (*salenp < sizeof (sin6_t))
+			return (EINVAL);
+
+		*salenp = sizeof (sin6_t);
+		*sin6 = sin6_null;
+		*sin6 = icmp->icmp_v6dst;
+		break;
+	}
+	return (0);
+}
+
+/* ARGSUSED */
+int
+rawip_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *sa,
+    socklen_t *salenp, cred_t *cr)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+	icmp_t  *icmp = connp->conn_icmp;
+	int	error;
+
+	ASSERT(icmp != NULL);
+
+	rw_enter(&icmp->icmp_rwlock, RW_READER);
+
+	error = rawip_do_getpeername(icmp, sa, salenp);
+
+	rw_exit(&icmp->icmp_rwlock);
+
+	return (error);
+}
+
+/* ARGSUSED */
+int
+rawip_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *sa,
+    socklen_t *salenp, cred_t *cr)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+	icmp_t	*icmp = connp->conn_icmp;
+	int	error;
+
+	ASSERT(icmp != NULL);
+	rw_enter(&icmp->icmp_rwlock, RW_READER);
+
+	error = rawip_do_getsockname(icmp, sa, salenp);
+
+	rw_exit(&icmp->icmp_rwlock);
+
+	return (error);
+}
+
+int
+rawip_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
+    const void *optvalp, socklen_t optlen, cred_t *cr)
+{
+	conn_t	*connp = (conn_t *)proto_handle;
+	icmp_t *icmp = connp->conn_icmp;
+	int error;
+
+	error = proto_opt_check(level, option_name, optlen, NULL,
+	    icmp_opt_obj.odb_opt_des_arr,
+	    icmp_opt_obj.odb_opt_arr_cnt,
+	    icmp_opt_obj.odb_topmost_tpiprovider,
+	    B_TRUE, B_FALSE, cr);
+
+	if (error != 0) {
+		/*
+		 * option not recognized
+		 */
+		if (error < 0) {
+			error = proto_tlitosyserr(-error);
+		}
+		return (error);
+	}
+
+	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
+	error = icmp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, level,
+	    option_name, optlen, (uchar_t *)optvalp, (uint_t *)&optlen,
+	    (uchar_t *)optvalp, NULL, cr);
+	rw_exit(&icmp->icmp_rwlock);
+
+	if (error < 0) {
+		/*
+		 * Pass on to ip
+		 */
+		error = ip_set_options(connp, level, option_name, optvalp,
+		    optlen, cr);
+	}
+
+	ASSERT(error >= 0);
+
+	return (error);
+}
+
+int
+rawip_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
+    void *optvalp, socklen_t *optlen, cred_t *cr)
+{
+	int		error;
+	conn_t		*connp = (conn_t *)proto_handle;
+	icmp_t		*icmp = connp->conn_icmp;
+	t_uscalar_t	max_optbuf_len;
+	void		*optvalp_buf;
+	int		len;
+
+	error = proto_opt_check(level, option_name, *optlen, &max_optbuf_len,
+	    icmp_opt_obj.odb_opt_des_arr,
+	    icmp_opt_obj.odb_opt_arr_cnt,
+	    icmp_opt_obj.odb_topmost_tpiprovider,
+	    B_FALSE, B_TRUE, cr);
+
+	if (error != 0) {
+		if (error < 0) {
+			error = proto_tlitosyserr(-error);
+		}
+		return (error);
+	}
+
+	optvalp_buf = kmem_alloc(max_optbuf_len, KM_SLEEP);
+	rw_enter(&icmp->icmp_rwlock, RW_READER);
+	len = icmp_opt_get(connp, level, option_name, optvalp_buf);
+	rw_exit(&icmp->icmp_rwlock);
+
+	if (len < 0) {
+		/*
+		 * Pass on to IP
+		 */
+		kmem_free(optvalp_buf, max_optbuf_len);
+		return (ip_get_options(connp, level, option_name, optvalp,
+		    optlen, cr));
+	} else {
+		/*
+		 * update optlen and copy option value
+		 */
+		t_uscalar_t size = MIN(len, *optlen);
+		bcopy(optvalp_buf, optvalp, size);
+		bcopy(&size, optlen, sizeof (size));
+
+		kmem_free(optvalp_buf, max_optbuf_len);
+		return (0);
+	}
+}
+
+/* ARGSUSED */
+int
+rawip_close(sock_lower_handle_t proto_handle, int flags, cred_t *cr)
+{
+	conn_t	*connp = (conn_t *)proto_handle;
+	(void) rawip_do_close(connp);
+	return (0);
+}
+
+/* ARGSUSED */
+int
+rawip_shutdown(sock_lower_handle_t proto_handle, int how, cred_t *cr)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+
+	/* shut down the send side */
+	if (how != SHUT_RD)
+		(*connp->conn_upcalls->su_opctl)(connp->conn_upper_handle,
+		    SOCK_OPCTL_SHUT_SEND, 0);
+	/* shut down the recv side */
+	if (how != SHUT_WR)
+		(*connp->conn_upcalls->su_opctl)(connp->conn_upper_handle,
+		    SOCK_OPCTL_SHUT_RECV, 0);
+	return (0);
+}
+
+void
+rawip_clr_flowctrl(sock_lower_handle_t proto_handle)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+	icmp_t	*icmp = connp->conn_icmp;
+
+	mutex_enter(&icmp->icmp_recv_lock);
+	connp->conn_flow_cntrld = B_FALSE;
+	mutex_exit(&icmp->icmp_recv_lock);
+}
+
+int
+rawip_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
+    int mode, int32_t *rvalp, cred_t *cr)
+{
+	conn_t  	*connp = (conn_t *)proto_handle;
+	int		error;
+
+	switch (cmd) {
+	case ND_SET:
+	case ND_GET:
+	case _SIOCSOCKFALLBACK:
+	case TI_GETPEERNAME:
+	case TI_GETMYNAME:
+#ifdef DEBUG
+		cmn_err(CE_CONT, "icmp_ioctl cmd 0x%x on non streams"
+		    " socket", cmd);
+#endif
+		error = EINVAL;
+		break;
+	default:
+		/*
+		 * Pass on to IP using helper stream
+		 */
+		error = ldi_ioctl(
+		    connp->conn_helper_info->ip_helper_stream_handle,
+		    cmd, arg, mode, cr, rvalp);
+		break;
+	}
+	return (error);
+}
+
+/* ARGSUSED */
+int
+rawip_send(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
+    cred_t *cr)
+{
+	conn_t *connp = (conn_t *)proto_handle;
+	icmp_t	*icmp = connp->conn_icmp;
+	icmp_stack_t *is = icmp->icmp_is;
+	int error = 0;
+	boolean_t bypass_dgram_errind = B_FALSE;
+
+	ASSERT(DB_TYPE(mp) == M_DATA);
+
+	if (is_system_labeled())
+		msg_setcredpid(mp, cr, curproc->p_pid);
+
+	/* do an implicit bind if necessary */
+	if (icmp->icmp_state == TS_UNBND) {
+		error = rawip_implicit_bind(connp);
+		/*
+		 * We could be racing with an actual bind, in which case
+		 * we would see EPROTO. We cross our fingers and try
+		 * to connect.
+		 */
+		if (!(error == 0 || error == EPROTO)) {
+			freemsg(mp);
+			return (error);
+		}
+	}
+
+	rw_enter(&icmp->icmp_rwlock, RW_WRITER);
+
+	if (msg->msg_name != NULL && icmp->icmp_state == TS_DATA_XFER) {
+		error = EISCONN;
+		goto done_lock;
+	}
+
+	switch (icmp->icmp_family) {
+	case AF_INET6: {
+		sin6_t	*sin6;
+		ip6_pkt_t	ipp_s;	/* For ancillary data options */
+		ip6_pkt_t	*ipp = &ipp_s;
+
+		sin6 = (sin6_t *)msg->msg_name;
+		if (sin6 != NULL) {
+			error = proto_verify_ip_addr(icmp->icmp_family,
+			    (struct sockaddr *)msg->msg_name, msg->msg_namelen);
+			if (error != 0) {
+				bypass_dgram_errind = B_TRUE;
+				goto done_lock;
+			}
+			if (icmp->icmp_delayed_error != 0) {
+				sin6_t  *sin1 = (sin6_t *)msg->msg_name;
+				sin6_t  *sin2 = (sin6_t *)
+				    &icmp->icmp_delayed_addr;
+
+				error = icmp->icmp_delayed_error;
+				icmp->icmp_delayed_error = 0;
+
+				/* Compare IP address and port */
+
+				if (sin1->sin6_port == sin2->sin6_port &&
+				    IN6_ARE_ADDR_EQUAL(&sin1->sin6_addr,
+				    &sin2->sin6_addr)) {
+					goto done_lock;
+				}
+			}
+		} else {
+			/*
+			 * Use connected address
+			 */
+			if (icmp->icmp_state != TS_DATA_XFER) {
+				BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+				error = EDESTADDRREQ;
+				bypass_dgram_errind = B_TRUE;
+				goto done_lock;
+			}
+			sin6 = &icmp->icmp_v6dst;
+		}
+
+		/* No support for mapped addresses on raw sockets */
+		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+			BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+			error = EADDRNOTAVAIL;
+			goto done_lock;
+		}
+
+		ipp->ipp_fields = 0;
+		ipp->ipp_sticky_ignored = 0;
+
+		/*
+		 * If options passed in, feed it for verification and handling
+		 */
+		if (msg->msg_controllen != 0) {
+			error = process_auxiliary_options(connp,
+			    msg->msg_control, msg->msg_controllen,
+			    ipp, &icmp_opt_obj, icmp_opt_set);
+			if (error != 0) {
+				goto done_lock;
+			}
+		}
+
+		rw_exit(&icmp->icmp_rwlock);
+
+		/*
+		 * Destination is a native IPv6 address.
+		 * Send out an IPv6 format packet.
+		 */
+
+		error = raw_ip_send_data_v6(connp->conn_wq, connp, mp, sin6,
+		    ipp);
+	}
+		break;
+	case AF_INET: {
+		sin_t	*sin;
+		ip4_pkt_t pktinfo;
+		ip4_pkt_t *pktinfop = &pktinfo;
+		ipaddr_t	v4dst;
+
+		sin = (sin_t *)msg->msg_name;
+		if (sin != NULL) {
+			error = proto_verify_ip_addr(icmp->icmp_family,
+			    (struct sockaddr *)msg->msg_name, msg->msg_namelen);
+			if (error != 0) {
+				bypass_dgram_errind = B_TRUE;
+				goto done_lock;
+			}
+			v4dst = sin->sin_addr.s_addr;
+			if (icmp->icmp_delayed_error != 0) {
+				sin_t *sin1 = (sin_t *)msg->msg_name;
+				sin_t *sin2 = (sin_t *)&icmp->icmp_delayed_addr;
+
+				error = icmp->icmp_delayed_error;
+				icmp->icmp_delayed_error = 0;
+
+				/* Compare IP address and port */
+				if (sin1->sin_port == sin2->sin_port &&
+				    sin1->sin_addr.s_addr ==
+				    sin2->sin_addr.s_addr) {
+					goto done_lock;
+				}
+
+			}
+		} else {
+			/*
+			 * Use connected address
+			 */
+			if (icmp->icmp_state != TS_DATA_XFER) {
+				BUMP_MIB(&is->is_rawip_mib, rawipOutErrors);
+				error = EDESTADDRREQ;
+				bypass_dgram_errind = B_TRUE;
+				goto done_lock;
+			}
+			v4dst = V4_PART_OF_V6(icmp->icmp_v6dst.sin6_addr);
+		}
+
+
+		pktinfop->ip4_ill_index = 0;
+		pktinfop->ip4_addr = INADDR_ANY;
+
+		/*
+		 * If options passed in, feed it for verification and handling
+		 */
+		if (msg->msg_controllen != 0) {
+			error = process_auxiliary_options(connp,
+			    msg->msg_control, msg->msg_controllen,
+			    pktinfop, &icmp_opt_obj, icmp_opt_set);
+			if (error != 0) {
+				goto done_lock;
+			}
+		}
+		rw_exit(&icmp->icmp_rwlock);
+
+		error = raw_ip_send_data_v4(connp->conn_wq, connp, mp,
+		    v4dst, pktinfop);
+		break;
+	}
+
+	default:
+		ASSERT(0);
+	}
+
+	goto done;
+
+done_lock:
+	rw_exit(&icmp->icmp_rwlock);
+	if (error != 0) {
+		ASSERT(mp != NULL);
+		freemsg(mp);
+	}
+done:
+	if (bypass_dgram_errind)
+		return (error);
+	return (icmp->icmp_dgram_errind ? error : 0);
+}
+
+sock_downcalls_t sock_rawip_downcalls = {
+	rawip_activate,
+	rawip_accept,
+	rawip_bind,
+	rawip_listen,
+	rawip_connect,
+	rawip_getpeername,
+	rawip_getsockname,
+	rawip_getsockopt,
+	rawip_setsockopt,
+	rawip_send,
+	NULL,
+	NULL,
+	NULL,
+	rawip_shutdown,
+	rawip_clr_flowctrl,
+	rawip_ioctl,
+	rawip_close
+};

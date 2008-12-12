@@ -29,12 +29,18 @@
 #include <sys/modctl.h>
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/tcp_impl.h>
+#include <sys/strsubr.h>
+#include <sys/socketvar.h>
 
 #define	INET_NAME	"tcp"
 #define	INET_MODSTRTAB	dummymodinfo
 #define	INET_DEVSTRTAB	tcpinfov4
 #define	INET_DEVDESC	"TCP STREAMS driver"
 #define	INET_MODDESC	"TCP dummy STREAMS module"
+#define	INET_SOCKDESC	"TCP socket module"
+#define	INET_SOCK_PROTO_CREATE_FUNC	(*tcp_create)
+#define	INET_SOCK_PROTO_FB_FUNC		(*tcp_fallback)
 #define	INET_DEVMINOR	0
 #define	INET_MODMTFLAGS	D_MP
 /*

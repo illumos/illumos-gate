@@ -289,6 +289,7 @@ GENUNIX_OBJS +=	\
 		sigsuspend.o	\
 		sigtimedwait.o	\
 		sleepq.o	\
+		sock_conf.o	\
 		space.o		\
 		sscanf.o	\
 		ssig.o		\
@@ -489,7 +490,8 @@ IP_OBJS +=	igmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
 		ip_multi.o ip_ndp.o ip_opt_data.o ip_rts.o ip_srcid.o \
 		ipddi.o ipdrop.o mi.o nd.o optcom.o snmpcom.o ipsec_loader.o \
 		spd.o ipclassifier.o inet_common.o ip_squeue.o squeue.o \
-		ip_sadb.o ip_ftable.o radix.o ip_dummy.o \
+		ip_sadb.o ip_ftable.o proto_set.o radix.o ip_dummy.o \
+		ip_helper_stream.o \
 		$(IP_ICMP_OBJS) \
 		$(IP_RTS_OBJS) \
 		$(IP_TCP_OBJS) \
@@ -530,6 +532,10 @@ SCTP_OBJS +=	sctpddi.o
 SCTP6_OBJS +=	sctp6ddi.o
 
 NCA_OBJS +=	ncaddi.o
+
+SDP_SOCK_MOD_OBJS += sockmod_sdp.o socksdp.o socksdpsubr.o
+
+SCTP_SOCK_MOD_OBJS += sockmod_sctp.o socksctp.o socksctpsubr.o
 
 TUN_OBJS +=	tun.o
 
@@ -1138,10 +1144,10 @@ SHAREFS_OBJS +=	sharetab.o	sharefs_vfsops.o	sharefs_vnops.o
 
 SPEC_OBJS +=	specsubr.o	specvfsops.o	specvnops.o
 
-SOCK_OBJS +=	socksubr.o	sockvfsops.o	sockvnops.o	\
-		socksyscalls.o	socktpi.o	sockstr.o	\
-		socksctp.o	socksctpsubr.o	socksctpvnops.o	sockssl.o \
-		socksdp.o       socksdpsubr.o   socksdpvnops.o  \
+SOCK_OBJS +=	socksubr.o	sockvfsops.o	sockparams.o	\
+		socksyscalls.o	socktpi.o	sockstr.o	sockssl.o \
+		sockcommon_vnops.o	sockcommon_subr.o \
+		sockcommon_sops.o	sockcommon.o		socknotify.o \
 		nl7c.o		nl7curi.o	nl7chttp.o	nl7clogd.o \
 		nl7cnca.o
 
@@ -1455,6 +1461,8 @@ KGSSD_OBJS +=	gssd_clnt_stubs.o gssd_handle.o gssd_prot.o \
 KGSSD_DERIVED_OBJS = gssd_xdr.o
 
 KGSS_DUMMY_OBJS += dmech.o
+
+KSOCKET_OBJS +=	ksocket.o ksocket_mod.o
 
 CRYPTO= cksumtypes.o decrypt.o encrypt.o encrypt_length.o etypes.o \
 	nfold.o verify_checksum.o prng.o block_size.o make_checksum.o\

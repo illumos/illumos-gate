@@ -48,23 +48,16 @@
 #include <sys/file.h>
 #include <sys/param.h>
 #include <sys/zone.h>
+#include <sys/sdt.h>
+#include <sys/modctl.h>
+#include <sys/atomic.h>
+#include <sys/socket.h>
+#include <sys/ksocket.h>
 #include <sys/sodirect.h>
-#include <inet/kssl/ksslapi.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
-/*
- * Internal representation used for addresses.
- */
-struct soaddr {
-	struct sockaddr	*soa_sa;	/* Actual address */
-	t_uscalar_t	soa_len;	/* Length in bytes for kmem_free */
-	t_uscalar_t	soa_maxlen;	/* Allocated length */
-};
-/* Maximum size address for transports that have ADDR_size == 1 */
-#define	SOA_DEFSIZE	128
 
 /*
  * Internal representation of the address used to represent addresses
@@ -97,6 +90,10 @@ struct sockaddr_ux {
 	struct so_ux_addr	sou_addr;
 };
 
+#if defined(_KERNEL) || defined(_KMEMUSER)
+
+#include <sys/socket_proto.h>
+
 typedef struct sonodeops sonodeops_t;
 typedef struct sonode sonode_t;
 
@@ -105,235 +102,148 @@ typedef struct sonode sonode_t;
  * name space and can not be opened using open() - only the socket, socketpair
  * and accept calls create sonodes.
  *
- * When an AF_UNIX socket is bound to a pathname the sockfs
- * creates a VSOCK vnode in the underlying file system. However, the vnodeops
- * etc in this VNODE remain those of the underlying file system.
- * Sockfs uses the v_stream pointer in the underlying file system VSOCK node
- * to find the sonode bound to the pathname. The bound pathname vnode
- * is accessed through so_ux_vp.
+ * The locking of sockfs uses the so_lock mutex plus the SOLOCKED and
+ * SOREADLOCKED flags in so_flag. The mutex protects all the state in the
+ * sonode. It is expected that the underlying transport protocol serializes
+ * socket operations, so sockfs will not normally not single-thread
+ * operations. However, certain sockets, including TPI based ones, can only
+ * handle one control operation at a time. The SOLOCKED flag is used to
+ * single-thread operations from sockfs users to prevent e.g. multiple bind()
+ * calls to operate on the same sonode concurrently. The SOREADLOCKED flag is
+ * used to ensure that only one thread sleeps in kstrgetmsg for a given
+ * sonode. This is needed to ensure atomic operation for things like
+ * MSG_WAITALL.
  *
- * A socket always corresponds to a VCHR stream representing the transport
- * provider (e.g. /dev/tcp). This information is retrieved from the kernel
- * socket configuration table and entered into so_accessvp. sockfs uses
- * this to perform VOP_ACCESS checks before allowing an open of the transport
- * provider.
- *
- * The locking of sockfs uses the so_lock mutex plus the SOLOCKED
- * and SOREADLOCKED flags in so_flag. The mutex protects all the state
- * in the sonode. The SOLOCKED flag is used to single-thread operations from
- * sockfs users to prevent e.g. multiple bind() calls to operate on the
- * same sonode concurrently. The SOREADLOCKED flag is used to ensure that
- * only one thread sleeps in kstrgetmsg for a given sonode. This is needed
- * to ensure atomic operation for things like MSG_WAITALL.
+ * The so_fallback_rwlock is used to ensure that for sockets that can
+ * fall back to TPI, the fallback is not initiated until all pending
+ * operations have completed.
  *
  * Note that so_lock is sometimes held across calls that might go to sleep
  * (kmem_alloc and soallocproto*). This implies that no other lock in
  * the system should be held when calling into sockfs; from the system call
- * side or from strrput. If locks are held while calling into sockfs
- * the system might hang when running low on memory.
+ * side or from strrput (in case of TPI based sockets). If locks are held
+ * while calling into sockfs the system might hang when running low on memory.
  */
 struct sonode {
 	struct	vnode	*so_vnode;	/* vnode associated with this sonode */
 
-	sonodeops_t	*so_ops;	/* operations vector for this sonode */
+	sonodeops_t 	*so_ops;	/* operations vector for this sonode */
+	void		*so_priv;	/* sonode private data */
 
-	/*
-	 * These fields are initialized once.
-	 */
-	dev_t		so_dev;		/* device the sonode represents */
-	struct	vnode	*so_accessvp;	/* vnode for the /dev entry */
-
-	/* The locks themselves */
+	krwlock_t	so_fallback_rwlock;
 	kmutex_t	so_lock;	/* protects sonode fields */
-	kmutex_t	so_plumb_lock;	/* serializes plumbs, and the related */
-					/* fields so_version and so_pushcnt */
+
 	kcondvar_t	so_state_cv;	/* synchronize state changes */
-	kcondvar_t	so_ack_cv;	/* wait for TPI acks */
-	kcondvar_t	so_connind_cv;	/* wait for T_CONN_IND */
 	kcondvar_t	so_want_cv;	/* wait due to SOLOCKED */
 
 	/* These fields are protected by so_lock */
-	uint_t	so_state;		/* internal state flags SS_*, below */
-	uint_t	so_mode;		/* characteristics on socket. SM_* */
 
-	mblk_t	*so_ack_mp;		/* TPI ack received from below */
-	mblk_t	*so_conn_ind_head;	/* b_next list of T_CONN_IND */
-	mblk_t	*so_conn_ind_tail;
-	mblk_t	*so_unbind_mp;		/* Preallocated T_UNBIND_REQ message */
+	uint_t		so_state;	/* internal state flags SS_*, below */
+	uint_t		so_mode;	/* characteristics on socket. SM_* */
+	ushort_t 	so_flag;	/* flags, see below */
+	int		so_count;	/* count of opened references */
 
-	ushort_t so_flag;		/* flags, see below */
-	dev_t	so_fsid;		/* file system identifier */
-	time_t  so_atime;		/* time of last access */
-	time_t  so_mtime;		/* time of last modification */
-	time_t  so_ctime;		/* time of last attributes change */
-	int	so_count;		/* count of opened references */
+	sock_connid_t	so_proto_connid; /* protocol generation number */
 
+	ushort_t 	so_error;	/* error affecting connection */
+
+	struct sockparams *so_sockparams;	/* vnode or socket module */
 	/* Needed to recreate the same socket for accept */
 	short	so_family;
 	short	so_type;
 	short	so_protocol;
 	short	so_version;		/* From so_socket call */
-	short	so_pushcnt;		/* Number of modules above "sockmod" */
+
+	/* Accept queue */
+	kmutex_t	so_acceptq_lock;	/* protects accept queue */
+	struct sonode	*so_acceptq_next;	/* acceptq list node */
+	struct sonode 	*so_acceptq_head;
+	struct sonode	**so_acceptq_tail;
+	unsigned int	so_acceptq_len;
+	unsigned int	so_backlog;		/* Listen backlog */
+	kcondvar_t	so_acceptq_cv;		/* wait for new conn. */
 
 	/* Options */
 	short	so_options;		/* From socket call, see socket.h */
 	struct linger	so_linger;	/* SO_LINGER value */
-	int	so_sndbuf;		/* SO_SNDBUF value */
-	int	so_rcvbuf;		/* SO_RCVBUF value */
-	int	so_sndlowat;		/* send low water mark */
-	int	so_rcvlowat;		/* receive low water mark */
-#ifdef notyet
-	int	so_sndtimeo;		/* Not yet implemented */
-	int	so_rcvtimeo;		/* Not yet implemented */
-#endif /* notyet */
-	ushort_t so_error;		/* error affecting connection */
-	ushort_t so_delayed_error;	/* From T_uderror_ind */
-	int	so_backlog;		/* Listen backlog */
+#define	so_sndbuf	so_proto_props.sopp_txhiwat	/* SO_SNDBUF value */
+#define	so_sndlowat	so_proto_props.sopp_txlowat	/* tx low water mark */
+#define	so_rcvbuf	so_proto_props.sopp_rxhiwat	/* SO_RCVBUF value */
+#define	so_rcvlowat	so_proto_props.sopp_rxlowat	/* rx low water mark */
+#define	so_max_addr_len	so_proto_props.sopp_maxaddrlen
+#define	so_minpsz	so_proto_props.sopp_minpsz
+#define	so_maxpsz	so_proto_props.sopp_maxpsz
 
-	/*
-	 * The counts (so_oobcnt and so_oobsigcnt) track the number of
-	 * urgent indicates that are (logically) queued on the stream head
-	 * read queue. The urgent data is queued on the stream head
-	 * as follows.
-	 *
-	 * In the normal case the SIGURG is not generated until
-	 * the T_EXDATA_IND arrives at the stream head. However, transports
-	 * that have an early indication that urgent data is pending
-	 * (e.g. TCP receiving a "new" urgent pointer value) can send up
-	 * an M_PCPROTO/SIGURG message to generate the signal early.
-	 *
-	 * The mark is indicated by either:
-	 *  - a T_EXDATA_IND (with no M_DATA b_cont) with MSGMARK set.
-	 *    When this message is consumed by sorecvmsg the socket layer
-	 *    sets SS_RCVATMARK until data has been consumed past the mark.
-	 *  - a message with MSGMARKNEXT set (indicating that the
-	 *    first byte of the next message constitutes the mark). When
-	 *    the last byte of the MSGMARKNEXT message is consumed in
-	 *    the stream head the stream head sets STRATMARK. This flag
-	 *    is cleared when at least one byte is read. (Note that
-	 *    the MSGMARKNEXT messages can be of zero length when there
-	 *    is no previous data to which the marknext can be attached.)
-	 *
-	 * While the T_EXDATA_IND method is the common case which is used
-	 * with all TPI transports, the MSGMARKNEXT method is needed to
-	 * indicate the mark when e.g. the TCP urgent byte has not been
-	 * received yet but the TCP urgent pointer has made TCP generate
-	 * the M_PCSIG/SIGURG.
-	 *
-	 * The signal (the M_PCSIG carrying the SIGURG) and the mark
-	 * indication can not be delivered as a single message, since
-	 * the signal should be delivered as high priority and any mark
-	 * indication must flow with the data. This implies that immediately
-	 * when the SIGURG has been delivered if the stream head queue is
-	 * empty it is impossible to determine if this will be the position
-	 * of the mark. This race condition is resolved by using MSGNOTMARKNEXT
-	 * messages and the STRNOTATMARK flag in the stream head. The
-	 * SIOCATMARK code calls the stream head to wait for either a
-	 * non-empty queue or one of the STR*ATMARK flags being set.
-	 * This implies that any transport that is sending M_PCSIG(SIGURG)
-	 * should send the appropriate MSGNOTMARKNEXT message (which can be
-	 * zero length) after sending an M_PCSIG to prevent SIOCATMARK
-	 * from sleeping unnecessarily.
-	 */
+	clock_t	so_sndtimeo;		/* send timeout */
+	clock_t	so_rcvtimeo;		/* recv timeout */
+
 	mblk_t	*so_oobmsg;		/* outofline oob data */
-	uint_t	so_oobsigcnt;		/* Number of SIGURG generated */
-	uint_t	so_oobcnt;		/* Number of T_EXDATA_IND queued */
+	ssize_t	so_oobmark;		/* offset of the oob data */
+
 	pid_t	so_pgrp;		/* pgrp for signals */
 
-	/* From T_info_ack */
-	t_uscalar_t	so_tsdu_size;
-	t_uscalar_t	so_etsdu_size;
-	t_scalar_t	so_addr_size;
-	t_uscalar_t	so_opt_size;
-	t_uscalar_t	so_tidu_size;
-	t_scalar_t	so_serv_type;
-
-	/* From T_capability_ack */
-	t_uscalar_t	so_acceptor_id;
-
-	/* Internal provider information */
-	struct tpi_provinfo	*so_provinfo;
-
-	/*
-	 * The local and remote addresses have multiple purposes
-	 * but one of the key reasons for their existence and careful
-	 * tracking in sockfs is to support getsockname and getpeername
-	 * when the transport does not handle the TI_GET*NAME ioctls
-	 * and caching when it does (signaled by valid bits in so_state).
-	 * When all transports support the new TPI (with T_ADDR_REQ)
-	 * we can revisit this code.
-	 * The other usage of so_faddr is to keep the "connected to"
-	 * address for datagram sockets.
-	 * Finally, for AF_UNIX both local and remote addresses are used
-	 * to record the sockaddr_un since we use a separate namespace
-	 * in the loopback transport.
-	 */
-	struct soaddr so_laddr;		/* Local address */
-	struct soaddr so_faddr;		/* Peer address */
-#define	so_laddr_sa	so_laddr.soa_sa
-#define	so_faddr_sa	so_faddr.soa_sa
-#define	so_laddr_len	so_laddr.soa_len
-#define	so_faddr_len	so_faddr.soa_len
-#define	so_laddr_maxlen	so_laddr.soa_maxlen
-#define	so_faddr_maxlen	so_faddr.soa_maxlen
-	mblk_t		*so_eaddr_mp;	/* for so_delayed_error */
-
-	/*
-	 * For AF_UNIX sockets:
-	 * so_ux_laddr/faddr records the internal addresses used with the
-	 * transport.
-	 * so_ux_vp and v_stream->sd_vnode form the cross-
-	 * linkage between the underlying fs vnode corresponding to
-	 * the bound sockaddr_un and the socket node.
-	 */
-	struct so_ux_addr so_ux_laddr;	/* laddr bound with the transport */
-	struct so_ux_addr so_ux_faddr;	/* temporary peer address */
-	struct vnode	*so_ux_bound_vp; /* bound AF_UNIX file system vnode */
-	struct sonode	*so_next;	/* next sonode on socklist	*/
-	struct sonode	*so_prev;	/* previous sonode on socklist	*/
-	mblk_t	*so_discon_ind_mp;	/* T_DISCON_IND received from below */
-
-					/* put here for delayed processing  */
-	void		*so_priv;	/* sonode private data */
 	cred_t		*so_peercred;	/* connected socket peer cred */
 	pid_t		so_cpid;	/* connected socket peer cached pid */
 	zoneid_t	so_zoneid;	/* opener's zoneid */
 
-	kmem_cache_t	*so_cache;	/* object cache of this "sonode". */
-	void		*so_obj;	/* object to free */
+	struct pollhead	so_poll_list;	/* common pollhead */
+	short		so_pollev;	/* events that should be generated */
 
-	/*
-	 * For NL7C sockets:
-	 *
-	 * so_nl7c_flags	the NL7C state of URL processing.
-	 *
-	 * so_nl7c_rcv_mp	mblk_t chain of already received data to be
-	 *			passed up to the app after NL7C gives up on
-	 *			a socket.
-	 *
-	 * so_nl7c_rcv_rval	returned rval for last mblk_t from above.
-	 *
-	 * so_nl7c_uri		the URI currently being processed.
-	 *
-	 * so_nl7c_rtime	URI request gethrestime_sec().
-	 *
-	 * so_nl7c_addr		pointer returned by nl7c_addr_lookup().
-	 */
-	uint64_t	so_nl7c_flags;
-	mblk_t		*so_nl7c_rcv_mp;
-	int64_t		so_nl7c_rcv_rval;
-	void		*so_nl7c_uri;
-	time_t		so_nl7c_rtime;
-	void		*so_nl7c_addr;
+	/* Receive */
+	unsigned int	so_rcv_queued;
+	mblk_t		*so_rcv_q_head;
+	mblk_t		*so_rcv_q_last_head;
+	mblk_t		*so_rcv_head;		/* 1st mblk in the list */
+	mblk_t		*so_rcv_last_head;	/* last mblk in b_next chain */
+	kcondvar_t	so_rcv_cv;
+	uint_t		so_rcv_wanted;	/* # of bytes wanted by app */
+	timeout_id_t	so_rcv_timer_tid;
 
-	/* For sockets acting as an in-kernel SSL proxy */
-	kssl_endpt_type_t	so_kssl_type;	/* is proxy/is proxied/none */
-	kssl_ent_t		so_kssl_ent;	/* SSL config entry */
-	kssl_ctx_t		so_kssl_ctx;	/* SSL session context */
+#define	so_rcv_thresh	so_proto_props.sopp_rcvthresh
+#define	so_rcv_timer_interval so_proto_props.sopp_rcvtimer
+
+	/* Send */
+	boolean_t	so_snd_qfull;	/* Transmit full */
+	kcondvar_t	so_snd_cv;
+
+	boolean_t so_rcv_wakeup;
+	boolean_t so_snd_wakeup;
+
+	/* Communication channel with protocol */
+	sock_lower_handle_t	so_proto_handle;
+	sock_downcalls_t 	*so_downcalls;
+
+	struct sock_proto_props	so_proto_props; /* protocol settings */
+	boolean_t		so_flowctrld;	/* Flow controlled */
+	uint_t			so_copyflag;	/* Copy related flag */
+	kcondvar_t		so_copy_cv;	/* Copy cond variable */
+
+	/* kernel sockets */
+	ksocket_callbacks_t 	so_ksock_callbacks;
+	void			*so_ksock_cb_arg;	/* callback argument */
+	kcondvar_t		so_closing_cv;
 
 	/* != NULL for sodirect_t enabled socket */
-	sodirect_t	*so_direct;
+	sodirect_t		*so_direct;
 };
+
+/*
+ * We do an initial check for events without holding locks. However,
+ * if there are no event available, then we redo the check for POLLIN
+ * events under the lock.
+ */
+#define	SO_HAVE_DATA(so)						\
+	((so)->so_rcv_timer_tid == 0 && (so->so_rcv_queued > 0)) ||	\
+	((so)->so_rcv_queued > (so)->so_rcv_thresh) ||			\
+	((so)->so_state & SS_CANTRCVMORE)
+
+/*
+ * Events handled by the protocol (in case sd_poll is set)
+ */
+#define	SO_PROTO_POLLEV		(POLLIN|POLLRDNORM|POLLRDBAND)
+
+
+#endif /* _KERNEL || _KMEMUSER */
 
 /* flags */
 #define	SOMOD		0x0001		/* update socket modification time */
@@ -344,6 +254,8 @@ struct sonode {
 #define	SOWANT		0x0040		/* some process waiting on lock */
 #define	SOCLONE		0x0080		/* child of clone driver */
 #define	SOASYNC_UNBIND	0x0100		/* wait for ACK of async unbind */
+
+#define	SOCK_IS_NONSTR(so)	((so)->so_vnode->v_stream == NULL)
 
 /*
  * Socket state bits.
@@ -360,29 +272,57 @@ struct sonode {
 
 #define	SS_ASYNC		0x00000100 /* async i/o notify */
 #define	SS_ACCEPTCONN		0x00000200 /* listen done */
-#define	SS_HASCONNIND		0x00000400 /* T_CONN_IND for poll */
+/*	unused			0x00000400 */	/* was SS_HASCONNIND */
 #define	SS_SAVEDEOR		0x00000800 /* Saved MSG_EOR rcv side state */
 
 #define	SS_RCVATMARK		0x00001000 /* at mark on input */
 #define	SS_OOBPEND		0x00002000 /* OOB pending or present - poll */
 #define	SS_HAVEOOBDATA		0x00004000 /* OOB data present */
 #define	SS_HADOOBDATA		0x00008000 /* OOB data consumed */
+#define	SS_CLOSING		0x00010000 /* in process of closing */
 
-#define	SS_FADDR_NOXLATE	0x00020000 /* No xlation of faddr for AF_UNIX */
+/*	unused			0x00020000 */	/* was SS_FADDR_NOXLATE */
+/*	unused			0x00040000 */	/* was SS_HASDATA */
+/*	unused 			0x00080000 */	/* was SS_DONEREAD */
+/*	unused 			0x00100000 */	/* was SS_MOREDATA */
+/*	unused 			0x00200000 */	/* was SS_DIRECT */
 
-#define	SS_HASDATA		0x00040000 /* NCAfs: data available */
-#define	SS_DONEREAD		0x00080000 /* NCAfs: all data read */
-#define	SS_MOREDATA		0x00100000 /* NCAfs: NCA has more data */
-
-#define	SS_DIRECT		0x00200000 /* transport is directly below */
 #define	SS_SODIRECT		0x00400000 /* transport supports sodirect */
 
-#define	SS_LADDR_VALID		0x01000000	/* so_laddr valid for user */
-#define	SS_FADDR_VALID		0x02000000	/* so_faddr valid for user */
+/*	unused			0x01000000 */	/* was SS_LADDR_VALID */
+/*	unused			0x02000000 */	/* was SS_FADDR_VALID */
+
+#define	SS_SENTLASTREADSIG	0x10000000 /* last rx signal has been sent */
+#define	SS_SENTLASTWRITESIG	0x20000000 /* last tx signal has been sent */
+
+#define	SS_FALLBACK_PENDING	0x40000000
+#define	SS_FALLBACK_COMP	0x80000000
+
 
 /* Set of states when the socket can't be rebound */
 #define	SS_CANTREBIND	(SS_ISCONNECTED|SS_ISCONNECTING|SS_ISDISCONNECTING|\
 			    SS_CANTSENDMORE|SS_CANTRCVMORE|SS_ACCEPTCONN)
+
+/*
+ * Sockets that can fall back to TPI must ensure that fall back is not
+ * initiated while a thread is using a socket.
+ */
+#define	SO_BLOCK_FALLBACK(so, fn) {			\
+	ASSERT(MUTEX_NOT_HELD(&(so)->so_lock));		\
+	rw_enter(&(so)->so_fallback_rwlock, RW_READER);	\
+	if ((so)->so_state & SS_FALLBACK_COMP) {	\
+		rw_exit(&(so)->so_fallback_rwlock);	\
+		return (fn);				\
+	}						\
+}
+
+#define	SO_UNBLOCK_FALLBACK(so)	{			\
+	rw_exit(&(so)->so_fallback_rwlock);		\
+}
+
+/* Poll events */
+#define	SO_POLLEV_IN		0x1	/* POLLIN wakeup needed */
+#define	SO_POLLEV_ALWAYS	0x2	/* wakeups */
 
 /*
  * Characteristics of sockets. Not changed after the socket is created.
@@ -399,6 +339,10 @@ struct sonode {
 
 #define	SM_ACCEPTOR_ID		0x100	/* so_acceptor_id is valid */
 
+#define	SM_KERNEL		0x200	/* kernel socket */
+
+#define	SM_ACCEPTSUPP		0x400	/* can handle accept() */
+
 /*
  * Socket versions. Used by the socket library when calling _so_socket().
  */
@@ -409,21 +353,177 @@ struct sonode {
 #define	SOV_XPG4_2	4	/* Xnet socket */
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
+
 /*
- * Used for mapping family/type/protocol to vnode.
- * Defined here so that crash can use it.
+ * sonode create and destroy functions.
+ */
+typedef struct sonode *(*so_create_func_t)(struct sockparams *,
+    int, int, int, int, int, int *, cred_t *);
+typedef void (*so_destroy_func_t)(struct sonode *);
+
+/* STREAM device information */
+typedef struct sdev_info {
+	char	*sd_devpath;
+	int	sd_devpathlen; /* Is 0 if sp_devpath is a static string */
+	vnode_t	*sd_vnode;
+} sdev_info_t;
+
+#define	SOCKMOD_VERSION		1
+/* name of the TPI pseudo socket module */
+#define	SOTPI_SMOD_NAME		"socktpi"
+
+typedef struct __smod_priv_s {
+	so_create_func_t	smodp_sock_create_func;
+	so_destroy_func_t	smodp_sock_destroy_func;
+	so_proto_fallback_func_t smodp_proto_fallback_func;
+} __smod_priv_t;
+
+/*
+ * Socket module register information
+ */
+typedef struct smod_reg_s {
+	int		smod_version;
+	char		*smod_name;
+	size_t		smod_uc_version;
+	size_t		smod_dc_version;
+	so_proto_create_func_t	smod_proto_create_func;
+
+	/* __smod_priv_data must be NULL */
+	__smod_priv_t	*__smod_priv;
+} smod_reg_t;
+
+/*
+ * Socket module information
+ */
+typedef struct smod_info {
+	int		smod_version;
+	char		*smod_name;
+	uint_t		smod_refcnt;		/* # of entries */
+	size_t		smod_uc_version; 	/* upcall version */
+	size_t		smod_dc_version;	/* down call version */
+	so_proto_create_func_t	smod_proto_create_func;
+	so_proto_fallback_func_t smod_proto_fallback_func;
+	so_create_func_t	smod_sock_create_func;
+	so_destroy_func_t	smod_sock_destroy_func;
+	list_node_t	smod_node;
+} smod_info_t;
+
+/*
+ * sockparams
+ *
+ * Used for mapping family/type/protocol to module
  */
 struct sockparams {
-	int	sp_domain;
-	int	sp_type;
-	int	sp_protocol;
-	char	*sp_devpath;
-	int	sp_devpathlen;	/* Is 0 if sp_devpath is a static string */
-	vnode_t	*sp_vnode;
-	struct sockparams *sp_next;
+	/*
+	 * The family, type, protocol, sdev_info and smod_info are
+	 * set when the entry is created, and they will never change
+	 * thereafter.
+	 */
+	int		sp_family;
+	int		sp_type;
+	int		sp_protocol;
+
+	sdev_info_t	sp_sdev_info;	/* STREAM device */
+	char		*sp_smod_name;	/* socket module name */
+	smod_info_t	*sp_smod_info;	/* socket module */
+
+	kmutex_t	sp_lock;	/* lock for refcnt */
+	uint64_t	sp_refcnt;	/* entry reference count */
+
+	/*
+	 * The entries below are only modified while holding
+	 * splist_lock as a writer.
+	 */
+	int		sp_flags;	/* see below */
+	list_node_t	sp_node;
 };
 
-extern struct sockparams *sphead;
+
+/*
+ * sockparams flags
+ */
+#define	SOCKPARAMS_EPHEMERAL	0x1	/* temp. entry, not on global list */
+
+extern void sockparams_init(void);
+extern struct sockparams *sockparams_hold_ephemeral_bydev(int, int, int,
+    const char *, int, int *);
+extern struct sockparams *sockparams_hold_ephemeral_bymod(int, int, int,
+    const char *, int, int *);
+extern void sockparams_ephemeral_drop_last_ref(struct sockparams *);
+
+extern void smod_init(void);
+extern void smod_add(smod_info_t *);
+extern int smod_register(const smod_reg_t *);
+extern int smod_unregister(const char *);
+extern smod_info_t *smod_lookup_byname(const char *);
+
+#define	SOCKPARAMS_HAS_DEVICE(sp)					\
+	((sp)->sp_sdev_info.sd_devpath != NULL)
+
+/* Increase the smod_info_t reference count */
+#define	SMOD_INC_REF(smodp) {						\
+	ASSERT((smodp) != NULL);					\
+	DTRACE_PROBE1(smodinfo__inc__ref, struct smod_info *, (smodp));	\
+	atomic_inc_uint(&(smodp)->smod_refcnt);				\
+}
+
+/*
+ * Decreace the socket module entry reference count.
+ * When no one mapping to the entry, we try to unload the module from the
+ * kernel. If the module can't unload, just leave the module entry with
+ * a zero refcnt.
+ */
+#define	SMOD_DEC_REF(sp, smodp) {					\
+	ASSERT((smodp) != NULL);					\
+	ASSERT((smodp)->smod_refcnt != 0);				\
+	atomic_dec_uint(&(smodp)->smod_refcnt);				\
+	/*								\
+	 * No need to atomically check the return value because the	\
+	 * socket module framework will verify that no one is using	\
+	 * the module before unloading. Worst thing that can happen	\
+	 * here is multiple calls to mod_remove_by_name(), which is OK.	\
+	 */								\
+	if ((smodp)->smod_refcnt == 0)					\
+		(void) mod_remove_by_name((sp)->sp_smod_name);		\
+}
+
+/* Increase the reference count */
+#define	SOCKPARAMS_INC_REF(sp) {					\
+	ASSERT((sp) != NULL);						\
+	DTRACE_PROBE1(sockparams__inc__ref, struct sockparams *, (sp));	\
+	mutex_enter(&(sp)->sp_lock);					\
+	(sp)->sp_refcnt++;						\
+	ASSERT((sp)->sp_refcnt != 0);					\
+	mutex_exit(&(sp)->sp_lock);					\
+}
+
+/*
+ * Decrease the reference count.
+ *
+ * If the sockparams is ephemeral, then the thread dropping the last ref
+ * count will destroy the entry.
+ */
+#define	SOCKPARAMS_DEC_REF(sp) {					\
+	ASSERT((sp) != NULL);						\
+	DTRACE_PROBE1(sockparams__dec__ref, struct sockparams *, (sp));	\
+	mutex_enter(&(sp)->sp_lock);					\
+	ASSERT((sp)->sp_refcnt > 0);					\
+	if ((sp)->sp_refcnt == 1) {					\
+		if ((sp)->sp_flags & SOCKPARAMS_EPHEMERAL) {		\
+			mutex_exit(&(sp)->sp_lock);			\
+			sockparams_ephemeral_drop_last_ref((sp));	\
+		} else {						\
+			(sp)->sp_refcnt--;				\
+			if ((sp)->sp_smod_info != NULL)			\
+				SMOD_DEC_REF(sp, (sp)->sp_smod_info);	\
+			(sp)->sp_smod_info = NULL;			\
+			mutex_exit(&(sp)->sp_lock);			\
+		}							\
+	} else {							\
+		(sp)->sp_refcnt--;					\
+		mutex_exit(&(sp)->sp_lock);				\
+	}								\
+}
 
 /*
  * Used to traverse the list of AF_UNIX sockets to construct the kstat
@@ -490,49 +590,71 @@ struct sendfile_queue {
 
 /* Socket network operations switch */
 struct sonodeops {
-	int	(*sop_accept)(struct sonode *, int, struct sonode **);
-	int	(*sop_bind)(struct sonode *, struct sockaddr *, socklen_t,
+	int 	(*sop_init)(struct sonode *, struct sonode *, cred_t *,
 		    int);
-	int	(*sop_listen)(struct sonode *, int);
+	int	(*sop_accept)(struct sonode *, int, cred_t *, struct sonode **);
+	int	(*sop_bind)(struct sonode *, struct sockaddr *, socklen_t,
+		    int, cred_t *);
+	int	(*sop_listen)(struct sonode *, int, cred_t *);
 	int	(*sop_connect)(struct sonode *, const struct sockaddr *,
-		    socklen_t, int, int);
+		    socklen_t, int, int, cred_t *);
 	int	(*sop_recvmsg)(struct sonode *, struct msghdr *,
-		    struct uio *);
+		    struct uio *, cred_t *);
 	int	(*sop_sendmsg)(struct sonode *, struct msghdr *,
-		    struct uio *);
-	int	(*sop_getpeername)(struct sonode *);
-	int	(*sop_getsockname)(struct sonode *);
-	int	(*sop_shutdown)(struct sonode *, int);
+		    struct uio *, cred_t *);
+	int	(*sop_sendmblk)(struct sonode *, struct msghdr *, int,
+		    cred_t *, mblk_t **);
+	int	(*sop_getpeername)(struct sonode *, struct sockaddr *,
+		    socklen_t *, boolean_t, cred_t *);
+	int	(*sop_getsockname)(struct sonode *, struct sockaddr *,
+		    socklen_t *, cred_t *);
+	int	(*sop_shutdown)(struct sonode *, int, cred_t *);
 	int	(*sop_getsockopt)(struct sonode *, int, int, void *,
-		    socklen_t *, int);
+		    socklen_t *, int, cred_t *);
 	int 	(*sop_setsockopt)(struct sonode *, int, int, const void *,
-		    socklen_t);
+		    socklen_t, cred_t *);
+	int 	(*sop_ioctl)(struct sonode *, int, intptr_t, int,
+		    cred_t *, int32_t *);
+	int 	(*sop_poll)(struct sonode *, short, int, short *,
+		    struct pollhead **);
+	int 	(*sop_close)(struct sonode *, int, cred_t *);
 };
 
-#define	SOP_ACCEPT(so, fflag, nsop)	\
-	((so)->so_ops->sop_accept((so), (fflag), (nsop)))
-#define	SOP_BIND(so, name, namelen, flags)	\
-	((so)->so_ops->sop_bind((so), (name), (namelen), (flags)))
-#define	SOP_LISTEN(so, backlog)	\
-	((so)->so_ops->sop_listen((so), (backlog)))
-#define	SOP_CONNECT(so, name, namelen, fflag, flags)	\
-	((so)->so_ops->sop_connect((so), (name), (namelen), (fflag), (flags)))
-#define	SOP_RECVMSG(so, msg, uiop)	\
-	((so)->so_ops->sop_recvmsg((so), (msg), (uiop)))
-#define	SOP_SENDMSG(so, msg, uiop)	\
-	((so)->so_ops->sop_sendmsg((so), (msg), (uiop)))
-#define	SOP_GETPEERNAME(so)	\
-	((so)->so_ops->sop_getpeername((so)))
-#define	SOP_GETSOCKNAME(so)	\
-	((so)->so_ops->sop_getsockname((so)))
-#define	SOP_SHUTDOWN(so, how)	\
-	((so)->so_ops->sop_shutdown((so), (how)))
-#define	SOP_GETSOCKOPT(so, level, optionname, optval, optlenp, flags)	\
+#define	SOP_INIT(so, flag, cr, flags)	\
+	((so)->so_ops->sop_init((so), (flag), (cr), (flags)))
+#define	SOP_ACCEPT(so, fflag, cr, nsop)	\
+	((so)->so_ops->sop_accept((so), (fflag), (cr), (nsop)))
+#define	SOP_BIND(so, name, namelen, flags, cr)	\
+	((so)->so_ops->sop_bind((so), (name), (namelen), (flags), (cr)))
+#define	SOP_LISTEN(so, backlog, cr)	\
+	((so)->so_ops->sop_listen((so), (backlog), (cr)))
+#define	SOP_CONNECT(so, name, namelen, fflag, flags, cr)	\
+	((so)->so_ops->sop_connect((so), (name), (namelen), (fflag), (flags), \
+	(cr)))
+#define	SOP_RECVMSG(so, msg, uiop, cr)	\
+	((so)->so_ops->sop_recvmsg((so), (msg), (uiop), (cr)))
+#define	SOP_SENDMSG(so, msg, uiop, cr)	\
+	((so)->so_ops->sop_sendmsg((so), (msg), (uiop), (cr)))
+#define	SOP_SENDMBLK(so, msg, size, cr, mpp)	\
+	((so)->so_ops->sop_sendmblk((so), (msg), (size), (cr), (mpp)))
+#define	SOP_GETPEERNAME(so, addr, addrlen, accept, cr)	\
+	((so)->so_ops->sop_getpeername((so), (addr), (addrlen), (accept), (cr)))
+#define	SOP_GETSOCKNAME(so, addr, addrlen, cr)	\
+	((so)->so_ops->sop_getsockname((so), (addr), (addrlen), (cr)))
+#define	SOP_SHUTDOWN(so, how, cr)	\
+	((so)->so_ops->sop_shutdown((so), (how), (cr)))
+#define	SOP_GETSOCKOPT(so, level, optionname, optval, optlenp, flags, cr) \
 	((so)->so_ops->sop_getsockopt((so), (level), (optionname),	\
-	    (optval), (optlenp), (flags)))
-#define	SOP_SETSOCKOPT(so, level, optionname, optval, optlen)		\
+	    (optval), (optlenp), (flags), (cr)))
+#define	SOP_SETSOCKOPT(so, level, optionname, optval, optlen, cr)	\
 	((so)->so_ops->sop_setsockopt((so), (level), (optionname),	\
-	    (optval), (optlen)))
+	    (optval), (optlen), (cr)))
+#define	SOP_IOCTL(so, cmd, arg, mode, cr, rvalp)	\
+	((so)->so_ops->sop_ioctl((so), (cmd), (arg), (mode), (cr), (rvalp)))
+#define	SOP_POLL(so, events, anyyet, reventsp, phpp) \
+	((so)->so_ops->sop_poll((so), (events), (anyyet), (reventsp), (phpp)))
+#define	SOP_CLOSE(so, flag, cr)	\
+	((so)->so_ops->sop_close((so), (flag), (cr)))
 
 #endif /* defined(_KERNEL) || defined(_KMEMUSER) */
 
@@ -544,6 +666,8 @@ struct sonodeops {
 #define	ROUNDUP_cmsglen(len) \
 	(((len) + _CMSG_HDR_ALIGNMENT - 1) & ~(_CMSG_HDR_ALIGNMENT - 1))
 
+#define	IS_NON_STREAM_SOCK(vp) \
+	((vp)->v_type == VSOCK && (vp)->v_stream == NULL)
 /*
  * Macros that operate on struct cmsghdr.
  * Used in parsing msg_control.
@@ -686,10 +810,8 @@ extern int sockprinterr;
 #endif /* defined(DEBUG) */
 
 extern struct vfsops			sock_vfsops;
-extern struct vnodeops			*socktpi_vnodeops;
-extern const struct fs_operation_def	socktpi_vnodeops_template[];
-
-extern sonodeops_t			sotpi_sonodeops;
+extern struct vnodeops			*socket_vnodeops;
+extern const struct fs_operation_def	socket_vnodeops_template[];
 
 extern dev_t				sockdev;
 
@@ -700,20 +822,10 @@ extern int	sock_getmsg(vnode_t *, struct strbuf *, struct strbuf *,
 			uchar_t *, int *, int, rval_t *);
 extern int	sock_putmsg(vnode_t *, struct strbuf *, struct strbuf *,
 			uchar_t, int, int);
-struct sonode	*sotpi_create(vnode_t *, int, int, int, int, struct sonode *,
-			int *);
-extern int	socktpi_open(struct vnode **, int, struct cred *,
-			caller_context_t *);
-extern int	so_sock2stream(struct sonode *);
-extern void	so_stream2sock(struct sonode *);
+extern int	sogetvp(char *, vnode_t **, int);
 extern int	sockinit(int, char *);
-extern struct vnode
-		*makesockvp(struct vnode *, int, int, int);
-extern void	sockfree(struct sonode *);
-extern void	so_update_attrs(struct sonode *, int);
-extern int	soconfig(int, int, int,	char *, int);
-extern struct vnode
-		*solookup(int, int, int, char *, int *);
+extern int	soconfig(int, int, int,	char *, int, char *);
+extern int	solookup(int, int, int, struct sockparams **);
 extern void	so_lock_single(struct sonode *);
 extern void	so_unlock_single(struct sonode *, int);
 extern int	so_lock_read(struct sonode *, int);
@@ -723,10 +835,6 @@ extern void	*sogetoff(mblk_t *, t_uscalar_t, t_uscalar_t, uint_t);
 extern void	so_getopt_srcaddr(void *, t_uscalar_t,
 			void **, t_uscalar_t *);
 extern int	so_getopt_unix_close(void *, t_uscalar_t);
-extern int	so_addr_verify(struct sonode *, const struct sockaddr *,
-			socklen_t);
-extern int	so_ux_addr_xlate(struct sonode *, struct sockaddr *,
-			socklen_t, int, void **, socklen_t *);
 extern void	fdbuf_free(struct fdbuf *);
 extern mblk_t	*fdbuf_allocmsg(int, struct fdbuf *);
 extern int	fdbuf_create(void *, int, struct fdbuf **);
@@ -744,55 +852,13 @@ extern void	soisdisconnected(struct sonode *, int);
 extern void	socantsendmore(struct sonode *);
 extern void	socantrcvmore(struct sonode *);
 extern void	soseterror(struct sonode *, int);
-extern int	sogeterr(struct sonode *);
-extern int	sogetrderr(vnode_t *, int, int *);
-extern int	sogetwrerr(vnode_t *, int, int *);
-extern void	so_unix_close(struct sonode *);
-extern mblk_t	*soallocproto(size_t, int);
-extern mblk_t	*soallocproto1(const void *, ssize_t, ssize_t, int);
-extern void	soappendmsg(mblk_t *, const void *, ssize_t);
-extern mblk_t	*soallocproto2(const void *, ssize_t, const void *, ssize_t,
-			ssize_t, int);
-extern mblk_t	*soallocproto3(const void *, ssize_t, const void *, ssize_t,
-			const void *, ssize_t, ssize_t, int);
-extern int	sowaitprim(struct sonode *, t_scalar_t, t_scalar_t,
-			t_uscalar_t, mblk_t **, clock_t);
-extern int	sowaitokack(struct sonode *, t_scalar_t);
-extern int	sowaitack(struct sonode *, mblk_t **, clock_t);
-extern void	soqueueack(struct sonode *, mblk_t *);
-extern int	sowaitconnind(struct sonode *, int, mblk_t **);
-extern void	soqueueconnind(struct sonode *, mblk_t *);
-extern int	soflushconnind(struct sonode *, t_scalar_t);
-extern void	so_drain_discon_ind(struct sonode *);
-extern void	so_flush_discon_ind(struct sonode *);
+extern int	sogeterr(struct sonode *, boolean_t);
 extern int	sowaitconnected(struct sonode *, int, int);
 
-extern int	sostream_direct(struct sonode *, struct uio *,
-		    mblk_t *, cred_t *);
-extern int	sosend_dgram(struct sonode *, struct sockaddr *,
-		    socklen_t, struct uio *, int);
-extern int	sosend_svc(struct sonode *, struct uio *, t_scalar_t, int, int);
-extern void	so_installhooks(struct sonode *);
-extern int	so_strinit(struct sonode *, struct sonode *);
-extern int	sotpi_recvmsg(struct sonode *, struct nmsghdr *,
-		    struct uio *);
-extern int	sotpi_getpeername(struct sonode *);
-extern int	sotpi_getsockopt(struct sonode *, int, int, void *,
-		    socklen_t *, int);
-extern int	sotpi_setsockopt(struct sonode *, int, int, const void *,
-		    socklen_t);
-extern int	socktpi_ioctl(struct vnode *, int, intptr_t, int,
-		    struct cred *, int *, caller_context_t *);
-extern int	sodisconnect(struct sonode *, t_scalar_t, int);
 extern ssize_t	soreadfile(file_t *, uchar_t *, u_offset_t, int *, size_t);
-extern int	so_set_asyncsigs(vnode_t *, pid_t, int, int, cred_t *);
-extern int	so_set_events(struct sonode *, vnode_t *, cred_t *);
-extern int	so_flip_async(struct sonode *, vnode_t *, int, cred_t *);
-extern int	so_set_siggrp(struct sonode *, vnode_t *, pid_t, int, cred_t *);
 extern void	*sock_kstat_init(zoneid_t);
 extern void	sock_kstat_fini(zoneid_t, void *);
 extern struct sonode *getsonode(int, int *, file_t **);
-
 /*
  * Function wrappers (mostly around the sonode switch) for
  * backward compatibility.
@@ -805,43 +871,17 @@ extern int	soconnect(struct sonode *, const struct sockaddr *, socklen_t,
 		    int, int);
 extern int	sorecvmsg(struct sonode *, struct nmsghdr *, struct uio *);
 extern int	sosendmsg(struct sonode *, struct nmsghdr *, struct uio *);
-extern int	sogetpeername(struct sonode *);
-extern int	sogetsockname(struct sonode *);
 extern int	soshutdown(struct sonode *, int);
 extern int	sogetsockopt(struct sonode *, int, int, void *, socklen_t *,
 		    int);
 extern int	sosetsockopt(struct sonode *, int, int, const void *,
 		    t_uscalar_t);
 
-extern struct sonode	*socreate(vnode_t *, int, int, int, int,
-			    struct sonode *, int *);
+extern struct sonode	*socreate(struct sockparams *, int, int, int, int,
+			    int *);
 
 extern int	so_copyin(const void *, void *, size_t, int);
 extern int	so_copyout(const void *, void *, size_t, int);
-
-extern int	socktpi_access(struct vnode *, int, int, struct cred *,
-		    caller_context_t *);
-extern int	socktpi_fid(struct vnode *, struct fid *, caller_context_t *);
-extern int	socktpi_fsync(struct vnode *, int, struct cred *,
-		    caller_context_t *);
-extern int	socktpi_getattr(struct vnode *, struct vattr *, int,
-		    struct cred *, caller_context_t *);
-extern int	socktpi_seek(struct vnode *, offset_t, offset_t *,
-		    caller_context_t *);
-extern int	socktpi_setattr(struct vnode *, struct vattr *, int,
-		    struct cred *, caller_context_t *);
-extern int	socktpi_setfl(vnode_t *, int, int, cred_t *,
-		    caller_context_t *);
-
-/* SCTP sockfs */
-extern struct sonode	*sosctp_create(vnode_t *, int, int, int, int,
-			    struct sonode *, int *);
-extern int sosctp_init(void);
-
-/* SDP sockfs */
-extern struct sonode    *sosdp_create(vnode_t *, int, int, int, int,
-			    struct sonode *, int *);
-extern int sosdp_init(void);
 
 #endif
 
@@ -865,9 +905,11 @@ struct sockinfo {
 	uint16_t	si_faddr_family;
 	char		si_laddr_sun_path[MAXPATHLEN + 1]; /* NULL terminated */
 	char		si_faddr_sun_path[MAXPATHLEN + 1];
+	boolean_t	si_faddr_noxlate;
 	zoneid_t	si_szoneid;
 };
 
+#define	SOCKMOD_PATH	"socketmod"	/* dir where sockmods are stored */
 
 #ifdef	__cplusplus
 }

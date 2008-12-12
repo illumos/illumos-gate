@@ -5845,6 +5845,55 @@ repeat:
 }
 
 /*
+ * Check if the address exists in the system.
+ * We don't hold the conn_lock as we will not perform defered ipsqueue
+ * operation.
+ */
+boolean_t
+ip_addr_exists(ipaddr_t addr, zoneid_t zoneid, ip_stack_t *ipst)
+{
+	ipif_t  *ipif;
+	ill_t   *ill;
+	ill_walk_context_t	ctx;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+
+	ill = ILL_START_WALK_V4(&ctx, ipst);
+	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
+		mutex_enter(&ill->ill_lock);
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
+			if (zoneid != ALL_ZONES &&
+			    zoneid != ipif->ipif_zoneid &&
+			    ipif->ipif_zoneid != ALL_ZONES)
+				continue;
+			/* Allow the ipif to be down */
+			/*
+			 * XXX Different from ipif_lookup_addr(), we don't do
+			 * twice lookups. As from bind()'s point of view, we
+			 * may return once we find a match.
+			 */
+			if (((ipif->ipif_lcl_addr == addr) &&
+			    ((ipif->ipif_flags & IPIF_UNNUMBERED) == 0)) ||
+			    ((ipif->ipif_flags & IPIF_POINTOPOINT) &&
+			    (ipif->ipif_pp_dst_addr == addr))) {
+				/*
+				 * Allow bind() to be successful even if the
+				 * ipif is with IPIF_CHANGING bit set.
+				 */
+				mutex_exit(&ill->ill_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
+				return (B_TRUE);
+			}
+		}
+		mutex_exit(&ill->ill_lock);
+	}
+
+	rw_exit(&ipst->ips_ill_g_lock);
+	return (B_FALSE);
+}
+
+/*
  * Look for an ipif with the specified address. For point-point links
  * we look for matches on either the destination address and the local
  * address, but we ignore the check on the local address if IPIF_UNNUMBERED
@@ -22145,7 +22194,6 @@ ip_sioctl_slifusesrc(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	usesrc_ill = ill_lookup_on_ifindex(ifindex, isv6, q, mp,
 	    ip_process_ioctl, &err, ipst);
-
 	if (usesrc_ill == NULL) {
 		return (err);
 	}

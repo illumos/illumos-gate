@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/strsubr.h>
@@ -41,15 +39,17 @@
 #include <sys/suntpi.h>
 #include <sys/policy.h>
 #include <sys/zone.h>
+#include <sys/disp.h>
 
 #include <sys/socket.h>
+#include <sys/socketvar.h>
 #include <netinet/in.h>
 
 #include <inet/common.h>
 #include <netinet/ip6.h>
 #include <inet/ip.h>
 #include <inet/ipclassifier.h>
-#include <inet/mi.h>
+#include <inet/proto_set.h>
 #include <inet/nd.h>
 #include <inet/optcom.h>
 #include <netinet/ip_mroute.h>
@@ -111,20 +111,10 @@ static rtsparam_t	lcl_param_arr[] = {
 #define	rtss_recv_hiwat		rtss_params[2].rts_param_value
 #define	rtss_max_buf		rtss_params[3].rts_param_value
 
-static int	rts_close(queue_t *q);
 static void 	rts_err_ack(queue_t *q, mblk_t *mp, t_scalar_t t_error,
     int sys_error);
 static void	rts_input(void *, mblk_t *, void *);
 static mblk_t	*rts_ioctl_alloc(mblk_t *data, cred_t *cr);
-static int	rts_open(queue_t *q, dev_t *devp, int flag, int sflag,
-    cred_t *credp);
-int		rts_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name,
-    uchar_t *ptr);
-int		rts_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name,
-    uchar_t *ptr);
-int		rts_opt_set(queue_t *q, uint_t optset_context, int level,
-    int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
-    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk);
 static int	rts_param_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *cr);
 static boolean_t rts_param_register(IDP *ndp, rtsparam_t *rtspa, int cnt);
 static int	rts_param_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
@@ -137,12 +127,21 @@ static void	rts_wput_iocdata(queue_t *q, mblk_t *mp);
 static void 	rts_wput_other(queue_t *q, mblk_t *mp);
 static int	rts_wrw(queue_t *q, struiod_t *dp);
 
+static int	rts_stream_open(queue_t *q, dev_t *devp, int flag, int sflag,
+		    cred_t *credp);
+static conn_t	*rts_open(int flag, cred_t *credp);
+
+static int	rts_stream_close(queue_t *q);
+static int	rts_close(sock_lower_handle_t proto_handle, int flags,
+		    cred_t *cr);
+
 static struct module_info rts_mod_info = {
 	129, "rts", 1, INFPSZ, 512, 128
 };
 
 static struct qinit rtsrinit = {
-	NULL, (pfi_t)rts_rsrv, rts_open, rts_close, NULL, &rts_mod_info
+	NULL, (pfi_t)rts_rsrv, rts_stream_open, rts_stream_close, NULL,
+	&rts_mod_info
 };
 
 static struct qinit rtswinit = {
@@ -201,9 +200,8 @@ rts_ioctl_alloc(mblk_t *data, cred_t *cr)
  * internal datastructure.
  */
 static int
-rts_close(queue_t *q)
+rts_common_close(queue_t *q, conn_t *connp)
 {
-	conn_t	*connp = Q_TO_CONN(q);
 
 	ASSERT(connp != NULL && IPCL_IS_RTS(connp));
 
@@ -211,25 +209,39 @@ rts_close(queue_t *q)
 
 	ip_quiesce_conn(connp);
 
-	qprocsoff(q);
+	if (!IPCL_IS_NONSTR(connp)) {
+		qprocsoff(q);
 
-	/*
-	 * Now we are truly single threaded on this stream, and can
-	 * delete the things hanging off the connp, and finally the connp.
-	 * We removed this connp from the fanout list, it cannot be
-	 * accessed thru the fanouts, and we already waited for the
-	 * conn_ref to drop to 0. We are already in close, so
-	 * there cannot be any other thread from the top. qprocsoff
-	 * has completed, and service has completed or won't run in
-	 * future.
-	 */
+		/*
+		 * Now we are truly single threaded on this stream, and can
+		 * delete the things hanging off the connp, and finally the
+		 * connp.
+		 * We removed this connp from the fanout list, it cannot be
+		 * accessed thru the fanouts, and we already waited for the
+		 * conn_ref to drop to 0. We are already in close, so
+		 * there cannot be any other thread from the top. qprocsoff
+		 * has completed, and service has completed or won't run in
+		 * future.
+		 */
+		inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
+	} else {
+		ip_close_helper_stream(connp);
+	}
 	ASSERT(connp->conn_ref == 1);
 
-	inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
 
 	connp->conn_ref--;
 	ipcl_conn_destroy(connp);
 
+	return (0);
+}
+
+static int
+rts_stream_close(queue_t *q)
+{
+	conn_t  *connp = Q_TO_CONN(q);
+
+	(void) rts_common_close(q, connp);
 	q->q_ptr = WR(q)->q_ptr = NULL;
 	return (0);
 }
@@ -240,14 +252,12 @@ rts_close(queue_t *q)
  */
 /* ARGSUSED */
 static int
-rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
+rts_stream_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 {
-	rts_t	*rts;
 	conn_t *connp;
 	dev_t	conn_dev;
-	zoneid_t zoneid;
-	netstack_t *ns;
 	rts_stack_t *rtss;
+	rts_t   *rts;
 
 	/* If the stream is already open, return immediately. */
 	if (q->q_ptr != NULL)
@@ -255,6 +265,69 @@ rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	if (sflag == MODOPEN)
 		return (EINVAL);
+
+
+	/*
+	 * Since RTS is not used so heavily, allocating from the small
+	 * arena should be sufficient.
+	 */
+	if ((conn_dev = inet_minor_alloc(ip_minor_arena_sa)) == 0) {
+		return (EBUSY);
+	}
+
+	connp = rts_open(flag, credp);
+	ASSERT(connp != NULL);
+
+
+	*devp = makedevice(getemajor(*devp), (minor_t)conn_dev);
+
+	rts = connp->conn_rts;
+
+	rw_enter(&rts->rts_rwlock, RW_WRITER);
+	connp->conn_dev = conn_dev;
+	connp->conn_minor_arena = ip_minor_arena_sa;
+
+	/*
+	 * Initialize the rts_t structure for this stream.
+	 */
+	q->q_ptr = connp;
+	WR(q)->q_ptr = connp;
+	connp->conn_rq = q;
+	connp->conn_wq = WR(q);
+
+	rtss = rts->rts_rtss;
+	q->q_hiwat = rtss->rtss_recv_hiwat;
+	WR(q)->q_hiwat = rtss->rtss_xmit_hiwat;
+	WR(q)->q_lowat = rtss->rtss_xmit_lowat;
+
+
+
+	mutex_enter(&connp->conn_lock);
+	connp->conn_state_flags &= ~CONN_INCIPIENT;
+	mutex_exit(&connp->conn_lock);
+
+	qprocson(q);
+	rw_exit(&rts->rts_rwlock);
+	/*
+	 * Indicate the down IP module that this is a routing socket
+	 * client by sending an RTS IOCTL without any user data. Although
+	 * this is just a notification message (without any real routing
+	 * request), we pass in any credential for correctness sake.
+	 */
+	ip_rts_register(connp);
+
+	return (0);
+}
+
+/* ARGSUSED */
+static conn_t *
+rts_open(int flag, cred_t *credp)
+{
+	netstack_t *ns;
+	rts_stack_t *rtss;
+	rts_t	*rts;
+	conn_t	*connp;
+	zoneid_t zoneid;
 
 	ns = netstack_find_by_cred(credp);
 	ASSERT(ns != NULL);
@@ -270,19 +343,7 @@ rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	else
 		zoneid = crgetzoneid(credp);
 
-	/*
-	 * Since RTS is not used so heavily, allocating from the small
-	 * arena should be sufficient.
-	 */
-	if ((conn_dev = inet_minor_alloc(ip_minor_arena_sa)) == 0) {
-		netstack_rele(ns);
-		return (EBUSY);
-	}
-	*devp = makedevice(getemajor(*devp), (minor_t)conn_dev);
-
 	connp = ipcl_conn_create(IPCL_RTSCONN, KM_SLEEP, ns);
-	connp->conn_dev = conn_dev;
-	connp->conn_minor_arena = ip_minor_arena_sa;
 	rts = connp->conn_rts;
 
 	/*
@@ -291,51 +352,32 @@ rts_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	 */
 	netstack_rele(ns);
 
-	/*
-	 * Initialize the rts_t structure for this stream.
-	 */
-	q->q_ptr = connp;
-	WR(q)->q_ptr = connp;
-	connp->conn_rq = q;
-	connp->conn_wq = WR(q);
 
 	rw_enter(&rts->rts_rwlock, RW_WRITER);
 	ASSERT(connp->conn_rts == rts);
 	ASSERT(rts->rts_connp == connp);
 
-	/* Set the initial state of the stream and the privilege status. */
-	rts->rts_state = TS_UNBND;
 	connp->conn_zoneid = zoneid;
+	connp->conn_flow_cntrld = B_FALSE;
 
 	connp->conn_ulp_labeled = is_system_labeled();
 
 	rts->rts_rtss = rtss;
-
-	q->q_hiwat = rtss->rtss_recv_hiwat;
-	WR(q)->q_hiwat = rtss->rtss_xmit_hiwat;
-	WR(q)->q_lowat = rtss->rtss_xmit_lowat;
+	rts->rts_xmit_hiwat = rtss->rtss_xmit_hiwat;
 
 	connp->conn_recv = rts_input;
 	crhold(credp);
 	connp->conn_cred = credp;
 
-	mutex_enter(&connp->conn_lock);
-	connp->conn_state_flags &= ~CONN_INCIPIENT;
-	mutex_exit(&connp->conn_lock);
-
-	qprocson(q);
+	/*
+	 * rts sockets start out as bound and connected
+	 * For streams based sockets, socket state is set to
+	 * SS_ISBOUND | SS_ISCONNECTED in so_strinit.
+	 */
+	rts->rts_state = TS_DATA_XFER;
 	rw_exit(&rts->rts_rwlock);
 
-	/*
-	 * Indicate the down IP module that this is a routing socket
-	 * client by sending an RTS IOCTL without any user data. Although
-	 * this is just a notification message (without any real routing
-	 * request), we pass in any credential for correctness sake.
-	 */
-	ip_rts_register(connp);
-
-	return (0);
-
+	return (connp);
 }
 
 /*
@@ -362,7 +404,7 @@ rts_ok_ack(queue_t *q, mblk_t *mp)
  * This routine is called by rts_wput to handle T_UNBIND_REQ messages.
  */
 static void
-rts_unbind(queue_t *q, mblk_t *mp)
+rts_tpi_unbind(queue_t *q, mblk_t *mp)
 {
 	conn_t	*connp = Q_TO_CONN(q);
 	rts_t	*rts = connp->conn_rts;
@@ -383,7 +425,7 @@ rts_unbind(queue_t *q, mblk_t *mp)
  * O_T_BIND_REQ and T_BIND_REQ semantics.
  */
 static void
-rts_bind(queue_t *q, mblk_t *mp)
+rts_tpi_bind(queue_t *q, mblk_t *mp)
 {
 	conn_t	*connp = Q_TO_CONN(q);
 	rts_t	*rts = connp->conn_rts;
@@ -392,13 +434,13 @@ rts_bind(queue_t *q, mblk_t *mp)
 
 	if ((mp->b_wptr - mp->b_rptr) < sizeof (*tbr)) {
 		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-		    "rts_bind: bad data, %d", rts->rts_state);
+		    "rts_tpi_bind: bad data, %d", rts->rts_state);
 		rts_err_ack(q, mp, TBADADDR, 0);
 		return;
 	}
 	if (rts->rts_state != TS_UNBND) {
 		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-		    "rts_bind: bad state, %d", rts->rts_state);
+		    "rts_tpi_bind: bad state, %d", rts->rts_state);
 		rts_err_ack(q, mp, TOUTSTATE, 0);
 		return;
 	}
@@ -415,7 +457,7 @@ rts_bind(queue_t *q, mblk_t *mp)
 	tbr = (struct T_bind_req *)mp->b_rptr;
 	if (tbr->ADDR_length != 0) {
 		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
-		    "rts_bind: bad ADDR_length %d", tbr->ADDR_length);
+		    "rts_tpi_bind: bad ADDR_length %d", tbr->ADDR_length);
 		rts_err_ack(q, mp, TBADADDR, 0);
 		return;
 	}
@@ -498,16 +540,14 @@ rts_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 	return (-1);
 }
 
-/*
- * This routine retrieves the current status of socket options.
- * It returns the size of the option retrieved.
- */
-int
-rts_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
+
+static int
+rts_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 {
-	int	*i1 = (int *)ptr;
-	conn_t	*connp = Q_TO_CONN(q);
 	rts_t	*rts = connp->conn_rts;
+	int	*i1 = (int *)ptr;
+
+	ASSERT(RW_READ_HELD(&rts->rts_rwlock));
 
 	switch (level) {
 	case SOL_SOCKET:
@@ -543,12 +583,12 @@ rts_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		 * but changing them should do nothing.
 		 */
 		case SO_SNDBUF:
-			ASSERT(q->q_hiwat <= INT_MAX);
-			*i1 = (int)(q->q_hiwat);
+			ASSERT(rts->rts_xmit_hiwat <= INT_MAX);
+			*i1 = (int)(rts->rts_xmit_hiwat);
 			break;
 		case SO_RCVBUF:
-			ASSERT(q->q_hiwat <= INT_MAX);
-			*i1 = (int)(RD(q)->q_hiwat);
+			ASSERT(rts->rts_recv_hiwat <= INT_MAX);
+			*i1 = (int)(rts->rts_recv_hiwat);
 			break;
 		case SO_DOMAIN:
 			*i1 = PF_ROUTE;
@@ -563,60 +603,17 @@ rts_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 	return ((int)sizeof (int));
 }
 
-
-/*
- * This routine sets socket options.
- */
-/*ARGSUSED*/
-int
-rts_opt_set(queue_t *q, uint_t optset_context, int level,
-    int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
-    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
+/* ARGSUSED */
+static int
+rts_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
+    uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp, cred_t *cr,
+    void *thisdg_attrs, boolean_t checkonly)
 {
 	int	*i1 = (int *)invalp;
-	conn_t	*connp = Q_TO_CONN(q);
 	rts_t	*rts = connp->conn_rts;
-	boolean_t checkonly;
 	rts_stack_t	*rtss = rts->rts_rtss;
 
-	switch (optset_context) {
-	case SETFN_OPTCOM_CHECKONLY:
-		checkonly = B_TRUE;
-		/*
-		 * Note: Implies T_CHECK semantics for T_OPTCOM_REQ
-		 * inlen != 0 implies value supplied and
-		 * 	we have to "pretend" to set it.
-		 * inlen == 0 implies that there is no
-		 * 	value part in T_CHECK request and just validation
-		 * done elsewhere should be enough, we just return here.
-		 */
-		if (inlen == 0) {
-			*outlenp = 0;
-			return (0);
-		}
-		break;
-	case SETFN_OPTCOM_NEGOTIATE:
-		checkonly = B_FALSE;
-		break;
-	case SETFN_UD_NEGOTIATE:
-	case SETFN_CONN_NEGOTIATE:
-		checkonly = B_FALSE;
-		/*
-		 * Negotiating local and "association-related" options
-		 * through T_UNITDATA_REQ or T_CONN_{REQ,CON}
-		 * Not allowed in this module.
-		 */
-		return (EINVAL);
-	default:
-		/*
-		 * We should never get here
-		 */
-		*outlenp = 0;
-		return (EINVAL);
-	}
-
-	ASSERT((optset_context != SETFN_OPTCOM_CHECKONLY) ||
-	    (optset_context == SETFN_OPTCOM_CHECKONLY && inlen != 0));
+	ASSERT(RW_WRITE_HELD(&rts->rts_rwlock));
 
 	/*
 	 * For rts, we should have no ancillary data sent down
@@ -680,7 +677,9 @@ rts_opt_set(queue_t *q, uint_t optset_context, int level,
 				return (ENOBUFS);
 			}
 			if (!checkonly) {
-				q->q_hiwat = *i1;
+				rts->rts_xmit_hiwat = *i1;
+				if (!IPCL_IS_NONSTR(connp))
+					connp->conn_wq->q_hiwat = *i1;
 			}
 			break;	/* goto sizeof (int) option return */
 		case SO_RCVBUF:
@@ -689,9 +688,13 @@ rts_opt_set(queue_t *q, uint_t optset_context, int level,
 				return (ENOBUFS);
 			}
 			if (!checkonly) {
-				RD(q)->q_hiwat = *i1;
-				(void) mi_set_sth_hiwat(RD(q), *i1);
+				rts->rts_recv_hiwat = *i1;
+				rw_exit(&rts->rts_rwlock);
+				(void) proto_set_rx_hiwat(connp->conn_rq, connp,
+				    *i1);
+				rw_enter(&rts->rts_rwlock, RW_WRITER);
 			}
+
 			break;	/* goto sizeof (int) option return */
 		default:
 			*outlenp = 0;
@@ -705,9 +708,103 @@ rts_opt_set(queue_t *q, uint_t optset_context, int level,
 	/*
 	 * Common case of return from an option that is sizeof (int)
 	 */
-	*(int *)outvalp = *i1;
+	if (invalp != outvalp) {
+		/* don't trust bcopy for identical src/dst */
+		(void) bcopy(invalp, outvalp, inlen);
+	}
 	*outlenp = (t_uscalar_t)sizeof (int);
 	return (0);
+}
+
+static int
+rts_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
+    uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
+    void *thisdg_attrs, cred_t *cr)
+{
+	boolean_t 	checkonly = B_FALSE;
+
+	if (optset_context) {
+		switch (optset_context) {
+		case SETFN_OPTCOM_CHECKONLY:
+			checkonly = B_TRUE;
+			/*
+			 * Note: Implies T_CHECK semantics for T_OPTCOM_REQ
+			 * inlen != 0 implies value supplied and
+			 * 	we have to "pretend" to set it.
+			 * inlen == 0 implies that there is no value part
+			 * 	in T_CHECK request and just validation
+			 * done elsewhere should be enough, we just return here.
+			 */
+			if (inlen == 0) {
+				*outlenp = 0;
+				return (0);
+			}
+			break;
+		case SETFN_OPTCOM_NEGOTIATE:
+			checkonly = B_FALSE;
+			break;
+		case SETFN_UD_NEGOTIATE:
+		case SETFN_CONN_NEGOTIATE:
+			checkonly = B_FALSE;
+			/*
+			 * Negotiating local and "association-related" options
+			 * through T_UNITDATA_REQ or T_CONN_{REQ,CON}
+			 * Not allowed in this module.
+			 */
+			return (EINVAL);
+		default:
+			/*
+			 * We should never get here
+			 */
+			*outlenp = 0;
+			return (EINVAL);
+		}
+
+		ASSERT((optset_context != SETFN_OPTCOM_CHECKONLY) ||
+		    (optset_context == SETFN_OPTCOM_CHECKONLY && inlen != 0));
+
+	}
+	return (rts_do_opt_set(connp, level, name, inlen, invalp, outlenp,
+	    outvalp, cr, thisdg_attrs, checkonly));
+
+}
+
+/*
+ * This routine retrieves the current status of socket options.
+ * It returns the size of the option retrieved.
+ */
+int
+rts_tpi_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
+{
+	rts_t	*rts;
+	int	err;
+
+	rts = Q_TO_RTS(q);
+	rw_enter(&rts->rts_rwlock, RW_READER);
+	err = rts_opt_get(Q_TO_CONN(q), level, name, ptr);
+	rw_exit(&rts->rts_rwlock);
+	return (err);
+}
+
+/*
+ * This routine sets socket options.
+ */
+/*ARGSUSED*/
+int
+rts_tpi_opt_set(queue_t *q, uint_t optset_context, int level,
+    int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
+    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
+{
+	conn_t	*connp = Q_TO_CONN(q);
+	int	error;
+	rts_t	*rts = connp->conn_rts;
+
+
+	rw_enter(&rts->rts_rwlock, RW_WRITER);
+	error = rts_opt_set(connp, optset_context, level, name, inlen, invalp,
+	    outlenp, outvalp, thisdg_attrs, cr);
+	rw_exit(&rts->rts_rwlock);
+	return (error);
 }
 
 /*
@@ -803,7 +900,7 @@ rts_wrw(queue_t *q, struiod_t *dp)
 			rts->rts_error = EINTR;
 			goto err_ret;
 		}
-		}
+	}
 	rts->rts_flag |= RTS_WRW_PENDING;
 
 	if (isuioq(q) && (error = struioget(q, mp, dp, 0))) {
@@ -954,10 +1051,10 @@ rts_wput_other(queue_t *q, mblk_t *mp)
 		switch (((union T_primitives *)rptr)->type) {
 		case T_BIND_REQ:
 		case O_T_BIND_REQ:
-			rts_bind(q, mp);
+			rts_tpi_bind(q, mp);
 			return;
 		case T_UNBIND_REQ:
-			rts_unbind(q, mp);
+			rts_tpi_unbind(q, mp);
 			return;
 		case T_CAPABILITY_REQ:
 			rts_capability_req(q, mp);
@@ -985,6 +1082,7 @@ rts_wput_other(queue_t *q, mblk_t *mp)
 			freemsg(mp);
 			(void) putnextctl1(RD(q), M_ERROR, EPROTO);
 			return;
+
 		default:
 			break;
 		}
@@ -1086,21 +1184,33 @@ rts_input(void *arg1, mblk_t *mp, void *arg2)
 	struct iocblk	*iocp;
 	mblk_t *mp1;
 	struct T_data_ind *tdi;
+	int	error;
 
 	switch (mp->b_datap->db_type) {
 	case M_IOCACK:
 	case M_IOCNAK:
 		iocp = (struct iocblk *)mp->b_rptr;
-		if (rts->rts_flag & (RTS_WPUT_PENDING)) {
-			rts->rts_flag &= ~RTS_WPUT_PENDING;
+		if (IPCL_IS_NONSTR(connp)) {
+			ASSERT(rts->rts_flag & (RTS_REQ_PENDING));
+			mutex_enter(&rts->rts_send_mutex);
+			rts->rts_flag &= ~RTS_REQ_INPROG;
 			rts->rts_error = iocp->ioc_error;
-			/*
-			 * Tell rts_wvw/qwait that we are done.
-			 * Note: there is no qwait_wakeup() we can use.
-			 */
-			qenable(connp->conn_rq);
+			cv_signal(&rts->rts_io_cv);
+			mutex_exit(&rts->rts_send_mutex);
 			freemsg(mp);
 			return;
+		} else {
+			if (rts->rts_flag & (RTS_WPUT_PENDING)) {
+				rts->rts_flag &= ~RTS_WPUT_PENDING;
+				rts->rts_error = iocp->ioc_error;
+				/*
+				 * Tell rts_wvw/qwait that we are done.
+				 * Note: there is no qwait_wakeup() we can use.
+				 */
+				qenable(connp->conn_rq);
+				freemsg(mp);
+				return;
+			}
 		}
 		break;
 	case M_DATA:
@@ -1124,12 +1234,33 @@ rts_input(void *arg1, mblk_t *mp, void *arg2)
 	default:
 		break;
 	}
-	putnext(connp->conn_rq, mp);
+
+	if (IPCL_IS_NONSTR(connp)) {
+		if ((*connp->conn_upcalls->su_recv)
+		    (connp->conn_upper_handle, mp, msgdsize(mp), 0,
+		    &error, NULL) < 0) {
+			ASSERT(error == ENOSPC);
+			/*
+			 * Let's confirm hoding the lock that
+			 * we are out of recv space.
+			 */
+			mutex_enter(&rts->rts_recv_mutex);
+			if ((*connp->conn_upcalls->su_recv)
+			    (connp->conn_upper_handle, NULL, 0, 0,
+			    &error, NULL) < 0) {
+				ASSERT(error == ENOSPC);
+				connp->conn_flow_cntrld = B_TRUE;
+			}
+			mutex_exit(&rts->rts_recv_mutex);
+		}
+	} else {
+		putnext(connp->conn_rq, mp);
+	}
 }
 
 
 void
-rts_ddi_init(void)
+rts_ddi_g_init(void)
 {
 	rts_max_optsize = optcom_max_optsize(rts_opt_obj.odb_opt_des_arr,
 	    rts_opt_obj.odb_opt_arr_cnt);
@@ -1143,10 +1274,12 @@ rts_ddi_init(void)
 }
 
 void
-rts_ddi_destroy(void)
+rts_ddi_g_destroy(void)
 {
 	netstack_unregister(NS_RTS);
 }
+
+#define	INET_NAME	"ip"
 
 /*
  * Initialize the RTS stack instance.
@@ -1157,6 +1290,8 @@ rts_stack_init(netstackid_t stackid, netstack_t *ns)
 {
 	rts_stack_t	*rtss;
 	rtsparam_t	*pa;
+	int		error = 0;
+	major_t		major;
 
 	rtss = (rts_stack_t *)kmem_zalloc(sizeof (*rtss), KM_SLEEP);
 	rtss->rtss_netstack = ns;
@@ -1167,6 +1302,10 @@ rts_stack_init(netstackid_t stackid, netstack_t *ns)
 
 	(void) rts_param_register(&rtss->rtss_g_nd,
 	    rtss->rtss_params, A_CNT(lcl_param_arr));
+
+	major = mod_name_to_major(INET_NAME);
+	error = ldi_ident_from_major(major, &rtss->rtss_ldi_ident);
+	ASSERT(error == 0);
 	return (rtss);
 }
 
@@ -1182,5 +1321,411 @@ rts_stack_fini(netstackid_t stackid, void *arg)
 	nd_free(&rtss->rtss_g_nd);
 	kmem_free(rtss->rtss_params, sizeof (lcl_param_arr));
 	rtss->rtss_params = NULL;
+	ldi_ident_release(rtss->rtss_ldi_ident);
 	kmem_free(rtss, sizeof (*rtss));
 }
+
+/* ARGSUSED */
+int
+rts_accept(sock_lower_handle_t lproto_handle,
+    sock_lower_handle_t eproto_handle, sock_upper_handle_t sock_handle,
+    cred_t *cr)
+{
+	return (EINVAL);
+}
+
+/* ARGSUSED */
+static int
+rts_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
+    socklen_t len, cred_t *cr)
+{
+	/*
+	 * rebind not allowed
+	 */
+	return (EINVAL);
+}
+
+/* ARGSUSED */
+int
+rts_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
+{
+	return (EINVAL);
+}
+
+/* ARGSUSED */
+int
+rts_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
+    socklen_t len, sock_connid_t *id, cred_t *cr)
+{
+	/*
+	 * rts sockets start out as bound and connected
+	 */
+	*id = 0;
+	return (EISCONN);
+}
+
+/* ARGSUSED */
+int
+rts_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *addr,
+    socklen_t *addrlen, cred_t *cr)
+{
+	conn_t *connp = (conn_t *)proto_handle;
+	rts_t *rts = connp->conn_rts;
+
+	ASSERT(rts != NULL);
+
+	bzero(addr, sizeof (struct sockaddr));
+	addr->sa_family = AF_ROUTE;
+	*addrlen = sizeof (struct sockaddr);
+
+	return (0);
+}
+
+/* ARGSUSED */
+int
+rts_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
+    socklen_t *addrlen, cred_t *cr)
+{
+	return (EOPNOTSUPP);
+}
+
+static int
+rts_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
+    void *optvalp, socklen_t *optlen, cred_t *cr)
+{
+	conn_t  	*connp = (conn_t *)proto_handle;
+	rts_t		*rts = connp->conn_rts;
+	int		error;
+	t_uscalar_t	max_optbuf_len;
+	void		*optvalp_buf;
+	int		len;
+
+	error = proto_opt_check(level, option_name, *optlen, &max_optbuf_len,
+	    rts_opt_obj.odb_opt_des_arr,
+	    rts_opt_obj.odb_opt_arr_cnt,
+	    rts_opt_obj.odb_topmost_tpiprovider,
+	    B_FALSE, B_TRUE, cr);
+	if (error != 0) {
+		if (error < 0)
+			error = proto_tlitosyserr(-error);
+		return (error);
+	}
+
+	optvalp_buf = kmem_alloc(max_optbuf_len, KM_SLEEP);
+	rw_enter(&rts->rts_rwlock, RW_READER);
+	len = rts_opt_get(connp, level, option_name, optvalp_buf);
+	rw_exit(&rts->rts_rwlock);
+
+	if (len < 0) {
+		/*
+		 * Pass on to IP
+		 */
+		error = ip_get_options(connp, level, option_name,
+		    optvalp, optlen, cr);
+	} else {
+		/*
+		 * update optlen and copy option value
+		 */
+		t_uscalar_t size = MIN(len, *optlen);
+		bcopy(optvalp_buf, optvalp, size);
+		bcopy(&size, optlen, sizeof (size));
+		error = 0;
+	}
+
+	kmem_free(optvalp_buf, max_optbuf_len);
+	return (error);
+}
+
+static int
+rts_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
+    const void *optvalp, socklen_t optlen, cred_t *cr)
+{
+	conn_t	*connp = (conn_t *)proto_handle;
+	rts_t	*rts = connp->conn_rts;
+	int	error;
+
+	error = proto_opt_check(level, option_name, optlen, NULL,
+	    rts_opt_obj.odb_opt_des_arr,
+	    rts_opt_obj.odb_opt_arr_cnt,
+	    rts_opt_obj.odb_topmost_tpiprovider,
+	    B_TRUE, B_FALSE, cr);
+
+	if (error != 0) {
+		if (error < 0)
+			error = proto_tlitosyserr(-error);
+		return (error);
+	}
+
+	rw_enter(&rts->rts_rwlock, RW_WRITER);
+	error = rts_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, level, option_name,
+	    optlen, (uchar_t *)optvalp, (uint_t *)&optlen, (uchar_t *)optvalp,
+	    NULL, cr);
+	rw_exit(&rts->rts_rwlock);
+
+	ASSERT(error >= 0);
+
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+rts_send(sock_lower_handle_t proto_handle, mblk_t *mp,
+    struct nmsghdr *msg, cred_t *cr)
+{
+	mblk_t  *mp1;
+	conn_t  *connp = (conn_t *)proto_handle;
+	rts_t   *rts = connp->conn_rts;
+	rt_msghdr_t	*rtm;
+	int error;
+
+	ASSERT(DB_TYPE(mp) == M_DATA);
+	/*
+	 * The semantics of the routing socket is such that the rtm_pid
+	 * field is automatically filled in during requests with the
+	 * current process' pid.  We do this here (where we still have
+	 * user context) after checking we have at least a message the
+	 * size of a routing message header.
+	 */
+	if ((mp->b_wptr - mp->b_rptr) < sizeof (rt_msghdr_t)) {
+		if (!pullupmsg(mp, sizeof (rt_msghdr_t))) {
+			rts->rts_error = EINVAL;
+			freemsg(mp);
+			return (rts->rts_error);
+		}
+	}
+	rtm = (rt_msghdr_t *)mp->b_rptr;
+	rtm->rtm_pid = curproc->p_pid;
+
+	mp1 = rts_ioctl_alloc(mp, DB_CRED(mp));
+	if (mp1 == NULL) {
+		ASSERT(rts != NULL);
+		freemsg(mp);
+		return (ENOMEM);
+	}
+
+	/*
+	 * Allow only one outstanding request(ioctl) at any given time
+	 */
+	mutex_enter(&rts->rts_send_mutex);
+	while (rts->rts_flag & RTS_REQ_PENDING) {
+		int ret;
+
+		ret = cv_wait_sig(&rts->rts_send_cv, &rts->rts_send_mutex);
+		if (ret <= 0) {
+			mutex_exit(&rts->rts_send_mutex);
+			freemsg(mp);
+			return (EINTR);
+		}
+	}
+
+	rts->rts_flag |= RTS_REQ_PENDING;
+
+	rts->rts_flag |= RTS_REQ_INPROG;
+
+	mutex_exit(&rts->rts_send_mutex);
+
+	CONN_INC_REF(connp);
+
+	error = ip_rts_request_common(rts->rts_connp->conn_wq, mp1, connp,
+	    DB_CREDDEF(mp, connp->conn_cred));
+
+	mutex_enter(&rts->rts_send_mutex);
+	if (error == EINPROGRESS) {
+		ASSERT(rts->rts_flag & RTS_REQ_INPROG);
+		if (rts->rts_flag & RTS_REQ_INPROG) {
+			/*
+			 * Once the request has been issued we wait for
+			 * completion
+			 */
+			cv_wait(&rts->rts_io_cv, &rts->rts_send_mutex);
+			error = rts->rts_error;
+		}
+	}
+
+	ASSERT((error != 0) || !(rts->rts_flag & RTS_REQ_INPROG));
+	ASSERT(MUTEX_HELD(&rts->rts_send_mutex));
+
+	rts->rts_flag &= ~(RTS_REQ_PENDING | RTS_REQ_INPROG);
+	cv_signal(&rts->rts_send_cv);
+	mutex_exit(&rts->rts_send_mutex);
+	return (error);
+}
+
+/* ARGSUSED */
+sock_lower_handle_t
+rts_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
+    uint_t *smodep, int *errorp, int flags, cred_t *credp)
+{
+	conn_t	*connp;
+	rts_t	*rts;
+	rts_stack_t *rtss;
+
+	if (family != AF_ROUTE || type != SOCK_RAW ||
+	    (proto != 0 && proto != AF_INET && proto != AF_INET6)) {
+		*errorp = EPROTONOSUPPORT;
+		return (NULL);
+	}
+
+	connp = rts_open(flags, credp);
+	ASSERT(connp != NULL);
+	connp->conn_flags |= IPCL_NONSTR;
+
+	rts = connp->conn_rts;
+	rtss = rts->rts_rtss;
+
+	rts->rts_xmit_hiwat = rtss->rtss_xmit_hiwat;
+	rts->rts_xmit_lowat = rtss->rtss_xmit_lowat;
+	rts->rts_recv_hiwat = rtss->rtss_recv_hiwat;
+	rts->rts_recv_lowat = rts_mod_info.mi_lowat;
+
+	ASSERT(rtss->rtss_ldi_ident != NULL);
+
+	*errorp = ip_create_helper_stream(connp, rtss->rtss_ldi_ident);
+	if (*errorp != 0) {
+#ifdef DEBUG
+		cmn_err(CE_CONT, "rts_create: create of IP helper stream"
+		    " failed\n");
+#endif
+		(void) rts_close((sock_lower_handle_t)connp, 0, credp);
+		return (NULL);
+	}
+
+	mutex_enter(&connp->conn_lock);
+	connp->conn_state_flags &= ~CONN_INCIPIENT;
+	mutex_exit(&connp->conn_lock);
+
+	*errorp = 0;
+	*smodep = SM_ATOMIC;
+	*sock_downcalls = &sock_rts_downcalls;
+	return ((sock_lower_handle_t)connp);
+}
+
+/* ARGSUSED */
+void
+rts_activate(sock_lower_handle_t proto_handle, sock_upper_handle_t sock_handle,
+    sock_upcalls_t *sock_upcalls, int flags, cred_t *cr)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+	rts_t	*rts = connp->conn_rts;
+	rts_stack_t *rtss = rts->rts_rtss;
+	struct sock_proto_props sopp;
+
+	connp->conn_upcalls = sock_upcalls;
+	connp->conn_upper_handle = sock_handle;
+
+	sopp.sopp_flags = SOCKOPT_WROFF | SOCKOPT_RCVHIWAT | SOCKOPT_RCVLOWAT |
+	    SOCKOPT_MAXBLK | SOCKOPT_MAXPSZ | SOCKOPT_MINPSZ;
+	sopp.sopp_wroff = 0;
+	sopp.sopp_rxhiwat = rtss->rtss_recv_hiwat;
+	sopp.sopp_rxlowat = rts_mod_info.mi_lowat;
+	sopp.sopp_maxblk = INFPSZ;
+	sopp.sopp_maxpsz = rts_mod_info.mi_maxpsz;
+	sopp.sopp_minpsz = (rts_mod_info.mi_minpsz == 1) ? 0 :
+	    rts_mod_info.mi_minpsz;
+
+	(*connp->conn_upcalls->su_set_proto_props)
+	    (connp->conn_upper_handle, &sopp);
+
+	/*
+	 * We treat it as already connected for routing socket.
+	 */
+	(*connp->conn_upcalls->su_connected)
+	    (connp->conn_upper_handle, 0, NULL, -1);
+
+	/*
+	 * Indicate the down IP module that this is a routing socket
+	 * client by sending an RTS IOCTL without any user data. Although
+	 * this is just a notification message (without any real routing
+	 * request), we pass in any credential for correctness sake.
+	 */
+	ip_rts_register(connp);
+}
+
+/* ARGSUSED */
+int
+rts_close(sock_lower_handle_t proto_handle, int flags, cred_t *cr)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+
+	ASSERT(connp != NULL && IPCL_IS_RTS(connp));
+	return (rts_common_close(NULL, connp));
+}
+
+/* ARGSUSED */
+int
+rts_shutdown(sock_lower_handle_t proto_handle, int how, cred_t *cr)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+
+	/* shut down the send side */
+	if (how != SHUT_RD)
+		(*connp->conn_upcalls->su_opctl)(connp->conn_upper_handle,
+		    SOCK_OPCTL_SHUT_SEND, 0);
+	/* shut down the recv side */
+	if (how != SHUT_WR)
+		(*connp->conn_upcalls->su_opctl)(connp->conn_upper_handle,
+		    SOCK_OPCTL_SHUT_RECV, 0);
+	return (0);
+}
+
+void
+rts_clr_flowctrl(sock_lower_handle_t proto_handle)
+{
+	conn_t  *connp = (conn_t *)proto_handle;
+	rts_t	*rts = connp->conn_rts;
+
+	mutex_enter(&rts->rts_recv_mutex);
+	connp->conn_flow_cntrld = B_FALSE;
+	mutex_exit(&rts->rts_recv_mutex);
+}
+
+int
+rts_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
+    int mode, int32_t *rvalp, cred_t *cr)
+{
+	conn_t		*connp = (conn_t *)proto_handle;
+	int		error;
+
+	switch (cmd) {
+	case ND_SET:
+	case ND_GET:
+	case TI_GETPEERNAME:
+	case TI_GETMYNAME:
+#ifdef DEUG
+		cmn_err(CE_CONT, "rts_ioctl cmd 0x%x on non sreams"
+		    " socket", cmd);
+#endif
+		error = EINVAL;
+		break;
+	default:
+		/*
+		 * Pass on to IP using helper stream
+		 */
+		error = ldi_ioctl(
+		    connp->conn_helper_info->ip_helper_stream_handle,
+		    cmd, arg, mode, cr, rvalp);
+		break;
+	}
+
+	return (error);
+}
+
+sock_downcalls_t sock_rts_downcalls = {
+	rts_activate,
+	rts_accept,
+	rts_bind,
+	rts_listen,
+	rts_connect,
+	rts_getpeername,
+	rts_getsockname,
+	rts_getsockopt,
+	rts_setsockopt,
+	rts_send,
+	NULL,
+	NULL,
+	NULL,
+	rts_shutdown,
+	rts_clr_flowctrl,
+	rts_ioctl,
+	rts_close
+};

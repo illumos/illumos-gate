@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -45,7 +43,7 @@ extern int	ip_opt_default(queue_t *q, int level, int name, uchar_t *ptr);
 extern int	ip_opt_get(queue_t *q, int level, int name, uchar_t *ptr);
 extern int	ip_opt_set(queue_t *q, uint_t optset_context, int level,
     int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
-    void *, cred_t *cr, mblk_t *);
+    void *dummy, cred_t *cr, mblk_t *first_mp);
 
 /*
  * Table of all known options handled on a IP protocol stack.
@@ -71,9 +69,11 @@ opdes_t		ip_opt_arr[] = {
 
 
 { IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
-	(OP_VARLEN|OP_NODEFAULT), 40, -1 /* not initialized */ },
+	(OP_VARLEN|OP_NODEFAULT),
+	IP_MAX_OPT_LENGTH + IP_ADDR_LEN, -1 /* not initialized */ },
 { T_IP_OPTIONS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP,
-	(OP_VARLEN|OP_NODEFAULT), 40, -1 /* not initialized */ },
+	(OP_VARLEN|OP_NODEFAULT),
+	IP_MAX_OPT_LENGTH + IP_ADDR_LEN, -1 /* not initialized */ },
 
 { IP_TOS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 { T_IP_TOS,	IPPROTO_IP, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },

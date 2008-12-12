@@ -378,9 +378,9 @@ extern void	mld_timeout_handler(void *);
 
 extern void	pr_addr_dbg(char *, int, const void *);
 extern int	ip_multirt_apply_membership_v6(int (*fn)(conn_t *, boolean_t,
-    const in6_addr_t *, int, mcast_record_t, const in6_addr_t *,
-    mblk_t *), ire_t *, conn_t *, boolean_t, const in6_addr_t *,
-    mcast_record_t, const in6_addr_t *, mblk_t *);
+    const in6_addr_t *, int, mcast_record_t, const in6_addr_t *, mblk_t *),
+    ire_t *, conn_t *, boolean_t, const in6_addr_t *, mcast_record_t,
+    const in6_addr_t *, mblk_t *);
 extern void	ip_newroute_ipif_v6(queue_t *, mblk_t *, ipif_t *,
     in6_addr_t, int, zoneid_t);
 extern void	ip_newroute_v6(queue_t *, mblk_t *, const in6_addr_t *,
@@ -391,6 +391,11 @@ extern size_t	ip6_get_src_preferences(conn_t *, uint32_t *);
 extern int	ip6_set_src_preferences(conn_t *, uint32_t);
 extern int	ip6_set_pktinfo(cred_t *, conn_t *, struct in6_pktinfo *,
     mblk_t *);
+extern int	ip_proto_bind_laddr_v6(conn_t *, mblk_t **, uint8_t,
+    const in6_addr_t *, uint16_t, boolean_t);
+extern int	ip_proto_bind_connected_v6(conn_t *, mblk_t **,
+    uint8_t, in6_addr_t *, uint16_t, const in6_addr_t *, ip6_pkt_t *,
+    uint16_t, boolean_t, boolean_t);
 
 #endif	/* _KERNEL */
 

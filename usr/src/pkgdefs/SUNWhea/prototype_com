@@ -971,6 +971,7 @@ f none usr/include/sys/kmem.h 644 root bin
 f none usr/include/sys/kmem_impl.h 644 root bin
 f none usr/include/sys/kobj.h 644 root bin
 f none usr/include/sys/kobj_impl.h 644 root bin
+f none usr/include/sys/ksocket.h 644 root bin
 f none usr/include/sys/kstat.h 644 root bin
 f none usr/include/sys/kstr.h 644 root bin
 f none usr/include/sys/ksyms.h 644 root bin
@@ -1225,6 +1226,7 @@ f none usr/include/sys/socket.h 644 root bin
 f none usr/include/sys/socket_impl.h 644 root bin
 f none usr/include/sys/socketvar.h 644 root bin
 f none usr/include/sys/sockio.h 644 root bin
+f none usr/include/sys/socket_proto.h 644 root bin
 f none usr/include/sys/sodirect.h 644 root bin
 f none usr/include/sys/sservice.h 644 root bin
 f none usr/include/sys/squeue.h 644 root bin

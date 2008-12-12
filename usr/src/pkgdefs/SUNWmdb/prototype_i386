@@ -89,6 +89,7 @@ f none usr/lib/mdb/kvm/amd64/sppp.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/ufs.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/uhci.so 555 root sys
 f none usr/lib/mdb/kvm/amd64/usba.so 555 root sys
+f none usr/lib/mdb/kvm/amd64/sockfs.so 555 root sys
 f none usr/lib/mdb/kvm/arp.so 555 root sys
 f none usr/lib/mdb/kvm/audiosup.so 555 root sys
 f none usr/lib/mdb/kvm/cpc.so 555 root sys
@@ -117,6 +118,7 @@ f none usr/lib/mdb/kvm/s1394.so 555 root sys
 f none usr/lib/mdb/kvm/scsi_vhci.so 555 root sys
 f none usr/lib/mdb/kvm/sctp.so 555 root sys
 f none usr/lib/mdb/kvm/sd.so 555 root sys
+f none usr/lib/mdb/kvm/sockfs.so 555 root sys
 f none usr/lib/mdb/kvm/specfs.so 555 root sys
 f none usr/lib/mdb/kvm/sppp.so 555 root sys
 f none usr/lib/mdb/kvm/ufs.so 555 root sys

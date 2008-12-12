@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * NL7C (Network Layer 7 Cache) as part of SOCKFS provides an in-kernel
@@ -57,6 +55,7 @@
 #include <netinet/in.h>
 #include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/nl7curi.h>
+#include <fs/sockfs/socktpi.h>
 
 #include <inet/nca/ncadoorhdr.h>
 #include <inet/nca/ncalogd.h>
@@ -90,7 +89,7 @@ extern void	nl7c_nca_init(void);
  *
  * This list is searched at bind(3SOCKET) time when an application doesn't
  * explicitly set AF_NCA but instead uses AF_INET, if a match is found then
- * the underlying socket is marked so_nl7c_flags NL7C_ENABLED.
+ * the underlying socket is marked sti_nl7c_flags NL7C_ENABLED.
  */
 
 typedef struct nl7c_addr_s {
@@ -121,7 +120,7 @@ nl7c_listener_addr(void *arg, struct sonode *so)
 
 	if (p->listener == NULL)
 		p->listener = so;
-	so->so_nl7c_addr = arg;
+	SOTOTPI(so)->sti_nl7c_addr = arg;
 }
 
 struct sonode *
@@ -256,7 +255,7 @@ nl7c_mi_report_addr(mblk_t *mp)
 				int a4 = ip & 0xFF;
 
 				(void) mi_sprintf(addr, "%d.%d.%d.%d",
-					a1, a2, a3, a4);
+				    a1, a2, a3, a4);
 			}
 			so = p->listener;
 			(void) mi_mpprintf(mp, "%p  %s:%d  %d",
@@ -398,7 +397,7 @@ ncaportconf_read(void)
 			if (ret != 0) {
 				/* Error of some sort, tell'm about it */
 				cmn_err(CE_WARN, "%s: read error %d",
-					portconf, ret);
+				    portconf, ret);
 				break;
 			}
 			if (resid == sizeof (buf)) {
@@ -564,7 +563,7 @@ ncakmodconf_read(void)
 			if (ret != 0) {
 				/* Error of some sort, tell'm about it */
 				cmn_err(CE_WARN, "%s: read error %d",
-					status, ret);
+				    status, ret);
 				break;
 			}
 			if (resid == sizeof (buf)) {
@@ -687,7 +686,7 @@ ncalogdconf_read(void)
 			if (ret != 0) {
 				/* Error of some sort, tell'm about it */
 				cmn_err(CE_WARN, "%s: read error %d",
-					ncalogd, ret);
+				    ncalogd, ret);
 				break;
 			}
 			if (resid == sizeof (buf)) {
@@ -933,7 +932,8 @@ boolean_t
 nl7c_process(struct sonode *so, boolean_t nonblocking)
 {
 	vnode_t	*vp = SOTOV(so);
-	mblk_t	*rmp = so->so_nl7c_rcv_mp;
+	sotpi_info_t *sti = SOTOTPI(so);
+	mblk_t	*rmp = sti->sti_nl7c_rcv_mp;
 	clock_t	timout;
 	rval_t	rval;
 	uchar_t pri;
@@ -942,7 +942,7 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 	boolean_t more;
 	boolean_t ret = B_FALSE;
 	boolean_t first = B_TRUE;
-	boolean_t pollin = (so->so_nl7c_flags & NL7C_POLLIN);
+	boolean_t pollin = (sti->sti_nl7c_flags & NL7C_POLLIN);
 
 	nl7c_proc_cnt++;
 
@@ -950,7 +950,7 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 	error = so_lock_read_intr(so, nonblocking ? FNDELAY|FNONBLOCK : 0);
 	if (error) {
 		/* Couldn't read lock, pass on this socket */
-		so->so_nl7c_flags = 0;
+		sti->sti_nl7c_flags = 0;
 		nl7c_proc_noLRI++;
 		return (B_FALSE);
 	}
@@ -958,7 +958,7 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 	mutex_exit(&so->so_lock);
 
 	if (pollin)
-		so->so_nl7c_flags &= ~NL7C_POLLIN;
+		sti->sti_nl7c_flags &= ~NL7C_POLLIN;
 
 	/* Initialize some kstrgetmsg() constants */
 	pflag = MSG_ANY | MSG_DELAYERROR;
@@ -966,7 +966,7 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 	if (nonblocking) {
 		/* Non blocking so don't block */
 		timout = 0;
-	} else if (so->so_nl7c_flags & NL7C_SOPERSIST) {
+	} else if (sti->sti_nl7c_flags & NL7C_SOPERSIST) {
 		/* 2nd or more time(s) here so use keep-alive value */
 		timout = nca_http_keep_alive_timeout;
 	} else {
@@ -996,18 +996,18 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 					/* Error of some sort */
 					nl7c_proc_error++;
 					rval.r_v.r_v2 = error;
-					so->so_nl7c_flags = 0;
+					sti->sti_nl7c_flags = 0;
 					break;
 				}
 				error = 0;
 			}
 			if (rmp != NULL) {
-				mblk_t	*mp = so->so_nl7c_rcv_mp;
+				mblk_t	*mp = sti->sti_nl7c_rcv_mp;
 
 
 				if (mp == NULL) {
 					/* Just new data, common case */
-					so->so_nl7c_rcv_mp = rmp;
+					sti->sti_nl7c_rcv_mp = rmp;
 				} else {
 					/* Add new data to tail */
 					while (mp->b_cont != NULL)
@@ -1015,13 +1015,14 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 					mp->b_cont = rmp;
 				}
 			}
-			if (so->so_nl7c_rcv_mp == NULL) {
+			if (sti->sti_nl7c_rcv_mp == NULL) {
 				/* No data */
 				nl7c_proc_nodata++;
 				if (timout > 0 || (first && pollin)) {
 					/* Expected data so EOF */
 					ret = B_TRUE;
-				} else if (so->so_nl7c_flags & NL7C_SOPERSIST) {
+				} else if (sti->sti_nl7c_flags &
+				    NL7C_SOPERSIST) {
 					/* Persistent so just checking */
 					ret = B_FALSE;
 				}
@@ -1035,7 +1036,7 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 
 		more = nl7c_parse(so, nonblocking, &ret);
 
-		if (ret == B_TRUE && (so->so_nl7c_flags & NL7C_SOPERSIST)) {
+		if (ret == B_TRUE && (sti->sti_nl7c_flags & NL7C_SOPERSIST)) {
 			/*
 			 * Parse complete, cache hit, response on its way,
 			 * socket is persistent so try to process the next
@@ -1045,7 +1046,7 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 				ret = B_FALSE;
 				break;
 			}
-			if (so->so_nl7c_rcv_mp) {
+			if (sti->sti_nl7c_rcv_mp) {
 				/* More recv-side data, pipelined */
 				nl7c_proc_again++;
 				goto again;
@@ -1061,10 +1062,10 @@ nl7c_process(struct sonode *so, boolean_t nonblocking)
 
 	} while (more);
 
-	if (so->so_nl7c_rcv_mp) {
+	if (sti->sti_nl7c_rcv_mp) {
 		nl7c_proc_rcv++;
 	}
-	so->so_nl7c_rcv_rval = rval.r_vals;
+	sti->sti_nl7c_rcv_rval = rval.r_vals;
 	/* Renter so_lock, caller called with it enter()ed */
 	mutex_enter(&so->so_lock);
 	so_unlock_read(so);

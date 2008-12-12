@@ -20,10 +20,8 @@
 #
 #
 # uts/sparc/icmp/Makefile
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the icmp IP driver
 #
@@ -42,7 +40,7 @@ MODULE		= icmp
 OBJECTS		= $(ICMP_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(ICMP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-ROOTLINK	= $(ROOT_STRMOD_DIR)/$(MODULE)
+ROOTLINK	= $(ROOT_STRMOD_DIR)/$(MODULE) $(ROOT_SOCK_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/inet/ip
 
 #
@@ -70,9 +68,9 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK) $(ROOT_CONFFILE)
 CFLAGS		+= $(CCVERBOSE)
 
 #
-#	depends on ip
+#	depends on ip and sockfs
 #
-LDFLAGS		+= -dy -Ndrv/ip
+LDFLAGS		+= -dy -Ndrv/ip -Nfs/sockfs
 
 #
 # For now, disable these lint checks; maintainers should endeavor
@@ -104,7 +102,7 @@ clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS) $(SISCHECK_DEPS)
 
-$(ROOTLINK):	$(ROOT_STRMOD_DIR) $(ROOTMODULE)
+$(ROOTLINK):	$(ROOT_STRMOD_DIR) $(ROOT_SOCK_DIR) $(ROOTMODULE)
 	-$(RM) $@; ln $(ROOTMODULE) $@
 
 #

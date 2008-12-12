@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/param.h>
@@ -36,9 +34,6 @@
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
 
-#include <sys/vfs.h>
-#include <sys/vfs_opreg.h>
-
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/strsun.h>
@@ -46,8 +41,10 @@
 
 #include <netinet/sctp.h>
 #include <inet/sctp_itf.h>
+#include <fs/sockfs/sockcommon.h>
 #include "socksctp.h"
 
+extern kmem_cache_t *sosctp_assoccache;
 /*
  * Find a free association id. See os/fio.c file descriptor allocator
  * for description of the algorithm.
@@ -178,8 +175,10 @@ sosctp_assoc_create(struct sctp_sonode *ss, int kmflag)
 		ssa->ssa_sonode = ss;
 		ssa->ssa_state = 0;
 		ssa->ssa_error = 0;
+#if 0
 		ssa->ssa_txqueued = 0;
-		ssa->ssa_rxqueued = 0;
+#endif
+		ssa->ssa_snd_qfull = 0;
 	}
 	dprint(2, ("sosctp_assoc_create %p %p\n", (void *)ss, (void *)ssa));
 	return (ssa);
@@ -305,55 +304,6 @@ sosctp_find_cmsg(const uchar_t *control, socklen_t clen, int type)
 }
 
 /*
- * Wait until the socket is connected or there is an error.
- * fmode should contain any nonblocking flags.
- */
-int
-sosctp_waitconnected(struct sonode *so, int fmode)
-{
-	int error = 0;
-
-	ASSERT(MUTEX_HELD(&so->so_lock));
-	ASSERT((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) ||
-	    so->so_error != 0);
-
-	while ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) ==
-	    SS_ISCONNECTING && so->so_error == 0) {
-
-		dprint(3, ("waiting for SS_ISCONNECTED on %p\n", (void *)so));
-		if (fmode & (FNDELAY|FNONBLOCK))
-			return (EINPROGRESS);
-
-		if (!cv_wait_sig_swap(&so->so_state_cv, &so->so_lock)) {
-			/*
-			 * Return EINTR and let the application use
-			 * nonblocking techniques for detecting when
-			 * the connection has been established.
-			 */
-			return (EINTR);
-		}
-		dprint(3, ("awoken on %p\n", (void *)so));
-	}
-
-	if (so->so_error != 0) {
-		error = sogeterr(so);
-		ASSERT(error != 0);
-		dprint(3, ("sosctp_waitconnected: error %d\n", error));
-		return (error);
-	}
-	if (!(so->so_state & SS_ISCONNECTED)) {
-		/*
-		 * Another thread could have consumed so_error
-		 * e.g. by calling read. - take from sowaitconnected()
-		 */
-		error = ECONNREFUSED;
-		dprint(3, ("sosctp_waitconnected: error %d\n", error));
-		return (error);
-	}
-	return (0);
-}
-
-/*
  * Wait until the association is connected or there is an error.
  * fmode should contain any nonblocking flags.
  */
@@ -373,6 +323,8 @@ sosctp_assoc_waitconnected(struct sctp_soassoc *ssa, int fmode)
 		if (fmode & (FNDELAY|FNONBLOCK))
 			return (EINPROGRESS);
 
+		if (so->so_state & SS_CLOSING)
+			return (EINTR);
 		if (!cv_wait_sig_swap(&so->so_state_cv, &so->so_lock)) {
 			/*
 			 * Return EINTR and let the application use
@@ -408,7 +360,7 @@ sosctp_assoc_waitconnected(struct sctp_soassoc *ssa, int fmode)
 int
 sosctp_assoc_createconn(struct sctp_sonode *ss, const struct sockaddr *name,
     socklen_t namelen, const uchar_t *control, socklen_t controllen, int fflag,
-    struct sctp_soassoc **ssap)
+    struct cred *cr, struct sctp_soassoc **ssap)
 {
 	struct sonode *so = &ss->ss_so;
 	struct sctp_soassoc *ssa;
@@ -427,8 +379,8 @@ sosctp_assoc_createconn(struct sctp_sonode *ss, const struct sockaddr *name,
 		bzero(&laddr, sizeof (laddr));
 		laddr.ss_family = so->so_family;
 
-		error = sosctp_bind(so, (struct sockaddr *)&laddr,
-		    sizeof (laddr), _SOBIND_LOCK_HELD);
+		error = SOP_BIND(so, (struct sockaddr *)&laddr,
+		    sizeof (laddr), _SOBIND_LOCK_HELD, cr);
 		if (error) {
 			*ssap = NULL;
 			return (error);
@@ -456,8 +408,8 @@ sosctp_assoc_createconn(struct sctp_sonode *ss, const struct sockaddr *name,
 	ssa = sosctp_assoc_create(ss, KM_SLEEP);
 	ssa->ssa_wroff = ss->ss_wroff;
 	ssa->ssa_wrsize = ss->ss_wrsize;
-	ssa->ssa_conn = sctp_create(ssa, so->so_priv, so->so_family,
-	    SCTP_CAN_BLOCK, &sosctp_assoc_upcalls, &sbl, CRED());
+	ssa->ssa_conn = sctp_create(ssa, (struct sctp_s *)so->so_proto_handle,
+	    so->so_family, SCTP_CAN_BLOCK, &sosctp_assoc_upcalls, &sbl, cr);
 
 	mutex_enter(&so->so_lock);
 	ss->ss_assocs[id].ssi_assoc = ssa;
@@ -561,7 +513,7 @@ void
 sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
     struct sctp_soassoc *ssa)
 {
-	mblk_t *mp, **nmp;
+	mblk_t *mp, **nmp, *last_mp;
 	struct sctp_soassoc *tmp;
 
 	sosctp_so_inherit(ss, nss);
@@ -571,26 +523,39 @@ sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
 	    (ssa->ssa_state & (SS_ISCONNECTED|SS_ISCONNECTING|
 	    SS_ISDISCONNECTING|SS_CANTSENDMORE|SS_CANTRCVMORE|SS_ISBOUND));
 	nss->ss_so.so_error = ssa->ssa_error;
-	nss->ss_txqueued = ssa->ssa_txqueued;
+#if 0
+	nss->ss_so.so_txqueued = ssa->ssa_txqueued;
+#endif
+	nss->ss_so.so_snd_qfull = ssa->ssa_snd_qfull;
 	nss->ss_wroff = ssa->ssa_wroff;
 	nss->ss_wrsize = ssa->ssa_wrsize;
-	nss->ss_rxqueued = ssa->ssa_rxqueued;
-	nss->ss_so.so_priv = ssa->ssa_conn;
+	nss->ss_so.so_rcv_queued = ssa->ssa_rcv_queued;
+	nss->ss_so.so_proto_handle = (sock_lower_handle_t)ssa->ssa_conn;
 
-	if (nss->ss_rxqueued > 0) {
-		nmp = &ss->ss_rxdata;
+	if (nss->ss_so.so_rcv_queued > 0) {
+		nmp = &ss->ss_so.so_rcv_q_head;
+		last_mp = NULL;
 		while ((mp = *nmp) != NULL) {
 			tmp = *(struct sctp_soassoc **)DB_BASE(mp);
 			if (tmp == ssa) {
 				*nmp = mp->b_next;
-				*nss->ss_rxtail = mp;
-				nss->ss_rxtail = &mp->b_next;
+				ASSERT(DB_TYPE(mp) != M_DATA);
+				if (nss->ss_so.so_rcv_q_last_head == NULL) {
+					nss->ss_so.so_rcv_q_head = mp;
+				} else {
+					nss->ss_so.so_rcv_q_last_head->b_next =
+					    mp;
+				}
+				nss->ss_so.so_rcv_q_last_head = mp;
+				nss->ss_so.so_rcv_q_last_head->b_prev = last_mp;
+				mp->b_next = NULL;
 			} else {
 				nmp = &mp->b_next;
+				last_mp = mp;
 			}
 		}
-		ss->ss_rxtail = nmp;
-		*nss->ss_rxtail = NULL;
+		ss->ss_so.so_rcv_q_last_head = last_mp;
+		ss->ss_so.so_rcv_q_last_head->b_prev = last_mp;
 	}
 }
 
@@ -642,98 +607,4 @@ sosctp_assoc_isdisconnected(struct sctp_soassoc *ssa, int error)
 	if (error != 0)
 		ssa->ssa_error = (ushort_t)error;
 	cv_broadcast(&so->so_state_cv);
-}
-
-/*
- * Change the process/process group to which SIGIO is sent.
- */
-int
-sosctp_chgpgrp(struct sctp_sonode *ss, pid_t pid)
-{
-	int error;
-
-	ASSERT(MUTEX_HELD(&ss->ss_so.so_lock));
-	if (pid != 0) {
-		/*
-		 * Permissions check by sending signal 0.
-		 * Note that when kill fails it does a
-		 * set_errno causing the system call to fail.
-		 */
-		error = kill(pid, 0);
-		if (error != 0) {
-			return (error);
-		}
-	}
-	ss->ss_so.so_pgrp = pid;
-	return (0);
-}
-
-/*
- * Generate a SIGIO, for 'writable' events include siginfo structure,
- * for read events just send the signal.
- */
-static void
-sosctp_sigproc(proc_t *proc, int event)
-{
-	k_siginfo_t info;
-
-	if (event & SCTPSIG_WRITE) {
-		info.si_signo = SIGPOLL;
-		info.si_code = POLL_OUT;
-		info.si_errno = 0;
-		info.si_fd = 0; /* not set with TCP either */
-		info.si_band = 0;
-		sigaddq(proc, NULL, &info, KM_NOSLEEP);
-	}
-	if (event & SCTPSIG_READ) {
-		sigtoproc(proc, NULL, SIGPOLL);
-	}
-}
-
-void
-sosctp_sendsig(struct sctp_sonode *ss, int event)
-{
-	proc_t *proc;
-	struct sonode *so = &ss->ss_so;
-
-	ASSERT(MUTEX_HELD(&ss->ss_so.so_lock));
-
-	if (so->so_pgrp == 0 || !(so->so_state & SS_ASYNC)) {
-		return;
-	}
-	dprint(3, ("sending sig to %d\n", so->so_pgrp));
-
-	if (so->so_pgrp > 0) {
-		/*
-		 * XXX This unfortunately still generates
-		 * a signal when a fd is closed but
-		 * the proc is active.
-		 */
-		mutex_enter(&pidlock);
-		proc = prfind(so->so_pgrp);
-		if (proc == NULL) {
-			mutex_exit(&pidlock);
-			return;
-		}
-		mutex_enter(&proc->p_lock);
-		mutex_exit(&pidlock);
-		sosctp_sigproc(proc, event);
-		mutex_exit(&proc->p_lock);
-	} else {
-		/*
-		 * Send to process group. Hold pidlock across
-		 * calls to sosctp_sigproc().
-		 */
-		pid_t pgrp = -so->so_pgrp;
-
-		mutex_enter(&pidlock);
-		proc = pgfind(pgrp);
-		while (proc != NULL) {
-			mutex_enter(&proc->p_lock);
-			sosctp_sigproc(proc, event);
-			proc = proc->p_pglink;
-			mutex_exit(&proc->p_lock);
-		}
-		mutex_exit(&pidlock);
-	}
 }

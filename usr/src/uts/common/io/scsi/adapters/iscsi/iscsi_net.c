@@ -34,8 +34,9 @@
 #include <sys/fs/dv_node.h>	/* declares:	devfs_lookupname */
 #include <sys/bootconf.h>
 #include <sys/bootprops.h>
-
+#include <netinet/in.h>
 #include "iscsi.h"
+#include <sys/ksocket.h>
 
 /*
  * This is a high level description of the default
@@ -60,42 +61,42 @@
  * The following listing describes the iscsi_net
  * entry points:
  *
- *   socket            - Creates TCP/IP socket connection.  In the
- *                       default implementation creates a sonode
- *                       via the sockfs kernel layer.
- *   bind              - Performs standard TCP/IP BSD operation.  In
- *                       the default implementation this only act
- *                       as a soft binding based on the IP and routing
- *	                 tables.  It would be preferred if this was
- *	                 a hard binding but that is currently not
- *	                 possible with Solaris's networking stack.
- *   connect           - Performs standard TCP/IP BSD operation.  This
- *                       establishes the TCP SYN to the peer IP address.
- *   listen            - Performs standard TCP/IP BSD operation.  This
- *                       listens for incoming peer connections.
- *   accept            - Performs standard TCP/IP BSD operation.  This
- *                       accepts incoming peer connections.
- *   shutdown          - This disconnects the TCP/IP connection while
- *                       maintaining the resources.
- *   close             - This disconnects the TCP/IP connection and
- *                       releases the resources.
+ *   socket	    - Creates TCP/IP socket connection.  In the
+ *		       default implementation creates a sonode
+ *		       via the sockfs kernel layer.
+ *   bind	      - Performs standard TCP/IP BSD operation.  In
+ *		       the default implementation this only act
+ *		       as a soft binding based on the IP and routing
+ *			 tables.  It would be preferred if this was
+ *			 a hard binding but that is currently not
+ *			 possible with Solaris's networking stack.
+ *   connect	   - Performs standard TCP/IP BSD operation.  This
+ *		       establishes the TCP SYN to the peer IP address.
+ *   listen	    - Performs standard TCP/IP BSD operation.  This
+ *		       listens for incoming peer connections.
+ *   accept	    - Performs standard TCP/IP BSD operation.  This
+ *		       accepts incoming peer connections.
+ *   shutdown	  - This disconnects the TCP/IP connection while
+ *		       maintaining the resources.
+ *   close	     - This disconnects the TCP/IP connection and
+ *		       releases the resources.
  *
- *   getsockopt        - Gets socket option for specified socket.
- *   setsockopt        - Sets socket option for specified socket.
+ *   getsockopt	- Gets socket option for specified socket.
+ *   setsockopt	- Sets socket option for specified socket.
  *
  *      The current socket options that are used by the initiator
  *      are listed below.
  *
- *        TCP_CONN_NOTIFY_THRESHOLD
- *        TCP_CONN_ABORT_THRESHOLD
- *        TCP_ABORT_THRESHOLD
- *        TCP_NODELAY
- *        SO_RCVBUF
- *        SO_SNDBUF
+ *	TCP_CONN_NOTIFY_THRESHOLD
+ *	TCP_CONN_ABORT_THRESHOLD
+ *	TCP_ABORT_THRESHOLD
+ *	TCP_NODELAY
+ *	SO_RCVBUF
+ *	SO_SNDBUF
  *
  *   iscsi_net_poll    - Poll socket interface for a specified amount
- *                       of data.  If data not received in timeout
- *                       period fail request.
+ *		       of data.  If data not received in timeout
+ *		       period fail request.
  *   iscsi_net_sendmsg - Send message on socket connection
  *   iscsi_net_recvmsg - Receive message on socket connection
  *
@@ -109,8 +110,8 @@
  *				generate or validate the iSCSI
  *				header digest CRC.
  *       ISCSI_NET_DATA_DIGESt   - The interface should either
- *                              generate or validate the iSCSI
- *                              data digest CRC.
+ *			      generate or validate the iSCSI
+ *			      data digest CRC.
  */
 
 
@@ -144,25 +145,18 @@ const int   is_incoming_opcode_invalid[256] = {
 	/* 0xEX */	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 	/* 0xFX */	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
 };
-/*
- * Define macros to manipulate snode, vnode, and open device flags
- */
-#define	VTYP_VALID(i)	(((i) == VCHR) || ((i) == VBLK))
-#define	STYP_VALID(i)	(((i) == S_IFCHR) || ((i) == S_IFBLK))
-#define	STYP_TO_VTYP(i)	(((i) == S_IFCHR) ? VCHR : VBLK)
 
 #define	IP_4_BITS	32
 #define	IP_6_BITS	128
 
 extern int modrootloaded;
-extern ib_boot_prop_t	*iscsiboot_prop;
+extern ib_boot_prop_t   *iscsiboot_prop;
 
 /* prototypes */
 
 /* for iSCSI boot */
 static int net_up = 0;
 static iscsi_status_t iscsi_net_interface();
-static int iscsi_ldi_vp_from_name(char *path, vnode_t **vpp);
 /* boot prototypes end */
 
 static void * iscsi_net_socket(int domain, int type, int protocol);
@@ -173,7 +167,7 @@ static int iscsi_net_connect(void *socket, struct sockaddr *
 static int iscsi_net_listen(void *socket, int backlog);
 static void * iscsi_net_accept(void *socket, struct sockaddr *addr,
     int *addr_len);
-static int iscsi_net_getsockname(void *socket);
+static int iscsi_net_getsockname(void *socket, struct sockaddr *, socklen_t *);
 static int iscsi_net_getsockopt(void *socket, int level,
     int option_name, void *option_val, int *option_len, int flags);
 static int iscsi_net_setsockopt(void *socket, int level,
@@ -198,7 +192,7 @@ static void iscsi_net_set_postconnect_options(void *socket);
 
 /*
  * +--------------------------------------------------------------------+
- * | network interface registration functions                           |
+ * | network interface registration functions			   |
  * +--------------------------------------------------------------------+
  */
 
@@ -287,7 +281,7 @@ iscsi_net_set_postconnect_options(void *socket)
 
 /*
  * +--------------------------------------------------------------------+
- * | register network interfaces                                        |
+ * | register network interfaces					|
  * +--------------------------------------------------------------------+
  */
 
@@ -297,93 +291,53 @@ iscsi_net_set_postconnect_options(void *socket)
 static void *
 iscsi_net_socket(int domain, int type, int protocol)
 {
-	vnode_t		*dvp		= NULL,
-	    *vp		= NULL;
-	struct snode	*csp		= NULL;
-	int		err		= 0;
-	major_t		maj;
+	ksocket_t	socket;
+	int 		err	= 0;
 
 	if (!modrootloaded && !net_up && iscsiboot_prop) {
 		if (iscsi_net_interface() == ISCSI_STATUS_SUCCESS)
 			net_up = 1;
 	}
 
-	/* ---- solookup: start ---- */
-	if ((vp = solookup(domain, type, protocol, NULL, &err)) == NULL) {
+	err = ksocket_socket(&socket, domain, type, protocol, KSOCKET_SLEEP,
+	    CRED());
+	if (!err)
+		return ((void *)socket);
+	else
+		return (NULL);
 
-		/*
-		 * solookup calls sogetvp if the vp is not found in
-		 * the cache.  Since the call to sogetvp is hardwired
-		 * to use USERSPACE and declared static we'll do the
-		 * work here instead.
-		 */
-		if (!modrootloaded) {
-			err = iscsi_ldi_vp_from_name("/devices/pseudo/tcp@0:"
-			    "tcp", &vp);
-		} else {
-			err = lookupname(type == SOCK_STREAM ? "/dev/tcp" :
-			    "/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
-		}
-		if (err) {
-			return (NULL);
-		}
-
-		/* ---- check that it is the correct vnode ---- */
-		if (vp->v_type != VCHR) {
-			VN_RELE(vp);
-			return (NULL);
-		}
-
-		csp = VTOS(VTOS(vp)->s_commonvp);
-		if (!(csp->s_flag & SDIPSET)) {
-			char    *pathname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-			err = ddi_dev_pathname(vp->v_rdev, S_IFCHR,
-			    pathname);
-			if (err == 0) {
-				err = devfs_lookupname(pathname, NULLVPP,
-				    &dvp);
-			}
-			VN_RELE(vp);
-			kmem_free(pathname, MAXPATHLEN);
-			if (err != 0) {
-				return (NULL);
-			}
-			vp = dvp;
-		}
-
-		maj = getmajor(vp->v_rdev);
-		if (!STREAMSTAB(maj)) {
-			VN_RELE(vp);
-			return (NULL);
-		}
-	}
-	/* ---- solookup: end ---- */
-	return (socreate(vp, domain, type, protocol, SOV_DEFAULT, NULL, &err));
 }
 
 /*
  * iscsi_net_bind - bind socket to a specific sockaddr
  */
+/* ARGSUSED */
 static int
 iscsi_net_bind(void *socket, struct sockaddr *name, int name_len,
 	int backlog, int flags)
 {
-	return (sobind((struct sonode *)socket, name, name_len,
-	    backlog, flags));
+	ksocket_t ks = (ksocket_t)socket;
+	int error;
+	error = ksocket_bind(ks, name, name_len, CRED());
+	if (error == 0 && backlog != 0)
+		error = ksocket_listen(ks, backlog, CRED());
+
+	return (error);
 }
 
 /*
  * iscsi_net_connect - connect socket to peer sockaddr
  */
+/* ARGSUSED */
 static int
 iscsi_net_connect(void *socket, struct sockaddr *name, int name_len,
 	int fflag, int flags)
 {
+	ksocket_t ks = (ksocket_t)socket;
 	int rval;
 
 	iscsi_net_set_preconnect_options(socket);
-	rval = soconnect((struct sonode *)socket, name,
-	    name_len, fflag, flags);
+	rval = ksocket_connect(ks, name, name_len, CRED());
 	iscsi_net_set_postconnect_options(socket);
 
 	return (rval);
@@ -395,7 +349,8 @@ iscsi_net_connect(void *socket, struct sockaddr *name, int name_len,
 static int
 iscsi_net_listen(void *socket, int backlog)
 {
-	return (solisten((struct sonode *)socket, backlog));
+	ksocket_t ks = (ksocket_t)socket;
+	return (ksocket_listen(ks, backlog, CRED()));
 }
 
 /*
@@ -404,41 +359,35 @@ iscsi_net_listen(void *socket, int backlog)
 static void *
 iscsi_net_accept(void *socket, struct sockaddr *addr, int *addr_len)
 {
-	struct sonode *listening_socket;
+	ksocket_t listen_ks;
+	ksocket_t ks = (ksocket_t)socket;
 
-	(void) soaccept((struct sonode *)socket,
-	    ((struct sonode *)socket)->so_flag,
-	    &listening_socket);
-	if (listening_socket != NULL) {
-		bcopy(listening_socket->so_faddr_sa, addr,
-		    (socklen_t)listening_socket->so_faddr_len);
-		*addr_len = listening_socket->so_faddr_len;
-	} else {
-		*addr_len = 0;
-	}
+	ksocket_accept(ks, addr, (socklen_t *)addr_len, &listen_ks, CRED());
 
-	return ((void *)listening_socket);
+	return ((void *)listen_ks);
 }
 
 /*
  * iscsi_net_getsockname -
  */
 static int
-iscsi_net_getsockname(void *socket)
+iscsi_net_getsockname(void *socket, struct sockaddr *addr, socklen_t *addrlen)
 {
-	return (sogetsockname((struct sonode *)socket));
+	ksocket_t ks = (ksocket_t)socket;
+	return (ksocket_getsockname(ks, addr, addrlen, CRED()));
 }
 
 /*
  * iscsi_net_getsockopt - get value of option on socket
  */
+/* ARGSUSED */
 static int
 iscsi_net_getsockopt(void *socket, int level, int option_name,
 	void *option_val, int *option_len, int flags)
 {
-	return (sogetsockopt((struct sonode *)socket, level,
-	    option_name, option_val, (socklen_t *)option_len,
-	    flags));
+	ksocket_t ks = (ksocket_t)socket;
+	return (ksocket_getsockopt(ks, level, option_name, option_val,
+	    option_len, CRED()));
 }
 
 /*
@@ -448,8 +397,9 @@ static int
 iscsi_net_setsockopt(void *socket, int level, int option_name,
 	void *option_val, int option_len)
 {
-	return (sosetsockopt((struct sonode *)socket, level,
-	    option_name, option_val, option_len));
+	ksocket_t ks = (ksocket_t)socket;
+	return (ksocket_setsockopt(ks, level, option_name, option_val,
+	    option_len, CRED()));
 }
 
 /*
@@ -458,7 +408,8 @@ iscsi_net_setsockopt(void *socket, int level, int option_name,
 static int
 iscsi_net_shutdown(void *socket, int how)
 {
-	return (soshutdown((struct sonode *)socket, how));
+	ksocket_t ks = (ksocket_t)socket;
+	return (ksocket_shutdown(ks, how, CRED()));
 }
 
 /*
@@ -467,26 +418,32 @@ iscsi_net_shutdown(void *socket, int how)
 static void
 iscsi_net_close(void *socket)
 {
-	vnode_t *vp = SOTOV((struct sonode *)socket);
-	(void) soshutdown((struct sonode *)socket, 2);
-	(void) VOP_CLOSE(vp, 0, 1, 0, kcred, NULL);
-	VN_RELE(vp);
+	ksocket_t ks = (ksocket_t)socket;
+	(void) ksocket_close(ks, CRED());
 }
 
 /*
  * iscsi_net_poll - poll socket for data
  */
+/* ARGSUSED */
 static size_t
 iscsi_net_poll(void *socket, clock_t timeout)
 {
 	int pflag;
-	uchar_t pri;
-	rval_t rval;
+	char msg[64];
+	size_t recv = 0;
+	struct timeval tl;
+	ksocket_t ks = (ksocket_t)socket;
+	/* timeout is millisecond */
+	tl.tv_sec = timeout / 1000;
+	tl.tv_usec = (timeout % 1000) * 1000;
 
-	pri = 0;
+	(void) ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVTIMEO, &tl,
+	    sizeof (struct timeval), CRED());
+
 	pflag = MSG_ANY;
-	return (kstrgetmsg(SOTOV((struct sonode *)socket), NULL, NULL,
-	    &pri, &pflag, timeout, &rval));
+	bzero(msg, sizeof (msg));
+	return (ksocket_recv(ks, msg, sizeof (msg), pflag, &recv, CRED()));
 }
 
 /*
@@ -496,24 +453,12 @@ iscsi_net_poll(void *socket, clock_t timeout)
 static size_t
 iscsi_net_sendmsg(void *socket, struct msghdr *msg)
 {
-	int i = 0;
-	int total_len = 0;
-	struct uio uio;
-
-	/* Initialization of the uio structure. */
-	bzero(&uio, sizeof (uio));
-	uio.uio_iov = msg->msg_iov;
-	uio.uio_iovcnt = msg->msg_iovlen;
-	uio.uio_segflg  = UIO_SYSSPACE;
-
-	for (i = 0; i < msg->msg_iovlen; i++) {
-		total_len += (msg->msg_iov)[i].iov_len;
-	}
-	uio.uio_resid = total_len;
-
-	(void) sosendmsg((struct sonode *)socket, msg, &uio);
-	DTRACE_PROBE2(sosendmsg, size_t, total_len, size_t, uio.uio_resid);
-	return (total_len - uio.uio_resid);
+	ksocket_t ks = (ksocket_t)socket;
+	size_t sent = 0;
+	int flag = msg->msg_flags;
+	(void) ksocket_sendmsg(ks, msg, flag, &sent, CRED());
+	DTRACE_PROBE1(ksocket_sendmsg, size_t, sent);
+	return (sent);
 }
 
 /*
@@ -523,80 +468,25 @@ iscsi_net_sendmsg(void *socket, struct msghdr *msg)
 static size_t
 iscsi_net_recvmsg(void *socket, struct msghdr *msg, int timeout)
 {
-	int		idx;
-	int		total_len   = 0;
-	struct uio	uio;
-	uchar_t		pri	    = 0;
-	int		prflag	    = MSG_ANY;
-	rval_t		rval;
-	struct sonode	*sonode	    = (struct sonode *)socket;
+	int		prflag	    = msg->msg_flags;
+	ksocket_t	ks	    = (ksocket_t)socket;
+	size_t 		recv	    = 0;
+	struct timeval	tl;
 
-	/* Initialization of the uio structure. */
-	bzero(&uio, sizeof (uio));
-	uio.uio_iov	    = msg->msg_iov;
-	uio.uio_iovcnt	    = msg->msg_iovlen;
-	uio.uio_segflg	    = UIO_SYSSPACE;
+	tl.tv_sec = timeout;
+	tl.tv_usec = 0;
 
-	for (idx = 0; idx < msg->msg_iovlen; idx++) {
-		total_len += (msg->msg_iov)[idx].iov_len;
-	}
-	uio.uio_resid = total_len;
-
-	/* If timeout requested on receive */
-	if (timeout > 0) {
-		boolean_t   loopback = B_FALSE;
-
-		/* And this isn't a loopback connection */
-		if (sonode->so_laddr.soa_sa->sa_family == AF_INET) {
-			struct sockaddr_in *lin =
-			    (struct sockaddr_in *)sonode->so_laddr.soa_sa;
-			struct sockaddr_in *fin =
-			    (struct sockaddr_in *)sonode->so_faddr.soa_sa;
-
-			if ((lin->sin_family == fin->sin_family) &&
-			    (bcmp(&lin->sin_addr, &fin->sin_addr,
-			    sizeof (struct in_addr)) == 0)) {
-				loopback = B_TRUE;
-			}
-		} else {
-			struct sockaddr_in6 *lin6 =
-			    (struct sockaddr_in6 *)sonode->so_laddr.soa_sa;
-			struct sockaddr_in6 *fin6 =
-			    (struct sockaddr_in6 *)sonode->so_faddr.soa_sa;
-
-			if ((lin6->sin6_family == fin6->sin6_family) &&
-			    (bcmp(&lin6->sin6_addr, &fin6->sin6_addr,
-			    sizeof (struct in6_addr)) == 0)) {
-				loopback = B_TRUE;
-			}
-		}
-
-		if (loopback == B_FALSE) {
-			/*
-			 * Then poll device for up to the timeout
-			 * period or the requested data is received.
-			 */
-			if (kstrgetmsg(SOTOV(sonode),
-			    NULL, NULL, &pri, &prflag, timeout * 1000,
-			    &rval) == ETIME) {
-				return (0);
-			}
-		}
-	}
-
+	/* Set recv timeout */
+	if (ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVTIMEO, &tl,
+	    sizeof (struct timeval), CRED()))
+		return (0);
 	/*
 	 * Receive the requested data.  Block until all
-	 * data is received.
-	 *
-	 * resid occurs only when the connection is
-	 * disconnected.  In that case it will return
-	 * the amount of data that was not received.
-	 * In general this is the total amount we
-	 * requested.
+	 * data is received or timeout.
 	 */
-	(void) sorecvmsg((struct sonode *)socket, msg, &uio);
-	DTRACE_PROBE2(sorecvmsg, size_t, total_len, size_t, uio.uio_resid);
-	return (total_len - uio.uio_resid);
+	ksocket_recvmsg(ks, msg, prflag, &recv, CRED());
+	DTRACE_PROBE1(ksocket_recvmsg, size_t, recv);
+	return (recv);
 }
 
 /*
@@ -701,7 +591,7 @@ iscsi_net_sendpdu(void *socket, iscsi_hdr_t *ihp, char *data, int flags)
 	msg.msg_flags	= MSG_WAITALL;
 	msg.msg_iovlen	= iovlen;
 
-	send_len = iscsi_net->sendmsg((struct sonode *)socket, &msg);
+	send_len = iscsi_net->sendmsg(socket, &msg);
 	DTRACE_PROBE2(sendmsg, size_t, total_len, size_t, send_len);
 	if (total_len != send_len) {
 		return (ISCSI_STATUS_TCP_TX_ERROR);
@@ -873,7 +763,6 @@ iscsi_net_recvdata(void *socket, iscsi_hdr_t *ihp, char *data,
 	}
 
 	if (dlength) {
-
 		/* calculate pad */
 		pad_len = ((ISCSI_PAD_WORD_LEN -
 		    (dlength & (ISCSI_PAD_WORD_LEN - 1))) &
@@ -1066,84 +955,4 @@ iscsi_net_interface()
 		}
 		return (ISCSI_STATUS_SUCCESS);
 	}
-}
-
-/*
- * vp is needed to create the socket for the time being.
- */
-static int
-iscsi_ldi_vp_from_name(char *path, vnode_t **vpp)
-{
-	vnode_t		*vp = NULL;
-	int		ret;
-
-	/* sanity check required input parameters */
-	if ((path == NULL) || (vpp == NULL))
-		return (EINVAL);
-
-	if (modrootloaded) {
-		cred_t *saved_cred = curthread->t_cred;
-
-		/* we don't want lookupname to fail because of credentials */
-		curthread->t_cred = kcred;
-
-		/*
-		 * all lookups should be done in the global zone.  but
-		 * lookupnameat() won't actually do this if an absolute
-		 * path is passed in.  since the ldi interfaces require an
-		 * absolute path we pass lookupnameat() a pointer to
-		 * the character after the leading '/' and tell it to
-		 * start searching at the current system root directory.
-		 */
-		ASSERT(*path == '/');
-		ret = lookupnameat(path + 1, UIO_SYSSPACE, FOLLOW, NULLVPP,
-		    &vp, rootdir);
-
-		/* restore this threads credentials */
-		curthread->t_cred = saved_cred;
-
-		if (ret == 0) {
-			if (!vn_matchops(vp, spec_getvnodeops()) ||
-			    !VTYP_VALID(vp->v_type)) {
-				VN_RELE(vp);
-				return (ENXIO);
-			}
-		}
-	}
-
-	if (vp == NULL) {
-		dev_info_t	*dip;
-		dev_t		dev;
-		int		spec_type;
-
-		/*
-		 * Root is not mounted, the minor node is not specified,
-		 * or an OBP path has been specified.
-		 */
-
-		/*
-		 * Determine if path can be pruned to produce an
-		 * OBP or devfs path for resolve_pathname.
-		 */
-		if (strncmp(path, "/devices/", 9) == 0)
-			path += strlen("/devices");
-
-		/*
-		 * if no minor node was specified the DEFAULT minor node
-		 * will be returned.  if there is no DEFAULT minor node
-		 * one will be fabricated of type S_IFCHR with the minor
-		 * number equal to the instance number.
-		 */
-		ret = resolve_pathname(path, &dip, &dev, &spec_type);
-		if (ret != 0)
-			return (ENODEV);
-
-		ASSERT(STYP_VALID(spec_type));
-		vp = makespecvp(dev, STYP_TO_VTYP(spec_type));
-		spec_assoc_vp_with_devi(vp, dip);
-		ddi_release_devi(dip);
-	}
-
-	*vpp = vp;
-	return (0);
 }

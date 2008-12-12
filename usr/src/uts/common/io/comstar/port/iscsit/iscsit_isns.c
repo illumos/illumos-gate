@@ -42,6 +42,7 @@
 #include <sys/iscsit/isns_protocol.h>
 #include <iscsit.h>
 #include <iscsit_isns.h>
+#include <sys/ksocket.h>
 
 /* local defines */
 #define	MAX_XID			(2^16)
@@ -177,7 +178,7 @@ static void
 isnst_esi_thread(void *arg);
 
 static boolean_t
-isnst_handle_esi_req(struct sonode *so, isns_pdu_t *pdu, size_t pl_size);
+isnst_handle_esi_req(ksocket_t so, isns_pdu_t *pdu, size_t pl_size);
 
 static void isnst_esi_start(isns_portal_list_t *portal);
 static void isnst_esi_stop();
@@ -303,22 +304,22 @@ isnst_esi_stop_thread(isns_esi_tinfo_t *tinfop)
 	list_remove(&esi_list, tinfop);
 
 	/*
-	 * The only way to break a thread waiting in soaccept() is to signal
-	 * it with EINTR.  See idm_so_tgt_svc_offline for more detail.
-	 */
-	tinfop->esi_so->so_error = EINTR;
-	cv_signal(&tinfop->esi_so->so_connind_cv);
-
-	/*
-	 * Must also drop the global lock in case the esi thread is running
-	 * and trying to update the server timestamps.
+	 * The only way to break a thread waiting in ksocket_accept() is to call
+	 * ksocket_close.
 	 */
 	mutex_exit(&isns_esi_mutex);
 	ISNS_GLOBAL_UNLOCK();
+	idm_soshutdown(tinfop->esi_so);
+	idm_sodestroy(tinfop->esi_so);
 	thread_join(tinfop->esi_thread_did);
 	ISNS_GLOBAL_LOCK();
 	mutex_enter(&isns_esi_mutex);
 
+	tinfop->esi_thread_running = B_FALSE;
+	tinfop->esi_so = NULL;
+	tinfop->esi_port = 0;
+	tinfop->esi_registered = B_FALSE;
+	cv_signal(&isns_esi_cv);
 	tinfop->esi_portal->portal_esi = NULL;
 	kmem_free(tinfop, sizeof (isns_esi_tinfo_t));
 }
@@ -630,18 +631,22 @@ isnst_stop()
  */
 
 static void
-isnst_update_server_timestamp(struct sonode *so)
+isnst_update_server_timestamp(ksocket_t so)
 {
 	iscsit_isns_svr_t	*svr;
 	struct in_addr		*sin = NULL, *svr_in;
 	struct in6_addr		*sin6 = NULL, *svr_in6;
+	struct sockaddr_in6	t_addr;
+	socklen_t		t_addrlen;
 
-	if (so->so_faddr_sa->sa_family == AF_INET) {
-		sin = &((struct sockaddr_in *)
-		    ((void *)so->so_faddr_sa))->sin_addr;
+	bzero(&t_addr, sizeof (struct sockaddr_in6));
+	t_addrlen = sizeof (struct sockaddr_in6);
+	(void) ksocket_getpeername(so, (struct sockaddr *)&t_addr, &t_addrlen,
+	    CRED());
+	if (((struct sockaddr *)(&t_addr))->sa_family == AF_INET) {
+		sin = &((struct sockaddr_in *)((void *)(&t_addr)))->sin_addr;
 	} else {
-		sin6 = &((struct sockaddr_in6 *)
-		    ((void *)so->so_faddr_sa))->sin6_addr;
+		sin6 = &(&t_addr)->sin6_addr;
 	}
 
 	/*
@@ -1982,7 +1987,7 @@ static void *
 isnst_open_so(struct sockaddr_storage *sa)
 {
 	int sa_sz;
-	struct sonode *so;
+	ksocket_t so;
 
 	/* determin local IP address */
 	if (sa->ss_family == AF_INET) {
@@ -2000,7 +2005,8 @@ isnst_open_so(struct sockaddr_storage *sa)
 	}
 
 	if (so != NULL) {
-		if (soconnect(so, (struct sockaddr *)sa, sa_sz, 0, 0) != 0) {
+		if (ksocket_connect(so, (struct sockaddr *)sa, sa_sz, CRED())
+		    != 0) {
 			/* not calling isnst_close_so() to */
 			/* make dtrace output look clear */
 			idm_soshutdown(so);
@@ -2133,7 +2139,7 @@ static void
 isnst_esi_thread(void *arg)
 {
 	isns_esi_tinfo_t	*tinfop;
-	struct sonode		*newso;
+	ksocket_t		newso;
 	struct sockaddr_in	sin;
 	struct sockaddr_in6	sin6;
 	uint32_t		on;
@@ -2141,6 +2147,14 @@ isnst_esi_thread(void *arg)
 	isns_pdu_t		*pdu;
 	size_t			pl_size;
 	int			family;
+	struct sockaddr_in	t_addr;
+	struct sockaddr_in6	t_addr6;
+	socklen_t		t_addrlen;
+	socklen_t		t_addrlen6;
+
+	bzero(&t_addr, sizeof (struct sockaddr_in6));
+	t_addrlen = sizeof (struct sockaddr_in);
+	t_addrlen6 = sizeof (struct sockaddr_in6);
 
 	tinfop = (isns_esi_tinfo_t *)arg;
 	tinfop->esi_thread_did = curthread->t_did;
@@ -2155,7 +2169,6 @@ isnst_esi_thread(void *arg)
 		family = AF_INET6;
 	}
 
-
 	if ((tinfop->esi_so =
 	    idm_socreate(family, SOCK_STREAM, 0)) == NULL) {
 		cmn_err(CE_WARN,
@@ -2166,7 +2179,7 @@ isnst_esi_thread(void *arg)
 		mutex_exit(&isns_esi_mutex);
 		thread_exit();
 	}
-
+	ksocket_hold(tinfop->esi_so);
 	/*
 	 * Set options, bind, and listen until we're told to stop
 	 */
@@ -2181,17 +2194,19 @@ isnst_esi_thread(void *arg)
 		    &sin.sin_addr.s_addr, sizeof (in_addr_t));
 		on = 1;
 
-		(void) sosetsockopt(tinfop->esi_so, SOL_SOCKET, SO_REUSEADDR,
-		    (char *)&on, sizeof (on));
+		(void) ksocket_setsockopt(tinfop->esi_so, SOL_SOCKET,
+		    SO_REUSEADDR, (char *)&on, sizeof (on), CRED());
 
-		if (sobind(tinfop->esi_so, (struct sockaddr *)&sin,
-		    sizeof (sin), 0, 0) != 0) {
+		if (ksocket_bind(tinfop->esi_so, (struct sockaddr *)&sin,
+		    sizeof (sin), CRED()) != 0) {
 			idm_sodestroy(tinfop->esi_so);
 			tinfop->esi_so = NULL;
 			tinfop->esi_thread_failed = B_TRUE;
 		} else {
+			(void) ksocket_getsockname(tinfop->esi_so,
+			    (struct sockaddr *)(&t_addr), &t_addrlen, CRED());
 			tinfop->esi_port = ntohs(((struct sockaddr_in *)
-			    ((void *)tinfop->esi_so->so_laddr_sa))->sin_port);
+			    (&t_addr))->sin_port);
 		}
 
 		break;
@@ -2205,17 +2220,19 @@ isnst_esi_thread(void *arg)
 		    &sin6.sin6_addr.s6_addr, sizeof (in6_addr_t));
 		on = 1;
 
-		(void) sosetsockopt(tinfop->esi_so, SOL_SOCKET,
-		    SO_REUSEADDR, (char *)&on, sizeof (on));
+		(void) ksocket_setsockopt(tinfop->esi_so, SOL_SOCKET,
+		    SO_REUSEADDR, (char *)&on, sizeof (on), CRED());
 
-		if (sobind(tinfop->esi_so, (struct sockaddr *)&sin6,
-		    sizeof (sin6), 0, 0) != 0) {
+		if (ksocket_bind(tinfop->esi_so, (struct sockaddr *)&sin6,
+		    sizeof (sin6), CRED()) != 0) {
 			idm_sodestroy(tinfop->esi_so);
 			tinfop->esi_so = NULL;
 			tinfop->esi_thread_failed = B_TRUE;
 		} else {
+			(void) ksocket_getsockname(tinfop->esi_so,
+			    (struct sockaddr *)(&t_addr6), &t_addrlen6, CRED());
 			tinfop->esi_port = ntohs(((struct sockaddr_in6 *)
-			    ((void *)tinfop->esi_so->so_laddr_sa))->sin6_port);
+			    (&t_addr6))->sin6_port);
 		}
 
 		break;
@@ -2226,7 +2243,7 @@ isnst_esi_thread(void *arg)
 		goto esi_thread_exit;
 	}
 
-	if ((rc = solisten(tinfop->esi_so, 5)) != 0) {
+	if ((rc = ksocket_listen(tinfop->esi_so, 5, CRED())) != 0) {
 		cmn_err(CE_WARN, "isnst_esi_thread: listen failure 0x%x", rc);
 		goto esi_thread_exit;
 	}
@@ -2244,21 +2261,21 @@ isnst_esi_thread(void *arg)
 		DTRACE_PROBE2(iscsit__isns__esi__accept__wait,
 		    boolean_t, tinfop->esi_thread_running,
 		    boolean_t, tinfop->esi_thread_failed);
-		if ((rc = soaccept(tinfop->esi_so, 0, &newso)) != 0) {
+		if ((rc = ksocket_accept(tinfop->esi_so, NULL, NULL,
+		    &newso, CRED())) != 0) {
 			mutex_enter(&isns_esi_mutex);
 			DTRACE_PROBE2(iscsit__isns__esi__accept__fail,
 			    boolean_t, tinfop->esi_thread_running,
 			    boolean_t, tinfop->esi_thread_failed);
 			/*
-			 * If we were interrupted with EINTR, it's not
-			 * really a failure.
+			 * If we were interrupted with EINTR
+			 * it's not really a failure.
 			 */
 			if (rc != EINTR) {
 				cmn_err(CE_WARN, "isnst_esi_thread: "
 				    "accept failure (0x%x)", rc);
 				tinfop->esi_thread_failed = B_TRUE;
 			}
-
 			tinfop->esi_thread_running = B_FALSE;
 			continue;
 		}
@@ -2281,7 +2298,7 @@ isnst_esi_thread(void *arg)
 			tinfop->esi_registered = B_TRUE;
 		}
 
-		(void) soshutdown(newso, SHUT_RDWR);
+		(void) ksocket_close(newso, CRED());
 
 		/*
 		 * Do not hold the esi mutex during server timestamp
@@ -2295,15 +2312,7 @@ isnst_esi_thread(void *arg)
 	}
 	mutex_exit(&isns_esi_mutex);
 esi_thread_exit:
-	idm_soshutdown(tinfop->esi_so);
-	idm_sodestroy(tinfop->esi_so);
-	mutex_enter(&isns_esi_mutex);
-	tinfop->esi_thread_running = B_FALSE;
-	tinfop->esi_so = NULL;
-	tinfop->esi_port = 0;
-	tinfop->esi_registered = B_FALSE;
-	cv_signal(&isns_esi_cv);
-	mutex_exit(&isns_esi_mutex);
+	ksocket_rele(tinfop->esi_so);
 	thread_exit();
 }
 
@@ -2312,7 +2321,7 @@ esi_thread_exit:
  */
 
 static boolean_t
-isnst_handle_esi_req(struct sonode *so, isns_pdu_t *pdu, size_t pl_size)
+isnst_handle_esi_req(ksocket_t ks, isns_pdu_t *pdu, size_t pl_size)
 {
 	isns_pdu_t	*rsp_pdu;
 	isns_resp_t	*rsp;
@@ -2353,7 +2362,7 @@ isnst_handle_esi_req(struct sonode *so, isns_pdu_t *pdu, size_t pl_size)
 	bcopy(pdu->payload, rsp->data, pl_len - 4);
 	rsp_pdu->payload_len = htons(pl_len);
 
-	if (isnst_send_pdu(so, rsp_pdu) != 0) {
+	if (isnst_send_pdu(ks, rsp_pdu) != 0) {
 		cmn_err(CE_WARN, "isnst_handle_esi_req: Send response failed");
 		esirv = B_FALSE;
 	}

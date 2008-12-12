@@ -61,7 +61,7 @@ INC_PATH	+= -I$(UTSBASE)/common/io/scsi/adapters/iscsi
 #
 # Note dependancy on misc/scsi.
 #
-LDFLAGS += -dy -N"misc/scsi" -N"fs/sockfs" -N"sys/doorfs" -N"misc/md5"
+LDFLAGS += -dy -N"misc/scsi" -N"fs/sockfs" -N"sys/doorfs" -N"misc/md5" -Nmisc/ksocket
 
 LINTFLAGS += -a -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_PTRDIFF_OVERFLOW
 LINTFLAGS64 += -a -erroff=E_BAD_PTR_CAST_ALIGN -erroff=E_PTRDIFF_OVERFLOW

@@ -261,8 +261,8 @@
 
 #include <inet/ip.h>
 #include <inet/ip6.h>
-#include <inet/tcp.h>
 #include <inet/ip_ndp.h>
+#include <inet/ip_impl.h>
 #include <inet/udp_impl.h>
 #include <inet/sctp_ip.h>
 #include <inet/sctp/sctp_impl.h>
@@ -272,9 +272,11 @@
 #include <sys/cpuvar.h>
 
 #include <inet/ipclassifier.h>
+#include <inet/tcp.h>
 #include <inet/ipsec_impl.h>
 
 #include <sys/tsol/tnet.h>
+#include <sys/sockio.h>
 
 #ifdef DEBUG
 #define	IPCL_DEBUG
@@ -325,6 +327,7 @@ typedef union itc_s {
 
 struct kmem_cache  *tcp_conn_cache;
 struct kmem_cache  *ip_conn_cache;
+struct kmem_cache  *ip_helper_stream_cache;
 extern struct kmem_cache  *sctp_conn_cache;
 extern struct kmem_cache  *tcp_sack_info_cache;
 extern struct kmem_cache  *tcp_iphc_cache;
@@ -349,6 +352,11 @@ static void	rawip_conn_destructor(void *, void *);
 
 static int	rts_conn_constructor(void *, void *, int);
 static void	rts_conn_destructor(void *, void *);
+
+static int	ip_helper_stream_constructor(void *, void *, int);
+static void	ip_helper_stream_destructor(void *, void *);
+
+boolean_t	ip_use_helper_cache = B_TRUE;
 
 #ifdef	IPCL_DEBUG
 #define	INET_NTOA_BUFSIZE	18
@@ -394,6 +402,15 @@ ipcl_g_init(void)
 	    sizeof (itc_t) + sizeof (rts_t), CACHE_ALIGN_SIZE,
 	    rts_conn_constructor, rts_conn_destructor,
 	    NULL, NULL, NULL, 0);
+
+	if (ip_use_helper_cache) {
+		ip_helper_stream_cache = kmem_cache_create
+		    ("ip_helper_stream_cache", sizeof (ip_helper_stream_info_t),
+		    CACHE_ALIGN_SIZE, ip_helper_stream_constructor,
+		    ip_helper_stream_destructor, NULL, NULL, NULL, 0);
+	} else {
+		ip_helper_stream_cache = NULL;
+	}
 }
 
 /*
@@ -749,6 +766,7 @@ ipcl_conn_destroy(conn_t *connp)
 		connp->conn_netstack = NULL;
 		netstack_rele(ns);
 	}
+
 	ipcl_conn_cleanup(connp);
 
 	/* leave conn_priv aka conn_udp, conn_icmp, etc in place. */
@@ -756,6 +774,7 @@ ipcl_conn_destroy(conn_t *connp)
 		connp->conn_flags = IPCL_UDPCONN;
 		kmem_cache_free(udp_conn_cache, connp);
 	} else if (connp->conn_flags & IPCL_RAWIPCONN) {
+
 		connp->conn_flags = IPCL_RAWIPCONN;
 		connp->conn_ulp = IPPROTO_ICMP;
 		kmem_cache_free(rawip_conn_cache, connp);
@@ -2025,6 +2044,7 @@ tcp_conn_constructor(void *buf, void *cdrarg, int kmflags)
 
 	mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
+	cv_init(&connp->conn_sq_cv, NULL, CV_DEFAULT, NULL);
 	tcp->tcp_timercache = tcp_timermp_alloc(KM_NOSLEEP);
 	connp->conn_tcp = tcp;
 	connp->conn_flags = IPCL_TCPCONN;
@@ -2047,6 +2067,7 @@ tcp_conn_destructor(void *buf, void *cdrarg)
 	tcp_timermp_free(tcp);
 	mutex_destroy(&connp->conn_lock);
 	cv_destroy(&connp->conn_cv);
+	cv_destroy(&connp->conn_sq_cv);
 }
 
 /* ARGSUSED */
@@ -2181,15 +2202,56 @@ rts_conn_destructor(void *buf, void *cdrarg)
 	cv_destroy(&connp->conn_cv);
 }
 
+/* ARGSUSED */
+int
+ip_helper_stream_constructor(void *buf, void *cdrarg, int kmflags)
+{
+	int error;
+	netstack_t	*ns;
+	int		ret;
+	tcp_stack_t	*tcps;
+	ip_helper_stream_info_t	*ip_helper_str;
+	ip_stack_t	*ipst;
+
+	ns = netstack_find_by_cred(kcred);
+	ASSERT(ns != NULL);
+	tcps = ns->netstack_tcp;
+	ipst = ns->netstack_ip;
+	ASSERT(tcps != NULL);
+	ip_helper_str = (ip_helper_stream_info_t *)buf;
+
+	error = ldi_open_by_name(DEV_IP, IP_HELPER_STR, kcred,
+	    &ip_helper_str->ip_helper_stream_handle, ipst->ips_ldi_ident);
+	if (error != 0) {
+		goto done;
+	}
+	error = ldi_ioctl(ip_helper_str->ip_helper_stream_handle,
+	    SIOCSQPTR, (intptr_t)buf, FKIOCTL, kcred, &ret);
+	if (error != 0) {
+		(void) ldi_close(ip_helper_str->ip_helper_stream_handle, 0,
+		    kcred);
+	}
+done:
+	netstack_rele(ipst->ips_netstack);
+	return (error);
+}
+
+/* ARGSUSED */
+static void
+ip_helper_stream_destructor(void *buf, void *cdrarg)
+{
+	ip_helper_stream_info_t *ip_helper_str = (ip_helper_stream_info_t *)buf;
+
+	ip_helper_str->ip_helper_stream_rq->q_ptr =
+	    ip_helper_str->ip_helper_stream_wq->q_ptr =
+	    ip_helper_str->ip_helper_stream_minfo;
+	(void) ldi_close(ip_helper_str->ip_helper_stream_handle, 0, kcred);
+}
+
+
 /*
  * Called as part of ipcl_conn_destroy to assert and clear any pointers
  * in the conn_t.
- *
- * Below we list all the pointers in the conn_t as a documentation aid.
- * The ones that we can not ASSERT to be NULL are #ifdef'ed out.
- * If you add any pointers to the conn_t please add an ASSERT here
- * and #ifdef it out if it can't be actually asserted to be NULL.
- * In any case, we bzero most of the conn_t at the end of the function.
  */
 void
 ipcl_conn_cleanup(conn_t *connp)
@@ -2197,7 +2259,6 @@ ipcl_conn_cleanup(conn_t *connp)
 	ASSERT(connp->conn_ire_cache == NULL);
 	ASSERT(connp->conn_latch == NULL);
 #ifdef notdef
-	/* These are not cleared */
 	ASSERT(connp->conn_rq == NULL);
 	ASSERT(connp->conn_wq == NULL);
 #endif
@@ -2236,11 +2297,11 @@ ipcl_conn_cleanup(conn_t *connp)
 	ASSERT(connp->conn_peercred == NULL);
 	ASSERT(connp->conn_netstack == NULL);
 
+	ASSERT(connp->conn_helper_info == NULL);
 	/* Clear out the conn_t fields that are not preserved */
 	bzero(&connp->conn_start_clr,
 	    sizeof (conn_t) -
 	    ((uchar_t *)&connp->conn_start_clr - (uchar_t *)connp));
-
 }
 
 /*

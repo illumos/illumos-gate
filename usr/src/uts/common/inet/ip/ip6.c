@@ -191,13 +191,15 @@ static void	icmp_inbound_too_big_v6(queue_t *, mblk_t *, ill_t *ill,
 static void	icmp_pkt_v6(queue_t *, mblk_t *, void *, size_t,
     const in6_addr_t *, boolean_t, zoneid_t, ip_stack_t *);
 static void	icmp_redirect_v6(queue_t *, mblk_t *, ill_t *ill);
-static int	ip_bind_connected_v6(conn_t *, mblk_t *, in6_addr_t *,
+static int	ip_bind_connected_v6(conn_t *, mblk_t **, uint8_t, in6_addr_t *,
     uint16_t, const in6_addr_t *, ip6_pkt_t *, uint16_t,
-    boolean_t, boolean_t, boolean_t, boolean_t);
-static boolean_t ip_bind_insert_ire_v6(mblk_t *, ire_t *, const in6_addr_t *,
+    boolean_t, boolean_t);
+static boolean_t ip_bind_get_ire_v6(mblk_t **, ire_t *, const in6_addr_t *,
     iulp_t *, ip_stack_t *);
-static int	ip_bind_laddr_v6(conn_t *, mblk_t *, const in6_addr_t *,
-    uint16_t, boolean_t, boolean_t, boolean_t);
+static void	ip_bind_post_handling_v6(conn_t *, mblk_t *, boolean_t,
+    boolean_t, ip_stack_t *);
+static int	ip_bind_laddr_v6(conn_t *, mblk_t **, uint8_t,
+    const in6_addr_t *, uint16_t, boolean_t);
 static void	ip_fanout_proto_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
     ill_t *, uint8_t, uint_t, uint_t, boolean_t, zoneid_t);
 static void	ip_fanout_tcp_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
@@ -2071,12 +2073,8 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 	uint16_t		lport;
 	uint16_t		fport;
 	uchar_t			*ucp;
-	mblk_t			*mp1;
-	boolean_t		ire_requested;
-	boolean_t		ipsec_policy_set;
 	int			error = 0;
 	boolean_t		local_bind;
-	boolean_t		orig_pkt_isv6 = connp->conn_pkt_isv6;
 	ipa6_conn_x_t		*acx6;
 	boolean_t		verify_dst;
 	ip_stack_t		*ipst = connp->conn_netstack->netstack_ip;
@@ -2145,9 +2143,6 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 		ip1dbg(("ip_bind_v6: unaligned address\n"));
 		goto bad_addr;
 	}
-	mp1 = mp->b_cont;	/* trailing mp if any */
-	ire_requested = (mp1 && mp1->b_datap->db_type == IRE_DB_REQ_TYPE);
-	ipsec_policy_set = (mp1 && mp1->b_datap->db_type == IPSEC_POLICY_SET);
 
 	switch (tbr->ADDR_length) {
 	default:
@@ -2173,9 +2168,6 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 		/*
 		 * Verify that both the source and destination addresses
 		 * are valid.
-		 * Note that we allow connect to broadcast and multicast
-		 * addresses when ire_requested is set. Thus the ULP
-		 * has to check for IRE_BROADCAST and multicast.
 		 */
 		ac6 = (ipa6_conn_t *)ucp;
 		v6srcp = &ac6->ac6_laddr;
@@ -2192,9 +2184,6 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 	case sizeof (ipa6_conn_x_t):
 		/*
 		 * Verify that the source address is valid.
-		 * Note that we allow connect to broadcast and multicast
-		 * addresses when ire_requested is set. Thus the ULP
-		 * has to check for IRE_BROADCAST and multicast.
 		 */
 		acx6 = (ipa6_conn_x_t *)ucp;
 		ac6 = &acx6->ac6x_conn;
@@ -2211,80 +2200,35 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 		break;
 	}
 	if (local_bind) {
-		if (IN6_IS_ADDR_V4MAPPED(v6srcp) && !connp->conn_ipv6_v6only) {
-			/* Bind to IPv4 address */
-			ipaddr_t v4src;
-
-			IN6_V4MAPPED_TO_IPADDR(v6srcp, v4src);
-
-			error = ip_bind_laddr(connp, mp, v4src, lport,
-			    ire_requested, ipsec_policy_set,
-			    tbr->ADDR_length != IPV6_ADDR_LEN);
-			if (error != 0)
-				goto bad_addr;
-			connp->conn_pkt_isv6 = B_FALSE;
-		} else {
-			if (IN6_IS_ADDR_V4MAPPED(v6srcp)) {
-				error = 0;
-				goto bad_addr;
-			}
-			error = ip_bind_laddr_v6(connp, mp, v6srcp, lport,
-			    ire_requested, ipsec_policy_set,
-			    (tbr->ADDR_length != IPV6_ADDR_LEN));
-			if (error != 0)
-				goto bad_addr;
-			connp->conn_pkt_isv6 = B_TRUE;
-		}
+		error = ip_proto_bind_laddr_v6(connp, &mp->b_cont, protocol,
+		    v6srcp, lport, tbr->ADDR_length != IPV6_ADDR_LEN);
 	} else {
-		/*
-		 * Bind to local and remote address. Local might be
-		 * unspecified in which case it will be extracted from
-		 * ire_src_addr_v6
-		 */
-		if (IN6_IS_ADDR_V4MAPPED(v6dstp) && !connp->conn_ipv6_v6only) {
-			/* Connect to IPv4 address */
-			ipaddr_t v4src;
-			ipaddr_t v4dst;
-
-			/* Is the source unspecified or mapped? */
-			if (!IN6_IS_ADDR_V4MAPPED(v6srcp) &&
-			    !IN6_IS_ADDR_UNSPECIFIED(v6srcp)) {
-				ip1dbg(("ip_bind_v6: "
-				    "dst is mapped, but not the src\n"));
-				goto bad_addr;
-			}
-			IN6_V4MAPPED_TO_IPADDR(v6srcp, v4src);
-			IN6_V4MAPPED_TO_IPADDR(v6dstp, v4dst);
-
-			/*
-			 * XXX Fix needed. Need to pass ipsec_policy_set
-			 * instead of B_FALSE.
-			 */
-
-			/* Always verify destination reachability. */
-			error = ip_bind_connected(connp, mp, &v4src, lport,
-			    v4dst, fport, ire_requested, ipsec_policy_set,
-			    B_TRUE, B_TRUE);
-			if (error != 0)
-				goto bad_addr;
-			IN6_IPADDR_TO_V4MAPPED(v4src, v6srcp);
-			connp->conn_pkt_isv6 = B_FALSE;
-		} else if (IN6_IS_ADDR_V4MAPPED(v6srcp)) {
-			ip1dbg(("ip_bind_v6: "
-			    "src is mapped, but not the dst\n"));
-			goto bad_addr;
-		} else {
-			error = ip_bind_connected_v6(connp, mp, v6srcp,
-			    lport, v6dstp, ipp, fport, ire_requested,
-			    ipsec_policy_set, B_TRUE, verify_dst);
-			if (error != 0)
-				goto bad_addr;
-			connp->conn_pkt_isv6 = B_TRUE;
-		}
+		error = ip_proto_bind_connected_v6(connp, &mp->b_cont, protocol,
+		    v6srcp, lport, v6dstp, ipp, fport, B_TRUE, verify_dst);
 	}
 
+	if (error == 0) {
+		/* Send it home. */
+		mp->b_datap->db_type = M_PCPROTO;
+		tbr->PRIM_type = T_BIND_ACK;
+		return (mp);
+	}
+
+bad_addr:
+	ASSERT(error != EINPROGRESS);
+	if (error > 0)
+		mp = mi_tpi_err_ack_alloc(mp, TSYSERR, error);
+	else
+		mp = mi_tpi_err_ack_alloc(mp, TBADADDR, 0);
+	return (mp);
+}
+
+static void
+ip_bind_post_handling_v6(conn_t *connp, mblk_t *mp,
+    boolean_t version_changed, boolean_t ire_requested, ip_stack_t *ipst)
+{
 	/* Update conn_send and pktversion if v4/v6 changed */
-	if (orig_pkt_isv6 != connp->conn_pkt_isv6) {
+	if (version_changed) {
 		ip_setpktversion(connp, connp->conn_pkt_isv6, B_TRUE, ipst);
 	}
 	/*
@@ -2293,27 +2237,12 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 	 * may not have been inherited at that point in time and hence
 	 * conn_out_enforce_policy may not be set.
 	 */
-	mp1 = mp->b_cont;
 	if (ire_requested && connp->conn_out_enforce_policy &&
-	    mp1 != NULL && DB_TYPE(mp1) == IRE_DB_REQ_TYPE) {
-		ire_t *ire = (ire_t *)mp1->b_rptr;
-		ASSERT(MBLKL(mp1) >= sizeof (ire_t));
+	    mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE) {
+		ire_t *ire = (ire_t *)mp->b_rptr;
+		ASSERT(MBLKL(mp) >= sizeof (ire_t));
 		ire->ire_ipsec_overhead = (conn_ipsec_length(connp));
 	}
-
-	/* Send it home. */
-	mp->b_datap->db_type = M_PCPROTO;
-	tbr->PRIM_type = T_BIND_ACK;
-	return (mp);
-
-bad_addr:
-	if (error == EINPROGRESS)
-		return (NULL);
-	if (error > 0)
-		mp = mi_tpi_err_ack_alloc(mp, TSYSERR, error);
-	else
-		mp = mi_tpi_err_ack_alloc(mp, TBADADDR, 0);
-	return (mp);
 }
 
 /*
@@ -2339,20 +2268,27 @@ bad_addr:
  * When the address is loopback or multicast, there might be many matching IREs
  * so bind has to look up based on the zone.
  */
+/*
+ * Verify the local IP address. Does not change the conn_t except
+ * conn_fully_bound and conn_policy_cached.
+ */
 static int
-ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
-    uint16_t lport, boolean_t ire_requested, boolean_t ipsec_policy_set,
-    boolean_t fanout_insert)
+ip_bind_laddr_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
+    const in6_addr_t *v6src, uint16_t lport, boolean_t fanout_insert)
 {
 	int		error = 0;
 	ire_t		*src_ire = NULL;
-	ipif_t		*ipif = NULL;
-	mblk_t		*policy_mp;
 	zoneid_t	zoneid;
+	mblk_t		*mp = NULL;
+	boolean_t	ire_requested;
+	boolean_t	ipsec_policy_set;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
-	if (ipsec_policy_set)
-		policy_mp = mp->b_cont;
+	if (mpp)
+		mp = *mpp;
+
+	ire_requested = (mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE);
+	ipsec_policy_set = (mp != NULL && DB_TYPE(mp) == IPSEC_POLICY_SET);
 
 	/*
 	 * If it was previously connected, conn_fully_bound would have
@@ -2372,11 +2308,11 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 		 * readability compared to a condition check.
 		 */
 		ASSERT(src_ire == NULL || !(src_ire->ire_type & IRE_BROADCAST));
+		/* LINTED - statement has no consequent */
 		if (IRE_IS_LOCAL(src_ire)) {
 			/*
 			 * (2) Bind to address of local UP interface
 			 */
-			ipif = src_ire->ire_ipif;
 		} else if (IN6_IS_ADDR_MULTICAST(v6src)) {
 			ipif_t	*multi_ipif = NULL;
 			ire_t	*save_ire;
@@ -2418,28 +2354,12 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 			if (multi_ipif != NULL)
 				ipif_refrele(multi_ipif);
 		} else {
-			*mp->b_wptr++ = (char)connp->conn_ulp;
-			ipif = ipif_lookup_addr_v6(v6src, NULL, zoneid,
-			    CONNP_TO_WQ(connp), mp, ip_wput_nondata, &error,
-			    ipst);
-			if (ipif == NULL) {
-				if (error == EINPROGRESS) {
-					if (src_ire != NULL)
-						ire_refrele(src_ire);
-					return (error);
-				}
+			if (!ip_addr_exists_v6(v6src, zoneid, ipst)) {
 				/*
 				 * Not a valid address for bind
 				 */
 				error = EADDRNOTAVAIL;
-			} else {
-				ipif_refrele(ipif);
 			}
-			/*
-			 * Just to keep it consistent with the processing in
-			 * ip_bind_v6().
-			 */
-			mp->b_wptr--;
 		}
 
 		if (error != 0) {
@@ -2471,17 +2391,18 @@ ip_bind_laddr_v6(conn_t *connp, mblk_t *mp, const in6_addr_t *v6src,
 		connp->conn_remv6 = ipv6_all_zeros;
 		connp->conn_lport = lport;
 		connp->conn_fport = 0;
-		error = ipcl_bind_insert_v6(connp, *mp->b_wptr, v6src, lport);
+		error = ipcl_bind_insert_v6(connp, protocol, v6src, lport);
 	}
 	if (error == 0) {
 		if (ire_requested) {
-			if (!ip_bind_insert_ire_v6(mp, src_ire, v6src, NULL,
+			if (!ip_bind_get_ire_v6(mpp, src_ire, v6src, NULL,
 			    ipst)) {
 				error = -1;
 				goto bad_addr;
 			}
+			mp = *mpp;
 		} else if (ipsec_policy_set) {
-			if (!ip_bind_ipsec_policy_set(connp, policy_mp)) {
+			if (!ip_bind_ipsec_policy_set(connp, mp)) {
 				error = -1;
 				goto bad_addr;
 			}
@@ -2501,54 +2422,70 @@ bad_addr:
 		ire_refrele(src_ire);
 
 	if (ipsec_policy_set) {
-		ASSERT(policy_mp != NULL);
-		freeb(policy_mp);
+		ASSERT(mp != NULL);
+		freeb(mp);
 		/*
 		 * As of now assume that nothing else accompanies
 		 * IPSEC_POLICY_SET.
 		 */
-		mp->b_cont = NULL;
+		*mpp = NULL;
 	}
+
 	return (error);
 }
-
-/* ARGSUSED */
-static void
-ip_bind_connected_resume_v6(ipsq_t *ipsq, queue_t *q, mblk_t *mp,
-    void *dummy_arg)
+int
+ip_proto_bind_laddr_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
+    const in6_addr_t *v6srcp, uint16_t lport, boolean_t fanout_insert)
 {
-	conn_t	*connp = NULL;
-	t_scalar_t prim;
+	int error;
+	boolean_t ire_requested;
+	mblk_t *mp = NULL;
+	boolean_t orig_pkt_isv6 = connp->conn_pkt_isv6;
+	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
-	ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
+	/*
+	 * Note that we allow connect to broadcast and multicast
+	 * address when ire_requested is set. Thus the ULP
+	 * has to check for IRE_BROADCAST and multicast.
+	 */
+	if (mpp)
+		mp = *mpp;
+	ire_requested = (mp && DB_TYPE(mp) == IRE_DB_REQ_TYPE);
 
-	if (CONN_Q(q))
-		connp = Q_TO_CONN(q);
-	ASSERT(connp != NULL);
+	ASSERT(connp->conn_af_isv6);
+	connp->conn_ulp = protocol;
 
-	prim = ((union T_primitives *)mp->b_rptr)->type;
-	ASSERT(prim == O_T_BIND_REQ || prim == T_BIND_REQ);
+	if (IN6_IS_ADDR_V4MAPPED(v6srcp) && !connp->conn_ipv6_v6only) {
+		/* Bind to IPv4 address */
+		ipaddr_t v4src;
 
-	if (IPCL_IS_TCP(connp)) {
-		/* Pass sticky_ipp for scope_id and pktinfo */
-		mp = ip_bind_v6(q, mp, connp, &connp->conn_tcp->tcp_sticky_ipp);
+		IN6_V4MAPPED_TO_IPADDR(v6srcp, v4src);
+
+		error = ip_bind_laddr_v4(connp, mpp, protocol, v4src, lport,
+		    fanout_insert);
+		if (error != 0)
+			goto bad_addr;
+		connp->conn_pkt_isv6 = B_FALSE;
 	} else {
-		/* For UDP and ICMP */
-		mp = ip_bind_v6(q, mp, connp, NULL);
-	}
-	if (mp != NULL) {
-		if (IPCL_IS_TCP(connp)) {
-			CONN_INC_REF(connp);
-			SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
-			    ip_resume_tcp_bind, connp, SQ_FILL,
-			    SQTAG_TCP_RPUTOTHER);
-		} else if (IPCL_IS_UDP(connp)) {
-			udp_resume_bind(connp, mp);
-		} else {
-			ASSERT(IPCL_IS_RAWIP(connp));
-			rawip_resume_bind(connp, mp);
+		if (IN6_IS_ADDR_V4MAPPED(v6srcp)) {
+			error = 0;
+			goto bad_addr;
 		}
+		error = ip_bind_laddr_v6(connp, mpp, protocol, v6srcp,
+		    lport, fanout_insert);
+		if (error != 0)
+			goto bad_addr;
+		connp->conn_pkt_isv6 = B_TRUE;
 	}
+
+	ip_bind_post_handling_v6(connp, mpp ? *mpp : NULL,
+	    orig_pkt_isv6 != connp->conn_pkt_isv6, ire_requested, ipst);
+	return (0);
+
+bad_addr:
+	if (error < 0)
+		error = -TBADADDR;
+	return (error);
 }
 
 /*
@@ -2562,41 +2499,42 @@ ip_bind_connected_resume_v6(ipsq_t *ipsq, queue_t *q, mblk_t *mp,
  * non-TCP cases, it is NULL and for all other tcp cases it is not useful.
  *
  */
-static int
-ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
-    uint16_t lport, const in6_addr_t *v6dst, ip6_pkt_t *ipp, uint16_t fport,
-    boolean_t ire_requested, boolean_t ipsec_policy_set,
-    boolean_t fanout_insert, boolean_t verify_dst)
+int
+ip_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
+    in6_addr_t *v6src, uint16_t lport, const in6_addr_t *v6dst,
+    ip6_pkt_t *ipp, uint16_t fport, boolean_t fanout_insert,
+    boolean_t verify_dst)
 {
 	ire_t		*src_ire;
 	ire_t		*dst_ire;
 	int		error = 0;
-	int 		protocol;
-	mblk_t		*policy_mp;
 	ire_t		*sire = NULL;
 	ire_t		*md_dst_ire = NULL;
 	ill_t		*md_ill = NULL;
 	ill_t 		*dst_ill = NULL;
 	ipif_t		*src_ipif = NULL;
 	zoneid_t	zoneid;
-	boolean_t ill_held = B_FALSE;
+	boolean_t	ill_held = B_FALSE;
+	mblk_t		*mp = NULL;
+	boolean_t	ire_requested = B_FALSE;
+	boolean_t	ipsec_policy_set = B_FALSE;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+	ts_label_t	*tsl = NULL;
+
+	if (mpp)
+		mp = *mpp;
+
+	if (mp != NULL) {
+		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
+		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
+		tsl = MBLK_GETLABEL(mp);
+	}
 
 	src_ire = dst_ire = NULL;
-	/*
-	 * NOTE:  The protocol is beyond the wptr because that's how
-	 * the undocumented transport<-->IP T_BIND_REQ behavior works.
-	 */
-	protocol = *mp->b_wptr & 0xFF;
-
 	/*
 	 * If we never got a disconnect before, clear it now.
 	 */
 	connp->conn_fully_bound = B_FALSE;
-
-	if (ipsec_policy_set) {
-		policy_mp = mp->b_cont;
-	}
 
 	zoneid = connp->conn_zoneid;
 
@@ -2620,7 +2558,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 			ipif = ipif_lookup_group_v6(v6dst, zoneid, ipst);
 		}
 		mutex_exit(&connp->conn_lock);
-		if (ipif == NULL || !ire_requested ||
+		if (ipif == NULL || ire_requested ||
 		    (dst_ire = ipif_to_ire_v6(ipif)) == NULL) {
 			if (ipif != NULL)
 				ipif_refrele(ipif);
@@ -2637,7 +2575,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 			ipif_refrele(ipif);
 	} else {
 		dst_ire = ire_route_lookup_v6(v6dst, NULL, NULL, 0,
-		    NULL, &sire, zoneid, MBLK_GETLABEL(mp),
+		    NULL, &sire, zoneid, tsl,
 		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
 		    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE | MATCH_IRE_SECATTR,
 		    ipst);
@@ -2693,8 +2631,8 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 	 */
 	if (dst_ire != NULL && is_system_labeled() &&
 	    !IPCL_IS_TCP(connp) &&
-	    tsol_compute_label_v6(DB_CREDDEF(mp, connp->conn_cred), v6dst, NULL,
-	    connp->conn_mac_exempt, ipst) != 0) {
+	    tsol_compute_label_v6(DB_CREDDEF(mp, connp->conn_cred),
+	    v6dst, NULL, connp->conn_mac_exempt, ipst) != 0) {
 		error = EHOSTUNREACH;
 		if (ip_debug > 2) {
 			pr_addr_dbg("ip_bind_connected: no label for dst %s\n",
@@ -2831,25 +2769,24 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 				/* No need to hold ill here */
 				dst_ill = dst_ire->ire_ipif->ipif_ill;
 			}
-			if (!ip6_asp_can_lookup(ipst)) {
-				*mp->b_wptr++ = (char)protocol;
-				ip6_asp_pending_op(CONNP_TO_WQ(connp), mp,
-				    ip_bind_connected_resume_v6);
-				error = EINPROGRESS;
-				goto refrele_and_quit;
-			}
-			src_ipif = ipif_select_source_v6(dst_ill, v6dst,
-			    RESTRICT_TO_NONE, connp->conn_src_preferences,
-			    zoneid);
-			ip6_asp_table_refrele(ipst);
-			if (src_ipif == NULL) {
-				pr_addr_dbg("ip_bind_connected_v6: "
-				    "no usable source address for "
-				    "connection to %s\n", AF_INET6, v6dst);
+			if (ip6_asp_can_lookup(ipst)) {
+				src_ipif = ipif_select_source_v6(dst_ill,
+				    v6dst, RESTRICT_TO_NONE,
+				    connp->conn_src_preferences, zoneid);
+				ip6_asp_table_refrele(ipst);
+				if (src_ipif == NULL) {
+					pr_addr_dbg("ip_bind_connected_v6: "
+					    "no usable source address for "
+					    "connection to %s\n",
+					    AF_INET6, v6dst);
+					error = EADDRNOTAVAIL;
+					goto bad_addr;
+				}
+				*v6src = src_ipif->ipif_v6lcl_addr;
+			} else {
 				error = EADDRNOTAVAIL;
 				goto bad_addr;
 			}
-			*v6src = src_ipif->ipif_v6lcl_addr;
 		}
 	}
 
@@ -2922,13 +2859,13 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 		if (sire != NULL)
 			ulp_info = &(sire->ire_uinfo);
 
-		if (!ip_bind_insert_ire_v6(mp, dst_ire, v6dst, ulp_info,
+		if (!ip_bind_get_ire_v6(mpp, dst_ire, v6dst, ulp_info,
 		    ipst)) {
 			error = -1;
 			goto bad_addr;
 		}
 	} else if (ipsec_policy_set) {
-		if (!ip_bind_ipsec_policy_set(connp, policy_mp)) {
+		if (!ip_bind_ipsec_policy_set(connp, mp)) {
 			error = -1;
 			goto bad_addr;
 		}
@@ -2982,19 +2919,24 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 			ASSERT(md_ill != NULL);
 			ASSERT(md_ill->ill_mdt_capab != NULL);
 			if ((mdinfo_mp = ip_mdinfo_return(md_dst_ire, connp,
-			    md_ill->ill_name, md_ill->ill_mdt_capab)) != NULL)
-				linkb(mp, mdinfo_mp);
+			    md_ill->ill_name, md_ill->ill_mdt_capab)) != NULL) {
+				if (mp == NULL) {
+					*mpp = mdinfo_mp;
+				} else {
+					linkb(mp, mdinfo_mp);
+				}
+			}
 		}
 	}
 bad_addr:
 	if (ipsec_policy_set) {
-		ASSERT(policy_mp != NULL);
-		freeb(policy_mp);
+		ASSERT(mp != NULL);
+		freeb(mp);
 		/*
 		 * As of now assume that nothing else accompanies
 		 * IPSEC_POLICY_SET.
 		 */
-		mp->b_cont = NULL;
+		*mpp = NULL;
 	}
 refrele_and_quit:
 	if (src_ire != NULL)
@@ -3012,34 +2954,110 @@ refrele_and_quit:
 	return (error);
 }
 
+/* ARGSUSED */
+int
+ip_proto_bind_connected_v6(conn_t *connp, mblk_t **mpp, uint8_t protocol,
+    in6_addr_t *v6srcp, uint16_t lport, const in6_addr_t *v6dstp,
+    ip6_pkt_t *ipp, uint16_t fport, boolean_t fanout_insert,
+    boolean_t verify_dst)
+{
+	int error = 0;
+	boolean_t orig_pkt_isv6 = connp->conn_pkt_isv6;
+	boolean_t ire_requested;
+	ip_stack_t *ipst = connp->conn_netstack->netstack_ip;
+
+	/*
+	 * Note that we allow connect to broadcast and multicast
+	 * address when ire_requested is set. Thus the ULP
+	 * has to check for IRE_BROADCAST and multicast.
+	 */
+	ASSERT(mpp != NULL);
+	ire_requested = (*mpp != NULL && DB_TYPE(*mpp) == IRE_DB_REQ_TYPE);
+
+	ASSERT(connp->conn_af_isv6);
+	connp->conn_ulp = protocol;
+
+	/* For raw socket, the local port is not set. */
+	lport = lport != 0 ? lport : connp->conn_lport;
+
+	/*
+	 * Bind to local and remote address. Local might be
+	 * unspecified in which case it will be extracted from
+	 * ire_src_addr_v6
+	 */
+	if (IN6_IS_ADDR_V4MAPPED(v6dstp) && !connp->conn_ipv6_v6only) {
+		/* Connect to IPv4 address */
+		ipaddr_t v4src;
+		ipaddr_t v4dst;
+
+		/* Is the source unspecified or mapped? */
+		if (!IN6_IS_ADDR_V4MAPPED(v6srcp) &&
+		    !IN6_IS_ADDR_UNSPECIFIED(v6srcp)) {
+			ip1dbg(("ip_proto_bind_connected_v6: "
+			    "dst is mapped, but not the src\n"));
+			goto bad_addr;
+		}
+		IN6_V4MAPPED_TO_IPADDR(v6srcp, v4src);
+		IN6_V4MAPPED_TO_IPADDR(v6dstp, v4dst);
+
+		/* Always verify destination reachability. */
+		error = ip_bind_connected_v4(connp, mpp, protocol, &v4src,
+		    lport, v4dst, fport, B_TRUE, B_TRUE);
+		if (error != 0)
+			goto bad_addr;
+		IN6_IPADDR_TO_V4MAPPED(v4src, v6srcp);
+		connp->conn_pkt_isv6 = B_FALSE;
+	} else if (IN6_IS_ADDR_V4MAPPED(v6srcp)) {
+		ip1dbg(("ip_proto_bind_connected_v6: "
+		    "src is mapped, but not the dst\n"));
+		goto bad_addr;
+	} else {
+		error = ip_bind_connected_v6(connp, mpp, protocol, v6srcp,
+		    lport, v6dstp, ipp, fport, B_TRUE, verify_dst);
+		if (error != 0)
+			goto bad_addr;
+		connp->conn_pkt_isv6 = B_TRUE;
+	}
+
+	ip_bind_post_handling_v6(connp, mpp ? *mpp : NULL,
+	    orig_pkt_isv6 != connp->conn_pkt_isv6, ire_requested, ipst);
+
+	/* Send it home. */
+	return (0);
+
+bad_addr:
+	if (error == 0)
+		error = -TBADADDR;
+	return (error);
+}
+
 /*
- * Insert the ire in b_cont. Returns false if it fails (due to lack of space).
+ * Get the ire in *mpp. Returns false if it fails (due to lack of space).
  * Makes the IRE be IRE_BROADCAST if dst is a multicast address.
  */
 /* ARGSUSED4 */
 static boolean_t
-ip_bind_insert_ire_v6(mblk_t *mp, ire_t *ire, const in6_addr_t *dst,
+ip_bind_get_ire_v6(mblk_t **mpp, ire_t *ire, const in6_addr_t *dst,
     iulp_t *ulp_info, ip_stack_t *ipst)
 {
-	mblk_t	*mp1;
+	mblk_t	*mp = *mpp;
 	ire_t	*ret_ire;
 
-	mp1 = mp->b_cont;
-	ASSERT(mp1 != NULL);
+	ASSERT(mp != NULL);
 
 	if (ire != NULL) {
 		/*
-		 * mp1 initialized above to IRE_DB_REQ_TYPE
+		 * mp initialized above to IRE_DB_REQ_TYPE
 		 * appended mblk. Its <upper protocol>'s
 		 * job to make sure there is room.
 		 */
-		if ((mp1->b_datap->db_lim - mp1->b_rptr) < sizeof (ire_t))
+		if ((mp->b_datap->db_lim - mp->b_rptr) < sizeof (ire_t))
 			return (B_FALSE);
 
-		mp1->b_datap->db_type = IRE_DB_TYPE;
-		mp1->b_wptr = mp1->b_rptr + sizeof (ire_t);
-		bcopy(ire, mp1->b_rptr, sizeof (ire_t));
-		ret_ire = (ire_t *)mp1->b_rptr;
+		mp->b_datap->db_type = IRE_DB_TYPE;
+		mp->b_wptr = mp->b_rptr + sizeof (ire_t);
+		bcopy(ire, mp->b_rptr, sizeof (ire_t));
+		ret_ire = (ire_t *)mp->b_rptr;
 		if (IN6_IS_ADDR_MULTICAST(dst) ||
 		    IN6_IS_ADDR_V4MAPPED_CLASSD(dst)) {
 			ret_ire->ire_type = IRE_BROADCAST;
@@ -3049,13 +3067,13 @@ ip_bind_insert_ire_v6(mblk_t *mp, ire_t *ire, const in6_addr_t *dst,
 			bcopy(ulp_info, &(ret_ire->ire_uinfo),
 			    sizeof (iulp_t));
 		}
-		ret_ire->ire_mp = mp1;
+		ret_ire->ire_mp = mp;
 	} else {
 		/*
 		 * No IRE was found. Remove IRE mblk.
 		 */
-		mp->b_cont = mp1->b_cont;
-		freeb(mp1);
+		*mpp = mp->b_cont;
+		freeb(mp);
 	}
 	return (B_TRUE);
 }
@@ -3168,7 +3186,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 			break;
 	}
 
-	if (connp == NULL || connp->conn_upq == NULL) {
+	if (connp == NULL) {
 		/*
 		 * No one bound to this port.  Is
 		 * there a client that wants all
@@ -3183,6 +3201,8 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 
 		return;
 	}
+
+	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
 
 	CONN_INC_REF(connp);
 	first_connp = connp;
@@ -3217,7 +3237,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 		 * needed just for verifying policy and it is never
 		 * sent up.
 		 */
-		if (connp == NULL || connp->conn_upq == NULL ||
+		if (connp == NULL ||
 		    (((first_mp1 = dupmsg(first_mp)) == NULL) &&
 		    ((first_mp1 = ip_copymsg(first_mp)) == NULL))) {
 			/*
@@ -3227,6 +3247,7 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 			connp = first_connp;
 			break;
 		}
+		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_rq != NULL);
 		mp1 = mctl_present ? first_mp1->b_cont : first_mp1;
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
@@ -3243,7 +3264,9 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 		}
 		if (mp1 == NULL) {
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
-		} else if (!canputnext(rq)) {
+		} else if (
+		    (IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+		    (!IPCL_IS_NONSTR(connp) && !canputnext(rq))) {
 			if (flags & IP_FF_RAWIP) {
 				BUMP_MIB(ill->ill_ip_mib,
 				    rawipIfStatsInOverflows);
@@ -3320,7 +3343,9 @@ ip_fanout_proto_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill,
 	}
 
 	rq = connp->conn_rq;
-	if (!canputnext(rq)) {
+	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+	    (!IPCL_IS_NONSTR(connp) && !canputnext(rq))) {
+
 		if (flags & IP_FF_RAWIP) {
 			BUMP_MIB(ill->ill_ip_mib, rawipIfStatsInOverflows);
 		} else {
@@ -3740,7 +3765,8 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
 
-		if (CONN_UDP_FLOWCTLD(connp)) {
+		if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+		    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
 			freemsg(first_mp);
 			CONN_DEC_REF(connp);
 			return;
@@ -3870,7 +3896,8 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			goto next_one;
 		}
-		if (CONN_UDP_FLOWCTLD(connp)) {
+		if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+		    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
 			BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
 			freemsg(first_mp1);
 			goto next_one;
@@ -3938,7 +3965,8 @@ next_one:
 			first_mp = mp;
 		}
 	}
-	if (CONN_UDP_FLOWCTLD(connp)) {
+	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+	    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
 		BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
 		freemsg(mp);
 	} else {
@@ -8397,7 +8425,8 @@ udp_fanout:
 		return;
 	}
 
-	if (CONN_UDP_FLOWCTLD(connp)) {
+	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+	    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
 		freemsg(first_mp);
 		BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
 		CONN_DEC_REF(connp);
@@ -9069,7 +9098,7 @@ done:
  *
  * case 1 : Routing header was processed by this node and
  *	    ip_process_rthdr replaced ip6_dst with the next hop
- *          and we are forwarding the packet to the next hop.
+ *	    and we are forwarding the packet to the next hop.
  *
  * case 2 : Routing header was not processed by this node and we
  *	    are just forwarding the packet.

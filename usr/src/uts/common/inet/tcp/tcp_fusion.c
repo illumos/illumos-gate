@@ -261,10 +261,9 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 	    tcp->tcp_kssl_ent == NULL &&
 	    !IPP_ENABLED(IPP_LOCAL_OUT|IPP_LOCAL_IN, ipst)) {
 		mblk_t *mp;
-		struct stroptions *stropt;
 		queue_t *peer_rq = peer_tcp->tcp_rq;
 
-		ASSERT(!TCP_IS_DETACHED(peer_tcp) && peer_rq != NULL);
+		ASSERT(!TCP_IS_DETACHED(peer_tcp));
 		ASSERT(tcp->tcp_fused_sigurg_mp == NULL);
 		ASSERT(peer_tcp->tcp_fused_sigurg_mp == NULL);
 		ASSERT(tcp->tcp_kssl_ctx == NULL);
@@ -276,19 +275,25 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		 * This is why we pre-allocate the M_PCSIG mblks for both
 		 * endpoints which will only be used during/after unfuse.
 		 */
-		if ((mp = allocb(1, BPRI_HI)) == NULL)
+		if (!IPCL_IS_NONSTR(tcp->tcp_connp)) {
+			if ((mp = allocb(1, BPRI_HI)) == NULL)
+				goto failed;
+
+			tcp->tcp_fused_sigurg_mp = mp;
+		}
+
+		if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp)) {
+			if ((mp = allocb(1, BPRI_HI)) == NULL)
+				goto failed;
+
+			peer_tcp->tcp_fused_sigurg_mp = mp;
+		}
+
+		if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
+		    (mp = allocb(sizeof (struct stroptions),
+		    BPRI_HI)) == NULL) {
 			goto failed;
-
-		tcp->tcp_fused_sigurg_mp = mp;
-
-		if ((mp = allocb(1, BPRI_HI)) == NULL)
-			goto failed;
-
-		peer_tcp->tcp_fused_sigurg_mp = mp;
-
-		/* Allocate M_SETOPTS mblk */
-		if ((mp = allocb(sizeof (*stropt), BPRI_HI)) == NULL)
-			goto failed;
+		}
 
 		/* If either tcp or peer_tcp sodirect enabled then disable */
 		if (tcp->tcp_sodirect != NULL) {
@@ -329,12 +334,12 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 		 * us data as soon as fusion is finished, and we need to be
 		 * able to flow control it in case it sends down huge amount
 		 * of data while we're still detached.  To prevent that we
-		 * inherit the listener's q_hiwat value; this is temporary
-		 * since we'll repeat the process in tcp_accept_finish().
+		 * inherit the listener's recv_hiwater value; this is temporary
+		 * since we'll repeat the process intcp_accept_finish().
 		 */
 		if (!tcp->tcp_refuse) {
 			(void) tcp_fuse_set_rcv_hiwat(tcp,
-			    tcp->tcp_saved_listener->tcp_rq->q_hiwat);
+			    tcp->tcp_saved_listener->tcp_recv_hiwater);
 
 			/*
 			 * Set the stream head's write offset value to zero
@@ -342,30 +347,53 @@ tcp_fuse(tcp_t *tcp, uchar_t *iphdr, tcph_t *tcph)
 			 * headers; tell it to not break up the writes (this
 			 * would reduce the amount of work done by kmem); and
 			 * configure our receive buffer. Note that we can only
-			 * do this for the active connect tcp since our eager
-			 * is still detached; it will be dealt with later in
+			 * do this for the active connect tcp since our eager is
+			 * still detached; it will be dealt with later in
 			 * tcp_accept_finish().
 			 */
-			DB_TYPE(mp) = M_SETOPTS;
-			mp->b_wptr += sizeof (*stropt);
+			if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp)) {
+				struct stroptions *stropt;
 
-			stropt = (struct stroptions *)mp->b_rptr;
-			stropt->so_flags = SO_MAXBLK | SO_WROFF | SO_HIWAT;
-			stropt->so_maxblk = tcp_maxpsz_set(peer_tcp, B_FALSE);
-			stropt->so_wroff = 0;
+				DB_TYPE(mp) = M_SETOPTS;
+				mp->b_wptr += sizeof (*stropt);
 
-			/*
-			 * Record the stream head's high water mark for
-			 * peer endpoint; this is used for flow-control
-			 * purposes in tcp_fuse_output().
-			 */
-			stropt->so_hiwat = tcp_fuse_set_rcv_hiwat(peer_tcp,
-			    peer_rq->q_hiwat);
+				stropt = (struct stroptions *)mp->b_rptr;
+				stropt->so_flags = SO_MAXBLK|SO_WROFF|SO_HIWAT;
+				stropt->so_maxblk = tcp_maxpsz_set(peer_tcp,
+				    B_FALSE);
+				stropt->so_wroff = 0;
 
-			tcp->tcp_refuse = B_FALSE;
-			peer_tcp->tcp_refuse = B_FALSE;
-			/* Send the options up */
-			putnext(peer_rq, mp);
+				/*
+				 * Record the stream head's high water mark for
+				 * peer endpoint; this is used for flow-control
+				 * purposes in tcp_fuse_output().
+				 */
+				stropt->so_hiwat = tcp_fuse_set_rcv_hiwat(
+				    peer_tcp, peer_rq->q_hiwat);
+
+				tcp->tcp_refuse = B_FALSE;
+				peer_tcp->tcp_refuse = B_FALSE;
+				/* Send the options up */
+				putnext(peer_rq, mp);
+			} else {
+				struct sock_proto_props sopp;
+
+				/* The peer is a non-STREAMS end point */
+				ASSERT(IPCL_IS_TCP(peer_connp));
+
+				(void) tcp_fuse_set_rcv_hiwat(tcp,
+				    tcp->tcp_saved_listener->tcp_recv_hiwater);
+
+				sopp.sopp_flags = SOCKOPT_MAXBLK |
+				    SOCKOPT_WROFF | SOCKOPT_RCVHIWAT;
+				sopp.sopp_maxblk = tcp_maxpsz_set(peer_tcp,
+				    B_FALSE);
+				sopp.sopp_wroff = 0;
+				sopp.sopp_rxhiwat = tcp_fuse_set_rcv_hiwat(
+				    peer_tcp, peer_tcp->tcp_recv_hiwater);
+				(*peer_connp->conn_upcalls->su_set_proto_props)
+				    (peer_connp->conn_upper_handle, &sopp);
+			}
 		}
 		tcp->tcp_refuse = B_FALSE;
 		peer_tcp->tcp_refuse = B_FALSE;
@@ -399,8 +427,6 @@ tcp_unfuse(tcp_t *tcp)
 	ASSERT(peer_tcp->tcp_fused && peer_tcp->tcp_loopback_peer == tcp);
 	ASSERT(tcp->tcp_connp->conn_sqp == peer_tcp->tcp_connp->conn_sqp);
 	ASSERT(tcp->tcp_unsent == 0 && peer_tcp->tcp_unsent == 0);
-	ASSERT(tcp->tcp_fused_sigurg_mp != NULL);
-	ASSERT(peer_tcp->tcp_fused_sigurg_mp != NULL);
 
 	/*
 	 * We disable synchronous streams, drain any queued data and
@@ -420,10 +446,16 @@ tcp_unfuse(tcp_t *tcp)
 	/* Unfuse the endpoints */
 	peer_tcp->tcp_fused = tcp->tcp_fused = B_FALSE;
 	peer_tcp->tcp_loopback_peer = tcp->tcp_loopback_peer = NULL;
-	freeb(peer_tcp->tcp_fused_sigurg_mp);
-	freeb(tcp->tcp_fused_sigurg_mp);
-	peer_tcp->tcp_fused_sigurg_mp = NULL;
-	tcp->tcp_fused_sigurg_mp = NULL;
+	if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp)) {
+		ASSERT(peer_tcp->tcp_fused_sigurg_mp != NULL);
+		freeb(peer_tcp->tcp_fused_sigurg_mp);
+		peer_tcp->tcp_fused_sigurg_mp = NULL;
+	}
+	if (!IPCL_IS_NONSTR(tcp->tcp_connp)) {
+		ASSERT(tcp->tcp_fused_sigurg_mp != NULL);
+		freeb(tcp->tcp_fused_sigurg_mp);
+		tcp->tcp_fused_sigurg_mp = NULL;
+	}
 }
 
 /*
@@ -527,6 +559,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	uint_t max_unread;
 	boolean_t flow_stopped, peer_data_queued = B_FALSE;
 	boolean_t urgent = (DB_TYPE(mp) != M_DATA);
+	boolean_t push = B_FALSE;
 	mblk_t *mp1 = mp;
 	ill_t *ilp, *olp;
 	ipif_t *iifp, *oifp;
@@ -545,7 +578,6 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	ASSERT(tcp->tcp_connp->conn_sqp == peer_tcp->tcp_connp->conn_sqp);
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_PROTO ||
 	    DB_TYPE(mp) == M_PCPROTO);
-
 
 	/* If this connection requires IP, unfuse and use regular path */
 	if (tcp_loopback_needs_ip(tcp, ns) ||
@@ -749,7 +781,38 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	 * Enqueue data into the peer's receive list; we may or may not
 	 * drain the contents depending on the conditions below.
 	 */
-	tcp_rcv_enqueue(peer_tcp, mp, recv_size);
+	if (IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
+	    peer_tcp->tcp_connp->conn_upper_handle != NULL) {
+		int error;
+		int flags = 0;
+
+		if ((tcp->tcp_valid_bits & TCP_URG_VALID) &&
+		    (tcp->tcp_urg == tcp->tcp_snxt)) {
+			flags = MSG_OOB;
+			(*peer_tcp->tcp_connp->conn_upcalls->su_signal_oob)
+			    (peer_tcp->tcp_connp->conn_upper_handle, 0);
+			tcp->tcp_valid_bits &= ~TCP_URG_VALID;
+		}
+		(*peer_tcp->tcp_connp->conn_upcalls->su_recv)(
+		    peer_tcp->tcp_connp->conn_upper_handle, mp, recv_size,
+		    flags, &error, &push);
+	} else {
+		if (IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
+		    (tcp->tcp_valid_bits & TCP_URG_VALID) &&
+		    (tcp->tcp_urg == tcp->tcp_snxt)) {
+			/*
+			 * Can not deal with urgent pointers
+			 * that arrive before the connection has been
+			 * accept()ed.
+			 */
+			tcp->tcp_valid_bits &= ~TCP_URG_VALID;
+			freemsg(mp);
+			mutex_exit(&peer_tcp->tcp_non_sq_lock);
+			return (B_TRUE);
+		}
+
+		tcp_rcv_enqueue(peer_tcp, mp, recv_size);
+	}
 
 	/* In case it wrapped around and also to keep it constant */
 	peer_tcp->tcp_rwnd += recv_size;
@@ -797,6 +860,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	    (peer_tcp->tcp_rcv_cnt >= peer_tcp->tcp_fuse_rcv_hiwater ||
 	    peer_tcp->tcp_fuse_rcv_unread_cnt >= max_unread)) ||
 	    (!peer_tcp->tcp_direct_sockfs && !TCP_IS_DETACHED(peer_tcp) &&
+	    !IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
 	    !canputnext(peer_tcp->tcp_rq))) {
 		peer_data_queued = B_TRUE;
 	}
@@ -861,7 +925,8 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 		 * will pull the data via tcp_fuse_rrw().
 		 */
 		if (urgent || (!flow_stopped && !peer_tcp->tcp_direct_sockfs)) {
-			ASSERT(peer_tcp->tcp_rcv_list != NULL);
+			ASSERT(IPCL_IS_NONSTR(peer_tcp->tcp_connp) ||
+			    peer_tcp->tcp_rcv_list != NULL);
 			/*
 			 * For TLI-based streams, a thread in tcp_accept_swap()
 			 * can race with us.  That thread will ensure that the
@@ -897,6 +962,8 @@ boolean_t
 tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 {
 	mblk_t *mp;
+	conn_t	*connp = tcp->tcp_connp;
+
 #ifdef DEBUG
 	uint_t cnt = 0;
 #endif
@@ -907,7 +974,7 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 	ASSERT(tcp->tcp_loopback);
 	ASSERT(tcp->tcp_fused || tcp->tcp_fused_sigurg);
 	ASSERT(!tcp->tcp_fused || tcp->tcp_loopback_peer != NULL);
-	ASSERT(sigurg_mpp != NULL || tcp->tcp_fused);
+	ASSERT(IPCL_IS_NONSTR(connp) || sigurg_mpp != NULL || tcp->tcp_fused);
 
 	/* No need for the push timer now, in case it was scheduled */
 	if (tcp->tcp_push_tid != 0) {
@@ -921,34 +988,41 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 	 * works properly.
 	 */
 	if (tcp->tcp_fused_sigurg) {
-		/*
-		 * sigurg_mpp is normally NULL, i.e. when we're still
-		 * fused and didn't get here because of tcp_unfuse().
-		 * In this case try hard to allocate the M_PCSIG mblk.
-		 */
-		if (sigurg_mpp == NULL &&
-		    (mp = allocb(1, BPRI_HI)) == NULL &&
-		    (mp = allocb_tryhard(1)) == NULL) {
-			/* Alloc failed; try again next time */
-			tcp->tcp_push_tid = TCP_TIMER(tcp, tcp_push_timer,
-			    MSEC_TO_TICK(tcps->tcps_push_timer_interval));
-			return (B_TRUE);
-		} else if (sigurg_mpp != NULL) {
-			/*
-			 * Use the supplied M_PCSIG mblk; it means we're
-			 * either unfused or in the process of unfusing,
-			 * and the drain must happen now.
-			 */
-			mp = *sigurg_mpp;
-			*sigurg_mpp = NULL;
-		}
-		ASSERT(mp != NULL);
-
 		tcp->tcp_fused_sigurg = B_FALSE;
-		/* Send up the signal */
-		DB_TYPE(mp) = M_PCSIG;
-		*mp->b_wptr++ = (uchar_t)SIGURG;
-		putnext(q, mp);
+		if (IPCL_IS_NONSTR(connp)) {
+			(*connp->conn_upcalls->su_signal_oob)
+			    (connp->conn_upper_handle, 0);
+		} else {
+			/*
+			 * sigurg_mpp is normally NULL, i.e. when we're still
+			 * fused and didn't get here because of tcp_unfuse().
+			 * In this case try hard to allocate the M_PCSIG mblk.
+			 */
+			if (sigurg_mpp == NULL &&
+			    (mp = allocb(1, BPRI_HI)) == NULL &&
+			    (mp = allocb_tryhard(1)) == NULL) {
+				/* Alloc failed; try again next time */
+				tcp->tcp_push_tid = TCP_TIMER(tcp,
+				    tcp_push_timer,
+				    MSEC_TO_TICK(
+				    tcps->tcps_push_timer_interval));
+				return (B_TRUE);
+			} else if (sigurg_mpp != NULL) {
+				/*
+				 * Use the supplied M_PCSIG mblk; it means we're
+				 * either unfused or in the process of unfusing,
+				 * and the drain must happen now.
+				 */
+				mp = *sigurg_mpp;
+				*sigurg_mpp = NULL;
+			}
+			ASSERT(mp != NULL);
+
+			/* Send up the signal */
+			DB_TYPE(mp) = M_PCSIG;
+			*mp->b_wptr++ = (uchar_t)SIGURG;
+			putnext(q, mp);
+		}
 		/*
 		 * Let the regular tcp_rcv_drain() path handle
 		 * draining the data if we're no longer fused.
@@ -980,6 +1054,7 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 #ifdef DEBUG
 		cnt += msgdsize(mp);
 #endif
+		ASSERT(!IPCL_IS_NONSTR(connp));
 		if (sd_rd_eof) {
 			freemsg(mp);
 		} else {
@@ -991,12 +1066,14 @@ tcp_fuse_rcv_drain(queue_t *q, tcp_t *tcp, mblk_t **sigurg_mpp)
 	if (tcp->tcp_direct_sockfs && !sd_rd_eof)
 		(void) strrput_sig(q, B_TRUE);
 
+#ifdef DEBUG
 	ASSERT(cnt == tcp->tcp_rcv_cnt);
+#endif
 	tcp->tcp_rcv_last_head = NULL;
 	tcp->tcp_rcv_last_tail = NULL;
 	tcp->tcp_rcv_cnt = 0;
 	tcp->tcp_fuse_rcv_unread_cnt = 0;
-	tcp->tcp_rwnd = q->q_hiwat;
+	tcp->tcp_rwnd = tcp->tcp_recv_hiwater;
 
 	if (peer_tcp->tcp_flow_stopped && (TCP_UNSENT_BYTES(peer_tcp) <=
 	    peer_tcp->tcp_xmit_lowater)) {
@@ -1409,8 +1486,10 @@ tcp_fuse_disable_pair(tcp_t *tcp, boolean_t unfusing)
 	}
 
 	/* Disable synchronous streams */
-	tcp_fuse_syncstr_disable(tcp);
-	tcp_fuse_syncstr_disable(peer_tcp);
+	if (!IPCL_IS_NONSTR(tcp->tcp_connp))
+		tcp_fuse_syncstr_disable(tcp);
+	if (!IPCL_IS_NONSTR(peer_tcp->tcp_connp))
+		tcp_fuse_syncstr_disable(peer_tcp);
 }
 
 /*

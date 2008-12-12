@@ -497,7 +497,10 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(sockfs, snf_segmap,  	nomod_einval);
 	NO_UNLOAD_STUB(sockfs, sock_getfasync,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, nl7c_sendfilev,  nomod_zero);
-	NO_UNLOAD_STUB(sockfs, sostream_direct,	nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sotpi_sototpi,  nomod_zero);
+	NO_UNLOAD_STUB(sockfs, socket_sendmblk,  nomod_zero);
+	NO_UNLOAD_STUB(sockfs, socket_setsockopt,  nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sod_uioa_mblk_done,	nomod_zero);
 	END_MODULE(sockfs);
 #endif
 
@@ -1278,30 +1281,6 @@ fcnname/**/_info:							\
 #endif
 
 /*
- * Stubs for SDP-IB driver.
- */	
-#ifndef SDPIB_MODULE
-	MODULE(sdpib,drv);
-	STUB(sdpib, sdp_create, nomod_zero);
-	STUB(sdpib, sdp_bind, nomod_einval);
-	STUB(sdpib, sdp_listen, nomod_einval);
-	STUB(sdpib, sdp_connect, nomod_einval);
-	STUB(sdpib, sdp_recv, nomod_einval);
-	STUB(sdpib, sdp_send, nomod_einval);
-	STUB(sdpib, sdp_getpeername, nomod_einval);
-	STUB(sdpib, sdp_getsockname, nomod_einval);
-	STUB(sdpib, sdp_disconnect, nomod_einval);
-	STUB(sdpib, sdp_shutdown, nomod_einval);
-	STUB(sdpib, sdp_get_opt, nomod_einval);
-	STUB(sdpib, sdp_set_opt, nomod_einval);
-	STUB(sdpib, sdp_close, nomod_void);
-	STUB(sdpib, sdp_polldata, nomod_zero);
-	STUB(sdpib, sdp_ioctl, nomod_einval);
-	END_MODULE(sdpib);
-#endif
-
-
-/*
  * Stubs for kssl, the kernel SSL proxy
  */
 #ifndef KSSL_MODULE
@@ -1346,6 +1325,35 @@ fcnname/**/_info:							\
 	MODULE(iommulib,misc);
 	STUB(iommulib, iommulib_nex_close, nomod_void);
         END_MODULE(iommulib);
+#endif
+
+/*
+ * Stubs for kernel socket, for iscsi
+ */
+#ifndef KSOCKET_MODULE
+	MODULE(ksocket, misc);
+	NO_UNLOAD_STUB(ksocket, ksocket_setsockopt, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_getsockopt, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_getpeername, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_getsockname, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_socket, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_bind, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_listen, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_accept, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_connect, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_recv, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_recvfrom, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_recvmsg, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_send, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_sendto, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_sendmsg, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_ioctl, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_setcallbacks, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_hold, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_rele, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_shutdown, nomod_minus_one);
+	NO_UNLOAD_STUB(ksocket, ksocket_close, nomod_minus_one);
+	END_MODULE(ksocket);
 #endif
 
 / this is just a marker for the area of text that contains stubs 

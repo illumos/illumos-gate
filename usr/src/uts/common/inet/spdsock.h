@@ -26,8 +26,6 @@
 #ifndef	_INET_SPDSOCK_H
 #define	_INET_SPDSOCK_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/netstack.h>
 
 #ifdef	__cplusplus
@@ -112,8 +110,7 @@ extern uint_t		spdsock_max_optsize;
 
 extern int spdsock_opt_get(queue_t *, int, int, uchar_t *);
 extern int spdsock_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
-    uint_t *, uchar_t *, void *, cred_t *,
-    mblk_t *);
+    uint_t *, uchar_t *, void *, cred_t *, mblk_t *);
 
 #ifdef	__cplusplus
 }

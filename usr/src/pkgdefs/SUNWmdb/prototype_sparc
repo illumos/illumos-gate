@@ -64,6 +64,7 @@ f none usr/lib/mdb/kvm/sparcv9/ptm.so 555 root sys
 s none usr/lib/mdb/kvm/sparcv9/px.so=intr.so
 f none usr/lib/mdb/kvm/sparcv9/random.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/sctp.so 555 root sys
+f none usr/lib/mdb/kvm/sparcv9/sockfs.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/s1394.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/scsi_vhci.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/specfs.so 555 root sys

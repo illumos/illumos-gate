@@ -1934,10 +1934,12 @@ iscsi_login_failure_str(uchar_t status_class, uchar_t status_detail)
 static iscsi_status_t
 iscsi_login_connect(iscsi_conn_t *icp)
 {
-	iscsi_hba_t	    *ihp;
-	iscsi_sess_t	    *isp;
-	struct sockaddr	    *addr;
-	struct sonode	    *so = NULL;
+	iscsi_hba_t		*ihp;
+	iscsi_sess_t		*isp;
+	struct sockaddr		*addr;
+	struct sockaddr_in6	t_addr;
+	struct sonode		*so = NULL;
+	socklen_t		t_addrlen;
 
 	ASSERT(icp != NULL);
 	isp = icp->conn_sess;
@@ -1946,6 +1948,8 @@ iscsi_login_connect(iscsi_conn_t *icp)
 	ASSERT(ihp != NULL);
 	addr = &icp->conn_curr_addr.sin;
 
+	t_addrlen = sizeof (struct sockaddr_in6);
+	bzero(&t_addr, sizeof (struct sockaddr_in6));
 	so = iscsi_net->socket(addr->sa_family, SOCK_STREAM, 0);
 	if (so == NULL) {
 		cmn_err(CE_WARN, "iscsi connection(%u) unable "
@@ -1982,7 +1986,8 @@ iscsi_login_connect(iscsi_conn_t *icp)
 	}
 
 	icp->conn_socket = so;
-	if (iscsi_net->getsockname(icp->conn_socket) != 0) {
+	if (iscsi_net->getsockname(icp->conn_socket,
+	    (struct sockaddr *)&t_addr, &t_addrlen) != 0) {
 		cmn_err(CE_NOTE, "iscsi connection(%u) failed to get "
 		    "socket information", icp->conn_oid);
 	}

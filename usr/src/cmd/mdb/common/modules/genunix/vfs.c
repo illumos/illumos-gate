@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -47,6 +45,11 @@
 #include <sys/socketvar.h>
 #include <sys/strsubr.h>
 #include <sys/un.h>
+#include <fs/sockfs/socktpi_impl.h>
+#include <inet/ipclassifier.h>
+#include <inet/ip_if.h>
+#include <inet/sctp/sctp_impl.h>
+#include <inet/sctp/sctp_addr.h>
 
 int
 vfs_walk_init(mdb_walk_state_t *wsp)
@@ -173,7 +176,7 @@ read_fsname(uintptr_t vfsp, char *fsname)
 #define	FSINFO_MNTLEN	56
 #endif
 
-/*ARGSUSED*/
+/* ARGSUSED */
 int
 fsinfo(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
@@ -387,14 +390,14 @@ pfiles_print_addr(struct sockaddr *addr)
 
 	switch (addr->sa_family) {
 	case AF_INET:
-		/*LINTED: alignment*/
+		/* LINTED: alignment */
 		s_in = (struct sockaddr_in *)addr;
 		mdb_nhconvert(&port, &s_in->sin_port, sizeof (port));
 		mdb_printf("AF_INET %I %d ", s_in->sin_addr.s_addr, port);
 		break;
 
 	case AF_INET6:
-		/*LINTED: alignment*/
+		/* LINTED: alignment */
 		s_in6 = (struct sockaddr_in6 *)addr;
 		mdb_nhconvert(&port, &s_in6->sin6_port, sizeof (port));
 		mdb_printf("AF_INET6 %N %d ", &(s_in6->sin6_addr), port);
@@ -410,31 +413,39 @@ pfiles_print_addr(struct sockaddr *addr)
 	}
 }
 
-
 static int
-pfiles_get_sonode(uintptr_t vp, struct sonode *sonode)
+pfiles_get_sonode(vnode_t *v_sock, struct sonode *sonode)
 {
-	vnode_t v;
-	struct stdata stream;
-
-	if (mdb_vread(&v, sizeof (v), vp) == -1) {
-		mdb_warn("failed to read socket vnode");
+	if (mdb_vread(sonode, sizeof (struct sonode),
+	    (uintptr_t)v_sock->v_data) == -1) {
+		mdb_warn("failed to read sonode");
 		return (-1);
 	}
 
-	if (mdb_vread(&stream, sizeof (stream), (uintptr_t)v.v_stream) == -1) {
+	return (0);
+}
+
+static int
+pfiles_get_tpi_sonode(vnode_t *v_sock, sotpi_sonode_t *sotpi_sonode)
+{
+
+	struct stdata stream;
+
+	if (mdb_vread(&stream, sizeof (stream),
+	    (uintptr_t)v_sock->v_stream) == -1) {
 		mdb_warn("failed to read stream data");
 		return (-1);
 	}
 
-	if (mdb_vread(&v, sizeof (v), (uintptr_t)stream.sd_vnode) == -1) {
+	if (mdb_vread(v_sock, sizeof (vnode_t),
+	    (uintptr_t)stream.sd_vnode) == -1) {
 		mdb_warn("failed to read stream vnode");
 		return (-1);
 	}
 
-	if (mdb_vread(sonode, sizeof (struct sonode),
-	    (uintptr_t)v.v_data) == -1) {
-		mdb_warn("failed to read sonode");
+	if (mdb_vread(sotpi_sonode, sizeof (sotpi_sonode_t),
+	    (uintptr_t)v_sock->v_data) == -1) {
+		mdb_warn("failed to read sotpi_sonode");
 		return (-1);
 	}
 
@@ -470,16 +481,20 @@ pfiles_dig_pathname(uintptr_t vp, char *path)
 
 		/*
 		 * For sockets, we won't find a path unless we print the path
-		 * associated with the accessvp.
+		 * associated with transport's STREAM device.
 		 */
 		if (v.v_type == VSOCK) {
 			struct sonode sonode;
 
-			if (pfiles_get_sonode(vp, &sonode) == -1) {
+			if (pfiles_get_sonode(&v, &sonode) == -1) {
 				return (-1);
 			}
-
-			vp = (uintptr_t)sonode.so_accessvp;
+			if (!SOCK_IS_NONSTR(&sonode)) {
+				struct sockparams *sp = sonode.so_sockparams;
+				vp = (uintptr_t)sp->sp_sdev_info.sd_vnode;
+			} else {
+				vp = NULL;
+			}
 		}
 	}
 
@@ -530,6 +545,364 @@ struct pfiles_cbdata {
 	int opt_p;
 	int fd;
 };
+
+#define	list_d2l(a, obj) ((list_node_t *)(((char *)obj) + (a)->list_offset))
+#define	list_object(a, node) ((void *)(((char *)node) - (a)->list_offset))
+
+/*
+ * SCTP interface for geting the first source address of a sctp_t.
+ */
+int
+sctp_getsockaddr(sctp_t *sctp, struct sockaddr *addr)
+{
+	int			err = -1;
+	int			i;
+	int			l;
+	sctp_saddr_ipif_t	*pobj;
+	sctp_saddr_ipif_t	obj;
+	size_t			added = 0;
+	sin6_t			*sin6;
+	sin_t			*sin4;
+	int			scanned = 0;
+	boolean_t		skip_lback = B_FALSE;
+
+	addr->sa_family = sctp->sctp_family;
+	if (sctp->sctp_nsaddrs == 0)
+		goto done;
+
+	/*
+	 * Skip loopback addresses for non-loopback assoc.
+	 */
+	if (sctp->sctp_state >= SCTPS_ESTABLISHED && !sctp->sctp_loopback) {
+		skip_lback = B_TRUE;
+	}
+
+	for (i = 0; i < SCTP_IPIF_HASH; i++) {
+		if (sctp->sctp_saddrs[i].ipif_count == 0)
+			continue;
+
+		pobj = list_object(&sctp->sctp_saddrs[i].sctp_ipif_list,
+		    sctp->sctp_saddrs[i].sctp_ipif_list.list_head.list_next);
+		if (mdb_vread(&obj, sizeof (sctp_saddr_ipif_t),
+		    (uintptr_t)pobj) == -1) {
+			mdb_warn("failed to read sctp_saddr_ipif_t");
+			return (err);
+		}
+
+		for (l = 0; l < sctp->sctp_saddrs[i].ipif_count; l++) {
+			sctp_ipif_t	ipif;
+			in6_addr_t	laddr;
+			list_node_t 	*pnode;
+			list_node_t	node;
+
+			if (mdb_vread(&ipif, sizeof (sctp_ipif_t),
+			    (uintptr_t)obj.saddr_ipifp) == -1) {
+				mdb_warn("failed to read sctp_ipif_t");
+				return (err);
+			}
+			laddr = ipif.sctp_ipif_saddr;
+
+			scanned++;
+			if ((ipif.sctp_ipif_state == SCTP_IPIFS_CONDEMNED) ||
+			    SCTP_DONT_SRC(&obj) ||
+			    (ipif.sctp_ipif_ill->sctp_ill_flags &
+			    PHYI_LOOPBACK) && skip_lback) {
+				if (scanned >= sctp->sctp_nsaddrs)
+					goto done;
+
+				/* LINTED: alignment */
+				pnode = list_d2l(&sctp->sctp_saddrs[i].
+				    sctp_ipif_list, pobj);
+				if (mdb_vread(&node, sizeof (list_node_t),
+				    (uintptr_t)pnode) == -1) {
+					mdb_warn("failed to read list_node_t");
+					return (err);
+				}
+				pobj = list_object(&sctp->sctp_saddrs[i].
+				    sctp_ipif_list, node.list_next);
+				if (mdb_vread(&obj, sizeof (sctp_saddr_ipif_t),
+				    (uintptr_t)pobj) == -1) {
+					mdb_warn("failed to read "
+					    "sctp_saddr_ipif_t");
+					return (err);
+				}
+				continue;
+			}
+
+			switch (sctp->sctp_family) {
+			case AF_INET:
+				/* LINTED: alignment */
+				sin4 = (sin_t *)addr;
+				if ((sctp->sctp_state <= SCTPS_LISTEN) &&
+				    sctp->sctp_bound_to_all) {
+					sin4->sin_addr.s_addr = INADDR_ANY;
+					sin4->sin_port = sctp->sctp_lport;
+				} else {
+					sin4 += added;
+					sin4->sin_family = AF_INET;
+					sin4->sin_port = sctp->sctp_lport;
+					IN6_V4MAPPED_TO_INADDR(&laddr,
+					    &sin4->sin_addr);
+				}
+				break;
+
+			case AF_INET6:
+				/* LINTED: alignment */
+				sin6 = (sin6_t *)addr;
+				if ((sctp->sctp_state <= SCTPS_LISTEN) &&
+				    sctp->sctp_bound_to_all) {
+					bzero(&sin6->sin6_addr,
+					    sizeof (sin6->sin6_addr));
+					sin6->sin6_port = sctp->sctp_lport;
+				} else {
+					sin6 += added;
+					sin6->sin6_family = AF_INET6;
+					sin6->sin6_port = sctp->sctp_lport;
+					sin6->sin6_addr = laddr;
+				}
+				sin6->sin6_flowinfo = sctp->sctp_ip6h->ip6_vcf &
+				    ~IPV6_VERS_AND_FLOW_MASK;
+				sin6->sin6_scope_id = 0;
+				sin6->__sin6_src_id = 0;
+				break;
+			}
+			added++;
+			if (added >= 1) {
+				err = 0;
+				goto done;
+			}
+			if (scanned >= sctp->sctp_nsaddrs)
+				goto done;
+
+			/* LINTED: alignment */
+			pnode = list_d2l(&sctp->sctp_saddrs[i].sctp_ipif_list,
+			    pobj);
+			if (mdb_vread(&node, sizeof (list_node_t),
+			    (uintptr_t)pnode) == -1) {
+				mdb_warn("failed to read list_node_t");
+				return (err);
+			}
+			pobj = list_object(&sctp->sctp_saddrs[i].
+			    sctp_ipif_list, node.list_next);
+			if (mdb_vread(&obj, sizeof (sctp_saddr_ipif_t),
+			    (uintptr_t)pobj) == -1) {
+				mdb_warn("failed to read sctp_saddr_ipif_t");
+				return (err);
+			}
+		}
+	}
+done:
+	return (err);
+}
+
+/*
+ * SCTP interface for geting the primary peer address of a sctp_t.
+ */
+static int
+sctp_getpeeraddr(sctp_t *sctp, struct sockaddr *addr)
+{
+	struct sockaddr_in	*sin4;
+	struct sockaddr_in6	*sin6;
+	sctp_faddr_t		sctp_primary;
+	in6_addr_t		faddr;
+
+	if (sctp->sctp_faddrs == NULL)
+		return (-1);
+
+	addr->sa_family = sctp->sctp_family;
+	if (mdb_vread(&sctp_primary, sizeof (sctp_faddr_t),
+	    (uintptr_t)sctp->sctp_primary) == -1) {
+		mdb_warn("failed to read sctp primary faddr");
+		return (-1);
+	}
+	faddr = sctp_primary.faddr;
+
+	switch (sctp->sctp_family) {
+	case AF_INET:
+		/* LINTED: alignment */
+		sin4 = (struct sockaddr_in *)addr;
+		IN6_V4MAPPED_TO_INADDR(&faddr, &sin4->sin_addr);
+		sin4->sin_port = sctp->sctp_fport;
+		sin4->sin_family = AF_INET;
+		break;
+
+	case AF_INET6:
+		/* LINTED: alignment */
+		sin6 = (struct sockaddr_in6 *)addr;
+		sin6->sin6_addr = faddr;
+		sin6->sin6_port = sctp->sctp_fport;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_flowinfo = 0;
+		sin6->sin6_scope_id = 0;
+		sin6->__sin6_src_id = 0;
+		break;
+	}
+
+	return (0);
+}
+
+static int
+tpi_sock_print(sotpi_sonode_t *sotpi_sonode)
+{
+	if (sotpi_sonode->st_info.sti_laddr_valid == 1) {
+		struct sockaddr *laddr =
+		    mdb_alloc(sotpi_sonode->st_info.sti_laddr_len, UM_SLEEP);
+		if (mdb_vread(laddr, sotpi_sonode->st_info.sti_laddr_len,
+		    (uintptr_t)sotpi_sonode->st_info.sti_laddr_sa) == -1) {
+			mdb_warn("failed to read sotpi_sonode socket addr");
+			return (-1);
+		}
+
+		mdb_printf("socket: ");
+		pfiles_print_addr(laddr);
+	}
+
+	if (sotpi_sonode->st_info.sti_faddr_valid == 1) {
+		struct sockaddr *faddr =
+		    mdb_alloc(sotpi_sonode->st_info.sti_faddr_len, UM_SLEEP);
+		if (mdb_vread(faddr, sotpi_sonode->st_info.sti_faddr_len,
+		    (uintptr_t)sotpi_sonode->st_info.sti_faddr_sa) == -1) {
+			mdb_warn("failed to read sotpi_sonode remote addr");
+			return (-1);
+		}
+
+		mdb_printf("remote: ");
+		pfiles_print_addr(faddr);
+	}
+
+	return (0);
+}
+
+static int
+tcpip_sock_print(struct sonode *socknode)
+{
+	switch (socknode->so_family) {
+	case AF_INET:
+	{
+		conn_t conn_t;
+		in_port_t port;
+
+		if (mdb_vread(&conn_t, sizeof (conn_t),
+		    (uintptr_t)socknode->so_proto_handle) == -1) {
+			mdb_warn("failed to read conn_t V4");
+			return (-1);
+		}
+
+		mdb_printf("socket: ");
+		mdb_nhconvert(&port, &conn_t.conn_lport, sizeof (port));
+		mdb_printf("AF_INET %I %d ", conn_t.conn_src, port);
+
+		/*
+		 * If this is a listening socket, we don't print
+		 * the remote address.
+		 */
+		if (IPCL_IS_TCP(&conn_t) && IPCL_IS_BOUND(&conn_t) == 0 ||
+		    IPCL_IS_UDP(&conn_t) && IPCL_IS_CONNECTED(&conn_t)) {
+			mdb_printf("remote: ");
+			mdb_nhconvert(&port, &conn_t.conn_fport, sizeof (port));
+			mdb_printf("AF_INET %I %d ", conn_t.conn_rem, port);
+		}
+
+		break;
+	}
+
+	case AF_INET6:
+	{
+		conn_t conn_t;
+		in_port_t port;
+
+		if (mdb_vread(&conn_t, sizeof (conn_t),
+		    (uintptr_t)socknode->so_proto_handle) == -1) {
+			mdb_warn("failed to read conn_t V6");
+			return (-1);
+		}
+
+		mdb_printf("socket: ");
+		mdb_nhconvert(&port, &conn_t.conn_lport, sizeof (port));
+		mdb_printf("AF_INET6 %N %d ", &conn_t.conn_srcv6, port);
+
+		/*
+		 * If this is a listening socket, we don't print
+		 * the remote address.
+		 */
+		if (IPCL_IS_TCP(&conn_t) && IPCL_IS_BOUND(&conn_t) == 0 ||
+		    IPCL_IS_UDP(&conn_t) && IPCL_IS_CONNECTED(&conn_t)) {
+			mdb_printf("remote: ");
+			mdb_nhconvert(&port, &conn_t.conn_fport, sizeof (port));
+			mdb_printf("AF_INET6 %N %d ", &conn_t.conn_remv6, port);
+		}
+
+		break;
+	}
+
+	default:
+		mdb_printf("AF_?? (%d)", socknode->so_family);
+		break;
+	}
+
+	return (0);
+}
+
+static int
+sctp_sock_print(struct sonode *socknode)
+{
+	sctp_t sctp_t;
+
+	struct sockaddr *laddr = mdb_alloc(sizeof (struct sockaddr), UM_SLEEP);
+	struct sockaddr *faddr = mdb_alloc(sizeof (struct sockaddr), UM_SLEEP);
+
+	if (mdb_vread(&sctp_t, sizeof (sctp_t),
+	    (uintptr_t)socknode->so_proto_handle) == -1) {
+		mdb_warn("failed to read sctp_t");
+		return (-1);
+	}
+
+	if (sctp_getsockaddr(&sctp_t, laddr) == 0) {
+		mdb_printf("socket:");
+		pfiles_print_addr(laddr);
+	}
+	if (sctp_getpeeraddr(&sctp_t, faddr) == 0) {
+		mdb_printf("remote:");
+		pfiles_print_addr(faddr);
+	}
+
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+sdp_sock_print(struct sonode *socknode)
+{
+	return (0);
+}
+
+struct sock_print {
+	int	family;
+	int	type;
+	int	pro;
+	int	(*print)(struct sonode *socknode);
+} sock_prints[] = {
+	{ 2,	2,	0,	tcpip_sock_print },	/* /dev/tcp	*/
+	{ 2,	2,	6,	tcpip_sock_print },	/* /dev/tcp	*/
+	{ 26,	2,	0,	tcpip_sock_print },	/* /dev/tcp6	*/
+	{ 26,	2,	6,	tcpip_sock_print },	/* /dev/tcp6	*/
+	{ 2,	1,	0,	tcpip_sock_print },	/* /dev/udp	*/
+	{ 2,	1,	17,	tcpip_sock_print },	/* /dev/udp	*/
+	{ 26,	1,	0,	tcpip_sock_print },	/* /dev/udp6	*/
+	{ 26,	1,	17,	tcpip_sock_print },	/* /dev/udp6	*/
+	{ 2,	4,	0,	tcpip_sock_print },	/* /dev/rawip	*/
+	{ 26,	4,	0,	tcpip_sock_print },	/* /dev/rawip6	*/
+	{ 2,	2,	132,	sctp_sock_print },	/* /dev/sctp	*/
+	{ 26,	2,	132,	sctp_sock_print },	/* /dev/sctp6	*/
+	{ 2,	6,	132,	sctp_sock_print },	/* /dev/sctp	*/
+	{ 26,	6,	132,	sctp_sock_print },	/* /dev/sctp6	*/
+	{ 24,	4,	0,	tcpip_sock_print },	/* /dev/rts	*/
+	{ 2,	2,	257,	sdp_sock_print },	/* /dev/sdp	*/
+	{ 26,	2,	257,	sdp_sock_print },	/* /dev/sdp	*/
+};
+
+#define	NUM_SOCK_PRINTS                                         \
+	(sizeof (sock_prints) / sizeof (struct sock_print))
 
 static int
 pfile_callback(uintptr_t addr, const struct file *f, struct pfiles_cbdata *cb)
@@ -624,40 +997,62 @@ pfile_callback(uintptr_t addr, const struct file *f, struct pfiles_cbdata *cb)
 
 	case VSOCK:
 	{
-		struct sonode sonode;
+		vnode_t v_sock;
+		struct sonode so;
 
-		if (pfiles_get_sonode(realvpp, &sonode) == -1)
+		if (mdb_vread(&v_sock, sizeof (v_sock), realvpp) == -1) {
+			mdb_warn("failed to read socket vnode");
 			return (DCMD_ERR);
+		}
 
 		/*
-		 * If the address is cached in the sonode, use it; otherwise,
-		 * we print nothing.
+		 * Sockets can be non-stream or stream, they have to be dealed
+		 * with differently.
 		 */
-		if (sonode.so_state & SS_LADDR_VALID) {
-			struct sockaddr *laddr =
-			    mdb_alloc(sonode.so_laddr_len, UM_SLEEP);
-			if (mdb_vread(laddr, sonode.so_laddr_len,
-			    (uintptr_t)sonode.so_laddr_sa) == -1) {
-				mdb_warn("failed to read sonode socket addr");
+		if (v_sock.v_stream == NULL) {
+			if (pfiles_get_sonode(&v_sock, &so) == -1)
 				return (DCMD_ERR);
+
+			/* Pick the proper methods. */
+			for (i = 0; i <= NUM_SOCK_PRINTS; i++) {
+				if ((sock_prints[i].family == so.so_family &&
+				    sock_prints[i].type == so.so_type &&
+				    sock_prints[i].pro == so.so_protocol) ||
+				    (sock_prints[i].family == so.so_family &&
+				    sock_prints[i].type == so.so_type &&
+				    so.so_type == SOCK_RAW)) {
+					if ((*sock_prints[i].print)(&so) == -1)
+						return (DCMD_ERR);
+				}
+			}
+		} else {
+			sotpi_sonode_t sotpi_sonode;
+
+			if (pfiles_get_sonode(&v_sock, &so) == -1)
+				return (DCMD_ERR);
+
+			/*
+			 * If the socket is a fallback socket, read its related
+			 * information separately; otherwise, read it as a whole
+			 * tpi socket.
+			 */
+			if (so.so_state & SS_FALLBACK_COMP) {
+				sotpi_sonode.st_sonode = so;
+
+				if (mdb_vread(&(sotpi_sonode.st_info),
+				    sizeof (sotpi_info_t),
+				    (uintptr_t)so.so_priv) == -1)
+					return (DCMD_ERR);
+			} else {
+				if (pfiles_get_tpi_sonode(&v_sock,
+				    &sotpi_sonode) == -1)
+					return (DCMD_ERR);
 			}
 
-			mdb_printf("socket: ");
-			pfiles_print_addr(laddr);
-		}
-
-		if (sonode.so_state & SS_FADDR_VALID) {
-			struct sockaddr *faddr =
-			    mdb_alloc(sonode.so_faddr_len, UM_SLEEP);
-			if (mdb_vread(faddr, sonode.so_faddr_len,
-			    (uintptr_t)sonode.so_faddr_sa) == -1) {
-				mdb_warn("failed to read sonode remote addr");
+			if (tpi_sock_print(&sotpi_sonode) == -1)
 				return (DCMD_ERR);
-			}
-
-			mdb_printf("remote: ");
-			pfiles_print_addr(faddr);
 		}
+
 		break;
 	}
 
@@ -690,7 +1085,6 @@ pfile_callback(uintptr_t addr, const struct file *f, struct pfiles_cbdata *cb)
 	default:
 		break;
 	}
-
 
 	mdb_printf("\n");
 

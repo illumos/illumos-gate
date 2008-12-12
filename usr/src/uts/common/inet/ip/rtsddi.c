@@ -28,10 +28,22 @@
 #include <sys/modctl.h>
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/rts_impl.h>
+#include <sys/strsubr.h>
+#include <sys/socketvar.h>
+
+#include <netinet/in.h>
+#include <netinet/ip6.h>
+
+#include <inet/common.h>
+#include <inet/ip.h>
+
 
 #define	INET_NAME	"rts"
 #define	INET_DEVSTRTAB	rtsinfo
 #define	INET_DEVDESC	"PF_ROUTE socket STREAMS driver"
+#define	INET_SOCKDESC	"PF_ROUTE socket module"
+#define	INET_SOCK_PROTO_CREATE_FUNC (*rts_create)
 #define	INET_DEVMINOR	0
 #define	INET_DEVMTFLAGS	(D_MP|D_MTQPAIR|D_SYNCSTR)
 

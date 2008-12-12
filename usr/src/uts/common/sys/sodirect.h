@@ -52,12 +52,15 @@
 extern "C" {
 #endif
 
+typedef int (*sod_enq_func)();
+typedef void (*sod_wakeup_func)();
+
 typedef struct sodirect_s {
 	uint32_t	sod_state;	/* State bits */
 	uint32_t	sod_want;	/* Pending read byte count or 0 */
 	queue_t		*sod_q;		/* Socket Q */
-	int		(*sod_enqueue)(); /* Call to enqueue an mblk_t */
-	void		(*sod_wakeup)(); /* Call to awkake a read()er, if any */
+	sod_enq_func	sod_enqueue;	/* Call to enqueue an mblk_t */
+	sod_wakeup_func	sod_wakeup;	/* Call to awkake a read()er, if any */
 	mblk_t		*sod_uioafh;	/* To be freed list head, or NULL */
 	mblk_t		*sod_uioaft;	/* To be freed list tail */
 	kmutex_t	*sod_lockp;	/* Pointer to the lock needed */
@@ -107,10 +110,36 @@ typedef struct sodirect_s {
 #define	SOD_QFULL(p) ((p)->sod_q->q_flag & QFULL)
 #define	SOD_QCNT(p) ((p)->sod_q->q_count)
 
-#define	SOD_DISABLE(p) (p)->sod_state &= ~SOD_ENABLED
+#define	SOD_DISABLE(p) {			\
+	if ((p) != NULL)			\
+		(p)->sod_state &= ~SOD_ENABLED;	\
+}
 
 #define	SOD_QTOSODP(q) (q)->q_stream->sd_sodirect
+#define	SOD_SOTOSODP(so) ((sonode_t *)so)->so_direct
 
+#define	SOD_UIOAFINI(sodp) {						\
+	if ((sodp) && (sodp)->sod_uioa.uioa_state & UIOA_ENABLED) {	\
+		(sodp)->sod_uioa.uioa_state &= UIOA_CLR;		\
+		(sodp)->sod_uioa.uioa_state |= UIOA_FINI;		\
+	}								\
+}
+
+struct sonode;
+struct sodirect_s;
+
+extern uio_t	*sod_rcv_init(struct sonode *, int, struct uio **);
+extern int	sod_rcv_done(struct sonode *, struct uio *, struct uio *);
+
+extern mblk_t	*sod_uioa_mblk_init(struct sodirect_s *, mblk_t *, size_t);
+extern void	sod_uioa_so_init(struct sonode *, struct sodirect_s *,
+    struct uio *);
+extern ssize_t	sod_uioa_mblk(struct sonode *, mblk_t *);
+extern void	sod_uioa_mblk_done(struct sodirect_s *, mblk_t *);
+
+extern void	sod_init();
+extern void	sod_sock_init(struct sonode *, struct stdata *, sod_enq_func,
+    sod_wakeup_func, kmutex_t *);
 
 #ifdef	__cplusplus
 }

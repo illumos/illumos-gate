@@ -59,7 +59,7 @@
 #include <inet/common.h>
 #include <netinet/ip6.h>
 #include <inet/ip.h>
-#include <inet/mi.h>
+#include <inet/proto_set.h>
 #include <inet/nd.h>
 #include <inet/optcom.h>
 #include <inet/ipsec_info.h>
@@ -707,7 +707,8 @@ keysock_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		mutex_exit(&keystack->keystack_list_lock);
 
 		qprocson(q);
-		(void) mi_set_sth_hiwat(q, keystack->keystack_recv_hiwat);
+		(void) proto_set_rx_hiwat(q, NULL,
+		    keystack->keystack_recv_hiwat);
 		/*
 		 * Wait outside the keysock module perimeter for IPsec
 		 * plumbing to be completed.  If it fails, keysock_close()
@@ -875,7 +876,7 @@ keysock_opt_set(queue_t *q, uint_t mgmt_flags, int level,
 			if (*i1 > keystack->keystack_max_buf)
 				return (ENOBUFS);
 			RD(q)->q_hiwat = *i1;
-			(void) mi_set_sth_hiwat(RD(q), *i1);
+			(void) proto_set_rx_hiwat(RD(q), NULL, *i1);
 			break;
 		}
 		mutex_exit(&ks->keysock_lock);

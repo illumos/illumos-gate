@@ -62,6 +62,7 @@
 #include	<inet/ip6.h>
 #include	<inet/tcp.h>
 #include	<inet/sctp_ip.h>
+#include	<inet/udp_impl.h>
 
 #include	<sys/strlog.h>
 #include	<sys/log.h>

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
@@ -50,6 +48,7 @@
 #include <inet/arp_impl.h>
 #include <inet/rawip_impl.h>
 #include <inet/mi.h>
+#include <fs/sockfs/socktpi_impl.h>
 
 #define	ADDR_V6_WIDTH	23
 #define	ADDR_V4_WIDTH	15
@@ -248,7 +247,7 @@ sonode_walk_init(mdb_walk_state_t *wsp)
 		}
 	}
 
-	wsp->walk_data = mdb_alloc(sizeof (struct sonode), UM_SLEEP);
+	wsp->walk_data = mdb_alloc(sizeof (struct sotpi_sonode), UM_SLEEP);
 	return (WALK_NEXT);
 }
 
@@ -256,12 +255,12 @@ int
 sonode_walk_step(mdb_walk_state_t *wsp)
 {
 	int status;
-	struct sonode *sonodep;
+	struct sotpi_sonode *stp;
 
 	if (wsp->walk_addr == NULL)
 		return (WALK_DONE);
 
-	if (mdb_vread(wsp->walk_data, sizeof (struct sonode),
+	if (mdb_vread(wsp->walk_data, sizeof (struct sotpi_sonode),
 	    wsp->walk_addr) == -1) {
 		mdb_warn("failed to read sonode at %p", wsp->walk_addr);
 		return (WALK_ERR);
@@ -270,16 +269,16 @@ sonode_walk_step(mdb_walk_state_t *wsp)
 	status = wsp->walk_callback(wsp->walk_addr, wsp->walk_data,
 	    wsp->walk_cbdata);
 
-	sonodep = wsp->walk_data;
+	stp = wsp->walk_data;
 
-	wsp->walk_addr = (uintptr_t)sonodep->so_next;
+	wsp->walk_addr = (uintptr_t)stp->st_info.sti_next_so;
 	return (status);
 }
 
 void
 sonode_walk_fini(mdb_walk_state_t *wsp)
 {
-	mdb_free(wsp->walk_data, sizeof (struct sonode));
+	mdb_free(wsp->walk_data, sizeof (struct sotpi_sonode));
 }
 
 struct mi_walk_data {
@@ -517,9 +516,9 @@ sonode(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf(" %4hi", so.so_type);
 	}
 
-	mdb_printf(" %5hi %05x %04x %04hx %0?p\n",
+	mdb_printf(" %5hi %05x %04x %04hx\n",
 	    so.so_protocol, so.so_state, so.so_mode,
-	    so.so_flag, so.so_accessvp);
+	    so.so_flag);
 
 	return (DCMD_OK);
 }
@@ -740,12 +739,13 @@ netstat_udpv6_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
  * returns 0 on success, -1 otherwise
  */
 static int
-netstat_unix_name_pr(const struct sonode *so, const struct soaddr *soa)
+netstat_unix_name_pr(const struct sotpi_sonode *st, const struct soaddr *soa)
 {
+	const struct sonode *so = &st->st_sonode;
 	const char none[] = " (none)";
 
 	if ((so->so_state & SS_ISBOUND) && (soa->soa_len != 0)) {
-		if (so->so_state & SS_FADDR_NOXLATE) {
+		if (st->st_info.sti_faddr_noxlate) {
 			mdb_printf("%-14s ", " (socketpair)");
 		} else {
 			if (soa->soa_len > sizeof (sa_family_t)) {
@@ -775,9 +775,11 @@ netstat_unix_name_pr(const struct sonode *so, const struct soaddr *soa)
 static int
 netstat_unix_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 {
-	const struct sonode *so = walk_data;
+	const struct sotpi_sonode *st = walk_data;
+	const struct sonode *so = &st->st_sonode;
+	const struct sotpi_info *sti = &st->st_info;
 
-	if (so->so_accessvp == NULL)
+	if (so->so_count == 0)
 		return (WALK_NEXT);
 
 	if (so->so_family != AF_UNIX) {
@@ -787,7 +789,7 @@ netstat_unix_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 
 	mdb_printf("%-?p ", kaddr);
 
-	switch (so->so_serv_type) {
+	switch (sti->sti_serv_type) {
 	case T_CLTS:
 		mdb_printf("%-10s ", "dgram");
 		break;
@@ -798,27 +800,27 @@ netstat_unix_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 		mdb_printf("%-10s ", "stream-ord");
 		break;
 	default:
-		mdb_printf("%-10i ", so->so_serv_type);
+		mdb_printf("%-10i ", sti->sti_serv_type);
 	}
 
 	if ((so->so_state & SS_ISBOUND) &&
-	    (so->so_ux_laddr.soua_magic == SOU_MAGIC_EXPLICIT)) {
-		mdb_printf("%0?p ", so->so_ux_laddr.soua_vp);
+	    (sti->sti_ux_laddr.soua_magic == SOU_MAGIC_EXPLICIT)) {
+		mdb_printf("%0?p ", sti->sti_ux_laddr.soua_vp);
 	} else {
 		mdb_printf("%0?p ", NULL);
 	}
 
 	if ((so->so_state & SS_ISCONNECTED) &&
-	    (so->so_ux_faddr.soua_magic == SOU_MAGIC_EXPLICIT)) {
-		mdb_printf("%0?p ", so->so_ux_faddr.soua_vp);
+	    (sti->sti_ux_faddr.soua_magic == SOU_MAGIC_EXPLICIT)) {
+		mdb_printf("%0?p ", sti->sti_ux_faddr.soua_vp);
 	} else {
 		mdb_printf("%0?p ", NULL);
 	}
 
-	if (netstat_unix_name_pr(so, &so->so_laddr) == -1)
+	if (netstat_unix_name_pr(st, &sti->sti_laddr) == -1)
 		return (WALK_ERR);
 
-	if (netstat_unix_name_pr(so, &so->so_faddr) == -1)
+	if (netstat_unix_name_pr(st, &sti->sti_faddr) == -1)
 		return (WALK_ERR);
 
 	mdb_printf("%4i\n", so->so_zoneid);

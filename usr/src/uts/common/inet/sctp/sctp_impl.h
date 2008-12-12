@@ -608,16 +608,16 @@ typedef struct sctp_s {
 	kcondvar_t	sctp_cv;
 	boolean_t	sctp_running;
 
-	void		*sctp_ulpd;	/* SCTP upper layer desc. */
+#define	sctp_ulpd	sctp_connp->conn_upper_handle
+#define	sctp_upcalls	sctp_connp->conn_upcalls
 
-	struct sctp_upcalls_s	sctp_upcalls;  /* upcalls for sctp_ulpd */
-#define	sctp_ulp_newconn	sctp_upcalls.su_newconn
-#define	sctp_ulp_connected	sctp_upcalls.su_connected
-#define	sctp_ulp_disconnected	sctp_upcalls.su_disconnected
-#define	sctp_ulp_disconnecting	sctp_upcalls.su_disconnecting
-#define	sctp_ulp_recv		sctp_upcalls.su_recv
-#define	sctp_ulp_xmitted	sctp_upcalls.su_xmitted
-#define	sctp_ulp_prop		sctp_upcalls.su_properties
+#define	sctp_ulp_newconn	sctp_upcalls->su_newconn
+#define	sctp_ulp_connected	sctp_upcalls->su_connected
+#define	sctp_ulp_disconnected	sctp_upcalls->su_disconnected
+#define	sctp_ulp_opctl		sctp_upcalls->su_opctl
+#define	sctp_ulp_recv		sctp_upcalls->su_recv
+#define	sctp_ulp_xmitted	sctp_upcalls->su_txq_full
+#define	sctp_ulp_prop		sctp_upcalls->su_set_proto_props
 
 	int32_t		sctp_state;
 
@@ -768,8 +768,9 @@ typedef struct sctp_s {
 		sctp_rexmitting : 1,	/* SCTP is retransmitting */
 		sctp_zero_win_probe : 1,	/* doing zero win probe */
 
+		sctp_txq_full : 1,	/* the tx queue is full */
 		sctp_ulp_discon_done : 1,	/* ulp_disconnecting done */
-		sctp_dummy : 7;
+		sctp_dummy : 6;
 	} sctp_bits;
 	struct {
 		uint32_t
@@ -809,6 +810,7 @@ typedef struct sctp_s {
 #define	sctp_linklocal sctp_bits.sctp_linklocal
 #define	sctp_rexmitting sctp_bits.sctp_rexmitting
 #define	sctp_zero_win_probe sctp_bits.sctp_zero_win_probe
+#define	sctp_txq_full sctp_bits.sctp_txq_full
 #define	sctp_ulp_discon_done sctp_bits.sctp_ulp_discon_done
 
 #define	sctp_recvsndrcvinfo sctp_events.sctp_recvsndrcvinfo
@@ -934,6 +936,15 @@ typedef struct sctp_s {
 	mblk_t		*sctp_err_chunks;	/* Error chunks */
 	uint32_t	sctp_err_len;		/* Total error chunks length */
 } sctp_t;
+
+#define	SCTP_TXQ_LEN(sctp)	((sctp)->sctp_unsent + (sctp)->sctp_unacked)
+#define	SCTP_TXQ_UPDATE(sctp)					\
+	if ((sctp)->sctp_txq_full && SCTP_TXQ_LEN(sctp) <=	\
+	    (sctp)->sctp_xmit_lowater) {			\
+		(sctp)->sctp_txq_full = 0;			\
+		(sctp)->sctp_ulp_xmitted((sctp)->sctp_ulpd,	\
+		    B_FALSE);					\
+	}
 
 #endif	/* (defined(_KERNEL) || defined(_KMEMUSER)) */
 

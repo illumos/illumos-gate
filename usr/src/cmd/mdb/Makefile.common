@@ -87,6 +87,7 @@ COMMON_MODULES_KVM = \
 	sdbc \
 	smbfs \
 	smbsrv \
+	sockfs \
 	specfs \
 	sppp \
 	stmf \

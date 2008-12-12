@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -40,14 +38,7 @@
 #include <netinet/tcp.h>
 #include <netinet/ip_mroute.h>
 #include <inet/optcom.h>
-
-extern int rts_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name,
-    uchar_t *ptr);
-extern int rts_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name,
-    uchar_t *ptr);
-extern int rts_opt_set(queue_t *q, uint_t optset_context, int level,
-    int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
-    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk);
+#include <inet/rts_impl.h>
 
 /*
  * Table of all known options handled on a RTS protocol stack.
@@ -102,8 +93,8 @@ uint_t rts_max_optsize; /* initialized in _init() */
 
 optdb_obj_t rts_opt_obj = {
 	rts_opt_default,	/* RTS default value function pointer */
-	rts_opt_get,		/* RTS get function pointer */
-	rts_opt_set,		/* RTS set function pointer */
+	rts_tpi_opt_get,		/* RTS get function pointer */
+	rts_tpi_opt_set,		/* RTS set function pointer */
 	B_TRUE,			/* RTS is tpi provider */
 	RTS_OPT_ARR_CNT,	/* RTS option database count of entries */
 	rts_opt_arr,		/* RTS option database */

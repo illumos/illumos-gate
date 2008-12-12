@@ -58,7 +58,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
-LDFLAGS		+= -dy -Nfs/sockfs
+LDFLAGS		+= -dy -Nfs/sockfs -Nmisc/ksocket
 
 #
 #	Default build targets.

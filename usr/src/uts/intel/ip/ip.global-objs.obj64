@@ -64,6 +64,7 @@ gcgrp4_hash
 gcgrp6_hash
 gcgrp_hash_size
 gcgrp_lock
+icmp_fallback_sock_winit
 icmp_frag_size_table
 icmp_g_t_info_ack
 icmp_ipha
@@ -104,6 +105,10 @@ ip_cgtp_filter_rev
 ip_conn_cache
 ip_debug
 ip_g_all_ones
+ip_helper_stream_cache
+ip_helper_stream_info
+ip_helper_stream_rinit
+ip_helper_stream_winit
 ip_ioctl_ftbl
 ip_ire_cleanup_cnt
 ip_ire_cpu_ratio
@@ -140,6 +145,7 @@ ip_squeue_worker_wait
 ip_thread_data
 ip_thread_list
 ip_thread_rwlock
+ip_use_helper_cache
 ip_wput_frag_mdt_min
 ipcl_bind_fanout_size
 ipcl_conn_hash_maxsize
@@ -243,6 +249,10 @@ sctprinit
 sctpwinit
 sin6_null
 sin_null
+sock_tcp_downcalls
+sock_rts_downcalls
+sock_rawip_downcalls
+sock_udp_downcalls
 sqset_global_list
 sqset_global_size
 sqset_lock
@@ -256,6 +266,7 @@ tcp_acceptor_winit
 tcp_conn_cache
 tcp_conn_hash_size
 tcp_drop_ack_unsent_cnt
+tcp_fallback_sock_winit
 tcp_free_list_max_cnt
 tcp_fusion_rcv_unread_min
 tcp_g_kstat
@@ -295,10 +306,12 @@ tcp_winit
 tcp_outbound_squeue_switch
 tcpinfov4
 tcpinfov6
+tli_errs
 tsol_strict_error
 tun_spd_hashsize
 udp_bind_fanout_size
 udp_conn_cache
+udp_fallback_sock_winit
 udp_g_t_info_ack_ipv4
 udp_g_t_info_ack_ipv6
 udp_lrinit

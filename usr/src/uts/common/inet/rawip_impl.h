@@ -27,8 +27,6 @@
 #ifndef	_RAWIP_IMPL_H
 #define	_RAWIP_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -44,6 +42,7 @@ extern "C" {
 
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/optcom.h>
 
 /* Named Dispatch Parameter Management Structure */
 typedef struct icmpparam_s {
@@ -63,7 +62,9 @@ struct icmp_stack {
 	icmpparam_t	*is_param_arr; 	/* ndd variable table */
 	kstat_t		*is_ksp;	/* kstats */
 	mib2_rawip_t	is_rawip_mib;	/* SNMP fixed size info */
+	ldi_ident_t	is_ldi_ident;
 };
+
 typedef struct icmp_stack icmp_stack_t;
 
 /* Internal icmp control structure, one per open stream */
@@ -76,7 +77,7 @@ typedef	struct icmp_s {
 	uint_t		icmp_state;	/* TPI state */
 	in6_addr_t	icmp_v6src;	/* Source address of this stream */
 	in6_addr_t	icmp_bound_v6src; /* Explicitely bound to address */
-	in6_addr_t 	icmp_v6dst;	/* Connected destination */
+	sin6_t		icmp_v6dst;	/* Connected destination */
 	/*
 	 * IP format that packets transmitted from this struct should use.
 	 * Value can be IP4_VERSION or IPV6_VERSION.
@@ -87,7 +88,6 @@ typedef	struct icmp_s {
 	sa_family_t	icmp_family;	/* Family from socket() call */
 
 	/* Following protected by icmp_rwlock */
-	uint32_t	icmp_flowinfo;	/* Connected flow id and tclass */
 	uint32_t 	icmp_max_hdr_len; /* For write offset in stream head */
 	uint_t		icmp_proto;
 	uint_t		icmp_ip_snd_options_len; /* Len of IPv4 options */
@@ -144,6 +144,15 @@ typedef	struct icmp_s {
 	uint_t		icmp_label_len_v6;	/* sec. part of sticky opt */
 	in6_addr_t 	icmp_v6lastdst;		/* most recent destination */
 	icmp_stack_t	*icmp_is;		/* Stack instance */
+	size_t		icmp_xmit_hiwat;
+	size_t		icmp_xmit_lowat;
+	size_t		icmp_recv_hiwat;
+	size_t		icmp_recv_lowat;
+	int		icmp_delayed_error;
+	kmutex_t	icmp_recv_lock;
+	mblk_t		*icmp_fallback_queue_head;
+	mblk_t		*icmp_fallback_queue_tail;
+	struct sockaddr_storage	icmp_delayed_addr;
 } icmp_t;
 
 /*
@@ -155,10 +164,16 @@ extern optdb_obj_t	icmp_opt_obj;
 extern uint_t		icmp_max_optsize;
 
 extern mblk_t	*icmp_snmp_get(queue_t *q, mblk_t *mpctl);
-extern void	rawip_resume_bind(conn_t *, mblk_t *);
 
-extern void	icmp_ddi_init(void);
-extern void	icmp_ddi_destroy(void);
+extern void	icmp_ddi_g_init(void);
+extern void	icmp_ddi_g_destroy(void);
+
+extern sock_lower_handle_t rawip_create(int, int, int, sock_downcalls_t **,
+    uint_t *, int *, int, cred_t *);
+extern void rawip_fallback(sock_lower_handle_t, queue_t *, boolean_t,
+    so_proto_quiesced_cb_t);
+
+extern sock_downcalls_t sock_rawip_downcalls;
 
 #endif	/* _KERNEL */
 

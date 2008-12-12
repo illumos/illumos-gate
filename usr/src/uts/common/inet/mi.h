@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
 #ifndef	_INET_MI_H
 #define	_INET_MI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -39,6 +36,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/vmem.h>
 #include <sys/varargs.h>
+#include <netinet/in.h>
 
 #define	MI_MIN_DEV		INET_MIN_DEV /* minimum minor device number */
 #define	MI_COPY_IN		1
@@ -136,13 +134,6 @@ extern int	mi_open_link(void **mi_head, IDP ptr, dev_t *devp, int flag,
 
 extern uint8_t *mi_offset_param(mblk_t *mp, size_t offset, size_t len);
 extern uint8_t *mi_offset_paramc(mblk_t *mp, size_t offset, size_t len);
-
-
-extern boolean_t	mi_set_sth_hiwat(queue_t *q, size_t size);
-extern boolean_t	mi_set_sth_lowat(queue_t *q, size_t size);
-extern boolean_t	mi_set_sth_maxblk(queue_t *q, ssize_t size);
-extern boolean_t	mi_set_sth_copyopt(queue_t *q, int copyopt);
-extern boolean_t	mi_set_sth_wroff(queue_t *q, size_t size);
 
 /*PRINTFLIKE2*/
 extern int	mi_sprintf(char *buf, char *fmt, ...)

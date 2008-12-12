@@ -39,6 +39,7 @@ extern "C" {
 
 #ifdef _KERNEL
 
+#include <inet/optcom.h>
 #include <inet/tcp.h>
 
 #define	TCP_MOD_ID	5105
@@ -273,6 +274,14 @@ extern int	tcp_fuse_maxpsz_set(tcp_t *);
  */
 extern optdb_obj_t	tcp_opt_obj;
 extern uint_t		tcp_max_optsize;
+
+extern sock_lower_handle_t tcp_create(int, int, int, sock_downcalls_t **,
+    uint_t *, int *, int, cred_t *);
+extern void tcp_fallback(sock_lower_handle_t, queue_t *, boolean_t,
+    so_proto_quiesced_cb_t);
+
+extern sock_downcalls_t sock_tcp_downcalls;
+
 
 #endif	/* _KERNEL */
 

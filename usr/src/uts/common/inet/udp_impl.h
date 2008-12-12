@@ -252,7 +252,9 @@ struct udp_stack {
  */
 	in_port_t	us_min_anonpriv_port;
 
+	ldi_ident_t	us_ldi_ident;
 };
+
 typedef struct udp_stack udp_stack_t;
 
 /* Internal udp control structure, one per open stream */
@@ -313,9 +315,14 @@ typedef	struct udp_s {
 	/* Following protected by udp_rwlock */
 	mblk_t		*udp_rcv_list_head;	/* b_next chain of mblks */
 	mblk_t		*udp_rcv_list_tail;	/* last mblk in chain */
+	kmutex_t	udp_recv_lock;		/* recv lock */
 	uint_t		udp_rcv_cnt;		/* total data in rcv_list */
 	uint_t		udp_rcv_msgcnt;		/* total msgs in rcv_list */
+	size_t		udp_rcv_disply_hiwat;	/* user's view of rcvbuf */
 	size_t		udp_rcv_hiwat;		/* receive high watermark */
+	size_t		udp_rcv_lowat;		/* receive low watermark */
+	size_t		udp_xmit_hiwat;		/* Send buffer high watermark */
+	size_t		udp_xmit_lowat;		/* Send buffer low watermark */
 	uint_t		udp_label_len;		/* length of security label */
 	uint_t		udp_label_len_v6;	/* len of v6 security label */
 	in6_addr_t 	udp_v6lastdst;		/* most recent destination */
@@ -323,6 +330,10 @@ typedef	struct udp_s {
 	uint64_t	udp_open_time;	/* time when this was opened */
 	pid_t		udp_open_pid;	/* process id when this was opened */
 	udp_stack_t	*udp_us;		/* Stack instance for zone */
+	int		udp_delayed_error;
+	mblk_t		*udp_fallback_queue_head;
+	mblk_t		*udp_fallback_queue_tail;
+	struct sockaddr_storage	udp_delayed_addr;
 } udp_t;
 
 /* UDP Protocol header */
@@ -351,7 +362,6 @@ typedef	struct udpahdr_s {
 #define	UDP_STAT(us, x)		((us)->us_statistics.x.value.ui64++)
 #define	UDP_STAT_UPDATE(us, x, n)	\
 			((us)->us_statistics.x.value.ui64 += (n))
-
 #ifdef DEBUG
 #define	UDP_DBGSTAT(us, x)	UDP_STAT(us, x)
 #else
@@ -359,25 +369,19 @@ typedef	struct udpahdr_s {
 #endif /* DEBUG */
 
 extern int	udp_opt_default(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
-extern int	udp_opt_get(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
-extern int	udp_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
+extern int	udp_tpi_opt_get(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
+extern int	udp_tpi_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
 		    uint_t *, uchar_t *, void *, cred_t *, mblk_t *);
 extern mblk_t	*udp_snmp_get(queue_t *, mblk_t *);
 extern int	udp_snmp_set(queue_t *, t_scalar_t, t_scalar_t, uchar_t *, int);
 extern void	udp_close_free(conn_t *);
 extern void	udp_quiesce_conn(conn_t *);
-extern void	udp_ddi_init(void);
-extern void	udp_ddi_destroy(void);
-extern void	udp_resume_bind(conn_t *, mblk_t *);
-extern	void	udp_wput(queue_t *, mblk_t *);
-
-extern int	udp_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name,
-    uchar_t *ptr);
-extern int	udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name,
-    uchar_t *ptr);
-extern int	udp_opt_set(queue_t *q, uint_t optset_context,
-    int level, int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
-    uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk);
+extern void	udp_ddi_g_init(void);
+extern void	udp_ddi_g_destroy(void);
+extern void	udp_g_q_inactive(udp_stack_t *);
+extern void	udp_output(conn_t *connp, mblk_t *mp, struct sockaddr *addr,
+		    socklen_t addrlen);
+extern void	udp_wput(queue_t *, mblk_t *);
 
 /*
  * Object to represent database of options to search passed to
@@ -386,6 +390,13 @@ extern int	udp_opt_set(queue_t *q, uint_t optset_context,
  */
 extern optdb_obj_t	udp_opt_obj;
 extern uint_t		udp_max_optsize;
+
+extern sock_lower_handle_t udp_create(int, int, int, sock_downcalls_t **,
+    uint_t *, int *, int, cred_t *);
+extern void udp_fallback(sock_lower_handle_t, queue_t *, boolean_t,
+    so_proto_quiesced_cb_t);
+
+extern sock_downcalls_t sock_udp_downcalls;
 
 #endif	/*  _KERNEL */
 

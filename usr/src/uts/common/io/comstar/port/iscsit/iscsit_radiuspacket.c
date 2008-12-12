@@ -32,18 +32,19 @@
 #include <sys/idm/idm_so.h>
 #include <sys/iscsit/radius_packet.h>
 #include <sys/iscsit/radius_protocol.h>
+#include <sys/ksocket.h>
 
 static void encode_chap_password(int identifier, int chap_passwd_len,
     uint8_t *chap_passwd, uint8_t *result);
 
-static size_t iscsit_net_recvmsg(void *socket, struct msghdr *msg,
+static size_t iscsit_net_recvmsg(ksocket_t socket, struct msghdr *msg,
     int timeout);
 
 /*
  * See radius_packet.h.
  */
 int
-iscsit_snd_radius_request(void *socket, iscsi_ipaddr_t rsvr_ip_addr,
+iscsit_snd_radius_request(ksocket_t socket, iscsi_ipaddr_t rsvr_ip_addr,
     uint32_t rsvr_port, radius_packet_data_t *req_data)
 {
 	int		i;		/* Loop counter. */
@@ -164,7 +165,7 @@ iscsit_snd_radius_request(void *socket, iscsi_ipaddr_t rsvr_ip_addr,
  * See radius_packet.h.
  */
 int
-iscsit_rcv_radius_response(void *socket, uint8_t *shared_secret,
+iscsit_rcv_radius_response(ksocket_t socket, uint8_t *shared_secret,
     uint32_t shared_secret_len, uint8_t *req_authenticator,
     radius_packet_data_t *resp_data)
 {
@@ -177,8 +178,6 @@ iscsit_rcv_radius_response(void *socket, uint8_t *shared_secret,
 
 	struct iovec		iov[1];
 	struct nmsghdr		msg;
-	struct sonode		*so = (struct sonode *)socket;
-	int			ret = 0;
 
 	tmp_data = kmem_zalloc(MAX_RAD_PACKET_LEN, KM_SLEEP);
 	iov[0].iov_base = (char *)tmp_data;
@@ -192,11 +191,6 @@ iscsit_rcv_radius_response(void *socket, uint8_t *shared_secret,
 	msg.msg_flags		= MSG_WAITALL;
 	msg.msg_iov		= iov;
 	msg.msg_iovlen		= 1;
-
-	(void) VOP_IOCTL(SOTOV(so), I_POP, 0, FKIOCTL, CRED(), &ret, NULL);
-	if (ret != 0) {
-		return (RAD_RSP_RCVD_NO_DATA);
-	}
 
 	received_len = iscsit_net_recvmsg(socket, &msg, RAD_RCV_TIMEOUT);
 
@@ -313,36 +307,32 @@ encode_chap_password(int identifier, int chap_passwd_len,
  */
 /* ARGSUSED */
 static size_t
-iscsit_net_recvmsg(void *socket, struct msghdr *msg, int timeout)
+iscsit_net_recvmsg(ksocket_t socket, struct msghdr *msg, int timeout)
 {
-	int		idx;
-	int		total_len   = 0;
-	struct uio	uio;
-	uchar_t		pri	    = 0;
-	int		prflag	    = MSG_ANY;
-	rval_t		rval;
-	struct sonode	*sonode	    = (struct sonode *)socket;
+	int		prflag	= msg->msg_flags;
+	size_t		recv	= 0;
+	struct sockaddr_in6 	l_addr, f_addr;
+	socklen_t	l_addrlen;
+	socklen_t	f_addrlen;
 
-	/* Initialization of the uio structure. */
-	bzero(&uio, sizeof (uio));
-	uio.uio_iov	    = msg->msg_iov;
-	uio.uio_iovcnt	    = msg->msg_iovlen;
-	uio.uio_segflg	    = UIO_SYSSPACE;
-
-	for (idx = 0; idx < msg->msg_iovlen; idx++) {
-		total_len += (msg->msg_iov)[idx].iov_len;
-	}
-	uio.uio_resid = total_len;
-
+	bzero(&l_addr, sizeof (struct sockaddr_in6));
+	bzero(&f_addr, sizeof (struct sockaddr_in6));
+	l_addrlen = sizeof (struct sockaddr_in6);
+	f_addrlen = sizeof (struct sockaddr_in6);
 	/* If timeout requested on receive */
 	if (timeout > 0) {
 		boolean_t   loopback = B_FALSE;
+		(void) ksocket_getsockname(socket, (struct sockaddr *)(&l_addr),
+		    &l_addrlen, CRED());
+		(void) ksocket_getpeername(socket, (struct sockaddr *)(&f_addr),
+		    &f_addrlen, CRED());
+
 		/* And this isn't a loopback connection */
-		if (sonode->so_laddr.soa_sa->sa_family == AF_INET) {
+		if (((struct sockaddr *)(&l_addr))->sa_family == AF_INET) {
 			struct sockaddr_in *lin = (struct sockaddr_in *)
-			    ((void *)sonode->so_laddr.soa_sa);
+			    ((void *)(&l_addr));
 			struct sockaddr_in *fin = (struct sockaddr_in *)
-			    ((void *)sonode->so_faddr.soa_sa);
+			    ((void *)(&f_addr));
 
 			if ((lin->sin_family == fin->sin_family) &&
 			    (bcmp(&lin->sin_addr, &fin->sin_addr,
@@ -351,9 +341,9 @@ iscsit_net_recvmsg(void *socket, struct msghdr *msg, int timeout)
 			}
 		} else {
 			struct sockaddr_in6 *lin6 = (struct sockaddr_in6 *)
-			    ((void *)sonode->so_laddr.soa_sa);
+			    ((void *)(&l_addr));
 			struct sockaddr_in6 *fin6 = (struct sockaddr_in6 *)
-			    ((void *)sonode->so_faddr.soa_sa);
+			    ((void *)(&f_addr));
 
 			if ((lin6->sin6_family == fin6->sin6_family) &&
 			    (bcmp(&lin6->sin6_addr, &fin6->sin6_addr,
@@ -361,23 +351,20 @@ iscsit_net_recvmsg(void *socket, struct msghdr *msg, int timeout)
 				loopback = B_TRUE;
 			}
 		}
-
 		if (loopback == B_FALSE) {
-			/*
-			 * Then poll device for up to the timeout
-			 * period or the requested data is received.
-			 */
-			if (kstrgetmsg(SOTOV(sonode),
-			    NULL, NULL, &pri, &prflag, timeout * 1000,
-			    &rval) == ETIME) {
+			struct timeval tl;
+			tl.tv_sec = timeout;
+			tl.tv_usec = 0;
+			/* Set recv timeout */
+			if (ksocket_setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO,
+			    &tl, sizeof (struct timeval), CRED()))
 				return (0);
-			}
 		}
 	}
 
 	/*
 	 * Receive the requested data.  Block until all
-	 * data is received.
+	 * data is received or timeout.
 	 *
 	 * resid occurs only when the connection is
 	 * disconnected.  In that case it will return
@@ -385,6 +372,6 @@ iscsit_net_recvmsg(void *socket, struct msghdr *msg, int timeout)
 	 * In general this is the total amount we
 	 * requested.
 	 */
-	(void) sorecvmsg((struct sonode *)socket, msg, &uio);
-	return (total_len - uio.uio_resid);
+	(void) ksocket_recvmsg(socket, msg, prflag, &recv, CRED());
+	return (recv);
 }

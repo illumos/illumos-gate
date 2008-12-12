@@ -51,13 +51,15 @@
 #include <sys/cmn_err.h>
 #include <sys/proc.h>
 #include <sys/ddi.h>
-#include <sys/kmem_impl.h>
 
 #include <sys/suntpi.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/socketvar.h>
+#include <sys/sodirect.h>
 #include <netinet/in.h>
+#include <inet/common.h>
+#include <inet/proto_set.h>
 
 #include <sys/tiuser.h>
 #define	_SUN_TPI_VERSION	2
@@ -67,6 +69,8 @@
 
 #include <c2/audit.h>
 
+#include <fs/sockfs/socktpi.h>
+#include <fs/sockfs/socktpi_impl.h>
 #include <sys/dcopy.h>
 
 int so_default_version = SOV_SOCKSTREAM;
@@ -115,13 +119,9 @@ static mblk_t *strsock_proto(vnode_t *vp, mblk_t *mp,
 static mblk_t *strsock_misc(vnode_t *vp, mblk_t *mp,
 		strwakeup_t *wakeups, strsigset_t *firstmsgsigs,
 		strsigset_t *allmsgsigs, strpollset_t *pollwakeups);
-
-static int tlitosyserr(int terr);
-
 /*
- * Sodirect kmem_cache and put/wakeup functions.
+ * STREAMS based sodirect put/wakeup functions.
  */
-struct kmem_cache *socktpi_sod_cache;
 static int sodput(sodirect_t *, mblk_t *);
 static void sodwakeup(sodirect_t *);
 
@@ -131,10 +131,7 @@ static void sodwakeup(sodirect_t *);
 int
 sostr_init()
 {
-	/* Allocate sodirect_t kmem_cache */
-	socktpi_sod_cache = kmem_cache_create("socktpi_sod_cache",
-	    sizeof (sodirect_t), 0, NULL, NULL, NULL, NULL, NULL, 0);
-
+	sod_init();
 	return (0);
 }
 
@@ -151,15 +148,16 @@ so_sock2stream(struct sonode *so)
 	queue_t			*rq;
 	mblk_t			*mp;
 	int			error = 0;
+	sotpi_info_t		*sti = SOTOTPI(so);
 
-	ASSERT(MUTEX_HELD(&so->so_plumb_lock));
+	ASSERT(MUTEX_HELD(&sti->sti_plumb_lock));
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);
 
 	ASSERT(so->so_version != SOV_STREAM);
 
-	if (so->so_state & SS_DIRECT) {
+	if (sti->sti_direct) {
 		mblk_t **mpp;
 		int rval;
 
@@ -175,9 +173,9 @@ so_sock2stream(struct sonode *so)
 			    "_SIOCSOCKFALLBACK failed\n", (void *)so));
 			goto exit;
 		}
-		so->so_state &= ~SS_DIRECT;
+		sti->sti_direct = 0;
 
-		for (mpp = &so->so_conn_ind_head; (mp = *mpp) != NULL;
+		for (mpp = &sti->sti_conn_ind_head; (mp = *mpp) != NULL;
 		    mpp = &mp->b_next) {
 			struct T_conn_ind	*conn_ind;
 
@@ -236,7 +234,7 @@ so_sock2stream(struct sonode *so)
 	}
 
 	so->so_version = SOV_STREAM;
-	so->so_priv = NULL;
+	so->so_proto_handle = NULL;
 
 	/*
 	 * Remove the hooks in the stream head to avoid queuing more
@@ -251,20 +249,20 @@ so_sock2stream(struct sonode *so)
 	 * on the queue - the behavior of urgent data after a switch is
 	 * left undefined.
 	 */
-	so->so_error = so->so_delayed_error = 0;
+	so->so_error = sti->sti_delayed_error = 0;
 	freemsg(so->so_oobmsg);
 	so->so_oobmsg = NULL;
-	so->so_oobsigcnt = so->so_oobcnt = 0;
+	sti->sti_oobsigcnt = sti->sti_oobcnt = 0;
 
 	so->so_state &= ~(SS_RCVATMARK|SS_OOBPEND|SS_HAVEOOBDATA|SS_HADOOBDATA|
-	    SS_HASCONNIND|SS_SAVEDEOR);
+	    SS_SAVEDEOR);
 	ASSERT(so_verify_oobstate(so));
 
-	freemsg(so->so_ack_mp);
-	so->so_ack_mp = NULL;
+	freemsg(sti->sti_ack_mp);
+	sti->sti_ack_mp = NULL;
 
 	/*
-	 * Flush the T_DISCON_IND on so_discon_ind_mp.
+	 * Flush the T_DISCON_IND on sti_discon_ind_mp.
 	 */
 	so_flush_discon_ind(so);
 
@@ -272,16 +270,15 @@ so_sock2stream(struct sonode *so)
 	 * Move any queued T_CONN_IND messages to stream head queue.
 	 */
 	rq = RD(strvp2wq(vp));
-	while ((mp = so->so_conn_ind_head) != NULL) {
-		so->so_conn_ind_head = mp->b_next;
+	while ((mp = sti->sti_conn_ind_head) != NULL) {
+		sti->sti_conn_ind_head = mp->b_next;
 		mp->b_next = NULL;
-		if (so->so_conn_ind_head == NULL) {
-			ASSERT(so->so_conn_ind_tail == mp);
-			so->so_conn_ind_tail = NULL;
+		if (sti->sti_conn_ind_head == NULL) {
+			ASSERT(sti->sti_conn_ind_tail == mp);
+			sti->sti_conn_ind_tail = NULL;
 		}
 		dprintso(so, 0,
-		    ("so_sock2stream(%p): moving T_CONN_IND\n",
-		    (void *)so));
+		    ("so_sock2stream(%p): moving T_CONN_IND\n", (void *)so));
 
 		/* Drop lock across put() */
 		mutex_exit(&so->so_lock);
@@ -311,14 +308,15 @@ void
 so_stream2sock(struct sonode *so)
 {
 	struct vnode *vp = SOTOV(so);
+	sotpi_info_t *sti = SOTOTPI(so);
 
-	ASSERT(MUTEX_HELD(&so->so_plumb_lock));
+	ASSERT(MUTEX_HELD(&sti->sti_plumb_lock));
 
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);
 	ASSERT(so->so_version == SOV_STREAM);
 	so->so_version = SOV_SOCKSTREAM;
-	so->so_pushcnt = 0;
+	sti->sti_pushcnt = 0;
 	mutex_exit(&so->so_lock);
 
 	/*
@@ -350,7 +348,7 @@ so_stream2sock(struct sonode *so)
 	mutex_enter(&so->so_lock);
 
 	/*
-	 * Flush the T_DISCON_IND on so_discon_ind_mp.
+	 * Flush the T_DISCON_IND on sti_discon_ind_mp.
 	 */
 	so_flush_discon_ind(so);
 	so_unlock_read(so);	/* Clear SOREADLOCKED */
@@ -388,95 +386,24 @@ so_removehooks(struct sonode *so)
 	 */
 }
 
-/*
- * Initialize the streams side of a socket including
- * T_info_req/ack processing. If tso is not NULL its values are used thereby
- * avoiding the T_INFO_REQ.
- */
-int
-so_strinit(struct sonode *so, struct sonode *tso)
+void
+so_basic_strinit(struct sonode *so)
 {
 	struct vnode *vp = SOTOV(so);
 	struct stdata *stp;
 	mblk_t *mp;
-	int error;
-
-	dprintso(so, 1, ("so_strinit(%p)\n", (void *)so));
+	sotpi_info_t *sti = SOTOTPI(so);
 
 	/* Preallocate an unbind_req message */
 	mp = soallocproto(sizeof (struct T_unbind_req), _ALLOC_SLEEP);
 	mutex_enter(&so->so_lock);
-	so->so_unbind_mp = mp;
+	sti->sti_unbind_mp = mp;
 #ifdef DEBUG
 	so->so_options = so_default_options;
 #endif /* DEBUG */
 	mutex_exit(&so->so_lock);
 
 	so_installhooks(so);
-
-	/*
-	 * The T_CAPABILITY_REQ should be the first message sent down because
-	 * at least TCP has a fast-path for this which avoids timeouts while
-	 * waiting for the T_CAPABILITY_ACK under high system load.
-	 */
-	if (tso == NULL) {
-		error = do_tcapability(so, TC1_ACCEPTOR_ID | TC1_INFO);
-		if (error)
-			return (error);
-	} else {
-		mutex_enter(&so->so_lock);
-		so->so_tsdu_size = tso->so_tsdu_size;
-		so->so_etsdu_size = tso->so_etsdu_size;
-		so->so_addr_size = tso->so_addr_size;
-		so->so_opt_size = tso->so_opt_size;
-		so->so_tidu_size = tso->so_tidu_size;
-		so->so_serv_type = tso->so_serv_type;
-		so->so_mode = tso->so_mode & ~SM_ACCEPTOR_ID;
-		mutex_exit(&so->so_lock);
-
-		/* the following do_tcapability may update so->so_mode */
-		if ((tso->so_serv_type != T_CLTS) &&
-		    !(tso->so_state & SS_DIRECT)) {
-			error = do_tcapability(so, TC1_ACCEPTOR_ID);
-			if (error)
-				return (error);
-		}
-	}
-	/*
-	 * If the addr_size is 0 we treat it as already bound
-	 * and connected. This is used by the routing socket.
-	 * We set the addr_size to something to allocate a the address
-	 * structures.
-	 */
-	if (so->so_addr_size == 0) {
-		so->so_state |= SS_ISBOUND | SS_ISCONNECTED;
-		/* Address size can vary with address families. */
-		if (so->so_family == AF_INET6)
-			so->so_addr_size =
-			    (t_scalar_t)sizeof (struct sockaddr_in6);
-		else
-			so->so_addr_size =
-			    (t_scalar_t)sizeof (struct sockaddr_in);
-		ASSERT(so->so_unbind_mp);
-	}
-	/*
-	 * Allocate the addresses.
-	 */
-	ASSERT(so->so_laddr_sa == NULL && so->so_faddr_sa == NULL);
-	ASSERT(so->so_laddr_len == 0 && so->so_faddr_len == 0);
-	so->so_laddr_maxlen = so->so_faddr_maxlen =
-	    P2ROUNDUP(so->so_addr_size, KMEM_ALIGN);
-	so->so_laddr_sa = kmem_alloc(so->so_laddr_maxlen * 2, KM_SLEEP);
-	so->so_faddr_sa = (struct sockaddr *)((caddr_t)so->so_laddr_sa
-	    + so->so_laddr_maxlen);
-
-	if (so->so_family == AF_UNIX) {
-		/*
-		 * Initialize AF_UNIX related fields.
-		 */
-		bzero(&so->so_ux_laddr, sizeof (so->so_ux_laddr));
-		bzero(&so->so_ux_faddr, sizeof (so->so_ux_faddr));
-	}
 
 	stp = vp->v_stream;
 	/*
@@ -492,29 +419,75 @@ so_strinit(struct sonode *so, struct sonode *tso)
 	 * If sodirect capable allocate and initialize sodirect_t.
 	 * Note, SS_SODIRECT is set in socktpi_open().
 	 */
-	if (so->so_state & SS_SODIRECT) {
-		sodirect_t	*sodp;
-
-		ASSERT(so->so_direct == NULL);
-
-		sodp = kmem_cache_alloc(socktpi_sod_cache, KM_SLEEP);
-		sodp->sod_state = SOD_ENABLED | SOD_WAKE_NOT;
-		sodp->sod_want = 0;
-		sodp->sod_q = RD(stp->sd_wrq);
-		sodp->sod_enqueue = sodput;
-		sodp->sod_wakeup = sodwakeup;
-		sodp->sod_uioafh = NULL;
-		sodp->sod_uioaft = NULL;
-		sodp->sod_lockp = &stp->sd_lock;
-		/*
-		 * Remainder of the sod_uioa members are left uninitialized
-		 * but will be initialized later by uioainit() before uioa
-		 * is enabled.
-		 */
-		sodp->sod_uioa.uioa_state = UIOA_ALLOC;
-		so->so_direct = sodp;
-		stp->sd_sodirect = sodp;
+	if ((so->so_state & SS_SODIRECT) &&
+	    !(so->so_state & SS_FALLBACK_PENDING)) {
+		sod_sock_init(so, stp, sodput, sodwakeup, &stp->sd_lock);
 	}
+}
+
+/*
+ * Initialize the streams side of a socket including
+ * T_info_req/ack processing. If tso is not NULL its values are used thereby
+ * avoiding the T_INFO_REQ.
+ */
+int
+so_strinit(struct sonode *so, struct sonode *tso)
+{
+	sotpi_info_t *sti = SOTOTPI(so);
+	sotpi_info_t *tsti;
+	int error;
+
+	so_basic_strinit(so);
+
+	/*
+	 * The T_CAPABILITY_REQ should be the first message sent down because
+	 * at least TCP has a fast-path for this which avoids timeouts while
+	 * waiting for the T_CAPABILITY_ACK under high system load.
+	 */
+	if (tso == NULL) {
+		error = do_tcapability(so, TC1_ACCEPTOR_ID | TC1_INFO);
+		if (error)
+			return (error);
+	} else {
+		tsti = SOTOTPI(tso);
+
+		mutex_enter(&so->so_lock);
+		sti->sti_tsdu_size = tsti->sti_tsdu_size;
+		sti->sti_etsdu_size = tsti->sti_etsdu_size;
+		sti->sti_addr_size = tsti->sti_addr_size;
+		sti->sti_opt_size = tsti->sti_opt_size;
+		sti->sti_tidu_size = tsti->sti_tidu_size;
+		sti->sti_serv_type = tsti->sti_serv_type;
+		so->so_mode = tso->so_mode & ~SM_ACCEPTOR_ID;
+		mutex_exit(&so->so_lock);
+
+		/* the following do_tcapability may update so->so_mode */
+		if ((tsti->sti_serv_type != T_CLTS) &&
+		    (sti->sti_direct == 0)) {
+			error = do_tcapability(so, TC1_ACCEPTOR_ID);
+			if (error)
+				return (error);
+		}
+	}
+	/*
+	 * If the addr_size is 0 we treat it as already bound
+	 * and connected. This is used by the routing socket.
+	 * We set the addr_size to something to allocate a the address
+	 * structures.
+	 */
+	if (sti->sti_addr_size == 0) {
+		so->so_state |= SS_ISBOUND | SS_ISCONNECTED;
+		/* Address size can vary with address families. */
+		if (so->so_family == AF_INET6)
+			sti->sti_addr_size =
+			    (t_scalar_t)sizeof (struct sockaddr_in6);
+		else
+			sti->sti_addr_size =
+			    (t_scalar_t)sizeof (struct sockaddr_in);
+		ASSERT(sti->sti_unbind_mp);
+	}
+
+	so_alloc_addr(so, sti->sti_addr_size);
 
 	return (0);
 }
@@ -522,25 +495,28 @@ so_strinit(struct sonode *so, struct sonode *tso)
 static void
 copy_tinfo(struct sonode *so, struct T_info_ack *tia)
 {
-	so->so_tsdu_size = tia->TSDU_size;
-	so->so_etsdu_size = tia->ETSDU_size;
-	so->so_addr_size = tia->ADDR_size;
-	so->so_opt_size = tia->OPT_size;
-	so->so_tidu_size = tia->TIDU_size;
-	so->so_serv_type = tia->SERV_type;
+	sotpi_info_t *sti = SOTOTPI(so);
+
+	sti->sti_tsdu_size = tia->TSDU_size;
+	sti->sti_etsdu_size = tia->ETSDU_size;
+	sti->sti_addr_size = tia->ADDR_size;
+	sti->sti_opt_size = tia->OPT_size;
+	sti->sti_tidu_size = tia->TIDU_size;
+	sti->sti_serv_type = tia->SERV_type;
 	switch (tia->CURRENT_state) {
 	case TS_UNBND:
 		break;
 	case TS_IDLE:
 		so->so_state |= SS_ISBOUND;
-		so->so_laddr_len = 0;
-		so->so_state &= ~SS_LADDR_VALID;
+		sti->sti_laddr_len = 0;
+		sti->sti_laddr_valid = 0;
 		break;
 	case TS_DATA_XFER:
 		so->so_state |= SS_ISBOUND|SS_ISCONNECTED;
-		so->so_laddr_len = 0;
-		so->so_faddr_len = 0;
-		so->so_state &= ~(SS_LADDR_VALID | SS_FADDR_VALID);
+		sti->sti_laddr_len = 0;
+		sti->sti_faddr_len = 0;
+		sti->sti_laddr_valid = 0;
+		sti->sti_faddr_valid = 0;
 		break;
 	}
 
@@ -550,11 +526,11 @@ copy_tinfo(struct sonode *so, struct T_info_ack *tia)
 	 * and SM_EXDATA, SM_OPTDATA, and SM_BYTESTREAM)
 	 * from the info ack.
 	 */
-	if (so->so_serv_type == T_CLTS) {
+	if (sti->sti_serv_type == T_CLTS) {
 		so->so_mode |= SM_ATOMIC | SM_ADDR;
 	} else {
 		so->so_mode |= SM_CONNREQUIRED;
-		if (so->so_etsdu_size != 0 && so->so_etsdu_size != -2)
+		if (sti->sti_etsdu_size != 0 && sti->sti_etsdu_size != -2)
 			so->so_mode |= SM_EXDATA;
 	}
 	if (so->so_type == SOCK_SEQPACKET || so->so_type == SOCK_RAW) {
@@ -563,9 +539,9 @@ copy_tinfo(struct sonode *so, struct T_info_ack *tia)
 	}
 	if (so->so_family == AF_UNIX) {
 		so->so_mode |= SM_FDPASSING | SM_OPTDATA;
-		if (so->so_addr_size == -1) {
+		if (sti->sti_addr_size == -1) {
 			/* MAXPATHLEN + soun_family + nul termination */
-			so->so_addr_size = (t_scalar_t)(MAXPATHLEN +
+			sti->sti_addr_size = (t_scalar_t)(MAXPATHLEN +
 			    sizeof (short) + 1);
 		}
 		if (so->so_type == SOCK_STREAM) {
@@ -573,60 +549,62 @@ copy_tinfo(struct sonode *so, struct T_info_ack *tia)
 			 * Make it into a byte-stream transport.
 			 * SOCK_SEQPACKET sockets are unchanged.
 			 */
-			so->so_tsdu_size = 0;
+			sti->sti_tsdu_size = 0;
 		}
-	} else if (so->so_addr_size == -1) {
+	} else if (sti->sti_addr_size == -1) {
 		/*
 		 * Logic extracted from sockmod - have to pick some max address
 		 * length in order to preallocate the addresses.
 		 */
-		so->so_addr_size = SOA_DEFSIZE;
+		sti->sti_addr_size = SOA_DEFSIZE;
 	}
-	if (so->so_tsdu_size == 0)
+	if (sti->sti_tsdu_size == 0)
 		so->so_mode |= SM_BYTESTREAM;
 }
 
 static int
 check_tinfo(struct sonode *so)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
+
 	/* Consistency checks */
-	if (so->so_type == SOCK_DGRAM && so->so_serv_type != T_CLTS) {
+	if (so->so_type == SOCK_DGRAM && sti->sti_serv_type != T_CLTS) {
 		eprintso(so, ("service type and socket type mismatch\n"));
 		eprintsoline(so, EPROTO);
 		return (EPROTO);
 	}
-	if (so->so_type == SOCK_STREAM && so->so_serv_type == T_CLTS) {
+	if (so->so_type == SOCK_STREAM && sti->sti_serv_type == T_CLTS) {
 		eprintso(so, ("service type and socket type mismatch\n"));
 		eprintsoline(so, EPROTO);
 		return (EPROTO);
 	}
-	if (so->so_type == SOCK_SEQPACKET && so->so_serv_type == T_CLTS) {
+	if (so->so_type == SOCK_SEQPACKET && sti->sti_serv_type == T_CLTS) {
 		eprintso(so, ("service type and socket type mismatch\n"));
 		eprintsoline(so, EPROTO);
 		return (EPROTO);
 	}
 	if (so->so_family == AF_INET &&
-	    so->so_addr_size != (t_scalar_t)sizeof (struct sockaddr_in)) {
+	    sti->sti_addr_size != (t_scalar_t)sizeof (struct sockaddr_in)) {
 		eprintso(so,
 		    ("AF_INET must have sockaddr_in address length. Got %d\n",
-		    so->so_addr_size));
+		    sti->sti_addr_size));
 		eprintsoline(so, EMSGSIZE);
 		return (EMSGSIZE);
 	}
 	if (so->so_family == AF_INET6 &&
-	    so->so_addr_size != (t_scalar_t)sizeof (struct sockaddr_in6)) {
+	    sti->sti_addr_size != (t_scalar_t)sizeof (struct sockaddr_in6)) {
 		eprintso(so,
 		    ("AF_INET6 must have sockaddr_in6 address length. Got %d\n",
-		    so->so_addr_size));
+		    sti->sti_addr_size));
 		eprintsoline(so, EMSGSIZE);
 		return (EMSGSIZE);
 	}
 
 	dprintso(so, 1, (
 	    "tinfo: serv %d tsdu %d, etsdu %d, addr %d, opt %d, tidu %d\n",
-	    so->so_serv_type, so->so_tsdu_size, so->so_etsdu_size,
-	    so->so_addr_size, so->so_opt_size,
-	    so->so_tidu_size));
+	    sti->sti_serv_type, sti->sti_tsdu_size, sti->sti_etsdu_size,
+	    sti->sti_addr_size, sti->sti_opt_size,
+	    sti->sti_tidu_size));
 	dprintso(so, 1, ("tinfo: so_state %s\n",
 	    pr_state(so->so_state, so->so_mode)));
 	return (0);
@@ -646,7 +624,7 @@ do_tinfo(struct sonode *so)
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 
 	if (so_no_tinfo) {
-		so->so_addr_size = 0;
+		SOTOTPI(so)->sti_addr_size = 0;
 		return (0);
 	}
 
@@ -697,16 +675,17 @@ do_tcapability(struct sonode *so, t_uscalar_t cap_bits1)
 	struct T_capability_ack *tca;
 	mblk_t *mp;
 	int error;
+	sotpi_info_t *sti = SOTOTPI(so);
 
 	ASSERT(cap_bits1 != 0);
 	ASSERT((cap_bits1 & ~(TC1_ACCEPTOR_ID | TC1_INFO)) == 0);
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 
-	if (so->so_provinfo->tpi_capability == PI_NO)
+	if (sti->sti_provinfo->tpi_capability == PI_NO)
 		return (do_tinfo(so));
 
 	if (so_no_tinfo) {
-		so->so_addr_size = 0;
+		sti->sti_addr_size = 0;
 		if ((cap_bits1 &= ~TC1_INFO) == 0)
 			return (0);
 	}
@@ -737,10 +716,10 @@ do_tcapability(struct sonode *so, t_uscalar_t cap_bits1)
 	if ((error = sowaitprim(so, T_CAPABILITY_REQ, T_CAPABILITY_ACK,
 	    (t_uscalar_t)sizeof (*tca), &mp, sock_capability_timeout * hz))) {
 		mutex_exit(&so->so_lock);
-		PI_PROVLOCK(so->so_provinfo);
-		if (so->so_provinfo->tpi_capability == PI_DONTKNOW)
-			so->so_provinfo->tpi_capability = PI_NO;
-		PI_PROVUNLOCK(so->so_provinfo);
+		PI_PROVLOCK(sti->sti_provinfo);
+		if (sti->sti_provinfo->tpi_capability == PI_DONTKNOW)
+			sti->sti_provinfo->tpi_capability = PI_NO;
+		PI_PROVUNLOCK(sti->sti_provinfo);
 		ASSERT((so->so_mode & SM_ACCEPTOR_ID) == 0);
 		if (cap_bits1 & TC1_INFO) {
 			/*
@@ -758,26 +737,13 @@ do_tcapability(struct sonode *so, t_uscalar_t cap_bits1)
 		return (0);
 	}
 
-	if (so->so_provinfo->tpi_capability == PI_DONTKNOW) {
-		PI_PROVLOCK(so->so_provinfo);
-		so->so_provinfo->tpi_capability = PI_YES;
-		PI_PROVUNLOCK(so->so_provinfo);
-	}
-
 	ASSERT(mp);
 	tca = (struct T_capability_ack *)mp->b_rptr;
 
 	ASSERT((cap_bits1 & TC1_INFO) == (tca->CAP_bits1 & TC1_INFO));
+	so_proc_tcapability_ack(so, tca);
 
 	cap_bits1 = tca->CAP_bits1;
-
-	if (cap_bits1 & TC1_ACCEPTOR_ID) {
-		so->so_acceptor_id = tca->ACCEPTOR_id;
-		so->so_mode |= SM_ACCEPTOR_ID;
-	}
-
-	if (cap_bits1 & TC1_INFO)
-		copy_tinfo(so, &tca->INFO_ack);
 
 	mutex_exit(&so->so_lock);
 	freemsg(mp);
@@ -789,17 +755,41 @@ do_tcapability(struct sonode *so, t_uscalar_t cap_bits1)
 }
 
 /*
- * Retrieve and clear the socket error.
+ * Process a T_CAPABILITY_ACK
+ */
+void
+so_proc_tcapability_ack(struct sonode *so, struct T_capability_ack *tca)
+{
+	sotpi_info_t *sti = SOTOTPI(so);
+
+	if (sti->sti_provinfo->tpi_capability == PI_DONTKNOW) {
+		PI_PROVLOCK(sti->sti_provinfo);
+		sti->sti_provinfo->tpi_capability = PI_YES;
+		PI_PROVUNLOCK(sti->sti_provinfo);
+	}
+
+	if (tca->CAP_bits1 & TC1_ACCEPTOR_ID) {
+		sti->sti_acceptor_id = tca->ACCEPTOR_id;
+		so->so_mode |= SM_ACCEPTOR_ID;
+	}
+
+	if (tca->CAP_bits1 & TC1_INFO)
+		copy_tinfo(so, &tca->INFO_ack);
+}
+
+/*
+ * Retrieve socket error, clear error if not peek.
  */
 int
-sogeterr(struct sonode *so)
+sogeterr(struct sonode *so, boolean_t clear_err)
 {
 	int error;
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	error = so->so_error;
-	so->so_error = 0;
+	if (clear_err)
+		so->so_error = 0;
 
 	return (error);
 }
@@ -898,8 +888,7 @@ void
 soisdisconnected(struct sonode *so, int error)
 {
 	ASSERT(MUTEX_HELD(&so->so_lock));
-	so->so_state &= ~(SS_ISCONNECTING|SS_ISCONNECTED|SS_ISDISCONNECTING|
-	    SS_LADDR_VALID|SS_FADDR_VALID);
+	so->so_state &= ~(SS_ISCONNECTING|SS_ISCONNECTED|SS_ISDISCONNECTING);
 	so->so_state |= (SS_CANTRCVMORE|SS_CANTSENDMORE);
 	so->so_error = (ushort_t)error;
 	if (so->so_peercred != NULL) {
@@ -935,7 +924,7 @@ void
 socantsendmore(struct sonode *so)
 {
 	ASSERT(MUTEX_HELD(&so->so_lock));
-	so->so_state = so->so_state & ~SS_FADDR_VALID | SS_CANTSENDMORE;
+	so->so_state |= SS_CANTSENDMORE;
 	cv_broadcast(&so->so_state_cv);
 }
 
@@ -1013,13 +1002,11 @@ sowaitprim(struct sonode *so, t_scalar_t request_prim, t_scalar_t ack_prim,
 		if (tpr->error_ack.TLI_error == TSYSERR) {
 			error = tpr->error_ack.UNIX_error;
 		} else {
-			error = tlitosyserr(tpr->error_ack.TLI_error);
+			error = proto_tlitosyserr(tpr->error_ack.TLI_error);
 		}
 		dprintso(so, 0, ("error_ack for %d: %d/%d ->%d\n",
-		    tpr->error_ack.ERROR_prim,
-		    tpr->error_ack.TLI_error,
-		    tpr->error_ack.UNIX_error,
-		    error));
+		    tpr->error_ack.ERROR_prim, tpr->error_ack.TLI_error,
+		    tpr->error_ack.UNIX_error, error));
 		freemsg(mp);
 		return (error);
 	}
@@ -1029,13 +1016,11 @@ sowaitprim(struct sonode *so, t_scalar_t request_prim, t_scalar_t ack_prim,
 #ifdef DEBUG
 	if (tpr->type == T_ERROR_ACK) {
 		dprintso(so, 0, ("error_ack for %d: %d/%d\n",
-		    tpr->error_ack.ERROR_prim,
-		    tpr->error_ack.TLI_error,
+		    tpr->error_ack.ERROR_prim, tpr->error_ack.TLI_error,
 		    tpr->error_ack.UNIX_error));
 	} else if (tpr->type == T_OK_ACK) {
 		dprintso(so, 0, ("ok_ack for %d, expected %d for %d\n",
-		    tpr->ok_ack.CORRECT_prim,
-		    ack_prim, request_prim));
+		    tpr->ok_ack.CORRECT_prim, ack_prim, request_prim));
 	} else {
 		dprintso(so, 0,
 		    ("unexpected primitive %d, expected %d for %d\n",
@@ -1066,11 +1051,13 @@ sowaitokack(struct sonode *so, t_scalar_t request_prim)
 }
 
 /*
- * Queue a received TPI ack message on so_ack_mp.
+ * Queue a received TPI ack message on sti_ack_mp.
  */
 void
 soqueueack(struct sonode *so, mblk_t *mp)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
+
 	if (DB_TYPE(mp) != M_PCPROTO) {
 		zcmn_err(getzoneid(), CE_WARN,
 		    "sockfs: received unexpected M_PROTO TPI ack. Prim %d\n",
@@ -1080,13 +1067,13 @@ soqueueack(struct sonode *so, mblk_t *mp)
 	}
 
 	mutex_enter(&so->so_lock);
-	if (so->so_ack_mp != NULL) {
-		dprintso(so, 1, ("so_ack_mp already set\n"));
-		freemsg(so->so_ack_mp);
-		so->so_ack_mp = NULL;
+	if (sti->sti_ack_mp != NULL) {
+		dprintso(so, 1, ("sti_ack_mp already set\n"));
+		freemsg(sti->sti_ack_mp);
+		sti->sti_ack_mp = NULL;
 	}
-	so->so_ack_mp = mp;
-	cv_broadcast(&so->so_ack_cv);
+	sti->sti_ack_mp = mp;
+	cv_broadcast(&sti->sti_ack_cv);
 	mutex_exit(&so->so_lock);
 }
 
@@ -1096,9 +1083,11 @@ soqueueack(struct sonode *so, mblk_t *mp)
 int
 sowaitack(struct sonode *so, mblk_t **mpp, clock_t wait)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
+
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
-	while (so->so_ack_mp == NULL) {
+	while (sti->sti_ack_mp == NULL) {
 #ifdef SOCK_TEST
 		if (wait == 0 && sock_test_timelimit != 0)
 			wait = sock_test_timelimit;
@@ -1110,16 +1099,16 @@ sowaitack(struct sonode *so, mblk_t **mpp, clock_t wait)
 			clock_t now;
 
 			time_to_wait(&now, wait);
-			if (cv_timedwait(&so->so_ack_cv, &so->so_lock,
+			if (cv_timedwait(&sti->sti_ack_cv, &so->so_lock,
 			    now) == -1) {
 				eprintsoline(so, ETIME);
 				return (ETIME);
 			}
 		}
 		else
-			cv_wait(&so->so_ack_cv, &so->so_lock);
+			cv_wait(&sti->sti_ack_cv, &so->so_lock);
 	}
-	*mpp = so->so_ack_mp;
+	*mpp = sti->sti_ack_mp;
 #ifdef DEBUG
 	{
 		union T_primitives *tpr;
@@ -1135,16 +1124,18 @@ sowaitack(struct sonode *so, mblk_t **mpp, clock_t wait)
 		    tpr->type == T_OPTMGMT_ACK);
 	}
 #endif /* DEBUG */
-	so->so_ack_mp = NULL;
+	sti->sti_ack_mp = NULL;
 	return (0);
 }
 
 /*
- * Queue a received T_CONN_IND message on so_conn_ind_head/tail.
+ * Queue a received T_CONN_IND message on sti_conn_ind_head/tail.
  */
 void
 soqueueconnind(struct sonode *so, mblk_t *mp)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
+
 	if (DB_TYPE(mp) != M_PROTO) {
 		zcmn_err(getzoneid(), CE_WARN,
 		    "sockfs: received unexpected M_PCPROTO T_CONN_IND\n");
@@ -1154,17 +1145,15 @@ soqueueconnind(struct sonode *so, mblk_t *mp)
 
 	mutex_enter(&so->so_lock);
 	ASSERT(mp->b_next == NULL);
-	if (so->so_conn_ind_head == NULL) {
-		so->so_conn_ind_head = mp;
-		so->so_state |= SS_HASCONNIND;
+	if (sti->sti_conn_ind_head == NULL) {
+		sti->sti_conn_ind_head = mp;
 	} else {
-		ASSERT(so->so_state & SS_HASCONNIND);
-		ASSERT(so->so_conn_ind_tail->b_next == NULL);
-		so->so_conn_ind_tail->b_next = mp;
+		ASSERT(sti->sti_conn_ind_tail->b_next == NULL);
+		sti->sti_conn_ind_tail->b_next = mp;
 	}
-	so->so_conn_ind_tail = mp;
+	sti->sti_conn_ind_tail = mp;
 	/* Wakeup a single consumer of the T_CONN_IND */
-	cv_signal(&so->so_connind_cv);
+	cv_signal(&so->so_acceptq_cv);
 	mutex_exit(&so->so_lock);
 }
 
@@ -1177,37 +1166,43 @@ int
 sowaitconnind(struct sonode *so, int fmode, mblk_t **mpp)
 {
 	mblk_t *mp;
+	sotpi_info_t *sti = SOTOTPI(so);
 	int error = 0;
 
 	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
 	mutex_enter(&so->so_lock);
 check_error:
 	if (so->so_error) {
-		error = sogeterr(so);
+		error = sogeterr(so, B_TRUE);
 		if (error) {
 			mutex_exit(&so->so_lock);
 			return (error);
 		}
 	}
 
-	if (so->so_conn_ind_head == NULL) {
+	if (sti->sti_conn_ind_head == NULL) {
 		if (fmode & (FNDELAY|FNONBLOCK)) {
 			error = EWOULDBLOCK;
 			goto done;
 		}
-		if (!cv_wait_sig_swap(&so->so_connind_cv, &so->so_lock)) {
+
+		if (so->so_state & SS_CLOSING) {
+			error = EINTR;
+			goto done;
+		}
+
+		if (!cv_wait_sig_swap(&so->so_acceptq_cv, &so->so_lock)) {
 			error = EINTR;
 			goto done;
 		}
 		goto check_error;
 	}
-	mp = so->so_conn_ind_head;
-	so->so_conn_ind_head = mp->b_next;
+	mp = sti->sti_conn_ind_head;
+	sti->sti_conn_ind_head = mp->b_next;
 	mp->b_next = NULL;
-	if (so->so_conn_ind_head == NULL) {
-		ASSERT(so->so_conn_ind_tail == mp);
-		so->so_conn_ind_tail = NULL;
-		so->so_state &= ~SS_HASCONNIND;
+	if (sti->sti_conn_ind_head == NULL) {
+		ASSERT(sti->sti_conn_ind_tail == mp);
+		sti->sti_conn_ind_tail = NULL;
 	}
 	*mpp = mp;
 done:
@@ -1225,31 +1220,32 @@ soflushconnind(struct sonode *so, t_scalar_t seqno)
 {
 	mblk_t *prevmp, *mp;
 	struct T_conn_ind *tci;
+	sotpi_info_t *sti = SOTOTPI(so);
 
 	mutex_enter(&so->so_lock);
-	for (prevmp = NULL, mp = so->so_conn_ind_head; mp != NULL;
+	for (prevmp = NULL, mp = sti->sti_conn_ind_head; mp != NULL;
 	    prevmp = mp, mp = mp->b_next) {
 		tci = (struct T_conn_ind *)mp->b_rptr;
 		if (tci->SEQ_number == seqno) {
 			dprintso(so, 1,
 			    ("t_discon_ind: found T_CONN_IND %d\n", seqno));
 			/* Deleting last? */
-			if (so->so_conn_ind_tail == mp) {
-				so->so_conn_ind_tail = prevmp;
+			if (sti->sti_conn_ind_tail == mp) {
+				sti->sti_conn_ind_tail = prevmp;
 			}
 			if (prevmp == NULL) {
 				/* Deleting first */
-				so->so_conn_ind_head = mp->b_next;
+				sti->sti_conn_ind_head = mp->b_next;
 			} else {
 				prevmp->b_next = mp->b_next;
 			}
 			mp->b_next = NULL;
-			if (so->so_conn_ind_head == NULL) {
-				ASSERT(so->so_conn_ind_tail == NULL);
-				so->so_state &= ~SS_HASCONNIND;
-			} else {
-				ASSERT(so->so_conn_ind_tail != NULL);
-			}
+
+			ASSERT((sti->sti_conn_ind_head == NULL &&
+			    sti->sti_conn_ind_tail == NULL) ||
+			    (sti->sti_conn_ind_head != NULL &&
+			    sti->sti_conn_ind_tail != NULL));
+
 			so->so_error = ECONNABORTED;
 			mutex_exit(&so->so_lock);
 
@@ -1295,6 +1291,9 @@ sowaitconnected(struct sonode *so, int fmode, int nosig)
 		if (fmode & (FNDELAY|FNONBLOCK))
 			return (EINPROGRESS);
 
+		if (so->so_state & SS_CLOSING)
+			return (EINTR);
+
 		if (nosig)
 			cv_wait(&so->so_state_cv, &so->so_lock);
 		else if (!cv_wait_sig_swap(&so->so_state_cv, &so->so_lock)) {
@@ -1309,7 +1308,7 @@ sowaitconnected(struct sonode *so, int fmode, int nosig)
 	}
 
 	if (so->so_error != 0) {
-		error = sogeterr(so);
+		error = sogeterr(so, B_TRUE);
 		ASSERT(error != 0);
 		dprintso(so, 1, ("sowaitconnected: error %d\n", error));
 		return (error);
@@ -1335,11 +1334,13 @@ static void
 so_oob_sig(struct sonode *so, int extrasig,
     strsigset_t *signals, strpollset_t *pollwakeups)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
+
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	ASSERT(so_verify_oobstate(so));
-	ASSERT(so->so_oobsigcnt >= so->so_oobcnt);
-	if (so->so_oobsigcnt > so->so_oobcnt) {
+	ASSERT(sti->sti_oobsigcnt >= sti->sti_oobcnt);
+	if (sti->sti_oobsigcnt > sti->sti_oobcnt) {
 		/*
 		 * Signal has already been generated once for this
 		 * urgent "event". However, since TCP can receive updated
@@ -1353,9 +1354,9 @@ so_oob_sig(struct sonode *so, int extrasig,
 		return;
 	}
 
-	so->so_oobsigcnt++;
-	ASSERT(so->so_oobsigcnt > 0);	/* Wraparound */
-	ASSERT(so->so_oobsigcnt > so->so_oobcnt);
+	sti->sti_oobsigcnt++;
+	ASSERT(sti->sti_oobsigcnt > 0);	/* Wraparound */
+	ASSERT(sti->sti_oobsigcnt > sti->sti_oobcnt);
 
 	/*
 	 * Record (for select/poll) that urgent data is pending.
@@ -1385,15 +1386,17 @@ static mblk_t *
 so_oob_exdata(struct sonode *so, mblk_t *mp,
 	strsigset_t *signals, strpollset_t *pollwakeups)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
+
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	ASSERT(so_verify_oobstate(so));
 
-	ASSERT(so->so_oobsigcnt > so->so_oobcnt);
+	ASSERT(sti->sti_oobsigcnt > sti->sti_oobcnt);
 
-	so->so_oobcnt++;
-	ASSERT(so->so_oobcnt > 0);	/* wraparound? */
-	ASSERT(so->so_oobsigcnt >= so->so_oobcnt);
+	sti->sti_oobcnt++;
+	ASSERT(sti->sti_oobcnt > 0);	/* wraparound? */
+	ASSERT(sti->sti_oobsigcnt >= sti->sti_oobcnt);
 
 	/*
 	 * Set MSGMARK for SIOCATMARK.
@@ -1412,11 +1415,13 @@ static mblk_t *
 so_oob_data(struct sonode *so, mblk_t *mp,
 	strsigset_t *signals, strpollset_t *pollwakeups)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
+
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	ASSERT(so_verify_oobstate(so));
 
-	ASSERT(so->so_oobsigcnt >= so->so_oobcnt);
+	ASSERT(sti->sti_oobsigcnt >= sti->sti_oobcnt);
 	ASSERT(mp != NULL);
 	/*
 	 * For OOBINLINE we keep the data in the T_EXDATA_IND.
@@ -1439,7 +1444,7 @@ so_oob_data(struct sonode *so, mblk_t *mp,
 /*
  * Caller must hold the mutex.
  * For delayed processing, save the T_DISCON_IND received
- * from below on so_discon_ind_mp.
+ * from below on sti_discon_ind_mp.
  * When the message is processed the framework will call:
  *      (*func)(so, mp);
  */
@@ -1448,14 +1453,16 @@ so_save_discon_ind(struct sonode *so,
 	mblk_t *mp,
 	void (*func)(struct sonode *so, mblk_t *))
 {
+	sotpi_info_t *sti = SOTOTPI(so);
+
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	/*
 	 * Discard new T_DISCON_IND if we have already received another.
-	 * Currently the earlier message can either be on so_discon_ind_mp
+	 * Currently the earlier message can either be on sti_discon_ind_mp
 	 * or being processed.
 	 */
-	if (so->so_discon_ind_mp != NULL || (so->so_flag & SOASYNC_UNBIND)) {
+	if (sti->sti_discon_ind_mp != NULL || (so->so_flag & SOASYNC_UNBIND)) {
 		zcmn_err(getzoneid(), CE_WARN,
 		    "sockfs: received unexpected additional T_DISCON_IND\n");
 		freemsg(mp);
@@ -1463,13 +1470,13 @@ so_save_discon_ind(struct sonode *so,
 	}
 	mp->b_prev = (mblk_t *)func;
 	mp->b_next = NULL;
-	so->so_discon_ind_mp = mp;
+	sti->sti_discon_ind_mp = mp;
 }
 
 /*
  * Caller must hold the mutex and make sure that either SOLOCKED
  * or SOASYNC_UNBIND is set. Called from so_unlock_single().
- * Perform delayed processing of T_DISCON_IND message on so_discon_ind_mp.
+ * Perform delayed processing of T_DISCON_IND message on sti_discon_ind_mp.
  * Need to ensure that strsock_proto() will not end up sleeping for
  * SOASYNC_UNBIND, while executing this function.
  */
@@ -1478,13 +1485,14 @@ so_drain_discon_ind(struct sonode *so)
 {
 	mblk_t	*bp;
 	void (*func)(struct sonode *so, mblk_t *);
+	sotpi_info_t *sti = SOTOTPI(so);
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 	ASSERT(so->so_flag & (SOLOCKED|SOASYNC_UNBIND));
 
-	/* Process T_DISCON_IND on so_discon_ind_mp */
-	if ((bp = so->so_discon_ind_mp) != NULL) {
-		so->so_discon_ind_mp = NULL;
+	/* Process T_DISCON_IND on sti_discon_ind_mp */
+	if ((bp = sti->sti_discon_ind_mp) != NULL) {
+		sti->sti_discon_ind_mp = NULL;
 		func = (void (*)())bp->b_prev;
 		bp->b_prev = NULL;
 
@@ -1502,20 +1510,21 @@ so_drain_discon_ind(struct sonode *so)
 
 /*
  * Caller must hold the mutex.
- * Remove the T_DISCON_IND on so_discon_ind_mp.
+ * Remove the T_DISCON_IND on sti_discon_ind_mp.
  */
 void
 so_flush_discon_ind(struct sonode *so)
 {
 	mblk_t	*bp;
+	sotpi_info_t *sti = SOTOTPI(so);
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 
 	/*
-	 * Remove T_DISCON_IND mblk at so_discon_ind_mp.
+	 * Remove T_DISCON_IND mblk at sti_discon_ind_mp.
 	 */
-	if ((bp = so->so_discon_ind_mp) != NULL) {
-		so->so_discon_ind_mp = NULL;
+	if ((bp = sti->sti_discon_ind_mp) != NULL) {
+		sti->sti_discon_ind_mp = NULL;
 		bp->b_prev = NULL;
 		freemsg(bp);
 	}
@@ -1526,9 +1535,9 @@ so_flush_discon_ind(struct sonode *so)
  *
  * This function is used to process the T_DISCON_IND message. It does
  * immediate processing when called from strsock_proto and delayed
- * processing of discon_ind saved on so_discon_ind_mp when called from
+ * processing of discon_ind saved on sti_discon_ind_mp when called from
  * so_drain_discon_ind. When a T_DISCON_IND message is saved in
- * so_discon_ind_mp for delayed processing, this function is registered
+ * sti_discon_ind_mp for delayed processing, this function is registered
  * as the callback function to process the message.
  *
  * SOASYNC_UNBIND should be held in this function, during the non-blocking
@@ -1549,6 +1558,7 @@ strsock_discon_ind(struct sonode *so, mblk_t *discon_mp)
 	struct T_unbind_req *ubr;
 	mblk_t *mp;
 	int error;
+	sotpi_info_t *sti = SOTOTPI(so);
 
 	ASSERT(MUTEX_HELD(&so->so_lock));
 	ASSERT(discon_mp);
@@ -1571,6 +1581,8 @@ strsock_discon_ind(struct sonode *so, mblk_t *discon_mp)
 	 * is the errno name space.
 	 */
 	soisdisconnected(so, tpr->discon_ind.DISCON_reason);
+	sti->sti_laddr_valid = 0;
+	sti->sti_faddr_valid = 0;
 
 	/*
 	 * Unbind with the transport without blocking.
@@ -1581,14 +1593,14 @@ strsock_discon_ind(struct sonode *so, mblk_t *discon_mp)
 	 *
 	 * If the socket is not bound, no need to unbind.
 	 */
-	mp = so->so_unbind_mp;
+	mp = sti->sti_unbind_mp;
 	if (mp == NULL) {
 		ASSERT(!(so->so_state & SS_ISBOUND));
 		mutex_exit(&so->so_lock);
 	} else if (!(so->so_state & SS_ISBOUND))  {
 		mutex_exit(&so->so_lock);
 	} else {
-		so->so_unbind_mp = NULL;
+		sti->sti_unbind_mp = NULL;
 
 		/*
 		 * Is another T_DISCON_IND being processed.
@@ -1602,7 +1614,8 @@ strsock_discon_ind(struct sonode *so, mblk_t *discon_mp)
 		 */
 		so->so_flag |= SOASYNC_UNBIND;
 		ASSERT(!(so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)));
-		so->so_state &= ~(SS_ISBOUND|SS_ACCEPTCONN|SS_LADDR_VALID);
+		so->so_state &= ~(SS_ISBOUND|SS_ACCEPTCONN);
+		sti->sti_laddr_valid = 0;
 		mutex_exit(&so->so_lock);
 
 		/*
@@ -1686,8 +1699,10 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 {
 	union T_primitives *tpr;
 	struct sonode *so;
+	sotpi_info_t *sti;
 
 	so = VTOSO(vp);
+	sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("strsock_proto(%p, %p)\n", (void *)vp, (void *)mp));
 
@@ -1849,11 +1864,11 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			 */
 			struct sockaddr_in *faddr, *sin;
 
-			/* Prevent so_faddr_sa from changing while accessed */
+			/* Prevent sti_faddr_sa from changing while accessed */
 			mutex_enter(&so->so_lock);
-			ASSERT(so->so_faddr_len ==
+			ASSERT(sti->sti_faddr_len ==
 			    (socklen_t)sizeof (struct sockaddr_in));
-			faddr = (struct sockaddr_in *)so->so_faddr_sa;
+			faddr = (struct sockaddr_in *)sti->sti_faddr_sa;
 			sin = (struct sockaddr_in *)addr;
 			if (addrlen !=
 			    (t_uscalar_t)sizeof (struct sockaddr_in) ||
@@ -1866,11 +1881,10 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				dprintso(so, 0,
 				    ("sockfs: T_UNITDATA_IND mismatch: %s",
 				    pr_addr(so->so_family,
-				    (struct sockaddr *)addr,
-				    addrlen)));
+				    (struct sockaddr *)addr, addrlen)));
 				dprintso(so, 0, (" - %s\n",
-				    pr_addr(so->so_family, so->so_faddr_sa,
-				    (t_uscalar_t)so->so_faddr_len)));
+				    pr_addr(so->so_family, sti->sti_faddr_sa,
+				    (t_uscalar_t)sti->sti_faddr_len)));
 #endif /* DEBUG */
 				mutex_exit(&so->so_lock);
 				freemsg(mp);
@@ -1885,11 +1899,11 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			struct sockaddr_in6 *faddr6, *sin6;
 			static struct in6_addr zeroes; /* inits to all zeros */
 
-			/* Prevent so_faddr_sa from changing while accessed */
+			/* Prevent sti_faddr_sa from changing while accessed */
 			mutex_enter(&so->so_lock);
-			ASSERT(so->so_faddr_len ==
+			ASSERT(sti->sti_faddr_len ==
 			    (socklen_t)sizeof (struct sockaddr_in6));
-			faddr6 = (struct sockaddr_in6 *)so->so_faddr_sa;
+			faddr6 = (struct sockaddr_in6 *)sti->sti_faddr_sa;
 			sin6 = (struct sockaddr_in6 *)addr;
 			/* XXX could we get a mapped address ::ffff:0.0.0.0 ? */
 			if (addrlen !=
@@ -1904,11 +1918,10 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				dprintso(so, 0,
 				    ("sockfs: T_UNITDATA_IND mismatch: %s",
 				    pr_addr(so->so_family,
-				    (struct sockaddr *)addr,
-				    addrlen)));
+				    (struct sockaddr *)addr, addrlen)));
 				dprintso(so, 0, (" - %s\n",
-				    pr_addr(so->so_family, so->so_faddr_sa,
-				    (t_uscalar_t)so->so_faddr_len)));
+				    pr_addr(so->so_family, sti->sti_faddr_sa,
+				    (t_uscalar_t)sti->sti_faddr_len)));
 #endif /* DEBUG */
 				mutex_exit(&so->so_lock);
 				freemsg(mp);
@@ -2008,6 +2021,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			if (so_getopt_unix_close(opt, optlen)) {
 				mutex_enter(&so->so_lock);
 				socantsendmore(so);
+				sti->sti_faddr_valid = 0;
 				mutex_exit(&so->so_lock);
 				strsetwerror(SOTOV(so), 0, 0, sogetwrerr);
 				freemsg(mp);
@@ -2045,7 +2059,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		 */
 		dprintso(so, 1,
 		    ("T_EXDATA_IND(%p): counts %d/%d state %s\n",
-		    (void *)vp, so->so_oobsigcnt, so->so_oobcnt,
+		    (void *)vp, sti->sti_oobsigcnt, sti->sti_oobcnt,
 		    pr_state(so->so_state, so->so_mode)));
 
 		if (msgdsize(mp->b_cont) == 0) {
@@ -2113,8 +2127,8 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				 * adjust the OOB count and OOB	signal count
 				 * just incremented for the new OOB data.
 				 */
-				so->so_oobcnt--;
-				so->so_oobsigcnt--;
+				sti->sti_oobcnt--;
+				sti->sti_oobsigcnt--;
 				mutex_exit(QLOCK(qp));
 				mutex_exit(&so->so_lock);
 				return (NULL);
@@ -2141,15 +2155,15 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			dprintso(so, 1,
 			    ("after outofline T_EXDATA_IND(%p): "
 			    "counts %d/%d  poll 0x%x sig 0x%x state %s\n",
-			    (void *)vp, so->so_oobsigcnt,
-			    so->so_oobcnt, *pollwakeups, *allmsgsigs,
+			    (void *)vp, sti->sti_oobsigcnt,
+			    sti->sti_oobcnt, *pollwakeups, *allmsgsigs,
 			    pr_state(so->so_state, so->so_mode)));
 		} else {
 			dprintso(so, 1,
 			    ("after inline T_EXDATA_IND(%p): "
 			    "counts %d/%d  poll 0x%x sig 0x%x state %s\n",
-			    (void *)vp, so->so_oobsigcnt,
-			    so->so_oobcnt, *pollwakeups, *allmsgsigs,
+			    (void *)vp, sti->sti_oobsigcnt,
+			    sti->sti_oobcnt, *pollwakeups, *allmsgsigs,
 			    pr_state(so->so_state, so->so_mode)));
 		}
 #endif /* DEBUG */
@@ -2194,13 +2208,15 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		 * For AF_UNIX require the identical length.
 		 */
 		if (so->so_family == AF_UNIX ?
-		    addrlen != (t_uscalar_t)sizeof (so->so_ux_laddr) :
-		    addrlen > (t_uscalar_t)so->so_faddr_maxlen) {
+		    addrlen != (t_uscalar_t)sizeof (sti->sti_ux_laddr) :
+		    addrlen > (t_uscalar_t)sti->sti_faddr_maxlen) {
 			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: T_conn_con with different "
 			    "length %u/%d\n",
 			    addrlen, conn_con->RES_length);
 			soisdisconnected(so, EPROTO);
+			sti->sti_laddr_valid = 0;
+			sti->sti_faddr_valid = 0;
 			mutex_exit(&so->so_lock);
 			strsetrerror(SOTOV(so), 0, 0, sogetrderr);
 			strsetwerror(SOTOV(so), 0, 0, sogetwrerr);
@@ -2240,10 +2256,10 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		 * Save for getpeername.
 		 */
 		if (so->so_family != AF_UNIX) {
-			so->so_faddr_len = (socklen_t)addrlen;
-			ASSERT(so->so_faddr_len <= so->so_faddr_maxlen);
-			bcopy(addr, so->so_faddr_sa, addrlen);
-			so->so_state |= SS_FADDR_VALID;
+			sti->sti_faddr_len = (socklen_t)addrlen;
+			ASSERT(sti->sti_faddr_len <= sti->sti_faddr_maxlen);
+			bcopy(addr, sti->sti_faddr_sa, addrlen);
+			sti->sti_faddr_valid = 1;
 		}
 
 		if (so->so_peercred != NULL)
@@ -2275,7 +2291,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 	case T_CONN_IND:
 		/*
 		 * Verify the min size and queue the message on
-		 * the so_conn_ind_head/tail list.
+		 * the sti_conn_ind_head/tail list.
 		 */
 		if (MBLKL(mp) < sizeof (struct T_conn_ind)) {
 			zcmn_err(getzoneid(), CE_WARN,
@@ -2301,7 +2317,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 			tpr->type = T_CONN_IND;
 
-			fbso = kssl_find_fallback(so->so_kssl_ent);
+			fbso = kssl_find_fallback(sti->sti_kssl_ent);
 
 			/*
 			 * No fallback: the remote will timeout and
@@ -2391,6 +2407,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		if ((so->so_state & SS_CANTRCVMORE) &&
 		    (so->so_family == AF_UNIX)) {
 			socantsendmore(so);
+			sti->sti_faddr_valid = 0;
 			mutex_exit(&so->so_lock);
 			strsetwerror(SOTOV(so), 0, 0, sogetwrerr);
 			dprintso(so, 1,
@@ -2468,7 +2485,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				/* Compare just IP address and port */
 				struct sockaddr_in *sin1, *sin2;
 
-				sin1 = (struct sockaddr_in *)so->so_faddr_sa;
+				sin1 = (struct sockaddr_in *)sti->sti_faddr_sa;
 				sin2 = (struct sockaddr_in *)addr;
 				if (addrlen == sizeof (struct sockaddr_in) &&
 				    sin1->sin_port == sin2->sin_port &&
@@ -2481,7 +2498,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				/* Compare just IP address and port. Not flow */
 				struct sockaddr_in6 *sin1, *sin2;
 
-				sin1 = (struct sockaddr_in6 *)so->so_faddr_sa;
+				sin1 = (struct sockaddr_in6 *)sti->sti_faddr_sa;
 				sin2 = (struct sockaddr_in6 *)addr;
 				if (addrlen == sizeof (struct sockaddr_in6) &&
 				    sin1->sin6_port == sin2->sin6_port &&
@@ -2491,16 +2508,16 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				break;
 			}
 			case AF_UNIX:
-				faddr = &so->so_ux_faddr;
+				faddr = &sti->sti_ux_faddr;
 				faddr_len =
-				    (t_uscalar_t)sizeof (so->so_ux_faddr);
+				    (t_uscalar_t)sizeof (sti->sti_ux_faddr);
 				if (faddr_len == addrlen &&
 				    bcmp(addr, faddr, addrlen) == 0)
 					match = B_TRUE;
 				break;
 			default:
-				faddr = so->so_faddr_sa;
-				faddr_len = (t_uscalar_t)so->so_faddr_len;
+				faddr = sti->sti_faddr_sa;
+				faddr_len = (t_uscalar_t)sti->sti_faddr_len;
 				if (faddr_len == addrlen &&
 				    bcmp(addr, faddr, addrlen) == 0)
 					match = B_TRUE;
@@ -2512,11 +2529,10 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				dprintso(so, 0,
 				    ("sockfs: T_UDERR_IND mismatch: %s - ",
 				    pr_addr(so->so_family,
-				    (struct sockaddr *)addr,
-				    addrlen)));
+				    (struct sockaddr *)addr, addrlen)));
 				dprintso(so, 0, ("%s\n",
-				    pr_addr(so->so_family, so->so_faddr_sa,
-				    so->so_faddr_len)));
+				    pr_addr(so->so_family, sti->sti_faddr_sa,
+				    sti->sti_faddr_len)));
 #endif /* DEBUG */
 				mutex_exit(&so->so_lock);
 				freemsg(mp);
@@ -2545,8 +2561,8 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		}
 		/*
 		 * If the application asked for delayed errors
-		 * record the T_UDERROR_IND so_eaddr_mp and the reason in
-		 * so_delayed_error for delayed error posting. If the reason
+		 * record the T_UDERROR_IND sti_eaddr_mp and the reason in
+		 * sti_delayed_error for delayed error posting. If the reason
 		 * is zero use ECONNRESET.
 		 * Note that delayed error indications do not make sense for
 		 * AF_UNIX sockets since sendto checks that the destination
@@ -2557,15 +2573,15 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			freemsg(mp);
 			return (NULL);
 		}
-		if (so->so_eaddr_mp != NULL)
-			freemsg(so->so_eaddr_mp);
+		if (sti->sti_eaddr_mp != NULL)
+			freemsg(sti->sti_eaddr_mp);
 
-		so->so_eaddr_mp = mp;
+		sti->sti_eaddr_mp = mp;
 		if (tudi->ERROR_type != 0)
 			error = tudi->ERROR_type;
 		else
 			error = ECONNRESET;
-		so->so_delayed_error = (ushort_t)error;
+		sti->sti_delayed_error = (ushort_t)error;
 		mutex_exit(&so->so_lock);
 		return (NULL);
 	}
@@ -2700,8 +2716,10 @@ strsock_misc(vnode_t *vp, mblk_t *mp,
 		strsigset_t *allmsgsigs, strpollset_t *pollwakeups)
 {
 	struct sonode *so;
+	sotpi_info_t *sti;
 
 	so = VTOSO(vp);
+	sti = SOTOTPI(so);
 
 	dprintso(so, 1, ("strsock_misc(%p, %p, 0x%x)\n",
 	    (void *)vp, (void *)mp, DB_TYPE(mp)));
@@ -2724,15 +2742,14 @@ strsock_misc(vnode_t *vp, mblk_t *mp,
 			mutex_enter(&so->so_lock);
 			dprintso(so, 1,
 			    ("SIGURG(%p): counts %d/%d state %s\n",
-			    (void *)vp, so->so_oobsigcnt,
-			    so->so_oobcnt,
+			    (void *)vp, sti->sti_oobsigcnt, sti->sti_oobcnt,
 			    pr_state(so->so_state, so->so_mode)));
 			so_oob_sig(so, 1, allmsgsigs, pollwakeups);
 			dprintso(so, 1,
 			    ("after SIGURG(%p): counts %d/%d "
 			    " poll 0x%x sig 0x%x state %s\n",
-			    (void *)vp, so->so_oobsigcnt,
-			    so->so_oobcnt, *pollwakeups, *allmsgsigs,
+			    (void *)vp, sti->sti_oobsigcnt, sti->sti_oobcnt,
+			    *pollwakeups, *allmsgsigs,
 			    pr_state(so->so_state, so->so_mode)));
 			mutex_exit(&so->so_lock);
 		}
@@ -2873,53 +2890,118 @@ bad:
 	return (error);
 }
 
+/*
+ * Wrapper for getmsg. If the socket has been converted to a stream
+ * pass the request to the stream head.
+ */
+int
+sock_getmsg(
+	struct vnode *vp,
+	struct strbuf *mctl,
+	struct strbuf *mdata,
+	uchar_t *prip,
+	int *flagsp,
+	int fmode,
+	rval_t *rvp
+)
+{
+	struct sonode *so;
 
+	ASSERT(vp->v_type == VSOCK);
+	/*
+	 * Use the stream head to find the real socket vnode.
+	 * This is needed when namefs sits above sockfs.  Some
+	 * sockets (like SCTP) are not streams.
+	 */
+	if (!vp->v_stream) {
+		return (ENOSTR);
+	}
+	ASSERT(vp->v_stream->sd_vnode);
+	vp = vp->v_stream->sd_vnode;
+	ASSERT(vn_matchops(vp, socket_vnodeops));
+	so = VTOSO(vp);
+
+	dprintso(so, 1, ("sock_getmsg(%p) %s\n",
+	    (void *)so, pr_state(so->so_state, so->so_mode)));
+
+	if (so->so_version == SOV_STREAM) {
+		/* The imaginary "sockmod" has been popped - act as a stream */
+		return (strgetmsg(vp, mctl, mdata, prip, flagsp, fmode, rvp));
+	}
+	eprintsoline(so, ENOSTR);
+	return (ENOSTR);
+}
 
 /*
- * Translate a TLI(/XTI) error into a system error as best we can.
+ * Wrapper for putmsg. If the socket has been converted to a stream
+ * pass the request to the stream head.
+ *
+ * Note that a while a regular socket (SOV_SOCKSTREAM) does support the
+ * streams ioctl set it does not support putmsg and getmsg.
+ * Allowing putmsg would prevent sockfs from tracking the state of
+ * the socket/transport and would also invalidate the locking in sockfs.
  */
-static const int tli_errs[] = {
-		0,		/* no error	*/
-		EADDRNOTAVAIL,  /* TBADADDR	*/
-		ENOPROTOOPT,	/* TBADOPT	*/
-		EACCES,		/* TACCES	*/
-		EBADF,		/* TBADF	*/
-		EADDRNOTAVAIL,	/* TNOADDR	*/
-		EPROTO,		/* TOUTSTATE	*/
-		ECONNABORTED,	/* TBADSEQ	*/
-		0,		/* TSYSERR - will never get	*/
-		EPROTO,		/* TLOOK - should never be sent by transport */
-		EMSGSIZE,	/* TBADDATA	*/
-		EMSGSIZE,	/* TBUFOVFLW	*/
-		EPROTO,		/* TFLOW	*/
-		EWOULDBLOCK,	/* TNODATA	*/
-		EPROTO,		/* TNODIS	*/
-		EPROTO,		/* TNOUDERR	*/
-		EINVAL,		/* TBADFLAG	*/
-		EPROTO,		/* TNOREL	*/
-		EOPNOTSUPP,	/* TNOTSUPPORT	*/
-		EPROTO,		/* TSTATECHNG	*/
-		/* following represent error namespace expansion with XTI */
-		EPROTO,		/* TNOSTRUCTYPE - never sent by transport */
-		EPROTO,		/* TBADNAME - never sent by transport */
-		EPROTO,		/* TBADQLEN - never sent by transport */
-		EADDRINUSE,	/* TADDRBUSY	*/
-		EBADF,		/* TINDOUT	*/
-		EBADF,		/* TPROVMISMATCH */
-		EBADF,		/* TRESQLEN	*/
-		EBADF,		/* TRESADDR	*/
-		EPROTO,		/* TQFULL - never sent by transport */
-		EPROTO,		/* TPROTO	*/
-};
-
-static int
-tlitosyserr(int terr)
+int
+sock_putmsg(
+	struct vnode *vp,
+	struct strbuf *mctl,
+	struct strbuf *mdata,
+	uchar_t pri,
+	int flag,
+	int fmode
+)
 {
-	ASSERT(terr != TSYSERR);
-	if (terr >= (sizeof (tli_errs) / sizeof (tli_errs[0])))
-		return (EPROTO);
+	struct sonode *so;
+
+	ASSERT(vp->v_type == VSOCK);
+	/*
+	 * Use the stream head to find the real socket vnode.
+	 * This is needed when namefs sits above sockfs.
+	 */
+	if (!vp->v_stream) {
+		return (ENOSTR);
+	}
+	ASSERT(vp->v_stream->sd_vnode);
+	vp = vp->v_stream->sd_vnode;
+	ASSERT(vn_matchops(vp, socket_vnodeops));
+	so = VTOSO(vp);
+
+	dprintso(so, 1, ("sock_putmsg(%p) %s\n",
+	    (void *)so, pr_state(so->so_state, so->so_mode)));
+
+	if (so->so_version == SOV_STREAM) {
+		/* The imaginary "sockmod" has been popped - act as a stream */
+		return (strputmsg(vp, mctl, mdata, pri, flag, fmode));
+	}
+	eprintsoline(so, ENOSTR);
+	return (ENOSTR);
+}
+
+/*
+ * Special function called only from f_getfl().
+ * Returns FASYNC if the SS_ASYNC flag is set on a socket, else 0.
+ * No locks are acquired here, so it is safe to use while uf_lock is held.
+ * This exists solely for BSD fcntl() FASYNC compatibility.
+ */
+int
+sock_getfasync(vnode_t *vp)
+{
+	struct sonode *so;
+
+	ASSERT(vp->v_type == VSOCK);
+	/*
+	 * For stream model, v_stream is used; For non-stream, v_stream always
+	 * equals NULL
+	 */
+	if (vp->v_stream != NULL)
+		so = VTOSO(vp->v_stream->sd_vnode);
 	else
-		return (tli_errs[terr]);
+		so = VTOSO(vp);
+
+	if (so->so_version == SOV_STREAM || !(so->so_state & SS_ASYNC))
+		return (0);
+
+	return (FASYNC);
 }
 
 /*

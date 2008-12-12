@@ -284,6 +284,44 @@ repeat:
 	goto repeat;
 }
 
+boolean_t
+ip_addr_exists_v6(const in6_addr_t *addr, zoneid_t zoneid,
+    ip_stack_t *ipst)
+{
+	ipif_t	*ipif;
+	ill_t	*ill;
+	ill_walk_context_t ctx;
+
+	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+
+	ill = ILL_START_WALK_V6(&ctx, ipst);
+	for (; ill != NULL; ill = ill_next(&ctx, ill)) {
+		mutex_enter(&ill->ill_lock);
+		for (ipif = ill->ill_ipif; ipif != NULL;
+		    ipif = ipif->ipif_next) {
+			if (zoneid != ALL_ZONES &&
+			    ipif->ipif_zoneid != zoneid &&
+			    ipif->ipif_zoneid != ALL_ZONES)
+				continue;
+			/* Allow the ipif to be down */
+			if (((IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6lcl_addr,
+			    addr) &&
+			    (ipif->ipif_flags & IPIF_UNNUMBERED) == 0)) ||
+			    ((ipif->ipif_flags & IPIF_POINTOPOINT) &&
+			    IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6pp_dst_addr,
+			    addr))) {
+				mutex_exit(&ill->ill_lock);
+				rw_exit(&ipst->ips_ill_g_lock);
+				return (B_TRUE);
+			}
+		}
+		mutex_exit(&ill->ill_lock);
+	}
+
+	rw_exit(&ipst->ips_ill_g_lock);
+	return (B_FALSE);
+}
+
 /*
  * Look for an ipif with the specified address. For point-point links
  * we look for matches on either the destination address and the local
@@ -2237,7 +2275,6 @@ ipif_select_source_v6(ill_t *dstill, const in6_addr_t *dst,
 	dstinfo.dst_scope = ip_addr_scope_v6(dst);
 	dstinfo.dst_label = ip6_asp_lookup(dst, NULL, ipst);
 	dstinfo.dst_prefer_src_tmp = ((src_prefs & IPV6_PREFER_SRC_TMP) != 0);
-
 	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	/*
 	 * Section three of the I-D states that for multicast and

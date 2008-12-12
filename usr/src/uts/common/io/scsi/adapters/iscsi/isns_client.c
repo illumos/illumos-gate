@@ -1518,7 +1518,11 @@ void
 		struct sockaddr_in6 s_in6;
 	} sa_rsvr = { 0 };
 	void *so;
+	struct sockaddr_in6	t_addr;
+	socklen_t		t_addrlen;
 
+	bzero(&t_addr, sizeof (struct sockaddr_in6));
+	t_addrlen = sizeof (struct sockaddr_in6);
 	if (isns_server_addr->a_addr.i_insize == sizeof (struct in_addr)) {
 		/* IPv4 */
 		sa_rsvr.s_in4.sin_family = AF_INET;
@@ -1555,7 +1559,8 @@ void
 		return (NULL);
 	}
 
-	(void) iscsi_net->getsockname(so);
+	(void) iscsi_net->getsockname(so, (struct sockaddr *)&t_addr,
+	    &t_addrlen);
 
 	return (so);
 }
@@ -2961,6 +2966,8 @@ isns_service_esi_scn(iscsi_thread_t *thread, void *arg)
 	isns_pdu_t *in_pdu;
 	size_t bytes_received, in_pdu_size = 0;
 	uint8_t *lhba_handle;
+	struct sockaddr_in6	 t_addr;
+	socklen_t		t_addrlen;
 	union {
 		struct sockaddr sin;
 		struct sockaddr_in s_in4;
@@ -2978,12 +2985,13 @@ isns_service_esi_scn(iscsi_thread_t *thread, void *arg)
 
 	/* Done using the argument - free it */
 	kmem_free(larg, sizeof (*larg));
+	bzero(&t_addr, sizeof (struct sockaddr_in6));
+	t_addrlen = sizeof (struct sockaddr_in6);
 
-	if (((struct sonode *)listening_so)->so_laddr.soa_len <=
-	    sizeof (local_conn_prop)) {
-		bcopy(((struct sonode *)listening_so)->so_laddr.soa_sa,
-		    &local_conn_prop,
-		    ((struct sonode *)listening_so)->so_laddr.soa_len);
+	(void) iscsi_net->getsockname(listening_so,
+	    (struct sockaddr *)&t_addr, &t_addrlen);
+	if (t_addrlen <= sizeof (local_conn_prop)) {
+		bcopy(&t_addr, &local_conn_prop, t_addrlen);
 	}
 
 	if (iscsi_net->listen(listening_so, 5) < 0) {
@@ -2999,8 +3007,7 @@ isns_service_esi_scn(iscsi_thread_t *thread, void *arg)
 
 		/* Blocking call */
 		connecting_so = iscsi_net->accept(
-		    (struct sonode *)listening_so,
-		    &clnt_addr.sin, &clnt_len);
+		    listening_so, &clnt_addr.sin, &clnt_len);
 
 		mutex_enter(&esi_scn_thr_mutex);
 		if (esi_scn_thr_to_shutdown == B_TRUE) {
@@ -3092,10 +3099,14 @@ find_local_portal(iscsi_addr_t *isns_server_addr,
 		struct sockaddr_in6 s_in6;
 	} serv_addr = { 0 };
 	void *so;
+	struct sockaddr_in6	t_addr;
+	socklen_t		t_addrlen;
 
 	*local_addr = NULL;
 	*listening_so = NULL;
 
+	bzero(&t_addr, sizeof (struct sockaddr_in6));
+	t_addrlen = sizeof (struct sockaddr_in6);
 	/*
 	 * Determine the local IP address.
 	 */
@@ -3104,16 +3115,14 @@ find_local_portal(iscsi_addr_t *isns_server_addr,
 		return (B_FALSE);
 	}
 
-	if (((struct sonode *)so)->so_laddr.soa_len >
-	    sizeof (local_conn_prop)) {
+	iscsi_net->getsockname(so, (struct sockaddr *)&t_addr, &t_addrlen);
+	if (t_addrlen > sizeof (local_conn_prop)) {
 		iscsi_net->close(so);
 		return (B_FALSE);
 	}
 
-	bcopy(((struct sonode *)so)->so_laddr.soa_sa,
-	    &local_conn_prop,
-	    ((struct sonode *)so)->so_laddr.soa_len);
-
+	bcopy(&t_addr, &local_conn_prop, t_addrlen);
+	t_addrlen = sizeof (struct sockaddr_in6);
 	if (local_conn_prop.soa4.sin_family == AF_INET) {
 		*local_addr = (iscsi_addr_t *)kmem_zalloc(sizeof (iscsi_addr_t),
 		    KM_SLEEP);
@@ -3160,11 +3169,10 @@ find_local_portal(iscsi_addr_t *isns_server_addr,
 		return (B_FALSE);
 	}
 
-	if (((struct sonode *)so)->so_laddr.soa_len <=
-	    sizeof (local_conn_prop)) {
-		bcopy(((struct sonode *)so)->so_laddr.soa_sa,
-		    &local_conn_prop,
-		    ((struct sonode *)so)->so_laddr.soa_len);
+	(void) iscsi_net->getsockname(so, (struct sockaddr *)&t_addr,
+	    &t_addrlen);
+	if (t_addrlen <= sizeof (local_conn_prop)) {
+		bcopy(&t_addr, &local_conn_prop, t_addrlen);
 		(*local_addr)->a_port = ntohs(local_conn_prop.soa4.sin_port);
 	} else {
 		(*local_addr)->a_port = ISNS_DEFAULT_ESI_SCN_PORT;

@@ -286,7 +286,6 @@ static void outer_insert(syncq_t *, syncq_t *);
 static void outer_remove(syncq_t *, syncq_t *);
 static void write_now(syncq_t *);
 static void clr_qfull(queue_t *);
-static void enable_svc(queue_t *);
 static void runbufcalls(void);
 static void sqenable(syncq_t *);
 static void sqfill_events(syncq_t *, queue_t *, mblk_t *, void (*)());
@@ -8398,6 +8397,21 @@ mblk_setcred(mblk_t *mp, cred_t *cr)
 		crhold(mp->b_datap->db_credp = cr);
 		if (ocr != NULL)
 			crfree(ocr);
+	}
+}
+
+/*
+ * Set the cred and pid for each mblk in the message. It is assumed that
+ * the message passed in does not already have a cred.
+ */
+void
+msg_setcredpid(mblk_t *mp, cred_t *cr, pid_t pid)
+{
+	while (mp != NULL) {
+		ASSERT(DB_CRED(mp) == NULL);
+		mblk_setcred(mp, cr);
+		DB_CPID(mp) = pid;
+		mp = mp->b_cont;
 	}
 }
 

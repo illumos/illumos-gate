@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>
@@ -59,6 +57,7 @@
 #include <sys/cpc_pcbe.h>
 #include <sys/kstat.h>
 #include <sys/fs/sdev_node.h>
+#include <sys/socketvar.h>
 #include <sys/kiconv.h>
 
 extern int moddebug;
@@ -183,6 +182,17 @@ static int mod_removestrmod(struct modlstrmod *, struct modlinkage *);
 
 struct mod_ops mod_strmodops = {
 	mod_installstrmod, mod_removestrmod, mod_infostrmod
+};
+
+/*
+ * Socket modules.
+ */
+static int mod_infosockmod(struct modlsockmod *, struct modlinkage *, int *);
+static int mod_installsockmod(struct modlsockmod *, struct modlinkage *);
+static int mod_removesockmod(struct modlsockmod *, struct modlinkage *);
+
+struct mod_ops mod_sockmodops = {
+	mod_installsockmod, mod_removesockmod, mod_infosockmod
 };
 
 /*
@@ -1175,6 +1185,59 @@ mod_removestrmod(struct modlstrmod *modl, struct modlinkage *modlp)
 		return (EBUSY);
 
 	return (fmodsw_unregister(modl->strmod_fmodsw->f_name));
+}
+
+/*
+ * Get status of a socket module.
+ */
+/*ARGSUSED*/
+static int
+mod_infosockmod(struct modlsockmod *modl, struct modlinkage *modlp, int *p0)
+{
+	*p0 = -1;	/* no useful info */
+	return (0);
+}
+
+/*
+ * Install a socket module.
+ */
+/*ARGSUSED*/
+static int
+mod_installsockmod(struct modlsockmod *modl, struct modlinkage *modlp)
+{
+	struct modctl *mcp;
+	char *mod_name;
+
+	mcp = mod_getctl(modlp);
+	ASSERT(mcp != NULL);
+	mod_name = mcp->mod_modname;
+	if (strcmp(mod_name, modl->sockmod_reg_info->smod_name) != 0) {
+#ifdef DEBUG
+		cmn_err(CE_CONT, "mod_installsockmod: different names"
+		    " %s != %s \n", mod_name,
+		    modl->sockmod_reg_info->smod_name);
+#endif
+		return (EINVAL);
+	}
+
+	/*
+	 * Register module.
+	 */
+	return (smod_register(modl->sockmod_reg_info));
+}
+
+/*
+ * Remove a socket module.
+ */
+/*ARGSUSED*/
+static int
+mod_removesockmod(struct modlsockmod *modl, struct modlinkage *modlp)
+{
+	/*
+	 * unregister from the global socket creation table
+	 * check the refcnt in the lookup table
+	 */
+	return (smod_unregister(modl->sockmod_reg_info->smod_name));
 }
 
 /*

@@ -293,9 +293,9 @@ smb_com_negotiate(smb_request_t *sr)
 
 	switch (dialect) {
 	case PC_NETWORK_PROGRAM_1_0:	/* core */
-		(void) sosetsockopt(sr->session->sock, SOL_SOCKET, SO_RCVBUF,
-		    (const void *)&smb_dos_tcp_rcvbuf,
-		    sizeof (smb_dos_tcp_rcvbuf));
+		(void) ksocket_setsockopt(sr->session->sock, SOL_SOCKET,
+		    SO_RCVBUF, (const void *)&smb_dos_tcp_rcvbuf,
+		    sizeof (smb_dos_tcp_rcvbuf), CRED());
 		rc = smbsr_encode_result(sr, 1, 0, "bww", 1, sel_pos, 0);
 		break;
 
@@ -306,9 +306,9 @@ smb_com_negotiate(smb_request_t *sr)
 	case LANMAN1_0:
 	case LM1_2X002:
 	case DOS_LM1_2X002:
-		(void) sosetsockopt(sr->session->sock, SOL_SOCKET, SO_RCVBUF,
-		    (const void *)&smb_dos_tcp_rcvbuf,
-		    sizeof (smb_dos_tcp_rcvbuf));
+		(void) ksocket_setsockopt(sr->session->sock, SOL_SOCKET,
+		    SO_RCVBUF, (const void *)&smb_dos_tcp_rcvbuf,
+		    sizeof (smb_dos_tcp_rcvbuf), CRED());
 		sr->smb_flg |= SMB_FLAGS_LOCK_AND_READ_OK;
 		rc = smbsr_encode_result(sr, 13, VAR_BCC,
 		    "bwwwwwwlYww2.w#c",
@@ -331,9 +331,9 @@ smb_com_negotiate(smb_request_t *sr)
 
 	case DOS_LANMAN2_1:
 	case LANMAN2_1:
-		(void) sosetsockopt(sr->session->sock, SOL_SOCKET, SO_RCVBUF,
-		    (const void *)&smb_dos_tcp_rcvbuf,
-		    sizeof (smb_dos_tcp_rcvbuf));
+		(void) ksocket_setsockopt(sr->session->sock, SOL_SOCKET,
+		    SO_RCVBUF, (const void *)&smb_dos_tcp_rcvbuf,
+		    sizeof (smb_dos_tcp_rcvbuf), CRED());
 		sr->smb_flg |= SMB_FLAGS_LOCK_AND_READ_OK;
 		rc = smbsr_encode_result(sr, 13, VAR_BCC,
 		    "bwwwwwwlYww2.w#cs",
@@ -356,9 +356,9 @@ smb_com_negotiate(smb_request_t *sr)
 		break;
 
 	case NT_LM_0_12:
-		(void) sosetsockopt(sr->session->sock, SOL_SOCKET, SO_RCVBUF,
-		    (const void *)&smb_nt_tcp_rcvbuf,
-		    sizeof (smb_nt_tcp_rcvbuf));
+		(void) ksocket_setsockopt(sr->session->sock, SOL_SOCKET,
+		    SO_RCVBUF, (const void *)&smb_nt_tcp_rcvbuf,
+		    sizeof (smb_nt_tcp_rcvbuf), CRED());
 		capabilities = CAP_LARGE_FILES
 		    | CAP_NT_SMBS
 		    | CAP_STATUS32

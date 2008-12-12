@@ -24,8 +24,6 @@
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <inet/common.h>	/* for various inet/mi.h and inet/nd.h needs */
 #include <sys/stream.h>
@@ -46,6 +44,9 @@
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/kobj.h>
+#include <sys/stropts.h>
+#include <sys/strsubr.h>
+#include <inet/proto_set.h>
 
 #define	ISDIGIT(ch)	((ch) >= '0' && (ch) <= '9')
 #define	ISUPPER(ch)	((ch) >= 'A' && (ch) <= 'Z')
@@ -64,7 +65,7 @@
  * allocation strategy is changed.
  */
 
-typedef	struct stroptions *STROPTP;
+typedef	struct	stroptions *STROPTP;
 typedef union T_primitives *TPRIMP;
 
 /* Timer block states. */
@@ -901,93 +902,6 @@ mi_offset_paramc(mblk_t *mp, size_t offset, size_t len)
 		}
 	}
 	return (NULL);
-}
-
-
-boolean_t
-mi_set_sth_hiwat(queue_t *q, size_t size)
-{
-	MBLKP	mp;
-	STROPTP stropt;
-
-	if (!(mp = allocb(sizeof (*stropt), BPRI_LO)))
-		return (B_FALSE);
-	mp->b_datap->db_type = M_SETOPTS;
-	mp->b_wptr += sizeof (*stropt);
-	stropt = (STROPTP)mp->b_rptr;
-	stropt->so_flags = SO_HIWAT;
-	stropt->so_hiwat = size;
-	putnext(q, mp);
-	return (B_TRUE);
-}
-
-boolean_t
-mi_set_sth_lowat(queue_t *q, size_t size)
-{
-	MBLKP	mp;
-	STROPTP stropt;
-
-	if (!(mp = allocb(sizeof (*stropt), BPRI_LO)))
-		return (B_FALSE);
-	mp->b_datap->db_type = M_SETOPTS;
-	mp->b_wptr += sizeof (*stropt);
-	stropt = (STROPTP)mp->b_rptr;
-	stropt->so_flags = SO_LOWAT;
-	stropt->so_lowat = size;
-	putnext(q, mp);
-	return (B_TRUE);
-}
-
-/* ARGSUSED */
-boolean_t
-mi_set_sth_maxblk(queue_t *q, ssize_t size)
-{
-	MBLKP	mp;
-	STROPTP stropt;
-
-	if (!(mp = allocb(sizeof (*stropt), BPRI_LO)))
-		return (B_FALSE);
-	mp->b_datap->db_type = M_SETOPTS;
-	mp->b_wptr += sizeof (*stropt);
-	stropt = (STROPTP)mp->b_rptr;
-	stropt->so_flags = SO_MAXBLK;
-	stropt->so_maxblk = size;
-	putnext(q, mp);
-	return (B_TRUE);
-}
-
-boolean_t
-mi_set_sth_copyopt(queue_t *q, int copyopt)
-{
-	MBLKP	mp;
-	STROPTP stropt;
-
-	if (!(mp = allocb(sizeof (*stropt), BPRI_LO)))
-		return (B_FALSE);
-	mp->b_datap->db_type = M_SETOPTS;
-	mp->b_wptr += sizeof (*stropt);
-	stropt = (STROPTP)mp->b_rptr;
-	stropt->so_flags = SO_COPYOPT;
-	stropt->so_copyopt = (ushort_t)copyopt;
-	putnext(q, mp);
-	return (B_TRUE);
-}
-
-boolean_t
-mi_set_sth_wroff(queue_t *q, size_t size)
-{
-	MBLKP	mp;
-	STROPTP stropt;
-
-	if (!(mp = allocb(sizeof (*stropt), BPRI_LO)))
-		return (B_FALSE);
-	mp->b_datap->db_type = M_SETOPTS;
-	mp->b_wptr += sizeof (*stropt);
-	stropt = (STROPTP)mp->b_rptr;
-	stropt->so_flags = SO_WROFF;
-	stropt->so_wroff = (ushort_t)size;
-	putnext(q, mp);
-	return (B_TRUE);
 }
 
 int

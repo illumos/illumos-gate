@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sysmacros.h>
 #include <sys/strsubr.h>
 #include <fs/sockfs/nl7c.h>
 #include <fs/sockfs/nl7curi.h>
+#include <fs/sockfs/socktpi.h>
 
 #include <inet/nca/ncadoorhdr.h>
 #include <inet/nca/ncalogd.h>
@@ -578,7 +577,7 @@ http_date2time_t(char *cp, char *ep)
 		leap--;
 	leap = leap / 4 - leap / 100 + leap / 400 - zeroleap;
 	secs = ((((year - 1970) * 365 + dom[month] + day  - 1 + leap) * 24
-		+ hour) * 60 + min) * 60 + sec;
+	    + hour) * 60 + min) * 60 + sec;
 
 	return (secs);
 }
@@ -1167,7 +1166,7 @@ nl7c_http_cond(uri_desc_t *req, uri_desc_t *res)
 mblk_t *
 nl7c_http_persist(struct sonode *so)
 {
-	uint64_t	flags = so->so_nl7c_flags & NL7C_SCHEMEPRIV;
+	uint64_t	flags = SOTOTPI(so)->sti_nl7c_flags & NL7C_SCHEMEPRIV;
 	mblk_t		*mp;
 
 	if (flags & HTTP_CONN_CL)
@@ -1187,6 +1186,7 @@ nl7c_http_persist(struct sonode *so)
 boolean_t
 nl7c_http_request(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
 	http_t	*http = kmem_cache_alloc(http_kmc, KM_SLEEP);
 	char	*cp = *cpp;
 	char	*hp;
@@ -1429,20 +1429,20 @@ done:
 	 *
 	 */
 	if (persist)
-		so->so_nl7c_flags |= NL7C_SOPERSIST;
+		sti->sti_nl7c_flags |= NL7C_SOPERSIST;
 	else
-		so->so_nl7c_flags &= ~NL7C_SOPERSIST;
+		sti->sti_nl7c_flags &= ~NL7C_SOPERSIST;
 
 	if (http->major == 1) {
-		so->so_nl7c_flags &= ~NL7C_SCHEMEPRIV;
+		sti->sti_nl7c_flags &= ~NL7C_SCHEMEPRIV;
 		if (http->minor >= 1) {
 			if (! persist)
-				so->so_nl7c_flags |= HTTP_CONN_CL;
+				sti->sti_nl7c_flags |= HTTP_CONN_CL;
 		} else {
 			if (persist)
-				so->so_nl7c_flags |= HTTP_CONN_KA;
+				sti->sti_nl7c_flags |= HTTP_CONN_KA;
 			else
-				so->so_nl7c_flags |= HTTP_CONN_CL;
+				sti->sti_nl7c_flags |= HTTP_CONN_CL;
 		}
 	}
 	/*
@@ -1464,6 +1464,7 @@ more:
 boolean_t
 nl7c_http_response(char **cpp, char *ep, uri_desc_t *uri, struct sonode *so)
 {
+	sotpi_info_t *sti = SOTOTPI(so);
 	http_t	*http = uri->scheme;
 	char	*cp = *cpp;
 	char	*hp;
@@ -1753,20 +1754,20 @@ done:
 
 	/* Set socket persist state */
 	if (persist)
-		so->so_nl7c_flags |= NL7C_SOPERSIST;
+		sti->sti_nl7c_flags |= NL7C_SOPERSIST;
 	else
-		so->so_nl7c_flags &= ~NL7C_SOPERSIST;
+		sti->sti_nl7c_flags &= ~NL7C_SOPERSIST;
 
 	if (http->major == 1) {
-		so->so_nl7c_flags &= ~NL7C_SCHEMEPRIV;
+		sti->sti_nl7c_flags &= ~NL7C_SCHEMEPRIV;
 		if (http->minor >= 1) {
 			if (! persist)
-				so->so_nl7c_flags |= HTTP_CONN_CL;
+				sti->sti_nl7c_flags |= HTTP_CONN_CL;
 		} else {
 			if (persist)
-				so->so_nl7c_flags |= HTTP_CONN_KA;
+				sti->sti_nl7c_flags |= HTTP_CONN_KA;
 			else
-				so->so_nl7c_flags |= HTTP_CONN_CL;
+				sti->sti_nl7c_flags |= HTTP_CONN_CL;
 		}
 	}
 

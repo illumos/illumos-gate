@@ -565,6 +565,7 @@ MISC_KMODS	+= kcf
 MISC_KMODS	+= kgssapi
 MISC_KMODS	+= kmech_dummy
 MISC_KMODS	+= kmech_krb5
+MISC_KMODS	+= ksocket
 MISC_KMODS	+= mac
 MISC_KMODS	+= mixer
 MISC_KMODS	+= net80211
@@ -683,6 +684,12 @@ MAC_KMODS	+= mac_ib
 # 'Devname' Modules (kernel/devname)
 #
 DEVNAME_KMODS	+= sdev_nsconfig_mod
+
+#
+# socketmod (kernel/socketmod)
+#
+SOCKET_KMODS	+= socksctp
+SOCKET_KMODS    += socksdp
 
 #
 #	kiconv modules (/kernel/kiconv):

@@ -64,7 +64,10 @@
 #include <vm/seg.h>
 #include <vm/seg_map.h>
 #include <vm/seg_kpm.h>
+
 #include <fs/sockfs/nl7c.h>
+#include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/socktpi.h>
 
 #ifdef SOCK_TEST
 int do_useracc = 1;		/* Controlled by setting SO_DEBUG to 4 */
@@ -90,115 +93,39 @@ extern int xnet_truncate_print;
  * devpath for the kernel to use.
  */
 int
-so_socket(int domain, int type, int protocol, char *devpath, int version)
+so_socket(int family, int type, int protocol, char *devpath, int version)
 {
-	vnode_t *accessvp;
 	struct sonode *so;
 	vnode_t *vp;
 	struct file *fp;
 	int fd;
 	int error;
-	boolean_t wildcard = B_FALSE;
-	int saved_error = 0;
-	int sdomain = domain;
 
-	dprint(1, ("so_socket(%d,%d,%d,%p,%d)\n",
-	    domain, type, protocol, (void *)devpath, version));
+	if (devpath != NULL) {
+		char *buf;
+		size_t kdevpathlen = 0;
 
-	if (domain == AF_NCA) {
-		/*
-		 * The request is for an NCA socket so for NL7C use the
-		 * INET domain instead and mark NL7C_AF_NCA below.
-		 */
-		domain = AF_INET;
-		/*
-		 * NL7C is not supported in non-global zones,
-		 *  we enforce this restriction here.
-		 */
-		if (getzoneid() != GLOBAL_ZONEID) {
-			return (set_errno(ENOTSUP));
-		}
-	}
-
-	accessvp = solookup(domain, type, protocol, devpath, &error);
-	if (accessvp == NULL) {
-		/*
-		 * If there is either an EPROTONOSUPPORT or EPROTOTYPE error
-		 * it makes sense doing the wildcard lookup since the
-		 * protocol might not be in the table.
-		 */
-		if (devpath != NULL || protocol == 0 ||
-		    !(error == EPROTONOSUPPORT || error == EPROTOTYPE))
-			return (set_errno(error));
-
-		saved_error = error;
-
-		/*
-		 * Try wildcard lookup. Never use devpath for wildcards.
-		 */
-		accessvp = solookup(domain, type, 0, NULL, &error);
-		if (accessvp == NULL) {
-			/*
-			 * Can't find in kernel table - have library
-			 * fall back to /etc/netconfig and tell us
-			 * the devpath (The library will do this if it didn't
-			 * already pass in a devpath).
-			 */
-			if (saved_error != 0)
-				error = saved_error;
+		buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		if ((error = copyinstr(devpath, buf,
+		    MAXPATHLEN, &kdevpathlen)) != 0) {
+			kmem_free(buf, MAXPATHLEN);
 			return (set_errno(error));
 		}
-		wildcard = B_TRUE;
-	}
-
-	/* Check the device policy */
-	if ((error = secpolicy_spec_open(CRED(),
-	    accessvp, FREAD|FWRITE)) != 0) {
-		return (set_errno(error));
-	}
-
-	if (protocol == IPPROTO_SCTP) {
-		so = sosctp_create(accessvp, domain, type, protocol, version,
-		    NULL, &error);
-	} else if (protocol == PROTO_SDP) {
-		so = sosdp_create(accessvp, domain, type, protocol, version,
-		    NULL, &error);
+		so = socket_create(family, type, protocol, buf, NULL,
+		    SOCKET_SLEEP, version, CRED(), &error);
+		kmem_free(buf, MAXPATHLEN);
 	} else {
-		so = sotpi_create(accessvp, domain, type, protocol, version,
-		    NULL, &error);
+		so = socket_create(family, type, protocol, NULL, NULL,
+		    SOCKET_SLEEP, version, CRED(), &error);
 	}
-	if (so == NULL) {
+	if (so == NULL)
 		return (set_errno(error));
-	}
-	if (sdomain == AF_NCA && domain == AF_INET) {
-		so->so_nl7c_flags = NL7C_AF_NCA;
-	}
-	vp = SOTOV(so);
 
-	if (wildcard) {
-		/*
-		 * Issue SO_PROTOTYPE setsockopt.
-		 */
-		error = SOP_SETSOCKOPT(so, SOL_SOCKET, SO_PROTOTYPE,
-		    &protocol,
-		    (t_uscalar_t)sizeof (protocol));
-		if (error) {
-			(void) VOP_CLOSE(vp, 0, 1, 0, CRED(), NULL);
-			VN_RELE(vp);
-			/*
-			 * Setsockopt often fails with ENOPROTOOPT but socket()
-			 * should fail with EPROTONOSUPPORT/EPROTOTYPE.
-			 */
-			if (saved_error != 0 && error == ENOPROTOOPT)
-				error = saved_error;
-			else
-				error = EPROTONOSUPPORT;
-			return (set_errno(error));
-		}
-	}
+	/* Allocate a file descriptor for the socket */
+	vp = SOTOV(so);
 	if (error = falloc(vp, FWRITE|FREAD, &fp, &fd)) {
-		(void) VOP_CLOSE(vp, 0, 1, 0, CRED(), NULL);
-		VN_RELE(vp);
+		(void) socket_close(so, 0, CRED());
+		socket_destroy(so);
 		return (set_errno(error));
 	}
 
@@ -402,6 +329,8 @@ so_socketpair(int sv[2])
 	int error;
 	struct sockaddr_ux *name;
 	size_t namelen;
+	sotpi_info_t *sti1;
+	sotpi_info_t *sti2;
 
 	dprint(1, ("so_socketpair(%p)\n", (void *)sv));
 
@@ -425,6 +354,9 @@ so_socketpair(int sv[2])
 		goto done;
 	}
 
+	sti1 = SOTOTPI(so1);
+	sti2 = SOTOTPI(so2);
+
 	/*
 	 * The code below makes assumptions about the "sockfs" implementation.
 	 * So make sure that the correct implementation is really used.
@@ -437,12 +369,12 @@ so_socketpair(int sv[2])
 		 * Bind both sockets and connect them with each other.
 		 * Need to allocate name/namelen for soconnect.
 		 */
-		error = SOP_BIND(so1, NULL, 0, _SOBIND_UNSPEC);
+		error = socket_bind(so1, NULL, 0, _SOBIND_UNSPEC, CRED());
 		if (error) {
 			eprintsoline(so1, error);
 			goto done;
 		}
-		error = SOP_BIND(so2, NULL, 0, _SOBIND_UNSPEC);
+		error = socket_bind(so2, NULL, 0, _SOBIND_UNSPEC, CRED());
 		if (error) {
 			eprintsoline(so2, error);
 			goto done;
@@ -450,21 +382,21 @@ so_socketpair(int sv[2])
 		namelen = sizeof (struct sockaddr_ux);
 		name = kmem_alloc(namelen, KM_SLEEP);
 		name->sou_family = AF_UNIX;
-		name->sou_addr = so2->so_ux_laddr;
-		error = SOP_CONNECT(so1,
+		name->sou_addr = sti2->sti_ux_laddr;
+		error = socket_connect(so1,
 		    (struct sockaddr *)name,
 		    (socklen_t)namelen,
-		    0, _SOCONNECT_NOXLATE);
+		    0, _SOCONNECT_NOXLATE, CRED());
 		if (error) {
 			kmem_free(name, namelen);
 			eprintsoline(so1, error);
 			goto done;
 		}
-		name->sou_addr = so1->so_ux_laddr;
-		error = SOP_CONNECT(so2,
+		name->sou_addr = sti1->sti_ux_laddr;
+		error = socket_connect(so2,
 		    (struct sockaddr *)name,
 		    (socklen_t)namelen,
-		    0, _SOCONNECT_NOXLATE);
+		    0, _SOCONNECT_NOXLATE, CRED());
 		kmem_free(name, namelen);
 		if (error) {
 			eprintsoline(so2, error);
@@ -487,17 +419,18 @@ so_socketpair(int sv[2])
 		int nfd;
 
 		/*
-		 * We could simply call SOP_LISTEN() here (which would do the
+		 * We could simply call socket_listen() here (which would do the
 		 * binding automatically) if the code didn't rely on passing
-		 * _SOBIND_NOXLATE to the TPI implementation of SOP_BIND().
+		 * _SOBIND_NOXLATE to the TPI implementation of socket_bind().
 		 */
-		error = SOP_BIND(so1, NULL, 0, _SOBIND_UNSPEC|_SOBIND_NOXLATE|
-		    _SOBIND_LISTEN|_SOBIND_SOCKETPAIR);
+		error = socket_bind(so1, NULL, 0, _SOBIND_UNSPEC|
+		    _SOBIND_NOXLATE|_SOBIND_LISTEN|_SOBIND_SOCKETPAIR,
+		    CRED());
 		if (error) {
 			eprintsoline(so1, error);
 			goto done;
 		}
-		error = SOP_BIND(so2, NULL, 0, _SOBIND_UNSPEC);
+		error = socket_bind(so2, NULL, 0, _SOBIND_UNSPEC, CRED());
 		if (error) {
 			eprintsoline(so2, error);
 			goto done;
@@ -506,20 +439,19 @@ so_socketpair(int sv[2])
 		namelen = sizeof (struct sockaddr_ux);
 		name = kmem_alloc(namelen, KM_SLEEP);
 		name->sou_family = AF_UNIX;
-		name->sou_addr = so1->so_ux_laddr;
-		error = SOP_CONNECT(so2,
+		name->sou_addr = sti1->sti_ux_laddr;
+		error = socket_connect(so2,
 		    (struct sockaddr *)name,
 		    (socklen_t)namelen,
-		    FNONBLOCK, _SOCONNECT_NOXLATE);
+		    FNONBLOCK, _SOCONNECT_NOXLATE, CRED());
 		kmem_free(name, namelen);
 		if (error) {
 			if (error != EINPROGRESS) {
-				eprintsoline(so2, error);
-				goto done;
+				eprintsoline(so2, error); goto done;
 			}
 		}
 
-		error = SOP_ACCEPT(so1, 0, &nso);
+		error = socket_accept(so1, 0, CRED(), &nso);
 		if (error) {
 			eprintsoline(so1, error);
 			goto done;
@@ -529,17 +461,17 @@ so_socketpair(int sv[2])
 		mutex_enter(&so2->so_lock);
 		error = sowaitconnected(so2, 0, 1);
 		mutex_exit(&so2->so_lock);
-		nvp = SOTOV(nso);
 		if (error != 0) {
-			(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
-			VN_RELE(nvp);
+			(void) socket_close(nso, 0, CRED());
+			socket_destroy(nso);
 			eprintsoline(so2, error);
 			goto done;
 		}
 
+		nvp = SOTOV(nso);
 		if (error = falloc(nvp, FWRITE|FREAD, &nfp, &nfd)) {
-			(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
-			VN_RELE(nvp);
+			(void) socket_close(nso, 0, CRED());
+			socket_destroy(nso);
 			eprintsoline(nso, error);
 			goto done;
 		}
@@ -603,13 +535,13 @@ bind(int sock, struct sockaddr *name, socklen_t namelen, int version)
 
 	switch (version) {
 	default:
-		error = SOP_BIND(so, name, namelen, 0);
+		error = socket_bind(so, name, namelen, 0, CRED());
 		break;
 	case SOV_XPG4_2:
-		error = SOP_BIND(so, name, namelen, _SOBIND_XPG4_2);
+		error = socket_bind(so, name, namelen, _SOBIND_XPG4_2, CRED());
 		break;
 	case SOV_SOCKBSD:
-		error = SOP_BIND(so, name, namelen, _SOBIND_SOCKBSD);
+		error = socket_bind(so, name, namelen, _SOBIND_SOCKBSD, CRED());
 		break;
 	}
 done:
@@ -635,7 +567,7 @@ listen(int sock, int backlog, int version)
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		return (set_errno(error));
 
-	error = SOP_LISTEN(so, backlog);
+	error = socket_listen(so, backlog, CRED());
 
 	releasef(sock);
 	if (error)
@@ -655,6 +587,8 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	struct vnode *nvp;
 	struct file *nfp;
 	int nfd;
+	struct sockaddr *addrp;
+	socklen_t addrlen;
 
 	dprint(1, ("accept(%d, %p, %p)\n",
 	    sock, (void *)name, (void *)namelenp));
@@ -681,15 +615,15 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	}
 
 	/*
-	 * Allocate the user fd before SOP_ACCEPT() in order to
-	 * catch EMFILE errors before calling SOP_ACCEPT().
+	 * Allocate the user fd before socket_accept() in order to
+	 * catch EMFILE errors before calling socket_accept().
 	 */
 	if ((nfd = ufalloc(0)) == -1) {
 		eprintsoline(so, EMFILE);
 		releasef(sock);
 		return (set_errno(EMFILE));
 	}
-	error = SOP_ACCEPT(so, fp->f_flag, &nso);
+	error = socket_accept(so, fp->f_flag, CRED(), &nso);
 	releasef(sock);
 	if (error) {
 		setf(nfd, NULL);
@@ -698,34 +632,32 @@ accept(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 
 	nvp = SOTOV(nso);
 
-	/*
-	 * so_faddr_sa can not go away even though we are not holding so_lock.
-	 * However, in theory its content could change from underneath us.
-	 * But this is not possible in practice since it can only
-	 * change due to either some socket system call
-	 * or due to a T_CONN_CON being received from the stream head.
-	 * Since the falloc/setf have not yet been done no thread
-	 * can do any system call on nso and T_CONN_CON can not arrive
-	 * on a socket that is already connected.
-	 * Thus there is no reason to hold so_lock here.
-	 *
-	 * SOP_ACCEPT() is required to have set the valid bit for the faddr,
-	 * but it could be instantly cleared by a disconnect from the transport.
-	 * For that reason we ignore it here.
-	 */
 	ASSERT(MUTEX_NOT_HELD(&nso->so_lock));
-	error = copyout_name(name, namelen, namelenp,
-	    nso->so_faddr_sa, (socklen_t)nso->so_faddr_len);
+	if (namelen != 0) {
+		addrlen = so->so_max_addr_len;
+		addrp = (struct sockaddr *)kmem_alloc(addrlen, KM_SLEEP);
+
+		if ((error = socket_getpeername(nso, (struct sockaddr *)addrp,
+		    &addrlen, B_TRUE, CRED())) == 0) {
+			error = copyout_name(name, namelen, namelenp,
+			    addrp, addrlen);
+		} else {
+			ASSERT(error == EINVAL || error == ENOTCONN);
+			error = ECONNABORTED;
+		}
+		kmem_free(addrp, so->so_max_addr_len);
+	}
+
 	if (error) {
 		setf(nfd, NULL);
-		(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
-		VN_RELE(nvp);
+		(void) socket_close(nso, 0, CRED());
+		socket_destroy(nso);
 		return (set_errno(error));
 	}
 	if (error = falloc(NULL, FWRITE|FREAD, &nfp, NULL)) {
 		setf(nfd, NULL);
-		(void) VOP_CLOSE(nvp, 0, 1, 0, CRED(), NULL);
-		VN_RELE(nvp);
+		(void) socket_close(nso, 0, CRED());
+		socket_destroy(nso);
 		eprintsoline(so, error);
 		return (set_errno(error));
 	}
@@ -790,8 +722,8 @@ connect(int sock, struct sockaddr *name, socklen_t namelen, int version)
 	} else
 		name = NULL;
 
-	error = SOP_CONNECT(so, name, namelen, fp->f_flag,
-	    (version != SOV_XPG4_2) ? 0 : _SOCONNECT_XPG4_2);
+	error = socket_connect(so, name, namelen, fp->f_flag,
+	    (version != SOV_XPG4_2) ? 0 : _SOCONNECT_XPG4_2, CRED());
 	releasef(sock);
 	if (name)
 		kmem_free(name, (size_t)namelen);
@@ -813,7 +745,7 @@ shutdown(int sock, int how, int version)
 	if ((so = getsonode(sock, &error, NULL)) == NULL)
 		return (set_errno(error));
 
-	error = SOP_SHUTDOWN(so, how);
+	error = socket_shutdown(so, how, CRED());
 
 	releasef(sock);
 	if (error)
@@ -857,13 +789,12 @@ recvit(int sock,
 	msg->msg_flags = flags & (MSG_OOB | MSG_PEEK | MSG_WAITALL |
 	    MSG_DONTWAIT | MSG_XPG4_2);
 
-	error = SOP_RECVMSG(so, msg, uiop);
+	error = socket_recvmsg(so, msg, uiop, CRED());
 	if (error) {
 		releasef(sock);
 		return (set_errno(error));
 	}
 	lwp_stat_update(LWP_STAT_MSGRCV, 1);
-	so_update_attrs(so, SOACC);
 	releasef(sock);
 
 	error = copyout_name(name, namelen, namelenp,
@@ -1198,7 +1129,7 @@ sendit(int sock, struct nmsghdr *msg, struct uio *uiop, int flags)
 	len = uiop->uio_resid;
 	msg->msg_flags = flags;
 
-	error = SOP_SENDMSG(so, msg, uiop);
+	error = socket_sendmsg(so, msg, uiop, CRED());
 done1:
 	if (control != NULL)
 		kmem_free(control, controllen);
@@ -1211,7 +1142,6 @@ done3:
 		return (set_errno(error));
 	}
 	lwp_stat_update(LWP_STAT_MSGSND, 1);
-	so_update_attrs(so, SOMOD);
 	releasef(sock);
 	return (len - uiop->uio_resid);
 }
@@ -1413,12 +1343,8 @@ getpeername(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 	struct sonode *so;
 	int error;
 	socklen_t namelen;
-	union {
-		struct sockaddr_in sin;
-		struct sockaddr_in6 sin6;
-	} sin;			/* Temporary buffer, common case */
-	void *addr;		/* Temporary buffer, uncommon case */
-	socklen_t addrlen, size;
+	socklen_t sock_addrlen;
+	struct sockaddr *sock_addrp;
 
 	dprint(1, ("getpeername(%d, %p, %p)\n",
 	    sock, (void *)name, (void *)namelenp));
@@ -1432,44 +1358,16 @@ getpeername(int sock, struct sockaddr *name, socklen_t *namelenp, int version)
 		error = EFAULT;
 		goto rel_out;
 	}
-	/*
-	 * If a connect or accept has been done, unless we're an Xnet socket,
-	 * the remote address has already been updated in so_faddr_sa.
-	 */
-	if (so->so_version != SOV_SOCKSTREAM && so->so_version != SOV_SOCKBSD ||
-	    !(so->so_state & SS_FADDR_VALID)) {
-		if ((error = SOP_GETPEERNAME(so)) != 0)
-			goto rel_out;
-	}
+	sock_addrlen = so->so_max_addr_len;
+	sock_addrp = (struct sockaddr *)kmem_alloc(sock_addrlen, KM_SLEEP);
 
-	if (so->so_faddr_maxlen <= sizeof (sin)) {
-		size = 0;
-		addr = &sin;
-	} else {
-		/*
-		 * Allocate temporary to avoid holding so_lock across
-		 * copyout
-		 */
-		size = so->so_faddr_maxlen;
-		addr = kmem_alloc(size, KM_SLEEP);
+	if ((error = socket_getpeername(so, sock_addrp, &sock_addrlen,
+	    B_FALSE, CRED())) == 0) {
+		ASSERT(sock_addrlen <= so->so_max_addr_len);
+		error = copyout_name(name, namelen, namelenp,
+		    (void *)sock_addrp, sock_addrlen);
 	}
-	/* Prevent so_faddr_sa/len from changing while accessed */
-	mutex_enter(&so->so_lock);
-	if (!(so->so_state & SS_ISCONNECTED)) {
-		mutex_exit(&so->so_lock);
-		error = ENOTCONN;
-		goto free_out;
-	}
-	addrlen = so->so_faddr_len;
-	bcopy(so->so_faddr_sa, addr, addrlen);
-	mutex_exit(&so->so_lock);
-
-	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
-	error = copyout_name(name, namelen, namelenp, addr,
-	    (so->so_state & SS_FADDR_NOXLATE) ? 0 : addrlen);
-free_out:
-	if (size != 0)
-		kmem_free(addr, size);
+	kmem_free(sock_addrp, so->so_max_addr_len);
 rel_out:
 	releasef(sock);
 bad:	return (error != 0 ? set_errno(error) : 0);
@@ -1482,13 +1380,8 @@ getsockname(int sock, struct sockaddr *name,
 {
 	struct sonode *so;
 	int error;
-	socklen_t namelen;
-	union {
-		struct sockaddr_in sin;
-		struct sockaddr_in6 sin6;
-	} sin;			/* Temporary buffer, common case */
-	void *addr;		/* Temporary buffer, uncommon case */
-	socklen_t addrlen, size;
+	socklen_t namelen, sock_addrlen;
+	struct sockaddr *sock_addrp;
 
 	dprint(1, ("getsockname(%d, %p, %p)\n",
 	    sock, (void *)name, (void *)namelenp));
@@ -1503,39 +1396,16 @@ getsockname(int sock, struct sockaddr *name,
 		goto rel_out;
 	}
 
-	/*
-	 * If a bind or accept has been done, unless we're an Xnet endpoint,
-	 * the local address has already been updated in so_laddr_sa.
-	 */
-	if ((so->so_version != SOV_SOCKSTREAM &&
-	    so->so_version != SOV_SOCKBSD) ||
-	    !(so->so_state & SS_LADDR_VALID)) {
-		if ((error = SOP_GETSOCKNAME(so)) != 0)
-			goto rel_out;
+	sock_addrlen = so->so_max_addr_len;
+	sock_addrp = (struct sockaddr *)kmem_alloc(sock_addrlen, KM_SLEEP);
+	if ((error = socket_getsockname(so, sock_addrp, &sock_addrlen,
+	    CRED())) == 0) {
+		ASSERT(MUTEX_NOT_HELD(&so->so_lock));
+		ASSERT(sock_addrlen <= so->so_max_addr_len);
+		error = copyout_name(name, namelen, namelenp,
+		    (void *)sock_addrp, sock_addrlen);
 	}
-
-	if (so->so_laddr_maxlen <= sizeof (sin)) {
-		size = 0;
-		addr = &sin;
-	} else {
-		/*
-		 * Allocate temporary to avoid holding so_lock across
-		 * copyout
-		 */
-		size = so->so_laddr_maxlen;
-		addr = kmem_alloc(size, KM_SLEEP);
-	}
-	/* Prevent so_laddr_sa/len from changing while accessed */
-	mutex_enter(&so->so_lock);
-	addrlen = so->so_laddr_len;
-	bcopy(so->so_laddr_sa, addr, addrlen);
-	mutex_exit(&so->so_lock);
-
-	ASSERT(MUTEX_NOT_HELD(&so->so_lock));
-	error = copyout_name(name, namelen, namelenp,
-	    addr, addrlen);
-	if (size != 0)
-		kmem_free(addr, size);
+	kmem_free(sock_addrp, so->so_max_addr_len);
 rel_out:
 	releasef(sock);
 bad:	return (error != 0 ? set_errno(error) : 0);
@@ -1577,8 +1447,9 @@ getsockopt(int sock,
 	}
 	optval = kmem_alloc(optlen, KM_SLEEP);
 	optlen_res = optlen;
-	error = SOP_GETSOCKOPT(so, level, option_name, optval,
-	    &optlen_res, (version != SOV_XPG4_2) ? 0 : _SOGETSOCKOPT_XPG4_2);
+	error = socket_getsockopt(so, level, option_name, optval,
+	    &optlen_res, (version != SOV_XPG4_2) ? 0 : _SOGETSOCKOPT_XPG4_2,
+	    CRED());
 	releasef(sock);
 	if (error) {
 		kmem_free(optval, optlen);
@@ -1633,8 +1504,8 @@ setsockopt(int sock,
 	} else
 		option_len = 0;
 
-	error = SOP_SETSOCKOPT(so, level, option_name, optval,
-	    (t_uscalar_t)option_len);
+	error = socket_setsockopt(so, level, option_name, optval,
+	    (t_uscalar_t)option_len, CRED());
 done1:
 	if (optval != buffer)
 		kmem_free(optval, (size_t)option_len);
@@ -1646,51 +1517,140 @@ done2:
 }
 
 /*
- * Add config info when devpath is non-NULL; delete info when devpath is NULL.
- * devpath is a user address.
+ * Add config info when name is non-NULL; delete info when name is NULL.
+ * name could be a device name or a module name and are user address.
  */
 int
-sockconfig(int domain, int type, int protocol, char *devpath)
+sockconfig(int family, int type, int protocol, char *name)
 {
-	char *kdevpath;		/* Copied in devpath string */
-	size_t kdevpathlen;
+	char *kdevpath = NULL;		/* Copied in devpath string */
+	char *kmodule = NULL;
+	size_t pathlen = 0;
 	int error = 0;
 
 	dprint(1, ("sockconfig(%d, %d, %d, %p)\n",
-	    domain, type, protocol, (void *)devpath));
+	    family, type, protocol, (void *)name));
 
 	if (secpolicy_net_config(CRED(), B_FALSE) != 0)
 		return (set_errno(EPERM));
 
-	if (devpath == NULL) {
-		/* Deleting an entry */
-		kdevpath = NULL;
-		kdevpathlen = 0;
-	} else {
+	/*
+	 * By default set the kdevpath and kmodule to NULL to delete an entry.
+	 * Otherwise when name is not NULL, set the kdevpath or kmodule
+	 * value to add an entry.
+	 */
+	if (name != NULL) {
 		/*
 		 * Adding an entry.
-		 * Copyin the devpath.
+		 * Copyin the name.
 		 * This also makes it possible to check for too long pathnames.
-		 * Compress the space needed for the devpath before passing it
+		 * Compress the space needed for the name before passing it
 		 * to soconfig - soconfig will store the string until
 		 * the configuration is removed.
 		 */
 		char *buf;
-
 		buf = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-		if ((error = copyinstr(devpath, buf, MAXPATHLEN,
-		    &kdevpathlen)) != 0) {
+		if ((error = copyinstr(name, buf, MAXPATHLEN, &pathlen)) != 0) {
 			kmem_free(buf, MAXPATHLEN);
 			goto done;
 		}
+		if (strncmp(buf, "/dev", strlen("/dev")) == 0) {
+			/* For device */
 
-		kdevpath = kmem_alloc(kdevpathlen, KM_SLEEP);
-		bcopy(buf, kdevpath, kdevpathlen);
-		kdevpath[kdevpathlen - 1] = '\0';
+			/*
+			 * Special handling for NCA:
+			 *
+			 * DEV_NCA is never opened even if an application
+			 * requests for AF_NCA. The device opened is instead a
+			 * predefined AF_INET transport (NCA_INET_DEV).
+			 *
+			 * Prior to Volo (PSARC/2007/587) NCA would determine
+			 * the device using a lookup, which worked then because
+			 * all protocols were based on TPI. Since TPI is no
+			 * longer the default, we have to explicitly state
+			 * which device to use.
+			 */
+			if (strcmp(buf, NCA_DEV) == 0) {
+				/* only support entry <28, 2, 0> */
+				if (family != AF_NCA || type != SOCK_STREAM ||
+				    protocol != 0) {
+					kmem_free(buf, MAXPATHLEN);
+					error = EINVAL;
+					goto done;
+				}
+
+				pathlen = strlen(NCA_INET_DEV) + 1;
+				kdevpath = kmem_alloc(pathlen, KM_SLEEP);
+				bcopy(NCA_INET_DEV, kdevpath, pathlen);
+				kdevpath[pathlen - 1] = '\0';
+			} else {
+				kdevpath = kmem_alloc(pathlen, KM_SLEEP);
+				bcopy(buf, kdevpath, pathlen);
+				kdevpath[pathlen - 1] = '\0';
+			}
+		} else {
+			/* For socket module */
+			kmodule = kmem_alloc(pathlen, KM_SLEEP);
+			bcopy(buf, kmodule, pathlen);
+			kmodule[pathlen - 1] = '\0';
+
+			pathlen = 0;
+			if (strcmp(kmodule, "tcp") == 0) {
+				/* Get the tcp device name for fallback */
+				if (family == 2) {
+					pathlen = strlen("/dev/tcp") + 1;
+					kdevpath = kmem_alloc(pathlen,
+					    KM_SLEEP);
+					bcopy("/dev/tcp", kdevpath,
+					    pathlen);
+					kdevpath[pathlen - 1] = '\0';
+				} else {
+					ASSERT(family == 26);
+					pathlen = strlen("/dev/tcp6") + 1;
+					kdevpath = kmem_alloc(pathlen,
+					    KM_SLEEP);
+					bcopy("/dev/tcp6", kdevpath, pathlen);
+					kdevpath[pathlen - 1] = '\0';
+				}
+			} else if (strcmp(kmodule, "udp") == 0) {
+				/* Get the udp device name for fallback */
+				if (family == 2) {
+					pathlen = strlen("/dev/udp") + 1;
+					kdevpath = kmem_alloc(pathlen,
+					    KM_SLEEP);
+					bcopy("/dev/udp", kdevpath, pathlen);
+					kdevpath[pathlen - 1] = '\0';
+				} else {
+					ASSERT(family == 26);
+					pathlen = strlen("/dev/udp6") + 1;
+					kdevpath = kmem_alloc(pathlen,
+					    KM_SLEEP);
+					bcopy("/dev/udp6", kdevpath, pathlen);
+					kdevpath[pathlen - 1] = '\0';
+				}
+			} else if (strcmp(kmodule, "icmp") == 0) {
+				/* Get the icmp device name for fallback */
+				if (family == 2) {
+					pathlen = strlen("/dev/rawip") + 1;
+					kdevpath = kmem_alloc(pathlen,
+					    KM_SLEEP);
+					bcopy("/dev/rawip", kdevpath, pathlen);
+					kdevpath[pathlen - 1] = '\0';
+				} else {
+					ASSERT(family == 26);
+					pathlen = strlen("/dev/rawip6") + 1;
+					kdevpath = kmem_alloc(pathlen,
+					    KM_SLEEP);
+					bcopy("/dev/rawip6", kdevpath, pathlen);
+					kdevpath[pathlen - 1] = '\0';
+				}
+			}
+		}
 
 		kmem_free(buf, MAXPATHLEN);
 	}
-	error = soconfig(domain, type, protocol, kdevpath, (int)kdevpathlen);
+	error = soconfig(family, type, protocol, kdevpath, (int)pathlen,
+	    kmodule);
 done:
 	if (error) {
 		eprintline(error);
@@ -1961,9 +1921,15 @@ snf_async_read(snf_req_t *sr)
 		 */
 		so = VTOSO(vp);
 		stp = vp->v_stream;
-		wroff = (int)(stp->sd_wroff);
-		maxblk = (int)(stp->sd_maxblk);
-		extra = wroff + (int)(stp->sd_tail);
+		if (stp == NULL) {
+			wroff = so->so_proto_props.sopp_wroff;
+			maxblk = so->so_proto_props.sopp_maxblk;
+			extra = wroff + so->so_proto_props.sopp_tail;
+		} else {
+			wroff = (int)(stp->sd_wroff);
+			maxblk = (int)(stp->sd_maxblk);
+			extra = wroff + (int)(stp->sd_tail);
+		}
 	}
 
 	while ((size != 0) && (sr->sr_write_error == 0)) {
@@ -1975,7 +1941,8 @@ snf_async_read(snf_req_t *sr)
 		 * need to adjust the size to the maximum
 		 * SSL record size set in the stream head.
 		 */
-		if (vp->v_type == VSOCK && so->so_kssl_ctx != NULL)
+		if (vp->v_type == VSOCK && !SOCK_IS_NONSTR(so) &&
+		    SOTOTPI(so)->sti_kssl_ctx != NULL)
 			iosize = (int)MIN(iosize, maxblk);
 
 		if ((mp = allocb(iosize + extra, BPRI_MED)) == NULL) {
@@ -2066,7 +2033,7 @@ create_thread(int operation, struct vnode *vp, file_t *fp,
 	 * store sd_qn_maxpsz into sr_maxpsz while we have stream head.
 	 * stream might be closed before thread returns from snf_async_read.
 	 */
-	if (stp->sd_qn_maxpsz > 0) {
+	if (stp != NULL && stp->sd_qn_maxpsz > 0) {
 		sr->sr_maxpsz = MIN(MAXBSIZE, stp->sd_qn_maxpsz);
 	} else {
 		sr->sr_maxpsz = MAXBSIZE;
@@ -2115,9 +2082,11 @@ snf_direct_io(file_t *fp, file_t *rfp, u_offset_t fileoff, u_offset_t size,
 	short fflag;
 	struct vnode *vp;
 	int ksize;
+	struct nmsghdr msg;
 
 	ksize = 0;
 	*count = 0;
+	bzero(&msg, sizeof (msg));
 
 	vp = fp->f_vnode;
 	fflag = fp->f_flag;
@@ -2138,8 +2107,11 @@ snf_direct_io(file_t *fp, file_t *rfp, u_offset_t fileoff, u_offset_t size,
 		}
 		iosize = MBLKL(mp);
 
-		if ((error = kstrwritemp(vp, mp, fflag)) != 0) {
-			freeb(mp);
+		error = socket_sendmblk(VTOSO(vp), &msg, fflag, CRED(), &mp);
+
+		if (error != 0) {
+			if (mp != NULL)
+				freeb(mp);
 			break;
 		}
 		ksize += iosize;
@@ -2233,10 +2205,13 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 	snf_smap_desbinfo *snfi;
 	struct vattr va;
 	boolean_t dowait = B_FALSE;
+	struct nmsghdr msg;
 
 	vp = fp->f_vnode;
 	fflag = fp->f_flag;
 	ksize = 0;
+	bzero(&msg, sizeof (msg));
+
 	for (;;) {
 		if (ISSIG(curthread, JUSTLOOKING)) {
 			error = EINTR;
@@ -2307,9 +2282,11 @@ snf_segmap(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 			mp->b_datap->db_struioflag |= STRUIO_ZCNOTIFY;
 		}
 		VOP_RWUNLOCK(fvp, V_WRITELOCK_FALSE, NULL);
-		if ((error = kstrwritemp(vp, mp, fflag)) != 0) {
+		error = socket_sendmblk(VTOSO(vp), &msg, fflag, CRED(), &mp);
+		if (error != 0) {
 			*count = ksize;
-			freemsg(mp);
+			if (mp != NULL)
+				freemsg(mp);
 			return (error);
 		}
 		ksize += iosize;
@@ -2335,16 +2312,22 @@ done:
 		stdata_t *stp;
 
 		stp = vp->v_stream;
-		mutex_enter(&stp->sd_lock);
-		while (!(stp->sd_flag & STZCNOTIFY)) {
-			if (cv_wait_sig(&stp->sd_zcopy_wait,
-			    &stp->sd_lock) == 0) {
-				error = EINTR;
-				break;
+		if (stp == NULL) {
+			struct sonode *so;
+			so = VTOSO(vp);
+			error = so_zcopy_wait(so);
+		} else {
+			mutex_enter(&stp->sd_lock);
+			while (!(stp->sd_flag & STZCNOTIFY)) {
+				if (cv_wait_sig(&stp->sd_zcopy_wait,
+				    &stp->sd_lock) == 0) {
+					error = EINTR;
+					break;
+				}
 			}
+			stp->sd_flag &= ~STZCNOTIFY;
+			mutex_exit(&stp->sd_lock);
 		}
-		stp->sd_flag &= ~STZCNOTIFY;
-		mutex_exit(&stp->sd_lock);
 	}
 	return (error);
 }
@@ -2367,6 +2350,7 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 	int maxblk = 0;
 	int wroff = 0;
 	struct sonode *so;
+	struct nmsghdr msg;
 
 	vp = fp->f_vnode;
 	if (vp->v_type == VSOCK) {
@@ -2377,11 +2361,17 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 		 */
 		so = VTOSO(vp);
 		stp = vp->v_stream;
-		wroff = (int)(stp->sd_wroff);
-		maxblk = (int)(stp->sd_maxblk);
-		extra = wroff + (int)(stp->sd_tail);
+		if (stp == NULL) {
+			wroff = so->so_proto_props.sopp_wroff;
+			maxblk = so->so_proto_props.sopp_maxblk;
+			extra = wroff + so->so_proto_props.sopp_tail;
+		} else {
+			wroff = (int)(stp->sd_wroff);
+			maxblk = (int)(stp->sd_maxblk);
+			extra = wroff + (int)(stp->sd_tail);
+		}
 	}
-
+	bzero(&msg, sizeof (msg));
 	fflag = fp->f_flag;
 	ksize = 0;
 	auio.uio_iov = &aiov;
@@ -2406,7 +2396,8 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 		 * need to adjust the size to the maximum
 		 * SSL record size set in the stream head.
 		 */
-		if (vp->v_type == VSOCK && so->so_kssl_ctx != NULL)
+		if (vp->v_type == VSOCK && !SOCK_IS_NONSTR(so) &&
+		    SOTOTPI(so)->sti_kssl_ctx != NULL)
 			iosize = (int)MIN(iosize, maxblk);
 
 		if ((mp = allocb(iosize + extra, BPRI_MED)) == NULL) {
@@ -2434,9 +2425,13 @@ snf_cache(file_t *fp, vnode_t *fvp, u_offset_t fileoff, u_offset_t size,
 		mp->b_wptr = mp->b_rptr + iosize;
 
 		VOP_RWUNLOCK(fvp, V_WRITELOCK_FALSE, NULL);
-		if ((error = kstrwritemp(vp, mp, fflag)) != 0) {
+
+		error = socket_sendmblk(VTOSO(vp), &msg, fflag, CRED(), &mp);
+
+		if (error != 0) {
 			*count = ksize;
-			freeb(mp);
+			if (mp != NULL)
+				freeb(mp);
 			return (error);
 		}
 		ksize += iosize;
@@ -2540,14 +2535,17 @@ sosendfile64(file_t *fp, file_t *rfp, const struct ksendfilevec64 *sfv,
 	if (sfv_len >= MAXBSIZE && (sfv_len >= (va_size >> 1) ||
 	    (sfv->sfv_flag & SFV_NOWAIT) || sfv_len >= 0x1000000) &&
 	    !vn_has_flocks(fvp) && !(fvp->v_flag & VNOMAP)) {
-		if ((stp->sd_copyflag & (STZCVMSAFE|STZCVMUNSAFE)) == 0) {
+		uint_t copyflag;
+		copyflag = stp != NULL ? stp->sd_copyflag :
+		    VTOSO(vp)->so_proto_props.sopp_zcopyflag;
+		if ((copyflag & (STZCVMSAFE|STZCVMUNSAFE)) == 0) {
 			int on = 1;
 
-			if (SOP_SETSOCKOPT(VTOSO(vp), SOL_SOCKET,
-			    SO_SND_COPYAVOID, &on, sizeof (on)) == 0)
+			if (socket_setsockopt(VTOSO(vp), SOL_SOCKET,
+			    SO_SND_COPYAVOID, &on, sizeof (on), CRED()) == 0)
 				dozcopy = B_TRUE;
 		} else {
-			dozcopy = (stp->sd_copyflag & STZCVMSAFE);
+			dozcopy = copyflag & STZCVMSAFE;
 		}
 	}
 	if (dozcopy) {
@@ -2555,10 +2553,19 @@ sosendfile64(file_t *fp, file_t *rfp, const struct ksendfilevec64 *sfv,
 		error = snf_segmap(fp, fvp, sfv_off, (u_offset_t)sfv_len,
 		    &count, ((sfv->sfv_flag & SFV_NOWAIT) != 0));
 	} else {
-		if (stp->sd_qn_maxpsz == INFPSZ)
+		if (vp->v_type == VSOCK && stp == NULL) {
+			sonode_t *so = VTOSO(vp);
+			maxpsz = so->so_proto_props.sopp_maxpsz;
+		} else if (stp != NULL) {
+			maxpsz = stp->sd_qn_maxpsz;
+		} else {
+			maxpsz = maxphys;
+		}
+
+		if (maxpsz == INFPSZ)
 			maxpsz = maxphys;
 		else
-			maxpsz = roundup(stp->sd_qn_maxpsz, MAXBSIZE);
+			maxpsz = roundup(maxpsz, MAXBSIZE);
 		sf_stats.ss_file_cached++;
 		error = snf_cache(fp, fvp, sfv_off, (u_offset_t)sfv_len,
 		    maxpsz, &count);
@@ -2613,7 +2620,7 @@ sendto32(int32_t sock, caddr32_t buffer, size32_t len, int32_t flags,
 int
 soaccept(struct sonode *so, int fflag, struct sonode **nsop)
 {
-	return (SOP_ACCEPT(so, fflag, nsop));
+	return (socket_accept(so, fflag, CRED(), nsop));
 }
 
 int
@@ -2622,9 +2629,9 @@ sobind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 {
 	int	error;
 
-	error = SOP_BIND(so, name, namelen, flags);
+	error = socket_bind(so, name, namelen, flags, CRED());
 	if (error == 0 && backlog != 0)
-		return (SOP_LISTEN(so, backlog));
+		return (socket_listen(so, backlog, CRED()));
 
 	return (error);
 }
@@ -2632,59 +2639,48 @@ sobind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
 int
 solisten(struct sonode *so, int backlog)
 {
-	return (SOP_LISTEN(so, backlog));
+	return (socket_listen(so, backlog, CRED()));
 }
 
 int
 soconnect(struct sonode *so, const struct sockaddr *name, socklen_t namelen,
     int fflag, int flags)
 {
-	return (SOP_CONNECT(so, name, namelen, fflag, flags));
+	return (socket_connect(so, name, namelen, fflag, flags, CRED()));
 }
 
 int
 sorecvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 {
-	return (SOP_RECVMSG(so, msg, uiop));
+	return (socket_recvmsg(so, msg, uiop, CRED()));
 }
 
 int
 sosendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 {
-	return (SOP_SENDMSG(so, msg, uiop));
-}
-
-int
-sogetpeername(struct sonode *so)
-{
-	return (SOP_GETPEERNAME(so));
-}
-
-int
-sogetsockname(struct sonode *so)
-{
-	return (SOP_GETSOCKNAME(so));
+	return (socket_sendmsg(so, msg, uiop, CRED()));
 }
 
 int
 soshutdown(struct sonode *so, int how)
 {
-	return (SOP_SHUTDOWN(so, how));
+	return (socket_shutdown(so, how, CRED()));
 }
 
 int
 sogetsockopt(struct sonode *so, int level, int option_name, void *optval,
     socklen_t *optlenp, int flags)
 {
-	return (SOP_GETSOCKOPT(so, level, option_name, optval, optlenp,
-	    flags));
+	return (socket_getsockopt(so, level, option_name, optval, optlenp,
+	    flags, CRED()));
 }
 
 int
 sosetsockopt(struct sonode *so, int level, int option_name, const void *optval,
     t_uscalar_t optlen)
 {
-	return (SOP_SETSOCKOPT(so, level, option_name, optval, optlen));
+	return (socket_setsockopt(so, level, option_name, optval, optlen,
+	    CRED()));
 }
 
 /*
@@ -2692,9 +2688,25 @@ sosetsockopt(struct sonode *so, int level, int option_name, const void *optval,
  * able to handle the creation of TPI sockfs sockets.
  */
 struct sonode *
-socreate(vnode_t *accessvp, int domain, int type, int protocol, int version,
-    struct sonode *tso, int *errorp)
+socreate(struct sockparams *sp, int family, int type, int protocol, int version,
+    int *errorp)
 {
-	return (sotpi_create(accessvp, domain, type, protocol, version, tso,
-	    errorp));
+	struct sonode *so;
+
+	ASSERT(sp != NULL);
+
+	so = sp->sp_smod_info->smod_sock_create_func(sp, family, type, protocol,
+	    version, SOCKET_SLEEP, errorp, CRED());
+	if (so == NULL) {
+		SOCKPARAMS_DEC_REF(sp);
+	} else {
+		if ((*errorp = SOP_INIT(so, NULL, CRED(), SOCKET_SLEEP)) == 0) {
+			/* Cannot fail, only bumps so_count */
+			(void) VOP_OPEN(&SOTOV(so), FREAD|FWRITE, CRED(), NULL);
+		} else {
+			socket_destroy(so);
+			so = NULL;
+		}
+	}
+	return (so);
 }

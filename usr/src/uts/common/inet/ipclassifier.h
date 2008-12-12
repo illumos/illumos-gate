@@ -37,6 +37,9 @@ extern "C" {
 #include <inet/ip6.h>
 #include <netinet/in.h>		/* for IPPROTO_* constants */
 #include <sys/sdt.h>
+#include <sys/socket_proto.h>
+#include <sys/sunddi.h>
+#include <sys/sunldi.h>
 
 typedef void (*edesc_spf)(void *, mblk_t *, void *, int);
 typedef void (*edesc_rpf)(void *, mblk_t *, void *);
@@ -80,6 +83,8 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 #define	IPCL_RTSCONN		0x00000020	/* From rts_conn_cache */
 #define	IPCL_ISV6		0x00000040	/* AF_INET6 */
 #define	IPCL_IPTUN		0x00000080	/* Has "tun" plumbed above it */
+#define	IPCL_NONSTR		0x00001000	/* A non-STREAMS socket */
+#define	IPCL_IN_SQUEUE		0x10000000	/* Waiting squeue to finish */
 
 /* Conn Masks */
 #define	IPCL_TCP		(IPCL_TCP4|IPCL_TCP6)
@@ -136,6 +141,8 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 	(connp)->conn_ulp == IPPROTO_IPV6) &&				\
 	((connp)->conn_flags & IPCL_IPTUN))
 
+#define	IPCL_IS_NONSTR(connp)	((connp)->conn_flags & IPCL_NONSTR)
+
 typedef struct connf_s connf_t;
 
 typedef struct
@@ -144,6 +151,21 @@ typedef struct
 #define	CONN_STACK_DEPTH	15
 	pc_t	ctb_stack[CONN_STACK_DEPTH];
 } conn_trace_t;
+
+typedef struct ip_helper_minor_info_s {
+	dev_t	ip_minfo_dev;		/* Device */
+	vmem_t	*ip_minfo_arena;	/* Arena */
+} ip_helper_minfo_t;
+
+/*
+ * ip helper stream info
+ */
+typedef struct ip_helper_stream_info_s {
+	ldi_handle_t		ip_helper_stream_handle;
+	queue_t 		*ip_helper_stream_rq;
+	queue_t 		*ip_helper_stream_wq;
+	ip_helper_minfo_t	*ip_helper_stream_minfo;
+} ip_helper_stream_info_t;
 
 /*
  * The initial fields in the conn_t are setup by the kmem_cache constructor,
@@ -236,6 +258,7 @@ struct conn_s {
 	queue_t		*conn_wq;		/* Write queue */
 	dev_t		conn_dev;		/* Minor number */
 	vmem_t		*conn_minor_arena;	/* Minor arena */
+	ip_helper_stream_info_t *conn_helper_info;
 
 	cred_t		*conn_cred;		/* Credentials */
 	connf_t		*conn_g_fanout;		/* Global Hash bucket head */
@@ -300,6 +323,11 @@ struct conn_s {
 #define	conn_nexthop_v4	V4_PART_OF_V6(conn_nexthop_v6)
 	cred_t		*conn_peercred;		/* Peer credentials, if any */
 
+	kcondvar_t	conn_sq_cv;		/* For non-STREAMS socket IO */
+	kthread_t	*conn_sq_caller;	/* Caller of squeue sync ops */
+	sock_upcalls_t	*conn_upcalls;		/* Upcalls to sockfs */
+	sock_upper_handle_t conn_upper_handle;	/* Upper handle: sonode * */
+
 	unsigned int
 		conn_ulp_labeled : 1,		/* ULP label is synced */
 		conn_mlp_type : 2,		/* mlp_type_t; tsol/tndb.h */
@@ -308,6 +336,8 @@ struct conn_s {
 		conn_anon_port : 1,		/* user bound anonymously */
 		conn_mac_exempt : 1,		/* unlabeled with loose MAC */
 		conn_spare : 26;
+
+	boolean_t	conn_flow_cntrld;
 	netstack_t	*conn_netstack;	/* Corresponds to a netstack_hold */
 #ifdef CONN_DEBUG
 #define	CONN_TRACE_MAX	10
@@ -582,6 +612,14 @@ conn_t *ipcl_conn_tcp_lookup_reversed_ipv4(conn_t *, ipha_t *, tcph_t *,
 	    ip_stack_t *);
 conn_t *ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *, ip6_t *, tcph_t *,
 	    ip_stack_t *);
+
+extern int ip_create_helper_stream(conn_t *connp, ldi_ident_t li);
+extern void ip_close_helper_stream(conn_t *connp);
+
+extern int ip_get_options(conn_t *, int, int, void *, t_uscalar_t *, cred_t *);
+extern int ip_set_options(conn_t *, int, int, const void *, t_uscalar_t,
+    cred_t *);
+
 #ifdef	__cplusplus
 }
 #endif

@@ -38,7 +38,6 @@
 #include <sys/tihdr.h>
 #include <sys/xti_inet.h>
 #include <sys/ddi.h>
-#include <sys/sunddi.h>
 #include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/kobj.h>
@@ -120,7 +119,6 @@
 #include <inet/udp_impl.h>
 #include <inet/rawip_impl.h>
 #include <inet/rts_impl.h>
-#include <sys/sunddi.h>
 
 #include <sys/tsol/label.h>
 #include <sys/tsol/tnet.h>
@@ -625,7 +623,7 @@ uint_t ip_max_frag_dups = 10;
 #define	IS_SIMPLE_IPH(ipha)						\
 	((ipha)->ipha_version_and_hdr_length == IP_SIMPLE_HDR_VERSION)
 
-/* RFC1122 Conformance */
+/* RFC 1122 Conformance */
 #define	IP_FORWARD_DEFAULT	IP_FORWARD_NEVER
 
 #define	ILL_MAX_NAMELEN			LIFNAMSIZ
@@ -658,8 +656,7 @@ static void	icmp_send_redirect(queue_t *, mblk_t *, ipaddr_t,
 		    ip_stack_t *);
 
 static void	ip_arp_news(queue_t *, mblk_t *);
-static boolean_t ip_bind_insert_ire(mblk_t *, ire_t *, iulp_t *,
-		    ip_stack_t *);
+static boolean_t ip_bind_get_ire_v4(mblk_t **, ire_t *, iulp_t *, ip_stack_t *);
 mblk_t		*ip_dlpi_alloc(size_t, t_uscalar_t);
 char		*ip_dot_addr(ipaddr_t, char *);
 mblk_t		*ip_carve_mp(mblk_t **, ssize_t);
@@ -770,6 +767,8 @@ static void	ip_multirt_bad_mtu(ire_t *, uint32_t);
 static int	ip_cgtp_filter_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 static int	ip_cgtp_filter_set(queue_t *, mblk_t *, char *,
     caddr_t, cred_t *);
+extern int	ip_helper_stream_setup(queue_t *, dev_t *, int, int,
+    cred_t *, boolean_t);
 static int	ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
     caddr_t cp, cred_t *cr);
 static int	ip_int_set(queue_t *, mblk_t *, char *, caddr_t,
@@ -1318,6 +1317,7 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 			ip_sioctl_set_ipmpfailback, NULL },
 	/* SIOCSENABLESDP is handled by SDP */
 	/* 183 */ { IPI_DONTCARE /* SIOCSENABLESDP */, 0, 0, 0, NULL, NULL },
+	/* 184 */ { IPI_DONTCARE /* SIOCSQPTR */, 0, 0, 0, NULL, NULL },
 };
 
 int ip_ndx_ioctl_count = sizeof (ip_ndx_ioctl_table) / sizeof (ip_ioctl_cmd_t);
@@ -1373,7 +1373,8 @@ static ipha_t icmp_ipha = {
 };
 
 struct module_info ip_mod_info = {
-	IP_MOD_ID, IP_MOD_NAME, 1, INFPSZ, 65536, 1024
+	IP_MOD_ID, IP_MOD_NAME, IP_MOD_MINPSZ, IP_MOD_MAXPSZ, IP_MOD_HIWAT,
+	IP_MOD_LOWAT
 };
 
 /*
@@ -4334,6 +4335,23 @@ ip_bind_ipsec_policy_set(conn_t *connp, mblk_t *policy_mp)
 	return (B_TRUE);
 }
 
+static void
+ip_bind_post_handling(conn_t *connp, mblk_t *mp, boolean_t ire_requested)
+{
+	/*
+	 * Pass the IPsec headers size in ire_ipsec_overhead.
+	 * We can't do this in ip_bind_get_ire because the policy
+	 * may not have been inherited at that point in time and hence
+	 * conn_out_enforce_policy may not be set.
+	 */
+	if (ire_requested && connp->conn_out_enforce_policy &&
+	    mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE) {
+		ire_t *ire = (ire_t *)mp->b_rptr;
+		ASSERT(MBLKL(mp) >= sizeof (ire_t));
+		ire->ire_ipsec_overhead = conn_ipsec_length(connp);
+	}
+}
+
 /*
  * Upper level protocols (ULP) pass through bind requests to IP for inspection
  * and to arrange for power-fanout assist.  The ULP is identified by
@@ -4374,7 +4392,6 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	uchar_t		*ucp;
 	mblk_t		*mp1;
 	boolean_t	ire_requested;
-	boolean_t	ipsec_policy_set = B_FALSE;
 	int		error = 0;
 	int		protocol;
 	ipa_conn_x_t	*acx;
@@ -4453,7 +4470,6 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 
 	mp1 = mp->b_cont;
 	ire_requested = (mp1 != NULL && DB_TYPE(mp1) == IRE_DB_REQ_TYPE);
-	ipsec_policy_set = (mp1 != NULL && DB_TYPE(mp1) == IPSEC_POLICY_SET);
 
 	switch (tbr->ADDR_length) {
 	default:
@@ -4463,14 +4479,14 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 
 	case IP_ADDR_LEN:
 		/* Verification of local address only */
-		error = ip_bind_laddr(connp, mp, *(ipaddr_t *)ucp, 0,
-		    ire_requested, ipsec_policy_set, B_FALSE);
+		error = ip_bind_laddr_v4(connp, &mp1, protocol,
+		    *(ipaddr_t *)ucp, 0, B_FALSE);
 		break;
 
 	case sizeof (sin_t):
 		sin = (sin_t *)ucp;
-		error = ip_bind_laddr(connp, mp, sin->sin_addr.s_addr,
-		    sin->sin_port, ire_requested, ipsec_policy_set, B_TRUE);
+		error = ip_bind_laddr_v4(connp, &mp1, protocol,
+		    sin->sin_addr.s_addr, sin->sin_port, B_TRUE);
 		break;
 
 	case sizeof (ipa_conn_t):
@@ -4479,9 +4495,9 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		if (ac->ac_lport == 0)
 			ac->ac_lport = connp->conn_lport;
 		/* Always verify destination reachability. */
-		error = ip_bind_connected(connp, mp, &ac->ac_laddr,
-		    ac->ac_lport, ac->ac_faddr, ac->ac_fport, ire_requested,
-		    ipsec_policy_set, B_TRUE, B_TRUE);
+		error = ip_bind_connected_v4(connp, &mp1, protocol,
+		    &ac->ac_laddr, ac->ac_lport, ac->ac_faddr, ac->ac_fport,
+		    B_TRUE, B_TRUE);
 		break;
 
 	case sizeof (ipa_conn_x_t):
@@ -4490,29 +4506,17 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 		 * Whether or not to verify destination reachability depends
 		 * on the setting of the ACX_VERIFY_DST flag in acx->acx_flags.
 		 */
-		error = ip_bind_connected(connp, mp, &acx->acx_conn.ac_laddr,
-		    acx->acx_conn.ac_lport, acx->acx_conn.ac_faddr,
-		    acx->acx_conn.ac_fport, ire_requested, ipsec_policy_set,
+		error = ip_bind_connected_v4(connp, &mp1, protocol,
+		    &acx->acx_conn.ac_laddr, acx->acx_conn.ac_lport,
+		    acx->acx_conn.ac_faddr, acx->acx_conn.ac_fport,
 		    B_TRUE, (acx->acx_flags & ACX_VERIFY_DST) != 0);
 		break;
 	}
-	if (error == EINPROGRESS)
-		return (NULL);
-	else if (error != 0)
+	ASSERT(error != EINPROGRESS);
+	if (error != 0)
 		goto bad_addr;
-	/*
-	 * Pass the IPsec headers size in ire_ipsec_overhead.
-	 * We can't do this in ip_bind_insert_ire because the policy
-	 * may not have been inherited at that point in time and hence
-	 * conn_out_enforce_policy may not be set.
-	 */
-	mp1 = mp->b_cont;
-	if (ire_requested && connp->conn_out_enforce_policy &&
-	    mp1 != NULL && DB_TYPE(mp1) == IRE_DB_REQ_TYPE) {
-		ire_t *ire = (ire_t *)mp1->b_rptr;
-		ASSERT(MBLKL(mp1) >= sizeof (ire_t));
-		ire->ire_ipsec_overhead = conn_ipsec_length(connp);
-	}
+
+	ip_bind_post_handling(connp, mp->b_cont, ire_requested);
 
 	/* Send it home. */
 	mp->b_datap->db_type = M_PCPROTO;
@@ -4539,7 +4543,7 @@ bad_addr:
  * upper protocol is expected to reset the src address
  * to 0 if it sees a IRE_BROADCAST type returned so that
  * no packets are emitted with broadcast/multicast address as
- * source address (that violates hosts requirements RFC1122)
+ * source address (that violates hosts requirements RFC 1122)
  * The addresses valid for bind are:
  *	(1) - INADDR_ANY (0)
  *	(2) - IP address of an UP interface
@@ -4561,21 +4565,26 @@ bad_addr:
  * matching IREs so bind has to look up based on the zone.
  *
  * Note: lport is in network byte order.
+ *
  */
 int
-ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
-    boolean_t ire_requested, boolean_t ipsec_policy_set,
-    boolean_t fanout_insert)
+ip_bind_laddr_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
+    ipaddr_t src_addr, uint16_t lport, boolean_t fanout_insert)
 {
 	int		error = 0;
 	ire_t		*src_ire;
-	mblk_t		*policy_mp;
-	ipif_t		*ipif;
 	zoneid_t	zoneid;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+	mblk_t		*mp = NULL;
+	boolean_t	ire_requested = B_FALSE;
+	boolean_t	ipsec_policy_set = B_FALSE;
 
-	if (ipsec_policy_set) {
-		policy_mp = mp->b_cont;
+	if (mpp)
+		mp = *mpp;
+
+	if (mp != NULL) {
+		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
+		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
 	}
 
 	/*
@@ -4585,7 +4594,6 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 	connp->conn_fully_bound = B_FALSE;
 
 	src_ire = NULL;
-	ipif = NULL;
 
 	zoneid = IPCL_ZONEID(connp);
 
@@ -4598,7 +4606,7 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 		 * Note: Following code is in if-else-if form for
 		 * readability compared to a condition check.
 		 */
-		/* LINTED - statement has no consequent */
+		/* LINTED - statement has no consequence */
 		if (IRE_IS_LOCAL(src_ire)) {
 			/*
 			 * (2) Bind to address of local UP interface
@@ -4617,20 +4625,10 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 			 * (ipif_lookup_addr() looks up all interfaces
 			 * but we do not get here for UP interfaces
 			 * - case (2) above)
-			 * We put the protocol byte back into the mblk
-			 * since we may come back via ip_wput_nondata()
-			 * later with this mblk if ipif_lookup_addr chooses
-			 * to defer processing.
 			 */
-			*mp->b_wptr++ = (char)connp->conn_ulp;
-			if ((ipif = ipif_lookup_addr(src_addr, NULL, zoneid,
-			    CONNP_TO_WQ(connp), mp, ip_wput_nondata,
-			    &error, ipst)) != NULL) {
-				ipif_refrele(ipif);
-			} else if (error == EINPROGRESS) {
-				if (src_ire != NULL)
-					ire_refrele(src_ire);
-				return (EINPROGRESS);
+			/* LINTED - statement has no consequent */
+			if (ip_addr_exists(src_addr, zoneid, ipst)) {
+				/* The address exists */
 			} else if (CLASSD(src_addr)) {
 				error = 0;
 				if (src_ire != NULL)
@@ -4653,19 +4651,15 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 				 */
 				error = EADDRNOTAVAIL;
 			}
-			/*
-			 * Just to keep it consistent with the processing in
-			 * ip_bind_v4()
-			 */
-			mp->b_wptr--;
 		}
 		if (error) {
 			/* Red Alert!  Attempting to be a bogon! */
-			ip1dbg(("ip_bind: bad src address 0x%x\n",
+			ip1dbg(("ip_bind_laddr_v4: bad src address 0x%x\n",
 			    ntohl(src_addr)));
 			goto bad_addr;
 		}
 	}
+
 
 	/*
 	 * Allow setting new policies. For example, disconnects come
@@ -4690,17 +4684,17 @@ ip_bind_laddr(conn_t *connp, mblk_t *mp, ipaddr_t src_addr, uint16_t lport,
 		/*
 		 * Do we need to add a check to reject Multicast packets
 		 */
-		error = ipcl_bind_insert(connp, *mp->b_wptr, src_addr, lport);
+		error = ipcl_bind_insert(connp, protocol, src_addr, lport);
 	}
 
 	if (error == 0) {
 		if (ire_requested) {
-			if (!ip_bind_insert_ire(mp, src_ire, NULL, ipst)) {
+			if (!ip_bind_get_ire_v4(mpp, src_ire, NULL, ipst)) {
 				error = -1;
 				/* Falls through to bad_addr */
 			}
 		} else if (ipsec_policy_set) {
-			if (!ip_bind_ipsec_policy_set(connp, policy_mp)) {
+			if (!ip_bind_ipsec_policy_set(connp, mp)) {
 				error = -1;
 				/* Falls through to bad_addr */
 			}
@@ -4717,15 +4711,32 @@ bad_addr:
 	}
 	if (src_ire != NULL)
 		IRE_REFRELE(src_ire);
-	if (ipsec_policy_set) {
-		ASSERT(policy_mp == mp->b_cont);
-		ASSERT(policy_mp != NULL);
-		freeb(policy_mp);
-		/*
-		 * As of now assume that nothing else accompanies
-		 * IPSEC_POLICY_SET.
-		 */
-		mp->b_cont = NULL;
+	return (error);
+}
+
+int
+ip_proto_bind_laddr_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
+    ipaddr_t src_addr, uint16_t lport, boolean_t fanout_insert)
+{
+	int error;
+	mblk_t	*mp = NULL;
+	boolean_t ire_requested;
+
+	if (ire_mpp)
+		mp = *ire_mpp;
+	ire_requested = (mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE);
+
+	ASSERT(!connp->conn_af_isv6);
+	connp->conn_pkt_isv6 = B_FALSE;
+	connp->conn_ulp = protocol;
+
+	error = ip_bind_laddr_v4(connp, ire_mpp, protocol, src_addr, lport,
+	    fanout_insert);
+	if (error == 0) {
+		ip_bind_post_handling(connp, ire_mpp ? *ire_mpp : NULL,
+		    ire_requested);
+	} else if (error < 0) {
+		error = -TBADADDR;
 	}
 	return (error);
 }
@@ -4746,16 +4757,14 @@ bad_addr:
  * Note: lport and fport are in network byte order.
  */
 int
-ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
-    uint16_t lport, ipaddr_t dst_addr, uint16_t fport,
-    boolean_t ire_requested, boolean_t ipsec_policy_set,
+ip_bind_connected_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
+    ipaddr_t *src_addrp, uint16_t lport, ipaddr_t dst_addr, uint16_t fport,
     boolean_t fanout_insert, boolean_t verify_dst)
 {
+
 	ire_t		*src_ire;
 	ire_t		*dst_ire;
 	int		error = 0;
-	int 		protocol;
-	mblk_t		*policy_mp;
 	ire_t		*sire = NULL;
 	ire_t		*md_dst_ire = NULL;
 	ire_t		*lso_dst_ire = NULL;
@@ -4763,25 +4772,33 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 	zoneid_t	zoneid;
 	ipaddr_t	src_addr = *src_addrp;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
+	mblk_t		*mp = NULL;
+	boolean_t	ire_requested = B_FALSE;
+	boolean_t	ipsec_policy_set = B_FALSE;
+	ts_label_t	*tsl = NULL;
+
+	if (mpp)
+		mp = *mpp;
+
+	if (mp != NULL) {
+		ire_requested = (DB_TYPE(mp) == IRE_DB_REQ_TYPE);
+		ipsec_policy_set = (DB_TYPE(mp) == IPSEC_POLICY_SET);
+		tsl = MBLK_GETLABEL(mp);
+	}
 
 	src_ire = dst_ire = NULL;
-	protocol = *mp->b_wptr & 0xFF;
 
 	/*
 	 * If we never got a disconnect before, clear it now.
 	 */
 	connp->conn_fully_bound = B_FALSE;
 
-	if (ipsec_policy_set) {
-		policy_mp = mp->b_cont;
-	}
-
 	zoneid = IPCL_ZONEID(connp);
 
 	if (CLASSD(dst_addr)) {
 		/* Pick up an IRE_BROADCAST */
 		dst_ire = ire_route_lookup(ip_g_all_ones, 0, 0, 0, NULL,
-		    NULL, zoneid, MBLK_GETLABEL(mp),
+		    NULL, zoneid, tsl,
 		    (MATCH_IRE_RECURSIVE |
 		    MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE |
 		    MATCH_IRE_SECATTR), ipst);
@@ -4804,11 +4821,11 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 
 		if (connp->conn_nexthop_set) {
 			dst_ire = ire_route_lookup(connp->conn_nexthop_v4, 0,
-			    0, 0, NULL, NULL, zoneid, MBLK_GETLABEL(mp),
+			    0, 0, NULL, NULL, zoneid, tsl,
 			    MATCH_IRE_SECATTR, ipst);
 		} else {
 			dst_ire = ire_route_lookup(dst_addr, 0, 0, 0, NULL,
-			    &sire, zoneid, MBLK_GETLABEL(mp),
+			    &sire, zoneid, tsl,
 			    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
 			    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE |
 			    MATCH_IRE_SECATTR), ipst);
@@ -4840,8 +4857,9 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 		 */
 		if (verify_dst || (dst_ire != NULL)) {
 			if (ip_debug > 2) {
-				pr_addr_dbg("ip_bind_connected: bad connected "
-				    "dst %s\n", AF_INET, &dst_addr);
+				pr_addr_dbg("ip_bind_connected_v4:"
+				    "bad connected dst %s\n",
+				    AF_INET, &dst_addr);
 			}
 			if (dst_ire == NULL || !(dst_ire->ire_type & IRE_HOST))
 				error = ENETUNREACH;
@@ -4872,7 +4890,8 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 	    connp->conn_mac_exempt, ipst) != 0) {
 		error = EHOSTUNREACH;
 		if (ip_debug > 2) {
-			pr_addr_dbg("ip_bind_connected: no label for dst %s\n",
+			pr_addr_dbg("ip_bind_connected_v4:"
+			    " no label for dst %s\n",
 			    AF_INET, &dst_addr);
 		}
 		goto bad_addr;
@@ -5056,7 +5075,7 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 	/* src_ire must be a local|loopback */
 	if (!IRE_IS_LOCAL(src_ire)) {
 		if (ip_debug > 2) {
-			pr_addr_dbg("ip_bind_connected: bad connected "
+			pr_addr_dbg("ip_bind_connected_v4: bad connected "
 			    "src %s\n", AF_INET, &src_addr);
 		}
 		error = EADDRNOTAVAIL;
@@ -5071,7 +5090,7 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 	 */
 	if (src_ire->ire_type == IRE_LOOPBACK &&
 	    !(IRE_IS_LOCAL(dst_ire) || CLASSD(dst_addr))) {
-		ip1dbg(("ip_bind_connected: bad connected loopback\n"));
+		ip1dbg(("ip_bind_connected_v4: bad connected loopback\n"));
 		error = -1;
 		goto bad_addr;
 	}
@@ -5114,12 +5133,13 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 		if (sire != NULL) {
 			ulp_info = &(sire->ire_uinfo);
 		}
-		if (!ip_bind_insert_ire(mp, dst_ire, ulp_info, ipst)) {
+		if (!ip_bind_get_ire_v4(mpp, dst_ire, ulp_info, ipst)) {
 			error = -1;
 			goto bad_addr;
 		}
+		mp = *mpp;
 	} else if (ipsec_policy_set) {
-		if (!ip_bind_ipsec_policy_set(connp, policy_mp)) {
+		if (!ip_bind_ipsec_policy_set(connp, mp)) {
 			error = -1;
 			goto bad_addr;
 		}
@@ -5171,27 +5191,36 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 
 			ASSERT(ill->ill_lso_capab != NULL);
 			if ((lsoinfo_mp = ip_lsoinfo_return(lso_dst_ire, connp,
-			    ill->ill_name, ill->ill_lso_capab)) != NULL)
-				linkb(mp, lsoinfo_mp);
+			    ill->ill_name, ill->ill_lso_capab)) != NULL) {
+				if (mp == NULL) {
+					*mpp = lsoinfo_mp;
+				} else {
+					linkb(mp, lsoinfo_mp);
+				}
+			}
 		} else if (md_dst_ire != NULL) {
 			mblk_t *mdinfo_mp;
 
 			ASSERT(ill->ill_mdt_capab != NULL);
 			if ((mdinfo_mp = ip_mdinfo_return(md_dst_ire, connp,
-			    ill->ill_name, ill->ill_mdt_capab)) != NULL)
-				linkb(mp, mdinfo_mp);
+			    ill->ill_name, ill->ill_mdt_capab)) != NULL) {
+				if (mp == NULL) {
+					*mpp = mdinfo_mp;
+				} else {
+					linkb(mp, mdinfo_mp);
+				}
+			}
 		}
 	}
 bad_addr:
 	if (ipsec_policy_set) {
-		ASSERT(policy_mp == mp->b_cont);
-		ASSERT(policy_mp != NULL);
-		freeb(policy_mp);
+		ASSERT(mp != NULL);
+		freeb(mp);
 		/*
 		 * As of now assume that nothing else accompanies
 		 * IPSEC_POLICY_SET.
 		 */
-		mp->b_cont = NULL;
+		*mpp = NULL;
 	}
 	if (src_ire != NULL)
 		IRE_REFRELE(src_ire);
@@ -5206,32 +5235,62 @@ bad_addr:
 	return (error);
 }
 
+int
+ip_proto_bind_connected_v4(conn_t *connp, mblk_t **ire_mpp, uint8_t protocol,
+    ipaddr_t *src_addrp, uint16_t lport, ipaddr_t dst_addr, uint16_t fport,
+    boolean_t fanout_insert, boolean_t verify_dst)
+{
+	int error;
+	mblk_t	*mp = NULL;
+	boolean_t ire_requested;
+
+	if (ire_mpp)
+		mp = *ire_mpp;
+	ire_requested = (mp != NULL && DB_TYPE(mp) == IRE_DB_REQ_TYPE);
+
+	ASSERT(!connp->conn_af_isv6);
+	connp->conn_pkt_isv6 = B_FALSE;
+	connp->conn_ulp = protocol;
+
+	/* For raw socket, the local port is not set. */
+	if (lport == 0)
+		lport = connp->conn_lport;
+	error = ip_bind_connected_v4(connp, ire_mpp, protocol,
+	    src_addrp, lport, dst_addr, fport, fanout_insert, verify_dst);
+	if (error == 0) {
+		ip_bind_post_handling(connp, ire_mpp ? *ire_mpp : NULL,
+		    ire_requested);
+	} else if (error < 0) {
+		error = -TBADADDR;
+	}
+	return (error);
+}
+
 /*
- * Insert the ire in b_cont. Returns false if it fails (due to lack of space).
+ * Get the ire in *mpp. Returns false if it fails (due to lack of space).
  * Prefers dst_ire over src_ire.
  */
 static boolean_t
-ip_bind_insert_ire(mblk_t *mp, ire_t *ire, iulp_t *ulp_info, ip_stack_t *ipst)
+ip_bind_get_ire_v4(mblk_t **mpp, ire_t *ire, iulp_t *ulp_info, ip_stack_t *ipst)
 {
-	mblk_t	*mp1;
-	ire_t *ret_ire = NULL;
+	mblk_t	*mp = *mpp;
+	ire_t	*ret_ire;
 
-	mp1 = mp->b_cont;
-	ASSERT(mp1 != NULL);
+	ASSERT(mp != NULL);
 
 	if (ire != NULL) {
 		/*
-		 * mp1 initialized above to IRE_DB_REQ_TYPE
+		 * mp initialized above to IRE_DB_REQ_TYPE
 		 * appended mblk. Its <upper protocol>'s
 		 * job to make sure there is room.
 		 */
-		if ((mp1->b_datap->db_lim - mp1->b_rptr) < sizeof (ire_t))
-			return (0);
+		if ((mp->b_datap->db_lim - mp->b_rptr) < sizeof (ire_t))
+			return (B_FALSE);
 
-		mp1->b_datap->db_type = IRE_DB_TYPE;
-		mp1->b_wptr = mp1->b_rptr + sizeof (ire_t);
-		bcopy(ire, mp1->b_rptr, sizeof (ire_t));
-		ret_ire = (ire_t *)mp1->b_rptr;
+		mp->b_datap->db_type = IRE_DB_TYPE;
+		mp->b_wptr = mp->b_rptr + sizeof (ire_t);
+		bcopy(ire, mp->b_rptr, sizeof (ire_t));
+		ret_ire = (ire_t *)mp->b_rptr;
 		/*
 		 * Pass the latest setting of the ip_path_mtu_discovery and
 		 * copy the ulp info if any.
@@ -5242,16 +5301,15 @@ ip_bind_insert_ire(mblk_t *mp, ire_t *ire, iulp_t *ulp_info, ip_stack_t *ipst)
 			bcopy(ulp_info, &(ret_ire->ire_uinfo),
 			    sizeof (iulp_t));
 		}
-		ret_ire->ire_mp = mp1;
+		ret_ire->ire_mp = mp;
 	} else {
 		/*
 		 * No IRE was found. Remove IRE mblk.
 		 */
-		mp->b_cont = mp1->b_cont;
-		freeb(mp1);
+		*mpp = mp->b_cont;
+		freeb(mp);
 	}
-
-	return (1);
+	return (B_TRUE);
 }
 
 /*
@@ -5645,9 +5703,9 @@ ip_ddi_destroy(void)
 {
 	tnet_fini();
 
-	icmp_ddi_destroy();
-	rts_ddi_destroy();
-	udp_ddi_destroy();
+	icmp_ddi_g_destroy();
+	rts_ddi_g_destroy();
+	udp_ddi_g_destroy();
 	sctp_ddi_g_destroy();
 	tcp_ddi_g_destroy();
 	ipsec_policy_g_destroy();
@@ -5814,6 +5872,7 @@ ip_stack_fini(netstackid_t stackid, void *arg)
 	kmem_free(ipst->ips_ill_g_heads, sizeof (ill_g_head_t) * MAX_G_HEADS);
 	ipst->ips_ill_g_heads = NULL;
 
+	ldi_ident_release(ipst->ips_ldi_ident);
 	kmem_free(ipst, sizeof (*ipst));
 }
 
@@ -5898,9 +5957,9 @@ ip_ddi_init(void)
 
 	tnet_init();
 
-	udp_ddi_init();
-	rts_ddi_init();
-	icmp_ddi_init();
+	udp_ddi_g_init();
+	rts_ddi_g_init();
+	icmp_ddi_g_init();
 }
 
 /*
@@ -5912,6 +5971,7 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	ip_stack_t	*ipst;
 	ipparam_t	*pa;
 	ipndp_t		*na;
+	major_t		major;
 
 #ifdef NS_DEBUG
 	printf("ip_stack_init(stack %d)\n", stackid);
@@ -6011,6 +6071,8 @@ ip_stack_init(netstackid_t stackid, netstack_t *ns)
 	list_create(&ipst->ips_capab_taskq_list, sizeof (mblk_t),
 	    offsetof(mblk_t, b_next));
 
+	major = mod_name_to_major(INET_NAME);
+	(void) ldi_ident_from_major(major, &ipst->ips_ldi_ident);
 	return (ipst);
 }
 
@@ -6353,7 +6415,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 		}
 	}
 
-	if (connp == NULL || connp->conn_upq == NULL) {
+	if (connp == NULL) {
 		/*
 		 * No one bound to these addresses.  Is
 		 * there a client that wants all
@@ -6392,6 +6454,9 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 		}
 		return;
 	}
+
+	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
+
 	CONN_INC_REF(connp);
 	first_connp = connp;
 
@@ -6415,7 +6480,7 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 		/*
 		 * Copy the packet.
 		 */
-		if (connp == NULL || connp->conn_upq == NULL ||
+		if (connp == NULL ||
 		    (((first_mp1 = dupmsg(first_mp)) == NULL) &&
 		    ((first_mp1 = ip_copymsg(first_mp)) == NULL))) {
 			/*
@@ -6425,11 +6490,17 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 			connp = first_connp;
 			break;
 		}
+		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_rq != NULL);
 		mp1 = mctl_present ? first_mp1->b_cont : first_mp1;
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
 		rq = connp->conn_rq;
-		if (!canputnext(rq)) {
+
+		/*
+		 * Check flow control
+		 */
+		if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+		    (!IPCL_IS_NONSTR(connp) && !canputnext(rq))) {
 			if (flags & IP_FF_RAWIP) {
 				BUMP_MIB(mibptr, rawipIfStatsInOverflows);
 			} else {
@@ -6527,7 +6598,11 @@ ip_fanout_proto(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha, uint_t flags,
 	}
 
 	rq = connp->conn_rq;
-	if (!canputnext(rq)) {
+	/*
+	 * Check flow control
+	 */
+	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+	    (!IPCL_IS_NONSTR(connp) && !canputnext(rq))) {
 		if (flags & IP_FF_RAWIP) {
 			BUMP_MIB(mibptr, rawipIfStatsInOverflows);
 		} else {
@@ -6975,7 +7050,8 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 	else
 		first_mp = mp;
 
-	if (CONN_UDP_FLOWCTLD(connp)) {
+	if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+	    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
 		BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
 		freemsg(first_mp);
 		return;
@@ -7166,8 +7242,11 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 			connp = connp->conn_next;
 		}
 
-		if (connp == NULL || connp->conn_upq == NULL)
+		if (connp == NULL ||
+		    !IPCL_IS_NONSTR(connp) && connp->conn_upq == NULL)
 			goto notfound;
+
+		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
 
 		if (is_system_labeled() &&
 		    !tsol_receive_local(mp, &dst, IPV4_VERSION, shared_addr,
@@ -7202,8 +7281,11 @@ ip_fanout_udp(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 		connp = connp->conn_next;
 	}
 
-	if (connp == NULL || connp->conn_upq == NULL)
+	if (connp == NULL ||
+	    !IPCL_IS_NONSTR(connp) && connp->conn_upq == NULL)
 		goto notfound;
+
+	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
 
 	first_connp = connp;
 	/*
@@ -7321,7 +7403,8 @@ notfound:
 		    connp))
 			connp = NULL;
 
-		if (connp == NULL || connp->conn_upq == NULL) {
+		if (connp == NULL ||
+		    !IPCL_IS_NONSTR(connp) && connp->conn_upq == NULL) {
 			/*
 			 * No one bound to this port.  Is
 			 * there a client that wants all
@@ -7349,6 +7432,7 @@ notfound:
 			}
 			return;
 		}
+		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
 
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
@@ -7377,7 +7461,8 @@ notfound:
 		connp = connp->conn_next;
 	}
 
-	if (connp == NULL || connp->conn_upq == NULL) {
+	if (connp == NULL ||
+	    !IPCL_IS_NONSTR(connp) && connp->conn_upq == NULL) {
 		/*
 		 * No one bound to this port.  Is
 		 * there a client that wants all
@@ -7406,6 +7491,7 @@ notfound:
 		}
 		return;
 	}
+	ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
 
 	first_connp = connp;
 
@@ -9774,6 +9860,15 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp,
 		return (ip_modopen(q, devp, flag, sflag, credp));
 	}
 
+	if ((flag & ~(FKLYR)) == IP_HELPER_STR) {
+		/*
+		 * Non streams based socket looking for a stream
+		 * to access IP
+		 */
+		return (ip_helper_stream_setup(q, devp, flag, sflag,
+		    credp, isv6));
+	}
+
 	ns = netstack_find_by_cred(credp);
 	ASSERT(ns != NULL);
 	ipst = ns->netstack_ip;
@@ -10344,7 +10439,7 @@ ip_opt_set_ipif(conn_t *connp, ipaddr_t addr, boolean_t checkonly, int option,
 		if (ipif == NULL) {
 			if (error == EINPROGRESS)
 				return (error);
-			else if ((option == IP_MULTICAST_IF) ||
+			if ((option == IP_MULTICAST_IF) ||
 			    (option == IP_NEXTHOP))
 				return (EHOSTUNREACH);
 			else
@@ -11611,7 +11706,6 @@ ip_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 	}
 	return (-1);
 }
-
 /* Named Dispatch routine to get a current value out of our parameter table. */
 /* ARGSUSED */
 static int
@@ -12806,10 +12900,11 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 
 	if ((connp = ipcl_classify_v4(mp, IPPROTO_UDP, IP_SIMPLE_HDR_LENGTH,
 	    ire->ire_zoneid, ipst)) != NULL) {
-		ASSERT(connp->conn_upq != NULL);
+		ASSERT(IPCL_IS_NONSTR(connp) || connp->conn_upq != NULL);
 		IP_STAT(ipst, ip_udp_fast_path);
 
-		if (CONN_UDP_FLOWCTLD(connp)) {
+		if ((IPCL_IS_NONSTR(connp) && PROTO_FLOW_CNTRLD(connp)) ||
+		    (!IPCL_IS_NONSTR(connp) && CONN_UDP_FLOWCTLD(connp))) {
 			freemsg(mp);
 			BUMP_MIB(ill->ill_ip_mib, udpIfStatsInOverflows);
 		} else {
@@ -20373,11 +20468,9 @@ ip_trash_ire_reclaim_stack(ip_stack_t *ipst)
  * upper level protocol.  We remove this conn from any fanout hash list it is
  * on, and zero out the bind information.  No reply is expected up above.
  */
-mblk_t *
-ip_unbind(queue_t *q, mblk_t *mp)
+void
+ip_unbind(conn_t *connp)
 {
-	conn_t  *connp = Q_TO_CONN(q);
-
 	ASSERT(!MUTEX_HELD(&connp->conn_lock));
 
 	if (is_system_labeled() && connp->conn_anon_port) {
@@ -20390,20 +20483,6 @@ ip_unbind(queue_t *q, mblk_t *mp)
 
 	ipcl_hash_remove(connp);
 
-	ASSERT(mp->b_cont == NULL);
-	/*
-	 * Convert mp into a T_OK_ACK
-	 */
-	mp = mi_tpi_ok_ack_alloc(mp);
-
-	/*
-	 * should not happen in practice... T_OK_ACK is smaller than the
-	 * original message.
-	 */
-	if (mp == NULL)
-		return (NULL);
-
-	return (mp);
 }
 
 /*
@@ -20475,11 +20554,13 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	ASSERT(connp != NULL);
 	zoneid = connp->conn_zoneid;
 	ipst = connp->conn_netstack->netstack_ip;
+	ASSERT(ipst != NULL);
 
 	/* is queue flow controlled? */
 	if ((q->q_first != NULL || connp->conn_draining) &&
 	    (caller == IP_WPUT)) {
 		ASSERT(!need_decref);
+		ASSERT(!IP_FLOW_CONTROLLED_ULP(connp->conn_ulp));
 		(void) putq(q, mp);
 		return;
 	}
@@ -21514,7 +21595,6 @@ dontroute:
 			 * connectivity.
 			 */
 			ipha->ipha_ttl = 1;
-
 			/* If suitable ipif not found, drop packet */
 			dst_ipif = ipif_lookup_onlink_addr(dst, zoneid, ipst);
 			if (dst_ipif == NULL) {
@@ -23244,6 +23324,7 @@ blocked:
 						 * ip_wsrv will be scheduled or
 						 * is already running.
 						 */
+
 						(void) putq(connp->conn_wq,
 						    first_mp);
 					}
@@ -27522,26 +27603,6 @@ ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode, ipsq_t *ipsq)
 		ipsq_current_finish(ipsq);
 }
 
-/*
- * This is called from ip_wput_nondata to resume a deferred TCP bind.
- */
-/* ARGSUSED */
-void
-ip_resume_tcp_bind(void *arg, mblk_t *mp, void *arg2)
-{
-	conn_t *connp = arg;
-	tcp_t	*tcp;
-
-	ASSERT(connp != NULL && IPCL_IS_TCP(connp) && connp->conn_tcp != NULL);
-	tcp = connp->conn_tcp;
-
-	if (connp->conn_tcp->tcp_state == TCPS_CLOSED)
-		freemsg(mp);
-	else
-		tcp_rput_other(tcp, mp);
-	CONN_OPER_PENDING_DONE(connp);
-}
-
 /* Called from ip_wput for all non data messages */
 /* ARGSUSED */
 void
@@ -27782,8 +27843,9 @@ nak:
 	case M_PROTO:
 	case M_PCPROTO:
 		/*
-		 * The only PROTO messages we expect are ULP binds and
-		 * copies of option negotiation acknowledgements.
+		 * The only PROTO messages we expect are copies of option
+		 * negotiation acknowledgements, AH and ESP bind requests
+		 * are also expected.
 		 */
 		switch (((union T_primitives *)mp->b_rptr)->type) {
 		case O_T_BIND_REQ:
@@ -27809,37 +27871,15 @@ nak:
 
 			mp = connp->conn_af_isv6 ? ip_bind_v6(q, mp,
 			    connp, NULL) : ip_bind_v4(q, mp, connp);
-			if (mp == NULL)
-				return;
-			if (IPCL_IS_TCP(connp)) {
-				/*
-				 * In the case of TCP endpoint we
-				 * come here only for bind retries
-				 */
-				ASSERT(ipsq != NULL);
-				CONN_INC_REF(connp);
-				SQUEUE_ENTER_ONE(connp->conn_sqp, mp,
-				    ip_resume_tcp_bind, connp,
-				    SQ_FILL, SQTAG_BIND_RETRY);
-			} else if (IPCL_IS_UDP(connp)) {
-				/*
-				 * In the case of UDP endpoint we
-				 * come here only for bind retries
-				 */
-				ASSERT(ipsq != NULL);
-				udp_resume_bind(connp, mp);
-			} else if (IPCL_IS_RAWIP(connp)) {
-				/*
-				 * In the case of RAWIP endpoint we
-				 * come here only for bind retries
-				 */
-				ASSERT(ipsq != NULL);
-				rawip_resume_bind(connp, mp);
-			} else {
-				/* The case of AH and ESP */
-				qreply(q, mp);
-				CONN_OPER_PENDING_DONE(connp);
-			}
+			ASSERT(mp != NULL);
+
+			ASSERT(!IPCL_IS_TCP(connp));
+			ASSERT(!IPCL_IS_UDP(connp));
+			ASSERT(!IPCL_IS_RAWIP(connp));
+
+			/* The case of AH and ESP */
+			qreply(q, mp);
+			CONN_OPER_PENDING_DONE(connp);
 			return;
 		}
 		case T_SVR4_OPTMGMT_REQ:
@@ -27908,7 +27948,8 @@ nak:
 				proto_str = "T_UNBIND_REQ";
 				goto protonak;
 			}
-			mp = ip_unbind(q, mp);
+			ip_unbind(Q_TO_CONN(q));
+			mp = mi_tpi_ok_ack_alloc(mp);
 			qreply(q, mp);
 			return;
 		default:
@@ -28582,6 +28623,11 @@ conn_drain_insert(conn_t *connp)
 		head->conn_drain_prev->conn_drain_next = connp;
 		head->conn_drain_prev = connp;
 	}
+	/*
+	 * For non streams based sockets assert flow control.
+	 */
+	(*connp->conn_upcalls->su_txq_full)
+	    (connp->conn_upper_handle, B_TRUE);
 	mutex_exit(CONN_DRAIN_LIST_LOCK(connp));
 }
 
@@ -28695,7 +28741,16 @@ conn_drain_tail(conn_t *connp, boolean_t closing)
 		}
 		connp->conn_drain_next = NULL;
 		connp->conn_drain_prev = NULL;
+
+		/*
+		 * For non streams based sockets open up flow control.
+		 */
+		if (IPCL_IS_NONSTR(connp)) {
+			(*connp->conn_upcalls->su_txq_full)
+			    (connp->conn_upper_handle, B_FALSE);
+		}
 	}
+
 	mutex_exit(CONN_DRAIN_LIST_LOCK(connp));
 }
 
@@ -28779,6 +28834,7 @@ ip_wsrv(queue_t *q)
 		 */
 		connp->conn_draining = 0;
 		enableok(q);
+
 	}
 
 	/* Enable the next conn for draining */
@@ -28941,7 +28997,7 @@ ip_conn_report(queue_t *q, mblk_t *mp, caddr_t arg, cred_t *ioc_cr)
 	    "CONN      " MI_COL_HDRPAD_STR
 	    "rfq      " MI_COL_HDRPAD_STR
 	    "stq      " MI_COL_HDRPAD_STR
-	    " zone local                 remote");
+	    " zone local		 remote");
 
 	/*
 	 * Because of the ndd constraint, at most we can have 64K buffer
@@ -29338,7 +29394,6 @@ ip_multirt_apply_membership(int (*fn)(conn_t *, boolean_t, ipaddr_t, ipaddr_t,
 	 */
 	return (or->or_private == CGTP_MCAST_SUCCESS ? 0 : error);
 }
-
 
 /*
  * Issue a warning regarding a route crossing an interface with an

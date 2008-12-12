@@ -546,7 +546,7 @@ typedef struct iscsi_conn {
 	kcondvar_t		conn_state_change;
 	boolean_t		conn_state_destroy;
 
-	struct sonode		*conn_socket;	/* aka. kernel net. socket */
+	void			*conn_socket;	/* kernel socket */
 
 	/* base connection information */
 	iscsi_sockaddr_t	conn_base_addr;
@@ -846,7 +846,7 @@ typedef struct iscsi_network {
 	int (*connect)(void *, struct sockaddr *, int, int, int);
 	int (*listen)(void *, int);
 	void* (*accept)(void *, struct sockaddr *, int *);
-	int (*getsockname)(void *);
+	int (*getsockname)(void *, struct sockaddr *, socklen_t *);
 	int (*getsockopt)(void *, int, int, void *, int *, int);
 	int (*setsockopt)(void *, int, int, void *, int);
 	int (*shutdown)(void *, int);

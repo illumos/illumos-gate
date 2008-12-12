@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +37,6 @@
  *
  *	@(#)rtsock.c	8.6 (Berkeley) 2/11/95
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains routines that processes routing socket requests.
@@ -104,10 +102,9 @@ static void	ip_rts_request_retry(ipsq_t *, queue_t *q, mblk_t *mp, void *);
  *
  */
 void
-rts_queue_input(mblk_t *mp, queue_t *q, sa_family_t af, ip_stack_t *ipst)
+rts_queue_input(mblk_t *mp, conn_t *o_connp, sa_family_t af, ip_stack_t *ipst)
 {
 	mblk_t	*mp1;
-	int	checkqfull;
 	conn_t 	*connp, *next_connp;
 
 	mutex_enter(&ipst->ips_rts_clients->connf_lock);
@@ -130,24 +127,16 @@ rts_queue_input(mblk_t *mp, queue_t *q, sa_family_t af, ip_stack_t *ipst)
 		 * socket, we check if there is room upstream for a copy of the
 		 * message.
 		 */
-		if ((q != NULL) && (CONNP_TO_RQ(connp) == RD(q))) {
-			if (connp->conn_loopback == 0) {
+		if ((o_connp == connp) && connp->conn_loopback == 0) {
 				connp = connp->conn_next;
 				continue;
-			}
-			/*
-			 * Just because it is the same queue doesn't mean it
-			 * will promptly read its acks. Have to avoid using
-			 * all of kernel memory.
-			 */
-			checkqfull = B_TRUE;
-		} else {
-			checkqfull = B_TRUE;
 		}
 		CONN_INC_REF(connp);
 		mutex_exit(&ipst->ips_rts_clients->connf_lock);
 		/* Pass to rts_input */
-		if (!checkqfull || canputnext(CONNP_TO_RQ(connp))) {
+		if ((IPCL_IS_NONSTR(connp) && !PROTO_FLOW_CNTRLD(connp))||
+		    (!IPCL_IS_NONSTR(connp) &&
+		    canputnext(CONNP_TO_RQ(connp)))) {
 			mp1 = dupmsg(mp);
 			if (mp1 == NULL)
 				mp1 = copymsg(mp);
@@ -273,7 +262,7 @@ ip_rts_unregister(conn_t *connp)
  * conn close occurs in conn_ioctl_cleanup.
  */
 int
-ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
+ip_rts_request_common(queue_t *q, mblk_t *mp, conn_t *connp, cred_t *ioc_cr)
 {
 	rt_msghdr_t	*rtm = NULL;
 	in6_addr_t	dst_addr_v6;
@@ -298,7 +287,6 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 	ipif_t		*ipif = NULL;
 	ipif_t		*tmp_ipif = NULL;
 	IOCP		iocp = (IOCP)mp->b_rptr;
-	conn_t		*connp;
 	boolean_t	gcgrp_xtraref = B_FALSE;
 	tsol_gcgrp_addr_t ga;
 	tsol_rtsecattr_t rtsecattr;
@@ -311,8 +299,6 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 
 	ip1dbg(("ip_rts_request: mp is %x\n", DB_TYPE(mp)));
 
-	ASSERT(CONN_Q(q));
-	connp = Q_TO_CONN(q);
 	zoneid = connp->conn_zoneid;
 	ipst = connp->conn_netstack->netstack_ip;
 
@@ -564,7 +550,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 
 			error = ip_rt_add(dst_addr, net_mask, gw_addr, src_addr,
 			    rtm->rtm_flags, ipif, &ire, B_FALSE,
-			    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry,
+			    WR(q), ioc_mp, ip_rts_request_retry,
 			    rtsap, ipst);
 			if (ipif != NULL)
 				ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
@@ -602,7 +588,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 
 				error = ip_rt_add_v6(&dst_addr_v6, &net_mask_v6,
 				    &gw_addr_v6, &src_addr_v6, rtm->rtm_flags,
-				    ipif, &ire, CONNP_TO_WQ(connp), ioc_mp,
+				    ipif, &ire, WR(q), ioc_mp,
 				    ip_rts_request_retry, rtsap, ipst);
 				break;
 			}
@@ -616,7 +602,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 			}
 			error = ip_rt_add_v6(&dst_addr_v6, &net_mask_v6,
 			    &gw_addr_v6, NULL, rtm->rtm_flags,
-			    ipif, &ire, CONNP_TO_WQ(connp), ioc_mp,
+			    ipif, &ire, WR(q), ioc_mp,
 			    ip_rts_request_retry, rtsap, ipst);
 			if (ipif != NULL)
 				ASSERT(!MUTEX_HELD(&ipif->ipif_ill->ill_lock));
@@ -646,14 +632,12 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 		case AF_INET:
 			error = ip_rt_delete(dst_addr, net_mask, gw_addr,
 			    found_addrs, rtm->rtm_flags, ipif, B_FALSE,
-			    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry,
-			    ipst);
+			    WR(q), ioc_mp, ip_rts_request_retry, ipst);
 			break;
 		case AF_INET6:
 			error = ip_rt_delete_v6(&dst_addr_v6, &net_mask_v6,
 			    &gw_addr_v6, found_addrs, rtm->rtm_flags, ipif,
-			    CONNP_TO_WQ(connp), ioc_mp, ip_rts_request_retry,
-			    ipst);
+			    WR(q), ioc_mp, ip_rts_request_retry, ipst);
 			break;
 		}
 		break;
@@ -867,7 +851,7 @@ ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
 						 */
 						tmp_ipif = ipif_lookup_addr(
 						    src_addr, NULL, ALL_ZONES,
-						    CONNP_TO_WQ(connp), ioc_mp,
+						    WR(q), ioc_mp,
 						    ip_rts_request_retry,
 						    &error, ipst);
 						if (tmp_ipif == NULL) {
@@ -1053,17 +1037,25 @@ done:
 			/* OK ACK already set up by caller except this */
 			ip2dbg(("ip_rts_request: OK ACK\n"));
 		}
-		rts_queue_input(mp, q, af, ipst);
+		rts_queue_input(mp, connp, af, ipst);
 	}
+
 	iocp->ioc_error = error;
 	ioc_mp->b_datap->db_type = M_IOCACK;
 	if (iocp->ioc_error != 0)
 		iocp->ioc_count = 0;
 	(connp->conn_recv)(connp, ioc_mp, NULL);
+
 	/* conn was refheld in ip_wput_ioctl. */
 	CONN_OPER_PENDING_DONE(connp);
 
 	return (error);
+}
+
+int
+ip_rts_request(queue_t *q, mblk_t *mp, cred_t *ioc_cr)
+{
+	return (ip_rts_request_common(q, mp, Q_TO_CONN(q), ioc_cr));
 }
 
 /*

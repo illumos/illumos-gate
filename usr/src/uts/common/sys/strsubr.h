@@ -1126,7 +1126,6 @@ extern void strclean(struct vnode *);
 extern void str_cn_clean();	/* XXX hook for consoles signal cleanup */
 extern int strwrite(struct vnode *, struct uio *, cred_t *);
 extern int strwrite_common(struct vnode *, struct uio *, cred_t *, int);
-extern int kstrwritemp(struct vnode *, mblk_t *, ushort_t);
 extern int strread(struct vnode *, struct uio *, cred_t *);
 extern int strioctl(struct vnode *, int, intptr_t, int, int, cred_t *, int *);
 extern int strrput(queue_t *, mblk_t *);
@@ -1151,6 +1150,7 @@ extern int strcopyout(void *, void *, size_t, int);
 extern void strsignal(struct stdata *, int, int32_t);
 extern clock_t str_cv_wait(kcondvar_t *, kmutex_t *, clock_t, int);
 extern void disable_svc(queue_t *);
+extern void enable_svc(queue_t *);
 extern void remove_runlist(queue_t *);
 extern void wait_svc(queue_t *);
 extern void backenable(queue_t *, uchar_t);
@@ -1212,6 +1212,7 @@ extern mblk_t *allocb_cred_wait(size_t, uint_t, int *, cred_t *);
 extern mblk_t *allocb_tmpl(size_t, const mblk_t *);
 extern mblk_t *allocb_tryhard(size_t);
 extern void mblk_setcred(mblk_t *, cred_t *);
+extern void msg_setcredpid(mblk_t *, cred_t *, pid_t);
 extern void strpollwakeup(vnode_t *, short);
 extern int putnextctl_wait(queue_t *, int);
 

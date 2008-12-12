@@ -32,7 +32,7 @@ extern "C" {
 
 #include <netinet/in.h>
 #include <sys/types.h>
-
+#include <sys/ksocket.h>
 #include <sys/iscsit/radius_protocol.h>
 
 /* A total of RAD_RCV_TIMEOUT * RAD_RETRY_MAX seconds timeout. */
@@ -69,7 +69,7 @@ typedef struct radius_packet_data {
  *
  */
 int
-iscsit_snd_radius_request(void *socket,
+iscsit_snd_radius_request(ksocket_t socket,
     iscsi_ipaddr_t rsvr_ip_addr,
     uint32_t rsvr_port,
     radius_packet_data_t *packet_data);
@@ -85,7 +85,7 @@ iscsit_snd_radius_request(void *socket,
  * Return receive status.
  */
 int
-iscsit_rcv_radius_response(void *socket,
+iscsit_rcv_radius_response(ksocket_t socket,
     uint8_t *shared_secret,
     uint32_t shared_secret_len,
     uint8_t *req_authenticator,

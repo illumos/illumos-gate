@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 #ifndef	_SYS_SOCKIO_H
 #define	_SYS_SOCKIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * General socket ioctl definitions.
@@ -316,7 +314,9 @@ extern "C" {
 #define	SIOCSIPMPFAILBACK	_IOW('i', 182, int)	/* enable/disable */
 							/* FAILBACK */
 
-#define	SIOCSENABLESDP _IOWR('i', 183, int)    /*  Enable SDP */
+#define	SIOCSENABLESDP	_IOWR('i', 183, int)    /*  Enable SDP */
+
+#define	SIOCSQPTR	_IOWR('i', 184, int)    /* set q_ptr of stream */
 
 #ifdef	__cplusplus
 }

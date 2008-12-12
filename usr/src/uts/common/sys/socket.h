@@ -120,6 +120,15 @@ typedef	void		*_RESTRICT_KYWD Psocklen_t;
 
 #ifdef _KERNEL
 #define	SO_SND_COPYAVOID 0x0800		/* Internal: use zero-copy */
+#define	SO_SND_BUFINFO	0x1000		/* Internal: get buffer info */
+					/* when doing zero-copy */
+
+struct so_snd_bufinfo {
+	ushort_t	sbi_wroff; 	/* Write offset */
+	ssize_t		sbi_maxblk;	/* Max size of a single mblk */
+	ssize_t		sbi_maxpsz;	/* Max total size of a mblk chain */
+	ushort_t	sbi_tail;	/* Extra space available at the end */
+};
 #endif /* _KERNEL */
 
 /*
@@ -143,6 +152,7 @@ typedef	void		*_RESTRICT_KYWD Psocklen_t;
 #define	SO_ANON_MLP	0x100a		/* create MLP on anonymous bind */
 #define	SO_MAC_EXEMPT	0x100b		/* allow dominated unlabeled peers */
 #define	SO_DOMAIN	0x100c		/* get socket domain */
+#define	SO_RCVPSH	0x100d		/* receive interval to push data */
 
 /* "Socket"-level control message types: */
 #define	SCM_RIGHTS	0x1010		/* access rights (array of int) */
@@ -167,6 +177,21 @@ typedef	void		*_RESTRICT_KYWD Psocklen_t;
  */
 #define	SO_ACCEPTOR	0x20000		/* acceptor socket */
 #define	SO_SOCKSTR	0x40000		/* normal socket stream */
+#define	SO_FALLBACK	0x80000		/* fallback to TPI socket */
+
+/*
+ * Flags for socket_create() and socket_newconn()
+ */
+#define	SOCKET_SLEEP	KM_SLEEP
+#define	SOCKET_NOSLEEP	KM_NOSLEEP
+
+
+/*
+ * flags used by sockfs when falling back to tpi socket
+ */
+#define	SO_FB_START	0x1
+#define	SO_FB_FINISH	0x2
+
 #endif	/* _KERNEL */
 
 /*
@@ -340,12 +365,26 @@ struct msghdr32 {
 #define	MSG_CTRUNC	0x10		/* Control data truncated */
 #define	MSG_TRUNC	0x20		/* Normal data truncated */
 #define	MSG_WAITALL	0x40		/* Wait for complete recv or error */
+#define	MSG_DUPCTRL	0x800		/* Save control message for use with */
+					/* with left over data */
 /* End of XPGv2 compliance */
 #define	MSG_DONTWAIT	0x80		/* Don't block for this recv */
 #define	MSG_NOTIFICATION 0x100		/* Notification, not data */
 #define	MSG_XPG4_2	0x8000		/* Private: XPG4.2 flag */
 
 #define	MSG_MAXIOVLEN	16
+
+#ifdef _KERNEL
+
+/*
+ * for kernel socket only
+ */
+#define	MSG_MBLK_QUICKRELE	0x10000000	/* free mblk chain */
+						/* in timely manner */
+#define	MSG_USERSPACE		0x20000000	/* buffer from user space */
+
+#endif /* _KERNEL */
+
 
 /* Added for XPGv2 compliance */
 #define	SHUT_RD		0

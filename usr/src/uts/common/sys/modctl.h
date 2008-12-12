@@ -26,8 +26,6 @@
 #ifndef	_SYS_MODCTL_H
 #define	_SYS_MODCTL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * loadable module support.
  */
@@ -73,6 +71,7 @@ extern struct mod_ops mod_miscops;
 extern struct mod_ops mod_schedops;
 extern struct mod_ops mod_strmodops;
 extern struct mod_ops mod_syscallops;
+extern struct mod_ops mod_sockmodops;
 #ifdef _SYSCALL32_IMPL
 extern struct mod_ops mod_syscallops32;
 #endif
@@ -189,6 +188,13 @@ struct modldev {
 	struct mod_ops		*dev_modops;
 	char			*dev_linkinfo;
 	struct devname_ops	*dev_ops;
+};
+
+/* For socket Modules. */
+struct modlsockmod {
+	struct mod_ops		*sockmod_modops;
+	char			*sockmod_linkinfo;
+	struct smod_reg_s	*sockmod_reg_info;
 };
 
 /* For kiconv modules */

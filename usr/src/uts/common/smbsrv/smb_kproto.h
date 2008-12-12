@@ -38,6 +38,7 @@ extern "C" {
 #include <sys/socket.h>
 #include <sys/strsubr.h>
 #include <sys/socketvar.h>
+#include <sys/ksocket.h>
 #include <sys/cred.h>
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/smb_xdr.h>
@@ -307,19 +308,17 @@ uint32_t smb_decode_sd(struct smb_xa *, smb_sd_t *);
 /*
  * Socket functions
  */
-struct sonode *smb_socreate(int domain, int type, int protocol);
-void smb_soshutdown(struct sonode *so);
-void smb_sodestroy(struct sonode *so);
-int smb_sorecv(struct sonode *so, void *msg, size_t len);
-int smb_iov_sorecv(struct sonode *so, iovec_t *iop, int iovlen,
-    size_t total_len);
+ksocket_t smb_socreate(int domain, int type, int protocol);
+void smb_soshutdown(ksocket_t so);
+void smb_sodestroy(ksocket_t so);
+int smb_sorecv(ksocket_t so, void *msg, size_t len);
 int smb_net_init(void);
 void smb_net_fini(void);
 void smb_net_txl_constructor(smb_txlst_t *);
 void smb_net_txl_destructor(smb_txlst_t *);
 smb_txreq_t *smb_net_txr_alloc(void);
 void smb_net_txr_free(smb_txreq_t *);
-int smb_net_txr_send(struct sonode *, smb_txlst_t *, smb_txreq_t *);
+int smb_net_txr_send(ksocket_t, smb_txlst_t *, smb_txreq_t *);
 
 /*
  * SMB RPC interface
@@ -489,7 +488,7 @@ void smb_request_cancel(smb_request_t *sr);
 /*
  * session functions (file smb_session.c)
  */
-smb_session_t *smb_session_create(struct sonode *, uint16_t, smb_server_t *);
+smb_session_t *smb_session_create(ksocket_t, uint16_t, smb_server_t *);
 int smb_session_daemon(smb_session_list_t *);
 void smb_session_reconnection_check(smb_session_list_t *, smb_session_t *);
 void smb_session_timers(smb_session_list_t *);

@@ -1242,7 +1242,7 @@ smb_server_listen(
     int				pthread_create_error)
 {
 	int			rc;
-	struct sonode		*s_so;
+	ksocket_t		s_so;
 	uint32_t		on = 1;
 	smb_session_t		*session;
 
@@ -1263,14 +1263,16 @@ smb_server_listen(
 
 		if (ld->ld_so) {
 
-			(void) sosetsockopt(ld->ld_so, SOL_SOCKET,
-			    SO_REUSEADDR, (const void *)&on, sizeof (on));
+			(void) ksocket_setsockopt(ld->ld_so, SOL_SOCKET,
+			    SO_REUSEADDR, (const void *)&on, sizeof (on),
+			    CRED());
 
-			rc = sobind(ld->ld_so, (struct sockaddr *)&ld->ld_sin,
-			    sizeof (ld->ld_sin), 0, 0);
+			rc = ksocket_bind(ld->ld_so,
+			    (struct sockaddr *)&ld->ld_sin,
+			    sizeof (ld->ld_sin), CRED());
 
 			if (rc == 0) {
-				rc =  solisten(ld->ld_so, 20);
+				rc =  ksocket_listen(ld->ld_so, 20, CRED());
 				if (rc < 0) {
 					cmn_err(CE_WARN,
 					    "Port %d: listen failed", port);
@@ -1297,19 +1299,22 @@ smb_server_listen(
 	DTRACE_PROBE1(so__wait__accept, struct sonode *, ld->ld_so);
 
 	for (;;) {
-		rc = soaccept(ld->ld_so, 0, &s_so);
+		rc = ksocket_accept(ld->ld_so, NULL, NULL, &s_so, CRED());
 		if (rc == 0) {
 			uint32_t	txbuf_size = 128*1024;
 			uint32_t	on = 1;
 
 			DTRACE_PROBE1(so__accept, struct sonode *, s_so);
 
-			(void) sosetsockopt(s_so, IPPROTO_TCP, TCP_NODELAY,
-			    (const void *)&on, sizeof (on));
-			(void) sosetsockopt(s_so, SOL_SOCKET, SO_KEEPALIVE,
-			    (const void *)&on, sizeof (on));
-			(void) sosetsockopt(s_so, SOL_SOCKET, SO_SNDBUF,
-			    (const void *)&txbuf_size, sizeof (txbuf_size));
+			(void) ksocket_setsockopt(s_so, IPPROTO_TCP,
+			    TCP_NODELAY, (const void *)&on, sizeof (on),
+			    CRED());
+			(void) ksocket_setsockopt(s_so, SOL_SOCKET,
+			    SO_KEEPALIVE, (const void *)&on, sizeof (on),
+			    CRED());
+			(void) ksocket_setsockopt(s_so, SOL_SOCKET, SO_SNDBUF,
+			    (const void *)&txbuf_size, sizeof (txbuf_size),
+			    CRED());
 			/*
 			 * Create a session for this connection.
 			 */

@@ -385,6 +385,7 @@ MISC_KMODS	+= s1394
 MISC_KMODS	+= hpcsvc pcihp pciehpc pcishpc
 MISC_KMODS	+= rsmops
 MISC_KMODS	+= kcf
+MISC_KMODS	+= ksocket
 MISC_KMODS	+= ibcm
 MISC_KMODS	+= ibdm
 MISC_KMODS	+= ibmf
@@ -484,6 +485,12 @@ MAC_KMODS	+= mac_ib
 # 'Devname' Modules (kernel/devname)
 #
 DEVNAME_KMODS	+= sdev_nsconfig_mod
+
+#
+# socketmod (kernel/socketmod)
+#
+SOCKET_KMODS	+= socksctp
+SOCKET_KMODS	+= socksdp
 
 #
 #	kiconv modules (/kernel/kiconv):

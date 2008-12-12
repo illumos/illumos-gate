@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-1996,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/stat.h>
@@ -40,12 +37,12 @@
  * Usage:
  *	sonconfig -f <file>
  *		Reads input from file. The file is structured as
- *			 <fam> <type> <protocol> <path>
+ *			 <fam> <type> <protocol> <path|module>
  *			 <fam> <type> <protocol>
  *		with the first line registering and the second line
  *		deregistering.
  *
- *	soconfig <fam> <type> <protocol> <path>
+ *	soconfig <fam> <type> <protocol> <path|module>
  *		registers
  *
  *	soconfig <fam> <type> <protocol>
@@ -99,9 +96,9 @@ static void
 usage(void)
 {
 	fprintf(stderr, gettext(
-		"Usage:	soconfig -f <file>\n"
-		"\tsoconfig <fam> <type> <protocol> <path>\n"
-		"\tsoconfig <fam> <type> <protocol>\n"));
+	    "Usage:	soconfig -f <file>\n"
+	    "\tsoconfig <fam> <type> <protocol> <path|module>\n"
+	    "\tsoconfig <fam> <type> <protocol>\n"));
 }
 
 /*
@@ -131,7 +128,7 @@ parse_file(char *filename)
 		linecount++;
 		strcpy(pline, line);
 		argcount = split_line(pline, argvec,
-				sizeof (argvec) / sizeof (argvec[0]));
+		    sizeof (argvec) / sizeof (argvec[0]));
 #ifdef DEBUG
 		{
 			int i;
@@ -147,18 +144,18 @@ parse_file(char *filename)
 			break;
 		case 3:
 			numerror += parse_params(argvec[0], argvec[1],
-					argvec[2], NULL, linecount);
+			    argvec[2], NULL, linecount);
 			break;
 		case 4:
 			numerror += parse_params(argvec[0], argvec[1],
-					argvec[2], argvec[3], linecount);
+			    argvec[2], argvec[3], linecount);
 			break;
 		default:
 			numerror++;
 			fprintf(stderr,
-				gettext("Malformed line: <%s>\n"), line);
+			    gettext("Malformed line: <%s>\n"), line);
 			fprintf(stderr,
-				gettext("\ton line %d\n"), linecount);
+			    gettext("\ton line %d\n"), linecount);
 			break;
 		}
 	}
@@ -223,7 +220,7 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 		fprintf(stderr, gettext("Bad family number: %s\n"), famstr);
 		if (line != -1)
 			fprintf(stderr,
-				gettext("\ton line %d\n"), line);
+			    gettext("\ton line %d\n"), line);
 		else {
 			fprintf(stderr, "\n");
 			usage();
@@ -234,10 +231,10 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 	type = parse_int(typestr);
 	if (type == -1) {
 		fprintf(stderr,
-			gettext("Bad socket type number: %s\n"), typestr);
+		    gettext("Bad socket type number: %s\n"), typestr);
 		if (line != -1)
 			fprintf(stderr,
-				gettext("\ton line %d\n"), line);
+			    gettext("\ton line %d\n"), line);
 		else {
 			fprintf(stderr, "\n");
 			usage();
@@ -248,10 +245,10 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 	protocol = parse_int(protostr);
 	if (protocol == -1) {
 		fprintf(stderr,
-			gettext("Bad protocol number: %s\n"), protostr);
+		    gettext("Bad protocol number: %s\n"), protostr);
 		if (line != -1)
 			fprintf(stderr,
-				gettext("\ton line %d\n"), line);
+			    gettext("\ton line %d\n"), line);
 		else {
 			fprintf(stderr, "\n");
 			usage();
@@ -263,11 +260,12 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 	if (path != NULL) {
 		struct stat stats;
 
-		if (stat(path, &stats) == -1) {
+		if (strncmp(path, "/dev", strlen("/dev")) == 0 &&
+		    stat(path, &stats) == -1) {
 			perror(path);
 			if (line != -1)
 				fprintf(stderr,
-					gettext("\ton line %d\n"), line);
+				    gettext("\ton line %d\n"), line);
 			else {
 				fprintf(stderr, "\n");
 				usage();
@@ -278,7 +276,7 @@ parse_params(char *famstr, char *typestr, char *protostr, char *path, int line)
 
 #ifdef DEBUG
 	printf("not calling sockconfig(%d, %d, %d, %s)\n",
-		fam, type, protocol, path == NULL ? "(null)" : path);
+	    fam, type, protocol, path == NULL ? "(null)" : path);
 #else
 	if (_sockconfig(fam, type, protocol, path) == -1) {
 		perror("sockconfig");

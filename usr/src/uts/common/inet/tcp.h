@@ -35,6 +35,7 @@ extern "C" {
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <sys/socket.h>
+#include <sys/socket_proto.h>
 #include <sys/sodirect.h>
 #include <sys/multidata.h>
 #include <sys/md5.h>
@@ -201,7 +202,6 @@ typedef struct tcp_s {
 #define	TCP_OFO_FIN_VALID 0x8	/* Has TCP received an out of order FIN? */
 
 
-	int32_t	tcp_xmit_hiwater;	/* Send buffer high water mark. */
 
 	timeout_id_t	tcp_timer_tid;	/* Control block for timer service */
 	uchar_t	tcp_timer_backoff;	/* Backoff shift count. */
@@ -340,7 +340,10 @@ typedef struct tcp_s {
 
 	struct tcp_s *tcp_listener;	/* Our listener */
 
-	int32_t	tcp_xmit_lowater;	/* Send buffer low water mark. */
+	size_t	tcp_xmit_hiwater;	/* Send buffer high water mark. */
+	size_t	tcp_xmit_lowater;	/* Send buffer low water mark. */
+	size_t	tcp_recv_hiwater;	/* Recv high water mark */
+	size_t	tcp_recv_lowater;	/* Recv low water mark */
 
 	uint32_t tcp_irs;		/* Initial recv seq num */
 	uint32_t tcp_fss;		/* Final/fin send seq num */
@@ -491,6 +494,7 @@ typedef struct tcp_s {
 	struct tcp_s *tcp_acceptor_hash; /* Acceptor hash chain */
 	struct tcp_s **tcp_ptpahn; /* Pointer to previous accept hash next. */
 	struct tcp_s *tcp_bind_hash; /* Bind hash chain */
+	struct tcp_s *tcp_bind_hash_port; /* tcp_t's bound to the same lport */
 	struct tcp_s **tcp_ptpbhn;
 
 	boolean_t	tcp_ire_ill_check_done;
@@ -597,6 +601,15 @@ typedef struct tcp_s {
 	 * protected by the tcp_non_sq_lock lock.
 	 */
 	boolean_t	tcp_flow_stopped;
+
+	/*
+	 * The socket generation number is bumped when an outgoing connection
+	 * attempts is made, and it sent up to the socket when the
+	 * connection was successfully established, or an error occured. The
+	 * generation is used to ensure that the socket does not miss the
+	 * asynchronous notification.
+	 */
+	sock_connid_t	tcp_connid;
 
 	/*
 	 * tcp_sodirect is used by tcp on the receive side to push mblk_t(s)

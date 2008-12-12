@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
 
 !include prototype_com
 #
@@ -32,10 +31,9 @@ f none kernel/kmdb/sparcv9/audiosup 555 root sys
 f none kernel/kmdb/sparcv9/cpc 555 root sys
 f none kernel/kmdb/sparcv9/crypto 555 root sys
 f none kernel/kmdb/sparcv9/genunix 555 root sys
+f none kernel/kmdb/sparcv9/hook 555 root sys
 f none kernel/kmdb/sparcv9/intr 555 root sys
 f none kernel/kmdb/sparcv9/ip 555 root sys
-f none kernel/kmdb/sparcv9/hook 555 root sys
-f none kernel/kmdb/sparcv9/neti 555 root sys
 f none kernel/kmdb/sparcv9/ipc 555 root sys
 f none kernel/kmdb/sparcv9/ipp 555 root sys
 f none kernel/kmdb/sparcv9/isp 555 root sys
@@ -47,16 +45,18 @@ f none kernel/kmdb/sparcv9/md 555 root sys
 f none kernel/kmdb/sparcv9/mdb_ds 555 root sys
 f none kernel/kmdb/sparcv9/mpt 555 root sys
 f none kernel/kmdb/sparcv9/nca 555 root sys
+f none kernel/kmdb/sparcv9/neti 555 root sys
 f none kernel/kmdb/sparcv9/nfs 555 root sys
-s none kernel/kmdb/sparcv9/pcisch=intr
 s none kernel/kmdb/sparcv9/pcipsy=intr
+s none kernel/kmdb/sparcv9/pcisch=intr
 f none kernel/kmdb/sparcv9/ptm 555 root sys
 s none kernel/kmdb/sparcv9/px=intr
 f none kernel/kmdb/sparcv9/random 555 root sys
-f none kernel/kmdb/sparcv9/sctp 555 root sys
 f none kernel/kmdb/sparcv9/s1394 555 root sys
 f none kernel/kmdb/sparcv9/scsi_vhci 555 root sys
+f none kernel/kmdb/sparcv9/sctp 555 root sys
 f none kernel/kmdb/sparcv9/sd 555 root sys
+f none kernel/kmdb/sparcv9/sockfs 555 root sys
 f none kernel/kmdb/sparcv9/specfs 555 root sys
 f none kernel/kmdb/sparcv9/sppp 555 root sys
 f none kernel/kmdb/sparcv9/ssd 555 root sys
@@ -68,10 +68,10 @@ d none platform/sun4u 755 root sys
 d none platform/sun4u/kernel 755 root sys
 d none platform/sun4u/kernel/kmdb 755 root sys
 d none platform/sun4u/kernel/kmdb/sparcv9 755 root sys
+f none platform/sun4u/kernel/kmdb/sparcv9/oplhwd 555 root sys
 f none platform/sun4u/kernel/kmdb/sparcv9/sgenv 555 root sys
 f none platform/sun4u/kernel/kmdb/sparcv9/sgsbbc 555 root sys
 f none platform/sun4u/kernel/kmdb/sparcv9/unix 555 root sys
-f none platform/sun4u/kernel/kmdb/sparcv9/oplhwd 555 root sys
 #
 d none platform/sun4v 755 root sys
 d none platform/sun4v/kernel 755 root sys

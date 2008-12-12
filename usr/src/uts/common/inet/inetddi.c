@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/stream.h>
@@ -57,12 +56,23 @@
  *
  * Drivers that need to masquerade as IP should set INET_DEVMTFLAGS to
  * IP_DEVMTFLAGS and set INET_DEVSTRTAB to ipinfo.
+ *
+ * The symbols that all socket modules must define are:
+ *
+ *	INET_SOCKDESC	The one-line description for this socket module
+ *	INET_SOCK_PROTO_CREATE_FUNC The function used to create PCBs
+ *
+ * In addition, socket modules that can be converted to TPI must define:
+ *
+ *	INET_SOCK_PROTO_FB_FUNC The function used to fallback to TPI
  */
 
 #if	!defined(INET_NAME)
 #error inetddi.c: INET_NAME is not defined!
-#elif	!defined(INET_DEVDESC) && !defined(INET_MODDESC)
-#error inetddi.c: at least one of INET_DEVDESC or INET_MODDESC must be defined!
+#elif	!defined(INET_DEVDESC) && !defined(INET_MODDESC) && \
+	!defined(INET_SOCKDESC)
+#error inetddi.c: at least one of INET_DEVDESC or INET_MODDESC or \
+INET_SOCKDESC must be defined!
 #elif	defined(INET_DEVDESC) && !defined(INET_DEVSTRTAB)
 #error inetddi.c: INET_DEVDESC is defined but INET_DEVSTRTAB is not!
 #elif	defined(INET_DEVDESC) && !defined(INET_DEVMTFLAGS)
@@ -73,6 +83,11 @@
 #error inetddi.c: INET_MODDESC is defined but INET_MODSTRTAB is not!
 #elif	defined(INET_MODDESC) && !defined(INET_MODMTFLAGS)
 #error inetddi.c: INET_MODDESC is defined but INET_MODMTFLAGS is not!
+#elif	defined(INET_SOCKDESC) && !defined(SOCKMOD_VERSION)
+#error  inetddi.c: INET_SOCKDESC is defined but SOCKMOD_VERSION is not!
+#elif	defined(INET_SOCKDESC) && !defined(INET_SOCK_PROTO_CREATE_FUNC)
+#error  inetddi.c: INET_SOCKDESC is defined but INET_SOCK_PROTO_CREATE_FUNC \
+is not!
 #endif
 
 #ifdef	INET_DEVDESC
@@ -192,7 +207,38 @@ static struct modlstrmod modlstrmod = {
 	INET_MODDESC,
 	&fsw
 };
+
 #endif /* INET_MODDESC */
+
+#ifdef  INET_SOCKDESC
+
+#ifdef	INET_SOCK_PROTO_FB_FUNC
+static __smod_priv_t smodpriv = {
+	NULL,
+	NULL,
+	INET_SOCK_PROTO_FB_FUNC
+};
+#endif	/* INET_SOCK_PROTO_FB_FUNC */
+
+static struct smod_reg_s smodreg = {
+	SOCKMOD_VERSION,
+	INET_NAME,
+	SOCK_UC_VERSION,
+	SOCK_DC_VERSION,
+	INET_SOCK_PROTO_CREATE_FUNC,
+#ifdef	INET_SOCK_PROTO_FB_FUNC
+	&smodpriv
+#else
+	NULL
+#endif	/* INET_SOCK_PROTO_FB_FUNC */
+};
+
+static struct modlsockmod modlsockmod = {
+	&mod_sockmodops,
+	INET_SOCKDESC,
+	&smodreg
+};
+#endif	/* INET_SOCKDESC */
 
 static struct modlinkage modlinkage = {
 	MODREV_1,
@@ -201,6 +247,9 @@ static struct modlinkage modlinkage = {
 #endif
 #ifdef	INET_MODDESC
 	&modlstrmod,
+#endif
+#ifdef	INET_SOCKDESC
+	&modlsockmod,
 #endif
 	NULL
 };

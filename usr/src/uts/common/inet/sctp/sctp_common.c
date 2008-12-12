@@ -398,6 +398,8 @@ void
 sctp_set_ulp_prop(sctp_t *sctp)
 {
 	int hdrlen;
+	struct sock_proto_props sopp;
+
 	sctp_stack_t *sctps = sctp->sctp_sctps;
 
 	if (sctp->sctp_current->isv4) {
@@ -408,9 +410,12 @@ sctp_set_ulp_prop(sctp_t *sctp)
 	ASSERT(sctp->sctp_ulpd);
 
 	ASSERT(sctp->sctp_current->sfa_pmss == sctp->sctp_mss);
-	sctp->sctp_ulp_prop(sctp->sctp_ulpd,
-	    sctps->sctps_wroff_xtra + hdrlen + sizeof (sctp_data_hdr_t),
-	    sctp->sctp_mss - sizeof (sctp_data_hdr_t));
+	bzero(&sopp, sizeof (sopp));
+	sopp.sopp_flags = SOCKOPT_MAXBLK|SOCKOPT_WROFF;
+	sopp.sopp_wroff = sctps->sctps_wroff_xtra + hdrlen +
+	    sizeof (sctp_data_hdr_t);
+	sopp.sopp_maxblk = sctp->sctp_mss - sizeof (sctp_data_hdr_t);
+	sctp->sctp_ulp_prop(sctp->sctp_ulpd, &sopp);
 }
 
 void

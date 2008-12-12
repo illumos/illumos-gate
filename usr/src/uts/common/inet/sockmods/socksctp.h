@@ -26,8 +26,6 @@
 #ifndef	_SOCKSCTP_H_
 #define	_SOCKSCTP_H_
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -47,15 +45,8 @@ struct sctp_sonode {
 	sctp_assoc_t		ss_maxassoc;	/* assoc array size for 1-N */
 	sctp_assoc_t		ss_assoccnt;	/* current # of assocs */
 	struct sctp_sa_id	*ss_assocs;	/* assoc array for 1-N */
-	kcondvar_t		ss_txdata_cv;	/* wait TX window to open */
-	int			ss_wroff;
-	size_t			ss_wrsize;
-	int			ss_txqueued;	/* queued tx bytes */
-	kcondvar_t		ss_rxdata_cv;	/* for waiting RX data */
-	mblk_t			*ss_rxdata;	/* queued rx data */
-	mblk_t			**ss_rxtail;	/* ptr to last message */
-	int			ss_rxqueued;	/* queued rx bytes/# of conn */
-	struct pollhead		ss_poll_list;
+#define	ss_wroff	ss_so.so_proto_props.sopp_wroff
+#define	ss_wrsize	ss_so.so_proto_props.sopp_maxblk
 };
 
 /*
@@ -69,14 +60,13 @@ struct sctp_soassoc {
 	struct sctp_s		*ssa_conn;	/* opaque ptr passed to SCTP */
 	uint_t			ssa_state;	/* same as so_state */
 	int			ssa_error;	/* same as so_error */
-	int			ssa_txqueued;	/* queued tx bytes */
+	boolean_t		ssa_snd_qfull;
 	int			ssa_wroff;
 	size_t			ssa_wrsize;
-	int			ssa_rxqueued;	/* queued rx bytes/# of conn */
+	int			ssa_rcv_queued;	/* queued rx bytes/# of conn */
 };
 
 /* 1-N socket association cache defined in socksctp.c */
-extern kmem_cache_t *sosctp_assoccache;
 
 /*
  * Association array element.
@@ -91,18 +81,14 @@ struct sctp_sa_id {
 	struct sctp_soassoc	*ssi_assoc;
 };
 
-extern sctp_upcalls_t sosctp_sock_upcalls;
-extern sctp_upcalls_t sosctp_assoc_upcalls;
-extern struct vnodeops *socksctp_vnodeops;
-extern const fs_operation_def_t socksctp_vnodeops_template[];
+extern sonodeops_t sosctp_sonodeops;
+extern sonodeops_t sosctp_seq_sonodeops;
+extern sock_upcalls_t sosctp_sock_upcalls;
+extern sock_upcalls_t sosctp_assoc_upcalls;
 
-extern void sosctp_free(struct sonode *so);
-extern int sosctp_chgpgrp(struct sctp_sonode *ss, pid_t pid);
-extern void sosctp_sendsig(struct sctp_sonode *ss, int event);
-
-extern int sosctp_bind(struct sonode *so, struct sockaddr *name,
-    socklen_t namelen, int flags);
-extern int sosctp_recvmsg(struct sonode *, struct nmsghdr *, struct uio *);
+extern struct sonode *socksctp_create(struct sockparams *, int, int,
+    int, int, int, int *, cred_t *);
+extern void sosctp_fini(struct sonode *, struct cred *);
 extern int sosctp_aid_grow(struct sctp_sonode *ss, sctp_assoc_t maxid,
     int kmflags);
 extern sctp_assoc_t sosctp_aid_get(struct sctp_sonode *ss);
@@ -119,7 +105,7 @@ extern struct sctp_soassoc *sosctp_assoc_create(struct sctp_sonode *ss,
 extern void sosctp_assoc_free(struct sctp_sonode *ss, struct sctp_soassoc *ssa);
 extern int sosctp_assoc_createconn(struct sctp_sonode *ss,
     const struct sockaddr *name, socklen_t namelen,
-    const uchar_t *control, socklen_t controllen, int fflag,
+    const uchar_t *control, socklen_t controllen, int fflag, struct cred *,
     struct sctp_soassoc **ssap);
 extern void sosctp_assoc_move(struct sctp_sonode *ss, struct sctp_sonode *nss,
     struct sctp_soassoc *ssa);
@@ -164,12 +150,6 @@ extern int sosctp_uiomove(mblk_t *hdr_mp, ssize_t count, ssize_t blk_size,
 		sosctp_assoc_free(ss, ssa);			\
 	}							\
 }
-
-/*
- * Event flags to sosctp_sendsig().
- */
-#define	SCTPSIG_WRITE	0x1
-#define	SCTPSIG_READ	0x2
 
 #ifdef	__cplusplus
 }

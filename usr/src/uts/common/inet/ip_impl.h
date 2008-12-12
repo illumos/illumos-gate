@@ -44,6 +44,8 @@ extern "C" {
 
 #define	IP_MOD_ID		5701
 
+#define	INET_NAME	"ip"
+
 #ifdef	_BIG_ENDIAN
 #define	IP_HDR_CSUM_TTL_ADJUST	256
 #define	IP_TCP_CSUM_COMP	IPPROTO_TCP
@@ -545,6 +547,22 @@ extern void ill_flow_enable(void *, ip_mac_tx_cookie_t);
 extern zoneid_t	ip_get_zoneid_v4(ipaddr_t, mblk_t *, ip_stack_t *, zoneid_t);
 extern zoneid_t	ip_get_zoneid_v6(in6_addr_t *, mblk_t *, const ill_t *,
     ip_stack_t *, zoneid_t);
+
+/*
+ * flag passed in by IP based protocols to get a private ip stream with
+ * no conn_t. Note this flag has the same value as SO_FALLBACK
+ */
+#define	IP_HELPER_STR	SO_FALLBACK
+
+#define	IP_MOD_MINPSZ	1
+#define	IP_MOD_MAXPSZ	INFPSZ
+#define	IP_MOD_HIWAT	65536
+#define	IP_MOD_LOWAT	1024
+
+#define	DEV_IP	"/devices/pseudo/ip@0:ip"
+#define	DEV_IP6	"/devices/pseudo/ip6@0:ip6"
+
+extern struct kmem_cache  *ip_helper_stream_cache;
 
 #endif	/* _KERNEL */
 

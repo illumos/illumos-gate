@@ -199,6 +199,7 @@ f none kernel/misc/sparcv9/idmap 755 root sys
 f none kernel/misc/sparcv9/ipc 755 root sys
 f none kernel/misc/sparcv9/kbtrans 755 root sys
 f none kernel/misc/sparcv9/kcf 755 root sys
+f none kernel/misc/sparcv9/ksocket 755 root sys
 f none kernel/misc/sparcv9/mac 755 root sys
 l none kernel/misc/sparcv9/md5=../../../kernel/crypto/sparcv9/md5
 f none kernel/misc/sparcv9/neti 755 root sys
@@ -267,3 +268,9 @@ f none kernel/kiconv/sparcv9/kiconv_ja 755 root sys
 f none kernel/kiconv/sparcv9/kiconv_ko 755 root sys
 f none kernel/kiconv/sparcv9/kiconv_sc 755 root sys
 f none kernel/kiconv/sparcv9/kiconv_tc 755 root sys
+d none kernel/socketmod/sparcv9 755 root sys
+l none kernel/socketmod/sparcv9/icmp=../../../kernel/drv/sparcv9/icmp
+l none kernel/socketmod/sparcv9/rts=../../../kernel/drv/sparcv9/rts
+l none kernel/socketmod/sparcv9/tcp=../../../kernel/drv/sparcv9/tcp
+l none kernel/socketmod/sparcv9/udp=../../../kernel/drv/sparcv9/udp
+f none kernel/socketmod/sparcv9/socksctp 755 root sys

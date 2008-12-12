@@ -62,7 +62,7 @@ typedef struct {
 	struct isns_portal_list_s	*esi_portal;
 	kthread_t			*esi_thread;
 	kt_did_t			esi_thread_did;
-	struct sonode			*esi_so;
+	ksocket_t			esi_so;
 	uint16_t			esi_port;
 	boolean_t			esi_thread_running;
 	boolean_t			esi_thread_failed;

@@ -45,7 +45,7 @@
 #include <netinet/in.h>
 #include <net/if.h>
 #include <sys/sockio.h>
-
+#include <sys/ksocket.h>
 #include <sys/idm/idm.h>
 #include <sys/idm/idm_so.h>
 #include <sys/idm/idm_text.h>
@@ -60,14 +60,13 @@ static void idm_sorx_cache_pdu_cb(idm_pdu_t *pdu, idm_status_t status);
 static void idm_sorx_addl_pdu_cb(idm_pdu_t *pdu, idm_status_t status);
 static void idm_sotx_cache_pdu_cb(idm_pdu_t *pdu, idm_status_t status);
 
-static idm_status_t idm_so_conn_create_common(idm_conn_t *ic,
-    struct sonode *new_so);
+static idm_status_t idm_so_conn_create_common(idm_conn_t *ic, ksocket_t new_so);
 static void idm_so_conn_destroy_common(idm_conn_t *ic);
 static void idm_so_conn_connect_common(idm_conn_t *ic);
 
 static void idm_set_ini_preconnect_options(idm_so_conn_t *sc);
 static void idm_set_ini_postconnect_options(idm_so_conn_t *sc);
-static void idm_set_tgt_connect_options(struct sonode *sonode);
+static void idm_set_tgt_connect_options(ksocket_t so);
 static idm_status_t idm_i_so_tx(idm_pdu_t *pdu);
 
 static idm_status_t idm_sorecvdata(idm_conn_t *ic, idm_pdu_t *pdu);
@@ -180,58 +179,17 @@ idm_so_fini(void)
 	kmem_cache_destroy(idm.idm_sorx_pdu_cache);
 }
 
-struct sonode *
+ksocket_t
 idm_socreate(int domain, int type, int protocol)
 {
-	vnode_t		*dvp;
-	vnode_t		*vp;
-	struct snode	*csp;
-	int		err;
-	major_t		maj;
+	ksocket_t ks;
 
-	if ((vp = solookup(domain, type, protocol, NULL, &err)) == NULL) {
-
-		/*
-		 * solookup calls sogetvp if the vp is not found in the cache.
-		 * Since the call to sogetvp is hardwired to use USERSPACE
-		 * and declared static we'll do the work here instead.
-		 */
-		err = lookupname(type == SOCK_STREAM ? "/dev/tcp" : "/dev/udp",
-		    UIO_SYSSPACE, FOLLOW, NULLVPP, &vp);
-		if (err != 0)
-			return (NULL);
-
-		/* Check that it is the correct vnode */
-		if (vp->v_type != VCHR) {
-			VN_RELE(vp);
-			return (NULL);
-		}
-
-		csp = VTOS(VTOS(vp)->s_commonvp);
-		if (!(csp->s_flag & SDIPSET)) {
-			char    *pathname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
-
-			err = ddi_dev_pathname(vp->v_rdev, S_IFCHR,
-			    pathname);
-			if (err == 0) {
-				err = devfs_lookupname(pathname, NULLVPP,
-				    &dvp);
-			}
-			VN_RELE(vp);
-			kmem_free(pathname, MAXPATHLEN);
-			if (err != 0) {
-				return (NULL);
-			}
-			vp = dvp;
-		}
-
-		maj = getmajor(vp->v_rdev);
-		if (!STREAMSTAB(maj)) {
-			VN_RELE(vp);
-			return (NULL);
-		}
+	if (!ksocket_socket(&ks, domain, type, protocol, KSOCKET_NOSLEEP,
+	    CRED())) {
+		return (ks);
+	} else {
+		return (NULL);
 	}
-	return (socreate(vp, domain, type, protocol, SOV_DEFAULT, NULL, &err));
 }
 
 /*
@@ -242,9 +200,9 @@ idm_socreate(int domain, int type, int protocol)
  * regain control of a thread stuck in idm_sorecv.
  */
 void
-idm_soshutdown(struct sonode *so)
+idm_soshutdown(ksocket_t so)
 {
-	(void) soshutdown(so, SHUT_RDWR);
+	(void) ksocket_shutdown(so, SHUT_RDWR, CRED());
 }
 
 /*
@@ -254,13 +212,9 @@ idm_soshutdown(struct sonode *so)
  * otherwise undefined behavior will result.
  */
 void
-idm_sodestroy(struct sonode *so)
+idm_sodestroy(ksocket_t ks)
 {
-	vnode_t *vp = SOTOV(so);
-
-	(void) VOP_CLOSE(vp, 0, 1, 0, kcred, NULL);
-
-	VN_RELE(vp);
+	(void) ksocket_close(ks, CRED());
 }
 
 /*
@@ -303,8 +257,7 @@ idm_v6_addr_okay(struct in6_addr *addr6)
 int
 idm_get_ipaddr(idm_addr_list_t **ipaddr_p)
 {
-	struct sonode 		*so4, *so6;
-	vnode_t 		*vp, *vp4, *vp6;
+	ksocket_t 		so4, so6;
 	struct lifnum		lifn;
 	struct lifconf		lifc;
 	struct lifreq		*lp;
@@ -332,19 +285,15 @@ idm_get_ipaddr(idm_addr_list_t **ipaddr_p)
 		return (0);
 	}
 
-	/* setup the vp's for each socket type */
-	vp6 = SOTOV(so6);
-	vp4 = SOTOV(so4);
-	/* use vp6 for ioctls with unspecified families by default */
-	vp = vp6;
 
 retry_count:
 	/* snapshot the current number of interfaces */
 	lifn.lifn_family = PF_UNSPEC;
 	lifn.lifn_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
 	lifn.lifn_count = 0;
-	if (VOP_IOCTL(vp, SIOCGLIFNUM, (intptr_t)&lifn, FKIOCTL, kcred,
-	    &rval, NULL) != 0) {
+	/* use vp6 for ioctls with unspecified families by default */
+	if (ksocket_ioctl(so6, SIOCGLIFNUM, (intptr_t)&lifn, &rval, CRED())
+	    != 0) {
 		goto cleanup;
 	}
 
@@ -364,8 +313,7 @@ retry_count:
 	lifc.lifc_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
 	lifc.lifc_len = bufsize;
 	lifc.lifc_buf = buf;
-	rc = VOP_IOCTL(vp, SIOCGLIFCONF, (intptr_t)&lifc, FKIOCTL, kcred,
-	    &rval, NULL);
+	rc = ksocket_ioctl(so6, SIOCGLIFCONF, (intptr_t)&lifc, &rval, CRED());
 	if (rc != 0) {
 		goto cleanup;
 	}
@@ -401,16 +349,16 @@ retry_count:
 		 */
 		switch (ss.ss_family) {
 		case AF_INET:
-			vp = vp4;
+			rc = ksocket_ioctl(so4, SIOCGLIFFLAGS, (intptr_t)lp,
+			    &rval, CRED());
 			break;
 		case AF_INET6:
-			vp = vp6;
+			rc = ksocket_ioctl(so6, SIOCGLIFFLAGS, (intptr_t)lp,
+			    &rval, CRED());
 			break;
 		default:
 			continue;
 		}
-		rc =  VOP_IOCTL(vp, SIOCGLIFFLAGS, (intptr_t)lp, FKIOCTL, kcred,
-		    &rval, NULL);
 		if (rc == 0) {
 			/*
 			 * If we got the flags, skip uninteresting
@@ -468,7 +416,7 @@ cleanup:
 }
 
 int
-idm_sorecv(struct sonode *so, void *msg, size_t len)
+idm_sorecv(ksocket_t so, void *msg, size_t len)
 {
 	iovec_t iov;
 
@@ -495,13 +443,13 @@ idm_sorecv(struct sonode *so, void *msg, size_t len)
  * -1 if sosendmsg returns success but uio_resid != 0
  */
 int
-idm_sosendto(struct sonode *so, void *buff, size_t len,
+idm_sosendto(ksocket_t so, void *buff, size_t len,
     struct sockaddr *name, socklen_t namelen)
 {
 	struct msghdr		msg;
-	struct uio		uio;
 	struct iovec		iov[1];
 	int			error;
+	size_t			sent = 0;
 
 	iov[0].iov_base	= buff;
 	iov[0].iov_len	= len;
@@ -510,19 +458,12 @@ idm_sosendto(struct sonode *so, void *buff, size_t len,
 	bzero(&msg, sizeof (msg));
 	msg.msg_iov	= iov;
 	msg.msg_iovlen	= 1;
-
-	/* Initialization of the uio structure. */
-	uio.uio_iov	= iov;
-	uio.uio_iovcnt	= 1;
-	uio.uio_segflg	= UIO_SYSSPACE;
-	uio.uio_resid	= len;
-
 	msg.msg_name	= name;
 	msg.msg_namelen	= namelen;
 
-	if ((error = sosendmsg(so, &msg, &uio)) == 0) {
+	if ((error = ksocket_sendmsg(so, &msg, 0, &sent, CRED())) == 0) {
 		/* Data sent */
-		if (uio.uio_resid == 0) {
+		if (sent == len) {
 			/* All data sent.  Success. */
 			return (0);
 		} else {
@@ -546,11 +487,11 @@ idm_sosendto(struct sonode *so, void *buff, size_t len,
  * -1 if sosendmsg returns success but uio_resid != 0
  */
 int
-idm_iov_sosend(struct sonode *so, iovec_t *iop, int iovlen, size_t total_len)
+idm_iov_sosend(ksocket_t so, iovec_t *iop, int iovlen, size_t total_len)
 {
 	struct msghdr		msg;
-	struct uio		uio;
 	int			error;
+	size_t 			sent = 0;
 
 	ASSERT(iop != NULL);
 
@@ -559,16 +500,10 @@ idm_iov_sosend(struct sonode *so, iovec_t *iop, int iovlen, size_t total_len)
 	msg.msg_iov	= iop;
 	msg.msg_iovlen	= iovlen;
 
-	/* Initialization of the uio structure. */
-	bzero(&uio, sizeof (uio));
-	uio.uio_iov	= iop;
-	uio.uio_iovcnt	= iovlen;
-	uio.uio_segflg	= UIO_SYSSPACE;
-	uio.uio_resid	= total_len;
-
-	if ((error = sosendmsg(so, &msg, &uio)) == 0) {
+	if ((error = ksocket_sendmsg(so, &msg, 0, &sent, CRED()))
+	    == 0) {
 		/* Data sent */
-		if (uio.uio_resid == 0) {
+		if (sent == total_len) {
 			/* All data sent.  Success. */
 			return (0);
 		} else {
@@ -592,30 +527,25 @@ idm_iov_sosend(struct sonode *so, iovec_t *iop, int iovlen, size_t total_len)
  * -1 if sorecvmsg returns success but uio_resid != 0
  */
 int
-idm_iov_sorecv(struct sonode *so, iovec_t *iop, int iovlen, size_t total_len)
+idm_iov_sorecv(ksocket_t so, iovec_t *iop, int iovlen, size_t total_len)
 {
 	struct msghdr		msg;
-	struct uio		uio;
 	int			error;
+	size_t			recv;
+	int 			flags;
 
 	ASSERT(iop != NULL);
 
 	/* Initialization of the message header. */
 	bzero(&msg, sizeof (msg));
 	msg.msg_iov	= iop;
-	msg.msg_flags	= MSG_WAITALL;
 	msg.msg_iovlen	= iovlen;
+	flags		= MSG_WAITALL;
 
-	/* Initialization of the uio structure. */
-	bzero(&uio, sizeof (uio));
-	uio.uio_iov	= iop;
-	uio.uio_iovcnt	= iovlen;
-	uio.uio_segflg	= UIO_SYSSPACE;
-	uio.uio_resid	= total_len;
-
-	if ((error = sorecvmsg(so, &msg, &uio)) == 0) {
+	if ((error = ksocket_recvmsg(so, &msg, flags, &recv, CRED()))
+	    == 0) {
 		/* Received data */
-		if (uio.uio_resid == 0) {
+		if (recv == total_len) {
 			/* All requested data received.  Success */
 			return (0);
 		} else {
@@ -639,12 +569,14 @@ idm_set_ini_preconnect_options(idm_so_conn_t *sc)
 	int	abort = 30000;
 
 	/* Pre-connect socket options */
-	(void) sosetsockopt(sc->ic_so, IPPROTO_TCP, TCP_CONN_NOTIFY_THRESHOLD,
-	    (char *)&conn_notify, sizeof (int));
-	(void) sosetsockopt(sc->ic_so, IPPROTO_TCP, TCP_CONN_ABORT_THRESHOLD,
-	    (char *)&conn_abort, sizeof (int));
-	(void) sosetsockopt(sc->ic_so, IPPROTO_TCP, TCP_ABORT_THRESHOLD,
-	    (char *)&abort, sizeof (int));
+	(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP,
+	    TCP_CONN_NOTIFY_THRESHOLD, (char *)&conn_notify, sizeof (int),
+	    CRED());
+	(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP,
+	    TCP_CONN_ABORT_THRESHOLD, (char *)&conn_abort, sizeof (int),
+	    CRED());
+	(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP, TCP_ABORT_THRESHOLD,
+	    (char *)&abort, sizeof (int), CRED());
 }
 
 static void
@@ -655,28 +587,28 @@ idm_set_ini_postconnect_options(idm_so_conn_t *sc)
 	const int	on = 1;
 
 	/* Set postconnect options */
-	(void) sosetsockopt(sc->ic_so, IPPROTO_TCP, TCP_NODELAY,
-	    (char *)&on, sizeof (int));
-	(void) sosetsockopt(sc->ic_so, SOL_SOCKET, SO_RCVBUF,
-	    (char *)&rcvbuf, sizeof (int));
-	(void) sosetsockopt(sc->ic_so, SOL_SOCKET, SO_SNDBUF,
-	    (char *)&sndbuf, sizeof (int));
+	(void) ksocket_setsockopt(sc->ic_so, IPPROTO_TCP, TCP_NODELAY,
+	    (char *)&on, sizeof (int), CRED());
+	(void) ksocket_setsockopt(sc->ic_so, SOL_SOCKET, SO_RCVBUF,
+	    (char *)&rcvbuf, sizeof (int), CRED());
+	(void) ksocket_setsockopt(sc->ic_so, SOL_SOCKET, SO_SNDBUF,
+	    (char *)&sndbuf, sizeof (int), CRED());
 }
 
 static void
-idm_set_tgt_connect_options(struct sonode *sonode)
+idm_set_tgt_connect_options(ksocket_t ks)
 {
 	int32_t		rcvbuf = IDM_RCVBUF_SIZE;
 	int32_t		sndbuf = IDM_SNDBUF_SIZE;
 	const int	on = 1;
 
 	/* Set connect options */
-	(void) sosetsockopt(sonode, SOL_SOCKET, SO_RCVBUF,
-	    (char *)&rcvbuf, sizeof (int));
-	(void) sosetsockopt(sonode, SOL_SOCKET, SO_SNDBUF,
-	    (char *)&sndbuf, sizeof (int));
-	(void) sosetsockopt(sonode, IPPROTO_TCP, TCP_NODELAY,
-	    (char *)&on, sizeof (on));
+	(void) ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVBUF,
+	    (char *)&rcvbuf, sizeof (int), CRED());
+	(void) ksocket_setsockopt(ks, SOL_SOCKET, SO_SNDBUF,
+	    (char *)&sndbuf, sizeof (int), CRED());
+	(void) ksocket_setsockopt(ks, IPPROTO_TCP, TCP_NODELAY,
+	    (char *)&on, sizeof (on), CRED());
 }
 
 static uint32_t
@@ -777,7 +709,7 @@ idm_sorecvhdr(idm_conn_t *ic, idm_pdu_t *pdu)
 static idm_status_t
 idm_so_ini_conn_create(idm_conn_req_t *cr, idm_conn_t *ic)
 {
-	struct sonode	*so;
+	ksocket_t	so;
 	idm_so_conn_t	*so_conn;
 	idm_status_t	idmrc;
 
@@ -789,8 +721,8 @@ idm_so_ini_conn_create(idm_conn_req_t *cr, idm_conn_t *ic)
 
 	/* Bind the socket if configured to do so */
 	if (cr->cr_bound) {
-		if (sobind(so, &cr->cr_bound_addr.sin,
-		    SIZEOF_SOCKADDR(&cr->cr_bound_addr.sin), 0, 0) != 0) {
+		if (ksocket_bind(so, &cr->cr_bound_addr.sin,
+		    SIZEOF_SOCKADDR(&cr->cr_bound_addr.sin), CRED()) != 0) {
 			idm_sodestroy(so);
 			return (IDM_STATUS_FAIL);
 		}
@@ -832,8 +764,8 @@ idm_so_ini_conn_connect(idm_conn_t *ic)
 
 	so_conn = ic->ic_transport_private;
 
-	if (soconnect(so_conn->ic_so, &ic->ic_ini_dst_addr.sin,
-	    (SIZEOF_SOCKADDR(&ic->ic_ini_dst_addr.sin)), 0, 0) != 0) {
+	if (ksocket_connect(so_conn->ic_so, &ic->ic_ini_dst_addr.sin,
+	    (SIZEOF_SOCKADDR(&ic->ic_ini_dst_addr.sin)), CRED()) != 0) {
 		idm_soshutdown(so_conn->ic_so);
 		return (IDM_STATUS_FAIL);
 	}
@@ -846,7 +778,7 @@ idm_so_ini_conn_connect(idm_conn_t *ic)
 }
 
 idm_status_t
-idm_so_tgt_conn_create(idm_conn_t *ic, struct sonode *new_so)
+idm_so_tgt_conn_create(idm_conn_t *ic, ksocket_t new_so)
 {
 	idm_status_t	idmrc;
 
@@ -875,7 +807,7 @@ idm_so_tgt_conn_connect(idm_conn_t *ic)
 }
 
 static idm_status_t
-idm_so_conn_create_common(idm_conn_t *ic, struct sonode *new_so)
+idm_so_conn_create_common(idm_conn_t *ic, ksocket_t new_so)
 {
 	idm_so_conn_t	*so_conn;
 
@@ -917,18 +849,20 @@ static void
 idm_so_conn_connect_common(idm_conn_t *ic)
 {
 	idm_so_conn_t	*so_conn;
+	struct sockaddr_in6	t_addr;
+	socklen_t	t_addrlen = 0;
 
 	so_conn = ic->ic_transport_private;
-
-	SOP_GETSOCKNAME(so_conn->ic_so);
+	bzero(&t_addr, sizeof (struct sockaddr_in6));
+	t_addrlen = sizeof (struct sockaddr_in6);
 
 	/* Set the local and remote addresses in the idm conn handle */
-	mutex_enter(&so_conn->ic_so->so_lock);
-	bcopy(so_conn->ic_so->so_laddr_sa, &ic->ic_laddr,
-	    so_conn->ic_so->so_laddr_len);
-	bcopy(so_conn->ic_so->so_faddr_sa, &ic->ic_raddr,
-	    so_conn->ic_so->so_faddr_len);
-	mutex_exit(&so_conn->ic_so->so_lock);
+	ksocket_getsockname(so_conn->ic_so, (struct sockaddr *)&t_addr,
+	    &t_addrlen, CRED());
+	bcopy(&t_addr, &ic->ic_laddr, t_addrlen);
+	ksocket_getpeername(so_conn->ic_so, (struct sockaddr *)&t_addr,
+	    &t_addrlen, CRED());
+	bcopy(&t_addr, &ic->ic_raddr, t_addrlen);
 
 	mutex_enter(&ic->ic_mutex);
 	so_conn->ic_tx_thread = thread_create(NULL, 0, idm_sotx_thread, ic, 0,
@@ -1027,16 +961,16 @@ idm_so_tgt_svc_online(idm_svc_t *is)
 		sin6_ip.sin6_port = htons(sr->sr_port);
 		sin6_ip.sin6_addr = in6addr_any;
 
-		(void) sosetsockopt(so_svc->is_so, SOL_SOCKET, SO_REUSEADDR,
-		    (char *)&on, sizeof (on));
+		(void) ksocket_setsockopt(so_svc->is_so, SOL_SOCKET,
+		    SO_REUSEADDR, (char *)&on, sizeof (on), CRED());
 		/*
 		 * Turn off SO_MAC_EXEMPT so future sobinds succeed
 		 */
-		(void) sosetsockopt(so_svc->is_so, SOL_SOCKET, SO_MAC_EXEMPT,
-		    (char *)&off, sizeof (off));
+		(void) ksocket_setsockopt(so_svc->is_so, SOL_SOCKET,
+		    SO_MAC_EXEMPT, (char *)&off, sizeof (off), CRED());
 
-		if (sobind(so_svc->is_so, (struct sockaddr *)&sin6_ip,
-		    sizeof (sin6_ip), 0, 0) != 0) {
+		if (ksocket_bind(so_svc->is_so, (struct sockaddr *)&sin6_ip,
+		    sizeof (sin6_ip), CRED()) != 0) {
 			mutex_exit(&is->is_mutex);
 			idm_sodestroy(so_svc->is_so);
 			return (IDM_STATUS_FAIL);
@@ -1045,7 +979,7 @@ idm_so_tgt_svc_online(idm_svc_t *is)
 
 	idm_set_tgt_connect_options(so_svc->is_so);
 
-	if (solisten(so_svc->is_so, 5) != 0) {
+	if (ksocket_listen(so_svc->is_so, 5, CRED()) != 0) {
 		mutex_exit(&is->is_mutex);
 		idm_soshutdown(so_svc->is_so);
 		idm_sodestroy(so_svc->is_so);
@@ -1063,7 +997,7 @@ idm_so_tgt_svc_online(idm_svc_t *is)
 		idm_sodestroy(so_svc->is_so);
 		return (IDM_STATUS_FAIL);
 	}
-
+	ksocket_hold(so_svc->is_so);
 	/* Wait for the port watcher thread to start */
 	while (!so_svc->is_thread_running)
 		cv_wait(&is->is_cv, &is->is_mutex);
@@ -1081,33 +1015,20 @@ static void
 idm_so_tgt_svc_offline(idm_svc_t *is)
 {
 	idm_so_svc_t		*so_svc;
-
 	mutex_enter(&is->is_mutex);
 	so_svc = (idm_so_svc_t *)is->is_so_svc;
 	so_svc->is_thread_running = B_FALSE;
 	mutex_exit(&is->is_mutex);
 
 	/*
-	 * When called from the kernel, soaccept blocks and cannot be woken
-	 * up via the sockfs API.  soclose does not work like you would
-	 * hope.  When the Volo project is available we can switch to that
-	 * API which should address this issue.  For now, we will poke at
-	 * the socket to wake it up.
+	 * Teardown socket
 	 */
-	mutex_enter(&so_svc->is_so->so_lock);
-	so_svc->is_so->so_error = EINTR;
-	cv_signal(&so_svc->is_so->so_connind_cv);
-	mutex_exit(&so_svc->is_so->so_lock);
+	idm_sodestroy(so_svc->is_so);
 
 	/*
 	 * Now we expect the port watcher thread to terminate
 	 */
 	thread_join(so_svc->is_thread_did);
-
-	/*
-	 * Teardown socket
-	 */
-	idm_sodestroy(so_svc->is_so);
 }
 
 /*
@@ -1117,13 +1038,17 @@ void
 idm_so_svc_port_watcher(void *arg)
 {
 	idm_svc_t		*svc = arg;
-	struct sonode		*new_so;
+	ksocket_t		new_so;
 	idm_conn_t		*ic;
 	idm_status_t		idmrc;
 	idm_so_svc_t		*so_svc;
 	int			rc;
 	const uint32_t		off = 0;
+	struct sockaddr_in6 	t_addr;
+	socklen_t		t_addrlen;
 
+	bzero(&t_addr, sizeof (struct sockaddr_in6));
+	t_addrlen = sizeof (struct sockaddr_in6);
 	mutex_enter(&svc->is_mutex);
 
 	so_svc = svc->is_so_svc;
@@ -1138,7 +1063,9 @@ idm_so_svc_port_watcher(void *arg)
 	while (so_svc->is_thread_running) {
 		mutex_exit(&svc->is_mutex);
 
-		if ((rc = soaccept(so_svc->is_so, 0, &new_so)) != 0) {
+		if ((rc = ksocket_accept(so_svc->is_so,
+		    (struct sockaddr *)&t_addr, &t_addrlen,
+		    &new_so, CRED())) != 0) {
 			mutex_enter(&svc->is_mutex);
 			if (rc == ECONNABORTED)
 				continue;
@@ -1148,8 +1075,8 @@ idm_so_svc_port_watcher(void *arg)
 		/*
 		 * Turn off SO_MAC_EXEMPT so future sobinds succeed
 		 */
-		(void) sosetsockopt(new_so, SOL_SOCKET, SO_MAC_EXEMPT,
-		    (char *)&off, sizeof (off));
+		(void) ksocket_setsockopt(new_so, SOL_SOCKET, SO_MAC_EXEMPT,
+		    (char *)&off, sizeof (off), CRED());
 
 		idmrc = idm_svc_conn_create(svc, IDM_TRANSPORT_TYPE_SOCKETS,
 		    &ic);
@@ -1178,7 +1105,7 @@ idm_so_svc_port_watcher(void *arg)
 
 		mutex_enter(&svc->is_mutex);
 	}
-
+	ksocket_rele(so_svc->is_so);
 	so_svc->is_thread_running = B_FALSE;
 	mutex_exit(&svc->is_mutex);
 

@@ -558,8 +558,6 @@ uioainit(uio_t *uiop, uioa_t *uioap)
 
 	uioap->uioa_mbytes = 0;
 
-	uioap->uioa_mbytes = 0;
-
 	/* uio_t/uioa_t uio_t common struct copy */
 	*((uio_t *)uioap) = *uiop;
 

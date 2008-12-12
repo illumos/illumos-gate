@@ -1049,10 +1049,8 @@ sctp_send_cookie_echo(sctp_t *sctp, sctp_chunk_hdr_t *iackch, mblk_t *iackmp)
 			 * unsent, since there won't be any sent-unack'ed
 			 * here.
 			 */
-			if (!SCTP_IS_DETACHED(sctp)) {
-				sctp->sctp_ulp_xmitted(sctp->sctp_ulpd,
-				    sctp->sctp_unsent);
-			}
+			if (!SCTP_IS_DETACHED(sctp))
+				SCTP_TXQ_UPDATE(sctp);
 		}
 		if (sctp->sctp_xmit_unsent == NULL)
 			sctp->sctp_xmit_unsent_tail = NULL;

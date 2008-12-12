@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/ib/clients/rds/rds.h>
-#include <inet/mi.h>
+#include <inet/proto_set.h>
 
 #define	rds_max_buf 2097152
 opdes_t rds_opt_arr[] = {
@@ -143,7 +141,7 @@ rds_opt_set(queue_t *q, uint_t optset_context, int level,
 			}
 			if (!checkonly) {
 				RD(q)->q_hiwat = *i1;
-				(void) mi_set_sth_hiwat(RD(q), *i1);
+				(void) proto_set_rx_hiwat(RD(q), NULL, *i1);
 			}
 			break;
 		default:

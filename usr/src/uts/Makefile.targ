@@ -22,7 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#
 #	This Makefiles contains the common targets and definitions for
 #	all kernels. It is to be included in the Makefiles for specific
 #	implementation architectures and processor architecture dependent
@@ -161,6 +160,9 @@ $(ROOT_FS_DIR)/%:	$(OBJS_DIR)/% $(ROOT_FS_DIR) FRC
 	$(INS.file)
 
 $(ROOT_SCHED_DIR)/%:	$(OBJS_DIR)/% $(ROOT_SCHED_DIR) FRC
+	$(INS.file)
+
+$(ROOT_SOCK_DIR)/%:	$(OBJS_DIR)/% $(ROOT_SOCK_DIR) FRC
 	$(INS.file)
 
 $(ROOT_STRMOD_DIR)/%:	$(OBJS_DIR)/% $(ROOT_STRMOD_DIR) FRC
@@ -388,12 +390,10 @@ $(MODLIST_DEPS): FRC
 	@case $@ in \
 	*32) \
 		class=32; \
-		relmodule=`dirname $(RELMODULE)`; \
-		rellink=`dirname $(RELLINK)`;; \
+		relmodule=`dirname $(RELMODULE)`;; \
 	*64) \
 		class=64; \
-		relmodule=`dirname $(RELMODULE)`/$(SUBDIR64); \
-		rellink=`dirname $(RELLINK)`/$(SUBDIR64);; \
+		relmodule=`dirname $(RELMODULE)`/$(SUBDIR64);; \
 	esac; \
 	if [ -z "$(THISIMPL)" ]; then \
 		impl=all; \
@@ -426,8 +426,16 @@ $(MODLIST_DEPS): FRC
 		done \
 	fi; \
 	if [ -n "$(ROOTLINK)" ]; then \
+		rellinks="$(RELLINK)"; \
+		for r in $$rellinks; do \
+		if [ $$class = 32 ]; then \
+			linkdir=`dirname $$r`; \
+		else \
+			linkdir=`dirname $$r`/$(SUBDIR64); \
+		fi; \
 		echo LINK $$relmodule $$module \
-		    $$rellink `basename $(RELLINK)` $$impl; \
+			$$linkdir `basename $$r` $$impl; \
+		done \
 	fi; \
 	if [ -n "$(UNIX32_LINK)" ]; then \
 		echo SYMLINK $(SUBDIR64)/$(UNIX) \

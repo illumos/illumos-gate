@@ -19,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
 #ifndef	_RTS_IMPL_H
 #define	_RTS_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -44,6 +42,7 @@ extern "C" {
 
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/optcom.h>
 
 /* Named Dispatch Parameter Management Structure */
 typedef struct rtsparam_s {
@@ -61,6 +60,8 @@ struct rts_stack {
 
 	caddr_t			rtss_g_nd;
 	rtsparam_t		*rtss_params;
+
+	ldi_ident_t		rtss_ldi_ident;
 };
 typedef struct rts_stack rts_stack_t;
 
@@ -84,10 +85,25 @@ typedef	struct rts_s {
 
 	/* Written to only once at the time of opening the endpoint */
 	conn_t		*rts_connp;
+
+	/* Outbound flow control */
+	size_t		rts_xmit_hiwat;
+	size_t		rts_xmit_lowat;
+
+	/* Inbound flow control */
+	size_t		rts_recv_hiwat;
+	size_t		rts_recv_lowat;
+
+	kmutex_t	rts_send_mutex;
+	kmutex_t	rts_recv_mutex;
+	kcondvar_t	rts_send_cv;
+	kcondvar_t	rts_io_cv;
 } rts_t;
 
 #define	RTS_WPUT_PENDING	0x1	/* Waiting for write-side to complete */
+#define	RTS_REQ_PENDING		0x1	/* For direct sockets */
 #define	RTS_WRW_PENDING		0x2	/* Routing socket write in progress */
+#define	RTS_REQ_INPROG		0x2	/* For direct sockets */
 
 /*
  * Object to represent database of options to search passed to
@@ -98,8 +114,19 @@ typedef	struct rts_s {
 extern optdb_obj_t	rts_opt_obj;
 extern uint_t		rts_max_optsize;
 
-extern void	rts_ddi_init(void);
-extern void	rts_ddi_destroy(void);
+extern void	rts_ddi_g_init(void);
+extern void	rts_ddi_g_destroy(void);
+
+extern int	rts_tpi_opt_get(queue_t *, t_scalar_t, t_scalar_t, uchar_t *);
+extern int	rts_tpi_opt_set(queue_t *, uint_t, int, int, uint_t, uchar_t *,
+		    uint_t *, uchar_t *, void *, cred_t *, mblk_t *);
+extern int	rts_opt_default(queue_t *q, t_scalar_t level, t_scalar_t name,
+		    uchar_t *ptr);
+
+extern sock_lower_handle_t rts_create(int, int, int, sock_downcalls_t **,
+    uint_t *, int *, int, cred_t *);
+
+extern sock_downcalls_t sock_rts_downcalls;
 
 #endif	/* _KERNEL */
 

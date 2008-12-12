@@ -53,6 +53,8 @@
 
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <fs/sockfs/sockcommon.h>
+#include <fs/sockfs/socktpi.h>
 
 #include <netinet/in.h>
 #include <sys/sendfile.h>
@@ -71,102 +73,10 @@ extern int nl7c_sendfilev(struct sonode *, u_offset_t *, struct sendfilevec *,
 		int, ssize_t *);
 extern int snf_segmap(file_t *, vnode_t *, u_offset_t, u_offset_t, ssize_t *,
 		boolean_t);
+extern sotpi_info_t *sotpi_sototpi(struct sonode *);
 
 #define	readflg	(V_WRITELOCK_FALSE)
 #define	rwflag	(V_WRITELOCK_TRUE)
-
-/*
- * kstrwritemp() has very similar semantics as that of strwrite().
- * The main difference is it obtains mblks from the caller and also
- * does not do any copy as done in strwrite() from user buffers to
- * kernel buffers.
- *
- * Currently, this routine is used by sendfile to send data allocated
- * within the kernel without any copying. This interface does not use the
- * synchronous stream interface as synch. stream interface implies
- * copying.
- */
-int
-kstrwritemp(struct vnode *vp, mblk_t *mp, ushort_t fmode)
-{
-	struct stdata *stp;
-	struct queue *wqp;
-	mblk_t *newmp;
-	char waitflag;
-	int tempmode;
-	int error = 0;
-	int done = 0;
-	struct sonode *so;
-	boolean_t direct;
-
-	ASSERT(vp->v_stream);
-	stp = vp->v_stream;
-
-	so = VTOSO(vp);
-	direct = (so->so_state & SS_DIRECT);
-
-	/*
-	 * This is the sockfs direct fast path. canputnext() need
-	 * not be accurate so we don't grab the sd_lock here. If
-	 * we get flow-controlled, we grab sd_lock just before the
-	 * do..while loop below to emulate what strwrite() does.
-	 */
-	wqp = stp->sd_wrq;
-	if (canputnext(wqp) && direct &&
-	    !(stp->sd_flag & (STWRERR|STRHUP|STPLEX))) {
-		return (sostream_direct(so, NULL, mp, CRED()));
-	} else if (stp->sd_flag & (STWRERR|STRHUP|STPLEX)) {
-		/* Fast check of flags before acquiring the lock */
-		mutex_enter(&stp->sd_lock);
-		error = strgeterr(stp, STWRERR|STRHUP|STPLEX, 0);
-		mutex_exit(&stp->sd_lock);
-		if (error != 0) {
-			if (!(stp->sd_flag & STPLEX) &&
-			    (stp->sd_wput_opt & SW_SIGPIPE)) {
-				tsignal(curthread, SIGPIPE);
-				error = EPIPE;
-			}
-			return (error);
-		}
-	}
-
-	waitflag = WRITEWAIT;
-	if (stp->sd_flag & OLDNDELAY)
-		tempmode = fmode & ~FNDELAY;
-	else
-		tempmode = fmode;
-
-	mutex_enter(&stp->sd_lock);
-	do {
-		if (canputnext(wqp)) {
-			mutex_exit(&stp->sd_lock);
-			if (stp->sd_wputdatafunc != NULL) {
-				newmp = (stp->sd_wputdatafunc)(vp, mp, NULL,
-				    NULL, NULL, NULL);
-				if (newmp == NULL) {
-					/* The caller will free mp */
-					return (ECOMM);
-				}
-				mp = newmp;
-			}
-			putnext(wqp, mp);
-			return (0);
-		}
-		error = strwaitq(stp, waitflag, (ssize_t)0, tempmode, -1,
-		    &done);
-	} while (error == 0 && !done);
-
-	mutex_exit(&stp->sd_lock);
-	/*
-	 * EAGAIN tells the application to try again. ENOMEM
-	 * is returned only if the memory allocation size
-	 * exceeds the physical limits of the system. ENOMEM
-	 * can't be true here.
-	 */
-	if (error == ENOMEM)
-		error = EAGAIN;
-	return (error);
-}
 
 #define	SEND_MAX_CHUNK	16
 
@@ -510,6 +420,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 	size_t  size = total_size;
 	size_t  extra;
 	int tail_len;
+	struct nmsghdr msg;
 
 	fflag = fp->f_flag;
 	vp = fp->f_vnode;
@@ -521,8 +432,17 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 	if (total_size == 0)
 		return (0);
 
-	wroff = (int)vp->v_stream->sd_wroff;
-	tail_len = (int)vp->v_stream->sd_tail;
+	if (vp->v_stream != NULL) {
+		wroff = (int)vp->v_stream->sd_wroff;
+		tail_len = (int)vp->v_stream->sd_tail;
+	} else {
+		struct sonode *so;
+
+		so = VTOSO(vp);
+		wroff = so->so_proto_props.sopp_wroff;
+		tail_len = so->so_proto_props.sopp_tail;
+	}
+
 	extra = wroff + tail_len;
 
 	buf_left = MIN(total_size, maxblk);
@@ -530,6 +450,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 	if (head == NULL)
 		return (ENOMEM);
 	head->b_wptr = head->b_rptr = head->b_rptr + wroff;
+	bzero(&msg, sizeof (msg));
 
 	auio.uio_extflg = UIO_COPY_DEFAULT;
 	for (i = 0; i < copy_cnt; i++) {
@@ -738,9 +659,10 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 	}
 
 	ASSERT(total_size == 0);
-	error = kstrwritemp(vp, head, fflag);
+	error = socket_sendmblk(VTOSO(vp), &msg, fflag, CRED(), &head);
 	if (error != 0) {
-		freemsg(head);
+		if (head != NULL)
+			freemsg(head);
 		return (error);
 	}
 	ttolwp(curthread)->lwp_ru.ioch += (ulong_t)size;
@@ -776,19 +698,28 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 	int maxblk, wroff, tail_len;
 	struct sonode *so;
 	stdata_t *stp;
+	struct nmsghdr msg;
 
 	fflag = fp->f_flag;
 	vp = fp->f_vnode;
 
 	if (vp->v_type == VSOCK) {
 		so = VTOSO(vp);
-		stp = vp->v_stream;
-		wroff = (int)stp->sd_wroff;
-		tail_len = (int)stp->sd_tail;
-		maxblk = (int)stp->sd_maxblk;
+		if (vp->v_stream != NULL) {
+			stp = vp->v_stream;
+			wroff = (int)stp->sd_wroff;
+			tail_len = (int)stp->sd_tail;
+			maxblk = (int)stp->sd_maxblk;
+		} else {
+			stp = NULL;
+			wroff = so->so_proto_props.sopp_wroff;
+			tail_len = so->so_proto_props.sopp_tail;
+			maxblk = so->so_proto_props.sopp_maxblk;
+		}
 		extra = wroff + tail_len;
 	}
 
+	bzero(&msg, sizeof (msg));
 	auio.uio_extflg = UIO_COPY_DEFAULT;
 	for (i = 0; i < copy_cnt; i++) {
 		if (ISSIG(curthread, JUSTLOOKING))
@@ -841,7 +772,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					size_t iov_len;
 
 					iov_len = sfv_len;
-					if (so->so_kssl_ctx != NULL)
+					if (!SOCK_IS_NONSTR(so) &&
+					    SOTOTPI(so)->sti_kssl_ctx != NULL)
 						iov_len = MIN(iov_len, maxblk);
 
 					aiov.iov_len = iov_len;
@@ -868,9 +800,12 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 						return (error);
 					}
 					dmp->b_wptr += iov_len;
-					error = kstrwritemp(vp, dmp, fflag);
+					error = socket_sendmblk(VTOSO(vp),
+					    &msg, fflag, CRED(), &dmp);
+
 					if (error != 0) {
-						freeb(dmp);
+						if (dmp != NULL)
+							freeb(dmp);
 						return (error);
 					}
 					ttolwp(curthread)->lwp_ru.ioch +=
@@ -880,6 +815,9 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					sfv_off += iov_len;
 				}
 			} else {
+				ttolwp(curthread)->lwp_ru.ioch +=
+				    (ulong_t)sfv_len;
+				*count += sfv_len;
 				aiov.iov_len = sfv_len;
 				aiov.iov_base = (caddr_t)(uintptr_t)sfv_off;
 
@@ -971,25 +909,30 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					return (ENOMEM);
 				}
 			} else {
+				uint_t	copyflag;
+
+				copyflag = stp != NULL ? stp->sd_copyflag :
+				    so->so_proto_props.sopp_zcopyflag;
 				/*
 				 * For sockets acting as an SSL proxy, we
 				 * need to adjust the size to the maximum
 				 * SSL record size set in the stream head.
 				 */
-				if (so->so_kssl_ctx != NULL)
+				if (!SOCK_IS_NONSTR(so) &&
+				    _SOTOTPI(so)->sti_kssl_ctx != NULL)
 					size = MIN(size, maxblk);
 
 				if (vn_has_flocks(readvp) ||
 				    readvp->v_flag & VNOMAP ||
-				    stp->sd_copyflag & STZCVMUNSAFE) {
+				    copyflag & STZCVMUNSAFE) {
 					segmapit = 0;
-				} else if (stp->sd_copyflag & STZCVMSAFE) {
+				} else if (copyflag & STZCVMSAFE) {
 					segmapit = 1;
 				} else {
 					int on = 1;
-					if (SOP_SETSOCKOPT(VTOSO(vp),
+					if (socket_setsockopt(VTOSO(vp),
 					    SOL_SOCKET, SO_SND_COPYAVOID,
-					    &on, sizeof (on)) == 0)
+					    &on, sizeof (on), CRED()) == 0)
 					segmapit = 1;
 				}
 			}
@@ -1085,9 +1028,12 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				if (vp->v_type == VSOCK) {
 					dmp->b_wptr = dmp->b_rptr + cnt;
 
-					error = kstrwritemp(vp, dmp, fflag);
+					error = socket_sendmblk(VTOSO(vp),
+					    &msg, fflag, CRED(), &dmp);
+
 					if (error != 0) {
-						freeb(dmp);
+						if (dmp != NULL)
+							freeb(dmp);
 						VOP_RWUNLOCK(readvp, readflg,
 						    NULL);
 						releasef(sfv->sfv_fd);
@@ -1186,45 +1132,11 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 	switch (vp->v_type) {
 	case VSOCK:
 		so = VTOSO(vp);
-		/* sendfile not supported for SCTP */
-		if (so->so_protocol == IPPROTO_SCTP) {
-			error = EPROTONOSUPPORT;
-			goto err;
-		}
 		is_sock = B_TRUE;
-		switch (so->so_family) {
-		case AF_INET:
-		case AF_INET6:
-			/*
-			 * Make similar checks done in SOP_WRITE().
-			 */
-			if (so->so_state & SS_CANTSENDMORE) {
-				tsignal(curthread, SIGPIPE);
-				error = EPIPE;
-				goto err;
-			}
-			if (so->so_type != SOCK_STREAM) {
-				error = EOPNOTSUPP;
-				goto err;
-			}
-
-			if ((so->so_state & (SS_ISCONNECTED|SS_ISBOUND)) !=
-			    (SS_ISCONNECTED|SS_ISBOUND)) {
-				error = ENOTCONN;
-				goto err;
-			}
-
-			if ((so->so_state & SS_DIRECT) &&
-			    (so->so_priv != NULL) &&
-			    (so->so_kssl_ctx == NULL)) {
-				maxblk = ((tcp_t *)so->so_priv)->tcp_mss;
-			} else {
-				maxblk = (int)vp->v_stream->sd_maxblk;
-			}
-			break;
-		default:
-			error = EAFNOSUPPORT;
-			goto err;
+		if (SOCK_IS_NONSTR(so)) {
+			maxblk = so->so_proto_props.sopp_maxblk;
+		} else {
+			maxblk = (int)vp->v_stream->sd_maxblk;
 		}
 		break;
 	case VREG:
@@ -1361,21 +1273,18 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 		 * senfilev() function to consume the sfv[].
 		 */
 		if (is_sock) {
-			switch (so->so_family) {
-			case AF_INET:
-			case AF_INET6:
-				if (so->so_nl7c_flags != 0)
-					error = nl7c_sendfilev(so, &fileoff,
-					    sfv, copy_cnt, &count);
-				else if ((total_size <= (4 * maxblk)) &&
-				    error == 0)
-					error = sendvec_small_chunk(fp,
-					    &fileoff, sfv, copy_cnt,
-					    total_size, maxblk, &count);
-				else
-					error = sendvec_chunk(fp, &fileoff,
-					    sfv, copy_cnt, &count);
-				break;
+			if (!SOCK_IS_NONSTR(so) &&
+			    _SOTOTPI(so)->sti_nl7c_flags != 0) {
+				error = nl7c_sendfilev(so, &fileoff,
+				    sfv, copy_cnt, &count);
+			} else if ((total_size <= (4 * maxblk)) &&
+			    error == 0) {
+				error = sendvec_small_chunk(fp,
+				    &fileoff, sfv, copy_cnt,
+				    total_size, maxblk, &count);
+			} else {
+				error = sendvec_chunk(fp, &fileoff,
+				    sfv, copy_cnt, &count);
 			}
 		} else {
 			ASSERT(vp->v_type == VREG);

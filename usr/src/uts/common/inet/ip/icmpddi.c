@@ -29,6 +29,9 @@
 #include <sys/modctl.h>
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/rawip_impl.h>
+#include <sys/strsubr.h>
+#include <sys/socketvar.h>
 
 #define	INET_NAME	"icmp"
 #define	INET_MODDESC	"ICMP dummy STREAMS module"
@@ -36,6 +39,9 @@
 #define	INET_DEVMINOR	0
 #define	INET_DEVSTRTAB	icmpinfov4
 #define	INET_MODSTRTAB	dummymodinfo
+#define	INET_SOCKDESC	"Rawip socket module"
+#define	INET_SOCK_PROTO_CREATE_FUNC (*rawip_create)
+#define	INET_SOCK_PROTO_FB_FUNC (*rawip_fallback)
 #define	INET_DEVMTFLAGS	D_MP
 #define	INET_MODMTFLAGS D_MP
 

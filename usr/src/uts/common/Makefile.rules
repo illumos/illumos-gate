@@ -481,6 +481,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/nca/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/sockmods/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/vni/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -678,6 +682,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/kb8042/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/kbtrans/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ksocket/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1548,6 +1556,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/idmap/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/sockmods/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/arp/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1730,6 +1741,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/kb8042/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/kbtrans/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ksocket/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/aggr/%.c

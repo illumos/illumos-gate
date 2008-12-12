@@ -85,6 +85,9 @@ extern void squeue_enter(squeue_t *, mblk_t *, mblk_t *,
     uint32_t, int, uint8_t);
 extern uintptr_t *squeue_getprivate(squeue_t *, sqprivate_t);
 
+extern int squeue_synch_enter(squeue_t *, void *, uint8_t);
+extern void squeue_synch_exit(squeue_t *, void *);
+
 #ifdef	__cplusplus
 }
 #endif
