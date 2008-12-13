@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Zones
  *
@@ -3124,8 +3122,13 @@ zone_start_init(void)
 	 */
 	p->p_zone->zone_boot_err = start_init_common();
 
+	/*
+	 * We will prevent booting zones from becoming running zones if the
+	 * global zone is shutting down.
+	 */
 	mutex_enter(&zone_status_lock);
-	if (z->zone_boot_err != 0) {
+	if (z->zone_boot_err != 0 || zone_status_get(global_zone) >=
+	    ZONE_IS_SHUTTING_DOWN) {
 		/*
 		 * Make sure we are still in the booting state-- we could have
 		 * raced and already be shutting down, or even further along.
@@ -5775,16 +5778,39 @@ zone_kadmin(int cmd, int fcn, const char *mdep, cred_t *credp)
 /*
  * Entry point so kadmin(A_SHUTDOWN, ...) can set the global zone's
  * status to ZONE_IS_SHUTTING_DOWN.
+ *
+ * This function also shuts down all running zones to ensure that they won't
+ * fork new processes.
  */
 void
 zone_shutdown_global(void)
 {
-	ASSERT(curproc->p_zone == global_zone);
+	zone_t *current_zonep;
 
+	ASSERT(INGLOBALZONE(curproc));
+	mutex_enter(&zonehash_lock);
 	mutex_enter(&zone_status_lock);
+
+	/* Modify the global zone's status first. */
 	ASSERT(zone_status_get(global_zone) == ZONE_IS_RUNNING);
 	zone_status_set(global_zone, ZONE_IS_SHUTTING_DOWN);
+
+	/*
+	 * Now change the states of all running zones to ZONE_IS_SHUTTING_DOWN.
+	 * We don't mark all zones with ZONE_IS_SHUTTING_DOWN because doing so
+	 * could cause assertions to fail (e.g., assertions about a zone's
+	 * state during initialization, readying, or booting) or produce races.
+	 * We'll let threads continue to initialize and ready new zones: they'll
+	 * fail to boot the new zones when they see that the global zone is
+	 * shutting down.
+	 */
+	for (current_zonep = list_head(&zone_active); current_zonep != NULL;
+	    current_zonep = list_next(&zone_active, current_zonep)) {
+		if (zone_status_get(current_zonep) == ZONE_IS_RUNNING)
+			zone_status_set(current_zonep, ZONE_IS_SHUTTING_DOWN);
+	}
 	mutex_exit(&zone_status_lock);
+	mutex_exit(&zonehash_lock);
 }
 
 /*
