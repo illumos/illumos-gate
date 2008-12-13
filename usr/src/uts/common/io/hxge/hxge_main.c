@@ -83,9 +83,9 @@ uint32_t hxge_max_rx_pkts = 1024;
  * hxge_rx_bcopy_size_type: receive buffer block size type.
  * hxge_rx_threshold_lo: copy only up to tunable block size type.
  */
-hxge_rxbuf_threshold_t hxge_rx_threshold_hi = HXGE_RX_COPY_7;
+hxge_rxbuf_threshold_t hxge_rx_threshold_hi = HXGE_RX_COPY_NONE;
 hxge_rxbuf_type_t hxge_rx_buf_size_type = RCR_PKTBUFSZ_0;
-hxge_rxbuf_threshold_t hxge_rx_threshold_lo = HXGE_RX_COPY_3;
+hxge_rxbuf_threshold_t hxge_rx_threshold_lo = HXGE_RX_COPY_NONE;
 
 rtrace_t hpi_rtracebuf;
 
@@ -168,8 +168,8 @@ static int hxge_get_priv_prop(p_hxge_t hxgep, const char *pr_name,
 static void hxge_link_poll(void *arg);
 static void hxge_link_update(p_hxge_t hxge, link_state_t state);
 static void hxge_msix_init(p_hxge_t hxgep);
-void hxge_check_msix_parity_err(p_hxge_t hxgep);
-static uint8_t gen_32bit_parity(uint32_t data, boolean_t odd_parity);
+static void hxge_store_msix_table(p_hxge_t hxgep);
+static void hxge_check_1entry_msix_table(p_hxge_t hxgep, int msix_index);
 
 mac_priv_prop_t hxge_priv_props[] = {
 	{"_rxdma_intr_time", MAC_PROP_PERM_RW},
@@ -212,6 +212,10 @@ static mac_callbacks_t hxge_m_callbacks = {
 	hxge_m_setprop,
 	hxge_m_getprop
 };
+
+/* PSARC/2007/453 MSI-X interrupt limit override. */
+#define	HXGE_MSIX_REQUEST_10G	8
+static int hxge_create_msi_property(p_hxge_t);
 
 /* Enable debug messages as necessary. */
 uint64_t hxge_debug_level = 0;
@@ -552,6 +556,9 @@ hxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Enable interrupts.
 	 */
 	hxge_intrs_enable(hxgep);
+
+	/* Keep copy of MSIx table written */
+	hxge_store_msix_table(hxgep);
 
 	if ((status = hxge_mac_register(hxgep)) != HXGE_OK) {
 		HXGE_DEBUG_MSG((hxgep, DDI_CTL,
@@ -1020,6 +1027,9 @@ hxge_init(p_hxge_t hxgep)
 
 	hxge_intrs_enable(hxgep);
 
+	/* Keep copy of MSIx table written */
+	hxge_store_msix_table(hxgep);
+
 	/*
 	 * Enable hardware interrupts.
 	 */
@@ -1279,6 +1289,9 @@ hxge_resume(p_hxge_t hxgep)
 	(void) hxge_tx_vmac_enable(hxgep);
 
 	hxge_intrs_enable(hxgep);
+
+	/* Keep copy of MSIx table written */
+	hxge_store_msix_table(hxgep);
 
 	hxgep->suspended = 0;
 
@@ -3433,7 +3446,7 @@ hxge_add_intrs_adv_type(p_hxge_t hxgep, uint32_t int_type)
 	void		*arg1, *arg2;
 	int		behavior;
 	int		nintrs, navail;
-	int		nactual, nrequired;
+	int		nactual, nrequired, nrequest;
 	int		inum = 0;
 	int		loop = 0;
 	int		x, y;
@@ -3463,6 +3476,18 @@ hxge_add_intrs_adv_type(p_hxge_t hxgep, uint32_t int_type)
 	HXGE_DEBUG_MSG((hxgep, INT_CTL,
 	    "ddi_intr_get_navail() returned: intr type %d nintrs %d, navail %d",
 	    int_type, nintrs, navail));
+
+	/* PSARC/2007/453 MSI-X interrupt limit override */
+	if (int_type == DDI_INTR_TYPE_MSIX) {
+		nrequest = hxge_create_msi_property(hxgep);
+		if (nrequest < navail) {
+			navail = nrequest;
+			HXGE_DEBUG_MSG((hxgep, INT_CTL,
+			    "hxge_add_intrs_adv_type: nintrs %d "
+			    "navail %d (nrequest %d)",
+			    nintrs, navail, nrequest));
+		}
+	}
 
 	if (int_type == DDI_INTR_TYPE_MSI && !ISP2(navail)) {
 		/* MSI must be power of 2 */
@@ -4085,6 +4110,14 @@ hxge_link_poll(void *arg)
 		}
 	}
 
+	if (hxgep->msix_count++ >= HXGE_MSIX_PARITY_CHECK_COUNT) {
+		hxgep->msix_count = 0;
+		hxgep->msix_index++;
+		if (hxgep->msix_index >= HXGE_MSIX_ENTRIES)
+			hxgep->msix_index = 0;
+		hxge_check_1entry_msix_table(hxgep, hxgep->msix_index);
+	}
+
 	/* Restart the link status timer to check the link status */
 	MUTEX_ENTER(&to->lock);
 	to->id = timeout(hxge_link_poll, arg, to->ticks);
@@ -4111,187 +4144,118 @@ hxge_link_update(p_hxge_t hxgep, link_state_t state)
 static void
 hxge_msix_init(p_hxge_t hxgep)
 {
-	indacc_mem1_ctrl_t	indacc_mem1_ctrl;
-	indacc_mem1_data0_t	data0;
-	indacc_mem1_data1_t	data1;
-	indacc_mem1_data2_t	data2;
-	indacc_mem1_prty_t	prty;
-	int			count;
+	uint32_t 		data0;
+	uint32_t 		data1;
+	uint32_t 		data2;
 	int			i;
+	uint32_t		msix_entry0;
+	uint32_t		msix_entry1;
+	uint32_t		msix_entry2;
+	uint32_t		msix_entry3;
 
+	/* Change to use MSIx bar instead of indirect access */
 	for (i = 0; i < HXGE_MSIX_ENTRIES; i++) {
-		indacc_mem1_ctrl.value = 0;
-		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
-		    &indacc_mem1_ctrl.value);
+		data0 = 0xffffffff - i;
+		data1 = 0xffffffff - i - 1;
+		data2 = 0xffffffff - i - 2;
 
-		data0.value = 0xffffffff - i;
-		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_DATA0,
-		    data0.value);
-		data1.value = 0xffffffff - i - 1;
-		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_DATA1,
-		    data1.value);
-		data2.value = 0xffffffff - i - 2;
-		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_DATA2,
-		    data2.value);
-
-		indacc_mem1_ctrl.value = 0;
-		indacc_mem1_ctrl.bits.mem1_addr = i;
-		indacc_mem1_ctrl.bits.mem1_sel = 2;
-		indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
-		indacc_mem1_ctrl.bits.mem1_command = 0;
-		indacc_mem1_ctrl.bits.mem1_diagen = 1;
-		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
-		    indacc_mem1_ctrl.value);
-
-		/* check that operation completed */
-		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
-		    &indacc_mem1_ctrl.value);
-
-		count = 0;
-		while (indacc_mem1_ctrl.bits.mem1_access_status != 1 &&
-		    count++ < HXGE_MSIX_WAIT_COUNT) {
-			HXGE_DELAY(1);
-			indacc_mem1_ctrl.value = 0;
-			HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
-			    &indacc_mem1_ctrl.value);
-		}
+		HXGE_REG_WR32(hxgep->hpi_msi_handle, i * 16, data0);
+		HXGE_REG_WR32(hxgep->hpi_msi_handle, i * 16 + 4, data1);
+		HXGE_REG_WR32(hxgep->hpi_msi_handle, i * 16 + 8, data2);
 	}
 
+	/* Initialize ram data out buffer. */
 	for (i = 0; i < HXGE_MSIX_ENTRIES; i++) {
-		indacc_mem1_ctrl.value = 0;
-		indacc_mem1_ctrl.bits.mem1_addr = i;
-		indacc_mem1_ctrl.bits.mem1_sel = 2;
-		indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
-		indacc_mem1_ctrl.bits.mem1_command = 1;
-		indacc_mem1_ctrl.bits.mem1_diagen = 1;
-
-		/* issue read command */
-		HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
-		    indacc_mem1_ctrl.value);
-
-		/* wait for read operation to complete */
-		count = 0;
-		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
-		    &indacc_mem1_ctrl.value);
-		while (indacc_mem1_ctrl.bits.mem1_access_status != 1 &&
-		    count++ < HXGE_MSIX_WAIT_COUNT) {
-			HXGE_DELAY(1);
-			HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
-			    &indacc_mem1_ctrl.value);
-		}
-
-
-
-		data0.value = data1.value = data2.value = prty.value = 0;
-		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_DATA0,
-		    &data0.value);
-		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_DATA1,
-		    &data1.value);
-		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_DATA2,
-		    &data2.value);
-		HXGE_REG_RD32(hxgep->hpi_handle, INDACC_MEM1_PRTY,
-		    &prty.value);
+		HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16, &msix_entry0);
+		HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16 + 4, &msix_entry1);
+		HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16 + 8, &msix_entry2);
+		HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16 + 12, &msix_entry3);
 	}
-
-	/* Turn off diagnostic mode */
-	indacc_mem1_ctrl.value = 0;
-	indacc_mem1_ctrl.bits.mem1_addr = 0;
-	indacc_mem1_ctrl.bits.mem1_sel = 0;
-	indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
-	indacc_mem1_ctrl.bits.mem1_command = 0;
-	indacc_mem1_ctrl.bits.mem1_diagen = 0;
-	HXGE_REG_WR32(hxgep->hpi_handle, INDACC_MEM1_CTRL,
-	    indacc_mem1_ctrl.value);
 }
 
-void
-hxge_check_msix_parity_err(p_hxge_t hxgep)
+static void
+hxge_store_msix_table(p_hxge_t hxgep)
 {
-	indacc_mem1_ctrl_t	indacc_mem1_ctrl;
-	indacc_mem1_data0_t	data0;
-	indacc_mem1_data1_t	data1;
-	indacc_mem1_data2_t	data2;
-	indacc_mem1_prty_t	prty;
-	uint32_t		parity = 0;
-	int			count;
 	int			i;
+	uint32_t		msix_entry0;
+	uint32_t		msix_entry1;
+	uint32_t		msix_entry2;
 
-	hpi_handle_t		handle;
+	for (i = 0; i < HXGE_MSIX_ENTRIES; i++) {
+		HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16, &msix_entry0);
+		HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16 + 4,
+		    &msix_entry1);
+		HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16 + 8,
+		    &msix_entry2);
+
+		hxgep->msix_table[i][0] = msix_entry0;
+		hxgep->msix_table[i][1] = msix_entry1;
+		hxgep->msix_table[i][2] = msix_entry2;
+	}
+}
+
+static void
+hxge_check_1entry_msix_table(p_hxge_t hxgep, int i)
+{
+	uint32_t		msix_entry0;
+	uint32_t		msix_entry1;
+	uint32_t		msix_entry2;
 	p_hxge_peu_sys_stats_t	statsp;
 
-	handle = hxgep->hpi_handle;
 	statsp = (p_hxge_peu_sys_stats_t)&hxgep->statsp->peu_sys_stats;
 
-	for (i = 0; i < HXGE_MSIX_ENTRIES; i++) {
-		indacc_mem1_ctrl.value = 0;
-		indacc_mem1_ctrl.bits.mem1_addr = i;
-		indacc_mem1_ctrl.bits.mem1_sel = 2;
-		indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
-		indacc_mem1_ctrl.bits.mem1_command = 1;
-		indacc_mem1_ctrl.bits.mem1_diagen = 1;
+	HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16, &msix_entry0);
+	HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16 + 4, &msix_entry1);
+	HXGE_REG_RD32(hxgep->hpi_msi_handle, i * 16 + 8, &msix_entry2);
 
-		/* issue read command */
-		HXGE_REG_WR32(handle, INDACC_MEM1_CTRL, indacc_mem1_ctrl.value);
+	hxgep->msix_table_check[i][0] = msix_entry0;
+	hxgep->msix_table_check[i][1] = msix_entry1;
+	hxgep->msix_table_check[i][2] = msix_entry2;
 
-		/* wait for read operation to complete */
-		count = 0;
-		HXGE_REG_RD32(handle, INDACC_MEM1_CTRL,
-		    &indacc_mem1_ctrl.value);
-		while (indacc_mem1_ctrl.bits.mem1_access_status != 1 &&
-		    count++ < HXGE_MSIX_WAIT_COUNT) {
-			HXGE_DELAY(1);
-			HXGE_REG_RD32(handle, INDACC_MEM1_CTRL,
-			    &indacc_mem1_ctrl.value);
-		}
-
-		data0.value = data1.value = data2.value = prty.value = 0;
-		HXGE_REG_RD32(handle, INDACC_MEM1_DATA0, &data0.value);
-		HXGE_REG_RD32(handle, INDACC_MEM1_DATA1, &data1.value);
-		HXGE_REG_RD32(handle, INDACC_MEM1_DATA2, &data2.value);
-		HXGE_REG_RD32(handle, INDACC_MEM1_PRTY, &prty.value);
-
-		parity = gen_32bit_parity(data0.value, B_FALSE) |
-		    (gen_32bit_parity(data1.value, B_FALSE) << 4) |
-		    (gen_32bit_parity(data2.value, B_FALSE) << 8);
-
-		if (parity != prty.bits.mem1_parity) {
-			statsp->eic_msix_parerr++;
-			if (statsp->eic_msix_parerr == 1) {
-				HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
-				    "==> hxge_check_msix_parity_err: "
-				    "eic_msix_parerr"));
-				HXGE_FM_REPORT_ERROR(hxgep, NULL,
-				    HXGE_FM_EREPORT_PEU_ERR);
-			}
+	if ((hxgep->msix_table[i][0] != hxgep->msix_table_check[i][0]) ||
+	    (hxgep->msix_table[i][1] != hxgep->msix_table_check[i][1]) ||
+	    (hxgep->msix_table[i][2] != hxgep->msix_table_check[i][2])) {
+		statsp->eic_msix_parerr++;
+		if (statsp->eic_msix_parerr == 1) {
+			HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
+			    "==> hxge_check_1entry_msix_table: "
+			    "eic_msix_parerr at index: %d", i));
+			HXGE_FM_REPORT_ERROR(hxgep, NULL,
+			    HXGE_FM_EREPORT_PEU_ERR);
 		}
 	}
-
-	/* Turn off diagnostic mode */
-	indacc_mem1_ctrl.value = 0;
-	indacc_mem1_ctrl.bits.mem1_addr = 0;
-	indacc_mem1_ctrl.bits.mem1_sel = 0;
-	indacc_mem1_ctrl.bits.mem1_prty_wen = 0;
-	indacc_mem1_ctrl.bits.mem1_command = 0;
-	indacc_mem1_ctrl.bits.mem1_diagen = 0;
-	HXGE_REG_WR32(handle, INDACC_MEM1_CTRL, indacc_mem1_ctrl.value);
 }
 
-static uint8_t
-gen_32bit_parity(uint32_t data, boolean_t odd_parity)
+/*
+ * The following function is to support
+ * PSARC/2007/453 MSI-X interrupt limit override.
+ */
+static int
+hxge_create_msi_property(p_hxge_t hxgep)
 {
-	uint8_t		parity = 0;
-	uint8_t		data_byte = 0;
-	uint8_t		parity_bit = 0;
-	uint32_t	i = 0, j = 0;
+	int	nmsi;
+	extern	int ncpus;
 
-	for (i = 0; i < 4; i++) {
-		data_byte = (data >> (i * 8)) & 0xffULL;
-		parity_bit = odd_parity ? 1 : 0;
-		for (j = 0; j < 8; j++) {
-			parity_bit ^= (data_byte >> j) & 0x1ULL;
-		}
-		parity |= (parity_bit << i);
+	HXGE_DEBUG_MSG((hxgep, MOD_CTL, "==>hxge_create_msi_property"));
+
+	(void) ddi_prop_create(DDI_DEV_T_NONE, hxgep->dip,
+	    DDI_PROP_CANSLEEP, "#msix-request", NULL, 0);
+	/*
+	 * The maximum MSI-X requested will be 8.
+	 * If the # of CPUs is less than 8, we will reqeust
+	 * # MSI-X based on the # of CPUs.
+	 */
+	if (ncpus >= HXGE_MSIX_REQUEST_10G) {
+		nmsi = HXGE_MSIX_REQUEST_10G;
+	} else {
+		nmsi = ncpus;
 	}
 
-	return (parity);
+	HXGE_DEBUG_MSG((hxgep, MOD_CTL,
+	    "==>hxge_create_msi_property(10G): exists 0x%x (nmsi %d)",
+	    ddi_prop_exists(DDI_DEV_T_NONE, hxgep->dip,
+	    DDI_PROP_CANSLEEP, "#msix-request"), nmsi));
+
+	HXGE_DEBUG_MSG((hxgep, MOD_CTL, "<==hxge_create_msi_property"));
+	return (nmsi);
 }

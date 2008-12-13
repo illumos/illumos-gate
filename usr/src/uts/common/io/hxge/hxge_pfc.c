@@ -705,7 +705,7 @@ hxge_pfc_config_init(p_hxge_t hxgep)
 
 	(void) hpi_pfc_set_tcam_enable(handle, B_FALSE);
 	(void) hpi_pfc_set_l2_hash(handle, B_FALSE);
-	(void) hpi_pfc_set_tcp_cksum(handle, B_FALSE);
+	(void) hpi_pfc_set_tcp_cksum(handle, B_TRUE);
 	(void) hpi_pfc_set_default_dma(handle, 0);
 	(void) hpi_pfc_mac_addr_enable(handle, 0);
 	(void) hpi_pfc_set_force_csum(handle, B_FALSE);

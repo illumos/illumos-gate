@@ -361,6 +361,9 @@ struct _hxge_t {
 	hxge_timeout		timeout;
 
 	int			msix_count;
+	int			msix_index;
+	uint32_t		msix_table[32][3];
+	uint32_t		msix_table_check[1][3];
 };
 
 /*

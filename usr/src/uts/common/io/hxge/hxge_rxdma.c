@@ -30,7 +30,7 @@
  * Number of blocks to accumulate before re-enabling DMA
  * when we get RBR empty.
  */
-#define	HXGE_RBR_EMPTY_THRESHOLD	64
+#define	HXGE_RBR_EMPTY_THRESHOLD	128
 
 /*
  * Globals: tunable parameters (/etc/system or adb)
@@ -89,8 +89,7 @@ static hxge_status_t hxge_rxdma_start_channel(p_hxge_t hxgep, uint16_t channel,
 	int n_init_kick);
 static hxge_status_t hxge_rxdma_stop_channel(p_hxge_t hxgep, uint16_t channel);
 static mblk_t *hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
-	p_rx_rcr_ring_t	*rcr_p, rdc_stat_t cs,
-	uint16_t *nptrs, uint16_t *npkts);
+	p_rx_rcr_ring_t	*rcr_p, rdc_stat_t cs);
 static void hxge_receive_packet(p_hxge_t hxgep, p_rx_rcr_ring_t rcr_p,
 	p_rcr_entry_t rcr_desc_rd_head_p, boolean_t *multi_p,
 	mblk_t ** mp, mblk_t ** mp_cont, uint32_t *invalid_rcr_entry);
@@ -99,8 +98,7 @@ static hxge_status_t hxge_disable_rxdma_channel(p_hxge_t hxgep,
 static p_rx_msg_t hxge_allocb(size_t, uint32_t, p_hxge_dma_common_t);
 static void hxge_freeb(p_rx_msg_t);
 static void hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex,
-	p_hxge_ldv_t ldvp, rdc_stat_t cs,
-	uint16_t *nptrs, uint16_t *npkts);
+    p_hxge_ldv_t ldvp, rdc_stat_t cs);
 static hxge_status_t hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index,
 	p_hxge_ldv_t ldvp, rdc_stat_t cs);
 static hxge_status_t hxge_rxbuf_index_info_init(p_hxge_t hxgep,
@@ -1004,7 +1002,6 @@ void hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p,
 void
 hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 {
-
 	HXGE_DEBUG_MSG((hxgep, RX_CTL, "==> hxge_post_page"));
 
 	/* Reuse this buffer */
@@ -1017,6 +1014,7 @@ hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 		rx_msg_p->rx_use_bcopy = B_FALSE;
 		atomic_dec_32(&rx_rbr_p->rbr_consumed);
 	}
+	atomic_dec_32(&rx_rbr_p->rbr_used);
 
 	/*
 	 * Get the rbr header pointer and its offset index.
@@ -1031,7 +1029,8 @@ hxge_post_page(p_hxge_t hxgep, p_rx_rbr_ring_t rx_rbr_p, p_rx_msg_t rx_msg_p)
 	 */
 	hpi_rxdma_rdc_rbr_kick(HXGE_DEV_HPI_HANDLE(hxgep), rx_rbr_p->rdc, 1);
 	if (rx_rbr_p->rbr_is_empty &&
-	    rx_rbr_p->rbr_consumed < rx_rbr_p->rbb_max / 16) {
+	    (rx_rbr_p->rbb_max - rx_rbr_p->rbr_used) >=
+	    HXGE_RBR_EMPTY_THRESHOLD) {
 		hxge_rbr_empty_restore(hxgep, rx_rbr_p);
 	}
 
@@ -1134,7 +1133,6 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	uint8_t			channel;
 	hpi_handle_t		handle;
 	rdc_stat_t		cs;
-	uint16_t		nptrs = 0, npkts = 0;
 	uint_t			serviced = DDI_INTR_UNCLAIMED;
 
 	if (ldvp == NULL) {
@@ -1168,16 +1166,12 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	channel = ldvp->channel;
 	ldgp = ldvp->ldgp;
 	RXDMA_REG_READ64(handle, RDC_STAT, channel, &cs.value);
-	cs.bits.ptrread = 0;
-	cs.bits.pktread = 0;
-	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "==> hxge_rx_intr:channel %d "
 	    "cs 0x%016llx rcrto 0x%x rcrthres %x",
 	    channel, cs.value, cs.bits.rcr_to, cs.bits.rcr_thres));
 
-	hxge_rx_pkts_vring(hxgep, ldvp->vdma_index, ldvp, cs,
-	    &nptrs, &npkts);
+	hxge_rx_pkts_vring(hxgep, ldvp->vdma_index, ldvp, cs);
 	serviced = DDI_INTR_CLAIMED;
 
 	/* error events. */
@@ -1194,11 +1188,9 @@ hxge_intr_exit:
 	 */
 	cs.value &= RDC_STAT_WR1C;
 	cs.bits.mex = 1;
-	cs.bits.ptrread = nptrs;
-	cs.bits.pktread = (npkts > 1) ? (npkts - 1) : 0;
+	cs.bits.ptrread = 0;
+	cs.bits.pktread = 0;
 	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
-
-	hpi_rxdma_rdc_rcr_flush(handle, channel);
 
 	/*
 	 * Rearm this logical group if this is a single device group.
@@ -1221,14 +1213,13 @@ hxge_intr_exit:
 
 static void
 hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
-    rdc_stat_t cs, uint16_t *nptrs, uint16_t *npkts)
+    rdc_stat_t cs)
 {
 	p_mblk_t		mp;
 	p_rx_rcr_ring_t		rcrp;
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "==> hxge_rx_pkts_vring"));
-	if ((mp = hxge_rx_pkts(hxgep, vindex, ldvp, &rcrp, cs,
-	    nptrs, npkts)) == NULL) {
+	if ((mp = hxge_rx_pkts(hxgep, vindex, ldvp, &rcrp, cs)) == NULL) {
 		HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
 		    "<== hxge_rx_pkts_vring: no mp"));
 		return;
@@ -1273,7 +1264,7 @@ hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 /*ARGSUSED*/
 mblk_t *
 hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
-    p_rx_rcr_ring_t *rcrp, rdc_stat_t cs, uint16_t *nptrs, uint16_t *npkts)
+    p_rx_rcr_ring_t *rcrp, rdc_stat_t cs)
 {
 	hpi_handle_t		handle;
 	uint8_t			channel;
@@ -1292,6 +1283,7 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	p_rxdma_mailbox_t	mboxp;
 	uint64_t		rcr_head_index, rcr_tail_index;
 	uint64_t		rcr_tail;
+	uint64_t		value;
 	rdc_rcr_tail_t		rcr_tail_reg;
 	p_hxge_rx_ring_stats_t	rdc_stats;
 
@@ -1347,7 +1339,11 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	 * as only one paccket and it may take up more than one completion
 	 * entry).
 	 */
-	qlen_hw = (qlen < hxge_max_rx_pkts) ? qlen : hxge_max_rx_pkts;
+	if (cs.bits.rbr_empty)
+		qlen_hw = qlen;
+	else
+		qlen_hw = (qlen < hxge_max_rx_pkts) ? qlen : hxge_max_rx_pkts;
+
 	head_mp = NULL;
 	tail_mp = &head_mp;
 	nmp = mp_cont = NULL;
@@ -1467,8 +1463,16 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 		    channel, rcr_cfg_b.value);
 	}
 
-	*nptrs = nrcr_read;
-	*npkts = npkt_read;
+	cs.bits.pktread = npkt_read;
+	cs.bits.ptrread = nrcr_read;
+	value = cs.value;
+	cs.value &= 0xffffffffULL;
+	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
+
+	cs.value = value & ~0xffffffffULL;
+	cs.bits.pktread = 0;
+	cs.bits.ptrread = 0;
+	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
 	    "==> hxge_rx_pkts: EXIT: rcr channel %d "
@@ -1488,6 +1492,7 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 
 #define	RCR_ENTRY_PATTERN	0x5a5a6b6b7c7c8d8dULL
 #define	NO_PORT_BIT		0x20
+#define	L4_CS_EQ_BIT		0x40
 
 /*ARGSUSED*/
 void
@@ -1501,6 +1506,7 @@ hxge_receive_packet(p_hxge_t hxgep,
 	uint8_t			channel;
 
 	boolean_t first_entry = B_TRUE;
+	boolean_t is_tcp_udp = B_FALSE;
 	boolean_t buffer_free = B_FALSE;
 	boolean_t error_send_up = B_FALSE;
 	uint8_t error_type;
@@ -1522,7 +1528,11 @@ hxge_receive_packet(p_hxge_t hxgep,
 	boolean_t is_valid = B_FALSE;
 	p_hxge_rx_ring_stats_t rdc_stats;
 	uint32_t bytes_read;
-	uint8_t header = 0;
+	uint8_t header0 = 0;
+	uint8_t header1 = 0;
+	uint64_t pkt_type;
+	uint8_t no_port_bit = 0;
+	uint8_t l4_cs_eq_bit = 0;
 
 	channel = rcr_p->rdc;
 
@@ -1542,6 +1552,7 @@ hxge_receive_packet(p_hxge_t hxgep,
 	*((uint64_t *)rcr_desc_rd_head_p) = RCR_ENTRY_PATTERN;
 
 	multi = (rcr_entry & RCR_MULTI_MASK);
+	pkt_type = (rcr_entry & RCR_PKT_TYPE_MASK);
 
 	error_type = ((rcr_entry & RCR_ERROR_MASK) >> RCR_ERROR_SHIFT);
 	l2_len = ((rcr_entry & RCR_L2_LEN_MASK) >> RCR_L2_LEN_SHIFT);
@@ -1707,10 +1718,19 @@ hxge_receive_packet(p_hxge_t hxgep,
 	    "==> hxge_receive_packet: after first dump:usage count"));
 
 	if (rx_msg_p->cur_usage_cnt == 0) {
+		atomic_inc_32(&rx_rbr_p->rbr_used);
 		if (rx_rbr_p->rbr_use_bcopy) {
 			atomic_inc_32(&rx_rbr_p->rbr_consumed);
-			if (rx_rbr_p->rbr_consumed >
+			if (rx_rbr_p->rbr_consumed <
 			    rx_rbr_p->rbr_threshold_hi) {
+				if (rx_rbr_p->rbr_threshold_lo == 0 ||
+				    ((rx_rbr_p->rbr_consumed >=
+				    rx_rbr_p->rbr_threshold_lo) &&
+				    (rx_rbr_p->rbr_bufsize_type >=
+				    pktbufsz_type))) {
+					rx_msg_p->rx_use_bcopy = B_TRUE;
+				}
+			} else {
 				rx_msg_p->rx_use_bcopy = B_TRUE;
 			}
 		}
@@ -1741,19 +1761,6 @@ hxge_receive_packet(p_hxge_t hxgep,
 		if (rx_msg_p->cur_usage_cnt == rx_msg_p->max_usage_cnt) {
 			buffer_free = B_TRUE;
 		}
-	}
-
-	if (rx_msg_p->rx_use_bcopy) {
-		rdc_stats->pkt_drop++;
-		atomic_inc_32(&rx_msg_p->ref_cnt);
-		if (buffer_free == B_TRUE) {
-			rx_msg_p->free = B_TRUE;
-		}
-
-		MUTEX_EXIT(&rx_rbr_p->lock);
-		MUTEX_EXIT(&rcr_p->lock);
-		hxge_freeb(rx_msg_p);
-		return;
 	}
 
 	HXGE_DEBUG_MSG((hxgep, RX_CTL,
@@ -1803,7 +1810,11 @@ hxge_receive_packet(p_hxge_t hxgep,
 	skip_len = sw_offset_bytes + hdr_size;
 
 	if (first_entry) {
-		header = rx_msg_p->buffer[buf_offset];
+		header0 = rx_msg_p->buffer[buf_offset];
+		no_port_bit = header0 & NO_PORT_BIT;
+
+		header1 = rx_msg_p->buffer[buf_offset + 1];
+		l4_cs_eq_bit = header1 & L4_CS_EQ_BIT;
 	}
 
 	if (!rx_msg_p->rx_use_bcopy) {
@@ -1923,7 +1934,10 @@ hxge_receive_packet(p_hxge_t hxgep,
 	 * Update stats and hardware checksuming.
 	 */
 	if (is_valid && !multi) {
-		if (!(header & NO_PORT_BIT) && !error_type) {
+		is_tcp_udp = ((pkt_type == RCR_PKT_IS_TCP ||
+		    pkt_type == RCR_PKT_IS_UDP) ? B_TRUE : B_FALSE);
+
+		if (!no_port_bit && l4_cs_eq_bit && is_tcp_udp && !error_type) {
 			(void) hcksum_assoc(nmp, NULL, NULL, 0, 0, 0, 0,
 			    HCK_FULLCKSUM_OK | HCK_FULLCKSUM, 0);
 
@@ -1964,8 +1978,9 @@ hxge_rx_rbr_empty_recover(p_hxge_t hxgep, uint8_t channel)
 	 * Post page will accumulate some buffers before re-enabling
 	 * the DMA channel.
 	 */
+
 	MUTEX_ENTER(&rbrp->post_lock);
-	if (rbrp->rbr_consumed < rbrp->rbb_max / 32) {
+	if ((rbrp->rbb_max - rbrp->rbr_used) >= HXGE_RBR_EMPTY_THRESHOLD) {
 		hxge_rbr_empty_restore(hxgep, rbrp);
 	} else {
 		rbrp->rbr_is_empty = B_TRUE;
@@ -2512,6 +2527,7 @@ hxge_map_rxdma_channel_cfg_ring(p_hxge_t hxgep, uint16_t dma_channel,
 	rbrp->rbr_rd_index = 0;
 
 	rbrp->rbr_consumed = 0;
+	rbrp->rbr_used = 0;
 	rbrp->rbr_use_bcopy = B_TRUE;
 	rbrp->rbr_bufsize_type = RCR_PKTBUFSZ_0;
 

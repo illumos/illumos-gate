@@ -159,6 +159,8 @@ extern "C" {
 				RDC_STAT_RBR_PRE_EMPTY | 	\
 				RDC_STAT_RBR_PRE_PAR |		\
 				RDC_STAT_RCR_SHA_PAR |		\
+				RDC_STAT_RCR_TO | 		\
+				RDC_STAT_RCR_THRES |		\
 				RDC_STAT_RBR_CPL |		\
 				RDC_STAT_PEU_ERR)
 
@@ -385,7 +387,7 @@ typedef struct _rx_rbr_ring_t {
 	hxge_os_mutex_t		lock;
 	hxge_os_mutex_t		post_lock;
 	boolean_t		rbr_is_empty;
-	uint32_t		accumulate;
+	uint32_t		rbr_used;
 	uint16_t		index;
 	struct _hxge_t		*hxgep;
 	uint16_t		rdc;
