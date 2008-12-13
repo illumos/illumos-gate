@@ -173,8 +173,8 @@ struct mobj_stats {
 	uint_t	mobjs_lib_va_find_delete;
 	uint_t	mobjs_lib_va_add_delay_delete;
 	uint_t	mobjs_lib_va_add_delete;
+	uint_t	mobjs_min_align;
 #if defined(__sparc)
-	uint_t	mobjs_vac_align;
 	uint_t	mobjs_aout_uzero_fault;
 	uint_t	mobjs_aout_64bit_try;
 	uint_t	mobjs_aout_noexec;
@@ -1259,9 +1259,16 @@ calc_loadable(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, size_t *len,
 	caddr_t start_addr = NULL;
 	caddr_t p_end = NULL;
 	size_t max_align = 0;
+	size_t min_align = PAGESIZE;	/* needed for vmem_xalloc */
 	STRUCT_HANDLE(myphdr, mph);
 #if defined(__sparc)
 	extern int vac_size;
+
+	/*
+	 * Want to prevent aliasing by making the start address at least be
+	 * aligned to vac_size.
+	 */
+	min_align = MAX(PAGESIZE, vac_size);
 #endif
 
 	model = get_udatamodel();
@@ -1329,16 +1336,10 @@ calc_loadable(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, size_t *len,
 			p_align = STRUCT_FGET(mph, x.p_align);
 			if (p_align > 1 && p_align > max_align) {
 				max_align = p_align;
-#if defined(__sparc)
-				/*
-				 * Want to prevent aliasing by making the start
-				 * address be aligned to vac_size.
-				 */
-				if (max_align < vac_size) {
-					max_align = vac_size;
-					MOBJ_STAT_ADD(vac_align);
+				if (max_align < min_align) {
+					max_align = min_align;
+					MOBJ_STAT_ADD(min_align);
 				}
-#endif
 			}
 		}
 		STRUCT_SET_HANDLE(mph, model,
@@ -1361,6 +1362,8 @@ calc_loadable(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, size_t *len,
 	} else {
 		*align = max_align;
 	}
+
+	ASSERT(*align >= PAGESIZE || *align == 0);
 
 	*loadable = num_segs;
 	*len = p_end - start_addr;
