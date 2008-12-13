@@ -22,7 +22,7 @@
 .\" Use is subject to license terms.
 .\"
 .\"
-.TH webrev 1 "3 Nov 2008"
+.TH webrev 1 "5 Dec 2008"
 .SH NAME
 webrev \- Generate HTML codereview materials
 .SH SYNOPSIS
@@ -187,10 +187,23 @@ The file list will be created from the output of the "svn status" command.
 
 .SH OPTIONS
 .TP 10
-.BI "-w " wx-file
-Extract the file list from the wx "active" file specified.  'wx' uses
-this mode when invoking webrev.  The list is assumed to be in the
-format expected by the \fIwx\fR package.  See FILE LIST, below.
+.BI "-D"
+Delete remote webrev via SFTP. Default remote host is \fIcr.opensolaris.org\fR,
+default remote directory for removal is the same as workspace/repository
+basename. Remote target can be overriden using -t option. If combined with
+-U the deletion will be performed first. Also, if used together with -U
+and the removal fails, no upload is done. Without -U option no webrev will
+be generated, just like if -n option was used. The deletion is done by
+moving the webrev to special directory in user's home directory. It is
+expected that the remote host periodically runs a script which deletes
+the contents of this directory. See the ENVIRONMENT VARIABLES section for
+more details about this directory.
+.TP 10
+.BI "-i " include-file
+Include the specified file into the index.html file which is generated
+as part of the webrev.  This allows a snippet of XHTML to be added by
+the webrev author. User content is contained by a <div> tag and
+the markup should validate as XHTML 1.0 Transitional.
 .TP 10
 .BI "-l " putback-args
 Extract the file list from the output of 
@@ -200,17 +213,17 @@ Any arguments supplied will be passed to
 See SCM INTERACTIONS.  For more information about file
 lists, see FILE LIST.  This argument should appear last.
 .TP 10
+.BI "-N"
+Suppress all comments from all output forms html, txt and pdf.
+.TP 10
+.BI "-n"
+Do not generate webrev. Useful whenever only upload is needed.
+.TP 10
 .B -O
 Enable \fIOpenSolaris\fR mode: bug links are generated relative to
 \fIbugs.opensolaris.org\fR, SAC links are generated relative to
 \fIwww.opensolaris.org\fR, and sources which appear in \fIusr/closed\fR
 are automatically elided from the review.
-.TP 10
-.BI "-i " include-file
-Include the specified file into the index.html file which is generated
-as part of the webrev.  This allows a snippet of XHTML to be added by
-the webrev author. User content is contained by a <div> tag and
-the markup should validate as XHTML 1.0 Transitional.
 .TP 10
 .BI "-o " output-dir
 Place output from running the script in the directory specified.  If
@@ -220,22 +233,22 @@ specified, this option takes precedence over the WDIR environment variable.
 Specify a basis of comparison meaningful for the SCM currently in use.
 See SCM INTERACTIONS and INCREMENTAL REVIEWS.
 .TP 10
-.BI "-N"
-Suppress all comments from all output forms html, txt and pdf.
-.TP 10
-.BI "-n"
-Do not generate webrev. Useful whenever only upload is needed.
-.TP 10
 .BI "-t " target
 Upload target. Specified in form of URI identifier. For SCP/SFTP it is
 \fIssh://user@remote_host:remote_dir\fR and for rsync it is
 \fIrsync://user@remote_host:remote_dir\fR. This option can override the
--o option if the URI is fully specified.
+-o option if the URI is fully specified. The target is relative to
+the top level directory of the default sftp/rsync directory tree.
 .TP 10
 .BI "-U"
 Upload the webrev. Default remote host is \fIcr.opensolaris.org\fR.
 Default transport is rsync. If it fails, fallback to SCP/SFTP transport
 is done.
+.TP 10
+.BI "-w " wx-file
+Extract the file list from the wx "active" file specified.  'wx' uses
+this mode when invoking webrev.  The list is assumed to be in the
+format expected by the \fIwx\fR package.  See FILE LIST, below.
 
 .SH FILE LIST
 .PP
@@ -350,6 +363,11 @@ sections of code may be expanded and collapsed.  It also provides a
 other.  The default path for this script is
 /ws/onnv-gate/public/bin/wdiff but WDIFF may be set to customize this
 to use a more convenient location.
+
+\fBWEBREV_TRASH_DIR\fR specifies alternative location of trash directory
+for remote webrev deletion using the \fI-D\fR option. The directory is
+relative to the top level directory of the default sftp/rsync directory tree.
+The default value of this directory is ".trash".
 
 .SH UPLOADING WEBREVS
 A webrev can be uploaded to remote site using the -U option. To simply

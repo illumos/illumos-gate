@@ -142,7 +142,7 @@ span.new {
 '
 
 # Upload the webrev via rsync. Return 0 on success, 1 on error.
-rsync_upload()
+function rsync_upload
 {
 	if (( $# != 1 )); then
 		return 1
@@ -150,18 +150,7 @@ rsync_upload()
 
 	typeset dst=$1
 
-	# if destination specification is not in the form of host:remote_dir
-	# then assume it is just remote hostname and append a colon and
-	# destination directory formed from local webrev directory name
-	if [[ -z ${dst##*:} ]]; then
-		if [[ "${dst}" == *: ]]; then
-			dst=${dst}${WNAME}
-		else
-			dst=${dst}:${WNAME}
-		fi
-	fi
-
-	print " Syncing webrev: \c"
+	print "        Syncing: \c"
 	# end source directory with a slash in order to copy just
 	# directory contents, not the whole directory
 	$RSYNC -r -q $WDIR/ $dst
@@ -176,52 +165,30 @@ rsync_upload()
 }
 
 # Upload the webrev via SSH. Return 0 on success, 1 on error.
-ssh_upload()
+function ssh_upload
 {
 	if (( $# != 1 )); then
+		print "ssh_upload: wrong usage"
 		return 1
 	fi
 
 	typeset dst=$1
 	typeset -r host_spec=${dst%%:*}
-	typeset -r dir_spec=${dst##*:}
+	typeset -r dir_spec=${dst#*:}
 
-	# if destination specification is not in the form of host:remote_dir
-	# then assume it is just remote hostname and append a colon
-	if [[ "${dst}" != *:* ]]; then
-		dst=${dst}:
-	fi
-
-	if [[ -z $tflag || -z $dir_spec ]]; then
-		dir_rm=$WNAME
-	else
-		if [[ "${dir_spec}" == */* ]]; then
-			dir_rm=${dir_spec%%/*}
-		else
-			dir_rm=${dir_spec##*/}
-		fi
-	fi
-
-	if [[ "${dir_spec}" != /* ]]; then
-		print "Removing old remote webrev: \c"
-		if [[ -z "$dir_rm" ]]; then
-			echo "empty directory for removal"
-			return 1
-		fi
-		typeset -r batch_file_rm=$( $MKTEMP /tmp/$webrev_remove.XXX )
-		echo "rename $dir_rm .trash/removed.$$" > $batch_file_rm
+	# if the deletion was explicitly requested there is no need
+	# to perform it again
+	if [[ -z $Dflag ]]; then
 		# we do not care about return value because this might be
 		# the first time this directory is uploaded
-		$SFTP -b $batch_file_rm $host_spec 2>/dev/null 1>&2
-		rm -f $batch_file_rm
-		print "Done."
+		delete_webrev 0
 	fi
 
 	# if the supplied path is absolute we assume all directories are
 	# created, otherwise try to create all directories in the path
 	# except the last one which will be created by scp
 	if [[ "${dir_spec}" == */* && "${dir_spec}" != /* ]]; then
-		print "Creating directories: \c"
+		print "  Creating dirs: \c"
 		typeset -r dirs_mk=${dir_spec%/*}
 		typeset -r batch_file_mkdir=$( $MKTEMP /tmp/$webrev_mkdir.XXX )
                 OLDIFS=$IFS
@@ -246,7 +213,7 @@ ssh_upload()
 		print "Done."
 	fi
 
-	print "Uploading webrev: \c"
+	print "      Uploading: \c"
 	$SCP -q -C -B -o PreferredAuthentications=publickey -r \
 		$WDIR $dst
 	if (( $? != 0 )); then
@@ -260,21 +227,69 @@ ssh_upload()
 }
 
 #
+# Delete webrev at remote site. Return 0 on success, 1 or exit code from sftp
+# on failure.
+#
+function delete_webrev
+{
+	if (( $# != 1 )); then
+		print "delete_webrev: wrong usage"
+		return 1
+	fi
+
+	# Strip the transport specification part of remote target first.
+	typeset -r stripped_target=${remote_target##*://}
+	typeset -r host_spec=${stripped_target%%:*}
+	typeset -r dir_spec=${stripped_target#*:}
+	integer -r check=$1
+	typeset dir_rm
+
+	# Do not accept an absolute path.
+	if [[ ${dir_spec} == /* ]]; then
+		return 1
+	fi
+
+	# Strip the ending slash.
+	if [[ ${dir_spec} == */ ]]; then
+		dir_rm=${dir_spec%%/}
+	else
+		dir_rm=${dir_spec}
+	fi
+
+	print "Removing remote: \c"
+	if [[ -z "$dir_rm" ]]; then
+		print "empty directory for removal"
+		return 1
+	fi
+
+	# Prepare batch file.
+	typeset -r batch_file_rm=$( $MKTEMP /tmp/webrev_remove.XXX )
+	if [[ -z $batch_file_rm ]]; then
+		print "Cannot create temporary file"
+		return 1
+	fi
+	print "rename $dir_rm $TRASH_DIR/removed.$$" > $batch_file_rm
+
+	# Perform remote deletion and remove the batch file.
+	$SFTP -b $batch_file_rm $host_spec 2>/dev/null 1>&2
+	integer -r ret=$?
+	rm -f $batch_file_rm
+	if (( $ret != 0 && $check > 0 )); then
+		print "Failed"
+		return $ret
+	fi
+	print "Done."
+
+	return 0
+}
+
+#
 # Upload webrev to remote site
 #
-upload_webrev()
+function upload_webrev
 {
-	# default host
-	host_spec="cr.opensolaris.org"
 	typeset -r rsync_prefix="rsync://"
 	typeset -r ssh_prefix="ssh://"
-
-	# if remote target is not specified, build the target from scratch
-	# using the default values
-	if [[ -z $tflag ]]; then
-		dst_rsync="$host_spec:$WNAME"
-		dst_ssh="$host_spec:$WNAME"
-	fi
 
 	if [[ ! -d "$WDIR" ]]; then
 		echo "webrev directory '$WDIR' does not exist"
@@ -285,7 +300,7 @@ upload_webrev()
 	# to remote target when -n is used. If the user used custom remote
 	# target he probably knows what he is doing.
 	if [[ -n $nflag && -z $tflag ]]; then
-		/usr/bin/find $WDIR -type d -name closed \
+		$FIND $WDIR -type d -name closed \
 			| $GREP closed >/dev/null
 		if (( $? == 0 )); then
 			echo "directory '$WDIR' contains \"closed\" directory"
@@ -307,10 +322,10 @@ upload_webrev()
 		fi
 	else
 		# try rsync first and fallback to SSH in case it fails
-		rsync_upload $dst_rsync
+		rsync_upload ${remote_target}
 		if (( $? != 0 )); then
 			echo "rsync upload failed, falling back to SSH"
-			ssh_upload $dst_ssh
+			ssh_upload ${remote_target}
 		fi
 		return $?
 	fi
@@ -1900,19 +1915,21 @@ function usage
 	webrev [common-options] -w <wx file>
 
 Options:
-	-O: Print bugids/arc cases suitable for OpenSolaris.
+	-D: delete remote webrev
 	-i <filename>: Include <filename> in the index.html file.
+	-n: do not generate the webrev (useful with -U)
+	-O: Print bugids/arc cases suitable for OpenSolaris.
 	-o <outdir>: Output webrev to specified directory.
 	-p <compare-against>: Use specified parent wkspc or basis for comparison
 	-t <remote_target>: Specify remote destination for webrev upload
 	-U: upload the webrev to remote destination
-	-n: do not generate the webrev (useful with -U)
 	-w <wxfile>: Use specified wx active file.
 
 Environment:
 	WDIR: Control the output directory.
 	WEBREV_BUGURL: Control the URL prefix for bugids.
 	WEBREV_SACURL: Control the URL prefix for ARC cases.
+	WEBREV_TRASH_DIR: Set directory for webrev delete.
 
 SCM Specific Options:
 	TeamWare: webrev [common-options] -l [arguments to 'putback']
@@ -1953,7 +1970,11 @@ PATH=$(dirname $(whence $0)):$PATH
 [[ -z $SFTP ]] && SFTP=`look_for_prog sftp`
 [[ -z $MKTEMP ]] && MKTEMP=`look_for_prog mktemp`
 [[ -z $GREP ]] && GREP=`look_for_prog grep`
+[[ -z $FIND ]] && FIND=`look_for_prog find`
 
+# set name of trash directory for remote webrev deletion
+TRASH_DIR=".trash"
+[[ -n $WEBREV_TRASH_DIR ]] && TRASH_DIR=$WEBREV_TRASH_DIR
 
 if [[ ! -x $PERL ]]; then
 	print -u2 "Error: No perl interpreter found.  Exiting."
@@ -1977,6 +1998,10 @@ fi
 # Declare global total counters.
 integer TOTL TINS TDEL TMOD TUNC
 
+# default remote host for upload/delete
+typeset -r DEFAULT_REMOTE_HOST="cr.opensolaris.org"
+
+Dflag=
 flist_mode=
 flist_file=
 iflag=
@@ -1991,9 +2016,16 @@ uflag=
 Uflag=
 wflag=
 remote_target=
-while getopts "i:o:p:lwONnt:U" opt
+
+#
+# NOTE: when adding/removing options it is necessary to sync the list
+# 	with usr/src/tools/onbld/hgext/cdm.py
+#
+while getopts "i:o:p:lwONnt:UD" opt
 do
 	case $opt in
+	D)	Dflag=1;;
+
 	i)	iflag=1
 		INCLUDE_FILE=$OPTARG;;
 
@@ -2036,12 +2068,13 @@ fi
 
 # more sanity checking
 if [[ -n $nflag && -z $Uflag ]]; then
-	print "it does not make sense to skip webrev generation without -U"
+	print "it does not make sense to skip webrev generation" \
+	    "without -U"
 	exit 1
 fi
 
-if [[ -n $tflag && -z $Uflag ]]; then
-	echo "remote target has to be used only for upload"
+if [[ -n $tflag && -z $Uflag && -z $Dflag ]]; then
+	echo "remote target has to be used only for upload or delete"
 	exit 1
 fi
 
@@ -2420,11 +2453,43 @@ else
 	WNAME=${CWS##*/}
 fi
 
-# Do not generate the webrev, just upload it. We trust the user that the
-# webrev is OpenSolaris one.
-if [[ -n $Uflag && -n $nflag ]]; then
-	upload_webrev
+# Make sure remote target is well formed for remote upload/delete.
+if [[ -n $Dflag || -n $Uflag ]]; then
+	# If remote target is not specified, build it from scratch using
+	# the default values.
+	if [[ -z $tflag ]]; then
+		remote_target=${DEFAULT_REMOTE_HOST}:${WNAME}
+	else
+		# If destination specification is not in the form of
+		# host_spec:remote_dir then assume it is just remote hostname
+		# and append a colon and destination directory formed from
+		# local webrev directory name.
+		if [[ -z ${remote_target##*:} ]]; then
+			if [[ "${remote_target}" == *: ]]; then
+				dst=${remote_target}${WNAME}
+			else
+				dst=${remote_target}:${WNAME}
+			fi
+		fi
+	fi
+fi
+
+# Option -D by itself (option -U not present) implies no webrev generation.
+if [[ -z $Uflag && -n $Dflag ]]; then
+	delete_webrev 1
 	exit $?
+fi
+
+# Do not generate the webrev, just upload it or delete it.
+if [[ -n $nflag ]]; then
+	if [[ -n $Dflag ]]; then
+		delete_webrev 1
+		(( $? == 0 )) || exit $?
+	fi
+	if [[ -n $Uflag ]]; then
+		upload_webrev
+		exit $?
+	fi
 fi
 
 if [ "${WDIR%%/*}" ]; then
@@ -2433,7 +2498,7 @@ fi
 
 if [[ ! -d $WDIR ]]; then
 	mkdir -p $WDIR
-	[[ $? != 0 ]] && exit 1
+	(( $? != 0 )) && exit 1
 fi
 
 #
@@ -2776,7 +2841,7 @@ fi
 # delete it - prevent accidental publishing of closed source
 
 if [[ -n "$Oflag" ]]; then
-	/usr/bin/find $WDIR -type d -name closed -exec /bin/rm -rf {} \;
+	$FIND $WDIR -type d -name closed -exec /bin/rm -rf {} \;
 fi
 
 # Now build the index.html file that contains
@@ -3054,6 +3119,12 @@ exec 1<&3			# dup FD 3 to restore stdout.
 exec 3<&-			# close FD 3.
 
 print "Done."
+
+# If remote deletion was specified and fails do not continue.
+if [[ -n $Dflag ]]; then
+	delete_webrev 1
+	(( $? == 0 )) || exit $?
+fi
 
 if [[ -n $Uflag ]]; then
 	upload_webrev
