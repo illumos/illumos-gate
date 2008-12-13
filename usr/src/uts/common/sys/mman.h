@@ -46,6 +46,10 @@
 extern "C" {
 #endif
 
+#if	!defined(_ASM) && !defined(_KERNEL)
+#include <sys/types.h>
+#endif	/* !_ASM && !_KERNEL */
+
 /*
  * Protections are chosen from these bits, or-ed together.
  * Note - not all implementations literally provide all possible
@@ -115,12 +119,8 @@ extern "C" {
 #define	_MAP_NEW	0x80000000	/* users should not need to use this */
 #endif	/* (_POSIX_C_SOURCE <= 2) */
 
-#if	!defined(_ASM) && !defined(_KERNEL)
 
-#include <sys/types.h>
-
-#endif	/* !_ASM && !_KERNEL */
-
+#if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 /* External flags for mmapobj syscall (Exclusive of MAP_* flags above) */
 #define	MMOBJ_PADDING		0x10000
 #define	MMOBJ_INTERPRET		0x20000
@@ -182,6 +182,7 @@ typedef struct mmapobj_result32 {
 } mmapobj_result32_t;
 #endif	/* defined(_KERNEL) || defined(_SYSCALL32) */
 #endif	/* !defined(_ASM) */
+#endif	/* !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__) */
 
 #if	!defined(_ASM) && !defined(_KERNEL)
 /*
@@ -220,7 +221,6 @@ typedef struct mmapobj_result32 {
 #ifdef	__STDC__
 #if (_POSIX_C_SOURCE > 2) || defined(_XPG4_2)
 extern void *mmap(void *, size_t, int, int, int, off_t);
-extern int mmapobj(int, uint_t, void *, uint_t *, void *);
 extern int munmap(void *, size_t);
 extern int mprotect(void *, size_t, int);
 extern int msync(void *, size_t, int);
@@ -236,7 +236,6 @@ extern void *mmap64(void *, size_t, int, int, int, off64_t);
 #else	/* (_POSIX_C_SOURCE > 2) || defined(_XPG4_2) */
 extern caddr_t mmap(caddr_t, size_t, int, int, int, off_t);
 extern int munmap(caddr_t, size_t);
-extern int mmapobj(int, uint_t, mmapobj_result_t *, uint_t *, void *);
 extern int mprotect(caddr_t, size_t, int);
 extern int msync(caddr_t, size_t, int);
 extern int mlock(caddr_t, size_t);
@@ -247,6 +246,7 @@ extern int madvise(caddr_t, size_t, int);
 #if !defined(__XOPEN_OR_POSIX) || defined(__EXTENSIONS__)
 extern int getpagesizes(size_t *, int);
 extern int getpagesizes2(size_t *, int);
+extern int mmapobj(int, uint_t, mmapobj_result_t *, uint_t *, void *);
 /* guard visibility of uint64_t */
 #if defined(_INT64_TYPE)
 extern int meminfo(const uint64_t *, int, const uint_t *, int, uint64_t *,
