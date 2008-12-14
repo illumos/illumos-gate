@@ -1,12 +1,10 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IPW2100_H
 #define	_SYS_IPW2100_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,7 +20,6 @@ extern "C" {
 
 #define	IPW2100_DRV_NAME  "ipw"
 #define	IPW2100_DRV_DESC  "Intel Wireless 2100"
-#define	IPW2100_DRV_REV   "V1.00"
 
 /*
  * Debug functionalities
@@ -41,6 +38,7 @@ extern "C" {
 #define	IPW2100_DBG_SOFTINT	(0x00008000)  /* softinterrupt */
 #define	IPW2100_DBG_STATISTIC	(0x00010000)  /* statistic */
 #define	IPW2100_DBG_FATAL	(0x00020000)  /* interrup report error */
+#define	IPW2100_DBG_BRUSSELS	(0x00040000)  /* brussels support */
 
 extern uint32_t ipw2100_debug;
 extern void	ipw2100_dbg(dev_info_t *dip, int level, const char *fmt, ...);

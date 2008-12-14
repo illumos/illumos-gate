@@ -69,6 +69,7 @@ extern "C" {
 #define	IPW2200_DBG_SOFTINT	(0x00008000)  /* soft interrupt */
 #define	IPW2200_DBG_FATAL	(0x00010000)  /* interrupt report error */
 #define	IPW2200_DBG_SUSPEND	(0x00020000)  /* suspend resume */
+#define	IPW2200_DBG_BRUSSELS	(0x00040000)  /* brussels support */
 
 extern uint32_t ipw2200_debug;
 extern void	ipw2200_dbg(dev_info_t *dip, int level, const char *fmt, ...);

@@ -137,6 +137,12 @@ static int	ipw2100_m_multicst(void *arg, boolean_t add, const uint8_t *m);
 static int	ipw2100_m_promisc(void *arg, boolean_t on);
 static mblk_t  *ipw2100_m_tx(void *arg, mblk_t *mp);
 static void	ipw2100_m_ioctl(void *arg, queue_t *wq, mblk_t *mp);
+static int	ipw2100_m_setprop(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length, const void *wldp_buf);
+static int	ipw2100_m_getprop(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, uint_t pr_flags, uint_t wldp_length,
+    void *wldp_buf, uint_t *perm);
+
 
 /*
  * Interrupt and Data transferring operations
@@ -169,7 +175,7 @@ static int	ipw_wificfg_disassoc(struct ipw2100_softc *sc,
  * Mac Call Back entries
  */
 mac_callbacks_t	ipw2100_m_callbacks = {
-	MC_IOCTL,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP,
 	ipw2100_m_stat,
 	ipw2100_m_start,
 	ipw2100_m_stop,
@@ -177,7 +183,12 @@ mac_callbacks_t	ipw2100_m_callbacks = {
 	ipw2100_m_multicst,
 	ipw2100_m_unicst,
 	ipw2100_m_tx,
-	ipw2100_m_ioctl
+	ipw2100_m_ioctl,
+	NULL,
+	NULL,
+	NULL,
+	ipw2100_m_setprop,
+	ipw2100_m_getprop
 };
 
 
@@ -200,6 +211,7 @@ uint32_t ipw2100_debug = 0;
  *	| IPW2100_DBG_STATISTIC
  *	| IPW2100_DBG_RING
  *	| IPW2100_DBG_WIFI
+ *	| IPW2100_DBG_BRUSSELS
  */
 
 /*
@@ -2324,6 +2336,77 @@ ipw2100_getset(struct ipw2100_softc *sc, mblk_t *m, uint32_t cmd,
 	m->b_wptr = m->b_rptr + outfp->wldp_length;
 
 	return (ret);
+}
+
+/*
+ * Call back functions for get/set proporty
+ */
+static int
+ipw2100_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+{
+	struct ipw2100_softc	*sc = (struct ipw2100_softc *)arg;
+	struct ieee80211com	*ic = &sc->sc_ic;
+	int 			err = 0;
+
+	switch (wldp_pr_num) {
+	/* mac_prop_id */
+	case MAC_PROP_WL_DESIRED_RATES:
+		IPW2100_DBG(IPW2100_DBG_BRUSSELS, (sc->sc_dip, CE_CONT,
+		    "ipw2100_m_getprop(): Not Support DESIRED_RATES\n"));
+		err = ENOTSUP;
+		break;
+	case MAC_PROP_WL_RADIO:
+		*(wl_linkstatus_t *)wldp_buf = ipw2100_get_radio(sc);
+		break;
+	default:
+		/* go through net80211 */
+		err = ieee80211_getprop(ic, pr_name, wldp_pr_num, pr_flags,
+		    wldp_length, wldp_buf, perm);
+		break;
+	}
+
+	return (err);
+}
+
+static int
+ipw2100_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t wldp_length, const void *wldp_buf)
+{
+	struct ipw2100_softc	*sc = (struct ipw2100_softc *)arg;
+	struct ieee80211com	*ic = &sc->sc_ic;
+	int			err;
+
+	switch (wldp_pr_num) {
+	/* mac_prop_id */
+	case MAC_PROP_WL_DESIRED_RATES:
+		IPW2100_DBG(IPW2100_DBG_BRUSSELS, (sc->sc_dip, CE_CONT,
+		    "ipw2100_m_setprop(): Not Support DESIRED_RATES\n"));
+		err = ENOTSUP;
+		break;
+	case MAC_PROP_WL_RADIO:
+		IPW2100_DBG(IPW2100_DBG_BRUSSELS, (sc->sc_dip, CE_CONT,
+		    "ipw2100_m_setprop(): Not Support RADIO\n"));
+		err = ENOTSUP;
+		break;
+	default:
+		/* go through net80211 */
+		err = ieee80211_setprop(ic, pr_name, wldp_pr_num, wldp_length,
+		    wldp_buf);
+		break;
+	}
+
+	if (err == ENETRESET) {
+		if (sc->sc_flags & IPW2100_FLAG_RUNNING) {
+			(void) ipw2100_m_start(sc);
+			(void) ieee80211_new_state(ic,
+			    IEEE80211_S_SCAN, -1);
+		}
+
+		err = 0;
+	}
+
+	return (err);
 }
 
 static int

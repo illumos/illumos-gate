@@ -325,6 +325,11 @@ static int	iwh_m_multicst(void *, boolean_t, const uint8_t *);
 static int	iwh_m_promisc(void *, boolean_t);
 static mblk_t	*iwh_m_tx(void *, mblk_t *);
 static void	iwh_m_ioctl(void *, queue_t *, mblk_t *);
+static int	iwh_m_setprop(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length, const void *wldp_buf);
+static int	iwh_m_getprop(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, uint_t pr_flags, uint_t wldp_length,
+    void *wldp_buf, uint_t *perm);
 
 /*
  * Supported rates for 802.11b/g modes (in 500Kbps unit).
@@ -406,7 +411,7 @@ _info(struct modinfo *mip)
  * Mac Call Back entries
  */
 mac_callbacks_t	iwh_m_callbacks = {
-	MC_IOCTL,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP,
 	iwh_m_stat,
 	iwh_m_start,
 	iwh_m_stop,
@@ -414,7 +419,12 @@ mac_callbacks_t	iwh_m_callbacks = {
 	iwh_m_multicst,
 	iwh_m_unicst,
 	iwh_m_tx,
-	iwh_m_ioctl
+	iwh_m_ioctl,
+	NULL,
+	NULL,
+	NULL,
+	iwh_m_setprop,
+	iwh_m_getprop
 };
 
 #ifdef DEBUG
@@ -3159,6 +3169,54 @@ iwh_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 			}
 		}
 	}
+}
+
+/*
+ * Call back functions for get/set proporty
+ */
+static int
+iwh_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf, uint_t *perm)
+{
+	iwh_sc_t		*sc = (iwh_sc_t *)arg;
+	int			err = 0;
+
+	err = ieee80211_getprop(&sc->sc_ic, pr_name, wldp_pr_num,
+	    pr_flags, wldp_length, wldp_buf, perm);
+
+	return (err);
+}
+
+static int
+iwh_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t wldp_length, const void *wldp_buf)
+{
+	iwh_sc_t		*sc = (iwh_sc_t *)arg;
+	ieee80211com_t		*ic = &sc->sc_ic;
+	int			err;
+
+	mutex_enter(&sc->sc_glock);
+	if (sc->sc_flags & (IWH_F_SUSPEND | IWH_F_HW_ERR_RECOVER)) {
+		mutex_exit(&sc->sc_glock);
+		return (ENXIO);
+	}
+	mutex_exit(&sc->sc_glock);
+
+	err = ieee80211_setprop(ic, pr_name, wldp_pr_num, wldp_length,
+	    wldp_buf);
+
+	if (err == ENETRESET) {
+		if (ic->ic_des_esslen) {
+			if (sc->sc_flags & IWH_F_RUNNING) {
+				iwh_m_stop(sc);
+				(void) iwh_m_start(sc);
+				(void) ieee80211_new_state(ic,
+				    IEEE80211_S_SCAN, -1);
+			}
+		}
+		err = 0;
+	}
+	return (err);
 }
 
 /*
