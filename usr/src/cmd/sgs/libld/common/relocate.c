@@ -2665,8 +2665,8 @@ ld_adj_movereloc(Ofl_desc *ofl, Rel_desc *arsp)
 
 /*
  * Partially Initialized Symbol Handling routines
- * For sparc architecture, the second argument is reld->rel_raddend.
- * For i386  acrchitecure, the second argument is the value stored
+ * For RELA architecture, the second argument is reld->rel_raddend.
+ * For REL  architecure, the second argument is the value stored
  *	at the relocation target address.
  */
 Sym_desc *

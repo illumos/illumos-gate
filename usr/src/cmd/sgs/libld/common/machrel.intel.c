@@ -764,29 +764,64 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				value = 0;
 			else if (ELF_ST_TYPE(sdp->sd_sym->st_info) ==
 			    STT_SECTION) {
-				Sym_desc	*sym;
-
 				/*
 				 * The value for a symbol pointing to a SECTION
 				 * is based off of that sections position.
-				 *
-				 * The second argument of the ld_am_I_partial()
-				 * is the value stored at the target address
-				 * relocation is going to be applied.
 				 */
-				if ((sdp->sd_isc->is_flags & FLG_IS_RELUPD) &&
-				    /* LINTED */
-				    (sym = ld_am_I_partial(arsp, *(Xword *)
-				    ((uchar_t *)
-				    arsp->rel_isdesc->is_indata->d_buf +
-				    arsp->rel_roffset)))) {
+				if (sdp->sd_isc->is_flags & FLG_IS_RELUPD) {
+					Sym_desc	*sym;
+					Xword		radd;
+					uchar_t		*raddr = (uchar_t *)
+					    arsp->rel_isdesc->is_indata->d_buf +
+					    arsp->rel_roffset;
+
 					/*
-					 * If the symbol is moved,
-					 * adjust the value
+					 * This is a REL platform. Hence, the
+					 * second argument of ld_am_I_partial()
+					 * is the value stored at the target
+					 * address where the relocation is
+					 * going to be applied.
 					 */
-					value = sym->sd_sym->st_value;
-					moved = 1;
-				} else {
+					if (ld_reloc_targval_get(ofl, arsp,
+					    raddr, &radd) == 0)
+						return (S_ERROR);
+					sym = ld_am_I_partial(arsp, radd);
+					if (sym) {
+						Sym	*osym = sym->sd_osym;
+
+						/*
+						 * The symbol was moved, so
+						 * adjust the value relative
+						 * to the new section.
+						 */
+						value = sym->sd_sym->st_value;
+						moved = 1;
+
+						/*
+						 * The original raddend covers
+						 * the displacement from the
+						 * section start to the desired
+						 * address. The value computed
+						 * above gets us from the
+						 * section start to the start
+						 * of the symbol range. Adjust
+						 * the old raddend to remove the
+						 * offset from section start to
+						 * symbol start, leaving the
+						 * displacement within the
+						 * range of the symbol.
+						 */
+						if (osym->st_value != 0) {
+							radd -= osym->st_value;
+							if (ld_reloc_targval_set
+							    (ofl, arsp, raddr,
+							    radd) == 0)
+								return (
+								    S_ERROR);
+						}
+					}
+				}
+				if (!moved) {
 					value = _elf_getxoff(
 					    sdp->sd_isc->is_indata);
 					if (sdp->sd_isc->is_shdr->sh_flags &

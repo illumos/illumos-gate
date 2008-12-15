@@ -1018,6 +1018,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			Sym_desc	*sdp;
 			const char	*ifl_name;
 			Xword		refaddr;
+			Sxword		raddend = arsp->rel_raddend;
 
 			/*
 			 * If the section this relocation is against has been
@@ -1081,11 +1082,11 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				 * is based off of that sections position.
 				 */
 				if ((sdp->sd_isc->is_flags & FLG_IS_RELUPD) &&
-				    (sym = ld_am_I_partial(arsp,
-				    arsp->rel_roffset))) {
+				    (sym = ld_am_I_partial(arsp, raddend))) {
 					/*
-					 * If the symbol is moved,
-					 * adjust the value
+					 * The symbol was moved, so adjust
+					 * the value relative to the new
+					 * section.
 					 */
 					value = _elf_getxoff(
 					    sym->sd_isc->is_indata);
@@ -1093,6 +1094,20 @@ ld_do_activerelocs(Ofl_desc *ofl)
 					    SHF_ALLOC)
 						value += sym->sd_isc->
 						    is_osdesc->os_shdr->sh_addr;
+
+					/*
+					 * The original raddend covers the
+					 * displacement from the section start
+					 * to the desired address. The value
+					 * computed above gets us from the
+					 * section start to the start of the
+					 * symbol range. Adjust the old raddend
+					 * to remove the offset from section
+					 * start to symbol start, leaving the
+					 * displacement within the range of
+					 * the symbol.
+					 */
+					raddend -= sym->sd_osym->st_value;
 				} else {
 					value = _elf_getxoff(
 					    sdp->sd_isc->is_indata);
@@ -1147,7 +1162,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			 * Add relocations addend to value.  Add extra
 			 * relocation addend if needed.
 			 */
-			value += arsp->rel_raddend;
+			value += raddend;
 			if (IS_EXTOFFSET(arsp->rel_rtype))
 				value += arsp->rel_typedata;
 

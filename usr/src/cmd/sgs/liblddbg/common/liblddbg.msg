@@ -539,7 +539,7 @@
 @ MSG_MOVE_ADJEXPAND	"for symbol=%s roffset: new=0x%llx"
 @ MSG_MOVE_ADJMOVE	"for symbol=%s roffset: from=0x%llx, to=0x%llx"
 @ MSG_MOVE_OUTSCTADJ	"adjusting addend for symbol=%s"
-@ MSG_MOVE_PAREXPN	"expanding %s into .SUNW_data1: %s"
+@ MSG_MOVE_PAREXPN	"expanding %s into .data: %s"
 @ MSG_MOVE_OUTMOVE	"copying move entries for %s into .SUNW_move"
 @ MSG_MOVE_INPUT	"collecting move entries: file=%s"
 

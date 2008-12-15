@@ -188,7 +188,7 @@ update_osym(Ofl_desc *ofl)
 #endif
 	Addr		bssaddr, etext = 0, edata = 0, end = 0, start = 0;
 	Addr		tlsbssaddr = 0;
-	Addr 		parexpnaddr;
+	Addr 		parexpnbase, parexpnaddr;
 	int		start_set = 0;
 	Sym		_sym = {0}, *sym, *symtab = 0;
 	Sym		*dynsym = 0, *ldynsym = 0;
@@ -616,7 +616,7 @@ update_osym(Ofl_desc *ofl)
 	 */
 	if (ofl->ofl_isparexpn) {
 		osp = ofl->ofl_isparexpn->is_osdesc;
-		parexpnaddr = (Addr)(osp->os_shdr->sh_addr +
+		parexpnbase = parexpnaddr = (Addr)(osp->os_shdr->sh_addr +
 		    ofl->ofl_isparexpn->is_indata->d_off);
 		/* LINTED */
 		parexpnndx = elf_ndxscn(osp->os_scn);
@@ -791,17 +791,12 @@ update_osym(Ofl_desc *ofl)
 			 */
 			if (ofl->ofl_isparexpn &&
 			    (sdp->sd_flags & FLG_SY_PAREXPN) && !update_done) {
-				static	Addr	laddr = 0;
-
 				sym->st_shndx = parexpnndx;
 				sdp->sd_isc = ofl->ofl_isparexpn;
-				if (flags & FLG_OF_RELOBJ) {
-					sym->st_value = parexpnaddr;
-				} else {
-					sym->st_value = laddr;
-					laddr += sym->st_size;
-				}
+				sym->st_value = parexpnaddr;
 				parexpnaddr += sym->st_size;
+				if ((flags & FLG_OF_RELOBJ) == 0)
+					sym->st_value -= parexpnbase;
 			}
 
 			/*
@@ -2921,16 +2916,13 @@ expand_move(Ofl_desc *ofl, Sym_desc *sdp, Move *u1)
 	unsigned char	*taddr, *taddr0;
 	Sxword		offset;
 	int		i;
-	Addr		base1;
 	unsigned int	stride;
 
 	osp = ofl->ofl_isparexpn->is_osdesc;
-	base1 = (Addr)(osp->os_shdr->sh_addr +
-	    ofl->ofl_isparexpn->is_indata->d_off);
 	taddr0 = taddr = osp->os_outdata->d_buf;
 	mv = u1;
 
-	offset = sdp->sd_sym->st_value - base1;
+	offset = sdp->sd_sym->st_value - osp->os_shdr->sh_addr;
 	taddr += offset;
 	taddr = taddr + mv->m_poffset;
 	for (i = 0; i < mv->m_repeat; i++) {

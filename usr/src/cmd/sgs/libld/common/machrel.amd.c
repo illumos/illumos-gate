@@ -624,6 +624,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			Xword		refaddr;
 			int		moved = 0;
 			Gotref		gref;
+			Sxword		raddend = arsp->rel_raddend;
 
 			/*
 			 * If the section this relocation is against has been
@@ -690,23 +691,31 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				/*
 				 * The value for a symbol pointing to a SECTION
 				 * is based off of that sections position.
-				 *
-				 * The second argument of the ld_am_I_partial()
-				 * is the value stored at the target address
-				 * relocation is going to be applied.
 				 */
 				if ((sdp->sd_isc->is_flags & FLG_IS_RELUPD) &&
 				    /* LINTED */
-				    (sym = ld_am_I_partial(arsp, *(Xword *)
-				    ((uchar_t *)
-				    arsp->rel_isdesc->is_indata->d_buf +
-				    arsp->rel_roffset)))) {
+				    (sym = ld_am_I_partial(arsp, raddend))) {
 					/*
-					 * If the symbol is moved,
-					 * adjust the value
+					 * The symbol was moved, so adjust
+					 * the value relative to the new
+					 * section.
 					 */
 					value = sym->sd_sym->st_value;
 					moved = 1;
+
+					/*
+					 * The original raddend covers the
+					 * displacement from the section start
+					 * to the desired address. The value
+					 * computed above gets us from the
+					 * section start to the start of the
+					 * symbol range. Adjust the old raddend
+					 * to remove the offset from section
+					 * start to symbol start, leaving the
+					 * displacement within the range of
+					 * the symbol.
+					 */
+					raddend -= sym->sd_osym->st_value;
 				} else {
 					value = _elf_getxoff(
 					    sdp->sd_isc->is_indata);
@@ -767,7 +776,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			 *	 being referenced (ie: that -4 thing).
 			 */
 			if ((arsp->rel_flags & FLG_REL_GOT) == 0)
-				value += arsp->rel_raddend;
+				value += raddend;
 
 			/*
 			 * Determine whether the value needs further adjustment.
