@@ -1130,7 +1130,7 @@ workaround_errata(struct cpu *cpu)
 #else	/* __xpv */
 		} else if ((x86_feature & X86_SSE2) && ((opteron_get_nnodes() *
 		    cpuid_get_ncpu_per_chip(cpu)) > 1)) {
-			if ((xrdmsr(MSR_AMD_BU_CFG) & 0x02) == 0)
+			if ((xrdmsr(MSR_AMD_BU_CFG) & (UINT64_C(1) << 33)) == 0)
 				opteron_workaround_6323525++;
 #endif	/* __xpv */
 		}
