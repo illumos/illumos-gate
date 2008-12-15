@@ -44,6 +44,8 @@
 #include <sys/bootconf.h>
 #include <sys/int_fmtio.h>
 #include <sys/dmar_acpi.h>
+#include <sys/smbios.h>
+#include <sys/iommulib.h>
 
 /*
  * the following pci manipulate function pinter
@@ -56,6 +58,11 @@
  */
 int intel_dmar_acpi_debug = 0;
 #define	dcmn_err	if (intel_dmar_acpi_debug) cmn_err
+
+/*
+ * define for printing blacklist ID
+ */
+int intel_iommu_blacklist_id;
 
 /*
  * global varables
@@ -382,6 +389,97 @@ parse_dmar_drhd(dmar_acpi_unit_head_t *head)
 	return (PARSE_DMAR_SUCCESS);
 }
 
+#define	OEMID_OFF	10
+#define	OEMID_LEN	6
+#define	OEM_TBLID_OFF	16
+#define	OEM_TBLID_LEN	8
+#define	OEMREV_OFF	24
+#define	OEMREV_LEN	4
+
+static int
+dmar_blacklisted(caddr_t dmart)
+{
+	char oemid[OEMID_LEN + 1] = {0};
+	char oem_tblid[OEM_TBLID_LEN + 1] = {0};
+	char oemrev[OEMREV_LEN + 1] = {0};
+	const char *mfgr = "?";
+	const char *product = "?";
+	const char *version = "?";
+	smbios_info_t smbios_info;
+	smbios_system_t smbios_sys;
+	id_t id;
+	char **blacklist;
+	int i;
+	uint_t n;
+
+	(void) strncpy(oemid, dmart + OEMID_OFF, OEMID_LEN);
+	(void) strncpy(oem_tblid, dmart + OEM_TBLID_OFF, OEM_TBLID_LEN);
+	(void) strncpy(oemrev, dmart + OEMREV_OFF, OEMREV_LEN);
+
+	iommulib_smbios = smbios_open(NULL, SMB_VERSION, ksmbios_flags,
+	    NULL);
+	if (iommulib_smbios &&
+	    (id = smbios_info_system(iommulib_smbios, &smbios_sys))
+	    != SMB_ERR &&
+	    smbios_info_common(iommulib_smbios, id, &smbios_info)
+	    != SMB_ERR) {
+		mfgr = smbios_info.smbi_manufacturer;
+		product = smbios_info.smbi_product;
+		version = smbios_info.smbi_version;
+	}
+
+	if (intel_iommu_blacklist_id) {
+		cmn_err(CE_NOTE, "SMBIOS ID:");
+		cmn_err(CE_NOTE, "Manufacturer = <%s>", mfgr);
+		cmn_err(CE_NOTE, "Product = <%s>", product);
+		cmn_err(CE_NOTE, "Version = <%s>", version);
+		cmn_err(CE_NOTE, "DMAR ID:");
+		cmn_err(CE_NOTE, "oemid = <%s>", oemid);
+		cmn_err(CE_NOTE, "oemtblid = <%s>", oem_tblid);
+		cmn_err(CE_NOTE, "oemrev = <%s>", oemrev);
+	}
+
+	/*
+	 * Fake up a dev_t since searching global prop list needs it
+	 */
+	if (ddi_prop_lookup_string_array(
+	    makedevice(ddi_name_to_major("rootnex"), 0), ddi_root_node(),
+	    DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL,
+	    "intel-iommu-blacklist", &blacklist, &n) != DDI_PROP_SUCCESS) {
+		/* No blacklist */
+		return (0);
+	}
+
+	if (n < 4 || n % 4 != 0) {
+		cmn_err(CE_WARN,
+		    "invalid Intel IOMMU blacklist: not a multiple of four");
+		return (0);
+	}
+
+	for (i = 0; i < n; i += 4) {
+		if (strcmp(blacklist[i], "SMBIOS") == 0 &&
+		    strcmp(blacklist[i+1], mfgr) == 0 &&
+		    strcmp(blacklist[i+2], product) == 0 &&
+		    (blacklist[i+3][0] == '\0' ||
+		    strcmp(blacklist[i+3], version) == 0)) {
+			ddi_prop_free(blacklist);
+			return (1);
+		}
+		if (strcmp(blacklist[i], "DMAR") == 0 &&
+		    strcmp(blacklist[i+1], oemid) == 0 &&
+		    strcmp(blacklist[i+2], oem_tblid) == 0 &&
+		    (blacklist[i+3][0] == '\0' ||
+		    strcmp(blacklist[i+3], oemrev) == 0)) {
+			ddi_prop_free(blacklist);
+			return (1);
+		}
+	}
+
+	ddi_prop_free(blacklist);
+
+	return (0);
+}
+
 /*
  * parse_dmar()
  *   parse the dmar table
@@ -403,6 +501,11 @@ parse_dmar(void)
 		dcmn_err(CE_CONT, "wrong DMAR signature: %c%c%c%c",
 		    dmar_head->dh_sig[0], dmar_head->dh_sig[1],
 		    dmar_head->dh_sig[2], dmar_head->dh_sig[3]);
+		return (PARSE_DMAR_FAIL);
+	}
+
+	if (dmar_blacklisted(dmart)) {
+		cmn_err(CE_NOTE, "Intel IOMMU is blacklisted on this platform");
 		return (PARSE_DMAR_FAIL);
 	}
 
@@ -619,6 +722,23 @@ intel_iommu_probe_and_parse(void)
 		}
 		kmem_free(opt, len);
 	}
+
+	/*
+	 * retrieve the print-iommu-blacklist-id boot option
+	 */
+	if ((len = do_bsys_getproplen(NULL, "print-iommu-blacklist-id")) > 0) {
+		opt = kmem_alloc(len, KM_SLEEP);
+		(void) do_bsys_getprop(NULL, "print-iommu-blacklist-id", opt);
+		if (strcmp(opt, "yes") == 0 ||
+		    strcmp(opt, "true") == 0) {
+			intel_iommu_blacklist_id = 1;
+		} else if (strcmp(opt, "no") == 0 ||
+		    strcmp(opt, "false") == 0) {
+			intel_iommu_blacklist_id = 0;
+		}
+		kmem_free(opt, len);
+	}
+
 
 	dcmn_err(CE_CONT, "intel iommu detect start\n");
 

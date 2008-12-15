@@ -26,8 +26,6 @@
 #ifndef	_SYS_DDIPROPDEFS_H
 #define	_SYS_DDIPROPDEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 */
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -266,6 +264,11 @@ typedef uint32_t prop_1275_cell_t;
  * not.
  */
 #define	DDI_PROP_DYNAMIC	0x10000
+
+/*
+ * Private flag used to lookup global properties specified in rootnex.conf file
+ */
+#define	DDI_PROP_ROOTNEX_GLOBAL	0x20000
 
 
 /*

@@ -1487,7 +1487,8 @@ i_ddi_search_global_prop(dev_t dev, char *name, uint_t flags)
 		if (!DDI_STRSAME(propp->prop_name, name))
 			continue;
 
-		if ((!(flags & LDI_DEV_T_ANY)) && (propp->prop_dev != dev))
+		if ((!(flags & DDI_PROP_ROOTNEX_GLOBAL)) &&
+		    (!(flags & LDI_DEV_T_ANY)) && (propp->prop_dev != dev))
 			continue;
 
 		if (((propp->prop_flags & flags) & DDI_PROP_TYPE_MASK) == 0)
@@ -3949,9 +3950,9 @@ ddi_prop_lookup_common(dev_t match_dev, dev_info_t *dip,
 	 */
 	bzero(&ph, sizeof (prop_handle_t));
 
-	if (flags & DDI_UNBND_DLPI2) {
+	if ((flags & DDI_UNBND_DLPI2) || (flags & DDI_PROP_ROOTNEX_GLOBAL)) {
 		/*
-		 * For unbound dlpi style-2 devices, index into
+		 * For rootnex and unbound dlpi style-2 devices, index into
 		 * the devnames' array and search the global
 		 * property list.
 		 */
@@ -4050,7 +4051,7 @@ ddi_prop_get_int(dev_t match_dev, dev_info_t *dip, uint_t flags,
 	int	rval;
 
 	if (flags & ~(DDI_PROP_DONTPASS | DDI_PROP_NOTPROM |
-	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2)) {
+	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2 | DDI_PROP_ROOTNEX_GLOBAL)) {
 #ifdef DEBUG
 		if (dip != NULL) {
 			cmn_err(CE_WARN, "ddi_prop_get_int: invalid flag"
@@ -4089,7 +4090,7 @@ ddi_prop_get_int64(dev_t match_dev, dev_info_t *dip, uint_t flags,
 	int	rval;
 
 	if (flags & ~(DDI_PROP_DONTPASS | DDI_PROP_NOTPROM |
-	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2)) {
+	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2 | DDI_PROP_ROOTNEX_GLOBAL)) {
 #ifdef DEBUG
 		if (dip != NULL) {
 			cmn_err(CE_WARN, "ddi_prop_get_int64: invalid flag"
@@ -4120,7 +4121,7 @@ ddi_prop_lookup_int_array(dev_t match_dev, dev_info_t *dip, uint_t flags,
     char *name, int **data, uint_t *nelements)
 {
 	if (flags & ~(DDI_PROP_DONTPASS | DDI_PROP_NOTPROM |
-	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2)) {
+	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2 | DDI_PROP_ROOTNEX_GLOBAL)) {
 #ifdef DEBUG
 		if (dip != NULL) {
 			cmn_err(CE_WARN, "ddi_prop_lookup_int_array: "
@@ -4146,7 +4147,7 @@ ddi_prop_lookup_int64_array(dev_t match_dev, dev_info_t *dip, uint_t flags,
     char *name, int64_t **data, uint_t *nelements)
 {
 	if (flags & ~(DDI_PROP_DONTPASS | DDI_PROP_NOTPROM |
-	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2)) {
+	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2 | DDI_PROP_ROOTNEX_GLOBAL)) {
 #ifdef DEBUG
 		if (dip != NULL) {
 			cmn_err(CE_WARN, "ddi_prop_lookup_int64_array: "
@@ -4257,7 +4258,7 @@ ddi_prop_lookup_string(dev_t match_dev, dev_info_t *dip, uint_t flags,
 	uint_t x;
 
 	if (flags & ~(DDI_PROP_DONTPASS | DDI_PROP_NOTPROM |
-	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2)) {
+	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2 | DDI_PROP_ROOTNEX_GLOBAL)) {
 #ifdef DEBUG
 		if (dip != NULL) {
 			cmn_err(CE_WARN, "%s: invalid flag 0x%x "
@@ -4283,7 +4284,7 @@ ddi_prop_lookup_string_array(dev_t match_dev, dev_info_t *dip, uint_t flags,
     char *name, char ***data, uint_t *nelements)
 {
 	if (flags & ~(DDI_PROP_DONTPASS | DDI_PROP_NOTPROM |
-	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2)) {
+	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2 | DDI_PROP_ROOTNEX_GLOBAL)) {
 #ifdef DEBUG
 		if (dip != NULL) {
 			cmn_err(CE_WARN, "ddi_prop_lookup_string_array: "
@@ -4354,7 +4355,7 @@ ddi_prop_lookup_byte_array(dev_t match_dev, dev_info_t *dip, uint_t flags,
     char *name, uchar_t **data, uint_t *nelements)
 {
 	if (flags & ~(DDI_PROP_DONTPASS | DDI_PROP_NOTPROM |
-	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2)) {
+	    LDI_DEV_T_ANY | DDI_UNBND_DLPI2 | DDI_PROP_ROOTNEX_GLOBAL)) {
 #ifdef DEBUG
 		if (dip != NULL) {
 			cmn_err(CE_WARN, "ddi_prop_lookup_byte_array: "

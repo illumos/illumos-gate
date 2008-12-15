@@ -85,6 +85,7 @@ f none platform/i86pc/kernel/drv/pit_beep.conf 644 root sys
 f none platform/i86pc/kernel/drv/ppm 755 root sys
 f none platform/i86pc/kernel/drv/ppm.conf 644 root sys
 f none platform/i86pc/kernel/drv/rootnex 755 root sys
+f none platform/i86pc/kernel/drv/rootnex.conf 644 root sys
 d none platform/i86pc/kernel/mach 755 root sys
 f none platform/i86pc/kernel/mach/pcplusmp 755 root sys
 d none platform/i86pc/kernel/mach/amd64 755 root sys

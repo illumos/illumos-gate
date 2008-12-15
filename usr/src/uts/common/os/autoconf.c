@@ -427,6 +427,8 @@ i_ddi_init_root()
 	ASSERT(DEV_OPS_HELD(DEVI(top_devinfo)->devi_ops));
 	DEVI(top_devinfo)->devi_instance = e_ddi_assign_instance(top_devinfo);
 
+	(void) i_ddi_load_drvconf(DEVI(top_devinfo)->devi_major);
+
 	mutex_enter(&(DEVI(top_devinfo)->devi_lock));
 	DEVI_SET_ATTACHING(top_devinfo);
 	mutex_exit(&(DEVI(top_devinfo)->devi_lock));

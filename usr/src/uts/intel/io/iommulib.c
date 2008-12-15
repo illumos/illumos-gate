@@ -54,6 +54,9 @@ typedef struct iommulib_nex {
 
 /* *********  Globals ************************ */
 
+/* For IOMMU drivers */
+smbios_hdl_t *iommulib_smbios;
+
 /* IOMMU side: Following data protected by lock */
 static kmutex_t iommulib_lock;
 static iommulib_unit_t   *iommulib_list;

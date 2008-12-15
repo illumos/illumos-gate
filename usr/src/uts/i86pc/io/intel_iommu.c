@@ -836,6 +836,7 @@ iommu_bringup_unit(intel_iommu_state_t *iommu)
 	 * at last enable the unit
 	 */
 	iommu->iu_dmar_ops->do_enable(iommu);
+	iommu->iu_enabled = B_TRUE;
 }
 
 /*
@@ -2502,7 +2503,6 @@ intel_iommu_attach_dmar_nodes(void)
 			    drhd_only_for_gfx(iommu))
 				continue;
 			iommu_bringup_unit(iommu);
-			iommu->iu_enabled = B_TRUE;
 		}
 	}
 

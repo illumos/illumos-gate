@@ -20,10 +20,8 @@
 #
 #
 # uts/i86pc/rootnex/Makefile
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the rootnex driver
 #
@@ -42,6 +40,7 @@ MODULE		= rootnex
 OBJECTS		= $(ROOTNEX_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(ROOTNEX_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/i86pc/io
 
 #
 #	Include common rules.
@@ -51,9 +50,9 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY)
+ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 #	Overrides.
@@ -88,7 +87,7 @@ modlintlib:	$(MODLINTLIB_DEPS)
 
 clean.lint:	$(CLEAN_LINT_DEPS)
 
-install:	$(INSTALL_DEPS)
+install:	$(INSTALL_DEPS) $(CONF_INSTALL_DEPS)
 
 #
 #	Include common targets.

@@ -33,6 +33,7 @@ extern "C" {
 #endif
 
 #include <sys/ddi_impldefs.h>
+#include <sys/smbios.h>
 
 #ifdef	_KERNEL
 
@@ -287,6 +288,11 @@ int iommulib_iommu_dma_map(dev_info_t *dip, dev_info_t *rdip,
 int iommulib_iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, enum ddi_dma_ctlops request, off_t *offp,
     size_t *lenp, caddr_t *objpp, uint_t cache_flags);
+
+/*
+ * For SMBIOS access from IOMMU drivers
+ */
+extern smbios_hdl_t *iommulib_smbios;
 
 #endif	/* _KERNEL */
 
