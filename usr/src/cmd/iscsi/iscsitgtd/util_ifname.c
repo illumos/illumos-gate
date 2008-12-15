@@ -311,7 +311,7 @@ if_setup(int *n)
 	}
 
 	lifc.lifc_family = AF_UNSPEC;
-	lifn.lifn_flags = LIFC_ALLZONES | LIFC_EXTERNAL_SOURCE;
+	lifc.lifc_flags = LIFC_ALLZONES | LIFC_EXTERNAL_SOURCE;
 	lifc.lifc_len = bufsize;
 	lifc.lifc_buf = buf;
 
