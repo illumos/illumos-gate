@@ -477,6 +477,8 @@ extern "C" {
 	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0001)
 #define	X86_CHIPREV_AMD_10_REV_B \
 	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0002)
+#define	X86_CHIPREV_AMD_10_REV_C \
+	_X86_CHIPREV_MKREV(X86_VENDOR_AMD, 0x10, 0x0004)
 
 /*
  * Various socket/package types, extended as the need to distinguish

@@ -159,6 +159,12 @@ static const struct amd_rev_mapent {
 	 * Give all of model 2 stepping range to rev B.
 	 */
 	{ 0x10, 0x02, 0x02, 0x0, 0xf, X86_CHIPREV_AMD_10_REV_B, "B", A_SKTS_2 },
+
+	/*
+	 * Rev C has models 4-6 (depending on L3 cache configuration)
+	 * Give all of model 2 stepping range to rev c.
+	 */
+	{ 0x10, 0x04, 0x06, 0x0, 0xf, X86_CHIPREV_AMD_10_REV_C, "C", A_SKTS_2 },
 };
 
 static void
