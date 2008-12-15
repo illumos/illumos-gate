@@ -599,10 +599,8 @@ rfs4_init_compound_state(struct compound_state *cs)
 void
 rfs4_grace_start(rfs4_servinst_t *sip)
 {
-	time_t now = gethrestime_sec();
-
 	rw_enter(&sip->rwlock, RW_WRITER);
-	sip->start_time = now;
+	sip->start_time = (time_t)TICK_TO_SEC(lbolt);
 	sip->grace_period = rfs4_grace_period;
 	rw_exit(&sip->rwlock);
 }
@@ -635,7 +633,7 @@ rfs4_servinst_in_grace(rfs4_servinst_t *sip)
 	grace_expiry = sip->start_time + sip->grace_period;
 	rw_exit(&sip->rwlock);
 
-	return (gethrestime_sec() < grace_expiry);
+	return (((time_t)TICK_TO_SEC(lbolt)) < grace_expiry);
 }
 
 int
