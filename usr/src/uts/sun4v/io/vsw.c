@@ -118,8 +118,9 @@ void vsw_mac_rx(vsw_t *vswp, mac_resource_handle_t mrh,
 /*
  * Functions imported from other files.
  */
-extern void vsw_setup_switching_timeout(void *arg);
-extern void vsw_stop_switching_timeout(vsw_t *vswp);
+extern void vsw_setup_switching_thread(void *arg);
+extern int vsw_setup_switching_start(vsw_t *vswp);
+extern void vsw_setup_switching_stop(vsw_t *vswp);
 extern int vsw_setup_switching(vsw_t *);
 extern void vsw_switch_frame_nop(vsw_t *vswp, mblk_t *mp, int caller,
     vsw_port_t *port, mac_resource_handle_t mrh);
@@ -180,9 +181,6 @@ boolean_t vsw_ldc_txthr_enabled = B_TRUE;	/* LDC Tx thread enabled */
 uint32_t	vsw_fdb_nchains = 8;	/* # of chains in fdb hash table */
 uint32_t	vsw_vlan_nchains = 4;	/* # of chains in vlan id hash table */
 uint32_t	vsw_ethermtu = 1500;	/* mtu of the device */
-
-/* sw timeout for boot delay only, in milliseconds */
-int vsw_setup_switching_boot_delay = 100 * MILLISEC;
 
 /* delay in usec to wait for all references on a fdb entry to be dropped */
 uint32_t vsw_fdbe_refcnt_delay = 10;
@@ -543,7 +541,8 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	mutex_init(&vswp->mac_lock, NULL, MUTEX_DRIVER, NULL);
 	mutex_init(&vswp->mca_lock, NULL, MUTEX_DRIVER, NULL);
-	mutex_init(&vswp->swtmout_lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&vswp->sw_thr_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&vswp->sw_thr_cv, NULL, CV_DRIVER, NULL);
 	rw_init(&vswp->maccl_rwlock, NULL, RW_DRIVER, NULL);
 	rw_init(&vswp->if_lockrw, NULL, RW_DRIVER, NULL);
 	rw_init(&vswp->mfdbrw, NULL, RW_DRIVER, NULL);
@@ -604,19 +603,14 @@ vsw_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	vswp->vsw_switch_frame = vsw_switch_frame_nop;
 
 	/*
-	 * Setup the required switching mode,
-	 * based on the mdprops that we read earlier.
-	 * schedule a short timeout (0.1 sec) for the first time
-	 * setup and avoid calling mac_open() directly here,
-	 * others are regular timeout 3 secs.
+	 * Setup the required switching mode, based on the mdprops that we read
+	 * earlier. We start a thread to do this, to avoid calling mac_open()
+	 * directly from attach().
 	 */
-	mutex_enter(&vswp->swtmout_lock);
-
-	vswp->swtmout_enabled = B_TRUE;
-	vswp->swtmout_id = timeout(vsw_setup_switching_timeout, vswp,
-	    drv_usectohz(vsw_setup_switching_boot_delay));
-
-	mutex_exit(&vswp->swtmout_lock);
+	rv = vsw_setup_switching_start(vswp);
+	if (rv != 0) {
+		goto vsw_attach_fail;
+	}
 
 	progress |= PROG_swmode;
 
@@ -665,7 +659,7 @@ vsw_attach_fail:
 		(void) vsw_mac_unregister(vswp);
 
 	if (progress & PROG_swmode) {
-		vsw_stop_switching_timeout(vswp);
+		vsw_setup_switching_stop(vswp);
 		vsw_hio_cleanup(vswp);
 		mutex_enter(&vswp->mac_lock);
 		vsw_mac_close(vswp);
@@ -696,7 +690,8 @@ vsw_attach_fail:
 		rw_destroy(&vswp->mfdbrw);
 		rw_destroy(&vswp->if_lockrw);
 		rw_destroy(&vswp->maccl_rwlock);
-		mutex_destroy(&vswp->swtmout_lock);
+		cv_destroy(&vswp->sw_thr_cv);
+		mutex_destroy(&vswp->sw_thr_lock);
 		mutex_destroy(&vswp->mca_lock);
 		mutex_destroy(&vswp->mac_lock);
 	}
@@ -730,8 +725,8 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	D2(vswp, "detaching instance %d", instance);
 
-	/* Stop any pending timeout to setup switching mode. */
-	vsw_stop_switching_timeout(vswp);
+	/* Stop any pending thread to setup switching mode. */
+	vsw_setup_switching_stop(vswp);
 
 	/* Cleanup the interface's mac client */
 	vsw_mac_client_cleanup(vswp, NULL, VSW_LOCALDEV);
@@ -768,7 +763,8 @@ vsw_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	mutex_exit(&vswp->mac_lock);
 
 	mutex_destroy(&vswp->mac_lock);
-	mutex_destroy(&vswp->swtmout_lock);
+	cv_destroy(&vswp->sw_thr_cv);
+	mutex_destroy(&vswp->sw_thr_lock);
 	rw_destroy(&vswp->maccl_rwlock);
 
 	/*
@@ -2079,9 +2075,9 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 	if (updated & (MD_physname | MD_smode | MD_mtu)) {
 
 		/*
-		 * Stop any pending timeout to setup switching mode.
+		 * Stop any pending thread to setup switching mode.
 		 */
-		vsw_stop_switching_timeout(vswp);
+		vsw_setup_switching_stop(vswp);
 
 		/* Cleanup HybridIO */
 		vsw_hio_cleanup(vswp);
@@ -2132,21 +2128,14 @@ vsw_update_md_prop(vsw_t *vswp, md_t *mdp, mde_cookie_t node)
 		if (rv == EAGAIN) {
 			/*
 			 * Unable to setup switching mode.
-			 * As the error is EAGAIN, schedule a timeout to retry
+			 * As the error is EAGAIN, schedule a thread to retry
 			 * and return. Programming addresses of ports and
-			 * vsw interface will be done when the timeout handler
-			 * completes successfully.
+			 * vsw interface will be done by the thread when the
+			 * switching setup completes successfully.
 			 */
-			mutex_enter(&vswp->swtmout_lock);
-
-			vswp->swtmout_enabled = B_TRUE;
-			vswp->swtmout_id =
-			    timeout(vsw_setup_switching_timeout, vswp,
-			    (vsw_setup_switching_delay *
-			    drv_usectohz(MICROSEC)));
-
-			mutex_exit(&vswp->swtmout_lock);
-
+			if (vsw_setup_switching_start(vswp) != 0) {
+				goto fail_update;
+			}
 			return;
 
 		} else if (rv) {

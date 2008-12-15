@@ -88,6 +88,10 @@ extern "C" {
 
 #define	VSW_PRI_ETH_DEFINED(vswp)	((vswp)->pri_num_types != 0)
 
+typedef enum {
+	VSW_SWTHR_STOP = 0x1
+} sw_thr_flags_t;
+
 /*
  * vlan-id information.
  */
@@ -107,9 +111,10 @@ typedef struct	vsw {
 	struct vsw		*next;		/* next in list */
 	char			physname[LIFNAMSIZ];	/* phys-dev */
 	uint8_t			smode;		/* switching mode */
-	kmutex_t		swtmout_lock;	/* setup switching tmout lock */
-	boolean_t		swtmout_enabled; /* setup switching tmout on */
-	timeout_id_t		swtmout_id;	/* setup switching tmout id */
+	kmutex_t		sw_thr_lock;	/* setup switching thr lock */
+	kcondvar_t		sw_thr_cv;	/* cv for setup switching thr */
+	kthread_t		*sw_thread;	/* setup switching thread */
+	sw_thr_flags_t		sw_thr_flags; 	/* setup switching thr flags */
 	uint32_t		switching_setup_done; /* setup switching done */
 	int			mac_open_retries; /* mac_open() retry count */
 	vsw_port_list_t		plist;		/* associated ports */

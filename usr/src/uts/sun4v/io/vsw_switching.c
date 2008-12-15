@@ -71,8 +71,9 @@
 #include <sys/vlan.h>
 
 /* Switching setup routines */
-void vsw_setup_switching_timeout(void *arg);
-void vsw_stop_switching_timeout(vsw_t *vswp);
+void vsw_setup_switching_thread(void *arg);
+int vsw_setup_switching_start(vsw_t *vswp);
+void vsw_setup_switching_stop(vsw_t *vswp);
 int vsw_setup_switching(vsw_t *);
 void vsw_setup_layer2_post_process(vsw_t *vswp);
 void vsw_switch_frame_nop(vsw_t *vswp, mblk_t *mp, int caller,
@@ -159,86 +160,126 @@ extern	uint32_t vsw_fdbe_refcnt_delay;
 }
 
 /*
- * Timeout routine to setup switching mode:
- * vsw_setup_switching() is invoked from vsw_attach() or vsw_update_md_prop()
- * initially. If it fails and the error is EAGAIN, then this timeout handler
- * is started to retry vsw_setup_switching(). vsw_setup_switching() is retried
- * until we successfully finish it; or the returned error is not EAGAIN.
+ * Thread to setup switching mode. This thread is created during vsw_attach()
+ * initially. It invokes vsw_setup_switching() and keeps retrying while the
+ * returned value is EAGAIN. The thread exits when the switching mode setup is
+ * done successfully or when the error returned is not EAGAIN. This thread may
+ * also get created from vsw_update_md_prop() if the switching mode needs to be
+ * updated.
  */
 void
-vsw_setup_switching_timeout(void *arg)
+vsw_setup_switching_thread(void *arg)
 {
-	vsw_t		*vswp = (vsw_t *)arg;
+	callb_cpr_t	cprinfo;
+	vsw_t		*vswp =  (vsw_t *)arg;
+	clock_t		wait_time;
+	clock_t		xwait;
+	clock_t		wait_rv;
 	int		rv;
 
-	if (vswp->swtmout_enabled == B_FALSE)
-		return;
+	/* wait time used on successive retries */
+	xwait = drv_usectohz(vsw_setup_switching_delay * MICROSEC);
 
-	rv = vsw_setup_switching(vswp);
+	CALLB_CPR_INIT(&cprinfo, &vswp->sw_thr_lock, callb_generic_cpr,
+	    "vsw_setup_sw_thread");
 
-	if (rv == 0) {
-		vsw_setup_layer2_post_process(vswp);
+	mutex_enter(&vswp->sw_thr_lock);
+
+	while ((vswp->sw_thr_flags & VSW_SWTHR_STOP) == 0) {
+
+		CALLB_CPR_SAFE_BEGIN(&cprinfo);
+
+		/* Wait for sometime before (re)trying setup_switching() */
+		wait_time = ddi_get_lbolt() + xwait;
+		while ((vswp->sw_thr_flags & VSW_SWTHR_STOP) == 0) {
+			wait_rv = cv_timedwait(&vswp->sw_thr_cv,
+			    &vswp->sw_thr_lock, wait_time);
+			if (wait_rv == -1) {	/* timed out */
+				break;
+			}
+		}
+
+		CALLB_CPR_SAFE_END(&cprinfo, &vswp->sw_thr_lock)
+
+		if ((vswp->sw_thr_flags & VSW_SWTHR_STOP) != 0) {
+			/*
+			 * If there is a stop request, process that first and
+			 * exit the loop. Continue to hold the mutex which gets
+			 * released in CALLB_CPR_EXIT().
+			 */
+			break;
+		}
+
+		mutex_exit(&vswp->sw_thr_lock);
+		rv = vsw_setup_switching(vswp);
+		if (rv == 0) {
+			vsw_setup_layer2_post_process(vswp);
+		}
+		mutex_enter(&vswp->sw_thr_lock);
+		if (rv != EAGAIN) {
+			break;
+		}
+
 	}
 
-	mutex_enter(&vswp->swtmout_lock);
-
-	if (rv == EAGAIN && vswp->swtmout_enabled == B_TRUE) {
-		/*
-		 * Reschedule timeout() if the error is EAGAIN and the
-		 * timeout is still enabled. For errors other than EAGAIN,
-		 * we simply return without rescheduling timeout().
-		 */
-		vswp->swtmout_id =
-		    timeout(vsw_setup_switching_timeout, vswp,
-		    (vsw_setup_switching_delay * drv_usectohz(MICROSEC)));
-		goto exit;
-	}
-
-	/* timeout handler completed */
-	vswp->swtmout_enabled = B_FALSE;
-	vswp->swtmout_id = 0;
-
-exit:
-	mutex_exit(&vswp->swtmout_lock);
+	vswp->sw_thr_flags &= ~VSW_SWTHR_STOP;
+	vswp->sw_thread = NULL;
+	CALLB_CPR_EXIT(&cprinfo);
+	thread_exit();
 }
 
 /*
- * Cancel the timeout handler to setup switching mode.
+ * Create a thread to setup the switching mode.
+ * Returns 0 on success; 1 on failure.
+ */
+int
+vsw_setup_switching_start(vsw_t *vswp)
+{
+	mutex_enter(&vswp->sw_thr_lock);
+
+	vswp->sw_thread = thread_create(NULL, 2 * DEFAULTSTKSZ,
+	    vsw_setup_switching_thread, vswp, 0, &p0, TS_RUN, minclsyspri);
+
+	if (vswp->sw_thread == NULL) {
+		mutex_exit(&vswp->sw_thr_lock);
+		return (1);
+	}
+
+	mutex_exit(&vswp->sw_thr_lock);
+	return (0);
+}
+
+/*
+ * Stop the thread to setup switching mode.
  */
 void
-vsw_stop_switching_timeout(vsw_t *vswp)
+vsw_setup_switching_stop(vsw_t *vswp)
 {
-	timeout_id_t tid;
+	kt_did_t	tid = 0;
 
-	mutex_enter(&vswp->swtmout_lock);
+	/*
+	 * Signal the setup_switching thread to stop and wait until it stops.
+	 */
+	mutex_enter(&vswp->sw_thr_lock);
 
-	tid = vswp->swtmout_id;
-
-	if (tid != 0) {
-		/* signal timeout handler to stop */
-		vswp->swtmout_enabled = B_FALSE;
-		vswp->swtmout_id = 0;
-		mutex_exit(&vswp->swtmout_lock);
-
-		(void) untimeout(tid);
-	} else {
-		mutex_exit(&vswp->swtmout_lock);
+	if (vswp->sw_thread != NULL) {
+		tid = vswp->sw_thread->t_did;
+		vswp->sw_thr_flags |= VSW_SWTHR_STOP;
+		cv_signal(&vswp->sw_thr_cv);
 	}
+
+	mutex_exit(&vswp->sw_thr_lock);
+
+	if (tid != 0)
+		thread_join(tid);
 
 	(void) atomic_swap_32(&vswp->switching_setup_done, B_FALSE);
 
-	mutex_enter(&vswp->mac_lock);
 	vswp->mac_open_retries = 0;
-	mutex_exit(&vswp->mac_lock);
 }
 
 /*
  * Setup the required switching mode.
- * This routine is invoked from vsw_attach() or vsw_update_md_prop()
- * initially. If it fails and the error is EAGAIN, then a timeout handler
- * is started to retry vsw_setup_switching(), until it successfully finishes;
- * or the returned error is not EAGAIN.
- *
  * Returns:
  *  0 on success.
  *  EAGAIN if retry is needed.
