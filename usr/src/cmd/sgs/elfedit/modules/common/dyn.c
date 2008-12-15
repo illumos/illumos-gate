@@ -23,7 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<ctype.h>
 #include	<elfedit.h>
@@ -500,23 +499,41 @@ print_dyn(DYN_CMD_T cmd, int autoprint, ARGSTATE *argstate,
 			/*
 			 * In simple or numeric mode under a print type
 			 * that is based on tag type rather than on index,
-			 * quietly: If we've already printed this value,
-			 * don't print it again. A common example of this
-			 * is PRINT_DYN_T_RUNPATH when both DT_RPATH and
-			 * DT_RUNPATH are present with the same value.
+			 * if there are more than one qualifying tag, we
+			 * want to skip printing redundant information.
 			 */
 			switch (print_type) {
 			case PRINT_DYN_T_TAG:
-				/*
-				 * Positional flags don't count, because
-				 * each one affects a different item. So don't
-				 * skip those.
-				 */
-				if (dyn->d_tag != DT_POSFLAG_1)
-					continue;
+				switch (dyn->d_tag) {
+				case DT_NEEDED:
+					/* Multiple NEEDED entries are normal */
+					break;
+				case DT_POSFLAG_1:
+					/*
+					 * Positional flags don't count,
+					 * because each one affects a different
+					 * item. Don't skip those even if they
+					 * have duplicate values.
+					 */
+					break;
+				default:
+					/*
+					 * Anything else: If we've already
+					 * printed this value, don't print
+					 * it again.
+					 */
+					if (printed &&
+					    (last_d_val == dyn->d_un.d_val))
+						continue;
+				}
 				break;
-
 			case PRINT_DYN_T_RUNPATH:
+				/*
+				 * If we've already printed this value,
+				 * don't print it again. This commonly
+				 * happens when both DT_RPATH and DT_RUNPATH
+				 * are present with the same value.
+				 */
 				if (printed && (last_d_val == dyn->d_un.d_val))
 					continue;
 				break;

@@ -119,7 +119,7 @@ ld_sup_loadso(Ofl_desc *ofl, const char *obj)
 			 */
 			if (version > LD_SUP_VCURRENT) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
-				    MSG_INTL(MSG_SUP_BADVERSION),
+				    MSG_INTL(MSG_SUP_BADVERSION), obj,
 				    LD_SUP_VCURRENT, version);
 				(void) dlclose(handle);
 				return (S_ERROR);

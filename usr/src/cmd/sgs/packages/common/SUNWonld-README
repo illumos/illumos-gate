@@ -1410,3 +1410,4 @@ Bugid   Risk Synopsis
 	libsoftcrypto_hwcap.so.1
 6765931 mcs generates unlink(NULL) system calls
 6775062 remove /usr/lib/libldstab.so (D)
+6782977 ld segfaults after support lib version error sends bad args to vprintf()
