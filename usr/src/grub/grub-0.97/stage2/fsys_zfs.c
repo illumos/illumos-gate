@@ -60,7 +60,6 @@ static uint64_t dnode_start = 0;
 static uint64_t dnode_end = 0;
 
 static uberblock_t current_uberblock;
-
 static char *stackbase;
 
 decomp_entry_t decomp_table[ZIO_COMPRESS_FUNCTIONS] =
@@ -71,6 +70,8 @@ decomp_entry_t decomp_table[ZIO_COMPRESS_FUNCTIONS] =
 	{"lzjb", lzjb_decompress},	/* ZIO_COMPRESS_LZJB */
 	{"empty", 0}			/* ZIO_COMPRESS_EMPTY */
 };
+
+static int zio_read_data(blkptr_t *bp, void *buf, char *stack);
 
 /*
  * Our own version of bcmp().
@@ -140,8 +141,7 @@ static int
 zio_checksum_verify(blkptr_t *bp, char *data, int size)
 {
 	zio_cksum_t zc = bp->blk_cksum;
-	uint32_t checksum = BP_IS_GANG(bp) ? ZIO_CHECKSUM_GANG_HEADER :
-	    BP_GET_CHECKSUM(bp);
+	uint32_t checksum = BP_GET_CHECKSUM(bp);
 	int byteswap = BP_SHOULD_BYTESWAP(bp);
 	zio_block_tail_t *zbt = (zio_block_tail_t *)(data + size) - 1;
 	zio_checksum_info_t *ci = &zio_checksum_table[checksum];
@@ -155,27 +155,13 @@ zio_checksum_verify(blkptr_t *bp, char *data, int size)
 		return (-1);
 
 	if (ci->ci_zbt) {
-		if (checksum == ZIO_CHECKSUM_GANG_HEADER) {
-			/*
-			 * 'gang blocks' is not supported.
-			 */
-			return (-1);
-		}
-
-		if (zbt->zbt_magic == BSWAP_64(ZBT_MAGIC)) {
-			/* byte swapping is not supported */
-			return (-1);
-		} else {
-			expected_cksum = zbt->zbt_cksum;
-			zbt->zbt_cksum = zc;
-			ci->ci_func[0](data, size, &actual_cksum);
-			zbt->zbt_cksum = expected_cksum;
-		}
+		expected_cksum = zbt->zbt_cksum;
+		zbt->zbt_cksum = zc;
+		ci->ci_func[0](data, size, &actual_cksum);
+		zbt->zbt_cksum = expected_cksum;
 		zc = expected_cksum;
 
 	} else {
-		if (BP_IS_GANG(bp))
-			return (-1);
 		ci->ci_func[byteswap](data, size, &actual_cksum);
 	}
 
@@ -305,7 +291,95 @@ find_bestub(uberblock_phys_t *ub_array, int label)
 }
 
 /*
- * Read in a block and put its uncompressed data in buf.
+ * Read a block of data based on the gang block address dva,
+ * and put its data in buf.
+ *
+ * Return:
+ *	0 - success
+ *	1 - failure
+ */
+static int
+zio_read_gang(blkptr_t *bp, dva_t *dva, void *buf, char *stack)
+{
+	zio_gbh_phys_t *zio_gb;
+	uint64_t offset, sector;
+	blkptr_t tmpbp;
+	int i;
+
+	zio_gb = (zio_gbh_phys_t *)stack;
+	stack += SPA_GANGBLOCKSIZE;
+	offset = DVA_GET_OFFSET(dva);
+	sector =  DVA_OFFSET_TO_PHYS_SECTOR(offset);
+
+	/* read in the gang block header */
+	if (devread(sector, 0, SPA_GANGBLOCKSIZE, (char *)zio_gb) == 0) {
+		grub_printf("failed to read in a gang block header\n");
+		return (1);
+	}
+
+	/* self checksuming the gang block header */
+	BP_ZERO(&tmpbp);
+	BP_SET_CHECKSUM(&tmpbp, ZIO_CHECKSUM_GANG_HEADER);
+	BP_SET_BYTEORDER(&tmpbp, ZFS_HOST_BYTEORDER);
+	ZIO_SET_CHECKSUM(&tmpbp.blk_cksum, DVA_GET_VDEV(dva),
+	    DVA_GET_OFFSET(dva), bp->blk_birth, 0);
+	if (zio_checksum_verify(&tmpbp, (char *)zio_gb, SPA_GANGBLOCKSIZE)) {
+		grub_printf("failed to checksum a gang block header\n");
+		return (1);
+	}
+
+	for (i = 0; i < SPA_GBH_NBLKPTRS; i++) {
+		if (zio_gb->zg_blkptr[i].blk_birth == 0)
+			continue;
+
+		if (zio_read_data(&zio_gb->zg_blkptr[i], buf, stack))
+			return (1);
+		buf += BP_GET_PSIZE(&zio_gb->zg_blkptr[i]);
+	}
+
+	return (0);
+}
+
+/*
+ * Read in a block of raw data to buf.
+ *
+ * Return:
+ *	0 - success
+ *	1 - failure
+ */
+static int
+zio_read_data(blkptr_t *bp, void *buf, char *stack)
+{
+	int i, psize;
+
+	psize = BP_GET_PSIZE(bp);
+
+	/* pick a good dva from the block pointer */
+	for (i = 0; i < SPA_DVAS_PER_BP; i++) {
+		uint64_t offset, sector;
+
+		if (bp->blk_dva[i].dva_word[0] == 0 &&
+		    bp->blk_dva[i].dva_word[1] == 0)
+			continue;
+
+		if (DVA_GET_GANG(&bp->blk_dva[i])) {
+			if (zio_read_gang(bp, &bp->blk_dva[i], buf, stack) == 0)
+				return (0);
+		} else {
+			/* read in a data block */
+			offset = DVA_GET_OFFSET(&bp->blk_dva[i]);
+			sector =  DVA_OFFSET_TO_PHYS_SECTOR(offset);
+			if (devread(sector, 0, psize, buf))
+				return (0);
+		}
+	}
+
+	return (1);
+}
+
+/*
+ * Read in a block of data, verify its checksum, decompress if needed,
+ * and put the uncompressed data in buf.
  *
  * Return:
  *	0 - success
@@ -314,50 +388,45 @@ find_bestub(uberblock_phys_t *ub_array, int label)
 static int
 zio_read(blkptr_t *bp, void *buf, char *stack)
 {
-	uint64_t offset, sector;
-	int psize, lsize;
-	int i, comp, cksum;
+	int lsize, psize, comp;
+	char *retbuf;
 
-	psize = BP_GET_PSIZE(bp);
-	lsize = BP_GET_LSIZE(bp);
 	comp = BP_GET_COMPRESS(bp);
-	cksum = BP_GET_CHECKSUM(bp);
+	lsize = BP_GET_LSIZE(bp);
+	psize = BP_GET_PSIZE(bp);
 
 	if ((unsigned int)comp >= ZIO_COMPRESS_FUNCTIONS ||
-	    comp != ZIO_COMPRESS_OFF && decomp_table[comp].decomp_func == NULL)
+	    (comp != ZIO_COMPRESS_OFF &&
+	    decomp_table[comp].decomp_func == NULL)) {
+		grub_printf("compression algorithm not supported\n");
 		return (ERR_FSYS_CORRUPT);
-
-	if ((char *)buf < stack && ((char *)buf) + lsize > stack)
-		return (ERR_FSYS_CORRUPT);
-	/* pick a good dva from the block pointer */
-	for (i = 0; i < SPA_DVAS_PER_BP; i++) {
-
-		if (bp->blk_dva[i].dva_word[0] == 0 &&
-		    bp->blk_dva[i].dva_word[1] == 0)
-			continue;
-
-		/* read in a block */
-		offset = DVA_GET_OFFSET(&bp->blk_dva[i]);
-		sector =  DVA_OFFSET_TO_PHYS_SECTOR(offset);
-
-		if (comp != ZIO_COMPRESS_OFF) {
-
-			if (devread(sector, 0, psize, stack) == 0)
-				continue;
-			if (zio_checksum_verify(bp, stack, psize) != 0)
-				continue;
-			decomp_table[comp].decomp_func(stack, buf, psize,
-			    lsize);
-		} else {
-			if (devread(sector, 0, psize, buf) == 0)
-				continue;
-			if (zio_checksum_verify(bp, buf, psize) != 0)
-				continue;
-		}
-		return (0);
 	}
 
-	return (ERR_FSYS_CORRUPT);
+	if ((char *)buf < stack && ((char *)buf) + lsize > stack) {
+		grub_printf("not enough memory allocated\n");
+		return (ERR_WONT_FIT);
+	}
+
+	retbuf = buf;
+	if (comp != ZIO_COMPRESS_OFF) {
+		buf = stack;
+		stack += psize;
+	}
+
+	if (zio_read_data(bp, buf, stack)) {
+		grub_printf("zio_read_data failed\n");
+		return (ERR_FSYS_CORRUPT);
+	}
+
+	if (zio_checksum_verify(bp, buf, psize) != 0) {
+		grub_printf("checksum verification failed\n");
+		return (ERR_FSYS_CORRUPT);
+	}
+
+	if (comp != ZIO_COMPRESS_OFF)
+		decomp_table[comp].decomp_func(buf, retbuf, psize, lsize);
+
+	return (0);
 }
 
 /*
