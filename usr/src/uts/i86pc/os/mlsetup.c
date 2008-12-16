@@ -201,6 +201,10 @@ mlsetup(struct regs *rp)
 		patch_tsc_read(X86_NO_TSC);
 #endif	/* __i386 && !__xpv */
 
+#if defined(__amd64) && !defined(__xpv)
+	patch_memops(cpuid_getvendor(CPU));
+#endif	/* __amd64 && !__xpv */
+
 #if !defined(__xpv)
 	/* XXPV	what, if anything, should be dorked with here under xen? */
 

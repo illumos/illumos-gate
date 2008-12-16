@@ -190,6 +190,9 @@ extern int xpv_panicking;
 extern void setup_mca(void);
 extern void pat_sync(void);
 extern void patch_tsc_read(int);
+#if defined(__amd64) && !defined(__xpv)
+extern void patch_memops(uint_t);
+#endif	/* defined(__amd64) && !defined(__xpv) */
 #define	cpr_dprintf prom_printf
 #define	IN_XPV_PANIC() (__lintzero)
 #endif

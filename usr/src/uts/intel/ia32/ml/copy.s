@@ -19,8 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
+ */
+
+/*
+ * Copyright (c) 2008, Intel Corporation
+ * All rights reserved.
  */
 
 /*       Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
@@ -29,8 +34,6 @@
 
 /*       Copyright (c) 1987, 1988 Microsoft Corporation			*/
 /*         All Rights Reserved						*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/errno.h>
 #include <sys/asm_linkage.h>
@@ -51,6 +54,17 @@
 #define	NTA_ALIGN_MASK	_CONST(NTA_ALIGN_SIZE-1)
 #define	COUNT_ALIGN_SIZE	16	/* Must be at least 16-byte aligned */
 #define	COUNT_ALIGN_MASK	_CONST(COUNT_ALIGN_SIZE-1)
+
+/*
+ * The optimal 64-bit bcopy and kcopy for modern x86 processors uses
+ * "rep smovq" for large sizes. Performance data shows that many calls to
+ * bcopy/kcopy/bzero/kzero operate on small buffers. For best performance for
+ * these small sizes unrolled code is used. For medium sizes loops writing
+ * 64-bytes per loop are used. Transition points were determined experimentally.
+ */ 
+#define BZERO_USE_REP	(1024)
+#define BCOPY_DFLT_REP	(128)
+#define	BCOPY_NHM_REP	(768)
 
 /*
  * Copy a block of storage, returning an error code if `from' or
@@ -94,17 +108,7 @@ kcopy(const void *from, void *to, size_t count)
 do_copy_fault:
 	movq	T_LOFAULT(%r9), %r11	/* save the current lofault */
 	movq	%rcx, T_LOFAULT(%r9)	/* new lofault */
-
-	xchgq	%rdi, %rsi		/* %rsi = source, %rdi = destination */
-	movq	%rdx, %rcx		/* %rcx = count */
-	shrq	$3, %rcx		/* 8-byte word count */
-	rep
-	  smovq
-
-	movq	%rdx, %rcx
-	andq	$7, %rcx		/* bytes left over */
-	rep
-	  smovb
+	call	bcopy_altentry
 	xorl	%eax, %eax		/* return 0 (success) */
 
 	/*
@@ -366,18 +370,501 @@ bcopy(const void *from, void *to, size_t count)
 	jmp	call_panic		/* setup stack and call panic */
 1:
 #endif
+	/*
+	 * bcopy_altentry() is called from kcopy, i.e., do_copy_fault.
+	 * kcopy assumes that bcopy doesn't touch %r9 and %r11. If bcopy
+	 * uses these registers in future they must be saved and restored.
+	 */
+	ALTENTRY(bcopy_altentry)
 do_copy:
+#define	L(s) .bcopy/**/s
+	cmpq	$0x50, %rdx		/* 80 */
+	jge	bcopy_ck_size
+
+	/*
+	 * Performance data shows many caller's copy small buffers. So for
+	 * best perf for these sizes unrolled code is used. Store data without
+	 * worrying about alignment.
+	 */
+	leaq	L(fwdPxQx)(%rip), %r10
+	addq	%rdx, %rdi
+	addq	%rdx, %rsi
+	movslq	(%r10,%rdx,4), %rcx
+	leaq	(%rcx,%r10,1), %r10
+	jmpq	*%r10
+
+	.p2align 4
+L(fwdPxQx):
+	.int       L(P0Q0)-L(fwdPxQx)	/* 0 */
+	.int       L(P1Q0)-L(fwdPxQx)
+	.int       L(P2Q0)-L(fwdPxQx)
+	.int       L(P3Q0)-L(fwdPxQx)
+	.int       L(P4Q0)-L(fwdPxQx)
+	.int       L(P5Q0)-L(fwdPxQx)
+	.int       L(P6Q0)-L(fwdPxQx)
+	.int       L(P7Q0)-L(fwdPxQx) 
+
+	.int       L(P0Q1)-L(fwdPxQx)	/* 8 */
+	.int       L(P1Q1)-L(fwdPxQx)
+	.int       L(P2Q1)-L(fwdPxQx)
+	.int       L(P3Q1)-L(fwdPxQx)
+	.int       L(P4Q1)-L(fwdPxQx)
+	.int       L(P5Q1)-L(fwdPxQx)
+	.int       L(P6Q1)-L(fwdPxQx)
+	.int       L(P7Q1)-L(fwdPxQx) 
+
+	.int       L(P0Q2)-L(fwdPxQx)	/* 16 */
+	.int       L(P1Q2)-L(fwdPxQx)
+	.int       L(P2Q2)-L(fwdPxQx)
+	.int       L(P3Q2)-L(fwdPxQx)
+	.int       L(P4Q2)-L(fwdPxQx)
+	.int       L(P5Q2)-L(fwdPxQx)
+	.int       L(P6Q2)-L(fwdPxQx)
+	.int       L(P7Q2)-L(fwdPxQx) 
+
+	.int       L(P0Q3)-L(fwdPxQx)	/* 24 */
+	.int       L(P1Q3)-L(fwdPxQx)
+	.int       L(P2Q3)-L(fwdPxQx)
+	.int       L(P3Q3)-L(fwdPxQx)
+	.int       L(P4Q3)-L(fwdPxQx)
+	.int       L(P5Q3)-L(fwdPxQx)
+	.int       L(P6Q3)-L(fwdPxQx)
+	.int       L(P7Q3)-L(fwdPxQx) 
+
+	.int       L(P0Q4)-L(fwdPxQx)	/* 32 */
+	.int       L(P1Q4)-L(fwdPxQx)
+	.int       L(P2Q4)-L(fwdPxQx)
+	.int       L(P3Q4)-L(fwdPxQx)
+	.int       L(P4Q4)-L(fwdPxQx)
+	.int       L(P5Q4)-L(fwdPxQx)
+	.int       L(P6Q4)-L(fwdPxQx)
+	.int       L(P7Q4)-L(fwdPxQx) 
+
+	.int       L(P0Q5)-L(fwdPxQx)	/* 40 */
+	.int       L(P1Q5)-L(fwdPxQx)
+	.int       L(P2Q5)-L(fwdPxQx)
+	.int       L(P3Q5)-L(fwdPxQx)
+	.int       L(P4Q5)-L(fwdPxQx)
+	.int       L(P5Q5)-L(fwdPxQx)
+	.int       L(P6Q5)-L(fwdPxQx)
+	.int       L(P7Q5)-L(fwdPxQx) 
+
+	.int       L(P0Q6)-L(fwdPxQx)	/* 48 */
+	.int       L(P1Q6)-L(fwdPxQx)
+	.int       L(P2Q6)-L(fwdPxQx)
+	.int       L(P3Q6)-L(fwdPxQx)
+	.int       L(P4Q6)-L(fwdPxQx)
+	.int       L(P5Q6)-L(fwdPxQx)
+	.int       L(P6Q6)-L(fwdPxQx)
+	.int       L(P7Q6)-L(fwdPxQx) 
+
+	.int       L(P0Q7)-L(fwdPxQx)	/* 56 */
+	.int       L(P1Q7)-L(fwdPxQx)
+	.int       L(P2Q7)-L(fwdPxQx)
+	.int       L(P3Q7)-L(fwdPxQx)
+	.int       L(P4Q7)-L(fwdPxQx)
+	.int       L(P5Q7)-L(fwdPxQx)
+	.int       L(P6Q7)-L(fwdPxQx)
+	.int       L(P7Q7)-L(fwdPxQx) 
+
+	.int       L(P0Q8)-L(fwdPxQx)	/* 64 */
+	.int       L(P1Q8)-L(fwdPxQx)
+	.int       L(P2Q8)-L(fwdPxQx)
+	.int       L(P3Q8)-L(fwdPxQx)
+	.int       L(P4Q8)-L(fwdPxQx)
+	.int       L(P5Q8)-L(fwdPxQx)
+	.int       L(P6Q8)-L(fwdPxQx)
+	.int       L(P7Q8)-L(fwdPxQx)
+
+	.int       L(P0Q9)-L(fwdPxQx)	/* 72 */
+	.int       L(P1Q9)-L(fwdPxQx)
+	.int       L(P2Q9)-L(fwdPxQx)
+	.int       L(P3Q9)-L(fwdPxQx)
+	.int       L(P4Q9)-L(fwdPxQx)
+	.int       L(P5Q9)-L(fwdPxQx)
+	.int       L(P6Q9)-L(fwdPxQx)
+	.int       L(P7Q9)-L(fwdPxQx)	/* 79 */
+
+	.p2align 4
+L(P0Q9):
+	mov    -0x48(%rdi), %rcx
+	mov    %rcx, -0x48(%rsi)
+L(P0Q8):
+	mov    -0x40(%rdi), %r10
+	mov    %r10, -0x40(%rsi)
+L(P0Q7):
+	mov    -0x38(%rdi), %r8
+	mov    %r8, -0x38(%rsi)
+L(P0Q6):
+	mov    -0x30(%rdi), %rcx
+	mov    %rcx, -0x30(%rsi)
+L(P0Q5):
+	mov    -0x28(%rdi), %r10
+	mov    %r10, -0x28(%rsi)
+L(P0Q4):
+	mov    -0x20(%rdi), %r8
+	mov    %r8, -0x20(%rsi)
+L(P0Q3):
+	mov    -0x18(%rdi), %rcx
+	mov    %rcx, -0x18(%rsi)
+L(P0Q2):
+	mov    -0x10(%rdi), %r10
+	mov    %r10, -0x10(%rsi)
+L(P0Q1):
+	mov    -0x8(%rdi), %r8
+	mov    %r8, -0x8(%rsi)
+L(P0Q0):                                   
+	ret   
+
+	.p2align 4
+L(P1Q9):
+	mov    -0x49(%rdi), %r8
+	mov    %r8, -0x49(%rsi)
+L(P1Q8):
+	mov    -0x41(%rdi), %rcx
+	mov    %rcx, -0x41(%rsi)
+L(P1Q7):
+	mov    -0x39(%rdi), %r10
+	mov    %r10, -0x39(%rsi)
+L(P1Q6):
+	mov    -0x31(%rdi), %r8
+	mov    %r8, -0x31(%rsi)
+L(P1Q5):
+	mov    -0x29(%rdi), %rcx
+	mov    %rcx, -0x29(%rsi)
+L(P1Q4):
+	mov    -0x21(%rdi), %r10
+	mov    %r10, -0x21(%rsi)
+L(P1Q3):
+	mov    -0x19(%rdi), %r8
+	mov    %r8, -0x19(%rsi)
+L(P1Q2):
+	mov    -0x11(%rdi), %rcx
+	mov    %rcx, -0x11(%rsi)
+L(P1Q1):
+	mov    -0x9(%rdi), %r10
+	mov    %r10, -0x9(%rsi)
+L(P1Q0):
+	movzbq -0x1(%rdi), %r8
+	mov    %r8b, -0x1(%rsi)
+	ret   
+
+	.p2align 4
+L(P2Q9):
+	mov    -0x4a(%rdi), %r8
+	mov    %r8, -0x4a(%rsi)
+L(P2Q8):
+	mov    -0x42(%rdi), %rcx
+	mov    %rcx, -0x42(%rsi)
+L(P2Q7):
+	mov    -0x3a(%rdi), %r10
+	mov    %r10, -0x3a(%rsi)
+L(P2Q6):
+	mov    -0x32(%rdi), %r8
+	mov    %r8, -0x32(%rsi)
+L(P2Q5):
+	mov    -0x2a(%rdi), %rcx
+	mov    %rcx, -0x2a(%rsi)
+L(P2Q4):
+	mov    -0x22(%rdi), %r10
+	mov    %r10, -0x22(%rsi)
+L(P2Q3):
+	mov    -0x1a(%rdi), %r8
+	mov    %r8, -0x1a(%rsi)
+L(P2Q2):
+	mov    -0x12(%rdi), %rcx
+	mov    %rcx, -0x12(%rsi)
+L(P2Q1):
+	mov    -0xa(%rdi), %r10
+	mov    %r10, -0xa(%rsi)
+L(P2Q0):
+	movzwq -0x2(%rdi), %r8
+	mov    %r8w, -0x2(%rsi)
+	ret   
+
+	.p2align 4
+L(P3Q9):
+	mov    -0x4b(%rdi), %r8
+	mov    %r8, -0x4b(%rsi)
+L(P3Q8):
+	mov    -0x43(%rdi), %rcx
+	mov    %rcx, -0x43(%rsi)
+L(P3Q7):
+	mov    -0x3b(%rdi), %r10
+	mov    %r10, -0x3b(%rsi)
+L(P3Q6):
+	mov    -0x33(%rdi), %r8
+	mov    %r8, -0x33(%rsi)
+L(P3Q5):
+	mov    -0x2b(%rdi), %rcx
+	mov    %rcx, -0x2b(%rsi)
+L(P3Q4):
+	mov    -0x23(%rdi), %r10
+	mov    %r10, -0x23(%rsi)
+L(P3Q3):
+	mov    -0x1b(%rdi), %r8
+	mov    %r8, -0x1b(%rsi)
+L(P3Q2):
+	mov    -0x13(%rdi), %rcx
+	mov    %rcx, -0x13(%rsi)
+L(P3Q1):
+	mov    -0xb(%rdi), %r10
+	mov    %r10, -0xb(%rsi)
+	/*
+	 * These trailing loads/stores have to do all their loads 1st, 
+	 * then do the stores.
+	 */
+L(P3Q0):
+	movzwq -0x3(%rdi), %r8
+	movzbq -0x1(%rdi), %r10
+	mov    %r8w, -0x3(%rsi)
+	mov    %r10b, -0x1(%rsi)
+	ret   
+
+	.p2align 4
+L(P4Q9):
+	mov    -0x4c(%rdi), %r8
+	mov    %r8, -0x4c(%rsi)
+L(P4Q8):
+	mov    -0x44(%rdi), %rcx
+	mov    %rcx, -0x44(%rsi)
+L(P4Q7):
+	mov    -0x3c(%rdi), %r10
+	mov    %r10, -0x3c(%rsi)
+L(P4Q6):
+	mov    -0x34(%rdi), %r8
+	mov    %r8, -0x34(%rsi)
+L(P4Q5):
+	mov    -0x2c(%rdi), %rcx
+	mov    %rcx, -0x2c(%rsi)
+L(P4Q4):
+	mov    -0x24(%rdi), %r10
+	mov    %r10, -0x24(%rsi)
+L(P4Q3):
+	mov    -0x1c(%rdi), %r8
+	mov    %r8, -0x1c(%rsi)
+L(P4Q2):
+	mov    -0x14(%rdi), %rcx
+	mov    %rcx, -0x14(%rsi)
+L(P4Q1):
+	mov    -0xc(%rdi), %r10
+	mov    %r10, -0xc(%rsi)
+L(P4Q0):
+	mov    -0x4(%rdi), %r8d
+	mov    %r8d, -0x4(%rsi)
+	ret   
+
+	.p2align 4
+L(P5Q9):
+	mov    -0x4d(%rdi), %r8
+	mov    %r8, -0x4d(%rsi)
+L(P5Q8):
+	mov    -0x45(%rdi), %rcx
+	mov    %rcx, -0x45(%rsi)
+L(P5Q7):
+	mov    -0x3d(%rdi), %r10
+	mov    %r10, -0x3d(%rsi)
+L(P5Q6):
+	mov    -0x35(%rdi), %r8
+	mov    %r8, -0x35(%rsi)
+L(P5Q5):
+	mov    -0x2d(%rdi), %rcx
+	mov    %rcx, -0x2d(%rsi)
+L(P5Q4):
+	mov    -0x25(%rdi), %r10
+	mov    %r10, -0x25(%rsi)
+L(P5Q3):
+	mov    -0x1d(%rdi), %r8
+	mov    %r8, -0x1d(%rsi)
+L(P5Q2):
+	mov    -0x15(%rdi), %rcx
+	mov    %rcx, -0x15(%rsi)
+L(P5Q1):
+	mov    -0xd(%rdi), %r10
+	mov    %r10, -0xd(%rsi)
+L(P5Q0):
+	mov    -0x5(%rdi), %r8d
+	movzbq -0x1(%rdi), %r10
+	mov    %r8d, -0x5(%rsi)
+	mov    %r10b, -0x1(%rsi)
+	ret   
+
+	.p2align 4
+L(P6Q9):
+	mov    -0x4e(%rdi), %r8
+	mov    %r8, -0x4e(%rsi)
+L(P6Q8):
+	mov    -0x46(%rdi), %rcx
+	mov    %rcx, -0x46(%rsi)
+L(P6Q7):
+	mov    -0x3e(%rdi), %r10
+	mov    %r10, -0x3e(%rsi)
+L(P6Q6):
+	mov    -0x36(%rdi), %r8
+	mov    %r8, -0x36(%rsi)
+L(P6Q5):
+	mov    -0x2e(%rdi), %rcx
+	mov    %rcx, -0x2e(%rsi)
+L(P6Q4):
+	mov    -0x26(%rdi), %r10
+	mov    %r10, -0x26(%rsi)
+L(P6Q3):
+	mov    -0x1e(%rdi), %r8
+	mov    %r8, -0x1e(%rsi)
+L(P6Q2):
+	mov    -0x16(%rdi), %rcx
+	mov    %rcx, -0x16(%rsi)
+L(P6Q1):
+	mov    -0xe(%rdi), %r10
+	mov    %r10, -0xe(%rsi)
+L(P6Q0):
+	mov    -0x6(%rdi), %r8d
+	movzwq -0x2(%rdi), %r10
+	mov    %r8d, -0x6(%rsi)
+	mov    %r10w, -0x2(%rsi)
+	ret   
+
+	.p2align 4
+L(P7Q9):
+	mov    -0x4f(%rdi), %r8
+	mov    %r8, -0x4f(%rsi)
+L(P7Q8):
+	mov    -0x47(%rdi), %rcx
+	mov    %rcx, -0x47(%rsi)
+L(P7Q7):
+	mov    -0x3f(%rdi), %r10
+	mov    %r10, -0x3f(%rsi)
+L(P7Q6):
+	mov    -0x37(%rdi), %r8
+	mov    %r8, -0x37(%rsi)
+L(P7Q5):
+	mov    -0x2f(%rdi), %rcx
+	mov    %rcx, -0x2f(%rsi)
+L(P7Q4):
+	mov    -0x27(%rdi), %r10
+	mov    %r10, -0x27(%rsi)
+L(P7Q3):
+	mov    -0x1f(%rdi), %r8
+	mov    %r8, -0x1f(%rsi)
+L(P7Q2):
+	mov    -0x17(%rdi), %rcx
+	mov    %rcx, -0x17(%rsi)
+L(P7Q1):
+	mov    -0xf(%rdi), %r10
+	mov    %r10, -0xf(%rsi)
+L(P7Q0):
+	mov    -0x7(%rdi), %r8d
+	movzwq -0x3(%rdi), %r10
+	movzbq -0x1(%rdi), %rcx
+	mov    %r8d, -0x7(%rsi)
+	mov    %r10w, -0x3(%rsi)
+	mov    %cl, -0x1(%rsi)
+	ret   
+
+	/*
+	 * For large sizes rep smovq is fastest.
+	 * Transition point determined experimentally as measured on
+	 * Intel Xeon processors (incl. Nehalem and previous generations) and
+	 * AMD Opteron. The transition value is patched at boot time to avoid
+	 * memory reference hit.
+	 */
+	.globl bcopy_patch_start
+bcopy_patch_start:
+	cmpq	$BCOPY_NHM_REP, %rdx
+	.globl bcopy_patch_end
+bcopy_patch_end:
+
+	.p2align 4
+	.globl bcopy_ck_size
+bcopy_ck_size:
+	cmpq	$BCOPY_DFLT_REP, %rdx
+	jge	L(use_rep)
+
+	/*
+	 * Align to a 8-byte boundary. Avoids penalties from unaligned stores
+	 * as well as from stores spanning cachelines.
+	 */
+	test	$0x7, %rsi
+	jz	L(aligned_loop)
+	test	$0x1, %rsi
+	jz	2f
+	movzbq	(%rdi), %r8
+	dec	%rdx
+	inc	%rdi
+	mov	%r8b, (%rsi)
+	inc	%rsi
+2:
+	test	$0x2, %rsi
+	jz	4f
+	movzwq	(%rdi), %r8
+	sub	$0x2, %rdx
+	add	$0x2, %rdi
+	mov	%r8w, (%rsi)
+	add	$0x2, %rsi
+4:
+	test	$0x4, %rsi
+	jz	L(aligned_loop)
+	mov	(%rdi), %r8d
+	sub	$0x4, %rdx
+	add	$0x4, %rdi
+	mov	%r8d, (%rsi)
+	add	$0x4, %rsi
+
+	/*
+	 * Copy 64-bytes per loop
+	 */
+	.p2align 4
+L(aligned_loop):
+	mov	(%rdi), %r8
+	mov	0x8(%rdi), %r10
+	lea	-0x40(%rdx), %rdx
+	mov	%r8, (%rsi)
+	mov	%r10, 0x8(%rsi)
+	mov	0x10(%rdi), %rcx
+	mov	0x18(%rdi), %r8
+	mov	%rcx, 0x10(%rsi)
+	mov	%r8, 0x18(%rsi)
+
+	cmp	$0x40, %rdx
+	mov	0x20(%rdi), %r10
+	mov	0x28(%rdi), %rcx
+	mov	%r10, 0x20(%rsi)
+	mov	%rcx, 0x28(%rsi)
+	mov	0x30(%rdi), %r8
+	mov	0x38(%rdi), %r10
+	lea	0x40(%rdi), %rdi
+	mov	%r8, 0x30(%rsi)
+	mov	%r10, 0x38(%rsi)
+	lea	0x40(%rsi), %rsi
+	jge	L(aligned_loop)
+
+	/*
+	 * Copy remaining bytes (0-63)
+	 */
+L(do_remainder):
+	leaq	L(fwdPxQx)(%rip), %r10
+	addq	%rdx, %rdi
+	addq	%rdx, %rsi
+	movslq	(%r10,%rdx,4), %rcx
+	leaq	(%rcx,%r10,1), %r10
+	jmpq	*%r10
+
+	/*
+	 * Use rep smovq. Clear remainder via unrolled code
+	 */
+	.p2align 4
+L(use_rep):
 	xchgq	%rdi, %rsi		/* %rsi = source, %rdi = destination */
 	movq	%rdx, %rcx		/* %rcx = count */
 	shrq	$3, %rcx		/* 8-byte word count */
 	rep
 	  smovq
 
-	movq	%rdx, %rcx
-	andq	$7, %rcx		/* bytes left over */
-	rep
-	  smovb
+	xchgq	%rsi, %rdi		/* %rdi = src, %rsi = destination */
+	andq	$7, %rdx		/* remainder */
+	jnz	L(do_remainder)
 	ret
+#undef	L
 
 #ifdef DEBUG
 	/*
@@ -395,6 +882,7 @@ call_panic:
 	xorl	%eax, %eax		/* no variable arguments */
 	call	panic			/* %rdi = format string */
 #endif
+	SET_SIZE(bcopy_altentry)
 	SET_SIZE(bcopy)
 
 #elif defined(__i386)
@@ -480,17 +968,7 @@ do_zero_fault:
 	movq	%gs:CPU_THREAD, %r9	/* %r9 = thread addr */
 	movq	T_LOFAULT(%r9), %r11	/* save the current lofault */
 	movq	%rdx, T_LOFAULT(%r9)	/* new lofault */
-	
-	movq	%rsi, %rcx		/* get size in bytes */
-	shrq	$3, %rcx		/* count of 8-byte words to zero */
-	xorl	%eax, %eax		/* clear %rax; used in sstoq / sstob */
-	rep
-	  sstoq				/* %rcx = words to clear (%rax=0) */
-
-	movq	%rsi, %rcx
-	andq	$7, %rcx		/* bytes left over */
-	rep
-	  sstob				/* %rcx = residual bytes to clear */
+	call	bzero_altentry
 	
 	/*
 	 * A fault during do_zero_fault is indicated through an errno value
@@ -582,18 +1060,310 @@ bzero(void *addr, size_t count)
 	jmp	call_panic		/* setup stack and call panic */
 0:
 #endif
+	ALTENTRY(bzero_altentry)
 do_zero:
+#define	L(s) .bzero/**/s
+	xorl	%eax, %eax
+
+	cmpq	$0x50, %rsi		/* 80 */
+	jge	L(ck_align)
+
+	/*
+	 * Performance data shows many caller's are zeroing small buffers. So
+	 * for best perf for these sizes unrolled code is used. Store zeros
+	 * without worrying about alignment.
+	 */
+	leaq	L(setPxQx)(%rip), %r10
+	addq	%rsi, %rdi
+	movslq	(%r10,%rsi,4), %rcx
+	leaq	(%rcx,%r10,1), %r10
+	jmpq	*%r10
+
+	.p2align 4
+L(setPxQx):
+	.int       L(P0Q0)-L(setPxQx)	/* 0 */
+	.int       L(P1Q0)-L(setPxQx)
+	.int       L(P2Q0)-L(setPxQx)
+	.int       L(P3Q0)-L(setPxQx)
+	.int       L(P4Q0)-L(setPxQx)
+	.int       L(P5Q0)-L(setPxQx)
+	.int       L(P6Q0)-L(setPxQx)
+	.int       L(P7Q0)-L(setPxQx) 
+
+	.int       L(P0Q1)-L(setPxQx)	/* 8 */
+	.int       L(P1Q1)-L(setPxQx)
+	.int       L(P2Q1)-L(setPxQx)
+	.int       L(P3Q1)-L(setPxQx)
+	.int       L(P4Q1)-L(setPxQx)
+	.int       L(P5Q1)-L(setPxQx)
+	.int       L(P6Q1)-L(setPxQx)
+	.int       L(P7Q1)-L(setPxQx) 
+
+	.int       L(P0Q2)-L(setPxQx)	/* 16 */
+	.int       L(P1Q2)-L(setPxQx)
+	.int       L(P2Q2)-L(setPxQx)
+	.int       L(P3Q2)-L(setPxQx)
+	.int       L(P4Q2)-L(setPxQx)
+	.int       L(P5Q2)-L(setPxQx)
+	.int       L(P6Q2)-L(setPxQx)
+	.int       L(P7Q2)-L(setPxQx) 
+
+	.int       L(P0Q3)-L(setPxQx)	/* 24 */
+	.int       L(P1Q3)-L(setPxQx)
+	.int       L(P2Q3)-L(setPxQx)
+	.int       L(P3Q3)-L(setPxQx)
+	.int       L(P4Q3)-L(setPxQx)
+	.int       L(P5Q3)-L(setPxQx)
+	.int       L(P6Q3)-L(setPxQx)
+	.int       L(P7Q3)-L(setPxQx) 
+
+	.int       L(P0Q4)-L(setPxQx)	/* 32 */
+	.int       L(P1Q4)-L(setPxQx)
+	.int       L(P2Q4)-L(setPxQx)
+	.int       L(P3Q4)-L(setPxQx)
+	.int       L(P4Q4)-L(setPxQx)
+	.int       L(P5Q4)-L(setPxQx)
+	.int       L(P6Q4)-L(setPxQx)
+	.int       L(P7Q4)-L(setPxQx) 
+
+	.int       L(P0Q5)-L(setPxQx)	/* 40 */
+	.int       L(P1Q5)-L(setPxQx)
+	.int       L(P2Q5)-L(setPxQx)
+	.int       L(P3Q5)-L(setPxQx)
+	.int       L(P4Q5)-L(setPxQx)
+	.int       L(P5Q5)-L(setPxQx)
+	.int       L(P6Q5)-L(setPxQx)
+	.int       L(P7Q5)-L(setPxQx) 
+
+	.int       L(P0Q6)-L(setPxQx)	/* 48 */
+	.int       L(P1Q6)-L(setPxQx)
+	.int       L(P2Q6)-L(setPxQx)
+	.int       L(P3Q6)-L(setPxQx)
+	.int       L(P4Q6)-L(setPxQx)
+	.int       L(P5Q6)-L(setPxQx)
+	.int       L(P6Q6)-L(setPxQx)
+	.int       L(P7Q6)-L(setPxQx) 
+
+	.int       L(P0Q7)-L(setPxQx)	/* 56 */
+	.int       L(P1Q7)-L(setPxQx)
+	.int       L(P2Q7)-L(setPxQx)
+	.int       L(P3Q7)-L(setPxQx)
+	.int       L(P4Q7)-L(setPxQx)
+	.int       L(P5Q7)-L(setPxQx)
+	.int       L(P6Q7)-L(setPxQx)
+	.int       L(P7Q7)-L(setPxQx) 
+
+	.int       L(P0Q8)-L(setPxQx)	/* 64 */
+	.int       L(P1Q8)-L(setPxQx)
+	.int       L(P2Q8)-L(setPxQx)
+	.int       L(P3Q8)-L(setPxQx)
+	.int       L(P4Q8)-L(setPxQx)
+	.int       L(P5Q8)-L(setPxQx)
+	.int       L(P6Q8)-L(setPxQx)
+	.int       L(P7Q8)-L(setPxQx)
+
+	.int       L(P0Q9)-L(setPxQx)	/* 72 */
+	.int       L(P1Q9)-L(setPxQx)
+	.int       L(P2Q9)-L(setPxQx)
+	.int       L(P3Q9)-L(setPxQx)
+	.int       L(P4Q9)-L(setPxQx)
+	.int       L(P5Q9)-L(setPxQx)
+	.int       L(P6Q9)-L(setPxQx)
+	.int       L(P7Q9)-L(setPxQx)	/* 79 */
+
+	.p2align 4
+L(P0Q9): mov    %rax, -0x48(%rdi)
+L(P0Q8): mov    %rax, -0x40(%rdi)
+L(P0Q7): mov    %rax, -0x38(%rdi)
+L(P0Q6): mov    %rax, -0x30(%rdi)
+L(P0Q5): mov    %rax, -0x28(%rdi)
+L(P0Q4): mov    %rax, -0x20(%rdi)
+L(P0Q3): mov    %rax, -0x18(%rdi)
+L(P0Q2): mov    %rax, -0x10(%rdi)
+L(P0Q1): mov    %rax, -0x8(%rdi)
+L(P0Q0): 
+	 ret
+
+	.p2align 4
+L(P1Q9): mov    %rax, -0x49(%rdi)
+L(P1Q8): mov    %rax, -0x41(%rdi)
+L(P1Q7): mov    %rax, -0x39(%rdi)
+L(P1Q6): mov    %rax, -0x31(%rdi)
+L(P1Q5): mov    %rax, -0x29(%rdi)
+L(P1Q4): mov    %rax, -0x21(%rdi)
+L(P1Q3): mov    %rax, -0x19(%rdi)
+L(P1Q2): mov    %rax, -0x11(%rdi)
+L(P1Q1): mov    %rax, -0x9(%rdi)
+L(P1Q0): mov    %al, -0x1(%rdi)
+	 ret
+
+	.p2align 4
+L(P2Q9): mov    %rax, -0x4a(%rdi)
+L(P2Q8): mov    %rax, -0x42(%rdi)
+L(P2Q7): mov    %rax, -0x3a(%rdi)
+L(P2Q6): mov    %rax, -0x32(%rdi)
+L(P2Q5): mov    %rax, -0x2a(%rdi)
+L(P2Q4): mov    %rax, -0x22(%rdi)
+L(P2Q3): mov    %rax, -0x1a(%rdi)
+L(P2Q2): mov    %rax, -0x12(%rdi)
+L(P2Q1): mov    %rax, -0xa(%rdi)
+L(P2Q0): mov    %ax, -0x2(%rdi)
+	 ret
+
+	.p2align 4
+L(P3Q9): mov    %rax, -0x4b(%rdi)
+L(P3Q8): mov    %rax, -0x43(%rdi)
+L(P3Q7): mov    %rax, -0x3b(%rdi)
+L(P3Q6): mov    %rax, -0x33(%rdi)
+L(P3Q5): mov    %rax, -0x2b(%rdi)
+L(P3Q4): mov    %rax, -0x23(%rdi)
+L(P3Q3): mov    %rax, -0x1b(%rdi)
+L(P3Q2): mov    %rax, -0x13(%rdi)
+L(P3Q1): mov    %rax, -0xb(%rdi)
+L(P3Q0): mov    %ax, -0x3(%rdi)
+	 mov    %al, -0x1(%rdi)
+	 ret
+
+	.p2align 4
+L(P4Q9): mov    %rax, -0x4c(%rdi)
+L(P4Q8): mov    %rax, -0x44(%rdi)
+L(P4Q7): mov    %rax, -0x3c(%rdi)
+L(P4Q6): mov    %rax, -0x34(%rdi)
+L(P4Q5): mov    %rax, -0x2c(%rdi)
+L(P4Q4): mov    %rax, -0x24(%rdi)
+L(P4Q3): mov    %rax, -0x1c(%rdi)
+L(P4Q2): mov    %rax, -0x14(%rdi)
+L(P4Q1): mov    %rax, -0xc(%rdi)
+L(P4Q0): mov    %eax, -0x4(%rdi)
+	 ret
+
+	.p2align 4
+L(P5Q9): mov    %rax, -0x4d(%rdi)
+L(P5Q8): mov    %rax, -0x45(%rdi)
+L(P5Q7): mov    %rax, -0x3d(%rdi)
+L(P5Q6): mov    %rax, -0x35(%rdi)
+L(P5Q5): mov    %rax, -0x2d(%rdi)
+L(P5Q4): mov    %rax, -0x25(%rdi)
+L(P5Q3): mov    %rax, -0x1d(%rdi)
+L(P5Q2): mov    %rax, -0x15(%rdi)
+L(P5Q1): mov    %rax, -0xd(%rdi)
+L(P5Q0): mov    %eax, -0x5(%rdi)
+	 mov    %al, -0x1(%rdi)
+	 ret
+
+	.p2align 4
+L(P6Q9): mov    %rax, -0x4e(%rdi)
+L(P6Q8): mov    %rax, -0x46(%rdi)
+L(P6Q7): mov    %rax, -0x3e(%rdi)
+L(P6Q6): mov    %rax, -0x36(%rdi)
+L(P6Q5): mov    %rax, -0x2e(%rdi)
+L(P6Q4): mov    %rax, -0x26(%rdi)
+L(P6Q3): mov    %rax, -0x1e(%rdi)
+L(P6Q2): mov    %rax, -0x16(%rdi)
+L(P6Q1): mov    %rax, -0xe(%rdi)
+L(P6Q0): mov    %eax, -0x6(%rdi)
+	 mov    %ax, -0x2(%rdi)
+	 ret
+
+	.p2align 4
+L(P7Q9): mov    %rax, -0x4f(%rdi)
+L(P7Q8): mov    %rax, -0x47(%rdi)
+L(P7Q7): mov    %rax, -0x3f(%rdi)
+L(P7Q6): mov    %rax, -0x37(%rdi)
+L(P7Q5): mov    %rax, -0x2f(%rdi)
+L(P7Q4): mov    %rax, -0x27(%rdi)
+L(P7Q3): mov    %rax, -0x1f(%rdi)
+L(P7Q2): mov    %rax, -0x17(%rdi)
+L(P7Q1): mov    %rax, -0xf(%rdi)
+L(P7Q0): mov    %eax, -0x7(%rdi)
+	 mov    %ax, -0x3(%rdi)
+	 mov    %al, -0x1(%rdi)
+	 ret
+
+	/*
+	 * Align to a 16-byte boundary. Avoids penalties from unaligned stores
+	 * as well as from stores spanning cachelines. Note 16-byte alignment
+	 * is better in case where rep sstosq is used.
+	 */
+	.p2align 4
+L(ck_align):
+	test	$0xf, %rdi
+	jz	L(aligned_now)
+	test	$1, %rdi
+	jz	2f
+	mov	%al, (%rdi)
+	dec	%rsi
+	lea	1(%rdi),%rdi
+2:
+	test	$2, %rdi
+	jz	4f
+	mov	%ax, (%rdi)
+	sub	$2, %rsi
+	lea	2(%rdi),%rdi
+4:
+	test	$4, %rdi
+	jz	8f
+	mov	%eax, (%rdi)
+	sub	$4, %rsi
+	lea	4(%rdi),%rdi
+8:
+	test	$8, %rdi
+	jz	L(aligned_now)
+	mov	%rax, (%rdi)
+	sub	$8, %rsi
+	lea	8(%rdi),%rdi
+
+	/*
+	 * For large sizes rep sstoq is fastest.
+	 * Transition point determined experimentally as measured on
+	 * Intel Xeon processors (incl. Nehalem) and AMD Opteron.
+	 */
+L(aligned_now):
+	cmp	$BZERO_USE_REP, %rsi
+	jg	L(use_rep)
+
+	/*
+	 * zero 64-bytes per loop
+	 */
+	.p2align 4
+L(bzero_loop):
+	leaq	-0x40(%rsi), %rsi
+	cmpq	$0x40, %rsi
+	movq	%rax, (%rdi) 
+	movq	%rax, 0x8(%rdi) 
+	movq	%rax, 0x10(%rdi) 
+	movq	%rax, 0x18(%rdi) 
+	movq	%rax, 0x20(%rdi) 
+	movq	%rax, 0x28(%rdi) 
+	movq	%rax, 0x30(%rdi) 
+	movq	%rax, 0x38(%rdi) 
+	leaq	0x40(%rdi), %rdi
+	jge	L(bzero_loop)
+
+	/*
+	 * Clear any remaining bytes..
+	 */
+9:
+	leaq	L(setPxQx)(%rip), %r10
+	addq	%rsi, %rdi
+	movslq	(%r10,%rsi,4), %rcx
+	leaq	(%rcx,%r10,1), %r10
+	jmpq	*%r10
+
+	/*
+	 * Use rep sstoq. Clear any remainder via unrolled code
+	 */
+	.p2align 4
+L(use_rep):
 	movq	%rsi, %rcx		/* get size in bytes */
 	shrq	$3, %rcx		/* count of 8-byte words to zero */
-	xorl	%eax, %eax		/* clear %rax; used in sstoq / sstob */
 	rep
 	  sstoq				/* %rcx = words to clear (%rax=0) */
-
-	movq	%rsi, %rcx
-	andq	$7, %rcx		/* bytes left over */
-	rep
-	  sstob				/* %rcx = residual bytes to clear */
+	andq	$7, %rsi		/* remaining bytes */
+	jnz	9b
 	ret
+#undef	L
+	SET_SIZE(bzero_altentry)
 	SET_SIZE(bzero)
 
 #elif defined(__i386)

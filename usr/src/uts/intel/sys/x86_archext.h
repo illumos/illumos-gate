@@ -624,6 +624,12 @@ extern	char _tsc_lfence_start;
 extern	char _tsc_lfence_end;
 #endif
 
+#if !defined(__xpv)
+extern	char bcopy_patch_start;
+extern	char bcopy_patch_end;
+extern	char bcopy_ck_size;
+#endif
+
 extern uint_t workaround_errata(struct cpu *);
 
 #if defined(OPTERON_ERRATUM_93)
