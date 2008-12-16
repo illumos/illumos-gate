@@ -20,11 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#From: "@(#)Install	1.56	96/10/11 SMI"
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Author:  Jeff Bonwick
 #
@@ -767,7 +764,6 @@ okexit() {
 RCOPTS=""
 LIBCREATE="no"
 LIBSRC=""
-PFLAG=0
 ENV_PATH=$CODEMGR_WS
 OBJD="debug"
 KMDB="yes"
@@ -794,8 +790,7 @@ do
 	    D)	INSTALL_LIB="$OPTARG";;
 	    d)	INSTALL_DIR="$OPTARG/$TRAILER";;
 	    G)	GLOM=yes; GLOMNAME="$OPTARG";;
-	  X|x)	echo "-$opt is obsolete; ignored";;
-	    P)	PFLAG=1;;
+	P|X|x)	echo "-$opt is obsolete; ignored";;
 	    h)	usage "${INSTALL}: installs unix and modules";;
 	    R)	x=$OPTIND; restore_state; OPTIND=$x;;
 	    i)	IMPL="$OPTARG";;
