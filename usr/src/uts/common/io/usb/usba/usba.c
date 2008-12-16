@@ -63,7 +63,8 @@ uint_t usba_ugen_force_binding;
 /*
  * compatible name handling
  */
-#define	USBA_MAX_COMPAT_NAMES		15
+/* allowing for 15 compat names, plus one force bind name */
+#define	USBA_MAX_COMPAT_NAMES		16
 #define	USBA_MAX_COMPAT_NAME_LEN	64
 
 /* double linked list for usba_devices */

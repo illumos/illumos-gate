@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef __LINUX_VIDEODEV2_H
 #define	__LINUX_VIDEODEV2_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -724,6 +723,13 @@ typedef uint64_t v4l2_std_id;
 #define	V4L2_STD_ALL		(V4L2_STD_525_60	|\
 				V4L2_STD_625_50)
 
+/*
+ * On amd64, use pack(4) to make structures match the x86 alignment rules.
+ */
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack(4)
+#endif
+
 struct v4l2_standard
 {
 	uint32_t		index;
@@ -733,6 +739,10 @@ struct v4l2_standard
 	uint32_t		framelines;
 	uint32_t		reserved[4];
 };
+
+#if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
+#pragma pack()
+#endif
 
 /*
  *	V I D E O   I N P U T S
