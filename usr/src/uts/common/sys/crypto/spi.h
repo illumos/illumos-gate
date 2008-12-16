@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_CRYPTO_SPI_H
 #define	_SYS_CRYPTO_SPI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * CSPI: Cryptographic Service Provider Interface.
@@ -718,6 +716,10 @@ typedef struct crypto_provider_info {
  * on maximum input data that it can digest.
  */
 #define	CRYPTO_HASH_NO_UPDATE		0x00000002
+
+/* provider can handle the request without returning a CRYPTO_QUEUED */
+#define	CRYPTO_SYNCHRONOUS		0x00000004
+
 #define	CRYPTO_PIFLAGS_RESERVED2	0x40000000
 #define	CRYPTO_PIFLAGS_RESERVED1	0x80000000
 

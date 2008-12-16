@@ -631,6 +631,24 @@ kcf_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 			break;
 
 		case CRYPTO_HW_PROVIDER:
+			/*
+			 * Special case for CRYPTO_SYNCHRONOUS providers that
+			 * never return a CRYPTO_QUEUED error. We skip any
+			 * request allocation and call the SPI directly.
+			 */
+			if ((pd->pd_flags & CRYPTO_SYNCHRONOUS) &&
+			    EMPTY_TASKQ(taskq)) {
+				KCF_PROV_IREFHOLD(pd);
+				if (pd->pd_state == KCF_PROV_READY) {
+					error = common_submit_request(pd, ctx,
+					    params, KCF_RHNDL(KM_SLEEP));
+					KCF_PROV_IREFRELE(pd);
+					ASSERT(error != CRYPTO_QUEUED);
+					break;
+				}
+				KCF_PROV_IREFRELE(pd);
+			}
+
 			sreq = kmem_cache_alloc(kcf_sreq_cache, KM_SLEEP);
 			sreq->sn_state = REQ_ALLOCATED;
 			sreq->sn_rv = CRYPTO_FAILED;

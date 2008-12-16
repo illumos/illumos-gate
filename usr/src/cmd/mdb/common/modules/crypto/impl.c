@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * mdb dcmds for selected structures from
@@ -122,8 +120,8 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (mdb_vread(&desc, sizeof (kcf_provider_desc_t), (uintptr_t)ptr)
 	    == -1) {
-		    mdb_warn("cannot read at address %p", (uintptr_t)ptr);
-		    return (DCMD_ERR);
+		mdb_warn("cannot read at address %p", (uintptr_t)ptr);
+		return (DCMD_ERR);
 	}
 	mdb_printf("%<b>kcf_provider_desc at %p%</b>\n", ptr);
 
@@ -147,10 +145,10 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (desc.pd_description == NULL)
 		mdb_printf("pd_description:\t\tNULL\n");
 	else if (mdb_readstr(string, MAXNAMELEN + 1,
-		    (uintptr_t)desc.pd_description) == -1) {
+	    (uintptr_t)desc.pd_description) == -1) {
 		mdb_warn("cannot read %p", desc.pd_description);
 	} else
-	    mdb_printf("pd_description:\t\t%s\n", string);
+		mdb_printf("pd_description:\t\t%s\n", string);
 
 	mdb_printf("pd_ops_vector:\t\t%p\n", desc.pd_ops_vector);
 	mdb_printf("pd_mech_list_count:\t%u\n", desc.pd_mech_list_count);
@@ -159,19 +157,19 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	for (i = 0; i < desc.pd_mech_list_count; i++) {
 		mech_pointer = desc.pd_mechanisms + i;
 		mdb_call_dcmd("crypto_mech_info",
-			(uintptr_t)mech_pointer, DCMD_ADDRSPEC, 0, NULL);
+		    (uintptr_t)mech_pointer, DCMD_ADDRSPEC, 0, NULL);
 	}
 	mdb_dec_indent(4);
 	mdb_printf("pd_mech_indx:\n");
 	mdb_inc_indent(8);
 	for (i = 0; i < KCF_OPS_CLASSSIZE; i++) {
-	    for (j = 0; j < KCF_MAXMECHTAB; j++) {
-		if (desc.pd_mech_indx[i][j] == KCF_INVALID_INDX)
-			mdb_printf("N ");
-		else
-			mdb_printf("%u ", desc.pd_mech_indx[i][j]);
-	    }
-	    mdb_printf("\n");
+		for (j = 0; j < KCF_MAXMECHTAB; j++) {
+			if (desc.pd_mech_indx[i][j] == KCF_INVALID_INDX)
+				mdb_printf("N ");
+			else
+				mdb_printf("%u ", desc.pd_mech_indx[i][j]);
+		}
+		mdb_printf("\n");
 	}
 	mdb_dec_indent(8);
 	mdb_printf("pd_ks_data.ps_ops_total:\n", desc.pd_ks_data.ps_ops_total);
@@ -197,12 +195,12 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("pd_refcnt:\t\t%u\n", desc.pd_refcnt);
 	if (desc.pd_name == NULL)
-	    mdb_printf("pd_name:\t\t NULL\n");
+		mdb_printf("pd_name:\t\t NULL\n");
 	else if (mdb_readstr(string, MAXNAMELEN + 1, (uintptr_t)desc.pd_name)
-		== -1)
+	    == -1)
 		mdb_warn("could not read pd_name from %X\n", desc.pd_name);
 	else
-	    mdb_printf("pd_name:\t\t%s\n", string);
+		mdb_printf("pd_name:\t\t%s\n", string);
 
 	mdb_printf("pd_instance:\t\t%u\n", desc.pd_instance);
 	mdb_printf("pd_module_id:\t\t%d\n", desc.pd_module_id);
@@ -217,15 +215,17 @@ kcf_provider_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	mdb_printf("pd_resume_cv:\t\t%hd\n", desc.pd_resume_cv._opaque);
 	mdb_printf("pd_remove_cv:\t\t%hd\n", desc.pd_remove_cv._opaque);
-	mdb_printf("pd_flags:\t\t%s %s %s %s\n",
+	mdb_printf("pd_flags:\t\t%s %s %s %s %s\n",
 	    (desc.pd_flags & CRYPTO_HIDE_PROVIDER) ?
-		"CRYPTO_HIDE_PROVIDER" : " ",
+	    "CRYPTO_HIDE_PROVIDER" : " ",
 	    (desc.pd_flags & CRYPTO_HASH_NO_UPDATE) ?
-		"CRYPTO_HASH_NO_UPDATE" : " ",
+	    "CRYPTO_HASH_NO_UPDATE" : " ",
+	    (desc.pd_flags & CRYPTO_SYNCHRONOUS) ?
+	    "CRYPTO_SYNCHRONOUS" : " ",
 	    (desc.pd_flags & KCF_LPROV_MEMBER) ?
-		"KCF_LPROV_MEMBER" : " ",
+	    "KCF_LPROV_MEMBER" : " ",
 	    (desc.pd_flags & KCF_PROV_RESTRICTED) ?
-		"KCF_PROV_RESTRICTED" : " ");
+	    "KCF_PROV_RESTRICTED" : " ");
 	if (desc.pd_flags & CRYPTO_HASH_NO_UPDATE)
 		mdb_printf("pd_hash_limit:\t\t%u\n", desc.pd_hash_limit);
 	mdb_printf("pd_provider_list:\t%p\n", desc.pd_provider_list);
@@ -278,8 +278,8 @@ prov_tab(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		/* save space, only print range for long list of nulls */
 		if (tab[i] == NULL) {
 			if (gotzero == GOT_NONE) {
-			    mdb_printf("prov_tab[%d", i);
-			    gotzero = i;
+				mdb_printf("prov_tab[%d", i);
+				gotzero = i;
 			}
 		} else {
 			/* first non-null in awhile, print index of prev null */
@@ -363,8 +363,8 @@ policy_tab(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		/* save space, only print range for long list of nulls */
 		if (tab[i] == NULL) {
 			if (gotzero == GOT_NONE) {
-			    mdb_printf("policy_tab[%d", i);
-			    gotzero = i;
+				mdb_printf("policy_tab[%d", i);
+				gotzero = i;
 			}
 		} else {
 			/* first non-null in awhile, print index of prev null */
@@ -422,11 +422,11 @@ prt_soft_conf_entry(kcf_soft_conf_entry_t *addr, kcf_soft_conf_entry_t *entry,
 	mdb_printf("ce_next: %p", entry->ce_next);
 
 	if (entry->ce_name == NULL)
-		    mdb_printf("\tce_name: NULL\n");
+		mdb_printf("\tce_name: NULL\n");
 	else if (mdb_readstr(name, MAXNAMELEN, (uintptr_t)entry->ce_name)
-		    == -1)
+	    == -1)
 		mdb_printf("could not read ce_name from %p\n",
-			entry->ce_name);
+		    entry->ce_name);
 	else
 		mdb_printf("\tce_name: %s\n", name);
 
@@ -465,7 +465,7 @@ soft_conf_walk_step(mdb_walk_state_t *wsp)
 		return (WALK_DONE);
 #ifdef DEBUG
 	else
-	    mdb_printf("DEBUG: wsp->walk_addr == %p\n", wsp->walk_addr);
+		mdb_printf("DEBUG: wsp->walk_addr == %p\n", wsp->walk_addr);
 #endif
 
 	if (mdb_vread(wsp->walk_data, sizeof (kcf_soft_conf_entry_t),
@@ -510,9 +510,9 @@ kcf_soft_conf_entry(uintptr_t addr, uint_t flags, int argc,
 		else
 			ptr = (kcf_soft_conf_entry_t *)addr;
 	} else if (mdb_readsym(&ptr, sizeof (void *), "soft_config_list")
-		    == -1) {
-			mdb_warn("cannot read soft_config_list");
-			return (DCMD_ERR);
+	    == -1) {
+		mdb_warn("cannot read soft_config_list");
+		return (DCMD_ERR);
 	} else
 		mdb_printf("soft_config_list = %p\n", ptr);
 
@@ -521,8 +521,8 @@ kcf_soft_conf_entry(uintptr_t addr, uint_t flags, int argc,
 
 	if (mdb_vread(&entry, sizeof (kcf_soft_conf_entry_t), (uintptr_t)ptr)
 	    == -1) {
-		    mdb_warn("cannot read at address %p", (uintptr_t)ptr);
-		    return (DCMD_ERR);
+		mdb_warn("cannot read at address %p", (uintptr_t)ptr);
+		return (DCMD_ERR);
 	}
 
 	/* this could change in the future to have more than one ret val */
@@ -548,8 +548,8 @@ kcf_policy_desc(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 	mdb_printf("pd_prov_type:  %s",
-	    desc.pd_prov_type == CRYPTO_HW_PROVIDER ? "CRYPTO_HW_PROVIDER"
-		: "CRYPTO_SW_PROVIDER");
+	    desc.pd_prov_type == CRYPTO_HW_PROVIDER ? "CRYPTO_HW_PROVIDER" :
+	    "CRYPTO_SW_PROVIDER");
 
 	if (desc.pd_name == NULL)
 		mdb_printf("\tpd_name: NULL\n");

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file is part of the core Kernel Cryptographic Framework.
@@ -53,7 +51,6 @@ int crypto_taskq_threads = CRYPTO_TASKQ_THREADS;
 int crypto_taskq_minalloc = CYRPTO_TASKQ_MIN;
 int crypto_taskq_maxalloc = CRYPTO_TASKQ_MAX;
 
-static void free_provider_list(kcf_provider_list_t *);
 static void remove_provider(kcf_provider_desc_t *);
 static void process_logical_providers(crypto_provider_info_t *,
     kcf_provider_desc_t *);
@@ -589,6 +586,9 @@ crypto_op_notification(crypto_req_handle_t handle, int error)
 {
 	kcf_call_type_t ctype;
 
+	if (handle == NULL)
+		return;
+
 	if ((ctype = GET_REQ_TYPE(handle)) == CRYPTO_SYNCH) {
 		kcf_sreq_node_t *sreq = (kcf_sreq_node_t *)handle;
 
@@ -715,7 +715,8 @@ init_prov_mechs(crypto_provider_info_t *info, kcf_provider_desc_t *desc)
 			}
 		}
 
-		if (kcf_add_mech_provider(mech_idx, desc, &pmd) != KCF_SUCCESS)
+		if ((err = kcf_add_mech_provider(mech_idx, desc, &pmd)) !=
+		    KCF_SUCCESS)
 			break;
 
 		if (pmd == NULL)
