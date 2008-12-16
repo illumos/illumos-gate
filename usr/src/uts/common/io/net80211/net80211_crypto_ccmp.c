@@ -35,8 +35,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * IEEE 802.11i CCMP crypto support.
  */
@@ -423,7 +421,6 @@ ccmp_encrypt(struct ieee80211_key *key, mblk_t *mp, int hdrlen)
 	uint8_t aad[2 * AES_BLOCK_LEN], b0[AES_BLOCK_LEN];
 	uint8_t *pos;
 	CK_AES_CCM_PARAMS cmparam;
-	uint8_t buf[IEEE80211_MAX_LEN];
 
 	wh = (struct ieee80211_frame *)mp->b_rptr;
 	data_len = MBLKL(mp) - (hdrlen + ccmp.ic_header);
@@ -440,9 +437,8 @@ ccmp_encrypt(struct ieee80211_key *key, mblk_t *mp, int hdrlen)
 
 	rv = aes_ccm_encrypt(&cmparam,
 	    key->wk_key, key->wk_keylen,
-	    pos, data_len, buf, data_len + IEEE80211_WEP_MICLEN);
+	    pos, data_len, pos, data_len + IEEE80211_WEP_MICLEN);
 
-	bcopy(buf, pos, data_len + IEEE80211_WEP_MICLEN);
 	mp->b_wptr += ccmp.ic_trailer;
 
 	return ((rv == CRYPTO_SUCCESS)? 1 : 0);
@@ -456,7 +452,6 @@ ccmp_decrypt(struct ieee80211_key *key, uint64_t pn, mblk_t *mp, int hdrlen)
 	uint8_t aad[2 * AES_BLOCK_LEN], b0[AES_BLOCK_LEN];
 	uint8_t *pos;
 	CK_AES_CCM_PARAMS cmparam;
-	uint8_t buf[IEEE80211_MAX_LEN];
 
 	wh = (struct ieee80211_frame *)mp->b_rptr;
 	data_len = MBLKL(mp) - (hdrlen + ccmp.ic_header);
@@ -472,8 +467,7 @@ ccmp_decrypt(struct ieee80211_key *key, uint64_t pn, mblk_t *mp, int hdrlen)
 	cmparam.authData = &aad[2]; /* A */
 
 	rv = aes_ccm_decrypt(&cmparam,
-	    key->wk_key, key->wk_keylen, pos, data_len, buf, data_len);
-	bcopy(buf, pos, data_len);
+	    key->wk_key, key->wk_keylen, pos, data_len, pos, data_len);
 
 	return ((rv == CRYPTO_SUCCESS)? 1 : 0);
 }
