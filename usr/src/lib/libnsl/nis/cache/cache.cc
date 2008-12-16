@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include <stdio.h>
@@ -1030,7 +1029,7 @@ NisCache::writePreference(FILE *fp)
 
 
 void
-NisCache::mergeOption(char *value)
+NisCache::mergeOption(const char *value)
 {
 	if (value && *value) {
 		if (strcasecmp(value, PREF_ALL) == 0) {

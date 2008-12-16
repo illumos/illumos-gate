@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY	=	libsocket.a
@@ -51,6 +50,10 @@ SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 MAPFILES +=	mapfile-vers
+
+# Make string literals read-only to save memory.
+CFLAGS +=	$(XSTRCONST)
+CFLAGS64 +=	$(XSTRCONST)
 
 CPPFLAGS +=	-DSYSV -D_REENTRANT -I../../common/inc
 %/rcmd.o :=	CPPFLAGS += -DNIS

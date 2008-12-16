@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Ported from SCCS version :
@@ -76,7 +75,7 @@ extern "C" void prime_pkey_cache(directory_obj *);
 
 static
 bool_t
-readColdStartFile(char *fileName, directory_obj *dobj, int prime)
+readColdStartFile(const char *fileName, directory_obj *dobj, int prime)
 {
 	FILE 		*fp;
 	XDR 		xdrs;
@@ -110,7 +109,7 @@ readColdStartFile(char *fileName, directory_obj *dobj, int prime)
  *  Read coldstart file and prime public key cache.
  */
 bool_t
-readColdStartFile(char *fileName, directory_obj *dobj)
+readColdStartFile(const char *fileName, directory_obj *dobj)
 {
 	return (readColdStartFile(fileName, dobj, 1));
 }
@@ -121,7 +120,7 @@ readColdStartFile(char *fileName, directory_obj *dobj)
  */
 static
 bool_t
-loadColdStartFile(char *fileName, directory_obj *dobj)
+loadColdStartFile(const char *fileName, directory_obj *dobj)
 {
 	return (readColdStartFile(fileName, dobj, 0));
 }
@@ -135,7 +134,7 @@ loadColdStartFile(char *fileName, directory_obj *dobj)
  */
 
 bool_t
-__nis_writeColdStartFile(char *fileName, directory_obj *dobj)
+__nis_writeColdStartFile(const char *fileName, directory_obj *dobj)
 {
 	FILE 		*fp;
 	int 		fd;

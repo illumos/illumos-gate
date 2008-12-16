@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY= libnsl.a
@@ -204,6 +203,13 @@ CPPFLAGS +=	-I$(SRC)/lib/common/inc -I$(SRC)/lib/libnsl/include -D_REENTRANT
 CPPFLAGS +=	-I$(SRC)/lib/libnsl/dial
 
 CFLAGS +=	$(CCVERBOSE)
+
+# Make string literals read-only to save memory.
+CFLAGS +=	$(XSTRCONST)
+CFLAGS64 +=	$(XSTRCONST)
+CCFLAGS +=	-_CC=-features=conststrings
+CCFLAGS64 +=	-_CC=-features=conststrings
+
 LIBMP =		-lmp
 lint :=		LIBMP =
 LDLIBS +=	$(LIBMP) -lmd -lscf -lc
