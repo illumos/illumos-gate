@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include "base_conversion.h"
 
@@ -148,7 +146,7 @@ __qaconvert(long double *arg, int ndigits, int *exp, int *sign, char *buf)
 
 	a.q = *arg;
 	*sign = a.i[0] >> 31;
-	ha = a.i[0] & ~0x80000000;
+	ha = a.i[0] &= ~0x80000000;
 
 	/* check for infinity or nan */
 	if (ha >= 0x7fff0000) {
@@ -195,7 +193,7 @@ __qaconvert(long double *arg, int ndigits, int *exp, int *sign, char *buf)
 		 * integer arithmetic.  Explicitly raise the inexact
 		 * exception if anything is rounded off.
 		 */
-		a.i[0] &= 0xffff;
+		a.i[0] = (a.i[0] & 0xffff) | 0x10000;
 		if (ndigits <= 5) {
 			/*
 			 * i and b are the index and bit position in a.i[]
@@ -253,7 +251,7 @@ __qaconvert(long double *arg, int ndigits, int *exp, int *sign, char *buf)
 				a.i[i] += b;
 				while (a.i[i] == 0)
 					a.i[--i]++;
-				if (a.i[0] >= 0x10000)
+				if (a.i[0] >= 0x20000)
 					(*exp)++;
 			}
 		}

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Conversion from binary to decimal floating point
  */
@@ -546,15 +544,16 @@ single_to_decimal(single *px, decimal_mode *pm, decimal_record *pd,
 			*ps = 0;
 			return;
 		} else {
-#if defined(__sparc)
+#if defined(__sparc) || defined(__amd64)
 			int	i;
 
 			pd->fpclass = fp_subnormal;
 			/*
-			 * On SPARC, simply converting *px to double
-			 * can flush a subnormal value to zero when
-			 * nonstandard mode is enabled, so we have
-			 * to go through all this nonsense instead.
+			 * On SPARC when nonstandard mode is enabled,
+			 * or on x64 when FTZ mode is enabled, simply
+			 * converting *px to double can flush a sub-
+			 * normal value to zero, so we have to go
+			 * through all this nonsense instead.
 			 */
 			i = *(int *)px;
 			x = (double)(i & ~0x80000000);

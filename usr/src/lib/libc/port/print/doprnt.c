@@ -2087,6 +2087,7 @@ wide_S:
 			}
 			inf_nan = 0;
 			inf_nan_mixed_case = 0;
+			flagword &= ~PADZERO; /* ignore 0 flag */
 		}
 
 		/* Calculate number of padding blanks */
