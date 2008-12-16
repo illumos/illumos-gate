@@ -3681,7 +3681,8 @@ st_close(dev_t dev, int flag, int otyp, cred_t *cred_p)
 	 * behaviour.
 	 */
 	if ((un->un_rsvd_status &
-	    (ST_RESERVE | ST_PRESERVE_RESERVE)) == ST_RESERVE) {
+	    (ST_RESERVE | ST_PRESERVE_RESERVE |
+	    ST_APPLICATION_RESERVATIONS)) == ST_RESERVE) {
 		(void) st_reserve_release(un, ST_RELEASE, st_uscsi_cmd);
 	}
 error_out:
