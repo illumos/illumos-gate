@@ -546,7 +546,7 @@ getNodeProps(IMA_NODE_PROPERTIES *nodeProps)
 static int
 sunInitiatorFind(IMA_OID *oid)
 {
-	IMA_OID_LIST *lhbaList;
+	IMA_OID_LIST *lhbaList = NULL;
 
 	IMA_STATUS status = IMA_GetLhbaOidList(&lhbaList);
 	if (!IMA_SUCCESS(status)) {
@@ -554,7 +554,15 @@ sunInitiatorFind(IMA_OID *oid)
 		return (-1);
 	}
 
+	if ((lhbaList == NULL) || (lhbaList->oidCount == 0)) {
+		printLibError(IMA_ERROR_OBJECT_NOT_FOUND);
+		if (lhbaList != NULL)
+			(void) IMA_FreeMemory(lhbaList);
+		return (-1);
+	}
+
 	*oid = lhbaList->oids[0];
+	(void) IMA_FreeMemory(lhbaList);
 
 	return (0);
 }
@@ -3608,12 +3616,9 @@ modifyNode(cmdOptions_t *options, int *funcRet)
 
 	/* Find Sun initiator */
 	ret = sunInitiatorFind(&oid);
-	if (ret > 0) {
+	if (ret != 0) {
 		(void) fprintf(stderr, "%s: %s\n",
 		    cmdName, gettext("no initiator found"));
-	}
-
-	if (ret != 0) {
 		return (ret);
 	}
 

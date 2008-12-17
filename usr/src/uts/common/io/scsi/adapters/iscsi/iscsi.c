@@ -2279,6 +2279,11 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				    iscsi_targetparam_get_name(chap->c_oid);
 			}
 
+			if (name == NULL) {
+				rw_exit(&ihp->hba_sess_list_rwlock);
+				rtn = EFAULT;
+				break;
+			}
 			/*
 			 * Initialize the target-side chap name to the
 			 * session name if no chap settings have been
@@ -3453,7 +3458,10 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			}
 		}
 
-		if (persistent_auth_set((char *)name, auth) == B_FALSE) {
+		if (name == NULL) {
+			rtn = EFAULT;
+		} else if (persistent_auth_set((char *)name, auth)
+		    == B_FALSE) {
 			rtn = EIO;
 		}
 

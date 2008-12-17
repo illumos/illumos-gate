@@ -848,8 +848,10 @@ iscsi_set_params(iscsi_param_set_t *ils, iscsi_hba_t *ihp, boolean_t persist)
 		} else {
 			/* session */
 			name = iscsi_targetparam_get_name(ils->s_oid);
+			if (name == NULL)
+				rtn = EFAULT;
 
-			if (persist) {
+			if (persist && (rtn == 0)) {
 				boolean_t		rval;
 				persistent_param_t	*pp;
 
@@ -926,7 +928,7 @@ mutex_exit(&isp->sess_state_mutex);
 		 * sessions that don't already have the parameter
 		 * overriden
 		 */
-		if (ils->s_oid == ihp->hba_oid) {
+		if ((ils->s_oid == ihp->hba_oid) && (rtn == 0)) {
 			ilg = (iscsi_param_get_t *)
 			    kmem_alloc(sizeof (*ilg), KM_SLEEP);
 
