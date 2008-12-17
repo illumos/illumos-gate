@@ -1417,13 +1417,15 @@ mc_scrubber_enable(mc_t *mc)
 #ifdef	OPTERON_ERRATUM_99
 	/*
 	 * This erratum applies on revisions D and earlier.
+	 * This erratum also applies on revisions E and later,
+	 * if BIOS uses chip-select hoisting instead of DRAM hole
+	 * mapping.
 	 *
-	 * Do not enable the dram scrubber is the chip-select ranges
+	 * Do not enable the dram scrubber if the chip-select ranges
 	 * for the node are not contiguous.
 	 */
 	if (mc_scrub_rate_dram != AMD_NB_SCRUBCTL_RATE_NONE &&
-	    mc->mc_csdiscontig &&
-	    !X86_CHIPREV_ATLEAST(rev, X86_CHIPREV_AMD_F_REV_E)) {
+	    mc->mc_csdiscontig)
 		cmn_err(CE_CONT, "?Opteron DRAM scrubber disabled on revision "
 		    "%s chip %d because DRAM hole is present on this node",
 		    mc->mc_revname, chipid);
