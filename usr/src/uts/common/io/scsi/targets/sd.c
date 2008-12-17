@@ -10283,6 +10283,8 @@ sd_ready_and_valid(sd_ssc_t *ssc, int part)
 	if (un->un_f_format_in_progress == FALSE) {
 		mutex_exit(SD_MUTEX(un));
 
+		(void) cmlb_validate(un->un_cmlbhandle, 0,
+		    (void *)SD_PATH_DIRECT);
 		if (cmlb_partinfo(un->un_cmlbhandle, part, NULL, NULL, NULL,
 		    NULL, (void *) SD_PATH_DIRECT) != 0) {
 			rval = SD_NOT_READY_VALID;
