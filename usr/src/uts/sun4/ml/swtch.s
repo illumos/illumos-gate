@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
  
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Process switching routines.
  */
@@ -526,7 +524,29 @@ resume_from_intr(kthread_id_t t)
 
 	ENTRY(resume_from_intr)
 	save	%sp, -SA(MINFRAME), %sp		! save ins and locals
-					
+
+	!
+	! We read in the fprs and call fp_save if FPRS_FEF is set
+	! to save the floating-point state if fprs has been
+	! modified by operations such as hw bcopy or fp_disabled.
+	! This is to resolve an issue where an interrupting thread
+	! doesn't retain their floating-point registers when
+	! switching out of the interrupt context.
+	!
+	rd	%fprs, %g4
+	ldn	[THREAD_REG + T_STACK], %i2
+	andcc	%g4, FPRS_FEF, %g0		! is FPRS_FEF set
+	bz,pt	%icc, 4f
+	  st	%g4, [%i2 + SA(MINFRAME) + FPU_FPRS]	! save fprs
+
+	! save kernel fp state in stack
+	add	%i2, SA(MINFRAME), %o0		! %o0 = kfpu_t ptr
+	rd	%gsr, %g5
+	call fp_save
+	stx	%g5, [%o0 + FPU_GSR]		! store GSR
+
+4:
+
 	flushw					! flushes all but this window
 	stn	%fp, [THREAD_REG + T_SP]	! delay - save sp
 	stn	%i7, [THREAD_REG + T_PC]	! save return address
