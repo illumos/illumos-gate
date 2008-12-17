@@ -381,6 +381,18 @@ MM_MSG(MM_5109_MSG, gettext("Administrator privilege client may not modify " \
 MM_MSG(MM_5110_MSG, gettext("No solutions to this begin-end group, " \
 	"one or more mounts cannot complete - $err_text$"))
 
+#define	MM_5111_MSG 5111
+MM_MSG(MM_5111_MSG, gettext("The following libraries must be offline to be " \
+	"deleted: $liblist$"))
+
+#define	MM_5112_MSG 5112
+MM_MSG(MM_5112_MSG, gettext("Library delete failed, cartridge(s) exist that " \
+	"are dependent on this library"))
+
+#define	MM_5113_MSG 5113
+MM_MSG(MM_5113_MSG, gettext("Library delete failed, drive(s) exist that " \
+	"are dependent on this library"))
+
 #ifdef	__cplusplus
 }
 #endif

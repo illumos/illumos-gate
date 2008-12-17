@@ -701,6 +701,7 @@ mms_sym_t	mms_sym_tab[] = {
 	"EDRIVEOFFLINE", ERROR_CODE,
 	"ELIBRARYONLINE", ERROR_CODE,
 	"ELIBRARYOFFLINE", ERROR_CODE,
+	"ELIBRARYDEPENDS", ERROR_CODE,
 #endif
 	/*
 	 * These are error classes
