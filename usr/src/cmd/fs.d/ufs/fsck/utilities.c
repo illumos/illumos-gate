@@ -265,7 +265,7 @@ unbufinit(void)
 
 	if (bufhead.b_size != cnt)
 		errexit("Panic: cache lost %d buffers\n",
-			bufhead.b_size - cnt);
+		    bufhead.b_size - cnt);
 }
 
 /*
@@ -564,8 +564,8 @@ allocblk(int wantedfrags)
 	if (wantedfrags <= 0 || wantedfrags > sblock.fs_frag) {
 		exitstat = EXERRFATAL;
 		errexit("allocblk() asked for %d frags.  "
-			"Legal range is 1 to %d",
-			wantedfrags, sblock.fs_frag);
+		    "Legal range is 1 to %d",
+		    wantedfrags, sblock.fs_frag);
 	}
 
 	/*
@@ -898,7 +898,7 @@ verrexit(caddr_t fmt, va_list ap)
 	if (!recursing) {
 		recursing = 1;
 		if (errorlocked || iscorrupt) {
-			if (havesb) {
+			if (havesb && fswritefd > 0) {
 				sblock.fs_clean = FSBAD;
 				sblock.fs_state = FSOKAY - (long)sblock.fs_time;
 				sblock.fs_state = -sblock.fs_state;
@@ -944,7 +944,7 @@ vpfatal(caddr_t fmt, va_list ap)
 		(void) printf(
 		    "%s: UNEXPECTED INCONSISTENCY; RUN fsck MANUALLY.\n",
 		    devname);
-		if (havesb) {
+		if (havesb && fswritefd > 0) {
 			sblock.fs_clean = FSBAD;
 			sblock.fs_state = -(FSOKAY - (long)sblock.fs_time);
 			sbdirty();
@@ -1070,7 +1070,7 @@ mounted(caddr_t name, caddr_t devstr, size_t str_size)
 		mount_point = strdup(mntent->mnt_mountp);
 		if (mount_point == NULL) {
 			errexit("fsck: memory allocation failure: %s",
-				strerror(errno));
+			    strerror(errno));
 			/* NOTREACHED */
 		}
 
@@ -1464,10 +1464,10 @@ is_errorlocked(caddr_t fs)
 
 	if (elock_combuf == NULL)
 		elock_combuf =
-			(caddr_t)calloc(LOCKFS_MAXCOMMENTLEN, sizeof (char));
+		    (caddr_t)calloc(LOCKFS_MAXCOMMENTLEN, sizeof (char));
 	else
 		elock_combuf =
-			(caddr_t)realloc(elock_combuf, LOCKFS_MAXCOMMENTLEN);
+		    (caddr_t)realloc(elock_combuf, LOCKFS_MAXCOMMENTLEN);
 
 	if (elock_combuf == NULL)
 		goto out;
@@ -1591,8 +1591,8 @@ do_errorlock(int lock_type)
 
 	if (elock_combuf == NULL)
 		errexit("do_errorlock(%s, %d): unallocated elock_combuf\n",
-			elock_mountp ? elock_mountp : "<null>",
-			lock_type);
+		    elock_mountp ? elock_mountp : "<null>",
+		    lock_type);
 
 	if ((buf = (caddr_t)calloc(LOCKFS_MAXCOMMENTLEN, sizeof (char))) ==
 	    NULL) {
@@ -1600,7 +1600,7 @@ do_errorlock(int lock_type)
 	}
 	if (lfp == NULL) {
 		errexit("do_errorlock(%s, %d): lockfs status unallocated\n",
-					elock_mountp, lock_type);
+		    elock_mountp, lock_type);
 	}
 
 	(void) memmove((void *)buf, (void *)elock_combuf,
@@ -2067,7 +2067,7 @@ cg_constants(int cgno, daddr32_t *btotoff, daddr32_t *boff,
 	*iusedoff = *boff + sblock.fs_cpg * sblock.fs_nrpos * sizeof (int16_t);
 	*freeoff = *iusedoff + howmany(sblock.fs_ipg, NBBY);
 	*nextfreeoff = *freeoff +
-		howmany(sblock.fs_cpg * sblock.fs_spc / NSPF(&sblock), NBBY);
+	    howmany(sblock.fs_cpg * sblock.fs_spc / NSPF(&sblock), NBBY);
 	*ndblk = dmax - cbase;
 }
 
@@ -2092,7 +2092,7 @@ fix_cg(struct cg *cgp, int cgno)
 	if ((cgp->cg_ncyl < 1) || (cgp->cg_ncyl > sblock.fs_cpg)) {
 		if (cgno == (sblock.fs_ncg - 1)) {
 			cgp->cg_ncyl = sblock.fs_ncyl -
-				(sblock.fs_cpg * cgno);
+			    (sblock.fs_cpg * cgno);
 		} else {
 			cgp->cg_ncyl = sblock.fs_cpg;
 		}
@@ -2198,7 +2198,7 @@ examinelog(void (*cb)(daddr32_t))
 	 * to do nothing harmful, so don't need to handle it.
 	 */
 	bp = getdatablk(logbtofrag(&sblock, sblock.fs_logbno),
-			(size_t)sblock.fs_bsize);
+	    (size_t)sblock.fs_bsize);
 	ebp = (void *)bp->b_un.b_buf;
 
 	/*
@@ -2313,7 +2313,11 @@ void
 dirty(struct bufarea *bp)
 {
 	if (fswritefd < 0) {
-		pfatal("SETTING DIRTY FLAG IN READ_ONLY MODE\n");
+		/*
+		 * No one should call dirty() in read only mode.
+		 * But if one does, it's not fatal issue. Just warn him.
+		 */
+		pwarn("WON'T SET DIRTY FLAG IN READ_ONLY MODE\n");
 	} else {
 		(bp)->b_dirty = 1;
 		isdirty = 1;
