@@ -47,6 +47,7 @@
 #include <inet/ipclassifier.h>
 #include <fs/sockfs/sockcommon.h>
 #include <fs/sockfs/nl7c.h>
+#include <fs/sockfs/socktpi.h>
 #include <inet/ip.h>
 
 extern int xnet_skip_checks, xnet_check_print, xnet_truncate_print;
@@ -557,6 +558,8 @@ sonode_init(struct sonode *so, struct sockparams *sp, int family,
 
 	so->so_ops = sops;
 
+	so->so_not_str = (sops != &sotpi_sonodeops);
+
 	so->so_proto_handle = NULL;
 
 	so->so_downcalls = NULL;
@@ -615,11 +618,6 @@ sonode_fini(struct sonode *so)
 
 	so_acceptq_flush(so);
 
-#ifdef DEBUG
-	mutex_enter(&so->so_lock);
-	ASSERT(so_verify_oobstate(so));
-	mutex_exit(&so->so_lock);
-#endif /* DEBUG */
 	if ((mp = so->so_oobmsg) != NULL) {
 		freemsg(mp);
 		so->so_oobmsg = NULL;

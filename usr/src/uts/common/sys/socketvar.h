@@ -202,12 +202,13 @@ struct sonode {
 #define	so_rcv_thresh	so_proto_props.sopp_rcvthresh
 #define	so_rcv_timer_interval so_proto_props.sopp_rcvtimer
 
-	/* Send */
-	boolean_t	so_snd_qfull;	/* Transmit full */
 	kcondvar_t	so_snd_cv;
-
-	boolean_t so_rcv_wakeup;
-	boolean_t so_snd_wakeup;
+	uint32_t
+		so_snd_qfull: 1,	/* Transmit full */
+		so_rcv_wakeup: 1,
+		so_snd_wakeup: 1,
+		so_not_str: 1,	/* B_TRUE if not streams based socket */
+		so_pad_to_bit_31: 28;
 
 	/* Communication channel with protocol */
 	sock_lower_handle_t	so_proto_handle;
@@ -255,7 +256,7 @@ struct sonode {
 #define	SOCLONE		0x0080		/* child of clone driver */
 #define	SOASYNC_UNBIND	0x0100		/* wait for ACK of async unbind */
 
-#define	SOCK_IS_NONSTR(so)	((so)->so_vnode->v_stream == NULL)
+#define	SOCK_IS_NONSTR(so)	((so)->so_not_str)
 
 /*
  * Socket state bits.

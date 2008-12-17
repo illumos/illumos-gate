@@ -1958,6 +1958,10 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 	so->so_ops = &sotpi_sonodeops;
 
 	/*
+	 * No longer a non streams socket
+	 */
+	so->so_not_str = B_FALSE;
+	/*
 	 * Wake up any threads stuck in poll. This is needed since the poll
 	 * head changes when the fallback happens (moves from the sonode to
 	 * the STREAMS head).

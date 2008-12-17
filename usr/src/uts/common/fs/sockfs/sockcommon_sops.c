@@ -1289,6 +1289,9 @@ so_close(struct sonode *so, int flag, struct cred *cr)
 	 * At this point there will be no more upcalls from the protocol
 	 */
 	mutex_enter(&so->so_lock);
+
+	ASSERT(so_verify_oobstate(so));
+
 	so_rcv_flush(so);
 	mutex_exit(&so->so_lock);
 

@@ -5885,6 +5885,8 @@ sotpi_close(struct sonode *so, int flag, struct cred *cr)
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
 
+	ASSERT(so_verify_oobstate(so));
+
 	/*
 	 * Only call NL7C's close on last open reference.
 	 */
