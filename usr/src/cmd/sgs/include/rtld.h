@@ -891,6 +891,7 @@ typedef struct rt_map32 {
 #define	LKUP_SINGLETON	0x1000		/* search for a singleton symbol */
 #define	LKUP_STANDARD	0x2000		/* standard lookup - originated from */
 					/* 	head link-map element */
+#define	LKUP_WORLD	0x4000		/* ensure world lookup */
 
 /*
  * For the runtime linker to perform a symbol search, a number of data items

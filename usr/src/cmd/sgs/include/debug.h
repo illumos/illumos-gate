@@ -150,8 +150,9 @@ extern "C" {
 #define	DBG_NL_STD		0	/* newline controllers - standard and */
 #define	DBG_NL_FRC		2	/*    forced. */
 
-#define	DBG_BNDREJ_NODIR	0	/* bind rejected, direct to nodirect */
-#define	DBG_BNDREJ_SINGLE	1	/* bind rejected, singleton without */
+#define	DBG_BNDREJ_DIRECT	0	/* bind rejected, direct to nodirect */
+#define	DBG_BNDREJ_GROUP	1	/* bind rejected, group to nodirect */
+#define	DBG_BNDREJ_SINGLE	2	/* bind rejected, singleton without */
 					/*    default search model */
 #define	DBG_BNDREJ_NUM		DBG_BNDREJ_SINGLE
 

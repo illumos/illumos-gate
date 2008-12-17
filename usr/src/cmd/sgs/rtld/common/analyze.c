@@ -653,7 +653,7 @@ are_u_this(Rej_desc *rej, int fd, struct stat *status, const char *name)
 	if ((status->st_mode & S_IFMT) == S_IFDIR) {
 		rej->rej_type = SGS_REJ_STR;
 		rej->rej_str = strerror(EISDIR);
-		return (0);
+		return (NULL);
 	}
 
 	/*
@@ -687,7 +687,7 @@ are_u_this(Rej_desc *rej, int fd, struct stat *status, const char *name)
 	if (maddr == MAP_FAILED) {
 		rej->rej_type = SGS_REJ_STR;
 		rej->rej_str = strerror(errno);
-		return (0);
+		return (NULL);
 	}
 
 	/*
@@ -732,7 +732,7 @@ are_u_this(Rej_desc *rej, int fd, struct stat *status, const char *name)
 				(void) printf(fmt, name, rej->rej_str);
 				return (vector[i]);
 			}
-			return (0);
+			return (NULL);
 		}
 	}
 
@@ -740,7 +740,7 @@ are_u_this(Rej_desc *rej, int fd, struct stat *status, const char *name)
 	 * Unknown file type.
 	 */
 	rej->rej_type = SGS_REJ_UNKFILE;
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -841,7 +841,7 @@ is_so_matched(Rt_map *lmp, const char *name, int path)
 		}
 	}
 
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -900,7 +900,7 @@ is_so_loaded(Lm_list *lml, const char *name, int *in_nfavl)
 			 */
 			if (in_nfavl)
 				(*in_nfavl)++;
-			return (0);
+			return (NULL);
 		}
 	}
 
@@ -922,7 +922,7 @@ is_so_loaded(Lm_list *lml, const char *name, int *in_nfavl)
 				return (lmp);
 		}
 	}
-	return ((Rt_map *)0);
+	return (NULL);
 }
 
 /*
@@ -1153,7 +1153,7 @@ is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
 			    (STINO(nlmp) == status->st_ino))
 				return (nlmp);
 		}
-		return ((Rt_map *)0);
+		return (NULL);
 	}
 
 	/*
@@ -1189,7 +1189,7 @@ is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
 			return (nlmp);
 		}
 	}
-	return ((Rt_map *)0);
+	return (NULL);
 }
 
 /*
@@ -1701,7 +1701,7 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdesc, int *in_nfavl)
 	fdesc->fd_fd = 0;
 
 	if (nlmp == 0)
-		return (0);
+		return (NULL);
 
 	/*
 	 * Save the dev/inode information for later comparisons.
@@ -1736,13 +1736,13 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdesc, int *in_nfavl)
 		if ((NAME(nlmp)[0] == '/') && (fpavl_insert(lml, nlmp,
 		    NAME(nlmp), fdesc->fd_avlwhere) == 0)) {
 			remove_so(lml, nlmp);
-			return (0);
+			return (NULL);
 		}
 		if (((NAME(nlmp)[0] != '/') ||
 		    (NAME(nlmp) != PATHNAME(nlmp))) &&
 		    (fpavl_insert(lml, nlmp, PATHNAME(nlmp), 0) == 0)) {
 			remove_so(lml, nlmp);
-			return (0);
+			return (NULL);
 		}
 
 		/*
@@ -1793,7 +1793,7 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdesc, int *in_nfavl)
 
 		if ((ndir = (char *)malloc(olen)) == 0) {
 			remove_so(lml, nlmp);
-			return (0);
+			return (NULL);
 		}
 		(void) strncpy(ndir, odir, olen);
 		ndir[--olen] = '\0';
@@ -1894,7 +1894,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 			char	*pname;
 
 			if ((pname = strdup(nfdp->fd_pname)) == NULL)
-				return (0);
+				return (NULL);
 			nfdp->fd_pname = pname;
 		}
 
@@ -1909,7 +1909,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		if (find_path(lml, oname, clmp, flags, nfdp,
 		    &_rej, in_nfavl) == 0) {
 			rejection_inherit(rej, &_rej);
-			return (0);
+			return (NULL);
 		}
 
 		/*
@@ -2005,7 +2005,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 	 * event of an error condition.
 	 */
 	if ((name = strdup(nfdp->fd_nname)) == NULL)
-		return (0);
+		return (NULL);
 
 	if (nfdp->fd_nname == nfdp->fd_pname)
 		nfdp->fd_nname = nfdp->fd_pname = name;
@@ -2353,13 +2353,13 @@ _load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
 		 * Note, the name of the file may be changed by an auditor.
 		 */
 		if ((load_trace(lml, oname, clmp)) == 0)
-			return (0);
+			return (NULL);
 
 		name = *oname;
 
 		if ((nlmp = load_so(lml, lmco, name, clmp, flags,
 		    nfdp, rej, in_nfavl)) == 0)
-			return (0);
+			return (NULL);
 
 		/*
 		 * If we've loaded a library which identifies itself as not
@@ -2378,7 +2378,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
 			DBG_CALL(Dbg_file_rejected(lml, &_rej, M_MACH));
 			rejection_inherit(rej, &_rej);
 			remove_so(lml, nlmp);
-			return (0);
+			return (NULL);
 		}
 	} else {
 		/*
@@ -2411,7 +2411,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
 			_rej.rej_str = strerror(ENOENT);
 			DBG_CALL(Dbg_file_rejected(lml, &_rej, M_MACH));
 			rejection_inherit(rej, &_rej);
-			return (0);
+			return (NULL);
 		}
 	}
 
@@ -2428,7 +2428,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
 		 */
 		if ((FLAGS(nlmp) & FLG_RT_ANALYZED) == 0)
 			remove_so(lml, nlmp);
-		return (0);
+		return (NULL);
 	}
 
 	/*
@@ -2445,7 +2445,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
 		    LIST(clmp)->lm_flags) & LML_FLG_NOAUDIT) == 0)) {
 			if (audit_objopen(clmp, nlmp) == 0) {
 				remove_so(lml, nlmp);
-				return (0);
+				return (NULL);
 			}
 		}
 	}
@@ -2551,7 +2551,7 @@ load_one(Lm_list *lml, Aliste lmco, Pnode *pnp, Rt_map *clmp, int mode,
 
 	file_notfound(lml, name, clmp, flags, &rej);
 	remove_rej(&rej);
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -2666,7 +2666,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 	}
 
 	if ((lml->lm_flags & LML_FLG_INTRPOSE) == 0)
-		return ((Sym *)0);
+		return (NULL);
 
 	/*
 	 * Traverse the list of known interposers to determine whether any
@@ -2712,7 +2712,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 			}
 		}
 	}
-	return ((Sym *)0);
+	return (NULL);
 }
 
 /*
@@ -2852,11 +2852,12 @@ core_lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 
 			slp->sl_imap = lmp;
 			if (((sym = SYMINTP(lmp)(slp, dlmp, binfo,
-			    in_nfavl)) != NULL) || (*binfo & BINFO_REJSINGLE))
+			    in_nfavl)) != NULL) ||
+			    (*binfo & BINFO_MSK_TRYAGAIN))
 				return (sym);
 		}
 	}
-	return (0);
+	return (NULL);
 }
 
 static Sym *
@@ -2877,7 +2878,7 @@ _lazy_find_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 				return (sym);
 		}
 	}
-	return (0);
+	return (NULL);
 }
 
 static Sym *
@@ -2976,11 +2977,11 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 				 * built), fall through to a standard symbol
 				 * search.
 				 */
-				if (((*binfo & BINFO_REJECTED) == 0) ||
-				    (*binfo & BINFO_REJSINGLE))
+				if (((*binfo & BINFO_MSK_REJECTED) == 0) ||
+				    (*binfo & BINFO_MSK_TRYAGAIN))
 					return (sym);
 
-				*binfo &= ~BINFO_REJECTED;
+				*binfo &= ~BINFO_MSK_REJECTED;
 			}
 		}
 	}
@@ -3033,7 +3034,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		for (ALIST_TRAVERSE_BY_OFFSET(lml->lm_lists, off, lmc)) {
 			if (((sym = core_lookup_sym(lmc->lc_head, &sl, dlmp,
 			    binfo, off, in_nfavl)) != NULL) ||
-			    (*binfo & BINFO_REJSINGLE))
+			    (*binfo & BINFO_MSK_TRYAGAIN))
 				break;
 		}
 	} else
@@ -3041,11 +3042,10 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		    in_nfavl);
 
 	/*
-	 * If a symbol binding was rejected, because a binding occurred to a
-	 * singleton without following the default symbol search, return so
-	 * that the search can be repreated.
+	 * If a symbol binding should be retried, return so that the search can
+	 * be repeated.
 	 */
-	if (*binfo & BINFO_REJSINGLE)
+	if (*binfo & BINFO_MSK_TRYAGAIN)
 		return (sym);
 
 	/*
@@ -3062,7 +3062,7 @@ _lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 
 		lml = LIST(lmp);
 		if ((sl.sl_flags & LKUP_WEAK) || (lml->lm_lazy == 0))
-			return ((Sym *)0);
+			return (NULL);
 
 		DBG_CALL(Dbg_syms_lazy_rescan(lml, name));
 
@@ -3104,6 +3104,7 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	Rt_map		*clmp = slp->sl_cmap;
 	Sym		*rsym = slp->sl_rsym, *sym = 0;
 	uchar_t		rtype = slp->sl_rtype;
+	int		mode;
 
 	if (slp->sl_hash == 0)
 		slp->sl_hash = elf_hash(slp->sl_name);
@@ -3146,23 +3147,40 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	}
 
 	/*
+	 * Save the callers MODE().
+	 */
+	mode = MODE(clmp);
+
+	/*
 	 * Carry out an initial symbol search.  This search takes into account
 	 * all the modes of the requested search.
 	 */
 	if (((sym = _lookup_sym(slp, dlmp, binfo, in_nfavl)) == NULL) &&
-	    (*binfo & BINFO_REJSINGLE)) {
+	    (*binfo & BINFO_MSK_TRYAGAIN)) {
 		Slookup	sl = *slp;
 
 		/*
-		 * If a binding has been rejected because of binding to a
-		 * singleton without going through a singleton search, then
-		 * reset the lookup data, and try again.
+		 * Try the symbol search again.  This retry can be necessary if:
+		 *
+		 *  .	a binding has been rejected because of binding to a
+		 *	singleton without going through a singleton search.
+		 *  .	a group binding has resulted in binding to a symbol
+		 *	that indicates no-direct binding.
+		 *
+		 * Reset the lookup data, and try again.
 		 */
 		sl.sl_imap = LIST(sl.sl_cmap)->lm_head;
 		sl.sl_flags &= ~(LKUP_FIRST | LKUP_SELF | LKUP_NEXT);
-		sl.sl_flags |= LKUP_SINGLETON;
 		sl.sl_rsymndx = 0;
-		*binfo &= ~BINFO_REJECTED;
+
+		if (*binfo & BINFO_REJSINGLE)
+			sl.sl_flags |= LKUP_SINGLETON;
+		if (*binfo & BINFO_REJGROUP) {
+			sl.sl_flags |= LKUP_WORLD;
+			mode |= RTLD_WORLD;
+		}
+		*binfo &= ~BINFO_MSK_REJECTED;
+
 		sym = _lookup_sym(&sl, dlmp, binfo, in_nfavl);
 	}
 
@@ -3171,11 +3189,11 @@ lookup_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * determine if it is necessary to follow a binding from outside of
 	 * the group.
 	 */
-	if ((MODE(clmp) & (RTLD_GROUP | RTLD_WORLD)) == RTLD_GROUP) {
+	if ((mode & (RTLD_GROUP | RTLD_WORLD)) == RTLD_GROUP) {
 		Sym	*isym;
 
 		if ((isym = lookup_sym_interpose(slp, dlmp, binfo, sym,
-		    in_nfavl)) != 0)
+		    in_nfavl)) != NULL)
 			return (isym);
 	}
 	return (sym);
@@ -3207,7 +3225,7 @@ bind_one(Rt_map *clmp, Rt_map *dlmp, uint_t flags)
 		/*
 		 * Create a new binding descriptor.
 		 */
-		if ((bdp = malloc(sizeof (Bnd_desc))) == 0)
+		if ((bdp = malloc(sizeof (Bnd_desc))) == NULL)
 			return (0);
 
 		bdp->b_caller = clmp;

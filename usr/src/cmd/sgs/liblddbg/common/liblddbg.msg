@@ -309,7 +309,9 @@
 # message is formatted to conform to the pattern used by the MSG_BINFO messages.
 @ MSG_BND_REJECT	"binding file=%s to file=%s: symbol `%s'  \
 			 (rejected: %s)"
-@ MSG_BNDREJ_NODIR	"attempt to directly bind to a NODIRECT definition"
+@ MSG_BNDREJ_DIRECT	"attempt to directly bind to a NODIRECT definition"
+@ MSG_BNDREJ_GROUP	"attempt to bind within a group to a NODIRECT \
+			 definition"
 @ MSG_BNDREJ_SINGLE	"attempt to bind to a SINGLETON definition without \
 			 following default search model"
 

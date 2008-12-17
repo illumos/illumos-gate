@@ -3559,7 +3559,8 @@ callable(Rt_map *clmp, Rt_map *dlmp, Grp_hdl *ghp, uint_t slflags)
 	 * An object with world access can always bind to an object with global
 	 * visibility.
 	 */
-	if ((MODE(clmp) & RTLD_WORLD) && (MODE(dlmp) & RTLD_GLOBAL))
+	if (((MODE(clmp) & RTLD_WORLD) || (slflags & LKUP_WORLD)) &&
+	    (MODE(dlmp) & RTLD_GLOBAL))
 		return (1);
 
 	/*

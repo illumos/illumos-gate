@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sgs/messages/Makefile.targ
@@ -61,7 +59,7 @@ test:		$(MSGDIR)/$(TEST_MOFILE)
 $(MSGDIR)/$(TEST_MOFILE): \
 		$(MSGDIR) $(TEST_MSGID) $(TEST_MSGSTR)
 		$(RM) $(MSGDIR)/$(TEXT_DOMAIN).mo
-		sort $(TEST_MSGID) $(TEST_MSGSTR) | \
+		sort -n $(TEST_MSGID) $(TEST_MSGSTR) | \
 			sed -e "s/ *[0-9]*	//" > $(TEST_POFILE)
 		$(MSGFMT) -o $(MSGDIR)/$(TEST_MOFILE) $(TEST_POFILE)
 

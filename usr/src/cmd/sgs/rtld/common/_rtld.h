@@ -411,13 +411,20 @@ typedef struct {
 					/* if the caller can't be determined */
 
 /*
- * Binding information.  Note, this is or'ed in with the DBG_BINFO flags to
- * convey information regarding symbol bindings.
+ * Binding information flags.  These flags are passed up from low level binding
+ * routines to indicate "additional" information, such as why a binding has been
+ * rejected.  These flags use the same data element as is used to record any
+ * DBG_BINFO flags.  The DBG_BINFO flags are used to define the final bindings
+ * information and are used to provide better binding diagnostics.
  */
-#define	BINFO_REJDIRECT	0x10000		/* reject a direct binding */
-#define	BINFO_REJSINGLE	0x20000		/* reject a singleton binding */
-#define	BINFO_REJECTED	0xf0000		/* a binding has been rejected */
+#define	BINFO_REJDIRECT		0x010000	/* reject a direct binding */
+#define	BINFO_REJSINGLE		0x100000	/* reject a singleton binding */
+#define	BINFO_REJGROUP		0x200000	/* reject a group binding */
 
+#define	BINFO_MSK_TRYAGAIN	0xf00000	/* a mask of bindings that */
+						/*    should be retried */
+#define	BINFO_MSK_REJECTED	0xff0000	/* a mask of bindings that */
+						/*    have been rejected */
 /*
  * Data declarations.
  */

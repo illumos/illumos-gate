@@ -1325,7 +1325,7 @@ elf_map_it(
 static Sym *
 elf_null_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 {
-	return ((Sym *)0);
+	return (NULL);
 }
 
 /*
@@ -1342,7 +1342,7 @@ elf_disable_filtee(Rt_map *lmp, Dyninfo *dip)
 		 */
 		if (OBJFLTRNDX(lmp) != FLTR_DISABLED) {
 			free(REFNAME(lmp));
-			REFNAME(lmp) = (char *)0;
+			REFNAME(lmp) = NULL;
 			OBJFLTRNDX(lmp) = FLTR_DISABLED;
 
 			/*
@@ -1439,7 +1439,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			if ((dip->di_info = (void *)expand_paths(ilmp,
 			    filtees, 0, 0)) == 0) {
 				elf_disable_filtee(ilmp, dip);
-				return ((Sym *)0);
+				return (NULL);
 			}
 		}
 	}
@@ -1486,7 +1486,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
 				if ((lmc = alist_append(&lml->lm_lists, 0,
 				    sizeof (Lm_cntl), AL_CNT_LMLISTS)) == 0)
-					return ((Sym *)0);
+					return (NULL);
 				lmco = (Aliste)((char *)lmc -
 				    (char *)lml->lm_lists);
 			} else {
@@ -1577,7 +1577,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 					    alist_append(&lml->lm_lists, 0,
 					    sizeof (Lm_cntl),
 					    AL_CNT_LMLISTS)) == 0)
-						return ((Sym *)0);
+						return (NULL);
 					lmco = (Aliste)((char *)lmc -
 					    (char *)lml->lm_lists);
 				} else {
@@ -1690,7 +1690,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 		 */
 		if (name) {
 			Grp_desc	*gdp;
-			Sym		*sym = 0;
+			Sym		*sym = NULL;
 			Aliste		idx;
 			Slookup		sl = *slp;
 
@@ -1745,7 +1745,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	 * If we're just here to trigger filtee loading then we're done.
 	 */
 	if (name == 0)
-		return ((Sym *)0);
+		return (NULL);
 
 	/*
 	 * If no filtees have been found for a filter, clean up any Pnode
@@ -1757,10 +1757,10 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	if (any == 0) {
 		remove_pnode((Pnode *)dip->di_info);
 		elf_disable_filtee(ilmp, dip);
-		return ((Sym *)0);
+		return (NULL);
 	}
 
-	return ((Sym *)0);
+	return (NULL);
 }
 
 /*
@@ -1800,7 +1800,7 @@ elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	 * that are yet to be completed.
 	 */
 	if (dip->di_flags == 0)
-		return ((Sym *)0);
+		return (NULL);
 
 	/*
 	 * Indicate whether an error message is required should this filtee not
@@ -1877,7 +1877,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		DBG_CALL(Dbg_syms_lookup(ilmp, name, MSG_ORIG(MSG_STR_ELF)));
 
 	if (HASH(ilmp) == 0)
-		return ((Sym *)0);
+		return (NULL);
 
 	buckets = HASH(ilmp)[0];
 	/* LINTED */
@@ -1888,7 +1888,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 	 * and symbol table pointers.
 	 */
 	if ((ndx = HASH(ilmp)[htmp + 2]) == 0)
-		return ((Sym *)0);
+		return (NULL);
 
 	chainptr = HASH(ilmp) + 2 + buckets;
 	strtabptr = STRTAB(ilmp);
@@ -1905,7 +1905,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		if ((*strtabname++ != *name) || strcmp(strtabname, &name[1])) {
 			if ((ndx = chainptr[ndx]) != 0)
 				continue;
-			return ((Sym *)0);
+			return (NULL);
 		}
 
 		/*
@@ -1928,7 +1928,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 			    ndx, VERSYM(ilmp)[ndx]));
 			if ((ndx = chainptr[ndx]) != 0)
 				continue;
-			return ((Sym *)0);
+			return (NULL);
 		}
 
 		/*
@@ -1973,7 +1973,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		/*
 		 * Undefined symbol.
 		 */
-		return ((Sym *)0);
+		return (NULL);
 	}
 
 	/*
@@ -1998,23 +1998,52 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		    DBG_BNDREJ_SINGLE));
 		*binfo |= BINFO_REJSINGLE;
 		*binfo &= ~DBG_BINFO_MSK;
-		return ((Sym *)0);
+		return (NULL);
 	}
 
 	/*
 	 * If this is a direct binding request, but the symbol definition has
 	 * disabled directly binding to it (presumably because the symbol
 	 * definition has been changed since the referring object was built),
-	 * indicate this failure so that the caller can fall back to a standard
+	 * reject this binding so that the caller can fall back to a standard
 	 * symbol search.
 	 */
 	if (sip && (slp->sl_flags & LKUP_DIRECT) &&
 	    (sip->si_flags & SYMINFO_FLG_NOEXTDIRECT)) {
 		DBG_CALL(Dbg_bind_reject(slp->sl_cmap, ilmp, name,
-		    DBG_BNDREJ_NODIR));
+		    DBG_BNDREJ_DIRECT));
 		*binfo |= BINFO_REJDIRECT;
 		*binfo &= ~DBG_BINFO_MSK;
-		return ((Sym *)0);
+		return (NULL);
+	}
+
+	/*
+	 * If this is a binding request within an RTLD_GROUP family, and the
+	 * symbol has disabled directly binding to it, reject this binding so
+	 * that the caller can fall back to a standard symbol search.
+	 *
+	 * Effectively, an RTLD_GROUP family achieves what can now be
+	 * established with direct bindings.  However, various symbols have
+	 * been tagged as inappropriate for direct binding to (ie. libc:malloc).
+	 *
+	 * A symbol marked as no-direct cannot be used within a group without
+	 * first ensuring that the symbol has not been interposed upon outside
+	 * of the group.  A common example occurs when users implement their own
+	 * version of malloc() in the executable.  Such a malloc() interposes on
+	 * the libc:malloc, and this interposition must be honored within the
+	 * group as well.
+	 *
+	 * Following any rejection, LKUP_WORLD is established as a means of
+	 * overriding this test as we return to a standard search.
+	 */
+	if (sip && (sip->si_flags & SYMINFO_FLG_NOEXTDIRECT) &&
+	    ((MODE(slp->sl_cmap) & (RTLD_GROUP | RTLD_WORLD)) == RTLD_GROUP) &&
+	    ((slp->sl_flags & LKUP_WORLD) == 0)) {
+		DBG_CALL(Dbg_bind_reject(slp->sl_cmap, ilmp, name,
+		    DBG_BNDREJ_GROUP));
+		*binfo |= BINFO_REJGROUP;
+		*binfo &= ~DBG_BINFO_MSK;
+		return (NULL);
 	}
 
 	/*
@@ -2036,7 +2065,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		 */
 		if ((sip->si_flags & SYMINFO_FLG_FILTER) &&
 		    (SYMSFLTRCNT(ilmp) == 0))
-			return ((Sym *)0);
+			return (NULL);
 
 		if ((sip->si_flags & SYMINFO_FLG_FILTER) ||
 		    ((sip->si_flags & SYMINFO_FLG_AUXILIARY) &&
@@ -2054,7 +2083,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 			    sip->si_boundto, in_nfavl)) != 0)
 				return (fsym);
 			if (sip->si_flags & SYMINFO_FLG_FILTER)
-				return ((Sym *)0);
+				return (NULL);
 		}
 	}
 
@@ -2078,7 +2107,7 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 		}
 
 		if (flags1 & FL1_RT_OBJSFLTR)
-			return ((Sym *)0);
+			return (NULL);
 	}
 	return (sym);
 }
@@ -3267,7 +3296,7 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 			 * change its meaning for subsequent callers.
 			 */
 			static const Sym fsym = { 0, 0, 0,
-				ELF_ST_INFO(STB_LOCAL, STT_OBJECT) };
+			    ELF_ST_INFO(STB_LOCAL, STT_OBJECT) };
 			*info = (void *) &fsym;
 		}
 
@@ -3307,7 +3336,7 @@ elf_lazy_cleanup(APlist *alp)
 Sym *
 elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 {
-	Sym		*sym = 0;
+	Sym		*sym = NULL;
 	APlist		*alist = NULL;
 	Aliste		idx;
 	Rt_map		*lmp1, *lmp = slp->sl_imap;
@@ -3428,7 +3457,7 @@ void
 elf_reloc_bad(Rt_map *lmp, void *rel, uchar_t rtype, ulong_t roffset,
     ulong_t rsymndx)
 {
-	const char	*name = (char *)0;
+	const char	*name = NULL;
 	Lm_list		*lml = LIST(lmp);
 	int		trace;
 

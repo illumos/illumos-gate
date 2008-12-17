@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include	<sys/types.h>
 #include	<string.h>
@@ -162,7 +160,8 @@ void
 Dbg_bind_reject(Rt_map *flmp, Rt_map *tlmp, const char *sym, int why)
 {
 	static Msg reason[DBG_BNDREJ_NUM + 1] = {
-		MSG_BNDREJ_NODIR,	/* MSG_INTL(MSG_BNDREJ_NODIR) */
+		MSG_BNDREJ_DIRECT,	/* MSG_INTL(MSG_BNDREJ_DIRECT) */
+		MSG_BNDREJ_GROUP,	/* MSG_INTL(MSG_BNDREJ_GROUP) */
 		MSG_BNDREJ_SINGLE	/* MSG_INTL(MSG_BNDREJ_SINGLE) */
 	};
 
