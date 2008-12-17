@@ -233,7 +233,7 @@ typedef struct {
 	const char	*fd_nname;	/* new file (expanded) name */
 	const char	*fd_pname;	/* new path (resolved) name */
 	dev_t		fd_dev;		/* file device number */
-	ino_t		fd_ino;		/* file inode number */
+	rtld_ino_t	fd_ino;		/* file inode number */
 	int		fd_fd;		/* open file descriptor */
 	uint_t		fd_flags;
 	avl_index_t	fd_avlwhere;	/* avl tree insertion index */
@@ -425,6 +425,31 @@ typedef struct {
 						/*    should be retried */
 #define	BINFO_MSK_REJECTED	0xff0000	/* a mask of bindings that */
 						/*    have been rejected */
+
+/*
+ * The 32-bit version of rtld uses special stat() wrapper functions
+ * that preserve the non-largefile semantics of stat()/fstat() while
+ * allowing for large inode values. The 64-bit rtld uses stat() directly.
+ */
+#ifdef _LP64
+#define	rtld_fstat	fstat
+#define	rtld_stat	stat
+typedef	struct stat	rtld_stat_t;
+#else
+typedef struct {
+	dev_t		st_dev;
+	rtld_ino_t	st_ino;
+	mode_t		st_mode;
+	uid_t		st_uid;
+	off_t		st_size;
+	timestruc_t	st_mtim;
+#ifdef sparc
+	blksize_t	st_blksize;
+#endif
+} rtld_stat_t;
+#endif
+
+
 /*
  * Data declarations.
  */
@@ -525,7 +550,7 @@ extern void		addfree(void *, size_t);
 extern int		append_alias(Rt_map *, const char *, int *);
 extern int		analyze_lmc(Lm_list *, Aliste, Rt_map *, int *);
 extern Am_ret		anon_map(Lm_list *, caddr_t *, size_t, int, int);
-extern Fct		*are_u_this(Rej_desc *, int, struct stat *,
+extern Fct		*are_u_this(Rej_desc *, int, rtld_stat_t *,
 			    const char *);
 extern void		atexit_fini(void);
 extern int		bind_one(Rt_map *, Rt_map *, uint_t);
@@ -652,6 +677,10 @@ extern void		rtld_db_dlactivity(Lm_list *);
 extern void		rtld_db_preinit(Lm_list *);
 extern void		rtld_db_postinit(Lm_list *);
 extern void		rtldexit(Lm_list *, int);
+#ifndef _LP64
+extern int		rtld_fstat(int, rtld_stat_t *restrict);
+extern int		rtld_stat(const char *restrict, rtld_stat_t *restrict);
+#endif
 extern int		rtld_getopt(char **, char ***, auxv_t **, Word *,
 			    Word *, int);
 extern void		security(uid_t, uid_t, gid_t, gid_t, int);

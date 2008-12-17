@@ -51,7 +51,7 @@ elf_config_validate(Addr addr, Rtc_head *head, Rt_map *lmp)
 	Rtc_obj		*obj;
 	Rtc_dir		*dirtbl;
 	Rtc_file	*filetbl;
-	struct stat	status;
+	rtld_stat_t	status;
 	int		err;
 
 	/*
@@ -128,7 +128,7 @@ elf_config_validate(Addr addr, Rtc_head *head, Rt_map *lmp)
 
 		str = strtbl + obj->co_name;
 
-		if (stat(str, &status) != 0) {
+		if (rtld_stat(str, &status) != 0) {
 			err = errno;
 			eprintf(lml, ERR_WARNING, MSG_INTL(MSG_CONF_DSTAT),
 			    config->c_name, str, strerror(err));
@@ -154,7 +154,7 @@ elf_config_validate(Addr addr, Rtc_head *head, Rt_map *lmp)
 			    (RTC_OBJ_DUMP | RTC_OBJ_REALPTH))
 				continue;
 
-			if (stat(str, &status) != 0) {
+			if (rtld_stat(str, &status) != 0) {
 				err = errno;
 				eprintf(lml, ERR_WARNING,
 				    MSG_INTL(MSG_CONF_FSTAT), config->c_name,
@@ -197,7 +197,7 @@ elf_config(Rt_map *lmp, int aout)
 	Rtc_id		*id;
 	Rtc_head	*head;
 	int		fd, features = 0;
-	struct stat	status;
+	rtld_stat_t	status;
 	Addr		addr;
 	Pnode		*pnp;
 	const char	*str;
@@ -267,7 +267,7 @@ elf_config(Rt_map *lmp, int aout)
 	/*
 	 * Determine the configuration file size and map the file.
 	 */
-	(void) fstat(fd, &status);
+	(void) rtld_fstat(fd, &status);
 	if (status.st_size < sizeof (Rtc_head)) {
 		(void) close(fd);
 		return (DBG_CONF_CORRUPT);

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Routines to provide profiling of shared libraries required by the called
  * executable.
@@ -407,7 +405,7 @@ la_objopen(Link_map *lmp, Lmid_t lmid, uintptr_t *cookie)
 	 * Don't even try to profile an object that does not have
 	 * auditing enabled on it's link-map.  This catches 'ld.so.1'.
 	 */
-	if (LIST((Rt_map *)lmp)->lm_flags & LML_FLG_NOAUDIT)
+	if (LIST(LINKMAP_TO_RTMAP(lmp))->lm_flags & LML_FLG_NOAUDIT)
 		return (LA_FLG_BINDFROM);
 
 	if (profile_open(pname, lmp) == 0)

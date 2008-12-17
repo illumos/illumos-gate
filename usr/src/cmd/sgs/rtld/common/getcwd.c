@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include	<sys/types.h>
 #include	<sys/stat.h>
 #include	<fcntl.h>
@@ -40,7 +38,7 @@
 
 #ifndef	EXPAND_RELATIVE
 
-static struct stat	status;
+static rtld_stat_t	status;
 
 /*
  * Included here (instead of using libc's) to reduce the number of stat calls.
@@ -54,7 +52,7 @@ _opendir(const char *file)
 	if ((fd = open(file, (O_RDONLY | O_NDELAY), 0)) < 0)
 		return (0);
 
-	if ((fstat(fd, &status) < 0) ||
+	if ((rtld_fstat(fd, &status) < 0) ||
 	    ((status.st_mode & S_IFMT) != S_IFDIR) ||
 	    ((dirp = (DIR *)malloc(sizeof (DIR) + DIRBUF)) == NULL)) {
 		(void) close(fd);
@@ -115,7 +113,7 @@ getcwd(char *path, size_t pathsz)
 {
 	char		_path[PATH_MAX], cwd[PATH_MAX];
 	size_t		cwdsz;
-	ino_t		cino;
+	rtld_ino_t	cino;
 	dev_t		cdev;
 
 	_path[--pathsz] = '\0';
@@ -127,7 +125,7 @@ getcwd(char *path, size_t pathsz)
 	(void) strcpy(cwd, MSG_ORIG(MSG_FMT_CWD));
 	cwdsz = MSG_FMT_CWD_SIZE;
 
-	if (stat(cwd, &status) == -1)
+	if (rtld_stat(cwd, &status) == -1)
 		return (NULL);
 
 	/* LINTED */
@@ -174,7 +172,7 @@ getcwd(char *path, size_t pathsz)
 			 * The parent director is a different filesystem, so
 			 * determine filenames of subdirectories and stat.
 			 */
-			struct stat	_status;
+			rtld_stat_t	_status;
 
 			cwd[cwdsz] = '/';
 
@@ -196,7 +194,7 @@ getcwd(char *path, size_t pathsz)
 				/*
 				 * Silently ignore non-stat'able entries.
 				 */
-				if (stat(cwd, &_status) == -1)
+				if (rtld_stat(cwd, &_status) == -1)
 					continue;
 
 				if ((_status.st_ino == cino) &&

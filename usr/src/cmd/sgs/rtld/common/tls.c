@@ -23,8 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio.h>
 #include <strings.h>
@@ -306,7 +304,7 @@ tls_statmod(Lm_list *lml, Rt_map *lmp)
 	 * Account for the initial dtv ptr in the TLSSIZE calculation.
 	 */
 	tlsmodndx = 0;
-	for (lmp = lml->lm_head; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+	for (lmp = lml->lm_head; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		if ((FCT(lmp) != &elf_fct) ||
 		    (PTTLS(lmp) == 0) || (PTTLS(lmp)->p_memsz == 0))
 			continue;

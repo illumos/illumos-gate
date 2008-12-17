@@ -49,7 +49,6 @@
  * link-map.  If a failures occurs after a handle have been created,
  * remove_hdl() is called to remove the handle and the link-map.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<string.h>
 #include	<stdio.h>
@@ -530,7 +529,7 @@ remove_incomplete(Lm_list *lml, Aliste lmco)
 	/*
 	 * First, remove any lists that may point between objects.
 	 */
-	for (lmp = lmc->lc_head; lmp; lmp = (Rt_map *)NEXT(lmp))
+	for (lmp = lmc->lc_head; lmp; lmp = NEXT_RT_MAP(lmp))
 		remove_lists(lmp, 1);
 
 	/*

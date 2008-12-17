@@ -151,7 +151,7 @@ preload(const char *str, Rt_map *lmp)
 				if (bind_one(clmp, nlmp, BND_REFER) == 0)
 					continue;
 			}
-			clmp = (Rt_map *)NEXT(lmp);
+			clmp = NEXT_RT_MAP(lmp);
 		}
 
 	} while ((ptr = strtok_r(NULL,
@@ -170,7 +170,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 {
 	Rt_map		*rlmp, *mlmp, **tobj = 0;
 	Ehdr		*ehdr;
-	struct stat	status;
+	rtld_stat_t	status;
 	int		features = 0, ldsoexec = 0;
 	size_t		eaddr, esize;
 	char		*str, *argvname;
@@ -411,7 +411,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		/*
 		 * Find out what type of object we have.
 		 */
-		(void) fstat(fd, &status);
+		(void) rtld_fstat(fd, &status);
 		if ((ftp = are_u_this(&rej, fd, &status, argvname)) == 0) {
 			Conv_reject_desc_buf_t rej_buf;
 
@@ -799,7 +799,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * load_so() checking for those who might dlopen(a.out).
 	 */
 	if ((FLAGS1(mlmp) & FL1_RT_RELATIVE) &&
-	    (stat(PATHNAME(mlmp), &status) == 0)) {
+	    (rtld_stat(PATHNAME(mlmp), &status) == 0)) {
 		STDEV(mlmp) = status.st_dev;
 		STINO(mlmp) = status.st_ino;
 	}

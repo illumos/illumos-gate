@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Object file dependent suport for ELF objects.
  */
@@ -230,12 +228,12 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	 * the contents rather than manipulate the link map pointers as parts
 	 * of the dlopen code have remembered the original link map address).
 	 */
-	NEXT((Rt_map *)PREV(nlmp)) = 0;
+	NEXT(PREV_RT_MAP(nlmp)) = 0;
 	/* LINTED */
 	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, CNTL(nlmp));
-	lmc->lc_tail = (Rt_map *)PREV(nlmp);
+	lmc->lc_tail = PREV_RT_MAP(nlmp);
 	if (CNTL(nlmp) == ALIST_OFF_DATA)
-		lml->lm_tail = (Rt_map *)PREV(nlmp);
+		lml->lm_tail = PREV_RT_MAP(nlmp);
 	lml->lm_obj--;
 
 	PREV(nlmp) = PREV(olmp);

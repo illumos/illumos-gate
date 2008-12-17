@@ -29,8 +29,6 @@
  *	All Rights Reserved
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * SPARC machine dependent and a.out format file class dependent functions.
  * Contains routines for performing function binding and symbol relocations.
@@ -86,7 +84,7 @@ aout_bndr(caddr_t pc)
 	 */
 	entry = enter(0);
 
-	for (lmp = lml_main.lm_head; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+	for (lmp = lml_main.lm_head; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		if (FCT(lmp) == &aout_fct) {
 			if (pc > (caddr_t)(LM2LP(lmp)->lp_plt) &&
 			    pc < (caddr_t)((int)LM2LP(lmp)->lp_plt +

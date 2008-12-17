@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * 4.x ld.so directory caching: run-time link-editor specific functions.
  */
@@ -157,7 +155,7 @@ find_so(const char *ds)
 	int fd;				/* descriptor on directory */
 	int n;				/* bytes from getdents */
 	char *cp;			/* working char * */
-	struct stat sb;			/* buffer for stat'ing directory */
+	rtld_stat_t sb;			/* buffer for stat'ing directory */
 	struct db *dbp;			/* database */
 	static caddr_t buf = NULL;	/* buffer for doing getdents */
 	static long bs;			/* cached blocksize for getdents */
@@ -183,7 +181,7 @@ find_so(const char *ds)
 	 * for the first directory we open successfully.
 	 */
 	if (!buf) {
-		if (fstat(fd, &sb) == -1) {
+		if (rtld_fstat(fd, &sb) == -1) {
 			(void) close(fd);
 			return ((struct db *)NULL);
 		}

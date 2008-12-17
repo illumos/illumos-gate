@@ -73,7 +73,7 @@ _caller(caddr_t cpc, int flags)
 			Rt_map	*lmp;
 
 			for (lmp = lmc->lc_head; lmp;
-			    lmp = (Rt_map *)NEXT(lmp)) {
+			    lmp = NEXT_RT_MAP(lmp)) {
 				Mmap	*mmap;
 
 				/*
@@ -650,7 +650,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 		if ((mode & (RTLD_NOW | RTLD_CONFGEN)) == RTLD_CONFGEN)
 			return (ghp);
 
-		for (nlmp = lml->lm_head; nlmp; nlmp = (Rt_map *)NEXT(nlmp)) {
+		for (nlmp = lml->lm_head; nlmp; nlmp = NEXT_RT_MAP(nlmp)) {
 			if (((MODE(nlmp) & RTLD_GLOBAL) == 0) ||
 			    (FLAGS(nlmp) & FLG_RT_DELETE))
 				continue;
@@ -1022,7 +1022,7 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 		 * traverse the present link-map list looking for promiscuous
 		 * entries.
 		 */
-		for (nlmp = lmp; nlmp; nlmp = (Rt_map *)NEXT(nlmp)) {
+		for (nlmp = lmp; nlmp; nlmp = NEXT_RT_MAP(nlmp)) {
 
 			/*
 			 * If this handle indicates we're only to look in the
@@ -1059,7 +1059,7 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 
 			sl.sl_flags |= LKUP_NODESCENT;
 
-			for (nlmp = lmp; nlmp; nlmp = (Rt_map *)NEXT(nlmp)) {
+			for (nlmp = lmp; nlmp; nlmp = NEXT_RT_MAP(nlmp)) {
 
 				if (!(MODE(nlmp) & RTLD_GLOBAL) || !LAZY(nlmp))
 					continue;
@@ -1236,7 +1236,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		 * RTLD_NEXT request so that it will use the callers link map to
 		 * start any possible lazy dependency loading.
 		 */
-		sl.sl_imap = nlmp = (Rt_map *)NEXT(clmp);
+		sl.sl_imap = nlmp = NEXT_RT_MAP(clmp);
 
 		DBG_CALL(Dbg_syms_dlsym(clmp, name, in_nfavl,
 		    (nlmp ? NAME(nlmp) : MSG_INTL(MSG_STR_NULL)),

@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utilities to handle shared object dependency graph.
  *
@@ -472,7 +470,7 @@ rb_visit(Rt_map * lmp, Sort * sort)
 {
 	Rt_map *	nlmp;
 
-	if ((nlmp = (Rt_map *)NEXT(lmp)) != 0)
+	if ((nlmp = NEXT_RT_MAP(lmp)) != 0)
 		rb_visit(nlmp, sort);
 
 	/*
@@ -510,7 +508,7 @@ fb_visit(Rt_map * lmp, Sort * sort, int flag)
 				FLAGS(lmp) |= FLG_RT_FINICLCT;
 			}
 		}
-		lmp = (Rt_map *)NEXT(lmp);
+		lmp = NEXT_RT_MAP(lmp);
 	}
 }
 #endif
@@ -827,9 +825,9 @@ tsort(Rt_map *lmp, int num, int flag)
 		 * the next object.
 		 */
 		if ((FLAGS(ilmp) & MSK_RT_INTPOSE) == 0)
-			ilmp = (Rt_map *)NEXT(ilmp);
+			ilmp = NEXT_RT_MAP(ilmp);
 
-		for (; ilmp; ilmp = (Rt_map *)NEXT(ilmp)) {
+		for (; ilmp; ilmp = NEXT_RT_MAP(ilmp)) {
 			if ((FLAGS(ilmp) & MSK_RT_INTPOSE) == 0)
 				break;
 
@@ -857,7 +855,7 @@ tsort(Rt_map *lmp, int num, int flag)
 	/*
 	 * Inspect any standard objects.
 	 */
-	for (; _lmp; _lmp = (Rt_map *)NEXT(_lmp)) {
+	for (; _lmp; _lmp = NEXT_RT_MAP(_lmp)) {
 		if (FLAGS(_lmp) & MSK_RT_INTPOSE)
 			continue;
 

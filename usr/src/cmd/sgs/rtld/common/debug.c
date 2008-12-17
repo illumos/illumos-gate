@@ -40,10 +40,10 @@
 #include	"msg.h"
 
 
-static int	dbg_fd;		/* debugging output file descriptor */
-static dev_t	dbg_dev;
-static ino_t	dbg_ino;
-static pid_t	pid;
+static int		dbg_fd;		/* debugging output file descriptor */
+static dev_t		dbg_dev;
+static rtld_ino_t	dbg_ino;
+static pid_t		pid;
 
 /*
  * Enable diagnostic output.  All debugging functions reside in the linker
@@ -53,7 +53,7 @@ uintptr_t
 dbg_setup(const char *options, Dbg_desc *dbp)
 {
 	uintptr_t	ret;
-	struct stat	status;
+	rtld_stat_t	status;
 
 	/*
 	 * If we're running secure, only allow debugging if ld.so.1 itself is
@@ -109,7 +109,7 @@ dbg_setup(const char *options, Dbg_desc *dbp)
 	 * the debugging file descriptor is still available once the
 	 * application has been entered.
 	 */
-	(void) fstat(dbg_fd, &status);
+	(void) rtld_fstat(dbg_fd, &status);
 	dbg_dev = status.st_dev;
 	dbg_ino = status.st_ino;
 	pid = getpid();
@@ -140,7 +140,7 @@ dbg_print(Lm_list *lml, const char *format, ...)
 	va_list		args;
 	char		buffer[ERRSIZE + 1];
 	pid_t		_pid;
-	struct stat	status;
+	rtld_stat_t	status;
 	Prfbuf		prf;
 
 	/*
@@ -168,7 +168,7 @@ dbg_print(Lm_list *lml, const char *format, ...)
 	 * same descriptor).
 	 */
 	if (rtld_flags & RT_FL_APPLIC) {
-		if ((fstat(dbg_fd, &status) == -1) ||
+		if ((rtld_fstat(dbg_fd, &status) == -1) ||
 		    (status.st_dev != dbg_dev) ||
 		    (status.st_ino != dbg_ino)) {
 			if (dbg_file) {
@@ -185,7 +185,7 @@ dbg_print(Lm_list *lml, const char *format, ...)
 					dbg_desc->d_class = 0;
 					return;
 				}
-				(void) fstat(dbg_fd, &status);
+				(void) rtld_fstat(dbg_fd, &status);
 				dbg_dev = status.st_dev;
 				dbg_ino = status.st_ino;
 			} else {

@@ -1084,7 +1084,7 @@ load_completion(Rt_map *nlmp)
 	    (rtld_flags2 & (RT_FL2_PLMSETUP | RT_FL2_NOPLM)))) {
 		Rt_map	*lmp;
 
-		for (lmp = nlmp; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+		for (lmp = nlmp; lmp; lmp = NEXT_RT_MAP(lmp)) {
 			if (PTTLS(lmp) && PTTLS(lmp)->p_memsz)
 				tls_modaddrem(lmp, TM_FLG_MODADD);
 		}
@@ -1265,8 +1265,8 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
 		 * for now only add interposers after the link-map lists head
 		 * object.
 		 */
-		for (tlmp = (Rt_map *)NEXT(lmc->lc_head); tlmp;
-		    tlmp = (Rt_map *)NEXT(tlmp)) {
+		for (tlmp = NEXT_RT_MAP(lmc->lc_head); tlmp;
+		    tlmp = NEXT_RT_MAP(tlmp)) {
 
 			if (FLAGS(tlmp) & FLG_RT_OBJINTPO)
 				continue;
@@ -1275,7 +1275,7 @@ lm_append(Lm_list *lml, Aliste lmco, Rt_map *lmp)
 			 * Insert the new link-map before this non-interposer,
 			 * and indicate an interposer is found.
 			 */
-			NEXT((Rt_map *)PREV(tlmp)) = (Link_map *)lmp;
+			NEXT(PREV_RT_MAP(tlmp)) = (Link_map *)lmp;
 			PREV(lmp) = PREV(tlmp);
 
 			NEXT(lmp) = (Link_map *)tlmp;
@@ -1350,14 +1350,14 @@ lm_delete(Lm_list *lml, Rt_map *lmp)
 	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, CNTL(lmp));
 
 	if (lmc->lc_head == lmp)
-		lmc->lc_head = (Rt_map *)NEXT(lmp);
+		lmc->lc_head = NEXT_RT_MAP(lmp);
 	else
-		NEXT((Rt_map *)PREV(lmp)) = (void *)NEXT(lmp);
+		NEXT(PREV_RT_MAP(lmp)) = (void *)NEXT(lmp);
 
 	if (lmc->lc_tail == lmp)
-		lmc->lc_tail = (Rt_map *)PREV(lmp);
+		lmc->lc_tail = PREV_RT_MAP(lmp);
 	else
-		PREV((Rt_map *)NEXT(lmp)) = PREV(lmp);
+		PREV(NEXT_RT_MAP(lmp)) = PREV(lmp);
 
 	/*
 	 * For backward compatibility with debuggers, the link-map list contains
@@ -1401,7 +1401,7 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 	 * Indicate each new link-map has been moved to the previous link-map
 	 * control list.
 	 */
-	for (lmp = nlmc->lc_head; lmp; lmp = (Rt_map *)NEXT(lmp))
+	for (lmp = nlmc->lc_head; lmp; lmp = NEXT_RT_MAP(lmp))
 		CNTL(lmp) = plmco;
 
 	/*
@@ -3337,7 +3337,7 @@ unused(Lm_list *lml)
 	 * is always used.
 	 */
 	nl = 0;
-	for (lmp = (Rt_map *)NEXT(lmp); lmp; lmp = (Rt_map *)NEXT(lmp)) {
+	for (lmp = NEXT_RT_MAP(lmp); lmp; lmp = NEXT_RT_MAP(lmp)) {
 		/*
 		 * Determine if this object contains any runpaths that have
 		 * not been used.
@@ -3711,10 +3711,10 @@ security(uid_t uid, uid_t euid, gid_t gid, gid_t egid, int auxflags)
 int
 is_rtld_setuid()
 {
-	struct stat	status;
+	rtld_stat_t	status;
 
 	if ((rtld_flags2 & RT_FL2_SETUID) ||
-	    ((stat(NAME(lml_rtld.lm_head), &status) == 0) &&
+	    ((rtld_stat(NAME(lml_rtld.lm_head), &status) == 0) &&
 	    (status.st_uid == 0) && (status.st_mode & S_ISUID))) {
 		rtld_flags2 |= RT_FL2_SETUID;
 		return (1);
@@ -3758,3 +3758,69 @@ demangle(const char *name)
 	else
 		return (name);
 }
+
+
+#ifndef _LP64
+/*
+ * Wrappers on stat() and fstat() for 32-bit rtld that uses stat64()
+ * underneath while preserving the object size limits of a non-largefile
+ * enabled 32-bit process. The purpose of this is to prevent large inode
+ * values from causing stat() to fail.
+ */
+inline static int
+rtld_stat_process(int r, struct stat64 *lbuf, rtld_stat_t *restrict buf)
+{
+	extern int	errno;
+
+	/*
+	 * Although we used a 64-bit capable stat(), the 32-bit rtld
+	 * can only handle objects < 2GB in size. If this object is
+	 * too big, turn the success into an overflow error.
+	 */
+	if ((lbuf->st_size & 0xffffffff80000000) != 0) {
+		errno = EOVERFLOW;
+		return (-1);
+	}
+
+	/*
+	 * Transfer the information needed by rtld into a rtld_stat_t
+	 * structure that preserves the non-largile types for everything
+	 * except inode.
+	 */
+	buf->st_dev = lbuf->st_dev;
+	buf->st_ino = lbuf->st_ino;
+	buf->st_mode = lbuf->st_mode;
+	buf->st_uid = lbuf->st_uid;
+	buf->st_size = (off_t)lbuf->st_size;
+	buf->st_mtim = lbuf->st_mtim;
+#ifdef sparc
+	buf->st_blksize = lbuf->st_blksize;
+#endif
+
+	return (r);
+}
+
+int
+rtld_stat(const char *restrict path, rtld_stat_t *restrict buf)
+{
+	struct stat64	lbuf;
+	int		r;
+
+	r = stat64(path, &lbuf);
+	if (r != -1)
+		r = rtld_stat_process(r, &lbuf, buf);
+	return (r);
+}
+
+int
+rtld_fstat(int fildes, rtld_stat_t *restrict buf)
+{
+	struct stat64	lbuf;
+	int		r;
+
+	r = fstat64(fildes, &lbuf);
+	if (r != -1)
+		r = rtld_stat_process(r, &lbuf, buf);
+	return (r);
+}
+#endif

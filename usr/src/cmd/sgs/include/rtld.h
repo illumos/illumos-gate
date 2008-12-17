@@ -49,6 +49,17 @@ extern "C" {
 
 
 /*
+ * We use rtld_ino_t instead of ino_t so that we can get
+ * access to large inode values from 32-bit code.
+ */
+#ifdef _LP64
+typedef ino_t		rtld_ino_t;
+#else
+typedef ino64_t		rtld_ino_t;
+#endif
+
+
+/*
  * Linked list of directories or filenames (built from colon separated string).
  */
 typedef struct pnode {
@@ -594,7 +605,7 @@ struct rt_map {
 	int		rt_sortval;	/* temporary buffer to traverse graph */
 	uint_t		rt_cycgroup;	/* cyclic group */
 	dev_t		rt_stdev;	/* device id and inode number for .so */
-	ino_t		rt_stino;	/*	multiple inclusion checks */
+	rtld_ino_t	rt_stino;	/*	multiple inclusion checks */
 	char		*rt_origname;	/* original pathname of loaded object */
 	size_t		rt_dirsz;	/*	and its size */
 	Rt_map_copy	rt_copy;	/* list of copy relocations */
@@ -795,6 +806,31 @@ typedef struct rt_map32 {
 #define	NEXT(X)		((X)->rt_public.l_next)
 #define	PREV(X)		((X)->rt_public.l_prev)
 #define	REFNAME(X)	((X)->rt_public.l_refname)
+
+/*
+ * An Rt_map starts with a Link_map, followed by other information.
+ * ld.so.1 allocates Rt_map structures, and then casts them to Link_map,
+ * and back, depending on context.
+ *
+ * On some platforms, Rt_map can have a higher alignment requirement
+ * than Link_map. On such platforms, the cast from Link_map to Rt_map will
+ * draw an E_BAD_PTR_CAST_ALIGN warning from lint. Since we allocate
+ * the memory as the higher alignment Rt_map, we know that this is a safe
+ * conversion. The LINKMAP_TO_RTMAP macro is used to handle the conversion
+ * in a manner that satisfies lint.
+ */
+#ifdef lint
+#define	LINKMAP_TO_RTMAP(X)	(Rt_map *)(void *)(X)
+#else
+#define	LINKMAP_TO_RTMAP(X)	(Rt_map *)(X)
+#endif
+
+/*
+ * Convenience macros for the common case of using
+ * NEXT()/PREV() and casting the result to (Rt_map *)
+ */
+#define	NEXT_RT_MAP(X)	LINKMAP_TO_RTMAP(NEXT(X))
+#define	PREV_RT_MAP(X)	LINKMAP_TO_RTMAP(PREV(X))
 
 /*
  * Macros for getting to linker private data.

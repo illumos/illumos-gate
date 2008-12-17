@@ -128,7 +128,7 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 
 	nlmc->lc_flags |= LMC_FLG_ANALYZING;
 
-	for (; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+	for (; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		if (FLAGS(lmp) &
 		    (FLG_RT_ANALZING | FLG_RT_ANALYZED | FLG_RT_DELETE))
 			continue;
@@ -294,7 +294,7 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated, int *in_nfavl)
 {
 	Rt_map	*lmp;
 
-	for (lmp = nlmp; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+	for (lmp = nlmp; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		/*
 		 * If this object has already been relocated, we're done.  If
 		 * this object is being deleted, skip it, there's probably a
@@ -639,7 +639,7 @@ rejection_inherit(Rej_desc *rej1, Rej_desc *rej2)
  * Determine the object type of a file.
  */
 Fct *
-are_u_this(Rej_desc *rej, int fd, struct stat *status, const char *name)
+are_u_this(Rej_desc *rej, int fd, rtld_stat_t *status, const char *name)
 {
 	int	i;
 	char	*maddr = 0;
@@ -914,7 +914,7 @@ is_so_loaded(Lm_list *lml, const char *name, int *in_nfavl)
 	 * Loop through the callers link-map lists.
 	 */
 	for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
-		for (lmp = lmc->lc_head; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+		for (lmp = lmc->lc_head; lmp; lmp = NEXT_RT_MAP(lmp)) {
 			if (FLAGS(lmp) & (FLG_RT_OBJECT | FLG_RT_DELETE))
 				continue;
 
@@ -1128,7 +1128,7 @@ append_alias(Rt_map *lmp, const char *str, int *added)
  * values.
  */
 static Rt_map *
-is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
+is_devinode_loaded(rtld_stat_t *status, Lm_list *lml, const char *name,
     uint_t flags)
 {
 	Lm_cntl	*lmc;
@@ -1164,7 +1164,7 @@ is_devinode_loaded(struct stat *status, Lm_list *lml, const char *name,
 	for (ALIST_TRAVERSE(lml->lm_lists, idx, lmc)) {
 		Rt_map	*nlmp;
 
-		for (nlmp = lmc->lc_head; nlmp; nlmp = (Rt_map *)NEXT(nlmp)) {
+		for (nlmp = lmc->lc_head; nlmp; nlmp = NEXT_RT_MAP(nlmp)) {
 			if ((FLAGS(nlmp) & FLG_RT_DELETE) ||
 			    (FLAGS1(nlmp) & FL1_RT_LDDSTUB))
 				continue;
@@ -1246,7 +1246,7 @@ static int
 file_open(int err, Lm_list *lml, const char *oname, const char *nname,
     Rt_map *clmp, uint_t flags, Fdesc *fdesc, Rej_desc *rej, int *in_nfavl)
 {
-	struct stat	status;
+	rtld_stat_t	status;
 	Rt_map		*nlmp;
 	int		resolved = 0;
 	char		*name;
@@ -1288,7 +1288,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 		}
 	}
 
-	if ((err == 0) && ((stat(nname, &status)) != -1)) {
+	if ((err == 0) && ((rtld_stat(nname, &status)) != -1)) {
 		char	path[PATH_MAX];
 		int	fd, size, added;
 
@@ -2679,9 +2679,9 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 	sl = *slp;
 
 	if (((FLAGS(lmp) & MSK_RT_INTPOSE) == 0) || (sl.sl_flags & LKUP_COPY))
-		lmp = (Rt_map *)NEXT(lmp);
+		lmp = NEXT_RT_MAP(lmp);
 
-	for (; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+	for (; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		if (FLAGS(lmp) & FLG_RT_DELETE)
 			continue;
 		if ((FLAGS(lmp) & MSK_RT_INTPOSE) == 0)
@@ -2842,11 +2842,11 @@ core_lookup_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 	 * main link-map control list.
 	 */
 	if ((off == ALIST_OFF_DATA) && (slp->sl_flags & LKUP_COPY) && ilmp)
-		lmp = (Rt_map *)NEXT(ilmp);
+		lmp = NEXT_RT_MAP(ilmp);
 	else
 		lmp = ilmp;
 
-	for (; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+	for (; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		if (callable(slp->sl_cmap, lmp, 0, slp->sl_flags)) {
 			Sym	*sym;
 
@@ -2866,7 +2866,7 @@ _lazy_find_sym(Rt_map *ilmp, Slookup *slp, Rt_map **dlmp, uint_t *binfo,
 {
 	Rt_map	*lmp;
 
-	for (lmp = ilmp; lmp; lmp = (Rt_map *)NEXT(lmp)) {
+	for (lmp = ilmp; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		if (LAZY(lmp) == 0)
 			continue;
 		if (callable(slp->sl_cmap, lmp, 0, slp->sl_flags)) {

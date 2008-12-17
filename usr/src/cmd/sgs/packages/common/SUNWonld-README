@@ -1413,3 +1413,4 @@ Bugid   Risk Synopsis
 6782977 ld segfaults after support lib version error sends bad args to vprintf()
 6773695 ld -z nopartial can break non-pic objects
 6778453 RTLD_GROUP prevents use of application defined malloc
+6782597 32-bit ld.so.1 needs to accept objects with large inode number
