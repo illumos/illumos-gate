@@ -2049,15 +2049,11 @@ checkauth(struct exportinfo *exi, struct svc_req *req, cred_t *cr, int anon_ok,
 
 	} else if (access & NFSAUTH_WRONGSEC) {
 		/*
-		 * NFSAUTH_WRONGSEC is used for NFSv4. Since V2/V3 already
-		 * negotiates the security flavor thru MOUNT protocol, the
-		 * only way it can get NFSAUTH_WRONGSEC here is from
-		 * NFS_ACL for V4. This could be for a limited view, so
-		 * map it to RO access. V4 lookup/readdir will take care
-		 * of the limited view portion.
+		 * NFSAUTH_WRONGSEC is used for NFSv4. If we get here,
+		 * it means a client ignored the list of allowed flavors
+		 * returned via the MOUNT protocol. So we just disallow it!
 		 */
-		access |= NFSAUTH_RO;
-		access &= ~NFSAUTH_WRONGSEC;
+		return (0);
 	}
 
 	switch (rpcflavor) {
