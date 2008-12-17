@@ -187,38 +187,40 @@ typedef struct iproutedata_s {
  * in the cluster
  *
  */
-int (*cl_inet_isclusterwide)(uint8_t protocol,
-    sa_family_t addr_family, uint8_t *laddrp) = NULL;
+int (*cl_inet_isclusterwide)(netstackid_t stack_id, uint8_t protocol,
+    sa_family_t addr_family, uint8_t *laddrp, void *args) = NULL;
 
 /*
  * Hook function to generate cluster wide ip fragment identifier
  */
-uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
-    uint8_t *laddrp, uint8_t *faddrp) = NULL;
+uint32_t (*cl_inet_ipident)(netstackid_t stack_id, uint8_t protocol,
+    sa_family_t addr_family, uint8_t *laddrp, uint8_t *faddrp,
+    void *args) = NULL;
 
 /*
  * Hook function to generate cluster wide SPI.
  */
-void (*cl_inet_getspi)(uint8_t, uint8_t *, size_t) = NULL;
+void (*cl_inet_getspi)(netstackid_t, uint8_t, uint8_t *, size_t,
+    void *) = NULL;
 
 /*
  * Hook function to verify if the SPI is already utlized.
  */
 
-int (*cl_inet_checkspi)(uint8_t, uint32_t) = NULL;
+int (*cl_inet_checkspi)(netstackid_t, uint8_t, uint32_t, void *) = NULL;
 
 /*
  * Hook function to delete the SPI from the cluster wide repository.
  */
 
-void (*cl_inet_deletespi)(uint8_t, uint32_t) = NULL;
+void (*cl_inet_deletespi)(netstackid_t, uint8_t, uint32_t, void *) = NULL;
 
 /*
  * Hook function to inform the cluster when packet received on an IDLE SA
  */
 
-void (*cl_inet_idlesa)(uint8_t, uint32_t, sa_family_t, in6_addr_t,
-    in6_addr_t) = NULL;
+void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t, sa_family_t,
+    in6_addr_t, in6_addr_t, void *) = NULL;
 
 /*
  * Synchronization notes:
@@ -22707,11 +22709,13 @@ another:;
 	clusterwide = 0;
 	if (cl_inet_ipident) {
 		ASSERT(cl_inet_isclusterwide);
-		if ((*cl_inet_isclusterwide)(IPPROTO_IP,
-		    AF_INET, (uint8_t *)(uintptr_t)src)) {
-			ipha->ipha_ident = (*cl_inet_ipident)(IPPROTO_IP,
-			    AF_INET, (uint8_t *)(uintptr_t)src,
-			    (uint8_t *)(uintptr_t)dst);
+		netstackid_t stack_id = ipst->ips_netstack->netstack_stackid;
+
+		if ((*cl_inet_isclusterwide)(stack_id, IPPROTO_IP,
+		    AF_INET, (uint8_t *)(uintptr_t)src, NULL)) {
+			ipha->ipha_ident = (*cl_inet_ipident)(stack_id,
+			    IPPROTO_IP, AF_INET, (uint8_t *)(uintptr_t)src,
+			    (uint8_t *)(uintptr_t)dst, NULL);
 			clusterwide = 1;
 		}
 	}

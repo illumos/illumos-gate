@@ -151,7 +151,8 @@ static boolean_t ah_register_out(uint32_t, uint32_t, uint_t, ipsecah_stack_t *);
 static void	*ipsecah_stack_init(netstackid_t stackid, netstack_t *ns);
 static void	ipsecah_stack_fini(netstackid_t stackid, void *arg);
 
-extern void (*cl_inet_getspi)(uint8_t, uint8_t *, size_t);
+extern void (*cl_inet_getspi)(netstackid_t, uint8_t, uint8_t *, size_t,
+    void *);
 
 /* Setable in /etc/system */
 uint32_t ah_hash_size = IPSEC_DEFAULT_HASH_SIZE;
@@ -1959,8 +1960,8 @@ ah_getspi(mblk_t *mp, keysock_in_t *ksi, ipsecah_stack_t *ahstack)
 	 * Randomly generate a proposed SPI value.
 	 */
 	if (cl_inet_getspi != NULL) {
-		cl_inet_getspi(IPPROTO_AH, (uint8_t *)&newspi,
-		    sizeof (uint32_t));
+		cl_inet_getspi(ahstack->ipsecah_netstack->netstack_stackid,
+		    IPPROTO_AH, (uint8_t *)&newspi, sizeof (uint32_t), NULL);
 	} else {
 		(void) random_get_pseudo_bytes((uint8_t *)&newspi,
 		    sizeof (uint32_t));

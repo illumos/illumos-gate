@@ -144,7 +144,8 @@ static boolean_t esp_strip_header(mblk_t *, boolean_t, uint32_t,
 static ipsec_status_t esp_submit_req_inbound(mblk_t *, ipsa_t *, uint_t);
 static ipsec_status_t esp_submit_req_outbound(mblk_t *, ipsa_t *, uchar_t *,
     uint_t);
-extern void (*cl_inet_getspi)(uint8_t, uint8_t *, size_t);
+extern void (*cl_inet_getspi)(netstackid_t, uint8_t, uint8_t *, size_t,
+    void *);
 
 /* Setable in /etc/system */
 uint32_t esp_hash_size = IPSEC_DEFAULT_HASH_SIZE;
@@ -1487,8 +1488,8 @@ esp_getspi(mblk_t *mp, keysock_in_t *ksi, ipsecesp_stack_t *espstack)
 	 * Randomly generate a proposed SPI value
 	 */
 	if (cl_inet_getspi != NULL) {
-		cl_inet_getspi(IPPROTO_ESP, (uint8_t *)&newspi,
-		    sizeof (uint32_t));
+		cl_inet_getspi(espstack->ipsecesp_netstack->netstack_stackid,
+		    IPPROTO_ESP, (uint8_t *)&newspi, sizeof (uint32_t), NULL);
 	} else {
 		(void) random_get_pseudo_bytes((uint8_t *)&newspi,
 		    sizeof (uint32_t));

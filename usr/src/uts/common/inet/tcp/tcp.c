@@ -1358,53 +1358,72 @@ uint32_t tcp_drop_ack_unsent_cnt = 10;
  * On non-clustered systems these vectors must always be NULL.
  */
 
-void (*cl_inet_listen)(uint8_t protocol, sa_family_t addr_family,
-			    uint8_t *laddrp, in_port_t lport) = NULL;
-void (*cl_inet_unlisten)(uint8_t protocol, sa_family_t addr_family,
-			    uint8_t *laddrp, in_port_t lport) = NULL;
-void (*cl_inet_connect)(uint8_t protocol, sa_family_t addr_family,
+void (*cl_inet_listen)(netstackid_t stack_id, uint8_t protocol,
+			    sa_family_t addr_family, uint8_t *laddrp,
+			    in_port_t lport, void *args) = NULL;
+void (*cl_inet_unlisten)(netstackid_t stack_id, uint8_t protocol,
+			    sa_family_t addr_family, uint8_t *laddrp,
+			    in_port_t lport, void *args) = NULL;
+
+int (*cl_inet_connect2)(netstackid_t stack_id, uint8_t protocol,
+			    boolean_t is_outgoing,
+			    sa_family_t addr_family,
 			    uint8_t *laddrp, in_port_t lport,
-			    uint8_t *faddrp, in_port_t fport) = NULL;
-void (*cl_inet_disconnect)(uint8_t protocol, sa_family_t addr_family,
-			    uint8_t *laddrp, in_port_t lport,
-			    uint8_t *faddrp, in_port_t fport) = NULL;
+			    uint8_t *faddrp, in_port_t fport,
+			    void *args) = NULL;
+
+void (*cl_inet_disconnect)(netstackid_t stack_id, uint8_t protocol,
+			    sa_family_t addr_family, uint8_t *laddrp,
+			    in_port_t lport, uint8_t *faddrp,
+			    in_port_t fport, void *args) = NULL;
 
 /*
  * The following are defined in ip.c
  */
-extern int (*cl_inet_isclusterwide)(uint8_t protocol, sa_family_t addr_family,
-				uint8_t *laddrp);
-extern uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
-				uint8_t *laddrp, uint8_t *faddrp);
+extern int (*cl_inet_isclusterwide)(netstackid_t stack_id, uint8_t protocol,
+			    sa_family_t addr_family, uint8_t *laddrp,
+			    void *args);
+extern uint32_t (*cl_inet_ipident)(netstackid_t stack_id, uint8_t protocol,
+			    sa_family_t addr_family, uint8_t *laddrp,
+			    uint8_t *faddrp, void *args);
 
-#define	CL_INET_CONNECT(tcp)		{			\
-	if (cl_inet_connect != NULL) {				\
+
+/*
+ * int CL_INET_CONNECT(conn_t *cp, tcp_t *tcp, boolean_t is_outgoing, int err)
+ */
+#define	CL_INET_CONNECT(connp, tcp, is_outgoing, err) {		\
+	(err) = 0;						\
+	if (cl_inet_connect2 != NULL) {				\
 		/*						\
 		 * Running in cluster mode - register active connection	\
 		 * information						\
 		 */							\
 		if ((tcp)->tcp_ipversion == IPV4_VERSION) {		\
 			if ((tcp)->tcp_ipha->ipha_src != 0) {		\
-				(*cl_inet_connect)(IPPROTO_TCP, AF_INET,\
+				(err) = (*cl_inet_connect2)(		\
+				    (connp)->conn_netstack->netstack_stackid,\
+				    IPPROTO_TCP, is_outgoing, AF_INET,	\
 				    (uint8_t *)(&((tcp)->tcp_ipha->ipha_src)),\
 				    (in_port_t)(tcp)->tcp_lport,	\
 				    (uint8_t *)(&((tcp)->tcp_ipha->ipha_dst)),\
-				    (in_port_t)(tcp)->tcp_fport);	\
+				    (in_port_t)(tcp)->tcp_fport, NULL);	\
 			}						\
 		} else {						\
 			if (!IN6_IS_ADDR_UNSPECIFIED(			\
-			    &(tcp)->tcp_ip6h->ip6_src)) {\
-				(*cl_inet_connect)(IPPROTO_TCP, AF_INET6,\
+			    &(tcp)->tcp_ip6h->ip6_src)) {		\
+				(err) = (*cl_inet_connect2)(		\
+				    (connp)->conn_netstack->netstack_stackid,\
+				    IPPROTO_TCP, is_outgoing, AF_INET6,	\
 				    (uint8_t *)(&((tcp)->tcp_ip6h->ip6_src)),\
 				    (in_port_t)(tcp)->tcp_lport,	\
 				    (uint8_t *)(&((tcp)->tcp_ip6h->ip6_dst)),\
-				    (in_port_t)(tcp)->tcp_fport);	\
+				    (in_port_t)(tcp)->tcp_fport, NULL);	\
 			}						\
 		}							\
 	}								\
 }
 
-#define	CL_INET_DISCONNECT(tcp)	{				\
+#define	CL_INET_DISCONNECT(connp, tcp)	{				\
 	if (cl_inet_disconnect != NULL) {				\
 		/*							\
 		 * Running in cluster mode - deregister active		\
@@ -1412,23 +1431,24 @@ extern uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
 		 */							\
 		if ((tcp)->tcp_ipversion == IPV4_VERSION) {		\
 			if ((tcp)->tcp_ip_src != 0) {			\
-				(*cl_inet_disconnect)(IPPROTO_TCP,	\
-				    AF_INET,				\
-				    (uint8_t *)(&((tcp)->tcp_ip_src)),\
+				(*cl_inet_disconnect)(			\
+				    (connp)->conn_netstack->netstack_stackid,\
+				    IPPROTO_TCP, AF_INET,		\
+				    (uint8_t *)(&((tcp)->tcp_ip_src)),	\
 				    (in_port_t)(tcp)->tcp_lport,	\
-				    (uint8_t *)				\
-				    (&((tcp)->tcp_ipha->ipha_dst)),\
-				    (in_port_t)(tcp)->tcp_fport);	\
+				    (uint8_t *)(&((tcp)->tcp_ipha->ipha_dst)),\
+				    (in_port_t)(tcp)->tcp_fport, NULL);	\
 			}						\
 		} else {						\
 			if (!IN6_IS_ADDR_UNSPECIFIED(			\
 			    &(tcp)->tcp_ip_src_v6)) {			\
-				(*cl_inet_disconnect)(IPPROTO_TCP, AF_INET6,\
+				(*cl_inet_disconnect)(			\
+				    (connp)->conn_netstack->netstack_stackid,\
+				    IPPROTO_TCP, AF_INET6,		\
 				    (uint8_t *)(&((tcp)->tcp_ip_src_v6)),\
 				    (in_port_t)(tcp)->tcp_lport,	\
-				    (uint8_t *)				\
-				    (&((tcp)->tcp_ip6h->ip6_dst)),\
-				    (in_port_t)(tcp)->tcp_fport);	\
+				    (uint8_t *)(&((tcp)->tcp_ip6h->ip6_dst)),\
+				    (in_port_t)(tcp)->tcp_fport, NULL);	\
 			}						\
 		}							\
 	}								\
@@ -1439,7 +1459,8 @@ extern uint32_t (*cl_inet_ipident)(uint8_t protocol, sa_family_t addr_family,
  * This routine is used to extract the current list of live connections
  * which must continue to to be dispatched to this node.
  */
-int cl_tcp_walk_list(int (*callback)(cl_tcp_info_t *, void *), void *arg);
+int cl_tcp_walk_list(netstackid_t stack_id,
+    int (*callback)(cl_tcp_info_t *, void *), void *arg);
 
 static int cl_tcp_walk_list_stack(int (*callback)(cl_tcp_info_t *, void *),
     void *arg, tcp_stack_t *tcps);
@@ -4235,7 +4256,7 @@ tcp_closei_local(tcp_t *tcp)
 	 */
 	if (tcp->tcp_state == TCPS_TIME_WAIT)
 		(void) tcp_time_wait_remove(tcp, NULL);
-	CL_INET_DISCONNECT(tcp);
+	CL_INET_DISCONNECT(connp, tcp);
 	ipcl_hash_remove(connp);
 
 	/*
@@ -5537,7 +5558,11 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	tcp_bind_hash_insert(&tcps->tcps_bind_fanout[
 	    TCP_BIND_HASH(eager->tcp_lport)], eager, 0);
 
-	CL_INET_CONNECT(eager);
+	CL_INET_CONNECT(connp, eager, B_FALSE, err);
+	if (err != 0) {
+		tcp_bind_hash_remove(eager);
+		goto error3;
+	}
 
 	/*
 	 * No need to check for multicast destination since ip will only pass
@@ -7463,7 +7488,7 @@ tcp_reinit(tcp_t *tcp)
 	 */
 	tcp_close_mpp(&tcp->tcp_conn.tcp_eager_conn_ind);
 
-	CL_INET_DISCONNECT(tcp);
+	CL_INET_DISCONNECT(tcp->tcp_connp, tcp);
 
 	/*
 	 * The connection can't be on the tcp_time_wait_head list
@@ -20071,6 +20096,7 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	int		usable_mmd, tail_unsent_mmd;
 	uint_t		snxt_mmd, obsegs_mmd, obbytes_mmd;
 	mblk_t		*xmit_tail_mmd;
+	netstackid_t	stack_id;
 
 #ifdef	_BIG_ENDIAN
 #define	IPVER(ip6h)	((((uint32_t *)ip6h)[0] >> 28) & 0x7)
@@ -20112,6 +20138,8 @@ tcp_multisend(queue_t *q, tcp_t *tcp, const int mss, const int tcp_hdr_len,
 	ASSERT(connp != NULL);
 	ASSERT(CONN_IS_LSO_MD_FASTPATH(connp));
 	ASSERT(!CONN_IPSEC_OUT_ENCAPSULATED(connp));
+
+	stack_id = connp->conn_netstack->netstack_stackid;
 
 	usable_mmd = tail_unsent_mmd = 0;
 	snxt_mmd = obsegs_mmd = obbytes_mmd = 0;
@@ -20877,14 +20905,15 @@ legacy_send_no_md:
 				clusterwide = B_FALSE;
 				if (cl_inet_ipident != NULL) {
 					ASSERT(cl_inet_isclusterwide != NULL);
-					if ((*cl_inet_isclusterwide)(IPPROTO_IP,
-					    AF_INET,
-					    (uint8_t *)(uintptr_t)src)) {
+					if ((*cl_inet_isclusterwide)(stack_id,
+					    IPPROTO_IP, AF_INET,
+					    (uint8_t *)(uintptr_t)src, NULL)) {
 						ipha->ipha_ident =
-						    (*cl_inet_ipident)
-						    (IPPROTO_IP, AF_INET,
+						    (*cl_inet_ipident)(stack_id,
+						    IPPROTO_IP, AF_INET,
 						    (uint8_t *)(uintptr_t)src,
-						    (uint8_t *)(uintptr_t)dst);
+						    (uint8_t *)(uintptr_t)dst,
+						    NULL);
 						clusterwide = B_TRUE;
 					}
 				}
@@ -25057,16 +25086,28 @@ tcp_iss_init(tcp_t *tcp)
  * gather a list of connections that need to be forwarded to
  * specific nodes in the cluster when configuration changes occur.
  *
- * The callback is invoked for each tcp_t structure. Returning
+ * The callback is invoked for each tcp_t structure from all netstacks,
+ * if 'stack_id' is less than 0. Otherwise, only for tcp_t structures
+ * from the netstack with the specified stack_id. Returning
  * non-zero from the callback routine terminates the search.
  */
 int
-cl_tcp_walk_list(int (*cl_callback)(cl_tcp_info_t *, void *),
-    void *arg)
+cl_tcp_walk_list(netstackid_t stack_id,
+    int (*cl_callback)(cl_tcp_info_t *, void *), void *arg)
 {
 	netstack_handle_t nh;
 	netstack_t *ns;
 	int ret = 0;
+
+	if (stack_id >= 0) {
+		if ((ns = netstack_find_by_stackid(stack_id)) == NULL)
+			return (EINVAL);
+
+		ret = cl_tcp_walk_list_stack(cl_callback, arg,
+		    ns->netstack_tcp);
+		netstack_rele(ns);
+		return (ret);
+	}
 
 	netstack_next_init(&nh);
 	while ((ns = netstack_next(&nh)) != NULL) {
@@ -26572,7 +26613,11 @@ tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error)
 		if (tcp->tcp_hard_binding) {
 			tcp->tcp_hard_binding = B_FALSE;
 			tcp->tcp_hard_bound = B_TRUE;
-			CL_INET_CONNECT(tcp);
+			CL_INET_CONNECT(tcp->tcp_connp, tcp, B_TRUE, retval);
+			if (retval != 0) {
+				error = EADDRINUSE;
+				goto bind_failed;
+			}
 		} else {
 			if (ire_mp != NULL)
 				freeb(ire_mp);

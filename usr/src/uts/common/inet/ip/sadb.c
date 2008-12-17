@@ -85,9 +85,12 @@ static void lifetime_fuzz(ipsa_t *);
 static void age_pair_peer_list(templist_t *, sadb_t *, boolean_t);
 static void ipsa_set_replay(ipsa_t *ipsa, uint32_t offset);
 
-extern void (*cl_inet_getspi)(uint8_t protocol, uint8_t *ptr, size_t len);
-extern int (*cl_inet_checkspi)(uint8_t protocol, uint32_t spi);
-extern void (*cl_inet_deletespi)(uint8_t protocol, uint32_t spi);
+extern void (*cl_inet_getspi)(netstackid_t stack_id, uint8_t protocol,
+    uint8_t *ptr, size_t len, void *args);
+extern int (*cl_inet_checkspi)(netstackid_t stack_id, uint8_t protocol,
+    uint32_t spi, void *args);
+extern void (*cl_inet_deletespi)(netstackid_t stack_id, uint8_t protocol,
+    uint32_t spi, void *args);
 
 /*
  * ipsacq_maxpackets is defined here to make it tunable
@@ -335,7 +338,8 @@ sadb_delete_cluster(ipsa_t *assoc)
 	    (assoc->ipsa_state == IPSA_STATE_MATURE))) {
 		protocol = (assoc->ipsa_type == SADB_SATYPE_AH) ?
 		    IPPROTO_AH : IPPROTO_ESP;
-		cl_inet_deletespi(protocol, assoc->ipsa_spi);
+		cl_inet_deletespi(assoc->ipsa_netstack->netstack_stackid,
+		    protocol, assoc->ipsa_spi, NULL);
 	}
 }
 
@@ -1026,24 +1030,25 @@ sadb_destroyer(isaf_t **tablep, uint_t numentries, boolean_t forever,
 	int i;
 	isaf_t *table = *tablep;
 	uint8_t protocol;
+	ipsa_t *sa;
+	netstackid_t sid;
 
 	if (table == NULL)
 		return;
 
 	for (i = 0; i < numentries; i++) {
 		mutex_enter(&table[i].isaf_lock);
-		while (table[i].isaf_ipsa != NULL) {
+		while ((sa = table[i].isaf_ipsa) != NULL) {
 			if (inbound && cl_inet_deletespi &&
-			    (table[i].isaf_ipsa->ipsa_state !=
-			    IPSA_STATE_ACTIVE_ELSEWHERE) &&
-			    (table[i].isaf_ipsa->ipsa_state !=
-			    IPSA_STATE_IDLE)) {
-				protocol = (table[i].isaf_ipsa->ipsa_type ==
-				    SADB_SATYPE_AH) ? IPPROTO_AH : IPPROTO_ESP;
-				cl_inet_deletespi(protocol,
-				    table[i].isaf_ipsa->ipsa_spi);
+			    (sa->ipsa_state != IPSA_STATE_ACTIVE_ELSEWHERE) &&
+			    (sa->ipsa_state != IPSA_STATE_IDLE)) {
+				protocol = (sa->ipsa_type == SADB_SATYPE_AH) ?
+				    IPPROTO_AH : IPPROTO_ESP;
+				sid = sa->ipsa_netstack->netstack_stackid;
+				cl_inet_deletespi(sid, protocol, sa->ipsa_spi,
+				    NULL);
 			}
-			sadb_unlinkassoc(table[i].isaf_ipsa);
+			sadb_unlinkassoc(sa);
 		}
 		table[i].isaf_gen++;
 		mutex_exit(&table[i].isaf_lock);
@@ -3255,7 +3260,8 @@ sadb_common_add(queue_t *ip_q, queue_t *pfkey_q, mblk_t *mp, sadb_msg_t *samsg,
 	if (!isupdate && (clone == B_TRUE || is_inbound == B_TRUE) &&
 	    cl_inet_checkspi &&
 	    (assoc->sadb_sa_state != SADB_X_SASTATE_ACTIVE_ELSEWHERE)) {
-		rcode = cl_inet_checkspi(protocol, assoc->sadb_sa_spi);
+		rcode = cl_inet_checkspi(ns->netstack_stackid, protocol,
+		    assoc->sadb_sa_spi, NULL);
 		if (rcode == -1) {
 			return (EEXIST);
 		}
@@ -5869,7 +5875,8 @@ sadb_getspi(keysock_in_t *ksi, uint32_t master_spi, int *diagnostic,
 	if (master_spi < min || master_spi > max) {
 		/* Return a random value in the range. */
 		if (cl_inet_getspi) {
-			cl_inet_getspi(protocol, (uint8_t *)&add, sizeof (add));
+			cl_inet_getspi(ns->netstack_stackid, protocol,
+			    (uint8_t *)&add, sizeof (add), NULL);
 		} else {
 			(void) random_get_pseudo_bytes((uint8_t *)&add,
 			    sizeof (add));
@@ -6896,8 +6903,8 @@ void
 sadb_buf_pkt(ipsa_t *ipsa, mblk_t *bpkt, netstack_t *ns)
 {
 	ipsec_stack_t   *ipss = ns->netstack_ipsec;
-	extern void (*cl_inet_idlesa)(uint8_t, uint32_t, sa_family_t,
-	    in6_addr_t, in6_addr_t);
+	extern void (*cl_inet_idlesa)(netstackid_t, uint8_t, uint32_t,
+	    sa_family_t, in6_addr_t, in6_addr_t, void *);
 	in6_addr_t *srcaddr = (in6_addr_t *)(&ipsa->ipsa_srcaddr);
 	in6_addr_t *dstaddr = (in6_addr_t *)(&ipsa->ipsa_dstaddr);
 
@@ -6910,9 +6917,9 @@ sadb_buf_pkt(ipsa_t *ipsa, mblk_t *bpkt, netstack_t *ns)
 		return;
 	}
 
-	cl_inet_idlesa((ipsa->ipsa_type == SADB_SATYPE_AH) ?
-	    IPPROTO_AH : IPPROTO_ESP, ipsa->ipsa_spi, ipsa->ipsa_addrfam,
-	    *srcaddr, *dstaddr);
+	cl_inet_idlesa(ns->netstack_stackid,
+	    (ipsa->ipsa_type == SADB_SATYPE_AH) ? IPPROTO_AH : IPPROTO_ESP,
+	    ipsa->ipsa_spi, ipsa->ipsa_addrfam, *srcaddr, *dstaddr, NULL);
 
 	mutex_enter(&ipsa->ipsa_lock);
 	ipsa->ipsa_mblkcnt++;

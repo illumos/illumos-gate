@@ -358,6 +358,15 @@ static void	ip_helper_stream_destructor(void *, void *);
 
 boolean_t	ip_use_helper_cache = B_TRUE;
 
+/*
+ * Hook functions to enable cluster networking
+ * On non-clustered systems these vectors must always be NULL.
+ */
+extern void	(*cl_inet_listen)(netstackid_t, uint8_t, sa_family_t,
+		    uint8_t *, in_port_t, void *);
+extern void	(*cl_inet_unlisten)(netstackid_t, uint8_t, sa_family_t,
+		    uint8_t *, in_port_t, void *);
+
 #ifdef	IPCL_DEBUG
 #define	INET_NTOA_BUFSIZE	18
 
@@ -810,8 +819,8 @@ ipcl_conn_unlisten(conn_t *connp)
 			addr_family = AF_INET;
 			laddrp = (uint8_t *)&connp->conn_bound_source;
 		}
-		(*cl_inet_unlisten)(IPPROTO_TCP, addr_family, laddrp,
-		    connp->conn_lport);
+		(*cl_inet_unlisten)(connp->conn_netstack->netstack_stackid,
+		    IPPROTO_TCP, addr_family, laddrp, connp->conn_lport, NULL);
 	}
 	connp->conn_flags &= ~IPCL_CL_LISTENER;
 }
@@ -1190,8 +1199,10 @@ ipcl_bind_insert(conn_t *connp, uint8_t protocol, ipaddr_t src, uint16_t lport)
 		if (cl_inet_listen != NULL) {
 			ASSERT(!connp->conn_pkt_isv6);
 			connp->conn_flags |= IPCL_CL_LISTENER;
-			(*cl_inet_listen)(IPPROTO_TCP, AF_INET,
-			    (uint8_t *)&connp->conn_bound_source, lport);
+			(*cl_inet_listen)(
+			    connp->conn_netstack->netstack_stackid,
+			    IPPROTO_TCP, AF_INET,
+			    (uint8_t *)&connp->conn_bound_source, lport, NULL);
 		}
 		break;
 
@@ -1271,8 +1282,9 @@ ipcl_bind_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 				laddrp = (uint8_t *)&connp->conn_bound_source;
 			}
 			connp->conn_flags |= IPCL_CL_LISTENER;
-			(*cl_inet_listen)(IPPROTO_TCP, addr_family, laddrp,
-			    lport);
+			(*cl_inet_listen)(
+			    connp->conn_netstack->netstack_stackid,
+			    IPPROTO_TCP, addr_family, laddrp, lport, NULL);
 		}
 		break;
 

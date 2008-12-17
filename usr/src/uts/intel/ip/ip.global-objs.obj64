@@ -26,7 +26,7 @@
 IP_MAJ
 cb_inet_devops
 cl_inet_bind
-cl_inet_connect
+cl_inet_connect2
 cl_inet_disconnect
 cl_inet_ipident
 cl_inet_isclusterwide

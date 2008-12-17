@@ -248,6 +248,52 @@ static int	udp_post_ip_bind_connect(udp_t *, mblk_t *, int);
 #define	UDP_XMIT_HIWATER	(56 * 1024)
 #define	UDP_XMIT_LOWATER	1024
 
+/*
+ * The following is defined in tcp.c
+ */
+extern int	(*cl_inet_connect2)(netstackid_t stack_id,
+		    uint8_t protocol, boolean_t is_outgoing,
+		    sa_family_t addr_family,
+		    uint8_t *laddrp, in_port_t lport,
+		    uint8_t *faddrp, in_port_t fport, void *args);
+
+/*
+ * Checks if the given destination addr/port is allowed out.
+ * If allowed, registers the (dest_addr/port, node_ID) mapping at Cluster.
+ * Called for each connect() and for sendto()/sendmsg() to a different
+ * destination.
+ * For connect(), called in udp_connect().
+ * For sendto()/sendmsg(), called in udp_output_v{4,6}().
+ *
+ * This macro assumes that the cl_inet_connect2 hook is not NULL.
+ * Please check this before calling this macro.
+ *
+ * void
+ * CL_INET_UDP_CONNECT(conn_t cp, udp_t *udp, boolean_t is_outgoing,
+ *     in6_addr_t *faddrp, in_port_t (or uint16_t) fport, int err);
+ */
+#define	CL_INET_UDP_CONNECT(cp, udp, is_outgoing, faddrp, fport, err) {	\
+	(err) = 0;							\
+	/*								\
+	 * Running in cluster mode - check and register active		\
+	 * "connection" information					\
+	 */								\
+	if ((udp)->udp_ipversion == IPV4_VERSION)			\
+		(err) = (*cl_inet_connect2)(				\
+		    (cp)->conn_netstack->netstack_stackid,		\
+		    IPPROTO_UDP, is_outgoing, AF_INET,			\
+		    (uint8_t *)&((udp)->udp_v6src._S6_un._S6_u32[3]),	\
+		    (udp)->udp_port,					\
+		    (uint8_t *)&((faddrp)->_S6_un._S6_u32[3]),		\
+		    (in_port_t)(fport), NULL);				\
+	else								\
+		(err) = (*cl_inet_connect2)(				\
+		    (cp)->conn_netstack->netstack_stackid,		\
+		    IPPROTO_UDP, is_outgoing, AF_INET6,			\
+		    (uint8_t *)&((udp)->udp_v6src), (udp)->udp_port,	\
+		    (uint8_t *)(faddrp), (in_port_t)(fport), NULL);	\
+}
+
 static struct module_info udp_mod_info =  {
 	UDP_MOD_ID, UDP_MOD_NAME, 1, INFPSZ, UDP_RECV_HIWATER, UDP_RECV_LOWATER
 };
@@ -371,10 +417,12 @@ uint32_t udp_random_anon_port = 1;
  * On non-clustered systems these vectors must always be NULL
  */
 
-void (*cl_inet_bind)(uchar_t protocol, sa_family_t addr_family,
-    uint8_t *laddrp, in_port_t lport) = NULL;
-void (*cl_inet_unbind)(uint8_t protocol, sa_family_t addr_family,
-    uint8_t *laddrp, in_port_t lport) = NULL;
+void (*cl_inet_bind)(netstackid_t stack_id, uchar_t protocol,
+    sa_family_t addr_family, uint8_t *laddrp, in_port_t lport,
+    void *args) = NULL;
+void (*cl_inet_unbind)(netstackid_t stack_id, uint8_t protocol,
+    sa_family_t addr_family, uint8_t *laddrp, in_port_t lport,
+    void *args) = NULL;
 
 typedef union T_primitives *t_primp_t;
 
@@ -841,13 +889,17 @@ udp_quiesce_conn(conn_t *connp)
 		 * Running in cluster mode - register unbind information
 		 */
 		if (udp->udp_ipversion == IPV4_VERSION) {
-			(*cl_inet_unbind)(IPPROTO_UDP, AF_INET,
+			(*cl_inet_unbind)(
+			    connp->conn_netstack->netstack_stackid,
+			    IPPROTO_UDP, AF_INET,
 			    (uint8_t *)(&(V4_PART_OF_V6(udp->udp_v6src))),
-			    (in_port_t)udp->udp_port);
+			    (in_port_t)udp->udp_port, NULL);
 		} else {
-			(*cl_inet_unbind)(IPPROTO_UDP, AF_INET6,
+			(*cl_inet_unbind)(
+			    connp->conn_netstack->netstack_stackid,
+			    IPPROTO_UDP, AF_INET6,
 			    (uint8_t *)(&(udp->udp_v6src)),
-			    (in_port_t)udp->udp_port);
+			    (in_port_t)udp->udp_port, NULL);
 		}
 	}
 
@@ -4916,7 +4968,8 @@ retry:
 }
 
 static int
-udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst)
+udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst,
+    boolean_t *update_lastdst)
 {
 	int err;
 	uchar_t opt_storage[IP_MAX_OPT_LENGTH];
@@ -4937,7 +4990,7 @@ udp_update_label(queue_t *wq, mblk_t *mp, ipaddr_t dst)
 		    char *, "queue(1) failed to update options(2) on mp(3)",
 		    queue_t *, wq, char *, opt_storage, mblk_t *, mp);
 	} else {
-		IN6_IPADDR_TO_V4MAPPED(dst, &udp->udp_v6lastdst);
+		*update_lastdst = B_TRUE;
 	}
 	return (err);
 }
@@ -4967,7 +5020,8 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	ipsec_stack_t	*ipss = ipst->ips_netstack->netstack_ipsec;
 	queue_t		*q = connp->conn_wq;
 	ire_t		*ire;
-
+	in6_addr_t	v6dst;
+	boolean_t	update_lastdst = B_FALSE;
 
 	*error = 0;
 	pktinfop->ip4_ill_index = 0;
@@ -5033,6 +5087,34 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 
 	rw_enter(&udp->udp_rwlock, RW_READER);
 	lock_held = B_TRUE;
+
+	/*
+	 * Cluster and TSOL note:
+	 *    udp.udp_v6lastdst		is shared by Cluster and TSOL
+	 *    udp.udp_lastdstport	is used by Cluster
+	 *
+	 * Both Cluster and TSOL need to update the dest addr and/or port.
+	 * Updating is done after both Cluster and TSOL checks, protected
+	 * by conn_lock.
+	 */
+	mutex_enter(&connp->conn_lock);
+
+	if (cl_inet_connect2 != NULL &&
+	    (!IN6_IS_ADDR_V4MAPPED(&udp->udp_v6lastdst) ||
+	    V4_PART_OF_V6(udp->udp_v6lastdst) != v4dst ||
+	    udp->udp_lastdstport != port)) {
+		mutex_exit(&connp->conn_lock);
+		*error = 0;
+		IN6_IPADDR_TO_V4MAPPED(v4dst, &v6dst);
+		CL_INET_UDP_CONNECT(connp, udp, B_TRUE, &v6dst, port, *error);
+		if (*error != 0) {
+			*error = EHOSTUNREACH;
+			goto done;
+		}
+		update_lastdst = B_TRUE;
+		mutex_enter(&connp->conn_lock);
+	}
+
 	/*
 	 * Check if our saved options are valid; update if not.
 	 * TSOL Note: Since we are not in WRITER mode, UDP packets
@@ -5043,7 +5125,6 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	 * and ip_snd_options_len are consistent for the current
 	 * destination and are updated atomically.
 	 */
-	mutex_enter(&connp->conn_lock);
 	if (is_system_labeled()) {
 		/* Using UDP MLP requires SCM_UCRED from user */
 		if (connp->conn_mlp_type != mlptSingle &&
@@ -5064,10 +5145,15 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 		if ((!IN6_IS_ADDR_V4MAPPED(&udp->udp_v6lastdst) ||
 		    V4_PART_OF_V6(udp->udp_v6lastdst) != v4dst ||
 		    connp->conn_mlp_type != mlptSingle) &&
-		    (*error = udp_update_label(q, mp, v4dst)) != 0) {
+		    (*error = udp_update_label(q, mp, v4dst, &update_lastdst))
+		    != 0) {
 			mutex_exit(&connp->conn_lock);
 			goto done;
 		}
+	}
+	if (update_lastdst) {
+		IN6_IPADDR_TO_V4MAPPED(v4dst, &udp->udp_v6lastdst);
+		udp->udp_lastdstport = port;
 	}
 	if (udp->udp_ip_snd_options_len > 0) {
 		ip_snd_opt_len = udp->udp_ip_snd_options_len;
@@ -5600,7 +5686,8 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 }
 
 static boolean_t
-udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst)
+udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst,
+    boolean_t *update_lastdst)
 {
 	udp_t *udp = Q_TO_UDP(wq);
 	int err;
@@ -5620,7 +5707,7 @@ udp_update_label_v6(queue_t *wq, mblk_t *mp, in6_addr_t *dst)
 		    char *, "queue(1) failed to update options(2) on mp(3)",
 		    queue_t *, wq, char *, opt_storage, mblk_t *, mp);
 	} else {
-		udp->udp_v6lastdst = *dst;
+		*update_lastdst = B_TRUE;
 	}
 	return (err);
 }
@@ -5940,6 +6027,7 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error,
 	uint8_t		*cp;
 	uint8_t		*nxthdr_ptr;
 	in6_addr_t	ip6_dst;
+	in_port_t	port;
 	udpattrs_t	attrs;
 	boolean_t	opt_present;
 	ip6_hbh_t	*hopoptsptr = NULL;
@@ -5947,6 +6035,7 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error,
 	boolean_t	is_ancillary = B_FALSE;
 	size_t		sth_wroff = 0;
 	ire_t		*ire;
+	boolean_t	update_lastdst = B_FALSE;
 
 	*error = 0;
 
@@ -6038,6 +6127,29 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error,
 	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
 		ip6_dst = ipv6_loopback;
 
+	port = sin6->sin6_port;
+
+	/*
+	 * Cluster and TSOL notes, Cluster check:
+	 * see comments in udp_output_v4().
+	 */
+	mutex_enter(&connp->conn_lock);
+
+	if (cl_inet_connect2 != NULL &&
+	    (!IN6_ARE_ADDR_EQUAL(&ip6_dst, &udp->udp_v6lastdst) ||
+	    port != udp->udp_lastdstport)) {
+		mutex_exit(&connp->conn_lock);
+		*error = 0;
+		CL_INET_UDP_CONNECT(connp, udp, B_TRUE, &ip6_dst, port, *error);
+		if (*error != 0) {
+			*error = EHOSTUNREACH;
+			rw_exit(&udp->udp_rwlock);
+			goto done;
+		}
+		update_lastdst = B_TRUE;
+		mutex_enter(&connp->conn_lock);
+	}
+
 	/*
 	 * If we're not going to the same destination as last time, then
 	 * recompute the label required.  This is done in a separate routine to
@@ -6051,7 +6163,6 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error,
 	 * and sticky ipp_hopoptslen are consistent for the current
 	 * destination and are updated atomically.
 	 */
-	mutex_enter(&connp->conn_lock);
 	if (is_system_labeled()) {
 		/* Using UDP MLP requires SCM_UCRED from user */
 		if (connp->conn_mlp_type != mlptSingle &&
@@ -6073,11 +6184,17 @@ udp_output_v6(conn_t *connp, mblk_t *mp, sin6_t *sin6, int *error,
 		if ((opt_present ||
 		    !IN6_ARE_ADDR_EQUAL(&udp->udp_v6lastdst, &ip6_dst) ||
 		    connp->conn_mlp_type != mlptSingle) &&
-		    (*error = udp_update_label_v6(q, mp, &ip6_dst)) != 0) {
+		    (*error = udp_update_label_v6(q, mp, &ip6_dst,
+		    &update_lastdst)) != 0) {
 			rw_exit(&udp->udp_rwlock);
 			mutex_exit(&connp->conn_lock);
 			goto done;
 		}
+	}
+
+	if (update_lastdst) {
+		udp->udp_v6lastdst = ip6_dst;
+		udp->udp_lastdstport = port;
 	}
 
 	/*
@@ -8263,15 +8380,16 @@ udp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 		 * Running in cluster mode - register bind information
 		 */
 		if (udp->udp_ipversion == IPV4_VERSION) {
-			(*cl_inet_bind)(IPPROTO_UDP, AF_INET,
+			(*cl_inet_bind)(connp->conn_netstack->netstack_stackid,
+			    IPPROTO_UDP, AF_INET,
 			    (uint8_t *)(&V4_PART_OF_V6(udp->udp_v6src)),
-			    (in_port_t)udp->udp_port);
+			    (in_port_t)udp->udp_port, NULL);
 		} else {
-			(*cl_inet_bind)(IPPROTO_UDP, AF_INET6,
+			(*cl_inet_bind)(connp->conn_netstack->netstack_stackid,
+			    IPPROTO_UDP, AF_INET6,
 			    (uint8_t *)&(udp->udp_v6src),
-			    (in_port_t)udp->udp_port);
+			    (in_port_t)udp->udp_port, NULL);
 		}
-
 	}
 
 	connp->conn_anon_port = (is_system_labeled() && requested_port == 0);
@@ -8446,13 +8564,17 @@ udp_do_unbind(conn_t *connp)
 		 * Running in cluster mode - register unbind information
 		 */
 		if (udp->udp_ipversion == IPV4_VERSION) {
-			(*cl_inet_unbind)(IPPROTO_UDP, AF_INET,
+			(*cl_inet_unbind)(
+			    connp->conn_netstack->netstack_stackid,
+			    IPPROTO_UDP, AF_INET,
 			    (uint8_t *)(&V4_PART_OF_V6(udp->udp_v6src)),
-			    (in_port_t)udp->udp_port);
+			    (in_port_t)udp->udp_port, NULL);
 		} else {
-			(*cl_inet_unbind)(IPPROTO_UDP, AF_INET6,
+			(*cl_inet_unbind)(
+			    connp->conn_netstack->netstack_stackid,
+			    IPPROTO_UDP, AF_INET6,
 			    (uint8_t *)&(udp->udp_v6src),
-			    (in_port_t)udp->udp_port);
+			    (in_port_t)udp->udp_port, NULL);
 		}
 	}
 
@@ -8744,6 +8866,17 @@ udp_do_connect(conn_t *connp, const struct sockaddr *sa, socklen_t len)
 		rw_exit(&udp->udp_rwlock);
 		return (-TBADADDR);
 	}
+
+	if (cl_inet_connect2 != NULL) {
+		CL_INET_UDP_CONNECT(connp, udp, B_TRUE, &v6dst, dstport, error);
+		if (error != 0) {
+			mutex_exit(&udpf->uf_lock);
+			udp->udp_pending_op = -1;
+			rw_exit(&udp->udp_rwlock);
+			return (-TBADADDR);
+		}
+	}
+
 	udp->udp_state = TS_DATA_XFER;
 	mutex_exit(&udpf->uf_lock);
 
