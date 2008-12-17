@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	syseventd - The system event daemon
@@ -93,7 +91,7 @@ static mutex_t door_lock;		/* sync door return access */
 static rwlock_t mod_unload_lock;		/* sync module unloading */
 
 /* declarations and definitions for avoiding multiple daemons running */
-#define	DAEMON_LOCK_FILE "/etc/sysevent/syseventd_lock"
+#define	DAEMON_LOCK_FILE "/var/run/syseventd.lock"
 char local_lock_file[PATH_MAX + 1];
 static int hold_daemon_lock;
 static int daemon_lock_fd;

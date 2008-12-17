@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sysevent_conf_mod - syseventd daemon sysevent.conf module
@@ -810,8 +808,7 @@ enter_lock(char *lock_file)
 	struct flock	lock;
 	int		lock_fd;
 
-	(void) snprintf(lock_file, PATH_MAX, "%s/%s",
-		SYSEVENT_CONFIG_DIR, LOCK_FILENAME);
+	(void) strlcpy(lock_file, LOCK_FILENAME, PATH_MAX);
 	lock_fd = open(lock_file, O_CREAT|O_RDWR, 0644);
 	if (lock_fd < 0) {
 		syslog(LOG_ERR, MSG_LOCK_CREATE_ERR,
