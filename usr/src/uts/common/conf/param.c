@@ -194,6 +194,7 @@ extern void pg_cmt_class_init(void);
 extern void pg_cpu0_init(void);
 extern void clock_tick_mp_init(void);
 extern void callout_mp_init(void);
+extern void cpu_seq_tbl_init(void);
 
 void	(*init_tbl[])(void) = {
 	system_taskq_init,
@@ -211,6 +212,7 @@ void	(*init_tbl[])(void) = {
 	anon_init,
 	segvn_init,
 	flk_init,
+	cpu_seq_tbl_init,
 	pg_init,
 	pg_cmt_class_init,
 	pg_cpu0_init,

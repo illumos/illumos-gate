@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_LGRP_H
 #define	_LGRP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * locality group definitions for kernel
@@ -66,12 +64,8 @@ typedef uintptr_t	lgrp_handle_t;	/* lgrp handle */
 /*
  * Maximum number of lgrps a platform may define.
  */
-
 #define	NLGRPS_MAX		64
-#define	NLGRP_LEAVES_MAX	24
 #define	LGRP_LOADAVG_MAX	UINT32_MAX
-#define	LPL_RSET_MAX		NLGRP_LEAVES_MAX
-#define	LPL_RSET_ARRYSZ		(LPL_RSET_MAX + 1)
 
 /*
  * The load-average we expect for one cpu-bound thread's worth of load
@@ -268,10 +262,11 @@ typedef struct lgrp_ld {
 	struct cpu	*lpl_cpus;	/* list of cpus in lpl */
 					/* NULL for non-leaf lgrps */
 	uint_t		lpl_nrset;	/* no. of leaf lpls for lgrp */
-	int		lpl_hint;	/* where to start looking in parent */
 	hrtime_t	lpl_homed_time;	/* time of last homing to this lpl */
-	struct lgrp_ld	*lpl_rset[LPL_RSET_ARRYSZ]; /* leaf lpls for lgrp */
+	uint_t		lpl_rset_sz;	/* Resource set capacity */
+	struct lgrp_ld	**lpl_rset;	/* leaf lpls for lgrp */
 					/* contains ptr to self for leaf lgrp */
+	int		*lpl_id2rset;	/* mapping of lgrpid to rset index */
 } lpl_t;
 
 /*
@@ -455,6 +450,13 @@ typedef struct lgrp_config_mem_rename {
  */
 #define	LGRP_EXISTS(lgrp)	\
 	(lgrp != NULL && lgrp->lgrp_id != LGRP_NONE)
+
+/*
+ * Macro for testing if a CPU is contained in an lgrp.
+ */
+#define	LGRP_CONTAINS_CPU(lgrp, cpu)	\
+	(klgrpset_ismember(lgrp->lgrp_set[LGRP_RSRC_CPU],	\
+	    cpu->cpu_lpl->lpl_lgrpid))
 
 /*
  * Initialize an lgrp_mnode_cookie

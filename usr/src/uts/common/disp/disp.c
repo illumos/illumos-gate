@@ -121,7 +121,6 @@ static void setkpdq(kthread_t *tp, int borf);
  */
 #define	RECHOOSE_INTERVAL 3
 int	rechoose_interval = RECHOOSE_INTERVAL;
-static cpu_t	*cpu_choose(kthread_t *, pri_t);
 
 /*
  * Parameter that determines how long (in nanoseconds) a thread must
@@ -502,31 +501,45 @@ disp_kp_free(disp_t *dq)
  * kernel preemption disabled to prevent the partition's
  * active cpu list from changing while being traversed.
  *
+ * This is essentially a simpler version of disp_getwork()
+ * to be called by CPUs preparing to "halt".
  */
 int
 disp_anywork(void)
 {
-	cpu_t   *cp = CPU;
-	cpu_t   *ocp;
-
-	if (cp->cpu_disp->disp_nrunnable != 0)
-		return (1);
+	cpu_t		*cp = CPU;
+	cpu_t		*ocp;
+	volatile int	*local_nrunnable = &cp->cpu_disp->disp_nrunnable;
 
 	if (!(cp->cpu_flags & CPU_OFFLINE)) {
 		if (CP_MAXRUNPRI(cp->cpu_part) >= 0)
 			return (1);
 
-		/*
-		 * Work can be taken from another CPU if:
-		 *	- There is unbound work on the run queue
-		 *	- That work isn't a thread undergoing a
-		 *	- context switch on an otherwise empty queue.
-		 *	- The CPU isn't running the idle loop.
-		 */
 		for (ocp = cp->cpu_next_part; ocp != cp;
 		    ocp = ocp->cpu_next_part) {
 			ASSERT(CPU_ACTIVE(ocp));
 
+			/*
+			 * Something has appeared on the local run queue.
+			 */
+			if (*local_nrunnable > 0)
+				return (1);
+			/*
+			 * If we encounter another idle CPU that will
+			 * soon be trolling around through disp_anywork()
+			 * terminate our walk here and let this other CPU
+			 * patrol the next part of the list.
+			 */
+			if (ocp->cpu_dispatch_pri == -1 &&
+			    (ocp->cpu_disp_flags & CPU_DISP_HALTED) == 0)
+				return (0);
+			/*
+			 * Work can be taken from another CPU if:
+			 *	- There is unbound work on the run queue
+			 *	- That work isn't a thread undergoing a
+			 *	- context switch on an otherwise empty queue.
+			 *	- The CPU isn't running the idle loop.
+			 */
 			if (ocp->cpu_disp->disp_max_unbound_pri != -1 &&
 			    !((ocp->cpu_disp_flags & CPU_DISP_DONTSTEAL) &&
 			    ocp->cpu_disp->disp_nrunnable == 1) &&
@@ -1121,120 +1134,6 @@ cpu_resched(cpu_t *cp, pri_t tpri)
 }
 
 /*
- * Perform multi-level CMT load balancing of running threads.
- * tp is the thread being enqueued
- * cp is the hint CPU (chosen by cpu_choose()).
- */
-static cpu_t *
-cmt_balance(kthread_t *tp, cpu_t *cp)
-{
-	int		hint, i, cpu, nsiblings;
-	int		self = 0;
-	group_t		*cmt_pgs, *siblings;
-	pg_cmt_t	*pg, *pg_tmp, *tpg = NULL;
-	int		pg_nrun, tpg_nrun;
-	int		level = 0;
-	cpu_t		*newcp;
-
-	ASSERT(THREAD_LOCK_HELD(tp));
-
-	cmt_pgs = &cp->cpu_pg->cmt_pgs;
-
-	if (GROUP_SIZE(cmt_pgs) == 0)
-		return (cp);	/* nothing to do */
-
-	if (tp == curthread)
-		self = 1;
-
-	/*
-	 * Balance across siblings in the CPUs CMT lineage
-	 */
-	do {
-		pg = GROUP_ACCESS(cmt_pgs, level);
-
-		siblings = pg->cmt_siblings;
-		nsiblings = GROUP_SIZE(siblings);	/* self inclusive */
-		if (nsiblings == 1)
-			continue;	/* nobody to balance against */
-
-		pg_nrun = pg->cmt_nrunning;
-		if (self &&
-		    bitset_in_set(&pg->cmt_cpus_actv_set, CPU->cpu_seqid))
-			pg_nrun--;	/* Ignore curthread's effect */
-
-		hint = pg->cmt_hint;
-		/*
-		 * Check for validity of the hint
-		 * It should reference a valid sibling
-		 */
-		if (hint >= nsiblings)
-			hint = pg->cmt_hint = 0;
-		else
-			pg->cmt_hint++;
-
-		/*
-		 * Find a balancing candidate from among our siblings
-		 * "hint" is a hint for where to start looking
-		 */
-		i = hint;
-		do {
-			ASSERT(i < nsiblings);
-			pg_tmp = GROUP_ACCESS(siblings, i);
-
-			/*
-			 * The candidate must not be us, and must
-			 * have some CPU resources in the thread's
-			 * partition
-			 */
-			if (pg_tmp != pg &&
-			    bitset_in_set(&tp->t_cpupart->cp_cmt_pgs,
-			    ((pg_t *)pg_tmp)->pg_id)) {
-				tpg = pg_tmp;
-				break;
-			}
-
-			if (++i >= nsiblings)
-				i = 0;
-		} while (i != hint);
-
-		if (!tpg)
-			continue;	/* no candidates at this level */
-
-		/*
-		 * Check if the balancing target is underloaded
-		 * Decide to balance if the target is running fewer
-		 * threads, or if it's running the same number of threads
-		 * with more online CPUs
-		 */
-		tpg_nrun = tpg->cmt_nrunning;
-		if (pg_nrun > tpg_nrun ||
-		    (pg_nrun == tpg_nrun &&
-		    (GROUP_SIZE(&tpg->cmt_cpus_actv) >
-		    GROUP_SIZE(&pg->cmt_cpus_actv)))) {
-			break;
-		}
-		tpg = NULL;
-	} while (++level < GROUP_SIZE(cmt_pgs));
-
-
-	if (tpg) {
-		/*
-		 * Select an idle CPU from the target PG
-		 */
-		for (cpu = 0; cpu < GROUP_SIZE(&tpg->cmt_cpus_actv); cpu++) {
-			newcp = GROUP_ACCESS(&tpg->cmt_cpus_actv, cpu);
-			if (newcp->cpu_part == tp->t_cpupart &&
-			    newcp->cpu_dispatch_pri == -1) {
-				cp = newcp;
-				break;
-			}
-		}
-	}
-
-	return (cp);
-}
-
-/*
  * setbackdq() keeps runqs balanced such that the difference in length
  * between the chosen runq and the next one is no more than RUNQ_MAX_DIFF.
  * For threads with priorities below RUNQ_MATCH_PRI levels, the runq's lengths
@@ -1245,6 +1144,16 @@ cmt_balance(kthread_t *tp, cpu_t *cp)
 #define	RUNQ_MAX_DIFF	2	/* maximum runq length difference */
 #define	RUNQ_LEN(cp, pri)	((cp)->cpu_disp->disp_q[pri].dq_sruncnt)
 
+/*
+ * Macro that evaluates to true if it is likely that the thread has cache
+ * warmth. This is based on the amount of time that has elapsed since the
+ * thread last ran. If that amount of time is less than "rechoose_interval"
+ * ticks, then we decide that the thread has enough cache warmth to warrant
+ * some affinity for t->t_cpu.
+ */
+#define	THREAD_HAS_CACHE_WARMTH(thread)	\
+	((thread == curthread) ||	\
+	((lbolt - thread->t_disp_time) <= rechoose_interval))
 /*
  * Put the specified thread on the back of the dispatcher
  * queue corresponding to its current priority.
@@ -1261,6 +1170,7 @@ setbackdq(kthread_t *tp)
 	cpu_t		*cp;
 	pri_t		tpri;
 	int		bound;
+	boolean_t	self;
 
 	ASSERT(THREAD_LOCK_HELD(tp));
 	ASSERT((tp->t_schedflag & TS_ALLSTART) == 0);
@@ -1275,6 +1185,8 @@ setbackdq(kthread_t *tp)
 		return;
 	}
 
+	self = (tp == curthread);
+
 	if (tp->t_bound_cpu || tp->t_weakbound_cpu)
 		bound = 1;
 	else
@@ -1288,10 +1200,24 @@ setbackdq(kthread_t *tp)
 			setkpdq(tp, SETKP_BACK);
 			return;
 		}
+
 		/*
-		 * Let cpu_choose suggest a CPU.
+		 * We'll generally let this thread continue to run where
+		 * it last ran...but will consider migration if:
+		 * - We thread probably doesn't have much cache warmth.
+		 * - The CPU where it last ran is the target of an offline
+		 *   request.
+		 * - The thread last ran outside it's home lgroup.
 		 */
-		cp = cpu_choose(tp, tpri);
+		if ((!THREAD_HAS_CACHE_WARMTH(tp)) ||
+		    (tp->t_cpu == cpu_inmotion)) {
+			cp = disp_lowpri_cpu(tp->t_cpu, tp->t_lpl, tpri, NULL);
+		} else if (!LGRP_CONTAINS_CPU(tp->t_lpl->lpl_lgrp, tp->t_cpu)) {
+			cp = disp_lowpri_cpu(tp->t_cpu, tp->t_lpl, tpri,
+			    self ? tp->t_cpu : NULL);
+		} else {
+			cp = tp->t_cpu;
+		}
 
 		if (tp->t_cpupart == cp->cpu_part) {
 			int	qlen;
@@ -1350,7 +1276,7 @@ setbackdq(kthread_t *tp)
 	 * situation, curthread is the only thread that could be in the ONPROC
 	 * state.
 	 */
-	if ((tp != curthread) && (tp->t_waitrq == 0)) {
+	if ((!self) && (tp->t_waitrq == 0)) {
 		hrtime_t curtime;
 
 		curtime = gethrtime_unscaled();
@@ -1402,8 +1328,7 @@ setbackdq(kthread_t *tp)
 	}
 
 	if (!bound && tpri > dp->disp_max_unbound_pri) {
-		if (tp == curthread && dp->disp_max_unbound_pri == -1 &&
-		    cp == CPU) {
+		if (self && dp->disp_max_unbound_pri == -1 && cp == CPU) {
 			/*
 			 * If there are no other unbound threads on the
 			 * run queue, don't allow other CPUs to steal
@@ -1465,17 +1390,25 @@ setfrontdq(kthread_t *tp)
 		cp = tp->t_cpu;
 		if (tp->t_cpupart == cp->cpu_part) {
 			/*
-			 * If we are of higher or equal priority than
-			 * the highest priority runnable thread of
-			 * the current CPU, just pick this CPU.  Otherwise
-			 * Let cpu_choose() select the CPU.  If this cpu
-			 * is the target of an offline request then do not
-			 * pick it - a thread_nomigrate() on the in motion
-			 * cpu relies on this when it forces a preempt.
+			 * We'll generally let this thread continue to run
+			 * where it last ran, but will consider migration if:
+			 * - The thread last ran outside it's home lgroup.
+			 * - The CPU where it last ran is the target of an
+			 *   offline request (a thread_nomigrate() on the in
+			 *   motion CPU relies on this when forcing a preempt).
+			 * - The thread isn't the highest priority thread where
+			 *   it last ran, and it is considered not likely to
+			 *   have significant cache warmth.
 			 */
-			if (tpri < cp->cpu_disp->disp_maxrunpri ||
-			    cp == cpu_inmotion)
-				cp = cpu_choose(tp, tpri);
+			if ((!LGRP_CONTAINS_CPU(tp->t_lpl->lpl_lgrp, cp)) ||
+			    (cp == cpu_inmotion)) {
+				cp = disp_lowpri_cpu(tp->t_cpu, tp->t_lpl, tpri,
+				    (tp == curthread) ? cp : NULL);
+			} else if ((tpri < cp->cpu_disp->disp_maxrunpri) &&
+			    (!THREAD_HAS_CACHE_WARMTH(tp))) {
+				cp = disp_lowpri_cpu(tp->t_cpu, tp->t_lpl, tpri,
+				    NULL);
+			}
 		} else {
 			/*
 			 * Migrate to a cpu in the new partition.
@@ -1945,8 +1878,9 @@ disp_getwork(cpu_t *cp)
 	pri_t		maxpri;
 	disp_t		*kpq;		/* kp queue for this partition */
 	lpl_t		*lpl, *lpl_leaf;
-	int		hint, leafidx;
+	int		leafidx, startidx;
 	hrtime_t	stealtime;
+	lgrp_id_t	local_id;
 
 	maxpri = -1;
 	tcp = NULL;
@@ -1974,7 +1908,8 @@ disp_getwork(cpu_t *cp)
 	 * from being migrated.
 	 */
 	lpl = lpl_leaf = cp->cpu_lpl;
-	hint = leafidx = 0;
+	local_id = lpl_leaf->lpl_lgrpid;
+	leafidx = startidx = 0;
 
 	/*
 	 * This loop traverses the lpl hierarchy. Higher level lpls represent
@@ -2005,8 +1940,8 @@ disp_getwork(cpu_t *cp)
 				 * - We happen across another idle CPU.
 				 *   Since it is patrolling the next portion
 				 *   of the lpl's list (assuming it's not
-				 *   halted), move to the next higher level
-				 *   of locality.
+				 *   halted, or busy servicing an interrupt),
+				 *   move to the next higher level of locality.
 				 */
 				if (cp->cpu_disp->disp_nrunnable != 0) {
 					kpreempt_enable();
@@ -2014,10 +1949,11 @@ disp_getwork(cpu_t *cp)
 				}
 				if (ocp->cpu_dispatch_pri == -1) {
 					if (ocp->cpu_disp_flags &
-					    CPU_DISP_HALTED)
+					    CPU_DISP_HALTED ||
+					    ocp->cpu_intr_actv != 0)
 						continue;
 					else
-						break;
+						goto next_level;
 				}
 
 				/*
@@ -2057,15 +1993,34 @@ disp_getwork(cpu_t *cp)
 				}
 			} while ((ocp = ocp->cpu_next_lpl) != ocp_start);
 
+			/*
+			 * Iterate to the next leaf lpl in the resource set
+			 * at this level of locality. If we hit the end of
+			 * the set, wrap back around to the beginning.
+			 *
+			 * Note: This iteration is NULL terminated for a reason
+			 * see lpl_topo_bootstrap() in lgrp.c for details.
+			 */
 			if ((lpl_leaf = lpl->lpl_rset[++leafidx]) == NULL) {
 				leafidx = 0;
 				lpl_leaf = lpl->lpl_rset[leafidx];
 			}
-		} while (leafidx != hint);
+		} while (leafidx != startidx);
 
-		hint = leafidx = lpl->lpl_hint;
-		if ((lpl = lpl->lpl_parent) != NULL)
-			lpl_leaf = lpl->lpl_rset[hint];
+next_level:
+		/*
+		 * Expand the search to include farther away CPUs (next
+		 * locality level). The closer CPUs that have already been
+		 * checked will be checked again. In doing so, idle CPUs
+		 * will tend to be more aggresive about stealing from CPUs
+		 * that are closer (since the closer CPUs will be considered
+		 * more often).
+		 * Begin at this level with the CPUs local leaf lpl.
+		 */
+		if ((lpl = lpl->lpl_parent) != NULL) {
+			leafidx = startidx = lpl->lpl_id2rset[local_id];
+			lpl_leaf = lpl->lpl_rset[leafidx];
+		}
 	} while (!tcp && lpl);
 
 	kpreempt_enable();
@@ -2717,35 +2672,4 @@ generic_idle_cpu(void)
 static void
 generic_enq_thread(cpu_t *cpu, int bound)
 {
-}
-
-/*
- * Select a CPU for this thread to run on.  Choose t->t_cpu unless:
- *	- t->t_cpu is not in this thread's assigned lgrp
- *	- the time since the thread last came off t->t_cpu exceeds the
- *	  rechoose time for this cpu (ignore this if t is curthread in
- *	  which case it's on CPU and t->t_disp_time is inaccurate)
- *	- t->t_cpu is presently the target of an offline or partition move
- *	  request
- */
-static cpu_t *
-cpu_choose(kthread_t *t, pri_t tpri)
-{
-	ASSERT(tpri < kpqpri);
-
-	if ((((lbolt - t->t_disp_time) > rechoose_interval) &&
-	    t != curthread) || t->t_cpu == cpu_inmotion) {
-		return (disp_lowpri_cpu(t->t_cpu, t->t_lpl, tpri, NULL));
-	}
-
-	/*
-	 * Take a trip through disp_lowpri_cpu() if the thread was
-	 * running outside it's home lgroup
-	 */
-	if (!klgrpset_ismember(t->t_lpl->lpl_lgrp->lgrp_set[LGRP_RSRC_CPU],
-	    t->t_cpu->cpu_lpl->lpl_lgrpid)) {
-		return (disp_lowpri_cpu(t->t_cpu, t->t_lpl, tpri,
-		    (t == curthread) ? t->t_cpu : NULL));
-	}
-	return (t->t_cpu);
 }

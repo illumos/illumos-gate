@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_BITSET_H
 #define	_BITSET_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -60,12 +58,19 @@ void		bitset_add(bitset_t *, uint_t);
 void		bitset_del(bitset_t *, uint_t);
 
 /*
+ * Atomic operations
+ */
+void		bitset_atomic_add(bitset_t *, uint_t);
+void		bitset_atomic_del(bitset_t *, uint_t);
+int		bitset_atomic_test_and_add(bitset_t *, uint_t);
+int		bitset_atomic_test_and_del(bitset_t *, uint_t);
+
+/*
  * Bitset queries
  */
 int		bitset_in_set(bitset_t *, uint_t);
 int		bitset_is_null(bitset_t *);
 uint_t		bitset_find(bitset_t *);
-
 
 #endif	/* !_KERNEL && !_KMEMUSER */
 

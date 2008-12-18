@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_CMT_H
 #define	_CMT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * CMT PG class
@@ -50,12 +48,10 @@ typedef struct pg_cmt {
 	struct pg_cmt	*cmt_parent;		/* Parent CMT PG */
 	struct group	*cmt_children;		/* Active children CMT PGs */
 	int		cmt_nchildren;		/* # of children CMT PGs */
-	int		cmt_hint;		/* hint for balancing */
 	uint32_t	cmt_nrunning;		/* # of running threads */
 	struct group	cmt_cpus_actv;
-	bitset_t	cmt_cpus_actv_set;	/* bitset of active CPUs */
+	struct bitset	cmt_cpus_actv_set;	/* bitset of active CPUs */
 } pg_cmt_t;
-
 
 /*
  * Change the number of running threads on the pg
@@ -68,6 +64,8 @@ int		pg_cmt_can_migrate(cpu_t *, cpu_t *);
 
 int		pg_plat_cmt_load_bal_hw(pghw_type_t);
 int		pg_plat_cmt_affinity_hw(pghw_type_t);
+
+cpu_t		*cmt_balance(kthread_t *, cpu_t *);
 
 #endif	/* !_KERNEL && !_KMEMUSER */
 

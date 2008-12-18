@@ -30,7 +30,7 @@
 #include <sys/promif.h>
 #include <sys/vm.h>
 #include <sys/cpu.h>
-#include <sys/atomic.h>
+#include <sys/bitset.h>
 #include <sys/cpupart.h>
 #include <sys/disp.h>
 #include <sys/hypervisor_api.h>
@@ -40,8 +40,9 @@
 #include <sys/cpu_module.h>
 #include <sys/mutex_impl.h>
 #include <sys/rwlock.h>
-#include <vm/vm_dep.h>
 #include <sys/sdt.h>
+#include <sys/cmt.h>
+#include <vm/vm_dep.h>
 
 #ifdef TRAPTRACE
 int mach_htraptrace_enable = 1;
@@ -104,7 +105,7 @@ static void
 cpu_halt(void)
 {
 	cpu_t *cpup = CPU;
-	processorid_t cpun = cpup->cpu_id;
+	processorid_t cpu_sid = cpup->cpu_seqid;
 	cpupart_t *cp = cpup->cpu_part;
 	int hset_update = 1;
 	volatile int *p = &cpup->cpu_disp->disp_nrunnable;
@@ -113,38 +114,43 @@ cpu_halt(void)
 	/*
 	 * If this CPU is online then we should notate our halting
 	 * by adding ourselves to the partition's halted CPU
-	 * bitmap. This allows other CPUs to find/awaken us when
+	 * bitset. This allows other CPUs to find/awaken us when
 	 * work becomes available.
 	 */
 	if (CPU->cpu_flags & CPU_OFFLINE)
 		hset_update = 0;
 
 	/*
-	 * Add ourselves to the partition's halted CPUs bitmask
+	 * Add ourselves to the partition's halted CPUs bitset
 	 * and set our HALTED flag, if necessary.
 	 *
 	 * When a thread becomes runnable, it is placed on the queue
-	 * and then the halted cpuset is checked to determine who
+	 * and then the halted cpu bitset is checked to determine who
 	 * (if anyone) should be awoken. We therefore need to first
-	 * add ourselves to the halted cpuset, and then check if there
-	 * is any work available.
+	 * add ourselves to the halted bitset, and then check if there
+	 * is any work available.  The order is important to prevent a race
+	 * that can lead to work languishing on a run queue somewhere while
+	 * this CPU remains halted.
+	 *
+	 * Either the producing CPU will see we're halted and will awaken us,
+	 * or this CPU will see the work available in disp_anywork()
 	 */
 	if (hset_update) {
 		cpup->cpu_disp_flags |= CPU_DISP_HALTED;
 		membar_producer();
-		CPUSET_ATOMIC_ADD(cp->cp_mach->mc_haltset, cpun);
+		bitset_atomic_add(&cp->cp_haltset, cpu_sid);
 	}
 
 	/*
 	 * Check to make sure there's really nothing to do.
 	 * Work destined for this CPU may become available after
 	 * this check. We'll be notified through the clearing of our
-	 * bit in the halted CPU bitmask, and a poke.
+	 * bit in the halted CPU bitset, and a poke.
 	 */
 	if (disp_anywork()) {
 		if (hset_update) {
 			cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
-			CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpun);
+			bitset_atomic_del(&cp->cp_haltset, cpu_sid);
 		}
 		return;
 	}
@@ -178,7 +184,7 @@ cpu_halt(void)
 	 */
 	s = disable_vec_intr();
 	while (*p == 0 &&
-	    ((hset_update && CPU_IN_SET(cp->cp_mach->mc_haltset, cpun)) ||
+	    ((hset_update && bitset_in_set(&cp->cp_haltset, cpu_sid)) ||
 	    (!hset_update && (CPU->cpu_flags & CPU_OFFLINE)))) {
 
 		DTRACE_PROBE1(idle__state__transition,
@@ -197,7 +203,7 @@ cpu_halt(void)
 	enable_vec_intr(s);
 	if (hset_update) {
 		cpup->cpu_disp_flags &= ~CPU_DISP_HALTED;
-		CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpun);
+		bitset_atomic_del(&cp->cp_haltset, cpu_sid);
 	}
 }
 
@@ -211,18 +217,19 @@ static void
 cpu_wakeup(cpu_t *cpu, int bound)
 {
 	uint_t		cpu_found;
-	int		result;
+	processorid_t	cpu_sid;
 	cpupart_t	*cp;
 
 	cp = cpu->cpu_part;
-	if (CPU_IN_SET(cp->cp_mach->mc_haltset, cpu->cpu_id)) {
+	cpu_sid = cpu->cpu_seqid;
+	if (bitset_in_set(&cp->cp_haltset, cpu_sid)) {
 		/*
 		 * Clear the halted bit for that CPU since it will be
 		 * poked in a moment.
 		 */
-		CPUSET_ATOMIC_DEL(cp->cp_mach->mc_haltset, cpu->cpu_id);
+		bitset_atomic_del(&cp->cp_haltset, cpu_sid);
 		/*
-		 * We may find the current CPU present in the halted cpuset
+		 * We may find the current CPU present in the halted cpu bitset
 		 * if we're in the context of an interrupt that occurred
 		 * before we had a chance to clear our bit in cpu_halt().
 		 * Poking ourself is obviously unnecessary, since if
@@ -242,30 +249,24 @@ cpu_wakeup(cpu_t *cpu, int bound)
 	}
 
 	/*
-	 * No need to wake up other CPUs if the thread we just enqueued
-	 * is bound.
+	 * No need to wake up other CPUs if this is for a bound thread.
 	 */
 	if (bound)
 		return;
 
 	/*
-	 * See if there's any other halted CPUs. If there are, then
-	 * select one, and awaken it.
-	 * It's possible that after we find a CPU, somebody else
-	 * will awaken it before we get the chance.
-	 * In that case, look again.
+	 * The CPU specified for wakeup isn't currently halted, so check
+	 * to see if there are any other halted CPUs in the partition,
+	 * and if there are then awaken one.
 	 */
 	do {
-		CPUSET_FIND(cp->cp_mach->mc_haltset, cpu_found);
-		if (cpu_found == CPUSET_NOTINSET)
+		cpu_found = bitset_find(&cp->cp_haltset);
+		if (cpu_found == (uint_t)-1)
 			return;
+	} while (bitset_atomic_test_and_del(&cp->cp_haltset, cpu_found) < 0);
 
-		ASSERT(cpu_found >= 0 && cpu_found < NCPU);
-		CPUSET_ATOMIC_XDEL(cp->cp_mach->mc_haltset, cpu_found, result);
-	} while (result < 0);
-
-	if (cpu_found != CPU->cpu_id)
-		poke_cpu(cpu_found);
+	if (cpu_found != CPU->cpu_seqid)
+		poke_cpu(cpu_seq[cpu_found]->cpu_id);
 }
 
 void

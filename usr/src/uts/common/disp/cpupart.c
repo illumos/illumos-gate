@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
@@ -68,7 +66,6 @@
 
 cpupart_t		*cp_list_head;
 cpupart_t		cp_default;
-struct mach_cpupart	cp_default_mach;
 static cpupartid_t	cp_id_next;
 uint_t			cp_numparts;
 uint_t			cp_numparts_nonempty;
@@ -217,6 +214,54 @@ cpupart_kstat_create(cpupart_t *cp)
 }
 
 /*
+ * Initialize the cpupart's lgrp partions (lpls)
+ */
+static void
+cpupart_lpl_initialize(cpupart_t *cp)
+{
+	int i, sz;
+
+	sz = cp->cp_nlgrploads = lgrp_plat_max_lgrps();
+	cp->cp_lgrploads = kmem_zalloc(sizeof (lpl_t) * sz, KM_SLEEP);
+
+	for (i = 0; i < sz; i++) {
+		/*
+		 * The last entry of the lpl's resource set is always NULL
+		 * by design (to facilitate iteration)...hence the "oversizing"
+		 * by 1.
+		 */
+		cp->cp_lgrploads[i].lpl_rset_sz = sz + 1;
+		cp->cp_lgrploads[i].lpl_rset =
+		    kmem_zalloc(sizeof (struct lgrp_ld *) * (sz + 1), KM_SLEEP);
+		cp->cp_lgrploads[i].lpl_id2rset =
+		    kmem_zalloc(sizeof (int) * (sz + 1), KM_SLEEP);
+		cp->cp_lgrploads[i].lpl_lgrpid = i;
+	}
+}
+
+/*
+ * Teardown the cpupart's lgrp partitions
+ */
+static void
+cpupart_lpl_teardown(cpupart_t *cp)
+{
+	int i, sz;
+	lpl_t *lpl;
+
+	for (i = 0; i < cp->cp_nlgrploads; i++) {
+		lpl = &cp->cp_lgrploads[i];
+
+		sz = lpl->lpl_rset_sz;
+		kmem_free(lpl->lpl_rset, sizeof (struct lgrp_ld *) * sz);
+		kmem_free(lpl->lpl_id2rset, sizeof (int) * sz);
+		lpl->lpl_rset = NULL;
+		lpl->lpl_id2rset = NULL;
+	}
+	kmem_free(cp->cp_lgrploads, sizeof (lpl_t) * cp->cp_nlgrploads);
+	cp->cp_lgrploads = NULL;
+}
+
+/*
  * Initialize the default partition and kpreempt disp queue.
  */
 void
@@ -238,7 +283,6 @@ cpupart_initialize_default(void)
 	for (i = 0; i < S_LOADAVG_SZ; i++) {
 		cp_default.cp_loadavg.lg_loads[i] = 0;
 	}
-	CPUSET_ZERO(cp_default.cp_mach->mc_haltset);
 	DISP_LOCK_INIT(&cp_default.cp_kp_queue.disp_lock);
 	cp_id_next = CP_DEFAULT + 1;
 	cpupart_kstat_create(&cp_default);
@@ -248,9 +292,7 @@ cpupart_initialize_default(void)
 	/*
 	 * Allocate space for cp_default list of lgrploads
 	 */
-	cp_default.cp_nlgrploads = lgrp_plat_max_lgrps();
-	cp_default.cp_lgrploads = kmem_zalloc(sizeof (lpl_t) *
-	    cp_default.cp_nlgrploads, KM_SLEEP);
+	cpupart_lpl_initialize(&cp_default);
 
 	/*
 	 * The initial lpl topology is created in a special lpl list
@@ -261,9 +303,7 @@ cpupart_initialize_default(void)
 	lpl_topo_bootstrap(cp_default.cp_lgrploads,
 	    cp_default.cp_nlgrploads);
 
-	for (i = 0; i < cp_default.cp_nlgrploads; i++) {
-		cp_default.cp_lgrploads[i].lpl_lgrpid = i;
-	}
+
 	cp_default.cp_attr = PSET_NOESCAPE;
 	cp_numparts_nonempty = 1;
 	/*
@@ -272,6 +312,8 @@ cpupart_initialize_default(void)
 	t0.t_lpl = &cp_default.cp_lgrploads[LGRP_ROOTID];
 
 	bitset_init(&cp_default.cp_cmt_pgs);
+	bitset_init(&cp_default.cp_haltset);
+	bitset_resize(&cp_default.cp_haltset, max_ncpus);
 }
 
 
@@ -462,8 +504,8 @@ again:
 	newpp->cp_ncpus++;
 	newpp->cp_gen++;
 
-	ASSERT(CPUSET_ISNULL(newpp->cp_mach->mc_haltset));
-	ASSERT(CPUSET_ISNULL(oldpp->cp_mach->mc_haltset));
+	ASSERT(bitset_is_null(&newpp->cp_haltset));
+	ASSERT(bitset_is_null(&oldpp->cp_haltset));
 
 	/*
 	 * let the lgroup framework know cp has entered the partition
@@ -521,7 +563,7 @@ again:
 				 */
 				ASSERT(t->t_lpl >= t->t_cpupart->cp_lgrploads &&
 				    (t->t_lpl < t->t_cpupart->cp_lgrploads +
-					t->t_cpupart->cp_nlgrploads));
+				    t->t_cpupart->cp_nlgrploads));
 
 				ASSERT(t->t_lpl->lpl_ncpu > 0);
 
@@ -574,7 +616,7 @@ again:
 			/* make sure lpl points to our own partition */
 			ASSERT((t->t_lpl >= t->t_cpupart->cp_lgrploads) &&
 			    (t->t_lpl < t->t_cpupart->cp_lgrploads +
-				t->t_cpupart->cp_nlgrploads));
+			    t->t_cpupart->cp_nlgrploads));
 
 			ASSERT(t->t_lpl->lpl_ncpu > 0);
 
@@ -708,7 +750,7 @@ cpupart_move_thread(kthread_id_t tp, cpupart_t *newpp, int ignore,
 		 */
 		ASSERT((tp->t_lpl >= tp->t_cpupart->cp_lgrploads) &&
 		    (tp->t_lpl < tp->t_cpupart->cp_lgrploads +
-			tp->t_cpupart->cp_nlgrploads));
+		    tp->t_cpupart->cp_nlgrploads));
 
 		ASSERT(tp->t_lpl->lpl_ncpu > 0);
 
@@ -771,12 +813,10 @@ int
 cpupart_create(psetid_t *psid)
 {
 	cpupart_t	*pp;
-	lgrp_id_t	i;
 
 	ASSERT(pool_lock_held());
 
 	pp = kmem_zalloc(sizeof (cpupart_t), KM_SLEEP);
-	pp->cp_mach = kmem_zalloc(sizeof (struct mach_cpupart), KM_SLEEP);
 	pp->cp_nlgrploads = lgrp_plat_max_lgrps();
 	pp->cp_lgrploads = kmem_zalloc(sizeof (lpl_t) * pp->cp_nlgrploads,
 	    KM_SLEEP);
@@ -786,7 +826,6 @@ cpupart_create(psetid_t *psid)
 		mutex_exit(&cpu_lock);
 		kmem_free(pp->cp_lgrploads, sizeof (lpl_t) * pp->cp_nlgrploads);
 		pp->cp_lgrploads = NULL;
-		kmem_free(pp->cp_mach, sizeof (struct mach_cpupart));
 		kmem_free(pp, sizeof (cpupart_t));
 		return (ENOMEM);
 	}
@@ -803,15 +842,19 @@ cpupart_create(psetid_t *psid)
 	pp->cp_kp_queue.disp_max_unbound_pri = -1;
 	pp->cp_kp_queue.disp_cpu = NULL;
 	pp->cp_gen = 0;
-	CPUSET_ZERO(pp->cp_mach->mc_haltset);
 	DISP_LOCK_INIT(&pp->cp_kp_queue.disp_lock);
 	*psid = CPTOPS(pp->cp_id);
 	disp_kp_alloc(&pp->cp_kp_queue, v.v_nglobpris);
 	cpupart_kstat_create(pp);
-	for (i = 0; i < pp->cp_nlgrploads; i++) {
-		pp->cp_lgrploads[i].lpl_lgrpid = i;
-	}
+	cpupart_lpl_initialize(pp);
+
 	bitset_init(&pp->cp_cmt_pgs);
+
+	/*
+	 * Initialize and size the partition's bitset of halted CPUs
+	 */
+	bitset_init(&pp->cp_haltset);
+	bitset_resize(&pp->cp_haltset, max_ncpus);
 
 	/*
 	 * Pause all CPUs while changing the partition list, to make sure
@@ -936,13 +979,14 @@ cpupart_destroy(psetid_t psid)
 	}
 
 	ASSERT(bitset_is_null(&pp->cp_cmt_pgs));
-	ASSERT(CPUSET_ISNULL(pp->cp_mach->mc_haltset));
+	ASSERT(bitset_is_null(&pp->cp_haltset));
 
 	/*
-	 * Teardown the partition's group of active CMT PGs now that
-	 * all of the CPUs have left.
+	 * Teardown the partition's group of active CMT PGs and halted
+	 * CPUs now that they have all left.
 	 */
 	bitset_fini(&pp->cp_cmt_pgs);
+	bitset_fini(&pp->cp_haltset);
 
 	/*
 	 * Reset the pointers in any offline processors so they won't
@@ -979,9 +1023,9 @@ cpupart_destroy(psetid_t psid)
 	cp_numparts--;
 
 	disp_kp_free(&pp->cp_kp_queue);
-	kmem_free(pp->cp_lgrploads, sizeof (lpl_t) * pp->cp_nlgrploads);
-	pp->cp_lgrploads = NULL;
-	kmem_free(pp->cp_mach, sizeof (struct mach_cpupart));
+
+	cpupart_lpl_teardown(pp);
+
 	kmem_free(pp, sizeof (cpupart_t));
 	mutex_exit(&cpu_lock);
 

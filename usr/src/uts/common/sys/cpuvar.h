@@ -217,6 +217,8 @@ typedef struct cpu {
 	hrtime_t	cpu_intrlast;   /* total interrupt time (nsec) */
 	int		cpu_intrload;   /* interrupt load factor (0-99%) */
 
+	uint_t		cpu_rotor;	/* for cheap pseudo-random numbers */
+
 	/*
 	 * New members must be added /before/ this member, as the CTF tools
 	 * rely on this being the last field before cpu_m, so they can
@@ -260,6 +262,14 @@ extern cpu_core_t cpu_core[];
  * getpil() should be used instead to check for PIL levels.
  */
 #define	CPU_ON_INTR(cpup) ((cpup)->cpu_intr_actv >> (LOCK_LEVEL + 1))
+
+/*
+ * CPU_PSEUDO_RANDOM() returns a per CPU value that changes each time one
+ * looks at it. It's meant as a cheap mechanism to be incorporated in routines
+ * wanting to avoid biasing, but where true randomness isn't needed (just
+ * something that changes).
+ */
+#define	CPU_PSEUDO_RANDOM() (CPU->cpu_rotor++)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
@@ -516,6 +526,7 @@ extern cpuset_t cpu_seqid_inuse;
 #if defined(_KERNEL) || defined(_KMEMUSER)
 
 extern struct cpu	*cpu[];		/* indexed by CPU number */
+extern struct cpu	**cpu_seq;	/* indexed by sequential CPU id */
 extern cpu_t		*cpu_list;	/* list of CPUs */
 extern cpu_t		*cpu_active;	/* list of active CPUs */
 extern int		ncpus;		/* number of CPUs present */

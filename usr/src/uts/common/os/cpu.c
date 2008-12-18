@@ -109,6 +109,8 @@ cpu_t		*cpu_active;		/* list of active CPUs */
 static cpuset_t	cpu_available;		/* set of available CPUs */
 cpuset_t	cpu_seqid_inuse;	/* which cpu_seqids are in use */
 
+cpu_t		**cpu_seq;		/* ptrs to CPUs, indexed by seq_id */
+
 /*
  * max_ncpus keeps the max cpus the system can have. Initially
  * it's NCPU, but since most archs scan the devtree for cpus
@@ -1643,6 +1645,20 @@ cpu_poweroff(cpu_t *cp)
 }
 
 /*
+ * Initialize the Sequential CPU id lookup table
+ */
+void
+cpu_seq_tbl_init()
+{
+	cpu_t	**tbl;
+
+	tbl = kmem_zalloc(sizeof (struct cpu *) * max_ncpus, KM_SLEEP);
+	tbl[0] = CPU;
+
+	cpu_seq = tbl;
+}
+
+/*
  * Initialize the CPU lists for the first CPU.
  */
 void
@@ -1659,8 +1675,15 @@ cpu_list_init(cpu_t *cp)
 
 	cp->cpu_seqid = 0;
 	CPUSET_ADD(cpu_seqid_inuse, 0);
+
+	/*
+	 * Bootstrap cpu_seq using cpu_list
+	 * The cpu_seq[] table will be dynamically allocated
+	 * when kmem later becomes available (but before going MP)
+	 */
+	cpu_seq = &cpu_list;
+
 	cp->cpu_cache_offset = KMEM_CACHE_SIZE(cp->cpu_seqid);
-	cp_default.cp_mach = &cp_default_mach;
 	cp_default.cp_cpulist = cp;
 	cp_default.cp_ncpus = 1;
 	cp->cpu_next_part = cp;
@@ -1719,6 +1742,7 @@ cpu_add_unit(cpu_t *cp)
 	cp->cpu_cache_offset = KMEM_CACHE_SIZE(cp->cpu_seqid);
 	cpu[cp->cpu_id] = cp;
 	CPUSET_ADD(cpu_available, cp->cpu_id);
+	cpu_seq[cp->cpu_seqid] = cp;
 
 	/*
 	 * allocate a pause thread for this CPU.
@@ -1777,6 +1801,8 @@ cpu_del_unit(int cpuid)
 	cpu_pause_free(cp);
 	CPUSET_DEL(cpu_available, cp->cpu_id);
 	cpu[cp->cpu_id] = NULL;
+	cpu_seq[cp->cpu_seqid] = NULL;
+
 	/*
 	 * The clock thread and mutex_vector_enter cannot hold the
 	 * cpu_lock while traversing the cpu list, therefore we pause

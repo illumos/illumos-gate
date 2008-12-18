@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Basic NUMA support in terms of locality groups
@@ -158,6 +156,8 @@ lgrp_t		*lgrp_root = NULL;
 #define	LPL_BOOTSTRAP_SIZE 2
 static lpl_t	lpl_bootstrap_list[LPL_BOOTSTRAP_SIZE];
 lpl_t		*lpl_bootstrap;
+static lpl_t	*lpl_bootstrap_rset[LPL_BOOTSTRAP_SIZE];
+static int	lpl_bootstrap_id2rset[LPL_BOOTSTRAP_SIZE];
 
 /*
  * If cp still references the bootstrap lpl, it has not yet been added to
@@ -258,10 +258,9 @@ static void	lpl_verify_wrapper(struct cpupart *);
 #define	LPL_TOPO_LPL_BAD_NCPU			-9
 #define	LPL_TOPO_RSET_MSSNG_LF			-10
 #define	LPL_TOPO_CPU_HAS_BAD_LPL		-11
-#define	LPL_TOPO_BOGUS_HINT			-12
-#define	LPL_TOPO_NONLEAF_HAS_CPUS		-13
-#define	LPL_TOPO_LGRP_NOT_LEAF			-14
-#define	LPL_TOPO_BAD_RSETCNT			-15
+#define	LPL_TOPO_NONLEAF_HAS_CPUS		-12
+#define	LPL_TOPO_LGRP_NOT_LEAF			-13
+#define	LPL_TOPO_BAD_RSETCNT			-14
 
 /*
  * Return whether lgroup optimizations should be enabled on this system
@@ -333,6 +332,21 @@ lgrp_root_init(void)
 	t0.t_lpl = lpl_bootstrap;
 	cp_default.cp_nlgrploads = LPL_BOOTSTRAP_SIZE;
 	lpl_bootstrap_list[1].lpl_lgrpid = 1;
+
+	/*
+	 * Set up the bootstrap rset
+	 * Since the bootstrap toplogy has just the root, and a leaf,
+	 * the rset contains just the leaf, and both lpls can use the same rset
+	 */
+	lpl_bootstrap_rset[0] = &lpl_bootstrap_list[1];
+	lpl_bootstrap_list[0].lpl_rset_sz = 1;
+	lpl_bootstrap_list[0].lpl_rset = lpl_bootstrap_rset;
+	lpl_bootstrap_list[0].lpl_id2rset = lpl_bootstrap_id2rset;
+
+	lpl_bootstrap_list[1].lpl_rset_sz = 1;
+	lpl_bootstrap_list[1].lpl_rset = lpl_bootstrap_rset;
+	lpl_bootstrap_list[1].lpl_id2rset = lpl_bootstrap_id2rset;
+
 	cp_default.cp_lgrploads = lpl_bootstrap;
 }
 
@@ -1420,9 +1434,8 @@ lgrp_mem_fini(int mnode, lgrp_handle_t hand, boolean_t is_copy_rename)
 	 * still need to update the lgroup topology.
 	 */
 	if ((my_lgrp->lgrp_nmnodes > 0) &&
-	    !(is_copy_rename &&
-		(my_lgrp == lgrp_root) &&
-		(my_lgrp->lgrp_mnodes == mnodes_mask))) {
+	    !(is_copy_rename && (my_lgrp == lgrp_root) &&
+	    (my_lgrp->lgrp_mnodes == mnodes_mask))) {
 		if (drop_lock)
 			mutex_exit(&cpu_lock);
 		return;
@@ -1830,9 +1843,6 @@ lpl_rset_add(lpl_t *lpl_target, lpl_t *lpl_leaf)
 	/* insert leaf, update counts */
 	entry_slot = i;
 	i = lpl_target->lpl_nrset++;
-	if (lpl_target->lpl_nrset >= LPL_RSET_MAX) {
-		panic("More leaf lgrps in system than are supported!\n");
-	}
 
 	/*
 	 * Start at the end of the rset array and work backwards towards the
@@ -1840,36 +1850,30 @@ lpl_rset_add(lpl_t *lpl_target, lpl_t *lpl_leaf)
 	 * preserves the current ordering by scooting everybody over one entry,
 	 * and placing the new entry into the space created.
 	 */
-
 	while (i-- > entry_slot) {
 		lpl_target->lpl_rset[i + 1] = lpl_target->lpl_rset[i];
+		lpl_target->lpl_id2rset[lpl_target->lpl_rset[i]->lpl_lgrpid] =
+		    i + 1;
 	}
 
 	lpl_target->lpl_rset[entry_slot] = lpl_leaf;
+	lpl_target->lpl_id2rset[lpl_leaf->lpl_lgrpid] = entry_slot;
+
 	lpl_target->lpl_ncpu += lpl_leaf->lpl_ncpu;
 }
 
 /*
- * Update each of lpl_parent's children with a proper hint and
- * a reference to their parent.
+ * Update each of lpl_parent's children with a reference to their parent.
  * The lgrp topology is used as the reference since it is fully
  * consistent and correct at this point.
- *
- * Each child's hint will reference an element in lpl_parent's
- * rset that designates where the child should start searching
- * for CPU resources. The hint selected is the highest order leaf present
- * in the child's lineage.
- *
  * This should be called after any potential change in lpl_parent's
  * rset.
  */
 static void
 lpl_child_update(lpl_t *lpl_parent, struct cpupart *cp)
 {
-	klgrpset_t	children, leaves;
-	lpl_t		*lpl;
-	int		hint;
-	int		i, j;
+	klgrpset_t	children;
+	int		i;
 
 	children = lgrp_table[lpl_parent->lpl_lgrpid]->lgrp_children;
 	if (klgrpset_isempty(children))
@@ -1877,21 +1881,6 @@ lpl_child_update(lpl_t *lpl_parent, struct cpupart *cp)
 
 	for (i = 0; i <= lgrp_alloc_max; i++) {
 		if (klgrpset_ismember(children, i)) {
-
-			/*
-			 * Given the set of leaves in this child's lineage,
-			 * find the highest order leaf present in the parent's
-			 * rset. Select this as the hint for the child.
-			 */
-			leaves = lgrp_table[i]->lgrp_leaves;
-			hint = 0;
-			for (j = 0; j < lpl_parent->lpl_nrset; j++) {
-				lpl = lpl_parent->lpl_rset[j];
-				if (klgrpset_ismember(leaves, lpl->lpl_lgrpid))
-					hint = j;
-			}
-			cp->cp_lgrploads[i].lpl_hint = hint;
-
 			/*
 			 * (Re)set the parent. It may be incorrect if
 			 * lpl_parent is new in the topology.
@@ -1912,6 +1901,10 @@ void
 lpl_rset_del(lpl_t *lpl_target, lpl_t *lpl_leaf)
 {
 	int i;
+	lpl_t *leaf;
+
+	if (lpl_target->lpl_nrset == 0)
+		return;
 
 	/* find leaf in intermediate node */
 	for (i = 0; i < lpl_target->lpl_nrset; i++) {
@@ -1924,11 +1917,17 @@ lpl_rset_del(lpl_t *lpl_target, lpl_t *lpl_leaf)
 		return;
 
 	/* prune leaf, compress array */
-	ASSERT(lpl_target->lpl_nrset < LPL_RSET_MAX);
 	lpl_target->lpl_rset[lpl_target->lpl_nrset--] = NULL;
+	lpl_target->lpl_id2rset[lpl_leaf->lpl_lgrpid] = -1;
 	lpl_target->lpl_ncpu--;
 	do {
 		lpl_target->lpl_rset[i] = lpl_target->lpl_rset[i + 1];
+		/*
+		 * Update the lgrp id <=> rset mapping
+		 */
+		if ((leaf = lpl_target->lpl_rset[i]) != NULL) {
+			lpl_target->lpl_id2rset[leaf->lpl_lgrpid] = i;
+		}
 	} while (i++ < lpl_target->lpl_nrset);
 }
 
@@ -2000,7 +1999,6 @@ lpl_cpu_adjcnt(lpl_act_t act, cpu_t *cp)
 /*
  * Initialize lpl with given resources and specified lgrp
  */
-
 void
 lpl_init(lpl_t *lpl, lpl_t *lpl_leaf, lgrp_t *lgrp)
 {
@@ -2012,6 +2010,7 @@ lpl_init(lpl_t *lpl, lpl_t *lpl_leaf, lgrp_t *lgrp)
 		lpl->lpl_ncpu = lpl_leaf->lpl_ncpu;
 	lpl->lpl_nrset = 1;
 	lpl->lpl_rset[0] = lpl_leaf;
+	lpl->lpl_id2rset[lpl_leaf->lpl_lgrpid] = 0;
 	lpl->lpl_lgrp = lgrp;
 	lpl->lpl_parent = NULL; /* set by lpl_leaf_insert() */
 	lpl->lpl_cpus = NULL; /* set by lgrp_part_add_cpu() */
@@ -2020,16 +2019,26 @@ lpl_init(lpl_t *lpl, lpl_t *lpl_leaf, lgrp_t *lgrp)
 /*
  * Clear an unused lpl
  */
-
 void
 lpl_clear(lpl_t *lpl)
 {
-	lgrp_id_t	lid;
-
-	/* save lid for debugging purposes */
-	lid = lpl->lpl_lgrpid;
-	bzero(lpl, sizeof (lpl_t));
-	lpl->lpl_lgrpid = lid;
+	/*
+	 * Clear out all fields in the lpl except:
+	 *    lpl_lgrpid - to facilitate debugging
+	 *    lpl_rset, lpl_rset_sz, lpl_id2rset - rset array references / size
+	 *
+	 * Note that the lpl's rset and id2rset mapping are cleared as well.
+	 */
+	lpl->lpl_loadavg = 0;
+	lpl->lpl_ncpu = 0;
+	lpl->lpl_lgrp = NULL;
+	lpl->lpl_parent = NULL;
+	lpl->lpl_cpus = NULL;
+	lpl->lpl_nrset = 0;
+	lpl->lpl_homed_time = 0;
+	bzero(lpl->lpl_rset, sizeof (lpl->lpl_rset[0]) * lpl->lpl_rset_sz);
+	bzero(lpl->lpl_id2rset,
+	    sizeof (lpl->lpl_id2rset[0]) * lpl->lpl_rset_sz);
 }
 
 /*
@@ -2098,7 +2107,6 @@ lpl_topo_verify(cpupart_t *cpupart)
 			 * that lpl doesn't show up in anyone else's rsets (in
 			 * this partition, anyway)
 			 */
-
 			for (j = 0; j < cpupart->cp_nlgrploads; j++) {
 				lpl_t *i_lpl; /* lpl we're iterating over */
 
@@ -2126,7 +2134,7 @@ lpl_topo_verify(cpupart_t *cpupart)
 		if (lgrp->lgrp_parent) {
 			ASSERT(lpl->lpl_parent);
 			ASSERT(lgrp->lgrp_parent->lgrp_id ==
-				    lpl->lpl_parent->lpl_lgrpid);
+			    lpl->lpl_parent->lpl_lgrpid);
 
 			if (!lpl->lpl_parent) {
 				return (LPL_TOPO_MISSING_PARENT);
@@ -2153,7 +2161,7 @@ lpl_topo_verify(cpupart_t *cpupart)
 			ASSERT((lgrp->lgrp_cpucnt >= lpl->lpl_ncpu) &&
 			    (lpl->lpl_ncpu > 0));
 			if ((lgrp->lgrp_cpucnt < lpl->lpl_ncpu) ||
-				(lpl->lpl_ncpu <= 0)) {
+			    (lpl->lpl_ncpu <= 0)) {
 				return (LPL_TOPO_BAD_CPUCNT);
 			}
 
@@ -2190,7 +2198,6 @@ lpl_topo_verify(cpupart_t *cpupart)
 			 * Also, check that leaf lpl is contained in all
 			 * intermediate lpls that name the leaf as a descendant
 			 */
-
 			for (j = 0; j <= lgrp_alloc_max; j++) {
 				klgrpset_t intersect;
 				lgrp_t *lgrp_cand;
@@ -2247,28 +2254,6 @@ lpl_topo_verify(cpupart_t *cpupart)
 		}
 
 		/*
-		 * check on lpl_hint. Don't check root, since it has no parent.
-		 */
-		if (lpl->lpl_parent != NULL) {
-			int hint;
-			lpl_t *hint_lpl;
-
-			/* make sure hint is within limits of nrset */
-			hint = lpl->lpl_hint;
-			ASSERT(lpl->lpl_parent->lpl_nrset >= hint);
-			if (lpl->lpl_parent->lpl_nrset < hint) {
-				return (LPL_TOPO_BOGUS_HINT);
-			}
-
-			/* make sure hint points to valid lpl */
-			hint_lpl = lpl->lpl_parent->lpl_rset[hint];
-			ASSERT(hint_lpl->lpl_ncpu > 0);
-			if (hint_lpl->lpl_ncpu <= 0) {
-				return (LPL_TOPO_BOGUS_HINT);
-			}
-		}
-
-		/*
 		 * Check the rset of the lpl in question.  Make sure that each
 		 * rset contains a subset of the resources in
 		 * lgrp_set[LGRP_RSRC_CPU] and in cp_lgrpset.  This also makes
@@ -2276,7 +2261,6 @@ lpl_topo_verify(cpupart_t *cpupart)
 		 * outside of that set.  (Which would be resources somehow not
 		 * accounted for).
 		 */
-
 		klgrpset_clear(rset);
 		for (j = 0; j < lpl->lpl_nrset; j++) {
 			klgrpset_add(rset, lpl->lpl_rset[j]->lpl_lgrpid);
@@ -2287,10 +2271,8 @@ lpl_topo_verify(cpupart_t *cpupart)
 		/* make sure rset is contained with in partition, too */
 		klgrpset_diff(cset, cpupart->cp_lgrpset);
 
-		ASSERT(klgrpset_isempty(rset) &&
-			    klgrpset_isempty(cset));
-		if (!klgrpset_isempty(rset) ||
-		    !klgrpset_isempty(cset)) {
+		ASSERT(klgrpset_isempty(rset) && klgrpset_isempty(cset));
+		if (!klgrpset_isempty(rset) || !klgrpset_isempty(cset)) {
 			return (LPL_TOPO_RSET_MISMATCH);
 		}
 
@@ -2298,9 +2280,10 @@ lpl_topo_verify(cpupart_t *cpupart)
 		 * check to make sure lpl_nrset matches the number of rsets
 		 * contained in the lpl
 		 */
-
-		for (j = 0; (lpl->lpl_rset[j] != NULL) && (j < LPL_RSET_MAX);
-		    j++);
+		for (j = 0; j < lpl->lpl_nrset; j++) {
+			if (lpl->lpl_rset[j] == NULL)
+				break;
+		}
 
 		ASSERT(j == lpl->lpl_nrset);
 		if (j != lpl->lpl_nrset) {
@@ -2407,7 +2390,6 @@ lpl_leaf_insert(lpl_t *lpl_leaf, cpupart_t *cpupart)
 {
 	int		i;
 	int		j;
-	int		hint;
 	int		rset_num_intersect;
 	lgrp_t		*lgrp_cur;
 	lpl_t		*lpl_cur;
@@ -2450,25 +2432,15 @@ lpl_leaf_insert(lpl_t *lpl_leaf, cpupart_t *cpupart)
 			continue;
 		}
 
-		/*
-		 * Initialize intermediate lpl
-		 * Save this lpl's hint though. Since we're changing this
-		 * lpl's resources, we need to update the hint in this lpl's
-		 * children, but the hint in this lpl is unaffected and
-		 * should be preserved.
-		 */
-		hint = lpl_cur->lpl_hint;
-
 		lpl_clear(lpl_cur);
 		lpl_init(lpl_cur, lpl_leaf, lgrp_cur);
 
-		lpl_cur->lpl_hint = hint;
 		lpl_cur->lpl_parent = lpl_parent;
 
 		/* does new lpl need to be populated with other resources? */
 		rset_intersect =
 		    klgrpset_intersects(lgrp_cur->lgrp_set[LGRP_RSRC_CPU],
-			cpupart->cp_lgrpset);
+		    cpupart->cp_lgrpset);
 		klgrpset_nlgrps(rset_intersect, rset_num_intersect);
 
 		if (rset_num_intersect > 1) {
@@ -2483,7 +2455,7 @@ lpl_leaf_insert(lpl_t *lpl_leaf, cpupart_t *cpupart)
 				lgrp_cand = lgrp_table[j];
 				if (!LGRP_EXISTS(lgrp_cand) ||
 				    !klgrpset_ismember(rset_intersect,
-					lgrp_cand->lgrp_id))
+				    lgrp_cand->lgrp_id))
 					continue;
 				lpl_cand =
 				    &cpupart->cp_lgrploads[lgrp_cand->lgrp_id];
@@ -2847,6 +2819,9 @@ lpl_topo_bootstrap(lpl_t *target, int size)
 {
 	lpl_t	*lpl = lpl_bootstrap;
 	lpl_t	*target_lpl = target;
+	lpl_t	**rset;
+	int	*id2rset;
+	int	sz;
 	int	howmany;
 	int	id;
 	int	i;
@@ -2862,10 +2837,19 @@ lpl_topo_bootstrap(lpl_t *target, int size)
 	howmany = MIN(LPL_BOOTSTRAP_SIZE, size);
 	for (i = 0; i < howmany; i++, lpl++, target_lpl++) {
 		/*
-		 * Copy all fields from lpl.
+		 * Copy all fields from lpl, except for the rset,
+		 * lgrp id <=> rset mapping storage,
+		 * and amount of storage
 		 */
+		rset = target_lpl->lpl_rset;
+		id2rset = target_lpl->lpl_id2rset;
+		sz = target_lpl->lpl_rset_sz;
 
 		*target_lpl = *lpl;
+
+		target_lpl->lpl_rset_sz = sz;
+		target_lpl->lpl_rset = rset;
+		target_lpl->lpl_id2rset = id2rset;
 
 		/*
 		 * Substitute CPU0 lpl pointer with one relative to target.
@@ -2881,30 +2865,51 @@ lpl_topo_bootstrap(lpl_t *target, int size)
 		if (lpl->lpl_parent != NULL)
 			target_lpl->lpl_parent = (lpl_t *)
 			    (((uintptr_t)lpl->lpl_parent -
-				(uintptr_t)lpl_bootstrap) +
-				(uintptr_t)target);
+			    (uintptr_t)lpl_bootstrap) +
+			    (uintptr_t)target);
 
 		/*
 		 * Walk over resource set substituting pointers relative to
-		 * lpl_bootstrap to pointers relative to target.
+		 * lpl_bootstrap's rset to pointers relative to target's
 		 */
 		ASSERT(lpl->lpl_nrset <= 1);
 
 		for (id = 0; id < lpl->lpl_nrset; id++) {
 			if (lpl->lpl_rset[id] != NULL) {
-				target_lpl->lpl_rset[id] =
-				    (lpl_t *)
+				target_lpl->lpl_rset[id] = (lpl_t *)
 				    (((uintptr_t)lpl->lpl_rset[id] -
-					(uintptr_t)lpl_bootstrap) +
-					(uintptr_t)target);
+				    (uintptr_t)lpl_bootstrap) +
+				    (uintptr_t)target);
 			}
+			target_lpl->lpl_id2rset[id] =
+			    lpl->lpl_id2rset[id];
 		}
 	}
 
 	/*
-	 * Topology information in lpl_bootstrap is no longer needed.
+	 * Clean up the bootstrap lpls since we have switched over to the
+	 * actual lpl array in the default cpu partition.
+	 *
+	 * We still need to keep one empty lpl around for newly starting
+	 * slave CPUs to reference should they need to make it through the
+	 * dispatcher prior to their lgrp/lpl initialization.
+	 *
+	 * The lpl related dispatcher code has been designed to work properly
+	 * (and without extra checks) for this special case of a zero'ed
+	 * bootstrap lpl. Such an lpl appears to the dispatcher as an lpl
+	 * with lgrpid 0 and an empty resource set. Iteration over the rset
+	 * array by the dispatcher is also NULL terminated for this reason.
+	 *
+	 * This provides the desired behaviour for an uninitialized CPU.
+	 * It shouldn't see any other CPU to either dispatch to or steal
+	 * from until it is properly initialized.
 	 */
 	bzero(lpl_bootstrap_list, sizeof (lpl_bootstrap_list));
+	bzero(lpl_bootstrap_id2rset, sizeof (lpl_bootstrap_id2rset));
+	bzero(lpl_bootstrap_rset, sizeof (lpl_bootstrap_rset));
+
+	lpl_bootstrap_list[0].lpl_rset = lpl_bootstrap_rset;
+	lpl_bootstrap_list[0].lpl_id2rset = lpl_bootstrap_id2rset;
 }
 
 /*
@@ -3331,8 +3336,8 @@ lgrp_move_thread(kthread_t *t, lpl_t *newlpl, int do_lgrpset_delete)
 						new = 0;
 					}
 				} while (cas32(
-					(lgrp_load_t *)&lpl->lpl_loadavg, old,
-					    new) != old);
+				    (lgrp_load_t *)&lpl->lpl_loadavg, old,
+				    new) != old);
 
 				lpl = lpl->lpl_parent;
 				if (lpl == NULL)

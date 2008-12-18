@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/systm.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -81,7 +79,6 @@
  * balancng across the CMT PGs within their respective (per lgroup) top level
  * groups.
  */
-
 typedef struct cmt_lgrp {
 	group_t		cl_pgs;		/* Top level group of active CMT PGs */
 	int		cl_npgs;	/* # of top level PGs in the lgroup */
@@ -92,6 +89,7 @@ typedef struct cmt_lgrp {
 static cmt_lgrp_t	*cmt_lgrps = NULL;	/* cmt_lgrps list head */
 static cmt_lgrp_t	*cpu0_lgrp = NULL;	/* boot CPU's initial lgrp */
 						/* used for null_proc_lpa */
+static cmt_lgrp_t	*cmt_root = NULL;	/* Reference to root cmt pg */
 
 static int		is_cpu0 = 1; /* true if this is boot CPU context */
 
@@ -111,7 +109,7 @@ static void		pg_cmt_cpu_active(cpu_t *);
 static void		pg_cmt_cpu_inactive(cpu_t *);
 static void		pg_cmt_cpupart_in(cpu_t *, cpupart_t *);
 static void		pg_cmt_cpupart_move(cpu_t *, cpupart_t *, cpupart_t *);
-static void		pg_cmt_hier_pack(pg_cmt_t **, int);
+static void		pg_cmt_hier_pack(void **, int);
 static int		pg_cmt_cpu_belongs(pg_t *, cpu_t *);
 static int		pg_cmt_hw(pghw_type_t);
 static cmt_lgrp_t	*pg_cmt_find_lgrp(lgrp_handle_t);
@@ -293,7 +291,7 @@ pg_cmt_cpu_init(cpu_t *cp)
 		pg_cpu_add((pg_t *)pg, cp);
 
 		/*
-		 * Ensure capacity of the active CPUs group/bitset
+		 * Ensure capacity of the active CPU group/bitset
 		 */
 		group_expand(&pg->cmt_cpus_actv,
 		    GROUP_SIZE(&((pg_t *)pg)->pg_cpus));
@@ -321,31 +319,37 @@ pg_cmt_cpu_init(cpu_t *cp)
 	}
 
 	/*
-	 * Pack out any gaps in the constructed lineage.
+	 * Pack out any gaps in the constructed lineage,
+	 * then size it out.
+	 *
 	 * Gaps may exist where the architecture knows
 	 * about a hardware sharing relationship, but such a
 	 * relationship either isn't relevant for load
 	 * balancing or doesn't exist between CPUs on the system.
 	 */
-	pg_cmt_hier_pack(cpu_cmt_hier, max_level + 1);
+	pg_cmt_hier_pack((void **)cpu_cmt_hier, max_level + 1);
+	group_expand(cmt_pgs, nlevels);
+
+
+	if (cmt_root == NULL)
+		cmt_root = pg_cmt_lgrp_create(lgrp_plat_root_hand());
 
 	/*
-	 * For each of the PGs int the CPU's lineage:
-	 *	- Add an entry in the CPU sorted CMT PG group
-	 *	  which is used for top down CMT load balancing
+	 * Find the lgrp that encapsulates this CPU's CMT hierarchy.
+	 * and locate/create a suitable cmt_lgrp_t.
+	 */
+	lgrp_handle = lgrp_plat_cpu_to_hand(cp->cpu_id);
+	if ((lgrp = pg_cmt_find_lgrp(lgrp_handle)) == NULL)
+		lgrp = pg_cmt_lgrp_create(lgrp_handle);
+
+	/*
+	 * For each of the PGs in the CPU's lineage:
+	 *	- Add an entry in the CPU's CMT PG group
+	 *	  which is used by the dispatcher to implement load balancing
+	 *	  policy.
 	 *	- Tie the PG into the CMT hierarchy by connecting
 	 *	  it to it's parent and siblings.
 	 */
-	group_expand(cmt_pgs, nlevels);
-
-	/*
-	 * Find the lgrp that encapsulates this CPU's CMT hierarchy
-	 */
-	lgrp_handle = lgrp_plat_cpu_to_hand(cp->cpu_id);
-	lgrp = pg_cmt_find_lgrp(lgrp_handle);
-	if (lgrp == NULL)
-		lgrp = pg_cmt_lgrp_create(lgrp_handle);
-
 	for (level = 0; level < nlevels; level++) {
 		uint_t		children;
 		int		err;
@@ -369,8 +373,10 @@ pg_cmt_cpu_init(cpu_t *cp)
 
 		if ((level + 1) == nlevels) {
 			pg->cmt_parent = NULL;
+
 			pg->cmt_siblings = &lgrp->cl_pgs;
 			children = ++lgrp->cl_npgs;
+			cmt_root->cl_npgs++;
 		} else {
 			pg->cmt_parent = cpu_cmt_hier[level + 1];
 
@@ -387,8 +393,9 @@ pg_cmt_cpu_init(cpu_t *cp)
 			pg->cmt_siblings = pg->cmt_parent->cmt_children;
 			children = ++pg->cmt_parent->cmt_nchildren;
 		}
-		pg->cmt_hint = 0;
+
 		group_expand(pg->cmt_siblings, children);
+		group_expand(&cmt_root->cl_pgs, cmt_root->cl_npgs);
 	}
 
 	/*
@@ -481,7 +488,6 @@ pg_cmt_cpu_fini(cpu_t *cp)
 		}
 		pg = pg->cmt_parent;
 	}
-
 	ASSERT(GROUP_SIZE(cmt_pgs) == 0);
 
 	/*
@@ -635,6 +641,16 @@ pg_cmt_cpu_active(cpu_t *cp)
 		    pg_plat_cmt_load_bal_hw(((pghw_t *)pg)->pghw_hw)) {
 			err = group_add(pg->cmt_siblings, pg, GRP_NORESIZE);
 			ASSERT(err == 0);
+
+			/*
+			 * If this is a top level PG, add it as a balancing
+			 * candidate when balancing within the root lgroup
+			 */
+			if (pg->cmt_parent == NULL) {
+				err = group_add(&cmt_root->cl_pgs, pg,
+				    GRP_NORESIZE);
+				ASSERT(err == 0);
+			}
 		}
 
 		/*
@@ -690,6 +706,12 @@ pg_cmt_cpu_inactive(cpu_t *cp)
 		    pg_plat_cmt_load_bal_hw(((pghw_t *)pg)->pghw_hw)) {
 			err = group_remove(pg->cmt_siblings, pg, GRP_NORESIZE);
 			ASSERT(err == 0);
+
+			if (pg->cmt_parent == NULL) {
+				err = group_remove(&cmt_root->cl_pgs, pg,
+				    GRP_NORESIZE);
+				ASSERT(err == 0);
+			}
 		}
 
 		/*
@@ -744,11 +766,10 @@ pg_cmt_cpu_belongs(pg_t *pg, cpu_t *cp)
 }
 
 /*
- * Pack the CPUs CMT hierarchy
- * The hierarchy order is preserved
+ * Hierarchy packing utility routine. The hierarchy order is preserved.
  */
 static void
-pg_cmt_hier_pack(pg_cmt_t *hier[], int sz)
+pg_cmt_hier_pack(void *hier[], int sz)
 {
 	int	i, j;
 
@@ -806,4 +827,137 @@ pg_cmt_lgrp_create(lgrp_handle_t hand)
 	group_create(&lgrp->cl_pgs);
 
 	return (lgrp);
+}
+
+/*
+ * Perform multi-level CMT load balancing of running threads.
+ *
+ * tp is the thread being enqueued.
+ * cp is a hint CPU, against which CMT load balancing will be performed.
+ *
+ * Returns cp, or a CPU better than cp with respect to balancing
+ * running thread load.
+ */
+cpu_t *
+cmt_balance(kthread_t *tp, cpu_t *cp)
+{
+	int		hint, i, cpu, nsiblings;
+	int		self = 0;
+	group_t		*cmt_pgs, *siblings;
+	pg_cmt_t	*pg, *pg_tmp, *tpg = NULL;
+	int		pg_nrun, tpg_nrun;
+	int		level = 0;
+	cpu_t		*newcp;
+
+	ASSERT(THREAD_LOCK_HELD(tp));
+
+	cmt_pgs = &cp->cpu_pg->cmt_pgs;
+
+	if (GROUP_SIZE(cmt_pgs) == 0)
+		return (cp);	/* nothing to do */
+
+	if (tp == curthread)
+		self = 1;
+
+	/*
+	 * Balance across siblings in the CPUs CMT lineage
+	 * If the thread is homed to the root lgroup, perform
+	 * top level balancing against other top level PGs
+	 * in the system. Otherwise, start with the default
+	 * top level siblings group, which is within the leaf lgroup
+	 */
+	pg = GROUP_ACCESS(cmt_pgs, level);
+	if (tp->t_lpl->lpl_lgrpid == LGRP_ROOTID)
+		siblings = &cmt_root->cl_pgs;
+	else
+		siblings = pg->cmt_siblings;
+
+	/*
+	 * Traverse down the lineage until we find a level that needs
+	 * balancing, or we get to the end.
+	 */
+	for (;;) {
+		nsiblings = GROUP_SIZE(siblings);	/* self inclusive */
+		if (nsiblings == 1)
+			goto next_level;
+
+		pg_nrun = pg->cmt_nrunning;
+		if (self &&
+		    bitset_in_set(&pg->cmt_cpus_actv_set, CPU->cpu_seqid))
+			pg_nrun--;	/* Ignore curthread's effect */
+
+		hint = CPU_PSEUDO_RANDOM() % nsiblings;
+
+		/*
+		 * Find a balancing candidate from among our siblings
+		 * "hint" is a hint for where to start looking
+		 */
+		i = hint;
+		do {
+			ASSERT(i < nsiblings);
+			pg_tmp = GROUP_ACCESS(siblings, i);
+
+			/*
+			 * The candidate must not be us, and must
+			 * have some CPU resources in the thread's
+			 * partition
+			 */
+			if (pg_tmp != pg &&
+			    bitset_in_set(&tp->t_cpupart->cp_cmt_pgs,
+			    ((pg_t *)pg_tmp)->pg_id)) {
+				tpg = pg_tmp;
+				break;
+			}
+
+			if (++i >= nsiblings)
+				i = 0;
+		} while (i != hint);
+
+		if (!tpg)
+			goto next_level; /* no candidates at this level */
+
+		/*
+		 * Check if the balancing target is underloaded
+		 * Decide to balance if the target is running fewer
+		 * threads, or if it's running the same number of threads
+		 * with more online CPUs
+		 */
+		tpg_nrun = tpg->cmt_nrunning;
+		if (pg_nrun > tpg_nrun ||
+		    (pg_nrun == tpg_nrun &&
+		    (GROUP_SIZE(&tpg->cmt_cpus_actv) >
+		    GROUP_SIZE(&pg->cmt_cpus_actv)))) {
+			break;
+		}
+		tpg = NULL;
+
+next_level:
+		if (++level == GROUP_SIZE(cmt_pgs))
+			break;
+
+		pg = GROUP_ACCESS(cmt_pgs, level);
+		siblings = pg->cmt_siblings;
+	}
+
+	if (tpg) {
+		uint_t	tgt_size = GROUP_SIZE(&tpg->cmt_cpus_actv);
+
+		/*
+		 * Select an idle CPU from the target
+		 */
+		hint = CPU_PSEUDO_RANDOM() % tgt_size;
+		cpu = hint;
+		do {
+			newcp = GROUP_ACCESS(&tpg->cmt_cpus_actv, cpu);
+			if (newcp->cpu_part == tp->t_cpupart &&
+			    newcp->cpu_dispatch_pri == -1) {
+				cp = newcp;
+				break;
+			}
+			if (++cpu == tgt_size)
+				cpu = 0;
+		} while (cpu != hint);
+	}
+
+	return (cp);
 }
