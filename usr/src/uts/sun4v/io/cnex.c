@@ -468,6 +468,7 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 {
 	int		idx;
 	cnex_ldc_t	*cldcp;
+	cnex_ldc_t	*new_cldcp;
 	int		listsz, num_nodes, num_channels;
 	md_t		*mdp = NULL;
 	mde_cookie_t	rootnode, *listp = NULL;
@@ -493,11 +494,11 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 		}
 		cldcp = cldcp->next;
 	}
+	mutex_exit(&cnex_ssp->clist_lock);
 
 	/* Get the Tx/Rx inos from the MD */
 	if ((mdp = md_get_handle()) == NULL) {
 		DWARN("cnex_reg_chan: cannot init MD\n");
-		mutex_exit(&cnex_ssp->clist_lock);
 		return (ENXIO);
 	}
 	num_nodes = md_node_count(mdp);
@@ -516,7 +517,6 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 		DWARN("cnex_reg_chan: invalid channel id\n");
 		kmem_free(listp, listsz);
 		(void) md_fini_handle(mdp);
-		mutex_exit(&cnex_ssp->clist_lock);
 		return (EINVAL);
 	}
 
@@ -528,7 +528,6 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 			DWARN("cnex_reg_chan: cannot read LDC ID\n");
 			kmem_free(listp, listsz);
 			(void) md_fini_handle(mdp);
-			mutex_exit(&cnex_ssp->clist_lock);
 			return (ENXIO);
 		}
 		if (tmp_id != id)
@@ -540,7 +539,6 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 			DWARN("cnex_reg_chan: cannot read Tx ino\n");
 			kmem_free(listp, listsz);
 			(void) md_fini_handle(mdp);
-			mutex_exit(&cnex_ssp->clist_lock);
 			return (ENXIO);
 		}
 		status = md_get_prop_val(mdp, listp[idx], "rx-ino", &rxino);
@@ -548,7 +546,6 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 			DWARN("cnex_reg_chan: cannot read Rx ino\n");
 			kmem_free(listp, listsz);
 			(void) md_fini_handle(mdp);
-			mutex_exit(&cnex_ssp->clist_lock);
 			return (ENXIO);
 		}
 		chan_dip = cnex_find_chan_dip(dip, id, mdp, listp[idx]);
@@ -563,28 +560,42 @@ cnex_reg_chan(dev_info_t *dip, uint64_t id, ldc_dev_t devclass)
 	 */
 	if ((rxino == -1) || (txino == -1)) {
 		DERR("cnex_reg_chan: no ID matching '%llx' in MD\n", id);
-		mutex_exit(&cnex_ssp->clist_lock);
 		return (ENOENT);
 	}
 
 	/* Allocate a new channel structure */
-	cldcp = kmem_zalloc(sizeof (*cldcp), KM_SLEEP);
+	new_cldcp = kmem_zalloc(sizeof (*new_cldcp), KM_SLEEP);
 
 	/* Initialize the channel */
-	mutex_init(&cldcp->lock, NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&new_cldcp->lock, NULL, MUTEX_DRIVER, NULL);
 
-	cldcp->id = id;
-	cldcp->tx.ino = txino;
-	cldcp->rx.ino = rxino;
-	cldcp->devclass = devclass;
-	cldcp->tx.weight = CNEX_TX_INTR_WEIGHT;
-	cldcp->rx.weight = cnex_class_weight(devclass);
-	cldcp->dip = chan_dip;
+	new_cldcp->id = id;
+	new_cldcp->tx.ino = txino;
+	new_cldcp->rx.ino = rxino;
+	new_cldcp->devclass = devclass;
+	new_cldcp->tx.weight = CNEX_TX_INTR_WEIGHT;
+	new_cldcp->rx.weight = cnex_class_weight(devclass);
+	new_cldcp->dip = chan_dip;
 
-	/* add channel to nexus channel list */
-	cldcp->next = cnex_ssp->clist;
-	cnex_ssp->clist = cldcp;
-
+	/*
+	 * Add channel to nexus channel list.
+	 * Check again to see if channel is already registered since
+	 * clist_lock was dropped above.
+	 */
+	mutex_enter(&cnex_ssp->clist_lock);
+	cldcp = cnex_ssp->clist;
+	while (cldcp) {
+		if (cldcp->id == id) {
+			DWARN("cnex_reg_chan: channel 0x%llx exists\n", id);
+			mutex_exit(&cnex_ssp->clist_lock);
+			mutex_destroy(&new_cldcp->lock);
+			kmem_free(new_cldcp, sizeof (*new_cldcp));
+			return (EINVAL);
+		}
+		cldcp = cldcp->next;
+	}
+	new_cldcp->next = cnex_ssp->clist;
+	cnex_ssp->clist = new_cldcp;
 	mutex_exit(&cnex_ssp->clist_lock);
 
 	return (0);
