@@ -1340,6 +1340,7 @@ raid_handle_init()
 	/* Clean up the new allocated handles */
 	for (i = raid_handle_sys.handle_num - HANDLER_SLOTS;
 	    i < raid_handle_sys.handle_num; ++i) {
+		bzero(&raid_handle_sys.handles[i], sizeof (handle_attr_t));
 		raid_handle_sys.handles[i].type = OBJ_TYPE_ALL;
 		raid_handle_sys.handles[i].next = i + 1;
 	}
