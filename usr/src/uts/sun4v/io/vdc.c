@@ -1959,70 +1959,70 @@ static int
 vdc_recv(vdc_t *vdc, vio_msg_t *msgp, size_t *nbytesp)
 {
 	int		status;
-	boolean_t	q_has_pkts = B_FALSE;
 	uint64_t	delay_time;
 	size_t		len;
 
-	mutex_enter(&vdc->read_lock);
-
-	if (vdc->read_state == VDC_READ_IDLE)
-		vdc->read_state = VDC_READ_WAITING;
-
-	while (vdc->read_state != VDC_READ_PENDING) {
-
-		/* detect if the connection has been reset */
-		if (vdc->read_state == VDC_READ_RESET) {
-			status = ECONNRESET;
-			goto done;
-		}
-
-		cv_wait(&vdc->read_cv, &vdc->read_lock);
-	}
-
 	/*
-	 * Until we get a blocking ldc read we have to retry
-	 * until the entire LDC message has arrived before
-	 * ldc_read() will succeed. Note we also bail out if
-	 * the channel is reset or goes away.
+	 * Until we get a blocking ldc read we have to retry until the entire
+	 * LDC message has arrived before ldc_read() will return that message.
+	 * If ldc_read() succeed but returns a zero length message then that
+	 * means that the LDC queue is empty and we have to wait for a
+	 * notification from the LDC callback which will set the read_state to
+	 * VDC_READ_PENDING. Note we also bail out if the channel is reset or
+	 * goes away.
 	 */
 	delay_time = vdc_ldc_read_init_delay;
-loop:
-	len = *nbytesp;
-	status = ldc_read(vdc->curr_server->ldc_handle, (caddr_t)msgp, &len);
-	switch (status) {
-	case EAGAIN:
-		delay_time *= 2;
-		if (delay_time >= vdc_ldc_read_max_delay)
-			delay_time = vdc_ldc_read_max_delay;
-		delay(delay_time);
-		goto loop;
 
-	case 0:
-		if (len == 0) {
-			DMSG(vdc, 1, "[%d] ldc_read returned 0 bytes with "
-			    "no error!\n", vdc->instance);
-			goto loop;
+	for (;;) {
+
+		len = *nbytesp;
+		/*
+		 * vdc->curr_server is protected by vdc->lock but to avoid
+		 * contentions we don't take the lock here. We can do this
+		 * safely because vdc_recv() is only called from thread
+		 * process_msg_thread() which is also the only thread that
+		 * can change vdc->curr_server.
+		 */
+		status = ldc_read(vdc->curr_server->ldc_handle,
+		    (caddr_t)msgp, &len);
+
+		if (status == EAGAIN) {
+			delay_time *= 2;
+			if (delay_time >= vdc_ldc_read_max_delay)
+				delay_time = vdc_ldc_read_max_delay;
+			delay(delay_time);
+			continue;
 		}
 
-		*nbytesp = len;
+		if (status != 0) {
+			DMSG(vdc, 0, "ldc_read returned %d\n", status);
+			break;
+		}
 
-		/*
-		 * If there are pending messages, leave the
-		 * read state as pending. Otherwise, set the state
-		 * back to idle.
-		 */
-		status = ldc_chkq(vdc->curr_server->ldc_handle, &q_has_pkts);
-		if (status == 0 && !q_has_pkts)
-			vdc->read_state = VDC_READ_IDLE;
+		if (len != 0) {
+			*nbytesp = len;
+			break;
+		}
 
-		break;
-	default:
-		DMSG(vdc, 0, "ldc_read returned %d\n", status);
-		break;
+		mutex_enter(&vdc->read_lock);
+
+		while (vdc->read_state != VDC_READ_PENDING) {
+
+			/* detect if the connection has been reset */
+			if (vdc->read_state == VDC_READ_RESET) {
+				mutex_exit(&vdc->read_lock);
+				return (ECONNRESET);
+			}
+
+			vdc->read_state = VDC_READ_WAITING;
+			cv_wait(&vdc->read_cv, &vdc->read_lock);
+		}
+
+		vdc->read_state = VDC_READ_IDLE;
+		mutex_exit(&vdc->read_lock);
+
+		delay_time = vdc_ldc_read_init_delay;
 	}
-
-done:
-	mutex_exit(&vdc->read_lock);
 
 	return (status);
 }
