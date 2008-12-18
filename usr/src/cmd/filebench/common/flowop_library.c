@@ -310,6 +310,84 @@ flowoplib_fileattrs(flowop_t *flowop)
 }
 
 /*
+ * Obtain a filesetentry for a file. Result placed where filep points.
+ * Supply with a flowop and a flag to indicate whether an existent or
+ * non-existent file is required. Returns FILEBENCH_NORSC if all out
+ * of the appropriate type of directories, FILEBENCH_ERROR if the
+ * flowop does not point to a fileset, and FILEBENCH_OK otherwise.
+ */
+static int
+flowoplib_pickfile(filesetentry_t **filep, flowop_t *flowop, int flags, int tid)
+{
+	fileset_t	*fileset;
+	int		fileindex;
+
+	if ((fileset = flowop->fo_fileset) == NULL) {
+		filebench_log(LOG_ERROR, "flowop NO fileset");
+		return (FILEBENCH_ERROR);
+	}
+
+	if (flowop->fo_fileindex) {
+		fileindex = (int)(avd_get_dbl(flowop->fo_fileindex) *
+		    ((double)(fileset->fs_constentries / 2)));
+		fileindex = fileindex % fileset->fs_constentries;
+		flags |= FILESET_PICKBYINDEX;
+	} else {
+		fileindex = 0;
+	}
+
+	if ((*filep = fileset_pick(fileset, FILESET_PICKFILE | flags,
+	    tid, fileindex)) == NULL) {
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "flowop %s failed to pick file from fileset %s",
+		    flowop->fo_name,
+		    avd_get_str(fileset->fs_name));
+		return (FILEBENCH_NORSC);
+	}
+
+	return (FILEBENCH_OK);
+}
+
+/*
+ * Obtain a filesetentry for a leaf directory. Result placed where dirp
+ * points. Supply with flowop and a flag to indicate whether an existent
+ * or non-existent leaf directory is required. Returns FILEBENCH_NORSC
+ * if all out of the appropriate type of directories, FILEBENCH_ERROR
+ * if the flowop does not point to a fileset, and FILEBENCH_OK otherwise.
+ */
+static int
+flowoplib_pickleafdir(filesetentry_t **dirp, flowop_t *flowop, int flags)
+{
+	fileset_t	*fileset;
+	int		dirindex;
+
+	if ((fileset = flowop->fo_fileset) == NULL) {
+		filebench_log(LOG_ERROR, "flowop NO fileset");
+		return (FILEBENCH_ERROR);
+	}
+
+	if (flowop->fo_fileindex) {
+		dirindex = (int)(avd_get_dbl(flowop->fo_fileindex) *
+		    ((double)(fileset->fs_constleafdirs / 2)));
+		dirindex = dirindex % fileset->fs_constleafdirs;
+		flags |= FILESET_PICKBYINDEX;
+	} else {
+		dirindex = 0;
+	}
+
+	if ((*dirp = fileset_pick(fileset,
+	    FILESET_PICKLEAFDIR | flags, 0, dirindex)) == NULL) {
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "flowop %s failed to pick directory from fileset %s",
+		    flowop->fo_name,
+		    avd_get_str(fileset->fs_name));
+		return (FILEBENCH_NORSC);
+	}
+
+	return (FILEBENCH_OK);
+}
+
+/*
  * Searches for a file descriptor. Tries the flowop's
  * fo_fdnumber first and returns with it if it has been
  * explicitly set (greater than 0). It next checks to
@@ -1753,6 +1831,7 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 	filesetentry_t *file;
 	char *fileset_name;
 	int tid = 0;
+	int err;
 
 	if (flowop->fo_fileset == NULL) {
 		filebench_log(LOG_ERROR, "flowop NULL file");
@@ -1822,12 +1901,12 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 	}
 #endif /* HAVE_RAW_SUPPORT */
 
-	if ((file = fileset_pick(flowop->fo_fileset,
-	    FILESET_PICKEXISTS, tid)) == NULL) {
+	if ((err = flowoplib_pickfile(&file, flowop,
+	    FILESET_PICKEXISTS, tid)) != FILEBENCH_OK) {
 		filebench_log(LOG_DEBUG_SCRIPT,
 		    "flowop %s failed to pick file from %s on fd %d",
 		    flowop->fo_name, fileset_name, fd);
-		return (FILEBENCH_NORSC);
+		return (err);
 	}
 
 	threadflow->tf_fse[fd] = file;
@@ -1853,7 +1932,7 @@ flowoplib_openfile_common(threadflow_t *threadflow, flowop_t *flowop, int fd)
 /*
  * Emulate create of a file. Uses the flowop's fdnumber to select
  * tf_fd and tf_fse array locations to put the created file's file
- * descriptor and filesetentry respectively. Uses fileset_pick()
+ * descriptor and filesetentry respectively. Uses flowoplib_pickfile()
  * to select a specific filesetentry whose file does not currently
  * exist for the file create operation. Then calls
  * fileset_openfile() with the O_CREATE flag set to create the
@@ -1867,6 +1946,7 @@ flowoplib_createfile(threadflow_t *threadflow, flowop_t *flowop)
 {
 	filesetentry_t *file;
 	int fd = flowop->fo_fdnumber;
+	int err;
 
 	if (threadflow->tf_fd[fd] != 0) {
 		filebench_log(LOG_ERROR,
@@ -1890,13 +1970,13 @@ flowoplib_createfile(threadflow_t *threadflow, flowop_t *flowop)
 	}
 #endif /* HAVE_RAW_SUPPORT */
 
-	if ((file = fileset_pick(flowop->fo_fileset,
-	    FILESET_PICKNOEXIST, 0)) == NULL) {
+	if ((err = flowoplib_pickfile(&file, flowop,
+	    FILESET_PICKNOEXIST, 0)) != FILEBENCH_OK) {
 		filebench_log(LOG_DEBUG_SCRIPT,
 		    "flowop %s failed to pick file from fileset %s",
 		    flowop->fo_name,
 		    avd_get_str(flowop->fo_fileset->fs_name));
-		return (FILEBENCH_NORSC);
+		return (err);
 	}
 
 	threadflow->tf_fse[fd] = file;
@@ -1940,19 +2020,13 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 	/* if fd specified, use it to access file */
 	if ((fd > 0) && ((file = threadflow->tf_fse[fd]) != NULL)) {
 
-		/* check whether file still open */
-		if (threadflow->tf_fd[fd] > 0) {
-			filebench_log(LOG_DEBUG_SCRIPT,
-			    "flowop %s deleting still open file at fd = %d",
-			    flowop->fo_name, fd);
-		}
-
 		/* indicate that the file will be deleted */
 		threadflow->tf_fse[fd] = NULL;
 
 		/* if here, we still have a valid file pointer */
 		fileset = file->fse_fileset;
 	} else {
+
 		/* Otherwise, pick arbitrary file */
 		file = NULL;
 		fileset = flowop->fo_fileset;
@@ -1975,12 +2049,14 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 #endif /* HAVE_RAW_SUPPORT */
 
 	if (file == NULL) {
+		int err;
+
 		/* pick arbitrary, existing (allocated) file */
-		if ((file = fileset_pick(fileset, FILESET_PICKEXISTS, 0))
-		    == NULL) {
+		if ((err = flowoplib_pickfile(&file, flowop,
+		    FILESET_PICKEXISTS, 0)) != FILEBENCH_OK) {
 			filebench_log(LOG_DEBUG_SCRIPT,
 			    "flowop %s failed to pick file", flowop->fo_name);
-			return (FILEBENCH_NORSC);
+			return (err);
 		}
 	} else {
 		/* delete specific file. wait for it to be non-busy */
@@ -1997,6 +2073,28 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 		(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
 	}
 
+	/* don't delete if anyone (other than me) has file open */
+	if ((fd > 0) && (threadflow->tf_fd[fd] > 0)) {
+		if (file->fse_open_cnt > 1) {
+			filebench_log(LOG_DEBUG_SCRIPT,
+			    "flowop %s can't delete file opened by other"
+			    " threads at fd = %d", flowop->fo_name, fd);
+			fileset_unbusy(file, FALSE, FALSE, 0);
+			return (FILEBENCH_OK);
+		} else {
+			filebench_log(LOG_DEBUG_SCRIPT,
+			    "flowop %s deleting still open file at fd = %d",
+			    flowop->fo_name, fd);
+		}
+	} else if (file->fse_open_cnt > 0) {
+		filebench_log(LOG_DEBUG_SCRIPT,
+		    "flowop %s can't delete file opened by other"
+		    " threads at fd = %d, open count = %d",
+		    flowop->fo_name, fd, file->fse_open_cnt);
+		fileset_unbusy(file, FALSE, FALSE, 0);
+		return (FILEBENCH_OK);
+	}
+
 	(void) fb_strlcpy(path, avd_get_str(fileset->fs_path), MAXPATHLEN);
 	(void) fb_strlcat(path, "/", MAXPATHLEN);
 	(void) fb_strlcat(path, avd_get_str(fileset->fs_name), MAXPATHLEN);
@@ -2010,7 +2108,7 @@ flowoplib_deletefile(threadflow_t *threadflow, flowop_t *flowop)
 	flowop_endop(threadflow, flowop, 0);
 
 	/* indicate that it is no longer busy and no longer exists */
-	fileset_unbusy(file, TRUE, FALSE);
+	fileset_unbusy(file, TRUE, FALSE, -file->fse_open_cnt);
 
 	filebench_log(LOG_DEBUG_SCRIPT, "deleted file %s", file->fse_path);
 
@@ -2103,6 +2201,7 @@ static int
 flowoplib_closefile(threadflow_t *threadflow, flowop_t *flowop)
 {
 	filesetentry_t *file;
+	fileset_t *fileset;
 	int fd = flowop->fo_fdnumber;
 
 	if (threadflow->tf_fd[fd] == 0) {
@@ -2112,45 +2211,36 @@ flowoplib_closefile(threadflow_t *threadflow, flowop_t *flowop)
 		return (FILEBENCH_ERROR);
 	}
 
+	file = threadflow->tf_fse[fd];
+	fileset = file->fse_fileset;
+
+	/* Wait for it to be non-busy */
+	(void) ipc_mutex_lock(&fileset->fs_pick_lock);
+	while (file->fse_flags & FSE_BUSY) {
+		file->fse_flags |= FSE_THRD_WAITNG;
+		(void) pthread_cond_wait(&fileset->fs_thrd_wait_cv,
+		    &fileset->fs_pick_lock);
+	}
+
+	/* File now available, grab it for closing */
+	file->fse_flags |= FSE_BUSY;
+
+	/* if last open, set declare idle */
+	if (file->fse_open_cnt == 1)
+		fileset->fs_idle_files--;
+
+	(void) ipc_mutex_unlock(&fileset->fs_pick_lock);
+
 	/* Measure time to close */
 	flowop_beginop(threadflow, flowop);
 	(void) close(threadflow->tf_fd[fd]);
 	flowop_endop(threadflow, flowop, 0);
 
-	file = threadflow->tf_fse[fd];
+	fileset_unbusy(file, FALSE, FALSE, -1);
 
 	threadflow->tf_fd[fd] = 0;
 
 	filebench_log(LOG_DEBUG_SCRIPT, "closed file %s", file->fse_path);
-
-	return (FILEBENCH_OK);
-}
-
-/*
- * Obtain a filesetentry for a leaf directory. Result placed where dirp
- * points. Supply with flowop and a flag to indicate whether an existent
- * or non-existent leaf directory is required. Returns FILEBENCH_NORSC
- * if all out of the appropriate type of directories, FILEBENCH_ERROR
- * if the flowop does not point to a fileset, and FILEBENCH_OK otherwise.
- */
-static int
-flowoplib_pickleafdir(filesetentry_t **dirp, flowop_t *flowop, int flags)
-{
-	fileset_t	*fileset;
-
-	if ((fileset = flowop->fo_fileset) == NULL) {
-		filebench_log(LOG_ERROR, "flowop NO fileset");
-		return (FILEBENCH_ERROR);
-	}
-
-	if ((*dirp = fileset_pick(fileset,
-	    FILESET_PICKLEAFDIR | flags, 0)) == NULL) {
-		filebench_log(LOG_DEBUG_SCRIPT,
-		    "flowop %s failed to pick directory from fileset %s",
-		    flowop->fo_name,
-		    avd_get_str(fileset->fs_name));
-		return (FILEBENCH_NORSC);
-	}
 
 	return (FILEBENCH_OK);
 }
@@ -2217,7 +2307,7 @@ flowoplib_makedir(threadflow_t *threadflow, flowop_t *flowop)
 	flowop_endop(threadflow, flowop, 0);
 
 	/* indicate that it is no longer busy and now exists */
-	fileset_unbusy(dir, TRUE, TRUE);
+	fileset_unbusy(dir, TRUE, TRUE, 0);
 
 	return (FILEBENCH_OK);
 }
@@ -2249,7 +2339,7 @@ flowoplib_removedir(threadflow_t *threadflow, flowop_t *flowop)
 	flowop_endop(threadflow, flowop, 0);
 
 	/* indicate that it is no longer busy and no longer exists */
-	fileset_unbusy(dir, TRUE, FALSE);
+	fileset_unbusy(dir, TRUE, FALSE, 0);
 
 	return (FILEBENCH_OK);
 }
@@ -2281,13 +2371,12 @@ flowoplib_listdir(threadflow_t *threadflow, flowop_t *flowop)
 		return (FILEBENCH_ERROR);
 	}
 
-	if ((dir = fileset_pick(fileset,
-	    FILESET_PICKDIR, 0)) == NULL) {
+	if ((dir = fileset_pick(fileset, FILESET_PICKDIR, 0, 0)) == NULL) {
 		filebench_log(LOG_DEBUG_SCRIPT,
 		    "flowop %s failed to pick directory from fileset %s",
 		    flowop->fo_name,
 		    avd_get_str(fileset->fs_name));
-		return (FILEBENCH_NORSC);
+		return (FILEBENCH_ERROR);
 	}
 
 	if ((ret = flowoplib_getdirpath(dir, full_path)) != FILEBENCH_OK)
@@ -2315,7 +2404,7 @@ flowoplib_listdir(threadflow_t *threadflow, flowop_t *flowop)
 	flowop_endop(threadflow, flowop, dir_bytes);
 
 	/* indicate that it is no longer busy */
-	fileset_unbusy(dir, FALSE, FALSE);
+	fileset_unbusy(dir, FALSE, FALSE, 0);
 
 	return (FILEBENCH_OK);
 }
@@ -2373,14 +2462,15 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
 	if (file == NULL) {
 		char path[MAXPATHLEN];
 		char *pathtmp;
+		int err;
 
 		/* pick arbitrary, existing (allocated) file */
-		if ((file = fileset_pick(fileset, FILESET_PICKEXISTS, 0))
-		    == NULL) {
+		if ((err = flowoplib_pickfile(&file, flowop,
+		    FILESET_PICKEXISTS, 0)) != FILEBENCH_OK) {
 			filebench_log(LOG_DEBUG_SCRIPT,
 			    "Statfile flowop %s failed to pick file",
 			    flowop->fo_name);
-			return (FILEBENCH_NORSC);
+			return (err);
 		}
 
 		/* resolve path and do a stat on file */
@@ -2400,7 +2490,7 @@ flowoplib_statfile(threadflow_t *threadflow, flowop_t *flowop)
 			    "statfile flowop %s failed", flowop->fo_name);
 		flowop_endop(threadflow, flowop, 0);
 
-		fileset_unbusy(file, FALSE, FALSE);
+		fileset_unbusy(file, FALSE, FALSE, 0);
 	} else {
 		/* stat specific file */
 		flowop_beginop(threadflow, flowop);

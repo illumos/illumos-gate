@@ -22,13 +22,12 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 set $dir=/tmp
-set $nfiles=1000
+set $nfiles=10000
 set $meandirwidth=20
 set $filesize=128k
-set $nthreads=100
+set $nthreads=50
 set $meaniosize=16k
 set $fixediosize=1m
 

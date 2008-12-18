@@ -26,9 +26,6 @@
 #ifndef	_FB_FLOWOP_H
 #define	_FB_FLOWOP_H
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
 
 #include <stdio.h>
@@ -88,6 +85,7 @@ typedef struct flowop {
 	avd_t		fo_blocking;	/* Attr */
 	avd_t		fo_directio;	/* Attr */
 	avd_t		fo_rotatefd;	/* Attr */
+	avd_t		fo_fileindex;	/* Attr */
 	flowstat_t	fo_stats;	/* Flow statistics */
 	pthread_cond_t	fo_cv;		/* Block/wakeup cv */
 	pthread_mutex_t	fo_lock;	/* Mutex around flowop */

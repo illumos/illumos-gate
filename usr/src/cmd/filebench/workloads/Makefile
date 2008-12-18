@@ -58,6 +58,7 @@ WORKLOADS = \
 	multistreamwritedirect.f \
 	oltp.f \
 	openfiles.f \
+	randomfileaccess.f \
 	randomread.f \
 	randomrw.f \
 	randomwrite.f \

@@ -35,7 +35,7 @@ define fileset name=bigfileset,path=$dir,size=0,leafdirs=$ndirs,dirwidth=$meandi
 
 define process name=remdir,instances=1
 {
-  thread name=fileopener,memsize=1m,instances=$nthreads
+  thread name=removedirectory,memsize=1m,instances=$nthreads
   {
     flowop removedir name=dirremover,filesetname=bigfileset
   }

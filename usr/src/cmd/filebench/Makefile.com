@@ -32,6 +32,7 @@ SRCS = \
 	auto_comp.c \
         eventgen.c \
 	fb_random.c \
+	fb_avl.c \
         fileset.c \
         flowop.c \
         flowop_library.c \

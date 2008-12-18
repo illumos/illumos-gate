@@ -81,6 +81,7 @@ f none usr/benchmarks/filebench/workloads/multistreamwrite.f 444 root bin
 f none usr/benchmarks/filebench/workloads/multistreamwritedirect.f 444 root bin
 f none usr/benchmarks/filebench/workloads/oltp.f 444 root bin
 f none usr/benchmarks/filebench/workloads/openfiles.f 444 root bin
+f none usr/benchmarks/filebench/workloads/randomfileaccess.f 444 root bin
 f none usr/benchmarks/filebench/workloads/randomread.f 444 root bin
 f none usr/benchmarks/filebench/workloads/randomrw.f 444 root bin
 f none usr/benchmarks/filebench/workloads/randomwrite.f 444 root bin

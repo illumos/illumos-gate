@@ -86,6 +86,7 @@ static cmd_t *alloc_cmd(void);
 static attr_t *alloc_attr(void);
 static attr_t *alloc_lvar_attr(var_t *var);
 static attr_t *get_attr(cmd_t *cmd, int64_t name);
+static attr_t *get_attr_fileset(cmd_t *cmd, int64_t name);
 static attr_t *get_attr_integer(cmd_t *cmd, int64_t name);
 static attr_t *get_attr_bool(cmd_t *cmd, int64_t name);
 static void get_attr_lvars(cmd_t *cmd, flowop_t *flowop);
@@ -185,7 +186,7 @@ static void parser_version(cmd_t *cmd);
 %token FSA_HIGHWATER FSA_DIRECTIO FSA_DIRWIDTH FSA_FD FSA_SRCFD FSA_ROTATEFD
 %token FSA_NAMELENGTH FSA_FILESIZE FSA_ENTRIES FSA_FILESIZEGAMMA FSA_DIRDEPTHRV
 %token FSA_DIRGAMMA FSA_USEISM FSA_TYPE FSA_RANDTABLE FSA_RANDSRC FSA_RANDROUND
-%token FSA_LEAFDIRS
+%token FSA_LEAFDIRS FSA_INDEXED
 %token FSA_RANDSEED FSA_RANDGAMMA FSA_RANDMEAN FSA_RANDMIN FSA_MASTER
 %token FSA_CLIENT
 %token FSS_TYPE FSS_SEED FSS_GAMMA FSS_MEAN FSS_MIN FSS_SRC FSS_ROUND
@@ -1438,6 +1439,8 @@ attrs_define_fileset:
 | FSA_DIRWIDTH { $$ = FSA_DIRWIDTH;}
 | FSA_DIRDEPTHRV { $$ = FSA_DIRDEPTHRV;}
 | FSA_PREALLOC { $$ = FSA_PREALLOC;}
+| FSA_PARALLOC { $$ = FSA_PARALLOC;}
+| FSA_REUSE { $$ = FSA_REUSE;}
 | FSA_FILESIZEGAMMA { $$ = FSA_FILESIZEGAMMA;}
 | FSA_DIRGAMMA { $$ = FSA_DIRGAMMA;}
 | FSA_CACHED { $$ = FSA_CACHED;}
@@ -1509,6 +1512,7 @@ attrs_flowop:
 | FSA_ROTATEFD { $$ = FSA_ROTATEFD;}
 | FSA_DSYNC { $$ = FSA_DSYNC;}
 | FSA_DIRECTIO { $$ = FSA_DIRECTIO;}
+| FSA_INDEXED { $$ = FSA_INDEXED;}
 | FSA_TARGET { $$ = FSA_TARGET;}
 | FSA_ITERS { $$ = FSA_ITERS;}
 | FSA_VALUE { $$ = FSA_VALUE;}
@@ -1619,8 +1623,7 @@ attr_list_value: var_string_list {
 	if (($$ = alloc_attr()) == NULL)
 		YYERROR;
 	$$->attr_param_list = $1;
-} | FSV_STRING
-{
+} | FSV_STRING {
 	if (($$ = alloc_attr()) == NULL)
 		YYERROR;
 	$$->attr_avd = avd_str_alloc($1);
@@ -1893,7 +1896,7 @@ parser_list2string(list_t *list)
 
 	*string = 0;
 
-
+	/*	printf("parser_list2string: called\n"); */
 	/* Format args */
 	for (l = list; l != NULL; l = l->list_next) {
 		char *lstr = avd_get_str(l->list_string);
@@ -1975,6 +1978,7 @@ parser_list2varstring(list_t *list)
 {
 	char *lstr = avd_get_str(list->list_string);
 
+	/*	printf("parser_list2varstring: Called\n"); */
 	/* Special case - variable name */
 	if ((list->list_next == NULL) && (*lstr == '$'))
 		return (var_ref_attr(lstr));
@@ -2244,7 +2248,7 @@ parser_thread_define(cmd_t *cmd, procflow_t *procflow, int procinstances)
 }
 
 /*
- * Files in the attributes for a newly allocated flowop
+ * Fills in the attributes for a newly allocated flowop
  */
 static void
 parser_flowop_get_attrs(cmd_t *cmd, flowop_t *flowop)
@@ -2333,6 +2337,12 @@ parser_flowop_get_attrs(cmd_t *cmd, flowop_t *flowop)
 	} else {
 		flowop->fo_highwater = avd_int_alloc(1);
 	}
+
+	/* find file or leaf directory by index number */
+	if (attr = get_attr_integer(cmd, FSA_INDEXED))
+		flowop->fo_fileindex = attr->attr_avd;
+	else
+		flowop->fo_fileindex = NULL;
 }
 
 /*
@@ -2591,7 +2601,7 @@ parser_fileset_define_common(cmd_t *cmd)
 	avd_t pathname;
 
 	/* Get the name of the file */
-	if (attr = get_attr(cmd, FSA_NAME)) {
+	if (attr = get_attr_fileset(cmd, FSA_NAME)) {
 		name = attr->attr_avd;
 	} else {
 		filebench_log(LOG_ERROR,
@@ -3597,12 +3607,6 @@ parser_randvar_define(cmd_t *cmd)
 	else
 		rndp->rnd_min = avd_int_alloc(0);
 
-	/* Get the mean value of the random distribution */
-	if (attr = get_attr_integer(cmd, FSA_RANDMEAN))
-		rndp->rnd_mean = attr->attr_avd;
-	else
-		rndp->rnd_mean = avd_int_alloc(0);
-
 	/* Get the roundoff value for the random distribution */
 	if (attr = get_attr_integer(cmd, FSA_RANDROUND))
 		rndp->rnd_round = attr->attr_avd;
@@ -3652,6 +3656,15 @@ parser_randvar_define(cmd_t *cmd)
 		rndp->rnd_gamma = attr->attr_avd;
 	else
 		rndp->rnd_gamma = avd_int_alloc(1500);
+
+	/* Get the mean value of the random distribution */
+	if (attr = get_attr_integer(cmd, FSA_RANDMEAN)) {
+		rndp->rnd_mean = attr->attr_avd;
+	} else if ((rndp->rnd_type & RAND_TYPE_MASK) == RAND_TYPE_GAMMA) {
+		rndp->rnd_mean = NULL;
+	} else {
+		rndp->rnd_mean = avd_int_alloc(0);
+	}
 }
 
 /*
@@ -3819,6 +3832,47 @@ alloc_lvar_attr(var_t *var)
 
 	return (attr);
 }
+
+
+/*
+ * Searches the attribute list for the command for the named attribute type.
+ * The attribute list is created by the parser from the list of attributes
+ * supplied with certain commands, such as the define and flowop commands.
+ * Returns a pointer to the attribute structure if the named attribute is
+ * found, otherwise returns NULL. If the attribute includes a parameter list,
+ * the list is converted to a string and stored in the attr_avd field of
+ * the returned attr_t struct.
+ */
+static attr_t *
+get_attr_fileset(cmd_t *cmd, int64_t name)
+{
+	attr_t *attr;
+	attr_t *rtn = NULL;
+	char *string;
+
+	for (attr = cmd->cmd_attr_list; attr != NULL;
+	    attr = attr->attr_next) {
+		filebench_log(LOG_DEBUG_IMPL,
+		    "attr %d = %d %llx?",
+		    attr->attr_name,
+		    name,
+		    attr->attr_avd);
+
+		if (attr->attr_name == name)
+			rtn = attr;
+	}
+
+	if (rtn == NULL)
+		return (NULL);
+
+	if (rtn->attr_param_list) {
+		filebench_log(LOG_DEBUG_SCRIPT, "attr is param list");
+		rtn->attr_avd = parser_list2varstring(rtn->attr_param_list);
+	}
+
+	return (rtn);
+}
+
 
 /*
  * Searches the attribute list for the command for the named attribute type.

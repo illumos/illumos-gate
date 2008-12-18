@@ -118,6 +118,7 @@ filename                { return FSA_FILE; }
 filesetname             { return FSA_FILE; }
 instances               { return FSA_INSTANCES;}                  
 iosize                  { return FSA_IOSIZE; }
+indexed                 { return FSA_INDEXED; }
 iters                   { return FSA_ITERS;}
 master			{ return FSA_MASTER; }
 client			{ return FSA_CLIENT; }

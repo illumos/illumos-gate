@@ -21,8 +21,6 @@
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 set $dir=/tmp
 set $nfiles=700
@@ -31,11 +29,11 @@ set $filesize=128k
 set $nthreads=10
 set $meaniosize=16k
 
-define fileset name=usr1files,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80, paralloc
+define fileset name=bigfileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80, paralloc
 
-define fileset name=usr2files,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80, paralloc
+define fileset name=u2fileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80, paralloc
 
-define fileset name=usr3files,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80, paralloc
+define fileset name=u3fileset,path=$dir,size=$filesize,entries=$nfiles,dirwidth=$meandirwidth,prealloc=80, paralloc
 
 define flowop name=readwrite, $fileset
 {
@@ -59,19 +57,19 @@ define flowop name=dowork, $filesetnm, $rwiters
 
 define process name=filereader1,instances=1
 {
-  thread name=drewthread,memsize=10m,instances=$nthreads
+  thread name=user1,memsize=10m,instances=$nthreads
   {
-    flowop dowork name=dowork1, iters=1, $rwiters=5, $filesetnm=usr1files
+    flowop dowork name=dowork1, iters=1, $rwiters=5, $filesetnm=bigfileset
   }
 
-  thread name=ericthread,memsize=10m,instances=$nthreads
+  thread name=user2,memsize=10m,instances=$nthreads
   {
-    flowop dowork name=dowork2, iters=1, $rwiters=4, $filesetnm=usr2files
+    flowop dowork name=dowork2, iters=1, $rwiters=4, $filesetnm=u2fileset
   }
 
-  thread name=spencerthread,memsize=10m,instances=$nthreads
+  thread name=user3,memsize=10m,instances=$nthreads
   {
-    flowop dowork name=dowork3, iters=1, $rwiters=3, $filesetnm=usr3files
+    flowop dowork name=dowork3, iters=1, $rwiters=3, $filesetnm=u3fileset
   }
 }
 

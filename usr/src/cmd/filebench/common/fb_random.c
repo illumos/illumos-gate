@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <fcntl.h>
 #include <math.h>
@@ -305,9 +303,13 @@ randdist_init_one(randdist_t *rndp)
 	int		pteidx;
 
 	/* convert parameters to doubles */
-	rndp->rnd_dbl_mean  = (double)avd_get_int(rndp->rnd_mean);
 	rndp->rnd_dbl_gamma = (double)avd_get_int(rndp->rnd_gamma) / 1000.0;
+	if (rndp->rnd_mean != NULL)
+		rndp->rnd_dbl_mean  = (double)avd_get_int(rndp->rnd_mean);
+	else
+		rndp->rnd_dbl_mean = rndp->rnd_dbl_gamma;
 
+	/* de-reference min and round amounts for later use */
 	rndp->rnd_vint_min  = avd_get_int(rndp->rnd_min);
 	rndp->rnd_vint_round  = avd_get_int(rndp->rnd_round);
 
