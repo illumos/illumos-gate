@@ -46,7 +46,7 @@ extern "C" {
  * MAC version identifier.  This is used by mac_alloc() mac_register() to
  * verify that incompatible drivers don't register.
  */
-#define	MAC_VERSION	0x1
+#define	MAC_VERSION	0x2
 
 /*
  * Opaque handle types

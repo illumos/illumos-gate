@@ -1280,8 +1280,10 @@ mac_client_open(mac_handle_t mh, mac_client_handle_t *mchp, char *name,
 	 */
 	mac_client_add(mcip);
 
-	mcip->mci_no_hwrings = no_hwrings;
-	mcip->mci_req_hwrings = req_hwrings;
+	if (no_hwrings)
+		mcip->mci_state_flags |= MCIS_NO_HWRINGS;
+	if (req_hwrings)
+		mcip->mci_state_flags |= MCIS_REQ_HWRINGS;
 	mcip->mci_share = NULL;
 	if (share_desired) {
 		ASSERT(!no_hwrings);
@@ -1629,7 +1631,8 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	uint_t mac_len = mip->mi_type->mt_addr_length;
 	boolean_t check_dups = !(flags & MAC_UNICAST_NODUPCHECK);
 	boolean_t is_primary = (flags & MAC_UNICAST_PRIMARY);
-	boolean_t is_vnic_primary = flags & MAC_UNICAST_VNIC_PRIMARY;
+	boolean_t is_vnic_primary = (flags & MAC_UNICAST_VNIC_PRIMARY);
+	boolean_t is_unicast_hw = (flags & MAC_UNICAST_HW);
 	boolean_t bcast_added = B_FALSE;
 	boolean_t nactiveclients_added = B_FALSE;
 	boolean_t mac_started = B_FALSE;
@@ -1780,8 +1783,18 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 	}
 	flent = mcip->mci_flent;
 	ASSERT(flent != NULL);
+
 	/* We are configuring the unicast flow now */
 	if (!MCIP_DATAPATH_SETUP(mcip)) {
+		if (is_unicast_hw) {
+			/*
+			 * The client requires a hardware MAC address slot
+			 * for that unicast address. Since we support only
+			 * one unicast MAC address per client, flag the
+			 * MAC client itself.
+			 */
+			mcip->mci_state_flags |= MCIS_UNICAST_HW;
+		}
 
 		MAC_CLIENT_SET_PRIORITY_RANGE(mcip,
 		    (mrp.mrp_mask & MRP_PRIORITY) ? mrp.mrp_priority :
@@ -1818,6 +1831,19 @@ i_mac_unicast_add(mac_client_handle_t mch, uint8_t *mac_addr, uint16_t flags,
 		 */
 
 		if (bcmp(mac_addr, map->ma_addr, map->ma_len) != 0) {
+			err = EINVAL;
+			goto bail;
+		}
+
+		/*
+		 * Make sure the client is consistent about its requests
+		 * for MAC addresses. I.e. all requests from the clients
+		 * must have the MAC_UNICAST_HW flag set or clear.
+		 */
+		if ((mcip->mci_state_flags & MCIS_UNICAST_HW) != 0 &&
+		    !is_unicast_hw ||
+		    (mcip->mci_state_flags & MCIS_UNICAST_HW) == 0 &&
+		    is_unicast_hw) {
 			err = EINVAL;
 			goto bail;
 		}
@@ -2077,6 +2103,7 @@ mac_unicast_remove(mac_client_handle_t mch, mac_unicast_handle_t mah)
 	}
 	if (mcip->mci_state_flags & MCIS_EXCLUSIVE)
 		mip->mi_state_flags &= ~MIS_EXCLUSIVE;
+	mcip->mci_state_flags &= ~MCIS_UNICAST_HW;
 
 	mac_stop(mip);
 

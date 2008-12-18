@@ -170,11 +170,6 @@ struct mac_client_impl_s {			/* Protected by */
 	 * Hybrid I/O related definitions.
 	 */
 	mac_share_handle_t	mci_share;
-	boolean_t		mci_share_bound;
-	boolean_t		mci_no_hwrings;
-
-	/* The client requests a hardware group */
-	boolean_t		mci_req_hwrings;
 
 	/* for multicast support */
 	struct mac_mcast_addrs_s *mci_mcast_addrs;	/* mi_rw_lock */
@@ -288,6 +283,8 @@ extern	int	mac_tx_percpu_cnt;
 #define	MCIS_NO_HWRINGS			0x0100
 #define	MCIS_DISABLE_TX_VID_CHECK	0x0200
 #define	MCIS_USE_DATALINK_NAME		0x0400
+#define	MCIS_UNICAST_HW			0x0800
+#define	MCIS_REQ_HWRINGS		0x1000
 
 /* in mac_client.c */
 extern void mac_promisc_client_dispatch(mac_client_impl_t *, mblk_t *);

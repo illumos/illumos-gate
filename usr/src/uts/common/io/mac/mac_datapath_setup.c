@@ -2073,7 +2073,7 @@ mac_srs_group_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 
 		if (mcip->mci_share != NULL) {
 			mac_srs_tx_t	*tx = &tx_srs->srs_tx;
-			ASSERT(!mcip->mci_no_hwrings);
+			ASSERT((mcip->mci_state_flags & MCIS_NO_HWRINGS) == 0);
 			/*
 			 * A share requires a dedicated TX group.
 			 * mac_reserve_tx_group() does the work needed to
@@ -2478,7 +2478,7 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		if (flent->fe_type & FLOW_PRIMARY_MAC)
 			rtype = MAC_RX_RESERVE_DEFAULT;
 
-		if (!mcip->mci_no_hwrings) {
+		if ((mcip->mci_state_flags & MCIS_NO_HWRINGS) == 0) {
 			/*
 			 * Check to see if we can get an exclusive group for
 			 * this mac address or if there already exists a
@@ -2489,7 +2489,7 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 		}
 
 		if (group == NULL) {
-			if (mcip->mci_req_hwrings)
+			if ((mcip->mci_state_flags & MCIS_REQ_HWRINGS) != 0)
 				return (ENOSPC);
 			group = &mip->mi_rx_groups[0];
 		}
@@ -2534,7 +2534,8 @@ mac_datapath_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 			goto setup_failed;
 
 		/* Program the H/W Classifier */
-		if ((err = mac_add_macaddr(mip, group, mac_addr)) != 0)
+		if ((err = mac_add_macaddr(mip, group, mac_addr,
+		    (mcip->mci_state_flags & MCIS_UNICAST_HW) != 0)) != 0)
 			goto setup_failed;
 		mcip->mci_unicast = mac_find_macaddr(mip, mac_addr);
 		ASSERT(mcip->mci_unicast != NULL);
@@ -3200,7 +3201,8 @@ mac_tx_srs_setup(mac_client_impl_t *mcip, flow_entry_t *flent,
 	 * the underlying link's ring set instead of the underlying
 	 * NIC's.
 	 */
-	if (srs_type == SRST_FLOW || mcip->mci_no_hwrings)
+	if (srs_type == SRST_FLOW ||
+	    (mcip->mci_state_flags & MCIS_NO_HWRINGS) != 0)
 		goto use_default_ring;
 
 	if (mcip->mci_share != NULL)
@@ -3307,6 +3309,29 @@ use_default_ring:
 }
 
 /*
+ * Update the fanout of a client if its recorded link speed doesn't match
+ * its current link speed.
+ */
+void
+mac_fanout_recompute_client(mac_client_impl_t *mcip)
+{
+	uint64_t link_speed;
+	mac_resource_props_t *mcip_mrp;
+
+	ASSERT(MAC_PERIM_HELD((mac_handle_t)mcip->mci_mip));
+
+	link_speed = mac_client_stat_get(mcip->mci_flent->fe_mcip,
+	    MAC_STAT_IFSPEED);
+
+	if ((link_speed != 0) &&
+	    (link_speed != mcip->mci_flent->fe_nic_speed)) {
+		mcip_mrp = MCIP_RESOURCE_PROPS(mcip);
+		mac_fanout_setup(mcip, mcip->mci_flent,
+		    mcip_mrp, mac_rx_deliver, mcip, NULL);
+	}
+}
+
+/*
  * Walk through the list of mac clients for the MAC.
  * For each active mac client, recompute the number of soft rings
  * associated with every client, only if current speed is different
@@ -3318,8 +3343,7 @@ void
 mac_fanout_recompute(mac_impl_t *mip)
 {
 	mac_client_impl_t	*mcip;
-	uint64_t		ifspeed;
-	mac_resource_props_t	*mcip_mrp;
+
 
 	i_mac_perim_enter(mip);
 	ASSERT(!(mip->mi_state_flags & MIS_IS_VNIC));
@@ -3331,17 +3355,10 @@ mac_fanout_recompute(mac_impl_t *mip)
 
 	for (mcip = mip->mi_clients_list; mcip != NULL;
 	    mcip = mcip->mci_client_next) {
-		if (!MCIP_DATAPATH_SETUP(mcip))
+		if ((mcip->mci_state_flags & MCIS_SHARE_BOUND) != 0 ||
+		    !MCIP_DATAPATH_SETUP(mcip))
 			continue;
-
-		ifspeed = mac_client_stat_get(mcip->mci_flent->fe_mcip,
-		    MAC_STAT_IFSPEED);
-		if ((ifspeed != 0) &&
-		    (ifspeed != mcip->mci_flent->fe_nic_speed)) {
-			mcip_mrp = MCIP_RESOURCE_PROPS(mcip);
-			mac_fanout_setup(mcip, mcip->mci_flent,
-			    mcip_mrp, mac_rx_deliver, mcip, NULL);
-		}
+		mac_fanout_recompute_client(mcip);
 	}
 	i_mac_perim_exit(mip);
 }

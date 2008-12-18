@@ -1571,6 +1571,12 @@ nxge_hio_share_add_group(mac_share_handle_t shandle,
 		return (EALREADY);
 	}
 
+	/*
+	 * If we are adding a group 0 to a share, this
+	 * is not correct.
+	 */
+	ASSERT(rg->gindex != 0);
+
 	nxge = rg->nxgep;
 	vr = shp->vrp;
 
@@ -2449,4 +2455,45 @@ nxge_hio_dc_unshare(
 	NXGE_DEBUG_MSG((nxge, HIO_CTL, "<== nxge_hio_dc_unshare"));
 }
 
+
+/*
+ * nxge_hio_rxdma_bind_intr():
+ *
+ *	For the guest domain driver, need to bind the interrupt group
+ *	and state to the rx_rcr_ring_t.
+ */
+
+int
+nxge_hio_rxdma_bind_intr(nxge_t *nxge, rx_rcr_ring_t *ring, int channel)
+{
+	nxge_hio_dc_t	*dc;
+	nxge_ldgv_t	*control;
+	nxge_ldg_t	*group;
+	nxge_ldv_t	*device;
+
+	/*
+	 * Find the DMA channel.
+	 */
+	if (!(dc = nxge_grp_dc_find(nxge, VP_BOUND_RX, channel))) {
+		return (NXGE_ERROR);
+	}
+
+	/*
+	 * Get the control structure.
+	 */
+	control = nxge->ldgvp;
+	if (control == NULL) {
+		return (NXGE_ERROR);
+	}
+
+	group = &control->ldgp[dc->ldg.vector];
+	device = &control->ldvp[dc->ldg.ldsv];
+
+	MUTEX_ENTER(&ring->lock);
+	ring->ldgp = group;
+	ring->ldvp = device;
+	MUTEX_EXIT(&ring->lock);
+
+	return (NXGE_OK);
+}
 #endif	/* if defined(sun4v) */

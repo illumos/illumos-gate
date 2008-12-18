@@ -381,7 +381,7 @@ extern int nxge_hio_share_rem_group(mac_share_handle_t,
 extern int nxge_hio_share_bind(mac_share_handle_t, uint64_t cookie,
     uint64_t *rcookie);
 extern void nxge_hio_share_unbind(mac_share_handle_t);
-
+extern int nxge_hio_rxdma_bind_intr(nxge_t *, rx_rcr_ring_t *, int);
 
 				/* nxge_hio_guest.c */
 extern void nxge_hio_unregister(nxge_t *);

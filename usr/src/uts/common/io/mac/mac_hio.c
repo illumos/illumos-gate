@@ -73,7 +73,7 @@ i_mac_share_alloc(mac_client_impl_t *mcip)
 	DTRACE_PROBE3(i__mac__share__alloc, mac_client_impl_t *, mcip,
 	    int, rv, mac_share_handle_t, mcip->mci_share);
 
-	mcip->mci_share_bound = B_FALSE;
+	mcip->mci_state_flags &= ~MCIS_SHARE_BOUND;
 
 	i_mac_perim_exit(mip);
 }
@@ -91,7 +91,7 @@ i_mac_share_free(mac_client_impl_t *mcip)
 	i_mac_perim_enter(mip);
 
 	/* MAC clients are required to unbind they shares before freeing them */
-	ASSERT(!mcip->mci_share_bound);
+	ASSERT((mcip->mci_state_flags & MCIS_SHARE_BOUND) == 0);
 
 	if (mcip->mci_share == NULL) {
 		i_mac_perim_exit(mip);
@@ -122,7 +122,7 @@ mac_share_bind(mac_client_handle_t mch, uint64_t cookie, uint64_t *rcookie)
 		return (ENOTSUP);
 	}
 
-	ASSERT(!mcip->mci_share_bound);
+	ASSERT((mcip->mci_state_flags & MCIS_SHARE_BOUND) == 0);
 
 	/*
 	 * Temporarly suspend the TX traffic for that client to make sure
@@ -137,18 +137,16 @@ mac_share_bind(mac_client_handle_t mch, uint64_t cookie, uint64_t *rcookie)
 	 * that traffic sent by the MAC client are sent through
 	 * the default ring.
 	 *
-	 * For TX XXX will ensure that packets are sent through the
-	 * default ring if the share of the MAC client is bound.
+	 * For the transmit path we ensure that packets are sent through the
+	 * default ring if the share of the MAC client is bound, see MAC_TX().
 	 */
 
 	rv = mip->mi_share_capab.ms_sbind(mcip->mci_share, cookie, rcookie);
 	if (rv == 0)
-		mcip->mci_share_bound = B_TRUE;
+		mcip->mci_state_flags |= MCIS_SHARE_BOUND;
 
 	/*
-	 * Resume TX traffic for the MAC client. Since mci_share_bound is set
-	 * to B_TRUE, mac_tx_send() will not send traffic to individual TX
-	 * rings until the share is unbound.
+	 * Resume transmit traffic for the MAC client.
 	 */
 	mac_tx_client_restart(mcip);
 
@@ -176,7 +174,15 @@ mac_share_unbind(mac_client_handle_t mch)
 
 	mip->mi_share_capab.ms_sunbind(mcip->mci_share);
 
-	mcip->mci_share_bound = B_FALSE;
+	mcip->mci_state_flags &= ~MCIS_SHARE_BOUND;
+
+	/*
+	 * If the link state changed while the share was bound, the
+	 * soft rings fanout associated with the client would have not
+	 * been updated by mac_fanout_recompute(). Do the check here
+	 * now that the share has been unbound.
+	 */
+	mac_fanout_recompute_client(mcip);
 
 	i_mac_perim_exit(mip);
 }

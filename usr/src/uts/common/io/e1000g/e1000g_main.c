@@ -2672,7 +2672,7 @@ static int
 e1000g_addmac(void *arg, const uint8_t *mac_addr)
 {
 	struct e1000g *Adapter = (struct e1000g *)arg;
-	int slot;
+	int slot, err;
 
 	mutex_enter(&Adapter->gen_lock);
 
@@ -2695,19 +2695,20 @@ e1000g_addmac(void *arg, const uint8_t *mac_addr)
 	}
 	ASSERT(slot < Adapter->unicst_total);
 
-	e1000g_unicst_set(Adapter, mac_addr, slot);
-	Adapter->unicst_avail--;
+	err = e1000g_unicst_set(Adapter, mac_addr, slot);
+	if (err == 0)
+		Adapter->unicst_avail--;
 
 	mutex_exit(&Adapter->gen_lock);
 
-	return (0);
+	return (err);
 }
 
 static int
 e1000g_remmac(void *arg, const uint8_t *mac_addr)
 {
 	struct e1000g *Adapter = (struct e1000g *)arg;
-	int slot;
+	int slot, err;
 
 	mutex_enter(&Adapter->gen_lock);
 
@@ -2720,12 +2721,13 @@ e1000g_remmac(void *arg, const uint8_t *mac_addr)
 	ASSERT(Adapter->unicst_addr[slot].mac.set);
 
 	/* Clear this slot */
-	e1000g_unicst_set(Adapter, NULL, slot);
-	Adapter->unicst_avail++;
+	err = e1000g_unicst_set(Adapter, NULL, slot);
+	if (err == 0)
+		Adapter->unicst_avail++;
 
 	mutex_exit(&Adapter->gen_lock);
 
-	return (0);
+	return (err);
 }
 
 static int

@@ -151,20 +151,20 @@ mac_soft_ring_create(int id, clock_t wait, void *flent, uint16_t type,
     mac_resource_handle_t x_arg2)
 {
 	mac_soft_ring_t 	*ringp;
-	char 			name[64];
+	char 			name[S_RING_NAMELEN];
 
 	bzero(name, 64);
 	ringp = kmem_cache_alloc(mac_soft_ring_cache, KM_SLEEP);
 
 	if (type & ST_RING_TCP) {
 		(void) snprintf(name, sizeof (name),
-		    "mac_tcp_soft_ring_%d_%p", id, mac_srs);
+		    "mac_tcp_soft_ring_%d_%p", id, (void *)mac_srs);
 	} else if (type & ST_RING_UDP) {
 		(void) snprintf(name, sizeof (name),
-		    "mac_udp_soft_ring_%d_%p", id, mac_srs);
+		    "mac_udp_soft_ring_%d_%p", id, (void *)mac_srs);
 	} else {
 		(void) snprintf(name, sizeof (name),
-		    "mac_oth_soft_ring_%d_%p", id, mac_srs);
+		    "mac_oth_soft_ring_%d_%p", id, (void *)mac_srs);
 	}
 
 	bzero(ringp, sizeof (mac_soft_ring_t));

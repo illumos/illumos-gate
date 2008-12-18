@@ -210,7 +210,7 @@ init_rxdma_channels_exit:
 nxge_status_t
 nxge_init_rxdma_channel(p_nxge_t nxge, int channel)
 {
-	nxge_status_t status;
+	nxge_status_t	status;
 
 	NXGE_DEBUG_MSG((nxge, MEM2_CTL, "==> nxge_init_rxdma_channel"));
 
@@ -220,6 +220,19 @@ nxge_init_rxdma_channel(p_nxge_t nxge, int channel)
 		    "<== nxge_init_rxdma: status 0x%x", status));
 		return (status);
 	}
+
+#if defined(sun4v)
+	if (isLDOMguest(nxge)) {
+		/* set rcr_ring */
+		p_rx_rcr_ring_t ring = nxge->rx_rcr_rings->rcr_rings[channel];
+
+		status = nxge_hio_rxdma_bind_intr(nxge, ring, channel);
+		if (status != NXGE_OK) {
+			nxge_unmap_rxdma(nxge, channel);
+			return (status);
+		}
+	}
+#endif
 
 	status = nxge_rxdma_hw_start(nxge, channel);
 	if (status != NXGE_OK) {
@@ -1931,7 +1944,8 @@ nxge_rx_intr(void *arg1, void *arg2)
 		}
 	} else {
 		/*
-		 * Rearm this logical group if this is a single device group.
+		 * Rearm this logical group if this is a single device
+		 * group.
 		 */
 		if (ldgp->nldvs == 1) {
 			if (isLDOMguest(nxgep)) {
