@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -37,9 +35,10 @@
 #define	DEFAULT_TOKEN_REPROMPT	gettext("Re-enter PIN for %s: ")
 #define	DEFAULT_TOKEN_MINSIZE	gettext("PIN must be at least %d characters.\n")
 
-#define	DEFAULT_USER_PROMPT	gettext("Enter key: ")
-#define	DEFAULT_USER_REPROMPT	gettext("Re-enter key: ")
-#define	DEFAULT_USER_MINSIZE	gettext("Key must be at least %d characters.\n")
+#define	DEFAULT_USER_PROMPT	gettext("Enter passphrase: ")
+#define	DEFAULT_USER_REPROMPT	gettext("Re-enter passphrase: ")
+#define	DEFAULT_USER_MINSIZE	\
+			gettext("Passphrase must be at least %d characters.\n")
 
 #define	DEFAULT_PK11TOKEN	SOFT_TOKEN_LABEL
 

@@ -482,13 +482,14 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		} else {
 			/* get the key from input */
 			status = pkcs11_get_pass(NULL, (char **)&pkeydata,
-			    (size_t *)&keysize, 0, B_FALSE);
+			    (size_t *)&keysize, 0,
+			    (cmd->type == CKA_ENCRYPT) ? B_TRUE : B_FALSE);
 		}
 
 		if (status != 0 || keysize == 0L) {
 			cryptoerror(LOG_STDERR,
-			    Kflag ? gettext("invalid password.") :
-			    gettext("invalid key."));
+			    kflag ? gettext("invalid key.") :
+			    gettext("invalid passphrase."));
 			return (EXIT_FAILURE);
 		}
 	}
