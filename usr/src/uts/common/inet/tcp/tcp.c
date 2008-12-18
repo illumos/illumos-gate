@@ -27447,7 +27447,8 @@ tcp_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
 	ASSERT(errorp != NULL);
 	*errorp = 0;
 	*sock_downcalls = &sock_tcp_downcalls;
-	*smodep = SM_CONNREQUIRED | SM_EXDATA | SM_ACCEPTSUPP;
+	*smodep = SM_CONNREQUIRED | SM_EXDATA | SM_ACCEPTSUPP |
+	    SM_SENDFILESUPP;
 
 	return ((sock_lower_handle_t)connp);
 }

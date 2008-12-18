@@ -815,9 +815,6 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					sfv_off += iov_len;
 				}
 			} else {
-				ttolwp(curthread)->lwp_ru.ioch +=
-				    (ulong_t)sfv_len;
-				*count += sfv_len;
 				aiov.iov_len = sfv_len;
 				aiov.iov_base = (caddr_t)(uintptr_t)sfv_off;
 

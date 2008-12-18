@@ -342,7 +342,9 @@ struct sonode {
 
 #define	SM_KERNEL		0x200	/* kernel socket */
 
+/* The modes below are only for non-streams sockets */
 #define	SM_ACCEPTSUPP		0x400	/* can handle accept() */
+#define	SM_SENDFILESUPP		0x800	/* Private: proto supp sendfile  */
 
 /*
  * Socket versions. Used by the socket library when calling _so_socket().

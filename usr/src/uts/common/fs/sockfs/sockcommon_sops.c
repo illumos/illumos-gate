@@ -513,7 +513,8 @@ so_sendmblk(struct sonode *so, struct nmsghdr *msg, int fflag,
 	    (fflag & (FNONBLOCK|FNDELAY));
 	size = msgdsize(mp);
 
-	if (so->so_downcalls->sd_send == NULL) {
+	if ((so->so_mode & SM_SENDFILESUPP) == 0 ||
+	    so->so_downcalls->sd_send == NULL) {
 		SO_UNBLOCK_FALLBACK(so);
 		return (EOPNOTSUPP);
 	}
