@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Internal PCI Fast DVMA implementation
@@ -71,9 +69,9 @@ px_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	DBG(DBG_FAST_DVMA, dip, "load index=%x: %p+%x ", index, a, len);
 	if (index + npages > mp->dmai_ndvmapages) {
 		cmn_err(px_panic_on_fatal_errors ? CE_PANIC : CE_WARN,
-			"%s%d: kaddr_load index(%x)+pgs(%lx) exceeds limit\n",
-			ddi_driver_name(dip), ddi_get_instance(dip),
-			index, npages);
+		    "%s%d: kaddr_load index(%x)+pgs(%lx) exceeds limit\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip),
+		    index, npages);
 		return;
 	}
 	fdvma_p->pagecnt[index] = npages;
@@ -85,7 +83,7 @@ px_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	/* construct the dma cookie to be returned */
 	MAKE_DMA_COOKIE(cp, dvma_addr | offset, len);
 	DBG(DBG_FAST_DVMA | DBG_CONT, dip, "cookie: %x+%x\n",
-		cp->dmac_address, cp->dmac_size);
+	    cp->dmac_address, cp->dmac_size);
 
 	attr = PX_GET_TTE_ATTR(mp->dmai_rflags, mp->dmai_attr.dma_attr_flags);
 
@@ -109,8 +107,8 @@ px_fdvma_unload(ddi_dma_handle_t h, uint_t index, uint_t sync_flag)
 	px_dvma_addr_t dvma_pg = MMU_BTOP(mp->dmai_mapping + MMU_PTOB(index));
 
 	DBG(DBG_FAST_DVMA, px_p->px_dip,
-		"unload index=%x sync_flag=%x %x+%x+%x\n", index, sync_flag,
-		mp->dmai_mapping, MMU_PTOB(index), MMU_PTOB(npages));
+	    "unload index=%x sync_flag=%x %x+%x+%x\n", index, sync_flag,
+	    mp->dmai_mapping, MMU_PTOB(index), MMU_PTOB(npages));
 
 	px_mmu_unmap_pages(px_p->px_mmu_p, mp, dvma_pg, npages);
 	fdvma_p->pagecnt[index] = 0;
@@ -126,8 +124,8 @@ px_fdvma_sync(ddi_dma_handle_t h, uint_t index, uint_t sync_flag)
 	size_t npg = fdvma_p->pagecnt[index];
 
 	DBG(DBG_FAST_DVMA, px_p->px_dip,
-		"sync index=%x sync_flag=%x %x+%x+%x\n", index, sync_flag,
-		mp->dmai_mapping, MMU_PTOB(index), MMU_PTOB(npg));
+	    "sync index=%x sync_flag=%x %x+%x+%x\n", index, sync_flag,
+	    mp->dmai_mapping, MMU_PTOB(index), MMU_PTOB(npg));
 }
 
 int
@@ -148,7 +146,7 @@ px_fdvma_reserve(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 		return (DDI_FAILURE);
 
 	DBG(DBG_DMA_CTL, dip, "DDI_DMA_RESERVE: rdip=%s%d\n",
-		ddi_driver_name(rdip), ddi_get_instance(rdip));
+	    ddi_driver_name(rdip), ddi_get_instance(rdip));
 
 	/*
 	 * Check the limit structure.
@@ -175,9 +173,9 @@ px_fdvma_reserve(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 	 *	size_t nocross, void *minaddr, void *maxaddr, int vmflag)
 	 */
 	dvma_pg = MMU_BTOP((ulong_t)vmem_xalloc(mmu_p->mmu_dvma_map,
-		MMU_PTOB(npages), MMU_PAGE_SIZE, 0,
-		counter_max, (void *)lo, (void *)(hi + 1),
-		dmareq->dmar_fp == DDI_DMA_SLEEP ? VM_SLEEP : VM_NOSLEEP));
+	    MMU_PTOB(npages), MMU_PAGE_SIZE, 0,
+	    counter_max, (void *)lo, (void *)(hi + 1),
+	    dmareq->dmar_fp == DDI_DMA_SLEEP ? VM_SLEEP : VM_NOSLEEP));
 	if (dvma_pg == 0) {
 		kmem_free(mp, sizeof (px_dma_hdl_t));
 		return (DDI_DMA_NOMAPPING);
@@ -206,15 +204,19 @@ px_fdvma_reserve(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 	mp->dmai_fdvma = (caddr_t)fdvma_p;
 
 	/*
-	 * For a given rdip, set mp->dmai_bdf with the bdf value of px's
-	 * immediate child. As we move down the PCIe fabric, this field
-	 * may be modified by switch and bridge drivers.
+	 * The bdf protection value is set to immediate child
+	 * at first. It gets modified by switch/bridge drivers
+	 * as the code traverses down the fabric topology.
+	 *
+	 * XXX No IOMMU protection for broken devices.
 	 */
-	mp->dmai_bdf = pcie_get_bdf_for_dma_xfer(dip, rdip);
+	ASSERT((intptr_t)ddi_get_parent_data(rdip) >> 1 == 0);
+	mp->dmai_bdf = ((intptr_t)ddi_get_parent_data(rdip) == 1) ? 0 :
+	    pcie_get_bdf_for_dma_xfer(dip, rdip);
 
 	DBG(DBG_DMA_CTL, dip,
-		"DDI_DMA_RESERVE: mp=%p dvma=%x npages=%x private=%p\n",
-		mp, mp->dmai_mapping, npages, fdvma_p);
+	    "DDI_DMA_RESERVE: mp=%p dvma=%x npages=%x private=%p\n",
+	    mp, mp->dmai_mapping, npages, fdvma_p);
 	*handlep = (ddi_dma_handle_t)mp;
 	return (DDI_SUCCESS);
 }
@@ -240,7 +242,7 @@ px_fdvma_release(dev_info_t *dip, px_t *px_p, ddi_dma_impl_t *mp)
 
 	npages = mp->dmai_ndvmapages;
 	vmem_xfree(mmu_p->mmu_dvma_map, (void *)mp->dmai_mapping,
-		MMU_PTOB(npages));
+	    MMU_PTOB(npages));
 
 	mmu_p->mmu_dvma_reserve += npages;
 	mp->dmai_ndvmapages = 0;

@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * PCI nexus utility routines:
  *	property and config routines for attach()
@@ -171,10 +169,10 @@ px_reloc_reg(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 	}
 
 	i = ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
-		"assigned-addresses", (caddr_t)&assign_p, &assign_len);
+	    "assigned-addresses", (caddr_t)&assign_p, &assign_len);
 	if (i) {
 		DBG(DBG_MAP | DBG_CONT, dip, "%s%d: assigned-addresses %d\n",
-			ddi_driver_name(rdip), ddi_get_instance(rdip), i);
+		    ddi_driver_name(rdip), ddi_get_instance(rdip), i);
 		return (DDI_ME_INVAL);
 	}
 
@@ -192,7 +190,7 @@ px_reloc_reg(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 			break;
 		}
 		if (space_type == PCI_ADDR_MEM64 &&
-			assign_type == PCI_ADDR_MEM32) {
+		    assign_type == PCI_ADDR_MEM32) {
 			rp->pci_phys_low += assign_p->pci_phys_low;
 			rp->pci_phys_hi ^= PCI_ADDR_MEM64 ^ PCI_ADDR_MEM32;
 			break;
@@ -200,8 +198,8 @@ px_reloc_reg(dev_info_t *dip, dev_info_t *rdip, px_t *px_p,
 	}
 	kmem_free(assign_p - i, assign_len);
 	DBG(DBG_MAP | DBG_CONT, dip, "\tpx_reloc_reg to: %x.%x.%x %x.%x <%d>\n",
-		rp->pci_phys_hi, rp->pci_phys_mid, rp->pci_phys_low,
-		rp->pci_size_hi, rp->pci_size_low, i);
+	    rp->pci_phys_hi, rp->pci_phys_mid, rp->pci_phys_low,
+	    rp->pci_size_hi, rp->pci_size_low, i);
 	return (i < assign_entries ? DDI_SUCCESS : DDI_ME_INVAL);
 }
 
@@ -252,8 +250,8 @@ px_xlate_reg(px_t *px_p, pci_regspec_t *px_rp, struct regspec *new_rp)
 	new_rp->regspec_bustype = (uint32_t)(addr >> 32);
 	new_rp->regspec_size = (uint32_t)reg_sz;
 	DBG(DBG_MAP | DBG_CONT, px_p->px_dip,
-		"\tpx_xlate_reg: entry %d new_rp %x.%x %x\n",
-		n, new_rp->regspec_bustype, new_rp->regspec_addr, reg_sz);
+	    "\tpx_xlate_reg: entry %d new_rp %x.%x %x\n",
+	    n, new_rp->regspec_bustype, new_rp->regspec_addr, reg_sz);
 
 	return (DDI_SUCCESS);
 }
@@ -352,10 +350,10 @@ px_name_child(dev_info_t *child, char *name, int namelen)
 		func = PCI_REG_FUNC_G(pci_rp[0].pci_phys_hi);
 		if (func != 0)
 			(void) snprintf(name, namelen, "%x,%x",
-				PCI_REG_DEV_G(pci_rp[0].pci_phys_hi), func);
+			    PCI_REG_DEV_G(pci_rp[0].pci_phys_hi), func);
 		else
 			(void) snprintf(name, namelen, "%x",
-				PCI_REG_DEV_G(pci_rp[0].pci_phys_hi));
+			    PCI_REG_DEV_G(pci_rp[0].pci_phys_hi));
 		ddi_prop_free(pci_rp);
 		return (DDI_SUCCESS);
 	}
@@ -373,6 +371,14 @@ px_uninit_child(px_t *px_p, dev_info_t *child)
 
 	ddi_set_name_addr(child, NULL);
 	ddi_remove_minor_node(child, NULL);
+
+	/*
+	 * XXX Clear parent private data used as a flag to disable
+	 * iommu BDF protection
+	 */
+	if ((intptr_t)ddi_get_parent_data(child) == 1)
+		ddi_set_parent_data(child, NULL);
+
 	impl_rem_dev_props(child);
 
 	DBG(DBG_PWR, ddi_get_parent(child), "\n\n");
@@ -400,6 +406,7 @@ px_init_child(px_t *px_p, dev_info_t *child)
 	pci_regspec_t	*pci_rp;
 	char		name[10];
 	int		i, no_config;
+	intptr_t	ppd = NULL;
 
 	/*
 	 * The following is a special case for pcimem nodes.
@@ -422,6 +429,14 @@ px_init_child(px_t *px_p, dev_info_t *child)
 	 */
 	no_config = ddi_prop_get_int(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
 	    "no-config", 0);
+
+	/*
+	 * XXX set ppd to 1 to disable iommu BDF protection
+	 * It relies on unused parent private data for PCI devices.
+	 */
+	if (ddi_prop_exists(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS,
+	    "dvma-share"))
+		ppd = 1;
 
 	/*
 	 * Pseudo nodes indicate a prototype node with per-instance
@@ -447,7 +462,7 @@ px_init_child(px_t *px_p, dev_info_t *child)
 			return (DDI_FAILURE);
 
 		ddi_set_name_addr(child, name);
-		ddi_set_parent_data(child, NULL);
+		ddi_set_parent_data(child, (void *)ppd);
 
 		/*
 		 * Try to merge the properties from this prototype
@@ -508,7 +523,7 @@ px_init_child(px_t *px_p, dev_info_t *child)
 	    "INITCHILD: config regs setup for %s@%s\n",
 	    ddi_node_name(child), ddi_get_name_addr(child));
 
-	ddi_set_parent_data(child, NULL);
+	ddi_set_parent_data(child, (void *)ppd);
 	if (pcie_init_bus(child))
 		(void) pcie_initchild(child);
 
@@ -629,7 +644,7 @@ px_get_cfg_pabase(px_t *px_p)
 
 	if (i >= nrange)
 		cmn_err(CE_PANIC, "no cfg space in px(%p) ranges prop.\n",
-			px_p);
+		    px_p);
 
 	return (((uint64_t)rangep->parent_high << 32) | rangep->parent_low);
 }

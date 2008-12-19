@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PCI Express nexus DVMA and DMA core routines:
@@ -113,11 +111,15 @@ px_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	mp->dmai_error.err_cf = NULL;
 
 	/*
-	 * For a given rdip, set mp->dmai_bdf with the bdf value of px's
-	 * immediate child. As we move down the PCIe fabric, this field
-	 * may be modified by switch and bridge drivers.
+	 * The bdf protection value is set to immediate child
+	 * at first. It gets modified by switch/bridge drivers
+	 * as the code traverses down the fabric topology.
+	 *
+	 * XXX No IOMMU protection for broken devices.
 	 */
-	mp->dmai_bdf = pcie_get_bdf_for_dma_xfer(dip, rdip);
+	ASSERT((intptr_t)ddi_get_parent_data(rdip) >> 1 == 0);
+	mp->dmai_bdf = ((intptr_t)ddi_get_parent_data(rdip) == 1) ? 0 :
+	    pcie_get_bdf_for_dma_xfer(dip, rdip);
 
 	return (mp);
 }
@@ -186,7 +188,7 @@ px_dma_lmts2hdl(dev_info_t *dip, dev_info_t *rdip, px_mmu_t *mmu_p,
 		count_max--;
 
 	if (!(mp = px_dma_allocmp(dip, rdip, dmareq->dmar_fp,
-		dmareq->dmar_arg)))
+	    dmareq->dmar_arg)))
 		return (NULL);
 
 	/* store original dev input at the 2nd ddi_dma_attr */
@@ -202,7 +204,7 @@ px_dma_lmts2hdl(dev_info_t *dip, dev_info_t *rdip, px_mmu_t *mmu_p,
 
 	if (PX_DEV_NOSYSLIMIT(lo, hi, syslo, fasthi, 1))
 		mp->dmai_flags |= PX_DMAI_FLAGS_NOFASTLIMIT |
-			PX_DMAI_FLAGS_NOSYSLIMIT;
+		    PX_DMAI_FLAGS_NOSYSLIMIT;
 	else {
 		if (PX_DEV_NOFASTLIMIT(lo, hi, syslo, syshi, 1))
 			mp->dmai_flags |= PX_DMAI_FLAGS_NOFASTLIMIT;
@@ -228,8 +230,8 @@ px_dma_attach(px_t *px_p)
 	uint64_t baddr;
 
 	if (px_lib_iommu_getbypass(px_p->px_dip, 0ull,
-			PCI_MAP_ATTR_WRITE|PCI_MAP_ATTR_READ,
-			&baddr) != DDI_ENOTSUP)
+	    PCI_MAP_ATTR_WRITE|PCI_MAP_ATTR_READ,
+	    &baddr) != DDI_ENOTSUP)
 		/* ignore all other errors */
 		px_p->px_dev_caps |= PX_BYPASS_DMA_ALLOWED;
 
@@ -270,11 +272,11 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 	uint64_t count_max		= attrp->dma_attr_count_max;
 
 	DBG(DBG_DMA_ALLOCH, px_p->px_dip, "attrp=%p cntr_max=%x.%08x\n",
-		attrp, HI32(count_max), LO32(count_max));
+	    attrp, HI32(count_max), LO32(count_max));
 	DBG(DBG_DMA_ALLOCH, px_p->px_dip, "hi=%x.%08x lo=%x.%08x\n",
-		HI32(hi), LO32(hi), HI32(lo), LO32(lo));
+	    HI32(hi), LO32(hi), HI32(lo), LO32(lo));
 	DBG(DBG_DMA_ALLOCH, px_p->px_dip, "seg=%x.%08x align=%x.%08x\n",
-		HI32(nocross), LO32(nocross), HI32(align), LO32(align));
+	    HI32(nocross), LO32(nocross), HI32(align), LO32(align));
 
 	if (!nocross)
 		nocross--;
@@ -296,7 +298,7 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 
 		/* do a range check and get the limits */
 		ret = px_lib_dma_bypass_rngchk(px_p->px_dip, attrp,
-				&syslo, &syshi);
+		    &syslo, &syshi);
 		if (ret != DDI_SUCCESS)
 			return (ret);
 	} else { /* MMU_XLATE or PEER_TO_PEER */
@@ -304,7 +306,7 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 		if ((align & nocross) != align) {
 			dev_info_t *rdip = mp->dmai_rdip;
 			cmn_err(CE_WARN, "%s%d dma_attr_seg not aligned",
-				NAMEINST(rdip));
+			    NAMEINST(rdip));
 			return (DDI_DMA_BADATTR);
 		}
 		align = MMU_BTOP(align + 1);
@@ -322,7 +324,7 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 		count_max--;
 
 	DBG(DBG_DMA_ALLOCH, px_p->px_dip, "hi=%x.%08x, lo=%x.%08x\n",
-		HI32(hi), LO32(hi), HI32(lo), LO32(lo));
+	    HI32(hi), LO32(hi), HI32(lo), LO32(lo));
 	if (hi <= lo) {
 		/*
 		 * If this is an IOMMU bypass access, the caller can't use
@@ -340,7 +342,7 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 
 	if (PX_DEV_NOSYSLIMIT(lo, hi, syslo, syshi, align))
 		mp->dmai_flags |= PX_DMAI_FLAGS_NOSYSLIMIT |
-			PX_DMAI_FLAGS_NOFASTLIMIT;
+		    PX_DMAI_FLAGS_NOFASTLIMIT;
 	else {
 		syshi = mmu_p->mmu_dvma_fast_end;
 		if (PX_DEV_NOFASTLIMIT(lo, hi, syslo, syshi, align))
@@ -418,20 +420,20 @@ px_dma_type(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	case DMA_OTYP_PADDR:
 	default:
 		cmn_err(CE_WARN, "%s%d requested unsupported dma type %x",
-			NAMEINST(mp->dmai_rdip), dobj_p->dmao_type);
+		    NAMEINST(mp->dmai_rdip), dobj_p->dmao_type);
 		return (DDI_DMA_NOMAPPING);
 	}
 	if (pfn0 == PFN_INVALID) {
 		cmn_err(CE_WARN, "%s%d: invalid pfn0 for DMA object %p",
-			NAMEINST(dip), dobj_p);
+		    NAMEINST(dip), dobj_p);
 		return (DDI_DMA_NOMAPPING);
 	}
 	if (TGT_PFN_INBETWEEN(pfn0, pec_p->pec_base32_pfn,
-			pec_p->pec_last32_pfn)) {
+	    pec_p->pec_last32_pfn)) {
 		mp->dmai_flags |= PX_DMAI_FLAGS_PTP|PX_DMAI_FLAGS_PTP32;
 		goto done;	/* leave bypass and dvma flag as 0 */
 	} else if (TGT_PFN_INBETWEEN(pfn0, pec_p->pec_base64_pfn,
-			pec_p->pec_last64_pfn)) {
+	    pec_p->pec_last64_pfn)) {
 		mp->dmai_flags |= PX_DMAI_FLAGS_PTP|PX_DMAI_FLAGS_PTP64;
 		goto done;	/* leave bypass and dvma flag as 0 */
 	}
@@ -471,7 +473,7 @@ px_dma_pgpfn(px_t *px_p, ddi_dma_impl_t *mp, uint_t npages)
 	case DMA_OTYP_VADDR: {
 		page_t **pplist = mp->dmai_object.dmao_obj.virt_obj.v_priv;
 		DBG(DBG_DMA_MAP, dip, "shadow pplist=%p, %x pages, pfns=",
-			pplist, npages);
+		    pplist, npages);
 		for (i = 1; i < npages; i++) {
 			px_iopfn_t pfn = page_pptonum(pplist[i]);
 			PX_SET_MP_PFN1(mp, i, pfn);
@@ -521,7 +523,7 @@ px_dma_vapfn(px_t *px_p, ddi_dma_impl_t *mp, uint_t npages)
 			goto err_badpfn;
 		PX_SET_MP_PFN1(mp, i, pfn);
 		DBG(DBG_DMA_BINDH, dip, "px_dma_vapfn: mp=%p pfnlst[%x]=%x\n",
-			mp, i, pfn);
+		    mp, i, pfn);
 	}
 	return (DDI_SUCCESS);
 err_badpfn:
@@ -550,13 +552,13 @@ px_dma_pfn(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 
 	px_pec_t *pec_p = px_p->px_pec_p;
 	px_iopfn_t pfn_base = peer32 ? pec_p->pec_base32_pfn :
-					pec_p->pec_base64_pfn;
+	    pec_p->pec_base64_pfn;
 	px_iopfn_t pfn_last = peer32 ? pec_p->pec_last32_pfn :
-					pec_p->pec_last64_pfn;
+	    pec_p->pec_last64_pfn;
 	px_iopfn_t pfn_adj = peer ? pfn_base : 0;
 
 	DBG(DBG_DMA_BINDH, dip, "px_dma_pfn: mp=%p pfn0=%x\n",
-		mp, PX_MP_PFN0(mp) - pfn_adj);
+	    mp, PX_MP_PFN0(mp) - pfn_adj);
 	/* 1 page: no array alloc/fill, no mixed mode check */
 	if (npages == 1) {
 		PX_SET_MP_PFN(mp, 0, PX_MP_PFN0(mp) - pfn_adj);
@@ -564,16 +566,16 @@ px_dma_pfn(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	}
 	/* allocate pfn array */
 	if (!(mp->dmai_pfnlst = kmem_alloc(npages * sizeof (px_iopfn_t),
-		waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP))) {
+	    waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP))) {
 		if (waitfp != DDI_DMA_DONTWAIT)
 			ddi_set_callback(waitfp, dmareq->dmar_arg,
-				&px_kmem_clid);
+			    &px_kmem_clid);
 		return (DDI_DMA_NORESOURCES);
 	}
 	/* fill pfn array */
 	PX_SET_MP_PFN(mp, 0, PX_MP_PFN0(mp) - pfn_adj);	/* pfnlst[0] */
 	if ((ret = PX_DMA_ISPGPFN(mp) ? px_dma_pgpfn(px_p, mp, npages) :
-		px_dma_vapfn(px_p, mp, npages)) != DDI_SUCCESS)
+	    px_dma_vapfn(px_p, mp, npages)) != DDI_SUCCESS)
 		goto err;
 
 	/* skip pfn0, check mixed mode and adjust peer to peer pfn */
@@ -581,12 +583,12 @@ px_dma_pfn(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		px_iopfn_t pfn = PX_GET_MP_PFN1(mp, i);
 		if (peer ^ TGT_PFN_INBETWEEN(pfn, pfn_base, pfn_last)) {
 			cmn_err(CE_WARN, "%s%d mixed mode DMA %lx %lx",
-				NAMEINST(mp->dmai_rdip), PX_MP_PFN0(mp), pfn);
+			    NAMEINST(mp->dmai_rdip), PX_MP_PFN0(mp), pfn);
 			ret = DDI_DMA_NOMAPPING;	/* mixed mode */
 			goto err;
 		}
 		DBG(DBG_DMA_MAP, dip,
-			"px_dma_pfn: pfnlst[%x]=%x-%x\n", i, pfn, pfn_adj);
+		    "px_dma_pfn: pfnlst[%x]=%x-%x\n", i, pfn, pfn_adj);
 		if (pfn_adj)
 			PX_SET_MP_PFN1(mp, i, pfn - pfn_adj);
 	}
@@ -638,7 +640,7 @@ px_dvma_win(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	pg_off	= mp->dmai_roffset;
 	xfer_sz	= obj_sz + redzone_sz;
 
-	/* include redzone in nocross check */ {
+	/* include redzone in nocross check */	{
 		uint64_t nocross = mp->dmai_attr.dma_attr_seg;
 		if (xfer_sz + pg_off - 1 > nocross)
 			xfer_sz = nocross - pg_off + 1;
@@ -651,7 +653,7 @@ px_dvma_win(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		}
 	}
 	xfer_sz -= redzone_sz;		/* restore transfer size  */
-	/* check counter max */ {
+	/* check counter max */	{
 		uint32_t count_max = mp->dmai_attr.dma_attr_count_max;
 		if (xfer_sz - 1 > count_max)
 			xfer_sz = count_max + 1;
@@ -665,7 +667,7 @@ px_dvma_win(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	}
 	if (!(dmareq->dmar_flags & DDI_DMA_PARTIAL)) {
 		DBG(DBG_DMA_MAP, px_p->px_dip, "too big: %lx+%lx+%lx > %lx\n",
-			obj_sz, pg_off, redzone_sz, xfer_sz);
+		    obj_sz, pg_off, redzone_sz, xfer_sz);
 		return (DDI_DMA_TOOBIG);
 	}
 
@@ -706,11 +708,13 @@ px_dvma_map_fast(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 	ASSERT(MMU_PTOB(npages) == mp->dmai_winsize);
 	ASSERT(npages + PX_HAS_REDZONE(mp) <= clustsz);
 
-	for (; i < entries && ldstub(lock_addr); i++, lock_addr++);
+	for (; i < entries && ldstub(lock_addr); i++, lock_addr++)
+		;
 	if (i >= entries) {
 		lock_addr = mmu_p->mmu_dvma_cache_locks;
 		i = 0;
-		for (; i < entries && ldstub(lock_addr); i++, lock_addr++);
+		for (; i < entries && ldstub(lock_addr); i++, lock_addr++)
+			;
 		if (i >= entries) {
 #ifdef	PX_DMA_PROF
 			px_dvmaft_exhaust++;
@@ -758,7 +762,7 @@ done:
 	PX_SAVE_MP_TTE(mp, attr);	/* save TTE template for unmapping */
 	if (PX_DVMA_DBG_ON(mmu_p))
 		px_dvma_alloc_debug(mmu_p, (char *)mp->dmai_mapping,
-			mp->dmai_size, mp);
+		    mp->dmai_size, mp);
 	return (DDI_SUCCESS);
 }
 
@@ -786,20 +790,20 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 	 */
 	if ((npages == 1) && !PX_HAS_REDZONE(mp) && PX_HAS_NOSYSLIMIT(mp)) {
 		dvma_addr = vmem_alloc(mmu_p->mmu_dvma_map,
-			MMU_PAGE_SIZE, sleep);
+		    MMU_PAGE_SIZE, sleep);
 		mp->dmai_flags |= PX_DMAI_FLAGS_VMEMCACHE;
 #ifdef	PX_DMA_PROF
 		px_dvma_vmem_alloc++;
 #endif	/* PX_DMA_PROF */
 	} else {
 		dvma_addr = vmem_xalloc(mmu_p->mmu_dvma_map,
-			MMU_PTOB(npages + PX_HAS_REDZONE(mp)),
-			MAX(mp->dmai_attr.dma_attr_align, MMU_PAGE_SIZE),
-			0,
-			mp->dmai_attr.dma_attr_seg + 1,
-			(void *)mp->dmai_attr.dma_attr_addr_lo,
-			(void *)(mp->dmai_attr.dma_attr_addr_hi + 1),
-			sleep);
+		    MMU_PTOB(npages + PX_HAS_REDZONE(mp)),
+		    MAX(mp->dmai_attr.dma_attr_align, MMU_PAGE_SIZE),
+		    0,
+		    mp->dmai_attr.dma_attr_seg + 1,
+		    (void *)mp->dmai_attr.dma_attr_addr_lo,
+		    (void *)(mp->dmai_attr.dma_attr_addr_hi + 1),
+		    sleep);
 #ifdef	PX_DMA_PROF
 		px_dvma_vmem_xalloc++;
 #endif	/* PX_DMA_PROF */
@@ -807,7 +811,7 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 	dvma_pg = MMU_BTOP((ulong_t)dvma_addr);
 	dvma_pg_index = dvma_pg - mmu_p->dvma_base_pg;
 	DBG(DBG_DMA_MAP, dip, "fallback dvma_pages: dvma_pg=%x index=%x\n",
-		dvma_pg, dvma_pg_index);
+	    dvma_pg, dvma_pg_index);
 	if (dvma_pg == 0)
 		goto noresource;
 
@@ -837,7 +841,7 @@ noresource:
 	if (dmareq->dmar_fp != DDI_DMA_DONTWAIT) {
 		DBG(DBG_DMA_MAP, dip, "dvma_pg 0 - set callback\n");
 		ddi_set_callback(dmareq->dmar_fp, dmareq->dmar_arg,
-			&mmu_p->mmu_dvma_clid);
+		    &mmu_p->mmu_dvma_clid);
 	}
 	DBG(DBG_DMA_MAP, dip, "vmem_xalloc - DDI_DMA_NORESOURCES\n");
 	return (DDI_DMA_NORESOURCES);
@@ -864,14 +868,14 @@ px_dvma_unmap(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 
 	if (mp->dmai_flags & PX_DMAI_FLAGS_VMEMCACHE) {
 		vmem_free(mmu_p->mmu_dvma_map, (void *)dvma_addr,
-			MMU_PAGE_SIZE);
+		    MMU_PAGE_SIZE);
 #ifdef PX_DMA_PROF
 		px_dvma_vmem_free++;
 #endif /* PX_DMA_PROF */
 	} else {
 		size_t npages = MMU_BTOP(mp->dmai_winsize) + PX_HAS_REDZONE(mp);
 		vmem_xfree(mmu_p->mmu_dvma_map, (void *)dvma_addr,
-			MMU_PTOB(npages));
+		    MMU_PTOB(npages));
 #ifdef PX_DMA_PROF
 		px_dvma_vmem_xfree++;
 #endif /* PX_DMA_PROF */
@@ -900,7 +904,7 @@ px_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 
 		if (off >= mp->dmai_object.dmao_size) {
 			cmn_err(CE_WARN, "%s%d invalid dma_htoc offset %lx",
-				NAMEINST(mp->dmai_rdip), off);
+			    NAMEINST(mp->dmai_rdip), off);
 			return (DDI_FAILURE);
 		}
 		off += mp->dmai_roffset;
@@ -909,17 +913,17 @@ px_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		if (ret)
 			return (ret);
 		DBG(DBG_DMA_CTL, dip, "HTOC:cookie=%x+%lx off=%lx,%lx\n",
-			cp->dmac_address, cp->dmac_size, off, *offp);
+		    cp->dmac_address, cp->dmac_size, off, *offp);
 
 		/* adjust cookie addr/len if we are not on window boundary */
 		ASSERT((off % win_size) == (off -
-			(PX_DMA_CURWIN(mp) ? mp->dmai_roffset : 0) - wo_off));
+		    (PX_DMA_CURWIN(mp) ? mp->dmai_roffset : 0) - wo_off));
 		off = PX_DMA_CURWIN(mp) ? off % win_size : *offp;
 		ASSERT(cp->dmac_size > off);
 		cp->dmac_laddress += off;
 		cp->dmac_size -= off;
 		DBG(DBG_DMA_CTL, dip, "HTOC:mp=%p cookie=%x+%lx off=%lx,%lx\n",
-			mp, cp->dmac_address, cp->dmac_size, off, wo_off);
+		    mp, cp->dmac_address, cp->dmac_size, off, wo_off);
 		}
 		return (DDI_SUCCESS);
 
@@ -974,7 +978,7 @@ px_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 
 	case DDI_DMA_SEGTOC:
 		MAKE_DMA_COOKIE((ddi_dma_cookie_t *)objp, mp->dmai_mapping,
-			mp->dmai_size);
+		    mp->dmai_size);
 		*offp = mp->dmai_offset;
 		*lenp = mp->dmai_size;
 		return (DDI_SUCCESS);
@@ -982,16 +986,16 @@ px_dvma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 	case DDI_DMA_COFF: {
 		ddi_dma_cookie_t *cp = (ddi_dma_cookie_t *)offp;
 		if (cp->dmac_address < mp->dmai_mapping ||
-			(cp->dmac_address + cp->dmac_size) >
-			(mp->dmai_mapping + mp->dmai_size))
+		    (cp->dmac_address + cp->dmac_size) >
+		    (mp->dmai_mapping + mp->dmai_size))
 			return (DDI_FAILURE);
 		*objp = (caddr_t)(cp->dmac_address - mp->dmai_mapping +
-			mp->dmai_offset);
+		    mp->dmai_offset);
 		}
 		return (DDI_SUCCESS);
 	default:
 		DBG(DBG_DMA_CTL, dip, "unknown command (%x): rdip=%s%d\n",
-			cmd, ddi_driver_name(rdip), ddi_get_instance(rdip));
+		    cmd, ddi_driver_name(rdip), ddi_get_instance(rdip));
 		break;
 	}
 	return (DDI_FAILURE);
@@ -1004,7 +1008,7 @@ px_dma_freewin(ddi_dma_impl_t *mp)
 	for (win2_p = win_p; win_p; win2_p = win_p) {
 		win_p = win2_p->win_next;
 		kmem_free(win2_p, sizeof (px_dma_win_t) +
-			sizeof (ddi_dma_cookie_t) * win2_p->win_ncookies);
+		    sizeof (ddi_dma_cookie_t) * win2_p->win_ncookies);
 	}
 	mp->dmai_nwin = 0;
 	mp->dmai_winlst = NULL;
@@ -1053,7 +1057,7 @@ px_dma_newwin(dev_info_t *dip, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp,
 	uint64_t baddr, seg_pfn0 = pfn;
 	size_t sz = cookie_no * sizeof (ddi_dma_cookie_t);
 	px_dma_win_t *win_p = kmem_zalloc(sizeof (px_dma_win_t) + sz,
-		waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP);
+	    waitfp == DDI_DMA_SLEEP ? KM_SLEEP : KM_NOSLEEP);
 	io_attributes_t	attr = PX_GET_TTE_ATTR(mp->dmai_rflags,
 	    mp->dmai_attr.dma_attr_flags);
 
@@ -1071,18 +1075,18 @@ px_dma_newwin(dev_info_t *dip, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp,
 	for (; start_idx <= end_idx; start_idx++, prev_pfn = pfn, pfn_no++) {
 		pfn = PX_GET_MP_PFN1(mp, start_idx);
 		if ((pfn == prev_pfn + 1) &&
-			(MMU_PTOB(pfn_no + 1) - 1 <= count_max))
+		    (MMU_PTOB(pfn_no + 1) - 1 <= count_max))
 			continue;
 
 		/* close up the cookie up to (including) prev_pfn */
 		baddr = MMU_PTOB(seg_pfn0);
 		if (bypass && (px_lib_iommu_getbypass(dip,
-				baddr, attr, &baddr) != DDI_SUCCESS))
+		    baddr, attr, &baddr) != DDI_SUCCESS))
 			return (DDI_FAILURE);
 
 		MAKE_DMA_COOKIE(cookie_p, baddr, MMU_PTOB(pfn_no));
 		DBG(DBG_BYPASS, mp->dmai_rdip, "cookie %p (%x pages)\n",
-			MMU_PTOB(seg_pfn0), pfn_no);
+		    MMU_PTOB(seg_pfn0), pfn_no);
 
 		cookie_p++;	/* advance to next available cookie cell */
 		pfn_no = 0;
@@ -1091,12 +1095,12 @@ px_dma_newwin(dev_info_t *dip, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp,
 
 	baddr = MMU_PTOB(seg_pfn0);
 	if (bypass && (px_lib_iommu_getbypass(dip,
-			baddr, attr, &baddr) != DDI_SUCCESS))
+	    baddr, attr, &baddr) != DDI_SUCCESS))
 		return (DDI_FAILURE);
 
 	MAKE_DMA_COOKIE(cookie_p, baddr, MMU_PTOB(pfn_no));
 	DBG(DBG_BYPASS, mp->dmai_rdip, "cookie %p (%x pages) of total %x\n",
-		MMU_PTOB(seg_pfn0), pfn_no, cookie_no);
+	    MMU_PTOB(seg_pfn0), pfn_no, cookie_no);
 #ifdef	DEBUG
 	cookie_p++;
 	ASSERT((cookie_p - (ddi_dma_cookie_t *)(win_p + 1)) == cookie_no);
@@ -1227,8 +1231,8 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		uint64_t nocross = dev_attr_p->dma_attr_seg;
 		px_pec_t *pec_p = px_p->px_pec_p;
 		px_iopfn_t pfn_last = PX_DMA_ISPTP32(mp) ?
-				pec_p->pec_last32_pfn - pec_p->pec_base32_pfn :
-				pec_p->pec_last64_pfn - pec_p->pec_base64_pfn;
+		    pec_p->pec_last32_pfn - pec_p->pec_base32_pfn :
+		    pec_p->pec_last64_pfn - pec_p->pec_base64_pfn;
 
 		if (nocross && (nocross < UINT32_MAX))
 			return (DDI_DMA_NOMAPPING);
@@ -1253,7 +1257,7 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		pfn_hi = MMU_BTOP(mp->dmai_attr.dma_attr_addr_hi);
 
 		if (px_lib_iommu_getbypass(dip, MMU_PTOB(pfn),
-				attr, &bypass_addr) != DDI_SUCCESS) {
+		    attr, &bypass_addr) != DDI_SUCCESS) {
 			cmn_err(CE_WARN, "bypass cookie failure %lx\n", pfn);
 			return (DDI_DMA_NOMAPPING);
 		}
@@ -1266,14 +1270,14 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		pfn = PX_GET_MP_PFN1(mp, i);
 		if (bypass_addr) {
 			if (px_lib_iommu_getbypass(dip, MMU_PTOB(pfn), attr,
-					&bypass_addr) != DDI_SUCCESS) {
+			    &bypass_addr) != DDI_SUCCESS) {
 				ret = DDI_DMA_NOMAPPING;
 				goto err;
 			}
 			pfn = MMU_BTOP(bypass_addr);
 		}
 		if ((pfn == prev_pfn + 1) &&
-				(MMU_PTOB(pfn_no + 1) - 1 <= count_max))
+		    (MMU_PTOB(pfn_no + 1) - 1 <= count_max))
 			continue;
 		if ((pfn < pfn_lo) || (prev_pfn > pfn_hi)) {
 			ret = DDI_DMA_NOMAPPING;
@@ -1285,9 +1289,9 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 			continue;
 
 		DBG(DBG_BYPASS, mp->dmai_rdip, "newwin pfn[%x-%x] %x cks\n",
-			win_pfn0_index, i - 1, cookie_no);
+		    win_pfn0_index, i - 1, cookie_no);
 		if (ret = px_dma_newwin(dip, dmareq, mp, cookie_no,
-			win_pfn0_index, i - 1, win_pp, count_max, bypass_addr))
+		    win_pfn0_index, i - 1, win_pp, count_max, bypass_addr))
 			goto err;
 
 		win_pp = &(*win_pp)->win_next;	/* win_pp = *(win_pp) */
@@ -1301,9 +1305,9 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	}
 	cookie_no++;
 	DBG(DBG_BYPASS, mp->dmai_rdip, "newwin pfn[%x-%x] %x cks\n",
-		win_pfn0_index, i - 1, cookie_no);
+	    win_pfn0_index, i - 1, cookie_no);
 	if (ret = px_dma_newwin(dip, dmareq, mp, cookie_no, win_pfn0_index,
-		i - 1, win_pp, count_max, bypass_addr))
+	    i - 1, win_pp, count_max, bypass_addr))
 		goto err;
 	win_no++;
 	px_dma_adjust(dmareq, mp, mp->dmai_winlst);
@@ -1357,11 +1361,11 @@ px_dma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		win_p->win_curseg = loop_cp - cp;
 		cp = (ddi_dma_cookie_t *)objp;
 		MAKE_DMA_COOKIE(cp, loop_cp->dmac_laddress + off,
-			loop_cp->dmac_size - off);
+		    loop_cp->dmac_size - off);
 
 		DBG(DBG_DMA_CTL, dip,
-			"HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
-			cp->dmac_laddress, cp->dmac_size);
+		    "HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
+		    cp->dmac_laddress, cp->dmac_size);
 		}
 		return (DDI_SUCCESS);
 
@@ -1393,8 +1397,8 @@ px_dma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		*offp = win_p->win_offset;
 		*lenp = win_p->win_size;
 		DBG(DBG_DMA_CTL, dip,
-			"HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
-			cp->dmac_laddress, cp->dmac_size);
+		    "HTOC: cookie - dmac_laddress=%p dmac_size=%x\n",
+		    cp->dmac_laddress, cp->dmac_size);
 		}
 		return (DDI_SUCCESS);
 
@@ -1440,7 +1444,8 @@ px_dma_ctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_impl_t *mp,
 		int i;
 
 		/* locate active window */
-		for (; win_p->win_offset != off; win_p = win_p->win_next);
+		for (; win_p->win_offset != off; win_p = win_p->win_next)
+			;
 		cp = (ddi_dma_cookie_t *)(win_p + 1);
 		for (i = 0; i < win_p->win_curseg; i++, cp++)
 			off += cp->dmac_size;
@@ -1476,7 +1481,7 @@ found:
 		}
 	default:
 		DBG(DBG_DMA_CTL, dip, "unknown command (%x): rdip=%s%d\n",
-			cmd, ddi_driver_name(rdip), ddi_get_instance(rdip));
+		    cmd, ddi_driver_name(rdip), ddi_get_instance(rdip));
 		break;
 	}
 	return (DDI_FAILURE);
@@ -1593,7 +1598,7 @@ px_dvma_free_debug(px_mmu_t *mmu_p, char *address, uint_t len,
 	}
 	if (!ptr) {
 		cmn_err(CE_WARN, "bad dvma free addr=%lx len=%x",
-			(long)address, len);
+		    (long)address, len);
 		goto done;
 	}
 	if (ptr == mmu_p->dvma_active_list)
@@ -1611,14 +1616,14 @@ void
 px_dump_dma_handle(uint64_t flag, dev_info_t *dip, ddi_dma_impl_t *hp)
 {
 	DBG(flag, dip, "mp(%p): flags=%x mapping=%lx xfer_size=%x\n",
-		hp, hp->dmai_inuse, hp->dmai_mapping, hp->dmai_size);
+	    hp, hp->dmai_inuse, hp->dmai_mapping, hp->dmai_size);
 	DBG(flag|DBG_CONT, dip, "\tnpages=%x roffset=%x rflags=%x nwin=%x\n",
-		hp->dmai_ndvmapages, hp->dmai_roffset, hp->dmai_rflags,
-		hp->dmai_nwin);
+	    hp->dmai_ndvmapages, hp->dmai_roffset, hp->dmai_rflags,
+	    hp->dmai_nwin);
 	DBG(flag|DBG_CONT, dip, "\twinsize=%x tte=%p pfnlst=%p pfn0=%p\n",
-		hp->dmai_winsize, hp->dmai_tte, hp->dmai_pfnlst, hp->dmai_pfn0);
+	    hp->dmai_winsize, hp->dmai_tte, hp->dmai_pfnlst, hp->dmai_pfn0);
 	DBG(flag|DBG_CONT, dip, "\twinlst=%x obj=%p attr=%p ckp=%p\n",
-		hp->dmai_winlst, &hp->dmai_object, &hp->dmai_attr,
-		hp->dmai_cookie);
+	    hp->dmai_winlst, &hp->dmai_object, &hp->dmai_attr,
+	    hp->dmai_cookie);
 }
 #endif	/* DEBUG */

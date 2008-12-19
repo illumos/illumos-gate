@@ -891,6 +891,7 @@ pxb_initchild(dev_info_t *child)
 	char 			name[MAXNAMELEN];
 	pxb_devstate_t		*pxb;
 	int			result = DDI_FAILURE;
+	intptr_t		ppd = NULL;
 #ifdef PX_PLX
 	int			i;
 	uint16_t		reg = 0;
@@ -905,8 +906,16 @@ pxb_initchild(dev_info_t *child)
 		goto done;
 	}
 
+	/*
+	 * XXX set ppd to 1 to disable iommu BDF protection
+	 * It relies on unused parent private data for PCI devices.
+	 */
+	if (ddi_prop_exists(DDI_DEV_T_NONE, child, DDI_PROP_DONTPASS,
+	    "dvma-share"))
+		ppd = 1;
+
 	ddi_set_name_addr(child, name);
-	ddi_set_parent_data(child, NULL);
+	ddi_set_parent_data(child, (void *)ppd);
 
 	/*
 	 * Pseudo nodes indicate a prototype node with per-instance
@@ -951,7 +960,7 @@ pxb_initchild(dev_info_t *child)
 		goto done;
 	}
 
-	ddi_set_parent_data(child, NULL);
+	ddi_set_parent_data(child, (void *)ppd);
 
 	pxb = (pxb_devstate_t *)ddi_get_soft_state(pxb_state,
 	    ddi_get_instance(ddi_get_parent(child)));
@@ -1283,6 +1292,13 @@ pxb_removechild(dev_info_t *dip)
 	 * Strip the node to properly convert it back to prototype form
 	 */
 	ddi_remove_minor_node(dip, NULL);
+
+	/*
+	 * XXX Clear parent private data used as a flag to disable
+	 * iommu BDF protection
+	 */
+	if ((intptr_t)ddi_get_parent_data(dip) == 1)
+		ddi_set_parent_data(dip, NULL);
 
 	impl_rem_dev_props(dip);
 
