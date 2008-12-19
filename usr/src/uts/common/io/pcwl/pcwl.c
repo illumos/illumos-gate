@@ -80,8 +80,15 @@ static ddi_device_acc_attr_t accattr = {
 void *pcwl_soft_state_p = NULL;
 static int pcwl_device_type;
 
+static int	pcwl_m_setprop(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, uint_t wldp_length,
+    const void *wldp_buf);
+static int	pcwl_m_getprop(void *arg, const char *pr_name,
+    mac_prop_id_t wldp_pr_num, uint_t pr_flags,
+    uint_t wldp_length, void *wldp_buf, uint_t *perm);
+
 mac_callbacks_t pcwl_m_callbacks = {
-	MC_IOCTL,
+	MC_IOCTL | MC_SETPROP | MC_GETPROP,
 	pcwl_gstat,
 	pcwl_start,
 	pcwl_stop,
@@ -89,7 +96,12 @@ mac_callbacks_t pcwl_m_callbacks = {
 	pcwl_sdmulti,
 	pcwl_saddr,
 	pcwl_tx,
-	pcwl_ioctl
+	pcwl_ioctl,
+	NULL,
+	NULL,
+	NULL,
+	pcwl_m_setprop,
+	pcwl_m_getprop
 };
 
 static char *pcwl_name_str = "pcwl";
@@ -2330,21 +2342,718 @@ pcwl_chip_type(pcwl_maci_t *pcwl_p)
 }
 
 /*
+ * Brussels support
+ */
+/*
+ * MAC_PROP_WL_ESSID
+ */
+static int
+pcwl_set_essid(pcwl_maci_t *pcwl_p, const void *wldp_buf)
+{
+	char 		*value;
+	pcwl_rf_t 	*rf_p;
+	wl_essid_t 	*iw_essid = (wl_essid_t *)wldp_buf;
+
+	rf_p = &pcwl_p->pcwl_rf;
+
+	value = iw_essid->wl_essid_essid;
+	(void) strncpy(rf_p->rf_desired_ssid, value,
+	    MIN(32, strlen(value)));
+	rf_p->rf_desired_ssid[strlen(value)] = '\0';
+	(void) strncpy(rf_p->rf_own_ssid, value,
+	    MIN(32, strlen(value)));
+	rf_p->rf_own_ssid[strlen(value)] = '\0';
+
+	PCWLDBG((CE_CONT, "pcwl: set: desired essid=%s\n",
+	    rf_p->rf_desired_ssid));
+
+	return (ENETRESET);
+
+}
+
+static int
+pcwl_get_essid(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	char		ssid[36];
+	uint16_t	ret;
+	uint16_t	val;
+	int		len;
+	int		err = 0;
+	wl_essid_t	ow_essid;
+	pcwl_rf_t	*rf_p;
+
+	rf_p = &pcwl_p->pcwl_rf;
+	bzero(&ow_essid, sizeof (wl_essid_t));
+	bzero(ssid, sizeof (ssid));
+
+	ret =  pcwl_get_ltv(pcwl_p, 2, WL_RID_PORTSTATUS, &val);
+	if (ret) {
+		err = EIO;
+		return (err);
+	}
+	PCWLDBG((CE_NOTE, "PortStatus = %d\n", val));
+
+	switch (val) {
+	case WL_PORT_DISABLED:
+	case WL_PORT_INITIAL:
+		len = mi_strlen(rf_p->rf_desired_ssid);
+		ow_essid.wl_essid_length = len;
+		bcopy(rf_p->rf_desired_ssid, ow_essid.wl_essid_essid,
+		    len);
+		break;
+	case WL_PORT_TO_IBSS:
+	case WL_PORT_TO_BSS:
+	case WL_PORT_OOR:
+		(void) pcwl_get_ltv((pcwl_p), 34, WL_RID_SSID,
+		    (uint16_t *)ssid);
+		PCWL_SWAP16((uint16_t *)(ssid+2), *(uint16_t *)ssid);
+		ssid[*(uint16_t *)ssid + 2] = '\0';
+		len = mi_strlen(ssid+2);
+		ow_essid.wl_essid_length = len;
+		bcopy(ssid + 2, ow_essid.wl_essid_essid, len);
+		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+
+	bcopy(&ow_essid, wldp_buf, sizeof (wl_essid_t));
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_BSSID
+ */
+static int
+pcwl_get_bssid(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	uint16_t 	ret;
+	uint16_t 	retval;
+	uint8_t 	bssid[6];
+	int 		err = 0;
+
+	if (ret = pcwl_get_ltv(pcwl_p, 2, WL_RID_PORTSTATUS, &retval)) {
+		err = EIO;
+		return (err);
+	}
+
+	PCWLDBG((CE_NOTE, "PortStatus = %d\n", ret));
+
+	if (retval == WL_PORT_DISABLED || retval == WL_PORT_INITIAL) {
+		bzero(wldp_buf, sizeof (wl_bssid_t));
+	} else if (retval == WL_PORT_TO_IBSS ||
+	    retval == WL_PORT_TO_BSS || retval == WL_PORT_OOR) {
+		(void) pcwl_get_ltv(pcwl_p, 6,
+		    WL_RID_BSSID, (uint16_t *)bssid);
+		PCWL_SWAP16((uint16_t *)bssid, 6);
+		bcopy(bssid, wldp_buf, sizeof (wl_bssid_t));
+	}
+
+	PCWLDBG((CE_CONT, "pcwl_get_bssid: bssid=%x %x %x %x %x %x\n",
+	    bssid[0], bssid[1], bssid[2],
+	    bssid[3], bssid[4], bssid[5]));
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_LINKSTATUS
+ */
+static int
+pcwl_get_linkstatus(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	uint16_t 	ret;
+	uint16_t	retval;
+	int		err = 0;
+
+	ret =  pcwl_get_ltv(pcwl_p, 2, WL_RID_PORTSTATUS, &retval);
+	if (ret) {
+		err = EIO;
+		PCWLDBG((CE_WARN, "cfg_linkstatus_get_error\n"));
+		return (err);
+	}
+	PCWLDBG((CE_NOTE, "PortStatus = %d\n", retval));
+
+	switch (retval) {
+	case WL_PORT_DISABLED:
+	case WL_PORT_INITIAL:
+		*(wl_linkstatus_t *)wldp_buf = WL_NOTCONNECTED;
+		break;
+	case WL_PORT_TO_IBSS:
+	case WL_PORT_TO_BSS:
+	case WL_PORT_OOR:
+		*(wl_linkstatus_t *)wldp_buf = WL_CONNECTED;
+		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_BSSTYP
+ */
+static int
+pcwl_set_bsstype(pcwl_maci_t *pcwl_p, const void *wldp_buf)
+{
+	uint16_t 	ret;
+	pcwl_rf_t 	*rf_p;
+	int		err = ENETRESET;
+
+	rf_p = &pcwl_p->pcwl_rf;
+
+	ret = (uint16_t)(*(wl_bss_type_t *)wldp_buf);
+	if ((ret != WL_BSS_BSS) &&
+	    (ret != WL_BSS_IBSS) &&
+	    (ret != WL_BSS_ANY)) {
+		err = ENOTSUP;
+		return (err);
+	}
+
+	rf_p->rf_porttype = ret;
+
+	return (err);
+}
+
+static void
+pcwl_get_bsstype(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	pcwl_rf_t *rf_p;
+
+	rf_p = &pcwl_p->pcwl_rf;
+
+	*(wl_bss_type_t *)wldp_buf = rf_p->rf_porttype;
+
+	PCWLDBG((CE_CONT, "pcwl_get_bsstype: porttype=%d\n",
+	    rf_p->rf_porttype));
+}
+
+/*
+ * MAC_PROP_WL_PHY_CONFIG
+ */
+static int
+pcwl_set_phy(pcwl_maci_t *pcwl_p, const void *wldp_buf)
+{
+	uint16_t 	ret;
+	pcwl_rf_t 	*rf_p;
+	int		err = ENETRESET;
+	wl_phy_conf_t 	*phy = (wl_phy_conf_t *)wldp_buf;
+
+	rf_p = &pcwl_p->pcwl_rf;
+	ret = (uint16_t)(phy->wl_phy_dsss_conf.wl_dsss_channel);
+	if (ret < 1 || ret > 14) {
+		err = ENOTSUP;
+		return (err);
+	}
+
+	rf_p->rf_own_chnl = ret;
+
+	PCWLDBG((CE_CONT, "pcwl: set channel=%d\n", rf_p->rf_own_chnl));
+
+	return (err);
+}
+
+static int
+pcwl_get_phy(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	uint16_t	retval;
+	wl_dsss_t 	*dsss = (wl_dsss_t *)wldp_buf;
+	int		err = 0;
+
+	if (pcwl_get_ltv(pcwl_p, 2, WL_RID_CURRENT_CHNL, &retval)) {
+		err = EIO;
+		return (err);
+	}
+
+	dsss->wl_dsss_channel = retval;
+	PCWLDBG((CE_CONT, "pcwl_get_phy: channel=%d\n", retval));
+	dsss->wl_dsss_subtype = WL_DSSS;
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_DESIRED_RATESa
+ */
+static int
+pcwl_set_desrates(pcwl_maci_t *pcwl_p, const void *wldp_buf)
+{
+	int		err = ENETRESET;
+	char 		rates[4];
+	char 		maxrate;
+	uint16_t 	i;
+	pcwl_rf_t 	*rf_p;
+	wl_rates_t 	*iw_rates = (wl_rates_t *)wldp_buf;
+
+	rf_p = &pcwl_p->pcwl_rf;
+
+	bzero(rates, sizeof (rates));
+
+	for (i = 0; i < 4; i++) {
+		rates[i] = iw_rates->wl_rates_rates[i];
+		PCWLDBG((CE_CONT, "pcwl: set tx_rate[%d]=%d\n", i, rates[i]));
+	}
+	PCWLDBG((CE_CONT, "pcwl: set rate_num=%d\n", iw_rates->wl_rates_num));
+
+	switch (iw_rates->wl_rates_num) {
+	case 1:
+		switch (rates[0]) {
+		case WL_RATE_1M:
+			rf_p->rf_tx_rate = WL_TX_RATE_FIX_1M(pcwl_p);
+			break;
+		case WL_RATE_2M:
+			rf_p->rf_tx_rate = WL_TX_RATE_FIX_2M(pcwl_p);
+			break;
+		case WL_RATE_11M:
+			rf_p->rf_tx_rate = WL_TX_RATE_FIX_11M(pcwl_p);
+			break;
+		case WL_RATE_5_5M:
+			rf_p->rf_tx_rate = WL_TX_RATE_FIX_5M(pcwl_p);
+			break;
+		default:
+			err = EINVAL;
+			break;
+		}
+		break;
+	case 2:
+		maxrate = (rates[0] > rates[1] ? rates[0] : rates[1]);
+		switch (maxrate) {
+		case WL_RATE_2M:
+			rf_p->rf_tx_rate = WL_TX_RATE_AUTO_L(pcwl_p);
+			break;
+		case WL_RATE_11M:
+			rf_p->rf_tx_rate = WL_TX_RATE_AUTO_H(pcwl_p);
+			break;
+		case WL_RATE_5_5M:
+			rf_p->rf_tx_rate = WL_TX_RATE_AUTO_M(pcwl_p);
+			break;
+		default:
+			err = EINVAL;
+			break;
+		}
+		break;
+	case 3:
+		maxrate = (rates[0] > rates[1] ? rates[0] : rates[1]);
+		maxrate = (rates[2] > maxrate ? rates[2] : maxrate);
+		switch (maxrate) {
+		case WL_RATE_11M:
+			rf_p->rf_tx_rate = WL_TX_RATE_AUTO_H(pcwl_p);
+			break;
+		case WL_RATE_5_5M:
+			rf_p->rf_tx_rate = WL_TX_RATE_AUTO_M(pcwl_p);
+			break;
+		default:
+			err = EINVAL;
+			break;
+		}
+		break;
+	case 4:
+		rf_p->rf_tx_rate = WL_TX_RATE_AUTO_H(pcwl_p);
+		break;
+	default:
+		err = ENOTSUP;
+		break;
+	}
+	PCWLDBG((CE_CONT, "pcwl: set tx_rate=%d\n", rf_p->rf_tx_rate));
+
+	return (err);
+}
+
+static int
+pcwl_get_desrates(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	uint16_t 	rate;
+	int		err = 0;
+
+	if (pcwl_get_ltv(pcwl_p, 2, WL_RID_TX_RATE, &rate)) {
+		err = EIO;
+		return (err);
+	}
+
+	if (pcwl_p->pcwl_chip_type == PCWL_CHIP_PRISMII) {
+		((wl_rates_t *)wldp_buf)->wl_rates_num = 1;
+		switch (rate) {
+		case WL_SPEED_1Mbps_P2:
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_1M;
+			break;
+		case WL_SPEED_2Mbps_P2:
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_2M;
+			break;
+		case WL_SPEED_55Mbps_P2:
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_5_5M;
+			break;
+		case WL_SPEED_11Mbps_P2:
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_11M;
+			break;
+		default:
+			err = EINVAL;
+			break;
+		}
+	} else {
+		switch (rate) {
+		case WL_L_TX_RATE_FIX_1M:
+			((wl_rates_t *)wldp_buf)->wl_rates_num = 1;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_1M;
+			break;
+		case WL_L_TX_RATE_FIX_2M:
+			((wl_rates_t *)wldp_buf)->wl_rates_num = 1;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_2M;
+			break;
+		case WL_L_TX_RATE_AUTO_H:
+			((wl_rates_t *)wldp_buf)->wl_rates_num = 4;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_1M;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[1] =
+			    WL_RATE_2M;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[2] =
+			    WL_RATE_5_5M;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[3] =
+			    WL_RATE_11M;
+			break;
+		case WL_L_TX_RATE_FIX_5M:
+			((wl_rates_t *)wldp_buf)->wl_rates_num = 1;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_5_5M;
+			break;
+		case WL_L_TX_RATE_FIX_11M:
+			((wl_rates_t *)wldp_buf)->wl_rates_num = 1;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_11M;
+			break;
+		case WL_L_TX_RATE_AUTO_L:
+			((wl_rates_t *)wldp_buf)->wl_rates_num = 2;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_1M;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[1] =
+			    WL_RATE_2M;
+			break;
+		case WL_L_TX_RATE_AUTO_M:
+			((wl_rates_t *)wldp_buf)->wl_rates_num = 3;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[0] =
+			    WL_RATE_1M;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[1] =
+			    WL_RATE_2M;
+			(((wl_rates_t *)wldp_buf)->wl_rates_rates)[2] =
+			    WL_RATE_5_5M;
+			break;
+		default:
+			err = EINVAL;
+			break;
+		}
+	}
+	PCWLDBG((CE_CONT, "pcwl: get rate=%d\n", rate));
+
+	return (err);
+}
+
+/*
+ * MAC_PROP_WL_SUP_RATE
+ */
+static void
+pcwl_get_suprates(void *wldp_buf)
+{
+	wl_rates_t *wl_rates = (wl_rates_t *)wldp_buf;
+
+	wl_rates->wl_rates_num = 4;
+	wl_rates->wl_rates_rates[0] = WL_RATE_1M;
+	wl_rates->wl_rates_rates[1] = WL_RATE_2M;
+	wl_rates->wl_rates_rates[2] = WL_RATE_5_5M;
+	wl_rates->wl_rates_rates[3] = WL_RATE_11M;
+}
+
+/*
+ * MAC_PROP_WL_POWER_MODE
+ */
+static int
+pcwl_set_powermode(pcwl_maci_t *pcwl_p, const void *wldp_buf)
+{
+	uint16_t 	ret;
+	pcwl_rf_t 	*rf_p;
+	int		err = 0;
+
+	rf_p = &pcwl_p->pcwl_rf;
+
+	ret = (uint16_t)(((wl_ps_mode_t *)wldp_buf)->wl_ps_mode);
+	if (ret != WL_PM_AM && ret != WL_PM_MPS && ret != WL_PM_FAST) {
+		err = ENOTSUP;
+		return (err);
+	}
+
+	rf_p->rf_pm_enabled = ret;
+
+	return (err);
+
+}
+
+static void
+pcwl_get_powermode(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	pcwl_rf_t *rf_p;
+
+	rf_p = &pcwl_p->pcwl_rf;
+	((wl_ps_mode_t *)wldp_buf)->wl_ps_mode = rf_p->rf_pm_enabled;
+}
+
+/*
+ * MAC_PROP_AUTH_MODE
+ */
+static int
+pcwl_set_authmode(pcwl_maci_t *pcwl_p, const void *wldp_buf)
+{
+	uint16_t	ret;
+	pcwl_rf_t 	*rf_p;
+	int		err = ENETRESET;
+
+	rf_p = &pcwl_p->pcwl_rf;
+
+	ret = (uint16_t)(*(wl_authmode_t *)wldp_buf);
+	if (ret != WL_OPENSYSTEM && ret != WL_SHAREDKEY) {
+		err = ENOTSUP;
+		return (err);
+	}
+
+	rf_p->rf_authtype = ret;
+
+	return (err);
+}
+
+static void
+pcwl_get_authmode(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	pcwl_rf_t 	*rf_p;
+
+	rf_p = &pcwl_p->pcwl_rf;
+	*(wl_authmode_t *)wldp_buf = rf_p->rf_authtype;
+}
+
+/*
+ * MAC_PROP_WL_ENCRYPTION
+ */
+static int
+pcwl_set_encrypt(pcwl_maci_t *pcwl_p, const void *wldp_buf)
+{
+	uint16_t 	ret;
+	pcwl_rf_t 	*rf_p;
+	int		err = ENETRESET;
+
+	rf_p = &pcwl_p->pcwl_rf;
+
+	ret = (uint16_t)(*(wl_encryption_t *)wldp_buf);
+	PCWLDBG((CE_NOTE, "pcwl_set_encrypt: %d\n", ret));
+	if (ret != WL_NOENCRYPTION && ret != WL_ENC_WEP) {
+		err = ENOTSUP;
+		return (err);
+	}
+
+	rf_p->rf_encryption = ret;
+
+	return (err);
+}
+
+static void
+pcwl_get_encrypt(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	pcwl_rf_t *rf_p;
+
+	rf_p = &pcwl_p->pcwl_rf;
+	*(wl_encryption_t *)wldp_buf = rf_p->rf_encryption;
+}
+
+/*
+ * MAC_PROP_WL_CREATE_IBSS
+ */
+static int
+pcwl_set_ibss(pcwl_maci_t *pcwl_p, const void *wldp_buf)
+{
+	uint16_t 	ret;
+	pcwl_rf_t 	*rf_p;
+	int		err = ENETRESET;
+
+	rf_p = &pcwl_p->pcwl_rf;
+
+	ret = (uint16_t)(*(wl_create_ibss_t *)wldp_buf);
+	if (ret != 0 && ret != 1) {
+		err = ENOTSUP;
+		return (err);
+	}
+
+	rf_p->rf_create_ibss = ret;
+
+	return (err);
+}
+
+static void
+pcwl_get_ibss(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	pcwl_rf_t 	*rf_p;
+
+	rf_p = &pcwl_p->pcwl_rf;
+	*(wl_create_ibss_t *)wldp_buf = rf_p->rf_create_ibss;
+}
+
+/*
+ * MAC_PROP_WL_RSSI
+ */
+static void
+pcwl_get_param_rssi(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+
+	if (pcwl_p->pcwl_chip_type == PCWL_CHIP_PRISMII) {
+		*(wl_rssi_t *)wldp_buf =
+		    min((pcwl_p->pcwl_rssi * 15 / 85 + 1), 15);
+	} else {
+		/*
+		 * According to the description of the
+		 * datasheet(Lucent card), the signal level
+		 * value is between 27 -- 154.
+		 * we reflect these value to 1-15 as rssi.
+		 */
+		if (pcwl_p->pcwl_rssi <= 27)
+			*(wl_rssi_t *)wldp_buf = 1;
+		else if (pcwl_p->pcwl_rssi > 154)
+			*(wl_rssi_t *)wldp_buf = 15;
+		else
+			*(wl_rssi_t *)wldp_buf =
+			    min(15, ((pcwl_p->pcwl_rssi - 27) * 15 / 127));
+	}
+}
+
+/*
+ * MAC_PROP_WL_KEY_TAB
+ */
+static int
+pcwl_set_wepkey(pcwl_maci_t *pcwl_p, const void *wldp_buf)
+{
+	uint16_t	i;
+	pcwl_rf_t 	*rf_p;
+	wl_wep_key_t 	*p_wepkey_tab;
+
+	rf_p = &pcwl_p->pcwl_rf;
+	bzero((rf_p->rf_ckeys), sizeof (rf_ckey_t) * MAX_NWEPKEYS);
+
+	p_wepkey_tab = (wl_wep_key_t *)wldp_buf;
+	for (i = 0; i < MAX_NWEPKEYS; i++) {
+		if (p_wepkey_tab[i].wl_wep_operation == WL_ADD) {
+			rf_p->rf_ckeys[i].ckey_len =
+			    p_wepkey_tab[i].wl_wep_length;
+			bcopy(p_wepkey_tab[i].wl_wep_key,
+			    rf_p->rf_ckeys[i].ckey_dat,
+			    p_wepkey_tab[i].wl_wep_length);
+			PCWL_SWAP16((uint16_t *)
+			    &rf_p->rf_ckeys[i].ckey_dat,
+			    rf_p->rf_ckeys[i].ckey_len + 1);
+			PCWLDBG((CE_CONT, "%s, %d\n",
+			    rf_p->rf_ckeys[i].ckey_dat, i));
+		}
+		PCWLDBG((CE_CONT, "pcwl: rf_ckeys[%d]=%s\n", i,
+		    (char *)(rf_p->rf_ckeys[i].ckey_dat)));
+	}
+
+	return (ENETRESET);
+}
+
+/*
+ * MAC_PROP_WL_RADIO
+ */
+static void
+pcwl_get_radio(void *wldp_buf)
+{
+	wl_radio_t *radio = (wl_radio_t *)wldp_buf;
+
+	*radio = B_TRUE;
+}
+
+/*
+ * MAC_PROP_WL_ESSLIST
+ */
+static void
+pcwl_get_esslist(pcwl_maci_t *pcwl_p, void *wldp_buf)
+{
+	uint16_t	i;
+	wl_ess_conf_t 	*p_ess_conf;
+	wl_scan_list_t	*scan_item;
+
+	mutex_enter(&pcwl_p->pcwl_scanlist_lock);
+
+	((wl_ess_list_t *)wldp_buf)->wl_ess_list_num =
+	    pcwl_p->pcwl_scan_num;
+
+	scan_item = list_head(&pcwl_p->pcwl_scan_list);
+
+	for (i = 0; i < pcwl_p->pcwl_scan_num; i++) {
+		if (!scan_item)
+			break;
+
+		p_ess_conf = (wl_ess_conf_t *)((char *)wldp_buf +
+		    offsetof(wl_ess_list_t, wl_ess_list_ess) +
+		    i * sizeof (wl_ess_conf_t));
+		bcopy(scan_item->wl_val.wl_srt_ssid,
+		    p_ess_conf->wl_ess_conf_essid.wl_essid_essid,
+		    mi_strlen(scan_item->wl_val.wl_srt_ssid));
+		bcopy(scan_item->wl_val.wl_srt_bssid,
+		    p_ess_conf->wl_ess_conf_bssid, 6);
+		(p_ess_conf->wl_phy_conf).wl_phy_dsss_conf.wl_dsss_subtype
+		    = WL_DSSS;
+		p_ess_conf->wl_ess_conf_wepenabled =
+		    (scan_item->wl_val.wl_srt_cap & 0x10 ?
+		    WL_ENC_WEP : WL_NOENCRYPTION);
+		p_ess_conf->wl_ess_conf_bsstype =
+		    (scan_item->wl_val.wl_srt_cap & 0x1 ?
+		    WL_BSS_BSS : WL_BSS_IBSS);
+		p_ess_conf->wl_phy_conf.wl_phy_dsss_conf.wl_dsss_channel =
+		    scan_item->wl_val.wl_srt_chid;
+		if (pcwl_p->pcwl_chip_type == PCWL_CHIP_PRISMII) {
+			p_ess_conf->wl_ess_conf_sl =
+			    min(scan_item->wl_val.wl_srt_sl * 15 / 85 + 1,
+			    15);
+		} else {
+			if (scan_item->wl_val.wl_srt_sl <= 27)
+				p_ess_conf->wl_ess_conf_sl = 1;
+			else if (scan_item->wl_val.wl_srt_sl > 154)
+				p_ess_conf->wl_ess_conf_sl = 15;
+			else
+				p_ess_conf->wl_ess_conf_sl = min(15,
+				    ((scan_item->wl_val.wl_srt_sl - 27)
+				    * 15 / 127));
+		}
+
+		p_ess_conf->wl_supported_rates[0] = WL_RATE_1M;
+		p_ess_conf->wl_supported_rates[0] = WL_RATE_2M;
+		p_ess_conf->wl_supported_rates[0] = WL_RATE_5_5M;
+		p_ess_conf->wl_supported_rates[0] = WL_RATE_11M;
+
+		scan_item = list_next(&pcwl_p->pcwl_scan_list, scan_item);
+	}
+
+	mutex_exit(&pcwl_p->pcwl_scanlist_lock);
+}
+
+
+/*
  * for wificonfig and dladm ioctl
  */
 
 static int
 pcwl_cfg_essid(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	char ssid[36];
-	uint16_t ret, i;
-	uint16_t val;
-	pcwl_rf_t *rf_p;
-	char *value;
-	wldp_t	*infp;
-	wldp_t *outfp;
-	char *buf;
-	int iret;
+	char 		ssid[36];
+	uint16_t 	i;
+	uint16_t 	val;
+	pcwl_rf_t 	*rf_p;
+	wldp_t		*infp;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		iret;
+	int 		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -2357,42 +3066,26 @@ pcwl_cfg_essid(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	infp = (wldp_t *)mp->b_rptr;
 	rf_p = &pcwl_p->pcwl_rf;
 
+
 	bzero(ssid, sizeof (ssid));
 	if (cmd == WLAN_GET_PARAM) {
-		ret =  pcwl_get_ltv(pcwl_p, 2,
-		    WL_RID_PORTSTATUS, &val);
-		if (ret) {
+		err = pcwl_get_essid(pcwl_p, outfp->wldp_buf);
+		if (err == EIO) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_HW_ERROR;
-			PCWLDBG((CE_WARN, "cfg_essid_get_error\n"));
 			goto done;
 		}
-		PCWLDBG((CE_NOTE, "PortStatus = %d\n", val));
-
+		(void) pcwl_get_ltv(pcwl_p, 2, WL_RID_PORTSTATUS, &val);
 		if (val == WL_PORT_DISABLED || val == WL_PORT_INITIAL) {
 			outfp->wldp_length = WIFI_BUF_OFFSET +
 			    offsetof(wl_essid_t, wl_essid_essid) +
 			    mi_strlen(rf_p->rf_desired_ssid);
-			((wl_essid_t *)(outfp->wldp_buf))->wl_essid_length =
-			    mi_strlen(rf_p->rf_desired_ssid);
-			bcopy(rf_p->rf_desired_ssid, buf + WIFI_BUF_OFFSET +
-			    offsetof(wl_essid_t, wl_essid_essid),
-			    mi_strlen(rf_p->rf_desired_ssid));
 		} else if (val == WL_PORT_TO_IBSS ||
 		    val == WL_PORT_TO_BSS ||
 		    val == WL_PORT_OOR) {
-			(void) pcwl_get_ltv((pcwl_p), 34,
-			    WL_RID_SSID, (uint16_t *)ssid);
-			PCWL_SWAP16((uint16_t *)(ssid+2), *(uint16_t *)ssid);
-			ssid[*(uint16_t *)ssid + 2] = '\0';
 			outfp->wldp_length = WIFI_BUF_OFFSET +
 			    offsetof(wl_essid_t, wl_essid_essid) +
 			    mi_strlen(ssid+2);
-			((wl_essid_t *)(outfp->wldp_buf))->wl_essid_length =
-			    mi_strlen(ssid+2);
-			bcopy(ssid + 2, buf + WIFI_BUF_OFFSET +
-			    offsetof(wl_essid_t, wl_essid_essid),
-			    mi_strlen(ssid+2));
 		} else {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 		}
@@ -2401,17 +3094,9 @@ pcwl_cfg_essid(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 		PCWLDBG((CE_CONT, "pcwl: get desired essid=%s\n",
 		    rf_p->rf_desired_ssid));
 	} else if (cmd == WLAN_SET_PARAM) {
-		value = ((wl_essid_t *)(infp->wldp_buf))->wl_essid_essid;
-		(void) strncpy(rf_p->rf_desired_ssid, value,
-		    MIN(32, strlen(value)));
-		rf_p->rf_desired_ssid[strlen(value)] = '\0';
-		(void) strncpy(rf_p->rf_own_ssid, value,
-		    MIN(32, strlen(value)));
-		rf_p->rf_own_ssid[strlen(value)] = '\0';
+		(void) pcwl_set_essid(pcwl_p, infp->wldp_buf);
 		outfp->wldp_length = WIFI_BUF_OFFSET;
 		outfp->wldp_result = WL_SUCCESS;
-		PCWLDBG((CE_CONT, "pcwl: set: desired essid=%s\n",
-		    rf_p->rf_desired_ssid));
 	} else {
 		kmem_free(buf, MAX_BUF_LEN);
 		return (EINVAL);
@@ -2427,11 +3112,11 @@ done:
 static int
 pcwl_cfg_bssid(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t ret, i;
-	int iret;
-	wldp_t *outfp;
-	char *buf;
-	uint8_t bssid[6];
+	uint16_t 	i;
+	int 		iret;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -2444,29 +3129,13 @@ pcwl_cfg_bssid(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_bssid_t);
 	if (cmd == WLAN_GET_PARAM) {
-		if (ret = pcwl_get_ltv(pcwl_p, 2,
-		    WL_RID_PORTSTATUS, &ret)) {
+		err = pcwl_get_bssid(pcwl_p, outfp->wldp_buf);
+		if (err == EIO) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_HW_ERROR;
 			goto done;
 		}
-		PCWLDBG((CE_NOTE, "PortStatus = %d\n", ret));
-		if (ret == WL_PORT_DISABLED || ret == WL_PORT_INITIAL) {
-			bzero(buf + WIFI_BUF_OFFSET,
-			    sizeof (wl_bssid_t));
-		} else if (ret == WL_PORT_TO_IBSS ||
-		    ret == WL_PORT_TO_BSS || ret == WL_PORT_OOR) {
-			(void) pcwl_get_ltv(pcwl_p, 6,
-			    WL_RID_BSSID, (uint16_t *)bssid);
-			PCWL_SWAP16((uint16_t *)bssid, 6);
-			bcopy(bssid, buf + WIFI_BUF_OFFSET,
-			    sizeof (wl_bssid_t));
-		}
 		outfp->wldp_result = WL_SUCCESS;
-
-		PCWLDBG((CE_CONT, "pcwl_getset: bssid=%x %x %x %x %x %x\n",
-		    bssid[0], bssid[1], bssid[2],
-		    bssid[3], bssid[4], bssid[5]));
 	} else if (cmd == WLAN_SET_PARAM) {
 		outfp->wldp_result = WL_READONLY;
 	} else {
@@ -2593,11 +3262,9 @@ done:
 static int
 pcwl_cfg_scan(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	wl_ess_conf_t *p_ess_conf;
-	wldp_t *outfp;
-	char *buf;
-	uint16_t i;
-	wl_scan_list_t *scan_item;
+	wldp_t 		*outfp;
+	char 		*buf;
+	uint16_t 	i;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -2608,73 +3275,29 @@ pcwl_cfg_scan(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 
-	mutex_enter(&pcwl_p->pcwl_scanlist_lock);
-	((wl_ess_list_t *)(outfp->wldp_buf))->wl_ess_list_num =
-	    pcwl_p->pcwl_scan_num;
+	pcwl_get_esslist(pcwl_p, outfp->wldp_buf);
+
 	outfp->wldp_length = WIFI_BUF_OFFSET +
 	    offsetof(wl_ess_list_t, wl_ess_list_ess) +
 	    pcwl_p->pcwl_scan_num * sizeof (wl_ess_conf_t);
-
-	scan_item = list_head(&pcwl_p->pcwl_scan_list);
-	for (i = 0; i < pcwl_p->pcwl_scan_num; i++) {
-		if (!scan_item)
-			goto done;
-		p_ess_conf = (wl_ess_conf_t *)(buf + WIFI_BUF_OFFSET +
-		    offsetof(wl_ess_list_t, wl_ess_list_ess) +
-		    i * sizeof (wl_ess_conf_t));
-		bcopy(scan_item->wl_val.wl_srt_ssid,
-		    p_ess_conf->wl_ess_conf_essid.wl_essid_essid,
-		    mi_strlen(scan_item->wl_val.wl_srt_ssid));
-		bcopy(scan_item->wl_val.wl_srt_bssid,
-		    p_ess_conf->wl_ess_conf_bssid, 6);
-		(p_ess_conf->wl_phy_conf).wl_phy_dsss_conf.wl_dsss_subtype
-		    = WL_DSSS;
-		p_ess_conf->wl_ess_conf_wepenabled =
-		    (scan_item->wl_val.wl_srt_cap & 0x10 ?
-		    WL_ENC_WEP : WL_NOENCRYPTION);
-		p_ess_conf->wl_ess_conf_bsstype =
-		    (scan_item->wl_val.wl_srt_cap & 0x1 ?
-		    WL_BSS_BSS : WL_BSS_IBSS);
-		p_ess_conf->wl_phy_conf.wl_phy_dsss_conf.wl_dsss_channel =
-		    scan_item->wl_val.wl_srt_chid;
-		if (pcwl_p->pcwl_chip_type == PCWL_CHIP_PRISMII) {
-			p_ess_conf->wl_ess_conf_sl =
-			    min(scan_item->wl_val.wl_srt_sl * 15 / 85 + 1,
-			    15);
-		} else {
-			if (scan_item->wl_val.wl_srt_sl <= 27)
-				p_ess_conf->wl_ess_conf_sl = 1;
-			else if (scan_item->wl_val.wl_srt_sl > 154)
-				p_ess_conf->wl_ess_conf_sl = 15;
-			else
-				p_ess_conf->wl_ess_conf_sl = min(15,
-				    ((scan_item->wl_val.wl_srt_sl - 27)
-				    * 15 / 127));
-		}
-		p_ess_conf->wl_supported_rates[0] = WL_RATE_1M;
-		p_ess_conf->wl_supported_rates[1] = WL_RATE_2M;
-		p_ess_conf->wl_supported_rates[2] = WL_RATE_5_5M;
-		p_ess_conf->wl_supported_rates[3] = WL_RATE_11M;
-		scan_item = list_next(&pcwl_p->pcwl_scan_list, scan_item);
-	}
-done:
-	mutex_exit(&pcwl_p->pcwl_scanlist_lock);
 	outfp->wldp_result = WL_SUCCESS;
 
 	for (i = 0; i < (outfp->wldp_length); i++)
 		(void) mi_mpprintf_putc((char *)mp, buf[i]);
 	kmem_free(buf, MAX_BUF_LEN);
 	return (WL_SUCCESS);
+
 }
 
 /*ARGSUSED*/
 static int
 pcwl_cfg_linkstatus(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	wldp_t *outfp;
-	char *buf;
-	uint16_t i, ret, val;
-	int iret;
+	wldp_t 		*outfp;
+	char 		*buf;
+	uint16_t 	i, val;
+	int 		iret;
+	int 		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -2685,27 +3308,26 @@ pcwl_cfg_linkstatus(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 
-	ret =  pcwl_get_ltv(pcwl_p, 2,
-	    WL_RID_PORTSTATUS, &val);
-	if (ret) {
+	err = pcwl_get_linkstatus(pcwl_p, outfp->wldp_buf);
+	if (err == EIO) {
 		outfp->wldp_length = WIFI_BUF_OFFSET;
 		outfp->wldp_result = WL_HW_ERROR;
-		PCWLDBG((CE_WARN, "cfg_linkstatus_get_error\n"));
 		goto done;
 	}
-	PCWLDBG((CE_NOTE, "PortStatus = %d\n", val));
+
+	(void) pcwl_get_ltv(pcwl_p, 2, WL_RID_PORTSTATUS, &val);
 	if (val == WL_PORT_DISABLED || val == WL_PORT_INITIAL) {
-		*(wl_linkstatus_t *)(outfp->wldp_buf) = WL_NOTCONNECTED;
 		outfp->wldp_length = WIFI_BUF_OFFSET +
 		    sizeof (wl_linkstatus_t);
 	} else if (val == WL_PORT_TO_IBSS ||
-	    val == WL_PORT_TO_BSS || val == WL_PORT_OOR) {
-		*(wl_linkstatus_t *)(outfp->wldp_buf) = WL_CONNECTED;
+	    val == WL_PORT_TO_BSS ||
+	    val == WL_PORT_OOR) {
 		outfp->wldp_length = WIFI_BUF_OFFSET +
 		    sizeof (wl_linkstatus_t);
 	} else {
 		outfp->wldp_length = WIFI_BUF_OFFSET;
 	}
+
 	outfp->wldp_result = WL_SUCCESS;
 done:
 	for (i = 0; i < (outfp->wldp_length); i++)
@@ -2718,12 +3340,12 @@ done:
 static int
 pcwl_cfg_bsstype(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t ret, i;
-	pcwl_rf_t *rf_p;
-	wldp_t	*infp;
-	wldp_t *outfp;
-	char *buf;
-	int iret;
+	uint16_t 	i;
+	wldp_t		*infp;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		iret;
+	int		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -2734,24 +3356,18 @@ pcwl_cfg_bsstype(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 	infp = (wldp_t *)mp->b_rptr;
-	rf_p = &pcwl_p->pcwl_rf;
 
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_bss_type_t);
 	if (cmd == WLAN_GET_PARAM) {
-		*(wl_bss_type_t *)(outfp->wldp_buf) = rf_p->rf_porttype;
-		PCWLDBG((CE_CONT, "pcwl_getset: porttype=%d\n",
-		    rf_p->rf_porttype));
+		pcwl_get_bsstype(pcwl_p, outfp->wldp_buf);
 		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
-		ret = (uint16_t)(*(wl_bss_type_t *)(infp->wldp_buf));
-		if ((ret != WL_BSS_BSS) &&
-		    (ret != WL_BSS_IBSS) &&
-		    (ret != WL_BSS_ANY)) {
+		err = pcwl_set_bsstype(pcwl_p, infp->wldp_buf);
+		if (err == ENOTSUP) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_NOTSUPPORTED;
 			goto done;
 		}
-		rf_p->rf_porttype = ret;
 		outfp->wldp_result = WL_SUCCESS;
 	} else {
 		kmem_free(buf, MAX_BUF_LEN);
@@ -2768,12 +3384,12 @@ done:
 static int
 pcwl_cfg_phy(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t ret, retval, i;
-	pcwl_rf_t *rf_p;
-	wldp_t	*infp;
-	wldp_t *outfp;
-	char *buf;
-	int iret;
+	uint16_t 	i;
+	wldp_t		*infp;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		iret;
+	int 		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -2784,31 +3400,23 @@ pcwl_cfg_phy(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 	infp = (wldp_t *)mp->b_rptr;
-	rf_p = &pcwl_p->pcwl_rf;
 
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_dsss_t);
 	if (cmd == WLAN_GET_PARAM) {
-		if (ret = pcwl_get_ltv(pcwl_p, 2,
-		    WL_RID_CURRENT_CHNL, &retval)) {
+		err = pcwl_get_phy(pcwl_p, outfp->wldp_buf);
+		if (err == EIO) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_HW_ERROR;
 			goto done;
 		}
-		((wl_dsss_t *)(outfp->wldp_buf))->wl_dsss_channel = retval;
-		PCWLDBG((CE_CONT, "pcwl_getset: channel=%d\n", retval));
-		((wl_dsss_t *)(outfp->wldp_buf))->wl_dsss_subtype = WL_DSSS;
 		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
-		ret = (uint16_t)
-		    (((wl_phy_conf_t *)(infp->wldp_buf))
-		    ->wl_phy_dsss_conf.wl_dsss_channel);
-		if (ret < 1 || ret > 14) {
+		err = pcwl_set_phy(pcwl_p, infp->wldp_buf);
+		if (err == ENOTSUP) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_NOTSUPPORTED;
 			goto done;
 		}
-		rf_p->rf_own_chnl = ret;
-		PCWLDBG((CE_CONT, "pcwl: set channel=%d\n", rf_p->rf_own_chnl));
 		outfp->wldp_result = WL_SUCCESS;
 	} else {
 		kmem_free(buf, MAX_BUF_LEN);
@@ -2826,15 +3434,13 @@ done:
 static int
 pcwl_cfg_desiredrates(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t rate;
-	uint16_t i;
-	pcwl_rf_t *rf_p;
-	wldp_t	*infp;
-	wldp_t *outfp;
-	char *buf;
-	int iret;
-	char rates[4];
-	char maxrate;
+	uint16_t 	rate;
+	uint16_t 	i;
+	wldp_t		*infp;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		iret;
+	int 		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -2845,206 +3451,74 @@ pcwl_cfg_desiredrates(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 	infp = (wldp_t *)mp->b_rptr;
-	rf_p = &pcwl_p->pcwl_rf;
 
 	if (cmd == WLAN_GET_PARAM) {
-		if (i = pcwl_get_ltv(pcwl_p, 2, WL_RID_TX_RATE, &rate)) {
+		err = pcwl_get_desrates(pcwl_p, outfp->wldp_buf);
+		if (err == EIO || err == EINVAL) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
-			outfp->wldp_result = WL_HW_ERROR;
+			outfp->wldp_result = WL_NOTSUPPORTED;
 			goto done;
 		}
-
 		if (pcwl_p->pcwl_chip_type == PCWL_CHIP_PRISMII) {
-			((wl_rates_t *)(outfp->wldp_buf))->wl_rates_num = 1;
 			outfp->wldp_length = WIFI_BUF_OFFSET +
 			    offsetof(wl_rates_t, wl_rates_rates) +
 			    1 * sizeof (char);
-			switch (rate) {
-			case WL_SPEED_1Mbps_P2:
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_1M;
-				break;
-			case WL_SPEED_2Mbps_P2:
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_2M;
-				break;
-			case WL_SPEED_55Mbps_P2:
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_5_5M;
-				break;
-			case WL_SPEED_11Mbps_P2:
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_11M;
-				break;
-			default:
-				outfp->wldp_length = WIFI_BUF_OFFSET;
-				outfp->wldp_result = WL_HW_ERROR;
-				goto done;
-			}
 		} else {
+			(void) pcwl_get_ltv(pcwl_p, 2, WL_RID_TX_RATE, &rate);
 			switch (rate) {
 			case WL_L_TX_RATE_FIX_1M:
-				((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_num = 1;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_1M;
 				outfp->wldp_length = WIFI_BUF_OFFSET +
 				    offsetof(wl_rates_t, wl_rates_rates) +
 				    1 * sizeof (char);
 				break;
 			case WL_L_TX_RATE_FIX_2M:
-				((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_num = 1;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_2M;
 				outfp->wldp_length = WIFI_BUF_OFFSET +
 				    offsetof(wl_rates_t, wl_rates_rates) +
 				    1 * sizeof (char);
 				break;
 			case WL_L_TX_RATE_AUTO_H:
-				((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_num = 4;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_1M;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[1] = WL_RATE_2M;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[2] = WL_RATE_5_5M;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[3] = WL_RATE_11M;
 				outfp->wldp_length = WIFI_BUF_OFFSET +
 				    offsetof(wl_rates_t, wl_rates_rates) +
 				    4 * sizeof (char);
 				break;
 			case WL_L_TX_RATE_FIX_5M:
-				((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_num = 1;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_5_5M;
 				outfp->wldp_length = WIFI_BUF_OFFSET +
 				    offsetof(wl_rates_t, wl_rates_rates) +
 				    1 * sizeof (char);
 				break;
 			case WL_L_TX_RATE_FIX_11M:
-				((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_num = 1;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_11M;
 				outfp->wldp_length = WIFI_BUF_OFFSET +
 				    offsetof(wl_rates_t, wl_rates_rates) +
 				    1 * sizeof (char);
 				break;
 			case WL_L_TX_RATE_AUTO_L:
-				((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_num = 2;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_1M;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[1] = WL_RATE_2M;
 				outfp->wldp_length = WIFI_BUF_OFFSET +
 				    offsetof(wl_rates_t, wl_rates_rates) +
 				    2 * sizeof (char);
 				break;
 			case WL_L_TX_RATE_AUTO_M:
-				((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_num = 3;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[0] = WL_RATE_1M;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[1] = WL_RATE_2M;
-				(((wl_rates_t *)(outfp->wldp_buf))->
-				    wl_rates_rates)[2] = WL_RATE_5_5M;
 				outfp->wldp_length = WIFI_BUF_OFFSET +
 				    offsetof(wl_rates_t, wl_rates_rates) +
 				    3 * sizeof (char);
 				break;
 			default:
-				outfp->wldp_length = WIFI_BUF_OFFSET;
-				outfp->wldp_result = WL_HW_ERROR;
-				goto done;
+				break;
 			}
 		}
-		PCWLDBG((CE_CONT, "pcwl: get rate=%d\n", rate));
 		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
-		bzero(rates, sizeof (rates));
-		for (i = 0; i < 4; i++) {
-			rates[i] = (((wl_rates_t *)
-			    (infp->wldp_buf))->wl_rates_rates)[i];
-			PCWLDBG((CE_CONT, "pcwl: set tx_rate[%d]=%d\n",
-			    i, rates[i]));
+		err = pcwl_set_desrates(pcwl_p, infp->wldp_buf);
+		if (err == EINVAL) {
+			outfp->wldp_length = WIFI_BUF_OFFSET;
+			outfp->wldp_result = WL_NOTSUPPORTED;
+			goto done;
 		}
-		PCWLDBG((CE_CONT, "pcwl: set rate_num=%d\n",
-		    ((wl_rates_t *)(infp->wldp_buf))
-		    ->wl_rates_num));
-		switch (((wl_rates_t *)
-		    (infp->wldp_buf))->wl_rates_num) {
-		case 1:
-			switch (rates[0]) {
-			case WL_RATE_1M:
-				rf_p->rf_tx_rate = WL_TX_RATE_FIX_1M(pcwl_p);
-				break;
-			case WL_RATE_2M:
-				rf_p->rf_tx_rate = WL_TX_RATE_FIX_2M(pcwl_p);
-				break;
-			case WL_RATE_11M:
-				rf_p->rf_tx_rate = WL_TX_RATE_FIX_11M(pcwl_p);
-				break;
-			case WL_RATE_5_5M:
-				rf_p->rf_tx_rate = WL_TX_RATE_FIX_5M(pcwl_p);
-				break;
-			default:
-				outfp->wldp_length = WIFI_BUF_OFFSET;
-				outfp->wldp_result = WL_NOTSUPPORTED;
-				goto done;
-			}
-			break;
-		case 2:
-			maxrate = (rates[0] > rates[1] ?
-			    rates[0] : rates[1]);
-			switch (maxrate) {
-			case WL_RATE_2M:
-				rf_p->rf_tx_rate = WL_TX_RATE_AUTO_L(pcwl_p);
-				break;
-			case WL_RATE_11M:
-				rf_p->rf_tx_rate = WL_TX_RATE_AUTO_H(pcwl_p);
-				break;
-			case WL_RATE_5_5M:
-				rf_p->rf_tx_rate = WL_TX_RATE_AUTO_M(pcwl_p);
-				break;
-			default:
-				outfp->wldp_length = WIFI_BUF_OFFSET;
-				outfp->wldp_result = WL_NOTSUPPORTED;
-				goto done;
-			}
-			break;
-		case 3:
-			maxrate = (rates[0] > rates[1] ?
-			    rates[0] : rates[1]);
-			maxrate = (rates[2] > maxrate ?
-			    rates[2] : maxrate);
-			switch (maxrate) {
-			case WL_RATE_11M:
-				rf_p->rf_tx_rate = WL_TX_RATE_AUTO_H(pcwl_p);
-				break;
-			case WL_RATE_5_5M:
-				rf_p->rf_tx_rate = WL_TX_RATE_AUTO_M(pcwl_p);
-				break;
-			default:
-				outfp->wldp_length = WIFI_BUF_OFFSET;
-				outfp->wldp_result = WL_NOTSUPPORTED;
-				goto done;
-			}
-			break;
-		case 4:
-			rf_p->rf_tx_rate = WL_TX_RATE_AUTO_H(pcwl_p);
-			break;
-		default:
+		if (err == ENOTSUP) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_LACK_FEATURE;
 			goto done;
 		}
-		PCWLDBG((CE_CONT, "pcwl: set tx_rate=%d\n", rf_p->rf_tx_rate));
+
 		outfp->wldp_length = WIFI_BUF_OFFSET;
 		outfp->wldp_result = WL_SUCCESS;
 	} else {
@@ -3077,15 +3551,7 @@ pcwl_cfg_supportrates(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 
 	if (cmd == WLAN_GET_PARAM) {
-		((wl_rates_t *)(outfp->wldp_buf))->wl_rates_num = 4;
-		(((wl_rates_t *)(outfp->wldp_buf))->wl_rates_rates)[0]
-		    = WL_RATE_1M;
-		(((wl_rates_t *)(outfp->wldp_buf))->wl_rates_rates)[1]
-		    = WL_RATE_2M;
-		(((wl_rates_t *)(outfp->wldp_buf))->wl_rates_rates)[2]
-		    = WL_RATE_5_5M;
-		(((wl_rates_t *)(outfp->wldp_buf))->wl_rates_rates)[3]
-		    = WL_RATE_11M;
+		pcwl_get_suprates(outfp->wldp_buf);
 		outfp->wldp_length = WIFI_BUF_OFFSET +
 		    offsetof(wl_rates_t, wl_rates_rates) +
 		    4 * sizeof (char);
@@ -3103,12 +3569,12 @@ pcwl_cfg_supportrates(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 static int
 pcwl_cfg_powermode(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t i, ret;
-	pcwl_rf_t *rf_p;
-	wldp_t	*infp;
-	wldp_t *outfp;
-	char *buf;
-	int iret;
+	uint16_t 	i;
+	wldp_t		*infp;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		iret;
+	int 		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -3119,22 +3585,18 @@ pcwl_cfg_powermode(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 	infp = (wldp_t *)mp->b_rptr;
-	rf_p = &pcwl_p->pcwl_rf;
 
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_ps_mode_t);
 	if (cmd == WLAN_GET_PARAM) {
-		((wl_ps_mode_t *)(outfp->wldp_buf))->wl_ps_mode =
-		    rf_p->rf_pm_enabled;
+		pcwl_get_powermode(pcwl_p, outfp->wldp_buf);
 		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
-		ret = (uint16_t)(((wl_ps_mode_t *)(infp->wldp_buf))
-		    ->wl_ps_mode);
-		if (ret != WL_PM_AM && ret != WL_PM_MPS && ret != WL_PM_FAST) {
+		err = pcwl_set_powermode(pcwl_p, infp->wldp_buf);
+		if (err == ENOTSUP) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_NOTSUPPORTED;
 			goto done;
 		}
-		rf_p->rf_pm_enabled = ret;
 		outfp->wldp_result = WL_SUCCESS;
 	} else {
 		kmem_free(buf, MAX_BUF_LEN);
@@ -3152,12 +3614,12 @@ done:
 static int
 pcwl_cfg_authmode(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t i, ret;
-	pcwl_rf_t *rf_p;
-	wldp_t	*infp;
-	wldp_t *outfp;
-	char *buf;
-	int iret;
+	uint16_t 	i;
+	wldp_t		*infp;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		iret;
+	int 		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -3168,21 +3630,18 @@ pcwl_cfg_authmode(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 	infp = (wldp_t *)mp->b_rptr;
-	rf_p = &pcwl_p->pcwl_rf;
-
 
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_authmode_t);
 	if (cmd == WLAN_GET_PARAM) {
-		*(wl_authmode_t *)(outfp->wldp_buf) = rf_p->rf_authtype;
+		pcwl_get_authmode(pcwl_p, outfp->wldp_buf);
 		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
-		ret = (uint16_t)(*(wl_authmode_t *)(infp->wldp_buf));
-		if (ret != WL_OPENSYSTEM && ret != WL_SHAREDKEY) {
+		err = pcwl_set_authmode(pcwl_p, infp->wldp_buf);
+		if (err == ENOTSUP) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_NOTSUPPORTED;
 			goto done;
 		}
-		rf_p->rf_authtype = ret;
 		outfp->wldp_result = WL_SUCCESS;
 	} else {
 		kmem_free(buf, MAX_BUF_LEN);
@@ -3199,12 +3658,12 @@ done:
 static int
 pcwl_cfg_encryption(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t i, ret;
-	pcwl_rf_t *rf_p;
-	wldp_t	*infp;
-	wldp_t *outfp;
-	char *buf;
-	int iret;
+	uint16_t 	i;
+	wldp_t		*infp;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		iret;
+	int 		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -3215,21 +3674,18 @@ pcwl_cfg_encryption(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 	infp = (wldp_t *)mp->b_rptr;
-	rf_p = &pcwl_p->pcwl_rf;
 
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_encryption_t);
 	if (cmd == WLAN_GET_PARAM) {
-		*(wl_encryption_t *)(outfp->wldp_buf) = rf_p->rf_encryption;
+		pcwl_get_encrypt(pcwl_p, outfp->wldp_buf);
 		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
-		ret = (uint16_t)(*(wl_encryption_t *)(infp->wldp_buf));
-		PCWLDBG((CE_NOTE, "set encryption: %d\n", ret));
-		if (ret != WL_NOENCRYPTION && ret != WL_ENC_WEP) {
+		err = pcwl_set_encrypt(pcwl_p, infp->wldp_buf);
+		if (err == ENOTSUP) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_NOTSUPPORTED;
 			goto done;
 		}
-		rf_p->rf_encryption = ret;
 		outfp->wldp_result = WL_SUCCESS;
 	} else {
 		kmem_free(buf, MAX_BUF_LEN);
@@ -3292,12 +3748,12 @@ done:
 static int
 pcwl_cfg_createibss(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t i, ret;
-	pcwl_rf_t *rf_p;
-	wldp_t	*infp;
-	wldp_t *outfp;
-	char *buf;
-	int iret;
+	uint16_t 	i;
+	wldp_t		*infp;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		iret;
+	int 		err = 0;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -3308,20 +3764,18 @@ pcwl_cfg_createibss(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 	infp = (wldp_t *)mp->b_rptr;
-	rf_p = &pcwl_p->pcwl_rf;
 
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_create_ibss_t);
 	if (cmd == WLAN_GET_PARAM) {
-		*(wl_create_ibss_t *)(outfp->wldp_buf) = rf_p->rf_create_ibss;
+		pcwl_get_ibss(pcwl_p, outfp->wldp_buf);
 		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
-		ret = (uint16_t)(*(wl_create_ibss_t *)(infp->wldp_buf));
-		if (ret != 0 && ret != 1) {
+		err = pcwl_set_ibss(pcwl_p, infp->wldp_buf);
+		if (err == ENOTSUP) {
 			outfp->wldp_length = WIFI_BUF_OFFSET;
 			outfp->wldp_result = WL_NOTSUPPORTED;
 			goto done;
 		}
-		rf_p->rf_create_ibss = ret;
 		outfp->wldp_result = WL_SUCCESS;
 	} else {
 		kmem_free(buf, MAX_BUF_LEN);
@@ -3355,25 +3809,7 @@ pcwl_cfg_rssi(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_rssi_t);
 
 	if (cmd == WLAN_GET_PARAM) {
-		if (pcwl_p->pcwl_chip_type == PCWL_CHIP_PRISMII) {
-			*(wl_rssi_t *)(outfp->wldp_buf) =
-			    min((pcwl_p->pcwl_rssi * 15 / 85 + 1), 15);
-		} else {
-		/*
-		 * According to the description of the
-		 * datasheet(Lucent card), the signal level
-		 * value is between 27 -- 154.
-		 * we reflect these value to 1-15 as rssi.
-		 */
-			if (pcwl_p->pcwl_rssi <= 27)
-				*(wl_rssi_t *)(outfp->wldp_buf) = 1;
-			else if (pcwl_p->pcwl_rssi > 154)
-				*(wl_rssi_t *)(outfp->wldp_buf) = 15;
-			else
-				*(wl_rssi_t *)(outfp->wldp_buf) =
-				    min(15, ((pcwl_p->pcwl_rssi - 27)
-				    * 15 / 127));
-		}
+		pcwl_get_param_rssi(pcwl_p, outfp->wldp_buf);
 		outfp->wldp_result = WL_SUCCESS;
 	} else if (cmd == WLAN_SET_PARAM) {
 		outfp->wldp_result = WL_READONLY;
@@ -3428,13 +3864,11 @@ pcwl_cfg_radio(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 static int
 pcwl_cfg_wepkey(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 {
-	uint16_t i;
-	wl_wep_key_t *p_wepkey_tab;
-	pcwl_rf_t *rf_p;
-	wldp_t	*infp;
-	wldp_t *outfp;
-	char *buf;
-	int iret;
+	uint16_t 	i;
+	wldp_t		*infp;
+	wldp_t 		*outfp;
+	char 		*buf;
+	int 		iret;
 
 	buf = kmem_zalloc(MAX_BUF_LEN, KM_NOSLEEP);
 	if (buf == NULL) {
@@ -3445,30 +3879,12 @@ pcwl_cfg_wepkey(mblk_t *mp, pcwl_maci_t *pcwl_p, uint32_t cmd)
 	outfp = (wldp_t *)buf;
 	bcopy(mp->b_rptr, buf,  sizeof (wldp_t));
 	infp = (wldp_t *)mp->b_rptr;
-	rf_p = &pcwl_p->pcwl_rf;
-	bzero((rf_p->rf_ckeys), sizeof (rf_ckey_t) * MAX_NWEPKEYS);
 
 	outfp->wldp_length = WIFI_BUF_OFFSET + sizeof (wl_wep_key_tab_t);
 	if (cmd == WLAN_GET_PARAM) {
 		outfp->wldp_result = WL_WRITEONLY;
 	} else if (cmd == WLAN_SET_PARAM) {
-		p_wepkey_tab = (wl_wep_key_t *)(infp->wldp_buf);
-		for (i = 0; i < MAX_NWEPKEYS; i++) {
-			if (p_wepkey_tab[i].wl_wep_operation == WL_ADD) {
-				rf_p->rf_ckeys[i].ckey_len =
-				    p_wepkey_tab[i].wl_wep_length;
-				bcopy(p_wepkey_tab[i].wl_wep_key,
-				    rf_p->rf_ckeys[i].ckey_dat,
-				    p_wepkey_tab[i].wl_wep_length);
-				PCWL_SWAP16((uint16_t *)
-				    &rf_p->rf_ckeys[i].ckey_dat,
-				    rf_p->rf_ckeys[i].ckey_len + 1);
-				PCWLDBG((CE_CONT, "%s, %d\n",
-				    rf_p->rf_ckeys[i].ckey_dat, i));
-			}
-			PCWLDBG((CE_CONT, "pcwl: rf_ckeys[%d]=%s\n", i,
-			    (char *)(rf_p->rf_ckeys[i].ckey_dat)));
-		}
+		(void) pcwl_set_wepkey(pcwl_p, infp->wldp_buf);
 		outfp->wldp_result = WL_SUCCESS;
 	} else {
 		kmem_free(buf, MAX_BUF_LEN);
@@ -3789,4 +4205,188 @@ pcwl_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 		miocnak(wq, mp, 0, ret);
 	else
 		pcwl_wlan_ioctl(pcwl_p, wq, mp, cmd);
+}
+
+/*
+ * brussels
+ */
+/* ARGSUSED */
+static int
+pcwl_m_setprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t wldp_length, const void *wldp_buf)
+{
+	int 		err = 0;
+	pcwl_maci_t 	*pcwl_p = (pcwl_maci_t *)arg;
+
+	mutex_enter(&pcwl_p->pcwl_glock);
+	if (!(pcwl_p->pcwl_flag & PCWL_CARD_READY)) {
+		mutex_exit(&pcwl_p->pcwl_glock);
+		err = EINVAL;
+		return (err);
+	}
+
+	switch (wldp_pr_num) {
+	/* mac_prop_id */
+	case MAC_PROP_WL_ESSID:
+		err = pcwl_set_essid(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_PHY_CONFIG:
+		err = pcwl_set_phy(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_KEY_TAB:
+		err = pcwl_set_wepkey(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_AUTH_MODE:
+		err = pcwl_set_authmode(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_ENCRYPTION:
+		err = pcwl_set_encrypt(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_BSSTYPE:
+		err = pcwl_set_bsstype(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_DESIRED_RATES:
+		err = pcwl_set_desrates(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_POWER_MODE:
+		err = pcwl_set_powermode(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_CREATE_IBSS:
+		err = pcwl_set_ibss(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_BSSID:
+	case MAC_PROP_WL_RADIO:
+	case MAC_PROP_WL_WPA:
+	case MAC_PROP_WL_KEY:
+	case MAC_PROP_WL_DELKEY:
+	case MAC_PROP_WL_SETOPTIE:
+	case MAC_PROP_WL_MLME:
+	case MAC_PROP_WL_LINKSTATUS:
+	case MAC_PROP_WL_ESS_LIST:
+	case MAC_PROP_WL_SUPPORTED_RATES:
+	case MAC_PROP_WL_RSSI:
+	case MAC_PROP_WL_CAPABILITY:
+	case MAC_PROP_WL_SCANRESULTS:
+		cmn_err(CE_WARN, "pcwl_setprop:"
+		    "opmode not support\n");
+		err = ENOTSUP;
+		break;
+	default:
+		cmn_err(CE_WARN, "pcwl_setprop:"
+		    "opmode err\n");
+		err = EINVAL;
+		break;
+	}
+
+	mutex_exit(&pcwl_p->pcwl_glock);
+
+	if (err == ENETRESET) {
+		(void) pcwl_set_cmd(pcwl_p, WL_CMD_DISABLE, 0);
+		if (pcwl_p->pcwl_connect_timeout_id != 0) {
+			(void) untimeout(pcwl_p->pcwl_connect_timeout_id);
+			pcwl_p->pcwl_connect_timeout_id = 0;
+		}
+		pcwl_p->pcwl_connect_timeout_id = timeout(pcwl_connect_timeout,
+		    pcwl_p, 2 * drv_usectohz(1000000));
+
+		err = 0;
+	}
+
+	return (err);
+} /* ARGSUSED */
+
+/* ARGSUSED */
+static int
+pcwl_m_getprop(void *arg, const char *pr_name, mac_prop_id_t wldp_pr_num,
+    uint_t pr_flags, uint_t wldp_length, void *wldp_buf,  uint_t *perm)
+{
+	int err = 0;
+
+	pcwl_maci_t *pcwl_p = (pcwl_maci_t *)arg;
+
+	if (wldp_length == 0) {
+		err = EINVAL;
+		return (err);
+	}
+	bzero(wldp_buf, wldp_length);
+
+	mutex_enter(&pcwl_p->pcwl_glock);
+	if (!(pcwl_p->pcwl_flag & PCWL_CARD_READY)) {
+		mutex_exit(&pcwl_p->pcwl_glock);
+		err = EINVAL;
+		return (err);
+	}
+
+	*perm = MAC_PROP_PERM_RW;
+
+	switch (wldp_pr_num) {
+	/* mac_prop_id */
+	case MAC_PROP_WL_ESSID:
+		err = pcwl_get_essid(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_BSSID:
+		err = pcwl_get_bssid(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_PHY_CONFIG:
+		err = pcwl_get_phy(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_AUTH_MODE:
+		pcwl_get_authmode(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_ENCRYPTION:
+		pcwl_get_encrypt(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_BSSTYPE:
+		pcwl_get_bsstype(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_LINKSTATUS:
+		*perm = MAC_PROP_PERM_READ;
+		err = pcwl_get_linkstatus(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_ESS_LIST:
+		*perm = MAC_PROP_PERM_READ;
+		pcwl_get_esslist(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_SUPPORTED_RATES:
+		*perm = MAC_PROP_PERM_READ;
+		pcwl_get_suprates(wldp_buf);
+		break;
+	case MAC_PROP_WL_RSSI:
+		*perm = MAC_PROP_PERM_READ;
+		pcwl_get_param_rssi(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_RADIO:
+		pcwl_get_radio(wldp_buf);
+		break;
+	case MAC_PROP_WL_POWER_MODE:
+		pcwl_get_powermode(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_CREATE_IBSS:
+		pcwl_get_ibss(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_DESIRED_RATES:
+		err = pcwl_get_desrates(pcwl_p, wldp_buf);
+		break;
+	case MAC_PROP_WL_CAPABILITY:
+	case MAC_PROP_WL_WPA:
+	case MAC_PROP_WL_SCANRESULTS:
+	case MAC_PROP_WL_KEY_TAB:
+	case MAC_PROP_WL_KEY:
+	case MAC_PROP_WL_DELKEY:
+	case MAC_PROP_WL_SETOPTIE:
+	case MAC_PROP_WL_MLME:
+		cmn_err(CE_WARN, "pcwl_getprop:"
+		    "opmode not support\n");
+		err = ENOTSUP;
+		break;
+	default:
+		cmn_err(CE_WARN, "pcwl_getprop:"
+		    "opmode err\n");
+		err = EINVAL;
+		break;
+	}
+
+	mutex_exit(&pcwl_p->pcwl_glock);
+
+	return (err);
 }
