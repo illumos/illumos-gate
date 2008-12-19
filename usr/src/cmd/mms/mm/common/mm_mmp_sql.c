@@ -6846,6 +6846,10 @@ mm_delete_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 	char		*list = NULL;
 	int		 match_off;
 	char		*path_buf = NULL;
+	char		*selecttype;
+	char		*errtype;
+	char		*errobj;
+	char		*objlist = NULL;
 	mm_pkey_t *p_key = NULL;
 	PGresult	*results;
 	char *source_buf_0;
@@ -7045,8 +7049,96 @@ mm_delete_cmd_func(mm_wka_t *mm_wka, mm_command_t *cmd)
 		mm_notify_add_librarydelete(db, mm_wka,
 		    cmd, match_off);
 	} else if (strcmp(objname, "DRIVE") == 0) {
+		path_buf = mms_strapp(path_buf, "SELECT \"DriveName\" "
+		    "FROM \"DRIVE\" %s and "
+		    "\"DriveOnline\" = 't'",
+		    &cmd->cmd_buf[match_off]);
+		if (mm_db_exec(HERE, db, path_buf) != MM_DB_DATA) {
+			goto db_error;
+		}
+		free(path_buf);
+		path_buf = NULL;
+
+		rows = PQntuples(db->mm_db_results);
+		results = db->mm_db_results;
+		if (rows > 0) {
+			for (row = 0; row < rows; row++) {
+				mms_trace(MMS_ERR, "mm_delete_cmd_func error:"
+				    "Drive %s is online",
+				    PQgetvalue(results, row,
+				    0));
+				list = mms_strapp(list, "%s ",
+				    PQgetvalue(results, row, 0));
+			}
+			mm_clear_db(&db->mm_db_results);
+			mm_response_error(cmd,
+			    ECLASS_STATE,
+			    mms_sym_code_to_str(MMS_EDRIVEONLINE),
+			    MM_5114_MSG,
+			    "drvlist",
+			    list,
+			    NULL);
+			cmd->cmd_remove = 1;
+			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
+			free(list);
+			return (MM_CMD_ERROR);
+		}
 		mm_notify_add_drivedelete(db, mm_wka,
 		    cmd, match_off);
+	}
+
+	/* If deleting an LM or DM, make sure they are not active */
+	if (strcmp(objname, "DM") == 0 || strcmp(objname, "LM") == 0) {
+		if (strcmp(objname, "DM") == 0) {
+			selecttype = "\"DMName\", \"DriveName\"";
+			errtype = "EDRIVEONLINE";
+			errobj = "drives";
+		} else {
+			selecttype = "\"LMName\", \"LibraryName\"";
+			errtype = "ELIBRARYONLINE";
+			errobj = "libraries";
+		}
+		path_buf = mms_strapp(path_buf, "SELECT %s FROM \"%s\" "
+		    "%s and \"%s\".\"%sStateSoft\" = 'ready'",
+		    selecttype, objname, &cmd->cmd_buf[match_off], objname,
+		    objname);
+		if (mm_db_exec(HERE, db, path_buf) != MM_DB_DATA) {
+			goto db_error;
+		}
+		free(path_buf);
+		path_buf = NULL;
+
+		rows = PQntuples(db->mm_db_results);
+		results = db->mm_db_results;
+		if (rows > 0) {
+			for (row = 0; row < rows; row++) {
+				mms_trace(MMS_ERR, "mm_delete_cmd_func error:"
+				    " %s is online", PQgetvalue(results, row,
+				    1));
+				list = mms_strapp(list, "%s ",
+				    PQgetvalue(results, row, 1));
+				objlist = mms_strapp(objlist, "%s ",
+				    PQgetvalue(results, row, 0));
+			}
+			mm_clear_db(&db->mm_db_results);
+			mm_response_error(cmd,
+			    ECLASS_STATE,
+			    errtype,
+			    MM_5115_MSG,
+			    "objtype",
+			    objname,
+			    "objname",
+			    objlist,
+			    "objects",
+			    errobj,
+			    "objlist",
+			    list,
+			    NULL);
+			cmd->cmd_remove = 1;
+			mm_send_text(mm_wka->mm_wka_conn, cmd->cmd_buf);
+			free(list);
+			return (MM_CMD_ERROR);
+		}
 	}
 
 	/* do delete in sql */

@@ -393,6 +393,14 @@ MM_MSG(MM_5112_MSG, gettext("Library delete failed, cartridge(s) exist that " \
 MM_MSG(MM_5113_MSG, gettext("Library delete failed, drive(s) exist that " \
 	"are dependent on this library"))
 
+#define	MM_5114_MSG 5114
+MM_MSG(MM_5114_MSG, gettext("Drive delete failed, drive(s) must be " \
+	"offline to be deleted: $drvlist$"))
+
+#define	MM_5115_MSG 5115
+MM_MSG(MM_5115_MSG, gettext("$objtype$: $objname$ delete failed, $objects$ " \
+	"must be offline to be deleted: $objlist$"))
+
 #ifdef	__cplusplus
 }
 #endif
