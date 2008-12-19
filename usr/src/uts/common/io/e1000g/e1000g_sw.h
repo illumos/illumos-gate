@@ -167,6 +167,7 @@ extern "C" {
 #define	DEFAULT_MSI_ENABLE		1	/* MSI Enable */
 #define	DEFAULT_TX_HCKSUM_ENABLE	1	/* Hardware checksum enable */
 #define	DEFAULT_LSO_ENABLE		1	/* LSO enable */
+#define	DEFAULT_MEM_WORKAROUND_82546	1	/* 82546 memory workaround */
 
 #define	TX_DRAIN_TIME		(200)	/* # milliseconds xmit drain */
 
@@ -912,6 +913,7 @@ typedef struct e1000g {
 	boolean_t tx_hcksum_enable;
 	boolean_t lso_enable;
 	boolean_t lso_premature_issue;
+	boolean_t mem_workaround_82546;
 	int intr_type;
 	int intr_cnt;
 	int intr_cap;

@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.2.14";
+static char e1000g_version[] = "Driver Ver. 5.3.1";
 
 /*
  * Proto types for DDI entry points
@@ -838,9 +838,10 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 
 	Adapter->min_frame_size = ETHERMIN + ETHERFCSL;
 
-	if ((mac->type == e1000_82545) ||
+	if (Adapter->mem_workaround_82546 &&
+	    ((mac->type == e1000_82545) ||
 	    (mac->type == e1000_82546) ||
-	    (mac->type == e1000_82546_rev_3)) {
+	    (mac->type == e1000_82546_rev_3))) {
 		Adapter->rx_buffer_size = E1000_RX_BUFFER_SIZE_2K;
 	} else {
 		rx_size = Adapter->max_frame_size + E1000G_IPALIGNPRESERVEROOM;
@@ -882,10 +883,6 @@ e1000g_set_bufsize(struct e1000g *Adapter)
 	 */
 	if (mac->type < e1000_82543)
 		Adapter->rx_buf_align = RECEIVE_BUFFER_ALIGN_SIZE;
-	else if ((mac->type == e1000_82545) ||
-	    (mac->type == e1000_82546) ||
-	    (mac->type == e1000_82546_rev_3))
-		Adapter->rx_buf_align = RECEIVE_BUFFER_ALIGN_SIZE_82546;
 	else
 		Adapter->rx_buf_align = 1;
 }
@@ -3607,6 +3604,15 @@ e1000g_get_conf(struct e1000g *Adapter)
 		Adapter->lso_premature_issue = B_FALSE;
 		Adapter->lso_enable = B_FALSE;
 	}
+
+	/*
+	 * If mem_workaround_82546 is enabled, the rx buffer allocated by
+	 * e1000_82545, e1000_82546 and e1000_82546_rev_3
+	 * will not cross 64k boundary.
+	 */
+	Adapter->mem_workaround_82546 =
+	    e1000g_get_prop(Adapter, "mem_workaround_82546",
+	    0, 1, DEFAULT_MEM_WORKAROUND_82546);
 }
 
 /*

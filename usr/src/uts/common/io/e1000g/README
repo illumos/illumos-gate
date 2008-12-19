@@ -619,3 +619,7 @@ Notes on packaging:
    6713032 e1000g port hang, no xmit, no recv
    6767201 e1000g default_mtu does not coincide with max_frame_size on some chipsets when set via e1000g.conf
 
+5.3.1
+======
+  This version has the following fix:
+   6779610 e1000g fails to attach post-6713032 due to memory allocation failures on some chipsets

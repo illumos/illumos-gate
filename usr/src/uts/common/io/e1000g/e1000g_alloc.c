@@ -225,9 +225,10 @@ e1000g_alloc_descriptors(struct e1000g *Adapter)
 	e1000g_tx_ring_t *tx_ring;
 	e1000g_rx_ring_t *rx_ring;
 
-	if ((Adapter->shared.mac.type == e1000_82545) ||
+	if (Adapter->mem_workaround_82546 &&
+	    ((Adapter->shared.mac.type == e1000_82545) ||
 	    (Adapter->shared.mac.type == e1000_82546) ||
-	    (Adapter->shared.mac.type == e1000_82546_rev_3)) {
+	    (Adapter->shared.mac.type == e1000_82546_rev_3))) {
 		/* Align on a 64k boundary for these adapter types */
 		Adapter->desc_align = E1000_MDALIGN_82546;
 	} else {
@@ -1311,9 +1312,10 @@ e1000g_alloc_rx_sw_packet(e1000g_rx_ring_t *rx_ring, ddi_dma_attr_t *p_dma_attr)
 		break;
 #endif
 	case USE_DMA:
-		if ((Adapter->shared.mac.type == e1000_82545) ||
+		if (Adapter->mem_workaround_82546 &&
+		    ((Adapter->shared.mac.type == e1000_82545) ||
 		    (Adapter->shared.mac.type == e1000_82546) ||
-		    (Adapter->shared.mac.type == e1000_82546_rev_3)) {
+		    (Adapter->shared.mac.type == e1000_82546_rev_3))) {
 			mystat = e1000g_alloc_dma_buffer_82546(Adapter,
 			    rx_buf, Adapter->rx_buffer_size, p_dma_attr);
 		} else {

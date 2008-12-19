@@ -345,9 +345,10 @@ e1000g_rx_setup(struct e1000g *Adapter)
 	if (Adapter->strip_crc)
 		rctl |= E1000_RCTL_SECRC;	/* Strip Ethernet CRC */
 
-	if ((hw->mac.type == e1000_82545) ||
+	if (Adapter->mem_workaround_82546 &&
+	    ((hw->mac.type == e1000_82545) ||
 	    (hw->mac.type == e1000_82546) ||
-	    (hw->mac.type == e1000_82546_rev_3)) {
+	    (hw->mac.type == e1000_82546_rev_3))) {
 		rctl |= E1000_RCTL_SZ_2048;
 	} else {
 		if ((Adapter->max_frame_size > FRAME_SIZE_UPTO_2K) &&
