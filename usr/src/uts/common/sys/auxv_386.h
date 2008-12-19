@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_AUXV_386_H
 #define	_SYS_AUXV_386_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,10 +65,11 @@ extern "C" {
 #define	AV_386_SSSE3		0x400000 /* Intel SSSE3 insns */
 #define	AV_386_SSE4_1		0x800000 /* Intel SSE4.1 insns */
 #define	AV_386_SSE4_2		0x1000000 /* Intel SSE4.2 insns */
+#define	AV_386_MOVBE		0x2000000 /* Intel MOVBE insns */
 
 #define	FMT_AV_386							\
 	"\20"								\
-	"\31sse4.2"							\
+	"\32movbe\31sse4.2"						\
 	"\30sse4.1\27ssse3\26amd_lzcnt\25popcnt"			\
 	"\24amd_sse4a\23tscp\22ahf\21cx16"				\
 	"\20mon\17sse3\16pause\15sse2\14sse\13fxsr\12amd3dx\11amd3d"	\

@@ -101,7 +101,7 @@ typedef enum {
  */
 #define	ELFCAP_NUM_SF1			3
 #define	ELFCAP_NUM_HW1_SPARC		16
-#define	ELFCAP_NUM_HW1_386		25
+#define	ELFCAP_NUM_HW1_386		26
 
 
 /*

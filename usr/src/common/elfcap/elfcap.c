@@ -280,6 +280,10 @@ static const elfcap_desc_t hw1_386[ELFCAP_NUM_HW1_386] = {
 	{						/* 0x01000000 */
 		AV_386_SSE4_2, STRDESC("AV_386_SSE4_2"),
 		STRDESC("SSE4.2"), STRDESC("sse4.2"),
+	},
+	{						/* 0x02000000 */
+		AV_386_MOVBE, STRDESC("AV_386_MOVBE"),
+		STRDESC("MOVBE"), STRDESC("movbe"),
 	}
 };
 

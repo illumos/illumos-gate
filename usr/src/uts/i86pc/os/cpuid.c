@@ -2065,6 +2065,8 @@ cpuid_pass4(cpu_t *cpu)
 				hwcap_flags |= AV_386_SSE4_1;
 			if (*ecx & CPUID_INTC_ECX_SSE4_2)
 				hwcap_flags |= AV_386_SSE4_2;
+			if (*ecx & CPUID_INTC_ECX_MOVBE)
+				hwcap_flags |= AV_386_MOVBE;
 		}
 		if (*ecx & CPUID_INTC_ECX_POPCNT)
 			hwcap_flags |= AV_386_POPCNT;

@@ -106,11 +106,12 @@ extern "C" {
 #define	CPUID_INTC_ECX_DCA	0x00040000	/* direct cache access */
 #define	CPUID_INTC_ECX_SSE4_1	0x00080000	/* SSE4.1 insns */
 #define	CPUID_INTC_ECX_SSE4_2	0x00100000	/* SSE4.2 insns */
+#define	CPUID_INTC_ECX_MOVBE	0x00400000	/* MOVBE insn */
 #define	CPUID_INTC_ECX_POPCNT	0x00800000	/* POPCNT insn */
 
 #define	FMT_CPUID_INTC_ECX					\
 	"\20"							\
-	"\30popcnt\25sse4.2\24sse4.1\23dca"			\
+	"\30popcnt\27movbe\25sse4.2\24sse4.1\23dca"		\
 	"\20\17etprd\16cx16\13cid\12ssse3\11tm2"		\
 	"\10est\7smx\6vmx\5dscpl\4mon\1sse3"
 
