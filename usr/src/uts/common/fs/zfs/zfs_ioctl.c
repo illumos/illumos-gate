@@ -1322,6 +1322,14 @@ zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 		(void) strlcat(zc->zc_name, "/", sizeof (zc->zc_name));
 	p = zc->zc_name + strlen(zc->zc_name);
 
+	if (zc->zc_cookie == 0) {
+		uint64_t cookie = 0;
+		int len = sizeof (zc->zc_name) - (p - zc->zc_name);
+
+		while (dmu_dir_list_next(os, len, p, NULL, &cookie) == 0)
+			dmu_objset_prefetch(p, NULL);
+	}
+
 	do {
 		error = dmu_dir_list_next(os,
 		    sizeof (zc->zc_name) - (p - zc->zc_name), p,
@@ -1365,6 +1373,9 @@ zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 	if (error)
 		return (error == ENOENT ? ESRCH : error);
 
+	if (zc->zc_cookie == 0)
+		dmu_objset_find(zc->zc_name, dmu_objset_prefetch,
+		    NULL, DS_FIND_SNAPSHOTS);
 	/*
 	 * A dataset name of maximum length cannot have any snapshots,
 	 * so exit immediately.
