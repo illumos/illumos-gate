@@ -20,11 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 . /lib/svc/share/smf_include.sh
 
 #
@@ -149,6 +147,9 @@ case "$1" in
 		MAXHALT=`expr $MAXHALT - 1`
 		sleep 1	# wait a bit longer
 	done
+
+	# If there are any remaining file systems in zones, try to unmount them.
+	umountall -Z
 
 	#
 	# Report on zones which failed to shutdown.

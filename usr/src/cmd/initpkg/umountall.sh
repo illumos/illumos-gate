@@ -32,8 +32,8 @@ usage () {
 	if [ -n "$1" ]; then
 		echo "umountall: $1" 1>&2
 	fi
-	echo "Usage:\n\tumountall [-k] [-s] [-F FSType] [-l|-r] [-n]" 1>&2
-	echo "\tumountall [-k] [-s] [-h host] [-n]" 1>&2
+	echo "Usage:\n\tumountall [-k] [-s] [-F FSType] [-l|-r] [-Z] [-n]" 1>&2
+	echo "\tumountall [-k] [-s] [-h host] [-Z] [-n]" 1>&2
 	exit 2
 }
 
@@ -66,7 +66,6 @@ MNTTAB=/etc/mnttab
 # /usr/bin/sleep	-k, to sleep after an fuser -c -k on the mountpoint
 # /usr/sbin/fuser	-k, to kill processes keeping a mount point busy
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
 # In addition, we use /usr/bin/tail if it is available; if not we use
 # slower shell constructs to reverse a file.
 
@@ -84,12 +83,13 @@ RFLAG=
 LFLAG=
 SFLAG=
 KFLAG=
+ZFLAG=
 NFLAG=
 LOCALNAME=
 UMOUNTFLAG=
 
 
-while getopts ?rslkF:h:n c
+while getopts ?rslkF:h:Zn c
 do
 	case $c in
 	r)	RFLAG="r";;
@@ -113,6 +113,7 @@ do
 			usage "FSType ${FSType} exceeds 8 characters"
 		esac;
 		;;
+	Z)	ZFLAG="z";;
 	n)	NFLAG="n"
 		# Alias any commands that would perform real actions to
 		# something that tells what action would have been performed
@@ -198,7 +199,7 @@ fi
 # Take advantage of parallel unmounting at this point if we have no
 # criteria to match and we are in the global zone
 #
-if [ -z "${SFLAG}${LFLAG}${RFLAG}${HFLAG}${KFLAG}${FFLAG}" -a \
+if [ -z "${SFLAG}${LFLAG}${RFLAG}${HFLAG}${KFLAG}${FFLAG}${ZFLAG}" -a \
     "$ZONENAME" = "global" ]; then
 	umount -a ${UMOUNTFLAG}
 	exit			# with return code of the umount -a
@@ -302,6 +303,24 @@ doumounts () {
 					fi
 				done
 				if [ "$option" != "zone=$ZONENAME" ]; then
+					continue
+				fi
+			# we are called from the global zone
+			else 
+				for option in `echo $mode | tr , '\012'`; do
+					case "$option" in
+					zone=*)
+						option="zone="
+						break
+					;;
+					esac
+				done
+				# skip mounts from non-global zones if ZFLAG is not set
+				if [ "$option" = "zone=" -a -z "$ZFLAG" ]; then
+					continue
+				fi
+				# skip mounts from the global zone if ZFLAG is set
+				if [ "$option" != "zone=" -a -n "$ZFLAG" ]; then
 					continue
 				fi
 			fi
