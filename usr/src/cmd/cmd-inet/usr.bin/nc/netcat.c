@@ -36,7 +36,9 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Portions Copyright 2008 Erik Trauschke
+ */
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -73,6 +75,7 @@
 #define	PORT_MIN	1
 #define	PORT_MAX	65535
 #define	PORT_MAX_LEN	6
+#define	PLIST_SZ	32	/* initial capacity of the portlist */
 
 /* Command Line Options */
 int	dflag;		/* detached, no stdin */
@@ -95,7 +98,17 @@ int	Tflag = -1;	/* IP Type of Service */
 
 int	timeout = -1;
 int	family = AF_UNSPEC;
-char	*portlist[PORT_MAX+1];
+
+/*
+ * portlist structure
+ * Used to store a list of ports given by the user and maintaining
+ * information about the number of ports stored.
+ */
+struct {
+	uint16_t *list; /* list containing the ports */
+	uint_t listsize;   /* capacity of the list (number of entries) */
+	uint_t numports;   /* number of ports in the list */
+} ports;
 
 void	atelnet(int, unsigned char *, unsigned int);
 void	build_ports(char *);
@@ -124,9 +137,10 @@ main(int argc, char *argv[])
 	struct sockaddr_storage cliaddr;
 	const char *errstr, *proxyhost = "", *proxyport = NULL;
 	struct addrinfo proxyhints;
+	char port[PORT_MAX_LEN];
 
 	ret = 1;
-	s = 0;
+	s = -1;
 	socksv = 5;
 	host = NULL;
 	uport = NULL;
@@ -307,13 +321,22 @@ main(int argc, char *argv[])
 		int connfd;
 		ret = 0;
 
-		if (family == AF_UNIX)
+		if (family == AF_UNIX) {
+			if (host == NULL)
+				usage(1);
 			s = unix_listen(host);
+		}
 
 		/* Allow only one connection at a time, but stay alive. */
 		for (;;) {
-			if (family != AF_UNIX)
+			if (family != AF_UNIX) {
+				/* check if uport is valid */
+				if (strtonum(uport, PORT_MIN, PORT_MAX,
+				    &errstr) == 0)
+					errx(1, "port number %s: %s",
+					    uport, errstr);
 				s = local_listen(host, uport, hints);
+			}
 			if (s < 0)
 				err(1, NULL);
 			/*
@@ -372,22 +395,25 @@ main(int argc, char *argv[])
 		exit(ret);
 
 	} else {	/* AF_INET or AF_INET6 */
-		int i = 0;
+		int i;
 
-		/* Construct the portlist[] array. */
+		/* Construct the portlist. */
 		build_ports(uport);
 
 		/* Cycle through portlist, connecting to each port. */
-		for (i = 0; portlist[i] != NULL; i++) {
-			if (s)
+		for (i = 0; i < ports.numports; i++) {
+			(void) snprintf(port, sizeof (port), "%u",
+			    ports.list[i]);
+
+			if (s != -1)
 				(void) close(s);
 
 			if (xflag)
-				s = socks_connect(host, portlist[i],
+				s = socks_connect(host, port,
 				    proxyhost, proxyport, proxyhints, socksv,
 				    Pflag);
 			else
-				s = remote_connect(host, portlist[i], hints);
+				s = remote_connect(host, port, hints);
 
 			if (s < 0)
 				continue;
@@ -407,21 +433,22 @@ main(int argc, char *argv[])
 					sv = NULL;
 				else {
 					sv = getservbyport(
-					    ntohs(atoi(portlist[i])),
+					    ntohs(ports.list[i]),
 					    uflag ? "udp" : "tcp");
 				}
 
 				(void) fprintf(stderr, "Connection to %s %s "
 				    "port [%s/%s] succeeded!\n",
-				    host, portlist[i], uflag ? "udp" : "tcp",
+				    host, port, uflag ? "udp" : "tcp",
 				    sv ? sv->s_name : "*");
 			}
 			if (!zflag)
 				readwrite(s);
 		}
+		free(ports.list);
 	}
 
-	if (s)
+	if (s != -1)
 		(void) close(s);
 
 	return (ret);
@@ -740,69 +767,87 @@ atelnet(int nfd, unsigned char *buf, unsigned int size)
 
 /*
  * build_ports()
- * Build an array of ports in portlist[], listing each port
+ * Build an array of ports in ports.list[], listing each port
  * that we should try to connect to.
  */
 void
 build_ports(char *p)
 {
 	const char *errstr;
+	const char *token;
 	char *n;
-	int hi, lo, cp;
-	int x = 0;
+	int lo, hi, cp;
+	int i;
 
-	if ((n = strchr(p, '-')) != NULL) {
-		if (lflag)
-			errx(1, "Cannot use -l with multiple ports!");
+	/* Set up initial portlist. */
+	ports.list = malloc(PLIST_SZ * sizeof (uint16_t));
+	if (ports.list == NULL)
+		err(1, NULL);
+	ports.listsize = PLIST_SZ;
+	ports.numports = 0;
 
-		*n = '\0';
-		n++;
+	/* Cycle through list of given ports sep. by "," */
+	while ((token = strsep(&p, ",")) != NULL) {
+		if (*token == '\0')
+			errx(1, "Invalid port/portlist format: "
+			    "zero length port");
 
-		/* Make sure the ports are in order: lowest->highest. */
-		hi = strtonum(n, PORT_MIN, PORT_MAX, &errstr);
+		/* check if it is a range */
+		if ((n = strchr(token, '-')) != NULL)
+			*n++ = '\0';
+
+		lo = strtonum(token, PORT_MIN, PORT_MAX, &errstr);
 		if (errstr)
-			errx(1, "port number %s: %s", errstr, n);
-		lo = strtonum(p, PORT_MIN, PORT_MAX, &errstr);
-		if (errstr)
-			errx(1, "port number %s: %s", errstr, p);
+			errx(1, "port number %s: %s", errstr, token);
 
-		if (lo > hi) {
-			cp = hi;
+		if (n == NULL) {
 			hi = lo;
-			lo = cp;
+		} else {
+			hi = strtonum(n, PORT_MIN, PORT_MAX, &errstr);
+			if (errstr)
+				errx(1, "port number %s: %s", errstr, n);
+			if (lo > hi) {
+				cp = hi;
+				hi = lo;
+				lo = cp;
+			}
+		}
+
+		/*
+		 * Grow the portlist if needed.
+		 * We double the size and add size of current range
+		 * to make sure we don't have to resize that often.
+		 */
+		if (hi - lo + ports.numports + 1 >= ports.listsize) {
+			ports.listsize = ports.listsize * 2 + hi - lo;
+			ports.list = realloc(ports.list,
+			    ports.listsize * sizeof (uint16_t));
+			if (ports.list == NULL)
+				err(1, NULL);
 		}
 
 		/* Load ports sequentially. */
-		for (cp = lo; cp <= hi; cp++) {
-			portlist[x] = calloc(1, PORT_MAX_LEN);
-			if (portlist[x] == NULL)
-				err(1, NULL);
-			(void) snprintf(portlist[x], PORT_MAX_LEN, "%d", cp);
-			x++;
+		for (i = lo; i <= hi; i++)
+			ports.list[ports.numports++] = i;
+	}
+
+	/* Randomly swap ports. */
+	if (rflag) {
+		int y;
+		uint16_t u;
+
+		if (ports.numports < 2) {
+			warnx("can not swap %d port randomly",
+			    ports.numports);
+			return;
 		}
-
-		/* Randomly swap ports. */
-		if (rflag) {
-			int y;
-			char *c;
-
-			srandom(time((time_t *)0));
-
-			for (x = 0; x <= (hi - lo); x++) {
-				y = (random() & 0xFFFF) % (hi - lo);
-				c = portlist[x];
-				portlist[x] = portlist[y];
-				portlist[y] = c;
-			}
+		srandom(time(NULL));
+		for (i = 0; i < ports.numports; i++) {
+			y = random() % (ports.numports - 1);
+			u = ports.list[i];
+			ports.list[i] = ports.list[y];
+			ports.list[y] = u;
 		}
-	} else {
-		hi = strtonum(p, PORT_MIN, PORT_MAX, &errstr);
-		if (errstr)
-			errx(1, "port number %s: %s", errstr, p);
-		portlist[0] = calloc(1, PORT_MAX_LEN);
-		if (portlist[0] == NULL)
-			err(1, NULL);
-		portlist[0] = p;
 	}
 }
 
@@ -887,7 +932,8 @@ help(void)
 	\t-X proto	Proxy protocol: \"4\", \"5\" (SOCKS) or \"connect\"\n\
 	\t-x addr[:port]\tSpecify proxy address and port\n\
 	\t-z		Zero-I/O mode [used for scanning]\n\
-	Port numbers can be individual or ranges: lo-hi [inclusive]\n");
+	Port numbers can be individuals, ranges (lo-hi; inclusive) and\n\
+	combinations of both separated by comma (e.g. 10,22-25,80)\n");
 	exit(1);
 }
 
