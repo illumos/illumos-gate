@@ -300,7 +300,7 @@ cpudrv_pm_set_topspeed(void *ctx, int plat_level)
 
 		spd->up_spd = top_spd;
 	}
-	cpupm->targ_spd = top_spd;
+	cpupm->top_spd = top_spd;
 
 	cpupm->pm_governor_thread = curthread;
 

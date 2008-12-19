@@ -72,6 +72,11 @@ extern cpuset_t cpu_ready_set;
 }
 
 /*
+ * The current top speed as defined by the _PPC.
+ */
+#define	CPUDRV_PM_TOPSPEED(cpupm)	(cpupm)->top_spd
+
+/*
  * Install a _PPC/_TPC change notification handler.
  */
 #define	CPUDRV_PM_INSTALL_MAX_CHANGE_HANDLER(cpudsp, dip) \

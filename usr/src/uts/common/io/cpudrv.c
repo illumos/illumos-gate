@@ -326,16 +326,14 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			 */
 			mutex_enter(&cpudsp->lock);
 			cpudsp->cpudrv_pm.cur_spd = NULL;
-			cpudsp->cpudrv_pm.targ_spd =
-			    cpudsp->cpudrv_pm.head_spd;
 			cpudsp->cpudrv_pm.pm_started = B_FALSE;
 			/*
 			 * We don't call pm_raise_power() directly from attach
 			 * because driver attach for a slave CPU node can
 			 * happen before the CPU is even initialized. We just
 			 * start the monitoring system which understands
-			 * unknown speed and moves CPU to targ_spd when it
-			 * have been initialized.
+			 * unknown speed and moves CPU to top speed when it
+			 * has been initialized.
 			 */
 			CPUDRV_PM_MONITOR_INIT(cpudsp);
 			mutex_exit(&cpudsp->lock);
@@ -367,7 +365,6 @@ cpudrv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 * that the needed speed is full speed for us.
 		 */
 		cpudsp->cpudrv_pm.cur_spd = NULL;
-		cpudsp->cpudrv_pm.targ_spd = cpudsp->cpudrv_pm.head_spd;
 		CPUDRV_PM_MONITOR_INIT(cpudsp);
 		mutex_exit(&cpudsp->lock);
 		CPUDRV_PM_REDEFINE_TOPSPEED(dip);
@@ -428,12 +425,14 @@ cpudrv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		cpupm = &(cpudsp->cpudrv_pm);
 
 		DPRINTF(D_DETACH, ("cpudrv_detach: instance %d: DDI_SUSPEND - "
-		    "cur_spd %d, head_spd %d\n", instance,
-		    cpupm->cur_spd->pm_level, cpupm->head_spd->pm_level));
+		    "cur_spd %d, topspeed %d\n", instance,
+		    cpupm->cur_spd->pm_level,
+		    CPUDRV_PM_TOPSPEED(cpupm)->pm_level));
 
 		CPUDRV_PM_MONITOR_FINI(cpudsp);
 
-		if (!cpudrv_direct_pm && (cpupm->cur_spd != cpupm->head_spd)) {
+		if (!cpudrv_direct_pm && (cpupm->cur_spd !=
+		    CPUDRV_PM_TOPSPEED(cpupm))) {
 			if (cpupm->pm_busycnt < 1) {
 				if ((pm_busy_component(dip, CPUDRV_PM_COMP_NUM)
 				    == DDI_SUCCESS)) {
@@ -449,12 +448,15 @@ cpudrv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 			}
 			mutex_exit(&cpudsp->lock);
 			if (pm_raise_power(dip, CPUDRV_PM_COMP_NUM,
-			    cpupm->head_spd->pm_level) != DDI_SUCCESS) {
+			    CPUDRV_PM_TOPSPEED(cpupm)->pm_level) !=
+			    DDI_SUCCESS) {
 				mutex_enter(&cpudsp->lock);
 				CPUDRV_PM_MONITOR_INIT(cpudsp);
 				mutex_exit(&cpudsp->lock);
 				cmn_err(CE_WARN, "cpudrv_detach: instance %d: "
-				    "can't raise CPU power level", instance);
+				    "can't raise CPU power level to %d",
+				    instance,
+				    CPUDRV_PM_TOPSPEED(cpupm)->pm_level);
 				return (DDI_FAILURE);
 			} else {
 				return (DDI_SUCCESS);
@@ -683,6 +685,7 @@ cpudrv_pm_init_power(cpudrv_devstate_t *cpudsp)
 		cur_spd->speed = speeds[i];
 		if (i == 0) {	/* normal speed */
 			cpupm->head_spd = cur_spd;
+			CPUDRV_PM_TOPSPEED(cpupm) = cur_spd;
 			cur_spd->quant_cnt = CPUDRV_PM_QUANT_CNT_NORMAL;
 			cur_spd->idle_hwm =
 			    (cpudrv_pm_idle_hwm * cur_spd->quant_cnt) / 100;
@@ -1007,7 +1010,7 @@ cpudrv_pm_monitor(void *arg)
 		DPRINTF(D_PM_MONITOR, ("cpudrv_pm_monitor: instance %d: "
 		    "cur_spd is unknown\n", ddi_get_instance(dip)));
 		CPUDRV_PM_MONITOR_PM_BUSY_AND_RAISE(dip, cpudsp, cpupm,
-		    cpupm->targ_spd->pm_level);
+		    CPUDRV_PM_TOPSPEED(cpupm)->pm_level);
 		/*
 		 * We just changed the speed. Wait till at least next
 		 * call to this routine before proceeding ahead.

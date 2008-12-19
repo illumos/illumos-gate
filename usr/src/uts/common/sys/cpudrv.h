@@ -74,8 +74,6 @@ typedef struct cpudrv_pm_spd {
 typedef struct cpudrv_pm {
 	cpudrv_pm_spd_t	*head_spd;	/* ptr to head of speed */
 	cpudrv_pm_spd_t	*cur_spd;	/* ptr to current speed */
-	cpudrv_pm_spd_t	*targ_spd;	/* target speed when cur_spd */
-					/* is unknown (i.e. NULL) */
 	uint_t		num_spd;	/* number of speeds */
 	hrtime_t	lastquan_mstate[NCMSTATES]; /* last quantum's mstate */
 	clock_t		lastquan_lbolt;	/* last quantum's lbolt */
@@ -87,6 +85,7 @@ typedef struct cpudrv_pm {
 	kcondvar_t	timeout_cv;	/* wait on timeout_count change */
 #if defined(__x86)
 	kthread_t	*pm_governor_thread; /* governor thread */
+	cpudrv_pm_spd_t	*top_spd;	/* ptr to effective head speed */
 #endif
 	boolean_t	pm_started;	/* PM really started */
 } cpudrv_pm_t;

@@ -63,6 +63,11 @@ extern boolean_t cpudrv_enabled;
 #define	CPUDRV_PM_INSTALL_MAX_CHANGE_HANDLER(cpudsp, dip)
 
 /*
+ * Topspeed is always the head speed.
+ */
+#define	CPUDRV_PM_TOPSPEED(cpupm)	(cpupm)->head_spd
+
+/*
  * There is no notion of changing topspeed on sun4u.
  */
 #define	CPUDRV_PM_REDEFINE_TOPSPEED(dip)
