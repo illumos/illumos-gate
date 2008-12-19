@@ -1380,7 +1380,7 @@ refreshq_realloc(int hint)
 
 			/* Copy the jobs from the beginning of the old array */
 			(void) memcpy((void *) &(p[tail_jobs]),
-			    (void *) &(refreshq[refreshq_next_job]),
+			    (void *) &(refreshq[0]),
 			    head_jobs * sizeof (refreshq_job_t));
 
 			/* update the job and slot indices to match */

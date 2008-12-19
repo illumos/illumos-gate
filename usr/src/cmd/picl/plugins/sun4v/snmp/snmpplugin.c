@@ -165,6 +165,7 @@ static char *group3[] = {
 static char *group4[] = {
 	OID_sunPlatBinarySensorInterpretTrue,
 	OID_sunPlatBinarySensorInterpretFalse,
+	0
 };
 
 static char *volgroup1[] = {
