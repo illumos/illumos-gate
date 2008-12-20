@@ -39,6 +39,7 @@
 #include <sys/modctl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/sunndi.h>
 #include <sys/mach_intr.h>
 #include <sys/kmem.h>
 #include <sys/pci.h>
@@ -792,7 +793,7 @@ pciide_compat_setup(dev_info_t *mydip, dev_info_t *cdip, int dev)
 		 */
 		if ((dev == 0 && !(class_code & PCI_IDE_IF_NATIVE_PRI)) ||
 		    (dev == 1 && !(class_code & PCI_IDE_IF_NATIVE_SEC))) {
-			rc = ddi_prop_update_int(DDI_DEV_T_NONE, cdip,
+			rc = ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
 			    "compatibility-mode", 1);
 			if (rc != DDI_PROP_SUCCESS)
 				cmn_err(CE_WARN,
