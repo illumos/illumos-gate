@@ -418,8 +418,10 @@ devlookup_done:
 	} else {
 		*xdev = svp->v_rdev;
 
-		if (svp->v_type != VBLK)
+		if (svp->v_type != VBLK) {
 			error = ENOTBLK;
+			goto out;
+		}
 
 		if ((error = secpolicy_spec_open(cr, svp, oflag)) != 0)
 			goto out;
