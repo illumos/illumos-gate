@@ -1,0 +1,42 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+OPENSSL_DIROLD=etc/sfw/openssl
+
+#
+# if the openssl configuration file and containing directory
+# was relocated by the corresponding preinstall script,
+# remove the stale entry from the packaging database
+#
+BASEPREFIX=`echo $PKG_INSTALL_ROOT | sed "s/\//_/g"`
+FILENAME=`echo openssl-reloc"$BASEPREFIX" | cut -c 1-256`
+TMPFILE=/tmp/$FILENAME
+
+if [ -f $TMPFILE ]; then
+	/usr/sbin/removef $PKGINST /$OPENSSL_DIROLD/openssl.cnf > /dev/null
+	/usr/sbin/removef -f $PKGINST > /dev/null
+	rm $TMPFILE
+fi

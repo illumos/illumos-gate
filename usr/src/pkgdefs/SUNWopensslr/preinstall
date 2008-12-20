@@ -1,0 +1,84 @@
+#!/sbin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+CLEANUP=/tmp/CLEANUP
+OPENSSL_DIROLD=etc/sfw/openssl
+OPENSSL_DIRNEW=etc/openssl
+
+BASEPREFIX=`echo $PKG_INSTALL_ROOT | sed "s/\//_/g"`
+FILENAME=`echo openssl-reloc"$BASEPREFIX" | cut -c 1-256`
+TMPFILE=/tmp/$FILENAME
+if [ -f $TMPFILE ]; then
+	rm $TMPFILE
+fi
+#
+# If the old containing directory exists as a real directory,
+# attempt to relocate the entire directory to the new location, thus
+# keeping any local content from the certs or private subdirectories.
+# If something is already at the new location, attempt to move the
+# old location within the /etc/sfw directory.
+#
+# If the script successfully relocates the old directory,
+# ask the corresponding postinstall script to remove the stale entry
+# (can't do it here due to possible package database locking).
+#
+SOURCE=$PKG_INSTALL_ROOT/$OPENSSL_DIROLD
+TARGET1=$PKG_INSTALL_ROOT/$OPENSSL_DIRNEW
+TARGET2=$SOURCE.keep
+
+MESSAGE1="Your OpenSSL configuration data has been relocated from
+$SOURCE to $TARGET1."
+
+MESSAGE2="Your OpenSSL configuration data has been relocated from
+$SOURCE to $TARGET2
+rather than to the new location at $TARGET1
+since that location already existed; please check and restore your
+configuration to the new location as appropriate."
+
+MESSAGE3="The existence of the $SOURCE directory
+precludes a successful installation of the $PKGINST package,
+and the attempt to relocate your OpenSSL configuration data from
+$SOURCE to $TARGET1
+either failed or the latter object already exists."
+
+rc=0
+if [ ! -h $SOURCE -a -d $SOURCE ]; then
+	TARGET=$TARGET1
+	MESSAGE="$MESSAGE1"
+	if [ -h $TARGET -o -d $TARGET ]; then
+		TARGET=$TARGET2
+		MESSAGE="$MESSAGE2"
+	fi
+	if { mv $PKG_INSTALL_ROOT/$OPENSSL_DIROLD $TARGET > /dev/null; } then
+		touch $TMPFILE
+	else
+		rc=1
+		MESSAGE="$MESSAGE3"
+	fi
+	echo "$MESSAGE" >> $CLEANUP
+	echo "$MESSAGE"
+fi
+
+exit $rc

@@ -35,6 +35,8 @@
 i pkginfo
 i copyright
 i depend
+i preinstall
+i postinstall
 i i.opensslcnf
 i r.opensslcnf
 d none etc 755 root sys
