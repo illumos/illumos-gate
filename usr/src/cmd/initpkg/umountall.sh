@@ -95,7 +95,7 @@ do
 	r)	RFLAG="r";;
 	l)	LFLAG="l";;
 	s)	SFLAG="s";;
-	k) 	KFLAG="k";;
+	k)	KFLAG="k";;
 	h)	if [ -n "$HFLAG" ]; then
 			usage "more than one host specified"
 		fi
@@ -245,6 +245,7 @@ doumounts () {
 	(
 	rc=0
 	fslist=""
+	nfslist=""
 	while read dev mountp fstype mode dummy
 	do
 		case "${mountp}" in
@@ -287,7 +288,29 @@ doumounts () {
 				continue
 			fi
 			if [ -n "$LFLAG" -a "$fstype" = "nfs" ]; then
+				nfslist="$nfslist $mountp"
 				continue
+			fi
+			#
+			# This will filter out autofs mounts with nfs file
+			# system mounted on the top of it.
+			#
+			# WARNING: use of any syscall on a NFS file system has
+			# the danger to go over-the-wire and could cause nfs
+			# clients to hang on shutdown, if the nfs server is
+			# down beforehand.
+			# For the reason described above, a simple test like 
+			# "df -F nfs $mountp" can't be used to filter out
+			# nfs-over-autofs mounts. We loop over a list instead:
+			#
+			if [ -n "$LFLAG" -a -n "$nfslist" -a "$fstype" = "autofs" ]
+			then
+				for m in $nfslist; do
+					if [ "$mountp" = "$m" ]; then
+						# Resume the outer while loop
+						continue 2
+					fi
+				done
 			fi
 			if [ -n "$RFLAG" -a "$fstype" != "nfs" ]; then
 				continue
