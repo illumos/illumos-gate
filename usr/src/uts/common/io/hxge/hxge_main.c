@@ -70,11 +70,7 @@ uint32_t hxge_tx_lb_policy = HXGE_TX_LB_TCPUDP;
  * Add tunable to reduce the amount of time spent in the
  * ISR doing Rx Processing.
  */
-#if defined(__sparc)
-uint32_t hxge_max_rx_pkts = 512;
-#else
-uint32_t hxge_max_rx_pkts = 1024;
-#endif
+uint32_t hxge_max_rx_pkts = 256;
 
 /*
  * Tunables to manage the receive buffer blocks.

@@ -30,7 +30,7 @@
  * Number of blocks to accumulate before re-enabling DMA
  * when we get RBR empty.
  */
-#define	HXGE_RBR_EMPTY_THRESHOLD	128
+#define	HXGE_RBR_EMPTY_THRESHOLD	64
 
 /*
  * Globals: tunable parameters (/etc/system or adb)
@@ -98,7 +98,7 @@ static hxge_status_t hxge_disable_rxdma_channel(p_hxge_t hxgep,
 static p_rx_msg_t hxge_allocb(size_t, uint32_t, p_hxge_dma_common_t);
 static void hxge_freeb(p_rx_msg_t);
 static void hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex,
-    p_hxge_ldv_t ldvp, rdc_stat_t cs);
+	p_hxge_ldv_t ldvp, rdc_stat_t cs);
 static hxge_status_t hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index,
 	p_hxge_ldv_t ldvp, rdc_stat_t cs);
 static hxge_status_t hxge_rxbuf_index_info_init(p_hxge_t hxgep,
@@ -114,8 +114,12 @@ hxge_init_rxdma_channels(p_hxge_t hxgep)
 {
 	hxge_status_t		status = HXGE_OK;
 	block_reset_t		reset_reg;
+	int			i;
 
 	HXGE_DEBUG_MSG((hxgep, MEM2_CTL, "==> hxge_init_rxdma_channels"));
+
+	for (i = 0; i < HXGE_MAX_RDCS; i++)
+		hxgep->rdc_first_intr[i] = B_TRUE;
 
 	/* Reset RDC block from PEU to clear any previous state */
 	reset_reg.value = 0;
@@ -1166,6 +1170,9 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	channel = ldvp->channel;
 	ldgp = ldvp->ldgp;
 	RXDMA_REG_READ64(handle, RDC_STAT, channel, &cs.value);
+	cs.bits.ptrread = 0;
+	cs.bits.pktread = 0;
+	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "==> hxge_rx_intr:channel %d "
 	    "cs 0x%016llx rcrto 0x%x rcrthres %x",
@@ -1207,7 +1214,6 @@ hxge_intr_exit:
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
 	    "<== hxge_rx_intr: serviced %d", serviced));
-
 	return (serviced);
 }
 
@@ -1283,7 +1289,6 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	p_rxdma_mailbox_t	mboxp;
 	uint64_t		rcr_head_index, rcr_tail_index;
 	uint64_t		rcr_tail;
-	uint64_t		value;
 	rdc_rcr_tail_t		rcr_tail_reg;
 	p_hxge_rx_ring_stats_t	rdc_stats;
 
@@ -1313,7 +1318,6 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 
 	rx_mboxp = hxgep->rx_mbox_areas_p->rxmbox_areas[channel];
 	mboxp = (p_rxdma_mailbox_t)rx_mboxp->rx_mbox.kaddrp;
-
 	(void) hpi_rxdma_rdc_rcr_qlen_get(handle, channel, &qlen);
 	RXDMA_REG_READ64(handle, RDC_RCR_TAIL, channel, &rcr_tail_reg.value);
 	rcr_tail = rcr_tail_reg.bits.tail;
@@ -1463,15 +1467,13 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 		    channel, rcr_cfg_b.value);
 	}
 
-	cs.bits.pktread = npkt_read;
+	if (hxgep->rdc_first_intr[channel] && (npkt_read > 0)) {
+		hxgep->rdc_first_intr[channel] = B_FALSE;
+		cs.bits.pktread = npkt_read - 1;
+	} else
+		cs.bits.pktread = npkt_read;
 	cs.bits.ptrread = nrcr_read;
-	value = cs.value;
 	cs.value &= 0xffffffffULL;
-	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
-
-	cs.value = value & ~0xffffffffULL;
-	cs.bits.pktread = 0;
-	cs.bits.ptrread = 0;
 	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
@@ -1482,7 +1484,6 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	/*
 	 * Update RCR buffer pointer read and number of packets read.
 	 */
-
 	*rcrp = rcr_p;
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "<== hxge_rx_pkts"));

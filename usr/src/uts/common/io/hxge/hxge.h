@@ -276,6 +276,7 @@ struct _hxge_t {
 	hxge_hw_list_t		*hxge_hw_p; 	/* pointer to per Hydra */
 	uint8_t			nrdc;
 	uint8_t			rdc[HXGE_MAX_RDCS];
+	boolean_t		rdc_first_intr[HXGE_MAX_RDCS];
 	uint8_t			ntdc;
 	uint8_t			tdc[HXGE_MAX_TDCS];
 

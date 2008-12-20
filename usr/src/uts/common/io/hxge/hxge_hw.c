@@ -449,6 +449,7 @@ hxge_intr_hw_disable(p_hxge_t hxgep)
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "<== hxge_intr_hw_disable"));
 }
 
+/*ARGSUSED*/
 void
 hxge_rx_hw_blank(void *arg, time_t ticks, uint_t count)
 {
@@ -461,7 +462,6 @@ hxge_rx_hw_blank(void *arg, time_t ticks, uint_t count)
 	 * processing by the receive packet interrupt routines.
 	 */
 	hxgep->intr_timeout = (uint16_t)ticks;
-	hxgep->intr_threshold = (uint16_t)count;
 
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "<== hxge_rx_hw_blank"));
 }

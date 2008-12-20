@@ -34,7 +34,7 @@ extern "C" {
 #include <hpi_rxdma.h>
 
 #define	RXDMA_CK_DIV_DEFAULT		8 	/* 27 nsec */
-#define	RXDMA_RCR_PTHRES_DEFAULT	0x20
+#define	RXDMA_RCR_PTHRES_DEFAULT	0x1
 #define	RXDMA_RCR_TO_DEFAULT		0x1
 #define	RXDMA_HDR_SIZE_DEFAULT		2
 #define	RXDMA_HDR_SIZE_FULL		6	/* entire header of 6B */
@@ -159,8 +159,6 @@ extern "C" {
 				RDC_STAT_RBR_PRE_EMPTY | 	\
 				RDC_STAT_RBR_PRE_PAR |		\
 				RDC_STAT_RCR_SHA_PAR |		\
-				RDC_STAT_RCR_TO | 		\
-				RDC_STAT_RCR_THRES |		\
 				RDC_STAT_RBR_CPL |		\
 				RDC_STAT_PEU_ERR)
 
