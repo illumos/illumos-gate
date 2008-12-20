@@ -49,6 +49,7 @@ extern int pci_boot_debug;
 void pci_enumerate(int);
 void pci_setup_tree(void);
 void pci_reprogram(void);
+void bus_res_fini(void);
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, "PCI BIOS interface"
@@ -79,6 +80,7 @@ _fini(void)
 		return (err);
 
 	impl_bus_delete_probe(pci_enumerate);
+	bus_res_fini();
 	return (0);
 }
 

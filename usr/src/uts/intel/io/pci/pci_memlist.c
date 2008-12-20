@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * XXX This stuff should be in usr/src/common, to be shared by boot
  * code, kernel DR, and busra stuff.
@@ -129,56 +127,76 @@ memlist_insert(struct memlist **listp, uint64_t addr, uint64_t size)
 }
 
 /*
- * Delete memory chunks, assuming list sorted by address
+ * Delete memlist entries, assuming list sorted by address
  */
+
+#define	MIN(a, b)	((a) < (b) ? (a) : (b))
+#define	MAX(a, b)	((a) > (b) ? (a) : (b))
+#define	IN_RANGE(a, b, e) ((a) >= (b) && (a) <= (e))
+
 int
 memlist_remove(struct memlist **listp, uint64_t addr, uint64_t size)
 {
-	struct memlist *entry;
-	struct memlist *prev = 0, *next;
+	struct memlist *prev = 0;
+	struct memlist *chunk;
+	uint64_t rem_begin, rem_end;
+	uint64_t chunk_begin, chunk_end;
+	int begin_in_chunk, end_in_chunk;
 
-	/* a remove can't be done on an empty list */
-	ASSERT(*listp);
 
-	/* find the location in list */
-	next = *listp;
-	while (next && (next->address + next->size < addr)) {
-		prev = next;
-		next = prev->next;
-	}
+	/* ignore removal of zero-length item */
+	if (size == 0)
+		return (0);
 
-	if (next == 0 || (addr < next->address)) {
-		dprintf("memlist_remove: addr 0x%x%x, size 0x%x%x"
-		    " not contained in list\n",
-		    (int)(addr >> 32), (int)addr,
-		    (int)(size >> 32), (int)size);
-		memlist_dump(*listp);
-		return (-1);
-	}
+	/* also inherently ignore a zero-length list */
+	rem_begin = addr;
+	rem_end = addr + size - 1;
+	chunk = *listp;
+	while (chunk) {
+		chunk_begin = chunk->address;
+		chunk_end = chunk->address + chunk->size - 1;
+		begin_in_chunk = IN_RANGE(rem_begin, chunk_begin, chunk_end);
+		end_in_chunk = IN_RANGE(rem_end, chunk_begin, chunk_end);
 
-	if (addr > next->address) {
-		uint64_t oldsize = next->size;
-		next->size = addr - next->address;
-		if ((next->address + oldsize) > (addr + size)) {
-			entry = memlist_alloc();
-			entry->address = addr + size;
-			entry->size = next->address + oldsize - addr - size;
-			entry->next = next->next;
-			next->next = entry;
+		if (rem_begin <= chunk_begin && rem_end >= chunk_end) {
+			struct memlist *delete_chunk;
+
+			/* spans entire chunk - delete chunk */
+			delete_chunk = chunk;
+			if (prev == 0)
+				chunk = *listp = chunk->next;
+			else
+				chunk = prev->next = chunk->next;
+
+			memlist_free(delete_chunk);
+			/* skip to start of while-loop */
+			continue;
+		} else if (begin_in_chunk && end_in_chunk &&
+		    chunk_begin != rem_begin && chunk_end != rem_end) {
+			struct memlist *new;
+			/* split chunk */
+			new = memlist_alloc();
+			new->address = rem_end + 1;
+			new->size = chunk_end - new->address + 1;
+			chunk->size = rem_begin - chunk_begin;
+			new->next = chunk->next;
+			chunk->next = new;
+			/* done - break out of while-loop */
+			break;
+		} else if (begin_in_chunk || end_in_chunk) {
+			/* trim chunk */
+			chunk->size -= MIN(chunk_end, rem_end) -
+			    MAX(chunk_begin, rem_begin) + 1;
+			if (rem_begin <= chunk_begin) {
+				chunk->address = rem_end + 1;
+				break;
+			}
+			/* fall-through to next chunk */
 		}
-	} else if ((next->address + next->size) > (addr + size)) {
-		/* addr == next->address */
-		next->address = addr + size;
-		next->size -= size;
-	} else {
-		/* the entire chunk is deleted */
-		if (prev == 0) {
-			*listp = next->next;
-		} else {
-			prev->next = next->next;
-		}
-		memlist_free(next);
+		prev = chunk;
+		chunk = chunk->next;
 	}
+
 	return (0);
 }
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,24 +19,25 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * pci_resource.c -- routines to retrieve available bus resources from
  *		 the MP Spec. Table and Hotplug Resource Table
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/memlist.h>
 #include <sys/pci_impl.h>
 #include <sys/systm.h>
 #include <sys/cmn_err.h>
+#include <sys/acpi/acpi.h>
+#include <sys/acpica.h>
 #include "mps_table.h"
 #include "pcihrt.h"
 
 extern int pci_boot_debug;
+extern int pci_bios_nbus;
 #define	dprintf	if (pci_boot_debug) printf
 
 static int tbl_init = 0;
@@ -45,13 +45,30 @@ static uchar_t *mps_extp = NULL;
 static uchar_t *mps_ext_endp = NULL;
 static struct php_entry *hrt_hpep;
 static int hrt_entry_cnt = 0;
+static int acpi_cb_cnt = 0;
 
 static void mps_probe(void);
+static void acpi_pci_probe(void);
 static int mps_find_bus_res(int, int, struct memlist **);
 static void hrt_probe(void);
 static int hrt_find_bus_res(int, int, struct memlist **);
+static int acpi_find_bus_res(int, int, struct memlist **);
 static uchar_t *find_sig(uchar_t *cp, int len, char *sig);
 static int checksum(unsigned char *cp, int len);
+static ACPI_STATUS acpi_wr_cb(ACPI_RESOURCE *rp, void *context);
+void bus_res_fini(void);
+
+struct memlist *acpi_io_res[256];
+struct memlist *acpi_mem_res[256];
+struct memlist *acpi_pmem_res[256];
+struct memlist *acpi_bus_res[256];
+
+/*
+ * -1 = attempt ACPI resource discovery
+ *  0 = don't attempt ACPI resource discovery
+ *  1 = ACPI resource discovery successful
+ */
+volatile int acpi_resource_discovery = -1;
 
 struct memlist *
 find_bus_res(int bus, int type)
@@ -60,15 +77,222 @@ find_bus_res(int bus, int type)
 
 	if (tbl_init == 0) {
 		tbl_init = 1;
+		acpi_pci_probe();
 		hrt_probe();
 		mps_probe();
 	}
+
+	if (acpi_find_bus_res(bus, type, &res) > 0)
+		return (res);
 
 	if (hrt_find_bus_res(bus, type, &res) > 0)
 		return (res);
 
 	(void) mps_find_bus_res(bus, type, &res);
 	return (res);
+}
+
+
+static void
+acpi_pci_probe(void)
+{
+	ACPI_HANDLE ah;
+	dev_info_t *dip;
+	int bus;
+
+	if (acpi_resource_discovery == 0)
+		return;
+
+	for (bus = 0; bus < pci_bios_nbus; bus++) {
+		/* if no dip or no ACPI handle, no resources to discover */
+		dip = pci_bus_res[bus].dip;
+		if ((dip == NULL) ||
+		    (ACPI_FAILURE(acpica_get_handle(dip, &ah))))
+			continue;
+
+		(void) AcpiWalkResources(ah, "_CRS", acpi_wr_cb,
+		    (void *)(uintptr_t)bus);
+	}
+
+	if (acpi_cb_cnt > 0)
+		acpi_resource_discovery = 1;
+}
+
+static int
+acpi_find_bus_res(int bus, int type, struct memlist **res)
+{
+
+	switch (type) {
+	case IO_TYPE:
+		*res = acpi_io_res[bus];
+		break;
+	case MEM_TYPE:
+		*res = acpi_mem_res[bus];
+		break;
+	case PREFETCH_TYPE:
+		*res = acpi_pmem_res[bus];
+		break;
+	case BUSRANGE_TYPE:
+		*res = acpi_bus_res[bus];
+		break;
+	default:
+		*res = NULL;
+		break;
+	}
+
+	/* memlist_count() treats NULL head as zero-length */
+	return (memlist_count(*res));
+}
+
+void
+bus_res_fini(void)
+{
+	int bus;
+
+	for (bus = 0; bus < pci_bios_nbus; bus++) {
+		memlist_free_all(&acpi_io_res[bus]);
+		memlist_free_all(&acpi_mem_res[bus]);
+		memlist_free_all(&acpi_pmem_res[bus]);
+		memlist_free_all(&acpi_bus_res[bus]);
+	}
+}
+
+
+struct memlist **
+rlistpp(UINT8 t, UINT8 flags, int bus)
+{
+	switch (t) {
+
+		case ACPI_MEMORY_RANGE:
+			/* is this really the best we've got? */
+			if (((flags >> 1) & 0x3) == ACPI_PREFETCHABLE_MEMORY)
+				return (&acpi_pmem_res[bus]);
+			else
+				return (&acpi_mem_res[bus]);
+
+		case ACPI_IO_RANGE:	return &acpi_io_res[bus];
+		case ACPI_BUS_NUMBER_RANGE: return &acpi_bus_res[bus];
+	}
+	return ((struct memlist **)NULL);
+}
+
+
+ACPI_STATUS
+acpi_wr_cb(ACPI_RESOURCE *rp, void *context)
+{
+	int bus = (intptr_t)context;
+
+	/* ignore consumed resources */
+	if (rp->Data.Address.ProducerConsumer == 1)
+		return (AE_OK);
+
+	switch (rp->Type) {
+	case ACPI_RESOURCE_TYPE_IRQ:
+		/* never expect to see a PCI bus produce an Interrupt */
+		dprintf("%s\n", "IRQ");
+		break;
+
+	case ACPI_RESOURCE_TYPE_DMA:
+		/* never expect to see a PCI bus produce DMA */
+		dprintf("%s\n", "DMA");
+		break;
+
+	case ACPI_RESOURCE_TYPE_START_DEPENDENT:
+		dprintf("%s\n", "START_DEPENDENT");
+		break;
+
+	case ACPI_RESOURCE_TYPE_END_DEPENDENT:
+		dprintf("%s\n", "END_DEPENDENT");
+		break;
+
+	case ACPI_RESOURCE_TYPE_IO:
+		if (rp->Data.Io.AddressLength == 0)
+			break;
+		acpi_cb_cnt++;
+		memlist_insert(&acpi_io_res[bus], rp->Data.Io.Minimum,
+		    rp->Data.Io.AddressLength);
+		break;
+
+	case ACPI_RESOURCE_TYPE_FIXED_IO:
+		/* only expect to see this as a consumer */
+		dprintf("%s\n", "FIXED_IO");
+		break;
+
+	case ACPI_RESOURCE_TYPE_VENDOR:
+		dprintf("%s\n", "VENDOR");
+		break;
+
+	case ACPI_RESOURCE_TYPE_END_TAG:
+		dprintf("%s\n", "END_TAG");
+		break;
+
+	case ACPI_RESOURCE_TYPE_MEMORY24:
+		/* only expect to see this as a consumer */
+		dprintf("%s\n", "MEMORY24");
+		break;
+
+	case ACPI_RESOURCE_TYPE_MEMORY32:
+		/* only expect to see this as a consumer */
+		dprintf("%s\n", "MEMORY32");
+		break;
+
+	case ACPI_RESOURCE_TYPE_FIXED_MEMORY32:
+		/* only expect to see this as a consumer */
+		dprintf("%s\n", "FIXED_MEMORY32");
+		break;
+
+	case ACPI_RESOURCE_TYPE_ADDRESS16:
+		if (rp->Data.Address16.AddressLength == 0)
+			break;
+		acpi_cb_cnt++;
+		memlist_insert(rlistpp(rp->Data.Address16.ResourceType,
+		    rp->Data.Address16.Info.TypeSpecific, bus),
+		    rp->Data.Address16.Minimum,
+		    rp->Data.Address16.AddressLength);
+		break;
+
+	case ACPI_RESOURCE_TYPE_ADDRESS32:
+		if (rp->Data.Address32.AddressLength == 0)
+			break;
+		acpi_cb_cnt++;
+		memlist_insert(rlistpp(rp->Data.Address32.ResourceType,
+		    rp->Data.Address32.Info.TypeSpecific, bus),
+		    rp->Data.Address32.Minimum,
+		    rp->Data.Address32.AddressLength);
+		break;
+
+	case ACPI_RESOURCE_TYPE_ADDRESS64:
+		if (rp->Data.Address64.AddressLength == 0)
+			break;
+		acpi_cb_cnt++;
+		memlist_insert(rlistpp(rp->Data.Address64.ResourceType,
+		    rp->Data.Address64.Info.TypeSpecific, bus),
+		    rp->Data.Address64.Minimum,
+		    rp->Data.Address64.AddressLength);
+		break;
+
+	case ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64:
+		if (rp->Data.ExtAddress64.AddressLength == 0)
+			break;
+		acpi_cb_cnt++;
+		memlist_insert(rlistpp(rp->Data.ExtAddress64.ResourceType,
+		    rp->Data.ExtAddress64.Info.TypeSpecific, bus),
+		    rp->Data.ExtAddress64.Minimum,
+		    rp->Data.ExtAddress64.AddressLength);
+		break;
+
+	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+		/* never expect to see a PCI bus produce an Interrupt */
+		dprintf("%s\n", "EXTENDED_IRQ");
+		break;
+
+	case ACPI_RESOURCE_TYPE_GENERIC_REGISTER:
+		/* never expect to see a PCI bus produce an GAS */
+		dprintf("%s\n", "GENERIC_REGISTER");
+		break;
+	}
+
+	return (AE_OK);
 }
 
 static void
@@ -92,7 +316,7 @@ mps_probe()
 		if (base_end_seg != ebda_seg) {
 			base_end = ((uintptr_t)base_end_seg) << 4;
 			fpp = (struct mps_fps_hdr *)find_sig(
-				(uchar_t *)base_end, 1024, "_MP_");
+			    (uchar_t *)base_end, 1024, "_MP_");
 		}
 	}
 	if (fpp == NULL) {
@@ -160,7 +384,7 @@ mps_find_bus_res(int bus, int type, struct memlist **res)
 			if (((int)sasmp->sasm_as_type) == type &&
 			    ((int)sasmp->sasm_bus_id) == bus) {
 				if (sasmp->sasm_as_base_hi != 0 ||
-					sasmp->sasm_as_len_hi != 0) {
+				    sasmp->sasm_as_len_hi != 0) {
 					printf("64 bits address space\n");
 					extp += SYS_AS_MAPPING_SIZE;
 					break;

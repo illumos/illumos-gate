@@ -165,6 +165,9 @@ parse_resources_io(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 {
 	ACPI_RESOURCE_IO acpi_io = resource_ptr->Data.Io;
 
+	if (acpi_io.AddressLength == 0)
+		return;
+
 	io[*io_count].regspec_bustype = 1; /* io */
 	io[*io_count].regspec_size = acpi_io.AddressLength;
 	io[*io_count].regspec_addr = acpi_io.Minimum;
@@ -184,6 +187,9 @@ parse_resources_fixed_io(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 {
 	ACPI_RESOURCE_FIXED_IO fixed_io = resource_ptr->Data.FixedIo;
 
+	if (fixed_io.AddressLength == 0)
+		return;
+
 	io[*io_count].regspec_bustype = 1; /* io */
 	io[*io_count].regspec_addr = fixed_io.Address;
 	io[*io_count].regspec_size = fixed_io.AddressLength;
@@ -202,6 +208,9 @@ parse_resources_fixed_mem32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	ACPI_RESOURCE_FIXED_MEMORY32 fixed_mem32 =
 	    resource_ptr->Data.FixedMemory32;
 
+	if (fixed_mem32.AddressLength == 0)
+		return;
+
 	io[*io_count].regspec_bustype = 0; /* memory */
 	io[*io_count].regspec_addr = fixed_mem32.Address;
 	io[*io_count].regspec_size = fixed_mem32.AddressLength;
@@ -218,6 +227,9 @@ parse_resources_mem32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
     int *io_count)
 {
 	ACPI_RESOURCE_MEMORY32 mem32 = resource_ptr->Data.Memory32;
+
+	if (mem32.AddressLength == 0)
+		return;
 
 	if (resource_ptr->Data.Memory32.Minimum ==
 	    resource_ptr->Data.Memory32.Maximum) {
@@ -247,6 +259,10 @@ parse_resources_addr16(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 {
 	ACPI_RESOURCE_ADDRESS16 addr16 =
 	    resource_ptr->Data.Address16;
+
+	if (addr16.AddressLength == 0)
+		return;
+
 	if (acpi_enum_debug & PARSE_RES_ADDRESS) {
 		if (addr16.ResourceType == ACPI_MEMORY_RANGE) {
 			cmn_err(CE_NOTE, "parse_resources() "\
@@ -299,6 +315,10 @@ parse_resources_addr32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 {
 	ACPI_RESOURCE_ADDRESS32 addr32 =
 	    resource_ptr->Data.Address32;
+
+	if (addr32.AddressLength == 0)
+		return;
+
 	if (acpi_enum_debug & PARSE_RES_ADDRESS) {
 		if (addr32.ResourceType == ACPI_MEMORY_RANGE) {
 			cmn_err(CE_NOTE, "parse_resources() "\
@@ -351,6 +371,10 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 {
 	ACPI_RESOURCE_ADDRESS64 addr64 =
 	    resource_ptr->Data.Address64;
+
+	if (addr64.AddressLength == 0)
+		return;
+
 	if (acpi_enum_debug & PARSE_RES_ADDRESS) {
 		if (addr64.ResourceType == ACPI_MEMORY_RANGE) {
 			cmn_err(CE_NOTE, "parse_resources() "\
