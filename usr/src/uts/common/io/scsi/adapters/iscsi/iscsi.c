@@ -3249,6 +3249,9 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 					    sizeof (*cp),
 					    (caddr_t)arg,
 					    mode);
+				} else {
+					kmem_free(cp, sizeof (*cp));
+					cp = NULL;
 				}
 			}
 			break;
@@ -3839,6 +3842,9 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		/* If iSNS discovery mode is not set, return with zero entry */
 		method = persistent_disc_meth_get();
 		if ((method & iSCSIDiscoveryMethodISNS) == 0) {
+			kmem_free(server_pg_list_hdr,
+			    sizeof (*server_pg_list_hdr));
+			server_pg_list_hdr = NULL;
 			rtn = EACCES;
 			break;
 		}
@@ -3850,6 +3856,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			initiator_node_name = NULL;
 			kmem_free(server_pg_list_hdr,
 			    sizeof (*server_pg_list_hdr));
+			server_pg_list_hdr = NULL;
 			rtn = EIO;
 			break;
 		}
@@ -3858,6 +3865,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			initiator_node_name = NULL;
 			kmem_free(server_pg_list_hdr,
 			    sizeof (*server_pg_list_hdr));
+			server_pg_list_hdr = NULL;
 			rtn = EIO;
 			break;
 		}
@@ -3949,9 +3957,16 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		}
 		DTRACE_PROBE1(iscsi_ioctl_iscsi_isns_server_get_pg_sz,
 		    int, pg_list_sz);
+		kmem_free(initiator_node_name, ISCSI_MAX_NAME_LEN);
+		initiator_node_name = NULL;
+		kmem_free(initiator_node_alias, ISCSI_MAX_NAME_LEN);
+		initiator_node_alias = NULL;
 		kmem_free(pg_list, pg_list_sz);
+		pg_list = NULL;
 		kmem_free(server_pg_list, server_pg_list_sz);
+		server_pg_list = NULL;
 		kmem_free(server_pg_list_hdr, sizeof (*server_pg_list_hdr));
+		server_pg_list_hdr = NULL;
 		break;
 
 	/*
@@ -3972,6 +3987,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 		if (ics->ics_ver != ISCSI_INTERFACE_VERSION) {
 			rtn = EINVAL;
 			kmem_free(ics, size);
+			ics = NULL;
 			break;
 		}
 
@@ -3998,6 +4014,9 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				/* copyout data for gets */
 				rtn = iscsi_ioctl_copyout(ics, size,
 				    (caddr_t)arg, mode);
+			} else {
+				kmem_free(ics, size);
+				ics = NULL;
 			}
 		} else {
 			/* set */
@@ -4011,11 +4030,15 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 					 * with mpxio enabled
 					 */
 					if (!iscsi_reconfig_boot_sess(ihp)) {
+						kmem_free(ics, size);
+						ics = NULL;
 						rtn = EINVAL;
 						break;
 					}
 				}
 			}
+			kmem_free(ics, size);
+			ics = NULL;
 		}
 		break;
 

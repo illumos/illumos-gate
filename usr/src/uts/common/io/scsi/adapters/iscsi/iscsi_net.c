@@ -187,8 +187,7 @@ static iscsi_status_t iscsi_net_recvdata(void *socket, iscsi_hdr_t *ihp,
 static iscsi_status_t iscsi_net_recvhdr(void *socket, iscsi_hdr_t *ihp,
     int header_length, int timeout, int flags);
 
-static void iscsi_net_set_preconnect_options(void *socket);
-static void iscsi_net_set_postconnect_options(void *socket);
+static void iscsi_net_set_connect_options(void *socket);
 
 /*
  * +--------------------------------------------------------------------+
@@ -236,12 +235,11 @@ iscsi_net_fini()
 	iscsi_net = NULL;
 }
 
-
 /*
- * iscsi_net_set_preconnect_options -
+ * iscsi_net_set_connect_options -
  */
 static void
-iscsi_net_set_preconnect_options(void *socket)
+iscsi_net_set_connect_options(void *socket)
 {
 	int ret = 0;
 	ret += iscsi_net->setsockopt(socket, IPPROTO_TCP,
@@ -252,20 +250,6 @@ iscsi_net_set_preconnect_options(void *socket)
 	    conn_abort_threshold, sizeof (int));
 	ret += iscsi_net->setsockopt(socket, IPPROTO_TCP, TCP_ABORT_THRESHOLD,
 	    (char *)&iscsi_net->tweaks.abort_threshold, sizeof (int));
-	if (ret != 0) {
-		cmn_err(CE_NOTE, "iscsi connection failed to set socket option"
-		    "TCP_CONN_NOTIFY_THRESHOLD, TCP_CONN_ABORT_THRESHOLD or "
-		    "TCP_ABORT_THRESHOLD");
-	}
-}
-
-/*
- * iscsi_net_set_postconnect_options -
- */
-static void
-iscsi_net_set_postconnect_options(void *socket)
-{
-	int ret = 0;
 	ret += iscsi_net->setsockopt(socket, IPPROTO_TCP, TCP_NODELAY,
 	    (char *)&iscsi_net->tweaks.nodelay, sizeof (int));
 	ret += iscsi_net->setsockopt(socket, SOL_SOCKET, SO_RCVBUF,
@@ -274,10 +258,10 @@ iscsi_net_set_postconnect_options(void *socket)
 	    (char *)&iscsi_net->tweaks.sndbuf, sizeof (int));
 	if (ret != 0) {
 		cmn_err(CE_NOTE, "iscsi connection failed to set socket option"
-		    "TCP_NODELAY, SO_RCVBUF or SO_SNDBUF");
+		    "TCP_CONN_NOTIFY_THRESHOLD, TCP_CONN_ABORT_THRESHOLD,"
+		    "TCP_ABORT_THRESHOLD, TCP_NODELAY, SO_RCVBUF or SO_SNDBUF");
 	}
 }
-
 
 /*
  * +--------------------------------------------------------------------+
@@ -336,9 +320,8 @@ iscsi_net_connect(void *socket, struct sockaddr *name, int name_len,
 	ksocket_t ks = (ksocket_t)socket;
 	int rval;
 
-	iscsi_net_set_preconnect_options(socket);
+	iscsi_net_set_connect_options(socket);
 	rval = ksocket_connect(ks, name, name_len, CRED());
-	iscsi_net_set_postconnect_options(socket);
 
 	return (rval);
 }
