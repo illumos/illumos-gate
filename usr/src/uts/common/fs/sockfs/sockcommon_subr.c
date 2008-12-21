@@ -835,7 +835,8 @@ again1:
 		if (mp != NULL) { /* more data blocks in msg */
 			more |= MOREDATA;
 			if ((flags & (MSG_PEEK|MSG_TRUNC))) {
-				if (flags & MSG_TRUNC) {
+				if (flags & MSG_TRUNC &&
+				    ((flags & MSG_PEEK) == 0)) {
 					mutex_enter(&so->so_lock);
 					so->so_rcv_queued -= msgdsize(mp);
 					mutex_exit(&so->so_lock);
@@ -1266,6 +1267,7 @@ socket_init_common(struct sonode *so, struct sonode *pso, int flags, cred_t *cr)
 		    SO_OOBINLINE|SO_DGRAM_ERRIND|SO_LINGER);
 		so->so_proto_props = pso->so_proto_props;
 		so->so_mode = pso->so_mode;
+		so->so_pollev = pso->so_pollev & SO_POLLEV_ALWAYS;
 
 		mutex_exit(&pso->so_lock);
 

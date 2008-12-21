@@ -228,14 +228,14 @@ struct sonode {
 	sodirect_t		*so_direct;
 };
 
-/*
- * We do an initial check for events without holding locks. However,
- * if there are no event available, then we redo the check for POLLIN
- * events under the lock.
- */
 #define	SO_HAVE_DATA(so)						\
-	((so)->so_rcv_timer_tid == 0 && (so->so_rcv_queued > 0)) ||	\
-	((so)->so_rcv_queued > (so)->so_rcv_thresh) ||			\
+	/*								\
+	 * For the (tid == 0) case we must check so_rcv_{q_,}head	\
+	 * rather than (so_rcv_queued > 0), since the latter does not	\
+	 * take into account mblks with only control/name information.	\
+	 */								\
+	((so)->so_rcv_timer_tid == 0 && ((so)->so_rcv_head != NULL ||	\
+	(so)->so_rcv_q_head != NULL)) ||				\
 	((so)->so_state & SS_CANTRCVMORE)
 
 /*

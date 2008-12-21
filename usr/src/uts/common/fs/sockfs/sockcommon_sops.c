@@ -866,6 +866,10 @@ so_poll(struct sonode *so, short events, int anyyet, short *reventsp,
 	 * or the socket is in a state where no more data will be received.
 	 * Also, if the socket is accepting connections, flip the bit if
 	 * there is something on the queue.
+	 *
+	 * We do an initial check for events without holding locks. However,
+	 * if there are no event available, then we redo the check for POLLIN
+	 * events under the lock.
 	 */
 
 	/* Pending connections */

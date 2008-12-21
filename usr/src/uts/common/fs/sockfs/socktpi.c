@@ -5866,6 +5866,9 @@ done2:
 	return (error);
 }
 
+/*
+ * sotpi_close() is called when the last open reference goes away.
+ */
 /* ARGSUSED */
 int
 sotpi_close(struct sonode *so, int flag, struct cred *cr)
@@ -5887,18 +5890,11 @@ sotpi_close(struct sonode *so, int flag, struct cred *cr)
 
 	ASSERT(so_verify_oobstate(so));
 
-	/*
-	 * Only call NL7C's close on last open reference.
-	 */
 	if (sti->sti_nl7c_flags & NL7C_ENABLED) {
 		sti->sti_nl7c_flags = 0;
 		nl7c_close(so);
 	}
 
-	/*
-	 * Only call the close routine when the last open reference through
-	 * any [s, v]node goes away.
-	 */
 	if (vp->v_stream != NULL) {
 		vnode_t *ux_vp;
 
