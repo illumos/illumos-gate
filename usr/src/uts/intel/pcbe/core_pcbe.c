@@ -24,7 +24,7 @@
  */
 
 /*
- * Performance Counter Back-End for Intel Family 6 Models 15 and 23
+ * Performance Counter Back-End for Intel Family 6 Models 15, 23, 26 & 28
  */
 
 #include <sys/cpuvar.h>
@@ -376,7 +376,7 @@ char *ffc_names_htt[] = {
 
 char **ffc_names = NULL;
 
-static char	**gpc_names;
+static char	**gpc_names = NULL;
 static uint32_t	versionid;
 static uint64_t	num_gpc;
 static uint64_t	width_gpc;
@@ -742,6 +742,126 @@ static uint64_t known_ffc_num;
 { 0xCC, 0x02, C0|C1|C2|C3, "fp_mmx_trans.to_mmx" },			\
 { 0xC3, 0x04, C0|C1|C2|C3, "machine_clears.smc" }
 
+#define	EVENTS_FAM6_MOD28						\
+	{ 0x2,  0x81, C0|C1, "store_forwards.good" },                   \
+	{ 0x6,  0x0,  C0|C1, "segment_reg_loads.any" },                 \
+	{ 0x7,  0x1,  C0|C1, "prefetch.prefetcht0" },                   \
+	{ 0x7,  0x6,  C0|C1, "prefetch.sw_l2" },                        \
+	{ 0x7,  0x8,  C0|C1, "prefetch.prefetchnta" },                  \
+	{ 0x8,  0x7,  C0|C1, "data_tlb_misses.dtlb_miss" },             \
+	{ 0x8,  0x5,  C0|C1, "data_tlb_misses.dtlb_miss_ld" },          \
+	{ 0x8,  0x9,  C0|C1, "data_tlb_misses.l0_dtlb_miss_ld" },	\
+	{ 0x8,  0x6,  C0|C1, "data_tlb_misses.dtlb_miss_st" },          \
+	{ 0xC,  0x3,  C0|C1, "page_walks.cycles" },                     \
+	{ 0x10, 0x1,  C0|C1, "x87_comp_ops_exe.any.s" },                \
+	{ 0x10, 0x81, C0|C1, "x87_comp_ops_exe.any.ar" },               \
+	{ 0x11, 0x1,  C0|C1, "fp_assist" },                             \
+	{ 0x11, 0x81, C0|C1, "fp_assist.ar" },                          \
+	{ 0x12, 0x1,  C0|C1, "mul.s" },                                 \
+	{ 0x12, 0x81, C0|C1, "mul.ar" },                                \
+	{ 0x13, 0x1,  C0|C1, "div.s" },                                 \
+	{ 0x13, 0x81, C0|C1, "div.ar" },                                \
+	{ 0x14, 0x1,  C0|C1, "cycles_div_busy" },                       \
+	{ 0x21, 0x0,  C0|C1, "l2_ads" },                      		\
+	{ 0x22, 0x0,  C0|C1, "l2_dbus_busy" },                		\
+	{ 0x24, 0x0,  C0|C1, "l2_lines_in" },   			\
+	{ 0x25, 0x0,  C0|C1, "l2_m_lines_in" },               		\
+	{ 0x26, 0x0,  C0|C1, "l2_lines_out" },  			\
+	{ 0x27, 0x0,  C0|C1, "l2_m_lines_out" },			\
+	{ 0x28, 0x0,  C0|C1, "l2_ifetch" },  				\
+	{ 0x29, 0x0,  C0|C1, "l2_ld" },					\
+	{ 0x2A, 0x0,  C0|C1, "l2_st" },      				\
+	{ 0x2B, 0x0,  C0|C1, "l2_lock" },    				\
+	{ 0x2E, 0x0,  C0|C1, "l2_rqsts" },             			\
+	{ 0x2E, 0x41, C0|C1, "l2_rqsts.self.demand.i_state" },		\
+	{ 0x2E, 0x4F, C0|C1, "l2_rqsts.self.demand.mesi" },		\
+	{ 0x30, 0x0,  C0|C1, "l2_reject_bus_q" },			\
+	{ 0x32, 0x0,  C0|C1, "l2_no_req" },                   		\
+	{ 0x3A, 0x0,  C0|C1, "eist_trans" },                            \
+	{ 0x3B, 0xC0, C0|C1, "thermal_trip" },                          \
+	{ 0x3C, 0x0,  C0|C1, "cpu_clk_unhalted.core_p" },               \
+	{ 0x3C, 0x1,  C0|C1, "cpu_clk_unhalted.bus" },                  \
+	{ 0x3C, 0x2,  C0|C1, "cpu_clk_unhalted.no_other" },             \
+	{ 0x40, 0x21, C0|C1, "l1d_cache.ld" },                          \
+	{ 0x40, 0x22, C0|C1, "l1d_cache.st" },                          \
+	{ 0x60, 0x0,  C0|C1, "bus_request_outstanding" },		\
+	{ 0x61, 0x0,  C0|C1, "bus_bnr_drv" },                		\
+	{ 0x62, 0x0,  C0|C1, "bus_drdy_clocks" },            		\
+	{ 0x63, 0x0,  C0|C1, "bus_lock_clocks" },  			\
+	{ 0x64, 0x0,  C0|C1, "bus_data_rcv" },                		\
+	{ 0x65, 0x0,  C0|C1, "bus_trans_brd" },    			\
+	{ 0x66, 0x0,  C0|C1, "bus_trans_rfo" },    			\
+	{ 0x67, 0x0,  C0|C1, "bus_trans_wb" },     			\
+	{ 0x68, 0x0,  C0|C1, "bus_trans_ifetch" }, 			\
+	{ 0x69, 0x0,  C0|C1, "bus_trans_inval" },  			\
+	{ 0x6A, 0x0,  C0|C1, "bus_trans_pwr" },				\
+	{ 0x6B, 0x0,  C0|C1, "bus_trans_p" },      			\
+	{ 0x6C, 0x0,  C0|C1, "bus_trans_io" },     			\
+	{ 0x6D, 0x0,  C0|C1, "bus_trans_def" },    			\
+	{ 0x6E, 0x0,  C0|C1, "bus_trans_burst" },  			\
+	{ 0x6F, 0x0,  C0|C1, "bus_trans_mem" },    			\
+	{ 0x70, 0x0,  C0|C1, "bus_trans_any" },    			\
+	{ 0x77, 0x0,  C0|C1, "ext_snoop" },     			\
+	{ 0x7A, 0x0,  C0|C1, "bus_hit_drv" },                		\
+	{ 0x7B, 0x0,  C0|C1, "bus_hitm_drv" },               		\
+	{ 0x7D, 0x0,  C0|C1, "busq_empty" },                  		\
+	{ 0x7E, 0x0,  C0|C1, "snoop_stall_drv" },  			\
+	{ 0x7F, 0x0,  C0|C1, "bus_io_wait" },				\
+	{ 0x80, 0x3,  C0|C1, "icache.accesses" },                       \
+	{ 0x80, 0x2,  C0|C1, "icache.misses" },                         \
+	{ 0x82, 0x4,  C0|C1, "itlb.flush" },                            \
+	{ 0x82, 0x2,  C0|C1, "itlb.misses" },                           \
+	{ 0xAA, 0x2,  C0|C1, "macro_insts.cisc_decoded" },              \
+	{ 0xAA, 0x3,  C0|C1, "macro_insts.all_decoded" },               \
+	{ 0xB0, 0x0,  C0|C1, "simd_uops_exec.s" },                      \
+	{ 0xB0, 0x80, C0|C1, "simd_uops_exec.ar" },                     \
+	{ 0xB1, 0x0,  C0|C1, "simd_sat_uop_exec.s" },                   \
+	{ 0xB1, 0x80, C0|C1, "simd_sat_uop_exec.ar" },                  \
+	{ 0xB3, 0x1,  C0|C1, "simd_uop_type_exec.mul.s" },              \
+	{ 0xB3, 0x81, C0|C1, "simd_uop_type_exec.mul.ar" },             \
+	{ 0xB3, 0x02, C0|C1, "simd_uop_type_exec.shift.s" },            \
+	{ 0xB3, 0x82, C0|C1, "simd_uop_type_exec.shift.ar" },           \
+	{ 0xB3, 0x04, C0|C1, "simd_uop_type_exec.pack.s" },             \
+	{ 0xB3, 0x84, C0|C1, "simd_uop_type_exec.pack.ar" },            \
+	{ 0xB3, 0x08, C0|C1, "simd_uop_type_exec.unpack.s" },           \
+	{ 0xB3, 0x88, C0|C1, "simd_uop_type_exec.unpack.ar" },          \
+	{ 0xB3, 0x10, C0|C1, "simd_uop_type_exec.logical.s" },          \
+	{ 0xB3, 0x90, C0|C1, "simd_uop_type_exec.logical.ar" },         \
+	{ 0xB3, 0x20, C0|C1, "simd_uop_type_exec.arithmetic.s" },       \
+	{ 0xB3, 0xA0, C0|C1, "simd_uop_type_exec.arithmetic.ar" },      \
+	{ 0xC2, 0x10, C0|C1, "uops_retired.any" },                      \
+	{ 0xC3, 0x1,  C0|C1, "machine_clears.smc" },                    \
+	{ 0xC4, 0x0,  C0|C1, "br_inst_retired.any" },                   \
+	{ 0xC4, 0x1,  C0|C1, "br_inst_retired.pred_not_taken" },        \
+	{ 0xC4, 0x2,  C0|C1, "br_inst_retired.mispred_not_taken" },     \
+	{ 0xC4, 0x4,  C0|C1, "br_inst_retired.pred_taken" },            \
+	{ 0xC4, 0x8,  C0|C1, "br_inst_retired.mispred_taken" },         \
+	{ 0xC4, 0xA,  C0|C1, "br_inst_retired.mispred" },               \
+	{ 0xC4, 0xC,  C0|C1, "br_inst_retired.taken" },                 \
+	{ 0xC4, 0xF,  C0|C1, "br_inst_retired.any1" },                  \
+	{ 0xC6, 0x1,  C0|C1, "cycles_int_masked.cycles_int_masked" },   \
+	{ 0xC6, 0x2,  C0|C1,						\
+		"cycles_int_masked.cycles_int_pending_and_masked" },	\
+	{ 0xC7, 0x1,  C0|C1, "simd_inst_retired.packed_single" },       \
+	{ 0xC7, 0x2,  C0|C1, "simd_inst_retired.scalar_single" },      	\
+	{ 0xC7, 0x4,  C0|C1, "simd_inst_retired.packed_double" },       \
+	{ 0xC7, 0x8,  C0|C1, "simd_inst_retired.scalar_double" },       \
+	{ 0xC7, 0x10, C0|C1, "simd_inst_retired.vector" },              \
+	{ 0xC7, 0x1F, C0|C1, "simd_inst_retired.any" },                 \
+	{ 0xC8, 0x00, C0|C1, "hw_int_rcv" },                            \
+	{ 0xCA, 0x1,  C0|C1, "simd_comp_inst_retired.packed_single" },  \
+	{ 0xCA, 0x2,  C0|C1, "simd_comp_inst_retired.scalar_single" }, 	\
+	{ 0xCA, 0x4,  C0|C1, "simd_comp_inst_retired.packed_double" },  \
+	{ 0xCA, 0x8,  C0|C1, "simd_comp_inst_retired.scalar_double" },  \
+	{ 0xCB, 0x1,  C0|C1, "mem_load_retired.l2_hit" },               \
+	{ 0xCB, 0x2,  C0|C1, "mem_load_retired.l2_miss" },              \
+	{ 0xCB, 0x4,  C0|C1, "mem_load_retired.dtlb_miss" },           	\
+	{ 0xCD, 0x0,  C0|C1, "simd_assist" },                           \
+	{ 0xCE, 0x0,  C0|C1, "simd_instr_retired" },                    \
+	{ 0xCF, 0x0,  C0|C1, "simd_sat_instr_retired" },                \
+	{ 0xE0, 0x1,  C0|C1, "br_inst_decoded" },                       \
+	{ 0xE4, 0x1,  C0|C1, "bogus_br" },                             	\
+	{ 0xE6, 0x1,  C0|C1, "baclears.any" }
 
 #define	EVENTS_FAM6_MOD37						\
 { 0xB0, 0x08, C0|C1|C2|C3, "offcore_requests.any.read" },		\
@@ -752,6 +872,11 @@ static const struct events_table_t *events_table = NULL;
 
 const struct events_table_t events_fam6_mod26[] = {
 	EVENTS_FAM6_MOD26,
+	{ NT_END, 0, 0, "" }
+};
+
+const struct events_table_t events_fam6_mod28[] = {
+	EVENTS_FAM6_MOD28,
 	{ NT_END, 0, 0, "" }
 };
 
@@ -856,6 +981,8 @@ core_pcbe_init(void)
 	versionid = cp.cp_eax & 0xFF;
 
 	/*
+	 * Fixed-Function Counters (FFC)
+	 *
 	 * All Family 6 Model 15 and Model 23 processors have fixed-function
 	 * counters.  These counters were made Architectural with
 	 * Family 6 Model 15 Stepping 9.
@@ -925,7 +1052,11 @@ core_pcbe_init(void)
 	}
 
 	mask_ffc = BITMASK_XBITS(width_ffc);
+	control_ffc = BITMASK_XBITS(num_ffc);
 
+	/*
+	 * General Purpose Counters (GPC)
+	 */
 	num_gpc = (cp.cp_eax >> 8) & 0xFF;
 	width_gpc = (cp.cp_eax >> 16) & 0xFF;
 
@@ -934,18 +1065,17 @@ core_pcbe_init(void)
 
 	mask_gpc = BITMASK_XBITS(width_gpc);
 
-	total_pmc = num_gpc + num_ffc;
-
 	control_gpc = BITMASK_XBITS(num_gpc);
-	control_ffc = BITMASK_XBITS(num_ffc);
 
 	control_mask = (control_ffc << 32) | control_gpc;
 
+	total_pmc = num_gpc + num_ffc;
 	if (total_pmc > 64) {
 		/* Too wide for the overflow bitmap */
 		return (-1);
 	}
 
+	/* GPC events for Family 6 Models 15 & 23 only */
 	if ((cpuid_getfamily(CPU) == 6) &&
 	    ((cpuid_getmodel(CPU) == 15) || (cpuid_getmodel(CPU) == 23))) {
 		(void) snprintf(core_impl_name, IMPL_NAME_LEN,
@@ -958,6 +1088,9 @@ core_pcbe_init(void)
 	    "Intel Arch PerfMon v%d on Family %d Model %d",
 	    versionid, cpuid_getfamily(CPU), cpuid_getmodel(CPU));
 
+	/*
+	 * Architectural events
+	 */
 	arch_events_vector_length = (cp.cp_eax >> 24) & 0xFF;
 
 	ASSERT(known_arch_events == arch_events_vector_length);
@@ -975,9 +1108,9 @@ core_pcbe_init(void)
 	arch_events_vector = cp.cp_ebx &
 	    BITMASK_XBITS(arch_events_vector_length);
 
-	/* General-purpose Counters (GPC) */
-	gpc_names = NULL;
-
+	/*
+	 * Process architectural and non-architectural events using GPC
+	 */
 	if (num_gpc > 0) {
 
 		gpc_names = kmem_alloc(num_gpc * sizeof (char *), KM_SLEEP);
@@ -991,15 +1124,21 @@ core_pcbe_init(void)
 			}
 		}
 
+		/* Non-architectural events list */
 		if (cpuid_getmodel(CPU) == 26) {
 			events_table = events_fam6_mod26;
+		} else if (cpuid_getmodel(CPU) == 28) {
+			events_table = events_fam6_mod28;
 		} else if (cpuid_getmodel(CPU) == 37) {
 			events_table = events_fam6_mod37;
 		}
 
 		for (i = 0; i < num_gpc; i++) {
 
-			/* Determine length of supported event names */
+			/*
+			 * Determine length of all supported event names
+			 * (architectural + non-architectural)
+			 */
 			size = arch_events_string_length;
 			for (j = 0; events_table != NULL &&
 			    events_table[j].eventselect != NT_END;
@@ -1017,7 +1156,10 @@ core_pcbe_init(void)
 				continue;
 			}
 
-			/* Create the list */
+			/*
+			 * Create the list of all supported events
+			 * (architectural + non-architectural)
+			 */
 			for (j = 0; j < known_arch_events; j++) {
 				if (((1U << j) & arch_events_vector) == 0) {
 					(void) strcat(gpc_names[i],
@@ -1035,9 +1177,8 @@ core_pcbe_init(void)
 					(void) strcat(gpc_names[i], ",");
 				}
 			}
-			/*
-			 * Remove trailing comma.
-			 */
+
+			/* Remove trailing comma */
 			gpc_names[i][size - 1] = '\0';
 		}
 	}
@@ -1088,9 +1229,8 @@ find_gpcevent_f6m15_23(char *name,
     const struct nametable_fam6mod15_23 *nametable)
 {
 	const struct nametable_fam6mod15_23 *n;
-	int compare_result;
+	int compare_result = -1;
 
-	compare_result = -1;
 	for (n = nametable; n->event_num != NT_END; n++) {
 		compare_result = strcmp(name, n->name);
 		if (compare_result <= 0) {
@@ -1110,6 +1250,7 @@ find_gpcevent(char *name)
 {
 	int i;
 
+	/* Search architectural events */
 	for (i = 0; i < known_arch_events; i++) {
 		if (strcmp(name, arch_events_table[i].name) == 0) {
 			if (((1U << i) & arch_events_vector) == 0) {
@@ -1118,13 +1259,12 @@ find_gpcevent(char *name)
 		}
 	}
 
-	if (events_table == NULL) {
-		return (NULL);
-	}
-
-	for (i = 0; events_table[i].eventselect != NT_END; i++) {
-		if (strcmp(name, events_table[i].name) == 0) {
-			return (&events_table[i]);
+	/* Search non-architectural events */
+	if (events_table != NULL) {
+		for (i = 0; events_table[i].eventselect != NT_END; i++) {
+			if (strcmp(name, events_table[i].name) == 0) {
+				return (&events_table[i]);
+			}
 		}
 	}
 
@@ -1317,13 +1457,12 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 
 	for (i = 0; i < nattrs; i++) {
 		if (strncmp(attrs[i].ka_name, "umask", 6) == 0) {
-			if (umask_known == 1) {
+			if ((umask_known == 1) ||
+			    ((attrs[i].ka_val | CORE_UMASK_MASK)
+			    != CORE_UMASK_MASK)) {
 				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
 			}
-			if ((attrs[i].ka_val | CORE_UMASK_MASK) !=
-			    CORE_UMASK_MASK) {
-				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
-			}
+
 			conf.core_ctl |= attrs[i].ka_val <<
 			    CORE_UMASK_SHIFT;
 		} else  if (strncmp(attrs[i].ka_name, "edge", 6) == 0) {

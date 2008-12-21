@@ -36,7 +36,7 @@ MODULE		= pcbe.GenuineIntel.6.15
 OBJECTS		= $(CORE_PCBE_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(CORE_PCBE_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(USR_PCBE_DIR)/$(MODULE)
-SOFTLINKS	= pcbe.GenuineIntel.6.23 pcbe.GenuineIntel.6.26 pcbe.GenuineIntel.6.37
+SOFTLINKS	= pcbe.GenuineIntel.6.23 pcbe.GenuineIntel.6.26 pcbe.GenuineIntel.6.28 pcbe.GenuineIntel.6.37
 ROOTSOFTLINKS	= $(SOFTLINKS:%=$(USR_PCBE_DIR)/%)
 
 #
