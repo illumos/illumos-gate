@@ -1369,6 +1369,7 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	int			list_space	= 0;
 	int			lun_sz		= 0;
 	int			did;
+	int			retry;
 	iscsi_hba_t		*ihp		= NULL;
 	iscsi_sess_t		*isp		= NULL;
 	iscsi_conn_t		*icp		= NULL;
@@ -3000,25 +3001,48 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 	/*
 	 * ISCSI_DISCOVERY_CLEAR -
 	 */
+#define	ISCSI_DISCOVERY_DELAY 2	/* seconds */
 	case ISCSI_DISCOVERY_CLEAR:
 		if (ddi_copyin((caddr_t)arg, &method, sizeof (method), mode)) {
 			rtn = EFAULT;
 			break;
 		}
 
-		/* Attempt to logout of all associated targets first */
-		if (iscsid_disable_discovery(ihp, method) == B_FALSE) {
-			rtn = EBUSY;
+		/* If discovery in progress, try few times before return busy */
+		retry = 0;
+		mutex_enter(&ihp->hba_discovery_events_mutex);
+		while (ihp->hba_discovery_in_progress == B_TRUE) {
+			if (++retry == 5) {
+				rtn = EBUSY;
+				break;
+			}
+			mutex_exit(&ihp->hba_discovery_events_mutex);
+			delay(SEC_TO_TICK(ISCSI_DISCOVERY_DELAY));
+			mutex_enter(&ihp->hba_discovery_events_mutex);
+		}
+#undef	ISCSI_DISCOVERY_DELAY
+
+		/*
+		 * Clear discovery first, so that any bus config or
+		 * discovery requests will ignore this discovery method
+		 */
+		if (rtn == 0 && persistent_disc_meth_clear(method) == B_FALSE) {
+			rtn = EIO;
+		}
+		mutex_exit(&ihp->hba_discovery_events_mutex);
+
+		if (rtn != 0) {
 			break;
 		}
 
-		/*
-		 * Successfully logged out of targets, Update
-		 * Persistent store.
-		 */
-		if (persistent_disc_meth_clear(method) == B_FALSE) {
-			rtn = EIO;
-			break;
+		/* Attempt to logout from all associated targets */
+		if (iscsid_disable_discovery(ihp, method) == B_FALSE) {
+			/* Failure!, reset the discovery */
+			if (persistent_disc_meth_set(method) == B_FALSE) {
+				cmn_err(CE_WARN, "Failed to reset discovery "
+				    "method after discovery disable failure.");
+			}
+			rtn = EBUSY;
 		}
 		break;
 
