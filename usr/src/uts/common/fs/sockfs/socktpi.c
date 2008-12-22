@@ -6957,7 +6957,7 @@ sotpi_info_destroy(struct sonode *so)
 }
 
 /*
- * Create the global sotpi socket module entry. It will never be free.
+ * Create the global sotpi socket module entry. It will never be freed.
  */
 smod_info_t *
 sotpi_smod_create(void)
@@ -6965,10 +6965,10 @@ sotpi_smod_create(void)
 	smod_info_t *smodp;
 
 	smodp = kmem_zalloc(sizeof (*smodp), KM_SLEEP);
-	smodp->smod_name = kmem_zalloc(strlen(SOTPI_SMOD_NAME), + 1);
-	(void *)strcpy(smodp->smod_name, SOTPI_SMOD_NAME);
+	smodp->smod_name = kmem_alloc(sizeof (SOTPI_SMOD_NAME), KM_SLEEP);
+	(void) strcpy(smodp->smod_name, SOTPI_SMOD_NAME);
 	/*
-	 * Initilization the refcnt to 1 so it will never be free.
+	 * Initialize the smod_refcnt to 1 so it will never be freed.
 	 */
 	smodp->smod_refcnt = 1;
 	smodp->smod_uc_version = SOCK_UC_VERSION;

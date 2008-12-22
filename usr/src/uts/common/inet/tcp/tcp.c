@@ -4332,11 +4332,6 @@ tcp_free(tcp_t *tcp)
 		tcp->tcp_ordrel_mp = NULL;
 	}
 
-	if (tcp->tcp_ordrel_mp != NULL) {
-		freeb(tcp->tcp_ordrel_mp);
-		tcp->tcp_ordrel_mp = NULL;
-	}
-
 	if (tcp->tcp_sack_info != NULL) {
 		if (tcp->tcp_notsack_list != NULL) {
 			TCP_NOTSACK_REMOVE_ALL(tcp->tcp_notsack_list);
@@ -9923,7 +9918,7 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 int
 tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
     uint_t inlen, uchar_t *invalp, uint_t *outlenp, uchar_t *outvalp,
-    void *thisdg_attrs, cred_t *cr)
+    void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
 {
 	tcp_t	*tcp = connp->conn_tcp;
 	int	*i1 = (int *)invalp;
@@ -10516,8 +10511,13 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 				 * IP will validate the source address and
 				 * interface index.
 				 */
-				reterr = ip_set_options(tcp->tcp_connp, level,
-				    name, invalp, inlen, cr);
+				if (IPCL_IS_NONSTR(tcp->tcp_connp)) {
+					reterr = ip_set_options(tcp->tcp_connp,
+					    level, name, invalp, inlen, cr);
+				} else {
+					reterr = ip6_set_pktinfo(cr,
+					    tcp->tcp_connp, pkti, mblk);
+				}
 				if (reterr != 0)
 					return (reterr);
 				ipp->ipp_ifindex = pkti->ipi6_ifindex;
@@ -10534,7 +10534,6 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			reterr = tcp_build_hdrs(tcp);
 			if (reterr != 0)
 				return (reterr);
-			PASS_OPT_TO_IP(connp);
 			break;
 		case IPV6_TCLASS:
 			if (inlen != 0 && inlen != sizeof (int))
@@ -10775,7 +10774,7 @@ tcp_tpi_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 	conn_t	*connp =  Q_TO_CONN(q);
 
 	return (tcp_opt_set(connp, optset_context, level, name, inlen, invalp,
-	    outlenp, outvalp, thisdg_attrs, cr));
+	    outlenp, outvalp, thisdg_attrs, cr, mblk));
 }
 
 int
@@ -10827,7 +10826,7 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 
 	error = tcp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, level, option_name,
 	    optlen, (uchar_t *)optvalp, (uint_t *)&optlen, (uchar_t *)optvalp,
-	    NULL, cr);
+	    NULL, cr, NULL);
 	squeue_synch_exit(sqp, connp);
 
 	if (error < 0) {
@@ -18003,14 +18002,14 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 
 		(void) tcp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, IPPROTO_IPV6,
 		    IPV6_BOUND_IF, len, (uchar_t *)&boundif, &len,
-		    (uchar_t *)&boundif, NULL, tcp->tcp_cred);
+		    (uchar_t *)&boundif, NULL, tcp->tcp_cred, NULL);
 	}
 	if (tcpopt->to_flags & TCPOPT_RECVPKTINFO) {
 		uint_t on = 1;
 		uint_t len = sizeof (uint_t);
 		(void) tcp_opt_set(connp, SETFN_OPTCOM_NEGOTIATE, IPPROTO_IPV6,
 		    IPV6_RECVPKTINFO, len, (uchar_t *)&on, &len,
-		    (uchar_t *)&on, NULL, tcp->tcp_cred);
+		    (uchar_t *)&on, NULL, tcp->tcp_cred, NULL);
 	}
 
 	/*
