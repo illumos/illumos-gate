@@ -4570,6 +4570,8 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 		connp->conn_send = ip_output;
 		connp->conn_recv = tcp_input;
 
+		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst,
+		    &connp->conn_bound_source_v6);
 		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &connp->conn_srcv6);
 		IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &connp->conn_remv6);
 
@@ -4606,6 +4608,7 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 		connp->conn_send = ip_output_v6;
 		connp->conn_recv = tcp_input;
 
+		connp->conn_bound_source_v6 = ip6h->ip6_dst;
 		connp->conn_srcv6 = ip6h->ip6_dst;
 		connp->conn_remv6 = ip6h->ip6_src;
 
@@ -4868,6 +4871,7 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 	connp->conn_recv = tcp_input;
 	connp->conn_fully_bound = B_FALSE;
 
+	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &connp->conn_bound_source_v6);
 	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_dst, &connp->conn_srcv6);
 	IN6_IPADDR_TO_V4MAPPED(ipha->ipha_src, &connp->conn_remv6);
 	connp->conn_fport = *(uint16_t *)tcph->th_lport;

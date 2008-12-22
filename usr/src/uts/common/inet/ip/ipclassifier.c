@@ -1329,15 +1329,26 @@ ipcl_conn_insert(conn_t *connp, uint8_t protocol, ipaddr_t src,
 			 */
 			IPCL_CONN_INIT(connp, protocol, src, rem, ports);
 		}
+
+		/*
+		 * For tcp, we check whether the connection tuple already
+		 * exists before allowing the connection to proceed.  We
+		 * also allow indexing on the zoneid. This is to allow
+		 * multiple shared stack zones to have the same tcp
+		 * connection tuple. In practice this only happens for
+		 * INADDR_LOOPBACK as it's the only local address which
+		 * doesn't have to be unique.
+		 */
 		connfp = &ipst->ips_ipcl_conn_fanout[
 		    IPCL_CONN_HASH(connp->conn_rem,
 		    connp->conn_ports, ipst)];
 		mutex_enter(&connfp->connf_lock);
 		for (tconnp = connfp->connf_head; tconnp != NULL;
 		    tconnp = tconnp->conn_next) {
-			if (IPCL_CONN_MATCH(tconnp, connp->conn_ulp,
+			if ((IPCL_CONN_MATCH(tconnp, connp->conn_ulp,
 			    connp->conn_rem, connp->conn_src,
-			    connp->conn_ports)) {
+			    connp->conn_ports)) &&
+			    (IPCL_ZONE_MATCH(tconnp, connp->conn_zoneid))) {
 
 				/* Already have a conn. bail out */
 				mutex_exit(&connfp->connf_lock);
@@ -1422,6 +1433,16 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 		if (!(connp->conn_flags & IPCL_EAGER)) {
 			IPCL_CONN_INIT_V6(connp, protocol, *src, *rem, ports);
 		}
+
+		/*
+		 * For tcp, we check whether the connection tuple already
+		 * exists before allowing the connection to proceed.  We
+		 * also allow indexing on the zoneid. This is to allow
+		 * multiple shared stack zones to have the same tcp
+		 * connection tuple. In practice this only happens for
+		 * ipv6_loopback as it's the only local address which
+		 * doesn't have to be unique.
+		 */
 		connfp = &ipst->ips_ipcl_conn_fanout[
 		    IPCL_CONN_HASH_V6(connp->conn_remv6, connp->conn_ports,
 		    ipst)];
@@ -1432,7 +1453,8 @@ ipcl_conn_insert_v6(conn_t *connp, uint8_t protocol, const in6_addr_t *src,
 			    connp->conn_remv6, connp->conn_srcv6,
 			    connp->conn_ports) &&
 			    (tconnp->conn_tcp->tcp_bound_if == 0 ||
-			    tconnp->conn_tcp->tcp_bound_if == ifindex)) {
+			    tconnp->conn_tcp->tcp_bound_if == ifindex) &&
+			    (IPCL_ZONE_MATCH(tconnp, connp->conn_zoneid))) {
 				/* Already have a conn. bail out */
 				mutex_exit(&connfp->connf_lock);
 				return (EADDRINUSE);
@@ -1521,9 +1543,11 @@ ipcl_classify_v4(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
-			if (IPCL_CONN_MATCH(connp, protocol,
-			    ipha->ipha_src, ipha->ipha_dst, ports))
+			if ((IPCL_CONN_MATCH(connp, protocol,
+			    ipha->ipha_src, ipha->ipha_dst, ports)) &&
+			    (IPCL_ZONE_MATCH(connp, zoneid))) {
 				break;
+			}
 		}
 
 		if (connp != NULL) {
@@ -1711,9 +1735,11 @@ ipcl_classify_v6(mblk_t *mp, uint8_t protocol, uint_t hdr_len, zoneid_t zoneid,
 		mutex_enter(&connfp->connf_lock);
 		for (connp = connfp->connf_head; connp != NULL;
 		    connp = connp->conn_next) {
-			if (IPCL_CONN_MATCH_V6(connp, protocol,
-			    ip6h->ip6_src, ip6h->ip6_dst, ports))
+			if ((IPCL_CONN_MATCH_V6(connp, protocol,
+			    ip6h->ip6_src, ip6h->ip6_dst, ports)) &&
+			    (IPCL_ZONE_MATCH(connp, zoneid))) {
 				break;
+			}
 		}
 
 		if (connp != NULL) {
