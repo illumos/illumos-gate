@@ -25,7 +25,7 @@
  */
 
 /*
- * Copyright 2007 Jason King.  All rights reserved.
+ * Copyright 2008 Jason King.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -615,7 +615,7 @@ static const char *v9_privreg_names[32] = {
 	NULL,	NULL,	NULL,	"%ver"
 };
 
-/* hyper privledged register names on v9 */
+/* hyper privileged register names on v9 */
 static const char *v9_hprivreg_names[32] = {
 	"%hpstate",	 "%htstate",	"%hrstba",  "%hintp",
 	NULL,	"%htba",	 "%hver",  NULL,
@@ -657,6 +657,7 @@ static void prt_name(dis_handle_t *, const char *, int);
 static void prt_imm(dis_handle_t *, uint32_t, int);
 
 static void prt_asi(dis_handle_t *, uint32_t);
+static const char *get_asi_name(uint8_t);
 static void prt_address(dis_handle_t *, uint32_t, int);
 static void prt_aluargs(dis_handle_t *, uint32_t, uint32_t);
 static void bprintf(dis_handle_t *, const char *, ...);
@@ -935,7 +936,10 @@ static int
 fmt_cas(dis_handle_t *dhp, uint32_t instr, const char *name)
 {
 	ifmt_t *f = (ifmt_t *)&instr;
+	const char *asistr = NULL;
 	int noasi = 0;
+
+	asistr = get_asi_name(f->f3.asi);
 
 	if ((dhp->dh_debug & (DIS_DEBUG_SYN_ALL|DIS_DEBUG_COMPAT)) != 0) {
 		if (f->f3.op3 == 0x3c && f->f3.i == 0) {
@@ -973,6 +977,9 @@ fmt_cas(dis_handle_t *dhp, uint32_t instr, const char *name)
 	}
 
 	bprintf(dhp, ", %s, %s", reg_names[f->f3.rs2], reg_names[f->f3.rd]);
+
+	if (noasi == 0 && asistr != NULL)
+		bprintf(dhp, "\t<%s>", asistr);
 
 	return (0);
 }
@@ -1014,6 +1021,7 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 {
 	ifmt_t *f = (ifmt_t *)&instr;
 	const char *regstr = NULL;
+	const char *asistr = NULL;
 
 	const char *iname = inp->in_data.in_def.in_name;
 	uint32_t flags = inp->in_data.in_def.in_flags;
@@ -1053,6 +1061,12 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 			    dhp->dh_buflen);
 		else
 			prt_imm(dhp, f->f3.rd, 0);
+
+		if (idx == 0x3d && f->f3.i == 0) {
+			asistr = get_asi_name(f->f3.asi);
+			if (asistr != NULL)
+				bprintf(dhp, "\t<%s>", asistr);
+		}
 
 		return (0);
 	}
@@ -1197,6 +1211,10 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 				    get_regname(dhp, REG_FPD, f->f3.rs2),
 				    get_regname(dhp, REG_FPD, f->f3.rs1));
 				prt_asi(dhp, instr);
+				asistr = get_asi_name(f->f3.asi);
+				if (asistr != NULL)
+					bprintf(dhp, "\t<%s>", asistr);
+
 				return (0);
 
 			default:
@@ -1206,6 +1224,9 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 	}
 
 	regstr = get_regname(dhp, FLG_RD_VAL(flags), f->f3.rd);
+
+	if (f->f3.i == 0)
+		asistr = get_asi_name(f->f3.asi);
 
 	prt_name(dhp, iname, 1);
 
@@ -1232,6 +1253,9 @@ fmt_ls(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 			(void) strlcat(dhp->dh_buf, regstr, dhp->dh_buflen);
 		}
 	}
+
+	if ((flags & FLG_ASI) != 0 && asistr != NULL)
+		bprintf(dhp, "\t<%s>", asistr);
 
 	return (0);
 }
@@ -1372,6 +1396,19 @@ dis_fmt_rdwr(dis_handle_t *dhp, uint32_t instr, const inst_t *inp, int idx)
 		} else {
 			regstr = asr_names[ridx];
 			mask = asr_wrmask;
+		}
+
+		/*
+		 * sir is shoehorned in here, per Ultrasparc 2007
+		 * hyperprivileged edition, section 7.88, all of
+		 * these must be true to distinguish from WRasr
+		 */
+		if (v9 != 0 && f->f3.rd == 15 && f->f3.rs1 == 0 &&
+		    f->f3.i == 1) {
+			prt_name(dhp, "sir", 1);
+			prt_imm(dhp, sign_extend(f->f3a.simm13, 13),
+			    IMM_SIGNED);
+			return (0);
 		}
 
 		/* synth: mov */
@@ -2183,7 +2220,7 @@ prt_field(const char *field, uint32_t val, int len)
 static void
 prt_field(const char *field, uint32_t val, int len)
 {
-	(void) fprintf(stderr, "DISASM: %8s = 0x%-8ulx (", field, val);
+	(void) fprintf(stderr, "DISASM: %8s = 0x%-8x (", field, val);
 	prt_binary(val, len);
 	(void) fprintf(stderr, ")\n");
 }
@@ -2476,6 +2513,264 @@ prt_aluargs(dis_handle_t *dhp, uint32_t instr, uint32_t flags)
 
 	if (p3 != 0)
 		(void) strlcat(dhp->dh_buf, r3, dhp->dh_buflen);
+}
+
+static const char *
+get_asi_name(uint8_t asi)
+{
+	switch (asi) {
+		case 0x04:
+			return ("ASI_N");
+
+		case 0x0c:
+			return ("ASI_NL");
+
+		case 0x10:
+			return ("ASI_AIUP");
+
+		case 0x11:
+			return ("ASI_AIUS");
+
+		case 0x14:
+			return ("ASI_REAL");
+
+		case 0x15:
+			return ("ASI_REAL_IO");
+
+		case 0x16:
+			return ("ASI_BLK_AIUP");
+
+		case 0x17:
+			return ("ASI_BLK_AIUS");
+
+		case 0x18:
+			return ("ASI_AIUPL");
+
+		case 0x19:
+			return ("ASI_AIUSL");
+
+		case 0x1c:
+			return ("ASI_REAL_L");
+
+		case 0x1d:
+			return ("ASI_REAL_IO_L");
+
+		case 0x1e:
+			return ("ASI_BLK_AIUPL");
+
+		case 0x1f:
+			return ("ASI_BLK_AIUS_L");
+
+		case 0x20:
+			return ("ASI_SCRATCHPAD");
+
+		case 0x21:
+			return ("ASI_MMU_CONTEXTID");
+
+		case 0x22:
+			return ("ASI_TWINX_AIUP");
+
+		case 0x23:
+			return ("ASI_TWINX_AIUS");
+
+		case 0x25:
+			return ("ASI_QUEUE");
+
+		case 0x26:
+			return ("ASI_TWINX_R");
+
+		case 0x27:
+			return ("ASI_TWINX_N");
+
+		case 0x2a:
+			return ("ASI_LDTX_AIUPL");
+
+		case 0x2b:
+			return ("ASI_TWINX_AIUS_L");
+
+		case 0x2e:
+			return ("ASI_TWINX_REAL_L");
+
+		case 0x2f:
+			return ("ASI_TWINX_NL");
+
+		case 0x30:
+			return ("ASI_AIPP");
+
+		case 0x31:
+			return ("ASI_AIPS");
+
+		case 0x36:
+			return ("ASI_AIPN");
+
+		case 0x38:
+			return ("ASI_AIPP_L");
+
+		case 0x39:
+			return ("ASI_AIPS_L");
+
+		case 0x3e:
+			return ("ASI_AIPN_L");
+
+		case 0x41:
+			return ("ASI_CMT_SHARED");
+
+		case 0x4f:
+			return ("ASI_HYP_SCRATCHPAD");
+
+		case 0x50:
+			return ("ASI_IMMU");
+
+		case 0x52:
+			return ("ASI_MMU_REAL");
+
+		case 0x54:
+			return ("ASI_MMU");
+
+		case 0x55:
+			return ("ASI_ITLB_DATA_ACCESS_REG");
+
+		case 0x56:
+			return ("ASI_ITLB_TAG_READ_REG");
+
+		case 0x57:
+			return ("ASI_IMMU_DEMAP");
+
+		case 0x58:
+			return ("ASI_DMMU / ASI_UMMU");
+
+		case 0x5c:
+			return ("ASI_DTLB_DATA_IN_REG");
+
+		case 0x5d:
+			return ("ASI_DTLB_DATA_ACCESS_REG");
+
+		case 0x5e:
+			return ("ASI_DTLB_TAG_READ_REG");
+
+		case 0x5f:
+			return ("ASI_DMMU_DEMAP");
+
+		case 0x63:
+			return ("ASI_CMT_PER_STRAND / ASI_CMT_PER_CORE");
+
+		case 0x80:
+			return ("ASI_P");
+
+		case 0x81:
+			return ("ASI_S");
+
+		case 0x82:
+			return ("ASI_PNF");
+
+		case 0x83:
+			return ("ASI_SNF");
+
+		case 0x88:
+			return ("ASI_PL");
+
+		case 0x89:
+			return ("ASI_SL");
+
+		case 0x8a:
+			return ("ASI_PNFL");
+
+		case 0x8b:
+			return ("ASI_SNFL");
+
+		case 0xc0:
+			return ("ASI_PST8_P");
+
+		case 0xc1:
+			return ("ASI_PST8_S");
+
+		case 0xc2:
+			return ("ASI_PST16_P");
+
+		case 0xc3:
+			return ("ASI_PST16_S");
+
+		case 0xc4:
+			return ("ASI_PST32_P");
+
+		case 0xc5:
+			return ("ASI_PST32_S");
+
+		case 0xc8:
+			return ("ASI_PST8_PL");
+
+		case 0xc9:
+			return ("ASI_PST8_SL");
+
+		case 0xca:
+			return ("ASI_PST16_PL");
+
+		case 0xcb:
+			return ("ASI_PST16_SL");
+
+		case 0xcc:
+			return ("ASI_PST32_PL");
+
+		case 0xcd:
+			return ("ASI_PST32_SL");
+
+		case 0xd0:
+			return ("ASI_FL8_P");
+
+		case 0xd1:
+			return ("ASI_FL8_S");
+
+		case 0xd2:
+			return ("ASI_FL16_P");
+
+		case 0xd3:
+			return ("ASI_FL16_S");
+
+		case 0xd8:
+			return ("ASI_FL8_PL");
+
+		case 0xd9:
+			return ("ASI_FL8_SL");
+
+		case 0xda:
+			return ("ASI_FL16_PL");
+
+		case 0xdb:
+			return ("ASI_FL16_SL");
+
+		case 0xe0:
+			return ("ASI_BLK_COMMIT_P");
+
+		case 0xe1:
+			return ("ASI_BLK_SOMMIT_S");
+
+		case 0xe2:
+			return ("ASI_TWINX_P");
+
+		case 0xe3:
+			return ("ASI_TWINX_S");
+
+		case 0xea:
+			return ("ASI_TWINX_PL");
+
+		case 0xeb:
+			return ("ASI_TWINX_SL");
+
+		case 0xf0:
+			return ("ASI_BLK_P");
+
+		case 0xf1:
+			return ("ASI_BLK_S");
+
+		case 0xf8:
+			return ("ASI_BLK_PL");
+
+		case 0xf9:
+			return ("ASI_BLK_SL");
+
+		default:
+			return (NULL);
+	}
 }
 
 /*
