@@ -4377,7 +4377,7 @@ top:
 		/*
 		 * skip pages that are already locked or can't be "exclusively"
 		 * locked or are already free.  After we lock the page, check
-		 * the free and age bits again to be sure it's not destroied
+		 * the free and age bits again to be sure it's not destroyed
 		 * yet.
 		 * To achieve max. parallelization, we use page_trylock instead
 		 * of page_lock so that we don't get block on individual pages
@@ -4440,7 +4440,8 @@ top:
 			    kcred, NULL);
 			VN_RELE(vp);
 		} else {
-			page_destroy(pp, 0);
+			/*LINTED: constant in conditional context*/
+			VN_DISPOSE(pp, B_INVAL, 0, kcred);
 		}
 	} while ((pp = page_next(pp)) != page0);
 	if (nbusypages && retry++ < MAXRETRIES) {

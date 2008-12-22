@@ -1342,6 +1342,9 @@ struct async_reqs {
 
 /*
  * VN_DISPOSE() -- given a page pointer, safely invoke VOP_DISPOSE().
+ * Note that there is no guarantee that the page passed in will be
+ * freed.  If that is required, then a check after calling VN_DISPOSE would
+ * be necessary to ensure the page was freed.
  */
 #define	VN_DISPOSE(pp, flag, dn, cr)	{ \
 	extern struct vnode kvp; \

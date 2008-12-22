@@ -176,7 +176,7 @@ struct biostats {
 #define	B_DONTNEED	0x002000	/* after write, need not be cached */
 #define	B_REMAPPED	0x004000	/* buffer is kernel addressable */
 #define	B_FREE		0x008000	/* free page when done */
-#define	B_INVAL		0x010000	/* does not contain valid info  */
+#define	B_INVAL		0x010000	/* destroy page when done */
 #define	B_FORCE		0x020000	/* semi-permanent removal from cache */
 #define	B_NOCACHE	0x080000 	/* don't cache block when released */
 #define	B_TRUNC		0x100000	/* truncate page without I/O */
@@ -186,6 +186,24 @@ struct biostats {
 #define	B_STARTED	0x2000000	/* io:::start probe called for buf */
 #define	B_ABRWRITE	0x4000000	/* Application based recovery active */
 #define	B_PAGE_NOWAIT	0x8000000	/* Skip the page if it is locked */
+
+/*
+ * There is some confusion over the meaning of B_FREE and B_INVAL and what
+ * the use of one over the other implies.
+ *
+ * In both cases, when we are done with the page (buffer) we want to free
+ * up the page.  In the case of B_FREE, the page will go to the cachelist.
+ * In the case of B_INVAL, the page will be destroyed (hashed out of it's
+ * vnode) and placed on the freelist.  Beyond this, there is no difference
+ * between the sole use of these two flags.  In both cases, IO will be done
+ * if the page is not yet committed to storage.
+ *
+ * In order to discard pages without writing them back, (B_INVAL | B_TRUNC)
+ * should be used.
+ *
+ * Use (B_INVAL | B_FORCE) to force the page to be destroyed even if we
+ * could not successfuly write out the page.
+ */
 
 /*
  * Insq/Remq for the buffer hash lists.
