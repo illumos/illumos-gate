@@ -6183,6 +6183,9 @@ do_create_secobj(int argc, char **argv, const char *use)
 	if (obj_name == NULL)
 		die("secure object name required");
 
+	if (!dladm_valid_secobj_name(obj_name))
+		die("invalid secure object name '%s'", obj_name);
+
 	success = check_auth(LINK_SEC_AUTH);
 	audit_secobj(LINK_SEC_AUTH, class_name, obj_name, success, B_TRUE);
 	if (!success)

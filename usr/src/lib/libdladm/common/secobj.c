@@ -130,6 +130,9 @@ dladm_set_secobj(const char *obj_name, dladm_secobj_class_t class,
 	dld_ioc_secobj_set_t	secobj_set;
 	dld_secobj_t		*objp;
 
+	if (!dladm_valid_secobj_name(obj_name))
+		return (DLADM_STATUS_BADARG);
+
 	if (!dladm_check_secobjclass(class) || flags == 0 ||
 	    obj_name == NULL || strlen(obj_name) > DLD_SECOBJ_NAME_MAX ||
 	    obj_val == NULL || obj_len == 0 || obj_len > DLD_SECOBJ_VAL_MAX)
@@ -650,4 +653,26 @@ dladm_init_secobj(void)
 	state.ss_namelist = NULL;
 
 	return (SECOBJ_RW_DB(&state, B_FALSE));
+}
+
+boolean_t
+dladm_valid_secobj_name(const char *secobj_name)
+{
+	size_t len = strlen(secobj_name);
+	const char *cp;
+
+	if (len + 1 > DLADM_SECOBJ_NAME_MAX)
+		return (B_FALSE);
+
+	/*
+	 * The legal characters in a secobj name are:
+	 * alphanumeric (a-z, A-Z, 0-9), '.', '_', '-'.
+	 */
+	for (cp = secobj_name; *cp != '\0'; cp++) {
+		if (!isalnum(*cp) &&
+		    (*cp != '.') && (*cp != '_') && (*cp != '-'))
+			return (B_FALSE);
+	}
+
+	return (B_TRUE);
 }

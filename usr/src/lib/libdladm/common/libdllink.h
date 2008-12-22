@@ -145,6 +145,7 @@ extern dladm_status_t	dladm_str2secobjclass(const char *,
 
 extern dladm_status_t	dladm_init_linkprop(datalink_id_t, boolean_t);
 extern dladm_status_t	dladm_init_secobj(void);
+extern boolean_t	dladm_valid_secobj_name(const char *);
 
 extern dladm_status_t	dladm_create_datalink_id(const char *, datalink_class_t,
 			    uint_t, uint32_t, datalink_id_t *);

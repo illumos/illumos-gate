@@ -1232,10 +1232,10 @@ key_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp,
 }
 
 /*
- * Print the key format into the appropriate field, then convert any ":"
+ * Print the key name format into the appropriate field, then convert any ":"
  * characters to ".", as ":[1-4]" is the slot indicator, which otherwise
- * would trip us up.  The third parameter is expected to be of size
- * DLADM_SECOBJ_NAME_MAX.
+ * would trip us up.  Invalid characters for secobj names are ignored.
+ * The fourth parameter is expected to be of size DLADM_SECOBJ_NAME_MAX.
  *
  * (Note that much of the system uses DLADM_WLAN_MAX_KEYNAME_LEN, which is 64
  * rather than 32, but that dladm_get_secobj will fail if a length greater than
@@ -1244,16 +1244,37 @@ key_string_to_secobj_value(char *buf, uint8_t *obj_val, uint_t *obj_lenp,
 static void
 set_key_name(const char *essid, const char *bssid, char *name, size_t nsz)
 {
-	int i, rtn, len;
+	int i, j;
+	char secobj_name[DLADM_WLAN_MAX_KEYNAME_LEN];
 
-	if (bssid[0] == '\0')
-		rtn = snprintf(name, nsz, "nwam-%s", essid);
-	else
-		rtn = snprintf(name, nsz, "nwam-%s-%s", essid, bssid);
-	len = (rtn < nsz) ? rtn : nsz - 1;
-	for (i = 0; i < len; i++)
-		if (name[i] == ':')
-			name[i] = '.';
+	/* create a concatenated string with essid and bssid */
+	if (bssid[0] == '\0') {
+		(void) snprintf(secobj_name, sizeof (secobj_name), "nwam-%s",
+		    essid);
+	} else {
+		(void) snprintf(secobj_name, sizeof (secobj_name), "nwam-%s-%s",
+		    essid, bssid);
+	}
+
+	/* copy only valid chars to the return string, terminating with \0 */
+	i = 0; /* index into secobj_name */
+	j = 0; /* index into name */
+	while (secobj_name[i] != '\0') {
+		if (j == nsz - 1)
+			break;
+
+		if (secobj_name[i] == ':') {
+			name[j] = '.';
+			j++;
+		} else if (isalnum(secobj_name[i]) ||
+		    secobj_name[i] == '.' || secobj_name[i] == '-' ||
+		    secobj_name[i] == '_') {
+			name[j] = secobj_name[i];
+			j++;
+		}
+		i++;
+	}
+	name[j] = '\0';
 }
 
 static int

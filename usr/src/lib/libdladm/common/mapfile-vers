@@ -38,6 +38,7 @@ SUNWprivate_1.1 {
 	dladm_get_linkprop;
 	dladm_set_linkprop;
 	dladm_walk_linkprop;
+	dladm_valid_secobj_name;
 	dladm_init_secobj;
 	dladm_get_secobj;
 	dladm_set_secobj;
