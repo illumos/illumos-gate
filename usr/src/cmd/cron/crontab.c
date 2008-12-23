@@ -26,8 +26,6 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -47,6 +45,8 @@
 #include <libintl.h>
 #include <spawn.h>
 #include <security/pam_appl.h>
+#include <limits.h>
+#include <libzoneinfo.h>
 #include "cron.h"
 #include "getresponse.h"
 
@@ -91,6 +91,9 @@
 	"     Edit again, to ensure crontab information is intact (%s/%s)?\n"\
 	"     ('%s' will discard edits.)"
 #define	NAMETOOLONG	"login name too long"
+#define	BAD_TZ	"Timezone unrecognized in: %s"
+#define	BAD_SHELL	"Invalid shell specified: %s"
+#define	BAD_HOME	"Unable to access directory: %s\t%s\n"
 
 extern int	per_errno;
 extern char 	**environ;
@@ -435,6 +438,7 @@ FILE *fp;
 	FILE *tfp;
 	char pid[6], *tnam_end;
 	int t;
+	char buf[LINE_MAX];
 
 	sprintf(pid, "%-5d", getpid());
 	tnam = xmalloc(strlen(CRONDIR)+strlen(TMPFILE)+7);
@@ -462,6 +466,56 @@ FILE *fp;
 		/* fix for 1039689 - treat blank line like a comment */
 		if (line[cursor] == '#' || line[cursor] == '\n')
 			goto cont;
+
+		if (strncmp(&line[cursor], ENV_TZ, strlen(ENV_TZ)) == 0) {
+			char *x;
+
+			strncpy(buf, &line[cursor + strlen(ENV_TZ)],
+			    sizeof (buf));
+			if ((x = strchr(buf, '\n')) != NULL)
+				*x = NULL;
+
+			if (isvalid_tz(buf, NULL, _VTZ_ALL)) {
+				goto cont;
+			} else {
+				err = 1;
+				fprintf(stderr, BAD_TZ, &line[cursor]);
+				continue;
+			}
+		} else if (strncmp(&line[cursor], ENV_SHELL,
+		    strlen(ENV_SHELL)) == 0) {
+			char *x;
+
+			strncpy(buf, &line[cursor + strlen(ENV_SHELL)],
+			    sizeof (buf));
+			if ((x = strchr(buf, '\n')) != NULL)
+				*x = NULL;
+
+			if (isvalid_shell(buf)) {
+				goto cont;
+			} else {
+				err = 1;
+				fprintf(stderr, BAD_SHELL, &line[cursor]);
+				continue;
+			}
+		} else if (strncmp(&line[cursor], ENV_HOME,
+		    strlen(ENV_HOME)) == 0) {
+			char *x;
+
+			strncpy(buf, &line[cursor + strlen(ENV_HOME)],
+			    sizeof (buf));
+			if ((x = strchr(buf, '\n')) != NULL)
+				*x = NULL;
+			if (chdir(buf) == 0) {
+				goto cont;
+			} else {
+				err = 1;
+				fprintf(stderr, BAD_HOME, &line[cursor],
+				    strerror(errno));
+				continue;
+			}
+		}
+
 		if (next_field(0, 59)) continue;
 		if (next_field(0, 23)) continue;
 		if (next_field(1, 31)) continue;

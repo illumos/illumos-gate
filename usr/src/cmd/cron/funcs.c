@@ -27,8 +27,6 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/param.h>
@@ -202,4 +200,34 @@ xcalloc(size_t nElements, size_t size)
 		exit(55);
 	}
 	return (p);
+}
+
+int
+isvalid_shell(const char *shell)
+{
+	char *t;
+	int ret = 0;
+
+	while ((t =  getusershell()) != NULL) {
+		if (strcmp(t, shell) == 0) {
+			ret = 1;
+			break;
+		}
+	}
+	endusershell();
+	return (ret);
+}
+
+int
+isvalid_dir(const char *dir)
+{
+	char *cwd = getcwd(NULL, 0);
+
+	if (dir[0] != '/' || chdir(dir) == -1) {
+		return (0);
+	}
+	if (cwd != NULL) {
+		(void) chdir(cwd);
+	}
+	return (1);
 }

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 DEFAULTFILES =	cron.dfl
@@ -144,10 +142,10 @@ at :=		LDLIBS += -lproject -lsecdb
 at.xpg4 :=	LDLIBS += -lproject -lsecdb
 atq :=		LDLIBS += -lsecdb
 atrm :=		LDLIBS += -lsecdb
-cron :=		LDLIBS += -lpam -lproject -lcontract
-crontab :=	LDLIBS += -lsecdb -lpam
-crontab.xpg6 :=	LDLIBS += -lsecdb -lpam
-crontab.xpg4 :=	LDLIBS += -lsecdb -lpam
+cron :=		LDLIBS += -lpam -lproject -lcontract -lzoneinfo
+crontab :=	LDLIBS += -lsecdb -lpam -lzoneinfo
+crontab.xpg6 :=	LDLIBS += -lsecdb -lpam -lzoneinfo
+crontab.xpg4 :=	LDLIBS += -lsecdb -lpam -lzoneinfo
 
 lint :=		LDLIBS += -lproject -lsecdb -lcontract -lpam
 

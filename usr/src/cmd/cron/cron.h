@@ -26,8 +26,6 @@
 #ifndef	_CRON_H
 #define	_CRON_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -88,6 +86,10 @@ struct	message {
 
 #define	SHELL		"/usr/bin/sh"	/* shell to execute */
 
+#define	ENV_SHELL	"SHELL="
+#define	ENV_TZ		"TZ="
+#define	ENV_HOME	"HOME="
+
 #define	CTLINESIZE	1000	/* max chars in a crontab line */
 #define	UNAMESIZE	20	/* max chars in a user name */
 
@@ -99,6 +101,8 @@ void	cron_sendmsg(char, char *, char *, char);
 time_t	 num(char **);
 void	*xmalloc(size_t);
 void	*xcalloc(size_t, size_t);
+int	isvalid_shell(const char *shell);
+int	isvalid_dir(const char *dir);
 
 #ifdef	__cplusplus
 }

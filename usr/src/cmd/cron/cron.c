@@ -29,7 +29,6 @@
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
 
-
 #ifdef lint
 /* make lint happy */
 #define	__EXTENSIONS__
@@ -70,6 +69,7 @@
 #include <stropts.h>
 #include <time.h>
 #include <unistd.h>
+#include <libzoneinfo.h>
 
 #include "cron.h"
 
@@ -119,9 +119,12 @@ isn't /usr/bin/sh, you can't use cron."
 
 #define	BADSTAT		"can't access your crontab or at-job file. Resubmit it."
 #define	BADPROJID	"can't set project id for your job."
-#define	CANTCDHOME	"can't change directory to your home directory.\
+#define	CANTCDHOME	"can't change directory to %s.\
 \nYour commands will not be executed."
-#define	CANTEXECSH	"unable to exec the shell for one of your commands."
+#define	CANTEXECSH	"unable to exec the shell, %s, for one of your \
+commands."
+#define	CANT_STR_LEN (sizeof (CANTEXECSH) > sizeof (CANTCDHOME) ? \
+	sizeof (CANTEXECSH) : sizeof (CANTCDHOME))
 #define	NOREAD		"can't read your crontab file.  Resubmit it."
 #define	BADTYPE		"crontab or at-job file is not a regular file.\n"
 #define	NOSTDIN		"unable to create a standard input file for \
@@ -166,6 +169,12 @@ error for each of your commands."
 #define	FORMAT	"%a %b %e %H:%M:%S %Y"
 static char	timebuf[80];
 
+struct shared {
+	int count;			/* usage count */
+	void (*free)(void *obj);	/* routine that will free obj */
+	void *obj;			/* object */
+};
+
 struct event {
 	time_t time;	/* time of the event	*/
 	short etype;	/* what type of event; 0=cron, 1=at	*/
@@ -180,6 +189,9 @@ struct event {
 			char *month;	/*   from	*/
 			char *dayweek;	/*   crontab)	*/
 			char *input;	/* ptr to stdin	*/
+			struct shared *tz;	/* timezone of this event */
+			struct shared *home;	/* directory for this event */
+			struct shared *shell;	/* shell for this event */
 		} ct;
 		struct { /* for at events */
 			short exists;	/* for revising at events	*/
@@ -256,9 +268,9 @@ static char *Def_supath	= NULL;
 static char *Def_path		= NULL;
 static char path[LINE_MAX]	= "PATH=";
 static char supath[LINE_MAX]	= "PATH=";
-static char homedir[LINE_MAX]	= "HOME=";
+static char homedir[LINE_MAX]	= ENV_HOME;
 static char logname[LINE_MAX]	= "LOGNAME=";
-static char tzone[LINE_MAX]	= "TZ=";
+static char tzone[LINE_MAX]	= ENV_TZ;
 static char *envinit[] = {
 	homedir,
 	logname,
@@ -327,6 +339,10 @@ static void cte_sendmail(char *);
 
 static int set_user_cred(const struct usr *, struct project *);
 
+static struct shared *create_shared_str(char *str);
+static struct shared *dup_shared(struct shared *obj);
+static void rel_shared(struct shared *obj);
+static void *get_obj(struct shared *obj);
 /*
  * last_time is set immediately prior to exection of an event (via ex())
  * to indicate the last time an event was executed.  This was (surely)
@@ -693,6 +709,9 @@ initialize(int firstpass)
 	init_time = time(NULL);
 	el_init(8, init_time, (time_t)(60*60*24), 10);
 
+	init_time = time(NULL);
+	el_init(8, init_time, (time_t)(60*60*24), 10);
+
 	/*
 	 * read directories, create users list, and add events to the
 	 * main event list. Only zero user list on firstpass.
@@ -715,7 +734,6 @@ initialize(int firstpass)
 	/* stderr also goes to ACCTFILE */
 	(void) close(fileno(stderr));
 	(void) dup(1);
-
 	/* null for stdin */
 	(void) freopen("/dev/null", "r", stdin);
 
@@ -874,7 +892,7 @@ mod_ctab(char *name, time_t reftime)
 	struct	passwd	*pw;
 	struct	stat	buf;
 	struct	usr	*u;
-	char	namebuf[PATH_MAX];
+	char	namebuf[LINE_MAX];
 	char	*pname;
 
 	/* skip over ancillary file names */
@@ -1110,6 +1128,9 @@ readcron(struct usr *u, time_t reftime)
 	unsigned int i;
 	char namebuf[PATH_MAX];
 	char *pname;
+	struct shared *tz = NULL;
+	struct shared *home = NULL;
+	struct shared *shell = NULL;
 	int lineno = 0;
 
 	/* read the crontab file */
@@ -1128,6 +1149,7 @@ readcron(struct usr *u, time_t reftime)
 		return;
 	}
 	while (fgets(line, CTLINESIZE, cf) != NULL) {
+		char *tmp;
 		/* process a line of a crontab file */
 		lineno++;
 		if (cte_istoomany())
@@ -1137,6 +1159,52 @@ readcron(struct usr *u, time_t reftime)
 			cursor++;
 		if (line[cursor] == '#' || line[cursor] == '\n')
 			continue;
+
+		if (strncmp(&line[cursor], ENV_TZ,
+		    strlen(ENV_TZ)) == 0) {
+			if ((tmp = strchr(&line[cursor], '\n')) != NULL) {
+				*tmp = NULL;
+			}
+
+			if (!isvalid_tz(&line[cursor + strlen(ENV_TZ)], NULL,
+			    _VTZ_ALL)) {
+				cte_add(lineno, line);
+				break;
+			}
+			if (tz == NULL || strcmp(&line[cursor], get_obj(tz))) {
+				rel_shared(tz);
+				tz = create_shared_str(&line[cursor]);
+			}
+			continue;
+		}
+
+		if (strncmp(&line[cursor], ENV_HOME,
+		    strlen(ENV_HOME)) == 0) {
+			if ((tmp = strchr(&line[cursor], '\n')) != NULL) {
+				*tmp = NULL;
+			}
+			if (home == NULL ||
+			    strcmp(&line[cursor], get_obj(home))) {
+				rel_shared(home);
+				home = create_shared_str(
+				    &line[cursor + strlen(ENV_HOME)]);
+			}
+			continue;
+		}
+
+		if (strncmp(&line[cursor], ENV_SHELL,
+		    strlen(ENV_SHELL)) == 0) {
+			if ((tmp = strchr(&line[cursor], '\n')) != NULL) {
+				*tmp = NULL;
+			}
+			if (shell == NULL ||
+			    strcmp(&line[cursor], get_obj(shell))) {
+				rel_shared(shell);
+				shell = create_shared_str(&line[cursor]);
+			}
+			continue;
+		}
+
 		e = xmalloc(sizeof (struct event));
 		e->etype = CRONEVENT;
 		if (!(((e->of.ct.minute = next_field(0, 59)) != NULL) &&
@@ -1178,6 +1246,12 @@ again:
 		} else {
 			e->of.ct.input = NULL;
 		}
+		/* set the timezone of this entry */
+		e->of.ct.tz = dup_shared(tz);
+		/* set the shell of this entry */
+		e->of.ct.shell = dup_shared(shell);
+		/* set the home of this entry */
+		e->of.ct.home = dup_shared(home);
 		/* have the event point to it's owner	*/
 		e->u = u;
 		/* insert this event at the front of this user's event list */
@@ -1203,6 +1277,9 @@ again:
 	}
 	cte_sendmail(u->name);	/* mail errors if any to user */
 	(void) fclose(cf);
+	rel_shared(tz);
+	rel_shared(shell);
+	rel_shared(home);
 }
 
 /*
@@ -1451,8 +1528,10 @@ next_field(int lower, int upper)
  * itself backwards).
  */
 
+
+
 static time_t
-next_time(struct event *e, time_t tflag)
+tz_next_time(struct event *e, time_t tflag)
 {
 	/*
 	 * returns the integer time for the next occurance of event e.
@@ -1465,10 +1544,9 @@ next_time(struct event *e, time_t tflag)
 	 */
 
 	struct tm *tm, ref_tm, tmp, tmp1, tmp2;
-	int tm_mon, tm_mday, tm_wday, wday, m, min, h, hr, carry, day, days,
-	    d1, day1, carry1, d2, day2, carry2, daysahead, mon, yr, db, wd,
-	    today;
-
+	int tm_mon, tm_mday, tm_wday, wday, m, min, h, hr, carry, day, days;
+	int d1, day1, carry1, d2, day2, carry2, daysahead, mon, yr, db, wd;
+	int today;
 	time_t t, ref_t, t1, t2, zone_start;
 	int fallback;
 	extern int days_btwn(int, int, int, int, int, int);
@@ -1575,8 +1653,9 @@ recalc:
 					t = get_switching_time(tmp1.tm_isdst,
 					    t1 - abs(timezone - altzone));
 				}
-				if (t == (time_t)-1)
+				if (t == (time_t)-1) {
 					return (0);
+				}
 			}
 			goto recalc;
 		}
@@ -1821,6 +1900,23 @@ recalc:
 	/*NOTREACHED*/
 }
 
+static time_t
+next_time(struct event *e, time_t tflag)
+{
+	if (e->of.ct.tz != NULL) {
+		time_t ret;
+
+		(void) putenv((char *)get_obj(e->of.ct.tz));
+		tzset();
+		ret = tz_next_time(e, tflag);
+		(void) putenv(tzone);
+		tzset();
+		return (ret);
+	} else {
+		return (tz_next_time(e, tflag));
+	}
+}
+
 /*
  * This returns TOD in time_t that zone switch will happen, and this
  * will be called when clock fallback is about to happen.
@@ -2040,6 +2136,9 @@ rm_ctevents(struct usr *u)
 	e2 = u->ctevents;
 	while (e2 != NULL) {
 		free(e2->cmd);
+		rel_shared(e2->of.ct.tz);
+		rel_shared(e2->of.ct.shell);
+		rel_shared(e2->of.ct.home);
 		free(e2->of.ct.minute);
 		free(e2->of.ct.hour);
 		free(e2->of.ct.daymon);
@@ -2087,13 +2186,20 @@ ex(struct event *e)
 	struct queue *qp;
 	struct runinfo *rp;
 	struct project proj, *pproj = NULL;
-	char mybuf[PROJECT_BUFSZ];
-	char mybuf2[PROJECT_BUFSZ];
+	union {
+		struct {
+			char buf[PROJECT_BUFSZ];
+			char buf2[PROJECT_BUFSZ];
+		} p;
+		char error[CANT_STR_LEN + PATH_MAX];
+	} bufs;
 	char *tmpfile;
 	FILE *fptr;
 	time_t dhltime;
 	projid_t projid;
 	int projflag = 0;
+	char *home;
+	char *sh;
 
 	qp = &qt[e->etype];	/* set pointer to queue defs */
 	if (qp->nrun >= qp->njob) {
@@ -2259,9 +2365,10 @@ ex(struct event *e)
 		 */
 		if (projflag == 1) {
 			if ((pproj = getprojbyid(projid, &proj,
-			    (void *)&mybuf, sizeof (mybuf))) == NULL ||
+			    (void *)&bufs.p.buf,
+			    sizeof (bufs.p.buf))) == NULL ||
 			    !inproj(e->u->name, pproj->pj_name,
-			    mybuf2, sizeof (mybuf2))) {
+			    bufs.p.buf2, sizeof (bufs.p.buf2))) {
 				cron_unlink(at_cmdfile);
 				mail((e->u)->name, BADPROJID, ERR_CANTEXECAT);
 				exit(1);
@@ -2401,11 +2508,17 @@ ex(struct event *e)
 			(void) close(fd);
 	}
 
-	(void) strlcat(homedir, (e->u)->home, sizeof (homedir));
+	if (e->etype == CRONEVENT && e->of.ct.home != NULL) {
+		home = (char *)get_obj(e->of.ct.home);
+	} else {
+		home = (e->u)->home;
+	}
+	(void) strlcat(homedir, home, sizeof (homedir));
 	(void) strlcat(logname, (e->u)->name, sizeof (logname));
 	environ = envinit;
-	if (chdir((e->u)->home) == -1) {
-		mail((e->u)->name, CANTCDHOME,
+	if (chdir(home) == -1) {
+		snprintf(bufs.error, sizeof (bufs.error), CANTCDHOME, home);
+		mail((e->u)->name, bufs.error,
 		    e->etype == CRONEVENT ? ERR_CANTEXECCRON :
 		    ERR_CANTEXECAT);
 		exit(1);
@@ -2421,11 +2534,33 @@ ex(struct event *e)
 
 	if ((e->u)->uid != 0)
 		(void) nice(qp->nice);
-	if (e->etype == CRONEVENT)
-		(void) execl(SHELL, "sh", "-c", e->cmd, 0);
-	else		/* type == ATEVENT */
+	if (e->etype == CRONEVENT) {
+		if (e->of.ct.tz) {
+			(void) putenv((char *)get_obj(e->of.ct.tz));
+		}
+		if (e->of.ct.shell) {
+			char *name;
+
+			sh = (char *)get_obj(e->of.ct.shell);
+			name = strrchr(sh, '/');
+			if (name == NULL)
+				name = sh;
+			else
+				name++;
+
+			(void) putenv(sh);
+			sh += strlen(ENV_SHELL);
+			(void) execl(sh, name, "-c", e->cmd, 0);
+		} else {
+			(void) execl(SHELL, "sh", "-c", e->cmd, 0);
+			sh = SHELL;
+		}
+	} else {		/* type == ATEVENT */
 		(void) execl(SHELL, "sh", 0);
-	mail((e->u)->name, CANTEXECSH,
+		sh = SHELL;
+	}
+	snprintf(bufs.error, sizeof (bufs.error), CANTEXECSH, sh);
+	mail((e->u)->name, bufs.error,
 	    e->etype == CRONEVENT ? ERR_CANTEXECCRON : ERR_CANTEXECAT);
 	exit(1);
 	/*NOTREACHED*/
@@ -3492,4 +3627,53 @@ contract_abandon_latest(pid_t pid)
 		cts_lost++;
 		return;
 	}
+}
+
+static struct shared *
+create_shared(void *obj, void * (*obj_alloc)(void *obj),
+	void (*obj_free)(void *))
+{
+	struct shared *out;
+
+	if ((out = xmalloc(sizeof (struct shared))) == NULL) {
+		return (NULL);
+	}
+	if ((out->obj = obj_alloc(obj)) == NULL) {
+		free(out);
+		return (NULL);
+	}
+	out->count = 1;
+	out->free = obj_free;
+
+	return (out);
+}
+
+static struct shared *
+create_shared_str(char *str)
+{
+	return (create_shared(str, (void *(*)(void *))strdup, free));
+}
+
+static struct shared *
+dup_shared(struct shared *obj)
+{
+	if (obj != NULL) {
+		obj->count++;
+	}
+	return (obj);
+}
+
+static void
+rel_shared(struct shared *obj)
+{
+	if (obj && (--obj->count) == 0) {
+		obj->free(obj->obj);
+		free(obj);
+	}
+}
+
+static void *
+get_obj(struct shared *obj)
+{
+	return (obj->obj);
 }
