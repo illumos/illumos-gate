@@ -25,7 +25,7 @@
 #
 #
 
-SUNW_1.1 {
+SUNWprivate_1.1 {
 	global:
 		drv_bind_raw_dev;
 		drv_blk_limit;
@@ -116,7 +116,3 @@ SUNW_1.1 {
 	local:
 		*;
 };
-
-
-
-

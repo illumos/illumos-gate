@@ -24,7 +24,7 @@
 #
 #
 
-SUNW_1.1 {
+SUNWprivate_1.1 {
 	global:
 		drv_density;
 		drv_drive_type;

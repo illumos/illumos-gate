@@ -40,8 +40,6 @@ SRCDIR =	../common
 
 SRCS =	$(OBJECTS:%.o=$(SRCDIR)/%.c)
 
-MAPFILES =
-
 ROOTLIBDIR = 	$(ROOTMMSLIBDIR)
 
 LDLIBS +=	-lsocket -lc

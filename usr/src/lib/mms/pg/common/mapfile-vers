@@ -25,7 +25,7 @@
 #
 #
 
-SUNW_1.1 {
+SUNWprivate_1.1 {
 	global:
 		pg_finfo_pg_get_uuid;
 		pg_finfo_pg_host_ident;

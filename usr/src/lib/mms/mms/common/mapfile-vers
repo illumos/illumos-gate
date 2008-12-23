@@ -25,24 +25,37 @@
 #
 
 SUNW_1.1 {
-	global:
-		mms_acc_insert;
-		mms_acc_wakeup;
-		mms_accept;
 		mms_agoodbye;
 		mms_ainit;
-		mms_api;
-		mms_api_reader;
-		mms_be_wait;
+		mms_free_rsp;
+		mms_get_attribute;
+		mms_goodbye;
+		mms_handle_err_rsp;
+		mms_hello;
+		mms_init;
+		mms_read_event;
+		mms_read_response;
+		mms_send_acmd;
+		mms_send_cmd;
+
+	local:
+		*;
+};
+
+SUNWprivate_1.1 {
+	global:
+		mms_host_ident;
+		mms_host_info;
+		mms_pn_lookup;
+		mms_sym_code_to_str;
+
+		mms_accept;
 		mms_be_wakeup;
 		mms_bld_msgcl;
 		mms_buf_msgcl;
 		mms_cat_open;
-		mms_cfg__flex_debug;
 		mms_cfg_alloc_getvar;
 		mms_cfg_getvar;
-		mms_cfg_in;
-		mms_cfg_out;
 		mms_cfg_setvar;
 		mms_cfg_unsetvar;
 		mms_close;
@@ -50,22 +63,10 @@ SUNW_1.1 {
 		mms_connect;
 		mms_dmpd_parse;
 		mms_dmpm_parse;
-		mms_empty_message;
-		mms_empty_string;
 		mms_format_sense;
-		mms_free_rsp;
-		mms_get_attribute;
 		mms_get_cat_msg;
 		mms_get_error_string;
 		mms_get_locstr;
-		mms_get_msg;
-		mms_get_msgcl;
-		mms_goodbye;
-		mms_handle_err_rsp;
-		mms_hello;
-		mms_host_ident;
-		mms_host_info;
-		mms_init;
 		mms_list_create;
 		mms_list_create_like;
 		mms_list_destroy;
@@ -85,13 +86,9 @@ SUNW_1.1 {
 		mms_listen;
 		mms_lmpl_parse;
 		mms_lmpm_parse;
-		mms_lookup_sym_code;
 		mms_man_cores;
 		mms_mmconnect;
 		mms_mmp_parse;
-		mms_mmsp__flex_debug;
-		mms_mmsp_in;
-		mms_mmsp_out;
 		mms_msg_get_severity;
 		mms_msg_sub;
 		mms_net_cfg_free;
@@ -103,19 +100,12 @@ SUNW_1.1 {
 		mms_pe_destroy;
 		mms_pn_build_cmd_text;
 		mms_pn_destroy;
-		mms_pn_lookup;
 		mms_pn_lookup_arg;
-		mms_read_event;
-		mms_read_response;
 		mms_reader;
 		mms_scsi_cmd;
 		mms_scsi_sensekey;
 		mms_scsi_status;
-		mms_send_acmd;
-		mms_send_cmd;
 		mms_set_core;
-		mms_sort_sym_code;
-		mms_sort_sym_token;
 		mms_ssl_build_cert_clause;
 		mms_ssl_check_conn_cert;
 		mms_ssl_client;
@@ -126,14 +116,11 @@ SUNW_1.1 {
 		mms_ssl_server;
 		mms_ssl_server_set_verify_peer;
 		mms_ssl_verify_cert_clause;
-		mms_state;
 		mms_strapp;
 		mms_strnapp;
 		mms_strnew;
 		mms_strpar_escape_sequence;
 		mms_strpar_undo_escape_sequence;
-		mms_sym_code_to_str;
-		mms_symtab_initialized;
 		mms_trace;
 		mms_trace_close;
 		mms_trace_dump;

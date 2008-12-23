@@ -1,0 +1,95 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#
+
+SUNWprivate_1.1 {
+	global:
+		create_mm_clnt;
+		free_acslib_list;
+		mgmt_db_dump;
+		mgmt_db_restore;
+		mgmt_find_local_drives;
+		mgmt_opt_to_var;
+		mgmt_set_str_or_arr;
+		mgmt_var_to_array;
+		mmp_get_nvattrs;
+		mms_add_drive;
+		mms_add_library;
+		mms_add_object;
+		mms_client_handle_rsp;
+		mms_gen_taskid;
+		mms_get_drive;
+		mms_list_free_and_destroy;
+		mms_mgmt_accept_request;
+		mms_mgmt_add_application;
+		mms_mgmt_add_cartridges;
+		mms_mgmt_add_dkvol;
+		mms_mgmt_add_dpool;
+		mms_mgmt_add_mpool;
+		mms_mgmt_add_voltype;
+		mms_mgmt_discover_libraries;
+		mms_mgmt_discover_media;
+		mms_mgmt_get_errstr;
+		mms_mgmt_get_opts;
+		mms_mgmt_get_pwd;
+		mms_mgmt_init_host;
+		mms_mgmt_label_multi;
+		mms_mgmt_list_drives;
+		mms_mgmt_list_libraries;
+		mms_mgmt_list_vols;
+		mms_mgmt_modify_application;
+		mms_mgmt_modify_dpool;
+		mms_mgmt_modify_mpool;
+		mms_mgmt_modify_voltype;
+		mms_mgmt_mount_vol;
+		mms_mgmt_reject_request;
+		mms_mgmt_remove_application;
+		mms_mgmt_remove_cartridges;
+		mms_mgmt_remove_dpool;
+		mms_mgmt_remove_mpool;
+		mms_mgmt_remove_partition;
+		mms_mgmt_remove_voltype;
+		mms_mgmt_send_cmd;
+		mms_mgmt_set_opts;
+		mms_mgmt_set_pass;
+		mms_mgmt_set_state;
+		mms_mgmt_set_vol_mode;
+		mms_mgmt_show_apps;
+		mms_mgmt_show_cartridge_type;
+		mms_mgmt_show_dpool;
+		mms_mgmt_show_mpool;
+		mms_mgmt_show_requests;
+		mms_mgmt_uninitialize;
+		mms_mgmt_unmount_vol;
+		mms_modify_drive;
+		mms_modify_library;
+		mms_remove_drive;
+		mms_remove_library;
+		val_objtype;
+
+	local:
+		*;
+};

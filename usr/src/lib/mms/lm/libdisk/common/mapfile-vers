@@ -24,7 +24,7 @@
 #
 #
 
-SUNW_1.1 {
+SUNWprivate_1.1 {
 	global:
 		lm_activate;
 		lm_barrier;
@@ -33,7 +33,6 @@ SUNW_1.1 {
 		lm_event;
 		lm_exit;
 		lm_inject;
-		lm_library_config;
 		lm_mount;
 		lm_move;
 		lm_private;

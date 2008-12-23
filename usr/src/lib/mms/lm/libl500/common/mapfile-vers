@@ -24,60 +24,21 @@
 #
 #
 
-SUNW_1.1 {
+SUNWprivate_1.1 {
 	global:
-		lm_acs_dismount;
-		lm_acs_display;
-		lm_acs_eject;
-		lm_acs_enter;
-		lm_acs_init;
-		lm_acs_mount;
-		lm_acs_query_cap;
-		lm_acs_query_drive;
-		lm_acs_query_mount;
-		lm_acs_query_server;
-		lm_acs_query_volume;
 		lm_activate;
 		lm_barrier;
 		lm_cancel;
-		lm_drive_geometry;
-		lm_drive_serial;
-		lm_drive_serial_num;
 		lm_eject;
 		lm_event;
 		lm_exit;
-		lm_get_display_cnt;
-		lm_get_type_info;
-		lm_handle_acs_cmd_error;
-		lm_handle_acsls_error;
-		lm_handle_acsls_rsp_error;
-		lm_handle_acsls_state;
-		lm_handle_dismount_error;
-		lm_handle_eject_error;
-		lm_handle_enter_error;
-		lm_handle_mount_error;
-		lm_handle_query_mount_error;
-		lm_handle_query_vol_error;
 		lm_inject;
-		lm_lib_type;
-		lm_library_config;
-		lm_library_config_non_comm;
 		lm_mount;
 		lm_move;
-		lm_num_panels;
-		lm_num_vols;
-		lm_obtain_acs_response;
-		lm_obtain_geometry;
-		lm_obtain_serial_num;
-		lm_priv_get;
-		lm_priv_set;
-		lm_priv_unset;
 		lm_private;
 		lm_reset;
 		lm_scan;
-		lm_set_drive_serial;
 		lm_unmount;
-		lm_validate_private;
 
 		acs_dismount = extern;
 		acs_display = extern;
@@ -108,6 +69,7 @@ SUNW_1.1 {
 		lm_serr = extern;
 		lm_set_drive_disabled = extern;
 		lm_state = extern;
+
 	local:
 		*;
 };
