@@ -17188,7 +17188,7 @@ st_add_recovery_info_to_pkt(struct scsi_tape *un, buf_t *bp,
 		return;
 	}
 
-	if (rinfo->cmd_attrib->explicit) {
+	if (rinfo->cmd_attrib->explicit_cmd_set) {
 		ASSERT(rinfo->pos.pmode != invalid);
 		ASSERT(rinfo->cmd_attrib->get_cnt);
 		count = rinfo->cmd_attrib->get_cnt(pkt->pkt_cdbp);

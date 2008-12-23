@@ -26,8 +26,6 @@
 #ifndef	_SYS_SCSI_TARGETS_STDEF_H
 #define	_SYS_SCSI_TARGETS_STDEF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/sunddi.h>
 #include <sys/note.h>
 #include <sys/condvar.h>
@@ -842,7 +840,7 @@ typedef struct {
 		retriable:		1,	/* can be retried */
 		chg_tape_pos:		1,	/* position will change */
 		chg_tape_data:		1,	/* data on media will change */
-		explicit:		1,	/* explicit command set */
+		explicit_cmd_set:	1,	/* explicit command set */
 		/*
 		 * 0 doesn't, 1 forward,
 		 * 2 back, 3 either
