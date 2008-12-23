@@ -2258,19 +2258,26 @@ ip_helper_stream_constructor(void *buf, void *cdrarg, int kmflags)
 	ASSERT(tcps != NULL);
 	ip_helper_str = (ip_helper_stream_info_t *)buf;
 
-	error = ldi_open_by_name(DEV_IP, IP_HELPER_STR, kcred,
-	    &ip_helper_str->ip_helper_stream_handle, ipst->ips_ldi_ident);
-	if (error != 0) {
-		goto done;
+	do {
+		error = ldi_open_by_name(DEV_IP, IP_HELPER_STR, kcred,
+		    &ip_helper_str->iphs_handle, ipst->ips_ldi_ident);
+	} while (error == EINTR);
+
+	if (error == 0) {
+		do {
+			error = ldi_ioctl(
+			    ip_helper_str->iphs_handle, SIOCSQPTR,
+			    (intptr_t)buf, FKIOCTL, kcred, &ret);
+		} while (error == EINTR);
+
+		if (error != 0) {
+			(void) ldi_close(
+			    ip_helper_str->iphs_handle, 0, kcred);
+		}
 	}
-	error = ldi_ioctl(ip_helper_str->ip_helper_stream_handle,
-	    SIOCSQPTR, (intptr_t)buf, FKIOCTL, kcred, &ret);
-	if (error != 0) {
-		(void) ldi_close(ip_helper_str->ip_helper_stream_handle, 0,
-		    kcred);
-	}
-done:
+
 	netstack_rele(ipst->ips_netstack);
+
 	return (error);
 }
 
@@ -2280,10 +2287,10 @@ ip_helper_stream_destructor(void *buf, void *cdrarg)
 {
 	ip_helper_stream_info_t *ip_helper_str = (ip_helper_stream_info_t *)buf;
 
-	ip_helper_str->ip_helper_stream_rq->q_ptr =
-	    ip_helper_str->ip_helper_stream_wq->q_ptr =
-	    ip_helper_str->ip_helper_stream_minfo;
-	(void) ldi_close(ip_helper_str->ip_helper_stream_handle, 0, kcred);
+	ip_helper_str->iphs_rq->q_ptr =
+	    ip_helper_str->iphs_wq->q_ptr =
+	    ip_helper_str->iphs_minfo;
+	(void) ldi_close(ip_helper_str->iphs_handle, 0, kcred);
 }
 
 

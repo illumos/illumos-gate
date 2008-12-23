@@ -161,10 +161,10 @@ typedef struct ip_helper_minor_info_s {
  * ip helper stream info
  */
 typedef struct ip_helper_stream_info_s {
-	ldi_handle_t		ip_helper_stream_handle;
-	queue_t 		*ip_helper_stream_rq;
-	queue_t 		*ip_helper_stream_wq;
-	ip_helper_minfo_t	*ip_helper_stream_minfo;
+	ldi_handle_t		iphs_handle;
+	queue_t 		*iphs_rq;
+	queue_t 		*iphs_wq;
+	ip_helper_minfo_t	*iphs_minfo;
 } ip_helper_stream_info_t;
 
 /*

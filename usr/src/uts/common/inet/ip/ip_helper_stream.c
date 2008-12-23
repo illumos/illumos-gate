@@ -71,15 +71,15 @@ ip_helper_share_conn(queue_t *q, mblk_t *mp)
 
 		ip_helper_info = *((ip_helper_stream_info_t **)
 		    mp->b_cont->b_rptr);
-		ip_helper_info->ip_helper_stream_minfo = q->q_ptr;
-		ip_helper_info->ip_helper_stream_rq = RD(q);
-		ip_helper_info->ip_helper_stream_wq = WR(q);
+		ip_helper_info->iphs_minfo = q->q_ptr;
+		ip_helper_info->iphs_rq = RD(q);
+		ip_helper_info->iphs_wq = WR(q);
 	} else {
 		conn_t *connp = *((conn_t **)mp->b_cont->b_rptr);
 
-		connp->conn_helper_info->ip_helper_stream_minfo = q->q_ptr;
-		connp->conn_helper_info->ip_helper_stream_rq = RD(q);
-		connp->conn_helper_info->ip_helper_stream_wq = WR(q);
+		connp->conn_helper_info->iphs_minfo = q->q_ptr;
+		connp->conn_helper_info->iphs_rq = RD(q);
+		connp->conn_helper_info->iphs_wq = WR(q);
 		WR(q)->q_ptr = RD(q)->q_ptr = (void *)connp;
 		connp->conn_rq = RD(q);
 		connp->conn_wq = WR(q);
@@ -192,19 +192,18 @@ ip_create_helper_stream(conn_t *connp, ldi_ident_t li)
 
 	error = 0;
 	if (IP_USE_HELPER_CACHE) {
-		connp->conn_helper_info = (ip_helper_stream_info_t *)
-		    kmem_cache_alloc(ip_helper_stream_cache, KM_SLEEP);
-		ASSERT(connp->conn_helper_info != NULL);
-		connp->conn_rq = connp->conn_helper_info->ip_helper_stream_rq;
-		connp->conn_wq =  connp->conn_helper_info->ip_helper_stream_wq;
-		connp->conn_helper_info->ip_helper_stream_rq->q_ptr =
-		    (void *)connp;
-		connp->conn_helper_info->ip_helper_stream_wq->q_ptr =
-		    (void *)connp;
+		connp->conn_helper_info = kmem_cache_alloc(
+		    ip_helper_stream_cache, KM_NOSLEEP);
+		if (connp->conn_helper_info == NULL)
+			return (EAGAIN);
+		connp->conn_rq = connp->conn_helper_info->iphs_rq;
+		connp->conn_wq = connp->conn_helper_info->iphs_wq;
+		connp->conn_helper_info->iphs_rq->q_ptr = connp;
+		connp->conn_helper_info->iphs_wq->q_ptr = connp;
 	} else {
 		ASSERT(connp->conn_helper_info == NULL);
-		connp->conn_helper_info = (ip_helper_stream_info_t *)
-		    kmem_alloc(sizeof (ip_helper_stream_info_t), KM_SLEEP);
+		connp->conn_helper_info = kmem_alloc(
+		    sizeof (ip_helper_stream_info_t), KM_SLEEP);
 		/*
 		 * open ip device via the layered interface.
 		 * pass in kcred as some threads do not have the
@@ -213,8 +212,7 @@ ip_create_helper_stream(conn_t *connp, ldi_ident_t li)
 		 */
 		error = ldi_open_by_name(connp->conn_af_isv6 ?
 		    DEV_IP6 : DEV_IP, IP_HELPER_STR,
-		    kcred, &connp->conn_helper_info->ip_helper_stream_handle,
-		    li);
+		    kcred, &connp->conn_helper_info->iphs_handle, li);
 
 		if (error != 0) {
 			kmem_free(connp->conn_helper_info,
@@ -225,8 +223,7 @@ ip_create_helper_stream(conn_t *connp, ldi_ident_t li)
 		/*
 		 * Share connp with the helper stream
 		 */
-		error = ldi_ioctl(
-		    connp->conn_helper_info->ip_helper_stream_handle,
+		error = ldi_ioctl(connp->conn_helper_info->iphs_handle,
 		    SIOCSQPTR, (intptr_t)connp, FKIOCTL, kcred, &ret);
 
 		if (error != 0) {
@@ -234,8 +231,7 @@ ip_create_helper_stream(conn_t *connp, ldi_ident_t li)
 			 * Passing in a zero flag indicates that an error
 			 * occured and stream was not shared
 			 */
-			(void) ldi_close(
-			    connp->conn_helper_info->ip_helper_stream_handle,
+			(void) ldi_close(connp->conn_helper_info->iphs_handle,
 			    0, kcred);
 			kmem_free(connp->conn_helper_info,
 			    (sizeof (ip_helper_stream_info_t)));
@@ -254,39 +250,41 @@ ip_close_helper_stream(conn_t *connp)
 {
 	ASSERT(!servicing_interrupt());
 	if (IP_USE_HELPER_CACHE) {
-		ASSERT(connp->conn_helper_info->ip_helper_stream_rq != NULL);
-		ASSERT(connp->conn_helper_info->ip_helper_stream_wq != NULL);
+
+		if (connp->conn_helper_info == NULL)
+			return;
+		ASSERT(connp->conn_helper_info->iphs_rq != NULL);
+		ASSERT(connp->conn_helper_info->iphs_wq != NULL);
 
 		/* Prevent service procedures from being called */
-		disable_svc(connp->conn_helper_info->ip_helper_stream_rq);
+		disable_svc(connp->conn_helper_info->iphs_rq);
 
 		/* Wait until service procedure of each queue is run */
-		wait_svc(connp->conn_helper_info->ip_helper_stream_rq);
+		wait_svc(connp->conn_helper_info->iphs_rq);
 
 		/* Cleanup any pending ioctls */
 		conn_ioctl_cleanup(connp);
 
 		/* Allow service procedures to be called again */
-		enable_svc(connp->conn_helper_info->ip_helper_stream_rq);
+		enable_svc(connp->conn_helper_info->iphs_rq);
 
 		/* Flush the queues */
-		flushq(connp->conn_helper_info->ip_helper_stream_rq, FLUSHALL);
-		flushq(connp->conn_helper_info->ip_helper_stream_wq, FLUSHALL);
+		flushq(connp->conn_helper_info->iphs_rq, FLUSHALL);
+		flushq(connp->conn_helper_info->iphs_wq, FLUSHALL);
 
-		connp->conn_helper_info->ip_helper_stream_rq->q_ptr = NULL;
-		connp->conn_helper_info->ip_helper_stream_wq->q_ptr = NULL;
+		connp->conn_helper_info->iphs_rq->q_ptr = NULL;
+		connp->conn_helper_info->iphs_wq->q_ptr = NULL;
 
 		kmem_cache_free(ip_helper_stream_cache,
 		    connp->conn_helper_info);
 	} else {
 		ASSERT(
-		    connp->conn_helper_info->ip_helper_stream_handle != NULL);
+		    connp->conn_helper_info->iphs_handle != NULL);
 
-		connp->conn_helper_info->ip_helper_stream_rq->q_ptr =
-		    connp->conn_helper_info->ip_helper_stream_wq->q_ptr =
-		    connp->conn_helper_info->ip_helper_stream_minfo;
-		(void) ldi_close(
-		    connp->conn_helper_info->ip_helper_stream_handle,
+		connp->conn_helper_info->iphs_rq->q_ptr =
+		    connp->conn_helper_info->iphs_wq->q_ptr =
+		    connp->conn_helper_info->iphs_minfo;
+		(void) ldi_close(connp->conn_helper_info->iphs_handle,
 		    IP_HELPER_STR, kcred);
 		kmem_free(connp->conn_helper_info,
 		    sizeof (ip_helper_stream_info_t));
@@ -305,7 +303,6 @@ ip_send_option_request(conn_t *connp, uint_t optset_context, int level,
 	struct opthdr		*ohp;
 	ssize_t			size;
 	mblk_t			*mp;
-	int			error;
 
 	size = sizeof (struct T_optmgmt_req) + sizeof (struct opthdr) + optlen;
 	mp = allocb_cred(size, cr);
@@ -340,9 +337,7 @@ ip_send_option_request(conn_t *connp, uint_t optset_context, int level,
 	/*
 	 * Send down the primitive
 	 */
-	error = ldi_putmsg(connp->conn_helper_info->ip_helper_stream_handle,
-	    mp);
-	return (error);
+	return (ldi_putmsg(connp->conn_helper_info->iphs_handle, mp));
 }
 
 /*
@@ -359,8 +354,7 @@ ip_get_option_response(conn_t *connp, uint_t optset_context, void *optval,
 	mp = NULL;
 
 	ASSERT(optset_context == T_CHECK || optset_context == T_NEGOTIATE);
-	error = ldi_getmsg(connp->conn_helper_info->ip_helper_stream_handle,
-	    &mp, NULL);
+	error = ldi_getmsg(connp->conn_helper_info->iphs_handle, &mp, NULL);
 	if (error != 0) {
 		return (error);
 	}

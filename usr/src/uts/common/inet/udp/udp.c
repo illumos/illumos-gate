@@ -7855,7 +7855,7 @@ udp_create(int family, int type, int proto, sock_downcalls_t **sock_downcalls,
 	ASSERT(us->us_ldi_ident != NULL);
 
 	if ((*errorp = ip_create_helper_stream(connp, us->us_ldi_ident)) != 0) {
-		ip1dbg(("create of IP helper stream failed\n"));
+		ip1dbg(("udp_create: create of IP helper stream failed\n"));
 		udp_do_close(connp);
 		return (NULL);
 	}
@@ -9474,8 +9474,7 @@ udp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 			/*
 			 * Pass on to IP using helper stream
 			 */
-			error = ldi_ioctl(
-			    connp->conn_helper_info->ip_helper_stream_handle,
+			error = ldi_ioctl(connp->conn_helper_info->iphs_handle,
 			    cmd, arg, mode, cr, rvalp);
 			break;
 	}

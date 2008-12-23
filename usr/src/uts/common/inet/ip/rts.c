@@ -1701,8 +1701,7 @@ rts_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 		/*
 		 * Pass on to IP using helper stream
 		 */
-		error = ldi_ioctl(
-		    connp->conn_helper_info->ip_helper_stream_handle,
+		error = ldi_ioctl(connp->conn_helper_info->iphs_handle,
 		    cmd, arg, mode, cr, rvalp);
 		break;
 	}
