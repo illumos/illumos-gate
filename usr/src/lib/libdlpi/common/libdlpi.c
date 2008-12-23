@@ -1391,8 +1391,13 @@ i_dlpi_strgetmsg(dlpi_impl_t *dip, int msec, dlpi_msg_t *dlreplyp,
 	dl_notify_ind_t		*dlnotif;
 	boolean_t		infinite = (msec < 0);	/* infinite timeout */
 
-	if ((dlreplyp == NULL && databuf == NULL) ||
-	    (databuf == NULL && datalenp != NULL) ||
+	/*
+	 * dlreplyp and databuf can be NULL at the same time, to force a check
+	 * for pending events on the DLPI link instance; dlpi_enabnotify(3DLPI).
+	 * this will be true more so for DLPI_RAW mode with notifications
+	 * enabled.
+	 */
+	if ((databuf == NULL && datalenp != NULL) ||
 	    (databuf != NULL && datalenp == NULL))
 		return (DLPI_EINVAL);
 
@@ -1478,13 +1483,14 @@ i_dlpi_strgetmsg(dlpi_impl_t *dip, int msec, dlpi_msg_t *dlreplyp,
 		 * requested message.
 		 */
 		if (dip->dli_notifylistp != NULL &&
-		    dlreplyp->dlm_msg->dl_primitive == DL_NOTIFY_IND) {
-			if (ctl.len < DL_NOTIFY_IND_SIZE)
-				continue;
-			dlnotif = &(dlreplyp->dlm_msg->notify_ind);
-
-			(void) i_dlpi_notifyind_process(dip, dlnotif);
-			continue;
+		    ctl.len >= (int)(sizeof (t_uscalar_t)) &&
+		    *(t_uscalar_t *)(void *)ctl.buf == DL_NOTIFY_IND) {
+			/* process properly-formed DL_NOTIFY_IND messages */
+			if (ctl.len >= DL_NOTIFY_IND_SIZE) {
+				dlnotif = (dl_notify_ind_t *)(void *)ctl.buf;
+				(void) i_dlpi_notifyind_process(dip, dlnotif);
+			}
+			goto update_timer;
 		}
 
 		/*
@@ -1521,7 +1527,7 @@ i_dlpi_strgetmsg(dlpi_impl_t *dip, int msec, dlpi_msg_t *dlreplyp,
 					break;
 			}
 		}
-
+update_timer:
 		if (!infinite) {
 			current = gethrtime() / (NANOSEC / MILLISEC);
 			msec -= (current - start);
