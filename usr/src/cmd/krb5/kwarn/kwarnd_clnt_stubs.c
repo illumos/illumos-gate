@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  *  stub module for kwarnd.
  */
@@ -45,18 +43,23 @@
 #include <sys/uio.h>
 #include <syslog.h>
 
-CLIENT  *clnt, *getkwarnd_handle(void);
+extern CLIENT *getkwarnd_handle(void);
+extern void resetkwarnd_handle(void);
 
 OM_UINT32
 kwarn_add_warning(WARNING_NAME_T warning_name, int cred_exp_time)
 {
 	kwarn_add_warning_arg args;
 	kwarn_add_warning_res res;
+	enum clnt_stat ret;
+	boolean_t first = TRUE;
+	CLIENT *clnt;
 
 	/* check the input/output parameters */
 	if (warning_name == NULL || cred_exp_time == 0)
 		return (1);
 
+rebind:
 	/* get the client handle to kwarnd */
 	if ((clnt = getkwarnd_handle()) == NULL) {
 		/*
@@ -74,7 +77,18 @@ kwarn_add_warning(WARNING_NAME_T warning_name, int cred_exp_time)
 
 	/* call the remote procedure */
 	memset(&res, 0, sizeof (res));
-	if (kwarn_add_warning_1(&args, &res, clnt) != RPC_SUCCESS) {
+	ret = kwarn_add_warning_1(&args, &res, clnt);
+	if (ret != RPC_SUCCESS) {
+		/*
+		 * Could have timed out due to the process restarting for
+		 * various reasons. Should attempt to rebind in the case
+		 * process is actually running.
+		 */
+		if (ret == RPC_TIMEDOUT && first) {
+			resetkwarnd_handle();
+			first = FALSE;
+			goto rebind;
+		}
 		return (1);
 	}
 
@@ -88,12 +102,15 @@ kwarn_del_warning(WARNING_NAME_T warning_name)
 {
 	kwarn_del_warning_arg args;
 	kwarn_del_warning_res res;
-
+	enum clnt_stat ret;
+	boolean_t first = TRUE;
+	CLIENT *clnt;
 
 	/* check the output parameters */
 	if (warning_name == NULL)
 		return (1);
 
+rebind:
 	/* get the client GSSD handle */
 	if ((clnt = getkwarnd_handle()) == NULL) {
 		/*
@@ -110,7 +127,18 @@ kwarn_del_warning(WARNING_NAME_T warning_name)
 
 	/* call the remote procedure */
 	memset(&res, 0, sizeof (res));
-	if (kwarn_del_warning_1(&args, &res, clnt) != RPC_SUCCESS) {
+	ret = kwarn_del_warning_1(&args, &res, clnt);
+	if (ret != RPC_SUCCESS) {
+		/*
+		 * Could have timed out due to the process restarting for
+		 * various reasons. Should attempt to rebind in the case
+		 * process is actually running.
+		 */
+		if (ret == RPC_TIMEDOUT && first) {
+			resetkwarnd_handle();
+			first = FALSE;
+			goto rebind;
+		}
 		return (1);
 	}
 
