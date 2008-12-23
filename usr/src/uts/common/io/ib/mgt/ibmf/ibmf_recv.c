@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file implements the MAD receive logic in IBMF.
@@ -200,12 +198,12 @@ ibmf_i_handle_recv_completion(ibmf_ci_t *cip, ibt_wc_t *wcp)
 			ret = ibmf_i_post_recv_buffer(cip, qpp,
 			    B_FALSE, ibmf_qp_handle);
 			if (ret != IBMF_SUCCESS) {
-			    IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L3,
-			    ibmf_i_handle_recv_compl, IBMF_TNF_TRACE,
-			    "", "ibmf_i_handle_recv_compl(): %s, "
-			    "status = %d\n", tnf_string, msg,
-			    "ibmf_i_post_recv_buffer() failed",
-			    tnf_int, status, ret);
+				IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L3,
+				    ibmf_i_handle_recv_compl, IBMF_TNF_TRACE,
+				    "", "ibmf_i_handle_recv_compl(): %s, "
+				    "status = %d\n", tnf_string, msg,
+				    "ibmf_i_post_recv_buffer() failed",
+				    tnf_int, status, ret);
 			}
 
 			mutex_enter(&qpp->iq_mutex);
@@ -228,12 +226,12 @@ ibmf_i_handle_recv_completion(ibmf_ci_t *cip, ibt_wc_t *wcp)
 			ret = ibmf_i_post_recv_buffer(cip, NULL,
 			    B_FALSE, ibmf_qp_handle);
 			if (ret != IBMF_SUCCESS) {
-			    IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L3,
-			    ibmf_i_handle_recv_compl, IBMF_TNF_TRACE,
-			    "", "ibmf_i_handle_recv_compl(): %s, "
-			    "status = %d\n", tnf_string, msg,
-			    "ibmf_i_post_recv_buffer() failed",
-			    tnf_int, status, ret);
+				IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L3,
+				    ibmf_i_handle_recv_compl, IBMF_TNF_TRACE,
+				    "", "ibmf_i_handle_recv_compl(): %s, "
+				    "status = %d\n", tnf_string, msg,
+				    "ibmf_i_post_recv_buffer() failed",
+				    tnf_int, status, ret);
 			}
 
 			mutex_enter(&altqp->isq_mutex);
@@ -1548,6 +1546,7 @@ ibmf_send_busy(ibmf_mod_load_args_t *modlargsp)
 	ibtstatus = ibt_register_mr(cip->ci_ci_handle, cip->ci_pd, &mem_attr,
 	    &mem_hdl, &mem_desc);
 	if (ibtstatus != IBT_SUCCESS) {
+		kmem_free(send_wqep->send_mem, IBMF_MEM_PER_WQE);
 		kmem_free(send_wqep, sizeof (ibmf_send_wqe_t));
 		ibmf_i_put_ud_dest(cip, msgimplp->im_ibmf_ud_dest);
 		kmem_free(msgimplp, sizeof (ibmf_msg_impl_t));
