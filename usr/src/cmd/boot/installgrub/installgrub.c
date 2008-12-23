@@ -43,12 +43,15 @@
 #include <locale.h>
 #include "message.h"
 #include <errno.h>
+#include <md5.h>
 
 #ifndef	TEXT_DOMAIN
 #define	TEXT_DOMAIN	"SUNW_OST_OSCMD"
 #endif
 
 #define	SECTOR_SIZE	0x200
+#define	HASH_SIZE	0x10
+#define	VERSION_SIZE	0x50
 #define	STAGE2_MEMADDR	0x8000	/* loading addr of stage2 */
 
 #define	STAGE1_BPB_OFFSET	0x3
@@ -63,13 +66,21 @@
 #define	STAGE2_INSTALLPART	(SECTOR_SIZE + 0x8)
 #define	STAGE2_FORCE_LBA	(SECTOR_SIZE + 0x11)
 #define	STAGE2_VER_STRING	(SECTOR_SIZE + 0x12)
+#define	STAGE2_SIGN_OFFSET	(SECTOR_SIZE + 0x60)
+#define	STAGE2_PKG_VERSION	(SECTOR_SIZE + 0x70)
 #define	STAGE2_BLKOFF		50	/* offset from start of fdisk part */
+
+static char extended_sig[] = "\xCC\xCC\xCC\xCC\xAA\xAA\xAA\xAA\xBB\xBB\xBB\xBB"
+"\xBB\xBB\xBB\xBB";
 
 static int nowrite = 0;
 static int write_mboot = 0;
 static int force_mboot = 0;
+static int getinfo = 0;
+static int do_version = 0;
 static int is_floppy = 0;
 static int is_bootpar = 0;
+static int strip = 0;
 static int stage2_fd;
 static int partition, slice = 0xff;
 static unsigned int stage2_first_sector, stage2_second_sector;
@@ -79,6 +90,8 @@ static char bpb_sect[SECTOR_SIZE];
 static char boot_sect[SECTOR_SIZE];
 static char stage1_buffer[SECTOR_SIZE];
 static char stage2_buffer[2 * SECTOR_SIZE];
+static char signature[HASH_SIZE];
+static char verstring[VERSION_SIZE];
 static unsigned int blocklist[SECTOR_SIZE / sizeof (unsigned int)];
 
 static int open_device(char *);
@@ -92,19 +105,22 @@ static unsigned int get_start_sector(int);
 static void copy_stage2(int, char *);
 static char *get_raw_partition(char *);
 static void usage(char *);
+static void print_info();
+static int read_stage2_info(int);
+static void check_extended_support();
 
 extern int read_stage2_blocklist(int, unsigned int *);
 
 int
 main(int argc, char *argv[])
 {
-	int dev_fd, opt;
+	int dev_fd, opt, params = 3;
 	char *stage1, *stage2, *device;
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	while ((opt = getopt(argc, argv, "fmn")) != EOF) {
+	while ((opt = getopt(argc, argv, "fmneis:")) != EOF) {
 		switch (opt) {
 		case 'm':
 			write_mboot = 1;
@@ -115,6 +131,18 @@ main(int argc, char *argv[])
 		case 'f':
 			force_mboot = 1;
 			break;
+		case 'i':
+			getinfo = 1;
+			params = 1;
+			break;
+		case 'e':
+			strip = 1;
+			break;
+		case 's':
+			do_version = 1;
+			(void) snprintf(verstring, sizeof (verstring), "%s",
+			    optarg);
+			break;
 		default:
 			/* fall through to process non-optional args */
 			break;
@@ -122,7 +150,7 @@ main(int argc, char *argv[])
 	}
 
 	/* check arguments */
-	if (argc != optind + 3) {
+	if (argc != optind + params) {
 		usage(argv[0]);
 	}
 
@@ -130,19 +158,42 @@ main(int argc, char *argv[])
 		(void) fprintf(stdout, DRY_RUN);
 	}
 
-	stage1 = strdup(argv[optind]);
-	stage2 = strdup(argv[optind + 1]);
-	device = strdup(argv[optind + 2]);
+	if (params == 1) {
+		device = strdup(argv[optind]);
+		if (!device) {
+			usage(argv[0]);
+		}
+	} else if (params == 3) {
+		stage1 = strdup(argv[optind]);
+		stage2 = strdup(argv[optind + 1]);
+		device = strdup(argv[optind + 2]);
 
-	if (!stage1 || !stage2 || !device) {
-		usage(argv[0]);
+		if (!stage1 || !stage2 || !device) {
+			usage(argv[0]);
+		}
 	}
 
 	/* open and check device type */
 	dev_fd = open_device(device);
 
+	if (getinfo) {
+		if (read_stage2_info(dev_fd) != 0) {
+			fprintf(stderr, "Unable to read extended information"
+			    " from %s\n", device);
+			exit(1);
+		}
+		print_info();
+		(void) free(device);
+		(void) close(dev_fd);
+		return (0);
+	}
+
 	/* read in stage1 and stage2 into buffer */
 	read_stage1_stage2(stage1, stage2);
+
+	/* check if stage2 supports extended versioning */
+	if (do_version)
+		check_extended_support(stage2);
 
 	/* In the pcfs case, write a fresh stage2 */
 	if (is_floppy || is_bootpar) {
@@ -162,7 +213,11 @@ main(int argc, char *argv[])
 
 	if (!is_floppy && write_mboot)
 		write_boot_sect(device);
+
 	(void) close(dev_fd);
+	free(device);
+	free(stage1);
+	free(stage2);
 
 	return (0);
 }
@@ -436,6 +491,117 @@ modify_and_write_stage1(int dev_fd)
 	}
 }
 
+static void check_extended_support(char *stage2)
+{
+	char	*cmp = stage2_buffer + STAGE2_SIGN_OFFSET - 1;
+
+	if ((*cmp++ != '\xEE') && memcmp(cmp, extended_sig, HASH_SIZE) != 0) {
+		fprintf(stderr, "%s does not support extended versioning\n",
+		    stage2);
+		do_version = 0;
+	}
+}
+
+
+static void print_info()
+{
+	int	i;
+
+	if (strip) {
+		fprintf(stdout, "%s\n", verstring);
+	} else {
+		fprintf(stdout, "Grub extended version information : %s\n",
+		    verstring);
+		fprintf(stdout, "Grub stage2 (MD5) signature : ");
+	}
+
+	for (i = 0; i < HASH_SIZE; i++)
+		fprintf(stdout, "%02x", (unsigned char)signature[i]);
+
+	fprintf(stdout, "\n");
+}
+
+static int
+read_stage2_info(int dev_fd)
+{
+	int 	ret;
+	int	first_offset, second_offset;
+	char	*sign;
+
+	if (is_floppy || is_bootpar) {
+
+		ret = pread(dev_fd, stage1_buffer, SECTOR_SIZE, 0);
+		if (ret != SECTOR_SIZE) {
+			perror("Error reading stage1 sector");
+			return (1);
+		}
+
+		first_offset = *((ulong_t *)(stage1_buffer +
+		    STAGE1_STAGE2_SECTOR));
+
+		/* Start reading in the first sector of stage 2 */
+
+		ret = pread(dev_fd, stage2_buffer, SECTOR_SIZE, first_offset *
+		    SECTOR_SIZE);
+		if (ret != SECTOR_SIZE) {
+			perror("Error reading stage2 first sector");
+			return (1);
+		}
+
+		/* From the block list section grab stage2 second sector */
+
+		second_offset = *((ulong_t *)(stage2_buffer +
+		    STAGE2_BLOCKLIST));
+
+		ret = pread(dev_fd, stage2_buffer + SECTOR_SIZE, SECTOR_SIZE,
+		    second_offset * SECTOR_SIZE);
+		if (ret != SECTOR_SIZE) {
+			perror("Error reading stage2 second sector");
+			return (1);
+		}
+	} else {
+		ret = pread(dev_fd, stage2_buffer, 2 * SECTOR_SIZE,
+		    STAGE2_BLKOFF * SECTOR_SIZE);
+		if (ret != 2 * SECTOR_SIZE) {
+			perror("Error reading stage2 sectors");
+			return (1);
+		}
+	}
+
+	sign = stage2_buffer + STAGE2_SIGN_OFFSET - 1;
+	if (*sign++ != '\xEE')
+		return (1);
+	(void) memcpy(signature, sign, HASH_SIZE);
+	sign = stage2_buffer + STAGE2_PKG_VERSION;
+	(void) strncpy(verstring, sign, VERSION_SIZE);
+	return (0);
+}
+
+
+static int
+compute_and_write_md5hash(char *dest)
+{
+	struct stat	sb;
+	char		*buffer;
+
+	if (fstat(stage2_fd, &sb) == -1)
+		return (-1);
+
+	buffer = malloc(sb.st_size);
+	if (buffer == NULL)
+		return (-1);
+
+	if (lseek(stage2_fd, 0, SEEK_SET) == -1)
+		return (-1);
+	if (read(stage2_fd, buffer, sb.st_size) < 0)
+		return (-1);
+
+	md5_calc(dest, buffer, sb.st_size);
+	free(buffer);
+	return (0);
+}
+
+
 #define	START_BLOCK(pos)	(*(ulong_t *)(pos))
 #define	NUM_BLOCK(pos)		(*(ushort_t *)((pos) + 4))
 #define	START_SEG(pos)		(*(ushort_t *)((pos) + 6))
@@ -443,8 +609,17 @@ modify_and_write_stage1(int dev_fd)
 static void
 modify_and_write_stage2(int dev_fd)
 {
-	int nrecord;
-	off_t offset;
+	int 	nrecord;
+	off_t 	offset;
+	char	*dest;
+
+	if (do_version) {
+		dest = stage2_buffer + STAGE2_SIGN_OFFSET;
+		if (compute_and_write_md5hash(dest) < 0)
+			perror("MD5 operation");
+		dest = stage2_buffer + STAGE2_PKG_VERSION;
+		(void) strncpy(dest, verstring, VERSION_SIZE);
+	}
 
 	if (is_floppy || is_bootpar) {
 		int i = 0;

@@ -67,6 +67,9 @@ int grub_stage2 (void);
 #define EXTENDED_MEMSIZE (64 * 1024 * 1024)	/* 64MB */
 #define CONVENTIONAL_MEMSIZE (640 * 1024)	/* 640kB */
 
+unsigned char md5hash[] = "\xCC\xCC\xCC\xCC\xAA\xAA\xAA\xAA\xBB\xBB\xBB\xBB"
+    "\xBB\xBB\xBB\xBB";
+char pkg_version[] = "empty";
 unsigned long install_partition = 0x20000;
 unsigned long boot_drive = 0;
 int saved_entryno = 0;

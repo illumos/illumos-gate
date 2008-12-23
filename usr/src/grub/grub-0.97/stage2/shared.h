@@ -596,6 +596,8 @@ extern int saved_entryno;
 extern unsigned char force_lba;
 extern char version_string[];
 extern char config_file[];
+extern unsigned char md5hash[];
+extern char pkg_version[];
 extern unsigned long linux_text_len;
 extern char *linux_data_tmp_addr;
 extern char *linux_data_real_addr;

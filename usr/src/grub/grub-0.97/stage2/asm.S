@@ -108,8 +108,17 @@ VARIABLE(config_file)
 	 *  Leave some breathing room for the config file name.
 	 */
 
-	. = EXT_C(main) + 0x70
-
+	. = EXT_C(main) + 0x5f
+VARIABLE(ext_info)
+	.byte 0xEE
+VARIABLE(md5hash)
+	.quad	0xAAAAAAAACCCCCCCC, 0xBBBBBBBBBBBBBBBB
+VARIABLE(pkg_version)
+	.byte 0
+	/* 
+	 * installgrub will place the pkg_version here
+	 */
+	.= EXT_C(main) + 0x110
 /* the real mode code continues... */
 codestart:
 	cli		/* we're not safe here! */

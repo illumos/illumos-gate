@@ -2132,6 +2132,31 @@ static struct builtin builtin_impsprobe =
   " a tight loop."
 };
 
+/* extended info */
+static int
+info_func (char *arg, int flags)
+{
+  int  i;
+
+  grub_printf("Extended version information : %s\n", pkg_version);
+  grub_printf("stage2 (MD5) signature : ");
+
+  for (i = 0; i < 0x10; i++)
+    grub_printf("%x", md5hash[i]);
+
+  grub_printf("\n");
+}
+
+static struct builtin builtin_info =
+{
+  "info",
+  info_func,
+  BUILTIN_CMDLINE | BUILTIN_HELP_LIST | BUILTIN_SCRIPT,
+  "info",
+  "Read Grub extended version and stage2 MD5 hash"
+};
+
+
 
 /* initrd */
 static int
@@ -5843,6 +5868,7 @@ struct builtin *builtin_table[] =
   &builtin_ifconfig,
 #endif /* SUPPORT_NETBOOT */
   &builtin_impsprobe,
+  &builtin_info,
   &builtin_initrd,
   &builtin_install,
   &builtin_ioprobe,
