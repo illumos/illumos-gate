@@ -1359,7 +1359,6 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 	uint_t			i;
 	long			event_num;
 	const struct events_table_t *eventcode;
-	int			umask_known;
 
 	if (((preset & BITS_EXTENDED_FROM_31) != 0) &&
 	    ((preset & BITS_EXTENDED_FROM_31) !=
@@ -1382,17 +1381,14 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 			conf.core_ctl = eventcode->eventselect;
 			conf.core_ctl |= eventcode->unitmask <<
 			    CORE_UMASK_SHIFT;
-			umask_known = 1;
 		} else {
 			/* Event specified as raw event code */
 			if (ddi_strtol(event, NULL, 0, &event_num) != 0) {
 				return (CPC_INVALID_EVENT);
 			}
 			conf.core_ctl = event_num & 0xFF;
-			umask_known = 0;
 		}
 	} else {
-		umask_known = 0;
 		n = find_gpcevent_f6m15_23(event, cmn_gpc_events_f6m15_23);
 		if (n == NULL) {
 			switch (picnum) {
@@ -1457,12 +1453,14 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 
 	for (i = 0; i < nattrs; i++) {
 		if (strncmp(attrs[i].ka_name, "umask", 6) == 0) {
-			if ((umask_known == 1) ||
-			    ((attrs[i].ka_val | CORE_UMASK_MASK)
-			    != CORE_UMASK_MASK)) {
+			if ((attrs[i].ka_val | CORE_UMASK_MASK) !=
+			    CORE_UMASK_MASK) {
 				return (CPC_ATTRIBUTE_OUT_OF_RANGE);
 			}
-
+			/* Clear out the default umask */
+			conf.core_ctl &= ~ (CORE_UMASK_MASK <<
+			    CORE_UMASK_SHIFT);
+			/* Use the user provided umask */
 			conf.core_ctl |= attrs[i].ka_val <<
 			    CORE_UMASK_SHIFT;
 		} else  if (strncmp(attrs[i].ka_name, "edge", 6) == 0) {
