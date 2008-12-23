@@ -1270,7 +1270,19 @@ idm_nvlist_add_keyvalue(nvlist_t *nvl,
 	ikvx = idm_lookup_kv_xlate(key, keylen);
 
 	if (ikvx->ik_key_id == KI_MAX_KEY) {
-		return (nvlist_add_string(nvl, key, value));
+		char *nkey;
+		int rc;
+		size_t len;
+
+		/*
+		 * key is not a NULL terminated string, so create one
+		 */
+		len = (size_t)(keylen+1);
+		nkey = kmem_zalloc(len, KM_SLEEP);
+		(void) strncpy(nkey, key, len-1);
+		rc = nvlist_add_string(nvl, nkey, value);
+		kmem_free(nkey, len);
+		return (rc);
 	}
 
 	return (idm_nvlist_add_kv(nvl, ikvx, value));
