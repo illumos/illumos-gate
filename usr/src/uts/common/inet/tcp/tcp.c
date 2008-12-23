@@ -971,7 +971,7 @@ void tcp_clean_death_wrapper(void *arg, mblk_t *mp, void *arg2);
 static int tcp_accept(sock_lower_handle_t, sock_lower_handle_t,
 	    sock_upper_handle_t, cred_t *);
 static int tcp_listen(sock_lower_handle_t, int, cred_t *);
-static int tcp_post_ip_bind(tcp_t *, mblk_t *, int);
+static int tcp_post_ip_bind(tcp_t *, mblk_t *, int, cred_t *, pid_t);
 static int tcp_do_listen(conn_t *, int, cred_t *);
 static int tcp_do_connect(conn_t *, const struct sockaddr *, socklen_t,
     cred_t *, pid_t);
@@ -5718,8 +5718,9 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 		CONN_INC_REF(econnp);
 		goto error;
 	}
+
 	DB_CPID(mp1) = tcp->tcp_cpid;
-	mblk_setcred(mp1, tcp->tcp_cred);
+	mblk_setcred(mp1, CONN_CRED(eager->tcp_connp));
 	eager->tcp_cpid = tcp->tcp_cpid;
 	eager->tcp_open_time = lbolt64;
 
@@ -6249,15 +6250,10 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 		error = ENOMEM;
 		goto failed;
 	}
+
 	mp->b_wptr += sizeof (ire_t);
 	mp->b_datap->db_type = IRE_DB_REQ_TYPE;
 	tcp->tcp_hard_binding = 1;
-	if (cr == NULL) {
-		cr = tcp->tcp_cred;
-		pid = tcp->tcp_cpid;
-	}
-	mblk_setcred(mp, cr);
-	DB_CPID(mp) = pid;
 
 	/*
 	 * We need to make sure that the conn_recv is set to a non-null
@@ -6285,7 +6281,8 @@ tcp_connect_ipv4(tcp_t *tcp, ipaddr_t *dstaddrp, in_port_t dstport,
 	BUMP_MIB(&tcps->tcps_mib, tcpActiveOpens);
 	tcp->tcp_active_open = 1;
 
-	return (tcp_post_ip_bind(tcp, mp, error));
+
+	return (tcp_post_ip_bind(tcp, mp, error, cr, pid));
 failed:
 	/* return error ack and blow away saved option results if any */
 	if (tcp->tcp_conn.tcp_opts_conn_req != NULL)
@@ -6441,12 +6438,7 @@ tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
 
 		mp->b_wptr += sizeof (ire_t);
 		mp->b_datap->db_type = IRE_DB_REQ_TYPE;
-		if (cr == NULL) {
-			cr = tcp->tcp_cred;
-			pid = tcp->tcp_cpid;
-		}
-		mblk_setcred(mp, cr);
-		DB_CPID(mp) = pid;
+
 		tcp->tcp_hard_binding = 1;
 
 		/*
@@ -6468,7 +6460,7 @@ tcp_connect_ipv6(tcp_t *tcp, in6_addr_t *dstaddrp, in_port_t dstport,
 		BUMP_MIB(&tcps->tcps_mib, tcpActiveOpens);
 		tcp->tcp_active_open = 1;
 
-		return (tcp_post_ip_bind(tcp, mp, error));
+		return (tcp_post_ip_bind(tcp, mp, error, cr, pid));
 	}
 	/* Error case */
 	tcp->tcp_state = oldstate;
@@ -6531,7 +6523,7 @@ tcp_def_q_set(tcp_t *tcp, mblk_t *mp)
 			ipcl_proto_insert_v6(connp, IPPROTO_TCP);
 		}
 
-		(void) tcp_post_ip_bind(tcp, NULL, error);
+		(void) tcp_post_ip_bind(tcp, NULL, error, NULL, 0);
 	}
 	qreply(q, mp);
 }
@@ -15763,87 +15755,6 @@ tcp_rput_add_ancillary(tcp_t *tcp, mblk_t *mp, ip6_pkt_t *ipp)
 }
 
 /*
- * Handle a *T_BIND_REQ that has failed either due to a T_ERROR_ACK
- * or a "bad" IRE detected by tcp_adapt_ire.
- * We can't tell if the failure was due to the laddr or the faddr
- * thus we clear out all addresses and ports.
- */
-static void
-tcp_tpi_bind_failed(tcp_t *tcp, mblk_t *mp, int error)
-{
-	queue_t	*q = tcp->tcp_rq;
-	tcph_t	*tcph;
-	struct T_error_ack *tea;
-	conn_t	*connp = tcp->tcp_connp;
-
-
-	ASSERT(mp->b_datap->db_type == M_PCPROTO);
-
-	if (mp->b_cont) {
-		freemsg(mp->b_cont);
-		mp->b_cont = NULL;
-	}
-	tea = (struct T_error_ack *)mp->b_rptr;
-	switch (tea->PRIM_type) {
-	case T_BIND_ACK:
-		/*
-		 * Need to unbind with classifier since we were just told that
-		 * our bind succeeded.
-		 */
-		tcp->tcp_hard_bound = B_FALSE;
-		tcp->tcp_hard_binding = B_FALSE;
-
-		ipcl_hash_remove(connp);
-		/* Reuse the mblk if possible */
-		ASSERT(mp->b_datap->db_lim - mp->b_datap->db_base >=
-		    sizeof (*tea));
-		mp->b_rptr = mp->b_datap->db_base;
-		mp->b_wptr = mp->b_rptr + sizeof (*tea);
-		tea = (struct T_error_ack *)mp->b_rptr;
-		tea->PRIM_type = T_ERROR_ACK;
-		tea->TLI_error = TSYSERR;
-		tea->UNIX_error = error;
-		if (tcp->tcp_state >= TCPS_SYN_SENT) {
-			tea->ERROR_prim = T_CONN_REQ;
-		} else {
-			tea->ERROR_prim = O_T_BIND_REQ;
-		}
-		break;
-
-	case T_ERROR_ACK:
-		if (tcp->tcp_state >= TCPS_SYN_SENT)
-			tea->ERROR_prim = T_CONN_REQ;
-		break;
-	default:
-		panic("tcp_tpi_bind_failed: unexpected TPI type");
-		/*NOTREACHED*/
-	}
-
-	tcp->tcp_state = TCPS_IDLE;
-	if (tcp->tcp_ipversion == IPV4_VERSION)
-		tcp->tcp_ipha->ipha_src = 0;
-	else
-		V6_SET_ZERO(tcp->tcp_ip6h->ip6_src);
-	/*
-	 * Copy of the src addr. in tcp_t is needed since
-	 * the lookup funcs. can only look at tcp_t
-	 */
-	V6_SET_ZERO(tcp->tcp_ip_src_v6);
-
-	tcph = tcp->tcp_tcph;
-	tcph->th_lport[0] = 0;
-	tcph->th_lport[1] = 0;
-	tcp_bind_hash_remove(tcp);
-	bzero(&connp->u_port, sizeof (connp->u_port));
-	/* blow away saved option results if any */
-	if (tcp->tcp_conn.tcp_opts_conn_req != NULL)
-		tcp_close_mpp(&tcp->tcp_conn.tcp_opts_conn_req);
-
-	conn_delete_ire(tcp->tcp_connp, NULL);
-	putnext(q, mp);
-}
-
-/*
  * tcp_rput_other is called by tcp_rput to handle everything other than M_DATA
  * messages.
  */
@@ -15861,15 +15772,10 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 		if ((mp->b_wptr - rptr) < sizeof (t_scalar_t))
 			break;
 		tea = (struct T_error_ack *)rptr;
+		ASSERT(tea->PRIM_type != T_BIND_ACK);
+		ASSERT(tea->ERROR_prim != O_T_BIND_REQ &&
+		    tea->ERROR_prim != T_BIND_REQ);
 		switch (tea->PRIM_type) {
-		case T_BIND_ACK:
-			/*
-			 * AF_INET socket should not be here.
-			 */
-			ASSERT(tcp->tcp_family != AF_INET &&
-			    tcp->tcp_family != AF_INET6);
-			(void) tcp_post_ip_bind(tcp, mp->b_cont, 0);
-			return;
 		case T_ERROR_ACK:
 			if (tcp->tcp_debug) {
 				(void) strlog(TCP_MOD_ID, 0, 1,
@@ -15879,13 +15785,6 @@ tcp_rput_other(tcp_t *tcp, mblk_t *mp)
 				    tea->ERROR_prim);
 			}
 			switch (tea->ERROR_prim) {
-			case O_T_BIND_REQ:
-			case T_BIND_REQ:
-				ASSERT(tcp->tcp_family != AF_INET);
-				tcp_tpi_bind_failed(tcp, mp,
-				    (int)((tcp->tcp_state >= TCPS_SYN_SENT) ?
-				    ENETUNREACH : EADDRNOTAVAIL));
-				return;
 			case T_SVR4_OPTMGMT_REQ:
 				if (tcp->tcp_drop_opt_ack_cnt > 0) {
 					/* T_OPTMGMT_REQ generated by TCP */
@@ -18838,9 +18737,6 @@ tcp_wput(queue_t *q, mblk_t *mp)
 			tcp_setqfull(tcp);
 		}
 		mutex_exit(&tcp->tcp_non_sq_lock);
-
-		if (DB_CRED(mp) == NULL && is_system_labeled())
-			msg_setcredpid(mp, CONN_CRED(connp), curproc->p_pid);
 
 		CONN_INC_REF(connp);
 		SQUEUE_ENTER_ONE(connp->conn_sqp, mp, tcp_output, connp,
@@ -26574,7 +26470,7 @@ tcp_squeue_add(squeue_t *sqp)
 }
 
 static int
-tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error)
+tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error, cred_t *cr, pid_t pid)
 {
 	mblk_t	*ire_mp = NULL;
 	mblk_t	*syn_mp;
@@ -26742,34 +26638,15 @@ tcp_post_ip_bind(tcp_t *tcp, mblk_t *mp, int error)
 		syn_mp = tcp_xmit_mp(tcp, NULL, 0, NULL, NULL,
 		    tcp->tcp_iss, B_FALSE, NULL, B_FALSE);
 		if (syn_mp) {
-			cred_t *cr;
-			pid_t pid;
-
-			/*
-			 * Obtain the credential from the
-			 * thread calling connect().
-			 * If none can be found, default to
-			 * the creator  of the socket.
-			 */
-			if (mp == NULL ||
-			    (cr = DB_CRED(mp)) == NULL) {
+			if (cr == NULL) {
 				cr = tcp->tcp_cred;
 				pid = tcp->tcp_cpid;
-			} else {
-				pid = DB_CPID(mp);
 			}
-
 			mblk_setcred(syn_mp, cr);
 			DB_CPID(syn_mp) = pid;
 			tcp_send_data(tcp, tcp->tcp_wq, syn_mp);
 		}
 	after_syn_sent:
-		/*
-		 * A trailer mblk indicates a waiting client upstream.
-		 * We complete here the processing begun in
-		 * either tcp_bind() or tcp_connect() by passing
-		 * upstream the reply message they supplied.
-		 */
 		if (mp != NULL) {
 			ASSERT(mp->b_cont == NULL);
 			freeb(mp);
@@ -27197,7 +27074,7 @@ tcp_do_bind(conn_t *connp, struct sockaddr *sa, socklen_t len, cred_t *cr,
 		error = ip_proto_bind_laddr_v4(connp, NULL, IPPROTO_TCP,
 		    tcp->tcp_ipha->ipha_src, 0, B_FALSE);
 	}
-	return (tcp_post_ip_bind(tcp, NULL, error));
+	return (tcp_post_ip_bind(tcp, NULL, error, NULL, 0));
 }
 
 int
@@ -27540,10 +27417,6 @@ tcp_sendmsg(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 			return (EPIPE);
 		}
 
-		if (is_system_labeled())
-			msg_setcredpid(mp, cr, curproc->p_pid);
-
-		/* XXX pass the size down and to the squeue */
 		msize = msgdsize(mp);
 
 		mutex_enter(&tcp->tcp_non_sq_lock);
@@ -28114,7 +27987,7 @@ do_listen:
 		error = ip_proto_bind_laddr_v6(connp, NULL, IPPROTO_TCP,
 		    &tcp->tcp_bound_source_v6, tcp->tcp_lport, B_TRUE);
 	}
-	return (tcp_post_ip_bind(tcp, NULL, error));
+	return (tcp_post_ip_bind(tcp, NULL, error, NULL, 0));
 }
 
 void
