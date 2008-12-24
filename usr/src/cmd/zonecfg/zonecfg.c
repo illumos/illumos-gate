@@ -5532,9 +5532,16 @@ verify_func(cmd_t *cmd)
 		 * and may include a default router, while
 		 * an exclusive IP must have neither an address
 		 * nor a default router.
+		 * The physical interface name must be valid in all cases.
 		 */
 		check_reqd_prop(nwiftab.zone_nwif_physical, RT_NET,
 		    PT_PHYSICAL, &ret_val);
+		if (validate_net_physical_syntax(nwiftab.zone_nwif_physical) !=
+		    Z_OK) {
+			saw_error = B_TRUE;
+			if (ret_val == Z_OK)
+				ret_val = Z_INVAL;
+		}
 
 		switch (iptype) {
 		case ZS_SHARED:
