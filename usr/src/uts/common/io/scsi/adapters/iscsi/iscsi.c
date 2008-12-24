@@ -3192,7 +3192,9 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 				}
 
 				if (lun_dip != NULL &&
-				    i_ddi_devi_attached(lun_dip)) {
+				    ((i_ddi_devi_attached(lun_dip)) ||
+				    (ddi_get_devstate(lun_dip) ==
+				    DDI_DEVSTATE_UP))) {
 					(void) ddi_pathname(lun_dip,
 					    lun->lp_pathname);
 				} else {
