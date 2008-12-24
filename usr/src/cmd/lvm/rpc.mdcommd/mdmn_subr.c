@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -446,6 +444,7 @@ dump_msg(uint_t dbc, char *prefix, md_mn_msg_t *msg)
 	commd_debug(dbc, "%s sender	= %d\n", prefix, msg->msg_sender);
 	commd_debug(dbc, "%s flags	= 0x%x\n", prefix, msg->msg_flags);
 	commd_debug(dbc, "%s setno	= %d\n", prefix, msg->msg_setno);
+	commd_debug(dbc, "%s recipient  = %d\n", prefix, msg->msg_recipient);
 	commd_debug(dbc, "%s type	= %d\n", prefix, msg->msg_type);
 	commd_debug(dbc, "%s size	= %d\n", prefix, msg->msg_event_size);
 	if (msg->msg_event_size) {
@@ -513,9 +512,8 @@ mdmn_get_mce_by_msg(md_mn_msg_t *msg)
 		class = msg->msg_msgid.mid_oclass;
 	}
 
-	mct_index = submsg +
-		    class * MAX_SUBMESSAGES +
-		    nodeid * MAX_SUBMESSAGES * MD_MN_NCLASSES;
+	mct_index = submsg + class * MAX_SUBMESSAGES +
+	    nodeid * MAX_SUBMESSAGES * MD_MN_NCLASSES;
 
 	mct_offset = mct_index * sizeof (md_mn_mce_t);
 
@@ -694,12 +692,12 @@ mdmn_check_completion(md_mn_msg_t *msg, md_mn_result_t *result)
 			}
 		}
 		commd_debug(MD_MMV_MISC,
-			    "mdmn_check_completion: msg already processed \n");
+		    "mdmn_check_completion: msg already processed \n");
 		dump_result(MD_MMV_MISC, "mdmn_check_completion", result);
 		return (MDMN_MCT_DONE);
 	}
 	commd_debug(MD_MMV_MISC,
-		    "mdmn_check_completion: msg not yet processed\n");
+	    "mdmn_check_completion: msg not yet processed\n");
 	return (MDMN_MCT_NOT_DONE);
 }
 

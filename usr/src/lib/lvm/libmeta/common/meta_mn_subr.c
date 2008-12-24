@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Just in case we're not in a build environment, make sure that
@@ -62,7 +60,7 @@ meta_is_mn_set(
 
 	/* Local set cannot be MultiNode */
 	if ((sp == NULL) || (sp->setname == NULL) ||
-				(strcmp(sp->setname, MD_LOCAL_NAME) == 0))
+	    (strcmp(sp->setname, MD_LOCAL_NAME) == 0))
 		return (0);
 	sd = metaget_setdesc(sp, ep);
 	ASSERT(sd != NULL);
@@ -128,7 +126,7 @@ meta_ping_mnset(set_t setno)
 	md_mn_result_t	*resp = NULL;
 
 	(void) mdmn_send_message(setno, MD_MN_MSG_TEST2,
-	    MD_MSGF_NO_LOG | MD_MSGF_FAIL_ON_SUSPEND, data,
+	    MD_MSGF_NO_LOG | MD_MSGF_FAIL_ON_SUSPEND, 0, data,
 	    sizeof (data), &resp, &mde);
 
 	if (resp != (md_mn_result_t *)NULL) {
@@ -234,9 +232,8 @@ meta_mn_send_command(
 	} else {
 		send_message_type = MD_MN_MSG_BC_CMD;
 	}
-	err = mdmn_send_message(
-		sp->setno, send_message_type, send_message_flags,
-		cmd, 1024, &resp, ep);
+	err = mdmn_send_message(sp->setno, send_message_type,
+	    send_message_flags, 0, cmd, 1024, &resp, ep);
 
 	free(cmd);
 
@@ -285,9 +282,9 @@ meta_mn_send_command(
 			    "Command not attempted: Unable to log message "
 			    "in set %s\n"), sp->setname);
 			if (c.c_flags & MDDB_C_STALE) {
-			    (void) mdmddberror(ep, MDE_DB_STALE,
-			    (minor_t)NODEV64, sp->setno, 0, NULL);
-			    mde_perror(ep, "");
+				(void) mdmddberror(ep, MDE_DB_STALE,
+				    (minor_t)NODEV64, sp->setno, 0, NULL);
+				mde_perror(ep, "");
 			}
 		} else {
 			(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
@@ -333,7 +330,7 @@ meta_mn_send_suspend_writes(
 	 */
 	result = mdmn_send_message(MD_MIN2SET(mnum),
 	    MD_MN_MSG_SUSPEND_WRITES,
-	    MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND,
+	    MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND, 0,
 	    (char *)&suspwrmsg, sizeof (suspwrmsg), &resp, ep);
 	if (resp != NULL) {
 		free_result(resp);
@@ -608,7 +605,7 @@ meta_mn_send_setsync(
 	 * time required.
 	 */
 	ret = mdmn_send_message(sp->setno, MD_MN_MSG_SETSYNC,
-	    MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND,
+	    MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND, 0,
 	    (char *)&setsyncmsg, sizeof (setsyncmsg), &resp, ep);
 	if (resp != NULL) {
 		free_result(resp);
@@ -720,7 +717,7 @@ meta_mn_send_resync_starting(
 	resyncmsg.msg_resync_mnum =  mnum;
 	result = mdmn_send_message(MD_MIN2SET(mnum),
 	    MD_MN_MSG_RESYNC_STARTING,
-	    MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND,
+	    MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND, 0,
 	    (char *)&resyncmsg, sizeof (resyncmsg), &resp, ep);
 
 	if (resp != NULL) {
@@ -905,7 +902,7 @@ meta_mn_send_get_tstate(
 	tstatemsg.gettstate_dev = dev;
 	result = mdmn_send_message(MD_MIN2SET(mnum),
 	    MD_MN_MSG_GET_TSTATE,
-	    MD_MSGF_NO_LOG | MD_MSGF_NO_BCAST,
+	    MD_MSGF_NO_LOG | MD_MSGF_NO_BCAST, 0,
 	    (char *)&tstatemsg, sizeof (tstatemsg), &resp, ep);
 
 	if (result == 0)

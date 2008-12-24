@@ -1150,6 +1150,7 @@ sp_admin_ioctl(int cmd, void *data, int mode, IOLOCK *lockp)
 	}
 
 	case MD_IOC_SPUPDATEWM:
+	case MD_MN_IOC_SPUPDATEWM:
 	{
 		if (! (mode & FWRITE))
 			return (EACCES);

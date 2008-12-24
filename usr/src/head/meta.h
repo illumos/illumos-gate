@@ -1844,10 +1844,12 @@ extern	int		meta_update_devtree(minor_t mnum);
 
 /* meta_mn_comm.c */
 extern int		mdmn_send_message(set_t setno, md_mn_msgtype_t type,
-			    uint_t flags, char *data, int size,
-			    md_mn_result_t **resp, md_error_t *ep);
+			    uint_t flags, md_mn_nodeid_t recipient,
+			    char *data, int size, md_mn_result_t **resp,
+			    md_error_t *ep);
 extern int		mdmn_send_message_with_msgid(set_t setno,
-			    md_mn_msgtype_t type, uint_t flags, char *data,
+			    md_mn_msgtype_t type, uint_t flags,
+			    md_mn_nodeid_t recipient, char *data,
 			    int size, md_mn_result_t **resp,
 			    md_mn_msgid_t *msgid, md_error_t *ep);
 extern int		mdmn_create_msgid(md_mn_msgid_t *id);
@@ -1931,11 +1933,11 @@ extern	int			clnt_imp_adddrvs(char *hostname,
 				    md_timeval32_t timestamp,
 				    ulong_t genid, md_error_t *ep);
 
-/* Flags for direction in copy_msg_1 */
+/* Flags for direction in copy_msg_2 */
 #define	MD_MN_COPY_TO_ONDISK 0x0001
 #define	MD_MN_COPY_TO_INCORE 0x0002
 
-extern void		copy_msg_1(md_mn_msg_t *incorep,
+extern void		copy_msg_2(md_mn_msg_t *incorep,
 			    md_mn_msg_od_t *ondiskp, int direction);
 extern void		free_msg(md_mn_msg_t *msg);
 

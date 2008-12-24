@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Just in case we're not in a build environment, make sure that
@@ -148,7 +147,7 @@ add_md_sidenms(mdsetname_t *sp, side_t sideno, side_t otherside, md_error_t *ep)
 		send_rval = mdmn_send_message(sp->setno,
 		    MD_MN_MSG_META_MD_ADDSIDE,
 		    MD_MSGF_FAIL_ON_SUSPEND | MD_MSGF_PANIC_WHEN_INCONSISTENT,
-		    (char *)&md_as, sizeof (md_mn_msg_meta_md_addside_t),
+		    0, (char *)&md_as, sizeof (md_mn_msg_meta_md_addside_t),
 		    &resultp, ep);
 		if (send_rval != 0) {
 			(void) mdstealerror(ep, &(resultp->mmr_ep));
@@ -178,7 +177,7 @@ add_md_sidenms(mdsetname_t *sp, side_t sideno, side_t otherside, md_error_t *ep)
 			 * Let's see if it is hsp or not
 			 */
 			nm.devname = (uintptr_t)meta_getnmentbykey(sp->setno,
-				otherside, nm.key, &drvnm, NULL, NULL, ep);
+			    otherside, nm.key, &drvnm, NULL, NULL, ep);
 			if (nm.devname == NULL || drvnm == NULL) {
 				if (nm.devname)
 					Free((void *)(uintptr_t)nm.devname);
@@ -229,9 +228,9 @@ add_md_sidenms(mdsetname_t *sp, side_t sideno, side_t otherside, md_error_t *ep)
 			 * increment the count to sync up with the other sides.
 			 */
 			for (i = 0; i < nm.ref_count; i++) {
-			    if (add_name(sp, sideno, nm.key, dname, mnum,
-				cname, NULL, NULL, ep) == -1)
-				rval = -1;
+				if (add_name(sp, sideno, nm.key, dname, mnum,
+				    cname, NULL, NULL, ep) == -1)
+					rval = -1;
 			}
 
 			Free(cname);
@@ -323,17 +322,17 @@ create_multinode_set_on_hosts(
 			(void) strcpy(nd->nd_nodename, node_v[i]);
 			nd->nd_ctime = now;
 			nd->nd_flags = (MD_MN_NODE_ALIVE |
-				MD_MN_NODE_ADD);
+			    MD_MN_NODE_ADD);
 			nl2 = nl;
 			while (nl2) {
-			    if (strcmp(nl2->msl_node_name,
-				node_v[i]) == 0) {
-				    nd->nd_nodeid = nl2->msl_node_id;
-				    (void) strcpy(nd->nd_priv_ic,
-					nl2->msl_node_addr);
-				    break;
-			    }
-			    nl2 = nl2->next;
+				if (strcmp(nl2->msl_node_name,
+				    node_v[i]) == 0) {
+					nd->nd_nodeid = nl2->msl_node_id;
+					(void) strcpy(nd->nd_priv_ic,
+					    nl2->msl_node_addr);
+					break;
+				}
+				nl2 = nl2->next;
 			}
 
 			/*
@@ -1123,7 +1122,7 @@ del_md_sidenms(mdsetname_t *sp, side_t sideno, md_error_t *ep)
 		send_rval = mdmn_send_message(sp->setno,
 		    MD_MN_MSG_META_MD_DELSIDE,
 		    MD_MSGF_FAIL_ON_SUSPEND | MD_MSGF_PANIC_WHEN_INCONSISTENT,
-		    (char *)&md_ds, sizeof (md_mn_msg_meta_md_delside_t),
+		    0, (char *)&md_ds, sizeof (md_mn_msg_meta_md_delside_t),
 		    &resultp, ep);
 		if (send_rval != 0) {
 			(void) mdstealerror(ep, &(resultp->mmr_ep));
@@ -1156,8 +1155,8 @@ del_md_sidenms(mdsetname_t *sp, side_t sideno, md_error_t *ep)
 			 * actually removed.
 			 */
 			for (i = 0; i < nm.ref_count; i++) {
-			    if (del_name(sp, sideno, nm.key, ep) == -1)
-				return (-1);
+				if (del_name(sp, sideno, nm.key, ep) == -1)
+					return (-1);
 			}
 		}
 	}
@@ -1183,7 +1182,7 @@ recreate_set(
 				continue;
 			}
 			has_set = nodehasset(sp, nd->nd_nodename,
-				NHS_NST_EQ, &xep);
+			    NHS_NST_EQ, &xep);
 
 			if (has_set >= 0) {
 				nd = nd->nd_next;
@@ -1207,7 +1206,7 @@ recreate_set(
 				continue;
 
 			has_set = nodehasset(sp, sd->sd_nodes[i],
-				NHS_NST_EQ, &xep);
+			    NHS_NST_EQ, &xep);
 
 			if (has_set >= 0)
 				continue;
@@ -1967,7 +1966,8 @@ make_sideno_sidenm(
 		return (-1);
 
 	/* find the end of the link list */
-	for (sn = dnp->side_names; sn->next != NULL; sn = sn->next);
+	for (sn = dnp->side_names; sn->next != NULL; sn = sn->next)
+		;
 	sn_next = &sn->next;
 
 	if (meta_replicaslice(dnp, &rep_slice, ep) != 0)
@@ -1986,13 +1986,13 @@ make_sideno_sidenm(
 		 * used instead of meta_getnextside_devinfo.
 		 */
 		if (meta_getside_devinfo(sp, np->bname, sideno, &sn->cname,
-			&sn->dname, &sn->mnum, ep) == -1)
+		    &sn->dname, &sn->mnum, ep) == -1)
 			err = -1;
 	} else {
 		/* decrement sideno, to look like the previous sideno */
 		sideno--;
-		if (meta_getnextside_devinfo(sp, np->bname, &sideno, &sn->cname,
-			&sn->dname, &sn->mnum, ep) == -1)
+		if (meta_getnextside_devinfo(sp, np->bname, &sideno,
+		    &sn->cname, &sn->dname, &sn->mnum, ep) == -1)
 			err = -1;
 	}
 
@@ -2377,14 +2377,14 @@ meta_multinode_set_addhosts(
 		nd->nd_ctime = now;
 		nl2 = nl;
 		while (nl2) {
-		    if (strcmp(nl2->msl_node_name,
-			node_v[nodeindex]) == 0) {
-			    nd->nd_nodeid = nl2->msl_node_id;
-			    (void) strcpy(nd->nd_priv_ic,
-				nl2->msl_node_addr);
-			    break;
-		    }
-		    nl2 = nl2->next;
+			if (strcmp(nl2->msl_node_name,
+			    node_v[nodeindex]) == 0) {
+				nd->nd_nodeid = nl2->msl_node_id;
+				(void) strcpy(nd->nd_priv_ic,
+				    nl2->msl_node_addr);
+				break;
+			}
+			nl2 = nl2->next;
 		}
 
 		/*
@@ -2773,16 +2773,16 @@ out:
 		 * rpc.mdcommd is running on the nodes with a set.
 		 */
 		if (remote_sets_created == 1) {
-		    for (i = 0; i < node_c; i++) {
-			if (clnt_mdcommdctl(node_v[i], COMMDCTL_REINIT,
-			    sp, NULL, MD_MSCF_NO_FLAGS, &xep)) {
-				if (rval == 0)
-					(void) mdstealerror(ep, &xep);
-				rval = -1;
-				mde_perror(ep, dgettext(TEXT_DOMAIN,
-				    "Unable to reinit rpc.mdcommd.\n"));
+			for (i = 0; i < node_c; i++) {
+				if (clnt_mdcommdctl(node_v[i], COMMDCTL_REINIT,
+				    sp, NULL, MD_MSCF_NO_FLAGS, &xep)) {
+					if (rval == 0)
+						(void) mdstealerror(ep, &xep);
+					rval = -1;
+					mde_perror(ep, dgettext(TEXT_DOMAIN,
+					    "Unable to reinit rpc.mdcommd.\n"));
+				}
 			}
-		    }
 		}
 	}
 	if ((suspend1_flag) || (suspendall_flag)) {
@@ -2819,17 +2819,18 @@ out:
 		 * rpc.mdcommd is be running on the nodes with a set.
 		 */
 		if (remote_sets_created == 1) {
-		    for (i = 0; i < node_c; i++) {
-			/* Already verified to be alive */
-			if (clnt_mdcommdctl(node_v[i], COMMDCTL_RESUME,
-			    sp, MD_MSG_CLASS0, MD_MSCF_NO_FLAGS, &xep)) {
-				if (rval == 0)
-					(void) mdstealerror(ep, &xep);
-				rval = -1;
-				mde_perror(ep, dgettext(TEXT_DOMAIN,
-				    "Unable to resume rpc.mdcommd.\n"));
+			for (i = 0; i < node_c; i++) {
+				/* Already verified to be alive */
+				if (clnt_mdcommdctl(node_v[i], COMMDCTL_RESUME,
+				    sp, MD_MSG_CLASS0, MD_MSCF_NO_FLAGS,
+				    &xep)) {
+					if (rval == 0)
+						(void) mdstealerror(ep, &xep);
+					rval = -1;
+					mde_perror(ep, dgettext(TEXT_DOMAIN,
+					    "Unable to resume rpc.mdcommd.\n"));
+				}
 			}
-		    }
 		}
 		meta_ping_mnset(sp->setno);
 		/*
@@ -4031,7 +4032,8 @@ meta_set_deletehosts(
 		rb_medr.med_rec_sn  = sp->setno;
 		(void) strcpy(rb_medr.med_rec_snm, sp->setname);
 		for (i = 0; i < MD_MAXSIDES; i++)
-		    (void) strcpy(rb_medr.med_rec_nodes[i], sd->sd_nodes[i]);
+			(void) strcpy(rb_medr.med_rec_nodes[i],
+			    sd->sd_nodes[i]);
 		rb_medr.med_rec_meds = sd->sd_med;  /* structure assigment */
 		(void) memset(&rb_medr.med_rec_data, '\0', sizeof (med_data_t));
 		rb_medr.med_rec_foff = 0;
@@ -4432,45 +4434,52 @@ meta_set_deletehosts(
 				 * alive nodes are updated correctly.
 				 */
 				if (strcmp(nd->nd_nodename, node_v[i]) == 0) {
-				    if ((oha == TRUE) &&
-					(!(nd->nd_flags & MD_MN_NODE_ALIVE))) {
+					if ((oha == TRUE) && (!(nd->nd_flags &
+					    MD_MN_NODE_ALIVE))) {
 						nd->nd_flags |= MD_MN_NODE_DEL;
 						nd->nd_flags &= ~MD_MN_NODE_OK;
 						nd = nd->nd_next;
 						continue;
-				    }
-				    if (nd->nd_flags & MD_MN_NODE_OWN) {
-					/*
-					 * Going to set locally cached node
-					 * flags to rollback join so in case
-					 * of error, the rollback code knows
-					 * which nodes to re-join.
-					 * rpc.metad ignores the RB_JOIN flag.
-					 */
-					nd->nd_flags |= MD_MN_NODE_RB_JOIN;
-					nd->nd_flags &= ~MD_MN_NODE_OWN;
+					}
+					if (nd->nd_flags & MD_MN_NODE_OWN) {
+						/*
+						 * Going to set locally cached
+						 * node flags to rollback join
+						 * so in case of error, the
+						 * rollback code knows which
+						 * nodes to re-join.  rpc.metad
+						 * ignores the RB_JOIN flag.
+						 */
+						nd->nd_flags |=
+						    MD_MN_NODE_RB_JOIN;
+						nd->nd_flags &= ~MD_MN_NODE_OWN;
 
-					/*
-					 * Be careful in ordering of following
-					 * steps so that recovery from a panic
-					 * between the steps is viable.
-					 * Only reset master info in rpc.metad
-					 * - don't reset local cached info
-					 * which will be used to set master
-					 * info back if failure (rollback).
-					 */
-					if (clnt_withdrawset(nd->nd_nodename,
-					    sp, ep))
-						goto rollback;
+						/*
+						 * Be careful in ordering of
+						 * following steps so that
+						 * recovery from a panic
+						 * between the steps is viable.
+						 * Only reset master info in
+						 * rpc.metad - don't reset
+						 * local cached info which will
+						 * be used to set master info
+						 * back if failure (rollback).
+						 */
+						if (clnt_withdrawset(
+						    nd->nd_nodename, sp, ep))
+							goto rollback;
 
-					/* Reset master on deleted node */
-					if (clnt_mnsetmaster(node_v[i], sp, "",
-					    MD_MN_INVALID_NID, ep))
-						goto rollback;
-				    }
+						/*
+						 * Reset master on deleted node
+						 */
+						if (clnt_mnsetmaster(node_v[i],
+						    sp, "", MD_MN_INVALID_NID,
+						    ep))
+							goto rollback;
+					}
 
-				    nd->nd_flags |= MD_MN_NODE_DEL;
-				    nd->nd_flags &= ~MD_MN_NODE_OK;
+					nd->nd_flags |= MD_MN_NODE_DEL;
+					nd->nd_flags &= ~MD_MN_NODE_OK;
 				}
 				nd = nd->nd_next;
 			}
@@ -4503,37 +4512,37 @@ meta_set_deletehosts(
 			/* Send reinit */
 			nd = sd->sd_nodelist;
 			while (nd) {
-			    if ((oha == TRUE) &&
-				(!(nd->nd_flags & MD_MN_NODE_ALIVE))) {
-				    nd = nd->nd_next;
-				    continue;
-			    }
-			    /* Class is ignored for REINIT */
-			    if (clnt_mdcommdctl(nd->nd_nodename,
-				COMMDCTL_REINIT,
-				sp, NULL, MD_MSCF_NO_FLAGS, ep)) {
-				    mde_perror(ep, dgettext(TEXT_DOMAIN,
-					"Unable to reinit rpc.mdcommd.\n"));
-				    goto rollback;
-			    }
-			    nd = nd->nd_next;
+				if ((oha == TRUE) &&
+				    (!(nd->nd_flags & MD_MN_NODE_ALIVE))) {
+					nd = nd->nd_next;
+					continue;
+				}
+				/* Class is ignored for REINIT */
+				if (clnt_mdcommdctl(nd->nd_nodename,
+				    COMMDCTL_REINIT, sp, NULL,
+				    MD_MSCF_NO_FLAGS, ep)) {
+					mde_perror(ep, dgettext(TEXT_DOMAIN,
+					    "Unable to reinit rpc.mdcommd.\n"));
+					goto rollback;
+				}
+				nd = nd->nd_next;
 			}
 			/* Send resume */
 			nd = sd->sd_nodelist;
 			while (nd) {
-			    if ((oha == TRUE) &&
-				(!(nd->nd_flags & MD_MN_NODE_ALIVE))) {
-				    nd = nd->nd_next;
-				    continue;
-			    }
-			    if (clnt_mdcommdctl(nd->nd_nodename,
-				COMMDCTL_RESUME, sp, MD_MSG_CLASS0,
-				MD_MSCF_DONT_RESUME_CLASS1, ep)) {
-				    mde_perror(ep, dgettext(TEXT_DOMAIN,
-					"Unable to resume rpc.mdcommd.\n"));
-				    goto rollback;
-			    }
-			    nd = nd->nd_next;
+				if ((oha == TRUE) &&
+				    (!(nd->nd_flags & MD_MN_NODE_ALIVE))) {
+					nd = nd->nd_next;
+					continue;
+				}
+				if (clnt_mdcommdctl(nd->nd_nodename,
+				    COMMDCTL_RESUME, sp, MD_MSG_CLASS0,
+				    MD_MSCF_DONT_RESUME_CLASS1, ep)) {
+					mde_perror(ep, dgettext(TEXT_DOMAIN,
+					    "Unable to resume rpc.mdcommd.\n"));
+					goto rollback;
+				}
+				nd = nd->nd_next;
 			}
 			meta_ping_mnset(sp->setno);
 		}
@@ -4727,50 +4736,52 @@ meta_set_deletehosts(
 				RB_TEST(24, "deletehosts", ep)
 			}
 		} else {
-		    nd = sd->sd_nodelist;
-		    /* All nodes guaranteed to be ALIVE unless in oha mode */
-		    while (nd) {
-			/*
-			 * If mirror owner was set to a deleted node, then
-			 * each existing node resets mirror owner to NULL.
-			 *
-			 * During OHA mode, don't issue RPCs to
-			 * non-alive nodes since there is no reason to
-			 * wait for RPC timeouts.
-			 */
-			if ((oha == TRUE) &&
-			    (!(nd->nd_flags & MD_MN_NODE_ALIVE))) {
+			nd = sd->sd_nodelist;
+			/* All nodes guaranteed ALIVE unless in oha mode */
+			while (nd) {
+				/*
+				 * If mirror owner was set to a deleted node,
+				 * then each existing node resets mirror owner
+				 * to NULL.
+				 *
+				 * During OHA mode, don't issue RPCs to
+				 * non-alive nodes since there is no reason to
+				 * wait for RPC timeouts.
+				 */
+				if ((oha == TRUE) &&
+				    (!(nd->nd_flags & MD_MN_NODE_ALIVE))) {
+					nd = nd->nd_next;
+					continue;
+				}
+
+				/* Skip nodes being deleted */
+				if (strinlst(nd->nd_nodename, node_c, node_v)) {
+					nd = nd->nd_next;
+					continue;
+				}
+
+				/*
+				 * If mirror owner is a deleted node, reset
+				 * mirror owners to NULL.  If an error occurs,
+				 * print a warning and continue.  Don't fail
+				 * metaset because of mirror owner reset
+				 * problem since next node to grab mirror
+				 * will resolve this issue.  Before next node
+				 * grabs mirrors, metaset will show the deleted
+				 * node as owner which is why an attempt to
+				 * reset the mirror owner is made.
+				 */
+				if (clnt_reset_mirror_owner(nd->nd_nodename, sp,
+				    node_c, &node_id_list[0], &xep) == -1) {
+					mde_perror(&xep, dgettext(TEXT_DOMAIN,
+					    "Unable to reset mirror owner on"
+					    " node %s\n"), nd->nd_nodename);
+					mdclrerror(&xep);
+				}
+
+				RB_TEST(21, "deletehosts", ep)
 				nd = nd->nd_next;
-				continue;
 			}
-
-			/* Skip nodes being deleted */
-			if (strinlst(nd->nd_nodename, node_c, node_v)) {
-				nd = nd->nd_next;
-				continue;
-			}
-
-			/*
-			 * If mirror owner is a deleted node, reset mirror
-			 * owners to NULL.  If an error occurs, print a
-			 * warning and continue.  Don't fail metaset
-			 * because of mirror owner reset problem since next
-			 * node to grab mirror will resolve this issue.
-			 * Before next node grabs mirrors, metaset will show
-			 * the deleted node as owner which is why an attempt
-			 * to reset the mirror owner is made.
-			 */
-			if (clnt_reset_mirror_owner(nd->nd_nodename, sp,
-			    node_c, &node_id_list[0], &xep) == -1) {
-				mde_perror(&xep, dgettext(TEXT_DOMAIN,
-				    "Unable to reset mirror owner on"
-				    " node %s\n"), nd->nd_nodename);
-				mdclrerror(&xep);
-			}
-
-			RB_TEST(21, "deletehosts", ep)
-			nd = nd->nd_next;
-		    }
 		}
 	}
 
@@ -4790,10 +4801,10 @@ meta_set_deletehosts(
 		for (i = 0; i < MD_MAXSIDES; i++) {
 			if (strinlst(sd->sd_nodes[i], node_c, node_v))
 				(void) memset(&medr.med_rec_nodes[i],
-					'\0', sizeof (md_node_nm_t));
+				    '\0', sizeof (md_node_nm_t));
 			else
 				(void) strcpy(medr.med_rec_nodes[i],
-					sd->sd_nodes[i]);
+				    sd->sd_nodes[i]);
 		}
 		crcgen(&medr, &medr.med_rec_cks, sizeof (med_rec_t), NULL);
 
@@ -5636,79 +5647,85 @@ meta_set_auto_take(
 
 	/* Lock the set on our side */
 	if (clnt_lock_set(hostname, sp, ep)) {
-	    rval = -1;
-	    goto out;
+		rval = -1;
+		goto out;
 	}
 
 	if (take_val) {
-	    /* enable auto_take but only if it is not already set */
-	    if (! (sd->sd_flags & MD_SR_AUTO_TAKE)) {
-		/* verify that we're the only host in the set */
-		for (i = 0; i < MD_MAXSIDES; i++) {
-		    if (sd->sd_nodes[i] == NULL || sd->sd_nodes[i][0] == '\0')
-			continue;
+		/* enable auto_take but only if it is not already set */
+		if (! (sd->sd_flags & MD_SR_AUTO_TAKE)) {
+			/* verify that we're the only host in the set */
+			for (i = 0; i < MD_MAXSIDES; i++) {
+				if (sd->sd_nodes[i] == NULL ||
+				    sd->sd_nodes[i][0] == '\0')
+					continue;
 
-		    if (strcmp(sd->sd_nodes[i], hostname) != 0) {
-			(void) mddserror(ep, MDE_DS_SINGLEHOST, sp->setno, NULL,
-			    NULL, sp->setname);
-			rval = -1;
-			goto out;
-		    }
+				if (strcmp(sd->sd_nodes[i], hostname) != 0) {
+					(void) mddserror(ep, MDE_DS_SINGLEHOST,
+					    sp->setno, NULL, NULL, sp->setname);
+					rval = -1;
+					goto out;
+				}
+			}
+
+			if (clnt_enable_sr_flags(hostname, sp,
+			    MD_SR_AUTO_TAKE, ep))
+				rval = -1;
+
+			/* Disable SCSI reservations */
+			if (sd->sd_flags & MD_SR_MB_DEVID)
+				dd = metaget_drivedesc(sp, MD_BASICNAME_OK |
+				    PRINT_FAST, &xep);
+			else
+				dd = metaget_drivedesc(sp, MD_BASICNAME_OK,
+				    &xep);
+
+			if (! mdisok(&xep))
+				mdclrerror(&xep);
+
+			if (dd != NULL) {
+				if (rel_own_bydd(sp, dd, TRUE, &xep))
+					mdclrerror(&xep);
+			}
 		}
-
-		if (clnt_enable_sr_flags(hostname, sp, MD_SR_AUTO_TAKE, ep))
-		    rval = -1;
-
-		/* Disable SCSI reservations */
-		if (sd->sd_flags & MD_SR_MB_DEVID)
-		    dd = metaget_drivedesc(sp, MD_BASICNAME_OK | PRINT_FAST,
-			&xep);
-		else
-		    dd = metaget_drivedesc(sp, MD_BASICNAME_OK, &xep);
-		if (! mdisok(&xep))
-		    mdclrerror(&xep);
-
-		if (dd != NULL) {
-		    if (rel_own_bydd(sp, dd, TRUE, &xep))
-			mdclrerror(&xep);
-		}
-	    }
 
 	} else {
-	    /* disable auto_take, if set, or error */
-	    if (sd->sd_flags & MD_SR_AUTO_TAKE) {
-		if (clnt_disable_sr_flags(hostname, sp, MD_SR_AUTO_TAKE, ep))
-		    rval = -1;
+		/* disable auto_take, if set, or error */
+		if (sd->sd_flags & MD_SR_AUTO_TAKE) {
+			if (clnt_disable_sr_flags(hostname, sp,
+			    MD_SR_AUTO_TAKE, ep))
+				rval = -1;
 
-		/* Enable SCSI reservations */
-		if (sd->sd_flags & MD_SR_MB_DEVID)
-		    dd = metaget_drivedesc(sp, MD_BASICNAME_OK | PRINT_FAST,
-			&xep);
-		else
-		    dd = metaget_drivedesc(sp, MD_BASICNAME_OK, &xep);
-		if (! mdisok(&xep))
-		    mdclrerror(&xep);
+			/* Enable SCSI reservations */
+			if (sd->sd_flags & MD_SR_MB_DEVID)
+				dd = metaget_drivedesc(sp, MD_BASICNAME_OK |
+				    PRINT_FAST, &xep);
+			else
+				dd = metaget_drivedesc(sp, MD_BASICNAME_OK,
+				    &xep);
 
-		if (dd != NULL) {
-		    mhd_mhiargs_t	mhiargs = defmhiargs;
+			if (! mdisok(&xep))
+				mdclrerror(&xep);
 
-		    if (tk_own_bydd(sp, dd, &mhiargs, TRUE, &xep))
-			mdclrerror(&xep);
+			if (dd != NULL) {
+				mhd_mhiargs_t	mhiargs = defmhiargs;
+
+				if (tk_own_bydd(sp, dd, &mhiargs, TRUE, &xep))
+					mdclrerror(&xep);
+			}
+		} else {
+			(void) mddserror(ep, MDE_DS_AUTONOTSET, sp->setno,
+			    NULL, NULL, sp->setname);
+			rval = -1;
 		}
-
-	    } else {
-		(void) mddserror(ep, MDE_DS_AUTONOTSET, sp->setno, NULL, NULL,
-		    sp->setname);
-		rval = -1;
-	    }
 	}
 
 out:
 	cl_sk = cl_get_setkey(sp->setno, sp->setname);
 	if (clnt_unlock_set(hostname, cl_sk, &xep)) {
-	    if (rval == 0)
-		(void) mdstealerror(ep, &xep);
-	    rval = -1;
+		if (rval == 0)
+			(void) mdstealerror(ep, &xep);
+		rval = -1;
 	}
 	cl_set_setkey(NULL);
 

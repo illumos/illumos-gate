@@ -173,6 +173,7 @@ static void
 mirror_parent_init(md_mps_t *ps)
 {
 	bzero(ps, offsetof(md_mps_t, ps_mx));
+	bzero(&ps->ps_overlap_node, sizeof (avl_node_t));
 }
 
 /*ARGSUSED1*/
@@ -223,11 +224,17 @@ send_poke_hotspares_msg(daemon_request_t *drq)
 
 	kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_POKE_HOTSPARES,
-	    MD_MSGF_NO_LOG | MD_MSGF_NO_BCAST, (char *)&pokehsp,
+	    MD_MSGF_NO_LOG | MD_MSGF_NO_BCAST, 0, (char *)&pokehsp,
 	    sizeof (pokehsp), kresult);
 
 	if (!MDMN_KSEND_MSG_OK(rval, kresult)) {
 		mdmn_ksend_show_error(rval, kresult, "POKE_HOTSPARES");
+		/* If we're shutting down already, pause things here. */
+		if (kresult->kmmr_comm_state == MDMNE_RPC_FAIL) {
+			while (!md_mn_is_commd_present()) {
+				delay(md_hz);
+			}
+		}
 		cmn_err(CE_PANIC,
 		    "ksend_message failure: POKE_HOTSPARES");
 	}
@@ -468,7 +475,7 @@ check_comp_4_hotspares(
 		}
 
 		kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
-		rval = mdmn_ksend_message(setno, msgtype, msgflags,
+		rval = mdmn_ksend_message(setno, msgtype, msgflags, 0,
 		    (char *)&allochspmsg, sizeof (allochspmsg),
 		    kresult);
 
@@ -490,6 +497,12 @@ check_comp_4_hotspares(
 				}
 				kmem_free(kresult, sizeof (md_mn_kresult_t));
 				return (1);
+			}
+			/* If we're shutting down already, pause things here. */
+			if (kresult->kmmr_comm_state == MDMNE_RPC_FAIL) {
+				while (!md_mn_is_commd_present()) {
+					delay(md_hz);
+				}
 			}
 			cmn_err(CE_PANIC,
 			    "ksend_message failure: ALLOCATE_HOTSPARE");
@@ -1636,9 +1649,14 @@ fast_select_read_unit(md_mps_t *ps, md_mcs_t *cs)
 	/*
 	 * For directed mirror read (DMR) we only use the specified side and
 	 * do not compute the source of the read.
+	 * If we're running with MD_MPS_DIRTY_RD set we always return the
+	 * first mirror side (this prevents unnecessary ownership switching).
+	 * Otherwise we return the submirror according to the mirror read option
 	 */
 	if (ps->ps_flags & MD_MPS_DMR) {
 		sm_index = un->un_dmr_last_read;
+	} else if (ps->ps_flags & MD_MPS_DIRTY_RD) {
+		sm_index = md_find_nth_unit(running_bm, 0);
 	} else {
 		/* Normal (non-DMR) operation */
 		switch (un->un_read_option) {
@@ -1883,6 +1901,13 @@ mirror_build_incore(mm_unit_t *un, int snarfing)
 	mutex_init(&un->un_dmr_mx, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&un->un_dmr_cv, NULL, CV_DEFAULT, NULL);
 
+	/*
+	 * Allocate rwlocks for un_pernode_dirty_bm accessing.
+	 */
+	for (i = 0; i < MD_MNMAXSIDES; i++) {
+		rw_init(&un->un_pernode_dirty_mx[i], NULL, RW_DEFAULT, NULL);
+	}
+
 	/* place various information in the in-core data structures */
 	md_nblocks_set(MD_SID(un), un->c.un_total_blocks);
 	MD_UNIT(MD_SID(un)) = un;
@@ -1903,6 +1928,7 @@ reset_mirror(struct mm_unit *un, minor_t mnum, int removing)
 	uint_t		bits = 0;
 	minor_t		selfid;
 	md_unit_t	*su;
+	int		i;
 
 	md_destroy_unit_incore(mnum, &mirror_md_ops);
 
@@ -1917,6 +1943,15 @@ reset_mirror(struct mm_unit *un, minor_t mnum, int removing)
 		kmem_free((caddr_t)un->un_goingdirty_bm, bitcnt);
 	if (un->un_resync_bm)
 		kmem_free((caddr_t)un->un_resync_bm, bitcnt);
+	if (un->un_pernode_dirty_sum)
+		kmem_free((caddr_t)un->un_pernode_dirty_sum, un->un_rrd_num);
+
+	/*
+	 * Destroy the taskq for deferred processing of DRL clean requests.
+	 * This taskq will only be present for Multi Owner mirrors.
+	 */
+	if (un->un_drl_task != NULL)
+		ddi_taskq_destroy(un->un_drl_task);
 
 	md_nblocks_set(mnum, -1ULL);
 	MD_UNIT(mnum) = NULL;
@@ -1965,6 +2000,12 @@ reset_mirror(struct mm_unit *un, minor_t mnum, int removing)
 	mutex_destroy(&un->un_dmr_mx);
 	cv_destroy(&un->un_dmr_cv);
 
+	for (i = 0; i < MD_MNMAXSIDES; i++) {
+		rw_destroy(&un->un_pernode_dirty_mx[i]);
+		if (un->un_pernode_dirty_bm[i])
+			kmem_free((caddr_t)un->un_pernode_dirty_bm[i], bitcnt);
+	}
+
 	/*
 	 * Remove self from the namespace
 	 */
@@ -1972,7 +2013,9 @@ reset_mirror(struct mm_unit *un, minor_t mnum, int removing)
 		(void) md_rem_selfname(un->c.un_self_id);
 	}
 
+	/* This frees the unit structure. */
 	mddb_deleterec_wrapper(un->c.un_record_id);
+
 	if (recid != 0)
 		mddb_deleterec_wrapper(recid);
 
@@ -2430,11 +2473,17 @@ set_sm_comp_state(
 		}
 
 		kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
-		rval = mdmn_ksend_message(setno, msgtype, msgflags,
+		rval = mdmn_ksend_message(setno, msgtype, msgflags, 0,
 		    (char *)&stchmsg, sizeof (stchmsg), kresult);
 
 		if (!MDMN_KSEND_MSG_OK(rval, kresult)) {
 			mdmn_ksend_show_error(rval, kresult, "STATE UPDATE");
+			/* If we're shutting down already, pause things here. */
+			if (kresult->kmmr_comm_state == MDMNE_RPC_FAIL) {
+				while (!md_mn_is_commd_present()) {
+					delay(md_hz);
+				}
+			}
 			cmn_err(CE_PANIC,
 			    "ksend_message failure: STATE_UPDATE");
 		}
@@ -3435,11 +3484,12 @@ update_resync(daemon_queue_t *dq)
 	md_mps_t	*ps = (md_mps_t *)dq;
 	buf_t		*pb = ps->ps_bp;
 	mdi_unit_t	*ui = ps->ps_ui;
-	mm_unit_t	*un;
+	mm_unit_t	*un = MD_UNIT(ui->ui_link.ln_id);
 	set_t		setno;
 	int		restart_resync;
 
-	un = md_unit_writerlock(ui);
+	mutex_enter(&un->un_rrp_inflight_mx);
+	(void) md_unit_writerlock(ui);
 	ps->ps_un = un;
 	setno = MD_MIN2SET(getminor(pb->b_edev));
 	if (mddb_reread_rr(setno, un->un_rr_dirty_recid) == 0) {
@@ -3447,15 +3497,14 @@ update_resync(daemon_queue_t *dq)
 		 * Synchronize our in-core view of what regions need to be
 		 * resync'd with the on-disk version.
 		 */
-		mutex_enter(&un->un_rrp_inflight_mx);
 		mirror_copy_rr(howmany(un->un_rrd_num, NBBY), un->un_resync_bm,
 		    un->un_dirty_bm);
-		mutex_exit(&un->un_rrp_inflight_mx);
 
 		/* Region dirty map is now up to date */
 	}
 	restart_resync = (un->un_rs_thread_flags & MD_RI_BLOCK_OWNER) ? 1 : 0;
 	md_unit_writerexit(ui);
+	mutex_exit(&un->un_rrp_inflight_mx);
 
 	/* Restart the resync thread if it was previously blocked */
 	if (restart_resync) {
@@ -3581,9 +3630,8 @@ become_owner(daemon_queue_t *dq)
 
 			kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 			rval = mdmn_ksend_message(setno,
-			    MD_MN_MSG_REQUIRE_OWNER, msg_flags,
-			    /* flags */ (char *)msg,
-			    sizeof (md_mn_req_owner_t), kres);
+			    MD_MN_MSG_REQUIRE_OWNER, msg_flags, 0,
+			    (char *)msg, sizeof (md_mn_req_owner_t), kres);
 
 			kmem_free(msg, sizeof (md_mn_req_owner_t));
 
@@ -3890,19 +3938,19 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 	}
 
 	/*
-	 * For Multinode mirrors with a Resync Region (not ABR) we need to
-	 * become the mirror owner before continuing with the write(). For ABR
-	 * mirrors we check that we 'own' the resync if we're in
-	 * write-after-read mode. We do this _after_ ensuring that there are no
-	 * overlaps to ensure that the once we know that we are the owner, the
-	 * readerlock will not released until the write is complete. As a
-	 * change of ownership in a MN set requires the writerlock, this
-	 * ensures that ownership cannot be changed until the write is
-	 * complete
+	 * For Multinode mirrors with no owner and a Resync Region (not ABR)
+	 * we need to become the mirror owner before continuing with the
+	 * write(). For ABR mirrors we check that we 'own' the resync if
+	 * we're in write-after-read mode. We do this _after_ ensuring that
+	 * there are no overlaps to ensure that once we know that we are
+	 * the owner, the readerlock will not be released until the write is
+	 * complete. As a change of ownership in a MN set requires the
+	 * writerlock, this ensures that ownership cannot be changed until
+	 * the write is complete.
 	 */
 	if (MD_MNSET_SETNO(setno) && (!((ui->ui_tstate & MD_ABR_CAP) ||
 	    (flag & MD_STR_ABR)) || (flag & MD_STR_WAR))) {
-		if (!MD_MN_MIRROR_OWNER(un))  {
+		if (MD_MN_NO_MIRROR_OWNER(un))  {
 			if (ps->ps_flags & MD_MPS_ON_OVERLAP)
 				mirror_overlap_tree_remove(ps);
 			md_kstat_waitq_exit(ui);
@@ -3922,10 +3970,11 @@ mirror_write_strategy(buf_t *pb, int flag, void *private)
 	if (!((ui->ui_tstate & MD_ABR_CAP) || (flag & MD_STR_ABR)) &&
 	    !(flag & MD_STR_WAR)) {
 		if (mirror_mark_resync_region(un, ps->ps_firstblk,
-		    ps->ps_lastblk)) {
+		    ps->ps_lastblk, md_mn_mynode_id)) {
 			pb->b_flags |= B_ERROR;
 			pb->b_resid = pb->b_bcount;
-			ASSERT(!(ps->ps_flags & MD_MPS_ON_OVERLAP));
+			if (ps->ps_flags & MD_MPS_ON_OVERLAP)
+				mirror_overlap_tree_remove(ps);
 			kmem_cache_free(mirror_parent_cache, ps);
 			md_kstat_waitq_exit(ui);
 			md_unit_readerexit(ui);
@@ -4169,9 +4218,9 @@ mirror_read_strategy(buf_t *pb, int flag, void *private)
 
 				/*
 				 * Before reading the buffer, see if
-				 * we are the owner
+				 * there is an owner.
 				 */
-				if (!MD_MN_MIRROR_OWNER(un))  {
+				if (MD_MN_NO_MIRROR_OWNER(un))  {
 					ps->ps_call = NULL;
 					mirror_overlap_tree_remove(ps);
 					md_kstat_waitq_exit(ui);
@@ -4506,6 +4555,7 @@ mirror_resync_message(md_mn_rs_params_t *p, IOLOCK *lockp)
 	md_error_t		mde = mdnullerror;
 	md_mps_t		*ps;
 	int			rs_active;
+	int			rr, rr_start, rr_end;
 
 	/* Check that the given device is part of a multi-node set */
 	setno = MD_MIN2SET(p->mnum);
@@ -4579,6 +4629,25 @@ mirror_resync_message(md_mn_rs_params_t *p, IOLOCK *lockp)
 			md_ioctl_readerexit(lockp);
 
 		if (p->rs_originator != md_mn_mynode_id) {
+			/*
+			 * Clear our un_resync_bm for the regions completed.
+			 * The owner (originator) will take care of itself.
+			 */
+			BLK_TO_RR(rr_end, ps->ps_lastblk, un);
+			BLK_TO_RR(rr_start, p->rs_start, un);
+			if (ps->ps_lastblk && rr_end < rr_start) {
+				BLK_TO_RR(rr_start, ps->ps_firstblk, un);
+				mutex_enter(&un->un_resync_mx);
+				/*
+				 * Update our resync bitmap to reflect that
+				 * another node has synchronized this range.
+				 */
+				for (rr = rr_start; rr <= rr_end; rr++) {
+					CLR_KEEPDIRTY(rr, un);
+				}
+				mutex_exit(&un->un_resync_mx);
+			}
+
 			/*
 			 * On all but the originating node, first update
 			 * the resync state, then unblock the previous
@@ -4654,6 +4723,7 @@ mirror_resync_message(md_mn_rs_params_t *p, IOLOCK *lockp)
 				    &p->mde, lockp);
 			}
 		}
+
 		break;
 	case MD_MN_MSG_RESYNC_FINISH:
 		/*
@@ -4792,6 +4862,24 @@ mirror_resync_message(md_mn_rs_params_t *p, IOLOCK *lockp)
 				un->c.un_status &= ~MD_UN_KEEP_DIRTY;
 				if (!broke_out)
 					un->c.un_status &= ~MD_UN_WAR;
+
+				/*
+				 * Clear our un_resync_bm for the regions
+				 * completed.  The owner (originator) will
+				 * take care of itself.
+				 */
+				if (p->rs_originator != md_mn_mynode_id &&
+				    (ps = un->un_rs_prev_overlap) != NULL) {
+					BLK_TO_RR(rr_start, ps->ps_firstblk,
+					    un);
+					BLK_TO_RR(rr_end, ps->ps_lastblk, un);
+					mutex_enter(&un->un_resync_mx);
+					for (rr = rr_start; rr <= rr_end;
+					    rr++) {
+						CLR_KEEPDIRTY(rr, un);
+					}
+					mutex_exit(&un->un_resync_mx);
+				}
 			}
 
 			/*

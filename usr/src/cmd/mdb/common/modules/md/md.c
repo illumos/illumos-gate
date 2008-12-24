@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mdb_modapi.h>
 
@@ -37,6 +34,7 @@ extern int set_io(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int dumpnamespace(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int dumpsetaddr(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int dumphotspare(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int printmmbm(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern void set_io_help();
 
 /* from mdbgen */
@@ -79,6 +77,8 @@ const mdb_dcmd_t dcmds[] = {
 	    dumpsetaddr },
 	{ "simple_de_ic", NULL, "simple mddb_de_ic_t",
 	    simple_de_ic },
+	{ "printmmbm", NULL, "print bitmaps for given mm_unit_t",
+	    printmmbm },
 	{ NULL }
 };
 

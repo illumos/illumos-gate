@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <meta.h>
 
@@ -56,6 +54,8 @@ extern void mdmn_do_delkeyname(HANDLER_PARMS);
 extern void mdmn_do_get_tstate(HANDLER_PARMS);
 extern void mdmn_do_get_mirstate(HANDLER_PARMS);
 extern void mdmn_do_addmdname(HANDLER_PARMS);
+extern void mdmn_do_mark_dirty(HANDLER_PARMS);
+extern void mdmn_do_mark_clean(HANDLER_PARMS);
 
 extern int mdmn_smgen_test6(SMGEN_PARMS);
 extern int mdmn_smgen_state_upd(SMGEN_PARMS);
@@ -693,10 +693,36 @@ md_mn_msg_tbl_entry_t  msg_table[MD_MN_NMESSAGES] = {
 	 * Add metadevice name into replica
 	 */
 		MD_MSG_CLASS1,		/* message class */
-		mdmn_do_addmdname,	/* add ,etadevice name */
+		mdmn_do_addmdname,	/* add metadevice name */
 		NULL,			/* submessage generator */
 		90,			/* times out in 90 secs */
 		10000, 2,		/* class busy retry / time delta */
 		10, 1000		/* comm fail retry / time delta */
+	},
+
+	{
+	/*
+	 * MD_MN_MSG_RR_DIRTY
+	 * Mark given range of un_dirty_bm as dirty
+	 */
+		MD_MSG_CLASS2,		/* message class */
+		mdmn_do_mark_dirty,	/* message handler */
+		NULL,			/* submessage generator */
+		8,			/* timeout in seconds */
+		UINT_MAX, 10,		/* class busy retry / time delta */
+		UINT_MAX, 100		/* comm fail retry / time delta */
+	},
+
+	{
+	/*
+	 * MD_MN_MSG_RR_CLEAN
+	 * Mark given range of un_dirty_bm as clean
+	 */
+		MD_MSG_CLASS2,		/* message class */
+		mdmn_do_mark_clean,	/* message handler */
+		NULL,			/* submessage generator */
+		8,			/* timeout in seconds */
+		UINT_MAX, 10,		/* class busy retry / time delta */
+		UINT_MAX, 100		/* comm fail retry / time delta */
 	},
 };

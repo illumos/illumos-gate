@@ -118,6 +118,7 @@ extern mdq_anchor_t	md_sp_daemon;
 extern kmutex_t		md_mx;
 extern kcondvar_t	md_cv;
 extern md_krwlock_t	md_unit_array_rw;
+extern clock_t		md_hz;
 
 static kmem_cache_t	*sp_parent_cache = NULL;
 static kmem_cache_t	*sp_child_cache = NULL;
@@ -341,15 +342,19 @@ sp_send_stat_msg(mp_unit_t *un, sp_status_t status)
 	kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_SP_SETSTAT2, MD_MSGF_NO_LOG,
-	    (char *)&sp_msg, sizeof (sp_msg), kres);
+	    0, (char *)&sp_msg, sizeof (sp_msg), kres);
 
 	if (!MDMN_KSEND_MSG_OK(rval, kres)) {
 		mdmn_ksend_show_error(rval, kres, "MD_MN_MSG_SP_SETSTAT2");
-
+		/* If we're shutting down already, pause things here. */
+		if (kres->kmmr_comm_state == MDMNE_RPC_FAIL) {
+			while (!md_mn_is_commd_present()) {
+				delay(md_hz);
+			}
+		}
 		/*
 		 * Panic as we are now in an inconsistent state.
 		 */
-
 		cmn_err(CE_PANIC, "md: %s: %s could not be set on all nodes\n",
 		    md_shortname(MD_SID(un)), str);
 	}

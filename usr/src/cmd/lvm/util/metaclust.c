@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <meta.h>
 #include <sdssc.h>
 #include <signal.h>
@@ -117,6 +115,8 @@ static void
 sigalarmhandler(int sig)
 {
 	int	i, n, ret, stat_loc = 0;
+	FILE	*pgcore;
+	char	corecmd[256];
 
 	n = sizeof (step_table) / sizeof (step_table[0]);
 	for (i = 0; i < n; i++) {
@@ -129,6 +129,25 @@ sigalarmhandler(int sig)
 	meta_mc_log(MC_LOG1, gettext("Timeout expired in %s: %s"),
 	    step_table[i].step_nam,
 	    meta_print_hrtime(gethrtime() - start_time));
+
+	/*
+	 * See what the child was actually doing when the timeout expired.
+	 * A core-dump of this would be _really_ good, so let's just
+	 * try a 'gcore -g c_pid' and hope
+	 */
+
+	(void) memset(corecmd, 0, sizeof (corecmd));
+	(void) snprintf(corecmd, sizeof (corecmd),
+	    "/bin/gcore -g %d >/dev/null 2>&1", (int)c_pid);
+
+	pgcore = popen(corecmd, "r");
+
+	if (pgcore == NULL) {
+		meta_mc_log(MC_LOG1, gettext("Could not grab core for pid %s"),
+		    c_pid);
+	} else {
+		(void) pclose(pgcore);
+	}
 
 	if ((ret = kill(c_pid, SIGKILL)) == 0) {
 		/*
@@ -1762,7 +1781,6 @@ main(int argc, char **argv)
 				    "rpc.mdcommd for set %s\n"), sp->setname);
 				md_exit(local_sp, 1);
 			}
-			meta_ping_mnset(setno);
 
 			/* Unblock mddb parse messages */
 			if (s_ownset(sp->setno, ep) == MD_SETOWNER_YES) {

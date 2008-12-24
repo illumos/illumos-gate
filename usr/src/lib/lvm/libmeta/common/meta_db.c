@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Just in case we're not in a build environment, make sure that
@@ -928,7 +927,7 @@ meta_db_addsidenms(
 			 */
 			send_rval = mdmn_send_message(sp->setno,
 			    MD_MN_MSG_META_DB_NEWSIDE, MD_MSGF_FAIL_ON_SUSPEND |
-			    MD_MSGF_PANIC_WHEN_INCONSISTENT, (char *)&db_ns,
+			    MD_MSGF_PANIC_WHEN_INCONSISTENT, 0, (char *)&db_ns,
 			    sizeof (md_mn_msg_meta_db_newside_t),
 			    &resultp, ep);
 			if (send_rval != 0) {
@@ -1048,7 +1047,7 @@ meta_db_delsidenm(
 		 */
 		send_rval = mdmn_send_message(sp->setno,
 		    MD_MN_MSG_META_DB_DELSIDE, MD_MSGF_FAIL_ON_SUSPEND |
-		    MD_MSGF_PANIC_WHEN_INCONSISTENT, (char *)&db_ds,
+		    MD_MSGF_PANIC_WHEN_INCONSISTENT, 0, (char *)&db_ds,
 		    sizeof (md_mn_msg_meta_db_delside_t), &resultp, ep);
 		if (send_rval != 0) {
 			if (resultp == NULL)
@@ -1542,7 +1541,7 @@ meta_db_attach(
 				flags |= MD_MSGF_NO_LOG;
 			send_rval = mdmn_send_message(sp->setno,
 			    MD_MN_MSG_META_DB_ATTACH,
-			    flags, (char *)&attach,
+			    flags, 0, (char *)&attach,
 			    sizeof (md_mn_msg_meta_db_attach_t),
 			    &resultp, ep);
 			if (send_rval != 0) {
@@ -2007,7 +2006,7 @@ meta_db_detach(
 				flags |= MD_MSGF_NO_LOG;
 			send_rval = mdmn_send_message(sp->setno,
 			    MD_MN_MSG_META_DB_DETACH,
-			    flags, (char *)&detach,
+			    flags, 0, (char *)&detach,
 			    sizeof (md_mn_msg_meta_db_detach_t),
 			    &resultp, ep);
 			if (send_rval != 0) {

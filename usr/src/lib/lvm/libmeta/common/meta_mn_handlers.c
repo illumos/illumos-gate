@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -448,7 +447,7 @@ mdmn_do_choose_owner(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 	myflags |= msg->msg_flags & MD_MSGF_INHERIT_BITS;
 
 	ret = mdmn_send_message(MD_MIN2SET(d->msg_chooseid_mnum),
-	    MD_MN_MSG_CHANGE_OWNER, myflags, (char *)&chownermsg,
+	    MD_MN_MSG_CHANGE_OWNER, myflags, 0, (char *)&chownermsg,
 	    sizeof (chownermsg), &resp1, &mde);
 	if (resp1 != NULL)
 		free_result(resp1);
@@ -2119,4 +2118,68 @@ mdmn_do_addmdname(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
 	}
 
 	resp->mmr_exitval = 0;
+}
+
+/*
+ * This is used to issue a MD_MN_RR_DIRTY ioctl to the mirror.
+ */
+/*ARGSUSED*/
+void
+mdmn_do_mark_dirty(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
+{
+	md_mn_msg_rr_dirty_t	*d;
+	md_mn_rr_dirty_params_t	rp;
+	int			ret;
+
+	resp->mmr_out_size = 0;
+	resp->mmr_err_size = 0;
+	resp->mmr_out = NULL;
+	resp->mmr_err = NULL;
+	resp->mmr_comm_state = MDMNE_ACK;
+	d = (md_mn_msg_rr_dirty_t *)((void *)(msg->msg_event_data));
+
+	(void) memset(&rp, 0, sizeof (rp));
+	MD_SETDRIVERNAME(&rp, MD_MIRROR, MD_MIN2SET(d->rr_mnum))
+	rp.rr_mnum = d->rr_mnum;
+	rp.rr_nodeid = d->rr_nodeid;
+	rp.rr_start = (ushort_t)((d->rr_range >> 16) & 0xffff);
+	rp.rr_end = (ushort_t)(d->rr_range & 0xffff);
+
+	ret = metaioctl(MD_MN_RR_DIRTY, &rp, &rp.mde, NULL);
+
+	resp->mmr_exitval = ret;
+}
+
+/*
+ * This is used to issue a MD_MN_RR_CLEAN ioctl to the mirror.
+ */
+/*ARGSUSED*/
+void
+mdmn_do_mark_clean(md_mn_msg_t *msg, uint_t flags, md_mn_result_t *resp)
+{
+	md_mn_msg_rr_clean_t	*d;
+	md_mn_rr_clean_params_t	*rcp;
+	int			ret;
+
+	resp->mmr_out_size = 0;
+	resp->mmr_err_size = 0;
+	resp->mmr_out = NULL;
+	resp->mmr_err = NULL;
+	resp->mmr_comm_state = MDMNE_ACK;
+	d = (md_mn_msg_rr_clean_t *)((void *)(msg->msg_event_data));
+
+	rcp = Zalloc(sizeof (struct md_mn_rr_clean_params) +
+	    MDMN_MSG_RR_CLEAN_DATA_BYTES(d));
+	MD_SETDRIVERNAME(rcp, MD_MIRROR, MD_MIN2SET(d->rr_mnum))
+	rcp->rr_mnum = d->rr_mnum;
+	rcp->rr_nodeid = d->rr_nodeid;
+	rcp->rr_start_size = d->rr_start_size;
+	(void) memcpy(MDMN_RR_CLEAN_PARAMS_DATA(rcp), MDMN_MSG_RR_CLEAN_DATA(d),
+	    MDMN_MSG_RR_CLEAN_DATA_BYTES(d));
+
+	ret = metaioctl(MD_MN_RR_CLEAN, rcp, &rcp->mde, NULL);
+
+	Free(rcp);
+
+	resp->mmr_exitval = ret;
 }

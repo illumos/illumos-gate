@@ -80,40 +80,80 @@ extern int		med_get_t_ioctl(mddb_med_t_parm_t *tpp, int mode);
 extern int		med_set_t_ioctl(mddb_med_t_parm_t *tpp, int mode);
 extern unit_t		md_get_nextunit(set_t setno);
 
-static int		md_mn_commd_present;
-
 /* md_mddb.c */
 extern mddb_set_t	*mddb_setenter(set_t setno, int flag, int *errorcodep);
 extern void		mddb_setexit(mddb_set_t *s);
 extern md_krwlock_t	nm_lock;
+
+#define	MD_MN_COMMD_CMD "rpc.mdcommd"
+static pid_t		md_mn_commd_pid;
 
 /*
  * md_mn_is_commd_present:
  * ----------------------
  * Determine if commd is running on this node.
  *
- * Returns:
- *	1	if commd has been started
- *	0	if commd has not been started or has exited
+ * If md_mn_commd_pid is 0, trust it.  Otherwise, do some in-depth checking
+ * to make sure it's still the one we originally set up by checking the
+ * provided PID's u_comm for the right program name in u_comm.
+ *
+ * This one's intended for the "something went awry" cases, and not for
+ * general use, due to its higher cost for the good/normal case.
  */
 int
 md_mn_is_commd_present(void)
 {
-	return (md_mn_commd_present ? 1 : 0);
+	proc_t  *commd_procp;
+
+	if (md_mn_commd_pid == (pid_t)0) {
+		return (0);
+	}
+
+	/* some in-depth checking */
+	mutex_enter(&pidlock);
+	if ((commd_procp = prfind(md_mn_commd_pid)) != NULL &&
+	    strncmp(commd_procp->p_user.u_comm,
+	    MD_MN_COMMD_CMD, strlen(MD_MN_COMMD_CMD)) == 0) {
+		mutex_exit(&pidlock);
+		/*
+		 * returns a little more info than asked for, but it will
+		 * never be PID 0 when valid.
+		 */
+		return ((int)md_mn_commd_pid);
+	}
+	/* if it's not there, make sure we only do these contortions once */
+	md_mn_commd_pid = (pid_t)0;
+	mutex_exit(&pidlock);
+
+	cmn_err(CE_WARN, "!rpc.mdcommd exited abnormally");
+	return (0);
+}
+
+/*
+ * This version merely checks the PID value that was set via an ioctl.
+ * It's intended to be used in the main code flow, where performance is
+ * critical, and accuracy can be sacrificed a little.  If something is
+ * already known to be wrong, don't use this, but use
+ * md_mn_is_commd_present() instead.
+ */
+int
+md_mn_is_commd_present_lite(void)
+{
+	return ((int)md_mn_commd_pid);
 }
 
 /*
  * md_mn_clear_commd_present:
  * -------------------------
- * Clear the commd_present flag. Called only from a CPR request to suspend /
- * terminate a resync thread. We clear the md_mn_commd_present flag so that
+ * Clear the md_mn_commd_pid. Called only from a CPR request to suspend /
+ * terminate a resync thread. We clear the md_mn_commd_pid so that
  * any RPC request that was in transit can complete with a failure and _not_
  * result in an unexpected system panic.
  */
 void
 md_mn_clear_commd_present()
 {
-	md_mn_commd_present = 0;
+	md_mn_commd_pid = (pid_t)0;
 }
 
 /*
@@ -855,7 +895,6 @@ getnum_ioctl(void *d, int mode)
 		return (mderror(mdep, MDE_UNIT_NOT_FOUND));
 	}
 
-	rw_enter(&md_ops[modindex]->md_link_rw.lock, RW_READER);
 	/* if array length is not 0 then allocate the output buffers */
 	if (minor_array_length != 0) {
 		sz = minor_array_length * ((int)sizeof (minor_t));
@@ -863,6 +902,7 @@ getnum_ioctl(void *d, int mode)
 		m_ptr = minors;
 	}
 
+	rw_enter(&md_ops[modindex]->md_link_rw.lock, RW_READER);
 	next = md_ops[modindex]->md_head;
 	count = 0;
 	while (next) {
@@ -2976,6 +3016,7 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 			    setno,
 			    MD_MN_MSG_TEST1,
 			    flags,
+			    0,
 			    (char *)&msg_test,
 			    sizeof (msg_test),
 			    result);
@@ -3019,6 +3060,7 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 			    setno,
 			    MD_MN_MSG_TEST2,
 			    flags,
+			    0,
 			    (char *)&msg_test,
 			    sizeof (msg_test),
 			    result);
@@ -3408,7 +3450,7 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 	}
 
 	/*
-	 * Update md_mn_commd_present global to reflect presence or absence of
+	 * Update md_mn_commd_pid global to reflect presence or absence of
 	 * /usr/sbin/rpc.mdcommd. This allows us to determine if an RPC failure
 	 * is expected during a mdmn_ksend_message() handshake. If the commd is
 	 * not present then an RPC failure is acceptable. If the commd _is_
@@ -3420,7 +3462,7 @@ md_base_ioctl(md_dev64_t dev, int cmd, caddr_t data, int mode, IOLOCK *lockp)
 		if (! (mode & FWRITE))
 			return (EACCES);
 
-		md_mn_commd_present = (int)(intptr_t)data;
+		md_mn_commd_pid = (pid_t)(intptr_t)data;
 		err = 0;
 		break;
 	}

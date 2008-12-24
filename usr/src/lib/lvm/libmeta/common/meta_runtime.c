@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Just in case we're not in a build environment, make sure that
@@ -171,9 +169,8 @@ do_owner_ioctls(void)
 			    ownerioctls_onp) != 0) {
 				(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
 				    "%s: illegal value for %s: %s.\n"),
-					function_namep,
-					ownerioctls_namep,
-					param_valuep);
+				    function_namep, ownerioctls_namep,
+				    param_valuep);
 				syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
 				    "%s: illegal value for %s: %s.\n"),
 				    function_namep,
@@ -216,6 +213,32 @@ commd_get_outfile(void)
 }
 
 /*
+ * This controls what type of RPC errors are sent to syslog().
+ * It is used as a bitmask against the clnt_stat list, which defines
+ * 0 as RPC_SUCCESS, so likely shouldn't be set.
+ *
+ * The #define below provides a default of all errors in the list.
+ * The default can then be modified to reduce the amount of traffic
+ * going to syslog in the event of RPC errors.
+ */
+
+#define	DEFAULT_ERRMASK	(UINT_MAX & ~(1 << RPC_SUCCESS))
+
+uint_t
+meta_rpc_err_mask(void)
+{
+	char		*param_valuep;
+	uint_t retval   = DEFAULT_ERRMASK;
+
+	param_valuep = meta_get_rt_param("commd_RPC_errors", B_FALSE);
+	if (param_valuep != NULL) {
+		retval = (uint_t)strtol(param_valuep, NULL, 16);
+		free(param_valuep);
+	}
+	return (retval);
+}
+
+/*
  * The following lines define private functions
  */
 
@@ -232,27 +255,23 @@ meta_get_rt_param(const char *param_namep, boolean_t warn_if_not_found)
 
 	line_bufferp = (char *)malloc(line_buffer_size);
 	if (line_bufferp == NULL) {
-		(void) fprintf(stderr,
-			dgettext(TEXT_DOMAIN, "%s: malloc failed\n"),
-			function_namep);
-		syslog(LOG_ERR,
-			dgettext(TEXT_DOMAIN, "%s: malloc failed\n"),
-			function_namep);
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "%s: malloc failed\n"), function_namep);
+		syslog(LOG_ERR, dgettext(TEXT_DOMAIN, "%s: malloc failed\n"),
+		    function_namep);
 		return (param_valuep);
 	}
 	param_filep = fopen(param_file_namep, "r");
 	if (param_filep == NULL) {
-		(void) fprintf(stderr,
-			dgettext(TEXT_DOMAIN, "%s: can't open %s\n"),
-			function_namep, param_file_namep);
-		syslog(LOG_ERR,
-			dgettext(TEXT_DOMAIN, "%s: can't open %s\n"),
-			function_namep, param_file_namep);
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "%s: can't open %s\n"), function_namep, param_file_namep);
+		syslog(LOG_ERR, dgettext(TEXT_DOMAIN, "%s: can't open %s\n"),
+		    function_namep, param_file_namep);
 		free(line_bufferp);
 		return (param_valuep);
 	}
 	while ((fgets(line_bufferp, line_buffer_size, param_filep) != NULL) &&
-		(param_valuep == NULL)) {
+	    (param_valuep == NULL)) {
 
 		newlinep = strchr(line_bufferp, '\n');
 		if (newlinep != NULL) {
@@ -261,10 +280,10 @@ meta_get_rt_param(const char *param_namep, boolean_t warn_if_not_found)
 		}
 		param_name_tokenp = strtok(line_bufferp, token_separator_listp);
 		if ((param_name_tokenp != NULL) &&
-			(strcmp(param_namep, param_name_tokenp) == 0)) {
+		    (strcmp(param_namep, param_name_tokenp) == 0)) {
 
 			param_value_tokenp = strtok(NULL,
-						token_separator_listp);
+			    token_separator_listp);
 		}
 		if (param_value_tokenp != NULL) {
 			param_valuep = strdup(param_value_tokenp);
@@ -282,18 +301,12 @@ meta_get_rt_param(const char *param_namep, boolean_t warn_if_not_found)
 		}
 	}
 	if ((param_valuep == NULL) && (warn_if_not_found == B_TRUE)) {
-		(void) fprintf(stderr,
-			dgettext(TEXT_DOMAIN,
-			    "%s: value of %s not set or error in %s\n"),
-			function_namep,
-			param_namep,
-			param_file_namep);
-		syslog(LOG_ERR,
-			dgettext(TEXT_DOMAIN,
-			    "%s: value of %s not set or error in %s\n"),
-			function_namep,
-			param_namep,
-			param_file_namep);
+		(void) fprintf(stderr, dgettext(TEXT_DOMAIN,
+		    "%s: value of %s not set or error in %s\n"),
+		    function_namep, param_namep, param_file_namep);
+		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
+		    "%s: value of %s not set or error in %s\n"),
+		    function_namep, param_namep, param_file_namep);
 	}
 	free(line_bufferp);
 	(void) fclose(param_filep);

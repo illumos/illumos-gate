@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,16 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdlib.h>
 #include <unistd.h>
-
 #include <wait.h>
 #include <sys/time.h>
 #include <meta.h>
@@ -131,7 +128,7 @@ copy_changelog(mdmn_changelog_record_t *incp,
 		odp->lr_class = incp->lr_class;
 		odp->lr_msglen = incp->lr_msglen;
 		if (incp->lr_msglen)
-			copy_msg_1(&incp->lr_msg, &odp->lr_od_msg, direction);
+			copy_msg_2(&incp->lr_msg, &odp->lr_od_msg, direction);
 	} else {
 		incp->lr_revision = odp->lr_revision;
 		incp->lr_flags = odp->lr_flags;
@@ -139,7 +136,7 @@ copy_changelog(mdmn_changelog_record_t *incp,
 		incp->lr_class = odp->lr_class;
 		incp->lr_msglen = odp->lr_msglen;
 		if (odp->lr_msglen)
-			copy_msg_1(&incp->lr_msg, &odp->lr_od_msg, direction);
+			copy_msg_2(&incp->lr_msg, &odp->lr_od_msg, direction);
 	}
 }
 
@@ -196,7 +193,7 @@ mdmn_allocate_changelog(mdsetname_t *sp, md_error_t *ep)
 			(void) mdstealerror(ep, &req.ur_mde);
 #ifdef DEBUG
 			syslog(LOG_DEBUG, "allocate_log: %s\n",
-						mde_sperror(ep, ""));
+			    mde_sperror(ep, ""));
 #endif
 			Free(mdmn_changelog[setno]);
 			return (-1);
@@ -389,13 +386,14 @@ mdmn_unlog_msg(md_mn_msg_t *msg)
 	assert(lr != NULL);
 	if (!MSGID_CMP(&(msg->msg_msgid), &(lr->lr_msg.msg_msgid))) {
 		syslog(LOG_ERR, dgettext(TEXT_DOMAIN,
-		"unlog_msg: msgid mismatch\n"
-		"\t\tstored: ID = (%d, 0x%llx-%d) setno %d class %d type %d\n"
-		"\t\tattempting to unlog:\n"
-		"\t\tID = (%d, 0x%llx-%d) setno %d class %d type %d.\n"),
-		MSGID_ELEMS(lr->lr_msg.msg_msgid), lr->lr_setno,
-		lr->lr_class, lr->lr_msgtype, MSGID_ELEMS(msg->msg_msgid),
-		msg->msg_setno, class, msg->msg_type);
+		    "unlog_msg: msgid mismatch\n"
+		    "\t\tstored: ID = (%d, 0x%llx-%d) setno %d "
+		    "class %d type %d\n"
+		    "\t\tattempting to unlog:\n"
+		    "\t\tID = (%d, 0x%llx-%d) setno %d class %d type %d.\n"),
+		    MSGID_ELEMS(lr->lr_msg.msg_msgid), lr->lr_setno,
+		    lr->lr_class, lr->lr_msgtype, MSGID_ELEMS(msg->msg_msgid),
+		    msg->msg_setno, class, msg->msg_type);
 		return (-1);
 	}
 	lr->lr_msglen = 0;
@@ -462,10 +460,10 @@ mdmn_commitlog(md_set_desc *sd, md_error_t *ep)
 	if (!(MD_MNSET_DESC(sd)) || !sd->sd_mn_am_i_master) {
 		if (!(MD_MNSET_DESC(sd))) {
 			syslog(LOG_DAEMON | LOG_ERR, dgettext(TEXT_DOMAIN,
-					"mdmn_commitlog - Not MN Set\n"));
+			    "mdmn_commitlog - Not MN Set\n"));
 		} else {
 			syslog(LOG_DAEMON | LOG_ERR, dgettext(TEXT_DOMAIN,
-				"mdmn_commit_log - Not Master\n"));
+			    "mdmn_commit_log - Not Master\n"));
 		}
 		return (-1);
 	}
@@ -485,7 +483,7 @@ mdmn_commitlog(md_set_desc *sd, md_error_t *ep)
 		req.ur_size  = MDMN_LOGRECSIZE_OD;
 		req.ur_data = (uintptr_t)&clodrec;
 		if ((retval = metaioctl(MD_MN_DB_USERREQ, &req, &req.ur_mde,
-							    NULL)) != 0) {
+		    NULL)) != 0) {
 			(void) mdstealerror(ep, &req.ur_mde);
 #ifdef DEBUG
 			syslog(LOG_DAEMON|LOG_DEBUG,
@@ -501,16 +499,16 @@ mdmn_commitlog(md_set_desc *sd, md_error_t *ep)
 		recs[lrc] = 0;
 		/* Commit to mddb  on disk */
 		METAD_SETUP_LR(MD_DB_COMMIT_MANY, setno,
-					mdmn_changelog[setno][0].lr_selfid);
+		    mdmn_changelog[setno][0].lr_selfid);
 		req.ur_size = size;
 		req.ur_data = (uintptr_t)recs;
 		if ((retval = metaioctl(MD_MN_DB_USERREQ, &req,
-						&req.ur_mde, NULL)) != 0) {
+		    &req.ur_mde, NULL)) != 0) {
 			(void) mdstealerror(ep, &req.ur_mde);
 #ifdef DEBUG
 			syslog(LOG_DAEMON|LOG_DEBUG,
-					"mdmn_commitlog - metaioctl COMMIT_MANY"
-					"Failure\n%s",  mde_sperror(ep, ""));
+			    "mdmn_commitlog - metaioctl COMMIT_MANY"
+			    "Failure\n%s",  mde_sperror(ep, ""));
 #endif
 		}
 	}
@@ -609,7 +607,7 @@ mdmn_snarf_changelog(set_t set, md_error_t *ep)
 	}
 
 	lr = (mdmn_changelog_record_od_t *)get_ur_rec(set, MD_UR_GET_NEXT,
-						    MDDB_UR_LR, &id, ep);
+	    MDDB_UR_LR, &id, ep);
 	if (lr == NULL)
 		return (0);
 
@@ -618,7 +616,7 @@ mdmn_snarf_changelog(set_t set, md_error_t *ep)
 	if (mdmn_changelog[set] == NULL) {
 		/* Allocate incore state for the log */
 		mdmn_changelog[set] = Zalloc(MDMN_LOGHDR_SIZE *
-			mdmn_logrecs);
+		    mdmn_logrecs);
 	}
 
 	do {

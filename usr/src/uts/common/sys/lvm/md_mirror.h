@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -30,6 +31,9 @@
 #include <sys/lvm/mdvar.h>
 #include <sys/lvm/md_mirror_shared.h>
 #include <sys/lvm/md_rename.h>
+#ifdef	_KERNEL
+#include <sys/sunddi.h>
+#endif
 
 #ifdef	__cplusplus
 extern "C" {
@@ -331,9 +335,24 @@ typedef struct  mm_mirror_ic {
 	kcondvar_t	un_dmr_cv;		/* condvar for DMR requests */
 	int		un_dmr_last_read;	/* last DMR submirror read */
 	callb_cpr_t	un_rs_cprinfo;		/* CPR info for resync thread */
-	kmutex_t	un_rs_cpr_mx;		/* Mutex for CPR info */
+	kmutex_t	un_rs_cpr_mx;		/* mutex for resync CPR info */
+	kmutex_t	un_prr_cpr_mx;		/* mutex for prr CPR info */
 	uint_t		un_resync_completed;	/* type of last resync */
 	int		un_abr_count;		/* count of sp's with abr set */
+
+	uchar_t		*un_pernode_dirty_bm[MD_MNMAXSIDES];
+	uchar_t		*un_pernode_dirty_sum;
+
+	krwlock_t	un_pernode_dirty_mx[MD_MNMAXSIDES];
+	ushort_t	un_rr_clean_start_bit;  /* where to start next clean */
+
+#ifdef	_KERNEL
+	ddi_taskq_t	*un_drl_task;		/* deferred RR_CLEAN taskq */
+#else
+	void		*un_drl_task;		/* deferred RR_CLEAN taskq */
+#endif	/* _KERNEL */
+	uint_t		un_waiting_to_clear;	/* Blocked waiting to clear */
+
 }mm_mirror_ic_t;
 
 #define	MM_MN_OWNER_SENT	0x0001		/* RPC in progress */
@@ -416,9 +435,15 @@ typedef struct mm_unit {
 #define	un_dmr_last_read	un_mmic.un_dmr_last_read
 #define	un_rs_cprinfo		un_mmic.un_rs_cprinfo
 #define	un_rs_cpr_mx		un_mmic.un_rs_cpr_mx
+#define	un_prr_cpr_mx		un_mmic.un_prr_cpr_mx
 #define	un_resync_completed	un_mmic.un_resync_completed
 #define	un_abr_count		un_mmic.un_abr_count
-
+#define	un_pernode_dirty_bm	un_mmic.un_pernode_dirty_bm
+#define	un_pernode_dirty_sum	un_mmic.un_pernode_dirty_sum
+#define	un_pernode_dirty_mx	un_mmic.un_pernode_dirty_mx
+#define	un_rr_clean_start_bit	un_mmic.un_rr_clean_start_bit
+#define	un_drl_task		un_mmic.un_drl_task
+#define	un_waiting_to_clear	un_mmic.un_waiting_to_clear
 
 #define	MM_RF_GATECLOSED	0x0001
 #define	MM_RF_COMMIT_NEEDED	0x0002
@@ -497,6 +522,12 @@ typedef struct optim_resync {
 #define	IS_KEEPDIRTY(i, un)	(isset((un)->un_resync_bm, (i)))
 #define	CLR_KEEPDIRTY(i, un)	(clrbit((un)->un_resync_bm, (i)))
 
+#define	IS_PERNODE_DIRTY(n, i, un) \
+	(isset((un)->un_pernode_dirty_bm[(n)-1], (i)))
+#define	CLR_PERNODE_DIRTY(n, i, un) \
+	(clrbit((un)->un_pernode_dirty_bm[(n)-1], (i)))
+#define	SET_PERNODE_DIRTY(n, i, un) \
+	(setbit((un)->un_pernode_dirty_bm[(n)-1], (i)))
 
 /*
  * Write-On-Write handling.
@@ -579,13 +610,15 @@ extern int		mirror_resync_unit(minor_t mnum, md_resync_ioctl_t *ri,
 			    md_error_t *ep, IOLOCK *);
 extern int		mirror_ioctl_resync(md_resync_ioctl_t *p, IOLOCK *);
 extern int		mirror_mark_resync_region(mm_unit_t *, diskaddr_t,
-				diskaddr_t);
+				diskaddr_t, md_mn_nodeid_t);
 extern void		resync_start_timeout(set_t setno);
 extern int		mirror_resize_resync_regions(mm_unit_t *, diskaddr_t);
 extern int		mirror_add_resync_regions(mm_unit_t *, diskaddr_t);
 extern int		mirror_probedevs(md_probedev_t *, IOLOCK *);
 extern void		mirror_copy_rr(int, uchar_t *, uchar_t *);
 extern void		mirror_process_unit_resync(mm_unit_t *);
+extern int		mirror_set_dirty_rr(md_mn_rr_dirty_params_t *);
+extern int		mirror_set_clean_rr(md_mn_rr_clean_params_t *);
 #endif	/* _KERNEL */
 
 #ifdef	__cplusplus

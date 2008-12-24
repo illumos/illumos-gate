@@ -1,7 +1,7 @@
 <?xml version='1.0'?>
 <!DOCTYPE service_bundle SYSTEM '/usr/share/lib/xml/dtd/service_bundle.dtd.1'>
 <!--
- Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -22,8 +22,6 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
-
-	pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 	NOTE:  This service manifest is not editable; its contents will
 	be overwritten by package or patch operations, including
@@ -82,8 +80,8 @@
 		<propval name='endpoint_type' type='astring' value='tli' />
 		<propval name='wait' type='boolean' value='true' />
 		<propval name='isrpc' type='boolean' value='true' />
-		<propval name='rpc_low_version' type='integer' value='1' />
-		<propval name='rpc_high_version' type='integer' value='1' />
+		<propval name='rpc_low_version' type='integer' value='2' />
+		<propval name='rpc_high_version' type='integer' value='2' />
 		<propval name='proto' type='astring' value='tcp' />
 	</property_group>
 

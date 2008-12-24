@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <door.h>
 #include <locale.h>
@@ -106,7 +104,7 @@ exit_daemon_lock(void)
 	if (close(daemon_lock_fd) == -1) {
 		syslog(LOG_DAEMON | LOG_DEBUG,
 		    gettext("close(%s) failed - %s\n"),
-			    daemon_lock_file, strerror(errno));
+		    daemon_lock_file, strerror(errno));
 		return;
 	}
 	unlink(daemon_lock_file);
@@ -133,37 +131,32 @@ door2rpc(void *cookie,		/* required by the doors infrastructure */
 	md_mn_kresult_t	kresult;
 
 	md_mn_kmsg_t *kmsg = (md_mn_kmsg_t *)(void *)argp;
-	err = mdmn_send_message(kmsg->kmsg_setno,
-				kmsg->kmsg_type,
-				kmsg->kmsg_flags,
-				(char *)&(kmsg->kmsg_data),
-				kmsg->kmsg_size,
-				&result,
-				&ep);
+	err = mdmn_send_message(kmsg->kmsg_setno, kmsg->kmsg_type,
+	    kmsg->kmsg_flags, kmsg->kmsg_recipient, (char *)&(kmsg->kmsg_data),
+	    kmsg->kmsg_size, &result, &ep);
+
 	if (result == NULL) {
 		kresult.kmmr_comm_state = MDMNE_RPC_FAIL;
 	} else {
 		kresult.kmmr_comm_state = result->mmr_comm_state;
-	}
-	if (err == 0) {
-		kresult.kmmr_msgtype = result->mmr_msgtype;
-		kresult.kmmr_flags = result->mmr_flags;
-		kresult.kmmr_exitval = result->mmr_exitval;
-		kresult.kmmr_failing_node = result->mmr_failing_node;
-		size = result->mmr_out_size;
-		if (size > 0) {
-			/* This is the maximum of data we can transfer, here */
-			if (size > MDMN_MAX_KRES_DATA) {
-				size = MDMN_MAX_KRES_DATA;
+		if (err == 0) {
+			kresult.kmmr_msgtype = result->mmr_msgtype;
+			kresult.kmmr_flags = result->mmr_flags;
+			kresult.kmmr_exitval = result->mmr_exitval;
+			kresult.kmmr_failing_node = result->mmr_failing_node;
+			size = result->mmr_out_size;
+			if (size > 0) {
+				/* This is the max data we can transfer, here */
+				if (size > MDMN_MAX_KRES_DATA) {
+					size = MDMN_MAX_KRES_DATA;
+				}
+				bcopy(result->mmr_out, &(kresult.kmmr_res_data),
+				    size);
+				kresult.kmmr_res_size = size;
+			} else {
+				kresult.kmmr_res_size = 0;
 			}
-			bcopy(result->mmr_out, &(kresult.kmmr_res_data), size);
-			kresult.kmmr_res_size = size;
-		} else {
-			kresult.kmmr_res_size = 0;
 		}
-	}
-
-	if (result != NULL) {
 		free_result(result);
 	}
 
@@ -252,7 +245,7 @@ main(void)
 	 * At this point we are single threaded.
 	 * We give mdmn_send_message() a chance to initialize safely.
 	 */
-	(void) mdmn_send_message(0, 0, 0, 0, 0, 0, 0);
+	(void) mdmn_send_message(0, 0, 0, 0, 0, 0, 0, 0);
 
 	/* setup the door handle */
 	mdmn_door_handle = door_create(door2rpc, NULL,
@@ -266,12 +259,12 @@ main(void)
 	if (metaioctl(MD_MN_SET_DOORH, &mdmn_door_handle, &ep,
 	    "mddoors") != 0) {
 		syslog(LOG_DAEMON | LOG_DEBUG, gettext(
-			"Couldn't set door handle"));
+		    "Couldn't set door handle"));
 		exit(1);
 	}
 
 	(void) pause();
 	syslog(LOG_DAEMON | LOG_ERR, gettext(
-			"Unexpected exit from pause()"));
+	    "Unexpected exit from pause()"));
 	return (1);
 }

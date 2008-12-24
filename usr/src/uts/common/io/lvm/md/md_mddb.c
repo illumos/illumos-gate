@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -643,7 +642,7 @@ computefreeblks(
 
 		freeblks = 0;
 		for (mbip = s->s_mbiarray[i]; mbip != NULL;
-					mbip = mbip->mbi_next) {
+		    mbip = mbip->mbi_next) {
 			freeblks += mbip->mbi_mddb_mb.mb_blkcnt;
 		}
 		if (freeblks == 0)	/* this happen when there is no */
@@ -798,7 +797,7 @@ mddb_devid_free_delete(
 		if ((did_freep1->free_blk == firstblk) &&
 		    (did_freep1->free_offset <= offset) &&
 		    ((did_freep1->free_length + did_freep1->free_offset) >=
-			(length + offset))) {
+		    (length + offset))) {
 			/* Have found our entry - remove from list */
 			block_found = 1;
 			did_freep_before = did_freep1;
@@ -816,17 +815,17 @@ mddb_devid_free_delete(
 			 * offset, length.
 			 */
 			did_freep_before->free_length = offset -
-				did_freep_before->free_offset;
+			    did_freep_before->free_offset;
 			/*
 			 * did_freep_after points to area in block after
 			 * offset, length.
 			 */
 			did_freep_after = (mddb_did_free_t *)kmem_zalloc
-					(sizeof (mddb_did_free_t), KM_SLEEP);
+			    (sizeof (mddb_did_free_t), KM_SLEEP);
 			did_freep_after->free_blk = did_freep_before->free_blk;
 			did_freep_after->free_offset = offset + length;
 			did_freep_after->free_length = old_length - length -
-				did_freep_before->free_length;
+			    did_freep_before->free_length;
 			/*
 			 * Add before and after areas to free list
 			 * If area before or after offset, length has length
@@ -835,28 +834,30 @@ mddb_devid_free_delete(
 			if (did_freep_after->free_length) {
 				did_freep_after->free_next = did_freep1;
 				if (did_freep2) {
-				    did_freep2->free_next = did_freep_after;
+					did_freep2->free_next =
+					    did_freep_after;
 				} else {
-				    s->s_did_icp->did_ic_freep =
-					did_freep_after;
+					s->s_did_icp->did_ic_freep =
+					    did_freep_after;
 				}
 				did_freep1 = did_freep_after;
 			} else {
 				kmem_free(did_freep_after,
-					sizeof (mddb_did_free_t));
+				    sizeof (mddb_did_free_t));
 			}
 
 			if (did_freep_before->free_length) {
 				did_freep_before->free_next = did_freep1;
 				if (did_freep2) {
-				    did_freep2->free_next = did_freep_before;
+					did_freep2->free_next =
+					    did_freep_before;
 				} else {
-				    s->s_did_icp->did_ic_freep =
-					did_freep_before;
+					s->s_did_icp->did_ic_freep =
+					    did_freep_before;
 				}
 			} else {
 				kmem_free(did_freep_before,
-					sizeof (mddb_did_free_t));
+				    sizeof (mddb_did_free_t));
 			}
 			break;
 		} else {
@@ -934,10 +935,10 @@ mddb_devid_free_get(
 			if (freep->free_length == 0) {
 				if (freep2) {
 					freep2->free_next =
-					freep->free_next;
+					    freep->free_next;
 				} else {
 					s->s_did_icp->did_ic_freep =
-					freep->free_next;
+					    freep->free_next;
 				}
 				kmem_free(freep, sizeof (mddb_did_free_t));
 			}
@@ -971,7 +972,7 @@ mddb_devid_free_get(
 
 		/* Add unused part of block to free list */
 		(void) mddb_devid_free_add(s, blk_num,
-			len, (dbtob(blk_cnt) - len));
+		    len, (dbtob(blk_cnt) - len));
 	}
 
 	return ((caddr_t)devid_ptr);
@@ -1015,9 +1016,9 @@ mddb_devid_add(
 		return (0);
 
 	devid_len = ddi_devid_sizeof(devid);
-	devid_ptr = (ddi_devid_t)
-			mddb_devid_free_get(s, devid_len, &blk, &blkcnt,
-				&offset);
+	devid_ptr = (ddi_devid_t)mddb_devid_free_get(s,
+	    devid_len, &blk, &blkcnt, &offset);
+
 	if (devid_ptr == NULL) {
 		return (1);
 	}
@@ -1090,7 +1091,7 @@ mddb_devid_delete(mddb_set_t *s, uint_t index)
 
 	/* Add new free space in disk block to free list */
 	(void) mddb_devid_free_add(s, did_info->info_firstblk,
-		did_info->info_offset, did_info->info_length);
+	    did_info->info_offset, did_info->info_length);
 
 	return (0);
 }
@@ -1439,7 +1440,7 @@ writeblks(
 		for (i = 0; i < cnt; i++)
 			blkarray[i] = blk + i;
 		ret = wrtblklst(s, buffer, blkarray, cnt,
-			li, 0, MDDB_WR_ONLY_MASTER);
+		    li, 0, MDDB_WR_ONLY_MASTER);
 		kmem_free(blkarray, size);
 		return (ret);
 	}
@@ -1505,7 +1506,7 @@ writelocall(
 		did_blk = s->s_did_icp->did_ic_blkp;
 		did_blk->blk_commitcnt = s->s_lbp->lb_commitcnt;
 		crcgen(did_blk, &did_blk->blk_checksum,
-			dbtob(lbp->lb_didblkcnt), NULL);
+		    dbtob(lbp->lb_didblkcnt), NULL);
 	}
 	crcgen(lbp, &lbp->lb_checksum, dbtob(lbp->lb_blkcnt), NULL);
 
@@ -1521,20 +1522,20 @@ writelocall(
 			did_dbp = s->s_did_icp->did_ic_dbp;
 			while (did_dbp) {
 				err |= writeblks(s, (caddr_t)did_dbp->db_ptr,
-					did_dbp->db_firstblk,
-					did_dbp->db_blkcnt, li,
-					MDDB_WR_ONLY_MASTER);
+				    did_dbp->db_firstblk,
+				    did_dbp->db_blkcnt, li,
+				    MDDB_WR_ONLY_MASTER);
 				did_dbp = did_dbp->db_next;
 			}
 
 			/* write out device id area block */
 			err |= writeblks(s, (caddr_t)did_blk,
-				lbp->lb_didfirstblk, lbp->lb_didblkcnt, li,
-				MDDB_WR_ONLY_MASTER);
+			    lbp->lb_didfirstblk, lbp->lb_didblkcnt, li,
+			    MDDB_WR_ONLY_MASTER);
 		}
 		/* write out locator block */
 		err |= writeblks(s, (caddr_t)lbp, 0, lbp->lb_blkcnt, li,
-			MDDB_WR_ONLY_MASTER);
+		    MDDB_WR_ONLY_MASTER);
 	}
 
 	/*
@@ -1715,7 +1716,7 @@ sizeofde(
 	size_t		size;
 
 	size = sizeof (mddb_de_ic_t) - sizeof (mddb_block_t) +
-		    sizeof (mddb_block_t) * dep->de_blkcount;
+	    sizeof (mddb_block_t) * dep->de_blkcount;
 	return (size);
 }
 
@@ -1727,7 +1728,7 @@ sizeofde32(
 	size_t		size;
 
 	size = sizeof (*dep) - sizeof (dep->de32_blks) +
-		    sizeof (mddb_block_t) * dep->de32_blkcount;
+	    sizeof (mddb_block_t) * dep->de32_blkcount;
 	return (size);
 }
 
@@ -1760,7 +1761,7 @@ create_db32rec(
 	if ((dbp->db_firstentry != NULL) && (db32p->db32_firstentry == 0))
 		db32p->db32_firstentry = 0x4;
 	de32p = (mddb_de32_t *)((void *) ((caddr_t)(&db32p->db32_firstentry)
-		+ sizeof (db32p->db32_firstentry)));
+	    + sizeof (db32p->db32_firstentry)));
 	for (dep = dbp->db_firstentry; dep; dep = dep->de_next) {
 		detode32(dep, de32p);
 		if ((dep->de_next != NULL) && (de32p->de32_next == 0))
@@ -2067,9 +2068,9 @@ readcopy(
 
 			dep = (mddb_de_ic_t *)
 			    kmem_zalloc(sizeof (mddb_de_ic_t) -
-				sizeof (mddb_block_t) +
-				sizeof (mddb_block_t) * de32p->de32_blkcount,
-				KM_SLEEP);
+			    sizeof (mddb_block_t) +
+			    sizeof (mddb_block_t) * de32p->de32_blkcount,
+			    KM_SLEEP);
 			de32tode(de32p, dep);
 
 			dbp->db_firstentry = dep;
@@ -2078,10 +2079,10 @@ readcopy(
 				de32p2 = nextentry(de32p);
 
 				dep2 = (mddb_de_ic_t *)kmem_zalloc(
-					sizeof (mddb_de_ic_t) -
-					sizeof (mddb_block_t) +
-					sizeof (mddb_block_t) *
-					de32p2->de32_blkcount, KM_SLEEP);
+				    sizeof (mddb_de_ic_t) -
+				    sizeof (mddb_block_t) +
+				    sizeof (mddb_block_t) *
+				    de32p2->de32_blkcount, KM_SLEEP);
 
 				de32tode(de32p2, dep2);
 
@@ -2277,10 +2278,9 @@ getoptdev(
 			if ((cb = devopsp[getmajor(lp->l_dev)]->devo_cb_ops)
 			    != NULL) {
 				error = (*cb->cb_prop_op)(DDI_DEV_T_ANY, devi,
-					prop_op,
-					DDI_PROP_NOTPROM|DDI_PROP_DONTPASS,
-					"removable-media",
-					(caddr_t)&propvalue, &proplength);
+				    prop_op, DDI_PROP_NOTPROM |
+				    DDI_PROP_DONTPASS, "removable-media",
+				    (caddr_t)&propvalue, &proplength);
 
 				if (error == DDI_PROP_SUCCESS)
 					removable = 1;
@@ -2348,7 +2348,7 @@ getuserdata(
 	    (MD_SET_IMPORT | MD_SET_REPLICATED_IMPORT)) &&
 	    (type >= MDDB_FIRST_MODID) &&
 	    ((rbp->rb_revision == MDDB_REV_RB) ||
-		(rbp->rb_revision == MDDB_REV_RBFN))) {
+	    (rbp->rb_revision == MDDB_REV_RBFN))) {
 
 		switch (dep->de_flags) {
 
@@ -2512,7 +2512,7 @@ writeoptrecord(
 		 * In a MN diskset, any node can write optimized record(s).
 		 */
 		wrt_err = wrtblklst(s, (caddr_t)rbp, dep->de_blks,
-			dep->de_blkcount, li, &bufhead, MDDB_WR_ANY_NODE);
+		    dep->de_blkcount, li, &bufhead, MDDB_WR_ANY_NODE);
 		/*
 		 * For MN diskset, set error in optinfo structure so
 		 * that mddb_commitrec knows which replica failed.
@@ -2556,10 +2556,10 @@ writeoptrecord(
 				lp = &lbp->lb_locators[dep->de_optinfo[0].o_li];
 				if (lp == bfp->bf_locator) {
 					dep->de_optinfo[0].o_flags |=
-						MDDB_F_EWRITE;
+					    MDDB_F_EWRITE;
 				} else {
 					dep->de_optinfo[1].o_flags |=
-						MDDB_F_EWRITE;
+					    MDDB_F_EWRITE;
 				}
 			}
 			err |= MDDB_F_EWRITE;
@@ -2689,7 +2689,7 @@ fixoptrecord(
 	create_db32rec(db32p, dbp);
 	crcgen(db32p, &db32p->db32_checksum, MDDB_BSIZE, NULL);
 	err = writeall(s, (caddr_t)db32p, db32p->db32_blknum,
-		1, MDDB_WR_ONLY_MASTER);
+	    1, MDDB_WR_ONLY_MASTER);
 	kmem_free((caddr_t)db32p, MDDB_BSIZE);
 	return (err);
 }
@@ -2932,13 +2932,13 @@ ridev(
 
 	if (MD_UPGRADE) {
 		ldev = md_makedevice(md_targ_name_to_major(clp->l_driver),
-			clp->l_mnum);
+		    clp->l_mnum);
 	} else {
 		if (ddi_name_to_major(clp->l_driver) == (major_t)-1)
 			return (EINVAL);
 
 		ldev = md_makedevice(ddi_name_to_major(clp->l_driver),
-			clp->l_mnum);
+		    clp->l_mnum);
 	}
 
 	if (clp->l_devid != 0) {
@@ -3099,7 +3099,7 @@ writecopy(
 		create_db32rec(db32p, dbp);
 		crcgen(db32p, &db32p->db32_checksum, MDDB_BSIZE, NULL);
 		err = writeblks(s, (caddr_t)db32p, dbp->db_blknum, 1, li,
-			MDDB_WR_ONLY_MASTER);
+		    MDDB_WR_ONLY_MASTER);
 		kmem_free((caddr_t)db32p, MDDB_BSIZE);
 		if (err)
 			return (err);
@@ -3804,7 +3804,7 @@ writestart(
 			lnp->ln_revision = MDDB_REV_LN;
 		crcgen(lnp, &lnp->ln_checksum, dbtob(lbp->lb_lnblkcnt), NULL);
 		err = writeall(s, (caddr_t)lnp, lbp->lb_lnfirstblk,
-			lbp->lb_lnblkcnt, 0);
+		    lbp->lb_lnblkcnt, 0);
 		/*
 		 * If a MN diskset and this is the master, set the PARSE_LOCNM
 		 * flag in the mddb_set structure to show that the locator
@@ -4413,28 +4413,34 @@ locator2cfgloc(
 	}
 
 	if (lbp->lb_flags & MDDB_DEVID_STYLE) {
-	    did_info = &(did_icp->did_ic_blkp->blk_info[li]);
-	    if (did_info->info_flags & MDDB_DID_EXISTS) {
-		sz = (int)ddi_devid_sizeof(did_icp->did_ic_devid[li]);
-		if (clp->l_devid_flags & MDDB_DEVID_SPACE) {
-			/* copy device id from mddb to cfg_loc structure */
-			szalloc = clp->l_devid_sz;
-			if (sz <= szalloc) {
-				for (i = 0; i < sz; i++) {
-					((char *)(uintptr_t)clp->l_devid)[i] =
-					((char *)did_icp->did_ic_devid[li])[i];
+		did_info = &(did_icp->did_ic_blkp->blk_info[li]);
+		if (did_info->info_flags & MDDB_DID_EXISTS) {
+			sz = (int)ddi_devid_sizeof(did_icp->did_ic_devid[li]);
+			if (clp->l_devid_flags & MDDB_DEVID_SPACE) {
+				/*
+				 * copy device id from mddb to
+				 * cfg_loc structure
+				 */
+				szalloc = clp->l_devid_sz;
+				if (sz <= szalloc) {
+					for (i = 0; i < sz; i++) {
+						((char *)(uintptr_t)
+						    clp->l_devid)[i] =
+						    ((char *)did_icp->
+						    did_ic_devid[li])[i];
+					}
+					clp->l_devid_flags |= MDDB_DEVID_VALID;
+					(void) strcpy(clp->l_minor_name,
+					    did_info->info_minor_name);
+				} else {
+					clp->l_devid_flags |=
+					    MDDB_DEVID_NOSPACE;
 				}
-				clp->l_devid_flags |= MDDB_DEVID_VALID;
-				(void) strcpy(clp->l_minor_name,
-					did_info->info_minor_name);
-			} else {
-				clp->l_devid_flags |= MDDB_DEVID_NOSPACE;
+			} else if (clp->l_devid_flags & MDDB_DEVID_GETSZ) {
+				clp->l_devid_flags = MDDB_DEVID_SZ;
+				clp->l_devid_sz = sz;
 			}
-		} else if (clp->l_devid_flags & MDDB_DEVID_GETSZ) {
-			clp->l_devid_flags = MDDB_DEVID_SZ;
-			clp->l_devid_sz = sz;
 		}
-	    }
 	}
 
 	/*
@@ -4770,8 +4776,7 @@ get_mbs_n_lbs(
 	 * lb_blkcnt will be set correctly for MN set later once getmasters
 	 * has determined that the set is a MN set.
 	 */
-	lb_blkcnt = ((setno == MD_LOCAL_SET) ?
-			MDDB_LOCAL_LBCNT : MDDB_LBCNT);
+	lb_blkcnt = ((setno == MD_LOCAL_SET) ? MDDB_LOCAL_LBCNT : MDDB_LBCNT);
 
 	for (rip = s->s_rip; rip != NULL; rip = rip->ri_next) {
 		rip->ri_flags &= (MDDB_F_PTCHED | MDDB_F_IOCTL |
@@ -4919,8 +4924,8 @@ get_mbs_n_lbs(
 			/* Read in device ID block */
 			if (did_icp == NULL) {
 				did_icp = (mddb_did_ic_t *)
-					kmem_zalloc(sizeof (mddb_did_ic_t),
-					    KM_SLEEP);
+				    kmem_zalloc(sizeof (mddb_did_ic_t),
+				    KM_SLEEP);
 			} else {
 				/* Reuse did_icp, but clear out data */
 				if (did_icp->did_ic_blkp !=
@@ -4932,22 +4937,23 @@ get_mbs_n_lbs(
 					    (mddb_did_blk_t *)NULL;
 				}
 				if (did_icp->did_ic_dbp !=
-					(mddb_did_db_t *)NULL) {
+				    (mddb_did_db_t *)NULL) {
 					did_dbp1 = did_icp->did_ic_dbp;
 					while (did_dbp1) {
-					    did_dbp2 = did_dbp1->db_next;
-					    kmem_free((caddr_t)did_dbp1->db_ptr,
-						dbtob(did_dbp1->db_blkcnt));
-					    kmem_free((caddr_t)did_dbp1,
-						sizeof (mddb_did_db_t));
-					    did_dbp1 = did_dbp2;
+						did_dbp2 = did_dbp1->db_next;
+						kmem_free((caddr_t)
+						    did_dbp1->db_ptr,
+						    dbtob(did_dbp1->db_blkcnt));
+						kmem_free((caddr_t)did_dbp1,
+						    sizeof (mddb_did_db_t));
+						did_dbp1 = did_dbp2;
 					}
 					did_icp->did_ic_dbp =
-						(mddb_did_db_t *)NULL;
+					    (mddb_did_db_t *)NULL;
 				}
 				for (i = 0; i < MDDB_NLB; i++) {
 					did_icp->did_ic_devid[i] =
-						(ddi_devid_t)NULL;
+					    (ddi_devid_t)NULL;
 				}
 			}
 
@@ -4985,7 +4991,7 @@ get_mbs_n_lbs(
 			if (revchk(MDDB_REV_DI, did_blkp->blk_revision))
 				continue;
 			if (crcchk(did_blkp, &did_blkp->blk_checksum,
-				dbtob(lbp->lb_didblkcnt), NULL))
+			    dbtob(lbp->lb_didblkcnt), NULL))
 				continue;
 
 			/*
@@ -5037,82 +5043,106 @@ get_mbs_n_lbs(
 			 * have been updated to match this valid device
 			 * id information.
 			 */
-		    for (li = 0; li < lbp->lb_loccnt; li++) {
-			did_info = &did_blkp->blk_info[li];
-			if (did_info->info_flags & MDDB_DID_EXISTS)
-				did_info->info_flags &=
-					~(MDDB_DID_VALID | MDDB_DID_UPDATED);
-		    }
+			for (li = 0; li < lbp->lb_loccnt; li++) {
+				did_info = &did_blkp->blk_info[li];
+				if (did_info->info_flags & MDDB_DID_EXISTS)
+					did_info->info_flags &=
+					    ~(MDDB_DID_VALID |
+					    MDDB_DID_UPDATED);
+			}
 
-		    cont_flag = 0;
-		    for (li = 0; li < lbp->lb_loccnt; li++) {
-			did_info = &did_blkp->blk_info[li];
-			did_block = (caddr_t)NULL;
-			if (did_info->info_flags & MDDB_DID_EXISTS) {
-			    /* Check if block has already been read in */
-			    did_dbp = did_icp->did_ic_dbp;
-			    while (did_dbp != 0) {
-				if (did_dbp->db_firstblk ==
-				    did_info->info_firstblk)
-					break;
-				else
-					did_dbp = did_dbp->db_next;
-			    }
-			    /* if block not found, read it in */
-			    if (did_dbp == NULL) {
-				did_block = (caddr_t)(kmem_zalloc(dbtob
-					    (did_info->info_blkcnt), KM_SLEEP));
-				buffer = (caddr_t)did_block;
-				for (blk = did_info->info_firstblk;
-				    blk < (did_info->info_firstblk +
-				    did_info->info_blkcnt); blk++) {
-					physblk = getphysblk(blk, rip->ri_mbip);
-					err = getblks(s, buffer, dev, physblk,
-					    btodb(MDDB_BSIZE), 0);
-					if (err) {
-						rip->ri_flags |= err;
+			cont_flag = 0;
+			for (li = 0; li < lbp->lb_loccnt; li++) {
+				did_info = &did_blkp->blk_info[li];
+				did_block = (caddr_t)NULL;
+				if (did_info->info_flags & MDDB_DID_EXISTS) {
+					/*
+					 * Check if block has
+					 * already been read in
+					 */
+					did_dbp = did_icp->did_ic_dbp;
+					while (did_dbp != 0) {
+						if (did_dbp->db_firstblk ==
+						    did_info->info_firstblk)
+							break;
+						else
+							did_dbp =
+							    did_dbp->db_next;
+					}
+					/* if block not found, read it in */
+					if (did_dbp == NULL) {
+						did_block = (caddr_t)
+						    (kmem_zalloc(dbtob(
+						    did_info->info_blkcnt),
+						    KM_SLEEP));
+						buffer = (caddr_t)did_block;
+						for (blk =
+						    did_info->info_firstblk;
+						    blk < (did_info->
+						    info_firstblk +
+						    did_info->info_blkcnt);
+						    blk++) {
+							physblk =
+							    getphysblk(blk,
+							    rip->ri_mbip);
+							err = getblks(s,
+							    buffer, dev,
+							    physblk, btodb(
+							    MDDB_BSIZE), 0);
+							if (err) {
+								rip->ri_flags |=
+								    err;
+								break;
+							}
+							buffer += MDDB_BSIZE;
+						}
+						if (err) {
+							kmem_free(did_block,
+							    dbtob(did_info->
+							    info_blkcnt));
+							did_block =
+							    (caddr_t)NULL;
+							cont_flag = 1;
+							break;
+						}
+
+						/*
+						 * Block read in -
+						 * alloc Disk Block area
+						 */
+						did_dbp = (mddb_did_db_t *)
+						    kmem_zalloc(
+						    sizeof (mddb_did_db_t),
+						    KM_SLEEP);
+						did_dbp->db_ptr = did_block;
+						did_dbp->db_firstblk =
+						    did_info->info_firstblk;
+						did_dbp->db_blkcnt =
+						    did_info->info_blkcnt;
+
+						/* Add to front of dbp list */
+						did_dbp->db_next =
+						    did_icp->did_ic_dbp;
+						did_icp->did_ic_dbp = did_dbp;
+					}
+					/* Check validity of devid in block */
+					if (crcchk(((char *)did_dbp->db_ptr +
+					    did_info->info_offset),
+					    &did_info->info_checksum,
+					    did_info->info_length, NULL)) {
+						cont_flag = 1;
 						break;
 					}
-					buffer += MDDB_BSIZE;
+
+					/* Block now pointed to by did_dbp */
+					did_icp->did_ic_devid[li] =
+					    (ddi_devid_t)((char *)
+					    did_dbp->db_ptr +
+					    did_info->info_offset);
 				}
-				if (err) {
-				    kmem_free(did_block,
-					dbtob(did_info->info_blkcnt));
-					did_block = (caddr_t)NULL;
-				    cont_flag = 1;
-				    break;
-				}
-
-				/*
-				 * Block read in - alloc Disk Block area
-				 */
-				did_dbp = (mddb_did_db_t *)kmem_zalloc(
-				    sizeof (mddb_did_db_t), KM_SLEEP);
-				did_dbp->db_ptr = did_block;
-				did_dbp->db_firstblk = did_info->info_firstblk;
-				did_dbp->db_blkcnt = did_info->info_blkcnt;
-
-				/* Add to front of dbp list */
-				did_dbp->db_next = did_icp->did_ic_dbp;
-				did_icp->did_ic_dbp = did_dbp;
-			    }
-			    /* Check validity of devid in block */
-			    if (crcchk(((char *)did_dbp->db_ptr +
-				did_info->info_offset),
-				&did_info->info_checksum,
-				did_info->info_length, NULL)) {
-				    cont_flag = 1;
-				    break;
-			    }
-
-			    /* Block now pointed to by did_dbp */
-			    did_icp->did_ic_devid[li] = (ddi_devid_t)
-				((char *)did_dbp->db_ptr +
-				did_info->info_offset);
 			}
-		    }
-		    if (cont_flag)
-			continue;
+			if (cont_flag)
+				continue;
 		}
 
 		/*
@@ -5194,11 +5224,11 @@ get_mbs_n_lbs(
 				    (rip->ri_old_devid != (ddi_devid_t)NULL)) {
 					if (ddi_devid_compare(rip->ri_old_devid,
 					    did_icp->did_ic_devid[li]) != 0)
-					    continue;
+						continue;
 				} else {
 					if (ddi_devid_compare(rip->ri_devid,
 					    did_icp->did_ic_devid[li]) != 0)
-					    continue;
+						continue;
 				}
 
 				if (strcmp(rip->ri_minor_name,
@@ -5214,64 +5244,74 @@ get_mbs_n_lbs(
 			 * information about itself.
 			 */
 			if (!mn_set) {
-			    for (li = 0; li < lbp->lb_loccnt; li++) {
-				mddb_drvnm_t		*dn;
-				mddb_sidelocator_t	*slp;
+				for (li = 0; li < lbp->lb_loccnt; li++) {
+					mddb_drvnm_t		*dn;
+					mddb_sidelocator_t	*slp;
 
-				lp = &lbp->lb_locators[li];
-				slp = &lbp->lb_sidelocators[s->s_sideno][li];
-				if (lp->l_flags & MDDB_F_DELETED)
-					continue;
-				if (slp->l_mnum != md_getminor(rip->ri_dev))
-					continue;
-				if (lp->l_blkno != rip->ri_blkno)
-					continue;
-				dn = &lbp->lb_drvnm[slp->l_drvnm_index];
-				if (strncmp(dn->dn_data, rip->ri_driver,
-				    MD_MAXDRVNM) == 0)
-				break;
-			    }
-			} else {
-			    for (li = 0; li < lbp->lb_loccnt; li++) {
-				mddb_drvnm_t		*dn;
-				mddb_mnsidelocator_t	*mnslp;
-				mddb_mnlb_t		*mnlbp;
-				int			i;
-
-				/*
-				 * Check all possible locators locking for
-				 * match to the currently read-in locator,
-				 * must match on:
-				 *	- blkno
-				 *	- side locator for this node's side
-				 *	- side locator minor number
-				 *	- side locator driver name
-				 */
-
-				/* Looking at sidelocs - cast lbp -> mnlbp */
-				mnlbp = (mddb_mnlb_t *)lbp;
-				lp = &mnlbp->lb_locators[li];
-				if (lp->l_flags & MDDB_F_DELETED)
-					continue;
-				if (lp->l_blkno != rip->ri_blkno)
-					continue;
-
-				for (i = 0; i < MD_MNMAXSIDES; i++) {
-				    mnslp = &mnlbp->lb_mnsidelocators[i][li];
-				    if (mnslp->mnl_sideno == s->s_sideno) {
-					break;
-				    }
+					lp = &lbp->lb_locators[li];
+					slp = &lbp->
+					    lb_sidelocators[s->s_sideno][li];
+					if (lp->l_flags & MDDB_F_DELETED)
+						continue;
+					if (slp->l_mnum != md_getminor(
+					    rip->ri_dev))
+						continue;
+					if (lp->l_blkno != rip->ri_blkno)
+						continue;
+					dn = &lbp->lb_drvnm[slp->l_drvnm_index];
+					if (strncmp(dn->dn_data,
+					    rip->ri_driver, MD_MAXDRVNM) == 0)
+						break;
 				}
-				/* No matching side found */
-				if (i == MD_MNMAXSIDES)
-					continue;
-				if (mnslp->mnl_mnum != md_getminor(rip->ri_dev))
-					continue;
-				dn = &lbp->lb_drvnm[mnslp->mnl_drvnm_index];
-				if (strncmp(dn->dn_data, rip->ri_driver,
-				    MD_MAXDRVNM) == 0)
-					break;
-			    }
+			} else {
+				for (li = 0; li < lbp->lb_loccnt; li++) {
+					mddb_drvnm_t		*dn;
+					mddb_mnsidelocator_t	*mnslp;
+					mddb_mnlb_t		*mnlbp;
+					int			i;
+
+					/*
+					 * Check all possible locators locking
+					 * for match to the currently read-in
+					 * locator, must match on:
+					 *	- blkno
+					 *	- side locator for this
+					 *	  node's side
+					 *	- side locator minor number
+					 *	- side locator driver name
+					 */
+
+					/*
+					 * Looking at sidelocs:
+					 * cast lbp -> mnlbp
+					 */
+					mnlbp = (mddb_mnlb_t *)lbp;
+					lp = &mnlbp->lb_locators[li];
+					if (lp->l_flags & MDDB_F_DELETED)
+						continue;
+					if (lp->l_blkno != rip->ri_blkno)
+						continue;
+
+					for (i = 0; i < MD_MNMAXSIDES; i++) {
+						mnslp = &mnlbp->
+						    lb_mnsidelocators[i][li];
+						if (mnslp->mnl_sideno ==
+						    s->s_sideno) {
+							break;
+						}
+					}
+					/* No matching side found */
+					if (i == MD_MNMAXSIDES)
+						continue;
+					if (mnslp->mnl_mnum !=
+					    md_getminor(rip->ri_dev))
+						continue;
+					dn = &lbp->
+					    lb_drvnm[mnslp->mnl_drvnm_index];
+					if (strncmp(dn->dn_data,
+					    rip->ri_driver, MD_MAXDRVNM) == 0)
+						break;
+				}
 			}
 		}
 
@@ -5549,7 +5589,7 @@ load_old_replicas(
 		did_dbp1 = did_icp->did_ic_dbp;
 		while (did_dbp1) {
 			if (mddb_devid_free_add(s, did_dbp1->db_firstblk,
-				0, dbtob(did_dbp1->db_blkcnt))) {
+			    0, dbtob(did_dbp1->db_blkcnt))) {
 				retval = MDDB_E_NOSPACE;
 				goto errout;
 			}
@@ -5904,9 +5944,9 @@ load_old_replicas(
 				/* Validate device id on current system */
 				newdev[li] = dev;
 				if (mddb_devid_validate(
-					did_icp->did_ic_devid[li],
-					&(newdev[li]),
-					did_info->info_minor_name) == 0) {
+				    did_icp->did_ic_devid[li],
+				    &(newdev[li]),
+				    did_info->info_minor_name) == 0) {
 					/* Set valid flag */
 					did_info->info_flags |= MDDB_DID_VALID;
 				} else {
@@ -5931,20 +5971,21 @@ load_old_replicas(
 						if (mddb_devid_add(s, li,
 						    ret_devid, minor_name)) {
 							cmn_err(CE_WARN,
-							"Not enough space in"
-							" metadevice state"
-							" database\n");
+							    "Not enough space"
+							    " in metadevice"
+							    " state"
+							    " database\n");
 							cmn_err(CE_WARN,
-							"to add relocation"
-							" information for"
-							" device:\n");
+							    "to add relocation"
+							    " information for"
+							    " device:\n");
 							cmn_err(CE_WARN,
-							" major = %d, "
-							" minor = %d\n",
-							getmajor(ddi_dev),
-							getminor(ddi_dev));
+							    " major = %d, "
+							    " minor = %d\n",
+							    getmajor(ddi_dev),
+							    getminor(ddi_dev));
 						} else {
-						    write_lb = 1;
+							write_lb = 1;
 						}
 						kmem_free(minor_name,
 						    strlen(minor_name) + 1);
@@ -6509,7 +6550,7 @@ initit(
 				if (! s->s_mbiarray[i])
 					continue;
 				dev = md_expldev(
-					s->s_lbp->lb_locators[i].l_dev);
+				    s->s_lbp->lb_locators[i].l_dev);
 				dev = md_xlate_targ_2_mini(dev);
 				if (dev != NODEV64)
 					mddb_devclose(dev);
@@ -6518,7 +6559,7 @@ initit(
 			}
 
 			kmem_free((caddr_t)s->s_mbiarray,
-				sizeof (mddb_mb_ic_t *) * mddb_maxcopies);
+			    sizeof (mddb_mb_ic_t *) * mddb_maxcopies);
 			s->s_mbiarray = NULL;
 		}
 
@@ -6560,7 +6601,7 @@ initit(
 	 */
 
 	lb_blkcnt = (mddb_block_t)((setno == MD_LOCAL_SET) ?
-				MDDB_LOCAL_LBCNT : MDDB_LBCNT);
+	    MDDB_LOCAL_LBCNT : MDDB_LBCNT);
 	if (flag & MDDB_MULTINODE) {
 		lb_blkcnt = MDDB_MNLBCNT;
 	}
@@ -6623,7 +6664,7 @@ initit(
 	/* the btodb that follows is converting the directory block size */
 	/* Data tag part of mddb located after first block of mddb data */
 	lbp->lb_dtfirstblk = (mddb_block_t)(lbp->lb_dbfirstblk +
-						btodb(MDDB_BSIZE));
+	    btodb(MDDB_BSIZE));
 	/* Data tags are not used in MN diskset - so set count to 0 */
 	if (flag & MDDB_MULTINODE)
 		lbp->lb_dtblkcnt = (mddb_block_t)0;
@@ -6675,14 +6716,14 @@ initit(
 		devid_flag = 0;
 	if (devid_flag) {
 		lbp->lb_didfirstblk = lbp->lb_dtfirstblk +
-			lbp->lb_dtblkcnt;
+		    lbp->lb_dtblkcnt;
 		lbp->lb_didblkcnt = (mddb_block_t)MDDB_DID_BLOCKS;
 		lbp->lb_flags |= MDDB_DEVID_STYLE;
 
 		did_icp = (mddb_did_ic_t *)kmem_zalloc
-			(sizeof (mddb_did_ic_t), KM_SLEEP);
+		    (sizeof (mddb_did_ic_t), KM_SLEEP);
 		did_blkp = (mddb_did_blk_t *)
-			kmem_zalloc(dbtob(lbp->lb_didblkcnt), KM_SLEEP);
+		    kmem_zalloc(dbtob(lbp->lb_didblkcnt), KM_SLEEP);
 		did_blkp->blk_magic = MDDB_MAGIC_DI;
 		did_blkp->blk_revision = MDDB_REV_DI;
 		did_icp->did_ic_blkp = did_blkp;
@@ -6846,8 +6887,7 @@ mddb_setexit(
 	 *	re-grab mutex
 	 *	set s_mn_parseflags_sending to zero
 	 */
-	mddb_parse_msg = kmem_zalloc(sizeof (md_mn_msg_mddb_parse_t),
-		KM_SLEEP);
+	mddb_parse_msg = kmem_zalloc(sizeof (md_mn_msg_mddb_parse_t), KM_SLEEP);
 	while (((s->s_mn_parseflags_sending & MDDB_PARSE_MASK) == 0) &&
 	    (s->s_mn_parseflags & MDDB_PARSE_MASK) &&
 	    (!(md_get_setstatus(s->s_setno) & MD_SET_MNPARSE_BLK))) {
@@ -6867,18 +6907,18 @@ mddb_setexit(
 		mddb_parse_msg->msg_parse_flags = s->s_mn_parseflags_sending;
 		for (i = 0; i < MDDB_NLB; i++) {
 			mddb_parse_msg->msg_lb_flags[i] =
-				lbp->lb_locators[i].l_flags;
+			    lbp->lb_locators[i].l_flags;
 		}
 		kresult = kmem_zalloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 		while (rval != 0) {
 			rval = mdmn_ksend_message(s->s_setno,
-				MD_MN_MSG_MDDB_PARSE, 0,
-				(char *)mddb_parse_msg,
-				sizeof (mddb_parse_msg), kresult);
+			    MD_MN_MSG_MDDB_PARSE, 0, 0,
+			    (char *)mddb_parse_msg,
+			    sizeof (md_mn_msg_mddb_parse_t), kresult);
 			if (rval != 0)
 				cmn_err(CE_WARN, "mddb_setexit: Unable to send "
-					"mddb update message to other nodes in "
-					"diskset %s\n", s->s_setname);
+				    "mddb update message to other nodes in "
+				    "diskset %s\n", s->s_setname);
 		}
 		kmem_free(kresult, sizeof (md_mn_kresult_t));
 
@@ -6987,12 +7027,12 @@ mddb_lb_did_convert(mddb_set_t *s, uint_t doit, uint_t *blk_cnt)
 					if (mddb_devid_add(s, li, ret_devid,
 					    minor_name)) {
 						cmn_err(CE_WARN,
-						"Not enough space in metadb"
-						" to add device id for"
-						"  dev: major = %d, "
-						"minor = %d\n",
-						getmajor(ddi_dev),
-						getminor(ddi_dev));
+						    "Not enough space in metadb"
+						    " to add device id for"
+						    "  dev: major = %d, "
+						    "minor = %d\n",
+						    getmajor(ddi_dev),
+						    getminor(ddi_dev));
 					}
 					sz = strlen(minor_name) + 1;
 					kmem_free(minor_name, sz);
@@ -7179,13 +7219,10 @@ mddb_unload_set(
 	}
 
 	md_clr_setstatus(setno, MD_SET_ACCOK | MD_SET_ACCEPT |
-				MD_SET_TAGDATA | MD_SET_USETAG |
-				MD_SET_TOOFEW | MD_SET_STALE |
-				MD_SET_OWNERSHIP | MD_SET_BADTAG |
-				MD_SET_CLRTAG | MD_SET_MNSET |
-				MD_SET_DIDCLUP | MD_SET_MNPARSE_BLK |
-				MD_SET_MN_MIR_STATE_RC | MD_SET_IMPORT |
-				MD_SET_REPLICATED_IMPORT);
+	    MD_SET_TAGDATA | MD_SET_USETAG | MD_SET_TOOFEW | MD_SET_STALE |
+	    MD_SET_OWNERSHIP | MD_SET_BADTAG | MD_SET_CLRTAG | MD_SET_MNSET |
+	    MD_SET_DIDCLUP | MD_SET_MNPARSE_BLK | MD_SET_MN_MIR_STATE_RC |
+	    MD_SET_IMPORT | MD_SET_REPLICATED_IMPORT);
 
 	mutex_exit(SETMUTEX(setno));
 }
@@ -7286,13 +7323,13 @@ mddb_locatorblock2splitname(
 
 		SPN_SUFFIX(spn).suf_len = mnsn->mn_ln_suffix.suf_len;
 		bcopy(mnsn->mn_ln_suffix.suf_data, SPN_SUFFIX(spn).suf_data,
-			SPN_SUFFIX(spn).suf_len);
+		    SPN_SUFFIX(spn).suf_len);
 		iprefix = mnsn->mn_ln_suffix.suf_prefix;
 	} else {
 		sn = &lnp->ln_suffixes[sideno][li];
 		SPN_SUFFIX(spn).suf_len = sn->suf_len;
 		bcopy(sn->suf_data, SPN_SUFFIX(spn).suf_data,
-			SPN_SUFFIX(spn).suf_len);
+		    SPN_SUFFIX(spn).suf_len);
 		iprefix = sn->suf_prefix;
 	}
 	SPN_PREFIX(spn).pre_len = lnp->ln_prefixes[iprefix].pre_len;
@@ -7328,7 +7365,7 @@ getdeldev(
 	 * Data checking
 	 */
 	if (setno >= md_nsets || cp->c_id < 0 ||
-		cp->c_id > cp->c_dbmax) {
+	    cp->c_id > cp->c_dbmax) {
 		return (mdmderror(ep, MDE_INVAL_UNIT, MD_ADM_MINOR));
 	}
 
@@ -7377,14 +7414,14 @@ getdeldev(
 		if (cp->c_id < 0 || cp->c_id > cp->c_dbmax) {
 			mddb_setexit(s);
 			return (mdmddberror(ep, MDE_DB_INVALID, NODEV32,
-						setno));
+			    setno));
 		}
 		li = cp->c_id;
 	} else {
 		if (cp->c_id >= cp->c_dbcnt) {
 			mddb_setexit(s);
 			return (mdmddberror(ep, MDE_DB_INVALID, NODEV32,
-						setno));
+			    setno));
 		}
 
 		/* CSTYLED */
@@ -7446,7 +7483,7 @@ getdeldev(
 		 * commitcnt to 0.
 		 */
 		(void) writeblks(s, (caddr_t)lbp, 0, lbp->lb_blkcnt, li,
-			MDDB_WR_ONLY_MASTER);
+		    MDDB_WR_ONLY_MASTER);
 		lbp->lb_commitcnt = commitcnt;
 	}
 
@@ -7689,7 +7726,7 @@ md_update_locator_namespace(
 		lnp->ln_revision = MDDB_REV_LN;
 	crcgen(lnp, &lnp->ln_checksum, dbtob(lbp->lb_lnblkcnt), NULL);
 	err = writeall(s, (caddr_t)lnp, lbp->lb_lnfirstblk,
-		lbp->lb_lnblkcnt, 0);
+	    lbp->lb_lnblkcnt, 0);
 	/*
 	 * If a MN diskset and this is the master, set the PARSE_LOCNM
 	 * flag in the mddb_set structure to show that the locator
@@ -7851,7 +7888,7 @@ update_mb_devid(
 		 */
 		if (devidptr != (ddi_devid_t)NULL) {
 			mb = (mddb_mb_t *)kmem_zalloc(MDDB_BSIZE,
-				KM_SLEEP);
+			    KM_SLEEP);
 			mb->mb_magic = MDDB_MAGIC_DU;
 			mb->mb_revision = MDDB_REV_MB;
 			mb2free = 1;
@@ -8077,7 +8114,7 @@ delnewside(
 				single_thread_end(s);
 				mddb_setexit(s);
 				return (mdmddberror(ep, MDE_DB_TOOSMALL,
-					NODEV32, setno));
+				    NODEV32, setno));
 			}
 		}
 
@@ -8095,7 +8132,7 @@ delnewside(
 			single_thread_end(s);
 			mddb_setexit(s);
 			return (mdmddberror(ep, MDE_DB_TOOSMALL, NODEV32,
-						setno));
+			    setno));
 		}
 
 		if (cfgloc2locator(lbp, clp, li, cp->c_sideno, index)) {
@@ -8105,7 +8142,7 @@ delnewside(
 			single_thread_end(s);
 			mddb_setexit(s);
 			return (mdmddberror(ep, MDE_DB_TOOSMALL, NODEV32,
-						setno));
+			    setno));
 		}
 	}
 
@@ -8119,9 +8156,9 @@ delnewside(
 				int	j;
 				mnlbp = (mddb_mnlb_t *)lbp;
 				for (j = 0; j < MD_MNMAXSIDES; j++) {
-				    mnslp = &mnlbp->lb_mnsidelocators[j][i];
-				    if (mnslp->mnl_sideno == cp->c_sideno)
-					break;
+					mnslp = &mnlbp->lb_mnsidelocators[j][i];
+					if (mnslp->mnl_sideno == cp->c_sideno)
+						break;
 				}
 				if (j < MD_MNMAXSIDES) {
 					mnslp->mnl_mnum = NODEV32;
@@ -8129,7 +8166,7 @@ delnewside(
 					mnlnp = (mddb_mnln_t *)lnp;
 					mnsn = &(mnlnp->ln_mnsuffixes[j][i]);
 					bzero((caddr_t)mnsn,
-						sizeof (md_mnname_suffix_t));
+					    sizeof (md_mnname_suffix_t));
 				}
 			} else {
 				slp = &lbp->lb_sidelocators[cp->c_sideno][i];
@@ -8148,7 +8185,7 @@ delnewside(
 		lnp->ln_revision = MDDB_REV_LN;
 	crcgen(lnp, &lnp->ln_checksum, dbtob(lbp->lb_lnblkcnt), NULL);
 	err |= writeall(s, (caddr_t)lnp, lbp->lb_lnfirstblk,
-		lbp->lb_lnblkcnt, 0);
+	    lbp->lb_lnblkcnt, 0);
 	/*
 	 * If a MN diskset and this is the master, set the PARSE_LOCNM
 	 * flag in the mddb_set structure to show that the locator
@@ -8288,11 +8325,11 @@ newdev(
 			    ((daddr_t)lp->l_blkno == clp->l_blkno)) {
 				if (command == MDDB_NEWDEV) {
 					ddi_devid_free((ddi_devid_t)(uintptr_t)
-						clp->l_devid);
+					    clp->l_devid);
 					single_thread_end(s);
 					mddb_setexit(s);
 					return (mdmddberror(ep,
-						MDE_DB_EXISTS, NODEV32, setno));
+					    MDE_DB_EXISTS, NODEV32, setno));
 				}
 			}
 		} else {
@@ -8302,7 +8339,7 @@ newdev(
 					single_thread_end(s);
 					mddb_setexit(s);
 					return (mdmddberror(ep,
-						MDE_DB_EXISTS, NODEV32, setno));
+					    MDE_DB_EXISTS, NODEV32, setno));
 				}
 			}
 		}
@@ -8345,7 +8382,7 @@ newdev(
 			single_thread_end(s);
 			mddb_setexit(s);
 			return (mdmddberror(ep, MDE_DB_TOOSMALL, NODEV32,
-						setno));
+			    setno));
 		}
 	}
 
@@ -8402,7 +8439,7 @@ newdev(
 			single_thread_end(s);
 			mddb_setexit(s);
 			return (mdmddberror(ep, MDE_DB_TOOSMALL,
-				NODEV32, setno));
+			    NODEV32, setno));
 		}
 	}
 	/*
@@ -8462,7 +8499,7 @@ newdev(
 		lnp->ln_revision = MDDB_REV_LN;
 	crcgen(lnp, &lnp->ln_checksum, dbtob(lbp->lb_lnblkcnt), NULL);
 	err |= writeall(s, (caddr_t)lnp, lbp->lb_lnfirstblk,
-		lbp->lb_lnblkcnt, 0);
+	    lbp->lb_lnblkcnt, 0);
 	/*
 	 * If a MN diskset and this is the master, set the PARSE_LOCNM
 	 * flag in the mddb_set structure to show that the locator
@@ -8579,67 +8616,74 @@ mddb_configure(
 	mdclrerror(ep);
 
 	switch (command) {
-	    case MDDB_NEWDEV:
-		err = newdev(cp, command, ep);
-		break;
+		case MDDB_NEWDEV:
+			err = newdev(cp, command, ep);
+			break;
 
-	    case MDDB_NEWSIDE:
-	    case MDDB_DELSIDE:
-		err = delnewside(cp, command, ep);
-		break;
+		case MDDB_NEWSIDE:
+		case MDDB_DELSIDE:
+			err = delnewside(cp, command, ep);
+			break;
 
-	    case MDDB_GETDEV:
-	    case MDDB_DELDEV:
-	    case MDDB_ENDDEV:
-		err = getdeldev(cp, command, ep);
-		break;
+		case MDDB_GETDEV:
+		case MDDB_DELDEV:
+		case MDDB_ENDDEV:
+			err = getdeldev(cp, command, ep);
+			break;
 
-	    case MDDB_GETDRVRNAME:
-		err = getdriver(&cp->c_locator);
-		break;
+		case MDDB_GETDRVRNAME:
+			err = getdriver(&cp->c_locator);
+			break;
 
-	    case MDDB_USEDEV:
-		/*
-		 * Note: must allow USEDEV ioctl during upgrade to support
-		 * auto-take disksets.
-		 *
-		 * Also during the set import if the md_devid_destroy
-		 * flag is set then error out
-		 */
+		case MDDB_USEDEV:
+			/*
+			 * Note: must allow USEDEV ioctl during upgrade to
+			 * support auto-take disksets.
+			 *
+			 * Also during the set import if the md_devid_destroy
+			 * flag is set then error out
+			 */
 
-		if ((cp->c_flags & MDDB_C_IMPORT) && md_devid_destroy)
-			return (mdmderror(ep, MDE_INVAL_UNIT, MD_ADM_MINOR));
+			if ((cp->c_flags & MDDB_C_IMPORT) && md_devid_destroy)
+				return (mdmderror(ep, MDE_INVAL_UNIT,
+				    MD_ADM_MINOR));
 
-		if (setno >= md_nsets)
-			return (mdmderror(ep, MDE_INVAL_UNIT, MD_ADM_MINOR));
+			if (setno >= md_nsets)
+				return (mdmderror(ep, MDE_INVAL_UNIT,
+				    MD_ADM_MINOR));
 
-		if ((s = mddb_setenter(setno, MDDB_NOINIT, &err)) == NULL) {
-			if ((s = init_set(cp, MDDB_NOINIT, &err)) == NULL) {
-				err = mddbstatus2error(ep, err, NODEV32, setno);
-				break;
+			if ((s = mddb_setenter(setno, MDDB_NOINIT, &err)) ==
+			    NULL) {
+				if ((s = init_set(cp, MDDB_NOINIT, &err)) ==
+				    NULL) {
+					err = mddbstatus2error(ep, err,
+					    NODEV32, setno);
+					break;
+				}
 			}
-		}
-		if (setno == MD_LOCAL_SET)
-			flag = MDDB_F_IOCTL;
-		if (cp->c_locator.l_old_devid) {
-			md_set_setstatus(setno, MD_SET_REPLICATED_IMPORT);
-		}
-		err = ridev(&s->s_rip, &cp->c_locator, NULL, flag);
-		mddb_setexit(s);
-		break;
+			if (setno == MD_LOCAL_SET)
+				flag = MDDB_F_IOCTL;
+			if (cp->c_locator.l_old_devid) {
+				md_set_setstatus(setno,
+				    MD_SET_REPLICATED_IMPORT);
+			}
+			err = ridev(&s->s_rip, &cp->c_locator, NULL, flag);
+			mddb_setexit(s);
+			break;
 
-	    case MDDB_RELEASESET:
-		mutex_enter(&mddb_lock);
-		mddb_unload_set(cp->c_setno);
-		mutex_exit(&mddb_lock);
-		break;
+		case MDDB_RELEASESET:
+			mutex_enter(&mddb_lock);
+			mddb_unload_set(cp->c_setno);
+			mutex_exit(&mddb_lock);
+			break;
 
-	    case MDDB_SETDID:
-		err = setdid(cp);
-		break;
+		case MDDB_SETDID:
+			err = setdid(cp);
+			break;
 
-	    default:
-		err = mdmddberror(ep, MDE_DB_INVALID, NODEV32, cp->c_setno);
+		default:
+			err = mdmddberror(ep, MDE_DB_INVALID, NODEV32,
+			    cp->c_setno);
 	}
 
 	return (err);
@@ -8761,15 +8805,14 @@ mddb_createrec(
 	}
 
 	recsize = roundup((sizeof (*rbp) - sizeof (rbp->rb_data)) +
-				usersize, MDDB_BSIZE);
+	    usersize, MDDB_BSIZE);
 	blkcnt = btodb(recsize);
 
 	if (mddb_maxblocks)
 		maxblocks = mddb_maxblocks;
 	else
-		maxblocks = (MDDB_BSIZE -
-			(sizeof (*db32p) + sizeof (*de32p) -
-			sizeof (de32p->de32_blks))) / sizeof (mddb_block_t);
+		maxblocks = (MDDB_BSIZE - (sizeof (*db32p) + sizeof (*de32p) -
+		    sizeof (de32p->de32_blks))) / sizeof (mddb_block_t);
 
 	if (blkcnt > maxblocks) {
 		mddb_setexit(s);
@@ -8833,7 +8876,7 @@ mddb_createrec(
 	} while (dbp);
 
 	desize = (sizeof (*de32p) - sizeof (de32p->de32_blks)) +
-			(sizeof (mddb_block_t) * blkcnt);
+	    (sizeof (mddb_block_t) * blkcnt);
 
 	/*
 	 * see if a directory block exists which will hold this entry
@@ -8872,7 +8915,8 @@ mddb_createrec(
 			mddb_setexit(s);
 			return (MDDB_E_NOSPACE);
 		}
-		for (dbp = s->s_dbp; dbp->db_next; dbp = dbp->db_next);
+		for (dbp = s->s_dbp; dbp->db_next; dbp = dbp->db_next)
+			;
 		dbp->db_next = newdbp;
 		bzero((caddr_t)dbp->db_next, sizeof (*newdbp));
 		dbp->db_nextblk = getfreeblks(s, 1);
@@ -8888,10 +8932,10 @@ mddb_createrec(
 	 * ready to add record
 	 */
 	desize_ic = (sizeof (*dep) - sizeof (dep->de_blks)) +
-			(sizeof (mddb_block_t) * blkcnt);
+	    (sizeof (mddb_block_t) * blkcnt);
 	if (dbp->db_firstentry) {
-		for (dep = dbp->db_firstentry; dep->de_next;
-		    dep = dep->de_next);
+		for (dep = dbp->db_firstentry; dep->de_next; dep = dep->de_next)
+			;
 		dep->de_next = (mddb_de_ic_t *)kmem_zalloc(desize_ic, KM_SLEEP);
 		dep = dep->de_next;
 	} else {
@@ -8919,8 +8963,8 @@ mddb_createrec(
 	dep->de_blkcount = blkcnt;
 	flag_type = options &
 	    (MD_CRO_OPTIMIZE | MD_CRO_STRIPE | MD_CRO_MIRROR | MD_CRO_RAID |
-		MD_CRO_SOFTPART | MD_CRO_TRANS_MASTER | MD_CRO_TRANS_LOG |
-		MD_CRO_HOTSPARE | MD_CRO_HOTSPARE_POOL | MD_CRO_CHANGELOG);
+	    MD_CRO_SOFTPART | MD_CRO_TRANS_MASTER | MD_CRO_TRANS_LOG |
+	    MD_CRO_HOTSPARE | MD_CRO_HOTSPARE_POOL | MD_CRO_CHANGELOG);
 	switch (flag_type) {
 	case MD_CRO_OPTIMIZE:
 		dep->de_flags = MDDB_F_OPT;
@@ -9003,7 +9047,7 @@ mddb_createrec(
 	if ((options & MD_CRO_OPTIMIZE) == 0) {
 		for (i = 0; i < blkcnt;	 i++) {
 			err |= writeall(s, (caddr_t)tmppnt,
-				dep->de_blks[i], 1, 0);
+			    dep->de_blks[i], 1, 0);
 			tmppnt += MDDB_BSIZE;
 		}
 	} else {
@@ -9310,10 +9354,10 @@ mddb_getrecaddr_resize(
 		mddb_rb32_t *nrbp;
 
 		recsize = roundup((sizeof (*nrbp) - sizeof (nrbp->rb_data)) +
-				icsize, MDDB_BSIZE);
+		    icsize, MDDB_BSIZE);
 		if (dep->de_recsize < recsize)
 			cmn_err(CE_PANIC, "mddb_getrecaddr_resize: only "
-				"nonoptimized records can be resized\n");
+			    "nonoptimized records can be resized\n");
 	}
 
 	mddb_setexit(s);
@@ -9673,26 +9717,29 @@ mddb_commitrec(
 				lbp = s->s_lbp;
 				mnlbp = (mddb_mnlb_t *)lbp;
 				for (i = 0; i < 2; i++) {
-				    li = dep->de_optinfo[i].o_li;
-				    lp = &lbp->lb_locators[li];
-				    for (j = 0; j < MD_MNMAXSIDES; j++) {
-					mnslp =
-					    &mnlbp->lb_mnsidelocators[j][li];
-					if (mnslp->mnl_sideno == s->s_sideno)
-					    break;
-				    }
-				    if (j == MD_MNMAXSIDES)
-					continue;
+					li = dep->de_optinfo[i].o_li;
+					lp = &lbp->lb_locators[li];
+					for (j = 0; j < MD_MNMAXSIDES; j++) {
+						mnslp =
+						    &mnlbp->
+						    lb_mnsidelocators[j][li];
+						if (mnslp->mnl_sideno ==
+						    s->s_sideno)
+							break;
+					}
+					if (j == MD_MNMAXSIDES)
+						continue;
 
-				    dn = &lbp->lb_drvnm[mnslp->mnl_drvnm_index];
-				    recerr = &msg_recerr->msg_recerr[i];
-				    recerr->r_li = li;
-				    recerr->r_flags =
-					dep->de_optinfo[i].o_flags;
-				    recerr->r_blkno = lp->l_blkno;
-				    recerr->r_mnum = md_getminor(lp->l_dev);
-				    (void) strncpy(recerr->r_driver_name,
-					dn->dn_data, MD_MAXDRVNM);
+					dn = &lbp->
+					    lb_drvnm[mnslp->mnl_drvnm_index];
+					recerr = &msg_recerr->msg_recerr[i];
+					recerr->r_li = li;
+					recerr->r_flags =
+					    dep->de_optinfo[i].o_flags;
+					recerr->r_blkno = lp->l_blkno;
+					recerr->r_mnum = md_getminor(lp->l_dev);
+					(void) strncpy(recerr->r_driver_name,
+					    dn->dn_data, MD_MAXDRVNM);
 				}
 
 				/* Release locks */
@@ -9711,17 +9758,17 @@ mddb_commitrec(
 				 * the optimized resync records it owns.
 				 */
 				rval = mdmn_ksend_message(s->s_setno,
-					MD_MN_MSG_MDDB_OPTRECERR,
-					MD_MSGF_NO_BCAST,
-					(char *)msg_recerr,
-					sizeof (md_mn_msg_mddb_optrecerr_t),
-					kres);
+				    MD_MN_MSG_MDDB_OPTRECERR,
+				    MD_MSGF_NO_BCAST, 0,
+				    (char *)msg_recerr,
+				    sizeof (md_mn_msg_mddb_optrecerr_t),
+				    kres);
 				if (!MDMN_KSEND_MSG_OK(rval, kres)) {
 					cmn_err(CE_WARN, "mddb_commitrec: "
-						"Unable to send optimized "
-						"resync record failure "
-						"message to other nodes in "
-						"diskset %s\n", s->s_setname);
+					    "Unable to send optimized "
+					    "resync record failure "
+					    "message to other nodes in "
+					    "diskset %s\n", s->s_setname);
 					mdmn_ksend_show_error(rval, kres,
 					    "MD_MN_MSG_MDDB_OPTRECERR");
 				}
@@ -9758,7 +9805,7 @@ mddb_commitrec(
 			}
 			kmem_free(kres, sizeof (md_mn_kresult_t));
 			kmem_free(msg_recerr,
-				sizeof (md_mn_msg_mddb_optrecerr_t));
+			    sizeof (md_mn_msg_mddb_optrecerr_t));
 
 			/* Resync record should be fixed - if possible */
 			s->s_optwaiterr--;
@@ -10723,8 +10770,7 @@ mddb_validate_lb(
 		if ((ddi_lyr_get_devid(ddi_dev, &rtn_devid) == DDI_SUCCESS) &&
 		    (ddi_devid_compare(rtn_devid, devid) == 0)) {
 			did_info->info_flags = MDDB_DID_VALID |
-						MDDB_DID_EXISTS |
-						MDDB_DID_UPDATED;
+			    MDDB_DID_EXISTS | MDDB_DID_UPDATED;
 		} else {
 			cnt++;
 			/*
@@ -11051,7 +11097,7 @@ mddb_parse(mddb_parse_parm_t *mpp)
 			/* Assumes master blocks are already setup */
 			if (lbp == (mddb_lb_t *)NULL) {
 				lbp = (mddb_lb_t *)kmem_zalloc(
-					dbtob(MDDB_MNLBCNT), KM_SLEEP);
+				    dbtob(MDDB_MNLBCNT), KM_SLEEP);
 			}
 			err |= readblks(s, (caddr_t)lbp, 0, lbp->lb_blkcnt, i);
 
@@ -11135,7 +11181,7 @@ mddb_parse(mddb_parse_parm_t *mpp)
 
 			/* Free this node's old view of mddb locator blocks */
 			kmem_free((caddr_t)s->s_lbp,
-				dbtob(s->s_lbp->lb_blkcnt));
+			    dbtob(s->s_lbp->lb_blkcnt));
 			s->s_lbp = lbp;
 		} else {
 			if (lbp)
@@ -11206,7 +11252,7 @@ mddb_parse(mddb_parse_parm_t *mpp)
 			 * master could have rewritten in during fixoptrecord.
 			 */
 			db32p = (mddb_db32_t *)kmem_zalloc(MDDB_BSIZE,
-				KM_SLEEP);
+			    KM_SLEEP);
 			create_db32rec(db32p, dbp);
 			for (li = 0; li < lbp->lb_loccnt; li++) {
 				lp = &lbp->lb_locators[li];
@@ -11216,16 +11262,16 @@ mddb_parse(mddb_parse_parm_t *mpp)
 					continue;
 
 				err = readblks(s, (caddr_t)db32p,
-					db32p->db32_blknum, 1, li);
+				    db32p->db32_blknum, 1, li);
 				if (err)
 					continue;
 
 				/* Reverify db; go to next mddb if bad */
 				if ((db32p->db32_magic != MDDB_MAGIC_DB) ||
 				    (revchk(MDDB_REV_DB,
-					db32p->db32_revision)) ||
+				    db32p->db32_revision)) ||
 				    (crcchk(db32p, &db32p->db32_checksum,
-					MDDB_BSIZE, NULL))) {
+				    MDDB_BSIZE, NULL))) {
 					continue;
 				} else {
 					break;
@@ -11254,9 +11300,8 @@ mddb_parse(mddb_parse_parm_t *mpp)
 			if (li == lbp->lb_loccnt) {
 				kmem_free((caddr_t)db32p, MDDB_BSIZE);
 				cmn_err(CE_PANIC, "md: mddb: Node unable to "
-					"access any SVM state database "
-					"replicas for diskset %s\n",
-					s->s_setname);
+				    "access any SVM state database "
+				    "replicas for diskset %s\n", s->s_setname);
 			}
 			/*
 			 * Setup temp copy of linked list of de's.
@@ -11505,45 +11550,53 @@ mddb_optrecfix(mddb_optrec_parm_t *mop)
 					lp->l_flags &= ~MDDB_F_ACTIVE;
 				}
 			} else {
-			/*
-			 * Passed in li from slave does not match
-			 * the replica in the master's structures.
-			 * This could have occurred if a delete
-			 * mddb command was running when the
-			 * optimized resync record had a failure.
-			 * Search all replicas for this entry.
-			 * If no match, just ignore.
-			 * If a match, set replica in error.
-			 */
-			    for (li = 0; li < lbp->lb_loccnt; li++) {
-				lp = &lbp->lb_locators[li];
-				if (lp->l_flags & MDDB_F_DELETED)
-					continue;
+				/*
+				 * Passed in li from slave does not match
+				 * the replica in the master's structures.
+				 * This could have occurred if a delete
+				 * mddb command was running when the
+				 * optimized resync record had a failure.
+				 * Search all replicas for this entry.
+				 * If no match, just ignore.
+				 * If a match, set replica in error.
+				 */
+				for (li = 0; li < lbp->lb_loccnt; li++) {
+					lp = &lbp->lb_locators[li];
+					if (lp->l_flags & MDDB_F_DELETED)
+						continue;
 
-				for (j = 0; j < MD_MNMAXSIDES; j++) {
-					mnslp =
-					    &mnlbp->lb_mnsidelocators[j][li];
-					if (mnslp->mnl_sideno == s->s_sideno)
-						break;
-				}
-				if (j == MD_MNMAXSIDES)
-					continue;
-
-				dn = &lbp->lb_drvnm[mnslp->mnl_drvnm_index];
-				if ((strncmp(dn->dn_data, recerr->r_driver_name,
-				    MD_MAXDRVNM) == 0) &&
-				    (recerr->r_blkno == lp->l_blkno) &&
-				    (recerr->r_mnum == mnslp->mnl_mnum)) {
-					if ((lp->l_flags & MDDB_F_ACTIVE) ||
-					    ((lp->l_flags & MDDB_F_EWRITE)
-					    == 0)) {
-						something_changed = 1;
-						lp->l_flags |= MDDB_F_EWRITE;
-						lp->l_flags &= ~MDDB_F_ACTIVE;
+					for (j = 0; j < MD_MNMAXSIDES; j++) {
+						mnslp =
+						    &mnlbp->
+						    lb_mnsidelocators[j][li];
+						if (mnslp->mnl_sideno ==
+						    s->s_sideno)
+							break;
 					}
-					break;
+					if (j == MD_MNMAXSIDES)
+						continue;
+
+					dn = &lbp->
+					    lb_drvnm[mnslp->mnl_drvnm_index];
+					if ((strncmp(dn->dn_data,
+					    recerr->r_driver_name,
+					    MD_MAXDRVNM) == 0) &&
+					    (recerr->r_blkno == lp->l_blkno) &&
+					    (recerr->r_mnum ==
+					    mnslp->mnl_mnum)) {
+						if ((lp->l_flags &
+						    MDDB_F_ACTIVE) ||
+						    ((lp->l_flags &
+						    MDDB_F_EWRITE) == 0)) {
+							something_changed = 1;
+							lp->l_flags |=
+							    MDDB_F_EWRITE;
+							lp->l_flags &=
+							    ~MDDB_F_ACTIVE;
+						}
+						break;
+					}
 				}
-			    }
 			}
 		}
 	}
@@ -11693,8 +11746,7 @@ mddb_check_write_ioctl(mddb_config_t *info)
 	/* Re-verify that set is not stale */
 	if (md_get_setstatus(setno) & MD_SET_STALE) {
 		mddb_setexit(s);
-		return (mdmddberror(ep, MDE_DB_STALE,
-			NODEV32, setno));
+		return (mdmddberror(ep, MDE_DB_STALE, NODEV32, setno));
 	}
 
 	lbp = s->s_lbp;
@@ -11735,34 +11787,39 @@ mddb_check_write_ioctl(mddb_config_t *info)
 		 * They may have been altered by the previous master
 		 */
 		for (dbp = s->s_dbp; dbp != NULL; dbp = dbp->db_next) {
-		    for (dep = dbp->db_firstentry; dep; dep = dep->de_next) {
-			if ((dep->de_flags & MDDB_F_CHANGELOG) == 0) {
-				continue;
-			}
-			/* This has been alloc'ed while joining the set */
-			if (dep->de_rb) {
-				kmem_free(dep->de_rb, dep->de_recsize);
-				dep->de_rb = (mddb_rb32_t *)NULL;
-			}
-			if (dep->de_rb_userdata) {
-				kmem_free(dep->de_rb_userdata, dep->de_reqsize);
-				dep->de_rb_userdata = (caddr_t)NULL;
-			}
-
-			err = getrecord(s, dep, li);
-			if (err) {
+			for (dep = dbp->db_firstentry; dep; dep =
+			    dep->de_next) {
+				if ((dep->de_flags & MDDB_F_CHANGELOG) == 0) {
+					continue;
+				}
 				/*
-				 * When we see on error while reading the
-				 * changelog entries, we move on to the next
-				 * mddb
+				 * This has been alloc'ed while
+				 * joining the set
 				 */
-				err = 1;
-				break; /* out of inner for-loop */
+				if (dep->de_rb) {
+					kmem_free(dep->de_rb, dep->de_recsize);
+					dep->de_rb = (mddb_rb32_t *)NULL;
+				}
+				if (dep->de_rb_userdata) {
+					kmem_free(dep->de_rb_userdata,
+					    dep->de_reqsize);
+					dep->de_rb_userdata = (caddr_t)NULL;
+				}
+
+				err = getrecord(s, dep, li);
+				if (err) {
+					/*
+					 * When we see on error while reading
+					 * the changelog entries, we move on
+					 * to the next mddb
+					 */
+					err = 1;
+					break; /* out of inner for-loop */
+				}
+				allocuserdata(dep);
 			}
-			allocuserdata(dep);
-		    }
-		    if (err)
-			    break; /* out of outer for-loop */
+			if (err)
+				break; /* out of outer for-loop */
 		}
 
 		/* If err, try next mddb */
@@ -11773,7 +11830,7 @@ mddb_check_write_ioctl(mddb_config_t *info)
 
 		/* Is incore locator block same as ondisk? */
 		if (bcmp((mddb_mnlb_t *)lbp, mnlbp_od, dbtob(MDDB_MNLBCNT))
-									== 1) {
+		    == 1) {
 			write_out_mddb = 1;
 			kmem_free((caddr_t)mnlbp_od, dbtob(MDDB_MNLBCNT));
 			break;
@@ -11786,7 +11843,7 @@ mddb_check_write_ioctl(mddb_config_t *info)
 		    KM_SLEEP);
 		/* read in on-disk locator names */
 		err = readblks(s, (caddr_t)mnlnp_od, lbp->lb_lnfirstblk,
-			lbp->lb_lnblkcnt, li);
+		    lbp->lb_lnblkcnt, li);
 
 		/* If err, try next mddb */
 		if (err) {
@@ -11796,7 +11853,7 @@ mddb_check_write_ioctl(mddb_config_t *info)
 
 		/* Are incore locator names same as ondisk? */
 		if (bcmp((mddb_mnln_t *)lnp, mnlnp_od, dbtob(MDDB_MNLNCNT))
-									== 1) {
+		    == 1) {
 			kmem_free((caddr_t)mnlnp_od, dbtob(MDDB_MNLNCNT));
 			write_out_mddb = 1;
 			break;
@@ -11885,7 +11942,7 @@ mddb_check_write_ioctl(mddb_config_t *info)
 
 		/* Is incore locator block same as ondisk? */
 		if (bcmp((mddb_mnlb_t *)lbp, mnlbp_od, dbtob(MDDB_MNLBCNT))
-									== 1) {
+		    == 1) {
 			kmem_free((caddr_t)mnlbp_od, dbtob(MDDB_MNLBCNT));
 			write_out_mddb = 1;
 			break;
@@ -11909,7 +11966,7 @@ mddb_check_write_ioctl(mddb_config_t *info)
 
 		/* Are incore locator names same as ondisk? */
 		if (bcmp((mddb_mnln_t *)lnp, mnlnp_od, dbtob(MDDB_MNLNCNT))
-									== 1) {
+		    == 1) {
 			kmem_free((caddr_t)mnlnp_od, dbtob(MDDB_MNLNCNT));
 			write_out_mddb = 1;
 			break;
@@ -12322,8 +12379,7 @@ update_mb(
 			/* disk is powered off or not there */
 			continue;
 
-		if (md_get_setstatus(s->s_setno) &
-			MD_SET_REPLICATED_IMPORT) {
+		if (md_get_setstatus(s->s_setno) & MD_SET_REPLICATED_IMPORT) {
 			/*
 			 * It is a replicated set
 			 */

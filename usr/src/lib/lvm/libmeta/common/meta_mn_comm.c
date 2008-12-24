@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -72,181 +70,264 @@ mdmn_get_timeout(md_mn_msgtype_t msgtype)
 void
 ldump_msg(char *prefix, md_mn_msg_t *msg)
 {
-	(void) fprintf(stderr, "%s &msg   = 0x%x\n", prefix, (uint_t)msg);
-	(void) fprintf(stderr, "%s ID     = (%d, 0x%llx-%d)\n", prefix,
+	(void) fprintf(stderr, "%s &msg       = 0x%x\n", prefix, (uint_t)msg);
+	(void) fprintf(stderr, "%s ID         = (%d, 0x%llx-%d)\n", prefix,
 	    MSGID_ELEMS(msg->msg_msgid));
-	(void) fprintf(stderr, "%s sender = %d\n", prefix, msg->msg_sender);
-	(void) fprintf(stderr, "%s flags  = 0x%x\n", prefix, msg->msg_flags);
-	(void) fprintf(stderr, "%s setno  = %d\n", prefix, msg->msg_setno);
-	(void) fprintf(stderr, "%s type   = %d\n", prefix, msg->msg_type);
-	(void) fprintf(stderr, "%s size   = %d\n", prefix, msg->msg_event_size);
+	(void) fprintf(stderr, "%s sender     = %d\n", prefix, msg->msg_sender);
+	(void) fprintf(stderr, "%s flags      = 0x%x\n",
+	    prefix, msg->msg_flags);
+	(void) fprintf(stderr, "%s setno      = %d\n", prefix, msg->msg_setno);
+	(void) fprintf(stderr, "%s recipient  = %d\n",
+	    prefix, msg->msg_recipient);
+	(void) fprintf(stderr, "%s type       = %d\n", prefix, msg->msg_type);
+	(void) fprintf(stderr, "%s size       = %d\n",
+	    prefix, msg->msg_event_size);
 }
 
+#define	COMMD_PROGNAME	"rpc.mdcommd"
+
+extern uint_t meta_rpc_err_mask(void);
+
+/*
+ * If a clnt_call gets an RPC error, force the message out here with details.
+ * This would be nice to send to commd_debug(), but we can't call rpc.mdcommd
+ * code from libmeta.
+ */
+static void
+mdmn_handle_RPC_error(CLIENT *clnt, char *ident, md_mn_nodeid_t nid)
+{
+	/*
+	 * This is sized for a max message which would look like this:
+	 * "mdmn_wakeup_initiator: rpc.mdcommd node 4294967295"
+	 */
+	char errstr[51];
+	struct rpc_err e;
+
+	CLNT_GETERR((CLIENT *) clnt, &e);
+	if (meta_rpc_err_mask() & (1 << e.re_status)) {
+		if (nid == 0) {
+			(void) snprintf(errstr, sizeof (errstr),
+			    "%s: %s node (local)", ident, COMMD_PROGNAME);
+		} else {
+			(void) snprintf(errstr, sizeof (errstr),
+			    "%s: %s node %d", ident, COMMD_PROGNAME, nid);
+		}
+		syslog(LOG_WARNING, "mdmn_handle_RPC_error: %s",
+		    clnt_sperror(clnt, errstr));
+	}
+}
 
 /* Default timeout can be changed using clnt_control() */
 static struct timeval TIMEOUT = { 25, 0 };
 
 md_mn_result_t *
-mdmn_send_1(argp, clnt)
+mdmn_send_2(argp, clnt, nid)
 	md_mn_msg_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	md_mn_result_t *clnt_res = Zalloc(sizeof (md_mn_result_t));
 
-	if (clnt_call(clnt, mdmn_send,
+	res = clnt_call(clnt, mdmn_send,
 		(xdrproc_t)xdr_md_mn_msg_t, (caddr_t)argp,
-		(xdrproc_t)xdr_md_mn_result_t, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
+		(xdrproc_t)xdr_md_mn_result_t, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_send", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 int *
-mdmn_work_1(argp, clnt)
+mdmn_work_2(argp, clnt, nid)
 	md_mn_msg_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	int *clnt_res = Zalloc(sizeof (int));
 
-	if (clnt_call(clnt, mdmn_work,
+	res = clnt_call(clnt, mdmn_work,
 		(xdrproc_t)xdr_md_mn_msg_t, (caddr_t)argp,
-		(xdrproc_t)xdr_int, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		Free(clnt_res);
-		return (NULL);
+		(xdrproc_t)xdr_int, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_work", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 int *
-mdmn_wakeup_initiator_1(argp, clnt)
+mdmn_wakeup_initiator_2(argp, clnt, nid)
 	md_mn_result_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	int *clnt_res = Zalloc(sizeof (int));
 
-	if (clnt_call(clnt, mdmn_wakeup_initiator,
+	res = clnt_call(clnt, mdmn_wakeup_initiator,
 		(xdrproc_t)xdr_md_mn_result_t, (caddr_t)argp,
-		(xdrproc_t)xdr_int, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		Free(clnt_res);
-		return (NULL);
+		(xdrproc_t)xdr_int, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_wakeup_initiator", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 int *
-mdmn_wakeup_master_1(argp, clnt)
+mdmn_wakeup_master_2(argp, clnt, nid)
 	md_mn_result_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	int *clnt_res = Zalloc(sizeof (int));
 
-	if (clnt_call(clnt, mdmn_wakeup_master,
+	res = clnt_call(clnt, mdmn_wakeup_master,
 		(xdrproc_t)xdr_md_mn_result_t, (caddr_t)argp,
-		(xdrproc_t)xdr_int, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		Free(clnt_res);
-		return (NULL);
+		(xdrproc_t)xdr_int, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_wakeup_master", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 int *
-mdmn_comm_lock_1(argp, clnt)
+mdmn_comm_lock_2(argp, clnt, nid)
 	md_mn_set_and_class_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	int *clnt_res = Zalloc(sizeof (int));
 
-	if (clnt_call(clnt, mdmn_comm_lock,
+	res = clnt_call(clnt, mdmn_comm_lock,
 		(xdrproc_t)xdr_md_mn_set_and_class_t, (caddr_t)argp,
-		(xdrproc_t)xdr_int, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
+		(xdrproc_t)xdr_int, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_comm_lock", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 int *
-mdmn_comm_unlock_1(argp, clnt)
+mdmn_comm_unlock_2(argp, clnt, nid)
 	md_mn_set_and_class_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	int *clnt_res = Zalloc(sizeof (int));
 
-	if (clnt_call(clnt, mdmn_comm_unlock,
+	res = clnt_call(clnt, mdmn_comm_unlock,
 		(xdrproc_t)xdr_md_mn_set_and_class_t, (caddr_t)argp,
-		(xdrproc_t)xdr_int, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
+		(xdrproc_t)xdr_int, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_comm_unlock", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 int *
-mdmn_comm_suspend_1(argp, clnt)
+mdmn_comm_suspend_2(argp, clnt, nid)
 	md_mn_set_and_class_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	int *clnt_res = Zalloc(sizeof (int));
 
-	if (clnt_call(clnt, mdmn_comm_suspend,
+	res = clnt_call(clnt, mdmn_comm_suspend,
 		(xdrproc_t)xdr_md_mn_set_and_class_t, (caddr_t)argp,
-		(xdrproc_t)xdr_int, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
+		(xdrproc_t)xdr_int, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_comm_suspend", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 int *
-mdmn_comm_resume_1(argp, clnt)
+mdmn_comm_resume_2(argp, clnt, nid)
 	md_mn_set_and_class_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	int *clnt_res = Zalloc(sizeof (int));
 
-	if (clnt_call(clnt, mdmn_comm_resume,
+	res = clnt_call(clnt, mdmn_comm_resume,
 		(xdrproc_t)xdr_md_mn_set_and_class_t, (caddr_t)argp,
-		(xdrproc_t)xdr_int, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
+		(xdrproc_t)xdr_int, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_comm_resume", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 int *
-mdmn_comm_reinit_set_1(argp, clnt)
+mdmn_comm_reinit_set_2(argp, clnt, nid)
 	set_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	int *clnt_res = Zalloc(sizeof (int));
 
-	if (clnt_call(clnt, mdmn_comm_reinit_set,
+	res = clnt_call(clnt, mdmn_comm_reinit_set,
 		(xdrproc_t)xdr_set_t, (caddr_t)argp,
-		(xdrproc_t)xdr_int, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
+		(xdrproc_t)xdr_int, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_comm_reinit_set", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 int *
-mdmn_comm_msglock_1(argp, clnt)
+mdmn_comm_msglock_2(argp, clnt, nid)
 	md_mn_type_and_lock_t *argp;
 	CLIENT *clnt;
+	md_mn_nodeid_t nid;
 {
+	enum clnt_stat	res;
 	int *clnt_res = Zalloc(sizeof (int));
 
-	if (clnt_call(clnt, mdmn_comm_msglock,
+	res = clnt_call(clnt, mdmn_comm_msglock,
 		(xdrproc_t)xdr_md_mn_type_and_lock_t, (caddr_t)argp,
-		(xdrproc_t)xdr_int, (caddr_t)clnt_res,
-		TIMEOUT) != RPC_SUCCESS) {
-		return (NULL);
+		(xdrproc_t)xdr_int, (caddr_t)clnt_res, TIMEOUT);
+
+	if (res == RPC_SUCCESS) {
+		return (clnt_res);
 	}
-	return (clnt_res);
+	mdmn_handle_RPC_error(clnt, "mdmn_comm_msglock", nid);
+	Free(clnt_res);
+	return (NULL);
 }
 
 
@@ -370,6 +451,7 @@ copy_msg(md_mn_msg_t *msg, md_mn_msg_t *dest)
 	nmsg->msg_flags		= msg->msg_flags;
 	nmsg->msg_setno		= msg->msg_setno;
 	nmsg->msg_type		= msg->msg_type;
+	nmsg->msg_recipient	= msg->msg_recipient;
 	nmsg->msg_event_size	= msg->msg_event_size;
 	if (msg->msg_event_size > 0) {
 		bcopy(msg->msg_event_data, nmsg->msg_event_data,
@@ -379,7 +461,7 @@ copy_msg(md_mn_msg_t *msg, md_mn_msg_t *dest)
 }
 
 void
-copy_msg_1(md_mn_msg_t *msg, md_mn_msg_od_t *msgod, int direction)
+copy_msg_2(md_mn_msg_t *msg, md_mn_msg_od_t *msgod, int direction)
 {
 	assert((direction == MD_MN_COPY_TO_ONDISK) ||
 	    (direction == MD_MN_COPY_TO_INCORE));
@@ -390,6 +472,7 @@ copy_msg_1(md_mn_msg_t *msg, md_mn_msg_od_t *msgod, int direction)
 		msgod->msg_flags	= msg->msg_flags;
 		msgod->msg_setno	= msg->msg_setno;
 		msgod->msg_type		= msg->msg_type;
+		msgod->msg_recipient	= msg->msg_recipient;
 		msgod->msg_od_event_size = msg->msg_event_size;
 		/* paranoid checks */
 		if (msg->msg_event_size != 0 && msg->msg_event_data != NULL)
@@ -401,6 +484,7 @@ copy_msg_1(md_mn_msg_t *msg, md_mn_msg_od_t *msgod, int direction)
 		msg->msg_flags		= msgod->msg_flags;
 		msg->msg_setno		= msgod->msg_setno;
 		msg->msg_type		= msgod->msg_type;
+		msg->msg_recipient	= msgod->msg_recipient;
 		msg->msg_event_size	= msgod->msg_od_event_size;
 		if (msg->msg_event_data == NULL)
 			msg->msg_event_data = Zalloc(msg->msg_event_size);
@@ -462,7 +546,7 @@ mdmn_get_local_clnt(uint_t flag)
 	if (mdmn_clients == (md_mn_client_list_t *)NULL) {
 		/* if there is no entry, create a client and return a it */
 		local_daemon = meta_client_create(LOCALHOST_IPv4, MDMN_COMMD,
-			ONE, "tcp");
+		    TWO, "tcp");
 	} else {
 		/*
 		 * If there is an entry from a previous put operation,
@@ -517,6 +601,13 @@ mdmn_put_local_clnt(CLIENT *local_daemon)
  * a msgid is already attached to it.
  * In that case mdmn_send_message_with_msgid() has to be called directly.
  *
+ * The recipient argument is almost always unused, and is therefore typically
+ * set to zero, as zero is an invalid cluster nodeid.  The exceptions are the
+ * marking and clearing of the DRL from a node that is not currently the
+ * owner.  In these cases, the recipient argument will be the nodeid of the
+ * mirror owner, and MD_MSGF_DIRECTED will be set in the flags.  Non-owner
+ * nodes will not receive these messages.
+ *
  * Return values / CAVEAT EMPTOR: see mdmn_send_message_with_msgid()
  */
 
@@ -525,13 +616,14 @@ mdmn_send_message(
 		set_t setno,
 		md_mn_msgtype_t type,
 		uint_t flags,
+		md_mn_nodeid_t recipient,
 		char *data,
 		int size,
 		md_mn_result_t **result,
 		md_error_t *ep)
 {
-	return (mdmn_send_message_with_msgid(
-		setno, type, flags, data, size, result, MD_NULL_MSGID, ep));
+	return (mdmn_send_message_with_msgid(setno, type, flags,
+	    recipient, data, size, result, MD_NULL_MSGID, ep));
 }
 /*
  * mdmn_send_message_with_msgid()
@@ -561,6 +653,7 @@ mdmn_send_message_with_msgid(
 		set_t setno,
 		md_mn_msgtype_t type,
 		uint_t flags,
+		md_mn_nodeid_t recipient,
 		char *data,
 		int size,
 		md_mn_result_t **result,
@@ -619,6 +712,7 @@ mdmn_send_message_with_msgid(
 	 */
 	msg.msg_flags		= flags;
 	msg.msg_setno		= setno;
+	msg.msg_recipient	= recipient;
 	msg.msg_type		= type;
 	msg.msg_event_size	= size;
 	msg.msg_event_data	= data;
@@ -655,7 +749,7 @@ mdmn_send_message_with_msgid(
 	 * - retries1 or retries2 exceeded
 	 */
 	for (; ; ) {
-		*result = mdmn_send_1(&msg, local_daemon);
+		*result = mdmn_send_2(&msg, local_daemon, 0);
 		resp = *result;
 		if (resp != (md_mn_result_t *)NULL) {
 			/* Bingo! */
@@ -800,8 +894,8 @@ mdmn_suspend(set_t setno, md_mn_msgclass_t class, long timeout)
 	if ((setno >= MD_MAXSETS) || (class >= MD_MN_NCLASSES)) {
 		return (MDE_DS_COMMDCTL_SUSPEND_FAIL);
 	}
-	local_daemon = meta_client_create(LOCALHOST_IPv4, MDMN_COMMD, ONE,
-		"tcp");
+	local_daemon = meta_client_create(LOCALHOST_IPv4, MDMN_COMMD, TWO,
+	    "tcp");
 	if (local_daemon == (CLIENT *)NULL) {
 		clnt_pcreateerror("local_daemon");
 		return (MDE_DS_COMMDCTL_SUSPEND_FAIL);
@@ -818,7 +912,7 @@ mdmn_suspend(set_t setno, md_mn_msgclass_t class, long timeout)
 	msc.msc_class = class;
 	msc.msc_flags = 0;
 
-	resp = mdmn_comm_suspend_1(&msc, local_daemon);
+	resp = mdmn_comm_suspend_2(&msc, local_daemon, 0);
 	clnt_destroy(local_daemon);
 
 	if (resp == NULL) {
@@ -861,8 +955,8 @@ mdmn_resume(set_t setno, md_mn_msgclass_t class, uint_t flags, long timeout)
 	if ((setno >= MD_MAXSETS) || (class >= MD_MN_NCLASSES)) {
 		return (MDE_DS_COMMDCTL_RESUME_FAIL);
 	}
-	local_daemon = meta_client_create(LOCALHOST_IPv4, MDMN_COMMD, ONE,
-		"tcp");
+	local_daemon = meta_client_create(LOCALHOST_IPv4, MDMN_COMMD, TWO,
+	    "tcp");
 	if (local_daemon == (CLIENT *)NULL) {
 		clnt_pcreateerror("local_daemon");
 		return (MDE_DS_COMMDCTL_RESUME_FAIL);
@@ -879,7 +973,7 @@ mdmn_resume(set_t setno, md_mn_msgclass_t class, uint_t flags, long timeout)
 	msc.msc_class = class;
 	msc.msc_flags = flags;
 
-	resp = mdmn_comm_resume_1(&msc, local_daemon);
+	resp = mdmn_comm_resume_2(&msc, local_daemon, 0);
 
 	if (resp != NULL) {
 		if (*resp == MDMNE_ACK) {
@@ -905,10 +999,8 @@ mdmn_abort(void)
 	md_error_t	mdne = mdnullerror;
 
 	(void) mdmn_send_message(0, /* No set is needed for this message */
-			MD_MN_MSG_ABORT,
-			MD_MSGF_LOCAL_ONLY,
-			dummy, sizeof (dummy),
-			&resultp, &mdne);
+	    MD_MN_MSG_ABORT, MD_MSGF_LOCAL_ONLY, 0,
+	    dummy, sizeof (dummy), &resultp, &mdne);
 
 	if (resultp != NULL) {
 		Free(resultp);
@@ -935,8 +1027,8 @@ mdmn_reinit_set(set_t setno, long timeout)
 	if ((setno == 0) || (setno >= MD_MAXSETS)) {
 		return (1);
 	}
-	local_daemon = meta_client_create(LOCALHOST_IPv4, MDMN_COMMD, ONE,
-		"tcp");
+	local_daemon = meta_client_create(LOCALHOST_IPv4, MDMN_COMMD, TWO,
+	    "tcp");
 	if (local_daemon == (CLIENT *)NULL) {
 		clnt_pcreateerror("local_daemon");
 		return (1);
@@ -949,7 +1041,7 @@ mdmn_reinit_set(set_t setno, long timeout)
 		}
 	}
 
-	resp = mdmn_comm_reinit_set_1(&setno, local_daemon);
+	resp = mdmn_comm_reinit_set_2(&setno, local_daemon, 0);
 
 	if (resp != NULL) {
 		if (*resp == MDMNE_ACK) {
@@ -984,8 +1076,8 @@ mdmn_msgtype_lock(md_mn_msgtype_t msgtype, uint_t locktype)
 	if ((msgtype == 0) || (msgtype >= MD_MN_NMESSAGES)) {
 		return (1);
 	}
-	local_daemon = meta_client_create(LOCALHOST_IPv4, MDMN_COMMD, ONE,
-		"tcp");
+	local_daemon = meta_client_create(LOCALHOST_IPv4, MDMN_COMMD, TWO,
+	    "tcp");
 	if (local_daemon == (CLIENT *)NULL) {
 		clnt_pcreateerror("local_daemon");
 		return (1);
@@ -993,7 +1085,7 @@ mdmn_msgtype_lock(md_mn_msgtype_t msgtype, uint_t locktype)
 	mmtl.mmtl_type = msgtype;
 	mmtl.mmtl_lock = locktype;
 
-	resp = mdmn_comm_msglock_1(&mmtl, local_daemon);
+	resp = mdmn_comm_msglock_2(&mmtl, local_daemon, 0);
 
 	if (resp != NULL) {
 		if (*resp == MDMNE_ACK) {

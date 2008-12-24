@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -67,7 +65,7 @@ extern major_t		md_major;
 
 extern md_ops_t		mirror_md_ops;
 extern kmem_cache_t	*mirror_child_cache; /* mirror child memory pool */
-extern mdq_anchor_t	md_mstr_daemon;
+extern mdq_anchor_t	md_mto_daemon;
 extern daemon_request_t	mirror_timeout;
 extern md_resync_t	md_cpr_resync;
 extern clock_t		md_hz;
@@ -141,81 +139,365 @@ int md_mirror_rr_sleep_timo = 1;
  */
 int md_max_xfer_bufsz = 2048;
 
+/*
+ * mirror_generate_rr_bitmap:
+ * -------------------
+ * Generate a compressed bitmap md_mn_msg_rr_clean_t for the given clean
+ * bitmap associated with mirror 'un'
+ *
+ * Input:
+ *      un      - mirror unit to get bitmap data from
+ *      *msgp   - location to return newly allocated md_mn_msg_rr_clean_t
+ *      *activep- location to return # of active i/os
+ *
+ * Returns:
+ *      1 => dirty bits cleared from un_dirty_bm and DRL flush required
+ *          *msgp contains bitmap of to-be-cleared bits
+ *      0 => no bits cleared
+ *          *msgp == NULL
+ */
 static int
-process_resync_regions(mm_unit_t *un)
+mirror_generate_rr_bitmap(mm_unit_t *un, md_mn_msg_rr_clean_t **msgp,
+    int *activep)
 {
-	int			i;
-	int			cleared_dirty = 0;
-	/*
-	 * Number of reasons why we can not
-	 * proceed shutting down the mirror.
-	 */
-	int			active = 0;
-	set_t			setno = MD_UN2SET(un);
+	unsigned int	i, next_bit, data_bytes, start_bit;
+	int		cleared_dirty = 0;
+
+	/* Skip any initial 0s. */
+retry_dirty_scan:
+	if ((start_bit = un->un_rr_clean_start_bit) >= un->un_rrd_num)
+		un->un_rr_clean_start_bit = start_bit = 0;
 
 	/*
-	 * Resync region processing must be
-	 * single threaded. We can't use
-	 * un_resync_mx for this purpose
-	 * since this mutex gets released
+	 * Handle case where NO bits are set in PERNODE_DIRTY but the
+	 * un_dirty_bm[] map does have entries set (after a 1st resync)
+	 */
+	for (; start_bit < un->un_rrd_num &&
+	    !IS_PERNODE_DIRTY(md_mn_mynode_id, start_bit, un) &&
+	    (un->un_pernode_dirty_sum[start_bit] != (uchar_t)0); start_bit++)
+		;
+
+	if (start_bit >= un->un_rrd_num) {
+		if (un->un_rr_clean_start_bit == 0) {
+			return (0);
+		} else {
+			un->un_rr_clean_start_bit = 0;
+			goto retry_dirty_scan;
+		}
+	}
+
+	/* how much to fit into this message */
+	data_bytes = MIN(howmany(un->un_rrd_num - start_bit, NBBY),
+	    MDMN_MSG_RR_CLEAN_DATA_MAX_BYTES);
+
+	(*msgp) = kmem_zalloc(MDMN_MSG_RR_CLEAN_SIZE_DATA(data_bytes),
+	    KM_SLEEP);
+
+	(*msgp)->rr_nodeid = md_mn_mynode_id;
+	(*msgp)->rr_mnum = MD_SID(un);
+	MDMN_MSG_RR_CLEAN_START_SIZE_SET(*msgp, start_bit, data_bytes);
+
+	next_bit = MIN(start_bit + data_bytes * NBBY, un->un_rrd_num);
+
+	for (i = start_bit; i < next_bit; i++) {
+		if (un->c.un_status & MD_UN_KEEP_DIRTY && IS_KEEPDIRTY(i, un)) {
+			continue;
+		}
+		if (!IS_REGION_DIRTY(i, un)) {
+			continue;
+		}
+		if (un->un_outstanding_writes[i] != 0) {
+			(*activep)++;
+			continue;
+		}
+
+		/*
+		 * Handle the case where a resync has completed and we still
+		 * have the un_dirty_bm[] entries marked as dirty (these are
+		 * the most recent DRL re-read from the replica). They need
+		 * to be cleared from our un_dirty_bm[] but they will not have
+		 * corresponding un_pernode_dirty[] entries set unless (and
+		 * until) further write()s have been issued to the area.
+		 * This handles the case where only the un_dirty_bm[] entry is
+		 * set. Without this we'd not clear this region until a local
+		 * write is issued to the affected area.
+		 */
+		if (IS_PERNODE_DIRTY(md_mn_mynode_id, i, un) ||
+		    (un->un_pernode_dirty_sum[i] == (uchar_t)0)) {
+			if (!IS_GOING_CLEAN(i, un)) {
+				SET_GOING_CLEAN(i, un);
+				(*activep)++;
+				continue;
+			}
+			/*
+			 * Now we've got a flagged pernode_dirty, _or_ a clean
+			 * bitmap entry to process. Update the bitmap to flush
+			 * the REGION_DIRTY / GOING_CLEAN bits when we send the
+			 * cross-cluster message.
+			 */
+			cleared_dirty++;
+			setbit(MDMN_MSG_RR_CLEAN_DATA(*msgp), i - start_bit);
+		} else {
+			/*
+			 * Not marked as active in the pernode bitmap, so skip
+			 * any update to this. We just increment the 0 count
+			 * and adjust the active count by any outstanding
+			 * un_pernode_dirty_sum[] entries. This means we don't
+			 * leave the mirror permanently dirty.
+			 */
+			(*activep) += (int)un->un_pernode_dirty_sum[i];
+		}
+	}
+	if (!cleared_dirty) {
+		kmem_free(*msgp, MDMN_MSG_RR_CLEAN_SIZE_DATA(data_bytes));
+		*msgp = NULL;
+	}
+	un->un_rr_clean_start_bit = next_bit;
+	return (cleared_dirty);
+}
+
+/*
+ * There are three paths into here:
+ *
+ * md_daemon -> check_resync_regions -> prr
+ * mirror_internal_close -> mirror_process_unit_resync -> prr
+ * mirror_set_capability -> mirror_process_unit_resync -> prr
+ *
+ * The first one is a kernel daemon, the other two result from system calls.
+ * Thus, only the first case needs to deal with kernel CPR activity.  This
+ * is indicated by the cprinfop being non-NULL for kernel daemon calls, and
+ * NULL for system call paths.
+ */
+static int
+process_resync_regions_non_owner(mm_unit_t *un, callb_cpr_t *cprinfop)
+{
+	int			i, start, end;
+	int			cleared_dirty = 0;
+	/* Number of reasons why we can not proceed shutting down the mirror. */
+	int			active = 0;
+	set_t			setno = MD_UN2SET(un);
+	md_mn_msg_rr_clean_t	*rmsg;
+	md_mn_kresult_t		*kres;
+	int			rval;
+	minor_t			mnum = MD_SID(un);
+	mdi_unit_t		*ui = MDI_UNIT(mnum);
+	md_mn_nodeid_t		owner_node;
+
+	/*
+	 * We drop the readerlock here to assist lock ordering with
+	 * update_resync.  Once we have the un_rrp_inflight_mx, we
+	 * can re-acquire it.
+	 */
+	md_unit_readerexit(ui);
+
+	/*
+	 * Resync region processing must be single threaded. We can't use
+	 * un_resync_mx for this purpose since this mutex gets released
 	 * when blocking on un_resync_cv.
 	 */
 	mutex_enter(&un->un_rrp_inflight_mx);
 
-	mutex_enter(&un->un_resync_mx);
-	while (un->un_resync_flg & MM_RF_STALL_CLEAN)
-		cv_wait(&un->un_resync_cv, &un->un_resync_mx);
+	(void) md_unit_readerlock(ui);
 
-	/*
-	 * For a mirror we can only update the resync-record if we currently
-	 * own the mirror. If we are called and we don't have ownership we bail
-	 * out before scanning the outstanding_writes[] array. This cannot be
-	 * set as we'd have become the owner before initiating the i/o to the
-	 * mirror.
-	 * NOTE: we only need to check here (before scanning the array) as we
-	 *	 are called with the readerlock held. This means that a change
-	 *	 of ownership away from us will block until this resync check
-	 *	 has completed.
-	 */
-	if (MD_MNSET_SETNO(setno)) {
-		if (!MD_MN_MIRROR_OWNER(un)) {
-			mutex_exit(&un->un_resync_mx);
+	mutex_enter(&un->un_resync_mx);
+
+	rw_enter(&un->un_pernode_dirty_mx[md_mn_mynode_id - 1], RW_READER);
+	cleared_dirty = mirror_generate_rr_bitmap(un, &rmsg, &active);
+	rw_exit(&un->un_pernode_dirty_mx[md_mn_mynode_id - 1]);
+
+	if (cleared_dirty) {
+		owner_node = un->un_mirror_owner;
+		mutex_exit(&un->un_resync_mx);
+
+		/*
+		 * Transmit the 'to-be-cleared' bitmap to all cluster nodes.
+		 * Receipt of the message will cause the mirror owner to
+		 * update the on-disk DRL.
+		 */
+
+		kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
+
+		/* release readerlock before sending message */
+		md_unit_readerexit(ui);
+
+		if (cprinfop) {
+			mutex_enter(&un->un_prr_cpr_mx);
+			CALLB_CPR_SAFE_BEGIN(cprinfop);
+		}
+
+		rval = mdmn_ksend_message(setno, MD_MN_MSG_RR_CLEAN,
+		    MD_MSGF_NO_LOG|MD_MSGF_BLK_SIGNAL|MD_MSGF_KSEND_NORETRY|
+		    MD_MSGF_DIRECTED, un->un_mirror_owner,
+		    (char *)rmsg, MDMN_MSG_RR_CLEAN_MSG_SIZE(rmsg), kres);
+
+		if (cprinfop) {
+			CALLB_CPR_SAFE_END(cprinfop, &un->un_prr_cpr_mx);
+			mutex_exit(&un->un_prr_cpr_mx);
+		}
+
+		/* reacquire readerlock after message */
+		(void) md_unit_readerlock(ui);
+
+		if ((!MDMN_KSEND_MSG_OK(rval, kres)) &&
+		    (kres->kmmr_comm_state != MDMNE_NOT_JOINED)) {
+			/* if commd is gone, no point in printing a message */
+			if (md_mn_is_commd_present())
+				mdmn_ksend_show_error(rval, kres, "RR_CLEAN");
+			kmem_free(kres, sizeof (md_mn_kresult_t));
+			kmem_free(rmsg, MDMN_MSG_RR_CLEAN_MSG_SIZE(rmsg));
 			mutex_exit(&un->un_rrp_inflight_mx);
 			return (active);
 		}
+		kmem_free(kres, sizeof (md_mn_kresult_t));
+
+		/*
+		 * If ownership changed while we were sending, we probably
+		 * sent the message to the wrong node.  Leave fixing that for
+		 * the next cycle.
+		 */
+		if (un->un_mirror_owner != owner_node) {
+			mutex_exit(&un->un_rrp_inflight_mx);
+			return (active);
+		}
+
+		/*
+		 * Now that we've sent the message, clear them from the
+		 * pernode_dirty arrays.  These are ONLY cleared on a
+		 * successful send, and failure has no impact.
+		 */
+		cleared_dirty = 0;
+		start = MDMN_MSG_RR_CLEAN_START_BIT(rmsg);
+		end = start + MDMN_MSG_RR_CLEAN_DATA_BYTES(rmsg) * NBBY;
+		mutex_enter(&un->un_resync_mx);
+		rw_enter(&un->un_pernode_dirty_mx[md_mn_mynode_id - 1],
+		    RW_READER);
+		for (i = start; i < end; i++) {
+			if (isset(MDMN_MSG_RR_CLEAN_DATA(rmsg),
+			    i - start)) {
+				if (IS_PERNODE_DIRTY(md_mn_mynode_id, i, un)) {
+					un->un_pernode_dirty_sum[i]--;
+					CLR_PERNODE_DIRTY(md_mn_mynode_id, i,
+					    un);
+				}
+				if (IS_REGION_DIRTY(i, un)) {
+					cleared_dirty++;
+					CLR_REGION_DIRTY(i, un);
+					CLR_GOING_CLEAN(i, un);
+				}
+			}
+		}
+		rw_exit(&un->un_pernode_dirty_mx[md_mn_mynode_id - 1]);
+
+		kmem_free(rmsg, MDMN_MSG_RR_CLEAN_MSG_SIZE(rmsg));
 	}
+	mutex_exit(&un->un_resync_mx);
 
-	for (i = 0; i < un->un_rrd_num; i++) {
+	mutex_exit(&un->un_rrp_inflight_mx);
 
-		if (un->c.un_status & MD_UN_KEEP_DIRTY)
-			if (IS_KEEPDIRTY(i, un))
+	return (active);
+}
+
+static int
+process_resync_regions_owner(mm_unit_t *un)
+{
+	int			i, start, end;
+	int			cleared_dirty = 0;
+	/* Number of reasons why we can not proceed shutting down the mirror. */
+	int			active = 0;
+	set_t			setno = MD_UN2SET(un);
+	int			mnset = MD_MNSET_SETNO(setno);
+	md_mn_msg_rr_clean_t	*rmsg;
+	minor_t			mnum = MD_SID(un);
+	mdi_unit_t		*ui = MDI_UNIT(mnum);
+
+	/*
+	 * We drop the readerlock here to assist lock ordering with
+	 * update_resync.  Once we have the un_rrp_inflight_mx, we
+	 * can re-acquire it.
+	 */
+	md_unit_readerexit(ui);
+
+	/*
+	 * Resync region processing must be single threaded. We can't use
+	 * un_resync_mx for this purpose since this mutex gets released
+	 * when blocking on un_resync_cv.
+	 */
+	mutex_enter(&un->un_rrp_inflight_mx);
+
+	(void) md_unit_readerlock(ui);
+
+	mutex_enter(&un->un_resync_mx);
+	un->un_waiting_to_clear++;
+	while (un->un_resync_flg & MM_RF_STALL_CLEAN)
+		cv_wait(&un->un_resync_cv, &un->un_resync_mx);
+	un->un_waiting_to_clear--;
+
+	if (mnset) {
+		rw_enter(&un->un_pernode_dirty_mx[md_mn_mynode_id - 1],
+		    RW_READER);
+		cleared_dirty = mirror_generate_rr_bitmap(un, &rmsg, &active);
+
+		if (cleared_dirty) {
+			/*
+			 * Clear the bits from the pernode_dirty arrays.
+			 * If that results in any being cleared from the
+			 * un_dirty_bm, commit it.
+			 */
+			cleared_dirty = 0;
+			start = MDMN_MSG_RR_CLEAN_START_BIT(rmsg);
+			end = start + MDMN_MSG_RR_CLEAN_DATA_BYTES(rmsg) * NBBY;
+			for (i = start; i < end; i++) {
+				if (isset(MDMN_MSG_RR_CLEAN_DATA(rmsg),
+				    i - start)) {
+					if (IS_PERNODE_DIRTY(md_mn_mynode_id, i,
+					    un)) {
+						un->un_pernode_dirty_sum[i]--;
+						CLR_PERNODE_DIRTY(
+						    md_mn_mynode_id, i, un);
+					}
+					if (un->un_pernode_dirty_sum[i] == 0) {
+						cleared_dirty++;
+						CLR_REGION_DIRTY(i, un);
+						CLR_GOING_CLEAN(i, un);
+					}
+				}
+			}
+			kmem_free(rmsg, MDMN_MSG_RR_CLEAN_MSG_SIZE(rmsg));
+		}
+		rw_exit(&un->un_pernode_dirty_mx[md_mn_mynode_id - 1]);
+	} else {
+		for (i = 0; i < un->un_rrd_num; i++) {
+			if (un->c.un_status & MD_UN_KEEP_DIRTY)
+				if (IS_KEEPDIRTY(i, un))
+					continue;
+
+			if (!IS_REGION_DIRTY(i, un))
 				continue;
+			if (un->un_outstanding_writes[i] != 0) {
+				active++;
+				continue;
+			}
 
-		if (!IS_REGION_DIRTY(i, un))
-			continue;
-		if (un->un_outstanding_writes[i] != 0) {
-			active++;
-			continue;
+			if (!IS_GOING_CLEAN(i, un)) {
+				SET_GOING_CLEAN(i, un);
+				active++;
+				continue;
+			}
+			CLR_REGION_DIRTY(i, un);
+			CLR_GOING_CLEAN(i, un);
+			cleared_dirty++;
 		}
-
-		if (!IS_GOING_CLEAN(i, un)) {
-			SET_GOING_CLEAN(i, un);
-			active++;
-			continue;
-		}
-		CLR_REGION_DIRTY(i, un);
-		CLR_GOING_CLEAN(i, un);
-		cleared_dirty = 1;
 	}
+
 	if (cleared_dirty) {
 		un->un_resync_flg |= MM_RF_GATECLOSED;
 		mutex_exit(&un->un_resync_mx);
-
 		mddb_commitrec_wrapper(un->un_rr_dirty_recid);
-
 		mutex_enter(&un->un_resync_mx);
 		un->un_resync_flg &= ~MM_RF_GATECLOSED;
-		if (un->un_waiting_to_mark != 0) {
+
+		if (un->un_waiting_to_mark != 0 ||
+		    un->un_waiting_to_clear != 0) {
 			active++;
 			cv_broadcast(&un->un_resync_cv);
 		}
@@ -225,6 +507,29 @@ process_resync_regions(mm_unit_t *un)
 	mutex_exit(&un->un_rrp_inflight_mx);
 
 	return (active);
+}
+
+static int
+process_resync_regions(mm_unit_t *un, callb_cpr_t *cprinfop)
+{
+	int	mnset = MD_MNSET_SETNO(MD_UN2SET(un));
+	/*
+	 * For a mirror we can only update the on-disk resync-record if we
+	 * currently own the mirror. If we are called and there is no owner we
+	 * bail out before scanning the outstanding_writes[] array.
+	 * NOTE: we only need to check here (before scanning the array) as we
+	 * 	are called with the readerlock held. This means that a change
+	 * 	of ownership away from us will block until this resync check
+	 * 	has completed.
+	 */
+	if (mnset && (MD_MN_NO_MIRROR_OWNER(un) ||
+	    (!MD_MN_MIRROR_OWNER(un) && !md_mn_is_commd_present_lite()))) {
+		return (0);
+	} else if (mnset && !MD_MN_MIRROR_OWNER(un)) {
+		return (process_resync_regions_non_owner(un, cprinfop));
+	} else {
+		return (process_resync_regions_owner(un));
+	}
 }
 
 /*
@@ -240,7 +545,7 @@ mirror_process_unit_resync(mm_unit_t *un)
 {
 	int	cleans = 0;
 
-	while (process_resync_regions(un)) {
+	while (process_resync_regions(un, NULL)) {
 
 		cleans++;
 		if (cleans >= md_mirror_rr_cleans) {
@@ -265,6 +570,7 @@ check_resync_regions(daemon_request_t *timeout)
 	mdi_unit_t	*ui;
 	mm_unit_t	*un;
 	md_link_t	*next;
+	callb_cpr_t	cprinfo;
 
 	rw_enter(&mirror_md_ops.md_link_rw.lock, RW_READER);
 	for (next = mirror_md_ops.md_head; next != NULL; next = next->ln_next) {
@@ -272,8 +578,18 @@ check_resync_regions(daemon_request_t *timeout)
 		if (md_get_setstatus(next->ln_setno) & MD_SET_STALE)
 			continue;
 
+		un = MD_UNIT(next->ln_id);
+
+		/*
+		 * Register this resync thread with the CPR mechanism. This
+		 * allows us to detect when the system is suspended and so
+		 * keep track of the RPC failure condition.
+		 */
+		CALLB_CPR_INIT(&cprinfo, &un->un_prr_cpr_mx, callb_md_mrs_cpr,
+		    "check_resync_regions");
+
 		ui = MDI_UNIT(next->ln_id);
-		un = (mm_unit_t *)md_unit_readerlock(ui);
+		(void) md_unit_readerlock(ui);
 
 		/*
 		 * Do not clean up resync regions if it is an ABR
@@ -287,8 +603,13 @@ check_resync_regions(daemon_request_t *timeout)
 			continue;
 		}
 
-		(void) process_resync_regions(un);
+		(void) process_resync_regions(un, &cprinfo);
+
 		md_unit_readerexit(ui);
+
+		/* Remove this thread from the CPR callback table. */
+		mutex_enter(&un->un_prr_cpr_mx);
+		CALLB_CPR_EXIT(&cprinfo);
 	}
 
 	rw_exit(&mirror_md_ops.md_link_rw.lock);
@@ -306,7 +627,7 @@ md_mirror_timeout(void *throwaway)
 	mutex_enter(&mirror_timeout.dr_mx);
 	if (!mirror_timeout.dr_pending) {
 		mirror_timeout.dr_pending = 1;
-		daemon_request(&md_mstr_daemon, check_resync_regions,
+		daemon_request(&md_mto_daemon, check_resync_regions,
 		    (daemon_queue_t *)&mirror_timeout, REQ_OLD);
 	}
 
@@ -466,6 +787,7 @@ unit_setup_resync(mm_unit_t *un, int snarfing)
 	un->un_resync_flg = 0;
 	un->un_waiting_to_mark = 0;
 	un->un_waiting_to_commit = 0;
+	un->un_waiting_to_clear = 0;
 
 	un->un_goingclean_bm = NULL;
 	un->un_goingdirty_bm = NULL;
@@ -504,6 +826,27 @@ unit_setup_resync(mm_unit_t *un, int snarfing)
 	    (uint_t)un->un_rrd_num * sizeof (short), KM_SLEEP);
 	un->un_resync_bm = (uchar_t *)kmem_zalloc((uint_t)(howmany(
 	    un->un_rrd_num, NBBY)), KM_SLEEP);
+
+	/*
+	 * Allocate pernode bitmap for this node. All other nodes' maps will
+	 * be created 'on-the-fly' in the ioctl message handler
+	 */
+	if (MD_MNSET_SETNO(MD_UN2SET(un))) {
+		un->un_pernode_dirty_sum =
+		    (uchar_t *)kmem_zalloc(un->un_rrd_num, KM_SLEEP);
+		if (md_mn_mynode_id > 0) {
+			un->un_pernode_dirty_bm[md_mn_mynode_id-1] = (uchar_t *)
+			    kmem_zalloc((uint_t)(howmany(un->un_rrd_num, NBBY)),
+			    KM_SLEEP);
+		}
+
+		/*
+		 * Allocate taskq to process deferred (due to locking) RR_CLEAN
+		 * requests.
+		 */
+		un->un_drl_task = (ddi_taskq_t *)md_create_taskq(MD_UN2SET(un),
+		    MD_SID(un));
+	}
 
 	if (md_get_setstatus(MD_UN2SET(un)) & MD_SET_STALE)
 		return (0);
@@ -734,7 +1077,7 @@ send_mn_resync_done_message(
 	CALLB_CPR_SAFE_BEGIN(&un->un_rs_cprinfo);
 
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_RESYNC_PHASE_DONE,
-	    MD_MSGF_NO_LOG, (char *)rmsg, sizeof (md_mn_msg_resync_t), kres);
+	    MD_MSGF_NO_LOG, 0, (char *)rmsg, sizeof (md_mn_msg_resync_t), kres);
 
 	CALLB_CPR_SAFE_END(&un->un_rs_cprinfo, &un->un_rs_cpr_mx);
 	mutex_exit(&un->un_rs_cpr_mx);
@@ -743,6 +1086,12 @@ send_mn_resync_done_message(
 	if ((!MDMN_KSEND_MSG_OK(rval, kres)) &&
 	    (kres->kmmr_comm_state !=  MDMNE_NOT_JOINED)) {
 		mdmn_ksend_show_error(rval, kres, "RESYNC_PHASE_DONE");
+		/* If we're shutting down already, pause things here. */
+		if (kres->kmmr_comm_state == MDMNE_RPC_FAIL) {
+			while (!md_mn_is_commd_present()) {
+				delay(md_hz);
+			}
+		}
 		cmn_err(CE_PANIC, "ksend_message failure: RESYNC_PHASE_DONE");
 	}
 	kmem_free(kres, sizeof (md_mn_kresult_t));
@@ -814,13 +1163,19 @@ send_mn_resync_next_message(
 	CALLB_CPR_SAFE_BEGIN(&un->un_rs_cprinfo);
 
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_RESYNC_NEXT, MD_MSGF_NO_LOG,
-	    (char *)rmsg, sizeof (md_mn_msg_resync_t), kres);
+	    0, (char *)rmsg, sizeof (md_mn_msg_resync_t), kres);
 
 	CALLB_CPR_SAFE_END(&un->un_rs_cprinfo, &un->un_rs_cpr_mx);
 	mutex_exit(&un->un_rs_cpr_mx);
 
 	if (!MDMN_KSEND_MSG_OK(rval, kres)) {
 		mdmn_ksend_show_error(rval, kres, "RESYNC_NEXT");
+		/* If we're shutting down already, pause things here. */
+		if (kres->kmmr_comm_state == MDMNE_RPC_FAIL) {
+			while (!md_mn_is_commd_present()) {
+				delay(md_hz);
+			}
+		}
 		cmn_err(CE_PANIC, "ksend_message failure: RESYNC_NEXT");
 	}
 	kmem_free(kres, sizeof (md_mn_kresult_t));
@@ -2301,7 +2656,7 @@ bail_out:
 			CALLB_CPR_SAFE_BEGIN(&un->un_rs_cprinfo);
 
 			rval = mdmn_ksend_message(setno,
-			    MD_MN_MSG_RESYNC_FINISH, MD_MSGF_NO_LOG,
+			    MD_MN_MSG_RESYNC_FINISH, MD_MSGF_NO_LOG, 0,
 			    (char *)rmsg, sizeof (md_mn_msg_resync_t), kres);
 
 			CALLB_CPR_SAFE_END(&un->un_rs_cprinfo,
@@ -2311,6 +2666,12 @@ bail_out:
 			if (!MDMN_KSEND_MSG_OK(rval, kres)) {
 				mdmn_ksend_show_error(rval, kres,
 				    "RESYNC_FINISH");
+				/* If we're shutting down, pause things here. */
+				if (kres->kmmr_comm_state == MDMNE_RPC_FAIL) {
+					while (!md_mn_is_commd_present()) {
+						delay(md_hz);
+					}
+				}
 				cmn_err(CE_PANIC,
 				    "ksend_message failure: RESYNC_FINISH");
 			}
@@ -2693,30 +3054,209 @@ mirror_ioctl_resync(
 }
 
 int
-mirror_mark_resync_region(struct mm_unit *un,
-	diskaddr_t startblk, diskaddr_t endblk)
+mirror_mark_resync_region_non_owner(struct mm_unit *un,
+	diskaddr_t startblk, diskaddr_t endblk, md_mn_nodeid_t source_node)
 {
-	int		no_change;
-	size_t		start_rr;
-	size_t		current_rr;
-	size_t		end_rr;
+	int			no_change;
+	size_t			start_rr;
+	size_t			current_rr;
+	size_t			end_rr;
+	md_mn_msg_rr_dirty_t	*rr;
+	md_mn_kresult_t		*kres;
+	set_t			setno = MD_UN2SET(un);
+	int			rval;
+	md_mn_nodeid_t		node_idx = source_node - 1;
+	mdi_unit_t		*ui = MDI_UNIT(MD_SID(un));
+	md_mn_nodeid_t		owner_node;
+	minor_t			mnum = MD_SID(un);
 
 	if (un->un_nsm < 2)
 		return (0);
 
+	/*
+	 * Check to see if we have a un_pernode_dirty_bm[] entry allocated. If
+	 * not, allocate it and then fill the [start..end] entries.
+	 * Update un_pernode_dirty_sum if we've gone 0->1.
+	 * Update un_dirty_bm if the corresponding entries are clear.
+	 */
+	rw_enter(&un->un_pernode_dirty_mx[node_idx], RW_WRITER);
+	if (un->un_pernode_dirty_bm[node_idx] == NULL) {
+		un->un_pernode_dirty_bm[node_idx] =
+		    (uchar_t *)kmem_zalloc(
+		    (uint_t)howmany(un->un_rrd_num, NBBY), KM_SLEEP);
+	}
+	rw_exit(&un->un_pernode_dirty_mx[node_idx]);
+
 	BLK_TO_RR(end_rr, endblk, un);
 	BLK_TO_RR(start_rr, startblk, un);
-	mutex_enter(&un->un_resync_mx);
 
 	no_change = 1;
+
+	mutex_enter(&un->un_resync_mx);
+	rw_enter(&un->un_pernode_dirty_mx[node_idx], RW_READER);
 	for (current_rr = start_rr; current_rr <= end_rr; current_rr++) {
 		un->un_outstanding_writes[current_rr]++;
+		if (!IS_PERNODE_DIRTY(source_node, current_rr, un)) {
+			un->un_pernode_dirty_sum[current_rr]++;
+			SET_PERNODE_DIRTY(source_node, current_rr, un);
+		}
+		CLR_GOING_CLEAN(current_rr, un);
+		if (!IS_REGION_DIRTY(current_rr, un)) {
+			no_change = 0;
+			SET_REGION_DIRTY(current_rr, un);
+			SET_GOING_DIRTY(current_rr, un);
+		} else if (IS_GOING_DIRTY(current_rr, un))
+			no_change = 0;
+	}
+	rw_exit(&un->un_pernode_dirty_mx[node_idx]);
+	mutex_exit(&un->un_resync_mx);
+
+	if (no_change) {
+		return (0);
+	}
+
+	/*
+	 * If we have dirty regions to commit, send a
+	 * message to the owning node so that the
+	 * in-core bitmap gets updated appropriately.
+	 * TODO: make this a kmem_cache pool to improve
+	 * alloc/free performance ???
+	 */
+	kres = (md_mn_kresult_t *)kmem_zalloc(sizeof (md_mn_kresult_t),
+	    KM_SLEEP);
+	rr = (md_mn_msg_rr_dirty_t *)kmem_alloc(sizeof (md_mn_msg_rr_dirty_t),
+	    KM_SLEEP);
+
+resend_mmrr:
+	owner_node = un->un_mirror_owner;
+
+	rr->rr_mnum = mnum;
+	rr->rr_nodeid = md_mn_mynode_id;
+	rr->rr_range = (ushort_t)start_rr << 16;
+	rr->rr_range |= (ushort_t)end_rr & 0xFFFF;
+
+	/* release readerlock before sending message */
+	md_unit_readerexit(ui);
+
+	rval = mdmn_ksend_message(setno, MD_MN_MSG_RR_DIRTY,
+	    MD_MSGF_NO_LOG|MD_MSGF_BLK_SIGNAL|MD_MSGF_DIRECTED,
+	    un->un_mirror_owner, (char *)rr,
+	    sizeof (md_mn_msg_rr_dirty_t), kres);
+
+	/* reaquire readerlock on message completion */
+	(void) md_unit_readerlock(ui);
+
+	/* if the message send failed, note it, and pass an error back up */
+	if (!MDMN_KSEND_MSG_OK(rval, kres)) {
+		/* if commd is gone, no point in printing a message */
+		if (md_mn_is_commd_present())
+			mdmn_ksend_show_error(rval, kres, "RR_DIRTY");
+		kmem_free(kres, sizeof (md_mn_kresult_t));
+		kmem_free(rr, sizeof (md_mn_msg_rr_dirty_t));
+		return (1);
+	}
+
+	/*
+	 * if the owner changed while we were sending the message, and it's
+	 * not us, the new mirror owner won't yet have done the right thing
+	 * with our data.  Let him know.  If we became the owner, we'll
+	 * deal with that differently below.  Note that receiving a message
+	 * about another node twice won't hurt anything.
+	 */
+	if (un->un_mirror_owner != owner_node && !MD_MN_MIRROR_OWNER(un))
+		goto resend_mmrr;
+
+	kmem_free(kres, sizeof (md_mn_kresult_t));
+	kmem_free(rr, sizeof (md_mn_msg_rr_dirty_t));
+
+	mutex_enter(&un->un_resync_mx);
+
+	/*
+	 * If we became the owner changed while we were sending the message,
+	 * we have dirty bits in the un_pernode_bm that aren't yet reflected
+	 * in the un_dirty_bm, as it was re-read from disk, and our bits
+	 * are also not reflected in the on-disk DRL.  Fix that now.
+	 */
+	if (MD_MN_MIRROR_OWNER(un)) {
+		rw_enter(&un->un_pernode_dirty_mx[node_idx], RW_WRITER);
+		mirror_copy_rr(howmany(un->un_rrd_num, NBBY),
+		    un->un_pernode_dirty_bm[node_idx], un->un_dirty_bm);
+		rw_exit(&un->un_pernode_dirty_mx[node_idx]);
+
+		un->un_resync_flg |= MM_RF_COMMITING | MM_RF_GATECLOSED;
+
+		mutex_exit(&un->un_resync_mx);
+		mddb_commitrec_wrapper(un->un_rr_dirty_recid);
+		mutex_enter(&un->un_resync_mx);
+
+		un->un_resync_flg &= ~(MM_RF_COMMITING | MM_RF_GATECLOSED);
+		cv_broadcast(&un->un_resync_cv);
+	}
+
+	for (current_rr = start_rr; current_rr <= end_rr; current_rr++)
+		CLR_GOING_DIRTY(current_rr, un);
+
+	mutex_exit(&un->un_resync_mx);
+
+	return (0);
+}
+
+int
+mirror_mark_resync_region_owner(struct mm_unit *un,
+	diskaddr_t startblk, diskaddr_t endblk, md_mn_nodeid_t source_node)
+{
+	int			no_change;
+	size_t			start_rr;
+	size_t			current_rr;
+	size_t			end_rr;
+	int			mnset = MD_MNSET_SETNO(MD_UN2SET(un));
+	md_mn_nodeid_t		node_idx = source_node - 1;
+
+	if (un->un_nsm < 2)
+		return (0);
+
+	/*
+	 * Check to see if we have a un_pernode_dirty_bm[] entry allocated. If
+	 * not, allocate it and then fill the [start..end] entries.
+	 * Update un_pernode_dirty_sum if we've gone 0->1.
+	 * Update un_dirty_bm if the corresponding entries are clear.
+	 */
+	if (mnset) {
+		rw_enter(&un->un_pernode_dirty_mx[node_idx], RW_WRITER);
+		if (un->un_pernode_dirty_bm[node_idx] == NULL) {
+			un->un_pernode_dirty_bm[node_idx] =
+			    (uchar_t *)kmem_zalloc(
+			    (uint_t)howmany(un->un_rrd_num, NBBY), KM_SLEEP);
+		}
+		rw_exit(&un->un_pernode_dirty_mx[node_idx]);
+	}
+
+	mutex_enter(&un->un_resync_mx);
+
+	if (mnset)
+		rw_enter(&un->un_pernode_dirty_mx[node_idx], RW_READER);
+
+	no_change = 1;
+	BLK_TO_RR(end_rr, endblk, un);
+	BLK_TO_RR(start_rr, startblk, un);
+	for (current_rr = start_rr; current_rr <= end_rr; current_rr++) {
+		if (!mnset || source_node == md_mn_mynode_id)
+			un->un_outstanding_writes[current_rr]++;
+		if (mnset) {
+			if (!IS_PERNODE_DIRTY(source_node, current_rr, un))
+				un->un_pernode_dirty_sum[current_rr]++;
+			SET_PERNODE_DIRTY(source_node, current_rr, un);
+		}
 		CLR_GOING_CLEAN(current_rr, un);
 		if (!IS_REGION_DIRTY(current_rr, un))
 			no_change = 0;
 		if (IS_GOING_DIRTY(current_rr, un))
 			no_change = 0;
 	}
+
+	if (mnset)
+		rw_exit(&un->un_pernode_dirty_mx[node_idx]);
+
 	if (no_change) {
 		mutex_exit(&un->un_resync_mx);
 		return (0);
@@ -2741,7 +3281,7 @@ mirror_mark_resync_region(struct mm_unit *un,
 		}
 	}
 	if (no_change) {
-		if (un->un_waiting_to_mark == 0)
+		if (un->un_waiting_to_mark == 0 || un->un_waiting_to_clear != 0)
 			cv_broadcast(&un->un_resync_cv);
 		mutex_exit(&un->un_resync_mx);
 		return (0);
@@ -2749,19 +3289,21 @@ mirror_mark_resync_region(struct mm_unit *un,
 
 	un->un_resync_flg |= MM_RF_COMMIT_NEEDED;
 	un->un_waiting_to_commit++;
-	while ((un->un_waiting_to_mark != 0) &&
-	    (!(un->un_resync_flg & MM_RF_GATECLOSED))) {
+	while (un->un_waiting_to_mark != 0 &&
+	    !(un->un_resync_flg & MM_RF_GATECLOSED)) {
 		if (panicstr)
 			return (1);
 		cv_wait(&un->un_resync_cv, &un->un_resync_mx);
 	}
 
-	if ((un->un_resync_flg & MM_RF_COMMIT_NEEDED)) {
+	if (un->un_resync_flg & MM_RF_COMMIT_NEEDED) {
 		un->un_resync_flg |= MM_RF_COMMITING | MM_RF_GATECLOSED;
 		un->un_resync_flg &= ~MM_RF_COMMIT_NEEDED;
+
 		mutex_exit(&un->un_resync_mx);
 		mddb_commitrec_wrapper(un->un_rr_dirty_recid);
 		mutex_enter(&un->un_resync_mx);
+
 		un->un_resync_flg &= ~MM_RF_COMMITING;
 		cv_broadcast(&un->un_resync_cv);
 	}
@@ -2779,7 +3321,23 @@ mirror_mark_resync_region(struct mm_unit *un,
 		cv_broadcast(&un->un_resync_cv);
 	}
 	mutex_exit(&un->un_resync_mx);
+
 	return (0);
+}
+
+int
+mirror_mark_resync_region(struct mm_unit *un,
+	diskaddr_t startblk, diskaddr_t endblk, md_mn_nodeid_t source_node)
+{
+	int	mnset = MD_MNSET_SETNO(MD_UN2SET(un));
+
+	if (mnset && !MD_MN_MIRROR_OWNER(un)) {
+		return (mirror_mark_resync_region_non_owner(un, startblk,
+		    endblk, source_node));
+	} else {
+		return (mirror_mark_resync_region_owner(un, startblk, endblk,
+		    source_node));
+	}
 }
 
 int
@@ -2793,9 +3351,10 @@ mirror_resize_resync_regions(mm_unit_t *un, diskaddr_t new_tb)
 	size_t		size;
 	mddb_recid_t	recid, old_recid;
 	uchar_t		*old_dirty_bm;
-	int		i;
+	int		i, j;
 	mddb_type_t	typ1;
 	set_t		setno = MD_UN2SET(un);
+	uchar_t		*old_pns;
 
 	old_nregions = un->un_rrd_num;
 	new_nregions = (uint_t)((new_tb/un->un_rrd_blksize) + 1);
@@ -2840,6 +3399,11 @@ mirror_resize_resync_regions(mm_unit_t *un, diskaddr_t new_tb)
 	un->un_outstanding_writes = (short *)kmem_zalloc(
 	    new_nregions * sizeof (short), KM_SLEEP);
 
+	old_pns = un->un_pernode_dirty_sum;
+	if (old_pns)
+		un->un_pernode_dirty_sum = (uchar_t *)kmem_zalloc(new_nregions,
+		    KM_SLEEP);
+
 	/*
 	 * Now translate the old records into the new
 	 * records
@@ -2847,15 +3411,41 @@ mirror_resize_resync_regions(mm_unit_t *un, diskaddr_t new_tb)
 	for (i = 0; i < old_nregions; i++) {
 		/*
 		 * only bring forward the
-		 * outstanding write counters and the dirty bits
+		 * outstanding write counters and the dirty bits and also
+		 * the pernode_summary counts
 		 */
 		if (!isset(old_dirty_bm, i))
 			continue;
 
 		setbit(un->un_dirty_bm, (i / rr_mult));
 		un->un_outstanding_writes[(i / rr_mult)] += owp[i];
+		if (old_pns)
+			un->un_pernode_dirty_sum[(i / rr_mult)] += old_pns[i];
 	}
 	kmem_free((caddr_t)owp, old_nregions * sizeof (short));
+	if (old_pns)
+		kmem_free((caddr_t)old_pns, old_nregions);
+
+	/*
+	 * Copy all non-zero un_pernode_dirty_bm[] arrays to new versions
+	 */
+	for (j = 0; j < MD_MNMAXSIDES; j++) {
+		rw_enter(&un->un_pernode_dirty_mx[j], RW_WRITER);
+		old_dirty_bm = un->un_pernode_dirty_bm[j];
+		if (old_dirty_bm) {
+			un->un_pernode_dirty_bm[j] = (uchar_t *)kmem_zalloc(
+			    new_bm_size, KM_SLEEP);
+			for (i = 0; i < old_nregions; i++) {
+				if (!isset(old_dirty_bm, i))
+					continue;
+
+				setbit(un->un_pernode_dirty_bm[j],
+				    (i / rr_mult));
+			}
+			kmem_free((caddr_t)old_dirty_bm, old_bm_size);
+		}
+		rw_exit(&un->un_pernode_dirty_mx[j]);
+	}
 
 	/* Save the old record id */
 	old_recid = un->un_rr_dirty_recid;
@@ -2891,6 +3481,7 @@ mirror_add_resync_regions(mm_unit_t *un, diskaddr_t new_tb)
 	mddb_recid_t	recid, old_recid;
 	mddb_type_t	typ1;
 	set_t		setno = MD_UN2SET(un);
+	int		i;
 
 	old_nregions = un->un_rrd_num;
 	new_nregions = (uint_t)((new_tb/un->un_rrd_blksize) + 1);
@@ -2924,6 +3515,8 @@ mirror_add_resync_regions(mm_unit_t *un, diskaddr_t new_tb)
 	 *		un_goingclean_bm
 	 *		un_resync_bm
 	 *		un_outstanding_writes
+	 *		un_pernode_dirty_sum
+	 *		un_pernode_dirty_bm[]
 	 */
 	old = un->un_goingdirty_bm;
 	un->un_goingdirty_bm = (uchar_t *)kmem_zalloc(new_bm_size, KM_SLEEP);
@@ -2946,6 +3539,28 @@ mirror_add_resync_regions(mm_unit_t *un, diskaddr_t new_tb)
 	bcopy((caddr_t)owp, (caddr_t)un->un_outstanding_writes,
 	    old_nregions * sizeof (short));
 	kmem_free((caddr_t)owp, (old_nregions * sizeof (short)));
+
+	old = un->un_pernode_dirty_sum;
+	if (old) {
+		un->un_pernode_dirty_sum = (uchar_t *)kmem_zalloc(
+		    new_nregions, KM_SLEEP);
+		bcopy((caddr_t)old, (caddr_t)un->un_pernode_dirty_sum,
+		    old_nregions);
+		kmem_free((caddr_t)old, old_nregions);
+	}
+
+	for (i = 0; i < MD_MNMAXSIDES; i++) {
+		rw_enter(&un->un_pernode_dirty_mx[i], RW_WRITER);
+		old = un->un_pernode_dirty_bm[i];
+		if (old) {
+			un->un_pernode_dirty_bm[i] = (uchar_t *)kmem_zalloc(
+			    new_bm_size, KM_SLEEP);
+			bcopy((caddr_t)old, (caddr_t)un->un_pernode_dirty_bm[i],
+			    old_bm_size);
+			kmem_free((caddr_t)old, old_bm_size);
+		}
+		rw_exit(&un->un_pernode_dirty_mx[i]);
+	}
 
 	/* Save the old record id */
 	old_recid = un->un_rr_dirty_recid;
@@ -2979,4 +3594,264 @@ mirror_copy_rr(int sz, uchar_t *src, uchar_t *dest)
 
 	for (i = 0; i < sz; i++)
 		*dest++ |= *src++;
+}
+
+/*
+ * mirror_set_dirty_rr:
+ * -------------------
+ * Set the pernode_dirty_bm[node] entries and un_dirty_bm[] if appropriate.
+ * For the owning node (DRL/mirror owner) update the on-disk RR if needed.
+ * Called on every clean->dirty transition for the originating writer node.
+ * Note: only the non-owning nodes will initiate this message and it is only
+ * the owning node that has to process it.
+ */
+int
+mirror_set_dirty_rr(md_mn_rr_dirty_params_t *iocp)
+{
+
+	minor_t			mnum = iocp->rr_mnum;
+	mm_unit_t		*un;
+	int			start = (int)iocp->rr_start;
+	int			end = (int)iocp->rr_end;
+	set_t			setno = MD_MIN2SET(mnum);
+	md_mn_nodeid_t		orignode = iocp->rr_nodeid;	/* 1-based */
+	diskaddr_t		startblk, endblk;
+
+	mdclrerror(&iocp->mde);
+
+	if ((setno >= md_nsets) ||
+	    (MD_MIN2UNIT(mnum) >= md_nunits)) {
+		return (mdmderror(&iocp->mde, MDE_INVAL_UNIT, mnum));
+	}
+
+	/* Must have _NO_ ioctl lock set if we update the RR on-disk */
+	un = mirror_getun(mnum, &iocp->mde, NO_LOCK, NULL);
+
+	if (un == NULL) {
+		return (mdmderror(&iocp->mde, MDE_UNIT_NOT_SETUP, mnum));
+	}
+	if (un->c.un_type != MD_METAMIRROR) {
+		return (mdmderror(&iocp->mde, MDE_NOT_MM, mnum));
+	}
+	if (orignode < 1 || orignode >= MD_MNMAXSIDES) {
+		return (mdmderror(&iocp->mde, MDE_INVAL_UNIT, mnum));
+	}
+	if (un->un_nsm < 2) {
+		return (0);
+	}
+
+	/*
+	 * Only process this message if we're the owner of the mirror.
+	 */
+	if (!MD_MN_MIRROR_OWNER(un)) {
+		return (0);
+	}
+
+	RR_TO_BLK(startblk, start, un);
+	RR_TO_BLK(endblk, end, un);
+	return (mirror_mark_resync_region_owner(un, startblk, endblk,
+	    orignode));
+}
+
+/*
+ * mirror_clean_rr_bits:
+ * --------------------
+ * Clear the pernode_dirty_bm[node] entries which are passed in the bitmap
+ * Once _all_ references are removed (pernode_dirty_count[x] == 0) this region
+ * is 'cleanable' and will get flushed out by clearing un_dirty_bm[] on all
+ * nodes. Callable from ioctl / interrupt / whatever context.
+ * un_resync_mx is held on entry.
+ */
+static void
+mirror_clean_rr_bits(
+	md_mn_rr_clean_params_t *iocp)
+{
+	minor_t			mnum = iocp->rr_mnum;
+	mm_unit_t		*un;
+	uint_t			cleared_bits;
+	md_mn_nodeid_t		node = iocp->rr_nodeid - 1;
+	md_mn_nodeid_t		orignode = iocp->rr_nodeid;
+	int			i, start, end;
+
+	un = mirror_getun(mnum, &iocp->mde, NO_LOCK, NULL);
+
+	cleared_bits = 0;
+	start = MDMN_RR_CLEAN_PARAMS_START_BIT(iocp);
+	end = start + MDMN_RR_CLEAN_PARAMS_DATA_BYTES(iocp) * NBBY;
+	rw_enter(&un->un_pernode_dirty_mx[node], RW_READER);
+	for (i = start; i < end; i++) {
+		if (isset(MDMN_RR_CLEAN_PARAMS_DATA(iocp), i - start)) {
+			if (IS_PERNODE_DIRTY(orignode, i, un)) {
+				un->un_pernode_dirty_sum[i]--;
+				CLR_PERNODE_DIRTY(orignode, i, un);
+			}
+			if (un->un_pernode_dirty_sum[i] == 0) {
+				cleared_bits++;
+				CLR_REGION_DIRTY(i, un);
+				CLR_GOING_CLEAN(i, un);
+			}
+		}
+	}
+	rw_exit(&un->un_pernode_dirty_mx[node]);
+	if (cleared_bits) {
+		/*
+		 * We can only be called iff we are the mirror owner, however
+		 * as this is a (potentially) decoupled routine the ownership
+		 * may have moved from us by the time we get to execute the
+		 * bit clearing. Hence we still need to check for being the
+		 * owner before flushing the DRL to the replica.
+		 */
+		if (MD_MN_MIRROR_OWNER(un)) {
+			mutex_exit(&un->un_resync_mx);
+			mddb_commitrec_wrapper(un->un_rr_dirty_recid);
+			mutex_enter(&un->un_resync_mx);
+		}
+	}
+}
+
+/*
+ * mirror_drl_task:
+ * ---------------
+ * Service routine for clearing the DRL bits on a deferred MD_MN_RR_CLEAN call
+ * We need to obtain exclusive access to the un_resync_cv and then clear the
+ * necessary bits.
+ * On completion, we must also free the passed in argument as it is allocated
+ * at the end of the ioctl handler and won't be freed on completion.
+ */
+static void
+mirror_drl_task(void *arg)
+{
+	md_mn_rr_clean_params_t	*iocp = (md_mn_rr_clean_params_t *)arg;
+	minor_t			mnum = iocp->rr_mnum;
+	mm_unit_t		*un;
+
+	un = mirror_getun(mnum, &iocp->mde, NO_LOCK, NULL);
+
+	mutex_enter(&un->un_rrp_inflight_mx);
+	mutex_enter(&un->un_resync_mx);
+	un->un_waiting_to_clear++;
+	while (un->un_resync_flg & MM_RF_STALL_CLEAN)
+		cv_wait(&un->un_resync_cv, &un->un_resync_mx);
+	un->un_waiting_to_clear--;
+
+	un->un_resync_flg |= MM_RF_GATECLOSED;
+	mirror_clean_rr_bits(iocp);
+	un->un_resync_flg &= ~MM_RF_GATECLOSED;
+	if (un->un_waiting_to_mark != 0 || un->un_waiting_to_clear != 0) {
+		cv_broadcast(&un->un_resync_cv);
+	}
+	mutex_exit(&un->un_resync_mx);
+	mutex_exit(&un->un_rrp_inflight_mx);
+
+	kmem_free((caddr_t)iocp, MDMN_RR_CLEAN_PARAMS_SIZE(iocp));
+}
+
+/*
+ * mirror_set_clean_rr:
+ * -------------------
+ * Clear the pernode_dirty_bm[node] entries which are passed in the bitmap
+ * Once _all_ references are removed (pernode_dirty_count[x] == 0) this region
+ * is 'cleanable' and will get flushed out by clearing un_dirty_bm[] on all
+ * nodes.
+ *
+ * Only the mirror-owner need process this message as it is the only RR updater.
+ * Non-owner nodes issue this request, but as we have no point-to-point message
+ * support we will receive the message on all nodes.
+ */
+int
+mirror_set_clean_rr(md_mn_rr_clean_params_t *iocp)
+{
+
+	minor_t			mnum = iocp->rr_mnum;
+	mm_unit_t		*un;
+	set_t			setno = MD_MIN2SET(mnum);
+	md_mn_nodeid_t		node = iocp->rr_nodeid - 1;
+	int			can_clear = 0;
+	md_mn_rr_clean_params_t	*newiocp;
+	int			rval = 0;
+
+	mdclrerror(&iocp->mde);
+
+	if ((setno >= md_nsets) ||
+	    (MD_MIN2UNIT(mnum) >= md_nunits)) {
+		return (mdmderror(&iocp->mde, MDE_INVAL_UNIT, mnum));
+	}
+
+	/* Must have _NO_ ioctl lock set if we update the RR on-disk */
+	un = mirror_getun(mnum, &iocp->mde, NO_LOCK, NULL);
+
+	if (un == NULL) {
+		return (mdmderror(&iocp->mde, MDE_UNIT_NOT_SETUP, mnum));
+	}
+	if (un->c.un_type != MD_METAMIRROR) {
+		return (mdmderror(&iocp->mde, MDE_NOT_MM, mnum));
+	}
+	if (un->un_nsm < 2) {
+		return (0);
+	}
+
+	/*
+	 * Check to see if we're the mirror owner. If not, there's nothing
+	 * for us to to.
+	 */
+	if (!MD_MN_MIRROR_OWNER(un)) {
+		return (0);
+	}
+
+	/*
+	 * Process the to-be-cleaned bitmap. We need to update the pernode_dirty
+	 * bits and pernode_dirty_sum[n], and if, and only if, the sum goes 0
+	 * we can then mark the un_dirty_bm entry as GOINGCLEAN. Alternatively
+	 * we can just defer this cleaning until the next process_resync_regions
+	 * timeout.
+	 */
+	rw_enter(&un->un_pernode_dirty_mx[node], RW_WRITER);
+	if (un->un_pernode_dirty_bm[node] == NULL) {
+		un->un_pernode_dirty_bm[node] = (uchar_t *)kmem_zalloc(
+		    un->un_rrd_num, KM_SLEEP);
+	}
+	rw_exit(&un->un_pernode_dirty_mx[node]);
+
+	/*
+	 * See if we can simply clear the un_dirty_bm[] entries. If we're not
+	 * the issuing node _and_ we aren't in the process of marking/clearing
+	 * the RR bitmaps, we can simply update the bits as needed.
+	 * If we're the owning node and _not_ the issuing node, we should also
+	 * sync the RR if we clear any bits in it.
+	 */
+	mutex_enter(&un->un_resync_mx);
+	can_clear = (un->un_resync_flg & MM_RF_STALL_CLEAN) ? 0 : 1;
+	if (can_clear) {
+		un->un_resync_flg |= MM_RF_GATECLOSED;
+		mirror_clean_rr_bits(iocp);
+		un->un_resync_flg &= ~MM_RF_GATECLOSED;
+		if (un->un_waiting_to_mark != 0 ||
+		    un->un_waiting_to_clear != 0) {
+			cv_broadcast(&un->un_resync_cv);
+		}
+	}
+	mutex_exit(&un->un_resync_mx);
+
+	/*
+	 * If we couldn't clear the bits, due to DRL update from m_m_r_r / p_r_r
+	 * we must schedule a blocking call to update the DRL on this node.
+	 * As we're invoked from an ioctl we are going to have the original data
+	 * disappear (kmem_free) once we return. So, copy the data into a new
+	 * structure and let the taskq routine release it on completion.
+	 */
+	if (!can_clear) {
+		size_t	sz = MDMN_RR_CLEAN_PARAMS_SIZE(iocp);
+
+		newiocp = (md_mn_rr_clean_params_t *)kmem_alloc(sz, KM_SLEEP);
+
+		bcopy(iocp, newiocp, sz);
+
+		if (ddi_taskq_dispatch(un->un_drl_task, mirror_drl_task,
+		    newiocp, DDI_NOSLEEP) != DDI_SUCCESS) {
+			kmem_free(newiocp, sz);
+			rval = ENOMEM;	/* probably starvation */
+		}
+	}
+
+	return (rval);
 }

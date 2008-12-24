@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mdinclude.h"
 
@@ -117,16 +115,84 @@ print_submirror(uintptr_t addr, void *arg, submirror_cb_t *data)
 	return (WALK_NEXT);
 }
 
+/*
+ * Construct an RLE count for the number of 'cleared' bits in the given 'bm'
+ * Output the RLE count in form: [<set>.<cleared>.<set>.<cleared>...]
+ * RLE is Run Length Encoding, a method for compactly describing a bitmap
+ * as a series of numbers indicating the count of consecutive set or cleared
+ * bits.
+ *
+ * Input:
+ *	<bm>	bitmap to scan
+ *	<size>	length of bitmap (in bits)
+ *	<comp_bm>	RLE count array to be updated
+ *	<opstr>	Descriptive text for bitmap RLE count display
+ */
+static void
+print_comp_bm(unsigned char *bm, uint_t size, ushort_t *comp_bm, char *opstr)
+{
+	int	cnt_clean, tot_dirty, cur_idx;
+	int	i, cur_clean, cur_dirty, printit, max_set_cnt, max_reset_cnt;
+
+	cnt_clean = 1;
+	printit = 0;
+	cur_clean = 0;
+	cur_dirty = 0;
+	cur_idx = 0;
+	tot_dirty = 0;
+	max_set_cnt = max_reset_cnt = 0;
+	for (i = 0; i < size; i++) {
+		if (isset(bm, i)) {
+			/* If we're counting clean bits, flush the count out */
+			if (cnt_clean) {
+				cnt_clean = 0;
+				comp_bm[cur_idx] = cur_clean;
+				printit = 1;
+				if (cur_clean > max_reset_cnt) {
+					max_reset_cnt = cur_clean;
+				}
+			}
+			cur_clean = 0;
+			cur_dirty++;
+			tot_dirty++;
+		} else {
+			if (!cnt_clean) {
+				cnt_clean = 1;
+				comp_bm[cur_idx] = cur_dirty;
+				printit = 1;
+				if (cur_dirty > max_set_cnt) {
+					max_set_cnt = cur_dirty;
+				}
+			}
+			cur_dirty = 0;
+			cur_clean++;
+		}
+		if (printit) {
+			mdb_printf("%u.", comp_bm[cur_idx++]);
+			printit = 0;
+		}
+	}
+
+	mdb_printf("\nTotal %s bits = %lu\n", opstr, tot_dirty);
+	mdb_printf("Total %s transactions = %lu\n", opstr, cur_idx);
+	mdb_printf("Maximum %s set count = %lu, reset count = %lu\n", opstr,
+	    max_set_cnt, max_reset_cnt);
+}
+
 void
 print_mirror(void *un_addr, void *mdcptr, uint_t verbose)
 {
-	mm_unit_t	mm;
+	mm_unit_t	mm, *mmp;
 	void		**ptr;
 	int		setno = 0;
 	minor_t		un_self_id;
 	diskaddr_t	un_total_blocks;
 	ushort_t	mm_un_nsm;
 	submirror_cb_t	data;
+	uint_t		num_rr, rr_blksize;
+	ushort_t	*comp_rr;
+	unsigned char	*rr_dirty_bm, *rr_goingclean_bm;
+	uintptr_t	un_dbm, un_gcbm;
 
 	/* read in the device */
 	if (mdb_vread(&mm, sizeof (mm_unit_t),
@@ -134,6 +200,9 @@ print_mirror(void *un_addr, void *mdcptr, uint_t verbose)
 		mdb_warn("failed to read mm_unit_t at %p\n", un_addr);
 		return;
 	}
+
+	mmp = &mm;
+
 	un_self_id = ((mdc_unit_t *)mdcptr)->un_self_id;
 	un_total_blocks = ((mdc_unit_t *)mdcptr)->un_total_blocks;
 	mm_un_nsm = mm.un_nsm;
@@ -148,6 +217,39 @@ print_mirror(void *un_addr, void *mdcptr, uint_t verbose)
 	}
 	mdb_inc_indent(2);
 	mdb_printf("Size: %llu blocks\n", un_total_blocks);
+
+	/*
+	 * Dump out the current un_dirty_bm together with its size
+	 * Also, attempt to Run Length encode the bitmap to see if this
+	 * is a viable option
+	 */
+	num_rr = mm.un_rrd_num;
+	rr_blksize = mm.un_rrd_blksize;
+
+	un_dbm = (uintptr_t)mmp->un_dirty_bm;
+	un_gcbm = (uintptr_t)mmp->un_goingclean_bm;
+
+	mdb_printf("RR size: %lu bits\n", num_rr);
+	mdb_printf("RR block size: %lu blocks\n", rr_blksize);
+
+	rr_dirty_bm = (unsigned char *)mdb_alloc(num_rr, UM_SLEEP|UM_GC);
+	rr_goingclean_bm = (unsigned char *)mdb_alloc(num_rr, UM_SLEEP|UM_GC);
+	comp_rr = (ushort_t *)mdb_alloc(num_rr * sizeof (ushort_t),
+	    UM_SLEEP|UM_GC);
+
+	if (mdb_vread(rr_dirty_bm, num_rr, un_dbm) == -1) {
+		mdb_warn("failed to read un_dirty_bm at %p\n", un_dbm);
+		return;
+	}
+	if (mdb_vread(rr_goingclean_bm, num_rr, un_gcbm) == -1) {
+		mdb_warn("failed to read un_goingclean_bm at %p\n", un_gcbm);
+		return;
+	}
+
+	print_comp_bm(rr_dirty_bm, num_rr, comp_rr, "dirty");
+
+	print_comp_bm(rr_goingclean_bm, num_rr, comp_rr, "clean");
+
 	/*
 	 * find the sub mirrors, search through each metadevice looking
 	 * at the un_parent.

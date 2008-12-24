@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 SUNWprivate_1.1 {
     global:
@@ -92,7 +90,7 @@ SUNWprivate_1.1 {
 	commitset;
 	comp_state_to_name;
 	copy_msg;
-	copy_msg_1;
+	copy_msg_2;
 	copy_result;
 	crcfreetab;
 	crcfunc;
@@ -160,12 +158,12 @@ SUNWprivate_1.1 {
 	md_med_pmap_timeout;
 	mdmn_abort;
 	mdmn_allocate_changelog;
-	mdmn_comm_lock_1;
-	mdmn_comm_msglock_1;
-	mdmn_comm_reinit_set_1;
-	mdmn_comm_resume_1;
-	mdmn_comm_suspend_1;
-	mdmn_comm_unlock_1;
+	mdmn_comm_lock_2;
+	mdmn_comm_msglock_2;
+	mdmn_comm_reinit_set_2;
+	mdmn_comm_resume_2;
+	mdmn_comm_suspend_2;
+	mdmn_comm_unlock_2;
 	mdmn_create_msgid;
 	mdmn_get_changelogrec;
 	mdmn_get_handler;
@@ -177,14 +175,14 @@ SUNWprivate_1.1 {
 	mdmn_reinit_set;
 	mdmn_reset_changelog;
 	mdmn_resume;
-	mdmn_send_1;
+	mdmn_send_2;
 	mdmn_send_message;
 	mdmn_snarf_changelog;
 	mdmn_suspend;
 	mdmn_unlog_msg;
-	mdmn_wakeup_initiator_1;
-	mdmn_wakeup_master_1;
-	mdmn_work_1;
+	mdmn_wakeup_initiator_2;
+	mdmn_wakeup_master_2;
+	mdmn_work_2;
 	mdnullerror;
 	md_perror;
 	md_post_sig;

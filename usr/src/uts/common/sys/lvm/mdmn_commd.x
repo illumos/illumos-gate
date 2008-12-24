@@ -20,11 +20,10 @@
 % */
 %
 %/*
-% * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+% * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 % * Use is subject to license terms.
 % */
 %
-%#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 %#include <sys/types.h>
 %#include <sys/types32.h>
@@ -103,6 +102,8 @@ enum md_mn_msgtype_t {
 	MD_MN_MSG_SETSYNC,		/* Set resync status */
 	MD_MN_MSG_POKE_HOTSPARES,	/* Call poke_hotspares */
 	MD_MN_MSG_ADDMDNAME,		/* Add metadevice name */
+	MD_MN_MSG_RR_DIRTY,		/* Mark RR range as dirty */
+	MD_MN_MSG_RR_CLEAN,		/* Mark RR range as clean */
 	MD_MN_NMESSAGES /* insert elements before */
 };
 
@@ -361,6 +362,39 @@ struct md_mn_msg_pokehsp_t {
 	minor_t		pokehsp_setno;
 };
 
+/* Message format for MD_MN_MSG_RR_DIRTY message */
+struct md_mn_msg_rr_dirty_t {
+	minor_t		rr_mnum;
+	int		rr_nodeid;
+	u_int		rr_range;	/* Start(16bits) | End(16bits) */
+};
+
+/* Message format for MD_MN_MSG_RR_CLEAN message */
+%#define	MDMN_MSG_RR_CLEAN_DATA_MAX_BYTES	\
+%		    ((MDMN_MAX_KMSG_DATA) - \
+%		    sizeof (struct md_mn_msg_rr_clean_t))
+%#define	MDMN_MSG_RR_CLEAN_SIZE_DATA(x)		\
+%		    (sizeof (struct md_mn_msg_rr_clean_t) + (x))
+%#define	MDMN_MSG_RR_CLEAN_MSG_SIZE(x)		\
+%		    (sizeof (struct md_mn_msg_rr_clean_t) \
+%		    + MDMN_MSG_RR_CLEAN_DATA_BYTES(x))
+%#define	MDMN_MSG_RR_CLEAN_DATA(x)		\
+%		    ((unsigned char *)(x) + \
+%		    sizeof (struct md_mn_msg_rr_clean_t))
+
+/* since we cannot use ushorts, some macros to extract the parts from an int */
+%#define	MDMN_MSG_RR_CLEAN_START_BIT(x)	((x)->rr_start_size >> 16)
+%#define	MDMN_MSG_RR_CLEAN_DATA_BYTES(x)	((x)->rr_start_size & 0xffff)
+%#define	MDMN_MSG_RR_CLEAN_START_SIZE_SET(x, start, size) \
+%			((x)->rr_start_size = (start << 16) | size)
+
+struct md_mn_msg_rr_clean_t {
+	md_mn_nodeid_t	rr_nodeid;
+	unsigned int	rr_mnum;
+	unsigned int	rr_start_size;	/* start_bit (16b) | data_bytes (16b) */
+	/* actual data goes here */
+};
+
 %#define	MD_MSGF_NO_LOG			0x00000001
 %#define	MD_MSGF_NO_BCAST		0x00000002
 %#define	MD_MSGF_STOP_ON_ERROR		0x00000004
@@ -373,6 +407,9 @@ struct md_mn_msg_pokehsp_t {
 %#define	MD_MSGF_FAIL_ON_SUSPEND		0x00000200
 %#define	MD_MSGF_NO_MCT			0x00000400
 %#define	MD_MSGF_PANIC_WHEN_INCONSISTENT	0x00000800
+%#define	MD_MSGF_BLK_SIGNAL		0x00001000
+%#define	MD_MSGF_KSEND_NORETRY		0x00002000
+%#define	MD_MSGF_DIRECTED		0x00004000
 %#define	MD_MSGF_VERBOSE			0x10000000
 %#define	MD_MSGF_VERBOSE_2		0x20000000
 
@@ -418,7 +455,8 @@ struct md_mn_msg_t {
 	u_int		msg_flags;	/* See MD_MSGF_* above */
 	set_t		msg_setno;	/* which set is involved */
         md_mn_msgtype_t msg_type;       /* what type of message */
-	char		msg_spare[32];	/* Always good to hav'em */
+	md_mn_nodeid_t	msg_recipient;	/* who to send DIRECTED message to */
+	char		msg_spare[28];	/* Always good to hav'em */
 	opaque		msg_event<>;	/* the actual event wrapped up */
 };
 %#define	msg_event_data	msg_event.msg_event_val
@@ -435,7 +473,8 @@ struct md_mn_msg_od_t {
 	uint32_t	msg_flags;	/* See MD_MSGF_* above */
 	set_t		msg_setno;	/* which set is involved */
         md_mn_msgtype_t msg_type;       /* what type of message */
-	char		msg_spare[32];	/* Always good to hav'em */
+	md_mn_nodeid_t	msg_recipient;	/* who to send DIRECTED message to */
+	char		msg_spare[28];	/* Always good to hav'em */
 	uint32_t	msg_ev_len;	
 	char		msg_ev_val[MD_MN_MSG_MAXDATALEN];
 };
@@ -450,6 +489,7 @@ struct md_mn_kmsg_t {
 	u_int		kmsg_flags;
 	set_t		kmsg_setno;
 	md_mn_msgtype_t	kmsg_type;
+	md_mn_nodeid_t	kmsg_recipient;	/* who to send DIRECTED message to */
 	int		kmsg_size;
 	char		kmsg_data[MDMN_MAX_KMSG_DATA];
 };
@@ -549,7 +589,7 @@ struct md_mn_type_and_lock_t {
 
 
 program MDMN_COMMD {
-	version ONE {
+	version TWO {
 		md_mn_result_t 
 		mdmn_send(md_mn_msg_t) = 1;
 
@@ -579,5 +619,5 @@ program MDMN_COMMD {
 		
 		int
 		mdmn_comm_msglock(md_mn_type_and_lock_t) = 10;
-	} = 1;
+	} = 2;
 } = 100422;

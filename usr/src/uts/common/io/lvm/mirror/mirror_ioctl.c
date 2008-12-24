@@ -1624,7 +1624,7 @@ mirror_choose_owner_thread(md_mn_msg_chooseid_t	*msg)
 
 	kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_CHOOSE_OWNER,
-	    MD_MSGF_NO_BCAST | MD_MSGF_NO_LOG, (char *)msg,
+	    MD_MSGF_NO_BCAST | MD_MSGF_NO_LOG, 0, (char *)msg,
 	    sizeof (md_mn_msg_chooseid_t), kres);
 	if (!MDMN_KSEND_MSG_OK(rval, kres)) {
 		mdmn_ksend_show_error(rval, kres, "CHOOSE OWNER");
@@ -1664,7 +1664,8 @@ mirror_owner_thread(md_mn_req_owner_t *ownp)
 
 	kresult = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_REQUIRE_OWNER,
-	    MD_MSGF_NO_LOG, (char *)ownp, sizeof (md_mn_req_owner_t), kresult);
+	    MD_MSGF_NO_LOG, 0, (char *)ownp, sizeof (md_mn_req_owner_t),
+	    kresult);
 
 	if (!MDMN_KSEND_MSG_OK(rval, kresult)) {
 		/*
@@ -2358,7 +2359,7 @@ mirror_get_status(mm_unit_t *un, IOLOCK *lockp)
 
 	kres = kmem_alloc(sizeof (md_mn_kresult_t), KM_SLEEP);
 	rval = mdmn_ksend_message(setno, MD_MN_MSG_GET_MIRROR_STATE,
-	    MD_MSGF_NO_BCAST | MD_MSGF_NO_LOG, (char *)&msg,
+	    MD_MSGF_NO_BCAST | MD_MSGF_NO_LOG, 0, (char *)&msg,
 	    sizeof (msg), kres);
 
 	/* if the node hasn't yet joined, it's Ok. */
@@ -2946,6 +2947,42 @@ free_mem:
 
 		err = mirror_get_mir_state((md_mn_get_mir_state_t *)d,
 		    lockp);
+		break;
+	}
+
+	case MD_MN_RR_DIRTY:
+	{
+		sz = sizeof (md_mn_rr_dirty_params_t);
+		d = kmem_zalloc(sz, KM_SLEEP);
+
+		if (ddi_copyin(data, d, sz, mode)) {
+			err = EFAULT;
+			break;
+		}
+
+		err = mirror_set_dirty_rr((md_mn_rr_dirty_params_t *)d);
+		break;
+	}
+
+	case MD_MN_RR_CLEAN:
+	{
+		md_mn_rr_clean_params_t tmp;
+
+		/* get the first part of the structure to find the size */
+		if (ddi_copyin(data, &tmp, sizeof (tmp), mode)) {
+			err = EFAULT;
+			break;
+		}
+
+		sz = MDMN_RR_CLEAN_PARAMS_SIZE(&tmp);
+		d = kmem_zalloc(sz, KM_SLEEP);
+
+		if (ddi_copyin(data, d, sz, mode)) {
+			err = EFAULT;
+			break;
+		}
+
+		err = mirror_set_clean_rr((md_mn_rr_clean_params_t *)d);
 		break;
 	}
 

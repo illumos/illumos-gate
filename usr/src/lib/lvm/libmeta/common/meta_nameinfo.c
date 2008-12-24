@@ -1244,11 +1244,11 @@ meta_isopen(
 			 * and the message doesn't need being logged either.
 			 * Hence NO_LOG and NO_MCT
 			 */
-			err = mdmn_send_message(
-			    sp->setno, MD_MN_MSG_CLU_CHECK,
-			    MD_MSGF_NO_MCT | MD_MSGF_STOP_ON_ERROR |
-			    MD_MSGF_NO_LOG | MD_MSGF_OVERRIDE_SUSPEND,
-			    (char *)&d, sizeof (md_isopen_t), &resp, ep);
+			err = mdmn_send_message(sp->setno,
+			    MD_MN_MSG_CLU_CHECK, MD_MSGF_NO_MCT |
+			    MD_MSGF_STOP_ON_ERROR | MD_MSGF_NO_LOG |
+			    MD_MSGF_OVERRIDE_SUSPEND, 0, (char *)&d,
+			    sizeof (md_isopen_t), &resp, ep);
 			if (err == 0) {
 				d.isopen = resp->mmr_exitval;
 			} else {

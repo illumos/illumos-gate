@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/lvm/mdmn_commd.h>
 #include <stdio.h>
@@ -60,16 +58,16 @@ static int _rpcpmstart;		/* Started by a port monitor ? */
 static int _rpcsvcstate = _IDLE;	/* Set when a request is serviced */
 static int _rpcsvccount = 0;		/* Number of requests being serviced */
 
-extern  md_mn_result_t	*mdmn_send_svc_1();
-extern  int		*mdmn_work_svc_1();
-extern  int		*mdmn_wakeup_initiator_svc_1();
-extern  int		*mdmn_wakeup_master_svc_1();
-extern  int		*mdmn_comm_lock_svc_1();
-extern  int		*mdmn_comm_unlock_svc_1();
-extern  int		*mdmn_comm_suspend_svc_1();
-extern  int		*mdmn_comm_resume_svc_1();
-extern  int		*mdmn_comm_reinit_set_svc_1();
-extern  int		*mdmn_comm_msglock_svc_1();
+extern  int		mdmn_send_svc_2();
+extern  int		*mdmn_work_svc_2();
+extern  int		*mdmn_wakeup_initiator_svc_2();
+extern  int		*mdmn_wakeup_master_svc_2();
+extern  int		*mdmn_comm_lock_svc_2();
+extern  int		*mdmn_comm_unlock_svc_2();
+extern  int		*mdmn_comm_suspend_svc_2();
+extern  int		*mdmn_comm_resume_svc_2();
+extern  int		*mdmn_comm_reinit_set_svc_2();
+extern  int		*mdmn_comm_msglock_svc_2();
 
 
 static void
@@ -107,7 +105,7 @@ closedown(void)
 }
 
 static void
-mdmn_commd_1(rqstp, transp)
+mdmn_commd_2(rqstp, transp)
 	struct svc_req *rqstp;
 	register SVCXPRT *transp;
 {
@@ -124,7 +122,6 @@ mdmn_commd_1(rqstp, transp)
 	char *(*local)();
 	int free_result = 0;
 
-
 	_rpcsvccount++;
 	switch (rqstp->rq_proc) {
 	case NULLPROC:
@@ -132,6 +129,7 @@ mdmn_commd_1(rqstp, transp)
 			(char *)NULL);
 		_rpcsvccount--;
 		_rpcsvcstate = _SERVED;
+		svc_done(transp);
 		return;
 
 	case mdmn_send:
@@ -140,81 +138,94 @@ mdmn_commd_1(rqstp, transp)
 		(void) memset((char *)&argument, 0, sizeof (argument));
 		if (!svc_getargs(transp, _xdr_argument, (caddr_t)&argument)) {
 			svcerr_decode(transp);
+			svc_done(transp);
 			_rpcsvccount--;
 			_rpcsvcstate = _SERVED;
 			return;
 		}
 		/*
-		 * mdmn_send_1 will not always do a sendreply.
+		 * mdmn_send_2 will not always do a sendreply.
 		 * it will register in a table and let the mdmn_wakeup1
 		 * do the sendreply for that call.
 		 * in order to register properly we need the transp handle
+		 * If we get a 0 back from mdmn_send_svc_2() we have no pending
+		 * RPC in-flight, so we drop the service count.
 		 */
-		(void) mdmn_send_svc_1((md_mn_msg_t *)&argument, rqstp);
+		if (mdmn_send_svc_2((md_mn_msg_t *)&argument, rqstp) == 0) {
+			_rpcsvccount--;
+			_rpcsvcstate = _SERVED;
+			svc_done(rqstp->rq_xprt);
+		}
 
-		return; /* xdr_free is called by mdmn_wakeup_initiator_svc_1 */
+		return; /* xdr_free is called by mdmn_wakeup_initiator_svc_2 */
 
 	case mdmn_work:
 		_xdr_argument = xdr_md_mn_msg_t;
 		_xdr_result = xdr_int;
-		local = (char *(*)()) mdmn_work_svc_1;
+		local = (char *(*)()) mdmn_work_svc_2;
 		free_result = 1;
 		break;
 
 	case mdmn_wakeup_master:
 		_xdr_argument = xdr_md_mn_result_t;
 		_xdr_result = xdr_int;
-		local = (char *(*)()) mdmn_wakeup_master_svc_1;
+		local = (char *(*)()) mdmn_wakeup_master_svc_2;
 		free_result = 1;
 		break;
 
 	case mdmn_wakeup_initiator:
+		/*
+		 * We must have had an in-flight RPC request to get here,
+		 * so drop the in-flight count.
+		 */
 		_xdr_argument = xdr_md_mn_result_t;
 		_xdr_result = xdr_int;
-		local = (char *(*)()) mdmn_wakeup_initiator_svc_1;
+		local = (char *(*)()) mdmn_wakeup_initiator_svc_2;
 		free_result = 1;
+		_rpcsvccount--;
 		break;
 
 	case mdmn_comm_lock:
 		_xdr_argument = xdr_md_mn_set_and_class_t;
 		_xdr_result = xdr_int;
-		local = (char *(*)()) mdmn_comm_lock_svc_1;
+		local = (char *(*)()) mdmn_comm_lock_svc_2;
 		break;
 
 	case mdmn_comm_unlock:
 		_xdr_argument = xdr_md_mn_set_and_class_t;
 		_xdr_result = xdr_int;
-		local = (char *(*)()) mdmn_comm_unlock_svc_1;
+		local = (char *(*)()) mdmn_comm_unlock_svc_2;
 		break;
 
 	case mdmn_comm_suspend:
 		_xdr_argument = xdr_md_mn_set_and_class_t;
 		_xdr_result = xdr_int;
-		local = (char *(*)()) mdmn_comm_suspend_svc_1;
+		local = (char *(*)()) mdmn_comm_suspend_svc_2;
 		break;
 
 	case mdmn_comm_resume:
 		_xdr_argument = xdr_md_mn_set_and_class_t;
 		_xdr_result = xdr_int;
-		local = (char *(*)()) mdmn_comm_resume_svc_1;
+		local = (char *(*)()) mdmn_comm_resume_svc_2;
 		break;
 
 	case mdmn_comm_reinit_set:
 		_xdr_argument = xdr_u_int;
 		_xdr_result = xdr_int;
-		local = (char *(*)()) mdmn_comm_reinit_set_svc_1;
+		local = (char *(*)()) mdmn_comm_reinit_set_svc_2;
 		break;
 
 	case mdmn_comm_msglock:
 		_xdr_argument = xdr_md_mn_type_and_lock_t;
 		_xdr_result = xdr_int;
-		local = (char *(*)()) mdmn_comm_msglock_svc_1;
+		local = (char *(*)()) mdmn_comm_msglock_svc_2;
 		break;
 
 	default:
 		svcerr_noproc(transp);
 		_rpcsvccount--;
 		_rpcsvcstate = _SERVED;
+		svc_done(transp);
 		return;
 	}
 	(void) memset((char *)&argument, 0, sizeof (argument));
@@ -222,6 +233,7 @@ mdmn_commd_1(rqstp, transp)
 		svcerr_decode(transp);
 		_rpcsvccount--;
 		_rpcsvcstate = _SERVED;
+		svc_done(transp);
 		return;
 	}
 	result = (*local)(&argument, rqstp);
@@ -231,12 +243,15 @@ mdmn_commd_1(rqstp, transp)
 	}
 	if (!svc_freeargs(transp, _xdr_argument, (caddr_t)&argument)) {
 		_msgout(gettext("unable to free arguments"));
+		svc_done(transp);
 		exit(1);
 	}
 
 	if (free_result == 1) {
 		free(result);
 	}
+
+	svc_done(transp);
 	_rpcsvccount--;
 	_rpcsvcstate = _SERVED;
 }
@@ -249,6 +264,7 @@ static void
 exit_commd()
 {
 	md_error_t	ep = mdnullerror;
+	syslog(LOG_DAEMON | LOG_DEBUG, gettext("mdcommd exiting"));
 	(void) metaioctl(MD_MN_SET_COMMD_RUNNING, 0, &ep, "rpc.mdcommd");
 }
 
@@ -259,8 +275,21 @@ main()
 	pid_t pid;
 	int i;
 	md_error_t	ep = mdnullerror;
+	int		mode = RPC_SVC_MT_USER;
 
 	(void) sigset(SIGPIPE, SIG_IGN);
+
+	/*
+	 * Attempt to set MT_USER behaviour for mdcommd service routines.
+	 * If this isn't done, there is a possibility that the transport
+	 * handle might be freed before the thread created by mdmn_send_svc_2
+	 * can use it.  A consequence of this is that svc_done() must be
+	 * called on the handle when it's no longer needed.
+	 */
+	if (rpc_control(RPC_SVC_MTMODE_SET, &mode) == FALSE) {
+		_msgout(gettext("cannot set MT_USER mode for RPC service"));
+		exit(1);
+	}
 
 	/*
 	 * If stdin looks like a TLI endpoint, we assume
@@ -294,9 +323,9 @@ main()
 		}
 		if (nconf)
 			freenetconfigent(nconf);
-		if (!svc_reg(transp, MDMN_COMMD, ONE, mdmn_commd_1, 0)) {
+		if (!svc_reg(transp, MDMN_COMMD, TWO, mdmn_commd_2, 0)) {
 			_msgout(gettext(
-			    "unable to register (MDMN_COMMD, ONE)."));
+			    "unable to register (MDMN_COMMD, TWO)."));
 			exit(1);
 		}
 
@@ -307,7 +336,8 @@ main()
 			(void) alarm(_RPCSVC_CLOSEDOWN/2);
 		}
 
-		(void) metaioctl(MD_MN_SET_COMMD_RUNNING, (void *)1, &ep,
+		pid = getpid();
+		(void) metaioctl(MD_MN_SET_COMMD_RUNNING, (void *)pid, &ep,
 		    "rpc.mdcommd");
 		svc_run();
 		exit(1);
@@ -343,8 +373,8 @@ main()
 		openlog("mdmn_commd", LOG_PID, LOG_DAEMON);
 #endif
 	}
-	if (!svc_create(mdmn_commd_1, MDMN_COMMD, ONE, "tcp")) {
-		_msgout(gettext("unable to create (MDMN_COMMD, ONE) for tcp."));
+	if (!svc_create(mdmn_commd_2, MDMN_COMMD, TWO, "tcp")) {
+		_msgout(gettext("unable to create (MDMN_COMMD, TWO) for tcp."));
 		exit(1);
 	}
 

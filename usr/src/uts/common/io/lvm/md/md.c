@@ -1858,6 +1858,9 @@ is_mt_ioctl(int cmd) {
 	case MD_MN_RESYNC:
 	case MD_MN_SETSYNC:
 	case MD_MN_POKE_HOTSPARES:
+	case MD_MN_RR_DIRTY:
+	case MD_MN_RR_CLEAN:
+	case MD_MN_IOC_SPUPDATEWM:
 		return (1);
 	default:
 		return (0);

@@ -18,15 +18,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS__MDIO_H
 #define	_SYS__MDIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/debug.h>
 #include <sys/ioctl.h>
@@ -433,6 +432,31 @@ typedef struct md_mkdev_params {
 	unit_t		un;
 } md_mkdev_params_t;
 
+#define	MDMN_RR_CLEAN_PARAMS_DATA(x)	((unsigned char *)(x) + \
+	    sizeof (md_mn_rr_clean_params_t))
+#define	MDMN_RR_CLEAN_PARAMS_SIZE(x)	(sizeof (md_mn_rr_clean_params_t) + \
+	    MDMN_RR_CLEAN_PARAMS_DATA_BYTES(x))
+#define	MDMN_RR_CLEAN_PARAMS_START_BIT(x)	((x)->rr_start_size >> 16)
+#define	MDMN_RR_CLEAN_PARAMS_DATA_BYTES(x)	((x)->rr_start_size & 0xffff)
+
+typedef struct md_mn_rr_clean_params {
+	MD_DRIVER
+	md_error_t	mde;
+	md_mn_nodeid_t	rr_nodeid;
+	minor_t		rr_mnum;
+	unsigned int	rr_start_size;	/* start_bit (16b) | data_bytes (16b) */
+	/* actual data goes here */
+} md_mn_rr_clean_params_t;
+
+typedef struct md_mn_rr_dirty_params {
+	MD_DRIVER
+	md_error_t	mde;
+	minor_t		rr_mnum;
+	md_mn_nodeid_t	rr_nodeid;
+	ushort_t	rr_start;	/* First RR region to mark */
+	ushort_t	rr_end;		/* Last RR region to mark */
+} md_mn_rr_dirty_params_t;
+
 /*
  * Flags to coordinate sending device id between kernel and user space.
  * To get devid from kernel:
@@ -756,7 +780,8 @@ typedef struct md_regen_param {
 #define	MD_IOCGET_HSP_NM	(MDIOC|105) /* get hsp entry from namespace */
 #define	MD_IOCREM_DEV		(MDIOC|106) /* remove device node for unit */
 #define	MD_IOCUPDATE_NM_RR_DID	(MDIOC|107) /* update remotely repl did in NM */
-
+#define	MD_MN_RR_DIRTY		(MDIOC|108) /* Mark RR range as dirty */
+#define	MD_MN_RR_CLEAN		(MDIOC|109) /* Clean RR bits from bitmap */
 
 #define	MDIOC_MISC	(MDIOC|128)	/* misc module base */
 /* Used in DEBUG_TEST code */

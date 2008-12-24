@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -42,38 +41,40 @@
 /*
  * This is the communication daemon for SVM Multi Node Disksets.
  * It runs on every node and provides the following rpc services:
- *  - mdmn_send_svc_1
- *  - mdmn_work_svc_1
- *  - mdmn_wakeup_initiator_svc_1
- *  - mdmn_wakeup_master_svc_1
- *  - mdmn_comm_lock_svc_1
- *  - mdmn_comm_unlock_svc_1
- *  - mdmn_comm_suspend_svc_1
- *  - mdmn_comm_resume_svc_1
- *  - mdmn_comm_reinit_set_svc_1
+ *  - mdmn_send_svc_2
+ *  - mdmn_work_svc_2
+ *  - mdmn_wakeup_initiator_svc_2
+ *  - mdmn_wakeup_master_svc_2
+ *  - mdmn_comm_lock_svc_2
+ *  - mdmn_comm_unlock_svc_2
+ *  - mdmn_comm_suspend_svc_2
+ *  - mdmn_comm_resume_svc_2
+ *  - mdmn_comm_reinit_set_svc_2
  * where send, lock, unlock and reinit are meant for external use,
  * work and the two wakeups are for internal use only.
  *
  * NOTE:
- * On every node only one of those xxx_1 functions can be active at the
+ * On every node only one of those xxx_2 functions can be active at the
  * same time because the daemon is single threaded.
  *
+ * (not quite true, as mdmn_send_svc_2 and mdmn_work_svc_2 do thr_create()s
+ * as part of their handlers, so those aspects are multi-threaded)
  *
  * In case an event occurs that has to be propagated to all the nodes...
  *
  * One node (the initiator)
  *	calls the libmeta function mdmn_send_message()
- *	This function calls the local daemon thru mdmn_send_svc_1.
+ *	This function calls the local daemon thru mdmn_send_svc_2.
  *
  * On the initiator:
- *	mdmn_send_svc_1()
+ *	mdmn_send_svc_2()
  *	    - starts a thread -> mdmn_send_to_work() and returns.
  *	mdmn_send_to_work()
  *	    - sends this message over to the master of the diskset.
- *	      This is done by calling mdmn_work_svc_1 on the master.
+ *	      This is done by calling mdmn_work_svc_2 on the master.
  *	    - registers to the initiator_table
  *	    - exits without doing a svc_sendreply() for the call to
- *	      mdmn_send_svc_1. This means that call is blocked until somebody
+ *	      mdmn_send_svc_2. This means that call is blocked until somebody
  *	      (see end of this comment) does a svc_sendreply().
  *	      This means mdmn_send_message() does not yet return.
  *	    - A timeout surveillance is started at this point.
@@ -82,42 +83,42 @@
  *	      to the caller.
  *
  * On the master:
- *	mdmn_work_svc_1()
+ *	mdmn_work_svc_2()
  *	    - starts a thread -> mdmn_master_process_msg() and returns
  *	mdmn_master_process_msg()
  *	    - logs the message to the change log
  *	    - executes the message locally
  *	    - flags the message in the change log
- *	    - sends the message to mdmn_work_svc_1() on all the
+ *	    - sends the message to mdmn_work_svc_2() on all the
  *	      other nodes (slaves)
- *	      after each call to mdmn_work_svc_1 the thread goes to sleep and
- *	      will be woken up by mdmn_wakeup_master_svc_1() as soon as the
+ *	      after each call to mdmn_work_svc_2 the thread goes to sleep and
+ *	      will be woken up by mdmn_wakeup_master_svc_2() as soon as the
  *	      slave node is done with this message.
  *	    - In case the slave doesn't respond in a apropriate time, an error
  *	      is assumed to ensure the master doesn't wait forever.
  *
  * On a slave:
- *	mdmn_work_svc_1()
+ *	mdmn_work_svc_2()
  *	    - starts a thread -> mdmn_slave_process_msg() and returns
  *	mdmn_slave_process_msg()
  *	    - processes this message locally by calling the appropriate message
  *	      handler, that creates some result.
- *	    - sends that result thru a call to mdmn_wakeup_master_svc_1() to
+ *	    - sends that result thru a call to mdmn_wakeup_master_svc_2() to
  *	      the master.
  *
  * Back on the master:
- *	mdmn_wakeup_master_svc_1()
+ *	mdmn_wakeup_master_svc_2()
  *	    - stores the result into the master_table.
  *	    - signals the mdmn_master_process_msg-thread.
  *	    - returns
  *	mdmn_master_process_msg()
  *	    - after getting the results from all nodes
  *	    - sends them back to the initiating node thru a call to
- *	      mdmn_wakeup_initiator_svc_1.
+ *	      mdmn_wakeup_initiator_svc_2.
  *
  * Back on the initiator:
- *	mdmn_wakeup_initiator_svc_1()
- *	    - calls svc_sendreply() which makes the call to mdmn_send_svc_1()
+ *	mdmn_wakeup_initiator_svc_2()
+ *	    - calls svc_sendreply() which makes the call to mdmn_send_svc_2()
  *	      return.
  *	      which allows the initial mdmn_send_message() call to return.
  */
@@ -195,8 +196,8 @@ mdmn_clnt_create(char *ignore, void *data, struct timeval *time_out)
 {
 	md_mnnode_desc	*node = (md_mnnode_desc *)data;
 
-	return (clnt_create_timed(node->nd_priv_ic, MDMN_COMMD, ONE, "tcp",
-		time_out));
+	return (clnt_create_timed(node->nd_priv_ic, MDMN_COMMD, TWO, "tcp",
+	    time_out));
 }
 
 #define	FLUSH_DEBUGFILE() \
@@ -219,15 +220,15 @@ panic_system(int nid, md_mn_msgtype_t type, int master_err, int master_exitval,
 
 	if (master_err != MDMNE_ACK) {
 		snprintf(msg_buf, MAXPATHLEN, "rpc.mdcommd: RPC fail on master "
-			"when processing message type %d\n", type);
+		    "when processing message type %d\n", type);
 	} else if (slave_result == NULL) {
 		snprintf(msg_buf, MAXPATHLEN, "rpc.mdcommd: RPC fail on node "
-			"%d when processing message type %d\n", nid, type);
+		    "%d when processing message type %d\n", nid, type);
 	} else {
 		snprintf(msg_buf, MAXPATHLEN, "rpc.mdcommd: Inconsistent "
-			"return value from node %d when processing message "
-			"type %d. Master exitval = %d, Slave exitval = %d\n",
-			nid, type, master_exitval, slave_result->mmr_exitval);
+		    "return value from node %d when processing message "
+		    "type %d. Master exitval = %d, Slave exitval = %d\n",
+		    nid, type, master_exitval, slave_result->mmr_exitval);
 	}
 	commd_err.size = strlen(msg_buf);
 	commd_err.md_message = (uint64_t)(uintptr_t)&msg_buf[0];
@@ -335,12 +336,17 @@ timeout_initiator(set_t setno, md_mn_msgclass_t class)
 
 	commd_debug(MD_MMV_MISC, "timeout_ini: (%d, 0x%llx-%d)\n",
 	    MSGID_ELEMS(mid));
+	/*
+	 * Give the result the corresponding msgid from the failed message.
+	 */
+	MSGID_COPY(&mid, &(resultp->mmr_msgid));
 
 	/* return to mdmn_send_message() and let it deal with the situation */
 	mdmn_svc_sendreply(transp, xdr_md_mn_result_t, (char *)resultp);
 
 	free(resultp);
 	commd_debug(MD_MMV_MISC, "timeout_ini: sendreplied\n");
+	svc_done(transp);
 	mdmn_unregister_initiator_table(setno, class);
 }
 
@@ -499,13 +505,13 @@ mdmn_is_node_dead(md_mnnode_desc *node)
  * Perform some global initializations.
  *
  * the following routines have to call this before operation can start:
- *  - mdmn_send_svc_1
- *  - mdmn_work_svc_1
- *  - mdmn_comm_lock_svc_1
- *  - mdmn_comm_unlock_svc_1
- *  - mdmn_comm_suspend_svc_1
- *  - mdmn_comm_resume_svc_1
- *  - mdmn_comm_reinit_set_svc_1
+ *  - mdmn_send_svc_2
+ *  - mdmn_work_svc_2
+ *  - mdmn_comm_lock_svc_2
+ *  - mdmn_comm_unlock_svc_2
+ *  - mdmn_comm_suspend_svc_2
+ *  - mdmn_comm_resume_svc_2
+ *  - mdmn_comm_reinit_set_svc_2
  *
  * This is a single threaded daemon, so it can only be in one of the above
  * routines at the same time.
@@ -547,8 +553,7 @@ global_init(void)
 
 	__savetime = gethrtime();
 	(void) time(&clock_val);
-	commd_debug(MD_MMV_MISC, "global init called %s\n",
-			ctime(&clock_val));
+	commd_debug(MD_MMV_MISC, "global init called %s\n", ctime(&clock_val));
 
 	/* start a thread that flushes out the debug on a regular basis */
 	thr_create(NULL, 0, (void *(*)(void *))flush_fcout,
@@ -663,9 +668,9 @@ mdmn_init_client(set_t setno, md_mn_nodeid_t nid)
 		 */
 		while ((client[setno][nid] == (CLIENT *) NULL) &&
 		    (tout < MD_CLNT_CREATE_TOUT)) {
-			client[setno][nid] = meta_client_create_retry
-				(node->nd_nodename, mdmn_clnt_create,
-				(void *) node, MD_CLNT_CREATE_SUBTIMEOUT, &ep);
+			client[setno][nid] = meta_client_create_retry(
+			    node->nd_nodename, mdmn_clnt_create,
+			    (void *) node, MD_CLNT_CREATE_SUBTIMEOUT, &ep);
 			/* Is the node dead? */
 			if (mdmn_is_node_dead(node) == 1) {
 				commd_debug(MD_MMV_SYSLOG,
@@ -889,9 +894,9 @@ mdmn_init_set(set_t setno, int todo)
 		 */
 		while ((client[setno][nid] == (CLIENT *) NULL) &&
 		    (tout < MD_CLNT_CREATE_TOUT)) {
-			client[setno][nid] = meta_client_create_retry
-				(node->nd_nodename, mdmn_clnt_create,
-				(void *) node, MD_CLNT_CREATE_SUBTIMEOUT, &ep);
+			client[setno][nid] = meta_client_create_retry(
+			    node->nd_nodename, mdmn_clnt_create,
+			    (void *) node, MD_CLNT_CREATE_SUBTIMEOUT, &ep);
 			/* Is the node dead? */
 			if (mdmn_is_node_dead(node) == 1) {
 				commd_debug(MD_MMV_SYSLOG,
@@ -942,7 +947,7 @@ mdmn_init_set(set_t setno, int todo)
 void *
 mdmn_send_to_work(void *arg)
 {
-	int			*rpc_err;
+	int			*rpc_err = NULL;
 	int			success;
 	int			try_master;
 	set_t			setno;
@@ -955,9 +960,6 @@ mdmn_send_to_work(void *arg)
 
 	msg			= matp->mat_msg;
 	transp			= matp->mat_transp;
-
-	/* the alloc was done in mdmn_send_svc_1 */
-	free(matp);
 
 	class = mdmn_get_message_class(msg->msg_type);
 	setno = msg->msg_setno;
@@ -980,8 +982,7 @@ mdmn_send_to_work(void *arg)
 	if (success == MDMNE_CLASS_BUSY) {
 		md_mn_msgid_t		active_mid;
 
-		mdmn_get_initiator_table_id(setno, class,
-		&active_mid);
+		mdmn_get_initiator_table_id(setno, class, &active_mid);
 
 		commd_debug(MD_MMV_SEND,
 		    "send_to_work: received but locally busy "
@@ -1011,7 +1012,8 @@ mdmn_send_to_work(void *arg)
 		 * Send the request to the work function on the master
 		 * this call will return immediately
 		 */
-		rpc_err = mdmn_work_1(msg, client[setno][set_master]);
+		rpc_err = mdmn_work_2(msg, client[setno][set_master],
+		    set_master);
 
 		/* Everything's Ok? */
 		if (rpc_err == NULL) {
@@ -1043,7 +1045,7 @@ mdmn_send_to_work(void *arg)
 		/*
 		 * If we are here, we sucessfully delivered the message.
 		 * We register the initiator_table, so that
-		 * wakeup_initiator_1  can do the sendreply with the
+		 * wakeup_initiator_2 can do the sendreply with the
 		 * results for us.
 		 */
 		success = MDMNE_ACK;
@@ -1068,15 +1070,27 @@ mdmn_send_to_work(void *arg)
 		md_mn_result_t *resultp;
 		resultp = Zalloc(sizeof (md_mn_result_t));
 		resultp->mmr_comm_state = success;
+		/*
+		 * copy the MSGID so that we know _which_ message
+		 * failed (if the transp has got mangled)
+		 */
+		MSGID_COPY(&(msg->msg_msgid), &(resultp->mmr_msgid));
 		mdmn_svc_sendreply(transp, xdr_md_mn_result_t, (char *)resultp);
 		commd_debug(MD_MMV_SEND,
 		    "send_to_work: not registered (%d, 0x%llx-%d) cs=%d\n",
 		    MSGID_ELEMS(msg->msg_msgid), success);
 		free_result(resultp);
+		/*
+		 * We don't have a timeout registered to wake us up, so we're
+		 * now done with this handle. Release it back to the pool.
+		 */
+		svc_done(transp);
 
 	}
 
 	free_msg(msg);
+	/* the alloc was done in mdmn_send_svc_2 */
+	Free(matp);
 	mutex_unlock(mx);
 	return (NULL);
 
@@ -1186,7 +1200,7 @@ do_send_message(md_mn_msg_t *msg, md_mnnode_desc *node)
 	int			timeout_retries = 0;
 	int			*ret = NULL;
 	set_t			setno;
-	cond_t			*cv;	/* see mdmn_wakeup_master_svc_1 */
+	cond_t			*cv;	/* see mdmn_wakeup_master_svc_2 */
 	mutex_t			*mx;	/* protection for class_busy */
 	timestruc_t		timeout; /* surveillance for remote daemon */
 	md_mn_nodeid_t		nid;
@@ -1251,7 +1265,7 @@ retry_rpc:
 		}
 
 		/* send it over, it will return immediately */
-		ret = mdmn_work_1(msg, client[setno][nid]);
+		ret = mdmn_work_2(msg, client[setno][nid], nid);
 
 		rw_unlock(&client_rwlock[setno]);
 
@@ -1462,7 +1476,7 @@ mdmn_master_process_msg(md_mn_msg_t *msg)
 			result->mmr_comm_state = MDMNE_LOG_FAIL;
 			/*
 			 * Note that the mark_busy was already done by
-			 * mdmn_work_svc_1()
+			 * mdmn_work_svc_2()
 			 */
 			mutex_lock(&mdmn_busy_mutex[setno]);
 			mdmn_mark_class_unbusy(setno, orig_class);
@@ -1487,8 +1501,8 @@ mdmn_master_process_msg(md_mn_msg_t *msg)
 			commd_debug(MD_MMV_SYSLOG,
 			    "proc_mas: No client for initiator \n");
 		} else {
-			ret = mdmn_wakeup_initiator_1(result,
-			    client[setno][sender]);
+			ret = mdmn_wakeup_initiator_2(result,
+			    client[setno][sender], sender);
 		}
 		rw_unlock(&client_rwlock[setno]);
 
@@ -1674,6 +1688,12 @@ proceed:
 
 			/* If this node didn't join the disk set, ignore it */
 			if ((node->nd_flags & MD_MN_NODE_OWN) == 0) {
+				continue;
+			}
+
+			/* If a DIRECTED message, skip non-recipient nodes */
+			if ((cmsg->msg_flags & MD_MSGF_DIRECTED) &&
+			    nid != cmsg->msg_recipient) {
 				continue;
 			}
 
@@ -1865,7 +1885,8 @@ proceed:
 		commd_debug(MD_MMV_SYSLOG,
 		    "proc_mas: unable to create client for initiator\n");
 	} else {
-		ret = mdmn_wakeup_initiator_1(result, client[setno][sender]);
+		ret = mdmn_wakeup_initiator_2(result, client[setno][sender],
+		    sender);
 	}
 	rw_unlock(&client_rwlock[setno]);
 
@@ -2046,14 +2067,14 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 			rw_unlock(&client_rwlock[setno]);
 			break;
 		} else {
-			ret = mdmn_wakeup_master_1(result,
-			    client[setno][sender]);
+			ret = mdmn_wakeup_master_2(result,
+			    client[setno][sender], sender);
 			/*
-			 * if mdmn_wakeup_master_1 returns NULL, it can be that
+			 * if mdmn_wakeup_master_2 returns NULL, it can be that
 			 * the master (or the commd on the master) had died.
 			 * In that case, we destroy the client to the master
 			 * and retry.
-			 * If mdmn_wakeup_master_1 doesn't return MDMNE_ACK,
+			 * If mdmn_wakeup_master_2 doesn't return MDMNE_ACK,
 			 * the commd on the master is alive but
 			 * something else is wrong,
 			 * in that case a retry doesn't make sense => break out
@@ -2097,8 +2118,19 @@ mdmn_slave_process_msg(md_mn_msg_t *msg)
 }
 
 
-md_mn_result_t *
-mdmn_send_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
+/*
+ * mdmn_send_svc_2:
+ * ---------------
+ * Check that the issuing node is a legitimate one (i.e. is licensed to send
+ * messages to us), that the RPC request can be staged.
+ *
+ * Returns:
+ *	0	=> no RPC request is in-flight, no deferred svc_sendreply()
+ *	1	=> queued RPC request in-flight. Completion will be made (later)
+ *		   by a wakeup_initiator_2() [hopefully]
+ */
+int
+mdmn_send_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 {
 	int			err;
 	set_t			setno;
@@ -2121,7 +2153,7 @@ mdmn_send_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 		mdmn_svc_sendreply(transp, xdr_md_mn_result_t, (char *)resultp);
 		free_result(resultp);
 		svc_freeargs(transp, xdr_md_mn_msg_t, (caddr_t)msg);
-		return (NULL);
+		return (0);
 	}
 
 	/* check if the global initialization is done */
@@ -2152,7 +2184,7 @@ mdmn_send_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 			    (char *)resultp);
 			free_result(resultp);
 			svc_freeargs(transp, xdr_md_mn_msg_t, (caddr_t)msg);
-			return (NULL);
+			return (0);
 		}
 	}
 
@@ -2169,7 +2201,7 @@ mdmn_send_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 		mdmn_svc_sendreply(transp, xdr_md_mn_result_t, (char *)resultp);
 		free_result(resultp);
 		svc_freeargs(transp, xdr_md_mn_msg_t, (caddr_t)msg);
-		return (NULL);
+		return (0);
 	}
 
 
@@ -2184,10 +2216,10 @@ mdmn_send_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 		free_result(resultp);
 		svc_freeargs(transp, xdr_md_mn_msg_t, (caddr_t)msg);
 		commd_debug(MD_MMV_SEND,
-			"send: type locked (%d, 0x%llx-%d), set=%d, class=%d, "
-			"type=%d\n", MSGID_ELEMS(msg->msg_msgid), setno, class,
-			msg->msg_type);
-		return (NULL);
+		    "send: type locked (%d, 0x%llx-%d), set=%d, class=%d, "
+		    "type=%d\n", MSGID_ELEMS(msg->msg_msgid), setno, class,
+		    msg->msg_type);
+		return (0);
 	}
 
 
@@ -2213,7 +2245,7 @@ mdmn_send_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 			free_result(resultp);
 			commd_debug(MD_MMV_SEND,
 			    "send: init err = %d\n", err);
-			return (NULL);
+			return (0);
 		}
 	}
 
@@ -2227,10 +2259,10 @@ mdmn_send_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 		svc_freeargs(transp, xdr_md_mn_msg_t, (caddr_t)msg);
 		free_result(resultp);
 		commd_debug(MD_MMV_SEND,
-			"send: class suspended (%d, 0x%llx-%d), set=%d, "
-			"class=%d, type=%d\n", MSGID_ELEMS(msg->msg_msgid),
-			setno, class, msg->msg_type);
-		return (NULL);
+		    "send: class suspended (%d, 0x%llx-%d), set=%d, "
+		    "class=%d, type=%d\n", MSGID_ELEMS(msg->msg_msgid),
+		    setno, class, msg->msg_type);
+		return (0);
 	}
 	mutex_unlock(&mdmn_busy_mutex[setno]);
 
@@ -2238,10 +2270,10 @@ mdmn_send_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 	if (check_license(rqstp, 0) == FALSE) {
 		svc_freeargs(transp, xdr_md_mn_msg_t, (caddr_t)msg);
 		commd_debug(MD_MMV_SEND,
-			"send: check licence fail(%d, 0x%llx-%d), set=%d, "
-			"class=%d, type=%d\n", MSGID_ELEMS(msg->msg_msgid),
-			setno, class, msg->msg_type);
-		return (NULL);
+		    "send: check licence fail(%d, 0x%llx-%d), set=%d, "
+		    "class=%d, type=%d\n", MSGID_ELEMS(msg->msg_msgid),
+		    setno, class, msg->msg_type);
+		return (0);
 	}
 
 
@@ -2268,17 +2300,17 @@ mdmn_send_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 	    MSGID_ELEMS(msg->msg_msgid));
 	/*
 	 * We return here without sending results. This will be done by
-	 * mdmn_wakeup_initiator_svc_1() as soon as the results are available.
+	 * mdmn_wakeup_initiator_svc_2() as soon as the results are available.
 	 * Until then the calling send_message will be blocked, while we
 	 * are able to take calls.
 	 */
 
-	return (NULL);
+	return (1);
 }
 
 /* ARGSUSED */
 int *
-mdmn_work_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
+mdmn_work_svc_2(md_mn_msg_t *omsg, struct svc_req *rqstp)
 {
 	int		err;
 	set_t		setno;
@@ -2362,7 +2394,7 @@ mdmn_work_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 
 	mutex_lock(&mdmn_busy_mutex[setno]);
 
-	/* check if class is locked via a call to mdmn_comm_lock_svc_1 */
+	/* check if class is locked via a call to mdmn_comm_lock_svc_2 */
 	if (mdmn_is_class_locked(setno, class) == TRUE) {
 		mutex_unlock(&mdmn_busy_mutex[setno]);
 		*retval = MDMNE_CLASS_LOCKED;
@@ -2430,14 +2462,14 @@ mdmn_work_svc_1(md_mn_msg_t *omsg, struct svc_req *rqstp)
 
 /* ARGSUSED */
 int *
-mdmn_wakeup_initiator_svc_1(md_mn_result_t *res, struct svc_req *rqstp)
+mdmn_wakeup_initiator_svc_2(md_mn_result_t *res, struct svc_req *rqstp)
 {
 
 	int		*retval;
 	int		err;
 	set_t		setno;
 	mutex_t		*mx;   /* protection of initiator_table */
-	SVCXPRT		*transp;
+	SVCXPRT		*transp = NULL;
 	md_mn_msgid_t	initiator_table_id;
 	md_mn_msgclass_t class;
 
@@ -2491,13 +2523,14 @@ mdmn_wakeup_initiator_svc_1(md_mn_result_t *res, struct svc_req *rqstp)
 	 * Search the initiator wakeup table.
 	 * If we find an entry here (which should always be true)
 	 * we are on the initiating node and we wakeup the original
-	 * local rpc call
+	 * local rpc call.
 	 */
 	mdmn_get_initiator_table_id(setno, class, &initiator_table_id);
 
 	if (MSGID_CMP(&(initiator_table_id), &(res->mmr_msgid))) {
 		transp = mdmn_get_initiator_table_transp(setno, class);
 		mdmn_svc_sendreply(transp, xdr_md_mn_result_t, (char *)res);
+		svc_done(transp);
 		mdmn_unregister_initiator_table(setno, class);
 		*retval = MDMNE_ACK;
 
@@ -2532,7 +2565,7 @@ mdmn_wakeup_initiator_svc_1(md_mn_result_t *res, struct svc_req *rqstp)
  */
 /* ARGSUSED */
 int *
-mdmn_wakeup_master_svc_1(md_mn_result_t *ores, struct svc_req *rqstp)
+mdmn_wakeup_master_svc_2(md_mn_result_t *ores, struct svc_req *rqstp)
 {
 
 	int		*retval;
@@ -2645,7 +2678,7 @@ mdmn_wakeup_master_svc_1(md_mn_result_t *ores, struct svc_req *rqstp)
  * This is mainly done for debug purpose.
  * This set/class combination immediately is blocked,
  * even in the middle of sending messages to multiple slaves.
- * This remains until the user issues a mdmn_comm_unlock_svc_1 for the same
+ * This remains until the user issues a mdmn_comm_unlock_svc_2 for the same
  * set/class combination.
  *
  * Special messages of class MD_MSG_CLASS0 can never be locked.
@@ -2666,7 +2699,7 @@ mdmn_wakeup_master_svc_1(md_mn_result_t *ores, struct svc_req *rqstp)
 
 /* ARGSUSED */
 int *
-mdmn_comm_lock_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
+mdmn_comm_lock_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 {
 	int			*retval;
 	set_t			setno = msc->msc_set;
@@ -2722,7 +2755,7 @@ mdmn_comm_lock_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
  */
 /* ARGSUSED */
 int *
-mdmn_comm_unlock_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
+mdmn_comm_unlock_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 {
 	int			*retval;
 	set_t			setno  = msc->msc_set;
@@ -2766,7 +2799,7 @@ mdmn_comm_unlock_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 }
 
 /*
- * mdmn_comm_suspend_svc_1(setno, class)
+ * mdmn_comm_suspend_svc_2(setno, class)
  *
  * Drain all outstanding messages for a given set/class combination
  * and don't allow new messages to be processed.
@@ -2812,7 +2845,7 @@ mdmn_comm_unlock_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 
 /* ARGSUSED */
 int *
-mdmn_comm_suspend_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
+mdmn_comm_suspend_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 {
 	int			*retval;
 	int			failure = 0;
@@ -2902,7 +2935,7 @@ mdmn_comm_suspend_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 }
 
 /*
- * mdmn_comm_resume_svc_1(setno, class)
+ * mdmn_comm_resume_svc_2(setno, class)
  *
  * Resume processing messages for a given set.
  * This incorporates the repeal of a previous suspend operation.
@@ -2927,7 +2960,7 @@ mdmn_comm_suspend_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
  */
 /* ARGSUSED */
 int *
-mdmn_comm_resume_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
+mdmn_comm_resume_svc_2(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 {
 	int			*retval;
 	set_t			startset, endset;
@@ -3029,7 +3062,7 @@ mdmn_comm_resume_svc_1(md_mn_set_and_class_t *msc, struct svc_req *rqstp)
 }
 /* ARGSUSED */
 int *
-mdmn_comm_reinit_set_svc_1(set_t *setnop, struct svc_req *rqstp)
+mdmn_comm_reinit_set_svc_2(set_t *setnop, struct svc_req *rqstp)
 {
 	int		*retval;
 	md_mnnode_desc	*node;
@@ -3093,7 +3126,7 @@ mdmn_comm_reinit_set_svc_1(set_t *setnop, struct svc_req *rqstp)
 
 /* ARGSUSED */
 int *
-mdmn_comm_msglock_svc_1(md_mn_type_and_lock_t *mmtl, struct svc_req *rqstp)
+mdmn_comm_msglock_svc_2(md_mn_type_and_lock_t *mmtl, struct svc_req *rqstp)
 {
 	int			*retval;
 	md_mn_msgtype_t		type = mmtl->mmtl_type;

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Just in case we're not in a build environment, make sure that
@@ -1877,7 +1875,6 @@ metadrivename_withdrkey(
 		return (NULL);
 	}
 
-
 	/*
 	 * Get the devid associated with the key.
 	 *
@@ -1893,6 +1890,11 @@ metadrivename_withdrkey(
 		 */
 		dnp = meta_getdnp_bydevid(sp, sideno, devidp, key, ep);
 		free(devidp);
+
+		/* dnp could be NULL if the devid could not be decoded. */
+		if (dnp == NULL) {
+			return (NULL);
+		}
 		dnp->side_names_key = key;
 	} else {
 		/*
@@ -1981,6 +1983,9 @@ metadrivename_withdrkey(
 			 */
 			dnp = meta_getdnp_bydevid(sp, sideno, devidp, key, ep);
 			free(devidp);
+			if (dnp == NULL) {
+				return (NULL);
+			}
 			dnp->side_names_key = key;
 		}
 	}
@@ -5733,6 +5738,7 @@ meta_mnsync_diskset_mddbs(
 		    lr->lr_msg.msg_type,
 		    lr->lr_msg.msg_flags | MD_MSGF_REPLAY_MSG |
 		    MD_MSGF_OVERRIDE_SUSPEND,
+		    lr->lr_msg.msg_recipient,
 		    lr->lr_msg.msg_event_data,
 		    lr->lr_msg.msg_event_size,
 		    &resultp,

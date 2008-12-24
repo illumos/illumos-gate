@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1895,7 +1896,7 @@ meta_sp_extlist_from_wm(
 				    wm.wm_mdname);
 				result = mdmn_send_message(sp->setno,
 				    MD_MN_MSG_ADDMDNAME,
-				    MD_MSGF_PANIC_WHEN_INCONSISTENT,
+				    MD_MSGF_PANIC_WHEN_INCONSISTENT, 0,
 				    (char *)send_params, message_size, &resp,
 				    ep);
 				Free(send_params);
@@ -2384,10 +2385,11 @@ meta_sp_get_start(
 }
 
 /*
- * FUNCTION:	meta_sp_update_wm()
+ * FUNCTION:	meta_sp_update_wm_common()
  * INPUT:	sp	- the operating set
  *		msp	- a pointer to the XDR unit structure
  *		extlist	- the extent list specifying watermarks to update
+ *		iocval	- either MD_IOC_SPUPDATEWM or MD_MN_IOC_SPUPDATEWM
  * OUTPUT:	ep	- return error pointer
  * RETURNS:	int	- -1 if error, 0 on success
  * PURPOSE:	steps backwards through the extent list updating
@@ -2401,10 +2403,11 @@ meta_sp_get_start(
  *		are realized.
  */
 static int
-meta_sp_update_wm(
+meta_sp_update_wm_common(
 	mdsetname_t	*sp,
 	md_sp_t		*msp,
 	sp_ext_node_t	*extlist,
+	int		iocval,
 	md_error_t	*ep
 )
 {
@@ -2493,8 +2496,8 @@ meta_sp_update_wm(
 	MD_SETDRIVERNAME(&update_params, MD_SP,
 	    MD_MIN2SET(update_params.mnum));
 
-	if (metaioctl(MD_IOC_SPUPDATEWM, &update_params,
-	    &update_params.mde, msp->common.namep->cname) != 0) {
+	if (metaioctl(iocval, &update_params, &update_params.mde,
+	    msp->common.namep->cname) != 0) {
 		(void) mdstealerror(ep, &update_params.mde);
 		rval = -1;
 		goto out;
@@ -2505,6 +2508,30 @@ out:
 	Free(offsets);
 
 	return (rval);
+}
+
+static int
+meta_sp_update_wm(
+	mdsetname_t	*sp,
+	md_sp_t		*msp,
+	sp_ext_node_t	*extlist,
+	md_error_t	*ep
+)
+{
+	return (meta_sp_update_wm_common(sp, msp, extlist, MD_IOC_SPUPDATEWM,
+	    ep));
+}
+
+static int
+meta_mn_sp_update_wm(
+	mdsetname_t	*sp,
+	md_sp_t		*msp,
+	sp_ext_node_t	*extlist,
+	md_error_t	*ep
+)
+{
+	return (meta_sp_update_wm_common(sp, msp, extlist, MD_MN_IOC_SPUPDATEWM,
+	    ep));
 }
 
 /*
@@ -4227,9 +4254,9 @@ meta_create_sp(
 	int		committed = 0;
 	int		repart_options = MD_REPART_FORCE;
 	int		create_flag = MD_CRO_32BIT;
+	int		mn_set_master = 0;
 
 	md_set_desc	*sd;
-	mm_unit_t	*mm;
 	md_set_mmown_params_t	*ownpar = NULL;
 	int		comp_is_mirror = 0;
 
@@ -4417,19 +4444,7 @@ meta_create_sp(
 			goto out;
 		}
 		if (MD_MNSET_DESC(sd) && sd->sd_mn_am_i_master) {
-			mm = (mm_unit_t *)meta_get_unit(sp, compnp, ep);
-			if (mm == NULL) {
-				rval = -1;
-				goto out;
-			} else {
-				rval = meta_mn_change_owner(&ownpar, sp->setno,
-				    meta_getminor(compnp->dev),
-				    sd->sd_mn_mynode->nd_nodeid,
-				    MD_MN_MM_PREVENT_CHANGE |
-				    MD_MN_MM_SPAWN_THREAD);
-				if (rval == -1)
-					goto out;
-			}
+			mn_set_master = 1;
 		}
 	}
 
@@ -4450,22 +4465,22 @@ meta_create_sp(
 	committed = 1;
 
 	/* write watermarks */
-	if (meta_sp_update_wm(sp, msp, extlist, ep) < 0) {
-		rval = -1;
-		goto out;
-	}
-
 	/*
-	 * Allow mirror ownership to change. If we don't succeed in this
-	 * ioctl it isn't fatal, but the cluster will probably hang fairly
-	 * soon as the mirror owner won't change. However, we have
-	 * successfully written the watermarks out to the device so the
-	 * softpart creation has succeeded
+	 * Special-case for Multi-node sets. As we now have a distributed DRL
+	 * update mechanism, we _will_ hit the ioctl-within-ioctl deadlock case
+	 * unless we use a 'special' MN-capable ioctl to stage the watermark
+	 * update. This only affects the master-node in an MN set.
 	 */
-	if (ownpar) {
-		(void) meta_mn_change_owner(&ownpar, sp->setno, ownpar->d.mnum,
-		    ownpar->d.owner,
-		    MD_MN_MM_ALLOW_CHANGE | MD_MN_MM_SPAWN_THREAD);
+	if (mn_set_master) {
+		if (meta_mn_sp_update_wm(sp, msp, extlist, ep) < 0) {
+			rval = -1;
+			goto out;
+		}
+	} else {
+		if (meta_sp_update_wm(sp, msp, extlist, ep) < 0) {
+			rval = -1;
+			goto out;
+		}
 	}
 
 	/* second phase of commit, set status to MD_SP_OK */
@@ -5838,7 +5853,7 @@ update_sp_status(
 			sp_setstat_params.sp_setstat_status = status;
 
 			result = mdmn_send_message(sp->setno,
-			    MD_MN_MSG_SP_SETSTAT, MD_MSGF_DEFAULT_FLAGS,
+			    MD_MN_MSG_SP_SETSTAT, MD_MSGF_DEFAULT_FLAGS, 0,
 			    (char *)&sp_setstat_params,
 			    sizeof (sp_setstat_params),
 			    &resp, ep);
@@ -6022,7 +6037,7 @@ meta_sp_recover_from_wm(
 				    compnp->cname);
 				result = mdmn_send_message(sp->setno,
 				    MD_MN_MSG_ADDKEYNAME, MD_MSGF_DEFAULT_FLAGS,
-				    (char *)send_params, message_size, &resp,
+				    0, (char *)send_params, message_size, &resp,
 				    ep);
 				Free(send_params);
 				if (resp != NULL) {
@@ -6154,7 +6169,7 @@ meta_sp_recover_from_wm(
 			    sizeof (*un_array[i]) - sizeof (mp_ext_t) +
 			    (un_array[i]->un_numexts * sizeof (mp_ext_t)));
 			result = mdmn_send_message(sp->setno,
-			    MD_MN_MSG_IOCSET, MD_MSGF_DEFAULT_FLAGS,
+			    MD_MN_MSG_IOCSET, MD_MSGF_DEFAULT_FLAGS, 0,
 			    (char *)&send_params, mess_size, &resp,
 			    ep);
 			if (resp != NULL) {
@@ -6303,7 +6318,8 @@ out:
 				send_params.delkeyname_key = np->key;
 				(void) mdmn_send_message(sp->setno,
 				    MD_MN_MSG_DELKEYNAME, MD_MSGF_DEFAULT_FLAGS,
-				    (char *)&send_params, sizeof (send_params),
+				    0, (char *)&send_params,
+				    sizeof (send_params),
 				    &resp, ep);
 				if (resp != NULL) {
 					free_result(resp);

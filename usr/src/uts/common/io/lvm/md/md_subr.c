@@ -86,6 +86,7 @@ extern md_set_io_t		md_set_io[];
 extern md_ops_t			**md_ops;
 extern md_ops_t			*md_opslist;
 extern ddi_modhandle_t		*md_mods;
+extern dev_info_t		*md_devinfo;
 
 extern md_krwlock_t		md_unit_array_rw;
 extern kmutex_t			md_mx;
@@ -113,7 +114,7 @@ extern void		*lookup_entry(struct nm_next_hdr *, set_t,
 extern struct nm_next_hdr	*get_first_record(set_t, int, int);
 
 struct mdq_anchor	md_done_daemon; /* done request queue */
-struct mdq_anchor	md_mstr_daemon; /* mirror timeout requests */
+struct mdq_anchor	md_mstr_daemon; /* mirror error, WOW requests */
 struct mdq_anchor	md_mhs_daemon;	/* mirror hotspare requests queue */
 struct mdq_anchor	md_hs_daemon;	/* raid hotspare requests queue */
 struct mdq_anchor	md_ff_daemonq;	/* failfast request queue */
@@ -121,6 +122,7 @@ struct mdq_anchor	md_mirror_daemon; /* mirror owner queue */
 struct mdq_anchor	md_mirror_io_daemon; /* mirror owner i/o queue */
 struct mdq_anchor	md_mirror_rs_daemon; /* mirror resync done queue */
 struct mdq_anchor	md_sp_daemon;	/* soft-part error daemon queue */
+struct mdq_anchor	md_mto_daemon;	/* mirror timeout daemon queue */
 
 int md_done_daemon_threads = 1;	/* threads for md_done_daemon requestq */
 int md_mstr_daemon_threads = 1;	/* threads for md_mstr_daemon requestq */
@@ -129,6 +131,7 @@ int md_hs_daemon_threads = 1;	/* threads for md_hs_daemon requestq */
 int md_ff_daemon_threads = 3;	/* threads for md_ff_daemon requestq */
 int md_mirror_daemon_threads = 1; /* threads for md_mirror_daemon requestq */
 int md_sp_daemon_threads = 1;	/* threads for md_sp_daemon requestq */
+int md_mto_daemon_threads = 1;	/* threads for md_mto_daemon requestq */
 
 #ifdef DEBUG
 /* Flag to switch on debug messages */
@@ -146,7 +149,7 @@ int md_release_reacquire_debug = 0;	/* debug flag */
  *
  */
 
-#define	MD_DAEMON_QUEUES 10
+#define	MD_DAEMON_QUEUES 11
 
 md_requestq_entry_t md_daemon_queues[MD_DAEMON_QUEUES] = {
 	{&md_done_daemon, &md_done_daemon_threads},
@@ -158,6 +161,7 @@ md_requestq_entry_t md_daemon_queues[MD_DAEMON_QUEUES] = {
 	{&md_mirror_rs_daemon, &md_mirror_daemon_threads},
 	{&md_sp_daemon, &md_sp_daemon_threads},
 	{&md_mhs_daemon, &md_mhs_daemon_threads},
+	{&md_mto_daemon, &md_mto_daemon_threads},
 	{0, 0}
 };
 
@@ -174,6 +178,12 @@ md_requestq_entry_t md_daemon_queues[MD_DAEMON_QUEUES] = {
  */
 
 uint_t			md_retry_cnt = 1; /* global so it can be patched */
+
+/*
+ * How many times to try to do the door_ki_upcall() in mdmn_ksend_message.
+ * Again, made patchable here should it prove useful.
+ */
+uint_t			md_send_retry_limit = 30;
 
 /*
  * Bug # 1212146
@@ -712,9 +722,9 @@ md_ioctl_lock_exit(int code, int flags, mdi_unit_t *ui, int ioctl_end)
 				if (status & MD_SET_STALE)
 					flag |= MD_MSGF_NO_LOG;
 				rval = mdmn_ksend_message(s->s_setno,
-				    MD_MN_MSG_MDDB_PARSE, flag,
+				    MD_MN_MSG_MDDB_PARSE, flag, 0,
 				    (char *)mddb_parse_msg,
-				    sizeof (mddb_parse_msg), kresult);
+				    sizeof (md_mn_msg_mddb_parse_t), kresult);
 				/* if the node hasn't yet joined, it's Ok. */
 				if ((!MDMN_KSEND_MSG_OK(rval, kresult)) &&
 				    (kresult->kmmr_comm_state !=
@@ -2817,6 +2827,15 @@ md_create_unit_incore(minor_t mnum, md_ops_t *ops, int alloc_lock)
 	mutex_init(&ui->ui_mx, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&ui->ui_cv, NULL, CV_DEFAULT, NULL);
 
+	if (alloc_lock) {
+		ui->ui_io_lock = kmem_zalloc(sizeof (md_io_lock_t), KM_SLEEP);
+		mutex_init(&ui->ui_io_lock->io_mx, NULL, MUTEX_DEFAULT, NULL);
+		cv_init(&ui->ui_io_lock->io_cv, NULL, CV_DEFAULT, NULL);
+		mutex_init(&ui->ui_io_lock->io_list_mutex, NULL,
+		    MUTEX_DEFAULT, NULL);
+		ui->ui_io_lock->io_list_front = NULL;
+		ui->ui_io_lock->io_list_back = NULL;
+	}
 	if (! (md_get_setstatus(setno) & MD_SET_SNARFING)) {
 		rw_enter(&md_unit_array_rw.lock, RW_WRITER);
 		MDI_VOIDUNIT(mnum) = (void *) ui;
@@ -2829,15 +2848,6 @@ md_create_unit_incore(minor_t mnum, md_ops_t *ops, int alloc_lock)
 	ui->ui_link.ln_setno = setno;
 	ui->ui_link.ln_id = mnum;
 	ops->md_head = &ui->ui_link;
-	if (alloc_lock) {
-		ui->ui_io_lock = kmem_zalloc(sizeof (md_io_lock_t), KM_SLEEP);
-		mutex_init(&ui->ui_io_lock->io_mx, NULL, MUTEX_DEFAULT, NULL);
-		cv_init(&ui->ui_io_lock->io_cv, NULL, CV_DEFAULT, NULL);
-		mutex_init(&ui->ui_io_lock->io_list_mutex, NULL,
-		    MUTEX_DEFAULT, NULL);
-		ui->ui_io_lock->io_list_front = NULL;
-		ui->ui_io_lock->io_list_back = NULL;
-	}
 	/* setup the unavailable field */
 #if defined(_ILP32)
 	if (((md_unit_t *)MD_UNIT(mnum))->c.un_revision & MD_64BIT_META_DEV) {
@@ -3865,82 +3875,68 @@ md_vtoc_to_efi_record(mddb_recid_t vtoc_recid, set_t setno)
 /*
  * Send a kernel message.
  * user has to provide for an allocated result structure
- * If the door handler disappears we retry forever emitting warnings every so
- * often.
- * TODO: make this a flaggable attribute so that the caller can decide if the
- *	 message is to be a 'one-shot' message or not.
+ * If the door handler disappears we retry, emitting warnings every so often.
+ *
+ * The recipient argument is almost always unused, and is therefore typically
+ * set to zero, as zero is an invalid cluster nodeid.  The exceptions are the
+ * marking and clearing of the DRL from a node that is not currently the
+ * owner.  In these cases, the recipient argument will be the nodeid of the
+ * mirror owner, and MD_MSGF_DIRECTED will be set in the flags.  Non-owner
+ * nodes will not receive these messages.
+ *
+ * For the case where md_mn_is_commd_present() is false, we rely on the
+ * "result" having been kmem_zalloc()ed which, in effect, sets MDMNE_NULL for
+ * kmmr_comm_state making MDMN_KSEND_MSG_OK() result in 0.
  */
 int
 mdmn_ksend_message(
 	set_t		setno,
 	md_mn_msgtype_t	type,
 	uint_t		flags,
+	md_mn_nodeid_t	recipient,
 	char		*data,
 	int		size,
 	md_mn_kresult_t	*result)
 {
 	door_arg_t	da;
 	md_mn_kmsg_t	*kmsg;
-	uint_t		retry_cnt = 0;
+	uint_t		send_try_cnt = 0;
+	uint_t		retry_noise_cnt = 0;
 	int		rval;
+	k_sigset_t	oldmask, newmask;
 
 	if (size > MDMN_MAX_KMSG_DATA)
 		return (ENOMEM);
 	kmsg = kmem_zalloc(sizeof (md_mn_kmsg_t), KM_SLEEP);
 	kmsg->kmsg_flags = flags;
 	kmsg->kmsg_setno = setno;
+	kmsg->kmsg_recipient = recipient;
 	kmsg->kmsg_type	= type;
 	kmsg->kmsg_size	= size;
 	bcopy(data, &(kmsg->kmsg_data), size);
 
-#ifdef DEBUG_COMM
-	printf("send msg: set=%d, flags=%d, type=%d, txid = 0x%llx,"
-	    " size=%d, data=%d, data2=%d\n",
-	    kmsg->kmsg_setno, kmsg->kmsg_flags, kmsg->kmsg_type,
-	    kmsg->kmsg_size, *(int *)data, *(int *)(char *)(&kmsg->kmsg_data));
-
-
-#endif /* DEBUG_COMM */
-
-	da.data_ptr	= (char *)(kmsg);
-	da.data_size	= sizeof (md_mn_kmsg_t);
-	da.desc_ptr	= NULL;
-	da.desc_num	= 0;
-	da.rbuf		= (char *)result;
-	da.rsize	= sizeof (*result);
-
 	/*
 	 * Wait for the door handle to be established.
 	 */
-
 	while (mdmn_door_did == -1) {
-		if ((++retry_cnt % MD_MN_WARN_INTVL) == 0) {
+		if ((++retry_noise_cnt % MD_MN_WARN_INTVL) == 0) {
 			cmn_err(CE_WARN, "door handle not yet ready. "
 			    "Check if /usr/lib/lvm/mddoors is running");
 		}
 		delay(md_hz);
 	}
-	retry_cnt = 0;
-
-	while ((rval = door_ki_upcall_limited(mdmn_door_handle, &da, NULL,
-	    SIZE_MAX, 0)) != 0) {
-		if (rval == EAGAIN)  {
-			if ((++retry_cnt % MD_MN_WARN_INTVL) == 0) {
-				cmn_err(CE_WARN, "door call failed. "
-				"Check if /usr/lib/lvm/mddoors is running");
-			}
-		} else {
-			cmn_err(CE_WARN,
-			    "md door call failed. Returned %d", rval);
-		}
-		delay(md_hz);
-	}
-	kmem_free(kmsg, sizeof (md_mn_kmsg_t));
 
 	/*
-	 * Attempt to determine if the message failed (with an RPC_FAILURE)
-	 * because we are in the middle of shutting the system down.
-	 *
+	 * If MD_MSGF_BLK_SIGNAL is set, mask out all signals so that we
+	 * do not fail if the user process receives a signal while we're
+	 * active in the door interface.
+	 */
+	if (flags & MD_MSGF_BLK_SIGNAL) {
+		sigfillset(&newmask);
+		sigreplace(&newmask, &oldmask);
+	}
+
+	/*
 	 * If message failed with an RPC_FAILURE when rpc.mdcommd had
 	 * been gracefully shutdown (md_mn_is_commd_present returns FALSE)
 	 * then don't retry the message anymore.  If message
@@ -3956,15 +3952,80 @@ mdmn_ksend_message(
 	 *
 	 */
 
-	retry_cnt = 0;
+	retry_noise_cnt = send_try_cnt = 0;
+	while (md_mn_is_commd_present_lite()) {
+		/*
+		 * data_ptr and data_size are initialized here because on
+		 * return from the upcall, they contain data duplicated from
+		 * rbuf and rsize.  This causes subsequent upcalls to fail.
+		 */
+		da.data_ptr = (char *)(kmsg);
+		da.data_size = sizeof (md_mn_kmsg_t);
+		da.desc_ptr = NULL;
+		da.desc_num = 0;
+		da.rbuf = (char *)result;
+		da.rsize = sizeof (*result);
 
-	if (result->kmmr_comm_state == MDMNE_RPC_FAIL) {
-		while (md_mn_is_commd_present() == 1) {
-			if ((++retry_cnt % MD_MN_WARN_INTVL) == 0)
+		while ((rval = door_ki_upcall_limited(mdmn_door_handle, &da,
+		    NULL, SIZE_MAX, 0)) != 0) {
+			if ((++retry_noise_cnt % MD_MN_WARN_INTVL) == 0) {
+				if (rval == EAGAIN)  {
+					cmn_err(CE_WARN,
+					    "md: door_upcall failed. "
+					    "Check if mddoors is running.");
+				} else if (rval == EINTR) {
+					cmn_err(CE_WARN,
+					    "md: door_upcall failed. "
+					    "Check if rpc.mdcommd is running.");
+				} else {
+					cmn_err(CE_WARN,
+					    "md: door_upcall failed. "
+					    "Returned %d",
+					    rval);
+				}
+			}
+			if (++send_try_cnt >= md_send_retry_limit)
 				break;
+
 			delay(md_hz);
+
+			/*
+			 * data_ptr and data_size are re-initialized here
+			 * because on return from the upcall, they contain
+			 * data duplicated from rbuf and rsize.  This causes
+			 * subsequent upcalls to fail.
+			 */
+			da.data_ptr = (char *)(kmsg);
+			da.data_size = sizeof (md_mn_kmsg_t);
+			da.desc_ptr = NULL;
+			da.desc_num = 0;
+			da.rbuf = (char *)result;
+			da.rsize = sizeof (*result);
 		}
+
+
+		/*
+		 * If:
+		 * - the send succeeded (MDMNE_ACK)
+		 * - we had an MDMNE_RPC_FAIL and commd is now gone
+		 *   (note: since the outer loop is commd-dependent,
+		 *   checking MDMN_RPC_FAIL here is meaningless)
+		 * - we were told not to retry
+		 * - we exceeded the RPC failure send limit
+		 * punch out of the outer loop prior to the delay()
+		 */
+		if (result->kmmr_comm_state == MDMNE_ACK ||
+		    (flags & MD_MSGF_KSEND_NORETRY) ||
+		    (++send_try_cnt % md_send_retry_limit) == 0 ||
+		    !md_mn_is_commd_present())
+			break;
+		delay(md_hz);
 	}
+
+	if (flags & MD_MSGF_BLK_SIGNAL) {
+		sigreplace(&oldmask, (k_sigset_t *)NULL);
+	}
+	kmem_free(kmsg, sizeof (md_mn_kmsg_t));
 
 	return (0);
 }
@@ -4008,7 +4069,7 @@ mdmn_send_capability_message(minor_t mnum, volcap_t vc, IOLOCK *lockp)
 	sigfillset(&newmask);
 	sigreplace(&newmask, &oldmask);
 	ret = (mdmn_ksend_message(MD_MIN2SET(mnum), MD_MN_MSG_SET_CAP,
-	    MD_MSGF_NO_LOG, (char *)&msg, sizeof (md_mn_msg_setcap_t),
+	    MD_MSGF_NO_LOG, 0, (char *)&msg, sizeof (md_mn_msg_setcap_t),
 	    kres));
 	sigreplace(&oldmask, (k_sigset_t *)NULL);
 
@@ -4056,7 +4117,7 @@ mdmn_clear_all_capabilities(minor_t mnum)
 	sigreplace(&newmask, &oldmask);
 	ret = mdmn_ksend_message(MD_MIN2SET(mnum),
 	    MD_MN_MSG_CLU_CHECK,
-	    MD_MSGF_STOP_ON_ERROR | MD_MSGF_NO_LOG | MD_MSGF_NO_MCT,
+	    MD_MSGF_STOP_ON_ERROR | MD_MSGF_NO_LOG | MD_MSGF_NO_MCT, 0,
 	    (char *)&clumsg, sizeof (clumsg), kresult);
 	sigreplace(&oldmask, (k_sigset_t *)NULL);
 
@@ -4211,4 +4272,24 @@ find_hot_spare_pool(set_t setno, int hsp_id)
 	}
 
 	return ((hot_spare_pool_t *)0);
+}
+
+/*
+ * md_create_taskq:
+ *
+ * Create a kernel taskq for the given set/unit combination. This is typically
+ * used to complete a RR_CLEAN request when the callee is unable to obtain the
+ * mutex / condvar access required to update the DRL safely.
+ */
+void *
+md_create_taskq(set_t setno, minor_t mnum)
+{
+	char			name[20];
+	ddi_taskq_t		*tqp;
+
+	(void) snprintf(name, 20, "%d/d%d", setno, MD_MIN2UNIT(mnum));
+
+	tqp = ddi_taskq_create(md_devinfo, name, 1, TASKQ_DEFAULTPRI, 0);
+
+	return ((void *)tqp);
 }
