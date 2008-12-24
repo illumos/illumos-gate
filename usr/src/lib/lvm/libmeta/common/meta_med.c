@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,8 +23,6 @@
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Just in case we're not in a build environment, make sure that
@@ -85,7 +82,7 @@ med_create_helper(char *hostname, void *private, struct timeval *time_out)
 	med_create_data_t	*cd = (med_create_data_t *)private;
 
 	return (clnt_create_timed(hostname, cd->mcd_program, cd->mcd_version,
-		cd->mcd_nettype, time_out));
+	    cd->mcd_nettype, time_out));
 }
 
 static
@@ -103,7 +100,7 @@ CLIENT *med_clnt_create_timed(
 	cd.mcd_version = vers;
 	cd.mcd_nettype = nettype;
 	return (meta_client_create_retry(hostname, med_create_helper,
-		(void *)&cd, (time_t)tp->tv_sec, NULL));
+	    (void *)&cd, (time_t)tp->tv_sec, NULL));
 }
 
 /*
@@ -327,7 +324,7 @@ setup_med_transtab(md_error_t *ep)
 			tp->med_tp_ents[i].med_te_dev = NODEV64;
 		} else {
 			tp->med_tp_ents[i].med_te_dev =
-				meta_expldev(statb.st_rdev);
+			    meta_expldev(statb.st_rdev);
 		}
 	}
 
@@ -846,7 +843,7 @@ meta_med_hnm2ip(md_hi_arr_t *mp, md_error_t *ep)
 			 */
 			if (sdssc_get_priv_ipaddr(mp->n_lst[i].a_nm[j],
 			    (struct in_addr *)&mp->n_lst[i].a_ip[j]) !=
-					SDSSC_OKAY) {
+			    SDSSC_OKAY) {
 				if ((hp = gethostbyname(hnm)) == NULL)
 					return (mdsyserror(ep, EADDRNOTAVAIL,
 					    hnm));
@@ -990,15 +987,27 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 	med_data_t	*save_medd;
 	md_h_t		mdh;
 	uint_t		latest_med_dat_cc = 0;
-	int		retval;
+	int		retval = 0;
 	int		medok = 0;
 	int		golden = 0;
 	bool_t		obandiskset;
 
 	/* Open the meddb file */
 	if ((fd = open(MED_DB_FILE, O_RDONLY, 0)) == -1) {
-		mde_perror(ep, "Error in opening meddb file");
-		return (1);
+
+		/*
+		 * During the start up of the SVM services, this function
+		 * will be called with an empty sname. In that case it is
+		 * entirely possible for the MED_DB_FILE not to exist.
+		 * If so, then no need to report an error.
+		 */
+		if (sname != NULL) {
+			(void) mdsyserror(ep, errno, MED_DB_FILE);
+			mde_perror(ep, dgettext(TEXT_DOMAIN,
+			    "Error in opening meddb file"));
+			return (1);
+		}
+		return (0);
 	}
 
 	/* Initialize rec_size */
@@ -1006,13 +1015,17 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 
 	/* Allocate a record buffer */
 	if ((rec_buf = malloc(rec_size)) == NULL) {
-		mde_perror(ep, "Error in allocating memory");
+		(void) mdsyserror(ep, errno, MED_DB_FILE);
+		mde_perror(ep, dgettext(TEXT_DOMAIN,
+		    "Error in allocating memory"));
 		goto out;
 	}
 
 	/* read the file header */
 	if ((read(fd, rec_buf, rec_size)) != rec_size) {
-		mde_perror(ep, "Error in reading mediator record");
+		(void) mdsyserror(ep, EINVAL, MED_DB_FILE);
+		mde_perror(ep, dgettext(TEXT_DOMAIN,
+		    "Error in reading mediator record"));
 		goto out;
 	}
 
@@ -1025,7 +1038,9 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 		(void) memset(rec_buf, 0, rec_size);
 
 		if (read(fd, rec_buf, rec_size) == -1) {
-			mde_perror(ep, "Error in reading mediator record");
+			(void) mdsyserror(ep, errno, MED_DB_FILE);
+			mde_perror(ep, dgettext(TEXT_DOMAIN,
+			    "Error in reading mediator record"));
 			goto out;
 		}
 
@@ -1080,7 +1095,7 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 
 			if ((sname != NULL) && (verbose))
 				(void) printf("%-17.17s\t",
-					medrecp->med_rec_meds.n_lst[j].a_nm[0]);
+				    medrecp->med_rec_meds.n_lst[j].a_nm[0]);
 
 			if (clnt_user_med_get_data(&mdh, obandiskset,
 			    setname, setnum, &medd, ep) == -1) {
@@ -1094,7 +1109,7 @@ meta_mediator_info_from_file(char *sname, int verbose, md_error_t *ep)
 							    "able"));
 						continue;
 					} else if (mdiserror(ep,
-						MDE_MED_ERROR)) {
+					    MDE_MED_ERROR)) {
 						if (verbose)
 							(void) printf("%s\n",
 							    gettext("Bad"));
@@ -1168,7 +1183,9 @@ out:
 	if (rec_buf != NULL)
 		Free(rec_buf);
 	if (close(fd) < 0) {
-		mde_perror(ep, "Error in closing meddb file");
+		(void) mdsyserror(ep, errno, MED_DB_FILE);
+		mde_perror(ep, dgettext(TEXT_DOMAIN,
+		    "Error in closing meddb file"));
 		return (1);
 	}
 	return (retval);
