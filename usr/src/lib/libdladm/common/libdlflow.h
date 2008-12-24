@@ -52,21 +52,23 @@ typedef struct dladm_flow_attr {
 	int			fa_nattr;
 } dladm_flow_attr_t;
 
-extern dladm_status_t	dladm_flow_add(datalink_id_t, dladm_arg_list_t *,
-			    dladm_arg_list_t *, char *, boolean_t,
+extern dladm_status_t	dladm_flow_add(dladm_handle_t, datalink_id_t,
+			    dladm_arg_list_t *, dladm_arg_list_t *, char *,
+			    boolean_t, const char *);
+extern dladm_status_t	dladm_flow_remove(dladm_handle_t, char *, boolean_t,
 			    const char *);
-extern dladm_status_t	dladm_flow_remove(char *, boolean_t, const char *);
-extern dladm_status_t	dladm_flow_init(void);
+extern dladm_status_t	dladm_flow_init(dladm_handle_t);
 
 extern dladm_status_t	dladm_flow_parse_db(char *, dld_flowinfo_t *);
-extern dladm_status_t	dladm_walk_flow(int (*)(dladm_flow_attr_t *,
-			    void *), datalink_id_t, void *, boolean_t);
-extern dladm_status_t	dladm_flow_info(const char *, dladm_flow_attr_t *);
+extern dladm_status_t	dladm_walk_flow(int (*)(dladm_flow_attr_t *, void *),
+			    dladm_handle_t, datalink_id_t, void *, boolean_t);
+extern dladm_status_t	dladm_flow_info(dladm_handle_t, const char *,
+			    dladm_flow_attr_t *);
 
-extern dladm_status_t	dladm_set_flowprop(const char *, const char *,
-			    char **, uint_t, uint_t, char **);
-extern dladm_status_t	dladm_get_flowprop(const char *, uint32_t,
-			    const char *, char **, uint_t *);
+extern dladm_status_t	dladm_set_flowprop(dladm_handle_t, const char *,
+			    const char *, char **, uint_t, uint_t, char **);
+extern dladm_status_t	dladm_get_flowprop(dladm_handle_t, const char *,
+			    uint32_t, const char *, char **, uint_t *);
 extern dladm_status_t	dladm_walk_flowprop(int (*)(void *, const char *),
 			    const char *, void *);
 

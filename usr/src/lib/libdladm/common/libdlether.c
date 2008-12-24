@@ -105,8 +105,8 @@ static attr_kstat_t attrstat[] =  {
  * by querying the appropriate kstat for each entry in the table.
  */
 static dladm_status_t
-i_dladm_get_spdx(datalink_id_t linkid, dladm_ether_attr_t *eattr,
-    ether_spdx_t *spdx_stat)
+i_dladm_get_spdx(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_ether_attr_t *eattr, ether_spdx_t *spdx_stat)
 {
 	int		i, nspdx = 0;
 	uint32_t	speed;
@@ -115,7 +115,7 @@ i_dladm_get_spdx(datalink_id_t linkid, dladm_ether_attr_t *eattr,
 
 	eattr->le_spdx = NULL;
 	for (i = 0; spdx_stat[i].eth_spdx_stat_name != NULL; i++) {
-		if ((status = dladm_get_single_mac_stat(linkid,
+		if ((status = dladm_get_single_mac_stat(handle, linkid,
 		    spdx_stat[i].eth_spdx_stat_name,
 		    KSTAT_DATA_UINT32, &speed)) != DLADM_STATUS_OK) {
 
@@ -265,7 +265,8 @@ dladm_ether_spdx2str(char *buf, size_t buflen, dladm_ether_info_t *eattr,
  * freed by calling dladm_ether_info_done().
  */
 extern dladm_status_t
-dladm_ether_info(datalink_id_t linkid, dladm_ether_info_t *eattr)
+dladm_ether_info(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_ether_info_t *eattr)
 {
 	uint32_t	autoneg, pause, asmpause, fault;
 	uint64_t	sp64;
@@ -274,7 +275,7 @@ dladm_ether_info(datalink_id_t linkid, dladm_ether_info_t *eattr)
 	link_duplex_t	link_duplex;
 
 	bzero(eattr, sizeof (*eattr));
-	status = dladm_datalink_id2info(linkid, NULL, NULL, NULL,
+	status = dladm_datalink_id2info(handle, linkid, NULL, NULL, NULL,
 	    eattr->lei_linkname, sizeof (eattr->lei_linkname));
 	if (status != DLADM_STATUS_OK)
 		goto bail;
@@ -287,35 +288,35 @@ dladm_ether_info(datalink_id_t linkid, dladm_ether_info_t *eattr)
 		goto bail;
 	}
 
-	if ((status = dladm_get_single_mac_stat(linkid, "ifspeed",
+	if ((status = dladm_get_single_mac_stat(handle, linkid, "ifspeed",
 	    KSTAT_DATA_UINT64, &sp64)) != DLADM_STATUS_OK)
 		goto bail;
 
-	if ((status = dladm_get_single_mac_stat(linkid, "link_duplex",
+	if ((status = dladm_get_single_mac_stat(handle, linkid, "link_duplex",
 	    KSTAT_DATA_UINT32, &link_duplex)) != DLADM_STATUS_OK)
 		goto bail;
 
 	eattr->lei_attr[CURRENT].le_spdx->lesd_speed = (int)(sp64/1000000ull);
 	eattr->lei_attr[CURRENT].le_spdx->lesd_duplex = link_duplex;
 
-	status = i_dladm_get_state(linkid, &eattr->lei_state);
+	status = i_dladm_get_state(handle, linkid, &eattr->lei_state);
 	if (status != DLADM_STATUS_OK)
 		goto bail;
 
 	/* get the auto, pause, asmpause, fault values */
 	for (i = CURRENT; i <= PEERADV; i++)  {
 
-		status = dladm_get_single_mac_stat(linkid,
+		status = dladm_get_single_mac_stat(handle, linkid,
 		    attrstat[i].autoneg_stat, KSTAT_DATA_UINT32, &autoneg);
 		if (status != DLADM_STATUS_OK)
 			goto bail;
 
-		status = dladm_get_single_mac_stat(linkid,
+		status = dladm_get_single_mac_stat(handle, linkid,
 		    attrstat[i].pause_stat, KSTAT_DATA_UINT32, &pause);
 		if (status != DLADM_STATUS_OK)
 			goto bail;
 
-		status = dladm_get_single_mac_stat(linkid,
+		status = dladm_get_single_mac_stat(handle, linkid,
 		    attrstat[i].asmpause_stat, KSTAT_DATA_UINT32, &asmpause);
 		if (status != DLADM_STATUS_OK)
 			goto bail;
@@ -326,14 +327,14 @@ dladm_ether_info(datalink_id_t linkid, dladm_ether_info_t *eattr)
 
 		if (i == CURRENT)
 			continue;
-		status = dladm_get_single_mac_stat(linkid,
+		status = dladm_get_single_mac_stat(handle, linkid,
 		    attrstat[i].fault_stat, KSTAT_DATA_UINT32, &fault);
 		if (status != DLADM_STATUS_OK)
 			goto bail;
 		eattr->lei_attr[i].le_fault = (pause != 0);
 
 		/* get all the supported speed/duplex values */
-		status = i_dladm_get_spdx(linkid, &eattr->lei_attr[i],
+		status = i_dladm_get_spdx(handle, linkid, &eattr->lei_attr[i],
 		    attrstat[i].spdx_stat);
 		if (status != DLADM_STATUS_OK)
 			goto bail;

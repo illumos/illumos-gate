@@ -65,7 +65,8 @@ typedef struct dladm_ether_info {
 	dladm_ether_attr_t	lei_attr[PEERADV+1];
 } dladm_ether_info_t;
 
-extern dladm_status_t	dladm_ether_info(datalink_id_t, dladm_ether_info_t *);
+extern dladm_status_t	dladm_ether_info(dladm_handle_t, datalink_id_t,
+			    dladm_ether_info_t *);
 extern char		*dladm_ether_autoneg2str(char *, size_t,
 			    dladm_ether_info_t *, int);
 extern char		*dladm_ether_pause2str(char *, size_t,

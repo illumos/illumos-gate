@@ -51,15 +51,16 @@ typedef struct pktsum_s {
 	uint64_t	oerrors;
 } pktsum_t;
 
-extern void		dladm_continuous(datalink_id_t, const char *, int, int);
+extern void		dladm_continuous(dladm_handle_t, datalink_id_t,
+			    const char *, int, int);
 
 extern kstat_t		*dladm_kstat_lookup(kstat_ctl_t *, const char *, int,
 			    const char *, const char *);
 extern void		dladm_get_stats(kstat_ctl_t *, kstat_t *, pktsum_t *);
 extern int		dladm_kstat_value(kstat_t *, const char *, uint8_t,
 			    void *);
-extern dladm_status_t	dladm_get_single_mac_stat(datalink_id_t, const char *,
-			    uint8_t, void *);
+extern dladm_status_t	dladm_get_single_mac_stat(dladm_handle_t, datalink_id_t,
+			    const char *, uint8_t, void *);
 
 extern void		dladm_stats_total(pktsum_t *, pktsum_t *, pktsum_t *);
 extern void		dladm_stats_diff(pktsum_t *, pktsum_t *, pktsum_t *);

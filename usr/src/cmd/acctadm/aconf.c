@@ -218,9 +218,9 @@ aconf_setup(const char *fmri)
 		 */
 		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_SYS_DL_CONFIG,
 		    NULL);
-		(void) dladm_start_usagelog(strncmp(tracked, "basic",
-		    strlen("basic")) == 0 ? DLADM_LOGTYPE_LINK :
-		    DLADM_LOGTYPE_FLOW, 20);
+		(void) dladm_start_usagelog(dld_handle,
+		    strncmp(tracked, "basic", strlen("basic")) == 0 ?
+		    DLADM_LOGTYPE_LINK : DLADM_LOGTYPE_FLOW, 20);
 		(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE, PRIV_SYS_DL_CONFIG,
 		    NULL);
 	}

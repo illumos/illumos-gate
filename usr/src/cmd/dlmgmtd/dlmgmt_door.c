@@ -951,7 +951,8 @@ dlmgmt_upcall_linkprop_init(void *argp, void *retp)
 	dlmgmt_table_unlock();
 
 	if (do_linkprop)
-		retvalp->lr_err = dladm_init_linkprop(lip->ld_linkid, B_TRUE);
+		retvalp->lr_err = dladm_init_linkprop(dld_handle,
+		    lip->ld_linkid, B_TRUE);
 }
 
 static dlmgmt_door_info_t i_dlmgmt_door_info_tbl[] = {

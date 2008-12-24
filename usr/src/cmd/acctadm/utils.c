@@ -76,6 +76,11 @@ die(char *format, ...)
 	va_end(alist);
 	if (strchr(format, '\n') == NULL)
 		(void) fprintf(stderr, gettext(ERRNO_FMT), strerror(err));
+
+	/* close the libdladm handle if it was opened */
+	if (dld_handle != NULL)
+		dladm_close(dld_handle);
+
 	exit(E_ERROR);
 }
 

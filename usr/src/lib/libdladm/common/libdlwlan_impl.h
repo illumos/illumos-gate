@@ -74,10 +74,11 @@ typedef enum {
 	DLADM_WLAN_PM_FAST
 } dladm_wlan_powermode_t;
 
-extern	dladm_status_t i_dladm_wlan_legacy_ioctl(datalink_id_t, wldp_t *,
-			    uint_t, size_t, uint_t, size_t);
-extern dladm_status_t	i_dladm_wlan_param(datalink_id_t, void *,
-			    mac_prop_id_t, size_t, boolean_t);
+extern	dladm_status_t i_dladm_wlan_legacy_ioctl(dladm_handle_t,
+			    datalink_id_t, wldp_t *, uint_t, size_t, uint_t,
+			    size_t);
+extern dladm_status_t	i_dladm_wlan_param(dladm_handle_t, datalink_id_t,
+			    void *, mac_prop_id_t, size_t, boolean_t);
 extern boolean_t	i_dladm_wlan_convert_chan(wl_phy_conf_t *, uint32_t *);
 
 #ifdef	__cplusplus

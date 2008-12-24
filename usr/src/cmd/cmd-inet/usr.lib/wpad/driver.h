@@ -11,8 +11,6 @@
 #ifndef __DRIVER_H
 #define	__DRIVER_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libdlwlan.h>
 #include <libdllink.h>
 
@@ -26,15 +24,17 @@ typedef enum { CIPHER_NONE, CIPHER_WEP40, CIPHER_TKIP, CIPHER_CCMP,
 typedef enum { KEY_MGMT_802_1X, KEY_MGMT_PSK, KEY_MGMT_NONE } wpa_key_mgmt;
 
 struct wpa_driver_ops {
-	int (*get_bssid)(datalink_id_t, char *);
-	int (*get_ssid)(datalink_id_t, char *);
-	int (*set_wpa)(datalink_id_t, boolean_t);
-	int (*set_key)(datalink_id_t, wpa_alg, uint8_t *,
+	int (*get_bssid)(dladm_handle_t, datalink_id_t, char *);
+	int (*get_ssid)(dladm_handle_t, datalink_id_t, char *);
+	int (*set_wpa)(dladm_handle_t, datalink_id_t, boolean_t);
+	int (*set_key)(dladm_handle_t, datalink_id_t, wpa_alg, uint8_t *,
 	    int, boolean_t, uint8_t *, uint32_t, uint8_t *, uint32_t);
-	int (*scan)(datalink_id_t);
-	int (*get_scan_results)(datalink_id_t, dladm_wlan_ess_t *, uint32_t);
-	int (*disassociate)(datalink_id_t, int);
-	int (*associate)(datalink_id_t, const char *, uint8_t *, uint32_t);
+	int (*scan)(dladm_handle_t, datalink_id_t);
+	int (*get_scan_results)(dladm_handle_t, datalink_id_t,
+	    dladm_wlan_ess_t *, uint32_t);
+	int (*disassociate)(dladm_handle_t, datalink_id_t, int);
+	int (*associate)(dladm_handle_t, datalink_id_t, const char *, uint8_t *,
+	    uint32_t);
 };
 
 #ifdef __cplusplus

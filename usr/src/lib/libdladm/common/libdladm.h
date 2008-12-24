@@ -160,6 +160,20 @@ typedef enum {
 typedef int dladm_conf_t;
 #define	DLADM_INVALID_CONF	0
 
+/* opaque dladm handle to libdladm functions */
+struct dladm_handle;
+typedef struct dladm_handle *dladm_handle_t;
+
+/* open/close handle */
+extern dladm_status_t	dladm_open(dladm_handle_t *);
+extern void		dladm_close(dladm_handle_t);
+
+/*
+ * retrieve the dld file descriptor from handle, only libdladm and
+ * dlmgmtd are given access to the door file descriptor.
+ */
+extern int	dladm_dld_fd(dladm_handle_t);
+
 typedef struct dladm_arg_info {
 	const char	*ai_name;
 	char		*ai_val[DLADM_MAX_ARG_VALS];
@@ -207,8 +221,9 @@ extern dladm_status_t	dladm_parse_flow_attrs(char *, dladm_arg_list_t **,
 			    boolean_t);
 extern void		dladm_free_attrs(dladm_arg_list_t *);
 
-extern dladm_status_t	dladm_start_usagelog(dladm_logtype_t, uint_t);
-extern dladm_status_t	dladm_stop_usagelog(dladm_logtype_t);
+extern dladm_status_t	dladm_start_usagelog(dladm_handle_t, dladm_logtype_t,
+			    uint_t);
+extern dladm_status_t	dladm_stop_usagelog(dladm_handle_t, dladm_logtype_t);
 extern dladm_status_t	dladm_walk_usage_res(int (*)(dladm_usage_t *, void *),
 			    int, char *, char *, char *, char *, void *);
 extern dladm_status_t	dladm_walk_usage_time(int (*)(dladm_usage_t *, void *),

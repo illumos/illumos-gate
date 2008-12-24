@@ -61,6 +61,7 @@ boolean_t shutting_down;
 sigset_t original_sigmask;
 char zonename[ZONENAME_MAX];
 pthread_mutex_t machine_lock = PTHREAD_MUTEX_INITIALIZER;
+dladm_handle_t dld_handle = NULL;
 
 /*
  * nwamd
@@ -424,6 +425,12 @@ main(int argc, char *argv[])
 
 	init_machine_mutex();
 
+	/* open the dladm handle */
+	if (dladm_open(&dld_handle) != DLADM_STATUS_OK) {
+		syslog(LOG_ERR, "failed to open dladm handle");
+		exit(EXIT_FAILURE);
+	}
+
 	initialize_interfaces();
 
 	llp_parse_config();
@@ -455,6 +462,7 @@ main(int argc, char *argv[])
 		(void) pthread_cancel(scan);
 		(void) pthread_join(scan, NULL);
 	}
+	dladm_close(dld_handle);
 	syslog(LOG_INFO, "nwamd shutting down");
 	return (EXIT_SUCCESS);
 }

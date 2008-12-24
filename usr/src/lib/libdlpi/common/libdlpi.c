@@ -96,6 +96,7 @@ dlpi_walk(dlpi_walkfunc_t *fn, void *arg, uint_t flags)
 	struct i_dlpi_walklink_arg warg;
 	struct dirent *d;
 	DIR *dp;
+	dladm_handle_t handle;
 
 	warg.fn = fn;
 	warg.arg = arg;
@@ -114,8 +115,18 @@ dlpi_walk(dlpi_walkfunc_t *fn, void *arg, uint_t flags)
 
 		(void) closedir(dp);
 	} else {
-		(void) dladm_walk(i_dlpi_walk_link, &warg, DATALINK_CLASS_ALL,
-		    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+		/*
+		 * Rather than have libdlpi take the libdladm handle,
+		 * open the handle here.
+		 */
+		if (dladm_open(&handle) != DLADM_STATUS_OK)
+			return;
+
+		(void) dladm_walk(i_dlpi_walk_link, handle, &warg,
+		    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE,
+		    DLADM_OPT_ACTIVE);
+
+		dladm_close(handle);
 	}
 }
 
@@ -1062,6 +1073,7 @@ i_dlpi_open(const char *provider, int *fd, uint_t flags, boolean_t style1)
 		char		device[DLPI_LINKNAME_MAX];
 		datalink_id_t	linkid;
 		uint_t		ppa;
+		dladm_handle_t	handle;
 
 		/*
 		 * This is not a valid style-1 name. It could be "ip" module
@@ -1095,14 +1107,22 @@ i_dlpi_open(const char *provider, int *fd, uint_t flags, boolean_t style1)
 		(void) snprintf(device, DLPI_LINKNAME_MAX, "%s%d", driver,
 		    ppa >= 1000 ? ppa % 1000 : ppa);
 
-		if (dladm_dev2linkid(device, &linkid) == DLADM_STATUS_OK) {
+		/* open libdladm handle rather than taking it as input */
+		if (dladm_open(&handle) != DLADM_STATUS_OK)
+			return (DLPI_FAILURE);
+
+		if (dladm_dev2linkid(handle, device, &linkid) ==
+		    DLADM_STATUS_OK) {
 			dladm_phys_attr_t dpa;
 
-			if ((dladm_phys_info(linkid, &dpa, DLADM_OPT_ACTIVE)) ==
-			    DLADM_STATUS_OK && !dpa.dp_novanity) {
+			if ((dladm_phys_info(handle, linkid, &dpa,
+			    DLADM_OPT_ACTIVE)) == DLADM_STATUS_OK &&
+			    !dpa.dp_novanity) {
+				dladm_close(handle);
 				return (DLPI_ENOTSTYLE2);
 			}
 		}
+		dladm_close(handle);
 	}
 
 fallback:

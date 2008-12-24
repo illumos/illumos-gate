@@ -114,8 +114,9 @@ generate_prop_line(const char *name, char *buf,
  * will be NULL; a new entry will be generated in this case and it will
  * contain only the property information in lsp.
  */
+/* ARGSUSED */
 boolean_t
-process_prop_set(prop_db_state_t *lsp, char *buf,
+process_prop_set(dladm_handle_t handle, prop_db_state_t *lsp, char *buf,
     prop_db_info_t *listp, dladm_status_t *statusp)
 {
 	dladm_status_t	status;
@@ -208,7 +209,7 @@ fail:
  */
 /* ARGSUSED */
 boolean_t
-process_prop_get(prop_db_state_t *lsp, char *buf,
+process_prop_get(dladm_handle_t handle, prop_db_state_t *lsp, char *buf,
     prop_db_info_t *listp, dladm_status_t *statusp)
 {
 	prop_db_info_t	*lip = listp;
@@ -254,7 +255,7 @@ process_prop_get(prop_db_state_t *lsp, char *buf,
  */
 /* ARGSUSED */
 boolean_t
-process_prop_init(prop_db_state_t *lsp, char *buf,
+process_prop_init(dladm_handle_t handle, prop_db_state_t *lsp, char *buf,
     prop_db_info_t *listp, dladm_status_t *statusp)
 {
 	dladm_status_t	status = DLADM_STATUS_OK;
@@ -281,7 +282,7 @@ process_prop_init(prop_db_state_t *lsp, char *buf,
 		for (i = 0; i < valcnt; i++, lvp = lvp->lv_nextval)
 			propval[i] = (char *)lvp->lv_name;
 
-		status = (*lsp->ls_initop)(lsp->ls_name, lip->li_name,
+		status = (*lsp->ls_initop)(handle, lsp->ls_name, lip->li_name,
 		    propval, valcnt, DLADM_OPT_ACTIVE, NULL);
 
 		/*
@@ -390,7 +391,7 @@ fail:
 }
 
 static boolean_t
-process_prop_line(prop_db_state_t *lsp, char *buf,
+process_prop_line(dladm_handle_t handle, prop_db_state_t *lsp, char *buf,
     dladm_status_t *statusp)
 {
 	prop_db_info_t		*lip = NULL;
@@ -447,7 +448,7 @@ process_prop_line(prop_db_state_t *lsp, char *buf,
 	if (parse_props(str, &lip) < 0)
 		goto fail;
 
-	cont = (*lsp->ls_op)(lsp, buf, lip, statusp);
+	cont = (*lsp->ls_op)(handle, lsp, buf, lip, statusp);
 	free_props(lip);
 	if (noname)
 		lsp->ls_name = NULL;
@@ -466,7 +467,7 @@ fail:
 }
 
 dladm_status_t
-process_prop_db(void *arg, FILE *fp, FILE *nfp)
+process_prop_db(dladm_handle_t handle, void *arg, FILE *fp, FILE *nfp)
 {
 	prop_db_state_t	*lsp = arg;
 	dladm_status_t		status = DLADM_STATUS_OK;
@@ -484,7 +485,7 @@ process_prop_db(void *arg, FILE *fp, FILE *nfp)
 	 */
 	while (fgets(buf, MAXLINELEN, fp) != NULL) {
 		if (cont)
-			cont = process_prop_line(lsp, buf, &status);
+			cont = process_prop_line(handle, lsp, buf, &status);
 
 		if (nfp != NULL && buf[0] != '\0' && fputs(buf, nfp) == EOF) {
 			status = dladm_errno2status(errno);
@@ -500,7 +501,7 @@ process_prop_db(void *arg, FILE *fp, FILE *nfp)
 		 * If the specified name is not found above, we add the
 		 * name and its properties to the configuration file.
 		 */
-		(void) (*lsp->ls_op)(lsp, buf, NULL, &status);
+		(void) (*lsp->ls_op)(handle, lsp, buf, NULL, &status);
 		if (status == DLADM_STATUS_OK && fputs(buf, nfp) == EOF)
 			status = dladm_errno2status(errno);
 	}
@@ -512,7 +513,7 @@ process_prop_db(void *arg, FILE *fp, FILE *nfp)
 }
 
 dladm_status_t
-i_dladm_get_prop_temp(const char *name, prop_type_t type,
+i_dladm_get_prop_temp(dladm_handle_t handle, const char *name, prop_type_t type,
     const char *prop_name, char **prop_val, uint_t *val_cntp,
     prop_table_t *prop_tbl)
 {
@@ -537,7 +538,7 @@ i_dladm_get_prop_temp(const char *name, prop_type_t type,
 
 	switch (type) {
 	case DLADM_PROP_VAL_CURRENT:
-		status = pdp->pd_get(name, prop_val, val_cntp);
+		status = pdp->pd_get(handle, name, prop_val, val_cntp);
 		break;
 	case DLADM_PROP_VAL_DEFAULT:
 		if (pdp->pd_defval.vd_name == NULL) {
@@ -550,7 +551,8 @@ i_dladm_get_prop_temp(const char *name, prop_type_t type,
 
 	case DLADM_PROP_VAL_MODIFIABLE:
 		if (pdp->pd_getmod != NULL) {
-			status = pdp->pd_getmod(name, prop_val, val_cntp);
+			status = pdp->pd_getmod(handle, name, prop_val,
+			    val_cntp);
 			break;
 		}
 		cnt = pdp->pd_nmodval;
@@ -575,8 +577,8 @@ i_dladm_get_prop_temp(const char *name, prop_type_t type,
 }
 
 static dladm_status_t
-i_dladm_set_one_prop_temp(const char *name, fprop_desc_t *pdp, char **prop_val,
-    uint_t val_cnt, uint_t flags)
+i_dladm_set_one_prop_temp(dladm_handle_t handle, const char *name,
+    fprop_desc_t *pdp, char **prop_val, uint_t val_cnt, uint_t flags)
 {
 	dladm_status_t	status;
 	val_desc_t	*vdp = NULL;
@@ -609,15 +611,16 @@ i_dladm_set_one_prop_temp(const char *name, fprop_desc_t *pdp, char **prop_val,
 		cnt = 1;
 	}
 
-	status = pdp->pd_set(name, vdp, cnt);
+	status = pdp->pd_set(handle, name, vdp, cnt);
 
 	free(vdp);
 	return (status);
 }
 
 dladm_status_t
-i_dladm_set_prop_temp(const char *name, const char *prop_name, char **prop_val,
-    uint_t val_cnt, uint_t flags, char **errprop, prop_table_t *prop_tbl)
+i_dladm_set_prop_temp(dladm_handle_t handle, const char *name,
+    const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags,
+    char **errprop, prop_table_t *prop_tbl)
 {
 	int 		i;
 	dladm_status_t	status = DLADM_STATUS_OK;
@@ -632,8 +635,8 @@ i_dladm_set_prop_temp(const char *name, const char *prop_name, char **prop_val,
 			continue;
 
 		found = B_TRUE;
-		s = i_dladm_set_one_prop_temp(name, pdp, prop_val, val_cnt,
-		    flags);
+		s = i_dladm_set_one_prop_temp(handle, name, pdp, prop_val,
+		    val_cnt, flags);
 
 		if (prop_name != NULL) {
 			status = s;

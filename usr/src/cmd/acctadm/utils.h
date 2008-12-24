@@ -26,9 +26,8 @@
 #ifndef	_UTILS_H
 #define	_UTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <libintl.h>
+#include <libdllink.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -37,6 +36,9 @@ extern "C" {
 #define	E_SUCCESS	0		/* Exit status for success */
 #define	E_ERROR		1		/* Exit status for error */
 #define	E_USAGE		2		/* Exit status for usage error */
+
+/* handle for libdladm calls */
+extern dladm_handle_t dld_handle;
 
 extern void warn(const char *, ...);
 extern void die(char *, ...);

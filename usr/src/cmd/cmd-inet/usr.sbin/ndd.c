@@ -46,7 +46,7 @@ static boolean_t do_getset(int fd, int cmd, char *buf, int buf_len);
 static int	get_value(char *msg, char *buf, int buf_len);
 static void	name_print(char *buf);
 static void	getset_interactive(int fd);
-static int	open_device(void);
+static int	open_device(dladm_handle_t);
 static char	*errmsg(int err);
 static void	fatal(char *fmt, ...);
 static void	printe(boolean_t print_errno, char *fmt, ...);
@@ -62,7 +62,7 @@ static char	usage_str[] =	"usage: ndd -set device_name name value\n"
  * to test for support of the flowctrl property.
  */
 static void
-gldv3_warning(char *module)
+gldv3_warning(dladm_handle_t handle, char *module)
 {
 	datalink_id_t	linkid;
 	dladm_status_t	status;
@@ -73,12 +73,12 @@ gldv3_warning(char *module)
 	link = strrchr(module, '/');
 	if (link == NULL)
 		return;
-	status = dladm_name2info(++link, &linkid, NULL, NULL, NULL);
+	status = dladm_name2info(handle, ++link, &linkid, NULL, NULL, NULL);
 	if (status != DLADM_STATUS_OK)
 		return;
 	cp = buf;
-	status = dladm_get_linkprop(linkid, DLADM_PROP_VAL_CURRENT, "flowctrl",
-	    &cp, &cnt);
+	status = dladm_get_linkprop(handle, linkid, DLADM_PROP_VAL_CURRENT,
+	    "flowctrl", &cp, &cnt);
 	if (status != DLADM_STATUS_OK)
 		return;
 	(void) fprintf(stderr, gettext(
@@ -94,10 +94,14 @@ main(int argc, char **argv)
 	char	*cp, *value;
 	int	cmd;
 	int	fd;
+	dladm_handle_t handle;
 
+	if (dladm_open(&handle) != DLADM_STATUS_OK)
+		fatal("failed to open dladm handle");
 
 	if (!(cp = *++argv)) {
-		while ((fd = open_device()) != -1) {
+		/* open_device() calls gldv3_warning() which needs handle */
+		while ((fd = open_device(handle)) != -1) {
 			getset_interactive(fd);
 			(void) close(fd);
 		}
@@ -113,7 +117,9 @@ main(int argc, char **argv)
 		if (!(cp = *++argv))
 			fatal(usage_str);
 	}
-	gldv3_warning(cp);
+	gldv3_warning(handle, cp);
+	dladm_close(handle);
+
 	if ((fd = open(cp, O_RDWR)) == -1)
 		fatal("open of %s failed: %s", cp, errmsg(errno));
 
@@ -287,7 +293,7 @@ printe(boolean_t print_errno, char *fmt, ...)
 
 
 static int
-open_device(void)
+open_device(dladm_handle_t handle)
 {
 	char	name[80];
 	int	fd, len;
@@ -303,7 +309,7 @@ open_device(void)
 			continue;
 		}
 
-		gldv3_warning(name);
+		gldv3_warning(handle, name);
 
 		if (isastream(fd))
 			return (fd);

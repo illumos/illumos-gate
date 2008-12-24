@@ -38,10 +38,12 @@ extern "C" {
 struct fprop_desc;
 struct fattr_desc;
 
-typedef	dladm_status_t	fpd_getf_t(const char *, char **, uint_t *);
-typedef	dladm_status_t	fpd_setf_t(const char *, val_desc_t *, uint_t);
-typedef	dladm_status_t	fpd_checkf_t(struct fprop_desc *, char **,
-			    uint_t, val_desc_t **);
+typedef	dladm_status_t	fpd_getf_t(dladm_handle_t, const char *, char **,
+			    uint_t *);
+typedef	dladm_status_t	fpd_setf_t(dladm_handle_t, const char *, val_desc_t *,
+			    uint_t);
+typedef	dladm_status_t	fpd_checkf_t(struct fprop_desc *, char **, uint_t,
+			    val_desc_t **);
 
 typedef struct fprop_desc {
 	char		*pd_name;
@@ -77,10 +79,12 @@ typedef struct fattr_desc {
 	fad_checkf_t	*ad_check;
 } fattr_desc_t;
 
-extern dladm_status_t	i_dladm_get_prop_temp(const char *, prop_type_t,
-			    const char *, char **, uint_t *, prop_table_t *);
-extern dladm_status_t	i_dladm_set_prop_temp(const char *, const char *,
-			    char **, uint_t, uint_t, char **, prop_table_t *);
+extern dladm_status_t	i_dladm_get_prop_temp(dladm_handle_t, const char *,
+			    prop_type_t, const char *, char **, uint_t *,
+			    prop_table_t *);
+extern dladm_status_t	i_dladm_set_prop_temp(dladm_handle_t, const char *,
+			    const char *, char **, uint_t, uint_t, char **,
+			    prop_table_t *);
 extern boolean_t	i_dladm_is_prop_temponly(const char *prop_name,
 			    char **, prop_table_t *);
 /*
@@ -99,11 +103,11 @@ typedef struct prop_db_info {
 
 typedef struct prop_db_state	prop_db_state_t;
 
-typedef boolean_t (*prop_db_op_t)(prop_db_state_t *,
+typedef boolean_t (*prop_db_op_t)(dladm_handle_t, prop_db_state_t *,
     char *, prop_db_info_t *, dladm_status_t *);
 
-typedef dladm_status_t (*prop_db_initop_t)(const char *, const char *,
-    char **, uint_t, uint_t, char **);
+typedef dladm_status_t (*prop_db_initop_t)(dladm_handle_t, const char *,
+    const char *, char **, uint_t, uint_t, char **);
 
 struct prop_db_state {
 	prop_db_op_t		ls_op;
@@ -114,22 +118,26 @@ struct prop_db_state {
 	prop_db_initop_t	ls_initop;
 };
 
-extern boolean_t	process_prop_set(prop_db_state_t *lsp, char *buf,
-			    prop_db_info_t *listp, dladm_status_t *statusp);
-extern boolean_t	process_prop_get(prop_db_state_t *lsp, char *buf,
-			    prop_db_info_t *listp, dladm_status_t *statusp);
-extern boolean_t	process_prop_init(prop_db_state_t *lsp, char *buf,
-			    prop_db_info_t *listp, dladm_status_t *statusp);
-extern dladm_status_t	process_prop_db(void *arg, FILE *fp, FILE *nfp);
+extern boolean_t	process_prop_set(dladm_handle_t, prop_db_state_t *lsp,
+			    char *buf, prop_db_info_t *listp,
+			    dladm_status_t *statusp);
+extern boolean_t	process_prop_get(dladm_handle_t, prop_db_state_t *lsp,
+			    char *buf, prop_db_info_t *listp,
+			    dladm_status_t *statusp);
+extern boolean_t	process_prop_init(dladm_handle_t, prop_db_state_t *lsp,
+			    char *buf, prop_db_info_t *listp,
+			    dladm_status_t *statusp);
+extern dladm_status_t	process_prop_db(dladm_handle_t, void *arg, FILE *fp,
+			    FILE *nfp);
 
-extern dladm_status_t	i_dladm_init_flowprop_db(void);
-extern dladm_status_t	i_dladm_set_flow_proplist_db(char *,
-    dladm_arg_list_t *);
+extern dladm_status_t	i_dladm_init_flowprop_db(dladm_handle_t);
+extern dladm_status_t	i_dladm_set_flow_proplist_db(dladm_handle_t, char *,
+			    dladm_arg_list_t *);
 extern dladm_status_t	i_dladm_flow_check_restriction(datalink_id_t,
-    flow_desc_t *, mac_resource_props_t *, boolean_t);
+			    flow_desc_t *, mac_resource_props_t *, boolean_t);
 
 extern dladm_status_t	dladm_flow_attrlist_extract(dladm_arg_list_t *,
-    flow_desc_t *);
+			    flow_desc_t *);
 
 #ifdef	__cplusplus
 }

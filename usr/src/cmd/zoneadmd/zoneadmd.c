@@ -107,6 +107,7 @@ char brand_name[MAXNAMELEN];
 boolean_t zone_isnative;
 boolean_t zone_iscluster;
 static zoneid_t zone_id;
+dladm_handle_t dld_handle = NULL;
 
 static char pre_statechg_hook[2 * MAXPATHLEN];
 static char post_statechg_hook[2 * MAXPATHLEN];
@@ -1925,6 +1926,12 @@ main(int argc, char *argv[])
 		goto child_out;
 	}
 
+	/* open the dladm handle */
+	if (dladm_open(&dld_handle) != DLADM_STATUS_OK) {
+		zerror(zlogp, B_FALSE, "failed to open dladm handle");
+		goto child_out;
+	}
+
 	/*
 	 * Note: door setup must occur *after* the console is setup.
 	 * This is so that as zlogin tests the door to see if zoneadmd
@@ -1984,6 +1991,7 @@ main(int argc, char *argv[])
 	 */
 	assert(!MUTEX_HELD(&lock));
 	(void) fdetach(zone_door_path);
+
 	for (;;)
 		(void) pause();
 
@@ -2006,5 +2014,9 @@ child_out:
 		(void) door_revoke(zone_door);
 		(void) fdetach(zone_door_path);
 	}
+
+	if (dld_handle != NULL)
+		dladm_close(dld_handle);
+
 	return (1); /* return from main() forcibly exits an MT process */
 }

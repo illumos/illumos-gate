@@ -1108,7 +1108,7 @@ initialize_interfaces(void)
 			wait_time = NWAM_IF_WAIT_DELTA_MAX;
 	}
 
-	(void) dladm_init_linkprop(DATALINK_ALL_LINKID, B_FALSE);
+	(void) dladm_init_linkprop(dld_handle, DATALINK_ALL_LINKID, B_FALSE);
 
 	(void) icfg_iterate_if(AF_INET, ICFG_PLUMBED, NULL, do_add_interface);
 
@@ -1203,7 +1203,7 @@ find_if_type(const char *name)
 	}
 
 	type = IF_WIRED;
-	if (dladm_name2info(name, NULL, NULL, NULL, &media) !=
+	if (dladm_name2info(dld_handle, name, NULL, NULL, NULL, &media) !=
 	    DLADM_STATUS_OK) {
 		if (strncmp(name, "ip.tun", 6) == 0 ||
 		    strncmp(name, "ip6.tun", 7) == 0 ||

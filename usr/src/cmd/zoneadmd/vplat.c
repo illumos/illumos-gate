@@ -2526,7 +2526,7 @@ add_datalink(zlog_t *zlogp, char *zone_name, char *dlname)
 	}
 
 	/* Set zoneid of this link. */
-	if (dladm_setzid(dlname, zone_name) != DLADM_STATUS_OK) {
+	if (dladm_setzid(dld_handle, dlname, zone_name) != DLADM_STATUS_OK) {
 		zerror(zlogp, B_TRUE, "WARNING: unable to add network "
 		    "interface '%s'.", dlname);
 		return (-1);
@@ -2538,7 +2538,7 @@ add_datalink(zlog_t *zlogp, char *zone_name, char *dlname)
 static int
 remove_datalink(zlog_t *zlogp, char *dlname)
 {
-	if (dladm_setzid(dlname, GLOBAL_ZONENAME)
+	if (dladm_setzid(dld_handle, dlname, GLOBAL_ZONENAME)
 	    != DLADM_STATUS_OK) {
 		zerror(zlogp, B_TRUE, "unable to release network "
 		    "interface '%s'", dlname);

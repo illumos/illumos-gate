@@ -137,17 +137,9 @@ static dladm_aggr_port_state_t port_states[] = {
 	(sizeof (port_states) / sizeof (dladm_aggr_port_state_t))
 
 static int
-i_dladm_aggr_ioctl(int cmd, void *ptr)
+i_dladm_aggr_ioctl(dladm_handle_t handle, int cmd, void *ptr)
 {
-	int err, fd;
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (-1);
-
-	err = ioctl(fd, cmd, ptr);
-	(void) close(fd);
-
-	return (err);
+	return (ioctl(dladm_dld_fd(handle), cmd, ptr));
 }
 
 /*
@@ -207,7 +199,8 @@ fail:
  * Caller must free attrp->la_ports.
  */
 static dladm_status_t
-i_dladm_aggr_info_active(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
+i_dladm_aggr_info_active(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_aggr_grp_attr_t *attrp)
 {
 	laioc_info_t *ioc;
 	int bufsize;
@@ -223,7 +216,7 @@ i_dladm_aggr_info_active(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
 
 tryagain:
 	ioc->li_bufsize = bufsize;
-	if (i_dladm_aggr_ioctl(LAIOC_INFO, ioc) != 0) {
+	if (i_dladm_aggr_ioctl(handle, LAIOC_INFO, ioc) != 0) {
 		if (errno == ENOSPC) {
 			/*
 			 * The LAIOC_INFO call failed due to a short
@@ -261,7 +254,8 @@ bail:
  * Caller must free attrp->la_ports.
  */
 static dladm_status_t
-i_dladm_aggr_info_persist(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
+i_dladm_aggr_info_persist(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_aggr_grp_attr_t *attrp)
 {
 	dladm_conf_t	conf;
 	uint32_t	nports, i;
@@ -272,29 +266,31 @@ i_dladm_aggr_info_persist(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
 	char		macstr[ETHERADDRL * 3];
 
 	attrp->lg_linkid = linkid;
-	if ((status = dladm_read_conf(linkid, &conf)) != DLADM_STATUS_OK)
+	if ((status = dladm_read_conf(handle, linkid, &conf)) !=
+	    DLADM_STATUS_OK)
 		return (status);
 
-	status = dladm_get_conf_field(conf, FKEY, &u64, sizeof (u64));
+	status = dladm_get_conf_field(handle, conf, FKEY, &u64, sizeof (u64));
 	if (status != DLADM_STATUS_OK)
 		goto done;
 	attrp->lg_key = (uint16_t)u64;
 
-	status = dladm_get_conf_field(conf, FPOLICY, &u64, sizeof (u64));
+	status = dladm_get_conf_field(handle, conf, FPOLICY, &u64,
+	    sizeof (u64));
 	if (status != DLADM_STATUS_OK)
 		goto done;
 	attrp->lg_policy = (uint32_t)u64;
 
-	status = dladm_get_conf_field(conf, FFIXMACADDR, &attrp->lg_mac_fixed,
-	    sizeof (boolean_t));
+	status = dladm_get_conf_field(handle, conf, FFIXMACADDR,
+	    &attrp->lg_mac_fixed, sizeof (boolean_t));
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
 	if (attrp->lg_mac_fixed) {
 		boolean_t fixed;
 
-		if ((status = dladm_get_conf_field(conf, FMACADDR, macstr,
-		    sizeof (macstr))) != DLADM_STATUS_OK) {
+		if ((status = dladm_get_conf_field(handle, conf, FMACADDR,
+		    macstr, sizeof (macstr))) != DLADM_STATUS_OK) {
 			goto done;
 		}
 		if (!dladm_aggr_str2macaddr(macstr, &fixed, attrp->lg_mac)) {
@@ -303,22 +299,25 @@ i_dladm_aggr_info_persist(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
 		}
 	}
 
-	status = dladm_get_conf_field(conf, FFORCE, &attrp->lg_force,
+	status = dladm_get_conf_field(handle, conf, FFORCE, &attrp->lg_force,
 	    sizeof (boolean_t));
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
-	status = dladm_get_conf_field(conf, FLACPMODE, &u64, sizeof (u64));
+	status = dladm_get_conf_field(handle, conf, FLACPMODE, &u64,
+	    sizeof (u64));
 	if (status != DLADM_STATUS_OK)
 		goto done;
 	attrp->lg_lacp_mode = (aggr_lacp_mode_t)u64;
 
-	status = dladm_get_conf_field(conf, FLACPTIMER, &u64, sizeof (u64));
+	status = dladm_get_conf_field(handle, conf, FLACPTIMER, &u64,
+	    sizeof (u64));
 	if (status != DLADM_STATUS_OK)
 		goto done;
 	attrp->lg_lacp_timer = (aggr_lacp_timer_t)u64;
 
-	status = dladm_get_conf_field(conf, FNPORTS, &u64, sizeof (u64));
+	status = dladm_get_conf_field(handle, conf, FNPORTS, &u64,
+	    sizeof (u64));
 	if (status != DLADM_STATUS_OK)
 		goto done;
 	nports = (uint32_t)u64;
@@ -330,7 +329,7 @@ i_dladm_aggr_info_persist(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
 		goto done;
 	}
 
-	status = dladm_get_conf_field(conf, FPORTS, portstr, size);
+	status = dladm_get_conf_field(handle, conf, FPORTS, portstr, size);
 	if (status != DLADM_STATUS_OK) {
 		free(portstr);
 		goto done;
@@ -354,27 +353,27 @@ i_dladm_aggr_info_persist(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp)
 	free(portstr);
 
 done:
-	dladm_destroy_conf(conf);
+	dladm_destroy_conf(handle, conf);
 	return (status);
 }
 
 dladm_status_t
-dladm_aggr_info(datalink_id_t linkid, dladm_aggr_grp_attr_t *attrp,
-    uint32_t flags)
+dladm_aggr_info(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_aggr_grp_attr_t *attrp, uint32_t flags)
 {
 	assert(flags == DLADM_OPT_ACTIVE || flags == DLADM_OPT_PERSIST);
 	if (flags == DLADM_OPT_ACTIVE)
-		return (i_dladm_aggr_info_active(linkid, attrp));
+		return (i_dladm_aggr_info_active(handle, linkid, attrp));
 	else
-		return (i_dladm_aggr_info_persist(linkid, attrp));
+		return (i_dladm_aggr_info_persist(handle, linkid, attrp));
 }
 
 /*
  * Add or remove one or more ports to/from an existing link aggregation.
  */
 static dladm_status_t
-i_dladm_aggr_add_rmv(datalink_id_t linkid, uint32_t nports,
-    dladm_aggr_port_attr_db_t *ports, uint32_t flags, int cmd)
+i_dladm_aggr_add_rmv(dladm_handle_t handle, datalink_id_t linkid,
+    uint32_t nports, dladm_aggr_port_attr_db_t *ports, uint32_t flags, int cmd)
 {
 	char *orig_portstr = NULL, *portstr = NULL;
 	laioc_add_rem_t *iocp = NULL;
@@ -395,7 +394,7 @@ i_dladm_aggr_add_rmv(datalink_id_t linkid, uint32_t nports,
 	 * physical links.
 	 */
 	for (i = 0; i < nports; i++) {
-		if ((dladm_datalink_id2info(ports[i].lp_linkid, NULL,
+		if ((dladm_datalink_id2info(handle, ports[i].lp_linkid, NULL,
 		    &class, &media, NULL, 0) != DLADM_STATUS_OK) ||
 		    (class != DATALINK_CLASS_PHYS) || (media != DL_ETHER)) {
 			return (DLADM_STATUS_BADARG);
@@ -409,14 +408,14 @@ i_dladm_aggr_add_rmv(datalink_id_t linkid, uint32_t nports,
 	 * PORT_DELIMITER ('.').
 	 */
 	if (flags & DLADM_OPT_PERSIST) {
-		status = dladm_read_conf(linkid, &conf);
+		status = dladm_read_conf(handle, linkid, &conf);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 
 		/*
 		 * Get the original configuration of FNPORTS and FPORTS.
 		 */
-		status = dladm_get_conf_field(conf, FNPORTS, &u64,
+		status = dladm_get_conf_field(handle, conf, FNPORTS, &u64,
 		    sizeof (u64));
 		if (status != DLADM_STATUS_OK)
 			goto destroyconf;
@@ -436,7 +435,8 @@ i_dladm_aggr_add_rmv(datalink_id_t linkid, uint32_t nports,
 			goto destroyconf;
 		}
 
-		status = dladm_get_conf_field(conf, FPORTS, orig_portstr, size);
+		status = dladm_get_conf_field(handle, conf, FPORTS,
+		    orig_portstr, size);
 		if (status != DLADM_STATUS_OK)
 			goto destroyconf;
 
@@ -496,14 +496,14 @@ i_dladm_aggr_add_rmv(datalink_id_t linkid, uint32_t nports,
 		}
 
 		u64 = result_nports;
-		if ((status = dladm_set_conf_field(conf, FNPORTS,
+		if ((status = dladm_set_conf_field(handle, conf, FNPORTS,
 		    DLADM_TYPE_UINT64, &u64)) != DLADM_STATUS_OK) {
 			free(portstr);
 			goto destroyconf;
 		}
 
-		status = dladm_set_conf_field(conf, FPORTS, DLADM_TYPE_STR,
-		    portstr);
+		status = dladm_set_conf_field(handle, conf, FPORTS,
+		    DLADM_TYPE_STR, portstr);
 		free(portstr);
 		if (status != DLADM_STATUS_OK)
 			goto destroyconf;
@@ -511,10 +511,10 @@ i_dladm_aggr_add_rmv(datalink_id_t linkid, uint32_t nports,
 		/*
 		 * Write the new configuration to the persistent repository.
 		 */
-		status = dladm_write_conf(conf);
+		status = dladm_write_conf(handle, conf);
 
 destroyconf:
-		dladm_destroy_conf(conf);
+		dladm_destroy_conf(handle, conf);
 		if (status != DLADM_STATUS_OK) {
 			free(orig_portstr);
 			return (status);
@@ -546,7 +546,7 @@ destroyconf:
 	for (i = 0; i < nports; i++)
 		ioc_ports[i].lp_linkid = ports[i].lp_linkid;
 
-	if (i_dladm_aggr_ioctl(cmd, iocp) < 0)
+	if (i_dladm_aggr_ioctl(handle, cmd, iocp) < 0)
 		status = dladm_errno2status(errno);
 
 done:
@@ -557,15 +557,15 @@ done:
 	 * persistent configuration if we've changed that.
 	 */
 	if ((status != DLADM_STATUS_OK) && (flags & DLADM_OPT_PERSIST)) {
-		if (dladm_read_conf(linkid, &conf) == DLADM_STATUS_OK) {
+		if (dladm_read_conf(handle, linkid, &conf) == DLADM_STATUS_OK) {
 			u64 = orig_nports;
-			if ((dladm_set_conf_field(conf, FNPORTS,
+			if ((dladm_set_conf_field(handle, conf, FNPORTS,
 			    DLADM_TYPE_UINT64, &u64) == DLADM_STATUS_OK) &&
-			    (dladm_set_conf_field(conf, FPORTS, DLADM_TYPE_STR,
-			    orig_portstr) == DLADM_STATUS_OK)) {
-				(void) dladm_write_conf(conf);
+			    (dladm_set_conf_field(handle, conf, FPORTS,
+			    DLADM_TYPE_STR, orig_portstr) == DLADM_STATUS_OK)) {
+				(void) dladm_write_conf(handle, conf);
 			}
-			(void) dladm_destroy_conf(conf);
+			(void) dladm_destroy_conf(handle, conf);
 		}
 	}
 	free(orig_portstr);
@@ -576,8 +576,8 @@ done:
  * Send a modify command to the link aggregation driver.
  */
 static dladm_status_t
-i_dladm_aggr_modify_sys(datalink_id_t linkid, uint32_t mask,
-    dladm_aggr_modify_attr_t *attr)
+i_dladm_aggr_modify_sys(dladm_handle_t handle, datalink_id_t linkid,
+    uint32_t mask, dladm_aggr_modify_attr_t *attr)
 {
 	laioc_modify_t ioc;
 
@@ -599,7 +599,7 @@ i_dladm_aggr_modify_sys(datalink_id_t linkid, uint32_t mask,
 	ioc.lu_lacp_mode = attr->ld_lacp_mode;
 	ioc.lu_lacp_timer = attr->ld_lacp_timer;
 
-	if (i_dladm_aggr_ioctl(LAIOC_MODIFY, &ioc) < 0) {
+	if (i_dladm_aggr_ioctl(handle, LAIOC_MODIFY, &ioc) < 0) {
 		if (errno == EINVAL)
 			return (DLADM_STATUS_MACADDRINVAL);
 		else
@@ -613,9 +613,9 @@ i_dladm_aggr_modify_sys(datalink_id_t linkid, uint32_t mask,
  * Send a create command to the link aggregation driver.
  */
 static dladm_status_t
-i_dladm_aggr_create_sys(datalink_id_t linkid, uint16_t key, uint32_t nports,
-    dladm_aggr_port_attr_db_t *ports, uint32_t policy,
-    boolean_t mac_addr_fixed, const uchar_t *mac_addr,
+i_dladm_aggr_create_sys(dladm_handle_t handle, datalink_id_t linkid,
+    uint16_t key, uint32_t nports, dladm_aggr_port_attr_db_t *ports,
+    uint32_t policy, boolean_t mac_addr_fixed, const uchar_t *mac_addr,
     aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer, boolean_t force)
 {
 	int i, len;
@@ -648,7 +648,7 @@ i_dladm_aggr_create_sys(datalink_id_t linkid, uint16_t key, uint32_t nports,
 	bcopy(mac_addr, iocp->lc_mac, ETHERADDRL);
 	iocp->lc_mac_fixed = mac_addr_fixed;
 
-	if (i_dladm_aggr_ioctl(LAIOC_CREATE, iocp) < 0)
+	if (i_dladm_aggr_ioctl(handle, LAIOC_CREATE, iocp) < 0)
 		status = dladm_errno2status(errno);
 
 done:
@@ -660,7 +660,7 @@ done:
  * Invoked to bring up a link aggregation group.
  */
 static int
-i_dladm_aggr_up(datalink_id_t linkid, void *arg)
+i_dladm_aggr_up(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
 	dladm_status_t *statusp = (dladm_status_t *)arg;
 	dladm_aggr_grp_attr_t attr;
@@ -669,7 +669,7 @@ i_dladm_aggr_up(datalink_id_t linkid, void *arg)
 	int i, j;
 	dladm_status_t status;
 
-	status = dladm_aggr_info(linkid, &attr, DLADM_OPT_PERSIST);
+	status = dladm_aggr_info(handle, linkid, &attr, DLADM_OPT_PERSIST);
 	if (status != DLADM_STATUS_OK) {
 		*statusp = status;
 		return (DLADM_WALK_CONTINUE);
@@ -694,7 +694,8 @@ i_dladm_aggr_up(datalink_id_t linkid, void *arg)
 		uint32_t	flags;
 		dladm_status_t	s;
 
-		s = dladm_datalink_id2info(portid, &flags, NULL, NULL, NULL, 0);
+		s = dladm_datalink_id2info(handle, portid, &flags, NULL, NULL,
+		    NULL, 0);
 		if (s != DLADM_STATUS_OK || !(flags & DLADM_OPT_ACTIVE))
 			continue;
 
@@ -712,24 +713,25 @@ i_dladm_aggr_up(datalink_id_t linkid, void *arg)
 	/*
 	 * Create active aggregation.
 	 */
-	if ((status = i_dladm_aggr_create_sys(linkid,
+	if ((status = i_dladm_aggr_create_sys(handle, linkid,
 	    key, j, ports, attr.lg_policy, attr.lg_mac_fixed,
 	    (const uchar_t *)attr.lg_mac, attr.lg_lacp_mode,
 	    attr.lg_lacp_timer, attr.lg_force)) != DLADM_STATUS_OK) {
 		goto done;
 	}
 
-	if ((status = dladm_up_datalink_id(linkid)) != DLADM_STATUS_OK) {
+	if ((status = dladm_up_datalink_id(handle, linkid)) !=
+	    DLADM_STATUS_OK) {
 		laioc_delete_t ioc;
 		ioc.ld_linkid = linkid;
-		(void) i_dladm_aggr_ioctl(LAIOC_DELETE, &ioc);
+		(void) i_dladm_aggr_ioctl(handle, LAIOC_DELETE, &ioc);
 		goto done;
 	}
 
 	/*
 	 * Reset the active linkprop of this specific link.
 	 */
-	(void) dladm_init_linkprop(linkid, B_FALSE);
+	(void) dladm_init_linkprop(handle, linkid, B_FALSE);
 
 done:
 	free(attr.lg_ports);
@@ -744,17 +746,17 @@ done:
  * case, the walk may terminate early if bringup of an aggregation fails.
  */
 dladm_status_t
-dladm_aggr_up(datalink_id_t linkid)
+dladm_aggr_up(dladm_handle_t handle, datalink_id_t linkid)
 {
 	dladm_status_t status;
 
 	if (linkid == DATALINK_ALL_LINKID) {
-		(void) dladm_walk_datalink_id(i_dladm_aggr_up, &status,
+		(void) dladm_walk_datalink_id(i_dladm_aggr_up, handle, &status,
 		    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE,
 		    DLADM_OPT_PERSIST);
 		return (DLADM_STATUS_OK);
 	} else {
-		(void) i_dladm_aggr_up(linkid, &status);
+		(void) i_dladm_aggr_up(handle, linkid, &status);
 		return (status);
 	}
 }
@@ -995,11 +997,11 @@ dladm_aggr_portstate2str(aggr_port_state_t state_id, char *buf)
 }
 
 static dladm_status_t
-dladm_aggr_persist_aggr_conf(const char *link, datalink_id_t linkid,
-    uint16_t key, uint32_t nports, dladm_aggr_port_attr_db_t *ports,
-    uint32_t policy, boolean_t mac_addr_fixed, const uchar_t *mac_addr,
-    aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer,
-    boolean_t force)
+dladm_aggr_persist_aggr_conf(dladm_handle_t handle, const char *link,
+    datalink_id_t linkid, uint16_t key, uint32_t nports,
+    dladm_aggr_port_attr_db_t *ports, uint32_t policy, boolean_t mac_addr_fixed,
+    const uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
+    aggr_lacp_timer_t lacp_timer, boolean_t force)
 {
 	dladm_conf_t conf = DLADM_INVALID_CONF;
 	char *portstr = NULL;
@@ -1008,18 +1010,20 @@ dladm_aggr_persist_aggr_conf(const char *link, datalink_id_t linkid,
 	int i, size;
 	uint64_t u64;
 
-	if ((status = dladm_create_conf(link, linkid, DATALINK_CLASS_AGGR,
-	    DL_ETHER, &conf)) != DLADM_STATUS_OK) {
+	if ((status = dladm_create_conf(handle, link, linkid,
+	    DATALINK_CLASS_AGGR, DL_ETHER, &conf)) != DLADM_STATUS_OK) {
 		return (status);
 	}
 
 	u64 = key;
-	status = dladm_set_conf_field(conf, FKEY, DLADM_TYPE_UINT64, &u64);
+	status = dladm_set_conf_field(handle, conf, FKEY, DLADM_TYPE_UINT64,
+	    &u64);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
 	u64 = nports;
-	status = dladm_set_conf_field(conf, FNPORTS, DLADM_TYPE_UINT64, &u64);
+	status = dladm_set_conf_field(handle, conf, FNPORTS, DLADM_TYPE_UINT64,
+	    &u64);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
@@ -1031,19 +1035,21 @@ dladm_aggr_persist_aggr_conf(const char *link, datalink_id_t linkid,
 
 	for (i = 0; i < nports; i++)
 		WRITE_PORT(portstr, ports[i].lp_linkid, size);
-	status = dladm_set_conf_field(conf, FPORTS, DLADM_TYPE_STR, portstr);
+	status = dladm_set_conf_field(handle, conf, FPORTS, DLADM_TYPE_STR,
+	    portstr);
 	free(portstr);
 
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
 	u64 = policy;
-	status = dladm_set_conf_field(conf, FPOLICY, DLADM_TYPE_UINT64, &u64);
+	status = dladm_set_conf_field(handle, conf, FPOLICY, DLADM_TYPE_UINT64,
+	    &u64);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
-	status = dladm_set_conf_field(conf, FFIXMACADDR, DLADM_TYPE_BOOLEAN,
-	    &mac_addr_fixed);
+	status = dladm_set_conf_field(handle, conf, FFIXMACADDR,
+	    DLADM_TYPE_BOOLEAN, &mac_addr_fixed);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
@@ -1054,34 +1060,36 @@ dladm_aggr_persist_aggr_conf(const char *link, datalink_id_t linkid,
 		}
 
 		(void) dladm_aggr_macaddr2str(mac_addr, macstr);
-		status = dladm_set_conf_field(conf, FMACADDR, DLADM_TYPE_STR,
-		    macstr);
+		status = dladm_set_conf_field(handle, conf, FMACADDR,
+		    DLADM_TYPE_STR, macstr);
 		if (status != DLADM_STATUS_OK)
 			goto done;
 	}
 
-	status = dladm_set_conf_field(conf, FFORCE, DLADM_TYPE_BOOLEAN, &force);
+	status = dladm_set_conf_field(handle, conf, FFORCE, DLADM_TYPE_BOOLEAN,
+	    &force);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
 	u64 = lacp_mode;
-	status = dladm_set_conf_field(conf, FLACPMODE, DLADM_TYPE_UINT64, &u64);
+	status = dladm_set_conf_field(handle, conf, FLACPMODE,
+	    DLADM_TYPE_UINT64, &u64);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
 	u64 = lacp_timer;
-	status = dladm_set_conf_field(conf, FLACPTIMER, DLADM_TYPE_UINT64,
-	    &u64);
+	status = dladm_set_conf_field(handle, conf, FLACPTIMER,
+	    DLADM_TYPE_UINT64, &u64);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
 	/*
 	 * Commit the link aggregation configuration.
 	 */
-	status = dladm_write_conf(conf);
+	status = dladm_write_conf(handle, conf);
 
 done:
-	dladm_destroy_conf(conf);
+	dladm_destroy_conf(handle, conf);
 	return (status);
 }
 
@@ -1090,10 +1098,10 @@ done:
  * file and bring it up.
  */
 dladm_status_t
-dladm_aggr_create(const char *name, uint16_t key, uint32_t nports,
-    dladm_aggr_port_attr_db_t *ports, uint32_t policy, boolean_t mac_addr_fixed,
-    const uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
-    aggr_lacp_timer_t lacp_timer, uint32_t flags)
+dladm_aggr_create(dladm_handle_t handle, const char *name, uint16_t key,
+    uint32_t nports, dladm_aggr_port_attr_db_t *ports, uint32_t policy,
+    boolean_t mac_addr_fixed, const uchar_t *mac_addr,
+    aggr_lacp_mode_t lacp_mode, aggr_lacp_timer_t lacp_timer, uint32_t flags)
 {
 	datalink_id_t linkid = DATALINK_INVALID_LINKID;
 	uint32_t media;
@@ -1109,7 +1117,7 @@ dladm_aggr_create(const char *name, uint16_t key, uint32_t nports,
 		return (DLADM_STATUS_BADARG);
 
 	for (i = 0; i < nports; i++) {
-		if ((dladm_datalink_id2info(ports[i].lp_linkid, NULL,
+		if ((dladm_datalink_id2info(handle, ports[i].lp_linkid, NULL,
 		    &class, &media, NULL, 0) != DLADM_STATUS_OK) ||
 		    !((class == DATALINK_CLASS_PHYS) && (media == DL_ETHER))) {
 			return (DLADM_STATUS_BADARG);
@@ -1117,27 +1125,28 @@ dladm_aggr_create(const char *name, uint16_t key, uint32_t nports,
 	}
 
 	flags &= (DLADM_OPT_ACTIVE | DLADM_OPT_PERSIST);
-	if ((status = dladm_create_datalink_id(name, DATALINK_CLASS_AGGR,
-	    DL_ETHER, flags, &linkid)) != DLADM_STATUS_OK) {
+	if ((status = dladm_create_datalink_id(handle, name,
+	    DATALINK_CLASS_AGGR, DL_ETHER, flags, &linkid)) !=
+	    DLADM_STATUS_OK) {
 		goto fail;
 	}
 
 	if ((flags & DLADM_OPT_PERSIST) &&
-	    (status = dladm_aggr_persist_aggr_conf(name, linkid, key, nports,
-	    ports, policy, mac_addr_fixed, mac_addr, lacp_mode, lacp_timer,
-	    force)) != DLADM_STATUS_OK) {
+	    (status = dladm_aggr_persist_aggr_conf(handle, name, linkid, key,
+	    nports, ports, policy, mac_addr_fixed, mac_addr, lacp_mode,
+	    lacp_timer, force)) != DLADM_STATUS_OK) {
 		goto fail;
 	}
 
 	if (!(flags & DLADM_OPT_ACTIVE))
 		return (DLADM_STATUS_OK);
 
-	status = i_dladm_aggr_create_sys(linkid, key, nports, ports, policy,
-	    mac_addr_fixed, mac_addr, lacp_mode, lacp_timer, force);
+	status = i_dladm_aggr_create_sys(handle, linkid, key, nports, ports,
+	    policy, mac_addr_fixed, mac_addr, lacp_mode, lacp_timer, force);
 
 	if (status != DLADM_STATUS_OK) {
 		if (flags & DLADM_OPT_PERSIST)
-			(void) dladm_remove_conf(linkid);
+			(void) dladm_remove_conf(handle, linkid);
 		goto fail;
 	}
 
@@ -1145,21 +1154,21 @@ dladm_aggr_create(const char *name, uint16_t key, uint32_t nports,
 
 fail:
 	if (linkid != DATALINK_INVALID_LINKID)
-		(void) dladm_destroy_datalink_id(linkid, flags);
+		(void) dladm_destroy_datalink_id(handle, linkid, flags);
 
 	return (status);
 }
 
 static dladm_status_t
-i_dladm_aggr_get_aggr_attr(dladm_conf_t conf, uint32_t mask,
-    dladm_aggr_modify_attr_t *attrp)
+i_dladm_aggr_get_aggr_attr(dladm_handle_t handle, dladm_conf_t conf,
+    uint32_t mask, dladm_aggr_modify_attr_t *attrp)
 {
 	dladm_status_t status = DLADM_STATUS_OK;
 	char macstr[ETHERADDRL * 3];
 	uint64_t u64;
 
 	if (mask & DLADM_AGGR_MODIFY_POLICY) {
-		status = dladm_get_conf_field(conf, FPOLICY, &u64,
+		status = dladm_get_conf_field(handle, conf, FPOLICY, &u64,
 		    sizeof (u64));
 		if (status != DLADM_STATUS_OK)
 			return (status);
@@ -1167,7 +1176,7 @@ i_dladm_aggr_get_aggr_attr(dladm_conf_t conf, uint32_t mask,
 	}
 
 	if (mask & DLADM_AGGR_MODIFY_MAC) {
-		status = dladm_get_conf_field(conf, FFIXMACADDR,
+		status = dladm_get_conf_field(handle, conf, FFIXMACADDR,
 		    &attrp->ld_mac_fixed, sizeof (boolean_t));
 		if (status != DLADM_STATUS_OK)
 			return (status);
@@ -1175,7 +1184,7 @@ i_dladm_aggr_get_aggr_attr(dladm_conf_t conf, uint32_t mask,
 		if (attrp->ld_mac_fixed) {
 			boolean_t fixed;
 
-			status = dladm_get_conf_field(conf, FMACADDR,
+			status = dladm_get_conf_field(handle, conf, FMACADDR,
 			    macstr, sizeof (macstr));
 			if (status != DLADM_STATUS_OK)
 				return (status);
@@ -1188,7 +1197,7 @@ i_dladm_aggr_get_aggr_attr(dladm_conf_t conf, uint32_t mask,
 	}
 
 	if (mask & DLADM_AGGR_MODIFY_LACP_MODE) {
-		status = dladm_get_conf_field(conf, FLACPMODE, &u64,
+		status = dladm_get_conf_field(handle, conf, FLACPMODE, &u64,
 		    sizeof (u64));
 		if (status != DLADM_STATUS_OK)
 			return (status);
@@ -1196,7 +1205,7 @@ i_dladm_aggr_get_aggr_attr(dladm_conf_t conf, uint32_t mask,
 	}
 
 	if (mask & DLADM_AGGR_MODIFY_LACP_TIMER) {
-		status = dladm_get_conf_field(conf, FLACPTIMER, &u64,
+		status = dladm_get_conf_field(handle, conf, FLACPTIMER, &u64,
 		    sizeof (u64));
 		if (status != DLADM_STATUS_OK)
 			return (status);
@@ -1207,8 +1216,8 @@ i_dladm_aggr_get_aggr_attr(dladm_conf_t conf, uint32_t mask,
 }
 
 static dladm_status_t
-i_dladm_aggr_set_aggr_attr(dladm_conf_t conf, uint32_t mask,
-    dladm_aggr_modify_attr_t *attrp)
+i_dladm_aggr_set_aggr_attr(dladm_handle_t handle, dladm_conf_t conf,
+    uint32_t mask, dladm_aggr_modify_attr_t *attrp)
 {
 	dladm_status_t status = DLADM_STATUS_OK;
 	char macstr[ETHERADDRL * 3];
@@ -1216,21 +1225,21 @@ i_dladm_aggr_set_aggr_attr(dladm_conf_t conf, uint32_t mask,
 
 	if (mask & DLADM_AGGR_MODIFY_POLICY) {
 		u64 = attrp->ld_policy;
-		status = dladm_set_conf_field(conf, FPOLICY, DLADM_TYPE_UINT64,
-		    &u64);
+		status = dladm_set_conf_field(handle, conf, FPOLICY,
+		    DLADM_TYPE_UINT64, &u64);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 	}
 
 	if (mask & DLADM_AGGR_MODIFY_MAC) {
-		status = dladm_set_conf_field(conf, FFIXMACADDR,
+		status = dladm_set_conf_field(handle, conf, FFIXMACADDR,
 		    DLADM_TYPE_BOOLEAN, &attrp->ld_mac_fixed);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 
 		if (attrp->ld_mac_fixed) {
 			(void) dladm_aggr_macaddr2str(attrp->ld_mac, macstr);
-			status = dladm_set_conf_field(conf, FMACADDR,
+			status = dladm_set_conf_field(handle, conf, FMACADDR,
 			    DLADM_TYPE_STR, macstr);
 			if (status != DLADM_STATUS_OK)
 				return (status);
@@ -1239,7 +1248,7 @@ i_dladm_aggr_set_aggr_attr(dladm_conf_t conf, uint32_t mask,
 
 	if (mask & DLADM_AGGR_MODIFY_LACP_MODE) {
 		u64 = attrp->ld_lacp_mode;
-		status = dladm_set_conf_field(conf, FLACPMODE,
+		status = dladm_set_conf_field(handle, conf, FLACPMODE,
 		    DLADM_TYPE_UINT64, &u64);
 		if (status != DLADM_STATUS_OK)
 			return (status);
@@ -1247,7 +1256,7 @@ i_dladm_aggr_set_aggr_attr(dladm_conf_t conf, uint32_t mask,
 
 	if (mask & DLADM_AGGR_MODIFY_LACP_TIMER) {
 		u64 = attrp->ld_lacp_timer;
-		status = dladm_set_conf_field(conf, FLACPTIMER,
+		status = dladm_set_conf_field(handle, conf, FLACPTIMER,
 		    DLADM_TYPE_UINT64, &u64);
 		if (status != DLADM_STATUS_OK)
 			return (status);
@@ -1261,8 +1270,9 @@ i_dladm_aggr_set_aggr_attr(dladm_conf_t conf, uint32_t mask,
  * the configuration file and pass the changes to the kernel.
  */
 dladm_status_t
-dladm_aggr_modify(datalink_id_t linkid, uint32_t modify_mask, uint32_t policy,
-    boolean_t mac_fixed, const uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
+dladm_aggr_modify(dladm_handle_t handle, datalink_id_t linkid,
+    uint32_t modify_mask, uint32_t policy, boolean_t mac_fixed,
+    const uchar_t *mac_addr, aggr_lacp_mode_t lacp_mode,
     aggr_lacp_timer_t lacp_timer, uint32_t flags)
 {
 	dladm_aggr_modify_attr_t new_attr, old_attr;
@@ -1276,24 +1286,24 @@ dladm_aggr_modify(datalink_id_t linkid, uint32_t modify_mask, uint32_t policy,
 	bcopy(mac_addr, new_attr.ld_mac, ETHERADDRL);
 
 	if (flags & DLADM_OPT_PERSIST) {
-		status = dladm_read_conf(linkid, &conf);
+		status = dladm_read_conf(handle, linkid, &conf);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 
-		if ((status = i_dladm_aggr_get_aggr_attr(conf, modify_mask,
-		    &old_attr)) != DLADM_STATUS_OK) {
+		if ((status = i_dladm_aggr_get_aggr_attr(handle, conf,
+		    modify_mask, &old_attr)) != DLADM_STATUS_OK) {
 			goto done;
 		}
 
-		if ((status = i_dladm_aggr_set_aggr_attr(conf, modify_mask,
-		    &new_attr)) != DLADM_STATUS_OK) {
+		if ((status = i_dladm_aggr_set_aggr_attr(handle, conf,
+		    modify_mask, &new_attr)) != DLADM_STATUS_OK) {
 			goto done;
 		}
 
-		status = dladm_write_conf(conf);
+		status = dladm_write_conf(handle, conf);
 
 done:
-		dladm_destroy_conf(conf);
+		dladm_destroy_conf(handle, conf);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 	}
@@ -1301,14 +1311,15 @@ done:
 	if (!(flags & DLADM_OPT_ACTIVE))
 		return (DLADM_STATUS_OK);
 
-	status = i_dladm_aggr_modify_sys(linkid, modify_mask, &new_attr);
+	status = i_dladm_aggr_modify_sys(handle, linkid, modify_mask,
+	    &new_attr);
 	if ((status != DLADM_STATUS_OK) && (flags & DLADM_OPT_PERSIST)) {
-		if (dladm_read_conf(linkid, &conf) == DLADM_STATUS_OK) {
-			if (i_dladm_aggr_set_aggr_attr(conf, modify_mask,
-			    &old_attr) == DLADM_STATUS_OK) {
-				(void) dladm_write_conf(conf);
+		if (dladm_read_conf(handle, linkid, &conf) == DLADM_STATUS_OK) {
+			if (i_dladm_aggr_set_aggr_attr(handle, conf,
+			    modify_mask, &old_attr) == DLADM_STATUS_OK) {
+				(void) dladm_write_conf(handle, conf);
 			}
-			dladm_destroy_conf(conf);
+			dladm_destroy_conf(handle, conf);
 		}
 	}
 
@@ -1321,12 +1332,13 @@ typedef struct aggr_held_arg_s {
 } aggr_held_arg_t;
 
 static int
-i_dladm_aggr_is_held(datalink_id_t linkid, void *arg)
+i_dladm_aggr_is_held(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
 	aggr_held_arg_t		*aggr_held_arg = arg;
 	dladm_vlan_attr_t	dva;
 
-	if (dladm_vlan_info(linkid, &dva, DLADM_OPT_PERSIST) != DLADM_STATUS_OK)
+	if (dladm_vlan_info(handle, linkid, &dva, DLADM_OPT_PERSIST) !=
+	    DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
 	if (dva.dv_linkid == aggr_held_arg->aggrid) {
@@ -1344,20 +1356,20 @@ i_dladm_aggr_is_held(datalink_id_t linkid, void *arg)
  * or the "key" is specified.
  */
 dladm_status_t
-dladm_aggr_delete(datalink_id_t linkid, uint32_t flags)
+dladm_aggr_delete(dladm_handle_t handle, datalink_id_t linkid, uint32_t flags)
 {
 	laioc_delete_t ioc;
 	datalink_class_t class;
 	dladm_status_t status;
 
-	if ((dladm_datalink_id2info(linkid, NULL, &class, NULL, NULL, 0) !=
-	    DLADM_STATUS_OK) || (class != DATALINK_CLASS_AGGR)) {
+	if ((dladm_datalink_id2info(handle, linkid, NULL, &class, NULL, NULL,
+	    0) != DLADM_STATUS_OK) || (class != DATALINK_CLASS_AGGR)) {
 		return (DLADM_STATUS_BADARG);
 	}
 
 	if (flags & DLADM_OPT_ACTIVE) {
 		ioc.ld_linkid = linkid;
-		if ((i_dladm_aggr_ioctl(LAIOC_DELETE, &ioc) < 0) &&
+		if ((i_dladm_aggr_ioctl(handle, LAIOC_DELETE, &ioc) < 0) &&
 		    ((errno != ENOENT) || !(flags & DLADM_OPT_PERSIST))) {
 			status = dladm_errno2status(errno);
 			return (status);
@@ -1366,9 +1378,10 @@ dladm_aggr_delete(datalink_id_t linkid, uint32_t flags)
 		/*
 		 * Delete ACTIVE linkprop first.
 		 */
-		(void) dladm_set_linkprop(linkid, NULL, NULL, 0,
+		(void) dladm_set_linkprop(handle, linkid, NULL, NULL, 0,
 		    DLADM_OPT_ACTIVE);
-		(void) dladm_destroy_datalink_id(linkid, DLADM_OPT_ACTIVE);
+		(void) dladm_destroy_datalink_id(handle, linkid,
+		    DLADM_OPT_ACTIVE);
 	}
 
 	/*
@@ -1383,14 +1396,15 @@ dladm_aggr_delete(datalink_id_t linkid, uint32_t flags)
 		arg.aggrid = linkid;
 		arg.isheld = B_FALSE;
 
-		(void) dladm_walk_datalink_id(i_dladm_aggr_is_held,
+		(void) dladm_walk_datalink_id(i_dladm_aggr_is_held, handle,
 		    &arg, DATALINK_CLASS_VLAN, DATALINK_ANY_MEDIATYPE,
 		    DLADM_OPT_PERSIST);
 		if (arg.isheld)
 			return (DLADM_STATUS_LINKBUSY);
 
-		(void) dladm_destroy_datalink_id(linkid, DLADM_OPT_PERSIST);
-		(void) dladm_remove_conf(linkid);
+		(void) dladm_destroy_datalink_id(handle, linkid,
+		    DLADM_OPT_PERSIST);
+		(void) dladm_remove_conf(handle, linkid);
 	}
 
 	return (DLADM_STATUS_OK);
@@ -1400,20 +1414,21 @@ dladm_aggr_delete(datalink_id_t linkid, uint32_t flags)
  * Add one or more ports to an existing link aggregation.
  */
 dladm_status_t
-dladm_aggr_add(datalink_id_t linkid, uint32_t nports,
+dladm_aggr_add(dladm_handle_t handle, datalink_id_t linkid, uint32_t nports,
     dladm_aggr_port_attr_db_t *ports, uint32_t flags)
 {
-	return (i_dladm_aggr_add_rmv(linkid, nports, ports, flags, LAIOC_ADD));
+	return (i_dladm_aggr_add_rmv(handle, linkid, nports, ports, flags,
+	    LAIOC_ADD));
 }
 
 /*
  * Remove one or more ports from an existing link aggregation.
  */
 dladm_status_t
-dladm_aggr_remove(datalink_id_t linkid, uint32_t nports,
+dladm_aggr_remove(dladm_handle_t handle, datalink_id_t linkid, uint32_t nports,
     dladm_aggr_port_attr_db_t *ports, uint32_t flags)
 {
-	return (i_dladm_aggr_add_rmv(linkid, nports, ports, flags,
+	return (i_dladm_aggr_add_rmv(handle, linkid, nports, ports, flags,
 	    LAIOC_REMOVE));
 }
 
@@ -1424,7 +1439,7 @@ typedef struct i_walk_key_state_s {
 } i_walk_key_state_t;
 
 static int
-i_dladm_walk_key2linkid(datalink_id_t linkid, void *arg)
+i_dladm_walk_key2linkid(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
 	dladm_conf_t conf;
 	uint16_t key;
@@ -1432,12 +1447,12 @@ i_dladm_walk_key2linkid(datalink_id_t linkid, void *arg)
 	i_walk_key_state_t *statep = (i_walk_key_state_t *)arg;
 	uint64_t u64;
 
-	if (dladm_read_conf(linkid, &conf) != 0)
+	if (dladm_read_conf(handle, linkid, &conf) != 0)
 		return (DLADM_WALK_CONTINUE);
 
-	status = dladm_get_conf_field(conf, FKEY, &u64, sizeof (u64));
+	status = dladm_get_conf_field(handle, conf, FKEY, &u64, sizeof (u64));
 	key = (uint16_t)u64;
-	dladm_destroy_conf(conf);
+	dladm_destroy_conf(handle, conf);
 
 	if ((status == DLADM_STATUS_OK) && (key == statep->key)) {
 		statep->found = B_TRUE;
@@ -1449,7 +1464,8 @@ i_dladm_walk_key2linkid(datalink_id_t linkid, void *arg)
 }
 
 dladm_status_t
-dladm_key2linkid(uint16_t key, datalink_id_t *linkidp, uint32_t flags)
+dladm_key2linkid(dladm_handle_t handle, uint16_t key, datalink_id_t *linkidp,
+    uint32_t flags)
 {
 	i_walk_key_state_t state;
 
@@ -1459,7 +1475,7 @@ dladm_key2linkid(uint16_t key, datalink_id_t *linkidp, uint32_t flags)
 	state.found = B_FALSE;
 	state.key = key;
 
-	(void) dladm_walk_datalink_id(i_dladm_walk_key2linkid, &state,
+	(void) dladm_walk_datalink_id(i_dladm_walk_key2linkid, handle, &state,
 	    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE, flags);
 	if (state.found == B_TRUE) {
 		*linkidp = state.linkid;

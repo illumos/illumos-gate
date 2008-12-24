@@ -32,11 +32,77 @@
 #include <stdlib.h>
 #include <sys/param.h>
 #include <sys/stat.h>
+#include <sys/dld.h>
 #include <libdladm_impl.h>
 #include <libintl.h>
 #include <libdlpi.h>
 
-static char		dladm_rootdir[MAXPATHLEN] = "/";
+static char	dladm_rootdir[MAXPATHLEN] = "/";
+
+dladm_status_t
+dladm_open(dladm_handle_t *handle)
+{
+	int dld_fd;
+
+	if (handle == NULL)
+		return (DLADM_STATUS_BADARG);
+
+	if ((dld_fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
+		return (dladm_errno2status(errno));
+
+	/*
+	 * Don't open DLMGMT_DOOR now.  dlmgmtd(1M) is not able to
+	 * open the door when the dladm handle is opened because the
+	 * door hasn't been created yet at that time.  Thus, we must
+	 * open it on-demand in dladm_door_fd().  Move the open()
+	 * to dladm_door_fd() for all cases.
+	 */
+
+	if ((*handle = malloc(sizeof (struct dladm_handle))) == NULL) {
+		(void) close(dld_fd);
+		return (DLADM_STATUS_NOMEM);
+	}
+
+	(*handle)->dld_fd = dld_fd;
+	(*handle)->door_fd = -1;
+
+	return (DLADM_STATUS_OK);
+}
+
+void
+dladm_close(dladm_handle_t handle)
+{
+	if (handle != NULL) {
+		(void) close(handle->dld_fd);
+		if (handle->door_fd != -1)
+			(void) close(handle->door_fd);
+		free(handle);
+	}
+}
+
+int
+dladm_dld_fd(dladm_handle_t handle)
+{
+	return (handle->dld_fd);
+}
+
+/*
+ * If DLMGMT_DOOR hasn't been opened in the handle yet, open it.
+ */
+dladm_status_t
+dladm_door_fd(dladm_handle_t handle, int *door_fd)
+{
+	int fd;
+
+	if (handle->door_fd == -1) {
+		if ((fd = open(DLMGMT_DOOR, O_RDONLY)) < 0)
+			return (dladm_errno2status(errno));
+		handle->door_fd = fd;
+	}
+	*door_fd = handle->door_fd;
+
+	return (DLADM_STATUS_OK);
+}
 
 const char *
 dladm_status2str(dladm_status_t status, char *buf)
@@ -557,8 +623,8 @@ dladm_media2str(uint32_t media, char *buf)
 }
 
 dladm_status_t
-i_dladm_rw_db(const char *db_file, mode_t db_perms,
-    dladm_status_t (*process_db)(void *, FILE *, FILE *),
+i_dladm_rw_db(dladm_handle_t handle, const char *db_file, mode_t db_perms,
+    dladm_status_t (*process_db)(dladm_handle_t, void *, FILE *, FILE *),
     void *arg, boolean_t writeop)
 {
 	dladm_status_t	status = DLADM_STATUS_OK;
@@ -613,7 +679,7 @@ i_dladm_rw_db(const char *db_file, mode_t db_perms,
 			return (dladm_errno2status(errno));
 		}
 	}
-	status = (*process_db)(arg, fp, nfp);
+	status = (*process_db)(handle, arg, fp, nfp);
 	if (!writeop || status != DLADM_STATUS_OK)
 		goto done;
 

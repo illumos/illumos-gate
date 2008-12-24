@@ -533,11 +533,10 @@ failed:
 }
 
 static dladm_status_t
-i_dladm_flow_add(char *flowname, datalink_id_t linkid, flow_desc_t *flowdesc,
-    mac_resource_props_t *mrp)
+i_dladm_flow_add(dladm_handle_t handle, char *flowname, datalink_id_t linkid,
+    flow_desc_t *flowdesc, mac_resource_props_t *mrp)
 {
 	dld_ioc_addflow_t	attr;
-	int			fd;
 
 	/* create flow */
 	bzero(&attr, sizeof (attr));
@@ -550,38 +549,23 @@ i_dladm_flow_add(char *flowname, datalink_id_t linkid, flow_desc_t *flowdesc,
 	(void) strlcpy(attr.af_name, flowname, sizeof (attr.af_name));
 	attr.af_linkid = linkid;
 
-	fd = open(DLD_CONTROL_DEV, O_RDWR);
-	if (fd < 0)
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_ADDFLOW, &attr) < 0)
 		return (dladm_errno2status(errno));
-
-	if (ioctl(fd, DLDIOC_ADDFLOW, &attr) < 0) {
-		(void) close(fd);
-		return (dladm_errno2status(errno));
-	}
-
-	(void) close(fd);
 
 	return (DLADM_STATUS_OK);
 }
 
 static dladm_status_t
-i_dladm_flow_remove(char *flowname)
+i_dladm_flow_remove(dladm_handle_t handle, char *flowname)
 {
 	dld_ioc_removeflow_t	attr;
-	int			fd;
 	dladm_status_t		status = DLADM_STATUS_OK;
 
 	(void) strlcpy(attr.rf_name, flowname,
 	    sizeof (attr.rf_name));
 
-	fd = open(DLD_CONTROL_DEV, O_RDWR);
-	if (fd < 0)
-		return (dladm_errno2status(errno));
-
-	if (ioctl(fd, DLDIOC_REMOVEFLOW, &attr) < 0)
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_REMOVEFLOW, &attr) < 0)
 		status = dladm_errno2status(errno);
-
-	(void) close(fd);
 
 	return (status);
 }
@@ -589,9 +573,9 @@ i_dladm_flow_remove(char *flowname)
 
 /* ARGSUSED */
 dladm_status_t
-dladm_flow_add(datalink_id_t linkid, dladm_arg_list_t *attrlist,
-    dladm_arg_list_t *proplist, char *flowname, boolean_t tempop,
-    const char *root)
+dladm_flow_add(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_arg_list_t *attrlist, dladm_arg_list_t *proplist, char *flowname,
+    boolean_t tempop, const char *root)
 {
 	dld_flowinfo_t		db_attr;
 	flow_desc_t		flowdesc;
@@ -613,7 +597,7 @@ dladm_flow_add(datalink_id_t linkid, dladm_arg_list_t *attrlist,
 	}
 
 	/* Add flow in kernel */
-	status = i_dladm_flow_add(flowname, linkid, &flowdesc, &mrp);
+	status = i_dladm_flow_add(handle, flowname, linkid, &flowdesc, &mrp);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
@@ -627,15 +611,15 @@ dladm_flow_add(datalink_id_t linkid, dladm_arg_list_t *attrlist,
 
 		if ((status = i_dladm_flow_create_db(&db_attr, root)) !=
 		    DLADM_STATUS_OK) {
-			(void) i_dladm_flow_remove(flowname);
+			(void) i_dladm_flow_remove(handle, flowname);
 			return (status);
 		}
 		/* set flow properties */
 		if (proplist != NULL) {
-			status = i_dladm_set_flow_proplist_db(flowname,
+			status = i_dladm_set_flow_proplist_db(handle, flowname,
 			    proplist);
 			if (status != DLADM_STATUS_OK) {
-				(void) i_dladm_flow_remove(flowname);
+				(void) i_dladm_flow_remove(handle, flowname);
 				return (status);
 			}
 		}
@@ -648,7 +632,7 @@ dladm_flow_add(datalink_id_t linkid, dladm_arg_list_t *attrlist,
  */
 /* ARGSUSED */
 dladm_status_t
-dladm_flow_remove(char *flowname, boolean_t tempop,
+dladm_flow_remove(dladm_handle_t handle, char *flowname, boolean_t tempop,
     const char *root)
 {
 	remove_db_state_t		state;
@@ -656,7 +640,7 @@ dladm_flow_remove(char *flowname, boolean_t tempop,
 	dladm_status_t			s = DLADM_STATUS_OK;
 
 	/* remove flow */
-	status = i_dladm_flow_remove(flowname);
+	status = i_dladm_flow_remove(handle, flowname);
 	if ((status != DLADM_STATUS_OK) &&
 	    (tempop || status != DLADM_STATUS_NOTFOUND))
 		goto done;
@@ -675,7 +659,7 @@ dladm_flow_remove(char *flowname, boolean_t tempop,
 		}
 
 		/* flow prop DB */
-		s = dladm_set_flowprop(flowname, NULL, NULL, 0,
+		s = dladm_set_flowprop(handle, flowname, NULL, NULL, 0,
 		    DLADM_OPT_PERSIST, NULL);
 	}
 
@@ -735,11 +719,11 @@ i_dladm_flow_get_db_fn(void *arg, dld_flowinfo_t *grp)
  */
 /* ARGSUSED */
 dladm_status_t
-dladm_walk_flow(int (*fn)(dladm_flow_attr_t *, void *),
+dladm_walk_flow(int (*fn)(dladm_flow_attr_t *, void *), dladm_handle_t handle,
     datalink_id_t linkid, void *arg, boolean_t persist)
 {
 	dld_flowinfo_t		*flow;
-	int			i, bufsize, fd;
+	int			i, bufsize;
 	dld_ioc_walkflow_t	*ioc = NULL;
 	dladm_flow_attr_t 	attr;
 	dladm_status_t		status = DLADM_STATUS_OK;
@@ -760,20 +744,16 @@ dladm_walk_flow(int (*fn)(dladm_flow_attr_t *, void *),
 		if (status != DLADM_STATUS_OK)
 			return (status);
 	} else {
-		if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-			return (dladm_errno2status(errno));
-
 		bufsize = MIN_INFO_SIZE;
 		if ((ioc = calloc(1, bufsize)) == NULL) {
 			status = dladm_errno2status(errno);
-			(void) close(fd);
 			return (status);
 		}
 
 		ioc->wf_linkid = linkid;
 		ioc->wf_len = bufsize - sizeof (*ioc);
 
-		while (ioctl(fd, DLDIOC_WALKFLOW, ioc) < 0) {
+		while (ioctl(dladm_dld_fd(handle), DLDIOC_WALKFLOW, ioc) < 0) {
 			if (errno == ENOSPC) {
 				bufsize *= 2;
 				ioc = realloc(ioc, bufsize);
@@ -805,12 +785,11 @@ dladm_walk_flow(int (*fn)(dladm_flow_attr_t *, void *),
 
 bail:
 	free(ioc);
-	(void) close(fd);
 	return (status);
 }
 
 dladm_status_t
-dladm_flow_init(void)
+dladm_flow_init(dladm_handle_t handle)
 {
 	flow_desc_t		flowdesc;
 	datalink_id_t		linkid;
@@ -841,11 +820,11 @@ dladm_flow_init(void)
 		    sizeof (attr.fi_flowname));
 		linkid = attr.fi_linkid;
 
-		s = i_dladm_flow_add(name, linkid, &flowdesc, NULL);
+		s = i_dladm_flow_add(handle, name, linkid, &flowdesc, NULL);
 		if (s != DLADM_STATUS_OK)
 			status = s;
 	}
-	s = i_dladm_init_flowprop_db();
+	s = i_dladm_init_flowprop_db(handle);
 	if (s != DLADM_STATUS_OK)
 		status = s;
 

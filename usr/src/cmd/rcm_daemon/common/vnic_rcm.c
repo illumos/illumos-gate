@@ -98,6 +98,8 @@ static link_cache_t	cache_tail;
 static mutex_t		cache_lock;
 static int		events_registered = 0;
 
+static dladm_handle_t	dld_handle = NULL;
+
 /*
  * RCM module interface prototypes
  */
@@ -169,6 +171,8 @@ rcm_mod_init(void)
 	cache_tail.vc_next = NULL;
 	(void) mutex_init(&cache_lock, 0, NULL);
 
+	dladm_open(&dld_handle);
+
 	/* Return the ops vectors */
 	return (&vnic_ops);
 }
@@ -200,6 +204,8 @@ rcm_mod_fini(void)
 	 */
 	cache_free();
 	(void) mutex_destroy(&cache_lock);
+
+	dladm_close(dld_handle);
 	return (RCM_SUCCESS);
 }
 
@@ -396,8 +402,8 @@ vnic_online_vnic(link_cache_t *node)
 		if (!(vnic->dlv_flags & VNIC_OFFLINED))
 			continue;
 
-		if ((status = dladm_vnic_up(vnic->dlv_vnic_id, 0)) !=
-		    DLADM_STATUS_OK) {
+		if ((status = dladm_vnic_up(dld_handle, vnic->dlv_vnic_id, 0))
+		    != DLADM_STATUS_OK) {
 			/*
 			 * Print a warning message and continue to online
 			 * other VNICs.
@@ -427,7 +433,7 @@ vnic_offline_vnic(link_cache_t *node, uint32_t flags, cache_node_state_t state)
 	 */
 	for (vnic = node->vc_vnic; vnic != NULL; vnic = vnic->dlv_next) {
 
-		if ((status = dladm_vnic_delete(vnic->dlv_vnic_id,
+		if ((status = dladm_vnic_delete(dld_handle, vnic->dlv_vnic_id,
 		    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK) {
 			rcm_log_message(RCM_WARNING,
 			    _("VNIC: VNIC offline failed (%u): %s\n"),
@@ -672,8 +678,8 @@ vnic_usage(link_cache_t *node)
 	rcm_log_message(RCM_TRACE2, "VNIC: usage(%s)\n", node->vc_resource);
 
 	assert(MUTEX_HELD(&cache_lock));
-	if ((status = dladm_datalink_id2info(node->vc_linkid, NULL, NULL, NULL,
-	    name, sizeof (name))) != DLADM_STATUS_OK) {
+	if ((status = dladm_datalink_id2info(dld_handle, node->vc_linkid, NULL,
+	    NULL, NULL, name, sizeof (name))) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_ERROR,
 		    _("VNIC: usage(%s) get link name failure(%s)\n"),
 		    node->vc_resource, dladm_status2str(status, errmsg));
@@ -713,8 +719,9 @@ vnic_usage(link_cache_t *node)
 	for (vnic = node->vc_vnic; vnic != NULL; vnic = vnic->dlv_next) {
 		rcm_log_message(RCM_DEBUG, "VNIC:= %u\n", vnic->dlv_vnic_id);
 
-		if ((status = dladm_datalink_id2info(vnic->dlv_vnic_id, NULL,
-		    NULL, NULL, name, sizeof (name))) != DLADM_STATUS_OK) {
+		if ((status = dladm_datalink_id2info(dld_handle,
+		    vnic->dlv_vnic_id, NULL, NULL, NULL, name, sizeof (name)))
+		    != DLADM_STATUS_OK) {
 			rcm_log_message(RCM_ERROR,
 			    _("VNIC: usage(%s) get vnic %u name failure(%s)\n"),
 			    node->vc_resource, vnic->dlv_vnic_id,
@@ -830,7 +837,7 @@ typedef struct vnic_update_arg_s {
  * vnic_update() - Update physical interface properties
  */
 static int
-vnic_update(datalink_id_t vnicid, void *arg)
+vnic_update(dladm_handle_t handle, datalink_id_t vnicid, void *arg)
 {
 	vnic_update_arg_t *vnic_update_argp = arg;
 	rcm_handle_t *hd = vnic_update_argp->hd;
@@ -846,7 +853,7 @@ vnic_update(datalink_id_t vnicid, void *arg)
 	rcm_log_message(RCM_TRACE2, "VNIC: vnic_update(%u)\n", vnicid);
 
 	assert(MUTEX_HELD(&cache_lock));
-	status = dladm_vnic_info(vnicid, &vnic_attr, DLADM_OPT_ACTIVE);
+	status = dladm_vnic_info(handle, vnicid, &vnic_attr, DLADM_OPT_ACTIVE);
 	if (status != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_TRACE1,
 		    "VNIC: vnic_update() cannot get vnic information for "
@@ -947,8 +954,8 @@ vnic_update_all(rcm_handle_t *hd)
 
 	assert(MUTEX_HELD(&cache_lock));
 	arg.hd = hd;
-	(void) dladm_walk_datalink_id(vnic_update, &arg, DATALINK_CLASS_VNIC,
-	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+	(void) dladm_walk_datalink_id(vnic_update, dld_handle, &arg,
+	    DATALINK_CLASS_VNIC, DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
 	return (arg.retval);
 }
 
@@ -1073,8 +1080,8 @@ vnic_log_err(datalink_id_t linkid, char **errorp, char *errmsg)
 		    RCM_LINK_PREFIX, linkid);
 
 		rcm_log_message(RCM_ERROR, _("VNIC: %s(%s)\n"), errmsg, rsrc);
-		if ((status = dladm_datalink_id2info(linkid, NULL, NULL,
-		    NULL, link, sizeof (link))) != DLADM_STATUS_OK) {
+		if ((status = dladm_datalink_id2info(dld_handle, linkid, NULL,
+		    NULL, NULL, link, sizeof (link))) != DLADM_STATUS_OK) {
 			rcm_log_message(RCM_WARNING,
 			    _("VNIC: cannot get link name for (%s) %s\n"),
 			    rsrc, dladm_status2str(status, errstr));
@@ -1258,14 +1265,14 @@ typedef struct vnic_up_arg_s {
 } vnic_up_arg_t;
 
 static int
-vnic_up(datalink_id_t vnicid, void *arg)
+vnic_up(dladm_handle_t handle, datalink_id_t vnicid, void *arg)
 {
 	vnic_up_arg_t *vnic_up_argp = arg;
 	dladm_status_t status;
 	dladm_vnic_attr_t vnic_attr;
 	char errmsg[DLADM_STRSIZE];
 
-	status = dladm_vnic_info(vnicid, &vnic_attr, DLADM_OPT_PERSIST);
+	status = dladm_vnic_info(handle, vnicid, &vnic_attr, DLADM_OPT_PERSIST);
 	if (status != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_TRACE1,
 		    "VNIC: vnic_up(): cannot get information for VNIC %u "
@@ -1277,7 +1284,7 @@ vnic_up(datalink_id_t vnicid, void *arg)
 		return (DLADM_WALK_CONTINUE);
 
 	rcm_log_message(RCM_TRACE3, "VNIC: vnic_up(%u)\n", vnicid);
-	if ((status = dladm_vnic_up(vnicid, 0)) == DLADM_STATUS_OK)
+	if ((status = dladm_vnic_up(handle, vnicid, 0)) == DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
 	/*
@@ -1318,8 +1325,8 @@ vnic_configure(rcm_handle_t *hd, datalink_id_t linkid)
 	(void) mutex_unlock(&cache_lock);
 
 	arg.linkid = linkid;
-	(void) dladm_walk_datalink_id(vnic_up, &arg, DATALINK_CLASS_VNIC,
-	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
+	(void) dladm_walk_datalink_id(vnic_up, dld_handle, &arg,
+	    DATALINK_CLASS_VNIC, DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
 
 	if (arg.retval == 0) {
 		rcm_log_message(RCM_TRACE2,

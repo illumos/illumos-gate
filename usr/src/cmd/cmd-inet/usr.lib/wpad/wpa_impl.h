@@ -11,8 +11,6 @@
 #ifndef __WPA_IMPL_H
 #define	__WPA_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <net/wpa.h>
 #include <libdladm.h>
 #include <libdllink.h>
@@ -165,6 +163,9 @@ struct wpa_ptk {
 struct wpa_supplicant {
 	struct l2_packet_data	*l2;
 	unsigned char		own_addr[IEEE80211_ADDR_LEN];
+
+	/* The handle required for libdladm calls */
+	dladm_handle_t		handle;
 
 	datalink_id_t		linkid;
 	char			kname[DLADM_SECOBJ_NAME_MAX];

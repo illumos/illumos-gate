@@ -4500,9 +4500,15 @@ static boolean_t
 ni_entry(const char *linkname, void *arg)
 {
 	dlpi_handle_t	dh;
+	dladm_handle_t	dld_handle;
 	datalink_class_t class;
 
-	(void) dladm_name2info(linkname, NULL, NULL, &class, NULL);
+	if (dladm_open(&dld_handle) != DLADM_STATUS_OK)
+		return (_B_FALSE);
+
+	(void) dladm_name2info(dld_handle, linkname, NULL, NULL, &class, NULL);
+	dladm_close(dld_handle);
+
 	if (class == DATALINK_CLASS_ETHERSTUB)
 		return (_B_FALSE);
 	if (dlpi_open(linkname, &dh, 0) != DLPI_SUCCESS)

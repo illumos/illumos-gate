@@ -31,6 +31,8 @@
 extern "C" {
 #endif
 
+#include <libdladm.h>
+
 /*
  * Multi-threaded programs should avoid MT-unsafe library calls (i.e., any-
  * thing which could try to acquire a user-level lock unprotected by an atfork
@@ -87,6 +89,7 @@ extern char boot_args[BOOTARGS_MAX];
 extern char bad_boot_arg[BOOTARGS_MAX];
 extern boolean_t zone_isnative;
 extern boolean_t zone_iscluster;
+extern dladm_handle_t dld_handle;
 
 extern void zerror(zlog_t *, boolean_t, const char *, ...);
 extern char *localize_msg(char *locale, const char *msg);

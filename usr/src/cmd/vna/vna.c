@@ -44,13 +44,13 @@ typedef struct vnic_attr {
 
 /*ARGSUSED*/
 static int
-v_print(datalink_id_t vnic_id, void *arg)
+v_print(dladm_handle_t handle, datalink_id_t vnic_id, void *arg)
 {
 	dladm_vnic_attr_t attr;
 	char vnic[MAXLINKNAMELEN];
 	char link[MAXLINKNAMELEN];
 
-	if (dladm_vnic_info(vnic_id, &attr, DLADM_OPT_ACTIVE) !=
+	if (dladm_vnic_info(handle, vnic_id, &attr, DLADM_OPT_ACTIVE) !=
 	    DLADM_STATUS_OK) {
 		return (DLADM_WALK_CONTINUE);
 	}
@@ -58,13 +58,13 @@ v_print(datalink_id_t vnic_id, void *arg)
 	if (attr.va_mac_len != ETHERADDRL)
 		return (DLADM_WALK_CONTINUE);
 
-	if (dladm_datalink_id2info(vnic_id, NULL, NULL, NULL, vnic,
+	if (dladm_datalink_id2info(handle, vnic_id, NULL, NULL, NULL, vnic,
 	    sizeof (vnic)) != DLADM_STATUS_OK) {
 		return (DLADM_WALK_CONTINUE);
 	}
 
-	if (dladm_datalink_id2info(attr.va_link_id, NULL, NULL, NULL, link,
-	    sizeof (link)) != DLADM_STATUS_OK) {
+	if (dladm_datalink_id2info(handle, attr.va_link_id, NULL, NULL, NULL,
+	    link, sizeof (link)) != DLADM_STATUS_OK) {
 		return (DLADM_WALK_CONTINUE);
 	}
 
@@ -75,21 +75,21 @@ v_print(datalink_id_t vnic_id, void *arg)
 }
 
 static void
-v_list(void)
+v_list(dladm_handle_t handle)
 {
-	(void) dladm_walk_datalink_id(v_print, NULL, DATALINK_CLASS_VNIC,
-	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+	(void) dladm_walk_datalink_id(v_print, handle, NULL,
+	    DATALINK_CLASS_VNIC, DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
 }
 
 static int
-v_find(datalink_id_t vnic_id, void *arg)
+v_find(dladm_handle_t handle, datalink_id_t vnic_id, void *arg)
 {
 	vnic_attr_t *vattr = arg;
 	dladm_vnic_attr_t *specp = &vattr->attr;
 	dladm_vnic_attr_t attr;
 	char linkname[MAXLINKNAMELEN];
 
-	if (dladm_vnic_info(vnic_id, &attr, DLADM_OPT_ACTIVE) !=
+	if (dladm_vnic_info(handle, vnic_id, &attr, DLADM_OPT_ACTIVE) !=
 	    DLADM_STATUS_OK) {
 		return (DLADM_WALK_CONTINUE);
 	}
@@ -107,8 +107,8 @@ v_find(datalink_id_t vnic_id, void *arg)
 
 	if (vattr->name != NULL) {
 		/* Names must match. */
-		if (dladm_datalink_id2info(vnic_id, NULL, NULL, NULL, linkname,
-		    sizeof (linkname)) != DLADM_STATUS_OK) {
+		if (dladm_datalink_id2info(handle, vnic_id, NULL, NULL, NULL,
+		    linkname, sizeof (linkname)) != DLADM_STATUS_OK) {
 			return (DLADM_WALK_CONTINUE);
 		}
 
@@ -178,7 +178,7 @@ v_broadcast(char *link)
  * Print out the link name of the VNIC.
  */
 static int
-v_add(char *link, char *addr, char *name)
+v_add(dladm_handle_t handle, char *link, char *addr, char *name)
 {
 	struct ether_addr *ea;
 	vnic_attr_t vattr;
@@ -194,7 +194,7 @@ v_add(char *link, char *addr, char *name)
 		return (-1);
 	}
 
-	if (dladm_name2info(link, &linkid, NULL, NULL, NULL) !=
+	if (dladm_name2info(handle, link, &linkid, NULL, NULL, NULL) !=
 	    DLADM_STATUS_OK) {
 		(void) fprintf(stderr, "Invalid link name: %s\n", link);
 		return (-1);
@@ -211,13 +211,13 @@ v_add(char *link, char *addr, char *name)
 	    vattr.attr.va_mac_len);
 	vattr.name = name;
 
-	(void) dladm_walk_datalink_id(v_find, &vattr, DATALINK_CLASS_VNIC,
-	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+	(void) dladm_walk_datalink_id(v_find, handle, &vattr,
+	    DATALINK_CLASS_VNIC, DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
 	if (vattr.attr.va_vnic_id == DATALINK_INVALID_LINKID) {
 		/*
 		 * None found, so create.
 		 */
-		status = dladm_vnic_create(name, linkid,
+		status = dladm_vnic_create(handle, name, linkid,
 		    VNIC_MAC_ADDR_TYPE_FIXED, (uchar_t *)ea->ether_addr_octet,
 		    ETHERADDRL, NULL, 0, 0, &vnic_id, NULL, DLADM_OPT_ACTIVE);
 
@@ -231,12 +231,13 @@ v_add(char *link, char *addr, char *name)
 		vnic_id = vattr.attr.va_vnic_id;
 	}
 
-	if ((status = dladm_datalink_id2info(vnic_id, NULL, NULL, NULL, vnic,
-	    sizeof (vnic))) != DLADM_STATUS_OK) {
+	if ((status = dladm_datalink_id2info(handle, vnic_id, NULL, NULL, NULL,
+	    vnic, sizeof (vnic))) != DLADM_STATUS_OK) {
 		(void) fprintf(stderr, "dladm_datalink_id2info: %s\n",
 		    dladm_status2str(status, buf));
 		if (vattr.attr.va_vnic_id == DATALINK_INVALID_LINKID)
-			(void) dladm_vnic_delete(vnic_id, DLADM_OPT_ACTIVE);
+			(void) dladm_vnic_delete(handle, vnic_id,
+			    DLADM_OPT_ACTIVE);
 		return (-1);
 	}
 
@@ -257,20 +258,20 @@ v_add(char *link, char *addr, char *name)
  * v_remove() takes VNIC link name as the argument.
  */
 static int
-v_remove(char *vnic)
+v_remove(dladm_handle_t handle, char *vnic)
 {
 	datalink_id_t vnic_id;
 	dladm_status_t status;
 	char buf[DLADM_STRSIZE];
 
-	if ((status = dladm_name2info(vnic, &vnic_id, NULL, NULL, NULL)) !=
-	    DLADM_STATUS_OK) {
+	if ((status = dladm_name2info(handle, vnic, &vnic_id, NULL, NULL,
+	    NULL)) != DLADM_STATUS_OK) {
 		(void) fprintf(stderr, "dladm_name2info: %s\n",
 		    dladm_status2str(status, buf));
 		return (-1);
 	}
 
-	status = dladm_vnic_delete(vnic_id, DLADM_OPT_ACTIVE);
+	status = dladm_vnic_delete(handle, vnic_id, DLADM_OPT_ACTIVE);
 
 	if (status != DLADM_STATUS_OK) {
 		(void) fprintf(stderr, "dladm_vnic_delete: %s\n",
@@ -284,27 +285,37 @@ v_remove(char *vnic)
 int
 main(int argc, char *argv[])
 {
+	dladm_handle_t	handle;
+	int		ret;
+
+	if (dladm_open(&handle) != DLADM_STATUS_OK) {
+		(void) fprintf(stderr, "Failed to open dladm handle\n");
+		return (-1);
+	}
+
 	switch (argc) {
 	case 1:
 		/* List operation. */
-		v_list();
-		return (0);
-		/* NOTREACHED */
+		v_list(handle);
+		ret = 0;
+		break;
 	case 2:
 		/* Remove operation. */
-		return (v_remove(argv[1]));
-		/* NOTREACHED */
+		ret = v_remove(handle, argv[1]);
+		break;
 	case 3:
 	case 4:
 		/* Add operation. */
-		return (v_add(argv[1], argv[2], (argc == 3 ? NULL : argv[3])));
-		/* NOTREACHED */
+		ret = v_add(handle, argv[1], argv[2],
+		    (argc == 3 ? NULL : argv[3]));
+		break;
 	default:
 		(void) fprintf(stderr, "Incorrect number of arguments - "
 		    "must have 0, 1, 2 or 3.\n");
-		return (-1);
-		/* NOTREACHED */
+		ret = -1;
+		break;
 	}
 
-	/* NOTREACHED */
+	dladm_close(handle);
+	return (ret);
 }

@@ -48,13 +48,14 @@
  * Return the attributes of the specified datalink from the DLD driver.
  */
 static dladm_status_t
-i_dladm_info(int fd, const datalink_id_t linkid, dladm_attr_t *dap)
+i_dladm_info(dladm_handle_t handle, const datalink_id_t linkid,
+    dladm_attr_t *dap)
 {
 	dld_ioc_attr_t	dia;
 
 	dia.dia_linkid = linkid;
 
-	if (ioctl(fd, DLDIOC_ATTR, &dia) < 0)
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_ATTR, &dia) < 0)
 		return (dladm_errno2status(errno));
 
 	dap->da_max_sdu = dia.dia_max_sdu;
@@ -63,47 +64,41 @@ i_dladm_info(int fd, const datalink_id_t linkid, dladm_attr_t *dap)
 }
 
 static dladm_status_t
-dladm_usagelog(dladm_logtype_t type, dld_ioc_usagelog_t *log_info)
+dladm_usagelog(dladm_handle_t handle, dladm_logtype_t type,
+    dld_ioc_usagelog_t *log_info)
 {
-	int		fd;
-
-	fd = open(DLD_CONTROL_DEV, O_RDWR);
-	if (fd < 0)
-		return (DLADM_STATUS_IOERR);
-
 	if (type == DLADM_LOGTYPE_FLOW)
 		log_info->ul_type = MAC_LOGTYPE_FLOW;
 	else
 		log_info->ul_type = MAC_LOGTYPE_LINK;
 
-	if (ioctl(fd, DLDIOC_USAGELOG, log_info) < 0) {
-		(void) close(fd);
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_USAGELOG, log_info) < 0)
 		return (DLADM_STATUS_IOERR);
-	}
-	(void) close(fd);
+
 	return (DLADM_STATUS_OK);
 }
 
 dladm_status_t
-dladm_start_usagelog(dladm_logtype_t type, uint_t interval)
+dladm_start_usagelog(dladm_handle_t handle, dladm_logtype_t type,
+    uint_t interval)
 {
 	dld_ioc_usagelog_t	log_info;
 
 	log_info.ul_onoff = B_TRUE;
 	log_info.ul_interval = interval;
 
-	return (dladm_usagelog(type, &log_info));
+	return (dladm_usagelog(handle, type, &log_info));
 }
 
 dladm_status_t
-dladm_stop_usagelog(dladm_logtype_t type)
+dladm_stop_usagelog(dladm_handle_t handle, dladm_logtype_t type)
 {
 	dld_ioc_usagelog_t	log_info;
 
 	log_info.ul_onoff = B_FALSE;
 	log_info.ul_interval = 0;
 
-	return (dladm_usagelog(type, &log_info));
+	return (dladm_usagelog(handle, type, &log_info));
 }
 
 struct i_dladm_walk_arg {
@@ -112,12 +107,12 @@ struct i_dladm_walk_arg {
 };
 
 static int
-i_dladm_walk(datalink_id_t linkid, void *arg)
+i_dladm_walk(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
 	struct i_dladm_walk_arg *walk_arg = arg;
 	char link[MAXLINKNAMELEN];
 
-	if (dladm_datalink_id2info(linkid, NULL, NULL, NULL, link,
+	if (dladm_datalink_id2info(handle, linkid, NULL, NULL, NULL, link,
 	    sizeof (link)) == DLADM_STATUS_OK) {
 		return (walk_arg->fn(link, walk_arg->arg));
 	}
@@ -129,29 +124,26 @@ i_dladm_walk(datalink_id_t linkid, void *arg)
  * Walk all datalinks.
  */
 dladm_status_t
-dladm_walk(dladm_walkcb_t *fn, void *arg, datalink_class_t class,
-    datalink_media_t dmedia, uint32_t flags)
+dladm_walk(dladm_walkcb_t *fn, dladm_handle_t handle, void *arg,
+    datalink_class_t class, datalink_media_t dmedia, uint32_t flags)
 {
 	struct i_dladm_walk_arg walk_arg;
 
 	walk_arg.fn = fn;
 	walk_arg.arg = arg;
-	return (dladm_walk_datalink_id(i_dladm_walk, &walk_arg,
+	return (dladm_walk_datalink_id(i_dladm_walk, handle, &walk_arg,
 	    class, dmedia, flags));
 }
 
 #define	MAXGRPPERLINK	64
 
 int
-dladm_walk_hwgrp(datalink_id_t linkid, void *arg,
+dladm_walk_hwgrp(dladm_handle_t handle, datalink_id_t linkid, void *arg,
     boolean_t (*fn)(void *, dladm_hwgrp_attr_t *))
 {
-	int		fd, bufsize, ret;
+	int		bufsize, ret;
 	int		nhwgrp = MAXGRPPERLINK;
 	dld_ioc_hwgrpget_t *iomp = NULL;
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (-1);
 
 	bufsize = sizeof (dld_ioc_hwgrpget_t) +
 	    nhwgrp * sizeof (dld_hwgrpinfo_t);
@@ -162,7 +154,7 @@ dladm_walk_hwgrp(datalink_id_t linkid, void *arg,
 	iomp->dih_size = nhwgrp * sizeof (dld_hwgrpinfo_t);
 	iomp->dih_linkid = linkid;
 
-	ret = ioctl(fd, DLDIOC_GETHWGRP, iomp);
+	ret = ioctl(dladm_dld_fd(handle), DLDIOC_GETHWGRP, iomp);
 	if (ret == 0) {
 		int i;
 		dld_hwgrpinfo_t *dhip;
@@ -187,7 +179,6 @@ dladm_walk_hwgrp(datalink_id_t linkid, void *arg,
 		}
 	}
 	free(iomp);
-	(void) close(fd);
 	return (ret);
 }
 
@@ -196,15 +187,12 @@ dladm_walk_hwgrp(datalink_id_t linkid, void *arg,
  * the specified device.
  */
 int
-dladm_walk_macaddr(datalink_id_t linkid, void *arg,
+dladm_walk_macaddr(dladm_handle_t handle, datalink_id_t linkid, void *arg,
     boolean_t (*fn)(void *, dladm_macaddr_attr_t *))
 {
-	int		fd, bufsize, ret;
+	int		bufsize, ret;
 	int		nmacaddr = 1024;
 	dld_ioc_macaddrget_t *iomp = NULL;
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (-1);
 
 	bufsize = sizeof (dld_ioc_macaddrget_t) +
 	    nmacaddr * sizeof (dld_macaddrinfo_t);
@@ -215,7 +203,7 @@ dladm_walk_macaddr(datalink_id_t linkid, void *arg,
 	iomp->dig_size = nmacaddr * sizeof (dld_macaddrinfo_t);
 	iomp->dig_linkid = linkid;
 
-	ret = ioctl(fd, DLDIOC_MACADDRGET, iomp);
+	ret = ioctl(dladm_dld_fd(handle), DLDIOC_MACADDRGET, iomp);
 	if (ret == 0) {
 		int i;
 		dld_macaddrinfo_t *dmip;
@@ -242,7 +230,6 @@ dladm_walk_macaddr(datalink_id_t linkid, void *arg,
 		}
 	}
 	free(iomp);
-	(void) close(fd);
 	return (ret);
 }
 
@@ -346,18 +333,9 @@ dladm_mac_walk(int (*fn)(const char *, void *arg), void *arg)
  * Get the current attributes of the specified datalink.
  */
 dladm_status_t
-dladm_info(datalink_id_t linkid, dladm_attr_t *dap)
+dladm_info(dladm_handle_t handle, datalink_id_t linkid, dladm_attr_t *dap)
 {
-	int		fd;
-	dladm_status_t	status;
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
-
-	status = i_dladm_info(fd, linkid, dap);
-
-	(void) close(fd);
-	return (status);
+	return (i_dladm_info(handle, linkid, dap));
 }
 
 const char *
@@ -406,17 +384,17 @@ dladm_linkduplex2str(link_duplex_t duplex, char *buf)
  * be created implicitly as the result of this function.
  */
 dladm_status_t
-dladm_setzid(const char *dlname, char *zone_name)
+dladm_setzid(dladm_handle_t handle, const char *dlname, char *zone_name)
 {
 	datalink_id_t	linkid;
 	dladm_status_t	status = DLADM_STATUS_OK;
 
 	/* If the link does not exist, it is a ppa-hacked vlan. */
-	status = dladm_name2info(dlname, &linkid, NULL, NULL, NULL);
+	status = dladm_name2info(handle, dlname, &linkid, NULL, NULL, NULL);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
-	status = dladm_set_linkprop(linkid, "zone", &zone_name, 1,
+	status = dladm_set_linkprop(handle, linkid, "zone", &zone_name, 1,
 	    DLADM_OPT_ACTIVE);
 
 	return (status);
@@ -427,13 +405,12 @@ dladm_setzid(const char *dlname, char *zone_name)
  * Result: <linkid1, link2>
  */
 static dladm_status_t
-i_dladm_rename_link_c1(datalink_id_t linkid1, const char *link1,
-    const char *link2, uint32_t flags)
+i_dladm_rename_link_c1(dladm_handle_t handle, datalink_id_t linkid1,
+    const char *link1, const char *link2, uint32_t flags)
 {
 	dld_ioc_rename_t	dir;
 	dladm_conf_t		conf;
 	dladm_status_t		status = DLADM_STATUS_OK;
-	int			fd;
 
 	/*
 	 * Link is currently available. Check to see whether anything is
@@ -443,17 +420,14 @@ i_dladm_rename_link_c1(datalink_id_t linkid1, const char *link1,
 		dir.dir_linkid1 = linkid1;
 		dir.dir_linkid2 = DATALINK_INVALID_LINKID;
 		(void) strlcpy(dir.dir_link, link2, MAXLINKNAMELEN);
-		if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-			return (dladm_errno2status(errno));
 
-		if (ioctl(fd, DLDIOC_RENAME, &dir) < 0) {
+		if (ioctl(dladm_dld_fd(handle), DLDIOC_RENAME, &dir) < 0) {
 			status = dladm_errno2status(errno);
-			(void) close(fd);
 			return (status);
 		}
 	}
 
-	status = dladm_remap_datalink_id(linkid1, link2);
+	status = dladm_remap_datalink_id(handle, linkid1, link2);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
@@ -461,17 +435,17 @@ i_dladm_rename_link_c1(datalink_id_t linkid1, const char *link1,
 	 * Flush the current mapping to persistent configuration.
 	 */
 	if ((flags & DLADM_OPT_PERSIST) &&
-	    (((status = dladm_read_conf(linkid1, &conf)) != DLADM_STATUS_OK) ||
-	    ((status = dladm_write_conf(conf)) != DLADM_STATUS_OK))) {
-		(void) dladm_remap_datalink_id(linkid1, link1);
+	    (((status = dladm_read_conf(handle, linkid1, &conf)) !=
+	    DLADM_STATUS_OK) ||
+	    ((status = dladm_write_conf(handle, conf)) != DLADM_STATUS_OK))) {
+		(void) dladm_remap_datalink_id(handle, linkid1, link1);
 	}
 done:
 	if (flags & DLADM_OPT_ACTIVE) {
 		if (status != DLADM_STATUS_OK) {
 			(void) strlcpy(dir.dir_link, link1, MAXLINKNAMELEN);
-			(void) ioctl(fd, DLDIOC_RENAME, &dir);
+			(void) ioctl(dladm_dld_fd(handle), DLDIOC_RENAME, &dir);
 		}
-		(void) close(fd);
 	}
 	return (status);
 }
@@ -483,14 +457,14 @@ typedef struct link_hold_arg_s {
 } link_hold_arg_t;
 
 static int
-i_dladm_aggr_link_hold(datalink_id_t aggrid, void *arg)
+i_dladm_aggr_link_hold(dladm_handle_t handle, datalink_id_t aggrid, void *arg)
 {
 	link_hold_arg_t		*hold_arg = arg;
 	dladm_aggr_grp_attr_t	ginfo;
 	dladm_status_t		status;
 	int			i;
 
-	status = dladm_aggr_info(aggrid, &ginfo, hold_arg->flags);
+	status = dladm_aggr_info(handle, aggrid, &ginfo, hold_arg->flags);
 	if (status != DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
@@ -504,13 +478,13 @@ i_dladm_aggr_link_hold(datalink_id_t aggrid, void *arg)
 }
 
 static int
-i_dladm_vlan_link_hold(datalink_id_t vlanid, void *arg)
+i_dladm_vlan_link_hold(dladm_handle_t handle, datalink_id_t vlanid, void *arg)
 {
 	link_hold_arg_t		*hold_arg = arg;
 	dladm_vlan_attr_t	vinfo;
 	dladm_status_t		status;
 
-	status = dladm_vlan_info(vlanid, &vinfo, hold_arg->flags);
+	status = dladm_vlan_info(handle, vlanid, &vinfo, hold_arg->flags);
 	if (status != DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
@@ -529,13 +503,13 @@ i_dladm_vlan_link_hold(datalink_id_t vlanid, void *arg)
  *     link2_other_attr>
  */
 static dladm_status_t
-i_dladm_rename_link_c2(datalink_id_t linkid1, datalink_id_t linkid2)
+i_dladm_rename_link_c2(dladm_handle_t handle, datalink_id_t linkid1,
+    datalink_id_t linkid2)
 {
 	rcm_handle_t		*rcm_hdl = NULL;
 	nvlist_t		*nvl = NULL;
 	link_hold_arg_t		arg;
 	dld_ioc_rename_t	dir;
-	int			fd;
 	dladm_conf_t		conf1, conf2;
 	char			devname[MAXLINKNAMELEN];
 	uint64_t		phymaj, phyinst;
@@ -548,13 +522,13 @@ i_dladm_rename_link_c2(datalink_id_t linkid1, datalink_id_t linkid2)
 	arg.linkid = linkid1;
 	arg.holder = DATALINK_INVALID_LINKID;
 	arg.flags = DLADM_OPT_PERSIST;
-	(void) dladm_walk_datalink_id(i_dladm_aggr_link_hold, &arg,
+	(void) dladm_walk_datalink_id(i_dladm_aggr_link_hold, handle, &arg,
 	    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
 	if (arg.holder != DATALINK_INVALID_LINKID)
 		return (DLADM_STATUS_LINKBUSY);
 
 	arg.flags = DLADM_OPT_PERSIST;
-	(void) dladm_walk_datalink_id(i_dladm_vlan_link_hold, &arg,
+	(void) dladm_walk_datalink_id(i_dladm_vlan_link_hold, handle, &arg,
 	    DATALINK_CLASS_VLAN, DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
 	if (arg.holder != DATALINK_INVALID_LINKID)
 		return (DLADM_STATUS_LINKBUSY);
@@ -565,16 +539,12 @@ i_dladm_rename_link_c2(datalink_id_t linkid1, datalink_id_t linkid2)
 	 * aggregations or VLANs, or is held by any application. If yes,
 	 * return failure.
 	 */
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
-
 	dir.dir_linkid1 = linkid1;
 	dir.dir_linkid2 = linkid2;
-	if (ioctl(fd, DLDIOC_RENAME, &dir) < 0)
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_RENAME, &dir) < 0)
 		status = dladm_errno2status(errno);
 
 	if (status != DLADM_STATUS_OK) {
-		(void) close(fd);
 		return (status);
 	}
 
@@ -583,40 +553,43 @@ i_dladm_rename_link_c2(datalink_id_t linkid1, datalink_id_t linkid2)
 	 * to be associated with linkid2. Before doing that, the old active
 	 * linkprop of linkid1 should be deleted.
 	 */
-	(void) dladm_set_linkprop(linkid1, NULL, NULL, 0, DLADM_OPT_ACTIVE);
+	(void) dladm_set_linkprop(handle, linkid1, NULL, NULL, 0,
+	    DLADM_OPT_ACTIVE);
 
-	if (((status = dladm_read_conf(linkid1, &conf1)) != DLADM_STATUS_OK) ||
-	    ((status = dladm_get_conf_field(conf1, FDEVNAME, devname,
+	if (((status = dladm_read_conf(handle, linkid1, &conf1)) !=
+	    DLADM_STATUS_OK) ||
+	    ((status = dladm_get_conf_field(handle, conf1, FDEVNAME, devname,
 	    MAXLINKNAMELEN)) != DLADM_STATUS_OK) ||
-	    ((status = dladm_get_conf_field(conf1, FPHYMAJ, &phymaj,
+	    ((status = dladm_get_conf_field(handle, conf1, FPHYMAJ, &phymaj,
 	    sizeof (uint64_t))) != DLADM_STATUS_OK) ||
-	    ((status = dladm_get_conf_field(conf1, FPHYINST, &phyinst,
+	    ((status = dladm_get_conf_field(handle, conf1, FPHYINST, &phyinst,
 	    sizeof (uint64_t))) != DLADM_STATUS_OK) ||
-	    ((status = dladm_read_conf(linkid2, &conf2)) != DLADM_STATUS_OK)) {
+	    ((status = dladm_read_conf(handle, linkid2, &conf2)) !=
+	    DLADM_STATUS_OK)) {
 		dir.dir_linkid1 = linkid2;
 		dir.dir_linkid2 = linkid1;
-		(void) dladm_init_linkprop(linkid1, B_FALSE);
-		(void) ioctl(fd, DLDIOC_RENAME, &dir);
-		(void) close(fd);
+		(void) dladm_init_linkprop(handle, linkid1, B_FALSE);
+		(void) ioctl(dladm_dld_fd(handle), DLDIOC_RENAME, &dir);
 		return (status);
 	}
-	(void) close(fd);
 
-	dladm_destroy_conf(conf1);
-	(void) dladm_set_conf_field(conf2, FDEVNAME, DLADM_TYPE_STR, devname);
-	(void) dladm_set_conf_field(conf2, FPHYMAJ, DLADM_TYPE_UINT64, &phymaj);
-	(void) dladm_set_conf_field(conf2, FPHYINST,
+	dladm_destroy_conf(handle, conf1);
+	(void) dladm_set_conf_field(handle, conf2, FDEVNAME, DLADM_TYPE_STR,
+	    devname);
+	(void) dladm_set_conf_field(handle, conf2, FPHYMAJ, DLADM_TYPE_UINT64,
+	    &phymaj);
+	(void) dladm_set_conf_field(handle, conf2, FPHYINST,
 	    DLADM_TYPE_UINT64, &phyinst);
-	(void) dladm_write_conf(conf2);
-	dladm_destroy_conf(conf2);
+	(void) dladm_write_conf(handle, conf2);
+	dladm_destroy_conf(handle, conf2);
 
 	/*
 	 * Delete link1 and mark link2 up.
 	 */
-	(void) dladm_destroy_datalink_id(linkid1, DLADM_OPT_ACTIVE |
+	(void) dladm_destroy_datalink_id(handle, linkid1, DLADM_OPT_ACTIVE |
 	    DLADM_OPT_PERSIST);
-	(void) dladm_remove_conf(linkid1);
-	(void) dladm_up_datalink_id(linkid2);
+	(void) dladm_remove_conf(handle, linkid1);
+	(void) dladm_up_datalink_id(handle, linkid2);
 
 	/*
 	 * Now generate the RCM_RESOURCE_LINK_NEW sysevent which can be
@@ -652,7 +625,8 @@ done:
  * the removed physical link.
  */
 static dladm_status_t
-i_dladm_rename_link_c3(const char *link1, datalink_id_t linkid2)
+i_dladm_rename_link_c3(dladm_handle_t handle, const char *link1,
+    datalink_id_t linkid2)
 {
 	dladm_conf_t	conf;
 	dladm_status_t	status;
@@ -660,23 +634,23 @@ i_dladm_rename_link_c3(const char *link1, datalink_id_t linkid2)
 	if (!dladm_valid_linkname(link1))
 		return (DLADM_STATUS_LINKINVAL);
 
-	status = dladm_read_conf(linkid2, &conf);
+	status = dladm_read_conf(handle, linkid2, &conf);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
-	if ((status = dladm_set_conf_field(conf, FDEVNAME, DLADM_TYPE_STR,
-	    link1)) == DLADM_STATUS_OK) {
-		status = dladm_write_conf(conf);
+	if ((status = dladm_set_conf_field(handle, conf, FDEVNAME,
+	    DLADM_TYPE_STR, link1)) == DLADM_STATUS_OK) {
+		status = dladm_write_conf(handle, conf);
 	}
 
-	dladm_destroy_conf(conf);
+	dladm_destroy_conf(handle, conf);
 
 done:
 	return (status);
 }
 
 dladm_status_t
-dladm_rename_link(const char *link1, const char *link2)
+dladm_rename_link(dladm_handle_t handle, const char *link1, const char *link2)
 {
 	datalink_id_t		linkid1 = DATALINK_INVALID_LINKID;
 	datalink_id_t		linkid2 = DATALINK_INVALID_LINKID;
@@ -686,9 +660,10 @@ dladm_rename_link(const char *link1, const char *link2)
 	boolean_t		remphy2 = B_FALSE;
 	dladm_status_t  	status;
 
-	(void) dladm_name2info(link1, &linkid1, &flags1, &class1, &media1);
-	if ((dladm_name2info(link2, &linkid2, &flags2, &class2, &media2) ==
-	    DLADM_STATUS_OK) && (class2 == DATALINK_CLASS_PHYS) &&
+	(void) dladm_name2info(handle, link1, &linkid1, &flags1, &class1,
+	    &media1);
+	if ((dladm_name2info(handle, link2, &linkid2, &flags2, &class2,
+	    &media2) == DLADM_STATUS_OK) && (class2 == DATALINK_CLASS_PHYS) &&
 	    (flags2 == DLADM_OPT_PERSIST)) {
 		/*
 		 * see whether link2 is a removed physical link.
@@ -702,8 +677,8 @@ dladm_rename_link(const char *link1, const char *link2)
 			 * case 1: rename an existing link to a link that
 			 * does not exist.
 			 */
-			status = i_dladm_rename_link_c1(linkid1, link1, link2,
-			    flags1);
+			status = i_dladm_rename_link_c1(handle, linkid1, link1,
+			    link2, flags1);
 		} else if (remphy2) {
 			/*
 			 * case 2: rename an available link to a REMOVED
@@ -714,14 +689,14 @@ dladm_rename_link(const char *link1, const char *link2)
 			    !(flags1 & DLADM_OPT_ACTIVE)) {
 				status = DLADM_STATUS_BADARG;
 			} else {
-				status = i_dladm_rename_link_c2(linkid1,
+				status = i_dladm_rename_link_c2(handle, linkid1,
 				    linkid2);
 			}
 		} else {
 			status = DLADM_STATUS_EXIST;
 		}
 	} else if (remphy2) {
-		status = i_dladm_rename_link_c3(link1, linkid2);
+		status = i_dladm_rename_link_c3(handle, link1, linkid2);
 	} else {
 		status = DLADM_STATUS_NOTFOUND;
 	}
@@ -733,23 +708,23 @@ typedef struct consumer_del_phys_arg_s {
 } consumer_del_phys_arg_t;
 
 static int
-i_dladm_vlan_link_del(datalink_id_t vlanid, void *arg)
+i_dladm_vlan_link_del(dladm_handle_t handle, datalink_id_t vlanid, void *arg)
 {
 	consumer_del_phys_arg_t	*del_arg = arg;
 	dladm_vlan_attr_t	vinfo;
 	dladm_status_t		status;
 
-	status = dladm_vlan_info(vlanid, &vinfo, DLADM_OPT_PERSIST);
+	status = dladm_vlan_info(handle, vlanid, &vinfo, DLADM_OPT_PERSIST);
 	if (status != DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
 	if (vinfo.dv_linkid == del_arg->linkid)
-		(void) dladm_vlan_delete(vlanid, DLADM_OPT_PERSIST);
+		(void) dladm_vlan_delete(handle, vlanid, DLADM_OPT_PERSIST);
 	return (DLADM_WALK_CONTINUE);
 }
 
 static int
-i_dladm_aggr_link_del(datalink_id_t aggrid, void *arg)
+i_dladm_aggr_link_del(dladm_handle_t handle, datalink_id_t aggrid, void *arg)
 {
 	consumer_del_phys_arg_t		*del_arg = arg;
 	dladm_aggr_grp_attr_t		ginfo;
@@ -757,7 +732,7 @@ i_dladm_aggr_link_del(datalink_id_t aggrid, void *arg)
 	dladm_aggr_port_attr_db_t	port[1];
 	int				i;
 
-	status = dladm_aggr_info(aggrid, &ginfo, DLADM_OPT_PERSIST);
+	status = dladm_aggr_info(handle, aggrid, &ginfo, DLADM_OPT_PERSIST);
 	if (status != DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
@@ -775,12 +750,13 @@ i_dladm_aggr_link_del(datalink_id_t aggrid, void *arg)
 			 */
 			aggr_del_arg.linkid = aggrid;
 			(void) dladm_walk_datalink_id(i_dladm_vlan_link_del,
-			    &aggr_del_arg, DATALINK_CLASS_VLAN,
+			    handle, &aggr_del_arg, DATALINK_CLASS_VLAN,
 			    DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
-			(void) dladm_aggr_delete(aggrid, DLADM_OPT_PERSIST);
+			(void) dladm_aggr_delete(handle, aggrid,
+			    DLADM_OPT_PERSIST);
 		} else {
 			port[0].lp_linkid = del_arg->linkid;
-			(void) dladm_aggr_remove(aggrid, 1, port,
+			(void) dladm_aggr_remove(handle, aggrid, 1, port,
 			    DLADM_OPT_PERSIST);
 		}
 	}
@@ -792,7 +768,7 @@ typedef struct del_phys_arg_s {
 } del_phys_arg_t;
 
 static int
-i_dladm_phys_delete(datalink_id_t linkid, void *arg)
+i_dladm_phys_delete(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
 	uint32_t		flags;
 	datalink_class_t	class;
@@ -801,7 +777,7 @@ i_dladm_phys_delete(datalink_id_t linkid, void *arg)
 	del_phys_arg_t		*del_phys_arg = arg;
 	consumer_del_phys_arg_t	del_arg;
 
-	if ((status = dladm_datalink_id2info(linkid, &flags, &class,
+	if ((status = dladm_datalink_id2info(handle, linkid, &flags, &class,
 	    &media, NULL, 0)) != DLADM_STATUS_OK) {
 		goto done;
 	}
@@ -817,16 +793,16 @@ i_dladm_phys_delete(datalink_id_t linkid, void *arg)
 
 	if (media == DL_ETHER) {
 		del_arg.linkid = linkid;
-		(void) dladm_walk_datalink_id(i_dladm_aggr_link_del, &del_arg,
-		    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE,
+		(void) dladm_walk_datalink_id(i_dladm_aggr_link_del, handle,
+		    &del_arg, DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE,
 		    DLADM_OPT_PERSIST);
-		(void) dladm_walk_datalink_id(i_dladm_vlan_link_del, &del_arg,
-		    DATALINK_CLASS_VLAN, DATALINK_ANY_MEDIATYPE,
+		(void) dladm_walk_datalink_id(i_dladm_vlan_link_del, handle,
+		    &del_arg, DATALINK_CLASS_VLAN, DATALINK_ANY_MEDIATYPE,
 		    DLADM_OPT_PERSIST);
 	}
 
-	(void) dladm_destroy_datalink_id(linkid, DLADM_OPT_PERSIST);
-	(void) dladm_remove_conf(linkid);
+	(void) dladm_destroy_datalink_id(handle, linkid, DLADM_OPT_PERSIST);
+	(void) dladm_remove_conf(handle, linkid);
 
 done:
 	del_phys_arg->rval = status;
@@ -834,23 +810,24 @@ done:
 }
 
 dladm_status_t
-dladm_phys_delete(datalink_id_t linkid)
+dladm_phys_delete(dladm_handle_t handle, datalink_id_t linkid)
 {
 	del_phys_arg_t	arg = {DLADM_STATUS_OK};
 
 	if (linkid == DATALINK_ALL_LINKID) {
-		(void) dladm_walk_datalink_id(i_dladm_phys_delete, &arg,
+		(void) dladm_walk_datalink_id(i_dladm_phys_delete, handle, &arg,
 		    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE,
 		    DLADM_OPT_PERSIST);
 		return (DLADM_STATUS_OK);
 	} else {
-		(void) i_dladm_phys_delete(linkid, &arg);
+		(void) i_dladm_phys_delete(handle, linkid, &arg);
 		return (arg.rval);
 	}
 }
 
 dladm_status_t
-dladm_phys_info(datalink_id_t linkid, dladm_phys_attr_t *dpap, uint32_t flags)
+dladm_phys_info(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_phys_attr_t *dpap, uint32_t flags)
 {
 	dladm_status_t	status;
 
@@ -860,29 +837,23 @@ dladm_phys_info(datalink_id_t linkid, dladm_phys_attr_t *dpap, uint32_t flags)
 	case DLADM_OPT_PERSIST: {
 		dladm_conf_t	conf;
 
-		status = dladm_read_conf(linkid, &conf);
+		status = dladm_read_conf(handle, linkid, &conf);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 
-		status = dladm_get_conf_field(conf, FDEVNAME, dpap->dp_dev,
-		    MAXLINKNAMELEN);
-		dladm_destroy_conf(conf);
+		status = dladm_get_conf_field(handle, conf, FDEVNAME,
+		    dpap->dp_dev, MAXLINKNAMELEN);
+		dladm_destroy_conf(handle, conf);
 		return (status);
 	}
 	case DLADM_OPT_ACTIVE: {
 		dld_ioc_phys_attr_t	dip;
-		int			fd;
-
-		if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-			return (dladm_errno2status(errno));
 
 		dip.dip_linkid = linkid;
-		if (ioctl(fd, DLDIOC_PHYS_ATTR, &dip) < 0) {
+		if (ioctl(dladm_dld_fd(handle), DLDIOC_PHYS_ATTR, &dip) < 0) {
 			status = dladm_errno2status(errno);
-			(void) close(fd);
 			return (status);
 		}
-		(void) close(fd);
 		dpap->dp_novanity = dip.dip_novanity;
 		(void) strlcpy(dpap->dp_dev, dip.dip_dev, MAXLINKNAMELEN);
 		return (DLADM_STATUS_OK);
@@ -899,13 +870,13 @@ typedef struct i_walk_dev_state_s {
 } i_walk_dev_state_t;
 
 int
-i_dladm_walk_dev2linkid(datalink_id_t linkid, void *arg)
+i_dladm_walk_dev2linkid(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
 	dladm_phys_attr_t dpa;
 	dladm_status_t status;
 	i_walk_dev_state_t *statep = arg;
 
-	status = dladm_phys_info(linkid, &dpa, DLADM_OPT_PERSIST);
+	status = dladm_phys_info(handle, linkid, &dpa, DLADM_OPT_PERSIST);
 	if ((status == DLADM_STATUS_OK) &&
 	    (strcmp(statep->devname, dpa.dp_dev) == 0)) {
 		statep->found = B_TRUE;
@@ -919,14 +890,15 @@ i_dladm_walk_dev2linkid(datalink_id_t linkid, void *arg)
  * Get the linkid from the physical device name.
  */
 dladm_status_t
-dladm_dev2linkid(const char *devname, datalink_id_t *linkidp)
+dladm_dev2linkid(dladm_handle_t handle, const char *devname,
+    datalink_id_t *linkidp)
 {
 	i_walk_dev_state_t state;
 
 	state.found = B_FALSE;
 	state.devname = devname;
 
-	(void) dladm_walk_datalink_id(i_dladm_walk_dev2linkid, &state,
+	(void) dladm_walk_datalink_id(i_dladm_walk_dev2linkid, handle, &state,
 	    DATALINK_CLASS_PHYS, DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
 	if (state.found == B_TRUE) {
 		*linkidp = state.linkid;
@@ -962,14 +934,16 @@ parse_devname(const char *devname, char *driver, uint_t *ppa, size_t maxlen)
 }
 
 dladm_status_t
-dladm_linkid2legacyname(datalink_id_t linkid, char *dev, size_t len)
+dladm_linkid2legacyname(dladm_handle_t handle, datalink_id_t linkid, char *dev,
+    size_t len)
 {
 	char			devname[MAXLINKNAMELEN];
 	uint16_t		vid = VLAN_ID_NONE;
 	datalink_class_t	class;
 	dladm_status_t		status;
 
-	status = dladm_datalink_id2info(linkid, NULL, &class, NULL, NULL, 0);
+	status = dladm_datalink_id2info(handle, linkid, NULL, &class, NULL,
+	    NULL, 0);
 	if (status != DLADM_STATUS_OK)
 		goto done;
 
@@ -980,14 +954,15 @@ dladm_linkid2legacyname(datalink_id_t linkid, char *dev, size_t len)
 	if (class == DATALINK_CLASS_VLAN) {
 		dladm_vlan_attr_t	dva;
 
-		status = dladm_vlan_info(linkid, &dva, DLADM_OPT_ACTIVE);
+		status = dladm_vlan_info(handle, linkid, &dva,
+		    DLADM_OPT_ACTIVE);
 		if (status != DLADM_STATUS_OK)
 			goto done;
 		linkid = dva.dv_linkid;
 		vid = dva.dv_vid;
 
-		if ((status = dladm_datalink_id2info(linkid, NULL, &class, NULL,
-		    NULL, 0)) != DLADM_STATUS_OK) {
+		if ((status = dladm_datalink_id2info(handle, linkid, NULL,
+		    &class, NULL, NULL, 0)) != DLADM_STATUS_OK) {
 			goto done;
 		}
 	}
@@ -996,7 +971,8 @@ dladm_linkid2legacyname(datalink_id_t linkid, char *dev, size_t len)
 	case DATALINK_CLASS_AGGR: {
 		dladm_aggr_grp_attr_t	dga;
 
-		status = dladm_aggr_info(linkid, &dga, DLADM_OPT_ACTIVE);
+		status = dladm_aggr_info(handle, linkid, &dga,
+		    DLADM_OPT_ACTIVE);
 		if (status != DLADM_STATUS_OK)
 			goto done;
 
@@ -1014,7 +990,8 @@ dladm_linkid2legacyname(datalink_id_t linkid, char *dev, size_t len)
 	case DATALINK_CLASS_PHYS: {
 		dladm_phys_attr_t	dpa;
 
-		status = dladm_phys_info(linkid, &dpa, DLADM_OPT_PERSIST);
+		status = dladm_phys_info(handle, linkid, &dpa,
+		    DLADM_OPT_PERSIST);
 		if (status != DLADM_STATUS_OK)
 			goto done;
 

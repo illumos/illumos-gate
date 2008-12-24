@@ -50,14 +50,12 @@ static size_t dladm_datatype_size[] = {
 };
 
 static dladm_status_t
-dladm_door_call(void *arg, size_t asize, void *rbuf, size_t rsize)
+dladm_door_call(dladm_handle_t handle, void *arg, size_t asize, void *rbuf,
+    size_t rsize)
 {
 	door_arg_t	darg;
-	int		fd;
+	int		door_fd;
 	dladm_status_t	status = DLADM_STATUS_OK;
-
-	if ((fd = open(DLMGMT_DOOR, O_RDONLY)) == -1)
-		return (dladm_errno2status(errno));
 
 	darg.data_ptr	= arg;
 	darg.data_size	= asize;
@@ -66,10 +64,11 @@ dladm_door_call(void *arg, size_t asize, void *rbuf, size_t rsize)
 	darg.rbuf	= rbuf;
 	darg.rsize	= rsize;
 
-	if (door_call(fd, &darg) == -1)
+	/* The door descriptor is opened if it isn't already */
+	if ((status = dladm_door_fd(handle, &door_fd)) != DLADM_STATUS_OK)
+		return (status);
+	if (door_call(door_fd, &darg) == -1)
 		status = dladm_errno2status(errno);
-	(void) close(fd);
-
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
@@ -92,8 +91,9 @@ dladm_door_call(void *arg, size_t asize, void *rbuf, size_t rsize)
  * Allocate a new linkid with the given name. Return the new linkid.
  */
 dladm_status_t
-dladm_create_datalink_id(const char *link, datalink_class_t class,
-    uint32_t media, uint32_t flags, datalink_id_t *linkidp)
+dladm_create_datalink_id(dladm_handle_t handle, const char *link,
+    datalink_class_t class, uint32_t media, uint32_t flags,
+    datalink_id_t *linkidp)
 {
 	dlmgmt_door_createid_t	createid;
 	dlmgmt_createid_retval_t retval;
@@ -116,8 +116,8 @@ dladm_create_datalink_id(const char *link, datalink_class_t class,
 	createid.ld_cmd = DLMGMT_CMD_CREATE_LINKID;
 	createid.ld_prefix = (flags & DLADM_OPT_PREFIX);
 
-	if ((status = dladm_door_call(&createid, sizeof (createid), &retval,
-	    sizeof (retval))) == DLADM_STATUS_OK) {
+	if ((status = dladm_door_call(handle, &createid, sizeof (createid),
+	    &retval, sizeof (retval))) == DLADM_STATUS_OK) {
 		*linkidp = retval.lr_linkid;
 	}
 	return (status);
@@ -127,7 +127,8 @@ dladm_create_datalink_id(const char *link, datalink_class_t class,
  * Destroy the given link ID.
  */
 dladm_status_t
-dladm_destroy_datalink_id(datalink_id_t linkid, uint32_t flags)
+dladm_destroy_datalink_id(dladm_handle_t handle, datalink_id_t linkid,
+    uint32_t flags)
 {
 	dlmgmt_door_destroyid_t		destroyid;
 	dlmgmt_destroyid_retval_t	retval;
@@ -140,15 +141,16 @@ dladm_destroy_datalink_id(datalink_id_t linkid, uint32_t flags)
 	destroyid.ld_linkid = linkid;
 	destroyid.ld_flags = dlmgmt_flags;
 
-	return (dladm_door_call(&destroyid, sizeof (destroyid),
-	    &retval, sizeof (retval)));
+	return (dladm_door_call(handle, &destroyid, sizeof (destroyid), &retval,
+	    sizeof (retval)));
 }
 
 /*
  * Remap a given link ID to a new name.
  */
 dladm_status_t
-dladm_remap_datalink_id(datalink_id_t linkid, const char *link)
+dladm_remap_datalink_id(dladm_handle_t handle, datalink_id_t linkid,
+    const char *link)
 {
 	dlmgmt_door_remapid_t	remapid;
 	dlmgmt_remapid_retval_t	retval;
@@ -157,15 +159,15 @@ dladm_remap_datalink_id(datalink_id_t linkid, const char *link)
 	remapid.ld_linkid = linkid;
 	(void) strlcpy(remapid.ld_link, link, MAXLINKNAMELEN);
 
-	return (dladm_door_call(&remapid, sizeof (remapid),
-	    &retval, sizeof (retval)));
+	return (dladm_door_call(handle, &remapid, sizeof (remapid), &retval,
+	    sizeof (retval)));
 }
 
 /*
  * Make a given link ID active.
  */
 dladm_status_t
-dladm_up_datalink_id(datalink_id_t linkid)
+dladm_up_datalink_id(dladm_handle_t handle, datalink_id_t linkid)
 {
 	dlmgmt_door_upid_t	upid;
 	dlmgmt_upid_retval_t	retval;
@@ -173,15 +175,15 @@ dladm_up_datalink_id(datalink_id_t linkid)
 	upid.ld_cmd = DLMGMT_CMD_UP_LINKID;
 	upid.ld_linkid = linkid;
 
-	return (dladm_door_call(&upid, sizeof (upid),
-	    &retval, sizeof (retval)));
+	return (dladm_door_call(handle, &upid, sizeof (upid), &retval,
+	    sizeof (retval)));
 }
 
 /*
  * Create a new link with the given name.  Return the new link's handle
  */
 dladm_status_t
-dladm_create_conf(const char *link, datalink_id_t linkid,
+dladm_create_conf(dladm_handle_t handle, const char *link, datalink_id_t linkid,
     datalink_class_t class, uint32_t media, dladm_conf_t *confp)
 {
 	dlmgmt_door_createconf_t	createconf;
@@ -197,7 +199,7 @@ dladm_create_conf(const char *link, datalink_id_t linkid,
 	createconf.ld_linkid = linkid;
 	createconf.ld_cmd = DLMGMT_CMD_CREATECONF;
 
-	if ((status = dladm_door_call(&createconf, sizeof (createconf),
+	if ((status = dladm_door_call(handle, &createconf, sizeof (createconf),
 	    &retval, sizeof (retval))) == DLADM_STATUS_OK) {
 		*confp = retval.lr_conf;
 	}
@@ -210,14 +212,15 @@ dladm_create_conf(const char *link, datalink_id_t linkid,
  * real status by calling dladm_phys_info().
  */
 dladm_status_t
-i_dladm_phys_status(datalink_id_t linkid, uint32_t *flagsp)
+i_dladm_phys_status(dladm_handle_t handle, datalink_id_t linkid,
+    uint32_t *flagsp)
 {
 	dladm_phys_attr_t	dpa;
 	dladm_status_t		status;
 
 	assert((*flagsp) & DLMGMT_ACTIVE);
 
-	status = dladm_phys_info(linkid, &dpa, DLADM_OPT_ACTIVE);
+	status = dladm_phys_info(handle, linkid, &dpa, DLADM_OPT_ACTIVE);
 	if (status == DLADM_STATUS_NOTFOUND) {
 		/*
 		 * No active status, this link was removed. Update its status
@@ -227,11 +230,11 @@ i_dladm_phys_status(datalink_id_t linkid, uint32_t *flagsp)
 		 * failure now since otherwise dladm_set_linkprop() might
 		 * call back to i_dladm_phys_status() recursively.
 		 */
-		status = dladm_destroy_datalink_id(linkid, DLADM_OPT_ACTIVE);
-		if (status != DLADM_STATUS_OK)
+		if ((status = dladm_destroy_datalink_id(handle, linkid,
+		    DLADM_OPT_ACTIVE)) != DLADM_STATUS_OK)
 			return (status);
 
-		(void) dladm_set_linkprop(linkid, NULL, NULL, 0,
+		(void) dladm_set_linkprop(handle, linkid, NULL, NULL, 0,
 		    DLADM_OPT_ACTIVE);
 
 		(*flagsp) &= ~DLMGMT_ACTIVE;
@@ -245,8 +248,9 @@ i_dladm_phys_status(datalink_id_t linkid, uint32_t *flagsp)
  * call fn on the linkid and arg.
  */
 dladm_status_t
-dladm_walk_datalink_id(int (*fn)(datalink_id_t, void *), void *argp,
-    datalink_class_t class, datalink_media_t dmedia, uint32_t flags)
+dladm_walk_datalink_id(int (*fn)(dladm_handle_t, datalink_id_t, void *),
+    dladm_handle_t handle, void *argp, datalink_class_t class,
+    datalink_media_t dmedia, uint32_t flags)
 {
 	dlmgmt_door_getnext_t	getnext;
 	dlmgmt_getnext_retval_t	retval;
@@ -267,8 +271,9 @@ dladm_walk_datalink_id(int (*fn)(datalink_id_t, void *), void *argp,
 
 	do {
 		getnext.ld_linkid = linkid;
-		if ((status = dladm_door_call(&getnext, sizeof (getnext),
-		    &retval, sizeof (retval))) != DLADM_STATUS_OK) {
+		if ((status = dladm_door_call(handle, &getnext,
+		    sizeof (getnext), &retval, sizeof (retval))) !=
+		    DLADM_STATUS_OK) {
 			/*
 			 * done with walking
 			 */
@@ -283,8 +288,8 @@ dladm_walk_datalink_id(int (*fn)(datalink_id_t, void *), void *argp,
 			 * daemon might not be active anymore. Check its
 			 * real status.
 			 */
-			if (i_dladm_phys_status(linkid, &retval.lr_flags) !=
-			    DLADM_STATUS_OK) {
+			if (i_dladm_phys_status(handle, linkid,
+			    &retval.lr_flags) != DLADM_STATUS_OK) {
 				continue;
 			}
 
@@ -292,7 +297,7 @@ dladm_walk_datalink_id(int (*fn)(datalink_id_t, void *), void *argp,
 				continue;
 		}
 
-		if (fn(linkid, argp) == DLADM_WALK_TERMINATE)
+		if (fn(handle, linkid, argp) == DLADM_WALK_TERMINATE)
 			break;
 	} while (linkid != DATALINK_INVALID_LINKID);
 
@@ -303,7 +308,8 @@ dladm_walk_datalink_id(int (*fn)(datalink_id_t, void *), void *argp,
  * Get the link properties structure for the given link.
  */
 dladm_status_t
-dladm_read_conf(datalink_id_t linkid, dladm_conf_t *confp)
+dladm_read_conf(dladm_handle_t handle, datalink_id_t linkid,
+    dladm_conf_t *confp)
 {
 	dlmgmt_door_readconf_t		readconf;
 	dlmgmt_readconf_retval_t	retval;
@@ -315,7 +321,7 @@ dladm_read_conf(datalink_id_t linkid, dladm_conf_t *confp)
 	readconf.ld_linkid = linkid;
 	readconf.ld_cmd = DLMGMT_CMD_READCONF;
 
-	if ((status = dladm_door_call(&readconf, sizeof (readconf),
+	if ((status = dladm_door_call(handle, &readconf, sizeof (readconf),
 	    &retval, sizeof (retval))) == DLADM_STATUS_OK) {
 		*confp = retval.lr_conf;
 	}
@@ -327,7 +333,7 @@ dladm_read_conf(datalink_id_t linkid, dladm_conf_t *confp)
  * that it will persist across reboots.
  */
 dladm_status_t
-dladm_write_conf(dladm_conf_t conf)
+dladm_write_conf(dladm_handle_t handle, dladm_conf_t conf)
 {
 	dlmgmt_door_writeconf_t		writeconf;
 	dlmgmt_writeconf_retval_t	retval;
@@ -338,8 +344,8 @@ dladm_write_conf(dladm_conf_t conf)
 	writeconf.ld_cmd = DLMGMT_CMD_WRITECONF;
 	writeconf.ld_conf = conf;
 
-	return (dladm_door_call(&writeconf, sizeof (writeconf),
-	    &retval, sizeof (retval)));
+	return (dladm_door_call(handle, &writeconf, sizeof (writeconf), &retval,
+	    sizeof (retval)));
 }
 
 /*
@@ -347,8 +353,8 @@ dladm_write_conf(dladm_conf_t conf)
  * data link configuration repository.
  */
 dladm_status_t
-dladm_get_conf_field(dladm_conf_t conf, const char *attr, void *attrval,
-    size_t attrsz)
+dladm_get_conf_field(dladm_handle_t handle, dladm_conf_t conf, const char *attr,
+    void *attrval, size_t attrsz)
 {
 	dlmgmt_door_getattr_t	getattr;
 	dlmgmt_getattr_retval_t	retval;
@@ -363,8 +369,8 @@ dladm_get_conf_field(dladm_conf_t conf, const char *attr, void *attrval,
 	getattr.ld_conf = conf;
 	(void) strlcpy(getattr.ld_attr, attr, MAXLINKATTRLEN);
 
-	if ((status = dladm_door_call(&getattr, sizeof (getattr), &retval,
-	    sizeof (retval))) != DLADM_STATUS_OK) {
+	if ((status = dladm_door_call(handle, &getattr, sizeof (getattr),
+	    &retval, sizeof (retval))) != DLADM_STATUS_OK) {
 		return (status);
 	}
 
@@ -379,8 +385,8 @@ dladm_get_conf_field(dladm_conf_t conf, const char *attr, void *attrval,
  * Get the link ID that is associated with the given name.
  */
 dladm_status_t
-dladm_name2info(const char *link, datalink_id_t *linkidp, uint32_t *flagp,
-    datalink_class_t *classp, uint32_t *mediap)
+dladm_name2info(dladm_handle_t handle, const char *link, datalink_id_t *linkidp,
+    uint32_t *flagp, datalink_class_t *classp, uint32_t *mediap)
 {
 	dlmgmt_door_getlinkid_t		getlinkid;
 	dlmgmt_getlinkid_retval_t	retval;
@@ -390,7 +396,7 @@ dladm_name2info(const char *link, datalink_id_t *linkidp, uint32_t *flagp,
 	getlinkid.ld_cmd = DLMGMT_CMD_GETLINKID;
 	(void) strlcpy(getlinkid.ld_link, link, MAXLINKNAMELEN);
 
-	if ((status = dladm_door_call(&getlinkid, sizeof (getlinkid),
+	if ((status = dladm_door_call(handle, &getlinkid, sizeof (getlinkid),
 	    &retval, sizeof (retval))) != DLADM_STATUS_OK) {
 		return (status);
 	}
@@ -402,7 +408,7 @@ dladm_name2info(const char *link, datalink_id_t *linkidp, uint32_t *flagp,
 		 * An active physical link reported by the dlmgmtd daemon
 		 * might not be active anymore. Check and set its real status.
 		 */
-		status = i_dladm_phys_status(linkid, &retval.lr_flags);
+		status = i_dladm_phys_status(handle, linkid, &retval.lr_flags);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 	}
@@ -426,8 +432,9 @@ dladm_name2info(const char *link, datalink_id_t *linkidp, uint32_t *flagp,
  * Get the link name that is associated with the given id.
  */
 dladm_status_t
-dladm_datalink_id2info(datalink_id_t linkid, uint32_t *flagp,
-    datalink_class_t *classp, uint32_t *mediap, char *link, size_t len)
+dladm_datalink_id2info(dladm_handle_t handle, datalink_id_t linkid,
+    uint32_t *flagp, datalink_class_t *classp, uint32_t *mediap, char *link,
+    size_t len)
 {
 	dlmgmt_door_getname_t	getname;
 	dlmgmt_getname_retval_t	retval;
@@ -440,8 +447,8 @@ dladm_datalink_id2info(datalink_id_t linkid, uint32_t *flagp,
 
 	getname.ld_cmd = DLMGMT_CMD_GETNAME;
 	getname.ld_linkid = linkid;
-	if ((status = dladm_door_call(&getname, sizeof (getname), &retval,
-	    sizeof (retval))) != DLADM_STATUS_OK) {
+	if ((status = dladm_door_call(handle, &getname, sizeof (getname),
+	    &retval, sizeof (retval))) != DLADM_STATUS_OK) {
 		return (status);
 	}
 
@@ -454,7 +461,7 @@ dladm_datalink_id2info(datalink_id_t linkid, uint32_t *flagp,
 		 * An active physical link reported by the dlmgmtd daemon
 		 * might not be active anymore. Check and set its real status.
 		 */
-		status = i_dladm_phys_status(linkid, &retval.lr_flags);
+		status = i_dladm_phys_status(handle, linkid, &retval.lr_flags);
 		if (status != DLADM_STATUS_OK)
 			return (status);
 	}
@@ -478,7 +485,7 @@ dladm_datalink_id2info(datalink_id_t linkid, uint32_t *flagp,
  * Set the given attr with the given attrval for the given link.
  */
 dladm_status_t
-dladm_set_conf_field(dladm_conf_t conf, const char *attr,
+dladm_set_conf_field(dladm_handle_t handle, dladm_conf_t conf, const char *attr,
     dladm_datatype_t type, const void *attrval)
 {
 	dlmgmt_door_setattr_t	setattr;
@@ -503,15 +510,16 @@ dladm_set_conf_field(dladm_conf_t conf, const char *attr,
 	setattr.ld_type = type;
 	bcopy(attrval, &setattr.ld_attrval, attrsz);
 
-	return (dladm_door_call(&setattr, sizeof (setattr),
-	    &retval, sizeof (retval)));
+	return (dladm_door_call(handle, &setattr, sizeof (setattr), &retval,
+	    sizeof (retval)));
 }
 
 /*
  * Unset the given attr the given link.
  */
 dladm_status_t
-dladm_unset_conf_field(dladm_conf_t conf, const char *attr)
+dladm_unset_conf_field(dladm_handle_t handle, dladm_conf_t conf,
+    const char *attr)
 {
 	dlmgmt_door_unsetattr_t		unsetattr;
 	dlmgmt_unsetattr_retval_t	retval;
@@ -523,8 +531,8 @@ dladm_unset_conf_field(dladm_conf_t conf, const char *attr)
 	unsetattr.ld_conf = conf;
 	(void) strlcpy(unsetattr.ld_attr, attr, MAXLINKATTRLEN);
 
-	return (dladm_door_call(&unsetattr, sizeof (unsetattr),
-	    &retval, sizeof (retval)));
+	return (dladm_door_call(handle, &unsetattr, sizeof (unsetattr), &retval,
+	    sizeof (retval)));
 }
 
 /*
@@ -532,7 +540,7 @@ dladm_unset_conf_field(dladm_conf_t conf, const char *attr)
  * repository.
  */
 dladm_status_t
-dladm_remove_conf(datalink_id_t linkid)
+dladm_remove_conf(dladm_handle_t handle, datalink_id_t linkid)
 {
 	dlmgmt_door_removeconf_t	removeconf;
 	dlmgmt_removeconf_retval_t	retval;
@@ -540,7 +548,7 @@ dladm_remove_conf(datalink_id_t linkid)
 	removeconf.ld_cmd = DLMGMT_CMD_REMOVECONF;
 	removeconf.ld_linkid = linkid;
 
-	return (dladm_door_call(&removeconf, sizeof (removeconf),
+	return (dladm_door_call(handle, &removeconf, sizeof (removeconf),
 	    &retval, sizeof (retval)));
 }
 
@@ -548,7 +556,7 @@ dladm_remove_conf(datalink_id_t linkid)
  * Free the contents of the link structure.
  */
 void
-dladm_destroy_conf(dladm_conf_t conf)
+dladm_destroy_conf(dladm_handle_t handle, dladm_conf_t conf)
 {
 	dlmgmt_door_destroyconf_t	destroyconf;
 	dlmgmt_destroyconf_retval_t	retval;
@@ -559,6 +567,6 @@ dladm_destroy_conf(dladm_conf_t conf)
 	destroyconf.ld_cmd = DLMGMT_CMD_DESTROYCONF;
 	destroyconf.ld_conf = conf;
 
-	(void) dladm_door_call(&destroyconf, sizeof (destroyconf),
+	(void) dladm_door_call(handle, &destroyconf, sizeof (destroyconf),
 	    &retval, sizeof (retval));
 }

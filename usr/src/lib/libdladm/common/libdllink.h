@@ -114,28 +114,34 @@ typedef struct dladm_macaddr_attr {
 	datalink_id_t	ma_client_linkid;
 } dladm_macaddr_attr_t;
 
-extern dladm_status_t	dladm_walk(dladm_walkcb_t *, void *, datalink_class_t,
-			    datalink_media_t, uint32_t);
+extern dladm_status_t	dladm_walk(dladm_walkcb_t *, dladm_handle_t, void *,
+			    datalink_class_t, datalink_media_t, uint32_t);
 extern dladm_status_t	dladm_mac_walk(dladm_walkcb_t *, void *);
-extern dladm_status_t	dladm_info(datalink_id_t, dladm_attr_t *);
-extern dladm_status_t	dladm_setzid(const char *, char *);
+extern dladm_status_t	dladm_info(dladm_handle_t, datalink_id_t,
+			    dladm_attr_t *);
+extern dladm_status_t	dladm_setzid(dladm_handle_t, const char *, char *);
 
-extern dladm_status_t	dladm_rename_link(const char *, const char *);
+extern dladm_status_t	dladm_rename_link(dladm_handle_t, const char *,
+			    const char *);
 
-extern dladm_status_t	dladm_set_linkprop(datalink_id_t, const char *,
-			    char **, uint_t, uint_t);
-extern dladm_status_t	dladm_get_linkprop(datalink_id_t, dladm_prop_type_t,
-			    const char *, char **, uint_t *);
-extern dladm_status_t	dladm_walk_linkprop(datalink_id_t, void *,
-			    int (*)(datalink_id_t, const char *, void *));
+extern dladm_status_t	dladm_set_linkprop(dladm_handle_t, datalink_id_t,
+			    const char *, char **, uint_t, uint_t);
+extern dladm_status_t	dladm_get_linkprop(dladm_handle_t, datalink_id_t,
+			    dladm_prop_type_t, const char *, char **, uint_t *);
+extern dladm_status_t	dladm_walk_linkprop(dladm_handle_t, datalink_id_t,
+			    void *, int (*)(dladm_handle_t, datalink_id_t,
+			    const char *, void *));
 
-extern dladm_status_t	dladm_set_secobj(const char *, dladm_secobj_class_t,
-			    uint8_t *, uint_t, uint_t);
-extern dladm_status_t	dladm_get_secobj(const char *, dladm_secobj_class_t *,
-			    uint8_t *, uint_t *, uint_t);
-extern dladm_status_t	dladm_unset_secobj(const char *, uint_t);
-extern dladm_status_t	dladm_walk_secobj(void *,
-			    boolean_t (*)(void *, const char *), uint_t);
+extern dladm_status_t	dladm_set_secobj(dladm_handle_t, const char *,
+			    dladm_secobj_class_t, uint8_t *, uint_t, uint_t);
+extern dladm_status_t	dladm_get_secobj(dladm_handle_t, const char *,
+			    dladm_secobj_class_t *, uint8_t *, uint_t *,
+			    uint_t);
+extern dladm_status_t	dladm_unset_secobj(dladm_handle_t, const char *,
+			    uint_t);
+extern dladm_status_t	dladm_walk_secobj(dladm_handle_t, void *,
+			    boolean_t (*)(dladm_handle_t, void *, const char *),
+			    uint_t);
 
 extern const char	*dladm_linkstate2str(link_state_t, char *);
 extern const char	*dladm_linkduplex2str(link_duplex_t, char *);
@@ -143,48 +149,60 @@ extern const char	*dladm_secobjclass2str(dladm_secobj_class_t, char *);
 extern dladm_status_t	dladm_str2secobjclass(const char *,
 			    dladm_secobj_class_t *);
 
-extern dladm_status_t	dladm_init_linkprop(datalink_id_t, boolean_t);
-extern dladm_status_t	dladm_init_secobj(void);
+extern dladm_status_t	dladm_init_linkprop(dladm_handle_t, datalink_id_t,
+			    boolean_t);
+extern dladm_status_t	dladm_init_secobj(dladm_handle_t);
 extern boolean_t	dladm_valid_secobj_name(const char *);
 
-extern dladm_status_t	dladm_create_datalink_id(const char *, datalink_class_t,
-			    uint_t, uint32_t, datalink_id_t *);
-extern dladm_status_t	dladm_destroy_datalink_id(datalink_id_t, uint32_t);
-extern dladm_status_t	dladm_remap_datalink_id(datalink_id_t, const char *);
-extern dladm_status_t	dladm_up_datalink_id(datalink_id_t);
-extern dladm_status_t	dladm_name2info(const char *, datalink_id_t *,
-			    uint32_t *, datalink_class_t *, uint32_t *);
-extern dladm_status_t	dladm_datalink_id2info(datalink_id_t, uint32_t *,
-			    datalink_class_t *, uint32_t *, char *, size_t);
-extern dladm_status_t	dladm_walk_datalink_id(int (*)(datalink_id_t, void *),
-			    void *, datalink_class_t, datalink_media_t,
+extern dladm_status_t	dladm_create_datalink_id(dladm_handle_t, const char *,
+			    datalink_class_t, uint_t, uint32_t,
+			    datalink_id_t *);
+extern dladm_status_t	dladm_destroy_datalink_id(dladm_handle_t, datalink_id_t,
 			    uint32_t);
-extern dladm_status_t	dladm_create_conf(const char *, datalink_id_t,
-			    datalink_class_t, uint32_t, dladm_conf_t *);
-extern dladm_status_t	dladm_read_conf(datalink_id_t, dladm_conf_t *);
-extern dladm_status_t	dladm_write_conf(dladm_conf_t);
-extern dladm_status_t	dladm_remove_conf(datalink_id_t);
-extern void		dladm_destroy_conf(dladm_conf_t);
-extern dladm_status_t	dladm_get_conf_field(dladm_conf_t, const char *,
-			    void *, size_t);
-extern dladm_status_t	dladm_set_conf_field(dladm_conf_t, const char *,
-			    dladm_datatype_t, const void *);
-extern dladm_status_t	dladm_unset_conf_field(dladm_conf_t, const char *);
+extern dladm_status_t	dladm_remap_datalink_id(dladm_handle_t, datalink_id_t,
+			    const char *);
+extern dladm_status_t	dladm_up_datalink_id(dladm_handle_t, datalink_id_t);
+extern dladm_status_t	dladm_name2info(dladm_handle_t, const char *,
+			    datalink_id_t *, uint32_t *, datalink_class_t *,
+			    uint32_t *);
+extern dladm_status_t	dladm_datalink_id2info(dladm_handle_t, datalink_id_t,
+			    uint32_t *, datalink_class_t *, uint32_t *, char *,
+			    size_t);
+extern dladm_status_t	dladm_walk_datalink_id(int (*)(dladm_handle_t,
+			    datalink_id_t, void *), dladm_handle_t, void *,
+			    datalink_class_t, datalink_media_t, uint32_t);
+extern dladm_status_t	dladm_create_conf(dladm_handle_t, const char *,
+			    datalink_id_t, datalink_class_t, uint32_t,
+			    dladm_conf_t *);
+extern dladm_status_t	dladm_read_conf(dladm_handle_t, datalink_id_t,
+			    dladm_conf_t *);
+extern dladm_status_t	dladm_write_conf(dladm_handle_t, dladm_conf_t);
+extern dladm_status_t	dladm_remove_conf(dladm_handle_t, datalink_id_t);
+extern void		dladm_destroy_conf(dladm_handle_t, dladm_conf_t);
+extern dladm_status_t	dladm_get_conf_field(dladm_handle_t, dladm_conf_t,
+			    const char *, void *, size_t);
+extern dladm_status_t	dladm_set_conf_field(dladm_handle_t, dladm_conf_t,
+			    const char *, dladm_datatype_t, const void *);
+extern dladm_status_t	dladm_unset_conf_field(dladm_handle_t, dladm_conf_t,
+			    const char *);
 
-extern dladm_status_t	dladm_dev2linkid(const char *, datalink_id_t *);
-extern dladm_status_t	dladm_linkid2legacyname(datalink_id_t, char *, size_t);
-extern dladm_status_t	dladm_phys_delete(datalink_id_t);
+extern dladm_status_t	dladm_dev2linkid(dladm_handle_t, const char *,
+			    datalink_id_t *);
+extern dladm_status_t	dladm_linkid2legacyname(dladm_handle_t, datalink_id_t,
+			    char *, size_t);
+extern dladm_status_t	dladm_phys_delete(dladm_handle_t, datalink_id_t);
 
-extern dladm_status_t	dladm_phys_info(datalink_id_t, dladm_phys_attr_t *,
-			    uint32_t);
+extern dladm_status_t	dladm_phys_info(dladm_handle_t, datalink_id_t,
+			    dladm_phys_attr_t *, uint32_t);
 extern dladm_status_t	dladm_parselink(const char *, char *, uint_t *);
 
-extern int		dladm_walk_macaddr(datalink_id_t, void *,
+extern int		dladm_walk_macaddr(dladm_handle_t, datalink_id_t,
+			    void *,
 			    boolean_t (*)(void *, dladm_macaddr_attr_t *));
-extern int		dladm_walk_hwgrp(datalink_id_t, void *,
+extern int		dladm_walk_hwgrp(dladm_handle_t, datalink_id_t, void *,
 			    boolean_t (*)(void *, dladm_hwgrp_attr_t *));
 
-extern dladm_status_t	dladm_link_get_proplist(datalink_id_t,
+extern dladm_status_t	dladm_link_get_proplist(dladm_handle_t, datalink_id_t,
 			    dladm_arg_list_t **);
 
 extern dladm_status_t	i_dladm_set_link_proplist_db(char *,

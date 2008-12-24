@@ -51,14 +51,27 @@
 #include <sys/param.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <libdladm_impl.h>
 #include <libdlmgmt.h>
 #include "dlmgmt_impl.h"
 
 const char		*progname;
 boolean_t		debug;
 static int		pfds[2];
+/*
+ * This file descriptor to DLMGMT_DOOR cannot be in the libdladm
+ * handle because the door isn't created when the handle is created.
+ */
 static int		dlmgmt_door_fd = -1;
-static int		dld_control_fd = -1;
+
+/*
+ * This libdladm handle is global so that dlmgmt_upcall_linkprop_init()
+ * can pass to libdladm.  The handle is opened during dlmgmt_init_privileges()
+ * with "ALL" privileges.  It is not able to open DLMGMT_DOOR at that time as
+ * it hasn't been created yet.  This door in the handle is opened in the first
+ * call to dladm_door_fd().
+ */
+dladm_handle_t		dld_handle = NULL;
 
 static void		dlmgmtd_exit(int);
 static int		dlmgmt_init();
@@ -72,11 +85,11 @@ dlmgmt_set_doorfd(boolean_t start)
 	dld_ioc_door_t did;
 	int err = 0;
 
-	assert(dld_control_fd != -1);
+	assert(dld_handle != NULL);
 
 	did.did_start_door = start;
 
-	if (ioctl(dld_control_fd, DLDIOC_DOORSERVER, &did) == -1)
+	if (ioctl(dladm_dld_fd(dld_handle), DLDIOC_DOORSERVER, &did) == -1)
 		err = errno;
 
 	return (err);
@@ -144,7 +157,7 @@ dlmgmt_door_fini()
 static int
 dlmgmt_init()
 {
-	int		err;
+	int err;
 
 	if (signal(SIGTERM, dlmgmtd_exit) == SIG_ERR ||
 	    signal(SIGINT, dlmgmtd_exit) == SIG_ERR) {
@@ -237,10 +250,12 @@ dlmgmt_init_privileges()
 
 	/*
 	 * When dlmgmtd is started at boot, "ALL" privilege is required
-	 * to open the dld control node.
+	 * to open the dld control node.  The door isn't created yet.
 	 */
-	if ((dld_control_fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (errno);
+	if (dladm_open(&dld_handle) != DLADM_STATUS_OK) {
+		dlmgmt_log(LOG_ERR, "dladm_open() failed");
+		return (EPERM);
+	}
 
 	/*
 	 * We need PRIV_SYS_DL_CONFIG for the DLDIOC_DOORSERVER ioctl,
@@ -248,10 +263,11 @@ dlmgmt_init_privileges()
 	 */
 	if (__init_daemon_priv(PU_RESETGROUPS|PU_CLEARLIMITSET, UID_DLADM,
 	    GID_SYS, PRIV_SYS_DL_CONFIG, PRIV_SYS_CONFIG, NULL) == -1) {
-		(void) close(dld_control_fd);
-		dld_control_fd = -1;
+		dladm_close(dld_handle);
+		dld_handle = NULL;
 		return (EPERM);
 	}
+
 
 	return (0);
 }
@@ -259,9 +275,9 @@ dlmgmt_init_privileges()
 static void
 dlmgmt_fini_privileges()
 {
-	if (dld_control_fd != -1) {
-		(void) close(dld_control_fd);
-		dld_control_fd = -1;
+	if (dld_handle != NULL) {
+		dladm_close(dld_handle);
+		dld_handle = NULL;
 	}
 }
 

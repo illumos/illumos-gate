@@ -51,16 +51,17 @@ typedef struct dladm_vnic_attr {
 	mac_resource_props_t	va_resource_props;
 } dladm_vnic_attr_t;
 
-extern dladm_status_t	dladm_vnic_create(const char *, datalink_id_t,
-			    vnic_mac_addr_type_t, uchar_t *, int, int *,
-			    uint_t, uint16_t, datalink_id_t *,
+extern dladm_status_t	dladm_vnic_create(dladm_handle_t, const char *,
+			    datalink_id_t, vnic_mac_addr_type_t, uchar_t *,
+			    int, int *, uint_t, uint16_t, datalink_id_t *,
 			    dladm_arg_list_t *, uint32_t);
 
-extern dladm_status_t	dladm_vnic_delete(datalink_id_t, uint32_t);
-extern dladm_status_t	dladm_vnic_info(datalink_id_t, dladm_vnic_attr_t *,
+extern dladm_status_t	dladm_vnic_delete(dladm_handle_t, datalink_id_t,
 			    uint32_t);
+extern dladm_status_t	dladm_vnic_info(dladm_handle_t, datalink_id_t,
+			    dladm_vnic_attr_t *, uint32_t);
 
-extern dladm_status_t	dladm_vnic_up(datalink_id_t, uint32_t);
+extern dladm_status_t	dladm_vnic_up(dladm_handle_t, datalink_id_t, uint32_t);
 extern dladm_status_t	dladm_vnic_str2macaddrtype(const char *,
 			    vnic_mac_addr_type_t *);
 

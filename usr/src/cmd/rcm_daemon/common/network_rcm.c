@@ -75,6 +75,8 @@ static net_cache_t	cache_tail;
 static mutex_t		cache_lock;
 static int		events_registered = 0;
 
+static dladm_handle_t	dld_handle = NULL;
+
 /* module interface routines */
 static int net_register(rcm_handle_t *);
 static int net_unregister(rcm_handle_t *);
@@ -138,6 +140,8 @@ rcm_mod_init(void)
 	cache_tail.next = NULL;
 	(void) mutex_init(&cache_lock, NULL, NULL);
 
+	dladm_open(&dld_handle);
+
 	/* Return the ops vectors */
 	return (&net_ops);
 }
@@ -163,6 +167,8 @@ rcm_mod_fini(void)
 {
 	free_cache();
 	(void) mutex_destroy(&cache_lock);
+
+	dladm_close(dld_handle);
 	return (RCM_SUCCESS);
 }
 
@@ -319,9 +325,9 @@ net_passthru(rcm_handle_t *hd, int op, const char *rsrc, uint_t flag,
 			 * Delete active linkprop before this active link
 			 * is deleted.
 			 */
-			(void) dladm_set_linkprop(linkid, NULL, NULL, 0,
-			    DLADM_OPT_ACTIVE);
-			(void) dladm_destroy_datalink_id(linkid,
+			(void) dladm_set_linkprop(dld_handle, linkid, NULL,
+			    NULL, 0, DLADM_OPT_ACTIVE);
+			(void) dladm_destroy_datalink_id(dld_handle, linkid,
 			    DLADM_OPT_ACTIVE);
 		}
 		break;
@@ -431,8 +437,8 @@ net_getinfo(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag,
 	}
 
 	len = strlen(info_fmt) + MAXLINKNAMELEN + 1;
-	if ((status = dladm_datalink_id2info(node->linkid, NULL, NULL, NULL,
-	    link, sizeof (link))) != DLADM_STATUS_OK) {
+	if ((status = dladm_datalink_id2info(dld_handle, node->linkid, NULL,
+	    NULL, NULL, link, sizeof (link))) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_ERROR,
 		    _("NET: usage(%s) get link name failure(%s)\n"),
 		    node->resource, dladm_status2str(status, errmsg));
@@ -666,7 +672,7 @@ devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 	di_devfs_path_free(devfspath);
 
 	(void) snprintf(dev, sizeof (dev), "%s%d", drv, di_instance(node));
-	if (dladm_dev2linkid(dev, &linkid) != DLADM_STATUS_OK) {
+	if (dladm_dev2linkid(dld_handle, dev, &linkid) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_DEBUG,
 		    _("NET: failed to find the linkid for %s\n"), dev);
 		return (DI_WALK_CONTINUE);

@@ -26,8 +26,6 @@
 #ifndef _LIBDLAGGR_H
 #define	_LIBDLAGGR_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file includes structures, macros and routines used by aggregation link
  * administration.
@@ -73,21 +71,22 @@ typedef struct dladm_aggr_grp_attr {
 	aggr_lacp_timer_t lg_lacp_timer;
 } dladm_aggr_grp_attr_t;
 
-extern dladm_status_t	dladm_aggr_create(const char *, uint16_t, uint32_t,
-			    dladm_aggr_port_attr_db_t *, uint32_t, boolean_t,
-			    const uchar_t *, aggr_lacp_mode_t,
-			    aggr_lacp_timer_t, uint32_t);
-extern dladm_status_t	dladm_aggr_delete(datalink_id_t, uint32_t);
-extern dladm_status_t	dladm_aggr_add(datalink_id_t, uint32_t,
-			    dladm_aggr_port_attr_db_t *, uint32_t);
-extern dladm_status_t	dladm_aggr_remove(datalink_id_t, uint32_t,
-			    dladm_aggr_port_attr_db_t *, uint32_t);
-extern dladm_status_t	dladm_aggr_modify(datalink_id_t, uint32_t, uint32_t,
-			    boolean_t, const uchar_t *, aggr_lacp_mode_t,
-			    aggr_lacp_timer_t, uint32_t);
-extern dladm_status_t	dladm_aggr_up(datalink_id_t);
-extern dladm_status_t	dladm_aggr_info(datalink_id_t, dladm_aggr_grp_attr_t *,
+extern dladm_status_t	dladm_aggr_create(dladm_handle_t, const char *,
+			    uint16_t, uint32_t, dladm_aggr_port_attr_db_t *,
+			    uint32_t, boolean_t, const uchar_t *,
+			    aggr_lacp_mode_t, aggr_lacp_timer_t, uint32_t);
+extern dladm_status_t	dladm_aggr_delete(dladm_handle_t, datalink_id_t,
 			    uint32_t);
+extern dladm_status_t	dladm_aggr_add(dladm_handle_t, datalink_id_t, uint32_t,
+			    dladm_aggr_port_attr_db_t *, uint32_t);
+extern dladm_status_t	dladm_aggr_remove(dladm_handle_t, datalink_id_t,
+			    uint32_t, dladm_aggr_port_attr_db_t *, uint32_t);
+extern dladm_status_t	dladm_aggr_modify(dladm_handle_t, datalink_id_t,
+			    uint32_t, uint32_t, boolean_t, const uchar_t *,
+			    aggr_lacp_mode_t, aggr_lacp_timer_t, uint32_t);
+extern dladm_status_t	dladm_aggr_up(dladm_handle_t, datalink_id_t);
+extern dladm_status_t	dladm_aggr_info(dladm_handle_t, datalink_id_t,
+			    dladm_aggr_grp_attr_t *, uint32_t);
 
 extern boolean_t	dladm_aggr_str2policy(const char *, uint32_t *);
 extern char		*dladm_aggr_policy2str(uint32_t, char *);
@@ -101,8 +100,8 @@ extern boolean_t	dladm_aggr_str2lacptimer(const char *,
 			    aggr_lacp_timer_t *);
 extern const char	*dladm_aggr_lacptimer2str(aggr_lacp_timer_t, char *);
 extern const char	*dladm_aggr_portstate2str(aggr_port_state_t, char *);
-extern dladm_status_t	dladm_key2linkid(uint16_t, datalink_id_t *,
-			    uint32_t);
+extern dladm_status_t	dladm_key2linkid(dladm_handle_t, uint16_t,
+			    datalink_id_t *, uint32_t);
 
 #ifdef	__cplusplus
 }

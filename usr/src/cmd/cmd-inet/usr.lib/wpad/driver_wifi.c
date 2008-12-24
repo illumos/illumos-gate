@@ -9,8 +9,6 @@
  * See README for more details.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -38,13 +36,14 @@
  * associated.
  */
 int
-wpa_driver_wifi_get_bssid(datalink_id_t linkid, char *bssid)
+wpa_driver_wifi_get_bssid(dladm_handle_t handle, datalink_id_t linkid,
+    char *bssid)
 {
 	dladm_status_t status;
 	dladm_wlan_linkattr_t attr;
 	dladm_wlan_attr_t *wl_attrp;
 
-	status = dladm_wlan_get_linkattr(linkid, &attr);
+	status = dladm_wlan_get_linkattr(handle, linkid, &attr);
 	if (status != DLADM_STATUS_OK)
 		return (-1);
 
@@ -72,14 +71,15 @@ wpa_driver_wifi_get_bssid(datalink_id_t linkid, char *bssid)
  * Returning zero is recommended if the STA is not associated.
  */
 int
-wpa_driver_wifi_get_ssid(datalink_id_t linkid, char *ssid)
+wpa_driver_wifi_get_ssid(dladm_handle_t handle, datalink_id_t linkid,
+    char *ssid)
 {
 	int ret;
 	dladm_status_t status;
 	dladm_wlan_linkattr_t attr;
 	dladm_wlan_attr_t *wl_attrp;
 
-	status = dladm_wlan_get_linkattr(linkid, &attr);
+	status = dladm_wlan_get_linkattr(handle, linkid, &attr);
 	if (status != DLADM_STATUS_OK)
 		return (-1);
 
@@ -98,13 +98,13 @@ wpa_driver_wifi_get_ssid(datalink_id_t linkid, char *ssid)
 }
 
 static int
-wpa_driver_wifi_set_wpa_ie(datalink_id_t linkid, uint8_t *wpa_ie,
-    uint32_t wpa_ie_len)
+wpa_driver_wifi_set_wpa_ie(dladm_handle_t handle, datalink_id_t linkid,
+    uint8_t *wpa_ie, uint32_t wpa_ie_len)
 {
 	dladm_status_t status;
 
 	wpa_printf(MSG_DEBUG, "%s", "wpa_driver_wifi_set_wpa_ie");
-	status = dladm_wlan_wpa_set_ie(linkid, wpa_ie, wpa_ie_len);
+	status = dladm_wlan_wpa_set_ie(handle, linkid, wpa_ie, wpa_ie_len);
 
 	return (WPA_STATUS(status));
 }
@@ -123,22 +123,24 @@ wpa_driver_wifi_set_wpa_ie(datalink_id_t linkid, uint8_t *wpa_ie,
  * allow wpa_supplicant to control roaming).
  */
 static int
-wpa_driver_wifi_set_wpa(datalink_id_t linkid, boolean_t enabled)
+wpa_driver_wifi_set_wpa(dladm_handle_t handle, datalink_id_t linkid,
+    boolean_t enabled)
 {
 	dladm_status_t status;
 
 	wpa_printf(MSG_DEBUG, "wpa_driver_wifi_set_wpa: enable=%d", enabled);
 
-	if (!enabled && wpa_driver_wifi_set_wpa_ie(linkid, NULL, 0) < 0)
+	if (!enabled && wpa_driver_wifi_set_wpa_ie(handle, linkid, NULL, 0) < 0)
 		return (-1);
 
-	status = dladm_wlan_wpa_set_wpa(linkid, enabled);
+	status = dladm_wlan_wpa_set_wpa(handle, linkid, enabled);
 
 	return (WPA_STATUS(status));
 }
 
 static int
-wpa_driver_wifi_del_key(datalink_id_t linkid, int key_idx, unsigned char *addr)
+wpa_driver_wifi_del_key(dladm_handle_t handle, datalink_id_t linkid,
+    int key_idx, unsigned char *addr)
 {
 	dladm_status_t status;
 	dladm_wlan_bssid_t bss;
@@ -147,7 +149,7 @@ wpa_driver_wifi_del_key(datalink_id_t linkid, int key_idx, unsigned char *addr)
 	    key_idx);
 
 	(void) memcpy(bss.wb_bytes, addr, DLADM_WLAN_BSSID_LEN);
-	status = dladm_wlan_wpa_del_key(linkid, key_idx, &bss);
+	status = dladm_wlan_wpa_del_key(handle, linkid, key_idx, &bss);
 
 	return (WPA_STATUS(status));
 }
@@ -186,9 +188,9 @@ wpa_driver_wifi_del_key(datalink_id_t linkid, int key_idx, unsigned char *addr)
  * configuration.
  */
 static int
-wpa_driver_wifi_set_key(datalink_id_t linkid, wpa_alg alg,
-    unsigned char *addr, int key_idx, boolean_t set_tx, uint8_t *seq,
-    uint32_t seq_len, uint8_t *key, uint32_t key_len)
+wpa_driver_wifi_set_key(dladm_handle_t handle, datalink_id_t linkid,
+    wpa_alg alg, unsigned char *addr, int key_idx, boolean_t set_tx,
+    uint8_t *seq, uint32_t seq_len, uint8_t *key, uint32_t key_len)
 {
 	char *alg_name;
 	dladm_wlan_cipher_t cipher;
@@ -197,7 +199,7 @@ wpa_driver_wifi_set_key(datalink_id_t linkid, wpa_alg alg,
 
 	wpa_printf(MSG_DEBUG, "%s", "wpa_driver_wifi_set_key");
 	if (alg == WPA_ALG_NONE)
-		return (wpa_driver_wifi_del_key(linkid, key_idx, addr));
+		return (wpa_driver_wifi_del_key(handle, linkid, key_idx, addr));
 
 	switch (alg) {
 	case WPA_ALG_WEP:
@@ -230,7 +232,7 @@ wpa_driver_wifi_set_key(datalink_id_t linkid, wpa_alg alg,
 	}
 	(void) memcpy(bss.wb_bytes, addr, DLADM_WLAN_BSSID_LEN);
 
-	status = dladm_wlan_wpa_set_key(linkid, cipher, &bss, set_tx,
+	status = dladm_wlan_wpa_set_key(handle, linkid, cipher, &bss, set_tx,
 	    *(uint64_t *)(uintptr_t)seq, key_idx, key, key_len);
 
 	return (WPA_STATUS(status));
@@ -245,14 +247,15 @@ wpa_driver_wifi_set_key(datalink_id_t linkid, wpa_alg alg,
  * Return: 0 on success, -1 on failure
  */
 static int
-wpa_driver_wifi_disassociate(datalink_id_t linkid, int reason_code)
+wpa_driver_wifi_disassociate(dladm_handle_t handle, datalink_id_t linkid,
+    int reason_code)
 {
 	dladm_status_t status;
 
 	wpa_printf(MSG_DEBUG, "wpa_driver_wifi_disassociate");
 
-	status = dladm_wlan_wpa_set_mlme(linkid, DLADM_WLAN_MLME_DISASSOC,
-	    reason_code, NULL);
+	status = dladm_wlan_wpa_set_mlme(handle, linkid,
+	    DLADM_WLAN_MLME_DISASSOC, reason_code, NULL);
 
 	return (WPA_STATUS(status));
 }
@@ -277,8 +280,8 @@ wpa_driver_wifi_disassociate(datalink_id_t linkid, int reason_code)
  * Return: 0 on success, -1 on failure
  */
 static int
-wpa_driver_wifi_associate(datalink_id_t linkid, const char *bssid,
-    uint8_t *wpa_ie, uint32_t wpa_ie_len)
+wpa_driver_wifi_associate(dladm_handle_t handle, datalink_id_t linkid,
+    const char *bssid, uint8_t *wpa_ie, uint32_t wpa_ie_len)
 {
 	dladm_status_t status;
 	dladm_wlan_bssid_t bss;
@@ -291,11 +294,11 @@ wpa_driver_wifi_associate(datalink_id_t linkid, const char *bssid,
 	 * this is implied by the bssid which is used to locate
 	 * the scanned node state which holds it.
 	 */
-	if (wpa_driver_wifi_set_wpa_ie(linkid, wpa_ie, wpa_ie_len) < 0)
+	if (wpa_driver_wifi_set_wpa_ie(handle, linkid, wpa_ie, wpa_ie_len) < 0)
 		return (-1);
 
 	(void) memcpy(bss.wb_bytes, bssid, DLADM_WLAN_BSSID_LEN);
-	status = dladm_wlan_wpa_set_mlme(linkid, DLADM_WLAN_MLME_ASSOC,
+	status = dladm_wlan_wpa_set_mlme(handle, linkid, DLADM_WLAN_MLME_ASSOC,
 	    0, &bss);
 
 	return (WPA_STATUS(status));
@@ -312,7 +315,7 @@ wpa_driver_wifi_associate(datalink_id_t linkid, const char *bssid,
  * results with wpa_driver_get_scan_results().
  */
 static int
-wpa_driver_wifi_scan(datalink_id_t linkid)
+wpa_driver_wifi_scan(dladm_handle_t handle, datalink_id_t linkid)
 {
 	dladm_status_t status;
 
@@ -322,10 +325,10 @@ wpa_driver_wifi_scan(datalink_id_t linkid)
 	 * to get ieee80211_begin_scan called.  We really want to scan w/o
 	 * altering the current state but that's not possible right now.
 	 */
-	(void) wpa_driver_wifi_disassociate(linkid,
+	(void) wpa_driver_wifi_disassociate(handle, linkid,
 	    DLADM_WLAN_REASON_DISASSOC_LEAVING);
 
-	status = dladm_wlan_scan(linkid, NULL, NULL);
+	status = dladm_wlan_scan(handle, linkid, NULL, NULL);
 
 	wpa_printf(MSG_DEBUG, "%s: return", "wpa_driver_wifi_scan");
 	return (WPA_STATUS(status));
@@ -344,7 +347,7 @@ wpa_driver_wifi_scan(datalink_id_t linkid)
  * buffer.
  */
 int
-wpa_driver_wifi_get_scan_results(datalink_id_t linkid,
+wpa_driver_wifi_get_scan_results(dladm_handle_t handle, datalink_id_t linkid,
     dladm_wlan_ess_t *results, uint32_t max_size)
 {
 	uint_t ret;
@@ -352,7 +355,7 @@ wpa_driver_wifi_get_scan_results(datalink_id_t linkid,
 	wpa_printf(MSG_DEBUG, "%s: max size=%d\n",
 	    "wpa_driver_wifi_get_scan_results", max_size);
 
-	if (dladm_wlan_wpa_get_sr(linkid, results, max_size, &ret)
+	if (dladm_wlan_wpa_get_sr(handle, linkid, results, max_size, &ret)
 	    != DLADM_STATUS_OK) {
 		return (-1);
 	}

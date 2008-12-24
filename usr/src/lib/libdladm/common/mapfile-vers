@@ -25,6 +25,10 @@
 
 SUNWprivate_1.1 {
     global:
+	dladm_open;
+	dladm_close;
+	dladm_dld_fd;
+	dladm_door_fd;
 	dladm_info;
 	dladm_walk;
 	dladm_setzid;

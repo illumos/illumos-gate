@@ -35,13 +35,14 @@
 #include <libdllink.h>
 #include <libdladm_impl.h>
 
-static dladm_status_t	i_dladm_set_secobj_db(const char *,
+static dladm_status_t	i_dladm_set_secobj_db(dladm_handle_t, const char *,
 			    dladm_secobj_class_t, uint8_t *, uint_t);
-static dladm_status_t	i_dladm_get_secobj_db(const char *,
+static dladm_status_t	i_dladm_get_secobj_db(dladm_handle_t, const char *,
 			    dladm_secobj_class_t *, uint8_t *, uint_t *);
-static dladm_status_t	i_dladm_unset_secobj_db(const char *);
-static dladm_status_t	i_dladm_walk_secobj_db(void *,
-			    boolean_t (*)(void *, const char *));
+static dladm_status_t	i_dladm_unset_secobj_db(dladm_handle_t, const char *);
+static dladm_status_t	i_dladm_walk_secobj_db(dladm_handle_t, void *,
+			    boolean_t (*)(dladm_handle_t, void *,
+			    const char *));
 
 typedef struct secobj_class_info {
 	const char		*sc_name;
@@ -122,10 +123,9 @@ dladm_convert_dldsecobjclass(dld_secobj_class_t dldclass,
 }
 
 dladm_status_t
-dladm_set_secobj(const char *obj_name, dladm_secobj_class_t class,
-    uint8_t *obj_val, uint_t obj_len, uint_t flags)
+dladm_set_secobj(dladm_handle_t handle, const char *obj_name,
+    dladm_secobj_class_t class, uint8_t *obj_val, uint_t obj_len, uint_t flags)
 {
-	int			fd;
 	dladm_status_t		status = DLADM_STATUS_OK;
 	dld_ioc_secobj_set_t	secobj_set;
 	dld_secobj_t		*objp;
@@ -153,30 +153,25 @@ dladm_set_secobj(const char *obj_name, dladm_secobj_class_t class,
 	if ((flags & DLADM_OPT_CREATE) != 0)
 		secobj_set.ss_flags = DLD_SECOBJ_OPT_CREATE;
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
-
-	if (ioctl(fd, DLDIOC_SECOBJ_SET, &secobj_set) < 0)
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_SECOBJ_SET, &secobj_set) < 0)
 		status = dladm_errno2status(errno);
-
-	(void) close(fd);
 
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
 persist:
 	if ((flags & DLADM_OPT_PERSIST) != 0) {
-		status = i_dladm_set_secobj_db(obj_name, class,
+		status = i_dladm_set_secobj_db(handle, obj_name, class,
 		    obj_val, obj_len);
 	}
 	return (status);
 }
 
 dladm_status_t
-dladm_get_secobj(const char *obj_name, dladm_secobj_class_t *classp,
-    uint8_t *obj_val, uint_t *obj_lenp, uint_t flags)
+dladm_get_secobj(dladm_handle_t handle, const char *obj_name,
+    dladm_secobj_class_t *classp, uint8_t *obj_val, uint_t *obj_lenp,
+    uint_t flags)
 {
-	int			fd;
 	dladm_status_t		status = DLADM_STATUS_OK;
 	dld_ioc_secobj_get_t	secobj_get;
 	dld_secobj_t		*objp;
@@ -187,7 +182,7 @@ dladm_get_secobj(const char *obj_name, dladm_secobj_class_t *classp,
 		return (DLADM_STATUS_BADARG);
 
 	if ((flags & DLADM_OPT_PERSIST) != 0) {
-		return (i_dladm_get_secobj_db(obj_name, classp,
+		return (i_dladm_get_secobj_db(handle, obj_name, classp,
 		    obj_val, obj_lenp));
 	}
 
@@ -195,14 +190,10 @@ dladm_get_secobj(const char *obj_name, dladm_secobj_class_t *classp,
 	objp = &secobj_get.sg_obj;
 	(void) strlcpy(objp->so_name, obj_name, DLD_SECOBJ_NAME_MAX);
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
-
 	secobj_get.sg_size = sizeof (secobj_get);
-	if (ioctl(fd, DLDIOC_SECOBJ_GET, &secobj_get) < 0)
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_SECOBJ_GET, &secobj_get) < 0)
 		status = dladm_errno2status(errno);
 
-	(void) close(fd);
 	if (objp->so_len > *obj_lenp)
 		return (DLADM_STATUS_TOOSMALL);
 
@@ -215,9 +206,8 @@ dladm_get_secobj(const char *obj_name, dladm_secobj_class_t *classp,
 }
 
 dladm_status_t
-dladm_unset_secobj(const char *obj_name, uint_t flags)
+dladm_unset_secobj(dladm_handle_t handle, const char *obj_name, uint_t flags)
 {
-	int			fd;
 	dladm_status_t		status = DLADM_STATUS_OK;
 	dld_ioc_secobj_unset_t	secobj_unset;
 
@@ -230,38 +220,31 @@ dladm_unset_secobj(const char *obj_name, uint_t flags)
 
 	bzero(&secobj_unset, sizeof (secobj_unset));
 	(void) strlcpy(secobj_unset.su_name, obj_name, DLD_SECOBJ_NAME_MAX);
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
 
-	if (ioctl(fd, DLDIOC_SECOBJ_UNSET, &secobj_unset) < 0)
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_SECOBJ_UNSET, &secobj_unset) < 0)
 		status = dladm_errno2status(errno);
 
-	(void) close(fd);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
 persist:
 	if ((flags & DLADM_OPT_PERSIST) != 0)
-		status = i_dladm_unset_secobj_db(obj_name);
+		status = i_dladm_unset_secobj_db(handle, obj_name);
 
 	return (status);
 }
 
 dladm_status_t
-dladm_walk_secobj(void *arg, boolean_t (*func)(void *, const char *),
-    uint_t flags)
+dladm_walk_secobj(dladm_handle_t handle, void *arg,
+    boolean_t (*func)(dladm_handle_t, void *, const char *), uint_t flags)
 {
-	int			fd = -1;
 	dladm_status_t		status = DLADM_STATUS_OK;
 	dld_ioc_secobj_get_t	*secobj_getp;
 	dld_secobj_t		*objp;
 	size_t			secobj_bufsz;
 
 	if ((flags & DLADM_OPT_PERSIST) != 0)
-		return (i_dladm_walk_secobj_db(arg, func));
-
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
+		return (i_dladm_walk_secobj_db(handle, arg, func));
 
 	/* Start with enough room for 10 objects, increase if necessary. */
 	secobj_bufsz = sizeof (*secobj_getp) + (10 * sizeof (*objp));
@@ -273,7 +256,7 @@ dladm_walk_secobj(void *arg, boolean_t (*func)(void *, const char *),
 
 tryagain:
 	secobj_getp->sg_size = secobj_bufsz;
-	if (ioctl(fd, DLDIOC_SECOBJ_GET, secobj_getp) < 0) {
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_SECOBJ_GET, secobj_getp) < 0) {
 		if (errno == ENOSPC) {
 			/* Increase the buffer size and try again. */
 			secobj_bufsz *= 2;
@@ -295,13 +278,12 @@ tryagain:
 
 	objp = (dld_secobj_t *)(secobj_getp + 1);
 	while (secobj_getp->sg_count > 0) {
-		if (!func(arg, objp->so_name))
+		if (!func(handle, arg, objp->so_name))
 			goto done;
 		secobj_getp->sg_count--;
 		objp++;
 	}
 done:
-	(void) close(fd);
 	free(secobj_getp);
 	return (status);
 }
@@ -323,8 +305,8 @@ typedef struct secobj_name {
 
 typedef struct secobj_db_state	secobj_db_state_t;
 
-typedef boolean_t (*secobj_db_op_t)(struct secobj_db_state *, char *,
-    secobj_info_t *, dladm_status_t *);
+typedef boolean_t (*secobj_db_op_t)(dladm_handle_t, struct secobj_db_state *,
+    char *, secobj_info_t *, dladm_status_t *);
 
 struct secobj_db_state {
 	secobj_db_op_t		ss_op;
@@ -337,8 +319,8 @@ struct secobj_db_state {
  */
 /* ARGSUSED */
 static boolean_t
-process_secobj_set(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
-    dladm_status_t *statusp)
+process_secobj_set(dladm_handle_t handle, secobj_db_state_t *ssp, char *buf,
+    secobj_info_t *sip, dladm_status_t *statusp)
 {
 	char	tmpbuf[MAXLINELEN];
 	char	classbuf[DLADM_STRSIZE];
@@ -366,8 +348,8 @@ process_secobj_set(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
 
 /* ARGSUSED */
 static boolean_t
-process_secobj_get(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
-    dladm_status_t *statusp)
+process_secobj_get(dladm_handle_t handle, secobj_db_state_t *ssp, char *buf,
+    secobj_info_t *sip, dladm_status_t *statusp)
 {
 	if (*sip->si_lenp > *ssp->ss_info.si_lenp) {
 		*statusp = DLADM_STATUS_TOOSMALL;
@@ -381,8 +363,8 @@ process_secobj_get(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
 
 /* ARGSUSED */
 static boolean_t
-process_secobj_unset(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
-    dladm_status_t *statusp)
+process_secobj_unset(dladm_handle_t handle, secobj_db_state_t *ssp, char *buf,
+    secobj_info_t *sip, dladm_status_t *statusp)
 {
 	/*
 	 * Delete line.
@@ -393,8 +375,8 @@ process_secobj_unset(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
 
 /* ARGSUSED */
 static boolean_t
-process_secobj_walk(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
-    dladm_status_t *statusp)
+process_secobj_walk(dladm_handle_t handle, secobj_db_state_t *ssp, char *buf,
+    secobj_info_t *sip, dladm_status_t *statusp)
 {
 	secobj_name_t	*snp;
 
@@ -414,11 +396,12 @@ process_secobj_walk(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
 
 /* ARGSUSED */
 static boolean_t
-process_secobj_init(secobj_db_state_t *ssp, char *buf, secobj_info_t *sip,
-    dladm_status_t *statusp)
+process_secobj_init(dladm_handle_t handle, secobj_db_state_t *ssp, char *buf,
+    secobj_info_t *sip, dladm_status_t *statusp)
 {
-	*statusp = dladm_set_secobj(sip->si_name, *sip->si_classp, sip->si_val,
-	    *sip->si_lenp, DLADM_OPT_ACTIVE | DLADM_OPT_CREATE);
+	*statusp = dladm_set_secobj(handle, sip->si_name, *sip->si_classp,
+	    sip->si_val, *sip->si_lenp,
+	    DLADM_OPT_ACTIVE | DLADM_OPT_CREATE);
 	return (B_TRUE);
 }
 
@@ -433,7 +416,7 @@ parse_secobj_val(char *buf, secobj_info_t *sip)
 }
 
 static boolean_t
-process_secobj_line(secobj_db_state_t *ssp, char *buf,
+process_secobj_line(dladm_handle_t handle, secobj_db_state_t *ssp, char *buf,
     dladm_status_t *statusp)
 {
 	secobj_info_t		sinfo;
@@ -503,7 +486,7 @@ process_secobj_line(secobj_db_state_t *ssp, char *buf,
 	if (parse_secobj_val(str, &sinfo) != 0)
 		goto fail;
 
-	return ((*ssp->ss_op)(ssp, buf, &sinfo, statusp));
+	return ((*ssp->ss_op)(handle, ssp, buf, &sinfo, statusp));
 
 fail:
 	/*
@@ -514,7 +497,7 @@ fail:
 }
 
 static dladm_status_t
-process_secobj_db(void *arg, FILE *fp, FILE *nfp)
+process_secobj_db(dladm_handle_t handle, void *arg, FILE *fp, FILE *nfp)
 {
 	secobj_db_state_t	*ssp = arg;
 	dladm_status_t		status = DLADM_STATUS_OK;
@@ -532,7 +515,7 @@ process_secobj_db(void *arg, FILE *fp, FILE *nfp)
 	 */
 	while (fgets(buf, MAXLINELEN, fp) != NULL) {
 		if (cont)
-			cont = process_secobj_line(ssp, buf, &status);
+			cont = process_secobj_line(handle, ssp, buf, &status);
 
 		if (nfp != NULL && buf[0] != '\0' && fputs(buf, nfp) == EOF) {
 			status = dladm_errno2status(errno);
@@ -547,7 +530,7 @@ process_secobj_db(void *arg, FILE *fp, FILE *nfp)
 		 * If the specified object is not found above, we add the
 		 * object to the configuration file.
 		 */
-		(void) (*ssp->ss_op)(ssp, buf, NULL, &status);
+		(void) (*ssp->ss_op)(handle, ssp, buf, NULL, &status);
 		if (status == DLADM_STATUS_OK && fputs(buf, nfp) == EOF)
 			status = dladm_errno2status(errno);
 	}
@@ -559,13 +542,13 @@ process_secobj_db(void *arg, FILE *fp, FILE *nfp)
 	return (status);
 }
 
-#define	SECOBJ_RW_DB(statep, writeop) \
-	(i_dladm_rw_db("/etc/dladm/secobj.conf", S_IRUSR | S_IWUSR, \
+#define	SECOBJ_RW_DB(handle, statep, writeop)				\
+	(i_dladm_rw_db(handle, "/etc/dladm/secobj.conf", S_IRUSR | S_IWUSR, \
 	process_secobj_db, (statep), (writeop)))
 
 static dladm_status_t
-i_dladm_set_secobj_db(const char *obj_name, dladm_secobj_class_t class,
-    uint8_t *obj_val, uint_t obj_len)
+i_dladm_set_secobj_db(dladm_handle_t handle, const char *obj_name,
+    dladm_secobj_class_t class, uint8_t *obj_val, uint_t obj_len)
 {
 	secobj_db_state_t	state;
 
@@ -576,12 +559,12 @@ i_dladm_set_secobj_db(const char *obj_name, dladm_secobj_class_t class,
 	state.ss_info.si_lenp = &obj_len;
 	state.ss_namelist = NULL;
 
-	return (SECOBJ_RW_DB(&state, B_TRUE));
+	return (SECOBJ_RW_DB(handle, &state, B_TRUE));
 }
 
 static dladm_status_t
-i_dladm_get_secobj_db(const char *obj_name, dladm_secobj_class_t *classp,
-    uint8_t *obj_val, uint_t *obj_lenp)
+i_dladm_get_secobj_db(dladm_handle_t handle, const char *obj_name,
+    dladm_secobj_class_t *classp, uint8_t *obj_val, uint_t *obj_lenp)
 {
 	secobj_db_state_t	state;
 
@@ -592,11 +575,11 @@ i_dladm_get_secobj_db(const char *obj_name, dladm_secobj_class_t *classp,
 	state.ss_info.si_lenp = obj_lenp;
 	state.ss_namelist = NULL;
 
-	return (SECOBJ_RW_DB(&state, B_FALSE));
+	return (SECOBJ_RW_DB(handle, &state, B_FALSE));
 }
 
 static dladm_status_t
-i_dladm_unset_secobj_db(const char *obj_name)
+i_dladm_unset_secobj_db(dladm_handle_t handle, const char *obj_name)
 {
 	secobj_db_state_t	state;
 
@@ -607,11 +590,12 @@ i_dladm_unset_secobj_db(const char *obj_name)
 	state.ss_info.si_lenp = NULL;
 	state.ss_namelist = NULL;
 
-	return (SECOBJ_RW_DB(&state, B_TRUE));
+	return (SECOBJ_RW_DB(handle, &state, B_TRUE));
 }
 
 static dladm_status_t
-i_dladm_walk_secobj_db(void *arg, boolean_t (*func)(void *, const char *))
+i_dladm_walk_secobj_db(dladm_handle_t handle, void *arg,
+    boolean_t (*func)(dladm_handle_t, void *, const char *))
 {
 	secobj_db_state_t	state;
 	secobj_name_t		*snp = NULL, *fsnp;
@@ -625,7 +609,7 @@ i_dladm_walk_secobj_db(void *arg, boolean_t (*func)(void *, const char *))
 	state.ss_info.si_lenp = NULL;
 	state.ss_namelist = &snp;
 
-	status = SECOBJ_RW_DB(&state, B_FALSE);
+	status = SECOBJ_RW_DB(handle, &state, B_FALSE);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
@@ -633,7 +617,7 @@ i_dladm_walk_secobj_db(void *arg, boolean_t (*func)(void *, const char *))
 		fsnp = snp;
 		snp = snp->sn_next;
 		if (cont)
-			cont = func(arg, fsnp->sn_name);
+			cont = func(handle, arg, fsnp->sn_name);
 		free(fsnp->sn_name);
 		free(fsnp);
 	}
@@ -641,7 +625,7 @@ i_dladm_walk_secobj_db(void *arg, boolean_t (*func)(void *, const char *))
 }
 
 dladm_status_t
-dladm_init_secobj(void)
+dladm_init_secobj(dladm_handle_t handle)
 {
 	secobj_db_state_t	state;
 
@@ -652,7 +636,7 @@ dladm_init_secobj(void)
 	state.ss_info.si_lenp = NULL;
 	state.ss_namelist = NULL;
 
-	return (SECOBJ_RW_DB(&state, B_FALSE));
+	return (SECOBJ_RW_DB(handle, &state, B_FALSE));
 }
 
 boolean_t

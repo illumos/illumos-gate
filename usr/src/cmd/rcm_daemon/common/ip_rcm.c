@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This RCM module adds support to the RCM framework for IP managed
  * interfaces.
@@ -210,6 +208,8 @@ static ip_cache_t	cache_tail;
 static mutex_t		cache_lock;
 static int		events_registered = 0;
 
+static dladm_handle_t	dld_handle = NULL;
+
 /*
  * RCM module interface prototypes
  */
@@ -303,6 +303,8 @@ rcm_mod_init(void)
 	cache_tail.ip_next = NULL;
 	(void) mutex_init(&cache_lock, NULL, NULL);
 
+	(void) dladm_open(&dld_handle);
+
 	/* Return the ops vectors */
 	return (&ip_ops);
 }
@@ -328,6 +330,8 @@ rcm_mod_fini(void)
 
 	free_cache();
 	(void) mutex_destroy(&cache_lock);
+
+	dladm_close(dld_handle);
 	return (RCM_SUCCESS);
 }
 
@@ -889,8 +893,8 @@ ip_usage(ip_cache_t *node)
 		return (NULL);
 	}
 
-	if ((status = dladm_datalink_id2info(linkid, NULL, NULL, NULL, link,
-	    sizeof (link))) != DLADM_STATUS_OK) {
+	if ((status = dladm_datalink_id2info(dld_handle, linkid, NULL, NULL,
+	    NULL, link, sizeof (link))) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: usage(%s) get link name failure(%s)\n"),
 		    node->ip_resource, dladm_status2str(status, errmsg));
@@ -1942,8 +1946,8 @@ get_link_resource(const char *link)
 	char		*resource;
 	dladm_status_t	status;
 
-	if ((status = dladm_name2info(link, &linkid, &flags, NULL, NULL))
-	    != DLADM_STATUS_OK) {
+	if ((status = dladm_name2info(dld_handle, link, &linkid, &flags, NULL,
+	    NULL)) != DLADM_STATUS_OK) {
 		goto fail;
 	}
 
@@ -2652,7 +2656,7 @@ if_configure(datalink_id_t linkid)
 	}
 	(void) mutex_unlock(&cache_lock);
 
-	if (dladm_datalink_id2info(linkid, NULL, NULL, NULL, ifinst,
+	if (dladm_datalink_id2info(dld_handle, linkid, NULL, NULL, NULL, ifinst,
 	    sizeof (ifinst)) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: get %u link name failed\n"), linkid);

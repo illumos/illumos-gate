@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Functions to maintain a table of datalink configuration information.
  */
@@ -83,6 +81,7 @@ typedef struct dlmgmt_dlconf_s {
 
 extern boolean_t	debug;
 extern const char	*progname;
+extern dladm_handle_t	dld_handle;
 
 extern avl_tree_t	dlmgmt_name_avl;
 extern avl_tree_t	dlmgmt_id_avl;

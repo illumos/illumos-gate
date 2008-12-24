@@ -37,12 +37,13 @@
  * Returns the current attributes of the specified VLAN.
  */
 dladm_status_t
-dladm_vlan_info(datalink_id_t vlanid, dladm_vlan_attr_t *dvap, uint32_t flags)
+dladm_vlan_info(dladm_handle_t handle, datalink_id_t vlanid,
+    dladm_vlan_attr_t *dvap, uint32_t flags)
 {
 	dladm_status_t status;
 	dladm_vnic_attr_t attr, *vnic = &attr;
 
-	if ((status = dladm_vnic_info(vlanid, vnic, flags)) !=
+	if ((status = dladm_vnic_info(handle, vlanid, vnic, flags)) !=
 	    DLADM_STATUS_OK)
 		return (status);
 
@@ -56,25 +57,26 @@ dladm_vlan_info(datalink_id_t vlanid, dladm_vlan_attr_t *dvap, uint32_t flags)
  * Create a VLAN on given link.
  */
 dladm_status_t
-dladm_vlan_create(const char *vlan, datalink_id_t linkid, uint16_t vid,
-    dladm_arg_list_t *proplist, uint32_t flags, datalink_id_t *vlan_id_out)
+dladm_vlan_create(dladm_handle_t handle, const char *vlan, datalink_id_t linkid,
+    uint16_t vid, dladm_arg_list_t *proplist, uint32_t flags,
+    datalink_id_t *vlan_id_out)
 {
-	return (dladm_vnic_create(vlan, linkid, VNIC_MAC_ADDR_TYPE_PRIMARY,
-	    NULL, 0, NULL, 0, vid, vlan_id_out, proplist,
-	    flags | DLADM_OPT_VLAN));
+	return (dladm_vnic_create(handle, vlan, linkid,
+	    VNIC_MAC_ADDR_TYPE_PRIMARY, NULL, 0, NULL, 0, vid, vlan_id_out,
+	    proplist, flags | DLADM_OPT_VLAN));
 }
 
 /*
  * Delete a given VLAN.
  */
 dladm_status_t
-dladm_vlan_delete(datalink_id_t vlanid, uint32_t flags)
+dladm_vlan_delete(dladm_handle_t handle, datalink_id_t vlanid, uint32_t flags)
 {
-	return (dladm_vnic_delete(vlanid, flags | DLADM_OPT_VLAN));
+	return (dladm_vnic_delete(handle, vlanid, flags | DLADM_OPT_VLAN));
 }
 
 dladm_status_t
-dladm_vlan_up(datalink_id_t linkid)
+dladm_vlan_up(dladm_handle_t handle, datalink_id_t linkid)
 {
-	return (dladm_vnic_up(linkid, DLADM_OPT_VLAN));
+	return (dladm_vnic_up(handle, linkid, DLADM_OPT_VLAN));
 }

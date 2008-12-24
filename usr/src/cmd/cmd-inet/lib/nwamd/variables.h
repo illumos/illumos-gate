@@ -59,4 +59,10 @@ extern boolean_t debug;
 
 extern char zonename[ZONENAME_MAX];
 
+/*
+ * This dladm handle is opened before interfaces are initialized and
+ * closed only when nwamd shuts down.
+ */
+extern dladm_handle_t dld_handle;
+
 #endif /* _VARIABLES_H */

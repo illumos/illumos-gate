@@ -43,13 +43,14 @@ typedef struct dladm_vlan_attr {
 	boolean_t	dv_force;
 } dladm_vlan_attr_t;
 
-extern dladm_status_t	dladm_vlan_info(datalink_id_t, dladm_vlan_attr_t *,
+extern dladm_status_t	dladm_vlan_info(dladm_handle_t, datalink_id_t,
+			    dladm_vlan_attr_t *, uint32_t);
+extern dladm_status_t	dladm_vlan_create(dladm_handle_t, const char *,
+			    datalink_id_t, uint16_t, dladm_arg_list_t *,
+			    uint32_t, datalink_id_t *);
+extern dladm_status_t	dladm_vlan_delete(dladm_handle_t, datalink_id_t,
 			    uint32_t);
-extern dladm_status_t	dladm_vlan_create(const char *, datalink_id_t,
-			    uint16_t, dladm_arg_list_t *, uint32_t,
-			    datalink_id_t *);
-extern dladm_status_t	dladm_vlan_delete(datalink_id_t, uint32_t);
-extern dladm_status_t	dladm_vlan_up(datalink_id_t);
+extern dladm_status_t	dladm_vlan_up(dladm_handle_t, datalink_id_t);
 
 #ifdef	__cplusplus
 }

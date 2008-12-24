@@ -26,8 +26,6 @@
 #ifndef _LIBDLWLAN_H
 #define	_LIBDLWLAN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file includes structures, macros and routines used by WLAN link
  * administration.
@@ -181,24 +179,26 @@ typedef struct dladm_wlan_key {
 	uint_t		wk_class;
 } dladm_wlan_key_t;
 
-extern dladm_status_t	dladm_wlan_scan(datalink_id_t, void *,
+extern dladm_status_t	dladm_wlan_scan(dladm_handle_t, datalink_id_t, void *,
 			    boolean_t (*)(void *, dladm_wlan_attr_t *));
-extern dladm_status_t	dladm_wlan_connect(datalink_id_t, dladm_wlan_attr_t *,
-			    int, void *, uint_t, uint_t);
-extern dladm_status_t	dladm_wlan_disconnect(datalink_id_t);
-extern dladm_status_t	dladm_wlan_get_linkattr(datalink_id_t,
+extern dladm_status_t	dladm_wlan_connect(dladm_handle_t, datalink_id_t,
+			    dladm_wlan_attr_t *, int, void *, uint_t, uint_t);
+extern dladm_status_t	dladm_wlan_disconnect(dladm_handle_t, datalink_id_t);
+extern dladm_status_t	dladm_wlan_get_linkattr(dladm_handle_t, datalink_id_t,
 			    dladm_wlan_linkattr_t *);
 /* WPA support routines */
-extern dladm_status_t	dladm_wlan_wpa_get_sr(datalink_id_t, dladm_wlan_ess_t *,
-			    uint_t, uint_t *);
-extern dladm_status_t	dladm_wlan_wpa_set_ie(datalink_id_t, uint8_t *, uint_t);
-extern dladm_status_t	dladm_wlan_wpa_set_wpa(datalink_id_t, boolean_t);
-extern dladm_status_t	dladm_wlan_wpa_del_key(datalink_id_t, uint_t,
-			    const dladm_wlan_bssid_t *);
-extern dladm_status_t	dladm_wlan_wpa_set_key(datalink_id_t,
+extern dladm_status_t	dladm_wlan_wpa_get_sr(dladm_handle_t, datalink_id_t,
+			    dladm_wlan_ess_t *, uint_t, uint_t *);
+extern dladm_status_t	dladm_wlan_wpa_set_ie(dladm_handle_t, datalink_id_t,
+			    uint8_t *, uint_t);
+extern dladm_status_t	dladm_wlan_wpa_set_wpa(dladm_handle_t, datalink_id_t,
+			    boolean_t);
+extern dladm_status_t	dladm_wlan_wpa_del_key(dladm_handle_t, datalink_id_t,
+			    uint_t, const dladm_wlan_bssid_t *);
+extern dladm_status_t	dladm_wlan_wpa_set_key(dladm_handle_t, datalink_id_t,
 			    dladm_wlan_cipher_t, const dladm_wlan_bssid_t *,
 			    boolean_t, uint64_t, uint_t, uint8_t *, uint_t);
-extern dladm_status_t	dladm_wlan_wpa_set_mlme(datalink_id_t,
+extern dladm_status_t	dladm_wlan_wpa_set_mlme(dladm_handle_t, datalink_id_t,
 			    dladm_wlan_mlme_op_t,
 			    dladm_wlan_reason_t, dladm_wlan_bssid_t *);
 

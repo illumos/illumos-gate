@@ -9,8 +9,6 @@
  * See README for more details.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -759,13 +757,15 @@ wpa_supplicant_get_ssid(struct wpa_supplicant *wpa_s)
 	uint8_t bssid[IEEE80211_ADDR_LEN];
 
 	(void) memset(ssid, 0, MAX_ESSID_LENGTH);
-	ssid_len = wpa_s->driver->get_ssid(wpa_s->linkid, (char *)ssid);
+	ssid_len = wpa_s->driver->get_ssid(wpa_s->handle, wpa_s->linkid,
+	    (char *)ssid);
 	if (ssid_len < 0) {
 		wpa_printf(MSG_WARNING, "Could not read SSID from driver.");
 		return (NULL);
 	}
 
-	if (wpa_s->driver->get_bssid(wpa_s->linkid, (char *)bssid) < 0) {
+	if (wpa_s->driver->get_bssid(wpa_s->handle, wpa_s->linkid,
+	    (char *)bssid) < 0) {
 		wpa_printf(MSG_WARNING, "Could not read BSSID from driver.");
 		return (NULL);
 	}
@@ -813,7 +813,8 @@ wpa_supplicant_key_request(struct wpa_supplicant *wpa_s,
 	else
 		ver = WPA_KEY_INFO_TYPE_HMAC_MD5_RC4;
 
-	if (wpa_s->driver->get_bssid(wpa_s->linkid, (char *)bssid) < 0) {
+	if (wpa_s->driver->get_bssid(wpa_s->handle, wpa_s->linkid,
+	    (char *)bssid) < 0) {
 		wpa_printf(MSG_WARNING, "Failed to read BSSID for EAPOL-Key "
 		    "request");
 		return;
@@ -1078,13 +1079,13 @@ wpa_supplicant_process_3_of_4_gtk(struct wpa_supplicant *wpa_s,
 		(void) memcpy(gtk + 24, tmpbuf, 8);
 	}
 	if (wpa_s->pairwise_cipher == WPA_CIPHER_NONE) {
-		if (wpa_s->driver->set_key(wpa_s->linkid, alg,
+		if (wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid, alg,
 		    (uint8_t *)"\xff\xff\xff\xff\xff\xff",
 		    keyidx, 1, key->key_rsc,
 		    key_rsc_len, gtk, gtk_len) < 0)
 			wpa_printf(MSG_WARNING, "WPA: Failed to set "
 			    "GTK to the driver (Group only).");
-	} else if (wpa_s->driver->set_key(wpa_s->linkid, alg,
+	} else if (wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid, alg,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", keyidx, tx,
 	    key->key_rsc, key_rsc_len, gtk, gtk_len) < 0) {
 		wpa_printf(MSG_WARNING, "WPA: Failed to set GTK to "
@@ -1274,8 +1275,8 @@ wpa_supplicant_process_3_of_4(struct wpa_supplicant *wpa_s,
 			wpa_hexdump(MSG_DEBUG, "WPA: RSC", key_rsc, rsclen);
 		}
 
-		if (wpa_s->driver->set_key(wpa_s->linkid, alg, src_addr,
-		    0, 1, key_rsc, rsclen,
+		if (wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid, alg,
+		    src_addr, 0, 1, key_rsc, rsclen,
 		    (uint8_t *)&wpa_s->ptk.tk1, keylen) < 0) {
 			wpa_printf(MSG_WARNING, "WPA: Failed to set PTK to the"
 			    " driver.");
@@ -1465,13 +1466,13 @@ wpa_supplicant_process_1_of_2(struct wpa_supplicant *wpa_s,
 		(void) memcpy(gtk + 24, tmpbuf, 8);
 	}
 	if (wpa_s->pairwise_cipher == WPA_CIPHER_NONE) {
-		if (wpa_s->driver->set_key(wpa_s->linkid, alg,
+		if (wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid, alg,
 		    (uint8_t *)"\xff\xff\xff\xff\xff\xff",
 		    keyidx, 1, key->key_rsc,
 		    key_rsc_len, gtk, keylen) < 0)
 			wpa_printf(MSG_WARNING, "WPA: Failed to set GTK to the"
 			    " driver (Group only).");
-	} else if (wpa_s->driver->set_key(wpa_s->linkid, alg,
+	} else if (wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid, alg,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff",
 	    keyidx, tx,
 	    key->key_rsc, key_rsc_len,

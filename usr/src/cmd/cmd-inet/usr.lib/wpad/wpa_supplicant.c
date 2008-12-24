@@ -137,7 +137,7 @@ wpa_supplicant_scan(void *eloop_ctx, void *timeout_ctx)
 		wpa_printf(MSG_DEBUG, "Scan SSID: %s", ssid->ssid);
 	}
 
-	if (wpa_s->driver->scan(wpa_s->linkid)) {
+	if (wpa_s->driver->scan(wpa_s->handle, wpa_s->linkid)) {
 		wpa_printf(MSG_WARNING, "Failed to initiate AP scan.");
 	}
 }
@@ -201,6 +201,7 @@ wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 		wpa_s->conf = NULL;
 	}
 
+	dladm_close(wpa_s->handle);
 	free(wpa_s->ap_wpa_ie);
 	pmksa_candidate_free(wpa_s);
 	pmksa_cache_free(wpa_s);
@@ -209,17 +210,17 @@ wpa_supplicant_cleanup(struct wpa_supplicant *wpa_s)
 static void
 wpa_clear_keys(struct wpa_supplicant *wpa_s, uint8_t *addr)
 {
-	wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE,
+	wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid, WPA_ALG_NONE,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", 0, 0, NULL, 0, NULL, 0);
-	wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE,
+	wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid, WPA_ALG_NONE,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", 1, 0, NULL, 0, NULL, 0);
-	wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE,
+	wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid, WPA_ALG_NONE,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", 2, 0, NULL, 0, NULL, 0);
-	wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE,
+	wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid, WPA_ALG_NONE,
 	    (uint8_t *)"\xff\xff\xff\xff\xff\xff", 3, 0, NULL, 0, NULL, 0);
 	if (addr) {
-		wpa_s->driver->set_key(wpa_s->linkid, WPA_ALG_NONE, addr,
-		    0, 0, NULL, 0, NULL, 0);
+		wpa_s->driver->set_key(wpa_s->handle, wpa_s->linkid,
+		    WPA_ALG_NONE, addr, 0, 0, NULL, 0, NULL, 0);
 	}
 }
 
@@ -353,7 +354,7 @@ static void wpa_supplicant_associate(struct wpa_supplicant *wpa_s,
 
 	wpa_clear_keys(wpa_s, bss->we_bssid.wb_bytes);
 	wpa_s->wpa_state = WPA_ASSOCIATING;
-	wpa_s->driver->associate(wpa_s->linkid,
+	wpa_s->driver->associate(wpa_s->handle, wpa_s->linkid,
 	    (const char *)bss->we_bssid.wb_bytes, wpa_ie, wpa_ie_len);
 
 	/* Timeout for IEEE 802.11 authentication and association */
@@ -367,7 +368,8 @@ wpa_supplicant_disassociate(struct wpa_supplicant *wpa_s, int reason_code)
 	wpa_s->wpa_state = WPA_DISCONNECTED;
 	if (memcmp(wpa_s->bssid, "\x00\x00\x00\x00\x00\x00",
 	    IEEE80211_ADDR_LEN) != 0) {
-		wpa_s->driver->disassociate(wpa_s->linkid, reason_code);
+		wpa_s->driver->disassociate(wpa_s->handle, wpa_s->linkid,
+		    reason_code);
 		addr = wpa_s->bssid;
 	}
 	wpa_clear_keys(wpa_s, addr);
@@ -449,8 +451,8 @@ wpa_supplicant_scan_results(struct wpa_supplicant *wpa_s)
 	struct wpa_ssid *ssid;
 
 	(void) memset(results, 0, sizeof (dladm_wlan_ess_t) * MAX_SCANRESULTS);
-	num = wpa_s->driver->get_scan_results(wpa_s->linkid, results,
-	    MAX_SCANRESULTS);
+	num = wpa_s->driver->get_scan_results(wpa_s->handle, wpa_s->linkid,
+	    results, MAX_SCANRESULTS);
 	wpa_printf(MSG_DEBUG, "Scan results: %d", num);
 	if (num < 0)
 		return;
@@ -550,7 +552,7 @@ wpa_supplicant_driver_init(const char *link, struct wpa_supplicant *wpa_s)
 		return (-1);
 	}
 
-	if (wpa_s->driver->set_wpa(wpa_s->linkid, 1) < 0) {
+	if (wpa_s->driver->set_wpa(wpa_s->handle, wpa_s->linkid, 1) < 0) {
 		wpa_printf(MSG_ERROR, "Failed to enable WPA in the driver.");
 		return (-1);
 	}
@@ -693,13 +695,13 @@ wpa_config_read_network(struct wpa_supplicant *wpa_s)
 	ssid->key_mgmt = WPA_KEY_MGMT_PSK; /* | WPA_KEY_MGMT_IEEE8021X; */
 
 	(void) memset(buf, 0, MAX_ESSID_LENGTH + 1);
-	wpa_s->driver->get_ssid(wpa_s->linkid, (char *)buf);
+	wpa_s->driver->get_ssid(wpa_s->handle, wpa_s->linkid, (char *)buf);
 
 	(void) wpa_config_parse_ssid(ssid, 0, buf);
 
 	key_len = sizeof (psk);
-	(void) dladm_get_secobj((const char *)wpa_s->kname, &cl, psk, &key_len,
-	    DLADM_OPT_ACTIVE);
+	(void) dladm_get_secobj(wpa_s->handle, (const char *)wpa_s->kname, &cl,
+	    psk, &key_len, DLADM_OPT_ACTIVE);
 	psk[key_len] = '\0';
 	ssid->passphrase = strdup((const char *)psk);
 
@@ -812,6 +814,7 @@ main(int argc, char *argv[])
 	int c;
 	int exitcode;
 	char door_file[MAXPATHLEN];
+	dladm_handle_t handle;
 
 	if (!is_smf_context()) {
 		(void) fprintf(stderr,
@@ -862,9 +865,17 @@ main(int argc, char *argv[])
 		return (-1);
 	}
 
-	if (dladm_name2info(link, &linkid, NULL, NULL, NULL) !=
+	/* This handle is stored in wpa_s when that struct is filled. */
+	if (dladm_open(&handle) != DLADM_STATUS_OK) {
+		wpa_printf(MSG_ERROR, "Failed to open dladm handle");
+		dlpi_close(dh);
+		return (-1);
+	}
+
+	if (dladm_name2info(handle, link, &linkid, NULL, NULL, NULL) !=
 	    DLADM_STATUS_OK) {
 		wpa_printf(MSG_ERROR, "Invalid link name '%s'.", link);
+		dladm_close(handle);
 		dlpi_close(dh);
 		return (-1);
 	}
@@ -874,10 +885,11 @@ main(int argc, char *argv[])
 	 * file name used to communicate with the driver. Note that different
 	 * links use different doors.
 	 */
-	if (dladm_phys_info(linkid, &dpa, DLADM_OPT_ACTIVE) !=
+	if (dladm_phys_info(handle, linkid, &dpa, DLADM_OPT_ACTIVE) !=
 	    DLADM_STATUS_OK) {
 		wpa_printf(MSG_ERROR,
 		    "Failed to get device name of link '%s'.", link);
+		dladm_close(handle);
 		dlpi_close(dh);
 		return (-1);
 	}
@@ -885,6 +897,7 @@ main(int argc, char *argv[])
 
 	(void) memset(&wpa_s, 0, sizeof (wpa_s));
 	wpa_s.driver = &wpa_driver_wifi_ops;
+	wpa_s.handle = handle;
 	wpa_s.linkid = linkid;
 	(void) strlcpy(wpa_s.kname, key, sizeof (wpa_s.kname));
 	eloop_init(&wpa_s);
@@ -935,12 +948,13 @@ main(int argc, char *argv[])
 	wpa_printf(MSG_DEBUG, "<= eloop_run()");
 	wpa_supplicant_disassociate(&wpa_s, REASON_DEAUTH_LEAVING);
 
-	if (wpa_s.driver->set_wpa(wpa_s.linkid, 0) < 0) {
+	if (wpa_s.driver->set_wpa(wpa_s.handle, wpa_s.linkid, 0) < 0) {
 		wpa_printf(MSG_ERROR, "Failed to disable WPA in the driver.\n");
 	}
 
 cleanup:
 	wpa_supplicant_door_destroy(door_file);
+	/* The libdladm handle is closed in the following method */
 	wpa_supplicant_cleanup(&wpa_s);
 	eloop_destroy();
 

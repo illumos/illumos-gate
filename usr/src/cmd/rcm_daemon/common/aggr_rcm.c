@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This RCM module adds support to the RCM framework for AGGR links
  */
@@ -102,6 +100,8 @@ static dl_aggr_t	aggr_head;
 static dl_aggr_t	aggr_tail;
 static mutex_t		aggr_list_lock;
 static int		events_registered = 0;
+
+static dladm_handle_t	dld_handle = NULL;
 
 /*
  * RCM module interface prototypes
@@ -181,6 +181,8 @@ rcm_mod_init(void)
 	aggr_tail.da_next = NULL;
 	(void) mutex_init(&aggr_list_lock, NULL, NULL);
 
+	(void) dladm_open(&dld_handle);
+
 	/* Return the ops vectors */
 	return (&aggr_ops);
 }
@@ -225,6 +227,7 @@ rcm_mod_fini(void)
 	aggr_list_free();
 	(void) mutex_destroy(&aggr_list_lock);
 
+	dladm_close(dld_handle);
 	return (RCM_SUCCESS);
 }
 
@@ -491,14 +494,15 @@ aggr_offline_port(link_cache_t *node, cache_node_state_t state)
 	if (aggr->da_lastport == node->vc_linkid) {
 		rcm_log_message(RCM_TRACE2, "AGGR: delete aggregation %u\n",
 		    aggr->da_aggrid);
-		status = dladm_aggr_delete(aggr->da_aggrid, DLADM_OPT_ACTIVE);
+		status = dladm_aggr_delete(dld_handle, aggr->da_aggrid,
+		    DLADM_OPT_ACTIVE);
 	} else {
 		rcm_log_message(RCM_TRACE2,
 		    "AGGR: remove port (%s) from aggregation %u\n",
 		    node->vc_resource, aggr->da_aggrid);
 		port.lp_linkid = node->vc_linkid;
-		status = dladm_aggr_remove(aggr->da_aggrid, 1, &port,
-		    DLADM_OPT_ACTIVE);
+		status = dladm_aggr_remove(dld_handle, aggr->da_aggrid, 1,
+		    &port, DLADM_OPT_ACTIVE);
 	}
 	if (status != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_WARNING,
@@ -537,14 +541,14 @@ aggr_online_port(link_cache_t *node, boolean_t *up)
 	if (aggr->da_lastport == node->vc_linkid) {
 		rcm_log_message(RCM_TRACE2, "AGGR: delete aggregation %u\n",
 		    aggr->da_aggrid);
-		status = dladm_aggr_up(aggr->da_aggrid);
+		status = dladm_aggr_up(dld_handle, aggr->da_aggrid);
 		*up = B_TRUE;
 	} else {
 		rcm_log_message(RCM_TRACE2,
 		    "AGGR: add port (%s) to aggregation %u\n",
 		    node->vc_resource, aggr->da_aggrid);
 		port.lp_linkid = node->vc_linkid;
-		status = dladm_aggr_add(aggr->da_aggrid, 1, &port,
+		status = dladm_aggr_add(dld_handle, aggr->da_aggrid, 1, &port,
 		    DLADM_OPT_ACTIVE);
 	}
 	if (status != DLADM_STATUS_OK) {
@@ -766,8 +770,8 @@ aggr_usage(link_cache_t *node)
 	else
 		fmt = _("%s is part of AGGR ");
 
-	if ((status = dladm_datalink_id2info(node->vc_linkid, NULL, NULL,
-	    NULL, name, sizeof (name))) != DLADM_STATUS_OK) {
+	if ((status = dladm_datalink_id2info(dld_handle, node->vc_linkid, NULL,
+	    NULL, NULL, name, sizeof (name))) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_ERROR,
 		    _("AGGR: usage(%s) get port name failure(%s)\n"),
 		    node->vc_resource, dladm_status2str(status, errmsg));
@@ -791,8 +795,9 @@ aggr_usage(link_cache_t *node)
 		return (buf);
 	}
 
-	if ((status = dladm_datalink_id2info(node->vc_aggr->da_aggrid, NULL,
-	    NULL, NULL, name, sizeof (name))) != DLADM_STATUS_OK) {
+	if ((status = dladm_datalink_id2info(dld_handle,
+	    node->vc_aggr->da_aggrid, NULL, NULL, NULL, name,
+	    sizeof (name))) != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_ERROR,
 		    _("AGGR: usage(%s) get aggr %u name failure(%s)\n"),
 		    node->vc_resource, node->vc_aggr->da_aggrid,
@@ -959,7 +964,7 @@ typedef struct aggr_update_arg_s {
  * aggr_update() - Update physical interface properties
  */
 static int
-aggr_update(datalink_id_t aggrid, void *arg)
+aggr_update(dladm_handle_t handle, datalink_id_t aggrid, void *arg)
 {
 	aggr_update_arg_t *aggr_update_argp = arg;
 	rcm_handle_t *hd = aggr_update_argp->hd;
@@ -974,7 +979,8 @@ aggr_update(datalink_id_t aggrid, void *arg)
 	rcm_log_message(RCM_TRACE1, "AGGR: aggr_update(%u)\n", aggrid);
 
 	assert(MUTEX_HELD(&aggr_list_lock));
-	status = dladm_aggr_info(aggrid, &aggr_attr, DLADM_OPT_ACTIVE);
+	status = dladm_aggr_info(handle, aggrid, &aggr_attr,
+	    DLADM_OPT_ACTIVE);
 	if (status != DLADM_STATUS_OK) {
 		rcm_log_message(RCM_TRACE1,
 		    "AGGR: cannot get aggr information for %u error(%s)\n",
@@ -1041,8 +1047,8 @@ aggr_update_all(rcm_handle_t *hd)
 	assert(MUTEX_HELD(&cache_lock));
 
 	arg.hd = hd;
-	(void) dladm_walk_datalink_id(aggr_update, &arg, DATALINK_CLASS_AGGR,
-	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
+	(void) dladm_walk_datalink_id(aggr_update, dld_handle, &arg,
+	    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE, DLADM_OPT_ACTIVE);
 	return (arg.retval);
 }
 
@@ -1147,8 +1153,8 @@ aggr_log_err(datalink_id_t linkid, char **errorp, char *errmsg)
 
 		rcm_log_message(RCM_ERROR, _("AGGR: %s(%s)\n"), errmsg, rsrc);
 
-		if ((status = dladm_datalink_id2info(linkid, NULL, NULL,
-		    NULL, link, sizeof (link))) != DLADM_STATUS_OK) {
+		if ((status = dladm_datalink_id2info(dld_handle, linkid, NULL,
+		    NULL, NULL, link, sizeof (link))) != DLADM_STATUS_OK) {
 			rcm_log_message(RCM_WARNING,
 			    _("AGGR: cannot get link name of (%s) %s\n"),
 			    rsrc, dladm_status2str(status, errstr));
@@ -1349,7 +1355,7 @@ typedef struct aggr_configure_arg {
 } aggr_configure_arg_t;
 
 static int
-aggr_configure(datalink_id_t aggrid, void *arg)
+aggr_configure(dladm_handle_t handle, datalink_id_t aggrid, void *arg)
 {
 	aggr_configure_arg_t *aggr_configure_argp = arg;
 	datalink_id_t portid;
@@ -1360,11 +1366,12 @@ aggr_configure(datalink_id_t aggrid, void *arg)
 	char errmsg[DLADM_STRSIZE];
 	int i;
 
-	status = dladm_datalink_id2info(aggrid, &flags, NULL, NULL, NULL, 0);
+	status = dladm_datalink_id2info(handle, aggrid, &flags, NULL, NULL,
+	    NULL, 0);
 	if (status != DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
-	status = dladm_aggr_info(aggrid, &aggr_attr, DLADM_OPT_PERSIST);
+	status = dladm_aggr_info(handle, aggrid, &aggr_attr, DLADM_OPT_PERSIST);
 	if (status != DLADM_STATUS_OK)
 		return (DLADM_WALK_CONTINUE);
 
@@ -1390,12 +1397,12 @@ aggr_configure(datalink_id_t aggrid, void *arg)
 		    "AGGR: aggr_configure dladm_aggr_add port %u (%u)\n",
 		    portid, aggrid);
 		port_attr.lp_linkid = portid;
-		status = dladm_aggr_add(aggrid, 1, &port_attr,
+		status = dladm_aggr_add(handle, aggrid, 1, &port_attr,
 		    DLADM_OPT_ACTIVE);
 	} else {
 		rcm_log_message(RCM_TRACE3,
 		    "AGGR: aggr_configure dladm_aggr_up (%u)\n", aggrid);
-		status = dladm_aggr_up(aggrid);
+		status = dladm_aggr_up(handle, aggrid);
 	}
 
 	if (status != DLADM_STATUS_OK) {
@@ -1443,8 +1450,8 @@ aggr_configure_all(rcm_handle_t *hd, datalink_id_t linkid, boolean_t *up)
 	(void) mutex_unlock(&cache_lock);
 
 	arg.portid = linkid;
-	(void) dladm_walk_datalink_id(aggr_configure, &arg, DATALINK_CLASS_AGGR,
-	    DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
+	(void) dladm_walk_datalink_id(aggr_configure, dld_handle, &arg,
+	    DATALINK_CLASS_AGGR, DATALINK_ANY_MEDIATYPE, DLADM_OPT_PERSIST);
 
 	if (arg.retval == 0) {
 		*up = arg.up;

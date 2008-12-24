@@ -52,6 +52,8 @@ Usage:\n\
 
 static const char OPTS[] = "rsxf:e:d:ED";
 
+dladm_handle_t dld_handle = NULL;
+
 static void
 usage()
 {
@@ -256,16 +258,22 @@ main(int argc, char *argv[])
 		return (E_SUCCESS);
 	}
 
+	/* Open the libdladm handle */
+	if (dladm_open(&dld_handle) != DLADM_STATUS_OK)
+		die(gettext("failed to open dladm handle\n"));
+
 	/*
 	 * smf(5) start method.  The FMRI to operate on is retrieved from the
 	 * SMF_FMRI environment variable that the restarter provides.
 	 */
 	if (sflg) {
-		if ((fmri = getenv("SMF_FMRI")) != NULL)
-			return (aconf_setup(fmri));
+		if ((fmri = getenv("SMF_FMRI")) != NULL) {
+			int ret = aconf_setup(fmri);
+			dladm_close(dld_handle);
+			return (ret);
+		}
 
-		warn(gettext("-s option should only be invoked by smf(5)\n"));
-		return (E_ERROR);
+		die(gettext("-s option should only be invoked by smf(5)\n"));
 	}
 
 	assert(type == AC_PROC || type == AC_TASK || type == AC_FLOW ||
@@ -301,7 +309,8 @@ main(int argc, char *argv[])
 		if (type & AC_NET) {
 			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
 			    PRIV_SYS_DL_CONFIG, NULL);
-			(void) dladm_stop_usagelog(DLADM_LOGTYPE_FLOW);
+			(void) dladm_stop_usagelog(dld_handle,
+			    DLADM_LOGTYPE_FLOW);
 			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
 			    PRIV_SYS_DL_CONFIG, NULL);
 		}
@@ -347,9 +356,10 @@ main(int argc, char *argv[])
 			if (type & AC_NET) {
 				(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
 				    PRIV_SYS_DL_CONFIG, NULL);
-				(void) dladm_stop_usagelog(strncmp(disabled,
-				    "basic", strlen("basic")) == 0 ?
-				    DLADM_LOGTYPE_LINK : DLADM_LOGTYPE_FLOW);
+				(void) dladm_stop_usagelog(dld_handle,
+				    strncmp(disabled, "basic", strlen("basic"))
+				    == 0 ? DLADM_LOGTYPE_LINK :
+				    DLADM_LOGTYPE_FLOW);
 				(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
 				    PRIV_SYS_DL_CONFIG, NULL);
 			}
@@ -386,9 +396,9 @@ main(int argc, char *argv[])
 			 */
 			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
 			    PRIV_SYS_DL_CONFIG, NULL);
-			(void) dladm_start_usagelog(strncmp(enabled, "basic",
-			    strlen("basic")) == 0 ? DLADM_LOGTYPE_LINK :
-			    DLADM_LOGTYPE_FLOW, 20);
+			(void) dladm_start_usagelog(dld_handle,
+			    strncmp(enabled, "basic", strlen("basic")) == 0 ?
+			    DLADM_LOGTYPE_LINK : DLADM_LOGTYPE_FLOW, 20);
 			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
 			    PRIV_SYS_DL_CONFIG, NULL);
 		}
@@ -403,8 +413,10 @@ main(int argc, char *argv[])
 		 * Open new accounting file
 		 */
 		(void) priv_set(PRIV_ON, PRIV_EFFECTIVE, PRIV_SYS_ACCT, NULL);
-		if (open_exacct_file(file, type) == -1)
+		if (open_exacct_file(file, type) == -1) {
+			dladm_close(dld_handle);
 			exit(E_ERROR);
+		}
 		if (aconf_set_string(AC_PROP_FILE, file) == -1)
 			die(gettext("cannot update %s property\n"),
 			    AC_PROP_FILE);
@@ -433,7 +445,8 @@ main(int argc, char *argv[])
 		if (type & AC_NET) {
 			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
 			    PRIV_SYS_DL_CONFIG, NULL);
-			(void) dladm_stop_usagelog(DLADM_LOGTYPE_FLOW);
+			(void) dladm_stop_usagelog(dld_handle,
+			    DLADM_LOGTYPE_FLOW);
 			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
 			    PRIV_SYS_DL_CONFIG, NULL);
 		}
@@ -474,7 +487,8 @@ main(int argc, char *argv[])
 			 */
 			(void) priv_set(PRIV_ON, PRIV_EFFECTIVE,
 			    PRIV_SYS_DL_CONFIG, NULL);
-			(void) dladm_start_usagelog(DLADM_LOGTYPE_FLOW, 20);
+			(void) dladm_start_usagelog(dld_handle,
+			    DLADM_LOGTYPE_FLOW, 20);
 			(void) priv_set(PRIV_OFF, PRIV_EFFECTIVE,
 			    PRIV_SYS_DL_CONFIG, NULL);
 		}
@@ -513,5 +527,6 @@ main(int argc, char *argv[])
 		free(smf_state);
 	}
 	aconf_scf_fini();
+	dladm_close(dld_handle);
 	return (E_SUCCESS);
 }

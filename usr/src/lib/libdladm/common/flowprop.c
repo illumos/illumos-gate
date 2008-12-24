@@ -46,10 +46,10 @@
  */
 #define	DLADM_PROP_VAL_MAX	32
 
-static dladm_status_t	i_dladm_set_flowprop_db(const char *, const char *,
-			    char **, uint_t);
-static dladm_status_t	i_dladm_get_flowprop_db(const char *, const char *,
-			    char **, uint_t *);
+static dladm_status_t	i_dladm_set_flowprop_db(dladm_handle_t, const char *,
+			    const char *, char **, uint_t);
+static dladm_status_t	i_dladm_get_flowprop_db(dladm_handle_t, const char *,
+			    const char *, char **, uint_t *);
 
 static fpd_getf_t	do_get_maxbw;
 static fpd_setf_t	do_set_maxbw;
@@ -85,8 +85,9 @@ static resource_prop_t rsrc_prop_table[] = {
 static dladm_status_t	flow_proplist_check(dladm_arg_list_t *);
 
 dladm_status_t
-dladm_set_flowprop(const char *flow, const char *prop_name, char **prop_val,
-    uint_t val_cnt, uint_t flags, char **errprop)
+dladm_set_flowprop(dladm_handle_t handle, const char *flow,
+    const char *prop_name, char **prop_val, uint_t val_cnt, uint_t flags,
+    char **errprop)
 {
 	dladm_status_t		status = DLADM_STATUS_BADARG;
 
@@ -95,8 +96,8 @@ dladm_set_flowprop(const char *flow, const char *prop_name, char **prop_val,
 		return (DLADM_STATUS_BADARG);
 
 	if ((flags & DLADM_OPT_ACTIVE) != 0) {
-		status = i_dladm_set_prop_temp(flow, prop_name, prop_val,
-		    val_cnt, flags, errprop, &prop_tbl);
+		status = i_dladm_set_prop_temp(handle, flow, prop_name,
+		    prop_val, val_cnt, flags, errprop, &prop_tbl);
 		if (status == DLADM_STATUS_TEMPONLY &&
 		    (flags & DLADM_OPT_PERSIST) != 0)
 			return (DLADM_STATUS_TEMPONLY);
@@ -107,7 +108,7 @@ dladm_set_flowprop(const char *flow, const char *prop_name, char **prop_val,
 		if (i_dladm_is_prop_temponly(prop_name, errprop, &prop_tbl))
 			return (DLADM_STATUS_TEMPONLY);
 
-		status = i_dladm_set_flowprop_db(flow, prop_name,
+		status = i_dladm_set_flowprop_db(handle, flow, prop_name,
 		    prop_val, val_cnt);
 	}
 	return (status);
@@ -131,7 +132,7 @@ dladm_walk_flowprop(int (*func)(void *, const char *), const char *flow,
 }
 
 dladm_status_t
-dladm_get_flowprop(const char *flow, uint32_t type,
+dladm_get_flowprop(dladm_handle_t handle, const char *flow, uint32_t type,
     const char *prop_name, char **prop_val, uint_t *val_cntp)
 {
 	dladm_status_t status;
@@ -143,11 +144,11 @@ dladm_get_flowprop(const char *flow, uint32_t type,
 	if (type == DLADM_PROP_VAL_PERSISTENT) {
 		if (i_dladm_is_prop_temponly(prop_name, NULL, &prop_tbl))
 			return (DLADM_STATUS_TEMPONLY);
-		return (i_dladm_get_flowprop_db(flow, prop_name,
+		return (i_dladm_get_flowprop_db(handle, flow, prop_name,
 		    prop_val, val_cntp));
 	}
 
-	status = i_dladm_get_prop_temp(flow, type, prop_name,
+	status = i_dladm_get_prop_temp(handle, flow, type, prop_name,
 	    prop_val, val_cntp, &prop_tbl);
 	if (status != DLADM_STATUS_NOTFOUND)
 		return (status);
@@ -155,14 +156,14 @@ dladm_get_flowprop(const char *flow, uint32_t type,
 	return (DLADM_STATUS_BADARG);
 }
 
-#define	FLOWPROP_RW_DB(statep, writeop) \
-	(i_dladm_rw_db("/etc/dladm/flowprop.conf", \
+#define	FLOWPROP_RW_DB(handle, statep, writeop)			\
+	(i_dladm_rw_db(handle, "/etc/dladm/flowprop.conf",	\
 	S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH, process_prop_db, \
 	(statep), (writeop)))
 
 static dladm_status_t
-i_dladm_set_flowprop_db(const char *flow, const char *prop_name,
-    char **prop_val, uint_t val_cnt)
+i_dladm_set_flowprop_db(dladm_handle_t handle, const char *flow,
+    const char *prop_name, char **prop_val, uint_t val_cnt)
 {
 	prop_db_state_t	state;
 
@@ -173,12 +174,12 @@ i_dladm_set_flowprop_db(const char *flow, const char *prop_name,
 	state.ls_valcntp = &val_cnt;
 	state.ls_initop = NULL;
 
-	return (FLOWPROP_RW_DB(&state, B_TRUE));
+	return (FLOWPROP_RW_DB(handle, &state, B_TRUE));
 }
 
 static dladm_status_t
-i_dladm_get_flowprop_db(const char *flow, const char *prop_name,
-    char **prop_val, uint_t *val_cntp)
+i_dladm_get_flowprop_db(dladm_handle_t handle, const char *flow,
+    const char *prop_name, char **prop_val, uint_t *val_cntp)
 {
 	prop_db_state_t	state;
 
@@ -189,11 +190,11 @@ i_dladm_get_flowprop_db(const char *flow, const char *prop_name,
 	state.ls_valcntp = val_cntp;
 	state.ls_initop = NULL;
 
-	return (FLOWPROP_RW_DB(&state, B_FALSE));
+	return (FLOWPROP_RW_DB(handle, &state, B_FALSE));
 }
 
 dladm_status_t
-i_dladm_init_flowprop_db(void)
+i_dladm_init_flowprop_db(dladm_handle_t handle)
 {
 	prop_db_state_t	state;
 
@@ -204,34 +205,30 @@ i_dladm_init_flowprop_db(void)
 	state.ls_valcntp = NULL;
 	state.ls_initop = dladm_set_flowprop;
 
-	return (FLOWPROP_RW_DB(&state, B_FALSE));
+	return (FLOWPROP_RW_DB(handle, &state, B_FALSE));
 }
 
 #define	MIN_INFO_SIZE (4 * 1024)
 
 dladm_status_t
-dladm_flow_info(const char *flow, dladm_flow_attr_t *attr)
+dladm_flow_info(dladm_handle_t handle, const char *flow,
+    dladm_flow_attr_t *attr)
 {
 	dld_ioc_walkflow_t	*ioc;
-	int			bufsize, fd;
+	int			bufsize;
 	dld_flowinfo_t		*flowinfo;
 
 	if ((flow == NULL) || (attr == NULL))
 		return (DLADM_STATUS_BADARG);
 
-	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
-		return (dladm_errno2status(errno));
-
 	bufsize = MIN_INFO_SIZE;
-	if ((ioc = calloc(1, bufsize)) == NULL) {
-		(void) close(fd);
+	if ((ioc = calloc(1, bufsize)) == NULL)
 		return (dladm_errno2status(errno));
-	}
 
 	(void) strlcpy(ioc->wf_name, flow, sizeof (ioc->wf_name));
 	ioc->wf_len = bufsize - sizeof (*ioc);
 
-	while (ioctl(fd, DLDIOC_WALKFLOW, ioc) < 0) {
+	while (ioctl(dladm_dld_fd(handle), DLDIOC_WALKFLOW, ioc) < 0) {
 		if (errno == ENOSPC) {
 			bufsize *= 2;
 			ioc = realloc(ioc, bufsize);
@@ -243,7 +240,6 @@ dladm_flow_info(const char *flow, dladm_flow_attr_t *attr)
 			}
 		}
 		free(ioc);
-		(void) close(fd);
 		return (dladm_errno2status(errno));
 	}
 
@@ -260,20 +256,20 @@ dladm_flow_info(const char *flow, dladm_flow_attr_t *attr)
 	    sizeof (attr->fa_resource_props));
 
 	free(ioc);
-	(void) close(fd);
 	return (DLADM_STATUS_OK);
 }
 
 /* ARGSUSED */
 static dladm_status_t
-do_get_maxbw(const char *flow, char **prop_val, uint_t *val_cnt)
+do_get_maxbw(dladm_handle_t handle, const char *flow, char **prop_val,
+    uint_t *val_cnt)
 {
 	mac_resource_props_t	*mrp;
 	char 			buf[DLADM_STRSIZE];
 	dladm_flow_attr_t	fa;
 	dladm_status_t		status;
 
-	status = dladm_flow_info(flow, &fa);
+	status = dladm_flow_info(handle, flow, &fa);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 	mrp = &(fa.fa_resource_props);
@@ -290,10 +286,10 @@ do_get_maxbw(const char *flow, char **prop_val, uint_t *val_cnt)
 
 /* ARGSUSED */
 static dladm_status_t
-do_set_maxbw(const char *flow, val_desc_t *vdp, uint_t val_cnt)
+do_set_maxbw(dladm_handle_t handle, const char *flow, val_desc_t *vdp,
+    uint_t val_cnt)
 {
 	dld_ioc_modifyflow_t	attr;
-	int			fd;
 	mac_resource_props_t	mrp;
 	void			*val;
 
@@ -313,16 +309,9 @@ do_set_maxbw(const char *flow, val_desc_t *vdp, uint_t val_cnt)
 	(void) strlcpy(attr.mf_name, flow, sizeof (attr.mf_name));
 	bcopy(&mrp, &attr.mf_resource_props, sizeof (mac_resource_props_t));
 
-	fd = open(DLD_CONTROL_DEV, O_RDWR);
-	if (fd < 0) {
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_MODIFYFLOW, &attr) < 0)
 		return (dladm_errno2status(errno));
-	}
 
-	if (ioctl(fd, DLDIOC_MODIFYFLOW, &attr) < 0) {
-		(void) close(fd);
-		return (dladm_errno2status(errno));
-	}
-	(void) close(fd);
 	return (DLADM_STATUS_OK);
 }
 
@@ -366,7 +355,8 @@ do_check_maxbw(fprop_desc_t *pdp, char **prop_val, uint_t val_cnt,
 
 /* ARGSUSED */
 static dladm_status_t
-do_get_priority(const char *flow, char **prop_val, uint_t *val_cnt)
+do_get_priority(dladm_handle_t handle, const char *flow, char **prop_val,
+    uint_t *val_cnt)
 {
 	mac_resource_props_t	*mrp;
 	char 			buf[DLADM_STRSIZE];
@@ -374,7 +364,7 @@ do_get_priority(const char *flow, char **prop_val, uint_t *val_cnt)
 	dladm_status_t		status;
 
 	bzero(&fa, sizeof (dladm_flow_attr_t));
-	status = dladm_flow_info(flow, &fa);
+	status = dladm_flow_info(handle, flow, &fa);
 	if (status != DLADM_STATUS_OK)
 		return (status);
 	mrp = &(fa.fa_resource_props);
@@ -391,10 +381,10 @@ do_get_priority(const char *flow, char **prop_val, uint_t *val_cnt)
 
 /* ARGSUSED */
 static dladm_status_t
-do_set_priority(const char *flow, val_desc_t *vdp, uint_t val_cnt)
+do_set_priority(dladm_handle_t handle, const char *flow, val_desc_t *vdp,
+    uint_t val_cnt)
 {
 	dld_ioc_modifyflow_t	attr;
-	int			fd;
 	mac_resource_props_t	mrp;
 	void			*val;
 
@@ -414,16 +404,9 @@ do_set_priority(const char *flow, val_desc_t *vdp, uint_t val_cnt)
 	(void) strlcpy(attr.mf_name, flow, sizeof (attr.mf_name));
 	bcopy(&mrp, &attr.mf_resource_props, sizeof (mac_resource_props_t));
 
-	fd = open(DLD_CONTROL_DEV, O_RDWR);
-	if (fd < 0) {
+	if (ioctl(dladm_dld_fd(handle), DLDIOC_MODIFYFLOW, &attr) < 0)
 		return (dladm_errno2status(errno));
-	}
 
-	if (ioctl(fd, DLDIOC_MODIFYFLOW, &attr) < 0) {
-		(void) close(fd);
-		return (dladm_errno2status(errno));
-	}
-	(void) close(fd);
 	return (DLADM_STATUS_OK);
 }
 
@@ -594,7 +577,8 @@ dladm_flow_proplist_extract(dladm_arg_list_t *proplist,
 }
 
 dladm_status_t
-i_dladm_set_flow_proplist_db(char *flow, dladm_arg_list_t *proplist)
+i_dladm_set_flow_proplist_db(dladm_handle_t handle, char *flow,
+    dladm_arg_list_t *proplist)
 {
 	dladm_status_t		status, ssave = DLADM_STATUS_OK;
 	dladm_arg_info_t	ai;
@@ -602,7 +586,7 @@ i_dladm_set_flow_proplist_db(char *flow, dladm_arg_list_t *proplist)
 
 	for (i = 0; i < proplist->al_count; i++) {
 		ai = proplist->al_info[i];
-		status = i_dladm_set_flowprop_db(flow, ai.ai_name,
+		status = i_dladm_set_flowprop_db(handle, flow, ai.ai_name,
 		    ai.ai_val, ai.ai_count);
 		if (status != DLADM_STATUS_OK)
 			ssave = status;
