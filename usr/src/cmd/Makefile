@@ -493,6 +493,7 @@ i386_SUBDIRS=		\
 sparc_SUBDIRS=		\
 	cvcd		\
 	dcs		\
+	device_remap	\
 	drd		\
 	fps		\
 	fruadm		\
