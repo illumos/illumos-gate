@@ -950,7 +950,8 @@ iscsi_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 		mutex_enter(&icmdp->cmd_mutex);
 		while ((icmdp->cmd_state != ISCSI_CMD_STATE_COMPLETED) ||
 		    (icmdp->cmd_un.scsi.r2t_icmdp != NULL) ||
-		    (icmdp->cmd_un.scsi.abort_icmdp != NULL)) {
+		    (icmdp->cmd_un.scsi.abort_icmdp != NULL) ||
+		    (icmdp->cmd_un.scsi.r2t_more == B_TRUE)) {
 			cv_wait(&icmdp->cmd_completion, &icmdp->cmd_mutex);
 		}
 		icmdp->cmd_state = ISCSI_CMD_STATE_FREE;

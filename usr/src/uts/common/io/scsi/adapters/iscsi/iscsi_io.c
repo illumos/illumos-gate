@@ -2055,7 +2055,8 @@ iscsi_tx_r2t(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
 	 * wake the _ic_ thread
 	 */
 	if ((orig_icmdp->cmd_state == ISCSI_CMD_STATE_COMPLETED) &&
-	    (ISCSI_SESS_STATE_FULL_FEATURE(isp->sess_state)))
+	    (ISCSI_SESS_STATE_FULL_FEATURE(isp->sess_state)) &&
+	    (orig_icmdp->cmd_un.scsi.r2t_more == B_FALSE))
 		iscsi_thread_send_wakeup(isp->sess_ic_thread);
 	ASSERT(!mutex_owned(&isp->sess_queue_pending.mutex));
 	return (rval);
@@ -2376,7 +2377,12 @@ iscsi_tx_text(iscsi_sess_t *isp, iscsi_cmd_t *icmdp)
  */
 
 /*
- * iscsi_handle_r2t -
+ * iscsi_handle_r2t - Create a R2T and put it into the pending queue.
+ *
+ * Since the rx thread can hold the pending mutex, the tx thread or wd
+ * thread may not have chance to check the commands in the pending queue.
+ * So if the previous R2T is still there, we will release the related
+ * mutex and wait for its completion in case of deadlock.
  */
 static void
 iscsi_handle_r2t(iscsi_conn_t *icp, iscsi_cmd_t *icmdp,
@@ -2384,20 +2390,48 @@ iscsi_handle_r2t(iscsi_conn_t *icp, iscsi_cmd_t *icmdp,
 {
 	iscsi_sess_t	*isp		= NULL;
 	iscsi_cmd_t	*new_icmdp	= NULL;
+	int		owned		= 0;
 
 	ASSERT(icp != NULL);
 	isp = icp->conn_sess;
 	ASSERT(isp != NULL);
 
-	/*
-	 * the sosendmsg from a previous r2t can be slow to return;
-	 * the array may have sent another r2t at this point, so
-	 * wait until the first one finishes and signals us.
-	 */
-	while (icmdp->cmd_un.scsi.r2t_icmdp != NULL) {
-		ASSERT(icmdp->cmd_state != ISCSI_CMD_STATE_COMPLETED);
-		cv_wait(&icmdp->cmd_completion, &icmdp->cmd_mutex);
+	if (icmdp->cmd_un.scsi.r2t_icmdp != NULL) {
+		/*
+		 * Occasionally the tx thread doesn't have a chance to
+		 * send commands when we hold the pending mutex.
+		 * So we should mark this scsi command with more R2T
+		 * and release the mutex. Then wait for completion.
+		 */
+		icmdp->cmd_un.scsi.r2t_more = B_TRUE;
+
+		mutex_exit(&icmdp->cmd_mutex);
+		owned = mutex_owned(&icp->conn_queue_active.mutex);
+		if (owned != 0) {
+			mutex_exit(&icp->conn_queue_active.mutex);
+		}
+		mutex_exit(&isp->sess_queue_pending.mutex);
+
+		/*
+		 * the transmission from a previous r2t can be
+		 * slow to return; the array may have sent
+		 * another r2t at this point, so wait until
+		 * the first one finishes and signals us.
+		 */
+		mutex_enter(&icmdp->cmd_mutex);
+		while (icmdp->cmd_un.scsi.r2t_icmdp != NULL) {
+			ASSERT(icmdp->cmd_state != ISCSI_CMD_STATE_COMPLETED);
+			cv_wait(&icmdp->cmd_completion, &icmdp->cmd_mutex);
+		}
+		mutex_exit(&icmdp->cmd_mutex);
+
+		mutex_enter(&isp->sess_queue_pending.mutex);
+		if (owned != 0) {
+			mutex_enter(&icp->conn_queue_active.mutex);
+		}
+		mutex_enter(&icmdp->cmd_mutex);
 	}
+
 	/*
 	 * try to create an R2T task to send it later.  If we can't,
 	 * we're screwed, and the command will eventually time out
@@ -2412,6 +2446,7 @@ iscsi_handle_r2t(iscsi_conn_t *icp, iscsi_cmd_t *icmdp,
 	new_icmdp->cmd_itt		= icmdp->cmd_itt;
 	new_icmdp->cmd_lun		= icmdp->cmd_lun;
 	icmdp->cmd_un.scsi.r2t_icmdp	= new_icmdp;
+	icmdp->cmd_un.scsi.r2t_more	= B_FALSE;
 
 	/*
 	 * pending queue mutex is already held by the
@@ -2932,10 +2967,12 @@ iscsi_ic_thread(iscsi_thread_t *thread, void *arg)
 			mutex_enter(&icmdp->cmd_mutex);
 			/*
 			 * check if the associated r2t/abort has finished
-			 * yet.  If not, don't complete the command.
+			 * yet, and make sure this command has no R2T
+			 * to handle. If not, don't complete this command.
 			 */
 			if ((icmdp->cmd_un.scsi.r2t_icmdp == NULL) &&
-			    (icmdp->cmd_un.scsi.abort_icmdp == NULL)) {
+			    (icmdp->cmd_un.scsi.abort_icmdp == NULL) &&
+			    (icmdp->cmd_un.scsi.r2t_more == B_FALSE)) {
 				mutex_exit(&icmdp->cmd_mutex);
 				(void) iscsi_dequeue_cmd(&isp->
 				    sess_queue_completion.head,

@@ -374,6 +374,11 @@ typedef struct iscsi_cmd {
 			 * command (if any)
 			 */
 			struct iscsi_cmd	*r2t_icmdp;
+			/*
+			 * It will be true if this command has
+			 * another R2T to handle.
+			 */
+			boolean_t		r2t_more;
 		} scsi;
 		/* ISCSI_CMD_TYPE_ABORT */
 		struct {
