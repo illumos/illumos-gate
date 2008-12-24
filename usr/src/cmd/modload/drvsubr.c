@@ -187,6 +187,44 @@ append_to_file(
 	return (NOERR);
 }
 
+/*
+ * Require exact match to delete a driver alias/permission entry.
+ * Note line argument does not remain unchanged.  Return 1 if matched.
+ */
+static int
+match_entry(char *line, char *match)
+{
+	char	*token, *p;
+	int	n;
+
+	/* skip any leading white space */
+	while (*line && ((*line == ' ') || (*line == '\t')))
+		line++;
+	/*
+	 * Find separator for driver name, either space or colon
+	 *	minor_perm: <driver>:<perm>
+	 *	driver_aliases: <driver> <alias>
+	 *	extra_privs: <driver>:<priv>
+	 */
+	if ((token = strpbrk(line, " :\t")) == NULL)
+		return (0);
+	token++;
+	/* skip leading white space and quotes */
+	while (*token && (*token == ' ' || *token == '\t' ||
+	    *token == '"' || *token == '\''))
+		token++;
+	/* strip trailing newline, white space and quotes */
+	n = strlen(token);
+	p = token + n-1;
+	while (n > 0 && (*p == '\n' || *p == ' ' || *p == '\t' ||
+	    *p == '"' || *p == '\'')) {
+		*p-- = 0;
+		n--;
+	}
+	if (n == 0)
+		return (0);
+	return (strcmp(token, match) == 0);
+}
 
 /*
  *  open file
@@ -214,16 +252,14 @@ delete_entry(
 	int		status = NOERR;
 	int		drvr_found = 0;
 	boolean_t 	nomatch = B_TRUE;
-	char		*newfile, *tptr, *cp, *dup;
+	char		*newfile, *tptr, *cp;
 	char		line[MAX_DBFILE_ENTRY], drv[FILENAME_MAX + 1];
 	FILE		*fp, *newfp;
 	struct group	*sysgrp;
+	char		*copy;		/* same size as line */
 
 	/*
 	 * check if match is specified and if it equals " "
-	 * this is a special case handling as we do a strstr(3STRING)
-	 * to match an entry. By default all entries are space separated
-	 * and without this check all entries of the file could get deleted.
 	 */
 	if (match && (*match == ' ' && strlen(match) == 1)) {
 		(void) fprintf(stderr, gettext(ERR_INT_UPDATE), oldfile);
@@ -236,13 +272,15 @@ delete_entry(
 		return (ERROR);
 	}
 
-	/*
-	 * Build filename for temporary file
-	 */
+	/* Space for defensive copy of input line */
+	copy = calloc(sizeof (line), 1);
 
-	if ((tptr = calloc(strlen(oldfile) + strlen(XEND) + 1, 1)) == NULL) {
+	/* Build filename for temporary file */
+	tptr = calloc(strlen(oldfile) + strlen(XEND) + 1, 1);
+	if (tptr == NULL || copy == NULL) {
 		perror(NULL);
 		(void) fprintf(stderr, gettext(ERR_NO_MEM));
+		return (ERROR);
 	}
 
 	(void) strcpy(tptr, oldfile);
@@ -267,36 +305,32 @@ delete_entry(
 	}
 
 	while ((fgets(line, sizeof (line), fp) != NULL) && status == NOERR) {
-		/* copy the whole line into dup */
-		if ((dup = strdup(line)) == NULL) {
-			perror(NULL);
-			(void) fprintf(stderr, gettext(ERR_NO_MEM));
+		/* copy the whole line */
+		if (strlcpy(copy, line, sizeof (line)) >= sizeof (line)) {
+			(void) fprintf(stderr, gettext(ERR_UPDATE), oldfile);
 			status = ERROR;
 			break;
 		}
 		/* cut off comments starting with '#' */
-		if ((cp = strchr(dup, '#')) != NULL)
+		if ((cp = strchr(copy, '#')) != NULL)
 			*cp = '\0';
 		/* ignore comment or blank lines */
-		if (is_blank(dup)) {
+		if (is_blank(copy)) {
 			if (fputs(line, newfp) == EOF) {
 				(void) fprintf(stderr, gettext(ERR_UPDATE),
 				    oldfile);
 				status = ERROR;
 			}
-			free(dup);
 			continue;
 		}
 
 		/* get the driver name */
-		if (sscanf(dup, "%s", drv) != 1) {
+		if (sscanf(copy, "%s", drv) != 1) {
 			(void) fprintf(stderr, gettext(ERR_BAD_LINE),
 			    oldfile, line);
 			status = ERROR;
-			free(dup);
 			break;
 		}
-		free(dup);
 
 		for (i = strcspn(drv, marker); i < FILENAME_MAX; i++) {
 			drv[i] =  '\0';
@@ -315,7 +349,17 @@ delete_entry(
 				if ((strcmp(oldfile, minor_perm) == 0) ||
 				    (strcmp(oldfile, extra_privs) == 0) ||
 				    (strcmp(oldfile, driver_aliases) == 0)) {
-					if (strstr(line, match)) {
+
+					/* make defensive copy */
+					if (strlcpy(copy, line, sizeof (line))
+					    >= sizeof (line)) {
+						(void) fprintf(stderr,
+						    gettext(ERR_UPDATE),
+						    oldfile);
+						status = ERROR;
+						break;
+					}
+					if (match_entry(copy, match)) {
 						nomatch = B_FALSE;
 					} else {
 						if ((fputs(line, newfp)) ==
@@ -335,6 +379,8 @@ delete_entry(
 	} /* end of while */
 
 	(void) fclose(fp);
+	free(tptr);
+	free(copy);
 
 	/* Make sure that the file is on disk */
 	if (fflush(newfp) != 0 || fsync(fileno(newfp)) != 0)
@@ -1059,8 +1105,7 @@ load_driver(char *driver_name, int verbose_flag)
 
 	if (exec_status != NOERR) {
 		/* no clean : name and major number are bound */
-		(void) fprintf(stderr, gettext(ERR_CONFIG),
-		    driver_name);
+		(void) fprintf(stderr, gettext(ERR_CONFIG), driver_name);
 	}
 }
 
