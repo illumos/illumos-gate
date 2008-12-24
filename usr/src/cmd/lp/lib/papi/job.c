@@ -23,7 +23,6 @@
  * Use is subject to license terms.
  */
 
-
 /*LINTLIBRARY*/
 
 #include <stdlib.h>
@@ -987,9 +986,6 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 	if ((svc == NULL) || (printer == NULL) || (job_id < 0) ||
 	    (attributes == NULL))
 		return (PAPI_BAD_ARGUMENT);
-
-	if ((status = authorized(svc, job_id)) != PAPI_OK)
-		return (status);
 
 	if ((*job = j = calloc(1, sizeof (*j))) == NULL)
 		return (PAPI_TEMPORARY_ERROR);

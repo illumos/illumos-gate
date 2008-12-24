@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "dispatch.h"
 #include <sys/types.h>
@@ -263,7 +261,7 @@ void s_print_request ( char * m, MESG * md )
 			 * IPP job attribute file exists for this job so
 			 * change permissions and ownership of the file
 			 */
-			(void) chownmod(path, Lp_Uid, Lp_Gid, 0600);
+			(void) chownmod(path, Lp_Uid, Lp_Gid, 0600); 
 			Free(path);
 		}
 		else
@@ -319,12 +317,13 @@ void s_start_change_request (char *m, MESG *md)
     short		status;
     RSTATUS		*rp;
     char		*path;
-    
+    char		tmpName[BUFSIZ];
+    struct stat		tmpBuf;
+ 
     (void) getmessage(m, S_START_CHANGE_REQUEST, &req_id);
     syslog(LOG_DEBUG, "s_start_change_request(%s)",
 	   (req_id ? req_id : "NULL"));
-
-    
+   
     if (!(rp = request_by_id(req_id)))
 	status = MUNKNOWN;
     else if ((md->admin == 0) && (is_system_labeled()) &&
@@ -361,7 +360,7 @@ void s_start_change_request (char *m, MESG *md)
 	}
 
 	rp->request->outcome |= RS_CHANGING;	
-    
+   
 	/*
 	 * Change the ownership of the request file to be "md->uid".
 	 * Either this is identical to "rp->secure->uid", or it is
@@ -369,14 +368,51 @@ void s_start_change_request (char *m, MESG *md)
 	 * person at the other end needs access, and that may not
 	 * be who queued the request.
 	 */
-	path = makepath(Lp_Tmp, rp->req_file, (char *)0);
+
+	path = makepath(Lp_Tmp, rp->req_file, (char *)0); 
 	(void) Chown(path, md->uid, rp->secure->gid);
-	Free (path);
+	Free(path);
+
+#ifdef LP_USE_PAPI_ATTR
+
+	/*
+	 * Check if the PAPI job attribute file exists, if it does
+	 * change the ownership of the file to be "md->uid".
+	 * Either this is identical to "rp->secure->uid", or it is
+	 * "Lp_Uid" or it is root. The idea is that the
+	 * person at the other end needs access, and that may not
+	 * be who queued the request.
+	 */
+     
+	snprintf(tmpName, sizeof (tmpName),
+	    "%s-%s", strtok(strdup(rp->req_file),"-"), LP_PAPIATTRNAME);
+ 
+	path = makepath(Lp_Tmp, tmpName, (char *)0);
+
+	if (stat(path, &tmpBuf) == 0)
+	{
+		syslog(LOG_DEBUG,
+		    "s_start_change_request: attribute file ='%s'", path);
+                        
+		/*
+		 * IPP job attribute file exists for this job so
+		 * change permissions and ownership of the file
+		 */
+                 (void) Chown(path, md->uid, rp->secure->gid);
+		Free (path);
+	}
+	else
+	{
+		syslog(LOG_DEBUG,
+		    "s_start_change_request: no attribute file");
+	}
+#endif
 
 	add_flt_act(md, FLT_CHANGE, rp);
 	req_file = rp->req_file;
 
     }
+
     mputm(md, R_START_CHANGE_REQUEST, status, req_file);
     return;
 }
@@ -398,7 +434,9 @@ void s_end_change_request(char *m, MESG *md)
     int			call_schedule	= 0;
     int			move_ok		= 0;
     char		*path;
-    
+    char		tmpName[BUFSIZ];
+    struct stat         tmpBuf;
+
     (void) getmessage(m, S_END_CHANGE_REQUEST, &req_id);
     syslog(LOG_DEBUG, "s_end_change_request(%s)", (req_id ? req_id : "NULL"));
 
@@ -415,6 +453,37 @@ void s_end_change_request(char *m, MESG *md)
 	(void) chownmod(path, Lp_Uid, Lp_Gid, 0600);
 	Free (path);
 
+
+#ifdef LP_USE_PAPI_ATTR
+        
+	/*
+	 * Check if the PAPI job attribute file exists, if it does
+	 * change the permission and the ownership of the file to be "Lp_Uid".
+	 */
+
+	snprintf(tmpName, sizeof (tmpName),
+	    "%s-%s", strtok(strdup(rp->req_file),"-"), LP_PAPIATTRNAME);
+
+	path = makepath(Lp_Tmp, tmpName, (char *)0);
+
+	if (stat(path, &tmpBuf) == 0)
+	{
+		syslog(LOG_DEBUG,
+		    "s_end_change_request: attribute file ='%s'", path);
+
+		/*
+		 * IPP job attribute file exists for this job so
+		 * change permissions and ownership of the file
+		 */
+		(void) chownmod(path, Lp_Uid, Lp_Gid, 0600);
+		Free (path);
+	}
+	else
+	{
+		syslog(LOG_DEBUG,
+		    "s_end_change_request: no attribute file");
+	}
+#endif
 	rp->request->outcome &= ~(RS_CHANGING);
 	del_flt_act(md, FLT_CHANGE);
 	/*
