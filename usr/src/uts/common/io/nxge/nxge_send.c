@@ -173,7 +173,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	tx_desc_t		tx_desc, *tmp_desc_p;
 	tx_desc_t		sop_tx_desc, *sop_tx_desc_p;
 	p_tx_pkt_header_t	hdrp;
-	tx_pkt_header_t		tmp_hdrp;
+	tx_pkt_hdr_all_t	tmp_hdrp;
 	p_tx_pkt_hdr_all_t	pkthdrp;
 	uint8_t			npads = 0;
 	uint64_t 		dma_ioaddr;
@@ -324,7 +324,7 @@ nxge_start(p_nxge_t nxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 
 	pkthdrp = (p_tx_pkt_hdr_all_t)&tmp_hdrp;
 	pkthdrp->reserved = 0;
-	tmp_hdrp.value = 0;
+	tmp_hdrp.pkthdr.value = 0;
 	nxge_fill_tx_hdr(mp, B_FALSE, cksum_on,
 	    0, 0, pkthdrp,
 	    start_offset, stuff_offset);
