@@ -383,18 +383,18 @@ usage(void)
 {
 	(void) fprintf(stderr, gettext("usage: flowadm <subcommand>"
 	    " <args>...\n"
-	    "\tadd-flow [-t] [-R <root-dir>] -l <link>\n"
-	    "\t\t-a attr=value[,...] [-p prop=value,...]\n"
-	    "\t\tflow-name\n"
-	    "\tremove-flow [-t] [-R <root-dir>] {-l <link> | flow-name}\n"
-	    "\tset-flowprop [-t] [-R <root-dir>] \n"
-	    "\t\t-p prop=value[,...] flowname\n"
-	    "\treset-flowprop [-t] [-R <root-dir>] \n"
-	    "\t\t[-p prop,...] flowname\n"
-	    "\tshow-flowprop [-cP] [-l <link>] [-p prop,...] [flow-name]\n"
-	    "\tshow-flow [-p] [-s [-i <interval>]] [-l <link>] [flow-name]\n"
-	    "\tshow-usage [-d|-p -F <format>] [-s <DD/MM/YYYY,HH:MM:SS>]\n"
-	    "\t\t[-e <DD/MM/YYYY,HH:MM:SS>]] -f <logfile> [<name>]\n"));
+	    "    add-flow       [-t] -l <link> -a <attr>=<value>[,...]\n"
+	    "\t\t   [-p <prop>=<value>,...] <flow>\n"
+	    "    remove-flow    [-t] {-l <link> | <flow>}\n"
+	    "    show-flow      [-p] [-s [-i <interval>]] [-l <link>] "
+	    "[<flow>]\n\n"
+	    "    set-flowprop   [-t] -p <prop>=<value>[,...] <flow>\n"
+	    "    reset-flowprop [-t] [-p <prop>,...] <flow>\n"
+	    "    show-flowprop  [-cP] [-l <link>] [-p <prop>,...] "
+	    "[<flow>]\n\n"
+	    "    show-usage     [-d|-p -F <format>] "
+	    "[-s <DD/MM/YYYY,HH:MM:SS>]\n"
+	    "\t\t   [-e <DD/MM/YYYY,HH:MM:SS>] -f <logfile> [<flow>]\n"));
 
 	/* close dladm handle if it was opened */
 	if (handle != NULL)

@@ -309,89 +309,92 @@ typedef struct	cmd {
 } cmd_t;
 
 static cmd_t	cmds[] = {
-	{ "show-link",		do_show_link,
-	    "\tshow-link\t[-pP] [-o <field>,..] [-s [-i <interval>]] [<link>]"},
 	{ "rename-link",	do_rename_link,
-	    "\trename-link\t[-R <root-dir>] <oldlink> <newlink>\n"	},
-	{ "create-aggr",	do_create_aggr,
-	    "\tcreate-aggr\t[-t] [-R <root-dir>] [-P <policy>] [-L <mode>]\n"
-	    "\t\t\t[-T <time>] [-u <address>] [-l <link>] ... <link>"	},
-	{ "delete-aggr",	do_delete_aggr,
-	    "\tdelete-aggr\t[-t] [-R <root-dir>] <link>"		},
-	{ "add-aggr",		do_add_aggr,
-	    "\tadd-aggr\t[-t] [-R <root-dir>] [-l <link>] ... <link>"	},
-	{ "remove-aggr",	do_remove_aggr,
-	    "\tremove-aggr\t[-t] [-R <root-dir>] [-l <link>] ... <link>"},
-	{ "modify-aggr",	do_modify_aggr,
-	    "\tmodify-aggr\t[-t] [-R <root-dir>] [-P <policy>] [-L <mode>]\n"
-	    "\t\t\t[-T <time>] [-u <address>] <link>"			},
-	{ "show-aggr",		do_show_aggr,
-	    "\tshow-aggr\t[-pPLx] [-o <field>,..] [-s [-i <interval>]] "
+	    "    rename-link      <oldlink> <newlink>"			},
+	{ "show-link",		do_show_link,
+	    "    show-link        [-pP] [-o <field>,..] [-s [-i <interval>]] "
 	    "[<link>]\n"						},
-	{ "up-aggr",		do_up_aggr,		NULL		},
+	{ "create-aggr",	do_create_aggr,
+	    "    create-aggr      [-t] [-P <policy>] [-L <mode>] [-T <time>] "
+	    "[-u <address>]\n"
+	    "\t\t     -l <link> [-l <link>...] <link>"			},
+	{ "delete-aggr",	do_delete_aggr,
+	    "    delete-aggr      [-t] <link>"				},
+	{ "add-aggr",		do_add_aggr,
+	    "    add-aggr         [-t] -l <link> [-l <link>...] <link>" },
+	{ "remove-aggr",	do_remove_aggr,
+	    "    remove-aggr      [-t] -l <link> [-l <link>...] <link>" },
+	{ "modify-aggr",	do_modify_aggr,
+	    "    modify-aggr      [-t] [-P <policy>] [-L <mode>] [-T <time>] "
+	    "[-u <address>]\n"
+	    "\t\t     <link>"						},
+	{ "show-aggr",		do_show_aggr,
+	    "    show-aggr        [-pPLx] [-o <field>,..] [-s [-i <interval>]] "
+	    "[<link>]\n"						},
+	{ "up-aggr",		do_up_aggr,	NULL			},
 	{ "scan-wifi",		do_scan_wifi,
-	    "\tscan-wifi\t[-p] [-o <field>,...] [<link>]"		},
+	    "    scan-wifi        [-p] [-o <field>,...] [<link>]"	},
 	{ "connect-wifi",	do_connect_wifi,
-	    "\tconnect-wifi\t[-e <essid>] [-i <bssid>] [-k <key>,...] "
+	    "    connect-wifi     [-e <essid>] [-i <bssid>] [-k <key>,...] "
 	    "[-s wep|wpa]\n"
-	    "\t\t\t[-a open|shared] [-b bss|ibss] [-c] [-m a|b|g]\n"
-	    "\t\t\t[-T <time>] [<link>]"				},
+	    "\t\t     [-a open|shared] [-b bss|ibss] [-c] [-m a|b|g] "
+	    "[-T <time>]\n"
+	    "\t\t     [<link>]"						},
 	{ "disconnect-wifi",	do_disconnect_wifi,
-	    "\tdisconnect-wifi\t[-a] [<link>]"				},
+	    "    disconnect-wifi  [-a] [<link>]"			},
 	{ "show-wifi",		do_show_wifi,
-	    "\tshow-wifi\t[-p] [-o <field>,...] [<link>]\n"		},
-	{ "show-linkprop",	do_show_linkprop,
-	    "\tshow-linkprop\t[-cP] [-o <field>,...] [-p <prop>,...] <name>"},
+	    "    show-wifi        [-p] [-o <field>,...] [<link>]\n"	},
 	{ "set-linkprop",	do_set_linkprop,
-	    "\tset-linkprop\t[-t] [-R <root-dir>] -p <prop>=<value>[,...] "
-	    "<name>"							},
+	    "    set-linkprop     [-t] -p <prop>=<value>[,...] <name>"	},
 	{ "reset-linkprop",	do_reset_linkprop,
-	    "\treset-linkprop\t[-t] [-R <root-dir>] [-p <prop>,...] <name>\n" },
+	    "    reset-linkprop   [-t] [-p <prop>,...] <name>"		},
+	{ "show-linkprop",	do_show_linkprop,
+	    "    show-linkprop    [-cP] [-o <field>,...] [-p <prop>,...] "
+	    "<name>\n"							},
 	{ "show-ether",		do_show_ether,
-	    "\tshow-ether\t[-px][-o <field>,...] <link>\n"		},
+	    "    show-ether       [-px][-o <field>,...] <link>\n"	},
 	{ "create-secobj",	do_create_secobj,
-	    "\tcreate-secobj\t[-t] [-R <root-dir>] [-f <file>] -c <class> "
-	    "<secobj>"							},
+	    "    create-secobj    [-t] [-f <file>] -c <class> <secobj>"	},
 	{ "delete-secobj",	do_delete_secobj,
-	    "\tdelete-secobj\t[-t] [-R <root-dir>] <secobj>[,...]"	},
+	    "    delete-secobj    [-t] <secobj>[,...]"			},
 	{ "show-secobj",	do_show_secobj,
-	    "\tshow-secobj\t[-pP] [-o <field>,...] [<secobj>,...]\n"	},
+	    "    show-secobj      [-pP] [-o <field>,...] [<secobj>,...]\n" },
 	{ "init-linkprop",	do_init_linkprop,	NULL		},
 	{ "init-secobj",	do_init_secobj,		NULL		},
 	{ "create-vlan", 	do_create_vlan,
-	    "\tcreate-vlan\t[-ft] [-R <root-dir>] -l <link> -v <vid> [link]" },
+	    "    create-vlan      [-ft] -l <link> -v <vid> [link]"	},
 	{ "delete-vlan", 	do_delete_vlan,
-	    "\tdelete-vlan\t[-t] [-R <root-dir>] <link>"		},
+	    "    delete-vlan      [-t] <link>"				},
 	{ "show-vlan",		do_show_vlan,
-	    "\tshow-vlan\t[-pP] [-o <field>,..] [<link>]\n"		},
+	    "    show-vlan        [-pP] [-o <field>,..] [<link>]\n"	},
 	{ "up-vlan",		do_up_vlan,		NULL		},
 	{ "delete-phys",	do_delete_phys,
-	    "\tdelete-phys\t<link>"					},
+	    "    delete-phys      <link>"				},
 	{ "show-phys",		do_show_phys,
-	    "\tshow-phys\t[-pP] [-o <field>,..] [-H] [<link>]"	},
+	    "    show-phys        [-pP] [-o <field>,..] [-H] [<link>]\n"},
 	{ "init-phys",		do_init_phys,		NULL		},
 	{ "show-linkmap",	do_show_linkmap,	NULL		},
 	{ "create-vnic",	do_create_vnic,
-	    "\tcreate-vnic     [-t] [-R <root-dir>] -l <link> [-m <value> |"
-	    " auto |\n"
-	    "\t                {factory [-n <slot-identifier>]} |\n"
-	    "\t                {random [-r <prefix>]}] [-v vlan-tag [-f]]\n"
-	    "\t                -p <prop>=<value>[,...] [-H]"
-	    " <vnic-link>\n"	},
+	    "    create-vnic      [-t] -l <link> [-m <value> | auto |\n"
+	    "\t\t     {factory [-n <slot-id>]} | {random [-r <prefix>]}]\n"
+	    "\t\t     [-v <vid> [-f]] [-p <prop>=<value>[,...]] [-H] "
+	    "<vnic-link>"						},
 	{ "delete-vnic",	do_delete_vnic,
-	    "\tdelete-vnic     [-t] [-R <root-dir>] <vnic-link>\n" 	},
+	    "    delete-vnic      [-t] <vnic-link>"			},
 	{ "show-vnic",		do_show_vnic,
-	    "\tshow-vnic       [-pP] [-l <link>] [-s [-i <interval>]]" },
+	    "    show-vnic        [-pP] [-l <link>] [-s [-i <interval>]] "
+	    "[<link>]\n"						},
 	{ "up-vnic",		do_up_vnic,		NULL		},
 	{ "create-etherstub",	do_create_etherstub,
-	    "\tcreate-etherstub [-t] [-R <root-dir>] <link>\n"		},
+	    "    create-etherstub [-t] <link>"				},
 	{ "delete-etherstub",	do_delete_etherstub,
-	    "\tdelete-etherstub [-t] [-R <root-dir>] <link>\n"		},
+	    "    delete-etherstub [-t] <link>"				},
 	{ "show-etherstub",	do_show_etherstub,
-	    "\tshow-etherstub  [-t] [-R <root-dir>] [<link>]\n" 	},
+	    "    show-etherstub   [-t] [<link>]\n"			},
 	{ "show-usage",		do_show_usage,
-	    "\tshow-usage      [-d|-p -F <format>] [-f <filename>]\n"
-	    "\t                [-s <time>] [-e <time>] <link>\n"	}
+	    "    show-usage       [-d|-p -F <format>] "
+	    "[-s <DD/MM/YYYY,HH:MM:SS>]\n"
+	    "\t\t     [-e <DD/MM/YYYY,HH:MM:SS>] -f <logfile> [<link>]"	}
 };
 
 static const struct option lopts[] = {
