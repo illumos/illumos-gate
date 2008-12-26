@@ -271,7 +271,7 @@ dm2s_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 	dm2sp->ms_dip = dip;
-	dm2sp->ms_major = ddi_name_to_major(ddi_get_name(dip));
+	dm2sp->ms_major = ddi_driver_major(dip);
 	dm2sp->ms_ppa = instance;
 
 	/*

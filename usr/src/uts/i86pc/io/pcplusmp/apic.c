@@ -2219,7 +2219,7 @@ apic_alloc_msi_vectors(dev_info_t *dip, int inum, int count, int pri,
 		return (0);
 	}
 
-	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
+	major = (dip != NULL) ? ddi_driver_major(dip) : 0;
 	for (i = 0; i < rcount; i++) {
 		if ((irqno = apic_allocate_irq(apic_first_avail_irq)) ==
 		    (uchar_t)-1) {
@@ -2300,7 +2300,7 @@ apic_alloc_msix_vectors(dev_info_t *dip, int inum, int count, int pri,
 		goto out;
 	}
 
-	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
+	major = (dip != NULL) ? ddi_driver_major(dip) : 0;
 	for (i = 0; i < rcount; i++) {
 		uchar_t	vector, irqno;
 		apic_irq_t	*irqptr;

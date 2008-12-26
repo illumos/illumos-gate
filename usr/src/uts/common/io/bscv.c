@@ -253,7 +253,6 @@ static struct bscv_idi_callout_mgr bscv_idi_mgr;
 #define	MYNAME			"bscv"
 #define	BSCV_INST_TO_MINOR(i)	(i)
 #define	BSCV_MINOR_TO_INST(m)	(m)
-#define	ddi_driver_major(dip)	ddi_name_to_major(ddi_binding_name(dip))
 
 /*
  * Strings for daemon event reporting

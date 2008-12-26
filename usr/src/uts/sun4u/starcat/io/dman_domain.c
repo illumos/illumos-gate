@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Domain specific portion of the Starcat Management Network Driver
@@ -125,7 +123,7 @@ man_domain_configure(void)
 
 	if (status != 0) {
 		cmn_err(CE_WARN, "man_domain_configure: failed to initialize"
-			" MBOXSC_MBOX_IN, errno = %d", status);
+		    " MBOXSC_MBOX_IN, errno = %d", status);
 		goto exit;
 	}
 
@@ -133,7 +131,7 @@ man_domain_configure(void)
 	if (status != 0) {
 		mboxsc_fini(IOSRAM_KEY_SCMD);
 		cmn_err(CE_WARN, "man_domain_configure: failed to initialize"
-			" MBOXSC_MBOX_OUT, errno = %d", status);
+		    " MBOXSC_MBOX_OUT, errno = %d", status);
 		goto exit;
 	}
 
@@ -179,7 +177,7 @@ man_path_discovery(void)
 	 * devices were found.
 	 */
 	if ((manc.manc_ip_type != AF_INET) &&
-			(manc.manc_ip_type != AF_INET6)) {
+	    (manc.manc_ip_type != AF_INET6)) {
 		goto exit;
 	}
 
@@ -268,7 +266,7 @@ man_dr_attach(dev_info_t *dip)
 		goto exit;
 	}
 	MAN_DBG(MAN_DR, ("man_dr_attach: dip major = %d instance =%d",
-			mdev.mdev_major, mdev.mdev_ppa));
+	    mdev.mdev_major, mdev.mdev_ppa));
 	wp = man_work_alloc(MAN_WORK_DRATTACH, KM_NOSLEEP);
 	if (wp == NULL) {
 		status = ENOMEM;
@@ -318,7 +316,7 @@ again:
 		 * Delay a bit and retry.
 		 */
 		MAN_DBG(MAN_DR,
-			("man_dr_detach(switch): EAGAIN - retrying..."));
+		    ("man_dr_detach(switch): EAGAIN - retrying..."));
 		retries++;
 		delay(drv_usectohz(manp->man_dr_delay));
 		goto again;
@@ -336,7 +334,7 @@ again:
 	status = man_dr_submit_work_wait(dip, MAN_WORK_DRDETACH);
 	if (status == EAGAIN && retries < manp->man_dr_retries) {
 		MAN_DBG(MAN_DR,
-			("man_dr_detach(detach): EAGAIN - retrying..."));
+		    ("man_dr_detach(detach): EAGAIN - retrying..."));
 		retries++;
 		goto again;
 	}
@@ -360,7 +358,7 @@ man_dr_submit_work_wait(dev_info_t *dip, int work_type)
 
 	wp->mw_arg.a_man_ppa = 0;
 	wp->mw_arg.a_pg_id = 0;
-	wp->mw_arg.a_sf_dev.mdev_major = ddi_name_to_major(ddi_get_name(dip));
+	wp->mw_arg.a_sf_dev.mdev_major = ddi_driver_major(dip);
 	wp->mw_arg.a_sf_dev.mdev_ppa = ddi_get_instance(dip);
 
 	mutex_enter(&man_lock);
@@ -426,7 +424,7 @@ man_dossc_switch(uint32_t exp_id)
 	length = sizeof (man_mbox_msg_t);
 	bzero((char *)&resp, sizeof (man_mbox_msg_t));
 	while (mboxsc_getmsg(IOSRAM_KEY_SCMD, &type, &resp_cmd, &resp_tid,
-		&length, &resp, 0) == 0) {
+	    &length, &resp, 0) == 0) {
 
 		resp_tid = resp_cmd = type = 0;
 		length = sizeof (man_mbox_msg_t);
@@ -445,12 +443,12 @@ man_dossc_switch(uint32_t exp_id)
 	req_cmd = MAN_WORK_SWITCH;
 
 	status = mboxsc_putmsg(IOSRAM_KEY_MDSC, MBOXSC_MSG_REQUEST,
-		req_cmd, &req_tid, sizeof (man_mbox_msg_t), &req,
-		MAN_IOSRAM_TIMEOUT);
+	    req_cmd, &req_tid, sizeof (man_mbox_msg_t), &req,
+	    MAN_IOSRAM_TIMEOUT);
 
 	if (status != 0) {
 		cmn_err(CE_WARN, "man_dossc_switch: mboxsc_putmsg failed,"
-			" errno = %d", status);
+		    " errno = %d", status);
 		goto exit;
 	}
 
@@ -459,10 +457,10 @@ man_dossc_switch(uint32_t exp_id)
 	resp_tid = type = resp_cmd = 0;
 	length = sizeof (man_mbox_msg_t);
 	status = mboxsc_getmsg(IOSRAM_KEY_SCMD, &type, &resp_cmd, &resp_tid,
-		&length, (void *)&resp, MAN_IOSRAM_TIMEOUT);
+	    &length, (void *)&resp, MAN_IOSRAM_TIMEOUT);
 	if (status != 0) {
 		cmn_err(CE_WARN, "man_dossc_switch: mboxsc_getmsg failed,"
-			" errno = %d", status);
+		    " errno = %d", status);
 		goto exit;
 	}
 
@@ -470,8 +468,8 @@ man_dossc_switch(uint32_t exp_id)
 
 	if (req_cmd != resp_cmd || req_tid != resp_tid) {
 		cmn_err(CE_WARN, "man_dossc_switch: failed,"
-			" cmd/transid mismatch (%d, %d)/(%d, %d)",
-			req_cmd, resp_cmd, (int)req_tid, (int)resp_tid);
+		    " cmd/transid mismatch (%d, %d)/(%d, %d)",
+		    req_cmd, resp_cmd, (int)req_tid, (int)resp_tid);
 		status = EINVAL;
 		goto exit;
 	}
@@ -479,7 +477,7 @@ man_dossc_switch(uint32_t exp_id)
 	status = resp.mb_status;
 	if (status != 0) {
 		cmn_err(CE_WARN, "man_dossc_switch: failed errno == %d",
-			status);
+		    status);
 	}
 exit:
 	return (status);
@@ -500,7 +498,7 @@ man_get_iosram(manc_t *mcp)
 	status = iosram_rd(IOSRAM_KEY_MANC, 0, sizeof (manc_t), (caddr_t)mcp);
 	if (status) {
 		cmn_err(CE_WARN, "man_get_iosram: iosram_rd failed"
-			" errno = %d\n", status);
+		    " errno = %d\n", status);
 		return (status);
 	}
 
@@ -509,12 +507,12 @@ man_get_iosram(manc_t *mcp)
 
 	if (mcp->manc_magic != IOSRAM_KEY_MANC) {
 		cmn_err(CE_WARN, "man_get_iosram: bad magic - got(0x%x)"
-			" expected(0x%x)\n", mcp->manc_magic, IOSRAM_KEY_MANC);
+		    " expected(0x%x)\n", mcp->manc_magic, IOSRAM_KEY_MANC);
 		status = EIO;
 	} else if (mcp->manc_version != MANC_VERSION) {
 		cmn_err(CE_WARN, "man_get_iosram: version mismatch -"
-			" got(0x%x) expected(0x%x)\n", mcp->manc_version,
-			MANC_VERSION);
+		    " got(0x%x) expected(0x%x)\n", mcp->manc_version,
+		    MANC_VERSION);
 		status = EIO;
 	}
 
@@ -558,12 +556,12 @@ man_get_iosram(manc_t *mcp)
 
 	if (mcp->manc_magic != IOSRAM_KEY_MANC) {
 		cmn_err(CE_WARN, "man_get_iosram: bad magic - got(0x%x)"
-			" expected(0x%x)\n", mcp->manc_magic, IOSRAM_KEY_MANC);
+		    " expected(0x%x)\n", mcp->manc_magic, IOSRAM_KEY_MANC);
 		status = EIO;
 	} else if (mcp->manc_version != MANC_VERSION) {
 		cmn_err(CE_WARN, "man_get_iosram: version mismatch -"
-			" got(0x%x) expected(0x%x)\n", mcp->manc_version,
-			MANC_VERSION);
+		    " got(0x%x) expected(0x%x)\n", mcp->manc_version,
+		    MANC_VERSION);
 		status = EIO;
 	}
 
@@ -592,7 +590,7 @@ man_find_devs(mi_path_t *mipathp, uchar_t golden_iob)
 	int		xmits;
 
 	MAN_DBG(MAN_PATH, ("man_find_devs: mdevpp(0x%p) golden_iob(%d)\n",
-		(void *)(mipathp), golden_iob));
+	    (void *)(mipathp), golden_iob));
 
 	/*
 	 * Hold parent busy while walking its child list.
@@ -623,10 +621,10 @@ man_find_devs(mi_path_t *mipathp, uchar_t golden_iob)
 			eri_dip = ddi_get_child(pdip);
 			while (eri_dip != NULL) {
 				MAN_DBG(MAN_PATH, ("man_find_devs: "
-					"eri_dip %s\n",
-					ddi_binding_name(eri_dip)));
+				    "eri_dip %s\n",
+				    ddi_binding_name(eri_dip)));
 				if (man_dip_is_eri(eri_dip, &ndev) &&
-					man_dip_is_attached(eri_dip)) {
+				    man_dip_is_attached(eri_dip)) {
 
 					ASSERT(exp_id != -1);
 					ndev.mdev_exp_id = exp_id;
@@ -671,7 +669,7 @@ man_get_eri_dev_info(dev_info_t *dip, man_dev_t *mdevp)
 	 * Verify if the parent is schizo(xmits)0 and pci B leaf.
 	 */
 	if (((parent_dip = ddi_get_parent(dip)) == NULL) ||
-		((name = ddi_binding_name(parent_dip)) == NULL))
+	    ((name = ddi_binding_name(parent_dip)) == NULL))
 		return (FALSE);
 	if (strcmp(name, MAN_SCHIZO_BINDING_NAME) != 0) {
 		/*
@@ -681,7 +679,7 @@ man_get_eri_dev_info(dev_info_t *dip, man_dev_t *mdevp)
 		if ((parent_dip = ddi_get_parent(parent_dip)) == NULL)
 			return (FALSE);
 		if (((name = ddi_binding_name(parent_dip)) == NULL) ||
-			(strcmp(name, MAN_XMITS_BINDING_NAME) != 0)) {
+		    (strcmp(name, MAN_XMITS_BINDING_NAME) != 0)) {
 			return (FALSE);
 		}
 	}
@@ -693,13 +691,12 @@ man_get_eri_dev_info(dev_info_t *dip, man_dev_t *mdevp)
 	 */
 	if (man_dip_is_attached(dip) == FALSE) {
 		MAN_DBG(MAN_DR, ("man_get_eri_dev_info: "
-				"dip 0x%p not attached\n", dip));
+		    "dip 0x%p not attached\n", dip));
 		return (FALSE);
 	}
 	mdevp->mdev_exp_id = exp_id;
 	mdevp->mdev_ppa = ddi_get_instance(dip);
-	mdevp->mdev_major =
-		ddi_name_to_major(ddi_get_name(dip));
+	mdevp->mdev_major = ddi_driver_major(dip);
 	mdevp->mdev_state = MDEV_ASSIGNED;
 	return (TRUE);
 }
@@ -733,15 +730,15 @@ man_dip_is_schizoxmits0_pcib(dev_info_t *dip, int *exp_id, int *xmits)
 		return (FALSE);
 	if (strcmp(name, MAN_SCHIZO_BINDING_NAME) == 0) {
 		MAN_DBG(MAN_PATH, ("man_dip_is_schizoxmits0_pcib: "
-						"SCHIZO found 0x%p\n", dip));
+		    "SCHIZO found 0x%p\n", dip));
 	} else if (strcmp(name, MAN_XMITS_BINDING_NAME) == 0) {
 		*xmits = TRUE;
 		MAN_DBG(MAN_PATH, ("man_dip_is_schizoxmits0_pcib: "
-						"XMITS found 0x%p\n", dip));
+		    "XMITS found 0x%p\n", dip));
 	} else
 		return (FALSE);
 	if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, 0, MAN_DEVTYPE_PROP,
-		(caddr_t)dtype, &length) == DDI_PROP_SUCCESS) {
+	    (caddr_t)dtype, &length) == DDI_PROP_SUCCESS) {
 
 		MAN_DBG(MAN_PATH, ("dtype: %s\n", dtype));
 		if (strncmp(dtype, MAN_DEVTYPE_PCI, 3) != 0)
@@ -751,7 +748,7 @@ man_dip_is_schizoxmits0_pcib(dev_info_t *dip, int *exp_id, int *xmits)
 		 * Get safari ID (DDI port ID).
 		 */
 		if ((portid = (int)ddi_getprop(DDI_DEV_T_ANY, dip, 0,
-					MAN_PORTID_PROP, -1)) == -1) {
+		    MAN_PORTID_PROP, -1)) == -1) {
 
 			MAN_DBG(MAN_PATH, ("ddi_getpropp: failed\n"));
 			goto notfound;
@@ -767,8 +764,8 @@ man_dip_is_schizoxmits0_pcib(dev_info_t *dip, int *exp_id, int *xmits)
 		 * All PCI nodes "B" are at configspace 0x70.0000
 		 */
 		if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-				MAN_REG_PROP, (caddr_t)&regbuf,
-				&length) != DDI_PROP_SUCCESS) {
+		    MAN_REG_PROP, (caddr_t)&regbuf,
+		    &length) != DDI_PROP_SUCCESS) {
 
 			MAN_DBG(MAN_PATH, ("ddi_getlongprop_buf: failed"));
 			goto notfound;
@@ -779,7 +776,7 @@ man_dip_is_schizoxmits0_pcib(dev_info_t *dip, int *exp_id, int *xmits)
 		if (pci_csr_base == MAN_PCI_B_CSR_BASE) {
 
 			MAN_DBG(MAN_PATH, ("man_dip_is_schizoxmits0_pcib:"
-				" found PCI B at dip(0x%p)\n", (void *)dip));
+			    " found PCI B at dip(0x%p)\n", (void *)dip));
 
 			*exp_id = portid >> 5;
 			return (TRUE);
@@ -799,10 +796,10 @@ man_dip_is_eri(dev_info_t *dip, man_dev_t *ndevp)
 	uint_t			pci_function;
 
 	MAN_DBG(MAN_PATH, ("man_dip_is_eri: dip(0x%p) ndevp(0x%p)\n",
-		(void *)dip, (void *)ndevp));
+	    (void *)dip, (void *)ndevp));
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-		MAN_REG_PROP, (caddr_t)&regbuf,
-		&length) == DDI_PROP_SUCCESS) {
+	    MAN_REG_PROP, (caddr_t)&regbuf,
+	    &length) == DDI_PROP_SUCCESS) {
 
 		pci_device = PCI_REG_DEV_G(regbuf->pci_phys_hi);
 		pci_function = PCI_REG_FUNC_G(regbuf->pci_phys_hi);
@@ -814,8 +811,7 @@ man_dip_is_eri(dev_info_t *dip, man_dev_t *ndevp)
 		 */
 		if (pci_device == 3 && pci_function == 1) {
 			ndevp->mdev_ppa = ddi_get_instance(dip);
-			ndevp->mdev_major =
-				ddi_name_to_major(ddi_get_name(dip));
+			ndevp->mdev_major = ddi_driver_major(dip);
 
 			MAN_DBG(MAN_PATH, ("man_dip_is_eri: found eri maj(%d)"
 			    " ppa(%d)\n", ndevp->mdev_major, ndevp->mdev_ppa));
@@ -844,7 +840,7 @@ man_dip_is_attached(dev_info_t *dip)
 			return (TRUE);
 		}
 		cmn_err(CE_WARN, "man_dip_is_attached: "
-				"eri 0x%p instance is not set yet", dip);
+		    "eri 0x%p instance is not set yet", dip);
 
 	}
 	return (FALSE);
@@ -863,9 +859,9 @@ man_print_manc(manc_t *mcp)
 	cmn_err(CE_CONT, "\tversion: 0x%x\n", mcp->manc_version);
 	cmn_err(CE_CONT, "\tcsum: %d\n", mcp->manc_csum);
 	cmn_err(CE_CONT, "\tdom_eaddr: %s\n",
-		ether_sprintf(&mcp->manc_dom_eaddr));
+	    ether_sprintf(&mcp->manc_dom_eaddr));
 	cmn_err(CE_CONT, "\tsc_eaddr: %s\n",
-		ether_sprintf(&mcp->manc_sc_eaddr));
+	    ether_sprintf(&mcp->manc_sc_eaddr));
 	cmn_err(CE_CONT, "\tiob_bitmap: 0x%x\n", mcp->manc_iob_bitmap);
 	cmn_err(CE_CONT, "\tgolden_iob: %d\n", mcp->manc_golden_iob);
 

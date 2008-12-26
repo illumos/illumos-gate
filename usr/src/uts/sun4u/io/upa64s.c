@@ -1045,8 +1045,7 @@ report_dev(dev_info_t *dip)
 		return (DDI_FAILURE);
 	cmn_err(CE_CONT, "?UPA64S-device: %s@%s, %s #%d\n",
 	    ddi_node_name(dip), ddi_get_name_addr(dip),
-	    ddi_major_to_name(ddi_name_to_major(ddi_get_name(dip))),
-	    ddi_get_instance(dip));
+	    ddi_get_name(dip), ddi_get_instance(dip));
 	return (DDI_SUCCESS);
 }
 

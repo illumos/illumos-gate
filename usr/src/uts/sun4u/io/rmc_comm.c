@@ -49,9 +49,6 @@
 /*
  * Local definitions
  */
-
-#define	ddi_driver_major(dip)	ddi_name_to_major(ddi_binding_name(dip))
-
 #define	MYNAME			"rmc_comm"
 #define	NOMAJOR			(~(major_t)0)
 #define	DUMMY_VALUE		(~(int8_t)0)

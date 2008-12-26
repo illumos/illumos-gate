@@ -960,7 +960,7 @@ man_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	ddi_set_driver_private(dip, manp);
 	manp->man_dip = dip;
-	manp->man_meta_major = ddi_name_to_major(ddi_get_name(dip));
+	manp->man_meta_major = ddi_driver_major(dip);
 	manp->man_meta_ppa = instance;
 
 	/*

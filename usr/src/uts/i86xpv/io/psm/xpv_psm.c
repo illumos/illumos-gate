@@ -996,7 +996,7 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type,
 	 * It doesn't return consecutive vectors.  This code is a first
 	 * cut for the (future) time that MSI is supported.
 	 */
-	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
+	major = (dip != NULL) ? ddi_driver_major(dip) : 0;
 	for (i = 0; i < rcount; i++) {
 		if ((irqno = apic_allocate_irq(apic_first_avail_irq)) ==
 		    INVALID_IRQ) {

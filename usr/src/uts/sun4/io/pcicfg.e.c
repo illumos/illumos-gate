@@ -4134,7 +4134,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 
 			DEBUG3("Before int DIP=%lx binding name %s major %d\n",
 			    new_child, ddi_binding_name(new_child),
-			    ddi_name_to_major(ddi_binding_name(new_child)));
+			    ddi_driver_major(new_child));
 
 			error = fcode_interpreter(parent, &pci_fc_ops, c);
 
@@ -4167,7 +4167,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 			 */
 			DEBUG3("DIP=%lx binding name %s major %d\n", new_child,
 			    ddi_binding_name(new_child),
-			    ddi_name_to_major(ddi_binding_name(new_child)));
+			    ddi_driver_major(new_child));
 
 			/*
 			 * Readjust resources specified by reg property.

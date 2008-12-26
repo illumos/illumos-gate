@@ -9357,7 +9357,7 @@ sd_get_nv_sup(sd_ssc_t *ssc)
 static dev_t
 sd_make_device(dev_info_t *devi)
 {
-	return (makedevice(ddi_name_to_major(ddi_get_name(devi)),
+	return (makedevice(ddi_driver_major(devi),
 	    ddi_get_instance(devi) << SDUNIT_SHIFT));
 }
 

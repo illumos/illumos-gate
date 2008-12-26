@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  * All rights reserved.
  * From "@(#)pcicfg.c   1.31    99/06/18 SMI"
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Cardbus hotplug module
@@ -221,7 +219,7 @@ cardbus_event_handler(caddr_t slot_arg, uint_t event_mask)
 
 		if (cbp->ostate != AP_OSTATE_UNCONFIGURED) {
 			cmn_err(CE_WARN, "!slot%d already configured\n",
-				cbp->cb_instance);
+			    cbp->cb_instance);
 			break;
 		}
 
@@ -235,10 +233,8 @@ cardbus_event_handler(caddr_t slot_arg, uint_t event_mask)
 		}
 
 		if (cardbus_configure_ap(cbp) == HPC_SUCCESS)
-			create_occupant_props(cbp->cb_dip,
-			    makedevice(ddi_name_to_major(ddi_get_name
-			    (cbp->cb_dip)),
-			    ap_minor));
+			create_occupant_props(cbp->cb_dip, makedevice(
+			    ddi_driver_major((cbp->cb_dip)), ap_minor));
 		else
 			rv = HPC_ERR_FAILED;
 
@@ -359,8 +355,7 @@ cardbus_pci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 
 	switch (request) {
 
-	case HPC_CTRL_GET_SLOT_STATE:
-	    {
+	case HPC_CTRL_GET_SLOT_STATE: {
 		hpc_slot_state_t	*hpc_slot_state;
 
 		hpc_slot_state = (hpc_slot_state_t *)arg;
@@ -376,10 +371,9 @@ cardbus_pci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 			*hpc_slot_state = HPC_SLOT_EMPTY;
 
 		break;
-	    }
+	}
 
-	case HPC_CTRL_GET_BOARD_TYPE:
-	    {
+	case HPC_CTRL_GET_BOARD_TYPE: {
 		hpc_board_type_t	*hpc_board_type;
 
 		hpc_board_type = (hpc_board_type_t *)arg;
@@ -394,7 +388,7 @@ cardbus_pci_control(caddr_t ops_arg, hpc_slot_t slot_hdl, int request,
 		*hpc_board_type = HPC_BOARD_PCI_HOTPLUG;
 
 		break;
-	    }
+	}
 
 	case HPC_CTRL_DEV_CONFIGURED:
 	case HPC_CTRL_DEV_UNCONFIGURED:
@@ -475,7 +469,7 @@ cardbus_new_slot_state(dev_info_t *dip, hpc_slot_t hdl,
 	 */
 	cb_instance = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
 	    DDI_PROP_DONTPASS, "cbus-instance", -1);
-	    ASSERT(cb_instance >= 0);
+	ASSERT(cb_instance >= 0);
 	cbp = (cbus_t *)ddi_get_soft_state(cardbus_state, cb_instance);
 
 	mutex_enter(&cbp->cb_mutex);
@@ -698,7 +692,7 @@ cardbus_configure_ap(cbus_t *cbp)
 
 		ndi_devi_enter(self, &circular_count);
 		ddi_walk_devs(ddi_get_child(self),
-			cbus_configure, (void *)&ctrl);
+		    cbus_configure, (void *)&ctrl);
 		ndi_devi_exit(self, circular_count);
 
 		if (cardbus_debug) {
@@ -780,7 +774,7 @@ cardbus_configure_ap(cbus_t *cbp)
 
 	/* tell HPC driver that the occupant is configured */
 	(void) hpc_nexus_control(cbp->slot_handle,
-		HPC_CTRL_DEV_CONFIGURED, NULL);
+	    HPC_CTRL_DEV_CONFIGURED, NULL);
 
 	return (rv);
 }
@@ -1055,7 +1049,7 @@ cardbus_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	 * Get the soft state structure for the 'devctl' device.
 	 */
 	cbp = (cbus_t *)ddi_get_soft_state(cardbus_state,
-		AP_MINOR_NUM_TO_CB_INSTANCE(minor));
+	    AP_MINOR_NUM_TO_CB_INSTANCE(minor));
 	if (cbp == NULL)
 		return (ENXIO);
 
@@ -1743,7 +1737,7 @@ cardbus_dump(struct cardbus_pci_desc *spcfg, ddi_acc_handle_t handle)
 	for (i = 0; spcfg[i].name; i++) {
 
 		cmn_err(CE_NOTE, spcfg[i].fmt, spcfg[i].name,
-			spcfg[i].cfg_get_func(handle, spcfg[i].offset));
+		    spcfg[i].cfg_get_func(handle, spcfg[i].offset));
 	}
 
 }
@@ -1758,11 +1752,11 @@ cardbus_dump_pci_node(dev_info_t *dip)
 
 	cmn_err(CE_NOTE, "\nPCI leaf node of dip 0x%p:\n", (void *)dip);
 	for (next = ddi_get_child(dip); next;
-		next = ddi_get_next_sibling(next)) {
+	    next = ddi_get_next_sibling(next)) {
 
 		VendorId = ddi_getprop(DDI_DEV_T_ANY, next,
-				DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
-				"vendor-id", -1);
+		    DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
+		    "vendor-id", -1);
 		if (VendorId == -1) {
 			/* not a pci device */
 			continue;
@@ -1788,8 +1782,9 @@ cardbus_dump_pci_config(dev_info_t *dip)
 	ddi_acc_handle_t config_handle;
 
 	if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS) {
-	    cmn_err(CE_WARN, "!pci_config_setup() failed on 0x%p", (void *)dip);
-	    return;
+		cmn_err(CE_WARN,
+		    "!pci_config_setup() failed on 0x%p", (void *)dip);
+		return;
 	}
 
 	spcfg = cardbus_pci_cfg;
@@ -1808,21 +1803,21 @@ cardbus_dump_socket(dev_info_t *dip)
 	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 	if (ddi_regs_map_setup(dip, 1,
-				(caddr_t *)&ioaddr,
-				0,
-				4096,
-				&attr, &iohandle) != DDI_SUCCESS) {
-	    cmn_err(CE_WARN, "Failed to map address for 0x%p", (void *)dip);
-	    return;
+	    (caddr_t *)&ioaddr,
+	    0,
+	    4096,
+	    &attr, &iohandle) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Failed to map address for 0x%p", (void *)dip);
+		return;
 	}
 
 	cmn_err(CE_NOTE, "////////////////////////////////////////");
 	cmn_err(CE_NOTE, "SOCKET_EVENT  = [0x%x]",
-		ddi_get32(iohandle, (uint32_t *)(ioaddr+CB_STATUS_EVENT)));
+	    ddi_get32(iohandle, (uint32_t *)(ioaddr+CB_STATUS_EVENT)));
 	cmn_err(CE_NOTE, "SOCKET_MASK   = [0x%x]",
-		ddi_get32(iohandle, (uint32_t *)(ioaddr+CB_STATUS_MASK)));
+	    ddi_get32(iohandle, (uint32_t *)(ioaddr+CB_STATUS_MASK)));
 	cmn_err(CE_NOTE, "SOCKET_STATE  = [0x%x]",
-		ddi_get32(iohandle, (uint32_t *)(ioaddr+CB_PRESENT_STATE)));
+	    ddi_get32(iohandle, (uint32_t *)(ioaddr+CB_PRESENT_STATE)));
 	cmn_err(CE_NOTE, "////////////////////////////////////////");
 
 	ddi_regs_map_free(&iohandle);

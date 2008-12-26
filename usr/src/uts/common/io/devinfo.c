@@ -3201,7 +3201,7 @@ di_match_drv_name(struct dev_info *node, struct di_state *st, int match)
 		return (NULL);
 	}
 
-	major = ddi_name_to_major(node->devi_binding_name);
+	major = node->devi_major;
 	if (major == (major_t)(-1)) {
 		return (NULL);
 	}

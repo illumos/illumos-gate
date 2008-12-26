@@ -1226,7 +1226,7 @@ cmlb_ioctl(cmlb_handle_t cmlbhandle, dev_t dev, int cmd, intptr_t arg,
 dev_t
 cmlb_make_device(struct cmlb_lun *cl)
 {
-	return (makedevice(ddi_name_to_major(ddi_get_name(CMLB_DEVINFO(cl))),
+	return (makedevice(ddi_driver_major(CMLB_DEVINFO(cl)),
 	    ddi_get_instance(CMLB_DEVINFO(cl)) << CMLBUNIT_SHIFT));
 }
 

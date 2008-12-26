@@ -23,8 +23,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * sunpm.c builds sunpm.o	"power management framework"
  *	kernel-resident power management code.  Implements power management
@@ -492,8 +490,9 @@ krwlock_t pm_pscc_interest_rwlock;
 pscc_t *pm_pscc_interest;
 pscc_t *pm_pscc_direct;
 
-#define	PM_MAJOR(dip) ddi_name_to_major(ddi_binding_name(dip))
-#define	PM_IS_NEXUS(dip) NEXUS_DRV(devopsp[PM_MAJOR(dip)])
+#define	PM_MAJOR(dip) ddi_driver_major(dip)
+#define	PM_IS_NEXUS(dip) ((PM_MAJOR(dip) == DDI_MAJOR_T_NONE) ? 0 : \
+	NEXUS_DRV(devopsp[PM_MAJOR(dip)]))
 #define	POWERING_ON(old, new) ((old) == 0 && (new) != 0)
 #define	POWERING_OFF(old, new) ((old) != 0 && (new) == 0)
 
@@ -8185,7 +8184,6 @@ pm_is_noinvol_ancestor(pm_noinvol_t *aip)
 	return (0);
 }
 
-#define	PM_MAJOR(dip) ddi_name_to_major(ddi_binding_name(dip))
 /*
  * scan through the pm_noinvolpm list adjusting ancestors of the current
  * node;  Modifies string *path.

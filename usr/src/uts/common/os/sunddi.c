@@ -4919,7 +4919,16 @@ ddi_binding_name(dev_info_t *dip)
 
 /*
  * ddi_driver_major: Return the major number of the driver that
- *		the supplied devinfo is bound to (-1 if none)
+ *	the supplied devinfo is bound to.  If not yet bound,
+ *	DDI_MAJOR_T_NONE.
+ *
+ * When used by the driver bound to 'devi', this
+ * function will reliably return the driver major number.
+ * Other ways of determining the driver major number, such as
+ *	major = ddi_name_to_major(ddi_get_name(devi));
+ *	major = ddi_name_to_major(ddi_binding_name(devi));
+ * can return a different result as the driver/alias binding
+ * can change dynamically, and thus should be avoided.
  */
 major_t
 ddi_driver_major(dev_info_t *devi)
@@ -6571,7 +6580,21 @@ ddi_get_parent_data(dev_info_t *dip)
 }
 
 /*
- * ddi_name_to_major: Returns the major number of a module given its name.
+ * ddi_name_to_major: returns the major number of a named module,
+ * derived from the current driver alias binding.
+ *
+ * Caveat: drivers should avoid the use of this function, in particular
+ * together with ddi_get_name/ddi_binding name, as per
+ *	major = ddi_name_to_major(ddi_get_name(devi));
+ * ddi_name_to_major() relies on the state of the device/alias binding,
+ * which can and does change dynamically as aliases are administered
+ * over time.  An attached device instance cannot rely on the major
+ * number returned by ddi_name_to_major() to match its own major number.
+ *
+ * For driver use, ddi_driver_major() reliably returns the major number
+ * for the module to which the device was bound at attach time over
+ * the life of the instance.
+ *	major = ddi_driver_major(dev_info_t *)
  */
 major_t
 ddi_name_to_major(char *name)

@@ -421,7 +421,7 @@ pcihp_info(
 		mutex_enter(&pcihp_mutex);
 		pcihp_p = pcihp_head;
 		while (pcihp_p != NULL) {
-			if (ddi_name_to_major(ddi_get_name(pcihp_p->dip)) ==
+			if (ddi_driver_major(pcihp_p->dip) ==
 			    major && ddi_get_instance(pcihp_p->dip) ==
 			    instance) {
 				*result = (void *)pcihp_p->dip;
@@ -2035,7 +2035,7 @@ pcihp_new_slot_state(dev_info_t *dip, hpc_slot_t hdl,
 		slotinfop->slot_hdl = hdl;
 
 		/* setup event handler for all hardware events on the slot */
-		ap_major = ddi_name_to_major(ddi_get_name(dip));
+		ap_major = ddi_driver_major(dip);
 		if (hpc_install_event_handler(hdl, -1, pcihp_event_handler,
 		    (caddr_t)makedevice(ap_major, ap_minor)) != 0) {
 			cmn_err(CE_WARN,

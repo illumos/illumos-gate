@@ -213,7 +213,7 @@ okm_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	okmsp->km_dip = dip;
-	okmsp->km_major = ddi_name_to_major(ddi_get_name(dip));
+	okmsp->km_major = ddi_driver_major(dip);
 	okmsp->km_inst = instance;
 
 	/*

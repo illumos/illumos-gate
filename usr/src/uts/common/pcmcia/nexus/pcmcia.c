@@ -315,9 +315,9 @@ _init()
 	cisp_init();
 
 	if (cs_init() != CS_SUCCESS) {
-	    if (cs_deinit() != CS_SUCCESS)
-		cmn_err(CE_CONT, "pcmcia: _init cs_deinit error\n");
-	    return (-1);
+		if (cs_deinit() != CS_SUCCESS)
+			cmn_err(CE_CONT, "pcmcia: _init cs_deinit error\n");
+		return (-1);
 	}
 
 	mutex_init(&pcmcia_global_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -405,7 +405,7 @@ pcmcia_attach(dev_info_t *dip, anp_t *adapter)
 
 	if (pm_create_components(dip, 1) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "%s: not power managed\n",
-			ddi_get_name_addr(dip));
+		    ddi_get_name_addr(dip));
 	} else {
 		pm_set_normal_power(dip, 0, 1);
 	}
@@ -521,8 +521,8 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug) {
 		cmn_err(CE_CONT, "pcmcia_ctlops(%p, %p, %d, %p, %p)\n",
-			(void *)dip, (void *)rdip, ctlop, (void *)arg,
-			(void *)result);
+		    (void *)dip, (void *)rdip, ctlop, (void *)arg,
+		    (void *)result);
 		if (rdip != NULL && ddi_get_name(rdip) != NULL)
 			cmn_err(CE_CONT, "\t[%s]\n", ddi_get_name(rdip));
 	}
@@ -535,18 +535,18 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 		if (strcmp("pcs", ddi_node_name(rdip)) == 0)
 			cmn_err(CE_CONT, "?PCCard socket %d at %s@%s\n",
-				ddi_get_instance(rdip),
-				ddi_driver_name(dip), ddi_get_name_addr(dip));
+			    ddi_get_instance(rdip),
+			    ddi_driver_name(dip), ddi_get_name_addr(dip));
 		else
 			cmn_err(CE_CONT, "?%s%d at %s@%s in socket %d\n",
-				ddi_driver_name(rdip),
-				ddi_get_instance(rdip),
-				ddi_driver_name(dip),
-				ddi_get_name_addr(dip),
-				CS_GET_SOCKET_NUMBER(
-				    ddi_getprop(DDI_DEV_T_NONE, rdip,
-				    DDI_PROP_DONTPASS,
-				    PCM_DEV_SOCKET, -1)));
+			    ddi_driver_name(rdip),
+			    ddi_get_instance(rdip),
+			    ddi_driver_name(dip),
+			    ddi_get_name_addr(dip),
+			    CS_GET_SOCKET_NUMBER(
+			    ddi_getprop(DDI_DEV_T_NONE, rdip,
+			    DDI_PROP_DONTPASS,
+			    PCM_DEV_SOCKET, -1)));
 
 		return (DDI_SUCCESS);
 
@@ -559,19 +559,19 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug) {
 			cmn_err(CE_CONT, "pcmcia: init child: %s(%d) @%p\n",
-				ddi_node_name(arg), ddi_get_instance(arg),
-				(void *)arg);
+			    ddi_node_name(arg), ddi_get_instance(arg),
+			    (void *)arg);
 			if (DEVI(arg)->devi_binding_name != NULL)
 				cmn_err(CE_CONT, "\tbinding_name=%s\n",
-					DEVI(arg)->devi_binding_name);
+				    DEVI(arg)->devi_binding_name);
 			if (DEVI(arg)->devi_node_name != NULL)
 				cmn_err(CE_CONT, "\tnode_name=%s\n",
-					DEVI(arg)->devi_node_name);
+				    DEVI(arg)->devi_node_name);
 		}
 #endif
 
 		ppd = (struct pcmcia_parent_private *)
-			ddi_get_parent_data((dev_info_t *)arg);
+		    ddi_get_parent_data((dev_info_t *)arg);
 		if (ppd == NULL)
 			return (DDI_FAILURE);
 
@@ -592,9 +592,9 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		if (ndi_dev_is_persistent_node((dev_info_t *)arg) == 0) {
 			(void) pcmcia_merge_conf((dev_info_t *)arg);
 			cmn_err(CE_WARN, "%s%d: %s.conf invalid",
-				ddi_get_name((dev_info_t *)arg),
-				ddi_get_instance((dev_info_t *)arg),
-				ddi_get_name((dev_info_t *)arg));
+			    ddi_get_name((dev_info_t *)arg),
+			    ddi_get_instance((dev_info_t *)arg),
+			    ddi_get_name((dev_info_t *)arg));
 			return (DDI_FAILURE);
 		}
 
@@ -602,10 +602,10 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug && ppd != NULL) {
 			cmn_err(CE_CONT, "\tnreg=%x, intr=%x, socket=%x,"
-				" function=%x, active=%x, flags=%x\n",
-				ppd->ppd_nreg, ppd->ppd_intr,
-				ppd->ppd_socket, ppd->ppd_function,
-				ppd->ppd_active, ppd->ppd_flags);
+			    " function=%x, active=%x, flags=%x\n",
+			    ppd->ppd_nreg, ppd->ppd_intr,
+			    ppd->ppd_socket, ppd->ppd_function,
+			    ppd->ppd_active, ppd->ppd_flags);
 		}
 #endif
 
@@ -626,9 +626,9 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT, "pcmcia: system init done for %s [%s] "
-				"nodeid: %x @%s\n",
-				ddi_get_name(arg), ddi_get_name_addr(arg),
-				DEVI(arg)->devi_nodeid, name);
+			    "nodeid: %x @%s\n",
+			    ddi_get_name(arg), ddi_get_name_addr(arg),
+			    DEVI(arg)->devi_nodeid, name);
 		if (pcmcia_debug > 1)
 			pcmcia_dump_minors((dev_info_t *)arg);
 #endif
@@ -640,14 +640,14 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug) {
 			cmn_err(CE_CONT, "pcmcia: uninit child: %s(%d) @%p\n",
-				ddi_node_name(arg), ddi_get_instance(arg),
-				(void *)arg);
+			    ddi_node_name(arg), ddi_get_instance(arg),
+			    (void *)arg);
 			if (DEVI(arg)->devi_binding_name != NULL)
 				cmn_err(CE_CONT, "\tbinding_name=%s\n",
-					DEVI(arg)->devi_binding_name);
+				    DEVI(arg)->devi_binding_name);
 			if (DEVI(arg)->devi_node_name != NULL)
 				cmn_err(CE_CONT, "\tnode_name=%s\n",
-					DEVI(arg)->devi_node_name);
+				    DEVI(arg)->devi_node_name);
 		}
 #endif
 
@@ -658,7 +658,7 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 	case DDI_CTLOPS_SLAVEONLY:
 		/* PCMCIA devices can't ever be busmaster until CardBus */
 		ppd = (struct pcmcia_parent_private *)
-			ddi_get_parent_data(rdip);
+		    ddi_get_parent_data(rdip);
 		if (ppd != NULL && ppd->ppd_flags & PPD_CB_BUSMASTER)
 			return (DDI_FAILURE); /* at most */
 		return (DDI_SUCCESS);
@@ -669,7 +669,7 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	case DDI_CTLOPS_NREGS:
 		ppd = (struct pcmcia_parent_private *)
-			ddi_get_parent_data(rdip);
+		    ddi_get_parent_data(rdip);
 		if (ppd != NULL)
 			*((uint32_t *)result) = (ppd->ppd_nreg);
 		else
@@ -678,7 +678,7 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	case DDI_CTLOPS_REGSIZE:
 		ppd = (struct pcmcia_parent_private *)
-			ddi_get_parent_data(rdip);
+		    ddi_get_parent_data(rdip);
 		if (ppd != NULL && ppd->ppd_nreg > 0)
 			*((off_t *)result) =  sizeof (struct pcm_regs);
 		else
@@ -687,7 +687,7 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 
 	case DDI_CTLOPS_POWER:
 		ppd = (struct pcmcia_parent_private *)
-			ddi_get_parent_data(rdip);
+		    ddi_get_parent_data(rdip);
 
 		if (ppd == NULL)
 			return (DDI_FAILURE);
@@ -709,11 +709,11 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug) {
 			cmn_err(CE_WARN, "power: %d: %p, %d, %d [%s]\n",
-				pm->request_type,
-				(void *)pm->req.set_power_req.who,
-				pm->req.set_power_req.cmpt,
-				pm->req.set_power_req.level,
-				ddi_get_name_addr(rdip));
+			    pm->request_type,
+			    (void *)pm->req.set_power_req.who,
+			    pm->req.set_power_req.cmpt,
+			    pm->req.set_power_req.level,
+			    ddi_get_name_addr(rdip));
 		}
 #endif
 		e = ppd->ppd_socket;
@@ -735,8 +735,8 @@ pcmcia_ctlops(dev_info_t *dip, dev_info_t *rdip,
 			 * for now, we let the child handle it itself
 			 */
 			(void) pcmcia_power(pm->req.set_power_req.who,
-				pm->req.set_power_req.cmpt,
-				pm->req.set_power_req.level);
+			    pm->req.set_power_req.cmpt,
+			    pm->req.set_power_req.level);
 			break;
 		default:
 			break;
@@ -979,9 +979,9 @@ pcmcia_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		break;
 	case DDI_MT_RNUMBER:
 		regs = (struct pcm_regs *)
-			pcmcia_rnum_to_regspec(rdip, mp->map_obj.rnumber);
+		    pcmcia_rnum_to_regspec(rdip, mp->map_obj.rnumber);
 		mregs = (struct pcm_regs *)
-			pcmcia_rnum_to_mapped(rdip, mp->map_obj.rnumber);
+		    pcmcia_rnum_to_mapped(rdip, mp->map_obj.rnumber);
 		rnum = mp->map_obj.rnumber;
 		if (regs == NULL)
 			return (DDI_FAILURE);
@@ -1088,7 +1088,7 @@ pcmcia_cons_regspec(dev_info_t *dip, int type, uchar_t *buff, ra_return_t *ret)
 		/* we're not a child of root so find out what */
 		len = sizeof (device_type);
 		if (ddi_prop_op(DDI_DEV_T_ANY, pdip, PROP_LEN_AND_VAL_BUF, 0,
-			"device_type", (caddr_t)device_type, &len) ==
+		    "device_type", (caddr_t)device_type, &len) ==
 		    DDI_PROP_SUCCESS) {
 			/* check things out */
 			if (strcmp(device_type, "pci") == 0)
@@ -1101,7 +1101,7 @@ pcmcia_cons_regspec(dev_info_t *dip, int type, uchar_t *buff, ra_return_t *ret)
 	case PTYPE_PCI:
 		/* XXX need to look at carefully */
 		if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			"reg", (caddr_t)&pcireg, &len) == DDI_SUCCESS) {
+		    "reg", (caddr_t)&pcireg, &len) == DDI_SUCCESS) {
 			bus = PCI_REG_BUS_G(pcireg->pci_phys_hi);
 			kmem_free(pcireg, len);
 		} else {
@@ -1109,7 +1109,7 @@ pcmcia_cons_regspec(dev_info_t *dip, int type, uchar_t *buff, ra_return_t *ret)
 		}
 		pcireg = (pci_regspec_t *)buff;
 		pcireg->pci_phys_hi = (type == PCMCIA_MAP_IO ? PCI_ADDR_IO :
-			PCI_ADDR_MEM32) | PCI_RELOCAT_B | (bus << 16);
+		    PCI_ADDR_MEM32) | PCI_RELOCAT_B | (bus << 16);
 		pcireg->pci_phys_mid = ret->ra_addr_hi;
 		pcireg->pci_phys_low = ret->ra_addr_lo;
 		if (type == PCMCIA_MAP_IO)
@@ -1144,7 +1144,7 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 	    KM_SLEEP);
 	pcmcia_adapters[i]->pca_dip = dip;
 	/* should this be pca_winshift??? */
-	pcmcia_adapters[i]->pca_module = ddi_name_to_major(ddi_get_name(dip));
+	pcmcia_adapters[i]->pca_module = ddi_driver_major(dip);
 	pcmcia_adapters[i]->pca_unit = ddi_get_instance(dip);
 	pcmcia_adapters[i]->pca_iblock = adapter->an_iblock;
 	pcmcia_adapters[i]->pca_idev = adapter->an_idev;
@@ -1152,7 +1152,7 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 	pcmcia_adapters[i]->pca_number = i;
 	(void) strcpy(pcmcia_adapters[i]->pca_name, ddi_get_name(dip));
 	pcmcia_adapters[i]->
-		pca_name[sizeof (pcmcia_adapters[i]->pca_name) - 1] = NULL;
+	    pca_name[sizeof (pcmcia_adapters[i]->pca_name) - 1] = NULL;
 
 	if (ls_if != NULL) {
 		inquire_adapter_t conf;
@@ -1163,7 +1163,7 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 
 		/* resources - assume worst case and fix from there */
 		pcmcia_adapters[i]->pca_flags = PCA_RES_NEED_IRQ |
-			PCA_RES_NEED_IO | PCA_RES_NEED_MEM;
+		    PCA_RES_NEED_IO | PCA_RES_NEED_MEM;
 		/* indicate first socket not initialized */
 		pcmcia_adapters[i]->pca_first_socket = -1;
 
@@ -1186,10 +1186,8 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 			pcmcia_adapters[i]->pca_avail_intr = conf.ActiveHigh;
 
 		/* power entries for adapter */
-		pcmcia_adapters[i]->pca_power =
-			conf.power_entry;
-		pcmcia_adapters[i]->pca_numpower =
-			conf.NumPower;
+		pcmcia_adapters[i]->pca_power = conf.power_entry;
+		pcmcia_adapters[i]->pca_numpower = conf.NumPower;
 
 		for (n = 0; n < conf.NumPower; n++)
 			pcmcia_merge_power(&conf.power_entry[n]);
@@ -1222,32 +1220,31 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 #if defined(PCMCIA_DEBUG)
 			if (pcmcia_debug) {
 				cmn_err(CE_CONT,
-					"pcmcia_init: new socket added %d "
-					"(%d)\n",
-					n, pcmcia_num_sockets);
+				    "pcmcia_init: new socket added %d "
+				    "(%d)\n",
+				    n, pcmcia_num_sockets);
 			}
 #endif
 
 			pcmcia_sockets[n] =
-				kmem_zalloc(sizeof (pcmcia_logical_socket_t),
-				KM_SLEEP);
+			    kmem_zalloc(sizeof (pcmcia_logical_socket_t),
+			    KM_SLEEP);
 			pcmcia_sockets[n]->ls_socket = sock;
 			pcmcia_sockets[n]->ls_if = ls_if;
 			pcmcia_sockets[n]->ls_adapter =
-				pcmcia_adapters[i];
+			    pcmcia_adapters[i];
 			pcmcia_sockets[n]->ls_cs_events = 0L;
 			pcmcia_sockets[n]->ls_sockdrv = sockdrv;
 			/* Prototype of intrspec */
-			pcmcia_sockets[n]->ls_intr_pri =
-				adapter->an_ipl;
+			pcmcia_sockets[n]->ls_intr_pri = adapter->an_ipl;
 #if defined(PCMCIA_DEBUG)
 			if (pcmcia_debug)
 				cmn_err(CE_CONT,
-					"phys sock %d, log sock %d\n",
-					sock, n);
+				    "phys sock %d, log sock %d\n",
+				    sock, n);
 #endif
 			mutex_init(&pcmcia_sockets[n]->ls_ilock, NULL,
-				MUTEX_DRIVER, *adapter->an_iblock);
+			    MUTEX_DRIVER, *adapter->an_iblock);
 		}
 
 		pcmcia_adapters[i]->pca_numsockets = conf.NumSockets;
@@ -1255,12 +1252,12 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 		for (win = 0; win < conf.NumWindows; win++) {
 			n = win + pcmcia_num_windows;
 			pcmcia_windows[n] =
-				kmem_zalloc(sizeof (pcmcia_logical_window_t),
-				    KM_SLEEP);
+			    kmem_zalloc(sizeof (pcmcia_logical_window_t),
+			    KM_SLEEP);
 			pcmcia_windows[n]->lw_window = win;
 			pcmcia_windows[n]->lw_if = ls_if;
 			pcmcia_windows[n]->lw_adapter =
-				pcmcia_adapters[i];
+			    pcmcia_adapters[i];
 		}
 		pcmcia_num_windows += conf.NumWindows;
 		SET_CALLBACK(ls_if, dip,
@@ -1271,14 +1268,14 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 #if defined(PCMCIA_DEBUG)
 			if (pcmcia_debug) {
 				cmn_err(CE_CONT,
-					"pcmcia_init: notify CS socket %d "
-					"sockp=%p\n",
-					sock, (void *)pcmcia_sockets[sock]);
+				    "pcmcia_init: notify CS socket %d "
+				    "sockp=%p\n",
+				    sock, (void *)pcmcia_sockets[sock]);
 			}
 #endif
 			if (pcmcia_sockets[sock] == NULL ||
 			    (pcmcia_sockets[sock]->ls_flags &
-				PCS_SOCKET_ADDED)) {
+			    PCS_SOCKET_ADDED)) {
 				/* skip the ones that are done already */
 				continue;
 			}
@@ -1301,25 +1298,25 @@ pcmcia_init_adapter(anp_t *adapter, dev_info_t *dip)
 			if (pcmcia_sockets[i] == NULL)
 				continue;
 			cmn_err(CE_CONT,
-				"\t%d: phys sock=%d, if=%p, adapt=%p\n",
-				i, pcmcia_sockets[i]->ls_socket,
-				(void *)pcmcia_sockets[i]->ls_if,
-				(void *)pcmcia_sockets[i]->ls_adapter);
+			    "\t%d: phys sock=%d, if=%p, adapt=%p\n",
+			    i, pcmcia_sockets[i]->ls_socket,
+			    (void *)pcmcia_sockets[i]->ls_if,
+			    (void *)pcmcia_sockets[i]->ls_adapter);
 		}
 		cmn_err(CE_CONT, "logical windows:\n");
 		for (i = 0; i < pcmcia_num_windows; i++) {
 			cmn_err(CE_CONT,
-				"\t%d: phys_window=%d, if=%p, adapt=%p\n",
-				i, pcmcia_windows[i]->lw_window,
-				(void *)pcmcia_windows[i]->lw_if,
-				(void *)pcmcia_windows[i]->lw_adapter);
+			    "\t%d: phys_window=%d, if=%p, adapt=%p\n",
+			    i, pcmcia_windows[i]->lw_window,
+			    (void *)pcmcia_windows[i]->lw_if,
+			    (void *)pcmcia_windows[i]->lw_adapter);
 		}
 		cmn_err(CE_CONT, "\tpcmcia_num_power=%d\n", pcmcia_num_power);
 		for (n = 0; n < pcmcia_num_power; n++)
 			cmn_err(CE_CONT,
-				"\t\tPowerLevel: %d\tValidSignals: %x\n",
-				pcmcia_power_table[n].PowerLevel,
-				pcmcia_power_table[n].ValidSignals);
+			    "\t\tPowerLevel: %d\tValidSignals: %x\n",
+			    pcmcia_power_table[n].PowerLevel,
+			    pcmcia_power_table[n].ValidSignals);
 	}
 #endif
 }
@@ -1397,7 +1394,7 @@ pcm_phys_to_log_socket(struct pcmcia_adapter *adapt, int socket)
 	int i;
 
 	for (i = 0, sockp = pcmcia_sockets[0];
-		i < pcmcia_num_sockets; i++, sockp = pcmcia_sockets[i]) {
+	    i < pcmcia_num_sockets; i++, sockp = pcmcia_sockets[i]) {
 		if (sockp == NULL)
 			continue;
 		if (sockp->ls_socket == socket && sockp->ls_adapter == adapt)
@@ -1407,9 +1404,9 @@ pcm_phys_to_log_socket(struct pcmcia_adapter *adapt, int socket)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT,
-				"\tbad socket/adapter: %x/%p != %x/%x\n",
-				socket, (void *)adapt, pcmcia_num_sockets,
-				pcmcia_num_adapters);
+			    "\tbad socket/adapter: %x/%p != %x/%x\n",
+			    socket, (void *)adapt, pcmcia_num_sockets,
+			    pcmcia_num_adapters);
 #endif
 		return (-1);
 	}
@@ -1451,7 +1448,7 @@ pcm_adapter_callback(dev_info_t *dip, int adapter, int event, int socket)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug) {
 		cmn_err(CE_CONT, "pcm_adapter_callback: %p %x %x %x: ",
-			(void *)dip, adapter, event, socket);
+		    (void *)dip, adapter, event, socket);
 		cmn_err(CE_CONT, "[%s]\n", cblist[event]);
 	}
 #endif
@@ -1460,7 +1457,7 @@ pcm_adapter_callback(dev_info_t *dip, int adapter, int event, int socket)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT, "\tbad adapter number: %d : %d\n",
-				adapter, pcmcia_num_adapters);
+			    adapter, pcmcia_num_adapters);
 #endif
 		return (1);
 	}
@@ -1476,12 +1473,12 @@ pcm_adapter_callback(dev_info_t *dip, int adapter, int event, int socket)
 	case -1:		/* special case of adapter going away */
 	case PCE_CARD_INSERT:
 		sockp->ls_cs_events |= PCE_E2M(PCE_CARD_INSERT) |
-			PCE_E2M(PCE_CARD_REMOVAL);
+		    PCE_E2M(PCE_CARD_REMOVAL);
 		break;
 	case PCE_CARD_REMOVAL:
 				/* disable interrupts at this point */
 		sockp->ls_cs_events |= PCE_E2M(PCE_CARD_INSERT) |
-			PCE_E2M(PCE_CARD_REMOVAL);
+		    PCE_E2M(PCE_CARD_REMOVAL);
 		/* remove children that never attached */
 
 		break;
@@ -1501,10 +1498,10 @@ pcm_adapter_callback(dev_info_t *dip, int adapter, int event, int socket)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug) {
 		cmn_err(CE_CONT,
-			"\tevent %d, event mask=%x, match=%x (log socket=%d)\n",
-			event,
-			(int)sockp->ls_cs_events,
-			(int)(sockp->ls_cs_events & PCE_E2M(event)), socket);
+		    "\tevent %d, event mask=%x, match=%x (log socket=%d)\n",
+		    event,
+		    (int)sockp->ls_cs_events,
+		    (int)(sockp->ls_cs_events & PCE_E2M(event)), socket);
 	}
 #endif
 
@@ -1512,8 +1509,8 @@ pcm_adapter_callback(dev_info_t *dip, int adapter, int event, int socket)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT, "\tcalling CS event handler (%p) "
-				"with event=%d\n",
-				(void *)pcmcia_cs_event, event);
+			    "with event=%d\n",
+			    (void *)pcmcia_cs_event, event);
 #endif
 		CS_EVENT(event, socket, 0);
 	}
@@ -1538,10 +1535,10 @@ pcm_event_manager(int event, int socket, void *arg)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT,
-				"pcm_event_manager: event=%d, mif_events=%x"
-				" (tst:%d)\n",
-				event, (int)*(uint32_t *)mif->mif_events,
-				PR_GET(mif->mif_events, event));
+			    "pcm_event_manager: event=%d, mif_events=%x"
+			    " (tst:%d)\n",
+			    event, (int)*(uint32_t *)mif->mif_events,
+			    PR_GET(mif->mif_events, event));
 #endif
 		if (PR_GET(mif->mif_events, event)) {
 			mif->mif_function(mif->mif_id, event, socket, arg);
@@ -1580,7 +1577,7 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 	    dip = (dev_info_t *)DEVI(dip)->devi_sibling) {
 		int ppd_socket;
 		ppd = (struct pcmcia_parent_private *)
-			ddi_get_parent_data(dip);
+		    ddi_get_parent_data(dip);
 		if (ppd == NULL) {
 #if defined(PCMCIA_DEBUG)
 			cmn_err(CE_WARN, "No parent private data\n");
@@ -1592,8 +1589,8 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug) {
 			cmn_err(CE_CONT, "\tbind=[%s], node=[%s]\n",
-				DEVI(dip)->devi_binding_name,
-				DEVI(dip)->devi_node_name);
+			    DEVI(dip)->devi_binding_name,
+			    DEVI(dip)->devi_node_name);
 		}
 #endif
 		if (info->pd_flags & PCM_NAME_VERS1) {
@@ -1607,7 +1604,7 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 		if ((info->pd_flags & (PCM_NAME_1275 | PCM_MULTI_FUNCTION)) ==
 		    (PCM_NAME_1275 | PCM_MULTI_FUNCTION)) {
 			(void) sprintf(bf, "%s,%x", info->pd_bind_name,
-				info->pd_function);
+			    info->pd_function);
 			if (strcmp(bf, DEVI(dip)->devi_binding_name) == 0 &&
 			    socket == ppd->ppd_socket)
 				break;
@@ -1615,13 +1612,13 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 		if (info->pd_flags & PCM_NAME_1275) {
 			if (DEVI(dip)->devi_binding_name &&
 			    strcmp(DEVI(dip)->devi_binding_name,
-				info->pd_bind_name) == 0 &&
+			    info->pd_bind_name) == 0 &&
 			    socket == ppd_socket)
 				break;
 		}
 		if (info->pd_flags & PCM_NAME_GENERIC) {
 			(void) sprintf(bf, "%s,%s", PCMDEV_NAMEPREF,
-				info->pd_generic_name);
+			    info->pd_generic_name);
 			if (DEVI(dip)->devi_binding_name &&
 			    strcmp(DEVI(dip)->devi_binding_name, bf) == 0 &&
 			    socket == ppd_socket)
@@ -1630,14 +1627,14 @@ pcm_search_devinfo(dev_info_t *self, struct pcm_device_info *info, int socket)
 		if (info->pd_flags & PCM_NAME_GENERIC) {
 			if (DEVI(dip)->devi_binding_name &&
 			    strcmp(DEVI(dip)->devi_binding_name,
-				info->pd_generic_name) == 0 &&
+			    info->pd_generic_name) == 0 &&
 			    socket == ppd_socket)
 				break;
 		}
 		if (info->pd_flags & PCM_NO_CONFIG) {
 			if (DEVI(dip)->devi_binding_name &&
 			    strcmp(DEVI(dip)->devi_binding_name,
-					"pccard,memory") == 0 &&
+			    "pccard,memory") == 0 &&
 			    socket == ppd_socket)
 				break;
 		}
@@ -1670,18 +1667,18 @@ pcm_find_devinfo(dev_info_t *pdip, struct pcm_device_info *info, int socket)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug)
 		cmn_err(CE_CONT, "find: initial dip = %p, socket=%d, name=%s "
-			"(instance=%d, socket=%d, name=%s)\n",
-			(void *)dip, socket, info->pd_bind_name,
-			ddi_get_instance(dip),
-			ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-			PCM_DEV_SOCKET, -1),
-			ddi_get_name(dip));
+		    "(instance=%d, socket=%d, name=%s)\n",
+		    (void *)dip, socket, info->pd_bind_name,
+		    ddi_get_instance(dip),
+		    ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		    PCM_DEV_SOCKET, -1),
+		    ddi_get_name(dip));
 #endif
 
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug && dip != NULL)
 		cmn_err(CE_CONT, "\treturning non-NULL dip (%s)\n",
-			ddi_get_name(dip));
+		    ddi_get_name(dip));
 #endif
 	return (dip);
 }
@@ -1743,8 +1740,7 @@ pcmcia_set_em_handler(int (*handler)(), caddr_t events, int elen,
 			return (EINVAL);
 
 		mif = (struct pcmcia_mif *)
-			kmem_zalloc(sizeof (struct pcmcia_mif),
-			    KM_NOSLEEP);
+		    kmem_zalloc(sizeof (struct pcmcia_mif), KM_NOSLEEP);
 		if (mif == NULL)
 			return (ENOSPC);
 
@@ -1787,7 +1783,7 @@ pcm_fix_bits(socket_enum_t src, socket_enum_t dst, int num, int dir)
 				/* RIGHT */
 		for (i = num; i < sizeof (dst) * PR_WORDSIZE; i++) {
 			if (PR_GET(src, i))
-			    PR_SET(dst, i - num);
+				PR_SET(dst, i - num);
 		}
 	}
 }
@@ -1862,9 +1858,9 @@ SocketServices(int function, ...)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug > 1)
 		cmn_err(CE_CONT, "SocketServices called for function %d [%s]\n",
-			function,
-			((function < 128) && ssfuncs[function] != NULL) ?
-			ssfuncs[function] : "UNKNOWN");
+		    function,
+		    ((function < 128) && ssfuncs[function] != NULL) ?
+		    ssfuncs[function] : "UNKNOWN");
 #endif
 	switch (function) {
 	case CSRegister:
@@ -1876,10 +1872,10 @@ SocketServices(int function, ...)
 		if (reg->cs_magic != PCCS_MAGIC ||
 		    reg->cs_version != PCCS_VERSION) {
 			cmn_err(CE_WARN,
-				"pcmcia: CSRegister (%x, %x, %p, %p) *ERROR*",
-				reg->cs_magic, reg->cs_version,
-				(void *)reg->cs_card_services,
-				(void *)reg->cs_event);
+			    "pcmcia: CSRegister (%x, %x, %p, %p) *ERROR*",
+			    reg->cs_magic, reg->cs_version,
+			    (void *)reg->cs_card_services,
+			    (void *)reg->cs_event);
 			error = BAD_FUNCTION;
 			break;
 		}
@@ -1904,8 +1900,8 @@ SocketServices(int function, ...)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT,
-				"CSCISInit: CIS is initialized on socket %d\n",
-				(int)args[0]);
+			    "CSCISInit: CIS is initialized on socket %d\n",
+			    (int)args[0]);
 #endif
 		/*
 		 * now that the CIS has been parsed (there may not
@@ -1943,7 +1939,7 @@ SocketServices(int function, ...)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT,
-				"CSCardRemoved! (socket=%d)\n", (int)args[0]);
+			    "CSCardRemoved! (socket=%d)\n", (int)args[0]);
 #endif
 		if (socket >= pcmcia_num_sockets)
 			break;
@@ -2086,12 +2082,12 @@ pcmcia_merge_power(struct power_entry *power)
 	for (i = 0; i < pcmcia_num_power; i++) {
 		if (pwr.PowerLevel == pcmcia_power_table[i].PowerLevel) {
 			if (pwr.ValidSignals ==
-				pcmcia_power_table[i].ValidSignals) {
+			    pcmcia_power_table[i].ValidSignals) {
 				return;
 			} else {
 				/* partial match */
 				pwr.ValidSignals &=
-					~pcmcia_power_table[i].ValidSignals;
+				    ~pcmcia_power_table[i].ValidSignals;
 			}
 		}
 	}
@@ -2133,7 +2129,7 @@ pcmcia_do_suspend(int socket, pcmcia_logical_socket_t *sockp)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug) {
 		cmn_err(CE_CONT,
-			"pcmcia_do_suspend(%d, %p)\n", socket, (void *)sockp);
+		    "pcmcia_do_suspend(%d, %p)\n", socket, (void *)sockp);
 	}
 #endif
 
@@ -2151,7 +2147,7 @@ pcmcia_do_suspend(int socket, pcmcia_logical_socket_t *sockp)
 		dip = sockp->ls_dip[i];
 		if (dip != NULL) {
 			ppd = (struct pcmcia_parent_private *)
-				ddi_get_parent_data(dip);
+			    ddi_get_parent_data(dip);
 			ppd->ppd_flags |= PPD_SUSPENDED;
 		}
 #if 0
@@ -2197,7 +2193,7 @@ pcmcia_do_resume(int socket, pcmcia_logical_socket_t *sockp)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug) {
 		cmn_err(CE_CONT,
-			"pcmcia_do_resume(%d, %p)\n", socket, (void *)sockp);
+		    "pcmcia_do_resume(%d, %p)\n", socket, (void *)sockp);
 	}
 #endif
 	if (GET_STATUS(ls_if, adapt->pca_dip, &stat) ==
@@ -2206,7 +2202,7 @@ pcmcia_do_resume(int socket, pcmcia_logical_socket_t *sockp)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT, "\tsocket=%x, CardState=%x\n",
-				socket, stat.CardState);
+			    socket, stat.CardState);
 #endif
 #if 0
 		/* now have socket info -- do we have events? */
@@ -2360,8 +2356,8 @@ pcmcia_1275_name(int socket, struct pcm_device_info *info,
 		    &manfid);
 		if (i == SUCCESS) {
 			(void) sprintf(info->pd_bind_name, "%s%x,%x",
-				PCMDEV_NAMEPREF,
-				manfid.manf, manfid.card);
+			    PCMDEV_NAMEPREF,
+			    manfid.manf, manfid.card);
 			info->pd_flags |= PCM_NAME_1275;
 		}
 	} else {
@@ -2373,8 +2369,8 @@ pcmcia_1275_name(int socket, struct pcm_device_info *info,
 			    &jedec);
 			if (i == SUCCESS) {
 				(void) sprintf(info->pd_bind_name, "%s%x,%x",
-					PCMDEV_NAMEPREF,
-					jedec.jid[0].id, jedec.jid[0].info);
+				    PCMDEV_NAMEPREF,
+				    jedec.jid[0].id, jedec.jid[0].info);
 				info->pd_flags |= PCM_NAME_1275;
 			}
 		}
@@ -2397,8 +2393,7 @@ pcmcia_vers1_name(int socket, struct pcm_device_info *info,
 	tuple.DesiredTuple = CISTPL_VERS_1;
 	tuple.Attributes = 0;
 	if (!which &&
-	    (i = csx_GetFirstTuple(handle, &tuple)) ==
-		SUCCESS) {
+	    (i = csx_GetFirstTuple(handle, &tuple)) == SUCCESS) {
 		i = csx_Parse_CISTPL_VERS_1(handle, &tuple, &vers1);
 		if (i == SUCCESS) {
 			for (i = 0, len = 0, space = 0; i < vers1.ns; i++) {
@@ -2497,8 +2492,8 @@ pcmcia_generic_name(int socket, struct pcm_device_info *info,
 				    pcmcia_generic_names[funcid.function]);
 			else
 				(void) sprintf(info->pd_generic_name,
-					"class,%x",
-					funcid.function);
+				    "class,%x",
+				    funcid.function);
 		}
 		info->pd_type = funcid.function;
 		switch (funcid.function) {
@@ -2515,7 +2510,7 @@ pcmcia_generic_name(int socket, struct pcm_device_info *info,
 						break;
 					}
 					(void) strcpy(info->pd_generic_name,
-						pcmcia_lan_types[i]);
+					    pcmcia_lan_types[i]);
 				}
 			}
 			break;
@@ -2533,7 +2528,7 @@ pcmcia_generic_name(int socket, struct pcm_device_info *info,
 						break;
 					}
 					(void) strcpy(info->pd_generic_names,
-						pcmcia_lan_types[i]);
+					    pcmcia_lan_types[i]);
 				}
 			}
 #endif
@@ -2547,7 +2542,7 @@ pcmcia_generic_name(int socket, struct pcm_device_info *info,
 		if (csx_GetFirstTuple(handle, &tuple) != SUCCESS) {
 			info->pd_flags |= PCM_NO_CONFIG | PCM_NAME_GENERIC;
 			(void) strcpy(info->pd_generic_name,
-				pcmcia_generic_names[PCM_TYPE_MEMORY]);
+			    pcmcia_generic_names[PCM_TYPE_MEMORY]);
 			info->pd_type = PCM_TYPE_MEMORY;
 		}
 	}
@@ -2596,11 +2591,11 @@ pcmcia_add_compatible(dev_info_t *dip, struct pcm_device_info *info)
 		if (strncmp(info->pd_generic_name, "class,", 6) == 0) {
 			/* no generic without "pccard" */
 			(void) sprintf(buff, "%s%s", PCMDEV_NAMEPREF,
-				info->pd_generic_name);
+			    info->pd_generic_name);
 		} else {
 			/* first pccard,generic-name */
 			(void) sprintf(buff, "%s,%s", PCMDEV_NAMEPREF,
-				info->pd_generic_name);
+			    info->pd_generic_name);
 		}
 		length = strlen(buff) + 1;
 		compat_name[ci] = kmem_alloc(length, KM_SLEEP);
@@ -2666,7 +2661,7 @@ pcmcia_get_mem_regs(struct pcm_regs *regs, struct pcm_device_info *info,
 	tuple.DesiredTuple = (cisdata_t)type;
 
 	space = (type == CISTPL_DEVICE_A) ? PC_REG_SPACE_ATTRIBUTE :
-		PC_REG_SPACE_MEMORY;
+	    PC_REG_SPACE_MEMORY;
 	if ((ret = csx_GetFirstTuple(info->pd_handle, &tuple)) == CS_SUCCESS) {
 		bzero(&device, sizeof (device));
 
@@ -2745,8 +2740,7 @@ pcmcia_get_io_regs(struct pcm_regs *regs, struct pcm_device_info *info,
 	tuple.Socket = info->pd_socket;
 	tuple.Attributes = 0;
 	bzero(tmp, sizeof (tmp));
-	while (csx_GetNextTuple(info->pd_handle,
-				&tuple) == CS_SUCCESS) {
+	while (csx_GetNextTuple(info->pd_handle, &tuple) == CS_SUCCESS) {
 	    bzero(&cftable, sizeof (cftable));
 	    if (csx_Parse_CISTPL_CFTABLE_ENTRY(info->pd_handle,
 						&tuple, &cftable) ==
@@ -2767,8 +2761,7 @@ pcmcia_get_io_regs(struct pcm_regs *regs, struct pcm_device_info *info,
 				/* we have potential relocation */
 				int mask;
 				mask = cftable.io.addr_lines ?
-						cftable.io.addr_lines :
-							genp2(len);
+				    cftable.io.addr_lines : genp2(len);
 				mask = genmask(mask);
 				if ((mask & curr_base) == 0) {
 					/* more accurate length */
@@ -2776,12 +2769,12 @@ pcmcia_get_io_regs(struct pcm_regs *regs, struct pcm_device_info *info,
 					regs->phys_lo = 0;
 					regs->phys_hi =
 					    PC_REG_PHYS_HI(0,
-						0,
-						pctype,
-						PC_REG_SPACE_IO,
-						info->pd_socket,
-						info->pd_function,
-						0);
+					    0,
+					    pctype,
+					    PC_REG_SPACE_IO,
+					    info->pd_socket,
+					    info->pd_function,
+					    0);
 					num_regs++;
 					found = 2;
 					break;
@@ -2798,13 +2791,13 @@ pcmcia_get_io_regs(struct pcm_regs *regs, struct pcm_device_info *info,
 			/* no I/O range so just a mask */
 			regs->phys_len = 1 << cftable.io.addr_lines;
 			regs->phys_hi =
-				PC_REG_PHYS_HI(0,
-						0,
-						pctype,
-						PC_REG_SPACE_IO,
-						info->pd_socket,
-						info->pd_function,
-						0);
+			    PC_REG_PHYS_HI(0,
+			    0,
+			    pctype,
+			    PC_REG_SPACE_IO,
+			    info->pd_socket,
+			    info->pd_function,
+			    0);
 			regs->phys_lo = 0;
 			num_regs++;
 			regs++;
@@ -2854,16 +2847,16 @@ pcmcia_find_regs(dev_info_t *dip, struct pcm_device_info *info,
 	if (ppd->ppd_flags & PPD_CARD_CARDBUS) {
 		/* always have a CIS map */
 		regs[0].phys_hi = PC_REG_PHYS_HI(0, 0, PC_REG_TYPE_CARDBUS,
-						PC_REG_SPACE_CONFIG,
-						info->pd_socket,
-						info->pd_function, 0);
+		    PC_REG_SPACE_CONFIG,
+		    info->pd_socket,
+		    info->pd_function, 0);
 		bustype = PC_REG_TYPE_CARDBUS;
 	} else {
 		/* always have a CIS map */
 		regs[0].phys_hi = PC_REG_PHYS_HI(0, 0, PC_REG_TYPE_16BIT,
-						PC_REG_SPACE_ATTRIBUTE,
-						info->pd_socket,
-						info->pd_function, 0);
+		    PC_REG_SPACE_ATTRIBUTE,
+		    info->pd_socket,
+		    info->pd_function, 0);
 		bustype = PC_REG_TYPE_16BIT;
 	}
 	regs[0].phys_lo = 0;	/* always starts at zero */
@@ -2876,9 +2869,9 @@ pcmcia_find_regs(dev_info_t *dip, struct pcm_device_info *info,
 	if (info->pd_flags & PCM_OTHER_NOCIS) {
 		/* special case of memory only card without CIS */
 		regs[1].phys_hi = PC_REG_PHYS_HI(0, 0, PC_REG_TYPE_16BIT,
-						PC_REG_SPACE_MEMORY,
-						info->pd_socket,
-						info->pd_function, 0);
+		    PC_REG_SPACE_MEMORY,
+		    info->pd_socket,
+		    info->pd_function, 0);
 		regs[1].phys_lo = 0;
 		regs[1].phys_len = PCM_MAX_R2_MEM;
 		num_regs++;
@@ -2888,13 +2881,13 @@ pcmcia_find_regs(dev_info_t *dip, struct pcm_device_info *info,
 		 * on the card and represent them here.
 		 */
 		num_regs += pcmcia_get_mem_regs(&regs[num_regs], info,
-						CISTPL_DEVICE_A, bustype);
+		    CISTPL_DEVICE_A, bustype);
 		num_regs += pcmcia_get_mem_regs(&regs[num_regs], info,
-						CISTPL_DEVICE, bustype);
+		    CISTPL_DEVICE, bustype);
 
 		/* now look for an I/O space to configure */
 		num_regs += pcmcia_get_io_regs(&regs[num_regs], info,
-						bustype);
+		    bustype);
 
 	}
 
@@ -2940,7 +2933,7 @@ pcmcia_need_intr(int socket, struct pcm_device_info *info)
 	}
 
 	for (cftable.index = (int)-1, i = -1;
-		i != config.last; i = cftable.index) {
+	    i != config.last; i = cftable.index) {
 		tuple.DesiredTuple = CISTPL_CFTABLE_ENTRY;
 		tuple.Attributes = 0;
 		if (csx_GetNextTuple(info->pd_handle,
@@ -2958,8 +2951,8 @@ pcmcia_need_intr(int socket, struct pcm_device_info *info)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT, "\t%x: flags=%x (%x)\n",
-				i, cftable.flags,
-				cftable.flags & CISTPL_CFTABLE_TPCE_FS_IRQ);
+			    i, cftable.flags,
+			    cftable.flags & CISTPL_CFTABLE_TPCE_FS_IRQ);
 #endif
 		if (cftable.flags & CISTPL_CFTABLE_TPCE_FS_IRQ)
 			return (1);
@@ -3016,7 +3009,7 @@ pcmcia_create_dev_info(int socket)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug)
 		cmn_err(CE_CONT, "create dev_info_t for device in socket %d\n",
-			socket);
+		    socket);
 #endif
 
 	/*
@@ -3044,7 +3037,7 @@ pcmcia_create_dev_info(int socket)
 #if defined(PCMCIA_DEBUG)
 			if (pcmcia_debug)
 				cmn_err(CE_CONT,
-					"pcmcia: RegisterClient failed\n");
+				    "pcmcia: RegisterClient failed\n");
 #endif
 			return;
 		}
@@ -3055,8 +3048,8 @@ pcmcia_create_dev_info(int socket)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug)
 		cmn_err(CE_CONT,
-			"pcmcia_create_dev_info: handle = %x\n",
-			(int)card_info.pd_handle);
+		    "pcmcia_create_dev_info: handle = %x\n",
+		    (int)card_info.pd_handle);
 #endif
 	card_info.pd_type = -1; /* no type to start */
 	card_info.pd_socket = socket;
@@ -3071,7 +3064,7 @@ pcmcia_create_dev_info(int socket)
 		/* no CIS means memory */
 		(void) strcpy(card_info.pd_generic_name, "memory");
 		card_info.pd_flags |= PCM_NAME_GENERIC |
-			PCM_OTHER_NOCIS | PCM_NAME_1275;
+		    PCM_OTHER_NOCIS | PCM_NAME_1275;
 		(void) strcpy(card_info.pd_bind_name, "pccard,memory");
 		(void) strcpy(card_info.pd_generic_name, "memory");
 		card_info.pd_type = PCM_TYPE_MEMORY;
@@ -3130,10 +3123,10 @@ pcmcia_create_dev_info(int socket)
 				 * so treat as generic "pccard"
 				 */
 				(void) strcpy(card_info.pd_generic_name,
-					"pccard,memory");
+				    "pccard,memory");
 				card_info.pd_flags |= PCM_NAME_GENERIC;
 				(void) strcpy(card_info.pd_bind_name,
-					"pccard,memory");
+				    "pccard,memory");
 			}
 		    }
 		    pcmcia_init_devinfo(pdip, &card_info);
@@ -3162,7 +3155,7 @@ pcmcia_init_devinfo(dev_info_t *pdip, struct pcm_device_info *info)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug)
 		cmn_err(CE_CONT, "init_devinfo(%s, %d)\n", info->pd_bind_name,
-			info->pd_socket);
+		    info->pd_socket);
 #endif
 
 	/*
@@ -3179,14 +3172,14 @@ pcmcia_init_devinfo(dev_info_t *pdip, struct pcm_device_info *info)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT, "\tfound existing device node (%s)\n",
-				ddi_get_name(dip));
+			    ddi_get_name(dip));
 #endif
 		if (strlen(info->pd_vers1_name) > 0)
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE,
 			    dip, PCM_DEV_MODEL, info->pd_vers1_name);
 
 		ppd = (struct pcmcia_parent_private *)
-			ddi_get_parent_data(dip);
+		    ddi_get_parent_data(dip);
 
 		pcmcia_sockets[info->pd_socket]->ls_dip[info->pd_function] =
 		    dip;
@@ -3229,7 +3222,7 @@ pcmcia_init_devinfo(dev_info_t *pdip, struct pcm_device_info *info)
 		pcmcia_add_compatible(dip, info);
 
 		ppd = kmem_zalloc(sizeof (struct pcmcia_parent_private),
-			    KM_SLEEP);
+		    KM_SLEEP);
 
 		ppd->ppd_socket = info->pd_socket;
 		ppd->ppd_function = info->pd_function;
@@ -3287,7 +3280,7 @@ pcmcia_init_devinfo(dev_info_t *pdip, struct pcm_device_info *info)
 
 		/* set PC Card as active and present in socket */
 		pcmcia_sockets[info->pd_socket]->ls_dip[info->pd_function] =
-			dip;
+		    dip;
 
 		ppd->ppd_active = 1;
 
@@ -3299,7 +3292,7 @@ pcmcia_init_devinfo(dev_info_t *pdip, struct pcm_device_info *info)
 			if (ndi_devi_online_async(dip, 0)
 			    != NDI_SUCCESS) {
 				pcmcia_sockets[info->pd_socket]->\
-				ls_dip[info->pd_function] = NULL;
+				    ls_dip[info->pd_function] = NULL;
 				pcmcia_ppd_free(ppd);
 				(void) ndi_devi_free(dip);
 				return;
@@ -3309,7 +3302,7 @@ pcmcia_init_devinfo(dev_info_t *pdip, struct pcm_device_info *info)
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug)
 		cmn_err(CE_CONT, "\tjust added \"active\" to %s in %d\n",
-			ddi_get_name(dip), info->pd_socket);
+		    ddi_get_name(dip), info->pd_socket);
 #endif
 	}
 
@@ -3429,7 +3422,7 @@ SSGetAdapter(get_adapter_t *adapter)
 
 	for (n = 0; n < pcmcia_num_adapters; n++) {
 		GET_ADAPTER(pcmcia_adapters[n]->pca_if,
-			pcmcia_adapters[n]->pca_dip, &info);
+		    pcmcia_adapters[n]->pca_dip, &info);
 		adapter->state &= info.state;
 		adapter->SCRouting &= info.SCRouting;
 	}
@@ -3453,7 +3446,7 @@ SSGetPage(get_page_t *page)
 	win = newpage.window = window->lw_window; /* real window */
 
 	retval = GET_PAGE(window->lw_if, window->lw_adapter->pca_dip,
-		&newpage);
+	    &newpage);
 	if (retval == SUCCESS) {
 		*page = newpage;
 		page->window = win;
@@ -3470,7 +3463,7 @@ SSGetSocket(get_socket_t *socket)
 
 	sock = socket->socket;
 	if (sock > pcmcia_num_sockets ||
-		(sockp = pcmcia_sockets[sock]) == NULL) {
+	    (sockp = pcmcia_sockets[sock]) == NULL) {
 		return (BAD_SOCKET);
 	}
 
@@ -3504,7 +3497,7 @@ SSGetStatus(get_ss_status_t *status)
 
 	sock = status->socket;
 	if (sock > pcmcia_num_sockets ||
-		(sockp = pcmcia_sockets[sock]) == NULL) {
+	    (sockp = pcmcia_sockets[sock]) == NULL) {
 		return (BAD_SOCKET);
 	}
 
@@ -3580,7 +3573,7 @@ SSInquireSocket(inquire_socket_t *socket)
 
 	sock = socket->socket;
 	if (sock > pcmcia_num_sockets ||
-		(sockp = pcmcia_sockets[sock]) == NULL)
+	    (sockp = pcmcia_sockets[sock]) == NULL)
 		return (BAD_SOCKET);
 	newsocket = *socket;
 	newsocket.socket = sockp->ls_socket;
@@ -3613,7 +3606,7 @@ SSInquireWindow(inquire_window_t *window)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug > 1)
 			cmn_err(CE_CONT, "SSInquireWindow: win=%d, pwin=%d\n",
-				win, newwin.window);
+			    win, newwin.window);
 #endif
 	if (retval == SUCCESS) {
 		*window = newwin;
@@ -3631,11 +3624,11 @@ SSInquireWindow(inquire_window_t *window)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug > 1) {
 			cmn_err(CE_CONT, "iw: orig bits=%x, new bits=%x\n",
-				(int)*(uint32_t *)newwin.Sockets,
-				(int)*(uint32_t *)window->Sockets);
+			    (int)*(uint32_t *)newwin.Sockets,
+			    (int)*(uint32_t *)window->Sockets);
 			cmn_err(CE_CONT, "\t%x.%x.%x\n", window->WndCaps,
-				window->mem_win_char.MemWndCaps,
-				window->mem_win_char.MinSize);
+			    window->mem_win_char.MemWndCaps,
+			    window->mem_win_char.MinSize);
 		}
 #endif
 		window->window = win;
@@ -3649,7 +3642,7 @@ SSResetSocket(int socket, int mode)
 	pcmcia_logical_socket_t *sockp;
 
 	if (socket >= pcmcia_num_sockets ||
-		(sockp = pcmcia_sockets[socket]) == NULL)
+	    (sockp = pcmcia_sockets[socket]) == NULL)
 		return (BAD_SOCKET);
 
 	return (RESET_SOCKET(sockp->ls_if, sockp->ls_adapter->pca_dip,
@@ -3668,7 +3661,7 @@ SSSetPage(set_page_t *page)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug > 1)
 			cmn_err(CE_CONT, "SSSetPage: window=%d (of %d)\n",
-				window, pcmcia_num_windows);
+			    window, pcmcia_num_windows);
 #endif
 		return (BAD_WINDOW);
 	}
@@ -3704,7 +3697,7 @@ SSSetWindow(set_window_t *win)
 	func = CS_GET_FUNCTION_NUMBER(win->socket);
 
 	if (socket > pcmcia_num_sockets ||
-		(sockp = pcmcia_sockets[socket]) == NULL) {
+	    (sockp = pcmcia_sockets[socket]) == NULL) {
 		return (BAD_SOCKET);
 	}
 
@@ -3733,18 +3726,18 @@ SSSetSocket(set_socket_t *socket)
 
 	sock = socket->socket;
 	if (sock > pcmcia_num_sockets ||
-		(sockp = pcmcia_sockets[sock]) == NULL) {
+	    (sockp = pcmcia_sockets[sock]) == NULL) {
 		return (BAD_SOCKET);
 	}
 
 	newsock = *socket;
 	/* note: we force CS to always get insert/removal events */
 	sockp->ls_cs_events = pcm_mapevents(newsock.SCIntMask) |
-		PCE_E2M(PCE_CARD_INSERT) | PCE_E2M(PCE_CARD_REMOVAL);
+	    PCE_E2M(PCE_CARD_INSERT) | PCE_E2M(PCE_CARD_REMOVAL);
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug > 1)
 		cmn_err(CE_CONT,
-			"SetSocket: SCIntMask = %x\n", newsock.SCIntMask);
+		    "SetSocket: SCIntMask = %x\n", newsock.SCIntMask);
 #endif
 	newsock.socket = sockp->ls_socket;
 	newsock.VccLevel = pcmcia_map_power_set(sockp->ls_adapter,
@@ -3794,17 +3787,17 @@ SSSetIRQHandler(set_irq_handler_t *handler)
 	sock = CS_GET_SOCKET_NUMBER(handler->socket);
 	func = CS_GET_FUNCTION_NUMBER(handler->socket);
 	if (sock > pcmcia_num_sockets ||
-		(sockp = pcmcia_sockets[sock]) == NULL) {
+	    (sockp = pcmcia_sockets[sock]) == NULL) {
 		return (BAD_SOCKET);
 	}
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug) {
 
 		cmn_err(CE_CONT, "SSSetIRQHandler: socket=%x, function=%x\n",
-			sock, func);
+		    sock, func);
 		cmn_err(CE_CONT, "\thandler(%p): socket=%x, irq=%x, id=%x\n",
-			(void *)handler->handler, handler->socket, handler->irq,
-			handler->handler_id);
+		    (void *)handler->handler, handler->socket, handler->irq,
+		    handler->handler_id);
 	}
 #endif
 	dip = sockp->ls_dip[func];
@@ -3849,17 +3842,17 @@ SSClearIRQHandler(clear_irq_handler_t *handler)
 	if (pcmcia_debug) {
 
 		cmn_err(CE_CONT,
-			"SSClearIRQHandler: socket=%x, function=%x\n",
-			sock, func);
+		    "SSClearIRQHandler: socket=%x, function=%x\n",
+		    sock, func);
 		cmn_err(CE_CONT,
-			"\thandler(%p): socket=%x, id=%x\n",
-			(void *)handler, handler->socket,
-			handler->handler_id);
+		    "\thandler(%p): socket=%x, id=%x\n",
+		    (void *)handler, handler->socket,
+		    handler->handler_id);
 	}
 #endif
 
 	if (sock > pcmcia_num_sockets ||
-		(sockp = pcmcia_sockets[sock]) == NULL) {
+	    (sockp = pcmcia_sockets[sock]) == NULL) {
 		return (BAD_SOCKET);
 	}
 	dip = sockp->ls_dip[func];
@@ -3921,13 +3914,13 @@ pcmcia_create_device(ss_make_device_node_t *init)
 #if defined(PCMCIA_DEBUG)
 			if (pcmcia_debug)
 				cmn_err(CE_CONT,
-					"pcmcia_create_device: failed "
-					"create\n");
+				    "pcmcia_create_device: failed "
+				    "create\n");
 #endif
 			return (BAD_ATTRIBUTE);
 		}
 
-		major = ddi_name_to_major(ddi_binding_name(init->dip));
+		major = ddi_driver_major(init->dip);
 		ops = ddi_get_driver(init->dip);
 		LOCK_DEV_OPS(&devnamesp[major].dn_lock);
 		INCR_DEV_OPS_REF(ops);
@@ -3941,13 +3934,12 @@ pcmcia_create_device(ss_make_device_node_t *init)
 #if defined(PCMCIA_DEBUG)
 		if (pcmcia_debug)
 			cmn_err(CE_CONT,
-				"pcmcia_create_device: created %s "
-				"from %s [%s]\n",
-				device.path, init->name, device.driver);
+			    "pcmcia_create_device: created %s "
+			    "from %s [%s]\n",
+			    device.path, init->name, device.driver);
 #endif
 		device.dev =
-		    makedevice(ddi_name_to_major(ddi_get_name(init->dip)),
-		    init->minor_num);
+		    makedevice(ddi_driver_major(init->dip), init->minor_num);
 		device.flags |= (init->flags & SS_CSINITDEV_MORE_DEVICES) ?
 		    PCM_EVENT_MORE : 0;
 		device.type = init->spec_type;
@@ -3962,9 +3954,7 @@ pcmcia_create_device(ss_make_device_node_t *init)
 		    -1);
 		if (init->name != NULL)
 			(void) strcpy(device.path, init->name);
-		device.dev =
-		    makedevice(ddi_name_to_major(ddi_get_name(init->dip)),
-		    0);
+		device.dev = makedevice(ddi_driver_major(init->dip), 0);
 		ddi_remove_minor_node(init->dip, init->name);
 	}
 
@@ -4007,8 +3997,8 @@ pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 	ndi_devi_enter(dip, &circ);
 	if (DEVI(dip)->devi_minor != (struct ddi_minor_data *)NULL) {
 		for (dp = DEVI(dip)->devi_minor;
-			dp != (struct ddi_minor_data *)NULL;
-			dp = dp->next) {
+		    dp != (struct ddi_minor_data *)NULL;
+		    dp = dp->next) {
 			count++; /* have one more */
 		}
 		/* we now know how many nodes to allocate */
@@ -4017,22 +4007,22 @@ pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 		if (md != NULL) {
 			*minors = md;
 			for (dp = DEVI(dip)->devi_minor;
-				dp != (struct ddi_minor_data *)NULL;
-				dp = dp->next, md++) {
+			    dp != (struct ddi_minor_data *)NULL;
+			    dp = dp->next, md++) {
 #if defined(PCMCIA_DEBUG)
 				if (pcmcia_debug > 1) {
 					cmn_err(CE_CONT,
-						"pcmcia_get_minors: name=%s,"
-						"socket=%d, stype=%x, "
-						"ntype=%s, dev_t=%x",
-						dp->ddm_name,
-						socket,
-						dp->ddm_spec_type,
-						dp->ddm_node_type,
-						(int)dp->ddm_dev);
+					    "pcmcia_get_minors: name=%s,"
+					    "socket=%d, stype=%x, "
+					    "ntype=%s, dev_t=%x",
+					    dp->ddm_name,
+					    socket,
+					    dp->ddm_spec_type,
+					    dp->ddm_node_type,
+					    (int)dp->ddm_dev);
 					cmn_err(CE_CONT,
-						"\tbind name = %s\n",
-						ddi_binding_name(dip));
+					    "\tbind name = %s\n",
+					    ddi_binding_name(dip));
 				}
 #endif
 				md->socket = socket;
@@ -4041,7 +4031,7 @@ pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 				md->type = dp->ddm_spec_type;
 				(void) strcpy(md->driver,
 				    ddi_binding_name(dip));
-				major = ddi_name_to_major(md->driver);
+				major = ddi_driver_major(dip);
 				ops = ddi_get_driver(dip);
 				LOCK_DEV_OPS(&devnamesp[major].dn_lock);
 				pcm_pathname(dip, dp->ddm_name, md->path);
@@ -4050,7 +4040,7 @@ pcmcia_get_minors(dev_info_t *dip, struct pcm_make_dev **minors)
 				DECR_DEV_OPS_REF(ops);
 				UNLOCK_DEV_OPS(&devnamesp[major].dn_lock);
 				(void) sprintf(md->path + strlen(md->path),
-					":%s", dp->ddm_name);
+				    ":%s", dp->ddm_name);
 				if (dp->next == NULL)
 					/* no more */
 					md->flags |= PCM_EVENT_MORE;
@@ -4078,7 +4068,7 @@ pcmcia_dump_minors(dev_info_t *dip)
 	unit = ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 	    PCM_DEV_SOCKET, -1);
 	cmn_err(CE_CONT,
-		"pcmcia_dump_minors: dip=%p, socket=%d\n", (void *)dip, unit);
+	    "pcmcia_dump_minors: dip=%p, socket=%d\n", (void *)dip, unit);
 
 	major = ddi_driver_major(dip);
 	if (major != -1) {
@@ -4091,7 +4081,7 @@ pcmcia_dump_minors(dev_info_t *dip)
 			if (np == dip)
 				cur = "CUR";
 			cmn_err(CE_CONT, "\tsibs: %s %s %s\n",
-				ddi_binding_name(np), cf2, cur);
+			    ddi_binding_name(np), cf2, cur);
 
 			ndi_devi_enter(np, &circ);
 			if (DEVI(np)->devi_minor !=
@@ -4105,16 +4095,16 @@ pcmcia_dump_minors(dev_info_t *dip)
 				    dp != (struct ddi_minor_data *)NULL;
 				    dp = dp->next) {
 					cmn_err(CE_CONT, "\ttype=%s, name=%s,"
-						"socket=%d, stype=%x, "
-						"ntype=%s, dev_t=%x",
-						ddmtypes[dp->type],
-						dp->ddm_name,
-						unit,
-						dp->ddm_spec_type,
-						dp->ddm_node_type,
-						(int)dp->ddm_dev);
+					    "socket=%d, stype=%x, "
+					    "ntype=%s, dev_t=%x",
+					    ddmtypes[dp->type],
+					    dp->ddm_name,
+					    unit,
+					    dp->ddm_spec_type,
+					    dp->ddm_node_type,
+					    (int)dp->ddm_dev);
 					cmn_err(CE_CONT, "\tbind name = %s\n",
-						ddi_binding_name(np));
+					    ddi_binding_name(np));
 				}
 			}
 			ndi_devi_exit(np, circ);
@@ -4175,7 +4165,7 @@ pcmcia_mfc_intr(caddr_t arg1, caddr_t arg2)
 
 	mutex_enter(&sockp->ls_ilock);
 	for (done = 0, result = 0, first = intr = sockp->ls_inthandlers;
-		intr != NULL && !done; intr = intr->next) {
+	    intr != NULL && !done; intr = intr->next) {
 		result |= intr->intr(intr->arg1, intr->arg2);
 		if (intr->next == first)
 			done++;
@@ -4216,7 +4206,7 @@ pcmcia_power(dev_info_t *dip, int component, int level)
 	}
 #else
 	cmn_err(CE_WARN, "pcmcia_power: component=%d, level=%d for %s",
-		component, level, ddi_get_name_addr(dip));
+	    component, level, ddi_get_name_addr(dip));
 	return (DDI_FAILURE);
 #endif
 }
@@ -4313,8 +4303,9 @@ pcmcia_wait_insert(dev_info_t *dip)
 #ifdef PCMCIA_DEBUG
 					if (pcmcia_debug) {
 						cmn_err(CE_NOTE,
-						"pcmcia_wait_insert: "
-						"socket in SUSPENDED state");
+						    "pcmcia_wait_insert: "
+						    "socket in SUSPENDED "
+						    "state");
 					}
 #endif
 					done = 0;
@@ -4377,9 +4368,9 @@ pcmcia_map_reg(dev_info_t *pdip, dev_info_t *dip, ra_return_t *ra,
 				 */
 				if ((p->phys_hi &
 				    PC_REG_SPACE(PC_REG_SPACE_IO)) &&
-					((req_base == p->phys_lo) ||
-					!(p->phys_hi & PC_REG_RELOC(1))))
-				    break;
+				    ((req_base == p->phys_lo) ||
+				    !(p->phys_hi & PC_REG_RELOC(1))))
+					break;
 			} else {
 				/* need memory */
 				type = PCMCIA_MAP_MEM;
@@ -4479,14 +4470,14 @@ pcmcia_set_assigned(dev_info_t *dip, int rnum, ra_return_t *ret)
 			} else if (assign->phys_lo != ret->ra_addr_lo) {
 #ifdef PCMCIA_DEBUG
 				cmn_err(CE_WARN, "pcmcia: bad address:"
-					"%s=<%x,%x>",
-					ddi_get_name_addr(dip),
-					ret->ra_addr_lo, assign->phys_lo);
+				    "%s=<%x,%x>",
+				    ddi_get_name_addr(dip),
+				    ret->ra_addr_lo, assign->phys_lo);
 #else
 				cmn_err(CE_WARN, "!pcmcia: bad address:"
-					"%s=<%x,%x>",
-					ddi_get_name_addr(dip),
-					ret->ra_addr_lo, (int)assign->phys_lo);
+				    "%s=<%x,%x>",
+				    ddi_get_name_addr(dip),
+				    ret->ra_addr_lo, (int)assign->phys_lo);
 #endif
 			}
 			assign->phys_hi = PC_INCR_REFCNT(assign->phys_hi);
@@ -4525,8 +4516,8 @@ is_subtractv(dev_info_t *dip)
 	if (dip == NULL)
 		return (B_FALSE);
 	class = ddi_getprop(DDI_DEV_T_ANY, dip,
-		DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
-		"class-code", 0xff);
+	    DDI_PROP_CANSLEEP|DDI_PROP_DONTPASS,
+	    "class-code", 0xff);
 	if (class == PPB_SUBTRACTIVE) {
 		return (B_TRUE);
 	}
@@ -4556,11 +4547,11 @@ pcmcia_pci_alloc(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret,
 	uint64_t len = 0;
 
 	if ((ndi_ra_alloc(dip, req, &base, &len, type, NDI_RA_PASS)
-							== NDI_FAILURE) ||
+	    == NDI_FAILURE) ||
 	    ((base >> 32) != 0)) {
 		if (is_subtractv(dip)) {
 			return (pcmcia_pci_alloc(ddi_get_parent(dip),
-					req, ret, type, res_dip));
+			    req, ret, type, res_dip));
 
 		} else {
 			ret->ra_addr_hi = 0;
@@ -4589,10 +4580,10 @@ pcmcia_ra_alloc(dev_info_t *dip, ndi_ra_request_t *req, ra_return_t *ret,
 	 */
 
 	if ((ndi_ra_alloc(dip, req, &base, &len, type, NDI_RA_PASS)
-							== NDI_FAILURE) ||
+	    == NDI_FAILURE) ||
 	    ((base >> 32) != 0)) {
 		return (pcmcia_pci_alloc(ddi_get_parent(dip), req, ret,
-				type, res_dip));
+		    type, res_dip));
 	} else {
 		ret->ra_addr_lo =  base & 0xffffffff;
 		ret->ra_addr_hi = 0;
@@ -5371,7 +5362,8 @@ pcmcia_intr_remove_isr(dev_info_t *dip, dev_info_t *rdip,
 					 * next handler in line the head.
 					 */
 					if (sockp->ls_inthandlers == intr)
-					    sockp->ls_inthandlers = intr->next;
+						sockp->ls_inthandlers =
+						    intr->next;
 
 					remque(intr);
 					kmem_free(intr, sizeof (inthandler_t));
@@ -5406,7 +5398,7 @@ pcmcia_intr_disable_isr(dev_info_t *dip, dev_info_t *rdip,
 	pcmcia_logical_socket_t		*sockp;
 	struct pcmcia_parent_private	*ppd;
 	ihdl_plat_t			*ihdl_plat_datap =
-					    (ihdl_plat_t *)hdlp->ih_private;
+	    (ihdl_plat_t *)hdlp->ih_private;
 
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug)

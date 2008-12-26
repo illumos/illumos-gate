@@ -2163,7 +2163,7 @@ apic_setup_irq_table(dev_info_t *dip, int irqno, struct apic_io_intr *intrp,
 
 	ASSERT(ispec != NULL);
 
-	major =  (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
+	major =  (dip != NULL) ? ddi_driver_major(dip) : 0;
 
 	if (DDI_INTR_IS_MSI_OR_MSIX(type)) {
 		/* MSI/X doesn't need to setup ioapic stuffs */
