@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -37,8 +37,15 @@ fmtclock(register Sfulong_t t)
 
 	static unsigned int	clk_tck;
 
-	if (!clk_tck && !(clk_tck = (unsigned int)strtoul(astconf("CLK_TCK", NiL, NiL), NiL, 10)))
-		clk_tck = 60;
+	if (!clk_tck)
+	{
+#ifdef CLOCKS_PER_SEC
+		clk_tck = CLOCKS_PER_SEC;
+#else
+		if (!(clk_tck = (unsigned int)strtoul(astconf("CLK_TCK", NiL, NiL), NiL, 10)))
+			clk_tck = 60;
+#endif
+	}
 	if (t == 0)
 		return "0";
 	if (t == ((Sfulong_t)~0))

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -26,48 +26,9 @@
  */
 
 #include "lclib.h"
+#include "lclang.h"
 
 #include <ctype.h>
-
-#if _WINIX
-
-#include <ast_windows.h>
-
-#define LANG_CHINESE_SIMPLIFIED			LANG_CHINESE
-#define LANG_CHINESE_TRADITIONAL		LANG_CHINESE
-#define LANG_NORWEGIAN_BOKMAL			LANG_NORWEGIAN
-#define LANG_NORWEGIAN_NYNORSK			LANG_NORWEGIAN
-#define LANG_SERBO_CROATIAN			LANG_CROATIAN
-
-#define CTRY_CZECH_REPUBLIC			CTRY_CZECH
-
-#define SUBLANG_CHINESE_SIMPLIFIED_CHINA	SUBLANG_CHINESE_SIMPLIFIED
-#define SUBLANG_CHINESE_SIMPLIFIED_HONG_KONG	SUBLANG_CHINESE_HONGKONG
-#define SUBLANG_CHINESE_SIMPLIFIED_SINGAPORE	SUBLANG_CHINESE_SINGAPORE
-#define SUBLANG_CHINESE_TRADITIONAL_TAIWAN	SUBLANG_CHINESE_TRADITIONAL
-#define SUBLANG_DUTCH_NETHERLANDS_ANTILLES	SUBLANG_DUTCH
-#define SUBLANG_DUTCH_BELGIUM			SUBLANG_DUTCH_BELGIAN
-#define SUBLANG_ENGLISH_AUSTRALIA		SUBLANG_ENGLISH_AUS
-#define SUBLANG_ENGLISH_CANADA			SUBLANG_ENGLISH_CAN
-#define SUBLANG_ENGLISH_IRELAND			SUBLANG_ENGLISH_EIRE
-#define SUBLANG_ENGLISH_NEW_ZEALAND		SUBLANG_ENGLISH_NZ
-#define SUBLANG_ENGLISH_TRINIDAD_TOBAGO		SUBLANG_ENGLISH_CARIBBEAN
-#define SUBLANG_ENGLISH_UNITED_KINGDOM		SUBLANG_ENGLISH_UK
-#define SUBLANG_ENGLISH_UNITED_STATES		SUBLANG_ENGLISH_US
-#define SUBLANG_FRENCH_BELGIUM			SUBLANG_FRENCH_BELGIAN
-#define SUBLANG_FRENCH_CANADA			SUBLANG_FRENCH_CANADIAN
-#define SUBLANG_FRENCH_SWITZERLAND		SUBLANG_FRENCH_SWISS
-#define SUBLANG_GERMAN_AUSTRIA			SUBLANG_GERMAN_AUSTRIAN
-#define SUBLANG_GERMAN_SWITZERLAND		SUBLANG_GERMAN_SWISS
-#define SUBLANG_ITALIAN_SWITZERLAND		SUBLANG_ITALIAN_SWISS
-#define SUBLANG_NORWEGIAN_BOKMAL_NORWAY		SUBLANG_NORWEGIAN_BOKMAL
-#define SUBLANG_NORWEGIAN_NORWAY		SUBLANG_NORWEGIAN_BOKMAL
-#define SUBLANG_NORWEGIAN_NYNORSK_NORWAY	SUBLANG_NORWEGIAN_NYNORSK
-#define SUBLANG_PORTUGUESE_BRAZIL		SUBLANG_PORTUGUESE_BRAZILIAN
-
-#endif
-
-#include "lctab.h"
 
 static Lc_numeric_t	default_numeric = { '.', -1 };
 
@@ -75,9 +36,9 @@ static Lc_t		default_lc =
 {
 	"C",
 	"POSIX",
-	&language[0],
-	&territory[0],
-	&charset[0],
+	&lc_languages[0],
+	&lc_territories[0],
+	&lc_charsets[0],
 	0, 
 	LC_default|LC_checked|LC_local,
 	0,
@@ -105,9 +66,9 @@ static Lc_t		debug_lc =
 {
 	"debug",
 	"debug",
-	&language[1],
-	&territory[1],
-	&charset[0],
+	&lc_languages[1],
+	&lc_territories[1],
+	&lc_charsets[0],
 	0, 
 	LC_debug|LC_checked|LC_local,
 	0,
@@ -184,7 +145,7 @@ lcindex(int category, int min)
 Lc_category_t*
 lccategories(void)
 {
-	return &categories[0];
+	return (Lc_category_t*)&lc_categories[0];
 }
 
 /*
@@ -333,7 +294,7 @@ canonical(const Lc_language_t* lp, const Lc_territory_t* tp, const Lc_charset_t*
 	}
 	if (s < e)
 	{
-		if (tp && tp != &territory[0] && (!(flags & (LC_abbreviated|LC_default)) || !lp || !streq(lp->code, tp->code)))
+		if (tp && tp != &lc_territories[0] && (!(flags & (LC_abbreviated|LC_default)) || !lp || !streq(lp->code, tp->code)))
 		{
 			if (lp)
 				*s++ = '_';
@@ -452,7 +413,7 @@ lcmake(const char* name)
 	for (lc = lcs; lc; lc = lc->next)
 		if (!strcasecmp(t, lc->code) || !strcasecmp(t, lc->name))
 			return lc;
-	for (mp = map; mp->code; mp++)
+	for (mp = lc_maps; mp->code; mp++)
 		if (streq(t, mp->code))
 		{
 			lp = mp->language;
@@ -553,15 +514,15 @@ lcmake(const char* name)
 
 	n = strlen(s = language_name);
 	if (n == 2)
-		for (lp = language; lp->code && !streq(s, lp->code); lp++);
+		for (lp = lc_languages; lp->code && !streq(s, lp->code); lp++);
 	else if (n == 3)
 	{
-		for (lp = language; lp->code && (!lp->alternates || !match(s, lp->alternates, n, 0)); lp++);
+		for (lp = lc_languages; lp->code && (!lp->alternates || !match(s, lp->alternates, n, 0)); lp++);
 		if (!lp->code)
 		{
 			c = s[2];
 			s[2] = 0;
-			for (lp = language; lp->code && !streq(s, lp->code); lp++);
+			for (lp = lc_languages; lp->code && !streq(s, lp->code); lp++);
 			s[2] = c;
 			if (lp->code)
 				n = 1;
@@ -571,18 +532,18 @@ lcmake(const char* name)
 		lp = 0;
 	if (!lp || !lp->code)
 	{
-		for (lp = language; lp->code && !match(s, lp->name, 0, 0); lp++);
+		for (lp = lc_languages; lp->code && !match(s, lp->name, 0, 0); lp++);
 		if (!lp || !lp->code)
 		{
 			if (!territory_name)
 			{
 				if (n == 2)
-					for (tp = territory; tp->code && !streq(s, tp->code); tp++);
+					for (tp = lc_territories; tp->code && !streq(s, tp->code); tp++);
 				else
 				{
 					z = 0;
 					tpb = 0;
-					for (tp = territory; tp->name; tp++)
+					for (tp = lc_territories; tp->name; tp++)
 						if ((i = match(s, tp->name, 3, 0)) > z)
 						{
 							tpb = tp;
@@ -609,8 +570,8 @@ lcmake(const char* name)
 					return 0;
 				name = ((Lc_language_t*)lp)->code = ((Lc_language_t*)lp)->name = (const char*)(lp + 1);
 				memcpy((char*)lp->code, s, z - 1);
-				tp = &territory[0];
-				cp = ((Lc_language_t*)lp)->charset = &charset[0];
+				tp = &lc_territories[0];
+				cp = ((Lc_language_t*)lp)->charset = &lc_charsets[0];
 				al = 0;
 				goto override;
 			}
@@ -627,7 +588,7 @@ lcmake(const char* name)
 		{
 			n = 0;
 			primary = 0;
-			for (tp = territory; tp->code; tp++)
+			for (tp = lc_territories; tp->code; tp++)
 				if (tp->languages[0] == lp)
 				{
 					if (tp->flags & LC_primary)
@@ -648,7 +609,7 @@ lcmake(const char* name)
 			n = strlen(s);
 			if (n == 2)
 			{
-				for (tp = territory; tp->code; tp++)
+				for (tp = lc_territories; tp->code; tp++)
 					if (streq(s, tp->code))
 					{
 						for (i = 0; i < elementsof(tp->languages) && lp != tp->languages[i]; i++);
@@ -659,7 +620,7 @@ lcmake(const char* name)
 			}
 			else
 			{
-				for (tp = territory; tp->code; tp++)
+				for (tp = lc_territories; tp->code; tp++)
 					if (match(s, tp->name, 3, 0))
 					{
 						for (i = 0; i < elementsof(tp->languages) && lp != tp->languages[i]; i++);
@@ -684,7 +645,7 @@ lcmake(const char* name)
 			c = *s;
 			*s = 0;
 			if (!(cp = lp->charset) || !match_charset(w, cp))
-				for (cp = charset; cp->code; cp++)
+				for (cp = lc_charsets; cp->code; cp++)
 					if (match_charset(w, cp))
 					{
 						ppa = cp;
@@ -721,7 +682,7 @@ lcmake(const char* name)
 	 */
 
 	if (s = charset_name)
-		for (cp = charset; cp->code; cp++)
+		for (cp = lc_charsets; cp->code; cp++)
 			if (match_charset(s, cp))
 				break;
 	if (!cp || !cp->code)
@@ -739,9 +700,9 @@ lcmake(const char* name)
 		return 0;
 	strcpy((char*)(lc->name = (const char*)(lc + 1)), name);
 	strcpy((char*)(lc->code = lc->name + n), s);
-	lc->language = lp ? lp : &language[0];
-	lc->territory = tp ? tp : &territory[0];
-	lc->charset = cp ? cp : &charset[0];  
+	lc->language = lp ? lp : &lc_languages[0];
+	lc->territory = tp ? tp : &lc_territories[0];
+	lc->charset = cp ? cp : &lc_charsets[0];  
 	lc->attributes = al;
 	for (i = 0; i < elementsof(lc->info); i++)
 		lc->info[i].lc = lc;
@@ -796,22 +757,22 @@ lcscan(Lc_t* lc)
 	{
 		if (++ls->language >= elementsof(ls->lc.territory->languages) || !(ls->lc.language = ls->lc.territory->languages[ls->language]))
 		{
-			if (++ls->territory >= (elementsof(territory) - 1))
+			if (!lc_territories[++ls->territory].code)
 			{
 				free(ls);
 				return 0;
 			}
-			ls->lc.territory = &territory[ls->territory];
+			ls->lc.territory = &lc_territories[ls->territory];
 			ls->lc.language = ls->lc.territory->languages[ls->language = 0];
 		}
 		if (ls->lc.language)
 		{
-			ls->lc.charset = ls->lc.language->charset ? ls->lc.language->charset : &charset[0];
+			ls->lc.charset = ls->lc.language->charset ? ls->lc.language->charset : &lc_charsets[0];
 			ls->list.attribute = ls->lc.language->attributes[ls->attribute = 0];
 		}
 		else
 		{
-			ls->lc.charset = &charset[0];
+			ls->lc.charset = &lc_charsets[0];
 			ls->list.attribute = 0;
 		}
 	}

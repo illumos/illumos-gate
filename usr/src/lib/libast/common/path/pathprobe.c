@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -60,6 +60,7 @@ static int
 rofs(const char* path)
 {
 	struct statvfs	vfs;
+	struct stat	st;
 
 	if (!statvfs(path, &vfs))
 	{
@@ -68,7 +69,7 @@ rofs(const char* path)
 			return 1;
 #endif
 #if defined(ST_NOSUID)
-		if (vfs.f_flag & ST_NOSUID)
+		if ((vfs.f_flag & ST_NOSUID) && (stat(path, &st) || st.st_uid != getuid() && st.st_uid != geteuid()))
 			return 1;
 #endif
 	}
@@ -238,8 +239,8 @@ pathprobe(char* path, char* attr, const char* lang, const char* tool, const char
 								ops[1] = 0;
 								if (pp = procopen(proc, arg, NiL, ops, PROC_READ))
 								{
-									if ((v = x - e) > sizeof(ver))
-										v = sizeof(ver);
+									if ((v = x - e) >= sizeof(ver))
+										v = sizeof(ver) - 1;
 									for (k = p = ver;; k++)
 									{
 										if (k >= p)
@@ -249,7 +250,7 @@ pathprobe(char* path, char* attr, const char* lang, const char* tool, const char
 											v -= r;
 											p = k + r;
 										}
-										if (*k == '\n')
+										if (*k == '\n' || *k == '\r')
 											break;
 										if (*k == n)
 											*k = ' ';
@@ -291,7 +292,7 @@ pathprobe(char* path, char* attr, const char* lang, const char* tool, const char
 		*ap++ = (char*)tool;
 		*ap++ = proc;
 		*ap = 0;
-		if (procrun(exe, arg))
+		if (procrun(exe, arg, 0))
 			return 0;
 		if (eaccess(path, R_OK))
 			return 0;

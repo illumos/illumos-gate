@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -219,7 +219,8 @@ hashlook(register Hash_table_t* tab, const char* name, long flags, const char* v
 					if (!(i = tab->bucketsize))
 						i = (sizeof(Hash_bucket_t) + sizeof(char*) - 1) / sizeof(char*);
 					i *= sizeof(char*);
-					if (b->name == ((char*)b + i) && strlen(b->name) <= (m = strlen(value)))
+					m = strlen(value);
+					if (b->name == ((char*)b + i) && strlen(b->name) <= m)
 					{
 						strcpy(b->name, value);
 						name = 0;

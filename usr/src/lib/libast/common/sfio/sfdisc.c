@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -104,29 +104,35 @@ Sfdisc_t*	disc;
 }
 
 #if __STD_C
-Sfdisc_t* sfdisc(reg Sfio_t* f, reg Sfdisc_t* disc)
+Sfdisc_t* sfdisc(Sfio_t* f, Sfdisc_t* disc)
 #else
 Sfdisc_t* sfdisc(f,disc)
-reg Sfio_t*	f;
-reg Sfdisc_t*	disc;
+Sfio_t*		f;
+Sfdisc_t*	disc;
 #endif
 {
-	reg Sfdisc_t	*d, *rdisc;
-	reg Sfread_f	oreadf;
-	reg Sfwrite_f	owritef;
-	reg Sfseek_f	oseekf;
+	Sfdisc_t	*d, *rdisc;
+	Sfread_f	oreadf;
+	Sfwrite_f	owritef;
+	Sfseek_f	oseekf;
 	ssize_t		n;
-	reg Dccache_t	*dcca = NIL(Dccache_t*);
+	Dccache_t	*dcca = NIL(Dccache_t*);
+	SFMTXDECL(f);
 
-	SFMTXSTART(f, NIL(Sfdisc_t*));
+	SFMTXENTER(f, NIL(Sfdisc_t*));
+
+	if((Sfio_t*)disc == f) /* special case to get the top discipline */
+		SFMTXRETURN(f,f->disc);
 
 	if((f->flags&SF_READ) && f->proc && (f->mode&SF_WRITE) )
 	{	/* make sure in read mode to check for read-ahead data */
 		if(_sfmode(f,SF_READ,0) < 0)
 			SFMTXRETURN(f, NIL(Sfdisc_t*));
 	}
-	else if((f->mode&SF_RDWR) != f->mode && _sfmode(f,0,0) < 0)
-		SFMTXRETURN(f, NIL(Sfdisc_t*));
+	else
+	{	if((f->mode&SF_RDWR) != f->mode && _sfmode(f,0,0) < 0)
+			SFMTXRETURN(f, NIL(Sfdisc_t*));
+	}
 
 	SFLOCK(f,0);
 	rdisc = NIL(Sfdisc_t*);

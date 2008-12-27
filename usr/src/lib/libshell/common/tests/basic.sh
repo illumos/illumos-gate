@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -28,6 +28,27 @@ alias err_exit='err_exit $LINENO'
 # test basic file operations like redirection, pipes, file expansion
 Command=${0##*/}
 integer Errors=0
+set -- \
+	go+r	0000	\
+	go-r	0044	\
+	ug=r	0330	\
+	go+w	0000	\
+	go-w	0022	\
+	ug=w	0550	\
+	go+x	0000	\
+	go-x	0011	\
+	ug=x	0660	\
+	go-rx	0055	\
+	uo-wx	0303	\
+	ug-rw	0660	\
+	o=	0007
+while	(( $# >= 2 ))
+do	umask 0
+	umask $1
+	g=$(umask)
+	[[ $g == $2 ]] || err_exit "umask 0; umask $1 failed -- expected $2, got $g"
+	shift 2
+done
 umask u=rwx,go=rx || err_exit "umask u=rws,go=rx failed"
 if	[[ $(umask -S) != u=rwx,g=rx,o=rx ]]
 then	err_exit 'umask -S incorrect'
@@ -37,6 +58,13 @@ trap "cd /; rm -rf /tmp/ksh$$" EXIT
 pwd=$PWD
 [[ $SHELL != /* ]] && SHELL=$pwd/$SHELL
 cd /tmp/ksh$$ || err_exit "cd /tmp/ksh$$ failed"
+um=$(umask -S)
+( umask 0777; > foobar )
+rm -f foobar
+> foobar
+[[ -r foobar ]] || err_exit 'umask not being restored after subshell'
+umask "$um"
+rm -f foobar
 # optimizer bug test
 > foobar
 for i in 1 2
@@ -272,20 +300,24 @@ optbug()
 	return 1
 }
 optbug ||  err_exit 'array size optimzation bug'
-wait # not running --pipefile which would interfere with subsequent tests
+wait # not running --pipefail which would interfere with subsequent tests
 : $(jobs -p) # required to clear jobs for next jobs -p (interactive side effect)
 sleep 20 &
+pids=$!
 if	[[ $(jobs -p) != $! ]]
 then	err_exit 'jobs -p not reporting a background job' 
 fi
 sleep 20 &
+pids="$pids $!"
 foo()
 {
 	set -- $(jobs -p)
 	(( $# == 2 )) || err_exit "$# jobs not reported -- 2 expected"
 }
 foo
-[[ $( (trap 'print alarm' ALRM; sleep 4) & sleep 2; kill -ALRM $!) == alarm ]] || err_exit 'ALRM signal not working'
+kill $pids
+
+[[ $( (trap 'print alarm' ALRM; sleep 4) & sleep 2; kill -ALRM $!; sleep 2; wait) == alarm ]] || err_exit 'ALRM signal not working'
 [[ $($SHELL -c 'trap "" HUP; $SHELL -c "(sleep 2;kill -HUP $$)& sleep 4;print done"') != done ]] && err_exit 'ignored traps not being ignored'
 [[ $($SHELL -c 'o=foobar; for x in foo bar; do (o=save);print $o;done' 2> /dev/null ) == $'foobar\nfoobar' ]] || err_exit 'for loop optimization subshell bug'
 command exec 3<> /dev/null
@@ -319,6 +351,7 @@ chmod +x /tmp/ksh$$x
 [[ $($SHELL -c "print foo | /tmp/ksh$$x ;:" 2> /dev/null ) == foo ]] || err_exit 'piping into script fails'
 [[ $($SHELL -c 'X=1;print -r -- ${X:=$(expr "a(0)" : '"'a*(\([^)]\))')}'" 2> /dev/null) == 1 ]] || err_exit 'x=1;${x:=$(..."...")} failure'
 [[ $($SHELL -c 'print -r -- ${X:=$(expr "a(0)" : '"'a*(\([^)]\))')}'" 2> /dev/null) == 0 ]] || err_exit '${x:=$(..."...")} failure'
+exec 3<&-
 if	[[ -d /dev/fd  && -w /dev/fd/3 ]]
 then	[[ $(cat <(print hello) ) == hello ]] || err_exit "process substitution not working outside for or while loop"
 	$SHELL -c '[[ $(for i in 1;do cat <(print hello);done ) == hello ]]' 2> /dev/null|| err_exit "process substitution not working in for or while loop"
@@ -330,7 +363,68 @@ print "#! $SHELL" > /tmp/ksh$$x
 print 'print  -- $0' >> /tmp/ksh$$x
 chmod +x /tmp/ksh$$x
 [[ $(/tmp/ksh$$x) == /tmp/ksh$$x ]] || err_exit  "\$0 is $0 instead of /tmp/ksh$$x"
+cat > /tmp/ksh$$x <<- \EOF
+	myfilter() { x=$(print ok | cat); print  -r -- $SECONDS;}
+	set -o pipefail
+	sleep 3 | myfilter
+EOF
+(( $($SHELL /tmp/ksh$$x) > 2.0 )) && err_exit 'command substitution causes pipefail option to hang'
 rm -f /tmp/ksh$$x
 exec 3<&-
 ( typeset -r foo=bar) 2> /dev/null || err_exit 'readonly variables set in a subshell cannot unset'
+$SHELL -c 'x=${ print hello;}; [[ $x == hello ]]' 2> /dev/null || err_exit '${ command;} not supported'
+$SHELL 2> /dev/null <<- \EOF || err_exit 'multiline ${...} command substitution not supported'
+	x=${
+		print hello
+	}
+	[[ $x == hello ]]
+EOF
+$SHELL 2> /dev/null <<- \EOF || err_exit '${...} command substitution with side effects not supported '
+	y=bye
+	x=${
+		y=hello
+		print hello
+	}
+	[[ $y == $x ]]
+EOF
+$SHELL   2> /dev/null <<- \EOF || err_exit 'nested ${...} command substitution not supported'
+	x=${
+		print ${ print hello;} $(print world)
+	}
+	[[ $x == 'hello world' ]]
+EOF
+$SHELL   2> /dev/null <<- \EOF || err_exit 'terminating } is not a reserved word with ${ command }'
+	x=${	{ print -n } ; print -n hello ; }  ; print ' world' }
+	[[ $x == '}hello world' ]]
+EOF
+$SHELL   2> /dev/null <<- \EOF || err_exit '${ command;}xxx not working'
+	f()
+	{
+		print foo
+	}
+	[[ ${ f;}bar == foobar ]]
+EOF
+
+unset foo
+function foo
+{
+	print bar
+}
+[[ ${foo} == bar ]] || err_exit '${foo} is not command substitution when foo unset' 
+[[ ! ${foo[@]} ]] || err_exit '${foo[@]} is not empty when foo is unset' 
+[[ ! ${foo[3]} ]] || err_exit '${foo[3]} is not empty when foo is unset' 
+[[ $(print  "[${ print foo }]") == '[foo]' ]] || err_exit '${...} not working when } is followed by ]'
+[[ $(print  "${ print "[${ print foo }]" }") == '[foo]' ]] || err_exit 'nested ${...} not working when } is followed by ]'
+unset foo
+foo=$(false) > /dev/null && err_exit 'failed command substitution with redirection not returning false'
+expected=foreback
+got=$(print -n fore;(sleep 2;print back)&)
+[[ $got == $expected ]] || err_exit "command substitution background process output error -- got '$got', expected '$expected'"
+
+for false in false $(whence -p false)
+do	x=$($false) && err_exit "x=\$($false) should fail"
+	$($false) && err_exit "\$($false) should fail"
+	$($false) > /dev/null && err_exit "\$($false) > /dev/null should fail"
+done
+[[ $(env 'x-a=y'  $SHELL -c 'env | grep x-a') == *x-a=y* ]] || err_exit 'invalid environment variables not preserved'
 exit $((Errors))

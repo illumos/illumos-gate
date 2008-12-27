@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -235,7 +235,7 @@ int	b_alarm(int argc,char *argv[],void *extra)
 	register int n,rflag=0;
 	register Namval_t *np;
 	register struct tevent *tp;
-	register Shell_t *shp = (Shell_t*)extra;
+	register Shell_t *shp = ((Shbltin_t*)extra)->shp;
 	while (n = optget(argv, sh_optalarm)) switch (n)
 	{
 	    case 'r':
@@ -262,7 +262,7 @@ int	b_alarm(int argc,char *argv[],void *extra)
 	np = nv_open(argv[0],shp->var_tree,NV_NOARRAY|NV_VARNAME|NV_NOASSIGN);
 	if(!nv_isnull(np))
 		nv_unset(np);
-	nv_setattr(np, NV_INTEGER|NV_DOUBLE);
+	nv_setattr(np, NV_DOUBLE);
 	if(!(tp = newof(NIL(struct tevent*),struct tevent,1,0)))
 		errormsg(SH_DICT,ERROR_exit(1),e_nospace);
 	tp->fun.disc = &alarmdisc;

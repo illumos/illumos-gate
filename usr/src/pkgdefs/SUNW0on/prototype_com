@@ -82,6 +82,7 @@ f none usr/lib/locale/C/LC_MESSAGES/libast               644 root sys
 f none usr/lib/locale/C/LC_MESSAGES/libcmd               644 root sys
 f none usr/lib/locale/C/LC_MESSAGES/libdll               644 root sys
 f none usr/lib/locale/C/LC_MESSAGES/libshell             644 root sys
+f none usr/lib/locale/C/LC_MESSAGES/libsum               644 root sys
 #
 # Java locale directories
 #

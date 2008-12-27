@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -31,6 +31,7 @@
 
 #include	<ast.h>
 #include	<cdt.h>
+#include	<option.h>
 
 /* for compatibility with old hash library */
 #define Hashtab_t	Dt_t
@@ -44,8 +45,7 @@ typedef struct Namfun Namfun_t;
 typedef struct Namdisc Namdisc_t;
 typedef struct Nambfun Nambfun_t;
 typedef struct Namarray Namarr_t;
-typedef struct Nambltin Nambltin_t;
-typedef struct Namtype Namtype_t;
+typedef struct Namdecl Namdecl_t;
 
 /*
  * This defines the template for nodes that have their own assignment
@@ -64,13 +64,14 @@ struct Namdisc
 	Namval_t *(*nextf)(Namval_t*, Dt_t*, Namfun_t*);
 	Namval_t *(*typef)(Namval_t*, Namfun_t*);
 	int	(*readf)(Namval_t*, Sfio_t*, int, Namfun_t*);
+	int	(*writef)(Namval_t*, Sfio_t*, int, Namfun_t*);
 };
 
 struct Namfun
 {
 	const Namdisc_t	*disc;
 	char		nofree;
-	char		funs;
+	unsigned char	subshell;
 	unsigned short	dsize;
 	Namfun_t	*next;
 	char		*last;
@@ -92,22 +93,14 @@ struct Namarray
 	long		nelem;				/* number of elements */
 	void	*(*fun)(Namval_t*,const char*,int);	/* associative arrays */
 	Namval_t	*parent;		/* for multi-dimensional */
+	Dt_t		*table;			/* for subscripts */
+	void		*scope;			/* non-zerp when scoped */
 };
 
-/* Passed as third argument to a builtin when  NV_BLTINOPT is set on node */
-struct Nambltin
+/* The context pointer for declaration command */
+struct Namdecl
 {
-        void		*shp;
-	Namval_t	*np;
-        void	 	*ptr;
-        void		*data;
-        int		flags;
-};
-
-struct Namtype
-{
-        void		*shp;
-	Namval_t	*np;
+	Namval_t	*tp;			/* point to type */
 	const char	*optstring;
 	void		*optinfof;
 };
@@ -132,6 +125,7 @@ struct Namval
 };
 
 #define NV_CLASS	".sh.type"
+#define NV_DATA		"_"	/* special class or instance variable */
 #define NV_MINSZ	(sizeof(struct Namval)-sizeof(Dtlink_t)-sizeof(char*))
 #define nv_namptr(p,n)	((Namval_t*)((char*)(p)+(n)*NV_MINSZ-sizeof(Dtlink_t)))
 
@@ -163,13 +157,14 @@ struct Namval
 #define NV_SHORT	(NV_RJUST)	/* when integers are not long */
 #define NV_LONG		(NV_UTOL)	/* for long long and long double */
 #define NV_UNSIGN	(NV_LTOU)	/* for unsigned quantities */
-#define NV_DOUBLE	(NV_ZFILL)	/* for floating point */
+#define NV_DOUBLE	(NV_INTEGER|NV_ZFILL)	/* for floating point */
 #define NV_EXPNOTE	(NV_LJUST)	/* for scientific notation */
+#define NV_HEXFLOAT	(NV_LTOU)	/* for C99 base16 float notation */
 
 /*  options for nv_open */
 
 #define NV_APPEND	0x10000		/* append value */
-#define NV_MOVE		0x20000		/* for use with nv_clone */
+#define NV_MOVE		0x8000000	/* for use with nv_clone */
 #define NV_ADD		8
 					/* add node if not found */
 #define NV_ASSIGN	NV_NOFREE	/* assignment is possible */
@@ -185,19 +180,21 @@ struct Namval
 #define NV_NODISC	NV_IDENT	/* ignore disciplines */
 
 #define NV_FUNCT	NV_IDENT	/* option for nv_create */
-#define NV_BLTINOPT	NV_ZFILL	/* save state for optimization*/
+#define NV_BLTINOPT	NV_ZFILL	/* mark builtins in libcmd */
 
 #define NV_PUBLIC	(~(NV_NOSCOPE|NV_ASSIGN|NV_IDENT|NV_VARNAME|NV_NOADD))
 
 /* numeric types */
+#define NV_INT16P	(NV_LJUST|NV_SHORT|NV_INTEGER)
 #define NV_INT16	(NV_SHORT|NV_INTEGER)
 #define NV_UINT16	(NV_UNSIGN|NV_SHORT|NV_INTEGER)
+#define NV_UINT16P	(NV_LJUSTNV_UNSIGN|NV_SHORT|NV_INTEGER)
 #define NV_INT32	(NV_INTEGER)
 #define NV_UNT32	(NV_UNSIGN|NV_INTEGER)
 #define NV_INT64	(NV_LONG|NV_INTEGER)
 #define NV_UINT64	(NV_UNSIGN|NV_LONG|NV_INTEGER)
-#define NV_FLOAT	(NV_SHORT|NV_DOUBLE|NV_INTEGER)
-#define NV_LDOUBLE	(NV_LONG|NV_DOUBLE|NV_INTEGER)
+#define NV_FLOAT	(NV_SHORT|NV_DOUBLE)
+#define NV_LDOUBLE	(NV_LONG|NV_DOUBLE)
 
 /* name-value pair macros */
 #define nv_isattr(np,f)		((np)->nvflag & (f))
@@ -213,6 +210,7 @@ struct Namval
 #define NV_ADELETE	5	/* delete current subscript */
 #define NV_AADD		6	/* add subscript if not found */
 #define NV_ACURRENT	7	/* return current subscript Namval_t* */
+#define NV_ASETSUB	8	/* set current subscript */
 
 /* The following are for nv_disc */
 #define NV_FIRST	1
@@ -221,7 +219,7 @@ struct Namval
 #define NV_CLONE	4
 
 /* The following are operations for nv_putsub() */
-#define ARRAY_BITS	24
+#define ARRAY_BITS	22
 #define ARRAY_ADD	(1L<<ARRAY_BITS)	/* add subscript if not found */
 #define	ARRAY_SCAN	(2L<<ARRAY_BITS)	/* For ${array[@]} */
 #define ARRAY_UNDEF	(4L<<ARRAY_BITS)	/* For ${array} */
@@ -239,7 +237,9 @@ struct Namval
 #   endif /* _BLD_shell */
 #endif /* _DLL */
 /* prototype for array interface*/
+extern Namarr_t	*nv_arrayptr(Namval_t*);
 extern Namarr_t	*nv_setarray(Namval_t*,void*(*)(Namval_t*,const char*,int));
+extern int	nv_arraynsub(Namarr_t*);
 extern void	*nv_associative(Namval_t*,const char*,int);
 extern int	nv_aindex(Namval_t*);
 extern int	nv_nextsub(Namval_t*);
@@ -253,6 +253,7 @@ extern int		nv_clone(Namval_t*, Namval_t*, int);
 extern void 		nv_close(Namval_t*);
 extern void		*nv_context(Namval_t*);
 extern Namval_t		*nv_create(const char*, Dt_t*, int,Namfun_t*);
+extern void		nv_delete(Namval_t*, Dt_t*, int);
 extern Dt_t		*nv_dict(Namval_t*);
 extern Sfdouble_t	nv_getn(Namval_t*, Namfun_t*);
 extern Sfdouble_t	nv_getnum(Namval_t*);
@@ -260,13 +261,15 @@ extern char 		*nv_getv(Namval_t*, Namfun_t*);
 extern char 		*nv_getval(Namval_t*);
 extern Namfun_t		*nv_hasdisc(Namval_t*, const Namdisc_t*);
 extern int		nv_isnull(Namval_t*);
+extern Namfun_t		*nv_isvtree(Namval_t*);
 extern Namval_t		*nv_lastdict(void);
+extern Namval_t		*nv_mkinttype(char*, size_t, int, const char*, Namdisc_t*);
 extern void 		nv_newattr(Namval_t*,unsigned,int);
 extern Namval_t		*nv_open(const char*,Dt_t*,int);
 extern void 		nv_putval(Namval_t*,const char*,int);
 extern void 		nv_putv(Namval_t*,const char*,int,Namfun_t*);
+extern int		nv_rename(Namval_t*,int);
 extern int		nv_scan(Dt_t*,void(*)(Namval_t*,void*),void*,int,int);
-extern Namval_t		*nv_scoped(Namval_t*);
 extern char 		*nv_setdisc(Namval_t*,const char*,Namval_t*,Namfun_t*);
 extern void		nv_setref(Namval_t*, Dt_t*,int);
 extern int		nv_settype(Namval_t*, Namval_t*, int);
@@ -274,17 +277,19 @@ extern void 		nv_setvec(Namval_t*,int,int,char*[]);
 extern void		nv_setvtree(Namval_t*);
 extern int 		nv_setsize(Namval_t*,int);
 extern Namfun_t		*nv_disc(Namval_t*,Namfun_t*,int);
-extern void 		nv_unset(Namval_t*);
+extern void 		nv_unset(Namval_t*);	 /*obsolete */
+extern void 		_nv_unset(Namval_t*,int);
 extern Namval_t		*nv_search(const char *, Dt_t*, int);
-extern void		nv_unscope(void);
 extern char		*nv_name(Namval_t*);
 extern Namval_t		*nv_type(Namval_t*);
+extern void		nv_addtype(Namval_t*,const char*, Optdisc_t*, size_t);
 extern const Namdisc_t	*nv_discfun(int);
 
 #ifdef _DLL
 #   undef extern
 #endif /* _DLL */
 
+#define nv_unset(np)		_nv_unset(np,0)
 #define nv_size(np)		nv_setsize((np),-1)
 #define nv_stack(np,nf)		nv_disc(np,nf,0)
 
@@ -296,7 +301,7 @@ extern const Namdisc_t	*nv_discfun(int);
 #   define nv_istype(np)	nv_isattr(np)
 #   define nv_newtype(np)	nv_newattr(np)
 #   define nv_namset(np,a,b)	nv_open(np,a,b)
-#   define nv_free(np)		nv_unset(np)
+#   define nv_free(np)		nv_unset(np,0)
 #   define nv_settype(np,a,b,c)	nv_setdisc(np,a,b,c)
 #   define nv_search(np,a,b)	nv_open(np,a,((b)?0:NV_NOADD))
 #   define settype	setdisc

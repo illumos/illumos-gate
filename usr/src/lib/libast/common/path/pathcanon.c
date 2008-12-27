@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -66,8 +66,13 @@ pathcanon(char* path, int flags)
 	dots = loop = 0;
 	phys = path;
 	v = path + ((flags >> 5) & 01777);
-	if (*path == '/' && *(path + 1) == '/' && *astconf("PATH_LEADING_SLASHES", NiL, NiL) == '1')
-		do path++; while (*path == '/' && *(path + 1) == '/');
+	if (*path == '/')
+	{
+		if (*(path + 1) == '/' && *astconf("PATH_LEADING_SLASHES", NiL, NiL) == '1')
+			do path++; while (*path == '/' && *(path + 1) == '/');
+		if (!*(path + 1))
+			return path + 1;
+	}
 	p = r = s = t = path;
 	for (;;) switch (*t++ = *s++)
 	{

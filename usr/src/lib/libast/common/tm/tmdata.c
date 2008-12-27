@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -185,7 +185,7 @@ static short	sum[] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 36
 
 static Tm_leap_t	leap[] =
 {
-	  946684822,   23,		/* 1999-12-31+23:59:60 UTC*/
+	 1136073622,   23,		/* 2005-12-31+23:59:60 UTC*/
 	  915148821,   22,		/* 1998-12-31+23:59:60 UTC */
 	  867715220,   21,		/* 1997-06-30+23:59:60 UTC */
 	  820454419,   20,		/* 1995-12-31+23:59:60 UTC */
@@ -229,6 +229,7 @@ static Tm_zone_t	zone[] =
  0,	"UCT",	0,	 ( 0 * 60),	     0,	/* UTC			*/
  0,	"UTC",	0,	 ( 0 * 60),	     0,	/* UTC			*/
  0,	"CUT",	0,	 ( 0 * 60),	     0,	/* UTC			*/
+ 0,	"Z",	0,	 ( 0 * 60),	     0,	/* UTC			*/
  "USA",	"HST",	0,	 (10 * 60),	     0,	/* Hawaii		*/
  0,	"YST",	"YDT",	 ( 9 * 60),	TM_DST,	/* Yukon		*/
  0,	"PST",	"PDT",	 ( 8 * 60),	TM_DST,	/* Pacific		*/

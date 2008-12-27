@@ -1,4 +1,4 @@
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/src/lib/libast/features/tvlib by iffe version 2007-04-04 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20081104/build_i386_64bit/src/lib/libast/features/tvlib by iffe version 2008-01-31 : : */
 #ifndef _def_tvlib_ast
 #define _def_tvlib_ast	1
 #define _sys_types	1	/* #include <sys/types.h> ok */
@@ -10,6 +10,7 @@
 #define _lib_utimes	1	/* utimes() in default lib(s) */
 #define _lib_nanosleep	1	/* nanosleep() in default lib(s) */
 #define _lib_usleep	1	/* usleep() in default lib(s) */
+#define _sys_stat	1	/* #include <sys/stat.h> ok */
 #define _sys_time	1	/* #include <sys/time.h> ok */
 #define _lib_clock_gettime	1	/* execute{\ passed */
 #define tmgettimeofday(p)	gettimeofday(p,(struct timezone*)0)

@@ -125,5 +125,10 @@ omitted features that are completely upward compatible.
 	the stty lnext character is set to control-v or is unset.
 	The sequence escape control-v will display the shell version.
 
+29.	In ksh88, DEBUG traps were executed. after each command.  In ksh93
+	DEBUG traps are exeucted before each command.
+
+30.	In ksh88, a redirection to a file name given by an empty string was
+	ignored.  In ksh93, this is an error.
 I am interested in expanding this list so please let me know if you
 uncover any others.

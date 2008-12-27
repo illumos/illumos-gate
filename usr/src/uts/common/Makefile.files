@@ -965,6 +965,8 @@ ELFEXEC_OBJS +=	elf.o elf_notes.o old_notes.o
 
 INTPEXEC_OBJS +=intp.o
 
+SHBINEXEC_OBJS +=shbin.o
+
 JAVAEXEC_OBJS +=java.o
 
 #

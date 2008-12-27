@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SUNWprivate_1.1 {
@@ -68,7 +66,7 @@ SUNWprivate_1.1 {
 	sh_waitsafe;
 	sh_exec;
 	sh_getliblist;
-
+	
 	nv_setarray;
 	nv_associative;
 	nv_aindex;
@@ -94,7 +92,6 @@ SUNWprivate_1.1 {
 	nv_putval;
 	nv_putv;
 	nv_scan;
-	nv_scoped;
 	nv_setdisc;
 	nv_setref;
 	nv_settype;
@@ -104,12 +101,13 @@ SUNWprivate_1.1 {
 	nv_disc;
 	nv_unset;
 	nv_search;
-	nv_unscope;
 	nv_name;
 	nv_discfun;
 
-	# libshell overrides libast's |_ast_procrun()| (see sh/xec.c)
-	_ast_procrun;
+	# semi-private, needed for shcomp
+	sh;
+	e_dict;
+
     local:
 	*;
 };

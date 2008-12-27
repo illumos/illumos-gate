@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -64,6 +64,7 @@ struct process
 	pid_t		p_fgrp;		/* process group when stopped */
 	short		p_job;		/* job number of process */
 	unsigned short	p_exit;		/* exit value or signal number */
+	unsigned short	p_exitmin;	/* minimum exit value for xargs */
 	unsigned short	p_flag;		/* flags - see below */
 	int		p_env;		/* subshell environment number */
 #ifdef JOBS
@@ -105,8 +106,19 @@ extern struct jobs job;
 
 #ifdef JOBS
 
+#if !_std_malloc
+#include <vmalloc.h>
+#if VMALLOC_VERSION >= 20070911L
+#define vmbusy()	(vmstat(0,0)!=0)
+#endif
+#endif
+#ifndef vmbusy
+#define vmbusy()	0
+#endif
+
+
 #define job_lock()	(job.in_critical++)
-#define job_unlock()	do{if(!--job.in_critical&&job.savesig)job_reap(job.savesig);}while(0)
+#define job_unlock()	do{if(!--job.in_critical&&job.savesig&&!vmbusy())job_reap(job.savesig);}while(0)
 
 extern const char	e_jobusage[];
 extern const char	e_done[];
@@ -137,21 +149,21 @@ extern void	job_clear(void);
 extern void	job_bwait(char**);
 extern int	job_walk(Sfio_t*,int(*)(struct process*,int),int,char*[]);
 extern int	job_kill(struct process*,int);
-extern void	job_wait(pid_t);
+extern int	job_wait(pid_t);
 extern int	job_post(pid_t,pid_t);
 extern void	*job_subsave(void);
 extern void	job_subrestore(void*);
 #ifdef JOBS
-	extern void	job_init(int);
-	extern int	job_close(void);
+	extern void	job_init(Shell_t*,int);
+	extern int	job_close(Shell_t*);
 	extern int	job_list(struct process*,int);
 	extern int	job_terminate(struct process*,int);
 	extern int	job_switch(struct process*,int);
 	extern void	job_fork(pid_t);
 	extern int	job_reap(int);
 #else
-#	define job_init(flag)
-#	define job_close()	(0)
+#	define job_init(s,flag)
+#	define job_close(s)	(0)
 #	define job_fork(p)
 #endif	/* JOBS */
 

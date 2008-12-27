@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -31,11 +31,12 @@ null=''
 if	[[ ! -z $null ]]
 then	err_exit "-z: null string should be of zero length"
 fi
-file=/tmp/regress$$
+file=/tmp/regresso$$
+newer_file=/tmp/regressn$$
 if	[[ -z $file ]]
 then	err_exit "-z: $file string should not be of zero length"
 fi
-trap "rm -f $file" EXIT
+trap "rm -f $file $newer_file" EXIT
 rm -f $file
 if	[[ -a $file ]]
 then	err_exit "-a: $file shouldn't exist"
@@ -111,11 +112,12 @@ if	[[ ! -w /dev/fd/2 ]]
 then	err_exit "/dev/fd/2 not open for writing"
 fi
 sleep 1
-if	[[ ! . -ot $file ]]
-then	err_exit ". should be older than $file"
+> $newer_file
+if	[[ ! $file -ot $newer_file ]]
+then	err_exit "$file should be older than $newer_file"
 fi
-if	[[ /bin -nt $file ]]
-then	err_exit "$file should be newer than /bin"
+if	[[ $file -nt $newer_file ]]
+then	err_exit "$newer_file should be newer than $file"
 fi
 if	[[ $file != /tmp/* ]]
 then	err_exit "$file should match /tmp/*"
@@ -176,6 +178,8 @@ test -d .  -a '(' ! -f . ')' || err_exit 'test not working'
 if	[[ '!' != ! ]]
 then	err_exit 'quoting unary operator not working'
 fi
+test \( -n x \) -o \( -n y \) 2> /dev/null || err_exit 'test ( -n x ) -o ( -n y) not working'
+test \( -n x \) -o -n y 2> /dev/null || err_exit 'test ( -n x ) -o -n y not working'
 chmod 600 $file
 exec 4> $file
 print -u4 foobar
@@ -230,4 +234,12 @@ $SHELL -c '[[ abc =~ a(b)c ]]' 2> /dev/null || err_exit '[[ abc =~ a(b)c ]] fail
 $SHELL -xc '[[ abc =~  \babc\b ]]' 2> /dev/null || err_exit '[[ abc =~ \babc\b ]] fails'
 [[ abc == ~(E)\babc\b ]] || err_exit '\b not preserved for ere when not in ()'
 [[ abc == ~(iEi)\babc\b ]] || err_exit '\b not preserved for ~(iEi) when not in ()'
+
+e=$($SHELL -c '[ -z "" -a -z "" ]' 2>&1)
+[[ $e ]] && err_exit "[ ... ] compatibility check failed -- $e"
+i=hell
+[[ hell0 == $i[0] ]]  ||  err_exit 'pattern $i[0] interpreded as array ref'
+test '(' = ')' && err_exit '"test ( = )" should not be true'
+[[ $($SHELL -c 'case  F in ~(Eilr)[a-z0-9#]) print ok;;esac' 2> /dev/null) == ok ]] || err_exit '~(Eilr) not working in case command'
+[[ $($SHELL -c "case  Q in ~(Fi)q |  \$'\E') print ok;;esac" 2> /dev/null) == ok ]] || err_exit '~(Fi)q | \E  not working in case command'
 exit $((Errors))

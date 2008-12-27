@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -226,4 +226,75 @@ function fun
 }
 i=foo
 [[ $(fun $i) == hi ]] || err_exit 'nameref for compound variable with in function name of caller fails'
+unset -n foo bar
+typeset -A foo
+foo[x.y]=(x=3 y=4)
+nameref bar=foo[x.y]
+[[ ${bar.x} == 3 ]] || err_exit 'nameref to subscript containing . fails'
+[[ ${!bar} == 'foo[x.y]' ]] || err_exit '${!var} not correct for nameref to an array instance'
+typeset +n bar
+nameref bar=foo
+[[ ${!bar} == foo ]] || err_exit '${!var} not correct for nameref to array variable'
+$SHELL -c 'function bar { nameref x=foo[++];};typeset -A foo;bar' 2> /dev/null ||err_exit 'nameref of associative array tries to evaluate subscript'
+i=$($SHELL -c 'nameref foo=bar; bar[2]=(x=3 y=4); nameref x=foo[2].y;print -r -- $x' 2> /dev/null)
+[[ $i == 4 ]] || err_exit 'creating reference from subscripted variable whose name is a reference failed'
+[[ $($SHELL 2> /dev/null <<- '+++EOF'
+	function bar
+	{
+	 	nameref x=$1
+	 	print -r -- "$x"
+	}
+	function foo
+	{
+	 	typeset var=( foo=hello)
+	 	bar var
+	}
+	foo
++++EOF
+) ==  *foo=hello* ]] || err_exit 'unable to display compound variable from name reference of local variable'
+#set -x
+for c in '=' '[' ']' '\' "'" '"' '<' '=' '('
+do	[[ $($SHELL 2> /dev/null <<- ++EOF++
+	x;i=\\$c;typeset -A a; a[\$i]=foo;typeset -n x=a[\$i]; print "\$x"
+	++EOF++
+) != foo ]] && err_exit 'nameref x=[$c] '"not working for c=$c"
+done
+unset -n foo x
+unset foo x
+typeset -A foo
+nameref x=foo[xyz]
+foo[xyz]=ok
+[[ $x == ok ]] || err_exit 'nameref to unset subscript not working'
+function function2
+{
+	nameref v=$1
+	v.x=19 v.y=20
+}
+function function1
+{
+	typeset compound_var=()
+	function2 compound_var
+	printf "x=%d, y=%d\n" compound_var.x compound_var.y
+}
+x="$(function1)"
+[[ "$x" != 'x=19, y=20' ]] && err_exit "expected 'x=19, y=20', got '${x}'"
+typeset +n bar
+unset foo bar
+[[ $(function a
+{
+	for i in  foo bar
+	do	typeset -n v=$i
+		print $v
+	done | cat
+}
+foo=1 bar=2;a) == $'1\n2' ]] 2> /dev/null || err_exit 'nameref in pipeline broken'
+function a
+{
+	typeset -n v=vars.data._1
+	print "${v.a} ${v.b}"
+}
+vars=(data=())
+vars.data._1.a=a.1
+vars.data._1.b=b.1
+[[ $(a) == 'a.1 b.1' ]] || err_exit 'nameref choosing wrong scope -- '
 exit $((Errors))

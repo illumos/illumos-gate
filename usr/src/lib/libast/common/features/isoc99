@@ -1,0 +1,13 @@
+if tst -D_ISOC99_SOURCE -lm note{ _ISOC99_SOURCE plays nice }end link{
+		#include <sys/types.h>
+		#include <sys/stat.h>
+		#include <stdlib.h>
+		#include <unistd.h>
+		#include <math.h>
+		int main() { return signbit(-0.0); }
+	}end {
+		#ifndef _ISOC99_SOURCE
+		#define _ISOC99_SOURCE	1
+		#endif
+	}
+endif

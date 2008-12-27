@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1986-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -86,7 +86,7 @@ ppmultiple(register struct ppfile* fp, register struct ppsymbol* test)
 			{
 				if ((pp.mode & (ALLMULTIPLE|LOADING)) == LOADING)
 					fp->guard = INC_IGNORE;
-				if (pp.state & WARN)
+				if ((pp.state & WARN) && (pp.mode & (HOSTED|MARKHOSTED|RELAX|PEDANTIC)) == PEDANTIC)
 					error(1, "%s: ignored -- already included", fp->name);
 				else
 					message((-3, "%s: ignored -- already included", fp->name));
@@ -530,7 +530,7 @@ if (pp.test & 0x0010) error(1, "SEARCH#%d file=%s path=%s index=%d data=<%lu,%lu
 						xp->guard = INC_TEST;
 					else
 					{
-						if (pp.state & WARN)
+						if ((pp.state & WARN) && (pp.mode & (HOSTED|MARKHOSTED|RELAX|PEDANTIC)) == PEDANTIC)
 							error(1, "%s: ignored -- already included", xp->name);
 						else
 							message((-3, "%s: ignored -- already included", xp->name));
@@ -598,6 +598,7 @@ ppsearch(char* file, int type, int flags)
 	struct oplist*		cp;
 	struct ppfile*		xp;
 	int			dospath;
+	int			chop;
 	int			fd;
 	int			index;
 	char			name[MAXTOKEN + 1];
@@ -605,24 +606,26 @@ ppsearch(char* file, int type, int flags)
 	pp.include = 0;
 	fd = -1;
 	dospath = 0;
+	chop = 0;
  again:
 	pathcanon(file, 0);
-	for (cp = pp.chop; cp; cp = cp->next)
-		if (strneq(file, cp->value, cp->op))
-		{
-			if (cp->value[cp->op + 1])
+	if (chop)
+		for (cp = pp.chop; cp; cp = cp->next)
+			if (strneq(file, cp->value, cp->op))
 			{
-				sfsprintf(name, sizeof(name) - 1, "%s%s", cp->value + cp->op + 1, file + cp->op);
-				message((-3, "chop: %s -> %s", file, name));
-				file = name;
+				if (cp->value[cp->op + 1])
+				{
+					sfsprintf(name, sizeof(name) - 1, "%s%s", cp->value + cp->op + 1, file + cp->op);
+					message((-2, "search: %s -> %s", file, name));
+					file = name;
+				}
+				else if (strchr(file + cp->op, '/'))
+				{
+					message((-2, "search: %s -> %s", file, file + cp->op));
+					file += cp->op;
+				}
+				break;
 			}
-			else if (strchr(file + cp->op, '/'))
-			{
-				message((-3, "chop: %s -> %s", file, file + cp->op));
-				file += cp->op;
-			}
-			break;
-		}
 	fp = ppsetfile(file);
 	while ((fp->flags & INC_MAPALL) || (fp->flags & INC_MAPHOSTED) && (pp.mode & HOSTED) || (fp->flags & INC_MAPNOHOSTED) && !(pp.mode & HOSTED))
 	{
@@ -779,6 +782,12 @@ ppsearch(char* file, int type, int flags)
 		}
 		if ((flags & (SEARCH_INCLUDE|SEARCH_NEXT)) == SEARCH_INCLUDE)
 		{
+			if (!chop && pp.chop)
+			{
+				chop = 1;
+				type = T_STRING;
+				goto again;
+			}
 			if (!(pp.mode & GENDEPS))
 			{
 				if (!(pp.option & ALLPOSSIBLE) || pp.in->prev->prev)

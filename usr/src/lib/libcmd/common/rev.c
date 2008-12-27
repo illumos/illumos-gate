@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -31,7 +31,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: rev (AT&T Research) 1999-04-10 $\n]"
+"[-?\n@(#)$Id: rev (AT&T Research) 2007-11-29 $\n]"
 USAGE_LICENSE
 "[+NAME?rev - reverse the characters or lines of one or more files]"
 "[+DESCRIPTION?\brev\b copies one or more files to standard output "
@@ -61,19 +61,51 @@ static int rev_char(Sfio_t *in, Sfio_t *out)
 {
 	register int c;
 	register char *ep, *bp, *cp;
-	register int n;
-	while(cp = bp = sfgetr(in,'\n',0))
+	register wchar_t *wp, *xp;
+	register size_t n;
+	register size_t w;
+	if (mbwide())
 	{
-		ep = bp + (n=sfvalue(in)) -1;
-		while(ep > bp)
+		wp = 0;
+		w = 0;
+		while(cp = bp = sfgetr(in,'\n',0))
 		{
-			c = *--ep;
-			*ep = *bp;
-			*bp++ = c;
+			ep = bp + (n=sfvalue(in)) - 1;
+			if (n > w)
+			{
+				w = roundof(n + 1, 1024);
+				if (!(wp = newof(wp, wchar_t, w, 0)))
+				{
+					error(ERROR_SYSTEM|2, "out of space");
+					return 0;
+				}
+			}
+			xp = wp;
+			while (cp < ep)
+				*xp++ = mbchar(cp);
+			cp = bp;
+			while (xp > wp)
+				cp += mbconv(cp, *--xp);
+			*cp++ = '\n';
+			if (sfwrite(out, bp, cp - bp) < 0)
+				return -1;
 		}
-		if(sfwrite(out,cp,n)<0)
-			return(-1);
+		if (wp)
+			free(wp);
 	}
+	else
+		while(cp = bp = sfgetr(in,'\n',0))
+		{
+			ep = bp + (n=sfvalue(in)) -1;
+			while(ep > bp)
+			{
+				c = *--ep;
+				*ep = *bp;
+				*bp++ = c;
+			}
+			if(sfwrite(out,cp,n)<0)
+				return(-1);
+		}
 	return(0);
 }
 

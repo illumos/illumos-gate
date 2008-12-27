@@ -22,6 +22,7 @@ char *stkseek(Stk_t *\fIstack\fP, unsigned \fIoffset\fP);
 int stktell(Stk_t *\fIstack\fP);
 char *stkptr(Stk_t *\fIstack\fP, unsigned \fIoffset\fP);
 char *stkfreeze(Stk_t *\fIstack\fP, unsigned \fIextra\fP);
+int stkon(Stk *\fIstack\fP, char* \fIaddr\fP)
 \fR
 .fi
 .SH DESCRIPTION
@@ -143,6 +144,10 @@ stack and returns a pointer to the beginning of this object.
 If \fIextra\fP is non-zero, \fIextra\fP bytes are added to the stack
 before the current object is terminated.  The first added byte will
 contain zero and the contents of the remaining bytes are undefined.
+.PP
+The \f5stkon\fP()
+function returns non-zero if the address given by \fIaddr\fP is
+on the stack \fIstack\fP and \f50\fP otherwise.
 .PP
 .SH HISTORY
 The

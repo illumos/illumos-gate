@@ -21,8 +21,6 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
 # This file contains the dictionary of file format identifiers (magic strings)
 # used by file(1).  The fields of this file are as follows:
 #
@@ -523,6 +521,7 @@
 0	string		LZ		DOS built-in
 0	byte		0xe9		DOS executable (COM)
 0	byte		0xeb		DOS executable (COM)
+0	string		\013\023\010\000	ksh compiled shell script executable
 24	long		60012		ufsdump archive file
 0	string		TZif		zoneinfo timezone data file
 0	string		BZh		bzip2 compressed data

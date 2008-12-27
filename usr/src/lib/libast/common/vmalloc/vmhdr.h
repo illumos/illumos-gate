@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -128,9 +128,8 @@ typedef int		ssize_t;
 
 #define VM_check	0x0001	/* enable detailed checks		*/
 #define VM_abort	0x0002	/* abort() on assertion failure		*/
-#define VM_primary	0x0004	/* enable primary native allocation	*/
-#define VM_region	0x0008	/* enable region segment checks		*/
-#define VM_secondary	0x0010	/* enable secondary native allocation	*/
+#define VM_region	0x0004	/* enable region segment checks		*/
+#define VM_mmap		0x0010	/* favor mmap allocation		*/
 #define VM_init		0x8000	/* VMCHECK env var checked		*/
 
 #if _UWIN
@@ -200,10 +199,13 @@ extern void		_vmmessage _ARG_((const char*, long, const char*, long));
 #define VM_AGAIN	0010000		/* research the arena for space */
 #define VM_LOCK		0020000		/* region is locked		*/
 #define VM_LOCAL	0040000		/* local call, bypass lock	*/
-#define VM_UNUSED	0104060
+#define VM_INUSE	0004000		/* some operation is running	*/
+#define VM_UNUSED	0100060
 #define VMETHOD(vd)	((vd)->mode&VM_METHODS)
 
 /* test/set/clear lock state */
+#define SETINUSE(vd,iu)	(((iu) = (vd)->mode&VM_INUSE), ((vd)->mode |= VM_INUSE) )
+#define CLRINUSE(vd,iu)	((iu) ? 0 : ((vd)->mode &= ~VM_INUSE) )
 #define SETLOCAL(vd)	((vd)->mode |= VM_LOCAL)
 #define GETLOCAL(vd,l)	(((l) = (vd)->mode&VM_LOCAL), ((vd)->mode &= ~VM_LOCAL) )
 #define ISLOCK(vd,l)	((l) ? 0 : ((vd)->mode &  VM_LOCK) )

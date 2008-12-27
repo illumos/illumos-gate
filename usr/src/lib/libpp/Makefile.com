@@ -19,13 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SHELL=/usr/bin/ksh
+SHELL=/usr/bin/ksh93
 
 LIBRARY=	libpp.a
 VERS=		.1
@@ -64,11 +62,15 @@ include ../../Makefile.lib
 # automated code updates easier.
 MAPFILES=       ../mapfile-vers
 
-# Set common AST build flags (e.g., needed to support the math stuff).
+# Set common AST build flags (e.g. C99/XPG6, needed to support the math stuff)
 include ../../../Makefile.ast
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-last -lc
+
+LDLIBS += \
+	-last \
+	-lc
+
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 SRCDIR =	../common
@@ -85,16 +87,15 @@ CPPFLAGS = \
 	-D_PACKAGE_ast \
 	'-DUSAGE_LICENSE=\
 		"[-author?Glenn Fowler <gsf@research.att.com>]"\
-		"[-copyright?Copyright (c) 1986-2007 AT&T Knowledge Ventures]"\
+		"[-copyright?Copyright (c) 1986-2008 AT&T Intellectual Property]"\
 		"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
 		"[--catalog?libpp]"'
 
+
 CFLAGS += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS)
 CFLAGS64 += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS64)
 
 pics/ppcall.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/ppcontrol.o 	:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
@@ -116,6 +117,5 @@ all: $(LIBS)
 #
 lint:
 	@ print "usr/src/lib/libpp is not lint-clean: skipping"
-	@ $(TRUE)
 
 include ../../Makefile.targ

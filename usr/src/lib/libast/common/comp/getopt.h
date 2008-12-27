@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -24,11 +24,14 @@
  * gnu getopt interface
  */
 
-#include <ast_getopt.h>
+#ifdef	_AST_STD_I
+#define _GETOPT_H		-1
+#endif
 
-#if !defined(_GETOPT_H) && !defined(_AST_STD_I)
-
+#ifndef _GETOPT_H
 #define _GETOPT_H		1
+
+#include <ast_getopt.h>
 
 #define no_argument		0
 #define required_argument	1

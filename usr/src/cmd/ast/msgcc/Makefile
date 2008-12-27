@@ -19,13 +19,11 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SHELL=/usr/bin/ksh
+SHELL=/usr/bin/ksh93
 
 include ../../Makefile.cmd
 
@@ -40,26 +38,26 @@ CPPFLAGS = \
         -I$(ROOT)/usr/include/ast \
 	-D_PACKAGE_ast \
 	'-DUSAGE_LICENSE=\
-	"[-author?Glenn Fowler <gsf@research.att.com>]"\
-	"[-copyright?Copyright (c) 2000-2007 AT&T Knowledge Ventures]"\
-	"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
-	"[--catalog?msgcc]"'
+		"[-author?Glenn Fowler <gsf@research.att.com>]"\
+		"[-copyright?Copyright (c) 1986-2008 AT&T Intellectual Property]"\
+		"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
+		"[--catalog?msgcc]"'
 
 CFLAGS += \
-        $(CCVERBOSE) \
-        -xstrconst
+	$(ASTCFLAGS)
 
 LDLIBS += -last
 msgcpp   := LDLIBS += -lpp
 
+# This target should use "shcomp" in the future
 msgcc:	msgcc.sh
 	rm -f msgcc ; \
-	( \
+	{ \
 		print "#!/usr/bin/ksh93" ; \
 		print "export PATH=/usr/ast/bin:/usr/xpg6/bin:/usr/xpg4/bin:/usr/bin:\$${PATH}" ; \
 		print "builtin date" ; \
 		cat "msgcc.sh" ; \
-	) >msgcc ; \
+	} >msgcc ; \
 	chmod a+rx msgcc
 
 ROOTCMDDIR=$(ROOT)/usr/ast/bin

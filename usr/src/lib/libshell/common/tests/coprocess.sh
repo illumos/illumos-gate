@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -37,7 +37,7 @@ fi
 function ping # id
 {
 	integer x=0
-	while ((x < 5))
+	while ((x++ < 5))
 	do	read -r
 		print -r "$1 $REPLY"
 	done
@@ -52,6 +52,7 @@ print -u5 'hello again' || err_exit 'write on u5 fails'
 read -u6 line
 [[ $line == 'hello again' ]] || err_exit 'coprocess after moving fds fails' 
 exec 5<&- 6<&-
+wait $!
 
 ping three |&
 exec 3>&p
@@ -66,25 +67,25 @@ do	case $i in
 	four)	to=-u4;;
 	pipe)	to=-p;;
 	esac
-	count=count+1
-	print  $to $i $count
+	(( count++ ))
+	print $to $i $count
 done
 
 while	((count > 0))
-do	count=count-1
+do	(( count-- ))
 	read -p
-#	print -r - "$REPLY"
 	set -- $REPLY
 	if	[[ $1 != $2 ]]
-	then	err_exit "$1 does not match 2"
+	then	err_exit "$1 does not match $2"
 	fi
 	case $1 in
-	three);;
-	four) ;;
-	pipe) ;;
-	*)	err_exit "unknown message +|$REPLY|+"
+	three)	;;
+	four)	;;
+	pipe)	;;
+	*)	err_exit "unknown message +|$REPLY|+" ;;
 	esac
 done
+kill $(jobs -p) 2>/dev/null
 
 file=/tmp/regress$$
 trap "rm -f $file" EXIT
@@ -92,60 +93,72 @@ cat > $file  <<\!
 /bin/cat |&
 !
 chmod +x $file
-$file 2> /dev/null  || err_exit "parent coprocess prevents script coprocess"
+sleep 10 |&
+$file 2> /dev/null || err_exit "parent coprocess prevents script coprocess"
 exec 5<&p 6>&p
 exec 5<&- 6>&-
+kill $(jobs -p) 2>/dev/null
+
 ${SHELL-ksh} |&
 print -p  $'print hello | cat\nprint Done'
 read -t 5 -p
 read -t 5 -p
 if	[[ $REPLY != Done ]]
-then	err_exit	"${SHELL-ksh} coprocess not working"
+then	err_exit "${SHELL-ksh} coprocess not working"
 fi
 exec 5<&p 6>&p
 exec 5<&- 6>&-
-count=0
+wait $!
+
 {
 echo line1 | grep 'line2'
 echo line2 | grep 'line1'
 } |&
-SECONDS=0
-while
-   read -p -t 10 line
-do
-   ((count = count + 1))
-   echo "Line $count: $line"
+SECONDS=0 count=0
+while	read -p -t 10 line
+do	((count++))
 done
 if	(( SECONDS > 8 ))
-then	err_exit 'read -p hanging'
+then	err_exit "read -p hanging (SECONDS=$SECONDS count=$count)"
 fi
+wait $!
+
 ( sleep 3 |& sleep 1 && kill $!; sleep 1; sleep 3 |& sleep 1 && kill $! ) || 
 	err_exit "coprocess cleanup not working correctly"
-unset line
+{ : |& } 2>/dev/null ||
+	err_exit "subshell coprocess lingers in parent"
+wait $!
+
+unset N r e
+integer N=5
+e=12345
 (
-	integer n=0
-	while read  line
-	do	echo $line  |&
-		if	cat  <&p 
-		then	((n++))
-			wait $!
-		fi
-	done > /dev/null 2>&1 <<-  !
-		line1
-		line2
-		line3
-		line4
-		line5
-		line6
-		line7
-	!
-	(( n==7 ))  && print ok
-)  | read -t 10 line
-if	[[ $line != ok ]]
-then	err_exit 'coprocess timing bug'
-fi
+	integer i
+	for ((i = 1; i <= N; i++))
+	do	print $i |&
+		read -p r
+		print -n $r
+		wait $!
+	done
+	print
+) 2>/dev/null | read -t 10 r
+[[ $r == $e ]] || err_exit "coprocess timing bug -- expected $e, got '$r'"
+r=
+(
+	integer i
+	for ((i = 1; i <= N; i++))
+	do	print $i |&
+		sleep 0.01
+		r=$r$(cat <&p)
+		wait $!
+	done
+	print $r
+) 2>/dev/null | read -t 10 r
+[[ $r == $e ]] || err_exit "coprocess command substitution bug -- expected $e, got '$r'"
+
 (
 	/bin/cat |&
+	sleep 0.01
 	exec 6>&p
 	print -u6 ok
 	exec 6>&-
@@ -154,7 +167,7 @@ fi
 ) && err_exit 'coprocess with subshell would hang'
 for sig in IOT ABRT
 do	if	( trap - $sig ) 2> /dev/null
-	then	if	[[ $(	
+	then	if	[[ $( { sig=$sig $SHELL  2> /dev/null <<- '++EOF++'
 				cat |&
 				pid=$!
 				trap "print TRAP" $sig
@@ -164,9 +177,12 @@ do	if	( trap - $sig ) 2> /dev/null
 					sleep 2
 					kill -$sig $$
 					kill $pid
-				) 2> /dev/null &
+					sleep 2
+					kill  $$
+				) &
 				read -p
-			) != $'TRAP\nTRAP' ]]
+			++EOF++
+			} ) != $'TRAP\nTRAP' ]] 2> /dev/null
 		then	err_exit 'traps when reading from coprocess not working'
 		fi
 		break

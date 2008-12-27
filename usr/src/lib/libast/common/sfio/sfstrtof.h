@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -299,7 +299,7 @@ S2F_function(str, end) char* str; char** end;
 			}
 			PUT(s);
 			if (v == 0)
-				return v;
+				return negative ? -v : v;
 			if (fraction >= 0)
 				m -= 4 * (digits - fraction);
 			if (m < S2F_exp_2_min)
@@ -369,7 +369,7 @@ S2F_function(str, end) char* str; char** end;
 		}
 		do c = GET(s); while (c && !isspace(c));
 		PUT(s);
-		return S2F_nan;
+		return negative ? -S2F_nan : S2F_nan;
 	}
 	else if (c < '1' || c > '9')
 	{
@@ -469,8 +469,9 @@ S2F_function(str, end) char* str; char** end;
 	 * and at most one divide overall
 	 */
 
+	v = 0;
 	if (!part)
-		return 0;
+		return negative ? -v : v;
 	else if ((m = parts[part-1].digits - digits) > 0)
 		digits += m;
 	else
@@ -480,7 +481,6 @@ S2F_function(str, end) char* str; char** end;
 	 * combine the parts
 	 */
 
-	v = 0;
 	while (part--)
 	{
 		p = parts[part].batch;

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -54,20 +52,45 @@ f none usr/demo/ELF/pcom.c 644 root bin
 f none usr/demo/ELF/dcom.c 644 root bin
 f none usr/demo/ELF/tpcom.c 644 root bin
 d none usr/demo/ksh 755 root bin
+d none usr/demo/ksh/bin 755 root bin
+f none usr/demo/ksh/bin/crawlsrccomments 755 root bin
+f none usr/demo/ksh/bin/filemutexdemo1 755 root bin
+f none usr/demo/ksh/bin/filetree1 755 root bin
+f none usr/demo/ksh/bin/gnaw 755 root bin
+f none usr/demo/ksh/bin/mandelbrotset1 755 root bin
+f none usr/demo/ksh/bin/multifollow 755 root bin
+f none usr/demo/ksh/bin/primenumbers1 755 root bin
+f none usr/demo/ksh/bin/rssread 755 root bin
+f none usr/demo/ksh/bin/shcalc 755 root bin
+f none usr/demo/ksh/bin/shircbot 755 root bin
+f none usr/demo/ksh/bin/shlint 755 root bin
+f none usr/demo/ksh/bin/shman 755 root bin
+f none usr/demo/ksh/bin/shnote 755 root bin
+f none usr/demo/ksh/bin/shpiano 755 root bin
+f none usr/demo/ksh/bin/shtinyurl 755 root bin
+f none usr/demo/ksh/bin/shtwitter 755 root bin
+f none usr/demo/ksh/bin/svcproptree1 755 root bin
+f none usr/demo/ksh/bin/termclock 755 root bin
+f none usr/demo/ksh/bin/test_net_sctp 755 root bin
+f none usr/demo/ksh/bin/xmldocumenttree1 755 root bin
+d none usr/demo/ksh/doc 755 root bin
+f none usr/demo/ksh/doc/COMPATIBILITY 644 root bin
+f none usr/demo/ksh/doc/DESIGN 644 root bin
+f none usr/demo/ksh/doc/OBSOLETE 644 root bin
+f none usr/demo/ksh/doc/README 644 root bin
+f none usr/demo/ksh/doc/RELEASE 644 root bin
+f none usr/demo/ksh/doc/TYPES 644 root bin
 d none usr/demo/ksh/fun 755 root bin
-f none usr/demo/ksh/fun/dirs 644 root bin
-f none usr/demo/ksh/fun/mandelbrotset1 644 root bin
-f none usr/demo/ksh/fun/gnaw 644 root bin
-f none usr/demo/ksh/fun/rssread 644 root bin
-f none usr/demo/ksh/fun/popd 644 root bin
-f none usr/demo/ksh/fun/pushd 644 root bin
-f none usr/demo/ksh/fun/termclock 644 root bin
-f none usr/demo/ksh/fun/title 644 root bin
+f none usr/demo/ksh/fun/dirs 755 root bin
+f none usr/demo/ksh/fun/popd 755 root bin
+f none usr/demo/ksh/fun/pushd 755 root bin
+f none usr/demo/ksh/fun/title 755 root bin
 d none usr/demo/ksh/tests 755 root bin
 f none usr/demo/ksh/tests/alias.sh 644 root bin
 f none usr/demo/ksh/tests/append.sh 644 root bin
 f none usr/demo/ksh/tests/arith.sh 644 root bin
 f none usr/demo/ksh/tests/arrays.sh 644 root bin
+f none usr/demo/ksh/tests/arrays2.sh 644 root bin
 f none usr/demo/ksh/tests/attributes.sh 644 root bin
 f none usr/demo/ksh/tests/basic.sh 644 root bin
 f none usr/demo/ksh/tests/bracket.sh 644 root bin
@@ -75,6 +98,8 @@ f none usr/demo/ksh/tests/builtins.sh 644 root bin
 f none usr/demo/ksh/tests/case.sh 644 root bin
 f none usr/demo/ksh/tests/comvar.sh 644 root bin
 f none usr/demo/ksh/tests/coprocess.sh 644 root bin
+f none usr/demo/ksh/tests/cubetype.sh 644 root bin
+f none usr/demo/ksh/tests/enum.sh 644 root bin
 f none usr/demo/ksh/tests/exit.sh 644 root bin
 f none usr/demo/ksh/tests/expand.sh 644 root bin
 f none usr/demo/ksh/tests/functions.sh 644 root bin
@@ -82,18 +107,44 @@ f none usr/demo/ksh/tests/glob.sh 644 root bin
 f none usr/demo/ksh/tests/grep.sh 644 root bin
 f none usr/demo/ksh/tests/heredoc.sh 644 root bin
 f none usr/demo/ksh/tests/io.sh 644 root bin
+f none usr/demo/ksh/tests/locale.sh 644 root bin
 f none usr/demo/ksh/tests/nameref.sh 644 root bin
 f none usr/demo/ksh/tests/options.sh 644 root bin
 f none usr/demo/ksh/tests/path.sh 644 root bin
+f none usr/demo/ksh/tests/pointtype.sh 644 root bin
 f none usr/demo/ksh/tests/quoting.sh 644 root bin
 f none usr/demo/ksh/tests/quoting2.sh 644 root bin
+f none usr/demo/ksh/tests/recttype.sh 644 root bin
+f none usr/demo/ksh/tests/restricted.sh 644 root bin
 f none usr/demo/ksh/tests/return.sh 644 root bin
 f none usr/demo/ksh/tests/select.sh 644 root bin
-f none usr/demo/ksh/tests/shtests 644 root bin
+f none usr/demo/ksh/tests/shtests 755 root bin
+f none usr/demo/ksh/tests/sigchld.sh 644 root bin
+f none usr/demo/ksh/tests/signal.sh 644 root bin
+f none usr/demo/ksh/tests/statics.sh 644 root bin
 f none usr/demo/ksh/tests/substring.sh 644 root bin
+f none usr/demo/ksh/tests/subshell.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_builtin_sum.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_compoundvario.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_cr_6687139_command_substitution_exec_redirection_allocation_loop.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_cr_6713682_compound_var_bleeds_through_subshell.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_cr_6722134_background_CHLD_trap.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_cr_6753538_subshell_leaks_umask.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_cr_6754020_weird_square_bracket_expansion.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_cr_6766246_pattern_matching_bug.sh 644 root bin
 f none usr/demo/ksh/tests/sun_solaris_getconf.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_local_compound_nameref001.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_staticvariables.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_vartree001.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_vartree002.sh 644 root bin
+f none usr/demo/ksh/tests/sun_solaris_vartree003.sh 644 root bin
 f none usr/demo/ksh/tests/tilde.sh 644 root bin
+f none usr/demo/ksh/tests/timetype.sh 644 root bin
+f none usr/demo/ksh/tests/types.sh 644 root bin
 f none usr/demo/ksh/tests/variables.sh 644 root bin
+f none usr/demo/ksh/tests/vartree1.sh 644 root bin
+f none usr/demo/ksh/tests/vartree2.sh 644 root bin
 d none usr/demo/libexacct 755 root bin
 f none usr/demo/libexacct/README 644 root bin
 f none usr/demo/libexacct/Makefile 644 root bin

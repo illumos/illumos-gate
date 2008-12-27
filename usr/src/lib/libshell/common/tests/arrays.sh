@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -155,7 +155,6 @@ fi
 if	(( s[$y] != 4 ))
 then	err_exit '(( s[$y] != 4 ))'
 fi
-unset y
 set -A y 2 4 6
 typeset -i y
 z=${y[@]}
@@ -378,4 +377,91 @@ set -- "${foo[@]:1}"
 unset bar
 : ${_foo[bar=4]}
 (( bar == 4 )) || err_exit 'subscript of unset variable not evaluated'
+unset foo bar
+foo[5]=4
+bar[4]=3
+bar[0]=foo
+foo[0]=bam
+foo[4]=5
+[[ ${!foo[2+2]} == 'foo[4]' ]] || err_exit '${!var[sub]} should be var[sub]'
+[[ ${bar[${foo[5]}]} == 3 ]] || err_exit  'array subscript cannot be an array instance'
+[[ $bar[4] == 3 ]] || err_exit '$bar[x] != ${bar[x]} inside [[ ]]'
+(( $bar[4] == 3  )) || err_exit '$bar[x] != ${bar[x]} inside (( ))'
+[[ $bar[$foo[5]] == 3 ]]  || err_exit '$bar[foo[x]] != ${bar[foo[x]]} inside [[ ]]'
+(( $bar[$foo[5]] == 3  )) || err_exit '$bar[foo[x]] != ${bar[foo[x]]} inside (( ))'
+x=$bar[4]
+[[ $x == 4 ]] && err_exit '$bar[4] should not be an array in an assignment'
+x=${bar[$foo[5]]}
+(( $x == 3 )) || err_exit '${bar[$foo[sub]]} not working'
+[[ $($SHELL  <<- \++EOF+++
+	typeset -i test_variable=0
+	typeset -A test_array
+	test_array[1]=100
+	read test_array[2] <<-!
+	2
+	!
+	read test_array[3] <<-!
+	3
+	!
+	test_array[3]=4
+	print "val=${test_array[3]}"
+++EOF+++
+) == val=4 ]] 2> /dev/null || err_exit 'after reading array[j] and assign array[j] fails' 
+[[ $($SHELL <<- \+++EOF+++
+	pastebin=( typeset -a form)
+	pastebin.form+=( name="name"   data="clueless" )
+	print -r -- ${pastebin.form[0].name}
++++EOF+++
+) == name ]] 2> /dev/null ||  err_exit 'indexed array in compound variable not working'
+unset foo bar
+: ${foo[bar=2]}
+[[ $bar == 2 ]] || err_exit 'subscript not evaluated for unset variable'
+unset foo bar
+bar=1
+typeset -a foo=([1]=ok [2]=no)
+[[ $foo[bar] == ok ]] || err_exit 'typeset -a not working for simple assignment'
+unset foo
+typeset -a foo=([1]=(x=ok) [2]=(x=no))
+[[ $(typeset | grep 'foo$') == *index* ]] || err_exit 'typeset -a not creating an indexed array'
+foo+=([5]=good)
+[[ $(typeset | grep 'foo$') == *index* ]] || err_exit 'append to indexed array not preserving array type'
+unset foo
+typeset -A foo=([1]=ok [2]=no)
+[[ $foo[bar] == ok ]] && err_exit 'typeset -A not working for simple assignment'
+unset foo
+typeset -A foo=([1]=(x=ok) [2]=(x=no))
+[[ ${foo[bar].x} == ok ]] && err_exit 'typeset -A not working for compound assignment'
+[[ $($SHELL -c 'typeset -a foo;typeset | grep "foo$"'  2> /dev/null) == *index* ]] || err_exit 'typeset fails for indexed array with no elements'
+xxxxx=(one)
+[[ $(typeset | grep xxxxx$) == *'indexed array'* ]] || err_exit 'array of one element not an indexed array'
+unset foo
+foo[1]=(x=3 y=4)
+{ [[ ${!foo[1].*} == 'foo[1].x foo[1].y' ]] ;} 2> /dev/null || err_exit '${!foo[sub].*} not expanding correctly'
+unset x
+x=( typeset -a foo=( [0]="a" [1]="b" [2]="c" ))
+[[  ${@x.foo} == 'typeset -a'* ]] || err_exit 'x.foo is not an indexed array'
+x=( typeset -A foo=( [0]="a" [1]="b" [2]="c" ))
+[[  ${@x.foo} == 'typeset -A'* ]] || err_exit 'x.foo is not an associative array'
+$SHELL -c $'x=(foo\n\tbar\nbam\n)' 2> /dev/null || err_exit 'compound array assignment with new-lines not working'
+$SHELL -c $'x=(foo\n\tbar:\nbam\n)' 2> /dev/null || err_exit 'compound array assignment with labels not working'
+$SHELL -c $'x=(foo\n\tdone\nbam\n)' 2> /dev/null || err_exit 'compound array assignment with reserved words not working'
+[[ $($SHELL -c 'typeset -A A; print $(( A[foo].bar ))' 2> /dev/null) == 0 ]] || err_exit 'unset variable not evaluating to 0'
+unset a
+typeset -A a
+a[a].z=1
+a[z].z=2
+unset a[a]
+[[ ${!a[@]} == z ]] || err_exit '"unset a[a]" unsets entire array'
+unset a
+a=([x]=1 [y]=2 [z]=(foo=3 bar=4))
+eval "b=$(printf "%B\n" a)"
+eval "c=$(printf "%#B\n" a)"
+[[ ${a[*]} == "${b[*]}" ]] || err_exit 'printf %B not preserving values for arrays'
+[[ ${a[*]} == "${c[*]}" ]] || err_exit 'printf %#B not preserving values for arrays'
+unset a
+a=(zero one two three four)
+a[6]=six
+[[ ${a[-1]} == six ]] || err_exit 'a[-1] should be six'
+[[ ${a[-3]} == four ]] || err_exit 'a[-3] should be four'
+[[ ${a[-3..-1]} == 'four six' ]] || err_exit "a[-3,-1] should be 'four six'"
 exit $((Errors))

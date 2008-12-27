@@ -7,11 +7,14 @@
 #if !defined(__LINKAGE__)
 #define __LINKAGE__		/* 2004-08-11 transition */
 #endif
-#include <ast_getopt.h>
+#ifdef	_AST_STD_I
+#define _GETOPT_H		-1
+#endif
 
-#if !defined(_GETOPT_H) && !defined(_AST_STD_I)
-
+#ifndef _GETOPT_H
 #define _GETOPT_H		1
+
+#include <ast_getopt.h>
 
 #define no_argument		0
 #define required_argument	1

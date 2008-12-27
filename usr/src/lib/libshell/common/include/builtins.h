@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -39,8 +39,10 @@
 #define SYSBRACKET	(sh.bltin_cmds+11)
 #define SYSLET		(sh.bltin_cmds+12)
 #define SYSEXPORT	(sh.bltin_cmds+13)
+#define SYSDOT		(sh.bltin_cmds+14)
+#define SYSRETURN	(sh.bltin_cmds+15)
 #if SHOPT_BASH
-#   define SYSLOCAL	(sh.bltin_cmds+14)
+#   define SYSLOCAL	(sh.bltin_cmds+16)
 #else
 #   define SYSLOCAL	0
 #endif
@@ -54,6 +56,7 @@
 extern int b_alias(int, char*[],void*);
 extern int b_break(int, char*[],void*);
 extern int b_dot_cmd(int, char*[],void*);
+extern int b_enum(int, char*[],void*);
 extern int b_exec(int, char*[],void*);
 extern int b_eval(int, char*[],void*);
 extern int b_return(int, char*[],void*);
@@ -123,7 +126,6 @@ extern const char	e_overlimit[];
 extern const char	e_eneedsarg[];
 extern const char	e_toodeep[];
 extern const char	e_badname[];
-extern const char	e_badwrite[];
 extern const char	e_badsyntax[];
 #ifdef _cmd_universe
     extern const char	e_nouniverse[];
@@ -131,7 +133,6 @@ extern const char	e_badsyntax[];
 extern const char	e_histopen[];
 extern const char	e_condition[];
 extern const char	e_badrange[];
-extern const char	e_numeric[];
 extern const char	e_trap[];
 extern const char	e_direct[];
 extern const char	e_defedit[];

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -65,17 +65,21 @@ procclose(register Proc_t* p)
 			sigcritical(0);
 		else
 		{
-			signal(SIGINT, p->sigint);
-			signal(SIGQUIT, p->sigquit);
+			if (p->sigint != SIG_IGN)
+				signal(SIGINT, p->sigint);
+			if (p->sigquit != SIG_IGN)
+				signal(SIGQUIT, p->sigquit);
 #if defined(SIGCHLD)
 #if _lib_sigprocmask
 			sigprocmask(SIG_SETMASK, &p->mask, NiL);
 #else
 #if _lib_sigsetmask
 			sigsetmask(p->mask);
+#else
+			if (p->sigchld != SIG_DFL)
+				signal(SIGCHLD, p->sigchld);
 #endif
 #endif
-			signal(SIGCHLD, p->sigchld);
 #endif
 		}
 		status = status == -1 ?

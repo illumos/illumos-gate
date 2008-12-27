@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -27,6 +27,9 @@ alias err_exit='err_exit $LINENO'
 
 Command=${0##*/}
 integer Errors=0
+
+unset HISTFILE
+
 if	[[ $( ${SHELL-ksh} -s hello<<-\!
 		print $1
 		!
@@ -46,83 +49,85 @@ fi
 tmp=/tmp/ksh$$
 mkdir $tmp
 rc=$tmp/.kshrc
-print $'function env_hit\n{\n\tprint OK\n}' > $rc
+print $'PS1=""\nfunction env_hit\n{\n\tprint OK\n}' > $rc
 
-export ENV=$rc
+export ENV='${nosysrc}'$rc
 if	[[ -o privileged ]]
 then
-	[[ $(print env_hit | $SHELL 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | $SHELL 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged nointeractive shell reads $ENV file'
-	[[ $(print env_hit | $SHELL -E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | $SHELL -E 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged -E reads $ENV file'
-	[[ $(print env_hit | $SHELL +E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | $SHELL +E 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged +E reads $ENV file'
-	[[ $(print env_hit | $SHELL --rc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | $SHELL --rc 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged --rc reads $ENV file'
-	[[ $(print env_hit | $SHELL --norc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | $SHELL --norc 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged --norc reads $ENV file'
 else
-	[[ $(print env_hit | $SHELL 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | $SHELL 2>/dev/null) == "OK" ]] &&
 		err_exit 'nointeractive shell reads $ENV file'
-	[[ $(print env_hit | $SHELL -E 2>&1) == "OK" ]] ||
+	[[ $(print env_hit | $SHELL -E 2>/dev/null) == "OK" ]] ||
 		err_exit '-E ignores $ENV file'
-	[[ $(print env_hit | $SHELL +E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | $SHELL +E 2>/dev/null) == "OK" ]] &&
 		err_exit '+E reads $ENV file'
-	[[ $(print env_hit | $SHELL --rc 2>&1) == "OK" ]] ||
+	[[ $(print env_hit | $SHELL --rc 2>/dev/null) == "OK" ]] ||
 		err_exit '--rc ignores $ENV file'
-	[[ $(print env_hit | $SHELL --norc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | $SHELL --norc 2>/dev/null) == "OK" ]] &&
 		err_exit '--norc reads $ENV file'
+	[[ $(print env_hit | $SHELL -i 2>/dev/null) == "OK" ]] ||
+		err_exit '-i ignores $ENV file'
 fi
 
 export ENV=
 if	[[ -o privileged ]]
 then
-	[[ $(print env_hit | HOME=$tmp $SHELL 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged nointeractive shell reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL -E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL -E 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged -E ignores empty $ENV'
-	[[ $(print env_hit | HOME=$tmp $SHELL +E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL +E 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged +E reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL --rc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL --rc 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged --rc ignores empty $ENV'
-	[[ $(print env_hit | HOME=$tmp $SHELL --norc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL --norc 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged --norc reads $HOME/.kshrc file'
 else
-	[[ $(print env_hit | HOME=$tmp $SHELL 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL 2>/dev/null) == "OK" ]] &&
 		err_exit 'nointeractive shell reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL -E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL -E 2>/dev/null) == "OK" ]] &&
 		err_exit '-E ignores empty $ENV'
-	[[ $(print env_hit | HOME=$tmp $SHELL +E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL +E 2>/dev/null) == "OK" ]] &&
 		err_exit '+E reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL --rc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL --rc 2>/dev/null) == "OK" ]] &&
 		err_exit '--rc ignores empty $ENV'
-	[[ $(print env_hit | HOME=$tmp $SHELL --norc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL --norc 2>/dev/null) == "OK" ]] &&
 		err_exit '--norc reads $HOME/.kshrc file'
 fi
 
 unset ENV
 if	[[ -o privileged ]]
 then
-	[[ $(print env_hit | HOME=$tmp $SHELL 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged nointeractive shell reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL -E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL -E 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged -E reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL +E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL +E 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged +E reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL --rc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL --rc 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged --rc reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL --norc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL --norc 2>/dev/null) == "OK" ]] &&
 		err_exit 'privileged --norc reads $HOME/.kshrc file'
 else
-	[[ $(print env_hit | HOME=$tmp $SHELL 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL 2>/dev/null) == "OK" ]] &&
 		err_exit 'nointeractive shell reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL -E 2>&1) == "OK" ]] ||
+	[[ $(print env_hit | HOME=$tmp $SHELL -E 2>/dev/null) == "OK" ]] ||
 		err_exit '-E ignores $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL +E 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL +E 2>/dev/null) == "OK" ]] &&
 		err_exit '+E reads $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL --rc 2>&1) == "OK" ]] ||
+	[[ $(print env_hit | HOME=$tmp $SHELL --rc 2>/dev/null) == "OK" ]] ||
 		err_exit '--rc ignores $HOME/.kshrc file'
-	[[ $(print env_hit | HOME=$tmp $SHELL --norc 2>&1) == "OK" ]] &&
+	[[ $(print env_hit | HOME=$tmp $SHELL --norc 2>/dev/null) == "OK" ]] &&
 		err_exit '--norc reads $HOME/.kshrc file'
 fi
 
@@ -162,34 +167,34 @@ echo "echo '$t'" > .profile
 cp $SHELL ./-ksh
 if	[[ -o privileged ]]
 then
-	[[ $(HOME=$PWD $SHELL -l </dev/null 2>&1) == *$t* ]] &&
+	[[ $(HOME=$PWD $SHELL -l </dev/null 2>/dev/null) == *$t* ]] &&
 		err_exit 'privileged -l reads .profile'
-	[[ $(HOME=$PWD $SHELL --login </dev/null 2>&1) == *$t* ]] &&
+	[[ $(HOME=$PWD $SHELL --login </dev/null 2>/dev/null) == *$t* ]] &&
 		err_exit 'privileged --login reads .profile'
-	[[ $(HOME=$PWD $SHELL --login-shell </dev/null 2>&1) == *$t* ]] &&
+	[[ $(HOME=$PWD $SHELL --login-shell </dev/null 2>/dev/null) == *$t* ]] &&
 		err_exit 'privileged --login-shell reads .profile'
-	[[ $(HOME=$PWD $SHELL --login_shell </dev/null 2>&1) == *$t* ]] &&
+	[[ $(HOME=$PWD $SHELL --login_shell </dev/null 2>/dev/null) == *$t* ]] &&
 		err_exit 'privileged --login_shell reads .profile'
-	[[ $(HOME=$PWD exec -a -ksh $SHELL </dev/null 2>&1) == *$t* ]]  &&
+	[[ $(HOME=$PWD exec -a -ksh $SHELL </dev/null 2>/dev/null) == *$t* ]]  &&
 		err_exit 'privileged exec -a -ksh ksh reads .profile'
-	[[ $(HOME=$PWD ./-ksh -i </dev/null 2>&1) == *$t* ]] &&
+	[[ $(HOME=$PWD ./-ksh -i </dev/null 2>/dev/null) == *$t* ]] &&
 		err_exit 'privileged ./-ksh reads .profile'
-	[[ $(HOME=$PWD ./-ksh -ip </dev/null 2>&1) == *$t* ]] &&
+	[[ $(HOME=$PWD ./-ksh -ip </dev/null 2>/dev/null) == *$t* ]] &&
 		err_exit 'privileged ./-ksh -p reads .profile'
 else
-	[[ $(HOME=$PWD $SHELL -l </dev/null 2>&1) == *$t* ]] ||
+	[[ $(HOME=$PWD $SHELL -l </dev/null 2>/dev/null) == *$t* ]] ||
 		err_exit '-l ignores .profile'
-	[[ $(HOME=$PWD $SHELL --login </dev/null 2>&1) == *$t* ]] ||
+	[[ $(HOME=$PWD $SHELL --login </dev/null 2>/dev/null) == *$t* ]] ||
 		err_exit '--login ignores .profile'
-	[[ $(HOME=$PWD $SHELL --login-shell </dev/null 2>&1) == *$t* ]] ||
+	[[ $(HOME=$PWD $SHELL --login-shell </dev/null 2>/dev/null) == *$t* ]] ||
 		err_exit '--login-shell ignores .profile'
-	[[ $(HOME=$PWD $SHELL --login_shell </dev/null 2>&1) == *$t* ]] ||
+	[[ $(HOME=$PWD $SHELL --login_shell </dev/null 2>/dev/null) == *$t* ]] ||
 		err_exit '--login_shell ignores .profile'
-	[[ $(HOME=$PWD exec -a -ksh $SHELL </dev/null 2>&1) == *$t* ]]  ||
+	[[ $(HOME=$PWD exec -a -ksh $SHELL </dev/null 2>/dev/null) == *$t* ]]  ||
 		err_exit 'exec -a -ksh ksh ignores .profile'
-	[[ $(HOME=$PWD ./-ksh -i </dev/null 2>&1) == *$t* ]] ||
+	[[ $(HOME=$PWD ./-ksh -i </dev/null 2>/dev/null) == *$t* ]] ||
 		err_exit './-ksh ignores .profile'
-	[[ $(HOME=$PWD ./-ksh -ip </dev/null 2>&1) == *$t* ]] &&
+	[[ $(HOME=$PWD ./-ksh -ip </dev/null 2>/dev/null) == *$t* ]] &&
 		err_exit './-ksh -p does not ignore .profile'
 fi
 cd ~-
@@ -304,10 +309,68 @@ do	if	[[ -o ?$opt ]]
 	then	err_exit "[[ -o ?no$opt ]] should fail"
 	fi
 done
+
+[[ $(set +o) == $(set --state) ]] || err_exit "set --state different from set +o"
+set -- $(set --state)
+[[ $1 == set && $2 == --default ]] || err_exit "set --state failed -- expected 'set --default *', got '$1 $2 *'"
+shift
+restore=$*
+shift
+off=
+for opt
+do	case $opt in
+	--not*)	opt=${opt/--/--no} ;;
+	--no*)	opt=${opt/--no/--} ;;
+	--*)	opt=${opt/--/--no} ;;
+	esac
+	off="$off $opt"
+done
+set $off
+state=$(set --state)
+default=$(set --default --state)
+[[ $state == $default ]] || err_exit "set --state for default options failed: expected '$default', got '$state'"
+set $restore
+state=$(set --state)
+[[ $state == "set $restore" ]] || err_exit "set --state after restore failed: expected 'set $restore', got '$state'"
+
 false | true | true   || err_exit 'pipe not exiting exit value of last element'
 true | true | false   && err_exit 'pipe not exiting false'
 set -o pipefail
 false | true | true    && err_exit 'pipe with first not failing with pipefail'
 true | false | true    && err_exit 'pipe middle not failing with pipefail'
 true | true | false    && err_exit 'pipe last not failing with pipefail'
+print hi | (sleep 1;/bin/cat) > /dev/null || err_exit 'pipeline fails with pipefail' 
+(
+	set -o pipefail
+	false | true
+	(( $? )) || err_exit 'pipe not failing in subshell with pipefail'
+) | wc >/dev/null
+$SHELL -c 'set -o pipefail; false | $(whence -p true);' && err_exit 'pipefail not returning failure with sh -c'
+[[ $( set -o pipefail
+	pipe() { date | cat > /dev/null ;}
+	print $'1\n2' |
+	while	read i 
+	do 	if	pipe /tmp
+		then	{ print enter $i; sleep 2; print leave $i; } &
+		fi
+	done
+	wait) == $'enter 1\nenter 2'* ]] || err_exit  '& job delayed by pipefail'
+$SHELL -c '[[ $- == *c* ]]' || err_exit  'option c not in $-'
+trap 'rm -f /tmp/.profile' EXIT
+> /tmp/.profile
+for i in  i l r s D E a b e f h k n r t u v  x B C G H
+do	HOME=/tmp ENV= $SHELL -$i  2> /dev/null <<- ++EOF++ || err_exit "option $i not in \$-"
+	[[ \$- == *$i* ]]  ||   exit 1
+	++EOF++
+done
+letters=ilrabefhknuvxBCGE
+integer j=0
+for i in  interactive login restricted allexport notify errexit \
+	noglob  trackall keyword noexec nounset verbose xtrace braceexpand \
+	noclobber globstar rc
+do	HOME=/tmp ENV= $SHELL   -o $i  2> /dev/null <<- ++EOF++ || err_exit "option $i not equivalent to ${letters:j:1}"
+	[[ \$- == *${letters:j:1}* ]]  ||   exit 1
+	++EOF++
+	((j++))
+done
 exit $((Errors))

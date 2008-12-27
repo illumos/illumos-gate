@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -102,15 +102,16 @@ function PS1.set
 		var+="$prefix"
 		case ${remaining:1:1} in
 		t)	var+="\$(printf '%(%H:%M:%S)T')";;
-		d)	var+="\$(printf '%(%a %b:%d)T')";;
+		d)	var+="\$(printf '%(%a %b:%e)T')";;
 		n)	var+=$'\n';;
 		s)	var+=ksh;;
 		w)	var+="\$(pwd)";;
 		W)	var+="\$(basename \"\$(pwd)\")";;
 		u)	var+=$USER;;
-		h)	var+=$(hostname);;
+		h)	var+=$(hostname -s);;
 		'#')	var+=!;;
 		!)	var+=!;;
+		@)	var+="\$(printf '%(%I:%M%p)T')";;
 		'$')	if	(( $(id -u) == 0 ))
 			then	var+='#'
 			else	var+='$'
@@ -168,15 +169,47 @@ alias enable=builtin
 
 function help
 {
+	typeset b cmd usage try_cmd man
+	function has_help_option
+	{
+		[[ $1 == @(''|/*|:|echo|false|true|login|test|'[') ]] && return 1
+		return 0
+	}
+	typeset -A short_use=(
+		[echo]='Usage: echo [ options ] [arg]...'
+		[:]='Usage: : ...'
+		[true]='Usage: true ...'
+		[false]='Usage: false ...'
+		[login]='Usage: login [-p] [name]'
+		['[']='Usage: [ EXPRESSION ] | [ OPTION'
+		[test]='Usage: test EXPRESSION | test'
+	)
+	b=$(builtin)
+	if	(( $# == 0))
+	then	print 'The following is the current list of built-in commands:'
+		print -r $'Type help *name* for more information about name\n'
+		for cmd in $b
+		do	if	has_help_option $cmd
+			then	usage=$($cmd --short 2>&1)
+				print -r -- "${usage:7}"
+			else	print -r -- ${short_use[$cmd]:7}
+			fi
+		done
+		return
+	fi
+	b=${b/'['/}
 	man=--man
 	[[ $1 == -s ]] && man=--short && shift
-	b=$(builtin)
-	for i
-	do
-		for j in $b
-		do
-			[[ $i == $j ]] && $j $man
-		done
+	for try_cmd
+	do	if	has_help_option $try_cmd
+		then	if	[[ $try_cmd == @(${b//$'\n'/'|'}) ]]
+			then	$try_cmd $man
+			else	man $try_cmd
+			fi
+		elif	[[ $man == '--short' ]]
+		then	print -r -- ${short_use[$try_cmd]}
+		else	man $try_cmd
+		fi
 	done
 }
 
@@ -219,3 +252,4 @@ function cd
 typeset BASH=$0
 ! shopt -qo posix && HISTFILE=~/.bash_history
 HOSTNAME=$(hostname)
+nameref BASH_SUBSHELL=.sh.subshell

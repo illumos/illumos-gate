@@ -3,10 +3,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -117,16 +117,24 @@ struct lconv
 #define __MANGLE__ __LINKAGE__		__EXPORT__
 #endif
 
+#undef	getenv
+#define getenv		_ast_getenv
+
 #undef	localeconv
 #define localeconv	_ast_localeconv
 
 #undef	setlocale
 #define setlocale	_ast_setlocale
 
+#undef	setenviron
+#define setenviron	_ast_setenviron
+
 #undef	strerror
 #define strerror	_ast_strerror
 
+extern __MANGLE__ char*		getenv __PROTO__((const char*));
 extern __MANGLE__ struct lconv*	localeconv __PROTO__((void));
+extern __MANGLE__ char*		setenviron __PROTO__((const char*));
 extern __MANGLE__ char*		setlocale __PROTO__((int, const char*));
 extern __MANGLE__ char*		strerror __PROTO__((int));
 
@@ -334,6 +342,16 @@ extern __MANGLE__ int		_ast_getpgrp __PROTO__((void));
 #include <ast_map.h>
 
 #undef	_AST_STD_I
+
+#if _AST_GETOPT_H < 0
+#undef	_AST_GETOPT_H
+#include <ast_getopt.h>
+#endif
+
+#if _GETOPT_H < 0
+#undef	_GETOPT_H
+#include <getopt.h>
+#endif
 
 #if _REGEX_H < 0
 #undef	_REGEX_H

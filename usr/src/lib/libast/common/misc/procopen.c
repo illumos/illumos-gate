@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -360,7 +360,7 @@ restore(Proc_t* proc)
  */
 
 Proc_t*
-procopen(const char* cmd, char** argv, char** envv, long* modv, long flags)
+procopen(const char* cmd, char** argv, char** envv, long* modv, int flags)
 {
 	register Proc_t*	proc = 0;
 	register int		procfd;
@@ -368,6 +368,7 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, long flags)
 	char**			v;
 	int			i;
 	int			forked = 0;
+	int			signalled = 0;
 	long			n;
 	char			path[PATH_MAX];
 	char			env[PATH_MAX + 2];
@@ -469,10 +470,10 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, long flags)
 			sigcritical(SIG_REG_EXEC|SIG_REG_PROC);
 		else
 		{
+			signalled = 1;
 			proc->sigint = signal(SIGINT, SIG_IGN);
 			proc->sigquit = signal(SIGQUIT, SIG_IGN);
 #if defined(SIGCHLD)
-			proc->sigchld = signal(SIGCHLD, SIG_DFL);
 #if _lib_sigprocmask
 			sigemptyset(&mask);
 			sigaddset(&mask, SIGCHLD);
@@ -481,6 +482,8 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, long flags)
 #if _lib_sigsetmask
 			mask = sigmask(SIGCHLD);
 			proc->mask = sigblock(mask);
+#else
+			proc->sigchld = signal(SIGCHLD, SIG_DFL);
 #endif
 #endif
 #endif
@@ -491,25 +494,35 @@ procopen(const char* cmd, char** argv, char** envv, long* modv, long flags)
 		else if (!proc->pid)
 		{
 			if (proc->sigint != SIG_IGN)
+			{
 				proc->sigint = SIG_DFL;
-			signal(SIGINT, proc->sigint);
+				signal(SIGINT, proc->sigint);
+			}
 			if (proc->sigquit != SIG_IGN)
+			{
 				proc->sigquit = SIG_DFL;
-			signal(SIGQUIT, proc->sigquit);
+				signal(SIGQUIT, proc->sigquit);
+			}
 #if defined(SIGCHLD)
+#if _lib_sigprocmask
+			sigprocmask(SIG_SETMASK, &proc->mask, NiL);
+#else
+#if _lib_sigsetmask
+			sigsetmask(proc->mask);
+#else
 			if (proc->sigchld != SIG_IGN)
-				proc->sigchld = SIG_DFL;
-			signal(SIGCHLD, proc->sigchld);
+				signal(SIGCHLD, SIG_DFL);
+#endif
+#endif
 #endif
 		}
-		if (proc->pid == -1)
+		else if (proc->pid == -1)
 			goto bad;
 		forked = 1;
 	}
 #endif
 	if (!proc->pid)
 	{
-		char*		s;
 #if _use_spawnveg
 		char**		oenviron = 0;
 		char*		oenviron0 = 0;
@@ -731,10 +744,22 @@ sfsync(sfstderr);
 		{
 			if (flags & PROC_FOREGROUND)
 			{
+				signalled = 1;
 				proc->sigint = signal(SIGINT, SIG_IGN);
 				proc->sigquit = signal(SIGQUIT, SIG_IGN);
 #if defined(SIGCHLD)
+#if _lib_sigprocmask
+				sigemptyset(&mask);
+				sigaddset(&mask, SIGCHLD);
+				sigprocmask(SIG_BLOCK, &mask, &proc->mask);
+#else
+#if _lib_sigsetmask
+				mask = sigmask(SIGCHLD);
+				proc->mask = sigblock(mask);
+#else
 				proc->sigchld = signal(SIGCHLD, SIG_DFL);
+#endif
+#endif
 #endif
 			}
 		}
@@ -798,6 +823,25 @@ sfsync(sfstderr);
 		return proc;
 	}
  bad:
+	if (signalled)
+	{
+		if (proc->sigint != SIG_IGN)
+			signal(SIGINT, proc->sigint);
+		if (proc->sigquit != SIG_IGN)
+			signal(SIGQUIT, proc->sigquit);
+#if defined(SIGCHLD)
+#if _lib_sigprocmask
+		sigprocmask(SIG_SETMASK, &proc->mask, NiL);
+#else
+#if _lib_sigsetmask
+		sigsetmask(proc->mask);
+#else
+		if (proc->sigchld != SIG_DFL)
+			signal(SIGCHLD, proc->sigchld);
+#endif
+#endif
+#endif
+	}
 	if ((flags & PROC_CLEANUP) && modv)
 		for (i = 0; n = modv[i]; i++)
 			switch (PROC_OP(n))

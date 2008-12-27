@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -33,20 +33,20 @@
 typedef struct shtable1
 {
 	const char	*sh_name;
-	unsigned	sh_number;
+	const unsigned	sh_number;
 } Shtable_t;
 
 struct shtable2
 {
 	const char	*sh_name;
-	unsigned	sh_number;
+	const unsigned	sh_number;
 	const char	*sh_value;
 };
 
 struct shtable3
 {
 	const char	*sh_name;
-	unsigned	sh_number;
+	const unsigned	sh_number;
 	int		(*sh_value)(int, char*[], void*);
 };
 

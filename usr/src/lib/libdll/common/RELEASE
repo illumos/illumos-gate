@@ -1,3 +1,4 @@
+08-05-12 dllscan.c: LIBSUFFIX==.dylib => default plugin version match 0.0
 06-10-11 dllscan.c: check sfstruse() return values -- doh
 06-01-25 dllplug.c: add errorf() library message for dlopen() error
 05-02-14 dllscan.c: "" || "-" => NiL

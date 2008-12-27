@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -166,6 +166,21 @@ x=[123]def
 if	[[ "${x//\[(*)\]/\{\1\}}" != {123}def ]]
 then	err_exit 'closing brace escape not working'
 fi
+xx=%28text%29
+if	[[ ${xx//%28/abc\)} != 'abc)text%29' ]]
+then	 err_exit '${xx//%28/abc\)} not working'
+fi
+xx='a:b'
+str='(){}[]*?|&^%$#@l'
+for ((i=0 ; i < ${#str}; i++))
+do      [[ $(eval print -r -- \"\${xx//:/\\${str:i:1}}\") == "a${str:i:1}b" ]] || err_exit "substitution of \\${str:i:1}} failed"
+        [[ $(eval print -rn -- \"\${xx//:/\'${str:i:1}\'}\") == "a${str:i:1}b" ]] || err_exit "substitution of '${str:i:1}' failed"
+        [[ $(eval print -r -- \"\${xx//:/\"${str:i:1}\"}\") == "a${str:i:1}b" ]] || err_exit "substitution of \"${str:i:1}\" failed"
+done
+[[ ${xx//:/\\n} == 'a\nb' ]]  || err_exit "substituion of \\\\n failed"
+[[ ${xx//:/'\n'} == 'a\nb' ]] || err_exit "substituion of '\\n' failed"
+[[ ${xx//:/"\n"} ==  'a\nb' ]] || err_exit "substituion of \"\\n\" failed"
+[[ ${xx//:/$'\n'} ==  $'a\nb' ]] || err_exit "substituion of \$'\\n' failed"
 unset foo
 foo=one/two/three
 if	[[ ${foo//'/'/_} != one_two_three ]]
@@ -245,13 +260,6 @@ fi
 if	[[ ${var//+(\S)/Q} != 'Q Q' ]]
 then	err_exit '${var//+(\S)/Q} not workding'
 fi
-if	[[ "$(LC_ALL=debug $SHELL <<- \+EOF+
-		x=a<2bc><3xyz>g
-		print ${#x}
-		+EOF+)" != 4
-	]]
-then	err_exit '${#x} not working with multibyte locales'
-fi
 foo='foo+bar+'
 [[ $(print -r -- ${foo//+/'|'}) != 'foo|bar|' ]] && err_exit "\${foobar//+/'|'}"
 [[ $(print -r -- ${foo//+/"|"}) != 'foo|bar|' ]] && err_exit '${foobar//+/"|"}'
@@ -270,6 +278,10 @@ unset a b
 a='\[abc @(*) def\]'
 b='[abc 123 def]'
 [[ ${b//$a/\1} == 123 ]] || err_exit "\${var/pattern} not working with \[ in pattern"
+unset foo
+foo='(win32.i386) '
+[[ ${foo/'('/'(x11-'} == '(x11-win32.i386) ' ]] || err_exit "\${var/pattern} not working with ' in pattern" 
+$SHELL -c $'v=\'$(hello)\'; [[ ${v//\'$(\'/-I\'$(\'} == -I"$v" ]]' 2> /dev/null || err_exit "\${var/pattern} not working with \$( as pattern"
 unset X
 $SHELL -c '[[ ! ${X[@]:0:300} ]]' 2> /dev/null || err_exit '${X[@]:0:300} with X undefined fails'
 $SHELL -c '[[ ${@:0:300} == "$0" ]]' 2> /dev/null || err_exit '${@:0:300} with no arguments fails'
@@ -501,4 +513,56 @@ then	LC_ALL=en_US.UTF-8 $SHELL -c b1=$'"\342\202\254\342\202\254\342\202\254\342
 fi
 { $SHELL -c 'unset x;[[ ${SHELL:$x} == $SHELL ]]';} 2> /dev/null || err_exit '${var:$x} fails when x is not set' 
 { $SHELL -c 'x=;[[ ${SHELL:$x} == $SHELL ]]';} 2> /dev/null || err_exit '${var:$x} fails when x is null' 
+
+#	subject		mode	pattern			result	#
+set --							\
+	'a$z'		'E'	'[$]|#'		'a($)z'	\
+	'a#z'		'E'	'[$]|#'		'a(#)z'	\
+	'a$z'		'Elr'	'[$]|#'		'a$z'	\
+	'a#z'		'Elr'	'[$]|#'		'a#z'	\
+	'a$'		'E'	'[$]|#'		'a($)'	\
+	'a#'		'E'	'[$]|#'		'a(#)'	\
+	'a$'		'Elr'	'[$]|#'		'a$'	\
+	'a#'		'Elr'	'[$]|#'		'a#'	\
+	'$z'		'E'	'[$]|#'		'($)z'	\
+	'#z'		'E'	'[$]|#'		'(#)z'	\
+	'$z'		'Elr'	'[$]|#'		'$z'	\
+	'#z'		'Elr'	'[$]|#'		'#z'	\
+	'$'		'E'	'[$]|#'		'($)'	\
+	'#'		'E'	'[$]|#'		'(#)'	\
+	'$'		'Elr'	'[$]|#'		'($)'	\
+	'#'		'Elr'	'[$]|#'		'(#)'	\
+	'a$z'		'E'	'\$|#'		'a$z()'	\
+	'a$z'		'E'	'\\$|#'		'a$z'	\
+	'a$z'		'E'	'\\\$|#'	'a($)z'	\
+	'a#z'		'E'	'\\\$|#'	'a(#)z'	\
+	'a$z'		'Elr'	'\\\$|#'	'a$z'	\
+	'a#z'		'Elr'	'\\\$|#'	'a#z'	\
+	'a$'		'E'	'\\\$|#'	'a($)'	\
+	'a#'		'E'	'\\\$|#'	'a(#)'	\
+	'a$'		'Elr'	'\\\$|#'	'a$'	\
+	'a#'		'Elr'	'\\\$|#'	'a#'	\
+	'$z'		'E'	'\\\$|#'	'($)z'	\
+	'#z'		'E'	'\\\$|#'	'(#)z'	\
+	'$z'		'Elr'	'\\\$|#'	'$z'	\
+	'#z'		'Elr'	'\\\$|#'	'#z'	\
+	'$'		'E'	'\\\$|#'	'($)'	\
+	'#'		'E'	'\\\$|#'	'(#)'	\
+	'$'		'Elr'	'\\\$|#'	'($)'	\
+	'#'		'Elr'	'\\\$|#'	'(#)'	\
+#	do not delete this line			#
+unset i o
+while	(( $# >= 4 ))
+do	i=$1
+	eval o="\${i/~($2)$3/\\(\\0\\)}"
+	if	[[ "$o" != "$4" ]]
+	then	err_exit "i='$1'; \${i/~($2)$3/\\(\\0\\)} failed -- expected '$4', got '$o'"
+	fi
+	eval o="\${i/~($2)($3)/\\(\\1\\)}"
+	if	[[ "$o" != "$4" ]]
+	then	err_exit "i='$1'; \${i/~($2)($3)/\\(\\1\\)} failed -- expected '$4', got '$o'"
+	fi
+	shift 4
+done
+
 exit $((Errors))

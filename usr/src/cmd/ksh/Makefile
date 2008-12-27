@@ -18,19 +18,18 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SHELL=/usr/bin/ksh
+SHELL=/usr/bin/ksh93
 
 include ../../Makefile.ksh93switch
 
 $(BINKSH_IS_KSH93)PROG= ksh
-$(BINKSH_IS_KSH93)USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh
+$(BINKSH_IS_KSH93)USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh pfksh93 pfrksh pfrksh93
 
 $(BINKSH_ISNOT_KSH93)PROG= ksh93
 $(BINKSH_ISNOT_KSH93)USRKSH_ALIAS_LIST=ksh93 rksh93
@@ -39,6 +38,8 @@ include ../Makefile.cmd
 
 SUBDIRS= $(MACH)
 $(BUILD64)SUBDIRS += $(MACH64)
+
+SUBDIRS += builtins
 
 # Serialise the build to avoid that we run the test suite for 32bit
 # and 64bit in parallel
@@ -59,17 +60,19 @@ all clean clobber lint testshell: $(SUBDIRS)
 # (and "ksh" is just a frontend which calls directly into libshell,
 # e.g. there are no l10n strings here)
 $(PROG).po:
-	$(RM) ksh.po ksh93.po
-	touch $(PROG).po
+	$(RM) ksh.po ksh93.po ; \
+	$(TOUCH) $(PROG).po
 
 install:	$(ISAEXEC) $(SUBDIRS)
-	$(RM) $(ROOTPROG)
-	$(LN) $(ISAEXEC) $(ROOTPROG)
 	@(set -o xtrace ; \
+	builtin ln ; \
+	builtin rm ; \
+	rm -f  $(ROOTPROG) ; \
+	ln $(ISAEXEC) $(ROOTPROG) ; \
 	for i in $(USRKSH_ALIAS_LIST) ; do \
-		[[ "$$i" = "$(PROG)" ]] && continue ; \
-		$(RM) "$(ROOTBIN)/$$i" ; \
-		$(LN) "$(ROOTBIN)/$(PROG)" "$(ROOTBIN)/$$i" ; \
+		[[ "$$i" == "$(PROG)" ]] && continue ; \
+		rm -f "$(ROOTBIN)/$$i" ; \
+		ln "$(ROOTBIN)/$(PROG)" "$(ROOTBIN)/$$i" ; \
 	done \
 	)
 

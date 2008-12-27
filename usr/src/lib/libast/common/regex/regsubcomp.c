@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -201,17 +201,6 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 			p->re_npat = s - o - 1;
 			break;
 		}
-		else if (c == '~')
-		{
-			if (!sre || *s != '(')
-			{
-				*t++ = c;
-				continue;
-			}
-			r = s - 1;
-			s++;
-			c = *s++;
-		}
 		else if (c == '\\')
 		{
 			if (*s == c)
@@ -225,12 +214,6 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 			{
 				regfree(p);
 				return fatal(disc, REG_EESCAPE, s - 2);
-			}
-			if (sre)
-			{
-				*t++ = chresc(s - 2, &e);
-				s = (const char*)e;
-				continue;
 			}
 			if (c == '&')
 			{
@@ -279,22 +262,10 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 		case '0': case '1': case '2': case '3': case '4':
 		case '5': case '6': case '7': case '8': case '9':
 			c -= '0';
-			if (sre)
-				while (isdigit(*s))
-					c = c * 10 + *s++ - '0';
-			else if (isdigit(*s) && (p->env->flags & REG_MULTIREF))
+			if (isdigit(*s) && (p->env->flags & REG_MULTIREF))
 				c = c * 10 + *s++ - '0';
 			break;
 		case 'l':
-			if (sre)
-			{
-				if (*s != ')')
-				{
-					c = -1;
-					break;
-				}
-				s++;
-			}
 			if (c = *s)
 			{
 				s++;
@@ -304,15 +275,6 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 			}
 			continue;
 		case 'u':
-			if (sre)
-			{
-				if (*s != ')')
-				{
-					c = -1;
-					break;
-				}
-				s++;
-			}
 			if (c = *s)
 			{
 				s++;
@@ -322,15 +284,6 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 			}
 			continue;
 		case 'E':
-			if (sre)
-			{
-				if (*s != ')')
-				{
-					c = -1;
-					break;
-				}
-				s++;
-			}
 			f = g;
 		set:
 			if ((op->len = (t - sub->re_rhs) - op->off) && (n = ++op - sub->re_ops) >= nops)
@@ -346,28 +299,10 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 			op->off = t - sub->re_rhs;
 			continue;
 		case 'L':
-			if (sre)
-			{
-				if (*s != ')')
-				{
-					c = -1;
-					break;
-				}
-				s++;
-			}
 			g = f;
 			f = REG_SUB_LOWER;
 			goto set;
 		case 'U':
-			if (sre)
-			{
-				if (*s != ')')
-				{
-					c = -1;
-					break;
-				}
-				s++;
-			}
 			g = f;
 			f = REG_SUB_UPPER;
 			goto set;
@@ -381,16 +316,6 @@ regsubcomp(regex_t* p, register const char* s, const regflags_t* map, int minmat
 			s--;
 			c = -1;
 			break;
-		}
-		if (sre)
-		{
-			if (c < 0 || *s != ')')
-			{
-				while (r < s)
-					*t++ = *r++;
-				continue;
-			}
-			s++;
 		}
 		if (c > p->re_nsub)
 		{

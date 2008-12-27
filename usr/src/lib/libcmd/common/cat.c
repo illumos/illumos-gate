@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -31,7 +31,7 @@
 #include <fcntl.h>
 
 static const char usage[] =
-"[-?\n@(#)$Id: cat (AT&T Research) 2006-05-17 $\n]"
+"[-?\n@(#)$Id: cat (AT&T Research) 2007-07-17 $\n]"
 USAGE_LICENSE
 "[+NAME?cat - concatenate files]"
 "[+DESCRIPTION?\bcat\b copies each \afile\a in sequence to the standard"
@@ -111,6 +111,7 @@ vcat(register char* states, Sfio_t *fdin, Sfio_t *fdout, int flags)
 	unsigned char*		inbuff;
 	int			printdefer = (flags&(B_FLAG|N_FLAG));
 	int			lastchar;
+	int			lastline;
 
 	unsigned char		meta[4];
 
@@ -197,6 +198,7 @@ vcat(register char* states, Sfio_t *fdin, Sfio_t *fdout, int flags)
 					while ((n=states[*cp])==T_CONTROL);
 					break;
 				case T_NEWLINE:
+					lastline = line;
 					if (flags&S_FLAG)
 					{
 						while (states[*++cp]==T_NEWLINE)
@@ -209,6 +211,12 @@ vcat(register char* states, Sfio_t *fdin, Sfio_t *fdout, int flags)
 						if (flags&E_FLAG)
 							sfputc(fdout,'$');
 						sfputc(fdout,'\n');
+						if(line > lastline)
+						{
+							if (flags&E_FLAG)
+								sfputc(fdout,'$');
+							sfputc(fdout,'\n');
+						}
 						if (!(flags&(N_FLAG|B_FLAG)))
 							continue;
 						line++;
@@ -327,7 +335,7 @@ b_cat(int argc, char** argv, void* context)
 		if (!(flags&T_FLAG))
 			states['\t'] = 0;
 	}
-	if (flags&(V_FLAG|T_FLAG|N_FLAG|E_FLAG|B_FLAG))
+	if (flags&(V_FLAG|T_FLAG|N_FLAG|E_FLAG|B_FLAG|S_FLAG))
 	{
 		states['\n'] = T_NEWLINE;
 		dovcat = 1;

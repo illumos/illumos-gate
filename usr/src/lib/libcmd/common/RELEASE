@@ -1,4 +1,38 @@
-07-03-28 date.c: add --unelepsed=scale, -U: fmtelapsed() => strelapsed()
+08-10-15 rm.c: handle 'rm -f x x' => exit 0
+08-09-08 stty.c: #ifdef guard TAB[012] -- freebsd: damn the posix, full speed ahead
+08-06-17 shcmd.h: move to libast
+08-04-24 uniq.c: add optget() 'n' option for -1 => -f1
+08-04-24 getconf.c: clarify diffs between "name - value" and "name = value"
+08-04-01 cut.c: add write error check
+08-04-01 paste.c: fix --noserial stream vector access bug
+08-04-01 pids.c: add ls/ps style --format=format
+08-04-01 stty.c: fix off2 unitialized reference
+08-03-28 chgrp.c: add --before=file
+08-03-14 pids.c: add
+08-03-11 chgrp.c: fix -m to use uid:gid as lookup key
+08-02-11 Makefile: add -lmd possibly required by sumlib.o -- hack alert
+08-01-30 expr.c: fix <=0 type that broke substr * 1 * -- wow
+07-12-13 cp.c: fix builtin state reinitialization
+07-11-29 rev.c: honor multibyte locales
+07-11-27 cp.c: open non-existent destination with O_EXCL
+07-11-27 stty.c: add -t,--terminal-group to list tty pgrp
+07-11-27 cksum.c: --silent -s => -S, -s == -x sys5 for gnu compatibility
+07-11-11 tee.c: drop ancient bsd compatibility "-" operand => SIGINT
+07-10-29 cksum.c: add SUM_LEGACY for -r
+07-10-12 cp.c: plug usage string memory leak by using per-builtin state
+07-09-21 cksum.c: add sumprint() default scale arg, --scale, --bsd for solaris
+07-09-10 chmod.c: add --show,-n
+07-07-27 wclib.c: bias <wchar.h> checks for modern unix
+07-07-17 cat.c: fix --squeeze-blank to reduce multiple blank lines to *one*
+07-05-20 cmd.h: handle msvc's balk at if(0)0=0;
+07-05-20 cksum.c: #include <modex.h>
+07-05-11 cmd.h: add _CMD_CONTEXT_OK() to verify >= 20070511 context
+07-05-09 fds.c: handle ipv6 sockets
+07-05-09 cmd.h: <shbltin.h> : cmdquit() => sh_checksig(context)
+07-04-25 mkdir.c: force (S_ISVTX|S_ISUID|S_ISGID) after mkdir(2)
+07-04-24 procrun.c: add -last intercept => sh_run() and whence -q
+07-04-19 uname.c: name operands first checked for CS_NAME, then NAME
+07-03-28 date.c: add --unelapsed=scale, -U: fmtelapsed() => strelapsed()
 07-03-25 wclib.h: iswspace() requires <wctype.h>!
 07-03-11 tty.c: add sysV --line-number, -l
 07-02-26 Makefile: sumlib.o: direct extract from +lsum (vcodex someday)

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -76,16 +76,22 @@ signal(int sig, Sig_handler_t fun)
 {
 	struct sigaction	na;
 	struct sigaction	oa;
+	int			unblock;
 #ifdef SIGNO_MASK
 	unsigned int		flags;
 #endif
 
+	if (sig < 0)
+	{
+		sig = -sig;
+		unblock = 0;
+	}
+	else
+		unblock = fun == SIG_DFL;
 #ifdef SIGNO_MASK
 	flags = sig & ~SIGNO_MASK;
 	sig &= SIGNO_MASK;
 #endif
-	if (fun == SIG_DFL)
-		sigunblock(sig);
 	memzero(&na, sizeof(na));
 	na.sa_handler = fun;
 #if defined(SA_INTERRUPT) || defined(SA_RESTART)
@@ -116,7 +122,11 @@ signal(int sig, Sig_handler_t fun)
 		break;
 	}
 #endif
-	return(sigaction(sig, &na, &oa) ? (Sig_handler_t)0 : oa.sa_handler);
+	if (sigaction(sig, &na, &oa))
+		return 0;
+	if (unblock)
+		sigunblock(sig);
+	return oa.sa_handler;
 }
 
 #else

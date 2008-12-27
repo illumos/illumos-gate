@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,16 +27,17 @@
 */
 
 #if __STD_C
-int sfclose(reg Sfio_t* f)
+int sfclose(Sfio_t* f)
 #else
 int sfclose(f)
-reg Sfio_t*	f;
+Sfio_t*	f;
 #endif
 {
 	reg int		local, ex, rv;
 	Void_t*		data = NIL(Void_t*);
+	SFMTXDECL(f);
 
-	SFMTXSTART(f, -1);
+	SFMTXENTER(f, -1);
 
 	GETLOCAL(f,local);
 
@@ -52,6 +53,7 @@ reg Sfio_t*	f;
 
 		if(!(pop = (*_Sfstack)(f,NIL(Sfio_t*))) )
 			SFMTXRETURN(f,-1);
+
 		if(sfclose(pop) < 0)
 		{	(*_Sfstack)(f,pop);
 			SFMTXRETURN(f,-1);
@@ -116,7 +118,7 @@ reg Sfio_t*	f;
 
 	/* zap the file descriptor */
 	if(_Sfnotify)
-		(*_Sfnotify)(f,SF_CLOSING,f->file);
+		(*_Sfnotify)(f, SF_CLOSING, (void*)((long)f->file));
 	if(f->file >= 0 && !(f->flags&SF_STRING))
 		CLOSE(f->file);
 	f->file = -1;

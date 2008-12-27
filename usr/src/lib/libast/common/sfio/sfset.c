@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,17 +27,18 @@
 */
 
 #if __STD_C
-int sfset(reg Sfio_t* f, reg int flags, reg int set)
+int sfset(Sfio_t* f, int flags, int set)
 #else
 int sfset(f,flags,set)
-reg Sfio_t*	f;
-reg int		flags;
-reg int		set;
+Sfio_t*		f;
+int		flags;
+int		set;
 #endif
 {
 	reg int	oflags;
+	SFMTXDECL(f);
 
-	SFMTXSTART(f,0);
+	SFMTXENTER(f,0);
 
 	if(flags == 0 && set == 0)
 		SFMTXRETURN(f, (f->flags&SF_FLAGS));

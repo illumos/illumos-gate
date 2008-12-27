@@ -19,27 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/libdll/common/llib-ldll
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 
 #include <dlldefs.h>
-
-/* automatically generated data start here */
-extern Dllinfo_t* dllinfo(void);
-extern void* dllplug(const char*, const char*, const char*, int, char*, size_t);
-extern void* dllfind(const char*, const char*, int, char*, size_t);
-extern void* dllnext(int);
-extern void* dlllook(void*, const char*);
-extern Dllscan_t* dllsopen(const char*, const char*, const char*);
-extern Dllent_t* dllsread(Dllscan_t*);
-extern int dllsclose(Dllscan_t*);
-/* end of automatically generated data */

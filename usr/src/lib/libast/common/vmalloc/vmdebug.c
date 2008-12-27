@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -274,11 +274,14 @@ Void_t*		addr;
 	reg Vmuchar_t*	data;
 	reg long	offset = -1L;
 	reg Vmdata_t*	vd = vm->data;
-	reg int		local;
+	reg int		local, inuse;
 
+	SETINUSE(vd, inuse);
 	GETLOCAL(vd,local);
 	if(ISLOCK(vd,local) || !addr)
+	{	CLRINUSE(vd, inuse);
 		return -1L;
+	}
 	SETLOCK(vd,local);
 
 	b = endb = NIL(Block_t*);
@@ -319,6 +322,7 @@ Void_t*		addr;
 
 done:
 	CLRLOCK(vd,local);
+	CLRINUSE(vd, inuse);
 	return offset;
 }
 
@@ -335,9 +339,13 @@ Void_t*		addr;
 	reg Seg_t*	seg;
 	reg long	size;
 	reg Vmdata_t*	vd = vm->data;
+	reg int		inuse;
 
+	SETINUSE(vd, inuse);
 	if(ISLOCK(vd,0))
+	{	CLRINUSE(vd, inuse);
 		return -1L;
+	}
 	SETLOCK(vd,0);
 
 	size = -1L;
@@ -359,6 +367,7 @@ Void_t*		addr;
 	}
 done:
 	CLRLOCK(vd,0);
+	CLRINUSE(vd, inuse);
 	return size;
 }
 
@@ -376,11 +385,14 @@ size_t		size;
 	reg int			line;
 	reg Void_t*		func;
 	reg Vmdata_t*		vd = vm->data;
+	reg int			inuse;
 
+	SETINUSE(vd, inuse);
 	VMFLF(vm,file,line,func);
 
 	if(ISLOCK(vd,0) )
 	{	dbwarn(vm,NIL(Vmuchar_t*),0,file,line,func,DB_ALLOC);
+		CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
 	}
 	SETLOCK(vd,0);
@@ -411,6 +423,7 @@ size_t		size;
 done:
 	CLRLOCK(vd,0);
 	ANNOUNCE(0, vm, VM_ALLOC, (Void_t*)data, vm->disc);
+	CLRINUSE(vd, inuse);
 	return (Void_t*)data;
 }
 
@@ -429,14 +442,19 @@ Void_t*		data;
 	reg long	offset;
 	reg int		rv, *ip, *endip;
 	reg Vmdata_t*	vd = vm->data;
+	reg int		inuse;
 
+	SETINUSE(vd, inuse);
 	VMFLF(vm,file,line,func);
 
 	if(!data)
+	{	CLRINUSE(vd, inuse);
 		return 0;
+	}
 
 	if(ISLOCK(vd,0) )
 	{	dbwarn(vm,NIL(Vmuchar_t*),0,file,line,func,DB_FREE);
+		CLRINUSE(vd, inuse);
 		return -1;
 	}
 	SETLOCK(vd,0);
@@ -449,6 +467,7 @@ Void_t*		data;
 			(void)(*vm->disc->exceptf)(vm,VM_BADADDR,data,vm->disc);
 		dbwarn(vm,(Vmuchar_t*)data,offset == -1L ? 0 : 1,file,line,func,DB_FREE);
 		CLRLOCK(vd,0);
+		CLRINUSE(vd, inuse);
 		return -1;
 	}
 
@@ -469,6 +488,7 @@ Void_t*		data;
 	rv = KPVFREE((vm), (Void_t*)DB2BEST(data), (*Vmbest->freef));
 	CLRLOCK(vd,0);
 	ANNOUNCE(0, vm, VM_FREE, data, vm->disc);
+	CLRINUSE(vd, inuse);
 	return rv;
 }
 
@@ -490,7 +510,9 @@ int		type;		/* !=0 for movable, >0 for copy	*/
 	int		line, oldline;
 	Void_t*		func;
 	reg Vmdata_t*	vd = vm->data;
+	reg int		inuse;
 
+	SETINUSE(vd, inuse);
 	if(!addr)
 	{	oldsize = 0;
 		data = (Vmuchar_t*)dballoc(vm,size);
@@ -498,6 +520,7 @@ int		type;		/* !=0 for movable, >0 for copy	*/
 	}
 	if(size == 0)
 	{	(void)dbfree(vm,addr);
+		CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
 	}
 
@@ -505,6 +528,7 @@ int		type;		/* !=0 for movable, >0 for copy	*/
 
 	if(ISLOCK(vd,0) )
 	{	dbwarn(vm,NIL(Vmuchar_t*),0,file,line,func,DB_RESIZE);
+		CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
 	}
 	SETLOCK(vd,0);
@@ -517,6 +541,7 @@ int		type;		/* !=0 for movable, >0 for copy	*/
 			(void)(*vm->disc->exceptf)(vm,VM_BADADDR,addr,vm->disc);
 		dbwarn(vm,(Vmuchar_t*)addr,offset == -1L ? 0 : 1,file,line,func,DB_RESIZE);
 		CLRLOCK(vd,0);
+		CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
 	}
 
@@ -558,6 +583,7 @@ done:	if(data && (type&VM_RSZERO) && size > oldsize)
 	{	reg Vmuchar_t *d = data+oldsize, *ed = data+size;
 		do { *d++ = 0; } while(d < ed);
 	}
+	CLRINUSE(vd, inuse);
 	return (Void_t*)data;
 }
 
@@ -681,14 +707,20 @@ size_t		align;
 	reg int			line;
 	reg Void_t*		func;
 	reg Vmdata_t*		vd = vm->data;
+	reg int			inuse;
 
+	SETINUSE(vd, inuse);
 	VMFLF(vm,file,line,func);
 
 	if(size <= 0 || align <= 0)
+	{	CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
+	}
 
 	if(ISLOCK(vd,0) )
+	{	CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
+	}
 	SETLOCK(vd,0);
 
 	if((s = ROUND(size,ALIGN) + DB_EXTRA) < sizeof(Body_t))
@@ -708,6 +740,7 @@ size_t		align;
 done:
 	CLRLOCK(vd,0);
 	ANNOUNCE(0, vm, VM_ALLOC, (Void_t*)data, vm->disc);
+	CLRINUSE(vd, inuse);
 	return (Void_t*)data;
 }
 

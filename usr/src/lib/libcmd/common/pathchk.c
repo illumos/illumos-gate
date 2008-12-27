@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -78,9 +78,9 @@ USAGE_LICENSE
  */ 
 static long mypathconf(const char *path, int op)
 {
-	register long r;
+	register long			r;
 
-	static const char*	ops[] = { "NAME_MAX", "PATH_MAX" };
+	static const char* const	ops[] = { "NAME_MAX", "PATH_MAX" };
 
 	errno=0;
 	if((r=strtol(astconf(ops[op], path, NiL), NiL, 0))<0 && errno==0)

@@ -18,14 +18,13 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SHELL=/usr/bin/ksh
+SHELL=/usr/bin/ksh93
 
 LIBRARY=	libast.a
 VERS=		.1
@@ -179,6 +178,9 @@ OBJECTS += \
 	common/hash/strhash.o \
 	common/hash/strkey.o \
 	common/hash/strsum.o \
+	common/misc/astintercept.o \
+	common/misc/debug.o \
+	common/misc/cmdarg.o \
 	common/misc/error.o \
 	common/misc/errorf.o \
 	common/misc/errormsg.o \
@@ -190,6 +192,7 @@ OBJECTS += \
 	common/misc/ftwalk.o \
 	common/misc/ftwflags.o \
 	common/misc/getcwd.o \
+	common/misc/getenv.o \
 	common/misc/glob.o \
 	common/misc/liberror.o \
 	common/misc/libevent.o \
@@ -199,6 +202,7 @@ OBJECTS += \
 	common/misc/optesc.o \
 	common/misc/optget.o \
 	common/misc/optjoin.o \
+	common/misc/optctx.o \
 	common/misc/procclose.o \
 	common/misc/procfree.o \
 	common/misc/procopen.o \
@@ -378,6 +382,7 @@ OBJECTS += \
 	common/stdio/fgetwc.o \
 	common/stdio/fgetws.o \
 	common/stdio/fileno.o \
+	common/stdio/flockfile.o \
 	common/stdio/fopen.o \
 	common/stdio/fprintf.o \
 	common/stdio/fpurge.o \
@@ -385,6 +390,7 @@ OBJECTS += \
 	common/stdio/fputs.o \
 	common/stdio/fputwc.o \
 	common/stdio/fputws.o \
+	common/stdio/funlockfile.o \
 	common/stdio/fread.o \
 	common/stdio/freopen.o \
 	common/stdio/fscanf.o \
@@ -393,6 +399,7 @@ OBJECTS += \
 	common/stdio/fsetpos.o \
 	common/stdio/ftell.o \
 	common/stdio/ftello.o \
+	common/stdio/ftrylockfile.o \
 	common/stdio/fwide.o \
 	common/stdio/fwprintf.o \
 	common/stdio/fwrite.o \
@@ -461,6 +468,7 @@ OBJECTS += \
 	common/string/fmtgid.o \
 	common/string/fmtident.o \
 	common/string/fmtip4.o \
+	common/string/fmtip6.o \
 	common/string/fmtls.o \
 	common/string/fmtmatch.o \
 	common/string/fmtmode.o \
@@ -498,7 +506,9 @@ OBJECTS += \
 	common/string/strntol.o \
 	common/string/strntold.o \
 	common/string/strntoll.o \
+	common/string/strnton.o \
 	common/string/strntoul.o \
+	common/string/strntonll.o \
 	common/string/strntoull.o \
 	common/string/stropt.o \
 	common/string/strperm.o \
@@ -507,6 +517,7 @@ OBJECTS += \
 	common/string/strsort.o \
 	common/string/strtape.o \
 	common/string/strtoip4.o \
+	common/string/strtoip6.o \
 	common/string/strton.o \
 	common/string/strtonll.o \
 	common/string/struid.o \
@@ -646,7 +657,7 @@ include ../../Makefile.lib
 # automated code updates easier.
 MAPFILES=       ../mapfile-vers
 
-# Set common AST build flags (e.g., needed to support the math stuff).
+# Set common AST build flags (e.g. C99/XPG6, needed to support the math stuff)
 include ../../../Makefile.ast
 
 # special rule because sources live both ../common (normal)
@@ -655,7 +666,10 @@ SRCS=		$(OBJECTS:%.o=../%.c)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 
-LDLIBS +=	-lsocket -lm -lc
+LDLIBS += \
+	-lsocket \
+	-lm \
+	-lc
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
@@ -690,35 +704,32 @@ CPPFLAGS = \
 	'-DCONF_LIBSUFFIX=".so"' \
 	'-DCONF_LIBPREFIX="lib"' \
 	-DERROR_CATALOG=\""libast"\" \
-	-D__OBSOLETE__=20060101 \
+	-D__OBSOLETE__=20080101 \
 	-D_BLD_ast \
 	-D_PACKAGE_ast \
 	-D_BLD_DLL
 
 CFLAGS += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS)
 CFLAGS64 += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS64)
 
-pics/$(MACH)/src/lib/libast/conftab.o	:= CERRWARN += -erroff=E_C99_INTEGER_PROMOTION
 pics/$(MACH)/src/lib/libast/conftab.o \
 pics/$(MACH64)/src/lib/libast/conftab.o	:= CERRWARN += -erroff=E_INIT_DOES_NOT_FIT
+pics/common/comp/setlocale.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
+pics/common/comp/setlocale.o		:= CERRWARN += -erroff=E_INIT_DOES_NOT_FIT
 pics/common/hash/hashlook.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
 pics/common/hash/memhash.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
 pics/common/hash/memsum.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
 pics/common/hash/strhash.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
 pics/common/hash/strsum.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
-pics/common/path/pathkey.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
-pics/common/comp/setlocale.o		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
-pics/common/comp/setlocale.o		:= CERRWARN += -erroff=E_INIT_DOES_NOT_FIT
-pics/common/misc/translate.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
 pics/common/misc/recstr.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
+pics/common/misc/translate.o 		:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
+pics/common/path/pathkey.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
+pics/common/port/astconf.o		:= CERRWARN += -erroff=E_CONST_OBJ_SHOULD_HAVE_INITIZR
 pics/common/sfio/sfmove.o 		:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 pics/common/sfio/sfrd.o 		:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 pics/common/sfio/sfvscanf.o 		:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
-pics/common/port/astconf.o		:= CERRWARN += -erroff=E_CONST_OBJ_SHOULD_HAVE_INITIZR
 
 .KEEP_STATE:
 
@@ -731,6 +742,5 @@ all: mkpicdirs .WAIT $(LIBS)
 #
 lint:
 	@ print "usr/src/lib/libast is not lint-clean: skipping"
-	@ $(TRUE)
 
 include ../../Makefile.targ

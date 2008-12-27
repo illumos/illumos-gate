@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -154,7 +154,7 @@ mcfind(char* path, const char* locale, const char* catalog, int category, int nl
 						case_C:
 							if (!catalog)
 								last = 1;
-							v = categories[category].name;
+							v = lc_categories[category].name;
 							break;
 						default:
 							*s++ = c;

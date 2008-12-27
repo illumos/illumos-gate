@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -556,6 +556,11 @@ int ed_viread(void *context, int fd, register char *shbuf, int nchar, int reedit
 	i = sigsetjmp(editb.e_env,0);
 	if( i != 0 )
 	{
+		if(vp->ed->e_multiline)
+		{
+			cur_virt = last_virt;
+			sync_cursor(vp);
+		}
 		virtual[0] = '\0';
 		tty_cooked(ERRIO);
 
@@ -795,7 +800,7 @@ static int cntlmode(Vi_t *vp)
 		case cntl('L'):		/** Redraw line **/
 			/*** print the prompt and ***/
 			/* force a total refresh */
-			if(vp->nonewline==0)
+			if(vp->nonewline==0 && !vp->ed->e_nocrnl)
 				putchar('\n');
 			vp->nonewline = 0;
 			pr_string(vp,Prompt);
@@ -1472,6 +1477,7 @@ static void getline(register Vi_t* vp,register int mode)
 			if( mode != SEARCH )
 				save_last(vp);
 			refresh(vp,INPUT);
+			last_phys++;
 			return;
 
 		case '\t':		/** command completion **/
@@ -1557,7 +1563,21 @@ static int mvcursor(register Vi_t* vp,register int motion)
 		switch(motion=getcount(vp,ed_getchar(vp->ed,-1)))
 		{
 		    case 'A':
-			ed_ungetchar(vp->ed,'k');
+			if(cur_virt>=0  && cur_virt<(SEARCHSIZE-2) && cur_virt == last_virt)
+			{
+				virtual[last_virt + 1] = '\0';
+				gencpy(&((genchar*)lsearch)[1], virtual);
+#if SHOPT_MULTIBYTE
+				ed_external(&((genchar*)lsearch)[1],lsearch+1);
+#endif /* SHOPT_MULTIBYTE */
+				*lsearch = '^';
+				vp->direction = -2;
+				ed_ungetchar(vp->ed,'n');
+			}
+			else if(cur_virt==0 && vp->direction == -2)
+				ed_ungetchar(vp->ed,'n');
+			else
+				ed_ungetchar(vp->ed,'k');
 			return(1);
 		    case 'B':
 			ed_ungetchar(vp->ed,'j');
@@ -1927,6 +1947,9 @@ static void refresh(register Vi_t* vp, int mode)
 		vp->long_line = vp->long_char;
 	}
 
+	if(vp->ed->e_multiline &&  vp->ofirst_wind==INVALID && !vp->ed->e_nocrnl)
+		ed_setcursor(vp->ed, physical, last_phys+1, last_phys+1, -1);
+	vp->ed->e_nocrnl = 0;
 	vp->ocur_phys = ncur_phys;
 	vp->ocur_virt = cur_virt;
 	vp->ofirst_wind = first_w;
@@ -2103,6 +2126,8 @@ static int search(register Vi_t* vp,register int mode)
 	register int i;
 	Histloc_t  location;
 
+	if( vp->direction == -2 && mode != 'n')
+		vp->direction = -1;
 	if( mode == '/' || mode == '?')
 	{
 		/*** new search expression ***/

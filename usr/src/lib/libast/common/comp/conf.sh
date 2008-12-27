@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1985-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1985-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -21,7 +21,7 @@
 ########################################################################
 : generate getconf and limits info
 #
-# @(#)conf.sh (AT&T Research) 2007-04-02
+# @(#)conf.sh (AT&T Research) 2008-01-31
 #
 # this script generates these files from the table file in the first arg
 # the remaining args are the C compiler name and flags
@@ -128,8 +128,33 @@ main()
 }
 !
 if	$cc -o $tmp.exe $tmp.c >/dev/null 2>&1 && ./$tmp.exe
-then	LL='ll'
-else	LL='l'
+then	LL_format='ll'
+else	LL_format='l'
+fi
+
+# determine the intmax_t constant suffix
+
+cat > $tmp.c <<!
+${head}
+int
+main()
+{
+#if _ast_intmax_long
+	return 1;
+#else
+	_ast_intmax_t		s = 0x7fffffffffffffffLL;
+	unsigned _ast_intmax_t	u = 0xffffffffffffffffLL;
+
+	return 0;
+#endif
+}
+!
+if	$cc -o $tmp.exe $tmp.c >/dev/null 2>&1
+then	if	./$tmp.exe
+	then	LL_suffix='LL'
+	else	LL_suffix='L'
+	fi
+else	LL_suffix=''
 fi
 
 # set up the names and keys
@@ -200,7 +225,7 @@ case $append$extra in
 						;;
 					*" -$f- "*)
 						;;
-					*)	if	iffe -n - hdr $f | grep -q _hdr_$f
+					*)	if	iffe -n - hdr $f | grep _hdr_$f >/dev/null
 						then	hdr="$hdr $f"
 							headers=$headers$nl#include$sp'<'$1'>'
 						else	hdr="$hdr -$f-"
@@ -769,11 +794,11 @@ unsigned int conf[] = {
 			sed 's/$/,/' $1
 			echo "};"
 		} > $tmp.c
-		[[ -f $tmp.1.c ]] || cp $tmp.c $tmp.1.c
+		[ -f $tmp.1.c ] || cp $tmp.c $tmp.1.c
 		if	$cc -c $tmp.c > $tmp.e 2>&1
 		then	break
 		fi
-		[[ -f $tmp.1.e ]] || cp $tmp.e $tmp.1.e
+		[ -f $tmp.1.e ] || cp $tmp.e $tmp.1.e
 		snl='\
 '
 		sed "s/[^_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789][^_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]*/${snl}/g" $tmp.e |
@@ -851,6 +876,7 @@ esac
 name_max=1
 export tmp name standard call cc
 
+exec > $tmp.t
 for key in $keys
 do	eval name=\"'$'CONF_name_$key\"
 	case $name in
@@ -984,9 +1010,6 @@ do	eval name=\"'$'CONF_name_$key\"
 	case $flags in
 	*W*)	conf_flags="${conf_flags}|CONF_PREFIX_ONLY" ;;
 	esac
-	case $shell in
-	ksh)	conf_flags=${conf_flags#0?} ;;
-	esac
 	case $debug in
 	?*)	case $standard in
 		????)	sep=" " ;;
@@ -1058,10 +1081,10 @@ do	eval name=\"'$'CONF_name_$key\"
 						;;
 					'')	case $conf_name in
 						SIZE_*|U*|*_MAX)	
-							f="%${LL}u"
+							f="%${LL_format}u"
 							t="unsigned _ast_intmax_t"
 							;;
-						*)	f="%${LL}d"
+						*)	f="%${LL_format}d"
 							t="_ast_intmax_t"
 							;;
 						esac
@@ -1294,7 +1317,84 @@ ${script}
 			conf_minmax=0x$conf_minmax
 			;;
 		esac
+		case $conf_limit in
+		?*[-+]*|*['()']*)
+			;;
+		*[lLuU])
+			case $LL_suffix in
+			??)	case $conf_limit in
+				*[!lL][lL]|*[!lL][lL][uU])
+					conf_limit=${conf_limit}L
+					;;
+				esac
+				;;
+			esac
+			;;
+		-*[2468])	
+			case $shell in
+			ksh)	p=${conf_limit%?}
+				s=${conf_limit#$p}
+				((s=s-1))
+				;;
+			*)	eval `echo '' $conf_limit | sed 's/ *\(.*\)\(.\) */p=\1 s=\2/'`
+				s=`expr $s - 1`
+				;;
+			esac
+			conf_limit=${p}${s}${LL_suffix}-1${LL_suffix}
+			;;
+		0[xX]*[abcdefABCDEF])
+			conf_limit=${conf_limit}${LL_suffix}
+			;;
+		-*[0123456789])
+			conf_limit=${conf_limit}${LL_suffix}
+			;;
+		*[0123456789])
+			conf_limit=${conf_limit}U${LL_suffix}
+			;;
+		esac
+		case $conf_minmax in
+		?*[-+]*|*['()']*)
+			;;
+		*[lLuU])
+			case $LL_suffix in
+			??)	case $conf_minmax in
+				*[!lL][lL]|*[!lL][lL][uU])
+					conf_minmax=${conf_minmax}L
+					;;
+				esac
+				;;
+			esac
+			;;
+		-*[2468])	
+			case $shell in
+			ksh)	p=${conf_minmax%?}
+				s=${conf_minmax#$p}
+				((s=s-1))
+				;;
+			*)	eval `echo '' $conf_minmax | sed 's/ *\(.*\)\(.\) */p=\1 s=\2/'`
+				s=`expr $s - 1`
+				;;
+			esac
+			conf_minmax=${p}${s}${LL_suffix}-1${LL_suffix}
+			;;
+		0[xX]*[abcdefABCDEF])
+			conf_minmax=${conf_minmax}${LL_suffix}
+			;;
+		-*[0123456789])
+			conf_minmax=${conf_minmax}${LL_suffix}
+			;;
+		*[0123456789])
+			conf_minmax=${conf_minmax}U${LL_suffix}
+			;;
+		esac
 		conf_limit="{ $conf_limit, 0 }" conf_minmax="{ $conf_minmax, 0 }"
+		;;
+	esac
+	case $conf_flags in
+	'0|'*)	case $shell in
+		ksh)	conf_flags=${conf_flags#0?} ;;
+		*)	conf_flags=`echo "$conf_flags" | sed 's/^0.//'` ;;
+		esac
 		;;
 	esac
 	echo "{ \"$conf_name\", $conf_limit, $conf_minmax, $conf_flags, $conf_standard, $conf_section, $conf_call, $conf_op },"
@@ -1310,7 +1410,8 @@ ${script}
 		fi
 		;;
 	esac
-done > $tmp.t
+done
+exec > /dev/null
 case $debug in
 -d6)	exit ;;
 esac
@@ -1327,13 +1428,15 @@ ksh)	((name_max=name_max+3)); ((name_max=name_max/4*4)) ;; # bsd /bin/sh !
 esac
 {
 cat <<!
-#pragma prototyped
-
 #ifndef _CONFTAB_H
 #define _CONFTAB_H
 $systeminfo
 
 ${generated}
+
+#if !defined(const) && !defined(__STDC__) && !defined(__cplusplus) && !defined(c_plusplus)
+#define const
+#endif
 
 #define conf		_ast_conf_data
 #define conf_elements	_ast_conf_ndata
@@ -1385,8 +1488,6 @@ cat <<!
 
 struct Conf_s; typedef struct Conf_s Conf_t;
 
-typedef int (*Conf_f)(Conf_t*, intmax_t*, char**);
-
 typedef struct Value_s
 {
 	intmax_t	number;
@@ -1398,7 +1499,7 @@ struct Conf_s
 	const char	name[${name_max}];
 	Value_t		limit;
 	Value_t		minmax;
-	short		flags;
+	unsigned int	flags;
 	short		standard;
 	short		section;
 	short		call;
@@ -1421,8 +1522,7 @@ extern int		prefix_elements;
 
 #endif
 !
-} > $tmp.1
-proto < $tmp.1 > $tmp.2
+} > $tmp.2
 case $debug in
 -d7)	echo $command: $tmp.2 ${base}.h ;;
 *)	cmp -s $tmp.2 ${base}.h 2>/dev/null || mv $tmp.2 ${base}.h ;;
@@ -1433,7 +1533,6 @@ case $verbose in
 esac
 {
 cat <<!
-#pragma prototyped
 ${head}
 #include <sys/types.h>
 #include <limits.h>
@@ -1480,8 +1579,7 @@ cat <<!
 
 int	conf_elements = (int)sizeof(conf) / (int)sizeof(conf[0]);
 !
-} > $tmp.3
-proto < $tmp.3 > $tmp.4
+} > $tmp.4
 case $debug in
 -d7)	echo $command: $tmp.4 ${base}.c ;;
 *)	cmp -s $tmp.4 ${base}.c 2>/dev/null || mv $tmp.4 ${base}.c ;;

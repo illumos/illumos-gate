@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -63,7 +63,7 @@ int    b_exec(int argc,char *argv[], void *extra)
 	register int n;
 	logdata.clear = 0;
 	logdata.arg0 = 0;
-	logdata.sh = (Shell_t*)extra;
+	logdata.sh = ((Shbltin_t*)extra)->shp;
         logdata.sh->st.ioset = 0;
 	while (n = optget(argv, sh_optexec)) switch (n)
 	{
@@ -102,7 +102,7 @@ int    B_login(int argc,char *argv[],void *extra)
 	register Shell_t *shp;
 	const char *pname;
 	if(argc)
-		shp = (Shell_t*)extra;
+		shp = ((Shbltin_t*)extra)->shp;
 	else
 	{
 		logp = (struct login*)extra;
@@ -143,15 +143,15 @@ int    B_login(int argc,char *argv[],void *extra)
 		if(logp && logp->arg0)
 			argv[0] = logp->arg0;
 #ifdef JOBS
-		if(job_close() < 0)
+		if(job_close(shp) < 0)
 			return(1);
 #endif /* JOBS */
 		/* force bad exec to terminate shell */
 		pp->mode = SH_JMPEXIT;
 		sh_sigreset(2);
-		sh_freeup();
+		sh_freeup(shp);
 		path_exec(pname,argv,NIL(struct argnod*));
-		sh_done(0);
+		sh_done(shp,0);
         }
 	return(1);
 }
@@ -182,7 +182,7 @@ int    b_let(int argc,char *argv[],void *extra)
 int    b_eval(int argc,char *argv[], void *extra)
 {
 	register int r;
-	register Shell_t *shp = (Shell_t*)extra;
+	register Shell_t *shp = ((Shbltin_t*)extra)->shp;
 	NOT_USED(argc);
 	while (r = optget(argv,sh_opteval)) switch (r)
 	{
@@ -209,14 +209,14 @@ int    b_dot_cmd(register int n,char *argv[],void* extra)
 	register char *script;
 	register Namval_t *np;
 	register int jmpval;
-	register Shell_t *shp = (Shell_t*)extra;
+	register Shell_t *shp = ((Shbltin_t*)extra)->shp;
 	struct sh_scoped savst, *prevscope = shp->st.self;
 	char *filename=0;
 	int	fd;
 	struct dolnod   *argsave=0, *saveargfor;
 	struct checkpt buff;
 	Sfio_t *iop=0;
-	NOT_USED(extra);
+	short level;
 	while (n = optget(argv,sh_optdot)) switch (n)
 	{
 	    case ':':
@@ -230,9 +230,8 @@ int    b_dot_cmd(register int n,char *argv[],void* extra)
 	script = *argv;
 	if(error_info.errors || !script)
 		errormsg(SH_DICT,ERROR_usage(2),"%s",optusage((char*)0));
-	if(shp->dot_depth++ > DOTMAX)
+	if(shp->dot_depth+1 > DOTMAX)
 		errormsg(SH_DICT,ERROR_exit(1),e_toodeep,script);
-	shp->st.lineno = error_info.line;
 	if(!(np=shp->posix_fun))
 	{
 		/* check for KornShell style function first */
@@ -241,11 +240,7 @@ int    b_dot_cmd(register int n,char *argv[],void* extra)
 		{
 			if(!np->nvalue.ip)
 			{
-#ifdef PATH_BFPATH
-				path_search(script,NIL(Pathcomp_t*),0);
-#else
-				path_search(script,NIL(char*),0);
-#endif
+				path_search(script,NIL(Pathcomp_t**),0);
 				if(np->nvalue.ip)
 				{
 					if(nv_isattr(np,NV_FPOSIX))
@@ -261,12 +256,19 @@ int    b_dot_cmd(register int n,char *argv[],void* extra)
 		{
 			if((fd=path_open(script,path_get(script))) < 0)
 				errormsg(SH_DICT,ERROR_system(1),e_open,script);
-			filename = path_fullname(stakptr(PATH_OFFSET));
+			filename = path_fullname(stkptr(shp->stk,PATH_OFFSET));
 		}
 	}
 	*prevscope = shp->st;
+	shp->st.lineno = np?((struct functnod*)nv_funtree(np))->functline:1;
+	shp->st.var_local = shp->st.save_tree = shp->var_tree;
 	if(filename)
+	{
 		shp->st.filename = filename;
+		shp->st.lineno = 1;
+	}
+	level  = shp->fn_depth+shp->dot_depth+1;
+	nv_putval(SH_LEVELNOD,(char*)&level,NV_INT16);
 	shp->st.prevst = prevscope;
 	shp->st.self = &savst;
 	shp->topscope = (Shscope_t*)shp->st.self;
@@ -277,11 +279,12 @@ int    b_dot_cmd(register int n,char *argv[],void* extra)
 	nv_putval(SH_PATHNAMENOD, shp->st.filename ,NV_NOFREE);
 	shp->posix_fun = 0;
 	if(np || argv[1])
-		argsave = sh_argnew(argv,&saveargfor);
+		argsave = sh_argnew(shp,argv,&saveargfor);
 	sh_pushcontext(&buff,SH_JMPDOT);
 	jmpval = sigsetjmp(buff.buff,0);
 	if(jmpval == 0)
 	{
+		shp->dot_depth++;
 		if(np)
 			sh_exec((Shnode_t*)(nv_funtree(np)),sh_isstate(SH_ERREXIT));
 		else
@@ -296,7 +299,7 @@ int    b_dot_cmd(register int n,char *argv[],void* extra)
 		free((void*)shp->st.filename);
 	shp->dot_depth--;
 	if((np || argv[1]) && jmpval!=SH_JMPSCRIPT)
-		sh_argreset(argsave,saveargfor);
+		sh_argreset(shp,argsave,saveargfor);
 	else
 	{
 		prevscope->dolc = shp->st.dolc;
@@ -340,7 +343,7 @@ int    b_false(int argc,register char *argv[], void *extra)
 int    b_shift(register int n, register char *argv[], void *extra)
 {
 	register char *arg;
-	register Shell_t *shp = (Shell_t*)extra;
+	register Shell_t *shp = ((Shbltin_t*)extra)->shp;
 	while((n = optget(argv,sh_optshift))) switch(n)
 	{
 		case ':':
@@ -366,7 +369,7 @@ int    b_shift(register int n, register char *argv[], void *extra)
 
 int    b_wait(int n,register char *argv[],void *extra)
 {
-	register Shell_t *shp = (Shell_t*)extra;
+	register Shell_t *shp = ((Shbltin_t*)extra)->shp;
 	while((n = optget(argv,sh_optwait))) switch(n)
 	{
 		case ':':
@@ -392,7 +395,7 @@ int    b_wait(int n,register char *argv[],void *extra)
 int    b_bg(register int n,register char *argv[],void *extra)
 {
 	register int flag = **argv;
-	register Shell_t *shp = (Shell_t*)extra;
+	register Shell_t *shp = ((Shbltin_t*)extra)->shp;
 	register const char *optstr = sh_optbg; 
 	if(*argv[0]=='f')
 		optstr = sh_optfg;
@@ -426,7 +429,7 @@ int    b_bg(register int n,register char *argv[],void *extra)
 int    b_jobs(register int n,char *argv[],void *extra)
 {
 	register int flag = 0;
-	register Shell_t *shp = (Shell_t*)extra;
+	register Shell_t *shp = ((Shbltin_t*)extra)->shp;
 	while((n = optget(argv,sh_optjobs))) switch(n)
 	{
 	    case 'l':
@@ -506,7 +509,7 @@ int	b_universe(int argc, char *argv[],void *extra)
 	register int flag, n;
 	register const char *optstr; 
 	register char *vend; 
-	register Shell_t *shp = (Shell_t*)extra;
+	register Shell_t *shp = ((Shbltin_t*)extra)->shp;
 	if(argv[0][1]=='p')
 	{
 		optstr = sh_optvpath;
@@ -539,7 +542,7 @@ int	b_universe(int argc, char *argv[],void *extra)
 		flag |= FS3D_GET;
 		if((n = mount(*argv,(char*)0,flag,0)) >= 0)
 		{
-			vend = stakalloc(++n);
+			vend = stkalloc(shp->stk,++n);
 			n = mount(*argv,vend,flag|FS3D_SIZE(n),0);
 		}
 		if(n < 0)

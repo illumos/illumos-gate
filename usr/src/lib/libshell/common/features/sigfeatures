@@ -7,8 +7,8 @@ cat{
 	#endif
 	#ifdef _lib_sigprocmask
 	#    define sh_sigaction(s,action) do { sigset_t ss;\
-				sigemptyset(&ss);\
-				sigaddset(&ss,(s));\
+				sigemptyset(&ss); \
+				if(s) sigaddset(&ss,(s)); \
 				sigprocmask(action,&ss,0); \
 				}while(0)
 	#    define sigrelease(s)	sh_sigaction(s,SIG_UNBLOCK)

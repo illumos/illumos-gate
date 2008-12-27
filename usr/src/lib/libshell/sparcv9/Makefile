@@ -18,14 +18,17 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
 include ../../Makefile.lib.64
+
+# Use -KPIC since libshell is too big for -Kpic on 64bit
+# (and on 32bit it is close to the barrier)
+sparcv9_C_PICFLAGS  = $(C_BIGPICFLAGS)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)

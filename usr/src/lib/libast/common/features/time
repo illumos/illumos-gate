@@ -40,7 +40,7 @@ if ! mem timeval.tv_sec sys/time.h {
 endif
 
 cat{
-#ifndef CLOCKS_PER_SEC
+#if !defined(CLOCKS_PER_SEC) && defined(CLK_TCK)
 #define CLOCKS_PER_SEC	CLK_TCK
 #endif
 }end

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -315,7 +315,9 @@ extern double		strntod(const char*, size_t, char**);
 extern _ast_fltmax_t	strntold(const char*, size_t, char**);
 extern long		strntol(const char*, size_t, char**, int);
 extern intmax_t		strntoll(const char*, size_t, char**, int);
+extern long		strnton(const char*, size_t, char**, char*, int);
 extern unsigned long	strntoul(const char*, size_t, char**, int);
+extern intmax_t		strntonll(const char*, size_t, char**, char*, int);
 extern uintmax_t	strntoull(const char*, size_t, char**, int);
 extern int		stropt(const char*, const void*, int, int(*)(void*, const void*, int, const char*), void*);
 extern int		strperm(const char*, char**, int);

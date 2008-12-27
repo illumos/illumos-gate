@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -37,14 +37,11 @@
 #   define bltin(x)	0
 #endif
 
-#ifndef SH_CMDLIB_DIR
-#	define SH_CMDLIB_DIR	"/opt/ast/bin"
-#endif
 #if defined(SHOPT_CMDLIB_DIR) && !defined(SHOPT_CMDLIB_HDR)
 #	define SHOPT_CMDLIB_HDR	<cmdlist.h>
 #endif
 #define Q(f)		#f	/* libpp cpp workaround -- fixed 2005-04-11 */
-#define CMDLIST(f)	SH_CMDLIB_DIR "/" Q(f), NV_BLTIN|NV_NOFREE, bltin(f),
+#define CMDLIST(f)	SH_CMDLIB_DIR "/" Q(f), NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f),
 
 #undef	basename
 #undef	dirname
@@ -64,25 +61,26 @@ const struct shtable3 shtab_builtins[] =
 	"break",	NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(break),
 	"continue",	NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(break),
 	"typeset",	NV_BLTIN|BLT_ENV|BLT_SPC|BLT_DCL,bltin(typeset),
-	"test",		NV_BLTIN|BLT_ENV|NV_NOFREE,	bltin(test),
+	"test",		NV_BLTIN|BLT_ENV,		bltin(test),
 	"[",		NV_BLTIN|BLT_ENV,		bltin(test),
 	"let",		NV_BLTIN|BLT_ENV,		bltin(let),
-	"export",	NV_BLTIN|BLT_SPC|BLT_DCL,	bltin(readonly),
+	"export",	NV_BLTIN|BLT_ENV|BLT_SPC|BLT_DCL,bltin(readonly),
+	".",		NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(dot_cmd),
+	"return",	NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(return),
 #if SHOPT_BASH
 	"local",	NV_BLTIN|BLT_ENV|BLT_SPC|BLT_DCL,bltin(typeset),
 #endif
 #if _bin_newgrp || _usr_bin_newgrp
 	"newgrp",	NV_BLTIN|BLT_ENV|BLT_SPC,	Bltin(login),
 #endif	/* _bin_newgrp || _usr_bin_newgrp */
-	".",		NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(dot_cmd),
 	"alias",	NV_BLTIN|BLT_SPC|BLT_DCL,	bltin(alias),
 	"hash",		NV_BLTIN|BLT_SPC|BLT_DCL,	bltin(alias),
-	"exit",		NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(return),
+	"enum",		NV_BLTIN|BLT_ENV|BLT_SPC|BLT_DCL,bltin(enum),
 	"eval",		NV_BLTIN|BLT_ENV|BLT_SPC|BLT_EXIT,bltin(eval),
+	"exit",		NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(return),
 	"fc",		NV_BLTIN|BLT_ENV|BLT_EXIT,	bltin(hist),
 	"hist",		NV_BLTIN|BLT_ENV|BLT_EXIT,	bltin(hist),
 	"readonly",	NV_BLTIN|BLT_ENV|BLT_SPC|BLT_DCL,bltin(readonly),
-	"return",	NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(return),
 	"shift",	NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(shift),
 	"trap",		NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(trap),
 	"unalias",	NV_BLTIN|BLT_ENV|BLT_SPC,	bltin(unalias),
@@ -98,20 +96,19 @@ const struct shtable3 shtab_builtins[] =
 	"bg",		NV_BLTIN|BLT_ENV,		bltin(bg),
 	"fg",		NV_BLTIN|BLT_ENV|BLT_EXIT,	bltin(bg),
 	"disown",	NV_BLTIN|BLT_ENV,		bltin(bg),
-	"kill",		NV_BLTIN|BLT_ENV|NV_NOFREE,	bltin(kill),
+	"kill",		NV_BLTIN|BLT_ENV,		bltin(kill),
 #   else
-	"/bin/kill",	NV_BLTIN|BLT_ENV|NV_NOFREE,	bltin(kill),
+	"/bin/kill",	NV_BLTIN|BLT_ENV,		bltin(kill),
 #   endif	/* SIGTSTP */
 	"jobs",		NV_BLTIN|BLT_ENV,		bltin(jobs),
 #endif	/* JOBS */
 	"false",	NV_BLTIN|BLT_ENV,		bltin(false),
-SH_CMDLIB_DIR "/getconf",NV_BLTIN|BLT_ENV,		bltin(getconf),
 	"getopts",	NV_BLTIN|BLT_ENV,		bltin(getopts),
 	"print",	NV_BLTIN|BLT_ENV,		bltin(print),
-	"printf",	NV_BLTIN|NV_NOFREE,		bltin(printf),
-	"pwd",		NV_BLTIN|NV_NOFREE,		bltin(pwd),
+	"printf",	NV_BLTIN|BLT_ENV,		bltin(printf),
+	"pwd",		NV_BLTIN,			bltin(pwd),
 	"read",		NV_BLTIN|BLT_ENV,		bltin(read),
-	"sleep",	NV_BLTIN|NV_NOFREE,		bltin(sleep),
+	"sleep",	NV_BLTIN,			bltin(sleep),
 	"alarm",	NV_BLTIN,			bltin(alarm),
 	"ulimit",	NV_BLTIN|BLT_ENV,		bltin(ulimit),
 	"umask",	NV_BLTIN|BLT_ENV,		bltin(umask),
@@ -131,6 +128,7 @@ SH_CMDLIB_DIR "/getconf",NV_BLTIN|BLT_ENV,		bltin(getconf),
 	CMDLIST(basename)
 	CMDLIST(chmod)
 	CMDLIST(dirname)
+	CMDLIST(getconf)
 	CMDLIST(head)
 	CMDLIST(mkdir)
 	CMDLIST(logname)
@@ -159,7 +157,7 @@ const char sh_set[] =
 "}"
 "[f?Pathname expansion is disabled.]"
 "[h?Obsolete.  Causes each command whose name has the syntax of an "
-	"alias to become a tracked aliase when it is first encountered.]"
+	"alias to become a tracked alias when it is first encountered.]"
 "[k?This is obsolete.  All arguments of the form \aname\a\b=\b\avalue\a "
 	"are removed and placed in the variable assignment list for "
 	"the command.  Ordinarily, variable assignments must precede "
@@ -662,7 +660,7 @@ USAGE_LICENSE
   "Text between two \\b (backspace) characters indicates "
   "that the text should be emboldened when displayed. "
   "Text between two \\a (bell) characters indicates that the text should "
-  "be emphasised or italicized when displayed. "
+  "be emphasized or italicized when displayed. "
   "Text between two \\v (vertical tab) characters indicates "
   "that the text should displayed in a fixed width font. "
   "Text between two \\f (formfeed) characters will be replaced by the "
@@ -684,6 +682,8 @@ USAGE_LICENSE
       "[+i?Ignore this \aoptstring\a when generating help. Used when "
 	"combining \aoptstring\a values from multiple passes.]"
       "[+l?Display only \alongname\a options in help messages.]"
+      "[+n?Associate -\anumber\a and +\anumber\a options with the first "
+        "option with numeric arguments.]"
       "[+o?The \b-\b option character prefix is optional (supports "
         "obsolete \bps\b(1) option syntax.)]"
       "[+p?\anumber\a specifies the number of \b-\b characters that must "
@@ -865,7 +865,7 @@ USAGE_LICENSE
 "\n[job ...]\n"
 "\n"
 "[+EXIT STATUS?]{"
-	"[+0?If all jobs are sucessfully disowned.]"
+	"[+0?If all jobs are successfully disowned.]"
 	"[+>0?If one more \ajob\as does not exist.]"
 "}"
 
@@ -912,7 +912,7 @@ USAGE_LICENSE
 ;
 
 const char sh_opthist[]	= 
-"[-1c?@(#)$Id: hist (AT&T Research) 2000-04-02 $\n]"
+"[-1cn?@(#)$Id: hist (AT&T Research) 2000-04-02 $\n]"
 USAGE_LICENSE
 "[+NAME?\f?\f - process command history list]"
 "[+DESCRIPTION?\b\f?\f\b lists, edits, or re-executes, commands  "
@@ -1065,7 +1065,7 @@ USAGE_LICENSE
 "[+NAME?print - write arguments to standard output]"
 "[+DESCRIPTION?By default, \bprint\b writes each \astring\a operand to "
 	"standard output and appends a newline character.]"  
-"[+?Unless, the \b-r\b or \b-f\b option is specifed, each \b\\\b "
+"[+?Unless, the \b-r\b or \b-f\b option is specified, each \b\\\b "
 	"character in each \astring\a operand is processed specially as "
 	"follows:]{"
 		"[+\\a?Alert character.]"
@@ -1100,6 +1100,8 @@ USAGE_LICENSE
 "[s?Write the output as an entry in the shell history file instead of "
 	"standard output.]"
 "[u]:[fd:=1?Write to file descriptor number \afd\a instead of standard output.]"
+"[v?Treat each \astring\a as a variable name and write the value in \b%B\b "
+	"format.  Cannot be used with \b-f\b.]"
 "\n"
 "\n[string ...]\n"
 "\n"
@@ -1240,7 +1242,7 @@ USAGE_LICENSE
 "[+?If there are more variables than fields, the remaining variables are "
 	"set to empty strings.  If there are fewer variables than fields, "
 	"the leftover fields and their intervening separators are assigned "
-	"to the last variable.  If no \avar\a is specifed then the variable "
+	"to the last variable.  If no \avar\a is specified then the variable "
 	"\bREPLY\b is used.]"
 "[+?When \avar\a has the binary attribute and \b-n\b or \b-N\b is specified, "
 	"the bytes that are read are stored directly into \bvar\b.]"
@@ -1249,6 +1251,7 @@ USAGE_LICENSE
 	"is a terminal or pipe.]"
 "[A?Unset \avar\a and then create an indexed array containing each field in "
 	"the line starting at index 0.]"
+"[C?Unset \avar\a and read  \avar\a as a compound variable.]"
 "[d]:[delim?Read until delimiter \adelim\a instead of to the end of line.]"
 "[p?Read from the current co-process instead of standard input.  An end of "
 	"file causes \bread\b to disconnect the co-process so that another "
@@ -1275,7 +1278,7 @@ USAGE_LICENSE
 ;
 
 const char sh_optreadonly[] =
-"[-1c?\n@(#)$Id: readonly (AT&T Research) 1999-07-07 $\n]"
+"[-1c?\n@(#)$Id: readonly (AT&T Research) 2008-06-16 $\n]"
 USAGE_LICENSE
 "[+NAME?readonly - set readonly attribute on variables]"
 "[+DESCRIPTION?\breadonly\b sets the readonly attribute on each of "
@@ -1283,6 +1286,9 @@ USAGE_LICENSE
 	"values from being changed.  If \b=\b\avalue\a is specified, "
 	"the variable \aname\a is set to \avalue\a before the variable "
 	"is made readonly.]"
+"[+?Within a type definition, if the value is not specified, then a "
+	"value must be specified when creating each instance of the type "
+        "and the value is readonly for each instance.]"
 "[+?If no \aname\as are specified then the names and values of all "
 	"readonly variables are written to standard output.]" 
 "[+?\breadonly\b is built-in to the shell as a declaration command so that "
@@ -1368,14 +1374,19 @@ USAGE_LICENSE
 "[D\f:dump-strings\f?Do not execute the script, but output the set of double "
 	"quoted strings preceded by a \b$\b.  These strings are needed for "
 	"localization of the script to different locales.]"
-"[E?Reads the file \b${ENV-$HOME/.kshrc}\b, if it exists, as a profile. "
+"[E?Reads the file "
+#if SHOPT_SYSRC
+	"\b/etc/ksh.kshrc\b, if it exists, as a profile, followed by "
+#endif
+	"\b${ENV-$HOME/.kshrc}\b, if it exists, as a profile. "
 	"On by default for interactive shells; use \b+E\b to disable.]"
 #if SHOPT_PFSH
 "[P?Invoke the shell as a profile shell.  See \bpfexec\b(1).]"
 #endif
 #if SHOPT_KIA
 "[R]:[file?Do not execute the script, but create a cross reference database "
-	"in \afile\a that can be used a separate shell script browser.]"
+	"in \afile\a that can be used a separate shell script browser.  The "
+	"-R option requires a script to be specified as the first operand.]"
 #endif /* SHOPT_KIA */
 #if SHOPT_BASH
    "\fbash2\f"
@@ -1424,6 +1435,9 @@ USAGE_LICENSE
 "[A]:[name?Assign the arguments sequentially to the array named by \aname\a "
 	"starting at subscript 0 rather than to the positional parameters.]"
 "\fabc\f"
+"[06:default?Restore all non-command line options to the default settings.]"
+"[07:state?List the current option state in the form of a \bset\b command "
+	"that can be executed to restore the state.]"
 "\n"
 "\n[arg ...]\n"
 "\n"
@@ -1466,7 +1480,7 @@ USAGE_LICENSE
 "[+NAME?sleep - suspend execution for an interval]"
 "[+DESCRIPTION?\bsleep\b suspends execution for at least the time specified "
 	"by \aseconds\a or until a \bSIGALRM\b signal is received.  "
-	"\aseconds\a can be specifed as a floating point number but the "
+	"\aseconds\a can be specified as a floating point number but the "
 	"actual granularity depends on the underlying system, normally "
 	"around 1 millisecond.]"
 "\n"
@@ -1534,7 +1548,7 @@ USAGE_LICENSE
 ;
 
 const char sh_opttypeset[] =
-"+[-1c?\n@(#)$Id: typeset (AT&T Research) 2003-01-15 $\n]"
+"+[-1c?\n@(#)$Id: typeset (AT&T Research) 2008-08-04 $\n]"
 USAGE_LICENSE
 "[+NAME?\f?\f - declare or display variables with attributes]"
 "[+DESCRIPTION?Without the \b-f\b option, \b\f?\f\b sets, unsets, "
@@ -1571,10 +1585,12 @@ USAGE_LICENSE
 "[+?\b\f?\f\b is built-in to the shell as a declaration command so that "
 	"field splitting and pathname expansion are not performed on "
 	"the arguments.  Tilde expansion occurs on \avalue\a.]"
-#if SHOPT_BASH
-"[a?Ignored, used for bash compatibility.]"
-#endif
+#if 1
+"[a]:?[type?Indexed array.  This is the default. If \b[\b\atype\a\b]]\b is "
+    "specified, each subscript is interpreted as a value of type \atype\a.]"
+#else
 "[a?Indexed array. this is the default.]"
+#endif
 "[b?Each \aname\a may contain binary data.  Its value is the mime "
 	"base64 encoding of the data. It can be used with \b-Z\b, "
 	"to specify fixed sized fields.]"
@@ -1583,8 +1599,12 @@ USAGE_LICENSE
 	"from 2 to 64.]"
 "[l?Convert uppercase character to lowercase.  Unsets \b-u\b attribute.  When "
 	"used with \b-i\b, \b-E\b, or \b-F\b indicates long variant.]"
+"[m?Move.  The value is the name of a variable whose value will be "
+	"moved to \aname\a.  The orignal variable will be unset.  Cannot be "
+	"used with any other options.]"
 "[n?Name reference.  The value is the name of a variable that \aname\a "
-	"references.  \aname\a cannot contain a \b.\b.]"
+	"references.  \aname\a cannot contain a \b.\b.  Cannot be use with "
+	"any other options.]"
 "[p?Causes the output to be in a format that can be used as input to the "
 	"shell to recreate the attributes for variables.]"
 "[r?Enables readonly.  Once enabled it cannot be disabled.  See "
@@ -1602,6 +1622,9 @@ USAGE_LICENSE
 "[A?Associative array.  Each \aname\a will converted to an associate "
 	"array.  If a variable already exists, the current value will "
 	"become index \b0\b.]"
+"[C?Compound variable.  Each \aname\a will be a compound variable.  If "
+	"\avalue\a names a compound variable it will be copied to \aname\a. "
+	"Otherwise if the variable already exists, it will first be unset.]"
 "[E]#?[n:=10?Floating point number represented in scientific notation. "
 	"\an\a specifies the number of significant figures when the "
 	"value is expanded.]"
@@ -1617,6 +1640,19 @@ USAGE_LICENSE
 "[R]#?[n?Right justify.  If \an\a is given it represents the field width.  If "
 	"the \b-Z\b attribute is also specified, then zeros will "
 	"be used as the fill character.  Otherwise, spaces are used.]"
+"[X]#?[n:=10?Floating point number represented in hexadecimal notation. "
+	"\an\a specifies the number of significant figures when the "
+	"value is expanded.]"
+
+#ifdef SHOPT_TYPEDEF
+"[h]:[string?Used within a type definition to provide a help string  "
+	"for variable \aname\a.  Otherwise, it is ignored.]"
+"[S?Used with a type definition to indicate that the variable is shared by "
+	"each instance of the type.  When used inside a function defined "
+	"with the \bfunction\b reserved word, the specified variables "
+	"will have function static scope.  Otherwise, the variable is "
+	"unset prior to processing the assignment list.]"
+#endif
 "[T]:[tname?\atname\a is the name of a type name given to each \aname\a.]"
 "[Z]#?[n?Zero fill.  If \an\a is given it represents the field width.]"
 "\n"
@@ -1784,7 +1820,7 @@ USAGE_LICENSE
 #endif /* SHOPT_FS_3D */
 
 const char sh_optwhence[] =
-"[-1c?\n@(#)$Id: whence (AT&T Research) 1999-07-07 $\n]"
+"[-1c?\n@(#)$Id: whence (AT&T Research) 2007-04-24 $\n]"
 USAGE_LICENSE
 "[+NAME?whence - locate a command and describe its type]"
 "[+DESCRIPTION?Without \b-v\b, \bwhence\b writes on standard output an "
@@ -1792,12 +1828,14 @@ USAGE_LICENSE
 	"on the complete search order that the shell uses.  If \aname\a "  
 	"is not found, then no output is produced.]"
 "[+?If \b-v\b is specified, the output will also contain information "
-	"that indicates how the given \aname\a would be interpretted by "
+	"that indicates how the given \aname\a would be interpreted by "
 	"the shell in the current execution environment.]" 
 "[a?Displays all uses for each \aname\a rather than the first.]"
 "[f?Do not check for functions.]"
 "[p?Do not check to see if \aname\a is a reserved word, a built-in, "
-	"an alias, or a function.]"
+	"an alias, or a function.  This turns off the \b-v\b option.]"
+"[q?Quiet mode. Returns 0 if all arguments are built-ins, functions, or are "
+	"programs found on the path.]"
 "[v?For each name you specify, the shell displays a line that indicates "
 	"if that name is one of the following:]{"
 	"[+?Reserved word]"
@@ -1807,7 +1845,6 @@ USAGE_LICENSE
 	"[+?Function]"
 	"[+?Tracked alias]"
 	"[+?Program]"
-	"[+?Not found]"
 "}"
 "\n"
 "\nname  ...\n"
@@ -1828,6 +1865,5 @@ const char e_baddisc[]		= "%s: invalid discipline function";
 const char e_nospace[]		= "out of memory";
 const char e_nofork[]		= "cannot fork";
 const char e_nosignal[]		= "%s: unknown signal name";
-const char e_numeric[]		= "*([0-9])?(.)*([0-9])";
 const char e_condition[]	= "condition(s) required";
 const char e_cneedsarg[]	= "-c requires argument";

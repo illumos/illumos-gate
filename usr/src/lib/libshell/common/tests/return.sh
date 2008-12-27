@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -26,9 +26,11 @@ function err_exit
 	let Errors+=1
 }
 alias err_exit='err_exit $LINENO'
-
 Command=${0##*/}
 integer Errors=0
+
+unset HISTFILE
+
 foo=NOVAL bar=NOVAL
 file=/tmp/shtest$$
 trap "rm -f $file" EXIT INT
@@ -144,7 +146,7 @@ x=$( . $file)
 if	[[ $x != $0 ]]
 then	err_exit "\$0 in a dot script is $x. Should be $0"
 fi
-x=$($SHELL -i 2> /dev/null <<\!
+x=$($SHELL -i --norc 2> /dev/null <<\!
 typeset -i x=1/0
 print hello
 !

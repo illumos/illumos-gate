@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -308,7 +308,6 @@ if	[[ $x != 42#18 ]]
 then	err_exit 'display of unsigned integers in non-decimal bases wrong'
 fi
 $SHELL -c 'i=0;(( ofiles[i] != -1 && (ofiles[i] < mins || mins == -1) ));exit 0' 2> /dev/null || err_exit 'lexical error with arithemtic expression'
-rm -f core
 $SHELL -c '(( +1 == 1))' 2> /dev/null || err_exit 'unary + not working'
 typeset -E20 val=123.01234567890
 [[ $val == 123.0123456789 ]] || err_exit "rounding error val=$val"
@@ -328,7 +327,7 @@ do	let "x = $x+1"
 done
 (( x == n ))  || err_exit 'let with zero filled fields not working'
 (( y == n ))  || err_exit '((...)) with zero filled fields not working'
-typeset -LZ3 x=10
+typeset -RZ3 x=10
 [[ $(($x)) == 10 && $((1$x)) == 1010 ]] || err_exit 'zero filled fields not preserving leading zeros'
 unset y
 [[ $(let y=$x;print $y) == 10 && $(let y=1$x;print $y) == 1010 ]] || err_exit 'zero filled fields not preserving leading zeros with let'
@@ -357,7 +356,7 @@ typeset -i i=x
 (( ${x:0:1} == 0 )) || err_exit 'leading zero should not be stripped for x:a:b'
 c010=3
 (( c$x  == 3 )) || err_exit 'leading zero with variable should not be stripped'
-[[ $( ($SHELL -c '((++1))' 2>&1)2>/dev/null ) == *lvalue* ]] || err_exit "((--1)) not generating error message"
+[[ $( ($SHELL -c '((++1))' 2>&1)2>/dev/null ) == *lvalue* ]] || err_exit "((++1)) not generating error message"
 i=2
 (( "22" == 22 )) || err_exit "double quoted constants fail"
 (( "2$i" == 22 )) || err_exit "double quoted variables fail"
@@ -442,25 +441,46 @@ unset x
 [[ $x == "$((x))" ]] || err_exit  '$x !- $((x)) when x is pi'
 $SHELL -c  "[[  ${x//./} == {14,100}(\d) ]]" 2> /dev/null || err_exit 'pi has less than 14 significant places'
 if	(( Inf+1 == Inf ))
-then	[[ $(printf "%g\n" $((Inf))) == inf ]] || err_exit 'printf "%g\n" $((Inf)) fails'
-#	[[ $(printf "%g\n" $((Nan))) == inf ]] || err_exit 'printf "%g\n" $((Nan)) fails'
-	[[ $(printf "%g\n" Inf) == inf ]] || err_exit 'printf "%g\n" Inf fails'
-	[[ $(printf "%g\n" NaN) == nan ]] || err_exit 'printf "%g\n" NaN fails'
-	[[ $(print -- $((Inf))) == inf ]] || err_exit 'print -- $((Inf)) fails'
+then	set \
+		Inf		inf	\
+		-Inf		-inf	\
+		Nan		nan	\
+		-Nan		-nan	\
+		1.0/0.0		inf
+	while	(( $# >= 2 ))
+	do	x=$(printf "%g\n" $(($1)))
+		[[ $x == $2 ]] || err_exit "printf '%g\\n' \$(($1)) failed -- expected $2, got $x"
+		x=$(printf "%g\n" $1)
+		[[ $x == $2 ]] || err_exit "printf '%g\\n' $1 failed -- expected $2, got $x"
+		x=$(printf -- $(($1)))
+		[[ $x == $2 ]] || err_exit "print -- \$(($1)) failed -- expected $2, got $x"
+		shift 2
+	done
 	(( 1.0/0.0 == Inf )) || err_exit '1.0/0.0 != Inf'
-	[[ $(print -- $((0.0/0.0))) == nan ]] || err_exit '0.0/0.0 != NaN'
+	[[ $(print -- $((0.0/0.0))) == ?(-)nan ]] || err_exit '0.0/0.0 != NaN'
 	(( Inf*Inf == Inf )) || err_exit 'Inf*Inf != Inf'
 	(( NaN != NaN )) || err_exit 'NaN == NaN'
 	(( -5*Inf == -Inf )) || err_exit '-5*Inf != -Inf'
-	[[ $(print -- $((sqrt(-1.0)))) == nan ]]|| err_exit 'sqrt(-1.0) != NaN'
+	[[ $(print -- $((sqrt(-1.0)))) == ?(-)nan ]]|| err_exit 'sqrt(-1.0) != NaN'
 	(( pow(1.0,Inf) == 1.0 )) || err_exit 'pow(1.0,Inf) != 1.0'
 	(( pow(Inf,0.0) == 1.0 )) || err_exit 'pow(Inf,0.0) != 1.0'
-	[[ $(print -- $((NaN/Inf))) == nan ]] || err_exit 'NaN/Inf != NaN'
+	[[ $(print -- $((NaN/Inf))) == ?(-)nan ]] || err_exit 'NaN/Inf != NaN'
 	(( 4.0/Inf == 0.0 )) || err_exit '4.0/Inf != 0.0'
 else	err_exit 'Inf and NaN not working'
 fi
-unset x y
-float x=14.555 y
+unset x y n r
+n=14.555
+float x=$n y
 y=$(printf "%a" x)
-(( x == y )) || err_exit "output of printf %a not self preserving -- expected $x, got $y"
+r=$y
+[[ $r == $n ]] || err_exit "output of printf %a not self preserving -- expected $x, got $y"
+unset x y r
+x=-0
+y=$(printf "%g %g %g %g %g %g\n" -0. -0 $((-0)) x $x $((x)))
+r="-0 -0 -0 -0 -0 -0"
+[[ $y == "$r" ]] || err_exit "-0 vs -0.0 inconsistency -- expected '$r', got '$y'"
+$SHELL -c '(( x=));:' 2> /dev/null && err_exit '((x=)) should be an error'
+$SHELL -c '(( x+=));:' 2> /dev/null && err_exit '((x+=)) should be an error'
+$SHELL -c '(( x=+));:' 2> /dev/null && err_exit '((x=+)) should be an error'
+$SHELL -c 'x=();x.arr[0]=(z=3); ((x.arr[0].z=2))' 2> /dev/null || err_exit '(((x.arr[0].z=2)) should not be an error'
 exit $((Errors))

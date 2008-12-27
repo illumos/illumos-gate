@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -46,8 +46,17 @@ number(register char* s, register char* e, register long n, register int p, int 
 {
 	char*	b;
 
-	if (w && w > p)
-		p = w;
+	if (w)
+	{
+		if (p > 0 && (pad == 0 || pad == '0'))
+			while (w > p)
+			{
+				p++;
+				n *= 10;
+			}
+		else if (w > p)
+			p = w;
+	}
 	switch (pad)
 	{
 	case '-':
@@ -242,9 +251,8 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 		case 'o':	/* OBSOLETE */
 			p = tm_info.deformat;
 			goto push;
-		case 'F':	/* TM_DEFAULT */
-		case 'O':	/* OBSOLETE */
-			p = tm_info.format[TM_DEFAULT];
+		case 'F':	/* ISO 8601:2000 standard date format */
+			p = "%Y-%m-%d";
 			goto push;
 		case 'g':	/* %V 2 digit year */
 		case 'G':	/* %V 4 digit year */
@@ -302,6 +310,10 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 				}
 			}
 			p = tm_info.format[TM_RECENT];
+			goto push;
+		case 'L':	/* TM_DEFAULT */
+		case 'O':	/* OBSOLETE */
+			p = tm_info.format[TM_DEFAULT];
 			goto push;
 		case 'm':	/* month number */
 			cp = number(cp, ep, (long)(tp->tm_mon + 1), 2, width, pad);
@@ -447,7 +459,7 @@ tmxfmt(char* buf, size_t len, const char* format, Time_t t)
 			continue;
 		case 'z':	/* time zone west offset */
 			if ((ep - cp) >= 16)
-				cp = tmpoff(cp, ep - cp, "", (flags & TM_UTC) ? 0 : tm_info.zone->west, 24 * 60);
+				cp = tmpoff(cp, ep - cp, "", (flags & TM_UTC) ? 0 : tm_info.zone->west - (tp->tm_isdst ? 60 : 0), 24 * 60);
 			continue;
 		case 'Z':	/* time zone */
 			p = (flags & TM_UTC) ? tm_info.format[TM_UT] : tp->tm_isdst && tm_info.zone->daylight ? tm_info.zone->daylight : tm_info.zone->standard;

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -29,7 +29,7 @@
  * the sum of the hacks {s5,v10,planix} is _____ than the parts
  */
 
-static const char id[] = "\n@(#)$Id: magic library (AT&T Research) 2007-01-08 $\0\n";
+static const char id[] = "\n@(#)$Id: magic library (AT&T Research) 2008-09-10 $\0\n";
 
 static const char lib[] = "libast:magic";
 
@@ -396,11 +396,14 @@ static char*
 vcdecomp(char* b, char* e, unsigned char* m, unsigned char* x)
 {
 	unsigned char*	map;
+	const char*	o;
 	int		c;
 	int		n;
 	int		i;
+	int		a;
 
 	map = CCMAP(CC_ASCII, CC_NATIVE);
+	a = 0;
 	i = 1;
 	for (;;)
 	{
@@ -408,12 +411,47 @@ vcdecomp(char* b, char* e, unsigned char* m, unsigned char* x)
 			i = 0;
 		else
 			*b++ = '^';
-		while (b < e && m < x && (c = *m++))
+		if (m < (x - 1) && !*(m + 1))
 		{
-			if (map)
-				c = map[c];
-			*b++ = c;
+			/*
+			 * obsolete indices
+			 */
+
+			if (!a)
+			{
+				a = 1;
+				o = "old, ";
+				while (b < e && (c = *o++))
+					*b++ = c;
+			}
+			switch (*m)
+			{
+			case 0:		o = "delta"; break;
+			case 1:		o = "huffman"; break;
+			case 2:		o = "huffgroup"; break;
+			case 3:		o = "arith"; break;
+			case 4:		o = "bwt"; break;
+			case 5:		o = "rle"; break;
+			case 6:		o = "mtf"; break;
+			case 7:		o = "transpose"; break;
+			case 8:		o = "table"; break;
+			case 9:		o = "huffpart"; break;
+			case 50:	o = "map"; break;
+			case 100:	o = "recfm"; break;
+			case 101:	o = "ss7"; break;
+			default:	o = "UNKNOWN"; break;
+			}
+			m += 2;
+			while (b < e && (c = *o++))
+				*b++ = c;
 		}
+		else
+			while (b < e && m < x && (c = *m++))
+			{
+				if (map)
+					c = map[c];
+				*b++ = c;
+			}
 		if (b >= e)
 			break;
 		n = 0;
@@ -512,6 +550,8 @@ ckmagic(register Magic_t* mp, const char* file, char* buf, struct stat* st, unsi
 			}
 			break;
 		}
+		p = "";
+		num = 0;
 		if (!ep->expr)
 			num = ep->offset + off;
 		else

@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -20,7 +20,7 @@
 : generate the ksh math builtin table
 : include math.tab
 
-# @(#)math.sh (AT&T Research) 2007-02-02
+# @(#)math.sh (AT&T Research) 2008-08-29
 
 command=$0
 iffeflags="-n -v -F ast_standards.h"
@@ -35,13 +35,20 @@ table=$1
 names=
 tests=
 
+: check long double
+
+eval `iffe $iffeflags -c "$cc" - typ long.double 2>&$stderr`
+
 : read the table
 
 exec < $table
 while	read type args name aka comment
 do	case $type in
 	[fi])	names="$names $name"
-		tests="$tests,$name,${name}l"
+		tests="$tests,$name"
+		case $_typ_long_double in
+		1)	tests="$tests,${name}l" ;;
+		esac
 		eval TYPE_$name=$type ARGS_$name=$args AKA_$name=$aka
 		;;
 	esac
@@ -49,7 +56,7 @@ done
 
 : check the math library
 
-eval `iffe $iffeflags -c "$cc" - typ long.double : lib $tests $iffehdrs $iffelibs 2>&$stderr`
+eval `iffe $iffeflags -c "$cc" - lib $tests $iffehdrs $iffelibs 2>&$stderr`
 lib=
 for name in $names
 do	eval x='$'_lib_${name}l y='$'_lib_${name}
@@ -123,7 +130,7 @@ do	eval x='$'_lib_${name}l y='$'_lib_${name} r='$'TYPE_${name} a='$'ARGS_${name}
 		;;
 	esac
 	case $local:$m:$n:$d in
-	1:*:*:*|*:1:*:*|*:*::)
+	1:*:*:*|*:1:*:*|*:*:1:)
 		args=
 		code="static $L local_$f("
 		sep=

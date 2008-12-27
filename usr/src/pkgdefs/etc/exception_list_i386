@@ -870,6 +870,12 @@ usr/lib/llib-lshell			      i386
 usr/lib/llib-lshell.ln  		      i386
 usr/lib/amd64/libshell.so		      i386
 usr/lib/amd64/llib-lshell.ln		      i386
+# libsum
+usr/lib/libsum.so			      i386
+usr/lib/llib-lsum			      i386
+usr/lib/llib-lsum.ln			      i386
+usr/lib/amd64/libsum.so		              i386
+usr/lib/amd64/llib-lsum.ln		      i386
 #
 # bmc (IPMI) interfaces shared within ON.
 #

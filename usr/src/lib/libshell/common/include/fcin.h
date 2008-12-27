@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -36,7 +36,8 @@ typedef struct _fcin
 	unsigned char	*fclast;	/* pointer to end of input buffer */
 	unsigned char	*fcptr;		/* pointer to next input char */
 	unsigned char	fcchar;		/* saved character */
-	void (*fcfun)(Sfio_t*,const char*,int);	/* advance function */
+	void (*fcfun)(Sfio_t*,const char*,int,void*);	/* advance function */
+	void		*context;	/* context pointer */
 	int		fcleft;		/* for multibyte boundary */
 	Sfoff_t		fcoff;		/* offset for last read */
 } Fcin_t;
@@ -54,7 +55,7 @@ typedef struct _fcin
 extern int		fcfill(void);
 extern int		fcfopen(Sfio_t*);
 extern int		fcclose(void);
-void			fcnotify(void(*)(Sfio_t*,const char*,int));
+void			fcnotify(void(*)(Sfio_t*,const char*,int,void*),void*);
 extern int		fcmbstate(const char*,int*,int*);
 
 extern Fcin_t		_Fcin;		/* used by macros */

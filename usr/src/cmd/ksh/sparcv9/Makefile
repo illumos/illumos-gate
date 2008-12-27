@@ -18,15 +18,14 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Specify the MACH we currently use to build and test ksh
-CMDTRANSMACH= $(MACH64)
+LIBSHELLMACH= $(MACH64)
 
 include ../../Makefile.cmd
 include ../../Makefile.cmd.64
@@ -34,14 +33,6 @@ include ../../Makefile.cmd.64
 include ../Makefile.com
 
 install: all $(ROOTPROG64)
-	@ \
-	(print "# Installing 64bit $(PROG) aliases $(USRKSH_ALIAS_LIST)" ; \
-	set -o xtrace ; \
-	for i in $(USRKSH_ALIAS_LIST) ; do \
-		[[ "$$i" = "$(PROG)" ]] && continue ; \
-		$(RM) "$(ROOTBIN64)/$$i" ; \
-		$(LN) "$(ROOTBIN64)/$(PROG)" "$(ROOTBIN64)/$$i" ; \
-	done \
-	)
+	$(INSTALL.ksh.64bit)
 
 include ../../Makefile.targ

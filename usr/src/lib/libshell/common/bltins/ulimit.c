@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -70,13 +70,13 @@ int	b_ulimit(int argc,char *argv[],void *extra)
 	register char *limit;
 	register int mode=0, n;
 	register unsigned long hit = 0;
-	Shell_t *shp = (Shell_t*)extra;
+	Shell_t *shp = ((Shbltin_t*)extra)->shp;
 #ifdef _lib_getrlimit
 	struct rlimit rlp;
 #endif /* _lib_getrlimit */
 	const Limit_t* tp;
 	char* conf;
-	int label, unit, noargs, nosupport;
+	int label, unit, nosupport;
 	rlim_t i;
 	char tmp[32];
         Optdisc_t disc;
@@ -109,9 +109,9 @@ int	b_ulimit(int argc,char *argv[],void *extra)
 			break;
 	}
 	opt_info.disc = 0;
-	limit = argv[opt_info.index];
 	/* default to -f */
-	if(noargs=(hit==0))
+	limit = argv[opt_info.index];
+	if(hit==0)
 		for(n=0; shtab_limits[n].option; n++)
 			if(shtab_limits[n].index == RLIMIT_FSIZE)
 			{
@@ -196,10 +196,9 @@ int	b_ulimit(int argc,char *argv[],void *extra)
 					conf = (char*)e_nosupport;
 				sfputr(sfstdout,conf,'\n');
 			}
-			else if(i!=INFINITY || noargs)
+			else if(i!=INFINITY)
 			{
-				if(!noargs)
-					i += (unit-1);
+				i += (unit-1);
 				sfprintf(sfstdout,"%I*d\n",sizeof(i),i/unit);
 			}
 			else

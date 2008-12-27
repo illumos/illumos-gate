@@ -249,6 +249,7 @@ s none usr/lib/libsocket.so=../../lib/libsocket.so.1
 s none usr/lib/libsocket.so.1=../../lib/libsocket.so.1
 f none usr/lib/libsoftcrypto.so.1 755 root bin
 s none usr/lib/libsoftcrypto.so=./libsoftcrypto.so.1
+f none usr/lib/libsum.so.1 755 root bin
 s none usr/lib/libsys.so=./libsys.so.1
 f none usr/lib/libsys.so.1 755 root bin
 s none usr/lib/libsysevent.so=../../lib/libsysevent.so.1

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -198,7 +198,9 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid)
 	pid = fork();
 #endif
 	sigcritical(0);
-	if (!pid)
+	if (pid == -1)
+		n = errno;
+	else if (!pid)
 	{
 		if (pgid < 0)
 			setsid();
@@ -230,10 +232,10 @@ spawnveg(const char* path, char* const argv[], char* const envv[], pid_t pgid)
 		n = m;
 	}
 #else
-	if (pid != -1 && err[0] != -1)
+	if (err[0] != -1)
 	{
 		close(err[1]);
-		if (read(err[0], &m, sizeof(m)) == sizeof(m) && m)
+		if (pid != -1 && read(err[0], &m, sizeof(m)) == sizeof(m) && m)
 		{
 			while (waitpid(pid, NiL, 0) == -1 && errno == EINTR);
 			rid = pid = -1;

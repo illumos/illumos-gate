@@ -1,0 +1,29 @@
+if	tst -ldb note{ sleepycat ndbm compatibility }end link{
+		#define DB_DBM_HSEARCH	1
+		#include <db.h>
+		int main()
+		{
+			DBM*	dbm = 0;
+			dbm_close(dbm);
+			return 0;
+		}
+	}end {
+		#ifndef DB_DBM_HSEARCH
+		#define DB_DBM_HSEARCH	1
+		#include <db.h>
+		#endif
+		#define _use_ndbm	1
+	}
+elif	hdr gdbm-ndbm {
+	#include <gdbm-ndbm.h>
+	#define _use_ndbm	1
+}
+elif	hdr gdbm/ndbm {
+	#include <gdbm/ndbm.h>
+	#define _use_ndbm	1
+}
+elif	hdr ndbm {
+	#include <ndbm.h>
+	#define _use_ndbm	1
+}
+endif

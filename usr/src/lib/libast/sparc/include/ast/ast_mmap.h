@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -19,7 +19,7 @@
 *                   Phong Vo <kpv@research.att.com>                    *
 *                                                                      *
 ***********************************************************************/
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20070418/build_sparc_32bit/src/lib/libast/features/mmap by iffe version 2007-04-04 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20081104/build_sparc_32bit/src/lib/libast/features/mmap by iffe version 2008-01-31 : : */
 #ifndef _def_mmap_ast
 #define _def_mmap_ast	1
 #define _sys_types	1	/* #include <sys/types.h> ok */
@@ -28,6 +28,7 @@
 #define _lib_mmap64	1	/* mmap64 interface and implementation work */
 #define _mmap_anon	1	/* use mmap MAP_ANON to get raw memory */
 #define _mmap_devzero	1	/* use mmap on /dev/zero to get raw memory */
+#define _mmap_worthy	1	/* mmap is good */
 
 /* some systems get it wrong but escape concise detection */
 #ifndef _NO_MMAP

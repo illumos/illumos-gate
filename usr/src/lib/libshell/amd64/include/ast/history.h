@@ -3,10 +3,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -65,7 +65,7 @@ extern __MANGLE__ int _Hist;
 #define	hist_min(hp)	((_Hist=((int)((hp)->histind-(hp)->histsize)))>=0?_Hist:0)
 #define	hist_max(hp)	((int)((hp)->histind))
 /* these are the history interface routines */
-extern __MANGLE__ int		sh_histinit __PROTO__((void));
+extern __MANGLE__ int		sh_histinit __PROTO__((__V_ *));
 extern __MANGLE__ void 		hist_cancel __PROTO__((History_t*));
 extern __MANGLE__ void 		hist_close __PROTO__((History_t*));
 extern __MANGLE__ int		hist_copy __PROTO__((char*, int, int, int));

@@ -19,120 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/libshell/common/llib-lshell
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 
 #include <shell.h>
 #include <nval.h>
-
-/* automatically generated data start here */
-extern const char e_defpath[];
-extern const char e_found[];
-extern const char e_nospace[];
-extern const char e_format[];
-extern const char e_number[];
-extern const char e_restricted[];
-extern const char e_recursive[];
-extern char e_version[];
-extern Dt_t *sh_bltin_tree (void);
-extern void sh_subfork (void);
-extern Shell_t *sh_init (int,char*[],Shinit_f);
-extern int sh_reinit (char*[]);
-extern int sh_eval (Sfio_t*,int);
-extern void sh_delay (double);
-extern void *sh_parse (Shell_t*, Sfio_t*,int);
-extern int sh_trap (const char*,int);
-extern int sh_fun (Namval_t*,Namval_t*, char*[]);
-extern int sh_funscope (int,char*[],int(*)(void*),void*,int);
-extern Sfio_t *sh_iogetiop (int,int);
-extern int sh_main (int, char*[], void(*)(int));
-extern void sh_menu (Sfio_t*, int, char*[]);
-extern Namval_t *sh_addbuiltin (const char*, int(*)(int, char*[],void*), void*);
-extern char *sh_fmtq (const char*);
-extern char *sh_fmtqf (const char*, int, int);
-extern Sfdouble_t sh_strnum (const char*, char**, int);
-extern int sh_access (const char*,int);
-extern int sh_close (int);
-extern int sh_dup (int);
-extern void sh_exit (int);
-extern int sh_fcntl (int, int, ...);
-extern Sfio_t *sh_fd2sfio (int);
-extern Shell_t *sh_getinterp (void);
-extern int sh_open (const char*, int, ...);
-extern int sh_openmax (void);
-extern Sfio_t *sh_pathopen (const char*);
-extern ssize_t sh_read (int, void*, size_t);
-extern ssize_t sh_write (int, const void*, size_t);
-extern off_t sh_seek (int, off_t, int);
-extern int sh_pipe (int[]);
-extern mode_t sh_umask (mode_t);
-extern void *sh_waitnotify (Shwait_f);
-extern Shscope_t *sh_getscope (int,int);
-extern Shscope_t *sh_setscope (Shscope_t*);
-extern void sh_sigcheck (void);
-extern unsigned long sh_isoption (int);
-extern unsigned long sh_onoption (int);
-extern unsigned long sh_offoption (int);
-extern int sh_waitsafe (void);
-extern int sh_exec (const Shnode_t*,int);
-extern int sh_waitsafe(void);
-extern int sh_exec(const Shnode_t*,int);
-extern void **sh_getliblist(void);
-extern Shell_t sh;
-extern Namarr_t *nv_setarray (Namval_t*,void*(*)(Namval_t*,const char*,int));
-extern void *nv_associative (Namval_t*,const char*,int);
-extern int nv_aindex (Namval_t*);
-extern int nv_nextsub (Namval_t*);
-extern char *nv_getsub (Namval_t*);
-extern Namval_t *nv_putsub (Namval_t*, char*, long);
-extern Namval_t *nv_opensub (Namval_t*);
-extern int nv_adddisc (Namval_t*, const char**, Namval_t**);
-extern int nv_clone (Namval_t*, Namval_t*, int);
-extern void nv_close (Namval_t*);
-extern void *nv_context (Namval_t*);
-extern Namval_t *nv_create (const char*, Dt_t*, int,Namfun_t*);
-extern Dt_t *nv_dict (Namval_t*);
-extern Sfdouble_t nv_getn (Namval_t*, Namfun_t*);
-extern Sfdouble_t nv_getnum (Namval_t*);
-extern char *nv_getv (Namval_t*, Namfun_t*);
-extern char *nv_getval (Namval_t*);
-extern Namfun_t *nv_hasdisc (Namval_t*, const Namdisc_t*);
-extern int nv_isnull (Namval_t*);
-extern Namval_t *nv_lastdict (void);
-extern void nv_newattr (Namval_t*,unsigned,int);
-extern Namval_t *nv_open (const char*,Dt_t*,int);
-extern void nv_putval (Namval_t*,const char*,int);
-extern void nv_putv (Namval_t*,const char*,int,Namfun_t*);
-extern int nv_scan (Dt_t*,void(*)(Namval_t*,void*),void*,int,int);
-extern Namval_t *nv_scoped (Namval_t*);
-extern char *nv_setdisc (Namval_t*,const char*,Namval_t*,Namfun_t*);
-extern void nv_setref (Namval_t*, Dt_t*,int);
-extern int nv_settype (Namval_t*, Namval_t*, int);
-extern void nv_setvec (Namval_t*,int,int,char*[]);
-extern void nv_setvtree (Namval_t*);
-extern int nv_setsize (Namval_t*,int);
-extern Namfun_t *nv_disc (Namval_t*,Namfun_t*,int);
-extern void nv_unset (Namval_t*);
-extern Namval_t *nv_search (const char *, Dt_t*, int);
-extern void nv_unscope (void);
-extern char *nv_name (Namval_t*);
-extern Namval_t *nv_type (Namval_t*);
-extern const Namdisc_t *nv_discfun (int);
-/* end of automatically generated data */
-
-/* Manually added based on libshell/common/include/builtins.h */
-extern int b_printf(int, char*[],void*);
-extern int B_echo(int, char*[],void*);
-extern int b_print(int, char*[],void*);
-extern int b_pwd(int, char*[],void*);
-extern int b_sleep(int, char*[],void*);
-extern int b_test(int, char*[],void*);

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -28,20 +28,21 @@
 */
 
 #if __STD_C
-int _sfflsbuf(reg Sfio_t* f, reg int c)
+int _sfflsbuf(Sfio_t* f, int c)
 #else
 int _sfflsbuf(f,c)
-reg Sfio_t*	f;	/* write out the buffered content of this stream */
-reg int		c;	/* if c>=0, c is also written out */ 
+Sfio_t*	f;	/* write out the buffered content of this stream */
+int	c;	/* if c>=0, c is also written out */ 
 #endif
 {
-	reg ssize_t	n, w;
-	reg uchar*	data;
+	ssize_t		n, w;
+	uchar*		data;
 	uchar		outc;
-	reg int		local, isall;
+	int		local, isall;
 	int		inpc = c;
+	SFMTXDECL(f);
 
-	SFMTXSTART(f,-1);
+	SFMTXENTER(f,-1);
 
 	GETLOCAL(f,local);
 

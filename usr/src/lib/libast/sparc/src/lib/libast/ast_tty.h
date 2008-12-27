@@ -1,4 +1,4 @@
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20070418/build_sparc_32bit/src/lib/libast/features/tty by iffe version 2007-04-04 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20081104/build_sparc_32bit/src/lib/libast/features/tty by iffe version 2008-01-31 : : */
 #ifndef _def_tty_ast
 #define _def_tty_ast	1
 #define _sys_types	1	/* #include <sys/types.h> ok */

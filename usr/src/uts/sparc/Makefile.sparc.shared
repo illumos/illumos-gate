@@ -336,7 +336,7 @@ MISC_KMODS      += md_sp
 #
 #	Exec Class Modules (/kernel/exec):
 #
-EXEC_KMODS	+= aoutexec elfexec intpexec javaexec
+EXEC_KMODS	+= aoutexec elfexec intpexec shbinexec javaexec
 
 #
 #	Scheduling Class Modules (/kernel/sched):

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -41,15 +41,18 @@ int		flags;	/* flags must be in VM_FLAGS		*/
 int		on;	/* !=0 if turning on, else turning off	*/
 #endif
 {
-	reg int		mode;
+	reg int		mode, inuse;
 	reg Vmdata_t*	vd = vm->data;
 
 	if(flags == 0 && on == 0)
 		return vd->mode;
 
+	SETINUSE(vd, inuse);
 	if(!(vd->mode&VM_TRUST) )
 	{	if(ISLOCK(vd,0))
+		{	CLRINUSE(vd, inuse);
 			return 0;
+		}
 		SETLOCK(vd,0);
 	}
 
@@ -63,6 +66,7 @@ int		on;	/* !=0 if turning on, else turning off	*/
 		vd->mode &= ~VM_TRUST;
 
 	CLRLOCK(vd,0);
+	CLRINUSE(vd, inuse);
 
 	return mode;
 }

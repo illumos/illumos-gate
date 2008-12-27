@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -20,7 +20,7 @@
 *                                                                      *
 ***********************************************************************/
 #include	"sfhdr.h"
-static char*	Version = "\n@(#)$Id: sfio (AT&T Research) 2006-02-07 $\0\n";
+static char*	Version = "\n@(#)$Id: sfio (AT&T Research) 2008-07-17 $\0\n";
 
 /*	Functions to set a given stream to some desired mode
 **
@@ -45,6 +45,7 @@ static char*	Version = "\n@(#)$Id: sfio (AT&T Research) 2006-02-07 $\0\n";
 **		05/31/2003 (sfsetbuf(f,f,align_size) to set alignment for data)
 **			   (%I1d is fixed to handle "signed char" correctly)
 **		01/01/2004 Porting issues to various platforms resolved.
+**		06/01/2008 Allowing notify() at entering/exiting thread-safe routines.
 */
 
 /* the below is for protecting the application from SIGPIPE */
@@ -127,7 +128,7 @@ Sfio_t*	f;
 	if(!(p = f->pool) )
 		p = f->pool = &_Sfpool;
 
-	POOLMTXSTART(p);
+	POOLMTXENTER(p);
 
 	rv = -1;
 
@@ -581,7 +582,7 @@ reg int		local;	/* a local call */
 			errno = EBADF;
 
 		if(_Sfnotify) /* notify application of the error */
-			(*_Sfnotify)(f,wanted,f->file);
+			(*_Sfnotify)(f, wanted, (void*)((long)f->file));
 
 		rv = -1;
 		break;

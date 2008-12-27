@@ -18,15 +18,16 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
-# run the ksh93 minimum set of tests
+# Run the ksh93 minimum set of tests
+#
+
 #
 # Notes:
 # - "builtins.sh" may fail in some locales like this:
@@ -43,21 +44,10 @@
 #   This may be simply a different sort order or a bug in the test suite.
 #   Currently under investigation.
 #
-# - "io.sh" may fail due a subtle bug in ksh93 or the test suite which 
-#   only happens when ksh93 is NOT called "ksh"; to work around the
-#   problem the test sequence currently uses $(SRC)/cmd/ksh/$(CMDTRANSMACH)/ksh
-#   instead of $(SRC)/cmd/ksh/$(CMDTRANSMACH)/$(PROG) until we+upstream figure
-#   out what exactly is going wrong in this case.
-#   -- snip --
-#   ./close0[2]: ./close1: cannot execute [Exec format error]
-#	    io.sh[81]: picked up file descriptor zero for opening script file
-#   -- snip --
-#
 # - These tests need a working system clock, otherwise they'll bite you.
 #
-# - The test frontend in this Makefile should be rewritten in ksh93
-#   instead of the current /usr/bin/ksh (=ksh88i). This would be far less
-#   complicated.
+# - The current list of locales was mainly composed to cover various encodings
+#   and all important markets based on suggestions by Sun's i18n team.
 #
 # - More locales should be tested here (via ON_KSH_TEST_LOCALES below).
 #   Locales like "ru_RU.KOI8-R","de_DE.UTF-8", "is_IS.ISO8859-1", 
@@ -65,28 +55,28 @@
 #   that is getting little bit more compliciated because these locales use
 #   ',' as decimal delimter. The best solution may be to wait for ksh93
 #   being integrated into OS/Net and then change the test sequence to
-#   use ksh93's associate/compound variables (this may require a flag
+#   use ksh93's associative/compound variables (this may require a flag
 #   day... ;-( ).
-#   The current list was mainly composed to cover various encodings and
-#   all important markets based on suggestions by Sun's i18n team.
 #
 # - Due to the timing sensitivity of some of the tests, these tests should 
 #   be run on a quiet system with no other activity.
 #
 
-TESTSRC= $(LIBSHELLSRC)/../tests
+TESTSRC= $(LIBSHELLBASE)/common/tests
 
 # ON_KSH_TEST_LOCALES can be overridden via
 # $ export ON_KSH_TEST_LOCALES=<value> # before $ make install #
 ON_KSH_TEST_LOCALES = \
 	C \
-	en_US en_US.UTF-8 \
+	en_US.UTF-8 en_US en_US.ISO8859-15@euro \
 	he_IL.UTF-8 \
 	hi_IN.UTF-8 \
-	ja_JP.PCK ja_JP.UTF-8 ja_JP.eucJP \
-	ko_KR.EUC \
+	ja ja_JP.PCK ja_JP.UTF-8 ja_JP.eucJP \
+	ko_KR.UTF-8 ko_KR.EUC \
 	th_TH.TIS620 \
-	zh_CN.EUC zh_CN.GBK zh_CN.GB18030 zh_CN.UTF-8 \
+	zh_CN.EUC zh_CN.GBK \
+	zh_CN.GB18030 zh_CN.GB18030@pinyin zh_CN.GB18030@radical zh_CN.GB18030@stroke \
+	zh_CN.UTF-8 zh_CN.UTF-8@pinyin zh_CN.UTF-8@radical zh_CN.UTF-8@stroke \
 	zh_HK.BIG5HK \
 	zh_TW.BIG5 zh_TW.EUC zh_TW.UTF-8
 
@@ -103,61 +93,71 @@ ON_KSH_TEST_IGNORE_TESTFAILURE=false
 # test failures).
 testshell: $(PROG)
 	@ \
+	builtin basename ; \
 	print '# NOTE: Make sure your binaries in ROOT match your kernel!' ; \
 	( \
 	    set +o errexit ; \
-	    export PATH="$(SRC)/cmd/ksh/$(CMDTRANSMACH):/bin:/usr/bin" ; \
+	    export PATH="$(SRC)/cmd/ksh/$(LIBSHELLMACH):/bin:/usr/bin" ; \
 	    printf "# which ksh='%s', ksh93='%s'\n" \
 	        "$$(which ksh)" "$$(which ksh93)" ; \
 	) ; \
-	if [[ "$$(isalist | fgrep "$(CMDTRANSMACH)")" = "" ]] ; then \
+	if [[ "$$(isalist)" != ~(E)$(LIBSHELLMACH) ]] ; then \
 	    printf \
 	        "# ISA='%s' not available on this system, skipping tests...\n" \
-	        "$(CMDTRANSMACH)" ; \
+	        "$(LIBSHELLMACH)" ; \
 	    exit 0 ; \
 	fi ; \
-	exec 2>&1 ; \
+	print "# Libraries used:" ; \
+	LD_LIBRARY_PATH_64="$(ROOTLIB64)/" \
+	LD_LIBRARY_PATH_32="$(ROOTLIB)/" \
+	LD_LIBRARY_PATH="$(ROOTLIB64)/:$(ROOTLIB)/" \
+		/usr/bin/ldd "$(SRC)/cmd/ksh/$(LIBSHELLMACH)/ksh" ; \
+	print "# Running tests:" ; \
+	redirect 2>&1 ; \
 	(supported_locales="$$(/usr/bin/locale -a)" ; \
 	for test_lang in $(ON_KSH_TEST_LOCALES) ; do \
-	    if [[ "$$(print "$${supported_locales}" | \
-	             egrep "^$${test_lang}\$$")" = "" ]] ; then \
+	    if [[ "$$(egrep "^$${test_lang}\$$" <<< "$${supported_locales}")" == "" ]] ; then \
 	        printf \
 		    "# Locale '%s' not supported, skipping tests...\n" \
 		    "$${test_lang}" ; \
 	        continue ; \
 	    fi ; \
 	    (for test_item in $(ON_KSH_TEST_LIST) ; do \
-	        [[ "$${test_item}" = "$(TESTSRC)/builtins.sh" || \
-	           "$${test_item}" = "$(TESTSRC)/options.sh" ]] || \
+	        [[ "$${test_item}" == "$(TESTSRC)/builtins.sh" || \
+	           "$${test_item}" == "$(TESTSRC)/options.sh" ]] || \
 		   $(ON_KSH_TEST_IGNORE_TESTFAILURE) && \
 		   set +o errexit ; \
-	        printf \
-		    "## Running %s test: LANG='%s' script='%s'\n" \
-		    "$(CMDTRANSMACH)/ksh" \
-		    "$${test_lang}" \
-		    "$$(basename "$${test_item}")"; \
-                ( \
-	            test_output="$$( ( \
-	        	export \
-	        	    SHELL="$(SRC)/cmd/ksh/$(CMDTRANSMACH)/ksh" \
-	        	    LD_LIBRARY_PATH_64="$(ROOTLIB64)/" \
-	        	    LD_LIBRARY_PATH_32="$(ROOTLIB)/" ; \
-	        	    LD_LIBRARY_PATH="$(ROOTLIB64)/:$(ROOTLIB)/" ; \
-	        	"$${SHELL}" "$(TESTSRC)/shtests" -t \
-	        	    LD_LIBRARY_PATH_64="$${LD_LIBRARY_PATH_64}" \
-	        	    LD_LIBRARY_PATH_32="$${LD_LIBRARY_PATH_32}" \
-	        	    LD_LIBRARY_PATH="$${LD_LIBRARY_PATH}" \
-	        	    SHELL="$${SHELL}" \
-	        	    LANG="$${test_lang}" \
-	        	    LC_ALL="$${test_lang}" \
-	        	      "$${test_item}" \
-	            ) 2>&1 | while read ; do \
-		                 printf "#\t%s\n" "$${REPLY}" ; \
-			     done | tee /dev/stderr)" ; \
-	            [[ "$$(print "$${test_output}" | \
-		          egrep 'passed \[ .* tests 0 errors \]')" != "" ]] || \
-			      (print "##> test failed" ; exit 1) \
-                ) ; \
-	        set -o errexit ; \
+		   for mode in 'plain_script:-s' 'compiled_script:-c' ; do \
+		        printf \
+			    "## Running %s test: LANG='%s' script='%s', mode='%s'\n" \
+			    "$(LIBSHELLMACH)/ksh" \
+			    "$${test_lang}" \
+			    "$$(basename "$${test_item}")" \
+			    "$${mode%:*}"; \
+			( \
+		            test_output="$$( ( \
+		        	export \
+		        	    SHELL="$(SRC)/cmd/ksh/$(LIBSHELLMACH)/ksh" \
+		        	    LD_LIBRARY_PATH_64="$(ROOTLIB64)/" \
+		        	    LD_LIBRARY_PATH_32="$(ROOTLIB)/" \
+		        	    LD_LIBRARY_PATH="$(ROOTLIB64)/:$(ROOTLIB)/" ; \
+		        	"$${SHELL}" "$(TESTSRC)/shtests" -t "$${mode#*:}" \
+		        	    LD_LIBRARY_PATH_64="$${LD_LIBRARY_PATH_64}" \
+		        	    LD_LIBRARY_PATH_32="$${LD_LIBRARY_PATH_32}" \
+		        	    LD_LIBRARY_PATH="$${LD_LIBRARY_PATH}" \
+		        	    SHELL="$${SHELL}" \
+		        	    LANG="$${test_lang}" \
+		        	    LC_ALL="$${test_lang}" \
+				    VMDEBUG=a \
+				    SHCOMP="$(ROOTBIN)/shcomp" \
+		        	      "$${test_item}" \
+		            ) 2>&1 | while read ; do \
+			                 printf "#\t%s\n" "$${REPLY}" ; \
+				     done | tee /dev/stderr)" ; \
+			    [[ "$${test_output}" == ~(E)test.*passed\ \[\ [[:digit:]]*\ test.*\ 0\ errors\ \] ]] || \
+				      (print "##--------> test failed" ; exit 1) \
+			) ; \
+		   done ; \
+		   set -o errexit ; \
 	    done) ; \
 	done)

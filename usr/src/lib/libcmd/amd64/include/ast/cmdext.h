@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -55,6 +55,7 @@ extern __MANGLE__ int	b_mkfifo __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_mv __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_paste __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_pathchk __PROTO__((int, char**, __V_*));
+extern __MANGLE__ int	b_pids __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_rev __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_rm __PROTO__((int, char**, __V_*));
 extern __MANGLE__ int	b_rmdir __PROTO__((int, char**, __V_*));

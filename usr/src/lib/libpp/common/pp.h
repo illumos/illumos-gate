@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1986-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -68,7 +68,7 @@
 #define PPBUFSIZ	(32*PPBLKSIZ)		/* io buffer size	*/
 #define PPTOKSIZ	((PPBUFSIZ/2)-1)	/* max token size	*/
 
-#define PPWRITE(n)	do{if(write(1,pp.outbuf,n)!=(n))pperror(ERROR_SYSTEM|3,"%s: write error",pp.outfile);pp.offset+=(n);pp.lastout=pp.outbuf[n-1];}while(0)
+#define PPWRITE(n)	do{if(write(1,pp.outbuf,n)!=(n))pperror(ERROR_SYSTEM|3,"%s: write error",pp.outfile);pp.offset+=(n);pp.lastout=pp.outbuf[(n)-1];}while(0)
 
 #define pplastout()	((pp.outp>pp.outbuf)?*(pp.outp-1):pp.lastout)
 #define ppoffset()	(pp.offset+pppendout())

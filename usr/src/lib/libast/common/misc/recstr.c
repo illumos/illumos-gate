@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -178,7 +178,10 @@ recstr(register const char* s, char** e)
 				continue;
 			case '0': case '1': case '2': case '3': case '4':
 			case '5': case '6': case '7': case '8': case '9':
+				v = 0;
 				a[n++] = strtol(s, &t, 0);
+				if (t > s && (*(t - 1) == 'l' || *(t - 1) == 'L'))
+					t--;
 				s = (const char*)t - 1;
 				continue;
 			}
@@ -186,6 +189,8 @@ recstr(register const char* s, char** e)
 		}
 		if (e)
 			*e = (char*)s;
+		if (a[3] > (a[1] - a[2]))
+			a[3] = a[1] - a[2];
 		return REC_V_RECORD(REC_V_TYPE(a[1], a[2], a[3], a[4], a[5]), a[0]);
 	case '%':
 		if (e)

@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -27,6 +27,14 @@ alias err_exit='err_exit $LINENO'
 
 integer Errors=0
 Command=${0##*/}
+
+tmp=/tmp/kshtf$$
+function cleanup
+{
+	rm -rf $tmp
+}
+mkdir $tmp || err_exit "mkdir $tmp failed"
+
 integer foo=33
 bar=bye
 # check for global variables and $0
@@ -81,11 +89,11 @@ function foobar
 {
 	(return 0)
 }
-> /tmp/shtests$$.1
+> $tmp/shtests$$.1
 {
 foobar
-if	[ -r /tmp/shtests$$.1 ]
-then	rm -r /tmp/shtests$$.1
+if	[ -r $tmp/shtests$$.1 ]
+then	rm -r $tmp/shtests$$.1
 else	err_exit 'return within subshell inside function error'
 fi
 }
@@ -111,7 +119,7 @@ function foo
 	x=2
 	(
 		x=3
-		cd /tmp
+		cd $tmp
 		print bar
 	)
 	if	[[ $x != 2 ]]
@@ -130,19 +138,19 @@ fun() /bin/echo hello
 if	[[ $(fun) != hello ]]
 then	err_exit one line functions not working
 fi
-trap 'rm -f /tmp/script$$ /tmp/data$$.[12]' EXIT
-cat > /tmp/script$$ <<-\!
+trap cleanup EXIT
+cat > $tmp/script$$ <<-\!
 	print -r -- "$1"
 !
-chmod +x /tmp/script$$
+chmod +x $tmp/script$$
 function passargs
 {
-	/tmp/script$$ "$@"
+	$tmp/script$$ "$@"
 }
 if	[[ $(passargs one) != one ]]
 then	err_exit 'passing args from functions to scripts not working'
 fi
-cat > /tmp/script$$ <<-\!
+cat > $tmp/script$$ <<-\!
 	trap 'exit 0' EXIT
 	function foo
 	{
@@ -150,17 +158,17 @@ cat > /tmp/script$$ <<-\!
 	}
 	foo
 !
-if	! /tmp/script$$
+if	! $tmp/script$$
 then	err_exit 'exit trap incorrectly triggered' 
 fi
-if	! $SHELL -c /tmp/script$$
+if	! $SHELL -c $tmp/script$$
 then	err_exit 'exit trap incorrectly triggered when invoked with -c' 
 fi
-$SHELL -c "trap 'rm /tmp/script$$' EXIT"
-if	[[ -f /tmp/script$$ ]]
+$SHELL -c "trap 'rm $tmp/script$$' EXIT"
+if	[[ -f $tmp/script$$ ]]
 then	err_exit 'exit trap not triggered when invoked with -c' 
 fi
-cat > /tmp/script$$ <<- \EOF
+cat > $tmp/script$$ <<- \EOF
 	foobar()
 	{
 		return
@@ -169,8 +177,8 @@ cat > /tmp/script$$ <<- \EOF
 	foobar
 	print -r -- "$1"
 EOF
-chmod +x /tmp/script$$
-if	[[ $( $SHELL /tmp/script$$ arg1 arg2) != arg2 ]]
+chmod +x $tmp/script$$
+if	[[ $( $SHELL $tmp/script$$ arg1 arg2) != arg2 ]]
 then	err_exit 'arguments not restored by posix functions'
 fi
 function foo
@@ -205,15 +213,15 @@ if	[[ $(foo) != 3 ]]
 then	err_exit 'variable assignment list not using parent scope'
 fi
 unset -f foo$$
-trap "rm -f /tmp/foo$$" EXIT INT
-cat > /tmp/foo$$ <<!
+#trap "rm -f $tmp/foo$$" EXIT INT
+cat > $tmp/foo$$ <<!
 function foo$$
 {
 	print foo
 }
 !
-chmod +x /tmp/foo$$
-FPATH=/tmp
+chmod +x $tmp/foo$$
+FPATH=$tmp
 autoload foo$$
 if	[[ $(foo$$ 2>/dev/null) != foo ]]
 then	err_exit 'autoload not working'
@@ -286,6 +294,8 @@ bad
 if	[[ $val != false ]]
 then	err_exit 'set -e not inherited for posix functions'
 fi
+trap - ERR
+
 function myexport 
 {
 	nameref var=$1
@@ -302,34 +312,40 @@ function myexport
 	
 }
 export dgk=base
-if	[[ $(myexport dgk fun) != fun ]]
-then	err_exit 'export inside function not working'
+val=$(myexport dgk fun)
+if	[[ $val != fun ]]
+then	err_exit "export inside function not working -- expected 'fun', got '$val'"
 fi
-val=$(export | grep "^dgk=")
-if	[[ ${val#dgk=} != base ]]
-then	err_exit 'export not restored after function call'
+val=$(export | sed -e '/^dgk=/!d' -e 's/^dgk=//')
+if	[[ $val != base ]]
+then	err_exit "export not restored after function call -- expected 'base', got '$val'"
 fi
-if	[[ $(myexport dgk fun fun2) != fun2 ]]
-then	err_exit 'export inside function not working with recursive function'
+val=$(myexport dgk fun fun2)
+if	[[ $val != fun2 ]]
+then	err_exit "export inside function not working with recursive function -- expected 'fun2', got '$val'"
 fi
-val=$(export | grep "^dgk=")
-if	[[ ${val#dgk=} != base ]]
-then	err_exit 'export not restored after recursive function call'
+val=$(export | sed -e '/^dgk=/!d' -e 's/^dgk=//')
+if	[[ $val != base ]]
+then	err_exit "export not restored after recursive function call -- expected 'base', got '$val'"
 fi
-if	[[ $(dgk=try3 myexport dgk) != try3 ]]
-then	err_exit 'name=value not added to export list with function call'
+val=$(dgk=try3 myexport dgk)
+if	[[ $val != try3 ]]
+then	err_exit "name=value not added to export list with function call -- expected 'try3', got '$val'"
 fi
-val=$(export | grep "^dgk=")
-if	[[ ${val#dgk=} != base ]]
-then	err_exit 'export not restored name=value function call'
+val=$(export | sed -e '/^dgk=/!d' -e 's/^dgk=//')
+if	[[ $val != base ]]
+then	err_exit "export not restored name=value function call -- expected 'base', got '$val'"
 fi
 unset zzz
-if	[[ $(myexport zzz fun) != fun ]]
-then	err_exit 'export inside function not working for zzz'
+val=$(myexport zzz fun)
+if	[[ $val != fun ]]
+then	err_exit "export inside function not working -- expected 'fun', got '$val'"
 fi
-if	[[ $(export | grep "zzz=") ]]
-then	err_exit 'zzz exported after function call'
+val=$(export | sed -e '/^zzz=/!d' -e 's/^zzz=//')
+if	[[ $val ]]
+then	err_exit "unset varaible exported after function call -- expected '', got '$val'"
 fi
+
 unset zzz
 typeset -u zzz
 function foo
@@ -368,8 +384,8 @@ function closure
 	return $r
 }
 closure 0 || err_exit -u2 'for loop function optimization bug2'
-mkdir  /tmp/ksh$$ || err_exit "mkdir /tmp/ksh$$ failed"
-cd /tmp/ksh$$ || err_exit "cd /tmp/ksh$$ failed"
+mkdir  $tmp/ksh$$ || err_exit "mkdir $tmp/ksh$$ failed"
+cd $tmp/ksh$$ || err_exit "cd $tmp/ksh$$ failed"
 print 'false' > try
 chmod +x try
 cat > tst <<- EOF
@@ -384,9 +400,9 @@ EOF
 if	[[ $($SHELL < tst)  == error ]]
 then	err_exit 'ERR trap not cleared'
 fi
-FPATH=/tmp/ksh$$
-print ': This does nothing' > /tmp/ksh$$/foobar
-chmod +x /tmp/ksh$$/foobar
+FPATH=$tmp/ksh$$
+print ': This does nothing' > $tmp/ksh$$/foobar
+chmod +x $tmp/ksh$$/foobar
 unset -f  foobar
 { foobar;} 2> /dev/null
 if	[[ $? != 126 ]]
@@ -395,7 +411,7 @@ fi
 print 'set a b c' > dotscript 
 [[ $(PATH=$PATH: $SHELL -c '. dotscript;print $#') == 3 ]] || err_exit 'positional parameters not preserved with . script without arguments'
 cd ~- || err_exit "cd back failed"
-cd /; rm -r /tmp/ksh$$ || err_exit "rm -r /tmp/ksh$$ failed"
+cd /; rm -r $tmp/ksh$$ || err_exit "rm -r $tmp/ksh$$ failed"
 function errcheck
 {
 	trap 'print ERR; return 1' ERR
@@ -423,7 +439,7 @@ a()
 b() { : ;}
 [[ $(a) == a ]] || err_exit '.sh.fun not set correctly in a function'
 print $'a(){\ndate\n}'  | $SHELL 2> /dev/null || err_exit 'parser error in a(){;date;}'
-cat > /tmp/data$$.1 << '++EOF'
+cat > $tmp/data$$.1 << '++EOF'
      1  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
      2  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
      3  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -445,7 +461,7 @@ cat > /tmp/data$$.1 << '++EOF'
     19  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
     20  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ++EOF
-cat > /tmp/script$$ << '++EOF'
+cat > $tmp/script$$ << '++EOF'
 # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 # XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -711,11 +727,10 @@ f()
 {
 cat <<\M
 ++EOF
-cat /tmp/data$$.1 >> /tmp/script$$
-printf 'M\n}\n\nf\n\n' >> /tmp/script$$
-$SHELL -c /tmp/script$$  > /tmp/data$$.2
-cmp -s /tmp/data$$.[12] || err_exit 'error with long functions'
-rm -f /tmp/script$$ /tmp/data$$.[12]
+cat $tmp/data$$.1 >> $tmp/script$$
+printf 'M\n}\n\nf\n\n' >> $tmp/script$$
+$SHELL -c $tmp/script$$  > $tmp/data$$.2
+cmp -s $tmp/data$$.[12] || err_exit 'error with long functions'
 v=1
 function f
 {
@@ -755,4 +770,212 @@ function foo
 	done
 }
 [[ $(foo 'NUMBERED RECORDSIZE') == ok ]] || err_exit 'optimization error with undefined variable'
+unset x
+x=$(
+	set -e
+	integer count=0
+	function err_f
+	{
+		if	((count++==3))  
+		then	print failed
+		else	false
+		fi
+	}
+	trap 'err_f' ERR
+	false
+)
+[[ $x == failed ]] && err_exit 'ERR trap executed multiple times'
+trap cleanup EXIT
+export environment
+typeset global
+function f
+{
+	typeset i t local
+
+	for i
+	do	case $i in
+		[-+]*)	set "$@"
+			continue
+			;;
+		local)	local=f
+			t=$(typeset +f $local)
+			;;
+		global)	global=f
+			t=$(typeset +f $global)
+			;;
+		environment)
+			environment=f
+			t=$(typeset +f $environment)
+			;;
+		literal)t=$(typeset +f f)
+			;;
+		positional)
+			set -- f
+			t=$(typeset +f $1)
+			;;
+		esac
+		[[ $t ]] || err_exit "typeset +f \$$i failed"
+	done
+}
+f local global environment literal positional
+$SHELL -c '
+	print exit 0 > '$tmp'/script$$
+	chmod +x '$tmp'/script$$
+	unset var
+	var=( ident=1 )
+	function fun
+	{
+		PATH='$tmp' script$$
+	}
+	fun
+' || err_exit "compound variable cleanup before script exec failed"
+( $SHELL << \++EOF++ 
+function main
+{
+ 	typeset key
+ 	typeset -A entry
+ 	entry[a]=( value=aaa )
+}
+main
+++EOF++
+) 2> /dev/null || err_exit 'function main fails'
+optind=$OPTIND
+sub()
+{
+        (
+                OPTIND=1
+                while getopts :abc OPTION "$@"
+                do      print OPTIND=$OPTIND
+                done
+        )
+}
+[[ $(sub -a) == OPTIND=2 ]] || err_exit 'OPTIND should be 2'
+[[ $(sub -a) == OPTIND=2 ]] || err_exit 'OPTIND should be 2 again'
+[[ $OPTIND == "$optind" ]] || err_exit 'OPTIND should be 1'
+
+function bar
+{
+	[[ -o nounset ]] && err_exit  'nounset option should not be inherited'
+}
+function foo
+{
+	set -o nounset
+	bar
+}
+set +o nounset
+foo
+function red
+{
+	integer -S d=0
+	printf 'red_one %d\n' d
+	(( d++ ))
+	return 0
+}
+[[ ${ red } != 'red_one 0' ]] && err_exit 'expected red_one 0'
+[[ ${ red } != 'red_one 1' ]] && err_exit 'expected red_one 1'
+xyz=$0
+function traceback
+{
+	integer .level=.sh.level
+	while((--.level>=0))
+	do
+		((.sh.level = .level))
+		[[ $xyz == "$0" ]] || err_exit "\$xyz=$xyz does not match $0 on level ${.level}"
+		[[ ${.sh.lineno} == "$1" ]] || err_exit "\${.sh.lineno}=${.sh.lineno} does not match $1 on level ${.level}"
+	done
+}
+
+function foo
+{
+	typeset xyz=foo
+	set -- $((LINENO+1))
+	bar $LINENO "$1"
+}
+
+function bar
+{
+    	typeset xyz=bar
+	set -- $((LINENO+2))
+	trap 'traceback $LINENO' DEBUG
+	: $LINENO "$1"
+}
+
+set -- $((LINENO+1))
+foo $LINENO
+function .sh.fun.set
+{
+	print -r -- "${.sh.value}"
+}
+function abc
+{
+	:
+}
+def()
+{
+	:
+}
+[[ $(abc) == abc ]] || err_exit '.sh.fun.set not capturing function name'
+[[ $(def) == def ]] || err_exit '.sh.fun.set not capturing name()'
+unset -f .sh.fun.set
+
+# tests for debug functions
+basefile=${.sh.file}
+integer baseline
+cleanup
+trap 'rm $tmp' EXIT
+tmp=${TMPDIR:-/tmp}/ksh$$.1 
+cat > $tmp << \+++
+	: line 1
+
+	: line 3
++++
+# Print one line in a call stack
+function _Dbg_print_frame
+{
+	typeset -i pos=$1
+	typeset fn=$2
+	typeset filename="$3"
+	typeset -i line=$4
+	typeset  arg=$5
+	shift 5
+	if	((pos==0))
+	then	[[ $filename == "$basefile" ]] || err_exit "filename for level 0 is $filename not $basename"
+		[[ $arg == DEBUG  ]] && ((baseline++))
+		[[ $line == "$baseline" ]] || err_exit "line number for level 0 is $line not $baseline"
+	elif	((pos==1))
+	then	[[ $filename == "$tmp" ]] ||  err_exit "filename for level 1 is $filename not $tmp"
+		[[ $* == 'foo bar' ]] || err_exit "args are '$*', not 'foo bar'"
+		[[ $line == $arg ]] || err_exit "line number for level 1 is $line not $arg"
+	else	err_exit "level should be 0 or 1 but is $pos"
+	fi
+}
+
+function _Dbg_debug_trap_handler
+{
+
+	integer .level=.sh.level .max=.sh.level-1
+	while((--.level>=0))
+	do
+		((.sh.level = .level))
+      		_Dbg_print_frame  "${.level}" "$0" "${.sh.file}" "${.sh.lineno}" "${.sh.command##* }" "$@"
+	done
+}
+
+((baseline=LINENO+2))
+trap '_Dbg_debug_trap_handler' DEBUG
+.  $tmp  foo bar
+trap '' DEBUG
+             
+caller() {
+  integer .level=.sh.level .max=.sh.level-1
+  while((--.level>=0))
+  do
+      ((.sh.level = .level))
+      print -r -- "${.sh.lineno}"
+  done
+}
+bar() { caller;}
+set -- $(bar)
+[[ $1 == $2 ]] && err_exit ".sh.inline optimization bug"
+( $SHELL  -c ' function foo { typeset x=$1;print $1;};z=();z=($(foo bar)) ') 2> /dev/null ||  err_exit 'using a function to set an array in a command sub  fails'
 exit $((Errors))

@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -83,5 +83,10 @@ then	err_exit x=~:~ not $HOME:$HOME
 fi
 HOME=/
 [[ ~ == / ]] || err_exit '~ should be /'
+trap 'rm -rf /tmp/kshtilde$$' EXIT
 [[ ~/foo == /foo ]] || err_exit '~/foo should be /foo when ~==/'
+print $'print ~+\n[[ $1 ]] && $0' > /tmp/kshtilde$$
+chmod +x /tmp/kshtilde$$
+nl=$'\n'
+[[ $(/tmp/kshtilde$$ foo) == "$PWD$nl$PWD" ]] 2> /dev/null  || err_exit 'tilde fails inside a script run by name'
 exit $((Errors))

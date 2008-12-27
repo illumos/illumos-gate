@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -107,7 +105,6 @@ f none usr/bin/spell 555 root bin
 f none usr/bin/spline 555 root bin
 f none usr/bin/split 555 root bin
 s none usr/bin/strace=../sbin/strace
-f none usr/bin/sum 555 root bin
 f none usr/bin/tcopy 555 root bin
 l none usr/bin/uncompress=../../usr/bin/compress
 f none usr/bin/unexpand 555 root bin

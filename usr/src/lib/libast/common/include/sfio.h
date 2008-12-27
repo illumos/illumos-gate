@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -22,7 +22,7 @@
 #ifndef _SFIO_H
 #define _SFIO_H	1
 
-#define SFIO_VERSION	20050202L
+#define SFIO_VERSION	20080717L
 
 /*	Public header file for the sfio library
 **
@@ -181,6 +181,7 @@ struct _sffmt_s
 /* for the notify function and discipline exception */
 #define SF_NEW		0	/* new stream				*/
 #define SF_SETFD	(-1)	/* about to set the file descriptor 	*/
+#define SF_MTACCESS	(-2)	/* starting a multi-threaded stream	*/
 
 #define SF_BUFSIZE	8192	/* default buffer size			*/
 #define SF_UNBOUND	(-1)	/* unbounded buffer size		*/
@@ -240,7 +241,7 @@ extern int		sfclrlock _ARG_((Sfio_t*));
 extern Void_t*		sfsetbuf _ARG_((Sfio_t*, Void_t*, size_t));
 extern Sfdisc_t*	sfdisc _ARG_((Sfio_t*,Sfdisc_t*));
 extern int		sfraise _ARG_((Sfio_t*, int, Void_t*));
-extern int		sfnotify _ARG_((void(*)(Sfio_t*, int, int)));
+extern int		sfnotify _ARG_((void(*)(Sfio_t*, int, void*)));
 extern int		sfset _ARG_((Sfio_t*, int, int));
 extern int		sfsetfd _ARG_((Sfio_t*, int));
 extern Sfio_t*		sfpool _ARG_((Sfio_t*, Sfio_t*, int));

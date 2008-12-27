@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -256,6 +256,7 @@ void	sh_trim(register char *sp)
 			int len;
 			if(mbwide() && (len=mbsize(sp))>1)
 			{
+				memmove(dp, sp, len);
 				dp += len;
 				sp += len;
 				continue;
@@ -300,7 +301,7 @@ void sh_utol(register char const *str1,register char *str2)
  */
 char	*sh_fmtq(const char *string)
 {
-	register const char *cp = string;
+	register const char *cp = string, *op;
 	register int c, state;
 	int offset;
 	if(!cp)
@@ -343,14 +344,12 @@ char	*sh_fmtq(const char *string)
 #endif
 	{
 #if SHOPT_MULTIBYTE
-		if(c>=0x200)
-			continue;
 		if(c=='\'' || !iswprint(c))
 #else
 		if(c=='\'' || !isprint(c))
 #endif /* SHOPT_MULTIBYTE */
 			state = 2;
-		else if(c==']' || (c!=':' && (c=sh_lexstates[ST_NORM][c]) && c!=S_EPAT))
+		else if(c==']' || (c!=':' && c<=0xff && (c=sh_lexstates[ST_NORM][c]) && c!=S_EPAT))
 			state |=1;
 	}
 	if(state<2)
@@ -367,9 +366,9 @@ char	*sh_fmtq(const char *string)
 		stakwrite("$'",2);
 		cp = string;
 #if SHOPT_MULTIBYTE
-		while(c= mbchar(cp))
+		while(op = cp, c= mbchar(cp))
 #else
-		while(c= *(unsigned char*)cp++)
+		while(op = cp, c= *(unsigned char*)cp++)
 #endif
 		{
 			state=1;
@@ -401,19 +400,28 @@ char	*sh_fmtq(const char *string)
 			    default:
 #if SHOPT_MULTIBYTE
 				if(!iswprint(c))
+				{
+					while(op<cp)
+						sfprintf(staksp,"\\%.3o",*(unsigned char*)op++);
+					continue;
+				}
 #else
 				if(!isprint(c))
-#endif
 				{
 					sfprintf(staksp,"\\%.3o",c);
 					continue;
 				}
+#endif
 				state=0;
 				break;
 			}
 			if(state)
+			{
 				stakputc('\\');
-			stakputc(c);
+				stakputc(c);
+			}
+			else
+				stakwrite(op, cp-op);
 		}
 		stakputc('\'');
 	}

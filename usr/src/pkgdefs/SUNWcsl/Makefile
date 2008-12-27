@@ -22,8 +22,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 include ../Makefile.com
 
@@ -32,11 +30,14 @@ include ../Makefile.com
 LICENSEFILES_i386 = lic_AMD 
 LICENSEFILES += $(LICENSEFILES_$(MACH)) \
 	../../common/mpi/THIRDPARTYLICENSE \
+	../../lib/libast/THIRDPARTYLICENSE \
 	../../lib/libbsdmalloc/THIRDPARTYLICENSE \
+	../../lib/libcmd/THIRDPARTYLICENSE \
 	../../lib/libdll/THIRDPARTYLICENSE \
 	../../lib/libkmf/THIRDPARTYLICENSE \
 	../../lib/libldap5/THIRDPARTYLICENSE \
 	../../lib/libshell/THIRDPARTYLICENSE \
+	../../lib/libsum/THIRDPARTYLICENSE \
 	../../lib/libwrap/THIRDPARTYLICENSE \
 	../../lib/pam_modules/authtok_check/THIRDPARTYLICENSE \
 	../../lib/passwdutil/THIRDPARTYLICENSE

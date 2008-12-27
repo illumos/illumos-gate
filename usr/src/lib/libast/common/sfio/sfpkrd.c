@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -163,7 +163,7 @@ int	action;	/* >0: peeking, if rc>=0, get action records,
 #endif /*_lib_select*/
 			if(r == -2)
 			{
-#if !_lib_poll && !_lib_select	/* both poll and select cann't be used */
+#if !_lib_poll && !_lib_select	/* both poll and select can't be used */
 #ifdef FIONREAD			/* quick and dirty check for availability */
 				long	nsec = tm < 0 ? 0 : (tm+999)/1000;
 				while(nsec > 0 && r < 0)
@@ -208,6 +208,7 @@ int	action;	/* >0: peeking, if rc>=0, get action records,
 			 * work around macos 10.4 recv(MSG_PEEK) bug that consumes pipe() data
 			 */
 
+			struct stat	st;
 			static int	recv_peek_ok;
 			if (!recv_peek_ok)
 			{
@@ -219,7 +220,7 @@ int	action;	/* >0: peeking, if rc>=0, get action records,
 				close(fds[0]);
 				close(fds[1]);
 			}
-			if (recv_peek_ok < 0)
+			if (recv_peek_ok < 0 && !fstat(fd, &st) && !S_ISSOCK(st.st_mode))
 			{
 				r = -1;
 				t &= ~SOCKET_PEEK;

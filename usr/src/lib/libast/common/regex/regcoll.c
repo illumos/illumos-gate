@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -244,6 +244,7 @@ regcollate(register const char* s, char** e, char* buf, int size)
 						for (a = z; a; a = a->next)
 							if ((attr[0] & a->attr[0]) == attr[0] && (attr[1] & a->attr[1]) == attr[1] && (attr[2] & a->attr[2]) == attr[2])
 							{
+#if 0
 								if (a->code <= 0xff)
 								{
 #if CC_NATIVE != CC_ASCII
@@ -255,13 +256,11 @@ regcollate(register const char* s, char** e, char* buf, int size)
 									ul = 0;
 									break;
 								}
+#endif
 								w[0] = a->code;
 								w[1] = 0;
 								if ((r = wcstombs(buf, w, size)) > 0)
-								{
-									r--;
 									ul = 0;
-								}
 								break;
 							}
 						if (!ul)
@@ -272,10 +271,18 @@ regcollate(register const char* s, char** e, char* buf, int size)
 			}
 			if (r < 0)
 			{
-				if ((r = s - t - 2) > (size - 1))
+				if ((n = s - t - 2) > (size - 1))
 					return -1;
-				memcpy(buf, t, r);
-				buf[r] = 0;
+				memcpy(buf, t, n);
+				buf[n] = 0;
+				if (n == 1)
+					r = n;
+				else
+				{
+					for (t = buf; isalnum(*t); t++);
+					if (!*t)
+						r = n;
+				}
 			}
 		}
 		else if (*s++ != term || *s++ != ']')

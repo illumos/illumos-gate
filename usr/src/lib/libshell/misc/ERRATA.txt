@@ -18,10 +18,10 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
  
 # 
@@ -31,297 +31,212 @@
 #
 
 ######## Errata #001: ########
-Some constants which are larger than 2^32 seem to
-require either "LL" or "ULL" as suffix to get the build compiling - at least in
-OS/Net with it's very strict build flags the problem is that worse that I had
-to use "-Wno-error" in usr/src/lib/libast/Makefile.com for the gcc build to get
-it compiling:
+The usage of |posix_spawn()| has been manually disabled because there seems to be a
+race condition which cases sporadic failures like this:
+-- snip --.
+$ builtin | fgrep sum | fgrep sum
+/usr/ast/bin/sum
+/usr/bin/sum
+$ builtin | fgrep sum | fgrep sum
+fgrep: fgrep: cannot execute [Exec format error]
+-- snip --.
+The following files have been changed:
 -- snip --
-pics/$(MACH)/src/lib/libast/conftab.o   := CERRWARN +=
--erroff=E_C99_INTEGER_PROMOTION
-pics/$(MACH)/src/lib/libast/conftab.o \
-pics/$(MACH64)/src/lib/libast/conftab.o := CERRWARN +=
--erroff=E_INTEGRAL_CONSTANT_TOO_LARGE
-pics/$(MACH)/src/lib/libast/conftab.o \
-pics/$(MACH64)/src/lib/libast/conftab.o := CERRWARN +=
--erroff=E_INTEGER_OVERFLOW_DETECTED
-pics/$(MACH)/src/lib/libast/conftab.o \
-pics/$(MACH64)/src/lib/libast/conftab.o := CERRWARN += -_gcc=-Wno-error
-pics/common/hash/
+Index: src/lib/libast/sparcv9/include/ast/ast_lib.h
+===================================================================
+--- src/lib/libast/sparcv9/include/ast/ast_lib.h	(revision 888)
++++ src/lib/libast/sparcv9/include/ast/ast_lib.h	(working copy)
+@@ -160,7 +160,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/sparcv9/src/lib/libast/ast_lib.h
+===================================================================
+--- src/lib/libast/sparcv9/src/lib/libast/ast_lib.h	(revision 888)
++++ src/lib/libast/sparcv9/src/lib/libast/ast_lib.h	(working copy)
+@@ -139,7 +139,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/sparcv9/src/lib/libast/FEATURE/lib
+===================================================================
+--- src/lib/libast/sparcv9/src/lib/libast/FEATURE/lib	(revision 888)
++++ src/lib/libast/sparcv9/src/lib/libast/FEATURE/lib	(working copy)
+@@ -139,7 +139,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/sparc/include/ast/ast_lib.h
+===================================================================
+--- src/lib/libast/sparc/include/ast/ast_lib.h	(revision 888)
++++ src/lib/libast/sparc/include/ast/ast_lib.h	(working copy)
+@@ -171,7 +171,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/sparc/src/lib/libast/ast_lib.h
+===================================================================
+--- src/lib/libast/sparc/src/lib/libast/ast_lib.h	(revision 888)
++++ src/lib/libast/sparc/src/lib/libast/ast_lib.h	(working copy)
+@@ -150,7 +150,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/sparc/src/lib/libast/FEATURE/lib
+===================================================================
+--- src/lib/libast/sparc/src/lib/libast/FEATURE/lib	(revision 888)
++++ src/lib/libast/sparc/src/lib/libast/FEATURE/lib	(working copy)
+@@ -150,7 +150,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/i386/include/ast/ast_lib.h
+===================================================================
+--- src/lib/libast/i386/include/ast/ast_lib.h	(revision 888)
++++ src/lib/libast/i386/include/ast/ast_lib.h	(working copy)
+@@ -171,7 +171,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/i386/src/lib/libast/ast_lib.h
+===================================================================
+--- src/lib/libast/i386/src/lib/libast/ast_lib.h	(revision 888)
++++ src/lib/libast/i386/src/lib/libast/ast_lib.h	(working copy)
+@@ -150,7 +150,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/i386/src/lib/libast/FEATURE/lib
+===================================================================
+--- src/lib/libast/i386/src/lib/libast/FEATURE/lib	(revision 888)
++++ src/lib/libast/i386/src/lib/libast/FEATURE/lib	(working copy)
+@@ -150,7 +150,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/amd64/include/ast/ast_lib.h
+===================================================================
+--- src/lib/libast/amd64/include/ast/ast_lib.h	(revision 888)
++++ src/lib/libast/amd64/include/ast/ast_lib.h	(working copy)
+@@ -160,7 +160,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/amd64/src/lib/libast/ast_lib.h
+===================================================================
+--- src/lib/libast/amd64/src/lib/libast/ast_lib.h	(revision 888)
++++ src/lib/libast/amd64/src/lib/libast/ast_lib.h	(working copy)
+@@ -139,7 +139,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
+Index: src/lib/libast/amd64/src/lib/libast/FEATURE/lib
+===================================================================
+--- src/lib/libast/amd64/src/lib/libast/FEATURE/lib	(revision 888)
++++ src/lib/libast/amd64/src/lib/libast/FEATURE/lib	(working copy)
+@@ -139,7 +139,7 @@
+ #define _hdr_unistd	1	/* #include <unistd.h> ok */
+ #define _lib_vfork	1	/* vfork exists and it works */
+ #define _real_vfork	1	/* vfork child shares data with parent */
+-#define _lib_posix_spawn	2	/* posix_spawn exists and it works and its worth using */
++#define _lib_posix_spawn	1	/* posix_spawn exists and it works and its worth using */
+ #define _stream_peek	1	/* ioctl(I_PEEK) works */
+ #define _socket_peek	1	/* recv(MSG_PEEK) works */
+ #define _hdr_string	1	/* #include <string.h> ok */
 -- snip --
 
-The following diff has been used to (temporarily work around the problem:
--- snip --
-Index: src/lib/libast/sparcv9/src/lib/libast/conftab.c
-===================================================================
---- src/lib/libast/sparcv9/src/lib/libast/conftab.c	(revision 664)
-+++ src/lib/libast/sparcv9/src/lib/libast/conftab.c	(working copy)
-@@ -220,8 +220,8 @@
- { "LFS_LINTFLAGS", { 0, 0 }, { 0, 0 }, CONF_MINMAX|CONF_UNDERSCORE|CONF_STRING, CONF_POSIX, 1, CONF_confstr, _CS_LFS_LINTFLAGS },
- { "LINE_MAX", { 0, 0 }, { _POSIX2_LINE_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_NOSECTION|CONF_MINMAX_DEF, CONF_POSIX, 2, CONF_sysconf, _SC_LINE_MAX },
- { "LINK_MAX", { 0, 0 }, { _POSIX_LINK_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_POSIX, 1, CONF_pathconf, _PC_LINK_MAX },
--{ "LLONG_MAX", { 9223372036854775807, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
--{ "LLONG_MIN", { -9223372036854775808, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "LLONG_MAX", { 9223372036854775807LL, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "LLONG_MIN", { (-9223372036854775807LL-1LL), 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "LOCALEDEF", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_POSIX, 2, CONF_sysconf, _SC_2_LOCALEDEF },
- { "LOGIN_NAME_MAX", { 0, 0 }, { _POSIX_LOGIN_NAME_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_POSIX, 1, CONF_sysconf, _SC_LOGIN_NAME_MAX },
- { "LOGNAME_MAX", { 0, 0 }, { 8, 0 }, CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_SVID, 1, CONF_sysconf, _SC_LOGNAME_MAX },
-@@ -407,7 +407,7 @@
- { "UID_MAX", { 0, 0 }, { 60002, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_SVID, 1, CONF_sysconf, -1 },
- { "UINT_MAX", { 0, 0 }, { 0, 0 }, CONF_LIMIT, CONF_C, 1, CONF_nop, -1 },
- { "UIO_MAXIOV", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE, CONF_POSIX, 1, CONF_nop, -1 },
--{ "ULLONG_MAX", { 18446744073709551615, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "ULLONG_MAX", { 18446744073709551615ULL, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "ULONG_MAX", { 4294967295, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "UNIX", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_STANDARD|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_XOPEN, 1, CONF_sysconf, _SC_XOPEN_UNIX },
- { "UPE", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_POSIX, 2, CONF_sysconf, _SC_2_UPE },
-Index: src/lib/libast/sparc/src/lib/libast/conftab.c
-===================================================================
---- src/lib/libast/sparc/src/lib/libast/conftab.c	(revision 664)
-+++ src/lib/libast/sparc/src/lib/libast/conftab.c	(working copy)
-@@ -220,8 +220,8 @@
- { "LFS_LINTFLAGS", { 0, 0 }, { 0, 0 }, CONF_MINMAX|CONF_UNDERSCORE|CONF_STRING, CONF_POSIX, 1, CONF_confstr, _CS_LFS_LINTFLAGS },
- { "LINE_MAX", { 0, 0 }, { _POSIX2_LINE_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_NOSECTION|CONF_MINMAX_DEF, CONF_POSIX, 2, CONF_sysconf, _SC_LINE_MAX },
- { "LINK_MAX", { 0, 0 }, { _POSIX_LINK_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_POSIX, 1, CONF_pathconf, _PC_LINK_MAX },
--{ "LLONG_MAX", { 9223372036854775807, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
--{ "LLONG_MIN", { -9223372036854775808, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "LLONG_MAX", { 9223372036854775807LL, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "LLONG_MIN", { (-9223372036854775807LL-1LL), 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "LOCALEDEF", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_POSIX, 2, CONF_sysconf, _SC_2_LOCALEDEF },
- { "LOGIN_NAME_MAX", { 0, 0 }, { _POSIX_LOGIN_NAME_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_POSIX, 1, CONF_sysconf, _SC_LOGIN_NAME_MAX },
- { "LOGNAME_MAX", { 0, 0 }, { 8, 0 }, CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_SVID, 1, CONF_sysconf, _SC_LOGNAME_MAX },
-@@ -407,7 +407,7 @@
- { "UID_MAX", { 0, 0 }, { 60002, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_SVID, 1, CONF_sysconf, -1 },
- { "UINT_MAX", { 0, 0 }, { 0, 0 }, CONF_LIMIT, CONF_C, 1, CONF_nop, -1 },
- { "UIO_MAXIOV", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE, CONF_POSIX, 1, CONF_nop, -1 },
--{ "ULLONG_MAX", { 18446744073709551615, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "ULLONG_MAX", { 18446744073709551615ULL, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "ULONG_MAX", { 4294967295, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "UNIX", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_STANDARD|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_XOPEN, 1, CONF_sysconf, _SC_XOPEN_UNIX },
- { "UPE", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_POSIX, 2, CONF_sysconf, _SC_2_UPE },
-Index: src/lib/libast/i386/src/lib/libast/conftab.c
-===================================================================
---- src/lib/libast/i386/src/lib/libast/conftab.c	(revision 664)
-+++ src/lib/libast/i386/src/lib/libast/conftab.c	(working copy)
-@@ -220,8 +220,8 @@
- { "LFS_LINTFLAGS", { 0, 0 }, { 0, 0 }, CONF_MINMAX|CONF_UNDERSCORE|CONF_STRING, CONF_POSIX, 1, CONF_confstr, _CS_LFS_LINTFLAGS },
- { "LINE_MAX", { 0, 0 }, { _POSIX2_LINE_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_NOSECTION|CONF_MINMAX_DEF, CONF_POSIX, 2, CONF_sysconf, _SC_LINE_MAX },
- { "LINK_MAX", { 0, 0 }, { _POSIX_LINK_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_POSIX, 1, CONF_pathconf, _PC_LINK_MAX },
--{ "LLONG_MAX", { 9223372036854775807, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
--{ "LLONG_MIN", { -9223372036854775808, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "LLONG_MAX", { 9223372036854775807LL, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "LLONG_MIN", { (-9223372036854775807LL-1LL), 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "LOCALEDEF", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_POSIX, 2, CONF_sysconf, _SC_2_LOCALEDEF },
- { "LOGIN_NAME_MAX", { 0, 0 }, { _POSIX_LOGIN_NAME_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_POSIX, 1, CONF_sysconf, _SC_LOGIN_NAME_MAX },
- { "LOGNAME_MAX", { 0, 0 }, { 8, 0 }, CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_SVID, 1, CONF_sysconf, _SC_LOGNAME_MAX },
-@@ -407,7 +407,7 @@
- { "UID_MAX", { 0, 0 }, { 60002, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_SVID, 1, CONF_sysconf, -1 },
- { "UINT_MAX", { 0, 0 }, { 0, 0 }, CONF_LIMIT, CONF_C, 1, CONF_nop, -1 },
- { "UIO_MAXIOV", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE, CONF_POSIX, 1, CONF_nop, -1 },
--{ "ULLONG_MAX", { 18446744073709551615, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "ULLONG_MAX", { 18446744073709551615ULL, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "ULONG_MAX", { 4294967295, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "UNIX", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_STANDARD|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_XOPEN, 1, CONF_sysconf, _SC_XOPEN_UNIX },
- { "UPE", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_POSIX, 2, CONF_sysconf, _SC_2_UPE },
-Index: src/lib/libast/Makefile.com
-===================================================================
---- src/lib/libast/Makefile.com	(revision 664)
-+++ src/lib/libast/Makefile.com	(working copy)
-@@ -706,11 +706,7 @@
- CERRWARN += -erroff=E_UNRECOGNIZED_PRAGMA_IGNORED
- pics/$(MACH)/src/lib/libast/conftab.o	:= CERRWARN += -erroff=E_C99_INTEGER_PROMOTION
- pics/$(MACH)/src/lib/libast/conftab.o \
--pics/$(MACH64)/src/lib/libast/conftab.o	:= CERRWARN += -erroff=E_INTEGRAL_CONSTANT_TOO_LARGE
--pics/$(MACH)/src/lib/libast/conftab.o \
--pics/$(MACH64)/src/lib/libast/conftab.o	:= CERRWARN += -erroff=E_INTEGER_OVERFLOW_DETECTED
--pics/$(MACH)/src/lib/libast/conftab.o \
--pics/$(MACH64)/src/lib/libast/conftab.o	:= CERRWARN += -_gcc=-Wno-error
-+pics/$(MACH64)/src/lib/libast/conftab.o	:= CERRWARN += -erroff=E_INIT_DOES_NOT_FIT
- pics/common/hash/hashlook.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
- pics/common/hash/memhash.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
- pics/common/hash/memsum.o		:= CERRWARN += -erroff=E_CONST_PROMOTED_UNSIGNED_LONG
-Index: src/lib/libast/amd64/src/lib/libast/conftab.c
-===================================================================
---- src/lib/libast/amd64/src/lib/libast/conftab.c	(revision 664)
-+++ src/lib/libast/amd64/src/lib/libast/conftab.c	(working copy)
-@@ -220,8 +220,8 @@
- { "LFS_LINTFLAGS", { 0, 0 }, { 0, 0 }, CONF_MINMAX|CONF_UNDERSCORE|CONF_STRING, CONF_POSIX, 1, CONF_confstr, _CS_LFS_LINTFLAGS },
- { "LINE_MAX", { 0, 0 }, { _POSIX2_LINE_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_NOSECTION|CONF_MINMAX_DEF, CONF_POSIX, 2, CONF_sysconf, _SC_LINE_MAX },
- { "LINK_MAX", { 0, 0 }, { _POSIX_LINK_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_POSIX, 1, CONF_pathconf, _PC_LINK_MAX },
--{ "LLONG_MAX", { 9223372036854775807, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
--{ "LLONG_MIN", { -9223372036854775808, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "LLONG_MAX", { 9223372036854775807LL, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "LLONG_MIN", { (-9223372036854775807LL-1LL), 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "LOCALEDEF", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_POSIX, 2, CONF_sysconf, _SC_2_LOCALEDEF },
- { "LOGIN_NAME_MAX", { 0, 0 }, { _POSIX_LOGIN_NAME_MAX, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_POSIX, 1, CONF_sysconf, _SC_LOGIN_NAME_MAX },
- { "LOGNAME_MAX", { 0, 0 }, { 8, 0 }, CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_SVID, 1, CONF_sysconf, _SC_LOGNAME_MAX },
-@@ -407,7 +407,7 @@
- { "UID_MAX", { 0, 0 }, { 60002, 0 }, CONF_LIMIT|CONF_MINMAX|CONF_UNDERSCORE|CONF_MINMAX_DEF, CONF_SVID, 1, CONF_sysconf, -1 },
- { "UINT_MAX", { 0, 0 }, { 0, 0 }, CONF_LIMIT, CONF_C, 1, CONF_nop, -1 },
- { "UIO_MAXIOV", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE, CONF_POSIX, 1, CONF_nop, -1 },
--{ "ULLONG_MAX", { 18446744073709551615, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
-+{ "ULLONG_MAX", { 18446744073709551615ULL, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "ULONG_MAX", { 4294967295, 0 }, { 0, 0 }, CONF_LIMIT|CONF_LIMIT_DEF, CONF_C, 1, CONF_nop, -1 },
- { "UNIX", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_STANDARD|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_XOPEN, 1, CONF_sysconf, _SC_XOPEN_UNIX },
- { "UPE", { 0, 0 }, { 0, 0 }, CONF_FEATURE|CONF_UNDERSCORE|CONF_PREFIX_ONLY, CONF_POSIX, 2, CONF_sysconf, _SC_2_UPE },
--- snip --
-
-This change works around the problems in the generated "conftab.c" ; I'll file a patch against
-"libast/common/comp/conf.sh" later to fix the problem in the upstream sources...
 
 ######## Errata #002: ########
-A change to usr/src/lib/libcmd/common/date.c has been applied to prevent
-the string literals (backslashes added to prevent expansion) "%M\%" and "%Y\%"
-from being expanded by the SCCS version control software:
+A workaround was added for a problem with the "multiline" editor mode which
+occurs when the edit line becomes longer than the terminal's width and the
+terminal cursor is not at position 0 when PS1 is send to the terminal.
 
--- snip --
-Index: src/lib/libcmd/common/date.c
-===================================================================
---- src/lib/libcmd/common/date.c	(revision 694)
-+++ src/lib/libcmd/common/date.c	(working copy)
-@@ -222,13 +222,13 @@
-                *argv++ = s;
-                if (streq(astconf("UNIVERSE", NiL, NiL), "att"))
-                {
--                       tmxfmt(buf, sizeof(buf), "%m%d%H" "%M%Y.%S", now);
-+                       tmxfmt(buf, sizeof(buf), "%m%d%H" "%M" "%Y.%S", now);
-                        if (adjust)
-                                *argv++ = "-a";
-                }
-                else
-                {
--                       tmxfmt(buf, sizeof(buf), "%Y%m%d%H" "%M.%S", now);
-+                       tmxfmt(buf, sizeof(buf), "%Y" "%m%d%H" "%M.%S", now);
-                        if (network)
-                                *argv++ = "-n";
-                        if (tm_info.flags & TM_UTC)
--- snip --
+For example: The user executes a $ printf "foo"<enter> # the prompt will start
+at position 3 instead of 0. If the user enters a command which is longer than
+the terminal width and then removes enougth characters that the edit line fits
+again into one line the "foo" at the beginning will be overwritten with the
+prompt.
+
+The workaround is to add $(printf "%*s\r%s" COLUMNS "") at the beginning of
+PS1 set by /etc/ksh.kshrc, this causes the shell to move to the beginning
+of the next line if the terminal cursor is not at position 0.
 
 
 ######## Errata #003: ########
-A change to usr/src/lib/libshell/common/sh/jobs.c has been applied to handle
-a memory corruption condition caused by a call to |_ast_malloc()| from within
-a signal handler.
+A fix was backported to cure sporadic VSC test suite failures. The failures are
+generated when command substitutions+functions are executed in a nested manner
+- sometimes the return code is non-zero even if the called function explicitly
+contains a "return 0"-statement.
+The following files have been changed:
 -- snip --
 Index: src/lib/libshell/common/sh/jobs.c
 ===================================================================
---- src/lib/libshell/common/sh/jobs.c	(revision 743)
+--- src/lib/libshell/common/sh/jobs.c	(revision 1284)
 +++ src/lib/libshell/common/sh/jobs.c	(working copy)
-@@ -43,6 +24,8 @@
- #   define WIFCONTINUED(wstat)	(0)
- #endif
- 
-+#define	NJOB_SAVELIST	4
-+
- /*
-  * temporary hack to get W* macros to work
-  */
-@@ -59,13 +42,35 @@
- 	unsigned short	exitval;
- };
- 
-+static struct jobsave *job_savelist;
-+static int njob_savelist;
-+
-+static void init_savelist(void)
-+{
-+	register struct jobsave *jp;
-+	while(njob_savelist < NJOB_SAVELIST)
-+	{
-+		jp = newof(0,struct jobsave,1,0);
-+		jp->next = job_savelist;
-+		job_savelist = jp;
-+		njob_savelist++;
-+	}
-+}
-+
- /*
-  * return next on link list of jobsave free list
-  */
- static struct jobsave *jobsave_create(pid_t pid)
- {
--	struct jobsave *jp;
--	if(jp = newof(0,struct jobsave,1,0))
-+	register struct jobsave *jp = job_savelist;
-+	if(jp)
-+	{
-+		njob_savelist--;
-+		job_savelist = jp->next;
-+	}
-+	else
-+		jp = newof(0,struct jobsave,1,0);
-+	if(jp)
- 		jp->pid = pid;
- 	return(jp);
- }
-@@ -372,6 +377,8 @@
- #   if defined(SIGCLD) && (SIGCLD!=SIGCHLD)
- 	signal(SIGCLD,job_waitsafe);
- #   endif
-+	if(njob_savelist < NJOB_SAVELIST)
-+		init_savelist();
- 	if(!sh_isoption(SH_INTERACTIVE))
- 		return;
- 	/* use new line discipline when available */
-@@ -994,6 +1001,8 @@
- 		free((void*)jp);
- 	}
- 	bck.list = 0;
-+	if(njob_savelist < NJOB_SAVELIST)
-+		init_savelist();
- 	job.pwlist = NIL(struct process*);
- 	job.numpost=0;
- 	job.waitall = 0;
-@@ -1016,6 +1025,8 @@
- 	register struct process *pw;
- 	register History_t *hp = sh.hist_ptr;
- 	sh.jobenv = sh.curenv;
-+	if(njob_savelist < NJOB_SAVELIST)
-+		init_savelist();
- 	if(job.toclear)
+@@ -1224,6 +1224,8 @@
+ 	job_lock();
+ 	if(pid > 1)
  	{
- 		job_clear();
-@@ -1274,8 +1285,14 @@
- 							px->p_flag &= ~P_EXITSAVE;
- 					}
- 				}
--				if(!(px=job_unpost(pw,1)) || !job.waitall) 
-+				if(!job.waitall)
-+				{
-+					if(!sh_isoption(SH_PIPEFAIL))
-+						job_unpost(pw,1);
- 					break;
-+				}
-+				else if(!(px=job_unpost(pw,1)))
-+					break;
- 				pw = px;
- 				continue;
- 			}
-@@ -1313,6 +1330,8 @@
- 	else
- 		tty_set(-1, 0, NIL(struct termios*));
- done:
-+	if(!job.waitall && sh_isoption(SH_PIPEFAIL))
-+		return;
- 	if(!sh.intrap)
- 	{
- 		job_lock();
-@@ -1594,7 +1613,14 @@
- 		else
- 			bck.list = jp->next;
- 		bck.count--;
--		free((void*)jp);
-+		if(njob_savelist < NJOB_SAVELIST)
-+		{
-+			njob_savelist++;
-+			jp->next = job_savelist;
-+			job_savelist = jp;
-+		}
-+		else
-+			free((void*)jp);
- 	}
- 	return(r);
- }
++		if(pid==sh.spid)
++			sh.spid = 0;
+ 		if(!(pw=job_bypid(pid)))
+ 		{
+ 			/* check to see whether job status has been saved */
 -- snip --
-# EOF.
+
+#EOF.

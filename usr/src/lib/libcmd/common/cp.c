@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,7 +27,7 @@
  */
 
 static const char usage_head[] =
-"[-?@(#)$Id: cp (AT&T Research) 2006-11-21 $\n]"
+"[-?@(#)$Id: cp (AT&T Research) 2007-12-13 $\n]"
 USAGE_LICENSE
 ;
 
@@ -152,7 +152,6 @@ typedef struct State_s			/* program state		*/
 	int		missmode;	/* default missing dir mode	*/
 	int		official;	/* move to next view		*/
 	int		op;		/* {CP,LN,MV}			*/
-	int		pathsiz;	/* state.path buffer size	*/
 	int		perm;		/* permissions to preserve	*/
 	int		postsiz;	/* state.path post index	*/
 	int		presiz;		/* state.path pre index		*/
@@ -163,9 +162,14 @@ typedef struct State_s			/* program state		*/
 	int		uid;		/* caller uid			*/
 	int		update;		/* replace only if newer	*/
 	int		verbose;	/* list each file before op	*/
+	int		wflags;		/* open() for write flags	*/
 
 	int		(*link)(const char*, const char*);	/* link	*/
 	int		(*stat)(const char*, struct stat*);	/* stat	*/
+
+#define INITSTATE	pathsiz		/* (re)init state before this	*/
+	int		pathsiz;	/* state.path buffer size	*/
+
 
 	char*		path;		/* to pathname buffer		*/
 	char*		opname;		/* state.op message string	*/
@@ -229,8 +233,6 @@ visit(State_t* state, register FTSENT* ent)
 	FTSENT*		sub;
 	struct stat	st;
 
-	if (cmdquit())
-		return -1;
 	if (ent->fts_info == FTS_DC)
 	{
 		error(2, "%s: directory causes cycle", ent->fts_path);
@@ -569,7 +571,7 @@ visit(State_t* state, register FTSENT* ent)
 				error(ERROR_SYSTEM|2, "%s: cannot read", ent->fts_path);
 				return 0;
 			}
-			else if ((wfd = open(state->path, O_WRONLY|O_CREAT|O_TRUNC|O_BINARY, ent->fts_statp->st_mode & state->perm)) < 0)
+			else if ((wfd = open(state->path, st.st_mode ? (state->wflags & ~O_EXCL) : state->wflags, ent->fts_statp->st_mode & state->perm)) < 0)
 			{
 				error(ERROR_SYSTEM|2, "%s: cannot write", state->path);
 				if (ent->fts_statp->st_size > 0)
@@ -662,134 +664,144 @@ b_cp(int argc, register char** argv, void* context)
 	int		path_resolve;
 	int		standard;
 	struct stat	st;
-	State_t		state;
+	State_t*	state;
+	Shbltin_t*	sh;
 
 	cmdinit(argc, argv, context, ERROR_CATALOG, ERROR_NOTIFY);
-	memset(&state, 0, sizeof(state));
-	state.presiz = -1;
+	if (!(sh = CMD_CONTEXT(context)) || !(state = (State_t*)sh->ptr))
+	{
+		if (!(state = newof(0, State_t, 1, 0)))
+			error(ERROR_SYSTEM|3, "out of space");
+		if (sh)
+			sh->ptr = state;
+	}
+	else
+		memset(state, 0, offsetof(State_t, INITSTATE));
+	state->presiz = -1;
 	backup_type = 0;
-	state.flags = FTS_NOCHDIR|FTS_NOSEEDOTDIR;
-	state.uid = geteuid();
-	if (!(state.tmp = sfstropen()))
+	state->flags = FTS_NOCHDIR|FTS_NOSEEDOTDIR;
+	state->uid = geteuid();
+	state->wflags = O_WRONLY|O_CREAT|O_TRUNC|O_BINARY;
+	if (!state->tmp && !(state->tmp = sfstropen()))
 		error(ERROR_SYSTEM|3, "out of space [tmp string]");
-	sfputr(state.tmp, usage_head, -1);
+	sfputr(state->tmp, usage_head, -1);
 	standard = !strcmp(astconf("CONFORMANCE", NiL, NiL), "standard");
 	switch (error_info.id[0])
 	{
 	case 'c':
 	case 'C':
-		sfputr(state.tmp, usage_cp, -1);
-		state.op = CP;
-		state.stat = stat;
+		sfputr(state->tmp, usage_cp, -1);
+		state->op = CP;
+		state->stat = stat;
 		path_resolve = -1;
 		break;
 	case 'l':
 	case 'L':
-		sfputr(state.tmp, usage_ln, -1);
-		state.op = LN;
-		state.flags |= FTS_PHYSICAL;
-		state.link = link;
-		state.stat = lstat;
+		sfputr(state->tmp, usage_ln, -1);
+		state->op = LN;
+		state->flags |= FTS_PHYSICAL;
+		state->link = link;
+		state->stat = lstat;
 		path_resolve = 1;
 		break;
 	case 'm':
 	case 'M':
-		sfputr(state.tmp, usage_mv, -1);
-		state.op = MV;
-		state.flags |= FTS_PHYSICAL;
-		state.preserve = 1;
-		state.stat = lstat;
+		sfputr(state->tmp, usage_mv, -1);
+		state->op = MV;
+		state->flags |= FTS_PHYSICAL;
+		state->preserve = 1;
+		state->stat = lstat;
 		path_resolve = 1;
 		break;
 	default:
 		error(3, "not implemented");
 		break;
 	}
-	sfputr(state.tmp, usage_tail, -1);
-	if (!(usage = sfstruse(state.tmp)))
-		error(ERROR_SYSTEM|3, "%s: out of space", state.path);
-	state.opname = state.op == CP ? ERROR_translate(0, 0, 0, "overwrite") : ERROR_translate(0, 0, 0, "replace");
+	sfputr(state->tmp, usage_tail, -1);
+	if (!(usage = sfstruse(state->tmp)))
+		error(ERROR_SYSTEM|3, "%s: out of space", state->path);
+	state->opname = state->op == CP ? ERROR_translate(0, 0, 0, "overwrite") : ERROR_translate(0, 0, 0, "replace");
 	for (;;)
 	{
 		switch (optget(argv, usage))
 		{
 		case 'a':
-			state.flags |= FTS_PHYSICAL;
-			state.preserve = 1;
-			state.recursive = 1;
+			state->flags |= FTS_PHYSICAL;
+			state->preserve = 1;
+			state->recursive = 1;
 			path_resolve = 1;
 			continue;
 		case 'b':
-			state.backup = 1;
+			state->backup = 1;
 			continue;
 		case 'f':
-			state.force = 1;
-			if (state.op != CP || !standard)
-				state.interactive = 0;
+			state->force = 1;
+			if (state->op != CP || !standard)
+				state->interactive = 0;
 			continue;
 		case 'h':
-			state.hierarchy = 1;
+			state->hierarchy = 1;
 			continue;
 		case 'i':
-			state.interactive = 1;
-			if (state.op != CP || !standard)
-				state.force = 0;
+			state->interactive = 1;
+			if (state->op != CP || !standard)
+				state->force = 0;
 			continue;
 		case 'l':
-			state.op = LN;
-			state.link = link;
-			state.stat = lstat;
+			state->op = LN;
+			state->link = link;
+			state->stat = lstat;
 			continue;
 		case 'p':
-			state.preserve = 1;
+			state->preserve = 1;
 			continue;
 		case 'r':
-			state.recursive = 1;
+			state->recursive = 1;
 			if (path_resolve < 0)
 				path_resolve = 0;
 			continue;
 		case 's':
-			state.op = LN;
-			state.link = pathsetlink;
-			state.stat = lstat;
+			state->op = LN;
+			state->link = pathsetlink;
+			state->stat = lstat;
 			continue;
 		case 'u':
-			state.update = 1;
+			state->update = 1;
 			continue;
 		case 'v':
-			state.verbose = 1;
+			state->verbose = 1;
 			continue;
 		case 'x':
-			state.flags |= FTS_XDEV;
+			state->flags |= FTS_XDEV;
 			continue;
 		case 'F':
 #if _lib_fsync
-			state.sync = 1;
+			state->sync = 1;
 #else
 			error(1, "%s not implemented on this system", opt_info.name);
 #endif
 			continue;
 		case 'H':
-			state.flags |= FTS_META|FTS_PHYSICAL;
+			state->flags |= FTS_META|FTS_PHYSICAL;
 			path_resolve = 1;
 			continue;
 		case 'L':
-			state.flags &= ~FTS_PHYSICAL;
+			state->flags &= ~FTS_PHYSICAL;
 			path_resolve = 1;
 			continue;
 		case 'P':
-			state.flags &= ~FTS_META;
-			state.flags |= FTS_PHYSICAL;
+			state->flags &= ~FTS_META;
+			state->flags |= FTS_PHYSICAL;
 			path_resolve = 1;
 			continue;
 		case 'R':
-			state.recursive = 1;
-			state.flags &= ~FTS_META;
-			state.flags |= FTS_PHYSICAL;
+			state->recursive = 1;
+			state->flags &= ~FTS_META;
+			state->flags |= FTS_PHYSICAL;
 			path_resolve = 1;
 			continue;
 		case 'S':
-			state.suffix = opt_info.arg;
+			state->suffix = opt_info.arg;
 			continue;
 		case 'V':
 			backup_type = opt_info.arg;
@@ -814,15 +826,19 @@ b_cp(int argc, register char** argv, void* context)
 		error(3, "out of space");
 	memcpy(v, argv, (argc + 1) * sizeof(char*));
 	argv = v;
-	if (!argc && !standard)
+	if (!standard)
 	{
-		argc++;
-		argv[1] = (char*)dot;
+		state->wflags |= O_EXCL;
+		if (!argc)
+		{
+			argc++;
+			argv[1] = (char*)dot;
+		}
 	}
-	if (state.backup)
+	if (state->backup)
 	{
 		if (!(file = backup_type) && !(backup_type = getenv("VERSION_CONTROL")))
-			state.backup = BAK_existing;
+			state->backup = BAK_existing;
 		else
 			switch (strkey(backup_type))
 			{
@@ -834,7 +850,7 @@ b_cp(int argc, register char** argv, void* context)
 			case HASHKEY1('e'):
 			case HASHKEY3('n','i','l'):
 			case HASHKEY2('n','i'):
-				state.backup = BAK_existing;
+				state->backup = BAK_existing;
 				break;
 			case HASHKEY5('n','e','v','e','r'):
 			case HASHKEY4('n','e','v','e'):
@@ -846,7 +862,7 @@ b_cp(int argc, register char** argv, void* context)
 			case HASHKEY3('s','i','m'):
 			case HASHKEY2('s','i'):
 			case HASHKEY1('s'):
-				state.backup = BAK_simple;
+				state->backup = BAK_simple;
 				break;
 			case HASHKEY6('n','u','m','b','e','r'):
 			case HASHKEY5('n','u','m','b','e'):
@@ -854,21 +870,21 @@ b_cp(int argc, register char** argv, void* context)
 			case HASHKEY3('n','u','m'):
 			case HASHKEY2('n','u'):
 			case HASHKEY1('t'):
-				state.backup = BAK_number;
+				state->backup = BAK_number;
 				break;
 			default:
 				if (file)
 					error(2, "%s: unknown backup type", backup_type);
 				break;
 			}
-		if (!state.suffix && !(state.suffix = getenv("SIMPLE_BACKUP_SUFFIX")))
-			state.suffix = "~";
-		state.suflen = strlen(state.suffix);
+		if (!state->suffix && !(state->suffix = getenv("SIMPLE_BACKUP_SUFFIX")))
+			state->suffix = "~";
+		state->suflen = strlen(state->suffix);
 	}
 	if (argc <= 0 || error_info.errors)
 		error(ERROR_USAGE|4, "%s", optusage(NiL));
 	if (!path_resolve)
-		state.flags |= fts_flags();
+		state->flags |= fts_flags();
 	file = argv[argc];
 	argv[argc] = 0;
 	if (s = strrchr(file, '/'))
@@ -880,35 +896,34 @@ b_cp(int argc, register char** argv, void* context)
 	}
 	if (file != (char*)dot)
 		pathcanon(file, 0);
-	if (!(state.directory = !stat(file, &st) && S_ISDIR(st.st_mode)) && argc > 1)
+	if (!(state->directory = !stat(file, &st) && S_ISDIR(st.st_mode)) && argc > 1)
 		error(ERROR_USAGE|4, "%s", optusage(NiL));
-	if (s && !state.directory)
+	if (s && !state->directory)
 		error(3, "%s: not a directory", file);
-	if ((state.fs3d = fs3d(FS3D_TEST)) && strmatch(file, "...|*/...|.../*"))
-		state.official = 1;
-	state.postsiz = strlen(file);
-	state.pathsiz = roundof(state.postsiz + 2, PATH_CHUNK);
-	if (!(state.path = newof(0, char, state.pathsiz, 0)))
+	if ((state->fs3d = fs3d(FS3D_TEST)) && strmatch(file, "...|*/...|.../*"))
+		state->official = 1;
+	state->postsiz = strlen(file);
+	if (state->pathsiz < roundof(state->postsiz + 2, PATH_CHUNK) && !(state->path = newof(state->path, char, state->pathsiz = roundof(state->postsiz + 2, PATH_CHUNK), 0)))
 		error(3, "out of space");
-	memcpy(state.path, file, state.postsiz + 1);
-	if (state.directory && state.path[state.postsiz - 1] != '/')
-		state.path[state.postsiz++] = '/';
-	if (state.hierarchy)
+	memcpy(state->path, file, state->postsiz + 1);
+	if (state->directory && state->path[state->postsiz - 1] != '/')
+		state->path[state->postsiz++] = '/';
+	if (state->hierarchy)
 	{
-		if (!state.directory)
+		if (!state->directory)
 			error(3, "%s: last argument must be a directory", file);
-		state.missmode = st.st_mode;
+		state->missmode = st.st_mode;
 	}
-	state.perm = state.uid ? S_IPERM : (S_IPERM & ~S_ISVTX);
-	if (!state.recursive)
-		state.flags |= FTS_TOP;
-	if (fts = fts_open(argv, state.flags, NiL))
+	state->perm = state->uid ? S_IPERM : (S_IPERM & ~S_ISVTX);
+	if (!state->recursive)
+		state->flags |= FTS_TOP;
+	if (fts = fts_open(argv, state->flags, NiL))
 	{
-		while ((ent = fts_read(fts)) && !visit(&state, ent));
+		while (!sh_checksig(context) && (ent = fts_read(fts)) && !visit(state, ent));
 		fts_close(fts);
 	}
-	else if (state.link != pathsetlink)
-		switch (state.op)
+	else if (state->link != pathsetlink)
+		switch (state->op)
 		{
 		case CP:
 			error(ERROR_SYSTEM|2, "%s: cannot copy", argv[0]);
@@ -920,8 +935,7 @@ b_cp(int argc, register char** argv, void* context)
 			error(ERROR_SYSTEM|2, "%s: cannot move", argv[0]);
 			break;
 		}
-	else if ((*state.link)(*argv, state.path))
-		error(ERROR_SYSTEM|2, "%s: cannot link to %s", *argv, state.path);
-	free(state.path);
+	else if ((*state->link)(*argv, state->path))
+		error(ERROR_SYSTEM|2, "%s: cannot link to %s", *argv, state->path);
 	return error_info.errors != 0;
 }

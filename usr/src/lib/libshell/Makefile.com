@@ -18,14 +18,13 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SHELL=/usr/bin/ksh
+SHELL=/usr/bin/ksh93
 
 LIBRARY=	libshell.a
 VERS=		.1
@@ -34,6 +33,7 @@ OBJECTS= \
 	bltins/alarm.o \
 	bltins/cd_pwd.o \
 	bltins/cflow.o \
+	bltins/enum.o \
 	bltins/getopts.o \
 	bltins/hist.o \
 	bltins/misc.o \
@@ -81,6 +81,7 @@ OBJECTS= \
 	sh/name.o \
 	sh/nvdisc.o \
 	sh/nvtree.o \
+	sh/nvtype.o \
 	sh/parse.o \
 	sh/path.o \
 	sh/streval.o \
@@ -105,7 +106,11 @@ OBJDIRS =  \
 PICSDIRS= $(OBJDIRS:%=pics/%)
 mkpicdirs:
 	@mkdir -p $(PICSDIRS)
-
+	
+# Specify the MACH we currently use to build and test ksh
+LIBSHELLMACH= $(TARGETMACH)
+LIBSHELLBASE=..
+	
 include ../../Makefile.astmsg
 
 include ../../Makefile.lib
@@ -114,11 +119,19 @@ include ../../Makefile.lib
 # automated code updates easier.
 MAPFILES=       ../mapfile-vers
 
-# Set common AST build flags (e.g., needed to support the math stuff).
+# Set common AST build flags (e.g. C99/XPG6, needed to support the math stuff)
 include ../../../Makefile.ast
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lcmd -ldll -last -lsocket -lsecdb -lm -lc
+
+LDLIBS += \
+	-lcmd \
+	-ldll \
+	-last \
+	-lsocket \
+	-lsecdb \
+	-lm \
+	-lc
 
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
@@ -133,17 +146,15 @@ SRCDIR =	../common
 # way to explicitly list each single flag.
 CPPFLAGS = \
 	$(DTEXTDOM) $(DTS_ERRNO) \
-	-Isrc/cmd/ksh93 \
-	-I../common/include \
 	$(LIBSHELLCPPFLAGS)
 
-
 CFLAGS += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS)
 CFLAGS64 += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS64)
+
+pics/sh/macro.o		:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
+pics/sh/nvdisc.o	:= CERRWARN += -erroff=E_END_OF_LOOP_CODE_NOT_REACHED
 
 .KEEP_STATE:
 
@@ -156,6 +167,5 @@ all: mkpicdirs .WAIT $(LIBS)
 #
 lint:
 	@ print "usr/src/lib/libshell is not lint-clean: skipping"
-	@ $(TRUE)
 
 include ../../Makefile.targ

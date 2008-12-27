@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -31,6 +31,10 @@
 __STDPP__directive pragma pp:hide utime
 #else
 #define utime		______utime
+#endif
+
+#ifndef _ATFILE_SOURCE
+#define _ATFILE_SOURCE	1
 #endif
 
 #include <ast.h>
@@ -67,17 +71,71 @@ extern int	utime(const char*, const time_t*);
  * Tv_t==TV_TOUCH_RETAIN retains path value if it exists, current time otherwise
  * otherwise it is exact time
  * file created if it doesn't exist and (flags&1)
+ * symlink not followed if (flags&2)
  * cv most likely ignored on most implementations
+ *
+ * NOTE: when *at() calls are integrated we need macros for the flags!
  */
 
 int
 tvtouch(const char* path, register const Tv_t* av, register const Tv_t* mv, const Tv_t* cv, int flags)
 {
-	struct stat	st;
-	Tv_t		now;
 	int		fd;
 	int		mode;
 	int		oerrno;
+	struct stat	st;
+
+#if _lib_utimensat
+	struct timespec	ts[2];
+
+	errno = oerrno;
+	if (!av)
+	{
+		ts[0].tv_sec = 0;
+		ts[0].tv_nsec = UTIME_NOW;
+	}
+	else if (av == TV_TOUCH_RETAIN)
+	{
+		ts[0].tv_sec = 0;
+		ts[0].tv_nsec = UTIME_OMIT;
+	}
+	else
+	{
+		ts[0].tv_sec = av->tv_sec;
+		ts[0].tv_nsec = NS(av->tv_nsec);
+	}
+	if (!mv)
+	{
+		ts[1].tv_sec = 0;
+		ts[1].tv_nsec = UTIME_NOW;
+	}
+	else if (mv == TV_TOUCH_RETAIN)
+	{
+		ts[1].tv_sec = 0;
+		ts[1].tv_nsec = UTIME_OMIT;
+	}
+	else
+	{
+		ts[1].tv_sec = mv->tv_sec;
+		ts[1].tv_nsec = NS(mv->tv_nsec);
+	}
+	if (!cv && av == TV_TOUCH_RETAIN && mv == TV_TOUCH_RETAIN && !stat(path, &st) && !chmod(path, st.st_mode & S_IPERM))
+		return 0;
+	if (!utimensat(AT_FDCWD, path, ts[0].tv_nsec == UTIME_NOW && ts[1].tv_nsec == UTIME_NOW ? (struct timespec*)0 : ts, (flags & 2) ? AT_SYMLINK_NOFOLLOW : 0))
+		return 0;
+	if (errno != ENOENT || !(flags & 1))
+		return -1;
+	umask(mode = umask(0));
+	mode = (~mode) & (S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH);
+	if ((fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, mode)) < 0)
+		return -1;
+	close(fd);
+	errno = oerrno;
+	if ((ts[0].tv_nsec != UTIME_NOW || ts[1].tv_nsec != UTIME_NOW) && utimensat(AT_FDCWD, path, ts, (flags & 2) ? AT_SYMLINK_NOFOLLOW : 0))
+		return -1;
+	return 0;
+#else
+	Tv_t		now;
 #if _lib_utimets
 	struct timespec	am[2];
 #else
@@ -225,6 +283,7 @@ tvtouch(const char* path, register const Tv_t* av, register const Tv_t* mv, cons
 #else
 	errno = EINVAL;
 	return -1;
+#endif
 #endif
 #endif
 #endif

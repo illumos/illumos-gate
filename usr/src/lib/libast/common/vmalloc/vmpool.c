@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -50,7 +50,7 @@ reg size_t	size;
 	reg Block_t	*tp, *next;
 	reg size_t	s;
 	reg Seg_t*	seg;
-	reg int		local;
+	reg int		local, inuse;
 
 	if(size <= 0)
 		return NIL(Void_t*);
@@ -60,10 +60,13 @@ reg size_t	size;
 		else	return NIL(Void_t*);
 	}
 
+	SETINUSE(vd, inuse);
 	if(!(local = vd->mode&VM_TRUST) )
 	{	GETLOCAL(vd,local);
 		if(ISLOCK(vd, local))
+		{	CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
+		}
 		SETLOCK(vd, local);
 	}
 
@@ -115,6 +118,7 @@ done:
 
 	CLRLOCK(vd, local);
 	ANNOUNCE(local, vm, VM_ALLOC, (Void_t*)tp, vm->disc);
+	CLRINUSE(vd, inuse);
 	return (Void_t*)tp;
 }
 
@@ -132,12 +136,15 @@ reg Void_t*	addr;
 	reg Seg_t*	seg;
 	reg long	offset;
 	reg Vmdata_t*	vd = vm->data;
-	reg int		local;
+	reg int		local, inuse;
 
+	SETINUSE(vd, inuse);
 	if(!(local = vd->mode&VM_TRUST))
 	{	GETLOCAL(vd,local);
 		if(ISLOCK(vd,local))
+		{	CLRINUSE(vd, inuse);
 			return -1L;
+		}
 		SETLOCK(vd,local);
 	}
 
@@ -164,6 +171,7 @@ reg Void_t*	addr;
 
 done :
 	CLRLOCK(vd,local);
+	CLRINUSE(vd, inuse);
 	return offset;
 }
 
@@ -177,20 +185,24 @@ reg Void_t*	data;
 {
 	reg Block_t*	bp;
 	reg Vmdata_t*	vd = vm->data;
-	reg int		local;
+	reg int		local, inuse;
 
 	if(!data)
 		return 0;
 
+	SETINUSE(vd, inuse);
 	if(!(local = vd->mode&VM_TRUST))
 	{	GETLOCAL(vd, local);
 
 		if(ISLOCK(vd, local) || vd->pool <= 0)
+		{	CLRINUSE(vd, inuse);
 			return -1;
+		}
 
 		if(KPVADDR(vm,data,pooladdr) != 0)
 		{	if(vm->disc->exceptf)
 				(void)(*vm->disc->exceptf)(vm,VM_BADADDR,data,vm->disc);
+			CLRINUSE(vd, inuse);
 			return -1;
 		}
 
@@ -207,6 +219,7 @@ reg Void_t*	data;
 
 	CLRLOCK(vd,local);
 	ANNOUNCE(local, vm, VM_FREE, data, vm->disc);
+	CLRINUSE(vd, inuse);
 	return 0;
 }
 
@@ -220,20 +233,23 @@ size_t		size;
 int		type;
 #endif
 {
-	int		local;
+	int		local, inuse;
 	reg Vmdata_t*	vd = vm->data;
 
 	NOTUSED(type);
 
+	SETINUSE(vd, inuse);
 	if(!data)
 	{	if((data = poolalloc(vm,size)) && (type&VM_RSZERO) )
 		{	reg int	*d = (int*)data, *ed = (int*)((char*)data+size);
 			do { *d++ = 0;} while(d < ed);
 		}
+		CLRINUSE(vd, inuse);
 		return data;
 	}
 	if(size == 0)
 	{	(void)poolfree(vm,data);
+		CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
 	}
 
@@ -241,11 +257,14 @@ int		type;
 	{	GETLOCAL(vd, local);
 
 		if(ISLOCK(vd, local) )
+		{	CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
+		}
 
 		if(size != vd->pool || KPVADDR(vm,data,pooladdr) != 0)
 		{	if(vm->disc->exceptf)
 				(void)(*vm->disc->exceptf)(vm,VM_BADADDR,data,vm->disc);
+			CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
 		}
 
@@ -254,6 +273,7 @@ int		type;
 	}
 
 	ANNOUNCE(local, vm, VM_RESIZE, data, vm->disc);
+	CLRINUSE(vd, inuse);
 	return data;
 }
 
@@ -279,10 +299,14 @@ Vmalloc_t*	vm;
 	reg Seg_t	*seg, *next;
 	reg size_t	s;
 	reg Vmdata_t*	vd = vm->data;
+	reg int		inuse;
 
+	SETINUSE(vd, inuse);
 	if(!(vd->mode&VM_TRUST))
 	{	if(ISLOCK(vd,0))
+		{	CLRINUSE(vd, inuse);
 			return -1;
+		}
 		SETLOCK(vd,0);
 	}
 
@@ -305,6 +329,7 @@ Vmalloc_t*	vm;
 		(*_Vmtrace)(vm, (Vmuchar_t*)0, (Vmuchar_t*)0, 0, 0);
 
 	CLRLOCK(vd,0);
+	CLRINUSE(vd, inuse);
 	return 0;
 }
 

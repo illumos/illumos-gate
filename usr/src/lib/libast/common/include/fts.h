@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -118,6 +118,10 @@ struct Ftsent
 
 #ifdef _FTSENT_PRIVATE_
 	_FTSENT_PRIVATE_
+#else
+	short		_fts_pad_1;	/* <ftwalk.h> compatibility	*/
+	struct stat	_fts_pad_2;	/* <ftwalk.h> compatibility	*/
+	FTS*		fts;		/* fts_open() handle		*/
 #endif
 
 };
@@ -125,6 +129,7 @@ struct Ftsent
 struct Fts
 {
 	int		fts_errno;	/* last errno			*/
+	void*		fts_handle;	/* user defined handle		*/
 
 #ifdef _FTS_PRIVATE_
 	_FTS_PRIVATE_
@@ -139,6 +144,7 @@ struct Fts
 extern FTSENT*	fts_children(FTS*, int);
 extern int	fts_close(FTS*);
 extern int	fts_flags(void);
+extern int	fts_local(FTSENT*);
 extern int	fts_notify(int(*)(FTS*, FTSENT*, void*), void*);
 extern FTS*	fts_open(char* const*, int, int(*)(FTSENT* const*, FTSENT* const*));
 extern FTSENT*	fts_read(FTS*);

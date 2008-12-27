@@ -79,6 +79,8 @@ f none usr/include/ast/ast_limits.h 644 root bin
 f none usr/include/ast/ast_map.h 644 root bin
 f none usr/include/ast/ast_mmap.h 644 root bin
 f none usr/include/ast/ast_mode.h 644 root bin
+f none usr/include/ast/ast_namval.h 644 root bin
+f none usr/include/ast/ast_ndbm.h 644 root bin
 f none usr/include/ast/ast_nl_types.h 644 root bin
 f none usr/include/ast/ast_param.h 644 root bin
 f none usr/include/ast/ast_standards.h 644 root bin
@@ -87,7 +89,6 @@ f none usr/include/ast/ast_stdio.h 644 root bin
 f none usr/include/ast/ast_sys.h 644 root bin
 f none usr/include/ast/ast_time.h 644 root bin
 f none usr/include/ast/ast_tty.h 644 root bin
-f none usr/include/ast/ast_types.h 644 root bin
 f none usr/include/ast/ast_version.h 644 root bin
 f none usr/include/ast/ast_vfork.h 644 root bin
 f none usr/include/ast/ast_wait.h 644 root bin
@@ -118,6 +119,7 @@ f none usr/include/ast/hashkey.h 644 root bin
 f none usr/include/ast/hashpart.h 644 root bin
 f none usr/include/ast/history.h 644 root bin
 f none usr/include/ast/iconv.h 644 root bin
+f none usr/include/ast/ip6.h 644 root bin
 f none usr/include/ast/lc.h 644 root bin
 f none usr/include/ast/ls.h 644 root bin
 f none usr/include/ast/magic.h 644 root bin
@@ -142,12 +144,14 @@ f none usr/include/ast/sfdisc.h 644 root bin
 f none usr/include/ast/sfio.h 644 root bin
 f none usr/include/ast/sfio_s.h 644 root bin
 f none usr/include/ast/sfio_t.h 644 root bin
+f none usr/include/ast/shcmd.h 644 root bin
 f none usr/include/ast/shell.h 644 root bin
 f none usr/include/ast/sig.h 644 root bin
 f none usr/include/ast/stack.h 644 root bin
 f none usr/include/ast/stak.h 644 root bin
 f none usr/include/ast/stdio.h 644 root bin
 f none usr/include/ast/stk.h 644 root bin
+f none usr/include/ast/sum.h 644 root bin
 f none usr/include/ast/swap.h 644 root bin
 f none usr/include/ast/tar.h 644 root bin
 f none usr/include/ast/times.h 644 root bin

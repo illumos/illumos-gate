@@ -24,8 +24,9 @@ tst	cross{
 		esac
 	}
 	
-	test -d /dev/fd
+	ls /dev/fd/9 9<&0 >/dev/null 2>&1
 	option DEVFD $?
+	exec 9<&-
 	case  `echo a | tr a '\012' | wc -l` in
 	*1*)	option MULTIBYTE 0 ;;
 	esac

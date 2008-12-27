@@ -942,6 +942,12 @@ usr/lib/llib-lshell			      sparc
 usr/lib/llib-lshell.ln  		      sparc
 usr/lib/sparcv9/libshell.so		      sparc
 usr/lib/sparcv9/llib-lshell.ln  	      sparc
+# libsum
+usr/lib/libsum.so			      sparc
+usr/lib/llib-lsum			      sparc
+usr/lib/llib-lsum.ln			      sparc
+usr/lib/sparcv9/libsum.so		      sparc
+usr/lib/sparcv9/llib-lsum.ln		      sparc
 #
 # bmc (IPMI) interfaces shared within ON.
 #

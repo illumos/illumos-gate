@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -680,14 +680,16 @@ static char*
 save(const char* s)
 {
 	Save_t*		p;
+	Dtdisc_t*	d;
 
-	static Dtdisc_t	disc;
 	static Dt_t*	dict;
 
 	if (!dict)
 	{
-		disc.key = offsetof(Save_t, text);
-		if (!(dict = dtopen(&disc, Dthash)))
+		if (!(d = newof(0, Dtdisc_t, 1, 0)))
+			return (char*)s;
+		d->key = offsetof(Save_t, text);
+		if (!(dict = dtopen(d, Dthash)))
 			return (char*)s;
 	}
 	if (!(p = (Save_t*)dtmatch(dict, s)))
@@ -755,24 +757,27 @@ init(register char* s, Optpass_t* p)
 				p->version = 1;
 			else
 			{
-				if (*s < '0' || *s > '9')
+				if (!isdigit(*s))
 					p->version = 1;
 				else
-					while (*s >= '0' && *s <= '9')
+					while (isdigit(*s))
 						p->version = p->version * 10 + (*s++ - '0');
 				while (*s && *s != '?' && *s != ']')
 				{
 					c = *s++;
-					if (*s < '0' || *s > '9')
+					if (!isdigit(*s))
 						n = 1;
 					else
 					{
 						n = 0;
-						while (*s >= '0' && *s <= '9')
+						while (isdigit(*s))
 							n = n * 10 + (*s++ - '0');
 					}
 					switch (c)
 					{
+					case '+':
+						p->flags |= OPT_plus;
+						break;
 					case 'c':
 						p->flags |= OPT_cache;
 						break;
@@ -781,6 +786,9 @@ init(register char* s, Optpass_t* p)
 						break;
 					case 'l':
 						p->flags |= OPT_long;
+						break;
+					case 'n':
+						p->flags |= OPT_numeric;
 						break;
 					case 'o':
 						p->flags |= OPT_old;
@@ -839,6 +847,7 @@ init(register char* s, Optpass_t* p)
 		s++;
 		p->flags |= OPT_plus;
 	}
+	s = next(s, 0);
 	if (*s != '[')
 		for (t = s, a = 0; *t; t++)
 			if (!a && *t == '-')
@@ -1051,7 +1060,7 @@ localize(Push_t* psp, char* s, char* e, int term, int n, char* catalog, int vers
  */
 
 static int
-label(register Sfio_t* sp, int sep, register char* s, int z, int level, int style, int f, Sfio_t* ip, int version, char* catalog)
+label(register Sfio_t* sp, int sep, register char* s, int about, int z, int level, int style, int f, Sfio_t* ip, int version, char* catalog)
 {
 	register int	c;
 	register char*	t;
@@ -1084,6 +1093,8 @@ label(register Sfio_t* sp, int sep, register char* s, int z, int level, int styl
 	sep = !sep || z < 0;
 	va = 0;
 	y = 0;
+	if (about)
+		sfputc(sp, '(');
 	if (version < 1)
 	{
 		a = 0;
@@ -1180,7 +1191,7 @@ label(register Sfio_t* sp, int sep, register char* s, int z, int level, int styl
 				if (va & OPT_optional)
 					sfputc(sp, '[');
 				sfputc(sp, '=');
-				label(sp, 0, y, -1, 0, style, FONT_ITALIC, ip, version, catalog);
+				label(sp, 0, y, 0, -1, 0, style, FONT_ITALIC, ip, version, catalog);
 				if (va & OPT_optional)
 					sfputc(sp, ']');
 				y = 0;
@@ -1338,6 +1349,8 @@ label(register Sfio_t* sp, int sep, register char* s, int z, int level, int styl
  restore:
 	if (f)
 		sfputr(sp, font(f, style, 0), -1);
+	if (about)
+		sfputc(sp, ')');
 	if (psp)
 		pop(psp);
 	return r;
@@ -1415,7 +1428,7 @@ args(register Sfio_t* sp, register char* p, register int n, int flags, int style
 		}
 	}
 	if (n)
-		label(sp, sep, p, n, 0, style, 0, ip, version, catalog);
+		label(sp, sep, p, 0, n, 0, style, 0, ip, version, catalog);
 }
 
 /*
@@ -1425,7 +1438,7 @@ args(register Sfio_t* sp, register char* p, register int n, int flags, int style
  */
 
 static int
-item(Sfio_t* sp, char* s, int level, int style, Sfio_t* ip, int version, char* catalog)
+item(Sfio_t* sp, char* s, int about, int level, int style, Sfio_t* ip, int version, char* catalog)
 {
 	register char*	t;
 	int		n;
@@ -1446,7 +1459,7 @@ item(Sfio_t* sp, char* s, int level, int style, Sfio_t* ip, int version, char* c
 			for (n = 0; n < level; n++)
 				sfputc(sp, '\t');
 		}
-		label(sp, 0, s + 1, -1, level, style, FONT_LITERAL, ip, version, catalog);
+		label(sp, 0, s + 1, about, -1, level, style, FONT_LITERAL, ip, version, catalog);
 		sfputc(sp, '\n');
 		if (style >= STYLE_nroff)
 			sfprintf(sp, ".DE");
@@ -1459,7 +1472,7 @@ item(Sfio_t* sp, char* s, int level, int style, Sfio_t* ip, int version, char* c
 		if (level)
 		{
 			if (style >= STYLE_nroff)
-				sfprintf(sp, ".H%d ", (level + 1) / 2);
+				sfprintf(sp, ".H%d ", (level - (level > 2)) / 2);
 			else
 				for (n = 0; n < level; n++)
 					sfputc(sp, '\t');
@@ -1476,9 +1489,9 @@ item(Sfio_t* sp, char* s, int level, int style, Sfio_t* ip, int version, char* c
 						opt_info.state->flags |= OPT_proprietary;
 						break;
 					}
-			label(sp, 0, s, -1, level, 0, 0, ip, version, catalog);
+			label(sp, 0, s, about, -1, level, 0, 0, ip, version, catalog);
 			sfputr(sp, "\">", -1);
-			label(sp, 0, s, -1, level, style, level ? FONT_BOLD : 0, ip, version, catalog);
+			label(sp, 0, s, about, -1, level, style, level ? FONT_BOLD : 0, ip, version, catalog);
 			sfputr(sp, "</A>", -1);
 			if (!level)
 				sfputr(sp, "</H4>", -1);
@@ -1494,14 +1507,14 @@ item(Sfio_t* sp, char* s, int level, int style, Sfio_t* ip, int version, char* c
 				else if (style != STYLE_options && style != STYLE_match || *s == '-' || *s == '+')
 					sfputc(sp, '\t');
 			}
-			label(sp, 0, s, -1, level, style, FONT_BOLD, ip, version, catalog);
+			label(sp, 0, s, about, -1, level, style, FONT_BOLD, ip, version, catalog);
 		}
 	}
 	else
 	{
 		par = 1;
 		if (style >= STYLE_nroff)
-			sfputr(sp, ".PP", -1);
+			sfputr(sp, level ? ".SP" : ".PP", -1);
 	}
 	if (style >= STYLE_nroff || !level)
 		sfputc(sp, '\n');
@@ -1528,6 +1541,7 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 	int		a;
 	int		f;
 	int		par;
+	int		about;
 	Push_t*		tsp;
 
 	int		ident = 0;
@@ -1535,6 +1549,7 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 	Push_t*		psp = 0;
 
  again:
+	about = 0;
 	if ((c = *p) == GO)
 	{
 		for (;;)
@@ -1548,7 +1563,7 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 			}
 			else if (*p != OG)
 			{
-				if (level <= 1 || *p != '[' || *(p + 1) != '-')
+				if (level <= 1 || *p != '[' || *(p + 1) != '-' || style == STYLE_man && *(p + 2) == '?' || isalpha(*(p + 2)))
 					break;
 				p = skip(p, 0, 0, 0, 1, level, 0, version);
 			}
@@ -1574,15 +1589,38 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 		level++;
 	}
 	if (c == '-' && level > 1)
-		return skip(p, 0, 0, 0, 1, level, 1, version);
+	{
+		if (style == STYLE_man)
+		{
+			about = 1;
+			if (*(p + 1) == '-')
+				p++;
+		}
+		else
+			for (;;)
+			{
+				p = skip(p, 0, 0, 0, 1, level, 0, version);
+				while (*(p = next(p + 1, version)) == '\n');
+				if (*p == '[')
+				{
+					if ((c = *++p) != '-')
+						break;
+				}
+				else if (*p == GO)
+					goto again;
+				else if (*p == OG)
+					return p + 1;
+			}
+	}
 	if (c == '+' || c == '-' && (bump = 3) || c != ' ' && level > 1)
 	{
 		p = skip(t = p + 1, '?', 0, 0, 1, level, 0, version);
-		if (c == '-' && (*t == '?' || *t >= '0' && *t <= '9'))
+		if (c == '-' && (*t == '?' || isdigit(*t) || *p == '?' && *(p + 1) == '\n'))
 		{
 			if ((c = *p) != '?')
 				return skip(p, 0, 0, 0, 1, level, 1, version);
-			par = item(sp, C("version"), level, style, ip, version, ID);
+			e = C("version");
+			par = item(sp, e, about, level, style, ip, version, ID);
 			for (;;)
 			{
 				while (isspace(*(p + 1)))
@@ -1619,10 +1657,10 @@ textout(Sfio_t* sp, register char* p, int style, int level, int bump, Sfio_t* ip
 						*((t = e) + 1) = '|';
 				}
 			}
-			par = item(sp, t, level, style, ip, version, catalog);
+			par = item(sp, t, about, level, style, ip, version, catalog);
 			c = *p;
 		}
-		if (level)
+		if (!about && level)
 			par = 0;
 	}
 	else
@@ -2020,6 +2058,7 @@ opthelp(const char* oopts, const char* what)
 	int			z;
 	int			style;
 	int			head;
+	int			margin;
 	int			mode;
 	int			mutex;
 	int			prefix;
@@ -2270,9 +2309,9 @@ opthelp(const char* oopts, const char* what)
 					p++;
 				else if (c != '[')
 				{
-					if (c == '{')
+					if (c == GO)
 						vl++;
-					else if (c == '}')
+					else if (c == OG)
 						vl--;
 					continue;
 				}
@@ -2550,7 +2589,7 @@ opthelp(const char* oopts, const char* what)
 					break;
 				continue;
 			}
-			if (*p == '}')
+			if (*p == OG)
 			{
 				p++;
 				continue;
@@ -2563,7 +2602,9 @@ opthelp(const char* oopts, const char* what)
 			w = 0;
 			d = 0;
 			s = 0;
+			rb = re = 0;
 			sl = 0;
+			vl = 0;
 			if (*p == '[')
 			{
 				if ((c = *(p = next(p + 1, version))) == '-')
@@ -2581,7 +2622,7 @@ opthelp(const char* oopts, const char* what)
 					}
 					else if (style == STYLE_match && *what == '-')
 					{
-						if (*(p + 1) == '?' || *(p + 1) >= '0' && *(p + 1) <= '9')
+						if (*(p + 1) == '?' || isdigit(*(p + 1)))
 							s = C("version");
 						else
 							s = p + 1;
@@ -2776,7 +2817,8 @@ opthelp(const char* oopts, const char* what)
 				if (!f && !w)
 					z = -1;
 			}
-			ov = u = v = y = 0;
+			ov = 0;
+			u = v = y = 0;
 			if (*p == ':' && (a |= OPT_string) || *p == '#' && (a |= OPT_number))
 			{
 				message((-21, "opthelp: arg %s", show(p)));
@@ -2852,7 +2894,7 @@ opthelp(const char* oopts, const char* what)
 						if (!head)
 						{
 							head = 1;
-							item(sp_body, (flags & OPT_functions) ? C("FUNCTIONS") : C("OPTIONS"), 0, style, sp_info, version, ID);
+							item(sp_body, (flags & OPT_functions) ? C("FUNCTIONS") : C("OPTIONS"), 0, 0, style, sp_info, version, ID);
 						}
 						if (style >= STYLE_nroff)
 						{
@@ -2895,7 +2937,7 @@ opthelp(const char* oopts, const char* what)
 							else
 								sfputr(sp, "void", -1);
 							if (w)
-								label(sp_body, ' ', w, -1, 0, style, FONT_BOLD, sp_info, version, catalog);
+								label(sp_body, ' ', w, 0, -1, 0, style, FONT_BOLD, sp_info, version, catalog);
 						}
 						else
 						{
@@ -2907,10 +2949,10 @@ opthelp(const char* oopts, const char* what)
 							sfputc(sp_body, ' ');
 							if (w)
 							{
-								if (label(sp_body, 0, w, -1, 0, style, 0, sp_info, version, catalog))
+								if (label(sp_body, 0, w, 0, -1, 0, style, 0, sp_info, version, catalog))
 								{
 									sfputc(sp_body, '|');
-									label(sp_body, 0, w, -1, 0, style, 0, sp_info, version, native);
+									label(sp_body, 0, w, 0, -1, 0, style, 0, sp_info, version, native);
 								}
 							}
 							else
@@ -2932,7 +2974,7 @@ opthelp(const char* oopts, const char* what)
 									}
 							sfputc(sp_body, ' ');
 							if (y)
-								label(sp_body, 0, y, -1, 0, style, 0, sp_info, version, catalog);
+								label(sp_body, 0, y, 0, -1, 0, style, 0, sp_info, version, catalog);
 							else
 								sfputc(sp_body, '-');
 							if (v)
@@ -2978,10 +3020,10 @@ opthelp(const char* oopts, const char* what)
 								if (prefix > 1)
 									sfputc(sp_body, '-');
 							}
-							if (label(sp_body, 0, w, -1, 0, style, FONT_BOLD, sp_info, version, catalog))
+							if (label(sp_body, 0, w, 0, -1, 0, style, FONT_BOLD, sp_info, version, catalog))
 							{
 								sfputc(sp_body, '|');
-								label(sp_body, 0, w, -1, 0, style, FONT_BOLD, sp_info, version, native);
+								label(sp_body, 0, w, 0, -1, 0, style, FONT_BOLD, sp_info, version, native);
 							}
 						}
 						if (y)
@@ -2992,7 +3034,7 @@ opthelp(const char* oopts, const char* what)
 								sfputc(sp_body, ' ');
 							if (w)
 								sfputc(sp_body, prefix == 1 ? ' ' : '=');
-							label(sp_body, 0, y, -1, 0, style, FONT_ITALIC, sp_info, version, catalog);
+							label(sp_body, 0, y, 0, -1, 0, style, FONT_ITALIC, sp_info, version, catalog);
 							if (a & OPT_optional)
 								sfputc(sp_body, ']');
 						}
@@ -3081,7 +3123,7 @@ opthelp(const char* oopts, const char* what)
 			for (t = p; *t == '\t' || *t == '\n'; t++);
 			if (*t)
 			{
-				item(sp_body, C("IMPLEMENTATION"), 0, style, sp_info, version, ID);
+				item(sp_body, C("IMPLEMENTATION"), 0, 0, style, sp_info, version, ID);
 				sfputr(sp_body, p, -1);
 			}
 		}
@@ -3106,41 +3148,39 @@ opthelp(const char* oopts, const char* what)
 		sfprintf(sp, "\
 .\\\" format with nroff|troff|groff -man\n\
 .fp 5 CW\n\
-.nr mI 0\n\
-.de mI\n\
-.if \\\\n(mI>\\\\$1 \\{\n\
-.	nr mI \\\\n(mI-1\n\
-.	RE\n\
-.mI \\\\$1\n\
-.\\}\n\
-.if \\\\n(mI<\\\\$1 \\{\n\
-.	nr mI \\\\n(mI+1\n\
-.	RS\n\
-.mI \\\\$1\n\
-.\\}\n\
+.nr mH 5\n\
+.de H0\n\
+.nr mH 0\n\
+.in 5n\n\
+\\fB\\\\$1\\fP\n\
+.in 7n\n\
 ..\n\
 .de H1\n\
-.mI 1\n\
-.TP\n\
+.nr mH 1\n\
+.in 7n\n\
 \\fB\\\\$1\\fP\n\
+.in 9n\n\
 ..\n\
 .de H2\n\
-.mI 2\n\
-.TP\n\
+.nr mH 2\n\
+.in 11n\n\
 \\fB\\\\$1\\fP\n\
+.in 13n\n\
 ..\n\
 .de H3\n\
-.mI 3\n\
-.TP\n\
+.nr mH 3\n\
+.in 15n\n\
 \\fB\\\\$1\\fP\n\
+.in 17n\n\
 ..\n\
 .de H4\n\
-.mI 4\n\
-.TP\n\
+.nr mH 4\n\
+.in 19n\n\
 \\fB\\\\$1\\fP\n\
+.in 21n\n\
 ..\n\
 .de OP\n\
-.mI 0\n\
+.nr mH 0\n\
 .ie !'\\\\$1'-' \\{\n\
 .ds mO \\\\fB\\\\-\\\\$1\\\\fP\n\
 .ds mS ,\\\\0\n\
@@ -3156,13 +3196,30 @@ opthelp(const char* oopts, const char* what)
 .as mO \\\\*(mS\\\\fB%s\\\\$2\\\\fP\n\
 .if !'\\\\$4'-' .as mO =\\\\fI\\\\$4\\\\fP\n\
 .\\}\n\
-.TP\n\
+.in 5n\n\
 \\\\*(mO\n\
+.in 9n\n\
+..\n\
+.de SP\n\
+.if \\\\n(mH==2 .in 9n\n\
+.if \\\\n(mH==3 .in 13n\n\
+.if \\\\n(mH==4 .in 17n\n\
 ..\n\
 .de FN\n\
-.mI 0\n\
-.TP\n\
+.nr mH 0\n\
+.in 5n\n\
 \\\\$1 \\\\$2\n\
+.in 9n\n\
+..\n\
+.de DS\n\
+.in +3n\n\
+.ft 5\n\
+.nf\n\
+..\n\
+.de DE\n\
+.fi\n\
+.ft R\n\
+.in -3n\n\
 ..\n\
 .TH %s %d\n\
 "
@@ -3213,7 +3270,7 @@ opthelp(const char* oopts, const char* what)
 			sfclose(sp_head);
 			sp_head = 0;
 		}
-		item(sp, C("SYNOPSIS"), 0, style, sp_info, version, ID);
+		item(sp, C("SYNOPSIS"), 0, 0, style, sp_info, version, ID);
 	}
 	if (x)
 	{
@@ -3254,12 +3311,15 @@ opthelp(const char* oopts, const char* what)
 		goto nospace;
 	name = error_info.id ? error_info.id : "command";
 	m = strlen(name) + 1;
+#if 0
 	if (!opt_info.state->width)
+#endif
 	{
 		astwinsize(1, NiL, &opt_info.state->width);
 		if (opt_info.state->width < 20)
 			opt_info.state->width = OPT_WIDTH;
 	}
+	margin = style == STYLE_api ? (8 * 1024) : (opt_info.state->width - 1);
 	if (!(opt_info.state->flags & OPT_preformat))
 	{
 		if (style >= STYLE_man || matched < 0)
@@ -3279,7 +3339,7 @@ opthelp(const char* oopts, const char* what)
 		}
 		else
 			co = 0;
-		if ((rm = opt_info.state->width - ts - 1) < OPT_MARGIN)
+		if ((rm = margin - ts) < OPT_MARGIN)
 			rm = OPT_MARGIN;
 		ip = indent;
 		ip->stop = (ip+1)->stop = style >= STYLE_html ? 0 : 2;
@@ -3297,7 +3357,7 @@ opthelp(const char* oopts, const char* what)
 				tp = 0;
 				sfputc(mp, '\n');
 				co = 0;
-				rm = opt_info.state->width - 1;
+				rm = margin;
 				ts = ip->stop;
 				if (*p == '\n')
 				{
@@ -3362,7 +3422,7 @@ opthelp(const char* oopts, const char* what)
 						{
 							sfputc(mp, '\n');
 							co = 0;
-							rm = opt_info.state->width - 1;
+							rm = margin;
 							ts = ip->stop;
 						}
 					}
@@ -3509,7 +3569,7 @@ opthelp(const char* oopts, const char* what)
 						sfputc(mp, '\n');
 						for (co = 0; co < ts; co++)
 							sfputc(mp, ' ');
-						rm = opt_info.state->width - 1;
+						rm = margin;
 					}
 				}
 				else
@@ -3756,7 +3816,7 @@ optget(register char** argv, const char* oopts)
 	Optcache_t*	pcache;
 	Optpass_t*	pass;
 
-#if !_YOU_FIGURED_OUT_HOW_TO_GET_ALL_DLLS_TO_DO_THIS_
+#if !_PACKAGE_astsa && !_YOU_FIGURED_OUT_HOW_TO_GET_ALL_DLLS_TO_DO_THIS_
 	/*
 	 * these are not initialized by all dlls!
 	 */
@@ -3879,11 +3939,13 @@ optget(register char** argv, const char* oopts)
 						opt_info.index++;
 						return 0;
 					}
+					else if (*s == c)
+						return 0;
 				}
 				else if (*s == '?')
 					n = 1;
 			}
-			else if ((c = *s++) != '-' && (c != '+' || !(pass->flags & OPT_plus) && (*s < '0' || *s > '9' || !strmatch(opts, version ? "*\\]#\\[*" : "*#*"))))
+			else if ((c = *s++) != '-' && (c != '+' || !(pass->flags & OPT_plus) && (!(pass->flags & OPT_numeric) || !isdigit(*s))))
 			{
 				if (!(pass->flags & OPT_old) || !isalpha(c))
 					return 0;
@@ -3900,6 +3962,14 @@ optget(register char** argv, const char* oopts)
 					 */
 
 					opt_info.index++;
+					return 0;
+				}
+				else if (*s == c)
+				{
+					/*
+					 * ---* or +++* are operands
+					 */
+
 					return 0;
 				}
 				if (version || *s == '?' || !(pass->flags & OPT_minus))
@@ -4639,7 +4709,7 @@ optget(register char** argv, const char* oopts)
 				goto help;
 			}
 		}
-		if (w || c < '0' || c > '9' || !numopt)
+		if (w || !isdigit(c) || !numopt || !(pass->flags & OPT_numeric))
 		{
 			pop(psp);
 			return opterror("", version, catalog, 0);

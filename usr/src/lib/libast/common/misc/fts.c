@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -32,6 +32,7 @@
 #include <ast_dir.h>
 #include <error.h>
 #include <fs3d.h>
+#include <ls.h>
 
 struct Ftsent;
 
@@ -70,7 +71,7 @@ typedef int (*Stat_f)(const char*, struct stat*);
 	char*		home;			/* home/path buffer	*/ \
 	char*		endbase;		/* space to build paths */ \
 	char*		endbuf;			/* space to build paths */ \
-	char*		pad;
+	char*		pad[2];			/* $0.02 to splain this	*/
 
 /*
  * NOTE: <ftwalk.h> relies on status and statb being the first two elements
@@ -79,12 +80,12 @@ typedef int (*Stat_f)(const char*, struct stat*);
 #define _FTSENT_PRIVATE_ \
 	short		status;			/* internal status	*/ \
 	struct stat	statb;			/* fts_statp data	*/ \
+	FTS*		fts;			/* fts_open() handle	*/ \
 	int		nd;			/* popdir() count	*/ \
 	FTSENT*		left;			/* left child		*/ \
 	FTSENT*		right;			/* right child		*/ \
 	FTSENT*		pwd;			/* pwd parent		*/ \
 	FTSENT*		stack;			/* getlist() stack	*/ \
-	FTS*		fts;			/* for fts verification	*/ \
 	long		nlink;			/* FTS_D link count	*/ \
 	unsigned char	must;			/* must stat		*/ \
 	unsigned char	type;			/* DT_* type		*/ \
@@ -515,9 +516,13 @@ info(FTS* fts, register FTSENT* f, const char* path, struct stat* sp, int flags)
 		{
 			f->fts_parent->nlink--;
 #ifdef D_TYPE
-			f->must = 0;
 			if ((f->nlink = sp->st_nlink) < 2)
+			{
+				f->must = 2;
 				f->nlink = 2;
+			}
+			else
+				f->must = 0;
 #else
 			if ((f->nlink = sp->st_nlink) >= 2)
 				f->must = 1;
@@ -1457,6 +1462,22 @@ fts_flags(void)
 }
 
 /*
+ * return 1 if ent is mounted on a local filesystem
+ */
+
+int
+fts_local(FTSENT* ent)
+{
+#ifdef ST_LOCAL
+	struct statvfs	fs;
+
+	return statvfs(ent->fts_path, &fs) || (fs.f_flag & ST_LOCAL);
+#else
+	return !strgrpmatch(fmtfs(ent->fts_statp), "([an]fs|samb)", NiL, 0, STR_LEFT|STR_ICASE);
+#endif
+}
+
+/*
  * close an open fts stream
  */
 
@@ -1488,23 +1509,43 @@ fts_close(register FTS* fts)
 		x = f->fts_link;
 		free(f);
 	}
+	free(fts);
 	return 0;
 }
 
 /*
  * register function to be called for each fts_read() entry
+ * context==0 => unregister notifyf
  */
 
 int
 fts_notify(Notify_f notifyf, void* context)
 {
 	register Notify_t*	np;
+	register Notify_t*	pp;
 
-	if (!(np = newof(0, Notify_t, 1, 0)))
+	if (context)
+	{
+		if (!(np = newof(0, Notify_t, 1, 0)))
+			return -1;
+		np->notifyf = notifyf;
+		np->context = context;
+		np->next = notify;
+		notify = np;
+	}
+	else
+	{
+		for (np = notify, pp = 0; np; pp = np, np = np->next)
+			if (np->notifyf == notifyf)
+			{
+				if (pp)
+					pp->next = np->next;
+				else
+					notify = np->next;
+				free(np);
+				return 0;
+			}
 		return -1;
-	np->notifyf = notifyf;
-	np->context = context;
-	np->next = notify;
-	notify = np;
+	}
 	return 0;
 }

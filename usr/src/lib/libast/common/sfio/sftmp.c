@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -294,7 +294,7 @@ Sfdisc_t*	disc;
 	reg int		fd, m;
 	reg Sfio_t*	sf;
 	Sfio_t		newf, savf;
-	void		(*notifyf)_ARG_((Sfio_t*, int, int));
+	void		(*notifyf)_ARG_((Sfio_t*, int, void*));
 
 	NOTUSED(val);
 
@@ -356,7 +356,7 @@ Sfdisc_t*	disc;
 
 	/* announce change of status */
 	if(notifyf)
-		(*notifyf)(f,SF_NEW,f->file);
+		(*notifyf)(f, SF_NEW, (void*)((long)f->file));
 
 	f->disc = disc->disc;
 
@@ -369,13 +369,13 @@ Sfdisc_t*	disc;
 }
 
 #if __STD_C
-Sfio_t* sftmp(reg size_t s)
+Sfio_t* sftmp(size_t s)
 #else
 Sfio_t* sftmp(s)
-reg size_t	s;
+size_t	s;
 #endif
 {
-	reg Sfio_t*	f;
+	Sfio_t*		f;
 	static Sfdisc_t	Tmpdisc = 
 			{ NIL(Sfread_f), NIL(Sfwrite_f), NIL(Sfseek_f), _tmpexcept,
 #if _tmp_rmfail	

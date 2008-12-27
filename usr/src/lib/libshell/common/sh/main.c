@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -130,7 +130,7 @@ int sh_source(Shell_t *shp, Sfio_t *iop, const char *file)
 #define REMOTE(m)	!(m)
 #endif
 
-int sh_main(int ac, char *av[], void (*userinit)(int))
+int sh_main(int ac, char *av[], Shinit_f userinit)
 {
 	register char	*name;
 	register int	fdin;
@@ -140,7 +140,7 @@ int sh_main(int ac, char *av[], void (*userinit)(int))
 	int i, rshflag;		/* set for restricted shell */
 	char *command;
 #ifdef _lib_sigvec
-	/* This is to clear mask that my be left on by rlogin */
+	/* This is to clear mask that may be left on by rlogin */
 	clearsigmask(SIGALRM);
 	clearsigmask(SIGHUP);
 	clearsigmask(SIGCHLD);
@@ -160,8 +160,6 @@ int sh_main(int ac, char *av[], void (*userinit)(int))
 	{
 		/* begin script execution here */
 		sh_reinit((char**)0);
-		if(rshflag)
-			sh_onoption(SH_RESTRICTED);
 	}
 	shp->fn_depth = shp->dot_depth = 0;
 	command = error_info.id;
@@ -184,10 +182,11 @@ int sh_main(int ac, char *av[], void (*userinit)(int))
 		if(shp->login_sh >= 2)
 			sh_onoption(SH_LOGIN_SHELL);
 		/* decide whether shell is interactive */
-		if(!sh_isoption(SH_TFLAG) && !sh_isoption(SH_CFLAG) && sh_isoption(SH_SFLAG) &&
-			tty_check(0) && tty_check(ERRIO))
-		{
+		if(!sh_isoption(SH_INTERACTIVE) && !sh_isoption(SH_TFLAG) && !sh_isoption(SH_CFLAG) &&
+		   sh_isoption(SH_SFLAG) && tty_check(0) && tty_check(ERRIO))
 			sh_onoption(SH_INTERACTIVE);
+		if(sh_isoption(SH_INTERACTIVE))
+		{
 			sh_onoption(SH_BGNICE);
 			sh_onoption(SH_RC);
 		}
@@ -197,8 +196,8 @@ int sh_main(int ac, char *av[], void (*userinit)(int))
 #endif
 		  ))
 			sh_onoption(SH_RC);
-		for(i=0; i<elementsof(sh.offoptions.v); i++)
-			sh.options.v[i] &= ~sh.offoptions.v[i];
+		for(i=0; i<elementsof(shp->offoptions.v); i++)
+			shp->options.v[i] &= ~shp->offoptions.v[i];
 		if(sh_isoption(SH_INTERACTIVE))
 		{
 #ifdef SIGXCPU
@@ -209,15 +208,15 @@ int sh_main(int ac, char *av[], void (*userinit)(int))
 #endif /* SIGXFSZ */
 			sh_onoption(SH_MONITOR);
 		}
-		job_init(sh_isoption(SH_LOGIN_SHELL));
-		if(sh_isoption(SH_LOGIN_SHELL) && !sh_isoption(SH_NOPROFILE))
+		job_init(shp,sh_isoption(SH_LOGIN_SHELL));
+		if(sh_isoption(SH_LOGIN_SHELL))
 		{
 			/*	system profile	*/
 			sh_source(shp, iop, e_sysprofile);
 			if(!sh_isoption(SH_NOUSRPROFILE) && !sh_isoption(SH_PRIVILEGED))
 			{
 				char **files = shp->login_files;
-				while ((name = *files++) && !sh_source(shp, iop, sh_mactry(name)));
+				while ((name = *files++) && !sh_source(shp, iop, sh_mactry(shp,name)));
 			}
 		}
 		/* make sure PWD is set up correctly */
@@ -232,15 +231,22 @@ int sh_main(int ac, char *av[], void (*userinit)(int))
 #if SHOPT_SYSRC
 					sh_source(shp, iop, e_bash_sysrc);
 #endif
-					sh_source(shp, iop, shp->rcfile ? shp->rcfile : sh_mactry((char*)e_bash_rc));
+					sh_source(shp, iop, shp->rcfile ? shp->rcfile : sh_mactry(shp,(char*)e_bash_rc));
 				}
 				else
 #endif
 				{
+					if(name = sh_mactry(shp,nv_getval(ENVNOD)))
+						name = *name ? strdup(name) : (char*)0;
 #if SHOPT_SYSRC
-					sh_source(shp, iop, e_sysrc);
+					if(!strmatch(name, "?(.)/./*"))
+						sh_source(shp, iop, e_sysrc);
 #endif
-					sh_source(shp, iop, sh_mactry(nv_getval(ENVNOD)));
+					if(name)
+					{
+						sh_source(shp, iop, name);
+						free(name);
+					}
 				}
 			}
 			else if(sh_isoption(SH_INTERACTIVE) && sh_isoption(SH_PRIVILEGED))
@@ -272,7 +278,7 @@ int sh_main(int ac, char *av[], void (*userinit)(int))
 					int type;
 					fdin = (int)strtol(name+8, (char**)0, 10);
 					if(fstat(fdin,&statb)<0)
-						errormsg(SH_DICT,ERROR_system(1),e_open,error_info.id);
+						errormsg(SH_DICT,ERROR_system(1),e_open,name);
 #if !_WINIX
 					/*
 					 * try to undo effect of solaris 2.5+
@@ -356,7 +362,7 @@ int sh_main(int ac, char *av[], void (*userinit)(int))
 		sh_onstate(SH_INTERACTIVE);
 	nv_putval(IFSNOD,(char*)e_sptbnl,NV_RDONLY);
 	exfile(shp,iop,fdin);
-	sh_done(0);
+	sh_done(shp,0);
 	/* NOTREACHED */
 	return(0);
 }
@@ -389,7 +395,7 @@ static void	exfile(register Shell_t *shp, register Sfio_t *iop,register int fno)
 			}
 			fcntl(fno,F_SETFD,FD_CLOEXEC);
 			shp->fdstatus[fno] |= IOCLEX;
-			iop = sh_iostream(fno);
+			iop = sh_iostream((void*)shp,fno);
 		}
 		else
 			iop = sfstdin;
@@ -402,7 +408,7 @@ static void	exfile(register Shell_t *shp, register Sfio_t *iop,register int fno)
 		if(nv_isnull(PS1NOD))
 			nv_putval(PS1NOD,(shp->euserid?e_stdprompt:e_supprompt),NV_RDONLY);
 		sh_sigdone();
-		if(sh_histinit())
+		if(sh_histinit((void*)shp))
 			sh_onoption(SH_HISTORY);
 	}
 	else
@@ -423,14 +429,14 @@ static void	exfile(register Shell_t *shp, register Sfio_t *iop,register int fno)
 	if(jmpval)
 	{
 		Sfio_t *top;
-		sh_iorestore(0,jmpval);
+		sh_iorestore((void*)shp,0,jmpval);
 		hist_flush(shp->hist_ptr);
 		sfsync(shp->outpool);
 		shp->st.execbrk = shp->st.breakcnt = 0;
 		/* check for return from profile or env file */
 		if(sh_isstate(SH_PROFILE) && (jmpval==SH_JMPFUN || jmpval==SH_JMPEXIT))
 			goto done;
-		if(!sh_isoption(SH_INTERACTIVE) || sh_isstate(SH_FORKED) || (jmpval > SH_JMPERREXIT && job_close() >=0))
+		if(!sh_isoption(SH_INTERACTIVE) || sh_isstate(SH_FORKED) || (jmpval > SH_JMPERREXIT && job_close(shp) >=0))
 		{
 			sh_offstate(SH_INTERACTIVE);
 			sh_offstate(SH_MONITOR);
@@ -466,7 +472,7 @@ static void	exfile(register Shell_t *shp, register Sfio_t *iop,register int fno)
 	while(1)
 	{
 		shp->nextprompt = 1;
-		sh_freeup();
+		sh_freeup(shp);
 		stakset(NIL(char*),0);
 		exitset();
 		sh_offstate(SH_STOPOK);
@@ -540,7 +546,7 @@ static void	exfile(register Shell_t *shp, register Sfio_t *iop,register int fno)
 					errormsg(SH_DICT,0,e_logout);
 					continue;
 				}
-				else if(job_close()<0)
+				else if(job_close(shp)<0)
 					continue;
 			}
 			if(errno==0 && sferror(iop) && --maxtry>0)
@@ -596,12 +602,12 @@ done:
 	if(sh_isstate(SH_INTERACTIVE))
 	{
 		sfputc(sfstderr,'\n');
-		job_close();
+		job_close(shp);
 	}
 	if(jmpval == SH_JMPSCRIPT)
 		siglongjmp(*shp->jmplist,jmpval);
 	else if(jmpval == SH_JMPEXIT)
-		sh_done(0);
+		sh_done(shp,0);
 	if(fno>0)
 		sh_close(fno);
 	if(shp->st.filename)
@@ -662,7 +668,7 @@ static void chkmail(Shell_t *shp, char *files)
 						/* save and restore $_ */
 						char *save = shp->lastarg;
 						shp->lastarg = cp;
-						errormsg(SH_DICT,0,sh_mactry(qp?qp+1:(char*)e_mailmsg));
+						errormsg(SH_DICT,0,sh_mactry(shp,qp?qp+1:(char*)e_mailmsg));
 						shp->lastarg = save;
 					}
 					lastmail = statb;

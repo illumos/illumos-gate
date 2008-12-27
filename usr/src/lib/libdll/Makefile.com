@@ -18,14 +18,13 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SHELL=/usr/bin/ksh
+SHELL=/usr/bin/ksh93
 
 LIBRARY=	libdll.a
 VERS=		.1
@@ -46,11 +45,15 @@ include ../../Makefile.lib
 # automated code updates easier.
 MAPFILES=       ../mapfile-vers
 
-# Set common AST build flags (e.g., needed to support the math stuff).
+# Set common AST build flags (e.g. C99/XPG6, needed to support the math stuff)
 include ../../../Makefile.ast
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-last -lc
+
+LDLIBS += \
+	-last \
+	-lc
+
 $(LINTLIB) :=	SRCS = $(SRCDIR)/$(LINTSRC)
 
 SRCDIR =	../common
@@ -74,11 +77,9 @@ CPPFLAGS = \
 	-D_BLD_DLL
 
 CFLAGS += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS)
 CFLAGS64 += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS64)
 
 .KEEP_STATE:
 
@@ -91,6 +92,5 @@ all: $(LIBS)
 #
 lint:
 	@ print "usr/src/lib/libdll is not lint-clean: skipping"
-	@ $(TRUE)
 
 include ../../Makefile.targ

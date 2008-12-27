@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -69,10 +69,10 @@ struct slnod 	/* struct for link list of stacks */
 
 struct dolnod
 {
-	short		dolrefcnt;	/* reference count */
-	short		dolmax;		/* size of dolval array */
-	short		dolnum;		/* number of elements */
-	short		dolbot;		/* current first element */
+	int		dolrefcnt;	/* reference count */
+	int		dolmax;		/* size of dolval array */
+	int		dolnum;		/* number of elements */
+	int		dolbot;		/* current first element */
 	struct dolnod	*dolnxt;	/* used when list are chained */
 	char		*dolval[1];	/* array of value pointers */
 };
@@ -123,16 +123,12 @@ struct argnod
 #define ARG_OPTIMIZE	0x200	/* try to optimize */
 #define ARG_NOGLOB	0x400	/* no file name expansion */
 #define ARG_LET		0x800	/* processing let command arguments */
+#define ARG_ARRAYOK	0x1000	/* $x[sub] ==> ${x[sub]} */
 
-extern char 		**sh_argbuild(int*,const struct comnod*,int);
 extern struct dolnod	*sh_argcreate(char*[]);
-extern char 		*sh_argdolminus(void);
-extern struct dolnod	*sh_argfree(struct dolnod*,int);
-extern struct dolnod	*sh_argnew(char*[],struct dolnod**);
-extern int		sh_argopts(int,char*[]);
-extern void 		sh_argreset(struct dolnod*,struct dolnod*);
-extern void 		sh_argset(char*[]);
-extern struct dolnod	*sh_arguse(void);
+extern char 		*sh_argdolminus(void*);
+extern int		sh_argopts(int,char*[],void*);
+
 
 extern const char	e_heading[];
 extern const char	e_off[];

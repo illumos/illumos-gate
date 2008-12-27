@@ -18,29 +18,51 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 ROOTDEMODIRBASE=	$(ROOT)/usr/demo/ksh
 
 DEMOFILES= \
+	doc/RELEASE \
+	doc/README \
+	doc/TYPES \
+	doc/DESIGN \
+	doc/COMPATIBILITY \
+	doc/OBSOLETE \
+	bin/crawlsrccomments \
+	bin/filemutexdemo1 \
+	bin/filetree1 \
+	bin/gnaw \
+	bin/mandelbrotset1 \
+	bin/multifollow \
+	bin/primenumbers1 \
+	bin/rssread \
+	bin/shcalc \
+	bin/shircbot \
+	bin/shlint \
+	bin/shman \
+	bin/shnote \
+	bin/shpiano \
+	bin/shtinyurl \
+	bin/shtwitter \
+	bin/svcproptree1 \
+	bin/termclock \
+	bin/test_net_sctp \
+	bin/xmldocumenttree1 \
 	fun/dirs \
-	fun/gnaw \
-	fun/mandelbrotset1 \
-	fun/rssread \
 	fun/popd \
 	fun/pushd \
-	fun/termclock \
 	fun/title \
 	tests/shtests \
 	tests/alias.sh \
 	tests/append.sh \
 	tests/arith.sh \
 	tests/arrays.sh \
+	tests/arrays2.sh \
 	tests/attributes.sh \
 	tests/basic.sh \
 	tests/bracket.sh \
@@ -48,6 +70,8 @@ DEMOFILES= \
 	tests/case.sh \
 	tests/comvar.sh \
 	tests/coprocess.sh \
+	tests/cubetype.sh \
+	tests/enum.sh \
 	tests/exit.sh \
 	tests/expand.sh \
 	tests/functions.sh \
@@ -55,19 +79,68 @@ DEMOFILES= \
 	tests/grep.sh \
 	tests/heredoc.sh \
 	tests/io.sh \
+	tests/locale.sh \
 	tests/nameref.sh \
 	tests/options.sh \
 	tests/path.sh \
+	tests/pointtype.sh \
 	tests/quoting.sh \
 	tests/quoting2.sh \
+	tests/recttype.sh \
+	tests/restricted.sh \
 	tests/return.sh \
 	tests/select.sh \
-	tests/substring.sh \
+	tests/sigchld.sh \
+	tests/signal.sh \
+	tests/statics.sh \
+	tests/sun_solaris_builtin_sum.sh \
+	tests/sun_solaris_compoundvario.sh \
+	tests/sun_solaris_cr_6687139_command_substitution_exec_redirection_allocation_loop.sh \
+	tests/sun_solaris_cr_6713682_compound_var_bleeds_through_subshell.sh \
+	tests/sun_solaris_cr_6722134_background_CHLD_trap.sh \
+	tests/sun_solaris_cr_6753538_subshell_leaks_umask.sh \
+	tests/sun_solaris_cr_6754020_weird_square_bracket_expansion.sh \
+	tests/sun_solaris_cr_6763594_command_failure_execs_twice.sh \
+	tests/sun_solaris_cr_6766246_pattern_matching_bug.sh \
 	tests/sun_solaris_getconf.sh \
+	tests/sun_solaris_local_compound_nameref001.sh \
+	tests/sun_solaris_staticvariables.sh \
+	tests/sun_solaris_vartree001.sh \
+	tests/sun_solaris_vartree002.sh \
+	tests/sun_solaris_vartree003.sh \
+	tests/substring.sh \
+	tests/subshell.sh \
 	tests/tilde.sh \
-	tests/variables.sh
+	tests/timetype.sh \
+	tests/types.sh \
+	tests/variables.sh \
+	tests/vartree1.sh \
+	tests/vartree2.sh
+
+# Rules for executables
+$(ROOTDEMODIRBASE)/tests/shtests := FILEMODE= 755
+$(ROOTDEMODIRBASE)/fun/%	 := FILEMODE= 755
+$(ROOTDEMODIRBASE)/bin/%	 := FILEMODE= 755
+
+# ToDO: We should replace the "cat $<" below with $ shcomp $< # once the
+# build machines start to ship /usr/bin/shcomp to compile the scripts
+# in bin/ and use $ shcomp -n $< /dev/null 2>&1 # to do minimum lint-style
+# checks before installation.
+$(ROOTDEMODIRBASE)/bin/%: common/scripts/%.sh
+	cat "$<" >"$(@F)"
+	$(INS) -s -m $(FILEMODE) -f $(@D) "$(@F)"
+	$(RM) "$(@F)"
+	
+# Documentation rules
+$(ROOTDEMODIRBASE)/doc/%: common/%
+	$(INS.file)
+
+$(ROOTDEMODIRBASE)/doc/%: misc/%
+	$(INS.file)
 
 ROOTDEMODIRS=	$(ROOTDEMODIRBASE) .WAIT \
+		$(ROOTDEMODIRBASE)/bin \
+		$(ROOTDEMODIRBASE)/doc \
 		$(ROOTDEMODIRBASE)/fun \
 		$(ROOTDEMODIRBASE)/tests
 

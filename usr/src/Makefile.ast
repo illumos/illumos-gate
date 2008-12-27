@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Override this top level flag so the compiler builds in its native
@@ -34,8 +33,10 @@ C99MODE= $(C99_ENABLE) -D_XOPEN_SOURCE=600 -D__EXTENSIONS__=1
 # ... about |#pragma prototyped| ...
 CERRWARN += -erroff=E_UNRECOGNIZED_PRAGMA_IGNORED
 
-# common CPP flags for libshell consumers (ksh etc.)
+# common CPP flags for libshell consumers (ksh, shcomp etc.)
 LIBSHELLCPPFLAGS = \
+	-I$(LIBSHELLBASE)/$(LIBSHELLMACH)/src/cmd/ksh93 \
+	-I$(LIBSHELLBASE)/common/include \
 	-I$(ROOT)/usr/include/ast \
 	-DKSHELL \
 	-DSHOPT_BRACEPAT \
@@ -52,16 +53,32 @@ LIBSHELLCPPFLAGS = \
 	-DSHOPT_OPTIMIZE \
 	-DSHOPT_PFSH \
 	-DSHOPT_RAWONLY \
+	-DSHOPT_STATS \
 	-DSHOPT_SUID_EXEC \
 	-DSHOPT_SYSRC \
+	-DSHOPT_TYPEDEF \
 	-DSHOPT_VSH \
 	-D_BLD_shell \
 	-D_PACKAGE_ast \
+	'-DERROR_CATALOG="libshell"' \
 	-DERROR_CONTEXT_T=Error_context_t \
 	'-DUSAGE_LICENSE=\
 		"[-author?David Korn <dgk@research.att.com>]"\
-		"[-copyright?Copyright (c) 1982-2007 AT&T Knowledge Ventures]"\
+		"[-copyright?Copyright (c) 1982-2008 AT&T Intellectual Property]"\
 		"[-license?http://www.opensource.org/licenses/cpl1.0.txt]"\
 		"[--catalog?libshell]"'
 
-
+# Default CFLAGS/CFLAGS64 for AST sources
+# (-xstrconst makes string litereals read-only and -xcsi works 
+# around compiler issues)
+ASTCFLAGS = \
+	$(CCVERBOSE) \
+	-_cc=-xcsi \
+	-xstrconst
+ASTCFLAGS64 = \
+	$(CCVERBOSE) \
+	-_cc=-xcsi \
+	-xstrconst
+	
+# We need this for C99/VLA support
+DEBUGFORMAT=-xdebugformat=dwarf

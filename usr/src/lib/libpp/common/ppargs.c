@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1986-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: cpp (AT&T Research) 2006-01-11 $\n]"
+"[-?\n@(#)$Id: cpp (AT&T Research) 2007-03-11 $\n]"
 USAGE_LICENSE
 "[+NAME?cpp - C language preprocessor]"
 "[+DESCRIPTION?\bcpp\b is the preprocessor for all C language dialects. It is"
@@ -80,9 +80,11 @@ USAGE_LICENSE
 "		or the default ISO).]"
 "	[+-D-T\atest\a, \bpp::test\b \atest\a?Enable implementation specific"
 "		test code according to \atest\a.]"
-"	[+-D-W, pp::warn?Enable pedantic warnings in non-hosted files.]"
+"	[+-D-W, pp::warn?Enable warnings in non-hosted files.]"
 "	[+-D-X\b[\acc\a]]?Preprocess for the compiler \acc\a which must be"
 "		an executable path or an executable on \b$PATH\b.]"
+"	[+-D-Y, pp::pedantic?Enable pedantic \bpp::warn\b warnings in"
+"		non-hosted files.]"
 "	[+-D-Z, pp::pool?Enable pool mode. See \blibpp\b(3).]"
 "	[+-D-d?List canonicalized \b#define\b statements for non-predefined"
 "		macros in the output. ]"
@@ -271,6 +273,9 @@ ppargs(char** argv, int last)
 				case 'X':
 					ppop(PP_PROBE, n && *s ? s : 0);
 					goto hasarg;
+				case 'Y':
+					ppop(PP_PEDANTIC, n);
+					break;
 				case 'Z':
 					ppop(PP_POOL, n);
 					break;

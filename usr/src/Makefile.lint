@@ -275,7 +275,6 @@ COMMON_SUBDIRS = \
 	cmd/strings \
 	cmd/su \
 	cmd/sulogin \
-	cmd/sum \
 	cmd/svc \
 	cmd/swap \
 	cmd/sync \

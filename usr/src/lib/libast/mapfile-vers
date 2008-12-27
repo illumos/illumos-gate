@@ -23,8 +23,6 @@
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 # functions
 SUNWprivate_1.1 {
@@ -36,11 +34,11 @@ SUNWprivate_1.1 {
 	_Vmextern;
 	_Vmheap;
 	_ast___getdelim;
+	_ast__filbuf;
 	_ast_asprintf;
 	_ast_basename;
 	_ast_calloc;
 	_ast_catclose;
-	_ast_categories;
 	_ast_catgets;
 	_ast_catopen;
 	_ast_cfree;
@@ -67,6 +65,7 @@ SUNWprivate_1.1 {
 	_ast_fgetwc;
 	_ast_fgetws;
 	_ast_fileno_unlocked;
+	_ast_flockfile;
 	_ast_fmemopen;
 	_ast_fnmatch;
 	_ast_fopen;
@@ -92,6 +91,7 @@ SUNWprivate_1.1 {
 	_ast_ftell;
 	_ast_ftello64;
 	_ast_ftello;
+	_ast_ftrylockfile;
 	_ast_fts_children;
 	_ast_fts_close;
 	_ast_fts_flags;
@@ -102,6 +102,7 @@ SUNWprivate_1.1 {
 	_ast_ftw;
 	_ast_ftwalk;
 	_ast_ftwflags;
+	_ast_funlockfile;
 	_ast_fwide;
 	_ast_fwprintf;
 	_ast_fwrite;
@@ -112,12 +113,14 @@ SUNWprivate_1.1 {
 	_ast_getcwd;
 	_ast_getdate;
 	_ast_getdelim;
+	_ast_getenv;
 	_ast_getline;
 	_ast_getopt;
 	_ast_getopt_long;
 	_ast_getopt_long_only;
 	_ast_getpgrp;
 	_ast_gets;
+	_ast_getsubopt;
 	_ast_getw;
 	_ast_getwc;
 	_ast_getwchar;
@@ -133,6 +136,12 @@ SUNWprivate_1.1 {
 	_ast_iconv_open;
 	_ast_iconv_write;
 	_ast_info;
+	_ast_intercepts;
+	_ast_lc_categories;
+	_ast_lc_charsets;
+	_ast_lc_languages;
+	_ast_lc_maps;
+	_ast_lc_territories;
 	_ast_localeconv;
 	_ast_locales;
 	_ast_malloc;
@@ -145,10 +154,15 @@ SUNWprivate_1.1 {
 	_ast_mktemp;
 	_ast_mktime;
 	_ast_nftw;
+	_ast_optarg;
+	_ast_optctx;
+	_ast_opterr;
 	_ast_optesc;
 	_ast_optget;
 	_ast_opthelp;
+	_ast_optind;
 	_ast_optjoin;
+	_ast_optopt;
 	_ast_optstr;
 	_ast_optusage;
 	_ast_pathaccess;
@@ -178,7 +192,6 @@ SUNWprivate_1.1 {
 	_ast_procclose;
 	_ast_procfree;
 	_ast_procopen;
-	_ast_procrun =		NODIRECT;	# Allow libshell to override
 	_ast_putc_unlocked;
 	_ast_putchar_unlocked;
 	_ast_putenv;
@@ -311,7 +324,6 @@ SUNWprivate_1.1 {
 	_ccmapcpy;
 	_ccmapstr;
 	_error_info_;
-	_filbuf;
 	_fini;
 	_hash_info_;
 	_iblocks;
@@ -368,6 +380,7 @@ SUNWprivate_1.1 {
 	astconflist;
 	astcopy;
 	astgetconf;
+	astintercept;
 	astlicense;
 	astquery;
 	astwinsize;
@@ -435,7 +448,6 @@ SUNWprivate_1.1 {
 	fmtuid;
 	fmtversion;
 	fs3d;
-	getsubopt;
 	hashalloc;
 	hashdone;
 	hashdump;
@@ -482,10 +494,6 @@ SUNWprivate_1.1 {
 	mntwrite;
 	modei;
 	modex;
-	optarg;
-	opterr;
-	optind;
-	optopt;
 	pvalloc;
 	recfmt;
 	reclen;
@@ -557,7 +565,6 @@ SUNWprivate_1.1 {
 	sfsscanf;
 	sfstack;
 	sfstacked;
-	sfstrtmp;
 	sfswap;
 	sfsync;
 	sftell;

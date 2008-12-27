@@ -20,18 +20,19 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # functions by AST/ksh93's version of libcmd
 SUNWprivate_1.1 {
     global:
+    	_cmd_init;
+	
 	b_basename;
 	b_cat;
 	b_chgrp;
+	b_cksum;
 	b_chmod;
 	b_chown;
 	b_cmp;
@@ -50,15 +51,19 @@ SUNWprivate_1.1 {
 	b_join;
 	b_ln;
 	b_logname;
+	b_md5sum;
 	b_mkdir;
 	b_mkfifo;
 	b_mv;
 	b_paste;
 	b_pathchk;
+	b_pids;
+	b_readlink;
 	b_rev;
 	b_rm;
 	b_rmdir;
 	b_stty;
+	b_sum;
 	b_sync;
 	b_tail;
 	b_tee;

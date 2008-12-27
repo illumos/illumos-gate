@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,19 +27,20 @@
 */
 
 #if __STD_C
-ssize_t sfwrite(reg Sfio_t* f, const Void_t* buf, reg size_t n)
+ssize_t sfwrite(Sfio_t* f, const Void_t* buf, size_t n)
 #else
 ssize_t sfwrite(f,buf,n)
-reg Sfio_t*	f;	/* write to this stream. 	*/
+Sfio_t*		f;	/* write to this stream. 	*/
 Void_t*		buf;	/* buffer to be written.	*/
-reg size_t	n;	/* number of bytes. 		*/
+size_t		n;	/* number of bytes. 		*/
 #endif
 {
 	reg uchar	*s, *begs, *next;
 	reg ssize_t	w;
 	reg int		local;
+	SFMTXDECL(f);
 
-	SFMTXSTART(f, (ssize_t)(-1));
+	SFMTXENTER(f, (ssize_t)(-1));
 
 	GETLOCAL(f,local);
 

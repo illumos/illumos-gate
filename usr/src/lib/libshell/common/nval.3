@@ -28,7 +28,9 @@ Namdisc_t;
 .ft 5
 Namval_t 	*nv_open(const char *\fIname\fP, Dt_t *\fIdict\fP, int \fIflags\fP);
 Namval_t	*nv_create(const char *\fIname\fP,  Dt_t *\fIdict\fP, int \fIflags\fP, Namfun_t *\fIfp\fP);
+Namval_t	*nv_namptr(void *\fIptr\fP, int \fIindx\fP); 
 void	nv_close(Namval_t *\fInp\fP);
+void	nv_delete(Namval_t *\fInp\fP, Dt_t *\fIdict\fP, int \fInofree\fP);
 .ft R
 .fi
 .SS "GETTING AND SETTING VALUES"
@@ -38,7 +40,7 @@ char	*nv_getval(Namval_t *\fInp\fP);
 Sfdouble_t	nv_getnum(Namval_t *\fInp\fP);
 char	*nv_name(Namval_t *\fInp\fP);
 void	nv_putval(Namval_t *\fInp\fP, const char *\fIval\fP, int \fIflags\fP);
-void	nv_unset(Namval_t *\fInp\fP);
+void	nv_unset(Namval_t *\fInp\fP, int \fIflags\fP);
 int	nv_clone(Namval_t *\fIsrc\fP, Namval_t *\fIdest\fP, int \fIflags\fP);
 .ft R
 .fi
@@ -49,6 +51,7 @@ int	nv_isnull(Namval_t *\fInp\fP);
 int	nv_setsize(Namval_t *\fInp\fP, int \fIsize\fP);
 int	nv_size(Namval_t *\fInp\fP);
 unsigned nv_isattr(Namval_t *\fInp\fP, unsigned \fIflags\fP);
+Namfun_t	*nv_isvtree(Namval_t *\fInp\fP);
 unsigned nv_onattr(Namval_t *\fInp\fP, unsigned \fIflags\fP);
 unsigned nv_offattr(Namval_t *\fInp\fP, unsigned \fIflags\fP);
 void	nv_newattr(Namval_t *\fInp\fP, unsigned \fIflags\fP, int \fIsize\fP);
@@ -60,6 +63,7 @@ void	nv_newattr(Namval_t *\fInp\fP, unsigned \fIflags\fP, int \fIsize\fP);
 .ft 5
 unsigned nv_isarray(Namval_t *\fInp\fP);
 Namarr_t	*nv_setarray(Namval_t *\fInp\fP,void*(*\fIfun\fP)(Namval_t*,const char*,int));
+Namarr_t	*nv_arrayptr(Namval_t *\fInp\fP);
 Namval_t	*nv_putsub(Namval_t *\fInp\fP, char *\fIname\fP, long \fImode\fP);
 Namval_t	*nv_opensub(Namval_t *\fInp\fP);
 void	nv_setvec(Namval_t *\fInp\fP, int \fIappend\fP, int \fIargc\fP, char *\fIargv\fP[]);
@@ -81,11 +85,20 @@ char	*nv_adddisc(Namval_t *\fInp\fP, const char **\fInames\fP);
 const Namdisc_t	*nv_discfun(int \fIwhich\fP);
 .ft R
 .fi
+.SS "TYPES"
+.nf
+.ft 5
+Namval_t	*nv_type(Namval_t  *\fInp\fP);
+int	*nv_settype(Namval_t  *\fInp\fP, Namval_t *\fItp\fP, int \fIflags\fP);
+Namval_t	*nv_mkinttype(char *\fIname\fP, size_t \fIsz\fP, int \fIus\fP, const char *\fIstr\fP, Namdisc_t *\fIdp\fP);
+void	nv_addtype(Namval_t *\fInp\fP, const char *\fIstr\fP, Optdisc_t* *\fIop\fP, size_t \fIsz\fP);
+.ft R
+.fi
 .SS "MISCELLANEOUS FUNCTIONS"
 .nf
 .ft 5
 int	nv_scan(Dt_t *\fIdict\fP, void(*\fIfn\fP)(Namval_t*,void*), void *\fIdata\fP, int \fImask\fP, int \fIflags\fP);
-Dt_t	nv_dict(Namval_t *\fInp\fP);
+Dt_t	*nv_dict(Namval_t *\fInp\fP);
 void	nv_setvtree(Namval_t *\fInp\fP);
 void	nv_setref(Namval_t *\fInp\fP, Dt_t *\fIdp\fP, int \fIflags\fP);
 Namval_t	*nv_lastdict(void);
@@ -179,10 +192,24 @@ The \f5nv_lastdict()\fP function returns a pointer the the
 name-value pair that contains
 the last dictionary searched on the previous \f5nv_open()\fP.
 .PP
+Name-value pairs can also be allocated without belonging to
+a dictionary.  They will typically be looked by a a \fIcreate\fP
+discipline associated with a parent node.  In this case the
+node size will by \f5NV_MINSZ\fP and \fIn\fP nodes can be allocated
+vial \f5calloc(5NV_MINSZ,\fIn\fP)\fP(3).
+The \f5nv_namptr\fP function can be used on the pointer returned by
+\f5calloc\fP along with the element number to return the
+corresponding node.
+Each of these nodes must be given the \f5NV_MINIMAL\fP attributes.
+.PP
 The \f5nv_close()\fP indicates that the pointer returned by
 \f5nv_open()\fP or \f5nv_opensub()\fP will not be referenced again.  If the
 name-value pair is unset, and not referenced elsewhere,
 the name-value pair may be freed.
+.PP
+The \f5nv_delete()\fP function will remove the node \fInp\fP from
+the dictionary \fIdict\fP.  Unless \fInofree\fP is non-zero, the
+node \fInp\fP will also be freed.
 .PP
 The \f5nv_name()\fP function returns the name of the given name-value
 pair \fInp\fP.
@@ -228,6 +255,8 @@ as the value for \fInp\fP.
 The \f5nv_unset()\fP function clears out the value and attributes
 of the given name-value function but does not free the name-value
 pair.
+If called from the \f5putval\fP discipline function, use the \fIflags\fP
+argument as the \fIflags\fP to  \f5nv_unset()\fP.  Otherwise, use 0.
 .PP
 The following attributes can be associated with a name-value pair:
 .IP
@@ -282,6 +311,11 @@ expanded as a string.
 This attribute has an associated number that defines the
 the precision of the mantissa.
 .IP
+\f5NV_HEXFLOAT\fP:
+Used in conjunction with \f5NV_INTEGER\fP and \f5NV_DOUBLE\fP to
+cause the value to be represented in C99 %a format when expanded as
+a string.
+.IP
 \f5NV_BINARY\fP:
 The name-value pair contains a buffer of binary data and \f5nv_size()\fP
 is the number of bytes for this data.  By default the value
@@ -291,6 +325,10 @@ size to be fixed and data either truncated or filled with \f50\fP bytes.
 .IP
 \f5NV_REF\fP:
 The name-value pair is a name reference variable.
+.IP
+\f5NV_MINIMAL\fP:
+The name-value pair node is not embedded in a dictionary
+and is minimal size, \f5NV_MINSZ\fP.
 .IP
 \f5NV_NODISC\fP:
 All discipline functions are ignored when performing assignments
@@ -310,6 +348,10 @@ Changing the attribute may require changing the value
 to agree with the new attributes.
 For an array variable, the values for each of the
 subscripts will be changed.
+.PP
+The \f5nv_isvtree()\fP function returns a pointer to the compound
+variable discipline if the node \fInp\fP is a compound variable
+or \f5NULL\fP otherwise.
 .PP
 The \f5nv_isarray()\fP function returns a non-zero value if the specified
 name-value pair is an array. 
@@ -558,6 +600,15 @@ The name of the current subscript must be returned.
 Returns a pointer to a name-value pair corresponding to the
 current subscript, or \f5NULL\fP if this array type doesn't
 create represent each element as a name-value pair.
+.IP
+\f5NV_ASETSUB\fP:
+Set the current subscript to the name-value pair passed in
+as the second argument.
+.PP
+If \fInp\fP refers to an array,
+\f5nv_arrayptr()\fP returns a pointer to
+the array discipline structure \f5Namarr_t\fP.
+Otherwise \f5nv_arrayptr()\fP returns \f5NULL\fP.
 .PP
 If \fInp\fP refers to an array,
 the \f5nv_getsub()\fP returns a pointer to
@@ -612,8 +663,31 @@ will return a string containing all the names and values of
 children nodes in a format that can be used in
 a shell compound assignment.
 .PP
+The \f5nv_type()\fP function returns a name_value pair pointer
+that contains the type definition for the specified name-value pair.
+The \fInvname\fP field contains the name for the type. 
+.PP
+The \f5nv_settype()\fP function converts the name-value pair
+given by \fInp\fP into the type given by \fItp\fP.
+.PP
+The \f5nv_addtype()\fP function adds the name of the type given by
+\fInp\fP to the list of declaration built-ins.  The \fIstr\fP
+argument contains the string used by \f5optget\fP(3) to generate
+the man page and process the options.  The \fIop\fP argument
+specifies the callback discipline used by  \f5optget\fP(3) and
+\fIsz\fP specifies the size of the callback information so
+that the  discipline \fBoptget\fP(3) can be extended with private
+data used by the callback function.
+.P
+The \f5nv_mkinttype()\fP function creates named integer types
+of the specified \fIname\fP.  The \fIsize\fP parameter is the size
+in bytes of the integer variable and  \fIus\fP is non-zero
+for unsigned integer types.  If \fIdp\fP is specified then integer
+variables of this type will all use this discipline.
 .SH SEE ALSO
+calloc(3)
 cdt(3)
 shell(3)
+optget(3)
 .SH AUTHOR
 David G. Korn (dgk@research.att.com).

@@ -72,8 +72,20 @@
 ./src/lib/libshell/*/src/cmd/ksh93/FEATURE
 ./src/lib/libshell/common/data/math.tab
 ./src/lib/libshell/common/features
-./src/lib/libshell/misc/buildksh93.ksh
+./src/lib/libshell/misc/buildksh93.sh
 ./src/lib/libshell/misc/buildksh93.readme
+
+#
+# Ignore ksh93/ast-related "iffe" (if feature enabled) probe
+#
+./src/lib/libsum/common/features/sum
+
+#
+# Ignore ksh93/ast-related upstream source, currently superseded by
+# a per-platform version of sum.h, since we use libmd.so.1 for some
+# ciphers.
+#
+./src/lib/libsum/common/sum.h
 
 #
 # Ignore ksh93/ast-related test programs.
@@ -89,7 +101,6 @@
 ./src/lib/libcmd/common/md5sum.c
 ./src/lib/libcmd/common/sum.c
 ./src/lib/libshell/common/bltins/mkservice.c
-./src/lib/libshell/common/bltins/shopen.c
 ./src/lib/libshell/common/data/bash_pre_rc.sh
 ./src/lib/libshell/common/include/env.h
 ./src/lib/libshell/common/sh/bash.c

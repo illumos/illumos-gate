@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -44,7 +44,7 @@
 #define PATH_STD_DIR		0100	/* directory is on  $(getconf PATH) */
 
 #define PATH_OFFSET	2		/* path offset for path_join */
-#define MAXDEPTH	(sizeof(char*)==2?64:4096) /* maximum recursion depth*/
+#define MAXDEPTH	(sizeof(char*)==2?64:2048) /* maximum recursion depth*/
 
 /*
  * path component structure for path searching
@@ -55,6 +55,7 @@ typedef struct pathcomp
 	int		refcount;
 	dev_t		dev;
 	ino_t		ino;
+	time_t		mtime;
 	char		*name;
 	char		*lib;
 	char		*blib;
@@ -90,7 +91,7 @@ extern Pathcomp_t 	*path_get(const char*);
 #undef extern
 extern char 		*path_pwd(int);
 extern Pathcomp_t	*path_nextcomp(Pathcomp_t*,const char*,Pathcomp_t*);
-extern int		path_search(const char*,Pathcomp_t*,int);
+extern int		path_search(const char*,Pathcomp_t**,int);
 extern char		*path_relative(const char*);
 extern int		path_complete(const char*, const char*,struct argnod**);
 #if SHOPT_BRACEPAT
@@ -115,6 +116,7 @@ extern const char e_crondir[];
 #endif /* SHOPT_SUID_EXEC */
 extern const char is_alias[];
 extern const char is_builtin[];
+extern const char is_spcbuiltin[];
 extern const char is_builtver[];
 extern const char is_reserved[];
 extern const char is_talias[];

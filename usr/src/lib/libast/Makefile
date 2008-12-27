@@ -18,14 +18,13 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SHELL=/usr/bin/ksh
+SHELL=/usr/bin/ksh93
 
 include		../Makefile.lib
 
@@ -62,6 +61,8 @@ HDRS=	\
 	ast_map.h \
 	ast_mmap.h \
 	ast_mode.h \
+	ast_namval.h \
+	ast_ndbm.h \
 	ast_nl_types.h \
 	ast_param.h \
 	ast_standards.h \
@@ -70,7 +71,6 @@ HDRS=	\
 	ast_sys.h \
 	ast_time.h \
 	ast_tty.h \
-	ast_types.h \
 	ast_version.h \
 	ast_vfork.h \
 	ast_wait.h \
@@ -98,6 +98,7 @@ HDRS=	\
 	hashkey.h \
 	hashpart.h \
 	iconv.h \
+	ip6.h \
 	lc.h \
 	ls.h \
 	magic.h \
@@ -121,6 +122,7 @@ HDRS=	\
 	sfio_s.h \
 	sfio_t.h \
 	sfio.h \
+	shcmd.h \
 	sig.h \
 	stack.h \
 	stak.h \

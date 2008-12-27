@@ -18,19 +18,18 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
-SHELL=/usr/bin/ksh
+SHELL=/usr/bin/ksh93
 
 include ../../../Makefile.ksh93switch
 
 $(BINKSH_IS_KSH93)PROG= ksh
-$(BINKSH_IS_KSH93)USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh
+$(BINKSH_IS_KSH93)USRKSH_ALIAS_LIST=ksh ksh93 rksh rksh93 pfksh pfksh93 pfrksh pfrksh93
 
 $(BINKSH_ISNOT_KSH93)PROG= ksh93
 $(BINKSH_ISNOT_KSH93)USRKSH_ALIAS_LIST=ksh93 rksh93
@@ -38,12 +37,16 @@ $(BINKSH_ISNOT_KSH93)USRKSH_ALIAS_LIST=ksh93 rksh93
 OBJECTS= \
 	pmain.o
 
-LIBSHELLSRC=../../../lib/libshell/common/sh
+LIBSHELLBASE=../../../lib/libshell
+LIBSHELLSRC=$(LIBSHELLBASE)/common/sh
 
 SRCS=	$(OBJECTS:%.o=$(LIBSHELLSRC)/%.c)
 
 GROUP= bin
 LDLIBS += -lshell
+
+# Set common AST build flags (e.g., needed to support the math stuff).
+include ../../../Makefile.ast
 
 # 1. Make sure that the -D/-U defines in CFLAGS below are in sync
 # with usr/src/lib/libshell/Makefile.com
@@ -57,14 +60,12 @@ CPPFLAGS = \
 	$(LIBSHELLCPPFLAGS)
 
 CFLAGS += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS)
 CFLAGS64 += \
-	$(CCVERBOSE) \
-	-xstrconst
+	$(ASTCFLAGS64)
 
-# Set common AST build flags (e.g., needed to support the math stuff).
-include ../../../Makefile.ast
+# Workaround for CR#6628728 ("|memcntl()| prototype not available for C99/XPG6")
+pmain.o	:= CERRWARN += -erroff=E_NO_IMPLICIT_DECL_ALLOWED
 
 .KEEP_STATE:
 
@@ -98,6 +99,28 @@ CLOBBERFILES += \
 	ksh \
 	ksh93
 
+# Install rule for $(MACH)/Makefile (32bit)
+INSTALL.ksh.32bit=@ \
+	(print "$(POUND_SIGN) Installing 32bit $(PROG) aliases $(USRKSH_ALIAS_LIST)" ; \
+	set -o xtrace ; \
+	for i in $(USRKSH_ALIAS_LIST) ; do \
+		[[ "$$i" == "$(PROG)" ]] && continue ; \
+		$(RM) "$(ROOTBIN32)/$$i" ; \
+		$(LN) "$(ROOTBIN32)/$(PROG)" "$(ROOTBIN32)/$$i" ; \
+	done \
+	)
+
+# Install rule for $(MACH64)/Makefile (64bit)
+INSTALL.ksh.64bit=@ \
+	(print "$(POUND_SIGN) Installing 64bit $(PROG) aliases $(USRKSH_ALIAS_LIST)" ; \
+	set -o xtrace ; \
+	for i in $(USRKSH_ALIAS_LIST) ; do \
+		[[ "$$i" == "$(PROG)" ]] && continue ; \
+		$(RM) "$(ROOTBIN64)/$$i" ; \
+		$(LN) "$(ROOTBIN64)/$(PROG)" "$(ROOTBIN64)/$$i" ; \
+	done \
+	)
+
 #
 # ksh is not lint-clean yet; fake up a target.  (You can use
 # "make lintcheck" to actually run lint; please send all lint fixes
@@ -105,6 +128,5 @@ CLOBBERFILES += \
 #
 lint:
 	@ print "usr/src/cmd/ksh is not lint-clean: skipping"
-	@ $(TRUE)
 
 include ../Makefile.testshell

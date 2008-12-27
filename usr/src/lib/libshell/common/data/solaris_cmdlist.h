@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SOLARIS_CMDLIST_H
-#define	_SOLARIS_CMDLIST_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef _SOLARIS_KSH_CMDLIST_H
+#define	_SOLARIS_KSH_CMDLIST_H
 
 #ifdef	__cplusplus
 extern "C" {
@@ -42,19 +40,32 @@ extern "C" {
 
 /* POSIX compatible commands */
 #ifdef _NOT_YET
-#define	XPG6CMDLIST(f)   { "/usr/xpg6/bin/" #f, NV_BLTIN|NV_NOFREE, bltin(f) },
-#define	XPG4CMDLIST(f)   { "/usr/xpg4/bin/" #f, NV_BLTIN|NV_NOFREE, bltin(f) },
+#define	XPG6CMDLIST(f)	\
+	{ "/usr/xpg6/bin/" #f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
+#define	XPG4CMDLIST(f)	\
+	{ "/usr/xpg4/bin/" #f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
 #else
 #define	XPG6CMDLIST(f)
 #define	XPG4CMDLIST(f)
 #endif /* NOT_YET */
 /*
  * Commands which are 100% compatible with native Solaris versions (/bin is
- * a softlink to ./usr/bin so both need to be listed here)
+ * a softlink to ./usr/bin, ksh93 takes care about the lookup)
  */
-#define	BINCMDLIST(f)	 { "/bin/" #f,  	NV_BLTIN|NV_NOFREE, bltin(f) },
-/* Make all ksh93 builtins accessible when /usr/ast/bin was added to ${PATH} */
-#define	ASTCMDLIST(f)	 { "/usr/ast/bin/" #f,  NV_BLTIN|NV_NOFREE, bltin(f) },
+#define	BINCMDLIST(f)	\
+	{ "/bin/"	#f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
+#define	USRBINCMDLIST(f)	\
+	{ "/usr/bin/"	#f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
+#define	SBINCMDLIST(f)	\
+	{ "/sbin/"	#f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
+#define	SUSRBINCMDLIST(f)	\
+	{ "/usr/sbin/"	#f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
+/*
+ * Make all ksh93 builtins accessible when /usr/ast/bin was added to
+ * /usr/xpg6/bin:/usr/xpg4/bin:/usr/ccs/bin:/usr/bin:/bin:/opt/SUNWspro/bin
+ */
+#define	ASTCMDLIST(f)	\
+	{ "/usr/ast/bin/" #f, NV_BLTIN|NV_BLTINOPT|NV_NOFREE, bltin(f) },
 
 /* undo ast_map.h #defines to avoid collision */
 #undef basename
@@ -91,14 +102,17 @@ ASTCMDLIST(id)
 ASTCMDLIST(join)
 XPG4CMDLIST(ln)
 ASTCMDLIST(ln)
+BINCMDLIST(logname)
 ASTCMDLIST(logname)
 BINCMDLIST(mkdir)
 ASTCMDLIST(mkdir)
+BINCMDLIST(mkfifo)
 ASTCMDLIST(mkfifo)
 XPG4CMDLIST(mv)
 ASTCMDLIST(mv)
 ASTCMDLIST(paste)
 ASTCMDLIST(pathchk)
+BINCMDLIST(rev)
 ASTCMDLIST(rev)
 XPG4CMDLIST(rm)
 ASTCMDLIST(rm)
@@ -106,17 +120,23 @@ BINCMDLIST(rmdir)
 ASTCMDLIST(rmdir)
 XPG4CMDLIST(stty)
 ASTCMDLIST(stty)
+BINCMDLIST(sum)
+ASTCMDLIST(sum)
+SUSRBINCMDLIST(sync)
+SBINCMDLIST(sync)
+BINCMDLIST(sync)
+ASTCMDLIST(sync)
 XPG4CMDLIST(tail)
 ASTCMDLIST(tail)
 BINCMDLIST(tee)
 ASTCMDLIST(tee)
+BINCMDLIST(tty)
 ASTCMDLIST(tty)
 ASTCMDLIST(uname)
 BINCMDLIST(uniq)
 ASTCMDLIST(uniq)
 BINCMDLIST(wc)
 ASTCMDLIST(wc)
-/* End-of-generated-data. */
 
 /* Mandatory for ksh93 test suite and AST scripts */
 BINCMDLIST(getconf)
@@ -125,4 +145,4 @@ BINCMDLIST(getconf)
 }
 #endif
 
-#endif /* _SOLARIS_CMDLIST_H */
+#endif /* !_SOLARIS_KSH_CMDLIST_H */

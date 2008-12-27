@@ -232,6 +232,7 @@ f none usr/bin/pwd 555 root bin
 l none usr/bin/read=../../usr/bin/alias
 l none usr/bin/red=../../usr/bin/ed
 f none usr/bin/renice 555 root bin
+l none usr/bin/rev=../../usr/bin/alias
 l none usr/bin/rksh=../../usr/bin/ksh
 l none usr/bin/rksh93=../../usr/lib/isaexec
 f none usr/bin/rm 555 root bin
@@ -248,7 +249,8 @@ f none usr/bin/setpgrp 555 root sys
 f none usr/bin/settime 555 root bin
 l none usr/bin/setuname=../../usr/lib/isaexec
 s none usr/bin/sh=../../sbin/sh
-f none usr/bin/sleep 555 root bin
+f none usr/bin/shcomp 555 root bin
+l none usr/bin/sleep=../../usr/bin/alias
 l none usr/bin/sparc=../../usr/bin/i286
 f none usr/bin/strchg 555 root root
 s none usr/bin/strclean=../sbin/strclean
@@ -256,6 +258,7 @@ f none usr/bin/strconf 555 root root
 s none usr/bin/strerr=../sbin/strerr
 f none usr/bin/stty 555 root bin
 f none usr/bin/su 4555 root sys
+l none usr/bin/sum=../../usr/bin/alias
 l none usr/bin/sun2=../../usr/bin/i286
 l none usr/bin/sun3=../../usr/bin/i286
 l none usr/bin/sun3x=../../usr/bin/i286

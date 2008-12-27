@@ -27,7 +27,9 @@ and changing their value will cause all modules that could be affected
 by this change to be recompiled.
 The options have the following defaults and meanings:
     ACCT         off Shell accounting.
-    ACCTFILE     off Enable per user accounting info
+    ACCTFILE     off Enable per user accounting info.
+    AUDIT	 off For auditing specific users
+    AUDITFILE	 "/etc/ksh_audit"
     APPEND       on  Allows var+=val string and array append.
     BASH         off Bash compatibility mode.  It is not fully implemented
                      and is experimental.
@@ -69,10 +71,12 @@ The options have the following defaults and meanings:
     SEVENBIT     off Strip the eigth bit from characters.
     SPAWN        off Use spawn as combined fork/exec.  May improve speed on
                      some systems.
+    STATS	 on  Add .sh.stats compound variable.
     SUID_EXEC    on  Execute /etc/suid_exec for setuid, setgid script.
     TIMEOUT      off Set this to the number of seconds for timing out and
                      exiting the shell when you don't enter a command.  If
                      non-zero, TMOUT can not be set larger than this value.
+    TYPEDEF	 on  Enable typeset type definitions.
     VSH          on  Compile with vi command line editing.  The original vi
                      line editor code was provided by Pat Sullivan at CB.
 
@@ -125,7 +129,8 @@ equal.
 The tests sub-directory contains a number of regression tests for ksh.
 To run all these tests with the shell you just built, go to the tests
 directory and run the command
-        SHELL=../ksh shtests
+        SHELL=$dir/ksh $dir/ksh shtests
+where dir is the directory of the ksh you want to test.
 
 The file PROMO.mm is an advertisement that extolls the virtues of ksh.
 The file sh.1 contains the troff (man) description of this Shell.

@@ -3,10 +3,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -40,9 +40,9 @@
 #include <ast.h>
 #include <error.h>
 #include <stak.h>
+#include <shcmd.h>
 
 #define cmdinit			_cmd_init
-#define cmdquit()		0
 
 #if _BLD_cmd && defined(__EXPORT__)
 #undef __MANGLE__
@@ -60,11 +60,13 @@
 
 #ifdef CMD_STANDALONE
 
+#define CMD_CONTEXT(c)		((Shbltin_t*)0)
+
 #if CMD_DYNAMIC
 
 #include <dlldefs.h>
 
-typedef int (*Builtin_f) __PROTO__((int, char**, __V_*));
+typedef int (*Shbltin_f) __PROTO__((int, char**, __V_*));
 
 #else
 
@@ -106,7 +108,7 @@ main __PARAM__((int argc, char** argv), (argc, argv)) __OTORP__(int argc; char**
 	register char*	s;
 	register char*	t;
 	__V_*		dll;
-	Builtin_f	fun;
+	Shbltin_f	fun;
 	char		buf[64];
 
 	if (s = strrchr(argv[0], '/'))
@@ -126,16 +128,16 @@ main __PARAM__((int argc, char** argv), (argc, argv)) __OTORP__(int argc; char**
 	{
 		if (dll = dlopen(NiL, RTLD_LAZY))
 		{
-			if (fun = (Builtin_f)dlsym(dll, buf + 1))
+			if (fun = (Shbltin_f)dlsym(dll, buf + 1))
 				break;
-			if (fun = (Builtin_f)dlsym(dll, buf))
+			if (fun = (Shbltin_f)dlsym(dll, buf))
 				break;
 		}
 		if (dll = dllfind("cmd", NiL, RTLD_LAZY))
 		{
-			if (fun = (Builtin_f)dlsym(dll, buf + 1))
+			if (fun = (Shbltin_f)dlsym(dll, buf + 1))
 				break;
-			if (fun = (Builtin_f)dlsym(dll, buf))
+			if (fun = (Shbltin_f)dlsym(dll, buf))
 				break;
 		}
 		return 127;
@@ -149,27 +151,12 @@ main __PARAM__((int argc, char** argv), (argc, argv)) __OTORP__(int argc; char**
 #else
 
 #undef	cmdinit
+#ifdef _MSC_VER
+#define CMD_CONTEXT(p)		((Shbltin_t*)(p))
 #define cmdinit(a,b,c,d,e)	do{if(_cmd_init(a,b,c,d,e))return -1;}while(0)
-
-#ifndef CMD_BUILTIN
-
-#undef	cmdquit
-#define cmdquit()		(_cmd_quit)
-
-#if _BLD_cmd && defined(__EXPORT__)
-#undef __MANGLE__
-#define __MANGLE__ __LINKAGE__ __EXPORT__
-#endif
-#if !_BLD_cmd && defined(__IMPORT__)
-#undef __MANGLE__
-#define __MANGLE__ __LINKAGE__ __IMPORT__
-#endif
-
-extern __MANGLE__ int	_cmd_quit;
-
-#undef __MANGLE__
-#define __MANGLE__ __LINKAGE__
-
+#else
+#define CMD_CONTEXT(p)		(((p)&&((Shbltin_t*)(p))->version>=20071012&&((Shbltin_t*)(p))->version<20350101)?((Shbltin_t*)(p)):0)
+#define cmdinit(a,b,c,d,e)	do{if((c)&&!CMD_CONTEXT(c))c=0;if(_cmd_init(a,b,c,d,e))return -1;}while(0)
 #endif
 
 #if _BLD_cmd && defined(__EXPORT__)

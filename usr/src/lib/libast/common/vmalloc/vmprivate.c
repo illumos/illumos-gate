@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,7 +27,7 @@ void _STUB_vmprivate(){}
 
 #include	"vmhdr.h"
 
-static char*	Version = "\n@(#)$Id: Vmalloc (AT&T Research) 2005-09-28 $\0\n";
+static char*	Version = "\n@(#)$Id: Vmalloc (AT&T Research) 2007-09-11 $\0\n";
 
 #if _sys_stat
 #include	<sys/stat.h>

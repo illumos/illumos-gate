@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -43,9 +43,9 @@ if	[[ $var != : || $OPTARG != r ]]
 then	err_exit "'getopts :r:s var -r' not working"
 fi
 OPTIND=1
-getopts :d#u var -d 100
-if	[[ $var != d || $OPTARG != 100 ]]
-then	err_exit "'getopts :d#u var -d 100' not working var=$var"
+getopts :d#u OPT -d 16177
+if	[[ $OPT != d || $OPTARG != 16177 ]]
+then	err_exit "'getopts :d#u OPT=d OPTARG=16177' failed -- OPT=$OPT OPTARG=$OPTARG"
 fi
 OPTIND=1
 while getopts 'ab' option -a -b
@@ -128,6 +128,8 @@ x=$0
 if	[[ $(eval 'print $0') != $x ]]
 then	err_exit '$0 not correct for eval'
 fi
+$SHELL -c 'read x <<< hello' 2> /dev/null || err_exit 'syntax <<< not recognized'
+($SHELL -c 'read x[1] <<< hello') 2> /dev/null || err_exit 'read x[1] not working'
 unset x
 readonly x
 set -- $(readonly)
@@ -159,7 +161,7 @@ done
 if	[[ $(print -f "%b" "\a\n\v\b\r\f\E\03\\oo") != $'\a\n\v\b\r\f\E\03\\oo' ]]
 then	err_exit 'print -f "%b" not working'
 fi
-if	[[ $(print -f "%P" "[^x].*b$") != '*[!x]*b' ]]
+if	[[ $(print -f "%P" "[^x].*b\$") != '*[!x]*b' ]]
 then	err_exit 'print -f "%P" not working'
 fi
 if	[[ $(abc: for i in foo bar;do print $i;break abc;done) != foo ]]
@@ -184,10 +186,9 @@ fi
 if	[[ $(trap -p HUP) != 'print HUP' ]]
 then	err_exit '$(trap -p HUP) not working'
 fi
-[[ $($SHELL -c 'trap "print ok" SIGTERM; kill -s SIGTERM $$' 2> /dev/null) == ok
- ]] || err_exit 'SIGTERM not recognized'
-[[ $($SHELL -c 'trap "print ok" sigterm; kill -s sigterm $$' 2> /dev/null) == ok
- ]] || err_exit 'SIGTERM not recognized'
+[[ $($SHELL -c 'trap "print ok" SIGTERM; kill -s SIGTERM $$' 2> /dev/null) == ok ]] || err_exit 'SIGTERM not recognized'
+[[ $($SHELL -c 'trap "print ok" sigterm; kill -s sigterm $$' 2> /dev/null) == ok ]] || err_exit 'SIGTERM not recognized'
+[[ $($SHELL -c '( trap "" TERM);kill $$;print bad' == bad) ]] 2> /dev/null && err_exit 'trap ignored in subshell causes it to be ignored by parent'
 ${SHELL} -c 'kill -1 -$$' 2> /dev/null
 [[ $(kill -l $?) == HUP ]] || err_exit 'kill -1 -pid not working' 
 ${SHELL} -c 'kill -1 -$$' 2> /dev/null
@@ -297,12 +298,6 @@ print $'line1\nline2' | behead
 if	[[ $left != line2 ]]
 then	err_exit  "read reading ahead on a pipe"
 fi
-read -n1 y <<!
-abc
-!
-if      [[ $y != a ]]
-then    err_exit  'read -n1 not working'
-fi
 print -n $'{ read -r line;print $line;}\nhello' > /tmp/ksh$$
 chmod 755 /tmp/ksh$$
 trap 'rm -rf /tmp/ksh$$' EXIT
@@ -349,6 +344,34 @@ getopts 'n#num' opt  -n 3
 if	[[ $($SHELL -c $'printf \'%2$s %1$s\n\' world hello') != 'hello world' ]]
 then	err_exit 'printf %2$s %1$s not working'
 fi
+val=$(( 'C' ))
+set -- \
+	"'C"	$val	0	\
+	"'C'"	$val	0	\
+	'"C'	$val	0	\
+	'"C"'	$val	0	\
+	"'CX"	$val	1	\
+	"'CX'"	$val	1	\
+	"'C'X"	$val	1	\
+	'"CX'	$val	1	\
+	'"CX"'	$val	1	\
+	'"C"X'	$val	1
+while (( $# >= 3 ))
+do	arg=$1 val=$2 code=$3
+	shift 3
+	for fmt in '%d' '%g'
+	do	out=$(printf "$fmt" "$arg" 2>/dev/null)
+		err=$(printf "$fmt" "$arg" 2>&1 >/dev/null)
+		printf "$fmt" "$arg" >/dev/null 2>&1
+		ret=$?
+		[[ $out == $val ]] || err_exit "printf $fmt $arg failed -- expected $val, got $out"
+		if	(( $code ))
+		then	[[ $err ]] || err_exit "printf $fmt $arg failed, error message expected"
+		else	[[ $err ]] && err_exit "$err: printf $fmt $arg failed, error message not expected -- got '$err'"
+		fi
+		(( $ret == $code )) || err_exit "printf $fmt $arg failed -- expected exit code $code, got $ret"
+	done
+done
 ((n=0))
 ((n++)); ARGC[$n]=1 ARGV[$n]=""
 ((n++)); ARGC[$n]=2 ARGV[$n]="-a"
@@ -362,43 +385,19 @@ do	set -- ${ARGV[$i]}
 	do	:
 	done
 	if	[[ $OPTIND != ${ARGC[$i]} ]]
-	then	err_exit "\$OPTIND after getopts loop incorrect -- got $OPTIND, expected ${ARGC[$i]}"
+	then	err_exit "\$OPTIND after getopts loop incorrect -- expected ${ARGC[$i]}, got $OPTIND"
 	fi
 done
-unset a
-{ read -N3 a; read -N1 b;}  <<!
-abcdefg
-!
-[[ $a == abc ]] || err_exit 'read -N3 here-document not working'
-[[ $b == d ]] || err_exit 'read -N1 here-document not working'
-read -n3 a <<!
-abcdefg
-!
-[[ $a == abc ]] || err_exit 'read -n3 here-document not working'
-(print -n a;sleep 1; print -n bcde) | { read -N3 a; read -N1 b;}
-[[ $a == abc ]] || err_exit 'read -N3 from pipe not working'
-[[ $b == d ]] || err_exit 'read -N1 from pipe not working'
-(print -n a;sleep 1; print -n bcde) |read -n3 a
-[[ $a == a ]] || err_exit 'read -n3 from pipe not working'
-rm -f /tmp/fifo$$
-if	mkfifo /tmp/fifo$$ 2> /dev/null
-then	(print -n a; sleep 1;print -n bcde)  > /tmp/fifo$$ &
-	{
-	read -u5 -n3  -t2 a  || err_exit 'read -n3 from fifo timedout'
-	read -u5 -n1 -t2 b || err_exit 'read -n1 from fifo timedout'
-	} 5< /tmp/fifo$$
-	[[ $a == a ]] || err_exit 'read -n3 from fifo not working'
-	rm -f /tmp/fifo$$
-	mkfifo /tmp/fifo$$ 2> /dev/null
-	(print -n a; sleep 1;print -n bcde)  > /tmp/fifo$$ &
-	{
-	read -u5 -N3 -t2 a || err_exit 'read -N3 from fifo timed out'
-	read -u5 -N1 -t2 b || err_exit 'read -N1 from fifo timedout'
-	} 5< /tmp/fifo$$
-	[[ $a == abc ]] || err_exit 'read -N3 from fifo not working'
-	[[ $b == d ]] || err_exit 'read -N1 from fifo not working'
-fi
-rm -f /tmp/fifo$$
+options=ab:c
+optarg=foo
+set -- -a -b $optarg -c bar
+while	getopts $options opt
+do	case $opt in
+	a|c)	[[ $OPTARG ]] && err_exit "getopts $options \$OPTARG for flag $opt failed, expected \"\", got \"$OPTARG\"" ;;
+	b)	[[ $OPTARG == $optarg ]] || err_exit "getopts $options \$OPTARG failed -- \"$optarg\" expected, got \"$OPTARG\"" ;;
+	*)	err_exit "getopts $options failed -- got flag $opt" ;;
+	esac
+done
 function longline
 {
 	integer i
@@ -448,4 +447,23 @@ then	err_exit "read -t in pipe taking $total_t secs - $(( reps * delay )) minimu
 elif	(( total_t < reps * delay ))
 then	err_exit "read -t in pipe taking $total_t secs - $(( reps * delay )) minimum - too fast" 
 fi
+$SHELL -c 'sleep $(printf "%a" .95)' 2> /dev/null || err_exit "sleep doesn't except %a format constants"
+$SHELL -c 'test \( ! -e \)' 2> /dev/null ; [[ $? == 1 ]] || err_exit 'test \( ! -e \) not working'
+[[ $(ulimit) == "$(ulimit -fS)" ]] || err_exit 'ulimit is not the same as ulimit -fS'
+tmpfile=${TMP-/tmp}/ksh$$.2
+trap 'rm -f /tmp/ksh$$ "$tmpfile"' EXIT
+print $'\nprint -r -- "${.sh.file} ${LINENO} ${.sh.lineno}"' > $tmpfile
+[[ $( . "$tmpfile") == "$tmpfile 2 1" ]] || err_exit 'dot command not working'
+print -r -- "'xxx" > $tmpfile
+[[ $($SHELL -c ". $tmpfile"$'\n print ok' 2> /dev/null) == ok ]] || err_exit 'syntax error in dot command affects next command'
+
+float sec=$SECONDS del=4
+exec 3>&2 2>/dev/null
+$SHELL -c "( sleep 1; kill -ALRM \$\$ ) & sleep $del" 2> /dev/null
+exitval=$?
+(( sec = SECONDS - sec ))
+exec 2>&3-
+(( exitval )) && err_exit "sleep doesn't exit 0 with ALRM interupt"
+(( sec > (del - 1) )) || err_exit "ALRM signal causes sleep to terminate prematurely -- expected 3 sec, got $sec"
+
 exit $((Errors))

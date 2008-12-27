@@ -17,11 +17,10 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
  
 # 
@@ -29,14 +28,15 @@
 #
 
 * Intro:
-"buildksh93.ksh" is a small build script used to build the AT&T "ast-ksh"
+"buildksh93.sh" is a small build script used to build the AT&T "ast-ksh"
 and "ast-open" packages using its native (nmake-based) build system
 which is needed to build the iffe-generated (header) files (each time
 for { 32bit SPARC, 64bit SPARC, 32bit i386, 64bit AMD64 }) which are
 moved later to their matching OS/Net build directories.
+THIS SCRIPT IS NOT INTENDED FOR NORMAL USAGE.
 
 
-* Note that buildksh93.ksh modifies the build behaviour of the AST build
+* Note that buildksh93.sh modifies the build behaviour of the AST build
 system, including enforcing C99/XPG6 semantics (which is MANDATORY!!)
 and feeding additional libraries (like libnsl, libsocket, librt etc.)
 to the feature look system (called "iffe" (="if feature exists")) to
@@ -47,25 +47,28 @@ properly found.
 * Example usage of the script (more information can be found in the
 script itself):
 ## Download AT&T ksh93 sources
-$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/INIT.2007-04-18.tgz'
-$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/sw/download/beta/ast-ksh.2007-04-18.tgz'
+$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/~gsf/download/tgz/INIT.2008-11-04.tgz'
+$ wget --http-user="I accept www.opensource.org/licenses/cpl" --http-passwd="." 'http://www.research.att.com/~gsf/download/tgz/ast-ksh.2008-11-04.tgz'
 
 ## Unpack the sources (32bit SPARC):
-$ mkdir build32_sparc
-$ cd build32_sparc
-$ gunzip -c ../INIT.2007-03-28.tgz | tar -xf -
-$ gunzip -c ../ast-ksh.2007-03-28.tgz | tar -xf -
+$ mkdir build_sparc_32bit
+$ cd build_sparc_32bit
+$ gunzip -c <../INIT.2008-11-04.tgz | tar -xf -
+$ gunzip -c <../ast-ksh.2008-11-04.tgz | tar -xf -
 
-## Build ast-ksh for 32bit SPARC (build other build flags are:
-# - "build.solaris.sparc.32bit.suncc" - 32bit SPARC
-# - "build.solaris.sparc.64bit.suncc" - 64bit SPARC
-# - "build.solaris.i386.32bit.suncc"  - 32bit x86/i386
-# - "build.solaris.i386.64bit.suncc"  - 64bit x86/AMD64
+## Build ast-ksh for 32bit SPARC
+# (build other build flags are:
+#   - "build.solaris.sparc.32bit.suncc" - 32bit SPARC
+#   - "build.solaris.sparc.64bit.suncc" - 64bit SPARC
+#   - "build.solaris.i386.32bit.suncc"  - 32bit x86/i386
+#   - "build.solaris.i386.64bit.suncc"  - 64bit x86/AMD64
+#   - "build.solaris.s390.32bit.gcc"    - 32bit SystemZ/S390
+#   - "build.solaris.s390.64bit.gcc"    - 64bit SystemZ/S390x
 # )
-$ time nice ksh ../buildksh93.ksh "build.solaris.sparc.32bit.suncc" 2>&1 | tee -a buildlog.log
+$ time nice ksh ../buildksh93.sh "build.solaris.sparc.32bit.suncc" 2>&1 | tee -a buildlog.log
 
-## Test ksh93
-$ time nice ksh ../buildksh93.ksh "testshell" 2>&1 | tee -a buildlog.log
+## Test ksh93:
+$ time nice ksh ../buildksh93.sh "testshell" 2>&1 | tee -a buildlog.log
 
 ## Generated binaries and headers can be found in the arch/$(PLATFORM)/
 ## subdirectory.

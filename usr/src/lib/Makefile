@@ -84,6 +84,7 @@ SUBDIRS += \
 	libdll			\
 	libcmd			\
 	libshell		\
+	libsum			\
 	librt			\
 	libadm			\
 	libctf			\
@@ -328,6 +329,7 @@ MSGSUBDIRS=		\
 	libslp		\
 	libsmbfs	\
 	libsmedia	\
+	libsum		\
 	libtsol		\
 	libuutil	\
 	libvscan	\
@@ -428,6 +430,7 @@ HDRSUBDIRS=		\
 	libsmedia	\
 	libsqlite	\
 	libstmf		\
+	libsum		\
 	libsysevent	\
 	libtecla	\
 	libtnf		\
@@ -532,7 +535,7 @@ libast: 	libsocket
 libadutils: 	libldap5 libidmap
 nsswitch:	libadutils
 libbsm:		libtsol
-libcmd: 	libast libsocket libnsl
+libcmd: 	libsum libast libsocket libnsl
 libcmdutils:	libavl
 libcontract:	libnvpair
 libdevid:	libdevinfo
@@ -567,6 +570,7 @@ libshell:	libast libcmd libdll libsocket libsecdb
 libsip:		libmd5
 libsmbfs:	libsocket libnsl libkrb5
 libsocket:	libnsl
+libsum: 	libast
 libldap5:	libsasl libsocket libnsl libmd
 libsldap:	libldap5 libtsol libnsl libc libscf libresolv
 libpool:	libnvpair libexacct

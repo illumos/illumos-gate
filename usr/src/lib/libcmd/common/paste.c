@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -29,7 +29,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: paste (AT&T Research) 1999-06-22 $\n]"
+"[-?\n@(#)$Id: paste (AT&T Research) 2008-04-01 $\n]"
 USAGE_LICENSE
 "[+NAME?paste - merge lines of files]"
 "[+DESCRIPTION?\bpaste\b concatenates the corresponding lines of a "
@@ -211,36 +211,24 @@ b_paste(int argc,register char *argv[], void* context)
 		if(!cp || streq(cp,"-"))
 			fp = sfstdin;
 		else if(!(fp = sfopen(NiL,cp,"r")))
-		{
 			error(ERROR_system(0),"%s: cannot open",cp);
-			error_info.errors = 1;
-		}
 		if(fp && sflag)
 		{
 			if(spaste(fp,sfstdout,delim,dlen) < 0)
-			{
 				error(ERROR_system(0),"write failed");
-				error_info.errors = 1;
-			}
 			if(fp!=sfstdin)
 				sfclose(fp);
 		}
-		else
+		else if(!sflag)
 			streams[n++] = fp;
-	}
-	while(cp= *argv++);
+	} while(cp= *argv++);
 	if(!sflag)
 	{
 		if(error_info.errors==0 && paste(n,streams,sfstdout,delim,dlen) < 0)
-		{
 			error(ERROR_system(0),"write failed");
-			error_info.errors = 1;
-		}
 		while(--n>=0)
-		{
 			if((fp=streams[n]) && fp!=sfstdin)
 				sfclose(fp);
-		}
 	}
 	return(error_info.errors);
 }

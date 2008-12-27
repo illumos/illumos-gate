@@ -8,6 +8,11 @@ Directory layout:
 	The remainder are private.
 
 	The directory data contains readonly data files for ksh93.
+	The man pages for built-ins are in builtins.c rather
+	than included as statics with the implementations in the
+	bltins directory because some systems don't make static const
+	data readonly and we want these to be shared by all running
+	shells.
 
 	The directory edit contains the code for command line
 	editing and history.
@@ -59,7 +64,7 @@ Include directory:
 	4.	edit.h contains definitions that are common to both
 		vi and emacs edit modes.
 	5.	env.h contains interfaces for creating and modifying
-		environment variables.
+		environment variables. 
 	6.	fault.h contains prototypes for signal related
 		functions and trap and fault handling.
 	7.	fcin.h contains macro and function definitions for
@@ -134,30 +139,32 @@ sh directory:
 	18.	nvdisc.c contains code related to name-value pair disciplines.
 	19.	nvtree.c contains code for compound variables and for
 		walking the namespace.
-	20.	parse.c contains the code for the shell parser.
-	21.	path.c contains the code for pathname lookup and
+	20.	nvtype.c contains most of the code related to types that
+		are created with typeset -T.
+	21.	parse.c contains the code for the shell parser.
+	22.	path.c contains the code for pathname lookup and
 		some path functions.  It also contains the code
 		that executes commands and scripts.
-	22.	pmain.c is just a calls sh_main() so that all of the
+	23.	pmain.c is just a calls sh_main() so that all of the
 		rest of the shell can be in a shared library.
-	23.	shcomp.c contains the main program to the shell
+	24.	shcomp.c contains the main program to the shell
 		compiler.  This program parses a script and creates
 		a file that the shell can read containing the parse tree.
-	24.	streval.c is an C arithmetic evaluator.
-	25.	string.c contains some string related functions.
-	26.	subshell.c contains the code to save and restore
+	25.	streval.c is an C arithmetic evaluator.
+	26.	string.c contains some string related functions.
+	27.	subshell.c contains the code to save and restore
 		environments so that subshells can run without creating
 		a new process.
-	27.	suid_exec.c contains the program from running execute
+	28.	suid_exec.c contains the program from running execute
 		only and/or setuid/setgid scripts.
-	28.	tdump.c contains the code to dump a parse tree into
+	29.	tdump.c contains the code to dump a parse tree into
 		a file.
-	29.	timers.c contains code for multiple event timeouts.
-	30.	trestore contians the code for restoring the parse
+	30.	timers.c contains code for multiple event timeouts.
+	31.	trestore contians the code for restoring the parse
 		tree from the file created by tdump.
-	31.	userinit.c contains a dummy userinit() function.
+	32.	userinit.c contains a dummy userinit() function.
 		This is now obsolete with the new version of sh_main().
-	32.	waitevent.c contains the sh_waitnotify function so
+	33.	waitevent.c contains the sh_waitnotify function so
 		that builtins can handle processing events when the
 		shell is waiting for input or for process completion.
-	33.	xec.c is the main shell executuion loop.
+	34.	xec.c is the main shell executuion loop.

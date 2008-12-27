@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -38,7 +38,7 @@
 #define extern	__EXPORT__
 #endif
 
-extern char*
+extern int
 resolvepath(const char* file, char* path, size_t size)
 {
 	register char*	s;
@@ -66,5 +66,5 @@ resolvepath(const char* file, char* path, size_t size)
 		*s++ = '/';
 	}
 	strcpy(s, file);
-	return pathcanon(path, PATH_PHYSICAL|PATH_DOTDOT|PATH_EXISTS) ? path : (char*)0;
+	return pathcanon(path, PATH_PHYSICAL|PATH_DOTDOT|PATH_EXISTS) ? strlen(path) : -1;
 }

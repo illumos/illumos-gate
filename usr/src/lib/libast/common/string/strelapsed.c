@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -42,6 +42,7 @@ strelapsed(register const char* s, char** e, int n)
 	unsigned long		t = 0;
 	int			f = 0;
 	int			p = 0;
+	int			z = 1;
 	int			m;
 	const char*		last;
 
@@ -51,6 +52,15 @@ strelapsed(register const char* s, char** e, int n)
 			s++;
 		if (!*(last = s))
 			break;
+		if (z)
+		{
+			z = 0;
+			if (*s == '0' && (!(c = *(s + 1)) || isspace(c) || c == '_'))
+			{
+				last = s + 1;
+				break;
+			}
+		}
 		v = 0;
 		while ((c = *s++) >= '0' && c <= '9')
 			v = v * 10 + c - '0';

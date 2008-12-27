@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -43,13 +43,19 @@ Vmstat_t*	st;
 	reg Seg_t*	seg;
 	reg Block_t	*b, *endb;
 	reg size_t	s = 0;
-	reg Vmdata_t*	vd = vm->data;
+	reg Vmdata_t*	vd = vm ? vm->data : Vmregion->data;
+	reg int		inuse;
 
+	SETINUSE(vd, inuse);
 	if(!st)
-		return -1;
+	{	CLRINUSE(vd, inuse);
+		return inuse ? 1 : 0;
+	}
 	if(!(vd->mode&VM_TRUST))
 	{	if(ISLOCK(vd,0))
+		{	CLRINUSE(vd, inuse);
 			return -1;
+		}
 		SETLOCK(vd,0);
 	}
 
@@ -122,7 +128,8 @@ Vmstat_t*	st;
 	}
 
 	CLRLOCK(vd,0);
-	return 0;
+	CLRINUSE(vd, inuse);
+	return inuse ? 1 : 0;
 }
 
 #endif

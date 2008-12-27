@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -28,7 +28,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: uname (AT&T Research) 2007-01-22 $\n]"
+"[-?\n@(#)$Id: uname (AT&T Research) 2007-04-19 $\n]"
 USAGE_LICENSE
 "[+NAME?uname - identify the current system ]"
 "[+DESCRIPTION?By default \buname\b writes the operating system name to"
@@ -61,7 +61,9 @@ USAGE_LICENSE
 "[f:list?List all \bsysinfo\b(2) names and values, one per line.]"
 "[S:sethost?Set the hostname or nodename to \aname\a. No output is"
 "	written to standard output.]:[name]"
-
+"\n"
+"\n[ name ... ]\n"
+"\n"
 "[+SEE ALSO?\bhostname\b(1), \bgetconf\b(1), \buname\b(2),"
 "	\bsysconf\b(2), \bsysinfo\b(2)]"
 ;
@@ -327,7 +329,7 @@ b_uname(int argc, char** argv, void* context)
 			if (!streq(argv[0], s) && (!eaccess(s, X_OK) || !eaccess(s+=4, X_OK)))
 			{
 				argv[0] = s;
-				return procrun(s, argv);
+				return sh_run(context, argc, argv);
 			}
 			error(2, "%s", opt_info.arg);
 			break;
@@ -367,7 +369,7 @@ b_uname(int argc, char** argv, void* context)
 			while (t < e && (n = *s++))
 				*t++ = islower(n) ? toupper(n) : n;
 			*t = 0;
-			sfprintf(sfstdout, "%s%c", *(t = astconf(buf, NiL, NiL)) ? t : "unknown", *argv ? ' ' : '\n');
+			sfprintf(sfstdout, "%s%c", *(t = astconf(buf, NiL, NiL)) ? t : *(t = astconf(buf+3, NiL, NiL)) ? t :  "unknown", *argv ? ' ' : '\n');
 		}
 	}
 	else

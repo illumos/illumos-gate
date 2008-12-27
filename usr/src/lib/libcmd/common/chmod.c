@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -28,7 +28,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: chmod (AT&T Research) 2007-07-26 $\n]"
+"[-?\n@(#)$Id: chmod (AT&T Research) 2007-09-10 $\n]"
 USAGE_LICENSE
 "[+NAME?chmod - change the access permissions of files]"
 "[+DESCRIPTION?\bchmod\b changes the permission of each file "
@@ -92,7 +92,7 @@ USAGE_LICENSE
 
 "[+?When the \b-c\b or \b-v\b options are specified, change notifications "
 	"are written to standard output using the format, "
-	"\bmode of %s changed to %0.4o (%s)\b, with arguments of the "
+	"\b%s: mode changed to %0.4o (%s)\b, with arguments of the "
 	"pathname, the numeric mode, and the resulting permission bits as "
 	"would be displayed by the \bls\b command.]"
 
@@ -111,6 +111,7 @@ USAGE_LICENSE
 	"support this.]"
 "[i:ignore-umask?Ignore the \bumask\b(2) value in symbolic mode "
 	"expressions. This is probably how you expect \bchmod\b to work.]"
+"[n:show?Show actions but do not change any file modes.]"
 "[F:reference?Omit the \amode\a operand and use the mode of \afile\a "
 	"instead.]:[file]"
 "[v:verbose?Describe changed permissions of all files.]"
@@ -159,6 +160,7 @@ b_chmod(int argc, char** argv, void* context)
 	int		(*chmodf)(const char*, mode_t);
 	int		notify = 0;
 	int		ignore = 0;
+	int		show = 0;
 #if _lib_lchmod
 	int		chlink = 0;
 #endif
@@ -189,6 +191,9 @@ b_chmod(int argc, char** argv, void* context)
 			continue;
 		case 'i':
 			ignore = 1;
+			continue;
+		case 'n':
+			show = 1;
 			continue;
 		case 'v':
 			notify = 2;
@@ -247,7 +252,7 @@ b_chmod(int argc, char** argv, void* context)
 			umask(ignore);
 		error(ERROR_system(1), "%s: not found", *argv);
 	}
-	while (!cmdquit() && (ent = fts_read(fts)))
+	while (!sh_checksig(context) && (ent = fts_read(fts)))
 		switch (ent->fts_info)
 		{
 		case FTS_SL:
@@ -264,7 +269,7 @@ b_chmod(int argc, char** argv, void* context)
 		anyway:
 			if (amode)
 				mode = strperm(amode, &last, ent->fts_statp->st_mode);
-			if ((*chmodf)(ent->fts_accpath, mode) >= 0)
+			if (show || (*chmodf)(ent->fts_accpath, mode) >= 0)
 			{
 				if (notify == 2 || notify == 1 && (mode&S_IPERM) != (ent->fts_statp->st_mode&S_IPERM))
 					sfprintf(sfstdout, "%s: mode changed to %0.4o (%s)\n", ent->fts_path, mode, fmtmode(mode, 1)+1);

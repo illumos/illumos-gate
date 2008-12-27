@@ -332,6 +332,7 @@ s none usr/lib/amd64/libsocket.so.1=../../../lib/amd64/libsocket.so.1
 s none usr/lib/amd64/libsocket.so=../../../lib/amd64/libsocket.so.1
 f none usr/lib/amd64/libsoftcrypto.so.1 755 root bin
 s none usr/lib/amd64/libsoftcrypto.so=./libsoftcrypto.so.1
+f none usr/lib/amd64/libsum.so.1 755 root bin
 s none usr/lib/amd64/libsysevent.so=../../../lib/amd64/libsysevent.so.1
 s none usr/lib/amd64/libsysevent.so.1=../../../lib/amd64/libsysevent.so.1
 s none usr/lib/amd64/libtermcap.so=../../../lib/amd64/libcurses.so.1

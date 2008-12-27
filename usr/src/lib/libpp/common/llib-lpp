@@ -18,36 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/libpp/common/llib-lpp
- *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 
 #include "pp.h"
-
-/* automatically generated data start here */
-extern struct ppglobals pp;
-extern char ppctype[];
-extern int ppargs(char**, int);
-extern void ppcpp(void);
-extern void ppcomment(char*, char*, char*, int);
-extern void* ppcontext(void*, int);
-extern void pperror(int, ...);
-extern void ppincref(char*, char*, int, int);
-extern void ppinput(char*, char*, int);
-extern int pplex(void);
-extern void ppline(int, char*);
-extern void ppmacref(struct ppsymbol*, char*, int, int, unsigned long);
-extern void ppop(int, ...);
-extern void pppragma(char*, char*, char*, char*, int);
-extern int ppprintf(char*, ...);
-extern int ppsync(void);
-/* end of automatically generated data */

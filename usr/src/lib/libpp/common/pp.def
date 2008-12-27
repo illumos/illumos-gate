@@ -1,7 +1,7 @@
 #
 # list of known old cpp predefined symbols
 #
-# @(#)pp.def (gsf@research.att.com) 2002-11-26
+# @(#)pp.def (gsf@research.att.com) 2007-01-26
 #
 # symbols will be tested for the common `_' permutations
 # qualifiers may be combinations of
@@ -160,6 +160,7 @@ VAX		:architecture:
 VAX11C		:vendor:
 VAXC		:vendor:
 VMS		:system:
+WCHAR_T_DEFINED
 WCHAR_TYPE
 WIN32		:release:
 X86		:architecture:

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: getconf (AT&T Research) 2007-02-07 $\n]"
+"[-?\n@(#)$Id: getconf (AT&T Research) 2008-04-24 $\n]"
 USAGE_LICENSE
 "[+NAME?getconf - get configuration values]"
 "[+DESCRIPTION?\bgetconf\b displays the system configuration value for"
@@ -36,6 +36,8 @@ USAGE_LICENSE
 "	directory if \apath\a is omitted. If \avalue\a is specified then"
 "	\bgetconf\b attempts to change the process local value to \avalue\a."
 "	\b-\b may be used in place of \apath\a when it is not relevant."
+"	If \apath\a is \b=\b then the the \avalue\a is cached and used"
+"	for subsequent tests in the calling and all child processes."
 "	Only \bwritable\b variables may be set; \breadonly\b variables"
 "	cannot be changed.]"
 "[+?The current value for \aname\a is written to the standard output. If"
@@ -121,7 +123,7 @@ USAGE_LICENSE
 
 typedef struct Path_s
 {
-	char*		path;
+	const char*	path;
 	int		len;
 } Path_t;
 
@@ -131,8 +133,8 @@ b_getconf(int argc, char** argv, void* context)
 	register char*		name;
 	register char*		path;
 	register char*		value;
-	register char*		s;
-	register char*		t;
+	register const char*	s;
+	register const char*	t;
 	char*			pattern;
 	char*			native;
 	char*			cmd;
@@ -387,7 +389,8 @@ b_getconf(int argc, char** argv, void* context)
 	 * don't blame us for crappy diagnostics
 	 */
 
-	if ((n = procrun(cmd, oargv)) >= EXIT_NOEXEC)
+	oargv[0] = cmd;
+	if ((n = sh_run(context, argc, oargv)) >= EXIT_NOEXEC)
 		error(ERROR_SYSTEM|2, "%s: exec error [%d]", cmd, n);
 	return n;
 }

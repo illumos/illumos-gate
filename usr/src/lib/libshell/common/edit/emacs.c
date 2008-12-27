@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -108,6 +108,7 @@ typedef struct _emacs_
 	char	CntrlO;
 	char	overflow;		/* Screen overflow flag set */
 	char	scvalid;		/* Screen is up to date */
+	char	lastdraw;	/* last update type */
 	int	offset;		/* Screen offset */
 	enum
 	{
@@ -195,6 +196,7 @@ int ed_emacsread(void *context, int fd,char *buff,int scend, int reedit)
 	}
 	Prompt = prompt;
 	ep->screen = Screen;
+	ep->lastdraw = FINAL;
 	if(tty_raw(ERRIO,0) < 0)
 	{
 		 return(reedit?reedit:ed_read(context, fd,buff,scend,0));
@@ -206,7 +208,6 @@ int ed_emacsread(void *context, int fd,char *buff,int scend, int reedit)
 	out = (genchar*)buff;
 #if SHOPT_MULTIBYTE
 	out = (genchar*)roundof((char*)out-(char*)0,sizeof(genchar));
-	ed_internal(buff,out);
 #endif /* SHOPT_MULTIBYTE */
 	if(!kstack)
 	{
@@ -231,6 +232,12 @@ int ed_emacsread(void *context, int fd,char *buff,int scend, int reedit)
 	i = sigsetjmp(env,0);
 	if (i !=0)
 	{
+		if(ep->ed->e_multiline)
+		{
+			cur = eol;
+			draw(ep,FINAL);
+			ed_flush(ep->ed);
+		}
 		tty_cooked(ERRIO);
 		if (i == UEOF)
 		{
@@ -588,8 +595,10 @@ update:
 			}
 			continue;
 		case cntl('L'):
-			ed_crlf(ep->ed);
+			if(!ep->ed->e_nocrnl)
+				ed_crlf(ep->ed);
 			draw(ep,REFRESH);
+			ep->ed->e_nocrnl = 0;
 			continue;
 		case cntl('[') :
 		do_escape:
@@ -649,6 +658,8 @@ update:
 			location.hist_command = hline;	/* save current position */
 			location.hist_line = hloff;
 #endif
+			cur = 0;
+			draw(ep,UPDATE);
 			hist_copy((char*)out,MAXLINE, hline,hloff);
 #if SHOPT_MULTIBYTE
 			ed_internal((char*)(out),out);
@@ -1000,6 +1011,26 @@ static int escape(register Emacs_t* ep,register genchar *out,int count)
 			switch(i=ed_getchar(ep->ed,1))
 			{
 			    case 'A':
+				if(cur>0 && eol==cur && (cur<(SEARCHSIZE-2) || ep->prevdirection == -2))
+				{
+					if(ep->lastdraw==APPEND && ep->prevdirection != -2)
+					{
+						out[cur] = 0;
+						gencpy(&((genchar*)lstring)[1],out);
+#if SHOPT_MULTIBYTE
+						ed_external(&((genchar*)lstring)[1],lstring+1);
+#endif /* SHOPT_MULTIBYTE */
+						*lstring = '^';
+						ep->prevdirection = -2;
+					}
+					if(*lstring)
+					{
+						ed_ungetchar(ep->ed,'\r');
+						ed_ungetchar(ep->ed,cntl('R'));
+						return(-1);
+					}
+				}
+				*lstring = 0;
 				ed_ungetchar(ep->ed,cntl('P'));
 				return(-1);
 			    case 'B':
@@ -1189,6 +1220,8 @@ static void search(Emacs_t* ep,genchar *out,int direction)
 	}
 	i = genlen(string);
 	
+	if(ep->prevdirection == -2 && i!=2 || direction!=1)
+		ep->prevdirection = -1;
 	if (direction < 1)
 	{
 		ep->prevdirection = -ep->prevdirection;
@@ -1264,6 +1297,7 @@ static void draw(register Emacs_t *ep,Draw_t option)
 	sptr = drawbuff;
 	logcursor = sptr + cur;
 	longline = NORMAL;
+	ep->lastdraw = option;
 	
 	if (option == FIRST || option == REFRESH)
 	{
@@ -1377,6 +1411,9 @@ static void draw(register Emacs_t *ep,Draw_t option)
 		}
 #endif /* SHOPT_MULTIBYTE */
 	}
+	if(ep->ed->e_multiline && option == REFRESH && ep->ed->e_nocrnl==0)
+		ed_setcursor(ep->ed, ep->screen, ep->cursor-ep->screen, ep->ed->e_peol, -1);
+
 	
 	/******************
 	
@@ -1407,7 +1444,7 @@ static void draw(register Emacs_t *ep,Draw_t option)
 	i = (ncursor-nscreen) - ep->offset;
 	setcursor(ep,i,0);
 	if(option==FINAL && ep->ed->e_multiline)
-		setcursor(ep,nscend-nscreen,0);
+		setcursor(ep,nscend+1-nscreen,0);
 	ep->scvalid = 1;
 	return;
 }

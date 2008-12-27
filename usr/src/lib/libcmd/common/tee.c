@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: tee (AT&T Research) 2006-10-10 $\n]"
+"[-?\n@(#)$Id: tee (AT&T Research) 2007-11-11 $\n]"
 USAGE_LICENSE
 "[+NAME?tee - duplicate standard input]"
 "[+DESCRIPTION?\btee\b copies standard input to standard output "
@@ -129,17 +129,14 @@ b_tee(int argc, register char** argv, void* context)
 		error(ERROR_usage(2), "%s", optusage(NiL));
 	argv += opt_info.index;
 	argc -= opt_info.index;
-
-	/*
-	 * for backward compatibility
-	 */
-
+#if _ANCIENT_BSD_COMPATIBILITY
 	if (*argv && streq(*argv, "-"))
 	{
 		signal(SIGINT, SIG_IGN);
 		argv++;
 		argc--;
 	}
+#endif
 	if (argc > 0)
 	{
 		if (!(tp = (Tee_t*)stakalloc(sizeof(Tee_t) + argc * sizeof(int))))

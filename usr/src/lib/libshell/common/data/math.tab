@@ -1,6 +1,6 @@
 # <return type: i:integer f:floating-point> <#floating-point-args> <function-name> [<alias> ...]
 # <function-name>l variants are handled by features/math.sh
-# @(#)math.tab (AT&T Research) 2006-10-18
+# @(#)math.tab (AT&T Research) 2008-05-22
 f 1 acos
 f 1 acosh
 f 1 asin
@@ -9,6 +9,7 @@ f 1 atan
 f 2 atan2
 f 1 atanh
 f 1 cbrt
+f 1 ceil
 f 2 copysign
 f 1 cos
 f 1 cosh

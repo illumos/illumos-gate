@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -543,13 +543,17 @@ Vmalloc_t*	vm;
 	reg Seg_t	*seg, *next;
 	reg Block_t	*bp, *t;
 	reg size_t	size, segsize, round;
-	reg int		local;
+	reg int		local, inuse;
 	reg Vmdata_t*	vd = vm->data;
+
+	SETINUSE(vd, inuse);
 
 	if(!(local = vd->mode&VM_TRUST) )
 	{	GETLOCAL(vd,local);
 		if(ISLOCK(vd,local))
+		{	CLRINUSE(vd, inuse);
 			return -1;
+		}
 		SETLOCK(vd,local);
 	}
 
@@ -618,6 +622,7 @@ Vmalloc_t*	vm;
 
 	CLRLOCK(vd,local); /**/ASSERT(_vmbestcheck(vd, NIL(Block_t*)) == 0);
 
+	CLRINUSE(vd, inuse);
 	return 0;
 }
 
@@ -633,12 +638,12 @@ reg size_t	size;	/* desired block size		*/
 	reg size_t	s;
 	reg int		n;
 	reg Block_t	*tp, *np;
-	reg int		local;
+	reg int		local, inuse;
 	size_t		orgsize = 0;
 
 	if(!(_Vmassert & VM_init))
 	{	char	*chk = getenv("VMCHECK");
-		_Vmassert = VM_init|VM_primary|VM_secondary;
+		_Vmassert = VM_init;
 		if(chk)
 		{	int	set = 1;
 			for(;; set ? (_Vmassert |= n) : (_Vmassert &= ~n))
@@ -673,17 +678,15 @@ reg size_t	size;	/* desired block size		*/
 				case 'C':
 					n = VM_check;
 					continue;
-				case 'p':
-				case 'P':
-					n = VM_primary;
+#if _mem_mmap_anon || _mem_mmap_zero
+				case 'm':
+				case 'M':
+					n = VM_mmap;
+#endif
 					continue;
 				case 'r':
 				case 'R':
 					n = VM_region;
-					continue;
-				case 's':
-				case 'S':
-					n = VM_secondary;
 					continue;
 				default:
 					n = 0;
@@ -695,10 +698,14 @@ reg size_t	size;	/* desired block size		*/
 	}
 	/**/COUNT(N_alloc);
 
+	SETINUSE(vd, inuse);
+
 	if(!(local = vd->mode&VM_TRUST))
 	{	GETLOCAL(vd,local);	/**/ASSERT(!ISLOCK(vd,local));
 		if(ISLOCK(vd,local) )
+		{	CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
+		}
 		SETLOCK(vd,local);
 		orgsize = size;
 	}
@@ -759,6 +766,7 @@ reg size_t	size;	/* desired block size		*/
 			vd->mode &= ~VM_AGAIN;
 		else
 		{	CLRLOCK(vd,local);
+			CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
 		}
 	}
@@ -798,6 +806,7 @@ done:
 	CLRLOCK(vd,local);
 	ANNOUNCE(local, vm, VM_ALLOC, DATA(tp), vm->disc);
 
+	CLRINUSE(vd, inuse);
 	return DATA(tp);
 }
 
@@ -813,12 +822,16 @@ Void_t*		addr;	/* address to check		*/
 	reg Block_t	*b, *endb;
 	reg long	offset;
 	reg Vmdata_t*	vd = vm->data;
-	reg int		local;
+	reg int		local, inuse;
+
+	SETINUSE(vd, inuse);
 
 	if(!(local = vd->mode&VM_TRUST) )
 	{	GETLOCAL(vd,local); /**/ASSERT(!ISLOCK(vd,local));
 		if(ISLOCK(vd,local))
+		{	CLRINUSE(vd, inuse);
 			return -1L;
+		}
 		SETLOCK(vd,local);
 	}
 
@@ -856,6 +869,7 @@ Void_t*		addr;	/* address to check		*/
 
 done:	
 	CLRLOCK(vd,local);
+	CLRINUSE(vd, inuse);
 	return offset;
 }
 
@@ -870,7 +884,7 @@ Void_t*		data;
 	reg Vmdata_t*	vd = vm->data;
 	reg Block_t	*bp;
 	reg size_t	s;
-	reg int		local;
+	reg int		local, inuse;
 
 #ifdef DEBUG
 	if((local = (int)data) >= 0 && local <= 0xf)
@@ -887,12 +901,14 @@ Void_t*		data;
 
 	/**/COUNT(N_free);
 
+	SETINUSE(vd, inuse);
+
 	if(!(local = vd->mode&VM_TRUST) )
 	{	GETLOCAL(vd,local);	/**/ASSERT(!ISLOCK(vd,local));
-		if(ISLOCK(vd,local) )
+		if(ISLOCK(vd,local) || KPVADDR(vm,data,bestaddr) != 0 )
+		{	CLRINUSE(vd, inuse);
 			return -1;
-		if(KPVADDR(vm,data,bestaddr) != 0 )
-			return -1;
+		}
 		SETLOCK(vd,local);
 	}
 
@@ -935,6 +951,7 @@ Void_t*		data;
 	CLRLOCK(vd,local);
 	ANNOUNCE(local, vm, VM_FREE, data, vm->disc);
 
+	CLRINUSE(vd, inuse);
 	return 0;
 }
 
@@ -949,12 +966,14 @@ int		type;		/* !=0 to move, <0 for not copy */
 #endif
 {
 	reg Block_t	*rp, *np, *t;
-	int		local;
+	int		local, inuse;
 	size_t		s, bs, oldsize = 0, orgsize = 0;
 	Void_t		*oldd, *orgdata = NIL(Void_t*);
 	Vmdata_t	*vd = vm->data;
 
 	/**/COUNT(N_resize);
+
+	SETINUSE(vd, inuse);
 
 	if(!data)
 	{	if((data = bestalloc(vm,size)) )
@@ -965,15 +984,16 @@ int		type;		/* !=0 to move, <0 for not copy */
 	}
 	if(size == 0)
 	{	(void)bestfree(vm,data);
+		CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
 	}
 
 	if(!(local = vd->mode&VM_TRUST) )
 	{	GETLOCAL(vd,local); /**/ASSERT(!ISLOCK(vd,local));
-		if(ISLOCK(vd,local) )
+		if(ISLOCK(vd,local) || (!local && KPVADDR(vm,data,bestaddr) != 0 ) )
+		{	CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
-		if(!local && KPVADDR(vm,data,bestaddr) != 0 )
-			return NIL(Void_t*);
+		}
 		SETLOCK(vd,local);
 
 		orgdata = data;	/* for tracing */
@@ -1065,6 +1085,7 @@ int		type;		/* !=0 to move, <0 for not copy */
 done:	if(data && (type&VM_RSZERO) && (size = SIZE(BLOCK(data))&~BITS) > oldsize )
 		memset((Void_t*)((Vmuchar_t*)data + oldsize), 0, size-oldsize);
 
+	CLRINUSE(vd, inuse);
 	return data;
 }
 
@@ -1080,10 +1101,15 @@ Void_t*		addr;	/* address to check		*/
 	reg Block_t	*b, *endb;
 	reg long	size;
 	reg Vmdata_t*	vd = vm->data;
+	reg int		inuse;
+
+	SETINUSE(vd, inuse);
 
 	if(!(vd->mode&VM_TRUST) )
 	{	if(ISLOCK(vd,0))
+		{	CLRINUSE(vd, inuse);
 			return -1L;
+		}
 		SETLOCK(vd,0);
 	}
 
@@ -1110,6 +1136,7 @@ Void_t*		addr;	/* address to check		*/
 
 done:
 	CLRLOCK(vd,0);
+	CLRINUSE(vd, inuse);
 	return size;
 }
 
@@ -1125,17 +1152,21 @@ size_t		align;
 	reg Vmuchar_t	*data;
 	reg Block_t	*tp, *np;
 	reg Seg_t*	seg;
-	reg int		local;
+	reg int		local, inuse;
 	reg size_t	s, extra, orgsize = 0, orgalign = 0;
 	reg Vmdata_t*	vd = vm->data;
 
 	if(size <= 0 || align <= 0)
 		return NIL(Void_t*);
 
+	SETINUSE(vd, inuse);
+
 	if(!(local = vd->mode&VM_TRUST) )
 	{	GETLOCAL(vd,local); /**/ASSERT(!ISLOCK(vd,local));
 		if(ISLOCK(vd,local) )
+		{	CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
+		}
 		SETLOCK(vd,local);
 		orgsize = size;
 		orgalign = align;
@@ -1207,6 +1238,7 @@ done:
 	CLRLOCK(vd,local);
 	ANNOUNCE(local, vm, VM_ALLOC, (Void_t*)data, vm->disc);
 
+	CLRINUSE(vd, inuse);
 	return (Void_t*)data;
 }
 
@@ -1285,15 +1317,9 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 
 	if(csize == 0) /* allocating new memory */
 	{
-#if ( _mem_sbrk || _mem_mmap_anon || _mem_mmap_zero )
-#define ALTERNATES	VM_primary
-#endif
+
 #if _mem_sbrk	/* try using sbrk() and brk() */
-#if ALTERNATES
-		if (_Vmassert & ALTERNATES)
-#undef	ALTERNATES
-#define ALTERNATES	VM_secondary
-#endif
+		if(!(_Vmassert & VM_mmap))
 		{
 			addr = (Vmuchar_t*)sbrk(0); /* old break value */
 			if(addr && addr != (Vmuchar_t*)BRK_FAILED )
@@ -1303,11 +1329,6 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 #endif /* _mem_sbrk */
 
 #if _mem_mmap_anon /* anonymous mmap */
-#if ALTERNATES
-		if (_Vmassert & ALTERNATES)
-#undef	ALTERNATES
-#define ALTERNATES	VM_secondary
-#endif
 		{
 			addr = (Vmuchar_t*)mmap(0, nsize, PROT_READ|PROT_WRITE,
                                         	MAP_ANON|MAP_PRIVATE, -1, 0);
@@ -1317,11 +1338,6 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 #endif /* _mem_mmap_anon */
 
 #if _mem_mmap_zero /* mmap from /dev/zero */
-#if ALTERNATES
-		if (_Vmassert & ALTERNATES)
-#undef	ALTERNATES
-#define ALTERNATES	VM_secondary
-#endif
 		{
 			if(mmdc->fd < 0)
 			{	int	fd;
@@ -1351,16 +1367,8 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 	}
 	else
 	{	addr = caddr; /* in case !_mem_sbrk */
-#if ( _mem_sbrk || _mem_mmap_anon || _mem_mmap_zero )
-#undef	ALTERNATES
-#define ALTERNATES	VM_primary
-#endif
+
 #if _mem_sbrk
-#if ALTERNATES
-		if (_Vmassert & ALTERNATES)
-#undef	ALTERNATES
-#define ALTERNATES	VM_secondary
-#endif
 		{
 			addr = (Vmuchar_t*)sbrk(0);
 			if(!addr || addr == (Vmuchar_t*)BRK_FAILED)
@@ -1375,11 +1383,6 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 #endif /* _mem_sbrk */
 
 #if _mem_mmap_zero || _mem_mmap_anon
-#if ALTERNATES
-		if (_Vmassert & ALTERNATES)
-#undef	ALTERNATES
-#define ALTERNATES	VM_secondary
-#endif
 		{
 			if(((Vmuchar_t*)caddr+csize) > addr) /* in mmap-space */
 				if(nsize == 0 && munmap(caddr,csize) == 0)
@@ -1391,7 +1394,7 @@ Vmdisc_t*	disc;	/* discipline structure			*/
 	}
 #endif /*_done_sbrkmem*/
 
-#if !_done_sbrkmem /* use native malloc/free as a last resource */
+#if !_done_sbrkmem /* use native malloc/free as a last resort */
 	/**/ASSERT(_std_malloc); /* _std_malloc should be well-defined */
 	NOTUSED(vm);
 	NOTUSED(disc);

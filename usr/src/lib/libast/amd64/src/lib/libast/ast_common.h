@@ -1,4 +1,4 @@
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/src/lib/libast/features/common by iffe version 2007-04-04 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20081104/build_i386_64bit/src/lib/libast/features/common by iffe version 2008-01-31 : : */
 #ifndef _AST_COMMON_H
 #define _AST_COMMON_H	1
 #define _sys_types	1	/* #include <sys/types.h> ok */

@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -29,7 +29,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: cut (AT&T Research) 2007-01-23 $\n]"
+"[-?\n@(#)$Id: cut (AT&T Research) 2008-04-01 $\n]"
 USAGE_LICENSE
 "[+NAME?cut - cut out selected columns or fields of each line of a file]"
 "[+DESCRIPTION?\bcut\b bytes, characters, or character-delimited fields "
@@ -249,7 +249,7 @@ static int advance(const char *str, register int n, register int inlen)
  * cut each line of file <fdin> and put results to <fdout> using list <list>
  */
 
-static int cutcols(Cut_t *cuthdr,Sfio_t *fdin,Sfio_t *fdout)
+static void cutcols(Cut_t *cuthdr,Sfio_t *fdin,Sfio_t *fdout)
 {
 	register int		c, ncol=0,len;
 	register const int	*lp = cuthdr->list;
@@ -274,7 +274,7 @@ static int cutcols(Cut_t *cuthdr,Sfio_t *fdin,Sfio_t *fdout)
 				ncol++;
 			ncol -= c;
 			if(!skip && sfwrite(fdout,(char*)inp,c)<0)
-				return(-1);
+				return;
 			inp += c;
 			if(ncol)
 				break;
@@ -285,7 +285,6 @@ static int cutcols(Cut_t *cuthdr,Sfio_t *fdin,Sfio_t *fdout)
 		if(!cuthdr->nlflag && (skip || cuthdr->reclen))
 			sfputc(fdout,cuthdr->ldelim);
 	}
-	return(c);
 }
 
 /*
@@ -295,7 +294,7 @@ static int cutcols(Cut_t *cuthdr,Sfio_t *fdin,Sfio_t *fdout)
 
 #define endline(c)	(((signed char)-1)<0?(c)<0:(c)==((char)-1))
 
-static int cutfields(Cut_t *cuthdr,Sfio_t *fdin,Sfio_t *fdout)
+static void cutfields(Cut_t *cuthdr,Sfio_t *fdin,Sfio_t *fdout)
 {
 	register unsigned char *cp;
 	register int c, nfields;
@@ -397,7 +396,7 @@ static int cutfields(Cut_t *cuthdr,Sfio_t *fdin,Sfio_t *fdout)
 				goto failed;
 		}
 		/* see whether to save in tmp file */
-		if(nodelim && inword && !cuthdr->sflag && (c=cp-first)>0)
+		if(inword && nodelim && !cuthdr->sflag && (c=cp-first)>0)
 		{
 			/* copy line to tmpfile in case no fields */
 			if(!fdtmp)
@@ -409,7 +408,6 @@ static int cutfields(Cut_t *cuthdr,Sfio_t *fdin,Sfio_t *fdout)
 failed:
 	if(fdtmp)
 		sfclose(fdtmp);
-	return(0);
 }
 
 int
@@ -506,7 +504,8 @@ b_cut(int argc,char *argv[], void* context)
 			cutcols(cuthdr,fp,sfstdout);
 		if(fp!=sfstdin)
 			sfclose(fp);
-	}
-	while(cp= *argv++);
+	} while(cp = *argv++);
+	if (sfsync(sfstdout))
+		error(ERROR_system(0), "write error");
 	return(error_info.errors?1:0);
 }

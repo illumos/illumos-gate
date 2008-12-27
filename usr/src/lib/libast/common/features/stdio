@@ -117,7 +117,7 @@ cat{
 	extern int	fpurge(FILE*);
 	extern int	fputc(int, FILE*);
 	extern int	fputs(const char*, FILE*);
-	extern ssize_t	fread(void*, size_t, size_t, FILE*);
+	extern size_t	fread(void*, size_t, size_t, FILE*);
 	extern FILE*	freopen(const char*, const char*, FILE*);
 	extern int	fscanf(FILE*, const char*, ...);
 	extern int	fseek(FILE*, long, int);
@@ -125,7 +125,7 @@ cat{
 	extern int	fsetpos(FILE*, const fpos_t*);
 	extern long	ftell(FILE*);
 	extern off_t	ftello(FILE*);
-	extern ssize_t	fwrite(const void*, size_t, size_t, FILE*);
+	extern size_t	fwrite(const void*, size_t, size_t, FILE*);
 	extern int	getc(FILE*);
 	extern int	getchar(void);
 	extern char*	gets(char*);
@@ -183,6 +183,10 @@ cat{
 	extern int	getchar_unlocked(void);
 	extern int	putc_unlocked(int, FILE*);
 	extern int	putchar_unlocked(int);
+
+	extern void	flockfile(FILE*);
+	extern int	ftrylockfile(FILE*);
+	extern void	funlockfile(FILE*);
 
 	#ifdef _USE_GNU
 
@@ -295,6 +299,7 @@ output{
 		printf("#define vsscanf		_ast_vsscanf\n");
 
 		printf("#define fcloseall	_ast_fcloseall\n");
+		printf("#define _filbuf		_ast__filbuf\n");
 		printf("#define fmemopen	_ast_fmemopen\n");
 		printf("#define __getdelim	_ast___getdelim\n");
 		printf("#define getdelim	_ast_getdelim\n");
@@ -315,6 +320,10 @@ output{
 		printf("#define getchar_unlocked _ast_getchar_unlocked\n");
 		printf("#define putc_unlocked	_ast_putc_unlocked\n");
 		printf("#define putchar_unlocked _ast_putchar_unlocked\n");
+
+		printf("#define flockfile	_ast_flockfile\n");
+		printf("#define ftrylockfile	_ast_ftrylockfile\n");
+		printf("#define funlockfile	_ast_funlockfile\n");
 
 		printf("\n");
 	#endif
@@ -389,7 +398,7 @@ cat{
 	extern int	fpurge(FILE*);
 	extern int	fputc(int, FILE*);
 	extern int	fputs(const char*, FILE*);
-	extern ssize_t	fread(void*, size_t, size_t, FILE*);
+	extern size_t	fread(void*, size_t, size_t, FILE*);
 	extern FILE*	freopen(const char*, const char*, FILE*);
 	extern int	fscanf(FILE*, const char*, ...);
 	extern int	fseek(FILE*, long, int);
@@ -397,7 +406,7 @@ cat{
 	extern int	fsetpos(FILE*, const fpos_t*);
 	extern long	ftell(FILE*);
 	extern off_t	ftello(FILE*);
-	extern ssize_t	fwrite(const void*, size_t, size_t, FILE*);
+	extern size_t	fwrite(const void*, size_t, size_t, FILE*);
 	extern int	getc(FILE*);
 	extern int	getchar(void);
 	extern char*	gets(char*);

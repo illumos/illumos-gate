@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -97,7 +97,7 @@ int	fcfill(void)
 			_Fcin.fcptr = ptr = last;
 	}
 	if((n = ptr-_Fcin.fcbuff) && _Fcin.fcfun)
-		(*_Fcin.fcfun)(f,(const char*)_Fcin.fcbuff,n);
+		(*_Fcin.fcfun)(f,(const char*)_Fcin.fcbuff,n,_Fcin.context);
 	sfread(f, (char*)_Fcin.fcbuff, n);
 	_Fcin.fcoff +=n;
 	_Fcin._fcfile = 0;
@@ -128,9 +128,10 @@ int fcclose(void)
 /*
  * Set the notify function that is called for each fcfill()
  */
-void fcnotify(void (*fun)(Sfio_t*,const char*,int))
+void fcnotify(void (*fun)(Sfio_t*,const char*,int,void*),void* context)
 {
 	_Fcin.fcfun = fun;
+	_Fcin.context = context;
 }
 
 #ifdef __EXPORT__

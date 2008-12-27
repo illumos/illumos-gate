@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -44,13 +44,16 @@ size_t		size;
 	reg Seg_t	*seg, *last;
 	reg size_t	s;
 	reg Vmdata_t*	vd = vm->data;
-	reg int		local;
+	reg int		local, inuse;
 	size_t		orgsize = 0;
 
+	SETINUSE(vd, inuse);
 	if(!(local = vd->mode&VM_TRUST))
 	{	GETLOCAL(vd,local);
 		if(ISLOCK(vd,local))
+		{	CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
+		}
 		SETLOCK(vd,local);
 		orgsize = size;
 	}
@@ -95,6 +98,7 @@ got_block:
 done:
 	CLRLOCK(vd,local);
 	ANNOUNCE(local, vm, VM_ALLOC, (Void_t*)tp, vm->disc);
+	CLRINUSE(vd, inuse);
 	return (Void_t*)tp;
 }
 
@@ -110,20 +114,25 @@ reg Void_t*	data;
 	reg Block_t*	fp;
 	reg size_t	s;
 	reg Vmdata_t*	vd = vm->data;
-	reg int		local;
+	reg int		local, inuse;
 
 	if(!data)
 		return 0;
+
+	SETINUSE(vd, inuse);
 	if(!(local = vd->mode&VM_TRUST) )
 	{	GETLOCAL(vd, local);
 		if(ISLOCK(vd, local))
+		{	CLRINUSE(vd, inuse);
 			return -1;
+		}
 		SETLOCK(vd, local);
 	}
 	if(data != (Void_t*)vd->free)
 	{	if(!local && vm->disc->exceptf)
 			(void)(*vm->disc->exceptf)(vm,VM_BADADDR,data,vm->disc);
 		CLRLOCK(vd, local);
+		CLRINUSE(vd, inuse);
 		return -1;
 	}
 
@@ -144,6 +153,7 @@ reg Void_t*	data;
 
 	CLRLOCK(vd, local);
 	ANNOUNCE(local, vm, VM_FREE, data, vm->disc);
+	CLRINUSE(vd, inuse);
 	return 0;
 }
 
@@ -162,11 +172,12 @@ int		type;
 	reg size_t	oldsize;
 	reg ssize_t	s, ds;
 	reg Vmdata_t*	vd = vm->data;
-	reg int		local;
+	reg int		local, inuse;
 	reg Void_t*	addr;
 	Void_t*		orgdata = NIL(Void_t*);
 	size_t		orgsize = 0;
 
+	SETINUSE(vd, inuse);
 	if(!data)
 	{	oldsize = 0;
 		data = lastalloc(vm,size);
@@ -174,13 +185,16 @@ int		type;
 	}
 	if(size <= 0)
 	{	(void)lastfree(vm,data);
+		CLRINUSE(vd, inuse);
 		return NIL(Void_t*);
 	}
 
 	if(!(local = vd->mode&VM_TRUST))
 	{	GETLOCAL(vd, local);
 		if(ISLOCK(vd, local))
+		{	CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
+		}
 		SETLOCK(vd, local);
 		orgdata = data;
 		orgsize = size;
@@ -196,6 +210,7 @@ int		type;
 		if(!seg || (VLONG(data)%ALIGN) != 0 ||
 		   (seg->last && (Vmuchar_t*)data > (Vmuchar_t*)seg->last) )
 		{	CLRLOCK(vd,0);
+			CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
 		}
 	}
@@ -286,6 +301,7 @@ int		type;
 done:	if(data && (type&VM_RSZERO) && size > oldsize)
 		memset((Void_t*)((Vmuchar_t*)data + oldsize), 0, size-oldsize);
 
+	CLRINUSE(vd, inuse);
 	return data;
 }
 
@@ -337,10 +353,14 @@ Vmalloc_t*	vm;
 	reg Seg_t	*seg, *next;
 	reg size_t	s;
 	reg Vmdata_t*	vd = vm->data;
+	reg int		inuse;
 
+	SETINUSE(vd, inuse);
 	if(!(vd->mode&VM_TRUST))
 	{	if(ISLOCK(vd,0))
+		{	CLRINUSE(vd, inuse);
 			return -1;
+		}
 		SETLOCK(vd,0);
 	}
 
@@ -363,6 +383,7 @@ Vmalloc_t*	vm;
 		(*_Vmtrace)(vm,(Vmuchar_t*)0,(Vmuchar_t*)0,0,0);
 
 	CLRLOCK(vd,0);
+	CLRINUSE(vd, inuse);
 	return 0;
 }
 
@@ -378,17 +399,20 @@ size_t		align;
 	reg Vmuchar_t*	data;
 	reg Seg_t*	seg;
 	reg Block_t*	next;
-	reg int		local;
+	reg int		local, inuse;
 	reg size_t	s, orgsize = 0, orgalign = 0;
 	reg Vmdata_t*	vd = vm->data;
 
 	if(size <= 0 || align <= 0)
 		return NIL(Void_t*);
 
+	SETINUSE(vd, inuse);
 	if(!(local = vd->mode&VM_TRUST) )
 	{	GETLOCAL(vd,local);
 		if(ISLOCK(vd,local) )
+		{	CLRINUSE(vd, inuse);
 			return NIL(Void_t*);
+		}
 		SETLOCK(vd,local);
 		orgsize = size;
 		orgalign = align;
@@ -428,6 +452,7 @@ done:
 	CLRLOCK(vd,local);
 	ANNOUNCE(local, vm, VM_ALLOC, (Void_t*)data, vm->disc);
 
+	CLRINUSE(vd, inuse);
 	return (Void_t*)data;
 }
 

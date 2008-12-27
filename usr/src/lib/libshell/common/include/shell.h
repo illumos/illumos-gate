@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,7 +27,7 @@
  *
  */
 
-#include	<cmd.h>
+#include	<ast.h>
 #include	<cdt.h>
 #ifdef _SH_PRIVATE
 #   include	"name.h"
@@ -35,7 +35,7 @@
 #   include	<nval.h>
 #endif /* _SH_PRIVATE */
 
-#define SH_VERSION	20060510
+#define SH_VERSION	20071012
 
 #undef NOT_USED
 #define NOT_USED(x)	(&x,1)
@@ -47,8 +47,9 @@ typedef struct
 }
 Shopt_t;
 
-typedef void	(*Shinit_f)(int);
-typedef int     (*Shbltin_f)(int, char*[], void*);
+typedef struct Shell_s Shell_t;
+
+typedef void	(*Shinit_f)(Shell_t*, int);
 typedef int	(*Shwait_f)(int, long, int);
 
 union Shnode_u;
@@ -115,6 +116,7 @@ typedef struct sh_scope
 	char		**argv;
 	char		*cmdname;
 	char		*filename;
+	char		*funname;
 	int		lineno;
 	Dt_t		*var_tree;
 	struct sh_scope	*self;
@@ -124,7 +126,7 @@ typedef struct sh_scope
  * Saves the state of the shell
  */
 
-typedef struct sh_static
+struct Shell_s
 {
 	Shopt_t		options;	/* set -o options */
 	Dt_t		*var_tree;	/* for shell variables */
@@ -136,10 +138,11 @@ typedef struct sh_static
 	int		exitval;	/* most recent exit value */
 	unsigned char	trapnote;	/* set when trap/signal is pending */
 	char		subshell;	/* set for virtual subshell */
+	char		shcomp;		/* set when runing shcomp */
 #ifdef _SH_PRIVATE
 	_SH_PRIVATE
 #endif /* _SH_PRIVATE */
-} Shell_t;
+};
 
 /* flags for sh_parse */
 #define SH_NL		1	/* Treat new-lines as ; */
@@ -149,8 +152,12 @@ typedef struct sh_static
 #define SH_IOCOPROCESS	(-2)
 #define SH_IOHISTFILE	(-3)
 
+#include	<cmd.h>
+
 /* symbolic value for sh_fdnotify */
 #define SH_FDCLOSE	(-1)
+
+#undef getenv			/* -lshell provides its own */
 
 #if defined(__EXPORT__) && defined(_DLL)
 #   ifdef _BLD_shell
@@ -169,7 +176,8 @@ extern int 		sh_trap(const char*,int);
 extern int 		sh_fun(Namval_t*,Namval_t*, char*[]);
 extern int 		sh_funscope(int,char*[],int(*)(void*),void*,int);
 extern Sfio_t		*sh_iogetiop(int,int);
-extern int		sh_main(int, char*[], void(*)(int));
+extern int		sh_main(int, char*[], Shinit_f);
+extern int		sh_run(int, char*[]);
 extern void		sh_menu(Sfio_t*, int, char*[]);
 extern Namval_t		*sh_addbuiltin(const char*, int(*)(int, char*[],void*), void*);
 extern char		*sh_fmtq(const char*);

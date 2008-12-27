@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1997-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1997-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -236,20 +236,24 @@ dllsopen(const char* lib, const char* name, const char* version)
 		lib = 0;
 		i = 0;
 	}
+	if (version && *version && (*version != '-' || *(version + 1)))
+		version = 0;
 	if (!(scan = vmnewof(vm, 0, Dllscan_t, 1, i)) || !(scan->tmp = sfstropen()))
 	{
 		vmclose(vm);
 		return 0;
 	}
+	scan->vm = vm;
+	info = dllinfo();
+	scan->flags = info->flags;
 	if (lib)
 	{
 		scan->lib = (char**)(scan + 1);
 		s = *scan->lib = (char*)(scan->lib + 2);
 		sfsprintf(s, i, "lib/%s", lib);
+		if (!version && streq(info->suffix, ".dylib"))
+			version = "0.0";
 	}
-	scan->vm = vm;
-	info = dllinfo();
-	scan->flags = info->flags;
 	if (!name || !*name || *name == '-' && !*(name + 1))
 	{
 		name = (const char*)"?*";
@@ -262,9 +266,8 @@ dllsopen(const char* lib, const char* name, const char* version)
 		memcpy(scan->pb, name, t - (char*)name);
 		name = (const char*)(t + 1);
 	}
-	if (!version || !*version || *version == '-' && !*(version + 1))
+	if (!version)
 	{
-		version = 0;
 		scan->flags |= DLL_MATCH_VERSION;
 		sfsprintf(scan->nam, sizeof(scan->nam), "%s%s%s", info->prefix, name, info->suffix);
 	}

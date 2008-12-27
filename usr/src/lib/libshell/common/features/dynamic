@@ -1,8 +1,8 @@
-hdr,sys	dlfcn,dl,ldr,dll
-hdr	dlldefs
-lib	dlopen,shl_load,loadbind,dllload,dllfind
 cat{
-	#if !defined(SHOPT_FS_3D) && ( _lib_dllfind || _lib_dlopen || _lib_shl_load || _lib_loadbind )
+	#if SHOPT_DYNAMIC
+	#include	<dlldefs.h>
+	#endif
+	#if !defined(SHOPT_FS_3D) && SHOPT_DYNAMIC
 	#   define SHOPT_FS_3D	1
 	#endif /* !SHOPT_FS_3D */
 	#if SHOPT_FS_3D

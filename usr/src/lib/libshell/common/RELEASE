@@ -1,4 +1,439 @@
-07-04-18  --- Release ksh93s+  ---
+08-10-31  --- Release ksh93t  ---
+08-10-31  Variable scoping/initialization bugs that could dump core were fixed.
+08-10-24  The lexer now accepts all RE characters for patterns prefixed
+	  with a ksh ~(...) option expression.
+08-10-24  For ${var/pat/sub} \0 in sub expands to the text matched by pat.
+08-10-18  A bug in array scoping that could dump core has been fixed.
+08-10-10  read -n and -N fixed to count characters in multibyte locales.
+08-10-10  A bug that mishandled _.array[] type references has been fixed.
+08-10-09  ${.sh.version} now contains a catenation of the following (after
+	  'Version') denoting compile time features:
+		A	SHOPT_AUDIT
+		B	SHOPT_BASH
+		L	SHOPT_ACCT
+		M	SHOPT_MULTIBYTE
+08-10-09  A bug that caused subshell command substitution with redirection
+	  to hang has been fixed.
+08-10-08  Output errors, other than to stderr, now result in a diagnostic.
+08-10-08  ksh93 now supports types that contain arrays of other types as
+	  members.  Earlier versions core dumped in this case.
+08-10-05  A bug which caused the shell to emit a syntax error for an arithmetic
+	  statement of the form (( var.name[sub] = value)) has been fixed.
+08-10-01  A bug that caused subshell command substitution to hang has
+	  been fixed.
+08-09-29  When the -p export option of typeset is used with other options,
+	  only those variables matching the specified options are displayed.
+08-09-29  When the shell reads the environment and finds variables that are
+	  not valid shell assignments, it now passes these on to subsequent
+	  commands rather than deleting them.
+08-09-29  A bug in the display of compound variables containing an indexed
+	  array of compound variables has been fixed.
+08-09-29  A bug in the display of compound variables containing an associative
+	  array with a subscript containing a . in the name has been fixed.
+08-09-26  A core dump in the subshell environment restore has been fixed.
+08-09-24  $(...) has been fixed to properly set the exit status in $?.
+08-09-23  $(<...) with IFS=$'\n\n' has been fixed to retain all but the last
+	  of multiple trailing newlines.
+08-09-23  The -p option to typeset when used with other attributes, restricts
+	  the output to variables with the specified attributes.
+08-09-22  A bug that sometimes lost the exit status of a job has been fixed.
+08-09-21  A bug that retained trailing command substitution newlines in
+	  cases where the command caused the shell to fork has been fixed.
+08-09-19  type, whence -v, and command -v were fixed to comply with POSIX
+	  by writing 'not found' diagnostics to the standard error.
+08-09-18  test and [...] were fixed to comply with POSIX in the case
+	  of test '(' binop ')' where binop is a valid binary test operator.
+08-09-16  If a method discipline named create is specified when defining a
+	  type, this function will be called when an instance is created.
+08-09-15  The variable _ is now set as a reference to the compound variable
+	  when defining a compound variable or a type.
+08-09-10  The shell now prints an error message when the type name specified
+	  for an indexed array subscript is not an enumeration type.
+08-09-10  A bug in which a subshell that spawned a background process could
+	  loose output that was produced after the foreground completed
+	  has been fixed.
+08-09-10  A timing bug on some systems that could cause coprocesses started by a
+	  subshell to not clean up and prevent other coprocesses has been fixed.
+08-09-09  The typeset -m option is now able to rename array elements from
+	  the same array.
+08-09-09  The exit status of 2 from the DEBUG trap causes the next command
+	  to be skipped.  An exit value of 255 from a DEBUG trap called from
+	  a function causes the function to return. 
+08-09-08  A bug in which a coprocess created in a subshell that did not
+	  complete when the subshell terminated could prevent a coprocess
+	  from being created in the parent shell has been fixed.
+08-09-05  An assignment of the form name1=name2 where name1 and name2
+	  are both compound variables causes name1 to get a copy of name2.
+	  name1+=name2 causes name2 sub-variables to be appended to name1.
+08-09-05  A bug in which unsetting a compound variable did not unset all
+	  the sub-variables has been fixed.
+08-09-01  A bug in the subshell cleanup code that could cause SIGSEGV has
+	  been fixed.
+06-08-26  The SHLVL variable which is an environment variable used by bash
+          and zsh that gets incremented when the shell starts.
+08-08-25  For an indexed array, a negative subscript now refers to offsets
+	  from the end so that -1 refers to the last element.
+08-08-24  An alignment error for shorts on 64 bit architectures has been fixed.
+08-08-22  If oldvar is a compound variable, typeset -C newvar=oldvar creates 
+	  newvar as a copy of oldvar.
+08-08-19  The ALRM signal no longer cause the sleep builtin to terminate.
+08-08-13  When used in an arithmetic expression, the .sh.version variable  
+	  now produces a number that will be increasing for each release.
+08-08-11  A bug in which type instantiation with a compound assignment in
+	  a dot script in which the type is defined has been fixed. 
+08-08-07  The -m option has been added to typeset to move or rename a
+	  variable.  Not documented yet.
+08-08-06  A bug in read when used in a loop when a prompt was specified
+	  when reading from a terminal has been fixed.
+08-08-01  A bug with the pipefail option in which a nested pipeline could
+	  cause an asynchronous command to block has been fixed.
+08-08-01  A for loop optimizer bug that treats .sh.lineno as an invariant
+	  has been fixed.
+08-07-30  A bug in which expanding compound variable that had a get discipline
+	  from with a here document could cause a syntax error has been fixed.
+08-07-18  A bug in which a nameref caused a local variable to be created
+	  rather than binding to an existing variable in the global scope
+	  has been fixed.
+08-07-17  A bug which occurred when a nameref was created from within a
+	  function that was  part of a pipeline has been fixed.
+08-07-14  The compile option SHOPT_STATS was added. With this option the
+	  compound variable .sh.stats keeps usage statistics that could help
+	  with performance tuning.
+08-07-10  The output of set now always uses a single line for each variable.
+	  For array variables, the complete set of values is now displayed.
+08-07-09  The typeset -C option can be used with arrays to indicate that
+	  each element should default to a compound variable.
+08-07-08  The %B format now outputs compound variables and arrays.  The
+	  alternate flag # can be used to cause output into a single line.
+08-07-03  When the window change signal, WINCH, is received, the current
+	  edit line is redrawn in place. 
+08-07-01  A bug in the handling of shared variables when inside an embedded
+	  type has been fixed.
+08-06-29  A bug in multiline edit mode which occurred when the prompt length
+	  was three characters or less has been fixed.
+08-06-23  A bug in which the SIGCLD was not be triggered when background
+	  jobs completed has been fixed.
+08-06-23  KSH_VERSION added as a name reference to .sh.version.
+08-06-20  type now outputs 'special builtin' for special builtins.
+08-06-19  A couple of bugs in multi-dimensional arrays have been fxied.
+08-06-19  A bug in which a syntax error in a dot script could generated
+	  a syntax error in the next subsequent command has been fixed.
+08-06-17  Reduced the maximum function call depth to 2048 to avoid exceptions
+	  on some architectures.
+08-06-16  A bug in which printf "%B" could generate an exception when the
+	  specified variable was not set has been fixed.
+08-06-16  When typeset -p is followed by variable names, it now displays
+	  the attributes names and values for the specific names.
+08-06-14  A bug that could effect the drawing of the screen from multiline
+	  emacs or gmacs mode when walking up the history file has been fixed.
+08-06-13  A bug in which a compound variable defined in a subshell could
+	  have side effects into the parent shell has been fixed.
+08-06-13  A number of bugs related to using .sh.level to set the stack from
+	  for DEBUG traps have been fixed.
+08-06-13  The .sh.lineno variable has been added.  When .sh.level is changed
+	  inside a DEBUG trap, the .sh.lineno contains the calling line number
+	  for the specified stack frame.
+08-06-13  The .sh.level variable has been documented and now works.
+08-06-11  The -C option has been added to read for reading compound command
+	  definitions from a file.
+08-06-11  The . command is now permitted inside a compound command definition.
+	  The dot script can contain declaration commands and dot commands.
+08-06-09  Add -C option to typeset so that typeset -C foo, is equivalent
+	  to foo=().
+08-06-09  Added -n warning message for typeset option orderings that are valid
+	  with ksh88 but not valid with ksh93, for example Lx5.
+08-06-09  A bug in which the return value for an assignment command containing
+	  a command substitution with that failed was zero when the assignment
+	  contained redirections has been fixed.
+08-06-09  A bug in the quoting of $ inside a ERE pattern ~(E)(pattern)
+	  has been fixed.
+08-06-06  A bug when processing `` command substitution with the character
+	  sequence \$' has been fixed.
+08-06-02  When defining a type, the typeset -r attribute causes this field
+	  to be required to be specified for each instance of the type and
+	  does not allow a default value.
+08-06-02  Several bugs in which compound variables were modified by
+	  subshells have been fixed.
+08-05-22  The ceil function has been added to the math functions.
+08-05-21  A bug in which a name reference defined in a function and passed
+	  as an argument to another function could cause an incorrect binding.
+08-05-21  A bug in freeing compound variables that are local to functions
+	  has been fixed.
+08-05-19  The array expansions ${array[sub1..sub2]} and ${!array[sub1..sub2]}
+	  to expand to the value (or subscripts) for array between sub1 and
+	  sub2 inclusive.  For associative arrays, the range is based on
+	  location in the POSIX locale.  The .. must be explicit and cannot
+	  result from an expansion.
+08-05-15  The trap on SIGCLD is no longer triggered by the completion of
+	  the foreground job as with ksh88.
+08-05-14  A bug in the implementation of the editing feature added on 
+	  07-09-19 in emacs mode has been fixed.
+08-05-12  A bug in processing the test built-in with parenthesis has been
+	  fixed.
+08-05-12  The unset built-in now returns non-zero when deleting an array
+	  subscript that is not set.
+08-05-08  Changing the value of HISTFILE or HISTSIZE will cause the old
+	  history file to be close and reopened with the new name or size.
+08-05-08  When FPATH is changed functions that were found via a path search
+	  will be searched for again.
+08-05-08  A parser bug in which reserved words and labels were recognized
+	  inside compound indexed array assignment after a new-line has
+	  been fixed.
+08-05-07  A bug in getopts when handling numerical option arguments has
+	  been fixed.
+08-05-07  The typeset -S option was added for variables outside type
+	  definitions to provide a storage class similar to C static
+	  inside a function defined with function name.  When outside
+	  type definitions and outside a function, the -S option cause
+	  the specified variable so be unset before the assignment and
+	  before the remaining attributes are supplied.
+08-05-07  A bug that affected the cursor movement in multiline mode when
+	  a character was deleted from near the beginning of the any
+	  line other than the first.
+08-05-01  In multiline edit mode, the refresh operation will now clear
+	  the remaining portion of the last line.
+08-05-01  A bug in computing prompt widths for the edit modes for prompts
+	  with multibyte characters has been fixed.
+08-05-01  A bug in the multiline edit mode which could cause the current
+	  line to be displayed incorrectly when moving backwards from third
+	  or higher line to the previous line has been fixed.
+08-05-01  A bug in which options set in functions declared with the function
+	  name syntax were carried across into functions invoked by these
+	  functions has been fixed.
+08-04-30  A bug which could cause a coprocess to hang when the read end
+	  is a builtin command has been fixed.
+08-04-30  The emacs and vi editors have been modified to handle window
+	  change commands as soon as they happen rather than waiting for
+	  the next command.
+08-04-28  A bug in which ${!x} did not expand to x when x was unset has been
+	  fixed.
+08-04-27  A bug in which the assignment x=(typeset -a foo=([0]=abc)) created
+	  x.foo as an associative array has been fixed.
+08-04-25  A bug in which $# did not report correctly when there were more
+	  than 32K positional parameters has been fixed.
+08-04-04  Choose the name _ as the sub-variable that holds type or instance
+	  specific data used by discipline functions.
+08-03-27  A bug in which the terminal group was not given back to the parent
+	  shell when the last part of a pipeline was handled by the parent shell
+	  and the other parts of the pipeline complete has been fixed. 
+	  The symptom was that the pipeline became uninterruptable.
+08-03-25  A bug in restricted mode introduced in ksh93s that caused scripts
+	  that did not use #! to executed in restricted mode has been fixed.
+08-03-25  A bug in which the pipefail option did not work for a pipeline
+	  within a pipeline has been fixed.
+08-03-24  A bug in which OPTIND was not set correctly in subshells has
+	  been fixed.
+08-03-24  A bug which could cause a memory exception when a compound variable
+	  containing an indexed array with only element 0 defined was expanded.
+08-03-20  A bug in which ${!var[sub].*} was treated as an error has been fixed.
+08-03-20  Associative array assignments of the form ([name]=value ...)
+	  now allow ; as well as space tab and new line to separate elements.
+08-03-18  A buffering problem in which standard error was sometimes
+	  not flushed before sleep has been fixed.
+08-03-17  A bug in which a signal sent to $$ while in a subshell would be
+	  sent to the subshell rather than the parent has been fixed.
+08-03-17  --default option added to set(1) to handle set +o POSIX semantics.
+	  set --state added as a long name alias for set +o.
+08-03-14  A bug in which using monitor mode from within a script could
+	  cause the terminal group to change has been fixed.
+08-03-10  The new ${...} command substitution will treat the trailing }
+	  as a reserved word even if it is not at the beginning of a command,
+	  for example, ${ date }.
+08-03-10  If the name of the ENV begins with /./ or ././ then the
+	  /etc/ksh.kshrc file will not be executed on systems that support
+	  this interactive initialization file.
+08-03-07  A bug in which ksh -i did not run the ENV file has been fixed.
+08-03-07  A bug in which ulimit did not always produce the same output as
+	  ulimit -fS has been fixed.
+08-03-04  A bug in multiline mode in emacs and vi mode which could cause the
+	  cursor to be on the wrong line when interrupt was hit has been fixed.
+08-03-03  The change made in ksh93s+ on 07-06-18 in which braces became
+	  optional for ${a[i]} inside  [[...]] was restored in the case
+	  where the argument can be a pattern.
+08-03-03  A bug in which creating a name reference to an associative array
+	  instance would fail when the subscript contained characters [ or
+	  ] has been fixed.
+08-02-29  The redirection operator >; has been added which for non-special
+	  files, generates the output in a temporary file and writes the
+	  specified file only of the command has completed successfully.
+08-02-15  A bug in ${var/pattern/string} for patterns of the form ?(*) and +(*)
+	  has bee fixed.
+08-02-07  A bug in which test \( ! -e \) produced an error has been fixed.
+08-02-14  The typeset -a option can now optionally be followed by the name
+	  of an enumeration type which allows subscripts to be enumerations.
+08-02-14  The enum builtin which creates enumeration types has been added.
+08-02-12  The backoff logic when there are no more processes has been fixed.
+08-02-07  The -X option has been added to typeset.  The -X option creates
+	  a double precision number that gets displayed using the C99 %a
+	  format.  It can be used along with -l for long double.
+08-01-31  The -T option to typeset has been added for creating typed
+	  variables.  Also the -h and -S options have been added to
+	  typeset that are only applicable when defining a type.
+08-01-31  The prefix expansion operator @ has been added.  ${@name}
+	  expands to the type of name or yields the attributes.
+07-11-15  A bug in the macro expander for multibyte characters in which
+	  part of the character contains a file pattern byte has been fixed. 
+07-10-03  A bug in which : was not allowed as part of an alias name has been
+	  fixed.
+07-09-26  A bug in which appending a compound variable to a compound variable
+	  or to an index array didn't work has been fixed.
+07-09-19  In both emacs and vi edit mode, the escape sequence \E[A (usually
+	  cursor up, when the cursor is at the end of the line will fetch
+	  the most recent line starting with the current line.
+07-09-18  The value of ${!var} was correct when var was a reference to an
+	  array instance.
+07-09-18  The value of ${!var[sub]} was not expanding to var[sub] and this
+	  was fixed.  It also fixed ${name} where name is a name reference
+	  to var[sub].
+07-09-18  It is now legal to create a name reference without an initialization.
+	  It will be bound to a variable on the first assignment.
+07-08-30  A discipline function can be invoked as ${x.foo} and is equivalent
+	  to ${ x.foo;} and can be invoked as x.foo inside ((...)).
+07-07-09  A bug in which typeset -a did not list indexed arrays has been
+	  fixed.
+07-07-03  The command substitution ${ command;} has been added.  It behaves
+	  like $(command) except that command is executed in the current
+	  shell environment.  The ${ must be followed by a blank or an
+	  operator.
+
+08-04-17  --- Release ksh93s+  ---
+08-04-17  A bug in which umask was not being restored correctly after a
+          subshell has been fixed.
+08-04-15  A bug in which sending a STOP signal to a job control shell started
+	  from within a shell function caused cause the invoking shell to
+	  terminate has been fixed.
+08-04-11  A bug which caused $(exec > /dev/null) to go into an infinite loop
+	  has been fixed.
+08-03-27  A bug in which typeset -LZ was being treated as -RZ has been fixed.
+08-03-06  A bug with ksh -P on systems that support the the profile shell,
+          in which it would exit after running a non-builtin has been fixed.
+08-01-31  A bug in which command substitution inside ((...)) could cause
+	  syntax errors or lead to core dumps has been fixed.
+08-01-17  A bug in which discipline functions could be deleted when invoked
+	  from a subshell has been fixed.
+08-01-17  A bug in which a command substitution consisting only of
+	  assignments was treated as a noop has been fixed.
+08-01-17  A bug in which discipline functions invoked from withing a
+	  compound assignment could fail has been fixed.
+08-01-16  Incomplete arithmetic assignments, for example ((x += )), now
+	  generate an error message.
+08-01-16  A bug in which a set discipline defined for a variable before
+	  an array assignment could cause a core dump has been fixed. 
+08-01-03  A bug in on some systems in which exit status 0 is incorrectly
+	  returned by a process that catches the SIGCONT signal is stopped 
+	  and then continued.
+07-12-13  A race condition in which a program that has been stopped and then
+	  continued could loose the exit status has been fixed.
+07-12-12  Code to check for file system out of space write errors for all
+	  writes has been added.
+07-12-11  A bug in the macro expander for multibyte characters in which
+	  part of the character contains a file pattern byte has been fixed. 
+07-12-06  A bug in the emacs edit mode when multiline was set that output
+	  a backspace before the newline to the screen has been fixed.
+07-12-04  A bug in which using <n>TAB after a variable name listing expansion
+	  in the edit modes would cause the $ to disappear has been fixed.
+07-11-28  A bug in which setting IFS to readonly could cause a subsequent
+	  command substitution to fail has been fixed.
+07-11-27  A work around for a gcc 4.* C99 "feature" that could cause a job
+	  control shell to go into an infinite loop by adding the volatile
+	  attribute to some auto vars in functions that call setjmp().
+07-11-27  A bug in which the shell could read ahead on a pipe causing the
+	  standard input to be incorrectly positioned has been fixed.
+07-11-27  A bug in which compound variable UTF-8 multibyte values were not
+	  expanded or traced properly has been fixed.
+07-11-21  A bug where an unbalanced '[' in a command argument was not treated
+	  properly has been fixed.
+07-11-15  A bug in which compatibility mode (no long option names) getopts(1)
+	  incorrectly set the value of OPTARG for flag options has been fixed.
+07-11-15  A bug in which "hash -- name" treated "--" as an invalid name operand
+	  has been fixed.
+07-11-15  typeset now handles "-t -- [-r] [--]" for s5r4 hash(1) compatibility.
+07-11-15  A bug in which the umask builtin mis-handled symbolic mode operands
+	  has been fixed.
+07-11-15  Bugs in which shell arithmetic and the printf builtin mis-handled the
+	  signs of { -NaN -Inf -0.0 } have been fixed.
+07-11-15  The full { SIGRTMIN SIGRTMIN+1 ... SIGRTMAX-1 SIGRTMAX } range
+	  of signals, determined at runtime, are now supported.
+07-11-15  A bug in which creating an index array with only subscript 0 created
+	  only a simple variable has been fixed.
+07-11-14  A bug in which appending to an indexed array using the form
+	  name+=([sub]=value) could cause the array to become an associative
+	  array has been fixed.
+07-11-14  A bug in which typeset without arguments could coredump if a
+	  variable is declared as in indexed array and  has no elements has
+	  been fixed.
+07-11-14  A bug in which creating a local SECONDS variable with typeset in
+	  a function could corrupt memory has been fixed.
+07-11-14  A bug which could cause a core dump when a script invoked by name
+	  from a function used compound variables has been fixed.
+07-11-05  A bug in which printf %d "'AB" did not diagnose unconverted characters
+	  has been fixed.
+07-11-05  printf %g "'A" support added for all floating point formats.
+07-11-01  A bug in which typeset -f fun did not display the function definition
+          when invoked in a subshell has been fixed.
+07-10-29  The sleep builtin was fixed so that all floating point constants
+	  are valid operands.
+07-10-10  A bug in which the locale was not being restored after
+          LANG=value command has been fixed.
+07-09-20  A bug in which a nameref to a compound variable that was local
+	  to the calling function would not expand correctly when displaying
+	  is value has been fixed.
+07-09-19  A bug which cause cause a core dump if .sh.edchar returned
+	  80 characters or more from a keyboard trap has been fixed.
+07-09-14  A bug in which could cause a core dump when more than 8 file
+	  descriptors were in use has been fixed.
+07-09-10  A bug in which creating a name reference to an instance of
+	  an array when the array name is itself a reference has been fixed.
+07-09-10  The file completion code has been modified so that after an = in
+	  any word, each : will be considered a path delimiter.
+07-09-06  A bug in which subprocess cleanup could corrupt the malloc() heap
+          has been fixed.
+07-08-26  A bug in which a name reference to an associative array instance
+	  could cause the subscript to be evaluated as an arithmetic expression
+	  has been fixed.
+07-08-22  A bug in which the value of an array instance was of a compound
+	  variable was not expanded correctly has been fixed.
+07-08-14  A bug which could cause a core dump when a compound assignment was
+	  made to a compound variable element with a typeset -a attribute
+	  has been fixed.
+07-08-08  A bug in which a trap ignored in a subshell caused it to be
+	  ignored by the parent has been fixed.
+07-08-07  A bug in which the set command would generated erroneous output
+	  for a variable with the -RZ attribute if the variable name had been
+	  passed to a function has been fixed.
+07-08-02  A bug in which read x[1] could core dump has been fixed.
+07-08-02  A second bug in which after read x[sub] into an associative array
+	  of an element that hasn't been assigned could lead to a core dump
+	  has been fixed.
+07-07-31  A bug in which a pipeline that completed correctly could have
+	  an exit status of 127 when pipefail was enabled has been fixed.
+07-07-09  The SHOPT_AUDIT compile option has been added for keyboard logging.
+07-06-25  In vi insert mode, ksh no longer emits a backspace character
+	  before the carriage return when the newline is entered. 
+07-06-25  A bug in which pipefail would cause a command to return 0
+	  when the pipeline was the last command and the failure happened
+	  on a component other than the last has been fixed.
+07-06-25  A bug in the expansion of ${var/pattern/rep} when pattern or rep
+	  contained a left parenthesis in single quotes has been fixed.
+07-06-18  The braces for a subscripted variable with ${var[sub]} are now
+	  optional when inside [[...]], ((...)) or as a subscript.
+07-05-28  A bug in brace expansion in which single and double quotes did
+          not treat the comma as a literal character has been fixed.
+07-05-24  The -p option of whence now disables -v.
+07-05-23  Several bug fixes in compound variables and arrays of arrays
+	  have been made.
+07-05-15  A bug in which the %B format of printf was affected  by the
+	  locale has been fixed.
+07-05-14  A bug in which \ was not removed in the replacement pattern with
+	  ${var/pattern/rep} when it was not followed by \ or a digit has
+	  been fixed.
+07-05-10  A bug in which ksh -R file core dumped if no script was specified
+	  has been fixed.  it not displays an error message.
+07-05-07  Added additional Solaris signals to signal table.
+07-04-30  A bug in which a pipeline with command substitution inside a
+	  function could cause a pipeline that invokes this function to
+	  hang when the pipefail option is on has been fixed.
+07-04-30  Added -q to whence.
 07-04-18  A small memory leak with each redirection of a non-builtin has
 	  been fixed.
 07-03-08  A bug in which set +o output command line options has been fixed.
@@ -619,7 +1054,7 @@
 
 02-06-17  --- Release ksh93n-  ---
 02-06-17  A bug in which user defined macros could cause a core dump in
-	  with MULTIBYE mode has been fixed.
+	  with MULTIBYTE mode has been fixed.
 02-06-17  A bug in which printf format specifiers of the form %2$s were causing
 	  a core dump has been fixed.
 02-06-17  A bug in which setting stty to noecho mode did not prevent the
@@ -1326,7 +1761,7 @@
 	  positioned for the last command of a script has been fixed.
 95-04-31  A bug in the edit modes which allowed walking back in
 	  the history file for more than HISTSIZE commands has
-	  beed fixed.
+	  been fixed.
 95-04-31  A bug which could cause a core dump if variable TMPDIR was
 	  changed between two command substitutions has been fixed.
 95-04-31. A bug which prevented a trap on EXIT from being cleared

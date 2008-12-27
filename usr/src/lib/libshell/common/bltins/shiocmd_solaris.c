@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2007 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -21,6 +21,7 @@
 
 #include	<shell.h>
 #include	<stdio.h>
+#include	<stdbool.h>
 #include	<option.h>
 #include	<stk.h>
 #include	<tm.h>
@@ -30,6 +31,9 @@
 #   define SH_DICT     "libshell"
 #endif
 #include	<poll.h>
+
+#define sh_contexttoshb(context)	((Shbltin_t*)(context))
+#define sh_contexttoshell(context)	((context)?(sh_contexttoshb(context)->shp):(NULL))
 
 /*
  * time formatting related 
@@ -487,7 +491,7 @@ extern int b_open(int argc, char *argv[], void *extra)
 {
 	register Namval_t *np;
 	register int n,oflag=0;
-	Shell_t *shp = (Shell_t*)extra;
+	Shell_t *shp = sh_contexttoshell(extra);
 	struct filedata *fdp;
 	mode_t mode = 0666;
 	long flags = 0;
@@ -658,18 +662,18 @@ extern int b_tmpfile(int argc, char *argv[], void *extra)
 {
 	register Namval_t *np;
 	register int n;
-	Shell_t *shp = (Shell_t*)extra;
+	Shell_t *shp = sh_contexttoshell(extra);
 	struct filedata *fdp;
-	int inherit = 0;
+	bool inherit = false;
 	FILE *file = NULL;
 	int ffd, fd = -1;
 	while (n = optget(argv, sh_opttmpfile)) switch (n)
 	{
 	    case 'i':
-		inherit = 1;
+		inherit = true;
 		break;
 	    case 'I':
-		inherit = 0;
+		inherit = false;
 		break;
 	    case ':':
 		errormsg(SH_DICT, 2, "%s", opt_info.arg);
@@ -734,17 +738,17 @@ extern int b_dup(int argc, char *argv[], void *extra)
 {
 	register Namval_t *np;
 	register int n;
-	Shell_t *shp = (Shell_t*)extra;
+	Shell_t *shp = sh_contexttoshell(extra);
 	struct filedata *fdp;
-	int inherit = 0;
+	bool inherit = false;
 	int ffd, fd = -1;
 	while (n = optget(argv, sh_optdup)) switch (n)
 	{
 	    case 'i':
-		inherit = 1;
+		inherit = true;
 		break;
 	    case 'I':
-		inherit = 0;
+		inherit = false;
 		break;
 	    case ':':
 		errormsg(SH_DICT, 2, "%s", opt_info.arg);
@@ -809,7 +813,7 @@ extern int b_stat(int argc, char *argv[], void *extra)
 {
 	register Namval_t *np;
 	register int n;
-	Shell_t *shp = (Shell_t*)extra;
+	Shell_t *shp = sh_contexttoshell(extra);
 	struct filedata *fdp;
 	long flags = 0;
 	struct stat statb;
@@ -854,7 +858,7 @@ extern int b_stat(int argc, char *argv[], void *extra)
 }
 
 static const char sh_optpoll[] =
-"[-?\n@(#)$Id: poll (AT&T Labs Research) 2007-05-07 $\n]"
+"[-?\n@(#)$Id: poll (AT&T Labs Research) 2007-12-20 $\n]"
 "[-author?Roland Mainz <roland.mainz@nrubsig.org]"
 "[-license?http://www.opensource.org/licenses/cpl1.0.txt]"
 "[+NAME? poll - input/output multiplexing]"
@@ -957,7 +961,17 @@ static const char sh_optpoll[] =
  
 "[+?Regular files always poll TRUE for reading and writing.]"
 
-"[t:timeout]:[milliseconds?Timeout in milliseconds. If the value timeout is 0, "
+"[c:fdcount]:[fdcount?Upon successful completion, a non-negative value is "
+	"returned. A positive value indicates the total number of "
+	"file descriptors that has been selected (that is, file "
+	"descriptors for which the revents member is non-zero). A "
+	"value of 0 indicates that the call timed out and no file "
+	"descriptors have been selected. Upon failure, -1 is returned.]"
+"[t:timeout]:[seconds?Timeout in seconds. If the value timeout is 0, "
+	"poll returns immediately. If the value of timeout is -1, poll "
+	"blocks until a requested event occurs or until the call is "
+	"interrupted.]"
+"[T:mtimeout]:[milliseconds?Timeout in milliseconds. If the value timeout is 0, "
 	"poll returns immediately. If the value of timeout is -1, poll "
 	"blocks until a requested event occurs or until the call is "
 	"interrupted.]"
@@ -1041,32 +1055,48 @@ void poll_eventstostr(char *s, int events)
 	if(*s=='|')
 		*s='\0';
 }
+
+#undef  getconf
+#define getconf(x)      strtol(astconf(x,NiL,NiL),NiL,0)
 		
 extern int b_poll(int argc, char *argv[], void *extra)
 {
 	register Namval_t *np;
 	register int n;
-	Shell_t *shp = (Shell_t*)extra;
+	Shell_t *shp = sh_contexttoshell(extra);
 	char *varname;
 	int fd;
-/* |BPOLL_MAX| needs to be larger than |OPEN_MAX| to make sure we
- * can listen to different sets of events per fd.
- */
-#define BPOLL_MAX 512
-	struct pollfd pollfd[BPOLL_MAX];
 	unsigned int numpollfd = 0;
 	int i;
 	char *s;
-	long timeout = -1;
+	double timeout = -1.;
 	char buff[256];
-	
+	char *pollfdcountvarname = NULL;
+	long open_max,
+	     bpoll_max;
+
+	if ((open_max = getconf("OPEN_MAX")) <= 0)
+		open_max = OPEN_MAX;
+	/* |bpoll_max| needs to be larger than |OPEN_MAX| to make sure we
+	 * can listen to different sets of events per fd.
+	 */
+	bpoll_max = open_max*2L;
+
 	while (n = optget(argv, sh_optpoll)) switch (n)
 	{
 	    case 't':
+	    case 'T':
 		errno = 0;
-		timeout = strtol(opt_info.arg, (char **)NULL, 0);
+		timeout = strtod(opt_info.arg, (char **)NULL);	
 		if (errno != 0)
 			errormsg(SH_DICT, ERROR_system(1), "%s: invalid timeout", opt_info.arg);
+
+		/* -t uses seconds, -T milliseconds */
+		if (n == 't')
+			timeout *= 1000.;
+		break;
+	    case 'c':
+	    	pollfdcountvarname = opt_info.arg;
 		break;
 	    case ':':
 		errormsg(SH_DICT, 2, "%s", opt_info.arg);
@@ -1081,25 +1111,27 @@ extern int b_poll(int argc, char *argv[], void *extra)
 		errormsg(SH_DICT, ERROR_usage(2), optusage((char*)0));
 
         varname = argv[0];
+
+	struct pollfd pollfd[bpoll_max];
 	
-	for(i=0 ; i < BPOLL_MAX ; i++)
+	for(i=0 ; i < bpoll_max ; i++)
 	{	
-		np = nv_open_fmt(shp->var_tree, NV_ARRAY|NV_VARNAME|NV_NOASSIGN|NV_NOFAIL|NV_NOADD, "%s[%d].fd", varname, i);
+		np = nv_open_fmt(shp->var_tree, NV_VARNAME|NV_NOFAIL|NV_NOADD, "%s[%d].fd", varname, i);
 		if (!np)
 			break;
 		fd = (int)nv_getnum(np);
 		if (fd < 0 || fd > OPEN_MAX)
-			errormsg(SH_DICT, ERROR_system(1), "poll: invalid pollfd fd");
+			errormsg(SH_DICT, ERROR_system(1), "invalid pollfd fd");
 		nv_close(np);
 		pollfd[i].fd = fd;
 
-		np = nv_open_fmt(shp->var_tree, NV_ARRAY|NV_VARNAME|NV_NOASSIGN|NV_NOFAIL|NV_NOADD, "%s[%d].events", varname, i);
-		if (!s)
-			errormsg(SH_DICT, ERROR_system(1), "poll: missing pollfd events");
+		np = nv_open_fmt(shp->var_tree, NV_VARNAME|NV_NOFAIL|NV_NOADD, "%s[%d].events", varname, i);
+		if (!np)
+			errormsg(SH_DICT, ERROR_system(1), "missing pollfd events");
 
 		s = nv_getval(np);
 		if (!s)
-			errormsg(SH_DICT, ERROR_system(1), "poll: missing pollfd events value");
+			errormsg(SH_DICT, ERROR_system(1), "missing pollfd events value");
 		pollfd[i].events  = poll_strtoevents(s);
 		nv_close(np);
 
@@ -1108,19 +1140,30 @@ extern int b_poll(int argc, char *argv[], void *extra)
 		numpollfd++;
         }
 	
-	if (i == BPOLL_MAX)
-		errormsg(SH_DICT, ERROR_system(1), "poll: cannot handle more than %d entries.", BPOLL_MAX);
+	if (i == bpoll_max)
+		errormsg(SH_DICT, ERROR_system(1), "cannot handle more than %d entries.", bpoll_max);
 
 	n = poll(pollfd, numpollfd, timeout);
 	/* FixMe: EGAIN and EINTR may require extra handling */
 	if (n < 0)
-		errormsg(SH_DICT, ERROR_system(1), "poll: failure");
+		errormsg(SH_DICT, ERROR_system(1), "failure");
+
+	if (pollfdcountvarname)
+	{
+		int32_t v = n;
+
+		np = nv_open_fmt(shp->var_tree, NV_VARNAME|NV_NOFAIL, "%s", pollfdcountvarname);
+		if (!np)
+			errormsg(SH_DICT, ERROR_system(1), "couldn't create poll count variable %s", pollfdcountvarname);
+		nv_putval(np, (char *)&v, NV_INTEGER);
+		nv_close(np);
+	}
 
 	for(i=0 ; i < numpollfd ; i++)
 	{	
-		np = nv_open_fmt(shp->var_tree, NV_ARRAY|NV_VARNAME|NV_NOASSIGN|NV_NOFAIL, "%s[%d].revents", varname, i);
+		np = nv_open_fmt(shp->var_tree, NV_VARNAME|NV_NOFAIL, "%s[%d].revents", varname, i);
 		if (!np)
-			errormsg(SH_DICT, ERROR_system(1), "poll: couldn't create pollfd %s[%d].revents", varname, i);
+			errormsg(SH_DICT, ERROR_system(1), "couldn't create pollfd %s[%d].revents", varname, i);
 
 		poll_eventstostr(buff, pollfd[i].revents);
 	
@@ -1150,7 +1193,7 @@ static const char sh_optrewind[] =
 
 extern int b_rewind(int argc, char *argv[], void *extra)
 {
-	Shell_t *shp = (Shell_t*)extra;
+	Shell_t *shp = sh_contexttoshell(extra);
 	int fd = -1;
 	register int n;
 	while (n = optget(argv, sh_optrewind)) switch (n)
@@ -1177,4 +1220,3 @@ extern int b_rewind(int argc, char *argv[], void *extra)
 
 	return(0);
 }
-

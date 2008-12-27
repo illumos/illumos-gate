@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -474,7 +474,11 @@ static const Map_t map[] =
 	MON_10,				(TM_MONTH+9),
 	MON_11,				(TM_MONTH+10),
 	MON_12,				(TM_MONTH+11),
+#ifdef _DATE_FMT
+	_DATE_FMT,			TM_DEFAULT,
+#else
 	D_T_FMT,			TM_DEFAULT,
+#endif
 	D_FMT,				TM_DATE,
 	T_FMT,				TM_TIME,
 #ifdef ERA

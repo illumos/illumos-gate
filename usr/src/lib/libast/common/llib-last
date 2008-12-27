@@ -19,41 +19,48 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/libast/common/llib-last
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 
 #define _FTWALK_H 1
 
-#include <ast.h>
 #include <align.h>
+#include <ast.h>
 #include <ast_botch.h>
 #include <ast_ccode.h>
 #include <ast_common.h>
 #include <ast_dir.h>
 #include <ast_dirent.h>
+#include <ast_fcntl.h>
 #include <ast_float.h>
 #include <ast_fs.h>
 #include <ast_getopt.h>
 #include <ast_iconv.h>
 #include <ast_lib.h>
 #include <ast_limits.h>
+#include <ast_map.h>
 #include <ast_mmap.h>
 #include <ast_mode.h>
+#include <ast_ndbm.h>
 #include <ast_nl_types.h>
 #include <ast_param.h>
+#include <ast_standards.h>
+#include <ast_std.h>
+#include <ast_stdio.h>
+#include <ast_sys.h>
 #include <ast_time.h>
 #include <ast_tty.h>
-#include <ast_types.h>
 #include <ast_version.h>
+#include <ast_vfork.h>
+#include <ast_wait.h>
+#include <ast_wchar.h>
 #include <bytesex.h>
 #include <ccode.h>
 #include <cdt.h>
@@ -68,14 +75,15 @@
 #include <fs3d.h>
 #include <fts.h>
 #include <ftw.h>
+#include <ftwalk.h>
 #include <getopt.h>
 #include <glob.h>
 #include <hash.h>
 #include <hashkey.h>
 #include <hashpart.h>
 #include <iconv.h>
+#include <ip6.h>
 #include <lc.h>
-#include <limits.h>
 #include <ls.h>
 #include <magic.h>
 #include <magicid.h>
@@ -83,21 +91,24 @@
 #include <mime.h>
 #include <mnt.h>
 #include <modecanon.h>
+#include <modex.h>
 #include <namval.h>
 #include <nl_types.h>
 #include <option.h>
 #include <preroot.h>
 #include <proc.h>
+#include <prototyped.h>
 #include <re_comp.h>
 #include <recfmt.h>
 #include <regex.h>
-#include <regexp.h>
 #include <sfdisc.h>
+#include <sfio.h>
 #include <sfio_s.h>
 #include <sfio_t.h>
 #include <sig.h>
 #include <stack.h>
 #include <stak.h>
+#include <stdio.h>
 #include <stk.h>
 #include <swap.h>
 #include <tar.h>
@@ -109,554 +120,7 @@
 #include <usage.h>
 #include <vdb.h>
 #include <vecargs.h>
+#include <vmalloc.h>
 #include <wait.h>
 #include <wchar.h>
 #include <wordexp.h>
-
-#if defined(_AST_STD_H) || defined(_POSIX_SOURCE) || defined(_XOPEN_SOURCE)
-#define _AST_mode_t     mode_t
-#else
-#define _AST_mode_t     int
-#endif
-
-/* automatically generated data start here */
-/* tmpastinclude/ast.h */
-extern char* astconf(const char*, const char*, const char*);
-extern Ast_confdisc_f astconfdisc(Ast_confdisc_f);
-extern void astconflist(Sfio_t*, const char*, int, const char*);
-extern off_t astcopy(int, int, off_t);
-extern int astlicense(char*, int, char*, char*, int, int, int);
-extern int astquery(int, const char*, ...);
-extern void astwinsize(int, int*, int*);
-extern ssize_t base64encode(const void*, size_t, void**, void*, size_t, void**);
-extern ssize_t base64decode(const void*, size_t, void**, void*, size_t, void**);
-extern int chresc(const char*, char**);
-extern int chrtoi(const char*);
-extern int eaccess(const char*, int);
-/*
-extern char* fmtbase(long, int, int);
-extern char* fmtbasell(_ast_intmax_t, int, int);
-extern char* fmtbuf(size_t);
-extern char* fmtclock(Sfulong_t);
-extern char* fmtelapsed(unsigned long, int);
-extern char* fmterror(int);
-extern char* fmtesc(const char*);
-extern char* fmtesq(const char*, const char*);
-extern char* fmtident(const char*);
-extern char* fmtip4(unsigned _ast_int4_t, int);
-extern char* fmtfmt(const char*);
-extern char* fmtgid(int);
-extern char* fmtmatch(const char*);
-extern char* fmtmode(int, int);
-extern char* fmtnesq(const char*, const char*, size_t);
-extern char* fmtnum(unsigned long, int);
-extern char* fmtperm(int);
-extern char* fmtquote(const char*, const char*, const char*, size_t, int);
-extern char* fmtre(const char*);
-extern char* fmtscale(Sfulong_t, int);
-extern char* fmtsignal(int);
-extern char* fmttime(const char*, time_t);
-extern char* fmtuid(int);
-extern char* fmtversion(unsigned long);
-*/
-extern void* _ast_memdup(const void*, size_t);
-extern void _ast_memfatal(void);
-extern unsigned int _ast_memhash(const void*, int);
-extern unsigned long memsum(const void*, int, unsigned long);
-extern char* _ast_pathaccess(char*, const char*, const char*, const char*, int);
-extern char* _ast_pathbin(void);
-extern char* _ast_pathcanon(char*, int);
-extern char* _ast_pathcat(char*, const char*, int, const char*, const char*);
-extern int _ast_pathcd(const char*, const char*);
-extern int _ast_pathcheck(const char*, const char*, Pathcheck_t*);
-extern int _ast_pathexists(char*, int);
-extern char* _ast_pathfind(const char*, const char*, const char*, char*, size_t);
-extern int _ast_pathgetlink(const char*, char*, int);
-extern int _ast_pathinclude(const char*);
-extern char* _ast_pathkey(char*, char*, const char*, const char*, const char*);
-extern size_t _ast_pathnative(const char*, char*, size_t);
-extern char* _ast_pathpath(char*, const char*, const char*, int);
-extern size_t _ast_pathposix(const char*, char*, size_t);
-extern char* _ast_pathprobe(char*, char*, const char*, const char*, const char*, int);
-extern char* _ast_pathrepl(char*, const char*, const char*);
-extern int _ast_pathsetlink(const char*, const char*);
-extern char* _ast_pathshell(void);
-extern char* _ast_pathtemp(char*, size_t, const char*, const char*, int*);
-extern char* _ast_pathtmp(char*, const char*, const char*, int*);
-extern char* _ast_setenviron(const char*);
-extern int _ast_stracmp(const char*, const char*);
-extern char* _ast_strcopy(char*, const char*);
-extern unsigned long _ast_strelapsed(const char*, char**, int);
-extern int _ast_stresc(char*);
-extern long _ast_streval(const char*, char**, long(*)(const char*, char**));
-extern long _ast_strexpr(const char*, char**, long(*)(const char*, char**, void*), void*);
-extern int _ast_strgid(const char*);
-extern int _ast_strgrpmatch(const char*, const char*, int*, int, int);
-extern unsigned int strhash(const char*);
-extern void* _ast_strlook(const void*, size_t, const char*);
-extern int _ast_strmatch(const char*, const char*);
-extern int _ast_strmode(const char*);
-extern int _ast_strnacmp(const char*, const char*, size_t);
-extern char* _ast_strncopy(char*, const char*, size_t);
-extern double _ast_strntod(const char*, size_t, char**);
-extern _ast_fltmax_t _ast_strntold(const char*, size_t, char**);
-extern long _ast_strntol(const char*, size_t, char**, int);
-extern _ast_intmax_t _ast_strntoll(const char*, size_t, char**, int);
-extern unsigned long strntoul(const char*, size_t, char**, int);
-extern unsigned _ast_intmax_t strntoull(const char*, size_t, char**, int);
-extern int _ast_stropt(const char*, const void*, int, int(*)(void*, const void*, int, const char*), void*);
-extern int _ast_strperm(const char*, char**, int);
-extern void* _ast_strpsearch(const void*, size_t, size_t, const char*, char**);
-extern void* _ast_strsearch(const void*, size_t, size_t, Strcmp_f, const char*, void*);
-extern void _ast_strsort(char**, int, int(*)(const char*, const char*));
-extern char* _ast_strsubmatch(const char*, const char*, int);
-extern unsigned long _ast_strsum(const char*, unsigned long);
-extern char* _ast_strtape(const char*, char**);
-extern int _ast_strtoip4(const char*, char**, unsigned _ast_int4_t*, unsigned char*);
-extern long _ast_strton(const char*, char**, char*, int);
-extern _ast_intmax_t _ast_strtonll(const char*, char**, char*, int);
-extern int _ast_struid(const char*);
-extern int _ast_struniq(char**, int);
-extern char** environ;
-
-/* tmpastinclude/align.h */
-
-/* tmpastinclude/ast_botch.h */
-
-/* tmpastinclude/ast_ccode.h */
-
-/* tmpastinclude/ast_common.h */
-
-/* tmpastinclude/ast_dir.h */
-
-/* tmpastinclude/ast_dirent.h */
-
-/* tmpastinclude/ast_float.h */
-
-/* tmpastinclude/ast_fs.h */
-extern int fstatvfs(int, struct statvfs*);
-extern int statvfs(const char*, struct statvfs*);
-extern int statvfs64(const char*, struct statvfs64*);
-extern int fstatvfs64(int, struct statvfs64*);
-
-/* tmpastinclude/ast_getopt.h */
-extern int opterr;
-extern int optind;
-extern int optopt;
-extern char* optarg;
-extern int _ast_getopt(int, char* const*, const char*);
-extern int _ast_getsubopt(char**, char* const*, char**);
-
-/* tmpastinclude/ast_hdr.h */
-
-/* tmpastinclude/ast_iconv.h */
-extern _ast_iconv_t _ast_iconv_open(const char*, const char*);
-extern size_t _ast_iconv(_ast_iconv_t, char**, size_t*, char**, size_t*);
-extern int _ast_iconv_close(_ast_iconv_t);
-extern _ast_iconv_list_t* _ast_iconv_list(_ast_iconv_list_t*);
-extern int _ast_iconv_name(const char*, char*, size_t);
-extern ssize_t _ast_iconv_move(_ast_iconv_t, Sfio_t*, Sfio_t*, size_t, size_t*);
-extern ssize_t _ast_iconv_write(_ast_iconv_t, Sfio_t*, char**, size_t*, size_t*);
-extern ssize_t _ast_iconv_move(_ast_iconv_t, FILE*, FILE*, size_t, size_t*);
-extern ssize_t _ast_iconv_write(_ast_iconv_t, FILE*, char**, size_t*, size_t*);
-
-/* tmpastinclude/ast_lib.h */
-
-/* tmpastinclude/ast_limits.h */
-
-/* tmpastinclude/ast_mmap.h */
-
-/* tmpastinclude/ast_mode.h */
-
-/* tmpastinclude/ast_nl_types.h */
-extern nl_catd catopen(const char*, int);
-extern char* catgets(nl_catd, int, int, const char*);
-extern int catclose(nl_catd);
-
-/* tmpastinclude/ast_param.h */
-
-/* tmpastinclude/ast_time.h */
-
-/* tmpastinclude/ast_tty.h */
-
-/* tmpastinclude/ast_types.h */
-
-/* tmpastinclude/ast_unistd.h */
-
-/* tmpastinclude/ast_version.h */
-
-/* tmpastinclude/ast_wait.h */
-
-/* tmpastinclude/bytesex.h */
-
-/* tmpastinclude/ccode.h */
-extern unsigned char* _ccmap(int, int);
-extern void* _ccmapcpy(unsigned char*, void*, const void*, size_t);
-extern void* _ccmapstr(unsigned char*, void*, size_t);
-extern int ccmapid(const char*);
-extern char* ccmapname(int);
-extern void* ccnative(void*, const void*, size_t);
-extern Ccmap_t* ccmaplist(Ccmap_t*);
-
-/* tmpastinclude/cdt.h */
-extern Dtmethod_t* Dtset;
-extern Dtmethod_t* Dtbag;
-extern Dtmethod_t* Dtoset;
-extern Dtmethod_t* Dtobag;
-extern Dtmethod_t* Dtlist;
-extern Dtmethod_t* Dtstack;
-extern Dtmethod_t* Dtqueue;
-extern Dtmethod_t* Dtorder;
-extern Dtmethod_t* Dttree;
-extern Dtmethod_t* Dthash;
-extern Dtmethod_t _Dttree;
-extern Dtmethod_t _Dthash;
-extern Dtmethod_t _Dtlist;
-extern Dtmethod_t _Dtqueue;
-extern Dtmethod_t _Dtstack;
-extern Dt_t* dtopen(Dtdisc_t*, Dtmethod_t*);
-extern int dtclose(Dt_t*);
-extern Dt_t* dtview(Dt_t*, Dt_t*);
-extern Dtdisc_t* dtdisc(Dt_t* dt, Dtdisc_t*, int);
-extern Dtmethod_t* dtmethod(Dt_t*, Dtmethod_t*);
-extern Dtlink_t* dtflatten(Dt_t*);
-extern Dtlink_t* dtextract(Dt_t*);
-extern int dtrestore(Dt_t*, Dtlink_t*);
-extern int dttreeset(Dt_t*, int, int);
-extern int dtwalk(Dt_t*, int(*)(Dt_t*,Void_t*,Void_t*), Void_t*);
-extern Void_t* dtrenew(Dt_t*, Void_t*);
-extern int dtsize(Dt_t*);
-extern int dtstat(Dt_t*, Dtstat_t*, int);
-extern unsigned int dtstrhash(unsigned int, Void_t*, int);
-extern int memcmp(const Void_t*, const Void_t*, size_t);
-extern int strcmp(const char*, const char*);
-
-/* tmpastinclude/debug.h */
-extern void systrace(const char*);
-
-/* tmpastinclude/dirent.h */
-
-/* tmpastinclude/dt.h */
-extern Dt_t* dtnew(Vmalloc_t*, Dtdisc_t*, Dtmethod_t*);
-
-/* tmpastinclude/endian.h */
-
-/* tmpastinclude/error.h */
-extern int errno;
-extern Error_info_t error_info;
-extern void error(int, ...);
-extern int errormsg(const char*, int, ...);
-extern int errorf(void*, void*, int, ...);
-extern void errorv(const char*, int, va_list);
-extern char* errorx(const char*, const char*, const char*, const char*);
-extern void liberror(const char*, int, ...);
-extern int libevent(void*, void*, int, ...);
-
-/* tmpastinclude/find.h */
-extern Find_t* findopen(const char*, const char*, const char*, Finddisc_t*);
-extern char* findread(Find_t*);
-extern int findwrite(Find_t*, const char*, size_t, const char*);
-extern int findclose(Find_t*);
-
-/* tmpastinclude/fnmatch.h */
-extern int _ast_fnmatch(const char*, const char*, int);
-
-/* tmpastinclude/fnv.h */
-
-/* tmpastinclude/fs3d.h */
-extern int mount(const char*, char*, int, void*);
-extern int fs3d(int);
-extern char* pathnext(char*, char*, long*);
-
-/* tmpastinclude/fts.h */
-extern FTSENT* _ast_fts_children(FTS*, int);
-extern int _ast_fts_close(FTS*);
-extern int _ast_fts_flags(void);
-extern int _ast_fts_notify(int(*)(FTS*, FTSENT*, void*), void*);
-extern FTS* _ast_fts_open(char* const*, int, int(*)(FTSENT* const*, FTSENT* const*));
-extern FTSENT* _ast_fts_read(FTS*);
-extern int _ast_fts_set(FTS*, FTSENT*, int);
-
-/* tmpastinclude/ftw.h */
-extern int _ast_ftw(const char*, int(*)(const char*, const struct stat*, int), int);
-extern int _ast_nftw(const char*, int(*)(const char*, const struct stat*, int, struct FTW*), int, int);
-
-/* tmpastinclude/getopt.h */
-extern int getopt_long(int, char* const*, const char*, const struct option*, int*);
-extern int getopt_long_only(int, char* const*, const char*, const struct option*, int*);
-
-/* tmpastinclude/glob.h */
-extern int _ast_glob(const char*, int, int(*)(const char*,int), glob_t*);
-extern void _ast_globfree(glob_t*);
-
-/* tmpastinclude/hash.h */
-extern Hash_table_t* hashalloc(Hash_table_t*, ...);
-extern void hashdone(Hash_position_t*);
-extern void hashdump(Hash_table_t*, int);
-extern Hash_table_t* hashfree(Hash_table_t*);
-extern Hash_bucket_t* hashlast(Hash_table_t*);
-extern char* hashlook(Hash_table_t*, const char*, long, const char*);
-extern Hash_bucket_t* hashnext(Hash_position_t*);
-extern Hash_position_t* hashscan(Hash_table_t*, int);
-extern void hashsize(Hash_table_t*, int);
-extern Hash_table_t* hashview(Hash_table_t*, Hash_table_t*);
-extern int hashwalk(Hash_table_t*, int, int (*)(const char*, char*, void*), void*);
-
-/* tmpastinclude/hashkey.h */
-extern long _ast_strkey(const char*);
-
-/* tmpastinclude/hashpart.h */
-
-/* tmpastinclude/iconv.h */
-
-/* tmpastinclude/lc.h */
-extern size_t lccanon(Lc_t*, unsigned long flags, char*, size_t);
-extern Lc_category_t* lccategories(void);
-extern int lcindex(int, int);
-extern Lc_info_t* lcinfo(int);
-extern Lc_t* lcmake(const char*);
-extern Lc_t* lcscan(Lc_t*);
-
-/* tmpastinclude/limits.h */
-
-/* tmpastinclude/ls.h */
-extern int chmod(const char*, _AST_mode_t);
-extern int fstat(int, struct stat*);
-extern int lstat(const char*, struct stat*);
-extern int mkdir(const char*, _AST_mode_t);
-extern int mkfifo(const char*, _AST_mode_t);
-extern int mknod(const char*, _AST_mode_t, dev_t);
-extern int stat(const char*, struct stat*);
-extern _AST_mode_t umask(_AST_mode_t);
-extern off_t _iblocks(struct stat*);
-extern char* fmtdev(struct stat*);
-extern char* fmtfs(struct stat*);
-extern char* fmtls(char*, const char*, struct stat*, const char*, const char*, int);
-extern int _ast_pathstat(const char*, struct stat*);
-
-/* tmpastinclude/magic.h */
-extern Magic_t* magicopen(Magicdisc_t*);
-extern int magicload(Magic_t*, const char*, unsigned long);
-extern int magiclist(Magic_t*, Sfio_t*);
-extern char* magictype(Magic_t*, Sfio_t*, const char*, struct stat*);
-extern int magicclose(Magic_t*);
-
-/* tmpastinclude/magicid.h */
-
-/* tmpastinclude/mc.h */
-extern char* mcfind(char*, const char*, const char*, int, int);
-extern Mc_t* mcopen(Sfio_t*);
-extern char* mcget(Mc_t*, int, int, const char*);
-extern int mcput(Mc_t*, int, int, const char*);
-extern int mcdump(Mc_t*, Sfio_t*);
-extern int mcindex(const char*, char**, int*, int*);
-extern int mcclose(Mc_t*);
-
-/* tmpastinclude/mime.h */
-extern Mime_t* mimeopen(Mimedisc_t*);
-extern int mimeload(Mime_t*, const char*, unsigned long);
-extern int mimelist(Mime_t*, Sfio_t*, const char*);
-extern int mimeclose(Mime_t*);
-extern int mimeset(Mime_t*, char*, unsigned long);
-extern char* mimetype(Mime_t*, Sfio_t*, const char*, struct stat*);
-extern char* mimeview(Mime_t*, const char*, const char*, const char*, const char*);
-extern int mimehead(Mime_t*, void*, size_t, size_t, char*);
-extern int mimecmp(const char*, const char*, char**);
-
-/* tmpastinclude/mnt.h */
-extern void* mntopen(const char*, const char*);
-extern Mnt_t* mntread(void*);
-extern int mntwrite(void*, const Mnt_t*);
-extern int mntclose(void*);
-
-/* tmpastinclude/modecanon.h */
-
-/* tmpastinclude/namval.h */
-
-/* tmpastinclude/nl_types.h */
-
-/* tmpastinclude/option.h */
-extern Opt_t opt_info;
-extern int _ast_optget(char**, const char*);
-extern int _ast_optjoin(char**, ...);
-extern char* _ast_opthelp(const char*, const char*);
-extern char* _ast_optusage(const char*);
-extern int _ast_optstr(const char*, const char*);
-extern int _ast_optesc(Sfio_t*, const char*, int);
-
-/* tmpastinclude/preroot.h */
-
-/* tmpastinclude/proc.h */
-extern int _ast_procclose(Proc_t*);
-extern int _ast_procfree(Proc_t*);
-extern Proc_t* _ast_procopen(const char*, char**, char**, long*, long);
-extern int _ast_procrun(const char*, char**);
-
-/* tmpastinclude/re_comp.h */
-extern char* _ast_re_comp(const char*);
-extern int _ast_re_exec(const char*);
-
-/* tmpastinclude/recfmt.h */
-extern char* fmtrec(Recfmt_t, int);
-extern Recfmt_t recfmt(const void*, size_t, off_t);
-extern Recfmt_t recstr(const char*, char**);
-extern ssize_t reclen(Recfmt_t, const void*, size_t);
-
-/* tmpastinclude/regex.h */
-extern int _ast_regcomp(regex_t*, const char*, regflags_t);
-extern size_t _ast_regerror(int, const regex_t*, char*, size_t);
-extern int _ast_regexec(const regex_t*, const char*, size_t, regmatch_t*, regflags_t);
-extern void _ast_regfree(regex_t*);
-extern regclass_t _ast_regclass(const char*, char**);
-extern int _ast_regaddclass(const char*, regclass_t);
-extern int _ast_regcollate(const char*, char**, char*, int);
-extern int _ast_regcomb(regex_t*, regex_t*);
-extern int _ast_regdup(regex_t*, regex_t*);
-extern int _ast_regncomp(regex_t*, const char*, size_t, regflags_t);
-extern int _ast_regnexec(const regex_t*, const char*, size_t, size_t, regmatch_t*, regflags_t);
-extern void _ast_regfatal(regex_t*, int, int);
-extern void _ast_regfatalpat(regex_t*, int, int, const char*);
-extern int _ast_regrecord(const regex_t*);
-extern int _ast_regrexec(const regex_t*, const char*, size_t, size_t, regmatch_t*, regflags_t, regflags_t, void*, regrecord_t);
-extern regstat_t* _ast_regstat(const regex_t*);
-extern regex_t* _ast_regcache(const char*, regflags_t, int*);
-extern int _ast_regsubcomp(regex_t*, const char*, const regflags_t*, int, regflags_t);
-extern int _ast_regsubexec(const regex_t*, const char*, size_t, regmatch_t*);
-extern int _ast_regsubflags(regex_t*, const char*, char**, int, const regflags_t*, int*, regflags_t*);
-extern void _ast_regsubfree(regex_t*);
-extern void _ast_regalloc(void*, regresize_t, regflags_t);
-extern int _ast_regsub(const regex_t*, struct _sfio_s*, const char*, const char*, size_t, regmatch_t*, regflags_t);
-
-/* tmpastinclude/regexp.h */
-extern int _re_comp(regexp_t*, const char*, char*, unsigned int);
-extern int _re_exec(regexp_t*, const char*, const char*, int);
-extern char* _re_putc(int);
-extern char* _re_read(regexp_t*, const char*, char*, const char*, int);
-
-/* tmpastinclude/sfdisc.h */
-extern int sfkeyprintf(Sfio_t*, void*, const char*, Sf_key_lookup_t, Sf_key_convert_t);
-extern int sfkeyprintf(Sfio_t*, void*, const char*, Sf_key_lookup_t, Sf_key_convert_t);
-extern int sfdcdio(Sfio_t*, size_t);
-extern int sfdcdos(Sfio_t*);
-extern int sfdcfilter(Sfio_t*, const char*);
-extern int sfdcmore(Sfio_t*, const char*, int, int);
-extern int sfdcprefix(Sfio_t*, const char*);
-extern int sfdcseekable(Sfio_t*);
-extern int sfdcslow(Sfio_t*);
-extern int sfdctee(Sfio_t*, Sfio_t*);
-extern int sfdcunion(Sfio_t*, Sfio_t**, int);
-extern Sfio_t* sfdcsubstream(Sfio_t*, Sfio_t*, Sfoff_t, Sfoff_t);
-
-/* tmpastinclude/sfio_s.h */
-
-/* tmpastinclude/sfio_t.h */
-
-/* tmpastinclude/sig.h */
-extern int kill(pid_t, int);
-extern int killpg(pid_t, int);
-extern Sig_info_t sig_info;
-extern int sigcritical(int);
-extern int sigunblock(int);
-
-/* tmpastinclude/stack.h */
-extern STACK stackalloc(int, void*);
-extern void stackfree(STACK);
-extern void stackclear(STACK);
-extern void* stackget(STACK);
-extern int stackpush(STACK, void*);
-extern int stackpop(STACK);
-extern void stacktell(STACK, int, STACKPOS*);
-
-/* tmpastinclude/stak.h */
-
-/* tmpastinclude/stk.h */
-extern Sfio_t _Stk_data;
-extern Stk_t* stkopen(int);
-extern Stk_t* stkinstall(Stk_t*, char*(*)(int));
-extern int stkclose(Stk_t*);
-extern int stklink(Stk_t*);
-extern char* stkalloc(Stk_t*, unsigned);
-extern char* stkcopy(Stk_t*,const char*);
-extern char* stkset(Stk_t*, char*, unsigned);
-extern char* _stkseek(Stk_t*, unsigned);
-extern char* stkfreeze(Stk_t*, unsigned);
-
-/* tmpastinclude/swap.h */
-extern void*	swapmem (int, const void*, void*, size_t);
-extern intmax_t swapget (int, const void*, int);
-extern void*	swapput (int, void*, int, intmax_t);
-extern int	swapop (const void*, const void*, int);
-
-/* tmpastinclude/tar.h */
-
-/* tmpastinclude/times.h */
-extern int _ast_touch(const char*, time_t, time_t, int);
-
-/* tmpastinclude/tm.h */
-extern Tm_data_t tm_data;
-extern Tm_info_t tm_info;
-extern time_t tmdate(const char*, char**, time_t*);
-extern int tmequiv(Tm_t*);
-extern Tm_t* tmfix(Tm_t*);
-extern char* tmfmt(char*, size_t, const char*, time_t*);
-extern char* tmform(char*, const char*, time_t*);
-extern int tmgoff(const char*, char**, int);
-extern void tminit(Tm_zone_t*);
-extern time_t tmleap(time_t*);
-extern int tmlex(const char*, char**, char**, int, char**, int);
-extern char** tmlocale(void);
-extern Tm_t* tmmake(time_t*);
-extern char* tmpoff(char*, size_t, const char*, int, int);
-extern time_t tmscan(const char*, char**, const char*, char**, time_t*, long);
-extern int tmsleep(time_t, time_t);
-extern time_t tmtime(Tm_t*, int);
-extern Tm_zone_t* tmtype(const char*, char**);
-extern int tmweek(Tm_t*, int, int, int);
-extern int tmword(const char*, char**, const char*, char**, int);
-extern Tm_zone_t* tmzone(const char*, char**, const char*, int*);
-
-/* tmpastinclude/tmx.h */
-extern Time_t tmxdate(const char*, char**, Time_t);
-extern char* tmxfmt(char*, size_t, const char*, Time_t);
-extern Time_t tmxleap(Time_t);
-extern Tm_t* tmxmake(Time_t);
-extern Time_t tmxscan(const char*, char**, const char*, char**, Time_t, long);
-extern int tmxsleep(Time_t);
-extern Time_t tmxtime(Tm_t*, int);
-extern Time_t tmxgettime(void);
-extern int tmxsettime(Time_t);
-extern int tmxtouch(const char*, Time_t, Time_t, Time_t, int);
-extern char* fmttmx(const char*, Time_t);
-
-/* tmpastinclude/tok.h */
-extern Sfio_t* tokline(const char*, int, int*);
-extern int tokscan(char*, char**, const char*, ...);
-extern char* tokopen(char*, int);
-extern void tokclose(char*);
-extern char* tokread(char*);
-
-/* tmpastinclude/tv.h */
-extern int tvgettime(Tv_t*);
-extern int tvsettime(const Tv_t*);
-extern int tvcmp(const Tv_t*, const Tv_t*);
-extern int tvtouch(const char*, const Tv_t*, const Tv_t*, const Tv_t*, int);
-extern int tvsleep(const Tv_t*, Tv_t*);
-extern char* fmttv(const char*, Tv_t*);
-
-/* tmpastinclude/usage.h */
-
-/* tmpastinclude/vdb.h */
-
-/* tmpastinclude/vecargs.h */
-extern int vecargs(char**, int*, char***);
-extern char** vecfile(const char*);
-extern void vecfree(char**, int);
-extern char** vecload(char*);
-extern char** vecstring(const char*);
-
-/* tmpastinclude/wchar.h */
-
-/* tmpastinclude/wordexp.h */
-extern int _ast_wordexp(const char*, wordexp_t*, int);
-extern int _ast_wordfree(wordexp_t*);
-/* end of automatically generated data */

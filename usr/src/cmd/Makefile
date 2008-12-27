@@ -366,7 +366,7 @@ COMMON_SUBDIRS=		\
 	setuname	\
 	sgs		\
 	sh		\
-	sleep		\
+	shcomp		\
 	smbios		\
 	smbsrv		\
 	smserverd	\
@@ -386,7 +386,6 @@ COMMON_SUBDIRS=		\
 	strings		\
 	su		\
 	sulogin		\
-	sum		\
 	sunpc		\
 	svc		\
 	swap		\
@@ -690,7 +689,7 @@ MSGSUBDIRS=		\
 	sdpadm		\
 	sgs		\
 	sh		\
-	sleep		\
+	shcomp		\
 	sort		\
 	split		\
 	ssh		\
@@ -699,7 +698,6 @@ MSGSUBDIRS=		\
 	stmsboot	\
 	strings		\
 	su		\
-	sum		\
 	svc		\
 	swap		\
 	syseventadm	\
@@ -958,6 +956,7 @@ _dc: $(DCSUBDIRS)
 # Dependencies
 #
 fs.d: fstyp
+ksh:	shcomp isaexec
 
 $(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(BSMSUBDIRS) $(MANIFEST_SUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \

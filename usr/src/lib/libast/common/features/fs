@@ -54,6 +54,7 @@ lcl	xstat64 -D_LARGEFILE64_SOURCE link{
 }end
 
 header	sys/stat.h
+header	sys/mkdev.h
 
 extern	chmod		int	(const char*, mode_t)
 extern	fstat		int	(int, struct stat*)

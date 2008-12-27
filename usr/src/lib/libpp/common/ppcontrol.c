@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1986-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -907,6 +907,24 @@ ppcontrol(void)
 #endif
 							*p++ = (n1 || var.type == TOK_TOKCAT) ? 'C' : 'A';
 							*p++ = c + ARGOFFSET;
+							if ((pp.state & WARN) && !(pp.mode & (HOSTED|RELAX)) && var.type != TOK_TOKCAT && !(var.type & TOK_ID))
+							{
+								s = pp.in->nextchr;
+								while ((c = *s++) && (c == ' ' || c == '\t'));
+								if (c == '\n')
+									c = 0;
+								else if (c == '*' && *s == ')')
+									c = ')';
+								else if (c == '=' || ppisidig(c) || c == *s || *s == '=')
+									c = 0;
+								if (o != '.' && o != T_PTRMEM)
+								{
+									if ((var.type & TOK_ID) || o == ' ' || ppisseparate(o))
+										o = 0;
+									if (!((o == 0 || o == '(' || o == ')' || o == '[' || o == ']' || o == ',' || o == '|' || o == ';' || o == '{' || o == '}') && (c == '(' || c == ')' || c == '[' || c == ']' || c == ',' || c == '|' || c == ';' || c == '}' || c == 0)) && !(o == '*' && c == ')'))
+										error(1, "%s: %s: formal should be parenthesized in macro value (t=%x o=%#c c=%#c)", sym->name, pp.token, var.type, o, c);
+								}
+							}
 							var.type = TOK_FORMAL|TOK_ID;
 							c = '>';
 							goto checkvalue;
@@ -1621,7 +1639,7 @@ ppcontrol(void)
 			}
 			if (!p1 && p3 && (p4 - p3) == 4 && strneq(p3, "STDC", 4))
 				goto pass;
-			if ((pp.state & WARN) && !(pp.mode & (HOSTED|RELAX)))
+			if ((pp.state & WARN) && (pp.mode & (HOSTED|RELAX|PEDANTIC)) == PEDANTIC)
 				error(1, "#%s: non-standard directive", dirname(PRAGMA));
 			i0 = !p3 || *p3 != 'n' || *(p3 + 1) != 'o';
 			if (!p3)

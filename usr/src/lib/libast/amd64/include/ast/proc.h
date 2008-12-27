@@ -3,10 +3,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -41,12 +41,14 @@
 
 #define PROC_ARGMOD	(1<<0)	/* argv[-1],argv[0] can be modified	*/
 #define PROC_BACKGROUND	(1<<1)	/* shell background (&) setup		*/
+#define PROC_CHECK	(1<<17)	/* check that command exists		*/
 #define PROC_CLEANUP	(1<<2)	/* close parent redirect fds on error	*/
 #define PROC_DAEMON	(1<<3)	/* daemon setup				*/
 #define PROC_ENVCLEAR	(1<<4)	/* clear environment			*/
 #define PROC_FOREGROUND	(1<<14)	/* system(3) setup			*/
 #define PROC_GID	(1<<5)	/* setgid(getgid())			*/
 #define PROC_IGNORE	(1<<6)	/* ignore parent pipe errors		*/
+#define PROC_IGNOREPATH	(1<<16)	/* procrun() intercept to ignore path	*/
 #define PROC_OVERLAY	(1<<7)	/* overlay current process if possible	*/
 #define PROC_PARANOID	(1<<8)	/* restrict everything			*/
 #define PROC_PRIVELEGED	(1<<9)	/* setuid(0), setgid(getegid())		*/
@@ -104,8 +106,8 @@ _PROC_PRIVATE_
 
 extern __MANGLE__ int	procclose __PROTO__((Proc_t*));
 extern __MANGLE__ int	procfree __PROTO__((Proc_t*));
-extern __MANGLE__ Proc_t*	procopen __PROTO__((const char*, char**, char**, long*, long));
-extern __MANGLE__ int	procrun __PROTO__((const char*, char**));
+extern __MANGLE__ Proc_t*	procopen __PROTO__((const char*, char**, char**, long*, int));
+extern __MANGLE__ int	procrun __PROTO__((const char*, char**, int));
 
 #undef __MANGLE__
 #define __MANGLE__ __LINKAGE__

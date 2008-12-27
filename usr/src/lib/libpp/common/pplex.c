@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1986-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -234,7 +234,7 @@ ppcpp(void)
 	{
 		ip = bp;
 #if CPP
-		if (op == tp && (st & (ADD|HIDDEN)) && !(st & PASSTHROUGH))
+		if (op == tp && (st & (ADD|HIDDEN)) && !(st & PASSTHROUGH) && !(pp.option & PRESERVE))
 			switch (TERM(state))
 			{
 			case S_SHARP:
@@ -245,6 +245,8 @@ ppcpp(void)
 					break;
 				/*FALLTHROUGH*/
 			default:
+				if ((pp.option & PRESERVE) && !(st & NEWLINE) && c != '\n')
+					break;
 				PPSYNCLINE();
 				tp = op;
 				break;
@@ -918,7 +920,7 @@ ppcpp(void)
 				goto fsm_get;
 			}
 #if CPP
-			if (st & PASSTHROUGH)
+			if ((st & PASSTHROUGH) || (pp.option & PRESERVE))
 			{
 				if (c == '\n') goto fsm_newline;
 				bp = ip;
@@ -1121,7 +1123,10 @@ ppcpp(void)
 #if CPP
 		if (n && !(st & (PASSTHROUGH|SKIPCONTROL|NOTEXT)) && c == '\'' && (op - tp) <= 2 && !(pp.mode & (HOSTED|RELAX)))
 			error(1, "empty character constant");
-		st &= ~(ESCAPE|NEWLINE);
+		if (pp.option & PRESERVE)
+			st &= ~ESCAPE;
+		else
+			st &= ~(ESCAPE|NEWLINE);
 		pp.in->flags |= IN_tokens;
 		count(token);
 		goto fsm_start;
@@ -1787,7 +1792,7 @@ ppcpp(void)
 
 	case S_NL:
 #if CPP
-		if (op == tp && !(st & JOINING) && pp.in->type == IN_FILE)
+		if (op == tp && !(st & JOINING) && pp.in->type == IN_FILE && !(pp.option & PRESERVE))
 		{
 			st |= NEWLINE|HIDDEN;
 			pp.hidden++;

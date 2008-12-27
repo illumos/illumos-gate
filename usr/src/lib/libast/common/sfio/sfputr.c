@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -26,18 +26,19 @@
 **	Written by Kiem-Phong Vo.
 */
 #if __STD_C
-ssize_t sfputr(reg Sfio_t* f, const char* s, reg int rc)
+ssize_t sfputr(Sfio_t* f, const char* s, int rc)
 #else
 ssize_t sfputr(f,s,rc)
-reg Sfio_t*	f;	/* write to this stream	*/
+Sfio_t*		f;	/* write to this stream	*/
 char*		s;	/* string to write	*/
-reg int		rc;	/* record separator.	*/
+int		rc;	/* record separator.	*/
 #endif
 {
 	reg ssize_t	p, n, w;
 	reg uchar*	ps;
+	SFMTXDECL(f);
 
-	SFMTXSTART(f,-1);
+	SFMTXENTER(f,-1);
 
 	if(f->mode != SF_WRITE && _sfmode(f,SF_WRITE,0) < 0)
 		SFMTXRETURN(f, -1);

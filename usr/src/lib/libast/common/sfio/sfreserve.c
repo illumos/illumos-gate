@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,10 +27,10 @@
 */
 
 #if __STD_C
-Void_t* sfreserve(reg Sfio_t* f, ssize_t size, int type)
+Void_t* sfreserve(Sfio_t* f, ssize_t size, int type)
 #else
 Void_t* sfreserve(f,size,type)
-reg Sfio_t*	f;	/* file to peek */
+Sfio_t*		f;	/* file to peek */
 ssize_t		size;	/* size of peek */
 int		type;	/* LOCKR: lock stream, LASTR: last record */
 #endif
@@ -39,8 +39,9 @@ int		type;	/* LOCKR: lock stream, LASTR: last record */
 	reg Sfrsrv_t*	rsrv;
 	reg Void_t*	data;
 	reg int		mode, local;
+	SFMTXDECL(f);
 
-	SFMTXSTART(f,NIL(Void_t*));
+	SFMTXENTER(f,NIL(Void_t*));
 
 	sz = size < 0 ? -size : size;
 
@@ -105,14 +106,16 @@ int		type;	/* LOCKR: lock stream, LASTR: last record */
 		if(n > 0 && n >= sz) /* all done */
 			break;
 
-		/* amount to perform IO */
-		if(size == 0 || (f->mode&SF_WRITE) )
+		/* set amount to perform IO */
+		if(size == 0 || (f->mode&SF_WRITE))
 			iosz = -1;
+		else if(size < 0 && n == 0 && f->push) /* maybe stack-pop */
+			iosz = sz; /* so only get what is asked for */
 		else
-		{	iosz = sz - n;
-			if(type != SF_LOCKR && size < 0 && iosz < (f->size - n) )
-				iosz = f->size - n;
-			if(iosz <= 0)
+		{	iosz = sz - n; /* get enough to fulfill requirement */
+			if(size < 0 && iosz < (f->size - n) )
+				iosz = f->size - n; /* get as much as possible */
+			if(iosz <= 0) /* nothing to do */
 				break;
 		}
 
@@ -133,7 +136,13 @@ int		type;	/* LOCKR: lock stream, LASTR: last record */
 				break;
 			}
 		}
-		else	(void)SFFILBUF(f, iosz );
+		else
+		{	/* sfreserve(f,0,0) == sfread(f, sfreserve(f,-1,SF_LOCKR), 0) */
+			if(size == 0 && type == 0)
+				f->mode |= SF_RV;
+
+			(void)SFFILBUF(f, iosz );
+		}
 
 		if((n = f->endb - f->next) <= 0)
 			n = 0;

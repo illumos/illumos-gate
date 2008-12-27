@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -31,6 +31,7 @@
 
 #include <tmx.h>
 #include <ctype.h>
+#include <debug.h>
 
 #define dig1(s,n)	((n)=((*(s)++)-'0'))
 #define dig2(s,n)	((n)=((*(s)++)-'0')*10,(n)+=(*(s)++)-'0')
@@ -51,11 +52,12 @@
 #define MONTH		(1<<11)
 #define NEXT		(1<<12)
 #define NSEC		(1<<13)
-#define SECOND		(1<<14)
-#define THIS		(1L<<15)
-#define WDAY		(1L<<16)
-#define YEAR		(1L<<17)
-#define ZONE		(1L<<18)
+#define ORDINAL		(1<<14)
+#define SECOND		(1<<15)
+#define THIS		(1L<<16)
+#define WDAY		(1L<<17)
+#define YEAR		(1L<<18)
+#define ZONE		(1L<<19)
 
 /*
  * parse cron range into set
@@ -151,6 +153,7 @@ tmxdate(register const char* s, char** e, Time_t now)
 	 * check DATEMSK first
 	 */
 
+	debug((error(-1, "AHA tmxdate 2008-05-22")));
 	fix = tmxscan(s, &last, NiL, &t, now, 0);
 	if (t && !*last)
 	{
@@ -185,6 +188,7 @@ tmxdate(register const char* s, char** e, Time_t now)
 		state &= (state & HOLD) ? ~(HOLD) : ~(EXACT|LAST|NEXT|THIS);
 		if ((set|state) & (YEAR|MONTH|DAY))
 			skip['/'] = 1;
+		message((-1, "AHA#%d state=%s%s%s%s| set=%s%s%s%s|", __LINE__, (state & EXACT) ? "|EXACT" : "", (state & LAST) ? "|LAST" : "", (state & THIS) ? "|THIS" : "", (state & NEXT) ? "|NEXT" : "", (set & EXACT) ? "|EXACT" : "", (set & LAST) ? "|LAST" : "", (set & THIS) ? "|THIS" : "", (set & NEXT) ? "|NEXT" : ""));
 		for (;;)
 		{
 			if (*s == '.' || *s == '-' || *s == '+')
@@ -281,7 +285,7 @@ tmxdate(register const char* s, char** e, Time_t now)
 			{
 				Time_t	tt;
 				char	hit[60];
-				char	mon[12];
+				char	mon[13];
 				char	day[7];
 
 				state |= CRON;
@@ -432,10 +436,11 @@ tmxdate(register const char* s, char** e, Time_t now)
 				now = n;
 				goto sns;
 			}
+			if ((*t == 'T' || *t == 't') && ((set|state) & (YEAR|MONTH|DAY)) == (YEAR|MONTH) && isdigit(*(t + 1)))
+				t++;
 			u = t + (*t == '-');
 			if ((w == 2 || w == 4) && (*u == 'W' || *u == 'w') && isdigit(*(u + 1)))
 			{
-				t = u;
 				if (w == 4)
 				{
 					if ((n -= 1900) < TM_WINDOW)
@@ -444,47 +449,58 @@ tmxdate(register const char* s, char** e, Time_t now)
 				else if (n < TM_WINDOW)
 					n += 100;
 				m = n;
-				n = strtol(s = t + 1, &t, 0);
-				if ((i = (t - s)) < 2 || i > 3)
+				n = strtol(++u, &t, 10);
+				if ((i = (t - u)) < 2 || i > 3)
 					break;
-				if (dig2(s, j) < 0 || j > 53)
-					break;
-				if (!(t - s) && *t == '-')
-					n = strtol(s = t + 1, &t, 0);
-				if (!(i = (t - s)))
+				if (i == 3)
+				{
+					k = n % 10;
+					n /= 10;
+				}
+				else if (*t != '-')
 					k = 1;
-				else if (i != 1 || dig1(s, k) < 1 || k > 7)
+				else if (*++t && dig1(t, k) < 1 || k > 7)
 					break;
-				else if (k == 7)
+				if (n < 0 || n > 53)
+					break;
+				if (k == 7)
 					k = 0;
 				tm->tm_year = m;
-				tmweek(tm, 2, j, k);
+				tmweek(tm, 2, n, k);
 				set |= YEAR|MONTH|DAY;
+				s = t;
 				continue;
 			}
-			else if ((w == 6 || w == 8) && (*u == 'T' || *u == 't') && isdigit(*(u + 1)))
+			else if (w == 6 || w == 8 && (n / 1000000) > 12)
 			{
-				t = u;
+				t = (char*)s;
 				flags = 0;
-				if (w == 8)
+				if (w == 8 || w == 6 && *u != 'T' && *u != 't')
 				{
-					dig4(s, m);
+					dig4(t, m);
 					if ((m -= 1900) < TM_WINDOW)
 						break;
 				}
 				else
 				{
-					dig2(s, m);
+					dig2(t, m);
 					if (m < TM_WINDOW)
 						m += 100;
 				}
 				flags |= YEAR;
-				if (dig2(s, l) <= 0 || l > 12)
+				if (dig2(t, l) <= 0 || l > 12)
 					break;
 				flags |= MONTH;
-				if (dig2(s, k) < 1 || k > 31)
-					break;
-				n = strtol(s = t + 1, &t, 0);
+				if (*t != 'T' && *t != 't' || !isdigit(*++t))
+				{
+					if (w == 6)
+						goto save_yymm;
+					if (dig2(t, k) < 1 || k > 31)
+						break;
+					flags |= DAY;
+					goto save_yymmdd;
+				}
+				n = strtol(s = t, &t, 0);
 				if ((t - s) < 2)
 					break;
 				if (dig2(s, j) > 24)
@@ -524,20 +540,26 @@ tmxdate(register const char* s, char** e, Time_t now)
 			}
 			else if (f == -1 && isalpha(*t) && tmlex(t, &t, tm_info.format + TM_ORDINAL, TM_ORDINALS - TM_ORDINAL, NiL, 0) >= 0)
 			{
+				message((-1, "AHA#%d n=%d", __LINE__, n));
  ordinal:
-				state |= (f = n) ? NEXT : THIS;
+				if (n)
+					n--;
+				message((-1, "AHA#%d n=%d", __LINE__, n));
+				state |= ((f = n) ? NEXT : THIS)|ORDINAL;
 				set &= ~(EXACT|LAST|NEXT|THIS);
 				set |= state & (EXACT|LAST|NEXT|THIS);
 				for (s = t; skip[*s]; s++);
 				if (isdigit(*s))
 				{
-					n = strtol(s, &t, 10);
+					if (n = strtol(s, &t, 10))
+						n--;
 					s = t;
 					if (*s == '_')
 						s++;
 				}
 				else
 					n = -1;
+				message((-1, "AHA#%d f=%d n=%d", __LINE__, f, n));
 			}
 			else
 			{
@@ -556,7 +578,7 @@ tmxdate(register const char* s, char** e, Time_t now)
 						break;
 					state |= CCYYMMDDHHMMSS;
 					p = 0;
-					if ((i == 7 || i == 5) && !*t)
+					if ((i == 7 || i == 5) && (!*t || *t == 'Z' || *t == 'z'))
 					{
 						if (i == 7)
 						{
@@ -654,13 +676,15 @@ tmxdate(register const char* s, char** e, Time_t now)
 							break;
 					}
 				save:
-					tm->tm_year = m;
-					tm->tm_mon = l - 1;
-					tm->tm_mday = k;
 					tm->tm_hour = j;
 					tm->tm_min = i;
 					tm->tm_sec = n;
 					tm->tm_nsec = p;
+				save_yymmdd:
+					tm->tm_mday = k;
+				save_yymm:
+					tm->tm_mon = l - 1;
+					tm->tm_year = m;
 					s = t;
 					set |= flags;
 					continue;
@@ -727,6 +751,7 @@ tmxdate(register const char* s, char** e, Time_t now)
 					}
 					if (f >= 0 || (state & (LAST|NEXT)))
 					{
+						message((-1, "AHA#%d f=%d i=%d j=%d k=%d l=%d", __LINE__, f, i, j, k, l));
 						state &= ~HOLD;
 						if (f < 0)
 						{
@@ -823,9 +848,11 @@ tmxdate(register const char* s, char** e, Time_t now)
 					continue;
 				case TM_ORDINAL:
 					j += TM_ORDINALS - TM_ORDINAL;
+					message((-1, "AHA#%d j=%d", __LINE__, j));
 					/*FALLTHROUGH*/
 				case TM_ORDINALS:
 					n = j - TM_ORDINALS + 1;
+					message((-1, "AHA#%d n=%d", __LINE__, n));
 					goto ordinal;
 				case TM_MERIDIAN:
 					if (f >= 0)
@@ -890,6 +917,7 @@ tmxdate(register const char* s, char** e, Time_t now)
 						}
 					/*FALLTHROUGH*/
 				case TM_DAYS:
+					message((-1, "AHA#%d n=%d j=%d f=%d state=%s%s%s%s|", __LINE__, n, j, f, (state & EXACT) ? "|EXACT" : "", (state & LAST) ? "|LAST" : "", (state & THIS) ? "|THIS" : "", (state & NEXT) ? "|NEXT" : ""));
 					if (n == -1)
 					{
 						/*
@@ -898,16 +926,41 @@ tmxdate(register const char* s, char** e, Time_t now)
 
 						if (j == TM_PARTS && f == -1)
 						{
+							state &= ~(LAST|NEXT|THIS|ORDINAL); /*AHA*/
 							n = 2;
 							goto ordinal;
 						}
 						n = 1;
 					}
+
+					/*
+					 * disambiguate "last" vs. { "previous" "final" }
+					 */
+
+					while (isspace(*s))
+						s++;
+					message((-1, "AHA#%d disambiguate LAST s='%s'", __LINE__, s));
+					if ((k = tmlex(s, &t, tm_info.format + TM_NEXT, TM_EXACT - TM_NEXT, NiL, 0)) >= 0)
+					{
+						s = t;
+						if (state & LAST)
+						{
+							state &= ~LAST;
+							set &= ~LAST;
+							state |= FINAL;
+							set |= FINAL;
+							message((-1, "AHA#%d LAST => FINAL", __LINE__));
+						}
+						else
+							state &= ~(THIS|NEXT);
+					}
+					message((-1, "AHA#%d disambiguate LAST k=%d", __LINE__, k));
 					if (state & LAST)
 						n = -n;
 					else if (!(state & NEXT))
 						n--;
 					m = (f > 0) ? f * n : n;
+					message((-1, "AHA#%d f=%d n=%d i=%d j=%d k=%d l=%d m=%d state=%s%s%s%s|", __LINE__, f, n, i, j, k, l, m, (state & EXACT) ? "|EXACT" : "", (state & LAST) ? "|LAST" : "", (state & THIS) ? "|THIS" : "", (state & NEXT) ? "|NEXT" : ""));
 					switch (j)
 					{
 					case TM_DAYS+0:
@@ -975,21 +1028,47 @@ tmxdate(register const char* s, char** e, Time_t now)
 						set |= HOUR;
 						goto clear_min;
 					}
+					if (m >= 0 && (state & ORDINAL))
+						tm->tm_mday = 1;
 					tm = tmxmake(tmxtime(tm, zone));
 					day = j -= TM_DAY;
 					dir = m;
+					message((-1, "AHA#%d j=%d m=%d", __LINE__, j, m));
 					j -= tm->tm_wday;
+					message((-1, "AHA#%d mday=%d wday=%d day=%d dir=%d f=%d i=%d j=%d l=%d m=%d", __LINE__, tm->tm_mday, tm->tm_wday, day, dir, f, i, j, l, m));
 					if (state & (LAST|NEXT|THIS))
 					{
+						if (state & ORDINAL)
+						{
+							while (isspace(*s))
+								s++;
+							if (isdigit(*s) || tmlex(s, &t, tm_info.format, TM_DAY_ABBREV, NiL, 0) >= 0)
+							{
+								state &= ~(LAST|NEXT|THIS);
+								goto clear_hour;
+							}
+						}
 						if (j < 0)
 							j += 7;
 					}
 					else if (j > 0)
 						j -= 7;
-					tm->tm_mday += j + m * 7;
+					message((-1, "AHA#%d day=%d mday=%d f=%d m=%d j=%d state=%s%s%s%s|", __LINE__, day, tm->tm_mday, f, m, j, (state & EXACT) ? "|EXACT" : "", (state & LAST) ? "|LAST" : "", (state & THIS) ? "|THIS" : "", (state & NEXT) ? "|NEXT" : ""));
 					set |= DAY;
-					if (state & (LAST|NEXT|THIS))
+					if (set & FINAL)
 						goto clear_hour;
+					else if (state & (LAST|NEXT|THIS))
+					{
+						if (f >= 0)
+							day = -1;
+						else if (m > 0 && (state & (NEXT|YEAR|MONTH)) == NEXT && j >= 0)
+							m--;
+						tm->tm_mday += j + m * 7;
+						set &= ~(LAST|NEXT|THIS|ORDINAL); /*AHA*/
+						state &= ~(LAST|NEXT|THIS|ORDINAL); /*AHA*/
+						if (!(state & EXACT))
+							goto clear_hour;
+					}
 					continue;
 				case TM_MONTH_ABBREV:
 					j += TM_MONTH - TM_MONTH_ABBREV;
@@ -1058,13 +1137,15 @@ tmxdate(register const char* s, char** e, Time_t now)
 				zone = zp->west + dst;
 				tm_info.date = zp;
 				state |= ZONE;
-				continue;
+				if (n < 0)
+					continue;
 			}
-			if (!type && (zp = tmtype(s, &t)))
+			else if (!type && (zp = tmtype(s, &t)))
 			{
 				s = t;
 				type = zp->type;
-				continue;
+				if (n < 0)
+					continue;
 			}
 			state |= BREAK;
 		}
@@ -1124,6 +1205,8 @@ tmxdate(register const char* s, char** e, Time_t now)
 						tm->tm_year += ((state & NEXT) ? 1 : 0) + ((tm->tm_mon < n) ? 1 : 0);
 					if (state & MDAY)
 						goto clear_hour;
+					set &= ~(LAST|NEXT|THIS); /*AHA*/
+					state &= ~(LAST|NEXT|THIS); /*AHA*/
 					goto clear_mday;
 				}
 				continue;
@@ -1181,6 +1264,7 @@ tmxdate(register const char* s, char** e, Time_t now)
 			continue;
 		tm->tm_mday = 1;
 	clear_hour:
+		message((-1, "AHA#%d DAY", __LINE__));
 		set |= DAY;
 		if ((set|state) & (EXACT|HOUR))
 			continue;
@@ -1204,8 +1288,8 @@ tmxdate(register const char* s, char** e, Time_t now)
  done:
 	if (day >= 0 && !(state & (MDAY|WDAY)))
 	{
-		if ((m = dir) > 0)
-			m--;
+		message((-1, "AHA#%d day=%d dir=%d%s", __LINE__, day, dir, (state & FINAL) ? " FINAL" : ""));
+		m = dir;
 		if (state & MONTH)
 			tm->tm_mday = 1;
 		else if (m < 0)

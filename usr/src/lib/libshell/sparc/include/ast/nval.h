@@ -3,10 +3,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -40,6 +40,7 @@
 
 #include	<ast.h>
 #include	<cdt.h>
+#include	<option.h>
 
 /* for compatibility with old hash library */
 #define Hashtab_t	Dt_t
@@ -53,8 +54,7 @@ typedef struct Namfun Namfun_t;
 typedef struct Namdisc Namdisc_t;
 typedef struct Nambfun Nambfun_t;
 typedef struct Namarray Namarr_t;
-typedef struct Nambltin Nambltin_t;
-typedef struct Namtype Namtype_t;
+typedef struct Namdecl Namdecl_t;
 
 /*
  * This defines the template for nodes that have their own assignment
@@ -73,13 +73,14 @@ struct Namdisc
 	Namval_t *(*nextf) __PROTO__((Namval_t*, Dt_t*, Namfun_t*));
 	Namval_t *(*typef) __PROTO__((Namval_t*, Namfun_t*));
 	int	(*readf) __PROTO__((Namval_t*, Sfio_t*, int, Namfun_t*));
+	int	(*writef) __PROTO__((Namval_t*, Sfio_t*, int, Namfun_t*));
 };
 
 struct Namfun
 {
 	const Namdisc_t	*disc;
 	char		nofree;
-	char		funs;
+	unsigned char	subshell;
 	unsigned short	dsize;
 	Namfun_t	*next;
 	char		*last;
@@ -101,22 +102,14 @@ struct Namarray
 	long		nelem;				/* number of elements */
 	__V_	*(*fun) __PROTO__((Namval_t*,const char*,int));	/* associative arrays */
 	Namval_t	*parent;		/* for multi-dimensional */
+	Dt_t		*table;			/* for subscripts */
+	__V_		*scope;			/* non-zerp when scoped */
 };
 
-/* Passed as third argument to a builtin when  NV_BLTINOPT is set on node */
-struct Nambltin
+/* The context pointer for declaration command */
+struct Namdecl
 {
-        __V_		*shp;
-	Namval_t	*np;
-        __V_	 	*ptr;
-        __V_		*data;
-        int		flags;
-};
-
-struct Namtype
-{
-        __V_		*shp;
-	Namval_t	*np;
+	Namval_t	*tp;			/* point to type */
 	const char	*optstring;
 	__V_		*optinfof;
 };
@@ -141,6 +134,7 @@ struct Namval
 };
 
 #define NV_CLASS	".sh.type"
+#define NV_DATA		"_"	/* special class or instance variable */
 #define NV_MINSZ	(sizeof(struct Namval)-sizeof(Dtlink_t)-sizeof(char*))
 #define nv_namptr(p,n)	((Namval_t*)((char*)(p)+(n)*NV_MINSZ-sizeof(Dtlink_t)))
 
@@ -172,13 +166,14 @@ struct Namval
 #define NV_SHORT	(NV_RJUST)	/* when integers are not long */
 #define NV_LONG		(NV_UTOL)	/* for long long and long double */
 #define NV_UNSIGN	(NV_LTOU)	/* for unsigned quantities */
-#define NV_DOUBLE	(NV_ZFILL)	/* for floating point */
+#define NV_DOUBLE	(NV_INTEGER|NV_ZFILL)	/* for floating point */
 #define NV_EXPNOTE	(NV_LJUST)	/* for scientific notation */
+#define NV_HEXFLOAT	(NV_LTOU)	/* for C99 base16 float notation */
 
 /*  options for nv_open */
 
 #define NV_APPEND	0x10000		/* append value */
-#define NV_MOVE		0x20000		/* for use with nv_clone */
+#define NV_MOVE		0x8000000	/* for use with nv_clone */
 #define NV_ADD		8
 					/* add node if not found */
 #define NV_ASSIGN	NV_NOFREE	/* assignment is possible */
@@ -194,19 +189,21 @@ struct Namval
 #define NV_NODISC	NV_IDENT	/* ignore disciplines */
 
 #define NV_FUNCT	NV_IDENT	/* option for nv_create */
-#define NV_BLTINOPT	NV_ZFILL	/* save state for optimization*/
+#define NV_BLTINOPT	NV_ZFILL	/* mark builtins in libcmd */
 
 #define NV_PUBLIC	(~(NV_NOSCOPE|NV_ASSIGN|NV_IDENT|NV_VARNAME|NV_NOADD))
 
 /* numeric types */
+#define NV_INT16P	(NV_LJUST|NV_SHORT|NV_INTEGER)
 #define NV_INT16	(NV_SHORT|NV_INTEGER)
 #define NV_UINT16	(NV_UNSIGN|NV_SHORT|NV_INTEGER)
+#define NV_UINT16P	(NV_LJUSTNV_UNSIGN|NV_SHORT|NV_INTEGER)
 #define NV_INT32	(NV_INTEGER)
 #define NV_UNT32	(NV_UNSIGN|NV_INTEGER)
 #define NV_INT64	(NV_LONG|NV_INTEGER)
 #define NV_UINT64	(NV_UNSIGN|NV_LONG|NV_INTEGER)
-#define NV_FLOAT	(NV_SHORT|NV_DOUBLE|NV_INTEGER)
-#define NV_LDOUBLE	(NV_LONG|NV_DOUBLE|NV_INTEGER)
+#define NV_FLOAT	(NV_SHORT|NV_DOUBLE)
+#define NV_LDOUBLE	(NV_LONG|NV_DOUBLE)
 
 /* name-value pair macros */
 #define nv_isattr(np,f)		((np)->nvflag & (f))
@@ -222,6 +219,7 @@ struct Namval
 #define NV_ADELETE	5	/* delete current subscript */
 #define NV_AADD		6	/* add subscript if not found */
 #define NV_ACURRENT	7	/* return current subscript Namval_t* */
+#define NV_ASETSUB	8	/* set current subscript */
 
 /* The following are for nv_disc */
 #define NV_FIRST	1
@@ -230,7 +228,7 @@ struct Namval
 #define NV_CLONE	4
 
 /* The following are operations for nv_putsub() */
-#define ARRAY_BITS	24
+#define ARRAY_BITS	22
 #define ARRAY_ADD	(1L<<ARRAY_BITS)	/* add subscript if not found */
 #define	ARRAY_SCAN	(2L<<ARRAY_BITS)	/* For ${array[@]} */
 #define ARRAY_UNDEF	(4L<<ARRAY_BITS)	/* For ${array} */
@@ -250,7 +248,9 @@ struct Namval
 #   endif /* _BLD_shell */
 #endif /* _DLL */
 /* prototype for array interface*/
+extern __MANGLE__ Namarr_t	*nv_arrayptr __PROTO__((Namval_t*));
 extern __MANGLE__ Namarr_t	*nv_setarray __PROTO__((Namval_t*,__V_*(*)(Namval_t*,const char*,int)));
+extern __MANGLE__ int	nv_arraynsub __PROTO__((Namarr_t*));
 extern __MANGLE__ __V_	*nv_associative __PROTO__((Namval_t*,const char*,int));
 extern __MANGLE__ int	nv_aindex __PROTO__((Namval_t*));
 extern __MANGLE__ int	nv_nextsub __PROTO__((Namval_t*));
@@ -264,6 +264,7 @@ extern __MANGLE__ int		nv_clone __PROTO__((Namval_t*, Namval_t*, int));
 extern __MANGLE__ void 		nv_close __PROTO__((Namval_t*));
 extern __MANGLE__ __V_		*nv_context __PROTO__((Namval_t*));
 extern __MANGLE__ Namval_t		*nv_create __PROTO__((const char*, Dt_t*, int,Namfun_t*));
+extern __MANGLE__ void		nv_delete __PROTO__((Namval_t*, Dt_t*, int));
 extern __MANGLE__ Dt_t		*nv_dict __PROTO__((Namval_t*));
 extern __MANGLE__ Sfdouble_t	nv_getn __PROTO__((Namval_t*, Namfun_t*));
 extern __MANGLE__ Sfdouble_t	nv_getnum __PROTO__((Namval_t*));
@@ -271,13 +272,15 @@ extern __MANGLE__ char 		*nv_getv __PROTO__((Namval_t*, Namfun_t*));
 extern __MANGLE__ char 		*nv_getval __PROTO__((Namval_t*));
 extern __MANGLE__ Namfun_t		*nv_hasdisc __PROTO__((Namval_t*, const Namdisc_t*));
 extern __MANGLE__ int		nv_isnull __PROTO__((Namval_t*));
+extern __MANGLE__ Namfun_t		*nv_isvtree __PROTO__((Namval_t*));
 extern __MANGLE__ Namval_t		*nv_lastdict __PROTO__((void));
+extern __MANGLE__ Namval_t		*nv_mkinttype __PROTO__((char*, size_t, int, const char*, Namdisc_t*));
 extern __MANGLE__ void 		nv_newattr __PROTO__((Namval_t*,unsigned,int));
 extern __MANGLE__ Namval_t		*nv_open __PROTO__((const char*,Dt_t*,int));
 extern __MANGLE__ void 		nv_putval __PROTO__((Namval_t*,const char*,int));
 extern __MANGLE__ void 		nv_putv __PROTO__((Namval_t*,const char*,int,Namfun_t*));
+extern __MANGLE__ int		nv_rename __PROTO__((Namval_t*,int));
 extern __MANGLE__ int		nv_scan __PROTO__((Dt_t*,void(*)(Namval_t*,__V_*),__V_*,int,int));
-extern __MANGLE__ Namval_t		*nv_scoped __PROTO__((Namval_t*));
 extern __MANGLE__ char 		*nv_setdisc __PROTO__((Namval_t*,const char*,Namval_t*,Namfun_t*));
 extern __MANGLE__ void		nv_setref __PROTO__((Namval_t*, Dt_t*,int));
 extern __MANGLE__ int		nv_settype __PROTO__((Namval_t*, Namval_t*, int));
@@ -285,11 +288,12 @@ extern __MANGLE__ void 		nv_setvec __PROTO__((Namval_t*,int,int,char*[]));
 extern __MANGLE__ void		nv_setvtree __PROTO__((Namval_t*));
 extern __MANGLE__ int 		nv_setsize __PROTO__((Namval_t*,int));
 extern __MANGLE__ Namfun_t		*nv_disc __PROTO__((Namval_t*,Namfun_t*,int));
-extern __MANGLE__ void 		nv_unset __PROTO__((Namval_t*));
+extern __MANGLE__ void 		nv_unset __PROTO__((Namval_t*));	 /*obsolete */
+extern __MANGLE__ void 		_nv_unset __PROTO__((Namval_t*,int));
 extern __MANGLE__ Namval_t		*nv_search __PROTO__((const char *, Dt_t*, int));
-extern __MANGLE__ void		nv_unscope __PROTO__((void));
 extern __MANGLE__ char		*nv_name __PROTO__((Namval_t*));
 extern __MANGLE__ Namval_t		*nv_type __PROTO__((Namval_t*));
+extern __MANGLE__ void		nv_addtype __PROTO__((Namval_t*,const char*, Optdisc_t*, size_t));
 extern __MANGLE__ const Namdisc_t	*nv_discfun __PROTO__((int));
 
 #ifdef _DLL
@@ -297,6 +301,7 @@ extern __MANGLE__ const Namdisc_t	*nv_discfun __PROTO__((int));
 #define __MANGLE__ __LINKAGE__
 #endif /* _DLL */
 
+#define nv_unset(np)		_nv_unset(np,0)
 #define nv_size(np)		nv_setsize((np),-1)
 #define nv_stack(np,nf)		nv_disc(np,nf,0)
 
@@ -308,7 +313,7 @@ extern __MANGLE__ const Namdisc_t	*nv_discfun __PROTO__((int));
 #   define nv_istype(np)	nv_isattr(np)
 #   define nv_newtype(np)	nv_newattr(np)
 #   define nv_namset(np,a,b)	nv_open(np,a,b)
-#   define nv_free(np)		nv_unset(np)
+#   define nv_free(np)		nv_unset(np,0)
 #   define nv_settype(np,a,b,c)	nv_setdisc(np,a,b,c)
 #   define nv_search(np,a,b)	nv_open(np,a,((b)?0:NV_NOADD))
 #   define settype	setdisc

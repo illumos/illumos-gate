@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -35,7 +35,7 @@
 #define LLONG_MAX	LONG_MAX
 #endif
 
-static Sfdouble_t	Zero, NaN, Inf;
+static Sfdouble_t	NaN, Inf, Fun;
 static Namval_t Infnod =
 {
 	{ 0 },
@@ -50,36 +50,51 @@ static Namval_t NaNnod =
 	NV_NOFREE|NV_LDOUBLE,NV_RDONLY
 };
 
-static Namval_t *scope(register Namval_t *np,register struct lval *lvalue,int assign)
+static Namval_t FunNode =
+{
+	{ 0 },
+	"?",
+	NV_NOFREE|NV_LDOUBLE,NV_RDONLY
+};
+
+static Namval_t *scope(Shell_t *shp,register Namval_t *np,register struct lval *lvalue,int assign)
 {
 	register Namarr_t *ap;
 	register int flag = lvalue->flag;
-	register char *sub=0;
-	if(lvalue->emode&ARITH_COMP)
+	register char *sub=0, *cp=(char*)np;
+	register Namval_t *mp;
+	int	flags = HASH_NOSCOPE|HASH_SCOPE|HASH_BUCKET;
+	Dt_t	*sdict = (shp->st.real_fun? shp->st.real_fun->sdict:0);
+	assign = assign?NV_ASSIGN:NV_NOASSIGN;
+	if(cp>=lvalue->expr &&  cp < lvalue->expr+lvalue->elen)
 	{
-		char *cp = (char*)np;
-		register Namval_t *mp;
-		if(cp>=lvalue->expr &&  cp < lvalue->expr+lvalue->elen)
+		int offset;
+		/* do binding to node now */
+		int c = cp[flag];
+		cp[flag] = 0;
+		if((!(np = nv_open(cp,shp->var_tree,assign|NV_VARNAME|NV_NOADD|NV_NOFAIL)) || nv_isnull(np)) && sh_macfun(shp,cp, offset = staktell()))
 		{
-			/* do bindiing to node now */
-			int c = cp[flag];
-			cp[flag] = 0;
-			np = nv_open(cp,sh.var_tree,NV_NOASSIGN|NV_VARNAME);
+			Fun = sh_arith(sub=stakptr(offset));
+			FunNode.nvalue.ldp = &Fun;
 			cp[flag] = c;
-			if(cp[flag+1]=='[')
-				flag++;
-			else
-				flag = 0;
+			return(&FunNode);
 		}
-		else if(dtvnext(sh.var_tree) && (mp=nv_search((char*)np,sh.var_tree,HASH_NOSCOPE|HASH_SCOPE|HASH_BUCKET)))
+		np = nv_open(cp,shp->var_tree,assign|NV_VARNAME);
+		cp[flag] = c;
+		if(cp[flag+1]=='[')
+			flag++;
+		else
+			flag = 0;
+		cp = (char*)np;
+	}
+	if((lvalue->emode&ARITH_COMP) && dtvnext(shp->var_tree) && ((mp=nv_search(cp,shp->var_tree,flags))||(sdict && (mp=nv_search(cp,sdict,flags)))))
+	{
+		while(nv_isref(mp))
 		{
-			while(nv_isref(mp))
-			{
-				sub = nv_refsub(mp);
-				mp = nv_refnode(mp);
-			}
-			np = mp;
+			sub = nv_refsub(mp);
+			mp = nv_refnode(mp);
 		}
+		np = mp;
 	}
 	if(flag || sub)
 	{
@@ -95,14 +110,16 @@ static Namval_t *scope(register Namval_t *np,register struct lval *lvalue,int as
 
 static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdouble_t n)
 {
+	Shell_t		*shp = &sh;
 	register Sfdouble_t r= 0;
 	char *str = (char*)*ptr;
+	register char *cp;
 	switch(type)
 	{
 	    case ASSIGN:
 	    {
 		register Namval_t *np = (Namval_t*)(lvalue->value);
-		np = scope(np,lvalue,1);
+		np = scope(shp,np,lvalue,1);
 		nv_putval(np, (char*)&n, NV_LDOUBLE);
 		r=nv_getnum(np);
 		break;
@@ -119,14 +136,18 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 		{
 			register Namval_t *np;
 			int dot=0;
-			char *cp;
 			while(1)
 			{
 				while(xp=str, c=mbchar(str), isaname(c));
 				str = xp;
+				if(c=='[' && dot==NV_NOADD)
+				{
+					str = nv_endsubscript((Namval_t*)0,str,0);
+					c = *str;
+				}
 				if(c!='.')
 					break;
-				dot=1;
+				dot=NV_NOADD;
 				if((c = *++str) !='[')
 					continue;
 				str = nv_endsubscript((Namval_t*)0,cp=str,NV_SUBQUOTE)-1;
@@ -168,7 +189,7 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 			{
 				int offset = staktell();
 				char *saveptr = stakfreeze(0);
-				Dt_t  *root = (lvalue->emode&ARITH_COMP)?sh.var_base:sh.var_tree;
+				Dt_t  *root = (lvalue->emode&ARITH_COMP)?shp->var_base:shp->var_tree;
 				*str = c;
 				while(c=='[' || c=='.')
 				{
@@ -184,32 +205,39 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 					}
 					else
 					{
+						dot = NV_NOADD|NV_NOFAIL;
 						str++;
 						while(xp=str, c=mbchar(str), isaname(c));
 						str = xp;
 					}
 				}
 				*str = 0;
-				if(strcasecmp(*ptr,"Inf")==0)
+				cp = (char*)*ptr;
+				if ((cp[0] == 'i' || cp[0] == 'I') && (cp[1] == 'n' || cp[1] == 'N') && (cp[2] == 'f' || cp[2] == 'F') && cp[3] == 0)
 				{
-					Inf = 1.0/Zero;
+					Inf = strtold("Inf", NiL);
 					Infnod.nvalue.ldp = &Inf;
 					np = &Infnod;
 				}
-				else if(strcasecmp(*ptr,"NaN")==0)
+				else if ((cp[0] == 'n' || cp[0] == 'N') && (cp[1] == 'a' || cp[1] == 'A') && (cp[2] == 'n' || cp[2] == 'N') && cp[3] == 0)
 				{
-					NaN = 0.0/Zero;
+					NaN = strtold("NaN", NiL);
 					NaNnod.nvalue.ldp = &NaN;
 					np = &NaNnod;
 				}
-				else
-					np = nv_open(*ptr,root,NV_NOASSIGN|NV_VARNAME);
+				else if(!(np = nv_open(*ptr,root,NV_NOASSIGN|NV_VARNAME|dot)))
+				{
+					lvalue->value = (char*)*ptr;
+					lvalue->flag =  str-lvalue->value;
+				}
 				if(saveptr != stakptr(0))
 					stakset(saveptr,offset);
 				else
 					stakseek(offset);
 			}
 			*str = c;
+			if(!np && lvalue->value)
+				break;
 			lvalue->value = (char*)np;
 			if((lvalue->emode&ARITH_COMP) || (nv_isarray(np) && nv_aindex(np)<0))
 			{
@@ -230,9 +258,7 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 					str = nv_endsubscript(np,str,NV_ADD|NV_SUBQUOTE);
 				while((c=*str)=='[');
 			}
-			else if(nv_isarray(np))
-				nv_putsub(np,NIL(char*),ARRAY_UNDEF);
-			if(nv_isattr(np,NV_INTEGER|NV_DOUBLE)==(NV_INTEGER|NV_DOUBLE))
+			if(nv_isattr(np,NV_DOUBLE)==NV_DOUBLE)
 				lvalue->isfloat=1;
 			lvalue->flag = nv_aindex(np);
 		}
@@ -260,7 +286,8 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 				c='e';
 			else
 				c = *str;
-			if(c==GETDECIMAL(0) || c=='e' || c == 'E')
+			if(c==GETDECIMAL(0) || c=='e' || c == 'E' || lastbase ==
+ 16 && (c == 'p' || c == 'P'))
 			{
 				lvalue->isfloat=1;
 				r = strtold(val,&str);
@@ -289,7 +316,7 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 		register Namval_t *np = (Namval_t*)(lvalue->value);
 		if(sh_isoption(SH_NOEXEC))
 			return(0);
-		np = scope(np,lvalue,0);
+		np = scope(shp,np,lvalue,0);
 		if(((lvalue->emode&2) || lvalue->level>1 || sh_isoption(SH_NOUNSET)) && nv_isnull(np) && !nv_isattr(np,NV_INTEGER))
 		{
 			*ptr = nv_name(np);
@@ -300,7 +327,7 @@ static Sfdouble_t arith(const char **ptr, struct lval *lvalue, int type, Sfdoubl
 		r = nv_getnum(np);
 		if(nv_isattr(np,NV_INTEGER|NV_BINARY)==(NV_INTEGER|NV_BINARY))
 			lvalue->isfloat= (r!=(Sflong_t)r);
-		else if(nv_isattr(np,NV_INTEGER|NV_DOUBLE)==(NV_INTEGER|NV_DOUBLE))
+		else if(nv_isattr(np,NV_DOUBLE)==NV_DOUBLE)
 			lvalue->isfloat=1;
 		return(r);
 	    }
@@ -338,10 +365,13 @@ Sfdouble_t sh_strnum(register const char *str, char** ptr, int mode)
 	d = strtonll(str,&last,&base,-1);
 	if(*last || errno)
 	{
-		d = strval(str,&last,arith,mode);
+		if(!last || *last!='.' || last[1]!='.')
+			d = strval(str,&last,arith,mode);
 		if(!ptr && *last && mode>0)
 			errormsg(SH_DICT,ERROR_exit(1),e_lexbadchar,*last,str);
 	}
+	else if (!d && *str=='-')
+		d = -0.0;
 	if(ptr)
 		*ptr = last;
 	return(d);

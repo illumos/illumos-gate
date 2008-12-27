@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -160,7 +160,7 @@ static int p_arg(register const struct argnod *arg)
 	struct fornod *fp;
 	while(arg)
 	{
-		if((n = strlen(arg->argval)) || (arg->argflag&~ARG_APPEND))
+		if((n = strlen(arg->argval)) || (arg->argflag&~(ARG_APPEND|ARG_MESSAGE|ARG_QUOTED)))
 			fp=0;
 		else
 		{

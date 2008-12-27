@@ -20,6 +20,7 @@ libshell.a      -lshell
 Shell_t;
 Shopt_t;
 Shscope_t;
+Shbltin_t;
 Shbltin_f;
 Shinit_f;
 Shwait_f;
@@ -29,7 +30,7 @@ Shwait_f;
 .nf
 .ft 5
 int	sh_main(int \fIargc\fP, char *\fIargv\fP[], Sh_init \fIfn\fP);
-Shell_t	*sh_init(int \fIargc\fP, char *\fIargv\fP);
+Shell_t	*sh_init(int \fIargc\fP, char *\fIargv\fP[]);
 Shell_t	*sh_getinterp(void);
 
 Namval_t	*sh_addbuiltin(const char *\fIname\fP,Sh_bltin_f \fIfn\fP,void *\fIarg\fP);
@@ -40,6 +41,7 @@ unsigned int	sh_offoption(int \fIoption\fP);
 
 void	*sh_parse(Shell_t *\fIshp\fP, Sfio_t *\fIsp\fP, int \fIflags\fP);
 int 	sh_trap(const char *\fIstring\fP, int \fImode\fP);
+int	sh_run(int \fIargc\fP, char *\fIargv\fP[]);
 int 	sh_eval(Sfio_t *\fIsp\fP,int \fImode\fP);
 int 	sh_fun(Namval_t *\fIfunnode\fP, Namval_t *\fIvarnode\fP, char *\fIargv\fP[]);
 int 	sh_funscope(int \fIargc\fP,char *\fIargv\fP[],int(*\fIfn\fP)(void*),void *\fIarg\fP,int \fIflags\fP);
@@ -103,7 +105,10 @@ into the shell by loading dynamic libraries
 at run time using the \f5builtin\fP(1) command.
 In this case the shell will look for a function named \f5lib_init\fP
 in your library and, if found, will execute this function with
-argument \f50\fP when the library is loaded.
+two arguments.  The first
+argument will be an \f5int\P with value \f50\fP when the library is loaded.
+The second argument will contain a pointer to a structure of type
+\f5Shbltin_t\fP.
 In addition, for each argument named on the \f5builtin\fP
 command line, it will look for a function named \f5b_\fP\fIname\fP\f5()\fP
 in your library and will \fIname\fP as a built-in.
@@ -157,17 +162,20 @@ All built-in commands to the shell are invoked with
 three arguments.  The first two arguments give the
 number of arguments and the argument list
 and uses the same conventions as the \f5main()\fP function
-of a program.  The third argument is a pointer that
+of a program.  The third argument is a pointer to a structure
+of type \f5Shbltin_t\fP.  This structure contains \f5shp\P which is a pointer
+to the shell interpreter, and \f5ptr\fP which is a pointer that
 can be associated with each built-in.
 The \f5sh_addbuiltin()\fP function is used to add, replace or delete
 built-in commands. 
 It takes the name of the built-in, \fIname\fP, a pointer
 to the function that implements the built-in, \fIfn\fP, and
-a pointer that will be passed to the function when
+a pointer that will be passed to the function in the \f5ptr\fP field when
 it is invoked.
 If, \fIfn\fP is non-\f5NULL\fP the built-in command
-is added or replaced.  Otherwise, the given
-built-in command will be deleted.
+is added or replaced.  Otherwise, \f5sh_addbuiltin()\fP will
+return a pointer to the built-in if it exists or \f5NULL\fP otherwise.
+If \fIarg\fP is \f5(void*)1\fP the built-in will be deleted.
 The \fIname\fP argument can be in the format of a pathname.
 It cannot be the name of any of the special built-in commands.
 If \fIname\fP contains a \f5/\fP, the built-in is the basename of
@@ -267,6 +275,12 @@ The complete file associated with the string or file
 is compiled and then executed so that aliases defined
 within the string or file will not take effect until
 the next command is executed.
+.PP
+The \f5sh_run()\fP function will run the command given by
+by the argument list \fIargv\fP containing \fIargc\fP elements. 
+If \fIargv\fP\f5[0]\fP does not contain a \f5/\fP, it will
+be checked to see if it is a built-in or function before
+performing a path search. 
 .PP
 The \f5sh_eval()\fP function executes a string or file
 stream \fIsp\fP.

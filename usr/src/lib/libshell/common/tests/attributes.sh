@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -123,6 +123,10 @@ typeset -Z2 m
 if	[[ $(/tmp/ksh$$) != 13 ]]
 then	err_exit 'attributes not cleared for script execution'
 fi
+print 'print VAR=$VAR' > /tmp/ksh$$
+typeset -L70 VAR=var
+/tmp/ksh$$ > /tmp/ksh$$.1
+[[ $(< /tmp/ksh$$.1) == VAR= ]] || err_exit 'typeset -L should not be inherited'
 typeset -Z  LAST=00
 unset -f foo
 function foo
@@ -140,7 +144,8 @@ foo
 if	(( ${#LAST} != 2 ))
 then	err_exit 'LAST!=2'
 fi
-rm -rf /tmp/ksh$$
+[[ $(set | grep LAST) == LAST=02 ]] || err_exit "LAST not correct in set list"
+rm -rf /tmp/ksh$$*
 set -a
 unset foo
 foo=bar
@@ -190,7 +195,7 @@ hello worldhello worldhello world
 !
 [[ $v1 == "$b1" ]] || err_exit "v1=$v1 should be $b1"
 [[ $v2 == "$x" ]] || err_exit "v1=$v2 should be $x"
-[[ $(env '!=1' $SHELL -c 'echo ok' 2>/dev/null) == ok ]] || err_exit 'malformed environment terminates shell'
+[[ $(env - '!=1' $SHELL -c 'echo ok' 2>/dev/null) == ok ]] || err_exit 'malformed environment terminates shell'
 unset var
 typeset -b var
 printf '12%Z34' | read -r -N 5 var
@@ -213,4 +218,66 @@ function fun
 fun
 [[ $(export | grep foo) == 'foo=hello' ]] || err_exit 'export not working in functions'
 [[ $(export | grep bar) ]] && err_exit 'typeset -x not local'
+[[ $($SHELL -c 'typeset -r IFS=;print -r $(pwd)' 2> /dev/null) == "$(pwd)" ]] || err_exit 'readonly IFS causes command substitution to fail'
+fred[66]=88
+[[ $(typeset -pa) == *fred* ]] || err_exit 'typeset -pa not working'
+unset x y z
+typeset -LZ3 x=abcd y z=00abcd
+y=03
+[[ $y == "3  " ]] || err_exit '-LZ3 not working for value 03' 
+[[ $x == "abc" ]] || err_exit '-LZ3 not working for value abcd' 
+[[ $x == "abc" ]] || err_exit '-LZ3 not working for value 00abcd' 
+unset x z
+set +a
+[[ $(typeset -p z) ]] && err_exit "typeset -p for z undefined failed"
+unset z
+x='typeset -i z=45'
+eval "$x"
+[[ $(typeset -p z) == "$x" ]] || err_exit "typeset -p for '$x' failed"
+[[ $(typeset +p z) == "${x%=*}" ]] || err_exit "typeset +p for '$x' failed"
+unset z
+x='typeset -a z=(a b c)'
+eval "$x"
+[[ $(typeset -p z) == "$x" ]] || err_exit "typeset -p for '$x' failed"
+[[ $(typeset +p z) == "${x%=*}" ]] || err_exit "typeset +p for '$x' failed"
+unset z
+x='typeset -C z=(
+	foo=bar
+	xxx=bam
+)'
+eval "$x"
+x=${x//$'\t'}
+x=${x//$'(\n'/'('}
+x=${x//$'\n'/';'}
+[[ $(typeset -p z) == "$x" ]] || err_exit "typeset -p for '$x' failed"
+[[ $(typeset +p z) == "${x%%=*}" ]] || err_exit "typeset +p for '$x' failed"
+unset z
+x='typeset -A z=([bar]=bam [xyz]=bar)'
+eval "$x"
+[[ $(typeset -p z) == "$x" ]] || err_exit "typeset -p for '$x' failed"
+[[ $(typeset +p z) == "${x%%=*}" ]] || err_exit "typeset +p for '$x' failed"
+unset z
+foo=abc
+x='typeset -n z=foo'
+eval "$x"
+[[ $(typeset -p z) == "$x" ]] || err_exit "typeset -p for '$x' failed"
+[[ $(typeset +p z) == "${x%%=*}" ]] || err_exit "typeset +p for '$x' failed"
+typeset +n z
+unset foo z
+typeset -T Pt_t=(
+	float x=1 y=2
+)
+Pt_t z
+x=${z//$'\t'}
+x=${x//$'(\n'/'('}
+x=${x//$'\n'/';'}
+[[ $(typeset -p z) == "Pt_t z=$x" ]] || err_exit "typeset -p for type failed"
+[[ $(typeset +p z) == "Pt_t z" ]] || err_exit "typeset +p for type failed"
+unset z
+function foo
+{
+	typeset -p bar
+}
+bar=xxx
+[[ $(foo) == bar=xxx ]] || err_exit 'typeset -p not working inside a function'
 exit	$((Errors))

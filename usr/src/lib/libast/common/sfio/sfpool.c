@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -41,7 +41,7 @@ static int delpool(p)
 reg Sfpool_t*	p;
 #endif
 {
-	POOLMTXSTART(p);
+	POOLMTXENTER(p);
 
 	if(p->s_sf && p->sf != p->array)
 		free((Void_t*)p->sf);
@@ -85,7 +85,7 @@ reg int	mode;
 		POOLMTXUNLOCK(last);
 	}
 
-	POOLMTXSTART(p);
+	POOLMTXENTER(p);
 
 	p->mode = mode&SF_SHARE;
 	p->s_sf = sizeof(p->array)/sizeof(p->array[0]);
@@ -108,7 +108,7 @@ int		n;	/* current position in pool	*/
 	reg ssize_t	k, w, v;
 	reg int		rv;
 
-	POOLMTXSTART(p);
+	POOLMTXENTER(p);
 
 	if(n == 0)
 		POOLMTXRETURN(p,0);
@@ -175,7 +175,7 @@ Sfio_t*		f;	/* the stream		*/
 int		n;	/* position in pool	*/
 #endif
 {
-	POOLMTXSTART(p);
+	POOLMTXENTER(p);
 
 	p->n_sf -= 1;
 	for(; n < p->n_sf; ++n)

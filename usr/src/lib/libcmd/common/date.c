@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: date (AT&T Research) 2007-03-28 $\n]"
+"[-?\n@(#)$Id: date (AT&T Research) 2007-05-21 $\n]"
 USAGE_LICENSE
 "[+NAME?date - set/list/convert dates]"
 "[+DESCRIPTION?\bdate\b sets the current date and time (with appropriate"
@@ -96,7 +96,7 @@ USAGE_LICENSE
 "		[+e?blank padded day of month number]"
 "		[+E?unpadded day of month number]"
 "		[+f?locale default override date format]"
-"		[+F?locale default date format]"
+"		[+F?%ISO 8601:2000 standard date format; equivalent to Y-%m-%d]"
 "		[+g?\bls\b(1) \b-l\b recent date with \ahh:mm\a]"
 "		[+G?\bls\b(1) \b-l\b distant date with \ayyyy\a]"
 "		[+h?abbreviated month name]"
@@ -108,6 +108,7 @@ USAGE_LICENSE
 "		[+k?\bdate\b(1) style date]"
 "		[+K?all numeric date; equivalent to \b%Y-%m-%d+%H:%M:%S\b]"
 "		[+l?\bls\b(1) \b-l\b date; equivalent to \b%Q/%g/%G/\b]"
+"		[+L?locale default date format]"
 "		[+m?month number]"
 "		[+M?minutes]"
 "		[+n?newline character]"
@@ -206,7 +207,7 @@ typedef struct Fmt
  */
 
 static int
-settime(const char* cmd, Time_t now, int adjust, int network)
+settime(void* context, const char* cmd, Time_t now, int adjust, int network)
 {
 	char*		s;
 	char**		argv;
@@ -222,13 +223,13 @@ settime(const char* cmd, Time_t now, int adjust, int network)
 		*argv++ = s;
 		if (streq(astconf("UNIVERSE", NiL, NiL), "att"))
 		{
-			tmxfmt(buf, sizeof(buf), "%m%d%H" "%M" "%Y.%S", now);
+			tmxfmt(buf, sizeof(buf), "%m%d%H" "%M%Y.%S", now);
 			if (adjust)
 				*argv++ = "-a";
 		}
 		else
 		{
-			tmxfmt(buf, sizeof(buf), "%Y" "%m%d%H" "%M.%S", now);
+			tmxfmt(buf, sizeof(buf), "%Y%m%d%H" "%M.%S", now);
 			if (network)
 				*argv++ = "-n";
 			if (tm_info.flags & TM_UTC)
@@ -236,7 +237,7 @@ settime(const char* cmd, Time_t now, int adjust, int network)
 		}
 		*argv++ = buf;
 		*argv = 0;
-		if (!procrun(s, args))
+		if (!sh_run(context, argv - args, args))
 			return 0;
 	}
 	return -1;
@@ -473,7 +474,7 @@ b_date(int argc, register char** argv, void* context)
 			tmxfmt(buf, sizeof(buf), format, now);
 			sfprintf(sfstdout, "%s\n", buf);
 		}
-		else if (settime(cmd, now, increment, network))
+		else if (settime(context, cmd, now, increment, network))
 			error(ERROR_SYSTEM|3, "cannot set system time");
 	}
 	while (fmts != &fmt)

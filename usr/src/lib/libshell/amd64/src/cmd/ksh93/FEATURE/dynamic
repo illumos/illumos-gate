@@ -1,18 +1,17 @@
-/* : : generated from /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/src/cmd/ksh93/features/dynamic by iffe version 2007-04-04 : : */
+/* : : generated from /home/gisburn/ksh93/ast_ksh_20081104/build_i386_64bit/src/cmd/ksh93/features/dynamic by iffe version 2008-01-31 : : */
 #ifndef _def_dynamic_ksh93
 #define _def_dynamic_ksh93	1
 #define _sys_types	1	/* #include <sys/types.h> ok */
-#define _LIB_dll	1	/* /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/arch/sol11.i386/lib/libdll.a is a library */
-#define _LIB_ast	1	/* /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/arch/sol11.i386/lib/libast.a is a library */
+#define _LIB_dll	1	/* /home/gisburn/ksh93/ast_ksh_20081104/build_i386_64bit/arch/sol11.i386/lib/libdll.a is a library */
+#define _LIB_ast	1	/* /home/gisburn/ksh93/ast_ksh_20081104/build_i386_64bit/arch/sol11.i386/lib/libast.a is a library */
 #define _LIB_m	1	/* -lm is a library */
-#define _LIB_cmd	1	/* /home/gisburn/ksh93/ast_ksh_20070418/build_i386_64bit/arch/sol11.i386/lib/libcmd.a is a library */
+#define _LIB_cmd	1	/* /home/gisburn/ksh93/ast_ksh_20081104/build_i386_64bit/arch/sol11.i386/lib/libcmd.a is a library */
+#define _LIB_md	1	/* -lmd is a library */
 #define _LIB_nsl	1	/* -lnsl is a library */
-#define _hdr_dlfcn	1	/* #include <dlfcn.h> ok */
-#define _sys_dl	1	/* #include <sys/dl.h> ok */
-#define _hdr_dlldefs	1	/* #include <dlldefs.h> ok */
-#define _lib_dlopen	1	/* dlopen() in default lib(s) */
-#define _lib_dllfind	1	/* dllfind() in default lib(s) */
-#if !defined(SHOPT_FS_3D) && ( _lib_dllfind || _lib_dlopen || _lib_shl_load || _lib_loadbind )
+#if SHOPT_DYNAMIC
+#include	<dlldefs.h>
+#endif
+#if !defined(SHOPT_FS_3D) && SHOPT_DYNAMIC
 #   define SHOPT_FS_3D	1
 #endif /* !SHOPT_FS_3D */
 #if SHOPT_FS_3D

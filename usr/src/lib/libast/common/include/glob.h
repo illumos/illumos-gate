@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -68,8 +68,8 @@ struct _glob_
 	void*		(*gl_diropen)(glob_t*, const char*);
 	char*		(*gl_dirnext)(glob_t*, void*);
 	void		(*gl_dirclose)(glob_t*, void*);
-	int		(*gl_type)(glob_t*, const char*);
-	int		(*gl_attr)(glob_t*, const char*);
+	int		(*gl_type)(glob_t*, const char*, int);
+	int		(*gl_attr)(glob_t*, const char*, int);
 
 	/* gnu extensions -- but how do you synthesize dirent and stat? */
 

@@ -3,10 +3,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -112,6 +112,7 @@ extern __MANGLE__ char*		opthelp __PROTO__((const char*, const char*));
 extern __MANGLE__ char*		optusage __PROTO__((const char*));
 extern __MANGLE__ int		optstr __PROTO__((const char*, const char*));
 extern __MANGLE__ int		optesc __PROTO__((Sfio_t*, const char*, int));
+extern __MANGLE__ Opt_t*		optctx __PROTO__((Opt_t*, Opt_t*));
 
 #undef __MANGLE__
 #define __MANGLE__ __LINKAGE__

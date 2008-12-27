@@ -18,12 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 
 # Platform-specific config
 # Note that "HOSTTYPE" matches the value used by AT&T upstream.
@@ -31,7 +31,8 @@ ASTPLATFORMCPPFLAGS = '-DHOSTTYPE="sol$(RELEASE_MINOR).sun4"'
 
 # platform-specific sources
 OBJECTS = \
-	sparcv9/src/lib/libast/conftab.o
+	sparcv9/src/lib/libast/conftab.o \
+	sparcv9/src/lib/libast/lctab.o
 OBJDIRS = \
 	sparcv9/src/lib/libast
 

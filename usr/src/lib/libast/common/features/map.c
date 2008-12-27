@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -109,6 +109,14 @@ main()
 	printf("#define getopt_long	_ast_getopt_long\n");
 	printf("#undef	getopt_long_only\n");
 	printf("#define getopt_long_only _ast_getopt_long_only\n");
+	printf("#undef	optopt\n");
+	printf("#define optopt		_ast_optopt\n");
+	printf("#undef	optarg\n");
+	printf("#define optarg		_ast_optarg\n");
+	printf("#undef	optind\n");
+	printf("#define optind		_ast_optind\n");
+	printf("#undef	opterr\n");
+	printf("#define opterr		_ast_opterr\n");
 #endif
 	printf("#undef	getwd\n");
 	printf("#define getwd		_ast_getwd\n");
@@ -135,6 +143,8 @@ main()
 	printf("#define mktime		_ast_mktime\n");
 	printf("#undef	nftw\n");
 	printf("#define nftw		_ast_nftw\n");
+	printf("#undef	optctx\n");
+	printf("#define optctx		_ast_optctx\n");
 	printf("#undef	optesc\n");
 	printf("#define optesc		_ast_optesc\n");
 	printf("#undef	optget\n");
@@ -263,7 +273,7 @@ main()
 	printf("extern int		remove(const char*);\n");
 	printf("#undef	resolvepath\n");
 	printf("#define resolvepath	_ast_resolvepath\n");
-	printf("extern char*		resolvepath(const char*, char*, size_t);\n");
+	printf("extern int		resolvepath(const char*, char*, size_t);\n");
 	printf("#undef	setenv\n");
 	printf("#define setenv		_ast_setenv\n");
 	printf("extern int		setenv(const char*, const char*, int);\n");

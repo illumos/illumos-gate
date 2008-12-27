@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -110,6 +110,7 @@ va_list	args;		/* arg list if !argf	*/
 #endif
 	ssize_t		size;
 	Sfdouble_t	dval;
+	Void_t*		valp;
 	char		*tls[2], **ls;	/* for %..[separ]s		*/
 	char*		t_str;		/* stuff between ()		*/
 	ssize_t		n_str;		/* its length			*/
@@ -133,7 +134,7 @@ va_list	args;		/* arg list if !argf	*/
 	SFMBDCL(mbs)			/* state of some string		*/
 #ifdef mbwidth
 	char*		osp;
-	int		n_w, sf_wcwidth;
+	int		n_w, wc;
 #endif
 #endif
 
@@ -171,9 +172,11 @@ va_list	args;		/* arg list if !argf	*/
 			}
 #endif /* _sffmt_small */
 
+	SFMTXDECL(f);
+
 	SFCVINIT();	/* initialize conversion tables */
 
-	SFMTXSTART(f,-1);
+	SFMTXENTER(f,-1);
 
 	if(!form)
 		SFMTXRETURN(f, -1);
@@ -189,9 +192,6 @@ va_list	args;		/* arg list if !argf	*/
 		f->endb = f->data+sizeof(data);
 	}
 	SFINIT(f);
-#if _has_multibyte && defined(mbwidth)
-	sf_wcwidth = f->flags & SF_WCWIDTH;
-#endif
 
 	tls[1] = NIL(char*);
 
@@ -662,8 +662,11 @@ loop_fmt :
 			continue;
 
 		case 'S':
-			flags = (flags & ~SFFMT_TYPES) | SFFMT_LONG;
+			flags = (flags & ~(SFFMT_TYPES|SFFMT_LDOUBLE)) | SFFMT_LONG;
 		case 's':
+#if _has_multibyte && defined(mbwidth)
+			wc = (flags & SFFMT_LDOUBLE) && mbwide();
+#endif
 			if(base >= 0)	/* list of strings */
 			{	if(!(ls = argv.sp) || !ls[0])
 					continue;
@@ -698,7 +701,7 @@ loop_fmt :
 						if((n_s = wcrtomb(buf, *wsp, &mbs)) <= 0)
 							break;
 #ifdef mbwidth
-						if(sf_wcwidth )
+						if(wc)
 						{	n_w = mbwidth(*wsp);
 							if(precis >= 0 && (w+n_w) > precis )
 								break;
@@ -711,12 +714,12 @@ loop_fmt :
 						v += n_s;
 					}
 #ifdef mbwidth
-					if(!sf_wcwidth )
+					if(!wc)
 						w = v;
 #endif
 				}
-#if defined(mbwide) && defined(mbchar) && defined(mbwidth)
-				else if (mbwide())
+#if _has_multibyte && defined(mbwidth)
+				else if (wc)
 				{	w = 0;
 					SFMBCLR(&mbs);
 					ssp = sp;
@@ -726,7 +729,7 @@ loop_fmt :
 							break;
 						osp = ssp;
 						n = mbchar(osp);
-						n_w = sf_wcwidth ? mbwidth(n) : 1;
+						n_w = mbwidth(n);
 						if(precis >= 0 && (w+n_w) > precis )
 							break;
 						w += n_w;
@@ -779,8 +782,11 @@ loop_fmt :
 			continue;
 
 		case 'C':
-			flags = (flags & ~SFFMT_TYPES) | SFFMT_LONG;
+			flags = (flags & ~(SFFMT_TYPES|SFFMT_LDOUBLE)) | SFFMT_LONG;
 		case 'c':
+#if _has_multibyte && defined(mbwidth)
+			wc = (flags & SFFMT_LDOUBLE) && mbwide();
+#endif
 			if(precis <= 0) /* # of times to repeat a character */
 				precis = 1;
 #if _has_multibyte
@@ -818,7 +824,7 @@ loop_fmt :
 					if((n_s = wcrtomb(buf, *wsp++, &mbs)) <= 0)
 						break;
 #ifdef mbwidth
-					if(sf_wcwidth)
+					if(wc)
 						n_s = mbwidth(*(wsp - 1));
 #endif
 					n = width - precis*n_s; /* padding amount */
@@ -951,6 +957,9 @@ loop_fmt :
 #if _PACKAGE_ast
 				if(scale)
 				{	sp = fmtscale(lv, scale);
+#if _has_multibyte && defined(mbwidth)
+					wc = 0;
+#endif
 					goto str_cvt;
 				}
 #endif
@@ -1008,6 +1017,9 @@ loop_fmt :
 #if _PACKAGE_ast
 				if(scale)
 				{	sp = fmtscale(v, scale);
+#if _has_multibyte && defined(mbwidth)
+					wc = 0;
+#endif
 					goto str_cvt;
 				}
 #endif
@@ -1103,24 +1115,26 @@ loop_fmt :
 #if !_ast_fltmax_double
 			if(size == sizeof(Sfdouble_t) )
 			{	v = SFFMT_LDOUBLE;
+				valp = &argv.ld;
 				dval = argv.ld;
 			}
 			else
 #endif
 			{	v = 0;
+				valp = &argv.d;
 				dval = argv.d;
 			}
 
 			if(fmt == 'e' || fmt == 'E' && (v |= SFFMT_UPPER))
 			{	v |= SFFMT_EFORMAT;
 				n = (precis = precis < 0 ? FPRECIS : precis)+1;
-				ep = _sfcvt(dval,tmp+1,sizeof(tmp)-1, min(n,SF_FDIGITS),
+				ep = _sfcvt(valp,tmp+1,sizeof(tmp)-1, min(n,SF_FDIGITS),
 					    &decpt, &sign, &n_s, v);
 				goto e_format;
 			}
 			else if(fmt == 'f' || fmt == 'F' && (v |= SFFMT_UPPER))
 			{	precis = precis < 0 ? FPRECIS : precis;
-				ep = _sfcvt(dval,tmp+1,sizeof(tmp)-1, min(precis,SF_FDIGITS),
+				ep = _sfcvt(valp,tmp+1,sizeof(tmp)-1, min(precis,SF_FDIGITS),
 					    &decpt, &sign, &n_s, v);
 				goto f_format;
 			}
@@ -1132,7 +1146,7 @@ loop_fmt :
 					else	precis = 2*(sizeof(double) - 2);
 				}
 				n = precis + 1;
-				ep = _sfcvt(dval,tmp+1,sizeof(tmp)-1, min(n,SF_FDIGITS),
+				ep = _sfcvt(valp,tmp+1,sizeof(tmp)-1, min(n,SF_FDIGITS),
 					    &decpt, &sign, &n_s, v);
 
 				sp = endsp = buf+1;	/* reserve space for sign */
@@ -1147,7 +1161,7 @@ loop_fmt :
 				if(fmt == 'G')
 					v |= SFFMT_UPPER;
 				v |= SFFMT_EFORMAT;
-				ep = _sfcvt(dval,tmp+1,sizeof(tmp)-1, min(precis,SF_FDIGITS),
+				ep = _sfcvt(valp,tmp+1,sizeof(tmp)-1, min(precis,SF_FDIGITS),
 					    &decpt, &sign, &n_s, v);
 				if(dval == 0.)
 					decpt = 1;

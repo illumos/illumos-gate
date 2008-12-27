@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,19 +27,20 @@
 */
 
 #if __STD_C
-ssize_t sfread(reg Sfio_t* f, Void_t* buf, reg size_t n)
+ssize_t sfread(Sfio_t* f, Void_t* buf, size_t n)
 #else
 ssize_t sfread(f,buf,n)
-reg Sfio_t*	f;	/* read from this stream. 	*/
+Sfio_t*		f;	/* read from this stream. 	*/
 Void_t*		buf;	/* buffer to read into		*/
-reg size_t	n;	/* number of bytes to be read. 	*/
+size_t		n;	/* number of bytes to be read. 	*/
 #endif
 {
 	reg uchar	*s, *begs;
 	reg ssize_t	r;
 	reg int		local, justseek;
+	SFMTXDECL(f);
 
-	SFMTXSTART(f, (ssize_t)(-1));
+	SFMTXENTER(f, (ssize_t)(-1));
 
 	GETLOCAL(f,local);
 	justseek = f->bits&SF_JUSTSEEK; f->bits &= ~SF_JUSTSEEK;

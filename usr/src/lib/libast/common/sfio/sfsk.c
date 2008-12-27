@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -26,12 +26,12 @@
 **	Written by Kiem-Phong Vo.
 */
 #if __STD_C
-Sfoff_t sfsk(reg Sfio_t* f, Sfoff_t addr, reg int type, Sfdisc_t* disc)
+Sfoff_t sfsk(Sfio_t* f, Sfoff_t addr, int type, Sfdisc_t* disc)
 #else
 Sfoff_t sfsk(f,addr,type,disc)
-reg Sfio_t*	f;
+Sfio_t*		f;
 Sfoff_t		addr;
-reg int		type;
+int		type;
 Sfdisc_t*	disc;
 #endif
 {
@@ -39,8 +39,9 @@ Sfdisc_t*	disc;
 	reg Sfdisc_t*	dc;
 	reg ssize_t	s;
 	reg int		local, mode;
+	SFMTXDECL(f);
 
-	SFMTXSTART(f, (Sfoff_t)(-1));
+	SFMTXENTER(f, (Sfoff_t)(-1));
 
 	GETLOCAL(f,local);
 	if(!local && !(f->bits&SF_DCDOWN))

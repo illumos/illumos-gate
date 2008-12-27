@@ -869,8 +869,9 @@ into the buffer.
 .Tp
 \f5n == 0\fP:
 If the argument \f5type\fP is \f50\fP,
-\f5sfreserve()\fP attempts to get \fIat least\fP \f51\fP byte into the buffer;
-otherwise, no attempt will be made to read data into the buffer.
+\f5sfreserve()\fP attempts to get \fIat least\fP \f51\fP byte into the buffer
+but does not consume it (as consistent with \f5n == 0\fP).
+If \f5type != 0\fP, no attempt will be made to read data into the buffer.
 For example, the call \f5sfreserve(f, 0, -1)\fP only returns the buffer status,
 i.e., size of existing buffered data and pointer to such data, if any.
 The call \f5sfreserve(f, 0, SF_LOCKR)\fP is similar but also locks the stream.
@@ -1697,14 +1698,28 @@ After a successful discipline stack manipulation,
 the stream I/O position (see \f5sfseek()\fP and \f5sftell()\fP)
 and extent (see \f5sfsize()\fP) are updated
 to reflect that defined by the top discipline.
+\f5sfdisc()\fP returns \f5NULL\fP on failure.
+
+If the value of \f5disc\fP is identical to the value of \f5f\fP,
+then the top discipline on the discipline
+stack is returned without any further action.
+An application can then use this feature of \f5sfdisc()\fP
+and the field \f5disc\fP (below) of the discipline structure
+to traverse the entire discipline stack of a stream \f5f\fP as follows:
+
+.nf
+.ft 5
+    for(disc = sfdisc(f, (Sfdisc_t*)f); disc; disc = disc->disc)
+.ft 1
+.fi
+
 If \f5disc\fP is \f5SF_POPDISC\fP or \f5(Sfdisc_t*)0\fP,
 the top element of the stack, if any, is popped and its address is returned.
 Otherwise, \f5disc\fP is pushed onto the discipline stack.
 In this case, if successful, \f5sfdisc()\fP returns
 the discipline that was pushed down.
-\f5sfdisc()\fP returns \f5NULL\fP on failure.
 
-Note that a discipline can be used only on one stream at a time.
+Note that a discipline can be used on only one stream at a time.
 An application should take care to allocate different discipline
 structures for use with different streams. 
 A discipline structure is of the type \f5Sfdisc_t\fP which
@@ -1716,6 +1731,7 @@ contains the following public fields:
     Sfwrite_f  writef;
     Sfseek_f   seekf;
     Sfexcept_f exceptf;
+    Sfdisc_t*   disc;
 .ft 1
 .fi
 
@@ -1797,8 +1813,8 @@ discipline is about to be pushed or popped.
 
 A stream buffer is always synchronized before pushing or popping a discipline.
 If this synchronization fails, \f5SF_DBUFFER\fP will be raised with
-\f5*((size_t*)value)\fP being the amount of buffered data.
-If the return value of \f5exceptf\fP is positive,
+\f5*((size_t*)value)\fP being the amount of data still in the buffer.
+If the return value of \f5exceptf\fP is non-negative,
 the push or pop operation will continue normally;
 otherwise, \f5sfdisc()\fP returns failure.
 .Tp

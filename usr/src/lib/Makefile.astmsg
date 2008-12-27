@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -32,8 +31,8 @@
 
 # Should we build AST l10n catalogs ?
 # This can be overridden at build time via:
-# $ export ON_BUILD_AST_L10N_CATALOGS=1
-ON_BUILD_AST_L10N_CATALOGS=0
+# $ export ON_BUILD_AST_L10N_CATALOGS=0
+ON_BUILD_AST_L10N_CATALOGS=1
 
 DO_BUILD_AST_CATALOGS_1=	$(ON_BUILD_AST_L10N_CATALOGS:0=$(POUND_SIGN))
 DONT_BUILD_AST_CATALOGS_1=	$(ON_BUILD_AST_L10N_CATALOGS:1=$(POUND_SIGN))
@@ -47,12 +46,9 @@ DONT_BUILD_AST_CATALOGS=	$(DONT_BUILD_AST_CATALOGS_1:0=)
 MSGLIBNAME= $(LIBRARY:.a=)
 ASTMSGCATALOG= $(ROOT)/usr/lib/locale/C/LC_MESSAGES/$(MSGLIBNAME)
 
-# We can't support LD_LIBRARY_PATH/ROOT hacks that attempt to run software
-# out of the proto area.
 $(DO_BUILD_AST_CATALOGS)ASTMSGCC= \
-	PATH="$(ROOT)/usr/ast/bin/:/bin:/usr/bin" \
-	LD_LIBRARY_PATH="$(ROOT)/usr/lib/$(MACH64):$(ROOT)/usr/lib/" \
-		"$(ROOT)/bin/ksh93" "$(ROOT)/usr/ast/bin/msgcc" >>msgcc.out 2>&1
+	PATH="/usr/ast/bin/:/bin:/usr/bin" \
+		/usr/bin/ksh93 /usr/ast/bin/msgcc >>msgcc.out 2>&1
 
 ASTMSGS=  $(OBJECTS:%.o=msgs/%.mso)
 

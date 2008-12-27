@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -96,14 +96,19 @@ const char e_aliname[]		= "%s: invalid alias name";
 const char e_badexport[]	= "%s: invalid export name";
 const char e_badref[]		= "%s: reference variable cannot be an array";
 const char e_noarray[]		= "%s: cannot be an array";
+const char e_badappend[]	= "%s: invalid append to associative array";
 const char e_noref[]		= "%s: no reference name";
 const char e_selfref[]		= "%s: invalid self reference";
 const char e_noalias[]		= "%s: alias not found\n";
 const char e_format[]		= "%s: bad format";
 const char e_redef[]		= "%s: type cannot be redefined";
+const char e_required[]		= "%s: is a required element of %s";
 const char e_badtformat[]	= "%c: bad format character in time format";
 const char e_nolabels[]		= "%s: label not implemented";
 const char e_notimp[]		= "%s: not implemented";
+const char e_notelem[]		= "%.*s: is not an element of %s";
+const char e_notenum[]		= "%s: not an enumeration type";
+const char e_unknowntype[]	= "%.*s: unknown type";
 const char e_nosupport[]	= "not supported";
 const char e_badrange[]		= "%d-%d: invalid range";
 const char e_eneedsarg[]	= "-e - requires single argument";
@@ -116,6 +121,7 @@ const char e_on	[]		= "on";
 const char e_off[]		= "off";
 const char is_reserved[]	= " is a keyword";
 const char is_builtin[]		= " is a shell builtin";
+const char is_spcbuiltin[]	= " is a special shell builtin";
 const char is_builtver[]	= "is a shell builtin version of";
 const char is_alias[]		= "%s is an alias for ";
 const char is_xalias[]		= "%s is an exported alias for ";

@@ -19,67 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/libcmd/common/llib-lcmd
  *
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 
 #include <cmd.h>
 #include <cmdext.h>
-
-/* automatically generated data start here */
-extern int STANDALONE(int, char**, void*);
-extern int cmdrecurse(int, char**, int, char**);
-extern int b_basename(int, char**, void*);
-extern int b_cat(int, char**, void*);
-extern int b_chgrp(int, char**, void*);
-extern int b_chmod(int, char**, void*);
-extern int b_chown(int, char**, void*);
-extern int b_cmp(int, char**, void*);
-extern int b_comm(int, char**, void*);
-extern int b_cp(int, char**, void*);
-extern int b_cut(int, char**, void*);
-extern int b_date(int, char**, void*);
-extern int b_dirname(int, char**, void*);
-extern int b_expr(int, char**, void*);
-extern int b_fds(int, char**, void*);
-extern int b_fmt(int, char**, void*);
-extern int b_fold(int, char**, void*);
-extern int b_getconf(int, char**, void*);
-extern int b_head(int, char**, void*);
-extern int b_id(int, char**, void*);
-extern int b_join(int, char**, void*);
-extern int b_ln(int, char**, void*);
-extern int b_logname(int, char**, void*);
-extern int b_mkdir(int, char**, void*);
-extern int b_mkfifo(int, char**, void*);
-extern int b_mv(int, char**, void*);
-extern int b_paste(int, char**, void*);
-extern int b_pathchk(int, char**, void*);
-extern int b_rev(int, char**, void*);
-extern int b_rm(int, char**, void*);
-extern int b_rmdir(int, char**, void*);
-extern int b_stty(int, char**, void*);
-extern int b_tail(int, char**, void*);
-extern int b_tee(int, char**, void*);
-extern int b_tty(int, char**, void*);
-extern int b_uname(int, char**, void*);
-extern int b_uniq(int, char**, void*);
-extern int b_wc(int, char**, void*);
-/* end of automatically generated data */
-
-/*
- * The |def*()| functions are the historical contents of Solaris
- * libcmd. They have been moved to libc and libcmd contains only
- * filter symbols for them, redirecting to libc.
- */
-extern int defopen(char *fn);
-extern char *defread(char *cp);
-extern int defcntl(int cmd, int newflags);

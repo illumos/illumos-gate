@@ -18,11 +18,10 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Platform-specific config
@@ -31,7 +30,8 @@ ASTPLATFORMCPPFLAGS = '-DHOSTTYPE="sol$(RELEASE_MINOR).i386"'
 
 # platform-specific sources
 OBJECTS = \
-	amd64/src/lib/libast/conftab.o
+	amd64/src/lib/libast/conftab.o \
+	amd64/src/lib/libast/lctab.o
 OBJDIRS = \
 	amd64/src/lib/libast
 

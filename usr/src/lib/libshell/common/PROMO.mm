@@ -110,7 +110,7 @@ it to intercept assignments and references.
 .LI
 Improved debugging:  KSH-93 can generate line numbers on execution
 traces.  Also, I/O redirections are now traced.
-There is a DEBUG trap that gets evaluated after each command
+There is a DEBUG trap that gets evaluated before each command
 so that errors can be localized.
 .LI
 Job Control: On systems that support job control, including

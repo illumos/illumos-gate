@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -42,25 +42,29 @@ fs3d(register int op)
 	static char	on[] = FS3D_on;
 	static char	off[] = FS3D_off;
 
-	if (fsview < 0) return(0);
+	if (fsview < 0)
+		return 0;
 
 	/*
 	 * get the current setting
 	 */
 
-	if (!fsview && mount("", "", 0, NiL))
+	if (!fsview && (!getenv("LD_PRELOAD") || mount("", "", 0, NiL)))
 		goto nope;
 	if (FS3D_op(op) == FS3D_OP_INIT && mount(FS3D_init, NiL, FS3D_VIEW, NiL))
 		goto nope;
 	if (mount(on, val, FS3D_VIEW|FS3D_GET|FS3D_SIZE(sizeof(val)), NiL))
 		goto nope;
-	if (v = strchr(val, ' ')) v++;
-	else v = val;
+	if (v = strchr(val, ' '))
+		v++;
+	else
+		v = val;
 	if (!strcmp(v, on))
 		cur = FS3D_ON;
 	else if (!strncmp(v, off, sizeof(off) - 1) && v[sizeof(off)] == '=')
 		cur = FS3D_LIMIT((int)strtol(v + sizeof(off) + 1, NiL, 0));
-	else cur = FS3D_OFF;
+	else
+		cur = FS3D_OFF;
 	if (cur != op)
 	{
 		switch (FS3D_op(op))
@@ -83,8 +87,8 @@ fs3d(register int op)
 			goto nope;
 	}
 	fsview = 1;
-	return(cur);
+	return cur;
  nope:
 	fsview = -1;
-	return(0);
+	return 0;
 }

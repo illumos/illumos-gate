@@ -1,10 +1,10 @@
 ########################################################################
 #                                                                      #
 #               This software is part of the ast package               #
-#           Copyright (c) 1982-2007 AT&T Knowledge Ventures            #
+#          Copyright (c) 1982-2008 AT&T Intellectual Property          #
 #                      and is licensed under the                       #
 #                  Common Public License, Version 1.0                  #
-#                      by AT&T Knowledge Ventures                      #
+#                    by AT&T Intellectual Property                     #
 #                                                                      #
 #                A copy of the License is available at                 #
 #            http://www.opensource.org/licenses/cpl1.0.txt             #
@@ -78,6 +78,20 @@ builtin -d rm 2> /dev/null
 if	whence rm > /dev/null
 then	[[ ! $(alias -t | grep rm= ) ]] && err_exit 'tracked alias not set'
 	PATH=$PATH
-	[[ $(alias -t | grep rm= ) ]] &&  err_exit 'tracked alias not cleared'
+	[[ $(alias -t | grep rm= ) ]] && err_exit 'tracked alias not cleared'
 fi
+if	hash -r 2>/dev/null && [[ ! $(hash) ]]
+then	mkdir  /tmp/ksh$$ || err_exit "mkdir /tmp/ksh$$ failed" 
+	trap "cd /; rm -rf /tmp/ksh$$" EXIT
+	PATH=/tmp/ksh$$:/bin:/usr/bin
+	for i in foo -foo --
+	do	print ':' > /tmp/ksh$$/$i
+		chmod +x /tmp/ksh$$/$i
+		hash -r -- $i 2>/dev/null || err_exit "hash -r -- $i failed"
+		[[ $(hash) == $i=/tmp/ksh$$/$i ]] || err_exit "hash -r -- $i failed, expected $i=/tmp/ksh$$/$i, got $(hash)"
+	done
+else	err_exit 'hash -r failed'
+fi
+( alias :pr=print) 2> /dev/null || err_exit 'alias beginning with : fails'
+( alias p:r=print) 2> /dev/null || err_exit 'alias with : in name fails'
 exit $((Errors))

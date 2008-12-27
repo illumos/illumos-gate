@@ -1,6 +1,7 @@
 hdr	time
 lib	clock_settime,gettimeofday,settimeofday,stime,utimes
 lib	nanosleep,usleep
+lib	utimensat -D_ATFILE_SOURCE sys/stat.h
 
 if ! mem timeval.tv_sec sys/time.h {
 	struct timeval

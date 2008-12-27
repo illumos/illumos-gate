@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -65,19 +65,19 @@
 
 #define sh_inuse(f2)	(sh.fdptrs[f2])
 
-extern int	sh_iocheckfd(int);
-extern void 	sh_ioinit(void);
+extern int	sh_iocheckfd(Shell_t*,int);
+extern void 	sh_ioinit(Shell_t*);
 extern int 	sh_iomovefd(int);
-extern int	sh_iorenumber(int,int);
+extern int	sh_iorenumber(Shell_t*,int,int);
 extern void 	sh_pclose(int[]);
-extern void 	sh_iorestore(int,int);
+extern void 	sh_iorestore(Shell_t*,int,int);
 #if defined(__EXPORT__) && defined(_BLD_DLL) && defined(_BLD_shell) 
    __EXPORT__
 #endif
-extern Sfio_t 	*sh_iostream(int);
-extern int	sh_redirect(struct ionod*,int);
-extern void 	sh_iosave(int,int);
-extern void 	sh_iounsave(void);
+extern Sfio_t 	*sh_iostream(Shell_t*,int);
+extern int	sh_redirect(Shell_t*,struct ionod*,int);
+extern void 	sh_iosave(Shell_t *, int,int,char*);
+extern void 	sh_iounsave(Shell_t*);
 extern int	sh_chkopen(const char*);
 extern int	sh_ioaccess(int,int);
 extern int	sh_devtofd(const char*);
@@ -98,6 +98,7 @@ extern const char	e_open[];
 extern const char	e_notseek[];
 extern const char	e_noread[];
 extern const char	e_badseek[];
+extern const char	e_badwrite[];
 extern const char	e_badpattern[];
 extern const char	e_toomany[];
 extern const char	e_pipe[];

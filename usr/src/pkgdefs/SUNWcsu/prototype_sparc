@@ -82,6 +82,7 @@ f none usr/kernel/drv/sparcv9/ptm 755 root sys
 f none usr/kernel/drv/sparcv9/pts 755 root sys
 d none usr/kernel/exec/sparcv9 755 root sys
 f none usr/kernel/exec/sparcv9/javaexec 755 root sys
+f none usr/kernel/exec/sparcv9/shbinexec 755 root sys
 d none usr/kernel/fs/sparcv9 755 root sys
 f none usr/kernel/fs/sparcv9/fdfs 755 root sys
 f none usr/kernel/fs/sparcv9/pcfs 755 root sys

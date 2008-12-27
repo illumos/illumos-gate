@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -151,7 +151,7 @@ native_setlocale(int category, const char* locale)
 		return 0;
 	sys = uwin_setlocale(category, usr);
 	if (ast.locale.set & AST_LC_debug)
-		sfprintf(sfstderr, "locale uwin %17s %-24s %-24s\n", categories[lcindex(category, 0)].name, usr, sys);
+		sfprintf(sfstderr, "locale uwin %17s %-24s %-24s\n", lc_categories[lcindex(category, 0)].name, usr, sys);
 	return sys;
 }
 
@@ -370,9 +370,11 @@ debug_strxfrm(register char* t, register const char* s, size_t n)
 	register const char*	q;
 	register const char*	r;
 	register char*		e;
+	char*			o;
 	register size_t		z;
 	register int		w;
 
+	o = t;
 	z = 0;
 	if (e = t)
 		e += n;
@@ -449,9 +451,11 @@ debug_strxfrm(register char* t, register const char* s, size_t n)
 		s++;
 		z += DX;
 	}
+	if (!t)
+		return z;
 	if (t < e)
 		*t = 0;
-	return z;
+	return t - o;
 }
 
 static int
@@ -503,6 +507,28 @@ set_collate(Lc_category_t* cp)
 }
 
 /*
+ * workaround the interesting sjis that translates unshifted 7 bit ascii!
+ */
+
+#if _hdr_wchar && _typ_mbstate_t && _lib_mbrtowc
+
+#define mb_state_zero	((mbstate_t*)&ast.pad[sizeof(ast.pad)-2*sizeof(mbstate_t)])
+#define mb_state	((mbstate_t*)&ast.pad[sizeof(ast.pad)-sizeof(mbstate_t)])
+
+static int
+sjis_mbtowc(register wchar_t* p, register const char* s, size_t n)
+{
+	if (n && p && s && (*s == '\\' || *s == '~') && !memcmp(mb_state, mb_state_zero, sizeof(mbstate_t)))
+	{
+		*p = *s;
+		return 1;
+	}
+	return mbrtowc(p, s, n, mb_state);
+}
+
+#endif
+
+/*
  * called when LC_CTYPE initialized or changes
  */
 
@@ -530,6 +556,25 @@ set_ctype(Lc_category_t* cp)
 		if (!(ast.mb_width = wcwidth))
 			ast.mb_width = default_wcwidth;
 		ast.mb_conv = wctomb;
+#ifdef mb_state
+		{
+			/*
+			 * check for sjis that translates unshifted 7 bit ascii!
+			 */
+
+			char*	s;
+			char	buf[2];
+
+			mbinit();
+			buf[1] = 0;
+			*(s = buf) = '\\';
+			if (mbchar(s) != buf[0])
+			{
+				memcpy(mb_state, mb_state_zero, sizeof(mbstate_t));
+				ast.mb_towc = sjis_mbtowc;
+			}
+		}
+#endif
 	}
 	return 0;
 }
@@ -558,7 +603,7 @@ set_numeric(Lc_category_t* cp)
 			dp = &default_numeric;
 		LCINFO(category)->data = (void*)dp;
 		if (ast.locale.set & (AST_LC_debug|AST_LC_setlocale))
-			sfprintf(sfstderr, "locale info %17s decimal '%c' thousands '%c'\n", categories[category].name, dp->decimal, dp->thousand >= 0 ? dp->thousand : 'X');
+			sfprintf(sfstderr, "locale info %17s decimal '%c' thousands '%c'\n", lc_categories[category].name, dp->decimal, dp->thousand >= 0 ? dp->thousand : 'X');
 	}
 	return 0;
 }
@@ -567,7 +612,7 @@ set_numeric(Lc_category_t* cp)
  * this table is indexed by AST_LC_[A-Z]*
  */
 
-Lc_category_t		categories[] =
+Lc_category_t		lc_categories[] =
 {
 { "LC_ALL",           LC_ALL,           AST_LC_ALL,           0               },
 { "LC_COLLATE",       LC_COLLATE,       AST_LC_COLLATE,       set_collate     },
@@ -645,11 +690,11 @@ single(int category, Lc_t* lc)
 	const char*	sys;
 	int		i;
 
-	if (!lc && !(lc = categories[category].prev))
+	if (!lc && !(lc = lc_categories[category].prev))
 		lc = lcmake(NiL);
 	if (locales[category] != lc)
 	{
-		if (categories[category].external == -categories[category].internal)
+		if (lc_categories[category].external == -lc_categories[category].internal)
 		{
 			sys = 0;
 			for (i = 1; i < AST_LC_COUNT; i++)
@@ -660,13 +705,13 @@ single(int category, Lc_t* lc)
 				}
 		}
 		else if (lc->flags & (LC_debug|LC_local))
-			sys = setlocale(categories[category].external, lcmake(NiL)->name);
-		else if (!(sys = setlocale(categories[category].external, lc->name)) &&
-			 (streq(lc->name, lc->code) || !(sys = setlocale(categories[category].external, lc->code))) &&
+			sys = setlocale(lc_categories[category].external, lcmake(NiL)->name);
+		else if (!(sys = setlocale(lc_categories[category].external, lc->name)) &&
+			 (streq(lc->name, lc->code) || !(sys = setlocale(lc_categories[category].external, lc->code))) &&
 			 !streq(lc->code, lc->language->code))
-				sys = setlocale(categories[category].external, lc->language->code);
+				sys = setlocale(lc_categories[category].external, lc->language->code);
 		if (ast.locale.set & (AST_LC_debug|AST_LC_setlocale))
-			sfprintf(sfstderr, "locale set  %17s %-24s %-24s\n", categories[category].name, lc->name, sys);
+			sfprintf(sfstderr, "locale set  %17s %-24s %-24s\n", lc_categories[category].name, lc->name, sys);
 		if (!sys)
 		{
 			/*
@@ -684,13 +729,13 @@ single(int category, Lc_t* lc)
 			}
 			if (!(lc->flags & LC_local))
 				return 0;
-			if (categories[category].external != -categories[category].internal)
-				setlocale(categories[category].external, lcmake(NiL)->name);
+			if (lc_categories[category].external != -lc_categories[category].internal)
+				setlocale(lc_categories[category].external, lcmake(NiL)->name);
 		}
 		locales[category] = lc;
-		if (categories[category].setf && (*categories[category].setf)(&categories[category]))
+		if (lc_categories[category].setf && (*lc_categories[category].setf)(&lc_categories[category]))
 		{
-			locales[category] = categories[category].prev;
+			locales[category] = lc_categories[category].prev;
 			return 0;
 		}
 		if (lc->flags & LC_default)
@@ -729,7 +774,7 @@ composite(register const char* s, int initialize)
 		for (i = 1; i < AST_LC_COUNT; i++)
 		{
 			s = w;
-			t = categories[i].name;
+			t = lc_categories[i].name;
 			while (*t && *s++ == *t++);
 			if (!*t && *s++ == '=')
 			{
@@ -776,8 +821,8 @@ composite(register const char* s, int initialize)
 				}
 				stk[k++] = cat[i];
 			}
-			else if (!categories[cat[i]].prev)
-				categories[cat[i]].prev = p;
+			else if (!lc_categories[cat[i]].prev)
+				lc_categories[cat[i]].prev = p;
 	}
 	while (s[0] == '/' && s[1] && n < AST_LC_COUNT)
 	{
@@ -802,8 +847,8 @@ composite(register const char* s, int initialize)
 				return -1;
 			}
 		}
-		else if (!categories[n].prev)
-			categories[n].prev = p;
+		else if (!lc_categories[n].prev)
+			lc_categories[n].prev = p;
 	}
 	return n;
 }
@@ -862,7 +907,7 @@ _ast_setlocale(int category, const char* locale)
 					if (cat[j] == k)
 					{
 						cat[j] = -1;
-						sfprintf(sp, "%s=", categories[j].name);
+						sfprintf(sp, "%s=", lc_categories[j].name);
 					}
 				sfprintf(sp, "%s", locales[i]->name);
 			}
@@ -872,65 +917,66 @@ _ast_setlocale(int category, const char* locale)
 	}
 	if (!ast.locale.serial++)
 		stropt(getenv("LC_OPTIONS"), options, sizeof(*options), setopt, NiL);
-	if (!*locale)
+	if (*locale)
+		p = lcmake(locale);
+	else if (!initialized)
 	{
-		if (!initialized)
+		char*	u;
+		char	tmp[256];
+
+		/*
+		 * initialize from the environment
+		 * precedence determined by X/Open
+		 */
+
+		u = 0;
+		if (!(a = getenv("LC_ALL")) || !*a)
 		{
-			char*	u;
-			char	tmp[256];
-
-			/*
-			 * initialize from the environment
-			 * precedence determined by X/Open
-			 */
-
-			u = 0;
-			if (!(a = getenv("LC_ALL")) || !*a)
-			{
-				for (i = 1; i < AST_LC_COUNT; i++)
-					if ((s = getenv(categories[i].name)) && *s)
-					{
-						if (streq(s, local) && (u || (u = native_locale(locale, tmp, sizeof(tmp)))))
-							s = u;
-						categories[i].prev = lcmake(s);
-					}
-				a = getenv("LANG");
-			}
-			if (a)
-			{
-				if (streq(a, local) && (u || (u = native_locale(locale, tmp, sizeof(tmp)))))
-					a = u;
-				if (composite(a, 1))
-					a = 0;
-			}
-			p = 0;
 			for (i = 1; i < AST_LC_COUNT; i++)
-			{
-				if (!categories[i].prev)
+				if ((s = getenv(lc_categories[i].name)) && *s)
 				{
-					if (!p && !(p = lcmake(a)))
-						break;
-					categories[i].prev = p;
+					if (streq(s, local) && (u || (u = native_locale(locale, tmp, sizeof(tmp)))))
+						s = u;
+					lc_categories[i].prev = lcmake(s);
 				}
-				if (!single(i, categories[i].prev))
-				{
-					while (i--)
-						single(i, NiL);
-					return 0;
-				}
-			}
-			if (ast.locale.set & AST_LC_debug)
-				for (i = 1; i < AST_LC_COUNT; i++)
-					sfprintf(sfstderr, "locale env  %17s %s\n", categories[i].name, locales[i]->name);
-			initialized = 1;
+			a = getenv("LANG");
 		}
+		if (a)
+		{
+			if (streq(a, local) && (u || (u = native_locale(locale, tmp, sizeof(tmp)))))
+				a = u;
+			if (composite(a, 1))
+				a = 0;
+		}
+		p = 0;
+		for (i = 1; i < AST_LC_COUNT; i++)
+		{
+			if (!lc_categories[i].prev)
+			{
+				if (!p && !(p = lcmake(a)))
+					break;
+				lc_categories[i].prev = p;
+			}
+			if (!single(i, lc_categories[i].prev))
+			{
+				while (i--)
+					single(i, NiL);
+				return 0;
+			}
+		}
+		if (ast.locale.set & AST_LC_debug)
+			for (i = 1; i < AST_LC_COUNT; i++)
+				sfprintf(sfstderr, "locale env  %17s %s\n", lc_categories[i].name, locales[i]->name);
+		initialized = 1;
 		goto compose;
 	}
-	else if (category != AST_LC_ALL)
-		return single(category, lcmake(locale));
+	else if (!(p = lc_categories[category].prev))
+		p = lcmake("C");
+	if (category != AST_LC_ALL)
+		return single(category, p);
 	else if (!(i = composite(locale, 0)))
 	{
-		if (!(p = lcmake(locale)))
+		if (!p)
 			return 0;
 		for (i = 1; i < AST_LC_COUNT; i++)
 			if (!single(i, p))

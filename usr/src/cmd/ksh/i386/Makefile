@@ -18,29 +18,20 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Specify the MACH we currently use to build and test ksh
-CMDTRANSMACH= $(MACH)
+LIBSHELLMACH= $(MACH)
 
 include ../../Makefile.cmd
 
 include ../Makefile.com
 
 install: all $(ROOTPROG32)
-	@ \
-	(print "# Installing 32bit $(PROG) aliases $(USRKSH_ALIAS_LIST)" ; \
-	set -o xtrace ; \
-	for i in $(USRKSH_ALIAS_LIST) ; do \
-		[[ "$$i" = "$(PROG)" ]] && continue ; \
-		$(RM) "$(ROOTBIN32)/$$i" ; \
-		$(LN) "$(ROOTBIN32)/$(PROG)" "$(ROOTBIN32)/$$i" ; \
-	done \
-	)
+	$(INSTALL.ksh.32bit)
 
 include ../../Makefile.targ

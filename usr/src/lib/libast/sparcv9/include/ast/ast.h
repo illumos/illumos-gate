@@ -3,10 +3,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -333,7 +333,9 @@ extern __MANGLE__ double		strntod __PROTO__((const char*, size_t, char**));
 extern __MANGLE__ _ast_fltmax_t	strntold __PROTO__((const char*, size_t, char**));
 extern __MANGLE__ long		strntol __PROTO__((const char*, size_t, char**, int));
 extern __MANGLE__ intmax_t		strntoll __PROTO__((const char*, size_t, char**, int));
+extern __MANGLE__ long		strnton __PROTO__((const char*, size_t, char**, char*, int));
 extern __MANGLE__ unsigned long	strntoul __PROTO__((const char*, size_t, char**, int));
+extern __MANGLE__ intmax_t		strntonll __PROTO__((const char*, size_t, char**, char*, int));
 extern __MANGLE__ uintmax_t	strntoull __PROTO__((const char*, size_t, char**, int));
 extern __MANGLE__ int		stropt __PROTO__((const char*, const __V_*, int, int(*)(__V_*, const __V_*, int, const char*), __V_*));
 extern __MANGLE__ int		strperm __PROTO__((const char*, char**, int));

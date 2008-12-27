@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1982-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1982-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -113,7 +113,7 @@ int b_test(int argc, char *argv[],void *extra)
 	struct test tdata;
 	register char *cp = argv[0];
 	register int not;
-	tdata.sh = (Shell_t*)extra;
+	tdata.sh = ((Shbltin_t*)extra)->shp;
 	tdata.av = argv;
 	tdata.ap = 1;
 	if(c_eq(cp,'['))
@@ -125,6 +125,15 @@ int b_test(int argc, char *argv[],void *extra)
 	if(argc <= 1)
 		return(1);
 	cp = argv[1];
+	if(c_eq(cp,'(') && argc<=6 && c_eq(argv[argc-1],')'))
+	{
+		/* special case  ( binop ) to conform with standard */
+		if(!(argc==4  && (not=sh_lookup(cp=argv[2],shtab_testops))))
+		{
+			cp =  (++argv)[1];
+			argc -= 2;
+		}
+	}
 	not = c_eq(cp,'!');
 	/* posix portion for test */
 	switch(argc)
@@ -173,8 +182,6 @@ int b_test(int argc, char *argv[],void *extra)
 		case 2:
 			return(*cp==0);
 	}
-	if(argc==5)
-		argv--;
 	tdata.ac = argc;
 	return(!expr(&tdata,0));
 }

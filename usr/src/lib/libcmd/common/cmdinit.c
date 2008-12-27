@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -25,19 +25,13 @@
 
 #include <cmd.h>
 
-int	_cmd_quit = 0;
-
 int
 _cmd_init(int argc, char** argv, void* context, const char* catalog, int flags)
 {
 	register char*	cp;
 
 	if (argc < 0)
-	{
-		_cmd_quit = 1;
 		return -1;
-	}
-	_cmd_quit = 0;
 	if (cp = strrchr(argv[0], '/'))
 		cp++;
 	else

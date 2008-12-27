@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1986-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1986-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -46,6 +46,7 @@ ppbuiltin(void)
 	char*			token;
 	char*			t;
 	long			number;
+	long			onumber;
 	struct ppinstk*		in;
 	struct pplist*		list;
 	struct ppsymbol*	sym;
@@ -279,7 +280,7 @@ ppbuiltin(void)
 #define BACK(a,p)	((a>p)?*--a:(number++?0:((p=pp.outbuf+PPBUFSIZ),(a=pp.outbuf+2*PPBUFSIZ),*--a)))
 #define PEEK(a,p)	((a>p)?*(a-1):(number?0:*(pp.outbuf+2*PPBUFSIZ-1)))
 
-			number = pp.outbuf == pp.outb;
+			number = pp.outbuf != pp.outb;
 			a = pp.outp;
 			p = pp.outb;
 			op = 0;
@@ -327,14 +328,21 @@ ppbuiltin(void)
 				{
 					if (ppisidig(c))
 					{
-						for (t = p, token = a; ppisidig(PEEK(a, p)); a--);
-						for (p = pp.valbuf + 1; a <= token; *p++ = *a++);
+						for (t = p, token = a, onumber = number; ppisidig(PEEK(a, p)) && a >= p; BACK(a, p));
+						p = pp.valbuf + 1;
+						if (a > token)
+						{
+							for (; a < pp.outbuf+2*PPBUFSIZ; *p++ = *a++);
+							a = pp.outbuf;
+						}
+						for (; a <= token; *p++ = *a++);
 						*p = 0;
 						p = pp.valbuf + 1;
 						if (streq(p, "for") || streq(p, "if") || streq(p, "switch") || streq(p, "while"))
 						{
 							op = 0;
 							p = t;
+							number = onumber;
 							continue;
 						}
 					}
@@ -344,7 +352,7 @@ ppbuiltin(void)
 				}
 			}
 			if (op == 3)
-				strncpy(pp.funbuf, p, sizeof(pp.funbuf) - 1);
+				p = strncpy(pp.funbuf, p, sizeof(pp.funbuf) - 1);
 			else if (*pp.funbuf)
 				p = pp.funbuf;
 			else

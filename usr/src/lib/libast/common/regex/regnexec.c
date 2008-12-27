@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -302,38 +302,6 @@ pospush(Env_t* env, Rex_t* rex, unsigned char* p, int be)
  * returns 1 if new is better, -1 if old, else 0.
  */
 
-#if _AST_REGEX_DEBUG
-
-static void
-showmatch(regmatch_t* p)
-{
-	sfputc(sfstdout, '(');
-	if (p->rm_so < 0)
-		sfputc(sfstdout, '?');
-	else
-		sfprintf(sfstdout, "%d", p->rm_so);
-	sfputc(sfstdout, ',');
-	if (p->rm_eo < 0)
-		sfputc(sfstdout, '?');
-	else
-		sfprintf(sfstdout, "%d", p->rm_eo);
-	sfputc(sfstdout, ')');
-}
-
-static int
-better(Env_t* env, Pos_t* os, Pos_t* ns, Pos_t* oend, Pos_t* nend, int level)
-#define better	_better
-{
-	int	i;
-
-	DEBUG_CODE(0x0040,{sfprintf(sfstdout, "AHA better old ");for (i = 0; i <= env->nsub; i++)showmatch(&env->best[i]);sfprintf(sfstdout, "\n           new ");for (i = 0; i <= env->nsub; i++)showmatch(&env->match[i]);sfprintf(sfstdout, "\n");},{0;});
-	i = better(env, os, ns, oend, nend, 0);
-	DEBUG_TEST(0x0040,(sfprintf(sfstdout, "           %s\n", i <= 0 ? "OLD" : "NEW")),(0));
-	return i;
-}
-
-#endif
-
 static int
 better(Env_t* env, Pos_t* os, Pos_t* ns, Pos_t* oend, Pos_t* nend, int level)
 {
@@ -394,7 +362,38 @@ better(Env_t* env, Pos_t* os, Pos_t* ns, Pos_t* oend, Pos_t* nend, int level)
 	}
 }
 
-#undef	better
+#if _AST_REGEX_DEBUG
+
+static void
+showmatch(regmatch_t* p)
+{
+	sfputc(sfstdout, '(');
+	if (p->rm_so < 0)
+		sfputc(sfstdout, '?');
+	else
+		sfprintf(sfstdout, "%d", p->rm_so);
+	sfputc(sfstdout, ',');
+	if (p->rm_eo < 0)
+		sfputc(sfstdout, '?');
+	else
+		sfprintf(sfstdout, "%d", p->rm_eo);
+	sfputc(sfstdout, ')');
+}
+
+static int
+_better(Env_t* env, Pos_t* os, Pos_t* ns, Pos_t* oend, Pos_t* nend, int level)
+{
+	int	i;
+
+	DEBUG_CODE(0x0040,{sfprintf(sfstdout, "AHA better old ");for (i = 0; i <= env->nsub; i++)showmatch(&env->best[i]);sfprintf(sfstdout, "\n           new ");for (i = 0; i <= env->nsub; i++)showmatch(&env->match[i]);sfprintf(sfstdout, "\n");},{0;});
+	i = better(env, os, ns, oend, nend, 0);
+	DEBUG_TEST(0x0040,(sfprintf(sfstdout, "           %s\n", i <= 0 ? "OLD" : "NEW")),(0));
+	return i;
+}
+
+#define better	_better
+
+#endif
 
 #define follow(e,r,c,s)	((r)->next?parse(e,(r)->next,c,s):(c)?parse(e,c,0,s):BEST)
 
@@ -1461,6 +1460,8 @@ DEBUG_TEST(0x0200,(sfprintf(sfstdout,"AHA#%04d 0x%04x parse %s=>%s `%-.*s'\n", _
 			bitset(rex->re.neg_catch.index, s - rex->re.neg_catch.beg);
 			return NONE;
 		case REX_NEST:
+			if (s >= env->end)
+				return NONE;
 			do
 			{
 				if ((c = *s++) == rex->re.nest.primary)

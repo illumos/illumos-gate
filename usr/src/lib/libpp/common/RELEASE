@@ -1,3 +1,11 @@
+08-05-11 ppproto.c: fix proto test 10 regression
+07-09-21 ppproto.c: add "Public Domain" to the noticed list
+07-08-11 probe.win32: add cl.exe setuid workaround, CC.VERSION[.STRING]
+07-06-12 pplex.c: finish -D:preserve logic update for imake
+07-06-07 pplex.c: handle -D:preserve S_CHRB splices
+07-06-04 ppsearch.c: only apply pp:chop ?old?new? if original not found
+07-03-11 add -D-Y pp:pedantic, PP_WARN macro formal parenthesis checks
+07-01-26 pp.def,probe.win32: add _WCHAR_T_DEFINED
 06-09-23 ppop.c: check -I <dev,ino> for c and TYPE_HOSTED|TYPE_VENDOR attrs
 06-09-23 pplex.c: add HOSTED check for "/* appears in // comment" -- doh
 06-09-05 pp.probe: add version stamp comment

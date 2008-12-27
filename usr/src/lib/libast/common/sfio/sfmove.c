@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -47,10 +47,12 @@ reg int		rc;	/* record separator */
 	Sfoff_t		n_move, sk, cur;
 	uchar		*rbuf = NIL(uchar*);
 	ssize_t		rsize = 0;
+	SFMTXDECL(fr);
+	SFMTXDECL2(fw);
 
-	SFMTXSTART(fr, (Sfoff_t)0);
+	SFMTXENTER(fr, (Sfoff_t)0);
 	if(fw)
-		SFMTXLOCK(fw);
+		SFMTXBEGIN2(fw, (Sfoff_t)0);
 
 	for(n_move = 0; n != 0; )
 	{
@@ -230,11 +232,11 @@ reg int		rc;	/* record separator */
 	if(rbuf)
 		free(rbuf);
 
-	SFOPEN(fr,0);
 	if(fw)
 	{	SFOPEN(fw,0);
-		SFMTXUNLOCK(fw);
+		SFMTXEND2(fw);
 	}
 
+	SFOPEN(fr,0);
 	SFMTXRETURN(fr, n_move);
 }

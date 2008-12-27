@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -90,12 +90,12 @@ static int setlinemode()
 }
 
 #if __STD_C
-Void_t* sfsetbuf(reg Sfio_t* f, reg Void_t* buf, reg size_t size)
+Void_t* sfsetbuf(Sfio_t* f, Void_t* buf, size_t size)
 #else
 Void_t* sfsetbuf(f,buf,size)
-reg Sfio_t*	f;	/* stream to be buffered */
-reg Void_t*	buf;	/* new buffer */
-reg size_t	size;	/* buffer size, -1 for default size */
+Sfio_t*	f;	/* stream to be buffered */
+Void_t*	buf;	/* new buffer */
+size_t	size;	/* buffer size, -1 for default size */
 #endif
 {
 	int		sf_malloc, oflags, init, okmmap, local;
@@ -104,10 +104,11 @@ reg size_t	size;	/* buffer size, -1 for default size */
 	sfstat_t	st;
 	uchar*		obuf = NIL(uchar*);
 	ssize_t		osize = 0;
+	SFMTXDECL(f);
 
 	SFONCE();
 
-	SFMTXSTART(f,NIL(Void_t*));
+	SFMTXENTER(f,NIL(Void_t*));
 
 	GETLOCAL(f,local);
 

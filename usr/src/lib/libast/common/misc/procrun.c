@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -34,7 +34,16 @@
 #include "proclib.h"
 
 int
-procrun(const char* path, char** argv)
+procrun(const char* path, char** argv, int flags)
 {
-	return procclose(procopen(path, argv, NiL, NiL, PROC_FOREGROUND|PROC_GID|PROC_UID));
+#if __OBSOLETE__ < 20090101
+	flags &= argv ? PROC_ARGMOD : PROC_CHECK;
+#endif
+	if (flags & PROC_CHECK)
+	{
+		char	buf[PATH_MAX];
+
+		return pathpath(buf, path, NiL, PATH_REGULAR|PATH_EXECUTE) ? 0 : -1;
+	}
+	return procclose(procopen(path, argv, NiL, NiL, flags|PROC_FOREGROUND|PROC_GID|PROC_UID));
 }

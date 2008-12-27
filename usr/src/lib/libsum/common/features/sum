@@ -1,0 +1,4 @@
+lib	MD4Init md4.h -lmd
+lib	MD5Init md5.h -lmd
+lib	SHA1Init sha1.h -lmd
+lib	SHA2Init sha2.h -lmd

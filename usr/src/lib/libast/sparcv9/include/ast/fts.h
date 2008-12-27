@@ -3,10 +3,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -127,6 +127,10 @@ struct Ftsent
 
 #ifdef _FTSENT_PRIVATE_
 	_FTSENT_PRIVATE_
+#else
+	short		_fts_pad_1;	/* <ftwalk.h> compatibility	*/
+	struct stat	_fts_pad_2;	/* <ftwalk.h> compatibility	*/
+	FTS*		fts;		/* fts_open() handle		*/
 #endif
 
 };
@@ -134,6 +138,7 @@ struct Ftsent
 struct Fts
 {
 	int		fts_errno;	/* last errno			*/
+	__V_*		fts_handle;	/* user defined handle		*/
 
 #ifdef _FTS_PRIVATE_
 	_FTS_PRIVATE_
@@ -149,6 +154,7 @@ struct Fts
 extern __MANGLE__ FTSENT*	fts_children __PROTO__((FTS*, int));
 extern __MANGLE__ int	fts_close __PROTO__((FTS*));
 extern __MANGLE__ int	fts_flags __PROTO__((void));
+extern __MANGLE__ int	fts_local __PROTO__((FTSENT*));
 extern __MANGLE__ int	fts_notify __PROTO__((int(*)(FTS*, FTSENT*, __V_*), __V_*));
 extern __MANGLE__ FTS*	fts_open __PROTO__((char* const*, int, int(*)(FTSENT* const*, FTSENT* const*)));
 extern __MANGLE__ FTSENT*	fts_read __PROTO__((FTS*));

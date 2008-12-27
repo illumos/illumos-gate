@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1992-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1992-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -27,7 +27,7 @@
  */
 
 static const char usage[] =
-"[-?\n@(#)$Id: tty (AT&T Research) 2007-03-11 $\n]"
+"[-?\n@(#)$Id: tty (AT&T Research) 2008-03-13 $\n]"
 USAGE_LICENSE
 "[+NAME?tty - write the name of the terminal to standard output]"
 "[+DESCRIPTION?\btty\b writes the name of the terminal that is connected "
@@ -84,11 +84,14 @@ b_tty(int argc, char *argv[], void* context)
 	}
 	if(!sflag)
 		sfputr(sfstdout,tty,'\n');
+	if(lflag)
+	{
 #if _mac_STWLINE
-	if(lflag && (n = ioctl(0, STWLINE, 0)) >= 0)
-		error(ERROR_OUTPUT, 1, "synchronous line %d", n);
-	else
+		if (n = ioctl(0, STWLINE, 0)) >= 0)
+			error(ERROR_OUTPUT, 1, "synchronous line %d", n);
+		else
 #endif
-		error(ERROR_OUTPUT, 1, "not on an active synchronous line");
+			error(ERROR_OUTPUT, 1, "not on an active synchronous line");
+	}
 	return(error_info.errors);
 }

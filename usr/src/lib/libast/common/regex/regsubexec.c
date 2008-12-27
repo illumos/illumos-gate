@@ -1,10 +1,10 @@
 /***********************************************************************
 *                                                                      *
 *               This software is part of the ast package               *
-*           Copyright (c) 1985-2007 AT&T Knowledge Ventures            *
+*          Copyright (c) 1985-2008 AT&T Intellectual Property          *
 *                      and is licensed under the                       *
 *                  Common Public License, Version 1.0                  *
-*                      by AT&T Knowledge Ventures                      *
+*                    by AT&T Intellectual Property                     *
 *                                                                      *
 *                A copy of the License is available at                 *
 *            http://www.opensource.org/licenses/cpl1.0.txt             *
@@ -158,6 +158,7 @@ regsubexec(const regex_t* p, const char* s, size_t nmatch, regmatch_t* match)
 	m = b->re_min;
 	b->re_cur = b->re_buf;
 	e = (const char*)p->env->end;
+	c = 0;
 	for (;;)
 	{
 		if (--m > 0)
@@ -165,17 +166,22 @@ regsubexec(const regex_t* p, const char* s, size_t nmatch, regmatch_t* match)
 		else
 		{
 			PUTS(p, b, s, match->rm_so, return fatal(p->env->disc, c, NiL));
-			if (c = sub(p, b, s, b->re_ops, nmatch, match))
+			if (!c && (c = sub(p, b, s, b->re_ops, nmatch, match)))
 				return fatal(p->env->disc, c, NiL);
 		}
 		s += match->rm_eo;
-		if (m <= 0 && !(b->re_flags & REG_SUB_ALL))
+		if (m <= 0 && !(b->re_flags & REG_SUB_ALL) || !*s)
 			break;
 		if (c = regnexec(p, s, e - s, nmatch, match, p->env->flags|(match->rm_so == match->rm_eo ? REG_ADVANCE : 0)))
 		{
 			if (c != REG_NOMATCH)
 				return fatal(p->env->disc, c, NiL);
 			break;
+		}
+		if (!match->rm_so && !match->rm_eo && *s && m <= 1)
+		{
+			match->rm_so = match->rm_eo = 1;
+			c = 1;
 		}
 	}
 	while (s < e)
