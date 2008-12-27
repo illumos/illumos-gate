@@ -131,6 +131,7 @@ extern dladm_status_t	dladm_get_linkprop(dladm_handle_t, datalink_id_t,
 extern dladm_status_t	dladm_walk_linkprop(dladm_handle_t, datalink_id_t,
 			    void *, int (*)(dladm_handle_t, datalink_id_t,
 			    const char *, void *));
+extern boolean_t	dladm_attr_is_linkprop(const char *name);
 
 extern dladm_status_t	dladm_set_secobj(dladm_handle_t, const char *,
 			    dladm_secobj_class_t, uint8_t *, uint_t, uint_t);
@@ -181,6 +182,9 @@ extern dladm_status_t	dladm_remove_conf(dladm_handle_t, datalink_id_t);
 extern void		dladm_destroy_conf(dladm_handle_t, dladm_conf_t);
 extern dladm_status_t	dladm_get_conf_field(dladm_handle_t, dladm_conf_t,
 			    const char *, void *, size_t);
+extern dladm_status_t	dladm_getnext_conf_linkprop(dladm_handle_t,
+			    dladm_conf_t, const char *, char *, void *,
+			    size_t, size_t *);
 extern dladm_status_t	dladm_set_conf_field(dladm_handle_t, dladm_conf_t,
 			    const char *, dladm_datatype_t, const void *);
 extern dladm_status_t	dladm_unset_conf_field(dladm_handle_t, dladm_conf_t,

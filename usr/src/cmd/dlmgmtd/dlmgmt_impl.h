@@ -48,6 +48,7 @@ typedef struct dlmgmt_linkattr_s {
 	void				*lp_val;
 	dladm_datatype_t		lp_type;
 	uint_t				lp_sz;
+	boolean_t			lp_linkprop;
 } dlmgmt_linkattr_t;
 
 /*
@@ -94,6 +95,8 @@ int		linkattr_set(dlmgmt_linkattr_t **, const char *, void *,
 		    size_t, dladm_datatype_t);
 int		linkattr_get(dlmgmt_linkattr_t **, const char *, void **,
 		    size_t *, dladm_datatype_t *);
+int		linkprop_getnext(dlmgmt_linkattr_t **, const char *,
+		    char **, void **, size_t *, dladm_datatype_t *);
 
 void		link_destroy(dlmgmt_link_t *);
 dlmgmt_link_t	*link_by_id(datalink_id_t);

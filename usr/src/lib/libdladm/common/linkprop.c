@@ -120,7 +120,7 @@ static dld_ioc_macprop_t *i_dladm_get_public_prop(dladm_handle_t, datalink_id_t,
 
 static dladm_status_t i_dladm_set_prop(dladm_handle_t, datalink_id_t,
 			    const char *, char **, uint_t, uint_t);
-static dladm_status_t i_dladm_get_prop(dladm_handle_t, datalink_id_t,
+static dladm_status_t i_dladm_get_priv_prop(dladm_handle_t, datalink_id_t,
 			    const char *, char **, uint_t *, dladm_prop_type_t,
 			    uint_t);
 static link_attr_t *dladm_name2prop(const char *);
@@ -131,8 +131,8 @@ static pd_getf_t	do_get_zone, do_get_autopush, do_get_rate_mod,
 			do_get_powermode_prop, do_get_radio_prop,
 			i_dladm_duplex_get, i_dladm_status_get,
 			i_dladm_binary_get, i_dladm_uint32_get,
-			i_dladm_flowctl_get, dld_maxbw_get, dld_cpus_get,
-			dld_priority_get;
+			i_dladm_flowctl_get, i_dladm_maxbw_get,
+			i_dladm_cpus_get, i_dladm_priority_get;
 
 static pd_setf_t	do_set_zone, do_set_rate_prop,
 			do_set_powermode_prop, do_set_radio_prop,
@@ -480,17 +480,17 @@ static prop_desc_t	prop_table[] = {
 
 	{ "maxbw", { "--", RESET_VAL }, NULL, 0,
 	    do_set_res, NULL,
-	    dld_maxbw_get, do_check_maxbw, PD_CHECK_ALLOC,
+	    i_dladm_maxbw_get, do_check_maxbw, PD_CHECK_ALLOC,
 	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
 	{ "cpus", { "--", RESET_VAL }, NULL, 0,
 	    do_set_cpus, NULL,
-	    dld_cpus_get, do_check_cpus, 0,
+	    i_dladm_cpus_get, do_check_cpus, 0,
 	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 
 	{ "priority", { "high", RESET_VAL },
 	    link_priority_vals, VALCNT(link_priority_vals), do_set_res, NULL,
-	    dld_priority_get, do_check_priority, PD_CHECK_ALLOC,
+	    i_dladm_priority_get, do_check_priority, PD_CHECK_ALLOC,
 	    DATALINK_CLASS_ALL, DATALINK_ANY_MEDIATYPE },
 };
 
@@ -514,6 +514,9 @@ static dladm_status_t	i_dladm_set_linkprop_db(dladm_handle_t, datalink_id_t,
 			    const char *, char **, uint_t);
 static dladm_status_t	i_dladm_get_linkprop_db(dladm_handle_t, datalink_id_t,
 			    const char *, char **, uint_t *);
+static dladm_status_t	i_dladm_walk_linkprop_priv_db(dladm_handle_t,
+			    datalink_id_t, void *, int (*)(dladm_handle_t,
+			    datalink_id_t, const char *, void *));
 static dladm_status_t	i_dladm_set_single_prop(dladm_handle_t, datalink_id_t,
 			    datalink_class_t, uint32_t, prop_desc_t *, char **,
 			    uint_t, uint_t);
@@ -521,8 +524,6 @@ static dladm_status_t	i_dladm_set_linkprop(dladm_handle_t, datalink_id_t,
 			    const char *, char **, uint_t, uint_t);
 static dladm_status_t	i_dladm_getset_defval(dladm_handle_t, prop_desc_t *,
 			    datalink_id_t, datalink_media_t, uint_t);
-
-static dladm_status_t	link_proplist_check(dladm_arg_list_t *);
 
 /*
  * Unfortunately, MAX_SCAN_SUPPORT_RATES is too small to allow all
@@ -719,7 +720,12 @@ dladm_set_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 }
 
 /*
- * Walk link properties of the given specific link.
+ * Walk all link properties of the given specific link.
+ *
+ * Note: this function currently lacks the ability to walk _all_ private
+ * properties if the link, because there is no kernel interface to
+ * retrieve all known private property names. Once such an interface
+ * is added, this function should be fixed accordingly.
  */
 dladm_status_t
 dladm_walk_linkprop(dladm_handle_t handle, datalink_id_t linkid, void *arg,
@@ -738,6 +744,7 @@ dladm_walk_linkprop(dladm_handle_t handle, datalink_id_t linkid, void *arg,
 	if (status != DLADM_STATUS_OK)
 		return (status);
 
+	/* public */
 	for (i = 0; i < DLADM_MAX_PROPS; i++) {
 		if (!(prop_table[i].pd_class & class))
 			continue;
@@ -751,7 +758,10 @@ dladm_walk_linkprop(dladm_handle_t handle, datalink_id_t linkid, void *arg,
 		}
 	}
 
-	return (DLADM_STATUS_OK);
+	/* private */
+	status = i_dladm_walk_linkprop_priv_db(handle, linkid, arg, func);
+
+	return (status);
 }
 
 /*
@@ -786,8 +796,13 @@ dladm_get_linkprop(dladm_handle_t handle, datalink_id_t linkid,
 			/*
 			 * private property.
 			 */
-			return (i_dladm_get_prop(handle, linkid, prop_name,
-			    prop_val, val_cntp, type, dld_flags));
+			if (type == DLADM_PROP_VAL_PERSISTENT)
+				return (i_dladm_get_linkprop_db(handle, linkid,
+				    prop_name, prop_val, val_cntp));
+			else
+				return (i_dladm_get_priv_prop(handle, linkid,
+				    prop_name, prop_val, val_cntp, type,
+				    dld_flags));
 		} else {
 			return (DLADM_STATUS_NOTFOUND);
 		}
@@ -1223,7 +1238,7 @@ done:
 
 /* ARGSUSED */
 static dladm_status_t
-dld_maxbw_get(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
+i_dladm_maxbw_get(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media,
     uint_t flags, uint_t *perm_flags)
 {
@@ -1292,7 +1307,7 @@ do_extract_maxbw(val_desc_t *vdp, void *arg, uint_t cnt)
 
 /* ARGSUSED */
 static dladm_status_t
-dld_cpus_get(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
+i_dladm_cpus_get(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
     char **prop_val, uint_t *val_cnt, datalink_media_t media,
     uint_t flags, uint_t *perm_flags)
 {
@@ -1503,9 +1518,9 @@ do_extract_cpus(val_desc_t *vdp, void *arg, uint_t cnt)
 
 /* ARGSUSED */
 static dladm_status_t
-dld_priority_get(dladm_handle_t handle, prop_desc_t *pdp, datalink_id_t linkid,
-    char **prop_val, uint_t *val_cnt, datalink_media_t media,
-    uint_t flags, uint_t *perm_flags)
+i_dladm_priority_get(dladm_handle_t handle, prop_desc_t *pdp,
+    datalink_id_t linkid, char **prop_val, uint_t *val_cnt,
+    datalink_media_t media, uint_t flags, uint_t *perm_flags)
 {
 	dld_ioc_macprop_t	*dip;
 	mac_resource_props_t	mrp;
@@ -2144,6 +2159,42 @@ done:
 	return (status);
 }
 
+/*
+ * Walk persistent private link properties of a link.
+ */
+static dladm_status_t
+i_dladm_walk_linkprop_priv_db(dladm_handle_t handle, datalink_id_t linkid,
+    void *arg, int (*func)(dladm_handle_t, datalink_id_t, const char *, void *))
+{
+	dladm_status_t		status;
+	dladm_conf_t		conf;
+	char			last_attr[MAXLINKATTRLEN];
+	char			attr[MAXLINKATTRLEN];
+	char			attrval[MAXLINKATTRVALLEN];
+	size_t			attrsz;
+
+	if (linkid == DATALINK_INVALID_LINKID || func == NULL)
+		return (DLADM_STATUS_BADARG);
+
+	status = dladm_read_conf(handle, linkid, &conf);
+	if (status != DLADM_STATUS_OK)
+		return (status);
+
+	last_attr[0] = '\0';
+	while ((status = dladm_getnext_conf_linkprop(handle, conf, last_attr,
+	    attr, attrval, MAXLINKATTRVALLEN, &attrsz)) == DLADM_STATUS_OK) {
+		if (attr[0] == '_') {
+			if (func(handle, linkid, attr, arg) ==
+			    DLADM_WALK_TERMINATE)
+				break;
+		}
+		(void) strlcpy(last_attr, attr, MAXLINKATTRLEN);
+	}
+
+	dladm_destroy_conf(handle, conf);
+	return (DLADM_STATUS_OK);
+}
+
 static link_attr_t *
 dladm_name2prop(const char *prop_name)
 {
@@ -2525,6 +2576,7 @@ i_dladm_set_prop(dladm_handle_t handle, datalink_id_t linkid,
 
 	if (prop_val == NULL) {
 		status = i_dladm_macprop(handle, dip, B_FALSE);
+		dip->pr_flags = 0;
 	} else {
 		for (i = 0; i < val_cnt; i++) {
 			int plen = 0;
@@ -2539,22 +2591,22 @@ i_dladm_set_prop(dladm_handle_t handle, datalink_id_t linkid,
 				dp[slen++] = ',';
 			dp += (plen + 1);
 		}
-		status = i_dladm_macprop(handle, dip, B_TRUE);
 	}
+	if (status == DLADM_STATUS_OK)
+		status = i_dladm_macprop(handle, dip, B_TRUE);
 
 	free(dip);
 	return (status);
 }
 
 static dladm_status_t
-i_dladm_get_prop(dladm_handle_t handle, datalink_id_t linkid,
+i_dladm_get_priv_prop(dladm_handle_t handle, datalink_id_t linkid,
     const char *prop_name, char **prop_val, uint_t *val_cnt,
     dladm_prop_type_t type, uint_t dld_flags)
 {
 	dladm_status_t	status = DLADM_STATUS_OK;
 	dld_ioc_macprop_t *dip = NULL;
 	link_attr_t *p;
-	char tmp = '\0';
 
 	if ((prop_name == NULL && prop_val != NULL) ||
 	    (prop_val != NULL && val_cnt == 0))
@@ -2563,12 +2615,6 @@ i_dladm_get_prop(dladm_handle_t handle, datalink_id_t linkid,
 	p = dladm_name2prop(prop_name);
 	if (p->pp_id != MAC_PROP_PRIVATE)
 		return (DLADM_STATUS_BADARG);
-
-	if (type == DLADM_PROP_VAL_MODIFIABLE) {
-		*prop_val = &tmp;
-		*val_cnt = 1;
-		return (DLADM_STATUS_OK);
-	}
 
 	/*
 	 * private properties: all parsing is done in the kernel.
@@ -2582,11 +2628,16 @@ i_dladm_get_prop(dladm_handle_t handle, datalink_id_t linkid,
 	    DLADM_STATUS_OK) {
 		if (type == DLADM_PROP_VAL_PERM) {
 			(void) dladm_perm2str(dip->pr_perm_flags, *prop_val);
+		} else if (type == DLADM_PROP_VAL_MODIFIABLE) {
+			*prop_val[0] = '\0';
 		} else {
 			(void) strncpy(*prop_val, dip->pr_val,
 			    DLADM_PROP_VAL_MAX);
 		}
 		*val_cnt = 1;
+	} else if ((status == DLADM_STATUS_NOTSUP) &&
+	    (type == DLADM_PROP_VAL_CURRENT)) {
+		status = DLADM_STATUS_NOTFOUND;
 	}
 	free(dip);
 	return (status);
@@ -2786,41 +2837,10 @@ i_dladm_wlan_set_legacy_ioctl(dladm_handle_t handle, datalink_id_t linkid,
 	return (status);
 }
 
-static dladm_status_t
-link_proplist_check(dladm_arg_list_t *proplist)
-{
-	int		i, j;
-	boolean_t	matched;
-
-	for (i = 0; i < proplist->al_count; i++) {
-		matched = B_FALSE;
-		for (j = 0; j < DLADM_MAX_PROPS; j++) {
-			if (strcmp(proplist->al_info[i].ai_name,
-			    prop_table[j].pd_name) == 0)
-				matched = B_TRUE;
-		}
-		if (!matched)
-			return (DLADM_STATUS_BADPROP);
-	}
-	return (DLADM_STATUS_OK);
-}
-
 dladm_status_t
 dladm_parse_link_props(char *str, dladm_arg_list_t **listp, boolean_t novalues)
 {
-	dladm_status_t	status;
-
-	status = dladm_parse_args(str, listp, novalues);
-	if (status != DLADM_STATUS_OK)
-		return (status);
-
-	status = link_proplist_check(*listp);
-	if (status != DLADM_STATUS_OK) {
-		dladm_free_props(*listp);
-		return (status);
-	}
-
-	return (DLADM_STATUS_OK);
+	return (dladm_parse_args(str, listp, novalues));
 }
 
 /*
@@ -2993,4 +3013,33 @@ i_dladm_get_state(dladm_handle_t handle, datalink_id_t linkid,
 	(void) memcpy(state, dip->pr_val, sizeof (*state));
 	free(dip);
 	return (status);
+}
+
+boolean_t
+dladm_attr_is_linkprop(const char *name)
+{
+	/* non-property attribute names */
+	const char *nonprop[] = {
+		/* dlmgmtd core attributes */
+		"name",
+		"class",
+		"media",
+		FPHYMAJ,
+		FPHYINST,
+		FDEVNAME,
+
+		/* other attributes for vlan, aggr, etc */
+		DLADM_ATTR_NAMES
+	};
+	boolean_t	is_nonprop = B_FALSE;
+	int		i;
+
+	for (i = 0; i < sizeof (nonprop) / sizeof (nonprop[0]); i++) {
+		if (strcmp(name, nonprop[i]) == 0) {
+			is_nonprop = B_TRUE;
+			break;
+		}
+	}
+
+	return (!is_nonprop);
 }

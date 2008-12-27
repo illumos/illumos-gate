@@ -31,8 +31,6 @@
 #ifndef _LIBDLMGMT_H
 #define	_LIBDLMGMT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <libdladm.h>
 
@@ -59,6 +57,7 @@ extern "C" {
 #define	DLMGMT_CMD_REMOVECONF		(DLMGMT_CMD_BASE + 9)
 #define	DLMGMT_CMD_DESTROYCONF		(DLMGMT_CMD_BASE + 10)
 #define	DLMGMT_CMD_GETATTR		(DLMGMT_CMD_BASE + 11)
+#define	DLMGMT_CMD_LINKPROP_GETNEXT	(DLMGMT_CMD_BASE + 12)
 
 typedef struct dlmgmt_door_createid_s {
 	int			ld_cmd;
@@ -139,6 +138,20 @@ typedef struct dlmgmt_handle_retval_s {
 	uint_t			lr_err;
 	dladm_conf_t		lr_conf;
 } dlmgmt_createconf_retval_t, dlmgmt_readconf_retval_t;
+
+typedef struct dlmgmt_door_linkprop_getnext_s {
+	int			ld_cmd;
+	dladm_conf_t		ld_conf;
+	char			ld_last_attr[MAXLINKATTRLEN];
+} dlmgmt_door_linkprop_getnext_t;
+
+typedef struct dlmgmt_linkprop_getnext_retval_s {
+	uint_t			lr_err;
+	char			lr_attr[MAXLINKATTRLEN];
+	uint_t			lr_type;
+	uint_t			lr_attrsz;
+	char			lr_attrval[MAXLINKATTRVALLEN];
+} dlmgmt_linkprop_getnext_retval_t;
 
 typedef struct dlmgmt_retval_s	dlmgmt_remapid_retval_t,
 				dlmgmt_upid_retval_t,

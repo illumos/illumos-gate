@@ -382,6 +382,42 @@ dladm_get_conf_field(dladm_handle_t handle, dladm_conf_t conf, const char *attr,
 }
 
 /*
+ * Get next property attribute from data link configuration repository.
+ */
+dladm_status_t
+dladm_getnext_conf_linkprop(dladm_handle_t handle, dladm_conf_t conf,
+    const char *last_attr, char *attr, void *attrval, size_t attrsz,
+    size_t *attrszp)
+{
+	dlmgmt_door_linkprop_getnext_t		getnext;
+	dlmgmt_linkprop_getnext_retval_t	retval;
+	dladm_status_t				status;
+
+	if (conf == DLADM_INVALID_CONF || attrval == NULL ||
+	    attrsz == 0 || attr == NULL) {
+		return (DLADM_STATUS_BADARG);
+	}
+
+	getnext.ld_cmd = DLMGMT_CMD_LINKPROP_GETNEXT;
+	getnext.ld_conf = conf;
+	(void) strlcpy(getnext.ld_last_attr, last_attr, MAXLINKATTRLEN);
+
+	if ((status = dladm_door_call(handle, &getnext, sizeof (getnext),
+	    &retval, sizeof (retval))) != DLADM_STATUS_OK) {
+		return (status);
+	}
+
+	*attrszp = retval.lr_attrsz;
+	if (retval.lr_attrsz > attrsz) {
+		return (DLADM_STATUS_TOOSMALL);
+	}
+
+	(void) strlcpy(attr, retval.lr_attr, MAXLINKATTRLEN);
+	bcopy(retval.lr_attrval, attrval, retval.lr_attrsz);
+	return (DLADM_STATUS_OK);
+}
+
+/*
  * Get the link ID that is associated with the given name.
  */
 dladm_status_t

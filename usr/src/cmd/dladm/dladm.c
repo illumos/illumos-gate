@@ -5570,6 +5570,14 @@ show_linkprop(dladm_handle_t dh, datalink_id_t linkid, const char *propname,
 		if (!statep->ls_parseable)
 			print_header(&statep->ls_print);
 	}
+	/*
+	 * This will need to be fixed when kernel interfaces are added
+	 * to enable walking of all known private properties. For now,
+	 * we are limited to walking persistent private properties only.
+	 */
+	if ((propname[0] == '_') && !statep->ls_persist &&
+	    (statep->ls_proplist == NULL))
+		return (DLADM_WALK_CONTINUE);
 	if (!statep->ls_parseable &&
 	    !linkprop_is_supported(linkid, propname, statep))
 		return (DLADM_WALK_CONTINUE);

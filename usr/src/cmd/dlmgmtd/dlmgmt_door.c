@@ -446,6 +446,7 @@ dlmgmt_upcall_getattr(void *argp, void *retp)
 	dlmgmt_upcall_arg_getattr_t	*getattr = argp;
 	dlmgmt_getattr_retval_t		*retvalp = retp;
 	dlmgmt_link_t			*linkp;
+	int				err = 0;
 
 	/*
 	 * Hold the reader lock to access the link
@@ -455,7 +456,7 @@ dlmgmt_upcall_getattr(void *argp, void *retp)
 		/*
 		 * The link does not exist.
 		 */
-		retvalp->lr_err = ENOENT;
+		err = ENOENT;
 		goto done;
 	}
 
@@ -463,6 +464,7 @@ dlmgmt_upcall_getattr(void *argp, void *retp)
 
 done:
 	dlmgmt_table_unlock();
+	retvalp->lr_err = err;
 }
 
 static void
@@ -955,6 +957,54 @@ dlmgmt_upcall_linkprop_init(void *argp, void *retp)
 		    lip->ld_linkid, B_TRUE);
 }
 
+/*
+ * Get the link property that follows ld_last_attr.
+ * If ld_last_attr is empty, return the first property.
+ */
+static void
+dlmgmt_linkprop_getnext(void *argp, void *retp)
+{
+	dlmgmt_door_linkprop_getnext_t		*getnext = argp;
+	dlmgmt_linkprop_getnext_retval_t	*retvalp = retp;
+	dlmgmt_dlconf_t				dlconf, *dlconfp;
+	char					*attr;
+	void					*attrval;
+	size_t					attrsz;
+	dladm_datatype_t			attrtype;
+	int					err = 0;
+
+	/*
+	 * Hold the read lock to access the dlconf table.
+	 */
+	dlmgmt_dlconf_table_lock(B_FALSE);
+
+	dlconf.ld_id = (int)getnext->ld_conf;
+	dlconfp = avl_find(&dlmgmt_dlconf_avl, &dlconf, NULL);
+	if (dlconfp == NULL) {
+		err = ENOENT;
+		goto done;
+	}
+
+	err = linkprop_getnext(&dlconfp->ld_head, getnext->ld_last_attr,
+	    &attr, &attrval, &attrsz, &attrtype);
+	if (err != 0)
+		goto done;
+
+	if (attrsz > MAXLINKATTRVALLEN) {
+		err = EINVAL;
+		goto done;
+	}
+
+	(void) strlcpy(retvalp->lr_attr, attr, MAXLINKATTRLEN);
+	retvalp->lr_type = attrtype;
+	retvalp->lr_attrsz = attrsz;
+	bcopy(attrval, retvalp->lr_attrval, attrsz);
+
+done:
+	dlmgmt_dlconf_table_unlock();
+	retvalp->lr_err = err;
+}
+
 static dlmgmt_door_info_t i_dlmgmt_door_info_tbl[] = {
 	{ DLMGMT_CMD_DLS_CREATE, B_TRUE, sizeof (dlmgmt_upcall_arg_create_t),
 	    sizeof (dlmgmt_create_retval_t), dlmgmt_upcall_create },
@@ -997,7 +1047,11 @@ static dlmgmt_door_info_t i_dlmgmt_door_info_tbl[] = {
 	{ DLMGMT_CMD_LINKPROP_INIT, B_TRUE,
 	    sizeof (dlmgmt_door_linkprop_init_t),
 	    sizeof (dlmgmt_linkprop_init_retval_t),
-	    dlmgmt_upcall_linkprop_init }
+	    dlmgmt_upcall_linkprop_init },
+	{ DLMGMT_CMD_LINKPROP_GETNEXT, B_FALSE,
+	    sizeof (dlmgmt_door_linkprop_getnext_t),
+	    sizeof (dlmgmt_linkprop_getnext_retval_t),
+	    dlmgmt_linkprop_getnext }
 };
 
 #define	DLMGMT_INFO_TABLE_SIZE	(sizeof (i_dlmgmt_door_info_tbl) /	\

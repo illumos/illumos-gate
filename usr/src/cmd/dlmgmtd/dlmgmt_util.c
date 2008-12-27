@@ -24,8 +24,6 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Utility functions used by the dlmgmtd daemon.
  */
@@ -248,6 +246,7 @@ linkattr_set(dlmgmt_linkattr_t **headp, const char *attr, void *attrval,
 	bcopy(attrval, attrp->lp_val, attrsz);
 	attrp->lp_sz = attrsz;
 	attrp->lp_type = type;
+	attrp->lp_linkprop = dladm_attr_is_linkprop(attr);
 	return (0);
 }
 
@@ -305,6 +304,33 @@ linkattr_get(dlmgmt_linkattr_t **headp, const char *attr, void **attrvalp,
 	*attrszp = attrp->lp_sz;
 	if (typep != NULL)
 		*typep = attrp->lp_type;
+	return (0);
+}
+
+int
+linkprop_getnext(dlmgmt_linkattr_t **headp, const char *lastattr,
+    char **attrnamep, void **attrvalp, size_t *attrszp, dladm_datatype_t *typep)
+{
+	dlmgmt_linkattr_t	*attrp;
+
+	/* skip to entry following lastattr or pick first if none specified */
+	for (attrp = *headp; attrp != NULL; attrp = attrp->lp_next) {
+		if (!attrp->lp_linkprop)
+			continue;
+		if (lastattr[0] == '\0')
+			break;
+		if (strcmp(attrp->lp_name, lastattr) == 0) {
+			attrp = attrp->lp_next;
+			break;
+		}
+	}
+	if (attrp == NULL)
+		return (ENOENT);
+
+	*attrnamep = attrp->lp_name;
+	*attrvalp = attrp->lp_val;
+	*attrszp = attrp->lp_sz;
+	*typep = attrp->lp_type;
 	return (0);
 }
 

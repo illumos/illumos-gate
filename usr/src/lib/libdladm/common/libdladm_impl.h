@@ -99,6 +99,16 @@ extern void		dladm_free_args(dladm_arg_list_t *);
 #define	FMACADDR	"macaddr"	/* string */
 
 /*
+ * List of all the above attributes.
+ */
+#define	DLADM_ATTR_NAMES	FVLANID, FLINKOVER, \
+				FKEY, FNPORTS, FPORTS, FPOLICY, \
+				FFIXMACADDR, FFORCE, FLACPMODE, FLACPTIMER, \
+				FMADDRTYPE, FMADDRLEN, FMADDRSLOT, \
+				FMADDRPREFIXLEN, FHWRINGS, \
+				FMACADDR
+
+/*
  * Data structures used for implementing temporary properties
  */
 
