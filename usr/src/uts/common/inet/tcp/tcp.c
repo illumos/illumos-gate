@@ -27902,8 +27902,7 @@ tcp_do_listen(conn_t *connp, int backlog, cred_t *cr)
 
 	if (tcp->tcp_state >= TCPS_BOUND) {
 		if ((tcp->tcp_state == TCPS_BOUND ||
-		    tcp->tcp_state == TCPS_LISTEN) &&
-		    backlog > 0) {
+		    tcp->tcp_state == TCPS_LISTEN) && backlog > 0) {
 			/*
 			 * Handle listen() increasing backlog.
 			 * This is more "liberal" then what the TPI spec
@@ -27915,7 +27914,7 @@ tcp_do_listen(conn_t *connp, int backlog, cred_t *cr)
 		}
 		if (tcp->tcp_debug) {
 			(void) strlog(TCP_MOD_ID, 0, 1, SL_ERROR|SL_TRACE,
-			    "tcp_bind: bad state, %d", tcp->tcp_state);
+			    "tcp_listen: bad state, %d", tcp->tcp_state);
 		}
 		return (-TOUTSTATE);
 	} else {
@@ -27971,8 +27970,8 @@ do_listen:
 	}
 
 	/*
-	 * We can call ip_bind directly which returns a T_BIND_ACK mp. The
-	 * processing continues in tcp_rput_other().
+	 * We can call ip_bind directly, the processing continues
+	 * in tcp_post_ip_bind().
 	 *
 	 * We need to make sure that the conn_recv is set to a non-null
 	 * value before we insert the conn into the classifier table.

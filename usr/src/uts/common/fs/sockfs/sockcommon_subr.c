@@ -1256,6 +1256,7 @@ socket_init_common(struct sonode *so, struct sonode *pso, int flags, cred_t *cr)
 		so->so_pgrp = pso->so_pgrp;
 		so->so_rcvtimeo = pso->so_rcvtimeo;
 		so->so_sndtimeo = pso->so_sndtimeo;
+		so->so_xpg_rcvbuf = pso->so_xpg_rcvbuf;
 		/*
 		 * Make note of the socket level options. TCP and IP level
 		 * options are already inherited. We could do all this after
@@ -1263,7 +1264,7 @@ socket_init_common(struct sonode *so, struct sonode *pso, int flags, cred_t *cr)
 		 * no harm done for error case.
 		 */
 		so->so_options = pso->so_options & (SO_DEBUG|SO_REUSEADDR|
-		    SO_KEEPALIVE| SO_DONTROUTE|SO_BROADCAST|SO_USELOOPBACK|
+		    SO_KEEPALIVE|SO_DONTROUTE|SO_BROADCAST|SO_USELOOPBACK|
 		    SO_OOBINLINE|SO_DGRAM_ERRIND|SO_LINGER);
 		so->so_proto_props = pso->so_proto_props;
 		so->so_mode = pso->so_mode;
@@ -1538,7 +1539,7 @@ socket_strioc_common(struct sonode *so, int cmd, intptr_t arg, int mode,
 
 int
 socket_getopt_common(struct sonode *so, int level, int option_name,
-    void *optval, socklen_t *optlenp)
+    void *optval, socklen_t *optlenp, int flags)
 {
 	if (level != SOL_SOCKET)
 		return (-1);
@@ -1605,7 +1606,6 @@ socket_getopt_common(struct sonode *so, int level, int option_name,
 	case SO_USELOOPBACK:
 	case SO_OOBINLINE:
 	case SO_SNDBUF:
-	case SO_RCVBUF:
 #ifdef notyet
 	case SO_SNDLOWAT:
 	case SO_RCVLOWAT:
@@ -1615,6 +1615,31 @@ socket_getopt_common(struct sonode *so, int level, int option_name,
 
 		if (optlen < (t_uscalar_t)sizeof (int32_t))
 			return (EINVAL);
+		break;
+	}
+	case SO_RCVBUF: {
+		socklen_t optlen = *optlenp;
+
+		if (optlen < (t_uscalar_t)sizeof (int32_t))
+			return (EINVAL);
+
+		if ((flags & _SOGETSOCKOPT_XPG4_2) && so->so_xpg_rcvbuf != 0) {
+			/*
+			 * XXX If SO_RCVBUF has been set and this is an
+			 * XPG 4.2 application then do not ask the transport
+			 * since the transport might adjust the value and not
+			 * return exactly what was set by the application.
+			 * For non-XPG 4.2 application we return the value
+			 * that the transport is actually using.
+			 */
+			*(int32_t *)optval = so->so_xpg_rcvbuf;
+			*optlenp = sizeof (so->so_xpg_rcvbuf);
+			return (0);
+		}
+		/*
+		 * If the option has not been set then get a default
+		 * value from the transport.
+		 */
 		break;
 	}
 	case SO_LINGER: {

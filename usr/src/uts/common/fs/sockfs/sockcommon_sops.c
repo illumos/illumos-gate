@@ -686,8 +686,8 @@ so_getsockopt(struct sonode *so, int level, int option_name,
 	SO_BLOCK_FALLBACK(so,
 	    SOP_GETSOCKOPT(so, level, option_name, optval, optlenp, flags, cr));
 
-	error = socket_getopt_common(so, level, option_name, optval,
-	    optlenp);
+	error = socket_getopt_common(so, level, option_name, optval, optlenp,
+	    flags);
 	if (error < 0) {
 		error = (*so->so_downcalls->sd_getsockopt)
 		    (so->so_proto_handle, level, option_name, optval, optlenp,
@@ -776,24 +776,37 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 		return (EINVAL);
 	}
 
-	if (level == SOL_SOCKET &&
-	    ((option_name == SO_RCVTIMEO) || (option_name == SO_SNDTIMEO))) {
-		struct timeval *tl = (struct timeval *)optval;
-		clock_t t_usec;
+	if (level == SOL_SOCKET) {
+		switch (option_name) {
+		case SO_RCVTIMEO:
+		case SO_SNDTIMEO: {
+			struct timeval *tl = (struct timeval *)optval;
+			clock_t t_usec;
 
-		if (optlen != (t_uscalar_t)sizeof (struct timeval)) {
+			if (optlen != (t_uscalar_t)sizeof (struct timeval)) {
+				SO_UNBLOCK_FALLBACK(so);
+				return (EINVAL);
+			}
+			t_usec = tl->tv_sec * 1000 * 1000 + tl->tv_usec;
+			mutex_enter(&so->so_lock);
+			if (option_name == SO_RCVTIMEO)
+				so->so_rcvtimeo = drv_usectohz(t_usec);
+			else
+				so->so_sndtimeo = drv_usectohz(t_usec);
+			mutex_exit(&so->so_lock);
 			SO_UNBLOCK_FALLBACK(so);
-			return (EINVAL);
+			return (0);
 		}
-		t_usec = tl->tv_sec * 1000 * 1000 + tl->tv_usec;
-		mutex_enter(&so->so_lock);
-		if (option_name == SO_RCVTIMEO)
-			so->so_rcvtimeo = drv_usectohz(t_usec);
-		else
-			so->so_sndtimeo = drv_usectohz(t_usec);
-		mutex_exit(&so->so_lock);
-		SO_UNBLOCK_FALLBACK(so);
-		return (0);
+		case SO_RCVBUF:
+			/*
+			 * XXX XPG 4.2 applications retrieve SO_RCVBUF from
+			 * sockfs since the transport might adjust the value
+			 * and not return exactly what was set by the
+			 * application.
+			 */
+			so->so_xpg_rcvbuf = *(int32_t *)optval;
+			break;
+		}
 	}
 	error = (*so->so_downcalls->sd_setsockopt)
 	    (so->so_proto_handle, level, option_name, optval, optlen, cr);

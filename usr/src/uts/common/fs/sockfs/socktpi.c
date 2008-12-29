@@ -5059,6 +5059,7 @@ sotpi_getsockname(struct sonode *so, struct sockaddr *name, socklen_t *namelen,
 	if (so->so_family == AF_UNIX) {
 		/* Transport has different name space - return local info */
 		error = 0;
+		*namelen = 0;
 		goto done;
 	}
 	if (!(so->so_state & SS_ISBOUND)) {

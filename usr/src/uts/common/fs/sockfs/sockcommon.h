@@ -201,7 +201,8 @@ extern struct sonode *socket_sonode_create(struct sockparams *, int, int, int,
 extern void socket_sonode_destroy(struct sonode *);
 extern int socket_init_common(struct sonode *, struct sonode *, int flags,
     struct cred *);
-extern int socket_getopt_common(struct sonode *, int, int, void *, socklen_t *);
+extern int socket_getopt_common(struct sonode *, int, int, void *, socklen_t *,
+    int);
 extern int socket_ioctl_common(struct sonode *, int, intptr_t, int,
     struct cred *, int32_t *);
 extern int socket_strioc_common(struct sonode *, int, intptr_t, int,

@@ -545,6 +545,7 @@ sonode_init(struct sonode *so, struct sockparams *sp, int family,
 	so->so_error	= 0;
 	so->so_rcvtimeo	= 0;
 	so->so_sndtimeo = 0;
+	so->so_xpg_rcvbuf = 0;
 
 	ASSERT(so->so_oobmsg == NULL);
 	so->so_oobmark	= 0;

@@ -174,6 +174,7 @@ struct sonode {
 #define	so_minpsz	so_proto_props.sopp_minpsz
 #define	so_maxpsz	so_proto_props.sopp_maxpsz
 
+	int	so_xpg_rcvbuf;		/* SO_RCVBUF value for XPG4 socket */
 	clock_t	so_sndtimeo;		/* send timeout */
 	clock_t	so_rcvtimeo;		/* recv timeout */
 
