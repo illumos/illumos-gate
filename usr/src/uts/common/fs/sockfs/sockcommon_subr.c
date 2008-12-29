@@ -911,7 +911,7 @@ try_again:
 		 * No pending data. Return right away for nonblocking
 		 * socket, otherwise sleep waiting for data.
 		 */
-		if (!(so->so_state & SS_CANTRCVMORE)) {
+		if (!(so->so_state & SS_CANTRCVMORE) && uiop->uio_resid > 0) {
 			if ((uiop->uio_fmode & (FNDELAY|FNONBLOCK)) ||
 			    (flags & MSG_DONTWAIT)) {
 				error = EWOULDBLOCK;
