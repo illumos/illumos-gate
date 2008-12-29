@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,9 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SMBIOS Information Routines
@@ -50,6 +47,11 @@
  */
 
 #include <sys/smbios_impl.h>
+
+#ifndef _KERNEL
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 /*
  * A large number of SMBIOS structures contain a set of common strings used to
@@ -173,6 +175,11 @@ smbios_info_smbios(smbios_hdl_t *shp, smbios_entry_t *ep)
 	bcopy(&shp->sh_ent, ep, sizeof (smbios_entry_t));
 }
 
+#ifndef _KERNEL
+static char smbios_product_override[256];
+static boolean_t smbios_product_checked;
+#endif
+
 int
 smbios_info_common(smbios_hdl_t *shp, id_t id, smbios_info_t *ip)
 {
@@ -195,6 +202,28 @@ smbios_info_common(smbios_hdl_t *shp, id_t id, smbios_info_t *ip)
 	ip->smbi_asset = smb_info_strptr(stp, isp->is_asset, &n);
 	ip->smbi_location = smb_info_strptr(stp, isp->is_location, &n);
 	ip->smbi_part = smb_info_strptr(stp, isp->is_part, &n);
+
+	/*
+	 * This private file allows developers to experiment with reporting
+	 * different platform strings from SMBIOS.  It is not a supported
+	 * mechanism in the long term, and does not work in the kernel.
+	 */
+#ifndef _KERNEL
+	if (isp->is_type == SMB_TYPE_SYSTEM) {
+		if (!smbios_product_checked) {
+			int fd = open("/etc/smbios_product", O_RDONLY);
+			if (fd >= 0) {
+				(void) read(fd, smbios_product_override,
+				    sizeof (smbios_product_override) - 1);
+				(void) close(fd);
+			}
+			smbios_product_checked = B_TRUE;
+		}
+
+		if (smbios_product_override[0] != '\0')
+			ip->smbi_product = smbios_product_override;
+	}
+#endif
 
 	/*
 	 * If we have a port with an empty internal reference designator string
