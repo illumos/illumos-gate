@@ -131,7 +131,7 @@ typedef struct statetop {
 int	main __P((int, char *[]));
 
 static	void	showstats __P((friostat_t *, u_32_t));
-static	void	showfrstates __P((ipfrstat_t *));
+static	void	showfrstates __P((ipfrstat_t *, u_long));
 static	void	showlist __P((friostat_t *));
 static	void	showipstates __P((ips_stat_t *));
 static	void	showauthstates __P((fr_authstat_t *));
@@ -385,7 +385,7 @@ char *argv[];
 			showlist(fiop);
 		}
 	} else if (opts & OPT_FRSTATES)
-		showfrstates(ifrstp);
+		showfrstates(ifrstp, fiop->f_ticks);
 #ifdef STATETOP
 	else if (opts & OPT_STATETOP)
 		topipstates(saddr, daddr, sport, dport, protocol,
@@ -1565,8 +1565,9 @@ out:
 /*
  * Show fragment cache information that's held in the kernel.
  */
-static void showfrstates(ifsp)
+static void showfrstates(ifsp, ticks)
 ipfrstat_t *ifsp;
+u_long ticks;
 {
 	struct ipfr *ipfrtab[IPFT_SIZE], ifr;
 	int i;
@@ -1593,6 +1594,7 @@ ipfrstat_t *ifsp;
 			if (kmemcpy((char *)&ifr, (u_long)ipfrtab[i],
 				    sizeof(ifr)) == -1)
 				break;
+			ifr.ipfr_ttl -= ticks;
 			printfraginfo("", &ifr);
 			ipfrtab[i] = ifr.ipfr_next;
 		}
@@ -1606,6 +1608,7 @@ ipfrstat_t *ifsp;
 			if (kmemcpy((char *)&ifr, (u_long)ipfrtab[i],
 				    sizeof(ifr)) == -1)
 				break;
+			ifr.ipfr_ttl -= ticks;
 			printfraginfo("NAT: ", &ifr);
 			ipfrtab[i] = ifr.ipfr_next;
 		}

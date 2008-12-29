@@ -21,7 +21,7 @@ struct ipfr *ifr;
 		    sizeof(fr)) == -1)
 		return;
 	printf("%s id %d ttl %d pr %d seen0 %d ifp %p tos %#02x = %#x\n",
-		hostname(4, &ifr->ipfr_dst), ifr->ipfr_id, ifr->ipfr_seen0,
-		ifr->ipfr_ttl, ifr->ipfr_p, ifr->ipfr_ifp, ifr->ipfr_tos,
+		hostname(4, &ifr->ipfr_dst), ifr->ipfr_id, ifr->ipfr_ttl,
+		ifr->ipfr_p, ifr->ipfr_seen0, ifr->ipfr_ifp, ifr->ipfr_tos,
 		fr.fr_flags);
 }

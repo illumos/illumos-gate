@@ -1459,7 +1459,7 @@ u_int flags;
 
 	is->is_ifp[out << 1] = fin->fin_ifp;
 	if (fin->fin_ifp != NULL) {
-		COPYIFNAME(fin->fin_ifp, is->is_ifname[out << 1], fr->fr_v);
+		COPYIFNAME(fin->fin_ifp, is->is_ifname[out << 1], fin->fin_v);
 	}
 
 	/*
