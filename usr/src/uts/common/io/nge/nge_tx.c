@@ -200,13 +200,11 @@ nge_tx_recycle(nge_t *ngep, boolean_t is_intr)
 		ssbdp = &srp->sw_sbds[slot];
 		hw_sbd_p = DMA_VPTR(ssbdp->desc);
 
-		stflg = ngep->desc_attr.txd_check(hw_sbd_p, &len);
-
-		if (ssbdp->flags == HOST_OWN || (TXD_OWN & stflg) != 0)
+		if (ssbdp->flags == HOST_OWN)
 			break;
-
-		DMA_ZERO(ssbdp->desc);
-
+		stflg = ngep->desc_attr.txd_check(hw_sbd_p, &len);
+		if ((stflg & TXD_OWN) != 0)
+			break;
 		if (ssbdp->mp != NULL)	{
 			ssbdp->mp->b_next = mp;
 			mp = ssbdp->mp;
