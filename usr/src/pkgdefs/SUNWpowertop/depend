@@ -18,18 +18,13 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-include ../Makefile.com
-
-LICENSEFILES = $(GPLV2)
-
-.KEEP_STATE:
-
-all: $(FILES) depend
-install: all pkg
-
-include ../Makefile.targ
+P SUNWcsu	Core Solaris, (Usr)
+P SUNWcslr	Core Solaris Libraries (Root)
+P SUNWdtrc	Dynamic Tracing (DTrace) Clients 
+P SUNWdtrp	Dynamic Tracing (DTrace) Providers
