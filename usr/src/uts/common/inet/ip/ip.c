@@ -28630,8 +28630,10 @@ conn_drain_insert(conn_t *connp)
 	/*
 	 * For non streams based sockets assert flow control.
 	 */
-	(*connp->conn_upcalls->su_txq_full)
-	    (connp->conn_upper_handle, B_TRUE);
+	if (IPCL_IS_NONSTR(connp)) {
+		(*connp->conn_upcalls->su_txq_full)
+		    (connp->conn_upper_handle, B_TRUE);
+	}
 	mutex_exit(CONN_DRAIN_LIST_LOCK(connp));
 }
 
