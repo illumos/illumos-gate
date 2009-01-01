@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -627,6 +627,30 @@ sdhost_setup_intr(dev_info_t *dip, sdhost_t *shp)
 	if (ddi_intr_get_supported_types(dip, &itypes) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "ddi_intr_get_supported_types failed");
 		return (DDI_FAILURE);
+	}
+
+	/*
+	 * It turns out that some controllers don't properly implement MSI,
+	 * but advertise MSI capability in their  PCI config space.
+	 *
+	 * While this is really a chip-specific bug, the simplest solution
+	 * is to just suppress MSI for now by default -- every device seen
+	 * so far can use FIXED interrupts.
+	 *
+	 * We offer an override property, though, just in case someone really
+	 * wants to force it.
+	 *
+	 * We don't do this if the FIXED type isn't supported though!
+	 */
+	if ((ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "enable-msi", 0) == 0) &&
+	    (itypes & DDI_INTR_TYPE_FIXED)) {
+		itypes &= ~DDI_INTR_TYPE_MSI;
+	}
+	if ((ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "enable-msix", 0) == 0) &&
+	    (itypes & DDI_INTR_TYPE_FIXED)) {
+		itypes &= ~DDI_INTR_TYPE_MSIX;
 	}
 
 	/*
