@@ -17,7 +17,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,13 +35,13 @@ INTEL_NHM_OBJS = nhm_init.o mem_addr.o intel_nhmdrv.o nhm_pci_cfg.o \
     dimm_topo.o intel_nhm.o
 OBJECTS		= $(INTEL_NHM_OBJS:%=$(OBJS_DIR)/%)
 LINTS           = $(INTEL_NHM_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE      = $(ROOT_PSM_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/i86pc/io/intel_nhm
+ROOTMODULE      = $(ROOT_DRV_DIR)/$(MODULE)
+CONF_SRCDIR	= $(UTSBASE)/intel/io/intel_nhm
 
 #
 #       Include common rules.
 #
-include $(UTSBASE)/i86pc/Makefile.i86pc
+include $(UTSBASE)/intel/Makefile.intel
 
 #
 #       Define targets
@@ -50,7 +50,7 @@ ALL_TARGET      = $(BINARY) $(SRC_CONFFILE)
 LINT_TARGET     = $(LINT_MODULE).lint
 INSTALL_TARGET  = $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
-CPPFLAGS += -I$(SRC)/uts/i86pc/cpu/genuineintel
+CPPFLAGS +=  -I$(UTSBASE)/i86pc
 LDFLAGS += -dy -N drv/smbios
 
 #

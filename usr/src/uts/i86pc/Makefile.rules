@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -56,10 +56,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/genuineintel/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/intel_nhm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -266,9 +262,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/genuineintel/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/intel_nhm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/%.c

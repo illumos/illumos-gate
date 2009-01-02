@@ -22,7 +22,7 @@
 #
 # uts/i86pc/Makefile.i86pc
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile contains the common definitions for the i86pc unix
@@ -270,7 +270,6 @@ CPU_KMODS	+= amd_opteron
 CPU_KMODS	+= generic_cpu
 CPU_KMODS	+= authenticamd
 CPU_KMODS	+= genuineintel
-CPU_KMODS	+= intel_nhm
 
 #
 #	Exec Class Modules (/kernel/exec):

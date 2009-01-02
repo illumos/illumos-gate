@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -70,14 +70,11 @@ f none platform/i86pc/kernel/drv/acpippm.conf 644 root sys
 f none platform/i86pc/kernel/drv/amd64/ppm 755 root sys
 f none platform/i86pc/kernel/drv/amd64/isa 755 root sys
 f none platform/i86pc/kernel/drv/amd64/npe 755 root sys
-f none platform/i86pc/kernel/drv/amd64/intel_nhm 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pci 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pit_beep 755 root sys
 f none platform/i86pc/kernel/drv/amd64/rootnex 755 root sys
 f none platform/i86pc/kernel/drv/cpudrv 755 root sys
 f none platform/i86pc/kernel/drv/isa 755 root sys
-f none platform/i86pc/kernel/drv/intel_nhm 755 root sys
-f none platform/i86pc/kernel/drv/intel_nhm.conf 644 root sys
 f none platform/i86pc/kernel/drv/npe 755 root sys
 f none platform/i86pc/kernel/drv/pci 755 root sys
 f none platform/i86pc/kernel/drv/pit_beep 755 root sys

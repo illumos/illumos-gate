@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -91,6 +91,8 @@ f none kernel/drv/icmp 755 root sys
 f none kernel/drv/icmp6 755 root sys
 f none kernel/drv/intel_nb5000 755 root sys
 f none kernel/drv/intel_nb5000.conf 644 root sys
+f none kernel/drv/intel_nhm 755 root sys
+f none kernel/drv/intel_nhm.conf 644 root sys
 f none kernel/drv/ip 755 root sys
 f none kernel/drv/ip6 755 root sys
 f none kernel/drv/ipnet 755 root sys
@@ -310,6 +312,7 @@ f none kernel/drv/amd64/i8042 755 root sys
 f none kernel/drv/amd64/icmp 755 root sys
 f none kernel/drv/amd64/icmp6 755 root sys
 f none kernel/drv/amd64/intel_nb5000 755 root sys
+f none kernel/drv/amd64/intel_nhm 755 root sys
 f none kernel/drv/amd64/ip 755 root sys
 f none kernel/drv/amd64/ip6 755 root sys
 f none kernel/drv/amd64/ipnet 755 root sys

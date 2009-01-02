@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -231,6 +231,7 @@ DRV_KMODS	+= i915
 DRV_KMODS	+= icmp
 DRV_KMODS	+= icmp6
 DRV_KMODS	+= intel_nb5000
+DRV_KMODS	+= intel_nhm
 DRV_KMODS	+= ip
 DRV_KMODS	+= ip6
 DRV_KMODS	+= ipf

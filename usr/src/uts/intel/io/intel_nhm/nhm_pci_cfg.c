@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 #include <sys/pci.h>
 #include <sys/pcie.h>
 #include <vm/seg_kmem.h>
-#include <sys/machparam.h>
 #include <sys/mman.h>
 #include <sys/cpu_module.h>
 #include "intel_nhm.h"

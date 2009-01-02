@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,6 @@
 #include <sys/cpu_module_impl.h>
 #include <sys/smbios.h>
 #include <sys/pci.h>
-#include <sys/machsystm.h>
 #include "intel_nhm.h"
 #include "nhm_log.h"
 
@@ -267,7 +266,7 @@ nhm_scrubber_enable()
 			hw_scrub = 1;
 		}
 		if (hw_scrub)
-			memscrub_disable();
+			cmi_mc_sw_memscrub_disable();
 	}
 }
 
