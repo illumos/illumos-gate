@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,7 +130,15 @@ static dev_info_t *smb_drv_dip = NULL;
 int
 _init(void)
 {
-	return (mod_install(&modlinkage));
+	int	rc;
+
+	rc = smb_server_svc_init();
+	if (rc == 0) {
+		rc = mod_install(&modlinkage);
+		if (rc != 0)
+			(void) smb_server_svc_fini();
+	}
+	return (rc);
 }
 
 int
@@ -142,7 +150,12 @@ _info(struct modinfo *modinfop)
 int
 _fini(void)
 {
-	return (mod_remove(&modlinkage));
+	int	rc;
+
+	rc = mod_remove(&modlinkage);
+	if (rc == 0)
+		rc = smb_server_svc_fini();
+	return (rc);
 }
 
 /*
@@ -238,11 +251,8 @@ smb_drv_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			/* create the minor node */
 			if (ddi_create_minor_node(dip, "smbsrv", S_IFCHR, 0,
 			    DDI_PSEUDO, 0) == DDI_SUCCESS) {
-				if (smb_server_svc_init() == 0) {
-					smb_drv_dip = dip;
-					return (DDI_SUCCESS);
-				}
-				ddi_remove_minor_node(dip, NULL);
+				smb_drv_dip = dip;
+				return (DDI_SUCCESS);
 			} else {
 				cmn_err(CE_WARN, "smb_drv_attach:"
 				    " failed creating minor node");
@@ -257,11 +267,9 @@ smb_drv_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	if (cmd == DDI_DETACH) {
 		ASSERT(dip == smb_drv_dip);
-		if (smb_server_svc_fini() == 0) {
-			ddi_remove_minor_node(dip, NULL);
-			smb_drv_dip = NULL;
-			return (DDI_SUCCESS);
-		}
+		ddi_remove_minor_node(dip, NULL);
+		smb_drv_dip = NULL;
+		return (DDI_SUCCESS);
 	}
 	return (DDI_FAILURE);
 }
