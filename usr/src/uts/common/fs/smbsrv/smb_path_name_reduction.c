@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_path_name_reduction.c	1.6	08/08/07 SMI"
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
@@ -205,18 +203,24 @@ smb_pathname_reduce(
     char		*last_component)
 {
 	smb_node_t	*root_node;
-	struct pathname	ppn;
+	pathname_t	ppn;
 	char		*usepath;
 	int		lookup_flags = FOLLOW;
 	int 		trailing_slash = 0;
 	int		err = 0;
 	int		len;
+	smb_node_t	*vss_cur_node;
+	smb_node_t	*vss_root_node;
+	smb_node_t	*local_cur_node;
+	smb_node_t	*local_root_node;
 
 	ASSERT(dir_node);
 	ASSERT(last_component);
 
 	*dir_node = NULL;
 	*last_component = '\0';
+	vss_cur_node = NULL;
+	vss_root_node = NULL;
 
 	if (sr && sr->tid_tree) {
 		if (!STYPE_ISDSK(sr->tid_tree->t_res_type))
@@ -241,11 +245,6 @@ smb_pathname_reduce(
 
 	(void) strsubst(usepath, '\\', '/');
 
-	if (usepath[len - 1] == '/')
-		trailing_slash = 1;
-
-	(void) strcanon(usepath, "/");
-
 	if (share_root_node)
 		root_node = share_root_node;
 	else
@@ -254,11 +253,37 @@ smb_pathname_reduce(
 	if (cur_node == NULL)
 		cur_node = root_node;
 
+	local_cur_node = cur_node;
+	local_root_node = root_node;
+
+	if (sr && (sr->smb_flg2 & SMB_FLAGS2_REPARSE_PATH)) {
+		err = smb_vss_lookup_nodes(sr, root_node, cur_node,
+		    usepath, &vss_cur_node, &vss_root_node);
+
+		if (err != 0) {
+			kmem_free(usepath, MAXPATHLEN);
+			return (err);
+		}
+
+		len = strlen(usepath);
+		local_cur_node = vss_cur_node;
+		local_root_node = vss_root_node;
+	}
+
+	if (usepath[len - 1] == '/')
+		trailing_slash = 1;
+
+	(void) strcanon(usepath, "/");
+
 	(void) pn_alloc(&ppn);
 
 	if ((err = pn_set(&ppn, usepath)) != 0) {
 		(void) pn_free(&ppn);
 		kmem_free(usepath, MAXPATHLEN);
+		if (vss_cur_node != NULL)
+			(void) smb_node_release(vss_cur_node);
+		if (vss_root_node != NULL)
+			(void) smb_node_release(vss_root_node);
 		return (err);
 	}
 
@@ -278,14 +303,14 @@ smb_pathname_reduce(
 	}
 
 	if (strcmp(ppn.pn_buf, "/") == 0) {
-		smb_node_ref(root_node);
-		*dir_node = root_node;
+		smb_node_ref(local_root_node);
+		*dir_node = local_root_node;
 	} else if (ppn.pn_buf[0] == '\0') {
-		smb_node_ref(cur_node);
-		*dir_node = cur_node;
+		smb_node_ref(local_cur_node);
+		*dir_node = local_cur_node;
 	} else {
-		err = smb_pathname(sr, ppn.pn_buf, lookup_flags, root_node,
-		    cur_node, NULL, dir_node, cred);
+		err = smb_pathname(sr, ppn.pn_buf, lookup_flags,
+		    local_root_node, local_cur_node, NULL, dir_node, cred);
 	}
 
 	(void) pn_free(&ppn);
@@ -313,6 +338,11 @@ smb_pathname_reduce(
 		}
 		*last_component = 0;
 	}
+
+	if (vss_cur_node != NULL)
+		(void) smb_node_release(vss_cur_node);
+	if (vss_root_node != NULL)
+		(void) smb_node_release(vss_root_node);
 
 	return (err);
 }
@@ -346,10 +376,10 @@ smb_pathname(
 	char		*component = NULL;
 	char		*real_name = NULL;
 	char		*namep;
-	struct pathname	pn;
-	struct pathname	rpn;
-	struct pathname	upn;
-	struct pathname	link_pn;
+	pathname_t	pn;
+	pathname_t	rpn;
+	pathname_t	upn;
+	pathname_t	link_pn;
 	smb_node_t	*dnode = NULL;
 	smb_node_t	*fnode = NULL;
 	vnode_t		*rootvp;
@@ -549,4 +579,44 @@ smb_pathname(
 	(void) pn_free(&upn);
 
 	return (err);
+}
+
+/*
+ * sr - needed to check for case sense
+ * path - non mangled path needed to be looked up from the startvp
+ * startvp - the vnode to start the lookup from
+ * rootvp - the vnode of the root of the filesystem
+ * returns the vnode found when starting at startvp and using the path
+ *
+ * Finds a vnode starting at startvp and parsing the non mangled path
+ */
+
+vnode_t *
+smb_lookuppathvptovp(smb_request_t *sr, char *path, vnode_t *startvp,
+    vnode_t *rootvp)
+{
+	pathname_t pn;
+	vnode_t *vp = NULL;
+	int lookup_flags = FOLLOW;
+
+	if (SMB_TREE_IS_CASEINSENSITIVE(sr))
+		lookup_flags |= FIGNORECASE;
+
+	(void) pn_alloc(&pn);
+
+	if (pn_set(&pn, path) == 0) {
+		VN_HOLD(rootvp);
+		if (rootvp != rootdir)
+			VN_HOLD(rootvp);
+
+		/* lookuppnvp should release the holds */
+		if (lookuppnvp(&pn, NULL, lookup_flags, NULL, &vp,
+		    rootvp, startvp, kcred) != 0) {
+			pn_free(&pn);
+			return (NULL);
+		}
+	}
+
+	pn_free(&pn);
+	return (vp);
 }

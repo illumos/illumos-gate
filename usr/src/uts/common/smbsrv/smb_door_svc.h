@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,10 @@ enum smb_dr_opcode_t {
 	SMB_DR_LOOKUP_SID,
 	SMB_DR_LOOKUP_NAME,
 	SMB_DR_JOIN,
-	SMB_DR_GET_DCINFO
+	SMB_DR_GET_DCINFO,
+	SMB_DR_VSS_GET_COUNT,
+	SMB_DR_VSS_GET_SNAPSHOTS,
+	SMB_DR_VSS_MAP_GMTTOKEN
 };
 
 enum smb_kdr_opcode_t {
@@ -151,6 +154,11 @@ smb_token_t *smb_upcall_get_token(netr_client_t *);
 int smb_set_downcall_desc(door_desc_t *, uint_t);
 void smb_user_nonauth_logon(uint32_t);
 void smb_user_auth_logoff(uint32_t);
+uint32_t smb_upcall_vss_get_count(char *);
+void smb_upcall_vss_get_snapshots(char *resource_path, uint32_t count,
+    smb_dr_return_gmttokens_t *gmttokens);
+void smb_upcall_vss_get_snapshots_free(smb_dr_return_gmttokens_t *reply);
+void smb_upcall_vss_map_gmttoken(char *, char *, char *);
 #else /* _KERNEL */
 
 /*

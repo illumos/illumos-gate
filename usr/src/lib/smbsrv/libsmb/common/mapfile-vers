@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -78,6 +78,9 @@ SUNWprivate {
 	nt_domain_lookup_sid;
 	nt_domain_lookupbytype;
 	nt_domain_new;
+	nt_domain_save;
+	nt_domain_show;
+	nt_domain_unlink;
 	oem_get_smb_cpid;
 	oem_get_telnet_cpid;
 	oem_language_set;
@@ -180,6 +183,7 @@ SUNWprivate {
 	smb_idmap_restart;
 	smb_idmap_start;
 	smb_idmap_stop;
+	smb_ishostname;
 	smb_join;
 	smb_lgrp_add;
 	smb_lgrp_add_member;
@@ -257,7 +261,8 @@ SUNWprivate {
 	smb_privset_size;
 	smb_privset_validate;
 	smb_pwd_fini;
-	smb_pwd_getpasswd = AUXILIARY libsmb_pwd.so;
+	smb_pwd_getpwnam = AUXILIARY libsmb_pwd.so;
+	smb_pwd_getpwuid = AUXILIARY libsmb_pwd.so;
 	smb_pwd_init;
 	smb_pwd_iterate = AUXILIARY libsmb_pwd.so;
 	smb_pwd_iterclose = AUXILIARY libsmb_pwd.so;
@@ -288,6 +293,7 @@ SUNWprivate {
 	smb_tracef;
 	smb_update_netlogon_seqnum;
 	smb_wka_fini;
+	smb_wka_get_domain;
 	smb_wka_init;
 	smb_wka_is_wellknown;
 	smb_wka_lookup;
@@ -314,6 +320,9 @@ SUNWprivate {
 	xdr_smb_dr_joininfo_t;
 	xdr_smb_dr_string_t;
 	xdr_smb_dr_ulist_t;
+	xdr_smb_dr_get_gmttokens_t;
+	xdr_smb_dr_return_gmttokens_t;
+	xdr_smb_dr_map_gmttoken_t;
 	xlate_nt_status;
     local:
 	*;

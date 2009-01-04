@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -747,6 +747,11 @@ int smb_fsacl_to_vsa(acl_t *, vsecattr_t *, int *);
 boolean_t smb_ace_is_generic(int);
 boolean_t smb_ace_is_access(int);
 boolean_t smb_ace_is_audit(int);
+
+uint32_t smb_vss_ioctl_enumerate_snaps(smb_request_t *, smb_xa_t *);
+int smb_vss_lookup_nodes(smb_request_t *, smb_node_t *, smb_node_t *,
+    char *, smb_node_t **, smb_node_t **);
+vnode_t *smb_lookuppathvptovp(smb_request_t *, char *, vnode_t *, vnode_t *);
 
 #ifdef	__cplusplus
 }

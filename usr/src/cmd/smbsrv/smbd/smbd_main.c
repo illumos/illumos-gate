@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -456,7 +456,7 @@ smbd_service_fini(void)
 	smb_lgrp_stop();
 	smb_ccache_remove(SMB_CCACHE_PATH);
 	smb_pwd_fini();
-
+	nt_domain_unlink();
 }
 
 

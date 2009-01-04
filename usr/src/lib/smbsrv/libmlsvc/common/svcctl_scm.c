@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -631,19 +631,37 @@ svcctl_scm_bytes_needed(svcctl_manager_context_t *mgr_ctx)
 uint32_t
 svcctl_scm_validate_service(svcctl_manager_context_t *mgr_ctx, char *svc_name)
 {
-	svcctl_svc_node_t node;
-	uu_avl_index_t idx;
-
-	if (svc_name == NULL)
-		return (ERROR_SERVICE_DOES_NOT_EXIST);
-
-	bzero(&node, sizeof (svcctl_svc_node_t));
-	node.sn_name = svc_name;
-	if (uu_avl_find(mgr_ctx->mc_svcs, &node,
-	    &mgr_ctx->mc_scf_max_fmri_len, &idx) != NULL)
+	if (svcctl_scm_find_service(mgr_ctx, svc_name) != NULL)
 		return (ERROR_SUCCESS);
 
 	return (ERROR_SERVICE_DOES_NOT_EXIST);
+}
+
+/*
+ * svcctl_scm_map_windows_svc
+ *
+ * Windows client send windows service name. This method maps windows
+ * service names to Solaris service names.
+ */
+static char *
+svcctl_scm_map_windows_svc(char *svc_name)
+{
+	int i, size = 0;
+	struct {
+		char *win_svc_name;
+		char *solaris_svc_name;
+	} win2solaris_svc_map[] = {
+		{ "eventlog", "system/system-log:default" }
+	};
+
+	size = sizeof (win2solaris_svc_map)/sizeof (win2solaris_svc_map[0]);
+	for (i = 0; i < size; ++i) {
+		if (strcasecmp(svc_name,
+		    win2solaris_svc_map[i].win_svc_name) == 0)
+			return (win2solaris_svc_map[i].solaris_svc_name);
+	}
+
+	return (NULL);
 }
 
 /*
@@ -668,7 +686,13 @@ svcctl_scm_find_service(svcctl_manager_context_t *mgr_ctx, char *svc_name)
 	if (f_node != NULL)
 		return (f_node);
 
-	return (NULL);
+	bzero(&node, sizeof (svcctl_svc_node_t));
+	node.sn_name = svcctl_scm_map_windows_svc(svc_name);
+	if (node.sn_name != NULL)
+		f_node = uu_avl_find(mgr_ctx->mc_svcs, &node,
+		    &mgr_ctx->mc_scf_max_fmri_len, &idx);
+
+	return (f_node);
 }
 
 /*

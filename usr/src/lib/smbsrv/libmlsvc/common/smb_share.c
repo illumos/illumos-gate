@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,6 @@ static void smb_shr_sa_loadgrp(sa_group_t);
 static uint32_t smb_shr_sa_load(sa_share_t, sa_resource_t);
 static uint32_t smb_shr_sa_loadbyname(char *);
 static uint32_t smb_shr_sa_get(sa_share_t, sa_resource_t, smb_share_t *);
-static void smb_shr_sa_csc_option(const char *, smb_share_t *);
 
 /*
  * share publishing
@@ -161,6 +160,18 @@ static uint32_t smb_shr_lookup(char *, smb_share_t *);
 static uint32_t smb_shr_addipc(void);
 static void smb_shr_set_oemname(smb_share_t *);
 
+
+/*
+ * libshare handle and synchronization
+ */
+typedef struct smb_sa_handle {
+	sa_handle_t	sa_handle;
+	mutex_t		sa_mtx;
+	boolean_t	sa_in_service;
+} smb_sa_handle_t;
+
+static smb_sa_handle_t smb_sa_handle;
+
 /*
  * Creates and initializes the cache and starts the publisher
  * thread.
@@ -168,6 +179,10 @@ static void smb_shr_set_oemname(smb_share_t *);
 int
 smb_shr_start(void)
 {
+	(void) mutex_lock(&smb_sa_handle.sa_mtx);
+	smb_sa_handle.sa_in_service = B_TRUE;
+	(void) mutex_unlock(&smb_sa_handle.sa_mtx);
+
 	if (smb_shr_cache_create() != NERR_Success)
 		return (ENOMEM);
 
@@ -182,6 +197,49 @@ smb_shr_stop(void)
 {
 	smb_shr_cache_destroy();
 	smb_shr_publisher_stop();
+
+	(void) mutex_lock(&smb_sa_handle.sa_mtx);
+	smb_sa_handle.sa_in_service = B_FALSE;
+
+	if (smb_sa_handle.sa_handle != NULL) {
+		sa_fini(smb_sa_handle.sa_handle);
+		smb_sa_handle.sa_handle = NULL;
+	}
+
+	(void) mutex_unlock(&smb_sa_handle.sa_mtx);
+}
+
+/*
+ * Get a handle and exclusive access to the libshare API.
+ */
+sa_handle_t
+smb_shr_sa_enter(void)
+{
+	(void) mutex_lock(&smb_sa_handle.sa_mtx);
+	if (!smb_sa_handle.sa_in_service) {
+		(void) mutex_unlock(&smb_sa_handle.sa_mtx);
+		return (NULL);
+	}
+
+	if (smb_sa_handle.sa_handle == NULL) {
+		smb_sa_handle.sa_handle = sa_init(SA_INIT_SHARE_API);
+		if (smb_sa_handle.sa_handle == NULL) {
+			syslog(LOG_ERR, "share: failed to get libshare handle");
+			(void) mutex_unlock(&smb_sa_handle.sa_mtx);
+			return (NULL);
+		}
+	}
+
+	return (smb_sa_handle.sa_handle);
+}
+
+/*
+ * Release exclusive access to the libshare API.
+ */
+void
+smb_shr_sa_exit(void)
+{
+	(void) mutex_unlock(&smb_sa_handle.sa_mtx);
 }
 
 /*
@@ -489,9 +547,7 @@ smb_shr_modify(smb_share_t *new_si)
 		return (ERROR_ACCESS_DENIED);
 	}
 
-	if (strcmp(new_si->shr_cmnt, si->shr_cmnt) != 0)
-		(void) strlcpy(si->shr_cmnt, new_si->shr_cmnt,
-		    sizeof (si->shr_cmnt));
+	(void) strlcpy(si->shr_cmnt, new_si->shr_cmnt, sizeof (si->shr_cmnt));
 
 	adc_changed = (strcmp(new_si->shr_container, si->shr_container) != 0);
 	if (adc_changed) {
@@ -507,6 +563,7 @@ smb_shr_modify(smb_share_t *new_si)
 	si->shr_flags |= cscopt;
 
 	access = (new_si->shr_flags & SMB_SHRF_ACC_ALL);
+	si->shr_flags &= ~SMB_SHRF_ACC_ALL;
 	si->shr_flags |= access;
 
 	if (access & SMB_SHRF_ACC_NONE)
@@ -1130,10 +1187,8 @@ smb_shr_sa_loadall(void *args)
 	char *gstate;
 	boolean_t gdisabled;
 
-	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL) {
-		syslog(LOG_ERR, "share: failed to get libshare API handle");
+	if ((handle = smb_shr_sa_enter()) == NULL)
 		return (NULL);
-	}
 
 	for (group = sa_get_group(handle, NULL);
 	    group != NULL; group = sa_get_next_group(group)) {
@@ -1156,7 +1211,7 @@ smb_shr_sa_loadall(void *args)
 
 	}
 
-	sa_fini(handle);
+	smb_shr_sa_exit();
 	return (NULL);
 }
 
@@ -1346,7 +1401,7 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
  * If the option value is not recognized, it will be ignored: invalid
  * values will typically be caught and rejected by sharemgr.
  */
-static void
+void
 smb_shr_sa_csc_option(const char *value, smb_share_t *si)
 {
 	struct {
@@ -1359,8 +1414,6 @@ smb_shr_sa_csc_option(const char *value, smb_share_t *si)
 		{ "vdo",	SMB_SHRF_CSC_VDO }
 	};
 
-	char buf[SMB_SHR_CSC_BUFSZ];
-	smb_ctxbuf_t ctx;
 	int i;
 
 	for (i = 0; i < (sizeof (cscopt) / sizeof (cscopt[0])); ++i) {
@@ -1379,15 +1432,8 @@ smb_shr_sa_csc_option(const char *value, smb_share_t *si)
 		break;
 
 	default:
-		(void) smb_ctxbuf_init(&ctx, (uint8_t *)buf, SMB_SHR_CSC_BUFSZ);
-
-		for (i = 0; i < (sizeof (cscopt) / sizeof (cscopt[0])); ++i) {
-			if (si->shr_flags & cscopt[i].flag)
-				(void) smb_ctxbuf_printf(&ctx, " %s",
-				    cscopt[i].value);
-		}
-
-		syslog(LOG_ERR, "csc option conflict:%s", buf);
+		syslog(LOG_INFO, "csc option conflict: 0x%08x",
+		    si->shr_flags & SMB_SHRF_CSC_MASK);
 		break;
 	}
 }
@@ -1404,24 +1450,24 @@ smb_shr_sa_loadbyname(char *sharename)
 	sa_resource_t resource;
 	uint32_t status;
 
-	if ((handle = sa_init(SA_INIT_SHARE_API)) == NULL)
+	if ((handle = smb_shr_sa_enter()) == NULL)
 		return (NERR_InternalError);
 
 	resource = sa_find_resource(handle, sharename);
 	if (resource == NULL) {
-		sa_fini(handle);
+		smb_shr_sa_exit();
 		return (NERR_NetNameNotFound);
 	}
 
 	share = sa_get_resource_parent(resource);
 	if (share == NULL) {
-		sa_fini(handle);
+		smb_shr_sa_exit();
 		return (NERR_InternalError);
 	}
 
 	status = smb_shr_sa_load(share, resource);
 
-	sa_fini(handle);
+	smb_shr_sa_exit();
 	return (status);
 }
 

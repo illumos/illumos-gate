@@ -19,54 +19,34 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Event Log Service RPC (LOGR) interface definition.
  */
-
 #include <sys/utsname.h>
 #include <unistd.h>
 #include <strings.h>
-#include <netdb.h>
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/nmpipes.h>
 #include <smbsrv/libmlsvc.h>
-#include <smbsrv/ndl/eventlog.ndl>
+#include "eventlog.h"
+#include <smbsrv/nterror.h>
 
-#define	FWD	+1
-#define	REW	-1
+#define	LOGR_FWD		+1
+#define	LOGR_REW		-1
+#define	LOGR_RECORD_SIGNATURE	0x654C664C
 
-/* define the logging structs here - from syslog.h */
-#define	NMSGMASK	1023
-#define	MAXMSGLEN	223
-#define	LOGBUFSIZE	(MAXMSGLEN + 1)
+#define	LOGR_PRI(p)		((p) & LOG_PRIMASK)
+#define	LOGR_WNSTRLEN(S)	((strlen((S)) + 1) * sizeof (mts_wchar_t))
 
-#define	LOG_PRI(p)	((p) & LOG_PRIMASK)
-
-typedef struct log_entry {
-	struct timeval	timestamp;	    /* time of log entry */
-	int		pri;		    /* message priority */
-	char		msg[LOGBUFSIZE];    /* log message text */
-	int		thread_id;	    /* calling function thread ID */
-	char		thread_name[12];    /* calling function thread name */
-	unsigned long	caller_adr;	    /* calling function address */
-} log_entry_t;
-
-typedef struct log_info {
-	log_entry_t	entry[NMSGMASK+1];
-	int		ix;
-	int		alarm_on;
-	int		alarm_disable;
-	int		timestamp_level;
-	int		disp_msg_len;
-	int		prefix_len;
-} log_info_t;
+#define	LOGR_MSG_DWORD_OFFSET	12
+#define	LOGR_MSG_WORD_OFFSET	4
 
 /*
  * READ flags for EventLogRead
@@ -152,10 +132,6 @@ typedef struct log_info {
 #define	EVENTID_SYSTEM_CODE		0x00000000
 #define	EVENTID_CUSTOMER_CODE		0x20000000
 
-#define	MAX_SRCNAME_LEN			20
-#define	LOGR_KEY			"LogrOpen"
-
-
 static int logr_s_EventLogClose(void *, ndr_xa_t *);
 static int logr_s_EventLogQueryCount(void *, ndr_xa_t *);
 static int logr_s_EventLogGetOldestRec(void *, ndr_xa_t *);
@@ -186,18 +162,7 @@ static ndr_service_t logr_service = {
 	logr_stub_table			/* stub_table */
 };
 
-typedef struct {
-	DWORD tot_recnum;
-	DWORD last_sentrec;
-	char first_read;
-	struct log_info log;
-} read_data_t;
-
-static char logr_sysname[SYS_NMLN];
-static mts_wchar_t wcs_hostname[MAXHOSTNAMELEN];
-static int hostname_len = 0;
-static mts_wchar_t wcs_srcname[MAX_SRCNAME_LEN];
-static int srcname_len = 0;
+static int logr_get_snapshot(logr_context_t *);
 
 /*
  * logr_initialize
@@ -209,21 +174,75 @@ static int srcname_len = 0;
 void
 logr_initialize(void)
 {
-	struct utsname name;
-	char *sysname;
-	int len;
-
-	if (uname(&name) < 0)
-		sysname = "Solaris";
-	else
-		sysname = name.sysname;
-
-	(void) strlcpy(logr_sysname, sysname, SYS_NMLN);
-	len = strlen(logr_sysname) + 1;
-	(void) mts_mbstowcs(wcs_srcname, logr_sysname, len);
-	srcname_len = len * sizeof (mts_wchar_t);
-
 	(void) ndr_svc_register(&logr_service);
+}
+
+/*
+ * logr_hdlookup
+ *
+ * Handle lookup wrapper to validate the local service and/or manager context.
+ */
+static ndr_handle_t *
+logr_hdlookup(ndr_xa_t *mxa, ndr_hdid_t *id)
+{
+	ndr_handle_t *hd;
+	logr_context_t *ctx;
+
+	if ((hd = ndr_hdlookup(mxa, id)) == NULL)
+		return (NULL);
+
+	if ((ctx = (logr_context_t *)hd->nh_data) == NULL)
+		return (NULL);
+
+	if (ctx->lc_source_name == NULL)
+		return (NULL);
+
+	return (hd);
+}
+
+/*
+ * logr_context_data_free
+ *
+ * Callback to free the context data associated with local service
+ * and/or manager context.
+ */
+static void
+logr_context_data_free(void *ctxp)
+{
+	logr_context_t *ctx = (logr_context_t *)ctxp;
+
+	if (ctx == NULL)
+		return;
+
+	free(ctx->lc_source_name);
+	free(ctx->lc_cached_read_data->rd_log);
+	free(ctx->lc_cached_read_data);
+	free(ctx);
+	ctx = NULL;
+}
+
+/*
+ * logr_mgr_hdalloc
+ *
+ * Handle allocation wrapper to setup the local manager context.
+ */
+static ndr_hdid_t *
+logr_hdalloc(ndr_xa_t *mxa)
+{
+	logr_context_t *ctx;
+
+	if ((ctx = malloc(sizeof (logr_context_t))) == NULL)
+		return (NULL);
+	bzero(ctx, sizeof (logr_context_t));
+
+	ctx->lc_source_name = strdup("eventlog");
+	if ((ctx->lc_source_name != NULL) && (logr_get_snapshot(ctx) < 0)) {
+		free(ctx->lc_source_name);
+		free(ctx);
+		return (NULL);
+	}
+
+	return (ndr_hdalloc(mxa, ctx));
 }
 
 /*
@@ -245,12 +264,12 @@ logr_s_EventLogClose(void *arg, ndr_xa_t *mxa)
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (NDR_DRC_OK);
 	}
-
-	free(hd->nh_data);
+	logr_context_data_free(hd->nh_data);
 	ndr_hdfree(mxa, id);
 
 	bzero(&param->result_handle, sizeof (logr_handle_t));
 	param->status = NT_STATUS_SUCCESS;
+
 	return (NDR_DRC_OK);
 }
 
@@ -264,9 +283,19 @@ static int
 logr_s_EventLogOpen(void *arg, ndr_xa_t *mxa)
 {
 	struct logr_EventLogOpen *param = arg;
+	ndr_hdid_t *id = NULL;
+	ndr_handle_t *hd;
 
-	bzero(&param->handle, sizeof (logr_handle_t));
-	param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+	id = logr_hdalloc(mxa);
+	if (id && ((hd = logr_hdlookup(mxa, id)) != NULL)) {
+		hd->nh_data_free = logr_context_data_free;
+		bcopy(id, &param->handle, sizeof (logr_handle_t));
+		param->status = ERROR_SUCCESS;
+	} else {
+		bzero(&param->handle, sizeof (logr_handle_t));
+		param->status = ERROR_ACCESS_DENIED;
+	}
+
 	return (NDR_DRC_OK);
 }
 
@@ -275,11 +304,35 @@ logr_s_EventLogOpen(void *arg, ndr_xa_t *mxa)
  *
  * Allocate memory and make a copy, as a snapshot, from system log.
  */
-static read_data_t *
-logr_get_snapshot(void)
+static int
+logr_get_snapshot(logr_context_t *ctx)
 {
-	read_data_t *data = NULL;
-	return (data);
+	logr_read_data_t *data = NULL;
+
+	ctx->lc_cached_read_data = malloc(sizeof (logr_read_data_t));
+	if (ctx->lc_cached_read_data != NULL) {
+		data = ctx->lc_cached_read_data;
+
+		data->rd_log = (logr_info_t *)malloc(sizeof (logr_info_t));
+		if (data->rd_log == NULL) {
+			free(data);
+			return (-1);
+		}
+		bzero(data->rd_log, sizeof (logr_info_t));
+
+		data->rd_tot_recnum = logr_syslog_snapshot(data->rd_log);
+		if (data->rd_tot_recnum < 0) {
+			free(data->rd_log);
+			free(data);
+			return (-1);
+		}
+
+		data->rd_first_read = 1;
+
+		return (0);
+	}
+
+	return (-1);
 }
 
 /*
@@ -295,20 +348,18 @@ logr_s_EventLogQueryCount(void *arg, ndr_xa_t *mxa)
 	struct logr_EventLogQueryCount *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 	ndr_handle_t *hd;
-	read_data_t *data;
+	logr_context_t *ctx;
+	logr_read_data_t *data;
 
-	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
+	if ((hd = logr_hdlookup(mxa, id)) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (NDR_DRC_OK);
 	}
 
-	if ((data = logr_get_snapshot()) == NULL) {
-		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
-		return (NDR_DRC_OK);
-	}
+	ctx = (logr_context_t *)hd->nh_data;
+	data = ctx->lc_cached_read_data;
 
-	hd->nh_data = data;
-	param->rec_num = data->tot_recnum;
+	param->rec_num = data->rd_tot_recnum;
 	param->status = NT_STATUS_SUCCESS;
 	return (NDR_DRC_OK);
 }
@@ -324,29 +375,33 @@ logr_s_EventLogGetOldestRec(void *arg, ndr_xa_t *mxa)
 	struct logr_EventLogGetOldestRec *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 	ndr_handle_t *hd;
-	read_data_t *data;
+	logr_context_t *ctx;
+	logr_read_data_t *data;
 
-	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
+	if ((hd = logr_hdlookup(mxa, id)) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (NDR_DRC_OK);
 	}
 
-	data = (read_data_t *)hd->nh_data;
-	param->oldest_rec = data->log.ix - data->tot_recnum;
+	ctx = (logr_context_t *)hd->nh_data;
+	data = ctx->lc_cached_read_data;
+
+	param->oldest_rec = data->rd_log->li_idx - data->rd_tot_recnum + 1;
+
 	param->status = NT_STATUS_SUCCESS;
 	return (NDR_DRC_OK);
 }
 
 /*
- * set_event_typeid
+ * logr_set_event_typeid
  *
  * Map the local system log priority to the event type and event ID
  * for Windows events.
  */
 void
-set_event_typeid(int le_pri, WORD *etype, DWORD *eid)
+logr_set_event_typeid(int le_pri, WORD *etype, DWORD *eid)
 {
-	switch (LOG_PRI(le_pri)) {
+	switch (LOGR_PRI(le_pri)) {
 	case LOG_EMERG:
 	case LOG_ALERT:
 	case LOG_CRIT:
@@ -370,51 +425,70 @@ set_event_typeid(int le_pri, WORD *etype, DWORD *eid)
 	}
 }
 
-static log_entry_t *
-log_get_entry(struct log_info *linfo, int entno)
+/*
+ * logr_get_entry
+ *
+ * Gets a log entry.
+ */
+static logr_entry_t *
+logr_get_entry(logr_info_t *linfo, int entno)
 {
-	return (&linfo->entry[entno]);
+	return (&linfo->li_entry[entno]);
 }
 
 /*
+ * logr_set_logrecord
+ *
  * Fill a Windows event record based on a local system log record.
  */
 static void
-set_logrec(log_entry_t *le, DWORD recno, logr_record_t *rec)
+logr_set_logrecord(char *src_name, logr_entry_t *le,
+    DWORD recno, logr_record_t *rec)
 {
-	int str_offs;
-	int sh_len;
-	int len;
+	int srcname_len = 0, hostname_len = 0, len;
+	int str_offs, sh_len;
+	mts_wchar_t wcs_hostname[MAXHOSTNAMELEN];
+	mts_wchar_t wcs_srcname[SYS_NMLN * 2];
+
+	(void) mts_mbstowcs(wcs_srcname, src_name,
+	    strlen(src_name) + 1);
+	srcname_len = LOGR_WNSTRLEN(src_name);
+
+	/* Because, Solaris allows remote logging, need to get hostname here */
+	(void) mts_mbstowcs(wcs_hostname, le->le_hostname,
+	    strlen(le->le_hostname) + 1);
+	hostname_len = LOGR_WNSTRLEN(le->le_hostname);
 
 	sh_len = srcname_len + hostname_len;
-	str_offs = 12 * sizeof (DWORD) + 4 * sizeof (WORD) + sh_len;
+	str_offs = LOGR_MSG_DWORD_OFFSET * sizeof (DWORD) +
+	    LOGR_MSG_WORD_OFFSET * sizeof (WORD) + sh_len;
 
 	rec->Length1 = sizeof (logr_record_t);
-	rec->Reserved = 0x654C664C;
+	rec->Reserved = LOGR_RECORD_SIGNATURE;
 	rec->RecordNumber = recno;
-	rec->TimeGenerated = le->timestamp.tv_sec;
-	rec->TimeWritten = le->timestamp.tv_sec;
-	set_event_typeid(le->pri, &rec->EventType, &rec->EventID);
+	rec->TimeGenerated = le->le_timestamp.tv_sec;
+	rec->TimeWritten = le->le_timestamp.tv_sec;
+	logr_set_event_typeid(le->le_pri, &rec->EventType, &rec->EventID);
 	rec->NumStrings = 1;
 	rec->EventCategory = 0;
 	rec->ReservedFlags = 0;
 	rec->ClosingRecordNumber = 0;
 	rec->StringOffset = str_offs;
 	rec->UserSidLength = 0;
-	rec->UserSidOffset = sizeof (logr_record_t) - sizeof (DWORD);
+	rec->UserSidOffset = 0;
 	rec->DataLength = 0;
-	rec->DataOffset = sizeof (logr_record_t) - sizeof (DWORD);
-	bzero(rec->info, LOGR_INFOLEN);
+	rec->DataOffset = 0;
+
+	bzero(rec->info, LOGR_MAXENTRYLEN);
 	(void) memcpy(rec->info, wcs_srcname, srcname_len);
 	(void) memcpy(rec->info + srcname_len, wcs_hostname, hostname_len);
 
-	len = (LOGR_INFOLEN - sh_len) / 2;
+	len = strlen(le->le_msg) + 1;
+	if (len > 0)
+		/*LINTED E_BAD_PTR_CAST_ALIGN*/
+		(void) mts_mbstowcs((mts_wchar_t *)(rec->info + sh_len),
+		    le->le_msg, len);
 
-	if ((strlen(le->msg) + 1) < len)
-		len = strlen(le->msg) + 1;
-
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	(void) mts_mbstowcs((mts_wchar_t *)(rec->info+sh_len), le->msg, len);
 	rec->Length2 = sizeof (logr_record_t);
 }
 
@@ -430,43 +504,43 @@ logr_s_EventLogRead(void *arg, ndr_xa_t *mxa)
 	struct logr_EventLogRead *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
 	ndr_handle_t *hd;
-	read_data_t *rdata;
-	log_entry_t *le;
+	logr_read_data_t *rdata;
+	logr_entry_t *le;
 	DWORD ent_no, ent_num, ent_remain;
 	logr_record_t *rec;
 	BYTE *buf;
-	int dir, ent_per_req;
+	int dir, ent_per_req, iter;
+	logr_context_t *ctx;
 
-	if ((hd = ndr_hdlookup(mxa, id)) == NULL) {
+	if ((hd = logr_hdlookup(mxa, id)) == NULL) {
 		param->status = NT_SC_ERROR(NT_STATUS_INVALID_HANDLE);
 		return (NDR_DRC_OK);
 	}
 
-	rdata = (read_data_t *)hd->nh_data;
+	ctx = (logr_context_t *)hd->nh_data;
+	rdata = ctx->lc_cached_read_data;
 	if (rdata == NULL) {
-		if ((rdata = logr_get_snapshot()) == NULL) {
-			param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
-			return (NDR_DRC_OK);
-		}
-
-		hd->nh_data = rdata;
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (NDR_DRC_OK);
 	}
 
-	dir = (param->read_flags & EVENTLOG_FORWARDS_READ) ? FWD : REW;
+	dir = (param->read_flags & EVENTLOG_FORWARDS_READ) ?
+	    LOGR_FWD : LOGR_REW;
 
-	if (param->read_flags & EVENTLOG_SEEK_READ) {
-		rdata->last_sentrec = param->rec_offset;
-	} else if (rdata->first_read) {
+	if (param->read_flags & EVENTLOG_SEEK_READ)
+		rdata->rd_last_sentrec = param->rec_offset;
+	else if (rdata->rd_first_read)
 		/*
 		 * set last record number which is read for
 		 * the first iteration of sequential read.
 		 */
-		rdata->last_sentrec = (dir == FWD)
-		    ? (rdata->log.ix - rdata->tot_recnum) : rdata->log.ix;
-	}
+		rdata->rd_last_sentrec = (dir == LOGR_FWD)
+		    ? (rdata->rd_log->li_idx - rdata->rd_tot_recnum)
+		    : rdata->rd_log->li_idx;
 
-	ent_remain = (dir == FWD)
-	    ? (rdata->tot_recnum - rdata->last_sentrec) : rdata->last_sentrec;
+	ent_remain = (dir == LOGR_FWD)
+	    ? (rdata->rd_tot_recnum - rdata->rd_last_sentrec)
+	    : rdata->rd_last_sentrec;
 
 	/*
 	 * function should return as many whole log entries as
@@ -483,65 +557,35 @@ logr_s_EventLogRead(void *arg, ndr_xa_t *mxa)
 		 * can figure out that there is no more record
 		 * to read.
 		 */
+		param->buf = NDR_STRDUP(mxa, "");
 		param->sent_size = 0;
-		param->unknown = 0;
 		param->status = NT_SC_ERROR(NT_STATUS_END_OF_FILE);
 		return (NDR_DRC_OK);
 	}
 
-	buf = (param->read_flags & EVENTLOG_SEEK_READ)
-	    ? param->ru.rec : param->ru.recs;
+	param->buf = NDR_MALLOC(mxa, param->nbytes_to_read);
+	buf = (BYTE *)param->buf;
 
-	for (ent_num = 0, ent_no = rdata->last_sentrec;
+	for (ent_num = 0, ent_no = rdata->rd_last_sentrec;
 	    ent_num < ent_remain; ent_num++, ent_no += dir) {
-		le = log_get_entry(&rdata->log, ent_no & NMSGMASK);
+
+		iter = ent_no & LOGR_NMSGMASK;
+		if (dir == LOGR_REW)
+			iter = (ent_no - 1) & LOGR_NMSGMASK;
+
+		le = logr_get_entry(rdata->rd_log, iter);
+
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
 		rec = (logr_record_t *)buf;
-		set_logrec(le, ent_no, rec);
+		logr_set_logrecord(ctx->lc_source_name, le, ent_no, rec);
 		buf += sizeof (logr_record_t);
 	}
-	rdata->last_sentrec = ent_no;
-	rdata->first_read = 0;
+
+	rdata->rd_last_sentrec = ent_no;
+	rdata->rd_first_read = 0;
 
 	param->sent_size = sizeof (logr_record_t) * ent_remain;
-	param->unknown = 0;
 	param->status = NT_STATUS_SUCCESS;
+
 	return (NDR_DRC_OK);
-}
-
-/*
- * Declare extern references.
- */
-DECL_FIXUP_STRUCT(logr_read_u);
-DECL_FIXUP_STRUCT(logr_read_info);
-DECL_FIXUP_STRUCT(logr_EventLogRead);
-
-/*
- * Patch the logr_EventLogRead union.
- * This function is called from mlsvc_logr_ndr.c
- */
-void
-fixup_logr_EventLogRead(void *xarg)
-{
-	struct logr_EventLogRead *arg = (struct logr_EventLogRead *)xarg;
-	unsigned short size1 = 0;
-	unsigned short size2 = 0;
-	unsigned short size3 = 0;
-	DWORD nbr = arg->nbytes_to_read;
-
-	switch (nbr) {
-	case 0:
-		size1 = 0;
-		break;
-	default:
-		size1 = nbr;
-		break;
-	};
-
-	size2 = size1 + (2 * sizeof (DWORD));
-	size3 = size2 + sizeof (ndr_request_hdr_t) + sizeof (DWORD);
-
-	FIXUP_PDU_SIZE(logr_read_u, size1);
-	FIXUP_PDU_SIZE(logr_read_info, size2);
-	FIXUP_PDU_SIZE(logr_EventLogRead, size3);
 }

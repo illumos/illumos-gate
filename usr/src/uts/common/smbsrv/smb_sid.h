@@ -19,17 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMB_SID_H
 #define	_SMB_SID_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * NT Security Identifier (SID) interface definition.
+ * Security Identifier (SID) interface definition.
  */
 #include <smbsrv/wintypes.h>
 
@@ -218,26 +216,6 @@ typedef struct smb_sid {
 } smb_sid_t;
 
 /*
- * Well-known account structure
- */
-typedef struct smb_wka {
-	uint16_t	wka_type;
-	uint8_t		wka_domidx;
-	char		*wka_sid;
-	char		*wka_name;
-	uint16_t	wka_flags;
-	char		*wka_desc;
-	smb_sid_t	*wka_binsid;
-} smb_wka_t;
-
-/*
- * Defined values for smb_wka.wka_flags
- *
- * SMB_WKAFLG_LGRP_ENABLE		Can be added as local group
- */
-#define	SMB_WKAFLG_LGRP_ENABLE	0x1
-
-/*
  * The maximum size of a SID in string format
  */
 #define	SMB_SID_STRSZ		256
@@ -256,19 +234,6 @@ int smb_sid_splitstr(char *, uint32_t *);
 void smb_sid_tostr(smb_sid_t *, char *);
 smb_sid_t *smb_sid_fromstr(char *);
 char *smb_sid_type2str(uint16_t);
-
-
-/*
- * Well-known account interfaces
- */
-int smb_wka_init(void);
-void smb_wka_fini(void);
-smb_wka_t *smb_wka_lookup(char *);
-char *smb_wka_lookup_sid(smb_sid_t *, uint16_t *);
-smb_sid_t *smb_wka_lookup_name(char *, uint16_t *);
-char *smb_wka_lookup_domain(char *);
-boolean_t smb_wka_is_wellknown(char *);
-
 
 #ifdef __cplusplus
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,15 +101,6 @@ extern "C" {
 #define	SMB_PI_MAX_NATIVE_OS	32
 #define	SMB_PI_MAX_LANMAN	32
 
-
-#define	SMB_PI_UNKNOWN_DOMAIN		0
-#define	SMB_PI_RESOURCE_DOMAIN		1
-
-/*
- * K.L. The keep alive time out use to default to 900
- * seconds. It is not long enough for some applications
- * i.e. MS Access. We currently use 5400 seconds.
- */
 #define	SMB_PI_KEEP_ALIVE_MIN		(90 * 60)
 #define	SMB_LM_COMPATIBILITY_DEFAULT_LEV 3
 

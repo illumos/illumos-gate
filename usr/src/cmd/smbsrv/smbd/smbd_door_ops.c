@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,13 @@ static char *smb_dop_join(char *argp, size_t arg_size,
 static char *smb_dop_get_dcinfo(char *argp, size_t arg_size,
     door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
 
+static char *smb_dop_vss_get_count(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
+static char *smb_dop_vss_get_snapshots(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
+static char *smb_dop_vss_map_gmttoken(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err);
+
 /* SMB daemon's door operation table */
 smb_dr_op_t smb_doorsrv_optab[] =
 {
@@ -67,6 +74,9 @@ smb_dr_op_t smb_doorsrv_optab[] =
 	smb_dop_lookup_name,
 	smb_dop_join,
 	smb_dop_get_dcinfo,
+	smb_dop_vss_get_count,
+	smb_dop_vss_get_snapshots,
+	smb_dop_vss_map_gmttoken,
 };
 
 /*ARGSUSED*/
@@ -387,5 +397,144 @@ smb_dop_get_dcinfo(char *argp, size_t arg_size,
 		*err = SMB_DR_OP_ERR_ENCODE;
 		*rbufsize = 0;
 	}
+	return (rbuf);
+}
+
+/*
+ * This routine returns the number of snapshots for a dataset
+ */
+
+/*ARGSUSED*/
+static char *
+smb_dop_vss_get_count(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
+{
+	char *rbuf = NULL;
+	uint32_t count;
+	char *path;
+
+	*err = SMB_DR_OP_SUCCESS;
+	*rbufsize = 0;
+
+	if ((path = smb_dr_decode_string(argp, arg_size)) == NULL) {
+		*err = SMB_DR_OP_ERR_DECODE;
+		return (NULL);
+	}
+
+	if (smbd_vss_get_count(path, &count) == 0) {
+		if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &count,
+		    xdr_uint32_t, rbufsize)) == NULL) {
+			*err = SMB_DR_OP_ERR_ENCODE;
+		}
+	}
+
+	xdr_free(xdr_string, (char *)&path);
+
+	return (rbuf);
+}
+
+/*
+ * This routine returns the count and list of snapshots.
+ * The list is in the Microsoft @GMT token format.
+ */
+/*ARGSUSED*/
+static char *
+smb_dop_vss_get_snapshots(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
+{
+	char *rbuf = NULL, **gmtp;
+	smb_dr_get_gmttokens_t request;
+	smb_dr_return_gmttokens_t reply;
+	uint_t i;
+
+	*err = SMB_DR_OP_SUCCESS;
+	*rbufsize = 0;
+	bzero(&request, sizeof (smb_dr_get_gmttokens_t));
+	bzero(&reply, sizeof (smb_dr_return_gmttokens_t));
+
+	if (smb_dr_decode_common(argp, arg_size,
+	    xdr_smb_dr_get_gmttokens_t, &request) != 0) {
+		*err = SMB_DR_OP_ERR_DECODE;
+		return (NULL);
+	}
+
+	reply.rg_gmttokens.rg_gmttokens_val = malloc(request.gg_count *
+	    sizeof (char *));
+	bzero(reply.rg_gmttokens.rg_gmttokens_val, request.gg_count *
+	    sizeof (char *));
+
+	if (reply.rg_gmttokens.rg_gmttokens_val == NULL) {
+		xdr_free(xdr_smb_dr_get_gmttokens_t, (char *)&request);
+		return (NULL);
+	}
+
+	smbd_vss_get_snapshots(request.gg_path, request.gg_count,
+	    &reply.rg_count,
+	    &reply.rg_gmttokens.rg_gmttokens_len,
+	    reply.rg_gmttokens.rg_gmttokens_val);
+
+	if ((rbuf = smb_dr_encode_common(SMB_DR_OP_SUCCESS, &reply,
+	    xdr_smb_dr_return_gmttokens_t, rbufsize)) == NULL) {
+		*err = SMB_DR_OP_ERR_ENCODE;
+	}
+
+	for (i = 0, gmtp = reply.rg_gmttokens.rg_gmttokens_val;
+	    (i < request.gg_count); i++) {
+		if (*gmtp)
+			free(*gmtp);
+		gmtp++;
+	}
+	free(reply.rg_gmttokens.rg_gmttokens_val);
+	xdr_free(xdr_smb_dr_get_gmttokens_t, (char *)&request);
+	return (rbuf);
+}
+
+/*
+ * This routine returns the snapshot name of the snapshot
+ * that matches path of the pathname of the dataset and
+ * the @GMT token.
+ */
+
+/*ARGSUSED*/
+static char *
+smb_dop_vss_map_gmttoken(char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t n_desc, size_t *rbufsize, int *err)
+{
+	char *rbuf = NULL;
+	char *snapname;
+	smb_dr_map_gmttoken_t request;
+
+	*err = SMB_DR_OP_SUCCESS;
+	*rbufsize = 0;
+	bzero(&request, sizeof (smb_dr_map_gmttoken_t));
+
+	if (smb_dr_decode_common(argp, arg_size, xdr_smb_dr_map_gmttoken_t,
+	    &request) != 0) {
+		*err = SMB_DR_OP_ERR_DECODE;
+		xdr_free(xdr_smb_dr_map_gmttoken_t, (char *)&request);
+		return (NULL);
+	}
+
+	snapname = (char *)malloc(MAXPATHLEN);
+
+	if (snapname == NULL) {
+		xdr_free(xdr_smb_dr_map_gmttoken_t, (char *)&request);
+		return (NULL);
+	}
+
+	if ((smbd_vss_map_gmttoken(request.mg_path, request.mg_gmttoken,
+	    snapname) != 0)) {
+		*snapname = '\0';
+	}
+
+	rbuf = smb_dr_encode_string(SMB_DR_OP_SUCCESS, snapname, rbufsize);
+
+	if (rbuf == NULL) {
+		*err = SMB_DR_OP_ERR_ENCODE;
+		*rbufsize = 0;
+	}
+
+	xdr_free(xdr_smb_dr_map_gmttoken_t, (char *)&request);
+	free(snapname);
 	return (rbuf);
 }

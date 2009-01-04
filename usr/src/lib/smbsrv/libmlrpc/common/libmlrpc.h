@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -257,6 +257,14 @@ typedef struct ndr_pipe {
 	ndr_binding_t		np_binding_pool[NDR_N_BINDING_POOL];
 } ndr_pipe_t;
 
+typedef struct ndr_pipe_info {
+	uint32_t		npi_fid;
+	uint32_t		npi_permissions;
+	uint32_t		npi_num_locks;
+	char			npi_pathname[MAXPATHLEN];
+	char			npi_username[MAXNAMELEN];
+} ndr_pipe_info_t;
+
 /*
  * Number of bytes required to align SIZE on the next dword/4-byte
  * boundary.
@@ -465,7 +473,8 @@ typedef struct ndr_handle {
 	int			nh_remote_os;
 	const ndr_service_t	*nh_svc;
 	ndr_client_t		*nh_clnt;
-	void *nh_data;
+	void			*nh_data;
+	void			(*nh_data_free)(void *);
 } ndr_handle_t;
 
 /* ndr_ops.c */
@@ -496,6 +505,7 @@ int ndr_pipe_open(int, uint8_t *, uint32_t);
 int ndr_pipe_close(int);
 int ndr_pipe_read(int, uint8_t *, uint32_t *, uint32_t *);
 int ndr_pipe_write(int, uint8_t *, uint32_t);
+int ndr_pipe_getinfo(int, ndr_pipe_info_t *);
 
 int ndr_generic_call_stub(ndr_xa_t *);
 

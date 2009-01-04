@@ -19,11 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
 
 PROG=	smbd
 SRCS=				\
@@ -34,7 +33,8 @@ SRCS=				\
 	smbd_main.c		\
 	smbd_net.c		\
 	smbd_opipe_doorsvc.c	\
-	smbd_share_doorsvc.c
+	smbd_share_doorsvc.c	\
+	smbd_vss.c
 
 include ../../Makefile.cmd
 
@@ -46,7 +46,7 @@ $(ROOTMANIFEST):= FILEMODE = 0444
 include ../Makefile.smbsrv.defs
 
 LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lmlsvc -lmlrpc -lsmbrdr -lsmbns -lsmb \
-	-lbsm -lnsl -lumem
+	-lzfs -lbsm -lnsl -lumem
 LDFLAGS += -R/usr/lib/smbsrv
 
 ROOTSMBDDIR = $(ROOTLIB)/smbsrv

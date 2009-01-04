@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,8 +85,19 @@ static int smb_list_transient(sa_handle_t);
 
 static int smb_build_shareinfo(sa_share_t, sa_resource_t, smb_share_t *);
 static void smb_csc_option(const char *, smb_share_t *);
+static char *smb_csc_name(const smb_share_t *);
 static sa_group_t smb_get_defaultgrp(sa_handle_t);
 static int interface_validator(int, char *);
+
+static struct {
+	char *value;
+	uint32_t flag;
+} cscopt[] = {
+	{ "disabled",	SMB_SHRF_CSC_DISABLED },
+	{ "manual",	SMB_SHRF_CSC_MANUAL },
+	{ "auto",	SMB_SHRF_CSC_AUTO },
+	{ "vdo",	SMB_SHRF_CSC_VDO }
+};
 
 /* size of basic format allocation */
 #define	OPT_CHUNK	1024
@@ -253,11 +264,10 @@ validresource(const char *name)
 static boolean_t
 validcsc(const char *value)
 {
-	const char *cscopt[] = { "disabled", "manual", "auto", "vdo" };
 	int i;
 
 	for (i = 0; i < (sizeof (cscopt) / sizeof (cscopt[0])); ++i) {
-		if (strcasecmp(value, cscopt[i]) == 0)
+		if (strcasecmp(value, cscopt[i].value) == 0)
 			return (B_TRUE);
 	}
 
@@ -1464,6 +1474,7 @@ smb_add_transient(sa_handle_t handle, smb_share_t *si)
 	sa_share_t share;
 	sa_group_t group;
 	sa_resource_t resource;
+	char *cscopt;
 
 	if (si == NULL)
 		return (SA_INVALID_NAME);
@@ -1493,10 +1504,13 @@ smb_add_transient(sa_handle_t handle, smb_share_t *si)
 			return (SA_NO_SUCH_RESOURCE);
 	}
 
-	/* set resource attributes now */
-	(void) sa_set_resource_attr(resource, "description", si->shr_cmnt);
-	(void) sa_set_resource_attr(resource, SHOPT_AD_CONTAINER,
-	    si->shr_container);
+	if (si->shr_cmnt[0] != '\0')
+		(void) sa_set_resource_description(resource, si->shr_cmnt);
+	if (si->shr_container[0] != '\0')
+		(void) sa_set_resource_attr(resource, SHOPT_AD_CONTAINER,
+		    si->shr_container);
+	if ((cscopt = smb_csc_name(si)) != NULL)
+		(void) sa_set_resource_attr(resource, SHOPT_CSC, cscopt);
 
 	return (SA_OK);
 }
@@ -1538,31 +1552,24 @@ smb_list_transient(sa_handle_t handle)
 static char *
 fix_resource_name(sa_share_t share, char *name, char *prefix)
 {
-	char *dataset = NULL;
-	char *newname = NULL;
-	size_t psize;
-	size_t nsize;
+	char buf[SA_MAX_RESOURCE_NAME + 1];
+	char *dataset;
+	size_t bufsz = SA_MAX_RESOURCE_NAME + 1;
+	size_t prelen;
 
 	dataset = sa_get_share_attr(share, "dataset");
+	if (dataset == NULL)
+		return (strdup(name));
 
-	if (dataset != NULL && strcmp(dataset, prefix) != 0) {
-		psize = strlen(prefix);
-		if (strncmp(dataset, prefix, psize) == 0) {
-			/* need string plus ',' and NULL */
-			nsize = (strlen(dataset) - psize) + strlen(name) + 2;
-			newname = calloc(nsize, 1);
-			if (newname != NULL) {
-				(void) snprintf(newname, nsize, "%s%s", name,
-				    dataset + psize);
-				sa_fix_resource_name(newname);
-			}
-			sa_free_attr_string(dataset);
-			return (newname);
-		}
-	}
-	if (dataset != NULL)
-		sa_free_attr_string(dataset);
-	return (strdup(name));
+	(void) strlcpy(buf, name, bufsz);
+	prelen = strlen(prefix);
+
+	if (strncmp(dataset, prefix, prelen) == 0)
+		(void) strlcat(buf, dataset + prelen, bufsz);
+
+	sa_free_attr_string(dataset);
+	sa_fix_resource_name(buf);
+	return (strdup(buf));
 }
 
 /*
@@ -2038,16 +2045,6 @@ smb_build_shareinfo(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 static void
 smb_csc_option(const char *value, smb_share_t *si)
 {
-	struct {
-		char *value;
-		uint32_t flag;
-	} cscopt[] = {
-		{ "disabled",	SMB_SHRF_CSC_DISABLED },
-		{ "manual",	SMB_SHRF_CSC_MANUAL },
-		{ "auto",	SMB_SHRF_CSC_AUTO },
-		{ "vdo",	SMB_SHRF_CSC_VDO }
-	};
-
 	char buf[SMB_CSC_BUFSZ];
 	int i;
 
@@ -2080,6 +2077,23 @@ smb_csc_option(const char *value, smb_share_t *si)
 		syslog(LOG_ERR, "csc option conflict:%s", buf);
 		break;
 	}
+}
+
+/*
+ * Return the option name for the first CSC flag (there should be only
+ * one) encountered in the share flags.
+ */
+static char *
+smb_csc_name(const smb_share_t *si)
+{
+	int i;
+
+	for (i = 0; i < (sizeof (cscopt) / sizeof (cscopt[0])); ++i) {
+		if (si->shr_flags & cscopt[i].flag)
+			return (cscopt[i].value);
+	}
+
+	return (NULL);
 }
 
 /*

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 
 #include <smbsrv/libsmb.h>
 #include <smbsrv/libmlrpc.h>
+#include <smbsrv/ntaccess.h>
 
 /*
  * Fragment size (5680: NT style).
@@ -252,6 +253,37 @@ ndr_pipe_transact(ndr_pipe_t *np)
 	nds_destruct(&mxa->send_nds);
 	ndr_heap_destroy(mxa->heap);
 	free(mxa);
+	return (0);
+}
+
+/*
+ * Return information about the specified pipe.
+ */
+int
+ndr_pipe_getinfo(int ndx, ndr_pipe_info_t *npi)
+{
+	ndr_pipe_t *np;
+
+	if ((ndx < 0) || (ndx >= NDR_PIPE_MAX) || (npi == NULL))
+		return (-1);
+
+	(void) mutex_lock(&ndr_pipe_lock);
+	np = &ndr_pipe_table[ndx];
+
+	if (np->np_fid == 0) {
+		(void) mutex_unlock(&ndr_pipe_lock);
+		return (-1);
+	}
+
+	npi->npi_fid = np->np_fid;
+	npi->npi_permissions = FILE_READ_DATA | FILE_WRITE_DATA | FILE_EXECUTE;
+	npi->npi_num_locks = 0;
+	(void) snprintf(npi->npi_username, MAXNAMELEN, "%s\\%s",
+	    np->np_ctx.oc_domain, np->np_ctx.oc_account);
+	(void) snprintf(npi->npi_pathname, MAXPATHLEN, "%s",
+	    np->np_binding->service->sec_addr_port);
+
+	(void) mutex_unlock(&ndr_pipe_lock);
 	return (0);
 }
 

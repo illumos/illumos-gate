@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2208,64 +2208,67 @@ sa_needs_refresh(sa_handle_t handle)
 /*
  * sa_fix_resource_name(path)
  *
- * change all illegal characters to something else.  For now, all get
- * converted to '_' and the leading '/' is stripped off. This is used
- * to construct an resource name (SMB share name) that is valid.
- * Caller must pass a valid path.
+ * Convert invalid characters in a resource name (SMB share name)
+ * to underscores ('_').  The list of invalid characters includes
+ * control characters and the following:
+ *
+ *	" / \ [ ] : | < > + ; , ? * =
+ *
+ * The caller must pass a valid path.  Leading and trailing slashes
+ * are stripped from the path before converting invalid characters.
+ * Resource names are restricted to SA_MAX_RESOURCE_NAME characters.
  */
 void
 sa_fix_resource_name(char *path)
 {
-	char *cp;
+	char *invalid = "\"/\\[]:|<>+;,?*=";
+	char *p = path;
+	char *q;
 	size_t len;
 
 	assert(path != NULL);
 
-	/* make sure we are appropriate length */
-	cp = path;
-	if (*cp == '/')
-		cp++; /* skip leading slash */
-	while (cp != NULL && strlen(cp) > SA_MAX_RESOURCE_NAME) {
-		cp = strchr(cp, '/');
-		if (cp != NULL)
-			cp++;
+	/*
+	 * Strip leading and trailing /'s.
+	 */
+	p += strspn(p, "/");
+	q = strchr(p, '\0');
+	if (q != NULL && q != path) {
+		while ((--q, *q == '/'))
+			*q = '\0';
 	}
-	/* two cases - cp == NULL and cp is substring of path */
-	if (cp == NULL) {
-		/* just take last SA_MAX_RESOURCE_NAME chars */
-		len = 1 + strlen(path) - SA_MAX_RESOURCE_NAME;
-		(void) memmove(path, path + len, SA_MAX_RESOURCE_NAME);
-		path[SA_MAX_RESOURCE_NAME] = '\0';
-	} else {
-		len = strlen(cp) + 1;
-		(void) memmove(path, cp, len);
+
+	if (*p == '\0') {
+		(void) strcpy(path, "_");
+		return;
 	}
 
 	/*
-	 * Don't want any of the characters that are not allowed
-	 * in an SMB share name. Replace them with '_'.
+	 * Stride over path components until the remaining
+	 * path is no longer than SA_MAX_RESOURCE_NAME.
 	 */
-	while (*path) {
-		switch (*path) {
-		case '/':
-		case '"':
-		case '\\':
-		case '[':
-		case ']':
-		case ':':
-		case '|':
-		case '<':
-		case '>':
-		case '+':
-		case ';':
-		case ',':
-		case '?':
-		case '*':
-		case '=':
-		case '\t':
-			*path = '_';
-			break;
+	q = p;
+	while ((q != NULL) && (strlen(q) > SA_MAX_RESOURCE_NAME)) {
+		if ((q = strchr(q, '/')) != NULL) {
+			++q;
+			p = q;
 		}
-		path++;
+	}
+
+	/*
+	 * If the path is still longer than SA_MAX_RESOURCE_NAME,
+	 * take the trailing SA_MAX_RESOURCE_NAME characters.
+	 */
+	if ((len = strlen(p)) > SA_MAX_RESOURCE_NAME) {
+		len = SA_MAX_RESOURCE_NAME;
+		p = strchr(p, '\0') - (SA_MAX_RESOURCE_NAME - 1);
+	}
+
+	(void) memmove(path, p, len);
+	path[len] = '\0';
+
+	for (p = path; *p != '\0'; ++p) {
+		if ((iscntrl(*p)) || strchr(invalid, *p))
+			*p = '_';
 	}
 }

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This Makefile defines all file modules for the directory uts/common
@@ -1130,6 +1130,7 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
                 smb_util.o				\
 		smb_vfs.o				\
 		smb_vops.o				\
+		smb_vss.o				\
 		smb_write.o				\
 		smb_write_raw.o				\
 		smb_xlate.o

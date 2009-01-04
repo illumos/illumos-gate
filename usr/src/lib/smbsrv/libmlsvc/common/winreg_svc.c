@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,9 @@
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/winreg.ndl>
 
+#define	WINREG_LOGR_SYSTEMKEY	\
+	"System\\CurrentControlSet\\Services\\Eventlog\\System"
+
 /*
  * Local handle management keys.
  */
@@ -52,11 +55,12 @@ static int winreg_hkkey;
 
 /*
  * List of supported registry keys (case-insensitive).
- *	"System\\CurrentControlSet\\Services\\Alerter\\Parameters"
  */
 static char *winreg_keys[] = {
+	"System\\CurrentControlSet\\Services\\Eventlog",
+	"System\\CurrentControlSet\\Services\\Eventlog\\System",
 	"System\\CurrentControlSet\\Control\\ProductOptions",
-	"System\\CurrentControlSet\\Services\\Eventlog\\System"
+	"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
 };
 
 typedef struct winreg_subkey {
@@ -75,6 +79,7 @@ static winreg_keylist_t winreg_keylist;
 
 static boolean_t winreg_key_has_subkey(const char *);
 static char *winreg_lookup_value(const char *);
+static char *winreg_lookup_eventlog_registry(char *, char *);
 
 static int winreg_s_OpenHK(void *, ndr_xa_t *);
 static int winreg_s_OpenHKLM(void *, ndr_xa_t *);
@@ -429,6 +434,53 @@ winreg_key_has_subkey(const char *subkey)
 }
 
 /*
+ * winreg_subkey_get_relative_name
+ *
+ * Each key contains one or more child keys, each called a subkey.
+ * For any specified key, its name MUST be unique for any other subkeys that
+ * have the same parent key.
+ *
+ * To accurately identify a given subkey within the key namespace, its fully
+ * qualified name (FQN) is used. The FQN MUST consist of the name of the subkey
+ * and the name of all of its parent keys all the way to the root of the tree.
+ *
+ * The "\" character MUST be used as a hierarchy separator to identify each key
+ * in the FQN and therefore MUST not be used in the name of a single key.
+ * For example, the subkey "MountedDevices" belongs to the subtree
+ * HKEY_LOCAL_MACHINE, as shown in the following example.
+ *
+ *	HKEY_LOCAL_MACHINE -> SYSTEM -> MountedDevices
+ *
+ * The FQN for MountedDevices is HKEY_LOCAL_MACHINE\SYSTEM\MountedDevices.
+ * The relative name of the subkey is "MountedDevices". The relative name
+ * MUST be used only for operations that are performed on its immediate parent
+ * key (SYSTEM in the previous example).
+ */
+static char *
+winreg_subkey_get_relative_name(const char *subkey)
+{
+	winreg_subkey_t *key;
+	char *value;
+
+	if (subkey == NULL)
+		return (NULL);
+
+	if (list_is_empty(&winreg_keylist.kl_list))
+		return (NULL);
+
+	key = list_head(&winreg_keylist.kl_list);
+	do {
+		if (strcasecmp(subkey, key->sk_name) == 0) {
+			value = strrchr(key->sk_name, '\\');
+			if (value != NULL)
+				return (++value);
+		}
+	} while ((key = list_next(&winreg_keylist.kl_list, key)) != NULL);
+
+	return (NULL);
+}
+
+/*
  * winreg_s_DeleteValue
  */
 /*ARGSUSED*/
@@ -449,6 +501,9 @@ winreg_s_EnumKey(void *arg, ndr_xa_t *mxa)
 {
 	struct winreg_EnumKey *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	winreg_string_t	*name, *class;
+	char *value, *namep = NULL, *classp = NULL;
+	int slen = 0;
 
 	if (ndr_hdlookup(mxa, id) == NULL) {
 		bzero(param, sizeof (struct winreg_EnumKey));
@@ -456,8 +511,37 @@ winreg_s_EnumKey(void *arg, ndr_xa_t *mxa)
 		return (NDR_DRC_OK);
 	}
 
-	bzero(param, sizeof (struct winreg_EnumKey));
-	param->status = ERROR_NO_MORE_ITEMS;
+	if (param->index > 0) {
+		bzero(param, sizeof (struct winreg_EnumKey));
+		param->status = ERROR_NO_MORE_ITEMS;
+		return (NDR_DRC_OK);
+	}
+
+	name = (winreg_string_t	*)&param->name_in;
+	class = (winreg_string_t *)&param->class_in;
+	if (name->length != 0)
+		namep = (char *)name->str;
+
+	if (class->length != 0)
+		classp = (char *)class->str;
+
+	value = winreg_lookup_eventlog_registry(namep, classp);
+	if (value == NULL) {
+		bzero(param, sizeof (struct winreg_EnumKey));
+		param->status = ERROR_CANTREAD;
+		return (NDR_DRC_OK);
+	}
+
+	slen = mts_wcequiv_strlen(value) + sizeof (mts_wchar_t);
+	param->name_out.length = slen;
+	param->name_out.allosize = slen;
+	if ((param->name_out.str = NDR_STRDUP(mxa, value)) == NULL) {
+		bzero(param, sizeof (struct winreg_EnumKey));
+		param->status = ERROR_NOT_ENOUGH_MEMORY;
+		return (NDR_DRC_OK);
+	}
+
+	param->status = ERROR_SUCCESS;
 	return (NDR_DRC_OK);
 }
 
@@ -584,14 +668,21 @@ winreg_s_OpenKey(void *arg, ndr_xa_t *mxa)
 static int
 winreg_s_QueryKey(void *arg, ndr_xa_t *mxa)
 {
-	static char nullstr[2] = { 0, 0 };
 	struct winreg_QueryKey *param = arg;
+	int rc;
+	winreg_string_t	*name;
 
+	name = (winreg_string_t	*)&param->name;
 	bzero(param, sizeof (struct winreg_QueryKey));
+	if ((name = NDR_NEW(mxa, winreg_string_t)) != NULL)
+		rc = NDR_MSTRING(mxa, "", (ndr_mstring_t *)name);
 
-	param->name.length = 2;
-	param->name.allosize = 0;
-	param->name.str = (unsigned char *)nullstr;
+	if ((name == NULL) || (rc != 0)) {
+		bzero(param, sizeof (struct winreg_QueryKey));
+		param->status = ERROR_NOT_ENOUGH_MEMORY;
+		return (NDR_DRC_OK);
+	}
+
 	param->status = ERROR_SUCCESS;
 	return (NDR_DRC_OK);
 }
@@ -695,7 +786,23 @@ winreg_lookup_value(const char *name)
 		}
 	}
 
-	return (0);
+	return (NULL);
+}
+
+/*
+ * winreg_lookup_eventlog_registry
+ *
+ * Return the subkey of the specified EventLog key. Decoding of
+ * class paramater not yet supported.
+ */
+/*ARGSUSED*/
+static char *
+winreg_lookup_eventlog_registry(char *name, char *class)
+{
+	if (name == NULL)
+		return (winreg_subkey_get_relative_name(WINREG_LOGR_SYSTEMKEY));
+
+	return (winreg_subkey_get_relative_name(name));
 }
 
 /*

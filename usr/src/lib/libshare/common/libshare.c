@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -841,7 +841,9 @@ sa_init(int init_service)
 			 */
 			if (sa_zfs_init(handle) == B_FALSE) {
 				free(handle);
+				(void) mutex_lock(&sa_global_lock);
 				(void) proto_plugin_fini();
+				(void) mutex_unlock(&sa_global_lock);
 				return (NULL);
 			}
 			/*

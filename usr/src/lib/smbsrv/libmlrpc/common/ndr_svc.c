@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -233,6 +233,7 @@ ndr_hdalloc(const ndr_xa_t *xa, const void *data)
 	hd->nh_fid = xa->fid;
 	hd->nh_svc = xa->binding->service;
 	hd->nh_data = (void *)data;
+	hd->nh_data_free = NULL;
 
 	(void) mutex_lock(&ndr_handle_lock);
 	hd->nh_next = ndr_handle_list;
@@ -321,6 +322,10 @@ ndr_hdclose(int fid)
 
 		if (hd->nh_fid == fid) {
 			*pphd = hd->nh_next;
+
+			if (hd->nh_data_free)
+				(*hd->nh_data_free)(hd->nh_data);
+
 			free(hd);
 			continue;
 		}

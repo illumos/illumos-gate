@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,18 +29,25 @@
  * structures containing domain type, name and SID information.
  */
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdio.h>
 #include <strings.h>
+#include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <netdb.h>
 #include <syslog.h>
 #include <synch.h>
+#include <pwd.h>
+#include <grp.h>
 
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/string.h>
 #include <smbsrv/smb_sid.h>
-
 #include <smbsrv/libsmb.h>
 
+#define	SMB_DOMAINS_FILE	"domains"
 
 static void nt_domain_unlist(nt_domain_t *);
 
@@ -387,4 +394,109 @@ nt_domain_unlist(nt_domain_t *domain)
 		}
 		ppdomain = &(*ppdomain)->next;
 	}
+}
+
+/*
+ * Write the list of domains to /var/run/smb/domains.
+ */
+void
+nt_domain_save(void)
+{
+	char		fname[MAXPATHLEN];
+	char		sidstr[SMB_SID_STRSZ];
+	char		tag;
+	nt_domain_t	*domain;
+	FILE		*fp;
+	struct passwd	*pwd;
+	struct group	*grp;
+	uid_t		uid;
+	gid_t		gid;
+
+	(void) snprintf(fname, MAXPATHLEN, "%s/%s",
+	    SMB_VARRUN_DIR, SMB_DOMAINS_FILE);
+
+	if ((fp = fopen(fname, "w")) == NULL)
+		return;
+
+	pwd = getpwnam("root");
+	grp = getgrnam("sys");
+	uid = (pwd == NULL) ? 0 : pwd->pw_uid;
+	gid = (grp == NULL) ? 3 : grp->gr_gid;
+
+	(void) lockf(fileno(fp), F_LOCK, 0);
+	(void) fchmod(fileno(fp), 0600);
+	(void) fchown(fileno(fp), uid, gid);
+
+	(void) rw_rdlock(&nt_domain_lock);
+
+	domain = nt_domain_list;
+	while (domain) {
+		smb_sid_tostr(domain->sid, sidstr);
+		switch (domain->type) {
+		case NT_DOMAIN_PRIMARY:
+			tag = '*';
+			break;
+
+		case NT_DOMAIN_TRUSTED:
+		case NT_DOMAIN_UNTRUSTED:
+			tag = '-';
+			break;
+
+		case NT_DOMAIN_LOCAL:
+			tag = '.';
+			break;
+		default:
+			domain = domain->next;
+			continue;
+		}
+
+		(void) fprintf(fp, "[%c] [%s] [%s]\n",
+		    tag, domain->name, sidstr);
+
+		domain = domain->next;
+	}
+
+	(void) rw_unlock(&nt_domain_lock);
+	(void) lockf(fileno(fp), F_ULOCK, 0);
+	(void) fclose(fp);
+}
+
+/*
+ * List the domains in /var/run/smb/domains.
+ */
+void
+nt_domain_show(void)
+{
+	char buf[MAXPATHLEN];
+	char *p;
+	FILE *fp;
+
+	(void) snprintf(buf, MAXPATHLEN, "%s/%s",
+	    SMB_VARRUN_DIR, SMB_DOMAINS_FILE);
+
+	if ((fp = fopen(buf, "r")) != NULL) {
+		(void) lockf(fileno(fp), F_LOCK, 0);
+
+		while (fgets(buf, MAXPATHLEN, fp) != NULL) {
+			if ((p = strchr(buf, '\n')) != NULL)
+				*p = '\0';
+			(void) printf("%s\n", buf);
+		}
+
+		(void) lockf(fileno(fp), F_ULOCK, 0);
+		(void) fclose(fp);
+	}
+}
+
+/*
+ * Remove the /var/run/smb/domains file.
+ */
+void
+nt_domain_unlink(void)
+{
+	char fname[MAXPATHLEN];
+
+	(void) snprintf(fname, MAXPATHLEN, "%s/%s",
+	    SMB_VARRUN_DIR, SMB_DOMAINS_FILE);
+	(void) unlink(fname);
 }

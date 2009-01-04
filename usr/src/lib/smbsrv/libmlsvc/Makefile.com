@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -30,19 +30,18 @@ VERS =		.1
 OBJS_COMMON =		\
 	dssetup_clnt.o	\
 	dssetup_svc.o	\
+	eventlog_svc.o	\
+	eventlog_syslog.o	\
 	lsalib.o	\
 	lsar_lookup.o	\
 	lsar_open.o	\
 	mlsvc_client.o	\
 	mlsvc_domain.o	\
 	mlsvc_init.o	\
-	mlsvc_logr.o	\
 	mlsvc_lsa.o	\
 	mlsvc_netr.o	\
 	mlsvc_sam.o	\
-	mlsvc_srvsvc.o	\
 	mlsvc_util.o	\
-	mlsvc_winreg.o	\
 	mlsvc_wkssvc.o	\
 	msgsvc_svc.o	\
 	netdfs.o	\
@@ -55,9 +54,11 @@ OBJS_COMMON =		\
 	smb_logon.o	\
 	smb_share.o	\
 	spoolss_svc.o	\
-	srvsvc_client.o	\
+	srvsvc_clnt.o	\
+	srvsvc_svc.o	\
 	svcctl_scm.o	\
-	svcctl_svc.o
+	svcctl_svc.o	\
+	winreg_svc.o
 
 # Automatically generated from .ndl files
 NDLLIST =		\

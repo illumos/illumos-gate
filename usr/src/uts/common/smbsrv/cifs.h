@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -262,6 +262,7 @@ extern "C" {
 #define	SMB_FLAGS2_KNOWS_EAS			0x0002
 #define	SMB_FLAGS2_SMB_SECURITY_SIGNATURE	0x0004
 #define	SMB_FLAGS2_IS_LONG_NAME			0x0040
+#define	SMB_FLAGS2_REPARSE_PATH			0x0400
 #define	SMB_FLAGS2_EXT_SEC			0x0800
 #define	SMB_FLAGS2_DFS				0x1000
 #define	SMB_FLAGS2_PAGING_IO			0x2000

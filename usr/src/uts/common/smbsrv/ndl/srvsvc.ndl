@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -361,12 +361,14 @@ struct mslm_infonres {
 struct mslm_NetConnectInfoBuf0 {
         DWORD coni0_id;
 };
+typedef struct mslm_NetConnectInfoBuf0 srvsvc_NetConnectInfoBuf0_t;
 
 struct mslm_NetConnectInfo0 {
 	DWORD entries_read;
   SIZE_IS(entries_read)
         struct mslm_NetConnectInfoBuf0 *ci0;
 };
+typedef struct mslm_NetConnectInfo0 srvsvc_NetConnectInfo0_t;
 
 /* 
  * Level 1 connect information.
@@ -380,12 +382,14 @@ struct mslm_NetConnectInfoBuf1 {
 	LPTSTR coni1_username;
 	LPTSTR coni1_netname; /* share name */
 };
+typedef struct mslm_NetConnectInfoBuf1 srvsvc_NetConnectInfoBuf1_t;
 
 struct mslm_NetConnectInfo1 {
 	DWORD entries_read;
   SIZE_IS(entries_read)
 	struct mslm_NetConnectInfoBuf1 *ci1;
 };
+typedef struct mslm_NetConnectInfo1 srvsvc_NetConnectInfo1_t;
 
 union mslm_NetConnectInfoResUnion {
 	CASE(0) struct mslm_NetConnectInfo0 *info0;
@@ -420,12 +424,14 @@ struct mslm_NetConnectEnum {
 struct mslm_NetFileInfoBuf2 {
 	DWORD fi2_id;
 };
+typedef struct mslm_NetFileInfoBuf2 srvsvc_NetFileInfoBuf2_t;
 
 struct mslm_NetFileInfo2 {
 	DWORD entries_read;
   SIZE_IS(entries_read)
 	struct mslm_NetFileInfoBuf2 *fi2;
 };
+typedef struct mslm_NetFileInfo2 srvsvc_NetFileInfo2_t;
 
 struct mslm_NetFileInfoBuf3 {
 	DWORD fi3_id;
@@ -434,12 +440,14 @@ struct mslm_NetFileInfoBuf3 {
 	LPTSTR fi3_pathname;
 	LPTSTR fi3_username;
 };
+typedef struct mslm_NetFileInfoBuf3 srvsvc_NetFileInfoBuf3_t;
 
 struct mslm_NetFileInfo3 {
 	DWORD entries_read;
   SIZE_IS(entries_read)
 	struct mslm_NetFileInfoBuf3 *fi3;
 };
+typedef struct mslm_NetFileInfo3 srvsvc_NetFileInfo3_t;
 
 union mslm_NetFileInfoResUnion {
 	CASE(2)	struct mslm_NetFileInfo2 *info2;

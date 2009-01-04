@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -218,6 +218,10 @@ int smb_shr_is_special(char *);
 boolean_t smb_shr_is_restricted(char *);
 boolean_t smb_shr_is_admin(char *);
 boolean_t smb_shr_chkname(char *);
+
+sa_handle_t smb_shr_sa_enter(void);
+void smb_shr_sa_exit(void);
+void smb_shr_sa_csc_option(const char *, smb_share_t *);
 
 /*
  * CIFS share management API exported for other processes

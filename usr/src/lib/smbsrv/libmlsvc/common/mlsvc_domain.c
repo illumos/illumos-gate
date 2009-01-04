@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -542,7 +542,7 @@ smb_domain_populate_table(char *domain, char *server)
 		lsa_free_info(&info);
 	}
 
-
+	nt_domain_save();
 }
 
 static void

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -70,7 +68,8 @@ static mutex_t lck_lock = DEFAULTMUTEX;
 static void *smb_pwd_hdl = NULL;
 
 static struct {
-	smb_passwd_t *(*pwop_getpasswd)(const char *, smb_passwd_t *);
+	smb_passwd_t *(*pwop_getpwnam)(const char *, smb_passwd_t *);
+	smb_passwd_t *(*pwop_getpwuid)(uid_t, smb_passwd_t *);
 	int (*pwop_setcntl)(const char *, int);
 	int (*pwop_setpasswd)(const char *, const char *);
 	int (*pwop_num)(void);
@@ -89,7 +88,6 @@ static int smb_pwd_fulck(void);
  */
 typedef struct smb_pwbuf {
 	char		pw_buf[SMB_PWD_BUFSIZE];
-	char		*pw_name;
 	smb_passwd_t	*pw_pwd;
 } smb_pwbuf_t;
 
@@ -182,8 +180,11 @@ smb_pwd_init(boolean_t create_cache)
 
 	bzero((void *)&smb_pwd_ops, sizeof (smb_pwd_ops));
 
-	smb_pwd_ops.pwop_getpasswd =
-	    (smb_passwd_t *(*)())dlsym(smb_pwd_hdl, "smb_pwd_getpasswd");
+	smb_pwd_ops.pwop_getpwnam =
+	    (smb_passwd_t *(*)())dlsym(smb_pwd_hdl, "smb_pwd_getpwnam");
+
+	smb_pwd_ops.pwop_getpwuid =
+	    (smb_passwd_t *(*)())dlsym(smb_pwd_hdl, "smb_pwd_getpwuid");
 
 	smb_pwd_ops.pwop_setcntl =
 	    (int (*)())dlsym(smb_pwd_hdl, "smb_pwd_setcntl");
@@ -203,7 +204,8 @@ smb_pwd_init(boolean_t create_cache)
 	smb_pwd_ops.pwop_iterate =
 	    (smb_luser_t *(*)())dlsym(smb_pwd_hdl, "smb_pwd_iterate");
 
-	if (smb_pwd_ops.pwop_getpasswd == NULL ||
+	if (smb_pwd_ops.pwop_getpwnam == NULL ||
+	    smb_pwd_ops.pwop_getpwuid == NULL ||
 	    smb_pwd_ops.pwop_setcntl == NULL ||
 	    smb_pwd_ops.pwop_setpasswd == NULL ||
 	    smb_pwd_ops.pwop_num == NULL ||
@@ -236,7 +238,7 @@ smb_pwd_fini(void)
 }
 
 /*
- * smb_pwd_getpasswd
+ * smb_pwd_getpwnam
  *
  * Returns a smb password structure for the given user name.
  * smbpw is a pointer to a buffer allocated by the caller.
@@ -244,15 +246,15 @@ smb_pwd_fini(void)
  * Returns NULL upon failure.
  */
 smb_passwd_t *
-smb_pwd_getpasswd(const char *name, smb_passwd_t *smbpw)
+smb_pwd_getpwnam(const char *name, smb_passwd_t *smbpw)
 {
 	boolean_t found = B_FALSE;
 	smb_pwbuf_t pwbuf;
 	FILE *fp;
 	int err;
 
-	if (smb_pwd_ops.pwop_getpasswd != NULL)
-		return (smb_pwd_ops.pwop_getpasswd(name, smbpw));
+	if (smb_pwd_ops.pwop_getpwnam != NULL)
+		return (smb_pwd_ops.pwop_getpwnam(name, smbpw));
 
 	err = smb_pwd_lock();
 	if (err != SMB_PWE_SUCCESS)
@@ -263,11 +265,59 @@ smb_pwd_getpasswd(const char *name, smb_passwd_t *smbpw)
 		return (NULL);
 	}
 
-	pwbuf.pw_name = NULL;
 	pwbuf.pw_pwd = smbpw;
 
 	while (smb_pwd_fgetent(fp, &pwbuf, SMB_PWD_GETF_ALL) != NULL) {
-		if (strcmp(name, pwbuf.pw_name) == 0) {
+		if (strcmp(name, smbpw->pw_name) == 0) {
+			if ((smbpw->pw_flags & (SMB_PWF_LM | SMB_PWF_NT)))
+				found = B_TRUE;
+			break;
+		}
+	}
+
+	(void) fclose(fp);
+	(void) smb_pwd_unlock();
+
+	if (!found) {
+		bzero(smbpw, sizeof (smb_passwd_t));
+		return (NULL);
+	}
+
+	return (smbpw);
+}
+
+/*
+ * smb_pwd_getpwuid
+ *
+ * Returns a smb password structure for the given UID
+ * smbpw is a pointer to a buffer allocated by the caller.
+ *
+ * Returns NULL upon failure.
+ */
+smb_passwd_t *
+smb_pwd_getpwuid(uid_t uid, smb_passwd_t *smbpw)
+{
+	boolean_t found = B_FALSE;
+	smb_pwbuf_t pwbuf;
+	FILE *fp;
+	int err;
+
+	if (smb_pwd_ops.pwop_getpwuid != NULL)
+		return (smb_pwd_ops.pwop_getpwuid(uid, smbpw));
+
+	err = smb_pwd_lock();
+	if (err != SMB_PWE_SUCCESS)
+		return (NULL);
+
+	if ((fp = fopen(SMB_PASSWD, "rF")) == NULL) {
+		(void) smb_pwd_unlock();
+		return (NULL);
+	}
+
+	pwbuf.pw_pwd = smbpw;
+
+	while (smb_pwd_fgetent(fp, &pwbuf, SMB_PWD_GETF_ALL) != NULL) {
+		if (uid == smbpw->pw_uid) {
 			if ((smbpw->pw_flags & (SMB_PWF_LM | SMB_PWF_NT)))
 				found = B_TRUE;
 			break;
@@ -453,7 +503,6 @@ smb_pwd_update(const char *name, const char *password, int control)
 	if (lm_level >= 4)
 		control |= SMB_PWC_NOLM;
 
-	pwbuf.pw_name = NULL;
 	pwbuf.pw_pwd = &smbpw;
 
 	/*
@@ -461,7 +510,7 @@ smb_pwd_update(const char *name, const char *password, int control)
 	 * the entry that matches "name"
 	 */
 	while (smb_pwd_fgetent(src, &pwbuf, SMB_PWD_GETF_ALL) != NULL) {
-		if (strcmp(pwbuf.pw_name, name) == 0) {
+		if (strcmp(smbpw.pw_name, name) == 0) {
 			err = smb_pwd_chgpwent(&smbpw, password, control);
 			if (err == SMB_PWE_USER_DISABLE)
 				user_disable = B_TRUE;
@@ -480,8 +529,9 @@ smb_pwd_update(const char *name, const char *password, int control)
 
 	if (newent) {
 		if (getpwnam_r(name, &uxpw, uxbuf, sizeof (uxbuf))) {
-			pwbuf.pw_name = uxpw.pw_name;
 			bzero(&smbpw, sizeof (smb_passwd_t));
+			(void) strlcpy(smbpw.pw_name, uxpw.pw_name,
+			    sizeof (smbpw.pw_name));
 			smbpw.pw_uid = uxpw.pw_uid;
 			(void) smb_pwd_chgpwent(&smbpw, password, control);
 			err = smb_pwd_fputent(dst, &pwbuf);
@@ -565,11 +615,10 @@ smb_pwd_fgetent(FILE *fp, smb_pwbuf_t *pwbuf, uint32_t flags)
 	if ((*argv[SMB_PWD_NAME] == '\0') || (*argv[SMB_PWD_UID] == '\0'))
 		return (NULL);
 
-	pwbuf->pw_name = argv[SMB_PWD_NAME];
-
 	pw = pwbuf->pw_pwd;
 	bzero(pw, sizeof (smb_passwd_t));
 	pw->pw_uid = strtoul(argv[SMB_PWD_UID], 0, 10);
+	(void) strlcpy(pw->pw_name, argv[SMB_PWD_NAME], sizeof (pw->pw_name));
 
 	if (strcmp(argv[SMB_PWD_LMHASH], SMB_PWD_DISABLE) == 0) {
 		pw->pw_flags |= SMB_PWF_DISABLE;
@@ -685,7 +734,7 @@ smb_pwd_fputent(FILE *fp, smb_pwbuf_t *pwbuf)
 		(void) strcpy(hex_nthash, (char *)pw->pw_nthash);
 	}
 
-	rc = fprintf(fp, "%s:%u:%s:%s\n", pwbuf->pw_name, pw->pw_uid,
+	rc = fprintf(fp, "%s:%u:%s:%s\n", pw->pw_name, pw->pw_uid,
 	    hex_lmhash, hex_nthash);
 
 	if (rc <= 0)
@@ -963,7 +1012,7 @@ smb_lucache_do_update(void)
 	(void) rw_rdlock(&smb_uch.uc_cache_lck);
 
 	while (smb_pwd_fgetent(fp, &pwbuf, SMB_PWD_GETF_NOPWD) != NULL) {
-		uc_node.cn_user.su_name = pwbuf.pw_name;
+		uc_node.cn_user.su_name = smbpw.pw_name;
 		uc_newnode = avl_find(&smb_uch.uc_cache, &uc_node, NULL);
 		if (uc_newnode) {
 			/* update the node info */
@@ -991,7 +1040,7 @@ smb_lucache_do_update(void)
 		(void) smb_sid_getrid(sid, &user->su_rid);
 		smb_sid_free(sid);
 
-		user->su_name = strdup(pwbuf.pw_name);
+		user->su_name = strdup(smbpw.pw_name);
 		if (user->su_name == NULL) {
 			rc = SMB_PWE_NO_MEMORY;
 			free(uc_newnode);

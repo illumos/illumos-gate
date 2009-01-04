@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #ifndef _SMBSRV_WINIOCTL_H
 #define	_SMBSRV_WINIOCTL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Standard Windows NT IOCTL/FSCTL definitions (derived from the VC++
@@ -465,6 +463,11 @@ extern "C" {
 	CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 59,  METHOD_NEITHER, FILE_READ_ACCESS)
 #define	FSCTL_EXTEND_VOLUME \
 	CTL_CODE(FILE_DEVICE_FILE_SYSTEM, 60, METHOD_BUFFERED, FILE_ANY_ACCESS)
+
+/* Read the snapshot info for Volume Shadow Copy Services */
+#define	FSCTL_SRV_ENUMERATE_SNAPSHOTS \
+	CTL_CODE(FILE_DEVICE_NETWORK_FILE_SYSTEM, 0x19, \
+	METHOD_BUFFERED, FILE_READ_ACCESS)
 
 #endif /* _FILESYSTEMFSCTL_ */
 

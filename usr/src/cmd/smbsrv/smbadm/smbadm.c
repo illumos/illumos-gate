@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,6 +206,12 @@ smbadm_cmdusage(FILE *fp, smbadm_cmdinfo_t *cmd)
 
 	case HELP_LIST:
 		(void) fprintf(fp, gettext("\t%s\n"), cmd->name);
+		(void) fprintf(fp,
+		    gettext("\t\t[*] primary domain\n"));
+		(void) fprintf(fp, gettext("\t\t[.] local domain\n"));
+		(void) fprintf(fp, gettext("\t\t[-] other domains\n"));
+		(void) fprintf(fp,
+		    gettext("\t\t[+] selected domain controller\n"));
 		return;
 
 	case HELP_DEL_MEMBER:
@@ -781,7 +787,7 @@ smbadm_list(int argc, char **argv)
 	rc = smb_config_getstr(SMB_CI_SECURITY, modename, sizeof (modename));
 	if (rc != SMBD_SMF_OK) {
 		(void) fprintf(stderr,
-		    gettext("failed to get the connected mode\n"));
+		    gettext("cannot determine the operational mode\n"));
 		return (1);
 	}
 
@@ -790,22 +796,26 @@ smbadm_list(int argc, char **argv)
 		    modename);
 		return (1);
 	}
+
 	if (strcmp(modename, "workgroup") == 0) {
-		(void) printf(gettext("Workgroup: %s\n"), domain);
+		(void) printf(gettext("[*] [%s]\n"), domain);
 		return (0);
 	}
-	(void) printf(gettext("Domain: %s\n"), domain);
+
+	(void) printf(gettext("[*] [%s]\n"), domain);
 	if ((smb_getfqdomainname(fqdn, sizeof (fqdn)) == 0) && (*fqdn != '\0'))
-		(void) printf(gettext("FQDN: %s\n"), fqdn);
+		(void) printf(gettext("[*] [%s]\n"), fqdn);
 
 	if ((smb_get_dcinfo(srvname, MAXHOSTNAMELEN, &srvipaddr)
 	    == NT_STATUS_SUCCESS) && (*srvname != '\0') &&
 	    (srvipaddr != 0)) {
 		(void) inet_ntop(AF_INET, (const void *)&srvipaddr,
 		    ipstr, sizeof (ipstr));
-		(void) printf(gettext("Selected Domain Controller: %s (%s)\n"),
-		    srvname, ipstr);
+		(void) printf(gettext("\t[+%s.%s] [%s]\n"),
+		    srvname, fqdn, ipstr);
 	}
+
+	nt_domain_show();
 	return (0);
 }
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -269,7 +269,7 @@ samr_s_LookupDomain(void *arg, ndr_xa_t *mxa)
 	}
 
 	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
-	if (mlsvc_is_local_domain(domain_name) == 1) {
+	if (smb_ishostname(domain_name)) {
 		sid = smb_sid_dup(nt_domain_local_sid());
 	} else if (strcasecmp(resource_domain, domain_name) == 0) {
 		/*
@@ -606,8 +606,8 @@ samr_s_LookupNames(void *arg, ndr_xa_t *mxa)
 			return (NDR_DRC_OK);
 		}
 
-		if (smb_pwd_getpasswd((const char *)param->name.str,
-		    &smbpw) != NULL) {
+		if (smb_pwd_getpwnam((const char *)param->name.str, &smbpw)
+		    != NULL) {
 			if (smb_idmap_getsid(smbpw.pw_uid, SMB_IDMAP_USER,
 			    &sid) == IDMAP_SUCCESS) {
 				param->rids.n_entry = 1;

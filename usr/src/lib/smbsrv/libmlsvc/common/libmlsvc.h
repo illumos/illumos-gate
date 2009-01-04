@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -170,7 +170,6 @@ void mlsvc_free_user_info(smb_userinfo_t *user_info);
 void mlsvc_release_user_info(smb_userinfo_t *user_info);
 void mlsvc_setadmin_user_info(smb_userinfo_t *user_info);
 char *mlsvc_sid_name_use(unsigned int snu_id);
-extern int mlsvc_is_local_domain(const char *);
 
 /*
  * A local unique id (LUID) is an opaque id used by servers to identify

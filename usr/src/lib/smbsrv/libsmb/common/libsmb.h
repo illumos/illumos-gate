@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,6 +212,9 @@ extern bool_t xdr_smb_dr_joininfo_t(XDR *, smb_joininfo_t *);
 #define	SMB_DOMAIN_NODOMAIN_SID		-2
 
 extern int nt_domain_init(char *, uint32_t);
+extern void nt_domain_save(void);
+extern void nt_domain_show(void);
+extern void nt_domain_unlink(void);
 
 extern void smb_config_getdomaininfo(char *domain, char *fqdn, char *forest,
     char *guid);
@@ -260,6 +263,7 @@ extern int smb_getfqhostname(char *, size_t);
 extern int smb_getnetbiosname(char *, size_t);
 extern struct hostent *smb_gethostbyname(const char *, int *);
 extern struct hostent *smb_gethostbyaddr(const char *, int, int, int *);
+extern boolean_t smb_ishostname(const char *);
 
 #define	SMB_SAMACCT_MAXLEN	(NETBIOS_NAME_SZ + 1)
 extern int smb_getsamaccount(char *, size_t);
@@ -395,10 +399,11 @@ typedef struct smb_auth_info {
 #define	SMB_PWF_DISABLE	0x04	/* Account is disabled */
 
 typedef struct smb_passwd {
-	uid_t pw_uid;
-	uint32_t pw_flags;
-	unsigned char pw_lmhash[SMBAUTH_HASH_SZ];
-	unsigned char pw_nthash[SMBAUTH_HASH_SZ];
+	uid_t		pw_uid;
+	uint32_t	pw_flags;
+	char		pw_name[SMB_USERNAME_MAXLEN];
+	uint8_t		pw_lmhash[SMBAUTH_HASH_SZ];
+	uint8_t		pw_nthash[SMBAUTH_HASH_SZ];
 } smb_passwd_t;
 
 /*
@@ -437,7 +442,8 @@ typedef struct smb_luser {
 
 extern void smb_pwd_init(boolean_t);
 extern void smb_pwd_fini(void);
-extern smb_passwd_t *smb_pwd_getpasswd(const char *, smb_passwd_t *);
+extern smb_passwd_t *smb_pwd_getpwnam(const char *, smb_passwd_t *);
+extern smb_passwd_t *smb_pwd_getpwuid(uid_t, smb_passwd_t *);
 extern int smb_pwd_setpasswd(const char *, const char *);
 extern int smb_pwd_setcntl(const char *, int);
 extern int smb_pwd_num(void);
@@ -722,6 +728,48 @@ boolean_t smb_nic_exists(uint32_t, boolean_t);
 /* NIC Monitoring functions */
 int smb_nicmon_start(const char *);
 void smb_nicmon_stop(void);
+
+/*
+ * Well-known account structure
+ *
+ * A security identifier (SID) is a unique value of variable length that
+ * is used to identify a security principal or security group in
+ * Windows. Well-known SIDs are a group of SIDs that identify generic
+ * users or generic groups. Their values remain constant across all
+ * operating systems.
+ *
+ * This structure is defined to store these SIDs and other related
+ * information about them (e.g. account and domain names) in a
+ * predefined table.
+ */
+typedef struct smb_wka {
+	uint8_t		wka_domidx;
+	char		*wka_sid;
+	char		*wka_name;
+	uint16_t	wka_type;
+	uint16_t	wka_flags;
+	char		*wka_desc;
+	smb_sid_t	*wka_binsid;
+} smb_wka_t;
+
+/*
+ * Defined values for smb_wka.wka_flags
+ *
+ * SMB_WKAFLG_LGRP_ENABLE		Can be added as local group
+ */
+#define	SMB_WKAFLG_LGRP_ENABLE	0x1
+
+/*
+ * Well-known account interfaces
+ */
+int smb_wka_init(void);
+void smb_wka_fini(void);
+smb_wka_t *smb_wka_lookup(char *);
+char *smb_wka_lookup_sid(smb_sid_t *, uint16_t *);
+smb_sid_t *smb_wka_lookup_name(char *, uint16_t *);
+char *smb_wka_lookup_domain(char *);
+boolean_t smb_wka_is_wellknown(char *);
+char *smb_wka_get_domain(int);
 
 #ifdef	__cplusplus
 }

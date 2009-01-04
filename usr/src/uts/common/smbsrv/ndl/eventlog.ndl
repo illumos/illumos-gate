@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,49 +42,36 @@
 #define LOGR_OPNUM_EventLogOpen			0x07
 #define LOGR_OPNUM_EventLogRead			0x0A
 
-#define LOGR_INFOLEN	200
-#define LOGR_RECBUFLEN	0x4000
+#define LOGR_MAXENTRYLEN			800
 
 
 CONTEXT_HANDLE(logr_handle) logr_handle_t;
 
-
 struct logr_string {
-	WORD		length;
-	WORD		allosize;
-	LPTSTR		str;
+	WORD	length;
+	WORD	allosize;
+	LPTSTR	str;
 };
 typedef struct logr_string logr_string_t;
 
-
 struct logr_record {
-	DWORD  Length1;        // Length of full record
-	DWORD  Reserved;      // Used by the service
-	DWORD  RecordNumber;  // Absolute record number
-	DWORD  TimeGenerated; // Seconds since 1-1-1970
-	DWORD  TimeWritten;   // Seconds since 1-1-1970
+	DWORD  Length1;
+	DWORD  Reserved;
+	DWORD  RecordNumber;
+	DWORD  TimeGenerated;
+	DWORD  TimeWritten;
 	DWORD  EventID;
 	WORD   EventType;
 	WORD   NumStrings;
 	WORD   EventCategory;
-	WORD   ReservedFlags; // For use with paired events (auditing)
-	DWORD  ClosingRecordNumber; // For use with paired events (auditing)
-	DWORD  StringOffset;  // Offset from beginning of record
+	WORD   ReservedFlags;
+	DWORD  ClosingRecordNumber;
+	DWORD  StringOffset;
 	DWORD  UserSidLength;
 	DWORD  UserSidOffset;
 	DWORD  DataLength;
 	DWORD  DataOffset;
-	//
-	// Then follow:
-	//
-	// WCHAR SourceName[]	null terminated
-	// WCHAR Computername[]	null terminated
-	// SID   UserSid
-	// WCHAR Strings[]
-	// BYTE  Data[]
-	// CHAR  Pad[]	to DWORD
-	// DWORD Length; must be appear
-	BYTE   info[LOGR_INFOLEN];	
+	BYTE   info[LOGR_MAXENTRYLEN];
 	DWORD  Length2;
 };
 typedef struct logr_record logr_record_t;
@@ -96,8 +83,8 @@ typedef struct logr_record logr_record_t;
  */
 OPERATION(LOGR_OPNUM_EventLogClose)
 struct logr_EventLogClose {
-	IN		logr_handle_t handle;
-	OUT		logr_handle_t result_handle;
+	IN	logr_handle_t handle;
+	OUT	logr_handle_t result_handle;
 	OUT	DWORD status;
 };
 
@@ -108,9 +95,9 @@ struct logr_EventLogClose {
  */
 OPERATION(LOGR_OPNUM_EventLogQueryCount)
 struct logr_EventLogQueryCount {
-	IN		logr_handle_t handle;
-	OUT		DWORD rec_num;
-	OUT		DWORD status;
+	IN	logr_handle_t handle;
+	OUT	DWORD rec_num;
+	OUT	DWORD status;
 };
 
 /*
@@ -120,9 +107,9 @@ struct logr_EventLogQueryCount {
  */
 OPERATION(LOGR_OPNUM_EventLogGetOldestRec)
 struct logr_EventLogGetOldestRec {
-	IN		logr_handle_t handle;
-	OUT		DWORD oldest_rec;
-	OUT		DWORD status;
+	IN	logr_handle_t handle;
+	OUT	DWORD oldest_rec;
+	OUT	DWORD status;
 };
 
 /*
@@ -132,43 +119,26 @@ struct logr_EventLogGetOldestRec {
  */
 OPERATION(LOGR_OPNUM_EventLogOpen)
 struct logr_EventLogOpen {
-	IN		DWORD *whatever;
-	IN		logr_string_t log_name;
-	IN		DWORD unknown1;
-	IN		DWORD unknown2;
-	IN		DWORD unknown3;
-	OUT		logr_handle_t handle;
-	OUT		DWORD status;
-};
-
-/*
- ***********************************************************************
- * LOGR_OPNUM_EventLogRead
- ***********************************************************************
- */
-union logr_read_u {
-	CASE(1024)	BYTE rec[1024];
-	DEFAULT	BYTE	recs[LOGR_RECBUFLEN];
-};
-
-
-struct logr_read_info {
-	DWORD nbytes_to_read;
-  SWITCH(nbytes_to_read)
-	union logr_read_u ru;
+	IN	DWORD *server_name;
+	IN	logr_string_t log_name;
+	IN	DWORD reg_module_name;
+	IN	DWORD major_version;
+	IN	DWORD minor_version;
+	OUT	logr_handle_t handle;
+	OUT	DWORD status;
 };
 
 OPERATION(LOGR_OPNUM_EventLogRead)
 struct logr_EventLogRead {
-	IN		logr_handle_t handle;
-	IN		DWORD read_flags;
-	IN		DWORD rec_offset;
-	INOUT		DWORD nbytes_to_read;
-SWITCH (nbytes_to_read)
-	OUT		union logr_read_u ru;
-	OUT		DWORD sent_size;
-	OUT		DWORD unknown;
-	OUT		DWORD status;
+	IN	logr_handle_t handle;
+	IN	DWORD read_flags;
+	IN	DWORD rec_offset;
+	IN	DWORD nbytes_to_read;
+    SIZE_IS(nbytes_to_read)
+	OUT REFERENCE	LPBYTE buf;
+	OUT	DWORD sent_size;
+	OUT	DWORD min_bytes_needed;
+	OUT	DWORD status;
 };
 
 /*
@@ -191,6 +161,5 @@ union logr_interface {
 };
 typedef union logr_interface	logr_interface_t;
 EXTERNTYPEINFO(logr_interface)
-
 
 #endif /* _MLSVC_LOGR_NDL_ */

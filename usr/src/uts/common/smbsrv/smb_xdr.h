@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SMBSRV_SMB_XDR_H
 #define	_SMBSRV_SMB_XDR_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -126,6 +124,36 @@ bool_t smb_opipe_hdr_xdr(XDR *xdrs, smb_opipe_hdr_t *objp);
 int smb_opipe_context_encode(smb_opipe_context_t *, uint8_t *, uint32_t);
 int smb_opipe_context_decode(smb_opipe_context_t *, uint8_t *, uint32_t);
 bool_t smb_opipe_context_xdr(XDR *, smb_opipe_context_t *);
+/*
+ * VSS Door Structures
+ */
+#define	SMB_VSS_GMT_SIZE sizeof ("@GMT-yyyy.mm.dd-hh.mm.ss")
+
+typedef struct smb_dr_get_gmttokens {
+	uint32_t gg_count;
+	char *gg_path;
+} smb_dr_get_gmttokens_t;
+
+typedef char *gmttoken;
+
+typedef struct smb_dr_return_gmttokens {
+	uint32_t rg_count;
+	struct {
+		uint_t rg_gmttokens_len;
+		gmttoken *rg_gmttokens_val;
+	} rg_gmttokens;
+} smb_dr_return_gmttokens_t;
+
+typedef struct smb_dr_map_gmttoken {
+	char *mg_path;
+	char *mg_gmttoken;
+} smb_dr_map_gmttoken_t;
+
+extern bool_t xdr_smb_dr_get_gmttokens_t(XDR *, smb_dr_get_gmttokens_t *);
+extern bool_t xdr_gmttoken(XDR *, gmttoken *);
+extern bool_t xdr_smb_dr_return_gmttokens_t(XDR *xdrs,
+    smb_dr_return_gmttokens_t *);
+extern bool_t xdr_smb_dr_map_gmttoken_t(XDR *, smb_dr_map_gmttoken_t *);
 
 #ifdef	__cplusplus
 }

@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBD_H
 #define	_SMBD_H
-
-#pragma ident	"@(#)smbd.h	1.8	08/07/17 SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,6 +53,11 @@ extern uint32_t smbd_join(smb_joininfo_t *);
 
 extern int smbd_ioctl(int, smb_io_t *);
 extern void smbd_set_secmode(int);
+
+extern int smbd_vss_get_count(char *, uint32_t *);
+extern void smbd_vss_get_snapshots(char *, uint32_t, uint32_t *, uint32_t *,
+    char **);
+extern int smbd_vss_map_gmttoken(char *, char *, char *);
 
 typedef struct smbd {
 	const char	*s_version;	/* smbd version string */

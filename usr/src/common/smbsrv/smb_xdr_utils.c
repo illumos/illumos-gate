@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/sunddi.h>
 #ifndef _KERNEL
@@ -255,5 +253,52 @@ xdr_smb_dr_kshare_t(xdrs, objp)
 		return (FALSE);
 	if (!xdr_string(xdrs, &objp->k_sharename, MAXNAMELEN))
 		return (FALSE);
+	return (TRUE);
+}
+
+bool_t
+xdr_smb_dr_get_gmttokens_t(XDR *xdrs, smb_dr_get_gmttokens_t *objp)
+{
+	if (!xdr_uint32_t(xdrs, &objp->gg_count)) {
+		return (FALSE);
+	}
+	if (!xdr_string(xdrs, &objp->gg_path, ~0)) {
+		return (FALSE);
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_gmttoken(XDR *xdrs, gmttoken *objp)
+{
+	if (!xdr_string(xdrs, objp, SMB_VSS_GMT_SIZE)) {
+		return (FALSE);
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_smb_dr_return_gmttokens_t(XDR *xdrs, smb_dr_return_gmttokens_t *objp)
+{
+	if (!xdr_uint32_t(xdrs, &objp->rg_count)) {
+		return (FALSE);
+	}
+	if (!xdr_array(xdrs, (char **)&objp->rg_gmttokens.rg_gmttokens_val,
+	    (uint_t *)&objp->rg_gmttokens.rg_gmttokens_len, ~0,
+	    sizeof (gmttoken), (xdrproc_t)xdr_gmttoken)) {
+		return (FALSE);
+	}
+	return (TRUE);
+}
+
+bool_t
+xdr_smb_dr_map_gmttoken_t(XDR *xdrs, smb_dr_map_gmttoken_t *objp)
+{
+	if (!xdr_string(xdrs, &objp->mg_path, MAXPATHLEN)) {
+		return (FALSE);
+	}
+	if (!xdr_string(xdrs, &objp->mg_gmttoken, SMB_VSS_GMT_SIZE)) {
+		return (FALSE);
+	}
 	return (TRUE);
 }

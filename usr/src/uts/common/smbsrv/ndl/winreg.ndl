@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,14 +126,21 @@ typedef struct winreg_string_desc winreg_string_t;
 struct winreg_value {
 	DWORD	vc_first_is;	/* 0 */
 	DWORD	vc_length_is;
-  SIZE_IS(vc_length_is)
+    SIZE_IS(vc_length_is)
 	BYTE	value[ANY_SIZE_ARRAY];
+};
+
+struct winreg_vcs {
+	DWORD	vc_first_is;	/* 0 */
+	DWORD	vc_length_is;
+    SIZE_IS(vc_length_is)
+	WORD	value[ANY_SIZE_ARRAY];
 };
 
 struct winreg_vcbuf {
 	WORD wclen;
 	WORD wcsize;
-	struct winreg_value *buf;
+	struct winreg_vcs *buf;
 };
 typedef struct winreg_vcbuf winreg_vcbuf_t;
 
@@ -237,16 +244,12 @@ struct winreg_DeleteValue {
 OPERATION(WINREG_OPNUM_EnumKey)
 struct winreg_EnumKey {
 	IN	winreg_handle_t	handle;
-	IN	DWORD		index;
-	/* IN	ignore the remaining input data */
-/*
-	INOUT	winreg_vcbuf_t	name;
-	INOUT	winreg_vcbuf_t	*class;
+	IN	DWORD	index;
+	IN	winreg_string_t	name_in;
+	IN	winreg_string_t	class_in;
+	OUT	winreg_string_t	name_out;
+	OUT	winreg_string_t	*class_out;
 	INOUT	file_time_t	*change_time;
-*/
-	OUT	winreg_vcbuf_t	name;
-	OUT	winreg_vcbuf_t	*class;
-	OUT	file_time_t	*change_time;
 	OUT	DWORD		status;
 };
 

@@ -19,12 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_autohome.c	1.6	08/08/05 SMI"
-
+#include <sys/param.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -59,6 +58,7 @@ static smb_autohome_t *smb_autohome_lookup(const char *);
 static void smb_autohome_setent(void);
 static void smb_autohome_endent(void);
 static smb_autohome_t *smb_autohome_getent(const char *);
+static void smb_autohome_parse_options(smb_share_t *);
 
 /*
  * Add an autohome share.  See smb_autohome(4) for details.
@@ -98,7 +98,8 @@ smb_autohome_add(const char *username)
 
 	(void) strlcpy(si.shr_name, username, MAXNAMELEN);
 	(void) strlcpy(si.shr_container, ai->ah_container, MAXPATHLEN);
-	si.shr_flags = SMB_SHRF_TRANS | SMB_SHRF_AUTOHOME;
+	smb_autohome_parse_options(&si);
+	si.shr_flags |= SMB_SHRF_TRANS | SMB_SHRF_AUTOHOME;
 
 	(void) smb_shr_add(&si);
 }
@@ -299,15 +300,15 @@ smb_autohome_make_entry(smb_autohome_info_t *si)
 	bp = si->buf;
 
 	for (i = 0; i < SMB_AUTOHOME_MAXARG; ++i)
-		si->argv[i] = 0;
+		si->argv[i] = NULL;
 
 	for (i = 0; i < SMB_AUTOHOME_MAXARG; ++i) {
 		do {
-			if ((si->argv[i] = strsep((char **)&bp, " \t")) == 0)
+			if ((si->argv[i] = strsep(&bp, " \t")) == NULL)
 				break;
 		} while (*(si->argv[i]) == '\0');
 
-		if (si->argv[i] == 0)
+		if (si->argv[i] == NULL)
 			break;
 	}
 
@@ -387,4 +388,76 @@ smb_autohome_getinfo(void)
 		return (si);
 
 	return (0);
+}
+
+/*
+ * Parse the options string, which contains a comma separated list of
+ * name-value pairs.  One of the options may be an AD container, which
+ * is also a comma separated list of name-value pairs.  For example,
+ * dn=ad,dn=sun,dn=com,ou=users
+ *
+ * All options other than the AD container will be extracted from
+ * shr_container and used to set share properties.
+ * On return, shr_container will contain the AD container string.
+ */
+static void
+smb_autohome_parse_options(smb_share_t *si)
+{
+	char buf[MAXPATHLEN];
+	char **argv;
+	char **ap;
+	char *bp;
+	char *value;
+	boolean_t separator = B_FALSE;
+	int argc;
+	int i;
+
+	if (strlcpy(buf, si->shr_container, MAXPATHLEN) == 0)
+		return;
+
+	for (argc = 1, bp = si->shr_container; *bp != '\0'; ++bp)
+		if (*bp == ',')
+			++argc;
+
+	if ((argv = calloc(argc + 1, sizeof (char *))) == NULL)
+		return;
+
+	ap = argv;
+	for (bp = buf, i = 0; i < argc; ++i) {
+		do {
+			if ((value = strsep(&bp, ",")) == NULL)
+				break;
+		} while (*value == '\0');
+
+		if (value == NULL)
+			break;
+
+		*ap++ = value;
+	}
+	*ap = NULL;
+
+	si->shr_container[0] = '\0';
+	bp = si->shr_container;
+
+	for (ap = argv; *ap != NULL; ++ap) {
+		value = *ap;
+
+		if (strncasecmp(value, "csc=", 4) == 0) {
+			smb_shr_sa_csc_option((value + 4), si);
+			continue;
+		}
+
+		if (strncasecmp(value, "description=", 12) == 0) {
+			(void) strlcpy(si->shr_cmnt, (value + 12),
+			    SMB_SHARE_CMNT_MAX);
+			continue;
+		}
+
+		if (separator)
+			(void) strlcat(bp, ",", MAXPATHLEN);
+		(void) strlcat(bp, value, MAXPATHLEN);
+		separator = B_TRUE;
+	}
+
+	free(argv);
 }

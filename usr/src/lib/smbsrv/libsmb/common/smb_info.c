@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -516,4 +516,30 @@ smb_gethostbyaddr(const char *addr, int len, int type, int *err_num)
 	h = getipnodebyaddr(addr, len, type, err_num);
 
 	return (h);
+}
+
+/*
+ * Check to see if the given name is the hostname.
+ * It checks the hostname returned by OS and also both
+ * fully qualified and NetBIOS forms of the host name.
+ */
+boolean_t
+smb_ishostname(const char *name)
+{
+	char hostname[MAXHOSTNAMELEN];
+	int rc;
+
+	if (strchr(name, '.') != NULL)
+		rc = smb_getfqhostname(hostname, MAXHOSTNAMELEN);
+	else {
+		if (strlen(name) < NETBIOS_NAME_SZ)
+			rc = smb_getnetbiosname(hostname, MAXHOSTNAMELEN);
+		else
+			rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
+	}
+
+	if (rc != 0)
+		return (B_FALSE);
+
+	return (utf8_strcasecmp(name, hostname) == 0);
 }

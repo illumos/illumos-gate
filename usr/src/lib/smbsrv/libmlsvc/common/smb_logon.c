@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -698,7 +698,7 @@ smb_logon_local(netr_client_t *clnt, smb_userinfo_t *uinfo)
 	boolean_t lm_ok, nt_ok;
 	uint32_t status;
 
-	if (smb_pwd_getpasswd(clnt->username, &smbpw) == NULL) {
+	if (smb_pwd_getpwnam(clnt->username, &smbpw) == NULL) {
 		/*
 		 * If user doesn't have entry either in smbpasswd
 		 * or passwd it's considered as an invalid user.

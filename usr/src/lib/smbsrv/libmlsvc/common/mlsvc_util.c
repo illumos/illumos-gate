@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,44 +52,6 @@ extern int netr_open(char *, char *, mlsvc_handle_t *);
 extern int netr_close(mlsvc_handle_t *);
 extern DWORD netlogon_auth(char *, mlsvc_handle_t *, DWORD);
 extern int mlsvc_user_getauth(char *, char *, smb_auth_info_t *);
-
-/*
- * Compare the supplied domain name with the local hostname.
- * We need to deal with both server names and fully-qualified
- * domain names.
- *
- * Returns:
- *	0	The specified domain is not the local domain,
- *	1	The Specified domain is the local domain.
- *	-1	Invalid parameter or unable to get the local
- *		system information.
- */
-int
-mlsvc_is_local_domain(const char *domain)
-{
-	char hostname[MAXHOSTNAMELEN];
-	int rc;
-
-	if (smb_config_get_secmode() == SMB_SECMODE_WORKGRP)
-		return (1);
-
-	if (strchr(domain, '.') != NULL)
-		rc = smb_getfqhostname(hostname, MAXHOSTNAMELEN);
-	else {
-		if (strlen(domain) < NETBIOS_NAME_SZ)
-			rc = smb_getnetbiosname(hostname, MAXHOSTNAMELEN);
-		else
-			rc = smb_gethostname(hostname, MAXHOSTNAMELEN, 1);
-	}
-
-	if (rc != 0)
-		return (-1);
-
-	if (strcasecmp(domain, hostname) == 0)
-		return (1);
-
-	return (0);
-}
 
 /*
  * mlsvc_lookup_name

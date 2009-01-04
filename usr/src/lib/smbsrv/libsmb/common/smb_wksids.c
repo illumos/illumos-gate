@@ -19,111 +19,112 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * This module provides the interface to builtin domain information.
- * These are the predefined groups and aliases in the NT AUTHORITY or
- * BUILTIN domains, and some other miscellaneous bits.
  */
 
 #include <stdlib.h>
 #include <string.h>
 #include <synch.h>
 
-#include <smbsrv/smb_sid.h>
-#include <smbsrv/string.h>
-
-/*
- * This table should contain all of the NT builtin domain names.
- */
-static char *domain[] = {
-	"LOCAL",
-	"BUILTIN",
-	"NT AUTHORITY",
-	"UNKNOWN"
-};
+#include <smbsrv/libsmb.h>
 
 static int wk_init = 0;
 static rwlock_t wk_rwlock;
 
+static char *wka_nbdomain[] = {
+	"",
+	"NT Pseudo Domain",
+	"NT Authority",
+	"Builtin",
+	"Internet$",
+};
+
 /*
- * This table should contain all of the builtin domains, groups and
- * aliases. The order is important because we do string compares on
- * the SIDs. For each domain, ensure that the domain SID appears
- * before any aliases in that domain.
+ * Predefined well known accounts table
  */
 static smb_wka_t wka_tbl[] = {
-	{ SidTypeWellKnownGroup, 0, "S-1-0-0",		"Null",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 1, "S-1-1-0",		"Everyone",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 1, "S-1-2-0",		"LOCAL",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 1, "S-1-3-0",		"CREATOR OWNER",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 1, "S-1-3-1",		"CREATOR GROUP",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 1, "S-1-3-2",		"CREATOR OWNER SERVER",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 1, "S-1-3-3",		"CREATOR GROUP SERVER",
-	    0, NULL, NULL},
-	{ SidTypeDomain, 1, "S-1-4",			"NON UNIQUE",
-	    0, NULL, NULL},
-	{ SidTypeDomain, 2, "S-1-5",			"NT AUTHORITY",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-1",		"DIALUP",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-2",		"NETWORK",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-3",		"BATCH",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-4",		"INTERACTIVE",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-6",		"SERVICE",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-7",		"ANONYMOUS",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-8",		"PROXY",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-9",		"SERVER",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-10",		"SELF",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-11",		"Authenticated Users",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-12",		"RESTRICTED",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-18",		"SYSTEM",
-	    0, NULL, NULL},
-	{ SidTypeWellKnownGroup, 2, "S-1-5-21",		"NON_UNIQUE",
-	    0, NULL, NULL},
-	{ SidTypeDomain, 2, "S-1-5-32",			"BUILTIN",
-	    0, NULL, NULL},
-	{ SidTypeAlias, 1, "S-1-5-32-544",		"Administrators",
+	{ 0, "S-1-0-0",		"Null",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 0, "S-1-1-0",		"Everyone",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 0, "S-1-2-0",		"Local",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 0, "S-1-3-0",		"Creator Owner",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 0, "S-1-3-1",		"Creator Group",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 0, "S-1-3-2",		"Creator Owner Server",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 0, "S-1-3-3",		"Creator Group Server",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 0, "S-1-3-4",		"Owner Rights",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 1, "S-1-5",		"NT Pseudo Domain",
+		SidTypeDomain, 0, NULL, NULL },
+	{ 2, "S-1-5-1",		"Dialup",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-2",		"Network",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-3",		"Batch",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-4",		"Interactive",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-6",		"Service",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-7",		"Anonymous",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-8",		"Proxy",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-9",		"Enterprise Domain Controllers",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-10",	"Self",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-11",	"Authenticated Users",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-12",	"Restricted",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-13",	"Terminal Server User",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-14",	"Remote Interactive Logon",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-15",	"This Organization",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-18",	"System",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-19",	"Local Service",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-20",	"Network Service",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-33",	"Write Restricted",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 2, "S-1-5-1000",	"Other Organization",
+		SidTypeWellKnownGroup, 0, NULL, NULL },
+	{ 3, "S-1-5-32",	"Builtin",
+		SidTypeDomain, 0, NULL, NULL },
+	{ 4, "S-1-7",		"Internet$",
+		SidTypeDomain, 0, NULL, NULL },
+
+	{ 3, "S-1-5-32-544",	"Administrators", SidTypeAlias,
 	    SMB_WKAFLG_LGRP_ENABLE,
 	    "Members can fully administer the computer/domain", NULL },
-	{ SidTypeAlias, 1, "S-1-5-32-545",		"Users",
-	    0, NULL, NULL},
-	{ SidTypeAlias, 1, "S-1-5-32-546",		"Guests",
-	    0, NULL, NULL},
-	{ SidTypeAlias, 1, "S-1-5-32-547",		"Power Users",
+	{ 3, "S-1-5-32-545",	"Users",
+		SidTypeAlias, 0, NULL, NULL },
+	{ 3, "S-1-5-32-546",	"Guests",
+		SidTypeAlias, 0, NULL, NULL },
+	{ 3, "S-1-5-32-547",	"Power Users", SidTypeAlias,
 	    SMB_WKAFLG_LGRP_ENABLE, "Members can share directories", NULL },
-	{ SidTypeAlias, 1, "S-1-5-32-548",		"Account Operators",
-	    0, NULL, NULL},
-	{ SidTypeAlias, 1, "S-1-5-32-549",		"Server Operators",
-	    0, NULL, NULL},
-	{ SidTypeAlias, 1, "S-1-5-32-550",		"Print Operators",
-	    0, NULL, NULL},
-	{ SidTypeAlias, 1, "S-1-5-32-551",		"Backup Operators",
+	{ 3, "S-1-5-32-548",	"Account Operators",
+		SidTypeAlias, 0, NULL, NULL },
+	{ 3, "S-1-5-32-549",	"Server Operators",
+		SidTypeAlias, 0, NULL, NULL },
+	{ 3, "S-1-5-32-550",	"Print Operators",
+		SidTypeAlias, 0, NULL, NULL },
+	{ 3, "S-1-5-32-551",	"Backup Operators", SidTypeAlias,
 	    SMB_WKAFLG_LGRP_ENABLE,
 	    "Members can bypass file security to back up files", NULL },
-	{ SidTypeAlias, 1, "S-1-5-32-552",		"Replicator",
-	    0, NULL, NULL}
+	{ 3, "S-1-5-32-552",	"Replicator",
+		SidTypeAlias, 0, NULL, NULL }
 };
 
 #define	SMB_WKA_NUM	(sizeof (wka_tbl)/sizeof (wka_tbl[0]))
@@ -243,8 +244,20 @@ smb_wka_lookup_domain(char *name)
 		entry = &wka_tbl[i];
 
 		if (!utf8_strcasecmp(name, entry->wka_name))
-			return (domain[entry->wka_domidx]);
+			return (wka_nbdomain[entry->wka_domidx]);
 	}
+
+	return (NULL);
+}
+
+/*
+ * Returns the Netbios domain name for the given index
+ */
+char *
+smb_wka_get_domain(int idx)
+{
+	if ((idx >= 0) && (idx < SMB_WKA_NUM))
+		return (wka_nbdomain[idx]);
 
 	return (NULL);
 }

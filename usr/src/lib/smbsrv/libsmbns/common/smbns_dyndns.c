@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -853,19 +853,10 @@ dyndns_open_init_socket(int sock_type, unsigned long dest_addr, int port)
 {
 	int s;
 	struct sockaddr_in my_addr;
-	struct linger l;
 	struct sockaddr_in serv_addr;
 
 	if ((s = socket(AF_INET, sock_type, 0)) == -1) {
 		syslog(LOG_ERR, "dyndns: socket error");
-		return (-1);
-	}
-
-	l.l_onoff = 0;
-	if (setsockopt(s, SOL_SOCKET, SO_LINGER,
-	    (char *)&l, sizeof (l)) == -1) {
-		syslog(LOG_ERR, "dyndns: setsockopt error");
-		(void) close(s);
 		return (-1);
 	}
 

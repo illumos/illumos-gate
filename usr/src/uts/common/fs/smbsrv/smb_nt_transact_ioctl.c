@@ -19,29 +19,29 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/winioctl.h>
 #include <smbsrv/ntstatus.h>
 
+static uint32_t smb_nt_trans_ioctl_invalid_parm(smb_request_t *,
+    smb_xa_t *);
 
 /*
  * This table defines the list of IOCTL/FSCTL values for which we'll
- * return a specific NT status code.
+ * call a funtion to return a specific processing.
  */
 static struct {
 	uint32_t fcode;
-	DWORD status;
+	uint32_t (*ioctl_func)(smb_request_t *sr, smb_xa_t *xa);
 } ioctl_ret_tbl[] = {
-	{ FSCTL_GET_OBJECT_ID,		NT_STATUS_INVALID_PARAMETER },
-	{ FSCTL_QUERY_ALLOCATED_RANGES,	NT_STATUS_INVALID_PARAMETER }
+	{ FSCTL_GET_OBJECT_ID,	smb_nt_trans_ioctl_invalid_parm },
+	{ FSCTL_QUERY_ALLOCATED_RANGES,	smb_nt_trans_ioctl_invalid_parm },
+	{ FSCTL_SRV_ENUMERATE_SNAPSHOTS, smb_vss_ioctl_enumerate_snaps }
 };
-
 
 /*
  * smb_nt_transact_ioctl
@@ -76,9 +76,9 @@ static struct {
  * Data[ DataCount ]           The results of the io or fs control.
  */
 smb_sdrc_t
-smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
+smb_nt_transact_ioctl(smb_request_t *sr, smb_xa_t *xa)
 {
-	DWORD status = NT_STATUS_SUCCESS;
+	uint32_t status = NT_STATUS_SUCCESS;
 	uint32_t fcode;
 	unsigned short fid;
 	unsigned char is_fsctl;
@@ -94,7 +94,7 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 	for (i = 0; i < sizeof (ioctl_ret_tbl) / sizeof (ioctl_ret_tbl[0]);
 	    i++) {
 		if (ioctl_ret_tbl[i].fcode == fcode) {
-			status = ioctl_ret_tbl[i].status;
+			status = ioctl_ret_tbl[i].ioctl_func(sr, xa);
 			break;
 		}
 	}
@@ -106,4 +106,11 @@ smb_nt_transact_ioctl(struct smb_request *sr, struct smb_xa *xa)
 
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "l", 0);
 	return (SDRC_SUCCESS);
+}
+
+/* ARGSUSED */
+static uint32_t
+smb_nt_trans_ioctl_invalid_parm(smb_request_t *sr, smb_xa_t *xa)
+{
+	return (NT_STATUS_INVALID_PARAMETER);
 }
