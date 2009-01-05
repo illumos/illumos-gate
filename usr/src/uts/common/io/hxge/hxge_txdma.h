@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,7 @@ typedef struct _tx_msg_t {
 	size_t			bytes_used;
 	int			head;
 	int			tail;
+	int			offset_index;
 } tx_msg_t, *p_tx_msg_t;
 
 /*

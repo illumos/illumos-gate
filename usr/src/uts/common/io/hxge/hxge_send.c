@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <hxge_impl.h>
 
@@ -97,6 +95,7 @@ hxge_start(p_hxge_t hxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 	uint64_t		tot_xfer_len = 0, tmp_len = 0;
 	boolean_t		header_set = B_FALSE;
 	tdc_tdr_kick_t		kick;
+	uint32_t		offset;
 #ifdef HXGE_DEBUG
 	p_tx_desc_t 		tx_desc_ring_pp;
 	p_tx_desc_t 		tx_desc_pp;
@@ -294,9 +293,9 @@ start_again:
 			clen = pkt_len;
 			dma_handle = tx_msg_p->buf_dma_handle;
 			dma_ioaddr = DMA_COMMON_IOADDR(tx_msg_p->buf_dma);
+			offset = tx_msg_p->offset_index * hxge_bcopy_thresh;
 			(void) ddi_dma_sync(dma_handle,
-			    i * hxge_bcopy_thresh, hxge_bcopy_thresh,
-			    DDI_DMA_SYNC_FORDEV);
+			    offset, hxge_bcopy_thresh, DDI_DMA_SYNC_FORDEV);
 
 			tx_msg_p->flags.dma_type = USE_BCOPY;
 			goto hxge_start_control_header_only;
@@ -389,9 +388,9 @@ start_again:
 #endif
 			dma_handle = tx_msg_p->buf_dma_handle;
 			dma_ioaddr = DMA_COMMON_IOADDR(tx_msg_p->buf_dma);
+			offset = tx_msg_p->offset_index * hxge_bcopy_thresh;
 			(void) ddi_dma_sync(dma_handle,
-			    i * hxge_bcopy_thresh, hxge_bcopy_thresh,
-			    DDI_DMA_SYNC_FORDEV);
+			    offset, hxge_bcopy_thresh, DDI_DMA_SYNC_FORDEV);
 			clen = len + boff;
 			tdc_stats->tx_hdr_pkts++;
 			HXGE_DEBUG_MSG((hxgep, TX_CTL, "==> hxge_start(9): "

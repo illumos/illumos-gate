@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,8 @@ static hxge_status_t hxge_rxdma_start_channel(p_hxge_t hxgep, uint16_t channel,
 	int n_init_kick);
 static hxge_status_t hxge_rxdma_stop_channel(p_hxge_t hxgep, uint16_t channel);
 static mblk_t *hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
-	p_rx_rcr_ring_t	*rcr_p, rdc_stat_t cs);
+	p_rx_rcr_ring_t	*rcr_p, rdc_stat_t cs,
+	uint16_t *nptrs, uint16_t *npkts);
 static void hxge_receive_packet(p_hxge_t hxgep, p_rx_rcr_ring_t rcr_p,
 	p_rcr_entry_t rcr_desc_rd_head_p, boolean_t *multi_p,
 	mblk_t ** mp, mblk_t ** mp_cont, uint32_t *invalid_rcr_entry);
@@ -98,7 +99,8 @@ static hxge_status_t hxge_disable_rxdma_channel(p_hxge_t hxgep,
 static p_rx_msg_t hxge_allocb(size_t, uint32_t, p_hxge_dma_common_t);
 static void hxge_freeb(p_rx_msg_t);
 static void hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex,
-	p_hxge_ldv_t ldvp, rdc_stat_t cs);
+	p_hxge_ldv_t ldvp, rdc_stat_t cs,
+	uint16_t *nptrs, uint16_t *npkts);
 static hxge_status_t hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index,
 	p_hxge_ldv_t ldvp, rdc_stat_t cs);
 static hxge_status_t hxge_rxbuf_index_info_init(p_hxge_t hxgep,
@@ -1136,7 +1138,8 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	p_hxge_ldg_t		ldgp;
 	uint8_t			channel;
 	hpi_handle_t		handle;
-	rdc_stat_t		cs;
+	rdc_stat_t		cs, arm_cs;
+	uint16_t		npkts = 0, nptrs = 0;
 	uint_t			serviced = DDI_INTR_UNCLAIMED;
 
 	if (ldvp == NULL) {
@@ -1170,6 +1173,11 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	channel = ldvp->channel;
 	ldgp = ldvp->ldgp;
 	RXDMA_REG_READ64(handle, RDC_STAT, channel, &cs.value);
+
+	/*
+	 * Clear the sources of the interrupts by writing back
+	 * the Control Status registers.
+	 */
 	cs.bits.ptrread = 0;
 	cs.bits.pktread = 0;
 	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
@@ -1178,7 +1186,14 @@ hxge_rx_intr(caddr_t arg1, caddr_t arg2)
 	    "cs 0x%016llx rcrto 0x%x rcrthres %x",
 	    channel, cs.value, cs.bits.rcr_to, cs.bits.rcr_thres));
 
-	hxge_rx_pkts_vring(hxgep, ldvp->vdma_index, ldvp, cs);
+	/*
+	 * Make sure that either the mex bit is clear or rbr empty
+	 * has occurred before processing packets.
+	 */
+	if ((cs.bits.mex == 0) || (cs.bits.rbr_empty)) {
+		hxge_rx_pkts_vring(hxgep, ldvp->vdma_index, ldvp, cs,
+		    &nptrs, &npkts);
+	}
 	serviced = DDI_INTR_CLAIMED;
 
 	/* error events. */
@@ -1193,11 +1208,11 @@ hxge_intr_exit:
 	 * Also write 1 to rcrthres and rcrto to clear these two edge triggered
 	 * bits.
 	 */
-	cs.value &= RDC_STAT_WR1C;
-	cs.bits.mex = 1;
-	cs.bits.ptrread = 0;
-	cs.bits.pktread = 0;
-	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
+	arm_cs.value = 0;
+	arm_cs.bits.mex = 1;
+	arm_cs.bits.ptrread = nptrs;
+	arm_cs.bits.pktread = npkts;
+	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, arm_cs.value);
 
 	/*
 	 * Rearm this logical group if this is a single device group.
@@ -1219,13 +1234,14 @@ hxge_intr_exit:
 
 static void
 hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
-    rdc_stat_t cs)
+    rdc_stat_t cs, uint16_t *nptrs, uint16_t *npkts)
 {
 	p_mblk_t		mp;
 	p_rx_rcr_ring_t		rcrp;
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL, "==> hxge_rx_pkts_vring"));
-	if ((mp = hxge_rx_pkts(hxgep, vindex, ldvp, &rcrp, cs)) == NULL) {
+	if ((mp = hxge_rx_pkts(hxgep, vindex, ldvp, &rcrp, cs,
+	    nptrs, npkts)) == NULL) {
 		HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
 		    "<== hxge_rx_pkts_vring: no mp"));
 		return;
@@ -1270,7 +1286,7 @@ hxge_rx_pkts_vring(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 /*ARGSUSED*/
 mblk_t *
 hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
-    p_rx_rcr_ring_t *rcrp, rdc_stat_t cs)
+    p_rx_rcr_ring_t *rcrp, rdc_stat_t cs, uint16_t *nptrs, uint16_t *npkts)
 {
 	hpi_handle_t		handle;
 	uint8_t			channel;
@@ -1316,11 +1332,34 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	    channel, rcr_p->rcr_desc_rd_head_p,
 	    rcr_p->rcr_desc_rd_head_pp, rcr_p->comp_rd_index));
 
-	rx_mboxp = hxgep->rx_mbox_areas_p->rxmbox_areas[channel];
-	mboxp = (p_rxdma_mailbox_t)rx_mboxp->rx_mbox.kaddrp;
-	(void) hpi_rxdma_rdc_rcr_qlen_get(handle, channel, &qlen);
-	RXDMA_REG_READ64(handle, RDC_RCR_TAIL, channel, &rcr_tail_reg.value);
-	rcr_tail = rcr_tail_reg.bits.tail;
+	if (!cs.bits.mex && !cs.bits.rbr_empty) {
+		rdc_rcr_qlen_t		qlen_mb;
+		uint64_t		value;
+
+		/*
+		 * Get the pointer to the mbox.
+		 */
+		rx_mboxp = hxgep->rx_mbox_areas_p->rxmbox_areas[channel];
+		mboxp = (p_rxdma_mailbox_t)rx_mboxp->rx_mbox.kaddrp;
+
+		qlen_mb.value = mboxp->rcrstat_a.value;
+		value = mboxp->rcrstat_c.value;
+
+		/*
+		 * Get the rcr qlen.
+		 */
+		qlen = qlen_mb.bits.qlen;
+
+		/*
+		 * Get the rcr tail.
+		 */
+		rcr_tail = (uint64_t)value >> 3;
+	} else {
+		(void) hpi_rxdma_rdc_rcr_qlen_get(handle, channel, &qlen);
+		RXDMA_REG_READ64(handle, RDC_RCR_TAIL, channel,
+		    &rcr_tail_reg.value);
+		rcr_tail = rcr_tail_reg.bits.tail;
+	}
 
 	if (!qlen) {
 		HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
@@ -1451,9 +1490,6 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 	rcr_p->comp_rd_index = comp_rd_index;
 	rcr_p->rcr_desc_rd_head_p = rcr_desc_rd_head_p;
 
-	/* Adjust the mailbox queue length for a hardware bug workaround */
-	mboxp->rcrstat_a.bits.qlen -= npkt_read;
-
 	if ((hxgep->intr_timeout != rcr_p->intr_timeout) ||
 	    (hxgep->intr_threshold != rcr_p->intr_threshold)) {
 		rcr_p->intr_timeout = hxgep->intr_timeout;
@@ -1469,12 +1505,10 @@ hxge_rx_pkts(p_hxge_t hxgep, uint_t vindex, p_hxge_ldv_t ldvp,
 
 	if (hxgep->rdc_first_intr[channel] && (npkt_read > 0)) {
 		hxgep->rdc_first_intr[channel] = B_FALSE;
-		cs.bits.pktread = npkt_read - 1;
+		*npkts = npkt_read - 1;
 	} else
-		cs.bits.pktread = npkt_read;
-	cs.bits.ptrread = nrcr_read;
-	cs.value &= 0xffffffffULL;
-	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs.value);
+		*npkts = npkt_read;
+	*nptrs = nrcr_read;
 
 	HXGE_DEBUG_MSG((hxgep, RX_INT_CTL,
 	    "==> hxge_rx_pkts: EXIT: rcr channel %d "
@@ -1999,18 +2033,11 @@ hxge_rx_err_evnts(p_hxge_t hxgep, uint_t index, p_hxge_ldv_t ldvp,
 	boolean_t		rxchan_fatal = B_FALSE;
 	uint8_t			channel;
 	hxge_status_t		status = HXGE_OK;
-	uint64_t		cs_val;
 
 	HXGE_DEBUG_MSG((hxgep, INT_CTL, "==> hxge_rx_err_evnts"));
 
 	handle = HXGE_DEV_HPI_HANDLE(hxgep);
 	channel = ldvp->channel;
-
-	/* Clear the interrupts */
-	cs.bits.pktread = 0;
-	cs.bits.ptrread = 0;
-	cs_val = cs.value & RDC_STAT_WR1C;
-	RXDMA_REG_WRITE64(handle, RDC_STAT, channel, cs_val);
 
 	rdc_stats = &hxgep->statsp->rdc_stats[ldvp->vdma_index];
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 #include <sys/llc1.h>
 
 uint32_t hxge_reclaim_pending = TXDMA_RECLAIM_PENDING_DEFAULT;
-uint32_t hxge_tx_minfree = 32;
+uint32_t hxge_tx_minfree = 64;
 uint32_t hxge_tx_intr_thres = 0;
 uint32_t hxge_tx_max_gathers = TX_MAX_GATHER_POINTERS;
 uint32_t hxge_tx_tiny_pack = 1;
@@ -1942,10 +1942,10 @@ hxge_map_txdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 	    "dma_bufp $%p tx_rng_p $%p tx_msg_rng_p $%p bsize %d",
 	    dma_bufp, tx_ring_p, tx_msg_ring, bsize));
 
-	tx_buf_dma_handle = dma_bufp->dma_handle;
 	for (i = 0; i < num_chunks; i++, dma_bufp++) {
 		bsize = dma_bufp->block_size;
 		nblocks = dma_bufp->nblocks;
+		tx_buf_dma_handle = dma_bufp->dma_handle;
 		HXGE_DEBUG_MSG((hxgep, MEM3_CTL,
 		    "==> hxge_map_txdma_channel_buf_ring: dma chunk %d "
 		    "size %d dma_bufp $%p",
@@ -1953,6 +1953,7 @@ hxge_map_txdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 
 		for (j = 0; j < nblocks; j++) {
 			tx_msg_ring[index].buf_dma_handle = tx_buf_dma_handle;
+			tx_msg_ring[index].offset_index = j;
 			dmap = &tx_msg_ring[index++].buf_dma;
 			HXGE_DEBUG_MSG((hxgep, MEM3_CTL,
 			    "==> hxge_map_txdma_channel_buf_ring: j %d"
