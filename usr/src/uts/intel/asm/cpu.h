@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,15 +118,19 @@ extern __inline__ void __swapgs(void)
 
 /*
  * prefetch 64 bytes
+ * prefetch is an SSE extension which is not supported on
+ * older 32-bit processors, so define this as a no-op for now
  */
 
 extern __inline__ void prefetch64(caddr_t addr)
 {
+#if defined(__amd64)
 	__asm__ __volatile__(
 	    "prefetcht0 (%0);"
 	    "prefetcht0 32(%0)"
 	    : /* no output */
 	    : "r" (addr));
+#endif	/* __amd64 */
 }
 
 #endif	/* __i386 || __amd64 */

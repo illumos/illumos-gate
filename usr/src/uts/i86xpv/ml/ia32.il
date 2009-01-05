@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,9 +102,11 @@
 
 /
 / prefetch 64 bytes
+/ prefetch is an SSE extension which is not supported on older 32-bit processors
+/ so define this as a no-op for now
 /
 	.inline	prefetch64, 4
-	movl  (%esp), %eax
-	prefetcht0 (%eax)
-	prefetcht0 32(%eax)
+/	movl  (%esp), %eax
+/	prefetcht0 (%eax)
+/	prefetcht0 32(%eax)
 	.end
