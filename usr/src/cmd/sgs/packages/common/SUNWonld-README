@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -1400,6 +1400,7 @@ Bugid   Risk Synopsis
 	(link-editor components only)
 	PSARC/2008/622 32-bit Address Restriction Software Capabilities Flag
 6756953 customer requests that DT_CONFIG strings be honored for secure apps (D)
+6756048 rd_loadobj_iter() should always invoke brand plugin callback
 6765299 ld --version-script option not compatible with GNU ld (D)
 6748160 problem with -zrescan (D)
 	PSARC/2008/651 New ld archive rescan options
@@ -1414,3 +1415,4 @@ Bugid   Risk Synopsis
 6773695 ld -z nopartial can break non-pic objects
 6778453 RTLD_GROUP prevents use of application defined malloc
 6782597 32-bit ld.so.1 needs to accept objects with large inode number
+6786744 32-bit dbx failed with unknown rtld_db.so error on snv_104

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -771,7 +771,7 @@ _rd_loadobj_iter32_native(rd_agent_t *rap, rl_iter_f *cb, void *client_data,
 rd_err_e
 _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
 {
-	rd_err_e	rc, rc_brand;
+	rd_err_e	rc, rc_brand = RD_OK;
 	uint_t		abort_iter = 0;
 
 	/* First iterate over the native target objects */
@@ -785,6 +785,6 @@ _rd_loadobj_iter32(rd_agent_t *rap, rl_iter_f *cb, void *client_data)
 		rc_brand = rap->rd_helper.rh_ops->rho_loadobj_iter(
 		    rap->rd_helper.rh_data, cb, client_data);
 
-	rc = (rc == RD_OK) ? rc_brand : rc;
+	rc = (rc != RD_OK) ? rc : rc_brand;
 	return (rc);
 }
