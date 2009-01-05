@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1367,6 +1367,13 @@ socket_ioctl_common(struct sonode *so, int cmd, intptr_t arg, int mode,
     struct cred *cr, int32_t *rvalp)
 {
 	switch (cmd) {
+	case SIOCSQPTR:
+		/*
+		 * SIOCSQPTR is valid only when helper stream is created
+		 * by the protocol.
+		 */
+
+		return (EOPNOTSUPP);
 	case FIONBIO: {
 		int32_t value;
 

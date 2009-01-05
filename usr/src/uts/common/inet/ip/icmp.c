@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -857,7 +857,7 @@ rawip_do_close(conn_t *connp)
 	if (!IPCL_IS_NONSTR(connp)) {
 		inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
 	} else {
-		ip_close_helper_stream(connp);
+		ip_free_helper_stream(connp);
 	}
 
 	connp->conn_ref--;
@@ -5915,7 +5915,7 @@ rawip_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	/*
 	 * free helper stream
 	 */
-	ip_close_helper_stream(connp);
+	ip_free_helper_stream(connp);
 
 	/*
 	 * Collect the information needed to sync with the sonode

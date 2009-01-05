@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -614,7 +614,7 @@ conn_t *ipcl_conn_tcp_lookup_reversed_ipv6(conn_t *, ip6_t *, tcph_t *,
 	    ip_stack_t *);
 
 extern int ip_create_helper_stream(conn_t *connp, ldi_ident_t li);
-extern void ip_close_helper_stream(conn_t *connp);
+extern void ip_free_helper_stream(conn_t *connp);
 
 extern int ip_get_options(conn_t *, int, int, void *, t_uscalar_t *, cred_t *);
 extern int ip_set_options(conn_t *, int, int, const void *, t_uscalar_t,

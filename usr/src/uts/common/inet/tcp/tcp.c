@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -27369,7 +27369,7 @@ tcp_close(sock_lower_handle_t proto_handle, int flags, cred_t *cr)
 
 	tcp_close_common(connp, flags);
 
-	ip_close_helper_stream(connp);
+	ip_free_helper_stream(connp);
 
 	/*
 	 * Drop IP's reference on the conn. This is the last reference
@@ -27679,7 +27679,7 @@ tcp_fallback(sock_lower_handle_t proto_handle, queue_t *q,
 	/*
 	 * free the helper stream
 	 */
-	ip_close_helper_stream(connp);
+	ip_free_helper_stream(connp);
 
 	/*
 	 * Notify the STREAM head about options

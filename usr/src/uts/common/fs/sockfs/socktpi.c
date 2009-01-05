@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5966,6 +5966,11 @@ sotpi_ioctl(struct sonode *so, int cmd, intptr_t arg, int mode,
 	    cmd, arg, pr_state(so->so_state, so->so_mode)));
 
 	switch (cmd) {
+	case SIOCSQPTR:
+		/*
+		 * SIOCSQPTR is valid only when helper stream is created
+		 * by the protocol.
+		 */
 	case _I_INSERT:
 	case _I_REMOVE:
 		/*

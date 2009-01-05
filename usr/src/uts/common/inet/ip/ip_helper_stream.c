@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,8 +64,17 @@ static struct qinit ip_helper_stream_winit = {
  * set the q_ptr of the 'q' to the conn_t pointer passed in
  */
 static void
-ip_helper_share_conn(queue_t *q, mblk_t *mp)
+ip_helper_share_conn(queue_t *q, mblk_t *mp, cred_t *crp)
 {
+	/*
+	 * This operation is allowed only on helper streams with kcred
+	 */
+
+	if (kcred != crp || msgdsize(mp->b_cont) != sizeof (void *)) {
+		miocnak(q, mp, 0, EINVAL);
+		return;
+	}
+
 	if (IP_USE_HELPER_CACHE) {
 		ip_helper_stream_info_t	*ip_helper_info;
 
@@ -93,7 +102,7 @@ ip_helper_wput(queue_t *q, mblk_t *mp)
 	struct iocblk *iocp = (struct iocblk *)mp->b_rptr;
 	if (DB_TYPE(mp) == M_IOCTL &&
 	    iocp->ioc_cmd == SIOCSQPTR) {
-		ip_helper_share_conn(q, mp);
+		ip_helper_share_conn(q, mp, iocp->ioc_cr);
 	} else {
 		conn_t *connp = (conn_t *)q->q_ptr;
 
@@ -253,11 +262,11 @@ ip_create_helper_stream(conn_t *connp, ldi_ident_t li)
 }
 
 /*
- * Public interface for closing the shared IP stream
+ * Public interface for freeing IP helper stream
  */
 /* ARGSUSED */
 void
-ip_close_helper_stream(conn_t *connp)
+ip_free_helper_stream(conn_t *connp)
 {
 	ASSERT(!servicing_interrupt());
 	if (IP_USE_HELPER_CACHE) {

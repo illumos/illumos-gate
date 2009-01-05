@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +225,7 @@ rts_common_close(queue_t *q, conn_t *connp)
 		 */
 		inet_minor_free(connp->conn_minor_arena, connp->conn_dev);
 	} else {
-		ip_close_helper_stream(connp);
+		ip_free_helper_stream(connp);
 	}
 	ASSERT(connp->conn_ref == 1);
 
