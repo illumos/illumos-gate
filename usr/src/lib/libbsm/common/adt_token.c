@@ -21,7 +21,7 @@
 /*
  * adt_token.c
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This file does not provide any user callable functions.  See adt.c
@@ -678,7 +678,7 @@ adt_to_text(datadef *def, void *p_data, int required,
 		 * that list
 		 */
 	case ADT_MSG:
-		list = &adt_msg_text[(enum adt_login_text)def->dd_input_size];
+		list = &adt_msg_text[(enum adt_msg_list)def->dd_input_size];
 		list_index = ((union convert *)p_data)->msg_selector;
 
 		if ((list_index + list->ml_offset < list->ml_min_index) ||
