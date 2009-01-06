@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3298,8 +3298,8 @@ vhci_mpapi_synthesize_tpg_data(struct scsi_vhci *vhci, scsi_vhci_lun_t *vlun,
 void
 vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 {
-	struct scsi_vhci_lun	*vlun = ADDR2VLUN(ap);
-	struct scsi_vhci	*vhci = ADDR2VHCI(ap);
+	struct scsi_vhci_lun	*vlun;
+	struct scsi_vhci	*vhci;
 	struct scsi_device	*psd;
 	scsi_vhci_priv_t	*svp;
 	mdi_pathinfo_t		*pip;
@@ -3341,8 +3341,9 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 	}
 
 	/*
-	 * Get the vlun through the following process;
-	 * ADDR2VLUN(ap) doesn't give the scsi_vhci lun
+	 * The scsi_address passed is associated with a scsi_vhci allocated
+	 * scsi_device structure for a pathinfo node. Getting the vlun from
+	 * this is a bit complicated.
 	 */
 	if (ap->a_hba_tran->tran_hba_flags & SCSI_HBA_ADDR_COMPLEX)
 		psd = scsi_address_device(ap);
@@ -3362,8 +3363,10 @@ vhci_mpapi_update_tpg_data(struct scsi_address *ap, char *ptr)
 
 	VHCI_DEBUG(4, (CE_NOTE, NULL, "vhci_mpapi_update_tpg_data: vhci=%p, "
 	    "(vlun)wwn=(%p)%s, pip=%p, ap=%p, ptr=%p, as=%x, tpg_id=%s, fops="
-	    "%p\n", (void *)vhci, (void *)vlun, vlun->svl_lun_wwn, (void *)pip,
-	    (void *)ap, (void *)ptr, as, tpg_id, (void *)vlun->svl_fops));
+	    "%p\n", (void *)vhci, (void *)vlun,
+	    vlun ? vlun->svl_lun_wwn : "NONE",
+	    (void *)pip, (void *)ap, (void *)ptr, as, tpg_id,
+	    (void *)(vlun ? vlun->svl_fops : NULL)));
 
 	if ((vhci == NULL) || (vlun == NULL) || (pip == NULL) ||
 	    !SCSI_FAILOVER_IS_TPGS(vlun->svl_fops)) {
@@ -3758,16 +3761,13 @@ vhci_mpapi_sync_lu_oid_list(struct scsi_vhci *vhci)
 	ilist = vhci->mp_priv->obj_hdr_list[MP_OBJECT_TYPE_MULTIPATH_LU]->head;
 
 	while (ilist != NULL) {
-		if (MP_GET_MAJOR_FROM_ID((uint64_t)
-		    (ilist->item->oid.raw_oid)) != 0) {
-			lud = ilist->item->idata;
-			if (lud->valid == 1) {
-				svl = lud->resp;
-				ilist->item->oid.raw_oid =
-				    (uint64_t)ddi_get_instance(svl->svl_dip);
-				lud->prop.id =
-				    (uint64_t)ddi_get_instance(svl->svl_dip);
-			}
+		lud = ilist->item->idata;
+		if (lud->valid == 1) {
+			svl = lud->resp;
+			ilist->item->oid.raw_oid =
+			    (uint64_t)ddi_get_instance(svl->svl_dip);
+			lud->prop.id =
+			    (uint64_t)ddi_get_instance(svl->svl_dip);
 		}
 		ilist = ilist->next;
 	}
