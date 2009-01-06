@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,14 +19,16 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.43 v2008-7-17_MountAngel2
+ * IntelVersion: 1.46 sol_anvik_patch
  */
 #include "e1000_api.h"
+
+static void e1000_reload_nvm_generic(struct e1000_hw *hw);
 
 /*
  * e1000_init_nvm_ops_generic - Initialize NVM function pointers
@@ -686,7 +688,7 @@ e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		}
 	}
 
-	msec_delay(nvm->semaphore_delay);
+	msec_delay(10);
 release:
 	nvm->ops.release(hw);
 
@@ -918,9 +920,8 @@ e1000_update_nvm_checksum_generic(struct e1000_hw *hw)
 	}
 	checksum = (u16)NVM_SUM - checksum;
 	ret_val = hw->nvm.ops.write(hw, NVM_CHECKSUM_REG, 1, &checksum);
-	if (ret_val) {
+	if (ret_val)
 		DEBUGOUT("NVM Write Error while updating checksum.\n");
-	}
 
 out:
 	return (ret_val);

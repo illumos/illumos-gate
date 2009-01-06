@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,14 +19,16 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.76 v2008-7-17_MountAngel2
+ * IntelVersion: 1.92.4.1 sol_anvik_patch
  */
 #include "e1000_api.h"
+
+static s32 e1000_validate_mdi_setting_generic(struct e1000_hw *hw);
 
 /*
  * e1000_init_mac_ops_generic - Initialize MAC function pointers
@@ -47,7 +49,6 @@ e1000_init_mac_ops_generic(struct e1000_hw *hw)
 	mac->ops.setup_physical_interface = e1000_null_ops_generic;
 	mac->ops.get_bus_info = e1000_null_ops_generic;
 	mac->ops.read_mac_addr = e1000_read_mac_addr_generic;
-	mac->ops.remove_device = e1000_remove_device_generic;
 	mac->ops.config_collision_dist = e1000_config_collision_dist_generic;
 	mac->ops.clear_hw_cntrs = e1000_null_mac_generic;
 	/* LED */
@@ -167,22 +168,6 @@ e1000_null_rar_set(struct e1000_hw *hw, u8 *h, u32 a)
 }
 
 /*
- * e1000_remove_device_generic - Free device specific structure
- * @hw: pointer to the HW structure
- *
- * If a device specific structure was allocated, this function will
- * free it.
- */
-void
-e1000_remove_device_generic(struct e1000_hw *hw)
-{
-	DEBUGFUNC("e1000_remove_device_generic");
-
-	/* Freeing the dev_spec member of e1000_hw structure */
-	e1000_free_dev_spec_struct(hw);
-}
-
-/*
  * e1000_get_bus_info_pci_generic - Get PCI(x) bus information
  * @hw: pointer to the HW structure
  *
@@ -270,7 +255,7 @@ e1000_get_bus_info_pcie_generic(struct e1000_hw *hw)
 	if (ret_val)
 		bus->width = e1000_bus_width_unknown;
 	else
-		bus->width = (e1000_bus_width)((pcie_link_status &
+		bus->width = (enum e1000_bus_width)((pcie_link_status &
 		    PCIE_LINK_WIDTH_MASK) >>
 		    PCIE_LINK_WIDTH_SHIFT);
 
@@ -445,15 +430,13 @@ e1000_rar_set_generic(struct e1000_hw *hw, u8 *addr, u32 index)
 	rar_high = ((u32) addr[4] | ((u32) addr[5] << 8));
 
 	/* If MAC address zero, no need to set the AV bit */
-	if (rar_low || rar_high) {
-		if (!hw->mac.disable_av)
-			rar_high |= E1000_RAH_AV;
-	}
+	if (rar_low || rar_high)
+		rar_high |= E1000_RAH_AV;
 
 	/*
 	 * Some bridges will combine consecutive 32-bit writes into
 	 * a single burst write, which will malfunction on some
-	 * 82546 parts. The flush avoids this.
+	 * 82546 parts.  The flush avoids this.
 	 */
 	E1000_WRITE_REG(hw, E1000_RAL(index), rar_low);
 	E1000_WRITE_FLUSH(hw);
@@ -784,9 +767,8 @@ e1000_check_for_copper_link_generic(struct e1000_hw *hw)
 	 * have had to re-autoneg with a different link partner.
 	 */
 	ret_val = e1000_config_fc_after_link_up_generic(hw);
-	if (ret_val) {
+	if (ret_val)
 		DEBUGOUT("Error configuring flow control\n");
-	}
 
 out:
 	return (ret_val);
@@ -934,22 +916,42 @@ e1000_check_for_serdes_link_generic(struct e1000_hw *hw)
 		 */
 		/* SYNCH bit and IV bit are sticky. */
 		usec_delay(10);
-		if (E1000_RXCW_SYNCH & E1000_READ_REG(hw, E1000_RXCW)) {
+		rxcw = E1000_READ_REG(hw, E1000_RXCW);
+		if (rxcw & E1000_RXCW_SYNCH) {
 			if (!(rxcw & E1000_RXCW_IV)) {
 				mac->serdes_has_link = true;
-				DEBUGOUT("SERDES: Link is up.\n");
+				DEBUGOUT("SERDES: Link up - forced.\n");
 			}
 		} else {
 			mac->serdes_has_link = false;
-			DEBUGOUT("SERDES: Link is down.\n");
+			DEBUGOUT("SERDES: Link down - force failed.\n");
 		}
 	}
 
 	if (E1000_TXCW_ANE & E1000_READ_REG(hw, E1000_TXCW)) {
 		status = E1000_READ_REG(hw, E1000_STATUS);
-		mac->serdes_has_link = (status & E1000_STATUS_LU)
-		    ? true
-		    : false;
+		if (status & E1000_STATUS_LU) {
+			/* SYNCH bit and IV bit are sticky, so reread rxcw. */
+			usec_delay(10);
+			rxcw = E1000_READ_REG(hw, E1000_RXCW);
+			if (rxcw & E1000_RXCW_SYNCH) {
+				if (!(rxcw & E1000_RXCW_IV)) {
+					mac->serdes_has_link = true;
+					DEBUGOUT("SERDES: Link up - autoneg "
+					    "completed sucessfully.\n");
+				} else {
+					mac->serdes_has_link = false;
+					DEBUGOUT("SERDES: Link down - invalid"
+					    "codewords detected in autoneg.\n");
+				}
+			} else {
+				mac->serdes_has_link = false;
+				DEBUGOUT("SERDES: Link down - no sync.\n");
+			}
+		} else {
+			mac->serdes_has_link = false;
+			DEBUGOUT("SERDES: Link down - autoneg failed\n");
+		}
 	}
 
 out:
@@ -982,23 +984,23 @@ e1000_setup_link_generic(struct e1000_hw *hw)
 			goto out;
 
 	/*
-	 * If flow control is set to default, set flow control based on
-	 * the EEPROM flow control settings.
+	 * If flow control is set to default, set flow control
+	 * based on the EEPROM flow control settings.
 	 */
-	if (hw->fc.type == e1000_fc_default) {
+	if (hw->fc.current_mode == e1000_fc_default) {
 		ret_val = e1000_set_default_fc_generic(hw);
 		if (ret_val)
 			goto out;
 	}
 
 	/*
-	 * We want to save off the original Flow Control configuration just in
-	 * case we get disconnected and then reconnected into a different hub
-	 * or switch with different Flow Control capabilities.
+	 * Save off the requested flow control mode for use later.  Depending
+	 * on the link partner's capabilities, we may or may not use this mode.
 	 */
-	hw->fc.original_type = hw->fc.type;
+	hw->fc.requested_mode = hw->fc.current_mode;
 
-	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", hw->fc.type);
+	DEBUGOUT1("After fix-ups FlowControl is now = %x\n",
+	    hw->fc.current_mode);
 
 	/* Call the necessary media_type subroutine to configure the link. */
 	ret_val = hw->mac.ops.setup_physical_interface(hw);
@@ -1189,7 +1191,7 @@ e1000_commit_fc_settings_generic(struct e1000_hw *hw)
 	 *	do not support receiving pause frames).
 	 * 3:	Both Rx and Tx flow control (symmetric) are enabled.
 	 */
-	switch (hw->fc.type) {
+	switch (hw->fc.current_mode) {
 	case e1000_fc_none:
 		/* Flow control completely disabled by a software over-ride. */
 		txcw = (E1000_TXCW_ANE | E1000_TXCW_FD);
@@ -1255,7 +1257,7 @@ e1000_set_fc_watermarks_generic(struct e1000_hw *hw)
 	 * transmit pause frames is not enabled, then these registers will be
 	 * set to 0.
 	 */
-	if (hw->fc.type & e1000_fc_tx_pause) {
+	if (hw->fc.current_mode & e1000_fc_tx_pause) {
 		/*
 		 * We need to set up the Receive Threshold high and low water
 		 * marks as well as (optionally) enabling the transmission of
@@ -1305,12 +1307,12 @@ e1000_set_default_fc_generic(struct e1000_hw *hw)
 	}
 
 	if ((nvm_data & NVM_WORD0F_PAUSE_MASK) == 0)
-		hw->fc.type = e1000_fc_none;
+		hw->fc.current_mode = e1000_fc_none;
 	else if ((nvm_data & NVM_WORD0F_PAUSE_MASK) ==
 	    NVM_WORD0F_ASM_DIR)
-		hw->fc.type = e1000_fc_tx_pause;
+		hw->fc.current_mode = e1000_fc_tx_pause;
 	else
-		hw->fc.type = e1000_fc_full;
+		hw->fc.current_mode = e1000_fc_full;
 
 out:
 	return (ret_val);
@@ -1343,7 +1345,7 @@ e1000_force_mac_fc_generic(struct e1000_hw *hw)
 	 * control.
 	 *
 	 * The "Case" statement below enables/disable flow control according to
-	 * the "hw->fc.type" parameter.
+	 * the "hw->fc.current_mode" parameter.
 	 *
 	 * The possible values of the "fc" parameter are:
 	 * 0:	Flow control is completely disabled
@@ -1354,9 +1356,9 @@ e1000_force_mac_fc_generic(struct e1000_hw *hw)
 	 * 3:	Both Rx and Tx flow control (symmetric) is enabled.
 	 * other:  No other values should be possible at this point.
 	 */
-	DEBUGOUT1("hw->fc.type = %u\n", hw->fc.type);
+	DEBUGOUT1("hw->fc.current_mode = %u\n", hw->fc.current_mode);
 
-	switch (hw->fc.type) {
+	switch (hw->fc.current_mode) {
 	case e1000_fc_none:
 		ctrl &= (~(E1000_CTRL_TFCE | E1000_CTRL_RFCE));
 		break;
@@ -1397,7 +1399,6 @@ s32
 e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_phy_info *phy = &hw->phy;
 	s32 ret_val = E1000_SUCCESS;
 	u16 mii_status_reg, mii_nway_adv_reg, mii_nway_lp_ability_reg;
 	u16 speed, duplex;
@@ -1435,10 +1436,10 @@ e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		 * has completed.  We read this twice because this reg has
 		 * some "sticky" (latched) bits.
 		 */
-		ret_val = phy->ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
+		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
 		if (ret_val)
 			goto out;
-		ret_val = phy->ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
+		ret_val = hw->phy.ops.read_reg(hw, PHY_STATUS, &mii_status_reg);
 		if (ret_val)
 			goto out;
 
@@ -1453,11 +1454,11 @@ e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		 * 4) and the Auto_Negotiation Base Page Ability Register
 		 * (Address 5) to determine how flow control was negotiated.
 		 */
-		ret_val = phy->ops.read_reg(hw, PHY_AUTONEG_ADV,
+		ret_val = hw->phy.ops.read_reg(hw, PHY_AUTONEG_ADV,
 		    &mii_nway_adv_reg);
 		if (ret_val)
 			goto out;
-		ret_val = phy->ops.read_reg(hw, PHY_LP_ABILITY,
+		ret_val = hw->phy.ops.read_reg(hw, PHY_LP_ABILITY,
 		    &mii_nway_lp_ability_reg);
 		if (ret_val)
 			goto out;
@@ -1505,11 +1506,11 @@ e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 			 * ONLY. Hence, we must now check to see if we need to
 			 * turn OFF  the TRANSMISSION of PAUSE frames.
 			 */
-			if (hw->fc.original_type == e1000_fc_full) {
-				hw->fc.type = e1000_fc_full;
+			if (hw->fc.requested_mode == e1000_fc_full) {
+				hw->fc.current_mode = e1000_fc_full;
 				DEBUGOUT("Flow Control = FULL.\r\n");
 			} else {
-				hw->fc.type = e1000_fc_rx_pause;
+				hw->fc.current_mode = e1000_fc_rx_pause;
 				DEBUGOUT("Flow Control = "
 				    "RX PAUSE frames only.\r\n");
 			}
@@ -1526,7 +1527,7 @@ e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		    (mii_nway_adv_reg & NWAY_AR_ASM_DIR) &&
 		    (mii_nway_lp_ability_reg & NWAY_LPAR_PAUSE) &&
 		    (mii_nway_lp_ability_reg & NWAY_LPAR_ASM_DIR)) {
-			hw->fc.type = e1000_fc_tx_pause;
+			hw->fc.current_mode = e1000_fc_tx_pause;
 			DEBUGOUT("Flow Control = TX PAUSE frames only.\r\n");
 		}
 		/*
@@ -1541,14 +1542,14 @@ e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		    (mii_nway_adv_reg & NWAY_AR_ASM_DIR) &&
 		    !(mii_nway_lp_ability_reg & NWAY_LPAR_PAUSE) &&
 		    (mii_nway_lp_ability_reg & NWAY_LPAR_ASM_DIR)) {
-			hw->fc.type = e1000_fc_rx_pause;
+			hw->fc.current_mode = e1000_fc_rx_pause;
 			DEBUGOUT("Flow Control = RX PAUSE frames only.\r\n");
 		} else {
 			/*
 			 * Per the IEEE spec, at this point flow control
 			 * should be disabled.
 			 */
-			hw->fc.type = e1000_fc_none;
+			hw->fc.current_mode = e1000_fc_none;
 			DEBUGOUT("Flow Control = NONE.\r\n");
 		}
 
@@ -1564,7 +1565,7 @@ e1000_config_fc_after_link_up_generic(struct e1000_hw *hw)
 		}
 
 		if (duplex == HALF_DUPLEX)
-			hw->fc.type = e1000_fc_none;
+			hw->fc.current_mode = e1000_fc_none;
 
 		/*
 		 * Now we call a subroutine to actually force the MAC
@@ -2093,13 +2094,11 @@ e1000_reset_adaptive_generic(struct e1000_hw *hw)
 		return;
 	}
 
-	if (!mac->ifs_params_forced) {
-		mac->current_ifs_val = 0;
-		mac->ifs_min_val = IFS_MIN;
-		mac->ifs_max_val = IFS_MAX;
-		mac->ifs_step_size = IFS_STEP;
-		mac->ifs_ratio = IFS_RATIO;
-	}
+	mac->current_ifs_val = 0;
+	mac->ifs_min_val = IFS_MIN;
+	mac->ifs_max_val = IFS_MAX;
+	mac->ifs_step_size = IFS_STEP;
+	mac->ifs_ratio = IFS_RATIO;
 
 	mac->in_ifs_mode = false;
 	E1000_WRITE_REG(hw, E1000_AIT, 0);
@@ -2165,47 +2164,6 @@ e1000_validate_mdi_setting_generic(struct e1000_hw *hw)
 		DEBUGOUT("Invalid MDI setting detected\n");
 		hw->phy.mdix = 1;
 		ret_val = -E1000_ERR_CONFIG;
-		goto out;
-	}
-
-out:
-	return (ret_val);
-}
-
-/*
- * e1000_write_8bit_ctrl_reg_generic - Write a 8bit CTRL register
- * @hw: pointer to the HW structure
- * @reg: 32bit register offset such as E1000_SCTL
- * @offset: register offset to write to
- * @data: data to write at register offset
- *
- * Writes an address/data control type register.  There are several of these
- * and they all have the format address << 8 | data and bit 31 is polled for
- * completion.
- */
-s32
-e1000_write_8bit_ctrl_reg_generic(struct e1000_hw *hw, u32 reg,
-    u32 offset, u8 data)
-{
-	u32 i, regvalue = 0;
-	s32 ret_val = E1000_SUCCESS;
-
-	DEBUGFUNC("e1000_write_8bit_ctrl_reg_generic");
-
-	/* Set up the address and data */
-	regvalue = ((u32)data) | (offset << E1000_GEN_CTL_ADDRESS_SHIFT);
-	E1000_WRITE_REG(hw, reg, regvalue);
-
-	/* Poll the ready bit to see if the MDI read completed */
-	for (i = 0; i < E1000_GEN_POLL_TIMEOUT; i++) {
-		usec_delay(5);
-		regvalue = E1000_READ_REG(hw, reg);
-		if (regvalue & E1000_GEN_CTL_READY)
-			break;
-	}
-	if (!(regvalue & E1000_GEN_CTL_READY)) {
-		DEBUGOUT1("Reg %08x did not indicate ready\n", reg);
-		ret_val = -E1000_ERR_PHY;
 		goto out;
 	}
 

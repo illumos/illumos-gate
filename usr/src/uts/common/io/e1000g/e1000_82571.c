@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,19 +19,28 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.83 v2008-7-17_MountAngel2
+ * IntelVersion: 1.94 sol_anvik_patch
  */
 
 /*
- * e1000_82571
- * e1000_82572
- * e1000_82573
- * e1000_82574
+ * 82571EB Gigabit Ethernet Controller
+ * 82571EB Gigabit Ethernet Controller (Copper)
+ * 82571EB Gigabit Ethernet Controller (Fiber)
+ * 82571EB Dual Port Gigabit Mezzanine Adapter
+ * 82571EB Quad Port Gigabit Mezzanine Adapter
+ * 82571PT Gigabit PT Quad Port Server ExpressModule
+ * 82572EI Gigabit Ethernet Controller (Copper)
+ * 82572EI Gigabit Ethernet Controller (Fiber)
+ * 82572EI Gigabit Ethernet Controller
+ * 82573V Gigabit Ethernet Controller (Copper)
+ * 82573E Gigabit Ethernet Controller (Copper)
+ * 82573L Gigabit Ethernet Controller
+ * 82574L Gigabit Network Connection
  */
 
 #include "e1000_api.h"
@@ -71,15 +80,9 @@ static s32 e1000_write_nvm_eewr_82571(struct e1000_hw *hw, u16 offset,
 static s32 e1000_read_mac_addr_82571(struct e1000_hw *hw);
 static void e1000_power_down_phy_copper_82571(struct e1000_hw *hw);
 
-struct e1000_dev_spec_82571 {
-	bool laa_is_present;
-};
-
 /*
  * e1000_init_phy_params_82571 - Init PHY func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_phy_params_82571(struct e1000_hw *hw)
@@ -179,8 +182,6 @@ out:
 /*
  * e1000_init_nvm_params_82571 - Init NVM func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_nvm_params_82571(struct e1000_hw *hw)
@@ -255,8 +256,6 @@ e1000_init_nvm_params_82571(struct e1000_hw *hw)
 /*
  * e1000_init_mac_params_82571 - Init MAC func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_mac_params_82571(struct e1000_hw *hw)
@@ -360,8 +359,6 @@ e1000_init_mac_params_82571(struct e1000_hw *hw)
 		break;
 	}
 	mac->ops.led_off = e1000_led_off_generic;
-	/* remove device */
-	mac->ops.remove_device = e1000_remove_device_generic;
 	/* clear hardware counters */
 	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_82571;
 	/* link info */
@@ -369,11 +366,6 @@ e1000_init_mac_params_82571(struct e1000_hw *hw)
 	    (hw->phy.media_type == e1000_media_type_copper)
 	    ? e1000_get_speed_and_duplex_copper_generic
 	    : e1000_get_speed_and_duplex_fiber_serdes_generic;
-
-	hw->dev_spec_size = sizeof (struct e1000_dev_spec_82571);
-
-	/* Device-specific structure allocation */
-	ret_val = e1000_alloc_zeroed_dev_spec_struct(hw, hw->dev_spec_size);
 
 out:
 	return (ret_val);
@@ -383,8 +375,7 @@ out:
  * e1000_init_function_pointers_82571 - Init func ptrs.
  * @hw: pointer to the HW structure
  *
- * The only function explicitly called by the api module to initialize
- * all function pointers and parameters.
+ * Called to initialize all function pointers and parameters.
  */
 void
 e1000_init_function_pointers_82571(struct e1000_hw *hw)
@@ -852,8 +843,7 @@ out:
  * e1000_reset_hw_82571 - Reset hardware
  * @hw: pointer to the HW structure
  *
- * This resets the hardware into a known state.  This is a
- * function pointer entry point called by the api module.
+ * This resets the hardware into a known state.
  */
 static s32
 e1000_reset_hw_82571(struct e1000_hw *hw)
@@ -869,9 +859,8 @@ e1000_reset_hw_82571(struct e1000_hw *hw)
 	 * on the last TLP read/write transaction when MAC is reset.
 	 */
 	ret_val = e1000_disable_pcie_master_generic(hw);
-	if (ret_val) {
+	if (ret_val)
 		DEBUGOUT("PCI-E Master disable polling has failed.\n");
-	}
 
 	DEBUGOUT("Masking off all interrupts\n");
 	E1000_WRITE_REG(hw, E1000_IMC, 0xffffffff);
@@ -1032,9 +1021,6 @@ e1000_initialize_hw_bits_82571(struct e1000_hw *hw)
 	u32 reg;
 
 	DEBUGFUNC("e1000_initialize_hw_bits_82571");
-
-	if (hw->mac.disable_hw_init_bits)
-		return;
 
 	/* Transmit Descriptor Control 0 */
 	reg = E1000_READ_REG(hw, E1000_TXDCTL(0));
@@ -1239,8 +1225,8 @@ e1000_setup_link_82571(struct e1000_hw *hw)
 	 * control setting, so we explicitly set it to full.
 	 */
 	if ((hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574) &&
-	    hw->fc.type == e1000_fc_default)
-		hw->fc.type = e1000_fc_full;
+	    hw->fc.current_mode == e1000_fc_default)
+		hw->fc.current_mode = e1000_fc_full;
 
 	return (e1000_setup_link_generic(hw));
 }
@@ -1365,20 +1351,12 @@ out:
 bool
 e1000_get_laa_state_82571(struct e1000_hw *hw)
 {
-	struct e1000_dev_spec_82571 *dev_spec;
-	bool state = false;
-
 	DEBUGFUNC("e1000_get_laa_state_82571");
 
 	if (hw->mac.type != e1000_82571)
-		goto out;
+		return (false);
 
-	dev_spec = (struct e1000_dev_spec_82571 *)hw->dev_spec;
-
-	state = dev_spec->laa_is_present;
-
-out:
-	return (state);
+	return (hw->dev_spec._82571.laa_is_present);
 }
 
 /*
@@ -1391,16 +1369,12 @@ out:
 void
 e1000_set_laa_state_82571(struct e1000_hw *hw, bool state)
 {
-	struct e1000_dev_spec_82571 *dev_spec;
-
 	DEBUGFUNC("e1000_set_laa_state_82571");
 
 	if (hw->mac.type != e1000_82571)
 		return;
 
-	dev_spec = (struct e1000_dev_spec_82571 *)hw->dev_spec;
-
-	dev_spec->laa_is_present = state;
+	hw->dev_spec._82571.laa_is_present = state;
 
 	/* If workaround is activated... */
 	if (state) {

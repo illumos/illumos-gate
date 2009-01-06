@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,17 +19,21 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.63 v2008-7-17_MountAngel2
+ * IntelVersion: 1.67 sol_anvik_patch
  */
 
 /*
- * e1000_82543
- * e1000_82544
+ * 82543GC Gigabit Ethernet Controller (Fiber)
+ * 82543GC Gigabit Ethernet Controller (Copper)
+ * 82544EI Gigabit Ethernet Controller (Copper)
+ * 82544EI Gigabit Ethernet Controller (Fiber)
+ * 82544GC Gigabit Ethernet Controller (Copper)
+ * 82544GC Gigabit Ethernet Controller (LOM)
  */
 
 #include "e1000_api.h"
@@ -67,17 +71,9 @@ static void e1000_shift_out_mdi_bits_82543(struct e1000_hw *hw, u32 data,
 static bool e1000_tbi_compatibility_enabled_82543(struct e1000_hw *hw);
 static void e1000_set_tbi_sbp_82543(struct e1000_hw *hw, bool state);
 
-struct e1000_dev_spec_82543 {
-	u32 tbi_compatibility;
-	bool dma_fairness;
-	bool init_phy_disabled;
-};
-
 /*
  * e1000_init_phy_params_82543 - Init PHY func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_phy_params_82543(struct e1000_hw *hw)
@@ -161,8 +157,6 @@ out:
 /*
  * e1000_init_nvm_params_82543 - Init NVM func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_nvm_params_82543(struct e1000_hw *hw)
@@ -190,14 +184,11 @@ e1000_init_nvm_params_82543(struct e1000_hw *hw)
 /*
  * e1000_init_mac_params_82543 - Init MAC func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_mac_params_82543(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	s32 ret_val;
 
 	DEBUGFUNC("e1000_init_mac_params_82543");
 
@@ -253,33 +244,22 @@ e1000_init_mac_params_82543(struct e1000_hw *hw)
 	/* turn on/off LED */
 	mac->ops.led_on = e1000_led_on_82543;
 	mac->ops.led_off = e1000_led_off_82543;
-	/* remove device */
-	mac->ops.remove_device = e1000_remove_device_generic;
 	/* clear hardware counters */
 	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_82543;
-
-	hw->dev_spec_size = sizeof (struct e1000_dev_spec_82543);
-
-	/* Device-specific structure allocation */
-	ret_val = e1000_alloc_zeroed_dev_spec_struct(hw, hw->dev_spec_size);
-	if (ret_val)
-		goto out;
 
 	/* Set tbi compatibility */
 	if ((hw->mac.type != e1000_82543) ||
 	    (hw->phy.media_type == e1000_media_type_fiber))
 		e1000_set_tbi_compatibility_82543(hw, false);
 
-out:
-	return (ret_val);
+	return (E1000_SUCCESS);
 }
 
 /*
  * e1000_init_function_pointers_82543 - Init func ptrs.
  * @hw: pointer to the HW structure
  *
- * The only function explicitly called by the api module to initialize
- * all function pointers and parameters.
+ * Called to initialize all function pointers and parameters.
  */
 void
 e1000_init_function_pointers_82543(struct e1000_hw *hw)
@@ -301,20 +281,13 @@ e1000_init_function_pointers_82543(struct e1000_hw *hw)
 static bool
 e1000_tbi_compatibility_enabled_82543(struct e1000_hw *hw)
 {
-	struct e1000_dev_spec_82543 *dev_spec;
+	struct e1000_dev_spec_82543 *dev_spec = &hw->dev_spec._82543;
 	bool state = false;
 
 	DEBUGFUNC("e1000_tbi_compatibility_enabled_82543");
 
 	if (hw->mac.type != e1000_82543) {
 		DEBUGOUT("TBI compatibility workaround for 82543 only.\n");
-		goto out;
-	}
-
-	dev_spec = (struct e1000_dev_spec_82543 *)hw->dev_spec;
-
-	if (!dev_spec) {
-		DEBUGOUT("dev_spec pointer is set to NULL.\n");
 		goto out;
 	}
 
@@ -335,19 +308,12 @@ out:
 void
 e1000_set_tbi_compatibility_82543(struct e1000_hw *hw, bool state)
 {
-	struct e1000_dev_spec_82543 *dev_spec;
+	struct e1000_dev_spec_82543 *dev_spec = &hw->dev_spec._82543;
 
 	DEBUGFUNC("e1000_set_tbi_compatibility_82543");
 
 	if (hw->mac.type != e1000_82543) {
 		DEBUGOUT("TBI compatibility workaround for 82543 only.\n");
-		return;
-	}
-
-	dev_spec = (struct e1000_dev_spec_82543 *)hw->dev_spec;
-
-	if (!dev_spec) {
-		DEBUGOUT("dev_spec pointer is set to NULL.\n");
 		return;
 	}
 
@@ -367,20 +333,13 @@ e1000_set_tbi_compatibility_82543(struct e1000_hw *hw, bool state)
 bool
 e1000_tbi_sbp_enabled_82543(struct e1000_hw *hw)
 {
-	struct e1000_dev_spec_82543 *dev_spec;
+	struct e1000_dev_spec_82543 *dev_spec = &hw->dev_spec._82543;
 	bool state = false;
 
 	DEBUGFUNC("e1000_tbi_sbp_enabled_82543");
 
 	if (hw->mac.type != e1000_82543) {
 		DEBUGOUT("TBI compatibility workaround for 82543 only.\n");
-		goto out;
-	}
-
-	dev_spec = (struct e1000_dev_spec_82543 *)hw->dev_spec;
-
-	if (!dev_spec) {
-		DEBUGOUT("dev_spec pointer is set to NULL.\n");
 		goto out;
 	}
 
@@ -401,11 +360,9 @@ out:
 static void
 e1000_set_tbi_sbp_82543(struct e1000_hw *hw, bool state)
 {
-	struct e1000_dev_spec_82543 *dev_spec;
+	struct e1000_dev_spec_82543 *dev_spec = &hw->dev_spec._82543;
 
 	DEBUGFUNC("e1000_set_tbi_sbp_82543");
-
-	dev_spec = (struct e1000_dev_spec_82543 *)hw->dev_spec;
 
 	if (state && e1000_tbi_compatibility_enabled_82543(hw))
 		dev_spec->tbi_compatibility |= TBI_SBP_ENABLED;
@@ -423,20 +380,12 @@ e1000_set_tbi_sbp_82543(struct e1000_hw *hw, bool state)
 static bool
 e1000_init_phy_disabled_82543(struct e1000_hw *hw)
 {
-	struct e1000_dev_spec_82543 *dev_spec;
+	struct e1000_dev_spec_82543 *dev_spec = &hw->dev_spec._82543;
 	bool ret_val;
 
 	DEBUGFUNC("e1000_init_phy_disabled_82543");
 
 	if (hw->mac.type != e1000_82543) {
-		ret_val = false;
-		goto out;
-	}
-
-	dev_spec = (struct e1000_dev_spec_82543 *)hw->dev_spec;
-
-	if (!dev_spec) {
-		DEBUGOUT("dev_spec pointer is set to NULL.\n");
 		ret_val = false;
 		goto out;
 	}
@@ -911,7 +860,7 @@ out:
  * Sets the PHY_RESET_DIR bit in the extended device control register
  * to put the PHY into a reset and waits for completion.  Once the reset
  * has been accomplished, clear the PHY_RESET_DIR bit to take the PHY out
- * of reset.  This is a function pointer entry point called by the api module.
+ * of reset.
  */
 static s32
 e1000_phy_hw_reset_82543(struct e1000_hw *hw)
@@ -952,8 +901,7 @@ e1000_phy_hw_reset_82543(struct e1000_hw *hw)
  * e1000_reset_hw_82543 - Reset hardware
  * @hw: pointer to the HW structure
  *
- * This resets the hardware into a known state.  This is a
- * function pointer entry point called by the api module.
+ * This resets the hardware into a known state.
  */
 static s32
 e1000_reset_hw_82543(struct e1000_hw *hw)
@@ -1015,20 +963,12 @@ static s32
 e1000_init_hw_82543(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_dev_spec_82543 *dev_spec;
+	struct e1000_dev_spec_82543 *dev_spec = &hw->dev_spec._82543;
 	u32 ctrl;
 	s32 ret_val;
 	u16 i;
 
 	DEBUGFUNC("e1000_init_hw_82543");
-
-	dev_spec = (struct e1000_dev_spec_82543 *)hw->dev_spec;
-
-	if (!dev_spec) {
-		DEBUGOUT("dev_spec pointer is set to NULL.\n");
-		ret_val = -E1000_ERR_CONFIG;
-		goto out;
-	}
 
 	/* Disabling VLAN filtering */
 	E1000_WRITE_REG(hw, E1000_VET, 0);
@@ -1067,7 +1007,6 @@ e1000_init_hw_82543(struct e1000_hw *hw)
 	 */
 	e1000_clear_hw_cntrs_82543(hw);
 
-out:
 	return (ret_val);
 }
 
@@ -1595,8 +1534,7 @@ e1000_mta_set_82543(struct e1000_hw *hw, u32 hash_value)
  * e1000_led_on_82543 - Turn on SW controllable LED
  * @hw: pointer to the HW structure
  *
- * Turns the SW defined LED on.  This is a function pointer entry point
- * called by the api module.
+ * Turns the SW defined LED on.
  */
 static s32
 e1000_led_on_82543(struct e1000_hw *hw)
@@ -1624,8 +1562,7 @@ e1000_led_on_82543(struct e1000_hw *hw)
  * e1000_led_off_82543 - Turn off SW controllable LED
  * @hw: pointer to the HW structure
  *
- * Turns the SW defined LED off.  This is a function pointer entry point
- * called by the api module.
+ * Turns the SW defined LED off.
  */
 static s32
 e1000_led_off_82543(struct e1000_hw *hw)

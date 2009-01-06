@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,12 +19,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.47 v2008-7-17_MountAngel2
+ * IntelVersion: 1.55 sol_anvik_patch
  */
 #ifndef _E1000_PHY_H_
 #define	_E1000_PHY_H_
@@ -32,19 +32,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-typedef enum {
-	e1000_ms_hw_default = 0,
-	e1000_ms_force_master,
-	e1000_ms_force_slave,
-	e1000_ms_auto
-} e1000_ms_type;
-
-typedef enum {
-	e1000_smart_speed_default = 0,
-	e1000_smart_speed_on,
-	e1000_smart_speed_off
-} e1000_smart_speed;
 
 void e1000_init_phy_ops_generic(struct e1000_hw *hw);
 s32 e1000_null_read_reg(struct e1000_hw *hw, u32 offset, u16 *data);
@@ -84,12 +71,10 @@ s32 e1000_phy_reset_dsp(struct e1000_hw *hw);
 s32 e1000_phy_has_link_generic(struct e1000_hw *hw, u32 iterations,
     u32 usec_interval, bool *success);
 s32 e1000_phy_init_script_igp3(struct e1000_hw *hw);
-e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id);
+enum e1000_phy_type e1000_get_phy_type_from_id(u32 phy_id);
 s32 e1000_determine_phy_address(struct e1000_hw *hw);
 s32 e1000_write_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 data);
 s32 e1000_read_phy_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data);
-s32 e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw, u32 offset, u16 *data,
-    bool read);
 s32 e1000_read_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 *data);
 s32 e1000_write_phy_reg_bm2(struct e1000_hw *hw, u32 offset, u16 data);
 void e1000_power_up_phy_copper(struct e1000_hw *hw);

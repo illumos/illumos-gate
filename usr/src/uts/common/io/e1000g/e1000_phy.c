@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,16 +19,18 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.88 v2008-7-17_MountAngel2
+ * IntelVersion: 1.112 sol_anvik_patch
  */
 #include "e1000_api.h"
 
 static u32 e1000_get_phy_addr_for_bm_page(u32 page, u32 reg);
+static s32 e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw, u32 offset,
+    u16 *data, bool read);
 
 /* Cable length tables */
 static const u16 e1000_m88_cable_length_table[] =
@@ -82,6 +84,7 @@ e1000_init_phy_ops_generic(struct e1000_hw *hw)
 	phy->ops.write_reg = e1000_null_write_reg;
 	phy->ops.power_up = e1000_null_phy_generic;
 	phy->ops.power_down = e1000_null_phy_generic;
+	phy->ops.cfg_on_link_up = e1000_null_ops_generic;
 }
 
 /*
@@ -979,9 +982,8 @@ e1000_phy_setup_autoneg(struct e1000_hw *hw)
 	}
 
 	/* We do not allow the Phy to advertise 1000 Mb Half Duplex */
-	if (phy->autoneg_advertised & ADVERTISE_1000_HALF) {
+	if (phy->autoneg_advertised & ADVERTISE_1000_HALF)
 		DEBUGOUT("Advertise 1000mb Half duplex request denied!\n");
-	}
 
 	/* Do we want to advertise 1000 Mb Full Duplex? */
 	if (phy->autoneg_advertised & ADVERTISE_1000_FULL) {
@@ -1007,7 +1009,7 @@ e1000_phy_setup_autoneg(struct e1000_hw *hw)
 	 * other: No software override.  The flow control configuration
 	 *	in the EEPROM is used.
 	 */
-	switch (hw->fc.type) {
+	switch (hw->fc.current_mode) {
 	case e1000_fc_none:
 		/*
 		 * Flow control (Rx & Tx) is completely disabled by a software
@@ -1185,9 +1187,8 @@ e1000_phy_force_speed_duplex_igp(struct e1000_hw *hw)
 		if (ret_val)
 			goto out;
 
-		if (!link) {
+		if (!link)
 			DEBUGOUT("Link taking longer than expected.\n");
-		}
 
 		/* Try once more */
 		ret_val = e1000_phy_has_link_generic(hw,
@@ -1243,14 +1244,14 @@ e1000_phy_force_speed_duplex_m88(struct e1000_hw *hw)
 
 	e1000_phy_force_speed_duplex_setup(hw, &phy_data);
 
-	/* Reset the phy to commit changes. */
-	phy_data |= MII_CR_RESET;
-
 	ret_val = phy->ops.write_reg(hw, PHY_CONTROL, phy_data);
 	if (ret_val)
 		goto out;
 
-	usec_delay(1);
+	/* Reset the phy to commit changes. */
+	ret_val = hw->phy.ops.commit(hw);
+	if (ret_val)
+		goto out;
 
 	if (phy->autoneg_wait_to_complete) {
 		DEBUGOUT("Waiting for forced speed/duplex link on M88 phy.\n");
@@ -1334,7 +1335,7 @@ e1000_phy_force_speed_duplex_setup(struct e1000_hw *hw, u16 *phy_ctrl)
 	DEBUGFUNC("e1000_phy_force_speed_duplex_setup");
 
 	/* Turn off flow control when forcing speed/duplex */
-	hw->fc.type = e1000_fc_none;
+	hw->fc.current_mode = e1000_fc_none;
 
 	/* Force speed/duplex on the mac */
 	ctrl = E1000_READ_REG(hw, E1000_CTRL);
@@ -1711,10 +1712,16 @@ e1000_get_cable_length_m88(struct e1000_hw *hw)
 
 	index = (phy_data & M88E1000_PSSR_CABLE_LENGTH) >>
 	    M88E1000_PSSR_CABLE_LENGTH_SHIFT;
-	phy->min_cable_length = e1000_m88_cable_length_table[index];
-	phy->max_cable_length = e1000_m88_cable_length_table[index + 1];
 
-	phy->cable_length = (phy->min_cable_length + phy->max_cable_length) / 2;
+	if (index < M88E1000_CABLE_LENGTH_TABLE_SIZE + 1) {
+		phy->min_cable_length = e1000_m88_cable_length_table[index];
+		phy->max_cable_length = e1000_m88_cable_length_table[index + 1];
+
+		phy->cable_length = (phy->min_cable_length +
+		    phy->max_cable_length) / 2;
+	} else {
+		ret_val = E1000_ERR_PHY;
+	}
 
 out:
 	return (ret_val);
@@ -2134,10 +2141,10 @@ e1000_phy_init_script_igp3(struct e1000_hw *hw)
  *
  * Returns the phy type from the id.
  */
-e1000_phy_type
+enum e1000_phy_type
 e1000_get_phy_type_from_id(u32 phy_id)
 {
-	e1000_phy_type phy_type = e1000_phy_unknown;
+	enum e1000_phy_type phy_type = e1000_phy_unknown;
 
 	switch (phy_id) {
 	case M88E1000_I_PHY_ID:
@@ -2185,7 +2192,7 @@ e1000_determine_phy_address(struct e1000_hw *hw)
 	s32 ret_val = -E1000_ERR_PHY_TYPE;
 	u32 phy_addr = 0;
 	u32 i;
-	e1000_phy_type phy_type = e1000_phy_unknown;
+	enum e1000_phy_type phy_type = e1000_phy_unknown;
 
 	for (phy_addr = 0; phy_addr < E1000_MAX_PHY_ADDR; phy_addr++) {
 		hw->phy.addr = phy_addr;
@@ -2475,7 +2482,7 @@ out:
  * 4) Read or write the data using the data opcode (0x12)
  * 5) Restore 769_17.2 to its original value
  */
-s32
+static s32
 e1000_access_phy_wakeup_reg_bm(struct e1000_hw *hw,
     u32 offset, u16 *data, bool read)
 {

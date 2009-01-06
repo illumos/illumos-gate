@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,12 +19,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.44.12.1 v2008-7-17_MountAngel2
+ * IntelVersion: 1.50 sol_anvik_patch
  */
 #ifndef _E1000_API_H_
 #define	_E1000_API_H_
@@ -48,7 +48,6 @@ s32 e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device);
 s32 e1000_init_mac_params(struct e1000_hw *hw);
 s32 e1000_init_nvm_params(struct e1000_hw *hw);
 s32 e1000_init_phy_params(struct e1000_hw *hw);
-void e1000_remove_device(struct e1000_hw *hw);
 s32 e1000_get_bus_info(struct e1000_hw *hw);
 void e1000_clear_vfta(struct e1000_hw *hw);
 void e1000_write_vfta(struct e1000_hw *hw, u32 offset, u32 value);
@@ -78,11 +77,10 @@ s32 e1000_get_cable_length(struct e1000_hw *hw);
 s32 e1000_validate_mdi_setting(struct e1000_hw *hw);
 s32 e1000_read_phy_reg(struct e1000_hw *hw, u32 offset, u16 *data);
 s32 e1000_write_phy_reg(struct e1000_hw *hw, u32 offset, u16 data);
-s32 e1000_write_8bit_ctrl_reg(struct e1000_hw *hw, u32 reg,
-    u32 offset, u8 data);
 s32 e1000_get_phy_info(struct e1000_hw *hw);
 void e1000_release_phy(struct e1000_hw *hw);
 s32 e1000_acquire_phy(struct e1000_hw *hw);
+s32 e1000_cfg_on_link_up(struct e1000_hw *hw);
 s32 e1000_phy_hw_reset(struct e1000_hw *hw);
 s32 e1000_phy_commit(struct e1000_hw *hw);
 void e1000_power_up_phy(struct e1000_hw *hw);

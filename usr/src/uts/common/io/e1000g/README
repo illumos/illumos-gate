@@ -6,7 +6,7 @@
 #
 # CDDL LICENSE SUMMARY
 #
-# Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+# Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
 #
 # The contents of this file are subject to the terms of Version
 # 1.0 of the Common Development and Distribution License (the "License").
@@ -18,7 +18,7 @@
 # and limitations under the License.
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms of the CDDLv1.
 #
 #
@@ -623,3 +623,12 @@ Notes on packaging:
 ======
   This version has the following fix:
    6779610 e1000g fails to attach post-6713032 due to memory allocation failures on some chipsets
+
+5.3.2
+======
+  This version has the following fix:
+   6779494 e1000g need to sync with sol_anvik_patch shared code from Intel
+   6758857 fmadm reporting undiagnosable problems in snv_99
+   6698312 starcat panicked with "bad mutex" while running SUNWsgdr
+   6759330 PIT: panic during first reboot after successful pkgadd during osinstall
+   6776453 Monza(CP3260): loopback test fails on e1000g serdes ports

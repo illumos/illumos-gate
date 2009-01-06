@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,12 +19,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.91 v2008-7-17_MountAngel2
+ * IntelVersion: 1.107 sol_anvik_patch
  */
 
 #include "e1000_api.h"
@@ -69,7 +69,6 @@ e1000_init_nvm_params(struct e1000_hw *hw)
 	s32 ret_val = E1000_SUCCESS;
 
 	if (hw->nvm.ops.init_params) {
-		hw->nvm.semaphore_delay = 10;
 		ret_val = hw->nvm.ops.init_params(hw);
 		if (ret_val) {
 			DEBUGOUT("NVM Initialization Error\n");
@@ -360,20 +359,6 @@ e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device)
 
 out:
 	return (ret_val);
-}
-
-/*
- * e1000_remove_device - Free device specific structure
- * @hw: pointer to the HW structure
- *
- * If a device specific structure was allocated, this function will
- * free it. This is a function pointer entry point called by drivers.
- */
-void
-e1000_remove_device(struct e1000_hw *hw)
-{
-	if (hw->mac.ops.remove_device)
-		hw->mac.ops.remove_device(hw);
 }
 
 /*
@@ -948,6 +933,19 @@ e1000_acquire_phy(struct e1000_hw *hw)
 }
 
 /*
+ * e1000_cfg_on_link_up - Configure PHY upon link up
+ * @hw: pointer to the HW structure
+ */
+s32
+e1000_cfg_on_link_up(struct e1000_hw *hw)
+{
+	if (hw->phy.ops.cfg_on_link_up)
+		return (hw->phy.ops.cfg_on_link_up(hw));
+
+	return (E1000_SUCCESS);
+}
+
+/*
  * e1000_read_kmrn_reg - Reads register using Kumeran interface
  * @hw: pointer to the HW structure
  * @offset: the register to read
@@ -1209,22 +1207,6 @@ e1000_write_nvm(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 }
 
 /*
- * e1000_write_8bit_ctrl_reg - Writes 8bit Control register
- * @hw: pointer to the HW structure
- * @reg: 32bit register offset
- * @offset: the register to write
- * @data: the value to write.
- *
- * Writes the PHY register at offset with the value in data.
- * This is a function pointer entry point called by drivers.
- */
-s32
-e1000_write_8bit_ctrl_reg(struct e1000_hw *hw, u32 reg, u32 offset, u8 data)
-{
-	return (e1000_write_8bit_ctrl_reg_generic(hw, reg, offset, data));
-}
-
-/*
  * e1000_power_up_phy - Restores link in case of PHY power down
  * @hw: pointer to the HW structure
  *
@@ -1252,17 +1234,4 @@ e1000_power_down_phy(struct e1000_hw *hw)
 {
 	if (hw->phy.ops.power_down)
 		hw->phy.ops.power_down(hw);
-}
-
-/*
- * e1000_shutdown_fiber_serdes_link - Remove link during power down
- * @hw: pointer to the HW structure
- *
- * Shutdown the optics and PCS on driver unload.
- */
-void
-e1000_shutdown_fiber_serdes_link(struct e1000_hw *hw)
-{
-	if (hw->mac.ops.shutdown_serdes)
-		hw->mac.ops.shutdown_serdes(hw);
 }

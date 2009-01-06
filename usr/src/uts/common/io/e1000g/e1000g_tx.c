@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +119,8 @@ e1000g_m_tx(void *arg, mblk_t *mp)
 
 	rw_enter(&Adapter->chip_lock, RW_READER);
 
-	if ((Adapter->chip_state != E1000G_START) ||
+	if ((Adapter->e1000g_state & E1000G_SUSPENDED) ||
+	    !(Adapter->e1000g_state & E1000G_STARTED) ||
 	    (Adapter->link_state != LINK_STATE_UP)) {
 		freemsgchain(mp);
 		mp = NULL;
@@ -809,7 +810,7 @@ e1000g_fill_tx_ring(e1000g_tx_ring_t *tx_ring, LIST_DESCRIBER *pending_list,
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
-		Adapter->chip_state = E1000G_ERROR;
+		Adapter->e1000g_state |= E1000G_ERROR;
 	}
 
 	/* Put the pending SwPackets to the "Used" list */
@@ -988,7 +989,7 @@ e1000g_recycle(e1000g_tx_ring_t *tx_ring)
 	if (e1000g_check_dma_handle(
 	    tx_ring->tbd_dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
-		Adapter->chip_state = E1000G_ERROR;
+		Adapter->e1000g_state |= E1000G_ERROR;
 		return (0);
 	}
 

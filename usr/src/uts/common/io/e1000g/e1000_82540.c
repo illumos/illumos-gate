@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,20 +19,23 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.51 v2008-7-17_MountAngel2
+ * IntelVersion: 1.54 sol_anvik_patch
  */
 
 /*
- * e1000_82540
- * e1000_82545
- * e1000_82546
- * e1000_82545_rev_3
- * e1000_82546_rev_3
+ * 82540EM Gigabit Ethernet Controller
+ * 82540EP Gigabit Ethernet Controller
+ * 82545EM Gigabit Ethernet Controller (Copper)
+ * 82545EM Gigabit Ethernet Controller (Fiber)
+ * 82545GM Gigabit Ethernet Controller
+ * 82546EB Gigabit Ethernet Controller (Copper)
+ * 82546EB Gigabit Ethernet Controller (Fiber)
+ * 82546GB Gigabit Ethernet Controller
  */
 
 #include "e1000_api.h"
@@ -53,8 +56,6 @@ static void e1000_power_down_phy_copper_82540(struct e1000_hw *hw);
 /*
  * e1000_init_phy_params_82540 - Init PHY func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_phy_params_82540(struct e1000_hw *hw)
@@ -106,8 +107,6 @@ out:
 /*
  * e1000_init_nvm_params_82540 - Init NVM func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_nvm_params_82540(struct e1000_hw *hw)
@@ -150,8 +149,6 @@ e1000_init_nvm_params_82540(struct e1000_hw *hw)
 /*
  * e1000_init_mac_params_82540 - Init MAC func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_mac_params_82540(struct e1000_hw *hw)
@@ -244,8 +241,7 @@ out:
  * e1000_init_function_pointers_82540 - Init func ptrs.
  * @hw: pointer to the HW structure
  *
- * The only function explicitly called by the api module to initialize
- * all function pointers and parameters.
+ * Called to initialize all function pointers and parameters.
  */
 void
 e1000_init_function_pointers_82540(struct e1000_hw *hw)
@@ -261,8 +257,7 @@ e1000_init_function_pointers_82540(struct e1000_hw *hw)
  *  e1000_reset_hw_82540 - Reset hardware
  *  @hw: pointer to the HW structure
  *
- *  This resets the hardware into a known state.  This is a
- *  function pointer entry point called by the api module.
+ *  This resets the hardware into a known state.
  */
 static s32
 e1000_reset_hw_82540(struct e1000_hw *hw)
@@ -321,8 +316,7 @@ e1000_reset_hw_82540(struct e1000_hw *hw)
  *  e1000_init_hw_82540 - Initialize hardware
  *  @hw: pointer to the HW structure
  *
- *  This inits the hardware readying it for operation.  This is a
- *  function pointer entry point called by the api module.
+ *  This inits the hardware readying it for operation.
  */
 static s32
 e1000_init_hw_82540(struct e1000_hw *hw)
@@ -405,8 +399,7 @@ e1000_init_hw_82540(struct e1000_hw *hw)
  *  Calls the appropriate function to configure the link for auto-neg or forced
  *  speed and duplex.  Then we check for link, once link is established calls
  *  to configure collision distance and flow control are called.  If link is
- *  not established, we return -E1000_ERR_PHY (-2).  This is a function
- *  pointer entry point called by the api module.
+ *  not established, we return -E1000_ERR_PHY (-2).
  */
 static s32
 e1000_setup_copper_link_82540(struct e1000_hw *hw)
@@ -455,8 +448,7 @@ out:
  *  Set the output amplitude to the value in the EEPROM and adjust the VCO
  *  speed to improve Bit Error Rate (BER) performance.  Configures collision
  *  distance and flow control for fiber and serdes links.  Upon successful
- *  setup, poll for link.  This is a function pointer entry point called by
- *  the api module.
+ *  setup, poll for link.
  */
 static s32
 e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw)

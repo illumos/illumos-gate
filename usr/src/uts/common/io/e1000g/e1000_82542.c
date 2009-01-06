@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,16 +19,16 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.42 v2008-7-17_MountAngel2
+ * IntelVersion: 1.50 sol_anvik_patch
  */
 
 /*
- * e1000_82542 (rev 1 & 2)
+ * 82542 Gigabit Ethernet Controller
  */
 
 #include "e1000_api.h"
@@ -45,15 +45,9 @@ static s32 e1000_led_off_82542(struct e1000_hw *hw);
 static void e1000_rar_set_82542(struct e1000_hw *hw, u8 *addr, u32 index);
 static void e1000_clear_hw_cntrs_82542(struct e1000_hw *hw);
 
-struct e1000_dev_spec_82542 {
-	bool dma_fairness;
-};
-
 /*
  * e1000_init_phy_params_82542 - Init PHY func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_phy_params_82542(struct e1000_hw *hw)
@@ -71,8 +65,6 @@ e1000_init_phy_params_82542(struct e1000_hw *hw)
 /*
  * e1000_init_nvm_params_82542 - Init NVM func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_nvm_params_82542(struct e1000_hw *hw)
@@ -100,14 +92,11 @@ e1000_init_nvm_params_82542(struct e1000_hw *hw)
 /*
  * e1000_init_mac_params_82542 - Init MAC func ptrs.
  * @hw: pointer to the HW structure
- *
- * This is a function pointer entry point called by the api module.
  */
 static s32
 e1000_init_mac_params_82542(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	s32 ret_val = E1000_SUCCESS;
 
 	DEBUGFUNC("e1000_init_mac_params_82542");
 
@@ -147,28 +136,20 @@ e1000_init_mac_params_82542(struct e1000_hw *hw)
 	/* turn on/off LED */
 	mac->ops.led_on = e1000_led_on_82542;
 	mac->ops.led_off = e1000_led_off_82542;
-	/* remove device */
-	mac->ops.remove_device = e1000_remove_device_generic;
 	/* clear hardware counters */
 	mac->ops.clear_hw_cntrs = e1000_clear_hw_cntrs_82542;
 	/* link info */
 	mac->ops.get_link_up_info =
 	    e1000_get_speed_and_duplex_fiber_serdes_generic;
 
-	hw->dev_spec_size = sizeof (struct e1000_dev_spec_82542);
-
-	/* Device-specific structure allocation */
-	ret_val = e1000_alloc_zeroed_dev_spec_struct(hw, hw->dev_spec_size);
-
-	return (ret_val);
+	return (E1000_SUCCESS);
 }
 
 /*
  * e1000_init_function_pointers_82542 - Init func ptrs.
  * @hw: pointer to the HW structure
  *
- * The only function explicitly called by the api module to initialize
- * all function pointers and parameters.
+ * Called to initialize all function pointers and parameters.
  */
 void
 e1000_init_function_pointers_82542(struct e1000_hw *hw)
@@ -185,8 +166,7 @@ e1000_init_function_pointers_82542(struct e1000_hw *hw)
  * @hw: pointer to the HW structure
  *
  * This will obtain information about the HW bus for which the
- * adapter is attached and stores it in the hw structure.  This is a function
- * pointer entry point called by the api module.
+ * adapter is attached and stores it in the hw structure.
  */
 static s32
 e1000_get_bus_info_82542(struct e1000_hw *hw)
@@ -204,8 +184,7 @@ e1000_get_bus_info_82542(struct e1000_hw *hw)
  * e1000_reset_hw_82542 - Reset hardware
  * @hw: pointer to the HW structure
  *
- * This resets the hardware into a known state.  This is a
- * function pointer entry point called by the api module.
+ * This resets the hardware into a known state.
  */
 static s32
 e1000_reset_hw_82542(struct e1000_hw *hw)
@@ -256,21 +235,18 @@ e1000_reset_hw_82542(struct e1000_hw *hw)
  * e1000_init_hw_82542 - Initialize hardware
  * @hw: pointer to the HW structure
  *
- * This inits the hardware readying it for operation.  This is a
- * function pointer entry point called by the api module.
+ * This inits the hardware readying it for operation.
  */
 static s32
 e1000_init_hw_82542(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	struct e1000_dev_spec_82542 *dev_spec;
+	struct e1000_dev_spec_82542 *dev_spec = &hw->dev_spec._82542;
 	s32 ret_val = E1000_SUCCESS;
 	u32 ctrl;
 	u16 i;
 
 	DEBUGFUNC("e1000_init_hw_82542");
-
-	dev_spec = (struct e1000_dev_spec_82542 *)hw->dev_spec;
 
 	/* Disabling VLAN filtering */
 	E1000_WRITE_REG(hw, E1000_VET, 0);
@@ -334,8 +310,7 @@ e1000_init_hw_82542(struct e1000_hw *hw)
  * control.  Calls the appropriate media-specific link configuration
  * function.  Assuming the adapter has a valid link partner, a valid link
  * should be established.  Assumes the hardware has previously been reset
- * and the transmitter and receiver are not enabled.  This is a function
- * pointer entry point called by the api module.
+ * and the transmitter and receiver are not enabled.
  */
 static s32
 e1000_setup_link_82542(struct e1000_hw *hw)
@@ -349,19 +324,19 @@ e1000_setup_link_82542(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	hw->fc.type &= ~e1000_fc_tx_pause;
+	hw->fc.current_mode &= ~e1000_fc_tx_pause;
 
 	if (mac->report_tx_early == 1)
-		hw->fc.type &= ~e1000_fc_rx_pause;
+		hw->fc.current_mode &= ~e1000_fc_rx_pause;
 
 	/*
-	 * We want to save off the original Flow Control configuration just in
-	 * case we get disconnected and then reconnected into a different hub
-	 * or switch with different Flow Control capabilities.
+	 * Save off the requested flow control mode for use later.  Depending
+	 * on the link partner's capabilities, we may or may not use this mode.
 	 */
-	hw->fc.original_type = hw->fc.type;
+	hw->fc.requested_mode = hw->fc.current_mode;
 
-	DEBUGOUT1("After fix-ups FlowControl is now = %x\n", hw->fc.type);
+	DEBUGOUT1("After fix-ups FlowControl is now = %x\n",
+	    hw->fc.current_mode);
 
 	/* Call the necessary subroutine to configure the link. */
 	ret_val = mac->ops.setup_physical_interface(hw);
@@ -392,8 +367,7 @@ out:
  * e1000_led_on_82542 - Turn on SW controllable LED
  * @hw: pointer to the HW structure
  *
- * Turns the SW defined LED on.  This is a function pointer entry point
- * called by the api module.
+ * Turns the SW defined LED on.
  */
 static s32
 e1000_led_on_82542(struct e1000_hw *hw)
@@ -413,8 +387,7 @@ e1000_led_on_82542(struct e1000_hw *hw)
  * e1000_led_off_82542 - Turn off SW controllable LED
  * @hw: pointer to the HW structure
  *
- * Turns the SW defined LED off.  This is a function pointer entry point
- * called by the api module.
+ * Turns the SW defined LED off.
  */
 static s32
 e1000_led_off_82542(struct e1000_hw *hw)
@@ -457,10 +430,8 @@ e1000_rar_set_82542(struct e1000_hw *hw, u8 *addr, u32 index)
 	rar_high = ((u32) addr[4] | ((u32) addr[5] << 8));
 
 	/* If MAC address zero, no need to set the AV bit */
-	if (rar_low || rar_high) {
-		if (!hw->mac.disable_av)
-			rar_high |= E1000_RAH_AV;
-	}
+	if (rar_low || rar_high)
+		rar_high |= E1000_RAH_AV;
 
 	E1000_WRITE_REG_ARRAY(hw, E1000_RA, (index << 1), rar_low);
 	E1000_WRITE_REG_ARRAY(hw, E1000_RA, ((index << 1) + 1), rar_high);

@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,12 +19,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.17 v2008-7-17_MountAngel2
+ * IntelVersion: 1.18 sol_anvik_patch
  */
 #ifndef _E1000_NVM_H_
 #define	_E1000_NVM_H_
@@ -57,7 +57,6 @@ s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data);
 s32 e1000_update_nvm_checksum_generic(struct e1000_hw *hw);
 void e1000_stop_nvm(struct e1000_hw *hw);
 void e1000_release_nvm_generic(struct e1000_hw *hw);
-void e1000_reload_nvm_generic(struct e1000_hw *hw);
 
 #define	E1000_STM_OPCODE	0xDB00
 

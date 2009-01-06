@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +76,13 @@ extern "C" {
 #include <sys/fm/util.h>
 #include <sys/fm/io/ddi.h>
 #include "e1000_api.h"
+
+/* Driver states */
+#define	E1000G_UNKNOWN			0x00
+#define	E1000G_INITIALIZED		0x01
+#define	E1000G_STARTED			0x02
+#define	E1000G_SUSPENDED		0x04
+#define	E1000G_ERROR			0x80
 
 #define	JUMBO_FRAG_LENGTH		4096
 
@@ -504,12 +511,6 @@ typedef enum {
 	USE_DMA
 } dma_type_t;
 
-typedef enum {
-	E1000G_STOP,
-	E1000G_START,
-	E1000G_ERROR
-} chip_state_t;
-
 typedef struct _dma_buffer {
 	caddr_t address;
 	uint64_t dma_address;
@@ -817,7 +818,7 @@ typedef struct e1000g {
 	struct e1000_hw shared;
 	struct e1000g_osdep osdep;
 
-	chip_state_t chip_state;
+	uint32_t e1000g_state;
 	boolean_t e1000g_promisc;
 	boolean_t strip_crc;
 	boolean_t rx_buffer_setup;
@@ -867,8 +868,6 @@ typedef struct e1000g {
 	e1000g_rx_ring_t rx_ring[1];
 	e1000g_tx_ring_t tx_ring[1];
 	mac_group_handle_t rx_group;
-
-	kmutex_t gen_lock; /* General lock for the whole struct e1000g */
 
 	/*
 	 * Rx and Tx packet count for interrupt adaptive setting

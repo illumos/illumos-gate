@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -320,6 +320,11 @@ e1000g_m_stat(void *arg, uint_t stat, uint64_t *val)
 	e1000g_ksp = (p_e1000g_stat_t)Adapter->e1000g_ksp->ks_data;
 
 	rw_enter(&Adapter->chip_lock, RW_READER);
+
+	if (Adapter->e1000g_state & E1000G_SUSPENDED) {
+		rw_exit(&Adapter->chip_lock);
+		return (ECANCELED);
+	}
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:

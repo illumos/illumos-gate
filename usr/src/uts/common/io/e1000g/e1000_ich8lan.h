@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,12 +19,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 /*
- * IntelVersion: 1.23 v2008-7-17_MountAngel2
+ * IntelVersion: 1.25 sol_anvik_patch
  */
 #ifndef _E1000_ICH8LAN_H_
 #define	_E1000_ICH8LAN_H_
@@ -51,8 +51,6 @@ extern "C" {
 
 #define	FLASH_GFPREG_BASE_MASK		0x1FFF
 #define	FLASH_SECTOR_ADDR_SHIFT		12
-
-#define	E1000_SHADOW_RAM_WORDS		2048
 
 #define	ICH_FLASH_SEG_SIZE_256		256
 #define	ICH_FLASH_SEG_SIZE_4K		4096

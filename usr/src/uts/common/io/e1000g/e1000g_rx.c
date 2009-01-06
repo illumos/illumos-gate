@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,7 +19,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -368,9 +368,9 @@ e1000g_rx_setup(struct e1000g *Adapter)
 		rctl |= E1000_RCTL_SBP;
 
 	/*
-	 * Enable early receives on supported devices, only takes effect when
-	 * packet size is equal or larger than the specified value (in 8 byte
-	 * units), e.g. using jumbo frames when setting to E1000_ERT_2048
+	 * Enable Early Receive Threshold (ERT) on supported devices.
+	 * Only takes effect when packet size is equal or larger than the
+	 * specified value (in 8 byte units), e.g. using jumbo frames.
 	 */
 	if ((hw->mac.type == e1000_82573) ||
 	    (hw->mac.type == e1000_82574) ||
@@ -488,7 +488,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t *sz)
 
 	if (e1000g_check_dma_handle(rx_ring->rbd_dma_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
-		Adapter->chip_state = E1000G_ERROR;
+		Adapter->e1000g_state |= E1000G_ERROR;
 	}
 
 	current_desc = rx_ring->rbd_next;
@@ -555,7 +555,7 @@ e1000g_receive(e1000g_rx_ring_t *rx_ring, mblk_t **tail, uint_t *sz)
 		    rx_buf->dma_handle) != DDI_FM_OK) {
 			ddi_fm_service_impact(Adapter->dip,
 			    DDI_SERVICE_DEGRADED);
-			Adapter->chip_state = E1000G_ERROR;
+			Adapter->e1000g_state |= E1000G_ERROR;
 		}
 
 		accept_frame = (current_desc->errors == 0) ||
@@ -874,7 +874,7 @@ rx_next_desc:
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
-		Adapter->chip_state = E1000G_ERROR;
+		Adapter->e1000g_state |= E1000G_ERROR;
 	}
 
 	Adapter->rx_pkt_cnt = pkt_count;
@@ -919,7 +919,7 @@ rx_drop:
 
 	if (e1000g_check_acc_handle(Adapter->osdep.reg_handle) != DDI_FM_OK) {
 		ddi_fm_service_impact(Adapter->dip, DDI_SERVICE_DEGRADED);
-		Adapter->chip_state = E1000G_ERROR;
+		Adapter->e1000g_state |= E1000G_ERROR;
 	}
 
 	return (ret_mp);

@@ -6,7 +6,7 @@
  *
  * CDDL LICENSE SUMMARY
  *
- * Copyright(c) 1999 - 2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2009 Intel Corporation. All rights reserved.
  *
  * The contents of this file are subject to the terms of Version
  * 1.0 of the Common Development and Distribution License (the "License").
@@ -19,31 +19,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDLv1.
  */
 
 #include "e1000_osdep.h"
 #include "e1000_api.h"
-
-
-s32
-e1000_alloc_zeroed_dev_spec_struct(struct e1000_hw *hw, u32 size)
-{
-	hw->dev_spec = kmem_zalloc(size, KM_SLEEP);
-
-	return (E1000_SUCCESS);
-}
-
-void
-e1000_free_dev_spec_struct(struct e1000_hw *hw)
-{
-	if (hw->dev_spec == NULL)
-		return;
-
-	kmem_free(hw->dev_spec, hw->dev_spec_size);
-	hw->dev_spec = NULL;
-}
 
 void
 e1000_pci_set_mwi(struct e1000_hw *hw)
