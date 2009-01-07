@@ -1750,7 +1750,7 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 	 *	    having to figure out this information later
 	 */
 	lun_start = 0;
-	rw_enter(&isp->sess_lun_list_rwlock, RW_READER);
+	rw_enter(&isp->sess_lun_list_rwlock, RW_WRITER);
 	for (ilp = isp->sess_lun_list; ilp; ilp = ilp->lun_next) {
 		for (lun_count = lun_start;
 		    lun_count < lun_total; lun_count++) {
@@ -1838,9 +1838,7 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 			DTRACE_PROBE2(sess_reportluns_lun_no_longer_exists,
 			    int, ilp->lun_num, int, ilp->lun_state);
 
-			if (ilp->lun_state == ISCSI_LUN_STATE_ONLINE) {
-				(void) iscsi_lun_offline(ihp, ilp, B_FALSE);
-			}
+			(void) iscsi_lun_destroy(ihp, ilp);
 		}
 	}
 	rw_exit(&isp->sess_lun_list_rwlock);
