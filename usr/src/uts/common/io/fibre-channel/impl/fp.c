@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * NOT a DDI compliant Sun Fibre Channel port driver(fp)
@@ -94,7 +94,7 @@ static struct dev_ops fp_ops = {
 	fp_power	/* power */
 };
 
-#define	FP_VERSION		"1.96"
+#define	FP_VERSION		"1.97"
 #define	FP_NAME_VERSION		"SunFC Port v" FP_VERSION
 
 char *fp_version = FP_NAME_VERSION;
@@ -165,7 +165,7 @@ static struct fp_perms {
 	uint16_t	fp_ioctl_cmd;
 	uchar_t		fp_open_flag;
 } fp_perm_list [] = {
-	{ FCIO_GET_NUM_DEVS, 		FP_OPEN },
+	{ FCIO_GET_NUM_DEVS,		FP_OPEN },
 	{ FCIO_GET_DEV_LIST,		FP_OPEN },
 	{ FCIO_GET_SYM_PNAME,		FP_OPEN },
 	{ FCIO_GET_SYM_NNAME,		FP_OPEN },
@@ -216,13 +216,13 @@ static char *fp_pm_comps[] = {
 
 
 #ifdef	_LITTLE_ENDIAN
-#define	MAKE_BE_32(x)	{ \
-	uint32_t	*ptr1, i; \
-		ptr1 = (uint32_t *)(x); \
+#define	MAKE_BE_32(x)	{						\
+		uint32_t	*ptr1, i;				\
+		ptr1 = (uint32_t *)(x);					\
 		for (i = 0; i < sizeof (*(x)) / sizeof (uint32_t); i++) { \
-			*ptr1 = BE_32(*ptr1); \
-			ptr1++; \
-		} \
+			*ptr1 = BE_32(*ptr1);				\
+			ptr1++;						\
+		}							\
 	}
 #else
 #define	MAKE_BE_32(x)
@@ -256,7 +256,7 @@ static fc_trace_logq_t	*fp_logq = NULL;
 int fp_get_adapter_paths(char *pathList, int count);
 static void fp_log_port_event(fc_local_port_t *port, char *subclass);
 static void fp_log_target_event(fc_local_port_t *port, char *subclass,
-	    la_wwn_t tgt_pwwn, uint32_t port_id);
+    la_wwn_t tgt_pwwn, uint32_t port_id);
 static uint32_t fp_map_remote_port_state(uint32_t rm_state);
 static void fp_init_symbolic_names(fc_local_port_t *port);
 
@@ -396,9 +396,9 @@ fp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 fp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-	int 			rval = DDI_FAILURE;
-	fc_local_port_t 	*port;
-	fc_attach_cmd_t 	converse;
+	int			rval = DDI_FAILURE;
+	fc_local_port_t		*port;
+	fc_attach_cmd_t		converse;
 	uint8_t			cnt;
 
 	if ((port = ddi_get_soft_state(fp_driver_softstate,
@@ -508,7 +508,7 @@ fp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		/*
 		 * Mark state as detach failed so asynchronous ULP attach
 		 * events (downstream, not the ones we're initiating with
-		 * the call to fp_attach_ulps) are not honored.  We're
+		 * the call to fp_attach_ulps) are not honored.	 We're
 		 * really still in pending detach.
 		 */
 		port->fp_soft_state |= FP_DETACH_FAILED;
@@ -530,7 +530,7 @@ fp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 static int
 fp_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
-	int 		rval;
+	int		rval;
 	minor_t		instance;
 	fc_local_port_t *port;
 
@@ -665,7 +665,7 @@ fp_power(dev_info_t *dip, int comp, int level)
 static int
 fp_open(dev_t *devp, int flag, int otype, cred_t *credp)
 {
-	int 		instance;
+	int		instance;
 	fc_local_port_t *port;
 
 	if (otype != OTYP_CHR) {
@@ -728,7 +728,7 @@ fp_open(dev_t *devp, int flag, int otype, cred_t *credp)
 static int
 fp_close(dev_t dev, int flag, int otype, cred_t *credp)
 {
-	int 		instance;
+	int		instance;
 	fc_local_port_t *port;
 
 	if (otype != OTYP_CHR) {
@@ -761,7 +761,7 @@ fp_close(dev_t dev, int flag, int otype, cred_t *credp)
 static int
 fp_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp, int *rval)
 {
-	int 		instance;
+	int		instance;
 	int		ret = 0;
 	fcio_t		fcio;
 	fc_local_port_t *port;
@@ -813,13 +813,13 @@ fp_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp, int *rval)
 			fcio.fcio_cmd_flags = fcio32.fcio_cmd_flags;
 			fcio.fcio_ilen = (size_t)fcio32.fcio_ilen;
 			fcio.fcio_ibuf =
-				(caddr_t)(uintptr_t)fcio32.fcio_ibuf;
+			    (caddr_t)(uintptr_t)fcio32.fcio_ibuf;
 			fcio.fcio_olen = (size_t)fcio32.fcio_olen;
 			fcio.fcio_obuf =
-				(caddr_t)(uintptr_t)fcio32.fcio_obuf;
+			    (caddr_t)(uintptr_t)fcio32.fcio_obuf;
 			fcio.fcio_alen = (size_t)fcio32.fcio_alen;
 			fcio.fcio_abuf =
-				(caddr_t)(uintptr_t)fcio32.fcio_abuf;
+			    (caddr_t)(uintptr_t)fcio32.fcio_abuf;
 			fcio.fcio_errno = fcio32.fcio_errno;
 			break;
 		}
@@ -833,7 +833,7 @@ fp_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp, int *rval)
 		}
 #else	/* _MULTI_DATAMODEL */
 		if (ddi_copyin((void *)data, (void *)&fcio,
-		sizeof (fcio_t), mode)) {
+		    sizeof (fcio_t), mode)) {
 			ret = EFAULT;
 			break;
 		}
@@ -862,9 +862,9 @@ fp_ioctl(dev_t dev, int cmd, intptr_t data, int mode, cred_t *credp, int *rval)
  * if LV fails to get these,
  * LV will register its default symbolic names to name server.
  * The Default symbolic node name format is :
- * 	<hostname>:<hba driver name>(instance)
+ *	<hostname>:<hba driver name>(instance)
  * The Default symbolic port name format is :
- * 	<fp path name>
+ *	<fp path name>
  */
 static void
 fp_init_symbolic_names(fc_local_port_t *port)
@@ -914,14 +914,14 @@ fp_attach_handler(dev_info_t *dip)
 {
 	int			rval;
 	int			instance;
-	int 			port_num;
+	int			port_num;
 	int			port_len;
-	char 			name[30];
+	char			name[30];
 	char			i_pwwn[17];
 	fp_cmd_t		*pkt;
 	uint32_t		ub_count;
-	fc_local_port_t 	*port;
-	job_request_t 		*job;
+	fc_local_port_t		*port;
+	job_request_t		*job;
 	fc_local_port_t *phyport = NULL;
 	int portpro1;
 	char pwwn[17], nwwn[17];
@@ -1009,7 +1009,7 @@ fp_attach_handler(dev_info_t *dip)
 	    (port->fp_fca_tran->fca_pkt_size) + sizeof (fp_cmd_t), 8,
 	    fp_cache_constructor, fp_cache_destructor, NULL, (void *)port,
 	    NULL, 0);
-
+	port->fp_out_fpcmds = 0;
 	if (port->fp_pkt_cache == NULL) {
 		goto cache_alloc_failed;
 	}
@@ -1029,7 +1029,7 @@ fp_attach_handler(dev_info_t *dip)
 	    MINCLSYSPRI, 1, 16, 0);
 
 	/* Indicate that don't have the pm components yet */
-	port->fp_soft_state |=  FP_SOFT_NO_PMCOMP;
+	port->fp_soft_state |=	FP_SOFT_NO_PMCOMP;
 
 	/*
 	 * Bind the callbacks with the FCA driver. This will open the gate
@@ -1200,12 +1200,12 @@ fp_attach_handler(dev_info_t *dip)
 
 		/*
 		 * Don't unset the FP_SOFT_NO_PMCOMP flag until after
-		 * the call to pm_raise_power.  The PM framework can't
+		 * the call to pm_raise_power.	The PM framework can't
 		 * handle multiple threads calling into it during attach.
 		 */
 
 		mutex_enter(&port->fp_mutex);
-		port->fp_soft_state &=  ~FP_SOFT_NO_PMCOMP;
+		port->fp_soft_state &=	~FP_SOFT_NO_PMCOMP;
 		mutex_exit(&port->fp_mutex);
 	}
 
@@ -1458,7 +1458,7 @@ fp_resume_all(fc_local_port_t *port, fc_attach_cmd_t cmd)
  * But the unsolicited callbacks from the underlying FCA port need
  * to be handled very carefully. The steps followed to handle the
  * DDI_DETACH are:
- *	+ 	Grab the port driver mutex, check if the unsolicited
+ *	+	Grab the port driver mutex, check if the unsolicited
  *		callback is currently under processing. If true, fail
  *		the DDI_DETACH request by printing a message; If false
  *		mark the DDI_DETACH as under progress, so that any
@@ -1486,7 +1486,7 @@ fp_resume_all(fc_local_port_t *port, fc_attach_cmd_t cmd)
 static int
 fp_detach_handler(fc_local_port_t *port)
 {
-	job_request_t 	*job;
+	job_request_t	*job;
 	uint32_t	delay_count;
 	fc_orphan_t	*orp, *tmporp;
 
@@ -1500,6 +1500,22 @@ fp_detach_handler(fc_local_port_t *port)
 	 */
 	delay_count = 0;
 	mutex_enter(&port->fp_mutex);
+	if (port->fp_out_fpcmds != 0) {
+		/*
+		 * At this time we can only check fp internal commands, because
+		 * sd/ssd/scsi_vhci should have finsihed all their commands,
+		 * fcp/fcip/fcsm should have finished all their commands.
+		 *
+		 * It seems that all fp internal commands are asynchronous now.
+		 */
+		port->fp_soft_state &= ~FP_DETACH_INPROGRESS;
+		mutex_exit(&port->fp_mutex);
+
+		cmn_err(CE_WARN, "fp(%d): %d fp_cmd(s) is/are in progress"
+		    " Failing detach", port->fp_instance, port->fp_out_fpcmds);
+		return (DDI_FAILURE);
+	}
+
 	while ((port->fp_soft_state &
 	    (FP_SOFT_IN_STATEC_CB | FP_SOFT_IN_UNSOL_CB)) &&
 	    (delay_count < 30)) {
@@ -1513,6 +1529,7 @@ fp_detach_handler(fc_local_port_t *port)
 	    (FP_SOFT_IN_STATEC_CB | FP_SOFT_IN_UNSOL_CB)) {
 		port->fp_soft_state &= ~FP_DETACH_INPROGRESS;
 		mutex_exit(&port->fp_mutex);
+
 		cmn_err(CE_WARN, "fp(%d): FCA callback in progress: "
 		    " Failing detach", port->fp_instance);
 		return (DDI_FAILURE);
@@ -1590,7 +1607,7 @@ fp_detach_handler(fc_local_port_t *port)
 	mutex_enter(&port->fp_mutex);
 	if (port->fp_did_table) {
 		kmem_free(port->fp_did_table, did_table_size *
-			sizeof (struct d_id_hash));
+		    sizeof (struct d_id_hash));
 	}
 
 	if (port->fp_pwwn_table) {
@@ -1626,7 +1643,7 @@ fp_detach_handler(fc_local_port_t *port)
  *	    in progress, throw a warning message, return DDI_FAILURE
  *	- Cancel timeouts
  *	- SUSPEND the job_handler thread (means do nothing as it is
- *          taken care of by the CPR frame work)
+ *	    taken care of by the CPR frame work)
  */
 static int
 fp_suspend_handler(fc_local_port_t *port)
@@ -1787,13 +1804,13 @@ static void
 fp_suspend_all(fc_local_port_t *port)
 {
 	int			index;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 
 	if (port->fp_wait_tid != 0) {
-		timeout_id_t 	tid;
+		timeout_id_t	tid;
 
 		tid = port->fp_wait_tid;
 		port->fp_wait_tid = (timeout_id_t)NULL;
@@ -1804,7 +1821,7 @@ fp_suspend_all(fc_local_port_t *port)
 	}
 
 	if (port->fp_offline_tid) {
-		timeout_id_t 	tid;
+		timeout_id_t	tid;
 
 		tid = port->fp_offline_tid;
 		port->fp_offline_tid = (timeout_id_t)NULL;
@@ -1852,9 +1869,9 @@ fp_suspend_all(fc_local_port_t *port)
 static int
 fp_cache_constructor(void *buf, void *cdarg, int kmflags)
 {
-	int 		(*cb) (caddr_t);
-	fc_packet_t 	*pkt;
-	fp_cmd_t 	*cmd = (fp_cmd_t *)buf;
+	int		(*cb) (caddr_t);
+	fc_packet_t	*pkt;
+	fp_cmd_t	*cmd = (fp_cmd_t *)buf;
 	fc_local_port_t *port = (fc_local_port_t *)cdarg;
 
 	cb = (kmflags == KM_SLEEP) ? DDI_DMA_SLEEP : DDI_DMA_DONTWAIT;
@@ -1898,7 +1915,7 @@ fp_cache_constructor(void *buf, void *cdarg, int kmflags)
 static void
 fp_cache_destructor(void *buf, void *cdarg)
 {
-	fp_cmd_t 	*cmd = (fp_cmd_t *)buf;
+	fp_cmd_t	*cmd = (fp_cmd_t *)buf;
 	fc_packet_t	*pkt;
 
 	pkt = &cmd->cmd_pkt;
@@ -1920,7 +1937,7 @@ fp_cache_destructor(void *buf, void *cdarg)
  * or DVMA resources while performing some of these critical ELSs
  * cause a lot of problem. While memory allocation failures are
  * rare, DVMA resource failures are common as the applications
- * are becoming more and more powerful on huge servers.  So it
+ * are becoming more and more powerful on huge servers.	 So it
  * is desirable to have a framework support to reserve a fragment
  * of DVMA. So until this is fixed the correct way, the suffering
  * is huge whenever a LIP happens at a time DVMA resources are
@@ -1941,9 +1958,9 @@ fp_alloc_pkt(fc_local_port_t *port, int cmd_len, int resp_len, int kmflags,
 {
 	int		rval;
 	ulong_t		real_len;
-	fp_cmd_t 	*cmd;
+	fp_cmd_t	*cmd;
 	fc_packet_t	*pkt;
-	int 		(*cb) (caddr_t);
+	int		(*cb) (caddr_t);
 	ddi_dma_cookie_t	pkt_cookie;
 	ddi_dma_cookie_t	*cp;
 	uint32_t		cnt;
@@ -2118,7 +2135,7 @@ static void
 fp_free_pkt(fp_cmd_t *cmd)
 {
 	fc_local_port_t *port;
-	fc_packet_t 	*pkt;
+	fc_packet_t	*pkt;
 
 	ASSERT(!MUTEX_HELD(&cmd->cmd_port->fp_mutex));
 
@@ -2196,8 +2213,8 @@ fp_job_handler(fc_local_port_t *port)
 {
 	int			rval;
 	uint32_t		*d_id;
-	fc_remote_port_t 	*pd;
-	job_request_t 		*job;
+	fc_remote_port_t	*pd;
+	job_request_t		*job;
 
 #ifndef	__lock_lint
 	/*
@@ -2572,8 +2589,8 @@ fp_job_handler(fc_local_port_t *port)
 		}
 
 		case JOB_PORT_ONLINE: {
-			char 		*newtop;
-			char 		*oldtop;
+			char		*newtop;
+			char		*oldtop;
 			uint32_t	old_top;
 
 			fp_log_port_event(port, ESC_SUNFC_PORT_ONLINE);
@@ -2842,7 +2859,7 @@ fp_port_startup(fc_local_port_t *port, job_request_t *job)
 	int		rval;
 	uint32_t	state;
 	uint32_t	src_id;
-	fc_lilpmap_t 	*lilp_map;
+	fc_lilpmap_t	*lilp_map;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 	ASSERT((job->job_flags & JOB_TYPE_FP_ASYNC) == 0);
@@ -3074,6 +3091,10 @@ fp_sendcmd(fc_local_port_t *port, fp_cmd_t *cmd, opaque_t fca_handle)
 				cmd->cmd_pkt.pkt_state = FC_PKT_TRAN_BSY;
 			}
 		}
+	} else {
+		mutex_enter(&port->fp_mutex);
+		port->fp_out_fpcmds++;
+		mutex_exit(&port->fp_mutex);
 	}
 
 	return (rval);
@@ -3095,7 +3116,7 @@ fp_resendcmd(void *port_handle)
 {
 	int		rval;
 	fc_local_port_t	*port;
-	fp_cmd_t 	*cmd;
+	fp_cmd_t	*cmd;
 	fp_cmd_t	*cur_tail;
 
 	port = port_handle;
@@ -3132,6 +3153,10 @@ fp_resendcmd(void *port_handle)
 				}
 				cmd->cmd_pkt.pkt_reason = 0;
 				fp_iodone(cmd);
+			} else {
+				mutex_enter(&port->fp_mutex);
+				port->fp_out_fpcmds++;
+				mutex_exit(&port->fp_mutex);
 			}
 		} else {
 			fp_enque_cmd(port, cmd);
@@ -3161,7 +3186,7 @@ fp_resendcmd(void *port_handle)
 /*
  * Handle Local, Fabric, N_Port, Transport (whatever that means) BUSY here.
  *
- * Yes, as you can see below, cmd_retry_count is used here too.  That means
+ * Yes, as you can see below, cmd_retry_count is used here too.	 That means
  * the retries for BUSY are less if there were transport failures (transport
  * failure means fca_transport failure). The goal is not to exceed overall
  * retries set in the cmd_retry_count (whatever may be the reason for retry)
@@ -3226,9 +3251,9 @@ fp_enque_cmd(fc_local_port_t *port, fp_cmd_t *cmd)
 static int
 fp_handle_reject(fc_packet_t *pkt)
 {
-	int 		rval = FC_FAILURE;
+	int		rval = FC_FAILURE;
 	uchar_t		next_class;
-	fp_cmd_t 	*cmd;
+	fp_cmd_t	*cmd;
 	fc_local_port_t *port;
 
 	cmd = pkt->pkt_ulp_private;
@@ -3254,7 +3279,7 @@ fp_handle_reject(fc_packet_t *pkt)
 				pkt->pkt_state = FC_PKT_TRAN_ERROR;
 			}
 		}
-			break;
+		break;
 
 	case FC_PKT_LS_RJT:
 	case FC_PKT_BA_RJT:
@@ -3427,7 +3452,7 @@ fp_state_to_rval(uchar_t state)
 	int count;
 
 	for (count = 0; count < sizeof (fp_xlat) /
-	sizeof (fp_xlat[0]); count++) {
+	    sizeof (fp_xlat[0]); count++) {
 		if (fp_xlat[count].xlat_state == state) {
 			return (fp_xlat[count].xlat_rval);
 		}
@@ -3449,8 +3474,8 @@ static void
 fp_iodone(fp_cmd_t *cmd)
 {
 	fc_packet_t		*ulp_pkt = cmd->cmd_ulp_pkt;
-	job_request_t 		*job = cmd->cmd_job;
-	fc_remote_port_t 	*pd = cmd->cmd_pkt.pkt_pd;
+	job_request_t		*job = cmd->cmd_job;
+	fc_remote_port_t	*pd = cmd->cmd_pkt.pkt_pd;
 
 	ASSERT(job != NULL);
 	ASSERT(cmd->cmd_port != NULL);
@@ -3471,7 +3496,7 @@ fp_iodone(fp_cmd_t *cmd)
 	if (ulp_pkt) {
 		if (pd && cmd->cmd_flags & FP_CMD_DELDEV_ON_ERROR &&
 		    FP_IS_PKT_ERROR(ulp_pkt)) {
-			fc_local_port_t 	*port;
+			fc_local_port_t		*port;
 			fc_remote_node_t	*node;
 
 			port = cmd->cmd_port;
@@ -3541,9 +3566,9 @@ fp_port_shutdown(fc_local_port_t *port, job_request_t *job)
 	int			index;
 	int			count;
 	int			flags;
-	fp_cmd_t 		*cmd;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd;
+	fp_cmd_t		*cmd;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 
@@ -3678,12 +3703,12 @@ fp_port_shutdown(fc_local_port_t *port, job_request_t *job)
 static void
 fp_get_loopmap(fc_local_port_t *port, job_request_t *job)
 {
-	int 			rval;
+	int			rval;
 	int			flag;
-	int 			count;
+	int			count;
 	uint32_t		d_id;
-	fc_remote_port_t 	*pd;
-	fc_lilpmap_t 		*lilp_map;
+	fc_remote_port_t	*pd;
+	fc_lilpmap_t		*lilp_map;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 
@@ -3927,8 +3952,8 @@ fp_fabric_login(fc_local_port_t *port, uint32_t s_id, job_request_t *job,
     int flag, int sleep)
 {
 	int		rval;
-	fp_cmd_t 	*cmd;
-	uchar_t 	class;
+	fp_cmd_t	*cmd;
+	uchar_t		class;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -4111,7 +4136,7 @@ static void
 fp_register_login(ddi_acc_handle_t *handle, fc_remote_port_t *pd,
     la_els_logi_t *acc, uchar_t class)
 {
-	fc_remote_node_t 	*node;
+	fc_remote_node_t	*node;
 
 	ASSERT(pd != NULL);
 
@@ -4220,8 +4245,8 @@ fp_port_offline(fc_local_port_t *port, int notify)
 	int			index;
 	int			statec;
 	timeout_id_t		tid;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 
@@ -4283,7 +4308,7 @@ fp_offline_timeout(void *port_handle)
 	int		ret;
 	fc_local_port_t *port = port_handle;
 	uint32_t	listlen = 0;
-	fc_portmap_t 	*changelist = NULL;
+	fc_portmap_t	*changelist = NULL;
 
 	mutex_enter(&port->fp_mutex);
 
@@ -4393,7 +4418,7 @@ fp_logo_init(fc_remote_port_t *pd, fp_cmd_t *cmd, job_request_t *job)
 {
 	fc_local_port_t	*port;
 	fc_packet_t	*pkt;
-	la_els_logo_t 	payload;
+	la_els_logo_t	payload;
 
 	port = pd->pd_port;
 	pkt = &cmd->cmd_pkt;
@@ -4425,7 +4450,7 @@ fp_rnid_init(fp_cmd_t *cmd, uint16_t flag, job_request_t *job)
 {
 	fc_local_port_t	*port;
 	fc_packet_t	*pkt;
-	la_els_rnid_t 	payload;
+	la_els_rnid_t	payload;
 	fc_remote_port_t	*pd;
 
 	pkt = &cmd->cmd_pkt;
@@ -4458,7 +4483,7 @@ fp_rls_init(fp_cmd_t *cmd, job_request_t *job)
 {
 	fc_local_port_t	*port;
 	fc_packet_t	*pkt;
-	la_els_rls_t 	payload;
+	la_els_rls_t	payload;
 	fc_remote_port_t	*pd;
 
 	pkt = &cmd->cmd_pkt;
@@ -4492,7 +4517,7 @@ fp_adisc_init(fp_cmd_t *cmd, job_request_t *job)
 {
 	fc_local_port_t *port;
 	fc_packet_t	*pkt;
-	la_els_adisc_t 	payload;
+	la_els_adisc_t	payload;
 	fc_remote_port_t	*pd;
 
 	pkt = &cmd->cmd_pkt;
@@ -4531,7 +4556,7 @@ fp_ulp_statec_cb(fc_local_port_t *port, uint32_t state,
 {
 	fc_port_clist_t		*clist;
 	fc_remote_port_t	*pd;
-	int 			count;
+	int			count;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -4585,8 +4610,8 @@ fp_ulp_statec_cb(fc_local_port_t *port, uint32_t state,
 		for (count = 0; count < clist->clist_len; count++) {
 			if (clist->clist_map[count].map_state ==
 			    PORT_DEVICE_INVALID) {
-				la_wwn_t 	pwwn;
-				fc_portid_t 	d_id;
+				la_wwn_t	pwwn;
+				fc_portid_t	d_id;
 
 				pd = clist->clist_map[count].map_pd;
 				ASSERT(pd != NULL);
@@ -4658,7 +4683,7 @@ fp_ulp_devc_cb(fc_local_port_t *port, fc_portmap_t *changelist,
 	/* Send sysevents for target state changes */
 
 	if (clist->clist_size) {
-		int 			count;
+		int			count;
 		fc_remote_port_t	*pd;
 
 		ASSERT(clist->clist_map != NULL);
@@ -4737,8 +4762,8 @@ fp_ulp_devc_cb(fc_local_port_t *port, fc_portmap_t *changelist,
 			 */
 			if (pd && clist->clist_map[count].map_state ==
 			    PORT_DEVICE_INVALID) {
-				la_wwn_t 	pwwn;
-				fc_portid_t 	d_id;
+				la_wwn_t	pwwn;
+				fc_portid_t	d_id;
 
 				mutex_enter(&pd->pd_mutex);
 				pwwn = pd->pd_port_name;
@@ -4802,13 +4827,13 @@ static void
 fp_plogi_group(fc_local_port_t *port, job_request_t *job)
 {
 	int			offline;
-	int 			count;
+	int			count;
 	int			rval;
 	uint32_t		listlen;
 	uint32_t		done;
 	uint32_t		d_id;
 	fc_remote_node_t	*node;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 	fc_remote_port_t	*tmp_pd;
 	fc_packet_t		*ulp_pkt;
 	la_els_logi_t		*els_data;
@@ -4850,7 +4875,8 @@ fp_plogi_group(fc_local_port_t *port, job_request_t *job)
 
 		if (pd == NULL) {
 			pd = fctl_get_remote_port_by_did(port, d_id);
-			if (pd == NULL) { /* reset later */
+			if (pd == NULL) {
+				/* reset later */
 				ulp_pkt->pkt_state = FC_PKT_FAILURE;
 				continue;
 			}
@@ -5208,17 +5234,17 @@ fp_ns_init(fc_local_port_t *port, job_request_t *job, int sleep)
 /*
  * Name server finish:
  *	Unregister for RSCNs
- * 	Unregister all the host port objects in the Name Server
- * 	Perform LOGO with the NS;
+ *	Unregister all the host port objects in the Name Server
+ *	Perform LOGO with the NS;
  */
 static void
 fp_ns_fini(fc_local_port_t *port, job_request_t *job)
 {
-	fp_cmd_t 	*cmd;
+	fp_cmd_t	*cmd;
 	uchar_t		class;
 	uint32_t	s_id;
 	fc_packet_t	*pkt;
-	la_els_logo_t 	payload;
+	la_els_logo_t	payload;
 
 	ASSERT((job->job_flags & JOB_TYPE_FP_ASYNC) == 0);
 
@@ -5240,7 +5266,7 @@ fp_ns_fini(fc_local_port_t *port, job_request_t *job)
 	job->job_counter = 1;
 
 	cmd = fp_alloc_pkt(port, sizeof (la_els_logo_t),
-		FP_PORT_IDENTIFIER_LEN, KM_SLEEP, NULL);
+	    FP_PORT_IDENTIFIER_LEN, KM_SLEEP, NULL);
 	pkt = &cmd->cmd_pkt;
 
 	mutex_enter(&port->fp_mutex);
@@ -5292,10 +5318,10 @@ static int
 fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
     job_request_t *job, int polled, int sleep)
 {
-	int 		rval;
+	int		rval;
 	fc_portid_t	s_id;
-	fc_packet_t 	*pkt;
-	fp_cmd_t 	*cmd;
+	fc_packet_t	*pkt;
+	fp_cmd_t	*cmd;
 
 	if (pd == NULL) {
 		mutex_enter(&port->fp_mutex);
@@ -5325,9 +5351,9 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 		pkt = &cmd->cmd_pkt;
 
 		if (pd == NULL) {
-			rxn.rxn_xname = (cmd_code == NS_RPN_ID) ?
+			rxn.rxn_xname = ((cmd_code == NS_RPN_ID) ?
 			    (port->fp_service_params.nport_ww_name) :
-			    (port->fp_service_params.node_ww_name);
+			    (port->fp_service_params.node_ww_name));
 		} else {
 			if (cmd_code == NS_RPN_ID) {
 				mutex_enter(&pd->pd_mutex);
@@ -5414,9 +5440,9 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 	}
 
 	case NS_RSPN_ID: {
-		uchar_t 	name_len;
-		int 		pl_size;
-		fc_portid_t 	spn;
+		uchar_t		name_len;
+		int		pl_size;
+		fc_portid_t	spn;
 
 		if (pd == NULL) {
 			mutex_enter(&port->fp_mutex);
@@ -5431,7 +5457,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 		pl_size = sizeof (fc_portid_t) + name_len + 1;
 
 		cmd = fp_alloc_pkt(port, sizeof (fc_ct_header_t) + pl_size,
-			sizeof (fc_reg_resp_t), sleep, NULL);
+		    sizeof (fc_reg_resp_t), sleep, NULL);
 		if (cmd == NULL) {
 			return (FC_NOMEM);
 		}
@@ -5575,9 +5601,9 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 	}
 
 	case NS_RSNN_NN: {
-		uchar_t 		name_len;
-		int 			pl_size;
-		la_wwn_t 		snn;
+		uchar_t			name_len;
+		int			pl_size;
+		la_wwn_t		snn;
 		fc_remote_node_t	*node = NULL;
 
 		if (pd == NULL) {
@@ -5597,7 +5623,7 @@ fp_ns_reg(fc_local_port_t *port, fc_remote_port_t *pd, uint16_t cmd_code,
 		pl_size = sizeof (la_wwn_t) + name_len + 1;
 
 		cmd = fp_alloc_pkt(port, sizeof (fc_ct_header_t) +
-			pl_size, sizeof (fc_reg_resp_t), sleep, NULL);
+		    pl_size, sizeof (fc_reg_resp_t), sleep, NULL);
 		if (cmd == NULL) {
 			return (FC_NOMEM);
 		}
@@ -5697,7 +5723,7 @@ static int
 fp_common_intr(fc_packet_t *pkt, int iodone)
 {
 	int		rval = FC_FAILURE;
-	fp_cmd_t 	*cmd;
+	fp_cmd_t	*cmd;
 	fc_local_port_t	*port;
 
 	cmd = pkt->pkt_ulp_private;
@@ -5763,7 +5789,7 @@ fp_common_intr(fc_packet_t *pkt, int iodone)
  *
  *	In a point to point topology with an N_Port, during Fabric Login,
  *	the destination N_Port will check with our WWN and decide if it
- * 	needs to issue PLOGI or not. That means, FLOGI could potentially
+ *	needs to issue PLOGI or not. That means, FLOGI could potentially
  *	trigger an unsolicited PLOGI from an N_Port. The Unsolicited
  *	PLOGI creates the device handles.
  *
@@ -5779,18 +5805,22 @@ fp_flogi_intr(fc_packet_t *pkt)
 	int			f_port;
 	uint32_t		s_id;
 	uint32_t		d_id;
-	fp_cmd_t 		*cmd;
-	fc_local_port_t 	*port;
+	fp_cmd_t		*cmd;
+	fc_local_port_t		*port;
 	la_wwn_t		*swwn;
 	la_wwn_t		dwwn;
 	la_wwn_t		nwwn;
 	fc_remote_port_t	*pd;
-	la_els_logi_t 		*acc;
+	la_els_logi_t		*acc;
 	com_svc_t		csp;
 	ls_code_t		resp;
 
 	cmd = pkt->pkt_ulp_private;
 	port = cmd->cmd_port;
+
+	mutex_enter(&port->fp_mutex);
+	port->fp_out_fpcmds--;
+	mutex_exit(&port->fp_mutex);
 
 	FP_TRACE(FP_NHEAD1(1, 0), "fp_flogi_intr; port=%p, pkt=%p, state=%x",
 	    port, pkt, pkt->pkt_state);
@@ -5880,7 +5910,7 @@ fp_flogi_intr(fc_packet_t *pkt)
 				/*
 				 * We've just created this fc_remote_port_t, and
 				 * we're about to use it to send a PLOGI, so
-				 * bump the reference count right now.  When
+				 * bump the reference count right now.	When
 				 * the packet is freed, the reference count will
 				 * be decremented.  The ULP may also start using
 				 * it, so mark it as given away as well.
@@ -5935,10 +5965,10 @@ fp_plogi_intr(fc_packet_t *pkt)
 	int			nl_port;
 	int			bailout;
 	uint32_t		d_id;
-	fp_cmd_t 		*cmd;
+	fp_cmd_t		*cmd;
 	la_els_logi_t		*acc;
 	fc_local_port_t		*port;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 	la_wwn_t		nwwn;
 	la_wwn_t		pwwn;
 	ls_code_t		resp;
@@ -5961,6 +5991,7 @@ fp_plogi_intr(fc_packet_t *pkt)
 	 * state change has occurred
 	 */
 	mutex_enter(&port->fp_mutex);
+	port->fp_out_fpcmds--;
 	bailout = ((port->fp_statec_busy ||
 	    FC_PORT_STATE_MASK(port->fp_state) == FC_STATE_OFFLINE) &&
 	    cmd->cmd_ulp_pkt) ? 1 : 0;
@@ -6151,14 +6182,14 @@ fp_plogi_intr(fc_packet_t *pkt)
 			    pd->pd_type);
 			if ((pd->pd_state == PORT_DEVICE_LOGGED_IN &&
 			    pd->pd_type == PORT_DEVICE_OLD) ||
-				(pd->pd_aux_flags & PD_LOGGED_OUT)) {
+			    (pd->pd_aux_flags & PD_LOGGED_OUT)) {
 				pd->pd_type = PORT_DEVICE_NOCHANGE;
 			} else if (pd->pd_state != PORT_DEVICE_LOGGED_IN) {
 				pd->pd_type = PORT_DEVICE_NEW;
 			}
 		} else {
-			char 	old_name[17];
-			char 	new_name[17];
+			char	old_name[17];
+			char	new_name[17];
 
 			fc_wwn_to_str(&pd->pd_port_name, old_name);
 			fc_wwn_to_str(&pwwn, new_name);
@@ -6180,7 +6211,7 @@ fp_plogi_intr(fc_packet_t *pkt)
 				fc_portmap_t	*changelist;
 				fc_portmap_t	*listptr;
 				int		len = 1;
-						/* # entries in changelist */
+				/* # entries in changelist */
 
 				fctl_delist_pwwn_table(port, pd);
 
@@ -6290,7 +6321,7 @@ fp_plogi_intr(fc_packet_t *pkt)
 				ASSERT(changelist != NULL);
 
 				fp_fillout_changed_map(listptr, pd, &d_id,
-					&pwwn);
+				    &pwwn);
 				fctl_enlist_pwwn_table(port, pd);
 
 				mutex_exit(&pd->pd_mutex);
@@ -6299,7 +6330,7 @@ fp_plogi_intr(fc_packet_t *pkt)
 				fp_iodone(cmd);
 
 				(void) fp_ulp_devc_cb(port, changelist, len,
-						len, KM_NOSLEEP, 0);
+				    len, KM_NOSLEEP, 0);
 
 				return;
 			}
@@ -6308,8 +6339,9 @@ fp_plogi_intr(fc_packet_t *pkt)
 		if (pd->pd_porttype.port_type == FC_NS_PORT_NL) {
 			nl_port = 1;
 		}
-		if (pd->pd_aux_flags & PD_DISABLE_RELOGIN)
+		if (pd->pd_aux_flags & PD_DISABLE_RELOGIN) {
 			pd->pd_aux_flags &= ~PD_LOGGED_OUT;
+		}
 
 		mutex_exit(&pd->pd_mutex);
 		mutex_exit(&port->fp_mutex);
@@ -6434,7 +6466,7 @@ fp_adisc_intr(fc_packet_t *pkt)
 	fp_cmd_t		*cmd;
 	fc_local_port_t		*port;
 	fc_remote_port_t	*pd;
-	la_els_adisc_t 		*acc;
+	la_els_adisc_t		*acc;
 	ls_code_t		resp;
 	fc_hardaddr_t		ha;
 	fc_portmap_t		*changelist;
@@ -6451,6 +6483,7 @@ fp_adisc_intr(fc_packet_t *pkt)
 	ASSERT(pd != NULL && port != NULL && cmd != NULL);
 
 	mutex_enter(&port->fp_mutex);
+	port->fp_out_fpcmds--;
 	bailout = ((port->fp_statec_busy ||
 	    FC_PORT_STATE_MASK(port->fp_state) == FC_STATE_OFFLINE) &&
 	    cmd->cmd_ulp_pkt) ? 1 : 0;
@@ -6585,10 +6618,11 @@ fp_adisc_intr(fc_packet_t *pkt)
 			    (pd->pd_recepient == PD_PLOGI_INITIATOR) ? 1 : 0;
 			pd->pd_state = PORT_DEVICE_VALID;
 			pd->pd_aux_flags |= PD_LOGGED_OUT;
-			if (pd->pd_aux_flags & PD_DISABLE_RELOGIN)
+			if (pd->pd_aux_flags & PD_DISABLE_RELOGIN) {
 				pd->pd_type = PORT_DEVICE_NEW;
-			else
+			} else {
 				pd->pd_type = PORT_DEVICE_NOCHANGE;
+			}
 			mutex_exit(&pd->pd_mutex);
 
 			changelist =
@@ -6627,6 +6661,10 @@ fp_logo_intr(fc_packet_t *pkt)
 {
 	ls_code_t	resp;
 
+	mutex_enter(&((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port->fp_mutex);
+	((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port->fp_out_fpcmds--;
+	mutex_exit(&((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port->fp_mutex);
+
 	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp,
 	    (uint8_t *)pkt->pkt_resp, sizeof (resp), DDI_DEV_AUTOINCR);
 
@@ -6644,6 +6682,7 @@ fp_logo_intr(fc_packet_t *pkt)
 	if (pkt->pkt_pd != NULL) {
 		fp_unregister_login(pkt->pkt_pd);
 	}
+
 	fp_iodone(pkt->pkt_ulp_private);
 }
 
@@ -6661,8 +6700,12 @@ fp_rnid_intr(fc_packet_t *pkt)
 
 	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp,
 	    (uint8_t *)pkt->pkt_resp, sizeof (resp), DDI_DEV_AUTOINCR);
-
 	cmd = pkt->pkt_ulp_private;
+
+	mutex_enter(&cmd->cmd_port->fp_mutex);
+	cmd->cmd_port->fp_out_fpcmds--;
+	mutex_exit(&cmd->cmd_port->fp_mutex);
+
 	job = cmd->cmd_job;
 	ASSERT(job->job_private != NULL);
 
@@ -6696,8 +6739,12 @@ fp_rls_intr(fc_packet_t *pkt)
 
 	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp,
 	    (uint8_t *)pkt->pkt_resp, sizeof (resp), DDI_DEV_AUTOINCR);
-
 	cmd = pkt->pkt_ulp_private;
+
+	mutex_enter(&cmd->cmd_port->fp_mutex);
+	cmd->cmd_port->fp_out_fpcmds--;
+	mutex_exit(&cmd->cmd_port->fp_mutex);
+
 	job = cmd->cmd_job;
 	ASSERT(job->job_private != NULL);
 
@@ -6726,6 +6773,10 @@ fp_rls_intr(fc_packet_t *pkt)
 static void
 fp_intr(fc_packet_t *pkt)
 {
+	mutex_enter(&((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port->fp_mutex);
+	((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port->fp_out_fpcmds--;
+	mutex_exit(&((fp_cmd_t *)pkt->pkt_ulp_private)->cmd_port->fp_mutex);
+
 	if (FP_IS_PKT_ERROR(pkt)) {
 		(void) fp_common_intr(pkt, 1);
 		return;
@@ -6741,7 +6792,7 @@ static void
 fp_statec_cb(opaque_t port_handle, uint32_t state)
 {
 	fc_local_port_t *port = port_handle;
-	job_request_t 	*job;
+	job_request_t	*job;
 
 	/*
 	 * If it is not possible to process the callbacks
@@ -6892,9 +6943,9 @@ fp_ns_scr(fc_local_port_t *port, job_request_t *job, uchar_t scr_func,
 {
 	uint32_t	s_id;
 	uchar_t		class;
-	fc_scr_req_t 	payload;
-	fp_cmd_t 	*cmd;
-	fc_packet_t 	*pkt;
+	fc_scr_req_t	payload;
+	fp_cmd_t	*cmd;
+	fc_packet_t	*pkt;
 
 	mutex_enter(&port->fp_mutex);
 	s_id = port->fp_port_id.port_id;
@@ -7060,12 +7111,12 @@ fp_ns_get_devcount(fc_local_port_t *port, job_request_t *job, int create,
 static int
 fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 {
-	int 		rval = 0;
+	int		rval = 0;
 	int		jcode;
 	uint32_t	ret;
 	uchar_t		open_flag;
 	fcio_t		*kfcio;
-	job_request_t 	*job;
+	job_request_t	*job;
 	boolean_t	use32 = B_FALSE;
 
 #ifdef _MULTI_DATAMODEL
@@ -7211,7 +7262,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 	case FCIO_GET_OTHER_ADAPTER_PORTS: {
 		uint32_t    index;
 		char	    *tmpPath;
-		fc_local_port_t   *tmpPort;
+		fc_local_port_t	  *tmpPort;
 
 		if (fcio->fcio_olen < MAXPATHLEN ||
 		    fcio->fcio_ilen != sizeof (uint32_t)) {
@@ -7272,41 +7323,41 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 		val->version = FC_HBA_ADAPTER_ATTRIBUTES_VERSION;
 		mutex_enter(&port->fp_mutex);
 		bcopy(port->fp_hba_port_attrs.manufacturer,
-			val->Manufacturer,
-			sizeof (val->Manufacturer));
+		    val->Manufacturer,
+		    sizeof (val->Manufacturer));
 		bcopy(port->fp_hba_port_attrs.serial_number,
-			val->SerialNumber,
-			sizeof (val->SerialNumber));
+		    val->SerialNumber,
+		    sizeof (val->SerialNumber));
 		bcopy(port->fp_hba_port_attrs.model,
-			val->Model,
-			sizeof (val->Model));
+		    val->Model,
+		    sizeof (val->Model));
 		bcopy(port->fp_hba_port_attrs.model_description,
-			val->ModelDescription,
-			sizeof (val->ModelDescription));
+		    val->ModelDescription,
+		    sizeof (val->ModelDescription));
 		bcopy(port->fp_sym_node_name, val->NodeSymbolicName,
 		    sizeof (val->NodeSymbolicName));
 		bcopy(port->fp_hba_port_attrs.hardware_version,
-			val->HardwareVersion,
-			sizeof (val->HardwareVersion));
+		    val->HardwareVersion,
+		    sizeof (val->HardwareVersion));
 		bcopy(port->fp_hba_port_attrs.option_rom_version,
-			val->OptionROMVersion,
-			sizeof (val->OptionROMVersion));
+		    val->OptionROMVersion,
+		    sizeof (val->OptionROMVersion));
 		bcopy(port->fp_hba_port_attrs.firmware_version,
-			val->FirmwareVersion,
-			sizeof (val->FirmwareVersion));
+		    val->FirmwareVersion,
+		    sizeof (val->FirmwareVersion));
 		val->VendorSpecificID =
-			port->fp_hba_port_attrs.vendor_specific_id;
+		    port->fp_hba_port_attrs.vendor_specific_id;
 		bcopy(&port->fp_service_params.node_ww_name.raw_wwn,
-			&val->NodeWWN.raw_wwn,
-			sizeof (val->NodeWWN.raw_wwn));
+		    &val->NodeWWN.raw_wwn,
+		    sizeof (val->NodeWWN.raw_wwn));
 
 
 		bcopy(port->fp_hba_port_attrs.driver_name,
-			val->DriverName,
-			sizeof (val->DriverName));
+		    val->DriverName,
+		    sizeof (val->DriverName));
 		bcopy(port->fp_hba_port_attrs.driver_version,
-			val->DriverVersion,
-			sizeof (val->DriverVersion));
+		    val->DriverVersion,
+		    sizeof (val->DriverVersion));
 		mutex_exit(&port->fp_mutex);
 
 		if (fcio->fcio_cmd == FCIO_GET_ADAPTER_ATTRIBUTES) {
@@ -7319,28 +7370,28 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 			val32 = kmem_zalloc(sizeof (*val32), KM_SLEEP);
 			val32->version = val->version;
 			bcopy(val->Manufacturer, val32->Manufacturer,
-				sizeof (val->Manufacturer));
+			    sizeof (val->Manufacturer));
 			bcopy(val->SerialNumber, val32->SerialNumber,
-				sizeof (val->SerialNumber));
+			    sizeof (val->SerialNumber));
 			bcopy(val->Model, val32->Model,
-				sizeof (val->Model));
+			    sizeof (val->Model));
 			bcopy(val->ModelDescription, val32->ModelDescription,
-				sizeof (val->ModelDescription));
+			    sizeof (val->ModelDescription));
 			bcopy(val->NodeSymbolicName, val32->NodeSymbolicName,
 			    sizeof (val->NodeSymbolicName));
 			bcopy(val->HardwareVersion, val32->HardwareVersion,
-				sizeof (val->HardwareVersion));
+			    sizeof (val->HardwareVersion));
 			bcopy(val->OptionROMVersion, val32->OptionROMVersion,
-				sizeof (val->OptionROMVersion));
+			    sizeof (val->OptionROMVersion));
 			bcopy(val->FirmwareVersion, val32->FirmwareVersion,
-				sizeof (val->FirmwareVersion));
+			    sizeof (val->FirmwareVersion));
 			val32->VendorSpecificID = val->VendorSpecificID;
 			bcopy(&val->NodeWWN.raw_wwn, &val32->NodeWWN.raw_wwn,
-				sizeof (val->NodeWWN.raw_wwn));
+			    sizeof (val->NodeWWN.raw_wwn));
 			bcopy(val->DriverName, val32->DriverName,
-				sizeof (val->DriverName));
+			    sizeof (val->DriverName));
 			bcopy(val->DriverVersion, val32->DriverVersion,
-				sizeof (val->DriverVersion));
+			    sizeof (val->DriverVersion));
 
 			val32->NumberOfPorts = val->NumberOfPorts;
 
@@ -7547,7 +7598,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 	}
 
 	case FCIO_GET_ADAPTER_PORT_NPIV_ATTRIBUTES: {
-		fc_hba_port_npiv_attributes_t   *val;
+		fc_hba_port_npiv_attributes_t	*val;
 
 		val = kmem_zalloc(sizeof (*val), KM_SLEEP);
 		val->version = FC_HBA_PORT_NPIV_ATTRIBUTES_VERSION;
@@ -7620,38 +7671,39 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 
 		switch (FC_PORT_STATE_MASK(port->fp_state)) {
 		case FC_STATE_OFFLINE:
-		    val->PortState = FC_HBA_PORTSTATE_OFFLINE;
-		    break;
+			val->PortState = FC_HBA_PORTSTATE_OFFLINE;
+			break;
 		case FC_STATE_ONLINE:
 		case FC_STATE_LOOP:
 		case FC_STATE_NAMESERVICE:
-		    val->PortState = FC_HBA_PORTSTATE_ONLINE;
-		    break;
+			val->PortState = FC_HBA_PORTSTATE_ONLINE;
+			break;
 		default:
-		    val->PortState = FC_HBA_PORTSTATE_UNKNOWN;
-		    break;
+			val->PortState = FC_HBA_PORTSTATE_UNKNOWN;
+			break;
 		}
 
 		/* Translate from LV to FC-HBA port type codes */
 		switch (port->fp_port_type.port_type) {
 		case FC_NS_PORT_N:
-		    val->PortType = FC_HBA_PORTTYPE_NPORT;
-		    break;
-		case FC_NS_PORT_NL: /* Actually means loop for us */
-		    val->PortType = FC_HBA_PORTTYPE_LPORT;
-		    break;
+			val->PortType = FC_HBA_PORTTYPE_NPORT;
+			break;
+		case FC_NS_PORT_NL:
+			/* Actually means loop for us */
+			val->PortType = FC_HBA_PORTTYPE_LPORT;
+			break;
 		case FC_NS_PORT_F:
-		    val->PortType = FC_HBA_PORTTYPE_FPORT;
-		    break;
+			val->PortType = FC_HBA_PORTTYPE_FPORT;
+			break;
 		case FC_NS_PORT_FL:
-		    val->PortType = FC_HBA_PORTTYPE_FLPORT;
-		    break;
+			val->PortType = FC_HBA_PORTTYPE_FLPORT;
+			break;
 		case FC_NS_PORT_E:
-		    val->PortType = FC_HBA_PORTTYPE_EPORT;
-		    break;
+			val->PortType = FC_HBA_PORTTYPE_EPORT;
+			break;
 		default:
-		    val->PortType = FC_HBA_PORTTYPE_OTHER;
-		    break;
+			val->PortType = FC_HBA_PORTTYPE_OTHER;
+			break;
 		}
 
 
@@ -7678,8 +7730,9 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 			 * nothing is connected to it.
 			 * Current plan is to let userland handle this.
 			 */
-			if (port->fp_bind_state == FC_STATE_OFFLINE)
+			if (port->fp_bind_state == FC_STATE_OFFLINE) {
 				val->PortType = FC_HBA_PORTTYPE_UNKNOWN;
+			}
 			break;
 
 		default:
@@ -7692,37 +7745,37 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 		}
 
 		val->PortSupportedClassofService =
-			port->fp_hba_port_attrs.supported_cos;
+		    port->fp_hba_port_attrs.supported_cos;
 		val->PortSupportedFc4Types[0] = 0;
 		bcopy(port->fp_fc4_types, val->PortActiveFc4Types,
 		    sizeof (val->PortActiveFc4Types));
 		bcopy(port->fp_sym_port_name, val->PortSymbolicName,
 		    sizeof (val->PortSymbolicName));
 		val->PortSupportedSpeed =
-			port->fp_hba_port_attrs.supported_speed;
+		    port->fp_hba_port_attrs.supported_speed;
 
 		switch (FC_PORT_SPEED_MASK(port->fp_state)) {
 		case FC_STATE_1GBIT_SPEED:
-		    val->PortSpeed = FC_HBA_PORTSPEED_1GBIT;
-		    break;
+			val->PortSpeed = FC_HBA_PORTSPEED_1GBIT;
+			break;
 		case FC_STATE_2GBIT_SPEED:
-		    val->PortSpeed = FC_HBA_PORTSPEED_2GBIT;
-		    break;
+			val->PortSpeed = FC_HBA_PORTSPEED_2GBIT;
+			break;
 		case FC_STATE_4GBIT_SPEED:
-		    val->PortSpeed = FC_HBA_PORTSPEED_4GBIT;
-		    break;
+			val->PortSpeed = FC_HBA_PORTSPEED_4GBIT;
+			break;
 		case FC_STATE_8GBIT_SPEED:
-		    val->PortSpeed = FC_HBA_PORTSPEED_8GBIT;
-		    break;
+			val->PortSpeed = FC_HBA_PORTSPEED_8GBIT;
+			break;
 		case FC_STATE_10GBIT_SPEED:
-		    val->PortSpeed = FC_HBA_PORTSPEED_10GBIT;
-		    break;
+			val->PortSpeed = FC_HBA_PORTSPEED_10GBIT;
+			break;
 		case FC_STATE_16GBIT_SPEED:
-		    val->PortSpeed = FC_HBA_PORTSPEED_16GBIT;
-		    break;
+			val->PortSpeed = FC_HBA_PORTSPEED_16GBIT;
+			break;
 		default:
-		    val->PortSpeed = FC_HBA_PORTSPEED_UNKNOWN;
-		    break;
+			val->PortSpeed = FC_HBA_PORTSPEED_UNKNOWN;
+			break;
 		}
 		val->PortMaxFrameSize = port->fp_hba_port_attrs.max_frame_size;
 		val->NumberofDiscoveredPorts = port->fp_dev_count;
@@ -7735,9 +7788,9 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 			val32->fp_minor = val->fp_minor;
 
 			bcopy(&val->PortWWN.raw_wwn, &val32->PortWWN.raw_wwn,
-				sizeof (val->PortWWN.raw_wwn));
+			    sizeof (val->PortWWN.raw_wwn));
 			bcopy(&val->NodeWWN.raw_wwn, &val32->NodeWWN.raw_wwn,
-				sizeof (val->NodeWWN.raw_wwn));
+			    sizeof (val->NodeWWN.raw_wwn));
 			val32->PortFcId = val->PortFcId;
 			val32->PortState = val->PortState;
 			val32->PortType = val->PortType;
@@ -7899,10 +7952,10 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 				if (fp_copyout((void *)val32,
 				    (void *)fcio->fcio_obuf,
 				    fcio->fcio_olen, mode) == 0) {
-					    if (fp_fcio_copyout(fcio,
-						data, mode)) {
-						    rval = EFAULT;
-					    }
+					if (fp_fcio_copyout(fcio,
+					    data, mode)) {
+						rval = EFAULT;
+					}
 				} else {
 					rval = EFAULT;
 				}
@@ -8482,7 +8535,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 	case FCIO_GET_STATE: {
 		la_wwn_t		pwwn;
 		uint32_t		state;
-		fc_remote_port_t 	*pd;
+		fc_remote_port_t	*pd;
 		fctl_ns_req_t		*ns_cmd;
 
 		if (fcio->fcio_ilen != sizeof (la_wwn_t) ||
@@ -8616,7 +8669,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 	}
 
 	case FCIO_GET_FCODE_REV: {
-		caddr_t 	fcode_rev;
+		caddr_t		fcode_rev;
 		fc_fca_pm_t	pm;
 
 		if (fcio->fcio_olen < FC_FCODE_REV_SIZE ||
@@ -8666,7 +8719,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 	}
 
 	case FCIO_GET_FW_REV: {
-		caddr_t 	fw_rev;
+		caddr_t		fw_rev;
 		fc_fca_pm_t	pm;
 
 		if (fcio->fcio_olen < FC_FW_REV_SIZE ||
@@ -8707,7 +8760,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 	}
 
 	case FCIO_GET_DUMP_SIZE: {
-		uint32_t 	dump_size;
+		uint32_t	dump_size;
 		fc_fca_pm_t	pm;
 
 		if (fcio->fcio_olen != sizeof (dump_size) ||
@@ -8837,7 +8890,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 
 	case FCIO_GET_DUMP: {
 		caddr_t		dump;
-		uint32_t 	dump_size;
+		uint32_t	dump_size;
 		fc_fca_pm_t	pm;
 
 		if (fcio->fcio_xfer != FCIO_XFER_READ) {
@@ -9099,7 +9152,7 @@ fp_fciocmd(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 			rval = EFAULT;
 		}
 
-fp_fcio_diag_cleanup:
+		fp_fcio_diag_cleanup:
 		if (pm.pm_cmd_buf != NULL) {
 			kmem_free(pm.pm_cmd_buf, fcio->fcio_ilen);
 		}
@@ -9128,7 +9181,7 @@ fp_fcio_diag_cleanup:
 	}
 
 	case FCIO_SEND_NODE_ID: {
-		la_wwn_t 		pwwn;
+		la_wwn_t		pwwn;
 
 		/* validate parameters */
 		if (fcio->fcio_ilen != sizeof (la_wwn_t) ||
@@ -9212,9 +9265,9 @@ fp_fcio_diag_cleanup:
 			bzero((caddr_t)&pm, sizeof (pm));
 
 			pm.pm_cmd_flags = FC_FCA_PM_READ;
-			pm.pm_cmd_code  = FC_PORT_RLS;
-			pm.pm_data_len  = sizeof (*rls_acc);
-			pm.pm_data_buf  = (caddr_t)rls_acc;
+			pm.pm_cmd_code	= FC_PORT_RLS;
+			pm.pm_data_len	= sizeof (*rls_acc);
+			pm.pm_data_buf	= (caddr_t)rls_acc;
 
 			/* Get the adapter's link error status block */
 			ret = port->fp_fca_tran->fca_port_manage(
@@ -9375,9 +9428,9 @@ fp_fcio_diag_cleanup:
 	}
 
 	case FCIO_NS: {
-		fc_ns_cmd_t 	*ns_req;
-		fc_ns_cmd32_t 	*ns_req32;
-		fctl_ns_req_t 	*ns_cmd;
+		fc_ns_cmd_t	*ns_req;
+		fc_ns_cmd32_t	*ns_req32;
+		fctl_ns_req_t	*ns_cmd;
 
 		if (use32 == B_TRUE) {
 			if (fcio->fcio_ilen != sizeof (*ns_req32)) {
@@ -9520,7 +9573,7 @@ fp_copyout(void *from, void *to, size_t len, int mode)
 static int
 fp_set_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 {
-	int 		rval = 0;
+	int		rval = 0;
 	fc_rnid_t	*rnid;
 	fc_fca_pm_t	pm;
 
@@ -9537,9 +9590,9 @@ fp_set_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 	bzero((caddr_t)&pm, sizeof (pm));
 
 	pm.pm_cmd_flags = FC_FCA_PM_WRITE;
-	pm.pm_cmd_code  = FC_PORT_SET_NODE_ID;
-	pm.pm_data_len  = sizeof (*rnid);
-	pm.pm_data_buf  = (caddr_t)rnid;
+	pm.pm_cmd_code	= FC_PORT_SET_NODE_ID;
+	pm.pm_data_len	= sizeof (*rnid);
+	pm.pm_data_buf	= (caddr_t)rnid;
 
 	/* Get the adapter's node data */
 	rval = port->fp_fca_tran->fca_port_manage(
@@ -9555,7 +9608,7 @@ fp_set_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 		mutex_enter(&port->fp_mutex);
 		/* copy to the port structure */
 		bcopy(rnid, &port->fp_rnid_params,
-			sizeof (port->fp_rnid_params));
+		    sizeof (port->fp_rnid_params));
 		mutex_exit(&port->fp_mutex);
 	}
 
@@ -9576,7 +9629,7 @@ fp_get_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 {
 	fc_rnid_t		*rnid;
 	fc_fca_pm_t		pm;
-	int 			rval = 0;
+	int			rval = 0;
 	uint32_t		ret;
 
 	/* Allocate memory for rnid data block */
@@ -9600,7 +9653,7 @@ fp_get_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 
 		if (rval != FC_SUCCESS) {
 			FP_TRACE(FP_NHEAD1(3, 0), "fp_get_rnid: failed = %d",
-			rval);
+			    rval);
 		}
 
 		return (rval);
@@ -9611,14 +9664,14 @@ fp_get_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 	bzero((caddr_t)&pm, sizeof (pm));
 
 	pm.pm_cmd_flags = FC_FCA_PM_READ;
-	pm.pm_cmd_code  = FC_PORT_GET_NODE_ID;
-	pm.pm_data_len  = sizeof (fc_rnid_t);
-	pm.pm_data_buf  = (caddr_t)rnid;
+	pm.pm_cmd_code	= FC_PORT_GET_NODE_ID;
+	pm.pm_data_len	= sizeof (fc_rnid_t);
+	pm.pm_data_buf	= (caddr_t)rnid;
 
 	/* Get the adapter's node data */
 	ret = port->fp_fca_tran->fca_port_manage(
-			port->fp_fca_handle,
-			&pm);
+	    port->fp_fca_handle,
+	    &pm);
 
 	if (ret == FC_SUCCESS) {
 		/* initialize in the port_info */
@@ -9629,10 +9682,10 @@ fp_get_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 
 		/* xfer node info to userland */
 		if (ddi_copyout((void *)rnid,
-				(void *)fcio->fcio_obuf,
-				sizeof (*rnid), mode) == 0) {
+		    (void *)fcio->fcio_obuf,
+		    sizeof (*rnid), mode) == 0) {
 			if (fp_fcio_copyout(fcio, data,
-					mode)) {
+			    mode)) {
 				rval = EFAULT;
 			}
 		} else {
@@ -9657,12 +9710,12 @@ fp_get_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio)
 
 static int
 fp_send_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio,
-	la_wwn_t *pwwn)
+    la_wwn_t *pwwn)
 {
-	int 			rval = 0;
+	int			rval = 0;
 	fc_remote_port_t	*pd;
 	fp_cmd_t		*cmd;
-	job_request_t 		*job;
+	job_request_t		*job;
 	la_els_rnid_acc_t	*rnid_acc;
 
 	pd = fctl_get_remote_port_by_pwwn(port, pwwn);
@@ -9741,16 +9794,16 @@ fp_send_rnid(fc_local_port_t *port, intptr_t data, int mode, fcio_t *fcio,
 
 			/* get the response length */
 			rnid_cnt = sizeof (ls_code_t) + sizeof (fc_rnid_hdr_t) +
-					rnid_acc->hdr.cmn_len +
-					rnid_acc->hdr.specific_len;
+			    rnid_acc->hdr.cmn_len +
+			    rnid_acc->hdr.specific_len;
 
 			if (fcio->fcio_olen < rnid_cnt) {
 				rval = EINVAL;
 			} else if (ddi_copyout((void *)rnid_acc,
-				(void *)fcio->fcio_obuf,
-				rnid_cnt, mode) == 0) {
+			    (void *)fcio->fcio_obuf,
+			    rnid_cnt, mode) == 0) {
 				if (fp_fcio_copyout(fcio, data,
-					mode)) {
+				    mode)) {
 					rval = EFAULT;
 				}
 			} else {
@@ -9802,13 +9855,13 @@ fp_fcio_copyout(fcio_t *fcio, intptr_t data, int mode)
 		fcio32.fcio_cmd_flags = fcio->fcio_cmd_flags;
 		fcio32.fcio_ilen = fcio->fcio_ilen;
 		fcio32.fcio_ibuf =
-			(caddr32_t)(uintptr_t)fcio->fcio_ibuf;
+		    (caddr32_t)(uintptr_t)fcio->fcio_ibuf;
 		fcio32.fcio_olen = fcio->fcio_olen;
 		fcio32.fcio_obuf =
-			(caddr32_t)(uintptr_t)fcio->fcio_obuf;
+		    (caddr32_t)(uintptr_t)fcio->fcio_obuf;
 		fcio32.fcio_alen = fcio->fcio_alen;
 		fcio32.fcio_abuf =
-			(caddr32_t)(uintptr_t)fcio->fcio_abuf;
+		    (caddr32_t)(uintptr_t)fcio->fcio_abuf;
 		fcio32.fcio_errno = fcio->fcio_errno;
 
 		rval = ddi_copyout((void *)&fcio32, (void *)data,
@@ -9871,9 +9924,9 @@ fp_fillout_p2pmap(fc_local_port_t *port, fcio_t *fcio, int mode)
 	int			index;
 	int			num_devices;
 	fc_remote_node_t	*node;
-	fc_port_dev_t 		*devlist;
-	struct pwwn_hash 	*head;
-	fc_remote_port_t 	*pd;
+	fc_port_dev_t		*devlist;
+	struct pwwn_hash	*head;
+	fc_remote_port_t	*pd;
 
 	ASSERT(MUTEX_HELD(&port->fp_mutex));
 
@@ -9948,7 +10001,7 @@ fp_fabric_online(fc_local_port_t *port, job_request_t *job)
 	int			rval;
 	int			dbg_count;
 	int			count = 0;
-	char 			ww_name[17];
+	char			ww_name[17];
 	uint32_t		d_id;
 	uint32_t		listlen;
 	fctl_ns_req_t		*ns_cmd;
@@ -9973,7 +10026,7 @@ fp_fabric_online(fc_local_port_t *port, job_request_t *job)
 	 * Check if orphans are showing up now
 	 */
 	if (port->fp_orphan_count) {
-		fc_orphan_t 	*orp;
+		fc_orphan_t	*orp;
 		fc_orphan_t	*norp = NULL;
 		fc_orphan_t	*prev = NULL;
 
@@ -10070,7 +10123,7 @@ fp_fabric_online(fc_local_port_t *port, job_request_t *job)
 		npd = head->pwwn_head;
 
 		while ((pd = npd) != NULL) {
-			la_wwn_t 	*pwwn;
+			la_wwn_t	*pwwn;
 
 			npd = pd->pd_wwn_hnext;
 
@@ -10300,7 +10353,7 @@ fp_fillout_loopmap(fc_local_port_t *port, fcio_t *fcio, int mode)
 	int			index;
 	int			num_devices;
 	fc_remote_node_t	*node;
-	fc_port_dev_t 		*devlist;
+	fc_port_dev_t		*devlist;
 	int			lilp_device_count;
 	fc_lilpmap_t		*lilp_map;
 	uchar_t			*alpa_list;
@@ -10310,7 +10363,7 @@ fp_fillout_loopmap(fc_local_port_t *port, fcio_t *fcio, int mode)
 	num_devices = fcio->fcio_olen / sizeof (fc_port_dev_t);
 	if (port->fp_total_devices > port->fp_dev_count &&
 	    num_devices >= port->fp_total_devices) {
-		job_request_t 	*job;
+		job_request_t	*job;
 
 		mutex_exit(&port->fp_mutex);
 		job = fctl_alloc_job(JOB_PORT_GETMAP, 0, NULL, NULL, KM_SLEEP);
@@ -10373,7 +10426,7 @@ fp_fillout_loopmap(fc_local_port_t *port, fcio_t *fcio, int mode)
 			devlist[count].dev_hard_addr = pd->pd_hard_addr;
 			devlist[count].dev_did = pd->pd_port_id;
 			devlist[count].dev_did.priv_lilp_posit =
-						(uint8_t)(index & 0xff);
+			    (uint8_t)(index & 0xff);
 			bcopy((caddr_t)pd->pd_fc4types,
 			    (caddr_t)devlist[count].dev_type,
 			    sizeof (pd->pd_fc4types));
@@ -10421,11 +10474,15 @@ fp_fillout_loopmap(fc_local_port_t *port, fcio_t *fcio, int mode)
 static void
 fp_unsol_intr(fc_packet_t *pkt)
 {
-	fp_cmd_t 	*cmd;
+	fp_cmd_t	*cmd;
 	fc_local_port_t *port;
 
 	cmd = pkt->pkt_ulp_private;
 	port = cmd->cmd_port;
+
+	mutex_enter(&port->fp_mutex);
+	port->fp_out_fpcmds--;
+	mutex_exit(&port->fp_mutex);
 
 	if (pkt->pkt_state != FC_PKT_SUCCESS) {
 		fp_printf(port, CE_WARN, FP_LOG_ONLY, 0, pkt,
@@ -10455,22 +10512,26 @@ fp_linit_intr(fc_packet_t *pkt)
 	job_request_t		*job;
 	fc_linit_resp_t		acc;
 
+	cmd = (fp_cmd_t *)pkt->pkt_ulp_private;
+
+	mutex_enter(&cmd->cmd_port->fp_mutex);
+	cmd->cmd_port->fp_out_fpcmds--;
+	mutex_exit(&cmd->cmd_port->fp_mutex);
+
 	if (FP_IS_PKT_ERROR(pkt)) {
 		(void) fp_common_intr(pkt, 1);
 		return;
 	}
 
-	cmd = pkt->pkt_ulp_private;
 	job = cmd->cmd_job;
-
 	ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&acc,
 	    (uint8_t *)pkt->pkt_resp, sizeof (acc), DDI_DEV_AUTOINCR);
-
 	if (acc.status != FC_LINIT_SUCCESS) {
 		job->job_result = FC_FAILURE;
 	} else {
 		job->job_result = FC_SUCCESS;
 	}
+
 	fp_iodone(cmd);
 }
 
@@ -10494,7 +10555,7 @@ fp_unsol_cb(opaque_t port_handle, fc_unsol_buf_t *buf, uint32_t type)
 	fp_cmd_t	*cmd;
 	fc_local_port_t *port;
 	job_request_t	*job;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 
 	port = port_handle;
 
@@ -10784,7 +10845,7 @@ fp_handle_unsol_buf(fc_local_port_t *port, fc_unsol_buf_t *buf,
 	uchar_t			ls_code;
 	uint32_t		s_id;
 	fp_cmd_t		*cmd;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 	fp_unsol_spec_t		*ub_spec;
 
 	r_ctl = buf->ub_frame.r_ctl;
@@ -10975,7 +11036,7 @@ fp_ba_rjt_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
     job_request_t *job)
 {
 	fc_packet_t	*pkt;
-	la_ba_rjt_t 	payload;
+	la_ba_rjt_t	payload;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -11010,7 +11071,7 @@ fp_els_rjt_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
     uchar_t action, uchar_t reason, job_request_t *job)
 {
 	fc_packet_t	*pkt;
-	la_els_rjt_t 	payload;
+	la_els_rjt_t	payload;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -11053,7 +11114,7 @@ fp_els_rjt_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
  *
  * Return Value: *cmd		Command containing the response.
  *
- *      Context: Depends on the parameter sleep.
+ *	Context: Depends on the parameter sleep.
  */
 fp_cmd_t *
 fp_prlo_acc_init(fc_local_port_t *port, fc_remote_port_t *pd,
@@ -11151,7 +11212,7 @@ fp_els_acc_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
  * think that the Port Login has been lost.  If we follow the Fibre Channel
  * protocol to the letter a PRLI should be sent after accepting the PRLO.  If
  * the Port Login has also been lost, the remote port will reject the PRLI
- * indicating that we must PLOGI first.  The initiator will then turn around and
+ * indicating that we must PLOGI first.	 The initiator will then turn around and
  * send a PLOGI.  The way Leadville is layered and the way the ULP interface
  * is defined doesn't allow this scenario to be followed easily.  If FCP were to
  * handle the PRLO and attempt the PRLI, the reject indicating that a PLOGI is
@@ -11175,7 +11236,7 @@ fp_handle_unsol_prlo(fc_local_port_t *port, fc_unsol_buf_t *buf,
 	int		rval;
 	int		retain;
 	fp_cmd_t	*cmd;
-	fc_portmap_t 	*listptr;
+	fc_portmap_t	*listptr;
 	boolean_t	tolerance;
 	la_els_prlo_t	*req;
 
@@ -11259,8 +11320,8 @@ fp_handle_unsol_prlo(fc_local_port_t *port, fc_unsol_buf_t *buf,
 			fp_unregister_login(pd);
 			fctl_copy_portmap(listptr, pd);
 		} else {
-			uint32_t 	d_id;
-			char 		ww_name[17];
+			uint32_t	d_id;
+			char		ww_name[17];
 
 			mutex_enter(&pd->pd_mutex);
 			d_id = pd->pd_port_id.port_id;
@@ -11305,7 +11366,7 @@ fp_handle_unsol_logo(fc_local_port_t *port, fc_unsol_buf_t *buf,
 	int		rval;
 	int		retain;
 	fp_cmd_t	*cmd;
-	fc_portmap_t 	*listptr;
+	fc_portmap_t	*listptr;
 	boolean_t	tolerance;
 
 	mutex_enter(&port->fp_mutex);
@@ -11419,10 +11480,10 @@ fp_handle_unsol_logo(fc_local_port_t *port, fc_unsol_buf_t *buf,
 			fp_unregister_login(pd);
 			fctl_copy_portmap(listptr, pd);
 		} else {
-			uint32_t 	d_id;
-			char 		ww_name[17];
+			uint32_t	d_id;
+			char		ww_name[17];
 
-delete_pd:
+		delete_pd:
 			mutex_enter(&pd->pd_mutex);
 			d_id = pd->pd_port_id.port_id;
 			fc_wwn_to_str(&pd->pd_port_name, ww_name);
@@ -11480,10 +11541,10 @@ static void
 fp_i_handle_unsol_els(fc_local_port_t *port, fc_unsol_buf_t *buf)
 {
 	int			sent;
-	int 			f_port;
+	int			f_port;
 	int			do_acc;
-	fp_cmd_t 		*cmd;
-	la_els_logi_t 		*payload;
+	fp_cmd_t		*cmd;
+	la_els_logi_t		*payload;
 	fc_remote_port_t	*pd;
 	char			dww_name[17];
 
@@ -11719,12 +11780,12 @@ fp_handle_unsol_plogi(fc_local_port_t *port, fc_unsol_buf_t *buf,
 {
 	int			sent;
 	int			small;
-	int 			f_port;
+	int			f_port;
 	int			do_acc;
 	fp_cmd_t		*cmd;
-	la_wwn_t 		*swwn;
+	la_wwn_t		*swwn;
 	la_wwn_t		*dwwn;
-	la_els_logi_t 		*payload;
+	la_els_logi_t		*payload;
 	fc_remote_port_t	*pd;
 	char			dww_name[17];
 
@@ -11791,7 +11852,7 @@ fp_handle_unsol_plogi(fc_local_port_t *port, fc_unsol_buf_t *buf,
 	 *
 	 * A side note: There is no need to start a PLOGI from this end in
 	 *	this context if login isn't going to be accepted for the
-	 * 	above reason as either a LIP (in private loop), RSCN (in
+	 *	above reason as either a LIP (in private loop), RSCN (in
 	 *	fabric topology), or an FLOGI (in point to point - Huh ?
 	 *	check FC-PH) would normally drive the PLOGI from this end.
 	 *	At this point of time there is no need for an inbound PLOGI
@@ -11804,8 +11865,8 @@ fp_handle_unsol_plogi(fc_local_port_t *port, fc_unsol_buf_t *buf,
 	 *
 	 *	Unfortunately, as it turned out, during booting, it is possible
 	 *	to miss another initiator in the same loop as port driver
-	 * 	instances are serially attached. While preserving the above
-	 * 	comments for belly laughs, please kick an outbound PLOGI in
+	 *	instances are serially attached. While preserving the above
+	 *	comments for belly laughs, please kick an outbound PLOGI in
 	 *	a non-switch environment (which is a pt pt between N_Ports or
 	 *	a private loop)
 	 *
@@ -11919,11 +11980,11 @@ fp_handle_unsol_plogi(fc_local_port_t *port, fc_unsol_buf_t *buf,
  */
 static void
 fp_handle_unsol_flogi(fc_local_port_t *port, fc_unsol_buf_t *buf,
-	job_request_t *job, int sleep)
+    job_request_t *job, int sleep)
 {
 	uint32_t	state;
 	uint32_t	s_id;
-	fp_cmd_t 	*cmd;
+	fp_cmd_t	*cmd;
 
 	if (fp_is_class_supported(port->fp_cos, buf->ub_class) == FC_FAILURE) {
 		if (FP_IS_CLASS_1_OR_2(buf->ub_class)) {
@@ -12002,7 +12063,7 @@ fp_login_acc_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
     job_request_t *job, int sleep)
 {
 	fc_packet_t	*pkt;
-	fc_portmap_t 	*listptr;
+	fc_portmap_t	*listptr;
 	la_els_logi_t	payload;
 
 	ASSERT(buf != NULL);
@@ -12017,7 +12078,7 @@ fp_login_acc_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
 		int			small;
 		int			do_acc;
 		fc_remote_port_t	*pd;
-		la_els_logi_t 		*req;
+		la_els_logi_t		*req;
 
 		req = (la_els_logi_t *)buf->ub_buffer;
 		small = fctl_wwn_cmp(&port->fp_service_params.nport_ww_name,
@@ -12094,7 +12155,7 @@ fp_login_acc_init(fc_local_port_t *port, fp_cmd_t *cmd, fc_unsol_buf_t *buf,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (payload), DDI_DEV_AUTOINCR);
 
 	FP_TRACE(FP_NHEAD1(3, 0), "login_acc_init: ELS:0x%x d_id:0x%x "
-	    "bufsize:0x%x sizeof(la_els_logi):0x%x "
+	    "bufsize:0x%x sizeof (la_els_logi):0x%x "
 	    "port's wwn:0x%01x%03x%04x%08x requestor's wwn:0x%01x%03x%04x%08x "
 	    "statec_busy:0x%x", buf->ub_buffer[0], buf->ub_frame.s_id,
 	    buf->ub_bufsize, sizeof (la_els_logi_t),
@@ -12125,9 +12186,9 @@ fp_handle_unsol_rscn(fc_local_port_t *port, fc_unsol_buf_t *buf,
 	int			listindex;
 	int16_t			len;
 	fc_rscn_t		*payload;
-	fc_portmap_t 		*listptr;
+	fc_portmap_t		*listptr;
 	fctl_ns_req_t		*ns_cmd;
-	fc_affected_id_t 	*page;
+	fc_affected_id_t	*page;
 	caddr_t			nvname;
 	nvlist_t		*attr_list = NULL;
 
@@ -12198,29 +12259,29 @@ fp_handle_unsol_rscn(fc_local_port_t *port, fc_unsol_buf_t *buf,
 
 	/* Only proceed if we can allocate nvname and the nvlist */
 	if ((nvname = kmem_zalloc(RSCN_EVENT_NAME_LEN, KM_NOSLEEP)) != NULL &&
-		nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE,
-		KM_NOSLEEP) == DDI_SUCCESS) {
-	    if (!(attr_list && nvlist_add_uint32(attr_list, "instance",
+	    nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE,
+	    KM_NOSLEEP) == DDI_SUCCESS) {
+		if (!(attr_list && nvlist_add_uint32(attr_list, "instance",
 		    port->fp_instance) == DDI_SUCCESS &&
 		    nvlist_add_byte_array(attr_list, "port-wwn",
 		    port->fp_service_params.nport_ww_name.raw_wwn,
 		    sizeof (la_wwn_t)) == DDI_SUCCESS)) {
-		nvlist_free(attr_list);
-		attr_list = NULL;
-	    }
+			nvlist_free(attr_list);
+			attr_list = NULL;
+		}
 	}
 
 	for (listindex = 0; len; len -= FP_PORT_IDENTIFIER_LEN, page++) {
 		/* Add affected page to the event payload */
 		if (attr_list != NULL) {
-		    (void) snprintf(nvname, RSCN_EVENT_NAME_LEN,
+			(void) snprintf(nvname, RSCN_EVENT_NAME_LEN,
 			    "affected_page_%d", listindex);
-		    if (attr_list && nvlist_add_uint32(attr_list, nvname,
+			if (attr_list && nvlist_add_uint32(attr_list, nvname,
 			    ntohl(*(uint32_t *)page)) != DDI_SUCCESS) {
-			/* We don't want to send a partial event, so dump it */
-			nvlist_free(attr_list);
-			attr_list = NULL;
-		    }
+				/* We don't send a partial event, so dump it */
+				nvlist_free(attr_list);
+				attr_list = NULL;
+			}
 		}
 		/*
 		 * Query the NS to get the Port WWN for this
@@ -12272,16 +12333,16 @@ fp_handle_unsol_rscn(fc_local_port_t *port, fc_unsol_buf_t *buf,
 		}
 	}
 	if (attr_list != NULL) {
-	    (void) ddi_log_sysevent(port->fp_port_dip, DDI_VENDOR_SUNW,
+		(void) ddi_log_sysevent(port->fp_port_dip, DDI_VENDOR_SUNW,
 		    EC_SUNFC, ESC_SUNFC_PORT_RSCN, attr_list,
 		    NULL, DDI_SLEEP);
-	    nvlist_free(attr_list);
+		nvlist_free(attr_list);
 	} else {
-	    FP_TRACE(FP_NHEAD1(9, 0),
-		"RSCN handled, but event not sent to userland");
+		FP_TRACE(FP_NHEAD1(9, 0),
+		    "RSCN handled, but event not sent to userland");
 	}
 	if (nvname != NULL) {
-	    kmem_free(nvname, RSCN_EVENT_NAME_LEN);
+		kmem_free(nvname, RSCN_EVENT_NAME_LEN);
 	}
 
 	if (ns_cmd) {
@@ -12470,7 +12531,7 @@ fp_remote_lip(fc_local_port_t *port, la_wwn_t *pwwn, int sleep,
 	fc_porttype_t		ptype;
 	fc_packet_t		*pkt;
 	fc_linit_req_t		payload;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 
 	rval = 0;
 
@@ -12582,7 +12643,7 @@ fp_remote_lip(fc_local_port_t *port, la_wwn_t *pwwn, int sleep,
 
 	/*
 	 * How does LIP work by the way ?
-	 * 	If the L_Port receives three consecutive identical ordered
+	 *	If the L_Port receives three consecutive identical ordered
 	 *	sets whose first two characters (fully decoded) are equal to
 	 *	the values shown in Table 3 of FC-AL-2 then the L_Port shall
 	 *	recognize a Loop Initialization Primitive sequence. The
@@ -12591,10 +12652,10 @@ fp_remote_lip(fc_local_port_t *port, la_wwn_t *pwwn, int sleep,
 	 *		LIP(F8)		Loop Failure LIP
 	 *
 	 * The possible combination for the 3rd and 4th bytes are:
-	 *	F7, 	F7	Normal Lip 	- No valid AL_PA
-	 *	F8, 	F8	Loop Failure	- No valid AL_PA
-	 *	F7, 	AL_PS	Normal Lip	- Valid source AL_PA
-	 *	F8, 	AL_PS	Loop Failure	- Valid source AL_PA
+	 *	F7,	F7	Normal Lip	- No valid AL_PA
+	 *	F8,	F8	Loop Failure	- No valid AL_PA
+	 *	F7,	AL_PS	Normal Lip	- Valid source AL_PA
+	 *	F8,	AL_PS	Loop Failure	- Valid source AL_PA
 	 *	AL_PD	AL_PS	Loop reset of AL_PD originated by AL_PS
 	 *			And Normal Lip for all other loop members
 	 *	0xFF	AL_PS	Vendor specific reset of all loop members
@@ -12638,7 +12699,7 @@ static void
 fp_stuff_device_with_gan(ddi_acc_handle_t *handle, fc_remote_port_t *pd,
     ns_resp_gan_t *gan_resp)
 {
-	fc_remote_node_t 	*node;
+	fc_remote_node_t	*node;
 	fc_porttype_t		type;
 	fc_local_port_t		*port;
 
@@ -12705,8 +12766,8 @@ static int
 fp_ns_query(fc_local_port_t *port, fctl_ns_req_t *ns_cmd, job_request_t *job,
     int polled, int sleep)
 {
-	int 		rval;
-	fp_cmd_t 	*cmd;
+	int		rval;
+	fp_cmd_t	*cmd;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -12760,8 +12821,8 @@ fp_ct_init(fc_local_port_t *port, fp_cmd_t *cmd, fctl_ns_req_t *ns_cmd,
 {
 	uint32_t	s_id;
 	uchar_t		class;
-	fc_packet_t 	*pkt;
-	fc_ct_header_t 	ct;
+	fc_packet_t	*pkt;
+	fc_ct_header_t	ct;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 
@@ -12832,19 +12893,21 @@ fp_ns_intr(fc_packet_t *pkt)
 {
 	fp_cmd_t	*cmd;
 	fc_local_port_t	*port;
-	fc_ct_header_t 	resp_hdr;
-	fc_ct_header_t 	cmd_hdr;
+	fc_ct_header_t	resp_hdr;
+	fc_ct_header_t	cmd_hdr;
 	fctl_ns_req_t	*ns_cmd;
 
 	cmd = pkt->pkt_ulp_private;
 	port = cmd->cmd_port;
 
+	mutex_enter(&port->fp_mutex);
+	port->fp_out_fpcmds--;
+	mutex_exit(&port->fp_mutex);
+
 	ddi_rep_get8(pkt->pkt_cmd_acc, (uint8_t *)&cmd_hdr,
 	    (uint8_t *)pkt->pkt_cmd, sizeof (cmd_hdr), DDI_DEV_AUTOINCR);
-
 	ns_cmd = (fctl_ns_req_t *)
 	    (((fp_cmd_t *)(pkt->pkt_ulp_private))->cmd_private);
-
 	if (!FP_IS_PKT_ERROR(pkt)) {
 		ddi_rep_get8(pkt->pkt_resp_acc, (uint8_t *)&resp_hdr,
 		    (uint8_t *)pkt->pkt_resp, sizeof (resp_hdr),
@@ -13112,6 +13175,10 @@ fp_gan_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 	if (cmd->cmd_transport(port->fp_fca_handle, pkt) != FC_SUCCESS) {
 		pkt->pkt_state = FC_PKT_TRAN_ERROR;
 		fp_iodone(cmd);
+	} else {
+		mutex_enter(&port->fp_mutex);
+		port->fp_out_fpcmds++;
+		mutex_exit(&port->fp_mutex);
 	}
 }
 
@@ -13122,10 +13189,10 @@ fp_gan_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 static void
 fp_ns_query_handler(fc_packet_t *pkt, fctl_ns_req_t *ns_cmd)
 {
-	fp_cmd_t 	*cmd;
+	fp_cmd_t	*cmd;
 	fc_local_port_t	*port;
-	caddr_t 	src_ptr;
-	uint32_t 	xfer_len;
+	caddr_t		src_ptr;
+	uint32_t	xfer_len;
 
 	cmd = pkt->pkt_ulp_private;
 	port = cmd->cmd_port;
@@ -13323,7 +13390,7 @@ static int
 fp_logout(fc_local_port_t *port, fc_remote_port_t *pd, job_request_t *job)
 {
 	int		rval;
-	fp_cmd_t 	*cmd;
+	fp_cmd_t	*cmd;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
 	ASSERT(!MUTEX_HELD(&pd->pd_mutex));
@@ -13467,8 +13534,8 @@ static fc_remote_port_t *
 fp_create_remote_port_by_ns(fc_local_port_t *port, uint32_t d_id, int sleep)
 {
 	int			rval;
-	job_request_t 		*job;
-	fctl_ns_req_t 		*ns_cmd;
+	job_request_t		*job;
+	fctl_ns_req_t		*ns_cmd;
 	fc_remote_port_t	*pd;
 
 	ASSERT(!MUTEX_HELD(&port->fp_mutex));
@@ -13525,11 +13592,11 @@ fp_create_remote_port_by_ns(fc_local_port_t *port, uint32_t d_id, int sleep)
  * EXCLUSIVE open performed, return a FAILURE to just shut the door on it. If
  * the ioctl command isn't in one of the list built, shut the door on that too.
  *
- * 	Certain ioctls perform hardware accesses in FCA drivers, and it needs
+ *	Certain ioctls perform hardware accesses in FCA drivers, and it needs
  *	to be made sure that users open the port for an exclusive access while
  *	performing those operations.
  *
- * 	This can prevent a casual user from inflicting damage on the port by
+ *	This can prevent a casual user from inflicting damage on the port by
  *	sending these ioctls from multiple processes/threads (there is no good
  *	reason why one would need to do that) without actually realizing how
  *	expensive such commands could turn out to be.
@@ -13569,7 +13636,7 @@ fp_bind_callbacks(fc_local_port_t *port)
 {
 	fc_fca_bind_info_t	bind_info = {0};
 	fc_fca_port_info_t	*port_info;
-	int		rval =  DDI_SUCCESS;
+	int		rval =	DDI_SUCCESS;
 	uint16_t	class;
 	int		node_namelen, port_namelen;
 	char		*nname = NULL, *pname = NULL;
@@ -13695,7 +13762,7 @@ static void
 fp_retrieve_caps(fc_local_port_t *port)
 {
 	int			rval;
-	int 			ub_count;
+	int			ub_count;
 	fc_fcp_dma_t		fcp_dma;
 	fc_reset_action_t	action;
 	fc_dma_behavior_t	dma_behavior;
@@ -13822,17 +13889,17 @@ fp_validate_area_domain(fc_local_port_t *port, uint32_t id, uint32_t mask,
 	int			listindex;
 	int			login;
 	int			job_flags;
-	char 			ww_name[17];
+	char			ww_name[17];
 	uint32_t		d_id;
 	uint32_t		count;
 	fctl_ns_req_t		*ns_cmd;
 	fc_portmap_t		*list;
-	fc_orphan_t 		*orp;
+	fc_orphan_t		*orp;
 	fc_orphan_t		*norp;
 	fc_orphan_t		*prev;
-	fc_remote_port_t 	*pd;
-	fc_remote_port_t 	*npd;
-	struct pwwn_hash 	*head;
+	fc_remote_port_t	*pd;
+	fc_remote_port_t	*npd;
+	struct pwwn_hash	*head;
 
 	ns_cmd = fctl_alloc_ns_cmd(sizeof (ns_req_gid_pn_t),
 	    sizeof (ns_resp_gid_pn_t), sizeof (ns_resp_gid_pn_t),
@@ -14243,7 +14310,7 @@ fp_validate_rscn_page(fc_local_port_t *port, fc_affected_id_t *page,
     int *listindex, int sleep)
 {
 	int			rval;
-	char 			ww_name[17];
+	char			ww_name[17];
 	la_wwn_t		*pwwn;
 	fc_remote_port_t	*pwwn_pd;
 	fc_remote_port_t	*did_pd;
@@ -14343,7 +14410,7 @@ fp_validate_rscn_page(fc_local_port_t *port, fc_affected_id_t *page,
 
 		mutex_enter(&pwwn_pd->pd_mutex);
 		if ((pwwn_pd->pd_state == PORT_DEVICE_LOGGED_IN) ||
-			(pwwn_pd->pd_aux_flags & PD_LOGGED_OUT)) {
+		    (pwwn_pd->pd_aux_flags & PD_LOGGED_OUT)) {
 			fc_wwn_to_str(&pwwn_pd->pd_port_name, ww_name);
 			mutex_exit(&pwwn_pd->pd_mutex);
 
@@ -14494,7 +14561,7 @@ fp_validate_rscn_page(fc_local_port_t *port, fc_affected_id_t *page,
 		    " state=%x", pwwn_pd, pwwn_pd->pd_state);
 
 		if ((pwwn_pd->pd_state == PORT_DEVICE_LOGGED_IN) ||
-			(pwwn_pd->pd_aux_flags & PD_LOGGED_OUT)) {
+		    (pwwn_pd->pd_aux_flags & PD_LOGGED_OUT)) {
 			fc_wwn_to_str(&pwwn_pd->pd_port_name, ww_name);
 
 			mutex_exit(&pwwn_pd->pd_mutex);
@@ -14525,8 +14592,8 @@ fp_validate_rscn_page(fc_local_port_t *port, fc_affected_id_t *page,
 
 	if (pwwn_pd == NULL && did_pd != NULL) {
 		fc_portmap_t	*ptr;
-		uint32_t 	len = 1;
-		char 		old_ww_name[17];
+		uint32_t	len = 1;
+		char		old_ww_name[17];
 
 		mutex_enter(&did_pd->pd_mutex);
 		fc_wwn_to_str(&did_pd->pd_port_name, old_ww_name);
@@ -14631,7 +14698,7 @@ fp_validate_rscn_page(fc_local_port_t *port, fc_affected_id_t *page,
 	    did_pd->pd_port_name.raw_wwn[7]);
 
 	if ((did_pd->pd_state == PORT_DEVICE_LOGGED_IN) ||
-		(did_pd->pd_aux_flags & PD_LOGGED_OUT)) {
+	    (did_pd->pd_aux_flags & PD_LOGGED_OUT)) {
 		mutex_exit(&did_pd->pd_mutex);
 		mutex_exit(&port->fp_mutex);
 
@@ -14719,7 +14786,7 @@ fp_validate_lilp_map(fc_lilpmap_t *lilp_map)
 static int
 fp_is_valid_alpa(uchar_t al_pa)
 {
-	int 	count;
+	int	count;
 
 	for (count = 0; count < sizeof (fp_valid_alpas); count++) {
 		if (al_pa == fp_valid_alpas[count] || al_pa == 0) {
@@ -14825,10 +14892,10 @@ static int
 fp_fcio_login(fc_local_port_t *port, fcio_t *fcio, job_request_t *job)
 {
 	int			ret;
-	uint32_t 		d_id;
+	uint32_t		d_id;
 	la_wwn_t		pwwn;
-	fc_remote_port_t 	*pd = NULL;
-	fc_remote_port_t 	*held_pd = NULL;
+	fc_remote_port_t	*pd = NULL;
+	fc_remote_port_t	*held_pd = NULL;
 	fctl_ns_req_t		*ns_cmd;
 	fc_portmap_t		*changelist;
 
@@ -14967,7 +15034,7 @@ fp_fcio_logout(fc_local_port_t *port, fcio_t *fcio, job_request_t *job)
 	la_wwn_t		pwwn;
 	fp_cmd_t		*cmd;
 	fc_portmap_t		*changelist;
-	fc_remote_port_t 	*pd;
+	fc_remote_port_t	*pd;
 
 	bcopy(fcio->fcio_ibuf, &pwwn, sizeof (pwwn));
 
@@ -15183,11 +15250,11 @@ static uint32_t
 fp_map_remote_port_state(uint32_t rm_state)
 {
 	switch (rm_state) {
-		case PORT_DEVICE_LOGGED_IN:
-			return (FC_HBA_PORTSTATE_ONLINE);
-		case PORT_DEVICE_VALID:
-		case PORT_DEVICE_INVALID:
-		default:
-			return (FC_HBA_PORTSTATE_UNKNOWN);
+	case PORT_DEVICE_LOGGED_IN:
+		return (FC_HBA_PORTSTATE_ONLINE);
+	case PORT_DEVICE_VALID:
+	case PORT_DEVICE_INVALID:
+	default:
+		return (FC_HBA_PORTSTATE_UNKNOWN);
 	}
 }

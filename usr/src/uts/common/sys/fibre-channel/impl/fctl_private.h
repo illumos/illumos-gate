@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,7 +78,7 @@ extern "C" {
 					((x) & ULP_PORT_BUSY))
 
 typedef struct ulp_ports {
-	struct ulp_ports 	*port_next;
+	struct ulp_ports	*port_next;
 	int			port_dstate;
 	uint32_t		port_statec;
 	kmutex_t		port_mutex;
@@ -87,8 +87,8 @@ typedef struct ulp_ports {
 
 
 typedef struct ulp_module {
-	struct ulp_module 	*mod_next;
-	fc_ulp_modinfo_t 	*mod_info;
+	struct ulp_module	*mod_next;
+	fc_ulp_modinfo_t	*mod_info;
 	fc_ulp_ports_t		*mod_ports;
 } fc_ulp_module_t;
 
@@ -100,7 +100,7 @@ typedef struct ulp_list {
 
 
 typedef struct fca_port {
-	struct fca_port 	*port_next;
+	struct fca_port		*port_next;
 	struct fc_local_port	*port_handle;
 } fc_fca_port_t;
 
@@ -147,7 +147,7 @@ typedef struct fc_remote_node {
 	int			fd_flags;
 
 	/* Linked list of remote ports associated with this remote node. */
-	struct fc_remote_port 	*fd_portlistp;
+	struct fc_remote_port	*fd_portlistp;
 
 	uchar_t			fd_ipa[8];	/* Initial proc assoc */
 	uchar_t			fd_vv[16];	/* Vendor Version */
@@ -196,20 +196,20 @@ typedef struct fc_remote_port {
 	 * Link pointers for the port wwn and D_ID hash lists. These point
 	 * to the next remote port in the current hash chain.
 	 */
-	struct fc_remote_port 	*pd_wwn_hnext;
-	struct fc_remote_port 	*pd_did_hnext;
+	struct fc_remote_port	*pd_wwn_hnext;
+	struct fc_remote_port	*pd_did_hnext;
 
 	/*
 	 * Link pointer for list of *all* fc_remote_port_t structs
 	 * associated with the same fc_local_port_t struct.
 	 */
-	struct fc_remote_port 	*pd_port_next;
+	struct fc_remote_port	*pd_port_next;
 
 	/*
 	 * Pointer to the fc_remote_node_t struct for the remote node
 	 * associated with the remote port.
 	 */
-	struct fc_remote_node 	*pd_remote_nodep;
+	struct fc_remote_node	*pd_remote_nodep;
 
 	/* port type for the remote port */
 	fc_porttype_t		pd_porttype;
@@ -237,7 +237,7 @@ typedef struct fc_remote_port {
 
 	/*
 	 * This tracks the current state/status of a login attempt at the
-	 * remote port.  Legal values are given above.
+	 * remote port.	 Legal values are given above.
 	 * See also the pd_state field.
 	 */
 	uchar_t			pd_flags;	/* login in progress */
@@ -250,10 +250,10 @@ typedef struct fc_remote_port {
 	uchar_t			pd_ip_addr[8];	/* IP address */
 	uint32_t		pd_fc4types[8];	/* FC-4 types */
 	uint32_t		pd_cos;		/* class of service */
-	struct common_service 	pd_csp;		/* common service */
-	struct service_param 	pd_clsp1;	/* Class 1 */
-	struct service_param 	pd_clsp2;	/* Class 2 */
-	struct service_param 	pd_clsp3;	/* Class 3 */
+	struct common_service	pd_csp;		/* common service */
+	struct service_param	pd_clsp1;	/* Class 1 */
+	struct service_param	pd_clsp2;	/* Class 2 */
+	struct service_param	pd_clsp3;	/* Class 3 */
 
 	/* This is _SO_ private that even we don't use it */
 	caddr_t			pd_private;	/* private data */
@@ -282,8 +282,8 @@ typedef struct fc_remote_port {
 	 */
 	uchar_t			pd_aux_flags;	/* relogin disable */
 
-	uchar_t			pd_spn_len; 	/* length of sym name */
-	char			pd_spn[255]; 	/* symbolic port name */
+	uchar_t			pd_spn_len;	/* length of sym name */
+	char			pd_spn[255];	/* symbolic port name */
 
 	/*
 	 * Count of the # of unsolicited LOGOs received. See the definition
@@ -304,7 +304,7 @@ typedef struct fc_remote_port {
  * Structs for the global nwwn_hash_table[] entries.
  *
  * At _init() time, fctl allocates an array of fctl_nwwn_list_t structs that
- * has nwwn_table_size entries.  The hash_head member anchors a linked
+ * has nwwn_table_size entries.	 The hash_head member anchors a linked
  * list of fctl_nwwn_elem_t structs that are linked via the fne_next pointer.
  * Each fctl_nwwn_elem_t also contains a pointer to one fc_remote_node_t struct.
  */
@@ -312,7 +312,7 @@ typedef struct fctl_nwwn_elem fctl_nwwn_elem_t;
 
 struct fctl_nwwn_elem {
 	fctl_nwwn_elem_t	*fne_nextp;
-	fc_remote_node_t 	*fne_nodep;
+	fc_remote_node_t	*fne_nodep;
 };
 
 typedef struct fctl_nwwn_list {
@@ -413,7 +413,7 @@ typedef struct fc_local_port {
 	 * The actual 'state' is kept in the lower byte, and the port speed
 	 * is kept in the next most significant byte.  The code makes
 	 * extensive use of the FC_PORT_SPEED_MASK() and FC_PORT_STATE_MASK()
-	 * macros to separate these two items.  The current link topology
+	 * macros to separate these two items.	The current link topology
 	 * is actually kept separately in the fp_topology field.
 	 * The legal values for fp_state are given above.
 	 */
@@ -439,18 +439,18 @@ typedef struct fc_local_port {
 	 * fp's homegrown "job" threading mechanism (not a Solaris DDI taskq).
 	 *
 	 * Head/tail pointers for a linked list of requests to be executed
-	 * in a driver-private thread.  One thread per fc_local_port_t struct.
+	 * in a driver-private thread.	One thread per fc_local_port_t struct.
 	 * The thread is created during DDI_ATTACH for the instance.
 	 */
 	struct job_request	*fp_job_head;
 	struct job_request	*fp_job_tail;
 
-	struct fp_cmd 		*fp_wait_head;		/* waitQ head */
+	struct fp_cmd		*fp_wait_head;		/* waitQ head */
 	struct fp_cmd		*fp_wait_tail;		/* waitQ tail */
 
 	/*
 	 * Current port topology. Uses the FC_TOP_* values defined in
-	 * fc_appif.h.  This is used with the FC_IS_TOP_SWITCH() macro and
+	 * fc_appif.h.	This is used with the FC_IS_TOP_SWITCH() macro and
 	 * is also used with the FC_TOP_EXTERNAL() macro in the ULPs.
 	 */
 	uint32_t		fp_topology;		/* topology */
@@ -516,7 +516,8 @@ typedef struct fc_local_port {
 	 */
 	struct pwwn_hash	*fp_pwwn_table;
 
-	struct kmem_cache	*fp_pkt_cache;		/* packet cache */
+	struct kmem_cache	*fp_pkt_cache;
+	int			fp_out_fpcmds;	/* outstanding fp_cmd # */
 
 	/*
 	 * fp_statec_busy tracks the progression of state change
@@ -551,7 +552,7 @@ typedef struct fc_local_port {
 	int			fp_dev_count;		/* number of devices */
 	int			fp_ptpt_master;		/* my WWN is greater */
 	int			fp_ulp_nload;		/* count of ULPs */
-	int			fp_total_devices; 	/* total count */
+	int			fp_total_devices;	/* total count */
 
 	/*
 	 * Another "busy/not busy" flag. Value is either 0 or 1.
@@ -575,7 +576,7 @@ typedef struct fc_local_port {
 
 	/*
 	 * Apparently intended to facilitate reporting the FC_HBA type
-	 * for the local port.  Legal values are in fcgs2.h. The
+	 * for the local port.	Legal values are in fcgs2.h. The
 	 * fc_porttype_t typedef is in fc_types.h
 	 */
 	fc_porttype_t		fp_port_type;
@@ -608,7 +609,7 @@ typedef struct fc_local_port {
 
 	timeout_id_t		fp_wait_tid;		/* retry timer */
 	timeout_id_t		fp_offline_tid;		/* Offline timeout ID */
-	fc_lilpmap_t 		fp_lilp_map;		/* LILP map */
+	fc_lilpmap_t		fp_lilp_map;		/* LILP map */
 	la_els_logi_t		fp_service_params;	/* service parameters */
 	fc_fcp_dma_t		fp_fcp_dma;		/* FCP DVMA space */
 	fc_reset_action_t	fp_reset_action;	/* FCA reset behavior */
@@ -636,14 +637,14 @@ typedef struct fc_local_port {
 
 	/*
 	 * Opaque data for CALLB_CPR_* macros used by the per-local-port
-	 * job thread.  Required for safe thread shutdown during PM operations.
+	 * job thread.	Required for safe thread shutdown during PM operations.
 	 */
 	callb_cpr_t		fp_cpr_info;		/* CPR info */
 
 	char			fp_jindex;		/* Not used */
 	char			fp_jbuf[15];		/* Not used */
 
-	char			fp_ibuf[15];		/* instance buf  */
+	char			fp_ibuf[15];		/* instance buf	 */
 	char			fp_rnid_init;		/* init done */
 	fc_rnid_t		fp_rnid_params;		/* node id data */
 
@@ -673,28 +674,28 @@ typedef struct fc_local_port {
 /*
  * Struct for the d_id hash table in the fc_local_port_t struct.  The code
  * allocates memory for an array of D_ID_HASH_TABLE_SIZE elements at
- * attach time.  The array pointer is saved at the fp_did_table member
+ * attach time.	 The array pointer is saved at the fp_did_table member
  * in the fc_local_port_t struct.
  *  Each hash chain is a singly-linked list of fc_remote_port_t
  * structs, using the pd_did_hnext pointer in the fc_remote_port_t struct.
  */
 struct d_id_hash {
-	struct fc_remote_port 	*d_id_head;	/* Head of linked list */
-	int 			d_id_count;	/* Count of list entries */
+	struct fc_remote_port	*d_id_head;	/* Head of linked list */
+	int			d_id_count;	/* Count of list entries */
 };
 
 
 /*
  * Struct for the pwwn hash table in the fc_local_port_t struct.  The code
  * allocates memory for an array of PWWN_HASH_TABLE_SIZE elements at
- * attach time.  The array pointer is saved at the fp_pwwn_table member
+ * attach time.	 The array pointer is saved at the fp_pwwn_table member
  * in the fc_local_port_t struct.
  * Each hash chain is a singly-linked list of fc_remote_port_t
  * structs, using the pd_wwn_hnext pointer in the fc_remote_port_t struct.
  */
 struct pwwn_hash {
-	struct fc_remote_port 	*pwwn_head;	/* Head of linked list */
-	int 			pwwn_count;	/* Count of list entries */
+	struct fc_remote_port	*pwwn_head;	/* Head of linked list */
+	int			pwwn_count;	/* Count of list entries */
 };
 
 
@@ -737,7 +738,7 @@ static void fctl_check_alpa_list(fc_local_port_t *port, fc_remote_port_t *pd);
 static int fctl_is_alpa_present(fc_local_port_t *port, uchar_t alpa);
 static void fc_trace_freemsg(fc_trace_logq_t *logq);
 static void fctl_init_dma_attr(fc_local_port_t *port, fc_ulp_module_t *mod,
-    fc_ulp_port_info_t  *info);
+    fc_ulp_port_info_t	*info);
 fc_local_port_t *fc_get_npiv_port(fc_local_port_t *phyport, la_wwn_t *pwwn);
 fc_local_port_t *fc_delete_npiv_port(fc_local_port_t *phyport, la_wwn_t *pwwn);
 
