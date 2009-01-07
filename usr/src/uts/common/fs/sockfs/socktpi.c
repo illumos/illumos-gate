@@ -5159,6 +5159,7 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 	t_uscalar_t		len;
 	uint32_t		value;
 	struct timeval		tmo_val; /* used for SO_RCVTIMEO, SO_SNDTIMEO */
+	struct timeval32	tmo_val32;
 	struct so_snd_bufinfo	snd_bufinfo;	/* used for zero copy */
 
 	dprintso(so, 1, ("sotpi_getsockopt(%p, 0x%x, 0x%x, %p, %p) %s\n",
@@ -5203,10 +5204,19 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 			break;
 		case SO_RCVTIMEO:
 		case SO_SNDTIMEO:
-			if (maxlen < (t_uscalar_t)sizeof (struct timeval)) {
-				error = EINVAL;
-				eprintsoline(so, error);
-				goto done2;
+			if (get_udatamodel() == DATAMODEL_NATIVE) {
+				if (maxlen < sizeof (struct timeval)) {
+					error = EINVAL;
+					eprintsoline(so, error);
+					goto done2;
+				}
+			} else {
+				if (maxlen < sizeof (struct timeval32)) {
+					error = EINVAL;
+					eprintsoline(so, error);
+					goto done2;
+				}
+
 			}
 			break;
 		case SO_LINGER:
@@ -5368,14 +5378,21 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 		case SO_SNDTIMEO:
 		case SO_RCVTIMEO: {
 			clock_t val;
+
 			if (option_name == SO_RCVTIMEO)
 				val = drv_hztousec(so->so_rcvtimeo);
 			else
 				val = drv_hztousec(so->so_sndtimeo);
 			tmo_val.tv_sec = val / (1000 * 1000);
 			tmo_val.tv_usec = val % (1000 * 1000);
-			option = &tmo_val;
-			len = (t_uscalar_t)sizeof (struct timeval);
+			if (get_udatamodel() == DATAMODEL_NATIVE) {
+				option = &tmo_val;
+				len = sizeof (struct timeval);
+			} else {
+				TIMEVAL_TO_TIMEVAL32(&tmo_val32, &tmo_val);
+				option = &tmo_val32;
+				len = sizeof (struct timeval32);
+			}
 			break;
 		}
 		case SO_SND_BUFINFO: {
@@ -5541,12 +5558,22 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 				break;
 			case SO_SNDTIMEO:
 			case SO_RCVTIMEO:
-				if (optlen !=
-				    (t_uscalar_t)sizeof (struct timeval)) {
-					error = EINVAL;
-					eprintsoline(so, error);
-					mutex_enter(&so->so_lock);
-					goto done2;
+				if (get_udatamodel() == DATAMODEL_NATIVE) {
+					if (optlen !=
+					    sizeof (struct timeval)) {
+						error = EINVAL;
+						eprintsoline(so, error);
+						mutex_enter(&so->so_lock);
+						goto done2;
+					}
+				} else {
+					if (optlen !=
+					    sizeof (struct timeval32)) {
+						error = EINVAL;
+						eprintsoline(so, error);
+						mutex_enter(&so->so_lock);
+						goto done2;
+					}
 				}
 				ASSERT(optval);
 				handled = B_TRUE;
@@ -5583,6 +5610,25 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 				handled = B_TRUE;
 				break;
 			}
+			case SO_SNDTIMEO:
+			case SO_RCVTIMEO: {
+				struct timeval tl;
+				clock_t val;
+
+				if (get_udatamodel() == DATAMODEL_NATIVE)
+					bcopy(&tl, (struct timeval *)optval,
+					    sizeof (struct timeval));
+				else
+					TIMEVAL32_TO_TIMEVAL(&tl,
+					    (struct timeval32 *)optval);
+				val = tl.tv_sec * 1000 * 1000 + tl.tv_usec;
+				if (option_name == SO_RCVTIMEO)
+					so->so_rcvtimeo = drv_usectohz(val);
+				else
+					so->so_sndtimeo = drv_usectohz(val);
+				break;
+			}
+
 			case SO_DEBUG:
 				tcp->tcp_debug = onoff;
 #ifdef SOCK_TEST
@@ -5736,10 +5782,18 @@ done:
 			break;
 		case SO_SNDTIMEO:
 		case SO_RCVTIMEO:
-			if (optlen != (t_uscalar_t)sizeof (struct timeval)) {
-				error = EINVAL;
-				eprintsoline(so, error);
-				goto done2;
+			if (get_udatamodel() == DATAMODEL_NATIVE) {
+				if (optlen != sizeof (struct timeval)) {
+					error = EINVAL;
+					eprintsoline(so, error);
+					goto done2;
+				}
+			} else {
+				if (optlen != sizeof (struct timeval32)) {
+					error = EINVAL;
+					eprintsoline(so, error);
+					goto done2;
+				}
 			}
 			ASSERT(optval);
 			handled = B_TRUE;
@@ -5840,8 +5894,16 @@ done:
 #endif /* notyet */
 		case SO_SNDTIMEO:
 		case SO_RCVTIMEO: {
-			struct timeval *tl = (struct timeval *)optval;
-			clock_t val = tl->tv_sec * 1000 * 1000 + tl->tv_usec;
+			struct timeval tl;
+			clock_t val;
+
+			if (get_udatamodel() == DATAMODEL_NATIVE)
+				bcopy(&tl, (struct timeval *)optval,
+				    sizeof (struct timeval));
+			else
+				TIMEVAL32_TO_TIMEVAL(&tl,
+				    (struct timeval32 *)optval);
+			val = tl.tv_sec * 1000 * 1000 + tl.tv_usec;
 			if (option_name == SO_RCVTIMEO)
 				so->so_rcvtimeo = drv_usectohz(val);
 			else

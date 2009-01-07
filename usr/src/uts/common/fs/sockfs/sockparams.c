@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,17 +75,6 @@ static krwlock_t splist_lock;
  */
 static list_t sp_ephem_list;
 static krwlock_t sp_ephem_lock;
-
-/*
- * Mearch criteria used by sockparams_find()
- */
-typedef enum sp_match_criteria {
-	SP_MATCH_EXACT,		/* family, type & proto must match */
-	SP_MATCH_WILDCARD,	/* family & type must match, proto can be 0 */
-	SP_MATCH_INC_DEV,	/* same as exact, but dev must also match */
-	SP_MATCH_INC_MOD	/* same as exact, but mod must also match */
-} sp_match_criteria_t;
-
 
 void
 sockparams_init(void)
@@ -278,41 +267,30 @@ sockparams_sdev_fini(struct sockparams *sp)
 
 /*
  * Look for a matching sockparams entry on the given list.
- *
  * The caller must hold the associated list lock.
  */
 static struct sockparams *
 sockparams_find(list_t *list, int family, int type, int protocol,
-    enum sp_match_criteria crit, const char *name)
+    boolean_t by_devpath, const char *name)
 {
 	struct sockparams *sp;
-	struct sockparams *wild = NULL;
 
 	for (sp = list_head(list); sp != NULL; sp = list_next(list, sp)) {
-		if (sp->sp_family == family &&
-		    sp->sp_type == type) {
-
+		if (sp->sp_family == family && sp->sp_type == type) {
 			if (sp->sp_protocol == protocol) {
-				if (crit == SP_MATCH_EXACT ||
-				    crit == SP_MATCH_WILDCARD)
+				if (name == NULL)
 					break;
-				else if (crit == SP_MATCH_INC_DEV &&
+				else if (by_devpath &&
 				    sp->sp_sdev_info.sd_devpath != NULL &&
 				    strcmp(sp->sp_sdev_info.sd_devpath,
 				    name) == 0)
 					break;
-				else if (crit == SP_MATCH_INC_MOD &&
-				    strcmp(sp->sp_smod_name, name) == 0)
+				else if (strcmp(sp->sp_smod_name, name) == 0)
 					break;
-			} else if (crit == SP_MATCH_WILDCARD &&
-			    sp->sp_protocol == 0) {
-				/* best match so far */
-				wild = sp;
 			}
 		}
 	}
-
-	return ((sp == NULL) ? wild : sp);
+	return (sp);
 }
 
 /*
@@ -333,11 +311,9 @@ sockparams_find(list_t *list, int family, int type, int protocol,
  */
 static struct sockparams *
 sockparams_hold_ephemeral(int family, int type, int protocol,
-    const char *name, boolean_t tpi, int kmflag, int *errorp)
+    const char *name, boolean_t by_devpath, int kmflag, int *errorp)
 {
 	struct sockparams *sp = NULL;
-	sp_match_criteria_t crit = (tpi) ? SP_MATCH_INC_DEV : SP_MATCH_INC_MOD;
-
 	*errorp = 0;
 
 	/*
@@ -345,7 +321,7 @@ sockparams_hold_ephemeral(int family, int type, int protocol,
 	 */
 	rw_enter(&sp_ephem_lock, RW_READER);
 	sp = sockparams_find(&sp_ephem_list, family, type, protocol,
-	    crit, name);
+	    by_devpath, name);
 	if (sp != NULL) {
 		SOCKPARAMS_INC_REF(sp);
 		rw_exit(&sp_ephem_lock);
@@ -366,7 +342,7 @@ sockparams_hold_ephemeral(int family, int type, int protocol,
 		}
 
 		(void *)strncpy(namebuf, name, namelen);
-		if (tpi) {
+		if (by_devpath) {
 			newsp = sockparams_create(family, type,
 			    protocol, NULL, namebuf, namelen,
 			    SOCKPARAMS_EPHEMERAL, kmflag, errorp);
@@ -400,7 +376,7 @@ sockparams_hold_ephemeral(int family, int type, int protocol,
 		 */
 		rw_enter(&sp_ephem_lock, RW_WRITER);
 		sp = sockparams_find(&sp_ephem_list, family, type, protocol,
-		    crit, name);
+		    by_devpath, name);
 		if (sp != NULL) {
 			/*
 			 * Someone has requested a matching entry, so just
@@ -489,7 +465,7 @@ sockparams_add(struct sockparams *sp)
 
 	rw_enter(&splist_lock, RW_WRITER);
 	if (sockparams_find(&sphead, sp->sp_family, sp->sp_type,
-	    sp->sp_protocol, SP_MATCH_EXACT, NULL) != 0) {
+	    sp->sp_protocol, B_TRUE, NULL) != 0) {
 		rw_exit(&splist_lock);
 		return (EEXIST);
 	} else {
@@ -522,8 +498,7 @@ sockparams_delete(int family, int type, int protocol)
 	struct sockparams *sp;
 
 	rw_enter(&splist_lock, RW_WRITER);
-	sp = sockparams_find(&sphead, family, type, protocol, SP_MATCH_EXACT,
-	    NULL);
+	sp = sockparams_find(&sphead, family, type, protocol, B_TRUE, NULL);
 
 	if (sp != NULL) {
 		/*
@@ -633,7 +608,6 @@ soconfig(int family, int type, int protocol,
  *
  * TODO: should use ddi_modopen()/ddi_modclose()
  */
-
 int
 solookup(int family, int type, int protocol, struct sockparams **spp)
 {
@@ -651,8 +625,7 @@ solookup(int family, int type, int protocol, struct sockparams **spp)
 	 * the default entry for a specific family and type, the
 	 * entry of which would have a protocol value of 0.
 	 */
-	sp = sockparams_find(&sphead, family, type, protocol, SP_MATCH_WILDCARD,
-	    NULL);
+	sp = sockparams_find(&sphead, family, type, protocol, B_TRUE, NULL);
 
 	if (sp == NULL) {
 		int found = 0;
@@ -667,7 +640,6 @@ solookup(int family, int type, int protocol, struct sockparams **spp)
 				found = 2;
 		}
 		rw_exit(&splist_lock);
-
 		switch (found) {
 		case 0:
 			error = EAFNOSUPPORT;

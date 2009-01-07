@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,12 +71,14 @@ socket_create(int family, int type, int protocol, char *devpath, char *mod,
 {
 	struct sonode *so;
 	struct sockparams *sp = NULL;
+	int saved_error;
 
 	/*
 	 * Look for a sockparams entry that match the given criteria.
 	 * solookup() returns with the entry held.
 	 */
 	*errorp = solookup(family, type, protocol, &sp);
+	saved_error = *errorp;
 	if (sp == NULL) {
 		int kmflags = (flags == SOCKET_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
 		/*
@@ -84,17 +86,23 @@ socket_create(int family, int type, int protocol, char *devpath, char *mod,
 		 * created if the caller specifies a device or a socket module.
 		 */
 		if (devpath != NULL) {
+			saved_error = 0;
 			sp = sockparams_hold_ephemeral_bydev(family, type,
 			    protocol, devpath, kmflags, errorp);
 		} else if (mod != NULL) {
+			saved_error = 0;
 			sp = sockparams_hold_ephemeral_bymod(family, type,
 			    protocol, mod, kmflags, errorp);
 		} else {
-			return (NULL);
+			*errorp = solookup(family, type, 0, &sp);
 		}
 
-		if (sp == NULL)
+		if (sp == NULL) {
+			if (saved_error && (*errorp == EPROTONOSUPPORT ||
+			    *errorp == EPROTOTYPE || *errorp == ENOPROTOOPT))
+				*errorp = saved_error;
 			return (NULL);
+		}
 	}
 
 	ASSERT(sp->sp_smod_info != NULL);
@@ -108,6 +116,9 @@ socket_create(int family, int type, int protocol, char *devpath, char *mod,
 			/* Cannot fail, only bumps so_count */
 			(void) VOP_OPEN(&SOTOV(so), FREAD|FWRITE, cr, NULL);
 		} else {
+			if (saved_error && (*errorp == EPROTONOSUPPORT ||
+			    *errorp == EPROTOTYPE || *errorp == ENOPROTOOPT))
+				*errorp = saved_error;
 			socket_destroy(so);
 			so = NULL;
 		}
@@ -287,15 +298,15 @@ int
 socket_setsockopt(struct sonode *so, int level, int option_name,
     const void *optval, t_uscalar_t optlen, cred_t *cr)
 {
+	int val = 1;
 	/* Caller allocates aligned optval, or passes null */
 	ASSERT(((uintptr_t)optval & (sizeof (t_scalar_t) - 1)) == 0);
 	/* If optval is null optlen is 0, and vice-versa */
 	ASSERT(optval != NULL || optlen == 0);
 	ASSERT(optlen != 0 || optval == NULL);
 
-	/* No options should be zero-length */
-	if (optlen == 0)
-		return (EINVAL);
+	if (optval == NULL && optlen == 0)
+		optval = &val;
 
 	return (SOP_SETSOCKOPT(so, level, option_name, optval, optlen, cr));
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -780,14 +780,25 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 		switch (option_name) {
 		case SO_RCVTIMEO:
 		case SO_SNDTIMEO: {
-			struct timeval *tl = (struct timeval *)optval;
+			struct timeval tl;
 			clock_t t_usec;
 
-			if (optlen != (t_uscalar_t)sizeof (struct timeval)) {
-				SO_UNBLOCK_FALLBACK(so);
-				return (EINVAL);
+			if (get_udatamodel() == DATAMODEL_NATIVE) {
+				if (optlen != sizeof (struct timeval)) {
+					error = EINVAL;
+					goto done;
+				}
+				bcopy((struct timeval *)optval, &tl,
+				    sizeof (struct timeval));
+			} else {
+				if (optlen != sizeof (struct timeval32)) {
+					error = EINVAL;
+					goto done;
+				}
+				TIMEVAL32_TO_TIMEVAL(&tl,
+				    (struct timeval32 *)optval);
 			}
-			t_usec = tl->tv_sec * 1000 * 1000 + tl->tv_usec;
+			t_usec = tl.tv_sec * 1000 * 1000 + tl.tv_usec;
 			mutex_enter(&so->so_lock);
 			if (option_name == SO_RCVTIMEO)
 				so->so_rcvtimeo = drv_usectohz(t_usec);
@@ -810,7 +821,7 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 	}
 	error = (*so->so_downcalls->sd_setsockopt)
 	    (so->so_proto_handle, level, option_name, optval, optlen, cr);
-
+done:
 	SO_UNBLOCK_FALLBACK(so);
 	return (error);
 }
