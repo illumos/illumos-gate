@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI session interfaces
@@ -330,11 +330,14 @@ iscsi_sess_get(uint32_t oid, iscsi_hba_t *ihp, iscsi_sess_t **ispp)
  * iscsi_sess_online - initiate online of sessions connections
  */
 void
-iscsi_sess_online(iscsi_sess_t *isp)
+iscsi_sess_online(void *arg)
 {
+	iscsi_sess_t	*isp;
 	iscsi_hba_t	*ihp;
 	iscsi_conn_t	*icp;
 	int		idx;
+
+	isp = (iscsi_sess_t *)arg;
 
 	ASSERT(isp != NULL);
 	ihp = isp->sess_hba;

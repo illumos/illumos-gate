@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -841,6 +841,14 @@ typedef struct iscsi_sess {
 
 } iscsi_sess_t;
 
+/*
+ * This structure will be used to store sessions to be online
+ * during normal login operation.
+ */
+typedef struct iscsi_sess_list {
+	iscsi_sess_t		*session;
+	struct iscsi_sess_list	*next;
+} iscsi_sess_list_t;
 
 /*
  * iscsi_network
@@ -1015,7 +1023,7 @@ iscsi_sess_t *iscsi_sess_create(iscsi_hba_t *ihp,
     iSCSIDiscoveryMethod_t method, struct sockaddr *addr_dsc,
     char *target_name, int tpgt, uchar_t isid_lsb,
     iscsi_sess_type_t type, uint32_t *oid);
-void iscsi_sess_online(iscsi_sess_t *isp);
+void iscsi_sess_online(void *arg);
 int iscsi_sess_get(uint32_t oid, iscsi_hba_t *ihp, iscsi_sess_t **ispp);
 iscsi_status_t iscsi_sess_destroy(iscsi_sess_t *isp);
 void iscsi_sess_state_machine(iscsi_sess_t *isp, iscsi_sess_event_t event);

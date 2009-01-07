@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1177,8 +1177,15 @@ boolean_t
 iscsid_login_tgt(iscsi_hba_t *ihp, char *target_name,
     iSCSIDiscoveryMethod_t method, struct sockaddr *addr_dsc)
 {
-	boolean_t	rtn = B_FALSE;
-	iscsi_sess_t	*isp;
+	boolean_t		rtn		= B_FALSE;
+	iscsi_sess_t		*isp		= NULL;
+	iscsi_sess_list_t	*isp_list	= NULL;
+	iscsi_sess_list_t	*last_sess	= NULL;
+	iscsi_sess_list_t	*cur_sess	= NULL;
+	int			total		= 0;
+	ddi_taskq_t		*login_taskq	= NULL;
+	char			taskq_name[ISCSI_TH_MAX_NAME_LEN] = {0};
+	time_t			time_stamp;
 
 	ASSERT(ihp != NULL);
 
@@ -1241,12 +1248,70 @@ iscsid_login_tgt(iscsi_hba_t *ihp, char *target_name,
 			}
 		}
 
-		if (try_online == B_TRUE) {
-			iscsi_sess_online(isp);
+		if (try_online == B_TRUE &&
+		    isp->sess_type == ISCSI_SESS_TYPE_NORMAL) {
+			total++;
+			/* Copy these sessions to the list. */
+			if (isp_list == NULL) {
+				isp_list =
+				    (iscsi_sess_list_t *)kmem_zalloc(
+				    sizeof (iscsi_sess_list_t), KM_SLEEP);
+				last_sess = isp_list;
+				last_sess->session = isp;
+				last_sess->next = NULL;
+			} else {
+				last_sess->next =
+				    (iscsi_sess_list_t *)kmem_zalloc(
+				    sizeof (iscsi_sess_list_t), KM_SLEEP);
+				last_sess->next->session = isp;
+				last_sess->next->next = NULL;
+				last_sess = last_sess->next;
+			}
 			rtn = B_TRUE;
 		}
+
 		isp = isp->sess_next;
 	}
+
+	if (total > 0) {
+		time_stamp = ddi_get_time();
+		(void) snprintf(taskq_name, (ISCSI_TH_MAX_NAME_LEN - 1),
+		    "login_queue.%lx", time_stamp);
+
+		login_taskq = ddi_taskq_create(ihp->hba_dip,
+		    taskq_name, total, TASKQ_DEFAULTPRI, 0);
+		if (login_taskq == NULL) {
+			while (isp_list != NULL) {
+				cur_sess = isp_list;
+				isp_list = isp_list->next;
+				kmem_free(cur_sess, sizeof (iscsi_sess_list_t));
+			}
+			rtn = B_FALSE;
+			rw_exit(&ihp->hba_sess_list_rwlock);
+			return (rtn);
+		}
+
+		for (cur_sess = isp_list; cur_sess != NULL;
+		    cur_sess = cur_sess->next) {
+			if (ddi_taskq_dispatch(login_taskq,
+			    iscsi_sess_online, (void *)cur_sess->session,
+			    DDI_SLEEP) != DDI_SUCCESS) {
+				cmn_err(CE_NOTE, "Can't dispatch the task "
+				    "for login to the target: %s",
+				    cur_sess->session->sess_name);
+			}
+		}
+
+		ddi_taskq_wait(login_taskq);
+		ddi_taskq_destroy(login_taskq);
+		while (isp_list != NULL) {
+			cur_sess = isp_list;
+			isp_list = isp_list->next;
+			kmem_free(cur_sess, sizeof (iscsi_sess_list_t));
+		}
+
+	}
+
 	rw_exit(&ihp->hba_sess_list_rwlock);
 	return (rtn);
 }
