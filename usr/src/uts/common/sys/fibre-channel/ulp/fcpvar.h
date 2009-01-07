@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,12 +109,12 @@ extern "C" {
  * fcp_stats : Statistics provided for fcp.
  */
 struct fcp_stats {
-	uint_t  version;		/* version of this struct */
-	uint_t  lip_count;		/* lips forced by fcp */
-	uint_t  link_reset_count; 	/* lip failures, ie, no ONLINE */
+	uint_t	version;		/* version of this struct */
+	uint_t	lip_count;		/* lips forced by fcp */
+	uint_t	link_reset_count;	/* lip failures, ie, no ONLINE */
 					/* response after forcing lip */
-	uint_t  ncmds;			/* outstanding commands */
-	uint_t  throttle_limit;		/* current throttle limit */
+	uint_t	ncmds;			/* outstanding commands */
+	uint_t	throttle_limit;		/* current throttle limit */
 	char	drvr_name[MAXNAMELEN];	/* Name of driver, NULL term. */
 };
 #endif
@@ -146,7 +146,7 @@ struct fcp_port {
 	 * 'Send a PRLI ELS', 'Send a PRLO ELS', 'Send a PLOGI ELS' or
 	 * 'Send an Inquiry command'.  If the submission of the request to the
 	 * fp/fctl module failed (for a set of specific reasons) and the
-	 * request can be resubmitted later, it is queued here.  The watchdog
+	 * request can be resubmitted later, it is queued here.	 The watchdog
 	 * timer (fcp_watch()) will walk this queue and resubmit the requests.
 	 */
 	struct fcp_ipkt		*port_ipkt_list;
@@ -160,7 +160,7 @@ struct fcp_port {
 	 */
 	int			port_tmp_cnt;
 	/*
-	 * This is supposed to indicate the state of this port.  It is a
+	 * This is supposed to indicate the state of this port.	 It is a
 	 * bitmap which means several bits can be set simultaneously.  The list
 	 * of the different bits and their meaning is given further down in
 	 * this file.
@@ -169,7 +169,7 @@ struct fcp_port {
 	/*
 	 * This field is initialized at the very end of the function
 	 * fcp_handle_port_attach() if the attachment of the port was
-	 * successful.  It is set to the value stored in lbolt64 at the
+	 * successful.	It is set to the value stored in lbolt64 at the
 	 * time of the attachment.  This value is only used in the function
 	 * fcp_scsi_bus_config().  It is used to determine the value of the
 	 * parameter timeout when ndi_busop_bus_config() and cv_wait() are
@@ -199,9 +199,9 @@ struct fcp_port {
 	uint32_t		port_phys_state;
 	/*
 	 * This field points to the first element of a list of fcp_reset_elem
-	 * structures.  Those structures are created when the target driver
+	 * structures.	Those structures are created when the target driver
 	 * calls fcp_reset_target().  The target or the LUN specified by the
-	 * target driver is reset by sending a Task Management command.  After
+	 * target driver is reset by sending a Task Management command.	 After
 	 * the response has been received, a fcp_reset_elem structure is
 	 * queued here and will remain queued for FCP_RESET_DELAY.  While
 	 * the fcp_reset_elem structure is in this queue the LUNs of
@@ -213,14 +213,14 @@ struct fcp_port {
 	struct fcp_reset_elem	*port_reset_list;
 	/*
 	 * This points to the first element of a list of fcp_tgt_elem
-	 * structures.  This list is a list of targets to offline.  The list
+	 * structures.	This list is a list of targets to offline.  The list
 	 * is walked in fcp_watch(). After the target is offlined the
 	 * structure fcp_tgt_elem is freed.
 	 */
 	struct fcp_tgt_elem	*port_offline_tgts;
 	/*
 	 * This points to the first element of a list of fcp_lun_elem
-	 * structures.  This list is a list of LUNs to offline.  The list
+	 * structures.	This list is a list of LUNs to offline.	 The list
 	 * is walked in fcp_watch(). After the lun is offlined the
 	 * structure fcp_lun_elem is freed.
 	 */
@@ -228,9 +228,9 @@ struct fcp_port {
 	/*
 	 * This field is a counter initialized to 1 when the port attaches.
 	 * It is incremented when the line goes from online to offline and
-	 * vice versa.  It is also incremented when the port detaches.  The
+	 * vice versa.	It is also incremented when the port detaches.	The
 	 * value stored in this counter is used as a reference in time of the
-	 * link state.  For example, when the line comes up internal requests
+	 * link state.	For example, when the line comes up internal requests
 	 * are generated (fcp_ipkt) such as PRLI and INQUIRY.  Those requests
 	 * are tagged with the value contained in this field at the time the
 	 * request is built.  When the callback for the request is called, the
@@ -259,7 +259,7 @@ struct fcp_port {
 	 *	fcp_watchdog_time + FCP_ICMD_DEADLINE
 	 *
 	 * In all those instances a discovery process is started or extended
-	 * (2).  The value stored in port_deadline is only checked in one
+	 * (2).	 The value stored in port_deadline is only checked in one
 	 * function: fcp_is_retryable().  That function checks if an
 	 * internal command (fcp_ipkt) is retryable or not.  Usually
 	 * there's a counter that limits the number of times a command is
@@ -337,7 +337,7 @@ struct fcp_port {
 	 */
 	uint32_t		port_priv_pkt_len;
 	/*
-	 * This field contains the port's modlink info.  It is provided by
+	 * This field contains the port's modlink info.	 It is provided by
 	 * FP/FCTL during the port attachment.
 	 */
 	struct modlinkage	port_fp_modlinkage;
@@ -351,7 +351,7 @@ struct fcp_port {
 	/*
 	 * Field containing the hba_tran structure registered with SCSA.
 	 */
-	struct scsi_hba_tran 	*port_tran;
+	struct scsi_hba_tran	*port_tran;
 	/*
 	 * Device info structure provided by fp/fctl when the port attaches and
 	 * representing the local physical fibre channel port.
@@ -370,7 +370,7 @@ struct fcp_port {
 	ndi_event_hdl_t		port_ndi_event_hdl;
 	ndi_event_set_t		port_ndi_events;
 	/*
-	 * hash lists of targets attached to this port.   The hashing is based
+	 * hash lists of targets attached to this port.	  The hashing is based
 	 * on the WWN.
 	 */
 	struct fcp_tgt		*port_tgt_hash_table[FCP_NUM_HASH];
@@ -459,67 +459,67 @@ typedef int fcp_map_tag_t;
  *
  * This is what a fcp_pkt looks like after allocation:
  *
- *                      +================================+
- *               +--->  |        struct scsi_pkt         |
- *               |      |                                |
- *               | +--- | pkt_ha_private                 |
- *               | |    |                                |
- *               | |    +================================+
- *               | |
- *               | |    +================================+
- *               | +--> |        struct fcp_pkt          | <---------+
- *               +----- | cmd_pkt                        |           |
- *                      |                     cmd_fp_pkt | ---+      |
- *           +--------->| cmd_fcp_rsp[]                  |    |      |
- *           | +------->| cmd_fcp_cmd[]                  |    |      |
- *           | |        |--------------------------------|    |      |
- *           | |        |        struct fc_packet        | <--+      |
- *           | |        |                                |           |
- *           | |        |                pkt_ulp_private | ----------+
- *           | |        |                pkt_fca_private | -----+
- *           | |        |                pkt_data_cookie | ---+ |
- *           | |        | pkt_cmdlen                     |    | |
- *           | |(a)     | pkt_rsplen                     |    | |
- *           | +--------| .......... pkt_cmd ........... | ---|-|-------+
- *           |  (a)     |                 pkt_cmd_cookie | ---|-|-----+ |
- *           +----------| .......... pkt_resp .......... | ---|-|---+ | |
- *                      |                pkt_resp_cookie | ---|-|-+ | | |
- *                      | pkt_cmd_dma                    |    | | | | | |
- *                      | pkt_cmd_acc                    |    | | | | | |
- *                      +================================+    | | | | | |
- *                      |         dma_cookies            | <--+ | | | | |
- *                      |                                |      | | | | |
- *                      +================================+      | | | | |
- *                      |         fca_private            | <----+ | | | |
- *                      |                                |        | | | |
- *                      +================================+        | | | |
- *                                                                | | | |
- *                                                                | | | |
- *                      +================================+   (b)  | | | |
- *                      |        fcp_resp cookies        | <------+ | | |
- *                      |                                |          | | |
- *                      +================================+          | | |
- *                                                                  | | |
- *                      +================================+   (b)    | | |
- *                      |            fcp_resp            | <--------+ | |
- *                      |   (DMA resources associated)   |            | |
- *                      +================================+            | |
- *                                                                    | |
- *                                                                    | |
- *                                                                    | |
- *                      +================================+   (b)      | |
- *                      |         fcp_cmd cookies        | <----------+ |
- *                      |                                |              |
- *                      +================================+              |
- *                                                                      |
- *                      +================================+   (b)        |
- *                      |            fcp_cmd             | <------------+
- *                      |   (DMA resources associated)   |
- *                      +================================+
+ *			+================================+
+ *		 +--->	|	 struct scsi_pkt	 |
+ *		 |	|				 |
+ *		 | +--- | pkt_ha_private		 |
+ *		 | |	|				 |
+ *		 | |	+================================+
+ *		 | |
+ *		 | |	+================================+
+ *		 | +--> |	 struct fcp_pkt		 | <---------+
+ *		 +----- | cmd_pkt			 |	     |
+ *			|		      cmd_fp_pkt | ---+	     |
+ *	     +--------->| cmd_fcp_rsp[]			 |    |	     |
+ *	     | +------->| cmd_fcp_cmd[]			 |    |	     |
+ *	     | |	|--------------------------------|    |	     |
+ *	     | |	|	 struct fc_packet	 | <--+	     |
+ *	     | |	|				 |	     |
+ *	     | |	|		 pkt_ulp_private | ----------+
+ *	     | |	|		 pkt_fca_private | -----+
+ *	     | |	|		 pkt_data_cookie | ---+ |
+ *	     | |	| pkt_cmdlen			 |    | |
+ *	     | |(a)	| pkt_rsplen			 |    | |
+ *	     | +--------| .......... pkt_cmd ........... | ---|-|-------+
+ *	     |	(a)	|		  pkt_cmd_cookie | ---|-|-----+ |
+ *	     +----------| .......... pkt_resp .......... | ---|-|---+ | |
+ *			|		 pkt_resp_cookie | ---|-|-+ | | |
+ *			| pkt_cmd_dma			 |    | | | | | |
+ *			| pkt_cmd_acc			 |    | | | | | |
+ *			+================================+    | | | | | |
+ *			|	  dma_cookies		 | <--+ | | | | |
+ *			|				 |	| | | | |
+ *			+================================+	| | | | |
+ *			|	  fca_private		 | <----+ | | | |
+ *			|				 |	  | | | |
+ *			+================================+	  | | | |
+ *								  | | | |
+ *								  | | | |
+ *			+================================+   (b)  | | | |
+ *			|	 fcp_resp cookies	 | <------+ | | |
+ *			|				 |	    | | |
+ *			+================================+	    | | |
+ *								    | | |
+ *			+================================+   (b)    | | |
+ *			|	     fcp_resp		 | <--------+ | |
+ *			|   (DMA resources associated)	 |	      | |
+ *			+================================+	      | |
+ *								      | |
+ *								      | |
+ *								      | |
+ *			+================================+   (b)      | |
+ *			|	  fcp_cmd cookies	 | <----------+ |
+ *			|				 |		|
+ *			+================================+		|
+ *									|
+ *			+================================+   (b)	|
+ *			|	     fcp_cmd		 | <------------+
+ *			|   (DMA resources associated)	 |
+ *			+================================+
  *
  *
- * (a)  The underlying FCA does NOT support DMA for this field
- * (b)  The underlying FCA supports DMA for this field
+ * (a)	The underlying FCA does NOT support DMA for this field
+ * (b)	The underlying FCA supports DMA for this field
  */
 struct fcp_pkt {
 	/*
@@ -550,7 +550,7 @@ struct fcp_pkt {
 	 */
 	fcp_cmd_t		cmd_fcp_cmd;
 	/*
-	 * State of the packet.  The values for the state seem to indicate
+	 * State of the packet.	 The values for the state seem to indicate
 	 * that it isn't a bitmap.  However, in several instances the code
 	 * treats it as a bitmap doing a "&= ~FCP_PKT_ISSUED" to it
 	 * eventhough the value stored is always checked using "!=" and "==".
@@ -584,66 +584,66 @@ struct fcp_pkt {
  * fcp_ipkt : Packet for internal commands.
  * ------------------------------------------
  *
- *                      +================================+
- *                      |        struct fcp_ipkt         | <---------+
- *                      |        (kmem_zalloc())         |           |
- *                      |                      ipkt_fpkt | ---+      |
- *                      |                                |    |      |
- *                      |     ipkt_cmdlen = cmd_len      |    |      |
- *                      |                                |    |      |
- *                      |                                |    |      |
- *                      |                                |    |      |
- *                      |--------------------------------|    |      |
- *                      |        struct fc_packet        | <--+      |
- *                      |                                |           |
- *                      |                pkt_ulp_private | ----------+
- *                      |                pkt_fca_private | -----+
- *                      |                pkt_data_cookie | ---+ |
- *                      |           pkt_cmdlen           |    | |
- *                      |           pkt_rsplen           |    | |
- *                      | pkt_cmd ...................... | ---|-|-------+
- *                      |                 pkt_cmd_cookie | ---|-|-----+ |
- *                      | pkt_resp ..................... | ---|-|---+ | |
- *                      |                pkt_resp_cookie | ---|-|-+ | | |
- *                      |          pkt_cmd_dma           |    | | | | | |
- *                      |          pkt_cmd_acc           |    | | | | | |
- *                      +================================+    | | | | | |
- *                      |         dma_cookies            | <--+ | | | | |
- *                      |                                |      | | | | |
- *                      |                                |      | | | | |
- *                      |                                |      | | | | |
- *                      +================================+      | | | | |
- *                      |         fca_private            | <----+ | | | |
- *                      |                                |        | | | |
- *                      |                                |        | | | |
- *                      |                                |        | | | |
- *                      +================================+        | | | |
- *                                                                | | | |
- *                                                                | | | |
- *                      +================================+   (b)  | | | |
- *                      |        fcp_resp cookies        | <------+ | | |
- *                      |                                |          | | |
- *                      +================================+          | | |
- *                                                                  | | |
- *                      +================================+   (b)    | | |
- *                      |            fcp_resp            | <--------+ | |
- *                      |   (DMA resources associated)   |            | |
- *                      +================================+            | |
- *                                                                    | |
- *                                                                    | |
- *                                                                    | |
- *                      +================================+   (b)      | |
- *                      |         fcp_cmd cookies        | <----------+ |
- *                      |                                |              |
- *                      +================================+              |
- *                                                                      |
- *                      +================================+   (b)        |
- *                      |            fcp_cmd             | <------------+
- *                      |   (DMA resources associated)   |
- *                      +================================+
+ *			+================================+
+ *			|	 struct fcp_ipkt	 | <---------+
+ *			|	 (kmem_zalloc())	 |	     |
+ *			|		       ipkt_fpkt | ---+	     |
+ *			|				 |    |	     |
+ *			|     ipkt_cmdlen = cmd_len	 |    |	     |
+ *			|				 |    |	     |
+ *			|				 |    |	     |
+ *			|				 |    |	     |
+ *			|--------------------------------|    |	     |
+ *			|	 struct fc_packet	 | <--+	     |
+ *			|				 |	     |
+ *			|		 pkt_ulp_private | ----------+
+ *			|		 pkt_fca_private | -----+
+ *			|		 pkt_data_cookie | ---+ |
+ *			|	    pkt_cmdlen		 |    | |
+ *			|	    pkt_rsplen		 |    | |
+ *			| pkt_cmd ...................... | ---|-|-------+
+ *			|		  pkt_cmd_cookie | ---|-|-----+ |
+ *			| pkt_resp ..................... | ---|-|---+ | |
+ *			|		 pkt_resp_cookie | ---|-|-+ | | |
+ *			|	   pkt_cmd_dma		 |    | | | | | |
+ *			|	   pkt_cmd_acc		 |    | | | | | |
+ *			+================================+    | | | | | |
+ *			|	  dma_cookies		 | <--+ | | | | |
+ *			|				 |	| | | | |
+ *			|				 |	| | | | |
+ *			|				 |	| | | | |
+ *			+================================+	| | | | |
+ *			|	  fca_private		 | <----+ | | | |
+ *			|				 |	  | | | |
+ *			|				 |	  | | | |
+ *			|				 |	  | | | |
+ *			+================================+	  | | | |
+ *								  | | | |
+ *								  | | | |
+ *			+================================+   (b)  | | | |
+ *			|	 fcp_resp cookies	 | <------+ | | |
+ *			|				 |	    | | |
+ *			+================================+	    | | |
+ *								    | | |
+ *			+================================+   (b)    | | |
+ *			|	     fcp_resp		 | <--------+ | |
+ *			|   (DMA resources associated)	 |	      | |
+ *			+================================+	      | |
+ *								      | |
+ *								      | |
+ *								      | |
+ *			+================================+   (b)      | |
+ *			|	  fcp_cmd cookies	 | <----------+ |
+ *			|				 |		|
+ *			+================================+		|
+ *									|
+ *			+================================+   (b)	|
+ *			|	     fcp_cmd		 | <------------+
+ *			|   (DMA resources associated)	 |
+ *			+================================+
  *
- * (a)  The underlying FCA does NOT support DMA for this field
- * (b)  The underlying FCA supports DMA for this field
+ * (a)	The underlying FCA does NOT support DMA for this field
+ * (b)	The underlying FCA supports DMA for this field
  */
 struct fcp_ipkt {
 	/*
@@ -676,7 +676,7 @@ struct fcp_ipkt {
 	struct fc_packet	*ipkt_fpkt;
 	/*
 	 * This is the timeout value for the internal packet.  It seems to
-	 * increase with the number of retries.  It is initialized like this
+	 * increase with the number of retries.	 It is initialized like this
 	 * in the code:
 	 *
 	 *   icmd->ipkt_restart = fcp_watchdog_time + icmd->ipkt_retries++
@@ -805,7 +805,7 @@ struct fcp_tgt {
 	/*
 	 * This field is incremented each time the field tgt_state is updated.
 	 * Its use is similar to the use of the field port_link_cnt in the
-	 * fcp_port structure.  The internal packets are, for example, tagged
+	 * fcp_port structure.	The internal packets are, for example, tagged
 	 * with the value stored here.
 	 */
 	uint32_t		tgt_change_cnt;
@@ -960,7 +960,7 @@ typedef void		*child_info_t;
  * LUN structure
  * -------------
  *
- * This structure holds the information relative to a SCSI LUN.  This
+ * This structure holds the information relative to a SCSI LUN.	 This
  * structure is the one representing the object registered with the OS (NDI
  * or MPxIO...).
  */
@@ -970,7 +970,7 @@ struct fcp_lun {
 	 */
 	kmutex_t		lun_mutex;
 	/*
-	 * Logical unit number.  It is a SCSI3 format.
+	 * Logical unit number.	 It is a SCSI3 format.
 	 */
 	fcp_ent_addr_t		lun_addr;
 	/*
@@ -982,7 +982,7 @@ struct fcp_lun {
 	struct fcp_pkt		*lun_pkt_head;
 	struct fcp_pkt		*lun_pkt_tail;
 	/*
-	 * This field is treated like a union.  It may contain the dev_info_t
+	 * This field is treated like a union.	It may contain the dev_info_t
 	 * or the mdi_pathinfo_t depending on how the device associated with
 	 * this LUN was registered.
 	 */
@@ -1156,13 +1156,17 @@ struct fcp_hp_elem {
 	 */
 	child_info_t		*cip;
 	/*
+	 * lun_mpxio when the event is submitted
+	 */
+	int			old_lun_mpxio;
+	/*
 	 * What to do (offline, online...).
 	 */
-	int 			what;
+	int			what;
 	/*
 	 * FLags used when calling NDI fucntions.
 	 */
-	int 			flags;
+	int			flags;
 	/*
 	 * Link state change count when the structure was created.
 	 */
@@ -1303,7 +1307,7 @@ typedef struct fcp_black_list_entry {
 /*
  * timeout values
  */
-#define	FCP_ELS_TIMEOUT		20 	/* 20 seconds */
+#define	FCP_ELS_TIMEOUT		20	/* 20 seconds */
 #define	FCP_SCSI_CMD_TIMEOUT	25	/* 30 seconds */
 #define	FCP_POLL_TIMEOUT	60	/* 60 seconds */
 #define	FCP_TIMEOUT_DELTA	2	/* 2 seconds */
@@ -1324,7 +1328,7 @@ _NOTE(MUTEX_PROTECTS_DATA(fcp_port::port_pkt_mutex,
     fcp_port::port_npkts))
 
 _NOTE(MUTEX_PROTECTS_DATA(fcp_tgt::tgt_mutex,
-    fcp_tgt::tgt_state  fcp_tgt::tgt_device_created
+    fcp_tgt::tgt_state	fcp_tgt::tgt_device_created
     fcp_tgt::tgt_icap fcp_tgt::tgt_tcap
     fcp_tgt::tgt_tid fcp_tgt::tgt_pd_handle fcp_tgt::tgt_tmp_cnt
     fcp_tgt::tgt_statec_cause fcp_lun::lun_next fcp_lun::lun_state))
@@ -1360,7 +1364,7 @@ _NOTE(SCHEME_PROTECTS_DATA("Safe Data",
     fcp_hp_elem::what fcp_hp_elem::tgt_cnt fcp_hp_elem::tgt_cnt
     fcp_hp_elem::link_cnt fcp_reset_elem fcp_pkt fcp_ipkt
     scsi_pkt scsi_arq_status scsi_device scsi_hba_tran scsi_cdb))
-#endif  /* __lint */
+#endif	/* __lint */
 
 #define	FCP_CP_IN(s, d, handle, len)	(ddi_rep_get8((handle), \
 					(uint8_t *)(d), (uint8_t *)(s), \

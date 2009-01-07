@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Fibre Channel SCSI ULP Mapping driver
@@ -465,7 +465,7 @@ static void fcp_finish_init(struct fcp_port *pptr);
 static void fcp_create_luns(struct fcp_tgt *ptgt, int link_cnt,
     int tgt_cnt, int cause);
 static int fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip,
-    int online, int link_cnt, int tgt_cnt, int flags);
+    int old_mpxio, int online, int link_cnt, int tgt_cnt, int flags);
 static int fcp_offline_target(struct fcp_port *pptr, struct fcp_tgt *ptgt,
     int link_cnt, int tgt_cnt, int nowait, int flags);
 static void fcp_offline_target_now(struct fcp_port *pptr,
@@ -716,7 +716,7 @@ extern dev_info_t	*scsi_vhci_dip;
 	(es)->es_add_code == 0x25 &&		\
 	(es)->es_qual_code == 0x0)
 
-#define	FCP_VERSION		"1.186"
+#define	FCP_VERSION		"1.187"
 #define	FCP_NAME_VERSION	"SunFC FCP v" FCP_VERSION
 
 #define	FCP_NUM_ELEMENTS(array)			\
@@ -8007,8 +8007,8 @@ fcp_create_luns(struct fcp_tgt *ptgt, int link_cnt, int tgt_cnt, int cause)
  * function to online/offline devices
  */
 static int
-fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip, int online,
-    int lcount, int tcount, int flags)
+fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip, int old_mpxio,
+    int online, int lcount, int tcount, int flags)
 {
 	int			rval = NDI_FAILURE;
 	int			circ;
@@ -8017,6 +8017,17 @@ fcp_trigger_lun(struct fcp_lun *plun, child_info_t *cip, int online,
 	int			is_mpxio = pptr->port_mpxio;
 	dev_info_t		*cdip, *pdip;
 	char			*devname;
+
+	if ((old_mpxio != 0) && (plun->lun_mpxio != old_mpxio)) {
+		/*
+		 * When this event gets serviced, lun_cip and lun_mpxio
+		 * has changed, so it should be invalidated now.
+		 */
+		FCP_TRACE(fcp_logq, pptr->port_instbuf, fcp_trace,
+		    FCP_BUF_LEVEL_2, 0, "fcp_trigger_lun: lun_mpxio changed: "
+		    "plun: %p, cip: %p, what:%d", plun, cip, online);
+		return (rval);
+	}
 
 	FCP_TRACE(fcp_logq, pptr->port_instbuf,
 	    fcp_trace, FCP_BUF_LEVEL_2, 0,
@@ -12215,8 +12226,8 @@ fcp_hp_task(void *arg)
 	mutex_exit(&plun->lun_mutex);
 	mutex_exit(&pptr->port_mutex);
 
-	result = fcp_trigger_lun(plun, elem->cip, elem->what,
-	    elem->link_cnt, elem->tgt_cnt, elem->flags);
+	result = fcp_trigger_lun(plun, elem->cip, elem->old_lun_mpxio,
+	    elem->what, elem->link_cnt, elem->tgt_cnt, elem->flags);
 	fcp_process_elem(elem, result);
 }
 
@@ -14208,6 +14219,7 @@ fcp_pass_to_hp(struct fcp_port *pptr, struct fcp_lun *plun,
 	elem->port = pptr;
 	elem->lun = plun;
 	elem->cip = cip;
+	elem->old_lun_mpxio = plun->lun_mpxio;
 	elem->what = what;
 	elem->flags = flags;
 	elem->link_cnt = link_cnt;
