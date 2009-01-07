@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,6 +144,7 @@ scsi_dmafree_attr(struct scsi_pkt *pktp)
 		pktw->pcw_flags &= ~PCW_BOUND;
 	}
 	pktp->pkt_numcookies = 0;
+	pktw->pcw_totalwin = 0;
 }
 
 struct buf *
