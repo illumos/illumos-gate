@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -343,6 +343,7 @@ typedef struct {
 } pcie_max_supported_t;
 
 /* PCIe Friendly Functions */
+extern void pcie_init_root_port_mps(dev_info_t *dip);
 extern int pcie_initchild(dev_info_t *dip);
 extern void pcie_uninitchild(dev_info_t *dip);
 extern void pcie_clear_errors(dev_info_t *dip);

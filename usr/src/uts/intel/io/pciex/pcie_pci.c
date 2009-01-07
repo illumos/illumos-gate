@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -442,6 +442,14 @@ next_step:
 	pepb_intel_serr_workaround(devi, pepb->pepb_no_aer_msi);
 	pepb_intel_rber_workaround(devi);
 	pepb_intel_sw_workaround(devi);
+
+	/*
+	 * If this is a root port, determine and set the max payload size.
+	 * Since this will involve scanning the fabric, all error enabling
+	 * and sw workarounds should be in place before doing this.
+	 */
+	if (PCIE_IS_RP(bus_p))
+		pcie_init_root_port_mps(devi);
 
 	ddi_report_dev(devi);
 	return (DDI_SUCCESS);

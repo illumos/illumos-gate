@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -674,19 +674,7 @@ pcie_init_bus(dev_info_t *cdip)
 
 	pcie_init_pfd(cdip);
 
-	/*
-	 * If it is a Root Port, perform a fabric scan to determine
-	 * the Max Payload Size for the fabric.
-	 */
-	if (PCIE_IS_RP(bus_p)) {
-		int max_supported = pcie_max_mps;
-
-		(void) pcie_get_fabric_mps(ddi_get_parent(cdip), cdip,
-		    &max_supported);
-
-		bus_p->bus_mps = max_supported;
-	} else
-		bus_p->bus_mps = -1;
+	bus_p->bus_mps = 0;
 
 	PCIE_DBG("Add %s(dip 0x%p, bdf 0x%x, secbus 0x%x)\n",
 	    ddi_driver_name(cdip), (void *)cdip, bus_p->bus_bdf,
@@ -1134,6 +1122,31 @@ pcie_is_link_disabled(dev_info_t *dip)
 }
 
 /*
+ * Initialize the MPS for a root port.
+ *
+ * dip - dip of root port device.
+ */
+void
+pcie_init_root_port_mps(dev_info_t *dip)
+{
+	pcie_bus_t	*bus_p = PCIE_DIP2BUS(dip);
+	int rp_cap, max_supported = pcie_max_mps;
+
+	(void) pcie_get_fabric_mps(ddi_get_parent(dip),
+	    ddi_get_child(dip), &max_supported);
+
+	rp_cap = PCI_CAP_GET16(bus_p->bus_cfg_hdl, NULL,
+	    bus_p->bus_pcie_off, PCIE_DEVCAP) &
+	    PCIE_DEVCAP_MAX_PAYLOAD_MASK;
+
+	if (rp_cap < max_supported)
+		max_supported = rp_cap;
+
+	bus_p->bus_mps = max_supported;
+	pcie_initchild_mps(dip);
+}
+
+/*
  * Initialize the Maximum Payload Size of a device.
  *
  * cdip - dip of device.
@@ -1210,6 +1223,9 @@ pcie_initchild_mps(dev_info_t *cdip)
 void
 pcie_get_fabric_mps(dev_info_t *rc_dip, dev_info_t *dip, int *max_supported)
 {
+	if (dip == NULL)
+		return;
+
 	/*
 	 * Perform a fabric scan to obtain Maximum Payload Capabilities
 	 */
@@ -1231,11 +1247,10 @@ pcie_scan_mps(dev_info_t *rc_dip, dev_info_t *dip, int *max_supported)
 	max_pay_load_supported.dip = rc_dip;
 	max_pay_load_supported.highest_common_mps = *max_supported;
 
-	ndi_devi_enter(rc_dip, &circular_count);
+	ndi_devi_enter(ddi_get_parent(dip), &circular_count);
 	ddi_walk_devs(dip, pcie_get_max_supported,
 	    (void *)&max_pay_load_supported);
-	ndi_devi_exit(rc_dip, circular_count);
-
+	ndi_devi_exit(ddi_get_parent(dip), circular_count);
 	*max_supported = max_pay_load_supported.highest_common_mps;
 }
 

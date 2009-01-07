@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -535,6 +535,12 @@ hotplug_done:
 		goto fail;
 	}
 	pxb->pxb_init_flags |= PXB_INIT_FM;
+
+	/*
+	 * If this is a root port, determine and set the max payload size.
+	 */
+	if (PCIE_IS_RP(bus_p))
+		pcie_init_root_port_mps(devi);
 
 	ddi_report_dev(devi);
 
