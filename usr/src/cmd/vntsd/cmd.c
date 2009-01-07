@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Vntsd handles two types of special commands, one is telnet
@@ -39,6 +37,7 @@
  * BRK
  * AYT
  * HT
+ * NOP
  *
  * Vntsd special commands are:
  *  Send break		(~#)
@@ -92,7 +91,7 @@ genbrk(vntsd_client_t *clientp)
 	if (consp->clientpq->handle != clientp) {
 		/* reader */
 		return (vntsd_write_line(clientp,
-			    gettext(VNTSD_NO_WRITE_ACCESS_MSG)));
+		    gettext(VNTSD_NO_WRITE_ACCESS_MSG)));
 	}
 
 	/* writer */
@@ -148,7 +147,7 @@ acquire_write(vntsd_client_t *clientp)
 	if (consp->clientpq->handle == clientp) {
 		/* client is a  writer */
 		if ((rv = vntsd_write_line(clientp,
-			    gettext("You have write permission"))) !=
+		    gettext("You have write permission"))) !=
 		    VNTSD_SUCCESS) {
 			return (rv);
 
@@ -169,7 +168,7 @@ acquire_write(vntsd_client_t *clientp)
 	 * trailing newline.
 	 */
 	if ((rv = vntsd_write_lines(clientp,
-			    gettext("Warning: another user currently "
+	    gettext("Warning: another user currently "
 	    "has write permission\nto this console and forcibly removing "
 	    "him/her will terminate\nany current write action and all work "
 	    "will be lost."))) != VNTSD_SUCCESS) {
@@ -178,13 +177,13 @@ acquire_write(vntsd_client_t *clientp)
 
 	/* get client yes no */
 	if ((rv = vntsd_write_client(clientp, vntsd_eol,
-			    VNTSD_EOL_LEN)) != VNTSD_SUCCESS) {
+	    VNTSD_EOL_LEN)) != VNTSD_SUCCESS) {
 		return (rv);
 	}
 
 	if ((rv = vntsd_get_yes_no(clientp,
-			    gettext("Would you like to continue?"),
-			    &yes_no)) != VNTSD_SUCCESS) {
+	    gettext("Would you like to continue?"),
+	    &yes_no)) != VNTSD_SUCCESS) {
 		return (rv);
 	}
 
@@ -250,8 +249,8 @@ daemon_cmd_help(vntsd_client_t *clientp)
 	char	    buf[VNTSD_LINE_LEN];
 
 	if ((rv = vntsd_write_client(clientp, vntsd_eol,
-			    VNTSD_EOL_LEN)) != VNTSD_SUCCESS) {
-	    return (rv);
+	    VNTSD_EOL_LEN)) != VNTSD_SUCCESS) {
+		return (rv);
 	}
 
 	/*
@@ -265,7 +264,7 @@ daemon_cmd_help(vntsd_client_t *clientp)
 
 	for (p = etable; p->e_char; p++) {
 		(void) snprintf(buf, sizeof (buf),
-				"~%c --%s", p->e_char, p->e_help);
+		    "~%c --%s", p->e_char, p->e_help);
 
 		if ((rv = vntsd_write_line(clientp, buf)) != VNTSD_SUCCESS) {
 			return (rv);
@@ -382,7 +381,8 @@ vntsd_telnet_cmd(vntsd_client_t *clientp, char c)
 		return (rv);
 	}
 
-	if ((uint8_t)cmd != BRK) {
+	if ((uint8_t)cmd == WILL || (uint8_t)cmd == WONT ||
+	    (uint8_t)cmd == DO || (uint8_t)cmd == DONT) {
 		if ((rv = vntsd_read_char(clientp, &c)) != VNTSD_SUCCESS) {
 			return (rv);
 		}
@@ -436,16 +436,20 @@ vntsd_telnet_cmd(vntsd_client_t *clientp, char c)
 
 		break;
 
-	case AYT:
+	case AYT: {
+			static char aytresp[] = "vntsd here";
 
-		rv = vntsd_write_client(clientp, &c, 1);
-		break;
+			rv = vntsd_write_client(clientp, aytresp,
+			    sizeof (aytresp) - 1);
+			break;
+		}
 
 	case HT:
+	case NOP:
 		return (VNTSD_STATUS_CONTINUE);
 
 	default:
-		syslog(LOG_ERR, "not support telnet ctrl %x\n", c);
+		syslog(LOG_ERR, "not support telnet ctrl %2.2x\n", 0xff & cmd);
 		break;
 	}
 
