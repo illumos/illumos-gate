@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * rc_node.c - In-memory SCF object management
@@ -458,6 +456,17 @@ typedef enum pc_auth_type {
 	PC_AUTH_SVC,		/* strings specified in PG of a service. */
 	PC_AUTH_INST		/* strings specified in PG of an instance. */
 } pc_auth_type_t;
+
+/*
+ * The following enum is used to represent the results of the checks to see
+ * if the client has the appropriate permissions to perform an action.
+ */
+typedef enum perm_status {
+	PERM_DENIED = 0,	/* Permission denied. */
+	PERM_GRANTED,		/* Client has authorizations. */
+	PERM_GONE,		/* Door client went away. */
+	PERM_FAIL		/* Generic failure. e.g. resources */
+} perm_status_t;
 
 /* An authorization set hash table. */
 typedef struct {
@@ -1342,7 +1351,7 @@ pc_hash(const char *auth)
 	return (h);
 }
 
-static int
+static perm_status_t
 pc_exists(permcheck_t *pcp, const char *auth)
 {
 	uint32_t h;
@@ -1354,14 +1363,14 @@ pc_exists(permcheck_t *pcp, const char *auth)
 	    ep = ep->pce_next) {
 		if (strcmp(auth, ep->pce_auth) == 0) {
 			pcp->pc_auth_string = ep->pce_auth;
-			return (1);
+			return (PERM_GRANTED);
 		}
 	}
 
-	return (0);
+	return (PERM_DENIED);
 }
 
-static int
+static perm_status_t
 pc_match(permcheck_t *pcp, const char *pattern)
 {
 	uint_t i;
@@ -1371,12 +1380,12 @@ pc_match(permcheck_t *pcp, const char *pattern)
 		for (ep = pcp->pc_buckets[i]; ep != NULL; ep = ep->pce_next) {
 			if (_auth_match(pattern, ep->pce_auth)) {
 				pcp->pc_auth_string = ep->pce_auth;
-				return (1);
+				return (PERM_GRANTED);
 			}
 		}
 	}
 
-	return (0);
+	return (PERM_DENIED);
 }
 
 static int
@@ -1486,17 +1495,19 @@ perm_add_enabling(permcheck_t *pcp, const char *auth)
 /* Note that perm_add_enabling_values() is defined below. */
 
 /*
- * perm_granted() returns 1 if the current door caller has one of the enabling
- * authorizations in pcp, 0 if it doesn't, and -1 if an error (usually lack of
- * memory) occurs.  check_auth_list() checks an RBAC_AUTH_SEP-separated list
- * of authorizations for existence in pcp, and check_prof_list() checks the
- * authorizations granted to an RBAC_AUTH_SEP-separated list of profiles.
+ * perm_granted() returns PERM_GRANTED if the current door caller has one of
+ * the enabling authorizations in pcp, PERM_DENIED if it doesn't, PERM_GONE if
+ * the door client went away and PERM_FAIL if an error (usually lack of
+ * memory) occurs.  check_auth_list() checks an RBAC_AUTH_SEP-separated
+ * list of authorizations for existence in pcp, and check_prof_list()
+ * checks the authorizations granted to an RBAC_AUTH_SEP-separated list of
+ * profiles.
  */
-static int
+static perm_status_t
 check_auth_list(permcheck_t *pcp, char *authlist)
 {
 	char *auth, *lasts;
-	int ret;
+	perm_status_t ret;
 
 	for (auth = (char *)strtok_r(authlist, RBAC_AUTH_SEP, &lasts);
 	    auth != NULL;
@@ -1506,7 +1517,7 @@ check_auth_list(permcheck_t *pcp, char *authlist)
 		else
 			ret = pc_match(pcp, auth);
 
-		if (ret)
+		if (ret != PERM_DENIED)
 			return (ret);
 	}
 
@@ -1517,15 +1528,15 @@ check_auth_list(permcheck_t *pcp, char *authlist)
 	assert(pcp->pc_specific != NULL);
 	pcp->pc_auth_string = pcp->pc_specific->pce_auth;
 
-	return (0);
+	return (PERM_DENIED);
 }
 
-static int
+static perm_status_t
 check_prof_list(permcheck_t *pcp, char *proflist)
 {
 	char *prof, *lasts, *authlist, *subproflist;
 	profattr_t *pap;
-	int ret = 0;
+	perm_status_t ret = PERM_DENIED;
 
 	for (prof = strtok_r(proflist, RBAC_AUTH_SEP, &lasts);
 	    prof != NULL;
@@ -1538,7 +1549,7 @@ check_prof_list(permcheck_t *pcp, char *proflist)
 		if (authlist != NULL)
 			ret = check_auth_list(pcp, authlist);
 
-		if (!ret) {
+		if (ret == PERM_DENIED) {
 			subproflist = kva_match(pap->attr, PROFATTR_PROFS_KW);
 			if (subproflist != NULL)
 				/* depth check to avoid infinite recursion? */
@@ -1546,19 +1557,20 @@ check_prof_list(permcheck_t *pcp, char *proflist)
 		}
 
 		free_profattr(pap);
-		if (ret)
+		if (ret != PERM_DENIED)
 			return (ret);
 	}
 
 	return (ret);
 }
 
-static int
+static perm_status_t
 perm_granted(permcheck_t *pcp)
 {
 	ucred_t *uc;
 
-	int ret = 0;
+	perm_status_t ret = PERM_DENIED;
+	int rv;
 	uid_t uid;
 	userattr_t *uap;
 	char *authlist, *userattr_authlist, *proflist, *def_prof = NULL;
@@ -1580,7 +1592,7 @@ perm_granted(permcheck_t *pcp)
 			 * force the return of _PERMISSION_DENIED since we
 			 * couldn't determine the user.
 			 */
-			return (0);
+			return (PERM_GONE);
 		}
 		assert(0);
 		abort();
@@ -1590,21 +1602,21 @@ perm_granted(permcheck_t *pcp)
 	assert(uid != (uid_t)-1);
 
 	if (getpwuid_r(uid, &pw, pwbuf, sizeof (pwbuf)) == NULL) {
-		return (-1);
+		return (PERM_FAIL);
 	}
 
 	/*
 	 * Get user's default authorizations from policy.conf
 	 */
-	ret = _get_user_defs(pw.pw_name, &authlist, &def_prof);
+	rv = _get_user_defs(pw.pw_name, &authlist, &def_prof);
 
-	if (ret != 0)
-		return (-1);
+	if (rv != 0)
+		return (PERM_FAIL);
 
 	if (authlist != NULL) {
 		ret = check_auth_list(pcp, authlist);
 
-		if (ret) {
+		if (ret != PERM_DENIED) {
 			_free_user_defs(authlist, def_prof);
 			return (ret);
 		}
@@ -1624,12 +1636,12 @@ perm_granted(permcheck_t *pcp)
 		}
 	}
 
-	if (!ret && def_prof != NULL) {
+	if ((ret == PERM_DENIED) && (def_prof != NULL)) {
 		/* Check generic profiles. */
 		ret = check_prof_list(pcp, def_prof);
 	}
 
-	if (!ret && uap != NULL) {
+	if ((ret == PERM_DENIED) && (uap != NULL)) {
 		proflist = kva_match(uap->attr, USERATTR_PROFILES_KW);
 		if (proflist != NULL)
 			ret = check_prof_list(pcp, proflist);
@@ -1640,6 +1652,38 @@ perm_granted(permcheck_t *pcp)
 		free_userattr(uap);
 
 	return (ret);
+}
+
+static int
+map_granted_status(perm_status_t status, permcheck_t *pcp,
+    char **match_auth)
+{
+	int rc;
+
+	*match_auth = NULL;
+	switch (status) {
+	case PERM_DENIED:
+		*match_auth = strdup(pcp->pc_auth_string);
+		if (*match_auth == NULL)
+			rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
+		else
+			rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
+		break;
+	case PERM_GRANTED:
+		*match_auth = strdup(pcp->pc_auth_string);
+		if (*match_auth == NULL)
+			rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
+		else
+			rc = REP_PROTOCOL_SUCCESS;
+		break;
+	case PERM_GONE:
+		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
+		break;
+	case PERM_FAIL:
+		rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
+		break;
+	}
+	return (rc);
 }
 #endif /* NATIVE_BUILD */
 
@@ -2914,6 +2958,16 @@ rc_node_ptr_check_and_lock(rc_node_ptr_t *npp, int *res)
 		return (rc__res);					\
 }
 
+#define	RC_NODE_PTR_CHECK_LOCK_OR_FREE_RETURN(np, npp, mem) {		\
+	int rc__res;							\
+	if (((np) = rc_node_ptr_check_and_lock(npp, &rc__res)) == 	\
+	    NULL) {							\
+		if ((mem) != NULL)					\
+			free((mem));					\
+		return (rc__res);					\
+	}								\
+}
+
 #define	RC_NODE_PTR_GET_CHECK(np, npp) {				\
 	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);			\
 	(void) pthread_mutex_unlock(&(np)->rn_lock);			\
@@ -2934,20 +2988,8 @@ rc_node_ptr_check_and_lock(rc_node_ptr_t *npp, int *res)
 	}								\
 }
 
-#define	HOLD_PTR_FLAG_OR_RETURN(np, npp, flag) {			\
-	assert(MUTEX_HELD(&(np)->rn_lock));				\
-	assert(!((np)->rn_flags & RC_NODE_DEAD));			\
-	if (!rc_node_hold_flag((np), flag)) {				\
-		(void) pthread_mutex_unlock(&(np)->rn_lock);		\
-		assert((np) == (npp)->rnp_node);			\
-		rc_node_clear(npp, 1);					\
-		return (REP_PROTOCOL_FAIL_DELETED);			\
-	}								\
-}
-
 #define	HOLD_PTR_FLAG_OR_FREE_AND_RETURN(np, npp, flag, mem) {		\
 	assert(MUTEX_HELD(&(np)->rn_lock));				\
-	assert(!((np)->rn_flags & RC_NODE_DEAD));			\
 	if (!rc_node_hold_flag((np), flag)) {				\
 		(void) pthread_mutex_unlock(&(np)->rn_lock);		\
 		assert((np) == (npp)->rnp_node);			\
@@ -3376,22 +3418,22 @@ rc_node_update(rc_node_ptr_t *npp)
  *
  * The string returned to *match_auth must be freed.
  */
-int
+static perm_status_t
 rc_node_modify_permission_check(char **match_auth)
 {
-	int rc = REP_PROTOCOL_SUCCESS;
 	permcheck_t *pcp;
-	int granted;
+	perm_status_t granted = PERM_GRANTED;
+	int rc;
 
 	*match_auth = NULL;
 #ifdef NATIVE_BUILD
 	if (!client_is_privileged()) {
-		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
+		granted = PERM_DENIED;
 	}
-	return (rc);
+	return (granted);
 #else
 	if (is_main_repository == 0)
-		return (REP_PROTOCOL_SUCCESS);
+		return (PERM_GRANTED);
 	pcp = pc_create();
 	if (pcp != NULL) {
 		rc = perm_add_enabling(pcp, AUTH_MODIFY);
@@ -3399,9 +3441,8 @@ rc_node_modify_permission_check(char **match_auth)
 		if (rc == REP_PROTOCOL_SUCCESS) {
 			granted = perm_granted(pcp);
 
-			if (granted < 0) {
-				rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-			} else {
+			if ((granted == PERM_GRANTED) ||
+			    (granted == PERM_DENIED)) {
 				/*
 				 * Copy off the authorization
 				 * string before freeing pcp.
@@ -3409,19 +3450,18 @@ rc_node_modify_permission_check(char **match_auth)
 				*match_auth =
 				    strdup(pcp->pc_auth_string);
 				if (*match_auth == NULL)
-					rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
+					granted = PERM_FAIL;
 			}
+		} else {
+			granted = PERM_FAIL;
 		}
 
 		pc_free(pcp);
 	} else {
-		rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
+		granted = PERM_FAIL;
 	}
 
-	if (rc == REP_PROTOCOL_SUCCESS && !granted)
-		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
-
-	return (rc);
+	return (granted);
 #endif /* NATIVE_BUILD */
 }
 
@@ -3925,19 +3965,40 @@ rc_node_create_child(rc_node_ptr_t *npp, uint32_t type, const char *name,
 {
 	rc_node_t *np;
 	rc_node_t *cp = NULL;
-	int rc,  perm_rc;
+	int rc;
+	perm_status_t perm_rc;
 	size_t sz_out;
 	char fmri[REP_PROTOCOL_FMRI_LEN];
 	audit_event_data_t audit_data;
 
 	rc_node_clear(cpp, 0);
 
+	/*
+	 * rc_node_modify_permission_check() must be called before the node
+	 * is locked.  This is because the library functions that check
+	 * authorizations can trigger calls back into configd.
+	 */
 	perm_rc = rc_node_modify_permission_check(&audit_data.ed_auth);
+	switch (perm_rc) {
+	case PERM_DENIED:
+		/*
+		 * We continue in this case, so that an audit event can be
+		 * generated later in the function.
+		 */
+		break;
+	case PERM_GRANTED:
+		break;
+	case PERM_GONE:
+		return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
+	case PERM_FAIL:
+		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
+	default:
+		bad_error(rc_node_modify_permission_check, perm_rc);
+	}
 
-	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);
+	RC_NODE_PTR_CHECK_LOCK_OR_FREE_RETURN(np, npp, audit_data.ed_auth);
 
 	audit_data.ed_fmri = fmri;
-	audit_data.ed_auth = NULL;
 
 	/*
 	 * there is a separate interface for creating property groups
@@ -3951,7 +4012,10 @@ rc_node_create_child(rc_node_ptr_t *npp, uint32_t type, const char *name,
 	if (np->rn_id.rl_type == REP_PROTOCOL_ENTITY_CPROPERTYGRP) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		np = np->rn_cchain[0];
-		RC_NODE_CHECK_AND_LOCK(np);
+		if ((rc = rc_node_check_and_lock(np)) != REP_PROTOCOL_SUCCESS) {
+			free(audit_data.ed_auth);
+			return (rc);
+		}
 	}
 
 	if ((rc = rc_check_parent_child(np->rn_id.rl_type, type)) !=
@@ -3972,12 +4036,12 @@ rc_node_create_child(rc_node_ptr_t *npp, uint32_t type, const char *name,
 		free(audit_data.ed_auth);
 		return (rc);
 	}
-	if (perm_rc != REP_PROTOCOL_SUCCESS) {
+	if (perm_rc == PERM_DENIED) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		smf_audit_event(ADT_smf_create, ADT_FAILURE,
 		    ADT_FAIL_VALUE_AUTH, &audit_data);
 		free(audit_data.ed_auth);
-		return (perm_rc);
+		return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
 	}
 
 	HOLD_PTR_FLAG_OR_FREE_AND_RETURN(np, npp, RC_NODE_CREATING_CHILD,
@@ -4014,7 +4078,7 @@ rc_node_create_child_pg(rc_node_ptr_t *npp, uint32_t type, const char *name,
 	rc_node_t *cp;
 	int rc;
 	permcheck_t *pcp;
-	int granted;
+	perm_status_t granted;
 	char fmri[REP_PROTOCOL_FMRI_LEN];
 	audit_event_data_t audit_data;
 	au_event_t event_id;
@@ -4098,27 +4162,13 @@ rc_node_create_child_pg(rc_node_ptr_t *npp, uint32_t type, const char *name,
 			if (rc == REP_PROTOCOL_SUCCESS) {
 				granted = perm_granted(pcp);
 
-				if (granted < 0) {
-					rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-				} else {
-					/*
-					 * Copy out the authorization
-					 * string before freeing pcp.
-					 */
-					audit_data.ed_auth =
-					    strdup(pcp->pc_auth_string);
-					if (audit_data.ed_auth == NULL) {
-						/*
-						 * Following code line
-						 * cannot meet both the
-						 * indentation and the line
-						 * length requirements of
-						 * cstyle.  Indendation has
-						 * been sacrificed.
-						 */
-						/* CSTYLED */
-					    rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-					}
+				rc = map_granted_status(granted, pcp,
+				    &audit_data.ed_auth);
+				if (granted == PERM_GONE) {
+					/* No auditing if client gone. */
+					pc_free(pcp);
+					rc_node_rele(np);
+					return (rc);
 				}
 			}
 
@@ -4127,17 +4177,18 @@ rc_node_create_child_pg(rc_node_ptr_t *npp, uint32_t type, const char *name,
 			rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
 		}
 
-		if (rc == REP_PROTOCOL_SUCCESS && !granted)
-			rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
 	} else {
 		rc = REP_PROTOCOL_SUCCESS;
 	}
 #endif /* NATIVE_BUILD */
 
+
 	if (rc != REP_PROTOCOL_SUCCESS) {
 		rc_node_rele(np);
-		smf_audit_event(event_id, ADT_FAILURE,
-		    ADT_FAIL_VALUE_AUTH, &audit_data);
+		if (rc != REP_PROTOCOL_FAIL_NO_RESOURCES) {
+			smf_audit_event(event_id, ADT_FAILURE,
+			    ADT_FAIL_VALUE_AUTH, &audit_data);
+		}
 		if (audit_data.ed_auth != NULL)
 			free(audit_data.ed_auth);
 		return (rc);
@@ -4919,28 +4970,17 @@ again:
 			if (rc == REP_PROTOCOL_SUCCESS) {
 				granted = perm_granted(pcp);
 
-				if (granted < 0) {
-					rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-				} else {
-					/*
-					 * Copy out the authorization
-					 * string before freeing pcp.
-					 */
-					audit_data.ed_auth =
-					    strdup(pcp->pc_auth_string);
-					if (audit_data.ed_auth == NULL) {
-						/*
-						 * Following code line
-						 * cannot meet both the
-						 * indentation and the line
-						 * length requirements of
-						 * cstyle.  Indendation has
-						 * been sacrificed.
-						 */
-						/* CSTYLED */
-					    rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-					}
+				rc = map_granted_status(granted, pcp,
+				    &audit_data.ed_auth);
+				if (granted == PERM_GONE) {
+					/* No need to audit if client gone. */
+					pc_free(pcp);
+					rc_node_rele_flag(np,
+					    RC_NODE_DYING_FLAGS);
+					return (rc);
 				}
+				if (granted == PERM_DENIED)
+					audit_failure = 1;
 			}
 
 			pc_free(pcp);
@@ -4948,10 +4988,6 @@ again:
 			rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
 		}
 
-		if (rc == REP_PROTOCOL_SUCCESS && !granted) {
-			rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
-			audit_failure = 1;
-		}
 		(void) pthread_mutex_lock(&np->rn_lock);
 	} else {
 		rc = REP_PROTOCOL_SUCCESS;
@@ -5099,7 +5135,12 @@ rc_node_next_snaplevel(rc_node_ptr_t *npp, rc_node_ptr_t *cpp)
 
 		(void) pthread_mutex_unlock(&np->rn_lock);
 	} else {
-		HOLD_PTR_FLAG_OR_RETURN(np, npp, RC_NODE_USING_PARENT);
+		if (!rc_node_hold_flag(np, RC_NODE_USING_PARENT)) {
+			(void) pthread_mutex_unlock(&np->rn_lock);
+			rc_node_clear(npp, 1);
+			return (REP_PROTOCOL_FAIL_DELETED);
+		}
+
 		/*
 		 * mark our parent as children changing.  This call drops our
 		 * lock and the RC_NODE_USING_PARENT flag, and returns with
@@ -5178,6 +5219,7 @@ rc_attach_snapshot(
 	rc_node_t *pp;
 	int rc;
 	size_t sz_out;
+	perm_status_t granted;
 	au_event_t event_id;
 	audit_event_data_t audit_data;
 
@@ -5248,11 +5290,26 @@ rc_attach_snapshot(
 	rc_node_hold_locked(np);		/* simplifies the remainder */
 
 	(void) pthread_mutex_unlock(&np->rn_lock);
-	if ((rc = rc_node_modify_permission_check(&audit_data.ed_auth)) !=
-	    REP_PROTOCOL_SUCCESS) {
+	granted = rc_node_modify_permission_check(&audit_data.ed_auth);
+	switch (granted) {
+	case PERM_DENIED:
 		smf_audit_event(event_id, ADT_FAILURE, ADT_FAIL_VALUE_AUTH,
 		    &audit_data);
+		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
+		rc_node_rele(np);
 		goto cleanout;
+	case PERM_GRANTED:
+		break;
+	case PERM_GONE:
+		rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
+		rc_node_rele(np);
+		goto cleanout;
+	case PERM_FAIL:
+		rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
+		rc_node_rele(np);
+		goto cleanout;
+	default:
+		bad_error(rc_node_modify_permission_check, granted);
 	}
 	(void) pthread_mutex_lock(&np->rn_lock);
 
@@ -5417,6 +5474,7 @@ int
 rc_snapshot_take_new(rc_node_ptr_t *npp, const char *svcname,
     const char *instname, const char *name, rc_node_ptr_t *outpp)
 {
+	perm_status_t granted;
 	rc_node_t *np;
 	rc_node_t *outp = NULL;
 	int rc, perm_rc;
@@ -5426,9 +5484,34 @@ rc_snapshot_take_new(rc_node_ptr_t *npp, const char *svcname,
 
 	rc_node_clear(outpp, 0);
 
-	perm_rc = rc_node_modify_permission_check(&audit_data.ed_auth);
+	/*
+	 * rc_node_modify_permission_check() must be called before the node
+	 * is locked.  This is because the library functions that check
+	 * authorizations can trigger calls back into configd.
+	 */
+	granted = rc_node_modify_permission_check(&audit_data.ed_auth);
+	switch (granted) {
+	case PERM_DENIED:
+		/*
+		 * We continue in this case, so that we can generate an
+		 * audit event later in this function.
+		 */
+		perm_rc = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
+		break;
+	case PERM_GRANTED:
+		perm_rc = REP_PROTOCOL_SUCCESS;
+		break;
+	case PERM_GONE:
+		/* No need to produce audit event if client is gone. */
+		return (REP_PROTOCOL_FAIL_PERMISSION_DENIED);
+	case PERM_FAIL:
+		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
+	default:
+		bad_error("rc_node_modify_permission_check", granted);
+		break;
+	}
 
-	RC_NODE_PTR_GET_CHECK_AND_LOCK(np, npp);
+	RC_NODE_PTR_CHECK_LOCK_OR_FREE_RETURN(np, npp, audit_data.ed_auth);
 	if (np->rn_id.rl_type != REP_PROTOCOL_ENTITY_INSTANCE) {
 		(void) pthread_mutex_unlock(&np->rn_lock);
 		free(audit_data.ed_auth);
@@ -5458,7 +5541,6 @@ rc_snapshot_take_new(rc_node_ptr_t *npp, const char *svcname,
 		return (rc);
 	}
 
-	audit_data.ed_auth = NULL;
 	audit_data.ed_fmri = fmri;
 	audit_data.ed_snapname = (char *)name;
 
@@ -5783,7 +5865,8 @@ rc_node_pg_check_read_protect(rc_node_t *np)
 static int
 rc_node_property_may_read(rc_node_t *np)
 {
-	int ret, granted = 0;
+	int ret;
+	perm_status_t granted = PERM_DENIED;
 	rc_node_t *pgp;
 	permcheck_t *pcp;
 	audit_event_data_t audit_data;
@@ -5857,23 +5940,27 @@ rc_node_property_may_read(rc_node_t *np)
 
 	if (ret == REP_PROTOCOL_SUCCESS) {
 		granted = perm_granted(pcp);
-		if (granted < 0)
+		if (granted == PERM_FAIL)
 			ret = REP_PROTOCOL_FAIL_NO_RESOURCES;
+		if (granted == PERM_GONE)
+			ret = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
 	}
+
 	if (ret == REP_PROTOCOL_SUCCESS) {
 		/* Generate a read_prop audit event. */
 		audit_data.ed_fmri = malloc(REP_PROTOCOL_FMRI_LEN);
 		if (audit_data.ed_fmri == NULL)
 			ret = REP_PROTOCOL_FAIL_NO_RESOURCES;
 	}
-	ret = rc_node_get_fmri_or_fragment(np, audit_data.ed_fmri,
-	    REP_PROTOCOL_FMRI_LEN, &sz_out);
-	assert(ret == REP_PROTOCOL_SUCCESS);
+	if (ret == REP_PROTOCOL_SUCCESS) {
+		ret = rc_node_get_fmri_or_fragment(np, audit_data.ed_fmri,
+		    REP_PROTOCOL_FMRI_LEN, &sz_out);
+	}
 	if (ret == REP_PROTOCOL_SUCCESS) {
 		int status;
 		int ret_value;
 
-		if (granted == 0) {
+		if (granted == PERM_DENIED) {
 			status = ADT_FAILURE;
 			ret_value = ADT_FAIL_VALUE_AUTH;
 		} else {
@@ -5888,7 +5975,7 @@ rc_node_property_may_read(rc_node_t *np)
 
 	pc_free(pcp);
 
-	if (ret == REP_PROTOCOL_SUCCESS && !granted)
+	if ((ret == REP_PROTOCOL_SUCCESS) && (granted == PERM_DENIED))
 		ret = REP_PROTOCOL_FAIL_PERMISSION_DENIED;
 
 	return (ret);
@@ -6621,6 +6708,7 @@ rc_node_setup_tx(rc_node_ptr_t *npp, rc_node_ptr_t *txp)
 	rc_node_t *np;
 	permcheck_t *pcp;
 	int ret;
+	perm_status_t granted;
 	rc_auth_state_t authorized = RC_AUTH_UNKNOWN;
 	char *auth_string = NULL;
 
@@ -6738,20 +6826,18 @@ rc_node_setup_tx(rc_node_ptr_t *npp, rc_node_ptr_t *txp)
 		}
 	}
 
-	ret = perm_granted(pcp);
-	/*
-	 * Copy out the authorization string before freeing pcp.
-	 */
-	if (ret >= 0) {
-		auth_string = strdup(pcp->pc_auth_string);
-	}
+	granted = perm_granted(pcp);
+	ret = map_granted_status(granted, pcp, &auth_string);
 	pc_free(pcp);
-	if ((auth_string == NULL) || (ret < 0)) {
+
+	if ((granted == PERM_GONE) || (granted == PERM_FAIL) ||
+	    (ret == REP_PROTOCOL_FAIL_NO_RESOURCES)) {
+		free(auth_string);
 		rc_node_rele(np);
-		return (REP_PROTOCOL_FAIL_NO_RESOURCES);
+		return (ret);
 	}
 
-	if (ret == 0) {
+	if (granted == PERM_DENIED) {
 		/*
 		 * If we get here, the authorization failed.
 		 * Unfortunately, we don't have enough information at this
@@ -6936,7 +7022,8 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 	rc_node_pg_notify_t *pnp;
 	int rc;
 	permcheck_t *pcp;
-	int granted, normal;
+	perm_status_t granted;
+	int normal;
 	char *pg_fmri = NULL;
 	char *auth_string = NULL;
 	int auth_status = ADT_SUCCESS;
@@ -7058,16 +7145,14 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 
 		if (rc == REP_PROTOCOL_SUCCESS) {
 			granted = perm_granted(pcp);
-			if (granted < 0) {
-				rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
-			} else {
+			rc = map_granted_status(granted, pcp, &auth_string);
+			if ((granted == PERM_DENIED) && auth_string) {
 				/*
-				 * Copy out the authorization string before
-				 * freeing pcp.
+				 * _PERMISSION_DENIED should not cause us
+				 * to exit at this point, because we still
+				 * want to generate an audit event.
 				 */
-				auth_string = strdup(pcp->pc_auth_string);
-				if (auth_string == NULL)
-					rc = REP_PROTOCOL_FAIL_NO_RESOURCES;
+				rc = REP_PROTOCOL_SUCCESS;
 			}
 		}
 
@@ -7076,7 +7161,7 @@ rc_tx_commit(rc_node_ptr_t *txp, const void *cmds, size_t cmds_sz)
 		if (rc != REP_PROTOCOL_SUCCESS)
 			goto cleanout;
 
-		if (!granted) {
+		if (granted == PERM_DENIED) {
 			auth_status = ADT_FAILURE;
 			auth_ret_value = ADT_FAIL_VALUE_AUTH;
 			tx_flag = 0;

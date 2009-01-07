@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This is the client layer for svc.configd.  All direct protocol interactions
@@ -1959,40 +1957,52 @@ static void
 start_audit_session(repcache_client_t *cp)
 {
 	ucred_t *cred = NULL;
-	int adt_rc = 0;
 	adt_session_data_t *session;
 
-	if ((adt_rc = door_ucred(&cred)) != 0) {
-		syslog(LOG_ERR, gettext("start_audit_session(): cannot "
-		    "get ucred.  %m\n"));
+	/*
+	 * A NULL session pointer value can legally be used in all
+	 * subsequent calls to adt_* functions.
+	 */
+	cp->rc_adt_session = NULL;
+
+	if (door_ucred(&cred) != 0) {
+		switch (errno) {
+		case EAGAIN:
+		case ENOMEM:
+			syslog(LOG_ERR, gettext("start_audit_session(): cannot "
+			    "get ucred.  %m\n"));
+			return;
+		case EINVAL:
+			/*
+			 * Door client went away.  This is a normal,
+			 * although infrequent event, so there is no need
+			 * to create a syslog message.
+			 */
+			return;
+		case EFAULT:
+		default:
+			bad_error("door_ucred", errno);
+			return;
+		}
 	}
-	if ((adt_rc == 0) &&
-	    (adt_rc = adt_start_session(&session, NULL, 0)) != 0) {
-		/*
-		 * Log the failure, but don't quit because of inability to
-		 * audit.
-		 */
+	if (adt_start_session(&session, NULL, 0) != 0) {
 		syslog(LOG_ERR, gettext("start_audit_session(): could not "
 		    "start audit session.\n"));
+		ucred_free(cred);
+		return;
 	}
-	if ((adt_rc == 0) &&
-	    ((adt_rc = adt_set_from_ucred(session, cred, ADT_NEW)) != 0)) {
+	if (adt_set_from_ucred(session, cred, ADT_NEW) != 0) {
 		syslog(LOG_ERR, gettext("start_audit_session(): cannot set "
 		    "audit session data from ucred\n"));
-	}
-	if (adt_rc == 0) {
-		/* All went well.  Save the session data and session ID */
-		cp->rc_adt_session = session;
-		adt_get_asid(session, &cp->rc_adt_sessionid);
-	} else {
-		/*
-		 * Something went wrong.  End the session.  A NULL session
-		 * pointer value can legally be used in all subsequent
-		 * calls to adt_ functions.
-		 */
+		/* Something went wrong.  End the session. */
 		(void) adt_end_session(session);
-		cp->rc_adt_session = NULL;
+		ucred_free(cred);
+		return;
 	}
+
+	/* All went well.  Save the session data and session ID */
+	cp->rc_adt_session = session;
+	adt_get_asid(session, &cp->rc_adt_sessionid);
 
 	ucred_free(cred);
 }

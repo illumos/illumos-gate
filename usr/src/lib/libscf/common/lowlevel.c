@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -7290,6 +7290,11 @@ _scf_set_annotation(scf_handle_t *h, const char *operation, const char *file)
 	size_t copied;
 	int r;
 
+	if (h == NULL) {
+		/* We can't do anything if the handle is destroyed. */
+		return (scf_set_error(SCF_ERROR_HANDLE_DESTROYED));
+	}
+
 	request.rpr_request = REP_PROTOCOL_SET_AUDIT_ANNOTATION;
 	copied = strlcpy(request.rpr_operation,
 	    (operation == NULL) ? "" : operation,
@@ -7300,7 +7305,7 @@ _scf_set_annotation(scf_handle_t *h, const char *operation, const char *file)
 	copied = strlcpy(request.rpr_file,
 	    (file == NULL) ? "" : file,
 	    sizeof (request.rpr_file));
-	if (copied >= sizeof (request.rpr_operation))
+	if (copied >= sizeof (request.rpr_file))
 		return (scf_set_error(SCF_ERROR_INVALID_ARGUMENT));
 
 	(void) pthread_mutex_lock(&h->rh_lock);
