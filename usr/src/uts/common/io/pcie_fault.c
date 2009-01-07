@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2379,7 +2379,7 @@ pf_tlp_decode(pcie_bus_t *bus_p, pf_pcie_adv_err_regs_t *adv_reg_p) {
 }
 
 #define	PCIE_EREPORT	DDI_IO_CLASS "." PCI_ERROR_SUBCLASS "." PCIEX_FABRIC
-static void
+static int
 pf_ereport_setup(dev_info_t *dip, uint64_t ena, nvlist_t **ereport,
     nvlist_t **detector, errorq_elem_t **eqep)
 {
@@ -2390,7 +2390,7 @@ pf_ereport_setup(dev_info_t *dip, uint64_t ena, nvlist_t **ereport,
 	*eqep = errorq_reserve(fmhdl->fh_errorq);
 	if (*eqep == NULL) {
 		atomic_add_64(&fmhdl->fh_kstat.fek_erpt_dropped.value.ui64, 1);
-		return;
+		return (DDI_FAILURE);
 	}
 
 	*ereport = errorq_elem_nvl(fmhdl->fh_errorq, *eqep);
@@ -2417,6 +2417,8 @@ pf_ereport_setup(dev_info_t *dip, uint64_t ena, nvlist_t **ereport,
 		ena = fm_ena_generate(0, FM_ENA_FMT1);
 
 	fm_ereport_set(*ereport, 0, PCIE_EREPORT, ena, *detector, NULL);
+
+	return (DDI_SUCCESS);
 }
 
 /* ARGSUSED */
@@ -2453,8 +2455,9 @@ pf_send_ereport(ddi_fm_error_t *derr, pf_impl_t *impl)
 		    !DDI_FM_EREPORT_CAP(ddi_fm_capable(PCIE_PFD2DIP(pfd_p))))
 			continue;
 
-		pf_ereport_setup(PCIE_BUS2DIP(bus_p), derr->fme_ena, &ereport,
-		    &detector, &eqep);
+		if (pf_ereport_setup(PCIE_BUS2DIP(bus_p), derr->fme_ena,
+		    &ereport, &detector, &eqep) != DDI_SUCCESS)
+			continue;
 
 		/* Generic PCI device information */
 		fm_payload_set(ereport,
