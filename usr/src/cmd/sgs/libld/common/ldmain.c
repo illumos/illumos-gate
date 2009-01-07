@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -226,8 +226,7 @@ ld_main(int argc, char **argv, Half mach)
 	/*
 	 * If the user didn't supply a library path supply a default.  And, if
 	 * no run-path has been specified (-R), see if the environment variable
-	 * is in use (historic).  Also assign a default starting address.
-	 * Don't use MSG_ORIG() for these strings, they're written to later.
+	 * is in use (historic).
 	 */
 	if (Plibpath == NULL)
 		Plibpath = def_Plibpath;
@@ -238,8 +237,6 @@ ld_main(int argc, char **argv, Half mach)
 		    (strcmp((const char *)rpath, MSG_ORIG(MSG_STR_EMPTY))))
 			ofl->ofl_rpath = rpath;
 	}
-	if (ofl->ofl_flags & FLG_OF_EXEC)
-		ofl->ofl_segorigin = ld_targ.t_m.m_segm_origin;
 
 	/*
 	 * Argument pass two.  Input all libraries and objects.

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -661,7 +661,7 @@ extern	void	Dbg_cap_hw_candidate(Lm_list *, const char *);
 extern	void	Dbg_cap_hw_filter(Lm_list *, const char *, Rt_map *);
 extern	void	Dbg_cap_mapfile(Lm_list *, Xword, Xword, Half);
 extern	void	Dbg_cap_sec_entry(Lm_list *, uint_t, Xword, Xword, Half);
-extern	void	Dbg_cap_sec_title(Ofl_desc *);
+extern	void	Dbg_cap_sec_title(Lm_list *, const char *);
 extern	void	Dbg_cap_val_hw1(Lm_list *, Xword, Half);
 
 extern	const char *

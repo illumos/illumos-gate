@@ -22,7 +22,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,8 +74,8 @@ void	Dbg32_cap_sec_entry(Lm_list *, uint_t, Elf32_Word, Elf32_Word,
 	    Elf32_Half);
 void	Dbg64_cap_sec_entry(Lm_list *, uint_t, Elf64_Xword, Elf64_Xword,
 	    Elf64_Half);
-void	Dbg32_cap_sec_title(Ofl_desc *);
-void	Dbg64_cap_sec_title(Ofl_desc *);
+void	Dbg32_cap_sec_title(Lm_list *, const char *);
+void	Dbg64_cap_sec_title(Lm_list *, const char *);
 void	Dbg32_cap_val_hw1(Lm_list *, Elf32_Word, Elf32_Half);
 void	Dbg64_cap_val_hw1(Lm_list *, Elf64_Xword, Elf64_Half);
 

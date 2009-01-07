@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,7 +193,6 @@ struct ofl_desc {
 	Sym_desc	*ofl_dtracesym;	/* ld -zdtrace= */
 	ofl_flag_t	ofl_flags;	/* various state bits, args etc. */
 	ofl_flag_t	ofl_flags1;	/*	more flags */
-	Xword		ofl_segorigin;	/* segment origin (start) */
 	void		*ofl_entry;	/* entry point (-e and Sym_desc *) */
 	char		*ofl_filtees;	/* shared objects we are a filter for */
 	const char	*ofl_soname;	/* (-h option) output file name for */

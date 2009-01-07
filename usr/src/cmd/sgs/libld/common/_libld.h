@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,8 @@ typedef struct {
 	uchar_t		m_data;		/* Target byte order */
 
 	Xword		m_segm_align;	/* segment alignment */
-	Xword		m_segm_origin;	/* Default 1st segment offset */
+	Xword		m_segm_origin;	/* Default 1st segment origin */
+	Xword		m_segm_aorigin;	/* Alternative 1st segment origin */
 	Word		m_dataseg_perm;	/* data segment permission mask */
 	Word		m_word_align;	/* alignment to use for Word sections */
 	const char	*m_def_interp;	/* Def. interpreter for dyn objects */

@@ -1416,3 +1416,5 @@ Bugid   Risk Synopsis
 6778453 RTLD_GROUP prevents use of application defined malloc
 6782597 32-bit ld.so.1 needs to accept objects with large inode number
 6786744 32-bit dbx failed with unknown rtld_db.so error on snv_104
+6789925 64-bit applications with SF1_SUNW_ADDR32 require non-default starting
+	address

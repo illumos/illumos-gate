@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,10 +362,9 @@ ld_recalc_shdrcnt(Ofl_desc *ofl)
 	Sg_desc		*sgp;
 	Listnode	*lnp1, *lnp2;
 	Word		cnt = 0;
-	Is_desc *isp;
-	Os_desc	*osp;
-	Aliste	idx;
-
+	Is_desc		*isp;
+	Os_desc		*osp;
+	Aliste		idx;
 
 	/*
 	 * This code must be kept in sync with the similar code
@@ -552,11 +551,17 @@ ld_create_outfile(Ofl_desc *ofl)
 		}
 
 		/*
-		 * If the first loadable segment has the ?N flag,
-		 * then ?N will be on.
+		 * Establish any processing unique to the first loadable
+		 * segment.
 		 */
 		if ((ptype == PT_LOAD) && (ptloadidx == 0)) {
 			ptloadidx++;
+
+			/*
+			 * If the first loadable segment has the ?N flag then
+			 * alignments of following segments need to be fixed,
+			 * plus a .dynamic FLAGS1 setting is required.
+			 */
 			if (sgp->sg_flags & FLG_SG_NOHDR) {
 				fixalign = TRUE;
 				ofl->ofl_dtflags_1 |= DF_1_NOHDR;

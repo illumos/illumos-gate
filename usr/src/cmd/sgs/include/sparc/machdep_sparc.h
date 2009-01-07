@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Global include file for all sgs SPARC machine dependent macros, constants
@@ -167,15 +167,21 @@ extern "C" {
 #ifdef _ELF64
 #define	M_SEGM_ALIGN	ELF_SPARCV9_MAXPGSZ
 /*
- * Put 64-bit programs above 4 gigabytes to help insure correctness,
- * so any 64-bit programs that truncate pointers will fault now instead of
- * corrupting itself and dying mysteriously.
+ * Put default 64-bit programs above 4 gigabytes to help insure correctness, so
+ * that any 64-bit programs that truncate pointers will fault now instead of
+ * corrupting itself and dying mysteriously.  64-bit programs can also be
+ * restricted to a 32-bit address space (SF1_SUNW_ADDR32), and these programs
+ * provide an alternative origin.
  */
-#define	M_SEGM_ORIGIN	(Addr)0x100000000ULL  /* default first segment offset */
+#define	M_SEGM_ORIGIN	(Addr)0x100000000ULL	/* default 1st segment origin */
+#define	M_SEGM_AORIGIN	(Addr)0x100000ULL	/* alternative 1st segment */
+						/*    origin */
 #define	M_WORD_ALIGN	8
 #else
 #define	M_SEGM_ALIGN	ELF_SPARC_MAXPGSZ
-#define	M_SEGM_ORIGIN	(Addr)0x10000	/* default first segment offset */
+#define	M_SEGM_ORIGIN	(Addr)0x10000		/* default 1st segment origin */
+#define	M_SEGM_AORIGIN	M_SEGM_ORIGIN		/* alternative 1st segment */
+						/*    origin */
 #define	M_WORD_ALIGN	4
 #endif
 

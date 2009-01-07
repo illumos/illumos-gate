@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<debug.h>
@@ -98,15 +97,13 @@ Dbg_cap_sec_entry(Lm_list *lml, uint_t type, Xword tag, Xword val, Half mach)
 }
 
 void
-Dbg_cap_sec_title(Ofl_desc *ofl)
+Dbg_cap_sec_title(Lm_list *lml, const char *name)
 {
-	Lm_list	*lml = ofl->ofl_lml;
-
 	if (DBG_NOTCLASS(DBG_C_CAP))
 		return;
 
 	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_CAP_SEC_TITLE), ofl->ofl_name);
+	dbg_print(lml, MSG_INTL(MSG_CAP_SEC_TITLE), name);
 }
 
 void

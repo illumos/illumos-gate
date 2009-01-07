@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -391,7 +391,7 @@ process_cap(Ifl_desc *ifl, Is_desc *cisp, Ofl_desc *ofl)
 	Cap	*cdata;
 	Word	ndx, cnum;
 
-	DBG_CALL(Dbg_cap_sec_title(ofl));
+	DBG_CALL(Dbg_cap_sec_title(ofl->ofl_lml, ifl->ifl_name));
 
 	/*
 	 * The capabilities are supposed to be terminated with a CA_SUNW_NULL

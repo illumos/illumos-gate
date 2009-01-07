@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3252,7 +3252,7 @@ translate_link(Ofl_desc *ofl, Os_desc *osp, Word link, const char *msg)
 uintptr_t
 ld_update_outfile(Ofl_desc *ofl)
 {
-	Addr		size, etext, vaddr = ofl->ofl_segorigin;
+	Addr		size, etext, vaddr;
 	Listnode	*lnp1, *lnp2;
 	Sg_desc		*sgp, *dtracesgp = 0, *capsgp = 0;
 	Os_desc		*osp;
@@ -3267,6 +3267,24 @@ ld_update_outfile(Ofl_desc *ofl)
 	Boolean		nobits;
 	Off		offset;
 	Aliste		idx;
+
+	/*
+	 * Initialize the starting address for the first segment.  Executables
+	 * have different starting addresses depending upon the target ABI,
+	 * where as shared objects have a starting address of 0.  If this is
+	 * a 64-bit executable that is being constructed to run in a restricted
+	 * address space, use an alternative origin that will provide more free
+	 * address space for the the eventual process.
+	 */
+	if (ofl->ofl_flags & FLG_OF_EXEC) {
+#if	defined(_ELF64)
+		if (ofl->ofl_sfcap_1 & SF1_SUNW_ADDR32)
+			vaddr = ld_targ.t_m.m_segm_aorigin;
+		else
+#endif
+			vaddr = ld_targ.t_m.m_segm_origin;
+	} else
+		vaddr = 0;
 
 	/*
 	 * Loop through the segment descriptors and pick out what we need.

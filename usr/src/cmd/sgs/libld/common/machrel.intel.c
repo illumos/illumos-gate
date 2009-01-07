@@ -24,7 +24,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1638,6 +1638,7 @@ ld_targ_init_x86(void)
 
 			M_SEGM_ALIGN,		/* m_segm_align */
 			M_SEGM_ORIGIN,		/* m_segm_origin */
+			M_SEGM_AORIGIN,		/* m_segm_aorigin */
 			M_DATASEG_PERM,		/* m_dataseg_perm */
 			M_WORD_ALIGN,		/* m_word_align */
 			MSG_ORIG(MSG_PTH_RTLD),	/* m_def_interp */
