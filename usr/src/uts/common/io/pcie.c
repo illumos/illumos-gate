@@ -1143,7 +1143,7 @@ pcie_init_root_port_mps(dev_info_t *dip)
 		max_supported = rp_cap;
 
 	bus_p->bus_mps = max_supported;
-	pcie_initchild_mps(dip);
+	(void) pcie_initchild_mps(dip);
 }
 
 /*
