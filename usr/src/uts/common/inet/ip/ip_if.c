@@ -3812,10 +3812,11 @@ ill_set_nce_router_flags(ill_t *ill, boolean_t enable)
 
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 		/*
-		 * NOTE: we're called separately for each ill in an illgrp,
-		 * so don't match across the illgrp.
+		 * NOTE: we match across the illgrp because nce's for
+		 * addresses on IPMP interfaces have an nce_ill that points to
+		 * the bound underlying ill.
 		 */
-		nce = ndp_lookup_v6(ill, B_FALSE, &ipif->ipif_v6lcl_addr,
+		nce = ndp_lookup_v6(ill, B_TRUE, &ipif->ipif_v6lcl_addr,
 		    B_FALSE);
 		if (nce != NULL) {
 			mutex_enter(&nce->nce_lock);
