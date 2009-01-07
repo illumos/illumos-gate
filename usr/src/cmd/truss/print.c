@@ -19,15 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	_SYSCALL32	/* make 32-bit compat headers visible */
 
@@ -73,6 +70,7 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <netinet/sctp.h>
+#include <net/route.h>
 #include <sys/utrap.h>
 #include <sys/lgrp_user.h>
 #include <sys/door.h>
@@ -1749,6 +1747,8 @@ prt_sol(private_t *pri, int raw, long val)
 {
 	if (val == SOL_SOCKET) {
 		outstring(pri, "SOL_SOCKET");
+	} else if (val == SOL_ROUTE) {
+		outstring(pri, "SOL_ROUTE");
 	} else {
 		const struct protoent *p;
 		struct protoent res;
@@ -1826,6 +1826,18 @@ sol_optname(private_t *pri, long val)
 #undef CBSIZE
 }
 
+const char *
+route_optname(private_t *pri, long val)
+{
+	switch (val) {
+	case RT_AWARE:
+		return ("RT_AWARE");
+	default:
+		(void) snprintf(pri->code_buf, sizeof (pri->code_buf),
+		    "0x%lx", val);
+		return (pri->code_buf);
+	}
+}
 
 const char *
 tcp_optname(private_t *pri, long val)
@@ -1917,6 +1929,8 @@ prt_son(private_t *pri, int raw, long val)
 	/* cheating -- look at the level */
 	switch (pri->sys_args[1]) {
 	case SOL_SOCKET:	outstring(pri, sol_optname(pri, val));
+				break;
+	case SOL_ROUTE:		outstring(pri, route_optname(pri, val));
 				break;
 	case IPPROTO_TCP:	outstring(pri, tcp_optname(pri, val));
 				break;

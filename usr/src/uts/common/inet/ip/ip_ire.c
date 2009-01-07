@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
+#include <sys/strsun.h>
 #include <sys/ddi.h>
 #include <sys/cmn_err.h>
 #include <sys/policy.h>
@@ -61,7 +62,6 @@
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
 #include <inet/sadb.h>
-#include <sys/kmem.h>
 #include <inet/tcp.h>
 #include <inet/ipclassifier.h>
 #include <sys/zone.h>
@@ -219,11 +219,6 @@ struct kmem_cache *rt_entry_cache;
  *
  * IRE_MARK_CONDEMNED signifies that the ire has been logically deleted and is
  * to be ignored when walking the ires using ire_next.
- *
- * IRE_MARK_HIDDEN signifies that the ire is a special ire typically for the
- * benefit of in.mpathd which needs to probe interfaces for failures. Normal
- * applications should not be seeing this ire and hence this ire is ignored
- * in most cases in the search using ire_next.
  *
  * Zones note:
  *	Walking IREs within a given zone also walks certain ires in other
@@ -1235,10 +1230,9 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 {
 	irb_t *irb;
 	boolean_t drop = B_FALSE;
-	/* LINTED : set but not used in function */
 	boolean_t mctl_present;
 	mblk_t *first_mp = NULL;
-	mblk_t *save_mp = NULL;
+	mblk_t *data_mp = NULL;
 	ire_t *dst_ire;
 	ipha_t *ipha;
 	ip6_t *ip6h;
@@ -1258,27 +1252,16 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 		 * we resolve an IPv6 address with an IPv4 ire
 		 * or vice versa.
 		 */
+		EXTRACT_PKT_MP(mp, first_mp, mctl_present);
+		data_mp = mp;
+		mp = first_mp;
 		if (ire->ire_ipversion == IPV4_VERSION) {
-			EXTRACT_PKT_MP(mp, first_mp, mctl_present);
-			ipha = (ipha_t *)mp->b_rptr;
-			save_mp = mp;
-			mp = first_mp;
-
+			ipha = (ipha_t *)data_mp->b_rptr;
 			dst_ire = ire_cache_lookup(ipha->ipha_dst,
 			    ire->ire_zoneid, MBLK_GETLABEL(mp), ipst);
 		} else {
 			ASSERT(ire->ire_ipversion == IPV6_VERSION);
-			/*
-			 * Get a pointer to the beginning of the IPv6 header.
-			 * Ignore leading IPsec control mblks.
-			 */
-			first_mp = mp;
-			if (mp->b_datap->db_type == M_CTL) {
-				mp = mp->b_cont;
-			}
-			ip6h = (ip6_t *)mp->b_rptr;
-			save_mp = mp;
-			mp = first_mp;
+			ip6h = (ip6_t *)data_mp->b_rptr;
 			dst_ire = ire_cache_lookup_v6(&ip6h->ip6_dst,
 			    ire->ire_zoneid, MBLK_GETLABEL(mp), ipst);
 		}
@@ -1330,10 +1313,8 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 		 * is over: we just drop the packet.
 		 */
 		if (ire->ire_flags & RTF_MULTIRT) {
-			if (save_mp) {
-				save_mp->b_prev = NULL;
-				save_mp->b_next = NULL;
-			}
+			data_mp->b_prev = NULL;
+			data_mp->b_next = NULL;
 			MULTIRT_DEBUG_UNTAG(mp);
 			freemsg(mp);
 		} else {
@@ -1355,9 +1336,31 @@ ire_add_then_send(queue_t *q, ire_t *ire, mblk_t *mp)
 				    (CONN_Q(q) ? Q_TO_CONN(q) : NULL),
 				    ire->ire_zoneid, ipst);
 			} else {
+				int minlen = sizeof (ip6i_t) + IPV6_HDR_LEN;
+
 				ASSERT(ire->ire_ipversion == IPV6_VERSION);
-				ip_newroute_v6(q, mp, &ip6h->ip6_dst, NULL,
-				    NULL, ire->ire_zoneid, ipst);
+
+				/*
+				 * If necessary, skip over the ip6i_t to find
+				 * the header with the actual source address.
+				 */
+				if (ip6h->ip6_nxt == IPPROTO_RAW) {
+					if (MBLKL(data_mp) < minlen &&
+					    pullupmsg(data_mp, -1) == 0) {
+						ip1dbg(("ire_add_then_send: "
+						    "cannot pullupmsg ip6i\n"));
+						if (mctl_present)
+							freeb(first_mp);
+						ire_refrele(ire);
+						return;
+					}
+					ASSERT(MBLKL(data_mp) >= IPV6_HDR_LEN);
+					ip6h = (ip6_t *)(data_mp->b_rptr +
+					    sizeof (ip6i_t));
+				}
+				ip_newroute_v6(q, mp, &ip6h->ip6_dst,
+				    &ip6h->ip6_src, NULL, ire->ire_zoneid,
+				    ipst);
 			}
 		}
 
@@ -1680,7 +1683,9 @@ ire_check_and_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep,
 {
 	ire_t *ire;
 	uint64_t check_flags = IPIF_DEPRECATED | IPIF_NOLOCAL | IPIF_ANYCAST;
-	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+	boolean_t prefer;
+	ill_t *ill = ipif->ipif_ill;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	/*
 	 * No broadcast IREs for the LOOPBACK interface
@@ -1690,21 +1695,26 @@ ire_check_and_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep,
 	    (ipif->ipif_flags & IPIF_NOXMIT))
 		return (irep);
 
-	/* If this would be a duplicate, don't bother. */
+	/*
+	 * If this new IRE would be a duplicate, only prefer it if one of
+	 * the following is true:
+	 *
+	 * 1. The existing one has IPIF_DEPRECATED|IPIF_LOCAL|IPIF_ANYCAST
+	 *    set and the new one has all of those clear.
+	 *
+	 * 2. The existing one corresponds to an underlying ILL in an IPMP
+	 *    group and the new one corresponds to an IPMP group interface.
+	 */
 	if ((ire = ire_ctable_lookup(addr, 0, IRE_BROADCAST, ipif,
 	    ipif->ipif_zoneid, NULL, match_flags, ipst)) != NULL) {
-		/*
-		 * We look for non-deprecated (and non-anycast, non-nolocal)
-		 * ipifs as the best choice. ipifs with check_flags matching
-		 * (deprecated, etc) are used only if non-deprecated ipifs
-		 * are not available. if the existing ire's ipif is deprecated
-		 * and the new ipif is non-deprecated, switch to the new ipif
-		 */
-		if ((!(ire->ire_ipif->ipif_flags & check_flags)) ||
-		    (ipif->ipif_flags & check_flags)) {
+		prefer = ((ire->ire_ipif->ipif_flags & check_flags) &&
+		    !(ipif->ipif_flags & check_flags)) ||
+		    (IS_UNDER_IPMP(ire->ire_ipif->ipif_ill) && IS_IPMP(ill));
+		if (!prefer) {
 			ire_refrele(ire);
 			return (irep);
 		}
+
 		/*
 		 * Bcast ires exist in pairs. Both have to be deleted,
 		 * Since we are exclusive we can make the above assertion.
@@ -1716,10 +1726,7 @@ ire_check_and_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep,
 		ire_delete(ire);
 		ire_refrele(ire);
 	}
-
-	irep = ire_create_bcast(ipif, addr, irep);
-
-	return (irep);
+	return (ire_create_bcast(ipif, addr, irep));
 }
 
 uint_t ip_loopback_mtu = IP_LOOPBACK_MTU;
@@ -1733,6 +1740,22 @@ ire_t **
 ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 {
 	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+	ill_t		*ill = ipif->ipif_ill;
+
+	ASSERT(IAM_WRITER_IPIF(ipif));
+
+	if (IS_IPMP(ill)) {
+		/*
+		 * Broadcast IREs for the IPMP meta-interface use the
+		 * nominated broadcast interface to send and receive packets.
+		 * If there's no nominated interface, send the packets down to
+		 * the IPMP stub driver, which will discard them.  If the
+		 * nominated broadcast interface changes, ill_refresh_bcast()
+		 * will refresh the broadcast IREs.
+		 */
+		if ((ill = ipmp_illgrp_cast_ill(ill->ill_grp)) == NULL)
+			ill = ipif->ipif_ill;
+	}
 
 	*irep++ = ire_create(
 	    (uchar_t *)&addr,			/* dest addr */
@@ -1741,8 +1764,8 @@ ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 	    NULL,				/* no gateway */
 	    &ipif->ipif_mtu,			/* max frag */
 	    NULL,				/* no src nce */
-	    ipif->ipif_rq,			/* recv-from queue */
-	    ipif->ipif_wq,			/* send-to queue */
+	    ill->ill_rq,			/* recv-from queue */
+	    ill->ill_wq,			/* send-to queue */
 	    IRE_BROADCAST,
 	    ipif,
 	    0,
@@ -1761,7 +1784,7 @@ ire_create_bcast(ipif_t *ipif, ipaddr_t  addr, ire_t **irep)
 	    NULL,				/* no gateway */
 	    &ip_loopback_mtu,			/* max frag size */
 	    NULL,				/* no src_nce */
-	    ipif->ipif_rq,			/* recv-from queue */
+	    ill->ill_rq,			/* recv-from queue */
 	    NULL,				/* no send-to queue */
 	    IRE_BROADCAST,			/* Needed for fanout in wput */
 	    ipif,
@@ -2049,32 +2072,23 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 {
 	ill_t *ire_stq_ill = NULL;
 	ill_t *ire_ipif_ill = NULL;
-	ill_group_t *ire_ill_group = NULL;
 
 	ASSERT(match_flags != 0 || zoneid != ALL_ZONES);
 	/*
-	 * MATCH_IRE_ILL/MATCH_IRE_ILL_GROUP : We match both on ill
-	 *    pointed by ire_stq and ire_ipif. Only in the case of
-	 *    IRE_CACHEs can ire_stq and ire_ipif be pointing to
-	 *    different ills. But we want to keep this function generic
-	 *    enough for future use. So, we always try to match on both.
-	 *    The only caller of this function ire_walk_ill_tables, will
-	 *    call "func" after we return from this function. We expect
-	 *    "func" to do the right filtering of ires in this case.
-	 *
-	 * NOTE : In the case of MATCH_IRE_ILL_GROUP, groups
-	 * pointed by ire_stq and ire_ipif should always be the same.
-	 * So, we just match on only one of them.
+	 * MATCH_IRE_ILL: We match both on ill pointed by ire_stq and
+	 *    ire_ipif.  Only in the case of IRE_CACHEs can ire_stq and
+	 *    ire_ipif be pointing to different ills. But we want to keep
+	 *    this function generic enough for future use. So, we always
+	 *    try to match on both.  The only caller of this function
+	 *    ire_walk_ill_tables, will call "func" after we return from
+	 *    this function. We expect "func" to do the right filtering
+	 *    of ires in this case.
 	 */
-	if (match_flags & (MATCH_IRE_ILL|MATCH_IRE_ILL_GROUP)) {
+	if (match_flags & MATCH_IRE_ILL) {
 		if (ire->ire_stq != NULL)
-			ire_stq_ill = (ill_t *)ire->ire_stq->q_ptr;
+			ire_stq_ill = ire->ire_stq->q_ptr;
 		if (ire->ire_ipif != NULL)
 			ire_ipif_ill = ire->ire_ipif->ipif_ill;
-		if (ire_stq_ill != NULL)
-			ire_ill_group = ire_stq_ill->ill_group;
-		if ((ire_ill_group == NULL) && (ire_ipif_ill != NULL))
-			ire_ill_group = ire_ipif_ill->ill_group;
 	}
 
 	if (zoneid != ALL_ZONES) {
@@ -2115,7 +2129,7 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 					ipif_t *src_ipif;
 					src_ipif =
 					    ipif_select_source_v6(ire_stq_ill,
-					    &ire->ire_addr_v6, RESTRICT_TO_NONE,
+					    &ire->ire_addr_v6, B_FALSE,
 					    IPV6_PREFER_SRC_DEFAULT,
 					    zoneid);
 					if (src_ipif != NULL) {
@@ -2143,9 +2157,9 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 			ire_t *rire;
 
 			ire_match_flags |= MATCH_IRE_TYPE;
-			if (ire->ire_ipif != NULL) {
-				ire_match_flags |= MATCH_IRE_ILL_GROUP;
-			}
+			if (ire->ire_ipif != NULL)
+				ire_match_flags |= MATCH_IRE_ILL;
+
 			if (ire->ire_ipversion == IPV4_VERSION) {
 				rire = ire_route_lookup(ire->ire_gateway_addr,
 				    0, 0, IRE_INTERFACE, ire->ire_ipif, NULL,
@@ -2169,11 +2183,8 @@ ire_walk_ill_match(uint_t match_flags, uint_t ire_type, ire_t *ire,
 	if (((!(match_flags & MATCH_IRE_TYPE)) ||
 	    (ire->ire_type & ire_type)) &&
 	    ((!(match_flags & MATCH_IRE_ILL)) ||
-	    (ire_stq_ill == ill || ire_ipif_ill == ill)) &&
-	    ((!(match_flags & MATCH_IRE_ILL_GROUP)) ||
-	    (ire_stq_ill == ill) || (ire_ipif_ill == ill) ||
-	    (ire_ill_group != NULL &&
-	    ire_ill_group == ill->ill_group))) {
+	    (ire_stq_ill == ill || ire_ipif_ill == ill ||
+	    ire_ipif_ill != NULL && IS_IN_SAME_ILLGRP(ire_ipif_ill, ill)))) {
 		return (B_TRUE);
 	}
 	return (B_FALSE);
@@ -2221,8 +2232,7 @@ ire_walk_ill_tables(uint_t match_flags, uint_t ire_type, pfv_t func,
 	boolean_t ret;
 	struct rtfuncarg rtfarg;
 
-	ASSERT((!(match_flags & (MATCH_IRE_ILL |
-	    MATCH_IRE_ILL_GROUP))) || (ill != NULL));
+	ASSERT((!(match_flags & MATCH_IRE_ILL)) || (ill != NULL));
 	ASSERT(!(match_flags & MATCH_IRE_TYPE) || (ire_type != 0));
 	/*
 	 * Optimize by not looking at the forwarding table if there
@@ -2399,32 +2409,26 @@ ire_atomic_start(irb_t *irb_ptr, ire_t *ire, queue_t *q, mblk_t *mp,
 	}
 
 	/*
-	 * IPMP flag settings happen without taking the exclusive route
-	 * in ip_sioctl_flags. So we need to make an atomic check here
-	 * for FAILED/OFFLINE/INACTIVE flags or if it has hit the
-	 * FAILBACK=no case.
+	 * Don't allow IRE's to be created on changing ill's.  Also, since
+	 * IPMP flags can be set on an ill without quiescing it, if we're not
+	 * a writer on stq_ill, check that the flags still allow IRE creation.
 	 */
 	if ((stq_ill != NULL) && !IAM_WRITER_ILL(stq_ill)) {
 		if (stq_ill->ill_state_flags & ILL_CHANGING) {
 			ill = stq_ill;
 			error = EAGAIN;
-		} else if ((stq_ill->ill_phyint->phyint_flags & PHYI_OFFLINE) ||
-		    (ill_is_probeonly(stq_ill) &&
-		    !(ire->ire_marks & IRE_MARK_HIDDEN))) {
-			error = EINVAL;
+		} else if (IS_UNDER_IPMP(stq_ill)) {
+			mutex_enter(&stq_ill->ill_phyint->phyint_lock);
+			if (!ipmp_ill_is_active(stq_ill) &&
+			    !(ire->ire_marks & IRE_MARK_TESTHIDDEN)) {
+				error = EINVAL;
+			}
+			mutex_exit(&stq_ill->ill_phyint->phyint_lock);
 		}
-		goto done;
+		if (error != 0)
+			goto done;
 	}
 
-	/*
-	 * We don't check for OFFLINE/FAILED in this case because
-	 * the source address selection logic (ipif_select_source)
-	 * may still select a source address from such an ill. The
-	 * assumption is that these addresses will be moved by in.mpathd
-	 * soon. (i.e. this is a race). However link local addresses
-	 * will not move and hence ipif_select_source_v6 tries to avoid
-	 * FAILED ills. Please see ipif_select_source_v6 for more info
-	 */
 	if ((ipif_ill != NULL) && !IAM_WRITER_ILL(ipif_ill) &&
 	    (ipif_ill->ill_state_flags & ILL_CHANGING)) {
 		ill = ipif_ill;
@@ -2444,8 +2448,10 @@ done:
 	if (error == EAGAIN && ILL_CAN_WAIT(ill, q)) {
 		ipsq_t *ipsq = ill->ill_phyint->phyint_ipsq;
 		mutex_enter(&ipsq->ipsq_lock);
+		mutex_enter(&ipsq->ipsq_xop->ipx_lock);
 		ire_atomic_end(irb_ptr, ire);
 		ipsq_enq(ipsq, q, mp, func, NEW_OP, ill);
+		mutex_exit(&ipsq->ipsq_xop->ipx_lock);
 		mutex_exit(&ipsq->ipsq_lock);
 		error = EINPROGRESS;
 	} else if (error != 0) {
@@ -2502,39 +2508,7 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		ire = ire1;
 	}
 	if (ire->ire_stq != NULL)
-		stq_ill = (ill_t *)ire->ire_stq->q_ptr;
-
-	if (ire->ire_type == IRE_CACHE) {
-		/*
-		 * If this interface is FAILED, or INACTIVE or has hit
-		 * the FAILBACK=no case, we create IRE_CACHES marked
-		 * HIDDEN for some special cases e.g. bind to
-		 * IPIF_NOFAILOVER address etc. So, if this interface
-		 * is FAILED/INACTIVE/hit FAILBACK=no case, and we are
-		 * not creating hidden ires, we should not allow that.
-		 * This happens because the state of the interface
-		 * changed while we were waiting in ARP. If this is the
-		 * daemon sending probes, the next probe will create
-		 * HIDDEN ires and we will create an ire then. This
-		 * cannot happen with NDP currently because IRE is
-		 * never queued in NDP. But it can happen in the
-		 * future when we have external resolvers with IPv6.
-		 * If the interface gets marked with OFFLINE while we
-		 * are waiting in ARP, don't add the ire.
-		 */
-		if ((stq_ill->ill_phyint->phyint_flags & PHYI_OFFLINE) ||
-		    (ill_is_probeonly(stq_ill) &&
-		    !(ire->ire_marks & IRE_MARK_HIDDEN))) {
-			/*
-			 * We don't know whether it is a valid ipif or not.
-			 * unless we do the check below. So, set it to NULL.
-			 */
-			ire->ire_ipif = NULL;
-			ire_delete(ire);
-			*irep = NULL;
-			return (EINVAL);
-		}
-	}
+		stq_ill = ire->ire_stq->q_ptr;
 
 	if (stq_ill != NULL && ire->ire_type == IRE_CACHE &&
 	    stq_ill->ill_net_type == IRE_IF_RESOLVER) {
@@ -2573,12 +2547,12 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		rw_exit(&ipst->ips_ill_g_lock);
 		if (ipif == NULL ||
 		    (ipif->ipif_isv6 &&
+		    !IN6_IS_ADDR_UNSPECIFIED(&ire->ire_src_addr_v6) &&
 		    !IN6_ARE_ADDR_EQUAL(&ire->ire_src_addr_v6,
 		    &ipif->ipif_v6src_addr)) ||
 		    (!ipif->ipif_isv6 &&
 		    ire->ire_src_addr != ipif->ipif_src_addr) ||
 		    ire->ire_zoneid != ipif->ipif_zoneid) {
-
 			if (ipif != NULL)
 				ipif_refrele(ipif);
 			ire->ire_ipif = NULL;
@@ -2587,20 +2561,7 @@ ire_add(ire_t **irep, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			return (EINVAL);
 		}
 
-
 		ASSERT(ill != NULL);
-		/*
-		 * If this group was dismantled while this packets was
-		 * queued in ARP, don't add it here.
-		 */
-		if (ire->ire_ipif->ipif_ill->ill_group != ill->ill_group) {
-			/* We don't want ire_inactive bump stats for this */
-			ipif_refrele(ipif);
-			ire->ire_ipif = NULL;
-			ire_delete(ire);
-			*irep = NULL;
-			return (EINVAL);
-		}
 
 		/*
 		 * Since we didn't attach label security attributes to the
@@ -2677,6 +2638,16 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	boolean_t need_refrele = B_FALSE;
 	nce_t	*nce;
 	ip_stack_t	*ipst = ire->ire_ipst;
+	uint_t	marks = 0;
+
+	/*
+	 * IREs with source addresses hosted on interfaces that are under IPMP
+	 * should be hidden so that applications don't accidentally end up
+	 * sending packets with test addresses as their source addresses, or
+	 * sending out interfaces that are e.g. IFF_INACTIVE.  Hide them here.
+	 */
+	if (ire->ire_ipif != NULL && IS_UNDER_IPMP(ire->ire_ipif->ipif_ill))
+		marks |= IRE_MARK_TESTHIDDEN;
 
 	if (ire->ire_ipif != NULL)
 		ASSERT(!MUTEX_HELD(&ire->ire_ipif->ipif_ill->ill_lock));
@@ -2691,10 +2662,15 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	case IRE_HOST:
 		ire->ire_mask = IP_HOST_MASK;
 		ire->ire_masklen = IP_ABITS;
+		ire->ire_marks |= marks;
 		if ((ire->ire_flags & RTF_SETSRC) == 0)
 			ire->ire_src_addr = 0;
 		break;
 	case IRE_CACHE:
+		ire->ire_mask = IP_HOST_MASK;
+		ire->ire_masklen = IP_ABITS;
+		ire->ire_marks |= marks;
+		break;
 	case IRE_BROADCAST:
 	case IRE_LOCAL:
 	case IRE_LOOPBACK:
@@ -2702,15 +2678,14 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		ire->ire_masklen = IP_ABITS;
 		break;
 	case IRE_PREFIX:
-		if ((ire->ire_flags & RTF_SETSRC) == 0)
-			ire->ire_src_addr = 0;
-		break;
 	case IRE_DEFAULT:
+		ire->ire_marks |= marks;
 		if ((ire->ire_flags & RTF_SETSRC) == 0)
 			ire->ire_src_addr = 0;
 		break;
 	case IRE_IF_RESOLVER:
 	case IRE_IF_NORESOLVER:
+		ire->ire_marks |= marks;
 		break;
 	default:
 		ip0dbg(("ire_add_v4: ire %p has unrecognized IRE type (%d)\n",
@@ -2796,19 +2771,13 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 		 */
 		flags |= MATCH_IRE_IPIF;
 		/*
-		 * If we are creating hidden ires, make sure we search on
-		 * this ill (MATCH_IRE_ILL) and a hidden ire,
-		 * while we are searching for duplicates below. Otherwise we
-		 * could potentially find an IRE on some other interface
-		 * and it may not be a IRE marked with IRE_MARK_HIDDEN. We
-		 * shouldn't do this as this will lead to an infinite loop
-		 * (if we get to ip_wput again) eventually we need an hidden
-		 * ire for this packet to go out. MATCH_IRE_ILL is explicitly
-		 * done below.
+		 * If we are creating a hidden IRE, make sure we search for
+		 * hidden IREs when searching for duplicates below.
+		 * Otherwise, we might find an IRE on some other interface
+		 * that's not marked hidden.
 		 */
-		if (ire->ire_type == IRE_CACHE &&
-		    (ire->ire_marks & IRE_MARK_HIDDEN))
-			flags |= (MATCH_IRE_MARK_HIDDEN);
+		if (ire->ire_marks & IRE_MARK_TESTHIDDEN)
+			flags |= MATCH_IRE_MARK_TESTHIDDEN;
 	}
 	if ((ire->ire_type & IRE_CACHETABLE) == 0) {
 		irb_ptr = ire_get_bucket(ire);
@@ -2927,7 +2896,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			 * avoid a lookup in the caller again. If the callers
 			 * don't want to use it, they need to do a REFRELE.
 			 */
-			ip1dbg(("found dup ire existing %p new %p",
+			ip1dbg(("found dup ire existing %p new %p\n",
 			    (void *)ire1, (void *)ire));
 			IRE_REFHOLD(ire1);
 			ire_atomic_end(irb_ptr, ire);
@@ -2948,6 +2917,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			return (0);
 		}
 	}
+
 	if (ire->ire_type & IRE_CACHE) {
 		ASSERT(ire->ire_stq != NULL);
 		nce = ndp_lookup_v4(ire_to_ill(ire),
@@ -2999,17 +2969,9 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	}
 	/*
 	 * Make it easy for ip_wput_ire() to hit multiple broadcast ires by
-	 * grouping identical addresses together on the hash chain. We also
-	 * don't want to send multiple copies out if there are two ills part
-	 * of the same group. Thus we group the ires with same addr and same
-	 * ill group together so that ip_wput_ire can easily skip all the
-	 * ires with same addr and same group after sending the first copy.
-	 * We do this only for IRE_BROADCASTs as ip_wput_ire is currently
-	 * interested in such groupings only for broadcasts.
-	 *
-	 * NOTE : If the interfaces are brought up first and then grouped,
-	 * illgrp_insert will handle it. We come here when the interfaces
-	 * are already in group and we are bringing them UP.
+	 * grouping identical addresses together on the hash chain.  We do
+	 * this only for IRE_BROADCASTs as ip_wput_ire is currently interested
+	 * in such groupings only for broadcasts.
 	 *
 	 * Find the first entry that matches ire_addr. *irep will be null
 	 * if no match.
@@ -3023,29 +2985,7 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 	if (ire->ire_type == IRE_BROADCAST && *irep != NULL) {
 		/*
 		 * We found some ire (i.e *irep) with a matching addr. We
-		 * want to group ires with same addr and same ill group
-		 * together.
-		 *
-		 * First get to the entry that matches our address and
-		 * ill group i.e stop as soon as we find the first ire
-		 * matching the ill group and address. If there is only
-		 * an address match, we should walk and look for some
-		 * group match. These are some of the possible scenarios :
-		 *
-		 * 1) There are no groups at all i.e all ire's ill_group
-		 *    are NULL. In that case we will essentially group
-		 *    all the ires with the same addr together. Same as
-		 *    the "else" block of this "if".
-		 *
-		 * 2) There are some groups and this ire's ill_group is
-		 *    NULL. In this case, we will first find the group
-		 *    that matches the address and a NULL group. Then
-		 *    we will insert the ire at the end of that group.
-		 *
-		 * 3) There are some groups and this ires's ill_group is
-		 *    non-NULL. In this case we will first find the group
-		 *    that matches the address and the ill_group. Then
-		 *    we will insert the ire at the end of that group.
+		 * want to group ires with same addr.
 		 */
 		for (;;) {
 			ire1 = *irep;
@@ -3053,8 +2993,8 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 			    (ire1->ire_next->ire_addr != ire->ire_addr) ||
 			    (ire1->ire_type != IRE_BROADCAST) ||
 			    (ire1->ire_flags & RTF_MULTIRT) ||
-			    (ire1->ire_ipif->ipif_ill->ill_group ==
-			    ire->ire_ipif->ipif_ill->ill_group))
+			    (ire1->ire_ipif->ipif_ill->ill_grp ==
+			    ire->ire_ipif->ipif_ill->ill_grp))
 				break;
 			irep = &ire1->ire_next;
 		}
@@ -3071,18 +3011,14 @@ ire_add_v4(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func,
 
 		/*
 		 * Either we have hit the end of the list or the address
-		 * did not match or the group *matched*. If we found
-		 * a match on the group, skip to the end of the group.
+		 * did not match.
 		 */
 		while (*irep != NULL) {
 			ire1 = *irep;
 			if ((ire1->ire_addr != ire->ire_addr) ||
-			    (ire1->ire_type != IRE_BROADCAST) ||
-			    (ire1->ire_ipif->ipif_ill->ill_group !=
-			    ire->ire_ipif->ipif_ill->ill_group))
+			    (ire1->ire_type != IRE_BROADCAST))
 				break;
-			if (ire1->ire_ipif->ipif_ill->ill_group == NULL &&
-			    ire1->ire_ipif == ire->ire_ipif) {
+			if (ire1->ire_ipif == ire->ire_ipif) {
 				irep = &ire1->ire_next;
 				break;
 			}
@@ -3611,15 +3547,14 @@ ire_inactive(ire_t *ire)
 	 * The ipif that is associated with an ire is ire->ire_ipif and
 	 * hence when the ire->ire_ipif->ipif_ire_cnt drops to zero we call
 	 * ipif_ill_refrele_tail. Usually stq_ill is null or the same as
-	 * ire->ire_ipif->ipif_ill. So nothing more needs to be done. Only
-	 * in the case of IRE_CACHES when IPMP is used, stq_ill can be
-	 * different. If this is different from ire->ire_ipif->ipif_ill and
-	 * if the ill_ire_cnt on the stq_ill also has dropped to zero, we call
+	 * ire->ire_ipif->ipif_ill. So nothing more needs to be done.
+	 * However, for VNI or IPMP IRE entries, stq_ill can be different.
+	 * If this is different from ire->ire_ipif->ipif_ill and if the
+	 * ill_ire_cnt on the stq_ill also has dropped to zero, we call
 	 * ipif_ill_refrele_tail on the stq_ill.
 	 */
-
 	if (ire->ire_stq != NULL)
-		stq_ill = (ill_t *)ire->ire_stq->q_ptr;
+		stq_ill = ire->ire_stq->q_ptr;
 
 	if (stq_ill == NULL || stq_ill == ill) {
 		/* Optimize the most common case */
@@ -3881,26 +3816,27 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 {
 	ill_t *ire_ill = NULL, *dst_ill;
 	ill_t *ipif_ill = NULL;
-	ill_group_t *ire_ill_group = NULL;
-	ill_group_t *ipif_ill_group = NULL;
 
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 	ASSERT((ire->ire_addr & ~ire->ire_mask) == 0);
-	ASSERT((!(match_flags & (MATCH_IRE_ILL|MATCH_IRE_ILL_GROUP))) ||
+	ASSERT((!(match_flags & MATCH_IRE_ILL)) ||
 	    (ipif != NULL && !ipif->ipif_isv6));
 	ASSERT(!(match_flags & MATCH_IRE_WQ) || wq != NULL);
 
 	/*
-	 * HIDDEN cache entries have to be looked up specifically with
-	 * MATCH_IRE_MARK_HIDDEN. MATCH_IRE_MARK_HIDDEN is usually set
-	 * when the interface is FAILED or INACTIVE. In that case,
-	 * any IRE_CACHES that exists should be marked with
-	 * IRE_MARK_HIDDEN. So, we don't really need to match below
-	 * for IRE_MARK_HIDDEN. But we do so for consistency.
+	 * If MATCH_IRE_MARK_TESTHIDDEN is set, then only return the IRE if it
+	 * is in fact hidden, to ensure the caller gets the right one.  One
+	 * exception: if the caller passed MATCH_IRE_IHANDLE, then they
+	 * already know the identity of the given IRE_INTERFACE entry and
+	 * there's no point trying to hide it from them.
 	 */
-	if (!(match_flags & MATCH_IRE_MARK_HIDDEN) &&
-	    (ire->ire_marks & IRE_MARK_HIDDEN))
-		return (B_FALSE);
+	if (ire->ire_marks & IRE_MARK_TESTHIDDEN) {
+		if (match_flags & MATCH_IRE_IHANDLE)
+			match_flags |= MATCH_IRE_MARK_TESTHIDDEN;
+
+		if (!(match_flags & MATCH_IRE_MARK_TESTHIDDEN))
+			return (B_FALSE);
+	}
 
 	/*
 	 * MATCH_IRE_MARK_PRIVATE_ADDR is set when IP_NEXTHOP option
@@ -3994,19 +3930,18 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	}
 
 	/*
-	 * For IRE_CACHES, MATCH_IRE_ILL/ILL_GROUP really means that
-	 * somebody wants to send out on a particular interface which
-	 * is given by ire_stq and hence use ire_stq to derive the ill
-	 * value. ire_ipif for IRE_CACHES is just the means of getting
-	 * a source address i.e ire_src_addr = ire->ire_ipif->ipif_src_addr.
-	 * ire_to_ill does the right thing for this.
+	 * For IRE_CACHE entries, MATCH_IRE_ILL means that somebody wants to
+	 * send out ire_stq (ire_ipif for IRE_CACHE entries is just the means
+	 * of getting a source address -- i.e., ire_src_addr ==
+	 * ire->ire_ipif->ipif_src_addr).  ire_to_ill() handles this.
+	 *
+	 * NOTE: For IPMP, MATCH_IRE_ILL usually matches any ill in the group.
+	 * However, if MATCH_IRE_MARK_TESTHIDDEN is set (i.e., the IRE is for
+	 * IPMP test traffic), then the ill must match exactly.
 	 */
-	if (match_flags & (MATCH_IRE_ILL|MATCH_IRE_ILL_GROUP)) {
+	if (match_flags & MATCH_IRE_ILL) {
 		ire_ill = ire_to_ill(ire);
-		if (ire_ill != NULL)
-			ire_ill_group = ire_ill->ill_group;
 		ipif_ill = ipif->ipif_ill;
-		ipif_ill_group = ipif_ill->ill_group;
 	}
 
 	if ((ire->ire_addr == (addr & mask)) &&
@@ -4018,24 +3953,21 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	    (ire->ire_src_addr == ipif->ipif_src_addr)) &&
 	    ((!(match_flags & MATCH_IRE_IPIF)) ||
 	    (ire->ire_ipif == ipif)) &&
-	    ((!(match_flags & MATCH_IRE_MARK_HIDDEN)) ||
-	    (ire->ire_type != IRE_CACHE ||
-	    ire->ire_marks & IRE_MARK_HIDDEN)) &&
+	    ((!(match_flags & MATCH_IRE_MARK_TESTHIDDEN)) ||
+	    (ire->ire_marks & IRE_MARK_TESTHIDDEN)) &&
 	    ((!(match_flags & MATCH_IRE_MARK_PRIVATE_ADDR)) ||
 	    (ire->ire_type != IRE_CACHE ||
 	    ire->ire_marks & IRE_MARK_PRIVATE_ADDR)) &&
-	    ((!(match_flags & MATCH_IRE_ILL)) ||
-	    (ire_ill == ipif_ill)) &&
 	    ((!(match_flags & MATCH_IRE_WQ)) ||
 	    (ire->ire_stq == wq)) &&
+	    ((!(match_flags & MATCH_IRE_ILL)) ||
+	    (ire_ill == ipif_ill ||
+	    (!(match_flags & MATCH_IRE_MARK_TESTHIDDEN) &&
+	    ire_ill != NULL && IS_IN_SAME_ILLGRP(ipif_ill, ire_ill)))) &&
 	    ((!(match_flags & MATCH_IRE_IHANDLE)) ||
 	    (ire->ire_ihandle == ihandle)) &&
 	    ((!(match_flags & MATCH_IRE_MASK)) ||
 	    (ire->ire_mask == mask)) &&
-	    ((!(match_flags & MATCH_IRE_ILL_GROUP)) ||
-	    (ire_ill == ipif_ill) ||
-	    (ire_ill_group != NULL &&
-	    ire_ill_group == ipif_ill_group)) &&
 	    ((!(match_flags & MATCH_IRE_SECATTR)) ||
 	    (!is_system_labeled()) ||
 	    (tsol_ire_match_gwattr(ire, tsl) == 0))) {
@@ -4060,8 +3992,7 @@ ire_route_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	 * ire_match_args() will dereference ipif MATCH_IRE_SRC or
 	 * MATCH_IRE_ILL is set.
 	 */
-	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
-	    (ipif == NULL))
+	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL)) && (ipif == NULL))
 		return (NULL);
 
 	/*
@@ -4142,14 +4073,15 @@ ire_ctable_lookup(ipaddr_t addr, ipaddr_t gateway, int type, const ipif_t *ipif,
 
 /*
  * Check whether the IRE_LOCAL and the IRE potentially used to transmit
- * (could be an IRE_CACHE, IRE_BROADCAST, or IRE_INTERFACE) are part of
- * the same ill group.
+ * (could be an IRE_CACHE, IRE_BROADCAST, or IRE_INTERFACE) are identical
+ * or part of the same illgrp.  (In the IPMP case, usually the two IREs
+ * will both belong to the IPMP ill, but exceptions are possible -- e.g.
+ * if IPMP test addresses are on their own subnet.)
  */
 boolean_t
-ire_local_same_ill_group(ire_t *ire_local, ire_t *xmit_ire)
+ire_local_same_lan(ire_t *ire_local, ire_t *xmit_ire)
 {
-	ill_t		*recv_ill, *xmit_ill;
-	ill_group_t	*recv_group, *xmit_group;
+	ill_t *recv_ill, *xmit_ill;
 
 	ASSERT(ire_local->ire_type & (IRE_LOCAL|IRE_LOOPBACK));
 	ASSERT(xmit_ire->ire_type & (IRE_CACHETABLE|IRE_INTERFACE));
@@ -4160,20 +4092,11 @@ ire_local_same_ill_group(ire_t *ire_local, ire_t *xmit_ire)
 	ASSERT(recv_ill != NULL);
 	ASSERT(xmit_ill != NULL);
 
-	if (recv_ill == xmit_ill)
-		return (B_TRUE);
-
-	recv_group = recv_ill->ill_group;
-	xmit_group = xmit_ill->ill_group;
-
-	if (recv_group != NULL && recv_group == xmit_group)
-		return (B_TRUE);
-
-	return (B_FALSE);
+	return (IS_ON_SAME_LAN(recv_ill, xmit_ill));
 }
 
 /*
- * Check if the IRE_LOCAL uses the same ill (group) as another route would use.
+ * Check if the IRE_LOCAL uses the same ill as another route would use.
  * If there is no alternate route, or the alternate is a REJECT or BLACKHOLE,
  * then we don't allow this IRE_LOCAL to be used.
  */
@@ -4183,17 +4106,16 @@ ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
 {
 	ire_t		*alt_ire;
 	boolean_t	rval;
+	int		flags;
+
+	flags = MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE;
 
 	if (ire_local->ire_ipversion == IPV4_VERSION) {
 		alt_ire = ire_ftable_lookup(*((ipaddr_t *)addr), 0, 0, 0, NULL,
-		    NULL, zoneid, 0, tsl,
-		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_RJ_BHOLE, ipst);
+		    NULL, zoneid, 0, tsl, flags, ipst);
 	} else {
-		alt_ire = ire_ftable_lookup_v6((in6_addr_t *)addr, NULL, NULL,
-		    0, NULL, NULL, zoneid, 0, tsl,
-		    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_RJ_BHOLE, ipst);
+		alt_ire = ire_ftable_lookup_v6(addr, NULL, NULL, 0, NULL,
+		    NULL, zoneid, 0, tsl, flags, ipst);
 	}
 
 	if (alt_ire == NULL)
@@ -4203,16 +4125,14 @@ ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
 		ire_refrele(alt_ire);
 		return (B_FALSE);
 	}
-	rval = ire_local_same_ill_group(ire_local, alt_ire);
+	rval = ire_local_same_lan(ire_local, alt_ire);
 
 	ire_refrele(alt_ire);
 	return (rval);
 }
 
 /*
- * Lookup cache. Don't return IRE_MARK_HIDDEN entries. Callers
- * should use ire_ctable_lookup with MATCH_IRE_MARK_HIDDEN to get
- * to the hidden ones.
+ * Lookup cache
  *
  * In general the zoneid has to match (where ALL_ZONES match all of them).
  * But for IRE_LOCAL we also need to handle the case where L2 should
@@ -4220,8 +4140,7 @@ ire_local_ok_across_zones(ire_t *ire_local, zoneid_t zoneid, void *addr,
  * Ethernet drivers nor Ethernet hardware loops back packets sent to their
  * own MAC address. This loopback is needed when the normal
  * routes (ignoring IREs with different zoneids) would send out the packet on
- * the same ill (or ill group) as the ill with which this IRE_LOCAL is
- * associated.
+ * the same ill as the ill with which this IRE_LOCAL is associated.
  *
  * Earlier versions of this code always matched an IRE_LOCAL independently of
  * the zoneid. We preserve that earlier behavior when
@@ -4239,7 +4158,7 @@ ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid, const ts_label_t *tsl,
 	rw_enter(&irb_ptr->irb_lock, RW_READER);
 	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
 		if (ire->ire_marks & (IRE_MARK_CONDEMNED |
-		    IRE_MARK_HIDDEN | IRE_MARK_PRIVATE_ADDR)) {
+		    IRE_MARK_TESTHIDDEN | IRE_MARK_PRIVATE_ADDR)) {
 			continue;
 		}
 		if (ire->ire_addr == addr) {
@@ -4284,7 +4203,7 @@ ire_cache_lookup_simple(ipaddr_t dst, ip_stack_t *ipst)
 	ire_t *ire;
 
 	/*
-	 * Lets look for an ire in the cachetable whose
+	 * Look for an ire in the cachetable whose
 	 * ire_addr matches the destination.
 	 * Since we are being called by forwarding fastpath
 	 * no need to check for Trusted Solaris label.
@@ -4293,8 +4212,8 @@ ire_cache_lookup_simple(ipaddr_t dst, ip_stack_t *ipst)
 	    dst, ipst->ips_ip_cache_table_size)];
 	rw_enter(&irb_ptr->irb_lock, RW_READER);
 	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
-		if (ire->ire_marks & (IRE_MARK_CONDEMNED |
-		    IRE_MARK_HIDDEN | IRE_MARK_PRIVATE_ADDR)) {
+		if (ire->ire_marks & (IRE_MARK_CONDEMNED | IRE_MARK_TESTHIDDEN |
+		    IRE_MARK_PRIVATE_ADDR)) {
 			continue;
 		}
 		if (ire->ire_addr == dst) {
@@ -4306,7 +4225,6 @@ ire_cache_lookup_simple(ipaddr_t dst, ip_stack_t *ipst)
 	rw_exit(&irb_ptr->irb_lock);
 	return (NULL);
 }
-
 
 /*
  * Locate the interface ire that is tied to the cache ire 'cire' via
@@ -4333,13 +4251,8 @@ ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
 	 * because the ihandle refers to an ipif which can be in only one zone.
 	 */
 	match_flags =  MATCH_IRE_TYPE | MATCH_IRE_IHANDLE | MATCH_IRE_MASK;
-	/*
-	 * ip_newroute calls ire_ftable_lookup with MATCH_IRE_ILL only
-	 * for on-link hosts. We should never be here for onlink.
-	 * Thus, use MATCH_IRE_ILL_GROUP.
-	 */
 	if (pire->ire_ipif != NULL)
-		match_flags |= MATCH_IRE_ILL_GROUP;
+		match_flags |= MATCH_IRE_ILL;
 	/*
 	 * We know that the mask of the interface ire equals cire->ire_cmask.
 	 * (When ip_newroute() created 'cire' for the gateway it set its
@@ -4376,7 +4289,7 @@ ire_ihandle_lookup_offlink(ire_t *cire, ire_t *pire)
 	 */
 	match_flags =  MATCH_IRE_TYPE;
 	if (pire->ire_ipif != NULL)
-		match_flags |= MATCH_IRE_ILL_GROUP;
+		match_flags |= MATCH_IRE_ILL;
 	ire = ire_ftable_lookup(pire->ire_gateway_addr, 0, 0, IRE_OFFSUBNET,
 	    pire->ire_ipif, NULL, ALL_ZONES, 0, NULL, match_flags, ipst);
 	if (ire == NULL)
@@ -4411,7 +4324,16 @@ ire_t *
 ipif_to_ire(const ipif_t *ipif)
 {
 	ire_t	*ire;
-	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+	ip_stack_t *ipst = ipif->ipif_ill->ill_ipst;
+	uint_t	match_flags = MATCH_IRE_TYPE | MATCH_IRE_IPIF | MATCH_IRE_MASK;
+
+	/*
+	 * IRE_INTERFACE entries for ills under IPMP are IRE_MARK_TESTHIDDEN
+	 * so that they aren't accidentally returned.  However, if the
+	 * caller's ipif is on an ill under IPMP, there's no need to hide 'em.
+	 */
+	if (IS_UNDER_IPMP(ipif->ipif_ill))
+		match_flags |= MATCH_IRE_MARK_TESTHIDDEN;
 
 	ASSERT(!ipif->ipif_isv6);
 	if (ipif->ipif_ire_type == IRE_LOOPBACK) {
@@ -4421,13 +4343,12 @@ ipif_to_ire(const ipif_t *ipif)
 	} else if (ipif->ipif_flags & IPIF_POINTOPOINT) {
 		/* In this case we need to lookup destination address. */
 		ire = ire_ftable_lookup(ipif->ipif_pp_dst_addr, IP_HOST_MASK, 0,
-		    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0, NULL,
-		    (MATCH_IRE_TYPE | MATCH_IRE_IPIF | MATCH_IRE_MASK), ipst);
+		    IRE_INTERFACE, ipif, NULL, ALL_ZONES, 0, NULL, match_flags,
+		    ipst);
 	} else {
 		ire = ire_ftable_lookup(ipif->ipif_subnet,
 		    ipif->ipif_net_mask, 0, IRE_INTERFACE, ipif, NULL,
-		    ALL_ZONES, 0, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF |
-		    MATCH_IRE_MASK), ipst);
+		    ALL_ZONES, 0, NULL, match_flags, ipst);
 	}
 	return (ire);
 }
@@ -4811,7 +4732,7 @@ ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl, ip_stack_t *ipst)
 			continue;
 		if (cire->ire_addr != dst)
 			continue;
-		if (cire->ire_marks & (IRE_MARK_CONDEMNED | IRE_MARK_HIDDEN))
+		if (cire->ire_marks & (IRE_MARK_CONDEMNED|IRE_MARK_TESTHIDDEN))
 			continue;
 		unres_cnt--;
 	}
@@ -4983,7 +4904,7 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 						continue;
 					if (cire->ire_marks &
 					    (IRE_MARK_CONDEMNED |
-					    IRE_MARK_HIDDEN))
+					    IRE_MARK_TESTHIDDEN))
 						continue;
 
 					if (cire->ire_gw_secattr != NULL &&
@@ -5186,7 +5107,7 @@ ire_multirt_lookup(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 						continue;
 					if (cire->ire_marks &
 					    (IRE_MARK_CONDEMNED |
-					    IRE_MARK_HIDDEN))
+					    IRE_MARK_TESTHIDDEN))
 						continue;
 
 					if (cire->ire_gw_secattr != NULL &&
@@ -5401,7 +5322,7 @@ ire_trace_cleanup(const ire_t *ire)
  * invoked when the mblk containing fake_ire is freed.
  */
 void
-ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
+ire_arpresolve(ire_t *in_ire)
 {
 	areq_t		*areq;
 	ipaddr_t	*addrp;
@@ -5409,8 +5330,13 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
 	ire_t 		*ire, *buf;
 	size_t		bufsize;
 	frtn_t		*frtnp;
-	ill_t		*ill;
-	ip_stack_t	*ipst = dst_ill->ill_ipst;
+	ill_t		*dst_ill;
+	ip_stack_t	*ipst;
+
+	ASSERT(in_ire->ire_nce != NULL);
+
+	dst_ill = ire_to_ill(in_ire);
+	ipst = dst_ill->ill_ipst;
 
 	/*
 	 * Construct message chain for the resolver
@@ -5431,16 +5357,16 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
 	 */
 
 	/*
-	 * We use esballoc to allocate the second part(the ire_t size mblk)
-	 * of the message chain depicted above. THis mblk will be freed
-	 * by arp when there is a  timeout, and otherwise passed to IP
-	 * and IP will * free it after processing the ARP response.
+	 * We use esballoc to allocate the second part (IRE_MBLK)
+	 * of the message chain depicted above.  This mblk will be freed
+	 * by arp when there is a timeout, and otherwise passed to IP
+	 * and IP will free it after processing the ARP response.
 	 */
 
 	bufsize = sizeof (ire_t) + sizeof (frtn_t);
 	buf = kmem_alloc(bufsize, KM_NOSLEEP);
 	if (buf == NULL) {
-		ip1dbg(("ire_arpresolver:alloc buffer failed\n "));
+		ip1dbg(("ire_arpresolve: alloc buffer failed\n"));
 		return;
 	}
 	frtnp = (frtn_t *)(buf + 1);
@@ -5448,16 +5374,15 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
 	frtnp->free_func = ire_freemblk;
 
 	ire_mp = esballoc((unsigned char *)buf, bufsize, BPRI_MED, frtnp);
-
 	if (ire_mp == NULL) {
 		ip1dbg(("ire_arpresolve: esballoc failed\n"));
 		kmem_free(buf, bufsize);
 		return;
 	}
-	ASSERT(in_ire->ire_nce != NULL);
+
 	areq_mp = copyb(dst_ill->ill_resolver_mp);
 	if (areq_mp == NULL) {
-		kmem_free(buf, bufsize);
+		freemsg(ire_mp);
 		return;
 	}
 
@@ -5473,9 +5398,8 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
 	ire->ire_ipif_seqid = in_ire->ire_ipif_seqid;
 	ire->ire_ipif_ifindex = in_ire->ire_ipif_ifindex;
 	ire->ire_ipif = in_ire->ire_ipif;
-	ire->ire_stq = in_ire->ire_stq;
-	ill = ire_to_ill(ire);
-	ire->ire_stq_ifindex = ill->ill_phyint->phyint_ifindex;
+	ire->ire_stq = dst_ill->ill_wq;
+	ire->ire_stq_ifindex = dst_ill->ill_phyint->phyint_ifindex;
 	ire->ire_zoneid = in_ire->ire_zoneid;
 	ire->ire_stackid = ipst->ips_netstack->netstack_stackid;
 	ire->ire_ipst = ipst;
@@ -5528,7 +5452,6 @@ ire_arpresolve(ire_t *in_ire, ill_t *dst_ill)
  * Note that the ARP/IP merge should replace the functioanlity by providing
  * direct function calls to clean up unresolved entries in ire/nce lists.
  */
-
 void
 ire_freemblk(ire_t *ire_mp)
 {
@@ -5738,9 +5661,8 @@ retry_nce:
 		 *    is marked as ND_REACHABLE at this point.
 		 *    This nce does not undergo any further state changes,
 		 *    and exists as long as the interface is plumbed.
-		 * Note: we do the ire_nce assignment here for IRE_BROADCAST
-		 * because some functions like ill_mark_bcast() inline the
-		 * ire_add functionality.
+		 * Note: the assignment of ire_nce here is a historical
+		 * artifact of old code that used to inline ire_add().
 		 */
 		ire->ire_nce = nce;
 		/*
@@ -5772,8 +5694,7 @@ ip4_ctable_lookup_impl(ire_ctable_args_t *margs)
 	ire_t			*ire;
 	ip_stack_t		*ipst = margs->ict_ipst;
 
-	if ((margs->ict_flags &
-	    (MATCH_IRE_SRC | MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
+	if ((margs->ict_flags & (MATCH_IRE_SRC | MATCH_IRE_ILL)) &&
 	    (margs->ict_ipif == NULL)) {
 		return (NULL);
 	}
@@ -5802,10 +5723,7 @@ ip4_ctable_lookup_impl(ire_ctable_args_t *margs)
 /*
  * This function locates IRE_CACHE entries which were added by the
  * ire_forward() path. We can fully specify the IRE we are looking for by
- * providing the ipif_t AND the ire_stq. This is different to MATCH_IRE_ILL
- * which uses the ipif_ill. This is inadequate with IPMP groups where
- * illgrp_scheduler() may have been used to select an ill from the group for
- * the outgoing interface.
+ * providing the ipif (MATCH_IRE_IPIF) *and* the stq (MATCH_IRE_WQ).
  */
 ire_t *
 ire_arpresolve_lookup(ipaddr_t addr, ipaddr_t gw, ipif_t *ipif,

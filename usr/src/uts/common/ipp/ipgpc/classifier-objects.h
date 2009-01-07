@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _IPP_IPGPC_CLASSIFIER_OBJECTS_H
 #define	_IPP_IPGPC_CLASSIFIER_OBJECTS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <ipp/ipp.h>
@@ -64,14 +61,12 @@ extern "C" {
 #define	IPGPC_TABLE_UID		8
 #define	IPGPC_TABLE_PROJID	9
 #define	IPGPC_TABLE_IF		10
-#define	IPGPC_TABLE_IF_GRPNM	11
-#define	IPGPC_TABLE_DIR		12
+#define	IPGPC_TABLE_DIR		11
 #define	TABLE_ID_OFFSET		IPGPC_TABLE_PROTOID
 #define	PROTOID_IDX		(IPGPC_TABLE_PROTOID - TABLE_ID_OFFSET)
 #define	UID_IDX			(IPGPC_TABLE_UID - TABLE_ID_OFFSET)
 #define	PROJID_IDX		(IPGPC_TABLE_PROJID - TABLE_ID_OFFSET)
 #define	IF_IDX			(IPGPC_TABLE_IF - TABLE_ID_OFFSET)
-#define	IF_GRPNM_IDX		(IPGPC_TABLE_IF_GRPNM - TABLE_ID_OFFSET)
 #define	DIR_IDX			(IPGPC_TABLE_DIR - TABLE_ID_OFFSET)
 
 /* Match types for selector searching */
@@ -91,11 +86,10 @@ extern "C" {
 #define	UID_MASK	0x40
 #define	PROJID_MASK	0x80
 #define	IF_MASK		0x100
-#define	IF_GRPNM_MASK	0x200
-#define	DIR_MASK	0x400
+#define	DIR_MASK	0x200
 #define	ALL_MATCH_MASK	(DS_MASK | PROTO_MASK | SADDR_MASK | DADDR_MASK | \
 			SPORT_MASK | DPORT_MASK | UID_MASK | PROJID_MASK | \
-			IF_MASK | IF_GRPNM_MASK | DIR_MASK)
+			IF_MASK | DIR_MASK)
 
 #define	HASH_SIZE    	11	/* default hash table size */
 
@@ -108,7 +102,6 @@ typedef struct ipgpc_filter_s {
 	char filter_name[MAXNAMELEN]; /* null terminated name of filter */
 
 	/* exact match selectors */
-	char if_groupname[LIFNAMSIZ]; /* null terminated iface groupname */
 	uid_t uid;		/* uid key, value = exact or IPGPC_WILDCARD */
 	projid_t projid;	/* project id, " " */
 	uint_t if_index;	/* interface index, " " or 0 for wildcard */

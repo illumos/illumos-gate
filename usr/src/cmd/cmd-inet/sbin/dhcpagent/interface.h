@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	INTERFACE_H
 #define	INTERFACE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Interface.[ch] encapsulate all of the agent's knowledge of network
@@ -66,6 +64,9 @@ struct dhcp_pif_s {
 	boolean_t	pif_running;	/* interface is running */
 	uint_t		pif_hold_count;	/* reference count */
 	char		pif_name[LIFNAMSIZ];
+	char		pif_grifname[LIFNAMSIZ];
+	uint32_t	pif_grindex;	/* interface index for pif_grifname */
+	boolean_t	pif_under_ipmp;	/* is an ipmp underlying interface */
 };
 
 struct dhcp_lif_s {
@@ -182,7 +183,7 @@ dhcp_lif_t	*attach_lif(const char *, boolean_t, int *);
 int		set_lif_dhcp(dhcp_lif_t *, boolean_t);
 void		set_lif_deprecated(dhcp_lif_t *);
 boolean_t	clear_lif_deprecated(dhcp_lif_t *);
-boolean_t	open_ip_lif(dhcp_lif_t *, in_addr_t);
+boolean_t	open_ip_lif(dhcp_lif_t *, in_addr_t, boolean_t);
 void		close_ip_lif(dhcp_lif_t *);
 void		lif_mark_decline(dhcp_lif_t *, const char *);
 boolean_t	schedule_lif_timer(dhcp_lif_t *, dhcp_timer_t *,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -615,13 +615,10 @@ const struct ioc {
 	{ (uint_t)SIOCSIPSECONFIG,	"SIOCSIPSECONFIG",	NULL },
 	{ (uint_t)SIOCDIPSECONFIG,	"SIOCDIPSECONFIG",	NULL },
 	{ (uint_t)SIOCLIPSECONFIG,	"SIOCLIPSECONFIG",	NULL },
-	{ (uint_t)SIOCLIFFAILOVER,	"SIOCLIFFAILOVER",	"lifreq" },
-	{ (uint_t)SIOCLIFFAILBACK,	"SIOCLIFFAILBACK",	"lifreq" },
-	{ (uint_t)SIOCSIPMPFAILBACK,	"SIOCSIPMPFAILBACK",	NULL },
+	{ (uint_t)SIOCGLIFBINDING,	"SIOCGLIFBINDING",	"lifreq" },
 	{ (uint_t)SIOCSLIFGROUPNAME,	"SIOCSLIFGROUPNAME",	"lifreq" },
 	{ (uint_t)SIOCGLIFGROUPNAME,	"SIOCGLIFGROUPNAME",	"lifreq" },
-	{ (uint_t)SIOCGLIFOINDEX,	"SIOCGLIFOINDEX",	"lifreq" },
-	{ (uint_t)SIOCSLIFOINDEX,	"SIOCSLIFOINDEX",	"lifreq" },
+	{ (uint_t)SIOCGLIFGROUPINFO,	"SIOCGLIFGROUPINFO", "lifgroupinfo" },
 	{ (uint_t)SIOCGDSTINFO,		"SIOCGDSTINFO",		NULL },
 	{ (uint_t)SIOCGIP6ADDRPOLICY,	"SIOCGIP6ADDRPOLICY",	NULL },
 	{ (uint_t)SIOCSIP6ADDRPOLICY,	"SIOCSIP6ADDRPOLICY", 	NULL },

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -35,24 +33,13 @@
 #include <sys/ddi.h>
 #include <sys/cmn_err.h>
 #include <sys/socket.h>
-#include <sys/tihdr.h>
 #include <net/if.h>
-#include <net/if_arp.h>
 #include <net/if_types.h>
-#include <net/if_dl.h>
-#include <net/route.h>
-#include <sys/sockio.h>
 #include <netinet/in.h>
-#include <netinet/ip6.h>
-#include <netinet/icmp6.h>
 #include <sys/ethernet.h>
-#include <inet/common.h>	/* for various inet/mi.h and inet/nd.h needs */
-#include <inet/mi.h>
 #include <inet/arp.h>
 #include <inet/ip.h>
-#include <inet/ip_multi.h>
 #include <inet/ip_ire.h>
-#include <inet/ip_rts.h>
 #include <inet/ip_if.h>
 #include <sys/ib/mgt/ibcm/ibcm_arp.h>
 #include <inet/ip_ftable.h>
@@ -389,21 +376,16 @@ ibcm_arp_pr_callback(ibcm_arp_prwqn_t *wqnp, int status)
 	wqnp->func((void *)wqnp, status);
 }
 
+/*
+ * Check if the interface is loopback or IB.
+ */
 static int
-ibcm_arp_check_interface(ibcm_arp_prwqn_t *wqnp, int length)
+ibcm_arp_check_interface(ill_t *ill)
 {
-	/*
-	 * if the i/f is not ib or lo device, fail the request
-	 */
-	if (bcmp(wqnp->ifname, "ibd", 3) == 0) {
-		if (length != IPOIB_ADDRL) {
-			return (EINVAL);
-		}
-	} else if (bcmp(wqnp->ifname, "lo", 2)) {
-		return (ETIMEDOUT);
-	}
+	if (IS_LOOPBACK(ill) || ill->ill_type == IFT_IB)
+		return (0);
 
-	return (0);
+	return (ETIMEDOUT);
 }
 
 #define	IBTL_IPV4_ADDR(a)	(a->un.ip4addr)
@@ -414,11 +396,10 @@ ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
     ibcm_arp_pr_comp_func_t func)
 {
 	ibcm_arp_prwqn_t *wqnp;
-	ire_t	*ire;
-	ire_t	*src_ire;
+	ire_t	*ire = NULL;
+	ire_t	*src_ire = NULL;
 	ipif_t	*ipif;
-	ill_t	*ill;
-	int length;
+	ill_t	*ill, *hwaddr_ill = NULL;
 	ip_stack_t *ipst;
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_pr_lookup(src %p dest %p)",
@@ -449,12 +430,9 @@ ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 	if (src_ire == NULL) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
 		    "ire_ctable_lookup failed");
-		netstack_rele(ipst->ips_netstack);
-		ibcm_arp_prwqn_delete(wqnp);
 		ib_s->status = EFAULT;
-		return (1);
+		goto fail;
 	}
-
 
 	/*
 	 * get an ire for the destination adress with the matching source
@@ -463,16 +441,11 @@ ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 	ire = ire_ftable_lookup(IBTL_IPV4_ADDR(dst_addr), 0, 0, 0,
 	    src_ire->ire_ipif, 0, src_ire->ire_zoneid, 0, NULL, MATCH_IRE_SRC,
 	    ipst);
-
-	netstack_rele(ipst->ips_netstack);
-
 	if (ire == NULL) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
 		    "ire_ftable_lookup failed");
-		IRE_REFRELE(src_ire);
-		ibcm_arp_prwqn_delete(wqnp);
 		ib_s->status = EFAULT;
-		return (1);
+		goto fail;
 	}
 
 	wqnp->src_addr.un.ip4addr = ire->ire_src_addr;
@@ -480,35 +453,56 @@ ibcm_arp_pr_lookup(ibcm_arp_streams_t *ib_s, ibt_ip_addr_t *dst_addr,
 
 	ipif = src_ire->ire_ipif;
 	ill = ipif->ipif_ill;
-	length = ill->ill_name_length;
-	bcopy(ill->ill_name, &wqnp->ifname, ill->ill_name_length);
-	wqnp->ifname[length] = '\0';
-	bcopy(ill->ill_phys_addr, &wqnp->src_mac,
-	    ill->ill_phys_addr_length);
+	(void) strlcpy(wqnp->ifname, ill->ill_name, sizeof (wqnp->ifname));
 
-	IRE_REFRELE(ire);
-	IRE_REFRELE(src_ire);
+	/*
+	 * For IPMP data addresses, we need to use the hardware address of the
+	 * interface bound to the given address.
+	 */
+	if (IS_IPMP(ill)) {
+		if ((hwaddr_ill = ipmp_ipif_hold_bound_ill(ipif)) == NULL) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: no bound "
+			    "ill for IPMP interface %s", ill->ill_name);
+			ib_s->status = EFAULT;
+			goto fail;
+		}
+	} else {
+		hwaddr_ill = ill;
+		ill_refhold(hwaddr_ill); 	/* for symmetry */
+	}
 
-	ib_s->status =
-	    ibcm_arp_check_interface(wqnp, ill->ill_phys_addr_length);
-	if (ib_s->status) {
+	bcopy(hwaddr_ill->ill_phys_addr, &wqnp->src_mac,
+	    hwaddr_ill->ill_phys_addr_length);
+
+	if ((ib_s->status = ibcm_arp_check_interface(hwaddr_ill)) != 0) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
 		    "ibcm_arp_check_interface failed");
-		ibcm_arp_prwqn_delete(wqnp);
-		return (1);
+		goto fail;
 	}
 
-	ib_s->status = ibcm_arp_squery_arp(wqnp);
-	if (ib_s->status) {
+	if ((ib_s->status = ibcm_arp_squery_arp(wqnp)) != 0) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_pr_lookup: "
 		    "ibcm_arp_squery_arp failed");
-		ibcm_arp_prwqn_delete(wqnp);
-		return (1);
+		goto fail;
 	}
 
-	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_pr_lookup: Return: 0x%p", wqnp);
+	ill_refrele(hwaddr_ill);
+	IRE_REFRELE(ire);
+	IRE_REFRELE(src_ire);
+	netstack_rele(ipst->ips_netstack);
 
+	IBTF_DPRINTF_L4(cmlog, "ibcm_arp_pr_lookup: Return: 0x%p", wqnp);
 	return (0);
+fail:
+	if (hwaddr_ill != NULL)
+		ill_refrele(hwaddr_ill);
+	if (ire != NULL)
+		IRE_REFRELE(ire);
+	if (src_ire != NULL)
+		IRE_REFRELE(src_ire);
+	ibcm_arp_prwqn_delete(wqnp);
+	netstack_rele(ipst->ips_netstack);
+	return (1);
 }
 
 #define	IBCM_H2N_GID(gid) \

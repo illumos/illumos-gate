@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -266,13 +266,16 @@ typedef struct dl_ipnetinfo {
 #define	DL_OTHER	0x09	/* Any other medium not listed above */
 /*
  * Private media types.  These must be above the value 0x80000000 as
- * stated in the DLPI specification.
+ * stated in the DLPI specification.  NOTE: The SUNW_ prefix is used
+ * to denote synthetic DLPI types that are internal to the stack.
  */
 #define	DL_IPV4		0x80000001ul	/* IPv4 Tunnel Link */
 #define	DL_IPV6		0x80000002ul	/* IPv6 Tunnel Link */
 #define	SUNW_DL_VNI	0x80000003ul	/* Virtual network interface */
 #define	DL_WIFI		0x80000004ul	/* IEEE 802.11 */
 #define	DL_IPNET	0x80000005ul	/* ipnet(7D) link */
+#define	SUNW_DL_IPMP	0x80000006ul	/* IPMP stub interface */
+
 /*
  * DLPI provider service supported.
  * These must be allowed to be bitwise-OR for dl_service_mode in

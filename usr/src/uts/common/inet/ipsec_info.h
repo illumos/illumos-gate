@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_IPSEC_INFO_H
 #define	_INET_IPSEC_INFO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -114,12 +112,11 @@ typedef struct ipsec_in_s {
 
 		ipsec_in_decaps : 1,	/* Was this packet decapsulated from */
 					/* a matching inner packet? */
-		ipsec_in_attach_if : 1,	/* Don't load spread this packet */
 		ipsec_in_accelerated : 1, /* hardware accelerated packet */
 
 		ipsec_in_icmp_loopback : 1, /* Looped-back ICMP packet, */
 					    /* all should trust this. */
-		ipsec_in_pad_bits : 24;
+		ipsec_in_pad_bits : 25;
 
 	int    ipsec_in_ill_index;	/* interface on which ipha_dst was */
 					/* configured when pkt was recv'd  */
@@ -197,12 +194,11 @@ typedef struct ipsec_out_s {
 		ipsec_out_reserved : 1,
 		ipsec_out_v4 : 1,
 
-		ipsec_out_attach_if : 1,
 		ipsec_out_unspec_src : 1,	/* IPv6 ip6i_t info */
 		ipsec_out_reachable : 1, 	/* NDP reachability info */
 		ipsec_out_failed: 1,
-
 		ipsec_out_se_done: 1,
+
 		ipsec_out_esp_done: 1,
 		ipsec_out_ah_done: 1,
 		ipsec_out_need_policy: 1,
@@ -225,7 +221,7 @@ typedef struct ipsec_out_s {
 		 */
 		ipsec_out_icmp_loopback: 1,
 		ipsec_out_ip_nexthop : 1,	/* IP_NEXTHOP option is set */
-		ipsec_out_pad_bits : 12;
+		ipsec_out_pad_bits : 13;
 	cred_t	*ipsec_out_cred;
 	uint32_t ipsec_out_capab_ill_index;
 

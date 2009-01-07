@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,7 @@ typedef struct arl_s {
 	uint_t		arl_closing : 1;	/* stream is closing */
 	uint32_t	arl_index;		/* instance number */
 	struct arlphy_s	*arl_phy;		/* physical info, if any */
+	struct arl_s	*arl_ipmp_arl;		/* pointer to group arl_t */
 } arl_t;
 
 /*
@@ -75,7 +76,7 @@ typedef struct arl_s {
  */
 #define	ARL_TO_ARPSTACK(_arl)	(((ar_t *)(_arl)->arl_rq->q_ptr)->ar_as)
 
-/* ARL physical info structure for a link level device */
+/* ARL physical info structure, one per physical link level device */
 typedef struct arlphy_s {
 	uint32_t	ap_arp_hw_type;		/* hardware type */
 	uchar_t		*ap_arp_addr;		/* multicast address to use */
@@ -110,6 +111,7 @@ typedef struct ace_s {
 	clock_t		ace_last_bcast;		/* last broadcast Response */
 	clock_t		ace_xmit_interval;
 	int		ace_xmit_count;
+	arl_t		*ace_xmit_arl;		/* xmit on this arl */
 } ace_t;
 
 #define	ARPHOOK_INTERESTED_PHYSICAL_IN(as)	\
@@ -216,6 +218,7 @@ struct arp_stack {
 typedef struct arp_stack arp_stack_t;
 
 #define	ARL_F_NOARP	0x01
+#define	ARL_F_IPMP	0x02
 
 #define	ARL_S_DOWN	0x00
 #define	ARL_S_PENDING	0x01

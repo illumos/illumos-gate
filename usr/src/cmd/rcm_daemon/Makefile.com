@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -124,7 +124,7 @@ SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_vlan_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_vnic_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
 SUNW_aggr_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -ldladm
-SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil -ldladm
+SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil -ldladm -lipmp
 SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
 
 LDLIBS += -lgen -lelf -lrcm -lnvpair -ldevinfo -lnsl -lsocket

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -26,8 +26,6 @@
  *
  * @(#)$Header: traceroute.c,v 1.49 97/06/13 02:30:23 leres Exp $ (LBL)
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -707,7 +705,7 @@ get_hostinfo(char *host, int family, struct addrinfo **aipp)
 	struct addrinfo hints, *ai;
 	struct in6_addr addr6;
 	struct in_addr addr;
-	char temp_buf[INET6_ADDRSTRLEN];	/* use for inet_ntop() */
+	char abuf[INET6_ADDRSTRLEN];	/* use for inet_ntop() */
 	int rc;
 
 	/*
@@ -720,11 +718,10 @@ get_hostinfo(char *host, int family, struct addrinfo **aipp)
 		IN6_V4MAPPED_TO_INADDR(&addr6, &addr);
 
 		/* convert it back to a string */
-		(void) inet_ntop(AF_INET, (void *)&addr, temp_buf,
-		    sizeof (temp_buf));
+		(void) inet_ntop(AF_INET, &addr, abuf, sizeof (abuf));
 
 		/* now the host is an IPv4 address */
-		(void) strcpy(host, temp_buf);
+		(void) strcpy(host, abuf);
 
 		/*
 		 * If it's a mapped address, we convert it into IPv4
@@ -826,15 +823,19 @@ set_src_addr(struct pr_set *pr, struct ifaddrlist **alp)
 	struct sockaddr_in6 *sin6_from = (struct sockaddr_in6 *)pr->from;
 	struct addrinfo *aip;
 	char errbuf[ERRBUFSIZE];
-	char temp_buf[INET6_ADDRSTRLEN];	/* use for inet_ntop() */
+	char abuf[INET6_ADDRSTRLEN];		/* use for inet_ntop() */
 	int num_ifs;				/* all the interfaces  */
 	int num_src_ifs;			/* exclude loopback and down */
 	int i;
+	uint_t ifaddrflags = 0;
 
 	source = source_input;
 
+	if (device != NULL)
+		ifaddrflags |= LIFC_UNDER_IPMP;
+
 	/* get the interface address list */
-	num_ifs = ifaddrlist(&al, pr->family, errbuf);
+	num_ifs = ifaddrlist(&al, pr->family, ifaddrflags, errbuf);
 	if (num_ifs < 0) {
 		Fprintf(stderr, "%s: ifaddrlist: %s\n", prog, errbuf);
 		exit(EXIT_FAILURE);
@@ -881,26 +882,20 @@ set_src_addr(struct pr_set *pr, struct ifaddrlist **alp)
 		if (pr->family == AF_INET)
 			ap = (union any_in_addr *)
 			    /* LINTED E_BAD_PTR_CAST_ALIGN */
-			    &((struct sockaddr_in *)
-				aip->ai_addr)->sin_addr;
+			    &((struct sockaddr_in *)aip->ai_addr)->sin_addr;
 		else
 			ap = (union any_in_addr *)
 			    /* LINTED E_BAD_PTR_CAST_ALIGN */
-			    &((struct sockaddr_in6 *)
-				aip->ai_addr)->sin6_addr;
+			    &((struct sockaddr_in6 *)aip->ai_addr)->sin6_addr;
 
 		/*
 		 * LBNL bug fixed: used to accept any src address
 		 */
 		tmp2_al = find_ifaddr(al, num_ifs, ap, pr->family);
-
 		if (tmp2_al == NULL) {
-			Fprintf(stderr,
-			    "%s: %s is not a local %s address\n",
-			    prog, inet_ntop(pr->family, ap,
-				temp_buf, sizeof (temp_buf)),
-			    pr->name);
-
+			(void) inet_ntop(pr->family, ap, abuf, sizeof (abuf));
+			Fprintf(stderr, "%s: %s is not a local %s address\n",
+			    prog, abuf, pr->name);
 			free(al);
 			freeaddrinfo(aip);
 			return (0);
@@ -928,13 +923,11 @@ set_src_addr(struct pr_set *pr, struct ifaddrlist **alp)
 			set_sin(pr->from, ap, pr->family);
 
 			if (aip->ai_next != NULL) {
-				Fprintf(stderr,
-				    "%s: Warning: %s has multiple "
-				    "addresses; using %s\n",
-				    prog, source,
-				    inet_ntop(pr->family,
-					(const void *)pr->from_sin_addr,
-					temp_buf, sizeof (temp_buf)));
+				(void) inet_ntop(pr->family, pr->from_sin_addr,
+				    abuf, sizeof (abuf));
+				Fprintf(stderr, "%s: Warning: %s has multiple "
+				    "addresses; using %s\n", prog, source,
+				    abuf);
 			}
 		} else {			/* -i and -s used */
 			/*
@@ -1484,7 +1477,7 @@ traceroute(union any_in_addr *ip_addr, struct msghdr *msg6, struct pr_set *pr,
 	uchar_t code;				/* icmp code */
 	int reply;
 	int seq = 0;
-	char temp_buf[INET6_ADDRSTRLEN];	/* use for inet_ntop() */
+	char abuf[INET6_ADDRSTRLEN];		/* use for inet_ntop() */
 	int longjmp_return;			/* return value from longjump */
 	struct ip *ip = (struct ip *)packet;
 	boolean_t got_there = _B_FALSE;		/* we hit the destination */
@@ -1535,13 +1528,11 @@ traceroute(union any_in_addr *ip_addr, struct msghdr *msg6, struct pr_set *pr,
 			if (dev_name == NULL)
 				dev_name = "?";
 
+			(void) inet_ntop(pr->family, pr->from_sin_addr, abuf,
+			    sizeof (abuf));
 			Fprintf(stderr,
 			    "%s: Warning: Multiple interfaces found;"
-			    " using %s @ %s\n",
-			    prog, inet_ntop(pr->family,
-				(const void *)pr->from_sin_addr,
-				temp_buf, sizeof (temp_buf)),
-			    dev_name);
+			    " using %s @ %s\n", prog, abuf, dev_name);
 		}
 	}
 
@@ -1558,8 +1549,7 @@ traceroute(union any_in_addr *ip_addr, struct msghdr *msg6, struct pr_set *pr,
 		Fprintf(stderr, "%s to %s", prog, hostname);
 	} else {
 		Fprintf(stderr, "%s to %s (%s)", prog, hostname,
-		    inet_ntop(pr->family, (const void *)ip_addr, temp_buf,
-			sizeof (temp_buf)));
+		    inet_ntop(pr->family, ip_addr, abuf, sizeof (abuf)));
 	}
 
 	if (source)
@@ -1700,9 +1690,8 @@ traceroute(union any_in_addr *ip_addr, struct msghdr *msg6, struct pr_set *pr,
 				}
 
 				if (pr->family == AF_INET6) {
-					intp =
-					    (int *)find_ancillary_data(&in_msg,
-						IPPROTO_IPV6, IPV6_HOPLIMIT);
+					intp = find_ancillary_data(&in_msg,
+					    IPPROTO_IPV6, IPV6_HOPLIMIT);
 					if (intp == NULL) {
 						Fprintf(stderr,
 						    "%s: can't find "
@@ -2188,10 +2177,11 @@ static void
 usage(void)
 {
 	Fprintf(stderr, "Usage: %s [-adFIlnSvx] [-A address_family] "
-"[-c traffic_class] \n"
-"\t[-f first_hop] [-g gateway [-g gateway ...]| -r] [-i iface]\n"
-"\t[-L flow_label] [-m max_hop] [-P pause_sec] [-p port] [-Q max_timeout]\n"
-"\t[-q nqueries] [-s src_addr] [-t tos] [-w wait_time] host [packetlen]\n",
-		prog);
+	    "[-c traffic_class]\n"
+	    "\t[-f first_hop] [-g gateway [-g gateway ...]| -r] [-i iface]\n"
+	    "\t[-L flow_label] [-m max_hop] [-P pause_sec] [-p port] "
+	    "[-Q max_timeout]\n"
+	    "\t[-q nqueries] [-s src_addr] [-t tos] [-w wait_time] host "
+	    "[packetlen]\n", prog);
 	exit(EXIT_FAILURE);
 }

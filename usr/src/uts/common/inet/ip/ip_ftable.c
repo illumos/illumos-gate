@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,7 +67,6 @@
 #include <net/pfkeyv2.h>
 #include <inet/ipsec_info.h>
 #include <inet/sadb.h>
-#include <sys/kmem.h>
 #include <inet/tcp.h>
 #include <inet/ipclassifier.h>
 #include <sys/zone.h>
@@ -159,8 +158,7 @@ ire_ftable_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	 * ire_match_args() will dereference ipif MATCH_IRE_SRC or
 	 * MATCH_IRE_ILL is set.
 	 */
-	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
-	    (ipif == NULL))
+	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL)) && (ipif == NULL))
 		return (NULL);
 
 	(void) memset(&rdst, 0, sizeof (rdst));
@@ -290,28 +288,16 @@ found_ire_held:
 		 */
 		save_ire = ire;
 
+		if (ire->ire_ipif != NULL)
+			match_flags |= MATCH_IRE_ILL;
+
 		/*
-		 * Currently MATCH_IRE_ILL is never used with
-		 * (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT) while
-		 * sending out packets as MATCH_IRE_ILL is used only
-		 * for communicating with on-link hosts. We can't assert
-		 * that here as RTM_GET calls this function with
-		 * MATCH_IRE_ILL | MATCH_IRE_DEFAULT | MATCH_IRE_RECURSIVE.
-		 * We have already used the MATCH_IRE_ILL in determining
-		 * the right prefix route at this point. To match the
-		 * behavior of how we locate routes while sending out
-		 * packets, we don't want to use MATCH_IRE_ILL below
-		 * while locating the interface route.
-		 *
 		 * ire_ftable_lookup may end up with an incomplete IRE_CACHE
 		 * entry for the gateway (i.e., one for which the
 		 * ire_nce->nce_state is not yet ND_REACHABLE). If the caller
 		 * has specified MATCH_IRE_COMPLETE, such entries will not
 		 * be returned; instead, we return the IF_RESOLVER ire.
 		 */
-		if (ire->ire_ipif != NULL)
-			match_flags |= MATCH_IRE_ILL_GROUP;
-
 		ire = ire_route_lookup(ire->ire_gateway_addr, 0, 0, 0,
 		    ire->ire_ipif, NULL, zoneid, tsl, match_flags, ipst);
 		DTRACE_PROBE2(ftable__route__lookup1, (ire_t *), ire,
@@ -532,7 +518,7 @@ ire_ftable_lookup_simple(ipaddr_t addr,
 		}
 	}
 	if (ire->ire_ipif != NULL)
-		match_flags |= MATCH_IRE_ILL_GROUP;
+		match_flags |= MATCH_IRE_ILL;
 
 	ire = ire_route_lookup(ire->ire_gateway_addr, 0,
 	    0, 0, ire->ire_ipif, NULL, zoneid, NULL, match_flags, ipst);
@@ -678,13 +664,11 @@ ire_lookup_multi(ipaddr_t group, zoneid_t zoneid, ip_stack_t *ipst)
 	 * Make sure we follow ire_ipif.
 	 *
 	 * We need to determine the interface route through
-	 * which the gateway will be reached. We don't really
-	 * care which interface is picked if the interface is
-	 * part of a group.
+	 * which the gateway will be reached.
 	 */
 	if (ire->ire_ipif != NULL) {
 		ipif = ire->ire_ipif;
-		match_flags |= MATCH_IRE_ILL_GROUP;
+		match_flags |= MATCH_IRE_ILL;
 	}
 
 	switch (ire->ire_type) {
@@ -854,40 +838,26 @@ ire_get_next_default_ire(ire_t *ire, ire_t *ire_origin)
 }
 
 static ipif_t *
-ire_forward_src_ipif(ipaddr_t dst, ire_t *sire, ire_t *ire, ill_t *dst_ill,
+ire_forward_src_ipif(ipaddr_t dst, ire_t *sire, ire_t *ire,
     int zoneid, ushort_t *marks)
 {
 	ipif_t *src_ipif;
-	ip_stack_t *ipst = dst_ill->ill_ipst;
+	ill_t *ill = ire->ire_ipif->ipif_ill;
+	ip_stack_t *ipst = ill->ill_ipst;
 
 	/*
-	 * Pick the best source address from dst_ill.
+	 * Pick the best source address from ill.
 	 *
-	 * 1) If it is part of a multipathing group, we would
-	 *    like to spread the inbound packets across different
-	 *    interfaces. ipif_select_source picks a random source
-	 *    across the different ills in the group.
-	 *
-	 * 2) If it is not part of a multipathing group, we try
-	 *    to pick the source address from the destination
+	 * 1) Try to pick the source address from the destination
 	 *    route. Clustering assumes that when we have multiple
 	 *    prefixes hosted on an interface, the prefix of the
 	 *    source address matches the prefix of the destination
 	 *    route. We do this only if the address is not
 	 *    DEPRECATED.
 	 *
-	 * 3) If the conn is in a different zone than the ire, we
+	 * 2) If the conn is in a different zone than the ire, we
 	 *    need to pick a source address from the right zone.
-	 *
-	 * NOTE : If we hit case (1) above, the prefix of the source
-	 *	  address picked may not match the prefix of the
-	 *	  destination routes prefix as ipif_select_source
-	 *	  does not look at "dst" while picking a source
-	 *	  address.
-	 *	  If we want the same behavior as (2), we will need
-	 *	  to change the behavior of ipif_select_source.
 	 */
-
 	if ((sire != NULL) && (sire->ire_flags & RTF_SETSRC)) {
 		/*
 		 * The RTF_SETSRC flag is set in the parent ire (sire).
@@ -899,13 +869,10 @@ ire_forward_src_ipif(ipaddr_t dst, ire_t *sire, ire_t *ire, ill_t *dst_ill,
 		return (src_ipif);
 	}
 	*marks |= IRE_MARK_USESRC_CHECK;
-	if ((dst_ill->ill_group != NULL) ||
+	if (IS_IPMP(ill) ||
 	    (ire->ire_ipif->ipif_flags & IPIF_DEPRECATED) ||
-	    (dst_ill->ill_usesrc_ifindex != 0)) {
-		src_ipif = ipif_select_source(dst_ill, dst, zoneid);
-		if (src_ipif == NULL)
-			return (NULL);
-
+	    (ill->ill_usesrc_ifindex != 0)) {
+		src_ipif = ipif_select_source(ill, dst, zoneid);
 	} else {
 		src_ipif = ire->ire_ipif;
 		ASSERT(src_ipif != NULL);
@@ -1071,18 +1038,20 @@ create_irecache:
 		sire->ire_last_used_time = lbolt;
 	}
 
-	/* Obtain dst_ill */
-	dst_ill = ip_newroute_get_dst_ill(ire->ire_ipif->ipif_ill);
+	dst_ill = ire->ire_ipif->ipif_ill;
+	if (IS_IPMP(dst_ill))
+		dst_ill = ipmp_illgrp_hold_next_ill(dst_ill->ill_grp);
+	else
+		ill_refhold(dst_ill);
+
 	if (dst_ill == NULL) {
-		ip2dbg(("ire_forward no dst ill; ire 0x%p\n",
-		    (void *)ire));
+		ip2dbg(("ire_forward no dst ill; ire 0x%p\n", (void *)ire));
 		goto icmp_err_ret;
 	}
 
 	ASSERT(src_ipif == NULL);
 	/* Now obtain the src_ipif */
-	src_ipif = ire_forward_src_ipif(dst, sire, ire, dst_ill,
-	    zoneid, &ire_marks);
+	src_ipif = ire_forward_src_ipif(dst, sire, ire, zoneid, &ire_marks);
 	if (src_ipif == NULL)
 		goto icmp_err_ret;
 
@@ -1254,18 +1223,13 @@ ire_forward_simple(ipaddr_t dst, enum ire_forward_action *ret_action,
 	ire_t   *sire = NULL, *save_ire;
 	ill_t *dst_ill = NULL;
 	int error;
-	zoneid_t zoneid;
+	zoneid_t zoneid = GLOBAL_ZONEID;
 	ipif_t *src_ipif = NULL;
 	mblk_t *res_mp;
 	ushort_t ire_marks = 0;
 
-	zoneid = GLOBAL_ZONEID;
-
-
 	ire = ire_ftable_lookup_simple(dst, &sire, zoneid,
-	    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-	    MATCH_IRE_RJ_BHOLE, ipst);
-
+	    MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT | MATCH_IRE_RJ_BHOLE, ipst);
 	if (ire == NULL) {
 		ip_rts_change(RTM_MISS, dst, 0, 0, 0, 0, 0, 0, RTA_DST, ipst);
 		goto icmp_err_ret;
@@ -1288,9 +1252,7 @@ ire_forward_simple(ipaddr_t dst, enum ire_forward_action *ret_action,
 	 * nexthop router, just hand over the cache entry
 	 * and we are done.
 	 */
-
 	if (ire->ire_type & IRE_CACHE) {
-
 		/*
 		 * If we are using this ire cache entry as a
 		 * gateway to forward packets, chances are we
@@ -1334,18 +1296,21 @@ ire_forward_simple(ipaddr_t dst, enum ire_forward_action *ret_action,
 		UPDATE_OB_PKT_COUNT(sire);
 	}
 
-	/* Obtain dst_ill */
-	dst_ill = ip_newroute_get_dst_ill(ire->ire_ipif->ipif_ill);
+	dst_ill = ire->ire_ipif->ipif_ill;
+	if (IS_IPMP(dst_ill))
+		dst_ill = ipmp_illgrp_hold_next_ill(dst_ill->ill_grp);
+	else
+		ill_refhold(dst_ill);	/* for symmetry */
+
 	if (dst_ill == NULL) {
-		ip2dbg(("ire_forward no dst ill; ire 0x%p\n",
+		ip2dbg(("ire_forward_simple: no dst ill; ire 0x%p\n",
 		    (void *)ire));
 		goto icmp_err_ret;
 	}
 
 	ASSERT(src_ipif == NULL);
 	/* Now obtain the src_ipif */
-	src_ipif = ire_forward_src_ipif(dst, sire, ire, dst_ill,
-	    zoneid, &ire_marks);
+	src_ipif = ire_forward_src_ipif(dst, sire, ire, zoneid, &ire_marks);
 	if (src_ipif == NULL)
 		goto icmp_err_ret;
 
@@ -1720,33 +1685,24 @@ ipfil_sendpkt(const struct sockaddr *dst_addr, mblk_t *mp, uint_t ifindex,
 
 		match_flags = (MATCH_IRE_DSTONLY | MATCH_IRE_DEFAULT |
 		    MATCH_IRE_RECURSIVE| MATCH_IRE_RJ_BHOLE|
-		    MATCH_IRE_SECATTR);
+		    MATCH_IRE_SECATTR | MATCH_IRE_ILL);
 
 		/*
 		 * If supplied ifindex is non-null, the only valid
-		 * nexthop is one off of the interface or group corresponding
+		 * nexthop is one off of the interface corresponding
 		 * to the specified ifindex.
 		 */
 		ill = ill_lookup_on_ifindex(ifindex, B_FALSE,
 		    NULL, NULL, NULL, NULL, ipst);
 		if (ill != NULL) {
-			match_flags |= MATCH_IRE_ILL;
+			supplied_ipif = ipif_get_next_ipif(NULL, ill);
 		} else {
-			/* Fallback to group names if hook_emulation set */
-			if (ipst->ips_ipmp_hook_emulation) {
-				ill = ill_group_lookup_on_ifindex(ifindex,
-				    B_FALSE, ipst);
-			}
-			if (ill == NULL) {
-				ip1dbg(("ipfil_sendpkt: Could not find"
-				    " route to dst\n"));
-				value = ECOMM;
-				freemsg(mp);
-				goto discard;
-			}
-			match_flags |= MATCH_IRE_ILL_GROUP;
+			ip1dbg(("ipfil_sendpkt: Could not find"
+			    " route to dst\n"));
+			value = ECOMM;
+			freemsg(mp);
+			goto discard;
 		}
-		supplied_ipif = ipif_get_next_ipif(NULL, ill);
 
 		ire = ire_route_lookup(dst, 0, 0, 0, supplied_ipif,
 		    &sire, zoneid, MBLK_GETLABEL(mp), match_flags, ipst);
@@ -2325,9 +2281,9 @@ ire_round_robin(irb_t *irb_ptr, zoneid_t zoneid, ire_ftable_args_t *margs,
 		 * interested in routers that are
 		 * reachable through ipifs within our zone.
 		 */
-		if (ire->ire_ipif != NULL) {
-			match_flags |= MATCH_IRE_ILL_GROUP;
-		}
+		if (ire->ire_ipif != NULL)
+			match_flags |= MATCH_IRE_ILL;
+
 		rire = ire_route_lookup(ire->ire_gateway_addr, 0, 0,
 		    IRE_INTERFACE, ire->ire_ipif, NULL, zoneid, margs->ift_tsl,
 		    match_flags, ipst);

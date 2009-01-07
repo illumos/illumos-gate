@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -120,6 +117,9 @@ if_indextoname(uint32_t ifindex, char *ifname)
 	int		numifs;
 	size_t		bufsize;
 	boolean_t 	found;
+	uint_t		flags;
+
+	flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES | LIFC_UNDER_IPMP;
 
 	/* A interface index of 0 is invalid */
 	if (ifindex == 0) {
@@ -137,14 +137,19 @@ if_indextoname(uint32_t ifindex, char *ifname)
 
 	/* Prepare to send a SIOCGLIFNUM request message */
 	lifn.lifn_family = AF_UNSPEC;
-	lifn.lifn_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
+	lifn.lifn_flags = flags;
 	if (ioctl(s, SIOCGLIFNUM, (char *)&lifn) < 0) {
 		int save_err = errno;
 		(void) close(s);
 		errno = save_err;
 		return (NULL);
 	}
-	numifs = lifn.lifn_count;
+
+	/*
+	 * NOTE: "+ 10" sleaze mitigates new IP interfaces showing up between
+	 * the SIOCGLIFNUM and the SIOCGLIFCONF.
+	 */
+	numifs = lifn.lifn_count + 10;
 
 	/*
 	 * Provide enough buffer to obtain the interface
@@ -161,7 +166,7 @@ if_indextoname(uint32_t ifindex, char *ifname)
 		return (NULL);
 	}
 	lifc.lifc_family = AF_UNSPEC;
-	lifc.lifc_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
+	lifc.lifc_flags = flags;
 	lifc.lifc_len = bufsize;
 	lifc.lifc_buf = buf;
 	if (ioctl(s, SIOCGLIFCONF, (char *)&lifc) < 0) {

@@ -19,34 +19,23 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IB_MGT_IBCM_IBCM_ARP_H
 #define	_SYS_IB_MGT_IBCM_IBCM_ARP_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
 
 #include <sys/ib/mgt/ibcm/ibcm_impl.h>
 #include <sys/modhash.h>
 #include <sys/ib/clients/ibd/ibd.h>
 #include <sys/strsun.h>
-#include <sys/strsubr.h>
 #include <sys/socket.h>
 #include <sys/stat.h>	/* for S_IFCHR */
-#include <inet/common.h>
-#include <inet/ip.h>
-#include <inet/ip_if.h>
-#include <inet/ip_ire.h>
-#include <inet/ip_rts.h>
-#include <sys/dlpi.h>
-#include <net/route.h>
 
 /*
  * IPoIB addr lookup completion function
@@ -103,7 +92,6 @@ typedef struct ibcm_arp_streams_s {
 
 /* GID to IP-Addr and Ip-Addr to GID look-up functions. */
 
-#define	IBCM_ARP_IBD_NAME		"ibd"
 #define	IBCM_ARP_IBD_INSTANCES		4
 
 typedef struct ibcm_arp_ip_s {

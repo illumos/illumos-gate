@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -65,12 +65,13 @@ K5TELNETOBJS=	in.telnetd.o
 SRCS=		$(PROGSRCS) $(OTHERSRC)
 
 SUBDIRS=	bootconfchk htable ifconfig in.ftpd in.rdisc in.routed \
-		in.talkd inetadm inetconv ipqosconf kssl/kssladm kssl/ksslcfg \
-		ping routeadm snoop sppptun traceroute wificonfig ipsecutils
+		in.talkd inetadm inetconv ipmpstat ipqosconf ipsecutils \
+		kssl/kssladm kssl/ksslcfg ping routeadm snoop sppptun \
+		traceroute wificonfig
 
 MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd inetadm \
-		inetconv ipqosconf kssl/ksslcfg routeadm sppptun snoop \
-		wificonfig ipsecutils
+		inetconv ipmpstat ipqosconf ipsecutils kssl/ksslcfg routeadm \
+		sppptun snoop wificonfig
 
 # As programs get lint-clean, add them here and to the 'lint' target.
 # Eventually this hack should go away, and all in PROG should be
@@ -83,7 +84,8 @@ LINTCLEAN=	6to4relay arp in.rlogind in.rshd in.telnetd in.tftpd \
 # with SUBDIRS.  Also (sigh) deal with the commented-out build lines
 # for the lint rule.
 LINTSUBDIRS=	bootconfchk in.rdisc in.routed in.talkd inetadm inetconv \
-		ipqosconf ping routeadm sppptun traceroute wificonfig ipsecutils
+		ipmpstat ipqosconf ipsecutils ping routeadm sppptun traceroute \
+		wificonfig
 # And as programs are verified not to attempt to write into constants,
 # -xstrconst should be used to ensure they stay that way.
 CONSTCLEAN=
@@ -144,6 +146,8 @@ LDLIBS +=	$(K5LIBS)
 $(TSNETPROG)		:=	LDLIBS += -ltsnet
 
 in.rarpd		:=	LDLIBS += -linetutil -ldlpi
+if_mpadm		:=	LDLIBS += -linetutil -lipmp
+if_mpadm.po		:=	XGETFLAGS += -a
 route			:=	CPPFLAGS += -DNDEBUG
 ndd			:=	LDLIBS += -ldladm
 gettable in.comsat	:=	LDFLAGS += $(MAPFILE.NGB:%=-M%)
@@ -245,7 +249,7 @@ lint: $(LINTSUBDIRS)
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include \
 		-I$(SRC)/lib/pam_modules/krb5 \
 		in.telnetd.c $(LDLIBS) -lbsm -lpam -lsocket -lnsl
-	$(LINT.c) if_mpadm.c $(LDLIBS) -lsocket -lnsl -lipmp
+	$(LINT.c) if_mpadm.c $(LDLIBS) -lsocket -lnsl -lipmp -linetutil
 	$(LINT.c) ipaddrsel.c $(LDLIBS) -lsocket -lnsl
 	$(LINT.c) route.c $(LDLIBS) -lsocket -lnsl -ltsnet
 	$(LINT.c) syncinit.c $(LDLIBS) -ldlpi

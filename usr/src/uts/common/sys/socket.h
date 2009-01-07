@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -156,12 +156,10 @@ struct so_snd_bufinfo {
 
 /* "Socket"-level control message types: */
 #define	SCM_RIGHTS	0x1010		/* access rights (array of int) */
-
 #define	SO_SECATTR	0x1011		/* socket's security attributes */
 #define	SCM_UCRED	0x1012		/* sender's ucred */
 #define	SO_TIMESTAMP	0x1013		/* socket-level timestamp option */
 #define	SCM_TIMESTAMP	SO_TIMESTAMP	/* socket control message timestamp */
-
 #define	SO_ALLZONES	0x1014		/* bind in all zones */
 #define	SO_EXCLBIND	0x1015		/* exclusive binding */
 
@@ -203,9 +201,12 @@ struct	linger {
 };
 
 /*
- * Level number for (get/set)sockopt() to apply to socket itself.
+ * Levels for (get/set)sockopt() that don't apply to a specific protocol.
  */
 #define	SOL_SOCKET	0xffff		/* options for socket level */
+#if !defined(_XPG4_2) || defined(__EXTENSIONS__)
+#define	SOL_ROUTE	0xfffe		/* options for routing socket level */
+#endif
 
 /*
  * Address families.

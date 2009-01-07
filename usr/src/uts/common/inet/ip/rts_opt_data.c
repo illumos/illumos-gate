@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,7 @@ opdes_t	rts_opt_arr[] = {
 { SO_RCVBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 { SO_PROTOTYPE,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 { SO_DOMAIN,	SOL_SOCKET, OA_R, OA_R, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
+{ RT_AWARE,	SOL_ROUTE, OA_RW, OA_RW, OP_NP, 0, sizeof (int), 0 },
 };
 
 /*

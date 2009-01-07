@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,8 +83,9 @@ static	boolean_t nce_cmp_ll_addr(const nce_t *nce, const uchar_t *new_ll_addr,
 static	void	nce_ire_delete(nce_t *nce);
 static	void	nce_ire_delete1(ire_t *ire, char *nce_arg);
 static	void 	nce_set_ll(nce_t *nce, uchar_t *ll_addr);
-static	nce_t	*nce_lookup_addr(ill_t *, const in6_addr_t *, nce_t *);
-static	nce_t	*nce_lookup_mapping(ill_t *ill, const in6_addr_t *addr);
+static	nce_t	*nce_lookup_addr(ill_t *, boolean_t, const in6_addr_t *,
+    nce_t *);
+static	nce_t	*nce_lookup_mapping(ill_t *, const in6_addr_t *);
 static	void	nce_make_mapping(nce_t *nce, uchar_t *addrpos,
     uchar_t *addr);
 static	int	nce_set_multicast(ill_t *ill, const in6_addr_t *addr);
@@ -93,11 +94,16 @@ static	mblk_t	*nce_udreq_alloc(ill_t *ill);
 static	void	nce_update(nce_t *nce, uint16_t new_state,
     uchar_t *new_ll_addr);
 static	uint32_t	nce_solicit(nce_t *nce, mblk_t *mp);
-static	boolean_t	nce_xmit(ill_t *ill, uint32_t operation,
-    ill_t *hwaddr_ill, boolean_t use_lla_addr, const in6_addr_t *sender,
+static	boolean_t	nce_xmit(ill_t *ill, uint8_t type,
+    boolean_t use_lla_addr, const in6_addr_t *sender,
     const in6_addr_t *target, int flag);
+static boolean_t	nce_xmit_advert(nce_t *nce, boolean_t use_nd_lla,
+    const in6_addr_t *target, uint_t flags);
+static boolean_t	nce_xmit_solicit(nce_t *nce, boolean_t use_nd_lla,
+    const in6_addr_t *src, uint_t flags);
 static int	ndp_add_v4(ill_t *, const in_addr_t *, uint16_t,
     nce_t **, nce_t *);
+static ipif_t	*ip_ndp_lookup_addr_v6(const in6_addr_t *v6addrp, ill_t *ill);
 
 #ifdef DEBUG
 static void	nce_trace_cleanup(const nce_t *);
@@ -109,22 +115,6 @@ static void	nce_trace_cleanup(const nce_t *);
 #define	NCE_HASH_PTR_V6(ipst, addr)				 \
 	(&((ipst)->ips_ndp6->nce_hash_tbl[NCE_ADDR_HASH_V6(addr, \
 		NCE_TABLE_SIZE)]))
-
-/*
- * Compute default flags to use for an advertisement of this nce's address.
- */
-static int
-nce_advert_flags(const nce_t *nce)
-{
-	int flag = 0;
-
-	if (nce->nce_flags & NCE_F_ISROUTER)
-		flag |= NDP_ISROUTER;
-	if (!(nce->nce_flags & NCE_F_ANYCAST))
-		flag |= NDP_ORIDE;
-
-	return (flag);
-}
 
 /* Non-tunable probe interval, based on link capabilities */
 #define	ILL_PROBE_INTERVAL(ill)	((ill)->ill_note_link ? 150 : 1500)
@@ -262,8 +252,7 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		nce->nce_pcnt = ND_MAX_UNICAST_SOLICIT;
 		mutex_exit(&nce->nce_lock);
-		dropped = nce_xmit(ill, ND_NEIGHBOR_SOLICIT, NULL, B_FALSE,
-		    &ipv6_all_zeros, addr, NDP_PROBE);
+		dropped = nce_xmit_solicit(nce, B_FALSE, NULL, NDP_PROBE);
 		if (dropped) {
 			mutex_enter(&nce->nce_lock);
 			nce->nce_pcnt++;
@@ -282,23 +271,20 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		nce->nce_unsolicit_count = ipst->ips_ip_ndp_unsolicit_count - 1;
 		mutex_exit(&nce->nce_lock);
-		dropped = nce_xmit(ill,
-		    ND_NEIGHBOR_ADVERT,
-		    ill,	/* ill to be used for extracting ill_nd_lla */
-		    B_TRUE,	/* use ill_nd_lla */
-		    addr,	/* Source and target of the advertisement pkt */
-		    &ipv6_all_hosts_mcast, /* Destination of the packet */
-		    nce_advert_flags(nce));
+		dropped = nce_xmit_advert(nce, B_TRUE, &ipv6_all_hosts_mcast,
+		    0);
 		mutex_enter(&nce->nce_lock);
 		if (dropped)
 			nce->nce_unsolicit_count++;
 		if (nce->nce_unsolicit_count != 0) {
+			ASSERT(nce->nce_timeout_id == 0);
 			nce->nce_timeout_id = timeout(ndp_timer, nce,
 			    MSEC_TO_TICK(ipst->ips_ip_ndp_unsolicit_interval));
 		}
 		mutex_exit(&nce->nce_lock);
 		mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
 	}
+
 	/*
 	 * If the hw_addr is NULL, typically for ND_INCOMPLETE nces, then
 	 * we call nce_fastpath as soon as the nce is resolved in ndp_process.
@@ -311,10 +297,10 @@ ndp_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 }
 
 int
-ndp_lookup_then_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
-    const in6_addr_t *mask, const in6_addr_t *extract_mask,
-    uint32_t hw_extract_start, uint16_t flags, uint16_t state,
-    nce_t **newnce)
+ndp_lookup_then_add_v6(ill_t *ill, boolean_t match_illgrp, uchar_t *hw_addr,
+    const in6_addr_t *addr, const in6_addr_t *mask,
+    const in6_addr_t *extract_mask, uint32_t hw_extract_start, uint16_t flags,
+    uint16_t state, nce_t **newnce)
 {
 	int	err = 0;
 	nce_t	*nce;
@@ -325,7 +311,7 @@ ndp_lookup_then_add_v6(ill_t *ill, uchar_t *hw_addr, const in6_addr_t *addr,
 
 	/* Get head of v6 hash table */
 	nce = *((nce_t **)NCE_HASH_PTR_V6(ipst, *addr));
-	nce = nce_lookup_addr(ill, addr, nce);
+	nce = nce_lookup_addr(ill, match_illgrp, addr, nce);
 	if (nce == NULL) {
 		err = ndp_add_v6(ill,
 		    hw_addr,
@@ -562,13 +548,11 @@ nce_ire_delete_list(nce_t *nce)
 
 		if (nce->nce_ipversion == IPV4_VERSION) {
 			ire_walk_ill_v4(MATCH_IRE_ILL | MATCH_IRE_TYPE,
-			    IRE_CACHE, nce_ire_delete1,
-			    (char *)nce, nce->nce_ill);
+			    IRE_CACHE, nce_ire_delete1, nce, nce->nce_ill);
 		} else {
 			ASSERT(nce->nce_ipversion == IPV6_VERSION);
 			ire_walk_ill_v6(MATCH_IRE_ILL | MATCH_IRE_TYPE,
-			    IRE_CACHE, nce_ire_delete1,
-			    (char *)nce, nce->nce_ill);
+			    IRE_CACHE, nce_ire_delete1, nce, nce->nce_ill);
 		}
 		NCE_REFRELE_NOTR(nce);
 		nce = nce_next;
@@ -628,8 +612,7 @@ ndp_restart_dad(nce_t *nce)
 		nce->nce_state = ND_PROBE;
 		nce->nce_pcnt = ND_MAX_UNICAST_SOLICIT - 1;
 		mutex_exit(&nce->nce_lock);
-		dropped = nce_xmit(nce->nce_ill, ND_NEIGHBOR_SOLICIT, NULL,
-		    B_FALSE, &ipv6_all_zeros, &nce->nce_addr, NDP_PROBE);
+		dropped = nce_xmit_solicit(nce, B_FALSE, NULL, NDP_PROBE);
 		if (dropped) {
 			mutex_enter(&nce->nce_lock);
 			nce->nce_pcnt++;
@@ -649,22 +632,19 @@ ndp_restart_dad(nce_t *nce)
  * If one is found, the refcnt on the nce will be incremented.
  */
 nce_t *
-ndp_lookup_v6(ill_t *ill, const in6_addr_t *addr, boolean_t caller_holds_lock)
+ndp_lookup_v6(ill_t *ill, boolean_t match_illgrp, const in6_addr_t *addr,
+    boolean_t caller_holds_lock)
 {
 	nce_t	*nce;
-	ip_stack_t	*ipst;
+	ip_stack_t *ipst = ill->ill_ipst;
 
-	ASSERT(ill != NULL);
-	ipst = ill->ill_ipst;
-
-	ASSERT(ill != NULL && ill->ill_isv6);
-	if (!caller_holds_lock) {
+	ASSERT(ill->ill_isv6);
+	if (!caller_holds_lock)
 		mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
-	}
 
 	/* Get head of v6 hash table */
 	nce = *((nce_t **)NCE_HASH_PTR_V6(ipst, *addr));
-	nce = nce_lookup_addr(ill, addr, nce);
+	nce = nce_lookup_addr(ill, match_illgrp, addr, nce);
 	if (nce == NULL)
 		nce = nce_lookup_mapping(ill, addr);
 	if (!caller_holds_lock)
@@ -685,14 +665,17 @@ ndp_lookup_v4(ill_t *ill, const in_addr_t *addr, boolean_t caller_holds_lock)
 	in6_addr_t addr6;
 	ip_stack_t *ipst = ill->ill_ipst;
 
-	if (!caller_holds_lock) {
+	if (!caller_holds_lock)
 		mutex_enter(&ipst->ips_ndp4->ndp_g_lock);
-	}
 
 	/* Get head of v4 hash table */
 	nce = *((nce_t **)NCE_HASH_PTR_V4(ipst, *addr));
 	IN6_IPADDR_TO_V4MAPPED(*addr, &addr6);
-	nce = nce_lookup_addr(ill, &addr6, nce);
+	/*
+	 * NOTE: IPv4 never matches across the illgrp since the NCE's we're
+	 * looking up have fastpath headers that are inherently per-ill.
+	 */
+	nce = nce_lookup_addr(ill, B_FALSE, &addr6, nce);
 	if (!caller_holds_lock)
 		mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 	return (nce);
@@ -706,7 +689,8 @@ ndp_lookup_v4(ill_t *ill, const in_addr_t *addr, boolean_t caller_holds_lock)
  * lock (ndp_g_lock).
  */
 static nce_t *
-nce_lookup_addr(ill_t *ill, const in6_addr_t *addr, nce_t *nce)
+nce_lookup_addr(ill_t *ill, boolean_t match_illgrp, const in6_addr_t *addr,
+    nce_t *nce)
 {
 	ndp_g_t		*ndp;
 	ip_stack_t	*ipst = ill->ill_ipst;
@@ -716,12 +700,12 @@ nce_lookup_addr(ill_t *ill, const in6_addr_t *addr, nce_t *nce)
 	else
 		ndp = ipst->ips_ndp4;
 
-	ASSERT(ill != NULL);
 	ASSERT(MUTEX_HELD(&ndp->ndp_g_lock));
 	if (IN6_IS_ADDR_UNSPECIFIED(addr))
 		return (NULL);
 	for (; nce != NULL; nce = nce->nce_next) {
-		if (nce->nce_ill == ill) {
+		if (nce->nce_ill == ill ||
+		    match_illgrp && IS_IN_SAME_ILLGRP(ill, nce->nce_ill)) {
 			if (IN6_ARE_ADDR_EQUAL(&nce->nce_addr, addr) &&
 			    IN6_ARE_ADDR_EQUAL(&nce->nce_mask,
 			    &ipv6_all_ones)) {
@@ -771,8 +755,8 @@ nce_lookup_mapping(ill_t *ill, const in6_addr_t *addr)
  * Process passed in parameters either from an incoming packet or via
  * user ioctl.
  */
-void
-ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
+static void
+nce_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 {
 	ill_t	*ill = nce->nce_ill;
 	uint32_t hw_addr_len = ill->ill_nd_lla_len;
@@ -852,7 +836,7 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 				} else {
 					/*
 					 * Send locally originated packets back
-					 * into * ip_wput_v6.
+					 * into ip_wput_v6.
 					 */
 					put(ill->ill_wq, mp);
 				}
@@ -918,6 +902,65 @@ ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
 }
 
 /*
+ * Walker state structure used by ndp_process() / ndp_process_entry().
+ */
+typedef struct ndp_process_data {
+	ill_t		*np_ill; 	/* ill/illgrp to match against */
+	const in6_addr_t *np_addr; 	/* IPv6 address to match */
+	uchar_t		*np_hw_addr; 	/* passed to nce_process() */
+	uint32_t	np_flag;	/* passed to nce_process() */
+	boolean_t	np_is_adv;	/* passed to nce_process() */
+} ndp_process_data_t;
+
+/*
+ * Walker callback used by ndp_process() for IPMP groups: calls nce_process()
+ * for each NCE with a matching address that's in the same IPMP group.
+ */
+static void
+ndp_process_entry(nce_t *nce, void *arg)
+{
+	ndp_process_data_t *npp = arg;
+
+	if (IS_IN_SAME_ILLGRP(nce->nce_ill, npp->np_ill) &&
+	    IN6_ARE_ADDR_EQUAL(&nce->nce_addr, npp->np_addr) &&
+	    IN6_ARE_ADDR_EQUAL(&nce->nce_mask, &ipv6_all_ones)) {
+		nce_process(nce, npp->np_hw_addr, npp->np_flag, npp->np_is_adv);
+	}
+}
+
+/*
+ * Wrapper around nce_process() that handles IPMP.  In particular, for IPMP,
+ * NCEs are per-underlying-ill (because of nce_fp_mp) and thus we may have
+ * more than one NCE for a given IPv6 address to tend to.  In that case, we
+ * need to walk all NCEs and callback nce_process() for each one.  Since this
+ * is expensive, in the non-IPMP case we just directly call nce_process().
+ * Ultimately, nce_fp_mp needs to be moved out of the nce_t so that all IP
+ * interfaces in an IPMP group share the same NCEs -- at which point this
+ * function can be removed entirely.
+ */
+void
+ndp_process(nce_t *nce, uchar_t *hw_addr, uint32_t flag, boolean_t is_adv)
+{
+	ill_t *ill = nce->nce_ill;
+	struct ndp_g_s *ndp = ill->ill_ipst->ips_ndp6;
+	ndp_process_data_t np;
+
+	if (ill->ill_grp == NULL) {
+		nce_process(nce, hw_addr, flag, is_adv);
+		return;
+	}
+
+	/* IPMP case: walk all NCEs */
+	np.np_ill = ill;
+	np.np_addr = &nce->nce_addr;
+	np.np_flag = flag;
+	np.np_is_adv = is_adv;
+	np.np_hw_addr = hw_addr;
+
+	ndp_walk_common(ndp, NULL, (pfi_t)ndp_process_entry, &np, ALL_ZONES);
+}
+
+/*
  * Pass arg1 to the pfi supplied, along with each nce in existence.
  * ndp_walk() places a REFHOLD on the nce and drops the lock when
  * walking the hash list.
@@ -926,7 +969,6 @@ void
 ndp_walk_common(ndp_g_t *ndp, ill_t *ill, pfi_t pfi, void *arg1,
     boolean_t trace)
 {
-
 	nce_t	*nce;
 	nce_t	*nce1;
 	nce_t	**ncep;
@@ -1021,26 +1063,57 @@ ndp_walk(ill_t *ill, pfi_t pfi, void *arg1, ip_stack_t *ipst)
 int
 ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 {
-	nce_t		*nce;
-	int		err = 0;
+	nce_t		*nce, *hw_nce = NULL;
+	int		err;
+	ill_t		*ipmp_ill;
+	uint16_t	nce_flags;
 	uint32_t	ms;
 	mblk_t		*mp_nce = NULL;
 	ip_stack_t	*ipst = ill->ill_ipst;
+	uchar_t		*hwaddr = NULL;
 
 	ASSERT(ill->ill_isv6);
-	if (IN6_IS_ADDR_MULTICAST(dst)) {
-		err = nce_set_multicast(ill, dst);
-		return (err);
+
+	if (IN6_IS_ADDR_MULTICAST(dst))
+		return (nce_set_multicast(ill, dst));
+
+	nce_flags = (ill->ill_flags & ILLF_NONUD) ? NCE_F_NONUD : 0;
+
+	/*
+	 * If `ill' is under IPMP, then first check to see if there's an NCE
+	 * for `dst' on the IPMP meta-interface (e.g., because an application
+	 * explicitly did an SIOCLIFSETND to tie a hardware address to `dst').
+	 * If so, we use that hardware address when creating the NCE below.
+	 * Note that we don't yet have a mechanism to remove these NCEs if the
+	 * NCE for `dst' on the IPMP meta-interface is subsequently removed --
+	 * but rather than build such a beast, we should fix NCEs so that they
+	 * can be properly shared across an IPMP group.
+	 */
+	if (IS_UNDER_IPMP(ill)) {
+		if ((ipmp_ill = ipmp_ill_hold_ipmp_ill(ill)) != NULL) {
+			hw_nce = ndp_lookup_v6(ipmp_ill, B_FALSE, dst, B_FALSE);
+			if (hw_nce != NULL && hw_nce->nce_res_mp != NULL) {
+				hwaddr = hw_nce->nce_res_mp->b_rptr +
+				    NCE_LL_ADDR_OFFSET(ipmp_ill);
+				nce_flags |= hw_nce->nce_flags;
+			}
+			ill_refrele(ipmp_ill);
+		}
 	}
+
 	err = ndp_lookup_then_add_v6(ill,
-	    NULL,	/* No hardware address */
+	    B_FALSE,	/* NCE fastpath is per ill; don't match across group */
+	    hwaddr,
 	    dst,
 	    &ipv6_all_ones,
 	    &ipv6_all_zeros,
 	    0,
-	    (ill->ill_flags & ILLF_NONUD) ? NCE_F_NONUD : 0,
-	    ND_INCOMPLETE,
+	    nce_flags,
+	    hwaddr != NULL ? ND_REACHABLE : ND_INCOMPLETE,
 	    &nce);
+
+	if (hw_nce != NULL)
+		NCE_REFRELE(hw_nce);
 
 	switch (err) {
 	case 0:
@@ -1057,11 +1130,10 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 			NCE_REFRELE(nce);
 			return (0);
 		}
-		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+
 		mutex_enter(&nce->nce_lock);
 		if (nce->nce_state != ND_INCOMPLETE) {
 			mutex_exit(&nce->nce_lock);
-			rw_exit(&ipst->ips_ill_g_lock);
 			NCE_REFRELE(nce);
 			return (0);
 		}
@@ -1069,14 +1141,11 @@ ndp_resolver(ill_t *ill, const in6_addr_t *dst, mblk_t *mp, zoneid_t zoneid)
 		if (mp_nce == NULL) {
 			/* The caller will free mp */
 			mutex_exit(&nce->nce_lock);
-			rw_exit(&ipst->ips_ill_g_lock);
 			ndp_delete(nce);
 			NCE_REFRELE(nce);
 			return (ENOMEM);
 		}
-		ms = nce_solicit(nce, mp_nce);
-		rw_exit(&ipst->ips_ill_g_lock);
-		if (ms == 0) {
+		if ((ms = nce_solicit(nce, mp_nce)) == 0) {
 			/* The caller will free mp */
 			if (mp_nce != mp)
 				freeb(mp_nce);
@@ -1143,6 +1212,7 @@ ndp_noresolver(ill_t *ill, const in6_addr_t *dst)
 	}
 
 	err = ndp_lookup_then_add_v6(ill,
+	    B_FALSE,	/* NCE fastpath is per ill; don't match across group */
 	    NULL,	/* hardware address */
 	    dst,
 	    &ipv6_all_ones,
@@ -1191,7 +1261,7 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 
 	mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
 	nce = *((nce_t **)NCE_HASH_PTR_V6(ipst, *dst));
-	nce = nce_lookup_addr(ill, dst, nce);
+	nce = nce_lookup_addr(ill, B_FALSE, dst, nce);
 	if (nce != NULL) {
 		mutex_exit(&ipst->ips_ndp6->ndp_g_lock);
 		NCE_REFRELE(nce);
@@ -1259,7 +1329,13 @@ ndp_query(ill_t *ill, struct lif_nd_req *lnr)
 	sin6 = (sin6_t *)&lnr->lnr_addr;
 	addr =  &sin6->sin6_addr;
 
-	nce = ndp_lookup_v6(ill, addr, B_FALSE);
+	/*
+	 * NOTE: if the ill is an IPMP interface, then match against the whole
+	 * illgrp.  This e.g. allows in.ndpd to retrieve the link layer
+	 * addresses for the data addresses on an IPMP interface even though
+	 * ipif_ndp_up() created them with an nce_ill of ipif_bound_ill.
+	 */
+	nce = ndp_lookup_v6(ill, IS_IPMP(ill), addr, B_FALSE);
 	if (nce == NULL)
 		return (ESRCH);
 	/* If in INCOMPLETE state, no link layer address is available yet */
@@ -1347,24 +1423,14 @@ ndp_mcastreq(ill_t *ill, const in6_addr_t *addr, uint32_t hw_addr_len,
 uint32_t
 nce_solicit(nce_t *nce, mblk_t *mp)
 {
-	ill_t		*ill;
-	ill_t		*src_ill;
 	ip6_t		*ip6h;
-	in6_addr_t	src;
-	in6_addr_t	dst;
-	ipif_t		*ipif;
-	ip6i_t		*ip6i;
-	boolean_t	dropped = B_FALSE;
-	ip_stack_t	*ipst = nce->nce_ill->ill_ipst;
+	in6_addr_t	sender;
+	boolean_t	dropped;
 
-	ASSERT(RW_READ_HELD(&ipst->ips_ill_g_lock));
 	ASSERT(MUTEX_HELD(&nce->nce_lock));
-	ill = nce->nce_ill;
-	ASSERT(ill != NULL);
 
-	if (nce->nce_rcnt == 0) {
+	if (nce->nce_rcnt == 0)
 		return (0);
-	}
 
 	if (mp == NULL) {
 		ASSERT(nce->nce_qd_mp != NULL);
@@ -1385,60 +1451,22 @@ nce_solicit(nce_t *nce, mblk_t *mp)
 		 * could be from the nce_qd_mp which could have b_next/b_prev
 		 * non-NULL.
 		 */
-		ip6i = (ip6i_t *)ip6h;
-		ASSERT((mp->b_wptr - (uchar_t *)ip6i) >=
-		    sizeof (ip6i_t) + IPV6_HDR_LEN);
+		ASSERT(MBLKL(mp) >= sizeof (ip6i_t) + IPV6_HDR_LEN);
 		ip6h = (ip6_t *)(mp->b_rptr + sizeof (ip6i_t));
 	}
-	src = ip6h->ip6_src;
+
 	/*
-	 * If the src of outgoing packet is one of the assigned interface
-	 * addresses use it, otherwise we will pick the source address below.
+	 * Need to copy the sender address into a local since `mp' can
+	 * go away once we drop nce_lock.
 	 */
-	src_ill = ill;
-	if (!IN6_IS_ADDR_UNSPECIFIED(&src)) {
-		if (ill->ill_group != NULL)
-			src_ill = ill->ill_group->illgrp_ill;
-		for (; src_ill != NULL; src_ill = src_ill->ill_group_next) {
-			for (ipif = src_ill->ill_ipif; ipif != NULL;
-			    ipif = ipif->ipif_next) {
-				if (IN6_ARE_ADDR_EQUAL(&src,
-				    &ipif->ipif_v6lcl_addr)) {
-					break;
-				}
-			}
-			if (ipif != NULL)
-				break;
-		}
-		/*
-		 * If no relevant ipif can be found, then it's not one of our
-		 * addresses.  Reset to :: and let nce_xmit.  If an ipif can be
-		 * found, but it's not yet done with DAD verification, then
-		 * just postpone this transmission until later.
-		 */
-		if (src_ill == NULL)
-			src = ipv6_all_zeros;
-		else if (!ipif->ipif_addr_ready)
-			return (ill->ill_reachable_retrans_time);
-	}
-	dst = nce->nce_addr;
-	/*
-	 * If source address is unspecified, nce_xmit will choose
-	 * one for us and initialize the hardware address also
-	 * appropriately.
-	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(&src))
-		src_ill = NULL;
+	sender = ip6h->ip6_src;
 	nce->nce_rcnt--;
 	mutex_exit(&nce->nce_lock);
-	rw_exit(&ipst->ips_ill_g_lock);
-	dropped = nce_xmit(ill, ND_NEIGHBOR_SOLICIT, src_ill, B_TRUE, &src,
-	    &dst, 0);
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+	dropped = nce_xmit_solicit(nce, B_TRUE, &sender, 0);
 	mutex_enter(&nce->nce_lock);
 	if (dropped)
 		nce->nce_rcnt++;
-	return (ill->ill_reachable_retrans_time);
+	return (nce->nce_ill->ill_reachable_retrans_time);
 }
 
 /*
@@ -1475,7 +1503,7 @@ ip_ndp_recover(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		 */
 		mutex_enter(&ill->ill_lock);
 		if (!(ipif->ipif_flags & IPIF_DUPLICATE) ||
-		    (ipif->ipif_flags & (IPIF_MOVING | IPIF_CONDEMNED))) {
+		    (ipif->ipif_state_flags & IPIF_CONDEMNED)) {
 			mutex_exit(&ill->ill_lock);
 			continue;
 		}
@@ -1485,8 +1513,8 @@ ip_ndp_recover(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 		mutex_exit(&ill->ill_lock);
 		ipif->ipif_was_dup = B_TRUE;
 
-		if (ipif_ndp_up(ipif) != EINPROGRESS)
-			(void) ipif_up_done_v6(ipif);
+		VERIFY(ipif_ndp_up(ipif, B_TRUE) != EINPROGRESS);
+		(void) ipif_up_done_v6(ipif);
 	}
 	freeb(mp);
 }
@@ -1515,7 +1543,7 @@ ipif6_dup_recovery(void *arg)
 	/*
 	 * No lock, because this is just an optimization.
 	 */
-	if (ipif->ipif_state_flags & (IPIF_MOVING | IPIF_CONDEMNED))
+	if (ipif->ipif_state_flags & IPIF_CONDEMNED)
 		return;
 
 	/* If the link is down, we'll retry this later */
@@ -1542,13 +1570,20 @@ ndp_do_recovery(ipif_t *ipif)
 	if (mp == NULL) {
 		mutex_enter(&ill->ill_lock);
 		if (ipif->ipif_recovery_id == 0 &&
-		    !(ipif->ipif_state_flags & (IPIF_MOVING |
-		    IPIF_CONDEMNED))) {
+		    !(ipif->ipif_state_flags & IPIF_CONDEMNED)) {
 			ipif->ipif_recovery_id = timeout(ipif6_dup_recovery,
 			    ipif, MSEC_TO_TICK(ipst->ips_ip_dup_recovery));
 		}
 		mutex_exit(&ill->ill_lock);
 	} else {
+		/*
+		 * A recovery timer may still be running if we got here from
+		 * ill_restart_dad(); cancel that timer.
+		 */
+		if (ipif->ipif_recovery_id != 0)
+			(void) untimeout(ipif->ipif_recovery_id);
+		ipif->ipif_recovery_id = 0;
+
 		bcopy(&ipif->ipif_v6lcl_addr, mp->b_rptr,
 		    sizeof (ipif->ipif_v6lcl_addr));
 		ill_refhold(ill);
@@ -1558,41 +1593,51 @@ ndp_do_recovery(ipif_t *ipif)
 }
 
 /*
- * Find the solicitation in the given message, and extract printable details
- * (MAC and IP addresses) from it.
+ * Find the MAC and IP addresses in an NA/NS message.
  */
-static nd_neighbor_solicit_t *
-ip_ndp_find_solicitation(mblk_t *mp, mblk_t *dl_mp, ill_t *ill, char *hbuf,
-    size_t hlen, char *sbuf, size_t slen, uchar_t **haddr)
+static void
+ip_ndp_find_addresses(mblk_t *mp, mblk_t *dl_mp, ill_t *ill, in6_addr_t *targp,
+    uchar_t **haddr, uint_t *haddrlenp)
 {
-	nd_neighbor_solicit_t *ns;
-	ip6_t *ip6h;
+	ip6_t *ip6h = (ip6_t *)mp->b_rptr;
+	icmp6_t *icmp6 = (icmp6_t *)(mp->b_rptr + IPV6_HDR_LEN);
+	nd_neighbor_advert_t *na = (nd_neighbor_advert_t *)icmp6;
+	nd_neighbor_solicit_t *ns = (nd_neighbor_solicit_t *)icmp6;
 	uchar_t *addr;
-	int alen;
+	int alen = 0;
 
-	alen = 0;
-	ip6h = (ip6_t *)mp->b_rptr;
 	if (dl_mp == NULL) {
 		nd_opt_hdr_t *opt;
-		int nslen;
+		int len;
 
 		/*
 		 * If it's from the fast-path, then it can't be a probe
-		 * message, and thus must include the source linkaddr option.
+		 * message, and thus must include a linkaddr option.
 		 * Extract that here.
 		 */
-		ns = (nd_neighbor_solicit_t *)((char *)ip6h + IPV6_HDR_LEN);
-		nslen = mp->b_wptr - (uchar_t *)ns;
-		if ((nslen -= sizeof (*ns)) > 0) {
-			opt = ndp_get_option((nd_opt_hdr_t *)(ns + 1), nslen,
-			    ND_OPT_SOURCE_LINKADDR);
-			if (opt != NULL &&
-			    opt->nd_opt_len * 8 - sizeof (*opt) >=
-			    ill->ill_nd_lla_len) {
-				addr = (uchar_t *)(opt + 1);
-				alen = ill->ill_nd_lla_len;
+		switch (icmp6->icmp6_type) {
+		case ND_NEIGHBOR_SOLICIT:
+			len = mp->b_wptr - (uchar_t *)ns;
+			if ((len -= sizeof (*ns)) > 0) {
+				opt = ndp_get_option((nd_opt_hdr_t *)(ns + 1),
+				    len, ND_OPT_SOURCE_LINKADDR);
 			}
+			break;
+		case ND_NEIGHBOR_ADVERT:
+			len = mp->b_wptr - (uchar_t *)na;
+			if ((len -= sizeof (*na)) > 0) {
+				opt = ndp_get_option((nd_opt_hdr_t *)(na + 1),
+				    len, ND_OPT_TARGET_LINKADDR);
+			}
+			break;
 		}
+
+		if (opt != NULL && opt->nd_opt_len * 8 - sizeof (*opt) >=
+		    ill->ill_nd_lla_len) {
+			addr = (uchar_t *)(opt + 1);
+			alen = ill->ill_nd_lla_len;
+		}
+
 		/*
 		 * We cheat a bit here for the sake of printing usable log
 		 * messages in the rare case where the reply we got was unicast
@@ -1624,16 +1669,17 @@ ip_ndp_find_solicitation(mblk_t *mp, mblk_t *dl_mp, ill_t *ill, char *hbuf,
 			}
 		}
 	}
+
 	if (alen > 0) {
 		*haddr = addr;
-		(void) mac_colon_addr(addr, alen, hbuf, hlen);
+		*haddrlenp = alen;
 	} else {
 		*haddr = NULL;
-		(void) strcpy(hbuf, "?");
+		*haddrlenp = 0;
 	}
-	ns = (nd_neighbor_solicit_t *)((char *)ip6h + IPV6_HDR_LEN);
-	(void) inet_ntop(AF_INET6, &ns->nd_ns_target, sbuf, slen);
-	return (ns);
+
+	/* nd_ns_target and nd_na_target are at the same offset, so we cheat */
+	*targp = ns->nd_ns_target;
 }
 
 /*
@@ -1646,68 +1692,80 @@ ip_ndp_excl(ipsq_t *ipsq, queue_t *rq, mblk_t *mp, void *dummy_arg)
 {
 	ill_t	*ill = rq->q_ptr;
 	ipif_t	*ipif;
-	char ibuf[LIFNAMSIZ + 10];	/* 10 digits for logical i/f number */
-	char hbuf[MAC_STR_LEN];
-	char sbuf[INET6_ADDRSTRLEN];
-	nd_neighbor_solicit_t *ns;
-	mblk_t *dl_mp = NULL;
-	uchar_t *haddr;
+	mblk_t	*dl_mp = NULL;
+	uchar_t	*haddr;
+	uint_t	haddrlen;
 	ip_stack_t *ipst = ill->ill_ipst;
+	in6_addr_t targ;
 
 	if (DB_TYPE(mp) != M_DATA) {
 		dl_mp = mp;
 		mp = mp->b_cont;
 	}
-	ns = ip_ndp_find_solicitation(mp, dl_mp, ill, hbuf, sizeof (hbuf), sbuf,
-	    sizeof (sbuf), &haddr);
-	if (haddr != NULL &&
-	    bcmp(haddr, ill->ill_phys_addr, ill->ill_phys_addr_length) == 0) {
+
+	ip_ndp_find_addresses(mp, dl_mp, ill, &targ, &haddr, &haddrlen);
+	if (haddr != NULL && haddrlen == ill->ill_phys_addr_length) {
 		/*
-		 * Ignore conflicts generated by misbehaving switches that just
-		 * reflect our own messages back to us.
+		 * Ignore conflicts generated by misbehaving switches that
+		 * just reflect our own messages back to us.  For IPMP, we may
+		 * see reflections across any ill in the illgrp.
 		 */
+		if (bcmp(haddr, ill->ill_phys_addr, haddrlen) == 0 ||
+		    IS_UNDER_IPMP(ill) &&
+		    ipmp_illgrp_find_ill(ill->ill_grp, haddr, haddrlen) != NULL)
+			goto ignore_conflict;
+	}
+
+	/*
+	 * Look up the appropriate ipif.
+	 */
+	ipif = ipif_lookup_addr_v6(&targ, ill, ALL_ZONES, NULL, NULL, NULL,
+	    NULL, ipst);
+	if (ipif == NULL)
+		goto ignore_conflict;
+
+	/* Reload the ill to match the ipif */
+	ill = ipif->ipif_ill;
+
+	/* If it's already duplicate or ineligible, then don't do anything. */
+	if (ipif->ipif_flags & (IPIF_POINTOPOINT|IPIF_DUPLICATE)) {
+		ipif_refrele(ipif);
 		goto ignore_conflict;
 	}
 
-	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
+	/*
+	 * If this is a failure during duplicate recovery, then don't
+	 * complain.  It may take a long time to recover.
+	 */
+	if (!ipif->ipif_was_dup) {
+		char ibuf[LIFNAMSIZ];
+		char hbuf[MAC_STR_LEN];
+		char sbuf[INET6_ADDRSTRLEN];
 
-		if ((ipif->ipif_flags & IPIF_POINTOPOINT) ||
-		    !IN6_ARE_ADDR_EQUAL(&ipif->ipif_v6lcl_addr,
-		    &ns->nd_ns_target)) {
-			continue;
-		}
-
-		/* If it's already marked, then don't do anything. */
-		if (ipif->ipif_flags & IPIF_DUPLICATE)
-			continue;
-
-		/*
-		 * If this is a failure during duplicate recovery, then don't
-		 * complain.  It may take a long time to recover.
-		 */
-		if (!ipif->ipif_was_dup) {
-			ipif_get_name(ipif, ibuf, sizeof (ibuf));
-			cmn_err(CE_WARN, "%s has duplicate address %s (in "
-			    "use by %s); disabled", ibuf, sbuf, hbuf);
-		}
-		mutex_enter(&ill->ill_lock);
-		ASSERT(!(ipif->ipif_flags & IPIF_DUPLICATE));
-		ipif->ipif_flags |= IPIF_DUPLICATE;
-		ill->ill_ipif_dup_count++;
-		mutex_exit(&ill->ill_lock);
-		(void) ipif_down(ipif, NULL, NULL);
-		ipif_down_tail(ipif);
-		mutex_enter(&ill->ill_lock);
-		if (!(ipif->ipif_flags & (IPIF_DHCPRUNNING|IPIF_TEMPORARY)) &&
-		    ill->ill_net_type == IRE_IF_RESOLVER &&
-		    !(ipif->ipif_state_flags & (IPIF_MOVING |
-		    IPIF_CONDEMNED)) &&
-		    ipst->ips_ip_dup_recovery > 0) {
-			ipif->ipif_recovery_id = timeout(ipif6_dup_recovery,
-			    ipif, MSEC_TO_TICK(ipst->ips_ip_dup_recovery));
-		}
-		mutex_exit(&ill->ill_lock);
+		ipif_get_name(ipif, ibuf, sizeof (ibuf));
+		cmn_err(CE_WARN, "%s has duplicate address %s (in use by %s);"
+		    " disabled", ibuf,
+		    inet_ntop(AF_INET6, &targ, sbuf, sizeof (sbuf)),
+		    mac_colon_addr(haddr, haddrlen, hbuf, sizeof (hbuf)));
 	}
+	mutex_enter(&ill->ill_lock);
+	ASSERT(!(ipif->ipif_flags & IPIF_DUPLICATE));
+	ipif->ipif_flags |= IPIF_DUPLICATE;
+	ill->ill_ipif_dup_count++;
+	mutex_exit(&ill->ill_lock);
+	(void) ipif_down(ipif, NULL, NULL);
+	ipif_down_tail(ipif);
+	mutex_enter(&ill->ill_lock);
+	if (!(ipif->ipif_flags & (IPIF_DHCPRUNNING|IPIF_TEMPORARY)) &&
+	    ill->ill_net_type == IRE_IF_RESOLVER &&
+	    !(ipif->ipif_state_flags & IPIF_CONDEMNED) &&
+	    ipst->ips_ip_dup_recovery > 0) {
+		ASSERT(ipif->ipif_recovery_id == 0);
+		ipif->ipif_recovery_id = timeout(ipif6_dup_recovery,
+		    ipif, MSEC_TO_TICK(ipst->ips_ip_dup_recovery));
+	}
+	mutex_exit(&ill->ill_lock);
+	ipif_refrele(ipif);
 ignore_conflict:
 	if (dl_mp != NULL)
 		freeb(dl_mp);
@@ -1721,7 +1779,7 @@ ignore_conflict:
  * we start a timer on the ipif.
  */
 static void
-ip_ndp_failure(ill_t *ill, mblk_t *mp, mblk_t *dl_mp, nce_t *nce)
+ip_ndp_failure(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 {
 	if ((mp = copymsg(mp)) != NULL) {
 		if (dl_mp == NULL)
@@ -1736,7 +1794,6 @@ ip_ndp_failure(ill_t *ill, mblk_t *mp, mblk_t *dl_mp, nce_t *nce)
 			    B_FALSE);
 		}
 	}
-	ndp_delete(nce);
 }
 
 /*
@@ -1757,6 +1814,7 @@ ip_ndp_conflict(ill_t *ill, mblk_t *mp, mblk_t *dl_mp, nce_t *nce)
 	    NULL, NULL, ipst);
 	if (ipif == NULL)
 		return;
+
 	/*
 	 * First, figure out if this address is disposable.
 	 */
@@ -1786,19 +1844,21 @@ ip_ndp_conflict(ill_t *ill, mblk_t *mp, mblk_t *dl_mp, nce_t *nce)
 	 * sending out an unsolicited Neighbor Advertisement.
 	 */
 	if (defs >= maxdefense) {
-		ip_ndp_failure(ill, mp, dl_mp, nce);
+		ip_ndp_failure(ill, mp, dl_mp);
 	} else {
 		char hbuf[MAC_STR_LEN];
 		char sbuf[INET6_ADDRSTRLEN];
 		uchar_t *haddr;
+		uint_t haddrlen;
+		in6_addr_t targ;
 
-		(void) ip_ndp_find_solicitation(mp, dl_mp, ill, hbuf,
-		    sizeof (hbuf), sbuf, sizeof (sbuf), &haddr);
+		ip_ndp_find_addresses(mp, dl_mp, ill, &targ, &haddr, &haddrlen);
 		cmn_err(CE_WARN, "node %s is using our IP address %s on %s",
-		    hbuf, sbuf, ill->ill_name);
-		(void) nce_xmit(ill, ND_NEIGHBOR_ADVERT, ill, B_FALSE,
-		    &nce->nce_addr, &ipv6_all_hosts_mcast,
-		    nce_advert_flags(nce));
+		    mac_colon_addr(haddr, haddrlen, hbuf, sizeof (hbuf)),
+		    inet_ntop(AF_INET6, &targ, sbuf, sizeof (sbuf)),
+		    ill->ill_name);
+
+		(void) nce_xmit_advert(nce, B_FALSE, &ipv6_all_hosts_mcast, 0);
 	}
 }
 
@@ -1843,6 +1903,7 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 			bad_solicit = B_TRUE;
 			goto done;
 		}
+
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(&src)) {
 		/* Check to see if this is a valid DAD solicitation */
@@ -1859,7 +1920,13 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 		}
 	}
 
-	our_nce = ndp_lookup_v6(ill, &target, B_FALSE);
+	/*
+	 * NOTE: with IPMP, it's possible the nominated multicast ill (which
+	 * received this packet if it's multicast) is not the ill tied to
+	 * e.g. the IPMP ill's data link-local.  So we match across the illgrp
+	 * to ensure we find the associated NCE.
+	 */
+	our_nce = ndp_lookup_v6(ill, B_TRUE, &target, B_FALSE);
 	/*
 	 * If this is a valid Solicitation, a permanent
 	 * entry should exist in the cache
@@ -1883,7 +1950,7 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 			haddr = (uchar_t *)&opt[1];
 			if (hlen > opt->nd_opt_len * 8 - sizeof (*opt) ||
 			    hlen == 0) {
-				ip1dbg(("ndp_input_advert: bad SLLA\n"));
+				ip1dbg(("ndp_input_solicit: bad SLLA\n"));
 				bad_solicit = B_TRUE;
 				goto done;
 			}
@@ -1934,6 +2001,7 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 			goto no_source;
 
 		err = ndp_lookup_then_add_v6(ill,
+		    B_FALSE,
 		    haddr,
 		    &src,	/* Soliciting nodes address */
 		    &ipv6_all_ones,
@@ -1949,8 +2017,7 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 			break;
 		case EEXIST:
 			/*
-			 * B_FALSE indicates this is not an
-			 * an advertisement.
+			 * B_FALSE indicates this is not an an advertisement.
 			 */
 			ndp_process(nnce, haddr, 0, B_FALSE);
 			NCE_REFRELE(nnce);
@@ -1985,7 +2052,7 @@ no_source:
 				 * If someone else is probing our address, then
 				 * we've crossed wires.  Declare failure.
 				 */
-				ip_ndp_failure(ill, mp, dl_mp, our_nce);
+				ip_ndp_failure(ill, mp, dl_mp);
 			}
 			goto done;
 		}
@@ -1995,15 +2062,8 @@ no_source:
 		 */
 		src = ipv6_all_hosts_mcast;
 	}
-	flag |= nce_advert_flags(our_nce);
 	/* Response to a solicitation */
-	(void) nce_xmit(ill,
-	    ND_NEIGHBOR_ADVERT,
-	    ill,	/* ill to be used for extracting ill_nd_lla */
-	    B_TRUE,	/* use ill_nd_lla */
-	    &target,	/* Source and target of the advertisement pkt */
-	    &src,	/* IP Destination (source of original pkt) */
-	    flag);
+	(void) nce_xmit_advert(our_nce, B_TRUE, &src, flag);
 done:
 	if (bad_solicit)
 		BUMP_MIB(mib, ipv6IfIcmpInBadNeighborSolicitations);
@@ -2023,8 +2083,8 @@ ndp_input_advert(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 	in6_addr_t	target;
 	nd_opt_hdr_t	*opt = NULL;
 	int		len;
-	mib2_ipv6IfIcmpEntry_t	*mib = ill->ill_icmp6_mib;
 	ip_stack_t	*ipst = ill->ill_ipst;
+	mib2_ipv6IfIcmpEntry_t	*mib = ill->ill_icmp6_mib;
 
 	ip6h = (ip6_t *)mp->b_rptr;
 	icmp_nd = (icmp6_t *)(mp->b_rptr + IPV6_HDR_LEN);
@@ -2067,66 +2127,62 @@ ndp_input_advert(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 	}
 
 	/*
-	 * If this interface is part of the group look at all the
+	 * NOTE: we match across the illgrp since we need to do DAD for all of
+	 * our local addresses, and those are spread across all the active
 	 * ills in the group.
 	 */
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-	if (ill->ill_group != NULL)
-		ill = ill->ill_group->illgrp_ill;
+	if ((dst_nce = ndp_lookup_v6(ill, B_TRUE, &target, B_FALSE)) == NULL)
+		return;
 
-	for (; ill != NULL; ill = ill->ill_group_next) {
-		mutex_enter(&ill->ill_lock);
-		if (!ILL_CAN_LOOKUP(ill)) {
-			mutex_exit(&ill->ill_lock);
-			continue;
-		}
-		ill_refhold_locked(ill);
-		mutex_exit(&ill->ill_lock);
-		dst_nce = ndp_lookup_v6(ill, &target, B_FALSE);
-		/* We have to drop the lock since ndp_process calls put* */
-		rw_exit(&ipst->ips_ill_g_lock);
-		if (dst_nce != NULL) {
-			if ((dst_nce->nce_flags & NCE_F_PERMANENT) &&
-			    dst_nce->nce_state == ND_PROBE) {
-				/*
-				 * Someone else sent an advertisement for an
-				 * address that we're trying to configure.
-				 * Tear it down.  Note that dl_mp might be NULL
-				 * if we're getting a unicast reply.  This
-				 * isn't typically done (multicast is the norm
-				 * in response to a probe), but ip_ndp_failure
-				 * will handle the dl_mp == NULL case as well.
-				 */
-				ip_ndp_failure(ill, mp, dl_mp, dst_nce);
-			} else if (dst_nce->nce_flags & NCE_F_PERMANENT) {
-				/*
-				 * Someone just announced one of our local
-				 * addresses.  If it wasn't us, then this is a
-				 * conflict.  Defend the address or shut it
-				 * down.
-				 */
-				if (dl_mp != NULL &&
-				    (haddr == NULL ||
-				    nce_cmp_ll_addr(dst_nce, haddr,
-				    ill->ill_nd_lla_len))) {
-					ip_ndp_conflict(ill, mp, dl_mp,
-					    dst_nce);
+	if (dst_nce->nce_flags & NCE_F_PERMANENT) {
+		/*
+		 * Someone just advertised one of our local addresses.	First,
+		 * check it it was us -- if so, we can safely ignore it.
+		 */
+		if (haddr != NULL) {
+			if (!nce_cmp_ll_addr(dst_nce, haddr, hlen))
+				goto out;   /* from us -- no conflict */
+
+			/*
+			 * If we're in an IPMP group, check if this is an echo
+			 * from another ill in the group.  Use the double-
+			 * checked locking pattern to avoid grabbing
+			 * ill_g_lock in the non-IPMP case.
+			 */
+			if (IS_UNDER_IPMP(ill)) {
+				rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+				if (IS_UNDER_IPMP(ill) && ipmp_illgrp_find_ill(
+				    ill->ill_grp, haddr, hlen) != NULL) {
+					rw_exit(&ipst->ips_ill_g_lock);
+					goto out;
 				}
-			} else {
-				if (na->nd_na_flags_reserved &
-				    ND_NA_FLAG_ROUTER) {
-					dst_nce->nce_flags |= NCE_F_ISROUTER;
-				}
-				/* B_TRUE indicates this an advertisement */
-				ndp_process(dst_nce, haddr,
-				    na->nd_na_flags_reserved, B_TRUE);
+				rw_exit(&ipst->ips_ill_g_lock);
 			}
-			NCE_REFRELE(dst_nce);
 		}
-		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-		ill_refrele(ill);
+
+		/*
+		 * This appears to be a real conflict.  If we're trying to
+		 * configure this NCE (ND_PROBE), then shut it down.
+		 * Otherwise, handle the discovered conflict.
+		 *
+		 * Note that dl_mp might be NULL if we're getting a unicast
+		 * reply.  This isn't typically done (multicast is the norm in
+		 * response to a probe), but we can handle the dl_mp == NULL
+		 * case as well.
+		 */
+		if (dst_nce->nce_state == ND_PROBE)
+			ip_ndp_failure(ill, mp, dl_mp);
+		else
+			ip_ndp_conflict(ill, mp, dl_mp, dst_nce);
+	} else {
+		if (na->nd_na_flags_reserved & ND_NA_FLAG_ROUTER)
+			dst_nce->nce_flags |= NCE_F_ISROUTER;
+
+		/* B_TRUE indicates this an advertisement */
+		ndp_process(dst_nce, haddr, na->nd_na_flags_reserved, B_TRUE);
 	}
-	rw_exit(&ipst->ips_ill_g_lock);
+out:
+	NCE_REFRELE(dst_nce);
 }
 
 /*
@@ -2194,6 +2250,40 @@ done:
 }
 
 /*
+ * Utility routine to send an advertisement.  Assumes that the NCE cannot
+ * go away (e.g., because it's refheld).
+ */
+static boolean_t
+nce_xmit_advert(nce_t *nce, boolean_t use_nd_lla, const in6_addr_t *target,
+    uint_t flags)
+{
+	ASSERT((flags & NDP_PROBE) == 0);
+
+	if (nce->nce_flags & NCE_F_ISROUTER)
+		flags |= NDP_ISROUTER;
+	if (!(nce->nce_flags & NCE_F_ANYCAST))
+		flags |= NDP_ORIDE;
+
+	return (nce_xmit(nce->nce_ill, ND_NEIGHBOR_ADVERT, use_nd_lla,
+	    &nce->nce_addr, target, flags));
+}
+
+/*
+ * Utility routine to send a solicitation.  Assumes that the NCE cannot
+ * go away (e.g., because it's refheld).
+ */
+static boolean_t
+nce_xmit_solicit(nce_t *nce, boolean_t use_nd_lla, const in6_addr_t *sender,
+    uint_t flags)
+{
+	if (flags & NDP_PROBE)
+		sender = &ipv6_all_zeros;
+
+	return (nce_xmit(nce->nce_ill, ND_NEIGHBOR_SOLICIT, use_nd_lla,
+	    sender, &nce->nce_addr, flags));
+}
+
+/*
  * nce_xmit is called to form and transmit a ND solicitation or
  * advertisement ICMP packet.
  *
@@ -2207,88 +2297,79 @@ done:
  * corresponding ill's ill_wq otherwise returns B_TRUE.
  */
 static boolean_t
-nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
-    boolean_t use_nd_lla, const in6_addr_t *sender, const in6_addr_t *target,
-    int flag)
+nce_xmit(ill_t *ill, uint8_t type, boolean_t use_nd_lla,
+    const in6_addr_t *sender, const in6_addr_t *target, int flag)
 {
+	ill_t		*hwaddr_ill;
 	uint32_t	len;
 	icmp6_t 	*icmp6;
 	mblk_t		*mp;
 	ip6_t		*ip6h;
 	nd_opt_hdr_t	*opt;
-	uint_t		plen;
+	uint_t		plen, maxplen;
 	ip6i_t		*ip6i;
 	ipif_t		*src_ipif = NULL;
 	uint8_t		*hw_addr;
 	zoneid_t	zoneid = GLOBAL_ZONEID;
+	char		buf[INET6_ADDRSTRLEN];
+
+	ASSERT(!IS_IPMP(ill));
 
 	/*
-	 * If we have a unspecified source(sender) address, select a
-	 * proper source address for the solicitation here itself so
-	 * that we can initialize the h/w address correctly. This is
-	 * needed for interface groups as source address can come from
-	 * the whole group and the h/w address initialized from ill will
-	 * be wrong if the source address comes from a different ill.
-	 *
-	 * If the sender is specified then we use this address in order
-	 * to lookup the zoneid before calling ip_output_v6(). This is to
-	 * enable unicast ND_NEIGHBOR_ADVERT packets to be routed correctly
-	 * by IP (we cannot guarantee that the global zone has an interface
-	 * route to the destination).
-	 *
-	 * Note that the NA never comes here with the unspecified source
-	 * address. The following asserts that whenever the source
-	 * address is specified, the haddr also should be specified.
+	 * Check that the sender is actually a usable address on `ill', and if
+	 * so, track that as the src_ipif.  If not, for solicitations, set the
+	 * sender to :: so that a new one will be picked below; for adverts,
+	 * drop the packet since we expect nce_xmit_advert() to always provide
+	 * a valid sender.
 	 */
-	ASSERT(IN6_IS_ADDR_UNSPECIFIED(sender) || (hwaddr_ill != NULL));
-
-	if (IN6_IS_ADDR_UNSPECIFIED(sender) && !(flag & NDP_PROBE)) {
-		ASSERT(operation != ND_NEIGHBOR_ADVERT);
-		/*
-		 * Pick a source address for this solicitation, but
-		 * restrict the selection to addresses assigned to the
-		 * output interface (or interface group).  We do this
-		 * because the destination will create a neighbor cache
-		 * entry for the source address of this packet, so the
-		 * source address had better be a valid neighbor.
-		 */
-		src_ipif = ipif_select_source_v6(ill, target, RESTRICT_TO_ILL,
-		    IPV6_PREFER_SRC_DEFAULT, ALL_ZONES);
-		if (src_ipif == NULL) {
-			char buf[INET6_ADDRSTRLEN];
-
-			ip1dbg(("nce_xmit: No source ipif for dst %s\n",
-			    inet_ntop(AF_INET6, (char *)target, buf,
-			    sizeof (buf))));
-			return (B_TRUE);
+	if (!IN6_IS_ADDR_UNSPECIFIED(sender)) {
+		if ((src_ipif = ip_ndp_lookup_addr_v6(sender, ill)) == NULL ||
+		    !src_ipif->ipif_addr_ready) {
+			if (src_ipif != NULL) {
+				ipif_refrele(src_ipif);
+				src_ipif = NULL;
+			}
+			if (type == ND_NEIGHBOR_ADVERT) {
+				ip1dbg(("nce_xmit: No source ipif for src %s\n",
+				    inet_ntop(AF_INET6, sender, buf,
+				    sizeof (buf))));
+				return (B_TRUE);
+			}
+			sender = &ipv6_all_zeros;
 		}
-		sender = &src_ipif->ipif_v6src_addr;
-		hwaddr_ill = src_ipif->ipif_ill;
-	} else if (!(IN6_IS_ADDR_UNSPECIFIED(sender))) {
-		zoneid = ipif_lookup_addr_zoneid_v6(sender, ill, ill->ill_ipst);
-		/*
-		 * It's possible for ipif_lookup_addr_zoneid_v6() to return
-		 * ALL_ZONES if it cannot find a matching ipif for the address
-		 * we are trying to use. In this case we err on the side of
-		 * trying to send the packet by defaulting to the GLOBAL_ZONEID.
-		 */
-		if (zoneid == ALL_ZONES)
-			zoneid = GLOBAL_ZONEID;
 	}
 
 	/*
-	 * Always make sure that the NS/NA packets don't get load
-	 * spread. This is needed so that the probe packets sent
-	 * by the in.mpathd daemon can really go out on the desired
-	 * interface. Probe packets are made to go out on a desired
-	 * interface by including a ip6i with ATTACH_IF flag. As these
-	 * packets indirectly end up sending/receiving NS/NA packets
-	 * (neighbor doing NUD), we have to make sure that NA
-	 * also go out on the same interface.
+	 * If we still have an unspecified source (sender) address and this
+	 * isn't a probe, select a source address from `ill'.
 	 */
-	plen = (sizeof (nd_opt_hdr_t) + ill->ill_nd_lla_len + 7) / 8;
+	if (IN6_IS_ADDR_UNSPECIFIED(sender) && !(flag & NDP_PROBE)) {
+		ASSERT(type != ND_NEIGHBOR_ADVERT);
+		/*
+		 * Pick a source address for this solicitation, but restrict
+		 * the selection to addresses assigned to the output
+		 * interface.  We do this because the destination will create
+		 * a neighbor cache entry for the source address of this
+		 * packet, so the source address needs to be a valid neighbor.
+		 */
+		src_ipif = ipif_select_source_v6(ill, target, B_TRUE,
+		    IPV6_PREFER_SRC_DEFAULT, ALL_ZONES);
+		if (src_ipif == NULL) {
+			ip1dbg(("nce_xmit: No source ipif for dst %s\n",
+			    inet_ntop(AF_INET6, target, buf, sizeof (buf))));
+			return (B_TRUE);
+		}
+		sender = &src_ipif->ipif_v6src_addr;
+	}
+
+	/*
+	 * We're either sending a probe or we have a source address.
+	 */
+	ASSERT((flag & NDP_PROBE) || src_ipif != NULL);
+
+	maxplen = roundup(sizeof (nd_opt_hdr_t) + ND_MAX_HDW_LEN, 8);
 	len = IPV6_HDR_LEN + sizeof (ip6i_t) + sizeof (nd_neighbor_advert_t) +
-	    plen * 8;
+	    maxplen;
 	mp = allocb(len,  BPRI_LO);
 	if (mp == NULL) {
 		if (src_ipif != NULL)
@@ -2301,28 +2382,27 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 	ip6i = (ip6i_t *)mp->b_rptr;
 	ip6i->ip6i_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
 	ip6i->ip6i_nxt = IPPROTO_RAW;
-	ip6i->ip6i_flags = IP6I_ATTACH_IF | IP6I_HOPLIMIT;
+	ip6i->ip6i_flags = IP6I_HOPLIMIT;
 	if (flag & NDP_PROBE)
 		ip6i->ip6i_flags |= IP6I_UNSPEC_SRC;
-	ip6i->ip6i_ifindex = ill->ill_phyint->phyint_ifindex;
 
 	ip6h = (ip6_t *)(mp->b_rptr + sizeof (ip6i_t));
 	ip6h->ip6_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
 	ip6h->ip6_plen = htons(len - IPV6_HDR_LEN - sizeof (ip6i_t));
 	ip6h->ip6_nxt = IPPROTO_ICMPV6;
 	ip6h->ip6_hops = IPV6_MAX_HOPS;
+	ip6h->ip6_src = *sender;
 	ip6h->ip6_dst = *target;
 	icmp6 = (icmp6_t *)&ip6h[1];
 
 	opt = (nd_opt_hdr_t *)((uint8_t *)ip6h + IPV6_HDR_LEN +
 	    sizeof (nd_neighbor_advert_t));
 
-	if (operation == ND_NEIGHBOR_SOLICIT) {
+	if (type == ND_NEIGHBOR_SOLICIT) {
 		nd_neighbor_solicit_t *ns = (nd_neighbor_solicit_t *)icmp6;
 
 		if (!(flag & NDP_PROBE))
 			opt->nd_opt_type = ND_OPT_SOURCE_LINKADDR;
-		ip6h->ip6_src = *sender;
 		ns->nd_ns_target = *target;
 		if (!(flag & NDP_UNICAST)) {
 			/* Form multicast address of the target */
@@ -2335,7 +2415,6 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 
 		ASSERT(!(flag & NDP_PROBE));
 		opt->nd_opt_type = ND_OPT_TARGET_LINKADDR;
-		ip6h->ip6_src = *sender;
 		na->nd_na_target = *sender;
 		if (flag & NDP_ISROUTER)
 			na->nd_na_flags_reserved |= ND_NA_FLAG_ROUTER;
@@ -2347,22 +2426,48 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 
 	hw_addr = NULL;
 	if (!(flag & NDP_PROBE)) {
+		/*
+		 * Use our source address to find the hardware address to put
+		 * in the packet, so that the hardware address and IP address
+		 * will match up -- even if that hardware address doesn't
+		 * match the ill we actually transmit the packet through.
+		 */
+		if (IS_IPMP(src_ipif->ipif_ill)) {
+			hwaddr_ill = ipmp_ipif_hold_bound_ill(src_ipif);
+			if (hwaddr_ill == NULL) {
+				ip1dbg(("nce_xmit: no bound ill!\n"));
+				ipif_refrele(src_ipif);
+				freemsg(mp);
+				return (B_TRUE);
+			}
+		} else {
+			hwaddr_ill = src_ipif->ipif_ill;
+			ill_refhold(hwaddr_ill);	/* for symmetry */
+		}
+
+		plen = roundup(sizeof (nd_opt_hdr_t) +
+		    hwaddr_ill->ill_nd_lla_len, 8);
+
 		hw_addr = use_nd_lla ? hwaddr_ill->ill_nd_lla :
 		    hwaddr_ill->ill_phys_addr;
 		if (hw_addr != NULL) {
 			/* Fill in link layer address and option len */
-			opt->nd_opt_len = (uint8_t)plen;
+			opt->nd_opt_len = (uint8_t)(plen / 8);
 			bcopy(hw_addr, &opt[1], hwaddr_ill->ill_nd_lla_len);
 		}
-	}
-	if (hw_addr == NULL) {
-		/* If there's no link layer address option, then strip it. */
-		len -= plen * 8;
-		mp->b_wptr = mp->b_rptr + len;
-		ip6h->ip6_plen = htons(len - IPV6_HDR_LEN - sizeof (ip6i_t));
+
+		ill_refrele(hwaddr_ill);
 	}
 
-	icmp6->icmp6_type = (uint8_t)operation;
+	if (hw_addr == NULL)
+		plen = 0;
+
+	/* Fix up the length of the packet now that plen is known */
+	len -= (maxplen - plen);
+	mp->b_wptr = mp->b_rptr + len;
+	ip6h->ip6_plen = htons(len - IPV6_HDR_LEN - sizeof (ip6i_t));
+
+	icmp6->icmp6_type = type;
 	icmp6->icmp6_code = 0;
 	/*
 	 * Prepare for checksum by putting icmp length in the icmp
@@ -2370,8 +2475,17 @@ nce_xmit(ill_t *ill, uint32_t operation, ill_t *hwaddr_ill,
 	 */
 	icmp6->icmp6_cksum = ip6h->ip6_plen;
 
-	if (src_ipif != NULL)
+	/*
+	 * Before we toss the src_ipif, look up the zoneid to pass to
+	 * ip_output_v6().  This is to ensure unicast ND_NEIGHBOR_ADVERT
+	 * packets to be routed correctly by IP (we cannot guarantee that the
+	 * global zone has an interface route to the destination).
+	 */
+	if (src_ipif != NULL) {
+		if ((zoneid = src_ipif->ipif_zoneid) == ALL_ZONES)
+			zoneid = GLOBAL_ZONEID;
 		ipif_refrele(src_ipif);
+	}
 
 	ip_output_v6((void *)(uintptr_t)zoneid, mp, ill->ill_wq, IP_WPUT);
 	return (B_FALSE);
@@ -2448,7 +2562,6 @@ ndp_timer(void *arg)
 	ill_t		*ill = nce->nce_ill;
 	uint32_t	ms;
 	char		addrbuf[INET6_ADDRSTRLEN];
-	mblk_t		*mp;
 	boolean_t	dropped = B_FALSE;
 	ip_stack_t	*ipst = ill->ill_ipst;
 
@@ -2460,11 +2573,6 @@ ndp_timer(void *arg)
 	 */
 	ASSERT(nce != NULL);
 
-	/*
-	 * Grab the ill_g_lock now itself to avoid lock order problems.
-	 * nce_solicit needs ill_g_lock to be able to traverse ills
-	 */
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
 	mutex_enter(&nce->nce_lock);
 	NCE_REFHOLD_LOCKED(nce);
 	nce->nce_timeout_id = 0;
@@ -2474,11 +2582,10 @@ ndp_timer(void *arg)
 	 */
 	switch (nce->nce_state) {
 	case ND_DELAY:
-		rw_exit(&ipst->ips_ill_g_lock);
 		nce->nce_state = ND_PROBE;
 		mutex_exit(&nce->nce_lock);
-		(void) nce_xmit(ill, ND_NEIGHBOR_SOLICIT, NULL, B_FALSE,
-		    &ipv6_all_zeros, &nce->nce_addr, NDP_UNICAST);
+		(void) nce_xmit_solicit(nce, B_FALSE, &ipv6_all_zeros,
+		    NDP_UNICAST);
 		if (ip_debug > 3) {
 			/* ip2dbg */
 			pr_addr_dbg("ndp_timer: state for %s changed "
@@ -2489,7 +2596,6 @@ ndp_timer(void *arg)
 		return;
 	case ND_PROBE:
 		/* must be retransmit timer */
-		rw_exit(&ipst->ips_ill_g_lock);
 		nce->nce_pcnt--;
 		ASSERT(nce->nce_pcnt < ND_MAX_UNICAST_SOLICIT &&
 		    nce->nce_pcnt >= -1);
@@ -2504,8 +2610,8 @@ ndp_timer(void *arg)
 			    nce->nce_pcnt, inet_ntop(AF_INET6, &nce->nce_addr,
 			    addrbuf, sizeof (addrbuf))));
 			mutex_exit(&nce->nce_lock);
-			dropped = nce_xmit(ill, ND_NEIGHBOR_SOLICIT, NULL,
-			    B_FALSE, &ipv6_all_zeros, &nce->nce_addr,
+			dropped = nce_xmit_solicit(nce, B_FALSE,
+			    &ipv6_all_zeros,
 			    (nce->nce_flags & NCE_F_PERMANENT) ? NDP_PROBE :
 			    NDP_UNICAST);
 			if (dropped) {
@@ -2542,8 +2648,8 @@ ndp_timer(void *arg)
 			 */
 			nce->nce_state = ND_REACHABLE;
 			mutex_exit(&nce->nce_lock);
-			ipif = ipif_lookup_addr_v6(&nce->nce_addr, ill,
-			    ALL_ZONES, NULL, NULL, NULL, NULL, ipst);
+			ipif = ip_ndp_lookup_addr_v6(&nce->nce_addr,
+			    nce->nce_ill);
 			if (ipif != NULL) {
 				if (ipif->ipif_was_dup) {
 					char ibuf[LIFNAMSIZ + 10];
@@ -2566,9 +2672,8 @@ ndp_timer(void *arg)
 			}
 			/* Begin defending our new address */
 			nce->nce_unsolicit_count = 0;
-			dropped = nce_xmit(ill, ND_NEIGHBOR_ADVERT, ill,
-			    B_FALSE, &nce->nce_addr, &ipv6_all_hosts_mcast,
-			    nce_advert_flags(nce));
+			dropped = nce_xmit_advert(nce, B_FALSE,
+			    &ipv6_all_hosts_mcast, 0);
 			if (dropped) {
 				nce->nce_unsolicit_count = 1;
 				NDP_RESTART_TIMER(nce,
@@ -2589,51 +2694,40 @@ ndp_timer(void *arg)
 		}
 		NCE_REFRELE(nce);
 		return;
-	case ND_INCOMPLETE:
+	case ND_INCOMPLETE: {
+		ip6_t	*ip6h;
+		ip6i_t	*ip6i;
+		mblk_t	*mp, *datamp, *nextmp, **prevmpp;
+
 		/*
-		 * Must be resolvers retransmit timer.
+		 * Per case (2) in the nce_queue_mp() comments, scan nce_qd_mp
+		 * for any IPMP probe packets, and toss 'em.  IPMP probe
+		 * packets will always be at the head of nce_qd_mp and always
+		 * have an ip6i_t header, so we can stop at the first queued
+		 * ND packet without an ip6i_t.
 		 */
-		for (mp = nce->nce_qd_mp; mp != NULL; mp = mp->b_next) {
-			ip6i_t	*ip6i;
-			ip6_t	*ip6h;
-			mblk_t *data_mp;
-
-			/*
-			 * Walk the list of packets queued, and see if there
-			 * are any multipathing probe packets. Such packets
-			 * are always queued at the head. Since this is a
-			 * retransmit timer firing, mark such packets as
-			 * delayed in ND resolution. This info will be used
-			 * in ip_wput_v6(). Multipathing probe packets will
-			 * always have an ip6i_t. Once we hit a packet without
-			 * it, we can break out of this loop.
-			 */
-			if (mp->b_datap->db_type == M_CTL)
-				data_mp = mp->b_cont;
-			else
-				data_mp = mp;
-
-			ip6h = (ip6_t *)data_mp->b_rptr;
+		prevmpp = &nce->nce_qd_mp;
+		for (mp = nce->nce_qd_mp; mp != NULL; mp = nextmp) {
+			nextmp = mp->b_next;
+			datamp = (DB_TYPE(mp) == M_CTL) ? mp->b_cont : mp;
+			ip6h = (ip6_t *)datamp->b_rptr;
 			if (ip6h->ip6_nxt != IPPROTO_RAW)
 				break;
 
-			/*
-			 * This message should have been pulled up already in
-			 * ip_wput_v6. We can't do pullups here because the
-			 * b_next/b_prev is non-NULL.
-			 */
 			ip6i = (ip6i_t *)ip6h;
-			ASSERT((data_mp->b_wptr - (uchar_t *)ip6i) >=
-			    sizeof (ip6i_t) + IPV6_HDR_LEN);
-
-			/* Mark this packet as delayed due to ND resolution */
-			if (ip6i->ip6i_flags & IP6I_DROP_IFDELAYED)
-				ip6i->ip6i_flags |= IP6I_ND_DELAYED;
+			if (ip6i->ip6i_flags & IP6I_IPMP_PROBE) {
+				inet_freemsg(mp);
+				*prevmpp = nextmp;
+			} else {
+				prevmpp = &mp->b_next;
+			}
 		}
+
+		/*
+		 * Must be resolver's retransmit timer.
+		 */
 		if (nce->nce_qd_mp != NULL) {
-			ms = nce_solicit(nce, NULL);
-			rw_exit(&ipst->ips_ill_g_lock);
-			if (ms == 0) {
+			if ((ms = nce_solicit(nce, NULL)) == 0) {
 				if (nce->nce_state != ND_REACHABLE) {
 					mutex_exit(&nce->nce_lock);
 					nce_resolv_failed(nce);
@@ -2649,11 +2743,10 @@ ndp_timer(void *arg)
 			return;
 		}
 		mutex_exit(&nce->nce_lock);
-		rw_exit(&ipst->ips_ill_g_lock);
 		NCE_REFRELE(nce);
 		break;
-	case ND_REACHABLE :
-		rw_exit(&ipst->ips_ill_g_lock);
+	}
+	case ND_REACHABLE:
 		if (((nce->nce_flags & NCE_F_UNSOL_ADV) &&
 		    nce->nce_unsolicit_count != 0) ||
 		    ((nce->nce_flags & NCE_F_PERMANENT) &&
@@ -2661,13 +2754,8 @@ ndp_timer(void *arg)
 			if (nce->nce_unsolicit_count > 0)
 				nce->nce_unsolicit_count--;
 			mutex_exit(&nce->nce_lock);
-			dropped = nce_xmit(ill,
-			    ND_NEIGHBOR_ADVERT,
-			    ill,	/* ill to be used for hw addr */
-			    B_FALSE,	/* use ill_phys_addr */
-			    &nce->nce_addr,
-			    &ipv6_all_hosts_mcast,
-			    nce_advert_flags(nce));
+			dropped = nce_xmit_advert(nce, B_FALSE,
+			    &ipv6_all_hosts_mcast, 0);
 			if (dropped) {
 				mutex_enter(&nce->nce_lock);
 				nce->nce_unsolicit_count++;
@@ -2686,7 +2774,6 @@ ndp_timer(void *arg)
 		NCE_REFRELE(nce);
 		break;
 	default:
-		rw_exit(&ipst->ips_ill_g_lock);
 		mutex_exit(&nce->nce_lock);
 		NCE_REFRELE(nce);
 		break;
@@ -2819,23 +2906,20 @@ void
 nce_queue_mp_common(nce_t *nce, mblk_t *mp, boolean_t head_insert)
 {
 	uint_t	count = 0;
-	mblk_t  **mpp;
+	mblk_t  **mpp, *tmp;
 
 	ASSERT(MUTEX_HELD(&nce->nce_lock));
 
-	for (mpp = &nce->nce_qd_mp; *mpp != NULL;
-	    mpp = &(*mpp)->b_next) {
-		if (++count >
-		    nce->nce_ill->ill_max_buf) {
-			mblk_t *tmp = nce->nce_qd_mp->b_next;
-
+	for (mpp = &nce->nce_qd_mp; *mpp != NULL; mpp = &(*mpp)->b_next) {
+		if (++count > nce->nce_ill->ill_max_buf) {
+			tmp = nce->nce_qd_mp->b_next;
 			nce->nce_qd_mp->b_next = NULL;
 			nce->nce_qd_mp->b_prev = NULL;
 			freemsg(nce->nce_qd_mp);
 			nce->nce_qd_mp = tmp;
 		}
 	}
-	/* put this on the list */
+
 	if (head_insert) {
 		mp->b_next = nce->nce_qd_mp;
 		nce->nce_qd_mp = mp;
@@ -2849,8 +2933,8 @@ nce_queue_mp(nce_t *nce, mblk_t *mp)
 {
 	boolean_t head_insert = B_FALSE;
 	ip6_t	*ip6h;
-	ip6i_t	*ip6i;
-	mblk_t *data_mp;
+	ip6i_t  *ip6i;
+	mblk_t	*data_mp;
 
 	ASSERT(MUTEX_HELD(&nce->nce_lock));
 
@@ -2867,43 +2951,28 @@ nce_queue_mp(nce_t *nce, mblk_t *mp)
 		 * non-NULL.
 		 */
 		ip6i = (ip6i_t *)ip6h;
-		ASSERT((data_mp->b_wptr - (uchar_t *)ip6i) >=
-		    sizeof (ip6i_t) + IPV6_HDR_LEN);
+		ASSERT(MBLKL(data_mp) >= sizeof (ip6i_t) + IPV6_HDR_LEN);
+
 		/*
-		 * Multipathing probe packets have IP6I_DROP_IFDELAYED set.
-		 * This has 2 aspects mentioned below.
-		 * 1. Perform head insertion in the nce_qd_mp for these packets.
-		 * This ensures that next retransmit of ND solicitation
-		 * will use the interface specified by the probe packet,
-		 * for both NS and NA. This corresponds to the src address
-		 * in the IPv6 packet. If we insert at tail, we will be
-		 * depending on the packet at the head for successful
-		 * ND resolution. This is not reliable, because the interface
-		 * on which the NA arrives could be different from the interface
-		 * on which the NS was sent, and if the receiving interface is
-		 * failed, it will appear that the sending interface is also
-		 * failed, causing in.mpathd to misdiagnose this as link
-		 * failure.
-		 * 2. Drop the original packet, if the ND resolution did not
-		 * succeed in the first attempt. However we will create the
-		 * nce and the ire, as soon as the ND resolution succeeds.
-		 * We don't gain anything by queueing multiple probe packets
-		 * and sending them back-to-back once resolution succeeds.
-		 * It is sufficient to send just 1 packet after ND resolution
-		 * succeeds. Since mpathd is sending down probe packets at a
-		 * constant rate, we don't need to send the queued packet. We
-		 * need to queue it only for NDP resolution. The benefit of
-		 * dropping the probe packets that were delayed in ND
-		 * resolution, is that in.mpathd will not see inflated
-		 * RTT. If the ND resolution does not succeed within
-		 * in.mpathd's failure detection time, mpathd may detect
-		 * a failure, and it does not matter whether the packet
-		 * was queued or dropped.
+		 * If this packet is marked IP6I_IPMP_PROBE, then we need to:
+		 *
+		 *   1. Insert it at the head of the nce_qd_mp list.  Consider
+		 *	the normal (non-probe) load-speading case where the
+		 *	source address of the ND packet is not tied to nce_ill.
+		 *	If the ill bound to the source address cannot receive,
+		 *	the response to the ND packet will not be received.
+		 *	However, if ND packets for nce_ill's probes are queued
+		 *	behind that ND packet, those probes will also fail to
+		 *	be sent, and thus in.mpathd will erroneously conclude
+		 *	that nce_ill has also failed.
+		 *
+		 *   2. Drop the probe packet in ndp_timer() if the ND did
+		 *	not succeed on the first attempt.  This ensures that
+		 *	ND problems do not manifest as probe RTT spikes.
 		 */
-		if (ip6i->ip6i_flags & IP6I_DROP_IFDELAYED)
+		if (ip6i->ip6i_flags & IP6I_IPMP_PROBE)
 			head_insert = B_TRUE;
 	}
-
 	nce_queue_mp_common(nce, mp, head_insert);
 }
 
@@ -2988,13 +3057,17 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 	    (lnr->lnr_state_create != ND_STALE))
 		return (EINVAL);
 
+	if (lnr->lnr_hdw_len > ND_MAX_HDW_LEN)
+		return (EINVAL);
+
 	sin6 = (sin6_t *)&lnr->lnr_addr;
 	addr = &sin6->sin6_addr;
 
 	mutex_enter(&ipst->ips_ndp6->ndp_g_lock);
 	/* We know it can not be mapping so just look in the hash table */
 	nce = *((nce_t **)NCE_HASH_PTR_V6(ipst, *addr));
-	nce = nce_lookup_addr(ill, addr, nce);
+	/* See comment in ndp_query() regarding IS_IPMP(ill) usage */
+	nce = nce_lookup_addr(ill, IS_IPMP(ill), addr, nce);
 	if (nce != NULL)
 		new_flags = nce->nce_flags;
 
@@ -3065,7 +3138,7 @@ ndp_sioc_update(ill_t *ill, lif_nd_req_t *lnr)
 	 * the link layer address passed in to determine the state
 	 * much like incoming packets.
 	 */
-	ndp_process(nce, (uchar_t *)lnr->lnr_hdw_addr, 0, B_FALSE);
+	nce_process(nce, (uchar_t *)lnr->lnr_hdw_addr, 0, B_FALSE);
 	NCE_REFRELE(nce);
 	return (0);
 }
@@ -3463,7 +3536,11 @@ ndp_lookup_then_add_v4(ill_t *ill, const in_addr_t *addr, uint16_t flags,
 	mutex_enter(&ipst->ips_ndp4->ndp_g_lock);
 	nce = *((nce_t **)NCE_HASH_PTR_V4(ipst, *addr));
 	IN6_IPADDR_TO_V4MAPPED(*addr, &addr6);
-	nce = nce_lookup_addr(ill, &addr6, nce);
+	/*
+	 * NOTE: IPv4 never matches across the illgrp since the NCE's we're
+	 * looking up have fastpath headers that are inherently per-ill.
+	 */
+	nce = nce_lookup_addr(ill, B_FALSE, &addr6, nce);
 	if (nce == NULL) {
 		err = ndp_add_v4(ill, addr, flags, newnce, src_nce);
 	} else {
@@ -3717,4 +3794,27 @@ ndp_lookup_ipaddr(in_addr_t addr, netstack_t *ns)
 	}
 	mutex_exit(&ipst->ips_ndp4->ndp_g_lock);
 	return (nce != NULL);
+}
+
+/*
+ * Wrapper around ipif_lookup_addr_exact_v6() that allows ND to work properly
+ * with IPMP.  Specifically, since neighbor discovery is always done on
+ * underlying interfaces (even for addresses owned by an IPMP interface), we
+ * need to check for `v6addrp' on both `ill' and on the IPMP meta-interface
+ * associated with `ill' (if it exists).
+ */
+static ipif_t *
+ip_ndp_lookup_addr_v6(const in6_addr_t *v6addrp, ill_t *ill)
+{
+	ipif_t *ipif;
+	ip_stack_t *ipst = ill->ill_ipst;
+
+	ipif = ipif_lookup_addr_exact_v6(v6addrp, ill, ipst);
+	if (ipif == NULL && IS_UNDER_IPMP(ill)) {
+		if ((ill = ipmp_ill_hold_ipmp_ill(ill)) != NULL) {
+			ipif = ipif_lookup_addr_exact_v6(v6addrp, ill, ipst);
+			ill_refrele(ill);
+		}
+	}
+	return (ipif);
 }

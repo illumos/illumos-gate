@@ -1,5 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,9 +38,6 @@
  * @(#) $Header: ifaddrlist.c,v 1.2 97/04/22 13:31:05 leres Exp $ (LBL)
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <alloca.h>
 #include <errno.h>
 #include <libinetutil.h>
 #include <stdio.h>
@@ -54,9 +51,9 @@
  * See <libinetutil.h> for a description of the programming interface.
  */
 int
-ifaddrlist(struct ifaddrlist **ipaddrp, int family, char *errbuf)
+ifaddrlist(struct ifaddrlist **ipaddrp, int family, uint_t flags, char *errbuf)
 {
-	struct ifaddrlist	*ifaddrlist, *al;
+	struct ifaddrlist	*ifaddrlist = NULL, *al = NULL;
 	struct sockaddr_in	*sin;
 	struct sockaddr_in6	*sin6;
 	struct lifconf		lifc;
@@ -64,31 +61,28 @@ ifaddrlist(struct ifaddrlist **ipaddrp, int family, char *errbuf)
 	struct lifreq		*lifrp;
 	int			i, count, nlifr;
 	int			fd;
-	const char		*iocstr;
+	const char		*opstr;
 
+	(void) memset(&lifc, 0, sizeof (lifc));
 	if (family != AF_INET && family != AF_INET6) {
 		(void) strlcpy(errbuf, "invalid address family", ERRBUFSIZE);
 		return (-1);
 	}
 
-	fd = socket(family, SOCK_DGRAM, 0);
-	if (fd == -1) {
-		(void) snprintf(errbuf, ERRBUFSIZE, "socket: %s",
-		    strerror(errno));
-		return (-1);
+	if ((fd = socket(family, SOCK_DGRAM, 0)) == -1) {
+		opstr = "socket";
+		goto fail;
 	}
 
 	/*
 	 * Get the number of network interfaces of type `family'.
 	 */
 	lifn.lifn_family = family;
-	lifn.lifn_flags = 0;
+	lifn.lifn_flags = flags;
 again:
 	if (ioctl(fd, SIOCGLIFNUM, &lifn) == -1) {
-		(void) snprintf(errbuf, ERRBUFSIZE, "SIOCGLIFNUM: %s",
-		    strerror(errno));
-		(void) close(fd);
-		return (-1);
+		opstr = "SIOCGLIFNUM";
+		goto fail;
 	}
 
 	/*
@@ -97,16 +91,17 @@ again:
 	 */
 	lifn.lifn_count += 4;
 
+	lifc.lifc_flags = flags;
 	lifc.lifc_family = family;
 	lifc.lifc_len = lifn.lifn_count * sizeof (struct lifreq);
-	lifc.lifc_buf = alloca(lifc.lifc_len);
-	lifc.lifc_flags = 0;
+	if ((lifc.lifc_buf = realloc(lifc.lifc_buf, lifc.lifc_len)) == NULL) {
+		opstr = "realloc";
+		goto fail;
+	}
 
 	if (ioctl(fd, SIOCGLIFCONF, &lifc) == -1) {
-		(void) snprintf(errbuf, ERRBUFSIZE, "SIOCGLIFCONF: %s",
-		    strerror(errno));
-		(void) close(fd);
-		return (-1);
+		opstr = "SIOCGLIFCONF";
+		goto fail;
 	}
 
 	/*
@@ -121,12 +116,9 @@ again:
 	/*
 	 * Allocate the address list to return.
 	 */
-	ifaddrlist = calloc(nlifr, sizeof (struct ifaddrlist));
-	if (ifaddrlist == NULL) {
-		(void) snprintf(errbuf, ERRBUFSIZE, "calloc: %s",
-		    strerror(errno));
-		(void) close(fd);
-		return (-1);
+	if ((ifaddrlist = calloc(nlifr, sizeof (struct ifaddrlist))) == NULL) {
+		opstr = "calloc";
+		goto fail;
 	}
 
 	/*
@@ -142,7 +134,7 @@ again:
 		if (ioctl(fd, SIOCGLIFFLAGS, lifrp) == -1) {
 			if (errno == ENXIO)
 				continue;
-			iocstr = "SIOCGLIFFLAGS";
+			opstr = "SIOCGLIFFLAGS";
 			goto fail;
 		}
 		al->flags = lifrp->lifr_flags;
@@ -150,7 +142,7 @@ again:
 		if (ioctl(fd, SIOCGLIFINDEX, lifrp) == -1) {
 			if (errno == ENXIO)
 				continue;
-			iocstr = "SIOCGLIFINDEX";
+			opstr = "SIOCGLIFINDEX";
 			goto fail;
 		}
 		al->index = lifrp->lifr_index;
@@ -158,7 +150,7 @@ again:
 		if (ioctl(fd, SIOCGLIFADDR, lifrp) == -1) {
 			if (errno == ENXIO)
 				continue;
-			iocstr = "SIOCGLIFADDR";
+			opstr = "SIOCGLIFADDR";
 			goto fail;
 		}
 
@@ -174,6 +166,7 @@ again:
 	}
 
 	(void) close(fd);
+	free(lifc.lifc_buf);
 	if (count == 0) {
 		free(ifaddrlist);
 		*ipaddrp = NULL;
@@ -183,9 +176,14 @@ again:
 	*ipaddrp = ifaddrlist;
 	return (count);
 fail:
-	(void) snprintf(errbuf, ERRBUFSIZE, "%s: %s: %s", iocstr, al->device,
-	    strerror(errno));
-
+	if (al == NULL) {
+		(void) snprintf(errbuf, ERRBUFSIZE, "%s: %s", opstr,
+		    strerror(errno));
+	} else {
+		(void) snprintf(errbuf, ERRBUFSIZE, "%s: %s: %s", opstr,
+		    al->device, strerror(errno));
+	}
+	free(lifc.lifc_buf);
 	free(ifaddrlist);
 	(void) close(fd);
 	return (-1);

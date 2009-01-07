@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -161,6 +161,9 @@ ipinfov4
 ipinfov6
 iplrinit
 iplwinit
+ipmp_aract_template
+ipmp_ardeact_template
+ipmp_kstats
 iprinitv4
 iprinitv6
 ipsec_action_cache

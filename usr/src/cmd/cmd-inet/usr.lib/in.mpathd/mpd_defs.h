@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MPD_DEFS_H
 #define	_MPD_DEFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -78,12 +76,13 @@ extern "C" {
 #include <locale.h>
 #include <deflt.h>
 
+#include <libdlpi.h>
+#include <libinetutil.h>
 #include <libnvpair.h>
 #include <libsysevent.h>
 #include <sys/sysevent.h>
 #include <sys/sysevent/eventdefs.h>
 #include <sys/sysevent/ipmp.h>
-#include <zone.h>
 
 #include <ipmp_mpathd.h>
 #include <ipmp_query_impl.h>
@@ -92,7 +91,7 @@ extern "C" {
 /* Debug flags */
 #define	D_ALL		0xffff		/* enable all debug */
 #define	D_PROBE		0x0001		/* probe mechanism */
-#define	D_FAILOVER	0x0002		/* failover mechanism */
+#define	D_FAILREP	0x0002		/* failure/repair mechanism */
 #define	D_PHYINT	0x0004		/* phyint table */
 #define	D_LOGINT	0x0008		/* logint table */
 #define	D_TARGET	0x0010		/* target table */
@@ -199,10 +198,8 @@ extern	int	user_failure_detection_time; /* User specified fdt */
 extern	int	ifsock_v4;		/* IPv4 socket for ioctls */
 extern	int	ifsock_v6;		/* IPv6 socket for ioctls */
 
-extern boolean_t full_scan_required;	/* Do full scans */
-
 extern int debug;			/* debug option */
-
+extern boolean_t cleanup_started;	/* true if we're shutting down */
 extern boolean_t handle_link_notifications;
 
 /*
@@ -212,6 +209,7 @@ extern void	timer_schedule(uint_t delay);
 extern void	logmsg(int pri, const char *fmt, ...);
 extern void	logperror(const char *str);
 extern int	poll_add(int fd);
+extern int	poll_remove(int fd);
 extern uint64_t	getcurrentsec(void);
 extern uint_t	getcurrenttime(void);
 

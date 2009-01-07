@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,10 +133,8 @@ typedef struct ip6_info	ip6i_t;
 #define	IP6I_RAW_CHECKSUM	0x10
 			/* Compute checksum and stuff in ip6i_checksum_off */
 #define	IP6I_VERIFY_SRC	0x20	/* Verify ip6_src. Used when IPV6_PKTINFO */
-#define	IP6I_ATTACH_IF	0x40	/* Bind to no failover address or BOUND_PIF. */
-#define	IP6I_DROP_IFDELAYED	0x80
-			/* Drop the packet if delayed in ndp resolver */
-#define	IP6I_ND_DELAYED 0x100	/* Packet was delayed in ndp resolver */
+#define	IP6I_IPMP_PROBE	0x40	/* IPMP (in.mpathd) probe packet */
+				/* 0x80 - 0x100 available */
 #define	IP6I_DONTFRAG	0x200	/* Don't fragment this packet */
 #define	IP6I_HOPLIMIT	0x400	/* hoplimit has been set by the sender */
 
@@ -340,7 +338,7 @@ extern void	icmp_time_exceeded_v6(queue_t *, mblk_t *, uint8_t,
 extern void	icmp_unreachable_v6(queue_t *, mblk_t *, uint8_t,
     boolean_t, boolean_t, zoneid_t, ip_stack_t *);
 extern void	icmp_inbound_error_fanout_v6(queue_t *, mblk_t *, ip6_t *,
-    icmp6_t *, ill_t *, boolean_t, zoneid_t);
+    icmp6_t *, ill_t *, ill_t *, boolean_t, zoneid_t);
 extern boolean_t conn_wantpacket_v6(conn_t *, ill_t *, ip6_t *, int, zoneid_t);
 extern mblk_t	*ip_add_info_v6(mblk_t *, ill_t *, const in6_addr_t *);
 extern in6addr_scope_t	ip_addr_scope_v6(const in6_addr_t *);
@@ -382,7 +380,7 @@ extern int	ip_multirt_apply_membership_v6(int (*fn)(conn_t *, boolean_t,
     ire_t *, conn_t *, boolean_t, const in6_addr_t *, mcast_record_t,
     const in6_addr_t *, mblk_t *);
 extern void	ip_newroute_ipif_v6(queue_t *, mblk_t *, ipif_t *,
-    in6_addr_t, int, zoneid_t);
+    const in6_addr_t *, const in6_addr_t *, int, zoneid_t);
 extern void	ip_newroute_v6(queue_t *, mblk_t *, const in6_addr_t *,
     const in6_addr_t *, ill_t *, zoneid_t, ip_stack_t *);
 extern void	*ip6_kstat_init(netstackid_t, ip6_stat_t *);

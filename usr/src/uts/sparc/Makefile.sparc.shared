@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile contains the common definitions for all sparc
@@ -216,7 +216,8 @@ DRV_KMODS	+= ippctl sctp sctp6
 DRV_KMODS	+= dld
 DRV_KMODS	+= ipf
 DRV_KMODS	+= rpcib
-DRV_KMODS	+= vni vnic
+DRV_KMODS	+= dlpistub
+DRV_KMODS	+= vnic
 DRV_KMODS	+= xge
 DRV_KMODS	+= rds
 DRV_KMODS	+= chxge

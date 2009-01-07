@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,26 +17,17 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ *
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_IPMP_MPATHD_H
 #define	_IPMP_MPATHD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Definitions for the messaging protocol between in.mpathd and libipmp.
- * This interface is loosely documented in PSARC/2000/306.
- *
- * PLEASE NOTE: Although this interface is officially consolidation-private,
- * we will be reclassifying it as project-private in the future, and
- * transitioning any existing consumers to use higher-level libipmp routines.
- *
- * Put another way: treat this as if it was project-private!
+ * This interface is project-private to the IPMP subsystem.
  */
 
 #include <sys/types.h>
@@ -49,31 +39,39 @@ extern "C" {
 #endif
 
 #define	MPATHD_PORT	5999
-#define	MPATHD_PATH	"/usr/lib/inet/in.mpathd"
+#define	MPATHD_PATH	"/lib/inet/in.mpathd"
 
 /*
  * Supported commands.
  */
 enum {
-	MI_PING		= 0,	/* sanity test */
+	MI_PING		= 0,	/* ping in.mpathd */
 	MI_OFFLINE	= 1,	/* offline the interface */
 	MI_UNDO_OFFLINE	= 2,	/* undo the offline */
-	MI_SETOINDEX	= 3,	/* set original interface index */
-	MI_QUERY	= 4,	/* query ipmp-related information */
+	MI_QUERY	= 3,	/* query ipmp-related information */
 	MI_NCMD			/* total number of commands */
 };
 
 /*
  * Types of information which can be requested and received (except for
- * IPMP_IFLIST, which can only be received).
+ * IPMP_IFLIST and IPMP_ADDRLIST, which can only be received).
  */
 typedef enum {
 	IPMP_GROUPLIST	= 1,
 	IPMP_GROUPINFO	= 2,
 	IPMP_IFINFO	= 3,
 	IPMP_IFLIST	= 4,
-	IPMP_SNAP	= 5
+	IPMP_SNAP	= 5,
+	IPMP_ADDRLIST	= 6,
+	IPMP_ADDRINFO	= 7
 } ipmp_infotype_t;
+
+/*
+ * Daemon ping request.
+ */
+typedef struct mi_ping {
+	uint32_t	mip_command;
+} mi_ping_t;
 
 /*
  * Interface offline request; `mio_ifname' is the interface to offline;
@@ -83,7 +81,6 @@ typedef enum {
 typedef struct mi_offline {
 	uint32_t 	mio_command;
 	char		mio_ifname[LIFNAMSIZ];
-	char		mio_move_to_if[LIFNAMSIZ]; /* currently unused */
 	uint32_t	mio_min_redundancy;
 } mi_offline_t;
 
@@ -97,24 +94,12 @@ typedef struct mi_undo_offline {
 } mi_undo_offline_t;
 
 /*
- * Set original interface index request: `mis_lifname' is the name of the
- * logical interface that is having its index reset; `mis_new_pifname' is the
- * name of the interface whose index will be associated with `mis_lifname';
- * `mis_iftype' is the interface type.
- */
-typedef struct mi_setoindex {
-	uint32_t	mis_command;
-	char		mis_lifname[LIFNAMSIZ];
-	char		mis_new_pifname[LIFNAMSIZ];
-	uint32_t	mis_iftype;
-} mi_setoindex_t;
-
-/*
  * Retrieve IPMP-related information: `miq_inforeq' is the type of information
- * being request (see above for the list of types).  If the request is for
- * either IPMP_GROUPINFO or IPMP_IFINFO, then either `miq_grname' or
- * `miq_ifname' should be set (respectively) to indicate the name of the
- * group or interface to retrieve the information for.
+ * being request (see above for the list of types).  If the request type is
+ * IPMP_GROUPINFO, then `miq_grname' indicates the group.  If the request type
+ * is IPMP_IFINFO, then `miq_ifname' indicates the interface.  If the request
+ * type is IPMP_ADDRINFO then `miq_grname' indicates the group and `miq_addr'
+ * indicates the address.
  */
 typedef struct mi_query {
 	uint32_t	miq_command;
@@ -123,6 +108,7 @@ typedef struct mi_query {
 		char	miqu_ifname[LIFNAMSIZ];
 		char	miqu_grname[LIFGRNAMSIZ];
 	} miq_infodata;
+	struct sockaddr_storage	miq_addr;
 } mi_query_t;
 #define	miq_ifname	miq_infodata.miqu_ifname
 #define	miq_grname	miq_infodata.miqu_grname
@@ -132,10 +118,10 @@ typedef struct mi_query {
  * requirement for receiving any command.
  */
 union mi_commands {
-	uint32_t mi_command;
+	uint32_t		mi_command;
+	mi_ping_t		mi_pcmd;
 	mi_offline_t		mi_ocmd;
 	mi_undo_offline_t	mi_ucmd;
-	mi_setoindex_t 		mi_scmd;
 	mi_query_t		mi_qcmd;
 };
 
@@ -147,18 +133,7 @@ typedef struct mi_result {
 	uint32_t me_mpathd_error;		/* Mpathd error */
 } mi_result_t;
 
-/*
- * Legacy values for me_mpathd_error; the daemon now returns the IPMP
- * error codes defined in <ipmp.h>, which are compatible with these error
- * codes.  These will be removed in the future.
- */
-enum {
-	MPATHD_SUCCESS		= 0,	/* operation succeeded */
-	MPATHD_SYS_ERROR	= 1,	/* check me_sys_error for the errno */
-	MPATHD_MIN_RED_ERROR	= 2,	/* minimum redundancy not met */
-	MPATHD_FAILBACK_DISABLED = 3,	/* failback administratively disabled */
-	MPATHD_FAILBACK_PARTIAL = 4	/* unable to completely failback */
-};
+#define	IPMP_REQTIMEOUT	5			/* seconds */
 
 extern int ipmp_connect(int *);
 extern int ipmp_read(int, void *, size_t, const struct timeval *);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <net/if_arp.h>
+#include <net/if_types.h>
 #include <sys/file.h>
 #include <sys/sockio.h>
 #include <sys/pathname.h>
@@ -528,62 +529,112 @@ ibcm_arp_get_ibd_insts(ibcm_arp_ibd_insts_t *ibds)
 }
 
 /*
- * Return ibd interfaces and ibd instances.
+ * Issue an ioctl down to IP.  There are several similar versions of this
+ * function (e.g., rpcib_do_ip_ioctl()); clearly a utility routine is needed.
  */
 static int
-ibcm_arp_get_ibd_ipaddr(ibcm_arp_ibd_insts_t *ibds)
+ibcm_do_ip_ioctl(int cmd, int len, void *arg)
 {
-	TIUSER			*tiptr;
-	vnode_t			*kvp;
-	vnode_t			*vp = NULL;
-	struct strioctl		iocb;
-	struct lifreq		lif_req;
-	int			k, ip_cnt;
-	ibcm_arp_ip_t		*ipp;
+	vnode_t *kvp;
+	TIUSER  *tiptr;
+	struct  strioctl iocb;
+	int	err = 0;
 
-	if (lookupname("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &kvp) == 0) {
-		if (t_kopen((file_t *)NULL, kvp->v_rdev, FREAD|FWRITE,
-		    &tiptr, CRED()) == 0) {
-			vp = tiptr->fp->f_vnode;
-		} else {
-			VN_RELE(kvp);
-		}
+	if (lookupname("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &kvp) != 0)
+		return (EPROTO);
+
+	if (t_kopen(NULL, kvp->v_rdev, FREAD|FWRITE, &tiptr, CRED()) != 0) {
+		VN_RELE(kvp);
+		return (EPROTO);
 	}
 
-	if (vp == NULL)
-		return (-1);
-
-	/* Get ibd ip's */
-	ip_cnt = 0;
-	for (k = 0, ipp = ibds->ibcm_arp_ip; k < ibds->ibcm_arp_ibd_cnt;
-	    k++, ipp++) {
-
-		(void) bzero((void *)&lif_req, sizeof (struct lifreq));
-		(void) snprintf(lif_req.lifr_name, sizeof (lif_req.lifr_name),
-		    "%s%d", IBCM_ARP_IBD_NAME, ipp->ip_inst);
-
-		(void) bzero((void *)&iocb, sizeof (struct strioctl));
-		iocb.ic_cmd = SIOCGLIFADDR;
-		iocb.ic_timout = 0;
-		iocb.ic_len = sizeof (struct lifreq);
-		iocb.ic_dp = (caddr_t)&lif_req;
-
-		if (kstr_ioctl(vp, I_STR, (intptr_t)&iocb) == 0) {
-			ipp->ip_inet_family = AF_INET;
-			bcopy(&lif_req.lifr_addr, &ipp->ip_cm_sin,
-			    sizeof (struct sockaddr_in));
-			ip_cnt++;
-			continue;
-		}
-	}
-
+	iocb.ic_cmd = cmd;
+	iocb.ic_timout = 0;
+	iocb.ic_len = len;
+	iocb.ic_dp = (caddr_t)arg;
+	err = kstr_ioctl(tiptr->fp->f_vnode, I_STR, (intptr_t)&iocb);
 	(void) t_kclose(tiptr, 0);
 	VN_RELE(kvp);
+	return (err);
+}
 
-	if (ip_cnt == 0)
-		return (-1);
-	else
-		return (0);
+/*
+ * Issue an SIOCGLIFCONF down to IP and return the result in `lifcp'.
+ * lifcp->lifc_buf is dynamically allocated to be *bufsizep bytes.
+ */
+static int
+ibcm_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep)
+{
+	int err;
+	struct lifnum lifn;
+
+	bzero(&lifn, sizeof (struct lifnum));
+	lifn.lifn_family = AF_UNSPEC;
+
+	err = ibcm_do_ip_ioctl(SIOCGLIFNUM, sizeof (struct lifnum), &lifn);
+	if (err != 0)
+		return (err);
+
+	/*
+	 * Pad the interface count to account for additional interfaces that
+	 * may have been configured between the SIOCGLIFNUM and SIOCGLIFCONF.
+	 */
+	lifn.lifn_count += 4;
+
+	bzero(lifcp, sizeof (struct lifconf));
+	lifcp->lifc_family = AF_UNSPEC;
+	lifcp->lifc_len = *bufsizep = lifn.lifn_count * sizeof (struct lifreq);
+	lifcp->lifc_buf = kmem_zalloc(*bufsizep, KM_SLEEP);
+
+	err = ibcm_do_ip_ioctl(SIOCGLIFCONF, sizeof (struct lifconf), lifcp);
+	if (err != 0) {
+		kmem_free(lifcp->lifc_buf, *bufsizep);
+		return (err);
+	}
+	return (0);
+}
+
+/*
+ * Fill in `ibds' with IP addresses tied to IFT_IB IP interfaces.  Returns
+ * B_TRUE if at least one address was filled in.
+ */
+static boolean_t
+ibcm_arp_get_ibd_ipaddr(ibcm_arp_ibd_insts_t *ibds)
+{
+	int i, nifs, naddr = 0;
+	uint_t bufsize;
+	struct lifconf lifc;
+	struct lifreq *lifrp;
+	ibcm_arp_ip_t *ipp;
+
+	if (ibcm_do_lifconf(&lifc, &bufsize) != 0)
+		return (B_FALSE);
+
+	nifs = lifc.lifc_len / sizeof (struct lifreq);
+	for (lifrp = lifc.lifc_req, i = 0;
+	    i < nifs && naddr < ibds->ibcm_arp_ibd_cnt; i++, lifrp++) {
+		if (lifrp->lifr_type != IFT_IB)
+			continue;
+
+		ipp = &ibds->ibcm_arp_ip[naddr];
+		switch (lifrp->lifr_addr.ss_family) {
+		case AF_INET:
+			ipp->ip_inet_family = AF_INET;
+			bcopy(&lifrp->lifr_addr, &ipp->ip_cm_sin,
+			    sizeof (struct sockaddr_in));
+			naddr++;
+			break;
+		case AF_INET6:
+			ipp->ip_inet_family = AF_INET6;
+			bcopy(&lifrp->lifr_addr, &ipp->ip_cm_sin6,
+			    sizeof (struct sockaddr_in6));
+			naddr++;
+			break;
+		}
+	}
+
+	kmem_free(lifc.lifc_buf, bufsize);
+	return (naddr > 0);
 }
 
 ibt_status_t
@@ -600,7 +651,7 @@ ibcm_arp_get_ibds(ibcm_arp_ibd_insts_t *ibdp)
 		return (IBT_SRC_IP_NOT_FOUND);
 
 	/* Get the IP addresses of active ports. */
-	if (ibcm_arp_get_ibd_ipaddr(ibdp) != 0) {
+	if (!ibcm_arp_get_ibd_ipaddr(ibdp)) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_arp_get_ibds: failed to get "
 		    "ibd instance: IBT_SRC_IP_NOT_FOUND");
 		return (IBT_SRC_IP_NOT_FOUND);

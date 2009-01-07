@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +76,7 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 {
 	dhcp_pif_t *pif;
 	struct lifreq lifr;
+	lifgroupinfo_t lifgr;
 	dlpi_handle_t dh = NULL;
 	int fd = isv6 ? v6_sock_fd : v4_sock_fd;
 
@@ -127,12 +128,60 @@ insert_pif(const char *pname, boolean_t isv6, int *error)
 	}
 
 	/*
-	 * For IPv4, use DLPI to determine the hardware type, hardware
-	 * address, and hardware address length.
+	 * Check if the pif is in an IPMP group.  Interfaces using IPMP don't
+	 * have dedicated hardware addresses, and get their hardware type from
+	 * the SIOCGLIFGROUPINFO ioctl rather than DLPI.
 	 */
-	if (!isv6) {
-		int		rc;
-		dlpi_info_t	dlinfo;
+	if (ioctl(fd, SIOCGLIFGROUPNAME, &lifr) == -1) {
+		*error = DHCP_IPC_E_INT;
+		dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFGROUPNAME for %s", pname);
+		goto failure;
+	}
+
+	if (lifr.lifr_groupname[0] != '\0') {
+		(void) strlcpy(lifgr.gi_grname, lifr.lifr_groupname,
+		    LIFGRNAMSIZ);
+		if (ioctl(fd, SIOCGLIFGROUPINFO, &lifgr) == -1) {
+			*error = DHCP_IPC_E_INT;
+			dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFGROUPINFO for %s",
+			    lifgr.gi_grname);
+			goto failure;
+		}
+
+		pif->pif_hwtype = dlpi_arptype(lifgr.gi_mactype);
+		pif->pif_under_ipmp = (strcmp(pname, lifgr.gi_grifname) != 0);
+		(void) strlcpy(pif->pif_grifname, lifgr.gi_grifname, LIFNAMSIZ);
+
+		/*
+		 * For IPMP underlying interfaces, stash the interface index
+		 * of the IPMP meta-interface; we'll use it to send/receive
+		 * traffic.  This is both necessary (since IP_BOUND_IF for
+		 * non-unicast traffic won't work on underlying interfaces)
+		 * and preferred (since a test address lease will be able to
+		 * be maintained as long as another interface in the group is
+		 * still functioning).
+		 */
+		if (pif->pif_under_ipmp) {
+			(void) strlcpy(lifr.lifr_name, pif->pif_grifname,
+			    LIFNAMSIZ);
+
+			if (ioctl(fd, SIOCGLIFINDEX, &lifr) == -1) {
+				*error = DHCP_IPC_E_INT;
+				dhcpmsg(MSG_ERR, "insert_pif: SIOCGLIFINDEX "
+				    "for %s", lifr.lifr_name);
+				goto failure;
+			}
+			pif->pif_grindex = lifr.lifr_index;
+		}
+	}
+
+	/*
+	 * For IPv4, if the hardware type is still unknown, use DLPI to
+	 * determine it, the hardware address, and hardware address length.
+	 */
+	if (!isv6 && pif->pif_hwtype == 0) {
+		int			rc;
+		dlpi_info_t		dlinfo;
 
 		if ((rc = dlpi_open(pname, &dh, 0)) != DLPI_SUCCESS) {
 			dhcpmsg(MSG_ERROR, "insert_pif: dlpi_open: %s",
@@ -661,11 +710,12 @@ verify_lif(const dhcp_lif_t *lif)
 	boolean_t isv6;
 	int fd;
 	struct lifreq lifr;
+	dhcp_pif_t *pif = lif->lif_pif;
 
 	(void) memset(&lifr, 0, sizeof (struct lifreq));
 	(void) strlcpy(lifr.lifr_name, lif->lif_name, LIFNAMSIZ);
 
-	isv6 = lif->lif_pif->pif_isv6;
+	isv6 = pif->pif_isv6;
 	fd = isv6 ? v6_sock_fd : v4_sock_fd;
 
 	if (ioctl(fd, SIOCGLIFFLAGS, &lifr) == -1) {
@@ -689,41 +739,39 @@ verify_lif(const dhcp_lif_t *lif)
 	}
 
 	/*
-	 * Special case: if the interface has gone down as a duplicate, then
-	 * this alone does _not_ mean that we're abandoning it just yet.  Allow
-	 * the state machine to handle this normally by trying to get a new
-	 * lease.
-	 */
-	if ((lifr.lifr_flags & (IFF_UP|IFF_DUPLICATE)) == IFF_DUPLICATE) {
-		dhcpmsg(MSG_DEBUG, "verify_lif: duplicate address on %s",
-		    lif->lif_name);
-		return (B_TRUE);
-	}
-
-	/*
-	 * If the user has torn down or started up the interface manually, then
-	 * abandon the lease.
-	 */
-	if ((lif->lif_flags ^ lifr.lifr_flags) & IFF_UP) {
-		dhcpmsg(MSG_DEBUG, "verify_lif: user has %s %s",
-		    lifr.lifr_flags & IFF_UP ? "started up" : "shut down",
-		    lif->lif_name);
-		return (B_FALSE);
-	}
-
-	/*
 	 * Check for delete and recreate.
 	 */
 	if (ioctl(fd, SIOCGLIFINDEX, &lifr) == -1) {
-		dhcpmsg(MSG_ERR, "verify_lif: SIOCGLIFINDEX failed on %s",
-		    lif->lif_name);
+		if (errno != ENXIO) {
+			dhcpmsg(MSG_ERR, "verify_lif: SIOCGLIFINDEX failed "
+			    "on %s", lif->lif_name);
+		}
 		return (B_FALSE);
 	}
-	if (lifr.lifr_index != lif->lif_pif->pif_index) {
+	if (lifr.lifr_index != pif->pif_index) {
 		dhcpmsg(MSG_DEBUG,
 		    "verify_lif: ifindex on %s changed: %u to %u",
-		    lif->lif_name, lif->lif_pif->pif_index, lifr.lifr_index);
+		    lif->lif_name, pif->pif_index, lifr.lifr_index);
 		return (B_FALSE);
+	}
+
+	if (pif->pif_under_ipmp) {
+		(void) strlcpy(lifr.lifr_name, pif->pif_grifname, LIFNAMSIZ);
+
+		if (ioctl(fd, SIOCGLIFINDEX, &lifr) == -1) {
+			if (errno != ENXIO) {
+				dhcpmsg(MSG_ERR, "verify_lif: SIOCGLIFINDEX "
+				    "failed on %s", lifr.lifr_name);
+			}
+			return (B_FALSE);
+		}
+
+		if (lifr.lifr_index != pif->pif_grindex) {
+			dhcpmsg(MSG_DEBUG, "verify_lif: IPMP group ifindex "
+			    "on %s changed: %u to %u", lifr.lifr_name,
+			    pif->pif_grindex, lifr.lifr_index);
+			return (B_FALSE);
+		}
 	}
 
 	/*
@@ -934,6 +982,13 @@ plumb_lif(dhcp_pif_t *pif, const in6_addr_t *addr)
 		    lifr.lifr_name);
 		goto failure;
 	}
+
+	/*
+	 * See comment in set_lif_dhcp().
+	 */
+	if (pif->pif_under_ipmp && !(lifr.lifr_flags & IFF_NOFAILOVER))
+		lifr.lifr_flags |= IFF_NOFAILOVER | IFF_DEPRECATED;
+
 	lifr.lifr_flags |= IFF_UP | IFF_DHCPRUNNING;
 	if (ioctl(v6_sock_fd, SIOCSLIFFLAGS, &lifr) == -1) {
 		dhcpmsg(MSG_ERR, "plumb_lif: SIOCSLIFFLAGS %s",
@@ -1060,8 +1115,9 @@ set_lif_dhcp(dhcp_lif_t *lif, boolean_t is_adopting)
 	int fd;
 	int err;
 	struct lifreq lifr;
+	dhcp_pif_t *pif = lif->lif_pif;
 
-	fd = lif->lif_pif->pif_isv6 ? v6_sock_fd : v4_sock_fd;
+	fd = pif->pif_isv6 ? v6_sock_fd : v4_sock_fd;
 
 	(void) strlcpy(lifr.lifr_name, lif->lif_name, LIFNAMSIZ);
 
@@ -1098,6 +1154,17 @@ set_lif_dhcp(dhcp_lif_t *lif, boolean_t is_adopting)
 			    "set on %s", lif->lif_name);
 		}
 	} else {
+		/*
+		 * If the lif is on an interface under IPMP, IFF_NOFAILOVER
+		 * must be set or the kernel will prevent us from setting
+		 * IFF_DHCPRUNNING (since the subsequent IFF_UP would lead to
+		 * migration).  We set IFF_DEPRECATED too since the kernel
+		 * will set it automatically when setting IFF_NOFAILOVER,
+		 * causing our lif_flags value to grow stale.
+		 */
+		if (pif->pif_under_ipmp && !(lifr.lifr_flags & IFF_NOFAILOVER))
+			lifr.lifr_flags |= IFF_NOFAILOVER | IFF_DEPRECATED;
+
 		lifr.lifr_flags |= IFF_DHCPRUNNING;
 		if (ioctl(fd, SIOCSLIFFLAGS, &lifr) == -1) {
 			dhcpmsg(MSG_ERR, "set_lif_dhcp: SIOCSLIFFLAGS for %s",
@@ -1207,6 +1274,13 @@ clear_lif_deprecated(dhcp_lif_t *lif)
 		return (B_FALSE);
 	}
 
+	/*
+	 * Don't try to clear IFF_DEPRECATED if this is a test address,
+	 * since IPMP's use of IFF_DEPRECATED is not compatible with ours.
+	 */
+	if (lifr.lifr_flags & IFF_NOFAILOVER)
+		return (B_TRUE);
+
 	if (!(lifr.lifr_flags & IFF_DEPRECATED))
 		return (B_TRUE);
 
@@ -1226,16 +1300,19 @@ clear_lif_deprecated(dhcp_lif_t *lif)
  *
  *   input: dhcp_lif_t *: the logical interface to operate on
  *	    in_addr_t: the address the socket will be bound to (in hbo)
+ *	    boolean_t: B_TRUE if the address should be brought up (if needed)
  *  output: boolean_t: B_TRUE if the socket was opened successfully.
  */
 
 boolean_t
-open_ip_lif(dhcp_lif_t *lif, in_addr_t addr_hbo)
+open_ip_lif(dhcp_lif_t *lif, in_addr_t addr_hbo, boolean_t bringup)
 {
 	const char *errmsg;
 	struct lifreq lifr;
 	int on = 1;
 	uchar_t ttl = 255;
+	uint32_t ifindex;
+	dhcp_pif_t *pif = lif->lif_pif;
 
 	if (lif->lif_sock_ip_fd != -1) {
 		dhcpmsg(MSG_WARNING, "open_ip_lif: socket already open on %s",
@@ -1270,7 +1347,7 @@ open_ip_lif(dhcp_lif_t *lif, in_addr_t addr_hbo)
 		}
 
 		if (setsockopt(lif->lif_sock_ip_fd, IPPROTO_IP, IP_DHCPINIT_IF,
-		    &lif->lif_pif->pif_index, sizeof (int)) == -1) {
+		    &pif->pif_index, sizeof (int)) == -1) {
 			errmsg = "cannot set IP_DHCPINIT_IF";
 			goto failure;
 		}
@@ -1288,23 +1365,40 @@ open_ip_lif(dhcp_lif_t *lif, in_addr_t addr_hbo)
 		goto failure;
 	}
 
-	if (setsockopt(lif->lif_sock_ip_fd, IPPROTO_IP, IP_BOUND_IF,
-	    &lif->lif_pif->pif_index, sizeof (int)) == -1) {
+	ifindex = pif->pif_under_ipmp ? pif->pif_grindex : pif->pif_index;
+	if (setsockopt(lif->lif_sock_ip_fd, IPPROTO_IP, IP_BOUND_IF, &ifindex,
+	    sizeof (int)) == -1) {
 		errmsg = "cannot set IP_BOUND_IF";
 		goto failure;
 	}
 
-	/*
-	 * Make sure at least one lif on the interface we used in IP_BOUND_IF
-	 * is IFF_UP so that we can send and receive IP packets.
-	 */
 	(void) strlcpy(lifr.lifr_name, lif->lif_name, LIFNAMSIZ);
 	if (ioctl(v4_sock_fd, SIOCGLIFFLAGS, &lifr) == -1) {
 		errmsg = "cannot get interface flags";
 		goto failure;
 	}
 
-	if (!(lifr.lifr_flags & IFF_UP)) {
+	/*
+	 * If the lif is part of an interface under IPMP, IFF_NOFAILOVER must
+	 * be set or the kernel will prevent us from setting IFF_DHCPRUNNING
+	 * (since the subsequent IFF_UP would lead to migration).  We set
+	 * IFF_DEPRECATED too since the kernel will set it automatically when
+	 * setting IFF_NOFAILOVER, causing our lif_flags value to grow stale.
+	 */
+	if (pif->pif_under_ipmp && !(lifr.lifr_flags & IFF_NOFAILOVER)) {
+		lifr.lifr_flags |= IFF_NOFAILOVER | IFF_DEPRECATED;
+		if (ioctl(v4_sock_fd, SIOCSLIFFLAGS, &lifr) == -1) {
+			errmsg = "cannot set IFF_NOFAILOVER";
+			goto failure;
+		}
+	}
+	lif->lif_flags = lifr.lifr_flags;
+
+	/*
+	 * If this is initial bringup, make sure the address we're acquiring a
+	 * lease on is IFF_UP.
+	 */
+	if (bringup && !(lifr.lifr_flags & IFF_UP)) {
 		/*
 		 * Start from a clean slate.
 		 */
@@ -1328,6 +1422,30 @@ open_ip_lif(dhcp_lif_t *lif, in_addr_t addr_hbo)
 
 		lif->lif_netmask =
 		    ((struct sockaddr_in *)&lifr.lifr_addr)->sin_addr.s_addr;
+	}
+
+	/*
+	 * Usually, bringing up the address we're acquiring a lease on is
+	 * sufficient to allow packets to be sent and received via the
+	 * IP_BOUND_IF we did earlier.  However, if we're acquiring a lease on
+	 * an underlying IPMP interface, the group interface will be used for
+	 * sending and receiving IP packets via IP_BOUND_IF.  Thus, ensure at
+	 * least one address on the group interface is IFF_UP.
+	 */
+	if (bringup && pif->pif_under_ipmp) {
+		(void) strlcpy(lifr.lifr_name, pif->pif_grifname, LIFNAMSIZ);
+		if (ioctl(v4_sock_fd, SIOCGLIFFLAGS, &lifr) == -1) {
+			errmsg = "cannot get IPMP group interface flags";
+			goto failure;
+		}
+
+		if (!(lifr.lifr_flags & IFF_UP)) {
+			lifr.lifr_flags |= IFF_UP;
+			if (ioctl(v4_sock_fd, SIOCSLIFFLAGS, &lifr) == -1) {
+				errmsg = "cannot bring up IPMP group interface";
+				goto failure;
+			}
+		}
 	}
 
 	lif->lif_packet_id = iu_register_event(eh, lif->lif_sock_ip_fd, POLLIN,

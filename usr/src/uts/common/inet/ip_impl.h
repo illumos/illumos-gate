@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -394,11 +394,9 @@ typedef struct ip_lso_info_s {
 #define	CONN_IS_LSO_MD_FASTPATH(connp)	\
 	((connp)->conn_dontroute == 0 &&	/* SO_DONTROUTE */	\
 	!((connp)->conn_nexthop_set) &&		/* IP_NEXTHOP */	\
-	(connp)->conn_nofailover_ill == NULL &&	/* IPIF_NOFAILOVER */	\
-	(connp)->conn_outgoing_pill == NULL &&	/* IP{V6}_BOUND_PIF */	\
 	(connp)->conn_outgoing_ill == NULL)	/* IP{V6}_BOUND_IF */
 
-/* Definitons for fragmenting IP packets using MDT. */
+/* Definitions for fragmenting IP packets using MDT. */
 
 /*
  * Smaller and private version of pdescinfo_t used specifically for IP,

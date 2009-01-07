@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -85,6 +85,30 @@
  * talking to a given peer, then it doesn't matter if we have the right mapping
  * for that peer.  It would be possible to send queries on aging entries that
  * are active, but this isn't done.
+ *
+ * IPMP Notes
+ * ----------
+ *
+ * ARP is aware of IPMP.  In particular, IP notifies ARP about all "active"
+ * (able to transmit data packets) interfaces in a given group via
+ * AR_IPMP_ACTIVATE and AR_IPMP_DEACTIVATE messages.  These messages, combined
+ * with the "IPMP arl_t" that ARP creates over the IPMP DLPI stub driver,
+ * enable ARP to track all the arl_t's that are in the same group and thus
+ * ensure that ACEs are shared across each group and the arl_t that ARP
+ * chooses to transmit on for a given ACE is optimal.
+ *
+ * ARP relies on IP for hardware address updates.  In particular, if the
+ * hardware address of an interface changes (DL_NOTE_PHYS_ADDR), then IP will
+ * bring the interface down and back up -- and as part of bringing it back
+ * up, will send messages to ARP that allow it to update the affected arl's
+ * with new hardware addresses.
+ *
+ * N.B.: One side-effect of this approach is that when an interface fails and
+ * then starts to repair, it will temporarily populate the ARP cache with
+ * addresses that are owned by it rather than the group's arl_t.  To address
+ * this, we could add more messages (e.g., AR_IPMP_JOIN and AR_IPMP_LEAVE),
+ * but as the issue appears to be only cosmetic (redundant entries in the ARP
+ * cache during interace repair), we've kept things simple for now.
  */
 
 /*
@@ -134,6 +158,12 @@ typedef struct {
 #define	ARH_FIXED_LEN	8
 
 /*
+ * Macro used when creating ACEs to determine the arl that should own it.
+ */
+#define	OWNING_ARL(arl)							\
+	((arl)->arl_ipmp_arl != NULL ? (arl)->arl_ipmp_arl : arl)
+
+/*
  * MAC-specific intelligence.  Shouldn't be needed, but the DL_INFO_ACK
  * doesn't quite do it for us.
  */
@@ -154,7 +184,7 @@ static int	ar_ce_create(arl_t *arl, uint32_t proto, uchar_t *hw_addr,
     uint32_t hw_addr_len, uchar_t *proto_addr,
     uint32_t proto_addr_len, uchar_t *proto_mask,
     uchar_t *proto_extract_mask, uint32_t hw_extract_start,
-    uint32_t flags);
+    uchar_t *sender_addr, uint32_t flags);
 static void	ar_ce_delete(ace_t *ace);
 static void	ar_ce_delete_per_arl(ace_t *ace, void *arg);
 static ace_t	**ar_ce_hash(arp_stack_t *as, uint32_t proto,
@@ -167,6 +197,8 @@ static ace_t	*ar_ce_lookup_from_area(arp_stack_t *as, mblk_t *mp,
     ace_t *matchfn());
 static ace_t	*ar_ce_lookup_mapping(arl_t *arl, uint32_t proto,
     const uchar_t *proto_addr, uint32_t proto_addr_length);
+static ace_t	*ar_ce_lookup_permanent(arp_stack_t *as, uint32_t proto,
+    uchar_t *proto_addr, uint32_t proto_addr_length);
 static boolean_t ar_ce_resolve(ace_t *ace, const uchar_t *hw_addr,
     uint32_t hw_addr_length);
 static void	ar_ce_walk(arp_stack_t *as, void (*pfi)(ace_t *, void *),
@@ -187,6 +219,8 @@ static int	ar_interface_up(queue_t *q, mblk_t *mp);
 static int	ar_interface_down(queue_t *q, mblk_t *mp);
 static int	ar_interface_on(queue_t *q, mblk_t *mp);
 static int	ar_interface_off(queue_t *q, mblk_t *mp);
+static int	ar_ipmp_activate(queue_t *q, mblk_t *mp);
+static int	ar_ipmp_deactivate(queue_t *q, mblk_t *mp);
 static void	ar_ll_cleanup_arl_queue(queue_t *q);
 static void	ar_ll_down(arl_t *arl);
 static arl_t	*ar_ll_lookup_by_name(arp_stack_t *as, const char *name);
@@ -208,7 +242,7 @@ static int	ar_param_set(queue_t *q, mblk_t *mp, char *value,
 static void	ar_query_delete(ace_t *ace, void *ar);
 static void	ar_query_reply(ace_t *ace, int ret_val,
     uchar_t *proto_addr, uint32_t proto_addr_len);
-static clock_t	ar_query_xmit(arp_stack_t *as, ace_t *ace, ace_t *src_ace);
+static clock_t	ar_query_xmit(arp_stack_t *as, ace_t *ace);
 static void	ar_rput(queue_t *q, mblk_t *mp_orig);
 static void	ar_rput_dlpi(queue_t *q, mblk_t *mp);
 static void	ar_set_address(ace_t *ace, uchar_t *addrpos,
@@ -344,6 +378,10 @@ static arct_t	ar_cmd_tbl[] = {
 	    ARF_ONLY_CMD, OP_CONFIG, "AR_INTERFACE_ON" },
 	{ ar_interface_off,	AR_INTERFACE_OFF,	sizeof (arc_t),
 	    ARF_ONLY_CMD, OP_CONFIG, "AR_INTERFACE_OFF" },
+	{ ar_ipmp_activate,	AR_IPMP_ACTIVATE,	sizeof (arie_t),
+	    ARF_ONLY_CMD, OP_CONFIG, "AR_IPMP_ACTIVATE" },
+	{ ar_ipmp_deactivate, 	AR_IPMP_DEACTIVATE,	sizeof (arie_t),
+	    ARF_ONLY_CMD, OP_CONFIG, "AR_IPMP_DEACTIVATE" },
 	{ ar_set_ppa,		(uint32_t)IF_UNITSEL,	sizeof (int),
 	    ARF_IOCTL_AWARE | ARF_WPUT_OK, OP_CONFIG, "IF_UNITSEL" },
 	{ ar_nd_ioctl,		ND_GET,			1,
@@ -358,6 +396,65 @@ static arct_t	ar_cmd_tbl[] = {
 };
 
 /*
+ * Lookup and return an arl appropriate for sending packets with either source
+ * hardware address `hw_addr' or source protocol address `ip_addr', in that
+ * order.  If neither was specified or neither match, return any arl in the
+ * same group as `arl'.
+ */
+static arl_t *
+ar_ipmp_lookup_xmit_arl(arl_t *arl, uchar_t *hw_addr, uint_t hw_addrlen,
+    uchar_t *ip_addr)
+{
+	arlphy_t *ap;
+	ace_t *src_ace;
+	arl_t *xmit_arl = NULL;
+	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
+
+	ASSERT(arl->arl_flags & ARL_F_IPMP);
+
+	if (hw_addr != NULL && hw_addrlen != 0) {
+		xmit_arl = as->as_arl_head;
+		for (; xmit_arl != NULL; xmit_arl = xmit_arl->arl_next) {
+			/*
+			 * There may be arls with the same HW address that are
+			 * not in our IPMP group; we don't want those.
+			 */
+			if (xmit_arl->arl_ipmp_arl != arl)
+				continue;
+
+			ap = xmit_arl->arl_phy;
+			if (ap != NULL && ap->ap_hw_addrlen == hw_addrlen &&
+			    bcmp(ap->ap_hw_addr, hw_addr, hw_addrlen) == 0)
+				break;
+		}
+
+		DTRACE_PROBE4(xmit_arl_hwsrc, arl_t *, arl, arl_t *,
+		    xmit_arl, uchar_t *, hw_addr, uint_t, hw_addrlen);
+	}
+
+	if (xmit_arl == NULL && ip_addr != NULL) {
+		src_ace = ar_ce_lookup_permanent(as, IP_ARP_PROTO_TYPE, ip_addr,
+		    IP_ADDR_LEN);
+		if (src_ace != NULL)
+			xmit_arl = src_ace->ace_xmit_arl;
+
+		DTRACE_PROBE4(xmit_arl_ipsrc, arl_t *, arl, arl_t *,
+		    xmit_arl, uchar_t *, ip_addr, uint_t, IP_ADDR_LEN);
+	}
+
+	if (xmit_arl == NULL) {
+		xmit_arl = as->as_arl_head;
+		for (; xmit_arl != NULL; xmit_arl = xmit_arl->arl_next)
+			if (xmit_arl->arl_ipmp_arl == arl && xmit_arl != arl)
+				break;
+
+		DTRACE_PROBE2(xmit_arl_any, arl_t *, arl, arl_t *, xmit_arl);
+	}
+
+	return (xmit_arl);
+}
+
+/*
  * ARP Cache Entry creation routine.
  * Cache entries are allocated within timer messages and inserted into
  * the global hash list based on protocol and protocol address.
@@ -365,7 +462,8 @@ static arct_t	ar_cmd_tbl[] = {
 static int
 ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
     uchar_t *proto_addr, uint_t proto_addr_len, uchar_t *proto_mask,
-    uchar_t *proto_extract_mask, uint_t hw_extract_start, uint_t flags)
+    uchar_t *proto_extract_mask, uint_t hw_extract_start, uchar_t *sender_addr,
+    uint_t flags)
 {
 	static ace_t	ace_null;
 	ace_t	*ace;
@@ -373,16 +471,34 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 	uchar_t	*dst;
 	mblk_t	*mp;
 	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
+	arl_t	*xmit_arl;
 	arlphy_t *ap;
 
 	if ((flags & ~ACE_EXTERNAL_FLAGS_MASK) || arl == NULL)
 		return (EINVAL);
 
-	if ((ap = arl->arl_phy) == NULL)
+	if (proto_addr == NULL || proto_addr_len == 0 ||
+	    (proto == IP_ARP_PROTO_TYPE && proto_addr_len != IP_ADDR_LEN))
 		return (EINVAL);
 
 	if (flags & ACE_F_MYADDR)
 		flags |= ACE_F_PUBLISH | ACE_F_AUTHORITY;
+
+	/*
+	 * Latch a transmit arl for this ace.
+	 */
+	if (arl->arl_flags & ARL_F_IPMP) {
+		ASSERT(proto == IP_ARP_PROTO_TYPE);
+		xmit_arl = ar_ipmp_lookup_xmit_arl(arl, hw_addr, hw_addr_len,
+		    sender_addr);
+	} else {
+		xmit_arl = arl;
+	}
+
+	if (xmit_arl == NULL || xmit_arl->arl_phy == NULL)
+		return (EINVAL);
+
+	ap = xmit_arl->arl_phy;
 
 	if (!hw_addr && hw_addr_len == 0) {
 		if (flags == ACE_F_PERMANENT) {	/* Not publish */
@@ -398,9 +514,6 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 		flags |= ACE_F_RESOLVED;
 	}
 
-	if (proto_addr == NULL || proto_addr_len == 0 ||
-	    (proto == IP_ARP_PROTO_TYPE && proto_addr_len != IP_ADDR_LEN))
-		return (EINVAL);
 	/* Handle hw_addr_len == 0 for DL_ENABMULTI_REQ etc. */
 	if (hw_addr_len != 0 && hw_addr == NULL)
 		return (EINVAL);
@@ -432,6 +545,7 @@ ar_ce_create(arl_t *arl, uint_t proto, uchar_t *hw_addr, uint_t hw_addr_len,
 	ace->ace_proto = proto;
 	ace->ace_mp = mp;
 	ace->ace_arl = arl;
+	ace->ace_xmit_arl = xmit_arl;
 
 	dst = (uchar_t *)&ace[1];
 
@@ -510,10 +624,71 @@ ar_ce_delete(ace_t *ace)
 static void
 ar_ce_delete_per_arl(ace_t *ace, void *arl)
 {
-	if (ace->ace_arl == arl) {
+	if (ace->ace_arl == arl || ace->ace_xmit_arl == arl) {
 		ace->ace_flags &= ~ACE_F_PERMANENT;
 		ar_ce_delete(ace);
 	}
+}
+
+/*
+ * ar_ce_walk routine used when deactivating an `arl' in a group.  Deletes
+ * `ace' if it was using `arl_arg' as its output interface.
+ */
+static void
+ar_ce_ipmp_deactivate(ace_t *ace, void *arl_arg)
+{
+	arl_t *arl = arl_arg;
+
+	ASSERT(!(arl->arl_flags & ARL_F_IPMP));
+
+	if (ace->ace_arl == arl) {
+		ASSERT(ace->ace_xmit_arl == arl);
+		/*
+		 * This ACE is tied to the arl leaving the group (e.g., an
+		 * ACE_F_PERMANENT for a test address) and is not used by the
+		 * group, so we can leave it be.
+		 */
+		return;
+	}
+
+	if (ace->ace_xmit_arl != arl)
+		return;
+
+	ASSERT(ace->ace_arl == arl->arl_ipmp_arl);
+
+	/*
+	 * IP should've already sent us messages asking us to move any
+	 * ACE_F_MYADDR entries to another arl, but there are two exceptions:
+	 *
+	 * 1. The group was misconfigured with interfaces that have duplicate
+	 *    hardware addresses, but in.mpathd was unable to offline those
+	 *    duplicate interfaces.
+	 *
+	 * 2. The messages from IP were lost or never created (e.g. due to
+	 *    memory pressure).
+	 *
+	 * We handle the first case by just quietly deleting the ACE.  Since
+	 * the second case cannot be distinguished from a more serious bug in
+	 * the IPMP framework, we ASSERT() that this can't happen on DEBUG
+	 * systems, but quietly delete the ACE on production systems (the
+	 * deleted ACE will render the IP address unreachable).
+	 */
+	if (ace->ace_flags & ACE_F_MYADDR) {
+		arlphy_t *ap = arl->arl_phy;
+		uint_t hw_addrlen = ap->ap_hw_addrlen;
+
+		ASSERT(hw_addrlen == ace->ace_hw_addr_length &&
+		    bcmp(ap->ap_hw_addr, ace->ace_hw_addr, hw_addrlen) == 0);
+	}
+
+	/*
+	 * NOTE: it's possible this arl got selected as the ace_xmit_arl when
+	 * creating an ACE_F_PERMANENT ACE on behalf of an SIOCS*ARP ioctl for
+	 * an IPMP IP interface.  But it's still OK for us to delete such an
+	 * ACE since ipmp_illgrp_refresh_arpent() will ask us to recreate it
+	 * and we'll pick another arl then.
+	 */
+	ar_ce_delete(ace);
 }
 
 /* Cache entry hash routine, based on protocol and protocol address. */
@@ -559,7 +734,8 @@ ar_ce_lookup_entry(arl_t *arl, uint32_t proto, const uchar_t *proto_addr,
 		return (NULL);
 	ace = *ar_ce_hash(as, proto, proto_addr, proto_addr_length);
 	for (; ace; ace = ace->ace_next) {
-		if (ace->ace_arl == arl &&
+		if ((ace->ace_arl == arl ||
+		    ace->ace_arl == arl->arl_ipmp_arl) &&
 		    ace->ace_proto_addr_length == proto_addr_length &&
 		    ace->ace_proto == proto) {
 			int	i1 = proto_addr_length;
@@ -632,13 +808,6 @@ ar_ce_lookup_mapping(arl_t *arl, uint32_t proto, const uchar_t *proto_addr,
 
 /*
  * Look for a permanent entry for proto_addr across all interfaces.
- * This is used for sending ARP requests out. Requests may come from
- * IP on le0 with the source address of le1 and we need to send out
- * the request on le1 so that ARP does not think that somebody else
- * is using its PERMANENT address. If le0 and le1 are sitting on
- * the same wire, the same IP -> ethernet mapping might exist on
- * both the interfaces. But we should look for the permanent
- * mapping to avoid arp interpreting it as a duplicate.
  */
 static ace_t *
 ar_ce_lookup_permanent(arp_stack_t *as, uint32_t proto, uchar_t *proto_addr,
@@ -653,8 +822,8 @@ ar_ce_lookup_permanent(arp_stack_t *as, uint32_t proto, uchar_t *proto_addr,
 		if (ace->ace_proto_addr_length == proto_addr_length &&
 		    ace->ace_proto == proto) {
 			int	i1 = proto_addr_length;
-			uchar_t	*ace_addr = ace->ace_proto_addr;
-			uchar_t	*mask = ace->ace_proto_mask;
+			uchar_t *ace_addr = ace->ace_proto_addr;
+			uchar_t *mask = ace->ace_proto_mask;
 
 			/*
 			 * Note that the ace_proto_mask is applied to the
@@ -703,12 +872,8 @@ ar_ce_resolve(ace_t *ace, const uchar_t *hw_addr, uint32_t hw_addr_length)
  * 1. Resolution of unresolved entries and update of resolved entries.
  * 2. Detection of nodes with our own IP address (duplicates).
  *
- * This is complicated by ill groups.  We don't currently have knowledge of ill
- * groups, so we can't distinguish between a packet that comes in on one of the
- * arls that's part of the group versus one that's on an unrelated arl.  Thus,
- * we take a conservative approach.  If the arls match, then we update resolved
- * and unresolved entries alike.  If they don't match, then we update only
- * unresolved entries.
+ * If the resolving ARL is in the same group as a matching ACE's ARL, then
+ * update the ACE.  Otherwise, make no updates.
  *
  * For all entries, we first check to see if this is a duplicate (probable
  * loopback) message.  If so, then just ignore it.
@@ -741,7 +906,7 @@ ar_ce_resolve(ace_t *ace, const uchar_t *hw_addr, uint32_t hw_addr_length)
 
 static int
 ar_ce_resolve_all(arl_t *arl, uint32_t proto, const uchar_t *src_haddr,
-    uint32_t hlen, const uchar_t *src_paddr, uint32_t plen)
+    uint32_t hlen, const uchar_t *src_paddr, uint32_t plen, arl_t **ace_arlp)
 {
 	ace_t *ace;
 	ace_t *ace_next;
@@ -778,31 +943,35 @@ ar_ce_resolve_all(arl_t *arl, uint32_t proto, const uchar_t *src_haddr,
 		if (i1 >= 0)
 			continue;
 
+		*ace_arlp = ace->ace_arl;
+
 		/*
-		 * If both IP addr and hardware address match what we already
-		 * have, then this is a broadcast packet emitted by one of our
-		 * interfaces, reflected by the switch and received on another
-		 * interface.  We return AR_LOOPBACK.
+		 * If the IP address is ours, and the hardware address matches
+		 * one of our own arls, then this is a broadcast packet
+		 * emitted by one of our interfaces, reflected by the switch
+		 * and received on another interface.  We return AR_LOOPBACK.
 		 */
-		if ((ace->ace_flags & ACE_F_MYADDR) &&
-		    hlen == ace->ace_hw_addr_length &&
-		    bcmp(ace->ace_hw_addr, src_haddr,
-		    ace->ace_hw_addr_length) == 0) {
-			return (AR_LOOPBACK);
+		if (ace->ace_flags & ACE_F_MYADDR) {
+			arl_t *hw_arl = as->as_arl_head;
+			arlphy_t *ap;
+
+			for (; hw_arl != NULL; hw_arl = hw_arl->arl_next) {
+				ap = hw_arl->arl_phy;
+				if (ap != NULL && ap->ap_hw_addrlen == hlen &&
+				    bcmp(ap->ap_hw_addr, src_haddr, hlen) == 0)
+					return (AR_LOOPBACK);
+			}
 		}
 
 		/*
 		 * If the entry is unverified, then we've just verified that
 		 * someone else already owns this address, because this is a
 		 * message with the same protocol address but different
-		 * hardware address. Conflicts received via an interface which
-		 * doesn't own the conflict address are not actioned. Multiple
-		 * interfaces on the same segment imply any conflict will also
-		 * be seen via the correct interface, so we can ignore anything
-		 * not matching the arl from the ace.
+		 * hardware address.  NOTE: the ace_xmit_arl check ensures we
+		 * don't send duplicate AR_FAILEDs if arl is in an IPMP group.
 		 */
 		if ((ace->ace_flags & ACE_F_UNVERIFIED) &&
-		    arl == ace->ace_arl) {
+		    arl == ace->ace_xmit_arl) {
 			ar_ce_delete(ace);
 			return (AR_FAILED);
 		}
@@ -814,30 +983,29 @@ ar_ce_resolve_all(arl_t *arl, uint32_t proto, const uchar_t *src_haddr,
 		 * that, if we're currently in initial announcement mode, we
 		 * switch back to the lazier defense mode.  Knowing that
 		 * there's at least one duplicate out there, we ought not
-		 * blindly announce. Conflicts received via an interface which
-		 * doesn't own the conflict address are not actioned. Multiple
-		 * interfaces on the same segment imply the conflict will also
-		 * be seen via the correct interface, so we can ignore anything
-		 * not matching the arl from the ace.
+		 * blindly announce.  NOTE: the ace_xmit_arl check ensures we
+		 * don't send duplicate AR_BOGONs if arl is in an IPMP group.
 		 */
 		if ((ace->ace_flags & ACE_F_AUTHORITY) &&
-		    arl == ace->ace_arl) {
+		    arl == ace->ace_xmit_arl) {
 			ace->ace_xmit_count = 0;
 			return (AR_BOGON);
 		}
 
 		/*
-		 * Limit updating across other ills to unresolved
-		 * entries only.  We don't want to inadvertently update
-		 * published entries.
+		 * Only update this ACE if it's on the same network -- i.e.,
+		 * it's for our ARL or another ARL in the same IPMP group.
 		 */
-		if (ace->ace_arl == arl || !ACE_RESOLVED(ace)) {
+		if (ace->ace_arl == arl || ace->ace_arl == arl->arl_ipmp_arl) {
 			if (ar_ce_resolve(ace, src_haddr, hlen))
 				retv = AR_CHANGED;
 			else if (retv == AR_NOTFOUND)
 				retv = AR_MERGED;
 		}
 	}
+
+	if (retv == AR_NOTFOUND)
+		*ace_arlp = NULL;
 	return (retv);
 }
 
@@ -917,7 +1085,7 @@ static void
 ar_delete_notify(const ace_t *ace)
 {
 	const arl_t *arl = ace->ace_arl;
-	const arlphy_t *ap = arl->arl_phy;
+	const arlphy_t *ap = ace->ace_xmit_arl->arl_phy;
 	mblk_t	*mp;
 	size_t	len;
 	arh_t	*arh;
@@ -945,7 +1113,7 @@ ar_close(queue_t *q)
 {
 	ar_t	*ar = (ar_t *)q->q_ptr;
 	char	name[LIFNAMSIZ];
-	arl_t	*arl;
+	arl_t	*arl, *xarl;
 	arl_t	**arlp;
 	cred_t	*cr;
 	arc_t	*arc;
@@ -998,6 +1166,21 @@ ar_close(queue_t *q)
 
 		while (arl->arl_state != ARL_S_DOWN)
 			qwait(arl->arl_rq);
+
+		if (arl->arl_flags & ARL_F_IPMP) {
+			/*
+			 * Though rude, someone could force the IPMP arl
+			 * closed without removing the underlying interfaces.
+			 * In that case, force the ARLs out of the group.
+			 */
+			xarl = as->as_arl_head;
+			for (; xarl != NULL; xarl = xarl->arl_next) {
+				if (xarl->arl_ipmp_arl != arl || xarl == arl)
+					continue;
+				ar_ce_walk(as, ar_ce_ipmp_deactivate, xarl);
+				xarl->arl_ipmp_arl = NULL;
+			}
+		}
 
 		ar_ll_clear_defaults(arl);
 		/*
@@ -1417,9 +1600,9 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 	area_t	*area;
 	ace_t	*ace;
 	uchar_t	*hw_addr;
-	uint32_t	hw_addr_len;
+	uint32_t hw_addr_len;
 	uchar_t	*proto_addr;
-	uint32_t	proto_addr_len;
+	uint32_t proto_addr_len;
 	uchar_t	*proto_mask;
 	arl_t	*arl;
 	mblk_t	*mp = mp_orig;
@@ -1494,6 +1677,7 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 	    proto_mask,
 	    NULL,
 	    (uint32_t)0,
+	    NULL,
 	    aflags & ~ACE_F_MAPPING & ~ACE_F_UNVERIFIED & ~ACE_F_DEFEND);
 	if (err != 0) {
 		DTRACE_PROBE3(eadd_create_failed, arl_t *, arl, area_t *, area,
@@ -1502,7 +1686,13 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 	}
 
 	if (aflags & ACE_F_PUBLISH) {
-		arlphy_t *ap = arl->arl_phy;
+		arlphy_t *ap;
+
+		ace = ar_ce_lookup(arl, area->area_proto, proto_addr,
+		    proto_addr_len);
+		ASSERT(ace != NULL);
+
+		ap = ace->ace_xmit_arl->arl_phy;
 
 		if (hw_addr == NULL || hw_addr_len == 0) {
 			hw_addr = ap->ap_hw_addr;
@@ -1518,10 +1708,6 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 			bcopy(hw_addr, ap->ap_hw_addr, hw_addr_len);
 			ap->ap_hw_addrlen = hw_addr_len;
 		}
-
-		ace = ar_ce_lookup(arl, area->area_proto, proto_addr,
-		    proto_addr_len);
-		ASSERT(ace != NULL);
 
 		if (ace->ace_flags & ACE_F_FAST) {
 			ace->ace_xmit_count = as->as_fastprobe_count;
@@ -1555,9 +1741,9 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 				 */
 				DTRACE_PROBE2(eadd_probe, ace_t *, ace,
 				    area_t *, area);
-				ar_xmit(arl, ARP_REQUEST, area->area_proto,
-				    proto_addr_len, hw_addr, NULL, NULL,
-				    proto_addr, NULL, as);
+				ar_xmit(ace->ace_xmit_arl, ARP_REQUEST,
+				    area->area_proto, proto_addr_len,
+				    hw_addr, NULL, NULL, proto_addr, NULL, as);
 				ace->ace_xmit_count--;
 				ace->ace_xmit_interval =
 				    (ace->ace_flags & ACE_F_FAST) ?
@@ -1573,9 +1759,9 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 		} else {
 			DTRACE_PROBE2(eadd_announce, ace_t *, ace,
 			    area_t *, area);
-			ar_xmit(arl, ARP_REQUEST, area->area_proto,
-			    proto_addr_len, hw_addr, proto_addr,
-			    ap->ap_arp_addr, proto_addr, NULL, as);
+			ar_xmit(ace->ace_xmit_arl, ARP_REQUEST,
+			    area->area_proto, proto_addr_len, hw_addr,
+			    proto_addr, ap->ap_arp_addr, proto_addr, NULL, as);
 			ace->ace_last_bcast = ddi_get_lbolt();
 
 			/*
@@ -1583,9 +1769,9 @@ ar_entry_add(queue_t *q, mblk_t *mp_orig)
 			 * entry; we believe we're the authority for this
 			 * entry.  In that case, and if we're not just doing
 			 * one-off defense of the address, we send more than
-			 * one copy, so that if this is an IPMP failover, we'll
-			 * still have a good chance of updating everyone even
-			 * when there's a packet loss or two.
+			 * one copy, so we'll still have a good chance of
+			 * updating everyone even when there's a packet loss
+			 * or two.
 			 */
 			if ((aflags & ACE_F_AUTHORITY) &&
 			    !(aflags & ACE_F_DEFEND) &&
@@ -1667,7 +1853,6 @@ static int
 ar_entry_query(queue_t *q, mblk_t *mp_orig)
 {
 	ace_t	*ace;
-	ace_t	*src_ace = NULL;
 	areq_t	*areq;
 	arl_t	*arl;
 	int	err;
@@ -1782,20 +1967,12 @@ ar_entry_query(queue_t *q, mblk_t *mp_orig)
 			err = ENXIO;
 			goto err_ret;
 		}
-		if (arl->arl_phy == NULL) {
-			/* Can't get help if we don't know how. */
-			DTRACE_PROBE2(query_no_phy, ace_t *, ace,
-			    areq_t *, areq);
-			mpp[0] = NULL;
-			mp->b_prev = NULL;
-			err = ENXIO;
-			goto err_ret;
-		}
 		DTRACE_PROBE2(query_unresolved, ace_t, ace, areq_t *, areq);
 	} else {
 		/* No ace yet.	Make one now.  (This is the common case.) */
-		if (areq->areq_xmit_count == 0 || arl->arl_phy == NULL) {
-			DTRACE_PROBE2(query_phy, arl_t *, arl, areq_t *, areq);
+		if (areq->areq_xmit_count == 0) {
+			DTRACE_PROBE2(query_template, arl_t *, arl,
+			    areq_t *, areq);
 			mp->b_prev = NULL;
 			err = ENXIO;
 			goto err_ret;
@@ -1814,9 +1991,9 @@ ar_entry_query(queue_t *q, mblk_t *mp_orig)
 			err = EINVAL;
 			goto err_ret;
 		}
-		err = ar_ce_create(arl, areq->areq_proto, NULL, 0,
+		err = ar_ce_create(OWNING_ARL(arl), areq->areq_proto, NULL, 0,
 		    proto_addr, proto_addr_len, NULL,
-		    NULL, (uint32_t)0,
+		    NULL, (uint32_t)0, sender_addr,
 		    areq->areq_flags);
 		if (err != 0) {
 			DTRACE_PROBE3(query_create_failed, arl_t *, arl,
@@ -1835,49 +2012,13 @@ ar_entry_query(queue_t *q, mblk_t *mp_orig)
 			goto err_ret;
 		}
 		ace->ace_query_mp = mp;
-		/*
-		 * We don't have group information here. But if the sender
-		 * address belongs to a different arl, we might as well
-		 * search the other arl for a resolved ACE. If we find one,
-		 * we resolve it rather than sending out a ARP request.
-		 */
-		src_ace = ar_ce_lookup_permanent(as, areq->areq_proto,
-		    sender_addr, areq->areq_sender_addr_length);
-		if (src_ace == NULL) {
-			DTRACE_PROBE3(query_source_missing, arl_t *, arl,
-			    areq_t *, areq, ace_t *, ace);
-			ar_query_reply(ace, ENXIO, NULL, (uint32_t)0);
-			/*
-			 * ar_query_reply has already freed the mp.
-			 * Return EINPROGRESS, so that caller won't attempt
-			 * to free the 'mp' again.
-			 */
-			return (EINPROGRESS);
-		}
-		if (src_ace->ace_arl != ace->ace_arl) {
-			ace_t *dst_ace;
-
-			/*
-			 * Check for a resolved entry in the src_ace->ace_arl.
-			 */
-			dst_ace = ar_ce_lookup_entry(src_ace->ace_arl,
-			    areq->areq_proto, proto_addr, proto_addr_len);
-
-			if (dst_ace != NULL && ACE_RESOLVED(dst_ace)) {
-				DTRACE_PROBE3(query_other_arl, arl_t *, arl,
-				    areq_t *, areq, ace_t *, dst_ace);
-				(void) ar_ce_resolve(ace, dst_ace->ace_hw_addr,
-				    dst_ace->ace_hw_addr_length);
-				return (EINPROGRESS);
-			}
-		}
 	}
-	ms = ar_query_xmit(as, ace, src_ace);
+	ms = ar_query_xmit(as, ace);
 	if (ms == 0) {
 		/* Immediate reply requested. */
 		ar_query_reply(ace, ENXIO, NULL, (uint32_t)0);
 	} else {
-		mi_timer(arl->arl_wq, ace->ace_mp, ms);
+		mi_timer(ace->ace_arl->arl_wq, ace->ace_mp, ms);
 	}
 	return (EINPROGRESS);
 err_ret:
@@ -2073,6 +2214,80 @@ done:
 }
 
 /*
+ * Given an arie_t `mp', find the arl_t's that it names and return them
+ * in `*arlp' and `*ipmp_arlp'.  If they cannot be found, return B_FALSE.
+ */
+static boolean_t
+ar_ipmp_lookup(arp_stack_t *as, mblk_t *mp, arl_t **arlp, arl_t **ipmp_arlp)
+{
+	arie_t	*arie = (arie_t *)mp->b_rptr;
+
+	*arlp = ar_ll_lookup_from_mp(as, mp);
+	if (*arlp == NULL) {
+		DTRACE_PROBE1(ipmp_lookup_no_arl, mblk_t *, mp);
+		return (B_FALSE);
+	}
+
+	arie->arie_grifname[LIFNAMSIZ - 1] = '\0';
+	*ipmp_arlp = ar_ll_lookup_by_name(as, arie->arie_grifname);
+	if (*ipmp_arlp == NULL) {
+		DTRACE_PROBE1(ipmp_lookup_no_ipmp_arl, mblk_t *, mp);
+		return (B_FALSE);
+	}
+
+	DTRACE_PROBE2(ipmp_lookup, arl_t *, *arlp, arl_t *, *ipmp_arlp);
+	return (B_TRUE);
+}
+
+/*
+ * Bind an arl_t to an IPMP group arl_t.
+ */
+static int
+ar_ipmp_activate(queue_t *q, mblk_t *mp)
+{
+	arl_t *arl, *ipmp_arl;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
+
+	if (!ar_ipmp_lookup(as, mp, &arl, &ipmp_arl))
+		return (EINVAL);
+
+	if (arl->arl_ipmp_arl != NULL) {
+		DTRACE_PROBE1(ipmp_activated_already, arl_t *, arl);
+		return (EALREADY);
+	}
+
+	DTRACE_PROBE2(ipmp_activate, arl_t *, arl, arl_t *, ipmp_arl);
+	arl->arl_ipmp_arl = ipmp_arl;
+	return (0);
+}
+
+/*
+ * Unbind an arl_t from an IPMP group arl_t and update the ace_t's so
+ * that it is no longer part of the group.
+ */
+static int
+ar_ipmp_deactivate(queue_t *q, mblk_t *mp)
+{
+	arl_t *arl, *ipmp_arl;
+	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
+
+	if (!ar_ipmp_lookup(as, mp, &arl, &ipmp_arl))
+		return (EINVAL);
+
+	if (ipmp_arl != arl->arl_ipmp_arl) {
+		DTRACE_PROBE2(ipmp_deactivate_notactive, arl_t *, arl, arl_t *,
+		    ipmp_arl);
+		return (EINVAL);
+	}
+
+	DTRACE_PROBE2(ipmp_deactivate, arl_t *, arl, arl_t *,
+	    arl->arl_ipmp_arl);
+	ar_ce_walk(as, ar_ce_ipmp_deactivate, arl);
+	arl->arl_ipmp_arl = NULL;
+	return (0);
+}
+
+/*
  * Enable an interface to process ARP_REQUEST and ARP_RESPONSE messages.
  */
 /* ARGSUSED */
@@ -2199,6 +2414,11 @@ ar_ll_init(arp_stack_t *as, ar_t *ar, mblk_t *mp)
 	if ((arl = (arl_t *)mi_zalloc(sizeof (arl_t))) == NULL)
 		return;
 
+	if (dlia->dl_mac_type == SUNW_DL_IPMP) {
+		arl->arl_flags |= ARL_F_IPMP;
+		arl->arl_ipmp_arl = arl;
+	}
+
 	arl->arl_provider_style = dlia->dl_provider_style;
 	arl->arl_rq = ar->ar_rq;
 	arl->arl_wq = ar->ar_wq;
@@ -2261,7 +2481,7 @@ ar_ll_set_defaults(arl_t *arl, mblk_t *mp)
 	dl_info_ack_t	*dlia = (dl_info_ack_t *)mp->b_rptr;
 	dl_unitdata_req_t *dlur;
 	uchar_t		*up;
-	arlphy_t	*ap;
+	arlphy_t 	*ap;
 
 	ASSERT(arl != NULL);
 
@@ -2269,6 +2489,14 @@ ar_ll_set_defaults(arl_t *arl, mblk_t *mp)
 	 * Clear any stale defaults that might exist.
 	 */
 	ar_ll_clear_defaults(arl);
+
+	if (arl->arl_flags & ARL_F_IPMP) {
+		/*
+		 * If this is an IPMP arl_t, we have nothing to do,
+		 * since we will never transmit or receive.
+		 */
+		return;
+	}
 
 	ap = kmem_zalloc(sizeof (arlphy_t), KM_NOSLEEP);
 	if (ap == NULL)
@@ -2470,12 +2698,12 @@ ar_mapping_add(queue_t *q, mblk_t *mp_orig)
 	mblk_t	*mp = mp_orig;
 	ace_t	*ace;
 	uchar_t	*hw_addr;
-	uint32_t	hw_addr_len;
+	uint32_t hw_addr_len;
 	uchar_t	*proto_addr;
-	uint32_t	proto_addr_len;
+	uint32_t proto_addr_len;
 	uchar_t	*proto_mask;
 	uchar_t	*proto_extract_mask;
-	uint32_t	hw_extract_start;
+	uint32_t hw_extract_start;
 	arl_t	*arl;
 	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
@@ -2524,6 +2752,7 @@ ar_mapping_add(queue_t *q, mblk_t *mp_orig)
 	    proto_mask,
 	    proto_extract_mask,
 	    hw_extract_start,
+	    NULL,
 	    arma->arma_flags | ACE_F_MAPPING));
 }
 
@@ -2857,12 +3086,12 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
     uint32_t proto_addr_len)
 {
 	mblk_t	*areq_mp;
-	arl_t	*arl = ace->ace_arl;
 	mblk_t	*mp;
 	mblk_t	*xmit_mp;
-	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
+	queue_t	*arl_wq = ace->ace_arl->arl_wq;
+	arp_stack_t *as = ARL_TO_ARPSTACK(ace->ace_arl);
 	ip_stack_t *ipst = as->as_netstack->netstack_ip;
-	arlphy_t *ap = arl->arl_phy;
+	arlphy_t *ap = ace->ace_xmit_arl->arl_phy;
 
 	/*
 	 * On error or completion for a query, we need to shut down the timer.
@@ -2870,7 +3099,8 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 	 * Duplicate Address Detection, or it will never finish that phase.
 	 */
 	if (!(ace->ace_flags & (ACE_F_UNVERIFIED | ACE_F_AUTHORITY)))
-		mi_timer(arl->arl_wq, ace->ace_mp, -1L);
+		mi_timer(arl_wq, ace->ace_mp, -1L);
+
 	/* Establish the return value appropriate. */
 	if (ret_val == 0) {
 		if (!ACE_RESOLVED(ace) || ap == NULL)
@@ -2973,25 +3203,24 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 			 */
 			ar_ce_delete(ace);
 		} else {
-			mi_timer(arl->arl_wq, ace->ace_mp,
-			    as->as_cleanup_interval);
+			mi_timer(arl_wq, ace->ace_mp, as->as_cleanup_interval);
 		}
 	}
 }
 
 /*
  * Returns number of milliseconds after which we should either rexmit or abort.
- * Return of zero means we should abort. src_ace is the ace corresponding
- * to the source address in the areq sent by IP.
+ * Return of zero means we should abort.
  */
 static clock_t
-ar_query_xmit(arp_stack_t *as, ace_t *ace, ace_t *src_ace)
+ar_query_xmit(arp_stack_t *as, ace_t *ace)
 {
 	areq_t	*areq;
 	mblk_t	*mp;
 	uchar_t	*proto_addr;
 	uchar_t	*sender_addr;
-	arl_t *src_arl;
+	ace_t	*src_ace;
+	arl_t	*xmit_arl = ace->ace_xmit_arl;
 
 	mp = ace->ace_query_mp;
 	/*
@@ -3016,18 +3245,15 @@ ar_query_xmit(arp_stack_t *as, ace_t *ace, ace_t *src_ace)
 	    areq->areq_sender_addr_length);
 
 	/*
-	 * Get the source h/w address for the sender addr. With interface
-	 * groups, IP sends us source address belonging to a different
-	 * interface.
+	 * Get the ace for the sender address, so that we can verify that
+	 * we have one and that DAD has completed.
 	 */
+	src_ace = ar_ce_lookup(xmit_arl, areq->areq_proto, sender_addr,
+	    areq->areq_sender_addr_length);
 	if (src_ace == NULL) {
-		src_ace = ar_ce_lookup_permanent(as, areq->areq_proto,
-		    sender_addr, areq->areq_sender_addr_length);
-		if (src_ace == NULL) {
-			DTRACE_PROBE3(xmit_no_source, ace_t *, ace,
-			    areq_t *, areq, uchar_t *, sender_addr);
-			return (0);
-		}
+		DTRACE_PROBE3(xmit_no_source, ace_t *, ace, areq_t *, areq,
+		    uchar_t *, sender_addr);
+		return (0);
 	}
 
 	/*
@@ -3044,18 +3270,12 @@ ar_query_xmit(arp_stack_t *as, ace_t *ace, ace_t *src_ace)
 		return (areq->areq_xmit_interval);
 	}
 
-	/*
-	 * Transmit on src_arl. We should transmit on src_arl. Otherwise
-	 * the switch will send back a copy on other interfaces of the
-	 * same group and as we could be using somebody else's source
-	 * address + hardware address, ARP will treat this as a bogon.
-	 */
-	src_arl = src_ace->ace_arl;
 	DTRACE_PROBE3(xmit_send, ace_t *, ace, ace_t *, src_ace,
 	    areq_t *, areq);
-	ar_xmit(src_arl, ARP_REQUEST, areq->areq_proto,
-	    areq->areq_sender_addr_length, src_arl->arl_phy->ap_hw_addr,
-	    sender_addr, src_arl->arl_phy->ap_arp_addr, proto_addr, NULL, as);
+
+	ar_xmit(xmit_arl, ARP_REQUEST, areq->areq_proto,
+	    areq->areq_sender_addr_length, xmit_arl->arl_phy->ap_hw_addr,
+	    sender_addr, xmit_arl->arl_phy->ap_arp_addr, proto_addr, NULL, as);
 	src_ace->ace_last_bcast = ddi_get_lbolt();
 	return (areq->areq_xmit_interval);
 }
@@ -3066,6 +3286,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 {
 	arh_t	*arh;
 	arl_t	*arl;
+	arl_t	*client_arl;
 	ace_t	*dst_ace;
 	uchar_t	*dst_paddr;
 	int	err;
@@ -3079,6 +3300,8 @@ ar_rput(queue_t *q, mblk_t *mp)
 	uchar_t	*src_paddr;
 	uchar_t *dst_haddr;
 	boolean_t is_probe;
+	boolean_t is_unicast = B_FALSE;
+	dl_unitdata_ind_t *dlindp;
 	int i;
 	arp_stack_t *as = ((ar_t *)q->q_ptr)->ar_as;
 
@@ -3135,9 +3358,10 @@ ar_rput(queue_t *q, mblk_t *mp)
 		return;
 	case M_PCPROTO:
 	case M_PROTO:
+		dlindp = (dl_unitdata_ind_t *)mp->b_rptr;
 		if (MBLKL(mp) >= sizeof (dl_unitdata_ind_t) &&
-		    ((dl_unitdata_ind_t *)mp->b_rptr)->dl_primitive ==
-		    DL_UNITDATA_IND) {
+		    dlindp->dl_primitive == DL_UNITDATA_IND) {
+			is_unicast = (dlindp->dl_group_address == 0);
 			arl = ((ar_t *)q->q_ptr)->ar_arl;
 			if (arl != NULL && arl->arl_phy != NULL) {
 				/* Real messages from the wire! */
@@ -3261,19 +3485,24 @@ ar_rput(queue_t *q, mblk_t *mp)
 	 * RFC 826: first check if the <protocol, sender protocol address> is
 	 * in the cache, if there is a sender protocol address.  Note that this
 	 * step also handles resolutions based on source.
+	 *
+	 * Note that IP expects that each notification it receives will be
+	 * tied to the ill it received it on.  Thus, we must talk to it over
+	 * the arl tied to the resolved IP address (if any), hence client_arl.
 	 */
 	if (is_probe)
 		err = AR_NOTFOUND;
 	else
 		err = ar_ce_resolve_all(arl, proto, src_haddr, hlen, src_paddr,
-		    plen);
+		    plen, &client_arl);
+
 	switch (err) {
 	case AR_BOGON:
-		ar_client_notify(arl, mp1, AR_CN_BOGON);
+		ar_client_notify(client_arl, mp1, AR_CN_BOGON);
 		mp1 = NULL;
 		break;
 	case AR_FAILED:
-		ar_client_notify(arl, mp1, AR_CN_FAILED);
+		ar_client_notify(client_arl, mp1, AR_CN_FAILED);
 		mp1 = NULL;
 		break;
 	case AR_LOOPBACK:
@@ -3293,7 +3522,9 @@ ar_rput(queue_t *q, mblk_t *mp)
 	 * Now look up the destination address.  By RFC 826, we ignore the
 	 * packet at this step if the target isn't one of our addresses.  This
 	 * is true even if the target is something we're trying to resolve and
-	 * the packet is a response.
+	 * the packet is a response.  To avoid duplicate responses, we also
+	 * ignore the packet if it was multicast/broadcast to an arl that's in
+	 * an IPMP group but was not the designated xmit_arl for the ACE.
 	 *
 	 * Note that in order to do this correctly, we need to know when to
 	 * notify IP of a change implied by the source address of the ARP
@@ -3304,6 +3535,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 	 */
 	dst_ace = ar_ce_lookup_entry(arl, proto, dst_paddr, plen);
 	if (dst_ace == NULL || !ACE_RESOLVED(dst_ace) ||
+	    (dst_ace->ace_xmit_arl != arl && !is_unicast) ||
 	    !(dst_ace->ace_flags & ACE_F_PUBLISH)) {
 		/*
 		 * Let the client know if the source mapping has changed, even
@@ -3311,7 +3543,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 		 * client.
 		 */
 		if (err == AR_CHANGED)
-			ar_client_notify(arl, mp1, AR_CN_ANNOUNCE);
+			ar_client_notify(client_arl, mp1, AR_CN_ANNOUNCE);
 		else
 			freemsg(mp1);
 		freeb(mp);
@@ -3341,6 +3573,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 			    "arp_rput_end: q %p (%S)", q, "reflection");
 			return;
 		}
+
 		/*
 		 * Conflicts seen via the wrong interface may be bogus.
 		 * Multiple interfaces on the same segment imply any conflict
@@ -3378,12 +3611,21 @@ ar_rput(queue_t *q, mblk_t *mp)
 		 * the src_paddr field before sending it to IP. The same is
 		 * required for probes, where src_paddr will be INADDR_ANY.
 		 */
-		if (is_probe || op == ARP_RESPONSE) {
+		if (is_probe) {
+			/*
+			 * In this case, client_arl will be invalid (e.g.,
+			 * since probes don't have a valid sender address).
+			 * But dst_ace has the appropriate arl.
+			 */
 			bcopy(dst_paddr, src_paddr, plen);
-			ar_client_notify(arl, mp1, AR_CN_FAILED);
+			ar_client_notify(dst_ace->ace_arl, mp1, AR_CN_FAILED);
+			ar_ce_delete(dst_ace);
+		} else if (op == ARP_RESPONSE) {
+			bcopy(dst_paddr, src_paddr, plen);
+			ar_client_notify(client_arl, mp1, AR_CN_FAILED);
 			ar_ce_delete(dst_ace);
 		} else if (err == AR_CHANGED) {
-			ar_client_notify(arl, mp1, AR_CN_ANNOUNCE);
+			ar_client_notify(client_arl, mp1, AR_CN_ANNOUNCE);
 		} else {
 			DTRACE_PROBE3(rput_request_unverified, arl_t *, arl,
 			    arh_t *, arh, ace_t *, dst_ace);
@@ -3431,19 +3673,19 @@ ar_rput(queue_t *q, mblk_t *mp)
 		    dst_ace->ace_hw_addr, dst_ace->ace_proto_addr,
 		    src_haddr, src_paddr, dstaddr, as);
 		if (!is_probe && err == AR_NOTFOUND &&
-		    ar_ce_create(arl, proto, src_haddr, hlen, src_paddr, plen,
-		    NULL, NULL, 0, 0) == 0) {
+		    ar_ce_create(OWNING_ARL(arl), proto, src_haddr, hlen,
+		    src_paddr, plen, NULL, NULL, 0, NULL, 0) == 0) {
 			ace_t *ace;
 
 			ace = ar_ce_lookup(arl, proto, src_paddr, plen);
 			ASSERT(ace != NULL);
-			mi_timer(arl->arl_wq, ace->ace_mp,
+			mi_timer(ace->ace_arl->arl_wq, ace->ace_mp,
 			    as->as_cleanup_interval);
 		}
 	}
 	if (err == AR_CHANGED) {
 		freeb(mp);
-		ar_client_notify(arl, mp1, AR_CN_ANNOUNCE);
+		ar_client_notify(client_arl, mp1, AR_CN_ANNOUNCE);
 		TRACE_2(TR_FAC_ARP, TR_ARP_RPUT_END,
 		    "arp_rput_end: q %p (%S)", q, "reqchange");
 	} else {
@@ -3459,7 +3701,7 @@ ar_ce_restart_dad(ace_t *ace, void *arl_arg)
 	arl_t *arl = arl_arg;
 	arp_stack_t *as = ARL_TO_ARPSTACK(arl);
 
-	if ((ace->ace_arl == arl) &&
+	if ((ace->ace_xmit_arl == arl) &&
 	    (ace->ace_flags & (ACE_F_UNVERIFIED|ACE_F_DAD_ABORTED)) ==
 	    (ACE_F_UNVERIFIED|ACE_F_DAD_ABORTED)) {
 		/*
@@ -4060,9 +4302,9 @@ ar_wput(queue_t *q, mblk_t *mp)
 static boolean_t
 arp_say_ready(ace_t *ace)
 {
-	mblk_t *mp;
+	mblk_t	*mp;
 	arl_t *arl = ace->ace_arl;
-	arlphy_t *ap = arl->arl_phy;
+	arlphy_t *ap = ace->ace_xmit_arl->arl_phy;
 	arh_t *arh;
 	uchar_t *cp;
 
@@ -4107,7 +4349,7 @@ ace_reschedule(ace_t *ace, void *arg)
 	ace_t **acemax;
 	ace_t *atemp;
 
-	if (ace->ace_arl != art->art_arl)
+	if (ace->ace_xmit_arl != art->art_arl)
 		return;
 	/*
 	 * Only published entries that are ready for announcement are eligible.
@@ -4179,7 +4421,6 @@ static void
 ar_wsrv(queue_t *q)
 {
 	ace_t *ace;
-	arl_t *arl;
 	arlphy_t *ap;
 	mblk_t *mp;
 	clock_t	ms;
@@ -4196,8 +4437,7 @@ ar_wsrv(queue_t *q)
 			ace = (ace_t *)mp->b_rptr;
 			if (ace->ace_flags & ACE_F_DYING)
 				continue;
-			arl = ace->ace_arl;
-			ap = arl->arl_phy;
+			ap = ace->ace_xmit_arl->arl_phy;
 			if (ace->ace_flags & ACE_F_UNVERIFIED) {
 				ASSERT(ace->ace_flags & ACE_F_PUBLISH);
 				ASSERT(ace->ace_query_mp == NULL);
@@ -4216,7 +4456,7 @@ ar_wsrv(queue_t *q)
 					DTRACE_PROBE1(timer_probe,
 					    ace_t *, ace);
 					ace->ace_xmit_count--;
-					ar_xmit(arl, ARP_REQUEST,
+					ar_xmit(ace->ace_xmit_arl, ARP_REQUEST,
 					    ace->ace_proto,
 					    ace->ace_proto_addr_length,
 					    ace->ace_hw_addr, NULL, NULL,
@@ -4247,7 +4487,7 @@ ar_wsrv(queue_t *q)
 				    now - ap->ap_defend_start >
 				    SEC_TO_TICK(as->as_defend_period)) {
 					ap->ap_defend_start = now;
-					arl_reschedule(arl);
+					arl_reschedule(ace->ace_xmit_arl);
 				}
 				/*
 				 * Finish the job that we started in
@@ -4288,12 +4528,12 @@ ar_wsrv(queue_t *q)
 					DTRACE_PROBE1(timer_defend,
 					    ace_t *, ace);
 				}
-				ar_xmit(arl, ARP_REQUEST,
+				ar_xmit(ace->ace_xmit_arl, ARP_REQUEST,
 				    ace->ace_proto,
 				    ace->ace_proto_addr_length,
 				    ace->ace_hw_addr,
 				    ace->ace_proto_addr,
-				    ap->ap_arp_addr,
+				    ace->ace_xmit_arl->arl_phy->ap_arp_addr,
 				    ace->ace_proto_addr, NULL, as);
 				ace->ace_last_bcast = now;
 				if (ace->ace_xmit_count == 0)
@@ -4316,7 +4556,8 @@ ar_wsrv(queue_t *q)
 				    ndp_lookup_ipaddr(*(ipaddr_t *)
 				    ace->ace_proto_addr, as->as_netstack)) {
 					ace->ace_flags |= ACE_F_OLD;
-					mi_timer(arl->arl_wq, ace->ace_mp,
+					mi_timer(ace->ace_arl->arl_wq,
+					    ace->ace_mp,
 					    as->as_cleanup_interval);
 				} else {
 					ar_delete_notify(ace);
@@ -4333,7 +4574,7 @@ ar_wsrv(queue_t *q)
 			 * we complete the operation with a failure indication.
 			 * Otherwise, we restart the timer.
 			 */
-			ms = ar_query_xmit(as, ace, NULL);
+			ms = ar_query_xmit(as, ace);
 			if (ms == 0)
 				ar_query_reply(ace, ENXIO, NULL, (uint32_t)0);
 			else
@@ -4359,6 +4600,8 @@ ar_xmit(arl_t *arl, uint32_t operation, uint32_t proto, uint32_t plen,
 	uint_t	hlen;
 	mblk_t	*mp;
 	arlphy_t *ap = arl->arl_phy;
+
+	ASSERT(!(arl->arl_flags & ARL_F_IPMP));
 
 	if (ap == NULL) {
 		DTRACE_PROBE1(xmit_no_arl_phy, arl_t *, arl);

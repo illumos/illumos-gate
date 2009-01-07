@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,16 +17,13 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ *
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _IPMP_QUERY_H
 #define	_IPMP_QUERY_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/socket.h>			/* needed by <net/if.h> */
@@ -38,12 +34,49 @@
  * IPMP query interfaces.
  *
  * These interfaces may only be used within ON or after signing a contract
- * with ON.  For documentation, refer to PSARC/2002/615.
+ * with ON.  For documentation, refer to PSARC/2002/615 and PSARC/2007/272.
  */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/*
+ * Assorted enumerations used in the data types described below.
+ */
+typedef enum ipmp_if_probestate {
+	IPMP_PROBE_OK,		/* probes detect no problems */
+	IPMP_PROBE_FAILED,	/* probes detect failure */
+	IPMP_PROBE_UNKNOWN,	/* probe detection unavailable */
+	IPMP_PROBE_DISABLED	/* probe detection disabled */
+} ipmp_if_probestate_t;
+
+typedef enum ipmp_if_linkstate {
+	IPMP_LINK_UP,		/* link detects up */
+	IPMP_LINK_DOWN,		/* link detects down */
+	IPMP_LINK_UNKNOWN	/* link detection unavailable */
+} ipmp_if_linkstate_t;
+
+typedef enum ipmp_if_flags {
+	IPMP_IFFLAG_INACTIVE	= 0x1,
+	IPMP_IFFLAG_HWADDRDUP	= 0x2,
+	IPMP_IFFLAG_ACTIVE 	= 0x4,
+	IPMP_IFFLAG_DOWN	= 0x8
+} ipmp_if_flags_t;
+
+typedef enum ipmp_addr_state {
+	IPMP_ADDR_UP,		/* address is up */
+	IPMP_ADDR_DOWN		/* address is down */
+} ipmp_addr_state_t;
+
+typedef enum ipmp_if_targmode {
+	IPMP_TARG_DISABLED,	/* use of targets is disabled */
+	IPMP_TARG_ROUTES,	/* route-learned targets */
+	IPMP_TARG_MULTICAST	/* multicast-learned targets */
+} ipmp_if_targmode_t;
+
+#define	IPMP_LIST_SIZE(listtype, elsize, nel) \
+	((sizeof (ipmp_ ## listtype ## _t) - (elsize)) + ((nel) * (elsize)))
 
 /*
  * Data type describing a list of IPMP groups.
@@ -54,8 +87,8 @@ typedef struct ipmp_grouplist {
 	char		gl_groups[1][LIFGRNAMSIZ];
 } ipmp_grouplist_t;
 
-#define	IPMP_GROUPLIST_MINSIZE	(sizeof (ipmp_grouplist_t) - LIFGRNAMSIZ)
-#define	IPMP_GROUPLIST_SIZE(ngr) (IPMP_GROUPLIST_MINSIZE + (ngr) * LIFGRNAMSIZ)
+#define	IPMP_GROUPLIST_SIZE(ngr)	\
+	IPMP_LIST_SIZE(grouplist, LIFGRNAMSIZ, ngr)
 
 /*
  * Data type describing a list of interfaces.
@@ -65,8 +98,19 @@ typedef struct ipmp_iflist {
 	char		il_ifs[1][LIFNAMSIZ];
 } ipmp_iflist_t;
 
-#define	IPMP_IFLIST_MINSIZE	(sizeof (ipmp_iflist_t) - LIFNAMSIZ)
-#define	IPMP_IFLIST_SIZE(nif)	(IPMP_IFLIST_MINSIZE + (nif) * LIFNAMSIZ)
+#define	IPMP_IFLIST_SIZE(nif)		\
+	IPMP_LIST_SIZE(iflist, LIFNAMSIZ, nif)
+
+/*
+ * Data type describing a list of addresses.
+ */
+typedef struct ipmp_addrlist {
+	unsigned int		al_naddr;
+	struct sockaddr_storage al_addrs[1];
+} ipmp_addrlist_t;
+
+#define	IPMP_ADDRLIST_SIZE(naddr)	\
+	IPMP_LIST_SIZE(addrlist, sizeof (struct sockaddr_storage), naddr)
 
 /*
  * Data type describing the state of an IPMP group.
@@ -76,17 +120,48 @@ typedef struct ipmp_groupinfo {
 	uint64_t		gr_sig;
 	ipmp_group_state_t	gr_state;
 	ipmp_iflist_t		*gr_iflistp;
+	ipmp_addrlist_t		*gr_adlistp;
+	char			gr_ifname[LIFNAMSIZ];
+	char			gr_m4ifname[LIFNAMSIZ];
+	char			gr_m6ifname[LIFNAMSIZ];
+	char			gr_bcifname[LIFNAMSIZ];
+	unsigned int		gr_fdt;
 } ipmp_groupinfo_t;
+
+/*
+ * Data type describing IPMP target information for a particular interface.
+ */
+typedef struct ipmp_targinfo {
+	char			it_name[LIFNAMSIZ];
+	struct sockaddr_storage	it_testaddr;
+	ipmp_if_targmode_t	it_targmode;
+	ipmp_addrlist_t		*it_targlistp;
+} ipmp_targinfo_t;
 
 /*
  * Data type describing the IPMP-related state of an interface.
  */
 typedef struct ipmp_ifinfo {
-	char		if_name[LIFNAMSIZ];
-	char		if_group[LIFGRNAMSIZ];
-	ipmp_if_state_t	if_state;
-	ipmp_if_type_t	if_type;
+	char			if_name[LIFNAMSIZ];
+	char			if_group[LIFGRNAMSIZ];
+	ipmp_if_state_t		if_state;
+	ipmp_if_type_t		if_type;
+	ipmp_if_linkstate_t	if_linkstate;
+	ipmp_if_probestate_t	if_probestate;
+	ipmp_if_flags_t		if_flags;
+	ipmp_targinfo_t		if_targinfo4;
+	ipmp_targinfo_t		if_targinfo6;
 } ipmp_ifinfo_t;
+
+/*
+ * Data type describing an IPMP data address.
+ */
+typedef struct ipmp_addrinfo {
+	struct sockaddr_storage	ad_addr;
+	ipmp_addr_state_t	ad_state;
+	char			ad_group[LIFGRNAMSIZ];
+	char			ad_binding[LIFNAMSIZ];
+} ipmp_addrinfo_t;
 
 typedef enum {
 	IPMP_QCONTEXT_LIVE,
@@ -100,6 +175,9 @@ extern int  ipmp_getgroupinfo(ipmp_handle_t, const char *, ipmp_groupinfo_t **);
 extern void ipmp_freegroupinfo(ipmp_groupinfo_t *);
 extern int  ipmp_getifinfo(ipmp_handle_t, const char *, ipmp_ifinfo_t **);
 extern void ipmp_freeifinfo(ipmp_ifinfo_t *);
+extern int  ipmp_getaddrinfo(ipmp_handle_t, const char *,
+    struct sockaddr_storage *, ipmp_addrinfo_t **);
+extern void ipmp_freeaddrinfo(ipmp_addrinfo_t *);
 
 #ifdef __cplusplus
 }

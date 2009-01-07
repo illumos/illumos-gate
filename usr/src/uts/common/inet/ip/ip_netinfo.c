@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -568,33 +568,17 @@ ip_getifname_impl(phy_if_t phy_ifdata,
     char *buffer, const size_t buflen, boolean_t isv6, ip_stack_t *ipst)
 {
 	ill_t *ill;
-	char *name;
 
 	ASSERT(buffer != NULL);
 
 	ill = ill_lookup_on_ifindex((uint_t)phy_ifdata, isv6, NULL, NULL,
 	    NULL, NULL, ipst);
-	if (ill != NULL) {
-		name = ill->ill_name;
-	} else {
-		/* Fallback to group names only if hook_emulation is set */
-		if (ipst->ips_ipmp_hook_emulation) {
-			ill = ill_group_lookup_on_ifindex((uint_t)phy_ifdata,
-			    isv6, ipst);
-		}
-		if (ill == NULL)
-			return (1);
-		name = ill->ill_phyint->phyint_groupname;
-	}
-	if (name != NULL) {
-		(void) strlcpy(buffer, name, buflen);
-		ill_refrele(ill);
-		return (0);
-	} else {
-		ill_refrele(ill);
+	if (ill == NULL)
 		return (1);
-	}
 
+	(void) strlcpy(buffer, ill->ill_name, buflen);
+	ill_refrele(ill);
+	return (0);
 }
 
 /*
@@ -625,9 +609,6 @@ ipv6_getmtu(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata)
 
 /*
  * Shared implementation to determine the MTU of a network interface
- *
- * Note: this does not handle a non-zero ifdata when ipmp_hook_emulation is set.
- * But IP Filter only uses a zero ifdata.
  */
 /* ARGSUSED */
 static int
@@ -653,16 +634,7 @@ ip_getmtu_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6,
 
 		if ((ill = ill_lookup_on_ifindex((uint_t)phy_ifdata, isv6,
 		    NULL, NULL, NULL, NULL, ipst)) == NULL) {
-			/*
-			 * Fallback to group names only if hook_emulation
-			 * is set
-			 */
-			if (ipst->ips_ipmp_hook_emulation) {
-				ill = ill_group_lookup_on_ifindex(
-				    (uint_t)phy_ifdata, isv6, ipst);
-			}
-			if (ill == NULL)
-				return (0);
+			return (0);
 		}
 		mtu = ill->ill_max_frag;
 		ill_refrele(ill);
@@ -686,9 +658,6 @@ ip_getpmtuenabled(net_handle_t neti)
 
 /*
  * Get next interface from the current list of IPv4 physical network interfaces
- *
- * Note: this does not handle the case when ipmp_hook_emulation is set.
- * But IP Filter does not use this function.
  */
 static phy_if_t
 ip_phygetnext(net_handle_t neti, phy_if_t phy_ifdata)
@@ -752,15 +721,10 @@ ip_phylookup_impl(const char *name, boolean_t isv6, ip_stack_t *ipst)
 
 	ill = ill_lookup_on_name((char *)name, B_FALSE, isv6, NULL, NULL,
 	    NULL, NULL, NULL, ipst);
-
-	/* Fallback to group names only if hook_emulation is set */
-	if (ill == NULL && ipst->ips_ipmp_hook_emulation) {
-		ill = ill_group_lookup_on_name((char *)name, isv6, ipst);
-	}
 	if (ill == NULL)
 		return (0);
 
-	phy = ill->ill_phyint->phyint_hook_ifindex;
+	phy = ill->ill_phyint->phyint_ifindex;
 
 	ill_refrele(ill);
 
@@ -798,9 +762,6 @@ ipv6_lifgetnext(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata)
 /*
  * Shared implementation to get next interface from the current list of
  * logical network interfaces
- *
- * Note: this does not handle the case when ipmp_hook_emulation is set.
- * But IP Filter does not use this function.
  */
 static lif_if_t
 ip_lifgetnext_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6,
@@ -834,7 +795,7 @@ ip_lifgetnext_impl(phy_if_t phy_ifdata, lif_if_t ifdata, boolean_t isv6,
 	/*
 	 * It's safe to iterate the ill_ipif list when holding an ill_lock.
 	 * And it's also safe to access ipif_id without ipif refhold.
-	 * See ipif_get_id().
+	 * See the field access rules in ip.h.
 	 */
 	for (ipif = ill->ill_ipif; ipif != NULL; ipif = ipif->ipif_next) {
 		if (!IPIF_CAN_LOOKUP(ipif))
@@ -1013,8 +974,8 @@ ip_inject_impl(inject_t style, net_inject_t *packet, boolean_t isv6,
 		if (ire->ire_nce == NULL ||
 		    ire->ire_nce->nce_fp_mp == NULL &&
 		    ire->ire_nce->nce_res_mp == NULL) {
-			ip_newroute_v6(ire->ire_stq, mp,
-			    &sin6->sin6_addr, NULL, NULL, ALL_ZONES, ipst);
+			ip_newroute_v6(ire->ire_stq, mp, &sin6->sin6_addr,
+			    &ip6h->ip6_src, NULL, ALL_ZONES, ipst);
 
 			ire_refrele(ire);
 			return (0);
@@ -1170,7 +1131,7 @@ ip_routeto_impl(struct sockaddr *address, struct sockaddr *nexthop,
 	}
 
 	ASSERT(ill != NULL);
-	phy_if = (phy_if_t)ill->ill_phyint->phyint_hook_ifindex;
+	phy_if = (phy_if_t)ill->ill_phyint->phyint_ifindex;
 	if (sire != NULL)
 		ire_refrele(sire);
 	ire_refrele(ire);
@@ -1305,9 +1266,6 @@ ipv6_getlifaddr(net_handle_t neti, phy_if_t phy_ifdata, lif_if_t ifdata,
 
 /*
  * Shared implementation to determine the network addresses for an interface
- *
- * Note: this does not handle a non-zero ifdata when ipmp_hook_emulation is set.
- * But IP Filter only uses a zero ifdata.
  */
 /* ARGSUSED */
 static int
@@ -1531,12 +1489,6 @@ ip_ni_queue_func_impl(injection_t *inject,  boolean_t out)
 
 	ill = ill_lookup_on_ifindex((uint_t)packet->ni_physical,
 	    B_FALSE, NULL, NULL, NULL, NULL, ipst);
-
-	/* Fallback to group names only if hook_emulation is set */
-	if (ill == NULL && ipst->ips_ipmp_hook_emulation) {
-		ill = ill_group_lookup_on_ifindex((uint_t)packet->ni_physical,
-		    B_FALSE, ipst);
-	}
 	if (ill == NULL) {
 		kmem_free(inject, sizeof (*inject));
 		return;
@@ -1612,66 +1564,4 @@ done:
 		netstack_rele(ns);
 	kmem_free(info->hnei_event.hne_data, info->hnei_event.hne_datalen);
 	kmem_free(arg, sizeof (hook_nic_event_int_t));
-}
-
-/*
- * Temporary function to support IPMP emulation for IP Filter.
- * Lookup an ill based on the ifindex assigned to the group.
- * Skips unusable ones i.e. where any of these flags are set:
- * (PHYI_FAILED|PHYI_OFFLINE|PHYI_INACTIVE)
- */
-ill_t *
-ill_group_lookup_on_ifindex(uint_t index, boolean_t isv6, ip_stack_t *ipst)
-{
-	ill_t	*ill;
-	phyint_t *phyi;
-
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-	phyi = phyint_lookup_group_ifindex(index, ipst);
-	if (phyi != NULL) {
-		ill = isv6 ? phyi->phyint_illv6: phyi->phyint_illv4;
-		if (ill != NULL) {
-			mutex_enter(&ill->ill_lock);
-			if (ILL_CAN_LOOKUP(ill)) {
-				ill_refhold_locked(ill);
-				mutex_exit(&ill->ill_lock);
-				rw_exit(&ipst->ips_ill_g_lock);
-				return (ill);
-			}
-			mutex_exit(&ill->ill_lock);
-		}
-	}
-	rw_exit(&ipst->ips_ill_g_lock);
-	return (NULL);
-}
-
-/*
- * Temporary function to support IPMP emulation for IP Filter.
- * Lookup an ill based on the group name.
- * Skips unusable ones i.e. where any of these flags are set:
- * (PHYI_FAILED|PHYI_OFFLINE|PHYI_INACTIVE)
- */
-ill_t *
-ill_group_lookup_on_name(char *name, boolean_t isv6, ip_stack_t *ipst)
-{
-	ill_t	*ill;
-	phyint_t *phyi;
-
-	rw_enter(&ipst->ips_ill_g_lock, RW_READER);
-	phyi = phyint_lookup_group(name, B_TRUE, ipst);
-	if (phyi != NULL) {
-		ill = isv6 ? phyi->phyint_illv6: phyi->phyint_illv4;
-		if (ill != NULL) {
-			mutex_enter(&ill->ill_lock);
-			if (ILL_CAN_LOOKUP(ill)) {
-				ill_refhold_locked(ill);
-				mutex_exit(&ill->ill_lock);
-				rw_exit(&ipst->ips_ill_g_lock);
-				return (ill);
-			}
-			mutex_exit(&ill->ill_lock);
-		}
-	}
-	rw_exit(&ipst->ips_ill_g_lock);
-	return (NULL);
 }

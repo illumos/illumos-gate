@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -68,12 +68,10 @@ static void	ilm_gen_filter(ilm_t *ilm, mcast_record_t *fmode,
 
 static ilm_t	*ilm_add_v6(ipif_t *ipif, const in6_addr_t *group,
     ilg_stat_t ilgstat, mcast_record_t ilg_fmode, slist_t *ilg_flist,
-    int orig_ifindex, zoneid_t zoneid);
+    zoneid_t zoneid);
 static void	ilm_delete(ilm_t *ilm);
 static int	ip_ll_addmulti_v6(ipif_t *ipif, const in6_addr_t *group);
 static int	ip_ll_delmulti_v6(ipif_t *ipif, const in6_addr_t *group);
-static ilg_t	*ilg_lookup_ill_index_v6(conn_t *connp,
-    const in6_addr_t *v6group, int index);
 static ilg_t	*ilg_lookup_ipif(conn_t *connp, ipaddr_t group,
     ipif_t *ipif);
 static int	ilg_add(conn_t *connp, ipaddr_t group, ipif_t *ipif,
@@ -91,24 +89,20 @@ static int	ip_opt_delete_group_excl(conn_t *connp, ipaddr_t group,
 static int	ip_opt_delete_group_excl_v6(conn_t *connp,
     const in6_addr_t *v6group, ill_t *ill, mcast_record_t fmode,
     const in6_addr_t *v6src);
+static void	ill_ilm_walker_hold(ill_t *ill);
+static void	ill_ilm_walker_rele(ill_t *ill);
 
 /*
  * MT notes:
  *
  * Multicast joins operate on both the ilg and ilm structures. Multiple
  * threads operating on an conn (socket) trying to do multicast joins
- * need to synchronize  when operating on the ilg. Multiple threads
+ * need to synchronize when operating on the ilg. Multiple threads
  * potentially operating on different conn (socket endpoints) trying to
  * do multicast joins could eventually end up trying to manipulate the
- * ilm simulatenously and need to synchronize on the access to the ilm.
- * Both are amenable to standard Solaris MT techniques, but it would be
- * complex to handle a failover or failback which needs to manipulate
- * ilg/ilms if an applications can also simultaenously join/leave
- * multicast groups. Hence multicast join/leave also go through the ipsq_t
+ * ilm simultaneously and need to synchronize access to the ilm.  Currently,
+ * this is done by synchronizing join/leave via per-phyint ipsq_t
  * serialization.
- *
- * Multicast joins and leaves are single-threaded per phyint/IPMP group
- * using the ipsq serialization mechanism.
  *
  * An ilm is an IP data structure used to track multicast join/leave.
  * An ilm is associated with a <multicast group, ipif> tuple in IPv4 and
@@ -211,12 +205,13 @@ conn_ilg_reap(conn_t *connp)
  * Returns a pointer to the next available ilg in conn_ilg.  Allocs more
  * buffers in size of ILG_ALLOC_CHUNK ilgs when needed, and updates conn's
  * ilg tracking fields appropriately (conn_ilg_inuse reflects usage of the
- * returned ilg).  Returns NULL on failure (ENOMEM).
+ * returned ilg).  Returns NULL on failure, in which case `*errp' will be
+ * filled in with the reason.
  *
  * Assumes connp->conn_lock is held.
  */
 static ilg_t *
-conn_ilg_alloc(conn_t *connp)
+conn_ilg_alloc(conn_t *connp, int *errp)
 {
 	ilg_t *new, *ret;
 	int curcnt;
@@ -224,10 +219,21 @@ conn_ilg_alloc(conn_t *connp)
 	ASSERT(MUTEX_HELD(&connp->conn_lock));
 	ASSERT(connp->conn_ilg_inuse <= connp->conn_ilg_allocated);
 
+	/*
+	 * If CONN_CLOSING is set, conn_ilg cleanup has begun and we must not
+	 * create any ilgs.
+	 */
+	if (connp->conn_state_flags & CONN_CLOSING) {
+		*errp = EINVAL;
+		return (NULL);
+	}
+
 	if (connp->conn_ilg == NULL) {
 		connp->conn_ilg = GETSTRUCT(ilg_t, ILG_ALLOC_CHUNK);
-		if (connp->conn_ilg == NULL)
+		if (connp->conn_ilg == NULL) {
+			*errp = ENOMEM;
 			return (NULL);
+		}
 		connp->conn_ilg_allocated = ILG_ALLOC_CHUNK;
 		connp->conn_ilg_inuse = 0;
 	}
@@ -241,12 +247,15 @@ conn_ilg_alloc(conn_t *connp)
 			 * ilg_delete_all() will have to be changed when
 			 * this logic is changed.
 			 */
+			*errp = EBUSY;
 			return (NULL);
 		}
 		curcnt = connp->conn_ilg_allocated;
 		new = GETSTRUCT(ilg_t, curcnt + ILG_ALLOC_CHUNK);
-		if (new == NULL)
+		if (new == NULL) {
+			*errp = ENOMEM;
 			return (NULL);
+		}
 		bcopy(connp->conn_ilg, new, sizeof (ilg_t) * curcnt);
 		mi_free((char *)connp->conn_ilg);
 		connp->conn_ilg = new;
@@ -376,42 +385,6 @@ ilm_gen_filter(ilm_t *ilm, mcast_record_t *fmode, slist_t *flist)
 		*fmode = MODE_IS_EXCLUDE;
 		l_difference(&fbld.fbld_ex, &fbld.fbld_in, flist);
 	}
-}
-
-/*
- * If the given interface has failed, choose a new one to join on so
- * that we continue to receive packets.  ilg_orig_ifindex remembers
- * what the application used to join on so that we know the ilg to
- * delete even though we change the ill here.  Callers will store the
- * ilg returned from this function in ilg_ill.  Thus when we receive
- * a packet on ilg_ill, conn_wantpacket_v6 will deliver the packets.
- *
- * This function must be called as writer so we can walk the group
- * list and examine flags without holding a lock.
- */
-ill_t *
-ip_choose_multi_ill(ill_t *ill, const in6_addr_t *grp)
-{
-	ill_t	*till;
-	ill_group_t *illgrp = ill->ill_group;
-
-	ASSERT(IAM_WRITER_ILL(ill));
-
-	if (IN6_IS_ADDR_UNSPECIFIED(grp) || illgrp == NULL)
-		return (ill);
-
-	if ((ill->ill_phyint->phyint_flags & (PHYI_FAILED|PHYI_INACTIVE)) == 0)
-		return (ill);
-
-	till = illgrp->illgrp_ill;
-	while (till != NULL &&
-	    (till->ill_phyint->phyint_flags & (PHYI_FAILED|PHYI_INACTIVE))) {
-		till = till->ill_group_next;
-	}
-	if (till != NULL)
-		return (till);
-
-	return (ill);
 }
 
 static int
@@ -560,8 +533,7 @@ ilm_update_del(ilm_t *ilm, boolean_t isv6)
 }
 
 /*
- * INADDR_ANY means all multicast addresses. This is only used
- * by the multicast router.
+ * INADDR_ANY means all multicast addresses.
  * INADDR_ANY is stored as IPv6 unspecified addr.
  */
 int
@@ -578,40 +550,31 @@ ip_addmulti(ipaddr_t group, ipif_t *ipif, ilg_stat_t ilgstat,
 	if (!CLASSD(group) && group != INADDR_ANY)
 		return (EINVAL);
 
+	if (IS_UNDER_IPMP(ill))
+		return (EINVAL);
+
 	/*
-	 * INADDR_ANY is represented as the IPv6 unspecifed addr.
+	 * INADDR_ANY is represented as the IPv6 unspecified addr.
 	 */
 	if (group == INADDR_ANY)
 		v6group = ipv6_all_zeros;
 	else
 		IN6_IPADDR_TO_V4MAPPED(group, &v6group);
 
-	mutex_enter(&ill->ill_lock);
 	ilm = ilm_lookup_ipif(ipif, group);
-	mutex_exit(&ill->ill_lock);
 	/*
 	 * Since we are writer, we know the ilm_flags itself cannot
 	 * change at this point, and ilm_lookup_ipif would not have
 	 * returned a DELETED ilm. However, the data path can free
-	 * ilm->next via ilm_walker_cleanup() so we can safely
+	 * ilm->ilm_next via ilm_walker_cleanup() so we can safely
 	 * access anything in ilm except ilm_next (for safe access to
-	 * ilm_next we'd have  to take the ill_lock).
+	 * ilm_next we'd have to take the ill_lock).
 	 */
 	if (ilm != NULL)
 		return (ilm_update_add(ilm, ilgstat, ilg_flist, B_FALSE));
 
-	/*
-	 * ilms are associated with ipifs in IPv4. It moves with the
-	 * ipif if the ipif moves to a new ill when the interface
-	 * fails. Thus we really don't check whether the ipif_ill
-	 * has failed like in IPv6. If it has FAILED the ipif
-	 * will move (daemon will move it) and hence the ilm, if the
-	 * ipif is not IPIF_NOFAILOVER. For the IPIF_NOFAILOVER ipifs,
-	 * we continue to receive in the same place even if the
-	 * interface fails.
-	 */
 	ilm = ilm_add_v6(ipif, &v6group, ilgstat, ilg_fmode, ilg_flist,
-	    ill->ill_phyint->phyint_ifindex, ipif->ipif_zoneid);
+	    ipif->ipif_zoneid);
 	if (ilm == NULL)
 		return (ENOMEM);
 
@@ -623,10 +586,7 @@ ip_addmulti(ipaddr_t group, ipif_t *ipif, ilg_stat_t ilgstat,
 		 */
 		if (ilm_numentries_v6(ill, &v6group) > 1)
 			return (0);
-		if (ill->ill_group == NULL)
-			ret = ill_join_allmulti(ill);
-		else
-			ret = ill_nominate_mcast_rcv(ill->ill_group);
+		ret = ill_join_allmulti(ill);
 		if (ret != 0)
 			ilm_delete(ilm);
 		return (ret);
@@ -646,12 +606,8 @@ ip_addmulti(ipaddr_t group, ipif_t *ipif, ilg_stat_t ilgstat,
 
 /*
  * The unspecified address means all multicast addresses.
- * This is only used by the multicast router.
  *
- * ill identifies the interface to join on; it may not match the
- * interface requested by the application of a failover has taken
- * place.  orig_ifindex always identifies the interface requested
- * by the app.
+ * ill identifies the interface to join on.
  *
  * ilgstat tells us if there's an ilg associated with this join,
  * and if so, if it's a new ilg or a change to an existing one.
@@ -659,9 +615,8 @@ ip_addmulti(ipaddr_t group, ipif_t *ipif, ilg_stat_t ilgstat,
  * the ilg (and will be EXCLUDE {NULL} in the case of no ilg).
  */
 int
-ip_addmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
-    zoneid_t zoneid, ilg_stat_t ilgstat, mcast_record_t ilg_fmode,
-    slist_t *ilg_flist)
+ip_addmulti_v6(const in6_addr_t *v6group, ill_t *ill, zoneid_t zoneid,
+    ilg_stat_t ilgstat, mcast_record_t ilg_fmode, slist_t *ilg_flist)
 {
 	ilm_t	*ilm;
 	int	ret;
@@ -673,37 +628,20 @@ ip_addmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 		return (EINVAL);
 	}
 
+	if (IS_UNDER_IPMP(ill) && !IN6_IS_ADDR_MC_SOLICITEDNODE(v6group))
+		return (EINVAL);
+
 	/*
-	 * An ilm is uniquely identified by the tuple of (group, ill,
-	 * orig_ill).  group is the multicast group address, ill is
-	 * the interface on which it is currently joined, and orig_ill
-	 * is the interface on which the application requested the
-	 * join.  orig_ill and ill are the same unless orig_ill has
-	 * failed over.
-	 *
-	 * Both orig_ill and ill are required, which means we may have
-	 * 2 ilms on an ill for the same group, but with different
-	 * orig_ills.  These must be kept separate, so that when failback
-	 * occurs, the appropriate ilms are moved back to their orig_ill
-	 * without disrupting memberships on the ill to which they had
-	 * been moved.
-	 *
-	 * In order to track orig_ill, we store orig_ifindex in the
-	 * ilm and ilg.
+	 * An ilm is uniquely identified by the tuple of (group, ill) where
+	 * `group' is the multicast group address, and `ill' is the interface
+	 * on which it is currently joined.
 	 */
-	mutex_enter(&ill->ill_lock);
-	ilm = ilm_lookup_ill_index_v6(ill, v6group, orig_ifindex, zoneid);
-	mutex_exit(&ill->ill_lock);
+	ilm = ilm_lookup_ill_v6(ill, v6group, B_TRUE, zoneid);
 	if (ilm != NULL)
 		return (ilm_update_add(ilm, ilgstat, ilg_flist, B_TRUE));
 
-	/*
-	 * We need to remember where the application really wanted
-	 * to join. This will be used later if we want to failback
-	 * to the original interface.
-	 */
 	ilm = ilm_add_v6(ill->ill_ipif, v6group, ilgstat, ilg_fmode,
-	    ilg_flist, orig_ifindex, zoneid);
+	    ilg_flist, zoneid);
 	if (ilm == NULL)
 		return (ENOMEM);
 
@@ -715,11 +653,7 @@ ip_addmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 		 */
 		if (ilm_numentries_v6(ill, v6group) > 1)
 			return (0);
-		if (ill->ill_group == NULL)
-			ret = ill_join_allmulti(ill);
-		else
-			ret = ill_nominate_mcast_rcv(ill->ill_group);
-
+		ret = ill_join_allmulti(ill);
 		if (ret != 0)
 			ilm_delete(ilm);
 		return (ret);
@@ -754,6 +688,14 @@ ip_ll_send_enabmulti_req(ill_t *ill, const in6_addr_t *v6groupp)
 	char	group_buf[INET6_ADDRSTRLEN];
 
 	ASSERT(IAM_WRITER_ILL(ill));
+
+	/*
+	 * If we're on the IPMP ill, use the nominated multicast interface to
+	 * send and receive DLPI messages, if one exists.  (If none exists,
+	 * there are no usable interfaces and thus nothing to do.)
+	 */
+	if (IS_IPMP(ill) && (ill = ipmp_illgrp_cast_ill(ill->ill_grp)) == NULL)
+		return (0);
 
 	/*
 	 * Create a AR_ENTRY_SQUERY message with a dl_enabmulti_req tacked
@@ -842,9 +784,8 @@ ip_ll_addmulti_v6(ipif_t *ipif, const in6_addr_t *v6groupp)
 }
 
 /*
- * INADDR_ANY means all multicast addresses. This is only used
- * by the multicast router.
- * INADDR_ANY is stored as the IPv6 unspecifed addr.
+ * INADDR_ANY means all multicast addresses.
+ * INADDR_ANY is stored as the IPv6 unspecified addr.
  */
 int
 ip_delmulti(ipaddr_t group, ipif_t *ipif, boolean_t no_ilg, boolean_t leaving)
@@ -859,7 +800,7 @@ ip_delmulti(ipaddr_t group, ipif_t *ipif, boolean_t no_ilg, boolean_t leaving)
 		return (EINVAL);
 
 	/*
-	 * INADDR_ANY is represented as the IPv6 unspecifed addr.
+	 * INADDR_ANY is represented as the IPv6 unspecified addr.
 	 */
 	if (group == INADDR_ANY)
 		v6group = ipv6_all_zeros;
@@ -870,9 +811,7 @@ ip_delmulti(ipaddr_t group, ipif_t *ipif, boolean_t no_ilg, boolean_t leaving)
 	 * Look for a match on the ipif.
 	 * (IP_DROP_MEMBERSHIP specifies an ipif using an IP address).
 	 */
-	mutex_enter(&ill->ill_lock);
 	ilm = ilm_lookup_ipif(ipif, group);
-	mutex_exit(&ill->ill_lock);
 	if (ilm == NULL)
 		return (ENOENT);
 
@@ -897,11 +836,9 @@ ip_delmulti(ipaddr_t group, ipif_t *ipif, boolean_t no_ilg, boolean_t leaving)
 			return (0);
 
 		/* If we never joined, then don't leave. */
-		if (ill->ill_join_allmulti) {
+		if (ill->ill_join_allmulti)
 			ill_leave_allmulti(ill);
-			if (ill->ill_group != NULL)
-				(void) ill_nominate_mcast_rcv(ill->ill_group);
-		}
+
 		return (0);
 	}
 
@@ -921,11 +858,10 @@ ip_delmulti(ipaddr_t group, ipif_t *ipif, boolean_t no_ilg, boolean_t leaving)
 
 /*
  * The unspecified address means all multicast addresses.
- * This is only used by the multicast router.
  */
 int
-ip_delmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
-    zoneid_t zoneid, boolean_t no_ilg, boolean_t leaving)
+ip_delmulti_v6(const in6_addr_t *v6group, ill_t *ill, zoneid_t zoneid,
+    boolean_t no_ilg, boolean_t leaving)
 {
 	ipif_t	*ipif;
 	ilm_t *ilm;
@@ -938,25 +874,8 @@ ip_delmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 
 	/*
 	 * Look for a match on the ill.
-	 * (IPV6_LEAVE_GROUP specifies an ill using an ifindex).
-	 *
-	 * Similar to ip_addmulti_v6, we should always look using
-	 * the orig_ifindex.
-	 *
-	 * 1) If orig_ifindex is different from ill's ifindex
-	 *    we should have an ilm with orig_ifindex created in
-	 *    ip_addmulti_v6. We should delete that here.
-	 *
-	 * 2) If orig_ifindex is same as ill's ifindex, we should
-	 *    not delete the ilm that is temporarily here because of
-	 *    a FAILOVER. Those ilms will have a ilm_orig_ifindex
-	 *    different from ill's ifindex.
-	 *
-	 * Thus, always lookup using orig_ifindex.
 	 */
-	mutex_enter(&ill->ill_lock);
-	ilm = ilm_lookup_ill_index_v6(ill, v6group, orig_ifindex, zoneid);
-	mutex_exit(&ill->ill_lock);
+	ilm = ilm_lookup_ill_v6(ill, v6group, B_TRUE, zoneid);
 	if (ilm == NULL)
 		return (ENOENT);
 
@@ -985,11 +904,9 @@ ip_delmulti_v6(const in6_addr_t *v6group, ill_t *ill, int orig_ifindex,
 			return (0);
 
 		/* If we never joined, then don't leave. */
-		if (ill->ill_join_allmulti) {
+		if (ill->ill_join_allmulti)
 			ill_leave_allmulti(ill);
-			if (ill->ill_group != NULL)
-				(void) ill_nominate_mcast_rcv(ill->ill_group);
-		}
+
 		return (0);
 	}
 
@@ -1020,6 +937,13 @@ ip_ll_send_disabmulti_req(ill_t *ill, const in6_addr_t *v6groupp)
 	uint32_t	addrlen, addroff;
 
 	ASSERT(IAM_WRITER_ILL(ill));
+
+	/*
+	 * See comment in ip_ll_send_enabmulti_req().
+	 */
+	if (IS_IPMP(ill) && (ill = ipmp_illgrp_cast_ill(ill->ill_grp)) == NULL)
+		return (0);
+
 	/*
 	 * Create a AR_ENTRY_SQUERY message with a dl_disabmulti_req tacked
 	 * on.
@@ -1099,16 +1023,16 @@ ip_ll_delmulti_v6(ipif_t *ipif, const in6_addr_t *v6group)
 }
 
 /*
- * Make the driver pass up all multicast packets
- *
- * With ill groups, the caller makes sure that there is only
- * one ill joining the allmulti group.
+ * Make the driver pass up all multicast packets.  NOTE: to keep callers
+ * IPMP-unaware, if an IPMP ill is passed in, the ill_join_allmulti flag is
+ * set on it (rather than the cast ill).
  */
 int
 ill_join_allmulti(ill_t *ill)
 {
 	mblk_t		*promiscon_mp, *promiscoff_mp;
 	uint32_t	addrlen, addroff;
+	ill_t		*join_ill = ill;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
@@ -1120,7 +1044,13 @@ ill_join_allmulti(ill_t *ill)
 		return (0);
 	}
 
-	ASSERT(!ill->ill_join_allmulti);
+	/*
+	 * See comment in ip_ll_send_enabmulti_req().
+	 */
+	if (IS_IPMP(ill) && (ill = ipmp_illgrp_cast_ill(ill->ill_grp)) == NULL)
+		return (0);
+
+	ASSERT(!join_ill->ill_join_allmulti);
 
 	/*
 	 * Create a DL_PROMISCON_REQ message and send it directly to the DLPI
@@ -1144,20 +1074,18 @@ ill_join_allmulti(ill_t *ill)
 		ill_dlpi_send(ill, promiscon_mp);
 	}
 
-	ill->ill_join_allmulti = B_TRUE;
+	join_ill->ill_join_allmulti = B_TRUE;
 	return (0);
 }
 
 /*
  * Make the driver stop passing up all multicast packets
- *
- * With ill groups, we need to nominate some other ill as
- * this ipif->ipif_ill is leaving the group.
  */
 void
 ill_leave_allmulti(ill_t *ill)
 {
-	mblk_t		*promiscoff_mp = ill->ill_promiscoff_mp;
+	mblk_t	*promiscoff_mp;
+	ill_t	*leave_ill = ill;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
@@ -1169,7 +1097,13 @@ ill_leave_allmulti(ill_t *ill)
 		return;
 	}
 
-	ASSERT(ill->ill_join_allmulti);
+	/*
+	 * See comment in ip_ll_send_enabmulti_req().
+	 */
+	if (IS_IPMP(ill) && (ill = ipmp_illgrp_cast_ill(ill->ill_grp)) == NULL)
+		return;
+
+	ASSERT(leave_ill->ill_join_allmulti);
 
 	/*
 	 * Create a DL_PROMISCOFF_REQ message and send it directly to
@@ -1179,12 +1113,13 @@ ill_leave_allmulti(ill_t *ill)
 	 */
 	if ((ill->ill_net_type == IRE_IF_RESOLVER) &&
 	    !(ill->ill_phyint->phyint_flags & PHYI_MULTI_BCAST)) {
+		promiscoff_mp = ill->ill_promiscoff_mp;
 		ASSERT(promiscoff_mp != NULL);
 		ill->ill_promiscoff_mp = NULL;
 		ill_dlpi_send(ill, promiscoff_mp);
 	}
 
-	ill->ill_join_allmulti = B_FALSE;
+	leave_ill->ill_join_allmulti = B_FALSE;
 }
 
 static ill_t *
@@ -1213,21 +1148,34 @@ int
 ip_join_allmulti(uint_t ifindex, boolean_t isv6, ip_stack_t *ipst)
 {
 	ill_t		*ill;
-	int		ret;
+	int		ret = 0;
 
 	if ((ill = ipsq_enter_byifindex(ifindex, isv6, ipst)) == NULL)
 		return (ENODEV);
+
+	/*
+	 * The ip_addmulti*() functions won't allow IPMP underlying interfaces
+	 * to join allmulti since only the nominated underlying interface in
+	 * the group should receive multicast.  We silently succeed to avoid
+	 * having to teach IPobs (currently the only caller of this routine)
+	 * to ignore failures in this case.
+	 */
+	if (IS_UNDER_IPMP(ill))
+		goto out;
+
 	if (isv6) {
-		ret = ip_addmulti_v6(&ipv6_all_zeros, ill, ifindex,
-		    ill->ill_zoneid, ILGSTAT_NONE, MODE_IS_EXCLUDE, NULL);
+		ret = ip_addmulti_v6(&ipv6_all_zeros, ill, ill->ill_zoneid,
+		    ILGSTAT_NONE, MODE_IS_EXCLUDE, NULL);
 	} else {
 		ret = ip_addmulti(INADDR_ANY, ill->ill_ipif, ILGSTAT_NONE,
 		    MODE_IS_EXCLUDE, NULL);
 	}
 	ill->ill_ipallmulti_cnt++;
+out:
 	ipsq_exit(ill->ill_phyint->phyint_ipsq);
 	return (ret);
 }
+
 
 int
 ip_leave_allmulti(uint_t ifindex, boolean_t isv6, ip_stack_t *ipst)
@@ -1236,14 +1184,17 @@ ip_leave_allmulti(uint_t ifindex, boolean_t isv6, ip_stack_t *ipst)
 
 	if ((ill = ipsq_enter_byifindex(ifindex, isv6, ipst)) == NULL)
 		return (ENODEV);
-	ASSERT(ill->ill_ipallmulti_cnt != 0);
-	if (isv6) {
-		(void) ip_delmulti_v6(&ipv6_all_zeros, ill, ifindex,
-		    ill->ill_zoneid, B_TRUE, B_TRUE);
-	} else {
-		(void) ip_delmulti(INADDR_ANY, ill->ill_ipif, B_TRUE, B_TRUE);
+
+	if (ill->ill_ipallmulti_cnt > 0) {
+		if (isv6) {
+			(void) ip_delmulti_v6(&ipv6_all_zeros, ill,
+			    ill->ill_zoneid, B_TRUE, B_TRUE);
+		} else {
+			(void) ip_delmulti(INADDR_ANY, ill->ill_ipif, B_TRUE,
+			    B_TRUE);
+		}
+		ill->ill_ipallmulti_cnt--;
 	}
-	ill->ill_ipallmulti_cnt--;
 	ipsq_exit(ill->ill_phyint->phyint_ipsq);
 	return (0);
 }
@@ -1260,8 +1211,7 @@ ip_purge_allmulti(ill_t *ill)
 	for (; ill->ill_ipallmulti_cnt > 0; ill->ill_ipallmulti_cnt--) {
 		if (ill->ill_isv6) {
 			(void) ip_delmulti_v6(&ipv6_all_zeros, ill,
-			    ill->ill_phyint->phyint_ifindex, ill->ill_zoneid,
-			    B_TRUE, B_TRUE);
+			    ill->ill_zoneid, B_TRUE, B_TRUE);
 		} else {
 			(void) ip_delmulti(INADDR_ANY, ill->ill_ipif, B_TRUE,
 			    B_TRUE);
@@ -1539,13 +1489,14 @@ void
 ill_recover_multicast(ill_t *ill)
 {
 	ilm_t	*ilm;
+	ipif_t	*ipif = ill->ill_ipif;
 	char    addrbuf[INET6_ADDRSTRLEN];
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
 	ill->ill_need_recover_multicast = 0;
 
-	ILM_WALKER_HOLD(ill);
+	ill_ilm_walker_hold(ill);
 	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 		/*
 		 * Check how many ipif's that have members in this group -
@@ -1553,47 +1504,45 @@ ill_recover_multicast(ill_t *ill)
 		 * in the list.
 		 */
 		if (ilm_numentries_v6(ill, &ilm->ilm_v6addr) > 1 &&
-		    ilm_lookup_ill_v6(ill, &ilm->ilm_v6addr, ALL_ZONES) != ilm)
+		    ilm_lookup_ill_v6(ill, &ilm->ilm_v6addr, B_TRUE,
+		    ALL_ZONES) != ilm) {
 			continue;
-		ip1dbg(("ill_recover_multicast: %s\n",
-		    inet_ntop(AF_INET6, &ilm->ilm_v6addr, addrbuf,
-		    sizeof (addrbuf))));
+		}
+
+		ip1dbg(("ill_recover_multicast: %s\n", inet_ntop(AF_INET6,
+		    &ilm->ilm_v6addr, addrbuf, sizeof (addrbuf))));
+
 		if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
-			if (ill->ill_group == NULL) {
-				(void) ill_join_allmulti(ill);
-			} else {
-				/*
-				 * We don't want to join on this ill,
-				 * if somebody else in the group has
-				 * already been nominated.
-				 */
-				(void) ill_nominate_mcast_rcv(ill->ill_group);
-			}
+			(void) ill_join_allmulti(ill);
 		} else {
-			(void) ip_ll_addmulti_v6(ill->ill_ipif,
-			    &ilm->ilm_v6addr);
+			if (ill->ill_isv6)
+				mld_joingroup(ilm);
+			else
+				igmp_joingroup(ilm);
+
+			(void) ip_ll_addmulti_v6(ipif, &ilm->ilm_v6addr);
 		}
 	}
-	ILM_WALKER_RELE(ill);
+	ill_ilm_walker_rele(ill);
+
 }
 
 /*
  * The opposite of ill_recover_multicast() -- leaves all multicast groups
- * that were explicitly joined.  Note that both these functions could be
- * disposed of if we enhanced ARP to allow us to handle DL_DISABMULTI_REQ
- * and DL_ENABMULTI_REQ messages when an interface is down.
+ * that were explicitly joined.
  */
 void
 ill_leave_multicast(ill_t *ill)
 {
 	ilm_t	*ilm;
+	ipif_t	*ipif = ill->ill_ipif;
 	char    addrbuf[INET6_ADDRSTRLEN];
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
 	ill->ill_need_recover_multicast = 1;
 
-	ILM_WALKER_HOLD(ill);
+	ill_ilm_walker_hold(ill);
 	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 		/*
 		 * Check how many ipif's that have members in this group -
@@ -1601,25 +1550,26 @@ ill_leave_multicast(ill_t *ill)
 		 * in the list.
 		 */
 		if (ilm_numentries_v6(ill, &ilm->ilm_v6addr) > 1 &&
-		    ilm_lookup_ill_v6(ill, &ilm->ilm_v6addr, ALL_ZONES) != ilm)
+		    ilm_lookup_ill_v6(ill, &ilm->ilm_v6addr, B_TRUE,
+		    ALL_ZONES) != ilm) {
 			continue;
-		ip1dbg(("ill_leave_multicast: %s\n",
-		    inet_ntop(AF_INET6, &ilm->ilm_v6addr, addrbuf,
-		    sizeof (addrbuf))));
+		}
+
+		ip1dbg(("ill_leave_multicast: %s\n", inet_ntop(AF_INET6,
+		    &ilm->ilm_v6addr, addrbuf, sizeof (addrbuf))));
+
 		if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr)) {
 			ill_leave_allmulti(ill);
-			/*
-			 * If we were part of an IPMP group, then
-			 * ill_handoff_responsibility() has already
-			 * nominated a new member (so we don't).
-			 */
-			ASSERT(ill->ill_group == NULL);
 		} else {
-			(void) ip_ll_delmulti_v6(ill->ill_ipif,
-			    &ilm->ilm_v6addr);
+			if (ill->ill_isv6)
+				mld_leavegroup(ilm);
+			else
+				igmp_leavegroup(ilm);
+
+			(void) ip_ll_delmulti_v6(ipif, &ilm->ilm_v6addr);
 		}
 	}
-	ILM_WALKER_RELE(ill);
+	ill_ilm_walker_rele(ill);
 }
 
 /* Find an ilm for matching the ill */
@@ -1628,91 +1578,79 @@ ilm_lookup_ill(ill_t *ill, ipaddr_t group, zoneid_t zoneid)
 {
 	in6_addr_t	v6group;
 
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock));
 	/*
-	 * INADDR_ANY is represented as the IPv6 unspecifed addr.
+	 * INADDR_ANY is represented as the IPv6 unspecified addr.
 	 */
 	if (group == INADDR_ANY)
 		v6group = ipv6_all_zeros;
 	else
 		IN6_IPADDR_TO_V4MAPPED(group, &v6group);
 
-	return (ilm_lookup_ill_v6(ill, &v6group, zoneid));
+	return (ilm_lookup_ill_v6(ill, &v6group, B_TRUE, zoneid));
 }
 
 /*
- * Find an ilm for matching the ill. All the ilm lookup functions
- * ignore ILM_DELETED ilms. These have been logically deleted, and
- * igmp and linklayer disable multicast have been done. Only mi_free
- * yet to be done. Still there in the list due to ilm_walkers. The
- * last walker will release it.
+ * Find an ilm for address `v6group' on `ill' and zone `zoneid' (which may be
+ * ALL_ZONES).  In general, if `ill' is in an IPMP group, we will match
+ * against any ill in the group.  However, if `restrict_solicited' is set,
+ * then specifically for IPv6 solicited-node multicast, the match will be
+ * restricted to the specified `ill'.
  */
 ilm_t *
-ilm_lookup_ill_v6(ill_t *ill, const in6_addr_t *v6group, zoneid_t zoneid)
+ilm_lookup_ill_v6(ill_t *ill, const in6_addr_t *v6group,
+    boolean_t restrict_solicited, zoneid_t zoneid)
 {
 	ilm_t	*ilm;
+	ilm_walker_t ilw;
+	boolean_t restrict_ill = B_FALSE;
 
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock));
+	/*
+	 * In general, underlying interfaces cannot have multicast memberships
+	 * and thus lookups always match across the illgrp.  However, we must
+	 * allow IPv6 solicited-node multicast memberships on underlying
+	 * interfaces, and thus an IPMP meta-interface and one of its
+	 * underlying ills may have the same solicited-node multicast address.
+	 * In that case, we need to restrict the lookup to the requested ill.
+	 * However, we may receive packets on an underlying interface that
+	 * are for the corresponding IPMP interface's solicited-node multicast
+	 * address, and thus in that case we need to match across the group --
+	 * hence the unfortunate `restrict_solicited' argument.
+	 */
+	if (IN6_IS_ADDR_MC_SOLICITEDNODE(v6group) && restrict_solicited)
+		restrict_ill = (IS_IPMP(ill) || IS_UNDER_IPMP(ill));
 
-	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
-		if (ilm->ilm_flags & ILM_DELETED)
+	ilm = ilm_walker_start(&ilw, ill);
+	for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
+		if (!IN6_ARE_ADDR_EQUAL(&ilm->ilm_v6addr, v6group))
 			continue;
-		if (IN6_ARE_ADDR_EQUAL(&ilm->ilm_v6addr, v6group) &&
-		    (zoneid == ALL_ZONES || zoneid == ilm->ilm_zoneid))
-			return (ilm);
-	}
-	return (NULL);
-}
-
-ilm_t *
-ilm_lookup_ill_index_v6(ill_t *ill, const in6_addr_t *v6group, int index,
-    zoneid_t zoneid)
-{
-	ilm_t *ilm;
-
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock));
-
-	for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
-		if (ilm->ilm_flags & ILM_DELETED)
+		if (zoneid != ALL_ZONES && zoneid != ilm->ilm_zoneid)
 			continue;
-		if (IN6_ARE_ADDR_EQUAL(&ilm->ilm_v6addr, v6group) &&
-		    (zoneid == ALL_ZONES || zoneid == ilm->ilm_zoneid) &&
-		    ilm->ilm_orig_ifindex == index) {
-			return (ilm);
+		if (!restrict_ill || ill == (ill->ill_isv6 ?
+		    ilm->ilm_ill : ilm->ilm_ipif->ipif_ill)) {
+			break;
 		}
 	}
-	return (NULL);
+	ilm_walker_finish(&ilw);
+	return (ilm);
 }
 
-
 /*
- * Found an ilm for the ipif. Only needed for IPv4 which does
+ * Find an ilm for the ipif. Only needed for IPv4 which does
  * ipif specific socket options.
  */
 ilm_t *
 ilm_lookup_ipif(ipif_t *ipif, ipaddr_t group)
 {
-	ill_t	*ill = ipif->ipif_ill;
-	ilm_t	*ilm;
-	in6_addr_t	v6group;
+	ilm_t *ilm;
+	ilm_walker_t ilw;
 
-	ASSERT(ill->ill_ilm_walker_cnt != 0 || MUTEX_HELD(&ill->ill_lock));
-	/*
-	 * INADDR_ANY is represented as the IPv6 unspecifed addr.
-	 */
-	if (group == INADDR_ANY)
-		v6group = ipv6_all_zeros;
-	else
-		IN6_IPADDR_TO_V4MAPPED(group, &v6group);
-
-	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
-		if (ilm->ilm_flags & ILM_DELETED)
-			continue;
-		if (ilm->ilm_ipif == ipif &&
-		    IN6_ARE_ADDR_EQUAL(&ilm->ilm_v6addr, &v6group))
-			return (ilm);
+	ilm = ilm_walker_start(&ilw, ipif->ipif_ill);
+	for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
+		if (ilm->ilm_ipif == ipif && ilm->ilm_addr == group)
+			break;
 	}
-	return (NULL);
+	ilm_walker_finish(&ilw);
+	return (ilm);
 }
 
 /*
@@ -1739,8 +1677,7 @@ ilm_numentries_v6(ill_t *ill, const in6_addr_t *v6group)
 /* Caller guarantees that the group is not already on the list */
 static ilm_t *
 ilm_add_v6(ipif_t *ipif, const in6_addr_t *v6group, ilg_stat_t ilgstat,
-    mcast_record_t ilg_fmode, slist_t *ilg_flist, int orig_ifindex,
-    zoneid_t zoneid)
+    mcast_record_t ilg_fmode, slist_t *ilg_flist, zoneid_t zoneid)
 {
 	ill_t	*ill = ipif->ipif_ill;
 	ilm_t	*ilm;
@@ -1783,18 +1720,9 @@ ilm_add_v6(ipif_t *ipif, const in6_addr_t *v6group, ilg_stat_t ilgstat,
 		    (char *), "ilm", (void *), ilm);
 		ipif->ipif_ilm_cnt++;
 	}
+
 	ASSERT(ill->ill_ipst);
 	ilm->ilm_ipst = ill->ill_ipst;	/* No netstack_hold */
-
-	/*
-	 * After this if ilm moves to a new ill, we don't change
-	 * the ilm_orig_ifindex. Thus, if ill_index != ilm_orig_ifindex,
-	 * it has been moved. Indexes don't match even when the application
-	 * wants to join on a FAILED/INACTIVE interface because we choose
-	 * a new interface to join in. This is considered as an implicit
-	 * move.
-	 */
-	ilm->ilm_orig_ifindex = orig_ifindex;
 
 	ASSERT(!(ipif->ipif_state_flags & IPIF_CONDEMNED));
 	ASSERT(!(ill->ill_state_flags & ILL_CONDEMNED));
@@ -1969,6 +1897,108 @@ ilm_delete(ilm_t *ilm)
 	}
 }
 
+/* Increment the ILM walker count for `ill' */
+static void
+ill_ilm_walker_hold(ill_t *ill)
+{
+	mutex_enter(&ill->ill_lock);
+	ill->ill_ilm_walker_cnt++;
+	mutex_exit(&ill->ill_lock);
+}
+
+/* Decrement the ILM walker count for `ill' */
+static void
+ill_ilm_walker_rele(ill_t *ill)
+{
+	mutex_enter(&ill->ill_lock);
+	ill->ill_ilm_walker_cnt--;
+	if (ill->ill_ilm_walker_cnt == 0 && ill->ill_ilm_cleanup_reqd)
+		ilm_walker_cleanup(ill);	/* drops ill_lock */
+	else
+		mutex_exit(&ill->ill_lock);
+}
+
+/*
+ * Start walking the ILMs associated with `ill'; the first ILM in the walk
+ * (if any) is returned.  State associated with the walk is stored in `ilw'.
+ * Note that walks associated with interfaces under IPMP also walk the ILMs
+ * on the associated IPMP interface; this is handled transparently to callers
+ * via ilm_walker_step().  (Usually with IPMP all ILMs will be on the IPMP
+ * interface; the only exception is to support IPv6 test addresses, which
+ * require ILMs for their associated solicited-node multicast addresses.)
+ */
+ilm_t *
+ilm_walker_start(ilm_walker_t *ilw, ill_t *ill)
+{
+	ilw->ilw_ill = ill;
+	if (IS_UNDER_IPMP(ill))
+		ilw->ilw_ipmp_ill = ipmp_ill_hold_ipmp_ill(ill);
+	else
+		ilw->ilw_ipmp_ill = NULL;
+
+	ill_ilm_walker_hold(ill);
+	if (ilw->ilw_ipmp_ill != NULL)
+		ill_ilm_walker_hold(ilw->ilw_ipmp_ill);
+
+	if (ilw->ilw_ipmp_ill != NULL && ilw->ilw_ipmp_ill->ill_ilm != NULL)
+		ilw->ilw_walk_ill = ilw->ilw_ipmp_ill;
+	else
+		ilw->ilw_walk_ill = ilw->ilw_ill;
+
+	return (ilm_walker_step(ilw, NULL));
+}
+
+/*
+ * Helper function for ilm_walker_step() that returns the next ILM
+ * associated with `ilw', regardless of whether it's deleted.
+ */
+static ilm_t *
+ilm_walker_step_all(ilm_walker_t *ilw, ilm_t *ilm)
+{
+	if (ilm == NULL)
+		return (ilw->ilw_walk_ill->ill_ilm);
+
+	if (ilm->ilm_next != NULL)
+		return (ilm->ilm_next);
+
+	if (ilw->ilw_ipmp_ill != NULL && IS_IPMP(ilw->ilw_walk_ill)) {
+		ilw->ilw_walk_ill = ilw->ilw_ill;
+		/*
+		 * It's possible that ilw_ill left the group during our walk,
+		 * so we can't ASSERT() that it's under IPMP.  Callers that
+		 * care will be writer on the IPSQ anyway.
+		 */
+		return (ilw->ilw_walk_ill->ill_ilm);
+	}
+	return (NULL);
+}
+
+/*
+ * Step to the next ILM associated with `ilw'.
+ */
+ilm_t *
+ilm_walker_step(ilm_walker_t *ilw, ilm_t *ilm)
+{
+	while ((ilm = ilm_walker_step_all(ilw, ilm)) != NULL) {
+		if (!(ilm->ilm_flags & ILM_DELETED))
+			break;
+	}
+	return (ilm);
+}
+
+/*
+ * Finish the ILM walk associated with `ilw'.
+ */
+void
+ilm_walker_finish(ilm_walker_t *ilw)
+{
+	ill_ilm_walker_rele(ilw->ilw_ill);
+	if (ilw->ilw_ipmp_ill != NULL) {
+		ill_ilm_walker_rele(ilw->ilw_ipmp_ill);
+		ill_refrele(ilw->ilw_ipmp_ill);
+	}
+	bzero(&ilw, sizeof (ilw));
+}
 
 /*
  * Looks up the appropriate ipif given a v4 multicast group and interface
@@ -2256,16 +2286,15 @@ ip_set_srcfilter(conn_t *connp, struct group_filter *gf,
 		 * didn't find an ilg, there's nothing to do.
 		 */
 		if (!leave_grp)
-			ilg = conn_ilg_alloc(connp);
+			ilg = conn_ilg_alloc(connp, &err);
 		if (leave_grp || ilg == NULL) {
 			mutex_exit(&connp->conn_lock);
-			return (leave_grp ? 0 : ENOMEM);
+			return (leave_grp ? 0 : err);
 		}
 		ilgstat = ILGSTAT_NEW;
 		IN6_IPADDR_TO_V4MAPPED(grp, &ilg->ilg_v6group);
 		ilg->ilg_ipif = ipif;
 		ilg->ilg_ill = NULL;
-		ilg->ilg_orig_ifindex = 0;
 	} else if (leave_grp) {
 		ilg_delete(connp, ilg, NULL);
 		mutex_exit(&connp->conn_lock);
@@ -2389,7 +2418,7 @@ ip_set_srcfilter_v6(conn_t *connp, struct group_filter *gf,
     const struct in6_addr *grp, ill_t *ill)
 {
 	ilg_t *ilg;
-	int i, orig_ifindex, orig_fmode, new_fmode, err;
+	int i, orig_fmode, new_fmode, err;
 	slist_t *orig_filter = NULL;
 	slist_t *new_filter = NULL;
 	struct sockaddr_storage *sl;
@@ -2409,65 +2438,31 @@ ip_set_srcfilter_v6(conn_t *connp, struct group_filter *gf,
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
-	/*
-	 * Use the ifindex to do the lookup.  We can't use the ill
-	 * directly because ilg_ill could point to a different ill
-	 * if things have moved.
-	 */
-	orig_ifindex = ill->ill_phyint->phyint_ifindex;
-
 	mutex_enter(&connp->conn_lock);
-	ilg = ilg_lookup_ill_index_v6(connp, grp, orig_ifindex);
+	ilg = ilg_lookup_ill_v6(connp, grp, ill);
 	if (ilg == NULL) {
 		/*
 		 * if the request was actually to leave, and we
 		 * didn't find an ilg, there's nothing to do.
 		 */
 		if (!leave_grp)
-			ilg = conn_ilg_alloc(connp);
+			ilg = conn_ilg_alloc(connp, &err);
 		if (leave_grp || ilg == NULL) {
 			mutex_exit(&connp->conn_lock);
-			return (leave_grp ? 0 : ENOMEM);
+			return (leave_grp ? 0 : err);
 		}
 		ilgstat = ILGSTAT_NEW;
 		ilg->ilg_v6group = *grp;
 		ilg->ilg_ipif = NULL;
-		/*
-		 * Choose our target ill to join on. This might be
-		 * different from the ill we've been given if it's
-		 * currently down and part of a group.
-		 *
-		 * new ill is not refheld; we are writer.
-		 */
-		ill = ip_choose_multi_ill(ill, grp);
-		ASSERT(!(ill->ill_state_flags & ILL_CONDEMNED));
 		ilg->ilg_ill = ill;
-		/*
-		 * Remember the index that we joined on, so that we can
-		 * successfully delete them later on and also search for
-		 * duplicates if the application wants to join again.
-		 */
-		ilg->ilg_orig_ifindex = orig_ifindex;
 	} else if (leave_grp) {
-		/*
-		 * Use the ilg's current ill for the deletion,
-		 * we might have failed over.
-		 */
-		ill = ilg->ilg_ill;
 		ilg_delete(connp, ilg, NULL);
 		mutex_exit(&connp->conn_lock);
-		(void) ip_delmulti_v6(grp, ill, orig_ifindex,
-		    connp->conn_zoneid, B_FALSE, B_TRUE);
+		(void) ip_delmulti_v6(grp, ill, connp->conn_zoneid, B_FALSE,
+		    B_TRUE);
 		return (0);
 	} else {
 		ilgstat = ILGSTAT_CHANGE;
-		/*
-		 * The current ill might be different from the one we were
-		 * asked to join on (if failover has occurred); we should
-		 * join on the ill stored in the ilg.  The original ill
-		 * is noted in ilg_orig_ifindex, which matched our request.
-		 */
-		ill = ilg->ilg_ill;
 		/* preserve existing state in case ip_addmulti() fails */
 		orig_fmode = ilg->ilg_fmode;
 		if (ilg->ilg_filter == NULL) {
@@ -2531,8 +2526,8 @@ ip_set_srcfilter_v6(conn_t *connp, struct group_filter *gf,
 
 	mutex_exit(&connp->conn_lock);
 
-	err = ip_addmulti_v6(grp, ill, orig_ifindex, connp->conn_zoneid,
-	    ilgstat, new_fmode, new_filter);
+	err = ip_addmulti_v6(grp, ill, connp->conn_zoneid, ilgstat, new_fmode,
+	    new_filter);
 	if (err != 0) {
 		/*
 		 * Restore the original filter state, or delete the
@@ -2541,7 +2536,7 @@ ip_set_srcfilter_v6(conn_t *connp, struct group_filter *gf,
 		 * conn_lock.
 		 */
 		mutex_enter(&connp->conn_lock);
-		ilg = ilg_lookup_ill_index_v6(connp, grp, orig_ifindex);
+		ilg = ilg_lookup_ill_v6(connp, grp, ill);
 		ASSERT(ilg != NULL);
 		if (ilgstat == ILGSTAT_NEW) {
 			ilg_delete(connp, ilg, NULL);
@@ -3043,20 +3038,12 @@ ip_opt_delete_group_excl_v6(conn_t *connp, const in6_addr_t *v6group,
     ill_t *ill, mcast_record_t fmode, const in6_addr_t *v6src)
 {
 	ilg_t	*ilg;
-	ill_t	*ilg_ill;
-	uint_t	ilg_orig_ifindex;
 	boolean_t leaving = B_TRUE;
 
 	ASSERT(IAM_WRITER_ILL(ill));
 
-	/*
-	 * Use the index that we originally used to join. We can't
-	 * use the ill directly because ilg_ill could point to
-	 * a new ill if things have moved.
-	 */
 	mutex_enter(&connp->conn_lock);
-	ilg = ilg_lookup_ill_index_v6(connp, v6group,
-	    ill->ill_phyint->phyint_ifindex);
+	ilg = ilg_lookup_ill_v6(connp, v6group, ill);
 	if ((ilg == NULL) || (ilg->ilg_flags & ILG_DELETED)) {
 		mutex_exit(&connp->conn_lock);
 		return (EADDRNOTAVAIL);
@@ -3087,12 +3074,10 @@ ip_opt_delete_group_excl_v6(conn_t *connp, const in6_addr_t *v6group,
 			leaving = B_FALSE;
 	}
 
-	ilg_ill = ilg->ilg_ill;
-	ilg_orig_ifindex = ilg->ilg_orig_ifindex;
 	ilg_delete(connp, ilg, v6src);
 	mutex_exit(&connp->conn_lock);
-	(void) ip_delmulti_v6(v6group, ilg_ill, ilg_orig_ifindex,
-	    connp->conn_zoneid, B_FALSE, leaving);
+	(void) ip_delmulti_v6(v6group, ill, connp->conn_zoneid, B_FALSE,
+	    leaving);
 
 	return (0);
 }
@@ -3345,10 +3330,10 @@ ilg_add(conn_t *connp, ipaddr_t group, ipif_t *ipif, mcast_record_t fmode,
 
 	if (ilg == NULL) {
 		ilgstat = ILGSTAT_NEW;
-		if ((ilg = conn_ilg_alloc(connp)) == NULL) {
+		if ((ilg = conn_ilg_alloc(connp, &error)) == NULL) {
 			mutex_exit(&connp->conn_lock);
 			l_free(new_filter);
-			return (ENOMEM);
+			return (error);
 		}
 		if (src != INADDR_ANY) {
 			ilg->ilg_filter = l_alloc();
@@ -3369,7 +3354,6 @@ ilg_add(conn_t *connp, ipaddr_t group, ipif_t *ipif, mcast_record_t fmode,
 		}
 		ilg->ilg_ipif = ipif;
 		ilg->ilg_ill = NULL;
-		ilg->ilg_orig_ifindex = 0;
 		ilg->ilg_fmode = fmode;
 	} else {
 		int index;
@@ -3437,7 +3421,6 @@ ilg_add_v6(conn_t *connp, const in6_addr_t *v6group, ill_t *ill,
     mcast_record_t fmode, const in6_addr_t *v6src)
 {
 	int	error = 0;
-	int	orig_ifindex;
 	ilg_t	*ilg;
 	ilg_stat_t ilgstat;
 	slist_t	*new_filter = NULL;
@@ -3456,13 +3439,7 @@ ilg_add_v6(conn_t *connp, const in6_addr_t *v6group, ill_t *ill,
 	 */
 	mutex_enter(&connp->conn_lock);
 
-	/*
-	 * Use the ifindex to do the lookup. We can't use the ill
-	 * directly because ilg_ill could point to a different ill if
-	 * things have moved.
-	 */
-	orig_ifindex = ill->ill_phyint->phyint_ifindex;
-	ilg = ilg_lookup_ill_index_v6(connp, v6group, orig_ifindex);
+	ilg = ilg_lookup_ill_v6(connp, v6group, ill);
 
 	/*
 	 * Depending on the option we're handling, may or may not be okay
@@ -3501,10 +3478,10 @@ ilg_add_v6(conn_t *connp, const in6_addr_t *v6group, ill_t *ill,
 	}
 
 	if (ilg == NULL) {
-		if ((ilg = conn_ilg_alloc(connp)) == NULL) {
+		if ((ilg = conn_ilg_alloc(connp, &error)) == NULL) {
 			mutex_exit(&connp->conn_lock);
 			l_free(new_filter);
-			return (ENOMEM);
+			return (error);
 		}
 		if (!IN6_IS_ADDR_UNSPECIFIED(v6src)) {
 			ilg->ilg_filter = l_alloc();
@@ -3521,22 +3498,7 @@ ilg_add_v6(conn_t *connp, const in6_addr_t *v6group, ill_t *ill,
 		ilg->ilg_v6group = *v6group;
 		ilg->ilg_fmode = fmode;
 		ilg->ilg_ipif = NULL;
-		/*
-		 * Choose our target ill to join on. This might be different
-		 * from the ill we've been given if it's currently down and
-		 * part of a group.
-		 *
-		 * new ill is not refheld; we are writer.
-		 */
-		ill = ip_choose_multi_ill(ill, v6group);
-		ASSERT(!(ill->ill_state_flags & ILL_CONDEMNED));
 		ilg->ilg_ill = ill;
-		/*
-		 * Remember the orig_ifindex that we joined on, so that we
-		 * can successfully delete them later on and also search
-		 * for duplicates if the application wants to join again.
-		 */
-		ilg->ilg_orig_ifindex = orig_ifindex;
 	} else {
 		int index;
 		if (ilg->ilg_fmode != fmode || IN6_IS_ADDR_UNSPECIFIED(v6src)) {
@@ -3560,13 +3522,6 @@ ilg_add_v6(conn_t *connp, const in6_addr_t *v6group, ill_t *ill,
 		ilgstat = ILGSTAT_CHANGE;
 		index = ilg->ilg_filter->sl_numsrc++;
 		ilg->ilg_filter->sl_addr[index] = *v6src;
-		/*
-		 * The current ill might be different from the one we were
-		 * asked to join on (if failover has occurred); we should
-		 * join on the ill stored in the ilg.  The original ill
-		 * is noted in ilg_orig_ifindex, which matched our request.
-		 */
-		ill = ilg->ilg_ill;
 	}
 
 	/*
@@ -3584,8 +3539,8 @@ ilg_add_v6(conn_t *connp, const in6_addr_t *v6group, ill_t *ill,
 	 * info for the ill, which involves looking at the status of
 	 * all the ilgs associated with this group/interface pair.
 	 */
-	error = ip_addmulti_v6(v6group, ill, orig_ifindex, connp->conn_zoneid,
-	    ilgstat, new_fmode, new_filter);
+	error = ip_addmulti_v6(v6group, ill, connp->conn_zoneid, ilgstat,
+	    new_fmode, new_filter);
 	if (error != 0) {
 		/*
 		 * But because we waited, we have to undo the ilg update
@@ -3595,7 +3550,7 @@ ilg_add_v6(conn_t *connp, const in6_addr_t *v6group, ill_t *ill,
 		in6_addr_t delsrc =
 		    (ilgstat == ILGSTAT_NEW) ? ipv6_all_zeros : *v6src;
 		mutex_enter(&connp->conn_lock);
-		ilg = ilg_lookup_ill_index_v6(connp, v6group, orig_ifindex);
+		ilg = ilg_lookup_ill_v6(connp, v6group, ill);
 		ASSERT(ilg != NULL);
 		ilg_delete(connp, ilg, &delsrc);
 		mutex_exit(&connp->conn_lock);
@@ -3639,7 +3594,7 @@ ilg_lookup_ill_withsrc(conn_t *connp, ipaddr_t group, ipaddr_t src, ill_t *ill)
 		ASSERT(ilg->ilg_ill == NULL);
 		ilg_ill = ipif->ipif_ill;
 		ASSERT(!ilg_ill->ill_isv6);
-		if (ilg_ill == ill &&
+		if (IS_ON_SAME_LAN(ilg_ill, ill) &&
 		    IN6_ARE_ADDR_EQUAL(&ilg->ilg_v6group, &v6group)) {
 			if (SLIST_IS_EMPTY(ilg->ilg_filter)) {
 				/* no source filter, so this is a match */
@@ -3692,7 +3647,7 @@ ilg_lookup_ill_withsrc_v6(conn_t *connp, const in6_addr_t *v6group,
 			continue;
 		ASSERT(ilg->ilg_ipif == NULL);
 		ASSERT(ilg_ill->ill_isv6);
-		if (ilg_ill == ill &&
+		if (IS_ON_SAME_LAN(ilg_ill, ill) &&
 		    IN6_ARE_ADDR_EQUAL(&ilg->ilg_v6group, v6group)) {
 			if (SLIST_IS_EMPTY(ilg->ilg_filter)) {
 				/* no source filter, so this is a match */
@@ -3720,35 +3675,6 @@ ilg_lookup_ill_withsrc_v6(conn_t *connp, const in6_addr_t *v6group,
 	    (!isinlist && ilg->ilg_fmode == MODE_IS_EXCLUDE))
 		return (ilg);
 
-	return (NULL);
-}
-
-/*
- * Get the ilg whose ilg_orig_ifindex is associated with ifindex.
- * This is useful when the interface fails and we have moved
- * to a new ill, but still would like to locate using the index
- * that we originally used to join. Used only for IPv6 currently.
- */
-static ilg_t *
-ilg_lookup_ill_index_v6(conn_t *connp, const in6_addr_t *v6group, int ifindex)
-{
-	ilg_t	*ilg;
-	int	i;
-
-	ASSERT(MUTEX_HELD(&connp->conn_lock));
-	for (i = 0; i < connp->conn_ilg_inuse; i++) {
-		ilg = &connp->conn_ilg[i];
-		if (ilg->ilg_ill == NULL ||
-		    (ilg->ilg_flags & ILG_DELETED) != 0)
-			continue;
-		/* ilg_ipif is NULL for V6 */
-		ASSERT(ilg->ilg_ipif == NULL);
-		ASSERT(ilg->ilg_orig_ifindex != 0);
-		if (IN6_ARE_ADDR_EQUAL(&ilg->ilg_v6group, v6group) &&
-		    ilg->ilg_orig_ifindex == ifindex) {
-			return (ilg);
-		}
-	}
 	return (NULL);
 }
 
@@ -3863,32 +3789,28 @@ ilg_delete_all(conn_t *connp)
 	in6_addr_t v6group;
 	boolean_t success;
 	ipsq_t	*ipsq;
-	int	orig_ifindex;
 
 	mutex_enter(&connp->conn_lock);
 retry:
 	ILG_WALKER_HOLD(connp);
-	for (i = connp->conn_ilg_inuse - 1; i >= 0; ) {
+	for (i = connp->conn_ilg_inuse - 1; i >= 0; i--) {
 		ilg = &connp->conn_ilg[i];
 		/*
 		 * Since this walk is not atomic (we drop the
 		 * conn_lock and wait in ipsq_enter) we need
 		 * to check for the ILG_DELETED flag.
 		 */
-		if (ilg->ilg_flags & ILG_DELETED) {
-			/* Go to the next ilg */
-			i--;
+		if (ilg->ilg_flags & ILG_DELETED)
 			continue;
-		}
-		v6group = ilg->ilg_v6group;
 
-		if (IN6_IS_ADDR_V4MAPPED(&v6group)) {
+		if (IN6_IS_ADDR_V4MAPPED(&ilg->ilg_v6group)) {
 			ipif = ilg->ilg_ipif;
 			ill = ipif->ipif_ill;
 		} else {
 			ipif = NULL;
 			ill = ilg->ilg_ill;
 		}
+
 		/*
 		 * We may not be able to refhold the ill if the ill/ipif
 		 * is changing. But we need to make sure that the ill will
@@ -3897,11 +3819,9 @@ retry:
 		 * in which case the unplumb thread will handle the cleanup,
 		 * and we move on to the next ilg.
 		 */
-		if (!ill_waiter_inc(ill)) {
-			/* Go to the next ilg */
-			i--;
+		if (!ill_waiter_inc(ill))
 			continue;
-		}
+
 		mutex_exit(&connp->conn_lock);
 		/*
 		 * To prevent deadlock between ill close which waits inside
@@ -3916,51 +3836,31 @@ retry:
 		ipsq = ill->ill_phyint->phyint_ipsq;
 		ill_waiter_dcr(ill);
 		mutex_enter(&connp->conn_lock);
-		if (!success) {
-			/* Go to the next ilg */
-			i--;
+		if (!success)
 			continue;
-		}
 
 		/*
-		 * Make sure that nothing has changed under. For eg.
-		 * a failover/failback can change ilg_ill while we were
-		 * waiting to become exclusive above
+		 * Move on if the ilg was deleted while conn_lock was dropped.
 		 */
-		if (IN6_IS_ADDR_V4MAPPED(&v6group)) {
-			ipif = ilg->ilg_ipif;
-			ill = ipif->ipif_ill;
-		} else {
-			ipif = NULL;
-			ill = ilg->ilg_ill;
-		}
-		if (!IAM_WRITER_ILL(ill) || (ilg->ilg_flags & ILG_DELETED)) {
-			/*
-			 * The ilg has changed under us probably due
-			 * to a failover or unplumb. Retry on the same ilg.
-			 */
+		if (ilg->ilg_flags & ILG_DELETED) {
 			mutex_exit(&connp->conn_lock);
 			ipsq_exit(ipsq);
 			mutex_enter(&connp->conn_lock);
 			continue;
 		}
 		v6group = ilg->ilg_v6group;
-		orig_ifindex = ilg->ilg_orig_ifindex;
 		ilg_delete(connp, ilg, NULL);
 		mutex_exit(&connp->conn_lock);
 
-		if (ipif != NULL)
+		if (ipif != NULL) {
 			(void) ip_delmulti(V4_PART_OF_V6(v6group), ipif,
 			    B_FALSE, B_TRUE);
-
-		else
-			(void) ip_delmulti_v6(&v6group, ill, orig_ifindex,
+		} else {
+			(void) ip_delmulti_v6(&v6group, ill,
 			    connp->conn_zoneid, B_FALSE, B_TRUE);
-
+		}
 		ipsq_exit(ipsq);
 		mutex_enter(&connp->conn_lock);
-		/* Go to the next ilg */
-		i--;
 	}
 	ILG_WALKER_RELE(connp);
 
@@ -4063,7 +3963,6 @@ conn_delete_ill(conn_t *connp, caddr_t arg)
 	int	i;
 	char	group_buf[INET6_ADDRSTRLEN];
 	in6_addr_t v6group;
-	int	orig_ifindex;
 	ilg_t	*ilg;
 
 	/*
@@ -4097,11 +3996,10 @@ conn_delete_ill(conn_t *connp, caddr_t arg)
 			    ill->ill_name));
 
 			v6group = ilg->ilg_v6group;
-			orig_ifindex = ilg->ilg_orig_ifindex;
 			ilg_delete(connp, ilg, NULL);
 			mutex_exit(&connp->conn_lock);
 
-			(void) ip_delmulti_v6(&v6group, ill, orig_ifindex,
+			(void) ip_delmulti_v6(&v6group, ill,
 			    connp->conn_zoneid, B_FALSE, B_TRUE);
 			mutex_enter(&connp->conn_lock);
 		}
@@ -4115,7 +4013,6 @@ conn_delete_ill(conn_t *connp, caddr_t arg)
 	if (connp->conn_multicast_ill == ill) {
 		/* Revert to late binding */
 		connp->conn_multicast_ill = NULL;
-		connp->conn_orig_multicast_ifindex = 0;
 	}
 	mutex_exit(&connp->conn_lock);
 }

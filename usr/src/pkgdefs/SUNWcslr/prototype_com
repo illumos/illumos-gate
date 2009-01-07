@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -95,6 +95,8 @@ f none lib/libinetcfg.so.1 755 root bin
 f none lib/libinetutil.so.1 755 root bin
 s none lib/libintl.so=libintl.so.1
 f none lib/libintl.so.1 755 root bin
+s none lib/libipmp.so=./libipmp.so.1
+f none lib/libipmp.so.1 755 root bin
 s none lib/libkmf.so=libkmf.so.1
 f none lib/libkmf.so.1 755 root bin
 s none lib/libkmfberder.so=libkmfberder.so.1

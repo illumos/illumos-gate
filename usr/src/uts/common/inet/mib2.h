@@ -17,17 +17,14 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ *
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
 
 #ifndef	_INET_MIB2_H
 #define	_INET_MIB2_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <netinet/in.h>	/* For in6_addr_t */
 #include <sys/tsol/label.h> /* For brange_t */
@@ -65,9 +62,14 @@ extern "C" {
  * #define OPTLEN(x) ((((x) + sizeof(long) - 1) / sizeof(long)) * sizeof(long))
  * #define OPTVAL(opt) ((char *)(opt + 1))
  *
- * For get requests (T_NEGOTIATE), any MIB2_xxx value can be used (only
+ * For get requests (T_CURRENT), any MIB2_xxx value can be used (only
  * "get all" is supported, so all modules get a copy of the request to
- * return everything it knows.   Recommend: Use MIB2_IP
+ * return everything it knows.   In general, we use MIB2_IP.  There is
+ * one exception: in general, IP will not report information related to
+ * IRE_MARK_TESTHIDDEN routes (e.g., in the MIB2_IP_ROUTE table).
+ * However, using the special value EXPER_IP_AND_TESTHIDDEN will cause
+ * all information to be reported.  This special value should only be
+ * used by IPMP-aware low-level utilities (e.g. in.mpathd).
  *
  * IMPORTANT:  some fields are grouped in a different structure than
  * suggested by MIB-II, e.g., checksum error counts.  The original MIB-2
@@ -78,7 +80,6 @@ extern "C" {
 #ifndef IPPROTO_MAX
 #define	IPPROTO_MAX	256
 #endif
-
 
 #define	MIB2_SYSTEM		(IPPROTO_MAX+1)
 #define	MIB2_INTERFACES		(IPPROTO_MAX+2)
@@ -108,12 +109,13 @@ extern "C" {
 #define	EXPER_IGMP		(EXPER+1)
 #define	EXPER_DVMRP		(EXPER+2)
 #define	EXPER_RAWIP		(EXPER+3)
+#define	EXPER_IP_AND_TESTHIDDEN	(EXPER+4)
 
 /*
  * Define range of levels for experimental use
  */
 #define	EXPER_RANGE_START	(EXPER+1)
-#define	EXPER_RANGE_END		(EXPER+3)
+#define	EXPER_RANGE_END		(EXPER+4)
 
 #define	BUMP_MIB(s, x)		{				\
 	extern void __dtrace_probe___mib_##x(int, void *);	\

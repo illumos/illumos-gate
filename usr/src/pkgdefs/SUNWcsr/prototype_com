@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -332,6 +332,7 @@ d none lib 755 root bin
 d none lib/crypto 755 root bin
 f none lib/crypto/kcfd 555 root bin
 d none lib/inet 755 root bin
+f none lib/inet/in.mpathd 555 root bin
 f none lib/inet/nwamd 555 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/bin 0755 root bin
@@ -404,7 +405,8 @@ f none sbin/fiocompress 555 root bin
 f none sbin/hostconfig 555 root bin
 f none sbin/ifconfig 555 root bin
 f none sbin/ifparse 555 root bin
-s none sbin/in.mpathd=../usr/lib/inet/in.mpathd
+s none sbin/in.mpathd=../lib/inet/in.mpathd
+f none sbin/ipmpstat 555 root bin
 f none sbin/soconfig 555 root bin
 f none sbin/init 555 root sys
 s none sbin/jsh=sh

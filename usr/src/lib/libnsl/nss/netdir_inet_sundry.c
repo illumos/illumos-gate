@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * lib/libnsl/nss/netdir_inet_sundry.c
@@ -38,8 +37,6 @@
  *
  * Copied mostly from erstwhile lib/nametoaddr/tcpip/tcpip.c.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mt.h"
 #include <stdlib.h>
@@ -69,9 +66,6 @@
 #include <syslog.h>
 #include <values.h>
 #include <limits.h>
-#ifdef DEBUG
-#include <stdio.h>
-#endif
 #include <nss_dbdefs.h>
 #include "nss.h"
 
@@ -151,8 +145,8 @@ __inet_taddr2uaddr(struct netconfig *tp, struct netbuf *addr)
 		/* LINTED pointer cast */
 		sa6 = (struct sockaddr_in6 *)(addr->buf);
 		myport = ntohs(sa6->sin6_port);
-		if (inet_ntop(AF_INET6, (void *)sa6->sin6_addr.s6_addr,
-			tmp, sizeof (tmp)) == 0) {
+		if (inet_ntop(AF_INET6, sa6->sin6_addr.s6_addr, tmp,
+		    sizeof (tmp)) == NULL) {
 			_nderror = ND_BADARG;
 			return (NULL);
 		}
@@ -400,7 +394,7 @@ getifnum:
 			continue;
 
 		if_info[n_ifs].if_address =
-			((struct sockaddr_in *)&lifr->lifr_addr)->sin_addr;
+		    ((struct sockaddr_in *)&lifr->lifr_addr)->sin_addr;
 
 		if (nss_ioctl(AF_INET, SIOCGLIFFLAGS, lifr) < 0)
 			continue;
@@ -413,7 +407,7 @@ getifnum:
 			continue;
 
 		if_info[n_ifs].if_netmask =
-			((struct sockaddr_in *)&lifr->lifr_addr)->sin_addr;
+		    ((struct sockaddr_in *)&lifr->lifr_addr)->sin_addr;
 		n_ifs++;
 	}
 	free(buf);
@@ -528,21 +522,12 @@ get_best_match(struct in_addr addr)
 		if_addr = ntohl(ifn->if_address.s_addr);  /* host order */
 
 		/*
-		 * Checking if the interface selected is FAILED or DEPRECATED.
-		 * In case IFF_FAILED or IFF_DEPRECATED flag for the interface
-		 * is set, we move on to the next interface in the list.
-		 * Refer IPMP(IP Multi Pathing) for more details.
-		 */
-
-		if ((ifn->if_flags & (IFF_FAILED | IFF_DEPRECATED)) != 0)
-			continue;
-
-		/*
 		 * set initial count to first bit set in netmask, with
 		 * zero being the number of the least significant bit.
 		 */
-		for (count = 0, mask = netmask; mask && ((mask & 1) == 0);
-						count++, mask >>= 1);
+		count = 0;
+		for (mask = netmask; mask && ((mask & 1) == 0); mask >>= 1)
+			count++;
 
 		/*
 		 * Set limit so that we don't try to match prefixes shorter
@@ -570,12 +555,6 @@ get_best_match(struct in_addr addr)
 		 * (2) the best partial subnet match
 		 * (3) the first non-loopback && non-PPP interface
 		 * (4) the first non-loopback interface (PPP is OK)
-		 *
-		 * While checking for condition (3) and (4), we also look
-		 * if the interface we are returning is neither FAILED
-		 * nor DEPRECATED. In case there are no interface
-		 * available, which are neither FAILED nor DEPRECRATED,
-		 * we return 0.
 		 */
 		found = FALSE;
 		while (netmask && count < subnet_count) {
@@ -607,8 +586,7 @@ get_best_match(struct in_addr addr)
 	 */
 	if (bestmatch == NULL) {
 		for (ifn = if_info; ifn < (if_info + n_ifs); ifn++) {
-			if ((ifn->if_flags & (IFF_LOOPBACK |
-				IFF_FAILED | IFF_DEPRECATED)) == 0) {
+			if ((ifn->if_flags & IFF_LOOPBACK) == 0) {
 				bestmatch = ifn;
 
 				/*
@@ -619,10 +597,6 @@ get_best_match(struct in_addr addr)
 				 * list...
 				 */
 				if ((ifn->if_flags & IFF_POINTOPOINT) == 0) {
-#ifdef DEBUG
-		(void) printf("found !loopback && !non-PPP interface: %s\n",
-				inet_ntoa(ifn->if_address));
-#endif
 					break;
 				}
 			}
@@ -701,9 +675,9 @@ select_server_addr(union any_in_addr *dst_addr, int family,
 	}
 
 	/* open a UDP socket */
-	if ((tmp_fd = _so_socket(family, SOCK_DGRAM, 0,
-		NULL, SOV_SOCKBSD)) < 0) {
-		syslog(LOG_ERR, "selsect_server_addr:connect failed\n");
+	tmp_fd = _so_socket(family, SOCK_DGRAM, 0, NULL, SOV_SOCKBSD);
+	if (tmp_fd < 0) {
+		syslog(LOG_ERR, "select_server_addr: connect failed\n");
 		return (FALSE);
 	}
 
@@ -716,15 +690,16 @@ select_server_addr(union any_in_addr *dst_addr, int family,
 		 * message, as it'll try to send the probe packet out and will
 		 * receive ICMP unreachable.
 		 */
-		if (family == AF_INET)
+		if (family == AF_INET) {
 			src_addr->addr.s_addr = INADDR_ANY;
-		else
+		} else {
 			/*
 			 * Since in6addr_any is not in the scope
 			 * use the following hack
 			 */
 			(void) memset(src_addr->addr6.s6_addr,
-				0, sizeof (struct in6_addr));
+			    0, sizeof (struct in6_addr));
+		}
 		(void) close(tmp_fd);
 		free(sock);
 		return (FALSE);
@@ -732,7 +707,7 @@ select_server_addr(union any_in_addr *dst_addr, int family,
 
 	/* get the local sock info */
 	if (_so_getsockname(tmp_fd, sock, &sock_len, SOV_DEFAULT) < 0) {
-		syslog(LOG_ERR, "selsect_server_addr:getsockname failed\n");
+		syslog(LOG_ERR, "select_server_addr: getsockname failed\n");
 		(void) close(tmp_fd);
 		free(sock);
 		return (FALSE);
@@ -798,11 +773,6 @@ inet_netdir_mergeaddr(struct netconfig *tp, char *ruaddr, char *uaddr)
 		}
 
 		clientaddr.s_addr = inet_addr(ruaddr);
-
-#ifdef DEBUG
-		(void) printf("client's address is %s and %s\n",
-			ruaddr, inet_ntoa(clientaddr));
-#endif
 
 		/* We know cp is not NULL due to the check above */
 		*cp = '.';	/* Put the dot back in the IP addr */
@@ -895,28 +865,22 @@ inet_netdir_mergeaddr(struct netconfig *tp, char *ruaddr, char *uaddr)
 			    FALSE)
 				return (NULL);
 			server_addr.sin6_addr = out_addr.addr6;
+		} else {
+			(void) memcpy(&server_addr, &sa, sizeof (server_addr));
 		}
-		else
-			(void) memcpy(&server_addr, &sa,
-						sizeof (struct sockaddr_in6));
-#ifdef DEBUG
-		printf("%s\n", inet_ntop(af, out_addr.addr6.s6_addr,
-			tmp, sizeof (tmp)));
-#endif
 
-		if (inet_ntop(af, server_addr.sin6_addr.s6_addr,
-			tmp, sizeof (tmp)) == NULL) {
+		if (inet_ntop(af, server_addr.sin6_addr.s6_addr, tmp,
+		    sizeof (tmp)) == NULL) {
 			_nderror = ND_NOHOST;
 			return (NULL);
 		}
 
 		/* now extract the port info */
 		if ((dot = strrchr(uaddr, '.')) != 0) {
+			char *p = --dot;
 
-			char *p;
-
-			p = --dot;
-			while (*p-- != '.');
+			while (*p-- != '.')
+				;
 			p++;
 			(void) strcat(tmp + strlen(tmp), p);
 			_nderror = ND_OK;
@@ -1051,7 +1015,7 @@ bindresvport(struct netconfig *nconf, int fd, struct netbuf *addr)
 	 * this, if the caller has set this option before calling
 	 * bindresvport(), it will be unset.  Better be safe...
 	 */
-	 *optval = 0;
+	*optval = 0;
 	resp.flags = 0;
 	resp.opt.buf = (char *)reqbuf;
 	resp.opt.maxlen = sizeof (reqbuf);

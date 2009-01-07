@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -12,7 +12,6 @@
 #ifndef	_NET_IF_H
 #define	_NET_IF_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* if.h 1.26 90/05/29 SMI; from UCB 7.1 6/4/86		*/
 
 #include <sys/feature_tests.h>
@@ -105,7 +104,7 @@ struct ifnet {
  * If you define a flag here, you need to define one in ip_if.h before
  * using the new flag in IP. Don't use these flags directly in IP.
  */
-#define	IFF_UP		0x0000000001	/* interface is up */
+#define	IFF_UP		0x0000000001	/* address is up */
 #define	IFF_BROADCAST	0x0000000002	/* broadcast address valid */
 #define	IFF_DEBUG	0x0000000004	/* turn on debugging */
 #define	IFF_LOOPBACK	0x0000000008	/* is a loopback net */
@@ -138,7 +137,7 @@ struct ifnet {
  */
 #define	IFF_NOXMIT	0x0000010000	/* Do not transmit packets */
 #define	IFF_NOLOCAL	0x0000020000	/* No address - just on-link subnet */
-#define	IFF_DEPRECATED	0x0000040000	/* interface address deprecated */
+#define	IFF_DEPRECATED	0x0000040000	/* Address is deprecated */
 #define	IFF_ADDRCONF	0x0000080000	/* address from stateless addrconf */
 
 #define	IFF_ROUTER	0x0000100000	/* router on this interface */
@@ -149,14 +148,12 @@ struct ifnet {
 #define	IFF_IPV4	0x0001000000	/* IPv4 interface */
 #define	IFF_IPV6	0x0002000000	/* IPv6 interface */
 					/* 0x0004000000 was IFF_MIPRUNNING */
-#define	IFF_NOFAILOVER	0x0008000000	/* Don't failover on NIC failure */
+#define	IFF_NOFAILOVER	0x0008000000	/* in.mpathd(1M) test address */
 
-#define	IFF_FAILED	0x0010000000	/* NIC has failed */
-#define	IFF_STANDBY	0x0020000000	/* Standby NIC to be used on failures */
-#define	IFF_INACTIVE	0x0040000000	/* NIC active or not ? */
-					/* Used for Standby NIC or */
-					/* when FAILBACK is disabled by user */
-#define	IFF_OFFLINE	0x0080000000	/* NIC has been offlined */
+#define	IFF_FAILED	0x0010000000	/* Interface has failed */
+#define	IFF_STANDBY	0x0020000000	/* Interface is a hot-spare */
+#define	IFF_INACTIVE	0x0040000000	/* Functioning but not used for data */
+#define	IFF_OFFLINE	0x0080000000	/* Interface is offline */
 
 /*
  * The IFF_XRESOLV flag is an evolving interface and is subject
@@ -170,13 +167,21 @@ struct ifnet {
 #define	IFF_FIXEDMTU	0x1000000000ll	/* MTU manually set with SIOCSLIFMTU */
 #define	IFF_VIRTUAL	0x2000000000ll	/* Does not send or receive packets */
 #define	IFF_DUPLICATE	0x4000000000ll	/* Local address already in use */
+#define	IFF_IPMP	0x8000000000ll	/* IPMP IP interface */
 
-/* flags set internally only: */
+/* flags that cannot be changed by userland on any interface */
 #define	IFF_CANTCHANGE \
 	(IFF_BROADCAST | IFF_POINTOPOINT | IFF_RUNNING | IFF_PROMISC | \
 	IFF_MULTICAST | IFF_MULTI_BCAST | IFF_UNNUMBERED | IFF_IPV4 | \
-	IFF_IPV6 | IFF_INACTIVE | IFF_FIXEDMTU | IFF_VIRTUAL | \
+	IFF_IPV6 | IFF_IPMP | IFF_FIXEDMTU | IFF_VIRTUAL | \
 	IFF_LOOPBACK | IFF_ALLMULTI | IFF_DUPLICATE | IFF_COS_ENABLED)
+
+/* flags that cannot be changed by userland on an IPMP interface */
+#define	IFF_IPMP_CANTCHANGE 	IFF_FAILED
+
+/* flags that can never be set on an IPMP interface */
+#define	IFF_IPMP_INVALID	(IFF_STANDBY | IFF_INACTIVE | IFF_OFFLINE | \
+	IFF_NOFAILOVER | IFF_NOARP | IFF_NONUD | IFF_XRESOLV)
 
 /*
  * Output queues (ifp->if_snd) and internetwork datagram level (pup level 1)
@@ -354,7 +359,7 @@ struct	lifreq {
 	} lifr_lifru1;
 #define	lifr_addrlen	lifr_lifru1.lifru_addrlen
 #define	lifr_ppa	lifr_lifru1.lifru_ppa	/* Driver's ppa */
-	uint_t	lifr_movetoindex;		/* FAILOVER/FAILBACK ifindex */
+	uint_t		lifr_type;		/* IFT_ETHER, ... */
 	union {
 		struct	sockaddr_storage lifru_addr;
 		struct	sockaddr_storage lifru_dstaddr;
@@ -371,6 +376,7 @@ struct	lifreq {
 		struct lif_nd_req	lifru_nd_req;
 		struct lif_ifinfo_req	lifru_ifinfo_req;
 		char	lifru_groupname[LIFGRNAMSIZ]; /* SIOC[GS]LIFGROUPNAME */
+		char	lifru_binding[LIFNAMSIZ]; /* SIOCGLIFBINDING */
 		uint_t	lifru_delay;		   /* SIOC[GS]LIFNOTIFYDELAY */
 		zoneid_t lifru_zoneid;		/* SIOC[GS]LIFZONE */
 	} lifr_lifru;
@@ -392,6 +398,7 @@ struct	lifreq {
 #define	lifr_nd		lifr_lifru.lifru_nd_req	/* SIOCLIF*ND */
 #define	lifr_ifinfo	lifr_lifru.lifru_ifinfo_req /* SIOC[GS]LIFLNKINFO */
 #define	lifr_groupname	lifr_lifru.lifru_groupname
+#define	lifr_binding	lifr_lifru.lifru_binding
 #define	lifr_delay	lifr_lifru.lifru_delay
 #define	lifr_zoneid	lifr_lifru.lifru_zoneid
 };
@@ -556,6 +563,7 @@ struct lifsrcof {
 #define	LIFC_TEMPORARY	0x04		/* Include IFF_TEMPORARY interfaces */
 #define	LIFC_ALLZONES	0x08		/* Include all zones */
 					/* (must be issued from global zone) */
+#define	LIFC_UNDER_IPMP	0x10		/* Include underlying IPMP interfaces */
 
 #if defined(_SYSCALL32)
 
@@ -580,6 +588,22 @@ struct lifsrcof32 {
 };
 
 #endif	/* _SYSCALL32 */
+
+/*
+ * IPMP group information, for use with SIOCGLIFGROUPINFO.
+ */
+typedef struct lifgroupinfo {
+	char		gi_grname[LIFGRNAMSIZ];	/* group name (set by caller) */
+	char		gi_grifname[LIFNAMSIZ];	/* IPMP meta-interface name */
+	char		gi_m4ifname[LIFNAMSIZ];	/* v4 mcast interface name */
+	char		gi_m6ifname[LIFNAMSIZ];	/* v6 mcast interface name */
+	char		gi_bcifname[LIFNAMSIZ];	/* v4 bcast interface name */
+	boolean_t	gi_v4;			/* group is plumbed for v4 */
+	boolean_t	gi_v6; 			/* group is plumbed for v6 */
+	uint_t		gi_nv4;			/* # of underlying v4 if's */
+	uint_t		gi_nv6;			/* # of underlying v6 if's */
+	uint_t		gi_mactype; 		/* DLPI mac type of group */
+} lifgroupinfo_t;
 
 /*
  * OBSOLETE: Structure used in SIOCGIFCONF request.

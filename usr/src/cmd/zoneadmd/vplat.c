@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2397,6 +2397,7 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 		 */
 		char buffer[INET6_ADDRSTRLEN];
 		void  *addr;
+		const char *nomatch = "no matching subnet found in netmasks(4)";
 
 		if (af == AF_INET)
 			addr = &((struct sockaddr_in *)
@@ -2405,14 +2406,23 @@ configure_one_interface(zlog_t *zlogp, zoneid_t zone_id,
 			addr = &((struct sockaddr_in6 *)
 			    (&lifr.lifr_addr))->sin6_addr;
 
-		/* Find out what netmask interface is going to be using */
+		/*
+		 * Find out what netmask the interface is going to be using.
+		 * If we just brought up an IPMP data address on an underlying
+		 * interface above, the address will have already migrated, so
+		 * the SIOCGLIFNETMASK won't be able to find it (but we need
+		 * to bring the address up to get the actual netmask).  Just
+		 * omit printing the actual netmask in this corner-case.
+		 */
 		if (ioctl(s, SIOCGLIFNETMASK, (caddr_t)&lifr) < 0 ||
-		    inet_ntop(af, addr, buffer, sizeof (buffer)) == NULL)
-			goto bad;
-		zerror(zlogp, B_FALSE,
-		    "WARNING: %s: no matching subnet found in netmasks(4) for "
-		    "%s; using default of %s.",
-		    lifr.lifr_name, addrstr4, buffer);
+		    inet_ntop(af, addr, buffer, sizeof (buffer)) == NULL) {
+			zerror(zlogp, B_FALSE, "WARNING: %s; using default.",
+			    nomatch);
+		} else {
+			zerror(zlogp, B_FALSE,
+			    "WARNING: %s: %s: %s; using default of %s.",
+			    lifr.lifr_name, nomatch, addrstr4, buffer);
+		}
 	}
 
 	/*

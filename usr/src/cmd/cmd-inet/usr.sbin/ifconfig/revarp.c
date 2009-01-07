@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include "ifconfig.h"
@@ -88,6 +86,7 @@ doifrevarp(const char *linkname, struct sockaddr_in *laddr)
 	/* don't try to revarp if we know it won't work */
 	if ((lifr.lifr_flags & IFF_LOOPBACK) ||
 	    (lifr.lifr_flags & IFF_NOARP) ||
+	    (lifr.lifr_flags & IFF_IPMP) ||
 	    (lifr.lifr_flags & IFF_POINTOPOINT)) {
 		(void) close(s);
 		return (0);
@@ -324,28 +323,6 @@ rarp_recv(dlpi_handle_t dh, struct arphdr *ans, size_t msglen,
 	}
 
 	return (DLPI_ETIMEDOUT);
-}
-
-int
-dlpi_set_address(const char *linkname, uchar_t *physaddr, uint_t physaddrlen)
-{
-	int		retval;
-	dlpi_handle_t	dh;
-
-	if ((retval = dlpi_open(linkname, &dh, 0)) != DLPI_SUCCESS) {
-		Perrdlpi("dlpi_open failed", linkname, retval);
-		return (-1);
-	}
-
-	if ((retval = dlpi_set_physaddr(dh, DL_CURR_PHYS_ADDR, physaddr,
-	    physaddrlen)) != DLPI_SUCCESS) {
-		Perrdlpi("dlpi_set_physaddr failed", linkname, retval);
-		dlpi_close(dh);
-		return (-1);
-	}
-
-	dlpi_close(dh);
-	return (0);
 }
 
 void

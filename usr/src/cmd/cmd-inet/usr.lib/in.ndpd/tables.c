@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include "tables.h"
@@ -171,6 +169,7 @@ phyint_init_from_k(struct phyint *pi)
 	struct ipv6_mreq v6mcastr;
 	struct lifreq lifr;
 	int fd;
+	int save_errno;
 	boolean_t newsock;
 	uint_t ttl;
 	struct sockaddr_in6 *sin6;
@@ -297,30 +296,6 @@ start_over:
 		pi->pi_dst_token = in6addr_any;
 	}
 
-	/* Get link-layer address */
-	if (!(pi->pi_flags & IFF_MULTICAST) ||
-	    (pi->pi_flags & IFF_POINTOPOINT)) {
-		pi->pi_hdw_addr_len = 0;
-	} else {
-		sin6 = (struct sockaddr_in6 *)&lifr.lifr_nd.lnr_addr;
-		bzero(sin6, sizeof (struct sockaddr_in6));
-		sin6->sin6_family = AF_INET6;
-		sin6->sin6_addr = pi->pi_ifaddr;
-
-		if (ioctl(fd, SIOCLIFGETND, (char *)&lifr) < 0) {
-			logperror_pi(pi, "phyint_init_from_k: SIOCLIFGETND");
-			goto error;
-		}
-
-		pi->pi_hdw_addr_len = lifr.lifr_nd.lnr_hdw_len;
-
-		if (lifr.lifr_nd.lnr_hdw_len != 0) {
-			bcopy((char *)lifr.lifr_nd.lnr_hdw_addr,
-			    (char *)pi->pi_hdw_addr,
-			    lifr.lifr_nd.lnr_hdw_len);
-		}
-	}
-
 	if (newsock) {
 		icmp6_filter_t filter;
 		int on = 1;
@@ -360,8 +335,21 @@ start_over:
 		v6mcastr.ipv6mr_interface = pi->pi_index;
 		if (setsockopt(fd, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 		    (char *)&v6mcastr, sizeof (v6mcastr)) < 0) {
-			logperror_pi(pi, "phyint_init_from_k: "
-			    "setsockopt IPV6_JOIN_GROUP");
+			/*
+			 * One benign reason IPV6_JOIN_GROUP could fail is
+			 * when `pi' has been placed into an IPMP group and we
+			 * haven't yet processed the routing socket message
+			 * informing us of its disappearance.  As such, if
+			 * it's now in a group, don't print an error.
+			 */
+			save_errno = errno;
+			(void) strlcpy(lifr.lifr_name, pi->pi_name, LIFNAMSIZ);
+			if (ioctl(fd, SIOCGLIFGROUPNAME, &lifr) == -1 ||
+			    lifr.lifr_groupname[0] == '\0') {
+				errno = save_errno;
+				logperror_pi(pi, "phyint_init_from_k: "
+				    "setsockopt IPV6_JOIN_GROUP");
+			}
 			goto error;
 		}
 		pi->pi_state |= PI_JOINED_ALLNODES;
@@ -403,8 +391,17 @@ start_over:
 		v6mcastr.ipv6mr_interface = pi->pi_index;
 		if (setsockopt(fd, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 		    (char *)&v6mcastr, sizeof (v6mcastr)) < 0) {
-			logperror_pi(pi, "phyint_init_from_k: setsockopt "
-			    "IPV6_JOIN_GROUP");
+			/*
+			 * See IPV6_JOIN_GROUP comment above.
+			 */
+			save_errno = errno;
+			(void) strlcpy(lifr.lifr_name, pi->pi_name, LIFNAMSIZ);
+			if (ioctl(fd, SIOCGLIFGROUPNAME, &lifr) == -1 ||
+			    lifr.lifr_groupname[0] == '\0') {
+				errno = save_errno;
+				logperror_pi(pi, "phyint_init_from_k: "
+				    "setsockopt IPV6_JOIN_GROUP");
+			}
 			goto error;
 		}
 		pi->pi_state |= PI_JOINED_ALLROUTERS;
@@ -569,22 +566,16 @@ phyint_print(struct phyint *pi)
 	struct adv_prefix *adv_pr;
 	struct router *dr;
 	char abuf[INET6_ADDRSTRLEN];
-	char llabuf[BUFSIZ];
 
 	logmsg(LOG_DEBUG, "Phyint %s index %d state %x, kernel %x, "
 	    "num routers %d\n",
 	    pi->pi_name, pi->pi_index, pi->pi_state, pi->pi_kernel_state,
 	    pi->pi_num_k_routers);
-	logmsg(LOG_DEBUG, "\taddress: %s flags %x\n",
+	logmsg(LOG_DEBUG, "\taddress: %s flags %llx\n",
 	    inet_ntop(AF_INET6, (void *)&pi->pi_ifaddr,
 	    abuf, sizeof (abuf)), pi->pi_flags);
-	logmsg(LOG_DEBUG, "\tsock %d mtu %d hdw_addr len %d <%s>\n",
-	    pi->pi_sock, pi->pi_mtu, pi->pi_hdw_addr_len,
-	    ((pi->pi_hdw_addr_len != 0) ?
-	    fmt_lla(llabuf, sizeof (llabuf), pi->pi_hdw_addr,
-	    pi->pi_hdw_addr_len) : "none"));
-	logmsg(LOG_DEBUG, "\ttoken: len %d %s\n",
-	    pi->pi_token_length,
+	logmsg(LOG_DEBUG, "\tsock %d mtu %d\n", pi->pi_sock, pi->pi_mtu);
+	logmsg(LOG_DEBUG, "\ttoken: len %d %s\n", pi->pi_token_length,
 	    inet_ntop(AF_INET6, (void *)&pi->pi_token,
 	    abuf, sizeof (abuf)));
 	if (pi->pi_TmpAddrsEnabled) {
@@ -632,6 +623,43 @@ phyint_print(struct phyint *pi)
 	logmsg(LOG_DEBUG, "\n");
 }
 
+
+/*
+ * Store the LLA for the phyint `pi' `lifrp'.  Returns 0 on success, or
+ * -1 on failure.
+ *
+ * Note that we do not cache the hardware address since there's no reliable
+ * mechanism to determine when it's become stale.
+ */
+int
+phyint_get_lla(struct phyint *pi, struct lifreq *lifrp)
+{
+	struct sockaddr_in6 *sin6;
+
+	/* If this phyint doesn't have a link-layer address, bail */
+	if (!(pi->pi_flags & IFF_MULTICAST) ||
+	    (pi->pi_flags & IFF_POINTOPOINT)) {
+		return (-1);
+	}
+
+	(void) strlcpy(lifrp->lifr_name, pi->pi_name, LIFNAMSIZ);
+	sin6 = (struct sockaddr_in6 *)&(lifrp->lifr_nd.lnr_addr);
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_addr = pi->pi_ifaddr;
+	if (ioctl(pi->pi_sock, SIOCLIFGETND, lifrp) < 0) {
+		/*
+		 * For IPMP interfaces, don't report ESRCH errors since that
+		 * merely indicates that there are no active interfaces in the
+		 * IPMP group (and thus there's no working hardware address),
+		 * and the packet will thus never make it out anyway.
+		 */
+		if (!(pi->pi_flags & IFF_IPMP) || errno != ESRCH)
+			logperror_pi(pi, "phyint_get_lla: SIOCLIFGETND");
+		return (-1);
+	}
+	return (0);
+}
+
 /*
  * Randomize pi->pi_ReachableTime.
  * Done periodically when there are no RAs and at a maximum frequency when
@@ -642,20 +670,14 @@ phyint_print(struct phyint *pi)
 void
 phyint_reach_random(struct phyint *pi, boolean_t set_needed)
 {
+	struct lifreq lifr;
+
 	pi->pi_ReachableTime = GET_RANDOM(
 	    (int)(ND_MIN_RANDOM_FACTOR * pi->pi_BaseReachableTime),
 	    (int)(ND_MAX_RANDOM_FACTOR * pi->pi_BaseReachableTime));
 	if (set_needed) {
-		struct lifreq lifr;
-
-		(void) strncpy(lifr.lifr_name, pi->pi_name,
-		    sizeof (lifr.lifr_name));
-		pi->pi_name[sizeof (pi->pi_name) - 1] = '\0';
-		if (ioctl(pi->pi_sock, SIOCGLIFLNKINFO, (char *)&lifr) < 0) {
-			logperror_pi(pi,
-			    "phyint_reach_random: SIOCGLIFLNKINFO");
-			return;
-		}
+		bzero(&lifr, sizeof (lifr));
+		(void) strlcpy(lifr.lifr_name, pi->pi_name, LIFNAMSIZ);
 		lifr.lifr_ifinfo.lir_reachtime = pi->pi_ReachableTime;
 		if (ioctl(pi->pi_sock, SIOCSLIFLNKINFO, (char *)&lifr) < 0) {
 			logperror_pi(pi,
@@ -1386,12 +1408,12 @@ prefix_modify_flags(struct prefix *pr, uint64_t onflags, uint64_t offflags)
 	(void) strncpy(lifr.lifr_name, pr->pr_name, sizeof (lifr.lifr_name));
 	lifr.lifr_name[sizeof (lifr.lifr_name) - 1] = '\0';
 	if (ioctl(pi->pi_sock, SIOCGLIFFLAGS, (char *)&lifr) < 0) {
-		logperror_pr(pr, "prefix_modify_flags: SIOCGLIFFLAGS");
-		logmsg(LOG_ERR, "prefix_modify_flags(%s, %s) old 0x%llx "
-		    "on 0x%llx off 0x%llx\n",
-		    pr->pr_physical->pi_name,
-		    pr->pr_name,
-		    pr->pr_flags, onflags, offflags);
+		if (errno != ENXIO) {
+			logperror_pr(pr, "prefix_modify_flags: SIOCGLIFFLAGS");
+			logmsg(LOG_ERR, "prefix_modify_flags(%s, %s) old 0x%llx"
+			    " on 0x%llx off 0x%llx\n", pr->pr_physical->pi_name,
+			    pr->pr_name, pr->pr_flags, onflags, offflags);
+		}
 		return (-1);
 	}
 	old_flags = lifr.lifr_flags;
@@ -1399,12 +1421,13 @@ prefix_modify_flags(struct prefix *pr, uint64_t onflags, uint64_t offflags)
 	lifr.lifr_flags &= ~offflags;
 	pr->pr_flags = lifr.lifr_flags;
 	if (ioctl(pi->pi_sock, SIOCSLIFFLAGS, (char *)&lifr) < 0) {
-		logperror_pr(pr, "prefix_modify_flags: SIOCSLIFFLAGS");
-		logmsg(LOG_ERR, "prefix_modify_flags(%s, %s) old 0x%llx "
-		    "new 0x%llx on 0x%llx off 0x%llx\n",
-		    pr->pr_physical->pi_name,
-		    pr->pr_name,
-		    old_flags, lifr.lifr_flags, onflags, offflags);
+		if (errno != ENXIO) {
+			logperror_pr(pr, "prefix_modify_flags: SIOCSLIFFLAGS");
+			logmsg(LOG_ERR, "prefix_modify_flags(%s, %s) old 0x%llx"
+			    " new 0x%llx on 0x%llx off 0x%llx\n",
+			    pr->pr_physical->pi_name, pr->pr_name,
+			    old_flags, lifr.lifr_flags, onflags, offflags);
+		}
 		return (-1);
 	}
 	return (0);
@@ -1540,7 +1563,8 @@ prefix_update_k(struct prefix *pr)
 
 		/* Remove logical interface based on pr_name */
 		lifr.lifr_addr.ss_family = AF_UNSPEC;
-		if (ioctl(pi->pi_sock, SIOCLIFREMOVEIF, (char *)&lifr) < 0) {
+		if (ioctl(pi->pi_sock, SIOCLIFREMOVEIF, (char *)&lifr) < 0 &&
+		    errno != ENXIO) {
 			logperror_pr(pr, "prefix_update_k: SIOCLIFREMOVEIF");
 		}
 		pr->pr_kernel_state = 0;
@@ -1862,36 +1886,6 @@ prefix_print(struct prefix *pr)
 	logmsg(LOG_DEBUG, "\tOnLink %d Auto %d\n",
 	    pr->pr_OnLinkFlag, pr->pr_AutonomousFlag);
 	logmsg(LOG_DEBUG, "\n");
-}
-
-/*
- * Does the address formed by pr->pr_prefix and pi->pi_token match
- * pr->pr_address. It does not match if a failover has happened
- * earlier (done by in.mpathd) from a different pi. Should not
- * be called for onlink prefixes.
- */
-boolean_t
-prefix_token_match(struct phyint *pi, struct prefix *pr, uint64_t flags)
-{
-	int i;
-	in6_addr_t addr, *token;
-
-	if (flags & IFF_TEMPORARY)
-		token = &pi->pi_tmp_token;
-	else
-		token = &pi->pi_token;
-	for (i = 0; i < 16; i++) {
-		/*
-		 * prefix_create ensures that pr_prefix has all-zero
-		 * bits after prefixlen.
-		 */
-		addr.s6_addr[i] = pr->pr_prefix.s6_addr[i] | token->s6_addr[i];
-	}
-	if (IN6_ARE_ADDR_EQUAL(&pr->pr_address, &addr)) {
-		return (_B_TRUE);
-	} else {
-		return (_B_FALSE);
-	}
 }
 
 /*
@@ -2305,8 +2299,7 @@ phyint_print_all(void)
 }
 
 void
-phyint_cleanup(pi)
-	struct phyint *pi;
+phyint_cleanup(struct phyint *pi)
 {
 	pi->pi_state = 0;
 	pi->pi_kernel_state = 0;

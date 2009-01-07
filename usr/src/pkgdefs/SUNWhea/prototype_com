@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -270,6 +270,7 @@ f none usr/include/inet/tcp_stack.h 644 root bin
 f none usr/include/inet/wifi_ioctl.h 644 root bin
 f none usr/include/inttypes.h 644 root bin
 f none usr/include/ipmp.h 644 root bin
+f none usr/include/ipmp_admin.h 644 root bin
 f none usr/include/ipmp_mpathd.h 644 root bin
 f none usr/include/ipmp_query.h 644 root bin
 d none usr/include/ipp 755 root bin

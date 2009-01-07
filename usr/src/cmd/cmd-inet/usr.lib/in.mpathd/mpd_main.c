@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mpd_defs.h"
 #include "mpd_tables.h"
@@ -46,7 +44,6 @@ static int	lsock_v6;		/* Listen socket to detect mpathd */
 static int	mibfd = -1;		/* fd to get mib info */
 static boolean_t force_mcast = _B_FALSE; /* Only for test purposes */
 
-boolean_t	full_scan_required = _B_FALSE;
 static uint_t	last_initifs_time;	/* Time when initifs was last run */
 static	char **argv0;			/* Saved for re-exec on SIGHUP */
 boolean_t handle_link_notifications = _B_TRUE;
@@ -58,10 +55,6 @@ static void	check_if_removed(struct phyint_instance *pii);
 static void	select_test_ifs(void);
 static void	ire_process_v4(mib2_ipRouteEntry_t *buf, size_t len);
 static void	ire_process_v6(mib2_ipv6RouteEntry_t *buf, size_t len);
-static void	router_add_v4(mib2_ipRouteEntry_t *rp1,
-    struct in_addr nexthop_v4);
-static void	router_add_v6(mib2_ipv6RouteEntry_t *rp1,
-    struct in6_addr nexthop_v6);
 static void	router_add_common(int af, char *ifname,
     struct in6_addr nexthop);
 static void	init_router_targets();
@@ -74,17 +67,17 @@ static void	check_addr_unique(struct phyint_instance *,
 static void	init_host_targets(void);
 static void	dup_host_targets(struct phyint_instance *desired_pii);
 static void	loopback_cmd(int sock, int family);
-static int	poll_remove(int fd);
 static boolean_t daemonize(void);
 static int	closefunc(void *, int);
 static unsigned int process_cmd(int newfd, union mi_commands *mpi);
 static unsigned int process_query(int fd, mi_query_t *miq);
+static unsigned int send_addrinfo(int fd, ipmp_addrinfo_t *adinfop);
 static unsigned int send_groupinfo(int fd, ipmp_groupinfo_t *grinfop);
 static unsigned int send_grouplist(int fd, ipmp_grouplist_t *grlistp);
 static unsigned int send_ifinfo(int fd, ipmp_ifinfo_t *ifinfop);
 static unsigned int send_result(int fd, unsigned int error, int syserror);
 
-struct local_addr *laddr_list = NULL;
+addrlist_t *localaddrs;
 
 /*
  * Return the current time in milliseconds (from an arbitrary reference)
@@ -153,7 +146,7 @@ retry:
 /*
  * Remove fd from the set being polled. Returns 0 if ok; -1 if failed.
  */
-static int
+int
 poll_remove(int fd)
 {
 	int i;
@@ -205,17 +198,11 @@ pii_process(int af, char *name, struct phyint_instance **pii_p)
 			break;
 
 		case PI_GROUP_CHANGED:
-			/*
-			 * The phyint has changed group.
-			 */
-			restore_phyint(pii->pii_phyint);
-			/* FALLTHRU */
-
 		case PI_IFINDEX_CHANGED:
 			/*
-			 * Interface index has changed. Delete and
-			 * recreate the phyint as it is quite likely
-			 * the interface has been unplumbed and replumbed.
+			 * Interface index or group membership has changed.
+			 * Delete the old state and recreate based on the new
+			 * state (it may no longer be in a group).
 			 */
 			pii_other = phyint_inst_other(pii);
 			if (pii_other != NULL)
@@ -249,51 +236,26 @@ pii_process(int af, char *name, struct phyint_instance **pii_p)
 }
 
 /*
- * This phyint is leaving the group. Try to restore the phyint to its
- * initial state. Return the addresses that belong to other group members,
- * to the group, and take back any addresses owned by this phyint
- */
-void
-restore_phyint(struct phyint *pi)
-{
-	if (pi->pi_group == phyint_anongroup)
-		return;
-
-	/*
-	 * Move everthing to some other member in the group.
-	 * The phyint has changed group in the kernel. But we
-	 * have yet to do it in our tables.
-	 */
-	if (!pi->pi_empty)
-		(void) try_failover(pi, FAILOVER_TO_ANY);
-	/*
-	 * Move all addresses owned by 'pi' back to pi, from each
-	 * of the other members of the group
-	 */
-	(void) try_failback(pi);
-}
-
-/*
  * Scan all interfaces to detect changes as well as new and deleted interfaces
  */
 static void
 initifs()
 {
-	int	n;
+	int	i, nlifr;
 	int	af;
 	char	*cp;
 	char	*buf;
-	int	numifs;
+	int	sockfd;
+	uint64_t	flags;
 	struct lifnum	lifn;
 	struct lifconf	lifc;
+	struct lifreq	lifreq;
 	struct lifreq	*lifr;
 	struct logint	*li;
 	struct phyint_instance *pii;
 	struct phyint_instance *next_pii;
-	char	pi_name[LIFNAMSIZ + 1];
-	boolean_t exists;
-	struct phyint	*pi;
-	struct local_addr *next;
+	struct phyint_group *pg, *next_pg;
+	char		pi_name[LIFNAMSIZ + 1];
 
 	if (debug & D_PHYINT)
 		logdebug("initifs: Scanning interfaces\n");
@@ -301,13 +263,9 @@ initifs()
 	last_initifs_time = getcurrenttime();
 
 	/*
-	 * Free the laddr_list before collecting the local addresses.
+	 * Free the existing local address list; we'll build a new list below.
 	 */
-	while (laddr_list != NULL) {
-		next = laddr_list->next;
-		free(laddr_list);
-		laddr_list = next;
-	}
+	addrlist_free(&localaddrs);
 
 	/*
 	 * Mark the interfaces so that we can find phyints and logints
@@ -326,127 +284,163 @@ initifs()
 		}
 	}
 
+	/*
+	 * As above, mark groups so that we can detect IPMP interfaces which
+	 * have been removed from the kernel.  Also, delete the group address
+	 * list since we'll iteratively recreate it below.
+	 */
+	for (pg = phyint_groups; pg != NULL; pg = pg->pg_next) {
+		pg->pg_in_use = _B_FALSE;
+		addrlist_free(&pg->pg_addrs);
+	}
+
 	lifn.lifn_family = AF_UNSPEC;
-	lifn.lifn_flags = LIFC_ALLZONES;
+	lifn.lifn_flags = LIFC_ALLZONES | LIFC_UNDER_IPMP;
+again:
 	if (ioctl(ifsock_v4, SIOCGLIFNUM, (char *)&lifn) < 0) {
-		logperror("initifs: ioctl (get interface numbers)");
+		logperror("initifs: ioctl (get interface count)");
 		return;
 	}
-	numifs = lifn.lifn_count;
+	/*
+	 * Pad the interface count to detect when additional interfaces have
+	 * been configured between SIOCGLIFNUM and SIOCGLIFCONF.
+	 */
+	lifn.lifn_count += 4;
 
-	buf = (char *)calloc(numifs, sizeof (struct lifreq));
-	if (buf == NULL) {
+	if ((buf = calloc(lifn.lifn_count, sizeof (struct lifreq))) == NULL) {
 		logperror("initifs: calloc");
 		return;
 	}
 
 	lifc.lifc_family = AF_UNSPEC;
-	lifc.lifc_flags = LIFC_ALLZONES;
-	lifc.lifc_len = numifs * sizeof (struct lifreq);
+	lifc.lifc_flags = LIFC_ALLZONES | LIFC_UNDER_IPMP;
+	lifc.lifc_len = lifn.lifn_count * sizeof (struct lifreq);
 	lifc.lifc_buf = buf;
 
 	if (ioctl(ifsock_v4, SIOCGLIFCONF, (char *)&lifc) < 0) {
-		/*
-		 * EINVAL is commonly encountered, when things change
-		 * underneath us rapidly, (eg. at boot, when new interfaces
-		 * are plumbed successively) and the kernel finds the buffer
-		 * size we passed as too small. We will retry again
-		 * when we see the next routing socket msg, or at worst after
-		 * IF_SCAN_INTERVAL ms.
-		 */
-		if (errno != EINVAL) {
-			logperror("initifs: ioctl"
-			    " (get interface configuration)");
-		}
+		logperror("initifs: ioctl (get interface configuration)");
 		free(buf);
 		return;
 	}
 
-	lifr = (struct lifreq *)lifc.lifc_req;
+	/*
+	 * If every lifr_req slot is taken, then additional interfaces must
+	 * have been plumbed between the SIOCGLIFNUM and the SIOCGLIFCONF.
+	 * Recalculate to make sure we didn't miss any interfaces.
+	 */
+	nlifr = lifc.lifc_len / sizeof (struct lifreq);
+	if (nlifr >= lifn.lifn_count) {
+		free(buf);
+		goto again;
+	}
 
 	/*
-	 * For each lifreq returned by SIOGGLIFCONF, call pii_process()
-	 * and get the state of the corresponding phyint_instance. If it is
-	 * successful, then call logint_init_from_k() to get the state of the
-	 * logint.
+	 * Walk through the lifreqs returned by SIOGGLIFCONF, and refresh the
+	 * global list of addresses, phyint groups, phyints, and logints.
 	 */
-	for (n = lifc.lifc_len / sizeof (struct lifreq); n > 0; n--, lifr++) {
-		int	sockfd;
-		struct local_addr	*taddr;
-		struct sockaddr_in	*sin;
-		struct sockaddr_in6	*sin6;
-		struct lifreq	lifreq;
-
+	for (lifr = lifc.lifc_req, i = 0; i < nlifr; i++, lifr++) {
 		af = lifr->lifr_addr.ss_family;
-
-		/*
-		 * Collect all local addresses.
-		 */
 		sockfd = (af == AF_INET) ? ifsock_v4 : ifsock_v6;
-		(void) memset(&lifreq, 0, sizeof (lifreq));
-		(void) strlcpy(lifreq.lifr_name, lifr->lifr_name,
-		    sizeof (lifreq.lifr_name));
+		(void) strlcpy(lifreq.lifr_name, lifr->lifr_name, LIFNAMSIZ);
 
 		if (ioctl(sockfd, SIOCGLIFFLAGS, &lifreq) == -1) {
 			if (errno != ENXIO)
 				logperror("initifs: ioctl (SIOCGLIFFLAGS)");
 			continue;
 		}
+		flags = lifreq.lifr_flags;
 
 		/*
-		 * Add the interface address to laddr_list.
-		 * Another node might have the same IP address which is up.
-		 * In that case, it is appropriate  to use the address as a
-		 * target, even though it is also configured (but not up) on
-		 * the local system.
-		 * Hence,the interface address is not added to laddr_list
-		 * unless it is IFF_UP.
+		 * If the address is IFF_UP, add it to the local address list.
+		 * (We ignore addresses that aren't IFF_UP since another node
+		 * might legitimately have that address IFF_UP.)
 		 */
-		if (lifreq.lifr_flags & IFF_UP) {
-			taddr = malloc(sizeof (struct local_addr));
-			if (taddr == NULL) {
-				logperror("initifs: malloc");
-				continue;
-			}
-			if (af == AF_INET) {
-				sin = (struct sockaddr_in *)&lifr->lifr_addr;
-				IN6_INADDR_TO_V4MAPPED(&sin->sin_addr,
-				    &taddr->addr);
-			} else {
-				sin6 = (struct sockaddr_in6 *)&lifr->lifr_addr;
-				taddr->addr = sin6->sin6_addr;
-			}
-			taddr->next = laddr_list;
-			laddr_list = taddr;
+		if (flags & IFF_UP) {
+			(void) addrlist_add(&localaddrs, lifr->lifr_name, flags,
+			    &lifr->lifr_addr);
 		}
 
 		/*
-		 * Need to pass a phyint name to pii_process. Insert the
-		 * null where the ':' IF_SEPARATOR is found in the logical
-		 * name.
+		 * If this address is on an IPMP meta-interface, update our
+		 * phyint_group information (either by recording that group
+		 * still exists or creating a new group), and track what
+		 * group the address is part of.
+		 */
+		if (flags & IFF_IPMP) {
+			if (ioctl(sockfd, SIOCGLIFGROUPNAME, &lifreq) == -1) {
+				if (errno != ENXIO)
+					logperror("initifs: ioctl "
+					    "(SIOCGLIFGROUPNAME)");
+				continue;
+			}
+
+			pg = phyint_group_lookup(lifreq.lifr_groupname);
+			if (pg == NULL) {
+				pg = phyint_group_create(lifreq.lifr_groupname);
+				if (pg == NULL) {
+					logerr("initifs: cannot create group "
+					    "%s\n", lifreq.lifr_groupname);
+					continue;
+				}
+				phyint_group_insert(pg);
+			}
+			pg->pg_in_use = _B_TRUE;
+
+			/*
+			 * Add this to the group's list of data addresses.
+			 */
+			if (!addrlist_add(&pg->pg_addrs, lifr->lifr_name, flags,
+			    &lifr->lifr_addr)) {
+				logerr("initifs: insufficient memory to track "
+				    "data address information for %s\n",
+				    lifr->lifr_name);
+			}
+			continue;
+		}
+
+		/*
+		 * This isn't an address on an IPMP meta-interface, so it's
+		 * either on an underlying interface or not related to any
+		 * group.  Update our phyint and logint information (via
+		 * pii_process() and logint_init_from_k()) -- but first,
+		 * convert the logint name to a phyint name so we can call
+		 * pii_process().
 		 */
 		(void) strlcpy(pi_name, lifr->lifr_name, sizeof (pi_name));
 		if ((cp = strchr(pi_name, IF_SEPARATOR)) != NULL)
 			*cp = '\0';
 
-		exists = pii_process(af, pi_name, &pii);
-		if (exists) {
+		if (pii_process(af, pi_name, &pii)) {
 			/* The phyint is fine. So process the logint */
 			logint_init_from_k(pii, lifr->lifr_name);
 			check_addr_unique(pii, &lifr->lifr_addr);
 		}
-
 	}
-
 	free(buf);
 
 	/*
-	 * Scan for phyints and logints that have disappeared from the
+	 * Scan for groups, phyints and logints that have disappeared from the
 	 * kernel, and delete them.
 	 */
 	for (pii = phyint_instances; pii != NULL; pii = next_pii) {
 		next_pii = pii->pii_next;
 		check_if_removed(pii);
+	}
+
+	for (pg = phyint_groups; pg != NULL; pg = next_pg) {
+		next_pg = pg->pg_next;
+		if (!pg->pg_in_use) {
+			phyint_group_delete(pg);
+			continue;
+		}
+		/*
+		 * Refresh the group's state.  This is necessary since the
+		 * group's state is defined by the set of usable interfaces in
+		 * the group, and an interface is considered unusable if all
+		 * of its addresses are down.  When an address goes down/up,
+		 * the RTM_DELADDR/RTM_NEWADDR brings us through here.
+		 */
+		phyint_group_refresh_state(pg);
 	}
 
 	/*
@@ -455,64 +449,9 @@ initifs()
 	select_test_ifs();
 
 	/*
-	 * Handle link up/down notifications from the NICs.
+	 * Handle link up/down notifications.
 	 */
 	process_link_state_changes();
-
-	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
-		/*
-		 * If this is a case of group failure, we don't have much
-		 * to do until the group recovers again.
-		 */
-		if (GROUP_FAILED(pi->pi_group))
-			continue;
-
-		/*
-		 * Try/Retry any pending failovers / failbacks, that did not
-		 * not complete, or that could not be initiated previously.
-		 * This implements the 3 invariants described in the big block
-		 * comment at the beginning of probe.c
-		 */
-		if (pi->pi_flags & IFF_INACTIVE) {
-			if (!pi->pi_empty && (pi->pi_flags & IFF_STANDBY))
-				(void) try_failover(pi, FAILOVER_TO_NONSTANDBY);
-		} else {
-			struct phyint_instance *pii;
-
-			/*
-			 * Skip LINK UP interfaces which are not capable
-			 * of probing.
-			 */
-			pii = pi->pi_v4;
-			if (pii == NULL ||
-			    (LINK_UP(pi) && !PROBE_CAPABLE(pii))) {
-				pii = pi->pi_v6;
-				if (pii == NULL ||
-				    (LINK_UP(pi) && !PROBE_CAPABLE(pii)))
-					continue;
-			}
-
-			/*
-			 * It is possible that the phyint has started
-			 * receiving packets, after it has been marked
-			 * PI_FAILED. Don't initiate failover, if the
-			 * phyint has started recovering. failure_state()
-			 * captures this check. A similar logic is used
-			 * for failback/repair case.
-			 */
-			if (pi->pi_state == PI_FAILED && !pi->pi_empty &&
-			    (failure_state(pii) == PHYINT_FAILURE)) {
-				(void) try_failover(pi, FAILOVER_NORMAL);
-			} else if (pi->pi_state == PI_RUNNING && !pi->pi_full) {
-				if (try_failback(pi) != IPMP_FAILURE) {
-					(void) change_lif_flags(pi, IFF_FAILED,
-					    _B_FALSE);
-					/* Per state diagram */
-					pi->pi_empty = 0;
-				}
-			}
-		}
-	}
 }
 
 /*
@@ -569,7 +508,7 @@ check_addr_unique(struct phyint_instance *ourpii, struct sockaddr_storage *ss)
  * The probe socket is closed on each interface instance, and the
  * interface state set to PI_OFFLINE.
  */
-static void
+void
 stop_probing(struct phyint *pi)
 {
 	struct phyint_instance *pii;
@@ -631,7 +570,6 @@ select_test_ifs(void)
 	struct logint		*li;
 	struct logint  		*probe_logint;
 	boolean_t		target_scan_reqd = _B_FALSE;
-	struct target		*tg;
 	int			rating;
 
 	if (debug & D_PHYINT)
@@ -645,8 +583,8 @@ select_test_ifs(void)
 		probe_logint = NULL;
 
 		/*
-		 * An interface that is offline, should not be probed.
-		 * Offline interfaces should always in PI_OFFLINE state,
+		 * An interface that is offline should not be probed.
+		 * IFF_OFFLINE interfaces should always be PI_OFFLINE
 		 * unless some other entity has set the offline flag.
 		 */
 		if (pii->pii_phyint->pi_flags & IFF_OFFLINE) {
@@ -659,6 +597,15 @@ select_test_ifs(void)
 				stop_probing(pii->pii_phyint);
 			}
 			continue;
+		} else {
+			/*
+			 * If something cleared IFF_OFFLINE (e.g., by accident
+			 * because the SIOCGLIFFLAGS/SIOCSLIFFLAGS sequence is
+			 * inherently racy), the phyint may still be offline.
+			 * Just ignore it.
+			 */
+			if (pii->pii_phyint->pi_state == PI_OFFLINE)
+				continue;
 		}
 
 		li = pii->pii_probe_logint;
@@ -776,17 +723,6 @@ select_test_ifs(void)
 				phyint_chstate(pii->pii_phyint, PI_NOTARGETS);
 		}
 
-		if (pii->pii_phyint->pi_flags & IFF_POINTOPOINT) {
-			tg = pii->pii_targets;
-			if (tg != NULL)
-				target_delete(tg);
-			assert(pii->pii_targets == NULL);
-			assert(pii->pii_target_next == NULL);
-			assert(pii->pii_ntargets == 0);
-			target_create(pii, probe_logint->li_dstaddr,
-			    _B_TRUE);
-		}
-
 		/*
 		 * If no targets are currently known for this phyint
 		 * we need to call init_router_targets. Since
@@ -806,15 +742,16 @@ select_test_ifs(void)
 	}
 
 	/*
-	 * Check the interface list for any interfaces that are marked
-	 * PI_FAILED but no longer enabled to send probes, and call
-	 * phyint_check_for_repair() to see if the link now indicates that the
-	 * interface should be repaired.  Also see the state diagram in
+	 * Scan the interface list for any interfaces that are PI_FAILED or
+	 * PI_NOTARGETS but no longer enabled to send probes, and call
+	 * phyint_check_for_repair() to see if the link state indicates that
+	 * the interface should be repaired.  Also see the state diagram in
 	 * mpd_probe.c.
 	 */
 	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
-		if (pi->pi_state == PI_FAILED &&
-		    !PROBE_ENABLED(pi->pi_v4) && !PROBE_ENABLED(pi->pi_v6)) {
+		if ((!PROBE_ENABLED(pi->pi_v4) && !PROBE_ENABLED(pi->pi_v6)) &&
+		    (pi->pi_state == PI_FAILED ||
+		    pi->pi_state == PI_NOTARGETS)) {
 			phyint_check_for_repair(pi);
 		}
 	}
@@ -875,15 +812,14 @@ check_testconfig(void)
 		    pi->pi_v6->pii_probe_logint->li_dupaddr)
 			li = pi->pi_v6->pii_probe_logint;
 
-		if (li != NULL) {
-			if (!pi->pi_duptaddrmsg_printed) {
-				(void) pr_addr(li->li_phyint_inst->pii_af,
-				    li->li_addr, abuf, sizeof (abuf));
-				logerr("Test address %s is not unique in "
-				    "group; disabling probe-based failure "
-				    "detection on %s\n", abuf, pi->pi_name);
-				pi->pi_duptaddrmsg_printed = 1;
-			}
+		if (li != NULL && li->li_dupaddr) {
+			if (pi->pi_duptaddrmsg_printed)
+				continue;
+			logerr("Test address %s is not unique in group; "
+			    "disabling probe-based failure detection on %s\n",
+			    pr_addr(li->li_phyint_inst->pii_af,
+			    li->li_addr, abuf, sizeof (abuf)), pi->pi_name);
+			pi->pi_duptaddrmsg_printed = 1;
 			continue;
 		}
 
@@ -915,10 +851,10 @@ check_config(void)
 	boolean_t v6_in_group;
 
 	/*
-	 * All phyints of a group must be homogenous to ensure that
-	 * failover or failback can be done. If any phyint in a group
-	 * has IPv4 plumbed, check that all phyints have IPv4 plumbed.
-	 * Do a similar check for IPv6.
+	 * All phyints of a group must be homogeneous to ensure that they can
+	 * take over for one another.  If any phyint in a group has IPv4
+	 * plumbed, check that all phyints have IPv4 plumbed.  Do a similar
+	 * check for IPv6.
 	 */
 	for (pg = phyint_groups; pg != NULL; pg = pg->pg_next) {
 		if (pg == phyint_anongroup)
@@ -949,9 +885,9 @@ check_config(void)
 
 			if (v4_in_group == _B_TRUE && pi->pi_v4 == NULL) {
 				if (!pi->pi_cfgmsg_printed) {
-					logerr("NIC %s of group %s is"
-					    " not plumbed for IPv4 and may"
-					    " affect failover capability\n",
+					logerr("IP interface %s in group %s is"
+					    " not plumbed for IPv4, affecting"
+					    " IPv4 connectivity\n",
 					    pi->pi_name,
 					    pi->pi_group->pg_name);
 					pi->pi_cfgmsg_printed = 1;
@@ -959,9 +895,9 @@ check_config(void)
 			} else if (v6_in_group == _B_TRUE &&
 			    pi->pi_v6 == NULL) {
 				if (!pi->pi_cfgmsg_printed) {
-					logerr("NIC %s of group %s is"
-					    " not plumbed for IPv6 and may"
-					    " affect failover capability\n",
+					logerr("IP interface %s in group %s is"
+					    " not plumbed for IPv6, affecting"
+					    " IPv6 connectivity\n",
 					    pi->pi_name,
 					    pi->pi_group->pg_name);
 					pi->pi_cfgmsg_printed = 1;
@@ -974,10 +910,10 @@ check_config(void)
 				 * error recovery message
 				 */
 				if (pi->pi_cfgmsg_printed) {
-					logerr("NIC %s is now consistent with "
-					    "group %s and failover capability "
-					    "is restored\n", pi->pi_name,
-					    pi->pi_group->pg_name);
+					logerr("IP interface %s is now"
+					    " consistent with group %s "
+					    " and connectivity is restored\n",
+					    pi->pi_name, pi->pi_group->pg_name);
 					pi->pi_cfgmsg_printed = 0;
 				}
 			}
@@ -1117,8 +1053,8 @@ run_timeouts(void)
 
 static int eventpipe_read = -1;	/* Used for synchronous signal delivery */
 static int eventpipe_write = -1;
-static boolean_t cleanup_started = _B_FALSE;
-				/* Don't write to eventpipe if in cleanup */
+boolean_t cleanup_started = _B_FALSE;	/* true if we're going away */
+
 /*
  * Ensure that signals are processed synchronously with the rest of
  * the code by just writing a one character signal number on the pipe.
@@ -1228,7 +1164,7 @@ in_signal(int fd)
 			    "Number of probes sent %lld\n"
 			    "Number of probe acks received %lld\n"
 			    "Number of probes/acks lost %lld\n"
-			    "Number of valid unacknowled probes %lld\n"
+			    "Number of valid unacknowledged probes %lld\n"
 			    "Number of ambiguous probe acks received %lld\n",
 			    AF_STR(pii->pii_af), pii->pii_name,
 			    sent, acked, lost, unacked, unknown);
@@ -1321,12 +1257,20 @@ setup_rtsock(int af)
 {
 	int	s;
 	int	flags;
+	int	aware = RTAW_UNDER_IPMP;
 
 	s = socket(PF_ROUTE, SOCK_RAW, af);
 	if (s == -1) {
 		logperror("setup_rtsock: socket PF_ROUTE");
 		exit(1);
 	}
+
+	if (setsockopt(s, SOL_ROUTE, RT_AWARE, &aware, sizeof (aware)) == -1) {
+		logperror("setup_rtsock: setsockopt RT_AWARE");
+		(void) close(s);
+		exit(1);
+	}
+
 	if ((flags = fcntl(s, F_GETFL, 0)) < 0) {
 		logperror("setup_rtsock: fcntl F_GETFL");
 		(void) close(s);
@@ -1347,8 +1291,7 @@ setup_rtsock(int af)
 /*
  * Process an RTM_IFINFO message received on a routing socket.
  * The return value indicates whether a full interface scan is required.
- * Link up/down notifications from the NICs are reflected in the
- * IFF_RUNNING flag.
+ * Link up/down notifications are reflected in the IFF_RUNNING flag.
  * If just the state of the IFF_RUNNING interface flag has changed, a
  * a full interface scan isn't required.
  */
@@ -1400,7 +1343,7 @@ process_rtm_ifinfo(if_msghdr_t *ifm, int type)
 
 	/*
 	 * We want to try and avoid doing a full interface scan for
-	 * link state notifications from the NICs, as indicated
+	 * link state notifications from the datalink layer, as indicated
 	 * by the state of the IFF_RUNNING flag.  If just the
 	 * IFF_RUNNING flag has changed state, the link state changes
 	 * are processed without a full scan.
@@ -1441,25 +1384,7 @@ process_rtm_ifinfo(if_msghdr_t *ifm, int type)
 	 * types.
 	 */
 	if ((old_flags ^ pii->pii_flags) & IFF_STANDBY)
-		phyint_newtype(pi);
-
-	/*
-	 * If IFF_INACTIVE has been set, then no data addresses should be
-	 * hosted on the interface.  If IFF_INACTIVE has been cleared, then
-	 * move previously failed-over addresses back to it, provided it is
-	 * not failed.	For details, see the state diagram in mpd_probe.c.
-	 */
-	if ((old_flags ^ pii->pii_flags) & IFF_INACTIVE) {
-		if (pii->pii_flags & IFF_INACTIVE) {
-			if (!pi->pi_empty && (pi->pi_flags & IFF_STANDBY))
-				(void) try_failover(pi, FAILOVER_TO_NONSTANDBY);
-		} else {
-			if (pi->pi_state == PI_RUNNING && !pi->pi_full) {
-				pi->pi_empty = 0;
-				(void) try_failback(pi);
-			}
-		}
-	}
+		phyint_changed(pi);
 
 	/* Has just the IFF_RUNNING flag changed state ? */
 	if ((old_flags ^ pii->pii_flags) != IFF_RUNNING) {
@@ -1620,22 +1545,24 @@ update_router_list(int fd)
 	t_scalar_t		prim;
 
 	tor = (struct T_optmgmt_req *)&buf;
-
 	tor->PRIM_type = T_SVR4_OPTMGMT_REQ;
 	tor->OPT_offset = sizeof (struct T_optmgmt_req);
 	tor->OPT_length = sizeof (struct opthdr);
 	tor->MGMT_flags = T_CURRENT;
 
+	/*
+	 * Note: we use the special level value below so that IP will return
+	 * us information concerning IRE_MARK_TESTHIDDEN routes.
+	 */
 	req = (struct opthdr *)&tor[1];
-	req->level = MIB2_IP;	/* any MIB2_xxx value ok here */
+	req->level = EXPER_IP_AND_TESTHIDDEN;
 	req->name  = 0;
 	req->len   = 0;
 
 	ctlbuf.buf = (char *)&buf;
 	ctlbuf.len = tor->OPT_length + tor->OPT_offset;
 	ctlbuf.maxlen = sizeof (buf);
-	flags = 0;
-	if (putmsg(fd, &ctlbuf, NULL, flags) == -1) {
+	if (putmsg(fd, &ctlbuf, NULL, 0) == -1) {
 		logperror("update_router_list: putmsg(ctl)");
 		return (_B_FALSE);
 	}
@@ -1689,7 +1616,8 @@ update_router_list(int fd)
 		case T_OPTMGMT_ACK:
 			toa = &buf.uprim.optmgmt_ack;
 			optp = (struct opthdr *)&toa[1];
-			if (ctlbuf.len < sizeof (struct T_optmgmt_ack)) {
+			if (ctlbuf.len < (sizeof (struct T_optmgmt_ack) +
+			    sizeof (struct opthdr))) {
 				logerr("update_router_list: ctlbuf.len %d\n",
 				    ctlbuf.len);
 				return (_B_FALSE);
@@ -1707,7 +1635,7 @@ update_router_list(int fd)
 			return (_B_FALSE);
 		}
 
-		/* Process the T_OPGMGMT_ACK below */
+		/* Process the T_OPTMGMT_ACK below */
 		assert(prim == T_OPTMGMT_ACK);
 
 		switch (status) {
@@ -1717,9 +1645,8 @@ update_router_list(int fd)
 			 * message. If this is the last message i.e EOD,
 			 * return, else process the next T_OPTMGMT_ACK msg.
 			 */
-			if ((ctlbuf.len == sizeof (struct T_optmgmt_ack) +
-			    sizeof (struct opthdr)) && optp->len == 0 &&
-			    optp->name == 0 && optp->level == 0) {
+			if (optp->len == 0 && optp->name == 0 &&
+			    optp->level == 0) {
 				/*
 				 * This is the EOD message. Return
 				 */
@@ -1747,17 +1674,14 @@ update_router_list(int fd)
 			databuf.len = 0;
 			flags = 0;
 			for (;;) {
-				status = getmsg(fd, NULL, &databuf, &flags);
-				if (status >= 0) {
+				if (getmsg(fd, NULL, &databuf, &flags) >= 0)
 					break;
-				} else if (errno == EINTR) {
+				if (errno == EINTR)
 					continue;
-				} else {
-					logperror("update_router_list:"
-					    " getmsg(data)");
-					free(databuf.buf);
-					return (_B_FALSE);
-				}
+
+				logperror("update_router_list: getmsg(data)");
+				free(databuf.buf);
+				return (_B_FALSE);
 			}
 
 			if (optp->level == MIB2_IP &&
@@ -1777,18 +1701,35 @@ update_router_list(int fd)
 	/* NOTREACHED */
 }
 
+
 /*
- * Examine the IPv4 routing table, for default routers. For each default
- * router, populate the list of targets of each phyint that is on the same
- * link as the default router
+ * Convert octet `octp' to a phyint name and store in `ifname'
+ */
+static void
+oct2ifname(const Octet_t *octp, char *ifname, size_t ifsize)
+{
+	char *cp;
+	size_t len = MIN(octp->o_length, ifsize - 1);
+
+	(void) strncpy(ifname, octp->o_bytes, len);
+	ifname[len] = '\0';
+
+	if ((cp = strchr(ifname, IF_SEPARATOR)) != NULL)
+		*cp = '\0';
+}
+
+/*
+ * Examine the IPv4 routing table `buf' for possible targets.  For each
+ * possible target, if it's on the same subnet an interface route, pass
+ * it to router_add_common() for further consideration.
  */
 static void
 ire_process_v4(mib2_ipRouteEntry_t *buf, size_t len)
 {
-	mib2_ipRouteEntry_t	*rp;
-	mib2_ipRouteEntry_t	*rp1;
-	struct	in_addr		nexthop_v4;
-	mib2_ipRouteEntry_t	*endp;
+	char ifname[LIFNAMSIZ];
+	mib2_ipRouteEntry_t	*rp, *rp1, *endp;
+	struct in_addr		nexthop_v4;
+	struct in6_addr		nexthop;
 
 	if (len == 0)
 		return;
@@ -1797,72 +1738,37 @@ ire_process_v4(mib2_ipRouteEntry_t *buf, size_t len)
 	endp = buf + (len / sizeof (mib2_ipRouteEntry_t));
 
 	/*
-	 * Loop thru the routing table entries. Process any IRE_DEFAULT,
-	 * IRE_PREFIX, IRE_HOST, IRE_HOST_REDIRECT ire. Ignore the others.
-	 * For each such IRE_OFFSUBNET ire, get the nexthop gateway address.
-	 * This is a potential target for probing, which we try to add
-	 * to the list of probe targets.
+	 * Scan the routing table entries for any IRE_OFFSUBNET entries, and
+	 * cross-reference them with the interface routes to determine if
+	 * they're possible probe targets.
 	 */
 	for (rp = buf; rp < endp; rp++) {
 		if (!(rp->ipRouteInfo.re_ire_type & IRE_OFFSUBNET))
 			continue;
 
-		/*  Get the nexthop address. */
+		/* Get the nexthop address. */
 		nexthop_v4.s_addr = rp->ipRouteNextHop;
 
 		/*
-		 * Get the nexthop address. Then determine the outgoing
-		 * interface, by examining all interface IREs, and picking the
-		 * match. We don't look at the interface specified in the route
-		 * because we need to add the router target on all matching
-		 * interfaces anyway; the goal is to avoid falling back to
-		 * multicast when some interfaces are in the same subnet but
-		 * not in the same group.
+		 * Rescan the routing table looking for interface routes that
+		 * are on the same subnet, and try to add them.  If they're
+		 * not relevant (e.g., the interface route isn't part of an
+		 * IPMP group, router_add_common() will discard).
 		 */
 		for (rp1 = buf; rp1 < endp; rp1++) {
-			if (!(rp1->ipRouteInfo.re_ire_type & IRE_INTERFACE)) {
+			if (!(rp1->ipRouteInfo.re_ire_type & IRE_INTERFACE) ||
+			    rp1->ipRouteIfIndex.o_length == 0)
 				continue;
-			}
 
-			/*
-			 * Determine the interface IRE that matches the nexthop.
-			 * i.e.	 (IRE addr & IRE mask) == (nexthop & IRE mask)
-			 */
-			if ((rp1->ipRouteDest & rp1->ipRouteMask) ==
-			    (nexthop_v4.s_addr & rp1->ipRouteMask)) {
-				/*
-				 * We found the interface ire
-				 */
-				router_add_v4(rp1, nexthop_v4);
-			}
+			if ((rp1->ipRouteDest & rp1->ipRouteMask) !=
+			    (nexthop_v4.s_addr & rp1->ipRouteMask))
+				continue;
+
+			oct2ifname(&rp1->ipRouteIfIndex, ifname, LIFNAMSIZ);
+			IN6_INADDR_TO_V4MAPPED(&nexthop_v4, &nexthop);
+			router_add_common(AF_INET, ifname, nexthop);
 		}
 	}
-}
-
-void
-router_add_v4(mib2_ipRouteEntry_t *rp1, struct in_addr nexthop_v4)
-{
-	char *cp;
-	char ifname[LIFNAMSIZ + 1];
-	struct in6_addr	nexthop;
-	int len;
-
-	if (debug & D_TARGET)
-		logdebug("router_add_v4()\n");
-
-	len = MIN(rp1->ipRouteIfIndex.o_length, sizeof (ifname) - 1);
-	(void) memcpy(ifname, rp1->ipRouteIfIndex.o_bytes, len);
-	ifname[len] = '\0';
-
-	if (ifname[0] == '\0')
-		return;
-
-	cp = strchr(ifname, IF_SEPARATOR);
-	if (cp != NULL)
-		*cp = '\0';
-
-	IN6_INADDR_TO_V4MAPPED(&nexthop_v4, &nexthop);
-	router_add_common(AF_INET, ifname, nexthop);
 }
 
 void
@@ -1906,16 +1812,17 @@ router_add_common(int af, char *ifname, struct in6_addr nexthop)
 }
 
 /*
- * Examine the IPv6 routing table, for default routers. For each default
- * router, populate the list of targets of each phyint that is on the same
- * link as the default router
+ * Examine the IPv6 routing table `buf' for possible link-local targets, and
+ * pass any contenders to router_add_common() for further consideration.
  */
 static void
 ire_process_v6(mib2_ipv6RouteEntry_t *buf, size_t len)
 {
-	mib2_ipv6RouteEntry_t	*rp;
-	mib2_ipv6RouteEntry_t	*endp;
-	struct	in6_addr nexthop_v6;
+	struct lifreq lifr;
+	char ifname[LIFNAMSIZ];
+	char grname[LIFGRNAMSIZ];
+	mib2_ipv6RouteEntry_t *rp, *rp1, *endp;
+	struct in6_addr nexthop_v6;
 
 	if (debug & D_TARGET)
 		logdebug("ire_process_v6(len %d)\n", len);
@@ -1927,61 +1834,50 @@ ire_process_v6(mib2_ipv6RouteEntry_t *buf, size_t len)
 	endp = buf + (len / sizeof (mib2_ipv6RouteEntry_t));
 
 	/*
-	 * Loop thru the routing table entries. Process any IRE_DEFAULT,
-	 * IRE_PREFIX, IRE_HOST, IRE_HOST_REDIRECT ire. Ignore the others.
-	 * For each such IRE_OFFSUBNET ire, get the nexthop gateway address.
-	 * This is a potential target for probing, which we try to add
-	 * to the list of probe targets.
+	 * Scan the routing table entries for any IRE_OFFSUBNET entries, and
+	 * cross-reference them with the interface routes to determine if
+	 * they're possible probe targets.
 	 */
 	for (rp = buf; rp < endp; rp++) {
-		if (!(rp->ipv6RouteInfo.re_ire_type & IRE_OFFSUBNET))
+		if (!(rp->ipv6RouteInfo.re_ire_type & IRE_OFFSUBNET) ||
+		    !IN6_IS_ADDR_LINKLOCAL(&rp->ipv6RouteNextHop))
 			continue;
 
-		/*
-		 * We have the outgoing interface in ipv6RouteIfIndex
-		 * if ipv6RouteIfindex.o_length is non-zero. The outgoing
-		 * interface must be present for link-local addresses. Since
-		 * we use only link-local addreses for probing, we don't
-		 * consider the case when the outgoing interface is not
-		 * known and we need to scan interface ires
-		 */
+		/* Get the nexthop address. */
 		nexthop_v6 = rp->ipv6RouteNextHop;
-		if (rp->ipv6RouteIfIndex.o_length != 0) {
-			/*
-			 * We already have the outgoing interface
-			 * in ipv6RouteIfIndex.
-			 */
-			router_add_v6(rp, nexthop_v6);
+
+		/*
+		 * The interface name should always exist for link-locals;
+		 * we use it to map this entry to an IPMP group name.
+		 */
+		if (rp->ipv6RouteIfIndex.o_length == 0)
+			continue;
+
+		oct2ifname(&rp->ipv6RouteIfIndex, lifr.lifr_name, LIFNAMSIZ);
+		if (ioctl(ifsock_v6, SIOCGLIFGROUPNAME, &lifr) == -1 ||
+		    strlcpy(grname, lifr.lifr_groupname, LIFGRNAMSIZ) == 0) {
+			continue;
+		}
+
+		/*
+		 * Rescan the list of routes for interface routes, and add the
+		 * above target to any interfaces in the same IPMP group.
+		 */
+		for (rp1 = buf; rp1 < endp; rp1++) {
+			if (!(rp1->ipv6RouteInfo.re_ire_type & IRE_INTERFACE) ||
+			    rp1->ipv6RouteIfIndex.o_length == 0) {
+				continue;
+			}
+			oct2ifname(&rp1->ipv6RouteIfIndex, ifname, LIFNAMSIZ);
+			(void) strlcpy(lifr.lifr_name, ifname, LIFNAMSIZ);
+
+			if (ioctl(ifsock_v6, SIOCGLIFGROUPNAME, &lifr) != -1 &&
+			    strcmp(lifr.lifr_groupname, grname) == 0) {
+				router_add_common(AF_INET6, ifname, nexthop_v6);
+			}
 		}
 	}
 }
-
-
-void
-router_add_v6(mib2_ipv6RouteEntry_t *rp1, struct in6_addr nexthop_v6)
-{
-	char ifname[LIFNAMSIZ + 1];
-	char *cp;
-	int  len;
-
-	if (debug & D_TARGET)
-		logdebug("router_add_v6()\n");
-
-	len = MIN(rp1->ipv6RouteIfIndex.o_length, sizeof (ifname) - 1);
-	(void) memcpy(ifname, rp1->ipv6RouteIfIndex.o_bytes, len);
-	ifname[len] = '\0';
-
-	if (ifname[0] == '\0')
-		return;
-
-	cp = strchr(ifname, IF_SEPARATOR);
-	if (cp != NULL)
-		*cp = '\0';
-
-	router_add_common(AF_INET6, ifname, nexthop_v6);
-}
-
-
 
 /*
  * Build a list of target routers, by scanning the routing tables.
@@ -2001,11 +1897,9 @@ init_router_targets(void)
 	for (pii = phyint_instances; pii != NULL; pii = pii->pii_next) {
 		pi = pii->pii_phyint;
 		/*
-		 * Exclude ptp and host targets. Set tg_in_use to false,
-		 * only for router targets.
+		 * Set tg_in_use to false only for router targets.
 		 */
-		if (!pii->pii_targets_are_routers ||
-		    (pi->pi_flags & IFF_POINTOPOINT))
+		if (!pii->pii_targets_are_routers)
 			continue;
 
 		for (tg = pii->pii_targets; tg != NULL; tg = tg->tg_next)
@@ -2026,15 +1920,21 @@ init_router_targets(void)
 	}
 
 	for (pii = phyint_instances; pii != NULL; pii = pii->pii_next) {
-		if (!pii->pii_targets_are_routers ||
-		    (pi->pi_flags & IFF_POINTOPOINT))
+		pi = pii->pii_phyint;
+		if (!pii->pii_targets_are_routers)
 			continue;
 
 		for (tg = pii->pii_targets; tg != NULL; tg = next_tg) {
 			next_tg = tg->tg_next;
-			if (!tg->tg_in_use) {
+			/*
+			 * If the group has failed, it's likely the route was
+			 * removed by an application affected by that failure.
+			 * In that case, we keep the target so that we can
+			 * reliably repair, at which point we'll refresh the
+			 * target list again.
+			 */
+			if (!tg->tg_in_use && !GROUP_FAILED(pi->pi_group))
 				target_delete(tg);
-			}
 		}
 	}
 }
@@ -2140,7 +2040,7 @@ getdefault(char *name)
  * Command line options below
  */
 boolean_t	failback_enabled = _B_TRUE;	/* failback enabled/disabled */
-boolean_t	track_all_phyints = _B_FALSE;	/* option to track all NICs */
+boolean_t	track_all_phyints = _B_FALSE;	/* track all IP interfaces */
 static boolean_t adopt = _B_FALSE;
 static boolean_t foreground = _B_FALSE;
 
@@ -2149,6 +2049,7 @@ main(int argc, char *argv[])
 {
 	int i;
 	int c;
+	struct phyint *pi;
 	struct phyint_instance *pii;
 	char *value;
 
@@ -2173,14 +2074,15 @@ main(int argc, char *argv[])
 		if (user_failure_detection_time <= 0) {
 			user_failure_detection_time = FAILURE_DETECTION_TIME;
 			logerr("Invalid failure detection time %s, assuming "
-			    "default %d\n", value, user_failure_detection_time);
+			    "default of %d ms\n", value,
+			    user_failure_detection_time);
 
 		} else if (user_failure_detection_time <
 		    MIN_FAILURE_DETECTION_TIME) {
 			user_failure_detection_time =
 			    MIN_FAILURE_DETECTION_TIME;
 			logerr("Too small failure detection time of %s, "
-			    "assuming minimum %d\n", value,
+			    "assuming minimum of %d ms\n", value,
 			    user_failure_detection_time);
 		}
 		free(value);
@@ -2211,9 +2113,9 @@ main(int argc, char *argv[])
 	 */
 	value = getdefault("FAILBACK");
 	if (value != NULL) {
-		if (strncasecmp(value, "yes", 3) == 0)
+		if (strcasecmp(value, "yes") == 0)
 			failback_enabled = _B_TRUE;
-		else if (strncasecmp(value, "no", 2) == 0)
+		else if (strcasecmp(value, "no") == 0)
 			failback_enabled = _B_FALSE;
 		else
 			logerr("Invalid value for FAILBACK %s\n", value);
@@ -2229,9 +2131,9 @@ main(int argc, char *argv[])
 	 */
 	value = getdefault("TRACK_INTERFACES_ONLY_WITH_GROUPS");
 	if (value != NULL) {
-		if (strncasecmp(value, "yes", 3) == 0)
+		if (strcasecmp(value, "yes") == 0)
 			track_all_phyints = _B_FALSE;
-		else if (strncasecmp(value, "no", 2) == 0)
+		else if (strcasecmp(value, "no") == 0)
 			track_all_phyints = _B_TRUE;
 		else
 			logerr("Invalid value for "
@@ -2340,12 +2242,6 @@ main(int argc, char *argv[])
 
 	initifs();
 
-	/* Inform kernel whether failback is enabled or disabled */
-	if (ioctl(ifsock_v4, SIOCSIPMPFAILBACK, (int *)&failback_enabled) < 0) {
-		logperror("main: ioctl (SIOCSIPMPFAILBACK)");
-		exit(1);
-	}
-
 	/*
 	 * If we're operating in "adopt" mode and no interfaces need to be
 	 * tracked, shut down (ifconfig(1M) will restart us on demand if
@@ -2379,6 +2275,7 @@ main(int argc, char *argv[])
 				process_rtsock(rtsock_v4, rtsock_v6);
 				break;
 			}
+
 			for (pii = phyint_instances; pii != NULL;
 			    pii = pii->pii_next) {
 				if (pollfds[i].fd == pii->pii_probe_sock) {
@@ -2389,14 +2286,20 @@ main(int argc, char *argv[])
 					break;
 				}
 			}
+
+			for (pi = phyints; pi != NULL; pi = pi->pi_next) {
+				if (pi->pi_notes != 0 &&
+				    pollfds[i].fd == dlpi_fd(pi->pi_dh)) {
+					(void) dlpi_recv(pi->pi_dh, NULL, NULL,
+					    NULL, NULL, 0, NULL);
+					break;
+				}
+			}
+
 			if (pollfds[i].fd == lsock_v4)
 				loopback_cmd(lsock_v4, AF_INET);
 			else if (pollfds[i].fd == lsock_v6)
 				loopback_cmd(lsock_v6, AF_INET6);
-		}
-		if (full_scan_required) {
-			initifs();
-			full_scan_required = _B_FALSE;
 		}
 	}
 	/* NOTREACHED */
@@ -2481,29 +2384,23 @@ static struct {
 	{ "MI_PING",		sizeof (uint32_t)	},
 	{ "MI_OFFLINE",		sizeof (mi_offline_t)	},
 	{ "MI_UNDO_OFFLINE",	sizeof (mi_undo_offline_t) },
-	{ "MI_SETOINDEX",	sizeof (mi_setoindex_t) },
 	{ "MI_QUERY",		sizeof (mi_query_t)	}
 };
 
 /*
- * Commands received over the loopback interface come here. Currently
- * the agents that send commands are ifconfig, if_mpadm and the RCM IPMP
- * module. ifconfig only makes a connection, and closes it to check if
- * in.mpathd is running.
- * if_mpadm sends commands in the format specified by the mpathd_interface
- * structure.
+ * Commands received over the loopback interface come here (via libipmp).
  */
 static void
 loopback_cmd(int sock, int family)
 {
 	int newfd;
 	ssize_t len;
+	boolean_t is_priv = _B_FALSE;
 	struct sockaddr_storage	peer;
 	struct sockaddr_in	*peer_sin;
 	struct sockaddr_in6	*peer_sin6;
 	socklen_t peerlen;
 	union mi_commands mpi;
-	struct in6_addr loopback_addr = IN6ADDR_LOOPBACK_INIT;
 	char abuf[INET6_ADDRSTRLEN];
 	uint_t cmd;
 	int retval;
@@ -2528,10 +2425,11 @@ loopback_cmd(int sock, int family)
 			return;
 		}
 		peer_sin = (struct sockaddr_in *)&peer;
-		if ((ntohs(peer_sin->sin_port) >= IPPORT_RESERVED) ||
-		    (ntohl(peer_sin->sin_addr.s_addr) != INADDR_LOOPBACK)) {
-			(void) inet_ntop(AF_INET, &peer_sin->sin_addr.s_addr,
-			    abuf, sizeof (abuf));
+		is_priv = ntohs(peer_sin->sin_port) < IPPORT_RESERVED;
+		(void) inet_ntop(AF_INET, &peer_sin->sin_addr.s_addr,
+		    abuf, sizeof (abuf));
+
+		if (ntohl(peer_sin->sin_addr.s_addr) != INADDR_LOOPBACK) {
 			logerr("Attempt to connect from addr %s port %d\n",
 			    abuf, ntohs(peer_sin->sin_port));
 			(void) close(newfd);
@@ -2551,11 +2449,10 @@ loopback_cmd(int sock, int family)
 		 * talking to us.
 		 */
 		peer_sin6 = (struct sockaddr_in6 *)&peer;
-		if ((ntohs(peer_sin6->sin6_port) >= IPPORT_RESERVED) ||
-		    (!IN6_ARE_ADDR_EQUAL(&peer_sin6->sin6_addr,
-		    &loopback_addr))) {
-			(void) inet_ntop(AF_INET6, &peer_sin6->sin6_addr, abuf,
-			    sizeof (abuf));
+		is_priv = ntohs(peer_sin6->sin6_port) < IPPORT_RESERVED;
+		(void) inet_ntop(AF_INET6, &peer_sin6->sin6_addr, abuf,
+		    sizeof (abuf));
+		if (!IN6_IS_ADDR_LOOPBACK(&peer_sin6->sin6_addr)) {
 			logerr("Attempt to connect from addr %s port %d\n",
 			    abuf, ntohs(peer_sin6->sin6_port));
 			(void) close(newfd);
@@ -2575,15 +2472,6 @@ loopback_cmd(int sock, int family)
 	len = read(newfd, &mpi, sizeof (mpi));
 
 	/*
-	 * ifconfig does not send any data. Just tests to see if mpathd
-	 * is already running.
-	 */
-	if (len <= 0) {
-		(void) close(newfd);
-		return;
-	}
-
-	/*
 	 * In theory, we can receive any sized message for a stream socket,
 	 * but we don't expect that to happen for a small message over a
 	 * loopback connection.
@@ -2591,11 +2479,23 @@ loopback_cmd(int sock, int family)
 	if (len < sizeof (uint32_t)) {
 		logerr("loopback_cmd: bad command format or read returns "
 		    "partial data %d\n", len);
+		(void) close(newfd);
+		return;
 	}
 
 	cmd = mpi.mi_command;
 	if (cmd >= MI_NCMD) {
 		logerr("loopback_cmd: unknown command id `%d'\n", cmd);
+		(void) close(newfd);
+		return;
+	}
+
+	/*
+	 * Only MI_PING and MI_QUERY can come from unprivileged sources.
+	 */
+	if (!is_priv && (cmd != MI_QUERY && cmd != MI_PING)) {
+		logerr("Unprivileged request from %s for privileged "
+		    "command %s\n", abuf, commands[cmd].name);
 		(void) close(newfd);
 		return;
 	}
@@ -2615,179 +2515,46 @@ loopback_cmd(int sock, int family)
 	(void) close(newfd);
 }
 
-extern int global_errno;	/* set by failover() or failback() */
-
 /*
- * Process the offline, undo offline and set original index commands,
- * received from if_mpadm(1M)
+ * Process the commands received via libipmp.
  */
 static unsigned int
 process_cmd(int newfd, union mi_commands *mpi)
 {
-	uint_t	nif = 0;
-	uint32_t cmd;
 	struct phyint *pi;
-	struct phyint *pi2;
-	struct phyint_group *pg;
-	boolean_t success;
-	int error;
 	struct mi_offline *mio;
 	struct mi_undo_offline *miu;
-	struct lifreq lifr;
-	int ifsock;
-	struct mi_setoindex *mis;
+	unsigned int retval;
 
-	cmd = mpi->mi_command;
+	switch (mpi->mi_command) {
+	case MI_PING:
+		return (send_result(newfd, IPMP_SUCCESS, 0));
 
-	switch (cmd) {
 	case MI_OFFLINE:
 		mio = &mpi->mi_ocmd;
-		/*
-		 * Lookup the interface that needs to be offlined.
-		 * If it does not exist, return a suitable error.
-		 */
+
 		pi = phyint_lookup(mio->mio_ifname);
 		if (pi == NULL)
-			return (send_result(newfd, IPMP_FAILURE, EINVAL));
+			return (send_result(newfd, IPMP_EUNKIF, 0));
 
-		/*
-		 * Verify that the minimum redundancy requirements are met.
-		 * The multipathing group must have at least the specified
-		 * number of functional interfaces after offlining the
-		 * requested interface. Otherwise return a suitable error.
-		 */
-		pg = pi->pi_group;
-		nif = 0;
-		if (pg != phyint_anongroup) {
-			for (nif = 0, pi2 = pg->pg_phyint; pi2 != NULL;
-			    pi2 = pi2->pi_pgnext) {
-				if ((pi2->pi_state == PI_RUNNING) ||
-				    (pg->pg_groupfailed &&
-				    !(pi2->pi_flags & IFF_OFFLINE)))
-					nif++;
-			}
-		}
-		if (nif < mio->mio_min_redundancy)
-			return (send_result(newfd, IPMP_EMINRED, 0));
-
-		/*
-		 * The order of operation is to set IFF_OFFLINE, followed by
-		 * failover. Setting IFF_OFFLINE ensures that no new ipif's
-		 * can be created. Subsequent failover moves everything on
-		 * the OFFLINE interface to some other functional interface.
-		 */
-		success = change_lif_flags(pi, IFF_OFFLINE, _B_TRUE);
-		if (success) {
-			if (!pi->pi_empty) {
-				error = try_failover(pi, FAILOVER_NORMAL);
-				if (error != 0) {
-					if (!change_lif_flags(pi, IFF_OFFLINE,
-					    _B_FALSE)) {
-						logerr("process_cmd: couldn't"
-						    " clear OFFLINE flag on"
-						    " %s\n", pi->pi_name);
-						/*
-						 * Offline interfaces should
-						 * not be probed.
-						 */
-						stop_probing(pi);
-					}
-					return (send_result(newfd, error,
-					    global_errno));
-				}
-			}
-		} else {
+		retval = phyint_offline(pi, mio->mio_min_redundancy);
+		if (retval == IPMP_FAILURE)
 			return (send_result(newfd, IPMP_FAILURE, errno));
-		}
 
-		/*
-		 * The interface is now Offline, so stop probing it.
-		 * Note that if_mpadm(1M) will down the test addresses,
-		 * after receiving a success reply from us. The routing
-		 * socket message will then make us close the socket used
-		 * for sending probes. But it is more logical that an
-		 * offlined interface must not be probed, even if it has
-		 * test addresses.
-		 */
-		stop_probing(pi);
-		return (send_result(newfd, IPMP_SUCCESS, 0));
+		return (send_result(newfd, retval, 0));
 
 	case MI_UNDO_OFFLINE:
 		miu = &mpi->mi_ucmd;
-		/*
-		 * Undo the offline command. As usual lookup the interface.
-		 * Send an error if it does not exist or is not offline.
-		 */
+
 		pi = phyint_lookup(miu->miu_ifname);
-		if (pi == NULL || pi->pi_state != PI_OFFLINE)
-			return (send_result(newfd, IPMP_FAILURE, EINVAL));
+		if (pi == NULL)
+			return (send_result(newfd, IPMP_EUNKIF, 0));
 
-		/*
-		 * Reset the state of the interface based on the current link
-		 * state; if this phyint subsequently acquires a test address,
-		 * the state will be updated later as a result of the probes.
-		 */
-		if (LINK_UP(pi))
-			phyint_chstate(pi, PI_RUNNING);
-		else
-			phyint_chstate(pi, PI_FAILED);
-
-		if (pi->pi_state == PI_RUNNING) {
-			/*
-			 * Note that the success of MI_UNDO_OFFLINE is not
-			 * contingent on actually failing back; in the odd
-			 * case where we cannot do it here, we will try again
-			 * in initifs() since pi->pi_full will still be zero.
-			 */
-			if (do_failback(pi) != IPMP_SUCCESS) {
-				logdebug("process_cmd: cannot failback from "
-				    "%s during MI_UNDO_OFFLINE\n", pi->pi_name);
-			}
-		}
-
-		/*
-		 * Clear the IFF_OFFLINE flag.  We have to do this last
-		 * because do_failback() relies on it being set to decide
-		 * when to display messages.
-		 */
-		(void) change_lif_flags(pi, IFF_OFFLINE, _B_FALSE);
-
-		/*
-		 * Give the requestor time to configure test addresses
-		 * before complaining that they're missing.
-		 */
-		pi->pi_taddrthresh = getcurrentsec() + TESTADDR_CONF_TIME;
-
-		return (send_result(newfd, IPMP_SUCCESS, 0));
-
-	case MI_SETOINDEX:
-		mis = &mpi->mi_scmd;
-
-		/* Get the socket for doing ioctls */
-		ifsock = (mis->mis_iftype == AF_INET) ? ifsock_v4 : ifsock_v6;
-
-		/*
-		 * Get index of new original interface.
-		 * The index is returned in lifr.lifr_index.
-		 */
-		(void) strlcpy(lifr.lifr_name, mis->mis_new_pifname,
-		    sizeof (lifr.lifr_name));
-
-		if (ioctl(ifsock, SIOCGLIFINDEX, (char *)&lifr) < 0)
+		retval = phyint_undo_offline(pi);
+		if (retval == IPMP_FAILURE)
 			return (send_result(newfd, IPMP_FAILURE, errno));
 
-		/*
-		 * Set new original interface index.
-		 * The new index was put into lifr.lifr_index by the
-		 * SIOCGLIFINDEX ioctl.
-		 */
-		(void) strlcpy(lifr.lifr_name, mis->mis_lifname,
-		    sizeof (lifr.lifr_name));
-
-		if (ioctl(ifsock, SIOCSLIFOINDEX, (char *)&lifr) < 0)
-			return (send_result(newfd, IPMP_FAILURE, errno));
-
-		return (send_result(newfd, IPMP_SUCCESS, 0));
+		return (send_result(newfd, retval, 0));
 
 	case MI_QUERY:
 		return (process_query(newfd, &mpi->mi_qcmd));
@@ -2806,6 +2573,8 @@ process_cmd(int newfd, union mi_commands *mpi)
 static unsigned int
 process_query(int fd, mi_query_t *miq)
 {
+	ipmp_addrinfo_t		*adinfop;
+	ipmp_addrinfolist_t	*adlp;
 	ipmp_groupinfo_t	*grinfop;
 	ipmp_groupinfolist_t	*grlp;
 	ipmp_grouplist_t	*grlistp;
@@ -2815,6 +2584,19 @@ process_query(int fd, mi_query_t *miq)
 	unsigned int		retval;
 
 	switch (miq->miq_inforeq) {
+	case IPMP_ADDRINFO:
+		retval = getgraddrinfo(miq->miq_grname, &miq->miq_addr,
+		    &adinfop);
+		if (retval != IPMP_SUCCESS)
+			return (send_result(fd, retval, errno));
+
+		retval = send_result(fd, IPMP_SUCCESS, 0);
+		if (retval == IPMP_SUCCESS)
+			retval = send_addrinfo(fd, adinfop);
+
+		ipmp_freeaddrinfo(adinfop);
+		return (retval);
+
 	case IPMP_GROUPLIST:
 		retval = getgrouplist(&grlistp);
 		if (retval != IPMP_SUCCESS)
@@ -2829,7 +2611,7 @@ process_query(int fd, mi_query_t *miq)
 
 	case IPMP_GROUPINFO:
 		miq->miq_grname[LIFGRNAMSIZ - 1] = '\0';
-		retval = getgroupinfo(miq->miq_ifname, &grinfop);
+		retval = getgroupinfo(miq->miq_grname, &grinfop);
 		if (retval != IPMP_SUCCESS)
 			return (send_result(fd, retval, errno));
 
@@ -2854,6 +2636,11 @@ process_query(int fd, mi_query_t *miq)
 		return (retval);
 
 	case IPMP_SNAP:
+		/*
+		 * Before taking the snapshot, sync with the kernel.
+		 */
+		initifs();
+
 		retval = getsnap(&snap);
 		if (retval != IPMP_SUCCESS)
 			return (send_result(fd, retval, errno));
@@ -2883,6 +2670,13 @@ process_query(int fd, mi_query_t *miq)
 			if (retval != IPMP_SUCCESS)
 				goto out;
 		}
+
+		adlp = snap->sn_adinfolistp;
+		for (; adlp != NULL; adlp = adlp->adl_next) {
+			retval = send_addrinfo(fd, adlp->adl_adinfop);
+			if (retval != IPMP_SUCCESS)
+				goto out;
+		}
 	out:
 		ipmp_snap_free(snap);
 		return (retval);
@@ -2902,14 +2696,20 @@ static unsigned int
 send_groupinfo(int fd, ipmp_groupinfo_t *grinfop)
 {
 	ipmp_iflist_t	*iflistp = grinfop->gr_iflistp;
+	ipmp_addrlist_t	*adlistp = grinfop->gr_adlistp;
 	unsigned int	retval;
 
 	retval = ipmp_writetlv(fd, IPMP_GROUPINFO, sizeof (*grinfop), grinfop);
 	if (retval != IPMP_SUCCESS)
 		return (retval);
 
-	return (ipmp_writetlv(fd, IPMP_IFLIST,
-	    IPMP_IFLIST_SIZE(iflistp->il_nif), iflistp));
+	retval = ipmp_writetlv(fd, IPMP_IFLIST,
+	    IPMP_IFLIST_SIZE(iflistp->il_nif), iflistp);
+	if (retval != IPMP_SUCCESS)
+		return (retval);
+
+	return (ipmp_writetlv(fd, IPMP_ADDRLIST,
+	    IPMP_ADDRLIST_SIZE(adlistp->al_naddr), adlistp));
 }
 
 /*
@@ -2919,7 +2719,31 @@ send_groupinfo(int fd, ipmp_groupinfo_t *grinfop)
 static unsigned int
 send_ifinfo(int fd, ipmp_ifinfo_t *ifinfop)
 {
-	return (ipmp_writetlv(fd, IPMP_IFINFO, sizeof (*ifinfop), ifinfop));
+	ipmp_addrlist_t	*adlist4p = ifinfop->if_targinfo4.it_targlistp;
+	ipmp_addrlist_t	*adlist6p = ifinfop->if_targinfo6.it_targlistp;
+	unsigned int	retval;
+
+	retval = ipmp_writetlv(fd, IPMP_IFINFO, sizeof (*ifinfop), ifinfop);
+	if (retval != IPMP_SUCCESS)
+		return (retval);
+
+	retval = ipmp_writetlv(fd, IPMP_ADDRLIST,
+	    IPMP_ADDRLIST_SIZE(adlist4p->al_naddr), adlist4p);
+	if (retval != IPMP_SUCCESS)
+		return (retval);
+
+	return (ipmp_writetlv(fd, IPMP_ADDRLIST,
+	    IPMP_ADDRLIST_SIZE(adlist6p->al_naddr), adlist6p));
+}
+
+/*
+ * Send the address information pointed to by `adinfop' on file descriptor
+ * `fd'.  Returns an IPMP error code.
+ */
+static unsigned int
+send_addrinfo(int fd, ipmp_addrinfo_t *adinfop)
+{
+	return (ipmp_writetlv(fd, IPMP_ADDRINFO, sizeof (*adinfop), adinfop));
 }
 
 /*
@@ -3108,4 +2932,33 @@ close_probe_socket(struct phyint_instance *pii, boolean_t polled)
 	(void) close(pii->pii_probe_sock);
 	pii->pii_probe_sock = -1;
 	pii->pii_basetime_inited = 0;
+}
+
+boolean_t
+addrlist_add(addrlist_t **addrsp, const char *name, uint64_t flags,
+    struct sockaddr_storage *ssp)
+{
+	addrlist_t *addrp;
+
+	if ((addrp = malloc(sizeof (addrlist_t))) == NULL)
+		return (_B_FALSE);
+
+	(void) strlcpy(addrp->al_name, name, LIFNAMSIZ);
+	addrp->al_flags = flags;
+	addrp->al_addr = *ssp;
+	addrp->al_next = *addrsp;
+	*addrsp = addrp;
+	return (_B_TRUE);
+}
+
+void
+addrlist_free(addrlist_t **addrsp)
+{
+	addrlist_t *addrp, *next_addrp;
+
+	for (addrp = *addrsp; addrp != NULL; addrp = next_addrp) {
+		next_addrp = addrp->al_next;
+		free(addrp);
+	}
+	*addrsp = NULL;
 }

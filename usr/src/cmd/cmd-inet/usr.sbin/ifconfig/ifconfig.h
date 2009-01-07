@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -10,8 +10,6 @@
 
 #ifndef	_IFCONFIG_H
 #define	_IFCONFIG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -39,7 +37,6 @@ extern void	Perrdlpi_exit(const char *, const char *, int);
 
 extern int	doifrevarp(const char *, struct sockaddr_in *);
 
-extern int	dlpi_set_address(const char *, uchar_t *, uint_t);
 extern void	dlpi_print_address(const char *);
 
 #ifdef	__cplusplus

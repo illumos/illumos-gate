@@ -485,7 +485,7 @@ IP_SCTP_OBJS =	sctp.o sctp_opt_data.o sctp_output.o \
 		sctp_ioc.o sctp_bind.o sctp_notify.o sctp_asconf.o \
 		sctp_addr.o tn_ipopt.o tnet.o ip_netinfo.o
 
-IP_OBJS +=	igmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
+IP_OBJS +=	igmp.o ipmp.o ip.o ip6.o ip6_asp.o ip6_if.o ip6_ire.o ip6_rts.o \
 		ip_if.o ip_ire.o ip_listutils.o ip_mroute.o \
 		ip_multi.o ip_ndp.o ip_opt_data.o ip_rts.o ip_srcid.o \
 		ipddi.o ipdrop.o mi.o nd.o optcom.o snmpcom.o ipsec_loader.o \
@@ -1605,9 +1605,9 @@ IPF_OBJS += ip_fil_solaris.o fil.o solaris.o ip_state.o ip_frag.o ip_nat.o \
 
 IBD_OBJS +=	ibd.o
 
-SDP_OBJS +=	sdpddi.o
+DLPISTUB_OBJS += dlpistub.o
 
-VNI_OBJS += vni.o
+SDP_OBJS +=	sdpddi.o
 
 CTF_OBJS += ctf_create.o ctf_decl.o ctf_error.o ctf_hash.o ctf_labels.o \
 	ctf_lookup.o ctf_open.o ctf_types.o ctf_util.o ctf_subr.o ctf_mod.o

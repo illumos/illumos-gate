@@ -18,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <netinet/in.h>
@@ -32,7 +31,7 @@
 extern int getnetmaskbyaddr(const struct in_addr, struct in_addr *);
 
 /*
- * Generic internet (v4) functions.
+ * Internet utility functions.
  */
 
 /*
@@ -66,4 +65,33 @@ get_netmask4(const struct in_addr *n_addrp, struct in_addr *s_addrp)
 		s_addrp->s_addr = IN_CLASSC_NET;
 	else
 		s_addrp->s_addr = IN_CLASSE_NET;
+}
+
+/*
+ * Checks if the IP addresses `ssp1' and `ssp2' are equal.
+ */
+boolean_t
+sockaddrcmp(const struct sockaddr_storage *ssp1,
+    const struct sockaddr_storage *ssp2)
+{
+	struct in_addr addr1, addr2;
+	const struct in6_addr *addr6p1, *addr6p2;
+
+	if (ssp1->ss_family != ssp2->ss_family)
+		return (B_FALSE);
+
+	if (ssp1 == ssp2)
+		return (B_TRUE);
+
+	switch (ssp1->ss_family) {
+	case AF_INET:
+		addr1 = ((const struct sockaddr_in *)ssp1)->sin_addr;
+		addr2 = ((const struct sockaddr_in *)ssp2)->sin_addr;
+		return (addr1.s_addr == addr2.s_addr);
+	case AF_INET6:
+		addr6p1 = &((const struct sockaddr_in6 *)ssp1)->sin6_addr;
+		addr6p2 = &((const struct sockaddr_in6 *)ssp2)->sin6_addr;
+		return (IN6_ARE_ADDR_EQUAL(addr6p1, addr6p2));
+	}
+	return (B_FALSE);
 }

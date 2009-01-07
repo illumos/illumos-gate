@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This module contains core functions for managing DHCP state machine
  * instances.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <search.h>
@@ -151,7 +149,7 @@ insert_smach(dhcp_lif_t *lif, int *error)
 		/*
 		 * With IPv4 DHCP, we use a socket per lif.
 		 */
-		if (!open_ip_lif(lif, INADDR_ANY)) {
+		if (!open_ip_lif(lif, INADDR_ANY, B_TRUE)) {
 			dhcpmsg(MSG_ERR, "unable to open socket for %s",
 			    lif->lif_name);
 			/* This will also dispose of the LIF */
@@ -696,14 +694,15 @@ set_smach_state(dhcp_smach_t *dsmp, DHCPSTATE state)
 			if (is_bound_state(dsmp->dsm_state)) {
 				if (!is_bound_state(state)) {
 					close_ip_lif(lif);
-					if (!open_ip_lif(lif, INADDR_ANY))
+					if (!open_ip_lif(lif, INADDR_ANY,
+					    B_FALSE))
 						return (B_FALSE);
 				}
 			} else {
 				if (is_bound_state(state)) {
 					close_ip_lif(lif);
 					if (!open_ip_lif(lif,
-					    ntohl(lif->lif_addr)))
+					    ntohl(lif->lif_addr), B_FALSE))
 						return (B_FALSE);
 				}
 			}
@@ -952,11 +951,14 @@ no_specified_id:
 	 * unable to parse it.  We need to determine if a Client ID is required
 	 * and, if so, generate one.
 	 *
-	 * If it's IPv4 and not a logical interface, then we need to preserve
-	 * backward-compatibility by avoiding new-fangled DUID/IAID
-	 * construction.
+	 * If it's IPv4, not in an IPMP group, and not a logical interface,
+	 * then we need to preserve backward-compatibility by avoiding
+	 * new-fangled DUID/IAID construction.  (Note: even for IPMP test
+	 * addresses, we construct a DUID/IAID since we may renew a lease for
+	 * an IPMP test address on any functioning IP interface in the group.)
 	 */
-	if (!pif->pif_isv6 && strchr(dsmp->dsm_name, ':') == NULL) {
+	if (!pif->pif_isv6 && pif->pif_grifname[0] == '\0' &&
+	    strchr(dsmp->dsm_name, ':') == NULL) {
 		if (pif->pif_hwtype == ARPHRD_IB) {
 			/*
 			 * This comes from the DHCP over IPoIB specification.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,8 +37,6 @@
  *
  *	@(#)rtsock.c	8.6 (Berkeley) 2/11/95
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains routines that processes routing socket requests.
@@ -216,5 +214,5 @@ ip_rts_change_v6(int type, const in6_addr_t *dst_addr,
 	rtm->rtm_errno = error;
 	rtm->rtm_flags |= RTF_DONE;
 	rtm->rtm_addrs = rtm_addrs;
-	rts_queue_input(mp, NULL, AF_INET6, ipst);
+	rts_queue_input(mp, NULL, AF_INET6, RTSQ_ALL, ipst);
 }

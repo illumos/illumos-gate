@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -23,6 +23,7 @@
 #define	TUN_NAME	"tun"
 #define	ATUN_NAME	"atun"
 #define	TUN6TO4_NAME	"6to4tun"
+#define	IPMPSTUB	(void *)-1
 
 typedef struct if_flags {
 	uint64_t iff_value;
@@ -67,7 +68,20 @@ static if_flags_t	if_flags_tbl[] = {
 	{ IFF_TEMPORARY,	"TEMPORARY" },
 	{ IFF_FIXEDMTU,		"FIXEDMTU" },
 	{ IFF_VIRTUAL,		"VIRTUAL" },
-	{ IFF_DUPLICATE,	"DUPLICATE" }
+	{ IFF_DUPLICATE,	"DUPLICATE" },
+	{ IFF_IPMP,		"IPMP"}
+};
+
+typedef struct {
+	const char		*ia_app;
+	uint64_t		ia_flag;
+	uint_t			ia_tries;
+} if_appflags_t;
+
+static const if_appflags_t if_appflags_tbl[] = {
+	{ "dhcpagent(1M)",	IFF_DHCPRUNNING,	1 },
+	{ "in.ndpd(1M)",	IFF_ADDRCONF,		3 },
+	{  NULL,		0,			0 }
 };
 
 static struct	lifreq lifr;
@@ -75,7 +89,6 @@ static struct	lifreq lifr;
 static char	name[LIFNAMSIZ];
 /* foreach interface saved name */
 static char	origname[LIFNAMSIZ];
-static char savedname[LIFNAMSIZ];	/* For addif */
 static int	setaddr;
 
 /*
@@ -89,20 +102,7 @@ static int	setaddr;
 #define	NO_ESP_AALG 256
 #define	NO_ESP_EALG 256
 
-/*
- * iface_t
- * used by setifether to create a list of interfaces to mark
- * down-up when changing the ethernet address of an interface
- */
-typedef struct iface {
-	struct lifreq lifr;
-	struct iface *next;	/* pointer to the next list element */
-} iface_t;
-
-static	iface_t	*logifs = NULL; /* list of logical interfaces */
-static 	iface_t	*phyif	= NULL;	/* physical interface */
-
-int	s;
+int	s, s4, s6;
 int	af = AF_INET;	/* default address family */
 int	debug = 0;
 int	all = 0;	/* setifdhcp() needs to know this */
@@ -113,6 +113,7 @@ int	v4compat = 0;	/* Compatible printing format */
  * Function prototypes for command functions.
  */
 static int	addif(char *arg, int64_t param);
+static int	inetipmp(char *arg, int64_t param);
 static int	inetplumb(char *arg, int64_t param);
 static int	inetunplumb(char *arg, int64_t param);
 static int	removeif(char *arg, int64_t param);
@@ -141,7 +142,7 @@ static int	modinsert(char *arg, int64_t param);
 static int	modremove(char *arg, int64_t param);
 static int	setifgroupname(char *arg, int64_t param);
 static int	configinfo(char *arg, int64_t param);
-static void	print_config_flags(uint64_t flags);
+static void	print_config_flags(int af, uint64_t flags);
 static void	print_flags(uint64_t flags);
 static void	print_ifether(char *ifname);
 static int	set_tun_encap_limit(char *arg, int64_t param);
@@ -150,6 +151,7 @@ static int	set_tun_hop_limit(char *arg, int64_t param);
 static int	setzone(char *arg, int64_t param);
 static int	setallzones(char *arg, int64_t param);
 static int	setifsrc(char *arg, int64_t param);
+static int	lifnum(const char *ifname);
 
 /*
  * Address family specific function prototypes.
@@ -179,19 +181,22 @@ static int	settaddr(char *, int (*)(icfg_handle_t,
 static void	status(void);
 static void	ifstatus(const char *);
 static void	usage(void);
-static int	strioctl(int s, int cmd, char *buf, int buflen);
+static int	strioctl(int s, int cmd, void *buf, int buflen);
 static int	setifdhcp(const char *caller, const char *ifname,
 		    int argc, char *argv[]);
 static int	ip_domux2fd(int *, int *, int *, int *, int *);
 static int	ip_plink(int, int, int, int, int);
 static int	modop(char *arg, char op);
-static void	selectifs(int argc, char *argv[], int af,
-			struct lifreq *lifrp);
-static int	updownifs(iface_t *ifs, int up);
 static int	find_all_global_interfaces(struct lifconf *lifcp, char **buf,
 		    int64_t lifc_flags);
 static int	find_all_zone_interfaces(struct lifconf *lifcp, char **buf,
 		    int64_t lifc_flags);
+static int	create_ipmp(const char *grname, int af, const char *ifname,
+		    boolean_t implicit);
+static int	create_ipmp_peer(int af, const char *ifname);
+static void	start_ipmp_daemon(void);
+static boolean_t ifaddr_up(ifaddrlistx_t *ifaddrp);
+static boolean_t ifaddr_down(ifaddrlistx_t *ifaddrp);
 
 #define	max(a, b)	((a) < (b) ? (b) : (a))
 
@@ -251,6 +256,7 @@ struct	cmd {
 	{ "index",	NEXTARG,	setifindex,	0,	AF_ANY },
 	{ "broadcast",	NEXTARG,	setifbroadaddr,	0,	AF_INET },
 	{ "auto-revarp", 0,		setifrevarp,	1,	AF_INET },
+	{ "ipmp",	0,		inetipmp,	1,	AF_ANY },
 	{ "plumb",	0,		inetplumb,	1,	AF_ANY },
 	{ "unplumb",	0,		inetunplumb,	0,	AF_ANY },
 	{ "subnet",	NEXTARG,	setifsubnet,	0,	AF_ANY },
@@ -297,22 +303,30 @@ struct	cmd {
 
 typedef struct if_config_cmd {
 	uint64_t	iff_flag;
+	int		iff_af;
 	char		*iff_name;
 } if_config_cmd_t;
 
+/*
+ * NOTE: print_config_flags() processes this table in order, so we put "up"
+ * last so that we can be sure "-failover" will take effect first.  Otherwise,
+ * IPMP test addresses will erroneously migrate to the IPMP interface.
+ */
 static if_config_cmd_t	if_config_cmd_tbl[] = {
-	{ IFF_UP,		"up" },
-	{ IFF_NOTRAILERS,	"-trailers" },
-	{ IFF_PRIVATE,		"private" },
-	{ IFF_NOXMIT,		"-xmit" },
-	{ IFF_ANYCAST,		"anycast" },
-	{ IFF_NOLOCAL,		"-local" },
-	{ IFF_DEPRECATED,	"deprecated" },
-	{ IFF_NOFAILOVER,	"-failover" },
-	{ IFF_STANDBY,		"standby" },
-	{ IFF_FAILED,		"failed" },
-	{ IFF_PREFERRED,	"preferred" },
-	{ 0,			0 },
+	{ IFF_NOTRAILERS,	AF_UNSPEC,	"-trailers"	},
+	{ IFF_PRIVATE,		AF_UNSPEC,	"private"	},
+	{ IFF_NOXMIT,		AF_UNSPEC,	"-xmit"		},
+	{ IFF_ANYCAST,		AF_INET6,	"anycast"	},
+	{ IFF_NOLOCAL,		AF_UNSPEC,	"-local"	},
+	{ IFF_DEPRECATED,	AF_UNSPEC,	"deprecated"	},
+	{ IFF_NOFAILOVER,	AF_UNSPEC,	"-failover"	},
+	{ IFF_STANDBY,		AF_UNSPEC,	"standby"	},
+	{ IFF_FAILED,		AF_UNSPEC,	"failed"	},
+	{ IFF_PREFERRED,	AF_UNSPEC,	"preferred"	},
+	{ IFF_NONUD,		AF_INET6,	"-nud"		},
+	{ IFF_NOARP,		AF_INET,	"-arp"		},
+	{ IFF_UP,		AF_UNSPEC, 	"up" 		},
+	{ 0,			0,		NULL		},
 };
 
 typedef struct ni {
@@ -345,9 +359,10 @@ struct afswtch *afp;	/* the address family being set or asked about */
 int
 main(int argc, char *argv[])
 {
-	/* Include IFF_NOXMIT, IFF_TEMPORARY and all zone interfaces */
-	int64_t lifc_flags = LIFC_NOXMIT | LIFC_TEMPORARY | LIFC_ALLZONES;
+	int64_t lifc_flags;
 	char *default_ip_str;
+
+	lifc_flags = LIFC_NOXMIT|LIFC_TEMPORARY|LIFC_ALLZONES|LIFC_UNDER_IPMP;
 
 	if (argc < 2) {
 		usage();
@@ -388,9 +403,10 @@ main(int argc, char *argv[])
 	}
 
 	s = socket(SOCKET_AF(af), SOCK_DGRAM, 0);
-	if (s < 0) {
+	s4 = socket(AF_INET, SOCK_DGRAM, 0);
+	s6 = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s == -1 || s4 == -1 || s6 == -1)
 		Perror0_exit("socket");
-	}
 
 	/*
 	 * Special interface names is any combination of these flags.
@@ -1441,39 +1457,38 @@ setifdstaddr(char *addr, int64_t param)
 static int
 setifflags(char *val, int64_t value)
 {
-	int phyintlen, origphyintlen;
+	struct lifreq lifrl;	/* local lifreq struct */
+	boolean_t bringup = _B_FALSE;
 
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
 	if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0)
 		Perror0_exit("setifflags: SIOCGLIFFLAGS");
 
-	if (value == IFF_NOFAILOVER) {
-		/*
-		 * Fail if '-failover' is set after a prior addif created the
-		 * alias on a different interface. This can happen when the
-		 * interface is part of an IPMP group.
-		 */
-		phyintlen = strcspn(name, ":");
-		origphyintlen = strcspn(origname, ":");
-		if (phyintlen != origphyintlen ||
-		    strncmp(name, origname, phyintlen) != 0) {
-			(void) fprintf(stderr, "ifconfig: can't set -failover "
-			    "on failed/standby/offlined interface %s\n",
-			    origname);
-			exit(1);
-		}
-	}
-
 	if (value < 0) {
 		value = -value;
+
+		if ((value & IFF_NOFAILOVER) && (lifr.lifr_flags & IFF_UP)) {
+			/*
+			 * The kernel does not allow administratively up test
+			 * addresses to be converted to data addresses.  Bring
+			 * the address down first, then bring it up after it's
+			 * been converted to a data address.
+			 */
+			lifr.lifr_flags &= ~IFF_UP;
+			(void) ioctl(s, SIOCSLIFFLAGS, (caddr_t)&lifr);
+			bringup = _B_TRUE;
+		}
+
 		lifr.lifr_flags &= ~value;
-		if ((value & IFF_UP) && (lifr.lifr_flags & IFF_DUPLICATE)) {
+		if ((value & (IFF_UP | IFF_NOFAILOVER)) &&
+		    (lifr.lifr_flags & IFF_DUPLICATE)) {
 			/*
 			 * If the user is trying to mark an interface with a
-			 * duplicate address as "down," then fetch the address
-			 * and set it.  This will cause IP to clear the
-			 * IFF_DUPLICATE flag and stop the automatic recovery
-			 * timer.
+			 * duplicate address as "down," or convert a duplicate
+			 * test address to a data address, then fetch the
+			 * address and set it.  This will cause IP to clear
+			 * the IFF_DUPLICATE flag and stop the automatic
+			 * recovery timer.
 			 */
 			value = lifr.lifr_flags;
 			if (ioctl(s, SIOCGLIFADDR, (caddr_t)&lifr) >= 0)
@@ -1483,10 +1498,48 @@ setifflags(char *val, int64_t value)
 	} else {
 		lifr.lifr_flags |= value;
 	}
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	if (ioctl(s, SIOCSLIFFLAGS, (caddr_t)&lifr) < 0) {
-		Perror0_exit("setifflags: SIOCSLIFFLAGS");
+
+	/*
+	 * If we're about to bring up an underlying physical IPv6 interface in
+	 * an IPMP group, ensure the IPv6 IPMP interface is also up.  This is
+	 * for backward compatibility with legacy configurations in which
+	 * there are no explicit hostname files for IPMP interfaces.  (For
+	 * IPv4, this is automatically handled by the kernel when migrating
+	 * the underlying interface's data address to the IPMP interface.)
+	 */
+	(void) strlcpy(lifrl.lifr_name, name, LIFNAMSIZ);
+
+	if (lifnum(lifr.lifr_name) == 0 &&
+	    (lifr.lifr_flags & (IFF_UP|IFF_IPV6)) == (IFF_UP|IFF_IPV6) &&
+	    ioctl(s, SIOCGLIFGROUPNAME, &lifrl) == 0 &&
+	    lifrl.lifr_groupname[0] != '\0') {
+		lifgroupinfo_t lifgr;
+
+		(void) strlcpy(lifgr.gi_grname, lifrl.lifr_groupname,
+		    LIFGRNAMSIZ);
+		if (ioctl(s, SIOCGLIFGROUPINFO, &lifgr) == -1)
+			Perror0_exit("setifflags: SIOCGLIFGROUPINFO");
+
+		(void) strlcpy(lifrl.lifr_name, lifgr.gi_grifname, LIFNAMSIZ);
+		if (ioctl(s, SIOCGLIFFLAGS, &lifrl) == -1)
+			Perror0_exit("setifflags: SIOCGLIFFLAGS");
+		if (!(lifrl.lifr_flags & IFF_UP)) {
+			lifrl.lifr_flags |= IFF_UP;
+			if (ioctl(s, SIOCSLIFFLAGS, &lifrl) == -1)
+				Perror0_exit("setifflags: SIOCSLIFFLAGS");
+		}
 	}
+
+	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+	if (ioctl(s, SIOCSLIFFLAGS, (caddr_t)&lifr) < 0)
+		Perror0_exit("setifflags: SIOCSLIFFLAGS");
+
+	if (bringup) {
+		lifr.lifr_flags |= IFF_UP;
+		if (ioctl(s, SIOCSLIFFLAGS, (caddr_t)&lifr) < 0)
+			Perror0_exit("setifflags: SIOCSLIFFLAGS IFF_UP");
+	}
+
 	return (0);
 }
 
@@ -1524,21 +1577,27 @@ setifindex(char *val, int64_t param)
 }
 
 /* ARGSUSED */
+static void
+notifycb(dlpi_handle_t dh, dlpi_notifyinfo_t *dnip, void *arg)
+{
+}
+
+/* ARGSUSED */
 static int
 setifether(char *addr, int64_t param)
 {
-	uchar_t	*ea;
-	iface_t	*current;
-	int	maclen;
+	uchar_t		*hwaddr;
+	int		hwaddrlen;
+	int		retval;
+	ifaddrlistx_t	*ifaddrp, *ifaddrs = NULL;
+	dlpi_handle_t	dh;
+	dlpi_notifyid_t id;
 
 	if (addr == NULL) {
 		ifstatus(name);
 		print_ifether(name);
 		return (0);
 	}
-
-	phyif = NULL;
-	logifs = NULL;
 
 	/*
 	 * if the IP interface in the arguments is a logical
@@ -1550,79 +1609,68 @@ setifether(char *addr, int64_t param)
 		exit(1);
 	}
 
-	ea = _link_aton(addr, &maclen);
-	if (ea == NULL) {
-		if (maclen == -1)
+	if ((hwaddr = _link_aton(addr, &hwaddrlen)) == NULL) {
+		if (hwaddrlen == -1)
 			(void) fprintf(stderr,
-			    "ifconfig: %s: bad address\n", addr);
+			    "ifconfig: %s: bad address\n", hwaddr);
 		else
 			(void) fprintf(stderr, "ifconfig: malloc() failed\n");
 		exit(1);
 	}
 
-	(void) strncpy(savedname, name, sizeof (savedname));
+	if ((retval = dlpi_open(name, &dh, 0)) != DLPI_SUCCESS)
+		Perrdlpi_exit("cannot dlpi_open() link", name, retval);
+
+	if ((retval = dlpi_bind(dh, DLPI_ANY_SAP, NULL)) != DLPI_SUCCESS)
+		Perrdlpi_exit("cannot dlpi_bind() link", name, retval);
+
+	retval = dlpi_enabnotify(dh, DL_NOTE_PHYS_ADDR, notifycb, NULL, &id);
+	if (retval == DLPI_SUCCESS) {
+		(void) dlpi_disabnotify(dh, id, NULL);
+	} else {
+		/*
+		 * This link does not support DL_NOTE_PHYS_ADDR: bring down
+		 * all of the addresses to flush the old hardware address
+		 * information out of IP.
+		 *
+		 * NOTE: Skipping this when DL_NOTE_PHYS_ADDR is supported is
+		 * more than an optimization: in.mpathd will set IFF_OFFLINE
+		 * if it's notified and the new address is a duplicate of
+		 * another in the group -- but the flags manipulation in
+		 * ifaddr_{down,up}() cannot be atomic and thus might clobber
+		 * IFF_OFFLINE, confusing in.mpathd.
+		 */
+		if (ifaddrlistx(name, IFF_UP, 0, &ifaddrs) == -1)
+			Perror2_exit(name, "cannot get address list");
+
+		ifaddrp = ifaddrs;
+		for (; ifaddrp != NULL; ifaddrp = ifaddrp->ia_next) {
+			if (!ifaddr_down(ifaddrp)) {
+				Perror2_exit(ifaddrp->ia_name,
+				    "cannot bring down");
+			}
+		}
+	}
 
 	/*
-	 * Call selectifs only for the IP interfaces that are ipv4.
-	 * offflags == IFF_IPV6 because you should not change the
-	 *		Ethernet address of an ipv6 interface
+	 * Change the hardware address.
 	 */
-	foreachinterface(selectifs, 0, (char **)NULL, 0, 0, IFF_IPV6, 0);
-
-	/* If physical interface not found, exit now */
-	if (phyif == NULL) {
+	retval = dlpi_set_physaddr(dh, DL_CURR_PHYS_ADDR, hwaddr, hwaddrlen);
+	if (retval != DLPI_SUCCESS) {
 		(void) fprintf(stderr,
-		    "ifconfig: interface %s not found\n", savedname);
-		exit(1);
+		    "ifconfig: failed setting mac address on %s\n", name);
 	}
-
-	/* Restore */
-	(void) strncpy(name, savedname, sizeof (name));
-	(void) strncpy(origname, savedname, sizeof (origname));
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+	dlpi_close(dh);
 
 	/*
-	 * close and reopen the socket
-	 * we don't know which type of socket we have now
+	 * If any addresses were brought down before changing the hardware
+	 * address, bring them up again.
 	 */
-	(void) close(s);
-	s = socket(SOCKET_AF(AF_UNSPEC), SOCK_DGRAM, 0);
-	if (s < 0) {
-		Perror0_exit("socket");
+	for (ifaddrp = ifaddrs; ifaddrp != NULL; ifaddrp = ifaddrp->ia_next) {
+		if (!ifaddr_up(ifaddrp))
+			Perror2_exit(ifaddrp->ia_name, "cannot bring up");
 	}
-
-	/*
-	 * mark down the logical interfaces first,
-	 * and then the physical interface
-	 */
-	if (updownifs(logifs, 0) < 0 || updownifs(phyif, 0) < 0) {
-		Perror0_exit("mark down interface failed");
-	}
-
-	/*
-	 * Change the physical address
-	 */
-	if (dlpi_set_address(savedname, ea, maclen) == -1) {
-		(void) fprintf(stderr,
-		    "ifconfig: failed setting mac address on %s\n",
-		    savedname);
-	}
-
-	/*
-	 * if any interfaces were marked down before changing the
-	 * ethernet address, put them up again.
-	 * First the physical interface, then the logical ones.
-	 */
-	if (updownifs(phyif, 1) < 0 || updownifs(logifs, 1) < 0) {
-		Perror0_exit("mark down interface failed");
-	}
-
-	/* Free the memory allocated by selectifs */
-	free(phyif);
-	for (current = logifs; current != NULL; current = logifs) {
-		logifs = logifs->next;
-		free(current);
-	}
+	ifaddrlistx_free(ifaddrs);
 
 	return (0);
 }
@@ -1655,8 +1703,8 @@ print_ifether(char *ifname)
 	}
 	(void) close(fd);
 
-	/* Virtual interfaces don't have MAC addresses */
-	if (lifr.lifr_flags & IFF_VIRTUAL)
+	/* VNI and IPMP interfaces don't have MAC addresses */
+	if (lifr.lifr_flags & (IFF_VIRTUAL|IFF_IPMP))
 		return;
 
 	/*
@@ -1682,104 +1730,6 @@ print_ifether(char *ifname)
 	}
 
 	dlpi_print_address(ifname);
-}
-
-/*
- * static void selectifs(int argc, char *argv[], int af, struct lifreq *rp)
- *
- * Called inside setifether() to create a list of interfaces to
- * mark down/up when changing the Ethernet address.
- * If the current interface is the physical interface passed
- * as an argument to ifconfig, update phyif.
- * If the current interface is a logical interface associated
- * to the physical interface, add it to the logifs list.
- */
-/* ARGSUSED */
-static void
-selectifs(int argc, char *argv[], int af, struct lifreq *rp)
-{
-	char		*colonp;
-	int		length;
-	iface_t		*current;
-
-	/*
-	 *  savedname=	name of the IP interface to which you want to
-	 *		change ethernet address
-	 *  name=	name of the current IP interface
-	 */
-	colonp = strchr(name, ':');
-	if (colonp == NULL)
-		length = max(strlen(savedname), strlen(name));
-	else
-		length = max(strlen(savedname), colonp - name);
-	if (strncmp(savedname, name, length) == 0) {
-		(void) strcpy(lifr.lifr_name, name);
-		if (ioctl(s, SIOCGLIFFLAGS, &lifr) < 0) {
-			Perror0("selectifs: SIOCGLIFFLAGS");
-			return;
-		}
-
-		if ((current = malloc(sizeof (iface_t))) == NULL) {
-			Perror0_exit("selectifs: malloc failed\n");
-		}
-
-		if (colonp == NULL) {
-			/* this is the physical interface */
-			phyif = current;
-			bcopy(&lifr, &phyif->lifr, sizeof (struct lifreq));
-			phyif->next = NULL;
-		} else {
-			/* this is a logical interface */
-			bcopy(&lifr, &current->lifr, sizeof (struct lifreq));
-			current->next = logifs;
-			logifs = current;
-		}
-	}
-}
-
-/*
- * static int updownifs(iface_t *ifs, int up)
- *
- * It takes in input a list of IP interfaces (ifs)
- * and a flag (up).
- * It marks each interface in the list down (up = 0)
- * or up (up > 0). This is done ONLY if the IP
- * interface was originally up.
- *
- * Return values:
- *  0 = everything OK
- * -1 = problem
- */
-static int
-updownifs(iface_t *ifs, int up)
-{
-	iface_t *current;
-	int	ret = 0;
-	int 	save_errno;
-	char	savename[LIFNAMSIZ];
-	uint64_t orig_flags;
-
-	for (current = ifs; current != NULL; current = current->next) {
-		if (current->lifr.lifr_flags & IFF_UP) {
-			orig_flags = current->lifr.lifr_flags;
-			if (!up)
-				current->lifr.lifr_flags &= ~IFF_UP;
-			if (ioctl(s, SIOCSLIFFLAGS, &current->lifr) < 0) {
-				save_errno = errno;
-				(void) strcpy(savename,
-				    current->lifr.lifr_name);
-				ret = -1;
-			}
-			if (!up) /* restore the original flags */
-				current->lifr.lifr_flags = orig_flags;
-		}
-	}
-
-	if (ret == -1) {
-		(void) strcpy(lifr.lifr_name, savename);
-		errno = save_errno;
-	}
-	return (ret);
 }
 
 /*
@@ -2109,130 +2059,217 @@ setiftoken(char *addr, int64_t param)
 	return (0);
 }
 
-/*
- * Return value: 0 on success, -1 on failure.
- */
-static int
-connect_to_mpathd(int family)
-{
-	int s;
-	struct sockaddr_storage ss;
-	struct sockaddr_in *sin = (struct sockaddr_in *)&ss;
-	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&ss;
-	struct in6_addr loopback_addr = IN6ADDR_LOOPBACK_INIT;
-	int addrlen;
-	int ret;
-	int on;
-
-	s = socket(family, SOCK_STREAM, 0);
-	if (s < 0) {
-		Perror0_exit("connect_to_mpathd: socket");
-	}
-	(void) bzero((char *)&ss, sizeof (ss));
-	ss.ss_family = family;
-	/*
-	 * Need to bind to a privileged port. For non-root, this
-	 * will fail. in.mpathd verifies that only commands coming
-	 * from privileged ports succeed so that ordinary users
-	 * can't connect and start talking to in.mpathd
-	 */
-	on = 1;
-	if (setsockopt(s, IPPROTO_TCP, TCP_ANONPRIVBIND, &on,
-	    sizeof (on)) < 0) {
-		Perror0_exit("connect_to_mpathd: setsockopt");
-	}
-	switch (family) {
-	case AF_INET:
-		sin->sin_port = 0;
-		sin->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-		addrlen = sizeof (struct sockaddr_in);
-		break;
-	case AF_INET6:
-		sin6->sin6_port = 0;
-		sin6->sin6_addr = loopback_addr;
-		addrlen = sizeof (struct sockaddr_in6);
-		break;
-	}
-	ret = bind(s, (struct sockaddr *)&ss, addrlen);
-	if (ret != 0) {
-		(void) close(s);
-		return (-1);
-	}
-
-	switch (family) {
-	case AF_INET:
-		sin->sin_port = htons(MPATHD_PORT);
-		break;
-	case AF_INET6:
-		sin6->sin6_port = htons(MPATHD_PORT);
-		break;
-	}
-	ret = connect(s, (struct sockaddr *)&ss, addrlen);
-	(void) close(s);
-	return (ret);
-}
-
 /* ARGSUSED */
 static int
-setifgroupname(char *grpname, int64_t param)
+setifgroupname(char *grname, int64_t param)
 {
+	lifgroupinfo_t		lifgr;
+	struct lifreq		lifrl;
+	ifaddrlistx_t		*ifaddrp, *nextifaddrp;
+	ifaddrlistx_t		*ifaddrs = NULL, *downaddrs = NULL;
+	int			af;
+
 	if (debug) {
 		(void) printf("Setting groupname %s on interface %s\n",
-		    grpname, name);
+		    grname, name);
 	}
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
-	(void) strncpy(lifr.lifr_groupname, grpname,
-	    sizeof (lifr.lifr_groupname));
-	if (ioctl(s, SIOCSLIFGROUPNAME, (caddr_t)&lifr) < 0) {
-		Perror0_exit("setifgroupname: SIOCSLIFGROUPNAME");
+
+	(void) strlcpy(lifrl.lifr_name, name, LIFNAMSIZ);
+	(void) strlcpy(lifrl.lifr_groupname, grname, LIFGRNAMSIZ);
+
+	while (ioctl(s, SIOCSLIFGROUPNAME, &lifrl) == -1) {
+		switch (errno) {
+		case ENOENT:
+			/*
+			 * The group doesn't yet exist; create it and repeat.
+			 */
+			af = afp->af_af;
+			if (create_ipmp(grname, af, NULL, _B_TRUE) == -1) {
+				if (errno == EEXIST)
+					continue;
+
+				Perror2(grname, "cannot create IPMP group");
+				goto fail;
+			}
+			continue;
+
+		case EALREADY:
+			/*
+			 * The interface is already in another group; must
+			 * remove existing membership first.
+			 */
+			lifrl.lifr_groupname[0] = '\0';
+			if (ioctl(s, SIOCSLIFGROUPNAME, &lifrl) == -1) {
+				Perror2(name, "cannot remove existing "
+				    "IPMP group membership");
+				goto fail;
+			}
+			(void) strlcpy(lifrl.lifr_groupname, grname,
+			    LIFGRNAMSIZ);
+			continue;
+
+		case EAFNOSUPPORT:
+			/*
+			 * The group exists, but it's not configured with the
+			 * address families the interface needs.  Since only
+			 * two address families are currently supported, just
+			 * configure the "other" address family.  Note that we
+			 * may race with group deletion or creation by another
+			 * process (ENOENT or EEXIST); in such cases we repeat
+			 * our original SIOCSLIFGROUPNAME.
+			 */
+			(void) strlcpy(lifgr.gi_grname, grname, LIFGRNAMSIZ);
+			if (ioctl(s, SIOCGLIFGROUPINFO, &lifgr) == -1) {
+				if (errno == ENOENT)
+					continue;
+
+				Perror2(grname, "SIOCGLIFGROUPINFO");
+				goto fail;
+			}
+
+			af = lifgr.gi_v4 ? AF_INET6 : AF_INET;
+			if (create_ipmp(grname, af, lifgr.gi_grifname,
+			    _B_TRUE) == -1) {
+				if (errno == EEXIST)
+					continue;
+
+				Perror2(grname, "cannot configure IPMP group");
+				goto fail;
+			}
+			continue;
+
+		case EADDRINUSE:
+			/*
+			 * Some addresses are in-use (or under control of DAD).
+			 * Bring them down and retry the group join operation.
+			 * We will bring them back up after the interface has
+			 * been placed in the group.
+			 */
+			if (ifaddrlistx(lifrl.lifr_name, IFF_UP|IFF_DUPLICATE,
+			    0, &ifaddrs) == -1) {
+				Perror2(grname, "cannot get address list");
+				goto fail;
+			}
+
+			ifaddrp = ifaddrs;
+			for (; ifaddrp != NULL; ifaddrp = nextifaddrp) {
+				if (!ifaddr_down(ifaddrp)) {
+					ifaddrs = ifaddrp;
+					goto fail;
+				}
+				nextifaddrp = ifaddrp->ia_next;
+				ifaddrp->ia_next = downaddrs;
+				downaddrs = ifaddrp;
+			}
+			ifaddrs = NULL;
+			continue;
+
+		case EADDRNOTAVAIL: {
+			/*
+			 * Some data addresses are under application control.
+			 * For some of these (e.g., ADDRCONF), the application
+			 * should remove the address, in which case we retry a
+			 * few times (since the application's action is not
+			 * atomic with respect to us) before bailing out and
+			 * informing the user.
+			 */
+			int ntries, nappaddr = 0;
+			const if_appflags_t *iap = if_appflags_tbl;
+
+			for (; iap->ia_app != NULL; iap++) {
+				ntries = 0;
+again:
+				if (ifaddrlistx(lifrl.lifr_name, iap->ia_flag,
+				    IFF_NOFAILOVER, &ifaddrs) == -1) {
+					(void) fprintf(stderr, "ifconfig: %s: "
+					    "cannot get data addresses managed "
+					    "by %s\n", lifrl.lifr_name,
+					    iap->ia_app);
+					goto fail;
+				}
+
+				if (ifaddrs == NULL)
+					continue;
+
+				ifaddrlistx_free(ifaddrs);
+				ifaddrs = NULL;
+
+				if (++ntries < iap->ia_tries) {
+					(void) poll(NULL, 0, 100);
+					goto again;
+				}
+
+				(void) fprintf(stderr, "ifconfig: cannot join "
+				    "IPMP group: %s has data addresses managed "
+				    "by %s\n", lifrl.lifr_name, iap->ia_app);
+				nappaddr++;
+			}
+			if (nappaddr > 0)
+				goto fail;
+			continue;
+		}
+		default:
+			Perror2(name, "SIOCSLIFGROUPNAME");
+			goto fail;
+		}
 	}
 
 	/*
-	 * If the SUNW_NO_MPATHD environment variable is set then don't
-	 * bother starting up in.mpathd.  See PSARC/2002/249 for the
-	 * depressing details on this bit of stupidity.
+	 * If there were addresses that we had to bring down, it's time to
+	 * bring them up again.  As part of bringing them up, the kernel will
+	 * automatically move them to the new IPMP interface.
 	 */
-	if (getenv("SUNW_NO_MPATHD") != NULL) {
-		return (0);
+	for (ifaddrp = downaddrs; ifaddrp != NULL; ifaddrp = ifaddrp->ia_next) {
+		if (!ifaddr_up(ifaddrp) && errno != ENXIO) {
+			(void) fprintf(stderr, "ifconfig: cannot bring back up "
+			    "%s: %s\n", ifaddrp->ia_name, strerror(errno));
+		}
 	}
+	ifaddrlistx_free(downaddrs);
+	return (0);
+fail:
+	/*
+	 * Attempt to bring back up any interfaces that we downed.
+	 */
+	for (ifaddrp = downaddrs; ifaddrp != NULL; ifaddrp = ifaddrp->ia_next) {
+		if (!ifaddr_up(ifaddrp) && errno != ENXIO) {
+			(void) fprintf(stderr, "ifconfig: cannot bring back up "
+			    "%s: %s\n", ifaddrp->ia_name, strerror(errno));
+		}
+	}
+	ifaddrlistx_free(downaddrs);
+	ifaddrlistx_free(ifaddrs);
 
 	/*
-	 * Try to connect to in.mpathd using IPv4. If we succeed,
-	 * we conclude that in.mpathd is running, and quit.
+	 * We'd return -1, but foreachinterface() doesn't propagate the error
+	 * into the exit status, so we're forced to explicitly exit().
 	 */
-	if (connect_to_mpathd(AF_INET) == 0) {
-		/* connect succeeded, mpathd is already running */
-		return (0);
-	}
-	/*
-	 * Try to connect to in.mpathd using IPv6. If we succeed,
-	 * we conclude that in.mpathd is running, and quit.
-	 */
-	if (connect_to_mpathd(AF_INET6) == 0) {
-		/* connect succeeded, mpathd is already running */
-		return (0);
-	}
-
-	/*
-	 * in.mpathd may not be running. Start it now. If it is already
-	 * running, in.mpathd will take care of handling multiple incarnations
-	 * of itself. ifconfig only tries to optimize performance by not
-	 * starting another incarnation of in.mpathd.
-	 */
-	switch (fork()) {
-
-	case -1:
-		Perror0_exit("setifgroupname: fork");
-		/* NOTREACHED */
-	case 0:
-		(void) execl(MPATHD_PATH, MPATHD_PATH, NULL);
-		_exit(1);
-		/* NOTREACHED */
-	default:
-		return (0);
-	}
+	exit(1);
+	/* NOTREACHED */
 }
 
+static boolean_t
+modcheck(const char *ifname)
+{
+	(void) strlcpy(lifr.lifr_name, ifname, sizeof (lifr.lifr_name));
+
+	if (ioctl(s, SIOCGLIFFLAGS, &lifr) < 0) {
+		Perror0("SIOCGLIFFLAGS");
+		return (_B_FALSE);
+	}
+
+	if (lifr.lifr_flags & IFF_IPMP) {
+		(void) fprintf(stderr, "ifconfig: %s: module operations not"
+		    " supported on IPMP interfaces\n", ifname);
+		return (_B_FALSE);
+	}
+	if (lifr.lifr_flags & IFF_VIRTUAL) {
+		(void) fprintf(stderr, "ifconfig: %s: module operations not"
+		    " supported on virtual IP interfaces\n", ifname);
+		return (_B_FALSE);
+	}
+	return (_B_TRUE);
+}
 
 /*
  * To list all the modules above a given network interface.
@@ -2250,7 +2287,13 @@ modlist(char *null, int64_t param)
 	struct str_list strlist;
 	int orig_arpid;
 
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+	/*
+	 * We'd return -1, but foreachinterface() doesn't propagate the error
+	 * into the exit status, so we're forced to explicitly exit().
+	 */
+	if (!modcheck(name))
+		exit(1);
+
 	if (ip_domux2fd(&muxfd, &muxid_fd, &ipfd_lowstr, &arpfd_lowstr,
 	    &orig_arpid) < 0) {
 		return (-1);
@@ -2354,8 +2397,8 @@ open_arp_on_udp(char *udp_dev_name)
  * Return:
  *	-1 if operation fails, 0 otherwise.
  *
- * Please see the big block comment above plumb_one_device()
- * for the logic of the PLINK/PUNLINK
+ * Please see the big block comment above ifplumb() for the logic of the
+ * PLINK/PUNLINK
  */
 static int
 ip_domux2fd(int *muxfd, int *muxid_fd, int *ipfd_lowstr, int *arpfd_lowstr,
@@ -2467,8 +2510,8 @@ ip_domux2fd(int *muxfd, int *muxid_fd, int *ipfd_lowstr, int *arpfd_lowstr,
  * Return:
  *	-1 if operation fails, 0 otherwise.
  *
- * Please see the big block comment above plumb_one_device()
- * for the logic of the PLINK/PUNLINK
+ * Please see the big block comment above ifplumb() for the logic of the
+ * PLINK/PUNLINK
  */
 static int
 ip_plink(int muxfd, int muxid_fd, int ipfd_lowstr, int arpfd_lowstr,
@@ -2530,7 +2573,12 @@ modop(char *arg, char op)
 	char *arg_str;
 	int orig_arpid;
 
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+	/*
+	 * We'd return -1, but foreachinterface() doesn't propagate the error
+	 * into the exit status, so we're forced to explicitly exit().
+	 */
+	if (!modcheck(name))
+		exit(1);
 
 	/* Need to save the original string for -a option. */
 	if ((arg_str = malloc(strlen(arg) + 1)) == NULL) {
@@ -3067,13 +3115,14 @@ status(void)
 static int
 configinfo(char *null, int64_t param)
 {
+	char *cp;
 	struct afswtch *p = afp;
 	uint64_t flags;
-	char phydevname[LIFNAMSIZ];
+	char lifname[LIFNAMSIZ];
 	char if_usesrc_name[LIFNAMSIZ];
-	char *cp;
 
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+
 	if (ioctl(s, SIOCGLIFFLAGS, (caddr_t)&lifr) < 0) {
 		Perror0_exit("status: SIOCGLIFFLAGS");
 	}
@@ -3084,13 +3133,13 @@ configinfo(char *null, int64_t param)
 		    name, flags, p != NULL ? p->af_af : -1);
 	}
 
-	/* remove LIF component */
-	(void) strncpy(phydevname, name, sizeof (phydevname));
-	cp = strchr(phydevname, ':');
-	if (cp) {
-		*cp = 0;
-	}
-	phydevname[sizeof (phydevname) - 1] = '\0';
+	/*
+	 * Build the interface name to print (we can't directly use `name'
+	 * because one cannot "plumb" ":0" interfaces).
+	 */
+	(void) strlcpy(lifname, name, LIFNAMSIZ);
+	if ((cp = strchr(lifname, ':')) != NULL && atoi(cp + 1) == 0)
+		*cp = '\0';
 
 	/*
 	 * if the interface is IPv4
@@ -3105,7 +3154,7 @@ configinfo(char *null, int64_t param)
 		if (v4compat)
 			flags &= ~IFF_IPV4;
 
-		(void) printf("%s inet plumb", phydevname);
+		(void) printf("%s inet plumb", lifname);
 	} else if (flags & IFF_IPV6) {
 		/*
 		 * else if the interface is IPv6
@@ -3117,7 +3166,7 @@ configinfo(char *null, int64_t param)
 		if (v4compat)
 			return (-1);
 
-		(void) printf("%s inet6 plumb", phydevname);
+		(void) printf("%s inet6 plumb", lifname);
 	}
 
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
@@ -3131,8 +3180,8 @@ configinfo(char *null, int64_t param)
 	    ioctl(s, SIOCGLIFMTU, (caddr_t)&lifr) >= 0)
 		(void) printf(" mtu %d", lifr.lifr_metric);
 
-	/* don't print index when in compatibility mode */
-	if (!v4compat) {
+	/* Index only applies to the zeroth interface */
+	if (lifnum(name) == 0) {
 		if (ioctl(s, SIOCGLIFINDEX, (caddr_t)&lifr) >= 0)
 			(void) printf(" index %d", lifr.lifr_index);
 	}
@@ -3162,7 +3211,6 @@ configinfo(char *null, int64_t param)
 	}
 
 	(void) printf("\n");
-
 	return (0);
 }
 
@@ -3398,15 +3446,11 @@ in_status(int force, uint64_t flags)
 			    inet_ntoa(sin->sin_addr));
 		}
 	}
-	/* If there is a groupname, print it for lun 0 alone */
+	/* If there is a groupname, print it for only the physical interface */
 	if (strchr(name, ':') == NULL) {
-		(void) memset(lifr.lifr_groupname, 0,
-		    sizeof (lifr.lifr_groupname));
-		if (ioctl(s, SIOCGLIFGROUPNAME, (caddr_t)&lifr) >= 0) {
-			if (strlen(lifr.lifr_groupname) > 0) {
-				(void) printf("\n\tgroupname %s",
-				    lifr.lifr_groupname);
-			}
+		if (ioctl(s, SIOCGLIFGROUPNAME, &lifr) >= 0 &&
+		    lifr.lifr_groupname[0] != '\0') {
+			(void) printf("\n\tgroupname %s", lifr.lifr_groupname);
 		}
 	}
 	(void) putchar('\n');
@@ -3550,11 +3594,7 @@ in_configinfo(int force, uint64_t flags)
 				Perror0_exit("in_configinfo: SIOCGLIFADDR");
 		}
 		sin = (struct sockaddr_in *)&lifr.lifr_addr;
-		if (strchr(name, ':') != NULL) {
-			(void) printf(" addif %s ", inet_ntoa(sin->sin_addr));
-		} else {
-			(void) printf(" set %s ", inet_ntoa(sin->sin_addr));
-		}
+		(void) printf(" set %s ", inet_ntoa(sin->sin_addr));
 		laddr = sin;
 	}
 
@@ -3614,8 +3654,8 @@ in_configinfo(int force, uint64_t flags)
 		}
 	}
 
-	/* If there is a groupname, print it for only the physical interface */
-	if (strchr(name, ':') == NULL) {
+	/* If there is a groupname, print it for only the zeroth interface */
+	if (lifnum(name) == 0) {
 		if (ioctl(s, SIOCGLIFGROUPNAME, &lifr) >= 0 &&
 		    lifr.lifr_groupname[0] != '\0') {
 			(void) printf(" group %s ", lifr.lifr_groupname);
@@ -3623,12 +3663,7 @@ in_configinfo(int force, uint64_t flags)
 	}
 
 	/* Print flags to configure */
-	print_config_flags(flags);
-
-	/* IFF_NOARP applies to AF_INET only */
-	if (flags & IFF_NOARP) {
-		(void) printf("-arp ");
-	}
+	print_config_flags(AF_INET, flags);
 }
 
 static void
@@ -3657,17 +3692,9 @@ in6_configinfo(int force, uint64_t flags)
 				Perror0_exit("in6_configinfo: SIOCGLIFADDR");
 		}
 		sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
-		if (strchr(name, ':') != NULL) {
-			(void) printf(" addif %s/%d ",
-			    inet_ntop(AF_INET6, (void *)&sin6->sin6_addr,
-			    abuf, sizeof (abuf)),
-			    lifr.lifr_addrlen);
-		} else {
-			(void) printf(" set %s/%d ",
-			    inet_ntop(AF_INET6, (void *)&sin6->sin6_addr,
-			    abuf, sizeof (abuf)),
-			    lifr.lifr_addrlen);
-		}
+		(void) printf(" set %s/%d ",
+		    inet_ntop(AF_INET6, &sin6->sin6_addr, abuf, sizeof (abuf)),
+		    lifr.lifr_addrlen);
 		laddr6 = sin6;
 	}
 	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
@@ -3720,8 +3747,8 @@ in6_configinfo(int force, uint64_t flags)
 		    lifr.lifr_addrlen);
 	}
 
-	/* If there is a groupname, print it for only the physical interface */
-	if (strchr(name, ':') == NULL) {
+	/* If there is a groupname, print it for only the zeroth interface */
+	if (lifnum(name) == 0) {
 		if (ioctl(s, SIOCGLIFGROUPNAME, &lifr) >= 0 &&
 		    lifr.lifr_groupname[0] != '\0') {
 			(void) printf(" group %s ", lifr.lifr_groupname);
@@ -3729,12 +3756,7 @@ in6_configinfo(int force, uint64_t flags)
 	}
 
 	/* Print flags to configure */
-	print_config_flags(flags);
-
-	/* IFF_NONUD applies to AF_INET6 only */
-	if (flags & IFF_NONUD) {
-		(void) printf("-nud ");
-	}
+	print_config_flags(AF_INET6, flags);
 }
 
 /*
@@ -3768,31 +3790,41 @@ in6_configinfo(int force, uint64_t flags)
  *    compatibility for other utilities like atmifconfig etc. In this case
  *    the utility must use SIOCSLIFMUXID.
  */
-static void
-plumb_one_device(int af)
+static int
+ifplumb(const char *linkname, const char *ifname, boolean_t genppa, int af)
 {
 	int	arp_muxid = -1, ip_muxid;
 	int	mux_fd, ip_fd, arp_fd;
 	int 	retval;
-	uint_t	ppa;
 	char	*udp_dev_name;
-	char    provider[DLPI_LINKNAME_MAX];
+	uint64_t flags;
+	uint_t	dlpi_flags;
 	dlpi_handle_t	dh_arp, dh_ip;
 
 	/*
-	 * We use DLPI_NOATTACH because the ip module will do the attach
-	 * itself for DLPI style-2 devices.
+	 * Always dlpi_open() with DLPI_NOATTACH because the IP and ARP module
+	 * will do the attach themselves for DLPI style-2 links.
 	 */
-	retval = dlpi_open(name, &dh_ip, DLPI_NOATTACH);
-	if (retval != DLPI_SUCCESS)
-		Perrdlpi_exit("cannot open link", name, retval);
+	dlpi_flags = DLPI_NOATTACH;
 
-	if ((retval = dlpi_parselink(name, provider, &ppa)) != DLPI_SUCCESS)
-		Perrdlpi_exit("dlpi_parselink", name, retval);
+	/*
+	 * If `linkname' is the special token IPMPSTUB, then this is a request
+	 * to create an IPMP interface atop /dev/ipmpstub0.  (We can't simply
+	 * pass "ipmpstub0" as `linkname' since an admin *could* have a normal
+	 * vanity-named link named "ipmpstub0" that they'd like to plumb.)
+	 */
+	if (linkname == IPMPSTUB) {
+		linkname = "ipmpstub0";
+		dlpi_flags |= DLPI_DEVONLY;
+	}
+
+	retval = dlpi_open(linkname, &dh_ip, dlpi_flags);
+	if (retval != DLPI_SUCCESS)
+		Perrdlpi_exit("cannot open link", linkname, retval);
 
 	if (debug) {
-		(void) printf("ifconfig: plumb_one_device: provider %s,"
-		    " ppa %u\n", provider, ppa);
+		(void) printf("ifconfig: ifplumb: link %s, ifname %s, "
+		    "genppa %u\n", linkname, ifname, genppa);
 	}
 
 	ip_fd = dlpi_fd(dh_ip);
@@ -3812,29 +3844,106 @@ plumb_one_device(int af)
 		Perror2_exit("I_PUSH", ARP_MOD_NAME);
 
 	/*
-	 * Set IFF_IPV4/IFF_IPV6 flags.
-	 * At this point in time the kernel also allows an
-	 * override of the CANTCHANGE flags.
+	 * Prepare to set IFF_IPV4/IFF_IPV6 flags as part of SIOCSLIFNAME.
+	 * (At this point in time the kernel also allows an override of the
+	 * IFF_CANTCHANGE flags.)
 	 */
 	lifr.lifr_name[0] = '\0';
 	if (ioctl(ip_fd, SIOCGLIFFLAGS, (char *)&lifr) == -1)
-		Perror0_exit("plumb_one_device: SIOCGLIFFLAGS");
+		Perror0_exit("ifplumb: SIOCGLIFFLAGS");
 
-	/* Set the name string and the IFF_IPV* flag */
 	if (af == AF_INET6) {
-		lifr.lifr_flags |= IFF_IPV6;
-		lifr.lifr_flags &= ~(IFF_BROADCAST | IFF_IPV4);
+		flags = lifr.lifr_flags | IFF_IPV6;
+		flags &= ~(IFF_BROADCAST | IFF_IPV4);
 	} else {
-		lifr.lifr_flags |= IFF_IPV4;
-		lifr.lifr_flags &= ~IFF_IPV6;
+		flags = lifr.lifr_flags | IFF_IPV4;
+		flags &= ~IFF_IPV6;
 	}
 
-	/* record the device and module names as interface name */
-	lifr.lifr_ppa = ppa;
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+	/*
+	 * Set the interface name.  If we've been asked to generate the PPA,
+	 * then find the lowest available PPA (only currently used for IPMP
+	 * interfaces).  Otherwise, use the interface name as-is.
+	 */
+	if (genppa) {
+		int ppa;
 
-	/* set the interface name */
-	if (ioctl(ip_fd, SIOCSLIFNAME, (char *)&lifr) == -1) {
+		/*
+		 * We'd like to just set lifr_ppa to UINT_MAX and have the
+		 * kernel pick a PPA.  Unfortunately, that would mishandle
+		 * two cases:
+		 *
+		 *	1. If the PPA is available but the groupname is taken
+		 *	   (e.g., the "ipmp2" IP interface name is available
+		 *	   but the "ipmp2" groupname is taken) then the
+		 *	   auto-assignment by the kernel will fail.
+		 *
+		 *	2. If we're creating (e.g.) an IPv6-only IPMP
+		 *	   interface, and there's already an IPv4-only IPMP
+		 *	   interface, the kernel will allow us to accidentally
+		 *	   reuse the IPv6 IPMP interface name (since
+		 *	   SIOCSLIFNAME uniqueness is per-interface-type).
+		 *	   This will cause administrative confusion.
+		 *
+		 * Thus, we instead take a brute-force approach of checking
+		 * whether the IPv4 or IPv6 name is already in-use before
+		 * attempting the SIOCSLIFNAME.  As per (1) above, the
+		 * SIOCSLIFNAME may still fail, in which case we just proceed
+		 * to the next one.  If this approach becomes too slow, we
+		 * can add a new SIOC* to handle this case in the kernel.
+		 */
+		for (ppa = 0; ppa < UINT_MAX; ppa++) {
+			(void) snprintf(lifr.lifr_name, LIFNAMSIZ, "%s%d",
+			    ifname, ppa);
+
+			if (ioctl(s4, SIOCGLIFFLAGS, &lifr) != -1 ||
+			    errno != ENXIO)
+				continue;
+
+			if (ioctl(s6, SIOCGLIFFLAGS, &lifr) != -1 ||
+			    errno != ENXIO)
+				continue;
+
+			lifr.lifr_ppa = ppa;
+			lifr.lifr_flags = flags;
+			retval = ioctl(ip_fd, SIOCSLIFNAME, &lifr);
+			if (retval != -1 || errno != EEXIST)
+				break;
+		}
+	} else {
+		ifspec_t ifsp;
+
+		/*
+		 * The interface name could have come from the command-line;
+		 * check it.
+		 */
+		if (!ifparse_ifspec(ifname, &ifsp) || ifsp.ifsp_lunvalid)
+			Perror2_exit("invalid IP interface name", ifname);
+
+		/*
+		 * Before we call SIOCSLIFNAME, ensure that the IPMP group
+		 * interface for this address family exists.  Otherwise, the
+		 * kernel will kick the interface out of the group when we do
+		 * the SIOCSLIFNAME.
+		 *
+		 * Example: suppose bge0 is plumbed for IPv4 and in group "a".
+		 * If we're now plumbing bge0 for IPv6, but the IPMP group
+		 * interface for "a" is not plumbed for IPv6, the SIOCSLIFNAME
+		 * will kick bge0 out of group "a", which is undesired.
+		 */
+		if (create_ipmp_peer(af, ifname) == -1) {
+			(void) fprintf(stderr, "ifconfig: warning: cannot "
+			    "create %s IPMP group; %s will be removed from "
+			    "group\n", af == AF_INET ? "IPv4" : "IPv6", ifname);
+		}
+
+		lifr.lifr_ppa = ifsp.ifsp_ppa;
+		lifr.lifr_flags = flags;
+		(void) strlcpy(lifr.lifr_name, ifname, LIFNAMSIZ);
+		retval = ioctl(ip_fd, SIOCSLIFNAME, &lifr);
+	}
+
+	if (retval == -1) {
 		if (errno != EEXIST)
 			Perror0_exit("SIOCSLIFNAME for ip");
 		/*
@@ -3847,15 +3956,15 @@ plumb_one_device(int af)
 		 * called for EEXIST.
 		 */
 		Perror0("SIOCSLIFNAME for ip");
-		return;
+		return (-1);
 	}
 
 	/* Get the full set of existing flags for this stream */
 	if (ioctl(ip_fd, SIOCGLIFFLAGS, (char *)&lifr) == -1)
-		Perror0_exit("plumb_one_device: SIOCFLIFFLAGS");
+		Perror0_exit("ifplumb: SIOCGLIFFLAGS");
 
 	if (debug) {
-		(void) printf("ifconfig: plumb_one_device: %s got flags:\n",
+		(void) printf("ifconfig: ifplumb: %s got flags:\n",
 		    lifr.lifr_name);
 		print_flags(lifr.lifr_flags);
 		(void) putchar('\n');
@@ -3890,7 +3999,7 @@ plumb_one_device(int af)
 		if ((ip_muxid = ioctl(mux_fd, I_PLINK, ip_fd)) == -1)
 			Perror0_exit("I_PLINK for ip");
 		(void) close(mux_fd);
-		return;
+		return (lifr.lifr_ppa);
 	}
 
 	/*
@@ -3901,15 +4010,11 @@ plumb_one_device(int af)
 	 * only on the interface stream, not on the ARP stream.
 	 */
 	if (debug)
-		(void) printf("ifconfig: plumb_one_device: ifname: %s\n", name);
+		(void) printf("ifconfig: ifplumb: interface %s", ifname);
 
-	/*
-	 * We use DLPI_NOATTACH because the arp module will do the attach
-	 * itself for DLPI style-2 devices.
-	 */
-	retval = dlpi_open(name, &dh_arp, DLPI_NOATTACH);
+	retval = dlpi_open(linkname, &dh_arp, dlpi_flags);
 	if (retval != DLPI_SUCCESS)
-		Perrdlpi_exit("cannot open link", name, retval);
+		Perrdlpi_exit("cannot open link", linkname, retval);
 
 	arp_fd = dlpi_fd(dh_arp);
 	if (ioctl(arp_fd, I_PUSH, ARP_MOD_NAME) == -1)
@@ -3919,16 +4024,13 @@ plumb_one_device(int af)
 	 * Tell ARP the name and unit number for this interface.
 	 * Note that arp has no support for transparent ioctls.
 	 */
-	if (strioctl(arp_fd, SIOCSLIFNAME, (char *)&lifr,
-	    sizeof (lifr)) == -1) {
+	if (strioctl(arp_fd, SIOCSLIFNAME, &lifr, sizeof (lifr)) == -1) {
 		if (errno != EEXIST)
 			Perror0_exit("SIOCSLIFNAME for arp");
 		Perror0("SIOCSLIFNAME for arp");
-		dlpi_close(dh_arp);
-		dlpi_close(dh_ip);
-		(void) close(mux_fd);
-		return;
+		goto out;
 	}
+
 	/*
 	 * PLINK the IP and ARP streams so that ifconfig can exit
 	 * without tearing down the stream.
@@ -3942,11 +4044,12 @@ plumb_one_device(int af)
 
 	if (debug)
 		(void) printf("arp muxid = %d\n", arp_muxid);
+out:
 	dlpi_close(dh_ip);
 	dlpi_close(dh_arp);
 	(void) close(mux_fd);
+	return (lifr.lifr_ppa);
 }
-
 
 /*
  * If this is a physical interface then remove it.
@@ -3965,6 +4068,7 @@ inetunplumb(char *arg, int64_t param)
 	uint64_t flags;
 	boolean_t changed_arp_muxid = _B_FALSE;
 	int save_errno;
+	boolean_t v6 = (afp->af_af == AF_INET6);
 
 	strptr = strchr(name, ':');
 	if (strptr != NULL || strcmp(name, LOOPBACK_IF) == 0) {
@@ -3986,7 +4090,7 @@ inetunplumb(char *arg, int64_t param)
 	 * We used /dev/udp or udp6 to set up the mux. So we have to use
 	 * the same now for PUNLINK also.
 	 */
-	if (afp->af_af == AF_INET6)
+	if (v6)
 		udp_dev_name = UDP6_DEV_NAME;
 	else
 		udp_dev_name = UDP_DEV_NAME;
@@ -4002,6 +4106,50 @@ inetunplumb(char *arg, int64_t param)
 		Perror0_exit("unplumb: SIOCGLIFFLAGS");
 	}
 	flags = lifr.lifr_flags;
+
+	if (flags & IFF_IPMP) {
+		lifgroupinfo_t lifgr;
+		ifaddrlistx_t *ifaddrs, *ifaddrp;
+
+		/*
+		 * The kernel will fail the I_PUNLINK if the group still has
+		 * members, but check now to provide a better error message.
+		 */
+		if (ioctl(s, SIOCGLIFGROUPNAME, &lifr) == -1)
+			Perror0_exit("unplumb: SIOCGLIFGROUPNAME");
+
+		(void) strlcpy(lifgr.gi_grname, lifr.lifr_groupname,
+		    LIFGRNAMSIZ);
+		if (ioctl(s, SIOCGLIFGROUPINFO, &lifgr) == -1)
+			Perror0_exit("unplumb: SIOCGLIFGROUPINFO");
+
+		if ((v6 && lifgr.gi_nv6 != 0) || (!v6 && lifgr.gi_nv4 != 0)) {
+			(void) fprintf(stderr, "ifconfig: %s: cannot unplumb:"
+			    " IPMP group is not empty\n", name);
+			exit(1);
+		}
+
+		/*
+		 * The kernel will fail the I_PUNLINK if the IPMP interface
+		 * has administratively up addresses; bring 'em down.
+		 */
+		if (ifaddrlistx(name, IFF_UP|IFF_DUPLICATE, 0, &ifaddrs) == -1)
+			Perror2_exit(name, "cannot get address list");
+
+		ifaddrp = ifaddrs;
+		for (; ifaddrp != NULL; ifaddrp = ifaddrp->ia_next) {
+			if (((ifaddrp->ia_flags & IFF_IPV6) && !v6) ||
+			    (!(ifaddrp->ia_flags & IFF_IPV6) && v6))
+				continue;
+
+			if (!ifaddr_down(ifaddrp)) {
+				Perror2_exit(ifaddrp->ia_name,
+				    "cannot bring down");
+			}
+		}
+		ifaddrlistx_free(ifaddrs);
+	}
+
 	if (ioctl(muxid_fd, SIOCGLIFMUXID, (caddr_t)&lifr) < 0) {
 		Perror0_exit("unplumb: SIOCGLIFMUXID");
 	}
@@ -4098,12 +4246,6 @@ inetplumb(char *arg, int64_t param)
 				Perror2_exit("plumb: SIOCLIFADDIF", name);
 			}
 		}
-		/*
-		 * IP can create the new logical interface on a different
-		 * physical interface in the same IPMP group. Take the new
-		 * interface into account for further operations.
-		 */
-		(void) strncpy(name, lifr.lifr_name, sizeof (name));
 		return (0);
 	}
 
@@ -4131,8 +4273,227 @@ inetplumb(char *arg, int64_t param)
 	if (debug)
 		(void) printf("inetplumb: %s af %d\n", name, afp->af_af);
 
-	plumb_one_device(afp->af_af);
+	(void) ifplumb(name, name, _B_FALSE, afp->af_af);
 	return (0);
+}
+
+/* ARGSUSED */
+static int
+inetipmp(char *arg, int64_t param)
+{
+	int retval;
+
+	/*
+	 * Treat e.g. "ifconfig ipmp0:2 ipmp" as "ifconfig ipmp0:2 plumb".
+	 * Otherwise, try to create the requested IPMP interface.
+	 */
+	if (strchr(name, ':') != NULL)
+		retval = inetplumb(arg, param);
+	else
+		retval = create_ipmp(name, afp->af_af, name, _B_FALSE);
+
+	/*
+	 * We'd return -1, but foreachinterface() doesn't propagate the error
+	 * into the exit status, so we're forced to explicitly exit().
+	 */
+	if (retval == -1)
+		exit(1);
+	return (0);
+}
+
+/*
+ * Create an IPMP group `grname' with address family `af'.  If `ifname' is
+ * non-NULL, it specifies the interface name to use.  Otherwise, use the name
+ * ipmpN, where N corresponds to the lowest available integer.  If `implicit'
+ * is set, then the group is being created as a side-effect of placing an
+ * underlying interface in a group.  Also start in.mpathd if necessary.
+ */
+static int
+create_ipmp(const char *grname, int af, const char *ifname, boolean_t implicit)
+{
+	int ppa;
+	static int ipmp_daemon_started;
+
+	if (debug) {
+		(void) printf("create_ipmp: ifname %s grname %s af %d\n",
+		    ifname != NULL ? ifname : "NULL", grname, af);
+	}
+
+	if (ifname != NULL)
+		ppa = ifplumb(IPMPSTUB, ifname, _B_FALSE, af);
+	else
+		ppa = ifplumb(IPMPSTUB, "ipmp", _B_TRUE, af);
+
+	if (ppa == -1) {
+		Perror2(grname, "cannot create IPMP interface");
+		return (-1);
+	}
+
+	if (ifname != NULL)
+		(void) strlcpy(lifr.lifr_name, ifname, LIFNAMSIZ);
+	else
+		(void) snprintf(lifr.lifr_name, LIFNAMSIZ, "ipmp%d", ppa);
+
+	/*
+	 * To preserve backward-compatibility, always bring up the link-local
+	 * address for implicitly-created IPv6 IPMP interfaces.
+	 */
+	if (implicit && af == AF_INET6) {
+		if (ioctl(s6, SIOCGLIFFLAGS, &lifr) == 0) {
+			lifr.lifr_flags |= IFF_UP;
+			(void) ioctl(s6, SIOCSLIFFLAGS, &lifr);
+		}
+	}
+
+	/*
+	 * If the caller requested a different group name, issue a
+	 * SIOCSLIFGROUPNAME on the new IPMP interface.
+	 */
+	if (strcmp(lifr.lifr_name, grname) != 0) {
+		(void) strlcpy(lifr.lifr_groupname, grname, LIFGRNAMSIZ);
+		if (ioctl(s, SIOCSLIFGROUPNAME, &lifr) == -1) {
+			Perror0("SIOCSLIFGROUPNAME");
+			return (-1);
+		}
+	}
+
+	/*
+	 * If we haven't done so yet, ensure in.mpathd is started.
+	 */
+	if (ipmp_daemon_started++ == 0)
+		start_ipmp_daemon();
+
+	return (0);
+}
+
+/*
+ * Check if `ifname' is plumbed and in an IPMP group on its "other" address
+ * family.  If so, create a matching IPMP group for address family `af'.
+ */
+static int
+create_ipmp_peer(int af, const char *ifname)
+{
+	int		fd;
+	lifgroupinfo_t	lifgr;
+
+	assert(af == AF_INET || af == AF_INET6);
+
+	/*
+	 * Get the socket for the "other" address family.
+	 */
+	fd = (af == AF_INET) ? s6 : s4;
+
+	(void) strlcpy(lifr.lifr_name, ifname, LIFNAMSIZ);
+	if (ioctl(fd, SIOCGLIFGROUPNAME, &lifr) != 0)
+		return (0);
+
+	(void) strlcpy(lifgr.gi_grname, lifr.lifr_groupname, LIFGRNAMSIZ);
+	if (ioctl(fd, SIOCGLIFGROUPINFO, &lifgr) != 0)
+		return (0);
+
+	/*
+	 * If `ifname' *is* the IPMP group interface, or if the relevant
+	 * address family is already configured, then there's nothing to do.
+	 */
+	if (strcmp(lifgr.gi_grifname, ifname) == 0 ||
+	    (af == AF_INET && lifgr.gi_v4) || (af == AF_INET6 && lifgr.gi_v6))
+		return (0);
+
+	return (create_ipmp(lifgr.gi_grname, af, lifgr.gi_grifname, _B_TRUE));
+}
+
+/*
+ * Start in.mpathd if it's not already running.
+ */
+static void
+start_ipmp_daemon(void)
+{
+	int retval;
+	ipmp_handle_t ipmp_handle;
+
+	/*
+	 * Ping in.mpathd to see if it's running already.
+	 */
+	if ((retval = ipmp_open(&ipmp_handle)) != IPMP_SUCCESS) {
+		(void) fprintf(stderr, "ifconfig: cannot create IPMP handle: "
+		    "%s\n", ipmp_errmsg(retval));
+		return;
+	}
+
+	retval = ipmp_ping_daemon(ipmp_handle);
+	ipmp_close(ipmp_handle);
+
+	switch (retval) {
+	case IPMP_ENOMPATHD:
+		break;
+	case IPMP_SUCCESS:
+		return;
+	default:
+		(void) fprintf(stderr, "ifconfig: cannot ping in.mpathd: %s\n",
+		    ipmp_errmsg(retval));
+		break;
+	}
+
+	/*
+	 * Start in.mpathd.  Note that in.mpathd will handle multiple
+	 * incarnations (ipmp_ping_daemon() is just an optimization) so we
+	 * don't need to worry about racing with another ifconfig process.
+	 */
+	switch (fork()) {
+	case -1:
+		Perror0_exit("start_ipmp_daemon: fork");
+		/* NOTREACHED */
+	case 0:
+		(void) execl(MPATHD_PATH, MPATHD_PATH, NULL);
+		_exit(1);
+		/* NOTREACHED */
+	default:
+		break;
+	}
+}
+
+/*
+ * Bring the address named by `ifaddrp' up or down.  Doesn't trust any mutable
+ * values in ia_flags since they may be stale.
+ */
+static boolean_t
+ifaddr_op(ifaddrlistx_t *ifaddrp, boolean_t up)
+{
+	struct lifreq	lifrl;	/* Local lifreq struct */
+	int		fd = (ifaddrp->ia_flags & IFF_IPV4) ? s4 : s6;
+
+	(void) memset(&lifrl, 0, sizeof (lifrl));
+	(void) strlcpy(lifrl.lifr_name, ifaddrp->ia_name, LIFNAMSIZ);
+	if (ioctl(fd, SIOCGLIFFLAGS, &lifrl) == -1)
+		return (_B_FALSE);
+
+	if (up) {
+		lifrl.lifr_flags |= IFF_UP;
+	} else {
+		/*
+		 * If we've been asked to bring down an IFF_DUPLICATE address,
+		 * then get the address and set it.  This will cause IP to
+		 * clear IFF_DUPLICATE and stop the automatic recovery timer.
+		 */
+		if (lifrl.lifr_flags & IFF_DUPLICATE) {
+			return (ioctl(fd, SIOCGLIFADDR, &lifrl) != -1 &&
+			    ioctl(fd, SIOCSLIFADDR, &lifrl) != -1);
+		}
+		lifrl.lifr_flags &= ~IFF_UP;
+	}
+	return (ioctl(fd, SIOCSLIFFLAGS, &lifrl) == 0);
+}
+
+static boolean_t
+ifaddr_up(ifaddrlistx_t *ifaddrp)
+{
+	return (ifaddr_op(ifaddrp, _B_TRUE));
+}
+
+static boolean_t
+ifaddr_down(ifaddrlistx_t *ifaddrp)
+{
+	return (ifaddr_op(ifaddrp, _B_FALSE));
 }
 
 void
@@ -4404,14 +4765,14 @@ print_flags(uint64_t flags)
 }
 
 static void
-print_config_flags(uint64_t flags)
+print_config_flags(int af, uint64_t flags)
 {
-	int cnt, i;
+	if_config_cmd_t *cmdp;
 
-	cnt = sizeof (if_config_cmd_tbl) / sizeof (if_config_cmd_t);
-	for (i = 0; i < cnt; i++) {
-		if (flags & if_config_cmd_tbl[i].iff_flag) {
-			(void) printf("%s ", if_config_cmd_tbl[i].iff_name);
+	for (cmdp = if_config_cmd_tbl; cmdp->iff_flag != 0; cmdp++) {
+		if ((flags & cmdp->iff_flag) &&
+		    (cmdp->iff_af == AF_UNSPEC || cmdp->iff_af == af)) {
+			(void) printf("%s ", cmdp->iff_name);
 		}
 	}
 }
@@ -4454,7 +4815,18 @@ in_getmask(struct sockaddr_in *saddr, boolean_t addr_set)
 }
 
 static int
-strioctl(int s, int cmd, char *buf, int buflen)
+lifnum(const char *ifname)
+{
+	const char *cp;
+
+	if ((cp = strchr(ifname, ':')) == NULL)
+		return (0);
+	else
+		return (atoi(cp + 1));
+}
+
+static int
+strioctl(int s, int cmd, void *buf, int buflen)
 {
 	struct strioctl ioc;
 
@@ -4681,6 +5053,7 @@ usage(void)
 	    "\t[ modlist ]\n"
 	    "\t[ modinsert <module_name@position> ]\n"
 	    "\t[ modremove <module_name@position> ]\n"
+	    "\t[ ipmp ]\n"
 	    "\t[ group <groupname>] | [ group \"\"]\n"
 	    "\t[ deprecated | -deprecated ]\n"
 	    "\t[ standby | -standby ]\n"

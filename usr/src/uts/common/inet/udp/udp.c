@@ -80,6 +80,7 @@
 #include <inet/ipp_common.h>
 #include <sys/squeue_impl.h>
 #include <inet/ipnet.h>
+#include <sys/ethernet.h>
 
 /*
  * The ipsec_info.h header file is here since it has the definition for the
@@ -2141,7 +2142,6 @@ udp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 		case MCAST_UNBLOCK_SOURCE:
 		case MCAST_JOIN_SOURCE_GROUP:
 		case MCAST_LEAVE_SOURCE_GROUP:
-		case IP_DONTFAILOVER_IF:
 			/* cannot "get" the value for these */
 			return (-1);
 		case IP_BOUND_IF:
@@ -3152,9 +3152,7 @@ udp_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 			ipp->ipp_use_min_mtu = *i1;
 			break;
 
-		case IPV6_BOUND_PIF:
 		case IPV6_SEC_OPT:
-		case IPV6_DONTFAILOVER_IF:
 		case IPV6_SRC_PREFERENCES:
 		case IPV6_V6ONLY:
 			/* Handled at the IP level */
@@ -5351,7 +5349,6 @@ udp_output_v4(conn_t *connp, mblk_t *mp, ipaddr_t v4dst, uint16_t port,
 	if ((connp->conn_flags & IPCL_CHECK_POLICY) != 0 ||
 	    CONN_OUTBOUND_POLICY_PRESENT(connp, ipss) ||
 	    connp->conn_dontroute ||
-	    connp->conn_nofailover_ill != NULL ||
 	    connp->conn_outgoing_ill != NULL || optinfo.ip_opt_flags != 0 ||
 	    optinfo.ip_opt_ill_index != 0 ||
 	    ipha->ipha_version_and_hdr_length != IP_SIMPLE_HDR_VERSION ||
@@ -5419,8 +5416,7 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 		ill_t *stq_ill = (ill_t *)ire->ire_stq->q_ptr;
 
 		ASSERT(ipif != NULL);
-		if (stq_ill != ipif->ipif_ill && (stq_ill->ill_group == NULL ||
-		    stq_ill->ill_group != ipif->ipif_ill->ill_group))
+		if (!IS_ON_SAME_LAN(stq_ill, ipif->ipif_ill))
 			retry_caching = B_TRUE;
 	}
 
@@ -5444,7 +5440,7 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 			ASSERT(ipif != NULL);
 			ire = ire_ctable_lookup(dst, 0, 0, ipif,
 			    connp->conn_zoneid, MBLK_GETLABEL(mp),
-			    MATCH_IRE_ILL_GROUP, ipst);
+			    MATCH_IRE_ILL, ipst);
 		} else {
 			ASSERT(ipif == NULL);
 			ire = ire_cache_lookup(dst, connp->conn_zoneid,
@@ -5622,12 +5618,7 @@ udp_xmit(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, zoneid_t zoneid)
 	}
 
 	if (CLASSD(dst)) {
-		boolean_t ilm_exists;
-
-		ILM_WALKER_HOLD(ill);
-		ilm_exists = (ilm_lookup_ill(ill, dst, ALL_ZONES) != NULL);
-		ILM_WALKER_RELE(ill);
-		if (ilm_exists) {
+		if (ilm_lookup_ill(ill, dst, ALL_ZONES) != NULL) {
 			ip_multicast_loopback(q, ill, mp,
 			    connp->conn_multicast_loop ? 0 :
 			    IP_FF_NO_MCAST_LOOP, zoneid);

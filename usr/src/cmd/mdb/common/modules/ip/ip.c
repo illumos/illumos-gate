@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stropts.h>
@@ -524,8 +522,7 @@ ire_format(uintptr_t addr, const void *ire_arg, void *ire_cb_arg)
 
 	static const mdb_bitmask_t mmasks[] = {
 		{ "CONDEMNED",	IRE_MARK_CONDEMNED,	IRE_MARK_CONDEMNED },
-		{ "NORECV",	IRE_MARK_NORECV,	IRE_MARK_NORECV	},
-		{ "HIDDEN",	IRE_MARK_HIDDEN,	IRE_MARK_HIDDEN	},
+		{ "TESTHIDDEN",	IRE_MARK_TESTHIDDEN,	IRE_MARK_TESTHIDDEN },
 		{ "NOADD",	IRE_MARK_NOADD,		IRE_MARK_NOADD	},
 		{ "TEMPORARY",	IRE_MARK_TEMPORARY,	IRE_MARK_TEMPORARY },
 		{ "USESRC",	IRE_MARK_USESRC_CHECK,	IRE_MARK_USESRC_CHECK },

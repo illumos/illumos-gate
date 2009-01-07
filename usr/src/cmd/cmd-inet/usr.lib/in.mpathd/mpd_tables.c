@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mpd_defs.h"
 #include "mpd_tables.h"
@@ -47,11 +45,7 @@ static void phyint_inst_print(struct phyint_instance *pii);
 
 static void phyint_insert(struct phyint *pi, struct phyint_group *pg);
 static void phyint_delete(struct phyint *pi);
-
-static void phyint_group_insert(struct phyint_group *pg);
-static void phyint_group_delete(struct phyint_group *pg);
-static struct phyint_group *phyint_group_lookup(const char *pg_name);
-static struct phyint_group *phyint_group_create(const char *pg_name);
+static boolean_t phyint_is_usable(struct phyint *pi);
 
 static void logint_print(struct logint *li);
 static void logint_insert(struct phyint_instance *pii, struct logint *li);
@@ -68,16 +62,13 @@ static void reset_pii_probes(struct phyint_instance *pii, struct target *tg);
 static boolean_t phyint_inst_v6_sockinit(struct phyint_instance *pii);
 static boolean_t phyint_inst_v4_sockinit(struct phyint_instance *pii);
 
-static void ip_index_to_mask_v6(uint_t masklen, struct in6_addr *bitmask);
-static boolean_t prefix_equal(struct in6_addr p1, struct in6_addr p2,
-    int prefix_len);
-
 static int phyint_state_event(struct phyint_group *pg, struct phyint *pi);
 static int phyint_group_state_event(struct phyint_group *pg);
 static int phyint_group_change_event(struct phyint_group *pg, ipmp_group_op_t);
 static int phyint_group_member_event(struct phyint_group *pg, struct phyint *pi,
     ipmp_if_op_t op);
 
+static int logint_upcount(struct phyint *pi);
 static uint64_t gensig(void);
 
 /* Initialize any per-file global state.  Returns 0 on success, -1 on failure */
@@ -110,6 +101,183 @@ phyint_lookup(const char *name)
 	return (pi);
 }
 
+/*
+ * Lookup a phyint in the group that has the same hardware address as `pi', or
+ * NULL if there's none.  If `online_only' is set, then only online phyints
+ * are considered when matching.  Otherwise, phyints that had been offlined
+ * due to a duplicate hardware address will also be considered.
+ */
+static struct phyint *
+phyint_lookup_hwaddr(struct phyint *pi, boolean_t online_only)
+{
+	struct phyint *pi2;
+
+	if (pi->pi_group == phyint_anongroup)
+		return (NULL);
+
+	for (pi2 = pi->pi_group->pg_phyint; pi2 != NULL; pi2 = pi2->pi_pgnext) {
+		if (pi2 == pi)
+			continue;
+
+		/*
+		 * NOTE: even when online_only is B_FALSE, we ignore phyints
+		 * that are administratively offline (rather than offline
+		 * because they're dups); when they're brought back online,
+		 * they'll be flagged as dups if need be.
+		 */
+		if (pi2->pi_state == PI_OFFLINE &&
+		    (online_only || !pi2->pi_hwaddrdup))
+			continue;
+
+		if (pi2->pi_hwaddrlen == pi->pi_hwaddrlen &&
+		    bcmp(pi2->pi_hwaddr, pi->pi_hwaddr, pi->pi_hwaddrlen) == 0)
+			return (pi2);
+	}
+	return (NULL);
+}
+
+/*
+ * Respond to DLPI notifications.  Currently, this only processes physical
+ * address changes for the phyint passed via `arg' by onlining or offlining
+ * phyints in the group.
+ */
+/* ARGSUSED */
+static void
+phyint_link_notify(dlpi_handle_t dh, dlpi_notifyinfo_t *dnip, void *arg)
+{
+	struct phyint *pi = arg;
+	struct phyint *oduppi = NULL, *duppi = NULL;
+
+	assert((dnip->dni_note & pi->pi_notes) != 0);
+
+	if (dnip->dni_note != DL_NOTE_PHYS_ADDR)
+		return;
+
+	assert(dnip->dni_physaddrlen <= DLPI_PHYSADDR_MAX);
+
+	/*
+	 * If our hardware address hasn't changed, there's nothing to do.
+	 */
+	if (pi->pi_hwaddrlen == dnip->dni_physaddrlen &&
+	    bcmp(pi->pi_hwaddr, dnip->dni_physaddr, pi->pi_hwaddrlen) == 0)
+		return;
+
+	oduppi = phyint_lookup_hwaddr(pi, _B_FALSE);
+	pi->pi_hwaddrlen = dnip->dni_physaddrlen;
+	(void) memcpy(pi->pi_hwaddr, dnip->dni_physaddr, pi->pi_hwaddrlen);
+	duppi = phyint_lookup_hwaddr(pi, _B_FALSE);
+
+	if (oduppi != NULL || pi->pi_hwaddrdup) {
+		/*
+		 * Our old hardware address was a duplicate.  If we'd been
+		 * offlined because of it, and our new hardware address is not
+		 * a duplicate, then bring us online.  Otherwise, `oduppi'
+		 * must've been the one brought offline; bring it online.
+		 */
+		if (pi->pi_hwaddrdup) {
+			if (duppi == NULL)
+				(void) phyint_undo_offline(pi);
+		} else {
+			assert(oduppi->pi_hwaddrdup);
+			(void) phyint_undo_offline(oduppi);
+		}
+	}
+
+	if (duppi != NULL && !pi->pi_hwaddrdup) {
+		/*
+		 * Our new hardware address was a duplicate and we're not
+		 * yet flagged as a duplicate; bring us offline.
+		 */
+		pi->pi_hwaddrdup = _B_TRUE;
+		(void) phyint_offline(pi, 0);
+	}
+}
+
+/*
+ * Initialize information about the underlying link for `pi', and set us
+ * up to be notified about future changes.  Returns _B_TRUE on success.
+ */
+boolean_t
+phyint_link_init(struct phyint *pi)
+{
+	int retval;
+	uint_t notes;
+	const char *errmsg;
+	dlpi_notifyid_t id;
+
+	pi->pi_notes = 0;
+	retval = dlpi_open(pi->pi_name, &pi->pi_dh, 0);
+	if (retval != DLPI_SUCCESS) {
+		pi->pi_dh = NULL;
+		errmsg = "cannot open";
+		goto failed;
+	}
+
+	pi->pi_hwaddrlen = DLPI_PHYSADDR_MAX;
+	retval = dlpi_get_physaddr(pi->pi_dh, DL_CURR_PHYS_ADDR, pi->pi_hwaddr,
+	    &pi->pi_hwaddrlen);
+	if (retval != DLPI_SUCCESS) {
+		errmsg = "cannot get hardware address";
+		goto failed;
+	}
+
+	retval = dlpi_bind(pi->pi_dh, DLPI_ANY_SAP, NULL);
+	if (retval != DLPI_SUCCESS) {
+		errmsg = "cannot bind to DLPI_ANY_SAP";
+		goto failed;
+	}
+
+	/*
+	 * Check if the link supports DLPI link state notifications.  For
+	 * historical reasons, the actual changes are tracked through routing
+	 * sockets, so we immediately disable the notification upon success.
+	 */
+	notes = DL_NOTE_LINK_UP | DL_NOTE_LINK_DOWN;
+	retval = dlpi_enabnotify(pi->pi_dh, notes, phyint_link_notify, pi, &id);
+	if (retval == DLPI_SUCCESS) {
+		(void) dlpi_disabnotify(pi->pi_dh, id, NULL);
+		pi->pi_notes |= notes;
+	}
+
+	/*
+	 * Enable notification of hardware address changes to keep pi_hwaddr
+	 * up-to-date and track if we need to offline/undo-offline phyints.
+	 */
+	notes = DL_NOTE_PHYS_ADDR;
+	retval = dlpi_enabnotify(pi->pi_dh, notes, phyint_link_notify, pi, &id);
+	if (retval == DLPI_SUCCESS && poll_add(dlpi_fd(pi->pi_dh)) == 0)
+		pi->pi_notes |= notes;
+
+	return (_B_TRUE);
+failed:
+	logerr("%s: %s: %s\n", pi->pi_name, errmsg, dlpi_strerror(retval));
+	if (pi->pi_dh != NULL) {
+		dlpi_close(pi->pi_dh);
+		pi->pi_dh = NULL;
+	}
+	return (_B_FALSE);
+}
+
+/*
+ * Close use of link on `pi'.
+ */
+void
+phyint_link_close(struct phyint *pi)
+{
+	if (pi->pi_notes & DL_NOTE_PHYS_ADDR) {
+		(void) poll_remove(dlpi_fd(pi->pi_dh));
+		pi->pi_notes &= ~DL_NOTE_PHYS_ADDR;
+	}
+
+	/*
+	 * NOTE: we don't clear pi_notes here so that iflinkstate() can still
+	 * properly report the link state even when offline (which is possible
+	 * since we use IFF_RUNNING to track link state).
+	 */
+	dlpi_close(pi->pi_dh);
+	pi->pi_dh = NULL;
+}
+
 /* Return the phyint instance with the given name and the given family */
 struct phyint_instance *
 phyint_inst_lookup(int af, char *name)
@@ -128,7 +296,7 @@ phyint_inst_lookup(int af, char *name)
 	return (PHYINT_INSTANCE(pi, af));
 }
 
-static struct phyint_group *
+struct phyint_group *
 phyint_group_lookup(const char *pg_name)
 {
 	struct phyint_group *pg;
@@ -173,6 +341,9 @@ phyint_insert(struct phyint *pi, struct phyint_group *pg)
 		pi->pi_pgnext->pi_pgprev = pi;
 	pg->pg_phyint = pi;
 
+	/* Refresh the group state now that this phyint has been added */
+	phyint_group_refresh_state(pg);
+
 	pg->pg_sig++;
 	(void) phyint_group_member_event(pg, pi, IPMP_IF_ADD);
 }
@@ -214,24 +385,24 @@ phyint_create(char *pi_name, struct phyint_group *pg, uint_t ifindex,
 	}
 
 	/*
-	 * Record the phyint values. Also insert the phyint into the
-	 * phyint group by calling phyint_insert().
+	 * Record the phyint values.
 	 */
 	(void) strlcpy(pi->pi_name, pi_name, sizeof (pi->pi_name));
 	pi->pi_taddrthresh = getcurrentsec() + TESTADDR_CONF_TIME;
 	pi->pi_ifindex = ifindex;
-	pi->pi_icmpid =
-	    htons(((getpid() & 0xFF) << 8) | (pi->pi_ifindex & 0xFF));
+	pi->pi_icmpid = htons(((getpid() & 0xFF) << 8) | (ifindex & 0xFF));
+
 	/*
-	 * We optimistically start in the PI_RUNNING state.  Later (in
-	 * process_link_state_changes()), we will readjust this to match the
+	 * If the interface is offline, we set the state to PI_OFFLINE.
+	 * Otherwise, we optimistically start in the PI_RUNNING state.  Later
+	 * (in process_link_state_changes()), we will adjust this to match the
 	 * current state of the link.  Further, if test addresses are
 	 * subsequently assigned, we will transition to PI_NOTARGETS and then
-	 * either PI_RUNNING or PI_FAILED, depending on the result of the test
-	 * probes.
+	 * to either PI_RUNNING or PI_FAILED depending on the probe results.
 	 */
-	pi->pi_state = PI_RUNNING;
+	pi->pi_state = (flags & IFF_OFFLINE) ? PI_OFFLINE : PI_RUNNING;
 	pi->pi_flags = PHYINT_FLAGS(flags);
+
 	/*
 	 * Initialise the link state.  The link state is initialised to
 	 * up, so that if the link is down when IPMP starts monitoring
@@ -241,18 +412,16 @@ phyint_create(char *pi_name, struct phyint_group *pg, uint_t ifindex,
 	 */
 	INIT_LINK_STATE(pi);
 
+	if (!phyint_link_init(pi)) {
+		free(pi);
+		return (NULL);
+	}
+
 	/*
 	 * Insert the phyint in the list of all phyints, and the
 	 * list of phyint group members
 	 */
 	phyint_insert(pi, pg);
-
-	/*
-	 * If we are joining a failed group, mark the interface as
-	 * failed.
-	 */
-	if (GROUP_FAILED(pg))
-		(void) change_lif_flags(pi, IFF_FAILED, _B_TRUE);
 
 	return (pi);
 }
@@ -313,15 +482,14 @@ phyint_chstate(struct phyint *pi, enum pi_state state)
 		return;
 
 	pi->pi_state = state;
-	pi->pi_group->pg_sig++;
-	(void) phyint_state_event(pi->pi_group, pi);
+	phyint_changed(pi);
 }
 
 /*
- * Note that the type of phyint `pi' has changed.
+ * Note that `pi' has changed state.
  */
 void
-phyint_newtype(struct phyint *pi)
+phyint_changed(struct phyint *pi)
 {
 	pi->pi_group->pg_sig++;
 	(void) phyint_state_event(pi->pi_group, pi);
@@ -331,7 +499,7 @@ phyint_newtype(struct phyint *pi)
  * Insert the phyint group in the linked list of all phyint groups
  * at the head of the list
  */
-static void
+void
 phyint_group_insert(struct phyint_group *pg)
 {
 	pg->pg_next = phyint_groups;
@@ -347,7 +515,7 @@ phyint_group_insert(struct phyint_group *pg)
 /*
  * Create a new phyint group called 'name'.
  */
-static struct phyint_group *
+struct phyint_group *
 phyint_group_create(const char *name)
 {
 	struct	phyint_group *pg;
@@ -363,9 +531,16 @@ phyint_group_create(const char *name)
 
 	(void) strlcpy(pg->pg_name, name, sizeof (pg->pg_name));
 	pg->pg_sig = gensig();
-
 	pg->pg_fdt = user_failure_detection_time;
 	pg->pg_probeint = user_probe_interval;
+	pg->pg_in_use = _B_TRUE;
+
+	/*
+	 * Normal groups always start in the PG_FAILED state since they
+	 * have no active interfaces.  In contrast, anonymous groups are
+	 * heterogeneous and thus always PG_OK.
+	 */
+	pg->pg_state = (name[0] == '\0' ? PG_OK : PG_FAILED);
 
 	return (pg);
 }
@@ -378,10 +553,20 @@ phyint_group_chstate(struct phyint_group *pg, enum pg_state state)
 {
 	assert(pg != phyint_anongroup);
 
+	/*
+	 * To simplify things, some callers always set a given state
+	 * regardless of the previous state of the group (e.g., setting
+	 * PG_DEGRADED when it's already set).  We shouldn't bother
+	 * generating an event or consuming a signature for these, since
+	 * the actual state of the group is unchanged.
+	 */
+	if (pg->pg_state == state)
+		return;
+
+	pg->pg_state = state;
+
 	switch (state) {
 	case PG_FAILED:
-		pg->pg_groupfailed = 1;
-
 		/*
 		 * We can never know with certainty that a group has
 		 * failed.  It is possible that all known targets have
@@ -392,16 +577,15 @@ phyint_group_chstate(struct phyint_group *pg, enum pg_state state)
 		 * hosts, we have to discover it by multicast.	So flush
 		 * all the host targets. The next probe will send out a
 		 * multicast echo request. If this is a group failure, we
-		 * will still not see any response, otherwise we will
-		 * clear the pg_groupfailed flag after we get
-		 * NUM_PROBE_REPAIRS consecutive unicast replies on any
-		 * phyint.
+		 * will still not see any response, otherwise the group
+		 * will be repaired after we get NUM_PROBE_REPAIRS
+		 * consecutive unicast replies on any phyint.
 		 */
 		target_flush_hosts(pg);
 		break;
 
-	case PG_RUNNING:
-		pg->pg_groupfailed = 0;
+	case PG_OK:
+	case PG_DEGRADED:
 		break;
 
 	default:
@@ -432,7 +616,6 @@ phyint_inst_init_from_k(int af, char *pi_name)
 	struct lifreq	lifr;
 	struct phyint	*pi;
 	struct phyint_instance	*pii;
-	boolean_t	pg_created;
 	boolean_t	pi_created;
 	struct phyint_group	*pg;
 
@@ -441,7 +624,6 @@ retry:
 	pi = NULL;
 	pg = NULL;
 	pi_created = _B_FALSE;
-	pg_created = _B_FALSE;
 
 	if (debug & D_PHYINT) {
 		logdebug("phyint_inst_init_from_k(%s %s)\n",
@@ -454,11 +636,11 @@ retry:
 	ifsock = (af == AF_INET) ? ifsock_v4 : ifsock_v6;
 
 	/*
-	 * Get the interface flags. Ignore loopback and multipoint
-	 * interfaces.
+	 * Get the interface flags.  Ignore virtual interfaces, IPMP
+	 * meta-interfaces, point-to-point interfaces, and interfaces
+	 * that can't support multicast.
 	 */
-	(void) strncpy(lifr.lifr_name, pi_name, sizeof (lifr.lifr_name));
-	lifr.lifr_name[sizeof (lifr.lifr_name) - 1] = '\0';
+	(void) strlcpy(lifr.lifr_name, pi_name, sizeof (lifr.lifr_name));
 	if (ioctl(ifsock, SIOCGLIFFLAGS, (char *)&lifr) < 0) {
 		if (errno != ENXIO) {
 			logperror("phyint_inst_init_from_k:"
@@ -467,7 +649,8 @@ retry:
 		return (NULL);
 	}
 	flags = lifr.lifr_flags;
-	if (!(flags & IFF_MULTICAST) || (flags & IFF_LOOPBACK))
+	if (!(flags & IFF_MULTICAST) ||
+	    (flags & (IFF_VIRTUAL|IFF_IPMP|IFF_POINTOPOINT)))
 		return (NULL);
 
 	/*
@@ -493,8 +676,7 @@ retry:
 		}
 		return (NULL);
 	}
-	(void) strncpy(pg_name, lifr.lifr_groupname, sizeof (pg_name));
-	pg_name[sizeof (pg_name) - 1] = '\0';
+	(void) strlcpy(pg_name, lifr.lifr_groupname, sizeof (pg_name));
 
 	/*
 	 * If the phyint is not part of any group, pg_name is the
@@ -503,12 +685,13 @@ retry:
 	 */
 	if (pg_name[0] == '\0' && !track_all_phyints) {
 		/*
-		 * If the IFF_FAILED or IFF_OFFLINE flags are set, reset
-		 * them. These flags shouldn't be set if IPMP isn't
-		 * tracking the interface.
+		 * If the IFF_FAILED, IFF_INACTIVE, or IFF_OFFLINE flags are
+		 * set, reset them. These flags shouldn't be set if in.mpathd
+		 * isn't tracking the interface.
 		 */
-		if ((flags & (IFF_FAILED | IFF_OFFLINE)) != 0) {
-			lifr.lifr_flags = flags & ~(IFF_FAILED | IFF_OFFLINE);
+		if ((flags & (IFF_FAILED | IFF_INACTIVE | IFF_OFFLINE))) {
+			lifr.lifr_flags = flags &
+			    ~(IFF_FAILED | IFF_INACTIVE | IFF_OFFLINE);
 			if (ioctl(ifsock, SIOCSLIFFLAGS, (char *)&lifr) < 0) {
 				if (errno != ENXIO) {
 					logperror("phyint_inst_init_from_k:"
@@ -520,21 +703,20 @@ retry:
 	}
 
 	/*
-	 * We need to create a new phyint instance. A phyint instance
-	 * belongs to a phyint, and the phyint belongs to a phyint group.
-	 * So we first lookup the 'parents' and if they don't exist then
-	 * we create them.
+	 * We need to create a new phyint instance.  We may also need to
+	 * create the group if e.g. the SIOCGLIFCONF loop in initifs() found
+	 * an underlying interface before it found its IPMP meta-interface.
+	 * Note that we keep any created groups even if phyint_inst_from_k()
+	 * fails since a group's existence is not dependent on the ability of
+	 * in.mpathd to the track the group's interfaces.
 	 */
-	pg = phyint_group_lookup(pg_name);
-	if (pg == NULL) {
-		pg = phyint_group_create(pg_name);
-		if (pg == NULL) {
-			logerr("phyint_inst_init_from_k:"
-			    " unable to create group %s\n", pg_name);
+	if ((pg = phyint_group_lookup(pg_name)) == NULL) {
+		if ((pg = phyint_group_create(pg_name)) == NULL) {
+			logerr("phyint_inst_init_from_k: cannot create group "
+			    "%s\n", pg_name);
 			return (NULL);
 		}
 		phyint_group_insert(pg);
-		pg_created = _B_TRUE;
 	}
 
 	/*
@@ -546,8 +728,6 @@ retry:
 		if (pi == NULL) {
 			logerr("phyint_inst_init_from_k:"
 			    " unable to create phyint %s\n", pi_name);
-			if (pg_created)
-				phyint_group_delete(pg);
 			return (NULL);
 		}
 		pi_created = _B_TRUE;
@@ -564,8 +744,6 @@ retry:
 		 * while we are yet to update our tables. Do it now.
 		 */
 		if (pi->pi_ifindex != ifindex) {
-			if (pg_created)
-				phyint_group_delete(pg);
 			phyint_inst_delete(PHYINT_INSTANCE(pi, AF_OTHER(af)));
 			goto retry;
 		}
@@ -577,9 +755,6 @@ retry:
 		 * changed, while we are yet to update our tables. Do it now.
 		 */
 		if (strcmp(pi->pi_group->pg_name, pg_name) != 0) {
-			if (pg_created)
-				phyint_group_delete(pg);
-			restore_phyint(pi);
 			phyint_inst_delete(PHYINT_INSTANCE(pi,
 			    AF_OTHER(af)));
 			goto retry;
@@ -594,14 +769,23 @@ retry:
 	if (pii == NULL) {
 		logerr("phyint_inst_init_from_k: unable to create"
 		    "phyint inst %s\n", pi->pi_name);
-		if (pi_created) {
-			/*
-			 * Deleting the phyint will delete the phyint group
-			 * if this is the last phyint in the group.
-			 */
+		if (pi_created)
 			phyint_delete(pi);
-		}
+
 		return (NULL);
+	}
+
+	if (pi_created) {
+		/*
+		 * If this phyint does not have a unique hardware address in its
+		 * group, offline it.  (The change_pif_flags() implementation
+		 * requires that we defer this until after the phyint_instance
+		 * is created.)
+		 */
+		if (phyint_lookup_hwaddr(pi, _B_TRUE) != NULL) {
+			pi->pi_hwaddrdup = _B_TRUE;
+			(void) phyint_offline(pi, 0);
+		}
 	}
 
 	return (pii);
@@ -677,16 +861,16 @@ phyint_inst_v6_sockinit(struct phyint_instance *pii)
 {
 	icmp6_filter_t filter;
 	int hopcount = 1;
-	int int_op;
+	int off = 0;
+	int on = 1;
 	struct	sockaddr_in6	testaddr;
 
 	/*
 	 * Open a raw socket with ICMPv6 protocol.
 	 *
-	 * Use IPV6_DONTFAILOVER_IF to make sure that probes go out
-	 * on the specified phyint only, and are not subject to load
-	 * balancing. Bind to the src address chosen will ensure that
-	 * the responses are received only on the specified phyint.
+	 * Use IPV6_BOUND_IF to make sure that probes are sent and received on
+	 * the specified phyint only.  Bind to the test address to ensure that
+	 * the responses are sent to the specified phyint.
 	 *
 	 * Set the hopcount to 1 so that probe packets are not routed.
 	 * Disable multicast loopback. Set the receive filter to
@@ -696,7 +880,7 @@ phyint_inst_v6_sockinit(struct phyint_instance *pii)
 	if (pii->pii_probe_sock < 0) {
 		logperror_pii(pii, "phyint_inst_v6_sockinit: socket");
 		return (_B_FALSE);
-}
+	}
 
 	bzero(&testaddr, sizeof (testaddr));
 	testaddr.sin6_family = AF_INET6;
@@ -709,14 +893,17 @@ phyint_inst_v6_sockinit(struct phyint_instance *pii)
 		return (_B_FALSE);
 	}
 
-	/*
-	 * IPV6_DONTFAILOVER_IF option takes precedence over setting
-	 * IP_MULTICAST_IF. So we don't set IPV6_MULTICAST_IF again.
-	 */
-	if (setsockopt(pii->pii_probe_sock, IPPROTO_IPV6, IPV6_DONTFAILOVER_IF,
+	if (setsockopt(pii->pii_probe_sock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
 	    (char *)&pii->pii_ifindex, sizeof (uint_t)) < 0) {
 		logperror_pii(pii, "phyint_inst_v6_sockinit: setsockopt"
-		    " IPV6_DONTFAILOVER_IF");
+		    " IPV6_MULTICAST_IF");
+		return (_B_FALSE);
+	}
+
+	if (setsockopt(pii->pii_probe_sock, IPPROTO_IPV6, IPV6_BOUND_IF,
+	    &pii->pii_ifindex, sizeof (uint_t)) < 0) {
+		logperror_pii(pii, "phyint_inst_v6_sockinit: setsockopt"
+		    " IPV6_BOUND_IF");
 		return (_B_FALSE);
 	}
 
@@ -734,9 +921,8 @@ phyint_inst_v6_sockinit(struct phyint_instance *pii)
 		return (_B_FALSE);
 	}
 
-	int_op = 0;	/* used to turn off option */
 	if (setsockopt(pii->pii_probe_sock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
-	    (char *)&int_op, sizeof (int_op)) < 0) {
+	    (char *)&off, sizeof (off)) < 0) {
 		logperror_pii(pii, "phyint_inst_v6_sockinit: setsockopt"
 		    " IPV6_MULTICAST_LOOP");
 		return (_B_FALSE);
@@ -755,12 +941,19 @@ phyint_inst_v6_sockinit(struct phyint_instance *pii)
 		return (_B_FALSE);
 	}
 
-	/* Enable receipt of ancillary data */
-	int_op = 1;
+	/* Enable receipt of hoplimit */
 	if (setsockopt(pii->pii_probe_sock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT,
-	    (char *)&int_op, sizeof (int_op)) < 0) {
+	    &on, sizeof (on)) < 0) {
 		logperror_pii(pii, "phyint_inst_v6_sockinit: setsockopt"
 		    " IPV6_RECVHOPLIMIT");
+		return (_B_FALSE);
+	}
+
+	/* Enable receipt of timestamp */
+	if (setsockopt(pii->pii_probe_sock, SOL_SOCKET, SO_TIMESTAMP,
+	    &on, sizeof (on)) < 0) {
+		logperror_pii(pii, "phyint_inst_v6_sockinit: setsockopt"
+		    " SO_TIMESTAMP");
 		return (_B_FALSE);
 	}
 
@@ -775,20 +968,20 @@ static boolean_t
 phyint_inst_v4_sockinit(struct phyint_instance *pii)
 {
 	struct sockaddr_in  testaddr;
-	char	char_op;
+	char	char_off = 0;
 	int	ttl = 1;
 	char	char_ttl = 1;
+	int	on = 1;
 
 	/*
 	 * Open a raw socket with ICMPv4 protocol.
 	 *
-	 * Use IP_DONTFAILOVER_IF to make sure that probes go out
-	 * on the specified phyint only, and are not subject to load
-	 * balancing. Bind to the src address chosen will ensure that
-	 * the responses are received only on the specified phyint.
+	 * Use IP_BOUND_IF to make sure that probes are sent and received on
+	 * the specified phyint only.  Bind to the test address to ensure that
+	 * the responses are sent to the specified phyint.
 	 *
 	 * Set the ttl to 1 so that probe packets are not routed.
-	 * Disable multicast loopback.
+	 * Disable multicast loopback.  Enable receipt of timestamp.
 	 */
 	pii->pii_probe_sock = socket(pii->pii_af, SOCK_RAW, IPPROTO_ICMP);
 	if (pii->pii_probe_sock < 0) {
@@ -808,14 +1001,17 @@ phyint_inst_v4_sockinit(struct phyint_instance *pii)
 		return (_B_FALSE);
 	}
 
-	/*
-	 * IP_DONTFAILOVER_IF option takes precedence over setting
-	 * IP_MULTICAST_IF. So we don't set IP_MULTICAST_IF again.
-	 */
-	if (setsockopt(pii->pii_probe_sock, IPPROTO_IP, IP_DONTFAILOVER_IF,
+	if (setsockopt(pii->pii_probe_sock, IPPROTO_IP, IP_BOUND_IF,
+	    &pii->pii_ifindex, sizeof (uint_t)) < 0) {
+		logperror_pii(pii, "phyint_inst_v4_sockinit: setsockopt"
+		    " IP_BOUND_IF");
+		return (_B_FALSE);
+	}
+
+	if (setsockopt(pii->pii_probe_sock, IPPROTO_IP, IP_MULTICAST_IF,
 	    (char *)&testaddr.sin_addr, sizeof (struct in_addr)) < 0) {
 		logperror_pii(pii, "phyint_inst_v4_sockinit: setsockopt"
-		    " IP_DONTFAILOVER");
+		    " IP_MULTICAST_IF");
 		return (_B_FALSE);
 	}
 
@@ -826,9 +1022,8 @@ phyint_inst_v4_sockinit(struct phyint_instance *pii)
 		return (_B_FALSE);
 	}
 
-	char_op = 0;	/* used to turn off option */
 	if (setsockopt(pii->pii_probe_sock, IPPROTO_IP, IP_MULTICAST_LOOP,
-	    (char *)&char_op, sizeof (char_op)) == -1) {
+	    (char *)&char_off, sizeof (char_off)) == -1) {
 		logperror_pii(pii, "phyint_inst_v4_sockinit: setsockopt"
 		    " IP_MULTICAST_LOOP");
 		return (_B_FALSE);
@@ -841,6 +1036,13 @@ phyint_inst_v4_sockinit(struct phyint_instance *pii)
 		return (_B_FALSE);
 	}
 
+	if (setsockopt(pii->pii_probe_sock, SOL_SOCKET, SO_TIMESTAMP, &on,
+	    sizeof (on)) < 0) {
+		logperror_pii(pii, "phyint_inst_v4_sockinit: setsockopt"
+		    " SO_TIMESTAMP");
+		return (_B_FALSE);
+	}
+
 	return (_B_TRUE);
 }
 
@@ -848,7 +1050,7 @@ phyint_inst_v4_sockinit(struct phyint_instance *pii)
  * Remove the phyint group from the list of 'all phyint groups'
  * and free it.
  */
-static void
+void
 phyint_group_delete(struct phyint_group *pg)
 {
 	/*
@@ -881,7 +1083,66 @@ phyint_group_delete(struct phyint_group *pg)
 	phyint_grouplistsig++;
 	(void) phyint_group_change_event(pg, IPMP_GROUP_REMOVE);
 
+	addrlist_free(&pg->pg_addrs);
 	free(pg);
+}
+
+/*
+ * Refresh the state of `pg' based on its current members.
+ */
+void
+phyint_group_refresh_state(struct phyint_group *pg)
+{
+	enum pg_state state;
+	enum pg_state origstate = pg->pg_state;
+	struct phyint *pi, *usablepi;
+	uint_t nif = 0, nusable = 0;
+
+	/*
+	 * Anonymous groups never change state.
+	 */
+	if (pg == phyint_anongroup)
+		return;
+
+	for (pi = pg->pg_phyint; pi != NULL; pi = pi->pi_pgnext) {
+		nif++;
+		if (phyint_is_usable(pi)) {
+			nusable++;
+			usablepi = pi;
+		}
+	}
+
+	if (nusable == 0)
+		state = PG_FAILED;
+	else if (nif == nusable)
+		state = PG_OK;
+	else
+		state = PG_DEGRADED;
+
+	phyint_group_chstate(pg, state);
+
+	/*
+	 * If we're shutting down, skip logging messages since otherwise our
+	 * shutdown housecleaning will make us report that groups are unusable.
+	 */
+	if (cleanup_started)
+		return;
+
+	/*
+	 * NOTE: We use pg_failmsg_printed rather than origstate since
+	 * otherwise at startup we'll log a "now usable" message when the
+	 * first usable phyint is added to an empty group.
+	 */
+	if (state != PG_FAILED && pg->pg_failmsg_printed) {
+		assert(origstate == PG_FAILED);
+		logerr("At least 1 IP interface (%s) in group %s is now "
+		    "usable\n", usablepi->pi_name, pg->pg_name);
+		pg->pg_failmsg_printed = _B_FALSE;
+	} else if (origstate != PG_FAILED && state == PG_FAILED) {
+		logerr("All IP interfaces in group %s are now unusable\n",
+		    pg->pg_name);
+		pg->pg_failmsg_printed = _B_TRUE;
+	}
 }
 
 /*
@@ -998,28 +1259,16 @@ phyint_inst_update_from_k(struct phyint_instance *pii)
 	if (pi->pi_v6 != NULL)
 		pi->pi_v6->pii_flags = pi->pi_flags;
 
+	/*
+	 * Make sure the IFF_FAILED flag is set if and only if we think
+	 * the interface should be failed.
+	 */
 	if (pi->pi_flags & IFF_FAILED) {
-		/*
-		 * If we are in the running and full state, we have
-		 * completed failbacks successfully and we would have
-		 * expected IFF_FAILED to have been clear. That it is
-		 * set means there was a race condition. Some other
-		 * process turned on the IFF_FAILED flag. Since the
-		 * flag setting is not atomic, i.e. a get ioctl followed
-		 * by a set ioctl, and since there is no way to set an
-		 * individual flag bit, this could have occurred.
-		 */
-		if (pi->pi_state == PI_RUNNING && pi->pi_full)
-			(void) change_lif_flags(pi, IFF_FAILED, _B_FALSE);
+		if (pi->pi_state == PI_RUNNING)
+			(void) change_pif_flags(pi, 0, IFF_FAILED);
 	} else {
-		/*
-		 * If we are in the failed state, there was a race.
-		 * we have completed failover successfully because our
-		 * state is failed and empty. Some other process turned
-		 * off the IFF_FAILED flag. Same comment as above
-		 */
-		if (pi->pi_state == PI_FAILED && pi->pi_empty)
-			(void) change_lif_flags(pi, IFF_FAILED, _B_TRUE);
+		if (pi->pi_state == PI_FAILED)
+			(void) change_pif_flags(pi, IFF_FAILED, IFF_INACTIVE);
 	}
 
 	/* No change in phyint status */
@@ -1028,12 +1277,12 @@ phyint_inst_update_from_k(struct phyint_instance *pii)
 
 /*
  * Delete the phyint. Remove it from the list of all phyints, and the
- * list of phyint group members. If the group becomes empty, delete the
- * group also.
+ * list of phyint group members.
  */
 static void
 phyint_delete(struct phyint *pi)
 {
+	struct phyint *pi2;
 	struct phyint_group *pg = pi->pi_group;
 
 	if (debug & D_PHYINT)
@@ -1065,6 +1314,9 @@ phyint_delete(struct phyint *pi)
 	pi->pi_pgnext = NULL;
 	pi->pi_pgprev = NULL;
 
+	/* Refresh the group state now that this phyint has been removed */
+	phyint_group_refresh_state(pg);
+
 	/* Remove the phyint from the global list of phyints */
 	if (pi->pi_prev == NULL) {
 		/* Phyint is the 1st in the list */
@@ -1077,11 +1329,153 @@ phyint_delete(struct phyint *pi)
 	pi->pi_next = NULL;
 	pi->pi_prev = NULL;
 
+	/*
+	 * See if another phyint in the group had been offlined because
+	 * it was a dup of `pi' -- and if so, online it.
+	 */
+	if (!pi->pi_hwaddrdup &&
+	    (pi2 = phyint_lookup_hwaddr(pi, _B_FALSE)) != NULL) {
+		assert(pi2->pi_hwaddrdup);
+		(void) phyint_undo_offline(pi2);
+	}
+	phyint_link_close(pi);
 	free(pi);
+}
 
-	/* Delete the phyint_group if the last phyint has been deleted */
-	if (pg->pg_phyint == NULL)
-		phyint_group_delete(pg);
+/*
+ * Offline phyint `pi' if at least `minred' usable interfaces remain in the
+ * group.  Returns an IPMP error code.
+ */
+int
+phyint_offline(struct phyint *pi, uint_t minred)
+{
+	unsigned int nusable = 0;
+	struct phyint *pi2;
+	struct phyint_group *pg = pi->pi_group;
+
+	/*
+	 * Verify that enough usable interfaces in the group would remain.
+	 * As a special case, if the group has failed, allow any non-offline
+	 * phyints to be offlined.
+	 */
+	if (pg != phyint_anongroup) {
+		for (pi2 = pg->pg_phyint; pi2 != NULL; pi2 = pi2->pi_pgnext) {
+			if (pi2 == pi)
+				continue;
+			if (phyint_is_usable(pi2) ||
+			    (GROUP_FAILED(pg) && pi2->pi_state != PI_OFFLINE))
+				nusable++;
+		}
+	}
+	if (nusable < minred)
+		return (IPMP_EMINRED);
+
+	if (!change_pif_flags(pi, IFF_OFFLINE, 0))
+		return (IPMP_FAILURE);
+
+	/*
+	 * The interface is now offline, so stop probing it.  Note that
+	 * if_mpadm(1M) will down the test addresses, after receiving a
+	 * success reply from us. The routing socket message will then make us
+	 * close the socket used for sending probes. But it is more logical
+	 * that an offlined interface must not be probed, even if it has test
+	 * addresses.
+	 *
+	 * NOTE: stop_probing() also sets PI_OFFLINE.
+	 */
+	stop_probing(pi);
+
+	/*
+	 * If we're offlining the phyint because it has a duplicate hardware
+	 * address, print a warning -- and leave the link open so that we can
+	 * be notified of hardware address changes that make it usable again.
+	 * Otherwise, close the link so that we won't prevent a detach.
+	 */
+	if (pi->pi_hwaddrdup) {
+		logerr("IP interface %s has a hardware address which is not "
+		    "unique in group %s; offlining\n", pi->pi_name,
+		    pg->pg_name);
+	} else {
+		phyint_link_close(pi);
+	}
+
+	/*
+	 * If this phyint was preventing another phyint with a duplicate
+	 * hardware address from being online, bring that one online now.
+	 */
+	if (!pi->pi_hwaddrdup &&
+	    (pi2 = phyint_lookup_hwaddr(pi, _B_FALSE)) != NULL) {
+		assert(pi2->pi_hwaddrdup);
+		(void) phyint_undo_offline(pi2);
+	}
+
+	/*
+	 * If this interface was active, try to activate another INACTIVE
+	 * interface in the group.
+	 */
+	if (!(pi->pi_flags & IFF_INACTIVE))
+		phyint_activate_another(pi);
+
+	return (IPMP_SUCCESS);
+}
+
+/*
+ * Undo a previous offline of `pi'.  Returns an IPMP error code.
+ */
+int
+phyint_undo_offline(struct phyint *pi)
+{
+	if (pi->pi_state != PI_OFFLINE) {
+		errno = EINVAL;
+		return (IPMP_FAILURE);
+	}
+
+	/*
+	 * If necessary, reinitialize our link information and verify that its
+	 * hardware address is still unique across the group.
+	 */
+	if (pi->pi_dh == NULL && !phyint_link_init(pi)) {
+		errno = EIO;
+		return (IPMP_FAILURE);
+	}
+
+	if (phyint_lookup_hwaddr(pi, _B_TRUE) != NULL) {
+		pi->pi_hwaddrdup = _B_TRUE;
+		return (IPMP_EHWADDRDUP);
+	}
+
+	if (pi->pi_hwaddrdup) {
+		logerr("IP interface %s now has a unique hardware address in "
+		    "group %s; onlining\n", pi->pi_name, pi->pi_group->pg_name);
+		pi->pi_hwaddrdup = _B_FALSE;
+	}
+
+	if (!change_pif_flags(pi, 0, IFF_OFFLINE))
+		return (IPMP_FAILURE);
+
+	/*
+	 * While the interface was offline, it may have failed (e.g. the link
+	 * may have gone down).  phyint_inst_check_for_failure() will have
+	 * already set pi_flags with IFF_FAILED, so we can use that to decide
+	 * whether the phyint should transition to running.  Note that after
+	 * we transition to running, we will start sending probes again (if
+	 * test addresses are configured), which may also reveal that the
+	 * interface is in fact failed.
+	 */
+	if (pi->pi_flags & IFF_FAILED) {
+		phyint_chstate(pi, PI_FAILED);
+	} else {
+		/* calls phyint_chstate() */
+		phyint_transition_to_running(pi);
+	}
+
+	/*
+	 * Give the requestor time to configure test addresses before
+	 * complaining that they're missing.
+	 */
+	pi->pi_taddrthresh = getcurrentsec() + TESTADDR_CONF_TIME;
+
+	return (IPMP_SUCCESS);
 }
 
 /*
@@ -1166,11 +1560,10 @@ phyint_inst_print(struct phyint_instance *pii)
 	}
 
 	logdebug("\nPhyint instance: %s %s index %u state %x flags %llx	 "
-	    "sock %x in_use %d empty %x full %x\n",
+	    "sock %x in_use %d\n",
 	    AF_STR(pii->pii_af), pii->pii_name, pii->pii_ifindex,
 	    pii->pii_state, pii->pii_phyint->pi_flags, pii->pii_probe_sock,
-	    pii->pii_in_use, pii->pii_phyint->pi_empty,
-	    pii->pii_phyint->pi_full);
+	    pii->pii_in_use);
 
 	for (li = pii->pii_logint; li != NULL; li = li->li_next)
 		logint_print(li);
@@ -1211,9 +1604,11 @@ phyint_inst_print(struct phyint_instance *pii)
 			} else {
 				logdebug("#%d target NULL ", i);
 			}
-			logdebug("time_sent %u status %d time_ack/lost %u\n",
-			    pii->pii_probes[i].pr_time_sent,
+			logdebug("time_start %lld status %d "
+			    "time_ackproc %lld time_lost %u",
+			    pii->pii_probes[i].pr_hrtime_start,
 			    pii->pii_probes[i].pr_status,
+			    pii->pii_probes[i].pr_hrtime_ackproc,
 			    pii->pii_probes[i].pr_time_lost);
 			i = PROBE_INDEX_PREV(i);
 		} while (i != most_recent);
@@ -1293,7 +1688,6 @@ logint_init_from_k(struct phyint_instance *pii, char *li_name)
 	struct	logint	*li;
 	struct lifreq	lifr;
 	struct in6_addr	test_subnet;
-	struct in6_addr	test_subnet_mask;
 	struct in6_addr	testaddr;
 	int	test_subnet_len;
 	struct sockaddr_in6	*sin6;
@@ -1373,54 +1767,20 @@ logint_init_from_k(struct phyint_instance *pii, char *li_name)
 		testaddr = sin6->sin6_addr;
 	}
 
-	if (pii->pii_phyint->pi_flags & IFF_POINTOPOINT) {
-		ptp = _B_TRUE;
-		if (ioctl(ifsock, SIOCGLIFDSTADDR, (char *)&lifr) < 0) {
-			if (errno != ENXIO) {
-				logperror_li(li, "logint_init_from_k:"
-				    " (get dstaddr)");
-			}
-			goto error;
-		}
-		if (pii->pii_af == AF_INET) {
-			sin = (struct sockaddr_in *)&lifr.lifr_addr;
-			IN6_INADDR_TO_V4MAPPED(&sin->sin_addr, &tgaddr);
-		} else {
-			sin6 = (struct sockaddr_in6 *)&lifr.lifr_addr;
-			tgaddr = sin6->sin6_addr;
-		}
-	} else {
-		if (ioctl(ifsock, SIOCGLIFSUBNET, (char *)&lifr) < 0) {
-			/* Interface may have vanished */
-			if (errno != ENXIO) {
-				logperror_li(li, "logint_init_from_k:"
-				    " (get subnet)");
-			}
-			goto error;
-		}
-		if (lifr.lifr_subnet.ss_family == AF_INET6) {
-			sin6 = (struct sockaddr_in6 *)&lifr.lifr_subnet;
-			test_subnet = sin6->sin6_addr;
-			test_subnet_len = lifr.lifr_addrlen;
-		} else {
-			sin = (struct sockaddr_in *)&lifr.lifr_subnet;
-			IN6_INADDR_TO_V4MAPPED(&sin->sin_addr, &test_subnet);
-			test_subnet_len = lifr.lifr_addrlen +
-			    (IPV6_ABITS - IP_ABITS);
-		}
-		(void) ip_index_to_mask_v6(test_subnet_len, &test_subnet_mask);
-	}
-
-	/*
-	 * Also record the OINDEX for completeness. This information is
-	 * not used.
-	 */
-	if (ioctl(ifsock, SIOCGLIFOINDEX, (char *)&lifr) < 0) {
-		if (errno != ENXIO)  {
-			logperror_li(li, "logint_init_from_k:"
-			    " (get lifoindex)");
-		}
+	if (ioctl(ifsock, SIOCGLIFSUBNET, (char *)&lifr) < 0) {
+		/* Interface may have vanished */
+		if (errno != ENXIO)
+			logperror_li(li, "logint_init_from_k: (get subnet)");
 		goto error;
+	}
+	if (lifr.lifr_subnet.ss_family == AF_INET6) {
+		sin6 = (struct sockaddr_in6 *)&lifr.lifr_subnet;
+		test_subnet = sin6->sin6_addr;
+		test_subnet_len = lifr.lifr_addrlen;
+	} else {
+		sin = (struct sockaddr_in *)&lifr.lifr_subnet;
+		IN6_INADDR_TO_V4MAPPED(&sin->sin_addr, &test_subnet);
+		test_subnet_len = lifr.lifr_addrlen + (IPV6_ABITS - IP_ABITS);
 	}
 
 	/*
@@ -1454,7 +1814,6 @@ logint_init_from_k(struct phyint_instance *pii, char *li_name)
 	/* Update the logint with the values obtained from the kernel.	*/
 	li->li_addr = testaddr;
 	li->li_in_use = 1;
-	li->li_oifindex = lifr.lifr_index;
 	if (ptp) {
 		li->li_dstaddr = tgaddr;
 		li->li_subnet_len = (pii->pii_af == AF_INET) ?
@@ -1530,15 +1889,12 @@ static void
 logint_print(struct logint *li)
 {
 	char abuf[INET6_ADDRSTRLEN];
-	int af;
-
-	af = li->li_phyint_inst->pii_af;
+	int af = li->li_phyint_inst->pii_af;
 
 	logdebug("logint: %s %s addr %s/%u", AF_STR(af), li->li_name,
 	    pr_addr(af, li->li_addr, abuf, sizeof (abuf)), li->li_subnet_len);
 
-	logdebug("\tFlags: %llx in_use %d oifindex %d\n",
-	    li->li_flags, li->li_in_use, li->li_oifindex);
+	logdebug("\tFlags: %llx in_use %d\n", li->li_flags, li->li_in_use);
 }
 
 char *
@@ -1553,6 +1909,33 @@ pr_addr(int af, struct in6_addr addr, char *abuf, int len)
 		(void) inet_ntop(AF_INET6, (void *)&addr, abuf, len);
 	}
 	return (abuf);
+}
+
+/*
+ * Fill in the sockaddr_storage pointed to by `ssp' with the IP address
+ * represented by the [`af',`addr'] pair.  Needed because in.mpathd internally
+ * stores all addresses as in6_addrs, but we don't want to expose that.
+ */
+void
+addr2storage(int af, const struct in6_addr *addr, struct sockaddr_storage *ssp)
+{
+	struct sockaddr_in *sinp = (struct sockaddr_in *)ssp;
+	struct sockaddr_in6 *sin6p = (struct sockaddr_in6 *)ssp;
+
+	assert(af == AF_INET || af == AF_INET6);
+
+	switch (af) {
+	case AF_INET:
+		(void) memset(sinp, 0, sizeof (*sinp));
+		sinp->sin_family = AF_INET;
+		IN6_V4MAPPED_TO_INADDR(addr, &sinp->sin_addr);
+		break;
+	case AF_INET6:
+		(void) memset(sin6p, 0, sizeof (*sin6p));
+		sin6p->sin6_family = AF_INET6;
+		sin6p->sin6_addr = *addr;
+		break;
+	}
 }
 
 /* Lookup target on its address */
@@ -1686,7 +2069,7 @@ target_select_best(struct phyint_instance *pii)
 			if (tg->tg_latime + MIN_RECOVERY_TIME < now) {
 				slow_recovered = tg;
 				/*
-				 * Promote the slow_recoverd to unused
+				 * Promote the slow_recovered to unused
 				 */
 				tg->tg_status = TG_UNUSED;
 			} else {
@@ -1698,7 +2081,7 @@ target_select_best(struct phyint_instance *pii)
 			if (tg->tg_latime + MIN_RECOVERY_TIME < now) {
 				dead_recovered = tg;
 				/*
-				 * Promote the dead_recoverd to slow
+				 * Promote the dead_recovered to slow
 				 */
 				tg->tg_status = TG_SLOW;
 				tg->tg_latime = now;
@@ -1798,11 +2181,9 @@ target_create(struct phyint_instance *pii, struct in6_addr addr,
 
 	/*
 	 * If there are multiple subnets associated with an interface, then
-	 * add the target to this phyint instance, only if it belongs to the
-	 * same subnet as the test address. The reason is that interface
-	 * routes derived from non-test-addresses i.e. non-IFF_NOFAILOVER
-	 * addresses, will disappear after failover, and the targets will not
-	 * be reachable from this interface.
+	 * add the target to this phyint instance only if it belongs to the
+	 * same subnet as the test address.  This assures us that we will
+	 * be able to reach this target through our routing table.
 	 */
 	if (!prefix_equal(li->li_subnet, addr, li->li_subnet_len))
 		return;
@@ -1906,11 +2287,12 @@ target_add(struct phyint_instance *pii, struct in6_addr addr,
 
 	/*
 	 * If the target does not exist, create it; target_create() will set
-	 * tg_in_use to true.  If it exists already, and it is a router
-	 * target, set tg_in_use to to true, so that init_router_targets()
-	 * won't delete it
+	 * tg_in_use to true.  Even if it exists already, if it's a router
+	 * target and we'd previously learned of it through multicast, then we
+	 * need to recreate it as a router target.  Otherwise, just set
+	 * tg_in_use to to true so that init_router_targets() won't delete it.
 	 */
-	if (tg == NULL)
+	if (tg == NULL || (is_router && !pii->pii_targets_are_routers))
 		target_create(pii, addr, is_router);
 	else if (is_router)
 		tg->tg_in_use = 1;
@@ -2034,16 +2416,17 @@ target_delete(struct target *tg)
 	 * relevant any longer.
 	 */
 	assert(pii->pii_targets == NULL);
+	pii->pii_targets_are_routers = _B_FALSE;
 	clear_pii_probe_stats(pii);
 	pii_other = phyint_inst_other(pii);
 
 	/*
-	 * If there are no targets on both instances and the interface is
-	 * online, go back to PI_NOTARGETS state, since we cannot probe this
-	 * phyint any more.  For more details, please see phyint state
-	 * diagram in mpd_probe.c.
+	 * If there are no targets on both instances and the interface would
+	 * otherwise be considered PI_RUNNING, go back to PI_NOTARGETS state,
+	 * since we cannot probe this phyint any more.  For more details,
+	 * please see phyint state diagram in mpd_probe.c.
 	 */
-	if (!PROBE_CAPABLE(pii_other) &&
+	if (!PROBE_CAPABLE(pii_other) && LINK_UP(pii->pii_phyint) &&
 	    pii->pii_phyint->pi_state != PI_OFFLINE)
 		phyint_chstate(pii->pii_phyint, PI_NOTARGETS);
 }
@@ -2101,9 +2484,11 @@ reset_pii_probes(struct phyint_instance *pii, struct target *tg)
 
 	for (i = 0; i < PROBE_STATS_COUNT; i++) {
 		if (pii->pii_probes[i].pr_target == tg) {
+			if (pii->pii_probes[i].pr_status == PR_UNACKED) {
+				probe_chstate(&pii->pii_probes[i], pii,
+				    PR_LOST);
+			}
 			pii->pii_probes[i].pr_target = NULL;
-			if (pii->pii_probes[i].pr_status == PR_UNACKED)
-				pii->pii_probes[i].pr_status = PR_LOST;
 		}
 	}
 
@@ -2132,7 +2517,7 @@ target_print(struct target *tg)
 	af = tg->tg_phyint_inst->pii_af;
 
 	logdebug("Target on %s %s addr %s\n"
-	    "status %d rtt_sa %d rtt_sd %d crtt %d tg_in_use %d\n",
+	    "status %d rtt_sa %lld rtt_sd %lld crtt %d tg_in_use %d\n",
 	    AF_STR(af), tg->tg_phyint_inst->pii_name,
 	    pr_addr(af, tg->tg_address, abuf, sizeof (abuf)),
 	    tg->tg_status, tg->tg_rtt_sa, tg->tg_rtt_sd,
@@ -2158,35 +2543,16 @@ phyint_inst_print_all(void)
 }
 
 /*
- * Convert length for a mask to the mask.
- */
-static void
-ip_index_to_mask_v6(uint_t masklen, struct in6_addr *bitmask)
-{
-	int	j;
-
-	assert(masklen <= IPV6_ABITS);
-	bzero((char *)bitmask, sizeof (*bitmask));
-
-	/* Make the 'masklen' leftmost bits one */
-	for (j = 0; masklen > 8; masklen -= 8, j++)
-		bitmask->s6_addr[j] = 0xff;
-
-	bitmask->s6_addr[j] = 0xff << (8 - masklen);
-
-}
-
-/*
  * Compare two prefixes that have the same prefix length.
  * Fails if the prefix length is unreasonable.
  */
-static boolean_t
-prefix_equal(struct in6_addr p1, struct in6_addr p2, int prefix_len)
+boolean_t
+prefix_equal(struct in6_addr p1, struct in6_addr p2, uint_t prefix_len)
 {
 	uchar_t mask;
 	int j;
 
-	if (prefix_len < 0 || prefix_len > IPV6_ABITS)
+	if (prefix_len > IPV6_ABITS)
 		return (_B_FALSE);
 
 	for (j = 0; prefix_len > 8; prefix_len -= 8, j++)
@@ -2202,35 +2568,25 @@ prefix_equal(struct in6_addr p1, struct in6_addr p2, int prefix_len)
 }
 
 /*
- * Get the number of UP logints (excluding IFF_NOFAILOVERs), on both
- * IPv4 and IPv6 put together. The phyint with the least such number
- * will be used as the failover destination, if no standby interface is
- * available
+ * Get the number of UP logints on phyint `pi'.
  */
-int
+static int
 logint_upcount(struct phyint *pi)
 {
 	struct	logint	*li;
-	struct	phyint_instance *pii;
 	int count = 0;
 
-	pii = pi->pi_v4;
-	if (pii != NULL) {
-		for (li = pii->pii_logint; li != NULL; li = li->li_next) {
-			if ((li->li_flags &
-			    (IFF_UP | IFF_NOFAILOVER)) == IFF_UP) {
+	if (pi->pi_v4 != NULL) {
+		for (li = pi->pi_v4->pii_logint; li != NULL; li = li->li_next) {
+			if (li->li_flags & IFF_UP)
 				count++;
-			}
 		}
 	}
 
-	pii = pi->pi_v6;
-	if (pii != NULL) {
-		for (li = pii->pii_logint; li != NULL; li = li->li_next) {
-			if ((li->li_flags &
-			    (IFF_UP | IFF_NOFAILOVER)) == IFF_UP) {
+	if (pi->pi_v6 != NULL) {
+		for (li = pi->pi_v6->pii_logint; li != NULL; li = li->li_next) {
+			if (li->li_flags & IFF_UP)
 				count++;
-			}
 		}
 	}
 
@@ -2250,6 +2606,28 @@ phyint_inst_other(struct phyint_instance *pii)
 }
 
 /*
+ * Check whether a phyint is functioning.
+ */
+static boolean_t
+phyint_is_functioning(struct phyint *pi)
+{
+	if (pi->pi_state == PI_RUNNING)
+		return (_B_TRUE);
+	return (pi->pi_state == PI_NOTARGETS && !(pi->pi_flags & IFF_FAILED));
+}
+
+/*
+ * Check whether a phyint is usable.
+ */
+static boolean_t
+phyint_is_usable(struct phyint *pi)
+{
+	if (logint_upcount(pi) == 0)
+		return (_B_FALSE);
+	return (phyint_is_functioning(pi));
+}
+
+/*
  * Post an EC_IPMP sysevent of subclass `subclass' and attributes `nvl'.
  * Before sending the event, it prepends the current version of the IPMP
  * sysevent API.  Returns 0 on success, -1 on failure (in either case,
@@ -2258,16 +2636,18 @@ phyint_inst_other(struct phyint_instance *pii)
 static int
 post_event(const char *subclass, nvlist_t *nvl)
 {
-	sysevent_id_t eid;
+	static evchan_t *evchp = NULL;
 
 	/*
-	 * Since sysevents don't work yet in non-global zones, there cannot
-	 * possibly be any consumers yet, so don't bother trying to generate
-	 * them.  (Otherwise, we'll spew warnings.)
+	 * Initialize the event channel if we haven't already done so.
 	 */
-	if (getzoneid() != GLOBAL_ZONEID) {
-		nvlist_free(nvl);
-		return (0);
+	if (evchp == NULL) {
+		errno = sysevent_evc_bind(IPMP_EVENT_CHAN, &evchp, EVCH_CREAT);
+		if (errno != 0) {
+			logerr("cannot create event channel `%s': %s\n",
+			    IPMP_EVENT_CHAN, strerror(errno));
+			goto failed;
+		}
 	}
 
 	errno = nvlist_add_uint32(nvl, IPMP_EVENT_VERSION,
@@ -2278,8 +2658,9 @@ post_event(const char *subclass, nvlist_t *nvl)
 		goto failed;
 	}
 
-	if (sysevent_post_event(EC_IPMP, (char *)subclass, SUNW_VENDOR,
-	    "in.mpathd", nvl, &eid) == -1) {
+	errno = sysevent_evc_publish(evchp, EC_IPMP, subclass, "com.sun",
+	    "in.mpathd", nvl, EVCH_NOSLEEP);
+	if (errno != 0) {
 		logerr("cannot send `%s' event: %s\n", subclass,
 		    strerror(errno));
 		goto failed;
@@ -2300,6 +2681,8 @@ ifstate(struct phyint *pi)
 {
 	switch (pi->pi_state) {
 	case PI_NOTARGETS:
+		if (pi->pi_flags & IFF_FAILED)
+			return (IPMP_IF_FAILED);
 		return (IPMP_IF_UNKNOWN);
 
 	case PI_OFFLINE:
@@ -2330,12 +2713,203 @@ iftype(struct phyint *pi)
 }
 
 /*
+ * Return the external IPMP link state associated with phyint `pi'.
+ */
+static ipmp_if_linkstate_t
+iflinkstate(struct phyint *pi)
+{
+	if (!(pi->pi_notes & (DL_NOTE_LINK_UP|DL_NOTE_LINK_DOWN)))
+		return (IPMP_LINK_UNKNOWN);
+
+	return (LINK_DOWN(pi) ? IPMP_LINK_DOWN : IPMP_LINK_UP);
+}
+
+/*
+ * Return the external IPMP probe state associated with phyint `pi'.
+ */
+static ipmp_if_probestate_t
+ifprobestate(struct phyint *pi)
+{
+	if (!PROBE_ENABLED(pi->pi_v4) && !PROBE_ENABLED(pi->pi_v6))
+		return (IPMP_PROBE_DISABLED);
+
+	if (pi->pi_state == PI_FAILED)
+		return (IPMP_PROBE_FAILED);
+
+	if (!PROBE_CAPABLE(pi->pi_v4) && !PROBE_CAPABLE(pi->pi_v6))
+		return (IPMP_PROBE_UNKNOWN);
+
+	return (IPMP_PROBE_OK);
+}
+
+/*
+ * Return the external IPMP target mode associated with phyint instance `pii'.
+ */
+static ipmp_if_targmode_t
+iftargmode(struct phyint_instance *pii)
+{
+	if (!PROBE_ENABLED(pii))
+		return (IPMP_TARG_DISABLED);
+	else if (pii->pii_targets_are_routers)
+		return (IPMP_TARG_ROUTES);
+	else
+		return (IPMP_TARG_MULTICAST);
+}
+
+/*
+ * Return the external IPMP flags associated with phyint `pi'.
+ */
+static ipmp_if_flags_t
+ifflags(struct phyint *pi)
+{
+	ipmp_if_flags_t flags = 0;
+
+	if (logint_upcount(pi) == 0)
+		flags |= IPMP_IFFLAG_DOWN;
+	if (pi->pi_flags & IFF_INACTIVE)
+		flags |= IPMP_IFFLAG_INACTIVE;
+	if (pi->pi_hwaddrdup)
+		flags |= IPMP_IFFLAG_HWADDRDUP;
+	if (phyint_is_functioning(pi) && flags == 0)
+		flags |= IPMP_IFFLAG_ACTIVE;
+
+	return (flags);
+}
+
+/*
+ * Store the test address used on phyint instance `pii' in `ssp'.  If there's
+ * no test address, 0.0.0.0 is stored.
+ */
+static struct sockaddr_storage *
+iftestaddr(struct phyint_instance *pii, struct sockaddr_storage *ssp)
+{
+	if (PROBE_ENABLED(pii))
+		addr2storage(pii->pii_af, &pii->pii_probe_logint->li_addr, ssp);
+	else
+		addr2storage(AF_INET6, &in6addr_any, ssp);
+
+	return (ssp);
+}
+
+/*
  * Return the external IPMP group state associated with phyint group `pg'.
  */
 static ipmp_group_state_t
 groupstate(struct phyint_group *pg)
 {
-	return (GROUP_FAILED(pg) ? IPMP_GROUP_FAILED : IPMP_GROUP_OK);
+	switch (pg->pg_state) {
+	case PG_FAILED:
+		return (IPMP_GROUP_FAILED);
+	case PG_DEGRADED:
+		return (IPMP_GROUP_DEGRADED);
+	case PG_OK:
+		return (IPMP_GROUP_OK);
+	}
+
+	logerr("groupstate: unknown state %d; aborting\n", pg->pg_state);
+	abort();
+	/* NOTREACHED */
+}
+
+/*
+ * Return the external IPMP probe state associated with probe `ps'.
+ */
+static ipmp_probe_state_t
+probestate(struct probe_stats *ps)
+{
+	switch (ps->pr_status) {
+	case PR_UNUSED:
+	case PR_LOST:
+		return (IPMP_PROBE_LOST);
+	case PR_UNACKED:
+		return (IPMP_PROBE_SENT);
+	case PR_ACKED:
+		return (IPMP_PROBE_ACKED);
+	}
+
+	logerr("probestate: unknown state %d; aborting\n", ps->pr_status);
+	abort();
+	/* NOTREACHED */
+}
+
+/*
+ * Generate an ESC_IPMP_PROBE_STATE sysevent for the probe described by `pr'
+ * on phyint instance `pii'.  Returns 0 on success, -1 on failure.
+ */
+int
+probe_state_event(struct probe_stats *pr, struct phyint_instance *pii)
+{
+	nvlist_t *nvl;
+	hrtime_t proc_time = 0, recv_time = 0;
+	struct sockaddr_storage ss;
+	struct target *tg = pr->pr_target;
+
+	errno = nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0);
+	if (errno != 0) {
+		logperror("cannot create `interface change' event");
+		return (-1);
+	}
+
+	errno = nvlist_add_uint32(nvl, IPMP_PROBE_ID, pr->pr_id);
+	if (errno != 0)
+		goto failed;
+
+	errno = nvlist_add_string(nvl, IPMP_IF_NAME, pii->pii_phyint->pi_name);
+	if (errno != 0)
+		goto failed;
+
+	errno = nvlist_add_uint32(nvl, IPMP_PROBE_STATE, probestate(pr));
+	if (errno != 0)
+		goto failed;
+
+	errno = nvlist_add_hrtime(nvl, IPMP_PROBE_START_TIME,
+	    pr->pr_hrtime_start);
+	if (errno != 0)
+		goto failed;
+
+	errno = nvlist_add_hrtime(nvl, IPMP_PROBE_SENT_TIME,
+	    pr->pr_hrtime_sent);
+	if (errno != 0)
+		goto failed;
+
+	if (pr->pr_status == PR_ACKED) {
+		recv_time = pr->pr_hrtime_ackrecv;
+		proc_time = pr->pr_hrtime_ackproc;
+	}
+
+	errno = nvlist_add_hrtime(nvl, IPMP_PROBE_ACKRECV_TIME, recv_time);
+	if (errno != 0)
+		goto failed;
+
+	errno = nvlist_add_hrtime(nvl, IPMP_PROBE_ACKPROC_TIME, proc_time);
+	if (errno != 0)
+		goto failed;
+
+	if (tg != NULL)
+		addr2storage(pii->pii_af, &tg->tg_address, &ss);
+	else
+		addr2storage(pii->pii_af, &in6addr_any, &ss);
+
+	errno = nvlist_add_byte_array(nvl, IPMP_PROBE_TARGET, (uchar_t *)&ss,
+	    sizeof (ss));
+	if (errno != 0)
+		goto failed;
+
+	errno = nvlist_add_int64(nvl, IPMP_PROBE_TARGET_RTTAVG,
+	    tg->tg_rtt_sa / 8);
+	if (errno != 0)
+		goto failed;
+
+	errno = nvlist_add_int64(nvl, IPMP_PROBE_TARGET_RTTDEV,
+	    tg->tg_rtt_sd / 4);
+	if (errno != 0)
+		goto failed;
+
+	return (post_event(ESC_IPMP_PROBE_STATE, nvl));
+failed:
+	logperror("cannot create `probe state' event");
+	nvlist_free(nvl);
+	return (-1);
 }
 
 /*
@@ -2529,10 +3103,15 @@ gensig(void)
 unsigned int
 getgroupinfo(const char *grname, ipmp_groupinfo_t **grinfopp)
 {
-	struct phyint_group	*pg;
 	struct phyint		*pi;
+	struct phyint_group	*pg;
 	char			(*ifs)[LIFNAMSIZ];
-	unsigned int		nif, i;
+	unsigned int		i, j;
+	unsigned int		nif = 0, naddr = 0;
+	lifgroupinfo_t		lifgr;
+	addrlist_t		*addrp;
+	struct sockaddr_storage	*addrs;
+	int			fdt = 0;
 
 	pg = phyint_group_lookup(grname);
 	if (pg == NULL)
@@ -2540,21 +3119,111 @@ getgroupinfo(const char *grname, ipmp_groupinfo_t **grinfopp)
 
 	/*
 	 * Tally up the number of interfaces, allocate an array to hold them,
-	 * and insert their names into the array.
+	 * and insert their names into the array.  While we're at it, if any
+	 * interface is actually enabled to send probes, save the group fdt.
 	 */
-	for (nif = 0, pi = pg->pg_phyint; pi != NULL; pi = pi->pi_pgnext)
+	for (pi = pg->pg_phyint; pi != NULL; pi = pi->pi_pgnext)
 		nif++;
 
 	ifs = alloca(nif * sizeof (*ifs));
 	for (i = 0, pi = pg->pg_phyint; pi != NULL; pi = pi->pi_pgnext, i++) {
 		assert(i < nif);
 		(void) strlcpy(ifs[i], pi->pi_name, LIFNAMSIZ);
+		if (PROBE_ENABLED(pi->pi_v4) || PROBE_ENABLED(pi->pi_v6))
+			fdt = pg->pg_fdt;
 	}
 	assert(i == nif);
 
-	*grinfopp = ipmp_groupinfo_create(pg->pg_name, pg->pg_sig,
-	    groupstate(pg), nif, ifs);
+	/*
+	 * If this is the anonymous group, there's no other information to
+	 * collect (since there's no IPMP interface).
+	 */
+	if (pg == phyint_anongroup) {
+		*grinfopp = ipmp_groupinfo_create(pg->pg_name, pg->pg_sig, fdt,
+		    groupstate(pg), nif, ifs, "", "", "", "", 0, NULL);
+		return (*grinfopp == NULL ? IPMP_ENOMEM : IPMP_SUCCESS);
+	}
+
+	/*
+	 * Grab some additional information about the group from the kernel.
+	 * (NOTE: since SIOCGLIFGROUPINFO does not look up by interface name,
+	 * we can use ifsock_v4 even for a V6-only group.)
+	 */
+	(void) strlcpy(lifgr.gi_grname, grname, LIFGRNAMSIZ);
+	if (ioctl(ifsock_v4, SIOCGLIFGROUPINFO, &lifgr) == -1) {
+		if (errno == ENOENT)
+			return (IPMP_EUNKGROUP);
+
+		logperror("getgroupinfo: SIOCGLIFGROUPINFO");
+		return (IPMP_FAILURE);
+	}
+
+	/*
+	 * Tally up the number of data addresses, allocate an array to hold
+	 * them, and insert their values into the array.
+	 */
+	for (addrp = pg->pg_addrs; addrp != NULL; addrp = addrp->al_next)
+		naddr++;
+
+	addrs = alloca(naddr * sizeof (*addrs));
+	i = 0;
+	for (addrp = pg->pg_addrs; addrp != NULL; addrp = addrp->al_next) {
+		/*
+		 * It's possible to have duplicate addresses (if some are
+		 * down).  Weed the dups out to avoid confusing consumers.
+		 * (If groups start having tons of addresses, we'll need a
+		 * better algorithm here.)
+		 */
+		for (j = 0; j < i; j++) {
+			if (sockaddrcmp(&addrs[j], &addrp->al_addr))
+				break;
+		}
+		if (j == i) {
+			assert(i < naddr);
+			addrs[i++] = addrp->al_addr;
+		}
+	}
+	naddr = i;
+
+	*grinfopp = ipmp_groupinfo_create(pg->pg_name, pg->pg_sig, fdt,
+	    groupstate(pg), nif, ifs, lifgr.gi_grifname, lifgr.gi_m4ifname,
+	    lifgr.gi_m6ifname, lifgr.gi_bcifname, naddr, addrs);
 	return (*grinfopp == NULL ? IPMP_ENOMEM : IPMP_SUCCESS);
+}
+
+/*
+ * Store the target information associated with phyint instance `pii' into a
+ * dynamically allocated structure pointed to by `*targinfopp'.  Returns an
+ * IPMP error code.
+ */
+unsigned int
+gettarginfo(struct phyint_instance *pii, const char *name,
+    ipmp_targinfo_t **targinfopp)
+{
+	uint_t ntarg = 0;
+	struct target *tg;
+	struct sockaddr_storage	ss;
+	struct sockaddr_storage *targs = NULL;
+
+	if (PROBE_CAPABLE(pii)) {
+		targs = alloca(pii->pii_ntargets * sizeof (*targs));
+		tg = pii->pii_target_next;
+		do {
+			if (tg->tg_status == TG_ACTIVE) {
+				assert(ntarg < pii->pii_ntargets);
+				addr2storage(pii->pii_af, &tg->tg_address,
+				    &targs[ntarg++]);
+			}
+			if ((tg = tg->tg_next) == NULL)
+				tg = pii->pii_targets;
+		} while (tg != pii->pii_target_next);
+
+		assert(ntarg == pii->pii_ntargets);
+	}
+
+	*targinfopp = ipmp_targinfo_create(name, iftestaddr(pii, &ss),
+	    iftargmode(pii), ntarg, targs);
+	return (*targinfopp == NULL ? IPMP_ENOMEM : IPMP_SUCCESS);
 }
 
 /*
@@ -2564,15 +3233,29 @@ getgroupinfo(const char *grname, ipmp_groupinfo_t **grinfopp)
 unsigned int
 getifinfo(const char *ifname, ipmp_ifinfo_t **ifinfopp)
 {
+	int		retval;
 	struct phyint	*pi;
+	ipmp_targinfo_t	*targinfo4;
+	ipmp_targinfo_t	*targinfo6;
 
 	pi = phyint_lookup(ifname);
 	if (pi == NULL)
 		return (IPMP_EUNKIF);
 
+	if ((retval = gettarginfo(pi->pi_v4, pi->pi_name, &targinfo4)) != 0 ||
+	    (retval = gettarginfo(pi->pi_v6, pi->pi_name, &targinfo6)) != 0)
+		goto out;
+
 	*ifinfopp = ipmp_ifinfo_create(pi->pi_name, pi->pi_group->pg_name,
-	    ifstate(pi), iftype(pi));
-	return (*ifinfopp == NULL ? IPMP_ENOMEM : IPMP_SUCCESS);
+	    ifstate(pi), iftype(pi), iflinkstate(pi), ifprobestate(pi),
+	    ifflags(pi), targinfo4, targinfo6);
+	retval = (*ifinfopp == NULL ? IPMP_ENOMEM : IPMP_SUCCESS);
+out:
+	if (targinfo4 != NULL)
+		ipmp_freetarginfo(targinfo4);
+	if (targinfo6 != NULL)
+		ipmp_freetarginfo(targinfo6);
+	return (retval);
 }
 
 /*
@@ -2605,6 +3288,54 @@ getgrouplist(ipmp_grouplist_t **grlistpp)
 }
 
 /*
+ * Store the address information for `ssp' (in group `grname') into a
+ * dynamically allocated structure pointed to by `*adinfopp'.  Returns an IPMP
+ * error code.  (We'd call this function getaddrinfo(), but it would conflict
+ * with getaddrinfo(3SOCKET)).
+ */
+unsigned int
+getgraddrinfo(const char *grname, struct sockaddr_storage *ssp,
+    ipmp_addrinfo_t **adinfopp)
+{
+	int ifsock;
+	addrlist_t *addrp, *addrmatchp = NULL;
+	ipmp_addr_state_t state;
+	const char *binding = "";
+	struct lifreq lifr;
+	struct phyint_group *pg;
+
+	if ((pg = phyint_group_lookup(grname)) == NULL)
+		return (IPMP_EUNKADDR);
+
+	/*
+	 * Walk through the data addresses, and find a match.  Note that since
+	 * some of the addresses may be down, more than one may match.  We
+	 * prefer an up address (if one exists).
+	 */
+	for (addrp = pg->pg_addrs; addrp != NULL; addrp = addrp->al_next) {
+		if (sockaddrcmp(ssp, &addrp->al_addr)) {
+			addrmatchp = addrp;
+			if (addrmatchp->al_flags & IFF_UP)
+				break;
+		}
+	}
+
+	if (addrmatchp == NULL)
+		return (IPMP_EUNKADDR);
+
+	state = (addrmatchp->al_flags & IFF_UP) ? IPMP_ADDR_UP : IPMP_ADDR_DOWN;
+	if (state == IPMP_ADDR_UP) {
+		ifsock = (ssp->ss_family == AF_INET) ? ifsock_v4 : ifsock_v6;
+		(void) strlcpy(lifr.lifr_name, addrmatchp->al_name, LIFNAMSIZ);
+		if (ioctl(ifsock, SIOCGLIFBINDING, &lifr) >= 0)
+			binding = lifr.lifr_binding;
+	}
+
+	*adinfopp = ipmp_addrinfo_create(ssp, state, pg->pg_name, binding);
+	return (*adinfopp == NULL ? IPMP_ENOMEM : IPMP_SUCCESS);
+}
+
+/*
  * Store a snapshot of the IPMP subsystem into a dynamically allocated
  * structure pointed to by `*snapp'.  Returns an IPMP error code.
  */
@@ -2613,10 +3344,12 @@ getsnap(ipmp_snap_t **snapp)
 {
 	ipmp_grouplist_t	*grlistp;
 	ipmp_groupinfo_t	*grinfop;
+	ipmp_addrinfo_t		*adinfop;
+	ipmp_addrlist_t		*adlistp;
 	ipmp_ifinfo_t		*ifinfop;
 	ipmp_snap_t		*snap;
 	struct phyint		*pi;
-	unsigned int		i;
+	unsigned int		i, j;
 	int			retval;
 
 	snap = ipmp_snap_create();
@@ -2627,26 +3360,37 @@ getsnap(ipmp_snap_t **snapp)
 	 * Add group list.
 	 */
 	retval = getgrouplist(&snap->sn_grlistp);
-	if (retval != IPMP_SUCCESS) {
-		ipmp_snap_free(snap);
-		return (retval);
-	}
+	if (retval != IPMP_SUCCESS)
+		goto failed;
 
 	/*
-	 * Add information for each group in the list.
+	 * Add information for each group in the list, along with all of its
+	 * data addresses.
 	 */
 	grlistp = snap->sn_grlistp;
 	for (i = 0; i < grlistp->gl_ngroup; i++) {
 		retval = getgroupinfo(grlistp->gl_groups[i], &grinfop);
-		if (retval != IPMP_SUCCESS) {
-			ipmp_snap_free(snap);
-			return (retval);
-		}
+		if (retval != IPMP_SUCCESS)
+			goto failed;
+
 		retval = ipmp_snap_addgroupinfo(snap, grinfop);
 		if (retval != IPMP_SUCCESS) {
 			ipmp_freegroupinfo(grinfop);
-			ipmp_snap_free(snap);
-			return (retval);
+			goto failed;
+		}
+
+		adlistp = grinfop->gr_adlistp;
+		for (j = 0; j < adlistp->al_naddr; j++) {
+			retval = getgraddrinfo(grinfop->gr_name,
+			    &adlistp->al_addrs[j], &adinfop);
+			if (retval != IPMP_SUCCESS)
+				goto failed;
+
+			retval = ipmp_snap_addaddrinfo(snap, adinfop);
+			if (retval != IPMP_SUCCESS) {
+				ipmp_freeaddrinfo(adinfop);
+				goto failed;
+			}
 		}
 	}
 
@@ -2655,18 +3399,19 @@ getsnap(ipmp_snap_t **snapp)
 	 */
 	for (pi = phyints; pi != NULL; pi = pi->pi_next) {
 		retval = getifinfo(pi->pi_name, &ifinfop);
-		if (retval != IPMP_SUCCESS) {
-			ipmp_snap_free(snap);
-			return (retval);
-		}
+		if (retval != IPMP_SUCCESS)
+			goto failed;
+
 		retval = ipmp_snap_addifinfo(snap, ifinfop);
 		if (retval != IPMP_SUCCESS) {
 			ipmp_freeifinfo(ifinfop);
-			ipmp_snap_free(snap);
-			return (retval);
+			goto failed;
 		}
 	}
 
 	*snapp = snap;
 	return (IPMP_SUCCESS);
+failed:
+	ipmp_snap_free(snap);
+	return (retval);
 }

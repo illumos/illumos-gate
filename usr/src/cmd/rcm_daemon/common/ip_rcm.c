@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,23 +38,22 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <net/if.h>
 #include <netinet/in.h>
-#include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <stropts.h>
 #include <strings.h>
-#include <libdevinfo.h>
-#include <sys/systeminfo.h>
-#include <netdb.h>
+#include <sys/sysmacros.h>
 #include <inet/ip.h>
 #include <libinetutil.h>
 #include <libdllink.h>
+#include <libgen.h>
+#include <ipmp_admin.h>
 
-#include <ipmp_mpathd.h>
 #include "rcm_module.h"
 
 /*
@@ -75,42 +74,19 @@
 #define	RCM_LINK_RESOURCE_MAX	(13 + LINKID_STR_WIDTH)
 
 #define	RCM_STR_SUNW_IP		"SUNW_ip/"	/* IP address export prefix */
-#define	RCM_SIZE_SUNW_IP	9		/* strlen("SUNW_ip/") + 1 */
 
-/* ifconfig(1M) */
-#define	USR_SBIN_IFCONFIG	"/usr/sbin/ifconfig" /* ifconfig command */
-#define	CFGFILE_FMT_IPV4	"/etc/hostname."  /* IPV4 config file */
-#define	CFGFILE_FMT_IPV6	"/etc/hostname6." /* IPV6 config file */
+#define	SBIN_IFCONFIG		"/sbin/ifconfig" /* ifconfig command */
+#define	SBIN_IFPARSE		"/sbin/ifparse"	/* ifparse command */
+#define	DHCPFILE_FMT		"/etc/dhcp.%s"	/* DHCP config file */
+#define	CFGFILE_FMT_IPV4	"/etc/hostname.%s"  /* IPV4 config file */
+#define	CFGFILE_FMT_IPV6	"/etc/hostname6.%s" /* IPV6 config file */
 #define	CFG_CMDS_STD	" netmask + broadcast + up" /* Normal config string */
-#define	CONFIG_AF_INET		0x1		/* Post-configure IPv4 */
-#define	CONFIG_AF_INET6		0x2		/* Post-configure IPv6 */
-#define	MAXLINE			1024		/* Max. line length */
-#define	MAXARGS			512		/* Max. args in ifconfig cmd */
-
-/* Physical interface flags mask */
-#define	RCM_PIF_FLAGS		(IFF_OFFLINE | IFF_INACTIVE | IFF_FAILED | \
-				    IFF_STANDBY)
+#define	CFG_DHCP_CMD		"dhcp wait 0"	/* command to start DHCP */
 
 /* Some useful macros */
-#ifndef MAX
-#define	MAX(a, b)	(((a) > (b))?(a):(b))
-#endif /* MAX */
-
-#ifndef ISSPACE
 #define	ISSPACE(c)	((c) == ' ' || (c) == '\t')
-#endif
-
-#ifndef	ISEOL
 #define	ISEOL(c)	((c) == '\n' || (c) == '\r' || (c) == '\0')
-#endif
-
-#ifndef	STREQ
 #define	STREQ(a, b)	(*(a) == *(b) && strcmp((a), (b)) == 0)
-#endif
-
-#ifndef ADDSPACE
-#define	ADDSPACE(a)	((void) strcat((a), " "))
-#endif
 
 /* Interface Cache state flags */
 #define	CACHE_IF_STALE		0x1		/* stale cached data */
@@ -125,38 +101,10 @@
 /* RCM IPMP Module specific property definitions */
 #define	RCM_IPMP_MIN_REDUNDANCY	1		/* default min. redundancy */
 
-/* in.mpathd(1M) specifics */
-#define	MPATHD_MAX_RETRIES	5	/* Max. offline retries */
-
 /* Stream module operations */
 #define	MOD_INSERT		0	/* Insert a mid-stream module */
 #define	MOD_REMOVE		1	/* Remove a mid-stream module */
 #define	MOD_CHECK		2	/* Check mid-stream module safety */
-
-/*
- * in.mpathd(1M) message passing formats
- */
-typedef struct mpathd_cmd {
-	uint32_t	cmd_command;		/* message command */
-	char		cmd_ifname[LIFNAMSIZ];	/* this interface name */
-	char		cmd_movetoif[LIFNAMSIZ]; /* move to interface */
-	uint32_t	cmd_min_red;		/* min. redundancy */
-/* Message passing values for MI_SETOINDEX */
-#define	from_lifname	cmd_ifname		/* current logical interface */
-#define	to_pifname	cmd_movetoif		/* new physical interface */
-#define	addr_family	cmd_min_red		/* address family */
-} mpathd_cmd_t;
-
-/* This is needed since mpathd checks message size for offline */
-typedef struct mpathd_unoffline {
-	uint32_t	cmd_command;		/* offline / undo offline */
-	char		cmd_ifname[LIFNAMSIZ];	/* this interface name */
-} mpathd_unoffline_t;
-
-typedef struct mpathd_response {
-	uint32_t	resp_sys_errno;		/* system errno */
-	uint32_t	resp_mpathd_err;	/* mpathd error information */
-} mpathd_response_t;
 
 /*
  * IP module data types
@@ -164,9 +112,9 @@ typedef struct mpathd_response {
 
 /* Physical interface representation */
 typedef struct ip_pif {
-	char			pi_ifname[LIFNAMSIZ+1];	/* interface name */
-	char			pi_grpname[LIFNAMSIZ+1]; /* IPMP group name */
-	struct ip_lif		*pi_lifs;	/* ptr to logical interfaces */
+	char		pi_ifname[LIFNAMSIZ];	/* interface name */
+	char		pi_grname[LIFGRNAMSIZ]; /* IPMP group name */
+	struct ip_lif	*pi_lifs;		/* ptr to logical interfaces */
 } ip_pif_t;
 
 /* Logical interface representation */
@@ -239,7 +187,7 @@ static void 	free_node(ip_cache_t *);
 static void 	cache_insert(ip_cache_t *);
 static char 	*ip_usage(ip_cache_t *);
 static int 	update_pif(rcm_handle_t *, int, int, struct lifreq *);
-static int 	ip_ipmp_offline(ip_cache_t *, ip_cache_t *);
+static int 	ip_ipmp_offline(ip_cache_t *);
 static int	ip_ipmp_undo_offline(ip_cache_t *);
 static int	if_cfginfo(ip_cache_t *, uint_t);
 static int	if_unplumb(ip_cache_t *);
@@ -247,9 +195,6 @@ static int	if_replumb(ip_cache_t *);
 static void 	ip_log_err(ip_cache_t *, char **, char *);
 static char	*get_link_resource(const char *);
 static void	clr_cfg_state(ip_pif_t *);
-static uint64_t	if_get_flags(ip_pif_t *);
-static int	mpathd_send_cmd(mpathd_cmd_t *);
-static int	connect_to_mpathd(int);
 static int	modop(char *, char *, int, char);
 static int	get_modlist(char *, ip_lif_t *);
 static int	ip_domux2fd(int *, int *, int *, struct lifreq *);
@@ -262,15 +207,13 @@ static char 	**ip_get_addrlist(ip_cache_t *);
 static void	ip_free_addrlist(char **);
 static void	ip_consumer_notify(rcm_handle_t *, datalink_id_t, char **,
 			uint_t, rcm_info_t **);
+static boolean_t ip_addrstr(ip_lif_t *, char *, size_t);
 
 static int if_configure(datalink_id_t);
-static int isgrouped(char *);
-static int if_ipmp_config(char *, int, int);
-static int if_mpathd_configure(char *, char *, int, int);
-static char *get_mpathd_dest(char *, int);
-static int if_getcount(int);
-static void tokenize(char *, char **, char *, int *);
-
+static boolean_t isgrouped(const char *);
+static int if_config_inst(const char *, FILE *, int, boolean_t);
+static uint_t ntok(const char *cp);
+static boolean_t ifconfig(const char *, const char *, const char *, boolean_t);
 
 /* Module-Private data */
 static struct rcm_mod_ops ip_ops =
@@ -429,9 +372,9 @@ ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 {
 	ip_cache_t *node;
 	ip_pif_t *pif;
-	int detachable = 0;
-	int nofailover = 0;
-	int ipmp = 0;
+	boolean_t detachable = B_FALSE;
+	boolean_t ipmp;
+	int retval;
 
 	rcm_log_message(RCM_TRACE1, "IP: offline(%s)\n", rsrc);
 
@@ -455,25 +398,17 @@ ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 	pif = node->ip_pif;
 
 	/* Establish default detachability criteria */
-	if (flags & RCM_FORCE) {
-		detachable++;
-	}
+	if (flags & RCM_FORCE)
+		detachable = B_TRUE;
 
-	/* Check if the interface is an IPMP grouped interface */
-	if (strcmp(pif->pi_grpname, "")) {
-		ipmp++;
-	}
-
-	if (if_get_flags(pif) & IFF_NOFAILOVER) {
-		nofailover++;
-	}
+	/* Check if the interface is under IPMP */
+	ipmp = (pif->pi_grname[0] != '\0');
 
 	/*
-	 * Even if the interface is not in an IPMP group, it's possible that
-	 * it's still okay to offline it as long as there are higher-level
-	 * failover mechanisms for the addresses it owns (e.g., clustering).
-	 * In this case, ip_offlinelist() will return RCM_SUCCESS, and we
-	 * charge on.
+	 * Even if the interface is not under IPMP, it's possible that it's
+	 * still okay to offline it as long as there are higher-level failover
+	 * mechanisms for the addresses it owns (e.g., clustering).  In this
+	 * case, ip_offlinelist() will return RCM_SUCCESS, and we charge on.
 	 */
 	if (!ipmp && !detachable) {
 		/* Inform consumers of IP addresses being offlined */
@@ -487,17 +422,6 @@ ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 			(void) mutex_unlock(&cache_lock);
 			return (RCM_FAILURE);
 		}
-	}
-
-	/*
-	 * Cannot remove an IPMP interface if IFF_NOFAILOVER is set.
-	 */
-	if (ipmp && nofailover) {
-		/* Interface is part of an IPMP group, and cannot failover */
-		ip_log_err(node, errorp, "Failover disabled");
-		errno = EBUSY;
-		(void) mutex_unlock(&cache_lock);
-		return (RCM_FAILURE);
 	}
 
 	/* Check if it's a query */
@@ -534,38 +458,32 @@ ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 	}
 
 	/*
-	 * This an IPMP interface that can be failed over.
-	 * Request in.mpathd(1M) to failover the physical interface.
+	 * This is an IPMP interface that can be offlined.
+	 * Request in.mpathd(1M) to offline the physical interface.
 	 */
+	if ((retval = ip_ipmp_offline(node)) != IPMP_SUCCESS)
+		ip_log_err(node, errorp, "in.mpathd offline failed");
 
-	/* Failover to "any", let mpathd determine best failover candidate */
-	if (ip_ipmp_offline(node, NULL) < 0) {
-		ip_log_err(node, errorp, "in.mpathd failover failed");
+	if (retval == IPMP_EMINRED && !detachable) {
 		/*
-		 * Odds are that in.mpathd(1M) could not offline the device
-		 * because it was the last interface in the group.  However,
-		 * it's possible that it's still okay to offline it as long as
-		 * there are higher-level failover mechanisms for the
-		 * addresses it owns (e.g., clustering).  In this case,
-		 * ip_offlinelist() will return RCM_SUCCESS, and we charge on.
-		 *
-		 * TODO: change ip_ipmp_offline() to return the actual failure
-		 * from in.mpathd so that we can verify that it did indeed
-		 * fail with IPMP_EMINRED.
+		 * in.mpathd(1M) could not offline the device because it was
+		 * the last interface in the group.  However, it's possible
+		 * that it's still okay to offline it as long as there are
+		 * higher-level failover mechanisms for the addresses it owns
+		 * (e.g., clustering).  In this case, ip_offlinelist() will
+		 * return RCM_SUCCESS, and we charge on.
 		 */
-		if (!detachable) {
-			/* Inform consumers of IP addresses being offlined */
-			if (ip_offlinelist(hd, node, errorp, flags,
-			    depend_info) == RCM_SUCCESS) {
-				rcm_log_message(RCM_DEBUG,
-				    "IP: consumers agree on detach");
-			} else {
-				ip_log_err(node, errorp,
-				    "Device consumers prohibit offline");
-				(void) mutex_unlock(&cache_lock);
-				errno = EBUSY;
-				return (RCM_FAILURE);
-			}
+		/* Inform consumers of IP addresses being offlined */
+		if (ip_offlinelist(hd, node, errorp, flags,
+		    depend_info) == RCM_SUCCESS) {
+			rcm_log_message(RCM_DEBUG,
+			    "IP: consumers agree on detach");
+		} else {
+			ip_log_err(node, errorp,
+			    "Device consumers prohibit offline");
+			(void) mutex_unlock(&cache_lock);
+			errno = EBUSY;
+			return (RCM_FAILURE);
 		}
 	}
 
@@ -574,8 +492,8 @@ ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 		    _("IP: Unplumb failed (%s)\n"),
 		    pif->pi_ifname);
 
-		/* Request mpathd to undo the offline */
-		if (ip_ipmp_undo_offline(node) < 0) {
+		/* Request in.mpathd to undo the offline */
+		if (ip_ipmp_undo_offline(node) != IPMP_SUCCESS) {
 			ip_log_err(node, errorp, "Undo offline failed");
 			(void) mutex_unlock(&cache_lock);
 			return (RCM_FAILURE);
@@ -862,18 +780,16 @@ static char *
 ip_usage(ip_cache_t *node)
 {
 	ip_lif_t *lif;
-	int numifs;
-	char *buf;
-	char *linkidstr;
+	uint_t numup;
+	char *sep, *buf, *linkidstr;
 	datalink_id_t linkid;
-	const char *fmt;
-	char *sep;
+	const char *msg;
 	char link[MAXLINKNAMELEN];
 	char addrstr[INET6_ADDRSTRLEN];
 	char errmsg[DLADM_STRSIZE];
 	dladm_status_t status;
-	int offline = 0;
-	size_t bufsz;
+	boolean_t offline, ipmp;
+	size_t bufsz = 0;
 
 	rcm_log_message(RCM_TRACE2, "IP: usage(%s)\n", node->ip_resource);
 
@@ -904,76 +820,53 @@ ip_usage(ip_cache_t *node)
 	/* TRANSLATION_NOTE: separator used between IP addresses */
 	sep = _(", ");
 
-	numifs = 0;
-	for (lif = node->ip_pif->pi_lifs; lif != NULL; lif = lif->li_next) {
-		if (lif->li_ifflags & IFF_UP) {
-			numifs++;
+	numup = 0;
+	for (lif = node->ip_pif->pi_lifs; lif != NULL; lif = lif->li_next)
+		if (lif->li_ifflags & IFF_UP)
+			numup++;
+
+	ipmp = (node->ip_pif->pi_grname[0] != '\0');
+	offline = ((node->ip_cachestate & CACHE_IF_OFFLINED) != 0);
+
+	if (offline) {
+		msg = _("offlined");
+	} else if (numup == 0) {
+		msg = _("plumbed but down");
+	} else {
+		if (ipmp) {
+			msg = _("providing connectivity for IPMP group ");
+			bufsz += LIFGRNAMSIZ;
+		} else {
+			msg = _("hosts IP addresses: ");
+			bufsz += (numup * (INET6_ADDRSTRLEN + strlen(sep)));
 		}
 	}
 
-	if (node->ip_cachestate & CACHE_IF_OFFLINED) {
-		offline++;
-	}
-
-	if (!offline && numifs) {
-		fmt = _("%1$s hosts IP addresses: ");
-	} else if (offline) {
-		fmt = _("%1$s offlined");
-	} else {
-		fmt = _("%1$s plumbed but down");
-	}
-
-	/* space for addresses and separators, plus message */
-	bufsz = ((numifs * (INET6_ADDRSTRLEN + strlen(sep))) +
-	    strlen(fmt) + strlen(link) + 1);
+	bufsz += strlen(link) + strlen(msg) + 1;
 	if ((buf = malloc(bufsz)) == NULL) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: usage(%s) malloc failure(%s)\n"),
 		    node->ip_resource, strerror(errno));
 		return (NULL);
 	}
-	bzero(buf, bufsz);
-	(void) sprintf(buf, fmt, link);
+	(void) snprintf(buf, bufsz, "%s: %s", link, msg);
 
-	if (offline || (numifs == 0)) {	/* Nothing else to do */
-		rcm_log_message(RCM_TRACE2, "IP: usage (%s) info = %s\n",
-		    node->ip_resource, buf);
-
-		return (buf);
-	}
-
-	for (lif = node->ip_pif->pi_lifs; lif != NULL; lif = lif->li_next) {
-
-		void *addr;
-		int af;
-
-		if (!(lif->li_ifflags & IFF_UP)) {
-			/* ignore interfaces not up */
-			continue;
-		}
-		af = lif->li_addr.family;
-		if (af == AF_INET6) {
-			addr = &lif->li_addr.ip6.sin6_addr;
-		} else if (af == AF_INET) {
-			addr = &lif->li_addr.ip4.sin_addr;
+	if (!offline && numup > 0) {
+		if (ipmp) {
+			(void) strlcat(buf, node->ip_pif->pi_grname, bufsz);
 		} else {
-			rcm_log_message(RCM_DEBUG,
-			    "IP: unknown addr family %d, assuming AF_INET\n",
-			    af);
-			af = AF_INET;
-			addr = &lif->li_addr.ip4.sin_addr;
-		}
-		if (inet_ntop(af, addr, addrstr, INET6_ADDRSTRLEN) == NULL) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: inet_ntop: %s\n"), strerror(errno));
-			continue;
-		}
-		rcm_log_message(RCM_DEBUG, "IP addr := %s\n", addrstr);
+			lif = node->ip_pif->pi_lifs;
+			for (; lif != NULL; lif = lif->li_next) {
+				if (!(lif->li_ifflags & IFF_UP))
+					continue;
 
-		(void) strcat(buf, addrstr);
-		numifs--;
-		if (numifs > 0) {
-			(void) strcat(buf, ", ");
+				if (!ip_addrstr(lif, addrstr, sizeof (addrstr)))
+					continue;
+
+				(void) strlcat(buf, addrstr, bufsz);
+				if (--numup > 0)
+					(void) strlcat(buf, sep, bufsz);
+			}
 		}
 	}
 
@@ -981,6 +874,32 @@ ip_usage(ip_cache_t *node)
 	    node->ip_resource, buf);
 
 	return (buf);
+}
+
+static boolean_t
+ip_addrstr(ip_lif_t *lif, char *addrstr, size_t addrsize)
+{
+	int af = lif->li_addr.family;
+	void *addr;
+
+	if (af == AF_INET6) {
+		addr = &lif->li_addr.ip6.sin6_addr;
+	} else if (af == AF_INET) {
+		addr = &lif->li_addr.ip4.sin_addr;
+	} else {
+		rcm_log_message(RCM_DEBUG,
+		    "IP: unknown addr family %d, assuming AF_INET\n", af);
+		af = AF_INET;
+		addr = &lif->li_addr.ip4.sin_addr;
+	}
+	if (inet_ntop(af, addr, addrstr, addrsize) == NULL) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: inet_ntop: %s\n"), strerror(errno));
+		return (B_FALSE);
+	}
+
+	rcm_log_message(RCM_DEBUG, "IP addr := %s\n", addrstr);
+	return (B_TRUE);
 }
 
 /*
@@ -1121,11 +1040,13 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 		ifnumber = ifspec.ifsp_lun;
 
 	/* Get the interface flags */
-	(void) strcpy(lifreq.lifr_name, lifr->lifr_name);
+	(void) strlcpy(lifreq.lifr_name, lifr->lifr_name, LIFNAMSIZ);
 	if (ioctl(sock, SIOCGLIFFLAGS, (char *)&lifreq) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: SIOCGLIFFLAGS(%s): %s\n"),
-		    pif.pi_ifname, strerror(errno));
+		if (errno != ENXIO) {
+			rcm_log_message(RCM_ERROR,
+			    _("IP: SIOCGLIFFLAGS(%s): %s\n"),
+			    lifreq.lifr_name, strerror(errno));
+		}
 		return (-1);
 	}
 	(void) memcpy(&ifflags, &lifreq.lifr_flags, sizeof (ifflags));
@@ -1135,12 +1056,13 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 	 *   - IFF_VIRTUAL:	e.g., loopback and vni
 	 *   - IFF_POINTOPOINT:	e.g., sppp and ip.tun
 	 *   - !IFF_MULTICAST:	e.g., ip.6to4tun
+	 *   - IFF_IPMP:	IPMP meta-interfaces
 	 *
 	 * Note: The !IFF_MULTICAST check can be removed once iptun is
 	 * implemented as a datalink.
 	 */
 	if (!(ifflags & IFF_MULTICAST) ||
-	    (ifflags & (IFF_POINTOPOINT | IFF_VIRTUAL))) {
+	    (ifflags & (IFF_POINTOPOINT | IFF_VIRTUAL | IFF_IPMP))) {
 		rcm_log_message(RCM_TRACE3, "IP: if ignored (%s)\n",
 		    pif.pi_ifname);
 		return (0);
@@ -1148,23 +1070,26 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 
 	/* Get the interface group name for this interface */
 	if (ioctl(sock, SIOCGLIFGROUPNAME, (char *)&lifreq) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: SIOCGLIFGROUPNAME(%s): %s\n"),
-		    lifreq.lifr_name, strerror(errno));
+		if (errno != ENXIO) {
+			rcm_log_message(RCM_ERROR,
+			    _("IP: SIOCGLIFGROUPNAME(%s): %s\n"),
+			    lifreq.lifr_name, strerror(errno));
+		}
 		return (-1);
 	}
 
 	/* copy the group name */
-	(void) memcpy(&pif.pi_grpname, &lifreq.lifr_groupname,
-	    sizeof (pif.pi_grpname));
-	pif.pi_grpname[sizeof (pif.pi_grpname) - 1] = '\0';
+	(void) strlcpy(pif.pi_grname, lifreq.lifr_groupname,
+	    sizeof (pif.pi_grname));
 
 	/* Get the interface address for this interface */
 	if (ioctl(sock, SIOCGLIFADDR, (char *)&lifreq) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: SIOCGLIFADDR(%s): %s\n"),
-		    lifreq.lifr_name, strerror(errno));
-		return (-1);
+		if (errno != ENXIO) {
+			rcm_log_message(RCM_ERROR,
+			    _("IP: SIOCGLIFADDR(%s): %s\n"),
+			    lifreq.lifr_name, strerror(errno));
+			return (-1);
+		}
 	}
 	(void) memcpy(&ifaddr, &lifreq.lifr_addr, sizeof (ifaddr));
 
@@ -1241,9 +1166,9 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 		    sizeof (pif.pi_ifname));
 	}
 
-	/* save pif properties */
-	(void) memcpy(&probepif->pi_grpname, &pif.pi_grpname,
-	    sizeof (pif.pi_grpname));
+	/* save the group name */
+	(void) strlcpy(probepif->pi_grname, pif.pi_grname,
+	    sizeof (pif.pi_grname));
 
 	/* add lif, if this is a lif and it is not in cache */
 	if (!lif_listed) {
@@ -1304,7 +1229,7 @@ update_ipifs(rcm_handle_t *hd, int af)
 	}
 
 	lifn.lifn_family = af;
-	lifn.lifn_flags = 0;
+	lifn.lifn_flags = LIFC_UNDER_IPMP;
 	if (ioctl(sock, SIOCGLIFNUM, (char *)&lifn) < 0) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: SIOCLGIFNUM failed: %s\n"),
@@ -1321,7 +1246,7 @@ update_ipifs(rcm_handle_t *hd, int af)
 	}
 
 	lifc.lifc_family = af;
-	lifc.lifc_flags = 0;
+	lifc.lifc_flags = LIFC_UNDER_IPMP;
 	lifc.lifc_len = sizeof (struct lifreq) * lifn.lifn_count;
 	lifc.lifc_buf = buf;
 
@@ -1480,38 +1405,32 @@ static void
 ip_log_err(ip_cache_t *node, char **errorp, char *errmsg)
 {
 	char *ifname = NULL;
-	int len;
+	int size;
 	const char *errfmt;
-	char *error;
+	char *error = NULL;
 
 	if ((node != NULL) && (node->ip_pif != NULL) &&
 	    (node->ip_pif->pi_ifname != NULL)) {
 		ifname = node->ip_pif->pi_ifname;
 	}
 
-	if (errorp != NULL)
-		*errorp = NULL;
-
 	if (ifname == NULL) {
 		rcm_log_message(RCM_ERROR, _("IP: %s\n"), errmsg);
 		errfmt = _("IP: %s");
-		len = strlen(errfmt) + strlen(errmsg) + 1;
-		if (error = (char *)calloc(1, len)) {
-			(void) sprintf(error, errfmt, errmsg);
-		}
+		size = strlen(errfmt) + strlen(errmsg) + 1;
+		if (errorp != NULL && (error = malloc(size)) != NULL)
+			(void) snprintf(error, size, errfmt, errmsg);
 	} else {
 		rcm_log_message(RCM_ERROR, _("IP: %s(%s)\n"), errmsg, ifname);
 		errfmt = _("IP: %s(%s)");
-		len = strlen(errfmt) + strlen(errmsg) + strlen(ifname) + 1;
-		if (error = (char *)calloc(1, len)) {
-			(void) sprintf(error, errfmt, errmsg, ifname);
-		}
+		size = strlen(errfmt) + strlen(errmsg) + strlen(ifname) + 1;
+		if (errorp != NULL && (error = malloc(size)) != NULL)
+			(void) snprintf(error, size, errfmt, errmsg, ifname);
 	}
 
 	if (errorp != NULL)
 		*errorp = error;
 }
-
 
 /*
  * if_cfginfo() - Save off the config info for all interfaces
@@ -1538,7 +1457,7 @@ if_cfginfo(ip_cache_t *node, uint_t force)
 				rcm_log_message(RCM_ERROR,
 				    _("IP: get modlist error (%s) %s\n"),
 				    pif->pi_ifname, strerror(errno));
-				(void) clr_cfg_state(pif);
+				clr_cfg_state(pif);
 				return (-1);
 			}
 
@@ -1551,7 +1470,7 @@ if_cfginfo(ip_cache_t *node, uint_t force)
 						rcm_log_message(RCM_ERROR,
 						    _("IP: module %s@%d\n"),
 						    lif->li_modules[i], i);
-						(void) clr_cfg_state(pif);
+						clr_cfg_state(pif);
 						return (-1);
 					}
 				}
@@ -1595,11 +1514,11 @@ if_cfginfo(ip_cache_t *node, uint_t force)
 		/* Save reconfiguration information */
 		if (lif->li_ifflags & IFF_IPV4) {
 			(void) snprintf(syscmd, sizeof (syscmd),
-			    "%s %s:%d configinfo\n", USR_SBIN_IFCONFIG,
+			    "%s %s:%d configinfo\n", SBIN_IFCONFIG,
 			    pif->pi_ifname, lif->li_ifnum);
 		} else if (lif->li_ifflags & IFF_IPV6) {
 			(void) snprintf(syscmd, sizeof (syscmd),
-			    "%s %s:%d inet6 configinfo\n", USR_SBIN_IFCONFIG,
+			    "%s %s:%d inet6 configinfo\n", SBIN_IFCONFIG,
 			    pif->pi_ifname, lif->li_ifnum);
 		}
 		rcm_log_message(RCM_TRACE2, "IP: %s\n", syscmd);
@@ -1609,7 +1528,7 @@ if_cfginfo(ip_cache_t *node, uint_t force)
 			rcm_log_message(RCM_ERROR,
 			    _("IP: ifconfig configinfo error (%s:%d) %s\n"),
 			    pif->pi_ifname, lif->li_ifnum, strerror(errno));
-			(void) clr_cfg_state(pif);
+			clr_cfg_state(pif);
 			return (-1);
 		}
 		bzero(buf, MAX_RECONFIG_SIZE);
@@ -1619,20 +1538,18 @@ if_cfginfo(ip_cache_t *node, uint_t force)
 			    _("IP: ifconfig configinfo error (%s:%d) %s\n"),
 			    pif->pi_ifname, lif->li_ifnum, strerror(errno));
 			(void) pclose(fp);
-			(void) clr_cfg_state(pif);
+			clr_cfg_state(pif);
 			return (-1);
 		}
 		(void) pclose(fp);
 
-		lif->li_reconfig = malloc(strlen(buf)+1);
-		if (lif->li_reconfig == NULL) {
+		if ((lif->li_reconfig = strdup(buf)) == NULL) {
 			rcm_log_message(RCM_ERROR,
 			    _("IP: malloc error (%s) %s\n"),
 			    pif->pi_ifname, strerror(errno));
-			(void) clr_cfg_state(pif);
+			clr_cfg_state(pif);
 			return (-1);
 		}
-		(void) strcpy(lif->li_reconfig, buf);
 		rcm_log_message(RCM_DEBUG,
 		    "IP: if_cfginfo: reconfig string(%s:%d) = %s\n",
 		    pif->pi_ifname, lif->li_ifnum, lif->li_reconfig);
@@ -1654,57 +1571,37 @@ static int
 if_unplumb(ip_cache_t *node)
 {
 	ip_lif_t *lif;
-	ip_pif_t *pif;
-	int ipv4 = 0, ipv6 = 0;
-	char syscmd[MAX_RECONFIG_SIZE + LIFNAMSIZ];
+	ip_pif_t *pif = node->ip_pif;
+	boolean_t ipv4 = B_FALSE;
+	boolean_t ipv6 = B_FALSE;
 
 	rcm_log_message(RCM_TRACE2, "IP: if_unplumb(%s)\n", node->ip_resource);
 
-	pif = node->ip_pif;
-	lif = pif->pi_lifs;
-
-	while (lif != NULL) {
+	for (lif = pif->pi_lifs; lif != NULL; lif = lif->li_next) {
 		if (lif->li_ifflags & IFF_IPV4) {
-			ipv4++;
+			ipv4 = B_TRUE;
 		} else if (lif->li_ifflags & IFF_IPV6) {
-			ipv6++;
+			ipv6 = B_TRUE;
 		} else {
 			/* Unlikely case */
 			rcm_log_message(RCM_DEBUG,
 			    "IP: Unplumb ignored (%s:%d)\n",
 			    pif->pi_ifname, lif->li_ifnum);
-			lif = lif->li_next;
-			continue;
 		}
-		lif = lif->li_next;
 	}
 
-	/* Unplumb the physical interface */
-	if (ipv4) {
-		rcm_log_message(RCM_TRACE2,
-		    "IP: if_unplumb: ifconfig %s unplumb\n", pif->pi_ifname);
-		(void) snprintf(syscmd, sizeof (syscmd), "%s %s unplumb\n",
-		    USR_SBIN_IFCONFIG, pif->pi_ifname);
-		if (rcm_exec_cmd(syscmd) != 0) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: Cannot unplumb (%s) %s\n"),
-			    pif->pi_ifname, strerror(errno));
-			return (-1);
-		}
+	if (ipv4 && !ifconfig(pif->pi_ifname, "inet", "unplumb", B_FALSE)) {
+		rcm_log_message(RCM_ERROR, _("IP: Cannot unplumb (%s) %s\n"),
+		    pif->pi_ifname, strerror(errno));
+		return (-1);
 	}
-	if (ipv6) {
-		rcm_log_message(RCM_TRACE2,
-		    "IP: if_unplumb: ifconfig %s inet6 unplumb\n",
-		    pif->pi_ifname);
-		(void) snprintf(syscmd, sizeof (syscmd),
-		    "%s %s inet6 unplumb\n", USR_SBIN_IFCONFIG, pif->pi_ifname);
-		if (rcm_exec_cmd(syscmd) != 0) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: Cannot unplumb (%s) %s\n"),
-			    pif->pi_ifname, strerror(errno));
-			return (-1);
-		}
+
+	if (ipv6 && !ifconfig(pif->pi_ifname, "inet6", "unplumb", B_FALSE)) {
+		rcm_log_message(RCM_ERROR, _("IP: Cannot unplumb (%s) %s\n"),
+		    pif->pi_ifname, strerror(errno));
+		return (-1);
 	}
+
 	rcm_log_message(RCM_TRACE2, "IP: if_unplumb(%s) success\n",
 	    node->ip_resource);
 
@@ -1723,8 +1620,11 @@ if_replumb(ip_cache_t *node)
 	ip_lif_t *lif;
 	ip_pif_t *pif;
 	int i;
-	char syscmd[LIFNAMSIZ+MAXPATHLEN];	/* must be big enough */
-	int max_ipv4 = 0, max_ipv6 = 0;
+	boolean_t success, ipmp;
+	const char *fstr;
+	char lifname[LIFNAMSIZ];
+	char buf[MAX_RECONFIG_SIZE];
+	int max_lifnum = 0;
 
 	rcm_log_message(RCM_TRACE2, "IP: if_replumb(%s)\n", node->ip_resource);
 
@@ -1738,100 +1638,103 @@ if_replumb(ip_cache_t *node)
 	 */
 
 	pif = node->ip_pif;
-	lif = pif->pi_lifs;
+	ipmp = (node->ip_pif->pi_grname[0] != '\0');
 
 	/*
 	 * Make a first pass to plumb in physical interfaces and get a count
 	 * of the max logical interfaces
 	 */
-	while (lif != NULL) {
+	for (lif = pif->pi_lifs; lif != NULL; lif = lif->li_next) {
+		max_lifnum = MAX(lif->li_ifnum, max_lifnum);
 		if (lif->li_ifflags & IFF_IPV4) {
-			if (lif->li_ifnum > max_ipv4) {
-				max_ipv4 = lif->li_ifnum;
-			}
+			fstr = "inet";
 		} else if (lif->li_ifflags & IFF_IPV6) {
-			if (lif->li_ifnum > max_ipv6) {
-				max_ipv6 = lif->li_ifnum;
-			}
+			fstr = "inet6";
 		} else {
 			/* Unlikely case */
 			rcm_log_message(RCM_DEBUG,
 			    "IP: Re-plumb ignored (%s:%d)\n",
 			    pif->pi_ifname, lif->li_ifnum);
-			lif = lif->li_next;
 			continue;
 		}
 
-		if (lif->li_ifnum == 0) { /* physical interface instance */
-			if ((lif->li_ifflags & IFF_NOFAILOVER) ||
-			    (strcmp(pif->pi_grpname, "") == 0)) {
-				(void) snprintf(syscmd, sizeof (syscmd),
-				    "%s %s\n", USR_SBIN_IFCONFIG,
-				    lif->li_reconfig);
-			} else if (lif->li_ifflags & IFF_IPV4) {
-				(void) snprintf(syscmd, sizeof (syscmd),
-				    "%s %s inet plumb group %s\n",
-				    USR_SBIN_IFCONFIG,
-				    pif->pi_ifname, pif->pi_grpname);
-			} else if (lif->li_ifflags & IFF_IPV6) {
-				(void) snprintf(syscmd, sizeof (syscmd),
-				    "%s %s inet6 plumb group %s\n",
-				    USR_SBIN_IFCONFIG,
-				    pif->pi_ifname, pif->pi_grpname);
-			}
+		/* ignore logical interface instances */
+		if (lif->li_ifnum != 0)
+			continue;
 
-			rcm_log_message(RCM_TRACE2,
-			    "IP: if_replumb: %s\n", syscmd);
-			if (rcm_exec_cmd(syscmd) != 0) {
-				rcm_log_message(RCM_ERROR,
-				    _("IP: Cannot plumb (%s) %s\n"),
-				    pif->pi_ifname, strerror(errno));
-				return (-1);
-			}
-
-			rcm_log_message(RCM_TRACE2,
-			    "IP: if_replumb: Modcnt = %d\n", lif->li_modcnt);
-			/* modinsert modules in order, ignore driver(last) */
-			for (i = 0; i < (lif->li_modcnt - 1); i++) {
-				rcm_log_message(RCM_TRACE2,
-				    "IP: modinsert: Pos = %d Mod = %s\n",
-				    i, lif->li_modules[i]);
-				if (modop(pif->pi_ifname, lif->li_modules[i], i,
-				    MOD_INSERT) == -1) {
-					rcm_log_message(RCM_ERROR,
-					    _("IP: modinsert error(%s)\n"),
-					    pif->pi_ifname);
-					return (-1);
-				}
-			}
+		if ((lif->li_ifflags & IFF_NOFAILOVER) || !ipmp) {
+			success = ifconfig("", "", lif->li_reconfig, B_FALSE);
+		} else {
+			(void) snprintf(buf, sizeof (buf), "plumb group %s",
+			    pif->pi_grname);
+			success = ifconfig(pif->pi_ifname, fstr, buf, B_FALSE);
 		}
 
-		lif = lif->li_next;
+		if (!success) {
+			rcm_log_message(RCM_ERROR,
+			    _("IP: Cannot plumb (%s) %s\n"), pif->pi_ifname,
+			    strerror(errno));
+			return (-1);
+		}
+
+		/*
+		 * Restart DHCP if necessary.
+		 */
+		if ((lif->li_ifflags & IFF_DHCPRUNNING) &&
+		    !ifconfig(pif->pi_ifname, fstr, CFG_DHCP_CMD, B_FALSE)) {
+			rcm_log_message(RCM_ERROR, _("IP: Cannot start DHCP "
+			    "(%s) %s\n"), pif->pi_ifname, strerror(errno));
+			return (-1);
+		}
+
+		rcm_log_message(RCM_TRACE2,
+		    "IP: if_replumb: Modcnt = %d\n", lif->li_modcnt);
+		/* modinsert modules in order, ignore driver(last) */
+		for (i = 0; i < (lif->li_modcnt - 1); i++) {
+			rcm_log_message(RCM_TRACE2,
+			    "IP: modinsert: Pos = %d Mod = %s\n",
+			    i, lif->li_modules[i]);
+			if (modop(pif->pi_ifname, lif->li_modules[i], i,
+			    MOD_INSERT) == -1) {
+				rcm_log_message(RCM_ERROR,
+				    _("IP: modinsert error(%s)\n"),
+				    pif->pi_ifname);
+				return (-1);
+			}
+		}
 	}
 
 	/* Now, add all the logical interfaces in the correct order */
-	for (i = 1; i <= MAX(max_ipv6, max_ipv4); i++) {
+	for (i = 1; i <= max_lifnum; i++) {
+		(void) snprintf(lifname, LIFNAMSIZ, "%s:%d", pif->pi_ifname, i);
+
 		/* reset lif through every iteration */
-		lif = pif->pi_lifs;
-		while (lif != NULL) {
-			if (((lif->li_ifflags & IFF_NOFAILOVER) ||
-			    (strcmp(pif->pi_grpname, "") == 0)) &&
-			    (lif->li_ifnum == i)) {
-				/* Plumb in the logical interface */
-				(void) snprintf(syscmd, sizeof (syscmd),
-				    "%s %s\n", USR_SBIN_IFCONFIG,
-				    lif->li_reconfig);
-				rcm_log_message(RCM_TRACE2,
-				    "IP: if_replumb: %s\n", syscmd);
-				if (rcm_exec_cmd(syscmd) != 0) {
-					rcm_log_message(RCM_ERROR,
-					    _("IP: Cannot addif (%s:%d) "
-					    "%s\n"),
-					    pif->pi_ifname, i, strerror(errno));
-					return (-1);
-				}
+		for (lif = pif->pi_lifs; lif != NULL; lif = lif->li_next) {
+			/*
+			 * Process entries in order.  If the interface is
+			 * using IPMP, only process test addresses.
+			 */
+			if (lif->li_ifnum != i ||
+			    (ipmp && !(lif->li_ifflags & IFF_NOFAILOVER)))
+				continue;
+
+			if (!ifconfig("", "", lif->li_reconfig, B_FALSE)) {
+				rcm_log_message(RCM_ERROR,
+				    _("IP: Cannot addif (%s) %s\n"), lifname,
+				    strerror(errno));
+				return (-1);
 			}
-			lif = lif->li_next;
+
+			/*
+			 * Restart DHCP if necessary.
+			 */
+			if ((lif->li_ifflags & IFF_DHCPRUNNING) &&
+			    !ifconfig(lifname, fstr, CFG_DHCP_CMD, B_FALSE)) {
+				rcm_log_message(RCM_ERROR,
+				    _("IP: Cannot start DHCP (%s) %s\n"),
+				    lifname, strerror(errno));
+				return (-1);
+			}
 		}
 	}
 
@@ -1865,71 +1768,64 @@ clr_cfg_state(ip_pif_t *pif)
 }
 
 /*
- * ip_ipmp_offline() - Failover from if_from to if_to using a
- *		     minimum redudancy of min_red. This uses IPMPs
- *		     "offline" mechanism to achieve the failover.
+ * Attempt to offline ip_cache_t `node'; returns an IPMP error code.
  */
 static int
-ip_ipmp_offline(ip_cache_t *if_from, ip_cache_t *if_to)
+ip_ipmp_offline(ip_cache_t *node)
 {
-	mpathd_cmd_t mpdcmd;
-
-	if ((if_from == NULL) || (if_from->ip_pif == NULL) ||
-	    (if_from->ip_pif->pi_ifname == NULL)) {
-		return (-1);
-	}
+	int retval;
+	ipmp_handle_t handle;
 
 	rcm_log_message(RCM_TRACE1, "IP: ip_ipmp_offline\n");
 
-	mpdcmd.cmd_command = MI_OFFLINE;
-	(void) strcpy(mpdcmd.cmd_ifname, if_from->ip_pif->pi_ifname);
-
-	if ((if_to != NULL) && (if_to->ip_pif != NULL) &&
-	    (if_to->ip_pif->pi_ifname != NULL)) {
-		rcm_log_message(RCM_TRACE1, "IP: ip_ipmp_offline (%s)->(%s)\n",
-		    if_from->ip_pif->pi_ifname, if_to->ip_pif->pi_ifname);
-		(void) strncpy(mpdcmd.cmd_movetoif, if_to->ip_pif->pi_ifname,
-		    sizeof (mpdcmd.cmd_movetoif));
-		mpdcmd.cmd_movetoif[sizeof (mpdcmd.cmd_movetoif) - 1] = '\0';
-	} else {
-		rcm_log_message(RCM_TRACE1, "IP: ip_ipmp_offline (%s)->(any)\n",
-		    if_from->ip_pif->pi_ifname);
-		(void) strcpy(mpdcmd.cmd_movetoif, "");	/* signifies any */
-	}
-	mpdcmd.cmd_min_red = if_from->ip_ifred;
-
-	if (mpathd_send_cmd(&mpdcmd) < 0) {
+	if ((retval = ipmp_open(&handle)) != IPMP_SUCCESS) {
 		rcm_log_message(RCM_ERROR,
-		    _("IP: mpathd offline error: %s\n"),
-		    strerror(errno));
-		return (-1);
+		    _("IP: cannot create ipmp handle: %s\n"),
+		    ipmp_errmsg(retval));
+		return (retval);
 	}
 
-	rcm_log_message(RCM_TRACE1, "IP: ipmp offline success\n");
-	return (0);
+	retval = ipmp_offline(handle, node->ip_pif->pi_ifname, node->ip_ifred);
+	if (retval != IPMP_SUCCESS) {
+		rcm_log_message(RCM_ERROR, _("IP: ipmp_offline error: %s\n"),
+		    ipmp_errmsg(retval));
+	} else {
+		rcm_log_message(RCM_TRACE1, "IP: ipmp_offline success\n");
+	}
+
+	ipmp_close(handle);
+	return (retval);
 }
 
 /*
- * ip_ipmp_undo_offline() - Undo prior offline of the interface.
- *			  This uses IPMPs "undo offline" feature.
+ * Attempt to undo the offline ip_cache_t `node'; returns an IPMP error code.
  */
 static int
 ip_ipmp_undo_offline(ip_cache_t *node)
 {
-	mpathd_cmd_t mpdcmd;
+	int retval;
+	ipmp_handle_t handle;
 
-	mpdcmd.cmd_command = MI_UNDO_OFFLINE;
-	(void) strcpy(mpdcmd.cmd_ifname, node->ip_pif->pi_ifname);
+	rcm_log_message(RCM_TRACE1, "IP: ip_ipmp_undo_offline\n");
 
-	if (mpathd_send_cmd(&mpdcmd) < 0) {
+	if ((retval = ipmp_open(&handle)) != IPMP_SUCCESS) {
 		rcm_log_message(RCM_ERROR,
-		    _("IP: mpathd error: %s\n"),
-		    strerror(errno));
-		return (-1);
+		    _("IP: cannot create ipmp handle: %s\n"),
+		    ipmp_errmsg(retval));
+		return (retval);
 	}
 
-	rcm_log_message(RCM_TRACE1, "IP: ipmp undo offline success\n");
-	return (0);
+	retval = ipmp_undo_offline(handle, node->ip_pif->pi_ifname);
+	if (retval != IPMP_SUCCESS) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: ipmp_undo_offline error: %s\n"),
+		    ipmp_errmsg(retval));
+	} else {
+		rcm_log_message(RCM_TRACE1, "IP: ipmp_undo_offline success\n");
+	}
+
+	ipmp_close(handle);
+	return (retval);
 }
 
 /*
@@ -1946,10 +1842,9 @@ get_link_resource(const char *link)
 	char		*resource;
 	dladm_status_t	status;
 
-	if ((status = dladm_name2info(dld_handle, link, &linkid, &flags, NULL,
-	    NULL)) != DLADM_STATUS_OK) {
+	status = dladm_name2info(dld_handle, link, &linkid, &flags, NULL, NULL);
+	if (status != DLADM_STATUS_OK)
 		goto fail;
-	}
 
 	if (!(flags & DLADM_OPT_ACTIVE)) {
 		status = DLADM_STATUS_FAILED;
@@ -1973,243 +1868,6 @@ fail:
 	    _("IP: get_link_resource for %s error(%s)\n"),
 	    link, dladm_status2str(status, errmsg));
 	return (NULL);
-}
-
-/*
- * if_get_flags() - Return the cached physical interface flags
- *		  Call with cache_lock held
- */
-static uint64_t
-if_get_flags(ip_pif_t *pif)
-{
-	ip_lif_t *lif;
-
-	for (lif = pif->pi_lifs; lif != NULL; lif = lif->li_next) {
-		if (lif->li_ifnum == 0) {
-			return (lif->li_ifflags & RCM_PIF_FLAGS);
-		}
-	}
-	return (0);
-}
-
-/*
- * mpathd_send_cmd() - Sends the command to in.mpathd.
- */
-static int
-mpathd_send_cmd(mpathd_cmd_t *mpd)
-{
-	mpathd_unoffline_t mpc;
-	struct mpathd_response mpr;
-	int i;
-	int s;
-
-	rcm_log_message(RCM_TRACE1, "IP: mpathd_send_cmd \n");
-
-	for (i = 0; i < MPATHD_MAX_RETRIES; i++) {
-		s = connect_to_mpathd(AF_INET);
-		if (s == -1) {
-			s = connect_to_mpathd(AF_INET6);
-			if (s == -1) {
-				rcm_log_message(RCM_ERROR,
-				    _("IP: Cannot talk to mpathd\n"));
-				return (-1);
-			}
-		}
-		switch (mpd->cmd_command) {
-		case MI_OFFLINE :
-			rcm_log_message(RCM_TRACE1, "IP: MI_OFFLINE: "
-			    "(%s)->(%s) redundancy = %d\n", mpd->cmd_ifname,
-			    mpd->cmd_movetoif, mpd->cmd_min_red);
-
-			if (write(s, mpd, sizeof (mpathd_cmd_t)) !=
-			    sizeof (mpathd_cmd_t)) {
-				rcm_log_message(RCM_ERROR,
-				    _("IP: mpathd write: %s\n"),
-				    strerror(errno));
-				(void) close(s);
-				return (-1);
-			}
-			break;
-
-		case MI_SETOINDEX :
-			rcm_log_message(RCM_TRACE1, "IP: MI_SETOINDEX: "
-			    "(%s)->(%s) family = %d\n", mpd->from_lifname,
-			    mpd->to_pifname, mpd->addr_family);
-
-			if (write(s, mpd, sizeof (mpathd_cmd_t)) !=
-			    sizeof (mpathd_cmd_t)) {
-				rcm_log_message(RCM_ERROR,
-				    _("IP: mpathd write: %s\n"),
-				    strerror(errno));
-				(void) close(s);
-				return (-1);
-			}
-			break;
-
-		case MI_UNDO_OFFLINE:
-			/* mpathd checks for exact size of the message */
-			mpc.cmd_command = mpd->cmd_command;
-			(void) strcpy(mpc.cmd_ifname, mpd->cmd_ifname);
-
-			rcm_log_message(RCM_TRACE1, "IP: MI_UNDO_OFFLINE: "
-			    "(%s)\n", mpd->cmd_ifname);
-
-			if (write(s, &mpc, sizeof (mpathd_unoffline_t)) !=
-			    sizeof (mpathd_unoffline_t)) {
-				rcm_log_message(RCM_ERROR,
-				    _("IP: mpathd write: %s\n"),
-				    strerror(errno));
-				(void) close(s);
-				return (-1);
-			}
-			break;
-		default :
-			rcm_log_message(RCM_ERROR,
-			    _("IP: unsupported mpathd command\n"));
-			(void) close(s);
-			return (-1);
-		}
-
-		bzero(&mpr, sizeof (struct mpathd_response));
-		/* Read the result from mpathd */
-		if (read(s, &mpr, sizeof (struct mpathd_response)) !=
-		    sizeof (struct mpathd_response)) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: mpathd read : %s\n"), strerror(errno));
-			(void) close(s);
-			return (-1);
-		}
-
-		(void) close(s);
-		if (mpr.resp_mpathd_err == 0) {
-			rcm_log_message(RCM_TRACE1,
-			    "IP: mpathd_send_cmd success\n");
-			return (0);			/* Successful */
-		}
-
-		if (mpr.resp_mpathd_err == MPATHD_SYS_ERROR) {
-			if (mpr.resp_sys_errno == EAGAIN) {
-				(void) sleep(1);
-				rcm_log_message(RCM_DEBUG,
-				    "IP: mpathd retrying\n");
-				continue;		/* Retry */
-			}
-			errno = mpr.resp_sys_errno;
-			rcm_log_message(RCM_WARNING,
-			    _("IP: mpathd_send_cmd error: %s\n"),
-			    strerror(errno));
-		} else if (mpr.resp_mpathd_err == MPATHD_MIN_RED_ERROR) {
-			errno = EIO;
-			rcm_log_message(RCM_ERROR, _("IP: in.mpathd(1M): "
-			    "Minimum redundancy not met\n"));
-		} else {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: mpathd_send_cmd error\n"));
-		}
-		/* retry */
-	}
-
-	rcm_log_message(RCM_ERROR,
-	    _("IP: mpathd_send_cmd failed %d retries\n"), MPATHD_MAX_RETRIES);
-	return (-1);
-}
-
-/*
- * Returns -1 on failure. Returns the socket file descriptor on
- * success.
- */
-static int
-connect_to_mpathd(int family)
-{
-	int s;
-	struct sockaddr_storage ss;
-	struct sockaddr_in *sin = (struct sockaddr_in *)&ss;
-	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&ss;
-	struct in6_addr loopback_addr = IN6ADDR_LOOPBACK_INIT;
-	int addrlen;
-	int ret;
-	int on;
-
-	rcm_log_message(RCM_TRACE1, "IP: connect_to_mpathd\n");
-
-	s = socket(family, SOCK_STREAM, 0);
-	if (s < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: mpathd socket: %s\n"), strerror(errno));
-		return (-1);
-	}
-	bzero((char *)&ss, sizeof (ss));
-	ss.ss_family = family;
-	/*
-	 * Need to bind to a privelged port. For non-root, this
-	 * will fail. in.mpathd verifies that only commands coming
-	 * from priveleged ports succeed so that the ordinary user
-	 * can't issue offline commands.
-	 */
-	on = 1;
-	if (setsockopt(s, IPPROTO_TCP, TCP_ANONPRIVBIND, &on,
-	    sizeof (on)) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: mpathd setsockopt: TCP_ANONPRIVBIND: %s\n"),
-		    strerror(errno));
-		return (-1);
-	}
-	switch (family) {
-	case AF_INET:
-		sin->sin_port = 0;
-		sin->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-		addrlen = sizeof (struct sockaddr_in);
-		break;
-	case AF_INET6:
-		sin6->sin6_port = 0;
-		sin6->sin6_addr = loopback_addr;
-		addrlen = sizeof (struct sockaddr_in6);
-		break;
-	}
-	ret = bind(s, (struct sockaddr *)&ss, addrlen);
-	if (ret != 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: mpathd bind: %s\n"), strerror(errno));
-		return (-1);
-	}
-	switch (family) {
-	case AF_INET:
-		sin->sin_port = htons(MPATHD_PORT);
-		break;
-	case AF_INET6:
-		sin6->sin6_port = htons(MPATHD_PORT);
-		break;
-	}
-	ret = connect(s, (struct sockaddr *)&ss, addrlen);
-	if (ret != 0) {
-		if (errno == ECONNREFUSED) {
-			/* in.mpathd is not running, start it */
-			if (rcm_exec_cmd(MPATHD_PATH) == -1) {
-				rcm_log_message(RCM_ERROR,
-				    _("IP: mpathd exec: %s\n"),
-				    strerror(errno));
-				return (-1);
-			}
-			ret = connect(s, (struct sockaddr *)&ss, addrlen);
-		}
-		if (ret != 0) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: mpathd connect: %s\n"), strerror(errno));
-			return (-1);
-		}
-	}
-	on = 0;
-	if (setsockopt(s, IPPROTO_TCP, TCP_ANONPRIVBIND, &on,
-	    sizeof (on)) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: mpathd setsockopt TCP_ANONPRIVBIND: %s\n"),
-		    strerror(errno));
-		return (-1);
-	}
-
-	rcm_log_message(RCM_TRACE1, "IP: connect_to_mpathd success\n");
-
-	return (s);
 }
 
 /*
@@ -2239,12 +1897,10 @@ modop(char *name, char *arg, int pos, char op)
 
 	if (op == MOD_REMOVE) {
 		(void) snprintf(syscmd, sizeof (syscmd),
-		    "%s %s modremove %s@%d\n", USR_SBIN_IFCONFIG, name, arg,
-		    pos);
+		    "%s %s modremove %s@%d\n", SBIN_IFCONFIG, name, arg, pos);
 	} else if (op == MOD_INSERT) {
 		(void) snprintf(syscmd, sizeof (syscmd),
-		    "%s %s modinsert %s@%d\n", USR_SBIN_IFCONFIG, name, arg,
-		    pos);
+		    "%s %s modinsert %s@%d\n", SBIN_IFCONFIG, name, arg, pos);
 	} else {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: modop(%s): unknown operation\n"), name);
@@ -2277,11 +1933,11 @@ get_modlist(char *name, ip_lif_t *lif)
 	int i;
 	int num_mods;
 	struct lifreq lifr;
-	struct str_list strlist;
+	struct str_list strlist = { 0 };
 
 	rcm_log_message(RCM_TRACE1, "IP: getmodlist(%s)\n", name);
 
-	(void) strncpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
+	(void) strlcpy(lifr.lifr_name, name, sizeof (lifr.lifr_name));
 	lifr.lifr_flags = lif->li_ifflags;
 	if (ip_domux2fd(&mux_fd, &muxid_fd, &fd, &lifr) < 0) {
 		rcm_log_message(RCM_ERROR, _("IP: ip_domux2fd(%s)\n"), name);
@@ -2292,39 +1948,34 @@ get_modlist(char *name, ip_lif_t *lif)
 		rcm_log_message(RCM_ERROR,
 		    _("IP: get_modlist(%s): I_LIST(%s) \n"),
 		    name, strerror(errno));
-		(void) ip_plink(mux_fd, muxid_fd, fd, &lifr);
-		return (-1);
+		goto fail;
 	}
 
 	strlist.sl_nmods = num_mods;
 	strlist.sl_modlist = malloc(sizeof (struct str_mlist) * num_mods);
-
 	if (strlist.sl_modlist == NULL) {
 		rcm_log_message(RCM_ERROR, _("IP: get_modlist(%s): %s\n"),
 		    name, strerror(errno));
-		(void) ip_plink(mux_fd, muxid_fd, fd, &lifr);
-		return (-1);
+		goto fail;
 	}
 
 	if (ioctl(fd, I_LIST, (caddr_t)&strlist) < 0) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: get_modlist(%s): I_LIST error: %s\n"),
 		    name, strerror(errno));
-		(void) ip_plink(mux_fd, muxid_fd, fd, &lifr);
-		return (-1);
+		goto fail;
 	}
 
 	for (i = 0; i < strlist.sl_nmods; i++) {
-		lif->li_modules[i] =
-		    malloc(strlen(strlist.sl_modlist[i].l_name)+1);
+		lif->li_modules[i] = strdup(strlist.sl_modlist[i].l_name);
 		if (lif->li_modules[i] == NULL) {
 			rcm_log_message(RCM_ERROR,
 			    _("IP: get_modlist(%s): %s\n"),
 			    name, strerror(errno));
-			(void) ip_plink(mux_fd, muxid_fd, fd, &lifr);
-			return (-1);
+			while (i > 0)
+				free(lif->li_modules[--i]);
+			goto fail;
 		}
-		(void) strcpy(lif->li_modules[i], strlist.sl_modlist[i].l_name);
 	}
 
 	lif->li_modcnt = strlist.sl_nmods;
@@ -2332,6 +1983,10 @@ get_modlist(char *name, ip_lif_t *lif)
 
 	rcm_log_message(RCM_TRACE1, "IP: getmodlist(%s) success\n", name);
 	return (ip_plink(mux_fd, muxid_fd, fd, &lifr));
+fail:
+	free(strlist.sl_modlist);
+	(void) ip_plink(mux_fd, muxid_fd, fd, &lifr);
+	return (-1);
 }
 
 /*
@@ -2436,6 +2091,7 @@ ip_plink(int mux_fd, int muxid_fd, int fd, struct lifreq *lifr)
  *
  *	Notify online to IP address consumers.
  */
+/*ARGSUSED*/
 static int
 ip_onlinelist(rcm_handle_t *hd, ip_cache_t *node, char **errorp, uint_t flags,
 		rcm_info_t **depend_info)
@@ -2464,6 +2120,7 @@ ip_onlinelist(rcm_handle_t *hd, ip_cache_t *node, char **errorp, uint_t flags,
  *
  *	Offline IP address consumers.
  */
+/*ARGSUSED*/
 static int
 ip_offlinelist(rcm_handle_t *hd, ip_cache_t *node, char **errorp, uint_t flags,
 	rcm_info_t **depend_info)
@@ -2494,9 +2151,9 @@ ip_offlinelist(rcm_handle_t *hd, ip_cache_t *node, char **errorp, uint_t flags,
 }
 
 /*
- * ip_get_addrlist() -	Compile list of IP addresses hosted on this NIC (node)
- *			This routine malloc() required memeory for the list
- *			Returns list on success, NULL if failed
+ * ip_get_addrlist() -	Get the list of IP addresses on this interface (node);
+ *			This routine malloc()s required memory for the list.
+ *			Returns the list on success, NULL on failure.
  *			Call with cache_lock held.
  */
 static char **
@@ -2504,11 +2161,9 @@ ip_get_addrlist(ip_cache_t *node)
 {
 	ip_lif_t *lif;
 	char **addrlist = NULL;
-	int numifs;
+	int i, numifs;
+	size_t addrlistsize;
 	char addrstr[INET6_ADDRSTRLEN];
-	void *addr;
-	int af;
-	int i;
 
 	rcm_log_message(RCM_TRACE2, "IP: ip_get_addrlist(%s)\n",
 	    node->ip_resource);
@@ -2532,35 +2187,21 @@ ip_get_addrlist(ip_cache_t *node)
 	for (lif = node->ip_pif->pi_lifs, i = 0; lif != NULL;
 	    lif = lif->li_next, i++) {
 
-		af = lif->li_addr.family;
-		if (af == AF_INET6) {
-			addr = &lif->li_addr.ip6.sin6_addr;
-		} else if (af == AF_INET) {
-			addr = &lif->li_addr.ip4.sin_addr;
-		} else {
-			rcm_log_message(RCM_DEBUG,
-			    "IP: unknown addr family %d, assuming AF_INET\n",
-			    af);
-			af = AF_INET;
-			addr = &lif->li_addr.ip4.sin_addr;
-		}
-		if (inet_ntop(af, addr, addrstr, INET6_ADDRSTRLEN) == NULL) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: inet_ntop: %s\n"), strerror(errno));
+		if (!ip_addrstr(lif, addrstr, sizeof (addrstr))) {
 			ip_free_addrlist(addrlist);
 			return (NULL);
 		}
 
-		if ((addrlist[i] = malloc(strlen(addrstr) + RCM_SIZE_SUNW_IP))
-		    == NULL) {
+		addrlistsize = strlen(addrstr) + sizeof (RCM_STR_SUNW_IP);
+		if ((addrlist[i] = malloc(addrlistsize)) == NULL) {
 			rcm_log_message(RCM_ERROR,
 			    _("IP: ip_get_addrlist(%s) malloc failure(%s)\n"),
 			    node->ip_resource, strerror(errno));
 			ip_free_addrlist(addrlist);
 			return (NULL);
 		}
-		(void) strcpy(addrlist[i], RCM_STR_SUNW_IP);	/* SUNW_ip/ */
-		(void) strcat(addrlist[i], addrstr);	/* SUNW_ip/<address> */
+		(void) snprintf(addrlist[i], addrlistsize, "%s%s",
+		    RCM_STR_SUNW_IP, addrstr);
 
 		rcm_log_message(RCM_DEBUG, "Anon Address: %s\n", addrlist[i]);
 	}
@@ -2611,16 +2252,13 @@ ip_consumer_notify(rcm_handle_t *hd, datalink_id_t linkid, char **errorp,
 		return;
 	}
 	/*
-	 * Inform anonymous consumers about IP addresses being
-	 * onlined
+	 * Inform anonymous consumers about IP addresses being onlined.
 	 */
 	(void) ip_onlinelist(hd, node, errorp, flags, depend_info);
 
 	(void) mutex_unlock(&cache_lock);
 
 	rcm_log_message(RCM_TRACE2, "IP: ip_consumer_notify success\n");
-	return;
-
 }
 
 /*
@@ -2632,20 +2270,18 @@ if_configure(datalink_id_t linkid)
 	char ifinst[MAXLINKNAMELEN];
 	char cfgfile[MAXPATHLEN];
 	char cached_name[RCM_LINK_RESOURCE_MAX];
-	struct stat statbuf;
+	FILE *hostfp, *host6fp;
 	ip_cache_t *node;
-	int af = 0;
-	int ipmp = 0;
+	boolean_t ipmp = B_FALSE;
 
 	assert(linkid != DATALINK_INVALID_LINKID);
-
 	rcm_log_message(RCM_TRACE1, _("IP: if_configure(%u)\n"), linkid);
 
 	/* Check for the interface in the cache */
 	(void) snprintf(cached_name, sizeof (cached_name), "%s/%u",
 	    RCM_LINK_PREFIX, linkid);
 
-	/* Check if the interface is new or was previously offlined */
+	/* Check if the interface is new or was not previously offlined */
 	(void) mutex_lock(&cache_lock);
 	if (((node = cache_lookup(NULL, cached_name, CACHE_REFRESH)) != NULL) &&
 	    (!(node->ip_cachestate & CACHE_IF_OFFLINED))) {
@@ -2663,76 +2299,69 @@ if_configure(datalink_id_t linkid)
 		return (-1);
 	}
 
-	/* Scan IPv4 configuration first */
-	(void) snprintf(cfgfile, MAXPATHLEN, "%s%s", CFGFILE_FMT_IPV4, ifinst);
-	cfgfile[MAXPATHLEN - 1] = '\0';
-
+	/*
+	 * Scan the IPv4 and IPv6 hostname files to see if (a) they exist
+	 * and (b) if either one places the interface into an IPMP group.
+	 */
+	(void) snprintf(cfgfile, MAXPATHLEN, CFGFILE_FMT_IPV4, ifinst);
 	rcm_log_message(RCM_TRACE1, "IP: Scanning %s\n", cfgfile);
-	if (stat(cfgfile, &statbuf) == 0) {
-		af |= CONFIG_AF_INET;
-		if (isgrouped(cfgfile)) {
-			ipmp++;
-		}
+	if ((hostfp = fopen(cfgfile, "r")) != NULL) {
+		if (isgrouped(cfgfile))
+			ipmp = B_TRUE;
 	}
 
-	/* Scan IPv6 configuration details */
-	(void) snprintf(cfgfile, MAXPATHLEN, "%s%s", CFGFILE_FMT_IPV6, ifinst);
-	cfgfile[MAXPATHLEN - 1] = '\0';
+	(void) snprintf(cfgfile, MAXPATHLEN, CFGFILE_FMT_IPV6, ifinst);
 	rcm_log_message(RCM_TRACE1, "IP: Scanning %s\n", cfgfile);
-	if (stat(cfgfile, &statbuf) == 0) {
-		af |= CONFIG_AF_INET6;
-		if ((ipmp == 0) && isgrouped(cfgfile)) {
-			ipmp++;
-		}
+	if ((host6fp = fopen(cfgfile, "r")) != NULL) {
+		if (!ipmp && isgrouped(cfgfile))
+			ipmp = B_TRUE;
 	}
 
-	if (af & CONFIG_AF_INET) {
-		if (if_ipmp_config(ifinst, CONFIG_AF_INET, ipmp) == -1) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: IPv4 Post-attach failed (%s)\n"), ifinst);
-			return (-1);
-		}
+	/*
+	 * Configure the interface according to its hostname files.
+	 */
+	if (hostfp != NULL &&
+	    if_config_inst(ifinst, hostfp, AF_INET, ipmp) == -1) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: IPv4 Post-attach failed (%s)\n"), ifinst);
+		goto fail;
 	}
 
-	if (af & CONFIG_AF_INET6) {
-		if (if_ipmp_config(ifinst, CONFIG_AF_INET6, ipmp) == -1) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: IPv6 Post-attach failed(%s)\n"), ifinst);
-			return (-1);
-		}
+	if (host6fp != NULL &&
+	    if_config_inst(ifinst, host6fp, AF_INET6, ipmp) == -1) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: IPv6 Post-attach failed (%s)\n"), ifinst);
+		goto fail;
 	}
 
+	(void) fclose(hostfp);
+	(void) fclose(host6fp);
 	rcm_log_message(RCM_TRACE1, "IP: if_configure(%s) success\n", ifinst);
-
 	return (0);
-
+fail:
+	(void) fclose(hostfp);
+	(void) fclose(host6fp);
+	return (-1);
 }
 
 /*
- * isgrouped() - Scans the given config file to see if this is a grouped
- *	       interface
- *	       Returns non-zero if true; 0 if false
+ * isgrouped() - Scans the given config file to see if this interface is
+ *	         using IPMP.  Returns B_TRUE or B_FALSE.
  */
-static int
-isgrouped(char *cfgfile)
+static boolean_t
+isgrouped(const char *cfgfile)
 {
 	FILE *fp;
 	struct stat statb;
-	char *buf = NULL;
-	char *tokens[MAXARGS];		/* token pointers */
-	char tspace[MAXLINE];		/* token space */
-	int ntok;
-	int group = 0;
-
-	if (cfgfile == NULL)
-		return (0);
+	char *nlp, *line, *token, *lasts, *buf;
+	boolean_t grouped = B_FALSE;
 
 	rcm_log_message(RCM_TRACE1, "IP: isgrouped(%s)\n", cfgfile);
 
 	if (stat(cfgfile, &statb) != 0) {
 		rcm_log_message(RCM_TRACE1,
 		    _("IP: No config file(%s)\n"), cfgfile);
-		return (0);
+		return (B_FALSE);
 	}
 
 	/*
@@ -2744,609 +2373,284 @@ isgrouped(char *cfgfile)
 	if (statb.st_size <= 1) {
 		rcm_log_message(RCM_TRACE1,
 		    _("IP: Empty config file(%s)\n"), cfgfile);
-		return (0);
+		return (B_FALSE);
 	}
 
 	if ((fp = fopen(cfgfile, "r")) == NULL) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: Cannot open configuration file(%s): %s\n"), cfgfile,
 		    strerror(errno));
-		return (0);
+		return (B_FALSE);
 	}
 
-	if ((buf = calloc(1, statb.st_size)) == NULL) {
+	if ((buf = malloc(statb.st_size)) == NULL) {
 		rcm_log_message(RCM_ERROR,
-		    _("IP: calloc failure(%s): %s\n"), cfgfile,
+		    _("IP: malloc failure(%s): %s\n"), cfgfile,
 		    strerror(errno));
-		(void) fclose(fp);
-		return (0);
+		goto out;
 	}
 
 	while (fgets(buf, statb.st_size, fp) != NULL) {
-		if (*buf == '\0')
-			continue;
+		if ((nlp = strrchr(buf, '\n')) != NULL)
+			*nlp = '\0';
 
-		tokenize(buf, tokens, tspace, &ntok);
-		while (ntok) {
-			if (STREQ("group", tokens[ntok - 1])) {
-				if (tokens[ntok] != NULL) {
-					group++;
-				}
+		line = buf;
+		while ((token = strtok_r(line, " \t", &lasts)) != NULL) {
+			line = NULL;
+			if (STREQ("group", token) &&
+			    strtok_r(NULL, " \t", &lasts) != NULL) {
+				grouped = B_TRUE;
+				goto out;
 			}
-			ntok--;
 		}
 	}
-
+out:
 	free(buf);
-
 	(void) fclose(fp);
 
-	if (group <= 0) {
-		rcm_log_message(RCM_TRACE1, "IP: isgrouped(%s) non-grouped\n",
-		    cfgfile);
-		return (0);
-	} else {
-		rcm_log_message(RCM_TRACE1, "IP: isgrouped(%s) grouped\n",
-		    cfgfile);
-		return (1);
-	}
+	rcm_log_message(RCM_TRACE1, "IP: isgrouped(%s): %d\n", cfgfile,
+	    grouped);
+
+	return (grouped);
 }
 
-
 /*
- * if_ipmp_config() - Configure an interface instance as specified by the
+ * if_config_inst() - Configure an interface instance as specified by the
  *		    address family af and if it is grouped (ipmp).
  */
 static int
-if_ipmp_config(char *ifinst, int af, int ipmp)
+if_config_inst(const char *ifinst, FILE *hfp, int af, boolean_t ipmp)
 {
-	char cfgfile[MAXPATHLEN];	/* configuration file */
-	FILE *fp;
+	FILE *ifparsefp;
 	struct stat statb;
-	char *buf;
-	char *tokens[MAXARGS];		/* list of config attributes */
-	char tspace[MAXLINE];		/* token space */
-	char syscmd[MAX_RECONFIG_SIZE + MAXPATHLEN + 1];
-	char grpcmd[MAX_RECONFIG_SIZE + MAXPATHLEN + 1];
-	char fstr[8];		/* address family string inet or inet6 */
-	int nofailover = 0;
-	int newattach = 0;
-	int cmdvalid = 0;
-	int ntok;
-	int n;
-	int stdif = 0;
+	char *buf = NULL;
+	char *ifparsebuf = NULL;
+	uint_t ifparsebufsize;
+	const char *fstr;		/* address family string */
+	boolean_t stdif = B_FALSE;
 
-	if (ifinst == NULL)
-		return (0);
-
-	rcm_log_message(RCM_TRACE1, "IP: if_ipmp_config(%s) ipmp = %d\n",
+	rcm_log_message(RCM_TRACE1, "IP: if_config_inst(%s) ipmp = %d\n",
 	    ifinst, ipmp);
 
-	if (af & CONFIG_AF_INET) {
-		(void) snprintf(cfgfile, MAXPATHLEN, "%s%s", CFGFILE_FMT_IPV4,
-		    ifinst);
-		(void) strcpy(fstr, "inet");
-	} else if (af & CONFIG_AF_INET6) {
-		(void) snprintf(cfgfile, MAXPATHLEN, "%s%s", CFGFILE_FMT_IPV6,
-		    ifinst);
-		(void) strcpy(fstr, "inet6");
-	} else {
-		return (0);		/* nothing to do */
-	}
-
-	cfgfile[MAXPATHLEN - 1] = '\0';
-	grpcmd[0] = '\0';
-
-	if (stat(cfgfile, &statb) != 0) {
-		rcm_log_message(RCM_TRACE1,
-		    "IP: No config file(%s)\n", ifinst);
-		return (0);
-	}
-
-	/* Config file exists, plumb in the physical interface */
-	if (af & CONFIG_AF_INET6) {
-		if (if_getcount(AF_INET6) == 0) {
-			/*
-			 * Configure software loopback driver if this is the
-			 * first IPv6 interface plumbed
-			 */
-			newattach++;
-			(void) snprintf(syscmd, sizeof (syscmd),
-			    "%s lo0 %s plumb ::1 up", USR_SBIN_IFCONFIG, fstr);
-			if (rcm_exec_cmd(syscmd) != 0) {
-				rcm_log_message(RCM_ERROR,
-				    _("IP: Cannot plumb (%s) %s\n"),
-				    ifinst, strerror(errno));
-				return (-1);
-			}
-		}
-		(void) snprintf(syscmd, sizeof (syscmd), "%s %s %s plumb up",
-		    USR_SBIN_IFCONFIG, ifinst, fstr);
-	} else {
-		(void) snprintf(syscmd, sizeof (syscmd), "%s %s %s plumb ",
-		    USR_SBIN_IFCONFIG, ifinst, fstr);
-		if (if_getcount(AF_INET) == 0) {
-			newattach++;
-		}
-	}
-	rcm_log_message(RCM_TRACE1, "IP: Exec: %s\n", syscmd);
-
-	if (rcm_exec_cmd(syscmd) != 0) {
+	if (fstat(fileno(hfp), &statb) != 0) {
 		rcm_log_message(RCM_ERROR,
-		    _("IP: Cannot plumb (%s) %s\n"), ifinst, strerror(errno));
-		return (-1);
+		    _("IP: Cannot fstat file(%s)\n"), ifinst);
+		goto fail;
 	}
 
-	/* Check if config file is empty, if so, nothing else to do */
-	if (statb.st_size == 0) {
+	switch (af) {
+	case AF_INET:
+		fstr = "inet";
+		break;
+	case AF_INET6:
+		fstr = "inet6";
+		break;
+	default:
+		assert(0);
+	}
+
+	/*
+	 * The hostname file exists; plumb the physical interface.
+	 */
+	if (!ifconfig(ifinst, fstr, "plumb", B_FALSE))
+		goto fail;
+
+	/* Skip static configuration if the hostname file is empty */
+	if (statb.st_size <= 1) {
 		rcm_log_message(RCM_TRACE1,
-		    "IP: Zero size config file(%s)\n", ifinst);
-		return (0);
+		    _("IP: Zero size hostname file(%s)\n"), ifinst);
+		goto configured;
 	}
 
-	if ((fp = fopen(cfgfile, "r")) == NULL) {
+	if (fseek(hfp, 0, SEEK_SET) == -1) {
 		rcm_log_message(RCM_ERROR,
-		    _("IP: Open error(%s): %s\n"), cfgfile, strerror(errno));
-		return (-1);
+		    _("IP: Cannot rewind hostname file(%s): %s\n"), ifinst,
+		    strerror(errno));
+		goto fail;
 	}
 
+	/*
+	 * Allocate the worst-case single-line buffer sizes.  A bit skanky,
+	 * but since hostname files are small, this should suffice.
+	 */
 	if ((buf = calloc(1, statb.st_size)) == NULL) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: calloc(%s): %s\n"), ifinst, strerror(errno));
-		(void) fclose(fp);
-		return (-1);
+		goto fail;
 	}
 
-	/* a single line with one token implies a classical if */
-	if (fgets(buf, statb.st_size, fp) != NULL) {
-		tokenize(buf, tokens, tspace, &ntok);
-		if (ntok == 1) {
-			rcm_log_message(RCM_TRACE1, "IP: Standard interface\n");
-			stdif++;
-		}
+	ifparsebufsize = statb.st_size + sizeof (SBIN_IFPARSE " -s inet6 ");
+	if ((ifparsebuf = calloc(1, ifparsebufsize)) == NULL) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: calloc(%s): %s\n"), ifinst, strerror(errno));
+		goto fail;
 	}
-	if (fseek(fp, 0L, SEEK_SET) == -1) {
-		rcm_log_message(RCM_ERROR, _("IP: fseek: %s\n"),
+
+	/*
+	 * For IPv4, determine whether the hostname file consists of a single
+	 * line.  We need to handle these specially since they should
+	 * automatically be suffixed with "netmask + broadcast + up".
+	 */
+	if (af == AF_INET &&
+	    fgets(buf, statb.st_size, hfp) != NULL &&
+	    fgets(buf, statb.st_size, hfp) == NULL) {
+		rcm_log_message(RCM_TRACE1, "IP: one-line hostname file\n");
+		stdif = B_TRUE;
+	}
+
+	if (fseek(hfp, 0L, SEEK_SET) == -1) {
+		rcm_log_message(RCM_ERROR,
+		    _("IP: Cannot rewind hostname file(%s): %s\n"), ifinst,
 		    strerror(errno));
-		return (-1);
+		goto fail;
 	}
 
 	/*
-	 * Process the config command
-	 * This loop also handles multiple logical interfaces that may
-	 * be configured on a single line
+	 * Loop through the file one line at a time and feed it to ifconfig.
+	 * If the interface is using IPMP, then we use /sbin/ifparse -s to
+	 * weed out all of the data addresses, since those are already on the
+	 * IPMP meta-interface.
 	 */
-	while (fgets(buf, statb.st_size, fp) != NULL) {
-		nofailover = 0;
-		cmdvalid = 0;
-
-		if (*buf == '\0')
+	while (fgets(buf, statb.st_size, hfp) != NULL) {
+		if (ntok(buf) == 0)
 			continue;
 
-		tokenize(buf, tokens, tspace, &ntok);
-		if (ntok <= 0)
-			continue;
-
-		/* Reset the config command */
-		(void) snprintf(syscmd, sizeof (syscmd), "%s %s %s ",
-		    USR_SBIN_IFCONFIG, ifinst, fstr);
-
-		/* No parsing if this is first interface of its kind */
-		if (newattach) {
-			(void) strcat(syscmd, buf);
-			/* Classic if */
-			if ((af & CONFIG_AF_INET) && (stdif == 1)) {
-				(void) strcat(syscmd, CFG_CMDS_STD);
-			}
-			rcm_log_message(RCM_TRACE1, "IP: New: %s\n", syscmd);
-			if (rcm_exec_cmd(syscmd) != 0) {
-				rcm_log_message(RCM_ERROR,
-				    _("IP: Error: %s (%s): %s\n"),
-				    syscmd, ifinst, strerror(errno));
-			}
+		if (!ipmp) {
+			(void) ifconfig(ifinst, fstr, buf, stdif);
 			continue;
 		}
 
-		/* Parse the tokens to determine nature of the interface */
-		for (n = 0; n < ntok; n++) {
-			/* Handle pathological failover cases */
-			if (STREQ("-failover", tokens[n]))
-				nofailover++;
-			if (STREQ("failover", tokens[n]))
-				nofailover--;
-
-			/* group attribute requires special processing */
-			if (STREQ("group", tokens[n])) {
-				if (tokens[n + 1] != NULL) {
-					(void) snprintf(grpcmd, sizeof (grpcmd),
-					    "%s %s %s %s %s", USR_SBIN_IFCONFIG,
-					    ifinst, fstr,
-					    tokens[n], tokens[n + 1]);
-					n++;		/* skip next token */
-					continue;
-				}
-			}
-
-			/* Execute buffered command ? */
-			if (STREQ("set", tokens[n]) ||
-			    STREQ("addif", tokens[n]) ||
-			    STREQ("removeif", tokens[n]) ||
-			    (n == (ntok -1))) {
-
-				/* config command complete ? */
-				if (n == (ntok -1)) {
-					ADDSPACE(syscmd);
-					(void) strcat(syscmd, tokens[n]);
-					cmdvalid++;
-				}
-
-				if (!cmdvalid) {
-					ADDSPACE(syscmd);
-					(void) strcat(syscmd, tokens[n]);
-					cmdvalid++;
-					continue;
-				}
-				/* Classic if ? */
-				if ((af & CONFIG_AF_INET) && (stdif == 1)) {
-					(void) strcat(syscmd, CFG_CMDS_STD);
-				}
-
-				if (nofailover > 0) {
-					rcm_log_message(RCM_TRACE1,
-					    "IP: Interim exec: %s\n", syscmd);
-					if (rcm_exec_cmd(syscmd) != 0) {
-						rcm_log_message(RCM_ERROR,
-						    _("IP: %s fail(%s): %s\n"),
-						    syscmd, ifinst,
-						    strerror(errno));
-					}
-				} else {
-					/* Have mpathd configure the address */
-					if (if_mpathd_configure(syscmd, ifinst,
-					    af, ipmp) != 0) {
-						rcm_log_message(RCM_ERROR,
-						    _("IP: %s fail(%s): %s\n"),
-						    syscmd, ifinst,
-						    strerror(errno));
-					}
-				}
-
-				/* Reset config command */
-				(void) snprintf(syscmd, sizeof (syscmd),
-				    "%s %s %s ", USR_SBIN_IFCONFIG, ifinst,
-				    fstr);
-				nofailover = 0;
-				cmdvalid = 0;
-			}
-			/*
-			 * Note: No explicit command validation is required
-			 *	since ifconfig to does it for us
-			 */
-			ADDSPACE(syscmd);
-			(void) strcat(syscmd, tokens[n]);
-			cmdvalid++;
-		}
-	}
-
-	free(buf);
-	(void) fclose(fp);
-
-	/*
-	 * The group name needs to be set after all the test/nofailover
-	 * addresses have been configured. Otherwise, if IPMP detects that the
-	 * interface is failed, the addresses will be moved to a working
-	 * interface before the '-failover' flag can be set.
-	 */
-	if (grpcmd[0] != '\0') {
-		rcm_log_message(RCM_TRACE1, "IP: set group name: %s\n", grpcmd);
-		if (rcm_exec_cmd(grpcmd) != 0) {
-			rcm_log_message(RCM_ERROR, _("IP: %s fail(%s): %s\n"),
-			    grpcmd, ifinst, strerror(errno));
-		}
-	}
-
-	rcm_log_message(RCM_TRACE1, "IP: if_ipmp_config(%s) success\n", ifinst);
-
-	return (0);
-}
-
-/*
- * if_mpathd_configure() - Determine configuration disposition of the interface
- */
-static int
-if_mpathd_configure(char *syscmd, char *ifinst, int af, int ipmp)
-{
-	char *tokens[MAXARGS];
-	char tspace[MAXLINE];
-	int ntok;
-	char *addr;
-	char *from_lifname;
-	mpathd_cmd_t mpdcmd;
-	int n;
-
-	rcm_log_message(RCM_TRACE1, "IP: if_mpathd_configure(%s): %s\n",
-	    ifinst, syscmd);
-
-	tokenize(syscmd, tokens, tspace, &ntok);
-	if (ntok <= 0)
-		return (0);
-
-	addr = tokens[3];	/* by default, third token is valid address */
-	for (n = 0; n < ntok; n++) {
-		if (STREQ("set", tokens[n]) ||
-		    STREQ("addif", tokens[n])) {
-			addr = tokens[n+1];
-			if (addr == NULL) {	/* invalid format */
-				return (-1);
-			} else
-				break;
-		}
-	}
-
-	/* Check std. commands or no failed over address */
-	if (STREQ("removeif", addr) || STREQ("group", addr) ||
-	    ((from_lifname = get_mpathd_dest(addr, af)) == NULL)) {
-		rcm_log_message(RCM_TRACE1,
-		    "IP: No failed-over host, exec %s\n", syscmd);
-		if (rcm_exec_cmd(syscmd) != 0) {
+		(void) snprintf(ifparsebuf, ifparsebufsize, SBIN_IFPARSE
+		    " -s %s %s", fstr, buf);
+		if ((ifparsefp = popen(ifparsebuf, "r")) == NULL) {
 			rcm_log_message(RCM_ERROR,
-			    _("IP: %s failed(%s): %s\n"),
-			    syscmd, ifinst, strerror(errno));
-			return (-1);
+			    _("IP: cannot configure %s: popen \"%s\" "
+			    "failed: %s\n"), ifinst, buf, strerror(errno));
+			goto fail;
 		}
-		return (0);
+
+		while (fgets(buf, statb.st_size, ifparsefp) != NULL) {
+			if (ntok(buf) > 0)
+				(void) ifconfig(ifinst, fstr, buf, stdif);
+		}
+
+		if (pclose(ifparsefp) == -1) {
+			rcm_log_message(RCM_ERROR,
+			    _("IP: cannot configure %s: pclose \"%s\" "
+			    "failed: %s\n"), ifinst, buf, strerror(errno));
+			goto fail;
+		}
 	}
 
-	/* Check for non-IPMP failover scenarios */
-	if ((ipmp <= 0) && (from_lifname != NULL)) {
-		/* Address already hosted on another NIC, return */
-		rcm_log_message(RCM_TRACE1,
-		    "IP: Non-IPMP failed-over host(%s): %s\n",
-		    ifinst, addr);
-		return (0);
-	}
+configured:
+	/*
+	 * Bring up the interface (it may already be up)
+	 *
+	 * Technically, since the boot scripts only unconditionally bring up
+	 * IPv6 interfaces, we should only unconditionally bring up IPv6 here.
+	 * However, if we don't bring up IPv4, and a legacy IPMP configuration
+	 * without test addresses is being used, we will never bring the
+	 * interface up even though we would've at boot.  One fix is to check
+	 * if the IPv4 hostname file contains data addresses that we would've
+	 * brought up, but there's no simple way to do that.  Given that it's
+	 * rare to have persistent IP configuration for an interface that
+	 * leaves it down, we cheap out and always bring it up for IPMP.
+	 */
+	if ((af == AF_INET6 || ipmp) && !ifconfig(ifinst, fstr, "up", B_FALSE))
+		goto fail;
 
 	/*
-	 * Valid failed-over host; have mpathd set the original index
+	 * For IPv4, if a DHCP configuration file exists, have DHCP configure
+	 * the interface.  As with the boot scripts, this is done after the
+	 * hostname files are processed so that configuration in those files
+	 * (such as IPMP group names) will be applied first.
 	 */
-	mpdcmd.cmd_command = MI_SETOINDEX;
-	(void) strcpy(mpdcmd.from_lifname, from_lifname);
-	(void) strcpy(mpdcmd.to_pifname, ifinst);
-	if (af & CONFIG_AF_INET6) {
-		mpdcmd.addr_family = AF_INET6;
-	} else {
-		mpdcmd.addr_family = AF_INET;
-	}
+	if (af == AF_INET) {
+		char dhcpfile[MAXPATHLEN];
+		char *dhcpbuf;
+		off_t i, dhcpsize;
 
-	/* Send command to in.mpathd(1M) */
-	rcm_log_message(RCM_TRACE1,
-	    "IP: Attempting setoindex from (%s) to (%s) ....\n",
-	    from_lifname, ifinst);
+		(void) snprintf(dhcpfile, MAXPATHLEN, DHCPFILE_FMT, ifinst);
+		if (stat(dhcpfile, &statb) == -1)
+			goto out;
 
-	if (mpathd_send_cmd(&mpdcmd) < 0) {
-		rcm_log_message(RCM_TRACE1,
-		    "IP: mpathd set original index unsuccessful: %s\n",
-		    strerror(errno));
-		return (-1);
-	}
-
-	rcm_log_message(RCM_TRACE1,
-	    "IP: setoindex success (%s) to (%s)\n",
-	    from_lifname, ifinst);
-
-	return (0);
-}
-
-/*
- * get_mpathd_dest() - Return current destination for lif; caller is
- *		     responsible to free memory allocated for address
- */
-static char *
-get_mpathd_dest(char *addr, int family)
-{
-	int sock;
-	char *buf;
-	struct lifnum lifn;
-	struct lifconf lifc;
-	struct lifreq *lifrp;
-	sa_family_t af = AF_INET;	/* IPv4 by default */
-	int i;
-	struct lifreq lifreq;
-	struct sockaddr_in *sin;
-	struct sockaddr_in6 *sin6;
-	struct hostent *hp;
-	char *ifname = NULL;
-	char *prefix = NULL;
-	char addrstr[INET6_ADDRSTRLEN];
-	char ifaddr[INET6_ADDRSTRLEN];
-	int err;
-
-	if (addr == NULL) {
-		return (NULL);
-	}
-
-	rcm_log_message(RCM_TRACE2, "IP: get_mpathd_dest(%s)\n", addr);
-
-	if (family & CONFIG_AF_INET6) {
-		af = AF_INET6;
-	} else {
-		af = AF_INET;
-	}
-
-	if ((sock = socket(af, SOCK_DGRAM, 0)) == -1) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: failure opening %s socket: %s\n"),
-		    af == AF_INET6 ? "IPv6" : "IPv4", strerror(errno));
-		return (NULL);
-	}
-
-	lifn.lifn_family = af;
-	lifn.lifn_flags = 0;
-	if (ioctl(sock, SIOCGLIFNUM, (char *)&lifn) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: SIOCLGIFNUM failed: %s\n"),
-		    strerror(errno));
-		(void) close(sock);
-		return (NULL);
-	}
-
-	if ((buf = calloc(lifn.lifn_count, sizeof (struct lifreq))) == NULL) {
-		rcm_log_message(RCM_ERROR, _("IP: calloc: %s\n"),
-		    strerror(errno));
-		(void) close(sock);
-		return (NULL);
-	}
-
-	lifc.lifc_family = af;
-	lifc.lifc_flags = 0;
-	lifc.lifc_len = sizeof (struct lifreq) * lifn.lifn_count;
-	lifc.lifc_buf = buf;
-
-	if (ioctl(sock, SIOCGLIFCONF, (char *)&lifc) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: SIOCGLIFCONF failed: %s\n"),
-		    strerror(errno));
-		free(buf);
-		(void) close(sock);
-		return (NULL);
-	}
-
-	/* Filter out prefix address from netmask */
-	(void) strcpy(ifaddr, addr);
-	if ((prefix = strchr(ifaddr, '/')) != NULL) {
-		*prefix = '\0';	/* We care about the address part only */
-	}
-
-	/* Check for aliases */
-	hp = getipnodebyname(ifaddr, af, AI_DEFAULT, &err);
-	if (hp) {
-		if (inet_ntop(af, (void *)hp->h_addr_list[0],
-		    ifaddr, sizeof (ifaddr)) == NULL) {
-			/* Restore original address and use it */
-			(void) strcpy(ifaddr, addr);
-			if ((prefix = strchr(ifaddr, '/')) != NULL) {
-				*prefix = '\0';
-			}
-		}
-		freehostent(hp);
-	}
-	rcm_log_message(RCM_TRACE2, "IP: ifaddr(%s) = %s\n", addr, ifaddr);
-
-	/* now search the interfaces */
-	lifrp = lifc.lifc_req;
-	for (i = 0; i < lifn.lifn_count; i++, lifrp++) {
-		(void) strcpy(lifreq.lifr_name, lifrp->lifr_name);
-		/* Get the interface address for this interface */
-		if (ioctl(sock, SIOCGLIFADDR, (char *)&lifreq) < 0) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: SIOCGLIFADDR: %s\n"), strerror(errno));
-			free(buf);
-			(void) close(sock);
-			return (NULL);
+		if ((dhcpbuf = copylist(dhcpfile, &dhcpsize)) == NULL) {
+			rcm_log_message(RCM_ERROR, _("IP: cannot read "
+			    "(%s): %s\n"), dhcpfile, strerror(errno));
+			goto fail;
 		}
 
-		if (af == AF_INET6) {
-			sin6 = (struct sockaddr_in6 *)&lifreq.lifr_addr;
-			if (inet_ntop(AF_INET6, (void *)&sin6->sin6_addr,
-			    addrstr, sizeof (addrstr)) == NULL) {
-				continue;
-			}
-		} else {
-			sin = (struct sockaddr_in *)&lifreq.lifr_addr;
-			if (inet_ntop(AF_INET, (void *)&sin->sin_addr,
-			    addrstr, sizeof (addrstr)) == NULL) {
-				continue;
-			}
+		/*
+		 * The copylist() API converts \n's to \0's, but we want them
+		 * to be spaces.
+		 */
+		if (dhcpsize > 0) {
+			for (i = 0; i < dhcpsize; i++)
+				if (dhcpbuf[i] == '\0')
+					dhcpbuf[i] = ' ';
+			dhcpbuf[dhcpsize - 1] = '\0';
 		}
-
-		if (STREQ(addrstr, ifaddr)) {
-			/* Allocate memory to hold interface name */
-			if ((ifname = (char *)malloc(LIFNAMSIZ)) == NULL) {
-				rcm_log_message(RCM_ERROR,
-				    _("IP: malloc: %s\n"), strerror(errno));
-				free(buf);
-				(void) close(sock);
-				return (NULL);
-			}
-
-			/* Copy the interface name */
-			/*
-			 * (void) memcpy(ifname, lifrp->lifr_name,
-			 *  sizeof (ifname));
-			 * ifname[sizeof (ifname) - 1] = '\0';
-			 */
-			(void) strcpy(ifname, lifrp->lifr_name);
-			break;
-		}
+		(void) ifconfig(ifinst, CFG_DHCP_CMD, dhcpbuf, B_FALSE);
+		free(dhcpbuf);
 	}
-
-	(void) close(sock);
+out:
+	free(ifparsebuf);
 	free(buf);
-
-	if (ifname == NULL)
-		rcm_log_message(RCM_TRACE2, "IP: get_mpathd_dest(%s): none\n",
-		    addr);
-	else
-		rcm_log_message(RCM_TRACE2, "IP: get_mpathd_dest(%s): %s\n",
-		    addr, ifname);
-
-	return (ifname);
-}
-
-static int
-if_getcount(int af)
-{
-	int sock;
-	struct lifnum lifn;
-
-	rcm_log_message(RCM_TRACE1, "IP: if_getcount\n");
-
-	if ((sock = socket(af, SOCK_DGRAM, 0)) == -1) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: failure opening %s socket: %s\n"),
-		    af == AF_INET6 ? "IPv6" : "IPv4", strerror(errno));
-		return (-1);
-	}
-
-	lifn.lifn_family = af;
-	lifn.lifn_flags = 0;
-	if (ioctl(sock, SIOCGLIFNUM, (char *)&lifn) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: SIOCLGIFNUM failed: %s\n"),
-		    strerror(errno));
-		(void) close(sock);
-		return (-1);
-	}
-	(void) close(sock);
-
-	rcm_log_message(RCM_TRACE1, "IP: if_getcount success: %d\n",
-	    lifn.lifn_count);
-
-	return (lifn.lifn_count);
+	rcm_log_message(RCM_TRACE1, "IP: if_config_inst(%s) success\n", ifinst);
+	return (0);
+fail:
+	free(ifparsebuf);
+	free(buf);
+	rcm_log_message(RCM_ERROR, "IP: if_config_inst(%s) failure\n", ifinst);
+	return (-1);
 }
 
 /*
- * tokenize() - turn a command line into tokens; caller is responsible to
- *	      provide enough memory to hold all tokens
+ * ntok() - count the number of tokens in the provided buffer.
  */
-static void
-tokenize(char *line, char **tokens, char *tspace, int *ntok)
+static uint_t
+ntok(const char *cp)
 {
-	char *cp;
-	char *sp;
+	uint_t ntok = 0;
 
-	sp = tspace;
-	cp = line;
-	for (*ntok = 0; *ntok < MAXARGS; (*ntok)++) {
-		tokens[*ntok] = sp;
+	for (;;) {
 		while (ISSPACE(*cp))
 			cp++;
+
 		if (ISEOL(*cp))
 			break;
+
 		do {
-			*sp++ = *cp++;
+			cp++;
 		} while (!ISSPACE(*cp) && !ISEOL(*cp));
 
-		*sp++ = '\0';
+		ntok++;
 	}
+	return (ntok);
+}
+
+static boolean_t
+ifconfig(const char *ifinst, const char *fstr, const char *buf, boolean_t stdif)
+{
+	char syscmd[MAX_RECONFIG_SIZE + MAXPATHLEN + 1];
+	int status;
+
+	(void) snprintf(syscmd, sizeof (syscmd), SBIN_IFCONFIG " %s %s %s",
+	    ifinst, fstr, buf);
+
+	if (stdif)
+		(void) strlcat(syscmd, CFG_CMDS_STD, sizeof (syscmd));
+
+	rcm_log_message(RCM_TRACE1, "IP: Exec: %s\n", syscmd);
+	if ((status = rcm_exec_cmd(syscmd)) != 0) {
+		if (WIFEXITED(status)) {
+			rcm_log_message(RCM_ERROR, _("IP: \"%s\" failed with "
+			    "exit status %d\n"), syscmd, WEXITSTATUS(status));
+		} else {
+			rcm_log_message(RCM_ERROR, _("IP: Error: %s: %s\n"),
+			    syscmd, strerror(errno));
+		}
+		return (B_FALSE);
+	}
+	return (B_TRUE);
 }

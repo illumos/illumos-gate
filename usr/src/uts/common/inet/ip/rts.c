@@ -561,7 +561,6 @@ rts_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 		case SO_TYPE:
 			*i1 = SOCK_RAW;
 			break;
-
 		/*
 		 * The following three items are available here,
 		 * but are only meaningful to IP.
@@ -595,6 +594,15 @@ rts_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 			break;
 		default:
 			return (-1);
+		}
+		break;
+	case SOL_ROUTE:
+		switch (name) {
+		case RT_AWARE:
+			mutex_enter(&connp->conn_lock);
+			*i1 = connp->conn_rtaware;
+			mutex_exit(&connp->conn_lock);
+			break;
 		}
 		break;
 	default:
@@ -695,6 +703,20 @@ rts_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 				rw_enter(&rts->rts_rwlock, RW_WRITER);
 			}
 
+			break;	/* goto sizeof (int) option return */
+		default:
+			*outlenp = 0;
+			return (EINVAL);
+		}
+		break;
+	case SOL_ROUTE:
+		switch (name) {
+		case RT_AWARE:
+			if (!checkonly) {
+				mutex_enter(&connp->conn_lock);
+				connp->conn_rtaware = *i1;
+				mutex_exit(&connp->conn_lock);
+			}
 			break;	/* goto sizeof (int) option return */
 		default:
 			*outlenp = 0;

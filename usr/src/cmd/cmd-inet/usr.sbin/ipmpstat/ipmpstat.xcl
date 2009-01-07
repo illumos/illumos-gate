@@ -1,0 +1,106 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+msgid  " "
+msgid  "%-*s"
+msgid  "%.2fms"
+msgid  "%.2fs"
+msgid  "%d-%s"
+msgid  "%s"
+msgid  "%s "
+msgid  "%s: "
+msgid  "%u"
+msgid  "("
+msgid  ")"
+msgid  ","
+msgid  "--"
+msgid  ": %s\n"
+msgid  "?"
+msgid  "["
+msgid  "]"
+msgid  "<%d>"
+msgid  "\n"
+msgid  "ACTIVE"
+msgid  "ADDRESS"
+msgid  "EC_ipmp"
+msgid  "ESC_ipmp_probe_state"
+msgid  "FDT"
+msgid  "FLAGS"
+msgid  "GROUP"
+msgid  "GROUPNAME"
+msgid  "INBOUND"
+msgid  "INTERFACE"
+msgid  "INTERFACES"
+msgid  "IPMP_IF_NAME"
+msgid  "IPMP_PROBE_ACKPROC_TIME"
+msgid  "IPMP_PROBE_ACKRECV_TIME"
+msgid  "IPMP_PROBE_ID"
+msgid  "IPMP_PROBE_SENT_TIME"
+msgid  "IPMP_PROBE_START_TIME"
+msgid  "IPMP_PROBE_STATE"
+msgid  "IPMP_PROBE_TARGET"
+msgid  "IPMP_PROBE_TARGET_RTTAVG"
+msgid  "IPMP_PROBE_TARGET_RTTDEV"
+msgid  "LINK"
+msgid  "MODE"
+msgid  "NETRTT"
+msgid  "OUTBOUND"
+msgid  "PROBE"
+msgid  "RTT"
+msgid  "RTTAVG"
+msgid  "RTTDEV"
+msgid  "STATE"
+msgid  "TARGET"
+msgid  "TARGETS"
+msgid  "TESTADDR"
+msgid  "TIME"
+msgid  "agipt"
+msgid  "all"
+msgid  "bufsize > IPMPSTAT_NUM_FLAGS"
+msgid  "com.sun:ipmp:events"
+msgid  "degraded"
+msgid  "disabled"
+msgid  "down"
+msgid  "failed"
+msgid  "ipmp_event_version"
+msgid  "ipmp_if_name"
+msgid  "ipmp_probe_ackproc_time"
+msgid  "ipmp_probe_ackrecv_time"
+msgid  "ipmp_probe_id"
+msgid  "ipmp_probe_sent_time"
+msgid  "ipmp_probe_start_time"
+msgid  "ipmp_probe_state"
+msgid  "ipmp_probe_target"
+msgid  "ipmp_probe_target_rttavg"
+msgid  "ipmp_probe_target_rttdev"
+msgid  "ipmpstat.c"
+msgid  "multicast"
+msgid  "nLPo:agipt"
+msgid  "no"
+msgid  "offline"
+msgid  "ok"
+msgid  "routes"
+msgid  "sig == SIGWINCH"
+msgid  "unknown"
+msgid  "up"
+msgid  "yes"

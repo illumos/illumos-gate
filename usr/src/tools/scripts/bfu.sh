@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Upgrade a machine from a cpio archive area in about 5 minutes.
@@ -8060,9 +8060,13 @@ mondo_loop() {
 
 		# The global zone needs to have its /dev/dld symlink created
 		# during install so that processes can access it early in boot
-		# before devfsadm is run.
+		# before devfsadm is run.  Likewise for /dev/ipmpstub.
 		if [ ! -L $rootprefix/dev/dld ]; then
 			ln -s ../devices/pseudo/dld@0:ctl $rootprefix/dev/dld
+		fi
+		if [ ! -L $rootprefix/dev/ipmpstub ]; then
+			ln -s ../devices/pseudo/dlpistub@0:ipmpstub \
+			    $rootprefix/dev/ipmpstub
 		fi
 	fi
 

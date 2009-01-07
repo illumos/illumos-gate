@@ -20,10 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This is the second phase of TCP/IP configuration.  The first part is
 # run by the svc:/network/physical service and includes configuring the
@@ -52,10 +50,11 @@ if [ -f /etc/inet/ipaddrsel.conf ]; then
 fi
 
 #
-# Now that /usr is mounted, see if in.mpathd needs to be started by firing it
-# up in "adopt" mode; if there are no interfaces it needs to manage, it will
-# automatically exit.  Note that it may already be running if we're not
-# executing as part of system boot.
+# If explicit IPMP groups are being used, in.mpathd will already be started.
+# However, if TRACK_INTERFACES_ONLY_WITH_GROUPS=no and no explicit IPMP
+# groups have been configured, then it still needs to be started.  So, fire
+# it up in "adopt" mode; if there are no interfaces it needs to manage, it
+# will automatically exit.
 #
 /usr/bin/pgrep -x -u 0 -z `smf_zonename` in.mpathd >/dev/null 2>&1 || \
     /usr/lib/inet/in.mpathd -a

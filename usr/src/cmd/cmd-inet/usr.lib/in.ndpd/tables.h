@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_NDPD_TABLES_H
 #define	_NDPD_TABLES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -58,9 +56,7 @@ struct phyint {
 	char		pi_name[LIFNAMSIZ];	/* Used to identify it */
 	int		pi_sock;		/* For sending and receiving */
 	struct in6_addr	pi_ifaddr;		/* Local address */
-	uint_t		pi_flags;		/* IFF_* flags */
-	uint_t		pi_hdw_addr_len;
-	uchar_t		pi_hdw_addr[ND_MAX_HDW_LEN];
+	uint64_t		pi_flags;		/* IFF_* flags */
 	uint_t		pi_mtu;			/* From SIOCGLIFMTU */
 	struct in6_addr pi_token;
 	uint_t		pi_token_length;
@@ -256,6 +252,7 @@ extern int		phyint_init_from_k(struct phyint *pi);
 extern void		phyint_delete(struct phyint *pi);
 extern uint_t		phyint_timer(struct phyint *pi, uint_t elapsed);
 extern void		phyint_print_all(void);
+extern int		phyint_get_lla(struct phyint *pi, struct lifreq *lifrp);
 extern void		phyint_reach_random(struct phyint *pi,
 			    boolean_t set_needed);
 extern void		phyint_cleanup(struct phyint *pi);
@@ -280,8 +277,6 @@ extern void		prefix_update_k(struct prefix *pr);
 extern uint_t		prefix_timer(struct prefix *pr, uint_t elapsed);
 extern uint_t		adv_prefix_timer(struct adv_prefix *adv_pr,
 			    uint_t elapsed);
-extern boolean_t	prefix_token_match(struct phyint *pi,
-			    struct prefix *pr, uint64_t flags);
 extern struct prefix	*prefix_lookup_addr(struct phyint *pi,
 			    struct in6_addr prefix);
 

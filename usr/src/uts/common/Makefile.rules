@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/common/Makefile.rules
@@ -447,7 +447,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/ip/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:                $(UTSBASE)/common/inet/ipnet/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/ipnet/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -489,7 +489,7 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/sockmods/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/vni/%.c
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/dlpistub/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1572,7 +1572,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/arp/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/ip/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln: 	     	$(UTSBASE)/common/inet/ipnet/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/ipnet/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/ipf/%.c
@@ -1599,9 +1599,8 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/tcp/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/nca/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/vni/%.c
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/dlpistub/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

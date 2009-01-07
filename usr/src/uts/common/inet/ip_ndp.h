@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_INET_IP_NDP_H
 #define	_INET_IP_NDP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/mutex.h>
 #include <sys/stream.h>
@@ -318,7 +316,8 @@ extern	nd_opt_hdr_t *ndp_get_option(nd_opt_hdr_t *, int, int);
 extern	void	ndp_inactive(nce_t *);
 extern	void	ndp_input(ill_t *, mblk_t *, mblk_t *);
 extern	boolean_t ndp_lookup_ipaddr(in_addr_t, netstack_t *);
-extern	nce_t	*ndp_lookup_v6(ill_t *, const in6_addr_t *, boolean_t);
+extern	nce_t	*ndp_lookup_v6(ill_t *, boolean_t, const in6_addr_t *,
+    boolean_t);
 extern	nce_t	*ndp_lookup_v4(ill_t *, const in_addr_t *, boolean_t);
 extern	int	ndp_mcastreq(ill_t *, const in6_addr_t *, uint32_t, uint32_t,
     mblk_t *);
@@ -346,7 +345,7 @@ extern	void	nce_fastpath(nce_t *);
 extern	int	ndp_add_v6(ill_t *, uchar_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, uint32_t, uint16_t, uint16_t,
     nce_t **);
-extern	int	ndp_lookup_then_add_v6(ill_t *, uchar_t *,
+extern	int	ndp_lookup_then_add_v6(ill_t *, boolean_t, uchar_t *,
     const in6_addr_t *, const in6_addr_t *, const in6_addr_t *, uint32_t,
     uint16_t, uint16_t, nce_t **);
 extern	int	ndp_lookup_then_add_v4(ill_t *,

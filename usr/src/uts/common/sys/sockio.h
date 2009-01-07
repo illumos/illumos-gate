@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,7 +175,7 @@ extern "C" {
 #define	SIOCSLIFNETMASK	_IOW('i',  126, struct lifreq)	/* set subnetmask */
 #define	SIOCGLIFMETRIC	_IOWR('i', 127, struct lifreq)	/* get if metric */
 #define	SIOCSLIFMETRIC	_IOW('i',  128, struct lifreq)	/* set if metric */
-#define	SIOCSLIFNAME	_IOWR('i',  129, struct lifreq)	/* set interface name */
+#define	SIOCSLIFNAME	_IOWR('i', 129, struct lifreq)	/* set interface name */
 #define	SIOCGLIFNUM	_IOWR('i', 130, struct lifnum)	/* get number of ifs */
 #define	SIOCGLIFMUXID	_IOWR('i', 131, struct lifreq)	/* get if muxid */
 #define	SIOCSLIFMUXID	_IOW('i',  132, struct lifreq)	/* set if muxid */
@@ -223,22 +223,21 @@ extern "C" {
 #define	SIOCLIPSECONFIG	_IOW('i',  152, 0)		/* List Policy */
 
 /*
- * IOCTLS for implementing load balancing and failover within IP.
+ * 153 can be reused (was consolidation-private SIOCLIFFAILOVER).
  */
-#define	SIOCLIFFAILOVER	_IOW('i',  153, struct lifreq)	/* Failover */
-#define	SIOCLIFFAILBACK	_IOW('i',  154, struct lifreq)	/* Failback */
-#define	SIOCSLIFGROUPNAME _IOW('i',  155, struct lifreq) /* Group interfaces */
-#define	SIOCGLIFGROUPNAME _IOWR('i',  156, struct lifreq) /* Get group name */
-#define	SIOCGLIFOINDEX	_IOWR('i', 157, struct lifreq)	/* get orig if index */
+
+/*
+ * IP Multipathing ioctls.
+ */
+#define	SIOCGLIFBINDING		_IOWR('i', 154, struct lifreq)
+#define	SIOCSLIFGROUPNAME	_IOW('i',  155, struct lifreq)
+#define	SIOCGLIFGROUPNAME	_IOWR('i', 156, struct lifreq)
+#define	SIOCGLIFGROUPINFO	_IOWR('i', 157, struct lifgroupinfo)
 
 /*
  * Leave 158 - 160 unused; used to be SIOC*IFARP ioctls.
+ * However, 161 can be reused (was consolidation-private SIOCSLIFOINDEX).
  */
-
-/*
- * IOCTL for implementing load balancing and failover within IP.
- */
-#define	SIOCSLIFOINDEX	_IOWR('i', 161, struct lifreq)	/* set orig if index */
 
 /*
  * IOCTLS which provide an interface to the IPv6 address selection policy.
@@ -309,10 +308,8 @@ extern "C" {
 #define	SIOCSIPMSFILTER	_IOW('i', 181, 0)
 
 /*
- * IOCTL for implementing "disable FAILBACK" IPMP configuration.
+ * 182 can be reused (was consolidation-private SIOCSIPMPFAILBACK).
  */
-#define	SIOCSIPMPFAILBACK	_IOW('i', 182, int)	/* enable/disable */
-							/* FAILBACK */
 
 #define	SIOCSENABLESDP	_IOWR('i', 183, int)    /*  Enable SDP */
 

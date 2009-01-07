@@ -17,13 +17,10 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- */
-/*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ *
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include "tables.h"
@@ -122,7 +119,7 @@ sendpacket(struct sockaddr_in6 *sin6, int sock, int size, int flags)
 	char abuf[INET6_ADDRSTRLEN];
 
 	cc = sendto(sock, (char *)packet, size, flags,
-		(struct sockaddr *)sin6, sizeof (*sin6));
+	    (struct sockaddr *)sin6, sizeof (*sin6));
 	if (cc < 0 || cc != size) {
 		if (cc < 0) {
 			logperror("sendpacket: sendto");
@@ -133,6 +130,32 @@ sendpacket(struct sockaddr_in6 *sin6, int sock, int size, int flags)
 		    abuf, sizeof (abuf)),
 		    size, cc);
 	}
+}
+
+/*
+ * If possible, place an ND_OPT_SOURCE_LINKADDR option at `optp'.
+ * Return the number of bytes placed in the option.
+ */
+static uint_t
+add_opt_lla(struct phyint *pi, struct nd_opt_lla *optp)
+{
+	uint_t optlen;
+	uint_t hwaddrlen;
+	struct lifreq lifr;
+
+	/* If this phyint doesn't have a link-layer address, bail */
+	if (phyint_get_lla(pi, &lifr) == -1)
+		return (0);
+
+	hwaddrlen = lifr.lifr_nd.lnr_hdw_len;
+	/* roundup to multiple of 8 and make padding zero */
+	optlen = ((sizeof (struct nd_opt_hdr) + hwaddrlen + 7) / 8) * 8;
+	bzero(optp, optlen);
+	optp->nd_opt_lla_type = ND_OPT_SOURCE_LINKADDR;
+	optp->nd_opt_lla_len = optlen / 8;
+	bcopy(lifr.lifr_nd.lnr_hdw_addr, optp->nd_opt_lla_hdw_addr, hwaddrlen);
+
+	return (optlen);
 }
 
 /* Send a Router Solicitation */
@@ -151,24 +174,8 @@ solicit(struct sockaddr_in6 *sin6, struct phyint *pi)
 	packetlen += sizeof (*rs);
 	pptr += sizeof (*rs);
 
-	/* Attach any options */
-	if (pi->pi_hdw_addr_len != 0) {
-		struct nd_opt_lla *lo = (struct nd_opt_lla *)pptr;
-		int optlen;
-
-		/* roundup to multiple of 8 and make padding zero */
-		optlen = ((sizeof (struct nd_opt_hdr) +
-		    pi->pi_hdw_addr_len + 7) / 8) * 8;
-		bzero(pptr, optlen);
-
-		lo->nd_opt_lla_type = ND_OPT_SOURCE_LINKADDR;
-		lo->nd_opt_lla_len = optlen / 8;
-		bcopy((char *)pi->pi_hdw_addr,
-		    (char *)lo->nd_opt_lla_hdw_addr,
-		    pi->pi_hdw_addr_len);
-		packetlen += optlen;
-		pptr += optlen;
-	}
+	/* add options */
+	packetlen += add_opt_lla(pi, (struct nd_opt_lla *)pptr);
 
 	if (debug & D_PKTOUT) {
 		print_route_sol("Sending solicitation to ", pi, rs, packetlen,
@@ -224,24 +231,9 @@ advertise(struct sockaddr_in6 *sin6, struct phyint *pi, boolean_t no_prefixes)
 		return;
 	}
 
-	/* Attach any options */
-	if (pi->pi_hdw_addr_len != 0) {
-		struct nd_opt_lla *lo = (struct nd_opt_lla *)pptr;
-		int optlen;
-
-		/* roundup to multiple of 8 and make padding zero */
-		optlen = ((sizeof (struct nd_opt_hdr) +
-		    pi->pi_hdw_addr_len + 7) / 8) * 8;
-		bzero(pptr, optlen);
-
-		lo->nd_opt_lla_type = ND_OPT_SOURCE_LINKADDR;
-		lo->nd_opt_lla_len = optlen / 8;
-		bcopy((char *)pi->pi_hdw_addr,
-		    (char *)lo->nd_opt_lla_hdw_addr,
-		    pi->pi_hdw_addr_len);
-		packetlen += optlen;
-		pptr += optlen;
-	}
+	/* add options */
+	packetlen += add_opt_lla(pi, (struct nd_opt_lla *)pptr);
+	pptr = (char *)packet + packetlen;
 
 	if (pi->pi_AdvLinkMTU != 0) {
 		struct nd_opt_mtu *mo = (struct nd_opt_mtu *)pptr;
@@ -1671,10 +1663,10 @@ process_rtsock(int rtsock)
 			return;
 		}
 
-		if (ifm->ifm_flags != pi->pi_flags) {
+		if (ifm->ifm_flags != (uint_t)pi->pi_flags) {
 			if (debug & D_IFSCAN) {
 				logmsg(LOG_DEBUG, "process_rtsock: clr for "
-				    "%s old flags 0x%x new flags 0x%x\n",
+				    "%s old flags 0x%llx new flags 0x%x\n",
 				    pi->pi_name, pi->pi_flags, ifm->ifm_flags);
 			}
 		}
@@ -1825,140 +1817,66 @@ process_mibsock(int mibsock)
 }
 
 /*
- * Check whether the address formed by pr->pr_prefix and pi_token
- * exists in the kernel. Cannot call SIOCTMYADDR/ONLINK as it
- * does not check for down addresses. This function should not
- * be called for onlink prefixes.
- */
-static boolean_t
-is_address_present(struct phyint *pi, struct prefix *pr, uint64_t flags)
-{
-	int s;
-	in6_addr_t addr, *token;
-	int i;
-	int ret;
-	struct sockaddr_in6 sin6;
-
-	s = socket(AF_INET6, SOCK_DGRAM, 0);
-	if (s < 0) {
-		logperror("is_address_present: socket");
-		/*
-		 * By returning B_TRUE, we make the caller delete
-		 * the prefix from the internal table. In the worst
-		 * case the next RA will create the prefix.
-		 */
-		return (_B_TRUE);
-	}
-	if (flags & IFF_TEMPORARY)
-		token = &pi->pi_tmp_token;
-	else
-		token = &pi->pi_token;
-	for (i = 0; i < 16; i++) {
-		/*
-		 * prefix_create ensures that pr_prefix has all-zero
-		 * bits after prefixlen.
-		 */
-		addr.s6_addr[i] = pr->pr_prefix.s6_addr[i] | token->s6_addr[i];
-	}
-	(void) memset(&sin6, 0, sizeof (struct sockaddr_in6));
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_addr = addr;
-	ret = bind(s, (struct sockaddr *)&sin6, sizeof (struct sockaddr_in6));
-	(void) close(s);
-	if (ret < 0 && errno == EADDRNOTAVAIL)
-		return (_B_FALSE);
-	else
-		return (_B_TRUE);
-}
-
-/*
  * Look if the phyint or one of its prefixes have been removed from
  * the kernel and take appropriate action.
- * Uses {pi,pr}_in_use.
+ * Uses pr_in_use and pi{,_kernel}_state.
  */
 static void
 check_if_removed(struct phyint *pi)
 {
-	struct prefix *pr;
-	struct prefix *next_pr;
+	struct prefix *pr, *next_pr;
 
 	/*
-	 * Detect phyints that have been removed from the kernel.
-	 * Since we can't recreate it here (would require ifconfig plumb
-	 * logic) we just terminate use of that phyint.
+	 * Detect prefixes which are removed.
+	 * Static prefixes are just removed from our tables.
+	 * Non-static prefixes are recreated i.e. in.ndpd takes precedence
+	 * over manually removing prefixes via ifconfig.
+	 */
+	for (pr = pi->pi_prefix_list; pr != NULL; pr = next_pr) {
+		next_pr = pr->pr_next;
+		if (!pr->pr_in_use) {
+			/* Clear everything except PR_STATIC */
+			pr->pr_kernel_state &= PR_STATIC;
+			pr->pr_name[0] = '\0';
+			if (pr->pr_state & PR_STATIC) {
+				prefix_delete(pr);
+			} else if (!(pi->pi_kernel_state & PI_PRESENT)) {
+				/*
+				 * Ensure that there are no future attempts to
+				 * run prefix_update_k since the phyint is gone.
+				 */
+				pr->pr_state = pr->pr_kernel_state;
+			} else if (pr->pr_state != pr->pr_kernel_state) {
+				logmsg(LOG_INFO, "Prefix manually removed "
+				    "on %s; recreating\n", pi->pi_name);
+				prefix_update_k(pr);
+			}
+		}
+	}
+
+	/*
+	 * Detect phyints that have been removed from the kernel, and tear
+	 * down any prefixes we created that are associated with that phyint.
+	 * (NOTE: IPMP depends on in.ndpd tearing down these prefixes so an
+	 * administrator can easily place an IP interface with ADDRCONF'd
+	 * addresses into an IPMP group.)
 	 */
 	if (!(pi->pi_kernel_state & PI_PRESENT) &&
 	    (pi->pi_state & PI_PRESENT)) {
 		logmsg(LOG_ERR, "Interface %s has been removed from kernel. "
 		    "in.ndpd will no longer use it\n", pi->pi_name);
+
+		for (pr = pi->pi_prefix_list; pr != NULL; pr = next_pr) {
+			next_pr = pr->pr_next;
+			if (pr->pr_state & PR_AUTO)
+				prefix_delete(pr);
+		}
+
 		/*
-		 * Clear state so that should the phyint reappear
-		 * we will start with initial advertisements or
-		 * solicitations.
+		 * Clear state so that should the phyint reappear we will
+		 * start with initial advertisements or solicitations.
 		 */
 		phyint_cleanup(pi);
-	}
-	/*
-	 * Detect prefixes which are removed.
-	 *
-	 * We remove the prefix in all of the following cases :
-	 *
-	 * 1) Static prefixes are not the ones we create. So,
-	 *    just remove it from our tables.
-	 *
-	 * 2) On-link prefixes potentially move to a different
-	 *    phyint during failover. As it does not have
-	 *    an address, we can't use the logic in is_address_present
-	 *    to detect whether it is present in the kernel or not.
-	 *    Thus when it is manually removed we don't recreate it.
-	 *
-	 * 3) If there is a token mis-match and this prefix is not
-	 *    in the kernel, it means we don't need this prefix on
-	 *    this interface anymore. It must have been moved to a
-	 *    different interface by in.mpathd. This normally
-	 *    happens after a failover followed by a failback (or
-	 *    another failover) and we re-read the network
-	 *    configuration. For the failover from A to B, we would
-	 *    have created state on B about A's address, which will
-	 *    not be in use after the subsequent failback. So, we
-	 *    remove that prefix here.
-	 *
-	 * 4) If the physical interface is not present, then remove
-	 *    the prefix. In the cases where we are advertising
-	 *    prefixes, the state is kept in advertisement prefix and
-	 *    hence we can delete the prefix.
-	 *
-	 * 5) Similar to case (3), when we failover from A to B, the
-	 *    prefix in A will not be in use as it has been moved to B.
-	 *    We will delete it from our tables and recreate it when
-	 *    it fails back. is_address_present makes sure that the
-	 *    address is still valid in kernel.
-	 *
-	 * If none of the above is true, we recreate the prefix as it
-	 * has been manually removed. We do it only when the interface
-	 * is not FAILED or INACTIVE or OFFLINE.
-	 */
-	for (pr = pi->pi_prefix_list; pr != NULL; pr = next_pr) {
-		next_pr = pr->pr_next;
-		if (!pr->pr_in_use) {
-			/* Clear PR_AUTO and PR_ONLINK */
-			pr->pr_kernel_state &= PR_STATIC;
-			if ((pr->pr_state & PR_STATIC) ||
-			    !(pr->pr_state & PR_AUTO) ||
-			    !(prefix_token_match(pi, pr, pr->pr_flags)) ||
-			    (!(pi->pi_kernel_state & PI_PRESENT)) ||
-			    (is_address_present(pi, pr, pr->pr_flags))) {
-				prefix_delete(pr);
-			} else if (!(pi->pi_flags &
-			    (IFF_FAILED|IFF_INACTIVE|IFF_OFFLINE)) &&
-			    pr->pr_state != pr->pr_kernel_state) {
-				pr->pr_name[0] = '\0';
-				logmsg(LOG_INFO, "Prefix manually removed "
-				    "on %s - recreating it!\n",
-				    pi->pi_name);
-				prefix_update_k(pr);
-			}
-		}
 	}
 }
 

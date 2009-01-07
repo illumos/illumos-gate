@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _INET_SCTP_IP_H
 #define	_INET_SCTP_IP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {

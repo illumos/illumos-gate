@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,9 +150,6 @@ opdes_t	tcp_opt_arr[] = {
 
 { IP_NEXTHOP, IPPROTO_IP, OA_R, OA_RW, OP_CONFIG, OP_PASSNEXT,
 	sizeof (in_addr_t),	-1 /* not initialized  */ },
-
-{ IPV6_BOUND_PIF, IPPROTO_IPV6, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
-	sizeof (int),	0 /* no ifindex */ },
 
 { IPV6_UNSPEC_SRC, IPPROTO_IPV6, OA_R, OA_RW, OP_RAW, OP_PASSNEXT,
 	sizeof (int), 0 },

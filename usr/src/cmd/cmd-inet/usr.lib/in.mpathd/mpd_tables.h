@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_MPD_TABLES_H
 #define	_MPD_TABLES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -47,19 +45,10 @@ extern "C" {
  *	    switch AND
  *	(ii) share the same phyint group name.
  * Load spreading and failover occur across members of the same phyint group.
- * phyint group members must be homogenous. i.e. if a phyint belonging to a
+ * phyint group members must be homogeneous. i.e. if a phyint belonging to a
  * phyint group has a IPv6 protocol instance, then all members of the phyint
  * group, must have IPv6 protocol instances. (struct phyint_group)
  */
-
-/*
- * Parameter passed to try_failover(), indicating the type of failover
- * that is requested.
- */
-#define	FAILOVER_NORMAL		1	/* Failover to another phyint */
-					/* that is preferably a standby */
-#define	FAILOVER_TO_NONSTANDBY	2	/* Failover to non-standby phyint */
-#define	FAILOVER_TO_ANY		3	/* Failover to any available phyint */
 
 #define	MAXDEFERREDRTT		1	/* Maximum number of deferred rtts */
 
@@ -79,15 +68,9 @@ extern "C" {
 #define	PI_IOCTL_ERROR		4	/* Some ioctl error */
 #define	PI_GROUP_CHANGED	5	/* The phyint has changed group. */
 
-/*
- * Though IFF_POINTOPOINT is a logint property, for the purpose of
- * failover, we treat it as a phyint property. Note that we cannot failover
- * individual logints.
- */
 #define	PHYINT_FLAGS(flags)	\
-	(((flags) &  (IFF_STANDBY | IFF_INACTIVE | IFF_FAILED | IFF_OFFLINE | \
-	IFF_POINTOPOINT | IFF_RUNNING)) | (handle_link_notifications ? \
-	0 : IFF_RUNNING))
+	(((flags) & (IFF_STANDBY | IFF_INACTIVE | IFF_FAILED | IFF_OFFLINE | \
+	IFF_RUNNING)) | (handle_link_notifications ? 0 : IFF_RUNNING))
 
 /* A Phyint can have up to 2 instances, the IPv4 and the IPv6 instance */
 #define	PHYINT_INSTANCE(pi, af)	\
@@ -152,29 +135,32 @@ extern "C" {
  * Phyint group states; see below for the phyint group definition.
  */
 enum pg_state {
-	PG_RUNNING	= 1,	/* at least one interface in group is working */
-	PG_FAILED	= 2	/* group has failed completely */
+	PG_OK = 1,	/* all interfaces in the group are working */
+	PG_DEGRADED,	/* some interfaces in the group are unusable */
+	PG_FAILED	/* all interfaces in the group are unusable */
 };
 
 /*
  * Convenience macro to check if the whole group has failed.
  */
-#define	GROUP_FAILED(pg)	((pg)->pg_groupfailed)
+#define	GROUP_FAILED(pg)	((pg)->pg_state == PG_FAILED)
 
 /*
  * A doubly linked list of all phyint groups in the system.
  * A phyint group is identified by its group name.
  */
 struct phyint_group {
-	char pg_name[LIFNAMSIZ + 1];	/* Phyint group name */
+	char pg_name[LIFGRNAMSIZ];	/* Phyint group name */
 	struct phyint *pg_phyint;	/* List of phyints in this group */
 	struct phyint_group *pg_next;	/* Next phyint group */
 	struct phyint_group *pg_prev;	/* Prev phyint group */
-	uint64_t pg_sig;		/* Current signature of this group */
-	int	pg_probeint;		/* Interval between probes */
-	int	pg_fdt;			/* Time needed to detect failure */
-	uint_t
-		pg_groupfailed : 1; /* The whole group has failed */
+	uint64_t 	pg_sig;		/* Current signature of this group */
+	int		pg_probeint;	/* Interval between probes */
+	int		pg_fdt;		/* Time needed to detect failure */
+	enum pg_state	pg_state;	/* Current group state */
+	boolean_t	pg_in_use;	/* To detect removed groups */
+	struct addrlist	*pg_addrs;	/* Data addresses in this group */
+	boolean_t pg_failmsg_printed;	/* Group failure msg printed */
 };
 
 /*
@@ -207,6 +193,11 @@ struct phyint {
 	uint16_t	pi_icmpid;	/* icmp id in icmp echo request */
 	uint64_t	pi_taddrthresh;	/* time (in secs) to delay logging */
 					/* about missing test addresses */
+	dlpi_handle_t	pi_dh;		/* DLPI handle to underlying link */
+	uint_t		pi_notes; 	/* enabled DLPI notifications */
+	uchar_t		pi_hwaddr[DLPI_PHYSADDR_MAX]; /* phyint's hw address */
+	size_t		pi_hwaddrlen;	/* phyint's hw address length */
+
 	/*
 	 * The pi_whenup array is a circular buffer of the most recent
 	 * times (in milliseconds since some arbitrary point of time in
@@ -217,14 +208,12 @@ struct phyint {
 	unsigned int	pi_whendx;
 
 	uint_t
-		pi_empty : 1,		/* failover done, empty */
-		pi_full  : 1,		/* failback done, full  */
-					/* More details in probe.c */
 		pi_taddrmsg_printed : 1,	/* testaddr msg printed */
 		pi_duptaddrmsg_printed : 1,	/* dup testaddr msg printed */
 		pi_cfgmsg_printed : 1,	/* bad config msg printed */
 		pi_lfmsg_printed : 1,   /* link-flapping msg printed */
-		pi_link_state : 1;	/* interface link state */
+		pi_link_state : 1,	/* interface link state */
+		pi_hwaddrdup : 1; 	/* disabled due to dup hw address */
 };
 
 /*
@@ -260,19 +249,19 @@ struct phyint_instance {
 	uint64_t	pii_flags;	/* Phyint flags from kernel */
 
 	struct probe_stats {
-		struct target *pr_target;	/* Probe Target */
-		uint_t	pr_time_sent; 	/* Time probe was sent */
+		uint_t		pr_id;		/* Full ID of probe */
+		struct target	*pr_target;	/* Probe Target */
+		uint_t		pr_time_lost; 	/* Time probe declared lost */
+		struct timeval	pr_tv_sent;	/* Wall time probe was sent */
+		hrtime_t pr_hrtime_start;	/* hrtime probe op started */
+		hrtime_t pr_hrtime_sent;	/* hrtime probe was sent */
+		hrtime_t pr_hrtime_ackrecv; 	/* hrtime probe ack received */
+		hrtime_t pr_hrtime_ackproc;	/* hrtime probe ack processed */
 		uint_t	pr_status;	/* probe status as below */
 #define	PR_UNUSED	0		/* Probe slot unused */
 #define	PR_UNACKED	1		/* Probe is unacknowledged */
 #define	PR_ACKED	2		/* Probe has been acknowledged */
 #define	PR_LOST		3		/* Probe is declared lost */
-		union {
-			uint_t  tl;	/* time probe is declared lost */
-			uint_t	ta;	/* time probe is acked */
-		} prt;
-#define	pr_time_lost	prt.tl
-#define	pr_time_acked	prt.ta
 	} pii_probes[PROBE_STATS_COUNT];
 
 	uint_t
@@ -319,7 +308,6 @@ struct logint {
 	struct in6_addr	li_subnet;	/* prefix / subnet */
 	uint_t		li_subnet_len;	/* prefix / subnet length */
 	uint64_t	li_flags;	/* IFF_* flags */
-	uint_t		li_oifindex;	/* original ifindex (SIOCGLIFOINDEX) */
 	uint_t
 			li_in_use : 1,	/* flag to detect deleted logints */
 			li_dupaddr : 1;	/* test address is not unique */
@@ -345,12 +333,12 @@ struct target {
 #define	TG_DEAD		4		/* Target is not responding */
 
 	hrtime_t	tg_latime;	/* Target's last active time */
-	int		tg_rtt_sa;	/* Scaled round trip time(RTT) avg. */
-	int		tg_rtt_sd;	/* Scaled RTT deviation */
-	int		tg_crtt;	/* Conservative RTT = A + 4D */
+	int64_t		tg_rtt_sa;	/* Scaled RTT average (in ns) */
+	int64_t		tg_rtt_sd;	/* Scaled RTT deviation (in ns) */
+	int		tg_crtt;	/* Conservative RTT = A + 4D (in ms) */
 	uint32_t
 			tg_in_use : 1;	/* In use flag */
-	int		tg_deferred[MAXDEFERREDRTT + 1];
+	int64_t		tg_deferred[MAXDEFERREDRTT + 1];
 					/* Deferred rtt data points */
 	int		tg_num_deferred;
 					/* Number of deferred rtt data points */
@@ -393,19 +381,20 @@ struct probe_success_count
 struct probes_missed
 {
 	uint_t	pm_nprobes;	/* Cumulative number of missed probes */
-	uint_t	pm_ntimes;	/* Total number of occassions */
+	uint_t	pm_ntimes;	/* Total number of occasions */
 };
 
-struct local_addr
-{
-	struct in6_addr addr;
-	struct local_addr *next;
-};
+typedef struct addrlist {
+	struct addrlist		*al_next; 		/* next address */
+	char			al_name[LIFNAMSIZ];	/* address lif name */
+	uint64_t		al_flags;		/* address flags */
+	struct sockaddr_storage	al_addr; 		/* address */
+} addrlist_t;
 
 /*
  * Globals
  */
-extern struct local_addr *laddr_list;
+extern addrlist_t *localaddrs;
 			/* List of all local addresses, including local zones */
 extern struct phyint *phyints;		/* List of all phyints */
 extern struct phyint_group *phyint_groups; /* List of all phyint groups */
@@ -428,10 +417,19 @@ extern void phyint_inst_delete(struct phyint_instance *pii);
 extern uint_t phyint_inst_timer(struct phyint_instance *pii);
 extern boolean_t phyint_inst_sockinit(struct phyint_instance *pii);
 
-extern void phyint_newtype(struct phyint *pi);
+extern void phyint_changed(struct phyint *pi);
 extern void phyint_chstate(struct phyint *pi, enum pi_state state);
 extern void phyint_group_chstate(struct phyint_group *pg, enum pg_state state);
+extern struct phyint_group *phyint_group_create(const char *pg_name);
+extern struct phyint_group *phyint_group_lookup(const char *pg_name);
+extern void phyint_group_insert(struct phyint_group *pg);
+extern void phyint_group_delete(struct phyint_group *pg);
+extern void phyint_group_refresh_state(struct phyint_group *pg);
 extern void phyint_check_for_repair(struct phyint *pi);
+extern void phyint_transition_to_running(struct phyint *pi);
+extern void phyint_activate_another(struct phyint *pi);
+extern int phyint_offline(struct phyint *pi, unsigned int);
+extern int phyint_undo_offline(struct phyint *pi);
 
 extern void logint_init_from_k(struct phyint_instance *pii, char *li_name);
 extern void logint_delete(struct logint *li);
@@ -448,33 +446,39 @@ extern void target_add(struct phyint_instance *pii, struct in6_addr addr,
 extern void in_data(struct phyint_instance *pii);
 extern void in6_data(struct phyint_instance *pii);
 
-extern int try_failover(struct phyint *pi, int failover_type);
-extern int try_failback(struct phyint *pi);
-extern int do_failback(struct phyint *pi);
-extern boolean_t change_lif_flags(struct phyint *pi, uint64_t flags,
-    boolean_t setfl);
-
 extern void logperror_pii(struct phyint_instance *pii, const char *str);
 extern void logperror_li(struct logint *li, const char *str);
 extern char *pr_addr(int af, struct in6_addr addr, char *abuf, int len);
+extern void addr2storage(int af, const struct in6_addr *addr,
+    struct sockaddr_storage *ssp);
 extern void phyint_inst_print_all(void);
+extern boolean_t prefix_equal(struct in6_addr, struct in6_addr, uint_t);
 
-extern int logint_upcount(struct phyint *pi);
-extern void restore_phyint(struct phyint *pi);
 extern void reset_crtt_all(struct phyint *pi);
 extern int failure_state(struct phyint_instance *pii);
 extern void process_link_state_changes(void);
 extern void clear_pii_probe_stats(struct phyint_instance *pii);
 extern void start_timer(struct phyint_instance *pii);
+extern void stop_probing(struct phyint *pi);
 
 extern boolean_t own_address(struct in6_addr addr);
+extern boolean_t change_pif_flags(struct phyint *pi, uint64_t set,
+    uint64_t clear);
 
 extern void close_probe_socket(struct phyint_instance *pii, boolean_t flag);
+extern int probe_state_event(struct probe_stats *, struct phyint_instance *);
+extern void probe_chstate(struct probe_stats *, struct phyint_instance *, int);
 
+extern unsigned int getgraddrinfo(const char *, struct sockaddr_storage *,
+    ipmp_addrinfo_t **);
 extern unsigned int getifinfo(const char *, ipmp_ifinfo_t **);
 extern unsigned int getgroupinfo(const char *, ipmp_groupinfo_t **);
 extern unsigned int getgrouplist(ipmp_grouplist_t **);
 extern unsigned int getsnap(ipmp_snap_t **);
+
+extern boolean_t addrlist_add(addrlist_t **, const char *, uint64_t,
+    struct sockaddr_storage *);
+extern void addrlist_free(addrlist_t **);
 
 #ifdef	__cplusplus
 }

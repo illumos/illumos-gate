@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -7,8 +7,6 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Ifparse splits up an ifconfig command line, and was written for use
@@ -184,6 +182,7 @@ struct	cmd {
 	{ "auto-revarp", 	0,		AF_INET, PARSEFIXED},
 	{ "plumb",		0,		AF_ANY, PARSENOW },
 	{ "unplumb",		0,		AF_ANY, PARSENOW },
+	{ "ipmp",		0,		AF_ANY, PARSELOG0 },
 	{ "subnet",		NEXTARG,	AF_ANY, 0 },
 	{ "token",		NEXTARG,	AF_INET6, PARSELOG0 },
 	{ "tsrc",		NEXTARG,	AF_ANY, PARSELOG0 },

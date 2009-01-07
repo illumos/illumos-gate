@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * BOUND state of the DHCP client state machine.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -358,7 +356,8 @@ dhcp_bound_complete(dhcp_smach_t *dsmp)
 	lif = dsmp->dsm_lif;
 	if (router_list != NULL &&
 	    (router_list->len % sizeof (ipaddr_t)) == 0 &&
-	    strchr(lif->lif_name, ':') == NULL) {
+	    strchr(lif->lif_name, ':') == NULL &&
+	    !lif->lif_pif->pif_under_ipmp) {
 
 		dsmp->dsm_nrouters = router_list->len / sizeof (ipaddr_t);
 		dsmp->dsm_routers  = malloc(router_list->len);

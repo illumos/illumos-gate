@@ -20,10 +20,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 . /lib/svc/share/smf_include.sh
 
@@ -34,14 +33,6 @@
 # In the global zone and exclusive-IP zones we proceed.
 #
 smf_configure_ip || exit $SMF_EXIT_OK
-
-#
-# Cause ifconfig to not automatically start in.mpathd when IPMP groups are
-# configured.  This is not strictly necessary but makes it so that in.mpathd
-# will always be started explicitly from /lib/svc/method/net-init (the 
-# svc:/network/initial service), when we're sure that /usr is mounted.
-#
-SUNW_NO_MPATHD=; export SUNW_NO_MPATHD
 
 #
 # Before any interfaces are configured, we need to set the system

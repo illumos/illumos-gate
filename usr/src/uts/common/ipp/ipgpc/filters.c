@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/atomic.h>
 #include <sys/types.h>
@@ -83,7 +81,6 @@ static ht_node_t proto_table[TABLE_SIZE]; /* protocol table */
 static ht_node_t uid_table[TABLE_SIZE]; /* IPGPC_UID table */
 static ht_node_t projid_table[TABLE_SIZE]; /* IPGPC_PROJID table */
 static ht_node_t if_table[TABLE_SIZE]; /* Interface ID table */
-static ht_node_t if_grpnm_table[TABLE_SIZE]; /* Interface Group Name table */
 static ht_node_t dir_table[TABLE_SIZE]; /* packet direction table */
 static ipp_action_id_t ipgpc_aid; /* the action id for ipgpc */
 
@@ -262,9 +259,6 @@ initialize_tables(void)
 	/* IF_INDEX selector structure */
 	insert_ipgpc_table_list_info(IF_IDX, if_table, IPGPC_UNSPECIFIED,
 	    IF_MASK);
-	/* IF_GRPNM_INDEX selector structure */
-	insert_ipgpc_table_list_info(IF_GRPNM_IDX, if_grpnm_table,
-	    IPGPC_WILDCARD, IF_GRPNM_MASK);
 	/* DIR selector structure */
 	insert_ipgpc_table_list_info(DIR_IDX, dir_table, IPGPC_UNSPECIFIED,
 	    DIR_MASK);
@@ -617,19 +611,6 @@ ipgpc_parse_filter(ipgpc_filter_t *filter, nvlist_t *nvlp)
 
 	bcopy(s, filter->filter_name, (strlen(s) + 1));
 
-	/* parse interface group name */
-	if (nvlist_lookup_string(nvlp, IPGPC_IF_GROUPNAME, &s) != 0) {
-		filter->if_groupname[0] = '\0';
-	} else {
-		/* check max interface group name lenght */
-		if ((strlen(s) + 1) > LIFNAMSIZ) {
-			ipgpc0dbg(("ipgpc_parse_filter: interface group name" \
-			    " > LIFNAMSIZ"));
-			return (EINVAL);
-		}
-		bcopy(s, filter->if_groupname, (strlen(s) + 1));
-	}
-
 	/* parse uid */
 	if (nvlist_lookup_uint32(nvlp, IPGPC_UID, &filter->uid) != 0) {
 		filter->uid = (uid_t)IPGPC_WILDCARD;
@@ -976,8 +957,6 @@ insertfid(int filter_id, ipgpc_filter_t *filter, uint_t class_id)
 static void
 common_addfilter(fid_t *fid, int filter_id)
 {
-	int if_grpnm_hv;
-
 	/* start trie inserts */
 	/* add source port selector */
 	if (t_insert(&ipgpc_trie_list[IPGPC_TRIE_SPORTID], filter_id,
@@ -1023,17 +1002,6 @@ common_addfilter(fid_t *fid, int filter_id)
 	if (ht_insert(&ipgpc_table_list[IF_IDX], filter_id,
 	    fid->filter.if_index) == NORMAL_VALUE) {
 		fid->insert_map |= IF_MASK;
-	}
-
-	/* add interface groupname selector */
-	if (fid->filter.if_groupname[0] == '\0') {
-		if_grpnm_hv = IPGPC_WILDCARD;
-	} else {
-		if_grpnm_hv = name_hash(fid->filter.if_groupname, TABLE_SIZE);
-	}
-	if (ht_insert(&ipgpc_table_list[IF_GRPNM_IDX], filter_id, if_grpnm_hv)
-	    == NORMAL_VALUE) {
-		fid->insert_map |= IF_GRPNM_MASK;
 	}
 
 	/* add direction selector */
@@ -1102,8 +1070,8 @@ ipgpc_addfilter(ipgpc_filter_t *filter, char *class_name, ipp_flags_t flags)
 	fid_t *fid;
 	unsigned class_id;
 
-	if ((err = class_name2id(&class_id, class_name, ipgpc_num_cls)) !=
-		EEXIST) {
+	err = class_name2id(&class_id, class_name, ipgpc_num_cls);
+	if (err != EEXIST) {
 		ipgpc0dbg(("ipgpc_addfilter: class lookup error %d", err));
 		return (err);
 	}
@@ -1376,9 +1344,8 @@ insertcid(ipgpc_class_t *in_class, int *out_class_id)
 			/* init kstat entry */
 			if ((rc = class_statinit(in_class, class_id)) != 0) {
 				ipgpc_cid_list[class_id].info = -1;
-				ipgpc0dbg(("insertcid: " \
-					    "class_statinit failed with " \
-					    "error %d", rc));
+				ipgpc0dbg(("insertcid: "
+				    "class_statinit failed with error %d", rc));
 				mutex_exit(&ipgpc_cid_list_lock);
 				return (rc);
 			}
@@ -1409,8 +1376,6 @@ insertcid(ipgpc_class_t *in_class, int *out_class_id)
 static void
 common_removefilter(int in_filter_id, fid_t *fid)
 {
-	int if_grpnm_hv;
-
 	/* start trie removes */
 	t_remove(&ipgpc_trie_list[IPGPC_TRIE_SPORTID], in_filter_id,
 	    fid->filter.sport, fid->filter.sport_mask);
@@ -1438,14 +1403,6 @@ common_removefilter(int in_filter_id, fid_t *fid)
 	/* remove id from interface id table */
 	ht_remove(&ipgpc_table_list[IF_IDX], in_filter_id,
 	    fid->filter.if_index);
-
-	/* remove id from interface group name table */
-	if (fid->filter.if_groupname[0] == '\0') {
-		if_grpnm_hv = IPGPC_WILDCARD;
-	} else {
-		if_grpnm_hv = name_hash(fid->filter.if_groupname, TABLE_SIZE);
-	}
-	ht_remove(&ipgpc_table_list[IF_GRPNM_IDX], in_filter_id, if_grpnm_hv);
 	/* remove id from direction table */
 	ht_remove(&ipgpc_table_list[DIR_IDX], in_filter_id,
 	    fid->filter.direction);
@@ -1782,7 +1739,6 @@ int
 ipgpc_modifyclass(nvlist_t **nvlpp, ipp_flags_t flags)
 {
 	unsigned class_id;
-	ipp_stat_t *cl_stats;
 	ipgpc_class_t in_class;
 	char *name;
 	int rc;
@@ -1837,15 +1793,14 @@ ipgpc_modifyclass(nvlist_t **nvlpp, ipp_flags_t flags)
 		/* check to see if gather_stats booleans differ */
 		if ((ipgpc_cid_list[class_id].aclass.gather_stats !=
 		    in_class.gather_stats)) {
-			if (ipgpc_cid_list[class_id].aclass.gather_stats ==
-			    B_TRUE) {
-			    /* delete kstat entry */
-			    if (ipgpc_cid_list[class_id].cl_stats != NULL) {
-				    cl_stats =
-					ipgpc_cid_list[class_id].cl_stats;
-				    ipp_stat_destroy(cl_stats);
-				    ipgpc_cid_list[class_id].cl_stats = NULL;
-			    }
+			if (ipgpc_cid_list[class_id].aclass.gather_stats) {
+				/* delete kstat entry */
+				if (ipgpc_cid_list[class_id].cl_stats != NULL) {
+					ipp_stat_destroy(
+					    ipgpc_cid_list[class_id].cl_stats);
+					ipgpc_cid_list[class_id].cl_stats =
+					    NULL;
+				}
 			} else { /* gather_stats == B_FALSE */
 				if ((rc = class_statinit(&in_class, class_id))
 				    != 0) {
@@ -2324,14 +2279,6 @@ build_filter_nvlist(nvlist_t **nvlpp, ipgpc_filter_t *in_filter,
 	if ((rc = nvlist_add_byte(nvlp, IPP_CONFIG_TYPE,
 	    CLASSIFIER_ADD_FILTER)) != 0) {
 		return (rc);
-	}
-
-	/* add interface groupname */
-	if (in_filter->if_groupname[0] != '\0') {
-		if ((rc = nvlist_add_string(nvlp, IPGPC_IF_GROUPNAME,
-		    in_filter->if_groupname)) != 0) {
-			return (rc);
-		}
 	}
 
 	/* add uid */

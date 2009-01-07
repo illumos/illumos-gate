@@ -1892,7 +1892,6 @@ icmp_opt_get(conn_t *connp, int level, int name, uchar_t *ptr)
 		 * case MRT_VERSION:
 		 * case MRT_ASSERT:
 		 * case IP_SEC_OPT:
-		 * case IP_DONTFAILOVER_IF:
 		 * case IP_NEXTHOP:
 		 */
 		default:
@@ -2481,7 +2480,6 @@ icmp_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 		case MRT_VERSION:
 		case MRT_ASSERT:
 		case IP_SEC_OPT:
-		case IP_DONTFAILOVER_IF:
 		case IP_NEXTHOP:
 			/*
 			 * "soft" error (negative)
@@ -3014,9 +3012,7 @@ icmp_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 		case IPV6_PATHMTU:
 			return (EINVAL);
 
-		case IPV6_BOUND_PIF:
 		case IPV6_SEC_OPT:
-		case IPV6_DONTFAILOVER_IF:
 		case IPV6_SRC_PREFERENCES:
 		case IPV6_V6ONLY:
 			/* Handled at IP level */

@@ -19,13 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#define	AF_INET_OFFLOAD	30
 
 #include <sys/sockio.h>
 #include <sys/stream.h>
@@ -34,27 +30,24 @@
 #include <sys/strsun.h>
 #include <inet/common.h>
 #include <net/if.h>
+#include <net/if_types.h>
 #include <inet/mi.h>
 #include <sys/t_kuser.h>
 #include <sys/stropts.h>
 #include <sys/pathname.h>
 #include <sys/kstr.h>
 #include <sys/timod.h>
+#include <sys/sunddi.h>
 #include <sys/ib/clients/rds/rds.h>
 #include <sys/ib/clients/rds/rds_transport.h>
 
 static	sin_t	sin_null;	/* Zero address for quick clears */
 
-#define	isdigit(ch)	((ch) >= '0' && (ch) <= '9')
-
-#define	isalpha(ch)	(((ch) >= 'a' && (ch) <= 'z') || \
-			((ch) >= 'A' && (ch) <= 'Z'))
-
 /*
  * Just pass the ioctl to IP and the result to the caller.
  */
 int
-rds_do_ip_ioctl(int cmd, int len, caddr_t arg)
+rds_do_ip_ioctl(int cmd, int len, void *arg)
 {
 	vnode_t	*kvp, *vp;
 	TIUSER	*tiptr;
@@ -62,8 +55,7 @@ rds_do_ip_ioctl(int cmd, int len, caddr_t arg)
 	k_sigset_t smask;
 	int	err = 0;
 
-	if (lookupname("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP,
-	    &kvp) == 0) {
+	if (lookupname("/dev/udp", UIO_SYSSPACE, FOLLOW, NULLVPP, &kvp) == 0) {
 		if (t_kopen((file_t *)NULL, kvp->v_rdev, FREAD|FWRITE,
 		    &tiptr, CRED()) == 0) {
 			vp = tiptr->fp->f_vnode;
@@ -72,13 +64,13 @@ rds_do_ip_ioctl(int cmd, int len, caddr_t arg)
 			return (EPROTO);
 		}
 	} else {
-			return (EPROTO);
+		return (EPROTO);
 	}
 
 	iocb.ic_cmd = cmd;
 	iocb.ic_timout = 0;
 	iocb.ic_len = len;
-	iocb.ic_dp = arg;
+	iocb.ic_dp = (caddr_t)arg;
 	sigintr(&smask, 0);
 	err = kstr_ioctl(vp, I_STR, (intptr_t)&iocb);
 	sigunintr(&smask);
@@ -88,197 +80,166 @@ rds_do_ip_ioctl(int cmd, int len, caddr_t arg)
 }
 
 /*
- * Return 0 if the interface is IB.
- * Return error (>0) if any error is encountered during processing.
- * Return -1 if the interface is not IB and no error.
+ * Check if the IP interface named by `lifrp' is RDS-capable.
  */
-static int
-rds_is_ib_interface(char *name)
+static boolean_t
+rds_capable_interface(struct lifreq *lifrp)
 {
+	char	ifname[LIFNAMSIZ];
+	char	drv[MAXLINKNAMELEN];
+	uint_t	ppa;
+	char 	*cp;
 
-	char		dev_path[MAXPATHLEN];
-	char		devname[MAXNAMELEN];
-	ldi_handle_t	lh;
-	dl_info_ack_t	info;
-	int		ret = 0;
-	int		i;
-	k_sigset_t	smask;
+	if (lifrp->lifr_type == IFT_IB)
+		return (B_TRUE);
 
 	/*
-	 * ibd devices are only style 2 devices
-	 * so we will open only style 2 devices
-	 * by ignoring the ppa
+	 * Strip off the logical interface portion before getting
+	 * intimate with the name.
 	 */
-	i = strlen(name) - 1;
-	while ((i >= 0) && (!isalpha(name[i]))) i--;
-	if (i < 0) {
-		/* Invalid interface name, no alphabet */
-		return (-1);
-	}
-	(void) strncpy(devname, name, i + 1);
-	devname[i + 1] = '\0';
+	(void) strlcpy(ifname, lifrp->lifr_name, LIFNAMSIZ);
+	if ((cp = strchr(ifname, ':')) != NULL)
+		*cp = '\0';
 
-	if (strcmp("lo", devname) == 0) {
+	if (strcmp("lo0", ifname) == 0) {
 		/*
-		 * loopback interface is considered RDS capable
+		 * loopback is considered RDS-capable
 		 */
-		return (0);
+		return (B_TRUE);
 	}
 
-	(void) strncpy(dev_path, "/dev/", MAXPATHLEN);
-	if (strlcat(dev_path, devname, MAXPATHLEN) >= MAXPATHLEN) {
-		/* string overflow */
-		return (-1);
-	}
+	return (ddi_parse(ifname, drv, &ppa) == DDI_SUCCESS &&
+	    rds_transport_ops->rds_transport_if_lookup_by_name(drv));
+}
 
-	ret = ldi_open_by_name(dev_path, FREAD|FWRITE, kcred, &lh, rds_li);
-	if (ret != 0) {
-		return (ret);
-	}
+/*
+ * Issue an SIOCGLIFCONF down to IP and return the result in `lifcp'.
+ * lifcp->lifc_buf is dynamically allocated to be *bufsizep bytes.
+ */
+static int
+rds_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep)
+{
+	int err;
+	int nifs;
 
-	sigintr(&smask, 0);
-	ret = dl_info(lh, &info, NULL, NULL, NULL);
-	sigunintr(&smask);
-	(void) ldi_close(lh, FREAD|FWRITE, kcred);
-	if (ret != 0) {
-		return (ret);
-	}
+	if ((err = rds_do_ip_ioctl(SIOCGIFNUM, sizeof (int), &nifs)) != 0)
+		return (err);
 
-	if (info.dl_mac_type != DL_IB &&
-	    !rds_transport_ops->rds_transport_if_lookup_by_name(devname)) {
-		return (-1);
-	}
+	/*
+	 * Pad the interface count to account for additional interfaces that
+	 * may have been configured between the SIOCGLIFNUM and SIOCGLIFCONF.
+	 */
+	nifs += 4;
 
+	bzero(lifcp, sizeof (struct lifconf));
+	lifcp->lifc_family = AF_INET;
+	lifcp->lifc_len = *bufsizep = (nifs * sizeof (struct lifreq));
+	lifcp->lifc_buf = kmem_zalloc(*bufsizep, KM_NOSLEEP);
+	if (lifcp->lifc_buf == NULL)
+		return (ENOMEM);
+
+	err = rds_do_ip_ioctl(SIOCGLIFCONF, sizeof (struct lifconf), lifcp);
+	if (err != 0) {
+		kmem_free(lifcp->lifc_buf, *bufsizep);
+		return (err);
+	}
 	return (0);
 }
 
 void
 rds_ioctl_copyin_done(queue_t *q, mblk_t *mp)
 {
-	char	*addr;
+	void	*addr;
 	mblk_t	*mp1;
 	int	err = 0;
-	struct	iocblk *iocp = (struct iocblk *)(uintptr_t)mp->b_rptr;
+	struct	iocblk *iocp = (void *)mp->b_rptr;
 
 	if (!(mp1 = mp->b_cont) || !(mp1 = mp1->b_cont)) {
 		err = EPROTO;
 		goto done;
 	}
 
-	addr = (char *)mp1->b_rptr;
+	addr = mp1->b_rptr;
 
 	switch (iocp->ioc_cmd) {
-
 	case SIOCGIFNUM: {
-		/* Get number of interfaces. */
-		struct ifconf   kifc;
-		struct ifreq *ifr;
-		int num_ifs;
-		int n;
+		uint_t bufsize;
+		struct lifconf lifc;
+		struct lifreq *lifrp;
+		int i, nifs, retval = 0;
 
-		err = rds_do_ip_ioctl(iocp->ioc_cmd, sizeof (int),
-		    (char *)&num_ifs);
-		if (err != 0) {
+		if ((err = rds_do_lifconf(&lifc, &bufsize)) != 0)
 			break;
-		}
 
-		kifc.ifc_len = num_ifs * sizeof (struct ifreq);
-		kifc.ifc_buf = kmem_zalloc(kifc.ifc_len, KM_SLEEP);
-		err = rds_do_ip_ioctl(SIOCGIFCONF,
-		    sizeof (struct ifconf), (caddr_t)&kifc);
-		if (err != 0) {
-			kmem_free(kifc.ifc_buf, kifc.ifc_len);
-			break;
-		}
-		ifr = kifc.ifc_req;
-		n = num_ifs;
-		for (num_ifs = 0; n > 0; ifr++) {
-			err = rds_is_ib_interface(ifr->ifr_name);
-			if (err == 0) {
-				num_ifs++;
-			} else if (err > 0) {
-				num_ifs = 0;
-				break;
-			} else {
-				err = 0;
+		nifs = lifc.lifc_len / sizeof (struct lifreq);
+		for (lifrp = lifc.lifc_req, i = 0; i < nifs; i++, lifrp++) {
+			if (strlen(lifrp->lifr_name) <= IFNAMSIZ &&
+			    rds_capable_interface(lifrp)) {
+				retval++;
 			}
-			n--;
 		}
-		*((int *)(uintptr_t)addr) = num_ifs;
-		kmem_free(kifc.ifc_buf, kifc.ifc_len);
-	}
+		*((int *)addr) = retval;
+		kmem_free(lifc.lifc_buf, bufsize);
 		break;
+	}
 
 	case O_SIOCGIFCONF:
 	case SIOCGIFCONF: {
 		STRUCT_HANDLE(ifconf, ifc);
 		caddr_t ubuf_addr;
 		int	ubuf_size;
-		struct ifconf   kifc;
-		struct ifreq *ifr, *ptr;
-		int num_ifs;
+		uint_t	bufsize;
+		int 	i, nifs;
+		struct lifconf lifc;
+		struct lifreq *lifrp;
+		struct ifreq *ifrp;
 
-		STRUCT_SET_HANDLE(ifc, iocp->ioc_flag,
-		    (struct ifconf *)(uintptr_t)addr);
-
+		STRUCT_SET_HANDLE(ifc, iocp->ioc_flag, (struct ifconf *)addr);
 		ubuf_size = STRUCT_FGET(ifc, ifc_len);
 		ubuf_addr = STRUCT_FGETP(ifc, ifc_buf);
 
-		err = rds_do_ip_ioctl(SIOCGIFNUM, sizeof (int),
-		    (char *)&num_ifs);
-		if (err != 0) {
+		if ((err = rds_do_lifconf(&lifc, &bufsize)) != 0)
 			break;
-		}
 
-		kifc.ifc_len = num_ifs * sizeof (struct ifreq);
-		kifc.ifc_buf = kmem_zalloc(kifc.ifc_len, KM_SLEEP);
-		err = rds_do_ip_ioctl(iocp->ioc_cmd,
-		    sizeof (struct ifconf), (caddr_t)&kifc);
-		if (err != 0) {
-			kmem_free(kifc.ifc_buf, kifc.ifc_len);
-			break;
-		}
 		mp1 = mi_copyout_alloc(q, mp, ubuf_addr, ubuf_size, B_FALSE);
 		if (mp1 == NULL) {
 			err = ENOMEM;
-			kmem_free(kifc.ifc_buf, ubuf_size);
+			kmem_free(lifc.lifc_buf, bufsize);
 			break;
 		}
 
-		ifr = kifc.ifc_req;
-		ptr = (struct ifreq *)(uintptr_t)mp1->b_rptr;
-		for (; num_ifs > 0 &&
-		    (int)((uintptr_t)mp1->b_wptr - (uintptr_t)mp1->b_rptr) <
-		    ubuf_size; num_ifs--, ifr++) {
-			err = rds_is_ib_interface(ifr->ifr_name);
-			if (err == 0) {
-				ifr->ifr_addr.sa_family = AF_INET_OFFLOAD;
-				bcopy((caddr_t)ifr, ptr, sizeof (struct ifreq));
-				ptr++;
-				mp1->b_wptr = (uchar_t *)ptr;
-			} else if (err > 0) {
-				break;
-			} else {
-				err = 0;
+		ifrp = (void *)mp1->b_rptr;
+		nifs = lifc.lifc_len / sizeof (struct lifreq);
+		for (lifrp = lifc.lifc_req, i = 0; i < nifs &&
+		    MBLKTAIL(mp1) >= sizeof (struct ifreq); i++, lifrp++) {
+			/*
+			 * Skip entries that are impossible to return with
+			 * SIOCGIFCONF, or not RDS-capable.
+			 */
+			if (strlen(lifrp->lifr_name) > IFNAMSIZ ||
+			    !rds_capable_interface(lifrp)) {
+				continue;
 			}
+
+			ifrp->ifr_addr = *(struct sockaddr *)&lifrp->lifr_addr;
+			ifrp->ifr_addr.sa_family = AF_INET_OFFLOAD;
+			(void) strlcpy(ifrp->ifr_name, lifrp->lifr_name,
+			    IFNAMSIZ);
+			ifrp++;
+			mp1->b_wptr += sizeof (struct ifreq);
 		}
 
-		STRUCT_FSET(ifc, ifc_len, (int)((uintptr_t)mp1->b_wptr -
-		    (uintptr_t)mp1->b_rptr));
-		kmem_free(kifc.ifc_buf, kifc.ifc_len);
+		STRUCT_FSET(ifc, ifc_len, MBLKL(mp1));
+		kmem_free(lifc.lifc_buf, bufsize);
+		break;
 	}
-		break;
 	case SIOCGIFMTU:
-		err = rds_do_ip_ioctl(iocp->ioc_cmd,
-		    sizeof (struct ifreq), addr);
-		break;
-
 	case SIOCGIFFLAGS:
-		err = rds_do_ip_ioctl(iocp->ioc_cmd,
-		    sizeof (struct ifreq), addr);
+		err = rds_do_ip_ioctl(iocp->ioc_cmd, sizeof (struct ifreq),
+		    addr);
 		break;
-	case TI_GETMYNAME: {
 
+	case TI_GETMYNAME: {
 		rds_t *rds;
 		STRUCT_HANDLE(strbuf, sb);
 		ipaddr_t	v4addr;
@@ -287,8 +248,7 @@ rds_ioctl_copyin_done(queue_t *q, mblk_t *mp)
 		sin_t *sin;
 
 		STRUCT_SET_HANDLE(sb,
-		    ((struct iocblk *)(uintptr_t)mp->b_rptr)->ioc_flag,
-		    (void *)(uintptr_t)addr);
+		    ((struct iocblk *)(uintptr_t)mp->b_rptr)->ioc_flag, addr);
 		rds = (rds_t *)q->q_ptr;
 		ASSERT(rds->rds_family == AF_INET_OFFLOAD);
 		addrlen = sizeof (sin_t);
@@ -319,7 +279,6 @@ rds_ioctl_copyin_done(queue_t *q, mblk_t *mp)
 done:
 	mi_copy_done(q, mp, err);
 }
-
 
 void
 rds_ioctl_copyin_setup(queue_t *q, mblk_t *mp)
@@ -383,38 +342,26 @@ rds_ioctl(queue_t *q, mblk_t *mp)
 boolean_t
 rds_verify_bind_address(ipaddr_t addr)
 {
-	int	numifs;
-	struct ifconf   kifc;
-	struct ifreq *ifr;
-	boolean_t ret = B_FALSE;
+	int i, nifs;
+	uint_t bufsize;
+	struct lifconf lifc;
+	struct lifreq *lifrp;
+	struct sockaddr_in *sinp;
+	boolean_t retval = B_FALSE;
 
+	if (rds_do_lifconf(&lifc, &bufsize) != 0)
+		return (B_FALSE);
 
-	if (rds_do_ip_ioctl(SIOCGIFNUM, sizeof (int), (caddr_t)&numifs)) {
-		return (ret);
-	}
-
-	kifc.ifc_len = numifs * sizeof (struct ifreq);
-	kifc.ifc_buf = kmem_zalloc(kifc.ifc_len, KM_SLEEP);
-
-	if (rds_do_ip_ioctl(SIOCGIFCONF, sizeof (struct ifconf),
-	    (caddr_t)&kifc)) {
-		goto done;
-	}
-
-	ifr = kifc.ifc_req;
-	for (numifs = kifc.ifc_len / sizeof (struct ifreq);
-	    numifs > 0; numifs--, ifr++) {
-		struct	sockaddr_in	*sin;
-
-		sin = (struct sockaddr_in *)(uintptr_t)&ifr->ifr_addr;
-		if ((sin->sin_addr.s_addr == addr) &&
-		    (rds_is_ib_interface(ifr->ifr_name) == 0)) {
-				ret = B_TRUE;
-				break;
+	nifs = lifc.lifc_len / sizeof (struct lifreq);
+	for (lifrp = lifc.lifc_req, i = 0; i < nifs; i++, lifrp++) {
+		sinp = (struct sockaddr_in *)&lifrp->lifr_addr;
+		if (rds_capable_interface(lifrp) &&
+		    sinp->sin_addr.s_addr == addr) {
+			retval = B_TRUE;
+			break;
 		}
 	}
 
-done:
-	kmem_free(kifc.ifc_buf, kifc.ifc_len);
-	return (ret);
+	kmem_free(lifc.lifc_buf, bufsize);
+	return (retval);
 }

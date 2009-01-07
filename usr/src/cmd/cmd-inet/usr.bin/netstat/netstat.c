@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  * netstat.c 2.2, last change 9/9/91
  * MROUTING Revision 3.5
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * simple netstat based on snmp/mib-2 interface to the TCP/IP stack
@@ -221,6 +219,7 @@ static char		*plural(int n);
 static char		*pluraly(int n);
 static char		*plurales(int n);
 static void		process_filter(char *arg);
+static char		*ifindex2str(uint_t, char *);
 static boolean_t	family_selected(int family);
 
 static void		usage(char *);
@@ -680,8 +679,14 @@ mibget(int sd)
 	tor->OPT_offset = sizeof (struct T_optmgmt_req);
 	tor->OPT_length = sizeof (struct opthdr);
 	tor->MGMT_flags = T_CURRENT;
+
+
+	/*
+	 * Note: we use the special level value below so that IP will return
+	 * us information concerning IRE_MARK_TESTHIDDEN routes.
+	 */
 	req = (struct opthdr *)&tor[1];
-	req->level = MIB2_IP;		/* any MIB2_xxx value ok here */
+	req->level = EXPER_IP_AND_TESTHIDDEN;
 	req->name  = 0;
 	req->len   = 0;
 
@@ -712,7 +717,7 @@ mibget(int sd)
 				    stderr);
 				i = 0;
 				for (last_item = first_item; last_item;
-					last_item = last_item->next_item)
+				    last_item = last_item->next_item)
 					(void) printf("%d  %4d   %5d   %d\n",
 					    ++i,
 					    last_item->group,
@@ -1707,19 +1712,19 @@ mib_get_constants(mib_item_t *item)
 			ipRouteAttributeSize = ip->ipRouteAttributeSize;
 			transportMLPSize = ip->transportMLPSize;
 			assert(IS_P2ALIGNED(ipAddrEntrySize,
-			    sizeof (mib2_ipAddrEntry_t *)) &&
-			    IS_P2ALIGNED(ipRouteEntrySize,
-				sizeof (mib2_ipRouteEntry_t *)) &&
-			    IS_P2ALIGNED(ipNetToMediaEntrySize,
-				sizeof (mib2_ipNetToMediaEntry_t *)) &&
-			    IS_P2ALIGNED(ipMemberEntrySize,
-				sizeof (ip_member_t *)) &&
-			    IS_P2ALIGNED(ipGroupSourceEntrySize,
-				sizeof (ip_grpsrc_t *)) &&
-			    IS_P2ALIGNED(ipRouteAttributeSize,
-				sizeof (mib2_ipAttributeEntry_t *)) &&
-			    IS_P2ALIGNED(transportMLPSize,
-				sizeof (mib2_transportMLPEntry_t *)));
+			    sizeof (mib2_ipAddrEntry_t *)));
+			assert(IS_P2ALIGNED(ipRouteEntrySize,
+			    sizeof (mib2_ipRouteEntry_t *)));
+			assert(IS_P2ALIGNED(ipNetToMediaEntrySize,
+			    sizeof (mib2_ipNetToMediaEntry_t *)));
+			assert(IS_P2ALIGNED(ipMemberEntrySize,
+			    sizeof (ip_member_t *)));
+			assert(IS_P2ALIGNED(ipGroupSourceEntrySize,
+			    sizeof (ip_grpsrc_t *)));
+			assert(IS_P2ALIGNED(ipRouteAttributeSize,
+			    sizeof (mib2_ipAttributeEntry_t *)));
+			assert(IS_P2ALIGNED(transportMLPSize,
+			    sizeof (mib2_transportMLPEntry_t *)));
 			break;
 		}
 		case EXPER_DVMRP: {
@@ -1728,8 +1733,9 @@ mib_get_constants(mib_item_t *item)
 			vifctlSize = mrts->mrts_vifctlSize;
 			mfcctlSize = mrts->mrts_mfcctlSize;
 			assert(IS_P2ALIGNED(vifctlSize,
-			    sizeof (struct vifclt *)) &&
-			    IS_P2ALIGNED(mfcctlSize, sizeof (struct mfcctl *)));
+			    sizeof (struct vifclt *)));
+			assert(IS_P2ALIGNED(mfcctlSize,
+			    sizeof (struct mfcctl *)));
 			break;
 		}
 		case MIB2_IP6: {
@@ -1745,17 +1751,17 @@ mib_get_constants(mib_item_t *item)
 			ipv6GroupSourceEntrySize =
 			    ip6->ipv6GroupSourceEntrySize;
 			assert(IS_P2ALIGNED(ipv6IfStatsEntrySize,
-			    sizeof (mib2_ipv6IfStatsEntry_t *)) &&
-			    IS_P2ALIGNED(ipv6AddrEntrySize,
-				sizeof (mib2_ipv6AddrEntry_t *)) &&
-			    IS_P2ALIGNED(ipv6RouteEntrySize,
-				sizeof (mib2_ipv6RouteEntry_t *)) &&
-			    IS_P2ALIGNED(ipv6NetToMediaEntrySize,
-				sizeof (mib2_ipv6NetToMediaEntry_t *)) &&
-			    IS_P2ALIGNED(ipv6MemberEntrySize,
-				sizeof (ipv6_member_t *)) &&
-			    IS_P2ALIGNED(ipv6GroupSourceEntrySize,
-				sizeof (ipv6_grpsrc_t *)));
+			    sizeof (mib2_ipv6IfStatsEntry_t *)));
+			assert(IS_P2ALIGNED(ipv6AddrEntrySize,
+			    sizeof (mib2_ipv6AddrEntry_t *)));
+			assert(IS_P2ALIGNED(ipv6RouteEntrySize,
+			    sizeof (mib2_ipv6RouteEntry_t *)));
+			assert(IS_P2ALIGNED(ipv6NetToMediaEntrySize,
+			    sizeof (mib2_ipv6NetToMediaEntry_t *)));
+			assert(IS_P2ALIGNED(ipv6MemberEntrySize,
+			    sizeof (ipv6_member_t *)));
+			assert(IS_P2ALIGNED(ipv6GroupSourceEntrySize,
+			    sizeof (ipv6_grpsrc_t *)));
 			break;
 		}
 		case MIB2_ICMP6: {
@@ -1774,9 +1780,9 @@ mib_get_constants(mib_item_t *item)
 			tcpConnEntrySize = tcp->tcpConnTableSize;
 			tcp6ConnEntrySize = tcp->tcp6ConnTableSize;
 			assert(IS_P2ALIGNED(tcpConnEntrySize,
-			    sizeof (mib2_tcpConnEntry_t *)) &&
-			    IS_P2ALIGNED(tcp6ConnEntrySize,
-				sizeof (mib2_tcp6ConnEntry_t *)));
+			    sizeof (mib2_tcpConnEntry_t *)));
+			assert(IS_P2ALIGNED(tcp6ConnEntrySize,
+			    sizeof (mib2_tcp6ConnEntry_t *)));
 			break;
 		}
 		case MIB2_UDP: {
@@ -1785,9 +1791,9 @@ mib_get_constants(mib_item_t *item)
 			udpEntrySize = udp->udpEntrySize;
 			udp6EntrySize = udp->udp6EntrySize;
 			assert(IS_P2ALIGNED(udpEntrySize,
-			    sizeof (mib2_udpEntry_t *)) &&
-			    IS_P2ALIGNED(udp6EntrySize,
-				sizeof (mib2_udp6Entry_t *)));
+			    sizeof (mib2_udpEntry_t *)));
+			assert(IS_P2ALIGNED(udp6EntrySize,
+			    sizeof (mib2_udp6Entry_t *)));
 			break;
 		}
 		case MIB2_SCTP: {
@@ -1843,7 +1849,6 @@ stat_report(mib_item_t *item)
 {
 	int	jtemp = 0;
 	char	ifname[LIFNAMSIZ + 1];
-	char	*ifnamep;
 
 	/* 'for' loop 1: */
 	for (; item; item = item->next_item) {
@@ -1891,12 +1896,10 @@ stat_report(mib_item_t *item)
 			bzero(&sum6, sizeof (sum6));
 			/* 'for' loop 2a: */
 			for (ip6 = (mib2_ipv6IfStatsEntry_t *)item->valp;
-			    (char *)ip6 < (char *)item->valp
-			    + item->length;
+			    (char *)ip6 < (char *)item->valp + item->length;
 			    /* LINTED: (note 1) */
 			    ip6 = (mib2_ipv6IfStatsEntry_t *)((char *)ip6 +
 			    ipv6IfStatsEntrySize)) {
-
 				if (ip6->ipv6IfIndex == 0) {
 					/*
 					 * The "unknown interface" ip6
@@ -1905,19 +1908,10 @@ stat_report(mib_item_t *item)
 					sum_ip6_stats(ip6, &sum6);
 					continue; /* 'for' loop 2a */
 				}
-				ifnamep = if_indextoname(
-				    ip6->ipv6IfIndex,
-				    ifname);
-				if (ifnamep == NULL) {
-					(void) printf(
-					    "Invalid ifindex %d\n",
-					    ip6->ipv6IfIndex);
-					continue; /* 'for' loop 2a */
-				}
-
 				if (Aflag) {
 					(void) printf("\nIPv6 for %s\n",
-					    ifnamep);
+					    ifindex2str(ip6->ipv6IfIndex,
+					    ifname));
 					print_ip6_stats(ip6);
 				}
 				sum_ip6_stats(ip6, &sum6);
@@ -1935,15 +1929,10 @@ stat_report(mib_item_t *item)
 				break;
 			bzero(&sum6, sizeof (sum6));
 			/* 'for' loop 2b: */
-			for (icmp6 =
-			    (mib2_ipv6IfIcmpEntry_t *)item->valp;
-			    (char *)icmp6 < (char *)item->valp
-				+ item->length;
-			    icmp6 =
-				/* LINTED: (note 1) */
-				(mib2_ipv6IfIcmpEntry_t *)((char *)icmp6
-			    + ipv6IfIcmpEntrySize)) {
-
+			for (icmp6 = (mib2_ipv6IfIcmpEntry_t *)item->valp;
+			    (char *)icmp6 < (char *)item->valp + item->length;
+			    icmp6 = (void *)((char *)icmp6 +
+			    ipv6IfIcmpEntrySize)) {
 				if (icmp6->ipv6IfIcmpIfIndex == 0) {
 					/*
 					 * The "unknown interface" icmp6
@@ -1952,19 +1941,10 @@ stat_report(mib_item_t *item)
 					sum_icmp6_stats(icmp6, &sum6);
 					continue; /* 'for' loop 2b: */
 				}
-				ifnamep = if_indextoname(
-				    icmp6->ipv6IfIcmpIfIndex, ifname);
-				if (ifnamep == NULL) {
-					(void) printf(
-					    "Invalid ifindex %d\n",
-					    icmp6->ipv6IfIcmpIfIndex);
-					continue; /* 'for' loop 2b: */
-				}
-
 				if (Aflag) {
-					(void) printf(
-					    "\nICMPv6 for %s\n",
-					    ifnamep);
+					(void) printf("\nICMPv6 for %s\n",
+					    ifindex2str(
+					    icmp6->ipv6IfIcmpIfIndex, ifname));
 					print_icmp6_stats(icmp6);
 				}
 				sum_icmp6_stats(icmp6, &sum6);
@@ -2369,51 +2349,49 @@ print_mrt_stats(struct mrtstat *mrts)
 {
 	(void) puts("DVMRP multicast routing:");
 	(void) printf(" %10u hit%s - kernel forwarding cache hits\n",
-		mrts->mrts_mfc_hits, PLURAL(mrts->mrts_mfc_hits));
+	    mrts->mrts_mfc_hits, PLURAL(mrts->mrts_mfc_hits));
 	(void) printf(" %10u miss%s - kernel forwarding cache misses\n",
-		mrts->mrts_mfc_misses, PLURALES(mrts->mrts_mfc_misses));
+	    mrts->mrts_mfc_misses, PLURALES(mrts->mrts_mfc_misses));
 	(void) printf(" %10u packet%s potentially forwarded\n",
-		mrts->mrts_fwd_in, PLURAL(mrts->mrts_fwd_in));
+	    mrts->mrts_fwd_in, PLURAL(mrts->mrts_fwd_in));
 	(void) printf(" %10u packet%s actually sent out\n",
-		mrts->mrts_fwd_out, PLURAL(mrts->mrts_fwd_out));
+	    mrts->mrts_fwd_out, PLURAL(mrts->mrts_fwd_out));
 	(void) printf(" %10u upcall%s - upcalls made to mrouted\n",
-		mrts->mrts_upcalls, PLURAL(mrts->mrts_upcalls));
+	    mrts->mrts_upcalls, PLURAL(mrts->mrts_upcalls));
 	(void) printf(" %10u packet%s not sent out due to lack of resources\n",
-		mrts->mrts_fwd_drop, PLURAL(mrts->mrts_fwd_drop));
+	    mrts->mrts_fwd_drop, PLURAL(mrts->mrts_fwd_drop));
 	(void) printf(" %10u datagram%s with malformed tunnel options\n",
-		mrts->mrts_bad_tunnel, PLURAL(mrts->mrts_bad_tunnel));
+	    mrts->mrts_bad_tunnel, PLURAL(mrts->mrts_bad_tunnel));
 	(void) printf(" %10u datagram%s with no room for tunnel options\n",
-		mrts->mrts_cant_tunnel, PLURAL(mrts->mrts_cant_tunnel));
+	    mrts->mrts_cant_tunnel, PLURAL(mrts->mrts_cant_tunnel));
 	(void) printf(" %10u datagram%s arrived on wrong interface\n",
-		mrts->mrts_wrong_if, PLURAL(mrts->mrts_wrong_if));
+	    mrts->mrts_wrong_if, PLURAL(mrts->mrts_wrong_if));
 	(void) printf(" %10u datagram%s dropped due to upcall Q overflow\n",
-		mrts->mrts_upq_ovflw, PLURAL(mrts->mrts_upq_ovflw));
+	    mrts->mrts_upq_ovflw, PLURAL(mrts->mrts_upq_ovflw));
 	(void) printf(" %10u datagram%s cleaned up by the cache\n",
-		mrts->mrts_cache_cleanups, PLURAL(mrts->mrts_cache_cleanups));
+	    mrts->mrts_cache_cleanups, PLURAL(mrts->mrts_cache_cleanups));
 	(void) printf(" %10u datagram%s dropped selectively by ratelimiter\n",
-		mrts->mrts_drop_sel, PLURAL(mrts->mrts_drop_sel));
+	    mrts->mrts_drop_sel, PLURAL(mrts->mrts_drop_sel));
 	(void) printf(" %10u datagram%s dropped - bucket Q overflow\n",
-		mrts->mrts_q_overflow, PLURAL(mrts->mrts_q_overflow));
+	    mrts->mrts_q_overflow, PLURAL(mrts->mrts_q_overflow));
 	(void) printf(" %10u datagram%s dropped - larger than bkt size\n",
-		mrts->mrts_pkt2large, PLURAL(mrts->mrts_pkt2large));
+	    mrts->mrts_pkt2large, PLURAL(mrts->mrts_pkt2large));
 	(void) printf("\nPIM multicast routing:\n");
 	(void) printf(" %10u datagram%s dropped - bad version number\n",
-		mrts->mrts_pim_badversion, PLURAL(mrts->mrts_pim_badversion));
+	    mrts->mrts_pim_badversion, PLURAL(mrts->mrts_pim_badversion));
 	(void) printf(" %10u datagram%s dropped - bad checksum\n",
-		mrts->mrts_pim_rcv_badcsum, PLURAL(mrts->mrts_pim_rcv_badcsum));
+	    mrts->mrts_pim_rcv_badcsum, PLURAL(mrts->mrts_pim_rcv_badcsum));
 	(void) printf(" %10u datagram%s dropped - bad register packets\n",
-		mrts->mrts_pim_badregisters,
-		PLURAL(mrts->mrts_pim_badregisters));
+	    mrts->mrts_pim_badregisters, PLURAL(mrts->mrts_pim_badregisters));
 	(void) printf(
-		" %10u datagram%s potentially forwarded - register packets\n",
-		mrts->mrts_pim_regforwards, PLURAL(mrts->mrts_pim_regforwards));
+	    " %10u datagram%s potentially forwarded - register packets\n",
+	    mrts->mrts_pim_regforwards, PLURAL(mrts->mrts_pim_regforwards));
 	(void) printf(" %10u datagram%s dropped - register send drops\n",
-		mrts->mrts_pim_regsend_drops,
-		PLURAL(mrts->mrts_pim_regsend_drops));
+	    mrts->mrts_pim_regsend_drops, PLURAL(mrts->mrts_pim_regsend_drops));
 	(void) printf(" %10u datagram%s dropped - packet malformed\n",
-		mrts->mrts_pim_malformed, PLURAL(mrts->mrts_pim_malformed));
+	    mrts->mrts_pim_malformed, PLURAL(mrts->mrts_pim_malformed));
 	(void) printf(" %10u datagram%s dropped - no memory to forward\n",
-		mrts->mrts_pim_nomemory, PLURAL(mrts->mrts_pim_nomemory));
+	    mrts->mrts_pim_nomemory, PLURAL(mrts->mrts_pim_nomemory));
 }
 
 static void
@@ -2674,7 +2652,7 @@ if_report(mib_item_t *item, char *matchname,
 						    "Ierrs", "Opkts", "Oerrs",
 						    "Collis", "Queue");
 
-						    first = B_FALSE;
+						first = B_FALSE;
 						}
 						if_report_ip4(ap, ifname,
 						    logintname, &stat, B_TRUE);
@@ -2717,7 +2695,7 @@ if_report(mib_item_t *item, char *matchname,
 				    + item->length;
 				    ap++) {
 					(void) octetstr(&ap->ipAdEntIfIndex,
-					'a', ifname, sizeof (ifname));
+					    'a', ifname, sizeof (ifname));
 					(void) strtok(ifname, ":");
 
 					if (matchname) {
@@ -3387,7 +3365,7 @@ dhcp_walk_interfaces(uint_t flags_on, uint_t flags_off, int af,
 	 */
 	(void) memset(&lifn, 0, sizeof (lifn));
 	lifn.lifn_family = af;
-	lifn.lifn_flags = LIFC_ALLZONES | LIFC_NOXMIT;
+	lifn.lifn_flags = LIFC_ALLZONES | LIFC_NOXMIT | LIFC_UNDER_IPMP;
 	if (ioctl(sock_fd, SIOCGLIFNUM, &lifn) == -1)
 		n_ifs = LIFN_GUARD_VALUE;
 	else
@@ -3471,7 +3449,6 @@ group_report(mib_item_t *item)
 	ip_grpsrc_t	*ips;
 	ipv6_member_t	*ipmp6;
 	ipv6_grpsrc_t	*ips6;
-	char		*ifnamep;
 	boolean_t	first, first_src;
 
 	/* 'for' loop 1: */
@@ -3604,7 +3581,7 @@ group_report(mib_item_t *item)
 		    (char *)ipmp6 < (char *)v6grp->valp + v6grp->length;
 		    /* LINTED: (note 1) */
 		    ipmp6 = (ipv6_member_t *)((char *)ipmp6 +
-			ipv6MemberEntrySize)) {
+		    ipv6MemberEntrySize)) {
 			if (first) {
 				(void) puts("Group Memberships: "
 				    "IPv6");
@@ -3615,15 +3592,8 @@ group_report(mib_item_t *item)
 				first = B_FALSE;
 			}
 
-			ifnamep = if_indextoname(
-			    ipmp6->ipv6GroupMemberIfIndex, ifname);
-			if (ifnamep == NULL) {
-				(void) printf("Invalid ifindex %d\n",
-				    ipmp6->ipv6GroupMemberIfIndex);
-				continue;
-			}
 			(void) printf("%-5s %-27s %5u\n",
-			    ifnamep,
+			    ifindex2str(ipmp6->ipv6GroupMemberIfIndex, ifname),
 			    pr_addr6(&ipmp6->ipv6GroupMemberAddress,
 			    abuf, sizeof (abuf)),
 			    ipmp6->ipv6GroupMemberRefCnt);
@@ -3784,7 +3754,6 @@ ndp_report(mib_item_t *item)
 	char		xbuf[STR_EXPAND * OCTET_LENGTH + 1];
 	mib2_ipv6NetToMediaEntry_t	*np6;
 	char		ifname[LIFNAMSIZ + 1];
-	char		*ifnamep;
 	boolean_t	first;
 
 	if (!(family_selected(AF_INET6)))
@@ -3820,13 +3789,6 @@ ndp_report(mib_item_t *item)
 				first = B_FALSE;
 			}
 
-			ifnamep = if_indextoname(np6->ipv6NetToMediaIfIndex,
-			    ifname);
-			if (ifnamep == NULL) {
-				(void) printf("Invalid ifindex %d\n",
-				    np6->ipv6NetToMediaIfIndex);
-				continue; /* 'for' loop 2 */
-			}
 			switch (np6->ipv6NetToMediaState) {
 			case ND_INCOMPLETE:
 				state = "INCOMPLETE";
@@ -3865,7 +3827,7 @@ ndp_report(mib_item_t *item)
 				break;
 			}
 			(void) printf("%-5s %-17s  %-7s %-12s %-27s\n",
-			    ifnamep,
+			    ifindex2str(np6->ipv6NetToMediaIfIndex, ifname),
 			    octetstr(&np6->ipv6NetToMediaPhysAddress, 'h',
 			    xbuf, sizeof (xbuf)),
 			    type,
@@ -4472,7 +4434,7 @@ ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
 		(void) printf("%-27s %-27s %-5s %5u%c %5u %3u "
 		    "%-5s %6u %6u %s\n",
 		    pr_prefix6(&rp6->ipv6RouteDest,
-			rp6->ipv6RoutePfxLength, dstbuf, sizeof (dstbuf)),
+		    rp6->ipv6RoutePfxLength, dstbuf, sizeof (dstbuf)),
 		    IN6_IS_ADDR_UNSPECIFIED(&rp6->ipv6RouteNextHop) ?
 		    "    --" :
 		    pr_addr6(&rp6->ipv6RouteNextHop, gwbuf, sizeof (gwbuf)),
@@ -4489,7 +4451,7 @@ ire_report_item_v6(const mib2_ipv6RouteEntry_t *rp6, boolean_t first,
 	} else {
 		(void) printf("%-27s %-27s %-5s %3u %7u %-5s %s\n",
 		    pr_prefix6(&rp6->ipv6RouteDest,
-			rp6->ipv6RoutePfxLength, dstbuf, sizeof (dstbuf)),
+		    rp6->ipv6RoutePfxLength, dstbuf, sizeof (dstbuf)),
 		    IN6_IS_ADDR_UNSPECIFIED(&rp6->ipv6RouteNextHop) ?
 		    "    --" :
 		    pr_addr6(&rp6->ipv6RouteNextHop, gwbuf, sizeof (gwbuf)),
@@ -4690,9 +4652,9 @@ tcp_report_item_v4(const mib2_tcpConnEntry_t *tp, boolean_t first,
 		(void) printf("%-20s\n%-20s %5u %08x %08x %5u %08x %08x "
 		    "%5u %5u %s\n",
 		    pr_ap(tp->tcpConnLocalAddress,
-			tp->tcpConnLocalPort, "tcp", lname, sizeof (lname)),
+		    tp->tcpConnLocalPort, "tcp", lname, sizeof (lname)),
 		    pr_ap(tp->tcpConnRemAddress,
-			tp->tcpConnRemPort, "tcp", fname, sizeof (fname)),
+		    tp->tcpConnRemPort, "tcp", fname, sizeof (fname)),
 		    tp->tcpConnEntryInfo.ce_swnd,
 		    tp->tcpConnEntryInfo.ce_snxt,
 		    tp->tcpConnEntryInfo.ce_suna,
@@ -4710,9 +4672,9 @@ tcp_report_item_v4(const mib2_tcpConnEntry_t *tp, boolean_t first,
 
 		(void) printf("%-20s %-20s %5u %6d %5u %6d %s\n",
 		    pr_ap(tp->tcpConnLocalAddress,
-			tp->tcpConnLocalPort, "tcp", lname, sizeof (lname)),
+		    tp->tcpConnLocalPort, "tcp", lname, sizeof (lname)),
 		    pr_ap(tp->tcpConnRemAddress,
-			tp->tcpConnRemPort, "tcp", fname, sizeof (fname)),
+		    tp->tcpConnRemPort, "tcp", fname, sizeof (fname)),
 		    tp->tcpConnEntryInfo.ce_swnd,
 		    (sq >= 0) ? sq : 0,
 		    tp->tcpConnEntryInfo.ce_rwnd,
@@ -4756,9 +4718,9 @@ tcp_report_item_v6(const mib2_tcp6ConnEntry_t *tp6, boolean_t first,
 		(void) printf("%-33s\n%-33s %5u %08x %08x %5u %08x %08x "
 		    "%5u %5u %-11s %s\n",
 		    pr_ap6(&tp6->tcp6ConnLocalAddress,
-			tp6->tcp6ConnLocalPort, "tcp", lname, sizeof (lname)),
+		    tp6->tcp6ConnLocalPort, "tcp", lname, sizeof (lname)),
 		    pr_ap6(&tp6->tcp6ConnRemAddress,
-			tp6->tcp6ConnRemPort, "tcp", fname, sizeof (fname)),
+		    tp6->tcp6ConnRemPort, "tcp", fname, sizeof (fname)),
 		    tp6->tcp6ConnEntryInfo.ce_swnd,
 		    tp6->tcp6ConnEntryInfo.ce_snxt,
 		    tp6->tcp6ConnEntryInfo.ce_suna,
@@ -4777,9 +4739,9 @@ tcp_report_item_v6(const mib2_tcp6ConnEntry_t *tp6, boolean_t first,
 
 		(void) printf("%-33s %-33s %5u %6d %5u %6d %-11s %s\n",
 		    pr_ap6(&tp6->tcp6ConnLocalAddress,
-			tp6->tcp6ConnLocalPort, "tcp", lname, sizeof (lname)),
+		    tp6->tcp6ConnLocalPort, "tcp", lname, sizeof (lname)),
 		    pr_ap6(&tp6->tcp6ConnRemAddress,
-			tp6->tcp6ConnRemPort, "tcp", fname, sizeof (fname)),
+		    tp6->tcp6ConnRemPort, "tcp", fname, sizeof (fname)),
 		    tp6->tcp6ConnEntryInfo.ce_swnd,
 		    (sq >= 0) ? sq : 0,
 		    tp6->tcp6ConnEntryInfo.ce_rwnd,
@@ -5112,7 +5074,7 @@ sctp_pr_addr(int type, char *name, int namelen, const in6_addr_t *addr,
 	 * displaying.
 	 */
 	switch (type) {
-	    case MIB2_SCTP_ADDR_V4:
+	case MIB2_SCTP_ADDR_V4:
 		/* v4 */
 		v6addr = *addr;
 
@@ -5124,7 +5086,7 @@ sctp_pr_addr(int type, char *name, int namelen, const in6_addr_t *addr,
 		}
 		break;
 
-	    case MIB2_SCTP_ADDR_V6:
+	case MIB2_SCTP_ADDR_V6:
 		/* v6 */
 		if (port > 0) {
 			(void) pr_ap6(addr, port, "sctp", name, namelen);
@@ -5133,7 +5095,7 @@ sctp_pr_addr(int type, char *name, int namelen, const in6_addr_t *addr,
 		}
 		break;
 
-	    default:
+	default:
 		(void) snprintf(name, namelen, "<unknown addr type>");
 		break;
 	}
@@ -5379,7 +5341,7 @@ mrt_report(mib_item_t *item)
 		case EXPER_DVMRP_MRT:
 			if (Dflag)
 				(void) printf("%u records for ipMfcTable:\n",
-					item->length/sizeof (struct vifctl));
+				    item->length/sizeof (struct vifctl));
 			if (item->length/sizeof (struct vifctl) == 0) {
 				(void) puts("\nMulticast Forwarding Cache is "
 				    "empty");
@@ -5402,10 +5364,10 @@ mrt_report(mib_item_t *item)
 				    abuf, sizeof (abuf)));
 				(void) printf("%-15.15s  %6s  %3u    ",
 				    pr_net(mfccp->mfcc_mcastgrp.s_addr,
-					mfccp->mfcc_mcastgrp.s_addr,
-					abuf, sizeof (abuf)),
+				    mfccp->mfcc_mcastgrp.s_addr,
+				    abuf, sizeof (abuf)),
 				    pktscale((int)mfccp->mfcc_pkt_cnt),
-					mfccp->mfcc_parent);
+				    mfccp->mfcc_parent);
 
 				for (vifi = 0; vifi < MAXVIFS; ++vifi) {
 					if (mfccp->mfcc_ttls[vifi]) {
@@ -5468,7 +5430,7 @@ kmem_cache_stats(char *title, char *name, int prefix, int64_t *total_bytes)
 		    strncmp(ksp->ks_name, "streams_dblk", 12) == 0) {
 			(void) safe_kstat_read(kc, ksp, NULL);
 			total_buf_inuse -=
-				kstat_named_value(ksp, "buf_constructed");
+			    kstat_named_value(ksp, "buf_constructed");
 			continue; /* 'for' loop 1 */
 		}
 
@@ -5501,7 +5463,7 @@ kmem_cache_stats(char *title, char *name, int prefix, int64_t *total_bytes)
 
 	if (buf_size == 0) {
 		(void) printf("%-22s [couldn't find statistics for %s]\n",
-			title, name);
+		    title, name);
 		return;
 	}
 
@@ -5511,7 +5473,7 @@ kmem_cache_stats(char *title, char *name, int prefix, int64_t *total_bytes)
 		(void) snprintf(buf, sizeof (buf), "%s", title);
 
 	(void) printf("%-22s %6d %9d %11lld %11d\n", buf,
-		total_buf_inuse, total_buf_max, total_alloc, total_alloc_fail);
+	    total_buf_inuse, total_buf_max, total_alloc, total_alloc_fail);
 }
 
 static void
@@ -5534,7 +5496,7 @@ m_report(void)
 	kmem_cache_stats("qband", "qband_cache", 0, &total_bytes);
 
 	(void) printf("\n%lld Kbytes allocated for streams data\n",
-		total_bytes / 1024);
+	    total_bytes / 1024);
 
 	(void) putchar('\n');
 	(void) fflush(stdout);
@@ -5967,7 +5929,7 @@ portname(uint_t port, char *proto, char *dst, uint_t dstlen)
 		sp = getservbyport(htons(port), proto);
 	if (sp || port == 0)
 		(void) snprintf(dst, dstlen, "%.*s", MAXHOSTNAMELEN,
-				sp ? sp->s_name : "*");
+		    sp ? sp->s_name : "*");
 	else
 		(void) snprintf(dst, dstlen, "%d", port);
 	dst[dstlen - 1] = 0;
@@ -6161,8 +6123,8 @@ process_filter(char *arg)
 				 */
 				if (hp->h_addr_list[0] != NULL &&
 				    /* LINTED: (note 1) */
-				    IN6_IS_ADDR_V4MAPPED((in6_addr_t
-					*)hp->h_addr_list[0])) {
+				    IN6_IS_ADDR_V4MAPPED((in6_addr_t *)
+				    hp->h_addr_list[0])) {
 					maxv = IP_ABITS;
 				} else {
 					maxv = IPV6_ABITS;
@@ -6223,6 +6185,21 @@ family_selected(int family)
 		fp = fp->f_next;
 	}
 	return (B_FALSE);
+}
+
+/*
+ * Convert the interface index to a string using the buffer `ifname', which
+ * must be at least LIFNAMSIZ bytes.  We first try to map it to name.  If that
+ * fails (e.g., because we're inside a zone and it does not have access to
+ * interface for the index in question), just return "if#<num>".
+ */
+static char *
+ifindex2str(uint_t ifindex, char *ifname)
+{
+	if (if_indextoname(ifindex, ifname) == NULL)
+		(void) snprintf(ifname, LIFNAMSIZ, "if#%d", ifindex);
+
+	return (ifname);
 }
 
 /*

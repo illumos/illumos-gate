@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -179,6 +179,8 @@ extern "C" {
 /* Interface within an IPMP group has changed state or type */
 #define	ESC_IPMP_IF_CHANGE		"ESC_ipmp_if_change"
 
+/* IPMP probe has changed state */
+#define	ESC_IPMP_PROBE_STATE		"ESC_ipmp_probe_state"
 
 /*
  * EC_DEV_ADD and EC_DEV_REMOVE subclass definitions - supporting attributes

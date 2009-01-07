@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -11,13 +11,12 @@
 #ifndef _DEFS_H
 #define	_DEFS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include <errno.h>
+#include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -54,7 +53,10 @@ extern "C" {
 #include <assert.h>
 
 #include <ipmp_mpathd.h>
+#include <ipmp_admin.h>
 #include <inetcfg.h>
+#include <libinetutil.h>
+#include <alloca.h>
 
 #ifdef __cplusplus
 }

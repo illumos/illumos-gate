@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -743,7 +741,8 @@ icfg_set_flags(icfg_handle_t handle, uint64_t flags)
 	struct lifreq lifr;
 	uint64_t oflags;
 	int ret;
-	int rtsock;
+	int rtsock = -1;
+	int aware = RTAW_UNDER_IPMP;
 
 	(void) strlcpy(lifr.lifr_name, handle->ifh_interface.if_name,
 	    sizeof (lifr.lifr_name));
@@ -757,10 +756,16 @@ icfg_set_flags(icfg_handle_t handle, uint64_t flags)
 	/*
 	 * Any time flags are changed on an interface that has IFF_UP set,
 	 * you'll get a routing socket message.  We care about the status,
-	 * though, only when the new flags are marked "up."
+	 * though, only when the new flags are marked "up."  Since we may be
+	 * changing an IPMP test address, we enable RTAW_UNDER_IPMP.
 	 */
-	rtsock = (flags & IFF_UP) ?
-	    socket(PF_ROUTE, SOCK_RAW, ICFG_FAMILY(handle)) : -1;
+	if (flags & IFF_UP) {
+		rtsock = socket(PF_ROUTE, SOCK_RAW, ICFG_FAMILY(handle));
+		if (rtsock != -1) {
+			(void) setsockopt(rtsock, SOL_ROUTE, RT_AWARE, &aware,
+			    sizeof (aware));
+		}
+	}
 
 	lifr.lifr_flags = flags;
 	if (ioctl(handle->ifh_sock, SIOCSLIFFLAGS, (caddr_t)&lifr) < 0) {
@@ -993,7 +998,8 @@ icfg_set_addr(icfg_handle_t handle, const struct sockaddr *addr,
 	struct lifreq lifr;
 	uint64_t flags;
 	int ret;
-	int rtsock;
+	int rtsock = -1;
+	int aware = RTAW_UNDER_IPMP;
 
 	(void) memset(&lifr.lifr_addr, 0, sizeof (lifr.lifr_addr));
 	if ((ret = to_sockaddr_storage(ICFG_FAMILY(handle), addr, addrlen,
@@ -1002,15 +1008,19 @@ icfg_set_addr(icfg_handle_t handle, const struct sockaddr *addr,
 	}
 
 	/*
-	 * Need to do check on duplicate address detection results if the
-	 * interface is up.
+	 * Need to check duplicate address detection results if the address is
+	 * up.  Since this may be an IPMP test address, enable RTAW_UNDER_IPMP.
 	 */
-	if ((ret = icfg_get_flags(handle, &flags)) != ICFG_SUCCESS) {
+	if ((ret = icfg_get_flags(handle, &flags)) != ICFG_SUCCESS)
 		return (ret);
-	}
 
-	rtsock = (flags & IFF_UP) ?
-	    socket(PF_ROUTE, SOCK_RAW, ICFG_FAMILY(handle)) : -1;
+	if (flags & IFF_UP) {
+		rtsock = socket(PF_ROUTE, SOCK_RAW, ICFG_FAMILY(handle));
+		if (rtsock != -1) {
+			(void) setsockopt(rtsock, SOL_ROUTE, RT_AWARE, &aware,
+			    sizeof (aware));
+		}
+	}
 
 	(void) strlcpy(lifr.lifr_name, handle->ifh_interface.if_name,
 	    sizeof (lifr.lifr_name));

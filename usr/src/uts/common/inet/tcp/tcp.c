@@ -31,7 +31,6 @@
 #include <sys/strsubr.h>
 #include <sys/stropts.h>
 #include <sys/strlog.h>
-#include <sys/strsun.h>
 #define	_SUN_TPI_VERSION 2
 #include <sys/tihdr.h>
 #include <sys/timod.h>
@@ -4683,18 +4682,10 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 		/* ifindex must be already set */
 		ASSERT(ifindex != 0);
 
-		if (ltcp->tcp_bound_if != 0) {
-			/*
-			 * Set newtcp's bound_if equal to
-			 * listener's value. If ifindex is
-			 * not the same as ltcp->tcp_bound_if,
-			 * it must be a packet for the ipmp group
-			 * of interfaces
-			 */
+		if (ltcp->tcp_bound_if != 0)
 			tcp->tcp_bound_if = ltcp->tcp_bound_if;
-		} else if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_src)) {
+		else if (IN6_IS_ADDR_LINKSCOPE(&ip6h->ip6_src))
 			tcp->tcp_bound_if = ifindex;
-		}
 
 		tcp->tcp_ipv6_recvancillary = ltcp->tcp_ipv6_recvancillary;
 		tcp->tcp_recvifindex = 0;
@@ -10716,9 +10707,6 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 			ipp->ipp_fields |= IPPF_USE_MIN_MTU;
 			ipp->ipp_use_min_mtu = *i1;
 			break;
-		case IPV6_BOUND_PIF:
-			/* Handled at the IP level */
-			return (-EINVAL);
 		case IPV6_SEC_OPT:
 			/*
 			 * We should not allow policy setting after
@@ -18895,7 +18883,6 @@ tcp_zcopy_check(tcp_t *tcp)
 	    connp->conn_dontroute == 0 &&
 	    !connp->conn_nexthop_set &&
 	    connp->conn_outgoing_ill == NULL &&
-	    connp->conn_nofailover_ill == NULL &&
 	    do_tcpzcopy == 1) {
 		/*
 		 * the checks above  closely resemble the fast path checks
@@ -19139,7 +19126,6 @@ tcp_send_find_ire_ill(tcp_t *tcp, mblk_t *mp, ire_t **irep, ill_t **illp)
 	ipaddr_t	dst;
 	ire_t		*ire;
 	ill_t		*ill;
-	conn_t		*connp = tcp->tcp_connp;
 	mblk_t		*ire_fp_mp;
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 
@@ -19164,14 +19150,6 @@ tcp_send_find_ire_ill(tcp_t *tcp, mblk_t *mp, ire_t **irep, ill_t **illp)
 	}
 
 	ill = ire_to_ill(ire);
-	if (connp->conn_outgoing_ill != NULL) {
-		ill_t *conn_outgoing_ill = NULL;
-		/*
-		 * Choose a good ill in the group to send the packets on.
-		 */
-		ire = conn_set_outgoing_ill(connp, ire, &conn_outgoing_ill);
-		ill = ire_to_ill(ire);
-	}
 	ASSERT(ill != NULL);
 
 	if (!tcp->tcp_ire_ill_check_done) {

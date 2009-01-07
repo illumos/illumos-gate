@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,19 +37,28 @@ extern "C" {
  */
 #define	TSOL_RTSA_REQUEST_MAX	1	/* one per route destination */
 
+/*
+ * Flags for RTS queuing operations.
+ */
+#define	RTSQ_UNDER_IPMP	0x01	/* send only on RTAW_UNDER_IPMP queues */
+#define	RTSQ_NORMAL	0x02	/* send only on normal queues */
+#define	RTSQ_ALL	(RTSQ_UNDER_IPMP|RTSQ_NORMAL) /* send on all queues */
+#define	RTSQ_DEFAULT	0x04	/* use standard filtering */
+
 #ifdef _KERNEL
 
 extern	void	ip_rts_change(int, ipaddr_t, ipaddr_t,
-    ipaddr_t, ipaddr_t, ipaddr_t, int, int,
-    int, ip_stack_t *);
+    ipaddr_t, ipaddr_t, ipaddr_t, int, int, int, ip_stack_t *);
 
 extern	void	ip_rts_change_v6(int, const in6_addr_t *, const in6_addr_t *,
     const in6_addr_t *, const in6_addr_t *, const in6_addr_t *, int, int, int,
     ip_stack_t *);
 
-extern	void	ip_rts_ifmsg(const ipif_t *);
+extern	void	ip_rts_ifmsg(const ipif_t *, uint_t);
 
-extern	void	ip_rts_newaddrmsg(int, int, const ipif_t *);
+extern	void	ip_rts_xifmsg(const ipif_t *, uint64_t, uint64_t, uint_t);
+
+extern	void	ip_rts_newaddrmsg(int, int, const ipif_t *, uint_t);
 
 extern	int	ip_rts_request(queue_t *, mblk_t *, cred_t *);
 
@@ -70,9 +79,11 @@ extern	void	rts_fill_msg_v6(int, int, const in6_addr_t *,
 
 extern	size_t	rts_header_msg_size(int);
 
-extern	void	rts_queue_input(mblk_t *, conn_t *, sa_family_t, ip_stack_t *);
+extern	void	rts_queue_input(mblk_t *, conn_t *, sa_family_t, uint_t,
+    ip_stack_t *);
 
 extern int ip_rts_request_common(queue_t *q, mblk_t *mp, conn_t *, cred_t *);
+
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

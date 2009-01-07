@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,6 +133,7 @@ main(int argc, char **argv)
 	boolean_t	is_verbose;
 	int		ipc_fd;
 	int		c;
+	int		aware = RTAW_UNDER_IPMP;
 	struct rlimit	rl;
 
 	debug_level = df_get_int("", B_FALSE, DF_DEBUG_LEVEL);
@@ -301,6 +302,17 @@ main(int argc, char **argv)
 		dhcpmsg(MSG_ERR, "cannot open routing socket");
 		return (EXIT_FAILURE);
 	}
+
+	/*
+	 * We're IPMP-aware and can manage IPMP test addresses, so issue
+	 * RT_AWARE to get routing socket messages for interfaces under IPMP.
+	 */
+	if (setsockopt(rtsock_fd, SOL_ROUTE, RT_AWARE, &aware,
+	    sizeof (aware)) == -1) {
+		dhcpmsg(MSG_ERR, "cannot set RT_AWARE on routing socket");
+		return (EXIT_FAILURE);
+	}
+
 	if (iu_register_event(eh, rtsock_fd, POLLIN, rtsock_event, 0) == -1) {
 		dhcpmsg(MSG_ERR, "cannot register routing socket for messages");
 		return (EXIT_FAILURE);
@@ -1182,7 +1194,7 @@ check_lif(dhcp_lif_t *lif, const struct ifa_msghdr *ifam, int msglen)
 		    lif->lif_name);
 		lif_mark_decline(lif, "duplicate address");
 		close_ip_lif(lif);
-		(void) open_ip_lif(lif, INADDR_ANY);
+		(void) open_ip_lif(lif, INADDR_ANY, B_TRUE);
 	}
 
 	dad_wait = lif->lif_dad_wait;

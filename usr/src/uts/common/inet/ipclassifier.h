@@ -249,7 +249,6 @@ struct conn_s {
 
 	squeue_t	*conn_initial_sqp;	/* Squeue at open time */
 	squeue_t	*conn_final_sqp;	/* Squeue after connect */
-	ill_t		*conn_nofailover_ill;	/* Failover ill */
 	ill_t		*conn_dhcpinit_ill;	/* IP_DHCPINIT_IF */
 	ipsec_latch_t	*conn_latch;		/* latched state */
 	ill_t		*conn_outgoing_ill;	/* IP{,V6}_BOUND_IF */
@@ -295,7 +294,6 @@ struct conn_s {
 
 	uint_t		conn_proto;		/* SO_PROTOTYPE state */
 	ill_t		*conn_incoming_ill;	/* IP{,V6}_BOUND_IF */
-	ill_t		*conn_outgoing_pill;	/* IP{,V6}_BOUND_PIF */
 	ill_t		*conn_oper_pending_ill; /* pending shared ioctl */
 
 	ilg_t	*conn_ilg;		/* Group memberships */
@@ -307,9 +305,6 @@ struct conn_s {
 
 	struct ipif_s	*conn_multicast_ipif;	/* IP_MULTICAST_IF */
 	ill_t		*conn_multicast_ill;	/* IPV6_MULTICAST_IF */
-	int		conn_orig_bound_ifindex; /* BOUND_IF before MOVE */
-	int		conn_orig_multicast_ifindex;
-						/* IPv6 MC IF before MOVE */
 	struct	conn_s	*conn_drain_next;	/* Next conn in drain list */
 	struct	conn_s	*conn_drain_prev;	/* Prev conn in drain list */
 	idl_t		*conn_idl;		/* Ptr to the drain list head */
@@ -322,7 +317,7 @@ struct conn_s {
 	uchar_t		conn_broadcast_ttl; 	/* IP_BROADCAST_TTL */
 #define	conn_nexthop_v4	V4_PART_OF_V6(conn_nexthop_v6)
 	cred_t		*conn_peercred;		/* Peer credentials, if any */
-
+	int		conn_rtaware; 		/* RT_AWARE sockopt value */
 	kcondvar_t	conn_sq_cv;		/* For non-STREAMS socket IO */
 	kthread_t	*conn_sq_caller;	/* Caller of squeue sync ops */
 	sock_upcalls_t	*conn_upcalls;		/* Upcalls to sockfs */

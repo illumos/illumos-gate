@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -56,6 +56,7 @@ extern "C" {
 #include <net/route.h>
 #include <sys/systm.h>
 #include <sys/multidata.h>
+#include <sys/list.h>
 #include <net/radix.h>
 #include <sys/modhash.h>
 
@@ -565,15 +566,21 @@ typedef struct ipha_s {
 #define	IPH_ECN_ECT0	0x2	/* ECN-Capable Transport, ECT(0) */
 #define	IPH_ECN_CE	0x3	/* ECN-Congestion Experienced (CE) */
 
+struct ill_s;
+
+typedef	boolean_t ip_v6intfid_func_t(struct ill_s *, in6_addr_t *);
+typedef	boolean_t ip_v6mapinfo_func_t(uint_t, uint8_t *, uint8_t *, uint32_t *,
+    in6_addr_t *);
+typedef boolean_t ip_v4mapinfo_func_t(uint_t, uint8_t *, uint8_t *, uint32_t *,
+    ipaddr_t *);
+
 /* IP Mac info structure */
 typedef struct ip_m_s {
-	t_uscalar_t	ip_m_mac_type;	/* From <sys/dlpi.h> */
-	int		ip_m_type;	/* From <net/if_types.h> */
-	boolean_t	(*ip_m_v4mapinfo)(uint_t, uint8_t *, uint8_t *,
-			    uint32_t *, ipaddr_t *);
-	boolean_t	(*ip_m_v6mapinfo)(uint_t, uint8_t *, uint8_t *,
-			    uint32_t *, in6_addr_t *);
-	boolean_t	(*ip_m_v6intfid)(uint_t, uint8_t *, in6_addr_t *);
+	t_uscalar_t		ip_m_mac_type;	/* From <sys/dlpi.h> */
+	int			ip_m_type;	/* From <net/if_types.h> */
+	ip_v4mapinfo_func_t	*ip_m_v4mapinfo;
+	ip_v6mapinfo_func_t	*ip_m_v6mapinfo;
+	ip_v6intfid_func_t	*ip_m_v6intfid;
 } ip_m_t;
 
 /*
@@ -583,18 +590,22 @@ typedef struct ip_m_s {
  * layer multicast address range.
  * b. map from IPv6 multicast address range (ff00::/8) to the link
  * layer multicast address range.
- * c. derive the default IPv6 interface identifier from the link layer
- * address.
+ * c. derive the default IPv6 interface identifier from the interface.
+ * d. derive the default IPv6 destination interface identifier from
+ * the interface (point-to-point only).
  */
 #define	MEDIA_V4MINFO(ip_m, plen, bphys, maddr, hwxp, v4ptr) \
 	(((ip_m)->ip_m_v4mapinfo != NULL) && \
 	(*(ip_m)->ip_m_v4mapinfo)(plen, bphys, maddr, hwxp, v4ptr))
-#define	MEDIA_V6INTFID(ip_m, plen, phys, v6ptr) \
-	(((ip_m)->ip_m_v6intfid != NULL) && \
-	(*(ip_m)->ip_m_v6intfid)(plen, phys, v6ptr))
 #define	MEDIA_V6MINFO(ip_m, plen, bphys, maddr, hwxp, v6ptr) \
 	(((ip_m)->ip_m_v6mapinfo != NULL) && \
 	(*(ip_m)->ip_m_v6mapinfo)(plen, bphys, maddr, hwxp, v6ptr))
+#define	MEDIA_V6INTFID(ip_m, ill, v6ptr) \
+	(((ip_m)->ip_m_v6intfid != NULL) && \
+	(*(ip_m)->ip_m_v6intfid)(ill, v6ptr))
+#define	MEDIA_V6DESTINTFID(ip_m, ill, v6ptr) \
+	(((ip_m)->ip_m_v6destintfid != NULL) && \
+	(*(ip_m)->ip_m_v6destintfid)(ill, v6ptr))
 
 /* Router entry types */
 #define	IRE_BROADCAST		0x0001	/* Route entry for broadcast address */
@@ -621,18 +632,12 @@ typedef struct ip_m_s {
  * the bucket should delete this IRE from this bucket.
  */
 #define	IRE_MARK_CONDEMNED	0x0001
+
 /*
- * If a broadcast IRE is marked with IRE_MARK_NORECV, ip_rput will drop the
- * broadcast packets received on that interface. This is marked only
- * on broadcast ires. Employed by IPMP, where we have multiple NICs on the
- * same subnet receiving the same broadcast packet.
+ * An IRE with IRE_MARK_TESTHIDDEN is used by in.mpathd for test traffic.  It
+ * can only be looked up by requesting MATCH_IRE_MARK_TESTHIDDEN.
  */
-#define	IRE_MARK_NORECV		0x0002
-/*
- * IRE_CACHE marked this way won't be returned by ire_cache_lookup. Need
- * to look specifically using MATCH_IRE_MARK_HIDDEN. Used by IPMP.
- */
-#define	IRE_MARK_HIDDEN		0x0004	/* Typically Used by in.mpathd */
+#define	IRE_MARK_TESTHIDDEN	0x0004
 
 /*
  * An IRE with IRE_MARK_NOADD is created in ip_newroute_ipif when the outgoing
@@ -788,45 +793,18 @@ typedef struct mrec_s {
  * ilm records the state of multicast memberships with the driver and is
  * maintained per interface.
  *
- * Notes :
+ * There is no direct link between a given ilg and ilm. If the
+ * application has joined a group G with ifindex I, we will have
+ * an ilg with ilg_v6group and ilg_ill. There will be a corresponding
+ * ilm with ilm_ill/ilm_v6addr recording the multicast membership.
+ * To delete the membership:
  *
- * 1) There is no direct link between a given ilg and ilm. If the
- *    application has joined a group G with ifindex I, we will have
- *    an ilg with ilg_v6group and ilg_ill. There will be a corresponding
- *    ilm with ilm_ill/ilm_v6addr recording the multicast membership.
- *    To delete the membership,
+ *	a) Search for ilg matching on G and I with ilg_v6group
+ *	   and ilg_ill. Delete ilg_ill.
+ *	b) Search the corresponding ilm matching on G and I with
+ *	   ilm_v6addr and ilm_ill. Delete ilm.
  *
- *		a) Search for ilg matching on G and I with ilg_v6group
- *		   and ilg_ill. Delete ilg_ill.
- *		b) Search the corresponding ilm matching on G and I with
- *		   ilm_v6addr and ilm_ill. Delete ilm.
- *
- *    In IPv4, the only difference is, we look using ipifs instead of
- *    ills.
- *
- * 2) With IP multipathing, we want to keep receiving even after the
- *    interface has failed. We do this by moving multicast memberships
- *    to a new_ill within the group. This is achieved by sending
- *    DL_DISABMULTI_REQS on ilg_ill/ilm_ill and sending DL_ENABMULTIREQS
- *    on the new_ill and changing ilg_ill/ilm_ill to new_ill. But, we
- *    need to be able to delete memberships which will still come down
- *    with the ifindex of the old ill which is what the application
- *    knows of. Thus we store the ilm_/ilg_orig_ifindex to keep track
- *    of where we joined initially so that we can lookup even after we
- *    moved the membership. It is also used for moving back the membership
- *    when the old ill has been repaired. This is done by looking up for
- *    ilms with ilm_orig_ifindex matching on the old ill's ifindex. Only
- *    ilms actually move from old ill to new ill. ilgs don't move (just
- *    the ilg_ill is changed when it moves) as it just records the state
- *    of the application that has joined a group G where as ilm records
- *    the state joined with the driver. Thus when we send DL_XXXMULTI_REQs
- *    we also need to keep the ilm in the right ill.
- *
- *    In IPv4, as ipifs move from old ill to new_ill, ilgs and ilms move
- *    implicitly as we use only ipifs in IPv4. Thus, one can always lookup
- *    a given ilm/ilg even after it fails without the support of
- *    orig_ifindex. We move ilms still to record the driver state as
- *    mentioned above.
+ * For IPv4 the only difference is that we look using ipifs, not ills.
  */
 
 /*
@@ -839,7 +817,6 @@ typedef struct ilg_s {
 	in6_addr_t	ilg_v6group;
 	struct ipif_s	*ilg_ipif;	/* Logical interface we are member on */
 	struct ill_s	*ilg_ill;	/* Used by IPv6 */
-	int		ilg_orig_ifindex; /* Interface originally joined on */
 	uint_t		ilg_flags;
 	mcast_record_t	ilg_fmode;	/* MODE_IS_INCLUDE/MODE_IS_EXCLUDE */
 	slist_t		*ilg_filter;
@@ -866,9 +843,7 @@ typedef struct ilm_s {
 	struct ilm_s	*ilm_next;	/* Linked list for each ill */
 	uint_t		ilm_state;	/* state of the membership */
 	struct ill_s	*ilm_ill;	/* Back pointer to ill for IPv6 */
-	int		ilm_orig_ifindex;  /* V6_MULTICAST_IF/ilm_ipif index */
 	uint_t		ilm_flags;
-	boolean_t	ilm_is_new;	/* new ilm */
 	boolean_t	ilm_notify_driver; /* Need to notify the driver */
 	zoneid_t	ilm_zoneid;
 	int		ilm_no_ilg_cnt;	/* number of joins w/ no ilg */
@@ -881,28 +856,11 @@ typedef struct ilm_s {
 
 #define	ilm_addr	V4_PART_OF_V6(ilm_v6addr)
 
-/*
- * ilm_walker_cleanup needs to execute when the ilm_walker_cnt goes down to
- * zero. In addition it needs to block new walkers while it is unlinking ilm's
- * from the list. Thus simple atomics for the ill_ilm_walker_cnt don't suffice.
- */
-#define	ILM_WALKER_HOLD(ill)    {               \
-	mutex_enter(&(ill)->ill_lock);          \
-	ill->ill_ilm_walker_cnt++;              \
-	mutex_exit(&(ill)->ill_lock);           \
-}
-
-/*
- * ilm_walker_cleanup releases ill_lock
- */
-#define	ILM_WALKER_RELE(ill)	{ 		\
-	mutex_enter(&(ill)->ill_lock);		\
-	(ill)->ill_ilm_walker_cnt--;		\
-	if ((ill)->ill_ilm_walker_cnt == 0 && (ill)->ill_ilm_cleanup_reqd) \
-		ilm_walker_cleanup(ill);	\
-	else 					\
-		mutex_exit(&(ill)->ill_lock);	\
-}
+typedef struct ilm_walker {
+	struct ill_s	*ilw_ill;	/* associated ill */
+	struct ill_s	*ilw_ipmp_ill; 	/* associated ipmp ill (if any) */
+	struct ill_s	*ilw_walk_ill; 	/* current ill being walked */
+} ilm_walker_t;
 
 /*
  * Soft reference to an IPsec SA.
@@ -1047,11 +1005,8 @@ typedef struct conn_s conn_t;
  * ipc_acking_unbind 		conn_acking_unbind
  * ipc_pad_to_bit_31 		conn_pad_to_bit_31
  *
- * ipc_nofailover_ill		conn_nofailover_ill
- *
  * ipc_proto			conn_proto
  * ipc_incoming_ill		conn_incoming_ill
- * ipc_outgoing_pill		conn_outgoing_pill
  * ipc_pending_ill		conn_pending_ill
  * ipc_unbind_mp		conn_unbind_mp
  * ipc_ilg			conn_ilg
@@ -1061,8 +1016,6 @@ typedef struct conn_s conn_t;
  * ipc_refcv			conn_refcv
  * ipc_multicast_ipif		conn_multicast_ipif
  * ipc_multicast_ill		conn_multicast_ill
- * ipc_orig_bound_ifindex	conn_orig_bound_ifindex
- * ipc_orig_multicast_ifindex	conn_orig_multicast_ifindex
  * ipc_drain_next		conn_drain_next
  * ipc_drain_prev		conn_drain_prev
  * ipc_idl			conn_idl
@@ -1263,7 +1216,6 @@ typedef struct th_hash_s {
 /* The following are ipif_state_flags */
 #define	IPIF_CONDEMNED		0x1	/* The ipif is being removed */
 #define	IPIF_CHANGING		0x2	/* A critcal ipif field is changing */
-#define	IPIF_MOVING		0x8	/* The ipif is being moved */
 #define	IPIF_SET_LINKLOCAL	0x10	/* transient flag during bringup */
 #define	IPIF_ZERO_SOURCE	0x20	/* transient flag during bringup */
 
@@ -1273,7 +1225,6 @@ typedef struct ipif_s {
 	struct	ill_s	*ipif_ill;	/* Back pointer to our ill */
 	int	ipif_id;		/* Logical unit number */
 	uint_t	ipif_mtu;		/* Starts at ipif_ill->ill_max_frag */
-	uint_t	ipif_saved_mtu;		/* Save of mtu during ipif_move() */
 	in6_addr_t ipif_v6lcl_addr;	/* Local IP address for this if. */
 	in6_addr_t ipif_v6src_addr;	/* Source IP address for this if. */
 	in6_addr_t ipif_v6subnet;	/* Subnet prefix for this if. */
@@ -1306,17 +1257,15 @@ typedef struct ipif_s {
 	uint_t	ipif_ob_pkt_count;	/* Outbound packets to our dead IREs */
 	/* Exclusive bit fields, protected by ipsq_t */
 	unsigned int
-		ipif_multicast_up : 1,	/* We have joined the allhosts group */
-		ipif_replace_zero : 1,	/* Replacement for zero */
+		ipif_multicast_up : 1,	/* ipif_multicast_up() successful */
 		ipif_was_up : 1,	/* ipif was up before */
 		ipif_addr_ready : 1,	/* DAD is done */
-
 		ipif_was_dup : 1,	/* DAD had failed */
+
+		ipif_joined_allhosts : 1, /* allhosts joined */
 		ipif_pad_to_31 : 27;
 
-	int	ipif_orig_ifindex;	/* ifindex before SLIFFAILOVER */
 	uint_t	ipif_seqid;		/* unique index across all ills */
-	uint_t	ipif_orig_ipifid;	/* ipif_id before SLIFFAILOVER */
 	uint_t	ipif_state_flags;	/* See IPIF_* flag defs above */
 	uint_t	ipif_refcnt;		/* active consistent reader cnt */
 
@@ -1328,6 +1277,16 @@ typedef struct ipif_s {
 	zoneid_t ipif_zoneid;		/* zone ID number */
 	timeout_id_t ipif_recovery_id;	/* Timer for DAD recovery */
 	boolean_t ipif_trace_disable;	/* True when alloc fails */
+	/*
+	 * For an IPMP interface, ipif_bound_ill tracks the ill whose hardware
+	 * information this ipif is associated with via ARP/NDP.  We can use
+	 * an ill pointer (rather than an index) because only ills that are
+	 * part of a group will be pointed to, and an ill cannot disappear
+	 * while it's in a group.
+	 */
+	struct ill_s	*ipif_bound_ill;
+	struct ipif_s	*ipif_bound_next; /* bound ipif chain */
+	boolean_t	ipif_bound;	 /* B_TRUE if we successfully bound */
 } ipif_t;
 
 /*
@@ -1405,8 +1364,6 @@ typedef struct ipif_s {
  *
  * bit fields		ill_lock		ill_lock
  *
- * ipif_orig_ifindex	ipsq			None
- * ipif_orig_ipifid	ipsq			None
  * ipif_seqid		ipsq			Write once
  *
  * ipif_state_flags	ill_lock		ill_lock
@@ -1414,6 +1371,10 @@ typedef struct ipif_s {
  * ipif_ire_cnt		ill_lock		ill_lock
  * ipif_ilm_cnt		ill_lock		ill_lock
  * ipif_saved_ire_cnt
+ *
+ * ipif_bound_ill	ipsq + ipmp_lock	ipsq OR ipmp_lock
+ * ipif_bound_next	ipsq			ipsq
+ * ipif_bound		ipsq			ipsq
  */
 
 #define	IP_TR_HASH(tid)	((((uintptr_t)tid) >> 6) & (IP_TR_HASH_MAX - 1))
@@ -1457,103 +1418,154 @@ typedef struct ipif_s {
 #define	IPI2MODE(ipi)	((ipi)->ipi_flags & IPI_GET_CMD ? COPYOUT : NO_COPYOUT)
 
 /*
- * The IP-MT design revolves around the serialization object ipsq_t.
- * It is associated with an IPMP group. If IPMP is not enabled, there is
- * 1 ipsq_t per phyint. Eg. an ipsq_t would cover both hme0's IPv4 stream
+ * The IP-MT design revolves around the serialization objects ipsq_t (IPSQ)
+ * and ipxop_t (exclusive operation or "xop").  Becoming "writer" on an IPSQ
+ * ensures that no other threads can become "writer" on any IPSQs sharing that
+ * IPSQ's xop until the writer thread is done.
  *
- * ipsq_lock protects
- *	ipsq_reentry_cnt, ipsq_writer, ipsq_xopq_mphead, ipsq_xopq_mptail,
- *	ipsq_mphead, ipsq_mptail, ipsq_split
+ * Each phyint points to one IPSQ that remains fixed over the phyint's life.
+ * Each IPSQ points to one xop that can change over the IPSQ's life.  If a
+ * phyint is *not* in an IPMP group, then its IPSQ will refer to the IPSQ's
+ * "own" xop (ipsq_ownxop).  If a phyint *is* part of an IPMP group, then its
+ * IPSQ will refer to the "group" xop, which is shorthand for the xop of the
+ * IPSQ of the IPMP meta-interface's phyint.  Thus, all phyints that are part
+ * of the same IPMP group will have their IPSQ's point to the group xop, and
+ * thus becoming "writer" on any phyint in the group will prevent any other
+ * writer on any other phyint in the group.  All IPSQs sharing the same xop
+ * are chained together through ipsq_next (in the degenerate common case,
+ * ipsq_next simply refers to itself).  Note that the group xop is guaranteed
+ * to exist at least as long as there are members in the group, since the IPMP
+ * meta-interface can only be destroyed if the group is empty.
  *
- *	ipsq_pending_ipif, ipsq_current_ipif, ipsq_pending_mp, ipsq_flags,
- *	ipsq_waitfor
+ * Incoming exclusive operation requests are enqueued on the IPSQ they arrived
+ * on rather than the xop.  This makes switching xop's (as would happen when a
+ * phyint leaves an IPMP group) simple, because after the phyint leaves the
+ * group, any operations enqueued on its IPSQ can be safely processed with
+ * respect to its new xop, and any operations enqueued on the IPSQs of its
+ * former group can be processed with respect to their existing group xop.
+ * Even so, switching xops is a subtle dance; see ipsq_dq() for details.
  *
- * The fields in the last line above below are set mostly by a writer thread
- * But there is an exception in the last call to ipif_ill_refrele_tail which
- * could also race with a conn close which could be cleaning up the
- * fields. So we choose to protect using ipsq_lock instead of depending on
- * the property of the writer.
- * ill_g_lock protects
- *	ipsq_refs, ipsq_phyint_list
+ * An IPSQ's "own" xop is embedded within the IPSQ itself since they have have
+ * identical lifetimes, and because doing so simplifies pointer management.
+ * While each phyint and IPSQ point to each other, it is not possible to free
+ * the IPSQ when the phyint is freed, since we may still *inside* the IPSQ
+ * when the phyint is being freed.  Thus, ipsq_phyint is set to NULL when the
+ * phyint is freed, and the IPSQ free is later done in ipsq_exit().
+ *
+ * ipsq_t synchronization:	read			write
+ *
+ *	ipsq_xopq_mphead	ipx_lock		ipx_lock
+ *	ipsq_xopq_mptail	ipx_lock		ipx_lock
+ *	ipsq_xop_switch_mp	ipsq_lock		ipsq_lock
+ *	ipsq_phyint		write once		write once
+ *	ipsq_next		RW_READER ill_g_lock	RW_WRITER ill_g_lock
+ *	ipsq_xop 		ipsq_lock or ipsq	ipsq_lock + ipsq
+ *	ipsq_swxop		ipsq			ipsq
+ * 	ipsq_ownxop		see ipxop_t		see ipxop_t
+ *	ipsq_ipst		write once		write once
+ *
+ * ipxop_t synchronization:     read			write
+ *
+ *	ipx_writer  		ipx_lock		ipx_lock
+ *	ipx_xop_queued		ipx_lock 		ipx_lock
+ *	ipx_mphead		ipx_lock		ipx_lock
+ *	ipx_mptail		ipx_lock		ipx_lock
+ *	ipx_ipsq		write once		write once
+ *	ips_ipsq_queued		ipx_lock		ipx_lock
+ *	ipx_waitfor		ipsq or ipx_lock	ipsq + ipx_lock
+ *	ipx_reentry_cnt		ipsq or ipx_lock	ipsq + ipx_lock
+ *	ipx_current_done	ipsq			ipsq
+ *	ipx_current_ioctl	ipsq			ipsq
+ *	ipx_current_ipif	ipsq or ipx_lock	ipsq + ipx_lock
+ *	ipx_pending_ipif	ipsq or ipx_lock	ipsq + ipx_lock
+ *	ipx_pending_mp		ipsq or ipx_lock	ipsq + ipx_lock
+ *	ipx_forced		ipsq			ipsq
+ *	ipx_depth		ipsq			ipsq
+ *	ipx_stack		ipsq			ipsq
  */
-typedef struct ipsq_s {
-	kmutex_t ipsq_lock;
-	int	ipsq_reentry_cnt;
-	kthread_t *ipsq_writer;		/* current owner (thread id) */
-	int	ipsq_flags;
-	mblk_t	*ipsq_xopq_mphead;	/* list of excl ops mostly ioctls */
-	mblk_t	*ipsq_xopq_mptail;
-	mblk_t	*ipsq_mphead;		/* msgs on ipsq linked thru b_next */
-	mblk_t	*ipsq_mptail;		/* msgs on ipsq linked thru b_next */
-	int	ipsq_current_ioctl;	/* current ioctl, or 0 if no ioctl */
-	boolean_t ipsq_current_done; 	/* is the current op done? */
-	ipif_t	*ipsq_current_ipif;	/* ipif associated with current op */
-	ipif_t	*ipsq_pending_ipif;	/* ipif associated w. ipsq_pending_mp */
-	mblk_t	*ipsq_pending_mp;	/* current ioctl mp while waiting for */
-					/* response from another module */
-	struct	ipsq_s	*ipsq_next;	/* list of all syncq's (ipsq_g_list) */
-	uint_t		ipsq_refs;	/* Number of phyints on this ipsq */
-	struct phyint	*ipsq_phyint_list; /* List of phyints on this ipsq */
-	boolean_t	ipsq_split;	/* ipsq may need to be split */
-	int		ipsq_waitfor;	/* Values encoded below */
-	char		ipsq_name[LIFNAMSIZ+1];	/* same as phyint_groupname */
-	ip_stack_t	*ipsq_ipst;	/* Does not have a netstack_hold */
-
+typedef struct ipxop_s {
+	kmutex_t	ipx_lock;	/* see above */
+	kthread_t	*ipx_writer;  	/* current owner */
+	mblk_t		*ipx_mphead;	/* messages tied to this op */
+	mblk_t		*ipx_mptail;
+	struct ipsq_s	*ipx_ipsq;	/* associated ipsq */
+	boolean_t	ipx_ipsq_queued; /* ipsq using xop has queued op */
+	int		ipx_waitfor;	/* waiting; values encoded below */
+	int		ipx_reentry_cnt;
+	boolean_t	ipx_current_done;  /* is the current operation done? */
+	int		ipx_current_ioctl; /* current ioctl, or 0 if no ioctl */
+	ipif_t		*ipx_current_ipif; /* ipif for current op */
+	ipif_t		*ipx_pending_ipif; /* ipif for ipsq_pending_mp */
+	mblk_t 		*ipx_pending_mp;   /* current ioctl mp while waiting */
+	boolean_t	ipx_forced; 			/* debugging aid */
 #ifdef DEBUG
-	int		ipsq_depth;	/* debugging aid */
-#define	IPSQ_STACK_DEPTH	15
-	pc_t		ipsq_stack[IPSQ_STACK_DEPTH];	/* debugging aid */
+	int		ipx_depth;			/* debugging aid */
+#define	IPX_STACK_DEPTH	15
+	pc_t		ipx_stack[IPX_STACK_DEPTH];	/* debugging aid */
 #endif
+} ipxop_t;
+
+typedef struct ipsq_s {
+	kmutex_t ipsq_lock;		/* see above */
+	mblk_t	*ipsq_switch_mp;	/* op to handle right after switch */
+	mblk_t	*ipsq_xopq_mphead;	/* list of excl ops (mostly ioctls) */
+	mblk_t	*ipsq_xopq_mptail;
+	struct phyint	*ipsq_phyint;	/* associated phyint */
+	struct ipsq_s	*ipsq_next;	/* next ipsq sharing ipsq_xop */
+	struct ipxop_s	*ipsq_xop;	/* current xop synchronization info */
+	struct ipxop_s	*ipsq_swxop;	/* switch xop to on ipsq_exit() */
+	struct ipxop_s	ipsq_ownxop;	/* our own xop (may not be in-use) */
+	ip_stack_t	*ipsq_ipst;	/* does not have a netstack_hold */
 } ipsq_t;
 
-/* ipsq_flags */
-#define	IPSQ_GROUP	0x1	/* This ipsq belongs to an IPMP group */
+/*
+ * ipx_waitfor values:
+ */
+enum {
+	IPIF_DOWN = 1,	/* ipif_down() waiting for refcnts to drop */
+	ILL_DOWN,	/* ill_down() waiting for refcnts to drop */
+	IPIF_FREE,	/* ipif_free() waiting for refcnts to drop */
+	ILL_FREE	/* ill unplumb waiting for refcnts to drop */
+};
+
+/* Operation types for ipsq_try_enter() */
+#define	CUR_OP 0	/* request writer within current operation */
+#define	NEW_OP 1	/* request writer for a new operation */
+#define	SWITCH_OP 2	/* request writer once IPSQ XOP switches */
 
 /*
- * ipsq_waitfor:
- *
- * IPIF_DOWN	1	ipif_down waiting for refcnts to drop
- * ILL_DOWN	2	ill_down waiting for refcnts to drop
- * IPIF_FREE	3	ipif_free waiting for refcnts to drop
- * ILL_FREE	4	ill unplumb waiting for refcnts to drop
- * ILL_MOVE_OK	5	failover waiting for refcnts to drop
+ * Kstats tracked on each IPMP meta-interface.  Order here must match
+ * ipmp_kstats[] in ip/ipmp.c.
  */
-
-enum { IPIF_DOWN = 1, ILL_DOWN, IPIF_FREE, ILL_FREE, ILL_MOVE_OK };
-
-/* Flags passed to ipsq_try_enter */
-#define	CUR_OP 0		/* Current ioctl continuing again */
-#define	NEW_OP 1		/* New ioctl starting afresh */
+enum {
+	IPMP_KSTAT_OBYTES,	IPMP_KSTAT_OBYTES64,	IPMP_KSTAT_RBYTES,
+	IPMP_KSTAT_RBYTES64,	IPMP_KSTAT_OPACKETS,	IPMP_KSTAT_OPACKETS64,
+	IPMP_KSTAT_OERRORS,	IPMP_KSTAT_IPACKETS,	IPMP_KSTAT_IPACKETS64,
+	IPMP_KSTAT_IERRORS,	IPMP_KSTAT_MULTIRCV,	IPMP_KSTAT_MULTIXMT,
+	IPMP_KSTAT_BRDCSTRCV,	IPMP_KSTAT_BRDCSTXMT,	IPMP_KSTAT_LINK_UP,
+	IPMP_KSTAT_MAX		/* keep last */
+};
 
 /*
  * phyint represents state that is common to both IPv4 and IPv6 interfaces.
  * There is a separate ill_t representing IPv4 and IPv6 which has a
  * backpointer to the phyint structure for accessing common state.
- *
- * NOTE : It just stores the group name as there is only one name for
- *	  IPv4 and IPv6 i.e it is a underlying link property. Actually
- *        IPv4 and IPv6 ill are grouped together when their phyints have
- *        the same name.
  */
 typedef struct phyint {
 	struct ill_s	*phyint_illv4;
 	struct ill_s	*phyint_illv6;
-	uint_t		phyint_ifindex;		/* SIOCLSLIFINDEX */
-	char		*phyint_groupname;	/* SIOCSLIFGROUPNAME */
-	uint_t		phyint_groupname_len;
+	uint_t		phyint_ifindex;		/* SIOCSLIFINDEX */
 	uint64_t	phyint_flags;
 	avl_node_t	phyint_avl_by_index;	/* avl tree by index */
 	avl_node_t	phyint_avl_by_name;	/* avl tree by name */
 	kmutex_t	phyint_lock;
 	struct ipsq_s	*phyint_ipsq;		/* back pointer to ipsq */
-	struct phyint	*phyint_ipsq_next;	/* phyint list on this ipsq */
-	/* Once Clearview IPMP is added the follow two fields can be removed */
-	uint_t		phyint_group_ifindex;	/* index assigned to group */
-	uint_t		phyint_hook_ifindex;	/* index used with neti/hook */
+	struct ipmp_grp_s *phyint_grp;		/* associated IPMP group */
+	char		phyint_name[LIFNAMSIZ];	/* physical interface name */
+	uint64_t	phyint_kstats0[IPMP_KSTAT_MAX];	/* baseline kstats */
 } phyint_t;
 
 #define	CACHE_ALIGN_SIZE 64
-
 #define	CACHE_ALIGN(align_struct)	P2ROUNDUP(sizeof (struct align_struct),\
 							CACHE_ALIGN_SIZE)
 struct _phyint_list_s_ {
@@ -1568,34 +1580,6 @@ typedef union phyint_list_u {
 
 #define	phyint_list_avl_by_index	phyint_list_s.phyint_list_avl_by_index
 #define	phyint_list_avl_by_name		phyint_list_s.phyint_list_avl_by_name
-/*
- * ILL groups. We group ills,
- *
- * - if the ills have the same group name. (New way)
- *
- * ill_group locking notes:
- *
- * illgrp_lock protects ill_grp_ill_schednext.
- *
- * ill_g_lock protects ill_grp_next, illgrp_ill, illgrp_ill_count.
- * Holding ill_g_lock freezes the memberships of ills in IPMP groups.
- * It also freezes the global list of ills and all ipifs in all ills.
- *
- * To remove an ipif from the linked list of ipifs of that ill ipif_free_tail
- * holds both ill_g_lock, and ill_lock. Similarly to remove an ill from the
- * global list of ills, ill_glist_delete() holds ill_g_lock as writer.
- * This simplifies things for ipif_select_source, illgrp_scheduler etc.
- * that need to walk the members of an illgrp. They just hold ill_g_lock
- * as reader to do the walk.
- *
- */
-typedef	struct ill_group {
-	kmutex_t	illgrp_lock;
-	struct ill_group *illgrp_next;		/* Next ill_group */
-	struct ill_s	*illgrp_ill_schednext;	/* Next ill to be scheduled */
-	struct ill_s	*illgrp_ill;		/* First ill in the group */
-	int		illgrp_ill_count;
-} ill_group_t;
 
 /*
  * Fragmentation hash bucket
@@ -1792,6 +1776,108 @@ typedef struct ill_lso_capab_s ill_lso_capab_t;
 #define	IS_LOOPBACK(ill) \
 	((ill)->ill_phyint->phyint_flags & PHYI_LOOPBACK)
 
+/* Is this an IPMP meta-interface ILL? */
+#define	IS_IPMP(ill)							\
+	((ill)->ill_phyint->phyint_flags & PHYI_IPMP)
+
+/* Is this ILL under an IPMP meta-interface? (aka "in a group?") */
+#define	IS_UNDER_IPMP(ill)						\
+	((ill)->ill_grp != NULL && !IS_IPMP(ill))
+
+/* Is ill1 in the same illgrp as ill2? */
+#define	IS_IN_SAME_ILLGRP(ill1, ill2)					\
+	((ill1)->ill_grp != NULL && ((ill1)->ill_grp == (ill2)->ill_grp))
+
+/* Is ill1 on the same LAN as ill2? */
+#define	IS_ON_SAME_LAN(ill1, ill2)					\
+	((ill1) == (ill2) || IS_IN_SAME_ILLGRP(ill1, ill2))
+
+#define	ILL_OTHER(ill)							\
+	((ill)->ill_isv6 ? (ill)->ill_phyint->phyint_illv4 :		\
+	    (ill)->ill_phyint->phyint_illv6)
+
+/*
+ * IPMP group ILL state structure -- up to two per IPMP group (V4 and V6).
+ * Created when the V4 and/or V6 IPMP meta-interface is I_PLINK'd.  It is
+ * guaranteed to persist while there are interfaces of that type in the group.
+ * In general, most fields are accessed outside of the IPSQ (e.g., in the
+ * datapath), and thus use locks in addition to the IPSQ for protection.
+ *
+ * synchronization:		read			write
+ *
+ *	ig_if			ipsq or ill_g_lock	ipsq and ill_g_lock
+ *	ig_actif		ipsq or ipmp_lock	ipsq and ipmp_lock
+ *	ig_nactif		ipsq or ipmp_lock	ipsq and ipmp_lock
+ *	ig_next_ill		ipsq or ipmp_lock	ipsq and ipmp_lock
+ *	ig_ipmp_ill		write once		write once
+ *	ig_cast_ill		ipsq or ipmp_lock	ipsq and ipmp_lock
+ *	ig_arpent		ipsq			ipsq
+ *	ig_mtu			ipsq			ipsq
+ */
+typedef struct ipmp_illgrp_s {
+	list_t		ig_if; 		/* list of all interfaces */
+	list_t		ig_actif;	/* list of active interfaces */
+	uint_t		ig_nactif;	/* number of active interfaces */
+	struct ill_s	*ig_next_ill;	/* next active interface to use */
+	struct ill_s	*ig_ipmp_ill;	/* backpointer to IPMP meta-interface */
+	struct ill_s	*ig_cast_ill;	/* nominated ill for multi/broadcast */
+	list_t		ig_arpent;	/* list of ARP entries */
+	uint_t		ig_mtu;		/* ig_ipmp_ill->ill_max_mtu */
+} ipmp_illgrp_t;
+
+/*
+ * IPMP group state structure -- one per IPMP group.  Created when the
+ * IPMP meta-interface is plumbed; it is guaranteed to persist while there
+ * are interfaces in it.
+ *
+ * ipmp_grp_t synchronization:		read			write
+ *
+ *	gr_name				ipmp_lock		ipmp_lock
+ *	gr_ifname			write once		write once
+ *	gr_mactype			ipmp_lock		ipmp_lock
+ *	gr_phyint			write once		write once
+ *	gr_nif				ipmp_lock		ipmp_lock
+ *	gr_nactif			ipsq			ipsq
+ *	gr_v4				ipmp_lock		ipmp_lock
+ *	gr_v6				ipmp_lock		ipmp_lock
+ *	gr_nv4				ipmp_lock		ipmp_lock
+ *	gr_nv6				ipmp_lock		ipmp_lock
+ *	gr_pendv4			ipmp_lock		ipmp_lock
+ *	gr_pendv6			ipmp_lock		ipmp_lock
+ *	gr_linkdownmp			ipsq			ipsq
+ *	gr_ksp				ipmp_lock		ipmp_lock
+ *	gr_kstats0			atomic			atomic
+ */
+typedef struct ipmp_grp_s {
+	char		gr_name[LIFGRNAMSIZ];	/* group name */
+	char		gr_ifname[LIFNAMSIZ];	/* interface name */
+	t_uscalar_t	gr_mactype;	/* DLPI mactype of group */
+	phyint_t	*gr_phyint;	/* IPMP group phyint */
+	uint_t		gr_nif;		/* number of interfaces in group */
+	uint_t		gr_nactif; 	/* number of active interfaces */
+	ipmp_illgrp_t	*gr_v4;		/* V4 group information */
+	ipmp_illgrp_t	*gr_v6;		/* V6 group information */
+	uint_t		gr_nv4;		/* number of ills in V4 group */
+	uint_t		gr_nv6;		/* number of ills in V6 group */
+	uint_t		gr_pendv4; 	/* number of pending ills in V4 group */
+	uint_t		gr_pendv6; 	/* number of pending ills in V6 group */
+	mblk_t		*gr_linkdownmp;	/* message used to bring link down */
+	kstat_t		*gr_ksp;	/* group kstat pointer */
+	uint64_t	gr_kstats0[IPMP_KSTAT_MAX]; /* baseline group kstats */
+} ipmp_grp_t;
+
+/*
+ * IPMP ARP entry -- one per SIOCS*ARP entry tied to the group.  Used to keep
+ * ARP up-to-date as the active set of interfaces in the group changes.
+ */
+typedef struct ipmp_arpent_s {
+	mblk_t		*ia_area_mp;	/* AR_ENTRY_ADD pointer */
+	ipaddr_t	ia_ipaddr; 	/* IP address for this entry */
+	boolean_t	ia_proxyarp; 	/* proxy ARP entry? */
+	boolean_t	ia_notified; 	/* ARP notified about this entry? */
+	list_node_t	ia_node; 	/* next ARP entry in list */
+} ipmp_arpent_t;
+
 /*
  * IP Lower level Structure.
  * Instance data structure in ip_open when there is a device below us.
@@ -1851,6 +1937,7 @@ typedef struct ill_s {
 	mblk_t	*ill_unbind_mp;		/* unbind mp from ill_dl_up() */
 	mblk_t	*ill_promiscoff_mp;	/* for ill_leave_allmulti() */
 	mblk_t	*ill_dlpi_deferred;	/* b_next chain of control messages */
+	mblk_t	*ill_ardeact_mp;	/* deact mp from ipmp_ill_activate() */
 	mblk_t	*ill_phys_addr_mp;	/* mblk which holds ill_phys_addr */
 #define	ill_last_mp_to_free	ill_phys_addr_mp
 
@@ -1867,21 +1954,19 @@ typedef struct ill_s {
 		ill_dlpi_style_set : 1,
 
 		ill_ifname_pending : 1,
-		ill_move_in_progress : 1, /* FAILOVER/FAILBACK in progress */
 		ill_join_allmulti : 1,
 		ill_logical_down : 1,
-
 		ill_is_6to4tun : 1,	/* Interface is a 6to4 tunnel */
+
 		ill_promisc_on_phys : 1, /* phys interface in promisc mode */
 		ill_dl_up : 1,
 		ill_up_ipifs : 1,
-
 		ill_note_link : 1,	/* supports link-up notification */
+
 		ill_capab_reneg : 1, /* capability renegotiation to be done */
 		ill_dld_capab_inprog : 1, /* direct dld capab call in prog */
 		ill_need_recover_multicast : 1,
-
-		ill_pad_to_bit_31 : 16;
+		ill_pad_to_bit_31 : 17;
 
 	/* Following bit fields protected by ill_lock */
 	uint_t
@@ -1891,10 +1976,8 @@ typedef struct ill_s {
 		ill_arp_closing : 1,
 
 		ill_arp_bringup_pending : 1,
-		ill_mtu_userspecified : 1, /* SIOCSLIFLNKINFO has set the mtu */
 		ill_arp_extend : 1,	/* ARP has DAD extensions */
-
-		ill_pad_bit_31 : 25;
+		ill_pad_bit_31 : 26;
 
 	/*
 	 * Used in SIOCSIFMUXID and SIOCGIFMUXID for 'ifconfig unplumb'.
@@ -1931,6 +2014,7 @@ typedef struct ill_s {
 	 */
 	uint8_t	ill_max_hops;	/* Maximum hops for any logical interface */
 	uint_t	ill_max_mtu;	/* Maximum MTU for any logical interface */
+	uint_t	ill_user_mtu;	/* User-specified MTU via SIOCSLIFLNKINFO */
 	uint32_t ill_reachable_time;	/* Value for ND algorithm in msec */
 	uint32_t ill_reachable_retrans_time; /* Value for ND algorithm msec */
 	uint_t	ill_max_buf;		/* Max # of req to buffer for ND */
@@ -1953,13 +2037,9 @@ typedef struct ill_s {
 	 * of the ipif.
 	 */
 	mblk_t			*ill_arp_on_mp;
-	/* Peer ill of an IPMP move operation */
-	struct ill_s		*ill_move_peer;
 
 	phyint_t		*ill_phyint;
 	uint64_t		ill_flags;
-	ill_group_t		*ill_group;
-	struct ill_s		*ill_group_next;
 
 	kmutex_t	ill_lock;	/* Please see table below */
 	/*
@@ -2005,6 +2085,18 @@ typedef struct ill_s {
 	void		*ill_flownotify_mh; /* Tx flow ctl, mac cb handle */
 	uint_t		ill_ilm_cnt;    /* ilms referencing this ill */
 	uint_t		ill_ipallmulti_cnt; /* ip_join_allmulti() calls */
+	/*
+	 * IPMP fields.
+	 */
+	ipmp_illgrp_t	*ill_grp;	/* IPMP group information */
+	list_node_t	ill_actnode; 	/* next active ill in group */
+	list_node_t	ill_grpnode;	/* next ill in group */
+	ipif_t		*ill_src_ipif;	/* source address selection rotor */
+	ipif_t		*ill_move_ipif;	/* ipif awaiting move to new ill */
+	boolean_t	ill_nom_cast;	/* nominated for mcast/bcast */
+	uint_t		ill_bound_cnt;	/* # of data addresses bound to ill */
+	ipif_t		*ill_bound_ipif; /* ipif chain bound to ill */
+	timeout_id_t	ill_refresh_tid; /* ill refresh retry timeout id */
 } ill_t;
 
 /*
@@ -2088,6 +2180,7 @@ typedef struct ill_s {
  *
  * ill_max_mtu
  *
+ * ill_user_mtu			ipsq + ill_lock		ill_lock
  * ill_reachable_time		ipsq + ill_lock		ill_lock
  * ill_reachable_retrans_time	ipsq + ill_lock		ill_lock
  * ill_max_buf			ipsq + ill_lock		ill_lock
@@ -2102,12 +2195,9 @@ typedef struct ill_s {
  * ill_arp_down_mp		ipsq			ipsq
  * ill_arp_del_mapping_mp	ipsq			ipsq
  * ill_arp_on_mp		ipsq			ipsq
- * ill_move_peer		ipsq			ipsq
  *
  * ill_phyint			ipsq, ill_g_lock, ill_lock	Any of them
  * ill_flags			ill_lock		ill_lock
- * ill_group			ipsq, ill_g_lock, ill_lock	Any of them
- * ill_group_next		ipsq, ill_g_lock, ill_lock	Any of them
  * ill_nd_lla_mp		ipsq + down ill		only when ill is up
  * ill_nd_lla			ipsq + down ill		only when ill is up
  * ill_nd_lla_len		ipsq + down ill		only when ill is up
@@ -2122,11 +2212,26 @@ typedef struct ill_s {
  * ill_ilm_walker_cnt		ill_lock		ill_lock
  * ill_nce_cnt			ill_lock		ill_lock
  * ill_ilm_cnt			ill_lock		ill_lock
+ * ill_src_ipif			ill_g_lock		ill_g_lock
  * ill_trace			ill_lock		ill_lock
  * ill_usesrc_grp_next		ill_g_usesrc_lock	ill_g_usesrc_lock
  * ill_dhcpinit			atomics			atomics
  * ill_flownotify_mh		write once		write once
  * ill_capab_pending_cnt	ipsq			ipsq
+ *
+ * ill_bound_cnt		ipsq			ipsq
+ * ill_bound_ipif		ipsq			ipsq
+ * ill_actnode			ipsq + ipmp_lock	ipsq OR ipmp_lock
+ * ill_grpnode			ipsq + ill_g_lock	ipsq OR ill_g_lock
+ * ill_src_ipif			ill_g_lock		ill_g_lock
+ * ill_move_ipif		ipsq			ipsq
+ * ill_nom_cast			ipsq			ipsq OR advisory
+ * ill_refresh_tid		ill_lock		ill_lock
+ * ill_grp (for IPMP ill)	write once		write once
+ * ill_grp (for underlying ill)	ipsq + ill_g_lock	ipsq OR ill_g_lock
+ *
+ * NOTE: It's OK to make heuristic decisions on an underlying interface
+ *	 by using IS_UNDER_IPMP() or comparing ill_grp's raw pointer value.
  */
 
 /*
@@ -2167,7 +2272,7 @@ enum { IF_CMD = 1, LIF_CMD, TUN_CMD, ARP_CMD, XARP_CMD, MSFILT_CMD, MISC_CMD };
 #define	IPI_MODOK	0x2	/* Permitted on mod instance of IP */
 #define	IPI_WR		0x4	/* Need to grab writer access */
 #define	IPI_GET_CMD	0x8	/* branch to mi_copyout on success */
-#define	IPI_REPL	0x10	/* valid for replacement ipif created in MOVE */
+/*	unused		0x10	*/
 #define	IPI_NULL_BCONT	0x20	/* ioctl has not data and hence no b_cont */
 #define	IPI_PASS_DOWN	0x40	/* pass this ioctl down when a module only */
 
@@ -2175,17 +2280,6 @@ extern ip_ioctl_cmd_t	ip_ndx_ioctl_table[];
 extern ip_ioctl_cmd_t	ip_misc_ioctl_table[];
 extern int ip_ndx_ioctl_count;
 extern int ip_misc_ioctl_count;
-
-#define	ILL_CLEAR_MOVE(ill) {				\
-	ill_t *peer_ill;				\
-							\
-	peer_ill = (ill)->ill_move_peer;		\
-	ASSERT(peer_ill != NULL);			\
-	(ill)->ill_move_in_progress = B_FALSE;		\
-	peer_ill->ill_move_in_progress = B_FALSE;	\
-	(ill)->ill_move_peer = NULL;			\
-	peer_ill->ill_move_peer = NULL;			\
-}
 
 /* Passed down by ARP to IP during I_PLINK/I_PUNLINK */
 typedef struct ipmx_s {
@@ -2799,19 +2893,11 @@ typedef struct ip_pktinfo {
 	(!((ipif)->ipif_state_flags & (IPIF_CONDEMNED)) ||		\
 	IAM_WRITER_IPIF(ipif))
 
-/*
- * These macros are used by critical set ioctls and failover ioctls to
- * mark the ipif appropriately before starting the operation and to clear the
- * marks after completing the operation.
- */
-#define	IPIF_UNMARK_MOVING(ipif)                                \
-	(ipif)->ipif_state_flags &= ~IPIF_MOVING & ~IPIF_CHANGING;
-
 #define	ILL_UNMARK_CHANGING(ill)                                \
 	(ill)->ill_state_flags &= ~ILL_CHANGING;
 
 /* Macros used to assert that this thread is a writer */
-#define	IAM_WRITER_IPSQ(ipsq)	((ipsq)->ipsq_writer == curthread)
+#define	IAM_WRITER_IPSQ(ipsq)	((ipsq)->ipsq_xop->ipx_writer == curthread)
 #define	IAM_WRITER_ILL(ill)	IAM_WRITER_IPSQ((ill)->ill_phyint->phyint_ipsq)
 #define	IAM_WRITER_IPIF(ipif)	IAM_WRITER_ILL((ipif)->ipif_ill)
 
@@ -2837,9 +2923,9 @@ typedef struct ip_pktinfo {
 #define	RELEASE_ILL_LOCKS(ill_1, ill_2)		\
 {						\
 	if (ill_1 != NULL)			\
-		mutex_exit(&(ill_1)->ill_lock);	\
+		mutex_exit(&(ill_1)->ill_lock); \
 	if (ill_2 != NULL && ill_2 != ill_1)	\
-		mutex_exit(&(ill_2)->ill_lock);	\
+		mutex_exit(&(ill_2)->ill_lock); \
 }
 
 /* Get the other protocol instance ill */
@@ -2847,14 +2933,9 @@ typedef struct ip_pktinfo {
 	((ill)->ill_isv6 ? (ill)->ill_phyint->phyint_illv4 :	\
 	    (ill)->ill_phyint->phyint_illv6)
 
-#define	MATCH_V4_ONLY	0x1
-#define	MATCH_V6_ONLY	0x2
-#define	MATCH_ILL_ONLY	0x4
-
 /* ioctl command info: Ioctl properties extracted and stored in here */
 typedef struct cmd_info_s
 {
-	char    ci_groupname[LIFNAMSIZ + 1];	/* SIOCSLIFGROUPNAME */
 	ipif_t  *ci_ipif;	/* ipif associated with [l]ifreq ioctl's */
 	sin_t	*ci_sin;	/* the sin struct passed down */
 	sin6_t	*ci_sin6;	/* the sin6_t struct passed down */
@@ -2990,10 +3071,8 @@ extern struct module_info ip_mod_info;
 	((ipst)->ips_ip6_loopback_out_event.he_interested)
 
 /*
- * Hooks marcos used inside of ip
+ * Hooks macros used inside of ip
  */
-#define	IPHA_VHL	ipha_version_and_hdr_length
-
 #define	FW_HOOKS(_hook, _event, _ilp, _olp, _iph, _fm, _m, _llm, ipst)	\
 									\
 	if ((_hook).he_interested) {	\
@@ -3002,21 +3081,8 @@ extern struct module_info ip_mod_info;
 		_NOTE(CONSTCOND)					\
 		ASSERT((_ilp != NULL) || (_olp != NULL));		\
 									\
-		_NOTE(CONSTCOND)					\
-		if ((_ilp != NULL) &&					\
-		    (((ill_t *)(_ilp))->ill_phyint != NULL))		\
-			info.hpe_ifp = (phy_if_t)((ill_t *)		\
-			    (_ilp))->ill_phyint->phyint_hook_ifindex;	\
-		else							\
-			info.hpe_ifp = 0;				\
-									\
-		_NOTE(CONSTCOND)					\
-		if ((_olp != NULL) &&					\
-		    (((ill_t *)(_olp))->ill_phyint != NULL))		\
-			info.hpe_ofp = (phy_if_t)((ill_t *)		\
-			    (_olp))->ill_phyint->phyint_hook_ifindex;	\
-		else							\
-			info.hpe_ofp = 0;				\
+		FW_SET_ILL_INDEX(info.hpe_ifp, (ill_t *)_ilp);		\
+		FW_SET_ILL_INDEX(info.hpe_ofp, (ill_t *)_olp);		\
 		info.hpe_protocol = ipst->ips_ipv4_net_data;		\
 		info.hpe_hdr = _iph;					\
 		info.hpe_mp = &(_fm);					\
@@ -3026,10 +3092,8 @@ extern struct module_info ip_mod_info;
 		    _event, (hook_data_t)&info) != 0) {			\
 			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
 			    (_hook).he_name, (void *)_fm, (void *)_m));	\
-			if (_fm != NULL) {				\
-				freemsg(_fm);				\
-				_fm = NULL;				\
-			}						\
+			freemsg(_fm);					\
+			_fm = NULL;					\
 			_iph = NULL;					\
 			_m = NULL;					\
 		} else {						\
@@ -3046,21 +3110,8 @@ extern struct module_info ip_mod_info;
 		_NOTE(CONSTCOND)					\
 		ASSERT((_ilp != NULL) || (_olp != NULL));		\
 									\
-		_NOTE(CONSTCOND)					\
-		if ((_ilp != NULL) &&					\
-		    (((ill_t *)(_ilp))->ill_phyint != NULL))		\
-			info.hpe_ifp = (phy_if_t)((ill_t *)		\
-			    (_ilp))->ill_phyint->phyint_hook_ifindex;	\
-		else							\
-			info.hpe_ifp = 0;				\
-									\
-		_NOTE(CONSTCOND)					\
-		if ((_olp != NULL) &&					\
-		    (((ill_t *)(_olp))->ill_phyint != NULL))		\
-			info.hpe_ofp = (phy_if_t)((ill_t *)		\
-			    (_olp))->ill_phyint->phyint_hook_ifindex;	\
-		else							\
-			info.hpe_ofp = 0;				\
+		FW_SET_ILL_INDEX(info.hpe_ifp, (ill_t *)_ilp);		\
+		FW_SET_ILL_INDEX(info.hpe_ofp, (ill_t *)_olp);		\
 		info.hpe_protocol = ipst->ips_ipv6_net_data;		\
 		info.hpe_hdr = _iph;					\
 		info.hpe_mp = &(_fm);					\
@@ -3070,16 +3121,25 @@ extern struct module_info ip_mod_info;
 		    _event, (hook_data_t)&info) != 0) {			\
 			ip2dbg(("%s hook dropped mblk chain %p hdr %p\n",\
 			    (_hook).he_name, (void *)_fm, (void *)_m));	\
-			if (_fm != NULL) {				\
-				freemsg(_fm);				\
-				_fm = NULL;				\
-			}						\
+			freemsg(_fm);					\
+			_fm = NULL;					\
 			_iph = NULL;					\
 			_m = NULL;					\
 		} else {						\
 			_iph = info.hpe_hdr;				\
 			_m = info.hpe_mb;				\
 		}							\
+	}
+
+#define	FW_SET_ILL_INDEX(fp, ill)					\
+	_NOTE(CONSTCOND)						\
+	if ((ill) == NULL || (ill)->ill_phyint == NULL) {		\
+		(fp) = 0;						\
+		_NOTE(CONSTCOND)					\
+	} else if (IS_UNDER_IPMP(ill)) {				\
+		(fp) = ipmp_ill_get_ipmp_ifindex(ill);			\
+	} else {							\
+		(fp) = (ill)->ill_phyint->phyint_ifindex;		\
 	}
 
 /*
@@ -3146,16 +3206,15 @@ struct	ipsec_out_s;
 
 struct	mac_header_info_s;
 
-extern boolean_t ip_assign_ifindex(uint_t *, ip_stack_t *);
 extern void	ill_frag_timer(void *);
 extern ill_t	*ill_first(int, int, ill_walk_context_t *, ip_stack_t *);
 extern ill_t	*ill_next(ill_walk_context_t *, ill_t *);
 extern void	ill_frag_timer_start(ill_t *);
 extern void	ill_nic_event_dispatch(ill_t *, lif_if_t, nic_event_t,
     nic_event_data_t, size_t);
-extern void	ill_nic_event_plumb(ill_t *, boolean_t);
 extern mblk_t	*ip_carve_mp(mblk_t **, ssize_t);
 extern mblk_t	*ip_dlpi_alloc(size_t, t_uscalar_t);
+extern mblk_t	*ip_dlnotify_alloc(uint_t, uint_t);
 extern char	*ip_dot_addr(ipaddr_t, char *);
 extern const char *mac_colon_addr(const uint8_t *, size_t, char *, size_t);
 extern void	ip_lwput(queue_t *, mblk_t *);
@@ -3239,8 +3298,49 @@ extern int	ip_hdr_complete(ipha_t *, zoneid_t, ip_stack_t *);
 extern struct qinit iprinitv6;
 extern struct qinit ipwinitv6;
 
-extern	void	conn_drain_insert(conn_t *connp);
-extern	int	conn_ipsec_length(conn_t *connp);
+extern void	ipmp_init(ip_stack_t *);
+extern void	ipmp_destroy(ip_stack_t *);
+extern ipmp_grp_t *ipmp_grp_create(const char *, phyint_t *);
+extern void	ipmp_grp_destroy(ipmp_grp_t *);
+extern void	ipmp_grp_info(const ipmp_grp_t *, lifgroupinfo_t *);
+extern int	ipmp_grp_rename(ipmp_grp_t *, const char *);
+extern ipmp_grp_t *ipmp_grp_lookup(const char *, ip_stack_t *);
+extern int	ipmp_grp_vet_phyint(ipmp_grp_t *, phyint_t *);
+extern ipmp_illgrp_t *ipmp_illgrp_create(ill_t *);
+extern void	ipmp_illgrp_destroy(ipmp_illgrp_t *);
+extern ill_t	*ipmp_illgrp_add_ipif(ipmp_illgrp_t *, ipif_t *);
+extern void	ipmp_illgrp_del_ipif(ipmp_illgrp_t *, ipif_t *);
+extern ill_t	*ipmp_illgrp_next_ill(ipmp_illgrp_t *);
+extern ill_t	*ipmp_illgrp_hold_next_ill(ipmp_illgrp_t *);
+extern ill_t	*ipmp_illgrp_cast_ill(ipmp_illgrp_t *);
+extern ill_t	*ipmp_illgrp_hold_cast_ill(ipmp_illgrp_t *);
+extern ill_t	*ipmp_illgrp_ipmp_ill(ipmp_illgrp_t *);
+extern void	ipmp_illgrp_refresh_mtu(ipmp_illgrp_t *);
+extern ipmp_arpent_t *ipmp_illgrp_create_arpent(ipmp_illgrp_t *, mblk_t *,
+    boolean_t);
+extern void	ipmp_illgrp_destroy_arpent(ipmp_illgrp_t *, ipmp_arpent_t *);
+extern ipmp_arpent_t *ipmp_illgrp_lookup_arpent(ipmp_illgrp_t *, ipaddr_t *);
+extern void	ipmp_illgrp_refresh_arpent(ipmp_illgrp_t *);
+extern void	ipmp_illgrp_mark_arpent(ipmp_illgrp_t *, ipmp_arpent_t *);
+extern ill_t	*ipmp_illgrp_find_ill(ipmp_illgrp_t *, uchar_t *, uint_t);
+extern void	ipmp_illgrp_link_grp(ipmp_illgrp_t *, ipmp_grp_t *);
+extern int	ipmp_illgrp_unlink_grp(ipmp_illgrp_t *);
+extern uint_t	ipmp_ill_get_ipmp_ifindex(const ill_t *);
+extern void	ipmp_ill_join_illgrp(ill_t *, ipmp_illgrp_t *);
+extern void	ipmp_ill_leave_illgrp(ill_t *);
+extern ill_t	*ipmp_ill_hold_ipmp_ill(ill_t *);
+extern boolean_t ipmp_ill_is_active(ill_t *);
+extern void	ipmp_ill_refresh_active(ill_t *);
+extern void	ipmp_phyint_join_grp(phyint_t *, ipmp_grp_t *);
+extern void	ipmp_phyint_leave_grp(phyint_t *);
+extern void	ipmp_phyint_refresh_active(phyint_t *);
+extern ill_t	*ipmp_ipif_bound_ill(const ipif_t *);
+extern ill_t	*ipmp_ipif_hold_bound_ill(const ipif_t *);
+extern boolean_t ipmp_ipif_is_dataaddr(const ipif_t *);
+extern boolean_t ipmp_ipif_is_stubaddr(const ipif_t *);
+
+extern void	conn_drain_insert(conn_t *connp);
+extern int	conn_ipsec_length(conn_t *connp);
 extern void	ip_wput_ipsec_out(queue_t *, mblk_t *, ipha_t *, ill_t *,
     ire_t *);
 extern ipaddr_t	ip_get_dst(ipha_t *);
@@ -3274,9 +3374,6 @@ extern int	ip_srcid_report(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern uint8_t	ipoptp_next(ipoptp_t *);
 extern uint8_t	ipoptp_first(ipoptp_t *, ipha_t *);
 extern int	ip_opt_get_user(const ipha_t *, uchar_t *);
-extern ill_t	*ip_grab_attach_ill(ill_t *, mblk_t *, int, boolean_t,
-    ip_stack_t *);
-extern ire_t	*conn_set_outgoing_ill(conn_t *, ire_t *, ill_t **);
 extern int	ipsec_req_from_conn(conn_t *, ipsec_req_t *, int);
 extern int	ip_snmp_get(queue_t *q, mblk_t *mctl, int level);
 extern int	ip_snmp_set(queue_t *q, int, int, uchar_t *, int);
@@ -3295,7 +3392,6 @@ extern void	ip_savebuf(void **, uint_t *, boolean_t, const void *, uint_t);
 extern boolean_t	ipsq_pending_mp_cleanup(ill_t *, conn_t *);
 extern void	conn_ioctl_cleanup(conn_t *);
 extern ill_t	*conn_get_held_ill(conn_t *, ill_t **, int *);
-extern ill_t	*ip_newroute_get_dst_ill(ill_t *);
 
 struct multidata_s;
 struct pdesc_s;
@@ -3313,9 +3409,6 @@ extern boolean_t ip_md_hcksum_attr(struct multidata_s *, struct pdesc_s *,
 extern boolean_t ip_md_zcopy_attr(struct multidata_s *, struct pdesc_s *,
 			uint_t);
 extern	void	ip_unbind(conn_t *connp);
-
-extern phyint_t *phyint_lookup_group(char *, boolean_t, ip_stack_t *);
-extern phyint_t *phyint_lookup_group_ifindex(uint_t, ip_stack_t *);
 
 extern void tnet_init(void);
 extern void tnet_fini(void);
@@ -3434,6 +3527,8 @@ typedef struct ipobs_cb {
  * ihd_ifindex	  Interface index that the packet was received/sent over.
  *		  For local packets, this is the index of the interface
  *		  associated with the local destination address.
+ * ihd_grifindex  IPMP group interface index (zero unless ihd_ifindex
+ *		  is an IPMP underlying interface).
  * ihd_stack	  Netstack the packet is from.
  */
 typedef struct ipobs_hook_data {
@@ -3443,6 +3538,7 @@ typedef struct ipobs_hook_data {
 	ipobs_hook_type_t	ihd_htype;
 	uint16_t		ihd_ipver;
 	uint64_t		ihd_ifindex;
+	uint64_t 		ihd_grifindex;
 	netstack_t		*ihd_stack;
 } ipobs_hook_data_t;
 

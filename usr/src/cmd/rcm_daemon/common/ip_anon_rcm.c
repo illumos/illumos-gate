@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * RCM module to prevent plumbed IP addresses from being removed.
@@ -177,7 +175,7 @@ ip_anon_register(rcm_handle_t *hdl)
 
 	if (_cladm(CL_INITIALIZE, CL_GET_BOOTFLAG, &bootflags) != 0) {
 		rcm_log_message(RCM_ERROR,
-			gettext("unable to check cluster status\n"));
+		    gettext("unable to check cluster status\n"));
 		(void) mutex_unlock(&ip_list_lock);
 		return (RCM_FAILURE);
 	}
@@ -199,7 +197,7 @@ ip_anon_register(rcm_handle_t *hdl)
 			else {
 				if ((exclude_addrs.cladm_netaddrs_array =
 				    malloc(sizeof (cladm_netaddr_entry_t) *
-					    (num_exclude_addrs))) == NULL) {
+				    (num_exclude_addrs))) == NULL) {
 					rcm_log_message(RCM_ERROR,
 					    gettext("out of memory\n"));
 					(void) mutex_unlock(&ip_list_lock);
@@ -274,7 +272,7 @@ ip_anon_register(rcm_handle_t *hdl)
 
 	rcm_log_message(RCM_DEBUG,
 	    "ip_anon: obtaining list of IPv4 addresses.\n");
-	num_ifs = ifaddrlist(&al, AF_INET, errbuf);
+	num_ifs = ifaddrlist(&al, AF_INET, LIFC_UNDER_IPMP, errbuf);
 	if (num_ifs == -1) {
 		rcm_log_message(RCM_ERROR,
 		    gettext("cannot get IPv4 address list errno=%d (%s)\n"),
@@ -286,7 +284,7 @@ ip_anon_register(rcm_handle_t *hdl)
 	rcm_log_message(RCM_DEBUG,
 	    "ip_anon: obtaining list of IPv6 addresses.\n");
 
-	num_ifs6 = ifaddrlist(&al6, AF_INET6, errbuf);
+	num_ifs6 = ifaddrlist(&al6, AF_INET6, LIFC_UNDER_IPMP, errbuf);
 	if (num_ifs6 == -1) {
 		rcm_log_message(RCM_ERROR,
 		    gettext("cannot get IPv6 address list errno=%d (%s)\n"),
@@ -392,7 +390,7 @@ ip_anon_register(rcm_handle_t *hdl)
 			 * currently know about it.
 			 */
 			if (!(tentry->flags & IP_FLAG_CL) &&
-				!(tentry->flags & IP_FLAG_REG)) {
+			    !(tentry->flags & IP_FLAG_REG)) {
 				tentry->flags |= IP_FLAG_REG;
 				rcm_log_message(RCM_DEBUG,
 				    "ip_anon: registering interest in %s\n",

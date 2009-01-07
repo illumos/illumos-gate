@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -2037,6 +2037,7 @@ static int
 ip_mdq(mblk_t *mp, ipha_t *ipha, ill_t *ill, ipaddr_t tunnel_src,
     struct mfc *rt)
 {
+	ill_t *vill;
 	vifi_t vifi;
 	struct vif *vifp;
 	ipaddr_t dst = ipha->ipha_dst;
@@ -2102,25 +2103,21 @@ ip_mdq(mblk_t *mp, ipha_t *ipha, ill_t *ill, ipaddr_t tunnel_src,
 	}
 	/*
 	 * Don't forward if it didn't arrive from the parent vif for its
-	 * origin. But do match on the groups as we nominate only one
-	 * ill in the group for receiving allmulti packets.
+	 * origin.
 	 */
-	if ((ipst->ips_vifs[vifi].v_ipif->ipif_ill != ill &&
-	    (ill->ill_group == NULL ||
-	    ipst->ips_vifs[vifi].v_ipif->ipif_ill->ill_group !=
-		ill->ill_group)) ||
+	vill = ipst->ips_vifs[vifi].v_ipif->ipif_ill;
+	if ((vill != ill && !IS_IN_SAME_ILLGRP(vill, ill)) ||
 	    (ipst->ips_vifs[vifi].v_rmt_addr.s_addr != tunnel_src)) {
 		/* Came in the wrong interface */
 		ip1dbg(("ip_mdq: arrived wrong if, vifi %d "
 			"numvifs %d ill %s viftable ill %s\n",
 			(int)vifi, (int)ipst->ips_numvifs, ill->ill_name,
-			ipst->ips_vifs[vifi].v_ipif->ipif_ill->ill_name));
+			vill->ill_name));
 		if (ipst->ips_ip_mrtdebug > 1) {
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,
 			    "ip_mdq: arrived wrong if, vifi %d ill "
 			    "%s viftable ill %s\n",
-			    (int)vifi, ill->ill_name,
-			    ipst->ips_vifs[vifi].v_ipif->ipif_ill->ill_name);
+			    (int)vifi, ill->ill_name, vill->ill_name);
 		}
 		ipst->ips_mrtstat->mrts_wrong_if++;
 		rt->mfc_wrong_if++;
@@ -3047,7 +3044,6 @@ tbf_send_packet(struct vif *vifp, mblk_t *mp)
 		dst  = ipha->ipha_dst;
 		ipif = vifp->v_ipif;
 
-		mutex_enter(&ipif->ipif_ill->ill_lock);
 		if (ilm_lookup_ipif(ipif, dst) != NULL) {
 			/*
 			 * The packet is not yet reassembled, thus we need to
@@ -3057,7 +3053,6 @@ tbf_send_packet(struct vif *vifp, mblk_t *mp)
 			mblk_t 	*mp_loop;
 			ire_t	*ire;
 
-			mutex_exit(&ipif->ipif_ill->ill_lock);
 			if (ipst->ips_ip_mrtdebug > 1) {
 				(void) mi_strlog(mrouter->conn_rq, 1,
 				    SL_TRACE,
@@ -3082,8 +3077,6 @@ tbf_send_packet(struct vif *vifp, mblk_t *mp)
 			}
 			if (ire != NULL)
 				ire_refrele(ire);
-		} else {
-			mutex_exit(&ipif->ipif_ill->ill_lock);
 		}
 		if (ipst->ips_ip_mrtdebug > 1) {
 			(void) mi_strlog(mrouter->conn_rq, 1, SL_TRACE,

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include <sys/types.h>
@@ -970,7 +968,10 @@ send_pkt_internal(dhcp_smach_t *dsmp)
 			ipi6->ipi6_addr = lif->lif_v6addr;
 		else
 			ipi6->ipi6_addr = my_in6addr_any;
-		ipi6->ipi6_ifindex = lif->lif_pif->pif_index;
+		if (lif->lif_pif->pif_under_ipmp)
+			ipi6->ipi6_ifindex = lif->lif_pif->pif_grindex;
+		else
+			ipi6->ipi6_ifindex = lif->lif_pif->pif_index;
 		cmsg->cmsg_len = (char *)(ipi6 + 1) - (char *)cmsg;
 
 		/*

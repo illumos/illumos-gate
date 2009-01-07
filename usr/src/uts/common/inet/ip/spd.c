@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3989,7 +3989,7 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	ipsec_out_t  *io;
 	boolean_t v4;
 	mblk_t *mp;
-	boolean_t secure, attach_if;
+	boolean_t secure;
 	uint_t ifindex;
 	ipsec_selector_t sel;
 	ipsec_action_t *reflect_action = NULL;
@@ -4012,7 +4012,6 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	} else if (!ii->ipsec_in_loopback)
 		reflect_action = ipsec_in_to_out_action(ii);
 	secure = ii->ipsec_in_secure;
-	attach_if = ii->ipsec_in_attach_if;
 	ifindex = ii->ipsec_in_ill_index;
 	zoneid = ii->ipsec_in_zoneid;
 	ASSERT(zoneid != ALL_ZONES);
@@ -4057,7 +4056,6 @@ ipsec_in_to_out(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h)
 	io->ipsec_out_proc_begin = B_FALSE;
 	io->ipsec_out_secure = secure;
 	io->ipsec_out_v4 = v4;
-	io->ipsec_out_attach_if = attach_if;
 	io->ipsec_out_ill_index = ifindex;
 	io->ipsec_out_zoneid = zoneid;
 	io->ipsec_out_ns = ns;		/* No netstack_hold */
@@ -4549,7 +4547,6 @@ ipsec_out_to_in(mblk_t *ipsec_mp)
 	ii->ipsec_in_secure = B_TRUE;
 	ii->ipsec_in_v4 = v4;
 	ii->ipsec_in_icmp_loopback = icmp_loopback;
-	ii->ipsec_in_attach_if = B_FALSE;
 }
 
 /*

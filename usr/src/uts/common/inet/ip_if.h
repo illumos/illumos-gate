@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -80,7 +80,7 @@ extern "C" {
  */
 #define	IFF_PHYINT_FLAGS	(IFF_LOOPBACK|IFF_RUNNING|IFF_PROMISC| \
     IFF_ALLMULTI|IFF_INTELLIGENT|IFF_MULTI_BCAST|IFF_FAILED|IFF_STANDBY| \
-    IFF_INACTIVE|IFF_OFFLINE|IFF_VIRTUAL)
+    IFF_INACTIVE|IFF_OFFLINE|IFF_VIRTUAL|IFF_IPMP)
 
 #define	IFF_PHYINTINST_FLAGS	(IFF_DEBUG|IFF_NOTRAILERS|IFF_NOARP| \
     IFF_MULTICAST|IFF_ROUTER|IFF_NONUD|IFF_NORTEXCH|IFF_IPV4|IFF_IPV6| \
@@ -90,11 +90,6 @@ extern "C" {
     IFF_UNNUMBERED|IFF_DHCPRUNNING|IFF_PRIVATE|IFF_NOXMIT|IFF_NOLOCAL| \
     IFF_DEPRECATED|IFF_ADDRCONF|IFF_ANYCAST|IFF_NOFAILOVER| \
     IFF_PREFERRED|IFF_TEMPORARY|IFF_FIXEDMTU|IFF_DUPLICATE)
-
-#define	IPIF_REPL_CHECK(to_ipif, failback_cmd)				\
-	(((to_ipif)->ipif_replace_zero) || ((failback_cmd) &&		\
-	!(to_ipif)->ipif_isv6 && !((to_ipif)->ipif_flags & IPIF_UP) &&	\
-	(to_ipif)->ipif_lcl_addr == INADDR_ANY))
 
 #define	PHYI_LOOPBACK		IFF_LOOPBACK	/* is a loopback net */
 #define	PHYI_RUNNING		IFF_RUNNING	/* resources allocated */
@@ -107,6 +102,7 @@ extern "C" {
 #define	PHYI_INACTIVE		IFF_INACTIVE	/* Standby active or not ? */
 #define	PHYI_OFFLINE		IFF_OFFLINE	/* NIC has been offlined */
 #define	PHYI_VIRTUAL		IFF_VIRTUAL	/* Will not send or recv pkts */
+#define	PHYI_IPMP		IFF_IPMP	/* IPMP meta-interface */
 
 #define	ILLF_DEBUG		IFF_DEBUG	/* turn on debugging */
 #define	ILLF_NOTRAILERS		IFF_NOTRAILERS	/* avoid use of trailers */
@@ -137,11 +133,6 @@ extern "C" {
 #define	IPIF_FIXEDMTU		IFF_FIXEDMTU	/* set with SIOCSLIFMTU */
 #define	IPIF_DUPLICATE		IFF_DUPLICATE	/* address is in use */
 
-/* Source selection values for ipif_select_source_v6 */
-#define	RESTRICT_TO_NONE	0x0	/* No restriction in source selection */
-#define	RESTRICT_TO_GROUP	0x1	/* Restrict to IPMP group */
-#define	RESTRICT_TO_ILL		0x2	/* Restrict to ILL */
-
 #ifdef DEBUG
 #define	ILL_MAC_PERIM_HELD(ill)	ill_mac_perim_held(ill)
 #else
@@ -151,24 +142,23 @@ extern "C" {
 /* for ipif_resolver_up */
 enum ip_resolver_action {
 	Res_act_initial,		/* initial address establishment */
-	Res_act_move,			/* address move (IPMP, new DL addr) */
-	Res_act_defend			/* address defense */
+	Res_act_rebind,			/* IPMP address rebind (new hwaddr) */
+	Res_act_defend,			/* address defense */
+	Res_act_none			/* do nothing */
 };
 
-extern	ill_t	*illgrp_scheduler(ill_t *);
-extern	mblk_t	*ill_arp_alloc(ill_t *, uchar_t *, caddr_t);
-extern	mblk_t	*ipif_area_alloc(ipif_t *);
+extern	mblk_t	*ill_arp_alloc(ill_t *, const uchar_t *, caddr_t);
+extern	mblk_t	*ipif_area_alloc(ipif_t *, uint_t);
 extern	mblk_t	*ipif_ared_alloc(ipif_t *);
 extern	mblk_t	*ill_ared_alloc(ill_t *, ipaddr_t);
-extern	void	ill_dlpi_done(ill_t *, t_uscalar_t);
+extern	mblk_t	*ill_arie_alloc(ill_t *, const char *, const void *);
 extern	boolean_t ill_dlpi_pending(ill_t *, t_uscalar_t);
+extern	void	ill_dlpi_done(ill_t *, t_uscalar_t);
 extern	void	ill_dlpi_send(ill_t *, mblk_t *);
 extern	void	ill_dlpi_send_deferred(ill_t *);
 extern	void	ill_capability_done(ill_t *);
 
 extern	mblk_t	*ill_dlur_gen(uchar_t *, uint_t, t_uscalar_t, t_scalar_t);
-extern  ill_t	*ill_group_lookup_on_ifindex(uint_t, boolean_t, ip_stack_t *);
-extern	ill_t	*ill_group_lookup_on_name(char *, boolean_t, ip_stack_t *);
 /* NOTE: Keep unmodified ill_lookup_on_ifindex for ipp for now */
 extern  ill_t	*ill_lookup_on_ifindex_global_instance(uint_t, boolean_t,
     queue_t *, mblk_t *, ipsq_func_t, int *);
@@ -180,6 +170,7 @@ extern	ill_t	*ill_lookup_on_name(char *, boolean_t,
 extern uint_t	ill_get_next_ifindex(uint_t, boolean_t, ip_stack_t *);
 extern uint_t	ill_get_ifindex_by_name(char *, ip_stack_t *);
 extern	void	ill_ipif_cache_delete(ire_t *, char *);
+extern	void	ill_stq_cache_delete(ire_t *, char *);
 extern	void	ill_delete(ill_t *);
 extern	void	ill_delete_tail(ill_t *);
 extern	int	ill_dl_phys(ill_t *, ipif_t *, mblk_t *, queue_t *);
@@ -193,9 +184,9 @@ extern	void	ill_frag_prune(ill_t *, uint_t);
 extern	void	ill_frag_free_pkts(ill_t *, ipfb_t *, ipf_t *, int);
 extern	time_t	ill_frag_timeout(ill_t *, time_t);
 extern	int	ill_init(queue_t *, ill_t *);
-extern	int	ill_nominate_mcast_rcv(ill_group_t *);
-extern	boolean_t	ill_setdefaulttoken(ill_t *);
+extern	void	ill_refresh_bcast(ill_t *);
 extern	void	ill_restart_dad(ill_t *, boolean_t);
+extern	boolean_t	ill_setdefaulttoken(ill_t *);
 extern	int	ill_set_phys_addr(ill_t *, mblk_t *);
 extern	void	ill_set_ndmp(ill_t *, mblk_t *, uint_t, uint_t);
 
@@ -222,11 +213,9 @@ extern	void	ill_capability_reset(ill_t *, boolean_t);
 extern	void	ill_taskq_dispatch(ip_stack_t *);
 
 extern	void	ill_mtu_change(ire_t *, char *);
-extern void	ill_group_cleanup(ill_t *);
-extern int	ill_up_ipifs(ill_t *, queue_t *, mblk_t *);
-extern	boolean_t ill_is_probeonly(ill_t *);
-extern	boolean_t ill_hook_event_create(ill_t *, lif_if_t, nic_event_t,
-    nic_event_data_t, size_t);
+extern	int	ill_up_ipifs(ill_t *, queue_t *, mblk_t *);
+extern uint_t	ill_appaddr_cnt(const ill_t *);
+extern uint_t	ill_ptpaddr_cnt(const ill_t *);
 
 extern	void	ip_loopback_cleanup(ip_stack_t *);
 extern	void	ipif_get_name(const ipif_t *, char *, int);
@@ -238,6 +227,8 @@ extern	boolean_t ip_addr_exists(ipaddr_t, zoneid_t, ip_stack_t *);
 extern	ipif_t	*ipif_lookup_addr_v6(const in6_addr_t *, ill_t *, zoneid_t,
     queue_t *, mblk_t *, ipsq_func_t, int *, ip_stack_t *);
 extern  boolean_t ip_addr_exists_v6(const in6_addr_t *, zoneid_t,
+    ip_stack_t *);
+extern	ipif_t	*ipif_lookup_addr_exact_v6(const in6_addr_t *, ill_t *,
     ip_stack_t *);
 extern	zoneid_t ipif_lookup_addr_zoneid(ipaddr_t, ill_t *, ip_stack_t *);
 extern	zoneid_t ipif_lookup_addr_zoneid_v6(const in6_addr_t *, ill_t *,
@@ -251,31 +242,30 @@ extern	ipif_t	*ipif_lookup_multicast(ip_stack_t *, zoneid_t, boolean_t);
 extern	ipif_t	*ipif_lookup_remote(ill_t *, ipaddr_t, zoneid_t);
 extern	ipif_t	*ipif_lookup_onlink_addr(ipaddr_t, zoneid_t, ip_stack_t *);
 extern	ipif_t	*ipif_lookup_seqid(ill_t *, uint_t);
-extern	boolean_t	ipif_lookup_zoneid(ill_t *, zoneid_t, int,
-    ipif_t **);
-extern	boolean_t	ipif_lookup_zoneid_group(ill_t *, zoneid_t, int,
-    ipif_t **);
+extern	boolean_t ipif_lookup_zoneid(ill_t *, zoneid_t, int, ipif_t **);
 extern	ipif_t	*ipif_select_source(ill_t *, ipaddr_t, zoneid_t);
 extern	boolean_t	ipif_usesrc_avail(ill_t *, zoneid_t);
 extern	void	ipif_refhold(ipif_t *);
 extern	void	ipif_refhold_locked(ipif_t *);
-extern	void		ipif_refrele(ipif_t *);
+extern	void	ipif_refrele(ipif_t *);
 extern	void	ipif_all_down_tail(ipsq_t *, queue_t *, mblk_t *, void *);
+extern	void	ipif_resolver_down(ipif_t *);
 extern	int	ipif_resolver_up(ipif_t *, enum ip_resolver_action);
 extern	int	ipif_arp_setup_multicast(ipif_t *, mblk_t **);
 extern	int	ipif_down(ipif_t *, queue_t *, mblk_t *);
 extern	void	ipif_down_tail(ipif_t *);
+extern	void	ipif_multicast_down(ipif_t *);
 extern	void	ipif_multicast_up(ipif_t *);
 extern	void	ipif_ndp_down(ipif_t *);
-extern	int	ipif_ndp_up(ipif_t *);
+extern	int	ipif_ndp_up(ipif_t *, boolean_t);
 extern	int	ipif_ndp_setup_multicast(ipif_t *, struct nce_s **);
 extern	int	ipif_up_done(ipif_t *);
 extern	int	ipif_up_done_v6(ipif_t *);
 extern	void	ipif_up_notify(ipif_t *);
-extern	void	ipif_update_other_ipifs_v6(ipif_t *, ill_group_t *);
+extern	void	ipif_update_other_ipifs_v6(ipif_t *);
 extern	void	ipif_recreate_interface_routes_v6(ipif_t *, ipif_t *);
 extern	void	ill_update_source_selection(ill_t *);
-extern	ipif_t	*ipif_select_source_v6(ill_t *, const in6_addr_t *, uint_t,
+extern	ipif_t	*ipif_select_source_v6(ill_t *, const in6_addr_t *, boolean_t,
     uint32_t, zoneid_t);
 extern	boolean_t	ipif_cant_setlinklocal(ipif_t *);
 extern	int	ipif_setlinklocal(ipif_t *);
@@ -284,11 +274,8 @@ extern	ipif_t	*ipif_lookup_on_ifindex(uint_t, boolean_t, zoneid_t, queue_t *,
     mblk_t *, ipsq_func_t, int *, ip_stack_t *);
 extern	ipif_t	*ipif_get_next_ipif(ipif_t *curr, ill_t *ill);
 extern	void	ipif_ill_refrele_tail(ill_t *ill);
-extern	void	ipif_arp_down(ipif_t *ipif);
 extern	void	ipif_mask_reply(ipif_t *);
-
-extern	int	illgrp_insert(ill_group_t **, ill_t *, char *, ill_group_t *,
-    boolean_t);
+extern	int 	ipif_up(ipif_t *, queue_t *, mblk_t *);
 
 extern	void	ipsq_current_start(ipsq_t *, ipif_t *, int);
 extern	void	ipsq_current_finish(ipsq_t *);
@@ -451,13 +438,13 @@ extern int ip_sioctl_tmyaddr(ipif_t *, sin_t *, queue_t *, mblk_t *,
 extern int ip_sioctl_tunparam(ipif_t *, sin_t *, queue_t *, mblk_t *,
     ip_ioctl_cmd_t *, void *);
 
+extern int ip_sioctl_get_binding(ipif_t *, sin_t *, queue_t *,
+    mblk_t *, ip_ioctl_cmd_t *, void *);
 extern int ip_sioctl_groupname(ipif_t *, sin_t *, queue_t *,
     mblk_t *, ip_ioctl_cmd_t *, void *);
 extern int ip_sioctl_get_groupname(ipif_t *, sin_t *, queue_t *,
     mblk_t *, ip_ioctl_cmd_t *, void *);
-extern int ip_sioctl_slifoindex(ipif_t *, sin_t *, queue_t *,
-    mblk_t *, ip_ioctl_cmd_t *, void *);
-extern int ip_sioctl_get_oindex(ipif_t *, sin_t *, queue_t *,
+extern int ip_sioctl_groupinfo(ipif_t *, sin_t *, queue_t *,
     mblk_t *, ip_ioctl_cmd_t *, void *);
 
 extern int ip_sioctl_get_lifzone(ipif_t *, sin_t *, queue_t *,
@@ -473,15 +460,11 @@ extern int ip_sioctl_slifusesrc(ipif_t *, sin_t *, queue_t *,
     mblk_t *, ip_ioctl_cmd_t *, void *);
 extern int ip_sioctl_get_lifsrcof(ipif_t *, sin_t *, queue_t *,
     mblk_t *, ip_ioctl_cmd_t *, void *);
-extern int ip_sioctl_set_ipmpfailback(ipif_t *, sin_t *, queue_t *,
-    mblk_t *, ip_ioctl_cmd_t *, void *);
 
 extern	void	ip_sioctl_copyin_resume(ipsq_t *, queue_t *, mblk_t *, void *);
 extern	void	ip_sioctl_copyin_setup(queue_t *, mblk_t *);
-extern	void	ip_sioctl_iocack(queue_t *, mblk_t *);
+extern	void	ip_sioctl_iocack(ipsq_t *, queue_t *, mblk_t *, void *);
 extern	ip_ioctl_cmd_t *ip_sioctl_lookup(int);
-extern int ip_sioctl_move(ipif_t *, sin_t *, queue_t *, mblk_t *,
-    ip_ioctl_cmd_t *, void *);
 
 extern	void	conn_delete_ire(conn_t *, caddr_t);
 

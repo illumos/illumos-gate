@@ -19,20 +19,19 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libipmp.a
 VERS =		.1
-OBJECTS =	ipmp_query.o ipmp_mpathd.o ipmp.o
+OBJECTS =	ipmp_admin.o ipmp_query.o ipmp_mpathd.o ipmp.o
 
 include ../../Makefile.lib
+include ../../Makefile.rootfs
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lsocket -lc
+LDLIBS +=	-linetutil -lsocket -lc
 
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -932,15 +932,7 @@ typedef struct ipsec_req {
 #define	IP_BOUND_IF		0x41	/* bind socket to an ifindex	   */
 #define	IP_UNSPEC_SRC		0x42	/* use unspecified source address  */
 #define	IP_BROADCAST_TTL	0x43	/* use specific TTL for broadcast  */
-
-/*
- * IP_DONTFAILOVER_IF option is used to indicate that outbound unicast and
- * multicast packets go through the specified interface, no load spreading,
- * no failover.
- * This is a Sun private interface.
- */
-#define	IP_DONTFAILOVER_IF	0x44
-
+/* can be reused		0x44 */
 #define	IP_DHCPINIT_IF		0x45	/* accept all unicast DHCP traffic */
 
 /*
@@ -1258,15 +1250,6 @@ typedef struct {
 #define	IPV6_BOUND_IF		0x41	/* bind to an ifindex */
 #define	IPV6_UNSPEC_SRC		0x42	/* source of packets set to */
 					/* unspecified (all zeros) */
-#define	IPV6_BOUND_PIF		0x43	/* Bind to Physical interface */
-					/* No load balancing or failover */
-/*
- * IPV6_DONTFAILOVER_IF option is used to indicate that outbound unicast and
- * multicast packets go through the specified interface, no load spreading,
- * no failover.
- * This is a Sun private interface.
- */
-#define	IPV6_DONTFAILOVER_IF	0x44
 
 /*
  * Miscellaneous IPv6 constants.

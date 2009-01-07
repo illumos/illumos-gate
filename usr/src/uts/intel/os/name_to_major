@@ -102,7 +102,7 @@ kmdb 171
 sctp 172
 sctp6 173
 scsi_vhci 174
-vni 175
+dlpistub 175
 cpuid 176
 bmc 177
 dld 178

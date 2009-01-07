@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LIBINETUTIL_H
 #define	_LIBINETUTIL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Contains SMI-private API for general Internet functionality
@@ -59,17 +56,23 @@ typedef struct {
 
 extern boolean_t ifparse_ifspec(const char *, ifspec_t *);
 extern void get_netmask4(const struct in_addr *, struct in_addr *);
+extern boolean_t sockaddrcmp(const struct sockaddr_storage *,
+    const struct sockaddr_storage *);
 
 /*
  * Extended version of the classic BSD ifaddrlist() interface:
  *
- *    int ifaddrlist(struct ifaddrlist **addrlistp, int af, char *errbuf);
+ *    int ifaddrlist(struct ifaddrlist **addrlistp, int af, uint_t flags,
+ *	             char *errbuf);
  *
  * 	* addrlistp: Upon success, ifaddrlist() sets *addrlistp to a
  *	  dynamically-allocated array of addresses.
  *
  *	* af: Either AF_INET to obtain IPv4 addresses, or AF_INET6 to
  *	  obtain IPv6 addresses.
+ *
+ *	* flags: LIFC_* flags that control the classes of interfaces that
+ *	  will be visible.
  *
  *	* errbuf: A caller-supplied buffer of ERRBUFSIZE.  Upon failure,
  *	  provides the reason for the failure.
@@ -89,9 +92,43 @@ struct ifaddrlist {
 	uint64_t	flags;			/* interface flags */
 };
 
-#define	ERRBUFSIZE 128			/* expected size of third argument */
+#define	ERRBUFSIZE 128			/* expected size of fourth argument */
 
-extern int ifaddrlist(struct ifaddrlist **, int, char *);
+extern int ifaddrlist(struct ifaddrlist **, int, uint_t, char *);
+
+/*
+ * Similar to ifaddrlist(), but returns a linked-list of addresses for a
+ * *specific* interface name, and allows specific address flags to be matched
+ * against.  A linked list is used rather than an array so that information
+ * can grow over time without affecting binary compatibility.  Also, leaves
+ * error-handling up to the caller.  Returns the number of ifaddrlistx's
+ * chained through ifaddrp.
+ *
+ *    int ifaddrlistx(const char *ifname, uint64_t set, uint64_t clear,
+ *        ifaddrlistx_t **ifaddrp);
+ *
+ *	* ifname: Interface name to match against.
+ *
+ *	* set: One or more flags that must be set on the address for
+ *	  it to be returned.
+ *
+ *	* clear: Flags that must be clear on the address for it to be
+ *	  returned.
+ *
+ * 	* ifaddrp: Upon success, ifaddrlistx() sets *ifaddrp to the head
+ *	  of a dynamically-allocated array of ifaddrlistx structures.
+ *
+ * Once done, the caller must free `ifaddrp' by calling ifaddrlistx_free().
+ */
+typedef struct ifaddrlistx {
+	struct ifaddrlistx	*ia_next;
+	char			ia_name[LIFNAMSIZ];
+	uint64_t		ia_flags;
+	struct sockaddr_storage	ia_addr;
+} ifaddrlistx_t;
+
+extern int ifaddrlistx(const char *, uint64_t, uint64_t, ifaddrlistx_t **);
+extern void ifaddrlistx_free(ifaddrlistx_t *);
 
 /*
  * Timer queues

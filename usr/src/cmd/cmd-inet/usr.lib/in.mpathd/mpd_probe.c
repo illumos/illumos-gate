@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -19,8 +19,6 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mpd_defs.h"
 #include "mpd_tables.h"
@@ -45,7 +43,7 @@ struct pr_icmp
 	uint16_t pr_icmp_cksum;		/* checksum field */
 	uint16_t pr_icmp_id;		/* Identification */
 	uint16_t pr_icmp_seq;		/* sequence number */
-	uint32_t pr_icmp_timestamp;	/* Time stamp	*/
+	uint64_t pr_icmp_timestamp;	/* Time stamp (in ns) */
 	uint32_t pr_icmp_mtype;		/* Message type */
 };
 
@@ -58,11 +56,12 @@ static struct in_addr all_nodes_mcast_v4 = { { { 0xe0, 0x0, 0x0, 0x1 } } };
 
 static hrtime_t	last_fdt_bumpup_time;	/* When FDT was bumped up last */
 
-static void		*find_ancillary(struct msghdr *msg, int cmsg_type);
-static void		pi_set_crtt(struct target *tg, int m,
+static void		*find_ancillary(struct msghdr *msg, int cmsg_level,
+    int cmsg_type);
+static void		pi_set_crtt(struct target *tg, int64_t m,
     boolean_t is_probe_uni);
 static void		incoming_echo_reply(struct phyint_instance *pii,
-    struct pr_icmp *reply, struct in6_addr fromaddr);
+    struct pr_icmp *reply, struct in6_addr fromaddr, struct timeval *recv_tvp);
 static void		incoming_rtt_reply(struct phyint_instance *pii,
     struct pr_icmp *reply, struct in6_addr fromaddr);
 static void		incoming_mcast_reply(struct phyint_instance *pii,
@@ -78,13 +77,11 @@ static void		probe_success_info(struct phyint_instance *pii,
     struct target *cur_tg, struct probe_success_count *psinfo);
 static boolean_t	phyint_repaired(struct phyint *pi);
 
-static int		failover(struct phyint *from, struct phyint *to);
-static int		failback(struct phyint *from, struct phyint *to);
-static struct phyint	*get_failover_dst(struct phyint *pi, int failover_type);
-
 static boolean_t	highest_ack_tg(uint16_t seq, struct target *tg);
 static int 		in_cksum(ushort_t *addr, int len);
 static void		reset_snxt_basetimes(void);
+static int		ns2ms(int64_t ns);
+static int64_t		tv2ns(struct timeval *);
 
 /*
  * CRTT - Conservative Round Trip Time Estimate
@@ -104,7 +101,7 @@ static void		reset_snxt_basetimes(void);
  * 			Phyint state diagram
  *
  * The state of a phyint that is capable of being probed, is completely
- * specified by the 5-tuple <pi_state, pg_groupfailed, I, pi_empty, pi_full>.
+ * specified by the 3-tuple <pi_state, pg_state, I>.
  *
  * A phyint starts in either PI_RUNNING or PI_FAILED, depending on the state
  * of the link (according to the driver).  If the phyint is also configured
@@ -117,8 +114,8 @@ static void		reset_snxt_basetimes(void);
  * state, which indicates that the link is apparently functional but that
  * in.mpathd is unable to send probes to verify functionality (in this case,
  * in.mpathd makes the optimistic assumption that the interface is working
- * correctly and thus does not perform a failover, but reports the interface
- * as IPMP_IF_UNKNOWN through the async events and query interfaces).
+ * correctly and thus does not mark the interface FAILED, but reports it as
+ * IPMP_IF_UNKNOWN through the async events and query interfaces).
  *
  * At any point, a phyint may be administratively marked offline via if_mpadm.
  * In this case, the interface always transitions to PI_OFFLINE, regardless
@@ -131,8 +128,11 @@ static void		reset_snxt_basetimes(void);
  *	PI_RUNNING: The failure detection logic says the phyint is good.
  *	PI_FAILED: The failure detection logic says the phyint has failed.
  *
- * pg_groupfailed  - Group failure, all interfaces in the group have failed.
- *	The pi_state may be either PI_FAILED or PI_NOTARGETS.
+ * pg_state  - PG_OK, PG_DEGRADED, or PG_FAILED.
+ *	PG_OK: All interfaces in the group are OK.
+ *	PG_DEGRADED: Some interfaces in the group are unusable.
+ *	PG_FAILED: All interfaces in the group are unusable.
+ *
  *	In the case of router targets, we assume that the current list of
  *	targets obtained from the routing table, is still valid, so the
  *	phyint stat is PI_FAILED. In the case of host targets, we delete the
@@ -140,144 +140,46 @@ static void		reset_snxt_basetimes(void);
  *	target list. So the phyints are in the PI_NOTARGETS state.
  *
  * I -	value of (pi_flags & IFF_INACTIVE)
- *	IFF_INACTIVE: No failovers have been done to this phyint, from
- *		other phyints. This phyint is inactive. Phyint can be a Standby.
- *		When failback has been disabled (FAILOVER=no configured),
- *		phyint can also be a non-STANDBY. In this case IFF_INACTIVE
- *		is set when phyint subsequently recovers after a failure.
+ *	IFF_INACTIVE: This phyint will not send or receive packets.
+ *	Usually, inactive is tied to standby interfaces that are not yet
+ *	needed (e.g., no non-standby interfaces in the group have failed).
+ *	When failback has been disabled (FAILBACK=no configured), phyint can
+ *	also be a non-STANDBY. In this case IFF_INACTIVE is set when phyint
+ *	subsequently recovers after a failure.
  *
- * pi_empty
- *	This phyint has failed over successfully to another phyint, and
- *	this phyint is currently "empty". It does not host any addresses or
- *	multicast membership etc. This is the state of a phyint after a
- *	failover from the phyint has completed successfully and no subsequent
- *	'failover to' or 'failback to' has occurred on the phyint.
- *	IP guarantees that no new logicals will be hosted nor any multicast
- *	joins permitted on the phyint, since the phyint is either failed or
- *	inactive. pi_empty is set implies the phyint is either failed or
- *	inactive.
+ * Not all 9 possible combinations of the above 3-tuple are possible.
  *
- * pi_full
- *	The phyint hosts all of its own addresses that it "owns". If the
- *	phyint was previously failed or inactive, failbacks to the phyint
- *	has completed successfully. i.e. No more failbacks to this phyint
- *	can produce any change in system state whatsoever.
- *
- * Not all 32 possible combinations of the above 5-tuple are possible.
- * Furthermore some of the above combinations are transient. They may occur
- * only because the failover or failback did not complete successfully. The
- * failover/failback will be retried and eventually a stable state will be
- * reached.
- *
- * I is tracked by IP. pi_state, pi_empty and pi_full are tracked by mpathd.
- * The following are the state machines. 'from' and 'to' are the src and
- * dst of the failover/failback, below
- *
- *			pi_empty state machine
- * ---------------------------------------------------------------------------
- *	Event				State	->	New State
- * ---------------------------------------------------------------------------
- *	successful completion 		from.pi_empty = 0 -> from.pi_empty = 1
- *	of failover
- *
- *	Initiate failover 		to.pi_empty = X   -> to.pi_empty = 0
- *
- * 	Initiate failback 		to.pi_empty = X   -> to.pi_empty = 0
- *
- * 	group failure			pi_empty = X	  -> pi_empty = 0
- * ---------------------------------------------------------------------------
- *
- *			pi_full state machine
- * ---------------------------------------------------------------------------
- *	Event				State		  -> New State
- * ---------------------------------------------------------------------------
- *	successful completion		to.pi_full = 0    -> to.pi_full = 1
- *	of failback from
- *	each of the other phyints
- *
- *	Initiate failover 		from.pi_full = X  -> from.pi_full = 0
- *
- *	group failure			pi_full = X	  -> pi_full = 0
- * ---------------------------------------------------------------------------
+ * I is tracked by IP. pi_state is tracked by mpathd.
  *
  *			pi_state state machine
  * ---------------------------------------------------------------------------
  *	Event			State			New State
  *				Action:
  * ---------------------------------------------------------------------------
- *	NIC failure		(PI_RUNNING, I == 0) -> (PI_FAILED, I == 0)
- *	detection		: set IFF_FAILED on this phyint
- *				: failover from this phyint to another
- *
- *	NIC failure		(PI_RUNNING, I == 1) -> (PI_FAILED, I == 0)
+ *	IP interface failure	(PI_RUNNING, I == 0) -> (PI_FAILED, I == 0)
  *	detection		: set IFF_FAILED on this phyint
  *
- *	NIC repair 		(PI_FAILED, I == 0, FAILBACK=yes)
+ *	IP interface failure	(PI_RUNNING, I == 1) -> (PI_FAILED, I == 0)
+ *	detection		: set IFF_FAILED on this phyint
+ *
+ *	IP interface repair 	(PI_FAILED, I == 0, FAILBACK=yes)
  *	detection				     -> (PI_RUNNING, I == 0)
- *				: to.pi_empty = 0
  *				: clear IFF_FAILED on this phyint
- *				: failback to this phyint if enabled
  *
- *	NIC repair 		(PI_FAILED, I == 0, FAILBACK=no)
+ *	IP interface repair 	(PI_FAILED, I == 0, FAILBACK=no)
  *	detection				     ->	(PI_RUNNING, I == 1)
- *				: to.pi_empty = 0
  *				: clear IFF_FAILED on this phyint
  *				: if failback is disabled set I == 1
  *
  *	Group failure		(perform on all phyints in the group)
  *	detection 		PI_RUNNING		PI_FAILED
  *	(Router targets)	: set IFF_FAILED
- *				: clear pi_empty and pi_full
  *
  *	Group failure		(perform on all phyints in the group)
  *	detection 		PI_RUNNING		PI_NOTARGETS
  *	(Host targets)		: set IFF_FAILED
- *				: clear pi_empty and pi_full
  *				: delete the target list on all phyints
  * ---------------------------------------------------------------------------
- *
- *			I state machine
- * ---------------------------------------------------------------------------
- *	Event		State			Action:
- * ---------------------------------------------------------------------------
- *	Turn on I 	pi_empty == 0, STANDBY 	: failover from standby
- *
- *	Turn off I 	PI_RUNNING, STANDBY	: pi_empty = 0
- *			pi_full == 0		: failback to this if enabled
- * ---------------------------------------------------------------------------
- *
- * Assertions: (Read '==>' as implies)
- *
- * (pi_empty == 1) ==> (I == 1 || pi_state == PI_FAILED)
- * (pi_empty == 1) ==> (pi_full == 0)
- * (pi_full  == 1) ==> (pi_empty == 0)
- *
- * Invariants
- *
- * pg_groupfailed = 0  &&
- *   1. (I == 1, pi_empty == 0)		   ==> initiate failover from standby
- *   2. (I == 0, PI_FAILED, pi_empty == 0) ==> initiate failover from phyint
- *   3. (I == 0, PI_RUNNING, pi_full == 0) ==> initiate failback to phyint
- *
- * 1. says that an inactive standby, that is not empty, has to be failed
- * over. For a standby to be truly inactive, it should not host any
- * addresses. So we move them to some other phyint. Usually we catch the
- * turn on of IFF_INACTIVE, and perform this action. However if the failover
- * did not complete successfully, then subsequently we have lost the edge
- * trigger, and this invariant kicks in and completes the action.
- *
- * 2. says that any failed phyint that is not empty must be failed over.
- * Usually we do the failover when we detect NIC failure. However if the
- * failover does not complete successfully, this invariant kicks in and
- * completes the failover. We exclude inactive standby which is covered by 1.
- *
- * 3. says that any running phyint that is not full must be failed back.
- * Usually we do the failback when we detect NIC repair. However if the
- * failback does not complete successfully, this invariant kicks in and
- * completes the failback. Note that we don't want to failback to an inactive
- * standby.
- *
- * The invariants 1 - 3 and the actions are in initifs().
  */
 
 struct probes_missed probes_missed;
@@ -295,7 +197,7 @@ struct probes_missed probes_missed;
  *	not less than the current CRTT. pii_probes[] stores data
  *	about these probes. These packets consume sequence number space.
  *
- * PROBE_RTT: This type is used to make only rtt measurments. Normally these
+ * PROBE_RTT: This type is used to make only rtt measurements. Normally these
  * 	are not used. Under heavy network load, the rtt may go up very high,
  *	due to a spike, or may appear to go high, due to extreme scheduling
  * 	delays. Once the network stress is removed, mpathd takes long time to
@@ -310,17 +212,19 @@ struct probes_missed probes_missed;
  *	no targets are known. The packet is multicast to the all hosts addr.
  */
 static void
-probe(struct phyint_instance *pii, uint_t probe_type, uint_t cur_time)
+probe(struct phyint_instance *pii, uint_t probe_type, hrtime_t start_hrtime)
 {
+	hrtime_t sent_hrtime;
+	struct timeval sent_tv;
 	struct pr_icmp probe_pkt;	/* Probe packet */
-	struct sockaddr_in6 whereto6; 	/* target address IPv6 */
-	struct sockaddr_in whereto; 	/* target address IPv4 */
+	struct sockaddr_storage targ;	/* target address */
+	uint_t	targaddrlen;		/* targed address length */
 	int	pr_ndx;			/* probe index in pii->pii_probes[] */
 	boolean_t sent = _B_TRUE;
 
 	if (debug & D_TARGET) {
-		logdebug("probe(%s %s %d %u)\n", AF_STR(pii->pii_af),
-		    pii->pii_name, probe_type, cur_time);
+		logdebug("probe(%s %s %d %lld)\n", AF_STR(pii->pii_af),
+		    pii->pii_name, probe_type, start_hrtime);
 	}
 
 	assert(pii->pii_probe_sock != -1);
@@ -339,7 +243,7 @@ probe(struct phyint_instance *pii, uint_t probe_type, uint_t cur_time)
 	 * network byte order at initialization itself.
 	 */
 	probe_pkt.pr_icmp_id = pii->pii_icmpid;
-	probe_pkt.pr_icmp_timestamp = htonl(cur_time);
+	probe_pkt.pr_icmp_timestamp = htonll(start_hrtime);
 	probe_pkt.pr_icmp_mtype = htonl(probe_type);
 
 	/*
@@ -349,38 +253,34 @@ probe(struct phyint_instance *pii, uint_t probe_type, uint_t cur_time)
 	assert(probe_type == PROBE_MULTI || ((pii->pii_target_next != NULL) &&
 	    pii->pii_rtt_target_next != NULL));
 
+	bzero(&targ, sizeof (targ));
+	targ.ss_family = pii->pii_af;
+
 	if (pii->pii_af == AF_INET6) {
-		bzero(&whereto6, sizeof (whereto6));
-		whereto6.sin6_family = AF_INET6;
+		struct in6_addr *addr6;
+
+		addr6 = &((struct sockaddr_in6 *)&targ)->sin6_addr;
+		targaddrlen = sizeof (struct sockaddr_in6);
 		if (probe_type == PROBE_MULTI) {
-			whereto6.sin6_addr = all_nodes_mcast_v6;
+			*addr6 = all_nodes_mcast_v6;
 		} else if (probe_type == PROBE_UNI) {
-			whereto6.sin6_addr = pii->pii_target_next->tg_address;
-		} else  {
-			/* type is PROBE_RTT */
-			whereto6.sin6_addr =
-			    pii->pii_rtt_target_next->tg_address;
-		}
-		if (sendto(pii->pii_probe_sock, (char *)&probe_pkt,
-		    sizeof (probe_pkt), 0, (struct sockaddr *)&whereto6,
-		    sizeof (whereto6)) != sizeof (probe_pkt)) {
-			logperror_pii(pii, "probe: probe sendto");
-			sent = _B_FALSE;
+			*addr6 = pii->pii_target_next->tg_address;
+		} else { /* type is PROBE_RTT */
+			*addr6 = pii->pii_rtt_target_next->tg_address;
 		}
 	} else {
-		bzero(&whereto, sizeof (whereto));
-		whereto.sin_family = AF_INET;
+		struct in_addr *addr4;
+
+		addr4 = &((struct sockaddr_in *)&targ)->sin_addr;
+		targaddrlen = sizeof (struct sockaddr_in);
 		if (probe_type == PROBE_MULTI) {
-			whereto.sin_addr = all_nodes_mcast_v4;
+			*addr4 = all_nodes_mcast_v4;
 		} else if (probe_type == PROBE_UNI) {
 			IN6_V4MAPPED_TO_INADDR(
-			    &pii->pii_target_next->tg_address,
-			    &whereto.sin_addr);
-		} else {
-			/* type is PROBE_RTT */
+			    &pii->pii_target_next->tg_address, addr4);
+		} else { /* type is PROBE_RTT */
 			IN6_V4MAPPED_TO_INADDR(
-			    &pii->pii_rtt_target_next->tg_address,
-			    &whereto.sin_addr);
+			    &pii->pii_rtt_target_next->tg_address, addr4);
 		}
 
 		/*
@@ -388,12 +288,18 @@ probe(struct phyint_instance *pii, uint_t probe_type, uint_t cur_time)
 		 */
 		probe_pkt.pr_icmp_cksum =
 		    in_cksum((ushort_t *)&probe_pkt, (int)sizeof (probe_pkt));
-		if (sendto(pii->pii_probe_sock, (char *)&probe_pkt,
-		    sizeof (probe_pkt), 0, (struct sockaddr *)&whereto,
-		    sizeof (whereto)) != sizeof (probe_pkt)) {
-			logperror_pii(pii, "probe: probe sendto");
-			sent = _B_FALSE;
-		}
+	}
+
+	/*
+	 * Use the current time as the time we sent.  Not atomic, but the best
+	 * we can do from here.
+	 */
+	sent_hrtime = gethrtime();
+	(void) gettimeofday(&sent_tv, NULL);
+	if (sendto(pii->pii_probe_sock, &probe_pkt, sizeof (probe_pkt), 0,
+	    (struct sockaddr *)&targ, targaddrlen) != sizeof (probe_pkt)) {
+		logperror_pii(pii, "probe: probe sendto");
+		sent = _B_FALSE;
 	}
 
 	/*
@@ -415,9 +321,13 @@ probe(struct phyint_instance *pii, uint_t probe_type, uint_t cur_time)
 			pii->pii_cum_stats.acked++;
 		pii->pii_cum_stats.sent++;
 
-		pii->pii_probes[pr_ndx].pr_status = PR_UNACKED;
+		pii->pii_probes[pr_ndx].pr_id = pii->pii_snxt;
+		pii->pii_probes[pr_ndx].pr_tv_sent = sent_tv;
+		pii->pii_probes[pr_ndx].pr_hrtime_sent = sent_hrtime;
+		pii->pii_probes[pr_ndx].pr_hrtime_start = start_hrtime;
 		pii->pii_probes[pr_ndx].pr_target = pii->pii_target_next;
-		pii->pii_probes[pr_ndx].pr_time_sent = cur_time;
+		probe_chstate(&pii->pii_probes[pr_ndx], pii, PR_UNACKED);
+
 		pii->pii_probe_next = PROBE_INDEX_NEXT(pii->pii_probe_next);
 		pii->pii_target_next = target_next(pii->pii_target_next);
 		assert(pii->pii_target_next != NULL);
@@ -448,33 +358,42 @@ in_data(struct phyint_instance *pii)
 {
 	struct	sockaddr_in 	from;
 	struct	in6_addr	fromaddr;
-	uint_t	fromlen;
-	static uint_t in_packet[(IP_MAXPACKET + 1)/4];
+	static uint64_t in_packet[(IP_MAXPACKET + 1)/8];
+	static uint64_t ancillary_data[(IP_MAXPACKET + 1)/8];
 	struct ip *ip;
 	int 	iphlen;
 	int 	len;
 	char 	abuf[INET_ADDRSTRLEN];
-	struct	pr_icmp	*reply;
+	struct msghdr msg;
+	struct iovec iov;
+	struct pr_icmp *reply;
+	struct timeval *recv_tvp;
 
 	if (debug & D_PROBE) {
 		logdebug("in_data(%s %s)\n",
 		    AF_STR(pii->pii_af), pii->pii_name);
 	}
 
+	iov.iov_base = (char *)in_packet;
+	iov.iov_len = sizeof (in_packet);
+	msg.msg_iov = &iov;
+	msg.msg_iovlen = 1;
+	msg.msg_name = (struct sockaddr *)&from;
+	msg.msg_namelen = sizeof (from);
+	msg.msg_control = ancillary_data;
+	msg.msg_controllen = sizeof (ancillary_data);
+
 	/*
 	 * Poll has already told us that a message is waiting,
 	 * on this socket. Read it now. We should not block.
 	 */
-	fromlen = sizeof (from);
-	len = recvfrom(pii->pii_probe_sock, (char *)in_packet,
-	    sizeof (in_packet), 0, (struct sockaddr *)&from, &fromlen);
-	if (len < 0) {
-		logperror_pii(pii, "in_data: recvfrom");
+	if ((len = recvmsg(pii->pii_probe_sock, &msg, 0)) < 0) {
+		logperror_pii(pii, "in_data: recvmsg");
 		return;
 	}
 
 	/*
-	 * If the NIC has indicated the link is down, don't go
+	 * If the datalink has indicated the link is down, don't go
 	 * any further.
 	 */
 	if (LINK_DOWN(pii->pii_phyint))
@@ -482,6 +401,15 @@ in_data(struct phyint_instance *pii)
 
 	/* Get the printable address for error reporting */
 	(void) inet_ntop(AF_INET, &from.sin_addr, abuf, sizeof (abuf));
+
+	/* Ignore packets > 64k or control buffers that don't fit */
+	if (msg.msg_flags & (MSG_TRUNC|MSG_CTRUNC)) {
+		if (debug & D_PKTBAD) {
+			logdebug("Truncated message: msg_flags 0x%x from %s\n",
+			    msg.msg_flags, abuf);
+		}
+		return;
+	}
 
 	/* Make sure packet contains at least minimum ICMP header */
 	ip = (struct ip *)in_packet;
@@ -528,10 +456,17 @@ in_data(struct phyint_instance *pii)
 		return;
 	}
 
+	recv_tvp = find_ancillary(&msg, SOL_SOCKET, SCM_TIMESTAMP);
+	if (recv_tvp == NULL) {
+		logtrace("message without timestamp from %s on %s\n",
+		    abuf, pii->pii_name);
+		return;
+	}
+
 	IN6_INADDR_TO_V4MAPPED(&from.sin_addr, &fromaddr);
 	if (reply->pr_icmp_mtype == htonl(PROBE_UNI))
 		/* Unicast probe reply */
-		incoming_echo_reply(pii, reply, fromaddr);
+		incoming_echo_reply(pii, reply, fromaddr, recv_tvp);
 	else if (reply->pr_icmp_mtype == htonl(PROBE_MULTI)) {
 		/* Multicast reply */
 		incoming_mcast_reply(pii, reply, fromaddr);
@@ -543,7 +478,6 @@ in_data(struct phyint_instance *pii)
 		    reply->pr_icmp_mtype, abuf, pii->pii_name);
 		return;
 	}
-
 }
 
 /*
@@ -559,8 +493,9 @@ in6_data(struct phyint_instance *pii)
 	char abuf[INET6_ADDRSTRLEN];
 	struct msghdr msg;
 	struct iovec iov;
-	uchar_t *opt;
+	void	*opt;
 	struct	pr_icmp *reply;
+	struct	timeval *recv_tvp;
 
 	if (debug & D_PROBE) {
 		logdebug("in6_data(%s %s)\n",
@@ -577,12 +512,12 @@ in6_data(struct phyint_instance *pii)
 	msg.msg_controllen = sizeof (ancillary_data);
 
 	if ((len = recvmsg(pii->pii_probe_sock, &msg, 0)) < 0) {
-		logperror_pii(pii, "in6_data: recvfrom");
+		logperror_pii(pii, "in6_data: recvmsg");
 		return;
 	}
 
 	/*
-	 * If the NIC has indicated that the link is down, don't go
+	 * If the datalink has indicated that the link is down, don't go
 	 * any further.
 	 */
 	if (LINK_DOWN(pii->pii_phyint))
@@ -623,13 +558,14 @@ in6_data(struct phyint_instance *pii)
 		    "%s on %s\n", abuf, pii->pii_name);
 		return;
 	}
-	opt = find_ancillary(&msg, IPV6_RTHDR);
+	opt = find_ancillary(&msg, IPPROTO_IPV6, IPV6_RTHDR);
 	if (opt != NULL) {
 		/* Can't allow routing headers in probe replies  */
 		logtrace("message with routing header from %s on %s\n",
 		    abuf, pii->pii_name);
 		return;
 	}
+
 	if (reply->pr_icmp_code != 0) {
 		logtrace("probe reply code: %d from %s on %s\n",
 		    reply->pr_icmp_code, abuf, pii->pii_name);
@@ -640,8 +576,16 @@ in6_data(struct phyint_instance *pii)
 		    len, abuf, pii->pii_name);
 		return;
 	}
+
+	recv_tvp = find_ancillary(&msg, SOL_SOCKET, SCM_TIMESTAMP);
+	if (recv_tvp == NULL) {
+		logtrace("message without timestamp from %s on %s\n",
+		    abuf, pii->pii_name);
+		return;
+	}
+
 	if (reply->pr_icmp_mtype == htonl(PROBE_UNI)) {
-		incoming_echo_reply(pii, reply, from.sin6_addr);
+		incoming_echo_reply(pii, reply, from.sin6_addr, recv_tvp);
 	} else if (reply->pr_icmp_mtype == htonl(PROBE_MULTI)) {
 		incoming_mcast_reply(pii, reply, from.sin6_addr);
 	} else if (reply->pr_icmp_mtype == htonl(PROBE_RTT)) {
@@ -663,11 +607,9 @@ static void
 incoming_rtt_reply(struct phyint_instance *pii, struct pr_icmp *reply,
     struct in6_addr fromaddr)
 {
-	int 	m;		/* rtt measurment in ms */
-	uint32_t cur_time;	/* in ms from some arbitrary point */
+	int64_t	m;		/* rtt measurement in ns */
 	char	abuf[INET6_ADDRSTRLEN];
 	struct	target	*target;
-	uint32_t pr_icmp_timestamp;
 	struct 	phyint_group *pg;
 
 	/* Get the printable address for error reporting */
@@ -683,10 +625,7 @@ incoming_rtt_reply(struct phyint_instance *pii, struct pr_icmp *reply,
 	if (target == NULL)
 		return;
 
-	pr_icmp_timestamp  = ntohl(reply->pr_icmp_timestamp);
-	cur_time = getcurrenttime();
-	m = (int)(cur_time - pr_icmp_timestamp);
-
+	m = (int64_t)(gethrtime() - ntohll(reply->pr_icmp_timestamp));
 	/* Invalid rtt. It has wrapped around */
 	if (m < 0)
 		return;
@@ -754,29 +693,30 @@ incoming_rtt_reply(struct phyint_instance *pii, struct pr_icmp *reply,
  */
 static void
 incoming_echo_reply(struct phyint_instance *pii, struct pr_icmp *reply,
-    struct in6_addr fromaddr)
+    struct in6_addr fromaddr, struct timeval *recv_tvp)
 {
-	int 	m;		/* rtt measurment in ms */
-	uint32_t cur_time;	/* in ms from some arbitrary point */
+	int64_t	m;		/* rtt measurement in ns */
+	hrtime_t cur_hrtime;	/* in ns from some arbitrary point */
 	char	abuf[INET6_ADDRSTRLEN];
 	int	pr_ndx;
 	struct	target	*target;
 	boolean_t exception;
-	uint32_t pr_icmp_timestamp;
+	uint64_t pr_icmp_timestamp;
 	uint16_t pr_icmp_seq;
+	struct	probe_stats *pr_statp;
 	struct 	phyint_group *pg = pii->pii_phyint->pi_group;
 
 	/* Get the printable address for error reporting */
 	(void) pr_addr(pii->pii_af, fromaddr, abuf, sizeof (abuf));
 
 	if (debug & D_PROBE) {
-		logdebug("incoming_echo_reply: %s %s %s seq %u\n",
+		logdebug("incoming_echo_reply: %s %s %s seq %u recv_tvp %lld\n",
 		    AF_STR(pii->pii_af), pii->pii_name, abuf,
-		    ntohs(reply->pr_icmp_seq));
+		    ntohs(reply->pr_icmp_seq), tv2ns(recv_tvp));
 	}
 
-	pr_icmp_timestamp  = ntohl(reply->pr_icmp_timestamp);
-	pr_icmp_seq  = ntohs(reply->pr_icmp_seq);
+	pr_icmp_timestamp = ntohll(reply->pr_icmp_timestamp);
+	pr_icmp_seq = ntohs(reply->pr_icmp_seq);
 
 	/* Reject out of window probe replies */
 	if (SEQ_GE(pr_icmp_seq, pii->pii_snxt) ||
@@ -786,15 +726,16 @@ incoming_echo_reply(struct phyint_instance *pii, struct pr_icmp *reply,
 		pii->pii_cum_stats.unknown++;
 		return;
 	}
-	cur_time = getcurrenttime();
-	m = (int)(cur_time - pr_icmp_timestamp);
+
+	cur_hrtime = gethrtime();
+	m = (int64_t)(cur_hrtime - pr_icmp_timestamp);
 	if (m < 0) {
 		/*
 		 * This is a ridiculously high value of rtt. rtt has wrapped
 		 * around. Log a message, and ignore the rtt.
 		 */
-		logerr("incoming_echo_reply: rtt wraparound cur_time %u reply "
-		    "timestamp %u\n", cur_time, pr_icmp_timestamp);
+		logerr("incoming_echo_reply: rtt wraparound cur_hrtime %lld "
+		    "reply timestamp %lld\n", cur_hrtime, pr_icmp_timestamp);
 	}
 
 	/*
@@ -868,10 +809,10 @@ incoming_echo_reply(struct phyint_instance *pii, struct pr_icmp *reply,
 	 * debugger, or the system was hung or too busy for a
 	 * substantial time that we didn't get a chance to run.
 	 */
-	if ((m < 0) || (m > PROBE_STATS_COUNT * pg->pg_probeint)) {
+	if ((m < 0) || (ns2ms(m) > PROBE_STATS_COUNT * pg->pg_probeint)) {
 		/*
-		 * If the probe corresponding to this receieved response
-		 * was truly sent 'm' ms. ago, then this response must
+		 * If the probe corresponding to this received response
+		 * was truly sent 'm' ns. ago, then this response must
 		 * have been rejected by the sequence number checks. The
 		 * fact that it has passed the sequence number checks
 		 * means that the measured rtt is wrong. We were probably
@@ -947,7 +888,7 @@ incoming_echo_reply(struct phyint_instance *pii, struct pr_icmp *reply,
 				 * adjusts pii->pii_target_next
 				 */
 				target_delete(target);
-				probe(pii, PROBE_MULTI, cur_time);
+				probe(pii, PROBE_MULTI, cur_hrtime);
 			}
 		} else {
 			/*
@@ -999,8 +940,12 @@ incoming_echo_reply(struct phyint_instance *pii, struct pr_icmp *reply,
 		}
 	}
 out:
-	pii->pii_probes[pr_ndx].pr_status = PR_ACKED;
-	pii->pii_probes[pr_ndx].pr_time_acked = cur_time;
+	pr_statp = &pii->pii_probes[pr_ndx];
+	pr_statp->pr_hrtime_ackproc = cur_hrtime;
+	pr_statp->pr_hrtime_ackrecv = pr_statp->pr_hrtime_sent +
+	    (tv2ns(recv_tvp) - tv2ns(&pr_statp->pr_tv_sent));
+
+	probe_chstate(pr_statp, pii, PR_ACKED);
 
 	/*
 	 * Update pii->pii_rack, i.e. the sequence number of the last received
@@ -1240,13 +1185,13 @@ incoming_mcast_reply(struct phyint_instance *pii, struct pr_icmp *reply,
  *
  * New scaled average and deviation are passed back via sap and svp
  */
-static int
-compute_crtt(int *sap, int *svp, int m)
+static int64_t
+compute_crtt(int64_t *sap, int64_t *svp, int64_t m)
 {
-	int sa = *sap;
-	int sv = *svp;
-	int crtt;
-	int saved_m = m;
+	int64_t sa = *sap;
+	int64_t sv = *svp;
+	int64_t crtt;
+	int64_t saved_m = m;
 
 	assert(*sap >= -1);
 	assert(*svp >= 0);
@@ -1285,8 +1230,8 @@ compute_crtt(int *sap, int *svp, int m)
 	crtt = (sa >> 3) + sv;
 
 	if (debug & D_PROBE) {
-		logdebug("compute_crtt: m = %d sa = %d, sv = %d -> crtt = "
-		    "%d\n", saved_m, sa, sv, crtt);
+		logerr("compute_crtt: m = %lld sa = %lld, sv = %lld -> "
+		    "crtt = %lld\n", saved_m, sa, sv, crtt);
 	}
 
 	*sap = sa;
@@ -1300,22 +1245,22 @@ compute_crtt(int *sap, int *svp, int m)
 }
 
 static void
-pi_set_crtt(struct target *tg, int m, boolean_t is_probe_uni)
+pi_set_crtt(struct target *tg, int64_t m, boolean_t is_probe_uni)
 {
 	struct phyint_instance *pii = tg->tg_phyint_inst;
 	int probe_interval = pii->pii_phyint->pi_group->pg_probeint;
-	int sa = tg->tg_rtt_sa;
-	int sv = tg->tg_rtt_sd;
+	int64_t sa = tg->tg_rtt_sa;
+	int64_t sv = tg->tg_rtt_sd;
 	int new_crtt;
 	int i;
 
 	if (debug & D_PROBE)
-		logdebug("pi_set_crtt: target -  m %d\n", m);
+		logdebug("pi_set_crtt: target -  m %lld\n", m);
 
 	/* store the round trip time, in case we need to defer computation */
 	tg->tg_deferred[tg->tg_num_deferred] = m;
 
-	new_crtt = compute_crtt(&sa, &sv, m);
+	new_crtt = ns2ms(compute_crtt(&sa, &sv, m));
 
 	/*
 	 * If this probe's round trip time would singlehandedly cause an
@@ -1342,8 +1287,8 @@ pi_set_crtt(struct target *tg, int m, boolean_t is_probe_uni)
 			}
 
 			for (i = 0; i <= tg->tg_num_deferred; i++) {
-				tg->tg_crtt = compute_crtt(&tg->tg_rtt_sa,
-				    &tg->tg_rtt_sd, tg->tg_deferred[i]);
+				tg->tg_crtt = ns2ms(compute_crtt(&tg->tg_rtt_sa,
+				    &tg->tg_rtt_sd, tg->tg_deferred[i]));
 			}
 
 			tg->tg_num_deferred = 0;
@@ -1373,13 +1318,13 @@ pi_set_crtt(struct target *tg, int m, boolean_t is_probe_uni)
  * If not found return NULL.
  */
 static void *
-find_ancillary(struct msghdr *msg, int cmsg_type)
+find_ancillary(struct msghdr *msg, int cmsg_level, int cmsg_type)
 {
 	struct cmsghdr *cmsg;
 
 	for (cmsg = CMSG_FIRSTHDR(msg); cmsg != NULL;
 	    cmsg = CMSG_NXTHDR(msg, cmsg)) {
-		if (cmsg->cmsg_level == IPPROTO_IPV6 &&
+		if (cmsg->cmsg_level == cmsg_level &&
 		    cmsg->cmsg_type == cmsg_type) {
 			return (CMSG_DATA(cmsg));
 		}
@@ -1388,107 +1333,194 @@ find_ancillary(struct msghdr *msg, int cmsg_type)
 }
 
 /*
+ * Try to activate another INACTIVE interface in the same group as `pi'.
+ * Prefer STANDBY INACTIVE to just INACTIVE.
+ */
+void
+phyint_activate_another(struct phyint *pi)
+{
+	struct phyint *pi2;
+	struct phyint *inactivepi = NULL;
+
+	if (pi->pi_group == phyint_anongroup)
+		return;
+
+	for (pi2 = pi->pi_group->pg_phyint; pi2 != NULL; pi2 = pi2->pi_pgnext) {
+		if (pi == pi2 || pi2->pi_state != PI_RUNNING ||
+		    !(pi2->pi_flags & IFF_INACTIVE))
+			continue;
+
+		inactivepi = pi2;
+		if (pi2->pi_flags & IFF_STANDBY)
+			break;
+	}
+
+	if (inactivepi != NULL)
+		(void) change_pif_flags(inactivepi, 0, IFF_INACTIVE);
+}
+
+/*
+ * Transition a phyint back to PI_RUNNING (from PI_FAILED or PI_OFFLINE).  The
+ * caller must ensure that the transition is appropriate.  Clears IFF_OFFLINE
+ * or IFF_FAILED, as appropriate.  Also sets IFF_INACTIVE on this or other
+ * interfaces as appropriate (see comment below).  Finally, also updates the
+ * phyint's group state to account for the change.
+ */
+void
+phyint_transition_to_running(struct phyint *pi)
+{
+	struct phyint *pi2;
+	struct phyint *actstandbypi = NULL;
+	uint_t nactive = 0, nnonstandby = 0;
+	boolean_t onlining = (pi->pi_state == PI_OFFLINE);
+	uint64_t set, clear;
+
+	/*
+	 * The interface is running again, but should it or another interface
+	 * in the group end up INACTIVE?  There are three cases:
+	 *
+	 * 1. If it's a STANDBY interface, it should be end up INACTIVE if
+	 *    the group is operating at capacity (i.e., there are at least as
+	 *    many active interfaces as non-STANDBY interfaces in the group).
+	 *    No other interfaces should be changed.
+	 *
+	 * 2. If it's a non-STANDBY interface and we're onlining it or
+	 *    FAILBACK is enabled, then it should *not* end up INACTIVE.
+	 *    Further, if the group is above capacity as a result of this
+	 *    interface, then an active STANDBY interface in the group should
+	 *    end up INACTIVE.
+	 *
+	 * 3. If it's a non-STANDBY interface, we're repairing it, and
+	 *    FAILBACK is disabled, then it should end up INACTIVE *unless*
+	 *    the group was failed (in which case we have no choice but to
+	 *    use it).  No other interfaces should be changed.
+	 */
+	if (pi->pi_group != phyint_anongroup) {
+		pi2 = pi->pi_group->pg_phyint;
+		for (; pi2 != NULL; pi2 = pi2->pi_pgnext) {
+			if (!(pi2->pi_flags & IFF_STANDBY))
+				nnonstandby++;
+
+			if (pi2->pi_state == PI_RUNNING) {
+				if (!(pi2->pi_flags & IFF_INACTIVE)) {
+					nactive++;
+					if (pi2->pi_flags & IFF_STANDBY)
+						actstandbypi = pi2;
+				}
+			}
+		}
+	}
+
+	set = 0;
+	clear = (onlining ? IFF_OFFLINE : IFF_FAILED);
+
+	if (pi->pi_flags & IFF_STANDBY) {			/* case 1 */
+		if (nactive >= nnonstandby)
+			set |= IFF_INACTIVE;
+		else
+			clear |= IFF_INACTIVE;
+	} else if (onlining || failback_enabled) {		/* case 2 */
+		if (nactive >= nnonstandby && actstandbypi != NULL)
+			(void) change_pif_flags(actstandbypi, IFF_INACTIVE, 0);
+	} else if (!GROUP_FAILED(pi->pi_group)) {		/* case 3 */
+		set |= IFF_INACTIVE;
+	}
+	(void) change_pif_flags(pi, set, clear);
+
+	phyint_chstate(pi, PI_RUNNING);
+
+	/*
+	 * Update the group state to account for the change.
+	 */
+	phyint_group_refresh_state(pi->pi_group);
+}
+
+/*
  * See if a previously failed interface has started working again.
  */
 void
 phyint_check_for_repair(struct phyint *pi)
 {
-	if (phyint_repaired(pi)) {
-		if (pi->pi_group == phyint_anongroup) {
-			logerr("NIC repair detected on %s\n", pi->pi_name);
-		} else {
-			logerr("NIC repair detected on %s of group %s\n",
-			    pi->pi_name, pi->pi_group->pg_name);
-		}
+	if (!phyint_repaired(pi))
+		return;
 
-		/*
-		 * If the interface is offline, just clear the FAILED flag,
-		 * delaying the state change and failback operation until it
-		 * is brought back online.
-		 */
-		if (pi->pi_state == PI_OFFLINE) {
-			(void) change_lif_flags(pi, IFF_FAILED, _B_FALSE);
-			return;
-		}
-
-		if (pi->pi_flags & IFF_STANDBY) {
-			(void) change_lif_flags(pi, IFF_FAILED, _B_FALSE);
-		} else {
-			if (try_failback(pi) != IPMP_FAILURE) {
-				(void) change_lif_flags(pi,
-				    IFF_FAILED, _B_FALSE);
-				/* Per state diagram */
-				pi->pi_empty = 0;
-			}
-		}
-
-		phyint_chstate(pi, PI_RUNNING);
-
-		if (GROUP_FAILED(pi->pi_group)) {
-			/*
-			 * This is the 1st phyint to receive a response
-			 * after group failure.
-			 */
-			logerr("At least 1 interface (%s) of group %s has "
-			    "repaired\n", pi->pi_name, pi->pi_group->pg_name);
-			phyint_group_chstate(pi->pi_group, PG_RUNNING);
-		}
+	if (pi->pi_group == phyint_anongroup) {
+		logerr("IP interface repair detected on %s\n", pi->pi_name);
+	} else {
+		logerr("IP interface repair detected on %s of group %s\n",
+		    pi->pi_name, pi->pi_group->pg_name);
 	}
+
+	/*
+	 * If the interface is PI_OFFLINE, it can't be made PI_RUNNING yet.
+	 * So just clear IFF_OFFLINE and defer phyint_transition_to_running()
+	 * until it is brought back online.
+	 */
+	if (pi->pi_state == PI_OFFLINE) {
+		(void) change_pif_flags(pi, 0, IFF_FAILED);
+		return;
+	}
+
+	phyint_transition_to_running(pi);	/* calls phyint_chstate() */
 }
 
 /*
- * See if a previously functioning interface has failed, or if the
- * whole group of interfaces has failed.
+ * See if an interface has failed, or if the whole group of interfaces has
+ * failed.
  */
 static void
 phyint_inst_check_for_failure(struct phyint_instance *pii)
 {
-	struct	phyint	*pi;
-	struct	phyint	*pi2;
-
-	pi = pii->pii_phyint;
+	struct phyint	*pi = pii->pii_phyint;
+	struct phyint	*pi2;
+	boolean_t	was_active;
 
 	switch (failure_state(pii)) {
 	case PHYINT_FAILURE:
-		(void) change_lif_flags(pi, IFF_FAILED, _B_TRUE);
+		was_active = ((pi->pi_flags & IFF_INACTIVE) == 0);
+
+		(void) change_pif_flags(pi, IFF_FAILED, IFF_INACTIVE);
 		if (pi->pi_group == phyint_anongroup) {
-			logerr("NIC failure detected on %s\n", pii->pii_name);
+			logerr("IP interface failure detected on %s\n",
+			    pii->pii_name);
 		} else {
-			logerr("NIC failure detected on %s of group %s\n",
-			    pii->pii_name, pi->pi_group->pg_name);
+			logerr("IP interface failure detected on %s of group"
+			    " %s\n", pii->pii_name, pi->pi_group->pg_name);
 		}
+
 		/*
-		 * Do the failover, unless the interface is offline (in
-		 * which case we've already failed over).
+		 * If the interface is offline, the state change will be
+		 * noted when it comes back online.
 		 */
 		if (pi->pi_state != PI_OFFLINE) {
+			/*
+			 * If the failed interface was active, activate
+			 * another INACTIVE interface in the group if
+			 * possible.  (If the interface is PI_OFFLINE,
+			 * we already activated another.)
+			 */
+			if (was_active)
+				phyint_activate_another(pi);
+
 			phyint_chstate(pi, PI_FAILED);
 			reset_crtt_all(pi);
-			if (!(pi->pi_flags & IFF_INACTIVE))
-				(void) try_failover(pi, FAILOVER_NORMAL);
 		}
 		break;
 
 	case GROUP_FAILURE:
-		logerr("All Interfaces in group %s have failed\n",
-		    pi->pi_group->pg_name);
-		for (pi2 = pi->pi_group->pg_phyint; pi2 != NULL;
-		    pi2 = pi2->pi_pgnext) {
-			if (pi2->pi_flags & IFF_OFFLINE)
+		pi2 = pi->pi_group->pg_phyint;
+		for (; pi2 != NULL; pi2 = pi2->pi_pgnext) {
+			(void) change_pif_flags(pi2, IFF_FAILED, IFF_INACTIVE);
+			if (pi2->pi_state == PI_OFFLINE) /* see comment above */
 				continue;
-			(void) change_lif_flags(pi2, IFF_FAILED, _B_TRUE);
-			reset_crtt_all(pi2);
 
+			reset_crtt_all(pi2);
 			/*
-			 * In the case of host targets, we
-			 * would have flushed the targets,
-			 * and gone to PI_NOTARGETS state.
+			 * In the case of host targets, we would have flushed
+			 * the targets, and gone to PI_NOTARGETS state.
 			 */
 			if (pi2->pi_state == PI_RUNNING)
 				phyint_chstate(pi2, PI_FAILED);
-
-			pi2->pi_empty = 0;
-			pi2->pi_full = 0;
 		}
 		break;
 
@@ -1519,7 +1551,8 @@ phyint_inst_timer(struct phyint_instance *pii)
 	hrtime_t cur_hrtime;
 	int	probe_interval = pii->pii_phyint->pi_group->pg_probeint;
 
-	cur_time = getcurrenttime();
+	cur_hrtime = gethrtime();
+	cur_time = ns2ms(cur_hrtime);
 
 	if (debug & D_TIMER) {
 		logdebug("phyint_inst_timer(%s %s)\n",
@@ -1621,7 +1654,7 @@ phyint_inst_timer(struct phyint_instance *pii)
 		 * the failure detection (fd) probe timer has not yet fired.
 		 * Need to send only an rtt probe. The probe type is PROBE_RTT.
 		 */
-		probe(pii, PROBE_RTT, cur_time);
+		probe(pii, PROBE_RTT, cur_hrtime);
 		return (interval);
 	}
 	/*
@@ -1651,7 +1684,7 @@ phyint_inst_timer(struct phyint_instance *pii)
 	 * We can have at most, the latest 2 probes that we sent, in
 	 * the PR_UNACKED state. All previous probes sent, are either
 	 * PR_LOST or PR_ACKED. An unacknowledged probe is considered
-	 * timed out if the probe's time_sent + the CRTT < currenttime.
+	 * timed out if the probe's time_start + the CRTT < currenttime.
 	 * For each of the last 2 probes, examine whether it has timed
 	 * out. If so, mark it PR_LOST. The probe stats is a circular array.
 	 */
@@ -1686,16 +1719,15 @@ phyint_inst_timer(struct phyint_instance *pii)
 			 * not available use group's probe interval,
 			 * which is a worst case estimate.
 			 */
+			timeout = ns2ms(pr_statp->pr_hrtime_start);
 			if (cur_tg->tg_crtt != 0) {
-				timeout = pr_statp->pr_time_sent +
-				    cur_tg->tg_crtt;
+				timeout += cur_tg->tg_crtt;
 			} else {
-				timeout = pr_statp->pr_time_sent +
-				    probe_interval;
+				timeout += probe_interval;
 			}
 			if (TIME_LT(timeout, cur_time)) {
-				pr_statp->pr_status = PR_LOST;
 				pr_statp->pr_time_lost = timeout;
+				probe_chstate(pr_statp, pii, PR_LOST);
 			} else if (i == 1) {
 				/*
 				 * We are forced to consider this probe
@@ -1711,8 +1743,8 @@ phyint_inst_timer(struct phyint_instance *pii)
 				 * when the timer fires, we find 2 valid
 				 * unacked probes, and they are yet to timeout
 				 */
-				pr_statp->pr_status = PR_LOST;
 				pr_statp->pr_time_lost = cur_time;
+				probe_chstate(pr_statp, pii, PR_LOST);
 			} else {
 				/*
 				 * Only the most recent probe can enter
@@ -1740,16 +1772,15 @@ phyint_inst_timer(struct phyint_instance *pii)
 	 * The timer has fired. Take appropriate action depending
 	 * on the current state of the phyint.
 	 *
-	 * PI_RUNNING state 	- Failure detection and failover
-	 * PI_FAILED state 	- Repair detection and failback
+	 * PI_RUNNING state 	- Failure detection
+	 * PI_FAILED state 	- Repair detection
 	 */
 	switch (pii->pii_phyint->pi_state) {
 	case PI_FAILED:
 		/*
 		 * If the most recent probe (excluding unacked probes that
 		 * are yet to time out) has been acked, check whether the
-		 * phyint is now repaired. If the phyint is repaired, then
-		 * attempt failback, unless it is an inactive standby.
+		 * phyint is now repaired.
 		 */
 		if (pii->pii_rack + valid_unack_count + 1 == pii->pii_snxt) {
 			phyint_check_for_repair(pii->pii_phyint);
@@ -1760,10 +1791,8 @@ phyint_inst_timer(struct phyint_instance *pii)
 		/*
 		 * It's possible our probes have been lost because of a
 		 * spanning-tree mandated quiet period on the switch.  If so,
-		 * ignore the lost probes and consider the interface to still
-		 * be functioning.
+		 * ignore the lost probes.
 		 */
-		cur_hrtime = gethrtime();
 		if (pii->pii_fd_hrtime - cur_hrtime > 0)
 			break;
 
@@ -1771,8 +1800,7 @@ phyint_inst_timer(struct phyint_instance *pii)
 			/*
 			 * We have 1 or more failed probes (excluding unacked
 			 * probes that are yet to time out). Determine if the
-			 * phyint has failed. If so attempt a failover,
-			 * unless it is an inactive standby
+			 * phyint has failed.
 			 */
 			phyint_inst_check_for_failure(pii);
 		}
@@ -1790,16 +1818,16 @@ phyint_inst_timer(struct phyint_instance *pii)
 	 * was called, the target list may be empty.
 	 */
 	if (pii->pii_target_next != NULL) {
-		probe(pii, PROBE_UNI, cur_time);
+		probe(pii, PROBE_UNI, cur_hrtime);
 		/*
 		 * If we have just the one probe target, and we're not using
 		 * router targets, try to find another as we presently have
 		 * no resilience.
 		 */
 		if (!pii->pii_targets_are_routers && pii->pii_ntargets == 1)
-			probe(pii, PROBE_MULTI, cur_time);
+			probe(pii, PROBE_MULTI, cur_hrtime);
 	} else {
-		probe(pii, PROBE_MULTI, cur_time);
+		probe(pii, PROBE_MULTI, cur_hrtime);
 	}
 	return (interval);
 }
@@ -1859,8 +1887,8 @@ process_link_state_down(struct phyint *pi)
 
 	/*
 	 * Clear the probe statistics arrays, we don't want the repair
-	 * detection logic relying on probes that were succesful prior
-	 *  to the link going down.
+	 * detection logic relying on probes that were successful prior
+	 * to the link going down.
 	 */
 	if (PROBE_CAPABLE(pi->pi_v4))
 		clear_pii_probe_stats(pi->pi_v4);
@@ -2016,7 +2044,7 @@ phyint_inst_probe_failure_state(struct phyint_instance *pii, uint_t *tff)
 				pii->pii_target_next = target_next(cur_tg);
 		} else {
 			target_delete(cur_tg);
-			probe(pii, PROBE_MULTI, getcurrenttime());
+			probe(pii, PROBE_MULTI, gethrtime());
 		}
 		return (PHYINT_OK);
 	}
@@ -2065,13 +2093,13 @@ failure_state(struct phyint_instance *pii)
 	struct	probe_success_count psinfo;
 	uint_t	pi2_tls;		/* time last success */
 	uint_t	pi_tff;			/* time first fail */
-	struct	phyint	*pi2;
+	struct	phyint *pi2;
 	struct	phyint *pi;
 	struct	phyint_instance *pii2;
 	struct  phyint_group *pg;
-	boolean_t alone;
+	int	retval;
 
-	if (debug & D_FAILOVER)
+	if (debug & D_FAILREP)
 		logdebug("phyint_failed(%s)\n", pii->pii_name);
 
 	pi = pii->pii_phyint;
@@ -2082,24 +2110,13 @@ failure_state(struct phyint_instance *pii)
 		return (PHYINT_OK);
 
 	/*
-	 * At this point, the link is down, or the phyint is suspect,
-	 * as it has lost NUM_PROBE_FAILS or more probes. If the phyint
-	 * does not belong to any group, or is the only member of the
-	 * group capable of being probed, return PHYINT_FAILURE.
+	 * At this point, the link is down, or the phyint is suspect, as it
+	 * has lost NUM_PROBE_FAILS or more probes. If the phyint does not
+	 * belong to any group, this is a PHYINT_FAILURE.  Otherwise, continue
+	 * on to determine whether this should be considered a PHYINT_FAILURE
+	 * or GROUP_FAILURE.
 	 */
-	alone = _B_TRUE;
-	if (pg != phyint_anongroup) {
-		for (pi2 = pg->pg_phyint; pi2 != NULL; pi2 = pi2->pi_pgnext) {
-			if (pi2 == pi)
-				continue;
-			if (PROBE_CAPABLE(pi2->pi_v4) ||
-			    PROBE_CAPABLE(pi2->pi_v6)) {
-				alone = _B_FALSE;
-				break;
-			}
-		}
-	}
-	if (alone)
+	if (pg == phyint_anongroup)
 		return (PHYINT_FAILURE);
 
 	/*
@@ -2116,6 +2133,7 @@ failure_state(struct phyint_instance *pii)
 	 * after it was received, so there is no point looking at the tls
 	 * of other phyints.
 	 */
+	retval = GROUP_FAILURE;
 	for (pi2 = pg->pg_phyint; pi2 != NULL; pi2 = pi2->pi_pgnext) {
 		/* Exclude ourself from comparison */
 		if (pi2 == pi)
@@ -2123,76 +2141,86 @@ failure_state(struct phyint_instance *pii)
 
 		if (LINK_DOWN(pi)) {
 			/*
-			 * We use FLAGS_TO_LINK_STATE() to test the
-			 * flags directly, rather then LINK_UP() or
-			 * LINK_DOWN(), as we may not have got round
-			 * to processing the link state for the other
-			 * phyints in the group yet.
+			 * We use FLAGS_TO_LINK_STATE() to test the flags
+			 * directly, rather then LINK_UP() or LINK_DOWN(), as
+			 * we may not have got round to processing the link
+			 * state for the other phyints in the group yet.
 			 *
-			 * The check for PI_RUNNING and group
-			 * failure handles the case when the
-			 * group begins to recover.  The first
-			 * phyint to recover should not trigger
-			 * a failover from the soon-to-recover
-			 * other phyints to the first recovered
-			 * phyint. PI_RUNNING will be set, and
-			 * pg_groupfailed cleared only after
-			 * receipt of NUM_PROBE_REPAIRS, by
-			 * which time the other phyints should
-			 * have received at least 1 packet,
-			 * and so will not have NUM_PROBE_FAILS.
+			 * The check for PI_RUNNING and group failure handles
+			 * the case when the group begins to recover.
+			 * PI_RUNNING will be set, and group failure cleared
+			 * only after receipt of NUM_PROBE_REPAIRS, by which
+			 * time the other phyints should have received at
+			 * least 1 packet, and so will not have NUM_PROBE_FAILS.
 			 */
 			if ((pi2->pi_state == PI_RUNNING) &&
-			    !GROUP_FAILED(pg) && FLAGS_TO_LINK_STATE(pi2))
-				return (PHYINT_FAILURE);
-		} else {
-			/*
-			 * Need to compare against both IPv4 and
-			 * IPv6 instances.
-			 */
-			pii2 = pi2->pi_v4;
-			if (pii2 != NULL) {
-				probe_success_info(pii2, NULL, &psinfo);
-				if (psinfo.ps_tls_valid) {
-					pi2_tls = psinfo.ps_tls;
-					/*
-					 * See comment above regarding check
-					 * for PI_RUNNING and group failure.
-					 */
-					if (TIME_GT(pi2_tls, pi_tff) &&
-					    (pi2->pi_state == PI_RUNNING) &&
-					    !GROUP_FAILED(pg) &&
-					    FLAGS_TO_LINK_STATE(pi2))
-						return (PHYINT_FAILURE);
+			    !GROUP_FAILED(pg) && FLAGS_TO_LINK_STATE(pi2)) {
+				retval = PHYINT_FAILURE;
+				break;
+			}
+			continue;
+		}
+
+		if (LINK_DOWN(pi2))
+			continue;
+
+		/*
+		 * If there's no probe-based failure detection on this
+		 * interface, and its link is still up, then it's still
+		 * working and thus the group has not failed.
+		 */
+		if (!PROBE_ENABLED(pi2->pi_v4) && !PROBE_ENABLED(pi2->pi_v6)) {
+			retval = PHYINT_FAILURE;
+			break;
+		}
+
+		/*
+		 * Need to compare against both IPv4 and IPv6 instances.
+		 */
+		pii2 = pi2->pi_v4;
+		if (pii2 != NULL) {
+			probe_success_info(pii2, NULL, &psinfo);
+			if (psinfo.ps_tls_valid) {
+				pi2_tls = psinfo.ps_tls;
+				/*
+				 * See comment above regarding check
+				 * for PI_RUNNING and group failure.
+				 */
+				if (TIME_GT(pi2_tls, pi_tff) &&
+				    (pi2->pi_state == PI_RUNNING) &&
+				    !GROUP_FAILED(pg) &&
+				    FLAGS_TO_LINK_STATE(pi2)) {
+					retval = PHYINT_FAILURE;
+					break;
 				}
 			}
+		}
 
-			pii2 = pi2->pi_v6;
-			if (pii2 != NULL) {
-				probe_success_info(pii2, NULL, &psinfo);
-				if (psinfo.ps_tls_valid) {
-					pi2_tls = psinfo.ps_tls;
-					/*
-					 * See comment above regarding check
-					 * for PI_RUNNING and group failure.
-					 */
-					if (TIME_GT(pi2_tls, pi_tff) &&
-					    (pi2->pi_state == PI_RUNNING) &&
-					    !GROUP_FAILED(pg) &&
-					    FLAGS_TO_LINK_STATE(pi2))
-						return (PHYINT_FAILURE);
+		pii2 = pi2->pi_v6;
+		if (pii2 != NULL) {
+			probe_success_info(pii2, NULL, &psinfo);
+			if (psinfo.ps_tls_valid) {
+				pi2_tls = psinfo.ps_tls;
+				/*
+				 * See comment above regarding check
+				 * for PI_RUNNING and group failure.
+				 */
+				if (TIME_GT(pi2_tls, pi_tff) &&
+				    (pi2->pi_state == PI_RUNNING) &&
+				    !GROUP_FAILED(pg) &&
+				    FLAGS_TO_LINK_STATE(pi2)) {
+					retval = PHYINT_FAILURE;
+					break;
 				}
 			}
 		}
 	}
 
 	/*
-	 * Change the group state to PG_FAILED if it's not already.
+	 * Update the group state to account for the changes.
 	 */
-	if (!GROUP_FAILED(pg))
-		phyint_group_chstate(pg, PG_FAILED);
-
-	return (GROUP_FAILURE);
+	phyint_group_refresh_state(pg);
+	return (retval);
 }
 
 /*
@@ -2215,7 +2243,7 @@ probe_success_info(struct phyint_instance *pii, struct target *cur_tg,
 	uint_t timeout;
 	struct target *tg;
 
-	if (debug & D_FAILOVER)
+	if (debug & D_FAILREP)
 		logdebug("probe_success_info(%s)\n", pii->pii_name);
 
 	bzero(psinfo, sizeof (*psinfo));
@@ -2248,10 +2276,11 @@ probe_success_info(struct phyint_instance *pii, struct target *cur_tg,
 			 * not available use the value of the group's probe
 			 * interval which is a worst case estimate.
 			 */
+			timeout = ns2ms(pr_statp->pr_hrtime_start);
 			if (tg->tg_crtt != 0) {
-				timeout = pr_statp->pr_time_sent + tg->tg_crtt;
+				timeout += tg->tg_crtt;
 			} else {
-				timeout = pr_statp->pr_time_sent +
+				timeout +=
 				    pii->pii_phyint->pi_group->pg_probeint;
 			}
 
@@ -2261,7 +2290,7 @@ probe_success_info(struct phyint_instance *pii, struct target *cur_tg,
 				 * recent consecutive successes.
 				 */
 				pr_statp->pr_time_lost = timeout;
-				pr_statp->pr_status = PR_LOST;
+				probe_chstate(pr_statp, pii, PR_LOST);
 				pi_found_failure = _B_TRUE;
 				if (cur_tg != NULL && tg == cur_tg) {
 					/*
@@ -2292,7 +2321,8 @@ probe_success_info(struct phyint_instance *pii, struct target *cur_tg,
 			 * the most recent probe success.
 			 */
 			if (!psinfo->ps_tls_valid) {
-				psinfo->ps_tls = pr_statp->pr_time_acked;
+				psinfo->ps_tls =
+				    ns2ms(pr_statp->pr_hrtime_ackproc);
 				psinfo->ps_tls_valid = _B_TRUE;
 			}
 			break;
@@ -2339,7 +2369,7 @@ probe_fail_info(struct phyint_instance *pii, struct target *cur_tg,
 	uint_t	timeout;
 	struct	target *tg;
 
-	if (debug & D_FAILOVER)
+	if (debug & D_FAILREP)
 		logdebug("probe_fail_info(%s)\n", pii->pii_name);
 
 	bzero(pfinfo, sizeof (*pfinfo));
@@ -2377,10 +2407,11 @@ probe_fail_info(struct phyint_instance *pii, struct target *cur_tg,
 			 * not available use the group's probe interval,
 			 * which is a worst case estimate.
 			 */
+			timeout = ns2ms(pr_statp->pr_hrtime_start);
 			if (tg->tg_crtt != 0) {
-				timeout = pr_statp->pr_time_sent + tg->tg_crtt;
+				timeout += tg->tg_crtt;
 			} else {
-				timeout = pr_statp->pr_time_sent +
+				timeout +=
 				    pii->pii_phyint->pi_group->pg_probeint;
 			}
 
@@ -2388,7 +2419,7 @@ probe_fail_info(struct phyint_instance *pii, struct target *cur_tg,
 				break;
 
 			pr_statp->pr_time_lost = timeout;
-			pr_statp->pr_status = PR_LOST;
+			probe_chstate(pr_statp, pii, PR_LOST);
 			/* FALLTHRU */
 
 		case PR_LOST:
@@ -2421,6 +2452,19 @@ probe_fail_info(struct phyint_instance *pii, struct target *cur_tg,
 }
 
 /*
+ * Change the state of probe `pr' on phyint_instance `pii' to state `state'.
+ */
+void
+probe_chstate(struct probe_stats *pr, struct phyint_instance *pii, int state)
+{
+	if (pr->pr_status == state)
+		return;
+
+	pr->pr_status = state;
+	(void) probe_state_event(pr, pii);
+}
+
+/*
  * Check if the phyint has been repaired.  If no test address has been
  * configured, then consider the interface repaired if the link is up (unless
  * the link is flapping; see below).  Otherwise, look for proof of probes
@@ -2436,7 +2480,7 @@ phyint_repaired(struct phyint *pi)
 	int	pr_ndx;
 	uint_t	cur_time;
 
-	if (debug & D_FAILOVER)
+	if (debug & D_FAILREP)
 		logdebug("phyint_repaired(%s)\n", pi->pi_name);
 
 	if (LINK_DOWN(pi))
@@ -2458,7 +2502,7 @@ phyint_repaired(struct phyint *pi)
 		}
 		if (!pi->pi_lfmsg_printed) {
 			logerr("The link has come up on %s more than %d times "
-			    "in the last minute; disabling failback until it "
+			    "in the last minute; disabling repair until it "
 			    "stabilizes\n", pi->pi_name, LINK_UP_PERMIN);
 			pi->pi_lfmsg_printed = 1;
 		}
@@ -2490,354 +2534,41 @@ phyint_repaired(struct phyint *pi)
 }
 
 /*
- * Try failover from phyint 'pi' to a suitable destination.
- */
-int
-try_failover(struct phyint *pi, int failover_type)
-{
-	struct phyint *dst;
-	int err;
-
-	if (debug & D_FAILOVER)
-		logdebug("try_failover(%s %d)\n", pi->pi_name, failover_type);
-
-	/*
-	 * Attempt to find a failover destination 'dst'.
-	 * dst will be null if any of the following is true
-	 * Phyint is not part of a group  OR
-	 * Phyint is the only member of a group OR
-	 * No suitable failover dst was available
-	 */
-	dst = get_failover_dst(pi, failover_type);
-	if (dst == NULL)
-		return (IPMP_EMINRED);
-
-	dst->pi_empty = 0;			/* Per state diagram */
-	pi->pi_full = 0;			/* Per state diagram */
-
-	err = failover(pi, dst);
-
-	if (debug & D_FAILOVER) {
-		logdebug("failed over from %s to %s ret %d\n",
-		    pi->pi_name, dst->pi_name, err);
-	}
-	if (err == 0) {
-		pi->pi_empty = 1;		/* Per state diagram */
-		/*
-		 * we don't want to print out this message if a
-		 * phyint is leaving the group, nor for failover from
-		 * standby
-		 */
-		if (failover_type == FAILOVER_NORMAL) {
-			logerr("Successfully failed over from NIC %s to NIC "
-			    "%s\n", pi->pi_name, dst->pi_name);
-		}
-		return (0);
-	} else {
-		/*
-		 * The failover did not succeed. We must retry the failover
-		 * only after resyncing our state based on the kernel's.
-		 * For eg. either the src or the dst might have been unplumbed
-		 * causing this failure. initifs() will be called again,
-		 * from main, since full_scan_required has been set to true
-		 * by failover();
-		 */
-		return (IPMP_FAILURE);
-	}
-}
-
-/*
- * global_errno captures the errno value, if failover() or failback()
- * fails. This is sent to if_mpadm(1M).
- */
-int global_errno;
-
-/*
- * Attempt failover from phyint 'from' to phyint 'to'.
- * IP moves everything from phyint 'from' to phyint 'to'.
- */
-static int
-failover(struct phyint *from, struct phyint *to)
-{
-	struct	lifreq	lifr;
-	int 	ret;
-
-	if (debug & D_FAILOVER) {
-		logdebug("failing over from %s to %s\n",
-		    from->pi_name, to->pi_name);
-	}
-
-	/*
-	 * Perform the failover. Both IPv4 and IPv6 are failed over
-	 * using a single ioctl by passing in AF_UNSPEC family.
-	 */
-	lifr.lifr_addr.ss_family = AF_UNSPEC;
-	(void) strncpy(lifr.lifr_name, from->pi_name, sizeof (lifr.lifr_name));
-	lifr.lifr_movetoindex = to->pi_ifindex;
-
-	ret = ioctl(ifsock_v4, SIOCLIFFAILOVER, (caddr_t)&lifr);
-	if (ret < 0) {
-		global_errno = errno;
-		logperror("failover: ioctl (failover)");
-	}
-
-	/*
-	 * Set full_scan_required to true. This will make us read
-	 * the state from the kernel in initifs() and update our tables,
-	 * to reflect the current state after the failover. If the
-	 * failover has failed it will then reissue the failover.
-	 */
-	full_scan_required = _B_TRUE;
-	return (ret);
-}
-
-/*
- * phyint 'pi' has recovered. Attempt failback from every phyint in the same
- * group as phyint 'pi' that is a potential failback source, to phyint 'pi'.
- * Return values:
- * IPMP_SUCCESS:		Failback successful from each of the other
- *				phyints in the group.
- * IPMP_EFBPARTIAL: 		Failback successful from some of the other
- *				phyints in the group.
- * IPMP_FAILURE:		Failback syscall failed with some error.
- *
- * Note that failback is attempted regardless of the setting of the
- * failback_enabled flag.
- */
-int
-do_failback(struct phyint *pi)
-{
-	struct  phyint *from;
-	boolean_t done;
-	boolean_t partial;
-	boolean_t attempted_failback = _B_FALSE;
-
-	if (debug & D_FAILOVER)
-		logdebug("do_failback(%s)\n", pi->pi_name);
-
-	/* If this phyint is not part of a named group, return. */
-	if (pi->pi_group == phyint_anongroup) {
-		pi->pi_full = 1;
-		return (IPMP_SUCCESS);
-	}
-
-	/*
-	 * Attempt failback from every phyint in the group to 'pi'.
-	 * The reason for doing this, instead of only from the
-	 * phyint to which we did the failover is given below.
-	 *
-	 * After 'pi' failed, if any app. tries to join on a multicast
-	 * address (IPv6), on the failed phyint, IP picks any arbitrary
-	 * non-failed phyint in the group, instead of the failed phyint,
-	 * in.mpathd is not aware of this. Thus failing back only from the
-	 * interface to which 'pi' failed over, will failback the ipif's
-	 * but not the ilm's. So we need to failback from all members of
-	 * the phyint group
-	 */
-	done = _B_TRUE;
-	partial = _B_FALSE;
-	for (from = pi->pi_group->pg_phyint; from != NULL;
-	    from = from->pi_pgnext) {
-		/* Exclude ourself as a failback src */
-		if (from == pi)
-			continue;
-
-		/*
-		 * If the 'from' phyint has IPv4 plumbed, the 'to'
-		 * phyint must also have IPv4 plumbed. Similar check
-		 * for IPv6. IP makes the same check. Otherwise the
-		 * failback will fail.
-		 */
-		if ((from->pi_v4 != NULL && pi->pi_v4 == NULL) ||
-		    (from->pi_v6 != NULL && pi->pi_v6 == NULL)) {
-			partial = _B_TRUE;
-			continue;
-		}
-
-		pi->pi_empty = 0;	/* Per state diagram */
-		attempted_failback = _B_TRUE;
-		if (failback(from, pi) != 0) {
-			done = _B_FALSE;
-			break;
-		}
-	}
-
-	/*
-	 * We are done. No more phyint from which we can src the failback
-	 */
-	if (done) {
-		if (!partial)
-			pi->pi_full = 1;	/* Per state diagram */
-		/*
-		 * Don't print out a message unless there is a
-		 * transition from FAILED to RUNNING. For eg.
-		 * we don't want to print out this message if a
-		 * phyint is leaving the group, or at startup
-		 */
-		if (attempted_failback && (pi->pi_flags &
-		    (IFF_FAILED | IFF_OFFLINE))) {
-			logerr("Successfully failed back to NIC %s\n",
-			    pi->pi_name);
-		}
-		return (partial ? IPMP_EFBPARTIAL : IPMP_SUCCESS);
-	}
-
-	return (IPMP_FAILURE);
-}
-
-/*
- * This function is similar to do_failback() above, but respects the
- * failback_enabled flag for phyints in named groups.
- */
-int
-try_failback(struct phyint *pi)
-{
-	if (debug & D_FAILOVER)
-		logdebug("try_failback(%s)\n", pi->pi_name);
-
-	if (pi->pi_group != phyint_anongroup && !failback_enabled)
-		return (IPMP_EFBDISABLED);
-
-	return (do_failback(pi));
-}
-
-/*
- * Failback everything from phyint 'from' that has the same ifindex
- * as phyint to's ifindex.
- */
-static int
-failback(struct phyint *from, struct phyint *to)
-{
-	struct lifreq lifr;
-	int ret;
-
-	if (debug & D_FAILOVER)
-		logdebug("failback(%s %s)\n", from->pi_name, to->pi_name);
-
-	lifr.lifr_addr.ss_family = AF_UNSPEC;
-	(void) strncpy(lifr.lifr_name, from->pi_name, sizeof (lifr.lifr_name));
-	lifr.lifr_movetoindex = to->pi_ifindex;
-
-	ret = ioctl(ifsock_v4, SIOCLIFFAILBACK, (caddr_t)&lifr);
-	if (ret < 0) {
-		global_errno = errno;
-		logperror("failback: ioctl (failback)");
-	}
-
-	/*
-	 * Set full_scan_required to true. This will make us read
-	 * the state from the kernel in initifs() and update our tables,
-	 * to reflect the current state after the failback. If the
-	 * failback has failed it will then reissue the failback.
-	 */
-	full_scan_required = _B_TRUE;
-
-	return (ret);
-}
-
-/*
- * Select a target phyint for failing over from 'pi'.
- * In the normal case i.e. failover_type is FAILOVER_NORMAL, the preferred
- * target phyint is chosen as follows,
- *	1. Pick any inactive standby interface.
- *	2. If no inactive standby is available, select any phyint in the
- *	   same group that has the least number of logints, (excluding
- *	   IFF_NOFAILOVER and !IFF_UP logints)
- * If we are failing over from a standby, failover_type is
- * FAILOVER_TO_NONSTANDBY, and we won't pick a standby for the destination.
- * If a phyint is leaving the group, then failover_type is FAILOVER_TO_ANY,
- * and we won't return NULL, as long as there is at least 1 other phyint
- * in the group.
- */
-static struct phyint *
-get_failover_dst(struct phyint *pi, int failover_type)
-{
-	struct phyint	*maybe = NULL;
-	struct phyint	*pi2;
-	struct phyint 	*last_choice = NULL;
-
-	if (pi->pi_group == phyint_anongroup)
-		return (NULL);
-
-	/*
-	 * Loop thru the phyints in the group, and pick the preferred
-	 * phyint for the target.
-	 */
-	for (pi2 = pi->pi_group->pg_phyint; pi2 != NULL; pi2 = pi2->pi_pgnext) {
-		/* Exclude ourself and offlined interfaces */
-		if (pi2 == pi || pi2->pi_state == PI_OFFLINE)
-			continue;
-
-		/*
-		 * The chosen target phyint must have IPv4 instance
-		 * plumbed, if the src phyint has IPv4 plumbed. Similarly
-		 * for IPv6.
-		 */
-		if ((pi2->pi_v4 == NULL && pi->pi_v4 != NULL) ||
-		    (pi2->pi_v6 == NULL && pi->pi_v6 != NULL))
-			continue;
-
-		/* The chosen target must be PI_RUNNING. */
-		if (pi2->pi_state != PI_RUNNING) {
-			last_choice = pi2;
-			continue;
-		}
-
-		if ((pi2->pi_flags & (IFF_STANDBY | IFF_INACTIVE)) &&
-		    (failover_type != FAILOVER_TO_NONSTANDBY)) {
-			return (pi2);
-		} else {
-			if (maybe == NULL)
-				maybe = pi2;
-			else if (logint_upcount(pi2) < logint_upcount(maybe))
-				maybe = pi2;
-		}
-	}
-	if (maybe == NULL && failover_type == FAILOVER_TO_ANY)
-		return (last_choice);
-	else
-		return (maybe);
-}
-
-/*
  * Used to set/clear phyint flags, by making a SIOCSLIFFLAGS call.
  */
 boolean_t
-change_lif_flags(struct phyint *pi, uint64_t flags, boolean_t setfl)
+change_pif_flags(struct phyint *pi, uint64_t set, uint64_t clear)
 {
 	int ifsock;
 	struct lifreq lifr;
 	uint64_t old_flags;
 
-	if (debug & D_FAILOVER) {
-		logdebug("change_lif_flags(%s): flags %llx setfl %d\n",
-		    pi->pi_name, flags, (int)setfl);
+	if (debug & D_FAILREP) {
+		logdebug("change_pif_flags(%s): set %llx clear %llx\n",
+		    pi->pi_name, set, clear);
 	}
 
-	if (pi->pi_v4 != NULL) {
+	if (pi->pi_v4 != NULL)
 		ifsock = ifsock_v4;
-	} else  {
+	else
 		ifsock = ifsock_v6;
-	}
 
 	/*
 	 * Get the current flags from the kernel, and set/clear the
 	 * desired phyint flags. Since we set only phyint flags, we can
 	 * do it on either IPv4 or IPv6 instance.
 	 */
-	(void) strncpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
-	lifr.lifr_name[sizeof (lifr.lifr_name) - 1] = '\0';
+	(void) strlcpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
+
 	if (ioctl(ifsock, SIOCGLIFFLAGS, (char *)&lifr) < 0) {
 		if (errno != ENXIO)
-			logperror("change_lif_flags: ioctl (get flags)");
+			logperror("change_pif_flags: ioctl (get flags)");
 		return (_B_FALSE);
 	}
 
 	old_flags = lifr.lifr_flags;
-	if (setfl)
-		lifr.lifr_flags |= flags;
-	else
-		lifr.lifr_flags &= ~flags;
+	lifr.lifr_flags |= set;
+	lifr.lifr_flags &= ~clear;
 
 	if (old_flags == lifr.lifr_flags) {
 		/* No change in the flags. No need to send ioctl */
@@ -2846,7 +2577,7 @@ change_lif_flags(struct phyint *pi, uint64_t flags, boolean_t setfl)
 
 	if (ioctl(ifsock, SIOCSLIFFLAGS, (char *)&lifr) < 0) {
 		if (errno != ENXIO)
-			logperror("change_lif_flags: ioctl (set flags)");
+			logperror("change_pif_flags: ioctl (set flags)");
 		return (_B_FALSE);
 	}
 
@@ -2854,15 +2585,13 @@ change_lif_flags(struct phyint *pi, uint64_t flags, boolean_t setfl)
 	 * Keep pi_flags in synch. with actual flags. Assumes flags are
 	 * phyint flags.
 	 */
-	if (setfl)
-		pi->pi_flags |= flags;
-	else
-		pi->pi_flags &= ~flags;
+	pi->pi_flags |= set;
+	pi->pi_flags &= ~clear;
 
-	if (pi->pi_v4)
+	if (pi->pi_v4 != NULL)
 		pi->pi_v4->pii_flags = pi->pi_flags;
 
-	if (pi->pi_v6)
+	if (pi->pi_v6 != NULL)
 		pi->pi_v6->pii_flags = pi->pi_flags;
 
 	return (_B_TRUE);
@@ -2928,18 +2657,31 @@ reset_snxt_basetimes(void)
  * and it is up, it is not possible to detect the interface failure.
  * SIOCTMYADDR also doesn't consider local zone address as own address.
  * So, we choose to use SIOCGLIFCONF to collect the local addresses, and they
- * are stored in laddr_list.
+ * are stored in `localaddrs'
  */
-
 boolean_t
 own_address(struct in6_addr addr)
 {
-	struct local_addr *taddr = laddr_list;
+	addrlist_t *addrp;
+	struct sockaddr_storage ss;
+	int af = IN6_IS_ADDR_V4MAPPED(&addr) ? AF_INET : AF_INET6;
 
-	for (; taddr != NULL; taddr = taddr->next) {
-		if (IN6_ARE_ADDR_EQUAL(&addr, &taddr->addr)) {
+	addr2storage(af, &addr, &ss);
+	for (addrp = localaddrs; addrp != NULL; addrp = addrp->al_next) {
+		if (sockaddrcmp(&ss, &addrp->al_addr))
 			return (_B_TRUE);
-		}
 	}
 	return (_B_FALSE);
+}
+
+static int
+ns2ms(int64_t ns)
+{
+	return (ns / (NANOSEC / MILLISEC));
+}
+
+static int64_t
+tv2ns(struct timeval *tvp)
+{
+	return (tvp->tv_sec * NANOSEC + tvp->tv_usec * 1000);
 }

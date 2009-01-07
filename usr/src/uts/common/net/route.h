@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -45,7 +45,6 @@
 #ifndef	_NET_ROUTE_H
 #define	_NET_ROUTE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* from UCB 8.5 (Berkeley) 2/8/95 */
 
 #include <sys/tsol/label.h>
@@ -253,6 +252,18 @@ typedef struct tsol_rtsecattr_s {
 #define	RTSA_DOI	0x4	/* domain of interpretation is valid */
 #define	RTSA_CIPSO	0x100	/* CIPSO protocol */
 #define	RTSA_SLRANGE (RTSA_MINSL|RTSA_MAXSL)
+
+/*
+ * Routing socket options.
+ */
+#define	RT_AWARE	0x0001	/* set awareness of hidden interfaces */
+
+/*
+ * Supported RT_AWARE values.  As a convenience, the bit-values here mirror
+ * the LIFC_* values.
+ */
+#define	RTAW_DEFAULT	0x0000	/* unaware application */
+#define	RTAW_UNDER_IPMP	0x0010	/* aware of underlying IPMP interfaces */
 
 #ifdef	__cplusplus
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1109,7 +1109,7 @@ i_dlpi_open(const char *provider, int *fd, uint_t flags, boolean_t style1)
 
 		/* open libdladm handle rather than taking it as input */
 		if (dladm_open(&handle) != DLADM_STATUS_OK)
-			return (DLPI_FAILURE);
+			goto fallback;
 
 		if (dladm_dev2linkid(handle, device, &linkid) ==
 		    DLADM_STATUS_OK) {
@@ -1400,7 +1400,7 @@ i_dlpi_strgetmsg(dlpi_impl_t *dip, int msec, dlpi_msg_t *dlreplyp,
     void *databuf, size_t *datalenp, size_t *totdatalenp)
 {
 	int			retval;
-	int			flags = 0;
+	int			flags;
 	int			fd = dip->dli_fd;
 	struct strbuf		ctl, data;
 	struct pollfd		pfd;
@@ -1437,16 +1437,17 @@ i_dlpi_strgetmsg(dlpi_impl_t *dip, int msec, dlpi_msg_t *dlreplyp,
 			start = gethrtime() / (NANOSEC / MILLISEC);
 
 		switch (poll(&pfd, 1, msec)) {
-			default:
-				if (pfd.revents & POLLHUP)
-					return (DL_SYSERR);
-				break;
-			case 0:
-				return (DLPI_ETIMEDOUT);
-			case -1:
+		default:
+			if (pfd.revents & POLLHUP)
 				return (DL_SYSERR);
+			break;
+		case 0:
+			return (DLPI_ETIMEDOUT);
+		case -1:
+			return (DL_SYSERR);
 		}
 
+		flags = 0;
 		if ((retval = getmsg(fd, &ctl, &data, &flags)) < 0)
 			return (DL_SYSERR);
 

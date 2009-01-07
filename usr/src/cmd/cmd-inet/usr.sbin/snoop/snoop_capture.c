@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,7 +139,7 @@ check_device(dlpi_handle_t *dhp, char **devicep)
 			if (ioctl(s, SIOCGIFFLAGS, (char *)ifr) < 0)
 				pr_err("ioctl SIOCGIFFLAGS");
 			if ((ifr->ifr_flags &
-			    (IFF_VIRTUAL|IFF_LOOPBACK|IFF_UP|
+			    (IFF_VIRTUAL|IFF_IPMP|IFF_UP|
 			    IFF_RUNNING)) == (IFF_UP|IFF_RUNNING))
 				break;
 		}

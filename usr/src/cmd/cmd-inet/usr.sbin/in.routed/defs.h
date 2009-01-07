@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -414,16 +414,9 @@ struct interface {
 	    (IS_REMOTE|IS_PASSIVE))
 
 /*
- * Is an IP interface up?  Because of the way IPMP uses deprecated
- * interfaces, we need to check more than the IFF_UP and IFF_RUNNING
- * interface flags here.  Basically, we do not want to use IFF_DEPRECATED
- * interfaces unless they are also IFF_STANDBY and not IFF_INACTIVE.
+ * Is an IP interface up?
  */
-#define	IFF_GOOD	(IFF_UP|IFF_RUNNING)
-#define	IS_IFF_UP(f) \
-	((((f) & (IFF_GOOD|IFF_DEPRECATED)) == IFF_GOOD) || \
-	(((f) & (IFF_GOOD|IFF_INACTIVE|IFF_STANDBY)) == \
-	    (IFF_GOOD|IFF_STANDBY)))
+#define	IS_IFF_UP(f)	(((f) & (IFF_UP|IFF_RUNNING)) == (IFF_UP|IFF_RUNNING))
 
 /*
  * This defines interfaces that we should not use for advertising or

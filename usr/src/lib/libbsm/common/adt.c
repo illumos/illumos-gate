@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2137,7 +2137,7 @@ adt_get_local_address(int family, struct ifaddrlist *al)
 	int	ifal_count;
 	int	i;
 
-	if ((ifal_count = ifaddrlist(&ifal, family, errbuf)) <= 0) {
+	if ((ifal_count = ifaddrlist(&ifal, family, 0, errbuf)) <= 0) {
 		int serrno = errno;
 
 		(void) snprintf(msg, sizeof (msg), "adt_get_local_address "

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SUNWprivate_1.1 {
@@ -30,6 +28,8 @@ SUNWprivate_1.1 {
 	get_netmask4;
 	hexascii_to_octet;
 	ifaddrlist;
+	ifaddrlistx;
+	ifaddrlistx_free;
 	ifparse_ifspec;
 	iu_adjust_timer;
 	iu_cancel_timer;
@@ -48,6 +48,7 @@ SUNWprivate_1.1 {
 	iu_tq_destroy;
 	iu_unregister_event;
 	octet_to_hexascii;
+	sockaddrcmp;
     local:
 	*;
 };

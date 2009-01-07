@@ -182,7 +182,7 @@ pic16f819 233
 kmdb 234
 sctp 235
 sctp6 236
-vni 237
+dlpistub 237
 cpuid 238
 did 239
 ntwdt 240

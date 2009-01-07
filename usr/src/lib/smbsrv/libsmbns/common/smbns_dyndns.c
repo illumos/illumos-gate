@@ -1936,7 +1936,7 @@ dyndns_update_core(char *fqdn)
 		return (-1);
 
 	do {
-		if (ni.ni_nic.nic_sysflags & (IFF_STANDBY | IFF_PRIVATE))
+		if (ni.ni_nic.nic_sysflags & IFF_PRIVATE)
 			continue;
 
 		addr.s_addr = ni.ni_nic.nic_ip;
@@ -2003,7 +2003,7 @@ dyndns_clear_rev_zone(char *fqdn)
 		return (-1);
 
 	do {
-		if (ni.ni_nic.nic_sysflags & (IFF_STANDBY | IFF_PRIVATE))
+		if (ni.ni_nic.nic_sysflags & IFF_PRIVATE)
 			continue;
 
 		addr.s_addr = ni.ni_nic.nic_ip;

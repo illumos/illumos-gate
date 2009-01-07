@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -28,6 +28,7 @@
 #define	_INET_ARP_H
 
 #include <sys/types.h>
+#include <net/if.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -64,6 +65,8 @@ extern "C" {
  */
 #define	AR_ARP_CLOSING		(AR_IOCTL + 16)
 #define	AR_ARP_EXTEND		(AR_IOCTL + 17)
+#define	AR_IPMP_ACTIVATE	(AR_IOCTL + 18)
+#define	AR_IPMP_DEACTIVATE	(AR_IOCTL + 19)
 
 /* Both ace_flags and area_flags; must also modify arp.c in mdb */
 #define	ACE_F_PERMANENT		0x0001
@@ -181,6 +184,14 @@ typedef	struct ar_mapping_add_s {
 	uint32_t	arma_hw_mapping_start;
 					/* the mask&proto_addr */
 } arma_t;
+
+/* Structure used to notify ARP of changes to IPMP group topology */
+typedef	struct ar_ipmp_event_s {
+	uint32_t	arie_cmd;
+	uint32_t	arie_name_offset;
+	uint32_t	arie_name_length;
+	char		arie_grifname[LIFNAMSIZ];
+} arie_t;
 
 /* Structure used to notify clients of interesting conditions. */
 typedef struct ar_client_notify_s {

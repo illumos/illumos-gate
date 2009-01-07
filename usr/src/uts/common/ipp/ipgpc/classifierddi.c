@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/systm.h>
 #include <sys/socket.h>
@@ -433,12 +431,6 @@ ipgpc_invoke_action(ipp_action_id_t aid, ipp_packet_t *packet)
 		}
 	}
 
-	/* The ill_index could be 0 when called from forwarding (read) path */
-	if (ill_idx > 0) {
-		ill = ill_lookup_on_ifindex_global_instance(ill_idx, B_FALSE,
-		    NULL, NULL, NULL, NULL);
-	}
-
 	/* parse the packet from the message block */
 	ipha = (ipha_t *)mp->b_rptr;
 	/* Determine IP Header Version */
@@ -452,23 +444,27 @@ ipgpc_invoke_action(ipp_action_id_t aid, ipp_packet_t *packet)
 
 	pkt.direction = callout_pos; /* set packet direction */
 
+	/* The ill_index could be 0 when called from forwarding (read) path */
+	if (ill_idx > 0) {
+		ill = ill_lookup_on_ifindex_global_instance(ill_idx, B_FALSE,
+		    NULL, NULL, NULL, NULL);
+	}
 	if (ill != NULL) {
-		pkt.if_index = ill->ill_phyint->phyint_ifindex;
-		pkt.if_groupname_len =
-		    ill->ill_phyint->phyint_groupname_len;
-		if (pkt.if_groupname_len > 0) {
-			pkt.if_groupname =
-			    ill->ill_phyint->phyint_groupname;
-		} else {
-			pkt.if_groupname = NULL;
-		}
-		/* Got the fields from the ILL, go ahead and refrele */
+		/*
+		 * Since all IPP actions in an IPMP group are performed
+		 * relative to the IPMP group interface, if this is an
+		 * underlying interface in an IPMP group, use the IPMP
+		 * group interface's index.
+		 */
+		if (IS_UNDER_IPMP(ill))
+			pkt.if_index = ipmp_ill_get_ipmp_ifindex(ill);
+		else
+			pkt.if_index = ill->ill_phyint->phyint_ifindex;
+		/* Got the field from the ILL, go ahead and refrele */
 		ill_refrele(ill);
 	} else {
-		/* unknown if_index and if_group */
+		/* unknown if_index */
 		pkt.if_index = IPGPC_UNSPECIFIED;
-		pkt.if_groupname = NULL;
-		pkt.if_groupname_len = 0;
 	}
 
 	if (ipgpc_debug > 5) {

@@ -86,6 +86,7 @@ f none kernel/drv/crypto 755 root sys
 f none kernel/drv/cryptoadm 755 root sys
 f none kernel/drv/devinfo 755 root sys
 f none kernel/drv/dld 755 root sys
+f none kernel/drv/dlpistub 755 root sys
 f none kernel/drv/i8042 755 root sys
 f none kernel/drv/icmp 755 root sys
 f none kernel/drv/icmp6 755 root sys
@@ -152,7 +153,6 @@ f none kernel/drv/ucode.conf 644 root sys
 f none kernel/drv/udp 755 root sys
 f none kernel/drv/udp6 755 root sys
 f none kernel/drv/vgatext 755 root sys
-f none kernel/drv/vni 755 root sys
 f none kernel/drv/vnic 755 root sys
 f none kernel/drv/wc 755 root sys
 f none kernel/exec/elfexec 755 root sys
@@ -308,6 +308,7 @@ f none kernel/drv/amd64/crypto 755 root sys
 f none kernel/drv/amd64/cryptoadm 755 root sys
 f none kernel/drv/amd64/devinfo 755 root sys
 f none kernel/drv/amd64/dld 755 root sys
+f none kernel/drv/amd64/dlpistub 755 root sys
 f none kernel/drv/amd64/i8042 755 root sys
 f none kernel/drv/amd64/icmp 755 root sys
 f none kernel/drv/amd64/icmp6 755 root sys
@@ -366,7 +367,6 @@ f none kernel/drv/amd64/ucode 755 root sys
 f none kernel/drv/amd64/udp 755 root sys
 f none kernel/drv/amd64/udp6 755 root sys
 f none kernel/drv/amd64/vgatext 755 root sys
-f none kernel/drv/amd64/vni 755 root sys
 f none kernel/drv/amd64/vnic 755 root sys
 f none kernel/drv/amd64/wc 755 root sys
 d none kernel/exec/amd64 755 root sys

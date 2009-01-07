@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -47,6 +47,15 @@ typedef enum {
 	ILGSTAT_NEW,
 	ILGSTAT_CHANGE
 } ilg_stat_t;
+
+/*
+ * Flags shared via ips_mrt_flags, used by mcast_restart_timers_thread().
+ */
+typedef enum {
+	IP_MRT_STOP	= 0x1,	/* request to stop thread */
+	IP_MRT_DONE	= 0x2,	/* indication that thread is stopped */
+	IP_MRT_RUN 	= 0x4	/* request to restart timers */
+} ip_mrt_flags_t;
 
 /*
  * Extern functions
@@ -78,9 +87,7 @@ extern int		ip_get_dlpi_mbcast(ill_t *, mblk_t *);
 extern	void		ilm_free(ipif_t *);
 extern	ilm_t		*ilm_lookup_ill(ill_t *, ipaddr_t, zoneid_t);
 extern	ilm_t		*ilm_lookup_ill_v6(ill_t *, const in6_addr_t *,
-    zoneid_t);
-extern	ilm_t		*ilm_lookup_ill_index_v6(ill_t *, const in6_addr_t *,
-    int, zoneid_t);
+    boolean_t, zoneid_t);
 extern	ilm_t		*ilm_lookup_ipif(ipif_t *, ipaddr_t);
 
 extern int		ilm_numentries_v6(ill_t *, const in6_addr_t *);
@@ -92,10 +99,10 @@ extern int		ip_ll_send_enabmulti_req(ill_t *, const in6_addr_t *);
 
 extern	int		ip_addmulti(ipaddr_t, ipif_t *, ilg_stat_t,
     mcast_record_t, slist_t *);
-extern	int		ip_addmulti_v6(const in6_addr_t *, ill_t *, int,
+extern	int		ip_addmulti_v6(const in6_addr_t *, ill_t *,
     zoneid_t, ilg_stat_t, mcast_record_t, slist_t *);
 extern	int		ip_delmulti(ipaddr_t, ipif_t *, boolean_t, boolean_t);
-extern	int		ip_delmulti_v6(const in6_addr_t *, ill_t *, int,
+extern	int		ip_delmulti_v6(const in6_addr_t *, ill_t *,
     zoneid_t, boolean_t, boolean_t);
 extern	int		ill_join_allmulti(ill_t *);
 extern	void		ill_leave_allmulti(ill_t *);
@@ -140,9 +147,11 @@ extern	void		reset_conn_ipif(ipif_t *);
 extern	void		reset_conn_ill(ill_t *);
 extern	void		reset_mrt_ill(ill_t *);
 extern	void		reset_mrt_vif_ipif(ipif_t *);
-extern	void		igmp_start_timers(unsigned, ip_stack_t *);
-extern	void		mld_start_timers(unsigned, ip_stack_t *);
+extern	void		mcast_restart_timers_thread(ip_stack_t *);
 extern	void		ilm_inactive(ilm_t *);
+extern	ilm_t		*ilm_walker_start(ilm_walker_t *, ill_t *);
+extern	ilm_t		*ilm_walker_step(ilm_walker_t *, ilm_t *);
+extern	void		ilm_walker_finish(ilm_walker_t *);
 
 #endif /* _KERNEL */
 

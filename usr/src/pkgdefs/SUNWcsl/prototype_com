@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -144,8 +144,6 @@ s none usr/lib/libintl.so=../../lib/libintl.so.1
 s none usr/lib/libintl.so.1=../../lib/libintl.so.1
 f none usr/lib/libipmi.so.1 755 root bin
 s none usr/lib/libipmi.so=./libipmi.so.1
-s none usr/lib/libipmp.so=./libipmp.so.1
-f none usr/lib/libipmp.so.1 755 root bin
 s none usr/lib/libipp.so=./libipp.so.1
 f none usr/lib/libipp.so.1 755 root bin
 f none usr/lib/libipsecutil.so.1 755 root bin

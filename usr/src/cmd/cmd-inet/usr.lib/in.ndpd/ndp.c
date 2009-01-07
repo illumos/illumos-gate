@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -383,29 +383,12 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 	if (no_loopback && loopback)
 		return;
 
-	/*
-	 * If the interface is FAILED or INACTIVE or OFFLINE, don't
-	 * create any addresses on them. in.mpathd assumes that no new
-	 * addresses will appear on these. This implies that we
-	 * won't create any new prefixes advertised by the router
-	 * on FAILED/INACTIVE/OFFLINE interfaces. When the state changes,
-	 * the next RA will create the prefix on this interface.
-	 */
-	if (pi->pi_flags & (IFF_FAILED|IFF_INACTIVE|IFF_OFFLINE))
-		return;
+	bzero(&lifr, sizeof (lifr));
+	(void) strlcpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
 
-	(void) strncpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
-	lifr.lifr_name[sizeof (lifr.lifr_name) - 1] = '\0';
-	if (ioctl(pi->pi_sock, SIOCGLIFLNKINFO, (char *)&lifr) < 0) {
-		if (errno == ENXIO)
-			return;
-		logperror_pi(pi, "incoming_ra: SIOCGLIFLNKINFO");
-		return;
-	}
 	if (ra->nd_ra_curhoplimit != CURHOP_UNSPECIFIED &&
 	    ra->nd_ra_curhoplimit != pi->pi_CurHopLimit) {
 		pi->pi_CurHopLimit = ra->nd_ra_curhoplimit;
-
 		lifr.lifr_ifinfo.lir_maxhops = pi->pi_CurHopLimit;
 		set_needed = _B_TRUE;
 	}
@@ -460,7 +443,7 @@ incoming_ra(struct phyint *pi, struct nd_router_advert *ra, int len,
 			logmsg(LOG_DEBUG,
 			    "incoming_ra: trigger dhcp %s on %s\n",
 			    (ra->nd_ra_flags_reserved & ~pi->pi_ra_flags &
-				ND_RA_FLAG_MANAGED) ? "MANAGED" : "OTHER",
+			    ND_RA_FLAG_MANAGED) ? "MANAGED" : "OTHER",
 			    pi->pi_name);
 		}
 		pi->pi_ra_flags |= ra->nd_ra_flags_reserved;
@@ -999,11 +982,9 @@ incoming_prefix_addrconf_process(struct phyint *pi, struct prefix *pr,
 			 * Delete this prefix structure as kernel
 			 * does not allow duplicated addresses
 			 */
-
 			logmsg(LOG_ERR, "incoming_prefix_addrconf_process: "
-			    "Duplicate prefix  %s received on interface %s\n",
-			    inet_ntop(AF_INET6,
-			    (void *)&po->nd_opt_pi_prefix, abuf,
+			    "Duplicate prefix %s received on interface %s\n",
+			    inet_ntop(AF_INET6, &po->nd_opt_pi_prefix, abuf,
 			    sizeof (abuf)), pi->pi_name);
 			logmsg(LOG_ERR, "incoming_prefix_addrconf_process: "
 			    "Prefix already exists in interface %s\n",
@@ -1129,12 +1110,8 @@ incoming_mtu_opt(struct phyint *pi, uchar_t *opt,
 	}
 
 	pi->pi_LinkMTU = mtu;
-	(void) strncpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
-	lifr.lifr_name[sizeof (lifr.lifr_name) - 1] = '\0';
-	if (ioctl(pi->pi_sock, SIOCGLIFLNKINFO, (char *)&lifr) < 0) {
-		logperror_pi(pi, "incoming_mtu_opt: SIOCGLIFLNKINFO");
-		return;
-	}
+	bzero(&lifr, sizeof (lifr));
+	(void) strlcpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
 	lifr.lifr_ifinfo.lir_maxmtu = pi->pi_LinkMTU;
 	if (ioctl(pi->pi_sock, SIOCSLIFLNKINFO, (char *)&lifr) < 0) {
 		logperror_pi(pi, "incoming_mtu_opt: SIOCSLIFLNKINFO");
@@ -1155,33 +1132,33 @@ incoming_lla_opt(struct phyint *pi, uchar_t *opt,
 	struct sockaddr_in6 *sin6;
 	int max_content_len;
 
-	if (pi->pi_hdw_addr_len == 0)
+	/*
+	 * Get our link-layer address length.  We may not have one, in which
+	 * case we can just bail.
+	 */
+	if (phyint_get_lla(pi, &lifr) != 0)
 		return;
 
 	/*
 	 * Can't remove padding since it is link type specific.
-	 * However, we check against the length of our link-layer
-	 * address.
-	 * Note: assumes that all links have a fixed lengh address.
+	 * However, we check against the length of our link-layer address.
+	 * Note: assumes that all links have a fixed length address.
 	 */
 	max_content_len = lo->nd_opt_lla_len * 8 - sizeof (struct nd_opt_hdr);
-	if (max_content_len < pi->pi_hdw_addr_len ||
+	if (max_content_len < lifr.lifr_nd.lnr_hdw_len ||
 	    (max_content_len >= 8 &&
-	    max_content_len - 7 > pi->pi_hdw_addr_len)) {
+	    max_content_len - 7 > lifr.lifr_nd.lnr_hdw_len)) {
 		char abuf[INET6_ADDRSTRLEN];
 
 		(void) inet_ntop(AF_INET6, (void *)&from->sin6_addr,
 		    abuf, sizeof (abuf));
 		logmsg(LOG_INFO, "lla option from %s on %s too long with bad "
-		    "physaddr length (%d vs. %d bytes)\n",
-		    abuf, pi->pi_name,
-		    max_content_len, pi->pi_hdw_addr_len);
+		    "physaddr length (%d vs. %d bytes)\n", abuf, pi->pi_name,
+		    max_content_len, lifr.lifr_nd.lnr_hdw_len);
 		return;
 	}
 
-	lifr.lifr_nd.lnr_hdw_len = pi->pi_hdw_addr_len;
-	bcopy((char *)lo->nd_opt_lla_hdw_addr,
-	    (char *)lifr.lifr_nd.lnr_hdw_addr,
+	bcopy(lo->nd_opt_lla_hdw_addr, lifr.lifr_nd.lnr_hdw_addr,
 	    lifr.lifr_nd.lnr_hdw_len);
 
 	sin6 = (struct sockaddr_in6 *)&lifr.lifr_nd.lnr_addr;
@@ -1196,8 +1173,7 @@ incoming_lla_opt(struct phyint *pi, uchar_t *opt,
 	lifr.lifr_nd.lnr_state_same_lla = ND_UNCHANGED;
 	lifr.lifr_nd.lnr_state_diff_lla = ND_STALE;
 	lifr.lifr_nd.lnr_flags = isrouter;
-	(void) strncpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
-	lifr.lifr_name[sizeof (lifr.lifr_name) - 1] = '\0';
+	(void) strlcpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
 	if (ioctl(pi->pi_sock, SIOCLIFSETND, (char *)&lifr) < 0) {
 		logperror_pi(pi, "incoming_lla_opt: SIOCLIFSETND");
 		return;

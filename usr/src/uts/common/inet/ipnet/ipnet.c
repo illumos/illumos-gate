@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -229,16 +229,19 @@ ipnet_if_init(void)
 int
 _init(void)
 {
-	int	ret;
+	int ret;
+	boolean_t netstack_registered = B_FALSE;
 
 	if ((ipnet_major = ddi_name_to_major("ipnet")) == (major_t)-1)
 		return (ENODEV);
 	ipnet_minor_space = id_space_create("ipnet_minor_space",
 	    IPNET_MINOR_MIN, MAXMIN32);
-	netstack_register(NS_IPNET, ipnet_stack_init, NULL, ipnet_stack_fini);
+
 	/*
 	 * We call ddi_taskq_create() with nthread == 1 to ensure in-order
-	 * delivery of packets to clients.
+	 * delivery of packets to clients.  Note that we need to create the
+	 * taskqs before calling netstack_register() since ipnet_stack_init()
+	 * registers callbacks that use 'em.
 	 */
 	ipnet_taskq = ddi_taskq_create(NULL, "ipnet", 1, TASKQ_DEFAULTPRI, 0);
 	ipnet_nicevent_taskq = ddi_taskq_create(NULL, "ipnet_nic_event_queue",
@@ -247,6 +250,10 @@ _init(void)
 		ret = ENOMEM;
 		goto done;
 	}
+
+	netstack_register(NS_IPNET, ipnet_stack_init, NULL, ipnet_stack_fini);
+	netstack_registered = B_TRUE;
+
 	if ((ret = ipnet_if_init()) == 0)
 		ret = mod_install(&modlinkage);
 done:
@@ -255,7 +262,8 @@ done:
 			ddi_taskq_destroy(ipnet_taskq);
 		if (ipnet_nicevent_taskq != NULL)
 			ddi_taskq_destroy(ipnet_nicevent_taskq);
-		netstack_unregister(NS_IPNET);
+		if (netstack_registered)
+			netstack_unregister(NS_IPNET);
 		id_space_destroy(ipnet_minor_space);
 	}
 	return (ret);
@@ -268,9 +276,10 @@ _fini(void)
 
 	if ((err = mod_remove(&modlinkage)) != 0)
 		return (err);
+
+	netstack_unregister(NS_IPNET);
 	ddi_taskq_destroy(ipnet_nicevent_taskq);
 	ddi_taskq_destroy(ipnet_taskq);
-	netstack_unregister(NS_IPNET);
 	id_space_destroy(ipnet_minor_space);
 	return (0);
 }
@@ -987,11 +996,19 @@ static boolean_t
 ipnet_accept(ipnet_t *ipnet, ipobs_hook_data_t *ihd, ipnet_addrp_t *src,
     ipnet_addrp_t *dst)
 {
+	boolean_t		obsif;
 	uint64_t		ifindex = ipnet->ipnet_if->if_index;
 	ipnet_addrtype_t	srctype, dsttype;
 
 	srctype = ipnet_get_addrtype(ipnet, src);
 	dsttype = ipnet_get_addrtype(ipnet, dst);
+
+	/*
+	 * If the packet's ifindex matches ours, or the packet's group ifindex
+	 * matches ours, it's on the interface we're observing.  (Thus,
+	 * observing on the group ifindex matches all ifindexes in the group.)
+	 */
+	obsif = (ihd->ihd_ifindex == ifindex || ihd->ihd_grifindex == ifindex);
 
 	/*
 	 * Do not allow an ipnet stream to see packets that are not from or to
@@ -1025,7 +1042,7 @@ ipnet_accept(ipnet_t *ipnet, ipobs_hook_data_t *ihd, ipnet_addrp_t *src,
 	 * have our source address (this allows us to see packets we send).
 	 */
 	if (ipnet->ipnet_flags & IPNET_PROMISC_PHYS) {
-		if (ihd->ihd_ifindex == ifindex || srctype == IPNETADDR_MYADDR)
+		if (srctype == IPNETADDR_MYADDR || obsif)
 			return (B_TRUE);
 	}
 
@@ -1033,7 +1050,7 @@ ipnet_accept(ipnet_t *ipnet, ipobs_hook_data_t *ihd, ipnet_addrp_t *src,
 	 * We accept multicast and broadcast packets transmitted or received
 	 * on the interface we're observing.
 	 */
-	if (dsttype == IPNETADDR_MBCAST && ihd->ihd_ifindex == ifindex)
+	if (dsttype == IPNETADDR_MBCAST && obsif)
 		return (B_TRUE);
 
 	return (B_FALSE);

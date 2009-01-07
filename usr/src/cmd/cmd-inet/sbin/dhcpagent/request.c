@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * REQUESTING state of the client state machine.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <string.h>
@@ -1008,7 +1006,8 @@ dhcp_acknak_global(iu_eh_t *ehp, int fd, short events, iu_event_id_t id,
 	for (dsmp = lookup_smach_by_xid(xid, NULL, isv6); dsmp != NULL;
 	    dsmp = lookup_smach_by_xid(xid, dsmp, isv6)) {
 		pif = dsmp->dsm_lif->lif_pif;
-		if (pif->pif_index == plp->ifindex)
+		if (pif->pif_index == plp->ifindex ||
+		    pif->pif_under_ipmp && pif->pif_grindex == plp->ifindex)
 			break;
 	}
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -46,7 +46,7 @@
 #include <sys/cmn_err.h>
 #include <sys/atomic.h>
 #include <sys/zone.h>
-
+#include <sys/callb.h>
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <inet/ipclassifier.h>
@@ -83,7 +83,7 @@ static mrec_t	*mcast_bldmrec(mcast_record_t type, in6_addr_t *grp,
 static void	mcast_init_rtx(ill_t *ill, rtx_state_t *rtxp,
 		    mcast_record_t rtype, slist_t *flist);
 static mrec_t	*mcast_merge_rtx(ilm_t *ilm, mrec_t *rp, slist_t *flist);
-
+static void	mcast_signal_restart_thread(ip_stack_t *ipst);
 
 /*
  * Macros used to do timer len conversions.  Timer values are always
@@ -122,7 +122,7 @@ static mrec_t	*mcast_merge_rtx(ilm_t *ilm, mrec_t *rp, slist_t *flist);
  * The first multicast join will trigger the igmp timers / mld timers
  * The unit for next is milliseconds.
  */
-void
+static void
 igmp_start_timers(unsigned next, ip_stack_t *ipst)
 {
 	int	time_left;
@@ -207,7 +207,7 @@ igmp_start_timers(unsigned next, ip_stack_t *ipst)
  * mld_start_timers:
  * The unit for next is milliseconds.
  */
-void
+static void
 mld_start_timers(unsigned next, ip_stack_t *ipst)
 {
 	int	time_left;
@@ -306,7 +306,8 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	uint32_t 	group;
 	uint_t		next;
 	ipif_t 		*ipif;
-	ip_stack_t	 *ipst;
+	ip_stack_t	*ipst;
+	ilm_walker_t	ilw;
 
 	ASSERT(ill != NULL);
 	ASSERT(!ill->ill_isv6);
@@ -401,8 +402,7 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 					    "igmp_input: we are only "
 					    "member src 0x%x ipif_local 0x%x",
 					    (int)ntohl(src),
-					    (int)
-					    ntohl(ipif->ipif_lcl_addr));
+					    (int)ntohl(ipif->ipif_lcl_addr));
 				}
 				mutex_exit(&ill->ill_lock);
 				return (mp);
@@ -440,23 +440,20 @@ igmp_input(queue_t *q, mblk_t *mp, ill_t *ill)
 		}
 
 		/*
-		 * If we belong to the group being reported, and
-		 * we are a 'Delaying member' in the RFC terminology,
-		 * stop our timer for that group and 'clear flag' i.e.
-		 * mark as IGMP_OTHERMEMBER. Do this for all logical
-		 * interfaces on the given physical interface.
+		 * If our ill has ILMs that belong to the group being
+		 * reported, and we are a 'Delaying Member' in the RFC
+		 * terminology, stop our timer for that group and 'clear
+		 * flag' i.e. mark as IGMP_OTHERMEMBER.
 		 */
-		mutex_enter(&ill->ill_lock);
-		for (ipif = ill->ill_ipif; ipif != NULL;
-		    ipif = ipif->ipif_next) {
-			ilm = ilm_lookup_ipif(ipif, group);
-			if (ilm != NULL) {
+		ilm = ilm_walker_start(&ilw, ill);
+		for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
+			if (ilm->ilm_addr == group) {
 				++ipst->ips_igmpstat.igps_rcv_ourreports;
 				ilm->ilm_timer = INFINITY;
 				ilm->ilm_state = IGMP_OTHERMEMBER;
 			}
-		} /* for */
-		mutex_exit(&ill->ill_lock);
+		}
+		ilm_walker_finish(&ilw);
 		break;
 
 	case IGMP_V3_MEMBERSHIP_REPORT:
@@ -485,6 +482,7 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 	int	timer;
 	uint_t	next, current;
 	ip_stack_t	 *ipst;
+	ilm_walker_t 	ilw;
 
 	ipst = ill->ill_ipst;
 	++ipst->ips_igmpstat.igps_rcv_queries;
@@ -583,11 +581,12 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 	 *  the maximum timeout.
 	 */
 	next = (unsigned)INFINITY;
+
+	ilm = ilm_walker_start(&ilw, ill);
 	mutex_enter(&ill->ill_lock);
-
 	current = CURRENT_MSTIME;
-	for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
 
+	for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
 		/*
 		 * A multicast router joins INADDR_ANY address
 		 * to enable promiscuous reception of all
@@ -610,6 +609,7 @@ igmp_query_in(ipha_t *ipha, igmpa_t *igmpa, ill_t *ill)
 		}
 	}
 	mutex_exit(&ill->ill_lock);
+	ilm_walker_finish(&ilw);
 
 	return (next);
 }
@@ -623,6 +623,7 @@ igmpv3_query_in(igmp3qa_t *igmp3qa, ill_t *ill, int igmplen)
 	ipaddr_t	*src_array;
 	uint8_t		qrv;
 	ip_stack_t	 *ipst;
+	ilm_walker_t	ilw;
 
 	ipst = ill->ill_ipst;
 	/* make sure numsrc matches packet size */
@@ -693,8 +694,9 @@ igmpv3_query_in(igmp3qa_t *igmp3qa, ill_t *ill, int igmplen)
 
 	} else {
 		/* group or group/source specific query */
+		ilm = ilm_walker_start(&ilw, ill);
 		mutex_enter(&ill->ill_lock);
-		for (ilm = ill->ill_ilm; ilm; ilm = ilm->ilm_next) {
+		for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
 			if (!IN6_IS_ADDR_V4MAPPED(&ilm->ilm_v6addr) ||
 			    (ilm->ilm_addr == htonl(INADDR_ANY)) ||
 			    (ilm->ilm_addr == htonl(INADDR_ALLHOSTS_GROUP)) ||
@@ -749,6 +751,7 @@ group_query:
 			ilm->ilm_timer += current;
 		}
 		mutex_exit(&ill->ill_lock);
+		ilm_walker_finish(&ilw);
 	}
 
 	return (next);
@@ -819,13 +822,22 @@ igmp_joingroup(ilm_t *ilm)
 		mutex_exit(&ill->ill_lock);
 
 		/*
-		 * To avoid deadlock, we defer igmp_start_timers() to
-		 * ipsq_exit().  See the comment in ipsq_exit() for details.
+		 * We need to restart the IGMP timers, but we can't do it here
+		 * since we're inside the IPSQ and thus igmp_start_timers() ->
+		 * untimeout() (inside the IPSQ, waiting for a running timeout
+		 * to finish) could deadlock with igmp_timeout_handler() ->
+		 * ipsq_enter() (running the timeout, waiting to get inside
+		 * the IPSQ).  We also can't just delay it until after we
+		 * ipsq_exit() since we could be inside more than one IPSQ and
+		 * thus still have the other IPSQs pinned after we exit -- and
+		 * igmp_start_timers() may be trying to enter one of those.
+		 * Instead, signal a dedicated thread that will do it for us.
 		 */
 		mutex_enter(&ipst->ips_igmp_timer_lock);
 		ipst->ips_igmp_deferred_next = MIN(timer,
 		    ipst->ips_igmp_deferred_next);
 		mutex_exit(&ipst->ips_igmp_timer_lock);
+		mcast_signal_restart_thread(ipst);
 	}
 
 	if (ip_debug > 1) {
@@ -897,13 +909,14 @@ mld_joingroup(ilm_t *ilm)
 		mutex_exit(&ill->ill_lock);
 
 		/*
-		 * To avoid deadlock, we defer mld_start_timers() to
-		 * ipsq_exit().  See the comment in ipsq_exit() for details.
+		 * Signal another thread to restart the timers.  See the
+		 * comment in igmp_joingroup() for details.
 		 */
 		mutex_enter(&ipst->ips_mld_timer_lock);
 		ipst->ips_mld_deferred_next = MIN(timer,
 		    ipst->ips_mld_deferred_next);
 		mutex_exit(&ipst->ips_mld_timer_lock);
+		mcast_signal_restart_thread(ipst);
 	}
 
 	if (ip_debug > 1) {
@@ -1073,8 +1086,8 @@ send_to_in:
 	/*
 	 * Need to set up retransmission state; merge the new info with the
 	 * current state (which may be null).  If the timer is not currently
-	 * running, start it (need to do a delayed start of the timer as
-	 * we're currently in the sq).
+	 * running, signal a thread to restart it -- see the comment in
+	 * igmp_joingroup() for details.
 	 */
 	rp = mcast_merge_rtx(ilm, rp, flist);
 	if (ilm->ilm_rtx.rtx_timer == INFINITY) {
@@ -1085,6 +1098,7 @@ send_to_in:
 		    ilm->ilm_rtx.rtx_timer);
 		ilm->ilm_rtx.rtx_timer += CURRENT_MSTIME;
 		mutex_exit(&ipst->ips_igmp_timer_lock);
+		mcast_signal_restart_thread(ipst);
 	}
 
 	mutex_exit(&ill->ill_lock);
@@ -1161,8 +1175,8 @@ send_to_in:
 	/*
 	 * Need to set up retransmission state; merge the new info with the
 	 * current state (which may be null).  If the timer is not currently
-	 * running, start it (need to do a deferred start of the timer as
-	 * we're currently in the sq).
+	 * running, signal a thread to restart it -- see the comment in
+	 * igmp_joingroup() for details.
 	 */
 	rp = mcast_merge_rtx(ilm, rp, flist);
 	ASSERT(ilm->ilm_rtx.rtx_cnt > 0);
@@ -1174,6 +1188,7 @@ send_to_in:
 		    MIN(ipst->ips_mld_deferred_next, ilm->ilm_rtx.rtx_timer);
 		ilm->ilm_rtx.rtx_timer += CURRENT_MSTIME;
 		mutex_exit(&ipst->ips_mld_timer_lock);
+		mcast_signal_restart_thread(ipst);
 	}
 
 	mutex_exit(&ill->ill_lock);
@@ -1397,12 +1412,10 @@ per_ilm_rtxtimer:
  *
  * igmp_input() receives igmp queries and responds to the queries
  * in a delayed fashion by posting a timer i.e. it calls igmp_start_timers().
- * Later the igmp_timer fires, the timeout handler igmp_timerout_handler()
+ * Later the igmp_timer fires, the timeout handler igmp_timeout_handler()
  * performs the action exclusively after entering each ill's ipsq as writer.
- * The actual igmp timeout handler needs to run in the ipsq since it has to
- * access the ilm's and we don't want another exclusive operation like
- * say an IPMP failover to be simultaneously moving the ilms from one ill to
- * another.
+ * (The need to enter the IPSQ is largely historical but there are still some
+ * fields like ilm_filter that rely on it.)
  *
  * The igmp_slowtimeo() function is called thru another timer.
  * igmp_slowtimeout_lock protects the igmp_slowtimeout_id
@@ -1420,7 +1433,6 @@ igmp_timeout_handler(void *arg)
 	ASSERT(arg != NULL);
 	mutex_enter(&ipst->ips_igmp_timer_lock);
 	ASSERT(ipst->ips_igmp_timeout_id != 0);
-	ipst->ips_igmp_timer_thread = curthread;
 	ipst->ips_igmp_timer_scheduled_last = 0;
 	ipst->ips_igmp_time_to_next = 0;
 	mutex_exit(&ipst->ips_igmp_timer_lock);
@@ -1452,7 +1464,6 @@ igmp_timeout_handler(void *arg)
 	mutex_enter(&ipst->ips_igmp_timer_lock);
 	ASSERT(ipst->ips_igmp_timeout_id != 0);
 	ipst->ips_igmp_timeout_id = 0;
-	ipst->ips_igmp_timer_thread = NULL;
 	mutex_exit(&ipst->ips_igmp_timer_lock);
 
 	if (global_next != INFINITY)
@@ -1663,7 +1674,6 @@ mld_timeout_handler(void *arg)
 	ASSERT(arg != NULL);
 	mutex_enter(&ipst->ips_mld_timer_lock);
 	ASSERT(ipst->ips_mld_timeout_id != 0);
-	ipst->ips_mld_timer_thread = curthread;
 	ipst->ips_mld_timer_scheduled_last = 0;
 	ipst->ips_mld_time_to_next = 0;
 	mutex_exit(&ipst->ips_mld_timer_lock);
@@ -1695,7 +1705,6 @@ mld_timeout_handler(void *arg)
 	mutex_enter(&ipst->ips_mld_timer_lock);
 	ASSERT(ipst->ips_mld_timeout_id != 0);
 	ipst->ips_mld_timeout_id = 0;
-	ipst->ips_mld_timer_thread = NULL;
 	mutex_exit(&ipst->ips_mld_timer_lock);
 
 	if (global_next != INFINITY)
@@ -1871,7 +1880,7 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	int	hdrlen = sizeof (ipha_t) + RTRALERT_LEN;
 	size_t	size  = hdrlen + sizeof (igmpa_t);
 	ipif_t 	*ipif = ilm->ilm_ipif;
-	ill_t 	*ill  = ipif->ipif_ill;	/* Will be the "lower" ill */
+	ill_t 	*ill  = ipif->ipif_ill;
 	mblk_t	*first_mp;
 	ipsec_out_t *io;
 	zoneid_t zoneid;
@@ -1887,14 +1896,6 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	 * not get forwarded on other interfaces or looped back, we
 	 * set ipsec_out_dontroute to B_TRUE and ipsec_out_multicast_loop
 	 * to B_FALSE.
-	 *
-	 * We also need to make sure that this does not get load balanced
-	 * if it hits ip_newroute_ipif. So, we initialize ipsec_out_attach_if
-	 * here. If it gets load balanced, switches supporting igmp snooping
-	 * will send the packet that it receives for this multicast group
-	 * to the interface that we are sending on. As we have joined the
-	 * multicast group on this ill, by sending the packet out on this
-	 * ill, we receive all the packets back on this ill.
 	 */
 	first_mp = allocb(sizeof (ipsec_info_t), BPRI_HI);
 	if (first_mp == NULL)
@@ -1909,7 +1910,6 @@ igmp_sendpkt(ilm_t *ilm, uchar_t type, ipaddr_t addr)
 	io->ipsec_out_len = sizeof (ipsec_out_t);
 	io->ipsec_out_use_global_policy = B_TRUE;
 	io->ipsec_out_ill_index = ill->ill_phyint->phyint_ifindex;
-	io->ipsec_out_attach_if = B_TRUE;
 	io->ipsec_out_multicast_loop = B_FALSE;
 	io->ipsec_out_dontroute = B_TRUE;
 	if ((zoneid = ilm->ilm_zoneid) == ALL_ZONES)
@@ -1995,6 +1995,8 @@ igmpv3_sendrpt(ipif_t *ipif, mrec_t *reclist)
 	zoneid_t zoneid;
 	ip_stack_t	 *ipst = ill->ill_ipst;
 
+	ASSERT(IAM_WRITER_IPIF(ipif));
+
 	/* if there aren't any records, there's nothing to send */
 	if (reclist == NULL)
 		return;
@@ -2022,6 +2024,14 @@ nextpkt:
 				int srcspace, srcsperpkt;
 				srcspace = ill->ill_max_frag - (size +
 				    sizeof (grphdra_t));
+
+				/*
+				 * Skip if there's not even enough room in
+				 * a single packet to send something useful.
+				 */
+				if (srcspace <= sizeof (ipaddr_t))
+					continue;
+
 				srcsperpkt = srcspace / sizeof (ipaddr_t);
 				/*
 				 * Increment size and numrec, because we will
@@ -2082,7 +2092,6 @@ nextpkt:
 	io->ipsec_out_len = sizeof (ipsec_out_t);
 	io->ipsec_out_use_global_policy = B_TRUE;
 	io->ipsec_out_ill_index = ill->ill_phyint->phyint_ifindex;
-	io->ipsec_out_attach_if = B_TRUE;
 	io->ipsec_out_multicast_loop = B_FALSE;
 	io->ipsec_out_dontroute = B_TRUE;
 	if ((zoneid = ipif->ipif_zoneid) == ALL_ZONES)
@@ -2188,6 +2197,7 @@ mld_input(queue_t *q, mblk_t *mp, ill_t *ill)
 	uint_t		next;
 	int		mldlen;
 	ip_stack_t	*ipst = ill->ill_ipst;
+	ilm_walker_t	ilw;
 
 	BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInGroupMembTotal);
 
@@ -2294,7 +2304,6 @@ mld_input(queue_t *q, mblk_t *mp, ill_t *ill)
 			return;
 		}
 
-
 		/*
 		 * If we belong to the group being reported, and we are a
 		 * 'Delaying member' per the RFC terminology, stop our timer
@@ -2303,8 +2312,8 @@ mld_input(queue_t *q, mblk_t *mp, ill_t *ill)
 		 * membership entries for the same group address (one per zone)
 		 * so we need to walk the ill_ilm list.
 		 */
-		mutex_enter(&ill->ill_lock);
-		for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
+		ilm = ilm_walker_start(&ilw, ill);
+		for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
 			if (!IN6_ARE_ADDR_EQUAL(&ilm->ilm_v6addr, v6group_ptr))
 				continue;
 			BUMP_MIB(ill->ill_icmp6_mib,
@@ -2313,7 +2322,7 @@ mld_input(queue_t *q, mblk_t *mp, ill_t *ill)
 			ilm->ilm_timer = INFINITY;
 			ilm->ilm_state = IGMP_OTHERMEMBER;
 		}
-		mutex_exit(&ill->ill_lock);
+		ilm_walker_finish(&ilw);
 		break;
 	}
 	case MLD_LISTENER_REDUCTION:
@@ -2343,6 +2352,7 @@ mld_query_in(mld_hdr_t *mldh, ill_t *ill)
 	int	timer;
 	uint_t	next, current;
 	in6_addr_t *v6group;
+	ilm_walker_t ilw;
 
 	BUMP_MIB(ill->ill_icmp6_mib, ipv6IfIcmpInGroupMembQueries);
 
@@ -2397,10 +2407,12 @@ mld_query_in(mld_hdr_t *mldh, ill_t *ill)
 	 * maximum timeout.
 	 */
 	next = INFINITY;
-	mutex_enter(&ill->ill_lock);
 
+	ilm = ilm_walker_start(&ilw, ill);
+	mutex_enter(&ill->ill_lock);
 	current = CURRENT_MSTIME;
-	for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
+
+	for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
 		ASSERT(!IN6_IS_ADDR_V4MAPPED(&ilm->ilm_v6addr));
 
 		if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr) ||
@@ -2430,6 +2442,7 @@ mld_query_in(mld_hdr_t *mldh, ill_t *ill)
 		}
 	}
 	mutex_exit(&ill->ill_lock);
+	ilm_walker_finish(&ilw);
 
 	return (next);
 }
@@ -2446,6 +2459,7 @@ mldv2_query_in(mld2q_t *mld2q, ill_t *ill, int mldlen)
 	in6_addr_t *v6group, *src_array;
 	uint_t	next, numsrc, i, mrd, delay, qqi, current;
 	uint8_t	qrv;
+	ilm_walker_t ilw;
 
 	v6group = &mld2q->mld2q_addr;
 	numsrc = ntohs(mld2q->mld2q_numsrc);
@@ -2518,8 +2532,9 @@ mldv2_query_in(mld2q_t *mld2q, ill_t *ill, int mldlen)
 
 	} else {
 		/* group or group/source specific query */
+		ilm = ilm_walker_start(&ilw, ill);
 		mutex_enter(&ill->ill_lock);
-		for (ilm = ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
+		for (; ilm != NULL; ilm = ilm_walker_step(&ilw, ilm)) {
 			if (IN6_IS_ADDR_UNSPECIFIED(&ilm->ilm_v6addr) ||
 			    IN6_IS_ADDR_MC_NODELOCAL(&ilm->ilm_v6addr) ||
 			    IN6_IS_ADDR_MC_RESERVED(&ilm->ilm_v6addr) ||
@@ -2574,6 +2589,7 @@ group_query:
 			break;
 		}
 		mutex_exit(&ill->ill_lock);
+		ilm_walker_finish(&ilw);
 	}
 
 	return (next);
@@ -2591,9 +2607,8 @@ mld_sendpkt(ilm_t *ilm, uchar_t type, const in6_addr_t *v6addr)
 	ip6_hbh_t	*ip6hbh;
 	struct ip6_opt_router	*ip6router;
 	size_t		size = IPV6_HDR_LEN + sizeof (mld_hdr_t);
-	ill_t		*ill = ilm->ilm_ill;   /* Will be the "lower" ill */
+	ill_t		*ill = ilm->ilm_ill;
 	ipif_t		*ipif;
-	ip6i_t		*ip6i;
 
 	/*
 	 * We need to place a router alert option in this packet.  The length
@@ -2605,30 +2620,14 @@ mld_sendpkt(ilm_t *ilm, uchar_t type, const in6_addr_t *v6addr)
 
 	ASSERT(ill->ill_isv6);
 
-	/*
-	 * We need to make sure that this packet does not get load balanced.
-	 * So, we allocate an ip6i_t and set ATTACH_IF. ip_wput_v6 and
-	 * ip_newroute_ipif_v6 knows how to handle such packets.
-	 * If it gets load balanced, switches supporting MLD snooping
-	 * (in the future) will send the packet that it receives for this
-	 * multicast group to the interface that we are sending on. As we have
-	 * joined the multicast group on this ill, by sending the packet out
-	 * on this ill, we receive all the packets back on this ill.
-	 */
-	size += sizeof (ip6i_t) + router_alert_length;
+	size += router_alert_length;
 	mp = allocb(size, BPRI_HI);
 	if (mp == NULL)
 		return;
 	bzero(mp->b_rptr, size);
 	mp->b_wptr = mp->b_rptr + size;
 
-	ip6i = (ip6i_t *)mp->b_rptr;
-	ip6i->ip6i_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
-	ip6i->ip6i_nxt = IPPROTO_RAW;
-	ip6i->ip6i_flags = IP6I_ATTACH_IF | IP6I_HOPLIMIT;
-	ip6i->ip6i_ifindex = ill->ill_phyint->phyint_ifindex;
-
-	ip6h = (ip6_t *)&ip6i[1];
+	ip6h = (ip6_t *)mp->b_rptr;
 	ip6hbh = (struct ip6_hbh *)&ip6h[1];
 	ip6router = (struct ip6_opt_router *)&ip6hbh[1];
 	/*
@@ -2698,7 +2697,6 @@ mldv2_sendrpt(ill_t *ill, mrec_t *reclist)
 	in6_addr_t	*srcarray;
 	ip6_t		*ip6h;
 	ip6_hbh_t	*ip6hbh;
-	ip6i_t		*ip6i;
 	struct ip6_opt_router	*ip6router;
 	size_t		size, optlen, padlen, icmpsize, rsize;
 	ipif_t		*ipif;
@@ -2706,6 +2704,8 @@ mldv2_sendrpt(ill_t *ill, mrec_t *reclist)
 	mrec_t		*rp, *cur_reclist;
 	mrec_t		*next_reclist = reclist;
 	boolean_t	morepkts;
+
+	ASSERT(IAM_WRITER_ILL(ill));
 
 	/* If there aren't any records, there's nothing to send */
 	if (reclist == NULL)
@@ -2743,6 +2743,14 @@ nextpkt:
 				int srcspace, srcsperpkt;
 				srcspace = ill->ill_max_frag -
 				    (size + sizeof (mld2mar_t));
+
+				/*
+				 * Skip if there's not even enough room in
+				 * a single packet to send something useful.
+				 */
+				if (srcspace <= sizeof (in6_addr_t))
+					continue;
+
 				srcsperpkt = srcspace / sizeof (in6_addr_t);
 				/*
 				 * Increment icmpsize and size, because we will
@@ -2787,30 +2795,13 @@ nextpkt:
 		size += rsize;
 	}
 
-	/*
-	 * We need to make sure that this packet does not get load balanced.
-	 * So, we allocate an ip6i_t and set ATTACH_IF. ip_wput_v6 and
-	 * ip_newroute_ipif_v6 know how to handle such packets.
-	 * If it gets load balanced, switches supporting MLD snooping
-	 * (in the future) will send the packet that it receives for this
-	 * multicast group to the interface that we are sending on. As we have
-	 * joined the multicast group on this ill, by sending the packet out
-	 * on this ill, we receive all the packets back on this ill.
-	 */
-	size += sizeof (ip6i_t);
 	mp = allocb(size, BPRI_HI);
 	if (mp == NULL)
 		goto free_reclist;
 	bzero(mp->b_rptr, size);
 	mp->b_wptr = mp->b_rptr + size;
 
-	ip6i = (ip6i_t *)mp->b_rptr;
-	ip6i->ip6i_vcf = IPV6_DEFAULT_VERS_AND_FLOW;
-	ip6i->ip6i_nxt = IPPROTO_RAW;
-	ip6i->ip6i_flags = IP6I_ATTACH_IF;
-	ip6i->ip6i_ifindex = ill->ill_phyint->phyint_ifindex;
-
-	ip6h = (ip6_t *)&(ip6i[1]);
+	ip6h = (ip6_t *)mp->b_rptr;
 	ip6hbh = (ip6_hbh_t *)&(ip6h[1]);
 	ip6router = (struct ip6_opt_router *)&(ip6hbh[1]);
 	mld2r = (mld2r_t *)((uint8_t *)ip6hbh + optlen + padlen);
@@ -3101,4 +3092,65 @@ mcast_merge_rtx(ilm_t *ilm, mrec_t *mreclist, slist_t *flist)
 	}
 
 	return (rtnmrec);
+}
+
+/*
+ * Convenience routine to signal the restart-timer thread.
+ */
+static void
+mcast_signal_restart_thread(ip_stack_t *ipst)
+{
+	mutex_enter(&ipst->ips_mrt_lock);
+	ipst->ips_mrt_flags |= IP_MRT_RUN;
+	cv_signal(&ipst->ips_mrt_cv);
+	mutex_exit(&ipst->ips_mrt_lock);
+}
+
+/*
+ * Thread to restart IGMP/MLD timers.  See the comment in igmp_joingroup() for
+ * the story behind this unfortunate thread.
+ */
+void
+mcast_restart_timers_thread(ip_stack_t *ipst)
+{
+	int next;
+	char name[64];
+	callb_cpr_t cprinfo;
+
+	(void) snprintf(name, sizeof (name), "mcast_restart_timers_thread_%d",
+	    ipst->ips_netstack->netstack_stackid);
+	CALLB_CPR_INIT(&cprinfo, &ipst->ips_mrt_lock, callb_generic_cpr, name);
+
+	for (;;) {
+		mutex_enter(&ipst->ips_mrt_lock);
+		while (!(ipst->ips_mrt_flags & (IP_MRT_STOP|IP_MRT_RUN))) {
+			CALLB_CPR_SAFE_BEGIN(&cprinfo);
+			cv_wait(&ipst->ips_mrt_cv, &ipst->ips_mrt_lock);
+			CALLB_CPR_SAFE_END(&cprinfo, &ipst->ips_mrt_lock);
+		}
+		if (ipst->ips_mrt_flags & IP_MRT_STOP)
+			break;
+		ipst->ips_mrt_flags &= ~IP_MRT_RUN;
+		mutex_exit(&ipst->ips_mrt_lock);
+
+		mutex_enter(&ipst->ips_igmp_timer_lock);
+		next = ipst->ips_igmp_deferred_next;
+		ipst->ips_igmp_deferred_next = INFINITY;
+		mutex_exit(&ipst->ips_igmp_timer_lock);
+
+		if (next != INFINITY)
+			igmp_start_timers(next, ipst);
+
+		mutex_enter(&ipst->ips_mld_timer_lock);
+		next = ipst->ips_mld_deferred_next;
+		ipst->ips_mld_deferred_next = INFINITY;
+		mutex_exit(&ipst->ips_mld_timer_lock);
+		if (next != INFINITY)
+			mld_start_timers(next, ipst);
+	}
+
+	ipst->ips_mrt_flags |= IP_MRT_DONE;
+	cv_signal(&ipst->ips_mrt_done_cv);
+	CALLB_CPR_EXIT(&cprinfo);	/* drops ips_mrt_lock */
+	thread_exit();
 }

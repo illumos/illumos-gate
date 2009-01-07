@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2322,11 +2322,8 @@ ipcl_conn_cleanup(conn_t *connp)
 	 * We should replace these pointers with ifindex/ipaddr_t to
 	 * make the code less complex.
 	 */
-	ASSERT(connp->conn_xmit_if_ill == NULL);
-	ASSERT(connp->conn_nofailover_ill == NULL);
 	ASSERT(connp->conn_outgoing_ill == NULL);
 	ASSERT(connp->conn_incoming_ill == NULL);
-	ASSERT(connp->conn_outgoing_pill == NULL);
 	ASSERT(connp->conn_multicast_ipif == NULL);
 	ASSERT(connp->conn_multicast_ill == NULL);
 #endif

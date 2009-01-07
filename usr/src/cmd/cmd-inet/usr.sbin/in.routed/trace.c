@@ -1,5 +1,5 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1988, 1993
@@ -35,8 +35,6 @@
  *
  * $FreeBSD: src/sbin/routed/trace.c,v 1.6 2000/08/11 08:24:38 sheldonh Exp $
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "defs.h"
 #include "pathnames.h"
@@ -566,6 +564,7 @@ static struct bits if_bits[] = {
 	{ IFF_TEMPORARY,	0,		"TEMPORARY" },
 	{ IFF_FIXEDMTU,		0,		"FIXEDMTU" },
 	{ IFF_VIRTUAL,		0,		"VIRTUAL"},
+	{ IFF_IPMP,		0,		"IPMP"},
 	{ 0,			0,		NULL}
 };
 
@@ -898,8 +897,8 @@ trace_upslot(struct rt_entry *rt,
 		print_rts(rts, 0, 0,
 		    rts->rts_gate != new->rts_gate,
 		    rts->rts_tag != new->rts_tag,
-		    rts != rt->rt_spares || AGE_RT(rt->rt_state,
-			rts->rts_origin, rt->rt_ifp));
+		    rts != rt->rt_spares ||
+		    AGE_RT(rt->rt_state, rts->rts_origin, rt->rt_ifp));
 
 		(void) fprintf(ftrace, "\n       %19s%-16s ", "",
 		    (new->rts_gate != rts->rts_gate ?
@@ -1173,10 +1172,9 @@ trace_rip(const char *dir1, const char *dir2,
 				if (NA->a_type == RIP_AUTH_PW &&
 				    n == msg->rip_nets) {
 					(void) fprintf(ftrace, "\tPassword"
-					    " Authentication:"
-					    " \"%s\"\n",
+					    " Authentication: \"%s\"\n",
 					    qstring(NA->au.au_pw,
-						RIP_AUTH_PW_LEN));
+					    RIP_AUTH_PW_LEN));
 					continue;
 				}
 
@@ -1186,13 +1184,12 @@ trace_rip(const char *dir1, const char *dir2,
 					    "\tMD5 Auth"
 					    " pkt_len=%d KeyID=%u"
 					    " auth_len=%d"
-					    " seqno=%#lx"
-					    " rsvd=%#x,%#x\n",
+					    " seqno=%#x"
+					    " rsvd=%#hx,%#hx\n",
 					    ntohs(NA->au.a_md5.md5_pkt_len),
 					    NA->au.a_md5.md5_keyid,
 					    NA->au.a_md5.md5_auth_len,
-					    (unsigned long)ntohl(NA->au.a_md5.
-						md5_seqno),
+					    ntohl(NA->au.a_md5.md5_seqno),
 					    ntohs(NA->au.a_md5.rsvd[0]),
 					    ntohs(NA->au.a_md5.rsvd[1]));
 					continue;
@@ -1217,14 +1214,12 @@ trace_rip(const char *dir1, const char *dir2,
 				    inet_ntoa(tmp_mask));
 			} else if (msg->rip_vers == RIPv1) {
 				(void) fprintf(ftrace, "\t%-18s ",
-				    addrname(n->n_dst,
-					ntohl(n->n_mask),
-					n->n_mask == 0 ? 2 : 1));
+				    addrname(n->n_dst, ntohl(n->n_mask),
+				    n->n_mask == 0 ? 2 : 1));
 			} else {
 				(void) fprintf(ftrace, "\t%-18s ",
-				    addrname(n->n_dst,
-					ntohl(n->n_mask),
-					n->n_mask == 0 ? 2 : 0));
+				    addrname(n->n_dst, ntohl(n->n_mask),
+				    n->n_mask == 0 ? 2 : 0));
 			}
 			(void) fprintf(ftrace, "metric=%-2lu ",
 			    (unsigned long)ntohl(n->n_metric));
@@ -1242,8 +1237,8 @@ trace_rip(const char *dir1, const char *dir2,
 		break;
 
 	case RIPCMD_TRACEON:
-		(void) fprintf(ftrace, "\tfile=\"%.*s\"\n", size-4,
-			msg->rip_tracefile);
+		(void) fprintf(ftrace, "\tfile=\"%.*s\"\n", size - 4,
+		    msg->rip_tracefile);
 		break;
 
 	case RIPCMD_TRACEOFF:

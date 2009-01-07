@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -86,31 +86,17 @@ extern "C" {
 					/* return the ire. No recursive */
 					/* lookup should be done. */
 #define	MATCH_IRE_IHANDLE	0x0200	/* Match IRE on ihandle */
-#define	MATCH_IRE_MARK_HIDDEN	0x0400	/* Match IRE ire_marks with */
-					/* IRE_MARK_HIDDEN. */
+#define	MATCH_IRE_MARK_TESTHIDDEN 0x0400 /* Match IRE_MARK_TESTHIDDEN IREs */
+
 /*
- * MATCH_IRE_ILL is used whenever we want to specifically match an IRE
- * whose ire_ipif->ipif_ill or (ill_t *)ire_stq->q_ptr matches a given
- * ill. When MATCH_IRE_ILL is used to locate an IRE_CACHE, it implies
- * that the packet will not be load balanced. This is normally used
- * by in.mpathd to send out failure detection probes.
- *
- * MATCH_IRE_ILL_GROUP is used whenever we are not specific about which
- * interface (ill) the packet should be sent out. This implies that the
- * packets will be subjected to load balancing and it might go out on
- * any interface in the group. When there is only interface in the group,
- * MATCH_IRE_ILL_GROUP becomes MATCH_IRE_ILL. Most of the code uses
- * MATCH_IRE_ILL_GROUP and MATCH_IRE_ILL is used in very few cases where
- * we want to disable load balancing.
- *
  * MATCH_IRE_PARENT is used whenever we unconditionally want to get the
  * parent IRE (sire) while recursively searching IREs for an offsubnet
  * destination. With this flag, even if no IRE_CACHETABLE or IRE_INTERFACE
  * is found to help resolving IRE_OFFSUBNET in lookup routines, the
  * IRE_OFFSUBNET sire, if any, is returned to the caller.
  */
-#define	MATCH_IRE_ILL_GROUP	0x0800	/* Match IRE on ill or the ill_group. */
-#define	MATCH_IRE_ILL		0x1000	/* Match IRE on the ill only */
+/* UNUSED			0x0800  */
+#define	MATCH_IRE_ILL		0x1000	/* Match IRE on the ill */
 
 #define	MATCH_IRE_PARENT	0x2000	/* Match parent ire, if any, */
 					/* even if ire is not matched. */
@@ -305,7 +291,7 @@ extern	ire_t	*ire_ihandle_lookup_onlink(ire_t *);
 extern	ire_t	*ire_ihandle_lookup_offlink(ire_t *, ire_t *);
 extern	ire_t	*ire_ihandle_lookup_offlink_v6(ire_t *, ire_t *);
 
-extern	boolean_t	ire_local_same_ill_group(ire_t *, ire_t *);
+extern  boolean_t	ire_local_same_lan(ire_t *, ire_t *);
 extern	boolean_t	ire_local_ok_across_zones(ire_t *, zoneid_t, void *,
     const struct ts_label_s *, ip_stack_t *);
 
@@ -354,7 +340,7 @@ extern ire_t	*ipif_lookup_multi_ire_v6(ipif_t *, const in6_addr_t *);
 extern ire_t	*ire_get_next_bcast_ire(ire_t *, ire_t *);
 extern ire_t	*ire_get_next_default_ire(ire_t *, ire_t *);
 
-extern  void	ire_arpresolve(ire_t *,  ill_t *);
+extern  void	ire_arpresolve(ire_t *);
 extern  void	ire_freemblk(ire_t *);
 extern boolean_t	ire_match_args(ire_t *, ipaddr_t, ipaddr_t, ipaddr_t,
     int, const ipif_t *, zoneid_t, uint32_t, const struct ts_label_s *, int,

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -72,7 +72,6 @@ static	ire_t	*ire_init_v6(ire_t *, const in6_addr_t *, const in6_addr_t *,
     ushort_t, ipif_t *, const in6_addr_t *, uint32_t, uint32_t, uint_t,
     const iulp_t *, tsol_gc_t *, tsol_gcgrp_t *, ip_stack_t *);
 static	ire_t	*ip6_ctable_lookup_impl(ire_ctable_args_t *);
-
 
 /*
  * Initialize the ire that is specific to IPv6 part and call
@@ -261,13 +260,11 @@ ire_lookup_multi_v6(const in6_addr_t *group, zoneid_t zoneid, ip_stack_t *ipst)
 	 * Make sure we follow ire_ipif.
 	 *
 	 * We need to determine the interface route through
-	 * which the gateway will be reached. We don't really
-	 * care which interface is picked if the interface is
-	 * part of a group.
+	 * which the gateway will be reached.
 	 */
 	if (ire->ire_ipif != NULL) {
 		ipif = ire->ire_ipif;
-		match_flags |= MATCH_IRE_ILL_GROUP;
+		match_flags |= MATCH_IRE_ILL;
 	}
 
 	switch (ire->ire_type) {
@@ -409,35 +406,54 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	ire_t	*ire = *ire_p;
 	int	error;
 	ip_stack_t	*ipst = ire->ire_ipst;
+	uint_t	marks = 0;
 
 	ASSERT(ire->ire_ipversion == IPV6_VERSION);
 	ASSERT(ire->ire_mp == NULL); /* Calls should go through ire_add */
 	ASSERT(ire->ire_nce == NULL);
+
+	/*
+	 * IREs with source addresses hosted on interfaces that are under IPMP
+	 * should be hidden so that applications don't accidentally end up
+	 * sending packets with test addresses as their source addresses, or
+	 * sending out interfaces that are e.g. IFF_INACTIVE.  Hide them here.
+	 * (We let IREs with unspecified source addresses slip through since
+	 * ire_send_v6() will delete them automatically.)
+	 */
+	if (ire->ire_ipif != NULL && IS_UNDER_IPMP(ire->ire_ipif->ipif_ill) &&
+	    !IN6_IS_ADDR_UNSPECIFIED(&ire->ire_src_addr_v6)) {
+		DTRACE_PROBE1(ipmp__mark__testhidden, ire_t *, ire);
+		marks |= IRE_MARK_TESTHIDDEN;
+	}
 
 	/* Find the appropriate list head. */
 	switch (ire->ire_type) {
 	case IRE_HOST:
 		ire->ire_mask_v6 = ipv6_all_ones;
 		ire->ire_masklen = IPV6_ABITS;
+		ire->ire_marks |= marks;
 		if ((ire->ire_flags & RTF_SETSRC) == 0)
 			ire->ire_src_addr_v6 = ipv6_all_zeros;
 		break;
 	case IRE_CACHE:
+		ire->ire_mask_v6 = ipv6_all_ones;
+		ire->ire_masklen = IPV6_ABITS;
+		ire->ire_marks |= marks;
+		break;
 	case IRE_LOCAL:
 	case IRE_LOOPBACK:
 		ire->ire_mask_v6 = ipv6_all_ones;
 		ire->ire_masklen = IPV6_ABITS;
 		break;
 	case IRE_PREFIX:
-		if ((ire->ire_flags & RTF_SETSRC) == 0)
-			ire->ire_src_addr_v6 = ipv6_all_zeros;
-		break;
 	case IRE_DEFAULT:
+		ire->ire_marks |= marks;
 		if ((ire->ire_flags & RTF_SETSRC) == 0)
 			ire->ire_src_addr_v6 = ipv6_all_zeros;
 		break;
 	case IRE_IF_RESOLVER:
 	case IRE_IF_NORESOLVER:
+		ire->ire_marks |= marks;
 		break;
 	default:
 		printf("ire_add_v6: ire %p has unrecognized IRE type (%d)\n",
@@ -543,9 +559,8 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	 * 2) We could have multiple packets trying to create
 	 *    an IRE_CACHE for the same ill.
 	 *
-	 * Moreover, IPIF_NOFAILOVER and IPV6_BOUND_PIF endpoints wants
-	 * to go out on a particular ill. Rather than looking at the
-	 * packet, we depend on the above for MATCH_IRE_ILL here.
+	 * Rather than looking at the packet, we depend on the above for
+	 * MATCH_IRE_ILL here.
 	 *
 	 * Unlike IPv4, MATCH_IRE_IPIF is needed here as we could have
 	 * multiple IRE_CACHES for an ill for the same destination
@@ -555,20 +570,15 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 	 */
 	if (ire->ire_ipif != NULL)
 		flags |= MATCH_IRE_IPIF;
+
 	/*
-	 * If we are creating hidden ires, make sure we search on
-	 * this ill (MATCH_IRE_ILL) and a hidden ire, while we are
-	 * searching for duplicates below. Otherwise we could
-	 * potentially find an IRE on some other interface
-	 * and it may not be a IRE marked with IRE_MARK_HIDDEN. We
-	 * shouldn't do this as this will lead to an infinite loop as
-	 * eventually we need an hidden ire for this packet to go
-	 * out. MATCH_IRE_ILL is already marked above.
+	 * If we are creating a hidden IRE, make sure we search for
+	 * hidden IREs when searching for duplicates below.
+	 * Otherwise, we might find an IRE on some other interface
+	 * that's not marked hidden.
 	 */
-	if (ire->ire_marks & IRE_MARK_HIDDEN) {
-		ASSERT(ire->ire_type == IRE_CACHE);
-		flags |= MATCH_IRE_MARK_HIDDEN;
-	}
+	if (ire->ire_marks & IRE_MARK_TESTHIDDEN)
+		flags |= MATCH_IRE_MARK_TESTHIDDEN;
 
 	/*
 	 * Start the atomic add of the ire. Grab the ill locks,
@@ -692,7 +702,7 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 		}
 	}
 	if (ire->ire_type == IRE_CACHE) {
-		in6_addr_t gw_addr_v6;
+		const in6_addr_t *addr_v6;
 		ill_t	*ill = ire_to_ill(ire);
 		char	buf[INET6_ADDRSTRLEN];
 		nce_t	*nce;
@@ -712,12 +722,12 @@ ire_add_v6(ire_t **ire_p, queue_t *q, mblk_t *mp, ipsq_func_t func)
 		 * time on the list and rts_setgwr_v6 could not
 		 * be changing this.
 		 */
-		gw_addr_v6 = ire->ire_gateway_addr_v6;
-		if (IN6_IS_ADDR_UNSPECIFIED(&gw_addr_v6)) {
-			nce = ndp_lookup_v6(ill, &ire->ire_addr_v6, B_TRUE);
-		} else {
-			nce = ndp_lookup_v6(ill, &gw_addr_v6, B_TRUE);
-		}
+		addr_v6 = &ire->ire_gateway_addr_v6;
+		if (IN6_IS_ADDR_UNSPECIFIED(addr_v6))
+			addr_v6 = &ire->ire_addr_v6;
+
+		/* nce fastpath is per-ill; don't match across illgrp */
+		nce = ndp_lookup_v6(ill, B_FALSE, addr_v6, B_TRUE);
 		if (nce == NULL)
 			goto failed;
 
@@ -1217,28 +1227,29 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 	in6_addr_t gw_addr_v6;
 	ill_t *ire_ill = NULL, *dst_ill;
 	ill_t *ipif_ill = NULL;
-	ill_group_t *ire_ill_group = NULL;
-	ill_group_t *ipif_ill_group = NULL;
 	ipif_t	*src_ipif;
 
 	ASSERT(ire->ire_ipversion == IPV6_VERSION);
 	ASSERT(addr != NULL);
 	ASSERT(mask != NULL);
 	ASSERT((!(match_flags & MATCH_IRE_GW)) || gateway != NULL);
-	ASSERT((!(match_flags & (MATCH_IRE_ILL|MATCH_IRE_ILL_GROUP))) ||
+	ASSERT((!(match_flags & MATCH_IRE_ILL)) ||
 	    (ipif != NULL && ipif->ipif_isv6));
 
 	/*
-	 * HIDDEN cache entries have to be looked up specifically with
-	 * MATCH_IRE_MARK_HIDDEN. MATCH_IRE_MARK_HIDDEN is usually set
-	 * when the interface is FAILED or INACTIVE. In that case,
-	 * any IRE_CACHES that exists should be marked with
-	 * IRE_MARK_HIDDEN. So, we don't really need to match below
-	 * for IRE_MARK_HIDDEN. But we do so for consistency.
+	 * If MATCH_IRE_MARK_TESTHIDDEN is set, then only return the IRE if it
+	 * is in fact hidden, to ensure the caller gets the right one.  One
+	 * exception: if the caller passed MATCH_IRE_IHANDLE, then they
+	 * already know the identity of the given IRE_INTERFACE entry and
+	 * there's no point trying to hide it from them.
 	 */
-	if (!(match_flags & MATCH_IRE_MARK_HIDDEN) &&
-	    (ire->ire_marks & IRE_MARK_HIDDEN))
-		return (B_FALSE);
+	if (ire->ire_marks & IRE_MARK_TESTHIDDEN) {
+		if (match_flags & MATCH_IRE_IHANDLE)
+			match_flags |= MATCH_IRE_MARK_TESTHIDDEN;
+
+		if (!(match_flags & MATCH_IRE_MARK_TESTHIDDEN))
+			return (B_FALSE);
+	}
 
 	if (zoneid != ALL_ZONES && zoneid != ire->ire_zoneid &&
 	    ire->ire_zoneid != ALL_ZONES) {
@@ -1288,7 +1299,7 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 			 */
 			if ((dst_ill->ill_usesrc_ifindex != 0) &&
 			    (src_ipif = ipif_select_source_v6(dst_ill, addr,
-			    RESTRICT_TO_NONE, IPV6_PREFER_SRC_DEFAULT, zoneid))
+			    B_FALSE, IPV6_PREFER_SRC_DEFAULT, zoneid))
 			    != NULL) {
 				ip3dbg(("ire_match_args: src_ipif %p"
 				    " dst_ill %p", (void *)src_ipif,
@@ -1326,20 +1337,20 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 		gw_addr_v6 = ire->ire_gateway_addr_v6;
 		mutex_exit(&ire->ire_lock);
 	}
+
 	/*
-	 * For IRE_CACHES, MATCH_IRE_ILL/ILL_GROUP really means that
-	 * somebody wants to send out on a particular interface which
-	 * is given by ire_stq and hence use ire_stq to derive the ill
-	 * value. ire_ipif for IRE_CACHES is just the
-	 * means of getting a source address i.e ire_src_addr_v6 =
-	 * ire->ire_ipif->ipif_src_addr_v6.
+	 * For IRE_CACHE entries, MATCH_IRE_ILL means that somebody wants to
+	 * send out ire_stq (ire_ipif for IRE_CACHE entries is just the means
+	 * of getting a source address -- i.e., ire_src_addr_v6 ==
+	 * ire->ire_ipif->ipif_v6src_addr).  ire_to_ill() handles this.
+	 *
+	 * NOTE: For IPMP, MATCH_IRE_ILL usually matches any ill in the group.
+	 * However, if MATCH_IRE_MARK_TESTHIDDEN is set (i.e., the IRE is for
+	 * IPMP test traffic), then the ill must match exactly.
 	 */
-	if (match_flags & (MATCH_IRE_ILL|MATCH_IRE_ILL_GROUP)) {
+	if (match_flags & MATCH_IRE_ILL) {
 		ire_ill = ire_to_ill(ire);
-		if (ire_ill != NULL)
-			ire_ill_group = ire_ill->ill_group;
 		ipif_ill = ipif->ipif_ill;
-		ipif_ill_group = ipif_ill->ill_group;
 	}
 
 	/* No ire_addr_v6 bits set past the mask */
@@ -1357,17 +1368,14 @@ ire_match_args_v6(ire_t *ire, const in6_addr_t *addr, const in6_addr_t *mask,
 	    &ipif->ipif_v6src_addr)) &&
 	    ((!(match_flags & MATCH_IRE_IPIF)) ||
 	    (ire->ire_ipif == ipif)) &&
-	    ((!(match_flags & MATCH_IRE_MARK_HIDDEN)) ||
-	    (ire->ire_type != IRE_CACHE ||
-	    ire->ire_marks & IRE_MARK_HIDDEN)) &&
+	    ((!(match_flags & MATCH_IRE_MARK_TESTHIDDEN)) ||
+	    (ire->ire_marks & IRE_MARK_TESTHIDDEN)) &&
 	    ((!(match_flags & MATCH_IRE_ILL)) ||
-	    (ire_ill == ipif_ill)) &&
+	    (ire_ill == ipif_ill ||
+	    (!(match_flags & MATCH_IRE_MARK_TESTHIDDEN) &&
+	    ire_ill != NULL && IS_IN_SAME_ILLGRP(ipif_ill, ire_ill)))) &&
 	    ((!(match_flags & MATCH_IRE_IHANDLE)) ||
 	    (ire->ire_ihandle == ihandle)) &&
-	    ((!(match_flags & MATCH_IRE_ILL_GROUP)) ||
-	    (ire_ill == ipif_ill) ||
-	    (ire_ill_group != NULL &&
-	    ire_ill_group == ipif_ill_group)) &&
 	    ((!(match_flags & MATCH_IRE_SECATTR)) ||
 	    (!is_system_labeled()) ||
 	    (tsol_ire_match_gwattr(ire, tsl) == 0))) {
@@ -1391,8 +1399,7 @@ ire_route_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 	 * ire_match_args_v6() will dereference ipif MATCH_IRE_SRC or
 	 * MATCH_IRE_ILL is set.
 	 */
-	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
-	    (ipif == NULL))
+	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL)) && (ipif == NULL))
 		return (NULL);
 
 	/*
@@ -1477,8 +1484,7 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 	 * ire_match_args_v6() will dereference ipif MATCH_IRE_SRC or
 	 * MATCH_IRE_ILL is set.
 	 */
-	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
-	    (ipif == NULL))
+	if ((flags & (MATCH_IRE_SRC | MATCH_IRE_ILL)) && (ipif == NULL))
 		return (NULL);
 
 	/*
@@ -1661,8 +1667,7 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 				mutex_enter(&ire->ire_lock);
 				gw_addr_v6 = ire->ire_gateway_addr_v6;
 				mutex_exit(&ire->ire_lock);
-				match_flags = MATCH_IRE_ILL_GROUP |
-				    MATCH_IRE_SECATTR;
+				match_flags = MATCH_IRE_ILL | MATCH_IRE_SECATTR;
 				rire = ire_ctable_lookup_v6(&gw_addr_v6, NULL,
 				    0, ire->ire_ipif, zoneid, tsl, match_flags,
 				    ipst);
@@ -1703,7 +1708,7 @@ ire_ftable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *mask,
 
 					if (ire->ire_ipif != NULL) {
 						ire_match_flags |=
-						    MATCH_IRE_ILL_GROUP;
+						    MATCH_IRE_ILL;
 					}
 					rire = ire_route_lookup_v6(&gw_addr_v6,
 					    NULL, NULL, IRE_INTERFACE,
@@ -1791,21 +1796,8 @@ found_ire_held:
 		 */
 		saved_ire = ire;
 
-		/*
-		 * Currently MATCH_IRE_ILL is never used with
-		 * (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT) while
-		 * sending out packets as MATCH_IRE_ILL is used only
-		 * for communicating with on-link hosts. We can't assert
-		 * that here as RTM_GET calls this function with
-		 * MATCH_IRE_ILL | MATCH_IRE_DEFAULT | MATCH_IRE_RECURSIVE.
-		 * We have already used the MATCH_IRE_ILL in determining
-		 * the right prefix route at this point. To match the
-		 * behavior of how we locate routes while sending out
-		 * packets, we don't want to use MATCH_IRE_ILL below
-		 * while locating the interface route.
-		 */
 		if (ire->ire_ipif != NULL)
-			match_flags |= MATCH_IRE_ILL_GROUP;
+			match_flags |= MATCH_IRE_ILL;
 
 		mutex_enter(&ire->ire_lock);
 		gw_addr_v6 = ire->ire_gateway_addr_v6;
@@ -1958,9 +1950,7 @@ ire_ctable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *gateway,
 }
 
 /*
- * Lookup cache. Don't return IRE_MARK_HIDDEN entries. Callers
- * should use ire_ctable_lookup with MATCH_IRE_MARK_HIDDEN to get
- * to the hidden ones.
+ * Lookup cache.
  *
  * In general the zoneid has to match (where ALL_ZONES match all of them).
  * But for IRE_LOCAL we also need to handle the case where L2 should
@@ -1968,8 +1958,7 @@ ire_ctable_lookup_v6(const in6_addr_t *addr, const in6_addr_t *gateway,
  * Ethernet drivers nor Ethernet hardware loops back packets sent to their
  * own MAC address. This loopback is needed when the normal
  * routes (ignoring IREs with different zoneids) would send out the packet on
- * the same ill (or ill group) as the ill with which this IRE_LOCAL is
- * associated.
+ * the same ill as the ill with which this IRE_LOCAL is associated.
  *
  * Earlier versions of this code always matched an IRE_LOCAL independently of
  * the zoneid. We preserve that earlier behavior when
@@ -1986,7 +1975,7 @@ ire_cache_lookup_v6(const in6_addr_t *addr, zoneid_t zoneid,
 	    ipst->ips_ip6_cache_table_size)];
 	rw_enter(&irb_ptr->irb_lock, RW_READER);
 	for (ire = irb_ptr->irb_ire; ire; ire = ire->ire_next) {
-		if (ire->ire_marks & (IRE_MARK_CONDEMNED|IRE_MARK_HIDDEN))
+		if (ire->ire_marks & (IRE_MARK_CONDEMNED|IRE_MARK_TESTHIDDEN))
 			continue;
 		if (IN6_ARE_ADDR_EQUAL(&ire->ire_addr_v6, addr)) {
 			/*
@@ -2125,13 +2114,8 @@ ire_ihandle_lookup_offlink_v6(ire_t *cire, ire_t *pire)
 	ASSERT(cire != NULL && pire != NULL);
 
 	match_flags =  MATCH_IRE_TYPE | MATCH_IRE_IHANDLE | MATCH_IRE_MASK;
-	/*
-	 * ip_newroute_v6 calls ire_ftable_lookup with MATCH_IRE_ILL only
-	 * for on-link hosts. We should never be here for onlink.
-	 * Thus, use MATCH_IRE_ILL_GROUP.
-	 */
 	if (pire->ire_ipif != NULL)
-		match_flags |= MATCH_IRE_ILL_GROUP;
+		match_flags |= MATCH_IRE_ILL;
 	/*
 	 * We know that the mask of the interface ire equals cire->ire_cmask.
 	 * (When ip_newroute_v6() created 'cire' for an on-link destn. it set
@@ -2168,7 +2152,7 @@ ire_ihandle_lookup_offlink_v6(ire_t *cire, ire_t *pire)
 	 */
 	match_flags =  MATCH_IRE_TYPE;
 	if (pire->ire_ipif != NULL)
-		match_flags |= MATCH_IRE_ILL_GROUP;
+		match_flags |= MATCH_IRE_ILL;
 
 	mutex_enter(&pire->ire_lock);
 	gw_addr = pire->ire_gateway_addr_v6;
@@ -2210,24 +2194,30 @@ ire_t *
 ipif_to_ire_v6(const ipif_t *ipif)
 {
 	ire_t	*ire;
-	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+	ip_stack_t *ipst = ipif->ipif_ill->ill_ipst;
+	uint_t	match_flags = MATCH_IRE_TYPE | MATCH_IRE_IPIF;
+
+	/*
+	 * IRE_INTERFACE entries for ills under IPMP are IRE_MARK_TESTHIDDEN
+	 * so that they aren't accidentally returned.  However, if the
+	 * caller's ipif is on an ill under IPMP, there's no need to hide 'em.
+	 */
+	if (IS_UNDER_IPMP(ipif->ipif_ill))
+		match_flags |= MATCH_IRE_MARK_TESTHIDDEN;
 
 	ASSERT(ipif->ipif_isv6);
 	if (ipif->ipif_ire_type == IRE_LOOPBACK) {
 		ire = ire_ctable_lookup_v6(&ipif->ipif_v6lcl_addr, NULL,
-		    IRE_LOOPBACK, ipif, ALL_ZONES, NULL,
-		    (MATCH_IRE_TYPE | MATCH_IRE_IPIF), ipst);
+		    IRE_LOOPBACK, ipif, ALL_ZONES, NULL, match_flags, ipst);
 	} else if (ipif->ipif_flags & IPIF_POINTOPOINT) {
 		/* In this case we need to lookup destination address. */
 		ire = ire_ftable_lookup_v6(&ipif->ipif_v6pp_dst_addr,
 		    &ipv6_all_ones, NULL, IRE_INTERFACE, ipif, NULL, ALL_ZONES,
-		    0, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF |
-		    MATCH_IRE_MASK), ipst);
+		    0, NULL, (match_flags | MATCH_IRE_MASK), ipst);
 	} else {
 		ire = ire_ftable_lookup_v6(&ipif->ipif_v6subnet,
 		    &ipif->ipif_v6net_mask, NULL, IRE_INTERFACE, ipif, NULL,
-		    ALL_ZONES, 0, NULL, (MATCH_IRE_TYPE | MATCH_IRE_IPIF |
-		    MATCH_IRE_MASK), ipst);
+		    ALL_ZONES, 0, NULL, (match_flags | MATCH_IRE_MASK), ipst);
 	}
 	return (ire);
 }
@@ -2296,7 +2286,7 @@ ire_multirt_need_resolve_v6(const in6_addr_t *v6dstp, const ts_label_t *tsl,
 			continue;
 		if (!IN6_ARE_ADDR_EQUAL(&cire->ire_addr_v6, v6dstp))
 			continue;
-		if (cire->ire_marks & (IRE_MARK_CONDEMNED|IRE_MARK_HIDDEN))
+		if (cire->ire_marks & (IRE_MARK_CONDEMNED|IRE_MARK_TESTHIDDEN))
 			continue;
 		unres_cnt--;
 	}
@@ -2434,7 +2424,7 @@ ire_multirt_lookup_v6(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 						continue;
 					if (cire->ire_marks &
 					    (IRE_MARK_CONDEMNED|
-					    IRE_MARK_HIDDEN))
+					    IRE_MARK_TESTHIDDEN))
 						continue;
 
 					if (cire->ire_gw_secattr != NULL &&
@@ -2635,8 +2625,7 @@ ire_multirt_lookup_v6(ire_t **ire_arg, ire_t **fire_arg, uint32_t flags,
 					    &cire->ire_addr_v6, &v6dst))
 						continue;
 					if (cire->ire_marks &
-					    (IRE_MARK_CONDEMNED|
-					    IRE_MARK_HIDDEN))
+					    IRE_MARK_CONDEMNED)
 						continue;
 
 					if (cire->ire_gw_secattr != NULL &&
@@ -2845,8 +2834,7 @@ ip6_ctable_lookup_impl(ire_ctable_args_t *margs)
 	ire_t			*ire;
 	ip_stack_t		*ipst = margs->ict_ipst;
 
-	if ((margs->ict_flags &
-	    (MATCH_IRE_SRC | MATCH_IRE_ILL | MATCH_IRE_ILL_GROUP)) &&
+	if ((margs->ict_flags & (MATCH_IRE_SRC | MATCH_IRE_ILL)) &&
 	    (margs->ict_ipif == NULL)) {
 		return (NULL);
 	}

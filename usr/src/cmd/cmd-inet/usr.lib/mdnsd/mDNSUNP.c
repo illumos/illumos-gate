@@ -1,3 +1,7 @@
+/*
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /* -*- Mode: C; tab-width: 4 -*-
  *
  * Copyright (c) 2002-2004 Apple Computer, Inc. All rights reserved.
@@ -129,8 +133,6 @@ Revision 1.1  2002/09/17 06:24:34  cheshire
 First checkin
 
 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mDNSUNP.h"
 
@@ -398,13 +400,11 @@ select_src_ifi_info_solaris(int sockfd, int numifs,
             continue;
         /*
          * Avoid address if any of the following flags are set: 
-         *  IFF_NOFAILOVER: IPMP test address for use only by in.mpathd
          *  IFF_NOXMIT: no packets transmitted over interface
          *  IFF_NOLOCAL: no address
          *  IFF_PRIVATE: is not advertised
          */
-        if (ifflags & (IFF_NOFAILOVER | IFF_NOXMIT
-            | IFF_NOLOCAL | IFF_PRIVATE))
+        if (ifflags & (IFF_NOXMIT | IFF_NOLOCAL | IFF_PRIVATE))
             continue;
 
         if (*best_lifr != NULL) {

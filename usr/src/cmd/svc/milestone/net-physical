@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -38,21 +38,8 @@
 #
 smf_configure_ip || exit $SMF_EXIT_OK
 
-# Print warnings to console
-warn_failed_ifs() {
-	echo "Failed to $1 interface(s): $2" >/dev/msglog
-}
-
 # Make sure that the libraries essential to this stage of booting can be found.
 LD_LIBRARY_PATH=/lib; export LD_LIBRARY_PATH
-
-#
-# Cause ifconfig to not automatically start in.mpathd when IPMP groups are
-# configured.  This is not strictly necessary but makes it so that in.mpathd
-# will always be started explicitly from /etc/init.d/inetinit, when we're
-# sure that /usr is mounted.
-#
-SUNW_NO_MPATHD=; export SUNW_NO_MPATHD
 
 smf_netstrategy
 
@@ -127,13 +114,18 @@ if [ "$interface_names" != "/etc/hostname.*[0-9]" ]; then
 	IFS="$ORIGIFS"
 	while [ $# -ge 2 ]; do
 		shift
-		if [ $# -gt 1 -a "$2" != "/etc/hostname" ]; then
-			while [ $# -gt 1 -a "$1" != "/etc/hostname" ]; do
-				shift
-			done
-		else
-			inet_list="$inet_list $1"
+		intf_name=$1
+		while [ $# -gt 1 -a "$2" != "/etc/hostname" ]; do
+			intf_name="$intf_name.$2"
 			shift
+		done
+		shift
+
+	        read one rest < /etc/hostname.$intf_name
+		if [ "$one" = ipmp ]; then
+			ipmp_list="$ipmp_list $intf_name"
+		else
+			inet_list="$inet_list $intf_name"
 		fi
 	done
 fi
@@ -151,17 +143,38 @@ if [ "$interface_names" != "/etc/hostname6.*[0-9]" ]; then
 	IFS="$ORIGIFS"
 	while [ $# -ge 2 ]; do
 		shift
-		if [ $# -gt 1 -a "$2" != "/etc/hostname6" ]; then
-			while [ $# -gt 1 -a "$1" != "/etc/hostname6" ]; do
-				shift
-			done
-		else
-			inet6_list="$inet6_list $1"
+		intf_name=$1
+		while [ $# -gt 1 -a "$2" != "/etc/hostname6" ]; do
+			intf_name="$intf_name.$2"
 			shift
+		done
+		shift
+
+	        read one rest < /etc/hostname6.$intf_name
+		if [ "$one" = ipmp ]; then
+			ipmp6_list="$ipmp6_list $intf_name"
+		else
+			inet6_list="$inet6_list $intf_name"
 		fi
 	done
 fi
 
+#
+# Create all of the IPv4 IPMP interfaces.
+#
+if [ -n "$ipmp_list" ]; then
+	set -- $ipmp_list
+	while [ $# -gt 0 ]; do
+	    	if /sbin/ifconfig $1 ipmp; then
+			ipmp_created="$ipmp_created $1"
+		else
+			ipmp_failed="$ipmp_failed $1"
+		fi	
+		shift
+	done
+	[ -n "$ipmp_failed" ] && warn_failed_ifs "create IPv4 IPMP" \
+	    "$ipmp_failed"
+fi
 
 #
 # Step through the IPv4 interface list and try to plumb every interface.
@@ -178,7 +191,7 @@ if [ -n "$inet_list" ]; then
 		fi
 		shift
 	done
-	[ -n "$inet_failed" ] && warn_failed_ifs "plumb IPv4" $inet_failed
+	[ -n "$inet_failed" ] && warn_failed_ifs "plumb IPv4" "$inet_failed"
 fi
 
 # Run autoconf to connect to a WLAN if the interface is a wireless one
@@ -209,7 +222,24 @@ if [ -n "$inet6_list" ]; then
 		fi
 		shift
 	done
-	[ -n "$inet6_failed" ] && warn_failed_ifs "plumb IPv6" $inet6_failed
+	[ -n "$inet6_failed" ] && warn_failed_ifs "plumb IPv6" "$inet6_failed"
+fi
+
+#
+# Create all of the IPv6 IPMP interfaces.
+#
+if [ -n "$ipmp6_list" ]; then
+	set -- $ipmp6_list
+	while [ $# -gt 0 ]; do
+	    	if /sbin/ifconfig $1 inet6 ipmp; then
+			ipmp6_created="$ipmp6_created $1"
+		else
+			ipmp6_failed="$ipmp6_failed $1"
+ 		fi
+		shift
+	done
+	[ -n "$ipmp6_failed" ] && warn_failed_ifs "create IPv6 IPMP" \
+	    "$ipmp6_failed"
 fi
 
 if smf_is_globalzone; then
@@ -224,49 +254,24 @@ if smf_is_globalzone; then
 fi
 
 #
-# Process the /etc/hostname.* files of plumbed IPv4 interfaces.  If an
-# /etc/hostname file is not present or is empty, the ifconfig auto-dhcp
-# / auto-revarp command will attempt to set the address, later.
+# Process the /etc/hostname[6].* files for IPMP interfaces.  Processing these
+# before non-IPMP interfaces avoids accidental implicit IPMP group creation.
 #
-# If /etc/hostname.lo0 exists the loop below will do additional
-# configuration of lo0.
-#
-if [ -n "$inet_plumbed" ]; then
-	i4s_fail=
-	echo "configuring IPv4 interfaces:\c"
-	set -- $inet_plumbed
-	while [ $# -gt 0 ]; do
-		inet_process_hostname /sbin/ifconfig $1 inet \
-		    </etc/hostname.$1 >/dev/null
-		[ $? != 0 ] && i4s_fail="$i4s_fail $1"
-		echo " $1\c"
-		shift
-	done
-	echo "."
-	[ -n "$i4s_fail" ] && warn_failed_ifs "configure IPv4" $i4s_fail
-fi
+[ -n "$ipmp_created" ] && if_configure inet "IPMP" $ipmp_created
+[ -n "$ipmp6_created" ] && if_configure inet6 "IPMP" $ipmp6_created
 
 #
-# Process the /etc/hostname6.* files of plumbed IPv6 interfaces.  After
-# processing the hostname6 file, bring the interface up.  If
-# /etc/hostname6.lo0 exists the loop below will do additional
-# configuration of lo0.
+# Process the /etc/hostname[6].* files for non-IPMP interfaces.
 #
-if [ -n "$inet6_plumbed" ]; then
-	i6_fail=
-	echo "configuring IPv6 interfaces:\c"
-	set -- $inet6_plumbed
-	while [ $# -gt 0 ]; do
-		inet6_process_hostname /sbin/ifconfig $1 inet6 \
-		    </etc/hostname6.$1 >/dev/null && 
-		    /sbin/ifconfig $1 inet6 up
-		[ $? != 0 ] && i6_fail="$i6_fail $1"
-		echo " $1\c"
-		shift
-	done
-	echo "."
-	[ -n "$i6_fail" ] && warn_failed_ifs "configure IPv6" $i6_fail
-fi
+[ -n "$inet_plumbed" ] && if_configure inet "" $inet_plumbed
+[ -n "$inet6_plumbed" ] && if_configure inet6 "" $inet6_plumbed
+
+#
+# For the IPv4 and IPv6 interfaces that failed to plumb, find (or create)
+# IPMP meta-interfaces to host their data addresses.
+#
+[ -n "$inet_failed" ] && move_addresses inet
+[ -n "$inet6_failed" ] && move_addresses inet6
 
 # Run DHCP if requested. Skip boot-configured interface.
 interface_names="`echo /etc/dhcp.*[0-9] 2>/dev/null`"
@@ -326,7 +331,7 @@ if [ "$interface_names" != '/etc/dhcp.*[0-9]' ]; then
 	done
 	IFS="$ORIGIFS"
 	unset ORIGIFS
-	[ -n "$i4d_fail" ] && warn_failed_ifs "configure IPv4 DHCP" $i4d_fail
+	[ -n "$i4d_fail" ] && warn_failed_ifs "configure IPv4 DHCP" "$i4d_fail"
 fi
 
 # In order to avoid bringing up the interfaces that have
@@ -336,14 +341,6 @@ hostname="`shcat /etc/nodename 2>/dev/null`"
 if [ "$_INIT_NET_STRATEGY" = "rarp" -o -z "$hostname" ]; then
 	/sbin/ifconfig -adD4 auto-revarp netmask + broadcast + up
 fi
-
-#
-# Process IPv4 and IPv6 interfaces that failed to plumb.  Find an
-# alternative interface to host the addresses.
-#
-[ -n "$inet_failed" ] && move_addresses inet
-
-[ -n "$inet6_failed" ] && move_addresses inet6
 
 #
 # If the /etc/defaultrouter file exists, process it now so that the next

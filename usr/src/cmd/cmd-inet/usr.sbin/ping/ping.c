@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +36,6 @@
  * software developed by the University of California, Berkeley, and its
  * contributors.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <strings.h>
@@ -243,7 +241,7 @@ main(int argc, char *argv[])
 	ushort_t udp_src_port6;			/* used to identify replies */
 	uint_t flowinfo = 0;
 	uint_t class = 0;
-	char tmp_buf[INET6_ADDRSTRLEN];
+	char abuf[INET6_ADDRSTRLEN];
 	int c;
 	int i;
 	boolean_t has_sys_ip_config;
@@ -671,24 +669,18 @@ main(int argc, char *argv[])
 			Printf("PING %s: %d data bytes\n", targethost, datalen);
 		} else {
 			if (ai_dst->ai_family == AF_INET) {
-				Printf("PING %s (%s): %d data bytes\n",
-				    targethost,
-				    inet_ntop(AF_INET,
-					/* LINTED E_BAD_PTR_CAST_ALIGN */
-					&((struct sockaddr_in *)
-					ai_dst->ai_addr)->sin_addr,
-					tmp_buf, sizeof (tmp_buf)),
-				    datalen);
+				(void) inet_ntop(AF_INET,
+				    &((struct sockaddr_in *)(void *)
+				    ai_dst->ai_addr)->sin_addr,
+				    abuf, sizeof (abuf));
 			} else {
-				Printf("PING %s (%s): %d data bytes\n",
-				    targethost,
-				    inet_ntop(AF_INET6,
-					/* LINTED E_BAD_PTR_CAST_ALIGN */
-					&((struct sockaddr_in6 *)
-					ai_dst->ai_addr)->sin6_addr,
-					tmp_buf, sizeof (tmp_buf)),
-				    datalen);
+				(void) inet_ntop(AF_INET6,
+				    &((struct sockaddr_in6 *)(void *)
+				    ai_dst->ai_addr)->sin6_addr,
+				    abuf, sizeof (abuf));
 			}
+			Printf("PING %s (%s): %d data bytes\n",
+			    targethost, abuf, datalen);
 		}
 	}
 
@@ -1074,12 +1066,12 @@ select_all_src_addrs(union any_in_addr **src_addr_list, struct addrinfo *ai,
 	int num_dst = 1;
 	int i;
 
-	if (probe_all)
-		for (aip = ai; aip->ai_next != NULL;
-		    aip = aip->ai_next, num_dst++);
+	if (probe_all) {
+		for (aip = ai; aip->ai_next != NULL; aip = aip->ai_next)
+			num_dst++;
+	}
 
-	list = (union any_in_addr *)
-	    calloc((size_t)num_dst, sizeof (union any_in_addr));
+	list = calloc((size_t)num_dst, sizeof (union any_in_addr));
 	if (list == NULL) {
 		Fprintf(stderr, "%s: calloc: %s\n", progname, strerror(errno));
 		exit(EXIT_FAILURE);
@@ -1472,7 +1464,7 @@ setup_socket(int family, int *send_sockp, int *recv_sockp, int *if_index,
 		int i;
 
 		/* pull out the interface list */
-		num_ifs = ifaddrlist(&al, family, errbuf);
+		num_ifs = ifaddrlist(&al, family, LIFC_UNDER_IPMP, errbuf);
 		if (num_ifs == -1) {
 			Fprintf(stderr, "%s: %s\n", progname, errbuf);
 			exit(EXIT_FAILURE);
@@ -1699,8 +1691,8 @@ send_scheduled_probe()
 			} else {
 				Printf("no answer from %s(%s)\n", targethost,
 				    inet_ntop(current_targetaddr->family,
-					&current_targetaddr->dst_addr,
-					tmp_buf, sizeof (tmp_buf)));
+				    &current_targetaddr->dst_addr,
+				    tmp_buf, sizeof (tmp_buf)));
 			}
 		}
 		/*
@@ -1736,9 +1728,8 @@ send_scheduled_probe()
 			 * Each time we move to a new targetaddr, which has
 			 * a different target IP address, we update this field.
 			 */
-			current_targetaddr->starting_seq_num =
-			    use_udp ? dest_port :
-				(ntransmitted % (MAX_ICMP_SEQ + 1));
+			current_targetaddr->starting_seq_num = use_udp ?
+			    dest_port : (ntransmitted % (MAX_ICMP_SEQ + 1));
 		}
 	}
 

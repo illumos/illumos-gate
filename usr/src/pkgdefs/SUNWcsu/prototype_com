@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -649,7 +649,7 @@ d none usr/lib/inet/dhcp 755 root bin
 d none usr/lib/inet/dhcp/nsu 755 root bin
 d none usr/lib/inet/dhcp/svc 755 root bin
 f none usr/lib/inet/in.iked 555 root bin
-f none usr/lib/inet/in.mpathd 555 root bin
+s none usr/lib/inet/in.mpathd=../../../lib/inet/in.mpathd
 f none usr/lib/inet/inetd 555 root bin
 f none usr/lib/intrd 555 root bin
 f none usr/lib/isaexec 555 root bin
@@ -865,6 +865,7 @@ s none usr/sbin/init=../../sbin/init
 f none usr/sbin/install 555 root bin
 f none usr/sbin/installboot 555 root sys
 f none usr/sbin/ipaddrsel 555 root bin
+s none usr/sbin/ipmpstat=../../sbin/ipmpstat
 f none usr/sbin/ipsecalgs 555 root bin
 f none usr/sbin/ipsecconf 555 root bin
 f none usr/sbin/ipseckey 555 root bin

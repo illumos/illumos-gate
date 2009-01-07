@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -82,6 +82,7 @@ f none kernel/drv/sparcv9/cryptoadm 755 root sys
 f none kernel/drv/sparcv9/dad 755 root sys
 f none kernel/drv/sparcv9/devinfo 755 root sys
 f none kernel/drv/sparcv9/dld 755 root sys
+f none kernel/drv/sparcv9/dlpistub 755 root sys
 f none kernel/drv/sparcv9/esp 755 root sys
 f none kernel/drv/sparcv9/i8042 755 root sys
 f none kernel/drv/sparcv9/icmp 755 root sys
@@ -137,7 +138,6 @@ f none kernel/drv/sparcv9/ttymux 755 root sys
 f none kernel/drv/sparcv9/uata 755 root sys	
 f none kernel/drv/sparcv9/udp 755 root sys
 f none kernel/drv/sparcv9/udp6 755 root sys
-f none kernel/drv/sparcv9/vni 755 root sys
 f none kernel/drv/sparcv9/vnic 755 root sys
 f none kernel/drv/sparcv9/wc 755 root sys
 d none kernel/exec/sparcv9 755 root sys

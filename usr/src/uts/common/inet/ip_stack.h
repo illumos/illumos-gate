@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@ extern "C" {
 
 #include <sys/netstack.h>
 #include <netinet/igmp_var.h>
+#include <sys/modhash.h>
 
 #ifdef _KERNEL
 #include <sys/list.h>
@@ -172,9 +173,6 @@ struct ip_stack {
 
 	krwlock_t	ips_ill_g_usesrc_lock;
 
-	struct ill_group *ips_illgrp_head_v4;	/* Head of IPv4 ill groups */
-	struct ill_group *ips_illgrp_head_v6;	/* Head of IPv6 ill groups */
-
 	/* Taskq dispatcher for capability operations */
 	kmutex_t	ips_capab_taskq_lock;
 	kcondvar_t	ips_capab_taskq_cv;
@@ -204,7 +202,6 @@ struct ip_stack {
 	int 		ips_igmp_timer_scheduled_last;
 	int		ips_igmp_deferred_next;
 	timeout_id_t	ips_igmp_timeout_id;
-	kthread_t	*ips_igmp_timer_thread;
 	boolean_t	ips_igmp_timer_setter_active;
 
 	/* Following protected by mld_timer_lock */
@@ -212,7 +209,6 @@ struct ip_stack {
 	int 		ips_mld_timer_scheduled_last;
 	int		ips_mld_deferred_next;
 	timeout_id_t	ips_mld_timeout_id;
-	kthread_t	*ips_mld_timer_thread;
 	boolean_t	ips_mld_timer_setter_active;
 
 	/* Protected by igmp_slowtimeout_lock */
@@ -269,8 +265,6 @@ struct ip_stack {
 	int		ips_ip_g_forward;
 	int		ips_ipv6_forward;
 
-	int		ips_ipmp_hook_emulation; /* ndd variable */
-
 	time_t		ips_ip_g_frag_timeout;
 	clock_t		ips_ip_g_frag_timo_ms;
 
@@ -280,8 +274,6 @@ struct ip_stack {
 	clock_t		ips_icmp_pkt_err_last;
 	/* Number of packets sent in burst */
 	uint_t		ips_icmp_pkt_err_sent;
-	/* Used by icmp_send_redirect_v6 for picking random src. */
-	uint_t		ips_icmp_redirect_v6_src_index;
 
 	/* Protected by ip_mi_lock */
 	void		*ips_ip_g_head;		/* Instance Data List Head */
@@ -356,8 +348,6 @@ struct ip_stack {
 
 	kstat_t		*ips_loopback_ksp;
 
-	uint_t		ips_ipif_src_random;
-
 	struct idl_s	*ips_conn_drain_list;	/* Array of conn drain lists */
 	uint_t		ips_conn_drain_list_cnt; /* Count of conn_drain_list */
 	int		ips_conn_drain_list_index; /* Next drain_list */
@@ -374,15 +364,6 @@ struct ip_stack {
 
 	uint64_t	ips_ipif_g_seqid;
 	union phyint_list_u *ips_phyint_g_list;	/* start of phyint list */
-
-	/*
-	 * Reflects value of FAILBACK variable in IPMP config file
-	 * /etc/default/mpathd. Default value is B_TRUE.
-	 * Set to B_FALSE if user disabled failback by configuring
-	 * "FAILBACK=no" in.mpathd uses SIOCSIPMPFAILBACK ioctl to pass this
-	 * information to kernel.
-	 */
-	boolean_t ips_ipmp_enable_failback;
 
 /* ip_neti.c */
 	hook_family_t	ips_ipv4root;
@@ -427,12 +408,25 @@ struct ip_stack {
 	kcondvar_t		ips_ipobs_cb_cv;
 
 	struct __ldi_ident	*ips_ldi_ident;
+
+/* ipmp.c */
+	krwlock_t		ips_ipmp_lock;
+	mod_hash_t		*ips_ipmp_grp_hash;
+
+/* igmp.c */
+	/* multicast restart timers thread logic */
+	kmutex_t		ips_mrt_lock;
+	uint_t			ips_mrt_flags;
+	kcondvar_t		ips_mrt_cv;
+	kcondvar_t		ips_mrt_done_cv;
+	kthread_t		*ips_mrt_thread;
 };
 typedef struct ip_stack ip_stack_t;
 
 /* Finding an ip_stack_t */
 #define	CONNQ_TO_IPST(_q)	(Q_TO_CONN(_q)->conn_netstack->netstack_ip)
 #define	ILLQ_TO_IPST(_q)	(((ill_t *)(_q)->q_ptr)->ill_ipst)
+#define	PHYINT_TO_IPST(phyi)	((phyi)->phyint_ipsq->ipsq_ipst)
 
 #else /* _KERNEL */
 typedef int ip_stack_t;

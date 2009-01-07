@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include <inet/common.h>
 #include <inet/optcom.h>
 #include <inet/ip.h>
+#include <inet/ip_if.h>
 #include <inet/ip_impl.h>
 #include <inet/tcp.h>
 #include <inet/tcp_impl.h>

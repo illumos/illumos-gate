@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -122,8 +122,6 @@ s none usr/lib/llib-lintl=../../lib/llib-lintl
 s none usr/lib/llib-lintl.ln=../../lib/llib-lintl.ln
 f none usr/lib/llib-lipmi 644 root bin
 f none usr/lib/llib-lipmi.ln 644 root bin
-f none usr/lib/llib-lipmp 644 root bin
-f none usr/lib/llib-lipmp.ln 644 root bin
 f none usr/lib/llib-lipp 644 root bin
 f none usr/lib/llib-lipp.ln 644 root bin
 s none usr/lib/llib-lkstat=../../lib/llib-lkstat

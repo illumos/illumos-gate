@@ -18,18 +18,11 @@
 #
 # CDDL HEADER END
 #
-#
-# uts/intel/vni/Makefile
-#
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This makefile drives the production of the vni streams kernel
-#	module.
-#
-#	intel architecture dependent
+# This makefile drives the production of the dlpistub STREAMS module.
+# sparc architecture dependent
 #
 
 #
@@ -40,16 +33,16 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= vni
-OBJECTS		= $(VNI_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(VNI_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= dlpistub
+OBJECTS		= $(DLPISTUB_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(DLPISTUB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/common/inet/vni
+CONF_SRCDIR	= $(UTSBASE)/common/inet/dlpistub
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/intel/Makefile.intel
+include $(UTSBASE)/sparc/Makefile.sparc
 
 #
 #	Define targets
@@ -87,4 +80,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/intel/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ

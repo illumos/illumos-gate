@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _IPMP_H
 #define	_IPMP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * General IPMP-related definitions and functions.
@@ -50,13 +47,14 @@ enum {
 	IPMP_FAILURE,		/* operation failed (check errno) */
 	IPMP_EMINRED,		/* minimum failover redundancy not met */
 	IPMP_EFBDISABLED,	/* failback disabled */
-	IPMP_EFBPARTIAL,	/* unable to completely fail back */
+	IPMP_EUNKADDR,		/* unknown IPMP data address */
 	IPMP_EINVAL,		/* invalid argument */
 	IPMP_ENOMEM,		/* out of memory */
 	IPMP_ENOMPATHD,		/* cannot contact in.mpathd */
 	IPMP_EUNKGROUP,		/* unknown IPMP group */
 	IPMP_EUNKIF,		/* interface is not using IPMP */
 	IPMP_EPROTO,		/* unable to communicate with in.mpathd */
+	IPMP_EHWADDRDUP,	/* interface has duplicate hardware address */
 	IPMP_NERR		/* number of error codes */
 };
 

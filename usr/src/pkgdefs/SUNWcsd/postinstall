@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -48,6 +48,7 @@ prototype_com='
 devices/pseudo/arp@0:arp              dev/arp
 devices/pseudo/clone@0:ibd            dev/ibd
 devices/pseudo/dld@0:ctl              dev/dld
+devices/pseudo/dlpistub@0:ipmpstub    dev/ipmpstub
 devices/pseudo/icmp@0:icmp            dev/icmp
 devices/pseudo/icmp@0:icmp            dev/rawip
 devices/pseudo/icmp6@0:icmp6          dev/icmp6
