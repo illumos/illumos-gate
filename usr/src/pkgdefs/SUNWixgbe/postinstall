@@ -22,10 +22,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Function: check_add_drv()
@@ -131,5 +129,12 @@ check_add_drv()
 
 check_add_drv -i		\
 	'"pciex8086,10c6"
-	"pciex8086,10c7"'	\
+	"pciex8086,10c7"
+	"pciex8086,10c8"
+	"pciex8086,10db"
+	"pciex8086,10dd"
+	"pciex8086,10ec"
+	"pciex8086,10e1"
+	"pciex8086,10f1"
+	"pciex8086,10f4"'	\
 	-b "$BASEDIR" ixgbe

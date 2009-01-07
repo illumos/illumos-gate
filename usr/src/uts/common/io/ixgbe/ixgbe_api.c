@@ -22,16 +22,15 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.81 v2008-03-04 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* IntelVersion: 1.99 v2008-09-12 */
 
 #include "ixgbe_api.h"
 #include "ixgbe_common.h"
+#ident "$Id: ixgbe_api.c,v 1.99 2008/08/22 16:30:26 mrchilak Exp $"
 
 extern s32 ixgbe_init_ops_82598(struct ixgbe_hw *hw);
 
@@ -81,15 +80,19 @@ ixgbe_set_mac_type(struct ixgbe_hw *hw)
 {
 	s32 ret_val = IXGBE_SUCCESS;
 
-	DEBUGFUNC("ixgbe_set_mac_type");
+	DEBUGFUNC("ixgbe_set_mac_type\n");
 
 	if (hw->vendor_id == IXGBE_INTEL_VENDOR_ID) {
 		switch (hw->device_id) {
 		case IXGBE_DEV_ID_82598AF_SINGLE_PORT:
 		case IXGBE_DEV_ID_82598AF_DUAL_PORT:
+		case IXGBE_DEV_ID_82598AT:
 		case IXGBE_DEV_ID_82598EB_CX4:
 		case IXGBE_DEV_ID_82598_CX4_DUAL_PORT:
+		case IXGBE_DEV_ID_82598_DA_DUAL_PORT:
+		case IXGBE_DEV_ID_82598_SR_DUAL_PORT_EM:
 		case IXGBE_DEV_ID_82598EB_XF_LR:
+		case IXGBE_DEV_ID_82598EB_SFP_LOM:
 			hw->mac.type = ixgbe_mac_82598EB;
 			break;
 		default:
@@ -99,6 +102,9 @@ ixgbe_set_mac_type(struct ixgbe_hw *hw)
 	} else {
 		ret_val = IXGBE_ERR_DEVICE_NOT_SUPPORTED;
 	}
+
+	DEBUGOUT2("ixgbe_set_mac_type found mac: %d, returns: %d\n",
+	    hw->mac.type, ret_val);
 
 	return (ret_val);
 }
@@ -301,6 +307,21 @@ ixgbe_reset_phy(struct ixgbe_hw *hw)
 }
 
 /*
+ * ixgbe_get_phy_firmware_version -
+ * @hw: pointer to hardware structure
+ * @firmware_version: pointer to firmware version
+ */
+s32
+ixgbe_get_phy_firmware_version(struct ixgbe_hw *hw, u16 *firmware_version)
+{
+	s32 status = IXGBE_SUCCESS;
+
+	status = ixgbe_call_func(hw, hw->phy.ops.get_firmware_version,
+	    (hw, firmware_version), IXGBE_NOT_IMPLEMENTED);
+	return (status);
+}
+
+/*
  * ixgbe_read_phy_reg - Read PHY register
  * @hw: pointer to hardware structure
  * @reg_addr: 32 bit address of PHY register to read
@@ -345,10 +366,24 @@ ixgbe_setup_phy_link(struct ixgbe_hw *hw)
 }
 
 /*
+ * ixgbe_check_phy_link - Determine link and speed status
+ * @hw: pointer to hardware structure
+ *
+ * Reads a PHY register to determine if link is up and the current speed for
+ * the PHY.
+ */
+s32 ixgbe_check_phy_link(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
+    bool *link_up)
+{
+	return ixgbe_call_func(hw, hw->phy.ops.check_link, (hw, speed,
+	    link_up), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
  * ixgbe_setup_phy_link_speed - Set auto advertise
  * @hw: pointer to hardware structure
  * @speed: new link speed
- * @autoneg: TRUE if autonegotiation enabled
+ * @autoneg: true if autonegotiation enabled
  *
  * Sets the auto advertised capabilities
  */
@@ -384,17 +419,17 @@ ixgbe_setup_link(struct ixgbe_hw *hw)
  */
 s32
 ixgbe_check_link(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
-    bool *link_up)
+    bool *link_up, bool link_up_wait_to_complete)
 {
 	return ixgbe_call_func(hw, hw->mac.ops.check_link, (hw, speed,
-	    link_up), IXGBE_NOT_IMPLEMENTED);
+	    link_up, link_up_wait_to_complete), IXGBE_NOT_IMPLEMENTED);
 }
 
 /*
  * ixgbe_setup_link_speed - Set link speed
  * @hw: pointer to hardware structure
  * @speed: new link speed
- * @autoneg: TRUE if autonegotiation enabled
+ * @autoneg: true if autonegotiation enabled
  *
  * Set the link speed and restarts the link.
  */
@@ -567,6 +602,20 @@ ixgbe_set_rar(struct ixgbe_hw *hw, u32 index, u8 *addr, u32 vmdq,
 }
 
 /*
+ * ixgbe_clear_rar - Clear Rx address register
+ * @hw: pointer to hardware structure
+ * @index: Receive address register to write
+ *
+ * Puts an ethernet address into a receive address register.
+ */
+s32
+ixgbe_clear_rar(struct ixgbe_hw *hw, u32 index)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.clear_rar, (hw, index),
+	    IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
  * ixgbe_set_vmdq - Associate a VMDq index with a receive address
  * @hw: pointer to hardware structure
  * @rar: receive address register index to associate with VMDq index
@@ -576,6 +625,19 @@ s32
 ixgbe_set_vmdq(struct ixgbe_hw *hw, u32 rar, u32 vmdq)
 {
 	return ixgbe_call_func(hw, hw->mac.ops.set_vmdq, (hw, rar, vmdq),
+	    IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_clear_vmdq - Disassociate a VMDq index from a receive address
+ * @hw: pointer to hardware structure
+ * @rar: receive address register index to disassociate with VMDq index
+ * @vmdq: VMDq set or pool index
+ */
+s32
+ixgbe_clear_vmdq(struct ixgbe_hw *hw, u32 rar, u32 vmdq)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.clear_vmdq, (hw, rar, vmdq),
 	    IXGBE_NOT_IMPLEMENTED);
 }
 
@@ -742,4 +804,47 @@ ixgbe_write_analog_reg8(struct ixgbe_hw *hw, u32 reg, u8 val)
 {
 	return ixgbe_call_func(hw, hw->mac.ops.write_analog_reg8, (hw, reg,
 	    val), IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_init_uta_tables - Initializes Unicast Table Arrays.
+ * @hw: pointer to hardware structure
+ *
+ * Initializes the Unicast Table Arrays to zero on device load.  This
+ * is part of the Rx init addr execution path.
+ */
+s32
+ixgbe_init_uta_tables(struct ixgbe_hw *hw)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.init_uta_tables, (hw),
+	    IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_read_i2c_eeprom - Reads 8 bit EEPROM word over I2C interface
+ * @hw: pointer to hardware structure
+ * @byte_offset: EEPROM byte offset to read
+ * @eeprom_data: value read
+ *
+ * Performs byte read operation to SFP module's EEPROM over I2C interface.
+ */
+s32
+ixgbe_read_i2c_eeprom(struct ixgbe_hw *hw, u8 byte_offset, u8 *eeprom_data)
+{
+	return ixgbe_call_func(hw, hw->phy.ops.read_i2c_eeprom,
+	    (hw, byte_offset, eeprom_data),
+	    IXGBE_NOT_IMPLEMENTED);
+}
+
+/*
+ * ixgbe_get_supported_physical_layer - Returns physical layer type
+ * @hw: pointer to hardware structure
+ *
+ * Determines physical layer capabilities of the current configuration.
+ */
+s32
+ixgbe_get_supported_physical_layer(struct ixgbe_hw *hw)
+{
+	return ixgbe_call_func(hw, hw->mac.ops.get_supported_physical_layer,
+	    (hw), IXGBE_NOT_IMPLEMENTED);
 }

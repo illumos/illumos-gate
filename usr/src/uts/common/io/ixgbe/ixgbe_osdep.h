@@ -22,14 +22,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
 #ifndef	_IXGBE_OSDEP_H
 #define	_IXGBE_OSDEP_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,8 +79,8 @@ uint16_t ixgbe_read_pci_cfg(struct ixgbe_hw *, uint32_t);
 
 #define	OS_DEP(hw)		((struct ixgbe_osdep *)((hw)->back))
 
-#define	FALSE		0
-#define	TRUE		1
+#define	false		B_FALSE
+#define	true		B_TRUE
 
 #define	IXGBE_READ_PCIE_WORD 	ixgbe_read_pci_cfg
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
@@ -98,12 +96,12 @@ uint16_t ixgbe_read_pci_cfg(struct ixgbe_hw *, uint32_t);
 #define	IXGBE_WRITE_FLUSH(a)	(void) IXGBE_READ_REG(a, IXGBE_STATUS)
 
 #define	IXGBE_WRITE_REG(a, reg, value)	\
-	ddi_put32((OS_DEP(hw))->reg_handle, \
-	    (uint32_t *)((uintptr_t)(hw)->hw_addr + reg), (value))
+	ddi_put32((OS_DEP(a))->reg_handle, \
+	    (uint32_t *)((uintptr_t)(a)->hw_addr + reg), (value))
 
 #define	IXGBE_READ_REG(a, reg)	\
-	ddi_get32((OS_DEP(hw))->reg_handle, \
-	    (uint32_t *)((uintptr_t)(hw)->hw_addr + reg))
+	ddi_get32((OS_DEP(a))->reg_handle, \
+	    (uint32_t *)((uintptr_t)(a)->hw_addr + reg))
 
 #define	msec_delay_irq	msec_delay
 

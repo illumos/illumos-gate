@@ -22,11 +22,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ixgbe_sw.h"
 
@@ -324,7 +322,7 @@ ixgbe_nd_ioctl(ixgbe_t *ixgbe, queue_t *q,
 	switch (cmd) {
 	default:
 		/* NOTREACHED */
-		ASSERT(FALSE);
+		ASSERT(B_FALSE);
 		return (IOC_INVAL);
 
 	case ND_GET:

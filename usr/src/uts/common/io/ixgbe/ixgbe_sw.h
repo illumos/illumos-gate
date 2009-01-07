@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,17 +95,17 @@ extern "C" {
 #define	MIN_NUM_TX_DESC			2
 
 /*
- * Maximum values for user configurable parameters
- */
-
-/*
- * MAX_xx_QUEUE_NUM values need to be the maximum of all supported
- * silicon types.
+ * MAX_xx_QUEUE_NUM and MAX_RING_VECTOR values need to be the maximum of all
+ * supported silicon types.
  */
 #define	MAX_TX_QUEUE_NUM		32
 #define	MAX_RX_QUEUE_NUM		64
-#define	MAX_RX_GROUP_NUM		1
+#define	MAX_RING_VECTOR			16
 
+/*
+ * Maximum values for user configurable parameters
+ */
+#define	MAX_RX_GROUP_NUM		1
 #define	MAX_TX_RING_SIZE		4096
 #define	MAX_RX_RING_SIZE		4096
 
@@ -122,8 +122,6 @@ extern "C" {
 /*
  * Minimum values for user configurable parameters
  */
-#define	MIN_TX_QUEUE_NUM		1
-#define	MIN_RX_QUEUE_NUM		1
 #define	MIN_RX_GROUP_NUM		1
 #define	MIN_TX_RING_SIZE		64
 #define	MIN_RX_RING_SIZE		64
@@ -140,8 +138,6 @@ extern "C" {
 /*
  * Default values for user configurable parameters
  */
-#define	DEFAULT_TX_QUEUE_NUM		8
-#define	DEFAULT_RX_QUEUE_NUM		8
 #define	DEFAULT_RX_GROUP_NUM		1
 #define	DEFAULT_TX_RING_SIZE		1024
 #define	DEFAULT_RX_RING_SIZE		1024
@@ -180,14 +176,6 @@ extern "C" {
 #define	MAX_LINK_DOWN_TIMEOUT		8	/* 8 seconds */
 
 /*
- * Limits on msi-x vectors for 82598
- */
-#define	IXGBE_MAX_INTR_VECTOR		18
-#define	IXGBE_MAX_OTHER_VECTOR		1
-#define	IXGBE_MAX_TCP_TIMER_VECTOR	1
-#define	IXGBE_MAX_RING_VECTOR		16
-
-/*
  * Extra register bit masks for 82598
  */
 #define	IXGBE_PCS1GANA_FDC	0x20
@@ -216,6 +204,7 @@ extern "C" {
 #define	ATTACH_PROGRESS_MAC		0x0800	/* MAC registered */
 #define	ATTACH_PROGRESS_ENABLE_INTR	0x1000	/* DDI interrupts enabled */
 #define	ATTACH_PROGRESS_FM_INIT		0x2000	/* FMA initialized */
+#define	ATTACH_PROGRESS_LSC_TASKQ	0x4000	/* LSC taskq created */
 
 #define	PROP_DEFAULT_MTU		"default_mtu"
 #define	PROP_FLOW_CONTROL		"flow_control"
@@ -245,6 +234,39 @@ extern "C" {
 #define	IXGBE_LB_INTERNAL_MAC		2
 #define	IXGBE_LB_INTERNAL_PHY		3
 #define	IXGBE_LB_INTERNAL_SERDES	4
+
+/*
+ * capability/feature flags
+ * Flags named _CAPABLE are set when the NIC hardware is capable of the feature.
+ * Separately, the flag named _ENABLED is set when the feature is enabled.
+ */
+#define	IXGBE_FLAG_DCA_ENABLED		(u32)(1)
+#define	IXGBE_FLAG_DCA_CAPABLE		(u32)(1 << 1)
+#define	IXGBE_FLAG_DCB_ENABLED		(u32)(1 << 2)
+#define	IXGBE_FLAG_DCB_CAPABLE		(u32)(1 << 4)
+#define	IXGBE_FLAG_RSS_ENABLED		(u32)(1 << 4)
+#define	IXGBE_FLAG_RSS_CAPABLE		(u32)(1 << 5)
+#define	IXGBE_FLAG_VMDQ_CAPABLE		(u32)(1 << 6)
+#define	IXGBE_FLAG_VMDQ_ENABLED		(u32)(1 << 7)
+#define	IXGBE_FLAG_FAN_FAIL_CAPABLE	(u32)(1 << 8)
+
+/* adapter-specific info for each supported device type */
+typedef struct adapter_info {
+	uint32_t	max_rx_que_num;	/* maximum number of rx queues */
+	uint32_t	min_rx_que_num;	/* minimum number of rx queues */
+	uint32_t	def_rx_que_num;	/* default number of rx queues */
+	uint32_t	max_tx_que_num;	/* maximum number of tx queues */
+	uint32_t	min_tx_que_num;	/* minimum number of tx queues */
+	uint32_t	def_tx_que_num;	/* default number of tx queues */
+	uint32_t	max_msix_vect;	/* maximum total msix vectors */
+	uint32_t	max_ring_vect;	/* maximum number of ring vectors */
+	uint32_t	max_other_vect;	/* maximum number of other vectors */
+	uint32_t	other_intr;	/* "other" interrupt types handled */
+	uint32_t	flags;		/* capability flags */
+} adapter_info_t;
+
+/* bits representing all interrupt types other than tx & rx */
+#define	IXGBE_OTHER_INTR	0x3ff00000
 
 /*
  * Shorthand for the NDD parameters
@@ -641,6 +663,10 @@ typedef struct ixgbe {
 	struct ixgbe_hw		hw;
 	struct ixgbe_osdep	osdep;
 
+	adapter_info_t		*capab;	/* adapter hardware capabilities */
+	ddi_taskq_t		*lsc_taskq;	/* link-status-change taskq */
+	uint32_t		eims;		/* interrupt mask setting */
+
 	uint32_t		ixgbe_state;
 	link_state_t		link_state;
 	uint32_t		link_speed;
@@ -656,7 +682,7 @@ typedef struct ixgbe {
 	/*
 	 * Each msi-x vector: map vector to ring cleanup
 	 */
-	ixgbe_ring_vector_t	vect_map[IXGBE_MAX_RING_VECTOR];
+	ixgbe_ring_vector_t	vect_map[MAX_RING_VECTOR];
 
 	/*
 	 * Receive Rings
@@ -691,7 +717,7 @@ typedef struct ixgbe {
 	boolean_t		rx_hcksum_enable; /* Rx h/w cksum offload */
 	uint32_t		rx_copy_thresh; /* Rx copy threshold */
 	uint32_t		rx_limit_per_intr; /* Rx pkts per interrupt */
-	uint32_t		intr_throttling[IXGBE_MAX_RING_VECTOR];
+	uint32_t		intr_throttling[MAX_RING_VECTOR];
 	uint32_t		intr_force;
 	int			fm_capabilities; /* FMA capabilities */
 

@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,12 +67,10 @@ static void ixgbe_setup_multicst(ixgbe_t *);
 static void ixgbe_get_hw_state(ixgbe_t *);
 static void ixgbe_get_conf(ixgbe_t *);
 static int ixgbe_get_prop(ixgbe_t *, char *, int, int, int);
-static boolean_t ixgbe_driver_link_check(ixgbe_t *);
+static void ixgbe_driver_link_check(void *);
 static void ixgbe_local_timer(void *);
 static void ixgbe_arm_watchdog_timer(ixgbe_t *);
-static void ixgbe_start_watchdog_timer(ixgbe_t *);
 static void ixgbe_restart_watchdog_timer(ixgbe_t *);
-static void ixgbe_stop_watchdog_timer(ixgbe_t *);
 static void ixgbe_disable_adapter_interrupts(ixgbe_t *);
 static void ixgbe_enable_adapter_interrupts(ixgbe_t *);
 static boolean_t is_valid_mac_addr(uint8_t *);
@@ -100,7 +98,7 @@ static uint_t ixgbe_intr_rx_tx(void *, void *);
 static uint_t ixgbe_intr_other(void *, void *);
 static void ixgbe_intr_rx_work(ixgbe_rx_ring_t *);
 static void ixgbe_intr_tx_work(ixgbe_tx_ring_t *);
-static void ixgbe_intr_other_work(ixgbe_t *);
+static void ixgbe_intr_other_work(ixgbe_t *, uint32_t);
 static void ixgbe_get_driver_control(struct ixgbe_hw *);
 static int ixgbe_addmac(void *, const uint8_t *);
 static int ixgbe_remmac(void *, const uint8_t *);
@@ -201,6 +199,25 @@ static mac_callbacks_t ixgbe_m_callbacks = {
 };
 
 /*
+ * Initialize capabilities of each supported adapter type
+ */
+static adapter_info_t ixgbe_82598eb_cap = {
+	64,		/* maximum number of rx queues */
+	1,		/* minimum number of rx queues */
+	8,		/* default number of rx queues */
+	32,		/* maximum number of tx queues */
+	1,		/* minimum number of tx queues */
+	8,		/* default number of tx queues */
+	18,		/* maximum total msix vectors */
+	16,		/* maximum number of ring vectors */
+	2,		/* maximum number of other vectors */
+	IXGBE_EICR_LSC,	/* "other" interrupt types handled */
+	(IXGBE_FLAG_DCA_CAPABLE	/* capability flags */
+	| IXGBE_FLAG_RSS_CAPABLE
+	| IXGBE_FLAG_VMDQ_CAPABLE)
+};
+
+/*
  * Module Initialization Functions.
  */
 
@@ -266,6 +283,7 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	struct ixgbe_osdep *osdep;
 	struct ixgbe_hw *hw;
 	int instance;
+	char taskqname[32];
 
 	/*
 	 * Check the command and perform corresponding operations
@@ -378,6 +396,17 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	ixgbe->attach_progress |= ATTACH_PROGRESS_ADD_INTR;
 
 	/*
+	 * Create a taskq for link-status-change
+	 */
+	(void) sprintf(taskqname, "ixgbe%d_taskq", instance);
+	if ((ixgbe->lsc_taskq = ddi_taskq_create(devinfo, taskqname,
+	    1, TASKQ_DEFAULTPRI, 0)) == NULL) {
+		ixgbe_error(ixgbe, "taskq_create failed");
+		goto attach_fail;
+	}
+	ixgbe->attach_progress |= ATTACH_PROGRESS_LSC_TASKQ;
+
+	/*
 	 * Initialize driver parameters
 	 */
 	if (ixgbe_init_driver_settings(ixgbe) != IXGBE_SUCCESS) {
@@ -442,6 +471,7 @@ ixgbe_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 		ixgbe_error(ixgbe, "Failed to register MAC");
 		goto attach_fail;
 	}
+	mac_link_update(ixgbe->mac_hdl, LINK_STATE_UNKNOWN);
 	ixgbe->attach_progress |= ATTACH_PROGRESS_MAC;
 
 	/*
@@ -584,6 +614,13 @@ ixgbe_unconfigure(dev_info_t *devinfo, ixgbe_t *ixgbe)
 	}
 
 	/*
+	 * Remove taskq for link-status-change
+	 */
+	if (ixgbe->attach_progress & ATTACH_PROGRESS_LSC_TASKQ) {
+		ddi_taskq_destroy(ixgbe->lsc_taskq);
+	}
+
+	/*
 	 * Remove interrupts
 	 */
 	if (ixgbe->attach_progress & ATTACH_PROGRESS_ALLOC_INTR) {
@@ -711,6 +748,34 @@ ixgbe_identify_hardware(ixgbe_t *ixgbe)
 	    pci_config_get16(osdep->cfg_handle, PCI_CONF_SUBSYSID);
 	hw->subsystem_vendor_id =
 	    pci_config_get16(osdep->cfg_handle, PCI_CONF_SUBVENID);
+
+	/*
+	 * Set the mac type of the adapter based on the device id
+	 */
+	if (ixgbe_set_mac_type(hw) != IXGBE_SUCCESS) {
+		return (IXGBE_FAILURE);
+	}
+
+	/*
+	 * Install adapter capabilities
+	 */
+	switch (hw->mac.type) {
+	case ixgbe_mac_82598EB:
+		ixgbe_log(ixgbe, "identify oplin adapter\n");
+		ixgbe->capab = &ixgbe_82598eb_cap;
+
+		if (ixgbe_get_media_type(hw) == ixgbe_media_type_copper) {
+			ixgbe->capab->flags |= IXGBE_FLAG_FAN_FAIL_CAPABLE;
+			ixgbe->capab->other_intr |= IXGBE_EICR_GPI_SDP1;
+		}
+
+		break;
+	default:
+		ixgbe_log(ixgbe,
+		    "adapter not supported in ixgbe_identify_hardware(): %d\n",
+		    hw->mac.type);
+		return (IXGBE_FAILURE);
+	}
 
 	return (IXGBE_SUCCESS);
 }
@@ -843,7 +908,7 @@ ixgbe_init_driver_settings(ixgbe_t *ixgbe)
 	/*
 	 * Initialize values of interrupt throttling rate
 	 */
-	for (i = 1; i < IXGBE_MAX_RING_VECTOR; i++)
+	for (i = 1; i < MAX_RING_VECTOR; i++)
 		ixgbe->intr_throttling[i] = ixgbe->intr_throttling[0];
 
 	/*
@@ -1312,7 +1377,6 @@ ixgbe_tx_clean(ixgbe_t *ixgbe)
 	tx_control_block_t *tcb;
 	link_list_t pending_list;
 	uint32_t desc_num;
-	struct ixgbe_hw *hw = &ixgbe->hw;
 	int i, j;
 
 	LINK_LIST_INIT(&pending_list);
@@ -2257,12 +2321,16 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	 * Multiple rings configurations
 	 */
 	ixgbe->num_tx_rings = ixgbe_get_prop(ixgbe, PROP_TX_QUEUE_NUM,
-	    MIN_TX_QUEUE_NUM, MAX_TX_QUEUE_NUM, DEFAULT_TX_QUEUE_NUM);
+	    ixgbe->capab->min_tx_que_num,
+	    ixgbe->capab->max_tx_que_num,
+	    ixgbe->capab->def_tx_que_num);
 	ixgbe->tx_ring_size = ixgbe_get_prop(ixgbe, PROP_TX_RING_SIZE,
 	    MIN_TX_RING_SIZE, MAX_TX_RING_SIZE, DEFAULT_TX_RING_SIZE);
 
 	ixgbe->num_rx_rings = ixgbe_get_prop(ixgbe, PROP_RX_QUEUE_NUM,
-	    MIN_RX_QUEUE_NUM, MAX_RX_QUEUE_NUM, DEFAULT_RX_QUEUE_NUM);
+	    ixgbe->capab->min_rx_que_num,
+	    ixgbe->capab->max_rx_que_num,
+	    ixgbe->capab->def_rx_que_num);
 	ixgbe->rx_ring_size = ixgbe_get_prop(ixgbe, PROP_RX_RING_SIZE,
 	    MIN_RX_RING_SIZE, MAX_RX_RING_SIZE, DEFAULT_RX_RING_SIZE);
 
@@ -2291,7 +2359,6 @@ ixgbe_get_conf(ixgbe_t *ixgbe)
 	 */
 	ixgbe->intr_force = ixgbe_get_prop(ixgbe, PROP_INTR_FORCE,
 	    IXGBE_INTR_NONE, IXGBE_INTR_LEGACY, IXGBE_INTR_NONE);
-	ixgbe_log(ixgbe, "interrupt force: %d\n", ixgbe->intr_force);
 
 	ixgbe->tx_hcksum_enable = ixgbe_get_prop(ixgbe, PROP_TX_HCKSUM_ENABLE,
 	    0, 1, DEFAULT_TX_HCKSUM_ENABLE);
@@ -2420,19 +2487,21 @@ ixgbe_driver_setup_link(ixgbe_t *ixgbe, boolean_t setup_hw)
 }
 
 /*
- * ixgbe_driver_link_check - Link status processing.
+ * ixgbe_driver_link_check - Link status processing done in taskq.
  */
-static boolean_t
-ixgbe_driver_link_check(ixgbe_t *ixgbe)
+static void
+ixgbe_driver_link_check(void *arg)
 {
+	ixgbe_t *ixgbe = (ixgbe_t *)arg;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	ixgbe_link_speed speed = IXGBE_LINK_SPEED_UNKNOWN;
 	boolean_t link_up = B_FALSE;
 	boolean_t link_changed = B_FALSE;
 
-	ASSERT(mutex_owned(&ixgbe->gen_lock));
+	mutex_enter(&ixgbe->gen_lock);
 
-	(void) ixgbe_check_link(hw, &speed, &link_up);
+	/* check for link, wait the full time */
+	(void) ixgbe_check_link(hw, &speed, &link_up, true);
 	if (link_up) {
 		/*
 		 * The Link is up, check whether it was marked as down earlier
@@ -2472,7 +2541,22 @@ ixgbe_driver_link_check(ixgbe_t *ixgbe)
 		}
 	}
 
-	return (link_changed);
+	/*
+	 * this is only reached after a link-status-change interrupt
+	 * so always get new phy state
+	 */
+	ixgbe_get_hw_state(ixgbe);
+
+	/* re-enable the interrupt, which was automasked */
+	ixgbe->eims |= IXGBE_EICR_LSC;
+	IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
+
+	mutex_exit(&ixgbe->gen_lock);
+
+	/* outside the gen_lock */
+	if (link_changed) {
+		mac_link_update(ixgbe->mac_hdl, ixgbe->link_state);
+	}
 }
 
 /*
@@ -2689,7 +2773,7 @@ ixgbe_disable_watchdog_timer(ixgbe_t *ixgbe)
 /*
  * ixgbe_start_watchdog_timer - Start the driver watchdog timer.
  */
-static void
+void
 ixgbe_start_watchdog_timer(ixgbe_t *ixgbe)
 {
 	mutex_enter(&ixgbe->watchdog_lock);
@@ -2721,7 +2805,7 @@ ixgbe_restart_watchdog_timer(ixgbe_t *ixgbe)
 /*
  * ixgbe_stop_watchdog_timer - Stop the driver watchdog timer.
  */
-static void
+void
 ixgbe_stop_watchdog_timer(ixgbe_t *ixgbe)
 {
 	timeout_id_t tid;
@@ -2768,22 +2852,29 @@ static void
 ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	uint32_t eims, eiac, gpie;
+	uint32_t eiac, eiam;
+	uint32_t gpie = IXGBE_READ_REG(hw, IXGBE_GPIE);
 
-	gpie = 0;
-	eims = IXGBE_EIMS_ENABLE_MASK;	/* shared code default */
-	eims &= ~IXGBE_EIMS_TCP_TIMER;	/* minus tcp timer */
+	/* interrupt types to enable */
+	ixgbe->eims = IXGBE_EIMS_ENABLE_MASK;	/* shared code default */
+	ixgbe->eims &= ~IXGBE_EIMS_TCP_TIMER;	/* minus tcp timer */
+	ixgbe->eims |= ixgbe->capab->other_intr; /* "other" interrupt types */
+
+	/* enable automask on "other" causes that this adapter can generate */
+	eiam = ixgbe->capab->other_intr;
 
 	/*
 	 * msi-x mode
 	 */
 	if (ixgbe->intr_type == DDI_INTR_TYPE_MSIX) {
 		/* enable autoclear but not on bits 29:20 */
-		eiac = (eims & ~0x3ff00000);
+		eiac = (ixgbe->eims & ~IXGBE_OTHER_INTR);
 
 		/* general purpose interrupt enable */
-		gpie |= (IXGBE_GPIE_MSIX_MODE |
-		    IXGBE_GPIE_PBA_SUPPORT |IXGBE_GPIE_OCD);
+		gpie |= (IXGBE_GPIE_MSIX_MODE
+		    | IXGBE_GPIE_PBA_SUPPORT
+		    | IXGBE_GPIE_OCD
+		    | IXGBE_GPIE_EIAME);
 	/*
 	 * non-msi-x mode
 	 */
@@ -2791,10 +2882,15 @@ ixgbe_enable_adapter_interrupts(ixgbe_t *ixgbe)
 
 		/* disable autoclear, leave gpie at default */
 		eiac = 0;
+
+		/* general purpose interrupt enable */
+		gpie |= IXGBE_GPIE_EIAME;
 	}
 
-	IXGBE_WRITE_REG(hw, IXGBE_EIMS, eims);
+	/* write to interrupt control registers */
+	IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
 	IXGBE_WRITE_REG(hw, IXGBE_EIAC, eiac);
+	IXGBE_WRITE_REG(hw, IXGBE_EIAM, eiam);
 	IXGBE_WRITE_REG(hw, IXGBE_GPIE, gpie);
 	IXGBE_WRITE_FLUSH(hw);
 }
@@ -3016,33 +3112,34 @@ ixgbe_intr_tx_work(ixgbe_tx_ring_t *tx_ring)
 
 #pragma inline(ixgbe_intr_other_work)
 /*
- * ixgbe_intr_other_work - Other processing of ISR.
+ * ixgbe_intr_other_work - Process interrupt types other than tx/rx
  */
 static void
-ixgbe_intr_other_work(ixgbe_t *ixgbe)
+ixgbe_intr_other_work(ixgbe_t *ixgbe, uint32_t eicr)
 {
-	boolean_t link_changed;
-
-	ixgbe_stop_watchdog_timer(ixgbe);
-
-	mutex_enter(&ixgbe->gen_lock);
+	/*
+	 * dispatch taskq to handle link status change
+	 */
+	if (eicr & IXGBE_EICR_LSC) {
+		if ((ddi_taskq_dispatch(ixgbe->lsc_taskq,
+		    ixgbe_driver_link_check, (void *)ixgbe, DDI_NOSLEEP))
+		    != DDI_SUCCESS) {
+			ixgbe_log(ixgbe, "Fail to dispatch taskq");
+		}
+	}
 
 	/*
-	 * Take care of link status change
+	 * check for fan failure on adapters with fans
 	 */
-	link_changed = ixgbe_driver_link_check(ixgbe);
+	if ((ixgbe->capab->flags & IXGBE_FLAG_FAN_FAIL_CAPABLE) &&
+	    (eicr & IXGBE_EICR_GPI_SDP1)) {
 
-	/*
-	 * Get new phy state
-	 */
-	ixgbe_get_hw_state(ixgbe);
+		ixgbe_log(ixgbe,
+		    "Fan has stopped, replace the adapter\n");
 
-	mutex_exit(&ixgbe->gen_lock);
-
-	if (link_changed)
-		mac_link_update(ixgbe->mac_hdl, ixgbe->link_state);
-
-	ixgbe_start_watchdog_timer(ixgbe);
+		/* re-enable the interrupt, which was automasked */
+		ixgbe->eims |= IXGBE_EICR_GPI_SDP1;
+	}
 }
 
 /*
@@ -3051,7 +3148,6 @@ ixgbe_intr_other_work(ixgbe_t *ixgbe)
 static uint_t
 ixgbe_intr_legacy(void *arg1, void *arg2)
 {
-	_NOTE(ARGUNUSED(arg2));
 	ixgbe_t *ixgbe = (ixgbe_t *)arg1;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	ixgbe_tx_ring_t *tx_ring;
@@ -3059,9 +3155,9 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 	uint32_t eicr;
 	mblk_t *mp;
 	boolean_t tx_reschedule;
-	boolean_t link_changed;
 	uint_t result;
 
+	_NOTE(ARGUNUSED(arg2));
 
 	mutex_enter(&ixgbe->gen_lock);
 
@@ -3072,7 +3168,6 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 
 	mp = NULL;
 	tx_reschedule = B_FALSE;
-	link_changed = B_FALSE;
 
 	/*
 	 * Any bit set in eicr: claim this interrupt
@@ -3114,24 +3209,26 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 			    (tx_ring->tbd_free >= tx_ring->resched_thresh));
 		}
 
-		if (eicr & IXGBE_EICR_LSC) {
-
-			/* take care of link status change */
-			link_changed = ixgbe_driver_link_check(ixgbe);
-
-			/* Get new phy state */
-			ixgbe_get_hw_state(ixgbe);
+		/* any interrupt type other than tx/rx */
+		if (eicr & ixgbe->capab->other_intr) {
+			ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
+			ixgbe_intr_other_work(ixgbe, eicr);
 		}
+
+		mutex_exit(&ixgbe->gen_lock);
 
 		result = DDI_INTR_CLAIMED;
 	} else {
+		mutex_exit(&ixgbe->gen_lock);
+
 		/*
 		 * No interrupt cause bits set: don't claim this interrupt.
 		 */
 		result = DDI_INTR_UNCLAIMED;
 	}
 
-	mutex_exit(&ixgbe->gen_lock);
+	/* re-enable the interrupts which were automasked */
+	IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
 
 	/*
 	 * Do the following work outside of the gen_lock
@@ -3146,9 +3243,6 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 		IXGBE_DEBUG_STAT(tx_ring->stat_reschedule);
 	}
 
-	if (link_changed)
-		mac_link_update(ixgbe->mac_hdl, ixgbe->link_state);
-
 	return (result);
 }
 
@@ -3158,10 +3252,11 @@ ixgbe_intr_legacy(void *arg1, void *arg2)
 static uint_t
 ixgbe_intr_msi(void *arg1, void *arg2)
 {
-	_NOTE(ARGUNUSED(arg2));
 	ixgbe_t *ixgbe = (ixgbe_t *)arg1;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	uint32_t eicr;
+
+	_NOTE(ARGUNUSED(arg2));
 
 	eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
 
@@ -3186,9 +3281,16 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 		ixgbe_intr_tx_work(&ixgbe->tx_rings[0]);
 	}
 
-	if (eicr & IXGBE_EICR_LSC) {
-		ixgbe_intr_other_work(ixgbe);
+	/* any interrupt type other than tx/rx */
+	if (eicr & ixgbe->capab->other_intr) {
+		mutex_enter(&ixgbe->gen_lock);
+		ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
+		ixgbe_intr_other_work(ixgbe, eicr);
+		mutex_exit(&ixgbe->gen_lock);
 	}
+
+	/* re-enable the interrupts which were automasked */
+	IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -3199,10 +3301,11 @@ ixgbe_intr_msi(void *arg1, void *arg2)
 static uint_t
 ixgbe_intr_rx_tx(void *arg1, void *arg2)
 {
-	_NOTE(ARGUNUSED(arg2));
 	ixgbe_ring_vector_t *vect = (ixgbe_ring_vector_t *)arg1;
 	ixgbe_t *ixgbe = vect->ixgbe;
 	int r_idx = 0;
+
+	_NOTE(ARGUNUSED(arg2));
 
 	/*
 	 * Clean each rx ring that has its bit set in the map
@@ -3236,20 +3339,28 @@ ixgbe_intr_rx_tx(void *arg1, void *arg2)
 static uint_t
 ixgbe_intr_other(void *arg1, void *arg2)
 {
-	_NOTE(ARGUNUSED(arg2));
 	ixgbe_t *ixgbe = (ixgbe_t *)arg1;
 	struct ixgbe_hw *hw = &ixgbe->hw;
 	uint32_t eicr;
 
+	_NOTE(ARGUNUSED(arg2));
+
 	eicr = IXGBE_READ_REG(hw, IXGBE_EICR);
 
 	/*
-	 * Need check cause bits and only link change will
+	 * Need check cause bits and only other causes will
 	 * be processed
 	 */
-	if (eicr & IXGBE_EICR_LSC) {
-		ixgbe_intr_other_work(ixgbe);
+	/* any interrupt type other than tx/rx */
+	if (eicr & ixgbe->capab->other_intr) {
+		mutex_enter(&ixgbe->gen_lock);
+		ixgbe->eims &= ~(eicr & IXGBE_OTHER_INTR);
+		ixgbe_intr_other_work(ixgbe, eicr);
+		mutex_exit(&ixgbe->gen_lock);
 	}
+
+	/* re-enable the interrupts which were automasked */
+	IXGBE_WRITE_REG(hw, IXGBE_EIMS, ixgbe->eims);
 
 	return (DDI_INTR_CLAIMED);
 }
@@ -3376,8 +3487,8 @@ ixgbe_alloc_intr_handles(ixgbe_t *ixgbe, int intr_type)
 		 * # rx rings + # tx rings + 1 for other.
 		 */
 		request = ixgbe->num_rx_rings + ixgbe->num_tx_rings + 1;
-		if (request > (IXGBE_MAX_RING_VECTOR + 1))
-			request = IXGBE_MAX_RING_VECTOR + 1;
+		if (request > (ixgbe->capab->max_ring_vect + 1))
+			request = ixgbe->capab->max_ring_vect + 1;
 		minimum = 2;
 		IXGBE_DEBUGLOG_0(ixgbe, "interrupt type: MSI-X");
 		break;
@@ -3909,7 +4020,8 @@ static void
 ixgbe_get_hw_state(ixgbe_t *ixgbe)
 {
 	struct ixgbe_hw *hw = &ixgbe->hw;
-	uint32_t links;
+	ixgbe_link_speed speed = IXGBE_LINK_SPEED_UNKNOWN;
+	boolean_t link_up = B_FALSE;
 	uint32_t pcs1g_anlp = 0;
 	uint32_t pcs1g_ana = 0;
 
@@ -3917,8 +4029,9 @@ ixgbe_get_hw_state(ixgbe_t *ixgbe)
 	ixgbe->param_lp_1000fdx_cap = 0;
 	ixgbe->param_lp_100fdx_cap  = 0;
 
-	links = IXGBE_READ_REG(hw, IXGBE_LINKS);
-	if (links & IXGBE_LINKS_PCS_1G_EN) {
+	/* check for link, don't wait */
+	(void) ixgbe_check_link(hw, &speed, &link_up, false);
+	if (link_up) {
 		pcs1g_anlp = IXGBE_READ_REG(hw, IXGBE_PCS1GANLP);
 		pcs1g_ana = IXGBE_READ_REG(hw, IXGBE_PCS1GANA);
 
@@ -3993,10 +4106,11 @@ ixgbe_atomic_reserve(uint32_t *count_p, uint32_t n)
 static uint8_t *
 ixgbe_mc_table_itr(struct ixgbe_hw *hw, uint8_t **upd_ptr, uint32_t *vmdq)
 {
-	_NOTE(ARGUNUSED(hw));
-	_NOTE(ARGUNUSED(vmdq));
 	uint8_t *addr = *upd_ptr;
 	uint8_t *new_ptr;
+
+	_NOTE(ARGUNUSED(hw));
+	_NOTE(ARGUNUSED(vmdq));
 
 	new_ptr = addr + IXGBE_ETH_LENGTH_OF_ADDRESS;
 	*upd_ptr = new_ptr;

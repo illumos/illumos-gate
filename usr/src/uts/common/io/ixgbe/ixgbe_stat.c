@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -403,6 +403,8 @@ ixgbe_init_stats(ixgbe_t *ixgbe)
 	kstat_named_init(&ixgbe_ks->roc, "recv_oversize",
 	    KSTAT_DATA_UINT64);
 	kstat_named_init(&ixgbe_ks->rjc, "recv_jabber",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&ixgbe_ks->rnbc, "recv_no_buffer",
 	    KSTAT_DATA_UINT64);
 
 	/*

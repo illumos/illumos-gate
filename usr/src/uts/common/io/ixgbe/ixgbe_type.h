@@ -22,18 +22,17 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.164 v2008-03-04 */
+/* IntelVersion: 1.244 v2008-09-12 */
 
 #ifndef _IXGBE_TYPE_H
 #define	_IXGBE_TYPE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ixgbe_osdep.h"
+#ident "$Id: ixgbe_type.h,v 1.244 2008/09/04 17:23:49 mrchilak Exp $"
 
 /* Vendor ID */
 #define	IXGBE_INTEL_VENDOR_ID   0x8086
@@ -41,8 +40,12 @@
 /* Device IDs */
 #define	IXGBE_DEV_ID_82598AF_DUAL_PORT		0x10C6
 #define	IXGBE_DEV_ID_82598AF_SINGLE_PORT	0x10C7
+#define	IXGBE_DEV_ID_82598AT			0x10C8
+#define	IXGBE_DEV_ID_82598EB_SFP_LOM		0x10DB
 #define	IXGBE_DEV_ID_82598EB_CX4		0x10DD
 #define	IXGBE_DEV_ID_82598_CX4_DUAL_PORT	0x10EC
+#define	IXGBE_DEV_ID_82598_DA_DUAL_PORT		0x10F1
+#define	IXGBE_DEV_ID_82598_SR_DUAL_PORT_EM	0x10E1
 #define	IXGBE_DEV_ID_82598EB_XF_LR		0x10F4
 
 /* General Registers */
@@ -74,7 +77,8 @@
 #define	IXGBE_EIMC	0x00888
 #define	IXGBE_EIAC	0x00810
 #define	IXGBE_EIAM	0x00890
-#define	IXGBE_EITR(_i)	(0x00820 + ((_i) * 4)) /* 0x820-0x86c */
+#define	IXGBE_EITR(_i)	(((_i) <= 23) ? \
+	(0x00820 + ((_i) * 4)) : (0x012300 + ((_i) * 4)))
 #define	IXGBE_IVAR(_i)	(0x00900 + ((_i) * 4)) /* 24 at 0x900-0x960 */
 #define	IXGBE_MSIXT	0x00000 /* MSI-X Table. 0x0000 - 0x01C */
 #define	IXGBE_MSIXPBA	0x02000 /* MSI-X Pending bit array */
@@ -130,6 +134,8 @@
 /* Receive Registers */
 #define	IXGBE_RXCSUM    0x05000
 #define	IXGBE_RFCTL	0x05008
+#define	IXGBE_DRECCCTL	0x02F08
+#define	IXGBE_DRECCCTL_DISABLE	0
 /* Multicast Table Array - 128 entries */
 #define	IXGBE_MTA(_i)   (0x05200 + ((_i) * 4))
 #define	IXGBE_RAL(_i)   (((_i) <= 15) ? \
@@ -377,6 +383,10 @@
 #define	IXGBE_ANLP2		0x042B4
 #define	IXGBE_ATLASCTL		0x04800
 
+/* RDRXCTL Bit Masks */
+#define	IXGBE_RDRXCTL_RDMTS_1_2	0x00000000 /* Rx Desc Min Threshold Size */
+#define	IXGBE_RDRXCTL_MVMEN	0x00000020
+#define	IXGBE_RDRXCTL_DMAIDONE	0x00000008 /* DMA init cycle done */
 
 /* CTRL Bit Masks */
 #define	IXGBE_CTRL_GIO_DIS	0x00000004 /* Global IO Master Disable bit */
@@ -391,6 +401,7 @@
 #define	IXGBE_MHADD_MFS_SHIFT	16
 
 /* Extended Device Control */
+#define	IXGBE_CTRL_EXT_PFRSTD	0x00004000 /* Physical Function Reset Done */
 #define	IXGBE_CTRL_EXT_NS_DIS	0x00010000 /* No Snoop disable */
 #define	IXGBE_CTRL_EXT_RO_DIS	0x00020000 /* Relaxed Ordering disable */
 #define	IXGBE_CTRL_EXT_DRV_LOAD 0x10000000 /* Driver loaded bit for FW */
@@ -462,6 +473,7 @@
 #define	IXGBE_MDIO_PHY_XS_DEV_TYPE		0x4
 #define	IXGBE_MDIO_AUTO_NEG_DEV_TYPE		0x7
 #define	IXGBE_MDIO_VENDOR_SPECIFIC_1_DEV_TYPE	0x1E   /* Device 30 */
+#define	IXGBE_TWINAX_DEV			1
 
 #define	IXGBE_MDIO_COMMAND_TIMEOUT	100 /* PHY Timeout for 1 GB mode */
 
@@ -482,6 +494,10 @@
 #define	IXGBE_MDIO_PHY_SPEED_10G	0x0001 /* 10G capable */
 #define	IXGBE_MDIO_PHY_SPEED_1G		0x0010 /* 1G capable */
 
+#define	IXGBE_MDIO_PMA_PMD_SDA_SCL_ADDR	0xC30A	/* PHY_XS SDA/SCL Address Reg */
+#define	IXGBE_MDIO_PMA_PMD_SDA_SCL_DATA	0xC30B	/* PHY_XS SDA/SCL Data Reg */
+#define	IXGBE_MDIO_PMA_PMD_SDA_SCL_STAT	0xC30C	/* PHY_XS SDA/SCL Status Reg */
+
 /* MII clause 22/28 definitions */
 #define	IXGBE_MDIO_PHY_LOW_POWER_MODE	0x0800
 
@@ -494,7 +510,25 @@
 #define	IXGBE_MAX_PHY_ADDR		32
 
 /* PHY IDs */
+#define	TN1010_PHY_ID		0x00A19410
+#define	TNX_FW_REV		0xB
 #define	QT2022_PHY_ID		0x0043A400
+#define	ATH_PHY_ID		0x03429050
+
+/* PHY Types */
+#define	IXGBE_M88E1145_E_PHY_ID	0x01410CD0
+
+/* Special PHY Init Routine */
+#define	IXGBE_PHY_INIT_OFFSET_NL	0x002B
+#define	IXGBE_PHY_INIT_END_NL		0xFFFF
+#define	IXGBE_CONTROL_MASK_NL		0xF000
+#define	IXGBE_DATA_MASK_NL		0x0FFF
+#define	IXGBE_CONTROL_SHIFT_NL		12
+#define	IXGBE_DELAY_NL			0
+#define	IXGBE_DATA_NL			1
+#define	IXGBE_CONTROL_NL		0x000F
+#define	IXGBE_CONTROL_EOL_NL		0x0FFF
+#define	IXGBE_CONTROL_SOL_NL		0x0000
 
 /* General purpose Interrupt Enable */
 #define	IXGBE_SDP0_GPIEN	0x00000001 /* SDP0 */
@@ -577,10 +611,10 @@
 
 /* Extended Interrupt Cause Read */
 #define	IXGBE_EICR_RTX_QUEUE	0x0000FFFF /* RTx Queue Interrupt */
-#define	IXGBE_EICR_GPI_SDP0	0x01000000 /* Gen Purpose Interrupt on SDP0 */
-#define	IXGBE_EICR_GPI_SDP1	0x02000000 /* Gen Purpose Interrupt on SDP1 */
 #define	IXGBE_EICR_LSC		0x00100000 /* Link Status Change */
 #define	IXGBE_EICR_MNG		0x00400000 /* Manageability Event Interrupt */
+#define	IXGBE_EICR_GPI_SDP0	0x01000000 /* Gen Purpose Interrupt on SDP0 */
+#define	IXGBE_EICR_GPI_SDP1	0x02000000 /* Gen Purpose Interrupt on SDP1 */
 #define	IXGBE_EICR_PBUR		0x10000000 /* Packet Buffer Handler Error */
 #define	IXGBE_EICR_DHER		0x20000000 /* Descriptor Handler Error */
 #define	IXGBE_EICR_TCP_TIMER	0x40000000 /* TCP Timer */
@@ -588,12 +622,10 @@
 
 /* Extended Interrupt Cause Set */
 #define	IXGBE_EICS_RTX_QUEUE	IXGBE_EICR_RTX_QUEUE /* RTx Queue Interrupt */
-#define	IXGBE_EICS_GPI_SDP0	IXGBE_EICR_GPI_SDP0
-				/* Gen Purpose Interrupt on SDP0 */
-#define	IXGBE_EICS_GPI_SDP1	IXGBE_EICR_GPI_SDP1
-				/* Gen Purpose Interrupt on SDP1 */
 #define	IXGBE_EICS_LSC		IXGBE_EICR_LSC /* Link Status Change */
 #define	IXGBE_EICS_MNG		IXGBE_EICR_MNG /* MNG Event Interrupt */
+#define	IXGBE_EICS_GPI_SDP0	IXGBE_EICR_GPI_SDP0 /* SDP0 Gen Purpose Int */
+#define	IXGBE_EICS_GPI_SDP1	IXGBE_EICR_GPI_SDP1 /* SDP1 Gen Purpose Int */
 #define	IXGBE_EICS_PBUR		IXGBE_EICR_PBUR /* Pkt Buf Handler Error */
 #define	IXGBE_EICS_DHER		IXGBE_EICR_DHER /* Desc Handler Error */
 #define	IXGBE_EICS_TCP_TIMER	IXGBE_EICR_TCP_TIMER /* TCP Timer */
@@ -601,12 +633,10 @@
 
 /* Extended Interrupt Mask Set */
 #define	IXGBE_EIMS_RTX_QUEUE	IXGBE_EICR_RTX_QUEUE /* RTx Queue Interrupt */
-#define	IXGBE_EIMS_GPI_SDP0	IXGBE_EICR_GPI_SDP0
-				/* Gen Purpose Interrupt on SDP0 */
-#define	IXGBE_EIMS_GPI_SDP1	IXGBE_EICR_GPI_SDP1
-				/* Gen Purpose Interrupt on SDP1 */
 #define	IXGBE_EIMS_LSC		IXGBE_EICR_LSC /* Link Status Change */
 #define	IXGBE_EIMS_MNG		IXGBE_EICR_MNG /* MNG Event Interrupt */
+#define	IXGBE_EIMS_GPI_SDP0	IXGBE_EICR_GPI_SDP0 /* SDP0 Gen Purpose Int */
+#define	IXGBE_EIMS_GPI_SDP1	IXGBE_EICR_GPI_SDP1 /* SDP1 Gen Purpose Int */
 #define	IXGBE_EIMS_PBUR		IXGBE_EICR_PBUR /* Pkt Buf Handler Error */
 #define	IXGBE_EIMS_DHER		IXGBE_EICR_DHER /* Descr Handler Error */
 #define	IXGBE_EIMS_TCP_TIMER	IXGBE_EICR_TCP_TIMER /* TCP Timer */
@@ -614,12 +644,10 @@
 
 /* Extended Interrupt Mask Clear */
 #define	IXGBE_EIMC_RTX_QUEUE	IXGBE_EICR_RTX_QUEUE /* RTx Queue Interrupt */
-#define	IXGBE_EIMC_GPI_SDP0	IXGBE_EICR_GPI_SDP0
-				/* Gen Purpose Interrupt on SDP0 */
-#define	IXGBE_EIMC_GPI_SDP1	IXGBE_EICR_GPI_SDP1
-				/* Gen Purpose Interrupt on SDP1 */
 #define	IXGBE_EIMC_LSC		IXGBE_EICR_LSC /* Link Status Change */
 #define	IXGBE_EIMC_MNG		IXGBE_EICR_MNG /* MNG Event Interrupt */
+#define	IXGBE_EIMC_GPI_SDP0	IXGBE_EICR_GPI_SDP0 /* SDP0 Gen Purpose Int */
+#define	IXGBE_EIMC_GPI_SDP1	IXGBE_EICR_GPI_SDP1 /* SDP1 Gen Purpose Int */
 #define	IXGBE_EIMC_PBUR		IXGBE_EICR_PBUR /* Pkt Buf Handler Error */
 #define	IXGBE_EIMC_DHER		IXGBE_EICR_DHER /* Desc Handler Error */
 #define	IXGBE_EIMC_TCP_TIMER	IXGBE_EICR_TCP_TIMER /* TCP Timer */
@@ -749,6 +777,7 @@
 #define	IXGBE_LINKS_TL_FAULT	0x00001000
 #define	IXGBE_LINKS_SIGNAL	0x00000F00
 
+#define	IXGBE_LINK_UP_TIME	90 /* 9.0 Seconds */
 #define	IXGBE_AUTO_NEG_TIME	45 /* 4.5 Seconds */
 
 /* SW Semaphore Register bitmasks */
@@ -856,9 +885,6 @@
 /* Number of 100 microseconds we wait for PCI Express master disable */
 #define	IXGBE_PCI_MASTER_DISABLE_TIMEOUT 800
 
-/* PHY Types */
-#define	IXGBE_M88E1145_E_PHY_ID		0x01410CD0
-
 /* Check whether address is multicast. This is little-endian specific check. */
 #define	IXGBE_IS_MULTICAST(Address) \
 	(bool)(((u8 *)(Address))[0] & ((u8)0x01))
@@ -872,6 +898,7 @@
 #define	IXGBE_RAH_VIND_MASK		0x003C0000
 #define	IXGBE_RAH_VIND_SHIFT		18
 #define	IXGBE_RAH_AV			0x80000000
+#define	IXGBE_CLEAR_VMDQ_ALL		0xFFFFFFFF
 
 /* Header split receive */
 #define	IXGBE_RFCTL_ISCSI_DIS		0x00000001
@@ -961,7 +988,7 @@
 #define	IXGBE_RXD_ERR_USE	0x20    /* Undersize Error */
 #define	IXGBE_RXD_ERR_TCPE	0x40    /* TCP/UDP Checksum Error */
 #define	IXGBE_RXD_ERR_IPE	0x80    /* IP Checksum Error */
-#define	IXGBE_RXDADV_ERR_HBO	0x00800000
+#define	IXGBE_RXDADV_ERR_HBO	0x00800000 /* Header Buffer Overflow */
 #define	IXGBE_RXDADV_ERR_CE	0x01000000 /* CRC Error */
 #define	IXGBE_RXDADV_ERR_LE	0x02000000 /* Length Error */
 #define	IXGBE_RXDADV_ERR_PE	0x08000000 /* Packet Error */
@@ -1042,14 +1069,20 @@
 #define	IXGBE_RX_DESC_SPECIAL_PRI_SHIFT  0x000D /* Priority in upper 3 of 16 */
 #define	IXGBE_TX_DESC_SPECIAL_PRI_SHIFT  IXGBE_RX_DESC_SPECIAL_PRI_SHIFT
 
-#ifndef __le16
+#ifndef	__le16
 /* Little Endian defines */
-#define	__le8   u8
-#define	__le16  u16
-#define	__le32  u32
-#define	__le64  u64
-
+#define	__le16	u16
+#define	__le32	u32
+#define	__le64	u64
 #endif
+
+#ifndef	__be16
+/* Big Endian defines */
+#define	__be16	u16
+#define	__be32	u32
+#define	__be64	u64
+#endif
+
 /* Transmit Descriptor - Legacy */
 struct ixgbe_legacy_tx_desc {
 	u64 buffer_addr;	/* Address of the descriptor's data buffer */
@@ -1057,15 +1090,15 @@ struct ixgbe_legacy_tx_desc {
 		__le32 data;
 		struct {
 			__le16 length;	/* Data buffer length */
-			__le8 cso;	/* Checksum offset */
-			__le8 cmd;	/* Descriptor control */
+			u8 cso;		/* Checksum offset */
+			u8 cmd;		/* Descriptor control */
 		} flags;
 	} lower;
 	union {
 		__le32 data;
 		struct {
-			__le8 status;	/* Descriptor status */
-			__le8 css;	/* Checksum start */
+			u8 status;	/* Descriptor status */
+			u8 css;		/* Checksum start */
 			__le16 vlan;
 		} fields;
 	} upper;
@@ -1090,8 +1123,8 @@ struct ixgbe_legacy_rx_desc {
 	__le64 buffer_addr;	/* Address of the descriptor's data buffer */
 	__le16 length;		/* Length of data DMAed into data buffer */
 	__le16 csum;		/* Packet checksum */
-	__le8 status;		/* Descriptor status */
-	__le8 errors;		/* Descriptor Errors */
+	u8 status;		/* Descriptor status */
+	u8 errors;		/* Descriptor Errors */
 	__le16 vlan;
 };
 
@@ -1152,6 +1185,7 @@ struct ixgbe_adv_tx_context_desc {
 #define	IXGBE_ADVTXD_STAT_SN_CRC 0x00000002 /* NXTSEQ/SEED present in WB */
 #define	IXGBE_ADVTXD_STAT_RSV   0x0000000C /* STA Reserved */
 #define	IXGBE_ADVTXD_IDX_SHIFT  4 /* Adv desc Index shift */
+#define	IXGBE_ADVTXD_CC		0x00000080 /* Check Context */
 #define	IXGBE_ADVTXD_POPTS_SHIFT	8  /* Adv desc POPTS shift */
 #define	IXGBE_ADVTXD_POPTS_IXSM (IXGBE_TXD_POPTS_IXSM << \
 	IXGBE_ADVTXD_POPTS_SHIFT)
@@ -1170,6 +1204,7 @@ struct ixgbe_adv_tx_context_desc {
 #define	IXGBE_ADVTXD_TUCMD_IPV6    0x00000000  /* IP Packet Type: 0=IPv6 */
 #define	IXGBE_ADVTXD_TUCMD_L4T_UDP 0x00000000  /* L4 Packet TYPE of UDP */
 #define	IXGBE_ADVTXD_TUCMD_L4T_TCP 0x00000800  /* L4 Packet TYPE of TCP */
+#define	IXGBE_ADVTXD_TUCMD_L4T_SCTP	0x00001000  /* L4 Packet TYPE of SCTP */
 #define	IXGBE_ADVTXD_TUCMD_MKRREQ  0x00002000 /* Req requires Markers and CRC */
 #define	IXGBE_ADVTXD_L4LEN_SHIFT   8  /* Adv ctxt L4LEN shift */
 #define	IXGBE_ADVTXD_MSS_SHIFT	16  /* Adv ctxt MSS shift */
@@ -1185,6 +1220,21 @@ typedef u32 ixgbe_link_speed;
 #define	IXGBE_LINK_SPEED_82598_AUTONEG (IXGBE_LINK_SPEED_1GB_FULL | \
 	IXGBE_LINK_SPEED_10GB_FULL)
 
+/* Physical layer type */
+typedef u32 ixgbe_physical_layer;
+#define	IXGBE_PHYSICAL_LAYER_UNKNOWN		0
+#define	IXGBE_PHYSICAL_LAYER_10GBASE_T		0x0001
+#define	IXGBE_PHYSICAL_LAYER_1000BASE_T		0x0002
+#define	IXGBE_PHYSICAL_LAYER_100BASE_T		0x0004
+#define	IXGBE_PHYSICAL_LAYER_SFP_PLUS_CU	0x0008
+#define	IXGBE_PHYSICAL_LAYER_10GBASE_LR		0x0010
+#define	IXGBE_PHYSICAL_LAYER_10GBASE_LRM	0x0020
+#define	IXGBE_PHYSICAL_LAYER_10GBASE_SR		0x0040
+#define	IXGBE_PHYSICAL_LAYER_10GBASE_KX4	0x0080
+#define	IXGBE_PHYSICAL_LAYER_10GBASE_CX4	0x0100
+#define	IXGBE_PHYSICAL_LAYER_1000BASE_KX	0x0200
+#define	IXGBE_PHYSICAL_LAYER_1000BASE_BX	0x0400
+
 enum ixgbe_eeprom_type {
 	ixgbe_eeprom_uninitialized = 0,
 	ixgbe_eeprom_spi,
@@ -1199,9 +1249,33 @@ enum ixgbe_mac_type {
 
 enum ixgbe_phy_type {
 	ixgbe_phy_unknown = 0,
+	ixgbe_phy_tn,
 	ixgbe_phy_qt,
 	ixgbe_phy_xaui,
+	ixgbe_phy_nl,
+	ixgbe_phy_tw_tyco,
+	ixgbe_phy_tw_unknown,
+	ixgbe_phy_sfp_avago,
+	ixgbe_phy_sfp_ftl,
+	ixgbe_phy_sfp_unknown,
 	ixgbe_phy_generic
+};
+
+/*
+ * SFP+ module type IDs:
+ *
+ * ID   Module Type
+ * =============
+ * 0    SFP_DA_CU
+ * 1    SFP_SR
+ * 2    SFP_LR
+ */
+enum ixgbe_sfp_type {
+	ixgbe_sfp_type_da_cu = 0,
+	ixgbe_sfp_type_sr = 1,
+	ixgbe_sfp_type_lr = 2,
+	ixgbe_sfp_type_not_present = 0xFFFE,
+	ixgbe_sfp_type_unknown = 0xFFFF
 };
 
 enum ixgbe_media_type {
@@ -1363,17 +1437,18 @@ struct ixgbe_mac_operations {
 	s32 (*start_hw)(struct ixgbe_hw *);
 	s32 (*clear_hw_cntrs)(struct ixgbe_hw *);
 	enum ixgbe_media_type (*get_media_type)(struct ixgbe_hw *);
+	s32 (*get_supported_physical_layer)(struct ixgbe_hw *);
 	s32 (*get_mac_addr)(struct ixgbe_hw *, u8 *);
 	s32 (*stop_adapter)(struct ixgbe_hw *);
 	s32 (*get_bus_info)(struct ixgbe_hw *);
-	s32 (*read_analog_reg8)(struct ixgbe_hw *, u32, u8*);
+	s32 (*read_analog_reg8)(struct ixgbe_hw *, u32, u8 *);
 	s32 (*write_analog_reg8)(struct ixgbe_hw *, u32, u8);
 
 	/* Link */
 	s32 (*setup_link)(struct ixgbe_hw *);
 	s32 (*setup_link_speed)(struct ixgbe_hw *, ixgbe_link_speed, bool,
 	    bool);
-	s32 (*check_link)(struct ixgbe_hw *, ixgbe_link_speed *, bool *);
+	s32 (*check_link)(struct ixgbe_hw *, ixgbe_link_speed *, bool *, bool);
 	s32 (*get_link_capabilities)(struct ixgbe_hw *, ixgbe_link_speed *,
 	    bool *);
 
@@ -1385,7 +1460,9 @@ struct ixgbe_mac_operations {
 
 	/* RAR, Multicast, VLAN */
 	s32 (*set_rar)(struct ixgbe_hw *, u32, u8 *, u32, u32);
+	s32 (*clear_rar)(struct ixgbe_hw *, u32);
 	s32 (*set_vmdq)(struct ixgbe_hw *, u32, u32);
+	s32 (*clear_vmdq)(struct ixgbe_hw *, u32, u32);
 	s32 (*init_rx_addrs)(struct ixgbe_hw *);
 	s32 (*update_uc_addr_list)(struct ixgbe_hw *, u8 *, u32,
 	    ixgbe_mc_addr_itr);
@@ -1395,6 +1472,7 @@ struct ixgbe_mac_operations {
 	s32 (*disable_mc)(struct ixgbe_hw *);
 	s32 (*clear_vfta)(struct ixgbe_hw *);
 	s32 (*set_vfta)(struct ixgbe_hw *, u32, u32, bool);
+	s32 (*init_uta_tables)(struct ixgbe_hw *);
 
 	/* Flow Control */
 	s32 (*setup_fc)(struct ixgbe_hw *, s32);
@@ -1402,17 +1480,25 @@ struct ixgbe_mac_operations {
 
 struct ixgbe_phy_operations {
 	s32 (*identify)(struct ixgbe_hw *);
+	s32 (*identify_sfp)(struct ixgbe_hw *);
 	s32 (*reset)(struct ixgbe_hw *);
 	s32 (*read_reg)(struct ixgbe_hw *, u32, u32, u16 *);
 	s32 (*write_reg)(struct ixgbe_hw *, u32, u32, u16);
 	s32 (*setup_link)(struct ixgbe_hw *);
 	s32 (*setup_link_speed)(struct ixgbe_hw *, ixgbe_link_speed, bool,
 	    bool);
+	s32 (*check_link)(struct ixgbe_hw *, ixgbe_link_speed *, bool *);
+	s32 (*get_firmware_version)(struct ixgbe_hw *, u16 *);
+	s32 (*read_i2c_byte)(struct ixgbe_hw *, u8, u8, u8 *);
+	s32 (*write_i2c_byte)(struct ixgbe_hw *, u8, u8, u8);
+	s32 (*read_i2c_eeprom)(struct ixgbe_hw *, u8, u8 *);
+	s32 (*write_i2c_eeprom)(struct ixgbe_hw *, u8, u8);
 };
 
 struct ixgbe_eeprom_info {
 	struct ixgbe_eeprom_operations	ops;
 	enum ixgbe_eeprom_type		type;
+	u32				semaphore_delay;
 	u16				word_size;
 	u16				address_bits;
 };
@@ -1440,8 +1526,10 @@ struct ixgbe_phy_info {
 	enum ixgbe_phy_type		type;
 	u32				addr;
 	u32				id;
+	enum ixgbe_sfp_type		sfp_type;
 	u32				revision;
 	enum ixgbe_media_type		media_type;
+	bool				reset_disable;
 	ixgbe_autoneg_advertised	autoneg_advertised;
 	bool				autoneg_wait_to_complete;
 };
@@ -1485,6 +1573,9 @@ struct ixgbe_hw {
 #define	IXGBE_ERR_RESET_FAILED			-15
 #define	IXGBE_ERR_SWFW_SYNC			-16
 #define	IXGBE_ERR_PHY_ADDR_INVALID		-17
+#define	IXGBE_ERR_I2C				-18
+#define	IXGBE_ERR_SFP_NOT_SUPPORTED		-19
+#define	IXGBE_ERR_SFP_NOT_PRESENT		-20
 #define	IXGBE_NOT_IMPLEMENTED			0x7FFFFFFF
 
 #ifndef UNREFERENCED_PARAMETER

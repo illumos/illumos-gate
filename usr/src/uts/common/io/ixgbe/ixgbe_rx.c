@@ -24,7 +24,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -271,7 +271,6 @@ ixgbe_ring_rx(ixgbe_rx_ring_t *rx_ring, int poll_bytes)
 	uint32_t pkt_num;
 	uint32_t received_bytes;
 	ixgbe_t *ixgbe = rx_ring->ixgbe;
-	struct ixgbe_hw *hw = &ixgbe->hw;
 
 	mblk_head = NULL;
 	mblk_tail = &mblk_head;

@@ -22,18 +22,17 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.50 v2008-03-04 */
+/* IntelVersion: 1.63 v2008-09-12 */
 
 #ifndef _IXGBE_API_H
 #define	_IXGBE_API_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "ixgbe_type.h"
+#ident "$Id: ixgbe_api.h,v 1.63 2008/08/21 18:03:40 mrchilak Exp $"
 
 s32 ixgbe_init_shared_code(struct ixgbe_hw *hw);
 
@@ -66,7 +65,7 @@ s32 ixgbe_setup_link(struct ixgbe_hw *hw);
 s32 ixgbe_setup_link_speed(struct ixgbe_hw *hw, ixgbe_link_speed speed,
     bool autoneg, bool autoneg_wait_to_complete);
 s32 ixgbe_check_link(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
-    bool *link_up);
+    bool *link_up, bool link_up_wait_to_complete);
 s32 ixgbe_get_link_capabilities(struct ixgbe_hw *hw, ixgbe_link_speed *speed,
     bool *autoneg);
 s32 ixgbe_led_on(struct ixgbe_hw *hw, u32 index);
@@ -82,7 +81,9 @@ s32 ixgbe_update_eeprom_checksum(struct ixgbe_hw *hw);
 
 s32 ixgbe_set_rar(struct ixgbe_hw *hw, u32 index, u8 *addr, u32 vmdq,
     u32 enable_addr);
+s32 ixgbe_clear_rar(struct ixgbe_hw *hw, u32 index);
 s32 ixgbe_set_vmdq(struct ixgbe_hw *hw, u32 rar, u32 vmdq);
+s32 ixgbe_clear_vmdq(struct ixgbe_hw *hw, u32 rar, u32 vmdq);
 s32 ixgbe_init_rx_addrs(struct ixgbe_hw *hw);
 u32 ixgbe_get_num_rx_addrs(struct ixgbe_hw *hw);
 s32 ixgbe_update_uc_addr_list(struct ixgbe_hw *hw, u8 *addr_list,
@@ -101,5 +102,8 @@ s32 ixgbe_get_phy_firmware_version(struct ixgbe_hw *hw,
     u16 *firmware_version);
 s32 ixgbe_read_analog_reg8(struct ixgbe_hw *hw, u32 reg, u8 *val);
 s32 ixgbe_write_analog_reg8(struct ixgbe_hw *hw, u32 reg, u8 val);
+s32 ixgbe_init_uta_tables(struct ixgbe_hw *hw);
+s32 ixgbe_read_i2c_eeprom(struct ixgbe_hw *hw, u8 byte_offset, u8 *eeprom_data);
+s32 ixgbe_get_supported_physical_layer(struct ixgbe_hw *hw);
 
 #endif /* _IXGBE_API_H */

@@ -22,11 +22,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ixgbe_sw.h"
 #include "ixgbe_debug.h"
@@ -55,6 +53,8 @@ ixgbe_dump_interrupt(void *adapter, char *tag)
 	ixgbe_log(ixgbe, "..eiac: 0x%x\n", IXGBE_READ_REG(hw, IXGBE_EIAC));
 	ixgbe_log(ixgbe, "..eiam: 0x%x\n", IXGBE_READ_REG(hw, IXGBE_EIAM));
 	ixgbe_log(ixgbe, "..gpie: 0x%x\n", IXGBE_READ_REG(hw, IXGBE_GPIE));
+	ixgbe_log(ixgbe, "otherflag: 0x%x\n", ixgbe->capab->other_intr);
+	ixgbe_log(ixgbe, "eims_mask: 0x%x\n", ixgbe->eims);
 
 	/* ivar: interrupt vector allocation registers */
 	for (i = 0; i < IXGBE_IVAR_REG_NUM; i++) {
