@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -306,7 +306,7 @@ trim_stack_cache(int cache_limit)
  * thr_exit() stores 1 in the ul_dead member.
  * thr_join() stores -1 in the ul_lwpid member.
  */
-ulwp_t *
+static ulwp_t *
 find_stack(size_t stksize, size_t guardsize)
 {
 	static size_t pagesize = 0;
@@ -401,7 +401,6 @@ find_stack(size_t stksize, size_t guardsize)
 			ulwp->ul_guardsize = guardsize;
 			ulwp->ul_stktop = (uintptr_t)stk + mapsize;
 			ulwp->ul_stksiz = stksize;
-			ulwp->ul_ix = -1;
 			if (guardsize)	/* protect the extra red zone */
 				(void) mprotect(stk, guardsize, PROT_NONE);
 		}
@@ -588,8 +587,9 @@ _thrp_create(void *stk, size_t stksize, void *(*func)(void *), void *arg,
 		ulwp->ul_stk = stk;
 		ulwp->ul_stktop = (uintptr_t)stk + stksize;
 		ulwp->ul_stksiz = stksize;
-		ulwp->ul_ix = -1;
 	}
+	/* ulwp is not in the hash table; make sure hash_out() doesn't fail */
+	ulwp->ul_ix = -1;
 	ulwp->ul_errnop = &ulwp->ul_errno;
 
 	lwp_flags = LWP_SUSPENDED;
