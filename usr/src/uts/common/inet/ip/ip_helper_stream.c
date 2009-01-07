@@ -201,25 +201,21 @@ ip_create_helper_stream(conn_t *connp, ldi_ident_t li)
 
 	error = 0;
 	if (IP_USE_HELPER_CACHE) {
-		queue_t	*rq, *wq;
-
 		connp->conn_helper_info = kmem_cache_alloc(
 		    ip_helper_stream_cache, KM_NOSLEEP);
 		if (connp->conn_helper_info == NULL)
 			return (EAGAIN);
-		rq = connp->conn_helper_info->iphs_rq;
-		wq = connp->conn_helper_info->iphs_wq;
+		connp->conn_rq = connp->conn_helper_info->iphs_rq;
+		connp->conn_wq = connp->conn_helper_info->iphs_wq;
 		/*
 		 * Doesn't need to hold the QLOCK for there is no one else
 		 * should have a pointer to this queue.
 		 */
-		rq->q_flag |= QWANTR;
-		wq->q_flag |= QWANTR;
+		connp->conn_rq->q_flag |= QWANTR;
+		connp->conn_wq->q_flag |= QWANTR;
 
-		connp->conn_rq = rq;
-		connp->conn_wq = wq;
-		rq->q_ptr = (void *)connp;
-		wq->q_ptr = (void *)connp;
+		connp->conn_rq->q_ptr = connp;
+		connp->conn_wq->q_ptr = connp;
 	} else {
 		ASSERT(connp->conn_helper_info == NULL);
 		connp->conn_helper_info = kmem_alloc(
