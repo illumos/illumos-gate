@@ -18,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2007 Chad Mynhier
@@ -404,7 +405,7 @@ typedef int proc_lwp_all_f(void *, const lwpstatus_t *, const lwpsinfo_t *);
 extern int Plwp_iter_all(struct ps_prochandle *, proc_lwp_all_f *, void *);
 
 /*
- * Process iteration interface; iterate over all active processes.
+ * Process iteration interface; iterate over all non-system processes.
  */
 typedef int proc_walk_f(psinfo_t *, lwpsinfo_t *, void *);
 extern int proc_walk(proc_walk_f *, void *, int);

@@ -18,15 +18,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/proc.h>
 
 #include <libgen.h>
 #include <limits.h>
@@ -97,12 +97,12 @@ open_core(const char *arg, int *perr)
 			(void) close(fd);
 			fd = -1;
 		} else if ((is_noelf = memcmp(&ehdr.e_ident[EI_MAG0], ELFMAG,
-			    SELFMAG)) != 0 || ehdr.e_type != ET_CORE) {
-				(void) close(fd);
-				fd = -1;
-				if (is_noelf == 0 &&
-				    ehdr.e_ident[EI_DATA] != order)
-					*perr = G_ISAINVAL;
+		    SELFMAG)) != 0 || ehdr.e_type != ET_CORE) {
+			(void) close(fd);
+			fd = -1;
+			if (is_noelf == 0 &&
+			    ehdr.e_ident[EI_DATA] != order)
+				*perr = G_ISAINVAL;
 		}
 	} else if (errno == EACCES || errno == EPERM)
 		*perr = G_PERM;
@@ -422,6 +422,7 @@ proc_lwp_range_valid(const char *set)
 
 /*
  * Walk all processes or LWPs in /proc and call func() for each.
+ * Omit system processes (like process-IDs 0, 2, and 3).
  * Stop calling func() if it returns non 0 value and return it.
  */
 int
@@ -459,7 +460,8 @@ proc_walk(proc_walk_f *func, void *arg, int flag)
 		fd = open(pidstr, O_RDONLY);
 		if (fd < 0)
 			continue;
-		if (read(fd, &psinfo, sizeof (psinfo)) != sizeof (psinfo)) {
+		if (read(fd, &psinfo, sizeof (psinfo)) != sizeof (psinfo) ||
+		    (psinfo.pr_flag & SSYS)) {
 			(void) close(fd);
 			continue;
 		}
