@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
  *	All rights reserved.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Node hash implementation borrowed from NFS.
@@ -254,8 +252,8 @@ smbfs_make_node(
 	np->r_size = fap->fa_size;
 	/* XXX: np->r_attr = *fap here instead? */
 	np->r_atime = fap->fa_atime;
-	np->r_ctime = fap->fa_mtime;
-	np->r_mtime = fap->fa_ctime;
+	np->r_ctime = fap->fa_ctime;
+	np->r_mtime = fap->fa_mtime;
 
 #ifdef NOT_YET
 	if (!newnode) {
