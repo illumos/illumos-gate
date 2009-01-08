@@ -329,6 +329,7 @@ DRV_KMODS	+= winlock
 DRV_KMODS	+= wpi
 DRV_KMODS	+= xge
 DRV_KMODS	+= zcons
+DRV_KMODS	+= zyd
 DRV_KMODS	+= stmf
 DRV_KMODS	+= stmf_sbd
 DRV_KMODS	+= fct

@@ -143,6 +143,7 @@ clone:rtw 0666 root sys
 clone:rum 0666 root sys
 clone:ural 0666 root sys
 clone:wpi 0666 root sys
+clone:zyd 0666 root sys
 clone:dmfe 0666 root sys
 clone:afe 0666 root sys
 clone:mxfe 0666 root sys
@@ -169,6 +170,7 @@ rtw:* 0666 root sys
 rum:* 0666 root sys
 ural:* 0666 root sys
 wpi:* 0666 root sys
+zyd:* 0666 root sys
 physmem:* 0600 root sys
 sdp:sdp 0666 root sys
 acpi_drv:* 0666 root sys

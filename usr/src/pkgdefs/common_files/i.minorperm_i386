@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -121,6 +121,7 @@ clone:rtw		0600 root sys 0666 root sys	/dev/rtw
 clone:rum		0600 root sys 0666 root sys	/dev/rum
 clone:ural		0600 root sys 0666 root sys	/dev/ural
 clone:wpi		0600 root sys 0666 root sys	/dev/wpi
+clone:zyd		0600 root sys 0666 root sys	/dev/zyd
 clone:afe		0600 root sys 0666 root sys	/dev/afe
 clone:dmfe		0600 root sys 0666 root sys	/dev/dmfe
 clone:mxfe		0600 root sys 0666 root sys	/dev/mxfe
@@ -146,6 +147,7 @@ rtw:*			0600 root sys 0666 root sys	/dev/rtw*
 rum:*			0600 root sys 0666 root sys	/dev/rum*
 ural:*			0600 root sys 0666 root sys	/dev/ural*
 wpi:*			0600 root sys 0666 root sys	/dev/wpi*
+zyd:*			0600 root sys 0666 root sys	/dev/zyd*
 afe:*			0600 root sys 0666 root sys	/dev/afe*
 dmfe:*			0600 root sys 0666 root sys	/dev/dmfe*
 mxfe:*			0600 root sys 0666 root sys	/dev/mxfe*
@@ -297,6 +299,7 @@ clone:rtw
 clone:rum
 clone:ural
 clone:wpi
+clone:zyd
 clone:afe
 clone:dmfe
 clone:mxfe
@@ -322,6 +325,7 @@ rtw:*
 rum:*
 ural:*
 wpi:*
+zyd:*
 afe:*
 dmfe:*
 mxfe:*

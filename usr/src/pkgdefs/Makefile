@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -159,6 +159,7 @@ i386_SUBDIRS= \
 	SUNWxvmipar \
 	SUNWxvmipau \
 	SUNWxvmpv	\
+	SUNWzyd \
 	SUNWntxn
 
 i386_XMODS= \

@@ -1653,6 +1653,8 @@ URAL_OBJS += ural.o
 
 RTW_OBJS += rtw.o smc93cx6.o rtwphy.o rtwphyio.o
 
+ZYD_OBJS += zyd.o zyd_usb.o zyd_hw.o zyd_fw.o
+
 MXFE_OBJS += mxfe.o
 
 SFE_OBJS += sfe.o sfe_util.o
