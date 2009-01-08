@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2104,12 +2104,12 @@ extern void sfh4_printfhandle(const nfs4_sharedfh_t *);
 typedef struct nfs4_fname {
 	struct nfs4_fname *fn_parent;	/* parent name; null if fs root */
 	char *fn_name;			/* the actual name */
-	nfs4_sharedfh_t *fn_sfh;	/* The fh for this fname */
 	ssize_t fn_len;			/* strlen(fn_name) */
 	uint32_t fn_refcnt;		/* reference count */
 	kmutex_t fn_lock;
 	avl_node_t fn_tree;
 	avl_tree_t fn_children;		/* children, if any */
+	nfs4_sharedfh_t *fn_sfh;	/* The fh for this fname */
 } nfs4_fname_t;
 
 #ifdef _KERNEL

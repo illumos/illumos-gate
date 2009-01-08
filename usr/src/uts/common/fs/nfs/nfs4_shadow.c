@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,6 +90,7 @@ sv_activate(vnode_t **vpp, vnode_t *dvp, nfs4_fname_t **namepp, int newnode)
 {
 	svnode_t *svp;
 	vnode_t *resvp;
+	nfs4_fname_t *svpname;
 	rnode4_t *rp = VTOR4(*vpp);
 	svp = VTOSV(*vpp);
 
@@ -139,7 +140,7 @@ sv_activate(vnode_t **vpp, vnode_t *dvp, nfs4_fname_t **namepp, int newnode)
 		 * to protect sv_name.
 		 */
 		mutex_enter(&rp->r_svlock);
-		nfs4_fname_t *svpname = svp->sv_name;
+		svpname = svp->sv_name;
 		if (svpname != *namepp) {
 			/*
 			 * Call fn_rele() to release the hold for the
