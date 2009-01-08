@@ -892,6 +892,7 @@ fc_util_list_hbaport(int wwnCount, char **wwn_argv, cmdOptions_t *options)
 					    "handle(%d) Reason: "), handle);
 				printStatus(status);
 				fprintf(stderr, "\n");
+				HBA_CloseAdapter(handle);
 				continue;
 			}
 
@@ -1315,10 +1316,11 @@ fc_util_list_logicalunit(int luCount, char **luArgv, cmdOptions_t *options)
 		if (status != HBA_STATUS_OK) {
 			fprintf(stderr,
 			    gettext("Failed to get adapter attributes "
-			    "handle(%d) Reason: "), handle);
+				    "handle(%d) Reason: "), handle);
 			printStatus(status);
 			fprintf(stderr, "\n");
 			ret++;
+			HBA_CloseAdapter(handle);
 			continue;
 		}
 
