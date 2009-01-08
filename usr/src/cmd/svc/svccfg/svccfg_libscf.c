@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1384,123 +1384,6 @@ out:
 }
 
 /*
- * Refresh entity.  If isservice is zero, take entity to be an scf_instance_t *.
- * Otherwise take entity to be an scf_service_t * and refresh all of its child
- * instances.  fmri is used for messages.  inst, iter, and name_buf are used
- * for scratch space.  Returns
- *   0 - success
- *   ECONNABORTED - repository connection broken
- *   ECANCELED - entity was deleted
- *   EACCES - backend denied access
- *   EPERM - permission denied
- *   -1 - _smf_refresh_instance_i() failed.  scf_error() should be set.
- */
-static int
-refresh_entity(int isservice, void *entity, const char *fmri,
-    scf_instance_t *inst, scf_iter_t *iter, char *name_buf)
-{
-	scf_error_t scfe;
-	int r;
-
-	if (!isservice) {
-		if (_smf_refresh_instance_i(entity) == 0) {
-			if (g_verbose)
-				warn(gettext("Refreshed %s.\n"), fmri);
-			return (0);
-		}
-
-		switch (scf_error()) {
-		case SCF_ERROR_BACKEND_ACCESS:
-			return (EACCES);
-
-		case SCF_ERROR_PERMISSION_DENIED:
-			return (EPERM);
-
-		default:
-			return (-1);
-		}
-	}
-
-	if (scf_iter_service_instances(iter, entity) != 0) {
-		switch (scf_error()) {
-		case SCF_ERROR_CONNECTION_BROKEN:
-			return (ECONNABORTED);
-
-		case SCF_ERROR_DELETED:
-			return (ECANCELED);
-
-		case SCF_ERROR_HANDLE_MISMATCH:
-		case SCF_ERROR_NOT_BOUND:
-		case SCF_ERROR_NOT_SET:
-		default:
-			bad_error("scf_iter_service_instances", scf_error());
-		}
-	}
-
-	for (;;) {
-		r = scf_iter_next_instance(iter, inst);
-		if (r == 0)
-			break;
-		if (r != 1) {
-			switch (scf_error()) {
-			case SCF_ERROR_CONNECTION_BROKEN:
-				return (ECONNABORTED);
-
-			case SCF_ERROR_DELETED:
-				return (ECANCELED);
-
-			case SCF_ERROR_HANDLE_MISMATCH:
-			case SCF_ERROR_NOT_BOUND:
-			case SCF_ERROR_NOT_SET:
-			case SCF_ERROR_INVALID_ARGUMENT:
-			default:
-				bad_error("scf_iter_next_instance",
-				    scf_error());
-			}
-		}
-
-		if (_smf_refresh_instance_i(inst) == 0) {
-			if (g_verbose) {
-				if (scf_instance_get_name(inst, name_buf,
-				    max_scf_name_len + 1) < 0)
-					(void) strcpy(name_buf, "?");
-
-				warn(gettext("Refreshed %s:%s.\n"),
-				    fmri, name_buf);
-			}
-		} else {
-			if (scf_error() != SCF_ERROR_BACKEND_ACCESS ||
-			    g_verbose) {
-				scfe = scf_error();
-
-				if (scf_instance_to_fmri(inst, name_buf,
-				    max_scf_name_len + 1) < 0)
-					(void) strcpy(name_buf, "?");
-
-				warn(gettext(
-				    "Refresh of %s:%s failed: %s.\n"), fmri,
-				    name_buf, scf_strerror(scfe));
-			}
-		}
-	}
-
-	return (0);
-}
-
-static int
-stash_scferror_err(scf_callback_t *cbp, scf_error_t err)
-{
-	cbp->sc_err = scferror2errno(err);
-	return (UU_WALK_ERROR);
-}
-
-static int
-stash_scferror(scf_callback_t *cbp)
-{
-	return (stash_scferror_err(cbp, scf_error()));
-}
-
-/*
  * Create or update a snapshot of inst.  snap is a required scratch object.
  *
  * Returns
@@ -1572,6 +1455,259 @@ again:
 	}
 
 	return (0);
+}
+
+static int
+refresh_running_snapshot(void *entity) {
+	scf_snapshot_t *snap;
+	int r;
+
+	if ((snap = scf_snapshot_create(g_hndl)) == NULL)
+		scfdie();
+	r = take_snap(entity, snap_running, snap);
+	scf_snapshot_destroy(snap);
+
+	return (r);
+}
+
+/*
+ * Refresh entity.  If isservice is zero, take entity to be an scf_instance_t *.
+ * Otherwise take entity to be an scf_service_t * and refresh all of its child
+ * instances.  fmri is used for messages.  inst, iter, and name_buf are used
+ * for scratch space.  Returns
+ *   0 - success
+ *   ECONNABORTED - repository connection broken
+ *   ECANCELED - entity was deleted
+ *   EACCES - backend denied access
+ *   EPERM - permission denied
+ *   ENOSPC - repository server out of resources
+ *   -1 - _smf_refresh_instance_i() failed.  scf_error() should be set.
+ */
+static int
+refresh_entity(int isservice, void *entity, const char *fmri,
+    scf_instance_t *inst, scf_iter_t *iter, char *name_buf)
+{
+	scf_error_t scfe;
+	int r;
+
+	if (!isservice) {
+		if (est->sc_repo_filename == NULL) {
+			if (_smf_refresh_instance_i(entity) == 0) {
+				if (g_verbose)
+					warn(gettext("Refreshed %s.\n"), fmri);
+				return (0);
+			}
+
+			switch (scf_error()) {
+			case SCF_ERROR_BACKEND_ACCESS:
+				return (EACCES);
+
+			case SCF_ERROR_PERMISSION_DENIED:
+				return (EPERM);
+
+			default:
+				return (-1);
+			}
+		} else {
+			r = refresh_running_snapshot(entity);
+			switch (r) {
+			case 0:
+				break;
+
+			case ECONNABORTED:
+			case ECANCELED:
+			case EPERM:
+			case ENOSPC:
+				break;
+
+			default:
+				bad_error("refresh_running_snapshot",
+				    scf_error());
+			}
+
+			return (r);
+		}
+	}
+
+	if (scf_iter_service_instances(iter, entity) != 0) {
+		switch (scf_error()) {
+		case SCF_ERROR_CONNECTION_BROKEN:
+			return (ECONNABORTED);
+
+		case SCF_ERROR_DELETED:
+			return (ECANCELED);
+
+		case SCF_ERROR_HANDLE_MISMATCH:
+		case SCF_ERROR_NOT_BOUND:
+		case SCF_ERROR_NOT_SET:
+		default:
+			bad_error("scf_iter_service_instances", scf_error());
+		}
+	}
+
+	for (;;) {
+		r = scf_iter_next_instance(iter, inst);
+		if (r == 0)
+			break;
+		if (r != 1) {
+			switch (scf_error()) {
+			case SCF_ERROR_CONNECTION_BROKEN:
+				return (ECONNABORTED);
+
+			case SCF_ERROR_DELETED:
+				return (ECANCELED);
+
+			case SCF_ERROR_HANDLE_MISMATCH:
+			case SCF_ERROR_NOT_BOUND:
+			case SCF_ERROR_NOT_SET:
+			case SCF_ERROR_INVALID_ARGUMENT:
+			default:
+				bad_error("scf_iter_next_instance",
+				    scf_error());
+			}
+		}
+
+		if (est->sc_repo_filename != NULL) {
+			r = refresh_running_snapshot(inst);
+			switch (r) {
+			case 0:
+				continue;
+
+			case ECONNABORTED:
+			case ECANCELED:
+			case EPERM:
+			case ENOSPC:
+				break;
+			default:
+				bad_error("refresh_running_snapshot",
+				    scf_error());
+			}
+
+			return (r);
+
+		}
+
+		if (_smf_refresh_instance_i(inst) == 0) {
+			if (g_verbose) {
+				if (scf_instance_get_name(inst, name_buf,
+				    max_scf_name_len + 1) < 0)
+					(void) strcpy(name_buf, "?");
+
+				warn(gettext("Refreshed %s:%s.\n"),
+				    fmri, name_buf);
+			}
+		} else {
+			if (scf_error() != SCF_ERROR_BACKEND_ACCESS ||
+			    g_verbose) {
+				scfe = scf_error();
+
+				if (scf_instance_to_fmri(inst, name_buf,
+				    max_scf_name_len + 1) < 0)
+					(void) strcpy(name_buf, "?");
+
+				warn(gettext(
+				    "Refresh of %s:%s failed: %s.\n"), fmri,
+				    name_buf, scf_strerror(scfe));
+			}
+		}
+	}
+
+	return (0);
+}
+
+static void
+private_refresh(void)
+{
+	scf_instance_t *pinst = NULL;
+	scf_iter_t *piter = NULL;
+	ssize_t fmrilen;
+	size_t bufsz;
+	char *fmribuf;
+	void *ent;
+	int issvc;
+	int r;
+
+	if (est->sc_repo_filename == NULL)
+		return;
+
+	assert(cur_svc != NULL);
+
+	bufsz = max_scf_fmri_len + 1;
+	fmribuf = safe_malloc(bufsz);
+	if (cur_inst) {
+		issvc = 0;
+		ent = cur_inst;
+		fmrilen = scf_instance_to_fmri(ent, fmribuf, bufsz);
+	} else {
+		issvc = 1;
+		ent = cur_svc;
+		fmrilen = scf_service_to_fmri(ent, fmribuf, bufsz);
+		if ((pinst = scf_instance_create(g_hndl)) == NULL)
+			scfdie();
+
+		if ((piter = scf_iter_create(g_hndl)) == NULL)
+			scfdie();
+	}
+	if (fmrilen < 0) {
+		free(fmribuf);
+		if (scf_error() != SCF_ERROR_DELETED)
+			scfdie();
+
+		warn(emsg_deleted);
+		return;
+	}
+	assert(fmrilen < bufsz);
+
+	r = refresh_entity(issvc, ent, fmribuf, pinst, piter, NULL);
+	switch (r) {
+	case 0:
+		break;
+
+	case ECONNABORTED:
+		warn(gettext("Could not refresh %s "
+		    "(repository connection broken).\n"), fmribuf);
+		break;
+
+	case ECANCELED:
+		warn(emsg_deleted);
+		break;
+
+	case EPERM:
+		warn(gettext("Could not refresh %s "
+		    "(permission denied).\n"), fmribuf);
+		break;
+
+	case ENOSPC:
+		warn(gettext("Could not refresh %s "
+		    "(repository server out of resources).\n"),
+		    fmribuf);
+		break;
+
+	case EACCES:
+	default:
+		bad_error("refresh_entity", scf_error());
+	}
+
+	if (issvc) {
+		scf_instance_destroy(pinst);
+		scf_iter_destroy(piter);
+	}
+
+	free(fmribuf);
+}
+
+
+static int
+stash_scferror_err(scf_callback_t *cbp, scf_error_t err)
+{
+	cbp->sc_err = scferror2errno(err);
+	return (UU_WALK_ERROR);
+}
+
+static int
+stash_scferror(scf_callback_t *cbp)
+{
+	return (stash_scferror_err(cbp, scf_error()));
 }
 
 /*
@@ -6782,6 +6918,18 @@ imp_refresh_fmri(const char *fmri, const char *name, const char *d_fmri)
 			    "(permission denied).\n"), fmri, name, d_fmri);
 		return (r);
 
+	case ENOSPC:
+		if (name == NULL)
+			warn(gettext("Could not refresh %s "
+			    "(repository server out of resources).\n"),
+			    fmri);
+		else
+			warn(gettext("Could not refresh %s "
+			    "(dependent \"%s\" of %s) "
+			    "(repository server out of resources).\n"),
+			    fmri, name, d_fmri);
+		return (r);
+
 	case -1:
 		scfwarn();
 		return (r);
@@ -11914,6 +12062,8 @@ lscf_addpg(const char *name, const char *type, const char *flags)
 	}
 
 	scf_pg_destroy(pg);
+
+	private_refresh();
 }
 
 void
@@ -12173,6 +12323,9 @@ lscf_setprop(const char *pgname, const char *type, const char *value,
 	}
 
 	ret = 0;
+
+	private_refresh();
+
 	goto cleanup;
 
 fail:
@@ -12256,6 +12409,8 @@ lscf_delprop(char *pgn)
 				scfdie();
 
 			semerr(emsg_permission_denied);
+		} else {
+			private_refresh();
 		}
 
 		scf_pg_destroy(pg);
@@ -12300,6 +12455,8 @@ lscf_delprop(char *pgn)
 			scfdie();
 
 		semerr(emsg_permission_denied);
+	} else {
+		private_refresh();
 	}
 
 	scf_transaction_destroy(tx);
@@ -12850,6 +13007,8 @@ lscf_setpropvalue(const char *pgname, const char *type,
 	}
 
 	result = 0;
+
+	private_refresh();
 
 out:
 	scf_transaction_destroy(tx);
@@ -13670,7 +13829,6 @@ lscf_refresh(void)
 	size_t bufsz;
 	char *fmribuf;
 	int r;
-	scf_snapshot_t *snap;
 
 	lscf_prep_hndl();
 
@@ -13693,70 +13851,34 @@ lscf_refresh(void)
 	}
 	assert(fmrilen < bufsz);
 
-	/*
-	 * If the repository is the active one, a refresh of the instance is
-	 * requested.  For alternate repositories, the refresh command simply
-	 * takes a new 'running' snapshot, so the refresh method is not run.
-	 */
-	if (est->sc_repo_filename == NULL) {
-		r = refresh_entity(0, cur_inst, fmribuf, NULL, NULL, NULL);
+	r = refresh_entity(0, cur_inst, fmribuf, NULL, NULL, NULL);
+	switch (r) {
+	case 0:
+		break;
 
-		switch (r) {
-		case 0:
-			break;
+	case ECONNABORTED:
+		warn(gettext("Could not refresh %s "
+		    "(repository connection broken).\n"), fmribuf);
+		break;
 
-		case ECONNABORTED:
-			warn(gettext("Could not refresh %s "
-			    "(repository connection broken).\n"), fmribuf);
-			break;
+	case ECANCELED:
+		warn(emsg_deleted);
+		break;
 
-		case ECANCELED:
-			warn(emsg_deleted);
-			break;
+	case EPERM:
+		warn(gettext("Could not refresh %s "
+		    "(permission denied).\n"), fmribuf);
+		break;
 
-		case EPERM:
-			warn(gettext("Could not refresh %s "
-			    "(permission denied).\n"), fmribuf);
-			break;
+	case ENOSPC:
+		warn(gettext("Could not refresh %s "
+		    "(repository server out of resources).\n"),
+		    fmribuf);
+		break;
 
-		case EACCES:
-		default:
-			bad_error("refresh_entity", scf_error());
-		}
-
-	} else {
-		if ((snap = scf_snapshot_create(g_hndl)) == NULL)
-			scfdie();
-		r = take_snap(cur_inst, snap_running, snap);
-		scf_snapshot_destroy(snap);
-
-		switch (r) {
-		case 0:
-			break;
-
-		case ECONNABORTED:
-			warn(gettext("Could not refresh %s "
-			    "(repository connection broken).\n"), fmribuf);
-			break;
-
-		case ECANCELED:
-			warn(emsg_deleted);
-			break;
-
-		case EPERM:
-			warn(gettext("Could not refresh %s "
-			    "(permission denied).\n"), fmribuf);
-			break;
-
-		case ENOSPC:
-			warn(gettext("Could not refresh %s "
-			    "(repository server out of resources).\n"),
-			    fmribuf);
-			break;
-
-		default:
-			bad_error("take_snap", scf_error());
-		}
+	case EACCES:
+	default:
+		bad_error("refresh_entity", scf_error());
 	}
 
 	free(fmribuf);
