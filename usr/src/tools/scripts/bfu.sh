@@ -2864,6 +2864,7 @@ bfucmd="
 	/usr/bin/head
 	/usr/bin/id
 	/usr/bin/ksh
+	/usr/bin/ksh93
 	/usr/bin/line
 	/usr/bin/ln
 	/usr/bin/ls
@@ -2882,12 +2883,10 @@ bfucmd="
 	/usr/bin/rmdir
 	/usr/bin/sed
 	/usr/bin/sh
-	/usr/bin/sleep
 	/usr/bin/sort
 	/usr/bin/strings
 	/usr/bin/stty
 	/usr/bin/su
-	/usr/bin/sum
 	/usr/bin/tail
 	/usr/bin/tee
 	/usr/bin/touch
@@ -2934,19 +2933,26 @@ bfucmd="
 bfuscr="
 	${ACR-${GATE}/public/bin/acr}
 "
-#
-# basename and dirname may be ELF executables, not shell scripts;
-# make sure they go into the right list.
-#
-if `file /usr/bin/basename | grep ELF >/dev/null`
-then	bfucmd="$bfucmd /usr/bin/basename"
-else	bfuscr="$bfuscr /usr/bin/basename"
-fi
 
-if `file /usr/bin/dirname | grep ELF >/dev/null`
-then	bfucmd="$bfucmd /usr/bin/dirname"
-else	bfuscr="$bfuscr /usr/bin/dirname"
-fi
+#
+# Tools which may be either scripts or ELF binaries,
+# so we need to check them before adding to either $bfucmd or $bfuscr.
+# This does not handle compiled shell scripts yet.
+#
+bfuchameleons="
+        /usr/bin/basename
+        /usr/bin/dirname
+        /usr/bin/sleep
+        /usr/bin/sum
+"
+
+for chameleon in ${bfuchameleons} ; do
+        if [[ "$(file "${chameleon}")" == *ELF* ]] ; then
+                bfucmd="${bfucmd} ${chameleon}"
+        else
+                bfuscr="${bfuscr} ${chameleon}"
+        fi
+done
 
 rm -rf /tmp/bfubin
 mkdir /tmp/bfubin
