@@ -1,10 +1,8 @@
 #!/bin/ksh -p
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -83,7 +81,8 @@ printf 'PERL_LDLIBS = %s\n' "$perllibs"
 printf 'PERL_LD_ENV = LD_LIBRARY_PATH=$(PERL_DISTRIB); export LD_LIBRARY_PATH\n'
 printf 'PERL_LIB_ENV = PERL5LIB=$(PERL_UTILS)/lib:$(PERL_DISTRIB)/lib; '
 printf 'export PERL5LIB\n'
-printf 'PERL_MM_ENV = $(KEEP_STATE_OFF); unset VERSION; $(PERL_LIB_ENV)\n'
+printf 'PERL_MM_ENV = $(KEEP_STATE_OFF); unset VERSION || true; '
+printf '$(PERL_LIB_ENV)\n'
 printf "PERL_MM_ARGS = PERL_CORE=1 DEFINE='\$(DTEXTDOM)'\n"
 
 # Make sure we always run miniperl with the correct environment.
