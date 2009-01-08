@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/sendmail/src/Makefile
@@ -40,7 +40,7 @@ OBJS= alias.o arpadate.o bf.o collect.o conf.o control.o convtime.o daemon.o \
 SRCS=	$(OBJS:%.o=%.c)
 
 MAPFILES =	$(MAPFILE.INT) $(MAPFILE.NGB)
-LDFLAGS +=	-R$(SFW_ROOT)/lib $(MAPFILES:%=-M%)
+LDFLAGS +=	$(MAPFILES:%=-M%)
 
 # EXPORT DELETE START
 CRYPTOLIBS=	-lssl -lcrypto
