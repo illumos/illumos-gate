@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <hxge_impl.h>
 #include <hpi_pfc.h>
@@ -948,8 +946,8 @@ hpi_pfc_mac_addr_get_i(hpi_handle_t handle, uint8_t *data, int slot)
 	data[1] = (addr_lo & 0x0000ff00) >> 8;
 	data[2] = (addr_lo & 0x00ff0000) >> 16;
 	data[3] = (addr_lo & 0xff000000) >> 24;
-	data[4] = (addr_hi & 0x00000ff00) >> 8;
-	data[5] = (addr_hi & 0x0000000ff);
+	data[4] = (addr_hi & 0x0000000ff);
+	data[5] = (addr_hi & 0x00000ff00) >> 8;
 
 	return (HPI_SUCCESS);
 }
