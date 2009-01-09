@@ -1607,7 +1607,7 @@ ip_ndp_find_addresses(mblk_t *mp, mblk_t *dl_mp, ill_t *ill, in6_addr_t *targp,
 	int alen = 0;
 
 	if (dl_mp == NULL) {
-		nd_opt_hdr_t *opt;
+		nd_opt_hdr_t *opt = NULL;
 		int len;
 
 		/*
