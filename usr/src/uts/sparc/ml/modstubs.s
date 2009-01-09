@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1177,6 +1177,7 @@ stubs_base:
 	NO_UNLOAD_STUB(kcf, crypto_verify_recover_prov, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, crypto_verify_recover_init_prov, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, random_add_entropy, nomod_minus_one);
+	NO_UNLOAD_STUB(kcf, random_add_pseudo_entropy, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, random_get_bytes, nomod_minus_one);
 	NO_UNLOAD_STUB(kcf, random_get_pseudo_bytes, nomod_minus_one);
 	END_MODULE(kcf);

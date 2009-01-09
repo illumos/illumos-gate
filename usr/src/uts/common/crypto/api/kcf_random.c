@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,8 @@
  * This file implements the interfaces that the /dev/random
  * driver uses for read(2), write(2) and poll(2) on /dev/random or
  * /dev/urandom. It also implements the kernel API - random_add_entropy(),
- * random_get_pseudo_bytes() and random_get_bytes().
+ * random_add_pseudo_entropy(), random_get_pseudo_bytes()
+ * and random_get_bytes().
  *
  * We periodically collect random bits from providers which are registered
  * with the Kernel Cryptographic Framework (kCF) as capable of random
