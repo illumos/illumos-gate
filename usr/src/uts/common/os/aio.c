@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Kernel asynchronous I/O.
@@ -624,8 +622,10 @@ aiowaitn(void *uiocb, uint_t nent, uint_t *nwait, timespec_t *timout)
 	timestruc_t	*rqtp;
 
 	aiop = curproc->p_aio;
+	if (aiop == NULL || nent == 0 || nent > _AIO_LISTIO_MAX)
+		return (EINVAL);
 
-	if (aiop == NULL || aiop->aio_outstanding == 0)
+	if (aiop->aio_outstanding == 0)
 		return (EAGAIN);
 
 	if (copyin(nwait, &waitcnt, sizeof (uint_t)))
@@ -782,11 +782,6 @@ aiowaitn(void *uiocb, uint_t nent, uint_t *nwait, timespec_t *timout)
 			error = EFAULT;
 	}
 
-	if (aiop->aio_iocbsz > AIO_IOCB_MAX) {
-		kmem_free(iocblist, aiop->aio_iocbsz);
-		aiop->aio_iocb = NULL;
-	}
-
 	/* check if there is another thread waiting for execution */
 	mutex_enter(&aiop->aio_mutex);
 	aiop->aio_flags &= ~AIO_WAITN;
@@ -923,7 +918,7 @@ aiosuspend(
 	timestruc_t	*rqtp;
 
 	aiop = curproc->p_aio;
-	if (aiop == NULL || nent <= 0)
+	if (aiop == NULL || nent <= 0 || nent > _AIO_LISTIO_MAX)
 		return (EINVAL);
 
 	/*

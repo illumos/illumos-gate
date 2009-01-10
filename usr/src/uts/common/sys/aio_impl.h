@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_AIO_IMPL_H
 #define	_SYS_AIO_IMPL_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/aio_req.h>
 #include <sys/aio.h>
@@ -47,7 +45,6 @@ extern "C" {
 #define	AIO_HASHSZ		8192L		/* power of 2 */
 #define	AIO_HASH(cookie)	(((uintptr_t)(cookie) >> 3) & (AIO_HASHSZ-1))
 #define	DUPLICATE 1
-#define	AIO_IOCB_MAX		32768L
 
 /*
  * an aio_list_t is the head of a list. a group of requests are in
