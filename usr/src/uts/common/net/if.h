@@ -370,14 +370,11 @@ struct	lifreq {
 		uint64_t lifru_flags;		/* Flags for SIOC?LIFFLAGS */
 		int	lifru_metric;
 		uint_t	lifru_mtu;
-		char	lifru_data[1];		/* interface dependent data */
-		char	lifru_enaddr[6];
 		int	lif_muxid[2];		/* mux id's for arp and ip */
 		struct lif_nd_req	lifru_nd_req;
 		struct lif_ifinfo_req	lifru_ifinfo_req;
 		char	lifru_groupname[LIFGRNAMSIZ]; /* SIOC[GS]LIFGROUPNAME */
 		char	lifru_binding[LIFNAMSIZ]; /* SIOCGLIFBINDING */
-		uint_t	lifru_delay;		   /* SIOC[GS]LIFNOTIFYDELAY */
 		zoneid_t lifru_zoneid;		/* SIOC[GS]LIFZONE */
 	} lifr_lifru;
 
@@ -390,16 +387,12 @@ struct	lifreq {
 #define	lifr_flags	lifr_lifru.lifru_flags	/* flags */
 #define	lifr_metric	lifr_lifru.lifru_metric	/* metric */
 #define	lifr_mtu	lifr_lifru.lifru_mtu	/* mtu */
-#define	lifr_data	lifr_lifru.lifru_data	/* for use by interface */
-#define	lifr_enaddr	lifr_lifru.lifru_enaddr	/* ethernet address */
-#define	lifr_index	lifr_lifru.lifru_index	/* interface index */
 #define	lifr_ip_muxid	lifr_lifru.lif_muxid[0]
 #define	lifr_arp_muxid	lifr_lifru.lif_muxid[1]
 #define	lifr_nd		lifr_lifru.lifru_nd_req	/* SIOCLIF*ND */
 #define	lifr_ifinfo	lifr_lifru.lifru_ifinfo_req /* SIOC[GS]LIFLNKINFO */
 #define	lifr_groupname	lifr_lifru.lifru_groupname
 #define	lifr_binding	lifr_lifru.lifru_binding
-#define	lifr_delay	lifr_lifru.lifru_delay
 #define	lifr_zoneid	lifr_lifru.lifru_zoneid
 };
 #endif /* defined(_INT64_TYPE) */

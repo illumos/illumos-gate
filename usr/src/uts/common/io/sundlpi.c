@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,26 +27,23 @@
  *  Common Sun DLPI routines.
  */
 
-#include	<sys/types.h>
-#include	<sys/sysmacros.h>
-#include	<sys/byteorder.h>
-#include	<sys/systm.h>
-#include	<sys/stream.h>
-#include	<sys/strsun.h>
-#include	<sys/dlpi.h>
-#include	<sys/ddi.h>
-#include	<sys/sunddi.h>
-#include	<sys/sunldi.h>
-#include	<sys/cmn_err.h>
-
-#define		DLADDRL		(80)
+#include <sys/types.h>
+#include <sys/sysmacros.h>
+#include <sys/byteorder.h>
+#include <sys/stream.h>
+#include <sys/strsun.h>
+#include <sys/dlpi.h>
+#include <sys/ddi.h>
+#include <sys/sunddi.h>
+#include <sys/sunldi.h>
+#include <sys/cmn_err.h>
 
 void
 dlbindack(
 	queue_t		*wq,
 	mblk_t		*mp,
 	t_scalar_t	sap,
-	void		*addrp,
+	const void	*addrp,
 	t_uscalar_t	addrlen,
 	t_uscalar_t	maxconind,
 	t_uscalar_t	xidtest)
@@ -66,7 +63,6 @@ dlbindack(
 	dlp->bind_ack.dl_xidtest_flg = xidtest;
 	if (addrlen != 0)
 		bcopy(addrp, mp->b_rptr + sizeof (dl_bind_ack_t), addrlen);
-
 	qreply(wq, mp);
 }
 
@@ -110,22 +106,15 @@ void
 dluderrorind(
 	queue_t		*wq,
 	mblk_t		*mp,
-	void		*addrp,
+	const void	*addrp,
 	t_uscalar_t	addrlen,
 	t_uscalar_t	error,
 	t_uscalar_t	unix_errno)
 {
 	union DL_primitives	*dlp;
-	char			buf[DLADDRL];
 	size_t			size;
 
-	if (addrlen > DLADDRL)
-		addrlen = DLADDRL;
-
-	bcopy(addrp, buf, addrlen);
-
 	size = sizeof (dl_uderror_ind_t) + addrlen;
-
 	if ((mp = mexchange(wq, mp, size, M_PCPROTO, DL_UDERROR_IND)) == NULL)
 		return;
 
@@ -134,8 +123,8 @@ dluderrorind(
 	dlp->uderror_ind.dl_dest_addr_offset = sizeof (dl_uderror_ind_t);
 	dlp->uderror_ind.dl_unix_errno = unix_errno;
 	dlp->uderror_ind.dl_errno = error;
-	bcopy((caddr_t)buf,
-	    (caddr_t)(mp->b_rptr + sizeof (dl_uderror_ind_t)), addrlen);
+	if (addrlen != 0)
+		bcopy(addrp, mp->b_rptr + sizeof (dl_uderror_ind_t), addrlen);
 	qreply(wq, mp);
 }
 
@@ -143,7 +132,7 @@ void
 dlphysaddrack(
 	queue_t		*wq,
 	mblk_t		*mp,
-	void		*addrp,
+	const void	*addrp,
 	t_uscalar_t	len)
 {
 	union DL_primitives	*dlp;
