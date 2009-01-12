@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1651,10 +1651,29 @@ zfs_ioc_pool_set_props(zfs_cmd_t *zc)
 	nvlist_t *props;
 	spa_t *spa;
 	int error;
+	nvpair_t *elem;
 
 	if ((error = get_nvlist(zc->zc_nvlist_src, zc->zc_nvlist_src_size,
 	    &props)))
 		return (error);
+
+	/*
+	 * If the only property is the configfile, then just do a spa_lookup()
+	 * to handle the faulted case.
+	 */
+	elem = nvlist_next_nvpair(props, NULL);
+	if (elem != NULL && strcmp(nvpair_name(elem),
+	    zpool_prop_to_name(ZPOOL_PROP_CACHEFILE)) == 0 &&
+	    nvlist_next_nvpair(props, elem) == NULL) {
+		mutex_enter(&spa_namespace_lock);
+		if ((spa = spa_lookup(zc->zc_name)) != NULL) {
+			spa_configfile_set(spa, props, B_FALSE);
+			spa_config_sync(spa, B_FALSE, B_TRUE);
+		}
+		mutex_exit(&spa_namespace_lock);
+		if (spa != NULL)
+			return (0);
+	}
 
 	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {
 		nvlist_free(props);
@@ -1676,20 +1695,27 @@ zfs_ioc_pool_get_props(zfs_cmd_t *zc)
 	int error;
 	nvlist_t *nvp = NULL;
 
-	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
-		return (error);
-
-	error = spa_prop_get(spa, &nvp);
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0) {
+		/*
+		 * If the pool is faulted, there may be properties we can still
+		 * get (such as altroot and cachefile), so attempt to get them
+		 * anyway.
+		 */
+		mutex_enter(&spa_namespace_lock);
+		if ((spa = spa_lookup(zc->zc_name)) != NULL)
+			error = spa_prop_get(spa, &nvp);
+		mutex_exit(&spa_namespace_lock);
+	} else {
+		error = spa_prop_get(spa, &nvp);
+		spa_close(spa, FTAG);
+	}
 
 	if (error == 0 && zc->zc_nvlist_dst != NULL)
 		error = put_nvlist(zc, nvp);
 	else
 		error = EFAULT;
 
-	spa_close(spa, FTAG);
-
-	if (nvp)
-		nvlist_free(nvp);
+	nvlist_free(nvp);
 	return (error);
 }
 

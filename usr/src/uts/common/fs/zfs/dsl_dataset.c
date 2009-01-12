@@ -3030,11 +3030,7 @@ dsl_dataset_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 	dsl_dataset_t *ds = arg1;
 	uint64_t *reservationp = arg2;
 	uint64_t new_reservation = *reservationp;
-	int64_t delta;
 	uint64_t unique;
-
-	if (new_reservation > INT64_MAX)
-		return (EOVERFLOW);
 
 	if (spa_version(ds->ds_dir->dd_pool->dp_spa) <
 	    SPA_VERSION_REFRESERVATION)
@@ -3052,15 +3048,18 @@ dsl_dataset_set_reservation_check(void *arg1, void *arg2, dmu_tx_t *tx)
 
 	mutex_enter(&ds->ds_lock);
 	unique = dsl_dataset_unique(ds);
-	delta = MAX(unique, new_reservation) - MAX(unique, ds->ds_reserved);
 	mutex_exit(&ds->ds_lock);
 
-	if (delta > 0 &&
-	    delta > dsl_dir_space_available(ds->ds_dir, NULL, 0, TRUE))
-		return (ENOSPC);
-	if (delta > 0 && ds->ds_quota > 0 &&
-	    new_reservation > ds->ds_quota)
-		return (ENOSPC);
+	if (MAX(unique, new_reservation) > MAX(unique, ds->ds_reserved)) {
+		uint64_t delta = MAX(unique, new_reservation) -
+		    MAX(unique, ds->ds_reserved);
+
+		if (delta > dsl_dir_space_available(ds->ds_dir, NULL, 0, TRUE))
+			return (ENOSPC);
+		if (ds->ds_quota > 0 &&
+		    new_reservation > ds->ds_quota)
+			return (ENOSPC);
+	}
 
 	return (0);
 }
