@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: lpd-port.c 155 2006-04-26 02:34:54Z ktou $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <config-site.h>
 
@@ -117,8 +115,7 @@ sock_connect(int sock, char *host, int timeout)
 	struct sockaddr_in sin;
 #endif
 	static void (*old_handler)();
-	int	err,
-		error_num;
+	int	err, error_num;
 	unsigned timo = 1;
 
 	/*
@@ -133,7 +130,7 @@ sock_connect(int sock, char *host, int timeout)
 
 #if defined(HAVE_GETIPNODEBYNAME) && defined(HAVE_RRESVPORT_AF)
 	if ((hp = getipnodebyname(host, AF_INET6, AI_DEFAULT,
-		    &error_num)) == NULL) {
+	    &error_num)) == NULL) {
 		errno = ENOENT;
 		return (-1);
 	}
@@ -190,7 +187,7 @@ next_job_id()
 	/* gain back enough privilege to open the id file */
 #ifdef	PRIV_ALLSETS
 	if ((priv_set(PRIV_ON, PRIV_EFFECTIVE,
-			PRIV_FILE_DAC_READ, PRIV_FILE_DAC_WRITE, NULL)) < 0) {
+	    PRIV_FILE_DAC_READ, PRIV_FILE_DAC_WRITE, NULL)) < 0) {
 		syslog(LOG_ERR, "lpd_port:next_job_id:priv_set fails: : %m");
 		return (-1);
 	}
@@ -208,7 +205,7 @@ next_job_id()
 #ifdef	PRIV_ALLSETS
 	/* drop file access privilege */
 	priv_set(PRIV_OFF, PRIV_PERMITTED,
-			PRIV_FILE_DAC_READ, PRIV_FILE_DAC_WRITE, NULL);
+	    PRIV_FILE_DAC_READ, PRIV_FILE_DAC_WRITE, NULL);
 #else
 	seteuid(getuid());
 #endif
@@ -248,7 +245,7 @@ reserved_port()
 	/* gain back enough privilege to open a reserved port */
 #ifdef	PRIV_ALLSETS
 	if ((priv_set(
-		PRIV_ON, PRIV_EFFECTIVE, PRIV_NET_PRIVADDR, NULL)) != 0) {
+	    PRIV_ON, PRIV_EFFECTIVE, PRIV_NET_PRIVADDR, NULL)) != 0) {
 		syslog(LOG_ERR, "priv_set fails for net_privaddr %m");
 		return (-1);
 	}
@@ -415,9 +412,29 @@ send_control_file(int sock, char *data, int id)
 {
 	int len;
 	char buf[BUFSIZ];
-	char *host = "localhost";
+	char *ptr, *iter = NULL;
+	char *datacpy = NULL;
+	char *host = NULL;
 
 	len = strlen(data);
+
+	if ((datacpy = strdup(data)) == NULL)
+		return (-1);
+
+	syslog(LOG_DEBUG, "cfA: %s\n", datacpy);
+
+	for (ptr = strtok_r(datacpy, "\n", &iter); ptr != NULL;
+	    ptr = strtok_r(NULL, "\n", &iter)) {
+
+		if (ptr[0] != 'H')
+			continue;
+
+		ptr++;
+		host = ptr;
+		syslog(LOG_DEBUG, "hostname: %s\n", host);
+	}
+
+	free(datacpy);
 
 	/* request data file transfer, read ack/nack */
 	errno = ENOSPC;
@@ -453,14 +470,14 @@ submit_job(int sock, char *printer, int job_id, char *path)
 	/* open the control file */
 	if ((fd = open(path, O_RDONLY)) < 0) {
 		syslog(LOG_ERR, "submit_job(%d, %s, %d, %s): open(): %m",
-			sock, printer, job_id, path);
+		    sock, printer, job_id, path);
 		return (-1);
 	}
 
 	/* get the size of the control file */
 	if (fstat(fd, &st) < 0) {
 		syslog(LOG_ERR, "submit_job(%d, %s, %d, %s): fstat(): %m",
-			sock, printer, job_id, path);
+		    sock, printer, job_id, path);
 		close(fd);
 		return (-1);
 	}
@@ -468,7 +485,7 @@ submit_job(int sock, char *printer, int job_id, char *path)
 	/* allocate memory for the control file */
 	if ((metadata = calloc(1, st.st_size + 1)) == NULL) {
 		syslog(LOG_ERR, "submit_job(%d, %s, %d, %s): calloc(): %m",
-			sock, printer, job_id, path);
+		    sock, printer, job_id, path);
 		close(fd);
 		return (-1);
 	}
@@ -476,7 +493,7 @@ submit_job(int sock, char *printer, int job_id, char *path)
 	/* read in the control file */
 	if (read(fd, metadata, st.st_size) != st.st_size) {
 		syslog(LOG_ERR, "submit_job(%d, %s, %d, %s): read(): %m",
-			sock, printer, job_id, path);
+		    sock, printer, job_id, path);
 		free(metadata);
 		close(fd);
 		return (-1);
@@ -486,7 +503,7 @@ submit_job(int sock, char *printer, int job_id, char *path)
 	if (massage_control_data(metadata, job_id) < 0) {
 		/* bad control data, dump the job */
 		syslog(LOG_ALERT,
-			"bad control file, possible subversion attempt");
+		    "bad control file, possible subversion attempt");
 		free(metadata);
 		close(fd);
 		return (-1);
@@ -509,7 +526,7 @@ submit_job(int sock, char *printer, int job_id, char *path)
 
 	/* walk the control file sending the data files */
 	for (ptr = strtok_r(metadata, "\n", &iter); ptr != NULL;
-			ptr = strtok_r(NULL, "\n", &iter)) {
+	    ptr = strtok_r(NULL, "\n", &iter)) {
 		char *name = NULL;
 
 		if (ptr[0] != 'U')
@@ -604,11 +621,11 @@ usage(char *program)
 		name++;
 
 	fprintf(stderr, "usage:\t%s -H host [-t timeout] -s queue control ]\n",
-			name);
+	    name);
 	fprintf(stderr, "\t%s -H host [-t timeout] -c queue [user|job ...]\n",
-			name);
+	    name);
 	fprintf(stderr, "\t%s -H host [-t timeout] -q queue [user|job ...]\n",
-			name);
+	    name);
 	exit(EINVAL);
 }
 
@@ -640,8 +657,8 @@ main(int ac, char *av[])
 	/* lose as much as we can perminently and temporarily drop the rest. */
 
 	if ((saveset = priv_str_to_set("PRIV_NET_PRIVADDR,"
-			"PRIV_FILE_DAC_READ,PRIV_FILE_DAC_WRITE,",
-			",", (const char **)NULL)) == NULL) {
+	    "PRIV_FILE_DAC_READ,PRIV_FILE_DAC_WRITE,",
+	    ",", (const char **)NULL)) == NULL) {
 		syslog(LOG_ERR,
 		    "lpd_port: priv_str_to_set saveset failed: %m\n");
 		return (-1);
