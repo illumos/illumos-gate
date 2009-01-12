@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -542,6 +542,12 @@ size_t len)
 			break;
 		case TOPO_SENSOR_TYPE_GENERIC_ACPI:
 			ntp = &topo_sensor_states_generic_acpi_pwr_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_FAILURE:
+			ntp = &topo_sensor_states_generic_failure_table[0];
+			break;
+		case TOPO_SENSOR_TYPE_GENERIC_OK:
+			ntp = &topo_sensor_states_generic_ok_table[0];
 			break;
 		default:
 			(void) snprintf(buf, len, "0x%02x", state);

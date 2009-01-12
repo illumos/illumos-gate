@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2171,6 +2171,16 @@ fmd_nvl_dup(fmd_hdl_t *hdl, nvlist_t *src, int flags)
 		return (NULL);
 	else
 		return (nvl);
+}
+
+/*ARGSUSED*/
+void
+fmd_repair_fru(fmd_hdl_t *hdl, const char *fmri)
+{
+	int err;
+
+	fmd_asru_hash_apply_by_fru(fmd.d_asrus, (char *)fmri,
+	    fmd_asru_repaired, &err);
 }
 
 int

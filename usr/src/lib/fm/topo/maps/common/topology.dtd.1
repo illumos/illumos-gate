@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -22,7 +22,6 @@
 
  CDDL HEADER END
 
-    ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <!--
@@ -178,6 +177,7 @@
       		propname	Name of the property to create
 		proptype	Type of the property to create
 		mutable         optional: default is false (0)
+		nonvolatile     optional: default is false (0)
 -->
 
 <!ELEMENT propmethod
@@ -188,7 +188,8 @@
 	version		CDATA #REQUIRED
 	propname	CDATA #REQUIRED
 	proptype	CDATA #REQUIRED
-	mutable		(0|1) "0" >
+	mutable		(0|1) "0"
+	nonvolatile	(0|1) "0" >
 
 <!--
   enum-method

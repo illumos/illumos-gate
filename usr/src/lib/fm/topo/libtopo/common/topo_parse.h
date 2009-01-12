@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _TOPO_PARSE_H
 #define	_TOPO_PARSE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <libxml/parser.h>
@@ -146,6 +144,7 @@ typedef struct tf_info {
 #define	Ipmi	"ipmi"
 #define	Mutable "mutable"
 #define	Name "name"
+#define	Nonvolatile "nonvolatile"
 #define	Propname "propname"
 #define	Proptype "proptype"
 #define	Provider "provider"

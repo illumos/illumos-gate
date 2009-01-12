@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -203,7 +203,8 @@ extern int topo_prop_set_fmri_array(tnode_t *, const char *, const char *,
     int, const nvlist_t **, uint_t, int *);
 
 #define	TOPO_PROP_IMMUTABLE	0
-#define	TOPO_PROP_MUTABLE	1
+#define	TOPO_PROP_MUTABLE	0x01
+#define	TOPO_PROP_NONVOLATILE	0x02
 
 /* Protocol property group and property names */
 #define	TOPO_PGROUP_PROTOCOL	"protocol"	/* Required property group */
@@ -529,6 +530,15 @@ typedef enum topo_sensor_unit {
 	TOPO_SENSOR_UNITS_FATAL_ERROR,
 	TOPO_SENSOR_UNITS_GRAMS
 } topo_sensor_unit_t;
+
+/*
+ * These defines are used by the topo_method_sensor_failure to indicate
+ * whether the source of a sensor failure is believed to be the result of an
+ * internal failure, external condition or unknown
+ */
+#define	TOPO_SENSOR_ERRSRC_UNKNOWN	0
+#define	TOPO_SENSOR_ERRSRC_INTERNAL	1
+#define	TOPO_SENSOR_ERRSRC_EXTERNAL	2
 
 /*
  * Sensor Types amd the associated sensor-type-specific states
@@ -939,12 +949,32 @@ typedef enum topo_sensor_unit {
 #define	TOPO_SENSOR_STATE_GENERIC_ACPI_D3		0x0008
 
 /*
+ * These sensor types don't exist in the IPMI spec, but allow consumers to
+ * associate discrete sensors with component failure.  The 'ok' sensor is the
+ * inverse of the 'failure' sensor.  Note that the values intentionally mimic
+ * TOPO_SENSOR_TYPE_GENERIC_STATE, so that you can use existing IPMI sensors
+ * but just change the type to get semantically meaningful behavior.
+ */
+#define	TOPO_SENSOR_TYPE_GENERIC_FAILURE		0x010D
+
+#define	TOPO_SENSOR_STATE_GENERIC_FAIL_DEASSERTED	0x0001
+#define	TOPO_SENSOR_STATE_GENERIC_FAIL_NONRECOV		0x0002
+#define	TOPO_SENSOR_STATE_GENERIC_FAIL_CRITICAL		0x0004
+
+#define	TOPO_SENSOR_TYPE_GENERIC_OK			0x010E
+
+#define	TOPO_SENSOR_STATE_GENERIC_OK_DEASSERTED		0x0001
+#define	TOPO_SENSOR_STATE_GENERIC_OK_ASSERTED		0x0002
+
+/*
  * Indicator modes and types
  */
 typedef enum topo_led_state {
 	TOPO_LED_STATE_OFF = 0,
 	TOPO_LED_STATE_ON
 } topo_led_state_t;
+
+#define	TOPO_FAC_TYPE_ANY	0xFFFFFFFF
 
 /*
  * This list is limited to the set of LED's that we're likely to manage through

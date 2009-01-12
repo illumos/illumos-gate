@@ -19,13 +19,20 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 SUBDIRS=sun4u sun4v SUNW,Sun-Fire-15000
-EFT_COMMON_FILES= pci.eft pciex.eft sca500.eft sca1000.eft disk.eft neptune_xfp.eft neptune_xaui.eft
+EFT_COMMON_FILES=		\
+	disk.eft		\
+	neptune_xaui.eft	\
+	neptune_xfp.eft		\
+	pci.eft			\
+	pciex.eft		\
+	sca500.eft		\
+	sca1000.eft 		\
+	sensor.eft
 
 include ../../../Makefile.subdirs
 

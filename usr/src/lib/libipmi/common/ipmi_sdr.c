@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,8 @@
 #define	IPMI_DATA_FMT_UNSIGNED	0
 #define	IPMI_DATA_FMT_ONESCOMP	1
 #define	IPMI_DATA_FMT_TWOSCOMP	2
+
+#define	IPMI_SDR_HDR_SZ		offsetof(ipmi_sdr_t, is_record)
 
 typedef struct ipmi_sdr_cache_ent {
 	char				*isc_name;
@@ -181,7 +183,7 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 	uint16_t id;
 	ipmi_sdr_t *sdr;
 	ipmi_sdr_cache_ent_t *ent;
-	size_t namelen, len;
+	size_t namelen;
 	uint8_t type;
 	char *name;
 	ipmi_sdr_info_t *sip;
@@ -323,15 +325,12 @@ ipmi_sdr_refresh(ipmi_handle_t *ihp)
 		}
 
 		if ((ent = ipmi_zalloc(ihp,
-		    sizeof (ipmi_sdr_cache_ent_t))) == NULL)
-			goto error;
-
-		len = sdr->is_length + offsetof(ipmi_sdr_t, is_record);
-		if ((ent->isc_sdr = ipmi_alloc(ihp, len)) == NULL) {
-			ipmi_free(ihp, ent);
+		    sizeof (ipmi_sdr_cache_ent_t))) == NULL) {
+			free(sdr);
 			goto error;
 		}
-		bcopy(sdr, ent->isc_sdr, len);
+
+		ent->isc_sdr = sdr;
 
 		if (name != NULL) {
 			if ((ent->isc_name = ipmi_alloc(ihp, namelen + 1)) ==
@@ -456,15 +455,15 @@ ipmi_sdr_fini(ipmi_handle_t *ihp)
 ipmi_sdr_t *
 ipmi_sdr_get(ipmi_handle_t *ihp, uint16_t id, uint16_t *next)
 {
+	uint8_t offset = IPMI_SDR_HDR_SZ, count = 0, chunksz = 16, sdr_sz;
 	ipmi_cmd_t cmd, *rsp;
 	ipmi_cmd_get_sdr_t req;
-	ipmi_rsp_get_sdr_t *sdr;
-	int i;
+	ipmi_sdr_t *sdr;
+	int i = 0;
+	char *buf;
 
 	req.ic_gs_resid = ihp->ih_reservation;
 	req.ic_gs_recid = id;
-	req.ic_gs_offset = 0;
-	req.ic_gs_len = 0xFF;
 
 	cmd.ic_netfn = IPMI_NETFN_STORAGE;
 	cmd.ic_lun = 0;
@@ -472,6 +471,13 @@ ipmi_sdr_get(ipmi_handle_t *ihp, uint16_t id, uint16_t *next)
 	cmd.ic_dlen = sizeof (req);
 	cmd.ic_data = &req;
 
+	/*
+	 * The size of the SDR is contained in the 5th byte of the SDR header,
+	 * so we'll read the first 5 bytes to get the size, so we know how big
+	 * to make the buffer.
+	 */
+	req.ic_gs_offset = 0;
+	req.ic_gs_len = IPMI_SDR_HDR_SZ;
 	for (i = 0; i < ihp->ih_retries; i++) {
 		if ((rsp = ipmi_send(ihp, &cmd)) != NULL)
 			break;
@@ -483,19 +489,52 @@ ipmi_sdr_get(ipmi_handle_t *ihp, uint16_t id, uint16_t *next)
 			return (NULL);
 		req.ic_gs_resid = ihp->ih_reservation;
 	}
-
 	if (rsp == NULL)
 		return (NULL);
 
-	if (rsp->ic_dlen < sizeof (uint16_t) + sizeof (ipmi_sdr_t)) {
-		(void) ipmi_set_error(ihp, EIPMI_BAD_RESPONSE_LENGTH, NULL);
+	sdr = (ipmi_sdr_t *)((ipmi_rsp_get_sdr_t *)rsp->ic_data)->ir_gs_record;
+	sdr_sz = sdr->is_length;
+
+	if ((buf = ipmi_zalloc(ihp, sdr_sz + IPMI_SDR_HDR_SZ)) == NULL) {
+		(void) ipmi_set_error(ihp, EIPMI_NOMEM, NULL);
 		return (NULL);
 	}
+	(void) memcpy(buf, (void *)sdr, IPMI_SDR_HDR_SZ);
 
-	sdr = rsp->ic_data;
-	*next = sdr->ir_gs_next;
+	/*
+	 * Some SDRs can be bigger than the buffer sizes for a given bmc
+	 * interface.  Therefore we break up the process of reading in an entire
+	 * SDR into multiple smaller reads.
+	 */
+	while (count < sdr_sz && i < ihp->ih_retries) {
+		req.ic_gs_offset = offset;
+		if (chunksz > (sdr_sz - count))
+			chunksz = sdr_sz - count;
+		req.ic_gs_len = chunksz;
+		rsp = ipmi_send(ihp, &cmd);
 
-	return ((ipmi_sdr_t *)sdr->ir_gs_record);
+		if (rsp != NULL) {
+			count += chunksz;
+			sdr = (ipmi_sdr_t *)
+			    ((ipmi_rsp_get_sdr_t *)rsp->ic_data)->ir_gs_record;
+			(void) memcpy(buf+offset, (void *)sdr, chunksz);
+			offset += chunksz;
+			i = 0;
+		} else if (ipmi_errno(ihp) == EIPMI_INVALID_RESERVATION) {
+			if (ipmi_sdr_reserve_repository(ihp) != 0) {
+				free(buf);
+				return (NULL);
+			}
+			req.ic_gs_resid = ihp->ih_reservation;
+			i++;
+		} else {
+			free(buf);
+			return (NULL);
+		}
+	}
+	*next = ((ipmi_rsp_get_sdr_t *)rsp->ic_data)->ir_gs_next;
+
+	return ((ipmi_sdr_t *)buf);
 }
 
 int

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,9 @@ static const topo_method_t ipmi_methods[] = {
 	    TOPO_STABILITY_INTERNAL, ipmi_fru_label},
 	{ "ipmi_fru_fmri", "Property method", 0,
 	    TOPO_STABILITY_INTERNAL, ipmi_fru_fmri},
+	{ TOPO_METH_SENSOR_FAILURE, TOPO_METH_SENSOR_FAILURE_DESC,
+	    TOPO_METH_SENSOR_FAILURE_VERSION, TOPO_STABILITY_INTERNAL,
+	    topo_method_sensor_failure },
 	{ NULL }
 };
 

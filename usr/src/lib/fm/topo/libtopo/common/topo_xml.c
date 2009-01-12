@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -607,7 +607,7 @@ pmeth_record(topo_mod_t *mp, const char *pg_name, xmlNodePtr xn, tnode_t *tn,
 	xmlNodePtr cn;
 	xmlChar *meth_name = NULL, *prop_name = NULL;
 	xmlChar *arg_name = NULL;
-	uint64_t meth_ver, is_mutable = 0;
+	uint64_t meth_ver, is_mutable = 0, is_nonvolatile = 0;
 	topo_type_t prop_type;
 	struct propmeth_data meth;
 	int ret = 0, err;
@@ -632,10 +632,11 @@ pmeth_record(topo_mod_t *mp, const char *pg_name, xmlNodePtr xn, tnode_t *tn,
 		goto pmr_done;
 	}
 	/*
-	 * The "mutable" attribute is optional.  If not specified we default to
-	 * false (0)
+	 * The "mutable" and "nonvoltile" attributes are optional.  If not
+	 * specified we default to false (0)
 	 */
 	(void) xmlattr_to_int(mp, xn, Mutable, &is_mutable);
+	(void) xmlattr_to_int(mp, xn, Nonvolatile, &is_nonvolatile);
 
 	if ((prop_name = xmlGetProp(xn, (xmlChar *)Propname)) == NULL) {
 		topo_dprintf(mp->tm_hdl, TOPO_DBG_ERR,
@@ -730,6 +731,15 @@ pmeth_record(topo_mod_t *mp, const char *pg_name, xmlNodePtr xn, tnode_t *tn,
 						goto pmr_done;
 					}
 				}
+				if (is_nonvolatile) {
+					if (topo_prop_setnonvolatile(tmp,
+					    meth.pg_name, meth.prop_name, &err)
+					    != 0) {
+						ret = topo_mod_seterrno(mp,
+						    ETOPO_PRSR_REGMETH);
+						goto pmr_done;
+					}
+				}
 			}
 		}
 	} else {
@@ -739,6 +749,14 @@ pmeth_record(topo_mod_t *mp, const char *pg_name, xmlNodePtr xn, tnode_t *tn,
 		}
 		if (is_mutable) {
 			if (topo_prop_setmutable(tn, meth.pg_name,
+			    meth.prop_name, &err) != 0) {
+				ret = topo_mod_seterrno(mp,
+				    ETOPO_PRSR_REGMETH);
+				goto pmr_done;
+			}
+		}
+		if (is_nonvolatile) {
+			if (topo_prop_setnonvolatile(tn, meth.pg_name,
 			    meth.prop_name, &err) != 0) {
 				ret = topo_mod_seterrno(mp,
 				    ETOPO_PRSR_REGMETH);

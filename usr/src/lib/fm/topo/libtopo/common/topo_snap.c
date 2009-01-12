@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,7 +187,7 @@ topo_open(int version, const char *rootdir, int *errp)
 			if (strcmp(s2.smbi_product, SMB_DEFAULT1) != 0 &&
 			    strcmp(s2.smbi_product, SMB_DEFAULT2) != 0) {
 				thp->th_product = topo_cleanup_auth_str(thp,
-				    s2.smbi_product);
+				    (char *)s2.smbi_product);
 			}
 		}
 		smbios_close(shp);
@@ -369,11 +369,7 @@ topo_snap_hold(topo_hdl_t *thp, const char *uuid, int *errp)
 			    fac_walker, (void *)0, errp)) == NULL) {
 				return (ret);
 			}
-			if (topo_walk_step(twp, TOPO_WALK_CHILD)
-			    != TOPO_WALK_ERR) {
-				topo_walk_fini(twp);
-				return (ret);
-			}
+			(void) topo_walk_step(twp, TOPO_WALK_CHILD);
 			topo_walk_fini(twp);
 		}
 		return (ret);

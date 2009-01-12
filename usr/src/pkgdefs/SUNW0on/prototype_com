@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -47,6 +47,7 @@ f none usr/lib/locale/C/LC_MESSAGES/NXGE.po              644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/GMCA.po              644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/INTEL.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SCF.po               644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SENSOR.po            644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4.po              644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4U.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4V.po             644 root bin

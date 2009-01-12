@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -23,7 +23,6 @@
 
  CDDL HEADER END
 
-    ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <topology name='i86pc' scheme='hc'>
@@ -256,7 +255,7 @@
        </set>
     </set>
       
-   <set type='product' setlist='Sun-Fire-X4600-M2'>
+   <set type='product' setlist='Sun-Fire-X4600|Sun-Fire-X4600-M2'>
        <range name='psu' min='0' max='100'>
           <enum-method name='ipmi' version='1' />
           <propmap name='psu' />

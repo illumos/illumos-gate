@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -116,18 +116,21 @@ my @platforms = (
 		label => "FANBD%d",
 		fru => "self"
 	    }, {
-		fac_enum => 1,
-		provider => "fac_prov_ipmi",
 		label => "FANBD%d FM%d",
 		count => 3,
 		fru => "self",
+		provider => "fac_prov_ipmi",
 		entity_present => "fb%d.fm%d.prsnt",
-		entity_ref => "fb%d.fm%d.prsnt",
-		entity_ref_nparams => 2,
 		fm_service_indctr=> "fb%d.fm%d.led",
+		entity_ref_nparams => 2
 	    }, {
+		fac_enum => 1,
 		count => 2,
-		fru => "parent"
+		fru => "parent",
+		provider => "fac_prov_ipmi",
+		entity_ref => "fb%d.fm%d.f%d.speed",
+		entity_present => "fb%d.fm%d.prsnt",
+		entity_ref_nparams => 3
 	    }
 
 	]
@@ -141,7 +144,7 @@ my @platforms = (
     # but no other indicators.
     #
     {
-	set => "Sun-Fire-X4600-M2",
+	set => "Sun-Fire-X4600|Sun-Fire-X4600-M2",
 	topology => [
 	    {
 	        fac_enum => 1,
@@ -272,15 +275,24 @@ sub process_topology
 		#
 		# Entity references (if any)
 		#
-		if ($level->{entity_ref} || $level->{entity_present}) {
-			my $name = $level->{entity_ref} ? "entity_ref" :
-			    "entity_present";
-			my $val = $level->{$name};
+		if ($level->{entity_ref}) {
+			my $val = $level->{entity_ref};
 			printf("%*s<propgroup name='ipmi' version='1' " .
 			    "name-stability='Private' " .
 			    "data-stability='Private' >\n", $indent, "");
-			printf("%*s<propval name='%s' " .
-			    "type='string' value='", $indent + 2, "", $name);
+			printf("%*s<propval name='entity_ref' " .
+			    "type='string' value='", $indent + 2, "");
+			printf($val, @indices);
+			printf("' />\n");
+			printf("%*s</propgroup>\n", $indent, "");
+		}
+		if ($level->{entity_present}) {
+			my $val = $level->{entity_present};
+			printf("%*s<propgroup name='ipmi' version='1' " .
+			    "name-stability='Private' " .
+			    "data-stability='Private' >\n", $indent, "");
+			printf("%*s<propval name='entity_present' " .
+			    "type='string' value='", $indent + 2, "");
 			printf($val, @indices);
 			printf("' />\n");
 			printf("%*s</propgroup>\n", $indent, "");

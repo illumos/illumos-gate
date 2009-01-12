@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -64,6 +64,7 @@ SUNWprivate {
 	topo_list_delete;
 	topo_method_invoke;
 	topo_method_register;
+	topo_method_sensor_failure;
 	topo_method_supported;
 	topo_method_unregister;
 	topo_method_unregister_all;
@@ -160,6 +161,7 @@ SUNWprivate {
 	topo_prop_set_fmri_array;
 	topo_prop_setprop;
 	topo_prop_setmutable;
+	topo_prop_setnonvolatile;
 	topo_name2stability;
 	topo_sensor_state_name;
 	topo_sensor_type_name;

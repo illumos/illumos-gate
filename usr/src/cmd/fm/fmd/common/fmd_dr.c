@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * FMD Dynamic Reconfiguration (DR) Event Handling
@@ -104,6 +102,15 @@ fmd_dr_event(sysevent_t *sep)
 		 * as disk nodes only exist when the device is configured.
 		 */
 		update_topo = B_TRUE;
+	} else if (strcmp(class, EC_PLATFORM) == 0) {
+		if (strcmp(subclass, ESC_PLATFORM_SP_RESET) == 0) {
+			/*
+			 * Since we rely on the SP to enumerate fans,
+			 * power-supplies and sensors/leds, it would be prudent
+			 * to take a new snapshot if the SP resets.
+			 */
+			update_topo = B_TRUE;
+		}
 	} else if (strcmp(class, EC_ZFS) == 0) {
 		/*
 		 * These events can change the resource cache.

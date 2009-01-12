@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,6 +96,8 @@ extern int topo_mod_nvl2str(topo_mod_t *, nvlist_t *, char **);
 extern int topo_mod_str2nvl(topo_mod_t *, const char *,  nvlist_t **);
 extern int topo_prop_setmutable(tnode_t *node, const char *pgname,
     const char *pname, int *err);
+extern int topo_prop_setnonvolatile(tnode_t *node, const char *pgname,
+    const char *pname, int *err);
 /*
  * Snapshot walker support
  */
@@ -119,6 +121,9 @@ extern ipmi_handle_t *topo_mod_ipmi_hold(topo_mod_t *);
 extern void topo_mod_ipmi_rele(topo_mod_t *);
 extern di_prom_handle_t topo_mod_prominfo(topo_mod_t *);
 extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
+
+extern int topo_method_sensor_failure(topo_mod_t *, tnode_t *, topo_version_t,
+    nvlist_t *, nvlist_t **);
 
 /*
  * FMRI methods
@@ -190,6 +195,10 @@ extern nvlist_t *topo_mod_auth(topo_mod_t *, tnode_t *);
 #define	TOPO_METH_DISK_STATUS		"topo_disk_status"
 #define	TOPO_METH_DISK_STATUS_VERSION	0
 #define	TOPO_METH_DISK_STATUS_DESC	"Disk status"
+
+#define	TOPO_METH_SENSOR_FAILURE	"topo_sensor_failure"
+#define	TOPO_METH_SENSOR_FAILURE_VERSION	0
+#define	TOPO_METH_SENSOR_FAILURE_DESC	"Sensor failure state"
 
 #define	TOPO_PROP_METH_DESC		"Dynamic Property method"
 

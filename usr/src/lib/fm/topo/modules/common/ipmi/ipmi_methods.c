@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,7 +88,7 @@ store_prop_val(topo_mod_t *mod, void *buf, char *propname, topo_type_t type,
 			nvlist_free(*out);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 		}
-	} else if (type == TOPO_TYPE_FMRI)
+	} else if (type == TOPO_TYPE_FMRI) {
 		if (nvlist_add_nvlist(*out, TOPO_PROP_VAL_VAL, (nvlist_t *)buf)
 		    != 0) {
 			topo_mod_dprintf(mod, "Failed to set '%s'\n",
@@ -98,6 +96,15 @@ store_prop_val(topo_mod_t *mod, void *buf, char *propname, topo_type_t type,
 			nvlist_free(*out);
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 		}
+	} else if (type == TOPO_TYPE_UINT32) {
+		if (nvlist_add_uint32(*out, TOPO_PROP_VAL_VAL, *(uint32_t *)buf)
+		    != 0) {
+			topo_mod_dprintf(mod, "Failed to set '%s'\n",
+			    TOPO_PROP_VAL_VAL);
+			nvlist_free(*out);
+			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
+		}
+	}
 	return (0);
 }
 

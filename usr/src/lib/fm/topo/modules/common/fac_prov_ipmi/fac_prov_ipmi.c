@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -508,7 +508,7 @@ thumper_locate_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 			return (topo_mod_seterrno(mod, EMOD_NVL_INVAL));
 		}
 		if (mode_in == TOPO_LED_STATE_ON)
-			ledmode = IPMI_SUNOEM_LED_MODE_FAST;
+			ledmode = IPMI_SUNOEM_LED_MODE_SLOW;
 		else
 			ledmode = (uint8_t)mode_in;
 		if (ipmi_sunoem_led_set(hdl, gdl, ledmode) < 0) {
@@ -533,7 +533,8 @@ thumper_locate_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 	topo_mod_strfree(mod, entity_ref);
 	topo_mod_ipmi_rele(mod);
 
-	if (ledmode == IPMI_SUNOEM_LED_MODE_FAST)
+	if (ledmode == IPMI_SUNOEM_LED_MODE_SLOW ||
+	    ledmode == IPMI_SUNOEM_LED_MODE_FAST)
 		ledmode = TOPO_LED_STATE_ON;
 	else
 		ledmode = TOPO_LED_STATE_OFF;

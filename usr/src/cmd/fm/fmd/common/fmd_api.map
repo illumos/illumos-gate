@@ -18,7 +18,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -93,6 +93,8 @@
 	fmd_prop_get_int32 = FUNCTION extern;
 	fmd_prop_get_int64 = FUNCTION extern;
 	fmd_prop_get_string = FUNCTION extern;
+
+	fmd_repair_fru = FUNCTION extern;
 
 	fmd_serd_create = FUNCTION extern;
 	fmd_serd_destroy = FUNCTION extern;

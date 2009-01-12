@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <assert.h>
@@ -184,6 +182,9 @@ prop_get(tnode_t *node, const char *pgname, const char *pname, nvlist_t *pargs,
 		*err = ETOPO_PROP_NOENT;
 		return (NULL);
 	}
+
+	if (pv->tp_flag & TOPO_PROP_NONVOLATILE && pv->tp_val != NULL)
+		return (pv);
 
 	if (pv->tp_method != NULL) {
 		if (prop_method_get(node, pv, pv->tp_method, pargs, err) < 0)
@@ -533,7 +534,7 @@ prop_create(tnode_t *node, const char *pgname, const char *pname,
 	if ((pv = propval_get(pg, pname)) != NULL) {
 		if (pv->tp_type != type)
 			return (set_seterror(node, NULL, err, ETOPO_PROP_TYPE));
-		else if (pv->tp_flag == TOPO_PROP_IMMUTABLE)
+		else if (! (pv->tp_flag & TOPO_PROP_MUTABLE))
 			return (set_seterror(node, NULL, err, ETOPO_PROP_DEFD));
 
 		nvlist_free(pv->tp_val);
@@ -893,16 +894,17 @@ prop_method_register(tnode_t *node, const char *pgname, const char *pname,
 	/*
 	 * It's possible the property may already exist.  However we still want
 	 * to allow the method to be registered.  This is to handle the case
-	 * where we specify an prop method in an xml map to override the value
+	 * where we specify a prop method in an xml map to override the value
 	 * that was set by the enumerator.
 	 *
-	 * By default, propmethod-backed properties are IMMUTABLE.  This is done
-	 * to simplify the programming model for modules that implement property
-	 * methods as most propmethods tend to only support get operations.
-	 * Enumerator modules can override this by calling topo_prop_setflags().
-	 * Propmethods that are registered via XML can be set as mutable via
-	 * the optional "mutable" attribute, which will result in the xml parser
-	 * calling topo_prop_setflags() after registering the propmethod.
+	 * By default, propmethod-backed properties are not MUTABLE.  This is
+	 * done to simplify the programming model for modules that implement
+	 * property methods as most propmethods tend to only support get
+	 * operations.  Enumerator modules can override this by calling
+	 * topo_prop_setmutable().  Propmethods that are registered via XML can
+	 * be set as mutable via the optional "mutable" attribute, which will
+	 * result in the xml parser calling topo_prop_setflags() after
+	 * registering the propmethod.
 	 */
 	if ((pv = propval_get(pgroup_get(node, pgname), pname)) == NULL)
 		if ((pv = prop_create(node, pgname, pname, ptype,
@@ -1030,7 +1032,26 @@ topo_prop_setmutable(tnode_t *node, const char *pgname, const char *pname,
 		*err = ETOPO_PROP_DEFD;
 		return (-1);
 	}
-	pv->tp_flag = TOPO_PROP_MUTABLE;
+	pv->tp_flag |= TOPO_PROP_MUTABLE;
+
+	topo_node_unlock(node);
+
+	return (0);
+}
+int
+topo_prop_setnonvolatile(tnode_t *node, const char *pgname, const char *pname,
+    int *err)
+{
+	topo_propval_t *pv = NULL;
+
+	topo_node_lock(node);
+	if ((pv = propval_get(pgroup_get(node, pgname), pname)) == NULL) {
+		topo_node_unlock(node);
+		*err = ETOPO_PROP_NOENT;
+		return (-1);
+	}
+
+	pv->tp_flag |= TOPO_PROP_NONVOLATILE;
 
 	topo_node_unlock(node);
 
@@ -1077,7 +1098,7 @@ topo_prop_inherit(tnode_t *node, const char *pgname, const char *name, int *err)
 	/*
 	 * Can this propval be inherited?
 	 */
-	if (pv->tp_flag != TOPO_PROP_IMMUTABLE)
+	if (pv->tp_flag & TOPO_PROP_MUTABLE)
 		return (inherit_seterror(node, err, ETOPO_PROP_NOINHERIT));
 
 	/*

@@ -21,10 +21,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # Construct translation tables for defines in libtopo.h to translate to readable
@@ -49,8 +48,6 @@ echo "\
  * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	\"%Z%%M%	%I%	%E% SMI\"
 
 #include <libtopo.h>
 #include \"topo_mod.h\"
@@ -506,6 +503,26 @@ echo "\ntopo_name_trans_t topo_sensor_states_generic_acpi_pwr_table[] = {"
 
 pattern="#define	TOPO_SENSOR_STATE_GENERIC_ACPI_PWR_STATE_\([A-Z0-9_]*\).*\$"
 replace="	{ TOPO_SENSOR_STATE_GENERIC_ACPI_PWR_STATE_\1, \"\1\" },"
+
+cat $libtopo_h | sed -n "s/$pattern/$replace/p" || exit 1
+
+echo "\t{ 0, NULL }
+};"
+
+echo "\ntopo_name_trans_t topo_sensor_states_generic_failure_table[] = {"
+
+pattern="#define	TOPO_SENSOR_STATE_GENERIC_FAIL_\([A-Z0-9_]*\).*\$"
+replace="	{ TOPO_SENSOR_STATE_GENERIC_FAIL_\1, \"\1\" },"
+
+cat $libtopo_h | sed -n "s/$pattern/$replace/p" || exit 1
+
+echo "\t{ 0, NULL }
+};"
+
+echo "\ntopo_name_trans_t topo_sensor_states_generic_ok_table[] = {"
+
+pattern="#define	TOPO_SENSOR_STATE_GENERIC_OK_\([A-Z0-9_]*\).*\$"
+replace="	{ TOPO_SENSOR_STATE_GENERIC_OK_\1, \"\1\" },"
 
 cat $libtopo_h | sed -n "s/$pattern/$replace/p" || exit 1
 

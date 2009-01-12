@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -485,7 +485,8 @@
 
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
-			            propname='serial' proptype='string' >
+			            propname='serial' proptype='string'
+				    nonvolatile='1' >
               
                             <argval name='format' type='string'
 			        value='cpu%d.mem%d.vpd' />
@@ -515,7 +516,8 @@
 
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
-			            propname='serial' proptype='string' >
+			            propname='serial' proptype='string'
+				    nonvolatile='1' >
               
                             <argval name='format' type='string'
 			        value='p%d.d%d.fru' />
@@ -568,7 +570,8 @@
 
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
-			            propname='serial' proptype='string' >
+			            propname='serial' proptype='string'
+				    nonvolatile='1' >
               
                             <argval name='format' type='string'
 			        value='p%d.d%d.fru' />
@@ -616,7 +619,8 @@
 
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
-			            propname='serial' proptype='string' >
+			            propname='serial' proptype='string'
+				    nonvolatile='1' >
               
                             <argval name='format' type='string'
 			        value='p%d.d%d.fru' />
@@ -669,7 +673,8 @@
 
                         </propmethod>
                         <propmethod name='get_dimm_serial' version='0'
-			            propname='serial' proptype='string' >
+			            propname='serial' proptype='string'
+				    nonvolatile='1' >
               
                             <argval name='format' type='string'
 			        value='p%d.d%d.fru' />

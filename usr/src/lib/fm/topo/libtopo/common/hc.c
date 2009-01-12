@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1862,22 +1862,22 @@ hc_is_replaced(topo_mod_t *mod, tnode_t *node, void *pdata)
 		    &err) < 0) {
 			/* no present method either - assume present */
 			present = 1;
+			if (topo_mod_nvalloc(mod, &hap->ha_nvl,
+			    NV_UNIQUE_NAME) != 0)
+				return (ETOPO_PROP_NVL);
 		} else {
 			(void) nvlist_lookup_uint32(hap->ha_nvl,
 			    TOPO_METH_PRESENT_RET, &present);
 			(void) nvlist_remove(hap->ha_nvl,
 			    TOPO_METH_PRESENT_RET, DATA_TYPE_UINT32);
 		}
-		if (topo_mod_nvalloc(mod, &hap->ha_nvl,
-		    NV_UNIQUE_NAME) == 0)
-			if (nvlist_add_uint32(hap->ha_nvl,
-			    TOPO_METH_REPLACED_RET,
-			    present ? FMD_OBJ_STATE_UNKNOWN :
-			    FMD_OBJ_STATE_NOT_PRESENT) == 0)
-				return (0);
-		return (ETOPO_PROP_NVL);
+		if (nvlist_add_uint32(hap->ha_nvl, TOPO_METH_REPLACED_RET,
+		    present ? FMD_OBJ_STATE_UNKNOWN :
+		    FMD_OBJ_STATE_NOT_PRESENT) != 0) {
+			nvlist_free(hap->ha_nvl);
+			return (ETOPO_PROP_NVL);
+		}
 	}
-
 	return (0);
 }
 

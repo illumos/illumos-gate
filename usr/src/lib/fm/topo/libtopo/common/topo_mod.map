@@ -1,5 +1,5 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -21,7 +21,6 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 {
 	topo_node_range_create = FUNCTION extern;
@@ -71,6 +70,7 @@
 	topo_method_unregister = FUNCTION extern;
 	topo_method_unregister_all = FUNCTION extern;
 	topo_method_invoke = FUNCTION extern;
+	topo_method_sensor_failure = FUNCTION extern;
 
 	topo_prop_method_register = FUNCTION extern;
 	topo_prop_method_unregister = FUNCTION extern;

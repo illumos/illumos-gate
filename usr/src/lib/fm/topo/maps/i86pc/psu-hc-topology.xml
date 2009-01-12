@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE topology SYSTEM "/usr/share/lib/xml/dtd/topology.dtd.1">
 <!--
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -23,57 +23,12 @@
 
  CDDL HEADER END
 
-    ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <topology name='psu' scheme='hc'>
 
-	<!--
-		Thumper platforms explicitly have only two power supplies, as
-		the third (unused) bay is reported via IPMI but not actually
-		valid.
-	-->
-  <set type='product' setlist='Sun-Fire-X4500|Sun-Fire-X4540'>
+  <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4100-M2|Sun-Fire-X4200-M2|Sun-Fire-X4240|Sun-Fire-X4440|Sun-Fire-X4600|Sun-Fire-X4600-M2'>
     <range name='psu' min='0' max='100'>
-	<node instance='0'>
-	  <fac-enum provider='fac_prov_ipmi' />
-	  <propgroup name='protocol' version='1'
-	       name-stability='Private' data-stability='Private' >
-                    <propval name='label' type='string' value='PS0' />
-		      <propmethod name='ipmi_fru_fmri' version='0'
-			   propname='FRU' proptype='fmri' >
-			  <argval name='entity' type='string' value='self' />
-		      </propmethod>
-	  </propgroup>
-	  <propgroup name='ipmi' version='1'
-		       name-stability='Private' data-stability='Private' >
-	
-		      <propval name='entity_ref' type='string' value='ps0.prsnt' />
-	  </propgroup>
-	  <enum-method name='ipmi' version='1' />
-        </node>
-	<node instance='1'>
-	  <fac-enum provider='fac_prov_ipmi' />
-	  <propgroup name='protocol' version='1'
-	       name-stability='Private' data-stability='Private' >
-                    <propval name='label' type='string' value='PS1' />
-		      <propmethod name='ipmi_fru_fmri' version='0'
-			   propname='FRU' proptype='fmri' >
-			  <argval name='entity' type='string' value='self' />
-		      </propmethod>
-	  </propgroup>
-	  <propgroup name='ipmi' version='1'
-		       name-stability='Private' data-stability='Private' >
-	
-		      <propval name='entity_ref' type='string' value='ps1.prsnt' />
-	  </propgroup>
-	  <enum-method name='ipmi' version='1' />
-        </node>
-    </range>
-  </set>
-  <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4100-M2|Sun-Fire-X4200-M2|Sun-Fire-X4240|Sun-Fire-X4440|Sun-Fire-X4600-M2'>
-    <range name='psu' min='0' max='100'>
-        <fac-enum provider='fac_prov_ipmi' />
         <facility name='sys.psfail.led' type='indicator' provider='fac_prov_ipmi' >
               <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
 		    <propval name='entity_ref' type='string' value='sys.psfail.led' />
@@ -83,6 +38,41 @@
                     </propmethod>
               </propgroup>
         </facility>
+	<!--
+	    We override the 'vinok' and 'pwrok' sensors so that we can declare
+	    them as TOPO_SENSOR_TYPE_GENERIC_OK, which has semantic meaning for
+	    fan/psu fault diagnosis.
+	-->
+	<facility name='ps.vinok' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='ps%d.vinok' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
+	<facility name='ps.pwrok' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='ps%d.pwrok' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
         <propgroup name='protocol' version='1'
             name-stability='Private' data-stability='Private' >
 
@@ -106,6 +96,108 @@
 
                 </propmethod>
         </propgroup>
+    </range>
+  </set>
+
+  <!--
+	Thumper platforms explicitly have only two power supplies, as the third
+	(unused) bay is reported via IPMI but not actually valid.
+	See comments above for why we manually specify vinok/pwrok
+  -->
+  <set type='product' setlist='Sun-Fire-X4500|Sun-Fire-X4540'>
+    <range name='psu' min='0' max='100'>
+	<node instance='0'>
+	<facility name='ps0.vinok' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='ps%d.vinok' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
+	<facility name='ps0.pwrok' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='ps%d.pwrok' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
+	  <propgroup name='protocol' version='1'
+	       name-stability='Private' data-stability='Private' >
+                    <propval name='label' type='string' value='PS0' />
+		      <propmethod name='ipmi_fru_fmri' version='0'
+			   propname='FRU' proptype='fmri' >
+			  <argval name='entity' type='string' value='self' />
+		      </propmethod>
+	  </propgroup>
+	  <propgroup name='ipmi' version='1'
+		       name-stability='Private' data-stability='Private' >
+	
+		      <propval name='entity_ref' type='string' value='ps0.prsnt' />
+	  </propgroup>
+	  <enum-method name='ipmi' version='1' />
+        </node>
+	<node instance='1'>
+	<facility name='ps1.vinok' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='ps%d.vinok' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
+	<facility name='ps1.pwrok' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='ps%d.pwrok' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
+	  <propgroup name='protocol' version='1'
+	       name-stability='Private' data-stability='Private' >
+                    <propval name='label' type='string' value='PS1' />
+		      <propmethod name='ipmi_fru_fmri' version='0'
+			   propname='FRU' proptype='fmri' >
+			  <argval name='entity' type='string' value='self' />
+		      </propmethod>
+	  </propgroup>
+	  <propgroup name='ipmi' version='1'
+		       name-stability='Private' data-stability='Private' >
+	
+		      <propval name='entity_ref' type='string' value='ps1.prsnt' />
+	  </propgroup>
+	  <enum-method name='ipmi' version='1' />
+        </node>
     </range>
   </set>
 </topology>

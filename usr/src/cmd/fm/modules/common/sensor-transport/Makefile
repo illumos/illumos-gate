@@ -23,17 +23,13 @@
 # Use is subject to license terms.
 #
 
-SUBDIRS=i86pc
-EFT_COMMON_FILES=		\
-	disk.eft		\
-	neptune_xaui.eft	\
-	neptune_xfp.eft 	\
-	pci.eft			\
-	pciex.eft		\
-	sca500.eft		\
-	sca1000.eft 		\
-	sensor.eft
+MODULE = sensor-transport
+CLASS = common
+SRCS = sensor_transport.c
 
-include ../../../Makefile.subdirs
+include ../../Makefile.plugin
 
-include ../Makefile.com
+CFLAGS += $(INCS)
+LINTFLAGS += $(INCS)
+LDLIBS += -L$(ROOTLIB)/fm -ltopo
+LDFLAGS += -R/usr/lib/fm

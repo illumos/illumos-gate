@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sysevent/dr.h>
@@ -609,6 +607,7 @@ dm_process_sysevent(sysevent_t *dupev)
 	    strcmp(subclass, ESC_PLATFORM_SP_RESET) == 0) {
 		if (dm_platform_resync() != 0)
 			log_warn("failed to resync SP platform\n");
+		sysevent_free(dupev);
 		return;
 	}
 

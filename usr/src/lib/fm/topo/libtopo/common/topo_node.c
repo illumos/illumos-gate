@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -703,12 +703,12 @@ topo_node_facility(topo_hdl_t *thp, tnode_t *node, const char *fac_type,
 			return (-1);
 		}
 
-		nvlist_free(rsrc);
-
 		if (strcmp(fac_type, tmp_factype) != 0) {
 			topo_node_rele(tmp);
+			nvlist_free(rsrc);
 			continue;
 		}
+		nvlist_free(rsrc);
 
 		/*
 		 * Finally, look up the subtype, which is a property in the
@@ -722,7 +722,8 @@ topo_node_facility(topo_hdl_t *thp, tnode_t *node, const char *fac_type,
 			topo_node_unlock(node);
 			return (-1);
 		}
-		if (fac_subtype == tmp_facsubtype) {
+		if (fac_subtype == tmp_facsubtype ||
+		    fac_subtype == TOPO_FAC_TYPE_ANY) {
 			if ((fac_ele = topo_mod_zalloc(tmp->tn_enum,
 			    sizeof (topo_faclist_t))) == NULL) {
 				*errp = ETOPO_NOMEM;
