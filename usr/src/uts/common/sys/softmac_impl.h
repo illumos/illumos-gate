@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,7 +136,6 @@ typedef struct softmac {
 	int		smac_attacherr;
 	mac_handle_t	smac_mh;
 	softmac_dev_t	*smac_softmac[2];
-	taskqid_t	smac_taskq;
 	/*
 	 * Number of minor nodes whose post-attach routine has succeeded.
 	 * This should be the same as the numbers of softmac_dev_t.

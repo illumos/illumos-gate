@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -389,9 +389,8 @@ softmac_create(dev_info_t *dip, dev_t dev)
 	 * returns EBUSY if the asynchronous threads started in softmac_create
 	 * haven't finished.
 	 */
-	ASSERT(softmac->smac_taskq == NULL);
-	softmac->smac_taskq = taskq_dispatch(system_taskq,
-	    softmac_create_task, softmac, TQ_SLEEP);
+	(void) taskq_dispatch(system_taskq, softmac_create_task,
+	    softmac, TQ_SLEEP);
 	mutex_exit(&softmac->smac_mutex);
 	return (0);
 }
@@ -548,7 +547,6 @@ softmac_create_task(void *arg)
 	mutex_enter(&softmac->smac_mutex);
 	softmac->smac_media = (mac_info(mh))->mi_nativemedia;
 	softmac->smac_mh = mh;
-	softmac->smac_taskq = NULL;
 	mutex_exit(&softmac->smac_mutex);
 
 	/*
@@ -564,14 +562,12 @@ softmac_create_task(void *arg)
 	 */
 	err = softmac_create_datalink(softmac);
 
-	mutex_enter(&softmac->smac_mutex);
 done:
-	if (err != 0) {
+	mutex_enter(&softmac->smac_mutex);
+	if (err != 0)
 		softmac->smac_mh = NULL;
-		softmac->smac_attacherr = err;
-	}
+	softmac->smac_attacherr = err;
 	softmac->smac_state = SOFTMAC_ATTACH_DONE;
-	softmac->smac_taskq = NULL;
 	cv_broadcast(&softmac->smac_cv);
 	mutex_exit(&softmac->smac_mutex);
 }
@@ -841,7 +837,6 @@ done:
 	    softmac->smac_attachok_cnt == softmac->smac_cnt);
 	softmac->smac_state = SOFTMAC_ATTACH_DONE;
 	softmac->smac_attacherr = err;
-	softmac->smac_taskq = NULL;
 	cv_broadcast(&softmac->smac_cv);
 	mutex_exit(&softmac->smac_mutex);
 }
@@ -972,7 +967,6 @@ softmac_destroy(dev_info_t *dip, dev_t dev)
 			rw_exit(&softmac_hash_lock);
 			return (0);
 		}
-		ASSERT(softmac->smac_taskq == NULL);
 
 		err = mod_hash_remove(softmac_hash,
 		    (mod_hash_key_t)devname,
