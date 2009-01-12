@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1295,6 +1295,7 @@ hati_pte_map(
 	level_t		l = ht->ht_level;
 	hment_t		*hm;
 	uint_t		is_consist;
+	uint_t		is_locked;
 	int		rv = 0;
 
 	/*
@@ -1306,7 +1307,8 @@ hati_pte_map(
 	 * Track locked mapping count in the htable.  Do this first,
 	 * as we track locking even if there already is a mapping present.
 	 */
-	if ((flags & HAT_LOAD_LOCK) != 0 && hat != kas.a_hat)
+	is_locked = (flags & HAT_LOAD_LOCK) != 0 && hat != kas.a_hat;
+	if (is_locked)
 		HTABLE_LOCK_INC(ht);
 
 	/*
@@ -1324,9 +1326,11 @@ hati_pte_map(
 	old_pte = x86pte_set(ht, entry, pte, pte_ptr);
 
 	/*
-	 * did we get a large page / page table collision?
+	 * Did we get a large page / page table collision?
 	 */
 	if (old_pte == LPAGE_ERROR) {
+		if (is_locked)
+			HTABLE_LOCK_DEC(ht);
 		rv = -1;
 		goto done;
 	}
