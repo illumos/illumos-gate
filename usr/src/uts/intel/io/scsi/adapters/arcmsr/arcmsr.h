@@ -57,7 +57,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,7 +81,7 @@
 #endif /* DEBUG */
 
 
-#define	ARCMSR_DRIVER_VERSION		"1.20.00.16Sun"
+#define	ARCMSR_DRIVER_VERSION		"1.20.00.17Sun"
 #define	ARCMSR_SCSI_INITIATOR_ID	255
 #define	ARCMSR_DEV_SECTOR_SIZE		512
 #define	ARCMSR_MAX_XFER_SECTORS		256
@@ -303,6 +303,7 @@ struct QBUFFER {
  */
 #define	ARCMSR_FW_MODEL_OFFSET	0x0f
 #define	ARCMSR_FW_VERS_OFFSET	0x11
+#define	ARCMSR_FW_MAP_OFFSET	0x15
 
 struct FIRMWARE_INFO {
 	uint32_t	signature;
@@ -620,6 +621,8 @@ struct ACB {
 	kmutex_t		workingQ_mutex;
 	kmutex_t		ioctl_mutex;
 	timeout_id_t		timeout_id;
+	timeout_id_t		timeout_sc_id;
+	ddi_taskq_t		*taskq;
 	ddi_iblock_cookie_t	 iblock_cookie;
 	/* Offset for arc cdb physical to virtual calculations */
 	unsigned long		vir2phy_offset;
@@ -677,6 +680,7 @@ struct ACB {
 #define	ARECA_RAID_GONE		0x55
 #define	ARECA_RAID_GOOD		0xaa
 
+	uint32_t		timeout_count;
 	uint32_t		num_resets;
 	uint32_t		num_aborts;
 	uint32_t		firm_request_len;
@@ -685,8 +689,10 @@ struct ACB {
 	uint32_t		firm_ide_channels;
 	char			firm_model[12];
 	char			firm_version[20];
+	char			device_map[20];	/* 21,84-99 */
 	ddi_acc_handle_t	pci_acc_handle;
 	int			tgt_scsi_opts[ARCMSR_MAX_TARGETID];
+	dev_info_t	*ld[ARCMSR_MAX_TARGETID-1][ARCMSR_MAX_TARGETLUN];
 };
 
 

@@ -36,7 +36,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@
 #include <sys/debug.h>
 #include <sys/pci.h>
 #include <sys/policy.h>
+#include <sys/atomic.h>
 
 #include "arcmsr.h"
 
@@ -77,6 +78,8 @@ static struct scsi_pkt *arcmsr_tran_init_pkt(struct scsi_address *ap,
     struct scsi_pkt *pkt, struct buf *bp, int cmdlen, int statuslen,
     int tgtlen, int flags, int (*callback)(), caddr_t arg);
 
+static int arcmsr_config_lun(struct ACB *acb, uint16_t tgt, uint8_t lun,
+    dev_info_t **ldip);
 static uint_t arcmsr_interrupt(caddr_t arg);
 static int arcmsr_initialize(struct ACB *acb);
 static int arcmsr_dma_alloc(struct ACB *acb,
@@ -98,12 +101,19 @@ static void arcmsr_start_hba_bgrb(struct ACB *acb);
 static void arcmsr_polling_hba_ccbdone(struct ACB *acb, struct CCB *poll_ccb);
 static void arcmsr_polling_hbb_ccbdone(struct ACB *acb, struct CCB *poll_ccb);
 static void arcmsr_build_ccb(struct CCB *ccb);
-
+static int arcmsr_tran_bus_config(dev_info_t *parent, uint_t flags,
+    ddi_bus_config_op_t op, void *arg, dev_info_t **childp);
+static int arcmsr_name_node(dev_info_t *dip, char *name, int len);
+static dev_info_t *arcmsr_find_child(struct ACB *acb, uint16_t tgt,
+    uint8_t lun);
 
 static struct ACB *ArcMSRHBA[ARCMSR_MAX_ADAPTER];
 static int arcmsr_hba_count;
 static void *arcmsr_soft_state = NULL;
 static kmutex_t arcmsr_global_mutex;
+
+#define	MSR_MINOR	32
+#define	INST2MSR(x)	(((x) << INST_MINOR_SHIFT) | MSR_MINOR)
 
 static ddi_dma_attr_t arcmsr_dma_attr = {
 	DMA_ATTR_V0,		/* ddi_dma_attr version */
@@ -291,6 +301,41 @@ arcmsr_dump_scsi_cdb(struct scsi_address *ap, struct scsi_pkt *pkt) {
 #endif  /* ARCMSR_DEBUG */
 
 static void
+arcmsr_devmap_req_timeout(void* arg) {
+
+	struct ACB *acb = (struct ACB *)arg;
+	switch (acb->adapter_type) {
+	    case ACB_ADAPTER_TYPE_A:
+	    {
+		    struct HBA_msgUnit *phbamu;
+
+		    phbamu = (struct HBA_msgUnit *)acb->pmu;
+		    CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
+			&phbamu->inbound_msgaddr0,
+			ARCMSR_INBOUND_MESG0_GET_CONFIG);
+	    }
+	    break;
+	    case ACB_ADAPTER_TYPE_B:
+	    {
+		    struct HBB_msgUnit *phbbmu;
+		    phbbmu = (struct HBB_msgUnit *)acb->pmu;
+		    CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
+			&phbbmu->hbb_doorbell->drv2iop_doorbell,
+			ARCMSR_MESSAGE_GET_CONFIG);
+	    }
+	    break;
+	}
+
+	if ((acb->timeout_id != 0) &&
+	    ((acb->acb_flags & ACB_F_SCSISTOPADAPTER) == 0)) {
+		/* do pkt timeout check each 5 secs */
+		acb->timeout_id = timeout(arcmsr_devmap_req_timeout,
+		    (void*)acb, (5 * drv_usectohz(1000000)));
+	}
+}
+
+
+static void
 arcmsr_ccbs_timeout(void* arg) {
 
 	struct ACB *acb = (struct ACB *)arg;
@@ -352,6 +397,7 @@ arcmsr_ccbs_timeout(void* arg) {
 				    id, lun);
 				acb->devstate[id][lun] = ARECA_RAID_GONE;
 				arcmsr_ccb_complete(ccb, 1);
+				acb->timeout_count++;
 				continue;
 			}
 			ccb->ccb_time = (time_t)(ccb->pkt->pkt_time +
@@ -378,10 +424,8 @@ arcmsr_disable_allintr(struct ACB *acb) {
 		    (struct HBA_msgUnit *)acb->pmu;
 
 		/* disable all outbound interrupt */
-		/* disable outbound message0 int */
 		intmask_org = CHIP_REG_READ32(acb->reg_mu_acc_handle0,
-		    &phbamu->outbound_intmask) |
-		    ARCMSR_MU_OUTBOUND_MESSAGE0_INTMASKENABLE;
+		    &phbamu->outbound_intmask);
 		CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
 		    &phbamu->outbound_intmask,
 		    intmask_org|ARCMSR_MU_OUTBOUND_ALL_INTMASKENABLE);
@@ -392,10 +436,8 @@ arcmsr_disable_allintr(struct ACB *acb) {
 		    (struct HBB_msgUnit *)acb->pmu;
 
 		/* disable all outbound interrupt */
-		/* disable outbound message0 int */
 		intmask_org = CHIP_REG_READ32(acb->reg_mu_acc_handle0,
-		    &phbbmu->hbb_doorbell->iop2drv_doorbell_mask) &
-		    (~ARCMSR_IOP2DRV_MESSAGE_CMD_DONE);
+		    &phbbmu->hbb_doorbell->iop2drv_doorbell_mask);
 		/* disable all interrupts */
 		CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
 		    &phbbmu->hbb_doorbell->iop2drv_doorbell_mask, 0);
@@ -416,9 +458,13 @@ arcmsr_enable_allintr(struct ACB *acb, uint32_t intmask_org) {
 		struct HBA_msgUnit *phbamu =
 		    (struct HBA_msgUnit *)acb->pmu;
 
-		/* enable outbound Post Queue, outbound doorbell Interrupt */
+		/*
+		 * enable outbound Post Queue, outbound doorbell message0
+		 * Interrupt
+		 */
 		mask = ~(ARCMSR_MU_OUTBOUND_POSTQUEUE_INTMASKENABLE |
-		    ARCMSR_MU_OUTBOUND_DOORBELL_INTMASKENABLE);
+		    ARCMSR_MU_OUTBOUND_DOORBELL_INTMASKENABLE |
+		    ARCMSR_MU_OUTBOUND_MESSAGE0_INTMASKENABLE);
 		CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
 		    &phbamu->outbound_intmask, intmask_org & mask);
 		acb->outbound_int_enable = ~(intmask_org & mask) & 0x000000ff;
@@ -428,9 +474,9 @@ arcmsr_enable_allintr(struct ACB *acb, uint32_t intmask_org) {
 		struct HBB_msgUnit *phbbmu =
 		    (struct HBB_msgUnit *)acb->pmu;
 
-		/* disable ARCMSR_IOP2DRV_MESSAGE_CMD_DONE */
 		mask = (ARCMSR_IOP2DRV_DATA_WRITE_OK |
-		    ARCMSR_IOP2DRV_DATA_READ_OK | ARCMSR_IOP2DRV_CDB_DONE);
+		    ARCMSR_IOP2DRV_DATA_READ_OK | ARCMSR_IOP2DRV_CDB_DONE |
+		    ARCMSR_IOP2DRV_MESSAGE_CMD_DONE);
 		/* 1=interrupt enable, 0=interrupt disable */
 		CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
 		    &phbbmu->hbb_doorbell->iop2drv_doorbell_mask,
@@ -561,9 +607,6 @@ arcmsr_do_ddi_attach(dev_info_t *dev_info, int instance) {
 		goto error_level_0;
 	}
 
-
-
-
 	if (pci_config_setup(dev_info, &acb->pci_acc_handle)
 	    != DDI_SUCCESS) {
 		arcmsr_log(NULL, CE_NOTE,
@@ -679,11 +722,16 @@ arcmsr_do_ddi_attach(dev_info_t *dev_info, int instance) {
 	hba_trans->tran_quiesce = NULL;
 	hba_trans->tran_unquiesce = NULL;
 	hba_trans->tran_bus_reset = NULL;
+	hba_trans->tran_bus_config = arcmsr_tran_bus_config;
 	hba_trans->tran_add_eventcall = NULL;
 	hba_trans->tran_get_eventcookie = NULL;
 	hba_trans->tran_post_event = NULL;
 	hba_trans->tran_remove_eventcall = NULL;
 
+	/* iop init and enable interrupt here */
+	mutex_enter(&arcmsr_global_mutex);
+	arcmsr_iop_init(acb);
+	mutex_exit(&arcmsr_global_mutex);
 
 	/* Adding an Interrupt Handler */
 	if (ddi_add_intr(dev_info, 0, &acb->iblock_cookie, 0,
@@ -705,10 +753,13 @@ arcmsr_do_ddi_attach(dev_info_t *dev_info, int instance) {
 		goto error_level_5;
 	}
 
-	/* iop init and enable interrupt here */
-	mutex_enter(&arcmsr_global_mutex);
-	arcmsr_iop_init(acb);
-	mutex_exit(&arcmsr_global_mutex);
+	if (ddi_create_minor_node(dev_info, "arcmsr",
+	    S_IFCHR, INST2MSR(instance), DDI_PSEUDO, 0) == DDI_FAILURE) {
+		arcmsr_log(NULL, CE_WARN,
+		    "arcmsr%d: ddi_create_minor_node fail", instance);
+		goto error_level_6;
+	}
+
 
 	/* Initialize power management bookkeeping. */
 	if (pm_create_components(dev_info, 1) == DDI_SUCCESS) {
@@ -744,9 +795,20 @@ arcmsr_do_ddi_attach(dev_info_t *dev_info, int instance) {
 		goto error_level_8;
 	}
 
+	/* Create a taskq for dealing with dr events */
+	if ((acb->taskq = ddi_taskq_create(dev_info, "arcmsr_dr_taskq", 1,
+	    TASKQ_DEFAULTPRI, 0)) == NULL) {
+		cmn_err(CE_WARN, "ddi_taskq_create failed");
+		goto error_level_8;
+	}
+
+	acb->timeout_count = 0;
 	/* active ccbs "timeout" watchdog */
 	acb->timeout_id = timeout(arcmsr_ccbs_timeout, (caddr_t)acb,
 	    (60 * drv_usectohz(1000000)));
+	acb->timeout_sc_id = timeout(arcmsr_devmap_req_timeout, (caddr_t)acb,
+	    (5 * drv_usectohz(1000000)));
+
 	/* report device info */
 	ddi_report_dev(dev_info);
 	ArcMSRHBA[arcmsr_hba_count] = acb;
@@ -834,8 +896,11 @@ arcmsr_attach(dev_info_t *dev_info, ddi_attach_cmd_t cmd) {
 	    arcmsr_iop_init(acb);
 
 	    /* restart ccbs "timeout" watchdog */
+	    acb->timeout_count = 0;
 	    acb->timeout_id = timeout(arcmsr_ccbs_timeout,
-		(void*)acb, (60 * drv_usectohz(1000000)));
+		(caddr_t)acb, (60 * drv_usectohz(1000000)));
+	    acb->timeout_sc_id = timeout(arcmsr_devmap_req_timeout,
+		(caddr_t)acb, (5 * drv_usectohz(1000000)));
 	    mutex_exit(&acb->acb_mutex);
 	    return (DDI_SUCCESS);
 
@@ -879,6 +944,12 @@ arcmsr_detach(dev_info_t *dev_info, ddi_detach_cmd_t cmd) {
 			mutex_enter(&acb->acb_mutex);
 			acb->timeout_id = 0;
 		}
+		if (acb->timeout_sc_id != 0) {
+			mutex_exit(&acb->acb_mutex);
+			(void) untimeout(acb->timeout_sc_id);
+			mutex_enter(&acb->acb_mutex);
+			acb->timeout_sc_id = 0;
+		}
 		arcmsr_pcidev_disattach(acb);
 		/* Remove interrupt set up by ddi_add_intr */
 		ddi_remove_intr(dev_info, 0, acb->iblock_cookie);
@@ -897,6 +968,7 @@ arcmsr_detach(dev_info_t *dev_info, ddi_detach_cmd_t cmd) {
 		/* free scsi_hba_transport from scsi_hba_tran_alloc */
 		scsi_hba_tran_free(acb->scsi_hba_transport);
 		ddi_remove_minor_node(dev_info, NULL);
+		ddi_taskq_destroy(acb->taskq);
 		ddi_prop_remove_all(dev_info);
 		mutex_exit(&acb->acb_mutex);
 		mutex_destroy(&acb->acb_mutex);
@@ -915,9 +987,19 @@ arcmsr_detach(dev_info_t *dev_info, ddi_detach_cmd_t cmd) {
 			acb->acb_flags |= ACB_F_SCSISTOPADAPTER;
 			mutex_exit(&acb->acb_mutex);
 			(void) untimeout(acb->timeout_id);
+			(void) untimeout(acb->timeout_sc_id);
 			mutex_enter(&acb->acb_mutex);
 			acb->timeout_id = 0;
 		}
+
+		if (acb->timeout_sc_id != 0) {
+			acb->acb_flags |= ACB_F_SCSISTOPADAPTER;
+			mutex_exit(&acb->acb_mutex);
+			(void) untimeout(acb->timeout_sc_id);
+			mutex_enter(&acb->acb_mutex);
+			acb->timeout_sc_id = 0;
+		}
+
 		/* disable all outbound interrupt */
 		(void) arcmsr_disable_allintr(acb);
 		/* stop adapter background rebuild */
@@ -966,10 +1048,10 @@ arcmsr_tran_tgt_init(dev_info_t *host_dev_info, dev_info_t *target_dev_info,
 #ifndef __lock_lint
 	_NOTE(ARGUNUSED(hosttran, target_dev_info))
 #endif
-
-
 	uint16_t  target;
 	uint8_t  lun;
+	struct ACB *acb = (struct ACB *)sd->sd_address.a_hba_tran ->
+	    tran_hba_private;
 
 	target = sd->sd_address.a_target;
 	lun = sd->sd_address.a_lun;
@@ -981,6 +1063,22 @@ arcmsr_tran_tgt_init(dev_info_t *host_dev_info, dev_info_t *target_dev_info,
 		    target, lun, ARCMSR_MAX_TARGETID, ARCMSR_MAX_TARGETLUN);
 		return (DDI_FAILURE);
 	}
+
+
+	if (ndi_dev_is_persistent_node(target_dev_info) == 0) {
+		/*
+		 * If no persistent node exist, we don't allow .conf node
+		 * to be created.
+		 */
+		if (arcmsr_find_child(acb, target, lun) != NULL) {
+			if ((ndi_merge_node(target_dev_info,
+				    arcmsr_name_node) != DDI_SUCCESS)) {
+				return (DDI_SUCCESS);
+			}
+		}
+		return (DDI_FAILURE);
+	}
+
 	return (DDI_SUCCESS);
 }
 
@@ -1844,7 +1942,8 @@ arcmsr_ccb_complete(struct CCB *ccb, int flag) {
 	struct scsi_pkt *pkt = ccb->pkt;
 
 	if (flag == 1) {
-		acb->ccboutstandingcount--;
+		atomic_add_32((volatile uint32_t *)
+		    &acb->ccboutstandingcount, -1);
 	}
 	pkt->pkt_state |= (STATE_GOT_BUS | STATE_GOT_TARGET |
 	    STATE_SENT_CMD | STATE_GOT_STATUS);
@@ -2300,7 +2399,7 @@ arcmsr_post_ccb(struct ACB *acb, struct CCB *ccb) {
 	    DDI_DMA_SYNC_FORDEV) == DDI_FAILURE)
 		return (DDI_FAILURE);
 
-	acb->ccboutstandingcount++;
+	atomic_add_32((volatile uint32_t *)&acb->ccboutstandingcount, 1);
 	ccb->startdone = ARCMSR_CCB_START;
 
 	switch (acb->adapter_type) {
@@ -3278,19 +3377,26 @@ arcmsr_get_hba_config(struct ACB *acb) {
 
 	char *acb_firm_model;
 	char *acb_firm_version;
+	char *acb_device_map;
 	char *iop_firm_model;
 	char *iop_firm_version;
+	char *iop_device_map;
 	int count;
 
 	phbamu = (struct HBA_msgUnit *)acb->pmu;
 	acb_firm_model = acb->firm_model;
 	acb_firm_version = acb->firm_version;
+	acb_device_map = acb->device_map;
 	/* firm_model, 15 */
 	iop_firm_model = (char *)
 	    (&phbamu->msgcode_rwbuffer[ARCMSR_FW_MODEL_OFFSET]);
 	/* firm_version, 17 */
 	iop_firm_version =
 	    (char *)(&phbamu->msgcode_rwbuffer[ARCMSR_FW_VERS_OFFSET]);
+
+	/* device_map, 21 */
+	iop_device_map =
+	    (char *)(&phbamu->msgcode_rwbuffer[ARCMSR_FW_MAP_OFFSET]);
 
 	CHIP_REG_WRITE32(acb->reg_mu_acc_handle0, &phbamu->inbound_msgaddr0,
 	    ARCMSR_INBOUND_MESG0_GET_CONFIG);
@@ -3319,6 +3425,15 @@ arcmsr_get_hba_config(struct ACB *acb) {
 		count--;
 	}
 
+	count = 16;
+	while (count) {
+		*acb_device_map =
+		    CHIP_REG_READ8(acb->reg_mu_acc_handle0, iop_device_map);
+		acb_device_map++;
+		iop_device_map++;
+		count--;
+	}
+
 	cmn_err(CE_CONT, "arcmsr%d: ARECA RAID FIRMWARE VERSION %s",
 	    ddi_get_instance(acb->dev_info), acb->firm_version);
 
@@ -3343,22 +3458,25 @@ arcmsr_get_hbb_config(struct ACB *acb) {
 	struct HBB_msgUnit *phbbmu;
 	char *acb_firm_model;
 	char *acb_firm_version;
+	char *acb_device_map;
 	char *iop_firm_model;
 	char *iop_firm_version;
+	char *iop_device_map;
 	int count;
-
 
 	phbbmu = (struct HBB_msgUnit *)acb->pmu;
 	acb_firm_model = acb->firm_model;
 	acb_firm_version = acb->firm_version;
+	acb_device_map = acb->device_map;
 	/* firm_model, 15 */
 	iop_firm_model = (char *)
 	    (&phbbmu->hbb_rwbuffer->msgcode_rwbuffer[ARCMSR_FW_MODEL_OFFSET]);
 	/* firm_version, 17 */
 	iop_firm_version = (char *)
 	    (&phbbmu->hbb_rwbuffer->msgcode_rwbuffer[ARCMSR_FW_VERS_OFFSET]);
-
-
+	/* device_map, 21 */
+	iop_device_map = (char *)
+	    (&phbbmu->hbb_rwbuffer->msgcode_rwbuffer[ARCMSR_FW_MAP_OFFSET]);
 
 	CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
 	    &phbbmu->hbb_doorbell->drv2iop_doorbell,
@@ -3385,6 +3503,14 @@ arcmsr_get_hbb_config(struct ACB *acb) {
 		    iop_firm_version);
 		acb_firm_version++;
 		iop_firm_version++;
+		count--;
+	}
+	count = 16;
+	while (count) {
+		*acb_device_map =
+		    CHIP_REG_READ8(acb->reg_mu_acc_handle1, iop_device_map);
+		acb_device_map++;
+		iop_device_map++;
 		count--;
 	}
 
@@ -3481,17 +3607,21 @@ polling_ccb_retry:
 				break;
 			} else {
 				drv_usecwait(25000);
-				if (poll_count > 100) {
+				if ((poll_count > 100) && (poll_ccb != NULL)) {
 					break;
 				}
-				goto polling_ccb_retry;
+				if (acb->ccboutstandingcount == 0) {
+					break;
+				}
+					goto polling_ccb_retry;
 			}
 		}
 
 		/* check ifcommand done with no error */
 		ccb = (struct CCB *)(acb->vir2phy_offset  +
 		    (flag_ccb << 5)); /* frame must be 32 bytes aligned */
-		poll_ccb_done = (ccb == poll_ccb) ? 1 : 0;
+		if (poll_ccb != NULL)
+			poll_ccb_done = (ccb == poll_ccb) ? 1 : 0;
 
 		if ((ccb->acb != acb) ||
 		    (ccb->startdone != ARCMSR_CCB_START)) {
@@ -3548,9 +3678,10 @@ polling_ccb_retry:
 				break;
 			} else {
 				drv_usecwait(25000);
-				if (poll_count > 100)
+				if ((poll_count > 100) && (poll_ccb != NULL))
 					break;
-
+				if (acb->ccboutstandingcount == 0)
+					break;
 				goto polling_ccb_retry;
 			}
 		}
@@ -3564,7 +3695,8 @@ polling_ccb_retry:
 		/* frame must be 32 bytes aligned */
 		ccb = (struct CCB *)(acb->vir2phy_offset +
 		    (flag_ccb << 5));
-		poll_ccb_done = (ccb == poll_ccb) ? 1 : 0;
+		if (poll_ccb != NULL)
+			poll_ccb_done = (ccb == poll_ccb) ? 1 : 0;
 		if ((ccb->acb != acb) || (ccb->startdone != ARCMSR_CCB_START)) {
 			if (ccb->startdone == ARCMSR_CCB_ABORTED) {
 				ccb->pkt->pkt_reason = CMD_ABORTED;
@@ -3795,6 +3927,7 @@ arcmsr_tran_abort(struct scsi_address *ap, struct scsi_pkt *abortpkt) {
 	return (1);
 }
 
+
 /*
  * Function: arcmsr_tran_reset(9E)
  *           SCSA interface routine to perform scsi resets on either
@@ -3832,7 +3965,8 @@ arcmsr_tran_reset(struct scsi_address *ap, int level) {
 	case RESET_ALL:		/* level 1 */
 		acb->num_resets++;
 		acb->acb_flags |= ACB_F_BUS_RESET;
-		arcmsr_iop_reset(acb);
+		if (acb->timeout_count)
+			arcmsr_iop_reset(acb);
 		acb->acb_flags &= ~ACB_F_BUS_RESET;
 		return_code = 0;
 		break;
@@ -3995,7 +4129,112 @@ arcmsr_hba_postqueue_isr(struct ACB *acb) {
 	}	/* drain reply FIFO */
 }
 
+static void arcmsr_dr_handle(struct ACB *acb)
+{
+	char *acb_dev_map = (char *)acb->device_map;
+	char *devicemap;
+	int target, lun;
+	char diff;
+	int circ1;
+	dev_info_t *dip;
+	ddi_acc_handle_t reg;
+	switch (acb->adapter_type) {
+	case ACB_ADAPTER_TYPE_A:
+		{
+			struct HBA_msgUnit *phbamu = (struct HBA_msgUnit *)
+			    acb->pmu;
+			devicemap = (char *)&phbamu->msgcode_rwbuffer[21];
+			reg = acb->reg_mu_acc_handle0;
+		}
+		break;
+	case ACB_ADAPTER_TYPE_B:
+		{
+			struct HBB_msgUnit *phbbmu = (struct HBB_msgUnit *)
+			    acb->pmu;
+			devicemap = (char *)
+			    &phbbmu->hbb_rwbuffer->msgcode_rwbuffer[21];
+			reg = acb->reg_mu_acc_handle1;
+		}
+		break;
+	}
 
+	for (target = 0; target < ARCMSR_MAX_TARGETID - 1; target++) {
+		diff =
+		    (*acb_dev_map)^CHIP_REG_READ8(reg, devicemap);
+		if (diff != 0) {
+			char temp;
+			*acb_dev_map =
+			    CHIP_REG_READ8(reg, devicemap);
+			temp = *acb_dev_map;
+			for (lun = 0; lun < ARCMSR_MAX_TARGETLUN; lun++) {
+				if ((temp & 0x01) == 1 && (diff & 0x01) == 1) {
+					ndi_devi_enter(acb->dev_info, &circ1);
+					(void) arcmsr_config_lun(acb, target,
+					    lun, NULL);
+					ndi_devi_exit(acb->dev_info, circ1);
+				} else if ((temp & 0x01) == 0 && (diff & 0x01)
+				    == 1) {
+					dip = arcmsr_find_child(acb, target,
+					    lun);
+					if (dip != NULL) {
+						(void) ndi_devi_offline(dip,
+						    NDI_DEVI_REMOVE);
+						cmn_err(CE_NOTE, "arcmsr%d: "
+						    "T%dL%d offlined",
+						    ddi_get_instance
+						    (acb->dev_info), target,
+						    lun);
+					}
+				}
+				temp >>= 1;
+				diff >>= 1;
+			}
+		}
+		devicemap++;
+		acb_dev_map++;
+	}
+}
+
+static void arcmsr_hba_message_isr(struct ACB *acb)
+{
+	struct HBA_msgUnit *phbamu = (struct HBA_msgUnit *)acb->pmu;
+	uint32_t  *signature = (&phbamu->msgcode_rwbuffer[0]);
+	uint32_t outbound_message;
+
+	CHIP_REG_WRITE32(acb->reg_mu_acc_handle0, &phbamu->outbound_intstatus,
+	    ARCMSR_MU_OUTBOUND_MESSAGE0_INT);
+
+	outbound_message = CHIP_REG_READ32(acb->reg_mu_acc_handle0,
+	    signature);
+	if (outbound_message == ARCMSR_SIGNATURE_GET_CONFIG)
+		if ((ddi_taskq_dispatch(acb->taskq, (void (*)(void *))
+		    arcmsr_dr_handle, acb, DDI_NOSLEEP)) != DDI_SUCCESS)
+			cmn_err(CE_WARN, "DR task start failed");
+}
+
+static void arcmsr_hbb_message_isr(struct ACB *acb)
+{
+	struct HBB_msgUnit *phbbmu = (struct HBB_msgUnit *)acb->pmu;
+	uint32_t  *signature = (&phbbmu->hbb_rwbuffer->msgcode_rwbuffer[0]);
+	uint32_t outbound_message;
+
+	/* clear interrupts */
+	CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
+	    &phbbmu->hbb_doorbell->iop2drv_doorbell,
+	    ARCMSR_MESSAGE_INT_CLEAR_PATTERN);
+	CHIP_REG_WRITE32(acb->reg_mu_acc_handle0,
+	    &phbbmu->hbb_doorbell->drv2iop_doorbell,
+	    ARCMSR_DRV2IOP_END_OF_INTERRUPT);
+
+	outbound_message = CHIP_REG_READ32(acb->reg_mu_acc_handle0,
+	    signature);
+	if (outbound_message == ARCMSR_SIGNATURE_GET_CONFIG)
+		if ((ddi_taskq_dispatch(acb->taskq,
+		    (void (*)(void *))arcmsr_dr_handle, acb,
+		    DDI_NOSLEEP)) != DDI_SUCCESS) {
+			cmn_err(CE_WARN, "DR task start failed");
+		}
+}
 
 static void
 arcmsr_hbb_postqueue_isr(struct ACB *acb) {
@@ -4020,6 +4259,9 @@ arcmsr_hbb_postqueue_isr(struct ACB *acb) {
 		arcmsr_drain_donequeue(acb, flag_ccb);
 	}	/* drain reply FIFO */
 }
+
+
+
 
 
 static uint_t
@@ -4050,16 +4292,10 @@ arcmsr_handle_hba_isr(struct ACB *acb) {
 	if (outbound_intstatus & ARCMSR_MU_OUTBOUND_POSTQUEUE_INT)
 		arcmsr_hba_postqueue_isr(acb);
 
-	/*
-	 * The following block is commented out pending confirmation from
-	 * Areca whether it is or is not truly required
-	 */
-	/* MU message interrupt */
-	/*
-	 * if (outbound_intstatus & ARCMSR_MU_OUTBOUND_MESSAGE0_INT) {
-	 *	arcmsr_hba_message_isr(acb);
-	 * }
-	 */
+	if (outbound_intstatus & ARCMSR_MU_OUTBOUND_MESSAGE0_INT) {
+		arcmsr_hba_message_isr(acb);
+	}
+
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -4101,16 +4337,12 @@ arcmsr_handle_hbb_isr(struct ACB *acb) {
 	if (outbound_doorbell & ARCMSR_IOP2DRV_CDB_DONE)
 		arcmsr_hbb_postqueue_isr(acb);
 
-	/*
-	 * The following block is commented out pending confirmation from
-	 * Areca whether it is or is not truly required
-	 */
 	/* MU message interrupt */
-	/*
-	 * if (outbound_doorbell & ARCMSR_IOP2DRV_MESSAGE_CMD_DONE) {
-	 *		arcmsr_hbb_message_isr(acb);
-	 *	}
-	 */
+
+	if (outbound_doorbell & ARCMSR_IOP2DRV_MESSAGE_CMD_DONE) {
+		arcmsr_hbb_message_isr(acb);
+	}
+
 	return (DDI_INTR_CLAIMED);
 }
 
@@ -4607,4 +4839,228 @@ arcmsr_initialize(struct ACB *acb) {
 	arcmsr_enable_allintr(acb, intmask_org);
 
 	return (0);
+}
+
+/*
+ * Autoconfiguration support
+ */
+static int
+arcmsr_parse_devname(char *devnm, int *tgt, int *lun)
+{
+	char devbuf[SCSI_MAXNAMELEN];
+	char *addr;
+	char *p,  *tp, *lp;
+	long num;
+
+	/* Parse dev name and address */
+	(void) strcpy(devbuf, devnm);
+	addr = "";
+	for (p = devbuf; *p != '\0'; p++) {
+		if (*p == '@') {
+			addr = p + 1;
+			*p = '\0';
+		} else if (*p == ':') {
+			*p = '\0';
+			break;
+		}
+	}
+
+	/* Parse target and lun */
+	for (p = tp = addr, lp = NULL; *p != '\0'; p++) {
+		if (*p == ',') {
+			lp = p + 1;
+			*p = '\0';
+			break;
+		}
+	}
+	if (tgt && tp) {
+		if (ddi_strtol(tp, NULL, 0x10, &num))
+			return (-1);
+		*tgt = (int)num;
+	}
+	if (lun && lp) {
+		if (ddi_strtol(lp, NULL, 0x10, &num))
+			return (-1);
+		*lun = (int)num;
+	}
+	return (0);
+}
+
+static int
+arcmsr_name_node(dev_info_t *dip, char *name, int len)
+{
+	int tgt, lun;
+
+	tgt = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "target", -1);
+	if (tgt == -1)
+		return (DDI_FAILURE);
+	lun = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "lun", -1);
+	if (lun == -1)
+		return (DDI_FAILURE);
+
+	(void) snprintf(name, len, "%x,%x", tgt, lun);
+	return (DDI_SUCCESS);
+}
+
+static dev_info_t *
+arcmsr_find_child(struct ACB *acb, uint16_t tgt, uint8_t lun)
+{
+	dev_info_t *child = NULL;
+	char addr[SCSI_MAXNAMELEN];
+	char tmp[MAXNAMELEN];
+
+	(void) sprintf(addr, "%x,%x", tgt, lun);
+	for (child = ddi_get_child(acb->dev_info);
+	    child; child = ddi_get_next_sibling(child)) {
+		/* We don't care about non-persistent node */
+		if (ndi_dev_is_persistent_node(child) == 0)
+			continue;
+
+		if (arcmsr_name_node(child, tmp, MAXNAMELEN) !=
+		    DDI_SUCCESS)
+			continue;
+		if (strcmp(addr, tmp) == 0)
+			break;
+	}
+	return (child);
+}
+
+static int
+arcmsr_config_child(struct ACB *acb, struct scsi_device *sd,
+    dev_info_t **dipp)
+{
+	char *nodename = NULL;
+	char **compatible = NULL;
+	int ncompatible = 0;
+	dev_info_t *ldip = NULL;
+	int tgt = sd->sd_address.a_target;
+	int lun = sd->sd_address.a_lun;
+	int dtype = sd->sd_inq->inq_dtype & DTYPE_MASK;
+	int rval;
+
+	scsi_hba_nodename_compatible_get(sd->sd_inq, NULL, dtype,
+	    NULL, &nodename, &compatible, &ncompatible);
+	if (nodename == NULL) {
+		cmn_err(CE_WARN,
+		    "found no comptible driver for T%dL%d", tgt, lun);
+		rval = NDI_FAILURE;
+		goto finish;
+	}
+
+	/* Create dev node */
+	rval = ndi_devi_alloc(acb->dev_info, nodename, DEVI_SID_NODEID,
+	    &ldip);
+	if (rval == NDI_SUCCESS) {
+		if (ndi_prop_update_int(DDI_DEV_T_NONE, ldip, "target", tgt)
+		    != DDI_PROP_SUCCESS) {
+			cmn_err(CE_WARN, "arcmsr%d: unable to create "
+			    "property for T%dL%d (target)",
+			    ddi_get_instance(acb->dev_info), tgt, lun);
+			rval = NDI_FAILURE;
+			goto finish;
+		}
+		if (ndi_prop_update_int(DDI_DEV_T_NONE, ldip, "lun", lun)
+		    != DDI_PROP_SUCCESS) {
+			cmn_err(CE_WARN, "arcmsr%d: unable to create "
+			    "property for T%dL%d (lun)",
+			    ddi_get_instance(acb->dev_info), tgt, lun);
+			rval = NDI_FAILURE;
+			goto finish;
+		}
+		if (ndi_prop_update_string_array(DDI_DEV_T_NONE, ldip,
+		    "compatible", compatible, ncompatible)
+		    != DDI_PROP_SUCCESS) {
+			cmn_err(CE_WARN, "arcmsr%d: unable to create"
+			    "property for T%dL%d (compatible)",
+			    ddi_get_instance(acb->dev_info), tgt, lun);
+			rval = NDI_FAILURE;
+			goto finish;
+		}
+
+		rval = ndi_devi_online(ldip, NDI_ONLINE_ATTACH);
+		if (rval != NDI_SUCCESS) {
+			cmn_err(CE_WARN, "arcmsr%d: unable to online T%dL%d",
+			    ddi_get_instance(acb->dev_info), tgt, lun);
+			ndi_prop_remove_all(ldip);
+			(void) ndi_devi_free(ldip);
+		} else
+			cmn_err(CE_NOTE, "arcmsr%d: T%dL%d onlined",
+			    ddi_get_instance(acb->dev_info), tgt, lun);
+	}
+finish:
+	if (dipp)
+		*dipp = ldip;
+
+	scsi_hba_nodename_compatible_free(nodename, compatible);
+	return (rval);
+}
+
+static int
+arcmsr_config_lun(struct ACB *acb, uint16_t tgt, uint8_t lun,
+    dev_info_t **ldip)
+{
+	struct scsi_device sd;
+	dev_info_t *child;
+	int rval;
+
+	if ((child = arcmsr_find_child(acb, tgt, lun)) != NULL) {
+		if (ldip)
+			*ldip = child;
+		return (NDI_SUCCESS);
+	}
+
+	bzero(&sd, sizeof (struct scsi_device));
+	sd.sd_address.a_hba_tran = acb->scsi_hba_transport;
+	sd.sd_address.a_target = (uint16_t)tgt;
+	sd.sd_address.a_lun = (uint8_t)lun;
+	rval = scsi_hba_probe(&sd, NULL);
+	if (rval == SCSIPROBE_EXISTS)
+		rval = arcmsr_config_child(acb, &sd, ldip);
+	scsi_unprobe(&sd);
+	return (rval);
+}
+
+static int
+arcmsr_tran_bus_config(dev_info_t *parent, uint_t flags, ddi_bus_config_op_t op,
+    void *arg, dev_info_t **childp)
+{
+	struct ACB *acb;
+	int circ = 0;
+	int rval;
+	int tgt, lun;
+	if ((acb = ddi_get_soft_state(arcmsr_soft_state,
+	    ddi_get_instance(parent))) == NULL)
+		return (NDI_FAILURE);
+
+	ndi_devi_enter(parent, &circ);
+	switch (op) {
+	case BUS_CONFIG_ONE:
+		if (arcmsr_parse_devname(arg, &tgt, &lun) != 0) {
+			rval = NDI_FAILURE;
+			break;
+		}
+		mutex_enter(&acb->acb_mutex);
+		if (acb->device_map[tgt] & 1 << lun) {
+			rval = arcmsr_config_lun(acb, tgt, lun, childp);
+		}
+		mutex_exit(&acb->acb_mutex);
+		break;
+
+	case BUS_CONFIG_DRIVER:
+	case BUS_CONFIG_ALL:
+		for (tgt = 0; tgt < ARCMSR_MAX_TARGETID; tgt++)
+			for (lun = 0; lun < ARCMSR_MAX_TARGETLUN; lun++)
+				if (acb->device_map[tgt] & 1 << lun)
+					(void) arcmsr_config_lun(acb, tgt,
+					    lun, NULL);
+
+		rval = NDI_SUCCESS;
+		break;
+	}
+	if (rval == NDI_SUCCESS)
+		rval = ndi_busop_bus_config(parent, flags, op, arg, childp, 0);
+	ndi_devi_exit(parent, circ);
+	return (rval);
 }
