@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1600,6 +1600,7 @@ ibmf_send_busy(ibmf_mod_load_args_t *modlargsp)
 	ibtstatus = ibt_modify_ah(cip->ci_ci_handle, ud_dest->ud_ah, &adds_vec);
 	if (ibtstatus != IBT_SUCCESS) {
 		(void) ibt_deregister_mr(cip->ci_ci_handle, mem_hdl);
+		kmem_free(send_wqep->send_mem, IBMF_MEM_PER_WQE);
 		kmem_free(send_wqep, sizeof (ibmf_send_wqe_t));
 		ibmf_i_put_ud_dest(cip, msgimplp->im_ibmf_ud_dest);
 		kmem_free(msgimplp, sizeof (ibmf_msg_impl_t));
@@ -1645,6 +1646,7 @@ ibmf_send_busy(ibmf_mod_load_args_t *modlargsp)
 	    num_work_reqs, NULL);
 	if (ibtstatus != IBT_SUCCESS) {
 		(void) ibt_deregister_mr(cip->ci_ci_handle, mem_hdl);
+		kmem_free(send_wqep->send_mem, IBMF_MEM_PER_WQE);
 		kmem_free(send_wqep, sizeof (ibmf_send_wqe_t));
 		ibmf_i_put_ud_dest(cip, msgimplp->im_ibmf_ud_dest);
 		kmem_free(msgimplp, sizeof (ibmf_msg_impl_t));
