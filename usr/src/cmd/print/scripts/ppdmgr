@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -325,8 +325,8 @@ update_golden_cache()
 	# Combine the contents of all cache files into a
 	# temporary golden cache file.
 	#
-	tmpgoldencache=$(/bin/mktemp -p "${ppdmgrtmpdir}" \
-	    tmpgoldencache.XXXXXX 2>/dev/null)
+	tmpgoldencache=$ppdmgrtmpdir/tmpgoldencache
+
 	/bin/sort "${VARCACHES}"/* >>"${tmpgoldencache}" 2>/dev/null
 
 	if [[ ! -s "${tmpgoldencache}" ]] ; then
@@ -440,8 +440,7 @@ generate_label_cache_file()
 	# Generate a cache file containing cache entries for
 	# all files in the label.
 	#
-	ucfile=$(/bin/mktemp -p "${ppdmgrtmpdir}" \
-	    unsortedcache.XXXXXX 2>/dev/null)
+	ucfile=$ppdmgrtmpdir/unsortedcache
 
 	#
 	# Before processing new files, remove any cache entries
@@ -632,8 +631,7 @@ update_label_cache()
 		# of the PPD files under it is newer than the
 		# existing cache file), then generate a new cache file.
 		#
-		tmpcachepath=$(/bin/mktemp -p "${ppdmgrtmpdir}" \
-		    tmpcachepath.XXXXXX 2>/dev/null)
+		tmpcachepath=$ppdmgrtmpdir/tmpcachepath
 
 		# if this is a system repository, check for a prepopulated cache
 		if [[ "${2}" = "${SYSTEM}" && -e ${FOOCACHEDIR}/${3}.cache ]] ; then
@@ -1477,9 +1475,12 @@ nickn=
 devidmdl=
 devidmfg=
 
-ppdmgrtmpdir=/tmp/ppdmgr.$$
-/bin/mkdir "${ppdmgrtmpdir}" >/dev/null 2>&1
-set_perms ${DIRMODE} ${DIROWNER} "${ppdmgrtmpdir}"
+ppdmgrtmpdir=$(/usr/bin/mktemp -t -d ppdmgr.XXXXXX)
+if [ -z "$ppdmgrtmpdir" ] ; then
+	print -n "$myprog: " 1>&2
+	gettext "Fatal error: could not create temporary directory\n" 1>&2
+	exit 1
+fi
 
 aliasfile=${USERREP}/manufaliases
 tmpfilepath=

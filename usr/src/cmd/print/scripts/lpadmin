@@ -20,11 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
-set -o noclobber
 
 PATH=/bin:/usr/bin:/usr/sbin export PATH
 
@@ -39,6 +38,7 @@ LPADMIN=/usr/lib/lp/local/lpadmin
 LPFILTER=/usr/sbin/lpfilter
 COMM=/usr/bin/comm
 PPDMGR=/usr/sbin/ppdmgr
+MKTEMP="/usr/bin/mktemp -t"
 
 HOST=$(/bin/uname -n)
 exit_code=0
@@ -110,7 +110,11 @@ add_new_ppd_file() {
 	# Add new ppd file and echo full path it was actually saved to
 	ppdmgrcmd="${PFEXEC} ${PPDMGR} -a ${1} -w"
 
-	ppderrfile=/tmp/lpadminerror.$$
+	ppderrfile=$(${MKTEMP} lpadminerror.XXXXXX)
+	if [[ -z "${ppderrfile}" ]] ; then
+		gettext "lpadmin: System error; cannot create temporary file\n" 1>&2
+		exit 2
+	fi
 	ppd_file=$(${ppdmgrcmd} 2>${ppderrfile})
 	ppdmgrrc=$?
 	if [[ -s "${ppderrfile}" ]] ; then
@@ -293,7 +297,12 @@ fi
 # Do the LP configuration for a local printer served by lpsched
 if [[ -x ${LPADMIN} && -n "${local}" ]] ; then
 	# enumerate LP configured printers before modification
-	PRE=/tmp/lpadmin-pre.$$
+	PRE=$(${MKTEMP} lpadmin-pre.XXXXXX)
+	if [[ -z "${PRE}" ]] ; then
+		gettext "lpadmin: System error; cannot create temporary file\n" 1>&2
+		exit 2
+	fi
+
 	(/bin/ls /etc/lp/printers 2>/dev/null ; /bin/ls /etc/lp/classes \
 		2>/dev/null) >${PRE}
 
@@ -331,7 +340,13 @@ if [[ -x ${LPADMIN} && -n "${local}" ]] ; then
 	exit_code=$?
 
 	# enumerate LP configured printers after modification
-	POST=/tmp/lpadmin-post.$$
+	POST=$(${MKTEMP} lpadmin-post.XXXXXX)
+	if [[ -z "${POST}" ]] ; then
+		gettext "lpadmin: System error; cannot create temporary file\n" 1>&2
+		/bin/rm -f ${PRE} >/dev/null 2>&1
+		exit 2
+	fi
+
 	(/bin/ls /etc/lp/printers 2>/dev/null ; /bin/ls /etc/lp/classes \
 		2>/dev/null) >${POST}
 
