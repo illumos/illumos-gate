@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
@@ -155,6 +155,43 @@ get_device_uri(papi_service_t svc, char *name)
 	}
 
 	return (result);
+}
+
+static void
+print_description(papi_attribute_t **list, char *printer_name)
+{
+	char *str = "";
+
+	(void) papiAttributeListGetString(list, NULL,
+	    "printer-info", &str);
+
+	/*
+	 * If no printer-info is read then
+	 * by default the printer-info is <printer-name>@<server>
+	 */
+	if (str[0] == '\0') {
+		char *uri = NULL;
+		uri_t *u = NULL;
+
+		(void) papiAttributeListGetString(list, NULL,
+		    "printer-uri-supported", &uri);
+
+		if ((uri != NULL) && (uri_from_string(uri, &u) == 0)) {
+			char *nodename = localhostname();
+
+			if ((u->host == NULL) ||
+			    (strcasecmp(u->host, "localhost") == 0) ||
+			    (strcasecmp(u->host, nodename) == 0))
+				printf(gettext("\tDescription:\n"));
+			else
+				printf(gettext("\tDescription: %s@%s\n"),
+				    printer_name, u->host);
+
+			uri_free(u);
+		} else
+			printf(gettext("\tDescription:\n"));
+	} else
+		printf(gettext("\tDescription: %s\n"), str);
 }
 
 static char *report_device_keys[] = { "printer-name", "printer-uri-supported",
@@ -391,10 +428,8 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 			printf(", %s", str);
 		printf("\n");
 
-		str = "";
-		(void) papiAttributeListGetString(attrs, NULL,
-					"printer-info", &str);
-		printf(gettext("\tDescription: %s\n"), str);
+		/* Display the printer description */
+		print_description(attrs, name);
 
 		str = "";
 		iter = NULL;
@@ -523,12 +558,10 @@ report_printer(papi_service_t svc, char *name, papi_printer_t printer,
 			printf("\n");
 		}
 
-	} else if (description == 1) {
-		char *str = "";
-		(void) papiAttributeListGetString(attrs, NULL,
-					"printer-description", &str);
-		printf(gettext("\tDescription: %s\n"), str);
-	} else if (verbose > 1)
+	} else if (description == 1)
+		/* Display printer description */
+		print_description(attrs, name);
+	else if (verbose > 1)
 		papiAttributeListPrint(stdout, attrs, "\t");
 
 	if (verbose > 0)
