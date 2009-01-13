@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: lpd-query.c 155 2006-04-26 02:34:54Z ktou $ */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,6 +70,36 @@ static char *job_expr = "^(.*[[:alnum:]]):[[:space:]]+([[:alnum:]]+)[[:space:]]+
 static regex_t job_re;
 
 /*
+ * Print job entries for remote windows printer start with:
+ *	Owner Status Jobname Job-Id Size Pages Priority
+ *    e.g:
+ *    Owner   Status        Jobname      Job-Id  Size  Pages Priority
+ *    ------------------------------------------------------------
+ *    root (10.3. Waiting   /etc/release  2	 240   1     4
+ *
+ *    Owner is the job-owner's user name
+ *    Status is the job-status (printing, waiting, error)
+ *    Jobname is the name of the job to be printed
+ *    Job-Id is the id of the job queued to be printed
+ *    Size is the size of the job in bytes
+ *    Pages is the number of pages of the job
+ *    Priority is the job-priority
+ */
+static char *wjob_expr = "^([[:alnum:]]+)[[:space:]]*[(](.*)[)]*[[:space:]]+([[:alnum:]]+)[[:space:]]+(.*)([[:alnum:]]+)(.*)[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+)[[:space:]]+([[:digit:]]+)";
+static regex_t wjob_re;
+
+/*
+ * Windows job header is in the following format
+ * Owner  Status    Jobname      Job-Id    Size   Pages  Priority
+ * --------------------------------------------------------------
+ */
+static char *whjob_expr = "Owner       Status         Jobname          Job-Id    Size   Pages  Priority";
+static regex_t whjob_re;
+
+static char *wline_expr = "----------";
+static regex_t wline_re;
+
+/*
  * status line(s) for "processing" printers will contain one of the following:
  *	ready and printing
  *	Printing
@@ -87,6 +115,13 @@ static regex_t proc_re;
  */
 static char *idle_expr = "(no entries|is ready| idle)";
 static regex_t idle_re;
+
+/*
+ * Printer state reason
+ *	Paused
+ */
+static char *state_reason_expr = "(Paused)";
+static regex_t state_reason_re;
 
 /*
  * document line(s)
@@ -106,36 +141,77 @@ static void
 parse_lpd_job(service_t *svc, job_t **job, int fd, char *line, int len)
 {
 	papi_attribute_t **attributes = NULL;
-	regmatch_t matches[5];
+	regmatch_t matches[10];
 	char *s;
 	int octets = 0;
+	int flag = 0;
 
-	/* job_re was compiled in the calling function */
-	if (regexec(&job_re, line, (size_t)5, matches, 0) == REG_NOMATCH)
-		return;
+	/*
+	 * job_re and wjob_re were compiled in the calling function
+	 * first check for solaris jobs
+	 * if there is no-match check for windows jobs
+	 */
 
-	if ((s = regvalue(matches[1], line)) == NULL)
-		s = "nobody";
-	papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
-				"job-originating-user-name", s);
+	if (regexec(&job_re, line, (size_t)5, matches, 0) == REG_NOMATCH) {
+		if (regexec(&wjob_re, line, (size_t)10, matches, 0)
+		    == REG_NOMATCH)
+			return;
+		else
+			flag = 1;
+	}
 
-	if ((s = regvalue(matches[2], line)) == NULL)
-		s = "0";
-	papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
-				"number-of-intervening-jobs", atoi(s) - 1);
+	if (flag == 1) {
+		/* Windows job */
+		/* first match is job-id */
+		if ((s = regvalue(matches[1], line)) == NULL)
+			s = "nobody";
+		papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
+		    "job-originating-user-name", s);
 
-	if ((s = regvalue(matches[3], line)) == NULL)
-		s = "0";
-	papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
-				"job-id", atoi(s));
+		if ((s = regvalue(matches[4], line)) == NULL)
+			s = "unknown";
+		papiAttributeListAddString(&attributes, PAPI_ATTR_APPEND,
+		    "job-name", s);
+		papiAttributeListAddString(&attributes, PAPI_ATTR_APPEND,
+		    "job-file-names", s);
 
-	if ((s = regvalue(matches[4], line)) == NULL)
-		s = svc->uri->host;
-	papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
-				"job-originating-host-name", s);
+		if ((s = regvalue(matches[7], line)) == NULL)
+			s = "0";
+		papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
+		    "job-id", atoi(s));
+
+		if ((s = regvalue(matches[8], line)) == NULL)
+			s = "0";
+		octets = atoi(s);
+		papiAttributeListAddInteger(&attributes,
+		    PAPI_ATTR_APPEND, "job-file-sizes", atoi(s));
+
+	} else {
+		/* Solaris job */
+		if ((s = regvalue(matches[1], line)) == NULL)
+			s = "nobody";
+		papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
+		    "job-originating-user-name", s);
+
+		if ((s = regvalue(matches[2], line)) == NULL)
+			s = "0";
+		papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
+		    "number-of-intervening-jobs", atoi(s) - 1);
+
+		if ((s = regvalue(matches[3], line)) == NULL)
+			s = "0";
+		papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
+		    "job-id", atoi(s));
+
+		if ((s = regvalue(matches[4], line)) == NULL)
+			s = svc->uri->host;
+		papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
+		    "job-originating-host-name", s);
+	}
 
 	while ((fdgets(line, len, fd) != NULL) &&
-	       (regexec(&job_re, line, (size_t)0, NULL, 0) == REG_NOMATCH)) {
+	    (regexec(&job_re, line, (size_t)0, NULL, 0) == REG_NOMATCH) &&
+	    (regexec(&wjob_re, line, (size_t)0, NULL, 0) == REG_NOMATCH)) {
 		int size = 0, copies = 1;
 		/* process copies/documents */
 
@@ -152,25 +228,26 @@ parse_lpd_job(service_t *svc, job_t **job, int fd, char *line, int len)
 		if ((s = regvalue(matches[2], line)) == NULL)
 			s = "unknown";
 		papiAttributeListAddString(&attributes,
-				PAPI_ATTR_APPEND, "job-name", s);
+		    PAPI_ATTR_APPEND, "job-name", s);
 		papiAttributeListAddString(&attributes,
-				PAPI_ATTR_APPEND, "job-file-names", s);
+		    PAPI_ATTR_APPEND, "job-file-names", s);
 
 		if ((s = regvalue(matches[3], line)) == NULL)
 			s = "0";
 		size = atoi(s);
+
 		papiAttributeListAddInteger(&attributes,
-				PAPI_ATTR_APPEND, "job-file-sizes", size);
+		    PAPI_ATTR_APPEND, "job-file-sizes", size);
 
 		octets += (size * copies);
 	}
 
 	papiAttributeListAddInteger(&attributes, PAPI_ATTR_APPEND,
-			"job-k-octets", octets/1024);
+	    "job-k-octets", octets/1024);
 	papiAttributeListAddInteger(&attributes, PAPI_ATTR_APPEND,
-			"job-octets", octets);
+	    "job-octets", octets);
 	papiAttributeListAddString(&attributes, PAPI_ATTR_APPEND,
-			"printer-name", queue_name_from_uri(svc->uri));
+	    "printer-name", queue_name_from_uri(svc->uri));
 
 	if ((*job = (job_t *)calloc(1, sizeof (**job))) != NULL)
 		(*job)->attributes = attributes;
@@ -187,11 +264,11 @@ parse_lpd_query(service_t *svc, int fd)
 	char *s;
 
 	papiAttributeListAddString(&attributes, PAPI_ATTR_APPEND,
-			"printer-name", queue_name_from_uri(svc->uri));
+	    "printer-name", queue_name_from_uri(svc->uri));
 
 	if (uri_to_string(svc->uri, status, sizeof (status)) == 0)
 		papiAttributeListAddString(&attributes, PAPI_ATTR_APPEND,
-				"printer-uri-supported", status);
+		    "printer-uri-supported", status);
 
 	/*
 	 * on most systems, status is a single line, but some appear to
@@ -204,22 +281,48 @@ parse_lpd_query(service_t *svc, int fd)
 	 */
 	(void) regcomp(&job_re, job_expr, REG_EXTENDED|REG_ICASE);
 
+	/*
+	 * For remote windows printers
+	 * Print job entries start with:
+	 *  Owner  Status  Jobname  Job-Id  Size  Pages  Priority
+	 */
+	(void) regcomp(&wjob_re, wjob_expr, REG_EXTENDED|REG_ICASE);
+	(void) regcomp(&whjob_re, whjob_expr, REG_EXTENDED|REG_ICASE);
+	(void) regcomp(&wline_re, wline_expr, REG_EXTENDED|REG_ICASE);
+
 	status[0] = '\0';
+
 	while ((fdgets(line, sizeof (line), fd) != NULL) &&
-	       (regexec(&job_re, line, (size_t)0, NULL, 0) == REG_NOMATCH)) {
-		strlcat(status, line, sizeof (status));
+	    (regexec(&job_re, line, (size_t)0, NULL, 0) == REG_NOMATCH) &&
+	    (regexec(&wjob_re, line, (size_t)0, NULL, 0) == REG_NOMATCH)) {
+		/*
+		 * When windows job queue gets queried following header
+		 * should not get printed
+		 * Owner Status Jobname Job-Id Size Pages Priority
+		 * -----------------------------------------------
+		 */
+		if ((regexec(&whjob_re, line, (size_t)0, NULL, 0)
+		    == REG_NOMATCH) && (regexec(&wline_re, line, (size_t)0, NULL, 0)
+		    == REG_NOMATCH))
+			strlcat(status, line, sizeof (status));
 	}
+
 	/* chop off trailing whitespace */
 	s = status + strlen(status) - 1;
 	while ((s > status) && (isspace(*s) != 0))
 		*s-- = '\0';
 
 	papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
-			"printer-state-reasons", status);
+	    "printer-state-reasons", status);
 
 	(void) regcomp(&proc_re, proc_expr, REG_EXTENDED|REG_ICASE);
 	(void) regcomp(&idle_re, idle_expr, REG_EXTENDED|REG_ICASE);
-	if (regexec(&proc_re, status, (size_t)0, NULL, 0) == 0)
+	(void) regcomp(&state_reason_re, state_reason_expr,
+	    REG_EXTENDED|REG_ICASE);
+
+	if ((regexec(&proc_re, status, (size_t)0, NULL, 0) == 0) ||
+	    (regexec(&state_reason_re, status, (size_t)0, NULL, 0) ==
+	    REG_NOMATCH))
 		state = 0x04; /* processing */
 	else if (regexec(&idle_re, status, (size_t)0, NULL, 0) == 0)
 		state = 0x03; /* idle */
@@ -227,13 +330,13 @@ parse_lpd_query(service_t *svc, int fd)
 		state = 0x05; /* stopped */
 
 	papiAttributeListAddInteger(&attributes, PAPI_ATTR_REPLACE,
-			"printer-state", state);
+	    "printer-state", state);
 
 	if ((cache = (cache_t *)calloc(1, sizeof (*cache))) == NULL)
 		return;
 
 	if ((cache->printer = (printer_t *)calloc(1, sizeof (*cache->printer)))
-				== NULL)
+	    == NULL)
 		return;
 
 	cache->printer->attributes = attributes;
@@ -323,7 +426,7 @@ lpd_find_job_info(service_t *svc, int job_id, job_t **job)
 			int id = -1;
 
 			papiAttributeListGetInteger(jobs[i]->attributes, NULL,
-					"job-id", &id);
+			    "job-id", &id);
 			if (id == job_id)
 				*job = jobs[i];
 		}
