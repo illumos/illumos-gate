@@ -18,21 +18,18 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-SUBDIRS = \
-	cpu \
-	dev \
-	fmd \
-	hc  \
-	legacy-hc \
-	mem \
-	mod \
-	pkg \
-	svc \
-	zfs
+include ../Makefile.com
+include $(SRC)/Makefile.master.64
+include ../../Makefile.targ
 
-include ../Makefile.subdirs
+LDLIBS += -ltopo
+LDFLAGS += -L$(ROOT)/usr/lib/fm/$(MACH64) -R/usr/lib/fm/$(MACH64)
+LINTFLAGS += -L$(ROOT)/usr/lib/fm/$(MACH64)
+
+install: all $(ROOTPROG64)

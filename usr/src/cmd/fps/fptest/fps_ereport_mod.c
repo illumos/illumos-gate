@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <kstat.h>
 #include <libnvpair.h>
@@ -140,7 +138,7 @@ fps_fmri_svc_set(nvlist_t *fmri_svc, const char *svc_fmri)
 	if (svc_fmri == NULL)
 		return (1);
 
-	if (nvlist_add_uint8(fmri_svc, FM_FMRI_SVC_VERSION, 1) != 0)
+	if (nvlist_add_uint8(fmri_svc, FM_VERSION, FM_SVC_SCHEME_VERSION) != 0)
 		return (1);
 
 	if (nvlist_add_string(fmri_svc, FM_FMRI_SCHEME,

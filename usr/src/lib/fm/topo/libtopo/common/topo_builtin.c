@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pthread.h>
 
@@ -36,15 +34,21 @@
 #include <cpu.h>
 #include <hc.h>
 #include <dev.h>
+#include <fmd.h>
 #include <mem.h>
 #include <mod.h>
 #include <pkg.h>
+#include <svc.h>
+#include <zfs.h>
 
 static const struct topo_builtin _topo_builtins[] = {
 	{ "cpu", CPU_VERSION, cpu_init, cpu_fini },
 	{ "dev", DEV_VERSION, dev_init, dev_fini },
+	{ "fmd", FMD_VERSION, fmd_init, fmd_fini },
 	{ "mem", MEM_VERSION, mem_init, mem_fini },
 	{ "pkg", PKG_VERSION, pkg_init, pkg_fini },
+	{ "svc", SVC_VERSION, svc_init, svc_fini },
+	{ "zfs", ZFS_VERSION, zfs_init, zfs_fini },
 	{ "mod", MOD_VERSION, mod_init, mod_fini },
 	{ "hc", HC_VERSION, hc_init, hc_fini },		/* hc must go last */
 	{ NULL, 0, NULL, NULL }

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -29,13 +29,14 @@ VERS = .1
 BUILTINSRCS = \
 	cpu.c \
 	dev.c \
-	hc.c \
-	zfs.c \
 	fmd.c \
+	hc.c \
 	legacy_hc.c \
 	mem.c \
 	mod.c \
-	pkg.c
+	pkg.c \
+	svc.c \
+	zfs.c
 
 LIBSRCS = \
 	topo_2xml.c \
@@ -83,7 +84,7 @@ LINTFLAGS64 = -msux -m64
 
 $(DYNLIB)  := LDLIBS += \
 	-lnvpair -lelf -lumem -lxml2 -lkstat -luuid -ldevinfo \
-	-lsmbios -lc -ldevid -lipmi
+	-lsmbios -lc -ldevid -lipmi -lscf
 
 $(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
 $(LINTLIB) := LINTFLAGS = -nsvx

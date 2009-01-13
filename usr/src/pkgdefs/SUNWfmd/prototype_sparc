@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -47,6 +47,7 @@ f none usr/lib/fm/fmd/schemes/sparcv9/legacy-hc.so 555 root bin
 f none usr/lib/fm/fmd/schemes/sparcv9/mem.so 555 root bin
 f none usr/lib/fm/fmd/schemes/sparcv9/mod.so 555 root bin
 f none usr/lib/fm/fmd/schemes/sparcv9/pkg.so 555 root bin
+f none usr/lib/fm/fmd/schemes/sparcv9/svc.so 555 root bin
 f none usr/lib/fm/fmd/schemes/sparcv9/zfs.so 555 root bin
 d none usr/lib/fm/sparcv9 755 root bin
 f none usr/lib/fm/sparcv9/libfmd_agent.so.1 755 root bin

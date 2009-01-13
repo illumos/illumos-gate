@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,6 +205,8 @@ extern "C" {
 #define	FM_PKG_SCHEME_VERSION		PKG_SCHEME_VERSION0
 #define	LEGACY_SCHEME_VERSION0		0
 #define	FM_LEGACY_SCHEME_VERSION	LEGACY_SCHEME_VERSION0
+#define	SVC_SCHEME_VERSION0		0
+#define	FM_SVC_SCHEME_VERSION		SVC_SCHEME_VERSION0
 #define	ZFS_SCHEME_VERSION0		0
 #define	FM_ZFS_SCHEME_VERSION		ZFS_SCHEME_VERSION0
 
@@ -246,14 +248,13 @@ extern "C" {
 #define	FM_FMRI_PKG_VERSION		"pkg-version"
 
 /* svc scheme member names */
-#define	FM_FMRI_SVC_NAME		"service-name"
-#define	FM_FMRI_SVC_VERSION		"service-version"
-#define	FM_FMRI_SVC_INSTANCE		"instance"
-#define	FM_FMRI_SVC_CONTRACT_ID		"contract-id"
+#define	FM_FMRI_SVC_NAME		"svc-name"
+#define	FM_FMRI_SVC_INSTANCE		"svc-instance"
+#define	FM_FMRI_SVC_CONTRACT_ID		"svc-contract-id"
 
 /* svc-authority member names */
 #define	FM_FMRI_SVC_AUTH_SCOPE		"scope"
-#define	FM_FMRI_SVC_AUTH_SYSTEM_FQN	"system-FQN"
+#define	FM_FMRI_SVC_AUTH_SYSTEM_FQN	"system-fqn"
 
 /* cpu scheme member names */
 #define	FM_FMRI_CPU_ID			"cpuid"

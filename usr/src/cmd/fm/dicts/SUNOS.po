@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -215,6 +215,22 @@ msgid "SUNOS-8000-CF.impact"
 msgstr "Future reboots could fail until this problem is corrected.\n"
 msgid "SUNOS-8000-CF.action"
 msgstr "Examine /boot/grub/menu.lst and revise as\ndescribed in Details.\n"
+#
+# code: SUNOS-8000-DM
+# keys: defect.sunos.smf.svc.maintenance
+#
+msgid "SUNOS-8000-DM.type"
+msgstr "Defect"
+msgid "SUNOS-8000-DM.severity"
+msgstr "Major"
+msgid "SUNOS-8000-DM.description"
+msgstr "A service failed and could not be restarted.  Refer to %s for more information."
+msgid "SUNOS-8000-DM.response"
+msgstr "The service has been placed into the maintenance state."
+msgid "SUNOS-8000-DM.impact"
+msgstr "The service is unavailable."
+msgid "SUNOS-8000-DM.action"
+msgstr "Run svcs -x to determine why the service failed and the location of logfiles, if any."
 #
 # code: SUNOS-8000-E8
 # keys: defect.sunos.eft.undiag.checkpoint

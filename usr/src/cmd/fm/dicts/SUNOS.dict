@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -38,6 +38,7 @@ defect.Deprecated defect.io.pci.driver=8
 defect.sunos.zones.upgrade=9
 ereport.sunos.boot.upgrade.menu_lst=10
 ereport.sunos.boot.upgrade.menu_lst_bfu=11
+defect.sunos.smf.svc.maintenance=12
 defect.sunos.eft.undiag.checkpoint=13
 defect.sunos.eft.undiag.fme=14
 defect.sunos.eft.undiag.limit=15

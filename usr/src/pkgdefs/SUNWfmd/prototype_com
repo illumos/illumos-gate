@@ -105,6 +105,7 @@ f none usr/lib/fm/fmd/schemes/legacy-hc.so 555 root bin
 f none usr/lib/fm/fmd/schemes/mem.so 555 root bin
 f none usr/lib/fm/fmd/schemes/mod.so 555 root bin
 f none usr/lib/fm/fmd/schemes/pkg.so 555 root bin
+f none usr/lib/fm/fmd/schemes/svc.so 555 root bin
 f none usr/lib/fm/fmd/schemes/zfs.so 555 root bin
 f none usr/lib/fm/libfmd_agent.so.1 755 root bin
 s none usr/lib/fm/libfmd_agent.so=libfmd_agent.so.1
