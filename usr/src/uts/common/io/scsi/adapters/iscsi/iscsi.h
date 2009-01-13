@@ -472,8 +472,10 @@ typedef struct iscsi_lun {
 	uchar_t			lun_pid[ISCSI_INQ_PID_BUF_LEN];	/* Product ID */
 } iscsi_lun_t;
 
-#define	ISCSI_LUN_STATE_OFFLINE	0
-#define	ISCSI_LUN_STATE_ONLINE	1
+#define	ISCSI_LUN_STATE_CLEAR	0		/* used to clear all states */
+#define	ISCSI_LUN_STATE_OFFLINE	1
+#define	ISCSI_LUN_STATE_ONLINE	2
+#define	ISCSI_LUN_STATE_INVALID	4		/* offline failed */
 
 #define	ISCSI_LUN_CAP_RESET   0x01
 

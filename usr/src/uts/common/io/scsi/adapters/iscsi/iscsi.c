@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Software Initiator
@@ -3121,8 +3121,10 @@ iscsi_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			rw_enter(&isp->sess_lun_list_rwlock, RW_READER);
 			for (ilp = isp->sess_lun_list; ilp;
 			    ilp = ilp->lun_next) {
-				if (ilp->lun_state ==
-				    ISCSI_LUN_STATE_ONLINE) {
+				if ((ilp->lun_state &
+				    ISCSI_LUN_STATE_ONLINE) &&
+				    !(ilp->lun_state &
+				    ISCSI_LUN_STATE_INVALID)) {
 					if (llp->ll_out_cnt <
 					    llp->ll_in_cnt) {
 						iscsi_if_lun_t *lp;

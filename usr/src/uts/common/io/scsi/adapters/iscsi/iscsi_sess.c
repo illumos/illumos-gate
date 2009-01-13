@@ -1779,11 +1779,13 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 				/*
 				 * the lun we are looking for is found
 				 *
-				 * if the state of the lun is currently OFFLINE,
-				 * turn it back online
+				 * if the state of the lun is currently OFFLINE
+				 * or with INVALID, try to turn it back online
 				 */
-				if (ilp->lun_state ==
-				    ISCSI_LUN_STATE_OFFLINE) {
+				if ((ilp->lun_state &
+				    ISCSI_LUN_STATE_OFFLINE) ||
+				    (ilp->lun_state &
+				    ISCSI_LUN_STATE_INVALID)) {
 					DTRACE_PROBE2(
 					    sess_reportluns_lun_is_not_online,
 					    int, ilp->lun_num, int,
@@ -1812,8 +1814,10 @@ iscsi_sess_reportluns(iscsi_sess_t *isp)
 			 * make sure the lun is in the ONLINE state
 			 */
 				saved_replun_ptr[lun_count].lun_found = B_TRUE;
-					if (ilp->lun_state ==
-					    ISCSI_LUN_STATE_OFFLINE) {
+					if ((ilp->lun_state &
+					    ISCSI_LUN_STATE_OFFLINE) ||
+					    (ilp->lun_state &
+					    ISCSI_LUN_STATE_INVALID)) {
 #define	SRLINON sess_reportluns_lun_is_not_online
 						DTRACE_PROBE2(
 						    SRLINON,

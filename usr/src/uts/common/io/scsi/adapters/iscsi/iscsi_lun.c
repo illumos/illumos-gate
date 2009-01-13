@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI logical unit interfaces
@@ -90,7 +90,8 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 	/* allocate space for lun struct */
 	ilp = kmem_zalloc(sizeof (iscsi_lun_t), KM_SLEEP);
 	ilp->lun_sig = ISCSI_SIG_LUN;
-	ilp->lun_state = ISCSI_LUN_STATE_OFFLINE;
+	ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
+	ilp->lun_state |= ISCSI_LUN_STATE_OFFLINE;
 
 	/* initialize common LU information */
 	ilp->lun_num	    = lun_num;
@@ -170,7 +171,8 @@ iscsi_lun_create(iscsi_sess_t *isp, uint16_t lun_num, uint8_t lun_addr_type,
 		}
 		kmem_free(ilp, sizeof (iscsi_lun_t));
 	} else {
-		ilp->lun_state = ISCSI_LUN_STATE_ONLINE;
+		ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
+		ilp->lun_state |= ISCSI_LUN_STATE_ONLINE;
 		ilp->lun_time_online = ddi_get_time();
 
 		/* Check whether this is the required LUN for iscsi boot */
@@ -522,7 +524,8 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 		rval =  mdi_pi_online(ilp->lun_pip, 0);
 		ndi_devi_exit(scsi_vhci_dip, circ);
 		if (rval == MDI_SUCCESS) {
-			ilp->lun_state = ISCSI_LUN_STATE_ONLINE;
+			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
+			ilp->lun_state |= ISCSI_LUN_STATE_ONLINE;
 			ilp->lun_time_online = ddi_get_time();
 		}
 
@@ -531,7 +534,8 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
 		rval =  ndi_devi_online(ilp->lun_dip, 0);
 		ndi_devi_exit(ihp->hba_dip, circ);
 		if (rval == NDI_SUCCESS) {
-			ilp->lun_state = ISCSI_LUN_STATE_ONLINE;
+			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
+			ilp->lun_state |= ISCSI_LUN_STATE_ONLINE;
 			ilp->lun_time_online = ddi_get_time();
 		}
 	}
@@ -570,6 +574,11 @@ iscsi_lun_online(iscsi_hba_t *ihp, iscsi_lun_t *ilp)
  * logical unit is in use.  The user should unmount or
  * close the device and perform the nameservice operation
  * again if this occurs.
+ *
+ * If we fail to offline a LUN that we don't want to destroy,
+ * we will mark it with invalid state. If this LUN still
+ * exists on the target, we can have another chance to online
+ * it again when we do the LUN enumeration.
  */
 iscsi_status_t
 iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
@@ -597,7 +606,7 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 
 	if ((cdip != NULL) &&
 	    (lun_free == B_TRUE) &&
-	    (ilp->lun_state == ISCSI_LUN_STATE_ONLINE)) {
+	    (ilp->lun_state & ISCSI_LUN_STATE_ONLINE)) {
 		/*
 		 * Make sure node is attached otherwise
 		 * it won't have related cache nodes to
@@ -635,7 +644,7 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 		/* virt/mdi */
 		ndi_devi_enter(scsi_vhci_dip, &circ);
 		if ((lun_free == B_TRUE) &&
-		    (ilp->lun_state == ISCSI_LUN_STATE_ONLINE)) {
+		    (ilp->lun_state & ISCSI_LUN_STATE_ONLINE)) {
 			rval = mdi_pi_offline(ilp->lun_pip,
 			    NDI_DEVI_REMOVE);
 		} else {
@@ -643,13 +652,17 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 		}
 
 		if (rval == MDI_SUCCESS) {
-			ilp->lun_state = ISCSI_LUN_STATE_OFFLINE;
+			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
+			ilp->lun_state |= ISCSI_LUN_STATE_OFFLINE;
 			if (lun_free == B_TRUE) {
 				(void) mdi_prop_remove(ilp->lun_pip, NULL);
 				(void) mdi_pi_free(ilp->lun_pip, 0);
 			}
 		} else {
 			status = ISCSI_STATUS_INTERNAL_ERROR;
+			if (lun_free == B_FALSE) {
+				ilp->lun_state |= ISCSI_LUN_STATE_INVALID;
+			}
 		}
 		ndi_devi_exit(scsi_vhci_dip, circ);
 
@@ -658,7 +671,7 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 		/* phys/ndi */
 		ndi_devi_enter(ihp->hba_dip, &circ);
 		if ((lun_free == B_TRUE) &&
-		    (ilp->lun_state == ISCSI_LUN_STATE_ONLINE)) {
+		    (ilp->lun_state & ISCSI_LUN_STATE_ONLINE)) {
 			rval = ndi_devi_offline(
 			    ilp->lun_dip, NDI_DEVI_REMOVE);
 		} else {
@@ -667,8 +680,12 @@ iscsi_lun_offline(iscsi_hba_t *ihp, iscsi_lun_t *ilp, boolean_t lun_free)
 		}
 		if (rval != NDI_SUCCESS) {
 			status = ISCSI_STATUS_INTERNAL_ERROR;
+			if (lun_free == B_FALSE) {
+				ilp->lun_state |= ISCSI_LUN_STATE_INVALID;
+			}
 		} else {
-			ilp->lun_state = ISCSI_LUN_STATE_OFFLINE;
+			ilp->lun_state &= ISCSI_LUN_STATE_CLEAR;
+			ilp->lun_state |= ISCSI_LUN_STATE_OFFLINE;
 		}
 		ndi_devi_exit(ihp->hba_dip, circ);
 
