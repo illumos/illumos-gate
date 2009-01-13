@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8086,7 +8086,7 @@ vdc_store_label_efi(vdc_t *vdc, efi_gpt_t *gpt, efi_gpe_t *gpe)
 
 	for (i = 0; i < nparts && i < VD_EFI_WD_SLICE; i++) {
 
-		if (gpe[i].efi_gpe_StartingLBA == 0 ||
+		if (gpe[i].efi_gpe_StartingLBA == 0 &&
 		    gpe[i].efi_gpe_EndingLBA == 0) {
 			continue;
 		}

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,7 +189,7 @@ vd_efi_check_gpt(vd_efi_dev_t *dev, efi_gpt_t *gpt)
 	if (crc_stored != crc_computed) {
 		VD_EFI_DEBUG("Bad EFI CRC: 0x%x != 0x%x\n",
 		    crc_stored, crc_computed);
-		return (EINVAL);
+			return (EINVAL);
 	}
 
 	return (0);
@@ -210,7 +210,8 @@ vd_efi_alloc_and_read(vd_efi_dev_t *dev, efi_gpt_t **efi_gpt,
 	dk_efi_t		dk_efi;
 	efi_gpt_t		*gpt = NULL;
 	efi_gpe_t		*gpe = NULL;
-	size_t			gpt_len, gpe_len;
+	efi_gpt_t		*data = NULL;
+	size_t			gpt_len, gpe_len, data_len;
 	int 			nparts, status;
 
 	ASSERT(dev->block_size >= sizeof (efi_gpt_t));
@@ -224,7 +225,33 @@ vd_efi_alloc_and_read(vd_efi_dev_t *dev, efi_gpt_t **efi_gpt,
 	dk_efi.dki_data = gpt;
 	dk_efi.dki_length = gpt_len;
 
-	if ((status = vd_efi_ioctl(dev, DKIOCGETEFI, &dk_efi)) != 0) {
+	status = vd_efi_ioctl(dev, DKIOCGETEFI, &dk_efi);
+
+	if (status == EINVAL) {
+		/*
+		 * Because the DKIOCGETEFI ioctl was initially incorrectly
+		 * implemented for a ZFS volume, the ioctl can fail with
+		 * EINVAL if it is done on a ZFS volume managed by an old
+		 * version of Solaris. This can happen if a ZFS volume is
+		 * exported as a single-slice disk by a service domain
+		 * running Solaris older than Solaris 10 Update 6.
+		 *
+		 * So we retry the ioctl to read both the GPT and the GPE at
+		 * the same time accordingly to the old implementation.
+		 */
+		data_len = sizeof (efi_gpt_t) + sizeof (efi_gpe_t);
+		data = kmem_zalloc(data_len, KM_SLEEP);
+
+		dk_efi.dki_lba = 1;
+		dk_efi.dki_data = data;
+		dk_efi.dki_length = data_len;
+		status = vd_efi_ioctl(dev, DKIOCGETEFI, &dk_efi);
+
+		if (status == 0)
+			bcopy(data, gpt, sizeof (efi_gpt_t));
+	}
+
+	if (status != 0) {
 		VD_EFI_DEBUG("DKIOCGETEFI (GPT, LBA=1) error %d\n", status);
 		goto errdone;
 	}
@@ -273,14 +300,32 @@ vd_efi_alloc_and_read(vd_efi_dev_t *dev, efi_gpt_t **efi_gpt,
 	gpe_len = VD_EFI_GPE_LEN(dev, nparts);
 	gpe = kmem_zalloc(gpe_len, KM_SLEEP);
 
-	dk_efi.dki_lba = gpt->efi_gpt_PartitionEntryLBA;
-	dk_efi.dki_data = (efi_gpt_t *)gpe;
-	dk_efi.dki_length = gpe_len;
+	if (data != NULL) {
+		/*
+		 * The data variable is not NULL if we have used the old ioctl
+		 * implementation for a ZFS volume. In that case, we only expect
+		 * one partition and GPE data are already available in the data
+		 * buffer, right after GPT data.
+		 */
+		if (nparts != 1) {
+			VD_EFI_DEBUG("Unexpected number of partitions (%u)",
+			    nparts);
+			status = EINVAL;
+			goto errdone;
+		}
 
-	if ((status = vd_efi_ioctl(dev, DKIOCGETEFI, &dk_efi)) != 0) {
-		VD_EFI_DEBUG("DKIOCGETEFI (GPE, LBA=%lu) error %d\n",
-		    gpt->efi_gpt_PartitionEntryLBA, status);
-		goto errdone;
+		bcopy(data + 1, gpe, sizeof (efi_gpe_t));
+
+	} else {
+		dk_efi.dki_lba = gpt->efi_gpt_PartitionEntryLBA;
+		dk_efi.dki_data = (efi_gpt_t *)gpe;
+		dk_efi.dki_length = gpe_len;
+
+		if ((status = vd_efi_ioctl(dev, DKIOCGETEFI, &dk_efi)) != 0) {
+			VD_EFI_DEBUG("DKIOCGETEFI (GPE, LBA=%lu) error %d\n",
+			    gpt->efi_gpt_PartitionEntryLBA, status);
+			goto errdone;
+		}
 	}
 
 	vd_efi_swap_gpe(gpe, nparts);
@@ -288,14 +333,17 @@ vd_efi_alloc_and_read(vd_efi_dev_t *dev, efi_gpt_t **efi_gpt,
 	*efi_gpt = gpt;
 	*efi_gpe = gpe;
 
-	return (0);
-
 errdone:
 
-	if (gpe != NULL)
-		kmem_free(gpe, gpe_len);
-	if (gpt != NULL)
-		kmem_free(gpt, gpt_len);
+	if (data != NULL)
+		kmem_free(data, data_len);
+
+	if (status != 0) {
+		if (gpe != NULL)
+			kmem_free(gpe, gpe_len);
+		if (gpt != NULL)
+			kmem_free(gpt, gpt_len);
+	}
 
 	return (status);
 }

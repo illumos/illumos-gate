@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -304,6 +304,7 @@ efi_read(int fd, struct dk_gpt *vtoc)
 	int			label_len;
 	int			rval = 0;
 	int			md_flag = 0;
+	int			vdc_flag = 0;
 	struct dk_minfo		disk_info;
 	dk_efi_t		dk_ioc;
 	efi_gpt_t		*efi;
@@ -331,7 +332,15 @@ efi_read(int fd, struct dk_gpt *vtoc)
 	if ((strncmp(dki_info.dki_cname, "pseudo", 7) == 0) &&
 	    (strncmp(dki_info.dki_dname, "md", 3) == 0)) {
 		md_flag++;
+	} else if ((strncmp(dki_info.dki_cname, "vdc", 4) == 0) &&
+	    (strncmp(dki_info.dki_dname, "vdc", 4) == 0)) {
+		/*
+		 * The controller and drive name "vdc" (virtual disk client)
+		 * indicates a LDoms virtual disk.
+		 */
+		vdc_flag++;
 	}
+
 	/* get the LBA size */
 	if (ioctl(fd, DKIOCGMEDIAINFO, (caddr_t)&disk_info) == -1) {
 		if (efi_debug) {
@@ -455,12 +464,30 @@ efi_read(int fd, struct dk_gpt *vtoc)
 				rval = efi_ioctl(fd, DKIOCGETEFI, &dk_ioc);
 			}
 		}
-	} else {
+
+	} else if (rval == 0) {
+
 		dk_ioc.dki_lba = LE_64(efi->efi_gpt_PartitionEntryLBA);
 		dk_ioc.dki_data++;
 		dk_ioc.dki_length = label_len - disk_info.dki_lbsize;
 		rval = efi_ioctl(fd, DKIOCGETEFI, &dk_ioc);
+
+	} else if (vdc_flag && rval == VT_ERROR && errno == EINVAL) {
+		/*
+		 * When the device is a LDoms virtual disk, the DKIOCGETEFI
+		 * ioctl can fail with EINVAL if the virtual disk backend
+		 * is a ZFS volume serviced by a domain running an old version
+		 * of Solaris. This is because the DKIOCGETEFI ioctl was
+		 * initially incorrectly implemented for a ZFS volume and it
+		 * expected the GPT and GPE to be retrieved with a single ioctl.
+		 * So we try to read the GPT and the GPE using that old style
+		 * ioctl.
+		 */
+		dk_ioc.dki_lba = 1;
+		dk_ioc.dki_length = label_len;
+		rval = check_label(fd, &dk_ioc);
 	}
+
 	if (rval < 0) {
 		free(efi);
 		return (rval);
