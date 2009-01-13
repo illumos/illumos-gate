@@ -19,18 +19,22 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PCI_INTR_LIB_H
 #define	_SYS_PCI_INTR_LIB_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+typedef struct pci_class_val {
+	uint32_t class_code;
+	uint32_t class_mask;
+	uint32_t class_val;
+} pci_class_val_t;
 
 extern	int	pci_msi_get_cap(dev_info_t *rdip, int type, int *flagsp);
 extern	int	pci_msi_configure(dev_info_t *rdip, int type, int count,
@@ -55,9 +59,10 @@ extern	int	pci_intx_get_cap(dev_info_t *dip, int *flagsp);
 extern int	pci_intx_set_mask(dev_info_t *dip);
 extern int	pci_intx_clr_mask(dev_info_t *dip);
 extern int	pci_intx_get_pending(dev_info_t *dip, int *pendingp);
-extern int	pci_devclass_to_ipl(int class);
 extern ddi_intrspec_t	pci_intx_get_ispec(dev_info_t *dip, dev_info_t *rdip,
 			    int inum);
+extern uint32_t	pci_class_to_pil(dev_info_t *dip);
+extern int32_t	pci_class_to_intr_weight(dev_info_t *dip);
 
 #ifdef	__cplusplus
 }

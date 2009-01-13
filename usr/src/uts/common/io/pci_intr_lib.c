@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Support for MSI, MSIX and INTx
@@ -33,6 +31,7 @@
 #include <sys/debug.h>
 #include <sys/pci.h>
 #include <sys/pci_cap.h>
+#include <sys/pci_intr_lib.h>
 #include <sys/sunddi.h>
 #include <sys/bitmap.h>
 
@@ -43,6 +42,46 @@
  */
 static	uchar_t pci_msix_bir_index[8] = {0x10, 0x14, 0x18, 0x1c,
 					0x20, 0x24, 0xff, 0xff};
+
+/* default class to pil value mapping */
+pci_class_val_t pci_default_pil [] = {
+	{0x000000, 0xff0000, 0x1},	/* Class code for pre-2.0 devices */
+	{0x010000, 0xff0000, 0x5},	/* Mass Storage Controller */
+	{0x020000, 0xff0000, 0x6},	/* Network Controller */
+	{0x030000, 0xff0000, 0x9},	/* Display Controller */
+	{0x040000, 0xff0000, 0x8},	/* Multimedia Controller */
+	{0x050000, 0xff0000, 0x9},	/* Memory Controller */
+	{0x060000, 0xff0000, 0x9},	/* Bridge Controller */
+	{0x0c0000, 0xffff00, 0x9},	/* Serial Bus, FireWire (IEEE 1394) */
+	{0x0c0100, 0xffff00, 0x4},	/* Serial Bus, ACCESS.bus */
+	{0x0c0200, 0xffff00, 0x4},	/* Serial Bus, SSA */
+	{0x0c0300, 0xffff00, 0x9},	/* Serial Bus Universal Serial Bus */
+	{0x0c0400, 0xffff00, 0x6},	/* Serial Bus, Fibre Channel */
+	{0x0c0600, 0xffff00, 0x6}	/* Serial Bus, Infiniband */
+};
+
+/*
+ * Default class to intr_weight value mapping (% of CPU).  A driver.conf
+ * entry on or above the pci node like
+ *
+ *	pci-class-intr-weights= 0x020000, 0xff0000, 30;
+ *
+ * can be used to augment or override entries in the default table below.
+ *
+ * NB: The values below give NICs preference on redistribution, and provide
+ * NICs some isolation from other interrupt sources. We need better interfaces
+ * that allow the NIC driver to identify a specific NIC instance as high
+ * bandwidth, and thus deserving of separation from other low bandwidth
+ * NICs additional isolation from other interrupt sources.
+ *
+ * NB: We treat Infiniband like a NIC.
+ */
+pci_class_val_t pci_default_intr_weight [] = {
+	{0x020000, 0xff0000, 35},	/* Network Controller */
+	{0x010000, 0xff0000, 10},	/* Mass Storage Controller */
+	{0x0c0400, 0xffff00, 10},	/* Serial Bus, Fibre Channel */
+	{0x0c0600, 0xffff00, 50}	/* Serial Bus, Infiniband */
+};
 
 /*
  * Library utility functions
@@ -1098,60 +1137,6 @@ pci_intx_get_pending(dev_info_t *dip, int *pendingp)
 
 
 /*
- * pci_devclass_to_ipl:
- *	translate from device class to ipl
- *	NOTE: This function is added here as pci_intx_get_ispec()
- *	calls this to figure out the priority.
- *	It is moved over from x86 pci.c
- */
-int
-pci_devclass_to_ipl(int class)
-{
-	int	ipl;
-	int	base_class = (class & 0xff0000) >> 16;
-	int	sub_class = (class & 0xff00) >> 8;
-
-	/*
-	 * Use the class code values to construct an ipl for the device.
-	 */
-
-	switch (base_class) {
-	default:
-	case PCI_CLASS_NONE:
-		ipl = 1;
-		break;
-	case PCI_CLASS_MASS:
-		ipl = 0x5;
-		break;
-	case PCI_CLASS_NET:
-		ipl = 0x6;
-		break;
-	case PCI_CLASS_DISPLAY:
-		ipl = 0x9;
-		break;
-	case PCI_CLASS_SERIALBUS:
-		ipl = (sub_class == PCI_SERIAL_IB) ? 6 : 1;
-		break;
-	case PCI_CLASS_MM:
-		ipl = 0x8;
-		break;
-	/*
-	 * for high priority interrupt handlers, use level 12
-	 * as the highest for device drivers
-	 */
-	case PCI_CLASS_MEM:
-		ipl = 0xc;
-		break;
-	case PCI_CLASS_BRIDGE:
-		ipl = 0xc;
-		break;
-	}
-
-	return (ipl);
-}
-
-
-/*
  * pci_intx_get_ispec:
  *	Get intrspec for PCI devices (legacy support)
  *	NOTE: This is moved here from x86 pci.c and is
@@ -1161,7 +1146,7 @@ pci_devclass_to_ipl(int class)
 ddi_intrspec_t
 pci_intx_get_ispec(dev_info_t *dip, dev_info_t *rdip, int inum)
 {
-	int				class, *intpriorities;
+	int				*intpriorities;
 	uint_t				num_intpriorities;
 	struct intrspec			*ispec;
 	ddi_acc_handle_t		cfg_hdl;
@@ -1184,13 +1169,8 @@ pci_intx_get_ispec(dev_info_t *dip, dev_info_t *rdip, int inum)
 		}
 
 		/* If still no priority, guess based on the class code */
-		if (ispec->intrspec_pri == 0) {
-			/* get 'class' property to derive the intr priority */
-			class = ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
-			    DDI_PROP_DONTPASS, "class-code", -1);
-			ispec->intrspec_pri = (class == -1) ? 1 :
-			    pci_devclass_to_ipl(class);
-		}
+		if (ispec->intrspec_pri == 0)
+			ispec->intrspec_pri = pci_class_to_pil(rdip);
 	}
 
 	/* Get interrupt line value */
@@ -1206,4 +1186,104 @@ pci_intx_get_ispec(dev_info_t *dip, dev_info_t *rdip, int inum)
 	}
 
 	return ((ddi_intrspec_t)ispec);
+}
+
+static uint32_t
+pci_match_class_val(uint32_t key, pci_class_val_t *rec_p, int nrec,
+    uint32_t default_val)
+{
+	int i;
+
+	for (i = 0; i < nrec; rec_p++, i++) {
+		if ((rec_p->class_code & rec_p->class_mask) ==
+		    (key & rec_p->class_mask))
+			return (rec_p->class_val);
+	}
+
+	return (default_val);
+}
+
+/*
+ * Return the configuration value, based on class code and sub class code,
+ * from the specified property based or default pci_class_val_t table.
+ */
+uint32_t
+pci_class_to_val(dev_info_t *rdip, char *property_name, pci_class_val_t *rec_p,
+    int nrec, uint32_t default_val)
+{
+	int property_len;
+	uint32_t class_code;
+	pci_class_val_t *conf;
+	uint32_t val = default_val;
+
+	/*
+	 * Use the "class-code" property to get the base and sub class
+	 * codes for the requesting device.
+	 */
+	class_code = (uint32_t)ddi_prop_get_int(DDI_DEV_T_ANY, rdip,
+	    DDI_PROP_DONTPASS, "class-code", -1);
+
+	if (class_code == -1)
+		return (val);
+
+	/* look up the val from the default table */
+	val = pci_match_class_val(class_code, rec_p, nrec, val);
+
+
+	/* see if there is a more specific property specified value */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_NOTPROM,
+	    property_name, (caddr_t)&conf, &property_len))
+			return (val);
+
+	if ((property_len % sizeof (pci_class_val_t)) == 0)
+		val = pci_match_class_val(class_code, conf,
+		    property_len / sizeof (pci_class_val_t), val);
+	kmem_free(conf, property_len);
+	return (val);
+}
+
+/*
+ * pci_class_to_pil:
+ *
+ * Return the pil for a given PCI device.
+ */
+uint32_t
+pci_class_to_pil(dev_info_t *rdip)
+{
+	uint32_t pil;
+
+	/* Default pil is 1 */
+	pil = pci_class_to_val(rdip,
+	    "pci-class-priorities", pci_default_pil,
+	    sizeof (pci_default_pil) / sizeof (pci_class_val_t), 1);
+
+	/* Range check the result */
+	if (pil >= 0xf)
+		pil = 1;
+
+	return (pil);
+}
+
+/*
+ * pci_class_to_intr_weight:
+ *
+ * Return the intr_weight for a given PCI device.
+ */
+int32_t
+pci_class_to_intr_weight(dev_info_t *rdip)
+{
+	int32_t intr_weight;
+
+	/* default weight is 0% */
+	intr_weight = pci_class_to_val(rdip,
+	    "pci-class-intr-weights", pci_default_intr_weight,
+	    sizeof (pci_default_intr_weight) / sizeof (pci_class_val_t), 0);
+
+	/* range check the result */
+	if (intr_weight < 0)
+		intr_weight = 0;
+	if (intr_weight > 1000)
+		intr_weight = 1000;
+
+	return (intr_weight);
 }

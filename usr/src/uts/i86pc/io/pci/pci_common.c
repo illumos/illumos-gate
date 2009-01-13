@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,10 +163,7 @@ pci_get_priority(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp, int *pri)
 	if ((ispec = (struct intrspec *)pci_intx_get_ispec(dip, dip,
 	    hdlp->ih_inum)) == NULL) {
 		if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type)) {
-			int class = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-			    DDI_PROP_DONTPASS, "class-code", -1);
-
-			*pri = (class == -1) ? 1 : pci_devclass_to_ipl(class);
+			*pri = pci_class_to_pil(dip);
 			pci_common_set_parent_private_data(hdlp->ih_dip);
 			ispec = (struct intrspec *)pci_intx_get_ispec(dip, dip,
 			    hdlp->ih_inum);
