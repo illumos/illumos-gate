@@ -2,14 +2,12 @@
  *
  * devinfo_usb.h : USB devices
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  *
  **************************************************************************/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #  include <config.h>
@@ -460,10 +458,13 @@ out:
 static HalDevice *
 devinfo_usb_printer_add(HalDevice *parent, di_node_t node)
 {
+	char *properties[] = { "vendor", "product", "serial", NULL };
+	int i;
 	HalDevice *d = NULL;
 	char	udi[HAL_PATH_MAX];
 	char *s;
 	char *devlink = NULL, *minor_path = NULL;
+	const char	*subsystem;
 
 	get_dev_link_path(node, "ddi_printer", "printers/.+", &devlink, &minor_path);
 
@@ -477,14 +478,18 @@ devinfo_usb_printer_add(HalDevice *parent, di_node_t node)
 	hal_device_property_set_string (d, "info.category", "printer");
 	hal_device_add_capability (d, "printer");
 
-	/* copy parent's usb_device.* properties */
-	hal_device_merge_with_rewrite (d, parent, "usb.", "usb_device.");
-
 	/* add printer properties */
 	hal_device_property_set_string (d, "printer.device", devlink);
-	PROP_STR(d, node, s, "usb-vendor-name", "printer.vendor");
-	PROP_STR(d, node, s, "usb-product-name", "printer.product");
-	PROP_STR(d, node, s, "usb-serialno", "printer.serial");
+
+	/* copy parent's selected usb* properties to printer properties */
+	subsystem = hal_device_property_get_string (parent, "info.subsystem");
+	for (i = 0; properties[i] != NULL; i++) {
+		char src[32], dst[32]; /* "subsystem.property" names */
+
+		snprintf(src, sizeof (src), "%s.%s", subsystem, properties[i]);
+		snprintf(dst, sizeof (dst), "printer.%s", properties[i]);
+		hal_device_copy_property(parent, src, d, dst);
+	}
 
 	devinfo_add_enqueue (d, minor_path, &devinfo_usb_printer_handler);
 
