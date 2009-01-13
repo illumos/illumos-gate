@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,6 +205,7 @@ nge_tx_recycle(nge_t *ngep, boolean_t is_intr)
 		stflg = ngep->desc_attr.txd_check(hw_sbd_p, &len);
 		if ((stflg & TXD_OWN) != 0)
 			break;
+		DMA_ZERO(ssbdp->desc);
 		if (ssbdp->mp != NULL)	{
 			ssbdp->mp->b_next = mp;
 			mp = ssbdp->mp;
