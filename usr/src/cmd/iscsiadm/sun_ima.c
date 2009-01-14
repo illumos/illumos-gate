@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,7 +113,7 @@ static IMA_STATUS get_target_oid_list(uint32_t targetListType,
 static IMA_STATUS get_target_lun_oid_list(IMA_OID * targetOid,
 					    iscsi_lun_list_t  **ppLunList);
 
-static int get_lun_devlink(di_devlink_t link, void *osDeviceName);
+static int get_lun_devlink(di_devlink_t link, void *arg);
 
 static IMA_STATUS getConnOidList(
 	IMA_OID			*oid,
@@ -1171,6 +1171,12 @@ IMA_API IMA_STATUS SUN_IMA_GetDataDigest(
 	return (getDigest(oid, ISCSI_LOGIN_PARAM_DATA_DIGEST, algorithm));
 }
 
+typedef struct walk_devlink {
+	char *path;
+	size_t len;
+	char **linkpp;
+} walk_devlink_t;
+
 IMA_STATUS SUN_IMA_GetLuProperties(
 		IMA_OID luId,
 		SUN_IMA_LU_PROPERTIES *pProps
@@ -1184,6 +1190,8 @@ IMA_STATUS SUN_IMA_GetLuProperties(
 	int			openStatus;
 	iscsi_lun_props_t	lun;
 	di_devlink_handle_t	hdl;
+	walk_devlink_t		warg;
+	char			*minor_path, *devlinkp, lunpath[MAXPATHLEN];
 
 	if (luId.objectType != IMA_OBJECT_TYPE_LU) {
 		return (IMA_ERROR_INCORRECT_OBJECT_TYPE);
@@ -1264,19 +1272,49 @@ IMA_STATUS SUN_IMA_GetLuProperties(
 	}
 
 	if (lun.lp_status == LunValid) {
-
-		/* add minor device delimiter */
-		(void) strcat(lun.lp_pathname, ":");
-
-		if ((strstr(lun.lp_pathname, "sd@") != NULL) ||
+		if ((strlen(lun.lp_pathname) + strlen("/devices")) >
+		    (MAXPATHLEN -1)) {
+			/*
+			 * lun.lp_pathname length too long
+			 */
+			pProps->imaProps.osDeviceNameValid = IMA_FALSE;
+			pProps->imaProps.osParallelIdsValid = IMA_FALSE;
+			return (IMA_STATUS_SUCCESS);
+		}
+		if ((strstr(lun.lp_pathname, "st@") != NULL) ||
+		    (strstr(lun.lp_pathname, "tape@") != NULL)) {
+			(void) strlcat(lun.lp_pathname, ":n", MAXPATHLEN);
+		} else if ((strstr(lun.lp_pathname, "sd@") != NULL) ||
 		    (strstr(lun.lp_pathname, "ssd@") != NULL) ||
 		    (strstr(lun.lp_pathname, "disk@") != NULL)) {
 			/*
 			 * modify returned pathname to obtain the 2nd slice
 			 * of the raw disk
 			 */
-			(void) strcat(lun.lp_pathname, "c,raw");
+			(void) strlcat(lun.lp_pathname, ":c,raw", MAXPATHLEN);
+		} else if ((strstr(lun.lp_pathname, "ses@") != NULL) ||
+		    (strstr(lun.lp_pathname, "enclosure@") != NULL)) {
+			(void) strlcat(lun.lp_pathname, ":0", MAXPATHLEN);
 		}
+
+		(void) snprintf(lunpath, sizeof (lun.lp_pathname),
+		    "/devices%s", lun.lp_pathname);
+		if (strchr(lunpath, ':')) {
+			minor_path = lunpath;
+			if (strstr(minor_path, "/devices") != NULL) {
+				minor_path = lunpath +
+				    strlen("/devices");
+			} else {
+				minor_path = lunpath;
+			}
+			warg.path = NULL;
+		} else {
+			minor_path = NULL;
+			warg.len = strlen(lunpath);
+			warg.path = lunpath;
+		}
+		devlinkp = NULL;
+		warg.linkpp = &devlinkp;
 
 		/*
 		 * Pathname returned by driver is the physical device path.
@@ -1284,12 +1322,13 @@ IMA_STATUS SUN_IMA_GetLuProperties(
 		 */
 		if (hdl = di_devlink_init(lun.lp_pathname, DI_MAKE_LINK)) {
 			pProps->imaProps.osDeviceName[0] = L'\0';
-			(void) di_devlink_walk(hdl, NULL, lun.lp_pathname,
-			    DI_PRIMARY_LINK,
-			    (void *)pProps->imaProps.osDeviceName,
-			    get_lun_devlink);
-			if (pProps->imaProps.osDeviceName[0] != L'\0') {
+			(void) di_devlink_walk(hdl, NULL, minor_path,
+			    DI_PRIMARY_LINK, (void *)&warg, get_lun_devlink);
+			if (devlinkp != NULL) {
 				/* OS device name synchronously made */
+				(void) mbstowcs(pProps->imaProps.osDeviceName,
+				    devlinkp, MAXPATHLEN);
+				free(devlinkp);
 				pProps->imaProps.osDeviceNameValid = IMA_TRUE;
 			} else {
 				pProps->imaProps.osDeviceNameValid = IMA_FALSE;
@@ -1310,22 +1349,22 @@ IMA_STATUS SUN_IMA_GetLuProperties(
 	return (IMA_STATUS_SUCCESS);
 }
 
-#define	IMA_DISK_DEVICE_NAME_PREFIX	"/dev/rdsk/"
-#define	IMA_TAPE_DEVICE_NAME_PREFIX	"/dev/rmt/"
-
 static int
-get_lun_devlink(di_devlink_t link, void *osDeviceName)
+get_lun_devlink(di_devlink_t link, void *arg)
 {
-	if ((strncmp(IMA_DISK_DEVICE_NAME_PREFIX, di_devlink_path(link),
-	    strlen(IMA_DISK_DEVICE_NAME_PREFIX)) == 0) ||
-	    (strncmp(IMA_TAPE_DEVICE_NAME_PREFIX, di_devlink_path(link),
-	    strlen(IMA_TAPE_DEVICE_NAME_PREFIX)) == 0)) {
-		(void) mbstowcs((wchar_t *)osDeviceName, di_devlink_path(link),
-		    MAXPATHLEN);
-		return (DI_WALK_TERMINATE);
+	walk_devlink_t *warg = (walk_devlink_t *)arg;
+	if (warg->path) {
+		char *content = (char *)di_devlink_content(link);
+		char *start = strstr(content, "/devices");
+		if (start == NULL ||
+		    strncmp(start, warg->path, warg->len) != 0 ||
+		    start[warg->len] != ':')
+			return (DI_WALK_CONTINUE);
 	}
 
-	return (DI_WALK_CONTINUE);
+	*(warg->linkpp) = strdup(di_devlink_path(link));
+	return (DI_WALK_TERMINATE);
+
 }
 
 /*
