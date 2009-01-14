@@ -266,7 +266,7 @@ static int check(X509_STORE *ctx, char *file, STACK_OF(X509) *uchain, STACK_OF(X
 
 	ret=0;
 end:
-	if (i)
+	if (i > 0)
 		{
 		fprintf(stdout,"OK\n");
 		ret=1;

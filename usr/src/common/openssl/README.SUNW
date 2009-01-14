@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -126,6 +126,25 @@ The following files are different from the OpenSSL 0.9.8a release.
 	crypto/llib-lcrypto
 	ssl/llib-lssl
 
-7. And, finally, this file was added.
+7. OpenSSL version string was modified. Due to the fact that we don't upgrade
+   OpenSSL frequently we are forced to patch the currently shipped version. The
+   problem with this aproach is that normally, every security vulnerability fix
+   triggers a new release of OpenSSL so people can easily check whether their
+   currently installed version is vulnerable or not. That is not possible with a
+   patched older version. So, we decided to put the security bug tags into the
+   version string, like this:
+
+   OpenSSL 0.9.8a 11 Oct 2005 (+ security fixes for: CAN-2005-2969 CVE-2006-3738
+   CVE-2006-4343 CVE-2007-3108 CVE-2007-5135 CVE-2008-5077)
+
+   Note that actually it's all on the same line because we want to avoid
+   problems with Configure scripts that might rely on the fact that the original
+   OpenSSL version string consists of one line only.
+
+   Be aware that the version string is not considered a stable interface and
+   that all security vulnerability reports are available via SunAlert
+   notifications.
+
+8. And, finally, this file was added.
 
 	README.SUNW
