@@ -2,7 +2,7 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 /* $Id: acconfig.h,v 1.145 2002/09/26 00:38:48 tim Exp $ */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -432,7 +432,7 @@ extern "C" {
 /* #undef HAVE_ARC4RANDOM */
 
 /* Define to 1 if you have the `asprintf' function. */
-/* #undef HAVE_ASPRINTF */
+#define	HAVE_ASPRINTF 1
 
 /* Define to 1 if you have the `b64_ntop' function. */
 /* #undef HAVE_B64_NTOP */
@@ -901,7 +901,7 @@ extern "C" {
 #define	HAVE_UTMP_H 1
 
 /* Define to 1 if you have the `vasprintf' function. */
-/* #undef HAVE_VASPRINTF */
+#define	HAVE_VASPRINTF 1
 
 /* Define to 1 if you have the `vhangup' function. */
 #define	HAVE_VHANGUP 1

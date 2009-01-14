@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Definitions common for HAL code and consumers
 #
@@ -49,6 +47,7 @@ HAL_CONFIG_CPPFLAGS =	-DPACKAGE_DATA_DIR=\"/usr/lib\" \
 			-DPACKAGE_STRING=\""hal $(HAL_VERSION)"\" \
 			-DHALD_PID_FILE=\"/var/run/hald/pid\" \
 			-DHALD_SOCKET_DIR=\"/var/run/hald\" \
+			-DHAVE_ASPRINTF \
 			-DHAVE_POLKIT \
 			-DHWDATA_DIR=\"/usr/share/hwdata\" \
 			-DHAL_USER=\"$(HAL_USER)\" \

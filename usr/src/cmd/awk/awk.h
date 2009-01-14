@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 #ifndef AWK_H
 #define	AWK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <ctype.h>
@@ -339,7 +337,7 @@ extern Cell *substr(Node **, int);
 extern Cell *sub(Node **, int);
 extern Cell *gsub(Node **, int);
 extern Cell *sindex(Node **, int);
-extern Cell *asprintf(Node **, int);
+extern Cell *a_sprintf(Node **, int);
 extern Cell *arith(Node **, int);
 extern Cell *incrdecr(Node **, int);
 extern Cell *cat(Node **, int);

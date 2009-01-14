@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	tempfree(x, s)	if (istemp(x)) tfree(x, s)
 
@@ -931,7 +929,7 @@ format(uchar **bufp, uchar *s, Node *a)
 
 /*ARGSUSED*/
 Cell *
-asprintf(Node **a, int n)
+a_sprintf(Node **a, int n)
 {
 	register Cell *x;
 	register Node *y;

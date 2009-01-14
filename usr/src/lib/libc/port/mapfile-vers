@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -63,6 +63,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	aio_waitn;
 	aio_write;
 	aiowrite;
+	asprintf;
 	assfail;
 	backtrace;
 	backtrace_symbols;
@@ -166,6 +167,7 @@ SUNW_1.23 {		# SunOS 5.11 (Solaris 11)
 	uconv_u32tou8;
 	uconv_u8tou16;
 	uconv_u8tou32;
+	vasprintf;
 	vforkx;
 	verr;
 	verrx;

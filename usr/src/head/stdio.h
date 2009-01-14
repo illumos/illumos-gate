@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1988 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1988 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 /*
  * User-visible pieces of the ANSI C standard I/O package.
@@ -34,8 +33,6 @@
 
 #ifndef _STDIO_H
 #define	_STDIO_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 2.34.1.2 */
 
 #include <sys/feature_tests.h>
 
@@ -276,6 +273,10 @@ extern char	*tmpnam_r(char *);
 	(!defined(_STRICT_STDC) && !defined(__XOPEN_OR_POSIX))
 extern void setbuffer(FILE *, char *, size_t);
 extern int setlinebuf(FILE *);
+/* PRINTFLIKE2 */
+extern int asprintf(char **, const char *, ...);
+/* PRINTFLIKE2 */
+extern int vasprintf(char **, const char *, __va_list);
 #endif
 
 /*
@@ -368,6 +369,8 @@ extern char	*tmpnam_r();
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX)
 extern void setbuffer();
 extern int setlinebuf();
+extern int asprintf();
+extern int vasprintf();
 #endif
 
 #if defined(__EXTENSIONS__) || defined(__XOPEN_OR_POSIX)
