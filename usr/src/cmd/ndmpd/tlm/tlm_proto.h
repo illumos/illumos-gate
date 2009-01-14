@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,6 +120,8 @@ extern int tlm_vfy_tar_checksum(tlm_tar_hdr_t *);
 extern int tlm_entry_restored(tlm_job_stats_t *, char *, int);
 extern char *strupr(char *);
 extern char *parse(char **, char *);
+extern int sysattr_rdonly(char *);
+extern int sysattr_rw(char *);
 
 extern int tar_putfile(char *,
     char *,

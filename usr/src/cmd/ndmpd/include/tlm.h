@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,6 +93,10 @@
 #define	SCSI_SERIAL_PAGE	0x80
 #define	SCSI_DEVICE_IDENT_PAGE	0x83
 #define	SCMD_READ_ELEMENT_STATUS	0xB8
+
+#define	OCTAL7CHAR	07777777
+#define	SYSATTR_RDONLY	"SUNWattr_ro"
+#define	SYSATTR_RW	"SUNWattr_rw"
 
 typedef	int (*func_t)();
 
@@ -313,8 +317,6 @@ typedef struct {
 
 #define	RECORDSIZE	512
 #define	NAMSIZ	100
-#define	TUNMLEN	32
-#define	TGNMLEN	32
 
 typedef struct	tlm_tar_hdr {
 	char	th_name[TLM_NAME_SIZE];
@@ -327,8 +329,8 @@ typedef struct	tlm_tar_hdr {
 	char	th_linkflag;
 	char	th_linkname[TLM_NAME_SIZE];
 	char	th_magic[8];
-	char	th_uname[TUNMLEN];
-	char	th_gname[TGNMLEN];
+	char	th_uname[32];
+	char	th_gname[32];
 	union {
 		struct {
 			char	th_devmajor[8];
@@ -420,6 +422,8 @@ typedef struct	tlm_acls {
 	fs_fhandle_t acl_dir_fh;		/* parent dir's info */
 	fs_fhandle_t acl_fil_fh;		/* file's info */
 	struct stat64 acl_attr;			/* file system attributes */
+	char uname[32];
+	char gname[32];
 } tlm_acls_t;
 
 

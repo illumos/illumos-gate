@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -553,4 +553,28 @@ tlm_new_dir_info(struct  fs_fhandle *fhp, char *dir, char *nm)
 		return (NULL);
 	}
 	return (fdip);
+}
+
+/*
+ * sysattr_rdonly
+ *
+ * Check if the attribute file is one of the readonly system
+ * attributes.
+ */
+int
+sysattr_rdonly(char *name)
+{
+	return (name && strcmp(name, SYSATTR_RDONLY) == 0);
+}
+
+/*
+ * sysattr_rw
+ *
+ * Check if the attribute file is one of the read/write system
+ * attributes.
+ */
+int
+sysattr_rw(char *name)
+{
+	return (name && strcmp(name, SYSATTR_RW) == 0);
 }

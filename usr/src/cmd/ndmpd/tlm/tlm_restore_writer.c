@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,8 @@
 #include <priv.h>
 #include <tlm.h>
 #include <libzfs.h>
+#include <pwd.h>
+#include <grp.h>
 #include <ndmpd_prop.h>
 #include "tlm_proto.h"
 
@@ -279,6 +281,7 @@ tar_getdir(tlm_commands_t *commands,
 	 * It is not initialized for now.   We keep it here for future use.
 	 */
 	char *tmplink_dir = NULL;
+	int dar_recovered = 0;
 
 	/*
 	 * startup
@@ -453,6 +456,10 @@ tar_getdir(tlm_commands_t *commands,
 				    oct_atoi(tar_hdr->th_gid);
 				acls->acl_attr.st_mtime =
 				    oct_atoi(tar_hdr->th_mtime);
+				(void) strlcpy(acls->uname, tar_hdr->th_uname,
+				    sizeof (acls->uname));
+				(void) strlcpy(acls->gname, tar_hdr->th_gname,
+				    sizeof (acls->gname));
 				file_size = oct_atoi(tar_hdr->th_size);
 				acl_spot = 0;
 				last_action = tar_hdr->th_linkflag;
@@ -464,6 +471,15 @@ tar_getdir(tlm_commands_t *commands,
 		    acls->acl_attr.st_size, acls->acl_attr.st_mode,
 		    acls->acl_attr.st_uid, acls->acl_attr.st_gid,
 		    acls->acl_attr.st_mtime);
+
+		/*
+		 * If the restore is running using DAR we should check for
+		 * ACL and extended attribute entries
+		 */
+		if (dar_recovered &&
+		    tar_hdr->th_linkflag != LF_ACL &&
+		    tar_hdr->th_linkflag != LF_XATTR)
+			break;
 
 		switch (tar_hdr->th_linkflag) {
 		case LF_MULTIVOL:
@@ -886,8 +902,9 @@ tar_getdir(tlm_commands_t *commands,
 		 * long file names and HUGE file sizes.
 		 */
 		if (DAR && tar_hdr->th_linkflag != LF_ACL &&
+		    tar_hdr->th_linkflag != LF_XATTR &&
 		    !huge_size && !is_long_name)
-			break;
+			dar_recovered = 1;
 	}
 
 	/*
@@ -1239,6 +1256,41 @@ set_xattr(int fd, struct stat64 st)
 }
 
 /*
+ * Read the system attribute file in a single buffer to write
+ * it as a single write. A partial write to system attribute would
+ * cause an EINVAL on write.
+ */
+static char *
+get_read_one_buf(char *rec, int actual_size, int size, int *error,
+    tlm_cmd_t *lc)
+{
+	char *buf, *p;
+	int read_size;
+	int len;
+
+	if (actual_size > size)
+		return (rec);
+
+	buf = ndmp_malloc(size);
+	if (buf == NULL) {
+		*error = ENOMEM;
+		return (NULL);
+	}
+	(void) memcpy(buf, rec, actual_size);
+	rec = buf;
+	buf += actual_size;
+	while (actual_size < size) {
+		p = get_read_buffer(size - actual_size, error, &read_size, lc);
+		len = min(size - actual_size, read_size);
+		(void) memcpy(buf, p, len);
+		actual_size += len;
+		buf += len;
+	}
+	return (rec);
+}
+
+
+/*
  * read the extended attribute header and write
  * it to the file
  */
@@ -1293,10 +1345,10 @@ restore_xattr_hdr(int *fp,
 		fd = attropen(name, xattrname, O_CREAT | O_RDWR, 0755);
 		if (fd == -1) {
 			NDMP_LOG(LOG_DEBUG,
-			    "Could not open xattr [%s:%s] for restore.",
-			    name, xattrname);
-			NDMP_LOG(LOG_DEBUG, "err=%d ", errno);
+			    "Could not open xattr [%s:%s] for restore err=%d.",
+			    name, xattrname, errno);
 			job_stats->js_errors++;
+			return (0);
 		}
 		(void) strlcpy(local_commands->tc_file_name, xattrname,
 		    TLM_MAX_PATH_NAME);
@@ -1319,14 +1371,31 @@ restore_xattr_hdr(int *fp,
 	acls->acl_attr.st_gid = oct_atoi(tar_hdr->th_gid);
 	acls->acl_attr.st_mtime = oct_atoi(tar_hdr->th_mtime);
 
+	NDMP_LOG(LOG_DEBUG, "xattr_hdr: %s size %d mode %06o uid %d gid %d",
+	    xattrname, acls->acl_attr.st_size, acls->acl_attr.st_mode,
+	    acls->acl_attr.st_uid, acls->acl_attr.st_gid);
+
 	size = acls->acl_attr.st_size;
 	while (size > 0 && local_commands->tc_writer == TLM_RESTORE_RUN) {
 		char	*rec;
 		int	write_size;
+		int	sysattr_write = 0;
 
 		error = 0;
 		rec = get_read_buffer(size, &error, &actual_size,
 		    local_commands);
+
+		if ((actual_size < size) && sysattr_rw(xattrname)) {
+			rec = get_read_one_buf(rec, actual_size, size, &error,
+			    local_commands);
+			if (rec == NULL) {
+				NDMP_LOG(LOG_DEBUG, "Error %d in file [%s]",
+				    error, xattrname);
+				return (size);
+			}
+			actual_size = size;
+			sysattr_write = 1;
+		}
 		if (actual_size <= 0) {
 			NDMP_LOG(LOG_DEBUG,
 			    "RESTORE WRITER> error %d, actual_size %d",
@@ -1339,11 +1408,19 @@ restore_xattr_hdr(int *fp,
 			break;
 		} else {
 			write_size = min(size, actual_size);
-			write_size = write(*fp, rec, write_size);
+			if ((write_size = write(*fp, rec, write_size)) < 0) {
+				if (sysattr_write)
+					free(rec);
+
+				break;
+			}
+
 			NS_ADD(wdisk, write_size);
 			NS_INC(wfile);
 			size -= write_size;
 		}
+		if (sysattr_write)
+			free(rec);
 	}
 
 	if (*fp != 0) {
@@ -1870,18 +1947,40 @@ ndmp_set_eprivs_all(void)
  * Set the standard attributes of the file
  */
 static void
-set_attr(char *name, struct stat64 *st)
+set_attr(char *name, tlm_acls_t *acls)
 {
 	struct utimbuf tbuf;
 	boolean_t priv_all = FALSE;
+	struct stat64 *st;
+	uid_t uid;
+	gid_t gid;
+	struct passwd *pwd;
+	struct group *grp;
 
-	if (!name || !st)
+
+	if (!name || !acls)
 		return;
 
-	NDMP_LOG(LOG_DEBUG, "set_attr: %s uid %d gid %d mode %o", name,
-	    st->st_uid, st->st_gid, st->st_mode);
+	st = &acls->acl_attr;
+	NDMP_LOG(LOG_DEBUG, "set_attr: %s uid %d gid %d uname %s gname %s "
+	    "mode %o", name, st->st_uid, st->st_gid, acls->uname, acls->gname,
+	    st->st_mode);
 
-	if (chown(name, st->st_uid, st->st_gid))
+	uid = st->st_uid;
+	if ((pwd = getpwnam(acls->uname)) != NULL) {
+		NDMP_LOG(LOG_DEBUG, "set_attr: new uid %d old %d",
+		    pwd->pw_uid, uid);
+		uid = pwd->pw_uid;
+	}
+
+	gid = st->st_gid;
+	if ((grp = getgrnam(acls->gname)) != NULL) {
+		NDMP_LOG(LOG_DEBUG, "set_attr: new gid %d old %d",
+		    grp->gr_gid, gid);
+		gid = grp->gr_gid;
+	}
+
+	if (chown(name, uid, gid))
 		NDMP_LOG(LOG_ERR,
 		    "Could not set uid or/and gid for file %s.", name);
 
@@ -1933,7 +2032,7 @@ set_acl(char *name, tlm_acls_t *acls)
 	if (acls != 0) {
 		/* Need a place to save real modification time */
 
-		set_attr(name, &acls->acl_attr);
+		set_attr(name, acls);
 
 		if (!acls->acl_non_trivial) {
 			(void) memset(acls, 0, sizeof (tlm_acls_t));

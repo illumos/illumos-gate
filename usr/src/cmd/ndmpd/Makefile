@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -66,7 +66,7 @@ LINTFLAGS += -xerroff=E_INCONS_VAL_TYPE_DECL2
 # argument used inconsistently
 LINTFLAGS += -xerroff=E_INCONS_ARG_USED2 
 
-LDLIBS   += -lsocket -lnsl -lzfs -lsec -lndmp -lmd5 -lnvpair -lumem -lbsm -lgen
+LDLIBS   += -lsocket -lnsl -lzfs -lsec -lndmp -lmd5 -lnvpair -lumem -lbsm -lgen -lcmdutils
 
 OBJS= \
 	$(NDMP_DIR)/ndmp_xdr.o \

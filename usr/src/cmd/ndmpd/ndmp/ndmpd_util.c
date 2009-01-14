@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1348,9 +1348,8 @@ ndmp_execute_cdb(ndmpd_session_t *session, char *adapter_name, int sid, int lun,
 	(void) memset((void *)&reply, 0, sizeof (reply));
 	(void) memset((void *)rq_buf, 0, sizeof (rq_buf));
 
-	cmd.uscsi_flags = USCSI_RQENABLE;
 	if (request->flags == NDMP_SCSI_DATA_IN) {
-		cmd.uscsi_flags |= USCSI_READ;
+		cmd.uscsi_flags = USCSI_READ | USCSI_RQENABLE;
 		if ((cmd.uscsi_bufaddr =
 		    ndmp_malloc(request->datain_len)) == 0) {
 			reply.error = NDMP_NO_MEM_ERR;
@@ -1365,7 +1364,7 @@ ndmp_execute_cdb(ndmpd_session_t *session, char *adapter_name, int sid, int lun,
 		cmd.uscsi_rqlen = sizeof (rq_buf);
 		cmd.uscsi_rqbuf = rq_buf;
 	} else if (request->flags == NDMP_SCSI_DATA_OUT) {
-		cmd.uscsi_flags = USCSI_RQENABLE | USCSI_WRITE;
+		cmd.uscsi_flags = USCSI_WRITE;
 		cmd.uscsi_bufaddr = request->dataout.dataout_val;
 		cmd.uscsi_buflen = request->dataout.dataout_len;
 	} else {

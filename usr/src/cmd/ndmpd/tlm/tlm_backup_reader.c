@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,9 @@
 #include <tlm.h>
 #include <sys/fs/zfs.h>
 #include <libzfs.h>
+#include <libcmdutils.h>
+#include <pwd.h>
+#include <grp.h>
 #include "tlm_proto.h"
 
 
@@ -293,6 +296,9 @@ output_xattr_header(char *fname, char *aname, int fd,
 	(void) strlcpy(tar_hdr->th_magic, TLM_MAGIC,
 	    sizeof (tar_hdr->th_magic));
 
+	NDMP_LOG(LOG_DEBUG, "xattr_hdr: %s size %d mode %06o uid %d gid %d",
+	    aname, hsize, attr->st_mode & 07777, attr->st_uid, attr->st_gid);
+
 	tlm_build_header_checksum(tar_hdr);
 
 	xhdr = (struct xattr_hdr *)get_write_buffer(RECORDSIZE,
@@ -346,6 +352,12 @@ output_file_header(char *name, char *link,
 	boolean_t long_link = FALSE;
 	char	*section_name = ndmp_malloc(TLM_MAX_PATH_NAME);
 	int	nmlen, lnklen;
+	uid_t uid;
+	gid_t gid;
+	char *uname = "";
+	char *gname = "";
+	struct passwd *pwd;
+	struct group *grp;
 
 	if (section_name == NULL)
 		return (-TLM_NO_SCRATCH_SPACE);
@@ -360,6 +372,16 @@ output_file_header(char *name, char *link,
 		(void) snprintf(section_name,
 		    TLM_MAX_PATH_NAME, "%s.%03d", name, section);
 	}
+
+	if ((pwd = getpwuid(attr->st_uid)) != NULL)
+		uname = pwd->pw_name;
+	if ((grp = getgrgid(attr->st_gid)) != NULL)
+		gname = grp->gr_name;
+
+	if ((ulong_t)(uid = attr->st_uid) > (ulong_t)OCTAL7CHAR)
+		uid = UID_NOBODY;
+	if ((ulong_t)(gid = attr->st_gid) > (ulong_t)OCTAL7CHAR)
+		gid = GID_NOBODY;
 
 	nmlen = strlen(section_name);
 	if (nmlen >= NAMSIZ) {
@@ -385,9 +407,13 @@ output_file_header(char *name, char *link,
 		(void) snprintf(tar_hdr->th_mode, sizeof (tar_hdr->th_mode),
 		    "%06o ", attr->st_mode & 07777);
 		(void) snprintf(tar_hdr->th_uid, sizeof (tar_hdr->th_uid),
-		    "%06o ", attr->st_uid);
+		    "%06o ", uid);
 		(void) snprintf(tar_hdr->th_gid, sizeof (tar_hdr->th_gid),
-		    "%06o ", attr->st_gid);
+		    "%06o ", gid);
+		(void) snprintf(tar_hdr->th_uname, sizeof (tar_hdr->th_uname),
+		    "%.31s", uname);
+		(void) snprintf(tar_hdr->th_gname, sizeof (tar_hdr->th_gname),
+		    "%.31s", gname);
 		(void) snprintf(tar_hdr->th_mtime, sizeof (tar_hdr->th_mtime),
 		    "%011o ", attr->st_mtime);
 		(void) strlcpy(tar_hdr->th_magic, TLM_MAGIC,
@@ -424,9 +450,13 @@ output_file_header(char *name, char *link,
 		(void) snprintf(tar_hdr->th_mode, sizeof (tar_hdr->th_mode),
 		    "%06o ", attr->st_mode & 07777);
 		(void) snprintf(tar_hdr->th_uid, sizeof (tar_hdr->th_uid),
-		    "%06o ", attr->st_uid);
+		    "%06o ", uid);
 		(void) snprintf(tar_hdr->th_gid, sizeof (tar_hdr->th_gid),
-		    "%06o ", attr->st_gid);
+		    "%06o ", gid);
+		(void) snprintf(tar_hdr->th_uname, sizeof (tar_hdr->th_uname),
+		    "%.31s", uname);
+		(void) snprintf(tar_hdr->th_gname, sizeof (tar_hdr->th_gname),
+		    "%.31s", gname);
 		(void) snprintf(tar_hdr->th_mtime, sizeof (tar_hdr->th_mtime),
 		    "%011o ", attr->st_mtime);
 		(void) strlcpy(tar_hdr->th_magic, TLM_MAGIC,
@@ -485,9 +515,13 @@ output_file_header(char *name, char *link,
 	(void) snprintf(tar_hdr->th_mode, sizeof (tar_hdr->th_mode), "%06o ",
 	    attr->st_mode & 07777);
 	(void) snprintf(tar_hdr->th_uid, sizeof (tar_hdr->th_uid), "%06o ",
-	    attr->st_uid);
+	    uid);
 	(void) snprintf(tar_hdr->th_gid, sizeof (tar_hdr->th_gid), "%06o ",
-	    attr->st_gid);
+	    gid);
+	(void) snprintf(tar_hdr->th_uname, sizeof (tar_hdr->th_uname), "%.31s",
+	    uname);
+	(void) snprintf(tar_hdr->th_gname, sizeof (tar_hdr->th_gname), "%.31s",
+	    gname);
 	(void) snprintf(tar_hdr->th_mtime, sizeof (tar_hdr->th_mtime), "%011o ",
 	    attr->st_mtime);
 	(void) strlcpy(tar_hdr->th_magic, TLM_MAGIC,
@@ -535,6 +569,38 @@ tlm_readlink(char *nm, char *snap, char *buf, int bufsize)
 	return (len);
 }
 
+/*
+ * Read the system attribute file in a single buffer to write
+ * it as a single write. A partial write to system attribute would
+ * cause an EINVAL on write.
+ */
+static char *
+get_write_one_buf(char *buf, char *rec, int buf_size, int rec_size,
+    tlm_cmd_t *lc)
+{
+	int len;
+	long write_size;
+
+	if (rec_size > buf_size)
+		return (rec);
+
+	len = rec_size;
+	(void) memcpy(rec, buf, len);
+	buf += len;
+	while (rec_size < buf_size) {
+		rec = get_write_buffer(buf_size - rec_size,
+		    &write_size, FALSE, lc);
+		if (!rec)
+			return (0);
+
+		len = min(buf_size - rec_size, write_size);
+		(void) memcpy(rec, buf, len);
+		rec_size += len;
+		buf += len;
+	}
+	return (rec);
+}
+
 
 /*
  * tlm_output_xattr
@@ -575,7 +641,8 @@ tlm_output_xattr(char  *dir, char *name, char *chkdir,
 		return (-TLM_NO_SCRATCH_SPACE);
 	}
 
-	if (pathconf(fullname, _PC_XATTR_EXISTS) != 1) {
+	if (pathconf(fullname, _PC_XATTR_EXISTS) != 1 &&
+	    sysattr_support(fullname, _PC_SATTR_EXISTS) != 1) {
 		free(fullname);
 		return (0);
 	}
@@ -598,9 +665,10 @@ tlm_output_xattr(char  *dir, char *name, char *chkdir,
 	/*
 	 * Open the file for reading.
 	 */
-	fd = open(fnamep, O_RDONLY | O_XATTR);
+	fd = attropen(fnamep, ".", O_RDONLY);
 	if (fd == -1) {
-		NDMP_LOG(LOG_DEBUG, "BACKUP> Can't open file [%s]", fullname);
+		NDMP_LOG(LOG_DEBUG, "BACKUP> Can't open file [%s][%s]",
+		    fullname, fnamep);
 		rv = TLM_NO_SOURCE_FILE;
 		goto err_out;
 	}
@@ -618,21 +686,21 @@ tlm_output_xattr(char  *dir, char *name, char *chkdir,
 		goto err_out;
 	}
 
-	(void) output_acl_header(&tlm_acls->acl_info,
-	    local_commands);
-
 	while ((dtp = readdir(dp)) != NULL) {
 		int section_size;
 
 		if (*dtp->d_name == '.')
 			continue;
 
+		if (sysattr_rdonly(dtp->d_name))
+			continue;
+
 		(void) close(fd);
 		fd = attropen(fnamep, dtp->d_name, O_RDONLY);
 		if (fd == -1) {
 			NDMP_LOG(LOG_DEBUG,
-			    "problem(%d) opening xattr file [%s]", errno,
-			    fullname);
+			    "problem(%d) opening xattr file [%s][%s]", errno,
+			    fullname, fnamep);
 			goto tear_down;
 		}
 
@@ -651,6 +719,9 @@ tlm_output_xattr(char  *dir, char *name, char *chkdir,
 			char	*buf;
 			long	actual_size;
 			int	read_size;
+			int sysattr_read = 0;
+			char *rec;
+			int size;
 
 			/*
 			 * check for Abort commands
@@ -672,6 +743,17 @@ tlm_output_xattr(char  *dir, char *name, char *chkdir,
 			if (!buf)
 				goto tear_down;
 
+			if ((actual_size < section_size) &&
+			    sysattr_rw(dtp->d_name)) {
+				rec = buf;
+				buf = ndmp_malloc(section_size);
+				if (!buf)
+					goto tear_down;
+				size = actual_size;
+				actual_size = section_size;
+				sysattr_read = 1;
+			}
+
 			/*
 			 * check for Abort commands
 			 */
@@ -681,7 +763,19 @@ tlm_output_xattr(char  *dir, char *name, char *chkdir,
 			}
 
 			read_size = min(section_size, actual_size);
-			actual_size = read(fd, buf, read_size);
+			if ((actual_size = read(fd, buf, read_size)) < 0)
+				break;
+
+			if (sysattr_read) {
+				if (get_write_one_buf(buf, rec, read_size,
+				    size, local_commands) == 0) {
+					free(buf);
+					goto tear_down;
+				}
+				free(buf);
+			}
+
+
 			NS_ADD(rdisk, actual_size);
 			NS_INC(rfile);
 
@@ -811,8 +905,8 @@ tlm_output_file(char *dir, char *name, char *chkdir,
 		fd = open(fnamep, O_RDONLY);
 		if (fd == -1) {
 			NDMP_LOG(LOG_DEBUG,
-			    "BACKUP> Can't open file [%s] err(%d)",
-			    fullname, errno);
+			    "BACKUP> Can't open file [%s][%s] err(%d)",
+			    fullname, fnamep, errno);
 			real_size = -TLM_NO_SOURCE_FILE;
 			goto err_out;
 		}
