@@ -1418,3 +1418,4 @@ Bugid   Risk Synopsis
 6786744 32-bit dbx failed with unknown rtld_db.so error on snv_104
 6789925 64-bit applications with SF1_SUNW_ADDR32 require non-default starting
 	address
+6792906 ld -z nopartial fix breaks TLS

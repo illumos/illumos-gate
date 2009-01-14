@@ -624,7 +624,6 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			Xword		refaddr;
 			int		moved = 0;
 			Gotref		gref;
-			Sxword		raddend = arsp->rel_raddend;
 
 			/*
 			 * If the section this relocation is against has been
@@ -694,7 +693,8 @@ ld_do_activerelocs(Ofl_desc *ofl)
 				 */
 				if ((sdp->sd_isc->is_flags & FLG_IS_RELUPD) &&
 				    /* LINTED */
-				    (sym = ld_am_I_partial(arsp, raddend))) {
+				    (sym = ld_am_I_partial(arsp,
+				    arsp->rel_raddend))) {
 					/*
 					 * The symbol was moved, so adjust
 					 * the value relative to the new
@@ -715,7 +715,8 @@ ld_do_activerelocs(Ofl_desc *ofl)
 					 * displacement within the range of
 					 * the symbol.
 					 */
-					raddend -= sym->sd_osym->st_value;
+					arsp->rel_raddend -=
+					    sym->sd_osym->st_value;
 				} else {
 					value = _elf_getxoff(
 					    sdp->sd_isc->is_indata);
@@ -776,7 +777,7 @@ ld_do_activerelocs(Ofl_desc *ofl)
 			 *	 being referenced (ie: that -4 thing).
 			 */
 			if ((arsp->rel_flags & FLG_REL_GOT) == 0)
-				value += raddend;
+				value += arsp->rel_raddend;
 
 			/*
 			 * Determine whether the value needs further adjustment.
