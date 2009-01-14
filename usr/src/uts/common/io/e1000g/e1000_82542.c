@@ -324,16 +324,16 @@ e1000_setup_link_82542(struct e1000_hw *hw)
 	if (ret_val)
 		goto out;
 
-	hw->fc.current_mode &= ~e1000_fc_tx_pause;
+	hw->fc.requested_mode &= ~e1000_fc_tx_pause;
 
 	if (mac->report_tx_early == 1)
-		hw->fc.current_mode &= ~e1000_fc_rx_pause;
+		hw->fc.requested_mode &= ~e1000_fc_rx_pause;
 
 	/*
 	 * Save off the requested flow control mode for use later.  Depending
 	 * on the link partner's capabilities, we may or may not use this mode.
 	 */
-	hw->fc.requested_mode = hw->fc.current_mode;
+	hw->fc.current_mode = hw->fc.requested_mode;
 
 	DEBUGOUT1("After fix-ups FlowControl is now = %x\n",
 	    hw->fc.current_mode);

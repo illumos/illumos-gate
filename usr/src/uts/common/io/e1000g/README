@@ -632,3 +632,8 @@ Notes on packaging:
    6698312 starcat panicked with "bad mutex" while running SUNWsgdr
    6759330 PIT: panic during first reboot after successful pkgadd during osinstall
    6776453 Monza(CP3260): loopback test fails on e1000g serdes ports
+
+5.3.3
+======
+  This version has the following fix:
+   6791863 sync up flow control code with Intel latest shared code

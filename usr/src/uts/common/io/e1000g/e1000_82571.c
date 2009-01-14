@@ -1225,8 +1225,8 @@ e1000_setup_link_82571(struct e1000_hw *hw)
 	 * control setting, so we explicitly set it to full.
 	 */
 	if ((hw->mac.type == e1000_82573 || hw->mac.type == e1000_82574) &&
-	    hw->fc.current_mode == e1000_fc_default)
-		hw->fc.current_mode = e1000_fc_full;
+	    hw->fc.requested_mode == e1000_fc_default)
+		hw->fc.requested_mode = e1000_fc_full;
 
 	return (e1000_setup_link_generic(hw));
 }

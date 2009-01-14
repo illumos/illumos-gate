@@ -984,10 +984,10 @@ e1000_setup_link_generic(struct e1000_hw *hw)
 			goto out;
 
 	/*
-	 * If flow control is set to default, set flow control
+	 * If requested flow control is set to default, set flow control
 	 * based on the EEPROM flow control settings.
 	 */
-	if (hw->fc.current_mode == e1000_fc_default) {
+	if (hw->fc.requested_mode == e1000_fc_default) {
 		ret_val = e1000_set_default_fc_generic(hw);
 		if (ret_val)
 			goto out;
@@ -997,8 +997,7 @@ e1000_setup_link_generic(struct e1000_hw *hw)
 	 * Save off the requested flow control mode for use later.  Depending
 	 * on the link partner's capabilities, we may or may not use this mode.
 	 */
-	hw->fc.requested_mode = hw->fc.current_mode;
-
+	hw->fc.current_mode = hw->fc.requested_mode;
 	DEBUGOUT1("After fix-ups FlowControl is now = %x\n",
 	    hw->fc.current_mode);
 
@@ -1307,12 +1306,12 @@ e1000_set_default_fc_generic(struct e1000_hw *hw)
 	}
 
 	if ((nvm_data & NVM_WORD0F_PAUSE_MASK) == 0)
-		hw->fc.current_mode = e1000_fc_none;
+		hw->fc.requested_mode = e1000_fc_none;
 	else if ((nvm_data & NVM_WORD0F_PAUSE_MASK) ==
 	    NVM_WORD0F_ASM_DIR)
-		hw->fc.current_mode = e1000_fc_tx_pause;
+		hw->fc.requested_mode = e1000_fc_tx_pause;
 	else
-		hw->fc.current_mode = e1000_fc_full;
+		hw->fc.requested_mode = e1000_fc_full;
 
 out:
 	return (ret_val);

@@ -46,7 +46,7 @@
 
 static char ident[] = "Intel PRO/1000 Ethernet";
 static char e1000g_string[] = "Intel(R) PRO/1000 Network Connection";
-static char e1000g_version[] = "Driver Ver. 5.3.2";
+static char e1000g_version[] = "Driver Ver. 5.3.3";
 
 /*
  * Proto types for DDI entry points
@@ -3065,16 +3065,16 @@ e1000g_m_setprop(void *arg, const char *pr_name, mac_prop_id_t pr_num,
 				err = EINVAL;
 				break;
 			case LINK_FLOWCTRL_NONE:
-				fc->current_mode = e1000_fc_none;
+				fc->requested_mode = e1000_fc_none;
 				break;
 			case LINK_FLOWCTRL_RX:
-				fc->current_mode = e1000_fc_rx_pause;
+				fc->requested_mode = e1000_fc_rx_pause;
 				break;
 			case LINK_FLOWCTRL_TX:
-				fc->current_mode = e1000_fc_tx_pause;
+				fc->requested_mode = e1000_fc_tx_pause;
 				break;
 			case LINK_FLOWCTRL_BI:
-				fc->current_mode = e1000_fc_full;
+				fc->requested_mode = e1000_fc_full;
 				break;
 			}
 reset:
@@ -3609,12 +3609,12 @@ e1000g_get_conf(struct e1000g *Adapter)
 	 * FlowControl
 	 */
 	hw->fc.send_xon = B_TRUE;
-	hw->fc.current_mode =
+	hw->fc.requested_mode =
 	    e1000g_get_prop(Adapter, "FlowControl",
 	    e1000_fc_none, 4, DEFAULT_FLOW_CONTROL);
 	/* 4 is the setting that says "let the eeprom decide" */
-	if (hw->fc.current_mode == 4)
-		hw->fc.current_mode = e1000_fc_default;
+	if (hw->fc.requested_mode == 4)
+		hw->fc.requested_mode = e1000_fc_default;
 
 	/*
 	 * Max Num Receive Packets on Interrupt

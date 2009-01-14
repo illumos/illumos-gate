@@ -2154,15 +2154,14 @@ e1000_setup_link_ich8lan(struct e1000_hw *hw)
 	 * ICH parts do not have a word in the NVM to determine the default
 	 * flow control setting, so we explicitly set it to full.
 	 */
-	if (hw->fc.current_mode == e1000_fc_default)
-		hw->fc.current_mode = e1000_fc_full;
+	if (hw->fc.requested_mode == e1000_fc_default)
+		hw->fc.requested_mode = e1000_fc_full;
 
 	/*
 	 * Save off the requested flow control mode for use later.  Depending
 	 * on the link partner's capabilities, we may or may not use this mode.
 	 */
-	hw->fc.requested_mode = hw->fc.current_mode;
-
+	hw->fc.current_mode = hw->fc.requested_mode;
 	DEBUGOUT1("After fix-ups FlowControl is now = %x\n",
 	    hw->fc.current_mode);
 
