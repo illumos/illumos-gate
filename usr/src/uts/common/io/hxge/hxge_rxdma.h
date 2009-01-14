@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@ extern "C" {
 #include <hxge_rdc_hw.h>
 #include <hpi_rxdma.h>
 
-#define	RXDMA_CK_DIV_DEFAULT		8 	/* 27 nsec */
+#define	RXDMA_CK_DIV_DEFAULT		25000	/* 84 usec */
 #define	RXDMA_RCR_PTHRES_DEFAULT	0x1
 #define	RXDMA_RCR_TO_DEFAULT		0x1
 #define	RXDMA_HDR_SIZE_DEFAULT		2
