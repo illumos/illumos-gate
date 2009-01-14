@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,7 @@
 #include <sys/cnex.h>
 #include <sys/hsvc.h>
 #include <sys/sdt.h>
+#include <sys/kldc.h>
 
 /* Core internal functions */
 int i_ldc_h2v_error(int h_error);
@@ -74,6 +75,7 @@ static int i_ldc_txq_reconf(ldc_chan_t *ldcp);
 static int i_ldc_rxq_reconf(ldc_chan_t *ldcp, boolean_t force_reset);
 static int i_ldc_rxq_drain(ldc_chan_t *ldcp);
 static void i_ldc_reset_state(ldc_chan_t *ldcp);
+static void i_ldc_debug_enter(void);
 
 static int i_ldc_get_tx_tail(ldc_chan_t *ldcp, uint64_t *tail);
 static void i_ldc_get_tx_head(ldc_chan_t *ldcp, uint64_t *head);
@@ -186,6 +188,19 @@ uint64_t ldc_rxdq_multiplier = LDC_RXDQ_MULTIPLIER;
  */
 int ldc_max_retries = LDC_MAX_RETRIES;
 clock_t ldc_delay = LDC_DELAY;
+
+/*
+ * Channels which have a devclass satisfying the following
+ * will be reset when entering the prom or kmdb.
+ *
+ *   LDC_DEVCLASS_PROM_RESET(devclass) != 0
+ *
+ * By default, only block device service channels are reset.
+ */
+#define	LDC_DEVCLASS_BIT(dc)		(0x1 << (dc))
+#define	LDC_DEVCLASS_PROM_RESET(dc)	\
+	(LDC_DEVCLASS_BIT(dc) & ldc_debug_reset_mask)
+static uint64_t ldc_debug_reset_mask = LDC_DEVCLASS_BIT(LDC_DEV_BLK_SVC);
 
 /*
  * delay between each retry of channel unregistration in
@@ -411,6 +426,9 @@ _init(void)
 	ldcssp->chan_list = NULL;
 	ldcssp->dring_list = NULL;
 
+	/* Register debug_enter callback */
+	kldc_set_debug_cb(&i_ldc_debug_enter);
+
 	mutex_exit(&ldcssp->lock);
 
 	return (0);
@@ -437,6 +455,9 @@ _fini(void)
 		DWARN(DBG_ALL_LDCS, "_fini: mod_remove failed\n");
 		return (EIO);
 	}
+
+	/* Unregister debug_enter callback */
+	kldc_set_debug_cb(NULL);
 
 	/* Free descriptor rings */
 	dringp = ldcssp->dring_list;
@@ -687,6 +708,27 @@ i_ldc_reset(ldc_chan_t *ldcp, boolean_t force_reset)
 	ldcp->tstate |= TS_IN_RESET;
 }
 
+/*
+ * Walk the channel list and reset channels if they are of the right
+ * devclass and their Rx queues have been configured. No locks are
+ * taken because the function is only invoked by the kernel just before
+ * entering the prom or debugger when the system is single-threaded.
+ */
+static void
+i_ldc_debug_enter(void)
+{
+	ldc_chan_t *ldcp;
+
+	ldcp = ldcssp->chan_list;
+	while (ldcp != NULL) {
+		if (((ldcp->tstate & TS_QCONF_RDY) == TS_QCONF_RDY) &&
+		    (LDC_DEVCLASS_PROM_RESET(ldcp->devclass) != 0)) {
+			(void) hv_ldc_rx_qconf(ldcp->id, ldcp->rx_q_ra,
+			    ldcp->rx_q_entries);
+		}
+		ldcp = ldcp->next;
+	}
+}
 
 /*
  * Clear pending interrupts
@@ -2952,6 +2994,7 @@ ldc_open(ldc_handle_t handle)
 	if (rv && rv != EAGAIN) {
 		cmn_err(CE_WARN,
 		    "ldc_open: (0x%lx) channel register failed\n", ldcp->id);
+		ldcp->tstate &= ~TS_QCONF_RDY;
 		(void) hv_ldc_tx_qconf(ldcp->id, NULL, NULL);
 		(void) hv_ldc_rx_qconf(ldcp->id, NULL, NULL);
 		mutex_exit(&ldcp->lock);
@@ -2969,6 +3012,7 @@ ldc_open(ldc_handle_t handle)
 		    "ldc_open: (0x%lx) cannot read channel state\n",
 		    ldcp->id);
 		(void) i_ldc_unregister_channel(ldcp);
+		ldcp->tstate &= ~TS_QCONF_RDY;
 		(void) hv_ldc_tx_qconf(ldcp->id, NULL, NULL);
 		(void) hv_ldc_rx_qconf(ldcp->id, NULL, NULL);
 		mutex_exit(&ldcp->lock);
@@ -3144,6 +3188,8 @@ ldc_close(ldc_handle_t handle)
 		retries++;
 	}
 
+	ldcp->tstate &= ~TS_QCONF_RDY;
+
 	/*
 	 * Unregister queues
 	 */
@@ -3165,8 +3211,6 @@ ldc_close(ldc_handle_t handle)
 		mutex_exit(&ldcp->lock);
 		return (EIO);
 	}
-
-	ldcp->tstate &= ~TS_QCONF_RDY;
 
 	/* Reset channel state information */
 	i_ldc_reset_state(ldcp);

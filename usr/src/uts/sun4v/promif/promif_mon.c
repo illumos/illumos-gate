@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/promif_impl.h>
 #include <sys/uadmin.h>
@@ -44,6 +42,7 @@ extern void prom_reboot(char *bootstr);
 #else
 
 extern int vx_handler(cell_t *argument_array);
+extern void kldc_debug_enter(void);
 
 #define	PIL_DECL(p) int p
 #define	PIL_SET7(p) (p = spl7())
@@ -97,6 +96,7 @@ promif_enter_mon(void *p)
 
 #ifndef _KMDB
 	idle_other_cpus();
+	kldc_debug_enter();
 #endif
 
 	for (;;) {

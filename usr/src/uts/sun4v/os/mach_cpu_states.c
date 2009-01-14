@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@
 #include <sys/promimpl.h>
 #include <sys/hsvc.h>
 #include <sys/ldoms.h>
+#include <sys/kldc.h>
 
 /*
  * hvdump_buf_va is a pointer to the currently-configured hvdump_buf.
@@ -1130,6 +1131,7 @@ static void
 sun4v_system_claim(void)
 {
 	watchdog_suspend();
+	kldc_debug_enter();
 	/*
 	 * For "mdb -K", set soft state to debugging
 	 */

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This Makefile defines all file modules for the directory uts/sun4v
@@ -79,6 +79,7 @@ CORE_OBJS +=	promif_version.o
 CORE_OBJS +=	sfmmu_kdi.o
 CORE_OBJS +=	swtch.o
 CORE_OBJS +=	wdt.o
+CORE_OBJS +=	kldc.o
 CORE_OBJS +=	xhat_sfmmu.o
 
 CORE_OBJS +=	mdesc_diff.o
