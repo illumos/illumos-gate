@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -958,7 +958,7 @@ extern boolean_t sctp_add_ftsn_set(sctp_ftsn_set_t **, sctp_faddr_t *, mblk_t *,
 		    uint_t *, uint32_t *);
 extern boolean_t sctp_add_recvq(sctp_t *, mblk_t *, boolean_t);
 extern void	sctp_add_sendq(sctp_t *, mblk_t *);
-extern void	sctp_add_unrec_parm(sctp_parm_hdr_t *, mblk_t **);
+extern void	sctp_add_unrec_parm(sctp_parm_hdr_t *, mblk_t **, boolean_t);
 extern size_t	sctp_addr_params(sctp_t *, int, uchar_t *, boolean_t);
 extern mblk_t	*sctp_add_proto_hdr(sctp_t *, sctp_faddr_t *, mblk_t *, int,
 		    int *);

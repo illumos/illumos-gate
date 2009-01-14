@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1199,8 +1199,22 @@ copyports:
 	return (0);
 }
 
+/*
+ * got_errchunk is set B_TRUE only if called from validate_init_params(), when
+ * an ERROR chunk is already prepended the size of which needs updating for
+ * additional unrecognized parameters. Other callers either prepend the ERROR
+ * chunk with the correct size after calling this function, or they are calling
+ * to add an invalid parameter to an INIT_ACK chunk, in that case no ERROR chunk
+ * exists, the CAUSE blocks go into the INIT_ACK directly.
+ *
+ * *errmp will be non-NULL both when adding an additional CAUSE block to an
+ * existing prepended COOKIE ERROR chunk (processing params of an INIT_ACK),
+ * and when adding unrecognized parameters after the first, to an INIT_ACK
+ * (processing params of an INIT chunk).
+ */
 void
-sctp_add_unrec_parm(sctp_parm_hdr_t *uph, mblk_t **errmp)
+sctp_add_unrec_parm(sctp_parm_hdr_t *uph, mblk_t **errmp,
+    boolean_t got_errchunk)
 {
 	mblk_t *mp;
 	sctp_parm_hdr_t *ph;
@@ -1231,12 +1245,16 @@ sctp_add_unrec_parm(sctp_parm_hdr_t *uph, mblk_t **errmp)
 	mp->b_wptr = mp->b_rptr + len;
 	if (*errmp != NULL) {
 		/*
-		 * Update total length of the ERROR chunk, then link this
-		 * cause block to the possible chain of cause blocks
-		 * attached to the ERROR chunk.
+		 * Update total length if an ERROR chunk, then link
+		 * this CAUSE block to the possible chain of CAUSE
+		 * blocks attached to the ERROR chunk or INIT_ACK
+		 * being created.
 		 */
-		ecp = (sctp_chunk_hdr_t *)((*errmp)->b_rptr);
-		ecp->sch_len = htons(ntohs(ecp->sch_len) + len);
+		if (got_errchunk) {
+			/* ERROR chunk already prepended */
+			ecp = (sctp_chunk_hdr_t *)((*errmp)->b_rptr);
+			ecp->sch_len = htons(ntohs(ecp->sch_len) + len);
+		}
 		linkb(*errmp, mp);
 	} else {
 		*errmp = mp;

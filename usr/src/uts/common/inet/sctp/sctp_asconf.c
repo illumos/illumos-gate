@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -178,7 +178,7 @@ sctp_asconf_unrec_parm(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 	if ((ph->sph_type & SCTP_UNREC_PARAM_MASK) ==
 	    (SCTP_CONT_PROC_PARAMS | SCTP_REPORT_THIS_PARAM)) {
 		/* report unrecognized param, and keep processing */
-		sctp_add_unrec_parm(ph, &mp);
+		sctp_add_unrec_parm(ph, &mp, B_FALSE);
 		if (mp == NULL) {
 			*cont = -1;
 			return (NULL);
@@ -195,7 +195,7 @@ sctp_asconf_unrec_parm(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 	}
 	if (ph->sph_type & SCTP_REPORT_THIS_PARAM) {
 		/* Stop processing and drop; report unrecognized param */
-		sctp_add_unrec_parm(ph, &mp);
+		sctp_add_unrec_parm(ph, &mp, B_FALSE);
 		if (mp == NULL) {
 			*cont = -1;
 			return (NULL);

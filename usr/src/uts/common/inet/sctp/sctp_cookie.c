@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,11 +129,7 @@ hmac_md5(uchar_t *text, size_t text_len, uchar_t *key, size_t key_len,
  * If inmp is non-NULL, and we need to abort, it will use the IP/SCTP
  * info in initmp to send the abort. Otherwise, no abort will be sent.
  *
- * An ERROR chunk and chain of one or more error cause blocks will be
- * created if unrecognized parameters marked by the sender as reportable
- * are found. This error chain is visible to the caller via *errmp.
- *
- * When called from stcp_send_init_ack() while processing parameters
+ * When called from stcp_send_initack() while processing parameters
  * from a received INIT_CHUNK want_cookie will be NULL.
  *
  * When called from sctp_send_cookie_echo() while processing an INIT_ACK,
@@ -143,6 +139,16 @@ hmac_md5(uchar_t *text, size_t text_len, uchar_t *key, size_t key_len,
  * the cookie info.
  *
  * Note: an INIT_ACK is expected to contain a cookie.
+ *
+ * When processing an INIT_ACK, an ERROR chunk and chain of one or more
+ * error CAUSE blocks will be created if unrecognized parameters marked by
+ * the sender as reportable are found.
+ *
+ * When processing an INIT chunk, a chain of one or more error CAUSE blocks
+ * will be created if unrecognized parameters marked by the sender as
+ * reportable are found. These are appended directly to the INIT_ACK chunk.
+ *
+ * In both cases the error chain is visible to the caller via *errmp.
  *
  * Returns 1 if the parameters are OK (or if there are no optional
  * parameters), returns 0 otherwise.
@@ -275,11 +281,12 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 			 *    0. Obey the top bit silently.
 			 */
 			if (ptype & SCTP_REPORT_THIS_PARAM) {
-				if (!got_errchunk) {
+				if (!got_errchunk && want_cookie != NULL) {
 					/*
-					 * First reportable param, create an
+					 * Processing an INIT_ACK, this is the
+					 * first reportable param, create an
 					 * ERROR chunk and populate it with a
-					 * cause block for this parameter.
+					 * CAUSE block for this parameter.
 					 */
 					*errmp = sctp_make_err(sctp,
 					    PARM_UNRECOGNIZED,
@@ -288,10 +295,12 @@ validate_init_params(sctp_t *sctp, sctp_chunk_hdr_t *ch,
 					got_errchunk = B_TRUE;
 				} else {
 					/*
-					 * Add an additional cause block to
-					 * an existing ERROR chunk.
+					 * If processing an INIT chunk add
+					 * an additional CAUSE block to an
+					 * INIT_ACK, got_errchunk is B_FALSE.
 					 */
-					sctp_add_unrec_parm(cph, errmp);
+					sctp_add_unrec_parm(cph, errmp,
+					    got_errchunk);
 				}
 			}
 			if (ptype & SCTP_CONT_PROC_PARAMS) {
@@ -753,6 +762,9 @@ sctp_send_initack(sctp_t *sctp, sctp_hdr_t *initsh, sctp_chunk_hdr_t *ch,
 	    (uchar_t *)sctp->sctp_secret, SCTP_SECRET_LEN, (uchar_t *)p);
 
 	iackmp->b_wptr = iackmp->b_rptr + ipsctplen;
+	if (pad != 0)
+		bzero((iackmp->b_wptr - pad), pad);
+
 	iackmp->b_cont = errmp;		/*  OK if NULL */
 
 	if (is_system_labeled() && (cr = DB_CRED(iackmp)) != NULL &&
