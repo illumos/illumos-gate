@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  *  This file: 21000 - 21499
  *  Shared common messages: 1 - 1999
  */
-
-
 
 /*
  * Functions to support the download of FCode to PCI HBAs
@@ -122,8 +120,8 @@ static int	q_getbootdev(uchar_t *);
 static int	q_getdevctlpath(char *, int *);
 static int	q_warn(int);
 static int	q_findversion(int, int, uchar_t *, uint16_t *);
-static int 	q_findfileversion(char *, uchar_t *, uint16_t *, int, int *);
-static int 	q_findSbusfile(int, int *);
+static int	q_findfileversion(char *, uchar_t *, uint16_t *, int, int *);
+static int	q_findSbusfile(int, int *);
 static int	memstrstr(char *, char *, int, int);
 static int	fcode_load_file(int, char *, int *);
 
@@ -134,7 +132,7 @@ static int	emulex_fcodeversion(di_node_t, uchar_t *);
 static void	handle_emulex_error(int, char *);
 
 /*
- * Searches for and updates the cards.  This is the "main" function
+ * Searches for and updates the cards.	This is the "main" function
  * and will give the output to the user by calling the subfunctions.
  * args: FCode file; if NULL only the current FCode version is printed
  */
@@ -194,12 +192,12 @@ q_qlgc_update(unsigned int verbose, char *file)
 		 * FCode header check - make sure it's PCI FCode
 		 * Structure of FCode header (byte# refers to byte numbering
 		 * in FCode spec, not the byte# of our fcode_buf buffer):
-		 * header	byte 00    0x55  prom signature byte one
-		 *		byte 01    0xaa  prom signature byte two
+		 * header	byte 00	   0x55	 prom signature byte one
+		 *		byte 01	   0xaa	 prom signature byte two
 		 * data		byte 00-03 P C I R
 		 * OR
-		 * header	byte 32    0x55
-		 *		byte 33    0xaa
+		 * header	byte 32	   0x55
+		 *		byte 33	   0xaa
 		 * data		byte 60-63 P C I R
 		 * The second format with an offset of 32 is used for ifp prom
 		 */
@@ -395,14 +393,14 @@ q_qlgc_update(unsigned int verbose, char *file)
 
 /*
  * Retrieve the version banner from the card
- *    uses ioctl: FCIO_FCODE_MCODE_VERSION  	FCode revision
+ *    uses ioctl: FCIO_FCODE_MCODE_VERSION	FCode revision
  */
 static int
 q_findversion(int verbose, int index, uchar_t *version, uint16_t *chip_id)
 /*ARGSUSED*/
 {
 	int fd, ntries;
-	struct 	ifp_fm_version *version_buffer = NULL;
+	struct	ifp_fm_version *version_buffer = NULL;
 	char	prom_ver[100] = {NULL};
 	char	mcode_ver[100] = {NULL};
 	fcio_t	fcio;
@@ -696,7 +694,7 @@ q_getdevctlpath(char *devpath, int *devcnt)
 }
 
 /*
- * Get the boot device.  Cannot load FCode to current boot device.
+ * Get the boot device.	 Cannot load FCode to current boot device.
  * Boot devices under volume management will prompt a warning.
  */
 static int
@@ -733,7 +731,7 @@ q_getbootdev(uchar_t *bootpath)
 	 * so give a warning.  If a colon is present, we likely have a
 	 * non-local disk or cd-rom, so no warning is necessary.
 	 * e.g. /devices/pci@1f,4000/scsi@3/sd@6,0:b (cdrom, no link) or
-	 * 	storage-e4:/blah/blah remote boot server
+	 *	storage-e4:/blah/blah remote boot server
 	 */
 	if (readlink(mp.mnt_special, buf, BUFSIZ) < 0) {
 		if (strstr(mp.mnt_special, ":") == NULL) {
@@ -867,9 +865,9 @@ q_load_file(int fcode_fd, char *device)
 /*
  * Issue warning strings and loop for Yes/No user interaction
  *    err# 0 -- we're ok, warn for pending FCode load
- *         1 -- not in single user mode
- *         2 -- can't get chip_id
- *         3 -- card and file do not have same type (2100/2200)
+ *	   1 -- not in single user mode
+ *	   2 -- can't get chip_id
+ *	   3 -- card and file do not have same type (2100/2200)
  */
 static int
 q_warn(int errnum)
@@ -923,11 +921,11 @@ loop1:
 }
 
 /*
- * Name    : memstrstr
+ * Name	   : memstrstr
  * Input   : pointer to buf1, pointer to buf2, size of buf1, size of buf2
  * Returns :
- *      Offset of the start of contents-of-buf2 in buf1 if it is found
- *      -1 if buf1 does not contain contents of buf2
+ *	Offset of the start of contents-of-buf2 in buf1 if it is found
+ *	-1 if buf1 does not contain contents of buf2
  * Synopsis:
  * This function works similar to strstr(). The difference is that null
  * characters in the buffer are treated like any other character. So, buf1
@@ -1047,22 +1045,22 @@ int
 emulex_update(char *file)
 {
 
-	int 		fd, retval = 0;
-	int 		devcnt = 0;
-	uint_t 		state = 0, fflag = 0;
-	static uchar_t  bootpath[PATH_MAX];
-	int 		fcode_fd = -1;
+	int		fd, retval = 0;
+	int		devcnt = 0;
+	uint_t		state = 0, fflag = 0;
+	static uchar_t	bootpath[PATH_MAX];
+	int		fcode_fd = -1;
 	static struct	utmpx *utmpp = NULL;
-	di_node_t 	root;
-	di_node_t 	node, sib_node, count_node;
-	di_minor_t 	minor_node;
-	char 		phys_path[PATH_MAX], *path;
-	int 		errnum = 0, fcio_errno = 0;
+	di_node_t	root;
+	di_node_t	node, sib_node, count_node;
+	di_minor_t	minor_node;
+	char		phys_path[PATH_MAX], *path;
+	int		errnum = 0, fcio_errno = 0;
 	static uchar_t	prom_ver_data[MAXNAMELEN];
 	static char	ver_file[EMULEX_FCODE_VERSION_LENGTH];
 	void		(*sigint)();
 	int		prop_entries = -1;
-	int 		*port_data = NULL;
+	int		*port_data = NULL;
 
 	if (file) {
 		/* set the fcode download flag */
@@ -1122,13 +1120,29 @@ emulex_update(char *file)
 		"\n  Found Path to %d Emulex Devices.\n"), devcnt);
 		retval++;
 	} else {
-
 		count_node = node;
 		while (count_node != DI_NODE_NIL) {
 			state = di_state(count_node);
 			if ((state & DI_DRIVER_DETACHED)
 			    != DI_DRIVER_DETACHED) {
-				devcnt++;
+				sib_node = di_child_node(count_node);
+				while (sib_node != DI_NODE_NIL) {
+					state = di_state(sib_node);
+					if ((state & DI_DRIVER_DETACHED) !=
+					    DI_DRIVER_DETACHED) {
+						/* Found an attached node */
+						prop_entries =
+						    di_prop_lookup_ints(
+						    DDI_DEV_T_ANY, sib_node,
+						    "port", &port_data);
+						if (prop_entries != -1) {
+							devcnt++;
+							break;
+						}
+					}
+
+					sib_node = di_sibling_node(sib_node);
+				}
 			}
 			count_node = di_drv_next_node(count_node);
 		}
@@ -1150,7 +1164,6 @@ emulex_update(char *file)
 
 		sib_node = di_child_node(node);
 		while (sib_node != DI_NODE_NIL) {
-
 			state = di_state(sib_node);
 			if ((state & DI_DRIVER_DETACHED) !=
 			    DI_DRIVER_DETACHED) {
@@ -1171,8 +1184,9 @@ emulex_update(char *file)
 		}
 
 		if (sib_node == DI_NODE_NIL) {
-			return (1);
+			goto try_next;
 		}
+
 		path = di_devfs_path(sib_node);
 		(void) strcpy(phys_path, "/devices");
 		(void) strncat(phys_path, path, strlen(path));
@@ -1272,6 +1286,7 @@ emulex_update(char *file)
 			}
 		}
 
+	try_next:
 		node = di_drv_next_node(node);
 	}
 
