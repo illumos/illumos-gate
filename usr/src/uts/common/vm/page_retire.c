@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -919,29 +919,6 @@ page_retire_thread_cb(page_t *pp)
 		page_unlock(pp);
 	}
 }
-
-/*
- * page_retire_hunt() callback for mdboot().
- *
- * It is necessary to scrub any failing pages prior to reboot in order to
- * prevent a latent error trap from occurring on the next boot.
- */
-void
-page_retire_mdboot_cb(page_t *pp)
-{
-	/*
-	 * Don't scrub the kernel, since we might still need it, unless
-	 * we have UEs on the page, in which case we have nothing to lose.
-	 */
-	if (!PP_ISKAS(pp) || PP_TOXIC(pp)) {
-		pp->p_selock = -1;	/* pacify ASSERTs */
-		PP_CLRFREE(pp);
-		pagescrub(pp, 0, PAGESIZE);
-		pp->p_selock = 0;
-	}
-	pp->p_toxic = 0;
-}
-
 
 /*
  * Callback used by page_trycapture() to finish off retiring a page.
