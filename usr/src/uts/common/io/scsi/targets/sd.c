@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6820,9 +6820,7 @@ sd_unit_attach(dev_info_t *devi)
 	sd_ssc_t	*ssc;
 	int		status;
 	struct sd_fm_internal	*sfip = NULL;
-#if defined(__sparc)
 	int		max_xfer_size;
-#endif
 
 	/*
 	 * Retrieve the target driver's private data area. This was set
@@ -7459,13 +7457,22 @@ sd_unit_attach(dev_info_t *devi)
 	 * In the future the SPARC pci nexus driver may solve
 	 * the problem instead of this fix.
 	 */
-#if defined(__sparc)
 	max_xfer_size = scsi_ifgetcap(SD_ADDRESS(un), "dma-max", 1);
 	if ((max_xfer_size > 0) && (max_xfer_size < un->un_max_xfer_size)) {
+		/* We need DMA partial even on sparc to ensure sddump() works */
 		un->un_max_xfer_size = max_xfer_size;
-		un->un_partial_dma_supported = 1;
+		if (un->un_partial_dma_supported == 0)
+			un->un_partial_dma_supported = 1;
 	}
-#endif
+	if (ddi_prop_get_int(DDI_DEV_T_ANY, SD_DEVINFO(un),
+	    DDI_PROP_DONTPASS, "buf_break", 0) == 1) {
+		if (ddi_xbuf_attr_setup_brk(un->un_xbuf_attr,
+		    un->un_max_xfer_size) == 1) {
+			un->un_buf_breakup_supported = 1;
+			SD_INFO(SD_LOG_ATTACH_DETACH, un, "sd_unit_attach: "
+			    "un:0x%p Buf breakup enabled\n", un);
+		}
+	}
 
 	/*
 	 * Set PKT_DMA_PARTIAL flag.
@@ -10372,6 +10379,15 @@ sdmin(struct buf *bp)
 	un = ddi_get_soft_state(sd_state, instance);
 	ASSERT(un != NULL);
 
+	/*
+	 * We depend on DMA partial or buf breakup to restrict
+	 * IO size if any of them enabled.
+	 */
+	if (un->un_partial_dma_supported ||
+	    un->un_buf_breakup_supported) {
+		return;
+	}
+
 	if (bp->b_bcount > un->un_max_xfer_size) {
 		bp->b_bcount = un->un_max_xfer_size;
 	}
@@ -11874,25 +11890,28 @@ sd_buf_iodone(int index, struct sd_lun *un, struct buf *bp)
 	xp = SD_GET_XBUF(bp);
 	ASSERT(xp != NULL);
 
-	mutex_enter(SD_MUTEX(un));
+	/* xbuf is gone after this */
+	if (ddi_xbuf_done(bp, un->un_xbuf_attr)) {
+		mutex_enter(SD_MUTEX(un));
 
-	/*
-	 * Grab time when the cmd completed.
-	 * This is used for determining if the system has been
-	 * idle long enough to make it idle to the PM framework.
-	 * This is for lowering the overhead, and therefore improving
-	 * performance per I/O operation.
-	 */
-	un->un_pm_idle_time = ddi_get_time();
+		/*
+		 * Grab time when the cmd completed.
+		 * This is used for determining if the system has been
+		 * idle long enough to make it idle to the PM framework.
+		 * This is for lowering the overhead, and therefore improving
+		 * performance per I/O operation.
+		 */
+		un->un_pm_idle_time = ddi_get_time();
 
-	un->un_ncmds_in_driver--;
-	ASSERT(un->un_ncmds_in_driver >= 0);
-	SD_INFO(SD_LOG_IO, un, "sd_buf_iodone: un_ncmds_in_driver = %ld\n",
-	    un->un_ncmds_in_driver);
+		un->un_ncmds_in_driver--;
+		ASSERT(un->un_ncmds_in_driver >= 0);
+		SD_INFO(SD_LOG_IO, un,
+		    "sd_buf_iodone: un_ncmds_in_driver = %ld\n",
+		    un->un_ncmds_in_driver);
 
-	mutex_exit(SD_MUTEX(un));
+		mutex_exit(SD_MUTEX(un));
+	}
 
-	ddi_xbuf_done(bp, un->un_xbuf_attr);	/* xbuf is gone after this */
 	biodone(bp);				/* bp is gone after this */
 
 	SD_TRACE(SD_LOG_IO_CORE, un, "sd_buf_iodone: exit.\n");

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -873,6 +873,21 @@ aac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (aac_common_attach(softs) == AACERR)
 		goto error;
 	attach_state |= AAC_ATTACH_COMM_SPACE_SETUP;
+
+	/* Check for buf breakup support */
+	if ((ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, 0,
+	    "breakup-enable", &data) == DDI_SUCCESS)) {
+		if (strcmp(data, "yes") == 0) {
+			AACDB_PRINT(softs, CE_NOTE, "buf breakup enabled");
+			softs->flags |= AAC_FLAGS_BRKUP;
+		}
+		ddi_prop_free(data);
+	}
+	softs->dma_max = softs->buf_dma_attr.dma_attr_maxxfer;
+	if (softs->flags & AAC_FLAGS_BRKUP) {
+		softs->dma_max = ddi_prop_get_int(DDI_DEV_T_ANY, dip,
+		    DDI_PROP_DONTPASS, "dma-max", softs->dma_max);
+	}
 
 	/* Init the cmd queues */
 	for (i = 0; i < AAC_CMDQ_NUM; i++)
@@ -3937,6 +3952,14 @@ aac_tran_tgt_init(dev_info_t *hba_dip, dev_info_t *tgt_dip,
 		dvp = (struct aac_device *)&softs->nondasds[AAC_PD(tgt)];
 	}
 
+	if (softs->flags & AAC_FLAGS_BRKUP) {
+		if (ndi_prop_update_int(DDI_DEV_T_NONE, tgt_dip,
+		    "buf_break", 1) != DDI_PROP_SUCCESS) {
+			cmn_err(CE_CONT, "unable to create "
+			    "property for t%dL%d (buf_break)", tgt, lun);
+		}
+        }
+
 	AACDB_PRINT(softs, CE_NOTE,
 	    "aac_tran_tgt_init: c%dt%dL%d ok (%s)", ctl, tgt, lun,
 	    (dvp->type == AAC_DEV_PD) ? "pd" : "ld");
@@ -4762,7 +4785,7 @@ aac_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 		rval = 1;
 		break;
 	case SCSI_CAP_DMA_MAX:
-		rval = softs->buf_dma_attr.dma_attr_maxxfer;
+		rval = softs->dma_max;
 		break;
 	default:
 		rval = -1;

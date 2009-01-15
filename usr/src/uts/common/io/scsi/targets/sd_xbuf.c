@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/scsi/scsi.h>
 #include <sys/ddi.h>
@@ -56,6 +53,8 @@
 static int xbuf_iostart(ddi_xbuf_attr_t xap);
 static void xbuf_dispatch(ddi_xbuf_attr_t xap);
 static void xbuf_restart_callback(void *arg);
+static void xbuf_enqueue(struct buf *bp, ddi_xbuf_attr_t xap);
+static int xbuf_brk_done(struct buf *bp);
 
 
 /*
@@ -75,6 +74,33 @@ static int xbuf_attr_tq_maxalloc = XBUF_TQ_MAXALLOC;
 
 static kmutex_t	xbuf_mutex = { 0 };
 static uint32_t	xbuf_refcount = 0;
+
+/*
+ * Private wrapper for buf cloned via ddi_xbuf_qstrategy()
+ */
+struct xbuf_brk {
+	kmutex_t mutex;
+	struct buf *bp0;
+	uint8_t nbufs;	/* number of buf allocated */
+	uint8_t active; /* number of active xfer */
+
+	size_t brksize;	/* break size used for this buf */
+	int brkblk;
+
+	/* xfer position */
+	off_t off;
+	off_t noff;
+	daddr_t blkno;
+};
+
+_NOTE(DATA_READABLE_WITHOUT_LOCK(xbuf_brk::off))
+
+/*
+ * Hack needed in the prototype so buf breakup will work.
+ * Here we can rely on the sd code not changing the value in
+ * b_forw.
+ */
+#define	b_clone_private b_forw
 
 
 /* ARGSUSED */
@@ -167,6 +193,18 @@ ddi_xbuf_attr_unregister_devinfo(ddi_xbuf_attr_t xbuf_attr, dev_info_t *dip)
 	/* Currently a no-op in this prototype */
 }
 
+DDII int
+ddi_xbuf_attr_setup_brk(ddi_xbuf_attr_t xap, size_t size)
+{
+	if (size < DEV_BSIZE)
+		return (0);
+
+	mutex_enter(&xap->xa_mutex);
+	xap->xa_brksize = size & ~(DEV_BSIZE - 1);
+	mutex_exit(&xap->xa_mutex);
+	return (1);
+}
+
 
 
 /*
@@ -183,6 +221,30 @@ ddi_xbuf_qstrategy(struct buf *bp, ddi_xbuf_attr_t xap)
 
 	mutex_enter(&xap->xa_mutex);
 
+	ASSERT((bp->b_bcount & (DEV_BSIZE - 1)) == 0);
+
+	/*
+	 * Breakup buf if necessary. bp->b_private is temporarily
+	 * used to save xbuf_brk
+	 */
+	if (xap->xa_brksize && bp->b_bcount > xap->xa_brksize) {
+		struct xbuf_brk *brkp;
+
+		brkp = kmem_zalloc(sizeof (struct xbuf_brk), KM_SLEEP);
+		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*brkp))
+		mutex_init(&brkp->mutex, NULL, MUTEX_DRIVER, NULL);
+		brkp->bp0 = bp;
+		brkp->brksize = xap->xa_brksize;
+		brkp->brkblk = btodt(xap->xa_brksize);
+		brkp->noff = xap->xa_brksize;
+		brkp->blkno = bp->b_blkno;
+		_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*brkp))
+		bp->b_private = brkp;
+	} else {
+		bp->b_private = NULL;
+	}
+
+	/* Enqueue buf */
 	if (xap->xa_headp == NULL) {
 		xap->xa_headp = xap->xa_tailp = bp;
 	} else {
@@ -203,10 +265,11 @@ ddi_xbuf_qstrategy(struct buf *bp, ddi_xbuf_attr_t xap)
  * May be called under interrupt context.
  */
 
-DDII void
+DDII int
 ddi_xbuf_done(struct buf *bp, ddi_xbuf_attr_t xap)
 {
 	ddi_xbuf_t xp;
+	int done;
 
 	ASSERT(bp != NULL);
 	ASSERT(xap != NULL);
@@ -240,12 +303,57 @@ ddi_xbuf_done(struct buf *bp, ddi_xbuf_attr_t xap)
 	kmem_free(xp, xap->xa_allocsize);	/* return it to the system */
 
 done:
+	if (bp->b_iodone == xbuf_brk_done) {
+		struct xbuf_brk *brkp = (struct xbuf_brk *)bp->b_clone_private;
+
+		brkp->active--;
+		if (brkp->active || xap->xa_headp == brkp->bp0) {
+			done = 0;
+		} else {
+			brkp->off = -1;	/* mark bp0 as completed */
+			done = 1;
+		}
+	} else {
+		done = 1;
+	}
+
 	if ((xap->xa_active_limit == 0) ||
 	    (xap->xa_active_count <= xap->xa_active_lowater)) {
 		xbuf_dispatch(xap);
 	}
 
 	mutex_exit(&xap->xa_mutex);
+	return (done);
+}
+
+static int
+xbuf_brk_done(struct buf *bp)
+{
+	struct xbuf_brk *brkp = (struct xbuf_brk *)bp->b_clone_private;
+	struct buf *bp0 = brkp->bp0;
+	int done;
+
+	mutex_enter(&brkp->mutex);
+	if (bp->b_flags & B_ERROR && !(bp0->b_flags & B_ERROR)) {
+		bp0->b_flags |= B_ERROR;
+		bp0->b_error = bp->b_error;
+	}
+	if (bp->b_resid)
+		bp0->b_resid = bp0->b_bcount;
+
+	freerbuf(bp);
+	brkp->nbufs--;
+
+	done = (brkp->off == -1 && brkp->nbufs == 0);
+	mutex_exit(&brkp->mutex);
+
+	/* All buf segments done */
+	if (done) {
+		mutex_destroy(&brkp->mutex);
+		kmem_free(brkp, sizeof (struct xbuf_brk));
+		biodone(bp0);
+	}
+	return (0);
 }
 
 DDII void
@@ -386,9 +494,40 @@ xbuf_iostart(ddi_xbuf_attr_t xap)
 		 */
 		xap->xa_active_count++;
 
-		/* unlink the buf from the list */
-		xap->xa_headp = bp->av_forw;
-		bp->av_forw = NULL;
+		if (bp->b_private) {
+			struct xbuf_brk *brkp = bp->b_private;
+			struct buf *bp0 = bp;
+
+			brkp->active++;
+
+			mutex_enter(&brkp->mutex);
+			brkp->nbufs++;
+			mutex_exit(&brkp->mutex);
+
+			if (brkp->noff < bp0->b_bcount) {
+				bp = bioclone(bp0, brkp->off, brkp->brksize,
+				    bp0->b_edev, brkp->blkno, xbuf_brk_done,
+				    NULL, KM_SLEEP);
+
+				/* update xfer position */
+				brkp->off = brkp->noff;
+				brkp->noff += brkp->brksize;
+				brkp->blkno += brkp->brkblk;
+			} else {
+				bp = bioclone(bp0, brkp->off,
+				    bp0->b_bcount - brkp->off, bp0->b_edev,
+				    brkp->blkno, xbuf_brk_done, NULL, KM_SLEEP);
+
+				/* unlink the buf from the list */
+				xap->xa_headp = bp0->av_forw;
+				bp0->av_forw = NULL;
+			}
+			bp->b_clone_private = (struct buf *)brkp;
+		} else {
+			/* unlink the buf from the list */
+			xap->xa_headp = bp->av_forw;
+			bp->av_forw = NULL;
+		}
 
 		/*
 		 * Hack needed in the prototype so ddi_xbuf_get() will work.

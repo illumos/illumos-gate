@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@ extern "C" {
 
 #define	AAC_DRIVER_MAJOR_VERSION	2
 #define	AAC_DRIVER_MINOR_VERSION	2
-#define	AAC_DRIVER_BUGFIX_LEVEL		5
+#define	AAC_DRIVER_BUGFIX_LEVEL		6
 #define	AAC_DRIVER_TYPE			AAC_TYPE_RELEASE
 
 #define	STR(s)				# s
@@ -244,6 +244,7 @@ struct aac_slot {
 #define	AAC_FLAGS_17SG		(1 << 8) /* quirk: 17 scatter gather maximum */
 #define	AAC_FLAGS_34SG		(1 << 9) /* quirk: 34 scatter gather maximum */
 #define	AAC_FLAGS_NONDASD	(1 << 10) /* non-DASD device supported */
+#define	AAC_FLAGS_BRKUP		(1 << 11) /* pkt breakup support */
 
 struct aac_softstate;
 struct aac_interface {
@@ -285,6 +286,7 @@ struct aac_softstate {
 	scsi_hba_tran_t *hba_tran;
 	int slen;
 	int legacy;		/* legacy device naming */
+	uint32_t dma_max;	/* for buf breakup */
 
 	/* DMA attributes */
 	ddi_dma_attr_t buf_dma_attr;
