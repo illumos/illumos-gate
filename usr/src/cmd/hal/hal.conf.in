@@ -14,54 +14,48 @@
     <allow own="org.freedesktop.Hal"/>
   </policy>
 
-  <!-- Allow anyone to invoke methods on the Manager and Device interfaces -->
   <policy context="default">
-    <allow send_interface="org.freedesktop.Hal.Manager"/>
-    <allow send_interface="org.freedesktop.Hal.Device"/>
-    <allow receive_interface="org.freedesktop.Hal.Manager"
-           receive_sender="org.freedesktop.Hal"/>
-    <allow receive_interface="org.freedesktop.Hal.Device"
-           receive_sender="org.freedesktop.Hal"/>
+    <!-- Allow anyone to invoke methods on the Manager and Device interfaces -->
+    <allow send_interface="org.freedesktop.Hal.Manager"
+           send_destination="org.freedesktop.Hal"/>
+    <allow send_interface="org.freedesktop.Hal.Device"
+           send_destination="org.freedesktop.Hal"/>
+    <allow send_interface="org.freedesktop.DBus.Introspectable"
+           send_destination="org.freedesktop.Hal"/>
 
-    <allow send_interface="org.freedesktop.Hal.Device.SystemPowerManagement"/>
-    <allow send_interface="org.freedesktop.Hal.Device.LaptopPanel"/>
-    <allow send_interface="org.freedesktop.Hal.Device.Volume"/>
-    <allow send_interface="org.freedesktop.Hal.Device.Volume.Crypto"/>
-    <allow receive_interface="org.freedesktop.Hal.Device.SystemPowerManagement"
-	   receive_sender="org.freedesktop.Hal"/>
-    <allow receive_interface="org.freedesktop.Hal.Device.LaptopPanel"
-	   receive_sender="org.freedesktop.Hal"/>
-    <allow receive_interface="org.freedesktop.Hal.Device.Volume"
-	   receive_sender="org.freedesktop.Hal"/>
-    <allow receive_interface="org.freedesktop.Hal.Device.Volume.Crypto"
-	   receive_sender="org.freedesktop.Hal"/>
+    <!-- These interfaces use RBAC, should not block access at DBus level -->
+    <allow send_interface="org.freedesktop.Hal.Device.SystemPowerManagement"
+           send_destination="org.freedesktop.Hal"/>
+    <allow send_interface="org.freedesktop.Hal.Device.VideoAdapterPM"
+           send_destination="org.freedesktop.Hal"/>
+    <allow send_interface="org.freedesktop.Hal.Device.LaptopPanel"
+           send_destination="org.freedesktop.Hal"/>
+    <allow send_interface="org.freedesktop.Hal.Device.CPUFreq"
+           send_destination="org.freedesktop.Hal"/>
   </policy>
 
   <!-- Default policy for the exported interfaces -->
   <policy context="default">
-    <deny send_interface="org.freedesktop.Hal.Device.SystemPowerManagement"/>
-    <deny send_interface="org.freedesktop.Hal.Device.VideoAdapterPM"/>
-    <deny send_interface="org.freedesktop.Hal.Device.LaptopPanel"/>
-    <deny send_interface="org.freedesktop.Hal.Device.Volume"/>
-    <deny send_interface="org.freedesktop.Hal.Device.Volume.Crypto"/>
+    <deny send_interface="org.freedesktop.Hal.Device.Volume"
+          send_destination="org.freedesktop.Hal"/>
+    <deny send_interface="org.freedesktop.Hal.Device.Storage"
+          send_destination="org.freedesktop.Hal"/>
   </policy>
 
-  <!-- This will not work if pam_console support is not enabled -->
+  <!-- This will not work if logindevperm is not enabled -->
   <policy at_console="true">
-    <allow send_interface="org.freedesktop.Hal.Device.SystemPowerManagement"/>
-    <allow send_interface="org.freedesktop.Hal.Device.LaptopPanel"/>
-    <allow send_interface="org.freedesktop.Hal.Device.Volume"/>
-    <allow send_interface="org.freedesktop.Hal.Device.Volume.Crypto"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Volume"
+           send_destination="org.freedesktop.Hal"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Storage"
+           send_destination="org.freedesktop.Hal"/>
   </policy>
 
   <!-- You can change this to a more suitable user, or make per-group -->
   <policy user="0">
-    <allow send_interface="org.freedesktop.Hal.Device.SystemPowerManagement"/>
-    <allow send_interface="org.freedesktop.Hal.Device.VideoAdapterPM"/>
-    <allow send_interface="org.freedesktop.Hal.Device.LaptopPanel"/>
-    <allow send_interface="org.freedesktop.Hal.Device.Volume"/>
-    <allow send_interface="org.freedesktop.Hal.Device.Volume.Crypto"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Volume"
+           send_destination="org.freedesktop.Hal"/>
+    <allow send_interface="org.freedesktop.Hal.Device.Storage"
+           send_destination="org.freedesktop.Hal"/>
   </policy>
 
 </busconfig>
-
