@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,7 @@ struct aes_block {
 	uint64_t b;
 };
 
-static void
+void
 gcm_mul(uint64_t *x_in, uint64_t *y, uint64_t *res)
 {
 	uint64_t R = { 0xe100000000000000ULL };

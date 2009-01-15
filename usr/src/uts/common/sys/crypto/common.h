@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -448,7 +448,8 @@ typedef enum cmd_type {
 	COMPARE_TO_DATA,
 	MD5_DIGEST_DATA,
 	SHA1_DIGEST_DATA,
-	SHA2_DIGEST_DATA
+	SHA2_DIGEST_DATA,
+	GHASH_DATA
 } cmd_type_t;
 
 #define	CRYPTO_DO_UPDATE	0x01

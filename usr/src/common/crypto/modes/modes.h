@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -361,6 +361,8 @@ extern int gcm_init_ctx(gcm_ctx_t *, char *, size_t,
 
 extern void calculate_ccm_mac(ccm_ctx_t *, uint8_t *,
     int (*encrypt_block)(const void *, const uint8_t *, uint8_t *));
+
+extern void gcm_mul(uint64_t *, uint64_t *, uint64_t *);
 
 extern void crypto_init_ptrs(crypto_data_t *, void **, offset_t *);
 extern void crypto_get_ptrs(crypto_data_t *, void **, offset_t *,
