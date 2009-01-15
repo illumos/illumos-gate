@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,7 @@
 #include <curses.h>
 
 struct flowlist {
-	char		flowname[MAXNAMELEN];
+	char		flowname[MAXFLOWNAMELEN];
 	datalink_id_t	linkid;
 	uint_t		ifspeed;
 	boolean_t	first;
@@ -91,7 +91,7 @@ findstat(const char *flowname, datalink_id_t linkid)
 			break;
 		/* match the flowname */
 		if (flowname != NULL) {
-			if (strncmp(flowname, flist->flowname, MAXNAMELEN)
+			if (strncmp(flowname, flist->flowname, MAXFLOWNAMELEN)
 			    == NULL)
 				return (flist);
 		/* match the linkid */
@@ -120,7 +120,7 @@ findstat(const char *flowname, datalink_id_t linkid)
 	flist->first = B_TRUE;
 
 	if (flowname != NULL)
-		(void) strncpy(flist->flowname, flowname, MAXNAMELEN);
+		(void) strncpy(flist->flowname, flowname, MAXFLOWNAMELEN);
 	flist->linkid = linkid;
 	return (flist);
 }
@@ -145,7 +145,7 @@ print_flow_stats(dladm_handle_t handle, struct flowlist *flist)
 	    fcount <= statentry;
 	    fcount++, fcurr++) {
 		if (fcurr->flowname && fcurr->display) {
-			char linkname[MAXNAMELEN];
+			char linkname[MAXLINKNAMELEN];
 
 			(void) dladm_datalink_id2info(handle, fcurr->linkid,
 			    NULL, NULL, NULL, linkname, sizeof (linkname));
@@ -226,7 +226,7 @@ print_link_stats(dladm_handle_t handle, struct flowlist *flist)
 	    fcount++, fcurr++) {
 		if ((fcurr->linkid != DATALINK_INVALID_LINKID) &&
 		    fcurr->display)  {
-			char linkname[MAXNAMELEN];
+			char linkname[MAXLINKNAMELEN];
 
 			(void) dladm_datalink_id2info(handle, fcurr->linkid,
 			    NULL, NULL, NULL, linkname, sizeof (linkname));
@@ -271,7 +271,7 @@ link_kstats(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 	struct flowlist	*flist;
 	pktsum_t	currstats, *prevstats, *diffstats;
 	kstat_t		*ksp;
-	char		linkname[MAXNAMELEN];
+	char		linkname[MAXLINKNAMELEN];
 
 	/* find the flist entry */
 	flist = findstat(NULL, linkid);

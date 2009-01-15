@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -294,7 +294,7 @@ mac_bcast_add(mac_client_impl_t *mcip, const uint8_t *addr, uint16_t vid,
 		 * The group does not yet exist, create it.
 		 */
 		flow_desc_t flow_desc;
-		char flow_name[MAXFLOWNAME];
+		char flow_name[MAXFLOWNAMELEN];
 
 		grp = kmem_cache_alloc(mac_bcast_grp_cache, KM_SLEEP);
 		bzero(grp, sizeof (mac_bcast_grp_t));

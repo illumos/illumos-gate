@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +100,7 @@ extern int mac_link_flow_modify(char *, mac_resource_props_t *);
 extern boolean_t mac_link_has_flows(mac_client_handle_t);
 
 typedef struct {
-	char			fi_flow_name[MAXNAMELEN];
+	char			fi_flow_name[MAXFLOWNAMELEN];
 	datalink_id_t		fi_link_id;
 	flow_desc_t		fi_flow_desc;
 	mac_resource_props_t	fi_resource_props;

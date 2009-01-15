@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,11 @@ extern "C" {
 #include <netinet/in.h>		/* for IPPROTO_* constants */
 #include <sys/ethernet.h>
 
-#define	MAXFLOWNAME		32
+/*
+ * MAXFLOWNAMELEN defines the longest possible permitted flow name,
+ * including the terminating NUL.
+ */
+#define	MAXFLOWNAMELEN		128
 
 /* need to use MAXMACADDRLEN from dld.h instead of this one */
 #define	MAXMACADDR		20

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -194,7 +194,7 @@ mac_flow_create(flow_desc_t *fd, mac_resource_props_t *mrp, char *name,
 		flent->fe_cb_fn = (flow_fn_t)mac_pkt_drop;
 		flent->fe_index = -1;
 	}
-	(void) strlcpy(flent->fe_flow_name, name, MAXFLOWNAME);
+	(void) strlcpy(flent->fe_flow_name, name, MAXFLOWNAMELEN);
 
 	/* This is an initial flow, will be configured later */
 	if (fd == NULL) {
@@ -867,13 +867,13 @@ mac_flow_set_name(flow_entry_t *flent, const char *name)
 		 *  The flow hasn't yet been inserted into the table,
 		 * so only the caller knows about this flow
 		 */
-		(void) strlcpy(flent->fe_flow_name, name, MAXFLOWNAME);
+		(void) strlcpy(flent->fe_flow_name, name, MAXFLOWNAMELEN);
 	} else {
 		ASSERT(MAC_PERIM_HELD((mac_handle_t)ft->ft_mip));
 	}
 
 	mutex_enter(&flent->fe_lock);
-	(void) strlcpy(flent->fe_flow_name, name, MAXFLOWNAME);
+	(void) strlcpy(flent->fe_flow_name, name, MAXFLOWNAMELEN);
 	mutex_exit(&flent->fe_lock);
 }
 
@@ -1436,7 +1436,8 @@ typedef struct {
 static void
 mac_link_flowinfo_copy(mac_flowinfo_t *finfop, flow_entry_t *flent)
 {
-	(void) strlcpy(finfop->fi_flow_name, flent->fe_flow_name, MAXNAMELEN);
+	(void) strlcpy(finfop->fi_flow_name, flent->fe_flow_name,
+	    MAXFLOWNAMELEN);
 	finfop->fi_link_id = flent->fe_link_id;
 	finfop->fi_flow_desc = flent->fe_flow_desc;
 	finfop->fi_resource_props = flent->fe_resource_props;

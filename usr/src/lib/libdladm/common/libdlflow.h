@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@ extern "C" {
 
 typedef struct dladm_flow_attr {
 	datalink_id_t		fa_linkid;
-	char			fa_flowname[MAXNAMELEN];
+	char			fa_flowname[MAXFLOWNAMELEN];
 	flow_desc_t		fa_flow_desc;
 	mac_resource_props_t	fa_resource_props;
 	uint64_t		fa_mask;

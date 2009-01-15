@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,13 +78,15 @@ do_check_remote_ip(char *attr_val, flow_desc_t *fdesc)
 dladm_status_t
 do_check_ip_addr(char *addr_str, boolean_t local, flow_desc_t *fd)
 {
-	struct addrinfo	*info = NULL;
 	dladm_status_t	status;
-	int		err, prefix_max, prefix_len = 0;
+	int		prefix_max, prefix_len = 0;
 	char		*prefix_str, *endp = NULL;
 	flow_mask_t	mask;
 	in6_addr_t	*addr;
 	uchar_t		*netmask;
+	struct in_addr	v4addr;
+	struct in6_addr	v6addr;
+	int		family;
 
 	if ((prefix_str = strchr(addr_str, '/')) != NULL) {
 		*prefix_str++ = '\0';
@@ -93,10 +95,13 @@ do_check_ip_addr(char *addr_str, boolean_t local, flow_desc_t *fd)
 		if (errno != 0 || prefix_len == 0 || *endp != '\0')
 			return (DLADM_STATUS_INVALID_PREFIXLEN);
 	}
-
-	err = getaddrinfo(addr_str, NULL, NULL, &info);
-	if (err != 0)
+	if (inet_pton(AF_INET, addr_str, &v4addr.s_addr) == 1) {
+		family = AF_INET;
+	} else if (inet_pton(AF_INET6, addr_str, v6addr.s6_addr) == 1) {
+		family = AF_INET6;
+	} else {
 		return (DLADM_STATUS_INVALID_IP);
+	}
 
 	mask = FLOW_IP_VERSION;
 	if (local) {
@@ -109,21 +114,16 @@ do_check_ip_addr(char *addr_str, boolean_t local, flow_desc_t *fd)
 		netmask = (uchar_t *)&fd->fd_remote_netmask;
 	}
 
-	if (info->ai_family == AF_INET) {
-		IN6_INADDR_TO_V4MAPPED(&(((struct sockaddr_in *)
-		    (void *)info->ai_addr)->sin_addr), addr);
+	if (family == AF_INET) {
+		IN6_INADDR_TO_V4MAPPED(&v4addr, addr);
 		prefix_max = IP_ABITS;
 		fd->fd_ipversion = IPV4_VERSION;
 		netmask = (uchar_t *)
 		    &(V4_PART_OF_V6((*((in6_addr_t *)(void *)netmask))));
-	} else if (info->ai_family == AF_INET6) {
-		*addr = ((struct sockaddr_in6 *)
-		    (void *)info->ai_addr)->sin6_addr;
+	} else {
+		*addr = v6addr;
 		prefix_max = IPV6_ABITS;
 		fd->fd_ipversion = IPV6_VERSION;
-	} else {
-		freeaddrinfo(info);
-		return (DLADM_STATUS_INVALID_IP);
 	}
 
 	if (prefix_len == 0)
@@ -132,12 +132,10 @@ do_check_ip_addr(char *addr_str, boolean_t local, flow_desc_t *fd)
 	status = dladm_prefixlen2mask(prefix_len, prefix_max, netmask);
 
 	if (status != DLADM_STATUS_OK) {
-		freeaddrinfo(info);
 		return (DLADM_STATUS_INVALID_PREFIXLEN);
 	}
 
 	fd->fd_mask |= mask;
-	freeaddrinfo(info);
 	return (DLADM_STATUS_OK);
 }
 

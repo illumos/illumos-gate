@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1505,7 +1505,7 @@ mac_unicast_flow_create(mac_client_impl_t *mcip, uint8_t *mac_addr,
 {
 	mac_impl_t	*mip = (mac_impl_t *)mcip->mci_mip;
 	flow_desc_t	flow_desc;
-	char		flowname[MAXFLOWNAME];
+	char		flowname[MAXFLOWNAMELEN];
 	int		err;
 	uint_t		flent_flags;
 
@@ -1555,7 +1555,7 @@ mac_unicast_flow_create(mac_client_impl_t *mcip, uint8_t *mac_addr,
 	 * flent with the MAC client's flow name.
 	 */
 	if (first_flow) {
-		bcopy(mcip->mci_name, flowname, MAXFLOWNAME);
+		bcopy(mcip->mci_name, flowname, MAXFLOWNAMELEN);
 	} else {
 		(void) sprintf(flowname, "%s%u", mcip->mci_name, vid);
 		flent_flags = FLOW_NO_STATS;
@@ -3339,7 +3339,7 @@ mac_rename_flow_names(mac_client_impl_t *mcip, const char *new_name)
 {
 	flow_entry_t	*flent;
 	uint16_t	vid;
-	char		flowname[MAXFLOWNAME];
+	char		flowname[MAXFLOWNAMELEN];
 	mac_impl_t	*mip = mcip->mci_mip;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mip));
@@ -3421,19 +3421,18 @@ mac_client_remove_flow_from_list(mac_client_impl_t *mcip, flow_entry_t *flent)
 		fe = fe->fe_client_next;
 	}
 
-	/* XXX should be an ASSERT */
-	if (fe != NULL) {
-		if (prev_fe == NULL) {
-			/* Deleting the first node */
-			mcip->mci_flent_list = fe->fe_client_next;
-		} else {
-			prev_fe->fe_client_next = fe->fe_client_next;
-		}
-		mcip->mci_nflents--;
-
-		if (i_mac_flow_vid(flent) != VLAN_ID_NONE)
-			mcip->mci_nvids--;
+	ASSERT(fe != NULL);
+	if (prev_fe == NULL) {
+		/* Deleting the first node */
+		mcip->mci_flent_list = fe->fe_client_next;
+	} else {
+		prev_fe->fe_client_next = fe->fe_client_next;
 	}
+	mcip->mci_nflents--;
+
+	if (i_mac_flow_vid(flent) != VLAN_ID_NONE)
+		mcip->mci_nvids--;
+
 	rw_exit(&mcip->mci_rw_lock);
 }
 
@@ -3500,7 +3499,7 @@ mac_client_swap_mciflent(mac_client_impl_t *mcip)
 	flow_tab_t	*ft = flent->fe_flow_tab;
 	flow_entry_t	*flent1;
 	flow_desc_t	fl_desc;
-	char		fl_name[MAXFLOWNAME];
+	char		fl_name[MAXFLOWNAMELEN];
 	int		err;
 
 	ASSERT(MAC_PERIM_HELD((mac_handle_t)mcip->mci_mip));
@@ -3524,19 +3523,19 @@ mac_client_swap_mciflent(mac_client_impl_t *mcip)
 	mac_flow_remove(ft, flent1, B_TRUE);
 
 	bcopy(&flent->fe_flow_desc, &fl_desc, sizeof (flow_desc_t));
-	bcopy(flent->fe_flow_name, fl_name, MAXFLOWNAME);
+	bcopy(flent->fe_flow_name, fl_name, MAXFLOWNAMELEN);
 
 	/* update the primary flow entry */
 	mutex_enter(&flent->fe_lock);
 	bcopy(&flent1->fe_flow_desc, &flent->fe_flow_desc,
 	    sizeof (flow_desc_t));
-	bcopy(&flent1->fe_flow_name, &flent->fe_flow_name, MAXFLOWNAME);
+	bcopy(&flent1->fe_flow_name, &flent->fe_flow_name, MAXFLOWNAMELEN);
 	mutex_exit(&flent->fe_lock);
 
 	/* update the flow entry that is to be freed */
 	mutex_enter(&flent1->fe_lock);
 	bcopy(&fl_desc, &flent1->fe_flow_desc, sizeof (flow_desc_t));
-	bcopy(fl_name, &flent1->fe_flow_name, MAXFLOWNAME);
+	bcopy(fl_name, &flent1->fe_flow_name, MAXFLOWNAMELEN);
 	mutex_exit(&flent1->fe_lock);
 
 	/* now reinsert the flow entries in the table */

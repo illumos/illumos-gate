@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,7 +140,7 @@ dladm_flow_parse_db(char *line, dld_flowinfo_t *attr)
 	if ((token = strtok_r(line, " \t", &lasts)) == NULL)
 		goto done;
 
-	if (strlcpy(attr->fi_flowname, token, MAXNAMELEN) >= MAXNAMELEN)
+	if (strlcpy(attr->fi_flowname, token, MAXFLOWNAMELEN) >= MAXFLOWNAMELEN)
 		goto done;
 
 	/* resource control and flow descriptor parameters */
@@ -794,7 +794,7 @@ dladm_flow_init(dladm_handle_t handle)
 	flow_desc_t		flowdesc;
 	datalink_id_t		linkid;
 	dladm_status_t		s, status = DLADM_STATUS_OK;
-	char			name[MAXNAMELEN];
+	char			name[MAXFLOWNAMELEN];
 	char			line[MAXLINELEN];
 	dld_flowinfo_t		attr;
 	FILE			*fp;

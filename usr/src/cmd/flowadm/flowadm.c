@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,7 +212,7 @@ typedef struct flow_args_s {
 
 typedef struct flow_fields_buf_s
 {
-	char flow_name[MAXNAMELEN];
+	char flow_name[MAXFLOWNAMELEN];
 	char flow_link[MAXLINKNAMELEN];
 	char flow_ipaddr[INET6_ADDRSTRLEN+4];
 	char flow_proto[PROTO_MAXSTR_LEN];
@@ -721,7 +721,7 @@ do_show_usage(int argc, char *argv[])
 static void
 do_add_flow(int argc, char *argv[])
 {
-	char			devname[MAXNAMELEN];
+	char			devname[MAXLINKNAMELEN];
 	char			*name = NULL;
 	uint_t			index;
 	datalink_id_t		linkid;
@@ -743,7 +743,7 @@ do_add_flow(int argc, char *argv[])
 			break;
 		case 'l':
 			if (strlcpy(devname, optarg,
-			    MAXNAMELEN) >= MAXNAMELEN) {
+			    MAXLINKNAMELEN) >= MAXLINKNAMELEN) {
 				die("link name too long");
 			}
 			if (dladm_name2info(handle, devname, &linkid, NULL,
@@ -776,7 +776,7 @@ do_add_flow(int argc, char *argv[])
 		die("flow name is required");
 	} else {
 		/* get flow name; required last argument */
-		if (strlen(argv[index]) >= MAXFLOWNAME)
+		if (strlen(argv[index]) >= MAXFLOWNAMELEN)
 			die("flow name too long");
 		name = argv[index];
 	}
@@ -795,7 +795,7 @@ do_remove_flow(int argc, char *argv[])
 {
 	char			option;
 	char			*flowname = NULL;
-	char			linkname[MAXNAMELEN];
+	char			linkname[MAXLINKNAMELEN];
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	boolean_t		l_arg = B_FALSE;
 	remove_flow_state_t	state;
@@ -835,7 +835,7 @@ do_remove_flow(int argc, char *argv[])
 		if (optind != (argc-1)) {
 			usage();
 		} else {
-			if (strlen(argv[optind]) >= MAXFLOWNAME)
+			if (strlen(argv[optind]) >= MAXFLOWNAMELEN)
 				die("flow name too long");
 			flowname = argv[optind];
 		}
@@ -1098,8 +1098,8 @@ flow_stats(const char *flow, datalink_id_t linkid,  uint_t interval)
 static void
 do_show_flow(int argc, char *argv[])
 {
-	char			flowname[MAXFLOWNAME];
-	char			linkname[MAXNAMELEN];
+	char			flowname[MAXFLOWNAMELEN];
+	char			linkname[MAXLINKNAMELEN];
 	datalink_id_t		linkid = DATALINK_ALL_LINKID;
 	int			option;
 	boolean_t		s_arg = B_FALSE;
@@ -1181,8 +1181,8 @@ do_show_flow(int argc, char *argv[])
 
 	/* get flow name (optional last argument */
 	if (optind == (argc-1)) {
-		if (strlcpy(flowname, argv[optind], MAXFLOWNAME)
-		    >= MAXFLOWNAME)
+		if (strlcpy(flowname, argv[optind], MAXFLOWNAMELEN)
+		    >= MAXFLOWNAMELEN)
 			die("flow name too long");
 		state.fs_flow = flowname;
 	}
@@ -1282,7 +1282,7 @@ set_flowprop(int argc, char **argv, boolean_t reset)
 	}
 
 	if (optind == (argc - 1)) {
-		if (strlen(argv[optind]) >= MAXFLOWNAME)
+		if (strlen(argv[optind]) >= MAXFLOWNAMELEN)
 			die("flow name too long");
 		flow = argv[optind];
 	} else if (optind != argc) {
@@ -1743,7 +1743,7 @@ do_show_flowprop(int argc, char **argv)
 	}
 
 	if (optind == (argc - 1)) {
-		if (strlen(argv[optind]) >= MAXFLOWNAME)
+		if (strlen(argv[optind]) >= MAXFLOWNAMELEN)
 			die("flow name too long");
 		state.fs_flow = argv[optind];
 	} else if (optind != argc) {

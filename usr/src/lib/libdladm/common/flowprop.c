@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -234,7 +234,7 @@ dladm_flow_info(dladm_handle_t handle, const char *flow,
 			ioc = realloc(ioc, bufsize);
 			if (ioc != NULL) {
 				(void) strlcpy(ioc->wf_name, flow,
-				    MAXNAMELEN);
+				    MAXFLOWNAMELEN);
 				ioc->wf_len = bufsize - sizeof (*ioc);
 				continue;
 			}

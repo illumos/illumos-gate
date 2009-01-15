@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -239,7 +239,7 @@ struct flow_entry_s {					/* Protected by */
 	mac_resource_props_t	fe_effective_props;	/* SL */
 
 	kmutex_t		fe_lock;
-	char			fe_flow_name[MAXFLOWNAME];	/* fe_lock */
+	char			fe_flow_name[MAXFLOWNAMELEN];	/* fe_lock */
 	flow_desc_t		fe_flow_desc;		/* fe_lock */
 	kcondvar_t		fe_cv;			/* fe_lock */
 	/*
