@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -380,6 +380,13 @@ pciide_ddi_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 		*(off_t *)result = tmp;
 
 		return (rc);
+
+	case DDI_CTLOPS_ATTACH:
+	case DDI_CTLOPS_DETACH:
+		/*
+		 * Don't pass child ide ATTACH/DETACH to parent
+		 */
+		return (DDI_SUCCESS);
 
 	default:
 		return (ddi_ctlops(dip, rdip, ctlop, arg, result));

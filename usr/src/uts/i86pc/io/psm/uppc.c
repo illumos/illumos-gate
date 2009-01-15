@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	PSMI_1_6
 
@@ -36,6 +34,7 @@
 #include <sys/promif.h>
 #include <sys/psm.h>
 #include <sys/pit.h>
+#include <sys/apic.h>
 #include <sys/psm_common.h>
 #include <sys/atomic.h>
 #include <sys/archsystm.h>
@@ -47,6 +46,7 @@
  */
 static void uppc_softinit(void);
 static void uppc_picinit();
+static int uppc_post_cpu_start(void);
 static int uppc_clkinit(int);
 static int uppc_addspl(int irqno, int ipl, int min_ipl, int max_ipl);
 static int uppc_delspl(int irqno, int ipl, int min_ipl, int max_ipl);
@@ -56,6 +56,7 @@ static int uppc_probe(void);
 static int uppc_translate_irq(dev_info_t *dip, int irqno);
 static void uppc_shutdown(int cmd, int fcn);
 static void uppc_preshutdown(int cmd, int fcn);
+static int uppc_state(psm_state_request_t *request);
 static int uppc_init_acpi(void);
 static void uppc_setspl(int);
 static int uppc_intr_enter(int, int *);
@@ -154,7 +155,7 @@ static struct	psm_ops uppc_ops = {
 
 	uppc_get_next_processorid,		/* psm_get_next_processorid */
 	(int (*)(processorid_t, caddr_t))NULL,	/* psm_cpu_start	*/
-	(int (*)(void))NULL,			/* psm_post_cpu_start	*/
+	uppc_post_cpu_start,			/* psm_post_cpu_start	*/
 	uppc_shutdown,				/* psm_shutdown		*/
 	(int (*)(int, int))NULL,		/* psm_get_ipivect	*/
 	(void (*)(processorid_t, int))NULL,	/* psm_send_ipi		*/
@@ -170,12 +171,14 @@ static struct	psm_ops uppc_ops = {
 	uppc_preshutdown,			/* psm_preshutdown	*/
 
 	(int (*)(dev_info_t *, ddi_intr_handle_impl_t *,
-	    psm_intr_op_t, int *))NULL		/* psm_intr_ops		*/
+	    psm_intr_op_t, int *))NULL,		/* psm_intr_ops		*/
+
+	uppc_state				/* psm_state		*/
 };
 
 
 static struct	psm_info uppc_info = {
-	PSM_INFO_VER01_5,	/* version				*/
+	PSM_INFO_VER01_6,	/* version				*/
 	PSM_OWN_SYS_DEFAULT,	/* ownership				*/
 	(struct psm_ops *)&uppc_ops, /* operation			*/
 	"uppc",			/* machine name				*/
@@ -280,6 +283,27 @@ uppc_picinit()
 	 */
 	if (uppc_sci >= 0)
 		(void) uppc_addspl(uppc_sci, SCI_IPL, SCI_IPL, SCI_IPL);
+}
+
+static int
+uppc_post_cpu_start(void)
+{
+	/*
+	 * On uppc machines psm_post_cpu_start is called during S3 resume
+	 * on the boot cpu from assembly, using the ap_mlsetup vector.
+	 */
+
+	/*
+	 * Init master and slave pic
+	 */
+	picsetup();
+
+	/*
+	 * program timer 0
+	 */
+	(void) uppc_clkinit(hz);
+
+	return (PSM_SUCCESS);
 }
 
 /*ARGSUSED3*/
@@ -485,6 +509,112 @@ uppc_shutdown(int cmd, int fcn)
 
 	(void) acpi_poweroff();
 }
+
+
+static int
+uppc_acpi_enter_picmode(void)
+{
+	ACPI_OBJECT_LIST	arglist;
+	ACPI_OBJECT		arg;
+	ACPI_STATUS		status;
+
+	/* Setup parameter object */
+	arglist.Count = 1;
+	arglist.Pointer = &arg;
+	arg.Type = ACPI_TYPE_INTEGER;
+	arg.Integer.Value = ACPI_PIC_MODE;
+
+	status = AcpiEvaluateObject(NULL, "\\_PIC", &arglist, NULL);
+	if (ACPI_FAILURE(status))
+		return (PSM_FAILURE);
+	else
+		return (PSM_SUCCESS);
+}
+
+
+struct pic_state {
+	int8_t		mmask;
+	int8_t		smask;
+	uint16_t	elcr;
+};
+
+
+static void
+pic_save_state(struct pic_state *sp)
+{
+	struct standard_pic *pp;
+	int	vecno;
+
+	/*
+	 * Only the PIC masks and the ELCR can be saved;
+	 * other 8259 state is write-only
+	 */
+
+	/*
+	 * save current master and slave interrupt mask
+	 */
+	pp = &pics0;
+	sp->smask = pp->c_curmask[0];
+	sp->mmask = pp->c_curmask[1];
+
+	/*
+	 * save edge/level configuration for isa interrupts
+	 */
+	sp->elcr = 0;
+	for (vecno = 0; vecno <= MAX_ISA_IRQ; vecno++)
+		sp->elcr |= psm_get_elcr(vecno) << vecno;
+}
+
+static void
+pic_restore_state(struct pic_state *sp)
+{
+	int	vecno;
+
+	/* Restore master and slave interrupt masks */
+	outb(SIMR_PORT, sp->smask);
+	outb(MIMR_PORT, sp->mmask);
+
+	/* Read master to allow pics to settle */
+	(void) inb(MIMR_PORT);
+
+	/* Restore edge/level configuration for isa interupts */
+	for (vecno = 0; vecno <= MAX_ISA_IRQ; vecno++)
+		psm_set_elcr(vecno, sp->elcr & (1 << vecno));
+
+	/* Reenter PIC mode before restoring LNK devices */
+	(void) uppc_acpi_enter_picmode();
+
+	/* Restore ACPI link device mappings */
+	acpi_restore_link_devices();
+}
+
+static int
+uppc_state(psm_state_request_t *rp)
+{
+	switch (rp->psr_cmd) {
+	case PSM_STATE_ALLOC:
+		rp->req.psm_state_req.psr_state =
+		    kmem_zalloc(sizeof (struct pic_state), KM_NOSLEEP);
+		if (rp->req.psm_state_req.psr_state == NULL)
+			return (ENOMEM);
+		rp->req.psm_state_req.psr_state_size =
+		    sizeof (struct pic_state);
+		return (0);
+	case PSM_STATE_FREE:
+		kmem_free(rp->req.psm_state_req.psr_state,
+		    rp->req.psm_state_req.psr_state_size);
+		return (0);
+	case PSM_STATE_SAVE:
+		pic_save_state(rp->req.psm_state_req.psr_state);
+		return (0);
+	case PSM_STATE_RESTORE:
+		pic_restore_state(rp->req.psm_state_req.psr_state);
+		return (0);
+	default:
+		return (EINVAL);
+	}
+}
+
 
 static int
 uppc_acpi_translate_pci_irq(dev_info_t *dip, int busid, int devid,

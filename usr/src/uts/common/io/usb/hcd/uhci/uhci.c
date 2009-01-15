@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -850,6 +850,9 @@ uhci_cleanup(uhci_state_t *uhcip)
 static int
 uhci_cpr_suspend(uhci_state_t	*uhcip)
 {
+	uint16_t	cmd_reg;
+	int		i;
+
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 	    "uhci_cpr_suspend:");
 
@@ -861,20 +864,36 @@ uhci_cpr_suspend(uhci_state_t	*uhcip)
 
 	mutex_enter(&uhcip->uhci_int_mutex);
 
+	/* Stop the Host Controller */
+	cmd_reg = Get_OpReg16(USBCMD);
+	cmd_reg &= ~USBCMD_REG_HC_RUN;
+	Set_OpReg16(USBCMD, cmd_reg);
+
+	/*
+	 * Wait for the duration of an SOF period until the host controller
+	 * reaches the stopped state, indicated by the HCHalted bit in the
+	 * USB status register.
+	 */
+	for (i = 0; i <= UHCI_TIMEWAIT / 1000; i++) {
+		if (Get_OpReg16(USBSTS) & USBSTS_REG_HC_HALTED)
+			break;
+		drv_usecwait(1000);
+	}
+
+	USB_DPRINTF_L3(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+	    "uhci_cpr_suspend: waited %d milliseconds for hc to halt", i);
+
 	/* Disable interrupts */
 	Set_OpReg16(USBINTR, DISABLE_ALL_INTRS);
 
-	mutex_exit(&uhcip->uhci_int_mutex);
-
-	/* Wait for SOF time to handle the scheduled interrupt */
-	delay(drv_usectohz(UHCI_TIMEWAIT));
-
-	mutex_enter(&uhcip->uhci_int_mutex);
-	/* Stop the Host Controller */
-	Set_OpReg16(USBCMD, 0);
+	/* Clear any scheduled pending interrupts */
+	Set_OpReg16(USBSTS, USBSTS_REG_HC_HALTED |
+	    USBSTS_REG_HC_PROCESS_ERR | USBSTS_REG_HOST_SYS_ERR |
+	    USBSTS_REG_RESUME_DETECT | USBSTS_REG_USB_ERR_INTR |
+	    USBSTS_REG_USB_INTR);
 
 	/* Set Global Suspend bit */
-	Set_OpReg16(USBCMD, USBCMD_REG_ENER_GBL_SUSPEND);
+	Set_OpReg16(USBCMD, USBCMD_REG_ENTER_GBL_SUSPEND);
 
 	/* Set host controller soft state to suspend */
 	uhcip->uhci_hc_soft_state = UHCI_CTLR_SUSPEND_STATE;

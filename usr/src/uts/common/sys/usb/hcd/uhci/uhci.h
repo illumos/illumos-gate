@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,7 +68,7 @@ typedef volatile struct hcr_regs {
 #define	USBCMD_REG_CONFIG_FLAG		0x0040
 #define	USBCMD_REG_SW_DEBUG		0x0020
 #define	USBCMD_REG_FGBL_RESUME		0x0010
-#define	USBCMD_REG_ENER_GBL_SUSPEND	0x0008
+#define	USBCMD_REG_ENTER_GBL_SUSPEND	0x0008
 #define	USBCMD_REG_GBL_RESET		0x0004
 #define	USBCMD_REG_HC_RESET		0x0002
 #define	USBCMD_REG_HC_RUN		0x0001

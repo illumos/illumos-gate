@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,7 @@ struct ipw2100_softc {
 	int	(*sc_newstate)(struct ieee80211com *,
 	    enum ieee80211_state, int);
 	int			sc_authmode;
+	int			sc_suspended;
 	/* CSR */
 	ddi_acc_handle_t	sc_ioh;
 	caddr_t			sc_regs;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3551,12 +3551,12 @@ ata_resume_drive(ata_drv_t *ata_drvp)
 
 	if (!ATAPIDRV(ata_drvp)) {
 		/* Reset Ultra DMA mode */
-		(void) ata_set_dma_mode(ata_ctlp, ata_drvp);
+		ata_reset_dma_mode(ata_drvp);
 		if (!ata_disk_setup_parms(ata_ctlp, ata_drvp))
 			return;
 	} else {
 		(void) atapi_init_drive(ata_drvp);
-		(void) atapi_reset_dma_mode(ata_drvp);
+		atapi_reset_dma_mode(ata_drvp);
 	}
 	(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_DIS_REVPOD, 0);
 
@@ -3857,4 +3857,37 @@ ata_set_dma_mode(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
 	    subcmd|mode);
 
 	return (rval);
+}
+
+/*
+ * Reset Ultra DMA mode / MWDMA mode
+ */
+void
+ata_reset_dma_mode(ata_drv_t *ata_drvp)
+{
+	uint8_t	subcmd;
+	int	mode;
+	ata_ctl_t *ata_ctlp = ata_drvp->ad_ctlp;
+
+	switch (ata_drvp->ad_dma_cap) {
+	case ATA_DMA_ULTRAMODE:
+		subcmd = ATF_XFRMOD_UDMA;
+		for (mode = 0; mode <= 6; mode++) {
+			if (ata_drvp->ad_dma_mode & (1 << (mode + 8)))
+				break;
+		}
+		break;
+	case ATA_DMA_MWORDMODE:
+		subcmd = ATF_XFRMOD_MDMA;
+		mode = ((ata_drvp->ad_dma_mode & ATAC_MDMA_2_SEL) ==
+		    ATAC_MDMA_2_SEL ? 2 :
+		    (ata_drvp->ad_dma_mode & ATAC_MDMA_1_SEL) ==
+		    ATAC_MDMA_1_SEL ? 1 : 0);
+		break;
+	default:
+		return;
+	}
+
+	(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_SET_XFRMOD,
+	    (subcmd | mode));
 }

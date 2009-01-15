@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -697,5 +697,5 @@ acpica_ddi_restore_resources(dev_info_t *dip)
 	resbuf.Length = proplen;
 	(void) AcpiSetCurrentResources(devobj, &resbuf);
 	ddi_prop_free(propdata);
-	(void) ddi_prop_remove(DDI_DEV_T_ANY, dip, "acpi-crs");
+	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "acpi-crs");
 }

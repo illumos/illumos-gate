@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1208,31 +1208,8 @@ atapi_init_arq(
 void
 atapi_reset_dma_mode(ata_drv_t *ata_drvp)
 {
-	uint8_t	subcmd;
-	int	mode;
 	ata_ctl_t *ata_ctlp = ata_drvp->ad_ctlp;
 
-	switch (ata_drvp->ad_dma_cap) {
-	case ATA_DMA_ULTRAMODE:
-		subcmd = ATF_XFRMOD_UDMA;
-		for (mode = 0; mode <= 6; mode++) {
-			if (ata_drvp->ad_dma_mode & (1 << (mode + 8)))
-				break;
-		}
-		break;
-	case ATA_DMA_MWORDMODE:
-		subcmd = ATF_XFRMOD_MDMA;
-		mode = ((ata_drvp->ad_dma_mode & ATAC_MDMA_2_SEL) ==
-		    ATAC_MDMA_2_SEL ? 2 :
-		    (ata_drvp->ad_dma_mode & ATAC_MDMA_1_SEL) ==
-		    ATAC_MDMA_1_SEL ? 1 : 0);
-		break;
-	default:
-		return;
-	}
-
-	(void) ata_set_feature(ata_ctlp, ata_drvp, ATSF_SET_XFRMOD,
-	    (subcmd | mode));
-
+	ata_reset_dma_mode(ata_drvp);
 	(void) atapi_id_update(ata_ctlp, ata_drvp, NULL);
 }
