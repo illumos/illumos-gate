@@ -639,28 +639,36 @@ rts_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 	case SOL_SOCKET:
 		switch (name) {
 		case SO_REUSEADDR:
-			if (!checkonly)
-				rts->rts_reuseaddr = *i1;
+			if (!checkonly) {
+				rts->rts_reuseaddr = *i1 ? 1 : 0;
+				connp->conn_reuseaddr = *i1 ? 1 : 0;
+			}
 			break;	/* goto sizeof (int) option return */
 		case SO_DEBUG:
 			if (!checkonly)
-				rts->rts_debug = *i1;
+				rts->rts_debug = *i1 ? 1 : 0;
 			break;	/* goto sizeof (int) option return */
 		/*
 		 * The following three items are available here,
 		 * but are only meaningful to IP.
 		 */
 		case SO_DONTROUTE:
-			if (!checkonly)
-				rts->rts_dontroute = *i1;
+			if (!checkonly) {
+				rts->rts_dontroute = *i1 ? 1 : 0;
+				connp->conn_dontroute = *i1 ? 1 : 0;
+			}
 			break;	/* goto sizeof (int) option return */
 		case SO_USELOOPBACK:
-			if (!checkonly)
-				rts->rts_useloopback = *i1;
+			if (!checkonly) {
+				rts->rts_useloopback = *i1 ? 1 : 0;
+				connp->conn_loopback = *i1 ? 1 : 0;
+			}
 			break;	/* goto sizeof (int) option return */
 		case SO_BROADCAST:
-			if (!checkonly)
-				rts->rts_broadcast = *i1;
+			if (!checkonly) {
+				rts->rts_broadcast = *i1 ? 1 : 0;
+				connp->conn_broadcast = *i1 ? 1 : 0;
+			}
 			break;	/* goto sizeof (int) option return */
 		case SO_PROTOTYPE:
 			/*
@@ -672,8 +680,10 @@ rts_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 			 */
 			if (*i1 != AF_INET && *i1 != AF_INET6)
 				return (EPROTONOSUPPORT);
-			if (!checkonly)
+			if (!checkonly) {
 				rts->rts_proto = *i1;
+				connp->conn_proto = *i1;
+			}
 			break;	/* goto sizeof (int) option return */
 		/*
 		 * The following two items can be manipulated,
