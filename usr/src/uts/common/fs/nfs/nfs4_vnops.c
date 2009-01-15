@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6097,7 +6097,7 @@ nfs4lookup_setup(char *nm, lookup4_param_t *lookupargp, int needgetfh)
 			break;
 
 		/* ".." is counted as 1 component */
-		if (*nm == '.' && *(nm + 1) == '.')
+		if (*nm == '.' && *(nm + 1) != '/')
 			break;
 	}
 
