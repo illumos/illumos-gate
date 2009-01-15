@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -28,7 +28,7 @@ PATH="/usr/bin:/usr/sbin:${PATH}"; export PATH
 
 driver_not_installed()
 {
-        grep $1 /etc/name_to_major >/dev/null 2>&1
+        grep $1 $BASEDIR/etc/name_to_major >/dev/null 2>&1
 	if [ $? -eq 0 ]
 	then
 		return 1
@@ -39,26 +39,26 @@ driver_not_installed()
 
 driver_add()
 {
-	if [ "${BASEDIR}" = "/" ]; then
-		add_drv -n -m '* 0666 root sys' $1 > /dev/null 2>&1
-	else
-		add_drv -n -b "${BASEDIR}" -m '* 0666 root sys' $1 > /dev/null 2>&1
+	add_drv -n -b "${BASEDIR}" -m '* 0666 root sys' $1 > /dev/null 2>&1
+	if [ $? -ne 0 ]; then
+		echo "Failed add_drv $1\n" >&2
+		exit 1
 	fi
 }
 
 # Remove old sbd driver (if found)
 if [ ${ARCH} = "sparc" ]; then
-	RMSBD="/kernel/drv/sbd.conf /kernel/drv/sparcv9/sbd"
-	CHKSBD="/kernel/drv/sparcv9/sbd"
+	RMSBD="$BASEDIR/kernel/drv/sbd.conf $BASEDIR/kernel/drv/sparcv9/sbd"
+	CHKSBD="$BASEDIR/kernel/drv/sparcv9/sbd"
 else
-	RMSBD="/kernel/drv/sbd.conf /kernel/drv/sbd /kernel/drv/amd64/sbd"
-	CHKSBD="/kernel/drv/amd64/sbd"
+	RMSBD="$BASEDIR/kernel/drv/sbd.conf $BASEDIR/kernel/drv/sbd $BASEDIR/kernel/drv/amd64/sbd"
+	CHKSBD="$BASEDIR/kernel/drv/amd64/sbd"
 fi
 
 if [ -f $CHKSBD ]; then
 	strings $CHKSBD |grep COMSTAR >/dev/null 2>&1
 	if [ $? -eq 0 ]; then
-		rem_drv sbd >/dev/null 2>&1
+		rem_drv -b "${BASEDIR}" sbd >/dev/null 2>&1
 		/bin/rm -f $RMSBD
 	fi
 fi
