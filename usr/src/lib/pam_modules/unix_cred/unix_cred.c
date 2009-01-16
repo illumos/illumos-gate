@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,8 @@ pam_sm_authenticate(pam_handle_t *pamh, int flags, int argc, const char **argv)
  * fall back to the default, "defname".
  */
 static int
-getset(char *keyname, char *defname, userattr_t *ua, priv_set_t **res)
+getset(char *keyname, char *defname, userattr_t *ua, priv_set_t **res,
+    void *defp)
 {
 	char *str;
 	priv_set_t *tmp;
@@ -89,7 +90,7 @@ getset(char *keyname, char *defname, userattr_t *ua, priv_set_t **res)
 
 	if ((ua == NULL || ua->attr == NULL ||
 	    (str = kva_match(ua->attr, keyname)) == NULL) &&
-	    (str = defread(defname)) == NULL)
+	    (defp == NULL || (str = defread_r(defname, defp)) == NULL))
 		return (0);
 
 	len = strlen(str) + 1;
@@ -172,6 +173,7 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	char		*kvs;
 	struct passwd	pwd;
 	char		pwbuf[NSS_BUFLEN_PASSWD];
+	void		*defp;
 
 	for (i = 0; i < argc; i++) {
 		if (strcmp(argv[i], "debug") == 0)
@@ -529,12 +531,12 @@ adt_done:
 
 	ua = getusernam(user);
 
-	(void) defopen(AUTH_POLICY);
+	defp = defopen_r(AUTH_POLICY);
 
 	tset = def = lim = NULL;
 
-	if (getset(USERATTR_LIMPRIV_KW, DEF_LIMITPRIV, ua, &lim) != 0 ||
-	    getset(USERATTR_DFLTPRIV_KW, DEF_DFLTPRIV, ua, &def) != 0) {
+	if (getset(USERATTR_LIMPRIV_KW, DEF_LIMITPRIV, ua, &lim, defp) != 0 ||
+	    getset(USERATTR_DFLTPRIV_KW, DEF_DFLTPRIV, ua, &def, defp) != 0) {
 		ret = PAM_SYSTEM_ERR;
 		goto out;
 	}
@@ -596,7 +598,8 @@ adt_done:
 	(void) setpflags(PRIV_AWARE, 0);
 
 out:
-	(void) defopen(NULL);
+	if (defp != NULL)
+		defclose_r(defp);
 
 	if (ua != NULL)
 		free_userattr(ua);

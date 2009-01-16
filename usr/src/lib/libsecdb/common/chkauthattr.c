@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -266,8 +264,9 @@ _get_user_defs(const char *user, char **def_auth, char **def_prof)
 {
 	char *cp;
 	char *profs;
+	void	*defp;
 
-	if (defopen(AUTH_POLICY) != 0) {
+	if ((defp = defopen_r(AUTH_POLICY)) == NULL) {
 		if (def_auth != NULL) {
 			*def_auth = NULL;
 		}
@@ -278,9 +277,9 @@ _get_user_defs(const char *user, char **def_auth, char **def_prof)
 	}
 
 	if (def_auth != NULL) {
-		if ((cp = defread(DEF_AUTH)) != NULL) {
+		if ((cp = defread_r(DEF_AUTH, defp)) != NULL) {
 			if ((*def_auth = strdup(cp)) == NULL) {
-				(void) defopen(NULL);
+				defclose_r(defp);
 				return (-1);
 			}
 		} else {
@@ -289,21 +288,21 @@ _get_user_defs(const char *user, char **def_auth, char **def_prof)
 	}
 	if (def_prof != NULL) {
 		if (is_cons_user(user) &&
-		    (cp = defread(DEF_CONSUSER)) != NULL) {
+		    (cp = defread_r(DEF_CONSUSER, defp)) != NULL) {
 			if ((*def_prof = strdup(cp)) == NULL) {
-				(void) defopen(NULL);
+				defclose_r(defp);
 				return (-1);
 			}
 		}
-		if ((cp = defread(DEF_PROF)) != NULL) {
+		if ((cp = defread_r(DEF_PROF, defp)) != NULL) {
 			int	prof_len;
 
 			if (*def_prof == NULL) {
 				if ((*def_prof = strdup(cp)) == NULL) {
-					(void) defopen(NULL);
+					defclose_r(defp);
 					return (-1);
 				}
-				(void) defopen(NULL);
+				defclose_r(defp);
 				return (0);
 			}
 
@@ -312,7 +311,7 @@ _get_user_defs(const char *user, char **def_auth, char **def_prof)
 			if ((profs = malloc(prof_len)) == NULL) {
 				free(*def_prof);
 				*def_prof = NULL;
-				(void) defopen(NULL);
+				defclose_r(defp);
 				return (-1);
 			}
 			(void) snprintf(profs, prof_len, "%s,%s", *def_prof,
@@ -322,7 +321,7 @@ _get_user_defs(const char *user, char **def_auth, char **def_prof)
 		}
 	}
 
-	(void) defopen(NULL);
+	defclose_r(defp);
 	return (0);
 }
 

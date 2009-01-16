@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,20 +72,21 @@ get_max_failed(char *user)
 	int do_lock = 0;
 	int retval = 0;
 	char *p;
+	void	*defp;
 
 	if ((uattr = getusernam(user)) != NULL)
 		val = kva_match(uattr->attr, USERATTR_LOCK_AFTER_RETRIES_KW);
 
-	if (val != NULL)
+	if (val != NULL) {
 		do_lock = (strcasecmp(val, "yes") == 0);
-	else if (defopen(AUTH_POLICY) == 0) {
+	} else if ((defp = defopen_r(AUTH_POLICY)) != NULL) {
 		int flags;
-		flags = defcntl(DC_GETFLAGS, 0);
+		flags = defcntl_r(DC_GETFLAGS, 0, defp);
 		TURNOFF(flags, DC_CASE);
-		(void) defcntl(DC_SETFLAGS, flags);
-		if ((p = defread("LOCK_AFTER_RETRIES=")) != NULL)
+		(void) defcntl_r(DC_SETFLAGS, flags, defp);
+		if ((p = defread_r("LOCK_AFTER_RETRIES=", defp)) != NULL)
 			do_lock = (strcasecmp(p, "yes") == 0);
-		(void) defopen(NULL);
+		defclose_r(defp);
 	}
 
 	if (uattr != NULL)
@@ -93,10 +94,10 @@ get_max_failed(char *user)
 
 	if (do_lock) {
 		retval = MAXTRYS;
-		if (defopen(LOGINADMIN) == 0) {
-			if ((p = defread("RETRIES=")) != NULL)
+		if ((defp = defopen_r(LOGINADMIN)) != NULL) {
+			if ((p = defread_r("RETRIES=", defp)) != NULL)
 				retval = atoi(p);
-			(void) defopen(NULL);
+			defclose_r(defp);
 		}
 	}
 

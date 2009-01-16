@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -930,6 +930,7 @@ get_nfs_domain(void)
 {
 	char		*ndomain;
 	timestruc_t	 ntime;
+	void	*defp;
 
 	/*
 	 * If we can't get stats for the config file, then
@@ -946,16 +947,15 @@ get_nfs_domain(void)
 
 	/*
 	 * Get NFSMAPID_DOMAIN value from /etc/default/nfs for now.
-	 * Note: defread() returns a ptr to TSD.
+	 * Note: defread_r() returns a ptr to libc internal malloc.
 	 */
-	if (defopen(NFSADMIN) == 0) {
+	if ((defp = defopen_r(NFSADMIN)) != NULL) {
 		char	*dp = NULL;
 #ifdef	DEBUG
 		char	*whoami = "get_nfs_domain";
 		char	 orig[NS_MAXCDNAME] = {0};
 #endif
-		ndomain = (char *)defread("NFSMAPID_DOMAIN=");
-		(void) defopen(NULL);
+		ndomain = defread_r("NFSMAPID_DOMAIN=", defp);
 #ifdef	DEBUG
 		if (ndomain)
 			(void) strncpy(orig, ndomain, NS_MAXCDNAME);
@@ -972,9 +972,11 @@ get_nfs_domain(void)
 				(void) strncpy(nfs_domain, dp, NS_MAXCDNAME);
 				nfs_domain[NS_MAXCDNAME] = '\0';
 				nfs_mtime = ntime;
+				defclose_r(defp);
 				return;
 			}
 		}
+		defclose_r(defp);
 #ifdef	DEBUG
 		if (orig[0] != '\0') {
 			syslog(LOG_ERR, gettext("%s: Invalid domain name \"%s\""

@@ -1429,9 +1429,13 @@ SUNWprivate_1.1 {
 	_D_cplx_div_ix;
 	_D_cplx_div_rx;
 	_D_cplx_mul;
+	defclose_r;
 	defcntl;
+	defcntl_r;
 	defopen;
+	defopen_r;
 	defread;
+	defread_r;
 	_delete;
 	_dgettext;
 	_doprnt;

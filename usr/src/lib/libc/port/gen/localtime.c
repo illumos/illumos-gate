@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,8 +32,6 @@
  * clarified as of June 5, 1996 by Arthur David Olson
  * (arthur_david_olson@nih.gov).
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * localtime.c
@@ -700,7 +698,7 @@ mktime(struct tm *tmptr)
 
 #ifdef _ILP32
 	overflow = t > LONG_MAX || t < LONG_MIN ||
-			tmptr->tm_year < 1 || tmptr->tm_year > 138;
+	    tmptr->tm_year < 1 || tmptr->tm_year > 138;
 #else
 	overflow = t > LONG_MAX || t < LONG_MIN;
 #endif
@@ -714,11 +712,11 @@ mktime(struct tm *tmptr)
 				set_zone_context((time_t)t);
 				if (is_in_dst) {
 					(void) offtime_u((time_t)t,
-						    -altzone, &_tm);
+					    -altzone, &_tm);
 					_tm.tm_isdst = 1;
 				} else {
 					(void) offtime_u((time_t)t,
-						    -timezone, &_tm);
+					    -timezone, &_tm);
 				}
 			} else {
 				(void) offtime_u((time_t)t, -timezone, &_tm);
@@ -731,22 +729,22 @@ mktime(struct tm *tmptr)
 				set_zone_context((time_t)t);
 				if (is_in_dst) {
 					(void) offtime_u((time_t)t,
-						    -altzone, &_tm);
+					    -altzone, &_tm);
 					_tm.tm_isdst = 1;
 				} else {
 					(void) offtime_u((time_t)t,
-						    -timezone, &_tm);
+					    -timezone, &_tm);
 				}
 			} else { /* check for ambiguous 'fallback' transition */
 				set_zone_context((time_t)t - dst_delta);
 				if (is_in_dst) {  /* In fallback, force DST */
 					t -= dst_delta;
 					(void) offtime_u((time_t)t,
-						    -altzone, &_tm);
+					    -altzone, &_tm);
 					_tm.tm_isdst = 1;
 				} else {
 					(void) offtime_u((time_t)t,
-						    -timezone, &_tm);
+					    -timezone, &_tm);
 				}
 			}
 			break;
@@ -1088,16 +1086,16 @@ offtime_u(time_t t, long offset, struct tm *tmptr)
 		if (days < 0)
 			--newy;
 		days -= ((long)newy - (long)y) * DAYSPERNYEAR +
-			LEAPS_THRU_END_OF(newy > 0 ? newy - 1L : newy) -
-			LEAPS_THRU_END_OF(y > 0 ? y - 1L : y);
+		    LEAPS_THRU_END_OF(newy > 0 ? newy - 1L : newy) -
+		    LEAPS_THRU_END_OF(y > 0 ? y - 1L : y);
 		y = newy;
 	}
 	tmptr->tm_year = (int)(y - TM_YEAR_BASE);
 	tmptr->tm_yday = (int)days;
 	ip = __mon_lengths[yleap];
 	for (tmptr->tm_mon = 0; days >=
-		(long)ip[tmptr->tm_mon]; ++(tmptr->tm_mon))
-			days = days - (long)ip[tmptr->tm_mon];
+	    (long)ip[tmptr->tm_mon]; ++(tmptr->tm_mon))
+		days = days - (long)ip[tmptr->tm_mon];
 	tmptr->tm_mday = (int)(days + 1);
 	tmptr->tm_isdst = 0;
 
@@ -1130,8 +1128,8 @@ posix_check_dst(long long t, state_t *sp)
 
 	year = gmttm.tm_year + 1900;
 	jan01 = t - ((gmttm.tm_yday * SECSPERDAY) +
-			(gmttm.tm_hour * SECSPERHOUR) +
-			(gmttm.tm_min * SECSPERMIN) + gmttm.tm_sec);
+	    (gmttm.tm_hour * SECSPERHOUR) +
+	    (gmttm.tm_min * SECSPERMIN) + gmttm.tm_sec);
 	/*
 	 * If transition rules were provided for this zone,
 	 * use them, otherwise, default to USA daylight rules,
@@ -1620,7 +1618,7 @@ load_posixinfo(const char *name, state_t *sp)
 			return (-1);
 		dstlen = name - dstname;
 		if (dstlen < 1)
-		    return (-1);
+			return (-1);
 		if (*name == '>')
 			++name;
 		if (*name != '\0' && *name != ',' && *name != ';') {
@@ -1810,13 +1808,13 @@ getzname(const char *strp, int quoted)
 
 	if (quoted) {
 		while ((c = *strp) != '\0' && c != '>' &&
-			isgraph((unsigned char)c))
-				++strp;
+		    isgraph((unsigned char)c))
+			++strp;
 	} else {
 		while ((c = *strp) != '\0' && isgraph((unsigned char)c) &&
 		    !isdigit((unsigned char)c) && c != ',' && c != '-' &&
-			    c != '+')
-				++strp;
+		    c != '+')
+			++strp;
 	}
 
 	/* Found an excessively invalid character.  Discredit whole name */
@@ -1992,13 +1990,14 @@ get_default_tz(void)
 	char	*tz = NULL;
 	uchar_t	*tzp, *tzq;
 	int	flags;
+	void	*defp;
 
-	if (defopen(TIMEZONE) == 0) {
-		flags = defcntl(DC_GETFLAGS, 0);
+	if ((defp = defopen_r(TIMEZONE)) != NULL) {
+		flags = defcntl_r(DC_GETFLAGS, 0, defp);
 		TURNON(flags, DC_STRIP_QUOTES);
-		(void) defcntl(DC_SETFLAGS, flags);
+		(void) defcntl_r(DC_SETFLAGS, flags, defp);
 
-		if ((tzp = (uchar_t *)defread(TZSTRING)) != NULL) {
+		if ((tzp = (uchar_t *)defread_r(TZSTRING, defp)) != NULL) {
 			while (isspace(*tzp))
 				tzp++;
 			tzq = tzp;
@@ -2012,7 +2011,7 @@ get_default_tz(void)
 				tz = strdup((char *)tzp);
 		}
 
-		(void) defopen(NULL);
+		defclose_r(defp);
 	}
 	return (tz);
 }

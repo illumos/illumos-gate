@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,6 +242,7 @@ _getgroupsbymember(const char *username, gid_t gid_array[],
     int maxgids, int numgids)
 {
 	struct nss_groupsbymem	arg;
+	void	*defp;
 
 	arg.username	= username;
 	arg.gid_array	= gid_array;
@@ -268,10 +269,10 @@ _getgroupsbymember(const char *username, gid_t gid_array[],
 	 */
 	arg.force_slow_way = 1;
 
-	if (defopen(__NSW_DEFAULT_FILE) == 0) {
-		if (defread(USE_NETID_STR) != NULL)
+	if ((defp = defopen_r(__NSW_DEFAULT_FILE)) != NULL) {
+		if (defread_r(USE_NETID_STR, defp) != NULL)
 			arg.force_slow_way = 0;
-		(void) defopen(NULL);
+		defclose_r(defp);
 	}
 
 	(void) nss_search(&db_root, _nss_initf_group,

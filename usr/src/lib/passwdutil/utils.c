@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -161,12 +158,12 @@ no_mem:
  * return the supplied default value
  */
 int
-def_getuint(char *name, int defvalue)
+def_getuint(char *name, int defvalue, void *defp)
 {
 	char *p;
 	int val = -1;	/* -1 is a guard to catch undefined values */
 
-	if (p = defread(name))
+	if ((p = defread_r(name, defp)) != NULL)
 		val = atoi(p);
 
 	return (val >= 0 ? val : defvalue);
@@ -178,16 +175,17 @@ turn_on_default_aging(struct spwd *spw)
 	int minweeks;
 	int maxweeks;
 	int warnweeks;
+	void	*defp;
 
-	if (defopen(PWADMIN) != 0) {
+	if ((defp = defopen_r(PWADMIN)) == NULL) {
 		minweeks = MINWEEKS;
 		maxweeks = MAXWEEKS;
 		warnweeks = WARNWEEKS;
 	} else {
-		minweeks = def_getuint("MINWEEKS=", MINWEEKS);
-		maxweeks = def_getuint("MAXWEEKS=", MAXWEEKS);
-		warnweeks = def_getuint("WARNWEEKS=", WARNWEEKS);
-		(void) defopen(NULL);
+		minweeks = def_getuint("MINWEEKS=", MINWEEKS, defp);
+		maxweeks = def_getuint("MAXWEEKS=", MAXWEEKS, defp);
+		warnweeks = def_getuint("WARNWEEKS=", WARNWEEKS, defp);
+		defclose_r(defp);
 	}
 
 	/*
@@ -219,12 +217,14 @@ int
 def_getint(char *name, int defvalue)
 {
 	int	val;
+	void	*defp;
 
-	if (defopen(PWADMIN) != 0)
+	if ((defp = defopen_r(PWADMIN)) == NULL) {
 		val = defvalue;
-	else
-		val = def_getuint(name, defvalue);
+	} else {
+		val = def_getuint(name, defvalue, defp);
+		defclose_r(defp);
+	}
 
-	(void) defopen(NULL);
 	return (val);
 }

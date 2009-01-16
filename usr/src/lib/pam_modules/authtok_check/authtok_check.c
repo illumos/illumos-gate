@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/varargs.h>
@@ -125,11 +122,11 @@ error(pam_handle_t *pamh, int flags, char *fmt, ...)
 }
 
 int
-defread_int(char *name, uint_t *ip)
+defread_int(char *name, uint_t *ip, void *defp)
 {
 	char *q;
 	int r = 0;
-	if ((q = defread(name)) != NULL) {
+	if ((q = defread_r(name, defp)) != NULL) {
 		if (!isdigit(*q)) {
 			syslog(LOG_ERR, "pam_authtok_check: %s contains "
 			    "non-integer value for %s: %s. "
@@ -156,6 +153,7 @@ get_passwd_defaults(pam_handle_t *pamh, char *user, struct pwdefaults *p)
 	attrlist attr[2];
 	int result;
 	char *progname;
+	void	*defp;
 
 	(void) pam_get_item(pamh, PAM_SERVICE, (void **)&progname);
 
@@ -175,74 +173,77 @@ get_passwd_defaults(pam_handle_t *pamh, char *user, struct pwdefaults *p)
 	p->mindigit = 0;
 	p->whitespace = B_TRUE;
 
-	if (defopen(PWADMIN) != 0)
+	if ((defp = defopen_r(PWADMIN)) == NULL)
 		return (PAM_SUCCESS);
 
-	(void) defread_int("PASSLENGTH=", &p->minlength);
+	(void) defread_int("PASSLENGTH=", &p->minlength, defp);
 
-	if ((q = defread("NAMECHECK=")) != NULL && strcasecmp(q, "NO") == 0)
+	if ((q = defread_r("NAMECHECK=", defp)) != NULL &&
+	    strcasecmp(q, "NO") == 0)
 		p->do_namecheck = B_FALSE;
 
-	if ((q = defread("DICTIONLIST=")) != NULL) {
+	if ((q = defread_r("DICTIONLIST=", defp)) != NULL) {
 		if ((p->dicts = strdup(q)) == NULL) {
 			syslog(LOG_ERR, "pam_authtok_check: out of memory");
-			(void) defopen(NULL);
+			defclose_r(defp);
 			return (PAM_BUF_ERR);
 
 		}
 		p->do_dictcheck = B_TRUE;
-	} else
+	} else {
 		p->dicts = NULL;
+	}
 
-	if ((q = defread("DICTIONDBDIR=")) != NULL) {
+	if ((q = defread_r("DICTIONDBDIR=", defp)) != NULL) {
 		if (strlcpy(p->db_location, q, sizeof (p->db_location)) >=
 		    sizeof (p->db_location)) {
 			syslog(LOG_ERR, "pam_authtok_check: value for "
 			    "DICTIONDBDIR too large.");
-			(void) defopen(NULL);
+			defclose_r(defp);
 			return (PAM_SYSTEM_ERR);
 		}
 		p->do_dictcheck = B_TRUE;
-	} else
+	} else {
 		(void) strlcpy(p->db_location, CRACK_DIR,
 		    sizeof (p->db_location));
+	}
 
-	(void) defread_int("MINDIFF=", &p->mindiff);
-	(void) defread_int("MINALPHA=", &p->minalpha);
-	(void) defread_int("MINUPPER=", &p->minupper);
-	(void) defread_int("MINLOWER=", &p->minlower);
-	if (defread_int("MINNONALPHA=", &p->minnonalpha))
+	(void) defread_int("MINDIFF=", &p->mindiff, defp);
+	(void) defread_int("MINALPHA=", &p->minalpha, defp);
+	(void) defread_int("MINUPPER=", &p->minupper, defp);
+	(void) defread_int("MINLOWER=", &p->minlower, defp);
+	if (defread_int("MINNONALPHA=", &p->minnonalpha, defp))
 		minnonalpha_defined = B_TRUE;
-	(void) defread_int("MAXREPEATS=", &p->maxrepeat);
+	(void) defread_int("MAXREPEATS=", &p->maxrepeat, defp);
 
-	if (defread_int("MINSPECIAL=", &p->minspecial)) {
+	if (defread_int("MINSPECIAL=", &p->minspecial, defp)) {
 		if (minnonalpha_defined) {
 			syslog(LOG_ERR, "pam_authtok_check: %s contains "
 			    "definition for MINNONALPHA and for MINSPECIAL. "
 			    "These options are mutually exclusive.", PWADMIN);
-			(void) defopen(NULL);
+			defclose_r(defp);
 			return (PAM_SYSTEM_ERR);
 		}
 		p->minnonalpha = 0;
 	}
 
-	if (defread_int("MINDIGIT=", &p->mindigit)) {
+	if (defread_int("MINDIGIT=", &p->mindigit, defp)) {
 		if (minnonalpha_defined) {
 			syslog(LOG_ERR, "pam_authtok_check: %s contains "
 			    "definition for MINNONALPHA and for MINDIGIT. "
 			    "These options are mutually exclusive.", PWADMIN);
-			(void) defopen(NULL);
+			defclose_r(defp);
 			return (PAM_SYSTEM_ERR);
 		}
 		p->minnonalpha = 0;
 	}
 
-	if ((q = defread("WHITESPACE=")) != NULL)
+	if ((q = defread_r("WHITESPACE=", defp)) != NULL)
 		p->whitespace =
 		    (strcasecmp(q, "no") == 0 || strcmp(q, "0") == 0)
 		    ? B_FALSE : B_TRUE;
 
-	(void) defopen(NULL);
+	defclose_r(defp);
 
 	/*
 	 * Determine the number of significant characters in a password
@@ -552,7 +553,7 @@ check_composition(char *pw, struct pwdefaults *pwdef, pam_handle_t *pamh,
 		    pwdef->minnonalpha) {
 			error(pamh, flags, errmsg, pwdef->minnonalpha,
 			    dgettext(TEXT_DOMAIN,
-				"numeric or special character(s)"));
+			    "numeric or special character(s)"));
 			ret = 1;
 			goto out;
 		}

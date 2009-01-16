@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -147,8 +145,8 @@ parse_ldap_migration(
 		/* NIS to LDAP does not read command line attributes */
 		if (!yp2ldap)
 			rc = parse_ldap_cmd_line(cmdline_options, &proxyInfo,
-				&ldapConfig, &ldapTableMapping, &config_info,
-				&ldapDBTableMapping);
+			    &ldapConfig, &ldapTableMapping, &config_info,
+			    &ldapDBTableMapping);
 		else
 			rc = 0;
 	}
@@ -156,10 +154,10 @@ parse_ldap_migration(
 	if (rc == 0) {
 		if (yp2ldap)
 			rc = yp_parse_ldap_default_conf(&proxyInfo, &ldapConfig,
-				&config_info, &ldapDBTableMapping);
+			    &config_info, &ldapDBTableMapping);
 		else
 			rc = parse_ldap_default_conf(&proxyInfo, &ldapConfig,
-				&config_info, &ldapDBTableMapping);
+			    &config_info, &ldapDBTableMapping);
 	}
 
 	if (config_file == NULL) {
@@ -178,21 +176,21 @@ parse_ldap_migration(
 		cmdline_config = cmdline_options;
 		if (yp2ldap)
 			rc = yp_parse_ldap_config_file(config_file, &proxyInfo,
-				&ldapConfig, &ldapTableMapping, &config_info,
-				&ldapDBTableMapping, &ypDomains);
+			    &ldapConfig, &ldapTableMapping, &config_info,
+			    &ldapDBTableMapping, &ypDomains);
 		else
 			rc = parse_ldap_config_file(config_file, &proxyInfo,
-				&ldapConfig, &ldapTableMapping, &config_info,
-				&ldapDBTableMapping);
+			    &ldapConfig, &ldapTableMapping, &config_info,
+			    &ldapDBTableMapping);
 
 		warn_file = NULL;
 		cmdline_config = NULL;
 	}
 	if (rc == 0 && (config_info.config_dn != NULL) &&
-			(config_info.config_dn[0] != '\0')) {
+	    (config_info.config_dn[0] != '\0')) {
 		rc = parse_ldap_config_dn_attrs(&proxyInfo,
-			&ldapConfig, &ldapTableMapping, &config_info,
-			&ldapDBTableMapping);
+		    &ldapConfig, &ldapTableMapping, &config_info,
+		    &ldapDBTableMapping);
 	}
 
 	free_config_info(&config_info);
@@ -301,104 +299,103 @@ parse_ldap_default_conf(
 	char		*ldap_config_attributes[n_config_keys];
 	char		attr_buf[128];
 	char		*attr;
-	static char	*attr_val;
+	char		*attr_val;
 	int		defflags;
 	config_key	attrib_num;
 	int		i;
 	int		len;
 	int		attr_len;
+	void		*defp;
 
-		if (defopen(ETCCONFFILE) == 0) {
-			file_source = ETCCONFFILE;
-			if (verbose)
-				report_info(
-				"default configuration values: ", NULL);
-			/* Set defread() to be case insensitive */
-			defflags = defcntl(DC_GETFLAGS, 0);
-			TURNOFF(defflags, DC_CASE);
-			(void) defcntl(DC_SETFLAGS, defflags);
+	if ((defp = defopen_r(ETCCONFFILE)) != NULL) {
+		file_source = ETCCONFFILE;
+		if (verbose)
+			report_info("default configuration values: ", NULL);
+		/* Set defread_r() to be case insensitive */
+		defflags = defcntl_r(DC_GETFLAGS, 0, defp);
+		TURNOFF(defflags, DC_CASE);
+		(void) defcntl_r(DC_SETFLAGS, defflags, defp);
 
-			get_attribute_list(proxy_info, nis_config, config_info,
-				table_info, ldap_config_attributes);
-			i = 0;
-			while ((attr = ldap_config_attributes[i++]) != NULL) {
-				strlcpy(attr_buf, attr, sizeof (attr_buf));
-				/*
-				 * if nisplusUpdateBatching, make sure
-				 * we don't match nisplusUpdateBatchingTimeout
-				 */
-				if (strcmp(attr, UPDATE_BATCHING) == 0) {
-					attr_len = strlen(attr);
-					attr_buf[attr_len] = '=';
-					attr_buf[attr_len + 1] = '\0';
-					attr_val = defread(attr_buf);
+		get_attribute_list(proxy_info, nis_config, config_info,
+		    table_info, ldap_config_attributes);
+		i = 0;
+		while ((attr = ldap_config_attributes[i++]) != NULL) {
+			(void) strlcpy(attr_buf, attr, sizeof (attr_buf));
+			/*
+			 * if nisplusUpdateBatching, make sure
+			 * we don't match nisplusUpdateBatchingTimeout
+			 */
+			if (strcmp(attr, UPDATE_BATCHING) == 0) {
+				attr_len = strlen(attr);
+				attr_buf[attr_len] = '=';
+				attr_buf[attr_len + 1] = '\0';
+				attr_val = defread_r(attr_buf, defp);
 
-					if (attr_val == 0) {
-						attr_buf[attr_len] = ' ';
-						attr_val = defread(attr_buf);
-					}
-					if (attr_val == 0) {
-						attr_buf[attr_len] = '\t';
-						attr_val = defread(attr_buf);
-					}
-					if (attr_val == 0) {
-						attr_buf[attr_len] = '\n';
-						attr_val = defread(attr_buf);
-					}
-				} else {
-					attr_val = defread(attr_buf);
+				if (attr_val == 0) {
+					attr_buf[attr_len] = ' ';
+					attr_val = defread_r(attr_buf, defp);
 				}
-				if (attr_val == 0)
-					continue;
-
-				got_config_data = TRUE;
-				attrib_num = get_attrib_num(attr, strlen(attr));
-				if (attrib_num == key_bad) {
-					report_error(attr, NULL);
-					rc = -1;
-					break;
+				if (attr_val == 0) {
+					attr_buf[attr_len] = '\t';
+					attr_val = defread_r(attr_buf, defp);
 				}
-
-				/*
-				 * Allow either entries of the form
-				 *	attr val
-				 *	   or
-				 *	attr = val
-				 */
-				while (is_whitespace(*attr_val))
-					attr_val++;
-				if (*attr_val == '=')
-					attr_val++;
-				while (is_whitespace(*attr_val))
-					attr_val++;
-				len = strlen(attr_val);
-				while (len > 0 &&
-					is_whitespace(attr_val[len - 1]))
-					len--;
-
-				if (verbose) {
-					report_info("\t", attr);
-					report_info("\t\t", attr_val);
+				if (attr_val == 0) {
+					attr_buf[attr_len] = '\n';
+					attr_val = defread_r(attr_buf, defp);
 				}
-				if (IS_BIND_INFO(attrib_num)) {
-					rc = add_bind_attribute(attrib_num,
-					    attr_val, len, proxy_info);
-				} else if (IS_OPER_INFO(attrib_num)) {
-					rc = add_operation_attribute(attrib_num,
-						attr_val, len, nis_config,
-						table_info);
-				}
-				if (p_error != no_parse_error) {
-					report_error(attr_val, attr);
-					rc = -1;
-					break;
-				}
+			} else {
+				attr_val = defread_r(attr_buf, defp);
 			}
-			file_source = NULL;
-			/* Close the /etc/default file */
-			(void) defopen(0);
+			if (attr_val == NULL)
+				continue;
+
+			got_config_data = TRUE;
+			attrib_num = get_attrib_num(attr, strlen(attr));
+			if (attrib_num == key_bad) {
+				report_error(attr, NULL);
+				rc = -1;
+				break;
+			}
+
+			/*
+			 * Allow either entries of the form
+			 *	attr val
+			 *	   or
+			 *	attr = val
+			 */
+			while (is_whitespace(*attr_val))
+				attr_val++;
+			if (*attr_val == '=')
+				attr_val++;
+			while (is_whitespace(*attr_val))
+				attr_val++;
+			len = strlen(attr_val);
+			while (len > 0 && is_whitespace(attr_val[len - 1]))
+				len--;
+
+			if (verbose) {
+				report_info("\t", attr);
+				report_info("\t\t", attr_val);
+			}
+			if (IS_BIND_INFO(attrib_num)) {
+				rc = add_bind_attribute(attrib_num,
+				    attr_val, len, proxy_info);
+			} else if (IS_OPER_INFO(attrib_num)) {
+				rc = add_operation_attribute(attrib_num,
+				    attr_val, len, nis_config,
+				    table_info);
+			}
+			if (p_error != no_parse_error) {
+				report_error(attr_val, attr);
+				rc = -1;
+				break;
+			}
 		}
-		return (rc);
+		file_source = NULL;
+		/* Close the /etc/default file */
+		defclose_r(defp);
+	}
+	return (rc);
 }
 
 static int
@@ -412,83 +409,83 @@ yp_parse_ldap_default_conf(
 	char		*ldap_config_attributes[n_config_keys];
 	char		attr_buf[128];
 	char		*attr;
-	static 	char *attr_val;
+	char		*attr_val;
 	int		defflags;
 	config_key	attrib_num;
 	int 	i, len, attr_len;
+	void		*defp;
 
-	if ((defopen(YP_ETCCONFFILE)) == 0) {
+	if ((defp = defopen_r(YP_ETCCONFFILE)) != NULL) {
 		file_source = YP_ETCCONFFILE;
 		if (verbose)
 			report_info("default configuration values: ", NULL);
-		/* Set defread() to be case insensitive */
-			defflags = defcntl(DC_GETFLAGS, 0);
-			TURNOFF(defflags, DC_CASE);
-			(void) defcntl(DC_SETFLAGS, defflags);
+		/* Set defread_r() to be case insensitive */
+		defflags = defcntl_r(DC_GETFLAGS, 0, defp);
+		TURNOFF(defflags, DC_CASE);
+		(void) defcntl_r(DC_SETFLAGS, defflags, defp);
 
-			get_attribute_list(proxy_info, nis_config, config_info,
-				table_info, ldap_config_attributes);
-			i = 0;
-			while ((attr = ldap_config_attributes[i++]) != NULL) {
-				if ((strlcpy(attr_buf, attr,
-					sizeof (attr_buf))) >=
-					sizeof (attr_buf)) {
-					report_error(
-				"Static buffer attr_buf overflow", NULL);
-					return (-1);
-				}
-
-				if ((attr_val = defread(attr_buf)) == 0)
-					continue;
-
-				got_config_data = TRUE;
-				attrib_num = get_attrib_num(attr, strlen(attr));
-				if (attrib_num == key_bad) {
-					report_error(attr, NULL);
-					rc = -1;
-					break;
-				}
-
-				/*
-				 * Allow either entries of the form
-				 * attr val
-				 * or
-				 * attr = val
-				 */
-				while (is_whitespace(*attr_val))
-					attr_val++;
-				if (*attr_val == '=')
-					attr_val++;
-				while (is_whitespace(*attr_val))
-					attr_val++;
-				len = strlen(attr_val);
-				while (len > 0 &&
-					is_whitespace(attr_val[len - 1]))
-					len--;
-
-				if (verbose) {
-					report_info("\t", attr);
-					report_info("\t\t", attr_val);
-				}
-				if (IS_YP_BIND_INFO(attrib_num)) {
-					rc = add_bind_attribute(attrib_num,
-						attr_val, len, proxy_info);
-				} else if (IS_YP_OPER_INFO(attrib_num)) {
-					rc = add_operation_attribute(attrib_num,
-						attr_val, len, nis_config,
-						table_info);
-				}
-				if (p_error != no_parse_error) {
-					report_error(attr_val, attr);
-					rc = -1;
-					break;
-				}
+		get_attribute_list(proxy_info, nis_config, config_info,
+		    table_info, ldap_config_attributes);
+		i = 0;
+		while ((attr = ldap_config_attributes[i++]) != NULL) {
+			if ((strlcpy(attr_buf, attr, sizeof (attr_buf))) >=
+			    sizeof (attr_buf)) {
+				report_error(
+				    "Static buffer attr_buf overflow", NULL);
+				defclose_r(defp);
+				return (-1);
 			}
-			file_source = NULL;
-			/* Close the /etc/default file */
-			(void) defopen(0);
+
+			if ((attr_val = defread_r(attr_buf, defp)) == NULL)
+				continue;
+
+			got_config_data = TRUE;
+			attrib_num = get_attrib_num(attr, strlen(attr));
+			if (attrib_num == key_bad) {
+				report_error(attr, NULL);
+				rc = -1;
+				break;
+			}
+
+			/*
+			 * Allow either entries of the form
+			 * attr val
+			 * or
+			 * attr = val
+			 */
+			while (is_whitespace(*attr_val))
+				attr_val++;
+			if (*attr_val == '=')
+				attr_val++;
+			while (is_whitespace(*attr_val))
+				attr_val++;
+			len = strlen(attr_val);
+			while (len > 0 && is_whitespace(attr_val[len - 1]))
+				len--;
+
+			if (verbose) {
+				report_info("\t", attr);
+				report_info("\t\t", attr_val);
+			}
+			if (IS_YP_BIND_INFO(attrib_num)) {
+				rc = add_bind_attribute(attrib_num,
+				    attr_val, len, proxy_info);
+			} else if (IS_YP_OPER_INFO(attrib_num)) {
+				rc = add_operation_attribute(attrib_num,
+				    attr_val, len, nis_config,
+				    table_info);
+			}
+			if (p_error != no_parse_error) {
+				report_error(attr_val, attr);
+				rc = -1;
+				break;
+			}
 		}
-		return (rc);
+		file_source = NULL;
+		/* Close the /etc/default file */
+		defclose_r(defp);
+	}
+	return (rc);
 }
 
 /*
@@ -602,12 +599,12 @@ parse_ldap_config_file(
 			    attr_val, len, nis_config, table_info);
 		} else {
 			rc = add_mapping_attribute(attrib_num,
-		    attr_val, len, table_mapping);
+			    attr_val, len, table_mapping);
 		}
 
 		if (rc < 0) {
 			report_error(attr_val == NULL ?
-				"<no attribute>" : attr_val, _key_val);
+			    "<no attribute>" : attr_val, _key_val);
 			if (attr_val)
 				free(attr_val);
 			break;
@@ -672,19 +669,19 @@ yp_parse_ldap_config_file(
 		len = attr_val == NULL ? 0 : strlen(attr_val);
 		if (IS_YP_CONFIG_KEYWORD(attrib_num)) {
 			rc = add_config_attribute(attrib_num,
-				attr_val, len, config_info);
+			    attr_val, len, config_info);
 		} else if (IS_YP_BIND_INFO(attrib_num)) {
 			rc = add_bind_attribute(attrib_num,
-				attr_val, len, proxy_info);
+			    attr_val, len, proxy_info);
 		} else if (IS_YP_OPER_INFO(attrib_num)) {
 			rc = add_operation_attribute(attrib_num,
-				attr_val, len, nis_config, table_info);
+			    attr_val, len, nis_config, table_info);
 		} else if (IS_YP_DOMAIN_INFO(attrib_num)) {
 			rc = add_ypdomains_attribute(attrib_num,
-				attr_val, len, ypDomains);
+			    attr_val, len, ypDomains);
 		} else if (IS_YP_MAP_ATTR(attrib_num)) {
 			rc = add_mapping_attribute(attrib_num,
-				attr_val, len, table_mapping);
+			    attr_val, len, table_mapping);
 		} else {
 			rc = -1;
 			p_error = parse_unsupported_format;
@@ -692,7 +689,7 @@ yp_parse_ldap_config_file(
 
 		if (rc < 0) {
 			report_error(attr_val == NULL ?
-				"<no attribute>" : attr_val, _key_val);
+			    "<no attribute>" : attr_val, _key_val);
 			if (attr_val)
 				free(attr_val);
 			break;
@@ -769,7 +766,7 @@ get_file_attr_val(int fd, char **attr_val)
 			s--;
 
 		attribute_value =
-		(char *)calloc(1, (size_t)(s - start_val) + 1);
+		    calloc(1, (size_t)(s - start_val) + 1);
 		if (attribute_value == NULL) {
 			p_error = parse_no_mem_error;
 			return (key_bad);
@@ -784,7 +781,7 @@ get_file_attr_val(int fd, char **attr_val)
 					cut_here = s;
 					while (s < end_val) {
 						if (*s == DOUBLE_QUOTE_CHAR ||
-						*s == SINGLE_QUOTE_CHAR) {
+						    *s == SINGLE_QUOTE_CHAR) {
 							cut_here = 0;
 							break;
 						}
@@ -831,7 +828,7 @@ connect_to_ldap_config_server(
 		}
 	} else {
 		if ((errnum = ldapssl_client_init(
-			config_info->tls_cert_db, NULL)) < 0) {
+		    config_info->tls_cert_db, NULL)) < 0) {
 			p_error = parse_ldapssl_client_init_error;
 			report_error(ldapssl_err2string(errnum), NULL);
 			return (NULL);
@@ -845,7 +842,7 @@ connect_to_ldap_config_server(
 	}
 
 	(void) ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION,
-		&ldapVersion);
+	    &ldapVersion);
 	(void) ldap_set_option(ld, LDAP_OPT_DEREF, &derefOption);
 	(void) ldap_set_option(ld, LDAP_OPT_REFERRALS, LDAP_OPT_OFF);
 	(void) ldap_set_option(ld, LDAP_OPT_TIMELIMIT, &timelimit);
@@ -862,17 +859,17 @@ connect_to_ldap_config_server(
 	for (;;) {
 		if (config_info->auth_method == simple) {
 			errnum = ldap_simple_bind_s(ld, config_info->proxy_dn,
-				config_info->proxy_passwd);
+			    config_info->proxy_passwd);
 		} else if (config_info->auth_method == cram_md5) {
 			cred.bv_len = strlen(config_info->proxy_passwd);
 			cred.bv_val = config_info->proxy_passwd;
 			errnum = ldap_sasl_cram_md5_bind_s(ld,
-				config_info->proxy_dn, &cred, NULL, NULL);
+			    config_info->proxy_dn, &cred, NULL, NULL);
 		} else if (config_info->auth_method == digest_md5) {
 			cred.bv_len = strlen(config_info->proxy_passwd);
 			cred.bv_val = config_info->proxy_passwd;
 			errnum = ldap_x_sasl_digest_md5_bind_s(ld,
-				config_info->proxy_dn, &cred, NULL, NULL);
+			    config_info->proxy_dn, &cred, NULL, NULL);
 		} else {
 			errnum = ldap_simple_bind_s(ld, NULL, NULL);
 		}
@@ -881,12 +878,12 @@ connect_to_ldap_config_server(
 			break;
 
 		if (errnum == LDAP_CONNECT_ERROR ||
-			errnum == LDAP_SERVER_DOWN) {
+		    errnum == LDAP_SERVER_DOWN) {
 			if (!retrying) {
 				if (verbose)
-				    report_info(
+					report_info(
 					"LDAP server unavailable. Retrying...",
-					NULL);
+					    NULL);
 				retrying = TRUE;
 			}
 			(void) sleep(sleep_seconds);
@@ -945,82 +942,71 @@ process_ldap_config_result(
 	e = ldap_first_entry(ld, resultMsg);
 
 	if (e != NULL) {
-		for (attr = ldap_first_attribute(ld, e, &ber);
-			attr != NULL;
-			attr = ldap_next_attribute(ld, e, ber)) {
-		    if (verbose)
-			report_info("\t", attr);
-		    attrib_num = get_attrib_num(attr, strlen(attr));
-		    if (attrib_num == key_bad) {
+		for (attr = ldap_first_attribute(ld, e, &ber); attr != NULL;
+		    attr = ldap_next_attribute(ld, e, ber)) {
+			if (verbose)
+				report_info("\t", attr);
+			attrib_num = get_attrib_num(attr, strlen(attr));
+			if (attrib_num == key_bad) {
 				report_error(attr, NULL);
 				break;
-		    }
-		    if ((vals = ldap_get_values(ld, e, attr)) != NULL) {
-			n = ldap_count_values(vals);
-			/* parse the attribute values */
-			for (i = 0; i < n; i++) {
-				attr_val = vals[i];
-				while (is_whitespace(*attr_val))
-					attr_val++;
-				if (verbose)
-					report_info("\t\t", attr_val);
-				len = strlen(attr_val);
-				while (len > 0 &&
-				    is_whitespace(attr_val[len - 1]))
-					len--;
-				if (yp2ldap) {
-					if (IS_YP_BIND_INFO(attrib_num)) {
-						rc = add_bind_attribute(
-							attrib_num, attr_val,
-							len, proxy_info);
-					} else if (IS_YP_OPER_INFO(
-						attrib_num)) {
-						rc = add_operation_attribute(
-						attrib_num, attr_val, len,
-						nis_config, table_info);
-					} else if (IS_YP_MAP_ATTR(
-						attrib_num)) {
-						rc = add_mapping_attribute(
-						attrib_num, attr_val, len,
-						table_mapping);
-					} else {
-						p_error =
-						parse_unsupported_format;
-					}
-				} else {
-					if (IS_BIND_INFO(attrib_num)) {
-						rc = add_bind_attribute(
-						attrib_num, attr_val, len,
-						proxy_info);
-					} else if (IS_OPER_INFO(attrib_num)) {
-						rc = add_operation_attribute(
-						attrib_num, attr_val, len,
-						nis_config,
-						    table_info);
-					} else {
-						rc = add_mapping_attribute(
-						attrib_num, attr_val, len,
-						table_mapping);
-					}
-				}
-				if (p_error != no_parse_error) {
-					report_error(attr_val, attr);
-					error_reported = TRUE;
-					break;
-				}
 			}
-			ldap_value_free(vals);
-		    } else {
-			(void) ldap_get_option(ld, LDAP_OPT_ERROR_NUMBER,
-				&errnum);
-			if (errnum != LDAP_SUCCESS)
-				p_error = parse_ldap_get_values_error;
-		    }
-		    ldap_memfree(attr);
-		    if (p_error != no_parse_error)
-			break;
-		}
+			if ((vals = ldap_get_values(ld, e, attr)) != NULL) {
+				n = ldap_count_values(vals);
+				/* parse the attribute values */
+				for (i = 0; i < n; i++) {
+					attr_val = vals[i];
+					while (is_whitespace(*attr_val))
+						attr_val++;
+					if (verbose)
+						report_info("\t\t", attr_val);
+					len = strlen(attr_val);
+					while (len > 0 &&
+					    is_whitespace(attr_val[len - 1]))
+						len--;
+		if (yp2ldap) {
+			if (IS_YP_BIND_INFO(attrib_num)) {
+				rc = add_bind_attribute(attrib_num, attr_val,
+				    len, proxy_info);
+			} else if (IS_YP_OPER_INFO(attrib_num)) {
+				rc = add_operation_attribute(attrib_num,
+				    attr_val, len, nis_config, table_info);
+			} else if (IS_YP_MAP_ATTR(attrib_num)) {
+				rc = add_mapping_attribute(attrib_num, attr_val,
+				    len, table_mapping);
+			} else {
+				p_error = parse_unsupported_format;
+			}
 		} else {
+			if (IS_BIND_INFO(attrib_num)) {
+				rc = add_bind_attribute(attrib_num, attr_val,
+				    len, proxy_info);
+			} else if (IS_OPER_INFO(attrib_num)) {
+				rc = add_operation_attribute(attrib_num,
+				    attr_val, len, nis_config, table_info);
+			} else {
+				rc = add_mapping_attribute(attrib_num, attr_val,
+				    len, table_mapping);
+			}
+		}
+					if (p_error != no_parse_error) {
+						report_error(attr_val, attr);
+						error_reported = TRUE;
+						break;
+					}
+				}
+				ldap_value_free(vals);
+			} else {
+				(void) ldap_get_option(ld,
+				    LDAP_OPT_ERROR_NUMBER, &errnum);
+				if (errnum != LDAP_SUCCESS)
+					p_error = parse_ldap_get_values_error;
+			}
+			ldap_memfree(attr);
+			if (p_error != no_parse_error)
+				break;
+		}
+	} else {
 		errnum = ldap_result2error(ld, resultMsg, FALSE);
 		if (errnum != LDAP_SUCCESS)
 			p_error = parse_ldap_search_error;
@@ -1082,13 +1068,13 @@ process_ldap_referral(
 #endif
 
 	if ((ld = connect_to_ldap_config_server(ludpp->lud_host,
-			ludpp->lud_port, config_info)) == NULL) {
+	    ludpp->lud_port, config_info)) == NULL) {
 		ldap_free_urldesc(ludpp);
 		return (-1);
 	}
 
 	errnum = ldap_search_s(ld, config_info->config_dn, LDAP_SCOPE_BASE,
-		"objectclass=nisplusLDAPconfig", attrs, 0, &resultMsg);
+	    "objectclass=nisplusLDAPconfig", attrs, 0, &resultMsg);
 
 	ldap_source = config_info->config_dn;
 
@@ -1098,7 +1084,7 @@ process_ldap_referral(
 		rc = -1;
 	} else {
 		rc = process_ldap_config_result(ld, resultMsg, proxy_info,
-			nis_config, table_mapping, table_info);
+		    nis_config, table_mapping, table_info);
 	}
 
 	ldap_source = NULL;
@@ -1138,7 +1124,7 @@ process_ldap_referral_msg(
 	int	rc;
 
 	rc = ldap_parse_result(ld, resultMsg, &errCode, NULL, NULL, &referralsp,
-			NULL, 0);
+	    NULL, 0);
 
 	if (rc != LDAP_SUCCESS || errCode != LDAP_REFERRAL) {
 		p_error = parse_ldap_get_values_error;
@@ -1147,13 +1133,13 @@ process_ldap_referral_msg(
 	} else {
 		for (i = 0; referralsp[i] != NULL; i++) {
 			rc = process_ldap_referral(referralsp[i], attrs,
-				proxy_info, nis_config, table_mapping,
-				config_info, table_info);
+			    proxy_info, nis_config, table_mapping,
+			    config_info, table_info);
 			if (rc <= 0)
 				break;
 			else
 				report_info("Cannot use referral \n",
-					referralsp[i]);
+				    referralsp[i]);
 
 		}
 		if (rc > 0) {
@@ -1202,7 +1188,7 @@ parse_ldap_config_dn_attrs(
 	    (auth_method_t)NO_VALUE_SET)
 		p_error = parse_no_config_auth_error;
 	else if ((config_info->default_servers == NULL) ||
-			(config_info->default_servers[0] == '\0'))
+	    (config_info->default_servers[0] == '\0'))
 		p_error = parse_no_config_server_addr;
 	if (p_error != no_parse_error) {
 		report_error(NULL, NULL);
@@ -1212,8 +1198,8 @@ parse_ldap_config_dn_attrs(
 	if (config_info->tls_method == (tls_method_t)NO_VALUE_SET)
 		config_info->tls_method = no_tls;
 	else if (config_info->tls_method == ssl_tls &&
-			(config_info->tls_cert_db == NULL ||
-			*config_info->tls_cert_db == '\0')) {
+	    (config_info->tls_cert_db == NULL ||
+	    *config_info->tls_cert_db == '\0')) {
 		p_error = parse_no_config_cert_db;
 		report_error(NULL, NULL);
 		return (-1);
@@ -1221,34 +1207,34 @@ parse_ldap_config_dn_attrs(
 
 	if (verbose)
 		report_info(
-			"Getting configuration from LDAP server(s): ",
-			config_info->default_servers);
+		    "Getting configuration from LDAP server(s): ",
+		    config_info->default_servers);
 
 	/* Determine which attributes should be retrieved */
 	get_attribute_list(proxy_info, nis_config, NULL, table_info,
-		ldap_config_attributes);
+	    ldap_config_attributes);
 
 	if ((ld = connect_to_ldap_config_server(config_info->default_servers, 0,
-			config_info)) == NULL)
+	    config_info)) == NULL)
 		return (-1);
 
 	/* Get the attribute values */
 	errnum = ldap_search_s(ld, config_info->config_dn, LDAP_SCOPE_BASE,
-			"objectclass=nisplusLDAPconfig",
-			ldap_config_attributes, 0, &resultMsg);
+	    "objectclass=nisplusLDAPconfig",
+	    ldap_config_attributes, 0, &resultMsg);
 	ldap_source = config_info->config_dn;
 
 	if (errnum == LDAP_REFERRAL) {
 		rc = process_ldap_referral_msg(ld, resultMsg,
-			ldap_config_attributes, proxy_info, nis_config,
-			table_mapping, config_info, table_info);
+		    ldap_config_attributes, proxy_info, nis_config,
+		    table_mapping, config_info, table_info);
 	} else if (errnum != LDAP_SUCCESS) {
 		p_error = parse_ldap_search_error;
 		report_error(ldap_err2string(errnum), 0);
 		rc = -1;
 	} else {
 		rc = process_ldap_config_result(ld, resultMsg, proxy_info,
-			nis_config, table_mapping, table_info);
+		    nis_config, table_mapping, table_info);
 	}
 
 	ldap_source = NULL;
@@ -1313,10 +1299,10 @@ get_attribute_list(
 			if (config_info->default_servers == NULL)
 				attributes[n_attrs++] = YP_CONFIG_SERVER_LIST;
 			if (config_info->auth_method ==
-				(auth_method_t)NO_VALUE_SET)
+			    (auth_method_t)NO_VALUE_SET)
 				attributes[n_attrs++] = YP_CONFIG_AUTH_METHOD;
 			if (config_info->tls_method ==
-				(tls_method_t)NO_VALUE_SET)
+			    (tls_method_t)NO_VALUE_SET)
 				attributes[n_attrs++] = YP_CONFIG_TLS_OPTION;
 			if (config_info->proxy_dn == NULL)
 				attributes[n_attrs++] = YP_CONFIG_PROXY_USER;
@@ -1330,10 +1316,10 @@ get_attribute_list(
 			if (config_info->default_servers == NULL)
 				attributes[n_attrs++] = CONFIG_SERVER_LIST;
 			if (config_info->auth_method ==
-				(auth_method_t)NO_VALUE_SET)
+			    (auth_method_t)NO_VALUE_SET)
 				attributes[n_attrs++] = CONFIG_AUTH_METHOD;
 			if (config_info->tls_method ==
-				(tls_method_t)NO_VALUE_SET)
+			    (tls_method_t)NO_VALUE_SET)
 				attributes[n_attrs++] = CONFIG_TLS_OPTION;
 			if (config_info->proxy_dn == NULL)
 				attributes[n_attrs++] = CONFIG_PROXY_USER;
@@ -1383,53 +1369,53 @@ get_attribute_list(
 		if (proxy_info->default_nis_domain == NULL)
 			attributes[n_attrs++] = YP_LDAP_BASE_DOMAIN;
 		if (proxy_info->bind_timeout.tv_sec ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_BIND_TIMEOUT;
 		if (proxy_info->search_timeout.tv_sec ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_SEARCH_TIMEOUT;
 		if (proxy_info->modify_timeout.tv_sec ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_MODIFY_TIMEOUT;
 		if (proxy_info->add_timeout.tv_sec == (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_ADD_TIMEOUT;
 		if (proxy_info->delete_timeout.tv_sec ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_DELETE_TIMEOUT;
 		if (proxy_info->search_time_limit == (int)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_SEARCH_TIME_LIMIT;
 		if (proxy_info->search_size_limit == (int)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_SEARCH_SIZE_LIMIT;
 		if (proxy_info->follow_referral ==
-			(follow_referral_t)NO_VALUE_SET)
+		    (follow_referral_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_FOLLOW_REFERRAL;
 
 		if (table_info->retrieveError ==
-			(__nis_retrieve_error_t)NO_VALUE_SET)
+		    (__nis_retrieve_error_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_RETRIEVE_ERROR_ACTION;
 		if (table_info->retrieveErrorRetry.attempts == NO_VALUE_SET)
 			attributes[n_attrs++] = YP_RETREIVE_ERROR_ATTEMPTS;
 		if (table_info->retrieveErrorRetry.timeout ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_RETREIVE_ERROR_TIMEOUT;
 		if (table_info->storeError ==
-			(__nis_store_error_t)NO_VALUE_SET)
+		    (__nis_store_error_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_STORE_ERROR_ACTION;
 		if (table_info->storeErrorRetry.attempts == NO_VALUE_SET)
 			attributes[n_attrs++] = YP_STORE_ERROR_ATTEMPTS;
 		if (table_info->storeErrorRetry.timeout ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_STORE_ERROR_TIMEOUT;
 		if (table_info->refreshError ==
-			(__nis_refresh_error_t)NO_VALUE_SET)
+		    (__nis_refresh_error_t)NO_VALUE_SET)
 			attributes[n_attrs++] = REFRESH_ERROR_ACTION;
 		if (table_info->refreshErrorRetry.attempts == NO_VALUE_SET)
 			attributes[n_attrs++] = REFRESH_ERROR_ATTEMPTS;
 		if (table_info->refreshErrorRetry.timeout ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = REFRESH_ERROR_TIMEOUT;
 		if (table_info->matchFetch ==
-			(__nis_match_fetch_t)NO_VALUE_SET)
+		    (__nis_match_fetch_t)NO_VALUE_SET)
 			attributes[n_attrs++] = YP_MATCH_FETCH;
 	} else {
 		if (proxy_info->default_servers == NULL)
@@ -1449,69 +1435,69 @@ get_attribute_list(
 		if (proxy_info->default_nis_domain == NULL)
 			attributes[n_attrs++] = LDAP_BASE_DOMAIN;
 		if (proxy_info->bind_timeout.tv_sec ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = BIND_TIMEOUT;
 		if (proxy_info->search_timeout.tv_sec ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = SEARCH_TIMEOUT;
 		if (proxy_info->modify_timeout.tv_sec ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = MODIFY_TIMEOUT;
 		if (proxy_info->add_timeout.tv_sec == (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = ADD_TIMEOUT;
 		if (proxy_info->delete_timeout.tv_sec ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = DELETE_TIMEOUT;
 		if (proxy_info->search_time_limit == (int)NO_VALUE_SET)
 			attributes[n_attrs++] = SEARCH_TIME_LIMIT;
 		if (proxy_info->search_size_limit == (int)NO_VALUE_SET)
 			attributes[n_attrs++] = SEARCH_SIZE_LIMIT;
 		if (proxy_info->follow_referral ==
-			(follow_referral_t)NO_VALUE_SET)
+		    (follow_referral_t)NO_VALUE_SET)
 			attributes[n_attrs++] = FOLLOW_REFERRAL;
 
 		if (table_info->retrieveError ==
-			(__nis_retrieve_error_t)NO_VALUE_SET)
+		    (__nis_retrieve_error_t)NO_VALUE_SET)
 			attributes[n_attrs++] = RETRIEVE_ERROR_ACTION;
 		if (table_info->retrieveErrorRetry.attempts == NO_VALUE_SET)
 			attributes[n_attrs++] = RETREIVE_ERROR_ATTEMPTS;
 		if (table_info->retrieveErrorRetry.timeout ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = RETREIVE_ERROR_TIMEOUT;
 		if (table_info->storeError ==
-			(__nis_store_error_t)NO_VALUE_SET)
+		    (__nis_store_error_t)NO_VALUE_SET)
 			attributes[n_attrs++] = STORE_ERROR_ACTION;
 		if (table_info->storeErrorRetry.attempts == NO_VALUE_SET)
 			attributes[n_attrs++] = STORE_ERROR_ATTEMPTS;
 		if (table_info->storeErrorRetry.timeout ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = STORE_ERROR_TIMEOUT;
 		if (table_info->refreshError ==
-			(__nis_refresh_error_t)NO_VALUE_SET)
+		    (__nis_refresh_error_t)NO_VALUE_SET)
 			attributes[n_attrs++] = REFRESH_ERROR_ACTION;
 		if (table_info->refreshErrorRetry.attempts == NO_VALUE_SET)
 			attributes[n_attrs++] = REFRESH_ERROR_ATTEMPTS;
 		if (table_info->refreshErrorRetry.timeout ==
-			(time_t)NO_VALUE_SET)
+		    (time_t)NO_VALUE_SET)
 			attributes[n_attrs++] = REFRESH_ERROR_TIMEOUT;
 		if (table_info->matchFetch ==
-			(__nis_match_fetch_t)NO_VALUE_SET)
+		    (__nis_match_fetch_t)NO_VALUE_SET)
 			attributes[n_attrs++] = MATCH_FETCH;
 	}
 
 	switch (nis_config->initialUpdate) {
-		case (__nis_initial_update_t)NO_VALUE_SET:
-			attributes[n_attrs++] = INITIAL_UPDATE_ACTION;
-			attributes[n_attrs++] = INITIAL_UPDATE_ONLY;
-			break;
-		case (__nis_initial_update_t)INITIAL_UPDATE_NO_ACTION:
-		case (__nis_initial_update_t)NO_INITIAL_UPDATE_NO_ACTION:
-			attributes[n_attrs++] = INITIAL_UPDATE_ACTION;
-			break;
-		case (__nis_initial_update_t)FROM_NO_INITIAL_UPDATE:
-		case (__nis_initial_update_t)TO_NO_INITIAL_UPDATE:
-			attributes[n_attrs++] = INITIAL_UPDATE_ONLY;
-			break;
+	case (__nis_initial_update_t)NO_VALUE_SET:
+		attributes[n_attrs++] = INITIAL_UPDATE_ACTION;
+		attributes[n_attrs++] = INITIAL_UPDATE_ONLY;
+		break;
+	case (__nis_initial_update_t)INITIAL_UPDATE_NO_ACTION:
+	case (__nis_initial_update_t)NO_INITIAL_UPDATE_NO_ACTION:
+		attributes[n_attrs++] = INITIAL_UPDATE_ACTION;
+		break;
+	case (__nis_initial_update_t)FROM_NO_INITIAL_UPDATE:
+	case (__nis_initial_update_t)TO_NO_INITIAL_UPDATE:
+		attributes[n_attrs++] = INITIAL_UPDATE_ONLY;
+		break;
 	}
 
 	if (nis_config->threadCreationError ==
@@ -1520,7 +1506,7 @@ get_attribute_list(
 	if (nis_config->threadCreationErrorTimeout.attempts == NO_VALUE_SET)
 		attributes[n_attrs++] = THREAD_CREATE_ERROR_ATTEMPTS;
 	if (nis_config->threadCreationErrorTimeout.timeout ==
-			(time_t)NO_VALUE_SET)
+	    (time_t)NO_VALUE_SET)
 		attributes[n_attrs++] = THREAD_CREATE_ERROR_TIMEOUT;
 	if (nis_config->dumpError == (__nis_dump_error_t)NO_VALUE_SET)
 		attributes[n_attrs++] = DUMP_ERROR_ACTION;
@@ -1531,7 +1517,7 @@ get_attribute_list(
 	if (nis_config->resyncService == (__nis_resync_service_t)NO_VALUE_SET)
 		attributes[n_attrs++] = RESYNC;
 	if (nis_config->updateBatching ==
-			(__nis_update_batching_t)NO_VALUE_SET)
+	    (__nis_update_batching_t)NO_VALUE_SET)
 		attributes[n_attrs++] = UPDATE_BATCHING;
 	if (nis_config->updateBatchingTimeout.timeout == (time_t)NO_VALUE_SET)
 		attributes[n_attrs++] = UPDATE_BATCHING_TIMEOUT;

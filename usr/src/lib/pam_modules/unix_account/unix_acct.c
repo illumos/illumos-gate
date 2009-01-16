@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,8 +61,6 @@
 /*
  * Function Declarations
  */
-extern int		defopen(char *);
-extern char		*defread(char *);
 extern void		setusershell();
 extern int		_nfssys(int, void *);
 
@@ -188,12 +186,13 @@ perform_passwd_aging_check(
 	int	idledays = -1;
 	char	*ptr;
 	char	messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
+	void	*defp;
 
 
-	if (defopen(LOGINADMIN) == 0) {
-		if ((ptr = defread("IDLEWEEKS=")) != NULL)
+	if ((defp = defopen_r(LOGINADMIN)) != NULL) {
+		if ((ptr = defread_r("IDLEWEEKS=", defp)) != NULL)
 			idledays = 7 * atoi(ptr);
-		(void) defopen(NULL);
+		defclose_r(defp);
 	}
 
 	/*

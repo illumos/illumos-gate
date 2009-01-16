@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pwd.h>
 #include <grp.h>
@@ -67,34 +64,24 @@ static OM_uint32 private_gsscred_expname_to_unix_cred(const gss_buffer_t,
 static void
 get_conf_options(int *uid_map)
 {
-	register int  flags;
+	int  flags;
 	char *ptr;
+	void	*defp;
 	static char *conffile = "/etc/gss/gsscred.conf";
-	static  mutex_t deflt_lock = DEFAULTMUTEX;
-
 
 	*uid_map = 0;
-	/*
-	 * hold the lock for the deflt file access as its
-	 * interface does not appear to be mt-safe
-	 */
-	(void) mutex_lock(&deflt_lock);
-	if (defopen(conffile) == 0) {
-		flags = defcntl(DC_GETFLAGS, 0);
+	if ((defp = defopen_r(conffile)) != NULL) {
+		flags = defcntl_r(DC_GETFLAGS, 0, defp);
 		/* ignore case */
 		TURNOFF(flags, DC_CASE);
-		(void) defcntl(DC_SETFLAGS, flags);
+		(void) defcntl_r(DC_SETFLAGS, flags, defp);
 
-		if ((ptr = defread("SYSLOG_UID_MAPPING=")) != NULL &&
+		if ((ptr = defread_r("SYSLOG_UID_MAPPING=", defp)) != NULL &&
 		    strcasecmp("yes", ptr) == 0) {
-			(void) defopen((char *)NULL);
-			(void) mutex_unlock(&deflt_lock);
 			*uid_map = 1;
-			return;
 		}
-		(void) defopen((char *)NULL);
+		defclose_r(defp);
 	}
-	(void) mutex_unlock(&deflt_lock);
 }
 
 void
@@ -149,17 +136,17 @@ gsscred_expname_to_unix_cred_ext(
 
 	/* first check the mechanism for the mapping */
 	if (gss_import_name(&minor, expName, (gss_OID)GSS_C_NT_EXPORT_NAME,
-			&intName) == GSS_S_COMPLETE) {
+	    &intName) == GSS_S_COMPLETE) {
 
 		if (debug) {
 			gss_union_name_t uintName = (gss_union_name_t)intName;
 
 			if (uintName->mech_type)
 				mechStr = __gss_oid_to_mech(
-					uintName->mech_type);
+				    uintName->mech_type);
 
 			major = gss_display_name(&minor, intName,
-						&namebuf, NULL);
+			    &namebuf, NULL);
 			if (major == GSS_S_COMPLETE) {
 				nameStr = strdup(namebuf.value);
 				(void) gss_release_buffer(&minor, &namebuf);
@@ -168,7 +155,7 @@ gsscred_expname_to_unix_cred_ext(
 
 		if (try_mech) {
 			major = gss_pname_to_uid(&minor, intName,
-						NULL, uidOut);
+			    NULL, uidOut);
 			if (major == GSS_S_COMPLETE) {
 
 				if (debug) {
@@ -184,9 +171,7 @@ gsscred_expname_to_unix_cred_ext(
 				(void) gss_release_name(&minor, &intName);
 				if (gids && gidsLen && gidOut)
 					return (gss_get_group_info(*uidOut,
-								gidOut,
-								gids,
-								gidsLen));
+					    gidOut, gids, gidsLen));
 				return (GSS_S_COMPLETE);
 			}
 		}
@@ -199,7 +184,7 @@ gsscred_expname_to_unix_cred_ext(
 	 * start by making sure that the expName is an export name buffer
 	 */
 	major = private_gsscred_expname_to_unix_cred(expName, uidOut, gidOut,
-						gids, gidsLen);
+	    gids, gidsLen);
 
 	if (debug && major == GSS_S_COMPLETE) {
 		syslog(LOG_AUTH|LOG_DEBUG,
@@ -233,7 +218,7 @@ gsscred_expname_to_unix_cred(
 	int *gidsLen)
 {
 	return (gsscred_expname_to_unix_cred_ext(expName, uidOut, gidOut, gids,
-						gidsLen, 1));
+	    gidsLen, 1));
 }
 
 
@@ -350,7 +335,7 @@ gsscred_name_to_unix_cred_ext(
 
 	/* first try the mechanism provided mapping */
 	if (try_mech && gss_pname_to_uid(&minor, intName, mechType, uidOut)
-		== GSS_S_COMPLETE) {
+	    == GSS_S_COMPLETE) {
 
 		if (debug) {
 			char *s = make_name_str(intName, mechType);
@@ -365,7 +350,7 @@ gsscred_name_to_unix_cred_ext(
 
 		if (gids && gidsLen && gidOut)
 			return (gss_get_group_info(*uidOut, gidOut, gids,
-					gidsLen));
+			    gidsLen));
 		return (GSS_S_COMPLETE);
 	}
 	/*
@@ -373,7 +358,7 @@ gsscred_name_to_unix_cred_ext(
 	 * start by canonicalizing the passed in name and then export it
 	 */
 	if (major = gss_canonicalize_name(&minor, intName,
-				mechType, &canonName))
+	    mechType, &canonName))
 		return (major);
 
 	major = gss_export_name(&minor, canonName, &expName);
@@ -382,7 +367,7 @@ gsscred_name_to_unix_cred_ext(
 		return (major);
 
 	major = private_gsscred_expname_to_unix_cred(&expName, uidOut, gidOut,
-					gids, gidsLen);
+	    gids, gidsLen);
 
 
 	if (debug) {
@@ -391,11 +376,10 @@ gsscred_name_to_unix_cred_ext(
 		char *nameStr = NULL;
 
 		if (gss_import_name(&minor, &expName,
-				    (gss_OID)GSS_C_NT_EXPORT_NAME,
-				    &iName) == GSS_S_COMPLETE) {
+		    (gss_OID)GSS_C_NT_EXPORT_NAME, &iName) == GSS_S_COMPLETE) {
 
 			maj = gss_display_name(&minor, iName, &namebuf,
-					    NULL);
+			    NULL);
 			(void) gss_release_buffer(&minor, (gss_buffer_t)iName);
 			if (maj == GSS_S_COMPLETE) {
 				nameStr = strdup(namebuf.value);
@@ -437,8 +421,7 @@ gsscred_name_to_unix_cred(
 	int *gidsLen)
 {
 	return (gsscred_name_to_unix_cred_ext(intName, mechType,
-					    uidOut, gidOut,
-					    gids, gidsLen, 1));
+	    uidOut, gidOut, gids, gidsLen, 1));
 }
 
 

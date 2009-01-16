@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,6 @@
 
 /*	Copyright (c) 1987, 1988 Microsoft Corporation	*/
 /*	  All Rights Reserved	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include "libc.h"
@@ -45,13 +43,14 @@
 
 #define	TSTBITS(flags, mask)	(((flags) & (mask)) == (mask))
 
-static void strip_quotes(char *);
-
 struct thr_data {
 	int  Dcflags;	/* [re-]initialized on each call to defopen() */
 	FILE *fp;
 	char *buf;
 };
+
+static int	defopen_common(const char *, struct thr_data *);
+static void strip_quotes(char *);
 
 #define	BUFFERSIZE	1024
 
@@ -105,6 +104,46 @@ defopen(char *fn)
 {
 	struct thr_data *thr_data = get_thr_data();
 
+	return (defopen_common(fn, thr_data));
+}
+
+/*
+ *	defopen_r() - declare defopen filename (reentrant)
+ *
+ *	defopen_r(const char *fn)
+ *
+ *	'fn' is a full pathname of a file which becomes the one read
+ *	by subsequent defread_r() calls.  defopen_r returns a pointer
+ *	to the internally allocated buffer containing the file descriptor.
+ *	The pointer should be specified to the following defread_r and
+ *	defcntl_r functions.  As the pointer to be returned points to
+ *	the libc lmalloc'd memory, defclose_r must be used to close
+ *	the defopen file and to release the allocated memory.  Caller
+ *	must not try to release the memory by free().
+ *
+ *	see defread_r() for more details.
+ *
+ *	EXIT    returns non-NULL pointer if success
+ *		returns NULL if error
+ */
+void *
+defopen_r(const char *fn)
+{
+	/* memory allocated by lmalloc gets initialized to zeros */
+	struct thr_data	*thr_data = lmalloc(sizeof (struct thr_data));
+
+	if (defopen_common(fn, thr_data) < 0) {
+		if (thr_data != NULL)
+			lfree(thr_data, sizeof (struct thr_data));
+		return (NULL);
+	}
+
+	return ((void *)thr_data);
+}
+
+static int
+defopen_common(const char *fn, struct thr_data *thr_data)
+{
 	if (thr_data == NULL)
 		return (-1);
 
@@ -121,7 +160,8 @@ defopen(char *fn)
 
 	/*
 	 * We allocate the big buffer only if the fopen() succeeds.
-	 * Notice that we deallocate the buffer only when the thread exits.
+	 * Notice that we deallocate the buffer only when the thread exits
+	 * for defopen().
 	 * There are misguided applications that assume that data returned
 	 * by defread() continues to exist after defopen(NULL) is called.
 	 */
@@ -150,7 +190,7 @@ defopen(char *fn)
  *	the matched string (*cp).  If no line is found or no file
  *	is open, defread() returns NULL.
  *
- *	Note that there is no way to simulatniously peruse multiple
+ *	Note that there is no way to simultaneously peruse multiple
  *	defopen files; since there is no way of indicating 'which one'
  *	to defread().  If you want to peruse a secondary file you must
  *	recall defopen().  If you need to go back to the first file,
@@ -160,8 +200,29 @@ char *
 defread(char *cp)
 {
 	struct thr_data *thr_data = get_thr_data();
+
+	return (defread_r(cp, thr_data));
+}
+
+/*
+ *	defread_r() - read an entry from the defopen file
+ *
+ *	defread_r(const char *cp, void *defp)
+ *
+ *	defread_r scans the data file associated with the pointer
+ *	specified by 'defp' that was returned by defopen_r(), and
+ *	looks for a line which begins with the string '*cp'.
+ *	If such a line is found, defread_r returns a pointer to
+ *	the first character following the matched string (*cp).
+ *	If no line is found or no file is open, defread_r() returns NULL.
+ */
+char *
+defread_r(const char *cp, void *ptr)
+{
+	struct thr_data *thr_data = (struct thr_data *)ptr;
 	int (*compare)(const char *, const char *, size_t);
-	char *buf_tmp, *ret_ptr = NULL;
+	char *buf_tmp;
+	char *ret_ptr = NULL;
 	size_t off, patlen;
 
 	if (thr_data == NULL || thr_data->fp == NULL)
@@ -203,21 +264,52 @@ defread(char *cp)
  *
  *	ENTRY
  *	  cmd		Command.  One of DC_GET, DC_SET.
- *	  arg		Depends on command.  If DC_GET, ignored.  If
- *		DC_GET, new flags value, created by ORing the DC_* bits.
+ *	  arg		Depends on command.  If DC_GET, ignored.
+ *			If DC_SET, new flags value, created by ORing
+ *			the DC_* bits.
  *	RETURN
  *	  oldflags	Old value of flags.  -1 on error.
  *	NOTES
- *	  Currently only one bit of flags implemented, namely respect/
- *	  ignore case.  The routine is as general as it is so that we
- *	  leave our options open.  E.g. we might want to specify rewind/
- *	  norewind before each defread.
+ *	  The following commands are implemented:
+ *
+ *	  DC_CASE:		respect(on)/ignore(off) case
+ *	  DC_NOREWIND:		don't(on)/do(off) reqind in defread
+ *	  DC_STRIP_QUOTES:	strip(on)/leave(off) qoates
  */
-
 int
 defcntl(int cmd, int newflags)
 {
 	struct thr_data *thr_data = get_thr_data();
+
+	return (defcntl_r(cmd, newflags, thr_data));
+}
+
+/*
+ *	defcntl_r -- default control
+ *
+ *	SYNOPSIS
+ *	  oldflags = defcntl_r(int cmd, int arg, void *defp);
+ *
+ *	ENTRY
+ *	  cmd		Command.  One of DC_GET, DC_SET.
+ *	  arg		Depends on command.  If DC_GET, ignored.
+ *			If DC_SET, new flags value, created by ORing
+ *			the DC_* bits.
+ *	  defp		pointer to the defopen'd descriptor
+ *
+ *	RETURN
+ *	  oldflags	Old value of flags.  -1 on error.
+ *	NOTES
+ *	  The following commands are implemented:
+ *
+ *	  DC_CASE:		respect(on)/ignore(off) case
+ *	  DC_NOREWIND:		don't(on)/do(off) reqind in defread
+ *	  DC_STRIP_QUOTES:	strip(on)/leave(off) qoates
+ */
+int
+defcntl_r(int cmd, int newflags, void *ptr)
+{
+	struct thr_data *thr_data = (struct thr_data *)ptr;
 	int  oldflags;
 
 	if (thr_data == NULL)
@@ -237,6 +329,24 @@ defcntl(int cmd, int newflags)
 	}
 
 	return (oldflags);
+}
+
+/*
+ *	defclose_r() - close defopen file
+ *
+ *	defclose_r(void *defp)
+ *
+ *	defclose_r closes the defopen file associated with the specified
+ *	pointer and releases the allocated resources.
+ */
+void
+defclose_r(void *ptr)
+{
+	struct thr_data *thr_data = (struct thr_data *)ptr;
+
+	(void) fclose(thr_data->fp);
+	lfree(thr_data->buf, BUFFERSIZE);
+	lfree(thr_data, sizeof (struct thr_data));
 }
 
 /*

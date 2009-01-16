@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,7 +197,9 @@ pam_trace_cname(pam_handle_t *pamh)
 static void
 pam_settrace()
 {
-	if (defopen(PAM_DEBUG) == 0) {
+	void	*defp;
+
+	if ((defp = defopen_r(PAM_DEBUG)) != NULL) {
 		char	*arg;
 		int	code;
 		int	facility = LOG_AUTH;
@@ -205,23 +207,23 @@ pam_settrace()
 		pam_debug = PAM_DEBUG_DEFAULT;
 		log_priority = LOG_DEBUG;
 
-		(void) defcntl(DC_SETFLAGS, DC_CASE);
-		if ((arg = defread(LOG_PRIORITY)) != NULL) {
+		(void) defcntl_r(DC_SETFLAGS, DC_CASE, defp);
+		if ((arg = defread_r(LOG_PRIORITY, defp)) != NULL) {
 			code = (int)strtol(arg, NULL, 10);
 			if ((code & ~LOG_PRIMASK) == 0) {
 				log_priority = code;
 			}
 		}
-		if ((arg = defread(LOG_FACILITY)) != NULL) {
+		if ((arg = defread_r(LOG_FACILITY, defp)) != NULL) {
 			code = (int)strtol(arg, NULL, 10);
 			if (code < LOG_NFACILITIES) {
 				facility = code << 3;
 			}
 		}
-		if ((arg = defread(DEBUG_FLAGS)) != NULL) {
+		if ((arg = defread_r(DEBUG_FLAGS, defp)) != NULL) {
 			pam_debug = (int)strtol(arg, NULL, 0);
 		}
-		(void) defopen(NULL);	/* close */
+		defclose_r(defp);
 
 		log_priority |= facility;
 	}
