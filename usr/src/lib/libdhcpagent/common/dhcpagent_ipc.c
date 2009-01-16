@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <string.h>
 #include <unistd.h>
@@ -109,7 +107,7 @@ dhcp_ipc_alloc_request(dhcp_ipc_type_t type, const char *ifname,
 	request->data_type	= data_type;
 
 	if (ifname != NULL)
-		(void) strlcpy(request->ifname, ifname, IFNAMSIZ);
+		(void) strlcpy(request->ifname, ifname, LIFNAMSIZ);
 
 	if (buffer != NULL)
 		(void) memcpy(request->buffer, buffer, buffer_size);
@@ -246,7 +244,7 @@ dhcp_ipc_recv_request(int fd, dhcp_ipc_request_t **request, int msec)
 
 	/* guarantee that ifname will be NUL-terminated */
 	if (retval == 0)
-		(*request)->ifname[IFNAMSIZ - 1] = '\0';
+		(*request)->ifname[LIFNAMSIZ - 1] = '\0';
 
 	return (retval);
 }
@@ -718,7 +716,7 @@ getinfo_ifnames(const char *ifn, dhcp_optnum_t *optnum, DHCP_OPT **result)
 
 	for (; ifnames != NULL; ifnames = strtok(NULL, " ")) {
 
-		(void) strlcpy(request->ifname, ifnames, IFNAMSIZ);
+		(void) strlcpy(request->ifname, ifnames, LIFNAMSIZ);
 		retval = dhcp_ipc_make_request(request, &reply, 0);
 		if (retval != 0)
 			break;
@@ -775,7 +773,7 @@ get_ifnames(int flags_on, int flags_off)
 		return (NULL);
 	}
 
-	ifnames = calloc(1, n_ifs * (IFNAMSIZ + 1));
+	ifnames = calloc(1, n_ifs * (LIFNAMSIZ + 1));
 	ifc.ifc_len = n_ifs * sizeof (struct ifreq);
 	ifc.ifc_req = calloc(n_ifs, sizeof (struct ifreq));
 	if (ifc.ifc_req != NULL && ifnames != NULL) {
@@ -892,7 +890,7 @@ dhcp_ipc_getinfo(dhcp_optnum_t *optnum, DHCP_OPT **result, int32_t timeout)
 
 	ifnames_copy = strtok(ifnames_copy, " ");
 	for (; ifnames_copy != NULL; ifnames_copy = strtok(NULL, " ")) {
-		(void) strlcpy(request->ifname, ifnames_copy, IFNAMSIZ);
+		(void) strlcpy(request->ifname, ifnames_copy, LIFNAMSIZ);
 		if (dhcp_ipc_make_request(request, &reply, 0) == 0)
 			free(reply);
 	}
@@ -922,7 +920,7 @@ dhcp_ipc_getinfo(dhcp_optnum_t *optnum, DHCP_OPT **result, int32_t timeout)
 	ifnames_copy = strcpy(ifnames_head, ifnames);
 	ifnames_copy = strtok(ifnames_copy, " ");
 	for (; ifnames_copy != NULL; ifnames_copy = strtok(NULL, " ")) {
-		(void) strlcpy(request->ifname, ifnames_copy, IFNAMSIZ);
+		(void) strlcpy(request->ifname, ifnames_copy, LIFNAMSIZ);
 		if (dhcp_ipc_make_request(request, &reply, 0) == 0)
 			free(reply);
 	}

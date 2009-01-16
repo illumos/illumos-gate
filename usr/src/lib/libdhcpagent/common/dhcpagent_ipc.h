@@ -19,17 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DHCPAGENT_IPC_H
 #define	_DHCPAGENT_IPC_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/socket.h>
-#include <net/if.h>		/* IFNAMSIZ */
+#include <net/if.h>		/* LIFNAMSIZ */
 #include <stddef.h>
 #include <sys/types.h>
 #include <sys/time.h>
@@ -215,7 +213,7 @@ typedef enum {
 typedef struct dhcp_status {
 	uint8_t		version;	/* version of this structure */
 
-	char		if_name[IFNAMSIZ];
+	char		if_name[LIFNAMSIZ];
 	DHCPSTATE	if_state;	/* state of interface; see above */
 
 	time_t		if_began;	/* time lease began (absolute) */
@@ -264,7 +262,7 @@ struct	dhcp_ipc_request {
 	dhcp_ipc_id_t	 ipc_id;	/* per-socket unique request id */
 	dhcp_data_type_t data_type;	/* type of payload */
 	uint32_t	 data_length;	/* size of actual data in the buffer */
-	char		 ifname[IFNAMSIZ];
+	char		 ifname[LIFNAMSIZ];
 	int32_t		 timeout;	/* timeout in seconds */
 	uchar_t		 buffer[1];	/* dynamically extended */
 };

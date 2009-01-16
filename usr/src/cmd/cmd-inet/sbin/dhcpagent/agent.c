@@ -1016,7 +1016,7 @@ load_option:
 		status.if_recv		= dsmp->dsm_received;
 		status.if_bad_offers	= dsmp->dsm_bad_offers;
 
-		(void) strlcpy(status.if_name, dsmp->dsm_name, IFNAMSIZ);
+		(void) strlcpy(status.if_name, dsmp->dsm_name, LIFNAMSIZ);
 
 		send_data_reply(iap, 0, DHCP_TYPE_STATUS, &status,
 		    sizeof (dhcp_status_t));
