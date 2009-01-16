@@ -19,18 +19,19 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DDI_INTR_IMPL_H
 #define	_SYS_DDI_INTR_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Sun DDI interrupt implementation specific definitions
  */
+
+#include <sys/list.h>
+#include <sys/ksynch.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -60,7 +61,8 @@ typedef enum {
 	DDI_INTROP_SETMASK,		/* 16 set mask */
 	DDI_INTROP_CLRMASK,		/* 17 clear mask */
 	DDI_INTROP_GETPENDING,		/* 18 get pending interrupt */
-	DDI_INTROP_NAVAIL		/* 19 get num of available interrupts */
+	DDI_INTROP_NAVAIL,		/* 19 get num of available interrupts */
+	DDI_INTROP_GETPOOL		/* 20 get resource management pool */
 } ddi_intr_op_t;
 
 /* Version number used in the handles */
@@ -195,6 +197,72 @@ typedef struct ddi_intr_msix {
 	ddi_device_acc_attr_t	msix_dev_attr;		/* MSI-X device attr */
 } ddi_intr_msix_t;
 
+/*
+ * Interrupt Resource Management (IRM).
+ */
+
+#define	DDI_IRM_POLICY_LARGE	1
+#define	DDI_IRM_POLICY_EVEN	2
+
+#define	DDI_IRM_POLICY_VALID(p)	(((p) == DDI_IRM_POLICY_LARGE) || \
+				((p) == DDI_IRM_POLICY_EVEN))
+
+#define	DDI_IRM_FLAG_ACTIVE	0x1		/* Pool is active */
+#define	DDI_IRM_FLAG_QUEUED	0x2		/* Pool is queued */
+#define	DDI_IRM_FLAG_WAITERS	0x4		/* Pool has waiters */
+#define	DDI_IRM_FLAG_EXIT	0x8		/* Balance thread must exit */
+#define	DDI_IRM_FLAG_NEW	0x10		/* Request is new */
+#define	DDI_IRM_FLAG_CALLBACK	0x20		/* Request has callback */
+
+/*
+ * One such data structure for each supply of interrupt vectors.
+ * Contains information about the size and policies defining the
+ * supply, and a list of associated device-specific requests.
+ */
+typedef struct ddi_irm_pool {
+	int		ipool_flags;		/* Status flags of the pool */
+	int		ipool_types;		/* Types of interrupts */
+	int		ipool_policy;		/* Rebalancing policy */
+	uint_t		ipool_totsz;		/* Total size of the pool */
+	uint_t		ipool_defsz;		/* Default allocation size */
+	uint_t		ipool_minno;		/* Minimum number consumed */
+	uint_t		ipool_reqno;		/* Total number requested */
+	uint_t		ipool_resno;		/* Total number reserved */
+	kmutex_t	ipool_lock;		/* Protects all pool usage */
+	kmutex_t	ipool_navail_lock;	/* Protects 'navail' of reqs */
+	kcondvar_t	ipool_cv;		/* Condition variable */
+	kthread_t	*ipool_thread;		/* Balancing thread */
+	dev_info_t	*ipool_owner;		/* Device that created pool */
+	list_t		ipool_req_list;		/* All requests in pool */
+	list_t		ipool_scratch_list;	/* Requests being reduced */
+	list_node_t	ipool_link;		/* Links in global pool list */
+} ddi_irm_pool_t;
+
+/*
+ * One such data structure for each dip's devinfo_intr_t.
+ * Contains information about vectors requested from IRM.
+ */
+typedef struct ddi_irm_req {
+	int		ireq_flags;		/* Flags for request */
+	int		ireq_type;		/* Type requested */
+	uint_t		ireq_nreq;		/* Number requested */
+	uint_t		ireq_navail;		/* Number available */
+	uint_t		ireq_scratch;		/* Scratch value */
+	dev_info_t	*ireq_dip;		/* Requesting device */
+	ddi_irm_pool_t	*ireq_pool_p;		/* Supplying pool */
+	list_node_t	ireq_link;		/* Request list link */
+	list_node_t	ireq_scratch_link;	/* Scratch list link */
+} ddi_irm_req_t;
+
+/*
+ * This structure is used to pass parameters to ndi_create_irm(),
+ * and describes the operating parameters of an IRM pool.
+ */
+typedef struct ddi_irm_params {
+	int	iparams_types;		/* Types of interrupts in pool */
+	uint_t	iparams_total;		/* Total size of the pool */
+	uint_t	iparams_default;	/* Default allocation size */
+} ddi_irm_params_t;
 
 /*
  * One such data structure is allocated for each dip.
@@ -212,13 +280,15 @@ typedef struct devinfo_intr {
 	uint_t		devi_intr_sup_nintrs;	/* #intr supported */
 	uint_t		devi_intr_curr_nintrs;	/* #intr currently being used */
 
-	ddi_intr_handle_t **devi_intr_handle_p;	/* Hdl for legacy intr APIs */
+	ddi_intr_handle_t *devi_intr_handle_p;	/* Hdl for legacy intr APIs */
 
 #if defined(__i386) || defined(__amd64)
 	/* Save the PCI config space handle */
 	ddi_acc_handle_t devi_cfg_handle;
 	int		 devi_cap_ptr;		/* MSI or MSI-X cap pointer */
 #endif
+
+	ddi_irm_req_t	*devi_irm_req_p;	/* IRM request information */
 } devinfo_intr_t;
 
 #define	NEXUS_HAS_INTR_OP(dip)	\
@@ -245,10 +315,18 @@ uint_t	i_ddi_intr_get_supported_nintrs(dev_info_t *dip, int intr_type);
 void	i_ddi_intr_set_supported_nintrs(dev_info_t *dip, int nintrs);
 uint_t	i_ddi_intr_get_current_nintrs(dev_info_t *dip);
 void	i_ddi_intr_set_current_nintrs(dev_info_t *dip, int nintrs);
+uint_t	i_ddi_intr_get_current_navail(dev_info_t *dip, int intr_type);
 
-ddi_intr_handle_t *i_ddi_get_intr_handle(dev_info_t *dip, int inum);
-void	i_ddi_set_intr_handle(dev_info_t *dip, int inum,
-	    ddi_intr_handle_t *hdlp);
+ddi_irm_pool_t	*i_ddi_intr_get_pool(dev_info_t *dip, int intr_type);
+
+void	irm_init(void);
+int	i_ddi_irm_insert(dev_info_t *dip, int intr_type, int count);
+int	i_ddi_irm_modify(dev_info_t *dip, int nreq);
+int	i_ddi_irm_remove(dev_info_t *dip);
+void	i_ddi_irm_set_cb(dev_info_t *dip, boolean_t cb_flag);
+
+ddi_intr_handle_t i_ddi_get_intr_handle(dev_info_t *dip, int inum);
+void	i_ddi_set_intr_handle(dev_info_t *dip, int inum, ddi_intr_handle_t hdl);
 
 ddi_intr_msix_t	*i_ddi_get_msix(dev_info_t *dip);
 void	i_ddi_set_msix(dev_info_t *dip, ddi_intr_msix_t *msix_p);

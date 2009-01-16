@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +109,7 @@ struct devnames {
 #define	DDI_DBG_RTR_TRACE	0x4000	/* Trace Retire messages */
 #define	LDI_EV_DEBUG		0x8000  /* LDI events debug messages */
 #define	LDI_EV_TRACE		0x10000 /* LDI events trace messages */
+#define	DDI_INTR_IRM		0x20000 /* interrupt resource management */
 
 extern int ddidebug;
 
@@ -128,6 +129,7 @@ extern int ddidebug;
 #define	RIO_TRACE(args)		if (ddidebug & DDI_DBG_RTR_TRACE) cmn_err args
 #define	LDI_EVDBG(args)		if (ddidebug & LDI_EV_DEBUG) cmn_err args
 #define	LDI_EVTRC(args)		if (ddidebug & LDI_EV_TRACE) cmn_err args
+#define	DDI_INTR_IRMDBG(args)	if (ddidebug & DDI_INTR_IRM) cmn_err args
 #else
 #define	NDI_CONFIG_DEBUG(args)
 #define	BMDPRINTF(args)
@@ -144,6 +146,7 @@ extern int ddidebug;
 #define	RIO_TRACE(args)		if (ddidebug & DDI_DBG_RTR_TRACE) cmn_err args
 #define	LDI_EVDBG(args)		if (ddidebug & LDI_EV_DEBUG) cmn_err args
 #define	LDI_EVTRC(args)		if (ddidebug & LDI_EV_TRACE) cmn_err args
+#define	DDI_INTR_IRMDBG(args)
 #endif
 
 

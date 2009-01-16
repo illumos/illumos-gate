@@ -19,10 +19,9 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 # This file simply contains the list of sources files compiled together
@@ -43,6 +42,7 @@ GENUNIX_SRCS =		\
 	fm.c		\
 	genunix.c	\
 	group.c		\
+	irm.c		\
 	kgrep.c		\
 	kmem.c		\
 	ldi.c		\

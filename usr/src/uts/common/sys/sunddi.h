@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,7 @@ extern "C" {
 #define	DDI_EINVAL	(-4)	/* invalid request or arguments */
 #define	DDI_ENOTSUP	(-5)	/* operation is not supported */
 #define	DDI_EPENDING	(-6)	/* operation or an event is pending */
+#define	DDI_EALREADY	(-7)	/* operation already in progress */
 
 /*
  * General-purpose DDI error return value definitions
@@ -2160,6 +2161,17 @@ int ddi_quiesce_not_needed(dev_info_t *);
  * implement quiesce but haven't yet.
  */
 int ddi_quiesce_not_supported(dev_info_t *);
+
+/*
+ * DDI generic callback interface
+ */
+
+typedef struct __ddi_cb **ddi_cb_handle_t;
+
+int	ddi_cb_register(dev_info_t *dip, ddi_cb_flags_t flags,
+	    ddi_cb_func_t cbfunc, void *arg1, void *arg2,
+	    ddi_cb_handle_t *ret_hdlp);
+int	ddi_cb_unregister(ddi_cb_handle_t hdl);
 
 #endif	/* _KERNEL */
 

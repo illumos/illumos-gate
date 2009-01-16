@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,6 +72,7 @@
 #include "contract.h"
 #include "cpupart_mdb.h"
 #include "devinfo.h"
+#include "irm.h"
 #include "leaky.h"
 #include "lgrp.h"
 #include "pg.h"
@@ -4298,6 +4299,12 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "findstack_debug", NULL, "toggle findstack debugging",
 		findstack_debug },
 
+	/* from irm.c */
+	{ "irmpools", NULL, "display interrupt pools", irmpools_dcmd },
+	{ "irmreqs", NULL, "display interrupt requests in an interrupt pool",
+	    irmreqs_dcmd },
+	{ "irmreq", NULL, "display an interrupt request", irmreq_dcmd },
+
 	/* from kgrep.c + genunix.c */
 	{ "kgrep", KGREP_USAGE, "search kernel as for a pointer", kgrep,
 		kgrep_help },
@@ -4634,6 +4641,12 @@ static const mdb_walker_t walkers[] = {
 	{ "devinfo_fmc",
 		"walk a fault management handle cache active list",
 		devinfo_fmc_walk_init, devinfo_fmc_walk_step, NULL },
+
+	/* from irm.c */
+	{ "irmpools", "walk global list of interrupt pools",
+	    irmpools_walk_init, list_walk_step, list_walk_fini },
+	{ "irmreqs", "walk list of interrupt requests in an interrupt pool",
+	    irmreqs_walk_init, list_walk_step, list_walk_fini },
 
 	/* from kmem.c */
 	{ "allocdby", "given a thread, walk its allocated bufctls",

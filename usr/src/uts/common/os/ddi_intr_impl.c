@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 #include <sys/sysmacros.h>
@@ -54,8 +52,7 @@ i_ddi_intr_devi_init(dev_info_t *dip)
 	if (DEVI(dip)->devi_intr_p)
 		return;
 
-	DEVI(dip)->devi_intr_p = kmem_zalloc(sizeof (devinfo_intr_t),
-	    KM_SLEEP);
+	DEVI(dip)->devi_intr_p = kmem_zalloc(sizeof (devinfo_intr_t), KM_SLEEP);
 
 	supported_types = i_ddi_intr_get_supported_types(dip);
 
@@ -71,8 +68,7 @@ i_ddi_intr_devi_fini(dev_info_t *dip)
 	DDI_INTR_APIDBG((CE_CONT, "i_ddi_intr_devi_fini: dip %p\n",
 	    (void *)dip));
 
-	if ((DEVI(dip)->devi_intr_p == NULL) ||
-	    i_ddi_intr_get_current_nintrs(dip))
+	if ((intr_p == NULL) || i_ddi_intr_get_current_nintrs(dip))
 		return;
 
 	/*
@@ -87,6 +83,13 @@ i_ddi_intr_devi_fini(dev_info_t *dip)
 			    sizeof (ddi_intr_handle_t));
 		}
 	}
+
+	/*
+	 * devi_irm_req_p will only be used for devices which
+	 * are mapped to an Interrupt Resource Management pool.
+	 */
+	if (intr_p->devi_irm_req_p)
+		(void) i_ddi_irm_remove(dip);
 
 	kmem_free(DEVI(dip)->devi_intr_p, sizeof (devinfo_intr_t));
 	DEVI(dip)->devi_intr_p = NULL;
@@ -198,6 +201,71 @@ i_ddi_intr_set_current_nintrs(dev_info_t *dip, int nintrs)
 		intr_p->devi_intr_curr_nintrs = nintrs;
 }
 
+uint_t
+i_ddi_intr_get_current_navail(dev_info_t *dip, int type)
+{
+	ddi_intr_handle_impl_t	hdl;
+	devinfo_intr_t		*intr_p = DEVI(dip)->devi_intr_p;
+	ddi_cb_t		*cb_p;
+	ddi_irm_pool_t		*pool_p;
+	ddi_irm_req_t		*req_p;
+	uint_t			navail = 0, nintrs, nreq;
+
+	/* Get maximum number of supported interrupts */
+	nintrs = i_ddi_intr_get_supported_nintrs(dip, type);
+
+	/* Check for an interrupt pool */
+	pool_p = i_ddi_intr_get_pool(dip, type);
+
+	/*
+	 * If a pool exists, then IRM determines the availability.
+	 * Otherwise, use the older INTROP method.
+	 */
+	if (pool_p) {
+		if (intr_p && (req_p = intr_p->devi_irm_req_p) &&
+		    (type == req_p->ireq_type)) {
+			mutex_enter(&pool_p->ipool_navail_lock);
+			navail = req_p->ireq_navail;
+			mutex_exit(&pool_p->ipool_navail_lock);
+			return (navail);
+		}
+		if ((type == DDI_INTR_TYPE_MSIX) &&
+		    (cb_p = DEVI(dip)->devi_cb_p) &&
+		    (cb_p->cb_flags & DDI_CB_FLAG_INTR)) {
+			return (nintrs);
+		}
+		navail = pool_p->ipool_defsz;
+	} else {
+		bzero(&hdl, sizeof (ddi_intr_handle_impl_t));
+		hdl.ih_dip = dip;
+		hdl.ih_type = type;
+
+		if (i_ddi_intr_ops(dip, dip, DDI_INTROP_NAVAIL, &hdl,
+		    (void *)&navail) != DDI_SUCCESS) {
+			return (0);
+		}
+	}
+
+	/* Apply MSI-X workarounds */
+	if (type == DDI_INTR_TYPE_MSIX) {
+		/* Global tunable workaround */
+		if (navail < nintrs)
+			navail = MIN(nintrs, ddi_msix_alloc_limit);
+		/* Device property workaround */
+		if ((nreq = i_ddi_get_msix_alloc_limit(dip)) > 0)
+			navail = MAX(navail, nreq);
+	}
+
+	/* Always restrict MSI to a precise limit */
+	if (type == DDI_INTR_TYPE_MSI)
+		navail = MIN(navail, DDI_MAX_MSI_ALLOC);
+
+	/* Ensure availability doesn't exceed what's supported */
+	navail = MIN(navail, nintrs);
+
+	return (navail);
+}
+
 ddi_intr_msix_t *
 i_ddi_get_msix(dev_info_t *dip)
 {
@@ -215,7 +283,7 @@ i_ddi_set_msix(dev_info_t *dip, ddi_intr_msix_t *msix_p)
 		intr_p->devi_msix_p = msix_p;
 }
 
-ddi_intr_handle_t *
+ddi_intr_handle_t
 i_ddi_get_intr_handle(dev_info_t *dip, int inum)
 {
 	devinfo_intr_t *intr_p = DEVI(dip)->devi_intr_p;
@@ -235,8 +303,7 @@ i_ddi_get_intr_handle(dev_info_t *dip, int inum)
 }
 
 void
-i_ddi_set_intr_handle(dev_info_t *dip, int inum,
-    ddi_intr_handle_t *intr_hdlp)
+i_ddi_set_intr_handle(dev_info_t *dip, int inum, ddi_intr_handle_t intr_hdl)
 {
 	devinfo_intr_t	*intr_p = DEVI(dip)->devi_intr_p;
 
@@ -250,7 +317,7 @@ i_ddi_set_intr_handle(dev_info_t *dip, int inum,
 	if ((inum < 0) || (inum >= intr_p->devi_intr_sup_nintrs))
 		return;
 
-	if (intr_hdlp && (intr_p->devi_intr_handle_p == NULL)) {
+	if (intr_hdl && (intr_p->devi_intr_handle_p == NULL)) {
 		/* nintrs could be zero; so check for it first */
 		if (intr_p->devi_intr_sup_nintrs)
 			intr_p->devi_intr_handle_p = kmem_zalloc(
@@ -259,7 +326,7 @@ i_ddi_set_intr_handle(dev_info_t *dip, int inum,
 	}
 
 	if (intr_p->devi_intr_handle_p)
-		intr_p->devi_intr_handle_p[inum] = intr_hdlp;
+		intr_p->devi_intr_handle_p[inum] = intr_hdl;
 }
 
 /*

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
 #include <sys/sysmacros.h>
@@ -87,7 +85,6 @@ ddi_intr_get_supported_types(dev_info_t *dip, int *typesp)
 	return (ret);
 }
 
-
 /*
  * ddi_intr_get_nintrs:
  * 	Return as an integer in the integer pointed to by the argument
@@ -103,11 +100,11 @@ ddi_intr_get_nintrs(dev_info_t *dip, int type, int *nintrsp)
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_nintrs: dip %p, type: %d\n",
 	    (void *)dip, type));
 
-	if ((dip == NULL) || !DDI_INTR_TYPE_FLAG_VALID(type) ||
+	if ((dip == NULL) || (nintrsp == NULL) ||
+	    !DDI_INTR_TYPE_FLAG_VALID(type) ||
 	    !(i_ddi_intr_get_supported_types(dip) & type)) {
-		*nintrsp = 0;
-		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_nintrs: Invalid "
-		    "input args\n"));
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_nintrs: "
+		    "Invalid input args\n"));
 		return (DDI_EINVAL);
 	}
 
@@ -127,7 +124,6 @@ ddi_intr_get_nintrs(dev_info_t *dip, int type, int *nintrsp)
 	return (ret);
 }
 
-
 /*
  * ddi_intr_get_navail:
  *	Bus nexus driver will return availble interrupt count value for
@@ -140,34 +136,22 @@ ddi_intr_get_nintrs(dev_info_t *dip, int type, int *nintrsp)
 int
 ddi_intr_get_navail(dev_info_t *dip, int type, int *navailp)
 {
-	int			ret;
-	ddi_intr_handle_impl_t	hdl;
-
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_navail: dip %p, type: %d\n",
 	    (void *)dip, type));
 
-	if ((dip == NULL) || !DDI_INTR_TYPE_FLAG_VALID(type) ||
+	if ((dip == NULL) || (navailp == NULL) ||
+	    !DDI_INTR_TYPE_FLAG_VALID(type) ||
 	    !(i_ddi_intr_get_supported_types(dip) & type)) {
-		*navailp = 0;
-		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_navail: Invalid "
-		    "input args\n"));
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_get_navail: "
+		    "Invalid input args\n"));
 		return (DDI_EINVAL);
 	}
 
-	/*
-	 * In future, this interface implementation will change
-	 * with Resource Management support.
-	 */
-	bzero(&hdl, sizeof (ddi_intr_handle_impl_t));
-	hdl.ih_dip = dip;
-	hdl.ih_type = type;
+	if ((*navailp = i_ddi_intr_get_current_navail(dip, type)) == 0)
+		return (DDI_INTR_NOTFOUND);
 
-	ret = i_ddi_intr_ops(dip, dip, DDI_INTROP_NAVAIL, &hdl,
-	    (void *)navailp);
-
-	return (ret == DDI_SUCCESS ? DDI_SUCCESS : DDI_INTR_NOTFOUND);
+	return (DDI_SUCCESS);
 }
-
 
 /*
  * Interrupt allocate/free functions
@@ -177,17 +161,18 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
     int count, int *actualp, int behavior)
 {
 	ddi_intr_handle_impl_t	*hdlp, tmp_hdl;
-	int			i, ret, cap = 0, intr_type, nintrs = 0;
-	uint_t			pri, curr_nintrs = 0;
+	int			i, ret, cap = 0, curr_type, nintrs;
+	uint_t			pri, navail, curr_nintrs = 0;
 
 	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: name %s dip 0x%p "
 	    "type %x inum %x count %x behavior %x\n", ddi_driver_name(dip),
 	    (void *)dip, type, inum, count, behavior));
 
 	/* Validate parameters */
-	if (dip == NULL || h_array == NULL || count < 1 || inum < 0 ||
-	    !DDI_INTR_BEHAVIOR_FLAG_VALID(behavior)) {
-		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: Invalid args\n"));
+	if ((dip == NULL) || (h_array == NULL) || (inum < 0) || (count < 1) ||
+	    (actualp == NULL) || !DDI_INTR_BEHAVIOR_FLAG_VALID(behavior)) {
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: "
+		    "Invalid input args\n"));
 		return (DDI_EINVAL);
 	}
 
@@ -199,18 +184,16 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 		return (DDI_EINVAL);
 	}
 
-	/*
-	 * Check if the 'inum' was previously allocated or not? Fail, if so.
-	 */
+	/* Validate inum not previously allocated */
 	if ((type == DDI_INTR_TYPE_FIXED) &&
 	    (i_ddi_get_intr_handle(dip, inum) != NULL)) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: inum %d is already "
-		    "in use, can not allocate again!!\n", inum));
+		    "in use, cannot allocate again!!\n", inum));
 		return (DDI_EINVAL);
 	}
 
-	/* First, get how many interrupts the device supports */
-	if (!(nintrs = i_ddi_intr_get_supported_nintrs(dip, type))) {
+	/* Get how many interrupts the device supports */
+	if ((nintrs = i_ddi_intr_get_supported_nintrs(dip, type)) == 0) {
 		if (ddi_intr_get_nintrs(dip, type, &nintrs) != DDI_SUCCESS) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: no "
 			    "interrupts found of type %d\n", type));
@@ -218,91 +201,76 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 		}
 	}
 
-	/* Is this function invoked with more interrupt than device supports? */
+	/* Get how many interrupts the device is already using */
+	if ((curr_type = i_ddi_intr_get_current_type(dip)) != 0) {
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: type %x "
+		    "is already being used\n", curr_type));
+		curr_nintrs = i_ddi_intr_get_current_nintrs(dip);
+	}
+
+	/* Validate interrupt type consistency */
+	if ((curr_type != 0) && (type != curr_type)) {
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: Requested "
+		    "interrupt type %x is different from interrupt type %x"
+		    "already in use\n", type, curr_type));
+		return (DDI_EINVAL);
+	}
+
+	/* Validate count does not exceed what device supports */
 	if (count > nintrs) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: no of interrupts "
 		    "requested %d is more than supported %d\n", count, nintrs));
 		return (DDI_EINVAL);
-	}
-
-	/*
-	 * Check if requested interrupt type is not same as interrupt
-	 * type is in use if any.
-	 */
-	if (((intr_type = i_ddi_intr_get_current_type(dip)) != 0) &&
-	    (intr_type != type)) {
-		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: Requested "
-		    "interrupt type %x is different from interrupt type %x"
-		    "already in use\n", type, intr_type));
-
+	} else if ((count + curr_nintrs) > nintrs) {
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: count %d "
+		    "+ intrs in use %d exceeds supported %d intrs\n",
+		    count, curr_nintrs, nintrs));
 		return (DDI_EINVAL);
 	}
 
-	/*
-	 * Check if requested interrupt type is in use and requested number
-	 * of interrupts and number of interrupts already in use exceeds the
-	 * number of interrupts supported by this device.
-	 */
-	if (intr_type) {
-		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: type %x "
-		    "is already being used\n", type));
-
-		curr_nintrs = i_ddi_intr_get_current_nintrs(dip);
-		if ((count + curr_nintrs) > nintrs) {
-			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: count %d "
-			    "+ intrs in use %d exceeds supported %d intrs\n",
-			    count, curr_nintrs, nintrs));
-			return (DDI_EINVAL);
-		}
-	}
-
-	/*
-	 * For MSI, ensure that the requested interrupt count is a power of 2
-	 */
-	if (type == DDI_INTR_TYPE_MSI && !ISP2(count)) {
+	/* Validate power of 2 requirements for MSI */
+	if ((type == DDI_INTR_TYPE_MSI) && !ISP2(curr_nintrs + count)) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: "
 		    "MSI count %d is not a power of two\n", count));
 		return (DDI_EINVAL);
 	}
 
 	/*
-	 * NOTE:
+	 * Initialize the device's interrupt information structure,
+	 * and establish an association with IRM if it is supported.
 	 *
-	 * An intermediate solution is added here to allocate more MSI-X
-	 * interrupts to drivers to address some significant performance
-	 * issues discovered on various SPARC platforms. More MSI-X interrupts
-	 * will be allocated based on existence of "#msix-request" property.
-	 * The DDI framework will not honor this property after the Interrupt
-	 * Resource Management (IRM) project's integration.
-	 *
-	 * Hard limit for maximum MSI allocation is set to DDI_MAX_MSI_ALLOC,
-	 * however MSI-X's max allocation is controlled by
-	 * ddi_msix_alloc_limit().
+	 * NOTE: IRM checks minimum support, and can return DDI_EAGAIN.
 	 */
-	if (DDI_INTR_IS_MSI_OR_MSIX(type)) {
-		uint_t	alloc_limit = (type == DDI_INTR_TYPE_MSIX) ?
-		    i_ddi_get_msix_alloc_limit(dip) : DDI_MAX_MSI_ALLOC;
+	if (curr_nintrs == 0) {
+		i_ddi_intr_devi_init(dip);
+		if (i_ddi_irm_insert(dip, type, count) == DDI_EAGAIN) {
+			cmn_err(CE_WARN, "ddi_intr_alloc: "
+			    "cannot fit into interrupt pool\n");
+			return (DDI_EAGAIN);
+		}
+	}
 
-		if (curr_nintrs == alloc_limit) {
+	/* Get how many interrupts are currently available */
+	navail = i_ddi_intr_get_current_navail(dip, type);
+
+	/* Validate that requested number of interrupts are available */
+	if (curr_nintrs == navail) {
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: max # of intrs %d "
+		    "already allocated\n", navail));
+		return (DDI_EAGAIN);
+	}
+	if ((count + curr_nintrs) > navail) {
+		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: requested # of "
+		    "intrs %d exceeds # of available intrs %d\n", count,
+		    navail - curr_nintrs));
+		if (behavior == DDI_INTR_ALLOC_STRICT) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: "
-			    "max # of intrs %d already allocated\n",
-			    curr_nintrs));
-			return (DDI_EINVAL);
+			    "DDI_INTR_ALLOC_STRICT flag is passed, "
+			    "return failure\n"));
+			i_ddi_intr_devi_fini(dip);
+			return (DDI_EAGAIN);
 		}
-		if ((count + curr_nintrs) > alloc_limit) {
-			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: Requested "
-			    "MSI/Xs %d Max MSI/Xs limit %d\n", count,
-			    alloc_limit));
-
-			if (behavior == DDI_INTR_ALLOC_STRICT) {
-				DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: "
-				    "DDI_INTR_ALLOC_STRICT flag is passed, "
-				    "return failure\n"));
-				return (DDI_EAGAIN);
-			}
-
-			count = alloc_limit - curr_nintrs;
-		}
+		count = navail - curr_nintrs;
 	}
 
 	/* Now allocate required number of interrupts */
@@ -312,8 +280,6 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	tmp_hdl.ih_scratch1 = count;
 	tmp_hdl.ih_scratch2 = (void *)(uintptr_t)behavior;
 	tmp_hdl.ih_dip = dip;
-
-	i_ddi_intr_devi_init(dip);
 
 	if (i_ddi_intr_ops(dip, dip, DDI_INTROP_ALLOC,
 	    &tmp_hdl, (void *)actualp) != DDI_SUCCESS) {
@@ -348,7 +314,7 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	    i_ddi_intr_get_current_nintrs(dip) + *actualp);
 
 	/* Now, go and handle each "handle" */
-	for (i = 0; i < *actualp; i++) {
+	for (i = inum; i < (inum + *actualp); i++) {
 		hdlp = (ddi_intr_handle_impl_t *)kmem_zalloc(
 		    (sizeof (ddi_intr_handle_impl_t)), KM_SLEEP);
 		rw_init(&hdlp->ih_rwlock, NULL, RW_DRIVER, NULL);
@@ -359,10 +325,11 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 		hdlp->ih_ver = DDI_INTR_VERSION;
 		hdlp->ih_state = DDI_IHDL_STATE_ALLOC;
 		hdlp->ih_dip = dip;
-		hdlp->ih_inum = inum + i;
+		hdlp->ih_inum = i;
 		i_ddi_alloc_intr_phdl(hdlp);
 		if (type & DDI_INTR_TYPE_FIXED)
-			i_ddi_set_intr_handle(dip, hdlp->ih_inum, &h_array[i]);
+			i_ddi_set_intr_handle(dip, hdlp->ih_inum,
+			    (ddi_intr_handle_t)hdlp);
 
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_alloc: hdlp = 0x%p\n",
 		    (void *)h_array[i]));
@@ -377,7 +344,6 @@ fail:
 
 	return (ret);
 }
-
 
 int
 ddi_intr_free(ddi_intr_handle_t h)
@@ -1176,6 +1142,21 @@ ddi_intr_set_softint_pri(ddi_softint_handle_t h, uint_t soft_pri)
 }
 
 /*
+ * Set the number of interrupts requested from IRM
+ */
+int
+ddi_intr_set_nreq(dev_info_t *dip, int nreq)
+{
+	DDI_INTR_APIDBG((CE_CONT, "ddi_intr_set_nreq: dip %p, nreq %d\n",
+	    (void *)dip, nreq));
+
+	if (dip == NULL)
+		return (DDI_EINVAL);
+
+	return (i_ddi_irm_modify(dip, nreq));
+}
+
+/*
  * Old DDI interrupt framework
  *
  * The following DDI interrupt interfaces are obsolete.
@@ -1185,7 +1166,9 @@ ddi_intr_set_softint_pri(ddi_softint_handle_t h, uint_t soft_pri)
 int
 ddi_intr_hilevel(dev_info_t *dip, uint_t inumber)
 {
-	ddi_intr_handle_t	hdl, *existing_hdlp;
+	ddi_intr_handle_t	hdl;
+	ddi_intr_handle_t	*hdl_p;
+	size_t			hdl_sz = 0;
 	int			actual, ret;
 	uint_t			high_pri, pri;
 
@@ -1198,23 +1181,26 @@ ddi_intr_hilevel(dev_info_t *dip, uint_t inumber)
 	 * framework. If so, first try to get the existing interrupt handle
 	 * for that given inumber and use that handle.
 	 */
-	existing_hdlp = i_ddi_get_intr_handle(dip, inumber);
-	if (existing_hdlp) {
-		hdl = existing_hdlp[0];	/* Use existing handle */
-	} else {
-		if ((ret = ddi_intr_alloc(dip, &hdl, DDI_INTR_TYPE_FIXED,
+	if ((hdl = i_ddi_get_intr_handle(dip, inumber)) == NULL) {
+		hdl_sz = sizeof (ddi_intr_handle_t) * (inumber + 1);
+		hdl_p = kmem_zalloc(hdl_sz, KM_SLEEP);
+		if ((ret = ddi_intr_alloc(dip, hdl_p, DDI_INTR_TYPE_FIXED,
 		    inumber, 1, &actual,
 		    DDI_INTR_ALLOC_NORMAL)) != DDI_SUCCESS) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_hilevel: "
 			    "ddi_intr_alloc failed, ret 0x%x\n", ret));
+			kmem_free(hdl_p, hdl_sz);
 			return (0);
 		}
+		hdl = hdl_p[inumber];
 	}
 
 	if ((ret = ddi_intr_get_pri(hdl, &pri)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_intr_hilevel: "
 		    "ddi_intr_get_pri failed, ret 0x%x\n", ret));
 		(void) ddi_intr_free(hdl);
+		if (hdl_sz)
+			kmem_free(hdl_p, hdl_sz);
 		return (0);
 	}
 
@@ -1224,8 +1210,10 @@ ddi_intr_hilevel(dev_info_t *dip, uint_t inumber)
 	    "high_pri = %x\n", pri, high_pri));
 
 	/* Free the handle allocated here only if no existing handle exists */
-	if (existing_hdlp == NULL)
+	if (hdl_sz) {
 		(void) ddi_intr_free(hdl);
+		kmem_free(hdl_p, hdl_sz);
+	}
 
 	return (pri >= high_pri);
 }
@@ -1250,7 +1238,9 @@ int
 ddi_get_iblock_cookie(dev_info_t *dip, uint_t inumber,
     ddi_iblock_cookie_t *iblock_cookiep)
 {
-	ddi_intr_handle_t	hdl, *existing_hdlp;
+	ddi_intr_handle_t	hdl;
+	ddi_intr_handle_t	*hdl_p;
+	size_t			hdl_sz = 0;
 	int			actual, ret;
 	uint_t			pri;
 
@@ -1265,31 +1255,35 @@ ddi_get_iblock_cookie(dev_info_t *dip, uint_t inumber,
 	 * framework. If so, first try to get the existing interrupt handle
 	 * for that given inumber and use that handle.
 	 */
-	existing_hdlp = i_ddi_get_intr_handle(dip, inumber);
-	if (existing_hdlp) {
-		hdl = existing_hdlp[0];	/* Use existing handle */
-	} else {
-		if ((ret = ddi_intr_alloc(dip, &hdl, DDI_INTR_TYPE_FIXED,
-		    inumber, 1, &actual,
+	if ((hdl = i_ddi_get_intr_handle(dip, inumber)) == NULL) {
+		hdl_sz = sizeof (ddi_intr_handle_t) * (inumber + 1);
+		hdl_p = kmem_zalloc(hdl_sz, KM_SLEEP);
+		if ((ret = ddi_intr_alloc(dip, hdl_p,
+		    DDI_INTR_TYPE_FIXED, inumber, 1, &actual,
 		    DDI_INTR_ALLOC_NORMAL)) != DDI_SUCCESS) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_get_iblock_cookie: "
 			    "ddi_intr_alloc failed, ret 0x%x\n", ret));
+			kmem_free(hdl_p, hdl_sz);
 			return (DDI_INTR_NOTFOUND);
 		}
+		hdl = hdl_p[inumber];
 	}
 
 	if ((ret = ddi_intr_get_pri(hdl, &pri)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_get_iblock_cookie: "
 		    "ddi_intr_get_pri failed, ret 0x%x\n", ret));
-
 		(void) ddi_intr_free(hdl);
+		if (hdl_sz)
+			kmem_free(hdl_p, hdl_sz);
 		return (DDI_FAILURE);
 	}
 
 	*iblock_cookiep = (ddi_iblock_cookie_t)(uintptr_t)pri;
 	/* Free the handle allocated here only if no existing handle exists */
-	if (existing_hdlp == NULL)
+	if (hdl_sz) {
 		(void) ddi_intr_free(hdl);
+		kmem_free(hdl_p, hdl_sz);
+	}
 
 	return (DDI_SUCCESS);
 }
@@ -1302,6 +1296,7 @@ ddi_add_intr(dev_info_t *dip, uint_t inumber,
     caddr_t int_handler_arg)
 {
 	ddi_intr_handle_t	*hdl_p;
+	size_t			hdl_sz;
 	int			actual, ret;
 	uint_t			pri;
 
@@ -1309,39 +1304,40 @@ ddi_add_intr(dev_info_t *dip, uint_t inumber,
 	    "inum=0x%x\n", ddi_driver_name(dip), ddi_get_instance(dip),
 	    (void *)dip, inumber));
 
-	hdl_p = kmem_zalloc(sizeof (ddi_intr_handle_t), KM_SLEEP);
+	hdl_sz = sizeof (ddi_intr_handle_t) * (inumber + 1);
+	hdl_p = kmem_zalloc(hdl_sz, KM_SLEEP);
 
 	if ((ret = ddi_intr_alloc(dip, hdl_p, DDI_INTR_TYPE_FIXED,
 	    inumber, 1, &actual, DDI_INTR_ALLOC_NORMAL)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_add_intr: "
 		    "ddi_intr_alloc failed, ret 0x%x\n", ret));
-		kmem_free(hdl_p, sizeof (ddi_intr_handle_t));
+		kmem_free(hdl_p, hdl_sz);
 		return (DDI_INTR_NOTFOUND);
 	}
 
-	if ((ret = ddi_intr_get_pri(hdl_p[0], &pri)) != DDI_SUCCESS)  {
+	if ((ret = ddi_intr_get_pri(hdl_p[inumber], &pri)) != DDI_SUCCESS)  {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_add_intr: "
 		    "ddi_intr_get_pri failed, ret 0x%x\n", ret));
-		(void) ddi_intr_free(hdl_p[0]);
-		kmem_free(hdl_p, sizeof (ddi_intr_handle_t));
+		(void) ddi_intr_free(hdl_p[inumber]);
+		kmem_free(hdl_p, hdl_sz);
 		return (DDI_FAILURE);
 	}
 
-	if ((ret = ddi_intr_add_handler(hdl_p[0], (ddi_intr_handler_t *)
+	if ((ret = ddi_intr_add_handler(hdl_p[inumber], (ddi_intr_handler_t *)
 	    int_handler, int_handler_arg, NULL)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_add_intr: "
 		    "ddi_intr_add_handler failed, ret 0x%x\n", ret));
-		(void) ddi_intr_free(hdl_p[0]);
-		kmem_free(hdl_p, sizeof (ddi_intr_handle_t));
+		(void) ddi_intr_free(hdl_p[inumber]);
+		kmem_free(hdl_p, hdl_sz);
 		return (DDI_FAILURE);
 	}
 
-	if ((ret = ddi_intr_enable(hdl_p[0])) != DDI_SUCCESS) {
+	if ((ret = ddi_intr_enable(hdl_p[inumber])) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_add_intr: "
 		    "ddi_intr_enable failed, ret 0x%x\n", ret));
-		(void) ddi_intr_remove_handler(hdl_p[0]);
-		(void) ddi_intr_free(hdl_p[0]);
-		kmem_free(hdl_p, sizeof (ddi_intr_handle_t));
+		(void) ddi_intr_remove_handler(hdl_p[inumber]);
+		(void) ddi_intr_free(hdl_p[inumber]);
+		kmem_free(hdl_p, hdl_sz);
 		return (DDI_FAILURE);
 	}
 
@@ -1352,6 +1348,8 @@ ddi_add_intr(dev_info_t *dip, uint_t inumber,
 		idevice_cookiep->idev_vector = 0;
 		idevice_cookiep->idev_priority = pri;
 	}
+
+	kmem_free(hdl_p, hdl_sz);
 
 	return (DDI_SUCCESS);
 }
@@ -1374,38 +1372,36 @@ ddi_add_fastintr(dev_info_t *dip, uint_t inumber,
 void
 ddi_remove_intr(dev_info_t *dip, uint_t inum, ddi_iblock_cookie_t iblock_cookie)
 {
-	ddi_intr_handle_t	*hdl_p;
+	ddi_intr_handle_t	hdl;
 	int			ret;
 
 	DDI_INTR_APIDBG((CE_CONT, "ddi_remove_intr: name=%s%d dip=0x%p "
 	    "inum=0x%x\n", ddi_driver_name(dip), ddi_get_instance(dip),
 	    (void *)dip, inum));
 
-	if ((hdl_p = i_ddi_get_intr_handle(dip, inum)) == NULL) {
+	if ((hdl = i_ddi_get_intr_handle(dip, inum)) == NULL) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_remove_intr: no handle "
 		    "found\n"));
 		return;
 	}
 
-	if ((ret = ddi_intr_disable(hdl_p[0])) != DDI_SUCCESS) {
+	if ((ret = ddi_intr_disable(hdl)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_remove_intr: "
 		    "ddi_intr_disable failed, ret 0x%x\n", ret));
 		return;
 	}
 
-	if ((ret = ddi_intr_remove_handler(hdl_p[0])) != DDI_SUCCESS) {
+	if ((ret = ddi_intr_remove_handler(hdl)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_remove_intr: "
 		    "ddi_intr_remove_handler failed, ret 0x%x\n", ret));
 		return;
 	}
 
-	if ((ret = ddi_intr_free(hdl_p[0])) != DDI_SUCCESS) {
+	if ((ret = ddi_intr_free(hdl)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_remove_intr: "
 		    "ddi_intr_free failed, ret 0x%x\n", ret));
 		return;
 	}
-
-	kmem_free(hdl_p, sizeof (ddi_intr_handle_t));
 }
 
 /* ARGSUSED */

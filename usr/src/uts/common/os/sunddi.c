@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8962,4 +8962,79 @@ int
 ddi_quiesce_not_supported(dev_info_t *dip)
 {
 	return (DDI_FAILURE);
+}
+
+/*
+ * Generic DDI callback interfaces.
+ */
+
+int
+ddi_cb_register(dev_info_t *dip, ddi_cb_flags_t flags, ddi_cb_func_t cbfunc,
+    void *arg1, void *arg2, ddi_cb_handle_t *ret_hdlp)
+{
+	ddi_cb_t	*cbp;
+
+	ASSERT(dip != NULL);
+	ASSERT(DDI_CB_FLAG_VALID(flags));
+	ASSERT(cbfunc != NULL);
+	ASSERT(ret_hdlp != NULL);
+
+	/* Sanity check the context */
+	ASSERT(!servicing_interrupt());
+	if (servicing_interrupt())
+		return (DDI_FAILURE);
+
+	/* Validate parameters */
+	if ((dip == NULL) || !DDI_CB_FLAG_VALID(flags) ||
+	    (cbfunc == NULL) || (ret_hdlp == NULL))
+		return (DDI_EINVAL);
+
+	/* Check for previous registration */
+	if (DEVI(dip)->devi_cb_p != NULL)
+		return (DDI_EALREADY);
+
+	/* Allocate and initialize callback */
+	cbp = kmem_zalloc(sizeof (ddi_cb_t), KM_SLEEP);
+	cbp->cb_dip = dip;
+	cbp->cb_func = cbfunc;
+	cbp->cb_arg1 = arg1;
+	cbp->cb_arg2 = arg2;
+	cbp->cb_flags = flags;
+	DEVI(dip)->devi_cb_p = cbp;
+
+	/* If adding an IRM callback, notify IRM */
+	if (flags & DDI_CB_FLAG_INTR)
+		i_ddi_irm_set_cb(dip, B_TRUE);
+
+	*ret_hdlp = (ddi_cb_handle_t)&(DEVI(dip)->devi_cb_p);
+	return (DDI_SUCCESS);
+}
+
+int
+ddi_cb_unregister(ddi_cb_handle_t hdl)
+{
+	ddi_cb_t	*cbp;
+	dev_info_t	*dip;
+
+	ASSERT(hdl != NULL);
+
+	/* Sanity check the context */
+	ASSERT(!servicing_interrupt());
+	if (servicing_interrupt())
+		return (DDI_FAILURE);
+
+	/* Validate parameters */
+	if ((hdl == NULL) || ((cbp = *(ddi_cb_t **)hdl) == NULL) ||
+	    ((dip = cbp->cb_dip) == NULL))
+		return (DDI_EINVAL);
+
+	/* If removing an IRM callback, notify IRM */
+	if (cbp->cb_flags & DDI_CB_FLAG_INTR)
+		i_ddi_irm_set_cb(dip, B_FALSE);
+
+	/* Destroy the callback */
+	kmem_free(cbp, sizeof (ddi_cb_t));
+	DEVI(dip)->devi_cb_p = NULL;
+
+	return (DDI_SUCCESS);
 }

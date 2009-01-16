@@ -562,8 +562,9 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		 * We need to restrict this allocation in future
 		 * based on Resource Management policies.
 		 */
-		if ((ret = px_msi_alloc(px_p, rdip, hdlp->ih_inum,
-		    hdlp->ih_scratch1, (uintptr_t)hdlp->ih_scratch2, &msi_num,
+		if ((ret = px_msi_alloc(px_p, rdip, hdlp->ih_type,
+		    hdlp->ih_inum, hdlp->ih_scratch1,
+		    (uintptr_t)hdlp->ih_scratch2,
 		    (int *)result)) != DDI_SUCCESS) {
 			DBG(DBG_INTROPS, dip, "px_msix_ops: allocation "
 			    "failed, rdip 0x%p type 0x%d inum 0x%x "
@@ -801,6 +802,14 @@ msi_free:
 	case DDI_INTROP_NAVAIL:
 		/* XXX - a new interface may be needed */
 		ret = pci_msi_get_nintrs(rdip, hdlp->ih_type, (int *)result);
+		break;
+	case DDI_INTROP_GETPOOL:
+		if (msi_state_p->msi_pool_p == NULL) {
+			*(ddi_irm_pool_t **)result = NULL;
+			return (DDI_ENOTSUP);
+		}
+		*(ddi_irm_pool_t **)result = msi_state_p->msi_pool_p;
+		ret = DDI_SUCCESS;
 		break;
 	default:
 		ret = DDI_ENOTSUP;

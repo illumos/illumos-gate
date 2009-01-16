@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,31 @@ typedef enum {
 	DDI_NC_PROM = 0,
 	DDI_NC_PSEUDO
 } ddi_node_class_t;
+
+/*
+ * Definitions for generic callback mechanism.
+ */
+typedef enum {
+	DDI_CB_INTR_ADD,
+	DDI_CB_INTR_REMOVE
+} ddi_cb_action_t;
+
+typedef enum {
+	DDI_CB_FLAG_INTR = 0x1
+} ddi_cb_flags_t;
+
+#define	DDI_CB_FLAG_VALID(f)	((f) & DDI_CB_FLAG_INTR)
+
+typedef int	(*ddi_cb_func_t)(dev_info_t *dip, ddi_cb_action_t action,
+		    void *cbarg, void *arg1, void *arg2);
+
+typedef struct ddi_cb {
+	uint64_t	cb_flags;
+	dev_info_t	*cb_dip;
+	ddi_cb_func_t	cb_func;
+	void		*cb_arg1;
+	void		*cb_arg2;
+} ddi_cb_t;
 
 /*
  * dev_info:	The main device information structure this is intended to be
@@ -230,6 +255,9 @@ struct dev_info  {
 
 	/* IOMMU handle */
 	iommulib_handle_t	devi_iommulib_handle;
+
+	/* Generic callback mechanism */
+	ddi_cb_t	*devi_cb_p;
 };
 
 #define	DEVI(dev_info_type)	((struct dev_info *)(dev_info_type))

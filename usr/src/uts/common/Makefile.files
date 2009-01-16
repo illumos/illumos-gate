@@ -119,6 +119,7 @@ GENUNIX_OBJS +=	\
 		ddifm.o		\
 		ddi_intr.o	\
 		ddi_intr_impl.o	\
+		ddi_intr_irm.o	\
 		ddi_nodeid.o	\
 		ddi_strtol.o	\
 		ddi_timer.o	\
