@@ -928,7 +928,6 @@ static ipndp_t	lcl_ndp_arr[] = {
 #define	IPNDP_CGTP_FILTER_OFFSET	9
 	{  ip_cgtp_filter_get,	ip_cgtp_filter_set, NULL,
 	    "ip_cgtp_filter" },
-#define	IPNDP_IPMP_HOOK_OFFSET		10
 	{  ip_param_generic_get, ip_int_set, (caddr_t)&ip_debug,
 	    "ip_debug" },
 };
@@ -4567,7 +4566,6 @@ ip_bind_laddr_v4(conn_t *connp, mblk_t **mpp, uint8_t protocol,
 		}
 	}
 
-
 	/*
 	 * Allow setting new policies. For example, disconnects come
 	 * down as ipa_t bind. As we would have set conn_policy_cached
@@ -6782,8 +6780,6 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 			first_mp = mp;
 		}
 	}
-
-
 
 	/* Handle socket options. */
 	if (!syn_present &&
@@ -9368,7 +9364,6 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 				ire_refrele(fire);
 				fire = NULL;
 			}
-
 
 			/*
 			 * The resolution loop is re-entered if this was
@@ -14229,7 +14224,6 @@ discard:		ire_refrele(ire);
 		    ntohl(ire->ire_addr)));
 	}
 
-
 	/* Restore any hardware checksum flags */
 	DB_CKSUMFLAGS(mp) = hcksumflags;
 	return (ire);
@@ -16968,7 +16962,6 @@ ip_fanout_proto_again(mblk_t *ipsec_mp, ill_t *ill, ill_t *recv_ill, ire_t *ire)
 	mp = ipsec_mp->b_cont;
 	ASSERT(mp != NULL);
 
-
 	if (ill == NULL) {
 		ASSERT(recv_ill == NULL);
 		/*
@@ -17240,7 +17233,6 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	ASSERT(ire->ire_ipversion == IPV4_VERSION);
 	ASSERT(ill != NULL);
 
-
 #define	rptr	((uchar_t *)ipha)
 #define	iphs	((uint16_t *)ipha)
 
@@ -17290,7 +17282,6 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	 * ESP-in-UDP packet.
 	 */
 	ASSERT(!mctl_present || !esp_in_udp_packet);
-
 
 	/* u1 is # words of IP options */
 	u1 = ipha->ipha_version_and_hdr_length - (uchar_t)((IP_VERSION << 4) +
@@ -18308,7 +18299,6 @@ ip_snmp_get(queue_t *q, mblk_t *mpctl, int level)
 	freemsg(mpctl);
 	return (1);
 }
-
 
 /* Get global (legacy) IPv4 statistics */
 static mblk_t *
@@ -20639,7 +20629,6 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 			IRE_REFRELE_NOTR(ire);
 	}
 
-
 	TRACE_2(TR_FAC_IP, TR_IP_WPUT_END,
 	    "ip_wput_end: q %p (%S)", q, "end");
 
@@ -20648,7 +20637,6 @@ ip_output_options(void *arg, mblk_t *mp, void *arg2, int caller,
 	 * from an IRE_OFFSUBNET ire entry in ip_newroute().
 	 */
 	if (ire->ire_flags & RTF_MULTIRT) {
-
 		/*
 		 * Force the TTL of multirouted packets if required.
 		 * The TTL of such packets is bounded by the
@@ -22201,7 +22189,6 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller,
 #define	LENGTH	((v_hlen_tos_len >> 24) | ((v_hlen_tos_len >> 8) & 0xFF00))
 #define	PROTO	(ttl_protocol >> 8)
 #endif
-
 
 	orig_src = src = ipha->ipha_src;
 	/* (The loop back to "another" is explained down below.) */
@@ -27325,7 +27312,6 @@ nak:
 		ill_t		*ill;
 		in6_addr_t	gw_addr_v6;
 
-
 		/*
 		 * This is a response back from a resolver.  It
 		 * consists of a message chain containing:
@@ -28774,7 +28760,6 @@ ip_multirt_bad_mtu(ire_t *ire, uint32_t max_frag)
 	}
 }
 
-
 /*
  * Get the CGTP (multirouting) filtering status.
  * If 0, the CGTP hooks are transparent.
@@ -28788,7 +28773,6 @@ ip_cgtp_filter_get(queue_t *q, mblk_t *mp, caddr_t cp, cred_t *ioc_cr)
 	(void) mi_mpprintf(mp, "%d", (int)*ip_cgtp_filter_value);
 	return (0);
 }
-
 
 /*
  * Set the CGTP (multirouting) filtering status.
@@ -28840,7 +28824,6 @@ ip_cgtp_filter_set(queue_t *q, mblk_t *mp, char *value, caddr_t cp,
 	return (0);
 }
 
-
 /*
  * Return the expected CGTP hooks version number.
  */
@@ -28849,7 +28832,6 @@ ip_cgtp_filter_supported(void)
 {
 	return (ip_cgtp_filter_rev);
 }
-
 
 /*
  * CGTP hooks can be registered by invoking this function.

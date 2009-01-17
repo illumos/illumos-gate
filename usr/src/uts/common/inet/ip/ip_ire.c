@@ -337,8 +337,6 @@ typedef struct nce_clookup_s {
 static uint32_t	ip_max_cache_table_size = IP_MAX_CACHE_TABLE_SIZE;
 static uint32_t	ip6_max_cache_table_size = IP_MAX_CACHE_TABLE_SIZE;
 
-#define	NUM_ILLS	2	/* To build the ILL list to unlock */
-
 /* Zero iulp_t for initialization. */
 const iulp_t	ire_uinfo_null = { 0 };
 
@@ -724,7 +722,6 @@ done:
 	}
 	return (0);
 }
-
 
 /*
  * ip_ire_req is called by ip_wput when an IRE_DB_REQ_TYPE message is handed
@@ -1412,7 +1409,6 @@ ire_init(ire_t *ire, uchar_t *addr, uchar_t *mask, uchar_t *src_addr,
 	if ((gc != NULL || gcgrp != NULL) && !is_system_labeled())
 		return (NULL);
 
-
 	BUMP_IRE_STATS(ipst->ips_ire_stats_v4, ire_stats_alloced);
 
 	if (addr != NULL)
@@ -1552,7 +1548,6 @@ ire_create(uchar_t *addr, uchar_t *mask, uchar_t *src_addr, uchar_t *gateway,
 	ASSERT(ret_ire == ire);
 	return (ire);
 }
-
 
 /*
  * Common to IPv4 and IPv6
@@ -2340,12 +2335,12 @@ ip_plen_to_mask(uint_t masklen)
 void
 ire_atomic_end(irb_t *irb_ptr, ire_t *ire)
 {
-	ill_t	*ill_list[NUM_ILLS];
-	ip_stack_t	*ipst = ire->ire_ipst;
+	ill_t *stq_ill, *ipif_ill;
+	ip_stack_t *ipst = ire->ire_ipst;
 
-	ill_list[0] = ire->ire_stq != NULL ? ire->ire_stq->q_ptr : NULL;
-	ill_list[1] = ire->ire_ipif != NULL ? ire->ire_ipif->ipif_ill : NULL;
-	ill_unlock_ills(ill_list, NUM_ILLS);
+	stq_ill = ire->ire_stq != NULL ? ire->ire_stq->q_ptr : NULL;
+	ipif_ill = ire->ire_ipif != NULL ? ire->ire_ipif->ipif_ill : NULL;
+	RELEASE_ILL_LOCKS(ipif_ill, stq_ill);
 	rw_exit(&irb_ptr->irb_lock);
 	rw_exit(&ipst->ips_ill_g_usesrc_lock);
 }
@@ -2365,23 +2360,19 @@ ire_atomic_start(irb_t *irb_ptr, ire_t *ire, queue_t *q, mblk_t *mp,
 {
 	ill_t	*stq_ill;
 	ill_t	*ipif_ill;
-	ill_t	*ill_list[NUM_ILLS];
-	int	cnt = NUM_ILLS;
 	int	error = 0;
 	ill_t	*ill = NULL;
 	ip_stack_t	*ipst = ire->ire_ipst;
 
-	ill_list[0] = stq_ill = ire->ire_stq !=
-	    NULL ? ire->ire_stq->q_ptr : NULL;
-	ill_list[1] = ipif_ill = ire->ire_ipif !=
-	    NULL ? ire->ire_ipif->ipif_ill : NULL;
+	stq_ill = ire->ire_stq != NULL ? ire->ire_stq->q_ptr : NULL;
+	ipif_ill = ire->ire_ipif != NULL ? ire->ire_ipif->ipif_ill : NULL;
 
 	ASSERT((q != NULL && mp != NULL && func != NULL) ||
 	    (q == NULL && mp == NULL && func == NULL));
 	rw_enter(&ipst->ips_ill_g_usesrc_lock, RW_READER);
 	GRAB_CONN_LOCK(q);
 	rw_enter(&irb_ptr->irb_lock, RW_WRITER);
-	ill_lock_ills(ill_list, cnt);
+	GRAB_ILL_LOCKS(ipif_ill, stq_ill);
 
 	/*
 	 * While the IRE is in the process of being added, a user may have
@@ -3977,7 +3968,6 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	return (B_FALSE);
 }
 
-
 /*
  * Lookup for a route in all the tables
  */
@@ -4015,7 +4005,6 @@ ire_route_lookup(ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	}
 	return (ire);
 }
-
 
 /*
  * Delete the IRE cache for the gateway and all IRE caches whose
@@ -4552,7 +4541,6 @@ ip_ire_init(ip_stack_t *ipst)
 
 	(void) rn_inithead((void **)&ipst->ips_ip_ftable, 32);
 
-
 	/* Calculate the IPv4 cache table size. */
 	ipst->ips_ip_cache_table_size = MAX(ip_cache_table_size,
 	    ((mem_avail >> ip_ire_mem_ratio) / sizeof (ire_t) /
@@ -4751,7 +4739,6 @@ ire_multirt_need_resolve(ipaddr_t dst, const ts_label_t *tsl, ip_stack_t *ipst)
 
 	return (resolvable);
 }
-
 
 /*
  * Explore a forward_table bucket, starting from fire_arg.

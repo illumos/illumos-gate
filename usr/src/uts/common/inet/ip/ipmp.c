@@ -752,8 +752,7 @@ ipmp_illgrp_hold_next_ill(ipmp_illgrp_t *illg)
 		if (illg->ig_next_ill == NULL)
 			illg->ig_next_ill = list_head(&illg->ig_actif);
 
-		if (ILL_CAN_LOOKUP(ill)) {
-			ill_refhold(ill);
+		if (ill_check_and_refhold(ill) == 0) {
 			rw_exit(&ipst->ips_ipmp_lock);
 			return (ill);
 		}
@@ -770,13 +769,6 @@ ipmp_illgrp_hold_next_ill(ipmp_illgrp_t *illg)
 ill_t *
 ipmp_illgrp_cast_ill(ipmp_illgrp_t *illg)
 {
-	/*
-	 * Since an IPMP ill's ill_grp gets cleared during I_PUNLINK but
-	 * this function can get called after that point, handle NULL.
-	 */
-	if (illg == NULL)
-		return (NULL);
-
 	ASSERT(IAM_WRITER_ILL(illg->ig_ipmp_ill));
 	return (illg->ig_cast_ill);
 }
@@ -793,8 +785,7 @@ ipmp_illgrp_hold_cast_ill(ipmp_illgrp_t *illg)
 
 	rw_enter(&ipst->ips_ipmp_lock, RW_READER);
 	castill = illg->ig_cast_ill;
-	if (castill != NULL && ILL_CAN_LOOKUP(castill)) {
-		ill_refhold(castill);
+	if (castill != NULL && ill_check_and_refhold(castill) == 0) {
 		rw_exit(&ipst->ips_ipmp_lock);
 		return (castill);
 	}
@@ -1899,7 +1890,7 @@ ipmp_ill_ire_clear_testhidden(ire_t *ire, char *ill_arg)
  * Return a held pointer to the IPMP ill for underlying interface `ill', or
  * NULL if one doesn't exist.  (Unfortunately, this function needs to take an
  * underlying ill rather than an ipmp_illgrp_t because an underlying ill's
- * ill_grp pointer may become stale when not under an IPSQ and not holding
+ * ill_grp pointer may become stale when not inside an IPSQ and not holding
  * ipmp_lock.)  Caller need not be inside the IPSQ.
  */
 ill_t *
@@ -1912,8 +1903,7 @@ ipmp_ill_hold_ipmp_ill(ill_t *ill)
 
 	rw_enter(&ipst->ips_ipmp_lock, RW_READER);
 	illg = ill->ill_grp;
-	if (illg != NULL && ILL_CAN_LOOKUP(illg->ig_ipmp_ill)) {
-		ill_refhold(illg->ig_ipmp_ill);
+	if (illg != NULL && ill_check_and_refhold(illg->ig_ipmp_ill) == 0) {
 		rw_exit(&ipst->ips_ipmp_lock);
 		return (illg->ig_ipmp_ill);
 	}
@@ -2141,8 +2131,7 @@ ipmp_ipif_hold_bound_ill(const ipif_t *ipif)
 
 	rw_enter(&ipst->ips_ipmp_lock, RW_READER);
 	boundill = ipif->ipif_bound_ill;
-	if (boundill != NULL && ILL_CAN_LOOKUP(boundill)) {
-		ill_refhold(boundill);
+	if (boundill != NULL && ill_check_and_refhold(boundill) == 0) {
 		rw_exit(&ipst->ips_ipmp_lock);
 		return (boundill);
 	}

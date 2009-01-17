@@ -3361,7 +3361,6 @@ ill_capability_ack_thr(void *arg)
 		goto done;
 	}
 
-
 #define	SC(base, offset) (dl_capability_sub_t *)(((uchar_t *)(base))+(offset))
 	/*
 	 * There are sub-capabilities. Process the ones we know about.
@@ -4372,19 +4371,15 @@ ill_glist_insert(ill_t *ill, char *name, boolean_t isv6)
 	 * Interface type not found, create one.
 	 */
 	if (ill_interface == (ill_if_t *)&IP_VX_ILL_G_LIST(index, ipst)) {
-
 		ill_g_head_t ghead;
 
 		/*
 		 * allocate ill_if_t structure
 		 */
-
 		ill_interface = (ill_if_t *)mi_zalloc(sizeof (ill_if_t));
 		if (ill_interface == NULL) {
 			return (ENOMEM);
 		}
-
-
 
 		(void) strcpy(ill_interface->illif_name, name);
 		ill_interface->illif_name_len = name_length;
@@ -4399,7 +4394,6 @@ ill_glist_insert(ill_t *ill, char *name, boolean_t isv6)
 		 */
 		ghead = ipst->ips_ill_g_heads[index];
 		insque(ill_interface, ghead.ill_g_list_tail);
-
 	}
 
 	if (ill->ill_ppa == UINT_MAX)
@@ -10934,7 +10928,6 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	mutex_enter(&connp->conn_lock);
 	mutex_enter(&ill->ill_lock);
 
-
 	/* Are any references to this ipif active */
 	if (ipif_is_freeable(ipif)) {
 		mutex_exit(&ill->ill_lock);
@@ -11214,7 +11207,6 @@ ip_sioctl_addr_tail(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 
 	return (err);
 }
-
 
 /*
  * Restart entry point to restart the address set operation after the
@@ -13490,16 +13482,11 @@ ipif_resolver_down(ipif_t *ipif)
 }
 
 /*
- * This function sets up the multicast mappings in ARP. When ipif_resolver_up
- * calls this function, it passes a non-NULL arp_add_mapping_mp indicating
- * that it wants the add_mp allocated in this function to be returned
- * wihtout sending it to arp. When ip_rput_dlpi_writer calls this to
- * just re-do the multicast, it wants us to send the add_mp to ARP also.
- * ipif_resolver_up does not want us to do the "add" i.e sending to ARP,
- * as it does a ipif_arp_down after calling this function - which will
- * remove what we add here.
- *
- * Returns -1 on failures and 0 on success.
+ * Set up the multicast mappings for `ipif' in ARP.  If `arp_add_mapping_mp'
+ * is non-NULL, then upon success it will contain an mblk that can be passed
+ * to ARP to create the mapping.  Otherwise, if it's NULL, upon success ARP
+ * will have already been notified to create the mapping.  Returns zero on
+ * success, -1 upon failure.
  */
 int
 ipif_arp_setup_multicast(ipif_t *ipif, mblk_t **arp_add_mapping_mp)
@@ -13527,14 +13514,13 @@ ipif_arp_setup_multicast(ipif_t *ipif, mblk_t **arp_add_mapping_mp)
 		return (0);
 
 	/*
-	 * Delete the existing mapping from ARP. Normally ipif_down
-	 * -> ipif_arp_down should send this up to ARP. The only
-	 * reason we would find this when we are switching from
-	 * Multicast to Broadcast where we did not do a down.
+	 * Delete the existing mapping from ARP.  Normally, ipif_down() ->
+	 * ipif_resolver_down() will send this up to ARP, but it may be that
+	 * we are enabling PHYI_MULTI_BCAST via ip_rput_dlpi_writer().
 	 */
 	mp = ill->ill_arp_del_mapping_mp;
 	if (mp != NULL) {
-		ip1dbg(("ipif_arp_down: arp cmd %x for %s:%u\n",
+		ip1dbg(("ipif_arp_setup_multicast: arp cmd %x for %s:%u\n",
 		    *(unsigned *)mp->b_rptr, ill->ill_name, ipif->ipif_id));
 		putnext(ill->ill_rq, mp);
 		ill->ill_arp_del_mapping_mp = NULL;
@@ -13635,7 +13621,7 @@ ipif_arp_setup_multicast(ipif_t *ipif, mblk_t **arp_add_mapping_mp)
  *	* Res_act_rebind: tell ARP to change the hardware address for an IP
  *	  address (and issue gratuitous ARPs).  Used by ipmp_ill_bind_ipif().
  *
- * Returns error on failure.
+ * Returns zero on success, or an errno upon failure.
  */
 int
 ipif_resolver_up(ipif_t *ipif, enum ip_resolver_action res_act)
@@ -14103,55 +14089,6 @@ ill_down_ipifs(ill_t *ill)
 		(void) ipif_logical_down(ipif, NULL, NULL);
 		ipif_non_duplicate(ipif);
 		ipif_down_tail(ipif);
-	}
-}
-
-void
-ill_lock_ills(ill_t **list, int cnt)
-{
-	int	i;
-
-	if (cnt > 1) {
-		boolean_t try_again;
-		do {
-			try_again = B_FALSE;
-			for (i = 0; i < cnt - 1; i++) {
-				if (list[i] < list[i + 1]) {
-					ill_t	*tmp;
-
-					/* swap the elements */
-					tmp = list[i];
-					list[i] = list[i + 1];
-					list[i + 1] = tmp;
-					try_again = B_TRUE;
-				}
-			}
-		} while (try_again);
-	}
-
-	for (i = 0; i < cnt; i++) {
-		if (i == 0) {
-			if (list[i] != NULL)
-				mutex_enter(&list[i]->ill_lock);
-			else
-				return;
-		} else if ((list[i-1] != list[i]) && (list[i] != NULL)) {
-			mutex_enter(&list[i]->ill_lock);
-		}
-	}
-}
-
-void
-ill_unlock_ills(ill_t **list, int cnt)
-{
-	int	i;
-
-	for (i = 0; i < cnt; i++) {
-		if ((i == 0) && (list[i] != NULL)) {
-			mutex_exit(&list[i]->ill_lock);
-		} else if ((list[i-1] != list[i]) && (list[i] != NULL)) {
-			mutex_exit(&list[i]->ill_lock);
-		}
 	}
 }
 
@@ -17025,7 +16962,6 @@ retry:
 	return (ipif);
 }
 
-
 /*
  * If old_ipif is not NULL, see if ipif was derived from old
  * ipif and if so, recreate the interface route by re-doing
@@ -18988,7 +18924,6 @@ ipif_set_values(queue_t *q, mblk_t *mp, char *interf_name, uint_t *new_ppa_ptr)
 	return (error);
 }
 
-
 void
 ipif_init(ip_stack_t *ipst)
 {
@@ -19227,7 +19162,6 @@ ip_cgtp_bcast_add(ire_t *ire, ire_t *ire_dst, ip_stack_t *ipst)
 		ire_refrele(ire_prim);
 	}
 }
-
 
 /*
  * IP multirouting broadcast routes handling
