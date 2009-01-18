@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -150,7 +148,7 @@ main(int argc, char *argv[])
 			aliases = optarg;
 			if (check_space_within_quote(aliases) == ERROR) {
 				(void) fprintf(stderr, gettext(ERR_NO_SPACE),
-					aliases);
+				    aliases);
 				exit(1);
 			}
 			break;
@@ -257,7 +255,9 @@ main(int argc, char *argv[])
 				err_exit();
 	}
 
-	if (priv != NULL && check_priv_entry(priv, 1) != 0)
+	/* update kernel unless -b or -n */
+	if (noload_flag == 0 && server == 0 &&
+	    priv != NULL && check_priv_entry(priv, 1) != 0)
 		err_exit();
 
 	if (policy != NULL &&
@@ -274,7 +274,7 @@ main(int argc, char *argv[])
 		err_exit();
 	}
 
-	if (!server) {
+	if (noload_flag == 0 && server == 0) {
 		if (elf_type("/dev/ksyms", &kelf_desc, &kelf_type) == ERROR) {
 			(void) fprintf(stderr, gettext(ERR_KERNEL_ISA));
 			err_exit();
@@ -406,13 +406,13 @@ main(int argc, char *argv[])
 	if (policy != NULL) {
 		cleanup_flag |= CLEAN_DEV_POLICY;
 		if (update_device_policy(device_policy, policy, B_FALSE)
-								== ERROR) {
+		    == ERROR) {
 			remove_entry(cleanup_flag, driver_name);
 			err_exit();
 		}
 	}
 
-	if (server) {
+	if (noload_flag || server) {
 		(void) fprintf(stderr, gettext(BOOT_CLIENT));
 	} else {
 		/*

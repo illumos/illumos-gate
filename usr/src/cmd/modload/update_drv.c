@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,6 +91,7 @@ main(int argc, char *argv[])
 	int	i_flag = 0;		/* -i option */
 	int	l_flag = 0;		/* -l option */
 	int	m_flag = 0;		/* -m option */
+	int	n_flag = 0;		/* -n option */
 	char	*perms = NULL;
 	char	*aliases = NULL;
 	char	*basedir = NULL;
@@ -114,7 +115,7 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	while ((opt = getopt(argc, argv, "m:i:b:p:adlfuvP:")) != EOF) {
+	while ((opt = getopt(argc, argv, "m:ni:b:p:adlfuvP:")) != EOF) {
 		switch (opt) {
 		case 'a':
 			a_flag++;
@@ -144,6 +145,10 @@ main(int argc, char *argv[])
 		case 'm':
 			m_flag++;
 			perms = optarg;
+			break;
+		case 'n':
+			n_flag++;
+			update_conf = 0;
 			break;
 		case 'p':
 			policy = optarg;
@@ -212,7 +217,9 @@ main(int argc, char *argv[])
 	if ((check_name_to_major(R_OK)) == ERROR)
 		err_exit();
 
-	if (priv != NULL && check_priv_entry(priv, a_flag) != 0)
+	if ((n_flag == 0) &&
+	    (basedir == NULL || (strcmp(basedir, "/") == 0)) &&
+	    (priv != NULL) && check_priv_entry(priv, a_flag) != 0)
 		err_exit();
 
 	if (policy != NULL && (policy = check_plcy_entry(policy, driver_name,
@@ -233,7 +240,6 @@ main(int argc, char *argv[])
 			if ((error = check_perm_opts(perms)) == ERROR) {
 				if (force_flag == 0) { /* no force flag */
 					exit_unlock();
-
 					return (error);
 				}
 			}
@@ -246,7 +252,6 @@ main(int argc, char *argv[])
 			    (error = update_minor_entry(driver_name, perms))) {
 				if (force_flag == 0) { /* no force flag */
 					exit_unlock();
-
 					return (error);
 				}
 			}
@@ -255,7 +260,8 @@ main(int argc, char *argv[])
 			/*
 			 * Notify running system of minor perm change
 			 */
-			if (basedir == NULL || (strcmp(basedir, "/") == 0)) {
+			if ((n_flag == 0) &&
+			    (basedir == NULL || (strcmp(basedir, "/") == 0))) {
 				rval = devfs_add_minor_perm(driver_name,
 				    log_minorperm_error);
 				if (rval) {
@@ -381,7 +387,8 @@ done:
 			 * We don't have any ability to do this singly
 			 * at this point.
 			 */
-			if (basedir == NULL || (strcmp(basedir, "/") == 0)) {
+			if ((n_flag == 0) &&
+			    (basedir == NULL || (strcmp(basedir, "/") == 0))) {
 				rval = devfs_rm_minor_perm(driver_name,
 				    log_minorperm_error);
 				if (rval) {
@@ -400,7 +407,8 @@ done:
 			/*
 			 * Notify running system of new minor perm state
 			 */
-			if (basedir == NULL || (strcmp(basedir, "/") == 0)) {
+			if ((n_flag == 0) &&
+			    (basedir == NULL || (strcmp(basedir, "/") == 0))) {
 				rval = devfs_add_minor_perm(driver_name,
 				    log_minorperm_error);
 				if (rval) {

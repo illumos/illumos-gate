@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -63,6 +61,7 @@ main(int argc, char *argv[])
 	char maj_num[MAX_STR_MAJOR + 1];
 	int cleanup = 0;
 	int err;
+	int n_flag = 0;
 
 	(void) setlocale(LC_ALL, "");
 #if	!defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -77,7 +76,7 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	while ((opt = getopt(argc, argv, "b:C")) != -1) {
+	while ((opt = getopt(argc, argv, "b:Cn")) != -1) {
 		switch (opt) {
 		case 'b' :
 			server = 1;
@@ -90,6 +89,9 @@ main(int argc, char *argv[])
 			break;
 		case 'C':
 			cleanup = 1;
+			break;
+		case 'n':
+			n_flag = 1;
 			break;
 		case '?' :
 			usage();
@@ -143,7 +145,7 @@ main(int argc, char *argv[])
 		err_exit();
 	}
 
-	if (!server) {
+	if (n_flag == 0 && !server) {
 		mod_unloaded = 1;
 
 		/* get the module id for this driver */
@@ -187,7 +189,8 @@ main(int argc, char *argv[])
 	 * If removing the driver from the running system, notify
 	 * kernel dynamically to remove minor perm entries.
 	 */
-	if (basedir == NULL || (strcmp(basedir, "/") == 0)) {
+	if ((n_flag == 0) &&
+	    (basedir == NULL || (strcmp(basedir, "/") == 0))) {
 		err = devfs_rm_minor_perm(driver_name, log_minorperm_error);
 		if (err != 0) {
 			(void) fprintf(stderr, gettext(ERR_UPDATE_PERM),
@@ -206,7 +209,7 @@ main(int argc, char *argv[])
 	 * to the system, newly created nodes won't incorrectly
 	 * pick up these stale shadow node permissions.
 	 */
-	if (cleanup) {
+	if ((n_flag == 0) && cleanup) {
 		if ((basedir == NULL || (strcmp(basedir, "/") == 0))) {
 			err = modctl(MODREMDRVCLEANUP, driver_name, 0, NULL);
 			if (err != 0) {
