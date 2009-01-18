@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1231,6 +1231,7 @@ cpu_offline(cpu_t *cp, int flags)
 	cpu_t	*ncp;
 	int	intr_enable;
 	int	cyclic_off = 0;
+	int	callout_off = 0;
 	int	loop_count;
 	int	no_quiesce = 0;
 	int	(*bound_func)(struct cpu *, int);
@@ -1354,6 +1355,11 @@ again:	for (loop_count = 0; (*bound_func)(cp, 0); loop_count++) {
 		 * processor.
 		 */
 		delay(hz/100);
+	}
+
+	if (error == 0 && callout_off == 0) {
+		callout_cpu_offline(cp);
+		callout_off = 1;
 	}
 
 	if (error == 0 && cyclic_off == 0) {
@@ -1533,6 +1539,13 @@ out:
 	 */
 	if (error && cyclic_off)
 		cyclic_online(cp);
+
+	/*
+	 * If we failed, but managed to offline callouts on this CPU,
+	 * bring it back online.
+	 */
+	if (error && callout_off)
+		callout_cpu_online(cp);
 
 	/*
 	 * If we failed, tell the PG subsystem that the CPU is back

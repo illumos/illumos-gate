@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,10 +206,9 @@ cv_wakeup(void *arg)
 	 * This mutex is acquired and released in order to make sure that
 	 * the wakeup does not happen before the block itself happens.
 	 */
-	mutex_enter(t->t_wait_mp);
-	mutex_exit(t->t_wait_mp);
+	mutex_enter(&t->t_wait_mutex);
+	mutex_exit(&t->t_wait_mutex);
 	setrun(t);
-	t->t_wait_mp = NULL;
 }
 
 /*
@@ -233,11 +232,12 @@ cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 	timeleft = tim - lbolt;
 	if (timeleft <= 0)
 		return (-1);
-	t->t_wait_mp = mp;
+	mutex_enter(&t->t_wait_mutex);
 	id = realtime_timeout_default((void (*)(void *))cv_wakeup, t, timeleft);
 	thread_lock(t);		/* lock the thread */
 	cv_block((condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);
+	mutex_exit(&t->t_wait_mutex);
 	mutex_exit(mp);
 	swtch();
 	signalled = (t->t_schedflag & TS_SIGNALLED);
@@ -248,7 +248,7 @@ cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t tim)
 	 * we called untimeout.  We will treat this as if the timeout
 	 * has occured and set timeleft to -1.
 	 */
-	timeleft = (t->t_wait_mp == NULL) ? -1 : untimeout_default(id, 0);
+	timeleft = untimeout_default(id, 0);
 	mutex_enter(mp);
 	if (timeleft <= 0) {
 		timeleft = -1;
@@ -363,7 +363,7 @@ cv_timedwait_sig_internal(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int flag)
 	 * Set the timeout and wait.
 	 */
 	cancel_pending = schedctl_cancel_pending();
-	t->t_wait_mp = mp;
+	mutex_enter(&t->t_wait_mutex);
 	id = timeout_generic(CALLOUT_REALTIME, (void (*)(void *))cv_wakeup, t,
 	    TICK_TO_NSEC(timeleft), nsec_per_tick, flag);
 	lwp->lwp_asleep = 1;
@@ -371,6 +371,7 @@ cv_timedwait_sig_internal(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int flag)
 	thread_lock(t);
 	cv_block_sig(t, (condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);
+	mutex_exit(&t->t_wait_mutex);
 	mutex_exit(mp);
 	if (ISSIG(t, JUSTLOOKING) || MUSTRETURN(p, t) || cancel_pending)
 		setrun(t);
@@ -386,7 +387,7 @@ cv_timedwait_sig_internal(kcondvar_t *cvp, kmutex_t *mp, clock_t tim, int flag)
 	 * we called untimeout.  We will treat this as if the timeout
 	 * has occured and set rval to -1.
 	 */
-	rval = (t->t_wait_mp == NULL) ? -1 : untimeout_default(id, 0);
+	rval = untimeout_default(id, 0);
 	mutex_enter(mp);
 	if (rval <= 0)
 		rval = -1;
@@ -593,17 +594,17 @@ cv_wait_stop(kcondvar_t *cvp, kmutex_t *mp, int wakeup_time)
 	 * Wakeup in wakeup_time milliseconds, i.e., human time.
 	 */
 	tim = lbolt + MSEC_TO_TICK(wakeup_time);
-	t->t_wait_mp = mp;
+	mutex_enter(&t->t_wait_mutex);
 	id = realtime_timeout_default((void (*)(void *))cv_wakeup, t,
 	    tim - lbolt);
 	thread_lock(t);			/* lock the thread */
 	cv_block((condvar_impl_t *)cvp);
 	thread_unlock_nopreempt(t);
+	mutex_exit(&t->t_wait_mutex);
 	mutex_exit(mp);
 	/* ASSERT(no locks are held); */
 	swtch();
-	if (t->t_wait_mp != NULL)
-		(void) untimeout_default(id, 0);
+	(void) untimeout_default(id, 0);
 
 	/*
 	 * Check for reasons to stop, if lwp_nostop is not true.

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@
 static hrtime_t callout_debug_hrtime;		/* debugger entry time */
 static int callout_min_resolution;		/* Minimum resolution */
 static callout_table_t *callout_boot_ct;	/* Boot CPU's callout tables */
+static clock_t callout_max_ticks;		/* max interval */
 static hrtime_t callout_longterm;		/* longterm nanoseconds */
 static ulong_t callout_counter_low;		/* callout ID increment */
 static ulong_t callout_table_bits;		/* number of table bits in ID */
@@ -377,7 +378,7 @@ callout_heap_insert(callout_table_t *ct, hrtime_t expiration)
 	 * entered, the cyclic will be programmed for the earliest expiration
 	 * in the heap.
 	 */
-	if (callout_upheap(ct) && !(ct->ct_flags & CALLOUT_TABLE_SUSPENDED))
+	if (callout_upheap(ct) && (ct->ct_suspend == 0))
 		(void) cyclic_reprogram(ct->ct_cyclic, expiration);
 }
 
@@ -521,12 +522,22 @@ callout_heap_delete(callout_table_t *ct)
 	 * by CPR, just return. The cyclic has already been programmed to
 	 * infinity by the cyclic subsystem.
 	 */
-	if ((ct->ct_heap_num == 0) || (ct->ct_flags & CALLOUT_TABLE_SUSPENDED))
+	if ((ct->ct_heap_num == 0) || (ct->ct_suspend > 0))
 		return;
 
 	(void) cyclic_reprogram(ct->ct_cyclic, expiration);
 }
 
+/*
+ * Common function used to create normal and realtime callouts.
+ *
+ * Realtime callouts are handled at CY_LOW_PIL by a cyclic handler. So,
+ * there is one restriction on a realtime callout handler - it should not
+ * directly or indirectly acquire cpu_lock. CPU offline waits for pending
+ * cyclic handlers to complete while holding cpu_lock. So, if a realtime
+ * callout handler were to try to get cpu_lock, there would be a deadlock
+ * during CPU offline.
+ */
 callout_id_t
 timeout_generic(int type, void (*func)(void *), void *arg,
 	hrtime_t expiration, hrtime_t resolution, int flags)
@@ -596,6 +607,13 @@ timeout_generic(int type, void (*func)(void *), void *arg,
 	if (flags & CALLOUT_FLAG_ROUNDUP)
 		expiration += resolution - 1;
 	expiration = (expiration / resolution) * resolution;
+	if (expiration <= 0) {
+		/*
+		 * expiration hrtime overflow has occurred. Just set the
+		 * expiration to infinity.
+		 */
+		expiration = CY_INFINITY;
+	}
 
 	/*
 	 * Assign an ID to this callout
@@ -705,6 +723,8 @@ timeout(void (*func)(void *), void *arg, clock_t delta)
 	 */
 	if (delta <= 0)
 		delta = 1;
+	else if (delta > callout_max_ticks)
+		delta = callout_max_ticks;
 
 	id =  (ulong_t)timeout_generic(CALLOUT_NORMAL, func, arg,
 	    TICK_TO_NSEC(delta), nsec_per_tick, CALLOUT_LEGACY);
@@ -726,6 +746,8 @@ timeout_default(void (*func)(void *), void *arg, clock_t delta)
 	 */
 	if (delta <= 0)
 		delta = 1;
+	else if (delta > callout_max_ticks)
+		delta = callout_max_ticks;
 
 	id = timeout_generic(CALLOUT_NORMAL, func, arg, TICK_TO_NSEC(delta),
 	    nsec_per_tick, 0);
@@ -743,6 +765,8 @@ realtime_timeout(void (*func)(void *), void *arg, clock_t delta)
 	 */
 	if (delta <= 0)
 		delta = 1;
+	else if (delta > callout_max_ticks)
+		delta = callout_max_ticks;
 
 	id =  (ulong_t)timeout_generic(CALLOUT_REALTIME, func, arg,
 	    TICK_TO_NSEC(delta), nsec_per_tick, CALLOUT_LEGACY);
@@ -764,6 +788,8 @@ realtime_timeout_default(void (*func)(void *), void *arg, clock_t delta)
 	 */
 	if (delta <= 0)
 		delta = 1;
+	else if (delta > callout_max_ticks)
+		delta = callout_max_ticks;
 
 	id = timeout_generic(CALLOUT_REALTIME, func, arg, TICK_TO_NSEC(delta),
 	    nsec_per_tick, 0);
@@ -1092,12 +1118,14 @@ callout_suspend(void)
 			ct = &callout_table[CALLOUT_TABLE(t, f)];
 
 			mutex_enter(&ct->ct_mutex);
-			ct->ct_flags |= CALLOUT_TABLE_SUSPENDED;
+			ct->ct_suspend++;
 			if (ct->ct_cyclic == CYCLIC_NONE) {
 				mutex_exit(&ct->ct_mutex);
 				continue;
 			}
-			(void) cyclic_reprogram(ct->ct_cyclic, CY_INFINITY);
+			if (ct->ct_suspend == 1)
+				(void) cyclic_reprogram(ct->ct_cyclic,
+				    CY_INFINITY);
 			mutex_exit(&ct->ct_mutex);
 		}
 	}
@@ -1172,7 +1200,7 @@ callout_resume(hrtime_t delta)
 
 			mutex_enter(&ct->ct_mutex);
 			if (ct->ct_cyclic == CYCLIC_NONE) {
-				ct->ct_flags &= ~CALLOUT_TABLE_SUSPENDED;
+				ct->ct_suspend--;
 				mutex_exit(&ct->ct_mutex);
 				continue;
 			}
@@ -1180,21 +1208,23 @@ callout_resume(hrtime_t delta)
 			if (delta)
 				callout_adjust(ct, delta);
 
-			ct->ct_flags &= ~CALLOUT_TABLE_SUSPENDED;
-
-			/*
-			 * If the expired list is non-empty, then have the
-			 * cyclic expire immediately. Else, program the
-			 * cyclic based on the heap.
-			 */
-			if (ct->ct_expired.ch_head != NULL)
-				exp = gethrtime();
-			else if (ct->ct_heap_num > 0)
-				exp = ct->ct_heap[0];
-			else
-				exp = 0;
-			if (exp != 0)
-				(void) cyclic_reprogram(ct->ct_cyclic, exp);
+			ct->ct_suspend--;
+			if (ct->ct_suspend == 0) {
+				/*
+				 * If the expired list is non-empty, then have
+				 * the cyclic expire immediately. Else, program
+				 * the cyclic based on the heap.
+				 */
+				if (ct->ct_expired.ch_head != NULL)
+					exp = gethrtime();
+				else if (ct->ct_heap_num > 0)
+					exp = ct->ct_heap[0];
+				else
+					exp = 0;
+				if (exp != 0)
+					(void) cyclic_reprogram(ct->ct_cyclic,
+					    exp);
+			}
 			mutex_exit(&ct->ct_mutex);
 		}
 	}
@@ -1280,7 +1310,7 @@ callout_hrestime_one(callout_table_t *ct)
 
 	if (ecl->cl_callouts.ch_head != NULL) {
 		CALLOUT_LIST_APPEND(ct->ct_expired, ecl);
-		if (!(ct->ct_flags & CALLOUT_TABLE_SUSPENDED))
+		if (ct->ct_suspend == 0)
 			(void) cyclic_reprogram(ct->ct_cyclic, gethrtime());
 	} else {
 		ecl->cl_next = ct->ct_lfree;
@@ -1412,16 +1442,8 @@ callout_cyclic_init(callout_table_t *ct)
 	 */
 	ASSERT(ct->ct_cyclic == CYCLIC_NONE);
 
-	/*
-	 * Ideally, the handlers for CALLOUT_REALTIME and CALLOUT_NORMAL should
-	 * be run at CY_LOW_LEVEL. But there are some callers of the delay(9F)
-	 * function that call delay(9F) illegally from PIL > 0. delay(9F) uses
-	 * normal callouts. In order to avoid a deadlock, we run the normal
-	 * handler from LOCK level. When the delay(9F) issue is fixed, this
-	 * should be fixed as well.
-	 */
 	hdlr.cyh_func = (cyc_func_t)CALLOUT_CYCLIC_HANDLER(t);
-	hdlr.cyh_level = (t == CALLOUT_REALTIME) ? CY_LOW_LEVEL : CY_LOCK_LEVEL;
+	hdlr.cyh_level = CY_LOW_LEVEL;
 	hdlr.cyh_arg = ct;
 	when.cyt_when = CY_INFINITY;
 	when.cyt_interval = CY_INFINITY;
@@ -1498,11 +1520,30 @@ callout_cpu_online(cpu_t *cp)
 		mutex_exit(&ct->ct_mutex);
 
 		/*
-		 * Move the cyclic to this CPU by doing a bind. Then unbind
-		 * the cyclic. This will allow the cyclic subsystem to juggle
-		 * the cyclic during CPU offline.
+		 * Move the cyclic to this CPU by doing a bind.
 		 */
 		cyclic_bind(ct->ct_cyclic, cp, NULL);
+	}
+}
+
+void
+callout_cpu_offline(cpu_t *cp)
+{
+	callout_table_t *ct;
+	processorid_t seqid;
+	int t;
+
+	ASSERT(MUTEX_HELD(&cpu_lock));
+
+	seqid = cp->cpu_seqid;
+
+	for (t = 0; t < CALLOUT_NTYPES; t++) {
+		ct = &callout_table[CALLOUT_TABLE(t, seqid)];
+
+		/*
+		 * Unbind the cyclic. This will allow the cyclic subsystem
+		 * to juggle the cyclic during CPU offline.
+		 */
 		cyclic_bind(ct->ct_cyclic, NULL, NULL);
 	}
 }
@@ -1549,6 +1590,7 @@ callout_init(void)
 	callout_table_mask = (1 << callout_table_bits) - 1;
 	callout_counter_low = 1 << CALLOUT_COUNTER_SHIFT;
 	callout_longterm = TICK_TO_NSEC(CALLOUT_LONGTERM_TICKS);
+	callout_max_ticks = CALLOUT_MAX_TICKS;
 
 	/*
 	 * Because of the variability in timing behavior across systems with
@@ -1603,6 +1645,7 @@ callout_init(void)
 		for (t = 0; t < CALLOUT_NTYPES; t++) {
 			table_id = CALLOUT_TABLE(t, f);
 			ct = &callout_table[table_id];
+			ct->ct_type = t;
 			mutex_init(&ct->ct_mutex, NULL, MUTEX_DEFAULT, NULL);
 			/*
 			 * Precompute the base IDs for long and short-term

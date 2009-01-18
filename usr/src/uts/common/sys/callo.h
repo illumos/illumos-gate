@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -300,14 +300,6 @@ typedef enum callout_stat_type {
 #endif
 
 /*
- * Callout table flags:
- *
- * CALLOUT_TABLE_SUSPENDED
- *	Callout processing on this table has been suspended.
- */
-#define	CALLOUT_TABLE_SUSPENDED		0x1UL
-
-/*
  * All of the state information associated with a callout table.
  * The fields are ordered with cache performance in mind.
  */
@@ -321,7 +313,8 @@ typedef struct callout_table {
 	callout_hash_t 	*ct_clhash;	/* callout list hash */
 	kstat_named_t	*ct_kstat_data;	/* callout kstat data */
 
-	ulong_t		ct_flags;	/* flags */
+	uint_t		ct_type;	/* callout table type */
+	uint_t		ct_suspend;	/* suspend count */
 	cyclic_id_t	ct_cyclic;	/* cyclic for this table */
 	hrtime_t	*ct_heap;	/* callout expiration heap */
 	ulong_t		ct_heap_num;	/* occupied slots in the heap */
@@ -336,7 +329,7 @@ typedef struct callout_table {
 #ifdef _LP64
 	ulong_t		ct_pad[4];	/* cache alignment */
 #else
-	ulong_t		ct_pad[8];	/* cache alignment */
+	ulong_t		ct_pad[7];	/* cache alignment */
 #endif
 } callout_table_t;
 
@@ -377,12 +370,18 @@ typedef struct callout_table {
 
 #define	CALLOUT_ALIGN	64	/* cache line size */
 
+#ifdef _LP64
+#define	CALLOUT_MAX_TICKS	NSEC_TO_TICK(CY_INFINITY);
+#else
+#define	CALLOUT_MAX_TICKS	LONG_MAX
+#endif
+
 extern void		callout_init(void);
 extern void		membar_sync(void);
-extern void		callout_cpu_configure(cpu_t *);
 extern void		callout_cpu_online(cpu_t *);
-extern void		callout_cpu_init(cpu_t *);
+extern void		callout_cpu_offline(cpu_t *);
 extern void		callout_hrestime(void);
+
 #endif
 
 #ifdef	__cplusplus

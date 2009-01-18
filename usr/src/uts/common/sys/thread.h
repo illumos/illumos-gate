@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -341,7 +341,7 @@ typedef struct _kthread {
 	hrtime_t	t_hrtime;	/* high-res last time on cpu */
 	kmutex_t	t_ctx_lock;	/* protects t_ctx in removectx() */
 	struct waitq	*t_waitq;	/* wait queue */
-	kmutex_t	*t_wait_mp;	/* used in CV wait functions */
+	kmutex_t	t_wait_mutex;	/* used in CV wait functions */
 } kthread_t;
 
 /*

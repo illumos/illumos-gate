@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,8 +201,6 @@ cbe_xcall(void *arg, cpu_t *dest, cyc_func_t func, void *farg)
 	mutex_exit(&cbe_xcall_lock);
 
 	kpreempt_enable();
-
-	ASSERT(cbe_xcall_func == NULL && cbe_xcall_cpu == NULL);
 }
 
 void *

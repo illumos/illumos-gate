@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1591,8 +1591,9 @@ delay(clock_t ticks)
 	timeout_id_t id;
 	extern hrtime_t volatile devinfo_freeze;
 
-	if ((panicstr || devinfo_freeze) && ticks > 0) {
+	if ((getpil() > 0 || panicstr || devinfo_freeze) && ticks > 0) {
 		/*
+		 * Either the caller's PIL is not safe for timeout wait or
 		 * Timeouts aren't running, so all we can do is spin.
 		 */
 		drv_usecwait(TICK_TO_USEC(ticks));
