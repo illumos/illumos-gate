@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: job.c 148 2006-04-25 16:54:17Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -35,6 +34,9 @@
 #include <errno.h>
 #include <string.h>
 #include <papi_impl.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifndef OPID_CUPS_MOVE_JOB
 #define	OPID_CUPS_MOVE_JOB 0x400D
@@ -84,7 +86,7 @@ papiJobGetPrinterName(papi_job_t job)
 
 	if (j != NULL)
 		(void) papiAttributeListGetString(j->attributes, NULL,
-				"printer-name", &result);
+		    "printer-name", &result);
 
 	return (result);
 }
@@ -97,7 +99,7 @@ papiJobGetId(papi_job_t job)
 
 	if (j != NULL)
 		(void) papiAttributeListGetInteger(j->attributes, NULL,
-				"job-id", &result);
+		    "job-id", &result);
 
 	return (result);
 }
@@ -129,17 +131,17 @@ populate_job_request(service_t *svc, papi_attribute_t ***request,
 
 	/* split up the attributes into operational and job attributes */
 	split_and_copy_attributes(operational_names, attributes,
-			&operational, &job);
+	    &operational, &job);
 
 	/* add the operational attributes group to the request */
 	papiAttributeListAddCollection(request, PAPI_ATTR_REPLACE,
-			"operational-attributes-group", operational);
+	    "operational-attributes-group", operational);
 	papiAttributeListFree(operational);
 
 	/* add the job attributes group to the request */
 	if (job != NULL) {
 		papiAttributeListAddCollection(request, PAPI_ATTR_REPLACE,
-				"job-attributes-group", job);
+		    "job-attributes-group", job);
 		papiAttributeListFree(job);
 	}
 }
@@ -158,11 +160,11 @@ send_document_uri(service_t *svc, char *file, papi_attribute_t **attributes,
 	ipp_initialize_operational_attributes(svc, &op, printer, id);
 
 	papiAttributeListAddString(&op, PAPI_ATTR_REPLACE, "document-name",
-				file);
+	    file);
 	papiAttributeListAddBoolean(&op, PAPI_ATTR_REPLACE, "last-document",
-				(last ? PAPI_TRUE : PAPI_FALSE));
+	    (last ? PAPI_TRUE : PAPI_FALSE));
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
-			"operational-attributes-group", op);
+	    "operational-attributes-group", op);
 	papiAttributeListFree(op);
 
 	/* send the IPP request to the server */
@@ -184,6 +186,7 @@ internal_job_submit(papi_service_t handle, char *printer,
 {
 	papi_status_t result = PAPI_INTERNAL_ERROR;
 	service_t *svc = handle;
+	struct stat statbuf;
 	job_t *j = NULL;
 	int i;
 	uint16_t req_type = OPID_PRINT_JOB;
@@ -221,12 +224,24 @@ internal_job_submit(papi_service_t handle, char *printer,
 		req_type = OPID_VALIDATE_JOB;
 		/* if we have files, validate access to them */
 		if (files != NULL) {
-			for (i = 0; files[i] != NULL; i++)
+			for (i = 0; files[i] != NULL; i++) {
 				if (access(files[i], R_OK) < 0) {
 					detailed_error(svc, "%s: %s", files[i],
-							strerror(errno));
+					    strerror(errno));
 					return (PAPI_DOCUMENT_ACCESS_ERROR);
 				}
+
+				if (strcmp("standard input", files[i]) != 0) {
+					stat(files[i], &statbuf);
+					if (statbuf.st_size == 0) {
+						detailed_error(svc,
+						    "Zero byte (empty) file: "
+						    "%s",
+						    files[i]);
+						return (PAPI_BAD_ARGUMENT);
+					}
+				}
+			}
 			files = NULL;
 		}
 		break;
@@ -246,7 +261,7 @@ internal_job_submit(papi_service_t handle, char *printer,
 	switch (req_type) {
 	case OPID_PRINT_JOB:
 		result = ipp_send_request_with_file(svc, request, &response,
-							files[0]);
+		    files[0]);
 		break;
 	case OPID_CREATE_JOB:
 	case OPID_VALIDATE_JOB:
@@ -261,21 +276,21 @@ internal_job_submit(papi_service_t handle, char *printer,
 
 		/* retrieve the job attributes */
 		papiAttributeListGetCollection(response, NULL,
-				"job-attributes-group", &op);
+		    "job-attributes-group", &op);
 		copy_attributes(&j->attributes, op);
 
 		if (req_type == OPID_CREATE_JOB) {
 			int32_t id = 0;
 
 			papiAttributeListGetInteger(j->attributes, NULL,
-					"job-id", &id);
+			    "job-id", &id);
 			/* send each document */
 			for (i = 0; ((result == PAPI_OK) && (files[i] != NULL));
-			     i++)
+			    i++)
 				result = send_document_uri(svc, files[i],
-						job_attributes,
-						printer, id, (files[i+1]?0:1),
-						data_type);
+				    job_attributes,
+				    printer, id, (files[i+1]?0:1),
+				    data_type);
 		}
 	}
 	papiAttributeListFree(response);
@@ -289,7 +304,7 @@ papiJobSubmit(papi_service_t handle, char *printer,
 		papi_job_ticket_t *job_ticket, char **files, papi_job_t *job)
 {
 	return (internal_job_submit(handle, printer, job_attributes,
-				job_ticket, files, job, _WITH_DATA));
+	    job_ticket, files, job, _WITH_DATA));
 }
 
 papi_status_t
@@ -298,7 +313,7 @@ papiJobSubmitByReference(papi_service_t handle, char *printer,
 		papi_job_ticket_t *job_ticket, char **files, papi_job_t *job)
 {
 	return (internal_job_submit(handle, printer, job_attributes,
-				job_ticket, files, job, _BY_REFERENCE));
+	    job_ticket, files, job, _BY_REFERENCE));
 }
 
 papi_status_t
@@ -307,7 +322,7 @@ papiJobValidate(papi_service_t handle, char *printer,
 		papi_job_ticket_t *job_ticket, char **files, papi_job_t *job)
 {
 	return (internal_job_submit(handle, printer, job_attributes,
-				job_ticket, files, job, _VALIDATE));
+	    job_ticket, files, job, _VALIDATE));
 }
 
 papi_status_t
@@ -329,7 +344,7 @@ papiJobStreamOpen(papi_service_t handle, char *printer,
 
 	/* create job request */
 	populate_job_request(svc, &request, job_attributes, printer,
-				OPID_PRINT_JOB);
+	    OPID_PRINT_JOB);
 
 	*stream = svc->connection;
 
@@ -349,7 +364,7 @@ papiJobStreamWrite(papi_service_t handle,
 
 #ifdef DEBUG
 	printf("papiJobStreamWrite(0x%8.8x, 0x%8.8x, 0x%8.8x, %d)\n",
-		handle, stream, buffer, buflen);
+	    handle, stream, buffer, buflen);
 	httpDumpData(stdout, "papiJobStreamWrite:", buffer, buflen);
 #endif
 
@@ -402,7 +417,7 @@ papiJobStreamClose(papi_service_t handle,
 
 	/* read the IPP response */
 	result = ipp_read_message(&ipp_request_read, svc, &response,
-					IPP_TYPE_RESPONSE);
+	    IPP_TYPE_RESPONSE);
 	if (result == PAPI_OK)
 		result = ipp_status_info(svc, response);
 
@@ -410,7 +425,7 @@ papiJobStreamClose(papi_service_t handle,
 		papi_attribute_t **op = NULL;
 
 		papiAttributeListGetCollection(response, NULL,
-				"job-attributes-group", &op);
+		    "job-attributes-group", &op);
 		copy_attributes(&j->attributes, op);
 	}
 	papiAttributeListFree(response);
@@ -448,18 +463,18 @@ papiJobQuery(papi_service_t handle, char *printer, int32_t job_id,
 
 		for (i = 0; requested_attrs[i] != NULL; i++)
 			papiAttributeListAddString(&op, PAPI_ATTR_APPEND,
-				"requested-attributes", requested_attrs[i]);
+			    "requested-attributes", requested_attrs[i]);
 	}
 
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
-			"operational-attributes-group", op);
+	    "operational-attributes-group", op);
 	papiAttributeListFree(op);
 	result = ipp_send_request(svc, request, &response);
 	papiAttributeListFree(request);
 
 	op = NULL;
 	papiAttributeListGetCollection(response, NULL,
-			"job-attributes-group", &op);
+	    "job-attributes-group", &op);
 	copy_attributes(&j->attributes, op);
 	papiAttributeListFree(response);
 
@@ -488,7 +503,7 @@ _job_cancel_hold_release_restart_promote(papi_service_t handle,
 	ipp_initialize_operational_attributes(svc, &op, printer, job_id);
 
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
-			"operational-attributes-group", op);
+	    "operational-attributes-group", op);
 	papiAttributeListFree(op);
 	result = ipp_send_request(svc, request, &response);
 	papiAttributeListFree(request);
@@ -501,7 +516,7 @@ papi_status_t
 papiJobCancel(papi_service_t handle, char *printer, int32_t job_id)
 {
 	return (_job_cancel_hold_release_restart_promote(handle, printer,
-				job_id, OPID_CANCEL_JOB));
+	    job_id, OPID_CANCEL_JOB));
 }
 
 
@@ -509,28 +524,28 @@ papi_status_t
 papiJobHold(papi_service_t handle, char *printer, int32_t job_id)
 {
 	return (_job_cancel_hold_release_restart_promote(handle, printer,
-				job_id, OPID_HOLD_JOB));
+	    job_id, OPID_HOLD_JOB));
 }
 
 papi_status_t
 papiJobRelease(papi_service_t handle, char *printer, int32_t job_id)
 {
 	return (_job_cancel_hold_release_restart_promote(handle, printer,
-				job_id, OPID_RELEASE_JOB));
+	    job_id, OPID_RELEASE_JOB));
 }
 
 papi_status_t
 papiJobRestart(papi_service_t handle, char *printer, int32_t job_id)
 {
 	return (_job_cancel_hold_release_restart_promote(handle, printer,
-				job_id, OPID_RESTART_JOB));
+	    job_id, OPID_RESTART_JOB));
 }
 
 papi_status_t
 papiJobPromote(papi_service_t handle, char *printer, int32_t job_id)
 {
 	return (_job_cancel_hold_release_restart_promote(handle, printer,
-				job_id, OPID_PROMOTE_JOB));
+	    job_id, OPID_PROMOTE_JOB));
 }
 
 papi_status_t
@@ -555,14 +570,14 @@ papiJobMove(papi_service_t handle, char *printer, int32_t job_id,
 	ipp_initialize_operational_attributes(svc, &op, printer, job_id);
 
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
-			"operational-attributes-group", op);
+	    "operational-attributes-group", op);
 	papiAttributeListFree(op);
 
 	op = NULL;
 	papiAttributeListAddString(&op, PAPI_ATTR_EXCL,
-			"job-printer-uri", destination);
+	    "job-printer-uri", destination);
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
-			"job-attributes-group", op);
+	    "job-attributes-group", op);
 	papiAttributeListFree(op);
 
 	result = ipp_send_request(svc, request, &response);
@@ -598,16 +613,16 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 	ipp_initialize_operational_attributes(svc, &op, printer, job_id);
 
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
-			"operational-attributes-group", op);
+	    "operational-attributes-group", op);
 	papiAttributeListFree(op);
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
-			"job-attributes-group", attributes);
+	    "job-attributes-group", attributes);
 	result = ipp_send_request(svc, request, &response);
 	papiAttributeListFree(request);
 
 	op = NULL;
 	papiAttributeListGetCollection(response, NULL,
-				"job-attributes-group", &op);
+	    "job-attributes-group", &op);
 	copy_attributes(&j->attributes, op);
 	papiAttributeListFree(response);
 

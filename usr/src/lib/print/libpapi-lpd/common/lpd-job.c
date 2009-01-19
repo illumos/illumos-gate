@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: lpd-job.c 157 2006-04-26 15:07:55Z ktou $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	__EXTENSIONS__	/* for strtok_r() */
 #include <stdio.h>
@@ -173,16 +172,16 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	gethostname(host, sizeof (host));
 	add_lpd_control_line(metadata, 'H', host);
 	papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-			"job-originating-host-name", host);
+	    "job-originating-host-name", host);
 
 	if ((pw = getpwuid(uid)) != NULL)
 		user = pw->pw_name;
 	if (uid == 0)
 		papiAttributeListGetString(svc->attributes, NULL, "username",
-			&user);
+		    &user);
 	add_lpd_control_line(metadata, 'P', user);
 	papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-			"job-originating-user-name", user);
+	    "job-originating-user-name", user);
 
 	/* Class for Banner Page */
 	s = NULL;
@@ -190,7 +189,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_lpd_control_line(metadata, 'C', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"rfc-1179-class", s);
+		    "rfc-1179-class", s);
 	}
 
 	/* Print Banner Page */
@@ -199,7 +198,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if ((s != NULL) && (strcmp(s, "standard") == 0)) {
 		add_lpd_control_line(metadata, 'L', user);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"job-sheets", s);
+		    "job-sheets", s);
 	}
 
 	/* Jobname */
@@ -208,7 +207,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_lpd_control_line(metadata, 'J', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"job-name", s);
+		    "job-name", s);
 	}
 
 	/* User to mail when job is done - lpr -m */
@@ -217,7 +216,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (bool == PAPI_TRUE) {
 		add_lpd_control_line(metadata, 'M', user);
 		papiAttributeListAddBoolean(used, PAPI_ATTR_EXCL,
-				"rfc-1179-mail", bool);
+		    "rfc-1179-mail", bool);
 	}
 
 	/* Title for pr */
@@ -226,7 +225,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_lpd_control_line(metadata, 'T', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"pr-title", s);
+		    "pr-title", s);
 	}
 
 	/* Indent - used with pr filter */
@@ -235,7 +234,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (integer >= 1) {
 		add_int_control_line(metadata, 'I', integer, LPD_RFC);
 		papiAttributeListAddInteger(used, PAPI_ATTR_EXCL,
-				"pr-indent", integer);
+		    "pr-indent", integer);
 	}
 
 	/* Width - used with pr filter */
@@ -244,7 +243,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (integer >= 1) {
 		add_int_control_line(metadata, 'W', integer, LPD_RFC);
 		papiAttributeListAddInteger(used, PAPI_ATTR_EXCL,
-				"pr-width", integer);
+		    "pr-width", integer);
 	}
 
 	/* file with Times Roman font lpr -1	*/
@@ -253,7 +252,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_lpd_control_line(metadata, '1', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"rfc-1179-font-r", s);
+		    "rfc-1179-font-r", s);
 	}
 
 	/* file with Times Roman font lpr -2	*/
@@ -262,7 +261,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_lpd_control_line(metadata, '2', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"rfc-1179-font-i", s);
+		    "rfc-1179-font-i", s);
 	}
 
 	/* file with Times Roman font lpr -3	*/
@@ -271,7 +270,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_lpd_control_line(metadata, '3', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"rfc-1179-font-b", s);
+		    "rfc-1179-font-b", s);
 	}
 
 	/* file with Times Roman font lpr -4	*/
@@ -280,7 +279,7 @@ lpd_add_rfc1179_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_lpd_control_line(metadata, '4', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"rfc-1179-font-s", s);
+		    "rfc-1179-font-s", s);
 	}
 
 	return (status);
@@ -316,7 +315,7 @@ unused_attributes(papi_attribute_t **list, papi_attribute_t **used)
 					free(result);
 				result = calloc(1, size);
 			} while (papiAttributeListToString(unused, " ",
-					result, size) != PAPI_OK);
+			    result, size) != PAPI_OK);
 			papiAttributeListFree(unused);
 		}
 		free(names);
@@ -346,7 +345,7 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_svr4_control_line(metadata, 'f', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"media", s);
+		    "media", s);
 	}
 
 	/* Handling */
@@ -355,15 +354,15 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 	if ((s != NULL) && (strcmp(s, "indefinite"))) {
 		add_svr4_control_line(metadata, 'H', "hold");
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"job-hold-until", "indefinite");
+		    "job-hold-until", "indefinite");
 	} else if ((s != NULL) && (strcmp(s, "no-hold"))) {
 		add_svr4_control_line(metadata, 'H', "immediate");
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"job-hold-until", "no-hold");
+		    "job-hold-until", "no-hold");
 	} else if (s != NULL) {
 		add_svr4_control_line(metadata, 'H', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"job-hold-until", s);
+		    "job-hold-until", s);
 	}
 
 	/* Pages */
@@ -377,7 +376,7 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 		if ((s = strchr(buf, '=')) != NULL) {
 			add_svr4_control_line(metadata, 'P', ++s);
 			papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-					"page-ranges", s);
+			    "page-ranges", s);
 		}
 	}
 
@@ -388,7 +387,7 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 		integer = 40 - (integer / 2.5);
 		add_int_control_line(metadata, 'q', integer, LPD_SVR4);
 		papiAttributeListAddInteger(used, PAPI_ATTR_EXCL,
-				"job-priority", integer);
+		    "job-priority", integer);
 	}
 
 	/* Charset : lp -S */
@@ -397,7 +396,7 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_svr4_control_line(metadata, 'S', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"lp-charset", s);
+		    "lp-charset", s);
 	}
 
 	/* Type : done when adding file  */
@@ -408,7 +407,7 @@ lpd_add_svr4_attributes(service_t *svc, papi_attribute_t **attributes,
 	if (s != NULL) {
 		add_svr4_control_line(metadata, 'y', s);
 		papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-				"lp-modes", s);
+		    "lp-modes", s);
 	}
 
 	/* Options lp -o are handled elsewhere */
@@ -449,10 +448,10 @@ lpd_job_add_attributes(service_t *svc, papi_attribute_t **attributes,
 		if ((strcasecmp(svc->uri->fragment, "solaris") == 0) ||
 		    (strcasecmp(svc->uri->fragment, "svr4") == 0))
 			lpd_add_svr4_attributes(svc, attributes, metadata,
-					used);
+			    used);
 		else if (strcasecmp(svc->uri->fragment, "hpux") == 0)
 			lpd_add_hpux_attributes(svc, attributes, metadata,
-						used);
+			    used);
 		/*
 		 * others could be added here:
 		 *	lprng, sco, aix, digital unix, xerox, ...
@@ -477,13 +476,13 @@ lpd_job_add_files(service_t *svc, papi_attribute_t **attributes,
 		return (PAPI_BAD_ARGUMENT);
 
 	papiAttributeListGetString(attributes, NULL, "document-format",
-			&format);
+	    &format);
 	papiAttributeListAddString(used, PAPI_ATTR_EXCL,
-			"document-format", format);
+	    "document-format", format);
 	if ((rfc_fmt = mime_type_to_rfc1179_type(format)) == '\0') {
 		if ((svc->uri->fragment != NULL) &&
 		    ((strcasecmp(svc->uri->fragment, "solaris") == 0) ||
-		     (strcasecmp(svc->uri->fragment, "svr4") == 0)))
+		    (strcasecmp(svc->uri->fragment, "svr4") == 0)))
 			add_svr4_control_line(metadata, 'T', format);
 		rfc_fmt = 'l';
 	}
@@ -497,14 +496,24 @@ lpd_job_add_files(service_t *svc, papi_attribute_t **attributes,
 
 	for (i = 0; files[i] != NULL; i++) {
 		char name[BUFSIZ];
+		struct stat statbuf;
 		char key;
 		int j;
 
 		if ((strcmp("standard input", files[i]) != 0) &&
 		    (access(files[i], R_OK) < 0)) {
 			detailed_error(svc, gettext("aborting request, %s: %s"),
-				files[i], strerror(errno));
+			    files[i], strerror(errno));
 			return (PAPI_NOT_AUTHORIZED);
+		}
+		if (strcmp("standard input", files[i]) != 0) {
+			stat(files[i], &statbuf);
+			if (statbuf.st_size == 0) {
+				detailed_error(svc,
+				    gettext("Zero byte (empty) file: %s"),
+				    files[i]);
+				return (PAPI_BAD_ARGUMENT);
+			}
 		}
 
 		if (i < 26)
@@ -515,7 +524,7 @@ lpd_job_add_files(service_t *svc, papi_attribute_t **attributes,
 			key = '0' + (i - 52);
 		else {
 			detailed_error(svc,
-				gettext("too many files, truncated at 62"));
+			    gettext("too many files, truncated at 62"));
 			return (PAPI_OK_SUBST);
 		}
 
@@ -585,7 +594,7 @@ lpd_submit_job(service_t *svc, char *metadata, papi_attribute_t ***attributes,
 		int job_id = 0;
 		read(fd, &job_id, sizeof (job_id));
 		papiAttributeListAddInteger(attributes, PAPI_ATTR_REPLACE,
-				"job-id", job_id);
+		    "job-id", job_id);
 		close(fd);
 	}
 

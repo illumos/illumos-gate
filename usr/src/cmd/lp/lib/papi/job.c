@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +95,7 @@ papiJobGetPrinterName(papi_job_t job)
 
 	if (tmp != NULL)
 		papiAttributeListGetString(tmp->attributes, NULL,
-					"printer-name", &result);
+		    "printer-name", &result);
 
 	return (result);
 }
@@ -108,7 +108,7 @@ papiJobGetId(papi_job_t job)
 
 	if (tmp != NULL)
 		papiAttributeListGetInteger(tmp->attributes, NULL, "job-id",
-					&result);
+		    &result);
 
 	return (result);
 }
@@ -146,7 +146,7 @@ authorized(service_t *svc, int32_t id)
 		if ((uid == 0) || (uid == 71)) { /* root/lp can forge this */
 			papi_status_t s;
 			s = papiAttributeListGetString(svc->attributes, NULL,
-					"user-name", &user);
+			    "user-name", &user);
 			if (s != PAPI_OK)	/* true root/lp are almighty */
 				result = PAPI_OK;
 		}
@@ -400,6 +400,7 @@ papiJobSubmit(papi_service_t handle, char *printer,
 {
 	papi_status_t status;
 	service_t *svc = handle;
+	struct stat statbuf;
 	job_t *j;
 	int file_no;
 	char *request_id = NULL;
@@ -417,13 +418,21 @@ papiJobSubmit(papi_service_t handle, char *printer,
 		return (PAPI_OPERATION_NOT_SUPPORTED);
 
 	if (files != NULL)
-		for (file_no = 0; files[file_no] != NULL; file_no++)
+		for (file_no = 0; files[file_no] != NULL; file_no++) {
 			if (access(files[file_no], R_OK) < 0) {
 				detailed_error(svc,
-					gettext("Cannot access file: %s: %s"),
-					files[file_no], strerror(errno));
+				    gettext("Cannot access file: %s: %s"),
+				    files[file_no], strerror(errno));
 				return (PAPI_BAD_ARGUMENT);
 			}
+			stat(files[file_no], &statbuf);
+			if (statbuf.st_size == 0) {
+				detailed_error(svc,
+				    gettext("Zero byte (empty) file: %s"),
+				    files[file_no]);
+				return (PAPI_BAD_ARGUMENT);
+			}
+		}
 
 	if ((*job = j = calloc(1, sizeof (*j))) == NULL)
 		return (PAPI_TEMPORARY_ERROR);
@@ -434,17 +443,17 @@ papiJobSubmit(papi_service_t handle, char *printer,
 		return (status);
 
 	request = create_request(svc, (char *)printer,
-				(papi_attribute_t **)job_attributes);
+	    (papi_attribute_t **)job_attributes);
 
 	for (i = 0; files[i] != NULL; i++) {
 		papi_status_t status;
 		snprintf(lpfile, sizeof (lpfile), "%s%s-%d",
-			"/var/spool/lp/temp/", request_id, i+1);
+		    "/var/spool/lp/temp/", request_id, i+1);
 		status = copy_file(files[i], lpfile);
 		if (status != PAPI_OK) {
 			detailed_error(svc,
-				gettext("unable to copy: %s -> %s: %s"),
-				files[i], lpfile, strerror(errno));
+			    gettext("unable to copy: %s -> %s: %s"),
+			    files[i], lpfile, strerror(errno));
 				freerequest(request);
 			return (PAPI_DEVICE_ERROR);
 		}
@@ -459,11 +468,11 @@ papiJobSubmit(papi_service_t handle, char *printer,
 	 * interface script to process them
 	 */
 	snprintf(lpfile, sizeof (lpfile), "%s%s-%s",
-		"/var/spool/lp/temp/", request_id, LP_PAPIATTRNAME);
+	    "/var/spool/lp/temp/", request_id, LP_PAPIATTRNAME);
 	status = psm_copy_attrsToFile(job_attributes, lpfile);
 	if (status != PAPI_OK) {
 		detailed_error(svc, "unable to copy attributes to file: %s: %s",
-				lpfile, strerror(errno));
+		    lpfile, strerror(errno));
 		return (PAPI_DEVICE_ERROR);
 	}
 #endif
@@ -472,7 +481,7 @@ papiJobSubmit(papi_service_t handle, char *printer,
 	snprintf(lpfile, sizeof (lpfile), "%s-0", request_id);
 	if (putrequest(lpfile, request) < 0) {
 		detailed_error(svc, gettext("unable to save request: %s: %s"),
-			lpfile, strerror(errno));
+		    lpfile, strerror(errno));
 		freerequest(request);
 		return (PAPI_DEVICE_ERROR);
 	}
@@ -490,9 +499,9 @@ papiJobSubmit(papi_service_t handle, char *printer,
 	if ((c = strrchr(tmp, '-')) != NULL)
 		c++;
 	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-			"job-id", atoi(c));
+	    "job-id", atoi(c));
 	papiAttributeListAddString(&j->attributes, PAPI_ATTR_REPLACE,
-			"job-uri", tmp);
+	    "job-uri", tmp);
 
 	return (PAPI_OK);
 }
@@ -504,6 +513,7 @@ papiJobSubmitByReference(papi_service_t handle, char *printer,
 		char **files, papi_job_t *job)
 {
 	service_t *svc = handle;
+	struct stat statbuf;
 	job_t *j;
 	int file_no;
 	short status;
@@ -525,26 +535,34 @@ papiJobSubmitByReference(papi_service_t handle, char *printer,
 		for (file_no = 0; files[file_no] != NULL; file_no++) {
 			if (access(files[file_no], R_OK) < 0) {
 				detailed_error(svc,
-					gettext("Cannot access file: %s: %s"),
-					files[file_no], strerror(errno));
+				    gettext("Cannot access file: %s: %s"),
+				    files[file_no], strerror(errno));
 				return (PAPI_DOCUMENT_ACCESS_ERROR);
 			}
+			stat(files[file_no], &statbuf);
+			if (statbuf.st_size == 0) {
+				detailed_error(svc,
+				    gettext("Zero byte (empty) file: %s"),
+				    files[file_no]);
+				return (PAPI_BAD_ARGUMENT);
+			}
+
 			if (files[file_no][0] != '/') {
 				char path[MAXPATHLEN];
 
 				if (getcwd(path, sizeof (path)) == NULL) {
 					detailed_error(svc, gettext(
-						"getcwd for file: %s: %s"),
-						files[file_no],
-						strerror(errno));
+					    "getcwd for file: %s: %s"),
+					    files[file_no],
+					    strerror(errno));
 					return (PAPI_DOCUMENT_ACCESS_ERROR);
 				}
 				strlcat(path, "/", sizeof (path));
 				if (strlcat(path, files[file_no], sizeof (path))
-						>= sizeof (path)) {
+				    >= sizeof (path)) {
 					detailed_error(svc, gettext(
-						"pathname too long: %s"),
-						files[file_no]);
+					    "pathname too long: %s"),
+					    files[file_no]);
 					return (PAPI_DOCUMENT_ACCESS_ERROR);
 				}
 				addlist(&file_list, path);
@@ -561,7 +579,7 @@ papiJobSubmitByReference(papi_service_t handle, char *printer,
 		return (status);
 
 	request = create_request(svc, (char *)printer,
-				(papi_attribute_t **)job_attributes);
+	    (papi_attribute_t **)job_attributes);
 	request->file_list = file_list;
 
 #ifdef LP_USE_PAPI_ATTR
@@ -572,11 +590,11 @@ papiJobSubmitByReference(papi_service_t handle, char *printer,
 	 * interface script to process them
 	 */
 	snprintf(lpfile, sizeof (lpfile), "%s%s-%s",
-		"/var/spool/lp/temp/", request_id, LP_PAPIATTRNAME);
+	    "/var/spool/lp/temp/", request_id, LP_PAPIATTRNAME);
 	status = psm_copy_attrsToFile(job_attributes, lpfile);
 	if (status != PAPI_OK) {
 		detailed_error(svc, "unable to copy attributes to file: %s: %s",
-				lpfile, strerror(errno));
+		    lpfile, strerror(errno));
 		return (PAPI_DEVICE_ERROR);
 	}
 #endif
@@ -585,7 +603,7 @@ papiJobSubmitByReference(papi_service_t handle, char *printer,
 	snprintf(lpfile, sizeof (lpfile), "%s-0", request_id);
 	if (putrequest(lpfile, request) < 0) {
 		detailed_error(svc, gettext("unable to save request: %s: %s"),
-			lpfile, strerror(errno));
+		    lpfile, strerror(errno));
 		freerequest(request);
 		return (PAPI_DEVICE_ERROR);
 	}
@@ -604,9 +622,9 @@ papiJobSubmitByReference(papi_service_t handle, char *printer,
 	if ((c = strrchr(tmp, '-')) != NULL)
 		c++;
 	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-			"job-id", atoi(c));
+	    "job-id", atoi(c));
 	papiAttributeListAddString(&j->attributes, PAPI_ATTR_REPLACE,
-			"job-uri", tmp);
+	    "job-uri", tmp);
 
 	return (PAPI_OK);
 }
@@ -622,13 +640,13 @@ papiJobValidate(papi_service_t handle, char *printer,
 	int i;
 
 	papiAttributeListAddString(&attributes, PAPI_ATTR_REPLACE,
-			"job-hold-until", "indefinite");
+	    "job-hold-until", "indefinite");
 	for (i = 0; job_attributes[i]; i++)
 		list_append(&attributes, job_attributes[i]);
 
 	status = papiJobSubmitByReference(handle, printer,
-				(papi_attribute_t **)attributes,
-				job_ticket, files, job);
+	    (papi_attribute_t **)attributes,
+	    job_ticket, files, job);
 	if (status == PAPI_OK) {
 		int id = papiJobGetId(*job);
 
@@ -668,9 +686,9 @@ papiJobStreamOpen(papi_service_t handle, char *printer,
 		return (status);
 
 	s->request = create_request(svc, (char *)printer,
-				(papi_attribute_t **)job_attributes);
+	    (papi_attribute_t **)job_attributes);
 	snprintf(lpfile, sizeof (lpfile), "/var/spool/lp/temp/%s-1",
-							request_id);
+	    request_id);
 	s->fd = open(lpfile, O_WRONLY);
 	addlist(&(s->request->file_list), lpfile);
 
@@ -682,11 +700,11 @@ papiJobStreamOpen(papi_service_t handle, char *printer,
 	 * interface script to process them
 	 */
 	snprintf(lpfile, sizeof (lpfile), "%s%s-%s",
-		"/var/spool/lp/temp/", request_id, LP_PAPIATTRNAME);
+	    "/var/spool/lp/temp/", request_id, LP_PAPIATTRNAME);
 	status = psm_copy_attrsToFile(job_attributes, lpfile);
 	if (status != PAPI_OK) {
 		detailed_error(svc, "unable to copy attributes to file: %s: %s",
-				lpfile, strerror(errno));
+		    lpfile, strerror(errno));
 		close(s->fd);
 		free(s);
 		return (PAPI_DEVICE_ERROR);
@@ -698,7 +716,7 @@ papiJobStreamOpen(papi_service_t handle, char *printer,
 	s->meta_data_file = strdup(lpfile);
 	if (putrequest(lpfile, s->request) < 0) {
 		detailed_error(svc, gettext("unable to save request: %s: %s"),
-			lpfile, strerror(errno));
+		    lpfile, strerror(errno));
 		s->request = NULL;
 		return (PAPI_DEVICE_ERROR);
 	}
@@ -750,9 +768,9 @@ papiJobStreamClose(papi_service_t handle,
 		if ((c = strrchr(tmp, '-')) != NULL)
 			c++;
 		papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-			"job-id", atoi(c));
+		    "job-id", atoi(c));
 		papiAttributeListAddString(&j->attributes, PAPI_ATTR_REPLACE,
-			"job-uri", tmp);
+		    "job-uri", tmp);
 		free(s->meta_data_file);
 	}
 	freerequest(s->request);
@@ -772,15 +790,15 @@ papiJobQuery(papi_service_t handle, char *printer, int32_t job_id,
 	char req_id[32];
 	short rc;
 	char *form = NULL,
-		*request_id = NULL,
-		*charset = NULL,
-		*user = NULL,
-		*slabel = NULL,
-		*file = NULL;
+	    *request_id = NULL,
+	    *charset = NULL,
+	    *user = NULL,
+	    *slabel = NULL,
+	    *file = NULL;
 	time_t date = 0;
 	size_t size = 0;
 	short  rank = 0,
-		state = 0;
+	    state = 0;
 
 	if ((handle == NULL) || (printer == NULL) || (job_id < 0))
 		return (PAPI_BAD_ARGUMENT);
@@ -794,10 +812,10 @@ papiJobQuery(papi_service_t handle, char *printer, int32_t job_id,
 		return (PAPI_SERVICE_UNAVAILABLE);
 
 	if (rcv_msg(svc, R_INQUIRE_REQUEST_RANK, &rc, &request_id,
-			&user, &slabel, &size, &date, &state, &dest, &form,
-			&charset, &rank, &file) < 0) {
+	    &user, &slabel, &size, &date, &state, &dest, &form,
+	    &charset, &rank, &file) < 0) {
 		detailed_error(svc,
-			gettext("failed to read response from scheduler"));
+		    gettext("failed to read response from scheduler"));
 		return (PAPI_DEVICE_ERROR);
 	}
 
@@ -808,7 +826,7 @@ papiJobQuery(papi_service_t handle, char *printer, int32_t job_id,
 		return (PAPI_TEMPORARY_ERROR);
 
 	job_status_to_attributes(j, request_id, user, slabel, size, date, state,
-				dest, form, charset, rank, file);
+	    dest, form, charset, rank, file);
 
 	snprintf(req_id, sizeof (req_id), "%d-0", job_id);
 	lpsched_read_job_configuration(svc, j, req_id);
@@ -836,7 +854,7 @@ papiJobMove(papi_service_t handle, char *printer, int32_t job_id,
 	free(queue);
 
 	if (papiAttributeListGetString(svc->attributes, NULL, "user-name",
-			&user) == PAPI_OK) {
+	    &user) == PAPI_OK) {
 		REQUEST *r = getrequest(req_id);
 
 		if ((r != NULL) && (r->user != NULL) &&
@@ -878,7 +896,7 @@ papiJobCancel(papi_service_t handle, char *printer, int32_t job_id)
 	free(dest);
 
 	if (papiAttributeListGetString(svc->attributes, NULL, "user-name",
-			&user) == PAPI_OK) {
+	    &user) == PAPI_OK) {
 		REQUEST *r = getrequest(req_id);
 
 		if ((r != NULL) && (r->user != NULL) &&
@@ -936,15 +954,15 @@ hold_release_job(papi_service_t handle, char *printer,
 		}
 		if (putrequest(file, r) < 0) {
 			detailed_error(svc,
-				gettext("failed to write job: %s: %s"),
-				file, strerror(errno));
+			    gettext("failed to write job: %s: %s"),
+			    file, strerror(errno));
 			freerequest(r);
 			return (PAPI_DEVICE_ERROR);
 		}
 		freerequest(r);
 	} else {
 		detailed_error(svc, gettext("failed to read job: %s: %s"),
-				file, strerror(errno));
+		    file, strerror(errno));
 		return (PAPI_DEVICE_ERROR);
 	}
 
@@ -997,7 +1015,7 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 
 	if ((r = getrequest(file)) != NULL) {
 		job_attributes_to_lpsched_request(handle, r,
-				(papi_attribute_t **)attributes);
+		    (papi_attribute_t **)attributes);
 #ifdef LP_USE_PAPI_ATTR
 		/*
 		 * store the job attributes in the PAPI job attribute file
@@ -1005,26 +1023,26 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 		 * modify the attributes in the file as per the new attributes
 		 */
 		snprintf(lpfile, sizeof (lpfile), "%s%d-%s",
-			"/var/spool/lp/temp/", job_id, LP_PAPIATTRNAME);
+		    "/var/spool/lp/temp/", job_id, LP_PAPIATTRNAME);
 		status = psm_modifyAttrsFile(attributes, lpfile);
 		if (status != PAPI_OK) {
 			detailed_error(svc,
-				"unable to modify the attributes file: %s: %s",
-				lpfile, strerror(errno));
+			    "unable to modify the attributes file: %s: %s",
+			    lpfile, strerror(errno));
 			return (PAPI_DEVICE_ERROR);
 		}
 #endif
 
 		if (putrequest(file, r) < 0) {
 			detailed_error(svc,
-				gettext("failed to write job: %s: %s"),
-				file, strerror(errno));
+			    gettext("failed to write job: %s: %s"),
+			    file, strerror(errno));
 			freerequest(r);
 			return (PAPI_DEVICE_ERROR);
 		}
 	} else {
 		detailed_error(svc, gettext("failed to read job: %s: %s"),
-				file, strerror(errno));
+		    file, strerror(errno));
 		return (PAPI_DEVICE_ERROR);
 	}
 
@@ -1032,7 +1050,7 @@ papiJobModify(papi_service_t handle, char *printer, int32_t job_id,
 	lpsched_request_to_job_attributes(r, j);
 
 	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-			"job-id", job_id);
+	    "job-id", job_id);
 
 	freerequest(r);
 
@@ -1074,7 +1092,7 @@ papiJobCreate(papi_service_t handle, char *printer,
 
 	/* convert the attributes to an lpsched REQUEST structure */
 	request = create_request(svc, (char *)printer,
-				(papi_attribute_t **)job_attributes);
+	    (papi_attribute_t **)job_attributes);
 	if (request == NULL)
 		return (PAPI_TEMPORARY_ERROR);
 	addlist(&request->file_list, DUMMY_FILE);	/* add a dummy file */
@@ -1088,11 +1106,11 @@ papiJobCreate(papi_service_t handle, char *printer,
 	 * interface script to process them
 	 */
 	snprintf(metadata_file, sizeof (metadata_file), "%s%s-%s",
-		"/var/spool/lp/temp/", request_id, LP_PAPIATTRNAME);
+	    "/var/spool/lp/temp/", request_id, LP_PAPIATTRNAME);
 	status = psm_copy_attrsToFile(job_attributes, metadata_file);
 	if (status != PAPI_OK) {
 		detailed_error(svc, "unable to copy attributes to file: %s: %s",
-				metadata_file, strerror(errno));
+		    metadata_file, strerror(errno));
 		free(request_id);
 		return (PAPI_DEVICE_ERROR);
 	}
@@ -1103,7 +1121,7 @@ papiJobCreate(papi_service_t handle, char *printer,
 	free(request_id);
 	if (putrequest(metadata_file, request) < 0) {
 		detailed_error(svc, gettext("unable to save request: %s: %s"),
-			metadata_file, strerror(errno));
+		    metadata_file, strerror(errno));
 		return (PAPI_DEVICE_ERROR);
 	}
 
@@ -1118,9 +1136,9 @@ papiJobCreate(papi_service_t handle, char *printer,
 	if ((c = strrchr(tmp, '-')) != NULL)
 		c++;
 	papiAttributeListAddInteger(&j->attributes, PAPI_ATTR_REPLACE,
-			"job-id", atoi(c));
+	    "job-id", atoi(c));
 	papiAttributeListAddString(&j->attributes, PAPI_ATTR_REPLACE,
-			"job-uri", tmp);
+	    "job-uri", tmp);
 
 	return (PAPI_OK);
 }
@@ -1150,14 +1168,14 @@ papiJobCommit(papi_service_t handle, char *printer, int32_t id)
 
 		if (putrequest(metadata_file, r) < 0) {
 			detailed_error(svc,
-				gettext("failed to write job: %s: %s"),
-				metadata_file, strerror(errno));
+			    gettext("failed to write job: %s: %s"),
+			    metadata_file, strerror(errno));
 			freerequest(r);
 			return (PAPI_DEVICE_ERROR);
 		}
 	} else {
 		detailed_error(svc, gettext("failed to read job: %s: %s"),
-				metadata_file, strerror(errno));
+		    metadata_file, strerror(errno));
 		return (PAPI_DEVICE_ERROR);
 	}
 
@@ -1187,7 +1205,7 @@ papiJobStreamAdd(papi_service_t handle, char *printer, int32_t id,
 	snprintf(path, sizeof (path), "/var/spool/lp/temp/%d-XXXXXX", id);
 	if ((s->fd = mkstemp(path)) < 0) {
 		detailed_error(svc, gettext("unable to create sink (%s): %s"),
-			path, strerror(errno));
+		    path, strerror(errno));
 		free(s);
 		return (PAPI_NOT_AUTHORIZED);
 	}
@@ -1203,7 +1221,7 @@ papiJobStreamAdd(papi_service_t handle, char *printer, int32_t id,
 
 	if ((s->request = getrequest(metadata_file)) == NULL) {
 		detailed_error(svc, gettext("unable to load request: %s: %s"),
-			metadata_file, strerror(errno));
+		    metadata_file, strerror(errno));
 		close(s->fd);
 		free(s);
 		unlink(path);
@@ -1214,7 +1232,7 @@ papiJobStreamAdd(papi_service_t handle, char *printer, int32_t id,
 
 	if (putrequest(metadata_file, s->request) < 0) {
 		detailed_error(svc, gettext("unable to save request: %s: %s"),
-			metadata_file, strerror(errno));
+		    metadata_file, strerror(errno));
 		close(s->fd);
 		free(s);
 		unlink(path);

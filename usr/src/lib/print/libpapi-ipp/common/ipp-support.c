@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  */
 
 /* $Id: ipp-support.c 148 2006-04-25 16:54:17Z njacobs $ */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <papi_impl.h>
 #include <stdlib.h>
@@ -155,13 +154,13 @@ ipp_initialize_request(service_t *svc, papi_attribute_t ***request,
 		uint16_t operation)
 {
 	papiAttributeListAddInteger(request, PAPI_ATTR_EXCL,
-			"version-major", 1);
+	    "version-major", 1);
 	papiAttributeListAddInteger(request, PAPI_ATTR_EXCL,
-			"version-minor", 1);
+	    "version-minor", 1);
 	papiAttributeListAddInteger(request, PAPI_ATTR_EXCL,
-			"request-id", (short)lrand48());
+	    "request-id", (short)lrand48());
 	papiAttributeListAddInteger(request, PAPI_ATTR_EXCL,
-			"operation-id", operation);
+	    "operation-id", operation);
 }
 
 void
@@ -181,17 +180,17 @@ ipp_initialize_operational_attributes(service_t *svc, papi_attribute_t ***op,
 	 *	requesting-user-name		(process user or none)
 	 */
 	papiAttributeListAddString(op, PAPI_ATTR_EXCL,
-			"attributes-charset", charset);
+	    "attributes-charset", charset);
 
 	papiAttributeListAddString(op, PAPI_ATTR_EXCL,
-			"attributes-natural-language", language);
+	    "attributes-natural-language", language);
 
 	if (printer != NULL)
 		ipp_add_printer_uri(svc, printer, op);
 
 	if ((printer != NULL) && (job_id >= 0))
 		papiAttributeListAddInteger(op, PAPI_ATTR_EXCL,
-			"job-id", job_id);
+		    "job-id", job_id);
 
 	if ((pw = getpwuid(getuid())) != NULL)
 		user = pw->pw_name;
@@ -204,7 +203,7 @@ ipp_initialize_operational_attributes(service_t *svc, papi_attribute_t ***op,
 			user = svc->user;
 	}
 	papiAttributeListAddString(op, PAPI_ATTR_REPLACE,
-			"requesting-user-name", user);
+	    "requesting-user-name", user);
 }
 
 #ifndef OPID_CUPS_GET_DEFAULT	   /* for servers that will enumerate */
@@ -232,23 +231,23 @@ _default_destination(service_t *svc, char **uri)
 	ipp_initialize_request(svc, &request, OPID_CUPS_GET_DEFAULT);
 	ipp_initialize_operational_attributes(svc, &op, NULL, -1);
 	papiAttributeListAddString(&op, PAPI_ATTR_APPEND,
-			"requested-attributes", "printer-uri-supported");
+	    "requested-attributes", "printer-uri-supported");
 	papiAttributeListAddCollection(&request, PAPI_ATTR_REPLACE,
-			"operational-attributes-group", op);
+	    "operational-attributes-group", op);
 	papiAttributeListFree(op);
 	result = ipp_send_request(svc, request, &response);
 	papiAttributeListFree(request);
 
 	op = NULL;
 	papiAttributeListGetCollection(response, NULL,
-			"printer-attributes-group", &op);
+	    "printer-attributes-group", &op);
 
 	if (uri != NULL) {
 		char *tmp = NULL;
 
 		papiAttributeListGetString(op, NULL, "printer-uri", &tmp);
 		papiAttributeListGetString(op, NULL,
-					"printer-uri-supported", &tmp);
+		    "printer-uri-supported", &tmp);
 		if (tmp != NULL)
 			*uri = strdup(tmp);
 	}
@@ -341,7 +340,7 @@ ipp_request_read(void *fd, void *buffer, size_t length)
 	}
 #ifdef DEBUG
 	printf("ipp_request_read(0x%8.8x, 0x%8.8x, %d) = %d\n",
-			fd, buffer, length, rc);
+	    fd, buffer, length, rc);
 	httpDumpData(stdout, "ipp_request_read:", buffer, length);
 #endif
 
@@ -365,16 +364,16 @@ ipp_send_initial_request_block(service_t *svc, papi_attribute_t **request,
 	httpClearFields(svc->connection);
 	if (svc->transfer_encoding == TRANSFER_ENCODING_CHUNKED)
 		httpSetField(svc->connection, HTTP_FIELD_TRANSFER_ENCODING,
-			"chunked");
+		    "chunked");
 	else {
 		sprintf(length, "%lu", (unsigned long)(file_size + chunk_size));
 		httpSetField(svc->connection, HTTP_FIELD_CONTENT_LENGTH,
-			length);
+		    length);
 	}
 	httpSetField(svc->connection, HTTP_FIELD_CONTENT_TYPE,
-			"application/ipp");
+	    "application/ipp");
 	httpSetField(svc->connection, HTTP_FIELD_AUTHORIZATION,
-			svc->connection->authstring);
+	    svc->connection->authstring);
 
 	/* flush any state information about this connection */
 	httpFlush(svc->connection);
@@ -451,15 +450,15 @@ setAuthString(service_t *svc)
 		return (-1);
 
 	if (strncmp(http->fields[HTTP_FIELD_WWW_AUTHENTICATE],
-			"Basic", 5) == 0) {
+	    "Basic", 5) == 0) {
 		char plain[BUFSIZ];
 
 		snprintf(plain, sizeof (plain), "%s:%s", user, passphrase);
 		httpEncode64(encoded, plain);
 		snprintf(http->authstring, sizeof (http->authstring),
-			"Basic %s", encoded);
+		    "Basic %s", encoded);
 	} else if (strncmp(http->fields[HTTP_FIELD_WWW_AUTHENTICATE],
-			"Digest", 6) == 0) {
+	    "Digest", 6) == 0) {
 		char realm[HTTP_MAX_VALUE];
 		char nonce[HTTP_MAX_VALUE];
 		char line [BUFSIZ];
@@ -468,12 +467,12 @@ setAuthString(service_t *svc)
 		char *uri = svc->post;
 
 		httpGetSubField(http, HTTP_FIELD_WWW_AUTHENTICATE,
-				"realm", realm);
+		    "realm", realm);
 		httpGetSubField(http, HTTP_FIELD_WWW_AUTHENTICATE,
-				"nonce", nonce);
+		    "nonce", nonce);
 
 		snprintf(line, sizeof (line), "%s:%s:%s", user, realm,
-				passphrase);
+		    passphrase);
 		md5_calc(urp, line, strlen(line));
 
 		snprintf(line, sizeof (line), "POST:%s", uri);
@@ -483,9 +482,9 @@ setAuthString(service_t *svc)
 		md5_calc(encoded, line, strlen(line));
 
 		snprintf(http->authstring, sizeof (http->authstring),
-			"Digest username=\"%s\", realm=\"%s\", nonce=\"%s\", "
-			"uri=\"%s\", response=\"%s\"", user, realm, nonce, uri,
-			encoded);
+		    "Digest username=\"%s\", realm=\"%s\", nonce=\"%s\", "
+		    "uri=\"%s\", response=\"%s\"", user, realm, nonce, uri,
+		    encoded);
 	}
 
 	return (0);
@@ -498,14 +497,14 @@ ipp_status_info(service_t *svc, papi_attribute_t **response)
 	int32_t status = 0;
 
 	papiAttributeListGetCollection(response, NULL,
-			"operational-attributes-group", &operational);
+	    "operational-attributes-group", &operational);
 	if (operational != NULL) {
 		char *message = NULL;
 
 		papiAttributeListGetString(response, NULL,
-					"status-message", &message);
+		    "status-message", &message);
 		papiAttributeListAddString(&svc->attributes, PAPI_ATTR_REPLACE,
-					"detailed-status-message", message);
+		    "detailed-status-message", message);
 	}
 	papiAttributeListGetInteger(response, NULL, "status-code", &status);
 
@@ -518,6 +517,7 @@ ipp_send_request_with_file(service_t *svc, papi_attribute_t **request,
 {
 	papi_status_t result = PAPI_OK;
 	ssize_t size = 0;
+	struct stat statbuf;
 	int fd;
 
 #ifdef DEBUG
@@ -535,8 +535,15 @@ ipp_send_request_with_file(service_t *svc, papi_attribute_t **request,
 		if ((fd = open(file, O_RDONLY)) < 0) {
 			detailed_error(svc, "%s: %s", file, strerror(errno));
 			return (PAPI_DOCUMENT_ACCESS_ERROR);
+		} else if (strcmp("standard input", file) != 0) {
+			stat(file, &statbuf);
+			if (statbuf.st_size == 0) {
+				detailed_error(svc,
+				    "Zero byte (empty) file: %s", file);
+				return (PAPI_BAD_ARGUMENT);
+			}
 		} else if (svc->transfer_encoding !=
-						TRANSFER_ENCODING_CHUNKED) {
+		    TRANSFER_ENCODING_CHUNKED) {
 			struct stat st;
 
 			if (fstat(fd, &st) >= 0)
@@ -559,7 +566,7 @@ ipp_send_request_with_file(service_t *svc, papi_attribute_t **request,
 				lseek(fd, 0L, SEEK_SET);
 				while ((rc = read(fd, buf, sizeof (buf))) > 0) {
 					if (ipp_request_write(svc, buf, rc)
-							< rc) {
+					    < rc) {
 						break;
 					}
 				}
@@ -595,13 +602,13 @@ ipp_send_request_with_file(service_t *svc, papi_attribute_t **request,
 
 		/* read the IPP response */
 		result = ipp_read_message(&ipp_request_read, svc, response,
-				IPP_TYPE_RESPONSE);
+		    IPP_TYPE_RESPONSE);
 
 		if (result == PAPI_OK)
 			result = ipp_status_info(svc, *response);
 #ifdef DEBUG
 		fprintf(stderr, "\nIPP-RESPONSE: (%s) (%s)", (file ? file : ""),
-				papiStatusString(result));
+		    papiStatusString(result));
 		papiAttributeListPrint(stderr, *response, "    ");
 		putc('\n', stderr);
 		fflush(stderr);
