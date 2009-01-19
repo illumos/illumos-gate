@@ -19,11 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		ipf ipfs ipmon ipnat ippool ipfstat
@@ -227,13 +224,19 @@ clean:
 
 lint: 	lint_SRCS
 
-%.o:	$(SRC)/uts/common/inet/ipf/%.c
+#
+# NOTE: all rules must use relative paths otherwise absolute paths will be
+#       embedded into the binaries making them false positives and 
+#       reported by wsdiff
+#
+
+%.o:	../../../../uts/common/inet/ipf/%.c
 	$(COMPILE.c) $<
 
 %.o:	../%.c
 	$(COMPILE.c) $<
 
-%.o:	$(SRC)/common/net/patricia/%.c
+%.o:	../../../../common/net/patricia/%.c
 	$(COMPILE.c) $<
 
 include ../../../Makefile.targ
