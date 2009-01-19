@@ -65,6 +65,7 @@ extern "C" {
 #define	ddi_xbuf_dispatch		ssd_ddi_xbuf_dispatch
 
 #define	ddi_xbuf_flushq			ssd_ddi_xbuf_flushq
+#define	ddi_xbuf_attr_setup_brk		ssd_ddi_xbuf_attr_setup_brk
 
 #endif
 
