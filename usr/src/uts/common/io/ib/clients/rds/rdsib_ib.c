@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -85,7 +85,7 @@ static void rds_async_handler(void *clntp, ibt_hca_hdl_t hdl,
     ibt_async_code_t code, ibt_async_event_t *event);
 
 static struct ibt_clnt_modinfo_s rds_ib_modinfo = {
-	IBTI_V2,
+	IBTI_V_CURR,
 	IBT_NETWORK,
 	rds_async_handler,
 	NULL,

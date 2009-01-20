@@ -18,10 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 
 # IBTF TI and VTI api entry points
 root	ibt_attach
@@ -84,6 +83,7 @@ root	ibt_alloc_cq
 root	ibt_free_cq
 root	ibt_query_cq
 root	ibt_resize_cq
+root	ibt_modify_cq
 root	ibt_poll_cq
 root	ibt_set_cq_private
 root	ibt_get_cq_private
@@ -148,6 +148,10 @@ root	ibt_post_srq
 root	ibt_query_srq
 root	ibt_get_srq_private
 root	ibt_set_srq_private
+root	ibt_alloc_io_mem
+root	ibt_free_io_mem
+root	ibt_map_mem_iov
+root	ibt_unmap_mem_iov
 
 # IBTF CI api entry points
 root	ibc_init
@@ -245,6 +249,7 @@ add	ibc_operations_s::ibc_free_mw			targets	warlock_dummy
 add	ibc_operations_s::ibc_free_pd			targets	warlock_dummy
 add	ibc_operations_s::ibc_free_qp			targets	warlock_dummy
 add	ibc_operations_s::ibc_modify_ah			targets	warlock_dummy
+add	ibc_operations_s::ibc_modify_cq			targets	warlock_dummy
 add	ibc_operations_s::ibc_modify_ports		targets	warlock_dummy
 add	ibc_operations_s::ibc_modify_qp			targets	warlock_dummy
 add	ibc_operations_s::ibc_modify_system_image	targets	warlock_dummy
@@ -281,6 +286,10 @@ add	ibc_operations_s::ibc_destroy_fmr_pool		targets warlock_dummy
 add	ibc_operations_s::ibc_flush_fmr_pool		targets warlock_dummy
 add	ibc_operations_s::ibc_register_physical_fmr	targets warlock_dummy
 add	ibc_operations_s::ibc_deregister_fmr		targets warlock_dummy
+add	ibc_operations_s::ibc_alloc_io_mem		targets warlock_dummy
+add	ibc_operations_s::ibc_free_io_mem		targets warlock_dummy
+add	ibc_operations_s::ibc_map_mem_iov		targets warlock_dummy
+add	ibc_operations_s::ibc_unmap_mem_iov		targets warlock_dummy
 add	ibt_clnt_modinfo_s::mi_async_handler		targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_async_client_call/async_handler	targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_cq_handler_call/cq_handler	targets	warlock_dummy

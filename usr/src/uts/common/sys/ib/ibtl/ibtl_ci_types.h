@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTL_CI_TYPES_H
 #define	_SYS_IB_IBTL_IBTL_CI_TYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibtl_ci_types.h
@@ -166,6 +163,7 @@ typedef	struct ibc_rdd_s	*ibt_rdd_hdl_t;	/* ibt_alloc_eec() */
 #define	IBT_MC_MLID_INVALID		IBT_MC_OPAQUE
 #define	IBT_QP_SRQ			IBT_CHAN_SRQ
 #define	IBT_QP_TYPE_2A_MW_BOUND		IBT_CHAN_TYPE_2A_MW_BOUND
+#define	IBT_QP_WQE_SZ_INSUFF		IBT_CHAN_WQE_SZ_INSUFF
 
 
 /*
@@ -229,7 +227,8 @@ typedef enum ibt_qp_alloc_flags_e {
 	IBT_QP_NO_FLAGS		= 0,
 	IBT_QP_USER_MAP		= (1 << 0),
 	IBT_QP_DEFER_ALLOC	= (1 << 1),
-	IBT_QP_USES_SRQ		= (1 << 2)
+	IBT_QP_USES_SRQ		= (1 << 2),
+	IBT_QP_USES_RSS		= (1 << 3)
 } ibt_qp_alloc_flags_t;
 
 /*
@@ -299,13 +298,13 @@ typedef struct ibt_qp_rd_attr_s {
 	ibt_rnr_nak_time_t	rd_min_rnr_nak;	/* min RNR-NAK timer */
 } ibt_qp_rd_attr_t;
 
-
 /* UD transport specific */
 typedef struct ibt_qp_ud_attr_s {
 	ib_qkey_t	ud_qkey;	/* Q_Key */
 	uint32_t	ud_sq_psn:24;	/* SQ PSN */
 	uint16_t	ud_pkey_ix;	/* P_Key Index */
 	uint8_t		ud_port;	/* port */
+	ibt_rss_attr_t	ud_rss;		/* RSS stuff */
 } ibt_qp_ud_attr_t;
 
 /*

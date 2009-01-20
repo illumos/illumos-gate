@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,14 +23,12 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_DAT_H_
 #define	_DAT_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -270,7 +267,8 @@ typedef enum dat_mem_priv_flags {
 	DAT_MEM_PRIV_REMOTE_READ_FLAG	= 0x02,
 	DAT_MEM_PRIV_LOCAL_WRITE_FLAG	= 0x10,
 	DAT_MEM_PRIV_REMOTE_WRITE_FLAG	= 0x20,
-	DAT_MEM_PRIV_ALL_FLAG		= 0x33
+	DAT_MEM_PRIV_ALL_FLAG		= 0x33,
+	DAT_MEM_PRIV_RO_DISABLE_FLAG	= 0x100
 } DAT_MEM_PRIV_FLAGS;
 
 /*

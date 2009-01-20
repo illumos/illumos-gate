@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/ibtl/impl/ibtl.h>
 
@@ -204,12 +202,13 @@ ibt_free_cq(ibt_cq_hdl_t ibt_cq)
  * ibt_query_cq() - Returns the size of the cq
  */
 ibt_status_t
-ibt_query_cq(ibt_cq_hdl_t ibt_cq, uint32_t *entries_p)
+ibt_query_cq(ibt_cq_hdl_t ibt_cq, uint32_t *entries_p, uint_t *count_p,
+    uint_t *usec_p, ibt_cq_handler_id_t *hid_p)
 {
 	IBTF_DPRINTF_L3(ibtf_cq, "ibt_query_cq(%p)", ibt_cq);
 
 	return (IBTL_CQ2CIHCAOPS_P(ibt_cq)->ibc_query_cq(IBTL_CQ2CIHCA(ibt_cq),
-	    ibt_cq->cq_ibc_cq_hdl, entries_p));
+	    ibt_cq->cq_ibc_cq_hdl, entries_p, count_p, usec_p, hid_p));
 }
 
 
@@ -223,6 +222,17 @@ ibt_resize_cq(ibt_cq_hdl_t ibt_cq, uint32_t new_sz, uint32_t *real_sz)
 
 	return (IBTL_CQ2CIHCAOPS_P(ibt_cq)->ibc_resize_cq(IBTL_CQ2CIHCA(ibt_cq),
 	    ibt_cq->cq_ibc_cq_hdl, new_sz, real_sz));
+}
+
+ibt_status_t
+ibt_modify_cq(ibt_cq_hdl_t ibt_cq, uint_t count, uint_t usec,
+    ibt_cq_handler_id_t hid)
+{
+	IBTF_DPRINTF_L3(ibtf_cq, "ibt_modify_cq(%p, %d, %d, %d)", ibt_cq, count,
+	    usec, hid);
+
+	return (IBTL_CQ2CIHCAOPS_P(ibt_cq)->ibc_modify_cq(IBTL_CQ2CIHCA(ibt_cq),
+	    ibt_cq->cq_ibc_cq_hdl, count, usec, hid));
 }
 
 

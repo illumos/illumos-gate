@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -226,7 +226,7 @@ struct ibcm_close_s {
 } ibcm_close;
 
 static ibt_clnt_modinfo_t ibcm_ibt_modinfo = {	/* Client's modinfop */
-	IBTI_V2,
+	IBTI_V_CURR,
 	IBT_CM,
 	ibcm_async_handler,
 	NULL,

@@ -1,8 +1,7 @@
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
 
 one tavor_state_s
 
@@ -20,6 +19,7 @@ root	tavor_ci_query_ah
 root	tavor_ci_modify_ah
 root	tavor_ci_alloc_qp
 root	tavor_ci_alloc_special_qp
+root	tavor_ci_alloc_qp_range
 root	tavor_ci_free_qp
 root	tavor_ci_release_qpn
 root	tavor_ci_query_qp
@@ -28,6 +28,7 @@ root	tavor_ci_alloc_cq
 root	tavor_ci_free_cq
 root	tavor_ci_query_cq
 root	tavor_ci_resize_cq
+root	tavor_ci_modify_cq
 root	tavor_ci_alloc_cq_sched
 root	tavor_ci_free_cq_sched
 root	tavor_ci_alloc_eec
@@ -68,6 +69,10 @@ root	tavor_ci_destroy_fmr_pool
 root	tavor_ci_flush_fmr_pool
 root	tavor_ci_register_physical_fmr
 root	tavor_ci_deregister_fmr
+root	tavor_ci_map_mem_iov
+root	tavor_ci_unmap_mem_iov
+root	tavor_ci_alloc_io_mem
+root	tavor_ci_free_io_mem
 
 ### Tavor Firmware commands (currently unused)
 root	tavor_sync_tpt_cmd_post

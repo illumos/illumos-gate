@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,11 +23,9 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -158,18 +155,21 @@ dat_ia_openv(
 	DAT_IA_OPEN_FUNC		ia_open_func;
 	DAT_PROVIDER_INFO 		info;
 	DAT_RETURN 			status;
-	DAT_OS_SIZE 		len;
+	DAT_OS_SIZE 			len;
+#define	RO_AWARE_PREFIX	"RO_AWARE_"
+	boolean_t			ro_aware_client;
+	const char			*_name = name;
 
 	dat_os_dbg_print(DAT_OS_DBG_TYPE_CONSUMER_API,
 	    "DAT Registry: dat_ia_open() called\n");
 
-	if (UDAT_IS_BAD_POINTER(name)) {
+	if (UDAT_IS_BAD_POINTER(_name)) {
 		return (DAT_ERROR(DAT_INVALID_PARAMETER, DAT_INVALID_ARG1));
 	}
 
-	len = dat_os_strlen(name);
+	len = dat_os_strlen(_name);
 
-	if (DAT_NAME_MAX_LENGTH < len) {
+	if (DAT_NAME_MAX_LENGTH <= len) {
 		return (DAT_ERROR(DAT_INVALID_PARAMETER, DAT_INVALID_ARG1));
 	}
 
@@ -181,7 +181,18 @@ dat_ia_openv(
 		return (DAT_ERROR(DAT_INVALID_STATE, 0));
 	}
 
-	(void) dat_os_strncpy(info.ia_name, name, len);
+	/* Find out if this is an RO aware client and if so, strip the prefix */
+	ro_aware_client =
+	    (strncmp(RO_AWARE_PREFIX, _name, sizeof (RO_AWARE_PREFIX) - 1) ==
+	    0);
+
+	/* strip off the prefix from the provider's name if present */
+	if (ro_aware_client) {
+		_name = _name + sizeof (RO_AWARE_PREFIX) - 1;
+		len -= sizeof (RO_AWARE_PREFIX) - 1;
+	}
+
+	(void) dat_os_strncpy(info.ia_name, _name, len);
 	info.ia_name[len] = '\0';
 
 	info.dapl_version_major = dapl_major;
@@ -205,14 +216,15 @@ dat_ia_openv(
 		dat_os_dbg_print(DAT_OS_DBG_TYPE_CONSUMER_API,
 		    "DAT Registry: dat_ia_open() provider information "
 		    "for IA name %s not found in dynamic registry\n",
-		    name);
+		    _name);
 		return (status);
 	}
 
-	return (*ia_open_func)(name,
+	return (*ia_open_func)((const DAT_NAME_PTR) _name,
 	    async_event_qlen,
 	    async_event_handle,
-	    ia_handle);
+	    ia_handle,
+	    ro_aware_client);
 }
 
 

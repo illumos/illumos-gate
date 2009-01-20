@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTI_H
 #define	_SYS_IB_IBTL_IBTI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibti.h
@@ -49,7 +46,8 @@ typedef enum ibt_chan_alloc_flags_e {
 	IBT_ACHAN_CLONE			= (1 << 0),
 	IBT_ACHAN_USER_MAP		= (1 << 1),
 	IBT_ACHAN_DEFER_ALLOC		= (1 << 2),
-	IBT_ACHAN_USES_SRQ		= (1 << 3)
+	IBT_ACHAN_USES_SRQ		= (1 << 3),
+	IBT_ACHAN_USES_RSS		= (1 << 4)
 } ibt_chan_alloc_flags_t;
 
 
@@ -137,7 +135,6 @@ typedef struct ibt_ud_dest_query_attr_s {
 	ibt_pd_hdl_t		ud_pd;
 } ibt_ud_dest_query_attr_t;
 
-
 /*
  * Allocate UD channel ibt_alloc_ud_channel() arguments; see below at
  * ibt_alloc_ud_channel() for a description of what's required and optional.
@@ -153,6 +150,7 @@ typedef struct ibt_ud_chan_alloc_args_s {
 	ibt_pd_hdl_t		ud_pd;		/* PD */
 	ibt_channel_hdl_t	ud_clone_chan;	/* Optional clone handle */
 	ibt_srq_hdl_t		ud_srq;		/* Optional Shared Rcv Queue */
+	ibt_rss_attr_t		ud_rss;
 } ibt_ud_chan_alloc_args_t;
 
 /*
@@ -171,6 +169,7 @@ typedef struct ibt_ud_chan_query_attr_s {
 	ibt_chan_sizes_t	ud_chan_sizes;		/* Queue/SGL sizes */
 	ibt_attr_flags_t	ud_flags;		/* Signaling Type etc */
 	ibt_srq_hdl_t		ud_srq;		/* Optional Shared Rcv Queue */
+	ibt_rss_attr_t		ud_rss;
 } ibt_ud_chan_query_attr_t;
 
 /*
@@ -187,6 +186,7 @@ typedef struct ibt_ud_chan_modify_attr_s {
 	uint_t			ud_sq_sz;	/* Set SQ Max outstanding WRs */
 	uint_t			ud_rq_sz;	/* Set RQ Max outstanding WRs */
 	ib_qkey_t		ud_qkey;	/* Set Q_Key */
+	ibt_rss_attr_t		ud_rss;		/* Set RSS stuff */
 } ibt_ud_chan_modify_attr_t;
 
 
@@ -254,6 +254,16 @@ ibt_status_t ibt_modify_rc_channel(ibt_channel_hdl_t rc_chan,
  */
 ibt_status_t ibt_alloc_ud_channel(ibt_hca_hdl_t hca_hdl,
     ibt_chan_alloc_flags_t flags, ibt_ud_chan_alloc_args_t *args,
+    ibt_channel_hdl_t *ud_chan_p, ibt_chan_sizes_t *sizes);
+
+/*
+ * ibt_alloc_ud_channel_range
+ *	Allocate a range of UD channels that have consecutive QPNs for RSS.
+ */
+ibt_status_t ibt_alloc_ud_channel_range(ibt_hca_hdl_t hca_hdl,
+    uint_t log2, ibt_chan_alloc_flags_t flags,
+    ibt_ud_chan_alloc_args_t *args, ibt_cq_hdl_t *send_cq_p,
+    ibt_cq_hdl_t *recv_cq_p, ib_qpn_t *base_qpn_p,
     ibt_channel_hdl_t *ud_chan_p, ibt_chan_sizes_t *sizes);
 
 /*

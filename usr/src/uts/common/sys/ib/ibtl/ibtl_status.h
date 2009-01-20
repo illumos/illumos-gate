@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTL_STATUS_H
 #define	_SYS_IB_IBTL_IBTL_STATUS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibtl_status.h
@@ -210,6 +208,7 @@ typedef enum ibt_status_e {
 						/* SRQ */
 	IBT_CHAN_TYPE_2A_MW_BOUND	= 416,	/* Channel still has a type */
 						/* 2A memory window bound */
+	IBT_CHAN_WQE_SZ_INSUFF		= 417,	/* inline-data/LSO too large */
 
 	/*
 	 * Completion Queue (CQ) errors
@@ -254,6 +253,8 @@ typedef enum ibt_status_e {
 						/* Handle */
 	IBT_MW_TYPE_INVALID		= 810,
 	IBT_MA_HDL_INVALID		= 811,  /* Invalid Memory Area Hdl */
+	IBT_SGL_TOO_SMALL		= 812,
+	IBT_MI_HDL_INVALID		= 813,
 
 	/*
 	 * Multicast errors
@@ -273,6 +274,7 @@ typedef enum ibt_status_e {
 	 */
 	IBT_PD_HDL_INVALID		= 1100,	/* Invalid protection domain */
 	IBT_PD_IN_USE			= 1101,	/* Protection Domain in Use */
+	IBT_MEM_ALLOC_HDL_INVALID	= 1102,	/* Invalid MEM handle */
 
 	/*
 	 * Shared Receive Queue errors
@@ -292,7 +294,6 @@ typedef enum ibt_status_e {
 	IBT_FMR_POOL_HDL_INVALID	= 1300,	/* Invalid FMR Pool handle */
 	IBT_FMR_POOL_IN_USE		= 1301,	/* FMR Pool in use. */
 	IBT_PBL_TOO_SMALL		= 1302
-
 } ibt_status_t;
 
 /*

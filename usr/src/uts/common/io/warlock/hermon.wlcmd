@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -39,6 +39,7 @@ root	hermon_ci_query_ah
 root	hermon_ci_modify_ah
 root	hermon_ci_alloc_qp
 root	hermon_ci_alloc_special_qp
+root	hermon_ci_alloc_qp_range
 root	hermon_ci_free_qp
 root	hermon_ci_release_qpn
 root	hermon_ci_query_qp
@@ -47,6 +48,7 @@ root	hermon_ci_alloc_cq
 root	hermon_ci_free_cq
 root	hermon_ci_query_cq
 root	hermon_ci_resize_cq
+root	hermon_ci_modify_cq
 root	hermon_ci_alloc_cq_sched
 root	hermon_ci_free_cq_sched
 root	hermon_ci_alloc_eec
@@ -79,6 +81,8 @@ root	hermon_ci_modify_srq
 root	hermon_ci_post_srq
 root	hermon_ci_map_mem_area
 root	hermon_ci_unmap_mem_area
+root	hermon_ci_map_mem_iov
+root	hermon_ci_unmap_mem_iov
 root	hermon_ci_alloc_lkey
 root	hermon_ci_register_physical_mr
 root	hermon_ci_reregister_physical_mr
@@ -87,6 +91,8 @@ root	hermon_ci_destroy_fmr_pool
 root	hermon_ci_flush_fmr_pool
 root	hermon_ci_register_physical_fmr
 root	hermon_ci_deregister_fmr
+root	hermon_ci_alloc_io_mem
+root	hermon_ci_free_io_mem
 
 ### Hermon Firmware commands (currently unused)
 root	hermon_sync_tpt_cmd_post
@@ -158,6 +164,9 @@ root	hermon_qpn_avl_compare
 root	hermon_fmr_avl_compare
 root	hermon_fmr_processing
 add	hermon_sw_fmr_s::fmr_flush_function targets warlock_dummy
+
+### Hermon FMR processing
+root	hermon_inter_err_chk
 
 add	bus_ops::bus_add_eventcall	targets warlock_dummy
 add	bus_ops::bus_get_eventcookie	targets warlock_dummy

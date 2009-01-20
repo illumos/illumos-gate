@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTL_TYPES_H
 #define	_SYS_IB_IBTL_IBTL_TYPES_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibtl_types.h
@@ -40,6 +38,7 @@
 #include <sys/ib/ib_types.h>
 #include <sys/ib/ibtl/ibtl_status.h>
 #include <sys/socket.h>
+#include <sys/byteorder.h>
 
 
 #ifdef	__cplusplus
@@ -56,10 +55,10 @@ extern "C" {
 #if defined(_LITTLE_ENDIAN)
 #define	h2b16(x)	(htons(x))
 #define	h2b32(x)	(htonl(x))
-#define	h2b64(x)	(ddi_swap64(x))
+#define	h2b64(x)	(htonll(x))
 #define	b2h16(x)	(ntohs(x))
 #define	b2h32(x)	(ntohl(x))
-#define	b2h64(x)	(ddi_swap64(x))
+#define	b2h64(x)	(htonll(x))
 
 #define	h2l16(x)	(x)
 #define	h2l32(x)	(x)
@@ -109,6 +108,8 @@ typedef	struct	ibc_ah_s	*ibt_ah_hdl_t;	    /* ibt_alloc_ah() */
 typedef struct	ibtl_eec_s	*ibt_eec_hdl_t;
 typedef	struct	ibt_rd_dest_s	*ibt_rd_dest_hdl_t;	/* Reserved for */
 							/* Future use */
+typedef struct  ibc_mem_alloc_s *ibt_mem_alloc_hdl_t; /* ibt_alloc_io_mem() */
+typedef struct	ibc_mi_s	*ibt_mi_hdl_t;		/* ibt_map_mem_iov() */
 
 /*
  * Some General Types.
@@ -189,6 +190,7 @@ typedef struct ibt_chan_sizes_s {
 	uint_t	cs_rq;		/* ReceiveQ size. */
 	uint_t	cs_sq_sgl;	/* Max SGL elements in a SQ WR. */
 	uint_t	cs_rq_sgl;	/* Max SGL elements in a RQ Wr. */
+	uint_t  cs_inline;	/* max inline payload size */
 } ibt_chan_sizes_t;
 
 /*
@@ -350,9 +352,11 @@ typedef enum ibt_hca_flags_e {
 	IBT_HCA_RNR_NAK		= 1 << 15,	/* RNR-NAK supported for RC */
 	IBT_HCA_CURRENT_QP_STATE = 1 << 16,	/* Does modify_qp support */
 						/* checking of current state? */
-	IBT_HCA_SRQ 		= 1 << 17,	/* Shared Receive Queue */
+	IBT_HCA_SRQ 		= 1 << 17,	/* Shared Receive Queue (RC) */
+	IBT_HCA_RC_SRQ 		= IBT_HCA_SRQ,
 	IBT_HCA_RESIZE_SRQ	= 1 << 18,	/* Is resize SRQ supported? */
-	IBT_HCA_BASE_MEM_MGT	= 1 << 19,	/* Base memory mgt supported? */
+	IBT_HCA_UD_SRQ		= 1 << 19,	/* UD with SRQ */
+
 	IBT_HCA_MULT_PAGE_SZ_MR	= 1 << 20,	/* Support of multiple page */
 						/* sizes per memory region? */
 	IBT_HCA_BLOCK_LIST	= 1 << 21,	/* Block list physical buffer */
@@ -364,8 +368,25 @@ typedef enum ibt_hca_flags_e {
 	IBT_HCA_CKSUM_FULL	= 1 << 25,	/* Checksum offload supported */
 	IBT_HCA_MEM_WIN_TYPE_2B	= 1 << 26,	/* Type 2B memory windows */
 	IBT_HCA_PHYS_BUF_BLOCK	= 1 << 27,	/* Block mode phys buf lists */
-	IBT_HCA_FMR		= 1 << 28	/* FMR Support */
+	IBT_HCA_FMR		= 1 << 28,	/* FMR Support */
+	IBT_HCA_WQE_SIZE_INFO	= 1 << 29,	/* detailed WQE size info */
+	IBT_HCA_SQD_STATE	= 1 << 30	/* SQD QP state */
 } ibt_hca_flags_t;
+
+typedef enum ibt_hca_flags2_e {
+	IBT_HCA2_NO_FLAGS	= 0,
+
+	IBT_HCA2_UC		= 1 << 1,	/* Unreliable Connected */
+	IBT_HCA2_UC_SRQ		= 1 << 2,	/* UC with SRQ */
+	IBT_HCA2_RES_LKEY	= 1 << 3,	/* Reserved L_Key */
+	IBT_HCA2_PORT_CHANGE	= 1 << 4,	/* Port Change event */
+	IBT_HCA2_IP_CLASS	= 1 << 5,	/* IP Classification flags */
+	IBT_HCA2_RSS_TPL_ALG	= 1 << 6,	/* RSS: Toeplitz algorithm */
+	IBT_HCA2_RSS_XOR_ALG	= 1 << 7,	/* RSS: XOR algorithm */
+	IBT_HCA2_XRC		= 1 << 8,	/* Extended RC (XRC) */
+	IBT_HCA2_XRC_SRQ_RESIZE	= 1 << 9,	/* resize XRC SRQ */
+	IBT_HCA2_MEM_MGT_EXT	= 1 << 10 /* FMR-WR, send-inv, local-inv */
+} ibt_hca_flags2_t;
 
 /*
  * The definition of HCA page size capabilities as a bitfield
@@ -411,6 +432,7 @@ typedef enum ibt_mem_win_type_e {
  */
 typedef struct ibt_hca_attr_s {
 	ibt_hca_flags_t	hca_flags;		/* HCA capabilities etc */
+	ibt_hca_flags2_t hca_flags2;
 
 	/* device/version inconsistency w/ NodeInfo and IOControllerProfile */
 	uint32_t	hca_vendor_id:24;	/* 24 bit Vendor ID */
@@ -474,6 +496,7 @@ typedef struct ibt_hca_attr_s {
 	uint_t		hca_opaque4;
 	uint8_t		hca_opaque5;
 	uint8_t		hca_opaque6;
+	uint8_t		hca_rss_max_log2_table;	/* max RSS log2 table size */
 	uint_t		hca_opaque7;
 	uint_t		hca_opaque8;
 	uint_t		hca_max_srqs;		/* Max SRQs supported */
@@ -484,9 +507,34 @@ typedef struct ibt_hca_attr_s {
 	size_t		hca_block_sz_lo;	/* Range of block sizes */
 	size_t		hca_block_sz_hi;	/* supported by the HCA */
 	uint_t		hca_max_cq_handlers;
-	ibt_lkey_t	hca_reserved_lkey;
+	ibt_lkey_t	hca_reserved_lkey;	/* Reserved L_Key value */
 	uint_t		hca_max_fmrs;		/* Max FMR Supported */
 	uint_t		hca_opaque9;
+
+	uint_t		hca_max_lso_size;
+	uint_t		hca_max_lso_hdr_size;
+	uint_t		hca_max_inline_size;
+
+	uint_t		hca_max_cq_mod_count;	/* CQ notify moderation */
+	uint_t		hca_max_cq_mod_usec;
+
+	uint32_t	hca_fw_major_version;	/* firmware version */
+	uint16_t	hca_fw_minor_version;
+	uint16_t	hca_fw_micro_version;
+
+	uint_t		hca_max_xrc_domains;	/* XRC items */
+	uint_t		hca_max_xrc_srqs;
+	uint_t		hca_max_xrc_srq_size;
+	uint_t		hca_max_xrc_srq_sgl;
+
+	/* detailed WQE size info */
+	uint_t		hca_ud_send_inline_sz;	/* inline size in bytes */
+	uint_t		hca_conn_send_inline_sz;
+	uint_t		hca_conn_rdmaw_inline_overhead;
+	uint_t		hca_recv_sgl_sz;	/* detailed SGL sizes */
+	uint_t		hca_ud_send_sgl_sz;
+	uint_t		hca_conn_send_sgl_sz;
+	uint_t		hca_conn_rdma_sgl_overhead;
 } ibt_hca_attr_t;
 
 /*
@@ -610,6 +658,26 @@ typedef struct ibt_cep_path_s {
 } ibt_cep_path_t;
 
 /*
+ * Define Receive Side Scaling types for IP over IB.
+ */
+typedef enum ibt_rss_flags_e {
+	IBT_RSS_ALG_TPL		= (1 << 0),	/* RSS: Toeplitz hash */
+	IBT_RSS_ALG_XOR		= (1 << 1),	/* RSS: XOR hash */
+	IBT_RSS_HASH_IPV4	= (1 << 2),	/* RSS: hash IPv4 headers */
+	IBT_RSS_HASH_IPV6	= (1 << 3),	/* RSS: hash IPv6 headers */
+	IBT_RSS_HASH_TCP_IPV4	= (1 << 4),	/* RSS: hash TCP/IPv4 hdrs */
+	IBT_RSS_HASH_TCP_IPV6	= (1 << 5)	/* RSS: hash TCP/IPv6 hdrs */
+} ibt_rss_flags_t;
+
+typedef struct ibt_rss_attr_s {
+	ibt_rss_flags_t	rss_flags;		/* RSS: flags */
+	uint_t		rss_log2_table;		/* RSS: log2 table size */
+	ib_qpn_t	rss_base_qpn;		/* RSS: base QPN */
+	ib_qpn_t	rss_def_qpn;		/* RSS: default QPN */
+	uint8_t		rss_toe_key[40];	/* RSS: Toeplitz hash key */
+} ibt_rss_attr_t;
+
+/*
  * Channel Migration State.
  */
 typedef enum ibt_cep_cmstate_e {
@@ -655,7 +723,8 @@ typedef enum ibt_cep_state_e {
 typedef enum ibt_attr_flags_e {
 	IBT_ALL_SIGNALED	= 0,	/* All sends signaled */
 	IBT_WR_SIGNALED		= 1,	/* Signaled on a WR basis */
-	IBT_FAST_REG_RES_LKEY	= (1 << 1)
+	IBT_FAST_REG_RES_LKEY	= (1 << 1),
+	IBT_USES_LSO		= (1 << 2)
 } ibt_attr_flags_t;
 
 /*
@@ -703,7 +772,8 @@ typedef enum ibt_cep_modify_flags_e {
 	IBT_CEP_SET_SQD_EVENT		= (1 << 20),
 	IBT_CEP_SET_OPAQUE6		= (1 << 21),
 	IBT_CEP_SET_OPAQUE7		= (1 << 22),
-	IBT_CEP_SET_OPAQUE8		= (1 << 23)
+	IBT_CEP_SET_OPAQUE8		= (1 << 23),
+	IBT_CEP_SET_RSS			= (1 << 24)
 } ibt_cep_modify_flags_t;
 
 /*
@@ -777,8 +847,9 @@ typedef enum ibt_mr_flags_e {
 	IBT_MR_ZBVA			= (1 << 12),
 
 	/* Additional physical registration flags */
-	IBT_MR_CONSUMER_KEY		= (1 << 13)	/* Consumer owns key */
+	IBT_MR_CONSUMER_KEY		= (1 << 13),	/* Consumer owns key */
 							/* portion of keys */
+	IBT_MR_DISABLE_RO		= (1 << 14)
 } ibt_mr_flags_t;
 
 
@@ -793,7 +864,8 @@ typedef enum ibt_mr_attr_flags_e {
 	IBT_MR_ZERO_BASED_VA		= (1 << 5),
 	IBT_MR_CONSUMER_OWNED_KEY	= (1 << 6),
 	IBT_MR_SHARED			= (1 << 7),
-	IBT_MR_FMR			= (1 << 8)
+	IBT_MR_FMR			= (1 << 8),
+	IBT_MR_RO_DISABLED		= (1 << 9)
 } ibt_mr_attr_flags_t;
 
 /* Memory region physical descriptor. */
@@ -804,6 +876,14 @@ typedef struct ibt_phys_buf_s {
 	} _phys_buf;
 	size_t	p_size;
 } ibt_phys_buf_t;
+
+/* version of above for uniform buffer size */
+typedef struct ib_phys_addr_t {
+	union {
+		uint64_t	_p_ll;		/* 64 bit DMA address */
+		uint32_t	_p_la[2];	/* 2 x 32 bit address */
+	} _phys_buf;
+} ibt_phys_addr_t;
 
 #define	p_laddr		_phys_buf._p_ll
 #ifdef	_LONG_LONG_HTOL
@@ -858,18 +938,41 @@ typedef struct ibt_pmr_attr_s {
 	ib_memlen_t	pmr_offset;	/* Offset of the regions starting */
 					/* IOVA within the 1st physical */
 					/* buffer */
-	ibt_mr_flags_t	pmr_flags;
-	ibt_lkey_t	pmr_lkey;	/* Reregister only */
-	ibt_rkey_t	pmr_rkey;	/* Reregister only */
-	uint8_t		pmr_key;	/* Key to use on new Lkey & Rkey */
-	uint_t		pmr_num_buf;	/* Num of entries in the pmr_buf_list */
-	size_t		pmr_buf_sz;
-	ibt_phys_buf_t	*pmr_buf_list;	/* List of physical buffers accessed */
-					/* as an array */
 	ibt_ma_hdl_t	pmr_ma;		/* Memory handle used to obtain the */
 					/* pmr_buf_list */
+	ibt_phys_addr_t	*pmr_addr_list;	/* List of physical buffers accessed */
+					/* as an array */
+	size_t		pmr_buf_sz;
+	uint_t		pmr_num_buf;	/* Num of entries in the pmr_buf_list */
+	ibt_lkey_t	pmr_lkey;	/* Reregister only */
+	ibt_rkey_t	pmr_rkey;	/* Reregister only */
+	ibt_mr_flags_t	pmr_flags;
+	uint8_t		pmr_key;	/* Key to use on new Lkey & Rkey */
 } ibt_pmr_attr_t;
 
+/* addr/length pair */
+typedef struct ibt_iov_s {
+	caddr_t	iov_addr;	/* Beginning address */
+	size_t	iov_len;	/* Length */
+} ibt_iov_t;
+
+/* Map memory IOV */
+typedef enum ibt_iov_flags_e {
+	IBT_IOV_SLEEP		= 0,
+	IBT_IOV_NOSLEEP		= (1 << 0),
+	IBT_IOV_BUF		= (1 << 1),
+	IBT_IOV_RECV		= (1 << 2)
+} ibt_iov_flags_t;
+
+typedef struct ibt_iov_attr_s {
+	struct as		*iov_as;
+	ibt_iov_t		*iov;
+	struct buf		*iov_buf;
+	uint32_t		iov_list_len;
+	uint32_t		iov_wr_nds;
+	ib_msglen_t		iov_lso_hdr_sz;
+	ibt_iov_flags_t		iov_flags;
+} ibt_iov_attr_t;
 
 /*
  * Memory Region (Re)Register attributes - used by ibt_register_shared_mr(),
@@ -951,8 +1054,8 @@ typedef struct ibt_va_attr_s {
 	ib_memlen_t	va_len;		/* Length of region to register */
 	struct as	*va_as;		/* A pointer to an address space */
 					/* structure. */
-	size_t		va_phys_buf_min;
-	size_t		va_phys_buf_max;
+	size_t		va_phys_buf_min;	/* block mode only */
+	size_t		va_phys_buf_max;	/* block mode only */
 	ibt_va_flags_t	va_flags;
 	struct buf	*va_buf;
 } ibt_va_attr_t;
@@ -1006,6 +1109,7 @@ typedef uint8_t ibt_wrc_opcode_t;
 #define	IBT_WRC_RECV_RDMAWI	8	/* Received RDMA Write w/ Immediate */
 #define	IBT_WRC_FAST_REG_PMR	9	/* Fast Register Physical mem region */
 #define	IBT_WRC_LOCAL_INVALIDATE 10
+#define	IBT_WRC_SEND_LSO	11
 
 
 /*
@@ -1020,6 +1124,20 @@ typedef uint8_t ibt_wc_flags_t;
 #define	IBT_WC_RKEY_INVALIDATED		(1 << 2)
 #define	IBT_WC_CKSUM_OK			(1 << 3)
 
+/* IPoIB flags for wc_detail field */
+#define	IBT_WC_DETAIL_ALL_FLAGS_MASK	(0x0FC00000)
+#define	IBT_WC_DETAIL_IPV4		(1 << 22)
+#define	IBT_WC_DETAIL_IPV4_FRAG		(1 << 23)
+#define	IBT_WC_DETAIL_IPV6		(1 << 24)
+#define	IBT_WC_DETAIL_IPV4_OPT		(1 << 25)
+#define	IBT_WC_DETAIL_TCP		(1 << 26)
+#define	IBT_WC_DETAIL_UDP		(1 << 27)
+
+#define	IBT_WC_DETAIL_RSS_MATCH_MASK	(0x003F0000)
+#define	IBT_WC_DETAIL_RSS_TCP_IPV6	(1 << 18)
+#define	IBT_WC_DETAIL_RSS_IPV6		(1 << 19)
+#define	IBT_WC_DETAIL_RSS_TCP_IPV4	(1 << 20)
+#define	IBT_WC_DETAIL_RSS_IPV4		(1 << 21)
 
 /*
  * Work Request Completion - This structure encapsulates the information
@@ -1034,19 +1152,18 @@ typedef struct ibt_wc_s {
 	ibt_wrc_opcode_t	wc_type;	/* Operation Type */
 	uint16_t		wc_cksum;	/* payload checksum */
 	ibt_immed_t		wc_immed_data;	/* Immediate Data */
-	uint32_t		wc_freed_rc;	/* Freed Resource Count */
+	uint32_t		wc_res_hash;	/* RD: Freed Res, RSS: hash */
 	ibt_wc_status_t		wc_status;	/* Completion Status */
 	uint8_t			wc_sl:4;	/* Remote SL */
 	uint16_t		wc_ethertype;	/* Ethertype Field - RE */
 	ib_lid_t		wc_opaque1;
 	uint16_t		wc_opaque2;
 	ib_qpn_t		wc_qpn;		/* Source QPN Datagram only */
-	ib_eecn_t		wc_opaque3;
+	uint32_t		wc_detail;	/* RD: EECN, UD: IPoIB flags */
 	ib_qpn_t		wc_local_qpn;
 	ibt_rkey_t		wc_rkey;
 	ib_path_bits_t		wc_opaque4;
 } ibt_wc_t;
-
 
 /*
  * WR Flags. Common for both RC and UD
@@ -1062,6 +1179,7 @@ typedef uint8_t ibt_wr_flags_t;
 #define	IBT_WR_SEND_SOLICIT	(1 << 3)	/* Solicited Event Indicator */
 #define	IBT_WR_SEND_REMOTE_INVAL	(1 << 4) /* Remote Invalidate */
 #define	IBT_WR_SEND_CKSUM	(1 << 5)	/* Checksum offload Indicator */
+#define	IBT_WR_SEND_INLINE	(1 << 6)	/* INLINE required (no lkey) */
 
 /*
  * Access control flags for Bind Memory Window operation,
@@ -1151,14 +1269,21 @@ typedef struct ibt_wr_reg_pmr_s {
 					/* IOVA within the 1st physical */
 					/* buffer */
 	ibt_mr_hdl_t	pmr_mr_hdl;
-	ibt_phys_buf_t	*pmr_buf_list;	/* List of physical buffers accessed */
+	ibt_phys_addr_t	*pmr_addr_list; /* List of physical buffers accessed */
 					/* as an array */
+	size_t		pmr_buf_sz;	/* size of uniform size PBEs */
 	uint_t		pmr_num_buf;	/* Num of entries in the pmr_buf_list */
 	ibt_lkey_t	pmr_lkey;
 	ibt_rkey_t	pmr_rkey;
 	ibt_mr_flags_t	pmr_flags;
 	uint8_t		pmr_key;	/* Key to use on new Lkey & Rkey */
 } ibt_wr_reg_pmr_t;
+
+/* phys reg function or WR */
+typedef union ibt_reg_req_u {
+	ibt_pmr_attr_t		fn_arg;
+	ibt_wr_reg_pmr_t	wr;
+} ibt_reg_req_t;
 
 /*
  * Local Invalidate.
@@ -1254,6 +1379,14 @@ typedef struct ibt_wr_ud_s {
 	ibt_ud_dest_hdl_t	udwr_dest;
 } ibt_wr_ud_t;
 
+/* LSO variant */
+typedef struct ibt_wr_lso_s {
+	ibt_ud_dest_hdl_t	lso_ud_dest;
+	uint8_t			*lso_hdr;
+	ib_msglen_t		lso_hdr_sz;
+	ib_msglen_t		lso_mss;
+} ibt_wr_lso_t;
+
 /*
  * Send Work Request (WR) attributes structure.
  *
@@ -1276,6 +1409,7 @@ typedef struct ibt_send_wr_s {
 		ibt_wr_uc_t	uc;	/* Reserved For Future Use */
 		ibt_wr_reth_t	reth;	/* Reserved For Future Use */
 		ibt_wr_ripv6_t	ripv6;	/* Reserved For Future Use */
+		ibt_wr_lso_t	ud_lso;
 	} wr;				/* operation specific */
 } ibt_send_wr_t;
 
@@ -1288,6 +1422,11 @@ typedef struct ibt_recv_wr_s {
 						/* pointed to by wr_sgl */
 	ibt_wr_ds_t		*wr_sgl;	/* SGL */
 } ibt_recv_wr_t;
+
+typedef union ibt_all_wr_u {
+	ibt_send_wr_t	send;
+	ibt_recv_wr_t	recv;
+} ibt_all_wr_t;
 
 
 /*
@@ -1326,9 +1465,20 @@ typedef enum ibt_async_code_e {
 	IBT_ASYNC_OPAQUE4			= 0x010000,
 	IBT_EVENT_LIMIT_REACHED_SRQ		= 0x020000,
 	IBT_EVENT_EMPTY_CHAN			= 0x040000,
-	IBT_ERROR_CATASTROPHIC_SRQ		= 0x080000
+	IBT_ERROR_CATASTROPHIC_SRQ		= 0x080000,
+
+	IBT_PORT_CHANGE_EVENT			= 0x100000
 } ibt_async_code_t;
 
+typedef enum ibt_port_change_e {
+	IBT_PORT_CHANGE_SGID		= 0x000001, /* SGID table */
+	IBT_PORT_CHANGE_PKEY		= 0x000002, /* P_Key table */
+	IBT_PORT_CHANGE_SM_LID		= 0x000004, /* Master SM LID */
+	IBT_PORT_CHANGE_SM_SL		= 0x000008, /* Master SM SL */
+	IBT_PORT_CHANGE_SUB_TIMEOUT	= 0x000010, /* Subnet Timeout */
+	IBT_PORT_CHANGE_SM_FLAG		= 0x000020, /* IsSMDisabled bit */
+	IBT_PORT_CHANGE_REREG		= 0x000040  /* IsClientReregSupport */
+} ibt_port_change_t;
 
 /*
  * ibt_ci_data_in() and ibt_ci_data_out() flags.

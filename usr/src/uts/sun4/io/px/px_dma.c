@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1258,7 +1258,8 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 
 		if (px_lib_iommu_getbypass(dip, MMU_PTOB(pfn),
 		    attr, &bypass_addr) != DDI_SUCCESS) {
-			cmn_err(CE_WARN, "bypass cookie failure %lx\n", pfn);
+			DBG(DBG_BYPASS, mp->dmai_rdip,
+			    "bypass cookie failure %lx\n", pfn);
 			return (DDI_DMA_NOMAPPING);
 		}
 		pfn = MMU_BTOP(bypass_addr);

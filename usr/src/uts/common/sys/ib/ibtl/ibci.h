@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_IB_IBTL_IBCI_H
 #define	_SYS_IB_IBTL_IBCI_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibci.h
@@ -65,11 +62,13 @@ typedef struct ibc_srq_s	*ibc_srq_hdl_t;	/* Shared Receive Queue Hdl */
 typedef struct ibc_qpn_s	*ibc_qpn_hdl_t;	/* Queue Pair Number Handle */
 typedef struct ibc_cq_s		*ibc_cq_hdl_t;	/* Completion Queue Handle */
 typedef struct ibc_eec_s	*ibc_eec_hdl_t; /* End-to-End Context Handle */
+typedef struct ibc_mem_alloc_s	*ibc_mem_alloc_hdl_t; /* Memory Handle */
 
 #define	ibc_fmr_pool_hdl_t	ibt_fmr_pool_hdl_t /* FMR Pool Handle */
 #define	ibc_mr_hdl_t	ibt_mr_hdl_t	/* Memory Region Handle */
 #define	ibc_mw_hdl_t	ibt_mw_hdl_t	/* Memory Window Handle */
 #define	ibc_ma_hdl_t	ibt_ma_hdl_t	/* Memory Area Handle */
+#define	ibc_mi_hdl_t	ibt_mi_hdl_t	/* Memory IOV Handle */
 
 /* Handle used by CI for up calls to IBTF */
 typedef struct ibtl_hca_devinfo_s *ibc_clnt_hdl_t;	/* ibc_attach() */
@@ -156,13 +155,14 @@ typedef struct ibtl_hca_devinfo_s *ibc_clnt_hdl_t;	/* ibc_attach() */
 /*
  * ibt_wc_t
  */
-#define	wc_eecn		wc_opaque3	/* End-to-End Context RD's only */
+#define	wc_eecn		wc_detail	/* End-to-End Context RD's only */
 
 
 /* Channel Interface version */
 typedef enum ibc_version_e {
 	IBCI_V1		= 1,
-	IBCI_V2		= 2		/* FMR Support */
+	IBCI_V2		= 2,		/* FMR Support */
+	IBCI_V3		= 3
 } ibc_version_t;
 
 
@@ -221,8 +221,9 @@ typedef struct ibc_async_event_s {
 	ibtl_qp_hdl_t	ev_qp_hdl;	/* IBTF QP handle. */
 	ibtl_eec_hdl_t	ev_eec_hdl;	/* IBTF EEC handle. */
 	ibt_cq_hdl_t	ev_cq_hdl;	/* IBT CQ handle. */
-	uint8_t		ev_port;	/* Valid for PORT UP/DOWN events */
 	ibt_srq_hdl_t	ev_srq_hdl;	/* SRQ handle */
+	ibt_port_change_t ev_port_flags; /* Port Change flags */
+	uint8_t		ev_port;	/* For PORT UP/DOWN/CHANGE events */
 } ibc_async_event_t;
 
 
@@ -262,6 +263,11 @@ typedef struct ibc_operations_s {
 	    ibtl_qp_hdl_t ibt_qp, ibt_sqp_type_t type,
 	    ibt_qp_alloc_attr_t *attr_p, ibt_chan_sizes_t *queue_sizes_p,
 	    ibc_qp_hdl_t *qp_p);
+	ibt_status_t (*ibc_alloc_qp_range)(ibc_hca_hdl_t hca, uint_t log2,
+	    ibtl_qp_hdl_t *ibtl_qp_p, ibt_qp_type_t type,
+	    ibt_qp_alloc_attr_t *attr_p, ibt_chan_sizes_t *queue_sizes_p,
+	    ibc_cq_hdl_t *send_cq_p, ibc_cq_hdl_t *recv_cq_p,
+	    ib_qpn_t *qpn_p, ibc_qp_hdl_t *qp_p);
 	ibt_status_t (*ibc_free_qp)(ibc_hca_hdl_t hca, ibc_qp_hdl_t qp,
 	    ibc_free_qp_flags_t free_qp_flags, ibc_qpn_hdl_t *qpnh_p);
 	ibt_status_t (*ibc_release_qpn)(ibc_hca_hdl_t hca, ibc_qpn_hdl_t qpnh);
@@ -276,9 +282,12 @@ typedef struct ibc_operations_s {
 	    ibt_cq_attr_t *attr_p, ibc_cq_hdl_t *cq_p, uint_t *actual_size);
 	ibt_status_t (*ibc_free_cq)(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq);
 	ibt_status_t (*ibc_query_cq)(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq,
-	    uint_t *entries);
+	    uint_t *entries, uint_t *count_p, uint_t *usec_p,
+	    ibt_cq_handler_id_t *hid_p);
 	ibt_status_t (*ibc_resize_cq)(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq,
 	    uint_t size, uint_t *actual_size);
+	ibt_status_t (*ibc_modify_cq)(ibc_hca_hdl_t hca, ibc_cq_hdl_t cq,
+	    uint_t count, uint_t usec, ibt_cq_handler_id_t hid);
 	ibt_status_t (*ibc_alloc_cq_sched)(ibc_hca_hdl_t hca,
 	    ibt_cq_sched_flags_t flags, ibc_cq_handler_attr_t *handler_attrs_p);
 	ibt_status_t (*ibc_free_cq_sched)(ibc_hca_hdl_t hca,
@@ -367,6 +376,11 @@ typedef struct ibc_operations_s {
 	    ib_memlen_t *paddr_offset_p, ibc_ma_hdl_t *ma_hdl_p);
 	ibt_status_t (*ibc_unmap_mem_area)(ibc_hca_hdl_t hca_hdl,
 	    ibc_ma_hdl_t ma_hdl);
+	ibt_status_t (*ibc_map_mem_iov)(ibc_hca_hdl_t hca_hdl,
+	    ibt_iov_attr_t *iov_attr, ibt_all_wr_t *wr,
+	    ibc_mi_hdl_t *mi_hdl);
+	ibt_status_t (*ibc_unmap_mem_iov)(ibc_hca_hdl_t hca_hdl,
+	    ibc_mi_hdl_t mi_hdl);
 
 	/* Allocate L_Key */
 	ibt_status_t (*ibc_alloc_lkey)(ibc_hca_hdl_t hca_hdl, ibc_pd_hdl_t pd,
@@ -394,6 +408,25 @@ typedef struct ibc_operations_s {
 	    void *ibtl_reserved, ibc_mr_hdl_t *mr_hdl_p,
 	    ibt_pmr_desc_t *mem_desc_p);
 	ibt_status_t (*ibc_deregister_fmr)(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr);
+
+	/* IO memory management */
+	ibt_status_t (*ibc_alloc_io_mem)(ibc_hca_hdl_t hca_hdl, size_t size,
+	    ibt_mr_flags_t mr_flag, caddr_t *kaddrp,
+	    ibc_mem_alloc_hdl_t *mem_alloc_hdl);
+	ibt_status_t (*ibc_free_io_mem)(ibc_hca_hdl_t hca_hdl,
+	    ibc_mem_alloc_hdl_t mem_alloc_hdl);
+
+	/* Extended RC (XRC) */
+	ibt_status_t (*ibc_alloc_xrc_domain)();
+	ibt_status_t (*ibc_free_xrc_domain)();
+	ibt_status_t (*ibc_alloc_xrc_srq)();
+	ibt_status_t (*ibc_free_xrc_srq)();
+	ibt_status_t (*ibc_query_xrc_srq)();
+	ibt_status_t (*ibc_modify_xrc_srq)();
+	ibt_status_t (*ibc_alloc_xrc_tgt_qp)();
+	ibt_status_t (*ibc_free_xrc_tgt_qp)();
+	ibt_status_t (*ibc_query_xrc_tgt_qp)();
+	ibt_status_t (*ibc_modify_xrc_tgt_qp)();
 } ibc_operations_t;
 
 

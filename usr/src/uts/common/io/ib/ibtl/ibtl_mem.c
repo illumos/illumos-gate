@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/ibtl/impl/ibtl.h>
 
@@ -571,6 +569,127 @@ ibt_unmap_mem_area(ibt_hca_hdl_t hca_hdl, ibt_ma_hdl_t ma_hdl)
 	return (status);
 }
 
+/*
+ * Function:
+ *	ibt_map_mem_iov()
+ * Input:
+ *      hca_hdl		HCA Handle
+ *	iov_attr	A pointer to an ibt_iov_attr_t that describes the
+ *			virtual ranges to be translated.
+ * Output:
+ *	wr		A pointer to the work request where the output
+ *			sgl (reserved_lkey, size, paddr) will be written.
+ *	mi_hdl_p	Memory IOV Handle.
+ * Returns:
+ *      IBT_SUCCESS
+ * Description:
+ * 	Translate an array of virtual address ranges into HCA physical
+ *	addresses, sizes, and reserved_lkey.
+ */
+ibt_status_t
+ibt_map_mem_iov(ibt_hca_hdl_t hca_hdl, ibt_iov_attr_t *iov_attr,
+    ibt_all_wr_t *wr, ibt_mi_hdl_t *mi_hdl_p)
+{
+	ibt_status_t 	status;
+
+	IBTF_DPRINTF_L3(ibtl_mem, "ibt_map_mem_iov(%p, %p, %p)",
+	    hca_hdl, iov_attr, wr);
+
+	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_map_mem_iov(
+	    IBTL_HCA2CIHCA(hca_hdl), iov_attr, wr, mi_hdl_p);
+	if (status == IBT_SUCCESS) {
+		mutex_enter(&hca_hdl->ha_mutex);
+		hca_hdl->ha_ma_cnt++;
+		mutex_exit(&hca_hdl->ha_mutex);
+	}
+
+	return (status);
+}
+
+
+/*
+ * Function:
+ *	ibt_unmap_mem_iov()
+ * Input:
+ *      hca_hdl		HCA Handle
+ *	mi_hdl		Memory IOV Handle.
+ * Output:
+ *	None.
+ * Returns:
+ *      IBT_SUCCESS
+ * Description:
+ * 	Un pin physical pages pinned during an ibt_map_mem_iov() call.
+ */
+ibt_status_t
+ibt_unmap_mem_iov(ibt_hca_hdl_t hca_hdl, ibt_mi_hdl_t mi_hdl)
+{
+	ibt_status_t 	status;
+
+	IBTF_DPRINTF_L3(ibtl_mem, "ibt_unmap_mem_iov(%p, %p)",
+	    hca_hdl, mi_hdl);
+
+	status = (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_unmap_mem_iov(
+	    IBTL_HCA2CIHCA(hca_hdl), mi_hdl));
+	if (status == IBT_SUCCESS) {
+		mutex_enter(&hca_hdl->ha_mutex);
+		hca_hdl->ha_ma_cnt--;
+		mutex_exit(&hca_hdl->ha_mutex);
+	}
+
+	return (status);
+}
+
+/*
+ * Function:
+ *	ibt_alloc_io_mem()
+ * Input:
+ *      hca_hdl		HCA Handle
+ *	size		Number of bytes to allocate
+ *	mr_flag		Possible values: IBT_MR_SLEEP, IBT_MR_NONCOHERENT
+ * Output:
+ *     	kaddrp 		Contains pointer to the virtual address of the
+ *			memory allocated by this call.  (Set to NULL if
+ *			memory allocation fails).
+ *	mem_alloc_hdl	Memory access handle returned by ibt_mem_alloc()
+ *
+ * Returns:
+ *      IBT_SUCCESS
+ *	IBT_INSUFF_RESOURCE
+ * 	IBT_HCA_HDL_INVALID
+ *	IBT_MR_ACCESS_REQ_INVALID
+ *	IBT_INVALID_PARAM
+ * Description:
+ *	Wrapper for ddi_dma_mem_alloc()
+ */
+ibt_status_t
+ibt_alloc_io_mem(ibt_hca_hdl_t hca_hdl, size_t size, ibt_mr_flags_t mr_flag,
+    caddr_t *kaddrp, ibt_mem_alloc_hdl_t *mem_alloc_hdl)
+{
+	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_alloc_io_mem(
+	    IBTL_HCA2CIHCA(hca_hdl), size, mr_flag, kaddrp,
+	    (ibc_mem_alloc_hdl_t *)mem_alloc_hdl));
+}
+
+/*
+ * Function:
+ *	ibt_free_io_mem()
+ * Input:
+ *      hca_hdl		HCA Handle
+ *	mem_alloc_hdl	Memory access handle returned by ibt_mem_alloc()
+ * Output:
+ *	None
+ *
+ * Returns:
+ *      IBT_SUCCESS
+ * Description:
+ *	Wrapper for ddi_dma_mem_free()
+ */
+ibt_status_t
+ibt_free_io_mem(ibt_hca_hdl_t hca_hdl, ibt_mem_alloc_hdl_t mem_alloc_hdl)
+{
+	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_free_io_mem(
+	    IBTL_HCA2CIHCA(hca_hdl), (ibc_mem_alloc_hdl_t)mem_alloc_hdl));
+}
 
 /*
  * Function:

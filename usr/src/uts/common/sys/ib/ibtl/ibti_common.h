@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_IB_IBTL_IBTI_COMMON_H
 #define	_SYS_IB_IBTL_IBTI_COMMON_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibti_common.h
@@ -59,7 +57,9 @@ extern "C" {
 /* Transport Interface version */
 typedef enum ibt_version_e {
 	IBTI_V1 = 1,
-	IBTI_V2 = 2		/* FMR Support */
+	IBTI_V2 = 2,		/* FMR Support */
+	IBTI_V3 = 3,
+	IBTI_V_CURR = IBTI_V3
 } ibt_version_t;
 
 /*
@@ -106,8 +106,9 @@ typedef struct ibt_async_event_s {
 	ibt_channel_hdl_t	ev_chan_hdl;		/* Channel handle */
 	ibt_cq_hdl_t		ev_cq_hdl;		/* CQ handle */
 	ib_guid_t		ev_hca_guid;		/* HCA node GUID */
-	uint8_t			ev_port;		/* HCA port */
 	ibt_srq_hdl_t		ev_srq_hdl;		/* SRQ handle */
+	ibt_port_change_t	ev_port_flags;		/* Port Change flags */
+	uint8_t			ev_port;		/* HCA port */
 } ibt_async_event_t;
 
 /*
@@ -235,6 +236,9 @@ typedef struct ibt_cq_sched_attr_s {
  *	client driver that registered the function.
  */
 typedef void (*ibt_cq_handler_t)(ibt_cq_hdl_t ibt_cq, void *arg);
+
+/* default CQ handler ID */
+#define	IBT_CQ_HID_DEFAULT	(1)
 
 /*
  * Service Data and flags.
@@ -1144,13 +1148,23 @@ ibt_status_t ibt_poll_cq(ibt_cq_hdl_t ibt_cq, ibt_wc_t *work_completions,
  * ibt_query_cq()
  *	Return the total number of entries in the CQ.
  */
-ibt_status_t ibt_query_cq(ibt_cq_hdl_t ibt_cq, uint_t *entries);
+ibt_status_t ibt_query_cq(ibt_cq_hdl_t ibt_cq, uint_t *entries,
+    uint_t *count_p, uint_t *usec_p, ibt_cq_handler_id_t *hid_p);
 
 /*
  * ibt_resize_cq()
  *	Change the size of a CQ.
  */
 ibt_status_t ibt_resize_cq(ibt_cq_hdl_t ibt_cq, uint_t new_sz, uint_t *real_sz);
+
+/*
+ * ibt_modify_cq()
+ *	Change the interrupt moderation values of a CQ.
+ *	"count" is number of completions before interrupting.
+ *	"usec" is the number of microseconds before interrupting.
+ */
+ibt_status_t ibt_modify_cq(ibt_cq_hdl_t ibt_cq, uint_t count, uint_t usec,
+    ibt_cq_handler_id_t hid);
 
 /*
  * ibt_set_cq_private()
@@ -1288,6 +1302,13 @@ ibt_status_t ibt_map_mem_area(ibt_hca_hdl_t hca_hdl, ibt_va_attr_t *va_attrs,
  *	Un pin physical pages pinned during an ibt_map_mem_area() call.
  */
 ibt_status_t ibt_unmap_mem_area(ibt_hca_hdl_t hca_hdl, ibt_ma_hdl_t ma_hdl);
+
+/* ibt_map_mem_iov() */
+ibt_status_t ibt_map_mem_iov(ibt_hca_hdl_t hca_hdl,
+    ibt_iov_attr_t *iov_attr, ibt_all_wr_t *wr, ibt_mi_hdl_t *mi_hdl);
+
+/* ibt_unmap_mem_iov() */
+ibt_status_t ibt_unmap_mem_iov(ibt_hca_hdl_t hca_hdl, ibt_mi_hdl_t mi_hdl);
 
 /*
  * Work Request Functions
@@ -1861,6 +1882,16 @@ ibt_status_t ibt_get_port_state(ibt_hca_hdl_t hca_hdl, uint8_t port,
 
 ibt_status_t ibt_get_port_state_byguid(ib_guid_t hca_guid, uint8_t port,
     ib_gid_t *sgid_p, ib_lid_t *base_lid_p);
+
+/*
+ * ibt_alloc_io_mem()
+ * ibt_free_io_mem()
+ *	Allocate and deallocate dma-able memory.
+ */
+ibt_status_t ibt_alloc_io_mem(ibt_hca_hdl_t, size_t, ibt_mr_flags_t,
+    caddr_t *, ibt_mem_alloc_hdl_t *);
+
+ibt_status_t ibt_free_io_mem(ibt_hca_hdl_t, ibt_mem_alloc_hdl_t);
 
 #ifdef __cplusplus
 }

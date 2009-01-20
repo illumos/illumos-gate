@@ -67,6 +67,7 @@ cmd/cmd-inet/usr.sbin/bootconfchk
 ../closed/uts/common/sys/ib/adapters/hermon/hermon_cmd.h
 ../closed/uts/common/sys/ib/adapters/hermon/hermon_cq.h
 ../closed/uts/common/sys/ib/adapters/hermon/hermon_event.h
+../closed/uts/common/sys/ib/adapters/hermon/hermon_fm.h
 ../closed/uts/common/sys/ib/adapters/hermon/hermon_hw.h
 ../closed/uts/common/sys/ib/adapters/hermon/hermon_misc.h
 ../closed/uts/common/sys/ib/adapters/hermon/hermon_mr.h

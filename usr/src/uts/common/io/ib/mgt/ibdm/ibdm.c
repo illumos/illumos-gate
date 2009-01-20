@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,7 @@ struct modlinkage ibdm_modlinkage = {
 };
 
 static ibt_clnt_modinfo_t ibdm_ibt_modinfo = {
-	IBTI_V2,
+	IBTI_V_CURR,
 	IBT_DM,
 	ibdm_event_hdlr,
 	NULL,

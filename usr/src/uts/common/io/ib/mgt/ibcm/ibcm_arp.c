@@ -582,6 +582,7 @@ ibcm_do_lifconf(struct lifconf *lifcp, uint_t *bufsizep)
 	lifn.lifn_count += 4;
 
 	bzero(lifcp, sizeof (struct lifconf));
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*lifcp))
 	lifcp->lifc_family = AF_UNSPEC;
 	lifcp->lifc_len = *bufsizep = lifn.lifn_count * sizeof (struct lifreq);
 	lifcp->lifc_buf = kmem_zalloc(*bufsizep, KM_SLEEP);

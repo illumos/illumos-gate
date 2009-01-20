@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,14 +23,12 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _DAT_ERROR_H_
 #define	_DAT_ERROR_H_
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -377,7 +374,10 @@ typedef enum dat_return_subtype
 	DAT_NAME_NOT_REGISTERED,
 	DAT_MAJOR_NOT_FOUND,
 	DAT_MINOR_NOT_FOUND,
-	DAT_THREAD_SAFETY_NOT_FOUND
+	DAT_THREAD_SAFETY_NOT_FOUND,
+
+	/* DAT_INVALID_PARAMETER Sun specific */
+	DAT_INVALID_RO_COOKIE
 
 } DAT_RETURN_SUBTYPE;
 

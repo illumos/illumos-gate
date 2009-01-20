@@ -374,7 +374,7 @@ static rdma_stat rib_chk_srv_ibaddr(struct netbuf *, int,
  * Registration with IBTF as a consumer
  */
 static struct ibt_clnt_modinfo_s rib_modinfo = {
-	IBTI_V2,
+	IBTI_V_CURR,
 	IBT_GENERIC,
 	rib_async_handler,	/* async event handler */
 	NULL,			/* Memory Region Handler */

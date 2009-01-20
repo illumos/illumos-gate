@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_IB_MGT_IBMF_IBMF_IMPL_H
 #define	_SYS_IB_MGT_IBMF_IBMF_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the IBMF implementation dependent structures and defines.
@@ -585,43 +583,6 @@ typedef struct _ibmf_state {
 } ibmf_state_t;
 _NOTE(MUTEX_PROTECTS_DATA(ibmf_state_t::ibmf_mutex,
     ibmf_ci_t::ci_next))
-
-/*
- * Endian macros for swapping ib_mad_hdr components.  These are used by both
- * ibmf and ibmf_saa.  MAD header fields only need to be swapped, so in-place
- * swapping using these #defines is better.  However, the SA header and data
- * portions need to be unpacked as well (they can have unaligned 64-bit fields).
- * So the ibmf_utils pack, unpack functions are used for swapping and unpacking
- * the data portions of ibmf_saa messages.
- * The macros below are copied from the ibtl macros.
- */
-
-/*
- * Endian Macros
- *    h2b - host endian to big endian protocol
- *    b2h - big endian protocol to host endian
- *    h2l - host endian to little endian protocol
- *    l2h - little endian protocol to host endian
- */
-#if defined(_LITTLE_ENDIAN)
-#define	h2b16(x)	(htons(x))
-#define	h2b32(x)	(htonl(x))
-#define	h2b64(x)	(ddi_swap64(x))
-#define	b2h16(x)	(ntohs(x))
-#define	b2h32(x)	(ntohl(x))
-#define	b2h64(x)	(ddi_swap64(x))
-
-#elif defined(_BIG_ENDIAN)
-#define	h2b16(x)	(x)
-#define	h2b32(x)	(x)
-#define	h2b64(x)	(x)
-#define	b2h16(x)	(x)
-#define	b2h32(x)	(x)
-#define	b2h64(x)	(x)
-
-#else
-#error	One of _LITTLE_ENDIAN or _BIG_ENDIAN must be defined
-#endif
 
 /* UD Destination resource cache definitions */
 /*

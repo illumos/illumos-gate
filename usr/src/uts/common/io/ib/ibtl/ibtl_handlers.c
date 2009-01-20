@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1092,7 +1092,7 @@ ibtl_cq_handler_call(ibtl_cq_t *ibtl_cq)
 
 	IBTF_DPRINTF_L4(ibtf_handlers, "ibtl_cq_handler_call(%p)", ibtl_cq);
 
-	mutex_enter(&ibtl_cq->cq_mutex);
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*ibtl_cq))
 	cq_handler = ibtl_cq->cq_comp_handler;
 	arg = ibtl_cq->cq_arg;
 	if (cq_handler != NULL)
@@ -1100,7 +1100,6 @@ ibtl_cq_handler_call(ibtl_cq_t *ibtl_cq)
 	else
 		IBTF_DPRINTF_L2(ibtf_handlers, "ibtl_cq_handler_call: "
 		    "no cq_handler for cq %p", ibtl_cq);
-	mutex_exit(&ibtl_cq->cq_mutex);
 }
 
 /*
@@ -1280,10 +1279,9 @@ ibt_set_cq_handler(ibt_cq_hdl_t ibtl_cq, ibt_cq_handler_t completion_handler,
 	IBTF_DPRINTF_L3(ibtf_handlers, "ibt_set_cq_handler(%p, %p, %p)",
 	    ibtl_cq, completion_handler, arg);
 
-	mutex_enter(&ibtl_cq->cq_mutex);
+	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*ibtl_cq))
 	ibtl_cq->cq_comp_handler = completion_handler;
 	ibtl_cq->cq_arg = arg;
-	mutex_exit(&ibtl_cq->cq_mutex);
 }
 
 
