@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -865,6 +865,10 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 				ADD_NODE(PICL_CLASS_RPM_SENSOR)
 				add_prop(nodeh, &proph, node_name, row,
 				    PP_SPEED, snmp_syserr_p);
+			} else if (sensor_type == SSST_HUMIDITY) {
+				ADD_NODE(PICL_CLASS_HUMIDITY_SENSOR)
+				add_prop(nodeh, &proph, node_name, row,
+				    PP_HUMIDITY, snmp_syserr_p);
 			} else {
 				ADD_NODE(PICL_CLASS_SENSOR)
 				add_prop(nodeh, &proph, node_name, row,
@@ -902,6 +906,8 @@ make_node(picl_nodehdl_t subtree_root, int row, int *snmp_syserr_p)
 				ADD_NODE(PICL_CLASS_RPM_INDICATOR)
 			} else if (sensor_type == SSST_PRESENCE) {
 				ADD_NODE(PICL_CLASS_PRESENCE_INDICATOR)
+			} else if (sensor_type == SSST_HUMIDITY) {
+				ADD_NODE(PICL_CLASS_HUMIDITY_INDICATOR)
 			} else {
 				ADD_NODE(PICL_CLASS_INDICATOR)
 			}

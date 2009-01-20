@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,6 +128,8 @@ extern "C" {
 #define	PICL_CLASS_SENSOR		"sensor"
 #define	PICL_CLASS_STACK		"stack"
 #define	PICL_CLASS_UNKNOWN		"unknown"
+#define	PICL_CLASS_HUMIDITY_SENSOR	"humidity-sensor"
+#define	PICL_CLASS_HUMIDITY_INDICATOR	"humidity-indicator"
 
 /*
  * Solaris driver property names
@@ -240,6 +242,7 @@ extern "C" {
 #define	PICL_PROP_BASE_UNITS			"BaseUnits"
 #define	PICL_PROP_EXPONENT			"Exponent"
 #define	PICL_PROP_RATE_UNITS			"RateUnits"
+#define	PICL_PROP_HUMIDITY			"Humidity"
 
 /*
  * Various threshold property names

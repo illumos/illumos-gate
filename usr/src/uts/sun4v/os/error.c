@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -279,19 +279,23 @@ process_nonresumable_error(struct regs *rp, uint64_t flags,
 			}
 			/*
 			 * Context Register Parity - for reload of secondary
-			 * context register, see nonresumable_error.  Note
-			 * that 'size' for CRP denotes a sense of version,
-			 * so if it's out of range, then just let it fall
-			 * through and be processed later.
+			 * context register, see nonresumable_error.
 			 */
 			if ((errh_flt.errh_er.attr & ERRH_ATTR_ASI) &&
-			    (errh_flt.errh_er.asi == ASI_MMU_CTX) &&
-			    (errh_flt.errh_er.addr >= MMU_PCONTEXT0) &&
-			    (errh_flt.errh_er.addr + errh_flt.errh_er.sz <=
-			    MMU_SCONTEXT1 + sizeof (uint64_t))) {
+			    (errh_flt.errh_er.asi == ASI_MMU_CTX)) {
 
 				if (aflt->flt_tl)	/* TL>0, so panic */
 					break;
+
+				/* Panic on unknown context registers */
+				if (errh_flt.errh_er.addr < MMU_PCONTEXT0 ||
+				    errh_flt.errh_er.addr + errh_flt.errh_er.sz
+				    > MMU_SCONTEXT1 + sizeof (uint64_t)) {
+					cmn_err(CE_WARN, "Parity error on "
+					    "unknown context register\n");
+					aflt->flt_panic = 1;
+					break;
+				}
 
 				u_kill = 0;		/* do not terminate */
 				break;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,7 @@
 #include <sys/hypervisor_api.h>
 #include <sys/rock_hypervisor_api.h>
 #include <sys/hsvc.h>
+#include <vm/hat_sfmmu.h>
 
 uint_t root_phys_addr_lo_mask = 0xffffffffU;
 uint8_t	enable_tm = 1;
@@ -86,6 +87,11 @@ cpu_setup(void)
 	 * routine.
 	 */
 	cpu_setup_common(NULL);
+
+	/*
+	 * Rock's max nctxs is 64K. Set it accordingly.
+	 */
+	nctxs = MAX_NCTXS;
 
 	/*
 	 * Rock I$ is non-coherent.

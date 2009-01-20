@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -108,6 +106,8 @@ static void sun4v_env_print_current_sensors();
 static void sun4v_env_print_current_indicators();
 static void sun4v_env_print_voltage_sensors();
 static void sun4v_env_print_voltage_indicators();
+static void sun4v_env_print_humidity_sensors();
+static void sun4v_env_print_humidity_indicators();
 static void sun4v_env_print_LEDs();
 static void sun4v_print_fru_status();
 static void sun4v_print_fw_rev();
@@ -1100,6 +1100,16 @@ sun4v_disp_env_status()
 
 	class_node_found = 0;
 	all_status_ok = 1;
+	sun4v_env_print_humidity_sensors();
+	exit_code |= (!all_status_ok);
+
+	class_node_found = 0;
+	all_status_ok = 1;
+	sun4v_env_print_humidity_indicators();
+	exit_code |= (!all_status_ok);
+
+	class_node_found = 0;
+	all_status_ok = 1;
 	sun4v_env_print_LEDs();
 	exit_code |= (!all_status_ok);
 
@@ -1721,6 +1731,68 @@ sun4v_env_print_voltage_indicators()
 	    "-----------\n");
 	(void) picl_walk_tree_by_class(phyplatformh,
 	    PICL_CLASS_VOLTAGE_INDICATOR,
+	    (void *)PICL_PROP_CONDITION,
+	    sun4v_env_print_indicator_callback);
+}
+
+static void
+sun4v_env_print_humidity_sensors()
+{
+	char *fmt = "%-34s %-14s %-10s\n";
+	(void) picl_walk_tree_by_class(phyplatformh,
+	    PICL_CLASS_HUMIDITY_SENSOR,
+	    (void *)PICL_PROP_HUMIDITY,
+	    sun4v_env_print_sensor_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\nHumidity sensors:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+		    PICL_CLASS_HUMIDITY_SENSOR,
+		    PICL_PROP_HUMIDITY, sun4v_env_print_sensor_callback);
+		if (all_status_ok) {
+			log_printf("All humidity sensors are OK.\n");
+			return;
+		}
+	}
+	log_printf("-------------------------------------------------"
+	    "-----------\n");
+	log_printf(fmt, "Location", "Sensor", "Status", 0);
+	log_printf("-------------------------------------------------"
+	    "-----------\n");
+	(void) picl_walk_tree_by_class(phyplatformh,
+	    PICL_CLASS_HUMIDITY_SENSOR,
+	    (void *)PICL_PROP_HUMIDITY,
+	    sun4v_env_print_sensor_callback);
+}
+
+static void
+sun4v_env_print_humidity_indicators()
+{
+	char *fmt = "%-34s %-14s %-8s\n";
+	(void) picl_walk_tree_by_class(phyplatformh,
+	    PICL_CLASS_HUMIDITY_INDICATOR,
+	    (void *)PICL_PROP_CONDITION,
+	    sun4v_env_print_indicator_callback);
+	if (!class_node_found)
+		return;
+	log_printf("\nHumidity indicators:\n");
+	if (syserrlog == 0) {
+		(void) picl_walk_tree_by_class(phyplatformh,
+		    PICL_CLASS_HUMIDITY_INDICATOR, (void *)PICL_PROP_CONDITION,
+		    sun4v_env_print_indicator_callback);
+		if (all_status_ok) {
+			log_printf("All humidity indicators are OK.\n");
+			return;
+		}
+	}
+	log_printf("-------------------------------------------------"
+	    "-----------\n");
+	log_printf(fmt, "Location", "Indicator", "Condition", 0);
+	log_printf("-------------------------------------------------"
+	    "-----------\n");
+	(void) picl_walk_tree_by_class(phyplatformh,
+	    PICL_CLASS_HUMIDITY_INDICATOR,
 	    (void *)PICL_PROP_CONDITION,
 	    sun4v_env_print_indicator_callback);
 }

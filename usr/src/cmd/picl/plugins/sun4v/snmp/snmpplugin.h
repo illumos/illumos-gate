@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SNMPPLUGIN_H
 #define	_SNMPPLUGIN_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -113,7 +111,8 @@ typedef enum {
 	PP_MFG_NAME,
 	PP_MODEL_NAME,
 	PP_DESCRIPTION,
-	PP_LABEL
+	PP_LABEL,
+	PP_HUMIDITY
 } sp_propid_t;
 
 /*

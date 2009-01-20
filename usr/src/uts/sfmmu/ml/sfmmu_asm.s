@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1397,6 +1397,12 @@ sfmmu_kpm_unload_tsb(caddr_t addr, int vpshift)
 	flush	%o0
 	add     %o0, I_SIZE, %o0
 	st      %o1, [%o0]		! nop 4th instruction
+	flush	%o0
+	add     %o0, I_SIZE, %o0
+	st      %o1, [%o0]		! nop 5th instruction
+	flush	%o0
+	add     %o0, I_SIZE, %o0
+	st      %o1, [%o0]		! nop 6th instruction
 	retl
 	flush	%o0
 #endif /* sun4u */

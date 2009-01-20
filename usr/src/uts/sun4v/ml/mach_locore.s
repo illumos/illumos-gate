@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -795,16 +795,25 @@ have_win:
 	mov	MMU_PCONTEXT, %g1
 	stxa	%g2, [%g1]ASI_MMU_CTX
 	!
-	! If shared context support is not enabled, then the next four
+	! If shared context support is not enabled, then the next six
 	! instructions will be patched with nop instructions.
 	!
 	.global sfmmu_shctx_user_rtt_patch
 sfmmu_shctx_user_rtt_patch:
+	!
+	! On processors which support multiple contexts, writing to
+	! pcontext0 automatically updates pcontext1 for backwards
+	! compatibility. So, if scontext0 & scontext1 are the same
+	! a write to pcontext0 is sufficient.
+	!
 	mov	MMU_SCONTEXT1, %g1
-	ldxa	[%g1]ASI_MMU_CTX, %g2
-	mov	MMU_PCONTEXT1, %g1
-	stxa	%g2, [%g1]ASI_MMU_CTX
-	
+	ldxa	[%g1]ASI_MMU_CTX, %g3
+	cmp	%g2, %g3
+	beq,pt	%xcc, no_pctx1_update
+	  mov	MMU_PCONTEXT1, %g1
+	stxa	%g3, [%g1]ASI_MMU_CTX
+
+no_pctx1_update:
 	! Ensure new ctxs take effect by the time the "retry" (below) completes
 	membar	#Sync
 	

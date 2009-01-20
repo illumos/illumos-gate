@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -609,6 +609,7 @@ typedef struct mmu_ctx {
 
 extern uint_t		max_mmu_ctxdoms;
 extern mmu_ctx_t	**mmu_ctxs_tbl;
+extern uint_t		nctxs;
 
 extern void	sfmmu_cpu_init(cpu_t *);
 extern void	sfmmu_cpu_cleanup(cpu_t *);

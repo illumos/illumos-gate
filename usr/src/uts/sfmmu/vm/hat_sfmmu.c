@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -579,7 +579,7 @@ mmu_ctx_t	**mmu_ctxs_tbl;		/* global array of context domains */
 uint64_t	mmu_saved_gnum = 0;	/* to init incoming MMUs' gnums */
 
 #define	DEFAULT_NUM_CTXS_PER_MMU 8192
-static uint_t	nctxs = DEFAULT_NUM_CTXS_PER_MMU;
+uint_t	nctxs = DEFAULT_NUM_CTXS_PER_MMU;
 
 int		cache;			/* describes system cache */
 
