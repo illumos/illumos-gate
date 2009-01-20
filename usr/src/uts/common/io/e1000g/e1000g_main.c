@@ -1394,7 +1394,11 @@ e1000g_init(struct e1000g *Adapter)
 	 * Restore LED settings to the default from EEPROM
 	 * to meet the standard for Sun platforms.
 	 */
-	(void) e1000_cleanup_led(hw);
+	if ((hw->mac.type != e1000_82541) &&
+	    (hw->mac.type != e1000_82541_rev_2) &&
+	    (hw->mac.type != e1000_82547) &&
+	    (hw->mac.type != e1000_82547_rev_2))
+		(void) e1000_cleanup_led(hw);
 
 	/* Disable Smart Power Down */
 	phy_spd_state(hw, B_FALSE);
