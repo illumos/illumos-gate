@@ -1,5 +1,5 @@
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -134,7 +134,10 @@ pkg_drvadd() {
 			CMD="${CMD} -${OPT} \"${OPTARG}\""
 			;;
 		# update_drv accepts adding an existing alias without complaint
-		i)
+		i)	if [ ${CHECK_ADD} -eq 1 ]; then
+				CMD="${CMD} -a"
+				CHECK_ADD=0
+			fi
 			CMD="${CMD} -${OPT} '${OPTARG}'"
 			;;
 		\?)	echo "pkg_drvadd(): Unsupported option -${OPT}"
