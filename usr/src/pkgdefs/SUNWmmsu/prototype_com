@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -121,6 +121,9 @@ f none usr/lib/mms/dm/llib-lHP_Ultrium_3-SCSI.ln 0644 root bin
 f none usr/lib/mms/dm/libSUNW_DISK_ARCHIVING.so.1 0755 root bin
 s none usr/lib/mms/dm/libSUNW_DISK_ARCHIVING.so=libSUNW_DISK_ARCHIVING.so.1
 f none usr/lib/mms/dm/llib-lSUNW_DISK_ARCHIVING.ln 0644 root bin
+
+f none usr/lib/mms/dm/libQUANTUM_SDLT600.so 0755 root bin
+f none usr/lib/mms/dm/llib-lQUANTUM_SDLT600.ln 0644 root bin
 
 d none usr/lib/mms/lm 0755 root bin
 f none usr/lib/mms/lm/libDISK.so.1 0755 root other

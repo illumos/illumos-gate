@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,6 +227,7 @@ int drv_prsv_release(void);
 int drv_prsv_reserve(void);
 int drv_read(char *buf, int len);
 int drv_read_tm(void);
+int drv_read_attribute(uchar_t *buf, int32_t len, int servact, int32_t attr);
 int drv_rebind_target(void);
 int drv_release(void);
 int drv_req_sense(int len);

@@ -18,49 +18,12 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
-include ../../Makefile.lib
+include ../Makefile.com
 
-SUBDIRS = \
-	libDISK_ARCHIVING \
-	libHP_Ultrium_3-SCSI \
-	libIBM_ULTRIUM-TD1 \
-	libIBM_ULTRIUM-TD2 \
-	libIBM_ULTRIUM-TD3 \
-	libIBM_ULTRIUM-TD4 \
-	libSEAGATE_ULTRIUM06242-XXX \
-	libSTK_9840 \
-	libSTK_T9840B \
-	libSTK_T9840C \
-	libSTK_T9940A \
-	libSTK_T9940B \
-	libdefault \
-	libQUANTUM_SDLT600
-
-.KEEP_STATE:
-
-.PARALLEL:
-
-all := TARGET += all
-check := TARGET += check
-clean := TARGET += clean
-clobber := TARGET += clobber
-install := TARGET += install
-install_h := TARGET += install_h
-lint := TARGET += lint
-_msg := TARGET += _msg
-
-all check clean clobber install install_h lint: $(SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-include $(SRC)/lib/Makefile.targ
+install: all $(ROOTLIBS)

@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -577,6 +577,9 @@ typedef int		(drv_locate_t)(tapepos_t *);
 drv_locate_t		drv_locate;
 typedef int		(drv_log_sense_t)(uchar_t *, int, int, int);
 drv_log_sense_t		drv_log_sense;
+typedef int		(drv_read_attribute_t)(uchar_t *, int32_t, int,
+    int32_t);
+drv_read_attribute_t	drv_read_attribute;
 typedef int		(drv_blk_limit_t)(mms_blk_limit_t *);
 drv_blk_limit_t		drv_blk_limit;
 typedef int		(drv_reserve_t)(void);
@@ -656,6 +659,7 @@ typedef	struct	drv_jtab {
 	drv_mtrestpos_t		*drv_mtrestpos;
 	drv_locate_t		*drv_locate;
 	drv_log_sense_t		*drv_log_sense;
+	drv_read_attribute_t	*drv_read_attribute;
 	drv_blk_limit_t		*drv_blk_limit;
 	drv_reserve_t		*drv_reserve;
 	drv_release_t		*drv_release;

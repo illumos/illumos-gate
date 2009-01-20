@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -263,6 +263,7 @@ dm_init_dev_lib(void *hdl, int init)
 	DM_INIT_JTAB(drv_get_capacity);
 	DM_INIT_JTAB(drv_get_avail_capacity);
 	DM_INIT_JTAB(drv_log_sense);
+	DM_INIT_JTAB(drv_read_attribute);
 	DM_INIT_JTAB(drv_bind_raw_dev);
 
 	/*

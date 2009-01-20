@@ -19,7 +19,7 @@
     information: Portions Copyright [yyyy] [name of copyright owner]
 
     CDDL HEADER END
-    Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
 -->
@@ -36,6 +36,7 @@
 	<mm_drive_string value="LTO2"/>
 	<mm_drive_string value="LTO3"/>
 	<mm_drive_string value="LTO4"/>
+	<mm_drive_string value="SDLT600"/>
     </mm_drive_list>
     <mm_cartridge_list>
 	<mm_cartridge_string value="DISK"/>
@@ -45,6 +46,7 @@
 	<mm_cartridge_string value="LTO2"/>
 	<mm_cartridge_string value="LTO3"/>
 	<mm_cartridge_string value="LTO4"/>
+	<mm_cartridge_string value="SDLT2"/>
     </mm_cartridge_list>
     <mm_library_list>
         <mm_library>
@@ -69,6 +71,7 @@
 			<mm_cartridgeshape name="LTO2"/>
 			<mm_cartridgeshape name="LTO3"/>
 			<mm_cartridgeshape name="LTO4"/>
+			<mm_cartridgeshape name="SDLT2"/>
 		</mm_cartridgeshape_list>
         </mm_library>
     </mm_library_list>
