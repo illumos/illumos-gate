@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,16 +22,14 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.15 v2007-12-10_dragonlake5 */
+/* IntelVersion: 1.18 v2008-10-7 */
 
 #ifndef _IGB_MANAGE_H
 #define	_IGB_MANAGE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,14 +44,15 @@ s32  e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
     struct e1000_host_mng_command_header *hdr);
 s32  e1000_mng_write_dhcp_info_generic(struct e1000_hw *hw,
     u8 *buffer, u16 length);
+bool e1000_enable_mng_pass_thru(struct e1000_hw *hw);
 
-typedef enum {
+enum e1000_mng_mode {
 	e1000_mng_mode_none = 0,
 	e1000_mng_mode_asf,
 	e1000_mng_mode_pt,
 	e1000_mng_mode_ipmi,
 	e1000_mng_mode_host_if_only
-} e1000_mng_mode;
+};
 
 #define	E1000_FACTPS_MNGCG    0x20000000
 

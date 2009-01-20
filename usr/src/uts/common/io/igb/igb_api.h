@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,16 +22,14 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.39 v2007-12-10_dragonlake5 */
+/* IntelVersion: 1.50 v2008-10-7 */
 
 #ifndef _IGB_API_H
 #define	_IGB_API_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,13 +38,15 @@ extern "C" {
 #include "igb_hw.h"
 
 extern void e1000_init_function_pointers_82575(struct e1000_hw *hw);
+extern void e1000_rx_fifo_flush_82575(struct e1000_hw *hw);
+extern void e1000_init_function_pointers_vf(struct e1000_hw *hw);
+extern void e1000_shutdown_fiber_serdes_link(struct e1000_hw *hw);
 
 s32 e1000_set_mac_type(struct e1000_hw *hw);
 s32 e1000_setup_init_funcs(struct e1000_hw *hw, bool init_device);
 s32 e1000_init_mac_params(struct e1000_hw *hw);
 s32 e1000_init_nvm_params(struct e1000_hw *hw);
 s32 e1000_init_phy_params(struct e1000_hw *hw);
-void e1000_remove_device(struct e1000_hw *hw);
 s32 e1000_get_bus_info(struct e1000_hw *hw);
 void e1000_clear_vfta(struct e1000_hw *hw);
 void e1000_write_vfta(struct e1000_hw *hw, u32 offset, u32 value);
@@ -79,6 +79,8 @@ s32 e1000_write_phy_reg(struct e1000_hw *hw, u32 offset, u16 data);
 s32 e1000_write_8bit_ctrl_reg(struct e1000_hw *hw, u32 reg,
     u32 offset, u8 data);
 s32 e1000_get_phy_info(struct e1000_hw *hw);
+void e1000_release_phy(struct e1000_hw *hw);
+s32 e1000_acquire_phy(struct e1000_hw *hw);
 s32 e1000_phy_hw_reset(struct e1000_hw *hw);
 s32 e1000_phy_commit(struct e1000_hw *hw);
 void e1000_power_up_phy(struct e1000_hw *hw);
@@ -96,7 +98,6 @@ s32 e1000_wait_autoneg(struct e1000_hw *hw);
 s32 e1000_set_d3_lplu_state(struct e1000_hw *hw, bool active);
 s32 e1000_set_d0_lplu_state(struct e1000_hw *hw, bool active);
 bool e1000_check_mng_mode(struct e1000_hw *hw);
-bool e1000_enable_mng_pass_thru(struct e1000_hw *hw);
 bool e1000_enable_tx_pkt_filtering(struct e1000_hw *hw);
 s32 e1000_mng_enable_host_if(struct e1000_hw *hw);
 s32 e1000_mng_host_if_write(struct e1000_hw *hw,
@@ -105,14 +106,6 @@ s32 e1000_mng_write_cmd_header(struct e1000_hw *hw,
     struct e1000_host_mng_command_header *hdr);
 s32 e1000_mng_write_dhcp_info(struct e1000_hw *hw,
     u8 *buffer, u16 length);
-#ifndef FIFO_WORKAROUND
-s32 e1000_fifo_workaround_82547(struct e1000_hw *hw, u16 length);
-void e1000_update_tx_fifo_head_82547(struct e1000_hw *hw, u32 length);
-void e1000_set_ttl_workaround_state_82541(struct e1000_hw *hw, bool state);
-bool e1000_ttl_workaround_enabled_82541(struct e1000_hw *hw);
-s32 e1000_igp_ttl_workaround_82547(struct e1000_hw *hw);
-#endif
-
 
 /*
  * TBI_ACCEPT macro definition:
@@ -133,11 +126,11 @@ s32 e1000_igp_ttl_workaround_82547(struct e1000_hw *hw);
  * Typical use:
  *  ...
  *  if (TBI_ACCEPT) {
- *	accept_frame = TRUE;
+ *	accept_frame = true;
  *	e1000_tbi_adjust_stats(adapter, MacAddress);
  *	frame_length--;
  *  } else {
- *	accept_frame = FALSE;
+ *	accept_frame = false;
  *  }
  *  ...
  */

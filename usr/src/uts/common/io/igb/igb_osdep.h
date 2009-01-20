@@ -1,17 +1,19 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at:
+ *	http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * When using or redistributing this file, you may do so under the
+ * License only. No other modification of this header is permitted.
+ *
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -20,12 +22,8 @@
  */
 
 /*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
- */
-
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms of the CDDL.
  */
 
 #ifndef	_IGB_OSDEP_H
@@ -56,25 +54,26 @@ extern "C" {
 
 #define	usec_delay(x)		drv_usecwait(x)
 #define	msec_delay(x)		drv_usecwait(x * 1000)
+#define	msec_delay_irq		msec_delay
 
 #ifdef IGB_DEBUG
 #define	DEBUGOUT(S)		IGB_DEBUGLOG_0(NULL, S)
 #define	DEBUGOUT1(S, A)		IGB_DEBUGLOG_1(NULL, S, A)
 #define	DEBUGOUT2(S, A, B)	IGB_DEBUGLOG_2(NULL, S, A, B)
 #define	DEBUGOUT3(S, A, B, C)	IGB_DEBUGLOG_3(NULL, S, A, B, C)
-#define	DEBUGFUNC(F)
 #else
 #define	DEBUGOUT(S)
 #define	DEBUGOUT1(S, A)
 #define	DEBUGOUT2(S, A, B)
 #define	DEBUGOUT3(S, A, B, C)
-#define	DEBUGFUNC(F)
 #endif
+
+#define	DEBUGFUNC(F)
 
 #define	OS_DEP(hw)		((struct igb_osdep *)((hw)->back))
 
-#define	FALSE		0
-#define	TRUE		1
+#define	false			B_FALSE
+#define	true			B_TRUE
 
 #define	CMD_MEM_WRT_INVALIDATE	0x0010	/* BIT_4 */
 #define	PCI_COMMAND_REGISTER	0x04
@@ -132,9 +131,16 @@ extern "C" {
 #define	E1000_READ_REG_ARRAY_DWORD(a, reg, offset)		\
 	E1000_READ_REG_ARRAY(a, reg, offset)
 
-#define	msec_delay_irq	msec_delay
+#define	UNREFERENCED_1PARAMETER(_p)		_NOTE(ARGUNUSED(_p))
+#define	UNREFERENCED_2PARAMETER(_p, _q)		_NOTE(ARGUNUSED(_p, _q))
+#define	UNREFERENCED_3PARAMETER(_p, _q, _r)	_NOTE(ARGUNUSED(_p, _q, _r))
+#define	UNREFERENCED_4PARAMETER(_p, _q, _r, _s)	_NOTE(ARGUNUSED(_p, _q, _r, _s))
+#define	UNREFERENCED_5PARAMETER(_p, _q, _r, _s, _t)	\
+	_NOTE(ARGUNUSED(_p, _q, _r, _s, _t))
 
-#define	UNREFERENCED_PARAMETER(x)	_NOTE(ARGUNUSED(x))
+#define	__le16		u16
+#define	__le32		u32
+#define	__le64		u64
 
 typedef	int8_t		s8;
 typedef	int16_t		s16;

@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +22,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "igb_sw.h"
 #include "igb_debug.h"
@@ -259,13 +257,14 @@ pci_dump(void *arg)
 	    pci_config_get16(handle, offset + PCIE_LINKSTS));
 
 	/* MSI-X Memory Space */
-	if (ddi_dev_regsize(igb->dip, 4, &mem_size) != DDI_SUCCESS) {
+	if (ddi_dev_regsize(igb->dip, IGB_ADAPTER_MSIXTAB, &mem_size) !=
+	    DDI_SUCCESS) {
 		igb_log(igb, "ddi_dev_regsize() failed");
 		return;
 	}
 
-	if ((ddi_regs_map_setup(igb->dip, 4, (caddr_t *)&base, 0, mem_size,
-	    &igb_regs_acc_attr, &acc_hdl)) != DDI_SUCCESS) {
+	if ((ddi_regs_map_setup(igb->dip, IGB_ADAPTER_MSIXTAB, (caddr_t *)&base,
+	    0, mem_size, &igb_regs_acc_attr, &acc_hdl)) != DDI_SUCCESS) {
 		igb_log(igb, "ddi_regs_map_setup() failed");
 		return;
 	}

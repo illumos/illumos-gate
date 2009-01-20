@@ -1,17 +1,19 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at:
+ *	http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * When using or redistributing this file, you may do so under the
+ * License only. No other modification of this header is permitted.
+ *
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -20,12 +22,8 @@
  */
 
 /*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
- */
-
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms of the CDDL.
  */
 
 #ifndef	_IGB_SW_H
@@ -88,14 +86,23 @@ extern "C" {
 #define	IGB_INTR_MSI			2
 #define	IGB_INTR_LEGACY			3
 
+#define	IGB_ADAPTER_REGSET		1	/* mapping adapter registers */
+#define	IGB_ADAPTER_MSIXTAB		4	/* mapping msi-x table */
+
 #define	IGB_NO_POLL			-1
 #define	IGB_NO_FREE_SLOT		-1
 
 #define	MAX_NUM_UNICAST_ADDRESSES	E1000_RAR_ENTRIES
 #define	MAX_NUM_MULTICAST_ADDRESSES	256
-#define	MAX_NUM_EITR			10
 #define	MAX_COOKIE			16
 #define	MIN_NUM_TX_DESC			2
+
+/*
+ * Number of settings for interrupt throttle rate (ITR).  There is one of
+ * these per msi-x vector and it needs to be the maximum of all silicon
+ * types supported by this driver.
+ */
+#define	MAX_NUM_EITR			25
 
 /*
  * Maximum values for user configurable parameters
@@ -110,7 +117,6 @@ extern "C" {
 #define	MAX_RX_INTR_ABS_DELAY		65535
 #define	MAX_TX_INTR_DELAY		65535
 #define	MAX_TX_INTR_ABS_DELAY		65535
-#define	MAX_INTR_THROTTLING		65535
 
 #define	MAX_RX_COPY_THRESHOLD		9216
 #define	MAX_TX_COPY_THRESHOLD		9216
@@ -131,7 +137,6 @@ extern "C" {
 #define	MIN_RX_INTR_ABS_DELAY		0
 #define	MIN_TX_INTR_DELAY		0
 #define	MIN_TX_INTR_ABS_DELAY		0
-#define	MIN_INTR_THROTTLING		0
 #define	MIN_RX_COPY_THRESHOLD		0
 #define	MIN_TX_COPY_THRESHOLD		0
 #define	MIN_TX_RECYCLE_THRESHOLD	MIN_NUM_TX_DESC
@@ -141,8 +146,6 @@ extern "C" {
 /*
  * Default values for user configurable parameters
  */
-#define	DEFAULT_TX_QUEUE_NUM		4
-#define	DEFAULT_RX_QUEUE_NUM		4
 #define	DEFAULT_TX_RING_SIZE		512
 #define	DEFAULT_RX_RING_SIZE		512
 #define	DEFAULT_RX_GROUP_NUM		1
@@ -153,7 +156,6 @@ extern "C" {
 #define	DEFAULT_RX_INTR_ABS_DELAY	0
 #define	DEFAULT_TX_INTR_DELAY		300
 #define	DEFAULT_TX_INTR_ABS_DELAY	0
-#define	DEFAULT_INTR_THROTTLING		200	/* In unit of 256 nsec */
 #define	DEFAULT_RX_COPY_THRESHOLD	128
 #define	DEFAULT_TX_COPY_THRESHOLD	512
 #define	DEFAULT_TX_RECYCLE_THRESHOLD	MAX_COOKIE
@@ -336,6 +338,33 @@ typedef struct link_list {
 #define	IGB_PROP_GET_INT(d, n)	ddi_prop_get_int(DDI_DEV_T_ANY, (d), \
 				    DDI_PROP_DONTPASS, (n), -1)
 
+
+/* capability/feature flags */
+#define	IGB_FLAG_HAS_DCA	(1 << 0) /* has Direct Cache Access */
+#define	IGB_FLAG_VMDQ_POOL	(1 << 1) /* has vmdq capability */
+#define	IGB_FLAG_NEED_CTX_IDX	(1 << 2) /* context descriptor needs index */
+
+/* function pointer for nic-specific functions */
+typedef void (*igb_nic_func_t)(struct igb *);
+
+/* adapter-specific info for each supported device type */
+typedef struct adapter_info {
+	/* limits */
+	uint32_t	max_rx_que_num;	/* maximum number of rx queues */
+	uint32_t	min_rx_que_num;	/* minimum number of rx queues */
+	uint32_t	def_rx_que_num;	/* default number of rx queues */
+	uint32_t	max_tx_que_num;	/* maximum number of tx queues */
+	uint32_t	min_tx_que_num;	/* minimum number of tx queues */
+	uint32_t	def_tx_que_num;	/* default number of tx queues */
+	uint32_t	max_intr_throttle; /* maximum interrupt throttle */
+	uint32_t	min_intr_throttle; /* minimum interrupt throttle */
+	uint32_t	def_intr_throttle; /* default interrupt throttle */
+	/* function pointers */
+	igb_nic_func_t	enable_intr;	/* enable adapter interrupts */
+	igb_nic_func_t	setup_msix;	/* set up msi-x vectors */
+	/* capabilities */
+	uint32_t	flags;		/* capability flags */
+} adapter_info_t;
 
 /*
  * Named Data (ND) Parameter Management Structure
@@ -620,6 +649,8 @@ typedef struct igb {
 	struct e1000_hw		hw;
 	struct igb_osdep	osdep;
 
+	adapter_info_t		*capab;		/* adapter capabilities */
+
 	uint32_t		igb_state;
 	link_state_t		link_state;
 	uint32_t		link_speed;
@@ -780,6 +811,9 @@ typedef struct igb_stat {
  * Function prototypes in e1000_osdep.c
  */
 void e1000_enable_pciex_master(struct e1000_hw *);
+void e1000_rar_clear(struct e1000_hw *hw, uint32_t);
+void e1000_rar_set_vmdq(struct e1000_hw *hw, const uint8_t *, uint32_t,
+    uint32_t, uint8_t);
 
 /*
  * Function prototypes in igb_buf.c

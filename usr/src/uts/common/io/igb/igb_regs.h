@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,16 +22,14 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.41 v2007-12-10_dragonlake5 */
+/* IntelVersion: 1.61 v2008-10-7 */
 
 #ifndef _IGB_REGS_H
 #define	_IGB_REGS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,6 +46,7 @@ extern "C" {
 #define	E1000_SCTL	0x00024  /* SerDes Control - RW */
 #define	E1000_FCAL	0x00028  /* Flow Control Address Low - RW */
 #define	E1000_FCAH	0x0002C  /* Flow Control Address High -RW */
+#define	E1000_FEXT	0x0002C  /* Future Extended - RW */
 #define	E1000_FEXTNVM	0x00028  /* Future Extended NVM - RW */
 #define	E1000_FCT	0x00030  /* Flow Control Type - RW */
 #define	E1000_CONNSW	0x00034  /* Copper/Fiber switch control - RW */
@@ -58,7 +57,6 @@ extern "C" {
 #define	E1000_IMS	0x000D0  /* Interrupt Mask Set - RW */
 #define	E1000_IMC	0x000D8  /* Interrupt Mask Clear - WO */
 #define	E1000_IAM	0x000E0  /* Interrupt Acknowledge Auto Mask */
-#define	E1000_IVAR	0x000E4  /* Interrupt Vector Allocation Register - RW */
 #define	E1000_RCTL	0x00100  /* Rx Control - RW */
 #define	E1000_FCTTV	0x00170  /* Flow Control Transmit Timer Value - RW */
 #define	E1000_TXCW	0x00178  /* Tx Configuration Word - RW */
@@ -70,6 +68,9 @@ extern "C" {
 #define	E1000_EIMC	0x01528  /* Ext. Interrupt Mask Clear - WO */
 #define	E1000_EIAC	0x0152C  /* Ext. Interrupt Auto Clear - RW */
 #define	E1000_EIAM	0x01530  /* Ext. Interrupt Ack Auto Clear Mask - RW */
+#define	E1000_GPIE	0x01514  /* General Purpose Interrupt Enable - RW */
+#define	E1000_IVAR0	0x01700  /* Interrupt Vector Allocation (array) - RW */
+#define	E1000_IVAR_MISC	0x01740 /* IVAR for "other" causes - RW */
 #define	E1000_TCTL	0x00400  /* Tx Control - RW */
 #define	E1000_TCTL_EXT	0x00404  /* Extended Tx Control - RW */
 #define	E1000_TIPG	0x00410  /* Tx Inter-packet gap -RW */
@@ -95,6 +96,12 @@ extern "C" {
 #define	E1000_SWDSTS	0x01044  /* SW Device Status - RW */
 #define	E1000_FRTIMER	0x01048  /* Free Running Timer - RW */
 #define	E1000_TCPTIMER	0x0104C  /* TCP Timer - RW */
+#define	E1000_VPDDIAG	0x01060  /* VPD Diagnostic - RO */
+#define	E1000_ICR_V2 0x01500  /* Interrupt Cause - new location - RC */
+#define	E1000_ICS_V2 0x01504  /* Interrupt Cause Set - new location - WO */
+#define	E1000_IMS_V2 0x01508  /* Interrupt Mask Set/Read - new location - RW */
+#define	E1000_IMC_V2 0x0150C  /* Interrupt Mask Clear - new location - WO */
+#define	E1000_IAM_V2 0x01510  /* Interrupt Ack Auto Mask - new location - RW */
 #define	E1000_ERT	0x02008  /* Early Rx Threshold - RW */
 #define	E1000_FCRTL	0x02160  /* Flow Control Receive Threshold Low - RW */
 #define	E1000_FCRTH	0x02168  /* Flow Control Receive Threshold High - RW */
@@ -108,6 +115,13 @@ extern "C" {
 #define	E1000_RDPUWD	0x025D4  /* DMA Rx Descriptor uC Data Write - RW */
 #define	E1000_RDPURD	0x025D8  /* DMA Rx Descriptor uC Data Read - RW */
 #define	E1000_RDPUCTL	0x025DC  /* DMA Rx Descriptor uC Control - RW */
+#define	E1000_PBDIAG	0x02458  /* Packet Buffer Diagnostic - RW */
+#define	E1000_RXPBS	0x02404  /* Rx Packet Buffer Size - RW */
+#define	E1000_RXCTL(_n)	(0x0C014 + (0x40 * (_n)))
+#define	E1000_RQDPC(_n)	(0x0C030 + (0x40 * (_n)))
+#define	E1000_TXCTL(_n)	(0x0E014 + (0x40 * (_n)))
+#define	E1000_RXCTL(_n)	(0x0C014 + (0x40 * (_n)))
+#define	E1000_RQDPC(_n)	(0x0C030 + (0x40 * (_n)))
 #define	E1000_RDTR	0x02820  /* Rx Delay Timer - RW */
 #define	E1000_RADV	0x0282C  /* Rx Interrupt Absolute Delay Timer - RW */
 /*
@@ -118,67 +132,75 @@ extern "C" {
  * Example usage:
  * E1000_RDBAL_REG(current_rx_queue)
  */
-#define	E1000_RDBAL(_n)	((_n) < 4	\
-	? (0x02800 + ((_n) * 0x100))	\
-	: (0x0C000 + ((_n) * 0x40)))
-#define	E1000_RDBAH(_n)	((_n) < 4	\
-	? (0x02804 + ((_n) * 0x100))	\
-	: (0x0C004 + ((_n) * 0x40)))
-#define	E1000_RDLEN(_n)	((_n) < 4	\
-	? (0x02808 + ((_n) * 0x100))	\
-	: (0x0C008 + ((_n) * 0x40)))
-#define	E1000_SRRCTL(_n)	((_n) < 4	\
-	? (0x0280C + ((_n) * 0x100))	\
-	: (0x0C00C + ((_n) * 0x40)))
-#define	E1000_RDH(_n)	((_n) < 4	\
-	? (0x02810 + ((_n) * 0x100))	\
-	: (0x0C010 + ((_n) * 0x40)))
-#define	E1000_RDT(_n)	((_n) < 4	\
-	? (0x02818 + ((_n) * 0x100))	\
-	: (0x0C018 + ((_n) * 0x40)))
-#define	E1000_RXDCTL(_n)	((_n) < 4	\
-	? (0x02828 + ((_n) * 0x100))	\
-	: (0x0C028 + ((_n) * 0x40)))
-#define	E1000_TDBAL(_n)	((_n) < 4	\
-	? (0x03800 + ((_n) * 0x100))	\
-	: (0x0E000 + ((_n) * 0x40)))
-#define	E1000_TDBAH(_n)	((_n) < 4	\
-	? (0x03804 + ((_n) * 0x100))	\
-	: (0x0E004 + ((_n) * 0x40)))
-#define	E1000_TDLEN(_n)	((_n) < 4	\
-	? (0x03808 + ((_n) * 0x100))	\
-	: (0x0E008 + ((_n) * 0x40)))
-#define	E1000_TDH(_n)	((_n) < 4	\
-	? (0x03810 + ((_n) * 0x100))	\
-	: (0x0E010 + ((_n) * 0x40)))
-#define	E1000_TDT(_n)	((_n) < 4	\
-	? (0x03818 + ((_n) * 0x100))	\
-	: (0x0E018 + ((_n) * 0x40)))
-#define	E1000_TXDCTL(_n)	((_n) < 4	\
-	? (0x03828 + ((_n) * 0x100))	\
-	: (0x0E028 + ((_n) * 0x40)))
-#define	E1000_TARC(_n)    (0x03840 + (_n << 8))
-#define	E1000_DCA_TXCTRL(_n) (0x03814 + (_n << 8))
-#define	E1000_DCA_RXCTRL(_n) (0x02814 + (_n << 8))
-#define	E1000_TDWBAL(_n)	((_n) < 4	\
-	? (0x03838 + ((_n) * 0x100))	\
-	: (0x0E038 + ((_n) * 0x40)))
-#define	E1000_TDWBAH(_n)	((_n) < 4	\
-	? (0x0383C + ((_n) * 0x100))	\
-	: (0x0E03C + ((_n) * 0x40)))
+#define	E1000_RDBAL(_n)		((_n) < 4 ?	\
+	(0x02800 + ((_n) * 0x100)) :	\
+	(0x0C000 + ((_n) * 0x40)))
+#define	E1000_RDBAH(_n)		((_n) < 4 ?	\
+	(0x02804 + ((_n) * 0x100)) :	\
+	(0x0C004 + ((_n) * 0x40)))
+#define	E1000_RDLEN(_n)		((_n) < 4 ?	\
+	(0x02808 + ((_n) * 0x100)) :	\
+	(0x0C008 + ((_n) * 0x40)))
+#define	E1000_SRRCTL(_n)	((_n) < 4 ?	\
+	(0x0280C + ((_n) * 0x100)) :	\
+	(0x0C00C + ((_n) * 0x40)))
+#define	E1000_RDH(_n)		((_n) < 4 ?	\
+	(0x02810 + ((_n) * 0x100)) :	\
+	(0x0C010 + ((_n) * 0x40)))
+#define	E1000_RDT(_n)		((_n) < 4 ?	\
+	(0x02818 + ((_n) * 0x100)) :	\
+	(0x0C018 + ((_n) * 0x40)))
+#define	E1000_RXDCTL(_n)	((_n) < 4 ?	\
+	(0x02828 + ((_n) * 0x100)) :	\
+	(0x0C028 + ((_n) * 0x40)))
+#define	E1000_TDBAL(_n)		((_n) < 4 ?	\
+	(0x03800 + ((_n) * 0x100)) :	\
+	(0x0E000 + ((_n) * 0x40)))
+#define	E1000_TDBAH(_n)		((_n) < 4 ?	\
+	(0x03804 + ((_n) * 0x100)) :	\
+	(0x0E004 + ((_n) * 0x40)))
+#define	E1000_TDLEN(_n)		((_n) < 4 ?	\
+	(0x03808 + ((_n) * 0x100)) :	\
+	(0x0E008 + ((_n) * 0x40)))
+#define	E1000_TDH(_n)		((_n) < 4 ?	\
+	(0x03810 + ((_n) * 0x100)) :	\
+	(0x0E010 + ((_n) * 0x40)))
+#define	E1000_TDT(_n)		((_n) < 4 ?	\
+	(0x03818 + ((_n) * 0x100)) :	\
+	(0x0E018 + ((_n) * 0x40)))
+#define	E1000_TXDCTL(_n)	((_n) < 4 ?	\
+	(0x03828 + ((_n) * 0x100)) :	\
+	(0x0E028 + ((_n) * 0x40)))
+#define	E1000_TARC(_n)		(0x03840 + (_n << 8))
+#define	E1000_DCA_TXCTRL(_n)	(0x03814 + (_n << 8))
+#define	E1000_DCA_RXCTRL(_n)	(0x02814 + (_n << 8))
+#define	E1000_TDWBAL(_n)	((_n) < 4 ?	\
+	(0x03838 + ((_n) * 0x100)) :	\
+	(0x0E038 + ((_n) * 0x40)))
+#define	E1000_TDWBAH(_n)	((_n) < 4 ?	\
+	(0x0383C + ((_n) * 0x100)) :	\
+	(0x0E03C + ((_n) * 0x40)))
 #define	E1000_RSRPD	0x02C00  /* Rx Small Packet Detect - RW */
 #define	E1000_RAID	0x02C08  /* Receive Ack Interrupt Delay - RW */
 #define	E1000_TXDMAC	0x03000  /* Tx DMA Control - RW */
 #define	E1000_KABGTXD	0x03004  /* AFE Band Gap Transmit Ref Data */
 #define	E1000_PSRTYPE(_i)	(0x05480 + ((_i) * 4))
-#define	E1000_RAL(_i)		(0x05400 + ((_i) * 8))
-#define	E1000_RAH(_i)		(0x05404 + ((_i) * 8))
+#define	E1000_RAL(_i)		(((_i) <= 15) ?	\
+	(0x05400 + ((_i) * 8)) : \
+	(0x054E0 + ((_i - 16) * 8)))
+#define	E1000_RAH(_i)		(((_i) <= 15) ?	\
+	(0x05404 + ((_i) * 8)) : \
+	(0x054E4 + ((_i - 16) * 8)))
 #define	E1000_IP4AT_REG(_i)	(0x05840 + ((_i) * 8))
 #define	E1000_IP6AT_REG(_i)	(0x05880 + ((_i) * 4))
 #define	E1000_WUPM_REG(_i)	(0x05A00 + ((_i) * 4))
 #define	E1000_FFMT_REG(_i)	(0x09000 + ((_i) * 8))
 #define	E1000_FFVT_REG(_i)	(0x09800 + ((_i) * 8))
 #define	E1000_FFLT_REG(_i)	(0x05F00 + ((_i) * 8))
+#define	E1000_PBSLAC	0x03100  /* Packet Buffer Slave Access Control */
+/* Packet Buffer DWORD (_n) */
+#define	E1000_PBSLAD(_n)	(0x03110 + (0x4 * (_n)))
+#define	E1000_TXPBS	0x03404  /* Tx Packet Buffer Size - RW */
 #define	E1000_TDFH	0x03410  /* Tx Data FIFO Head - RW */
 #define	E1000_TDFT	0x03418  /* Tx Data FIFO Tail - RW */
 #define	E1000_TDFHS	0x03420  /* Tx Data FIFO Head Saved - RW */
@@ -190,6 +212,9 @@ extern "C" {
 #define	E1000_TDPURD	0x03588  /* DMA Tx Descriptor uC Data  Read  - RW */
 #define	E1000_TDPUCTL	0x0358C  /* DMA Tx Descriptor uC Control - RW */
 #define	E1000_DTXCTL	0x03590  /* DMA Tx Control - RW */
+#define	E1000_DTXTCPFLGL 0x0359C /* DMA Tx Control flag low - RW */
+#define	E1000_DTXTCPFLGH 0x035A0 /* DMA Tx Control flag high - RW */
+#define	E1000_DTXMXSZRQ  0x03540 /* DMA Tx Max Total Allow Size Requests - RW */
 #define	E1000_TIDV	0x03820  /* Tx Interrupt Delay Value - RW */
 #define	E1000_TADV	0x0382C  /* Tx Interrupt Absolute Delay Val - RW */
 #define	E1000_TSPMT	0x03830  /* TCP Segmentation PAD & Min Threshold - RW */
@@ -252,21 +277,94 @@ extern "C" {
 #define	E1000_TSCTC	0x040F8  /* TCP Segmentation Context Tx - R/clr */
 #define	E1000_TSCTFC	0x040FC  /* TCP Segmentation Context Tx Fail - R/clr */
 #define	E1000_IAC	0x04100  /* Interrupt Assertion Count */
-/* Interrupt Cause Rx Packet Timer Expire Count */
-#define	E1000_ICRXPTC	0x04104
-/* Interrupt Cause Rx Absolute Timer Expire Count */
-#define	E1000_ICRXATC	0x04108
-/* Interrupt Cause Tx Packet Timer Expire Count */
-#define	E1000_ICTXPTC	0x0410C
-/* Interrupt Cause Tx Absolute Timer Expire Count */
-#define	E1000_ICTXATC	0x04110
+#define	E1000_ICRXPTC	0x04104  /* Interrupt Cause Rx Pkt Timer Expire Count */
+#define	E1000_ICRXATC	0x04108  /* Interrupt Cause Rx Abs Timer Expire Count */
+#define	E1000_ICTXPTC	0x0410C  /* Interrupt Cause Tx Pkt Timer Expire Count */
+#define	E1000_ICTXATC	0x04110  /* Interrupt Cause Tx Abs Timer Expire Count */
 #define	E1000_ICTXQEC	0x04118  /* Interrupt Cause Tx Queue Empty Count */
-/* Interrupt Cause Tx Queue Minimum Threshold Count */
-#define	E1000_ICTXQMTC	0x0411C
-/* Interrupt Cause Rx Descriptor Minimum Threshold Count */
-#define	E1000_ICRXDMTC	0x04120
+#define	E1000_ICTXQMTC	0x0411C  /* Interrupt Cause Tx Queue Min Thresh Count */
+#define	E1000_ICRXDMTC	0x04120  /* Interrupt Cause Rx Desc Min Thresh Count */
 #define	E1000_ICRXOC	0x04124  /* Interrupt Cause Receiver Overrun Count */
 
+/* LinkSec Tx Untagged Packet Count - OutPktsUntagged */
+#define	E1000_LSECTXUT		0x04300
+/* LinkSec Encrypted Tx Packets Count - OutPktsEncrypted */
+#define	E1000_LSECTXPKTE	0x04304
+/* LinkSec Protected Tx Packet Count - OutPktsProtected */
+#define	E1000_LSECTXPKTP	0x04308
+/* LinkSec Encrypted Tx Octets Count - OutOctetsEncrypted */
+#define	E1000_LSECTXOCTE	0x0430C
+/* LinkSec Protected Tx Octets Count - OutOctetsProtected */
+#define	E1000_LSECTXOCTP	0x04310
+/* LinkSec Untagged non-Strict Rx Packet Count - InPktsUntagged/InPktsNoTag */
+#define	E1000_LSECRXUT		0x04314
+/* LinkSec Rx Octets Decrypted Count - InOctetsDecrypted */
+#define	E1000_LSECRXOCTD	0x0431C
+/* LinkSec Rx Octets Validated - InOctetsValidated */
+#define	E1000_LSECRXOCTV	0x04320
+/* LinkSec Rx Bad Tag - InPktsBadTag */
+#define	E1000_LSECRXBAD		0x04324
+/* LinkSec Rx Packet No SCI Count - InPktsNoSci */
+#define	E1000_LSECRXNOSCI	0x04328
+/* LinkSec Rx Packet Unknown SCI Count - InPktsUnknownSci */
+#define	E1000_LSECRXUNSCI	0x0432C
+/* LinkSec Rx Unchecked Packets Count - InPktsUnchecked */
+#define	E1000_LSECRXUNCH	0x04330
+/* LinkSec Rx Delayed Packet Count - InPktsDelayed */
+#define	E1000_LSECRXDELAY	0x04340
+/* LinkSec Rx Late Packets Count - InPktsLate */
+#define	E1000_LSECRXLATE	0x04350
+/* LinkSec Rx Packet OK Count - InPktsOk */
+#define	E1000_LSECRXOK(_n)	(0x04360 + (0x04 * (_n)))
+/* LinkSec Rx Invalid Count - InPktsInvalid */
+#define	E1000_LSECRXINV(_n)	(0x04380 + (0x04 * (_n)))
+/* LinkSec Rx Not Valid Count - InPktsNotValid */
+#define	E1000_LSECRXNV(_n)	(0x043A0 + (0x04 * (_n)))
+/* LinkSec Rx Unused SA Count - InPktsUnusedSa */
+#define	E1000_LSECRXUNSA	0x043C0
+/* LinkSec Rx Not Using SA Count - InPktsNotUsingSa */
+#define	E1000_LSECRXNUSA	0x043D0
+/* LinkSec Tx Capabilities Register - RO */
+#define	E1000_LSECTXCAP		0x0B000
+/* LinkSec Rx Capabilities Register - RO */
+#define	E1000_LSECRXCAP		0x0B300
+#define	E1000_LSECTXCTRL	0x0B004  /* LinkSec Tx Control - RW */
+#define	E1000_LSECRXCTRL	0x0B304  /* LinkSec Rx Control - RW */
+#define	E1000_LSECTXSCL		0x0B008  /* LinkSec Tx SCI Low - RW */
+#define	E1000_LSECTXSCH		0x0B00C  /* LinkSec Tx SCI High - RW */
+#define	E1000_LSECTXSA		0x0B010  /* LinkSec Tx SA0 - RW */
+#define	E1000_LSECTXPN0		0x0B018  /* LinkSec Tx SA PN 0 - RW */
+#define	E1000_LSECTXPN1		0x0B01C  /* LinkSec Tx SA PN 1 - RW */
+#define	E1000_LSECRXSCL		0x0B3D0  /* LinkSec Rx SCI Low - RW */
+#define	E1000_LSECRXSCH		0x0B3E0  /* LinkSec Rx SCI High - RW */
+/* LinkSec Tx 128-bit Key 0 - WO */
+#define	E1000_LSECTXKEY0(_n)	(0x0B020 + (0x04 * (_n)))
+/* LinkSec Tx 128-bit Key 1 - WO */
+#define	E1000_LSECTXKEY1(_n)	(0x0B030 + (0x04 * (_n)))
+/* LinkSec Rx SAs - RW */
+#define	E1000_LSECRXSA(_n)	(0x0B310 + (0x04 * (_n)))
+/* LinkSec Rx SAs - RW */
+#define	E1000_LSECRXPN(_n)	(0x0B330 + (0x04 * (_n)))
+/*
+ * LinkSec Rx Keys  - where _n is the SA no. and _m the 4 dwords of the 128 bit
+ * key - RW.
+ */
+#define	E1000_LSECRXKEY(_n, _m) (0x0B350 + (0x10 * (_n)) + (0x04 * (_m)))
+
+#define	E1000_SSVPC	0x041A0  /* Switch Security Violation Packet Count */
+#define	E1000_IPSCTRL	0xB430   /* IpSec Control Register */
+#define	E1000_IPSRXCMD	0x0B408  /* IPSec Rx Command Register - RW */
+#define	E1000_IPSRXIDX	0x0B400  /* IPSec Rx Index - RW */
+/* IPSec Rx IPv4/v6 Address - RW */
+#define	E1000_IPSRXIPADDR(_n)	(0x0B420+ (0x04 * (_n)))
+/* IPSec Rx 128-bit Key - RW */
+#define	E1000_IPSRXKEY(_n)	(0x0B410 + (0x04 * (_n)))
+#define	E1000_IPSRXSALT	0x0B404  /* IPSec Rx Salt - RW */
+#define	E1000_IPSRXSPI	0x0B40C  /* IPSec Rx SPI - RW */
+/* IPSec Tx 128-bit Key - RW */
+#define	E1000_IPSTXKEY(_n)	(0x0B460 + (0x04 * (_n)))
+#define	E1000_IPSTXSALT	0x0B454  /* IPSec Tx Salt - RW */
+#define	E1000_IPSTXIDX	0x0B450  /* IPSec Tx SA IDX - RW */
 #define	E1000_PCS_CFG0	0x04200  /* PCS Configuration 0 - RW */
 #define	E1000_PCS_LCTL	0x04208  /* PCS Link Control - RW */
 #define	E1000_PCS_LSTAT	0x0420C  /* PCS Link Status - RO */
@@ -287,17 +385,17 @@ extern "C" {
 #define	E1000_PCS_ANADV	0x04218  /* AN advertisement - RW */
 #define	E1000_PCS_LPAB	0x0421C  /* Link Partner Ability - RW */
 #define	E1000_PCS_NPTX	0x04220  /* AN Next Page Transmit - RW */
-/* Link Partner Ability Next Page - RW */
-#define	E1000_PCS_LPABNP	0x04224
-/* 1GSTAT Code Violation Packet Count - RW */
-#define	E1000_1GSTAT_RCV	0x04228
+#define	E1000_PCS_LPABNP 0x04224 /* Link Partner Ability Next Page - RW */
+#define	E1000_1GSTAT_RCV 0x04228 /* 1GSTAT Code Violation Packet Count - RW */
 #define	E1000_RXCSUM	0x05000  /* Rx Checksum Control - RW */
 #define	E1000_RLPML	0x05004  /* Rx Long Packet Max Length */
 #define	E1000_RFCTL	0x05008  /* Receive Filter Control */
 #define	E1000_MTA	0x05200  /* Multicast Table Array - RW Array */
 #define	E1000_RA	0x05400  /* Receive Address - RW Array */
+/* 2nd half of receive address array - RW Array */
+#define	E1000_RA2	0x054E0
 #define	E1000_VFTA	0x05600  /* VLAN Filter Table Array - RW Array */
-#define	E1000_VMD_CTL	0x0581C  /* VMDq Control - RW */
+#define	E1000_VT_CTL	0x0581C  /* VMDq Control - RW */
 #define	E1000_VFQA0	0x0B000  /* VLAN Filter Queue Array 0 - RW Array */
 #define	E1000_VFQA1	0x0B200  /* VLAN Filter Queue Array 1 - RW Array */
 #define	E1000_WUC	0x05800  /* Wakeup Control - RW */
@@ -314,6 +412,10 @@ extern "C" {
 #define	E1000_HOST_IF	0x08800  /* Host Interface */
 #define	E1000_FFMT	0x09000  /* Flexible Filter Mask Table - RW Array */
 #define	E1000_FFVT	0x09800  /* Flexible Filter Value Table - RW Array */
+/* Flexible Host Filter Table */
+#define	E1000_FHFT(_n)	(0x09000 + (_n * 0x100))
+/* Ext Flexible Host Filter Table */
+#define	E1000_FHFT_EXT(_n) (0x09A00 + (_n * 0x100))
 
 #define	E1000_KMRNCTRLSTA	0x00034 /* MAC-PHY interface - RW */
 #define	E1000_MDPHYA		0x0003C /* PHY address - RW */
@@ -335,7 +437,7 @@ extern "C" {
 #define	E1000_DCA_ID		0x05B70 /* DCA Requester ID Information - RO */
 #define	E1000_DCA_CTRL		0x05B74 /* DCA Control - RW */
 #define	E1000_FFLT_DBG		0x05F04 /* Debug Register */
-#define	E1000_HICR		0x08F00 /* Host Inteface Control */
+#define	E1000_HICR		0x08F00 /* Host Interface Control */
 
 /* RSS registers */
 #define	E1000_CPUVEC		0x02C10 /* CPU Vector Register - RW */
@@ -361,6 +463,76 @@ extern "C" {
 #define	E1000_RSSRK(_i)		(0x05C80 + ((_i) * 4))
 #define	E1000_RSSIM	0x05864 /* RSS Interrupt Mask */
 #define	E1000_RSSIR	0x05868 /* RSS Interrupt Request */
+/* VT Registers */
+#define	E1000_SWPBS	0x03004 /* Switch Packet Buffer Size - RW */
+#define	E1000_MBVFICR	0x00C80 /* Mailbox VF Cause - RWC */
+#define	E1000_MBVFIMR	0x00C84 /* Mailbox VF int Mask - RW */
+#define	E1000_VFLRE	0x00C88 /* VF Register Events - RWC */
+#define	E1000_VFRE	0x00C8C /* VF Receive Enables */
+#define	E1000_VFTE	0x00C90 /* VF Transmit Enables */
+#define	E1000_QDE	0x02408 /* Queue Drop Enable - RW */
+#define	E1000_DTXSWC	0x03500 /* DMA Tx Switch Control - RW */
+#define	E1000_VLVF	0x05D00 /* VLAN Virtual Machine Filter - RW */
+#define	E1000_RPLOLR	0x05AF0 /* Replication Offload - RW */
+#define	E1000_UTA	0x0A000 /* Unicast Table Array - RW */
+#define	E1000_IOVTCL	0x05BBC /* IOV Control Register */
+#define	E1000_VMRCTL	0X05D80 /* Virtual Mirror Rule Control */
+/* These act per VF so an array friendly macro is used */
+#define	E1000_V2PMAILBOX(_n)	(0x00C40 + (4 * (_n)))
+#define	E1000_P2VMAILBOX(_n)	(0x00C00 + (4 * (_n)))
+#define	E1000_VMBMEM(_n)	(0x00800 + (64 * (_n)))
+#define	E1000_VFVMBMEM(_n)	(0x00800 + (_n))
+#define	E1000_VMOLR(_n)		(0x05AD0 + (4 * (_n)))
+
+/* Filtering Registers */
+#define	E1000_SAQF(_n)	(0x05980 + (4 * (_n))) /* Source Address Queue Fltr */
+#define	E1000_DAQF(_n)	(0x059A0 + (4 * (_n))) /* Dest Address Queue Fltr */
+#define	E1000_SPQF(_n)	(0x059C0 + (4 * (_n))) /* Source Port Queue Fltr */
+#define	E1000_FTQF(_n)	(0x059E0 + (4 * (_n))) /* 5-tuple Queue Fltr */
+#define	E1000_SYNQF(_n)	(0x055FC + (4 * (_n))) /* SYN Packet Queue Fltr */
+#define	E1000_ETQF(_n)	(0x05CB0 + (4 * (_n))) /* EType Queue Fltr */
+
+#define	E1000_RTTDCS	0x3600 /* Reedtown Tx Desc plane control and status */
+#define	E1000_RTTPCS	0x3474 /* Reedtown Tx Packet Plane control and status */
+#define	E1000_RTRPCS	0x2474 /* Rx packet plane control and status */
+#define	E1000_RTRUP2TC	0x05AC4 /* Rx User Priority to Traffic Class */
+#define	E1000_RTTUP2TC	0x0418  /* Transmit User Priority to Traffic Class */
+/* Tx Desc plane TC Rate-scheduler config */
+#define	E1000_RTTDTCRC(_n)	(0x3610 + ((_n) * 4))
+/* Tx Packet plane TC Rate-Scheduler Config */
+#define	E1000_RTTPTCRC(_n)	(0x3480 + ((_n) * 4))
+/* Rx Packet plane TC Rate-Scheduler Config */
+#define	E1000_RTRPTCRC(_n)	(0x2480 + ((_n) * 4))
+/* Tx Desc Plane TC Rate-Scheduler Status */
+#define	E1000_RTTDTCRS(_n)	(0x3630 + ((_n) * 4))
+/* Tx Desc Plane TC Rate-Scheduler MMW */
+#define	E1000_RTTDTCRM(_n)	(0x3650 + ((_n) * 4))
+/* Tx Packet plane TC Rate-Scheduler Status */
+#define	E1000_RTTPTCRS(_n)	(0x34A0 + ((_n) * 4))
+/* Tx Packet plane TC Rate-scheduler MMW */
+#define	E1000_RTTPTCRM(_n)	(0x34C0 + ((_n) * 4))
+/* Rx Packet plane TC Rate-Scheduler Status */
+#define	E1000_RTRPTCRS(_n)	(0x24A0 + ((_n) * 4))
+/* Rx Packet plane TC Rate-Scheduler MMW */
+#define	E1000_RTRPTCRM(_n)	(0x24C0 + ((_n) * 4))
+/* Tx Desc plane VM Rate-Scheduler MMW */
+#define	E1000_RTTDVMRM(_n)	(0x3670 + ((_n) * 4))
+/* Tx BCN Rate-Scheduler MMW */
+#define	E1000_RTTBCNRM(_n)	(0x3690 + ((_n) * 4))
+#define	E1000_RTTDQSEL	0x3604  /* Tx Desc Plane Queue Select */
+#define	E1000_RTTDVMRC	0x3608  /* Tx Desc Plane VM Rate-Scheduler Config */
+#define	E1000_RTTDVMRS	0x360C  /* Tx Desc Plane VM Rate-Scheduler Status */
+#define	E1000_RTTBCNRC	0x36B0  /* Tx BCN Rate-Scheduler Config */
+#define	E1000_RTTBCNRS	0x36B4  /* Tx BCN Rate-Scheduler Status */
+#define	E1000_RTTBCNCR	0xB200  /* Tx BCN Control Register */
+#define	E1000_RTTBCNTG	0x35A4  /* Tx BCN Tagging */
+#define	E1000_RTTBCNCP	0xB208  /* Tx BCN Congestion point */
+#define	E1000_RTRBCNCR	0xB20C  /* Rx BCN Control Register */
+#define	E1000_RTTBCNRD	0x36B8  /* Tx BCN Rate Drift */
+#define	E1000_PFCTOP	0x1080  /* Priority Flow Control Type and Opcode */
+#define	E1000_RTTBCNIDX	0xB204  /* Tx BCN Congestion Point */
+#define	E1000_RTTBCNACH	0x0B214 /* Tx BCN Control High */
+#define	E1000_RTTBCNACL	0x0B210 /* Tx BCN Control Low */
 
 #ifdef __cplusplus
 }

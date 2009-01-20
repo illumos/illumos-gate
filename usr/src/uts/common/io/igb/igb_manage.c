@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,16 +22,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.19 v2007-12-10_dragonlake5 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* IntelVersion: 1.27 v2008-10-7 */
 
 #include "igb_api.h"
-#include "igb_manage.h"
 
 static u8 e1000_calculate_checksum(u8 *buffer, u32 length);
 
@@ -65,7 +62,7 @@ static u8 e1000_calculate_checksum(u8 *buffer, u32 length)
  *
  * Returns E1000_success upon success, else E1000_ERR_HOST_INTERFACE_COMMAND
  *
- * This function checks whether the HOST IF is enabled for command operaton
+ * This function checks whether the HOST IF is enabled for command operation
  * and also checks whether the previous command is completed.  It busy waits
  * in case of previous command is not completed.
  */
@@ -104,7 +101,7 @@ out:
 }
 
 /*
- * e1000_check_mng_mode_generic - Generic check managament mode
+ * e1000_check_mng_mode_generic - Generic check management mode
  * @hw: pointer to the HW structure
  *
  * Reads the firmware semaphore register and returns true (>0) if
@@ -138,13 +135,13 @@ e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	u32 offset;
 	s32 ret_val, hdr_csum, csum;
 	u8 i, len;
-	bool tx_filter = TRUE;
+	bool tx_filter = true;
 
 	DEBUGFUNC("e1000_enable_tx_pkt_filtering_generic");
 
 	/* No manageability, no filtering */
-	if (!e1000_check_mng_mode(hw)) {
-		tx_filter = FALSE;
+	if (!hw->mac.ops.check_mng_mode(hw)) {
+		tx_filter = false;
 		goto out;
 	}
 
@@ -152,9 +149,9 @@ e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 	 * If we can't read from the host interface for whatever
 	 * reason, disable filtering.
 	 */
-	ret_val = e1000_mng_enable_host_if(hw);
+	ret_val = hw->mac.ops.mng_enable_host_if(hw);
 	if (ret_val != E1000_SUCCESS) {
-		tx_filter = FALSE;
+		tx_filter = false;
 		goto out;
 	}
 
@@ -181,7 +178,7 @@ e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw)
 
 	/* Cookie area is valid, make the final check for filtering. */
 	if (!(hdr->status & E1000_MNG_DHCP_COOKIE_STATUS_PARSING))
-		tx_filter = FALSE;
+		tx_filter = false;
 
 out:
 	hw->mac.tx_pkt_filtering = tx_filter;
@@ -213,18 +210,18 @@ e1000_mng_write_dhcp_info_generic(struct e1000_hw *hw, u8 *buffer,
 	hdr.checksum = 0;
 
 	/* Enable the host interface */
-	ret_val = e1000_mng_enable_host_if(hw);
+	ret_val = hw->mac.ops.mng_enable_host_if(hw);
 	if (ret_val)
 		goto out;
 
 	/* Populate the host interface with the contents of "buffer". */
-	ret_val = e1000_mng_host_if_write(hw, buffer, length,
+	ret_val = hw->mac.ops.mng_host_if_write(hw, buffer, length,
 	    sizeof (hdr), &(hdr.checksum));
 	if (ret_val)
 		goto out;
 
 	/* Write the manageability command header */
-	ret_val = e1000_mng_write_cmd_header(hw, &hdr);
+	ret_val = hw->mac.ops.mng_write_cmd_header(hw, &hdr);
 	if (ret_val)
 		goto out;
 
@@ -359,7 +356,7 @@ e1000_enable_mng_pass_thru(struct e1000_hw *hw)
 {
 	u32 manc;
 	u32 fwsm, factps;
-	bool ret_val = FALSE;
+	bool ret_val = false;
 
 	DEBUGFUNC("e1000_enable_mng_pass_thru");
 
@@ -379,13 +376,13 @@ e1000_enable_mng_pass_thru(struct e1000_hw *hw)
 		if (!(factps & E1000_FACTPS_MNGCG) &&
 		    ((fwsm & E1000_FWSM_MODE_MASK) ==
 		    (e1000_mng_mode_pt << E1000_FWSM_MODE_SHIFT))) {
-			ret_val = TRUE;
+			ret_val = true;
 			goto out;
 		}
 	} else {
 		if ((manc & E1000_MANC_SMBUS_EN) &&
 		    !(manc & E1000_MANC_ASF_EN)) {
-			ret_val = TRUE;
+			ret_val = true;
 			goto out;
 		}
 	}

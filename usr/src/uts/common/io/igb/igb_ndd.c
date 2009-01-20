@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,11 +22,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "igb_sw.h"
 
@@ -339,7 +337,7 @@ igb_nd_ioctl(igb_t *igb, queue_t *q,
 	switch (cmd) {
 	default:
 		/* NOTREACHED */
-		ASSERT(FALSE);
+		ASSERT(B_FALSE);
 		return (IOC_INVAL);
 
 	case ND_GET:

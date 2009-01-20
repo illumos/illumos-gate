@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,16 +22,87 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.35 v2007-12-10_dragonlake5 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* IntelVersion: 1.46 v2008-10-7 */
 
 #include "igb_api.h"
-#include "igb_nvm.h"
+
+static void e1000_stop_nvm(struct e1000_hw *hw);
+static void e1000_reload_nvm_generic(struct e1000_hw *hw);
+
+/*
+ * e1000_init_nvm_ops_generic - Initialize NVM function pointers
+ * @hw: pointer to the HW structure
+ *
+ * Setups up the function pointers to no-op functions
+ */
+void
+e1000_init_nvm_ops_generic(struct e1000_hw *hw)
+{
+	struct e1000_nvm_info *nvm = &hw->nvm;
+	DEBUGFUNC("e1000_init_nvm_ops_generic");
+
+	/* Initialize function pointers */
+	nvm->ops.init_params = e1000_null_ops_generic;
+	nvm->ops.acquire = e1000_null_ops_generic;
+	nvm->ops.read = e1000_null_read_nvm;
+	nvm->ops.release = e1000_null_nvm_generic;
+	nvm->ops.reload = e1000_reload_nvm_generic;
+	nvm->ops.update = e1000_null_ops_generic;
+	nvm->ops.valid_led_default = e1000_null_led_default;
+	nvm->ops.validate = e1000_null_ops_generic;
+	nvm->ops.write = e1000_null_write_nvm;
+}
+
+/*
+ * e1000_null_nvm_read - No-op function, return 0
+ * @hw: pointer to the HW structure
+ */
+s32
+e1000_null_read_nvm(struct e1000_hw *hw, u16 a, u16 b, u16 *c)
+{
+	DEBUGFUNC("e1000_null_read_nvm");
+	UNREFERENCED_4PARAMETER(hw, a, b, c);
+	return (E1000_SUCCESS);
+}
+
+/*
+ * e1000_null_nvm_generic - No-op function, return void
+ * @hw: pointer to the HW structure
+ */
+void
+e1000_null_nvm_generic(struct e1000_hw *hw)
+{
+	DEBUGFUNC("e1000_null_nvm_generic");
+	UNREFERENCED_1PARAMETER(hw);
+}
+
+/*
+ * e1000_null_led_default - No-op function, return 0
+ * @hw: pointer to the HW structure
+ */
+s32
+e1000_null_led_default(struct e1000_hw *hw, u16 *data)
+{
+	DEBUGFUNC("e1000_null_led_default");
+	UNREFERENCED_2PARAMETER(hw, data);
+	return (E1000_SUCCESS);
+}
+
+/*
+ * e1000_null_write_nvm - No-op function, return 0
+ * @hw: pointer to the HW structure
+ */
+s32
+e1000_null_write_nvm(struct e1000_hw *hw, u16 a, u16 b, u16 *c)
+{
+	DEBUGFUNC("e1000_null_write_nvm");
+	UNREFERENCED_4PARAMETER(hw, a, b, c);
+	return (E1000_SUCCESS);
+}
 
 /*
  * e1000_raise_eec_clk - Raise EEPROM clock
@@ -285,7 +356,7 @@ e1000_stop_nvm(struct e1000_hw *hw)
 		eecd |= E1000_EECD_CS;
 		e1000_lower_eec_clk(hw, &eecd);
 	} else if (hw->nvm.type == e1000_nvm_eeprom_microwire) {
-		/* CS on Microcwire is active-high */
+		/* CS on Microwire is active-high */
 		eecd &= ~(E1000_EECD_CS | E1000_EECD_DI);
 		E1000_WRITE_REG(hw, E1000_EECD, eecd);
 		e1000_raise_eec_clk(hw, &eecd);
@@ -374,71 +445,6 @@ out:
 }
 
 /*
- * e1000_read_nvm_spi - Read EEPROM's using SPI
- * @hw: pointer to the HW structure
- * @offset: offset of word in the EEPROM to read
- * @words: number of words to read
- * @data: word read from the EEPROM
- *
- * Reads a 16 bit word from the EEPROM.
- */
-s32
-e1000_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
-{
-	struct e1000_nvm_info *nvm = &hw->nvm;
-	u32 i = 0;
-	s32 ret_val;
-	u16 word_in;
-	u8 read_opcode = NVM_READ_OPCODE_SPI;
-
-	DEBUGFUNC("e1000_read_nvm_spi");
-
-	/*
-	 * A check for invalid values:  offset too large, too many words,
-	 * and not enough words.
-	 */
-	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
-	    (words == 0)) {
-		DEBUGOUT("nvm parameter(s) out of bounds\n");
-		ret_val = -E1000_ERR_NVM;
-		goto out;
-	}
-
-	ret_val = e1000_acquire_nvm(hw);
-	if (ret_val)
-		goto out;
-
-	ret_val = e1000_ready_nvm_eeprom(hw);
-	if (ret_val)
-		goto release;
-
-	e1000_standby_nvm(hw);
-
-	if ((nvm->address_bits == 8) && (offset >= 128))
-		read_opcode |= NVM_A8_OPCODE_SPI;
-
-	/* Send the READ command (opcode + addr) */
-	e1000_shift_out_eec_bits(hw, read_opcode, nvm->opcode_bits);
-	e1000_shift_out_eec_bits(hw, (u16)(offset*2), nvm->address_bits);
-
-	/*
-	 * Read the data.  SPI NVMs increment the address with each byte
-	 * read and will roll over if reading beyond the end.  This allows
-	 * us to read the whole NVM from any offset
-	 */
-	for (i = 0; i < words; i++) {
-		word_in = e1000_shift_in_eec_bits(hw, 16);
-		data[i] = (word_in >> 8) | (word_in << 8);
-	}
-
-release:
-	e1000_release_nvm(hw);
-
-out:
-	return (ret_val);
-}
-
-/*
  * e1000_read_nvm_microwire - Reads EEPROM's using microwire
  * @hw: pointer to the HW structure
  * @offset: offset of word in the EEPROM to read
@@ -469,7 +475,7 @@ e1000_read_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 		goto out;
 	}
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
 
@@ -492,7 +498,7 @@ e1000_read_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 	}
 
 release:
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 out:
 	return (ret_val);
@@ -554,7 +560,7 @@ out:
  * Writes data to EEPROM at offset using SPI interface.
  *
  * If e1000_update_nvm_checksum is not called after this function , the
- * EEPROM will most likley contain an invalid checksum.
+ * EEPROM will most likely contain an invalid checksum.
  */
 s32
 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
@@ -576,11 +582,9 @@ e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 		goto out;
 	}
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
-
-	msec_delay(10);
 
 	while (widx < words) {
 		u8 write_opcode = NVM_WRITE_OPCODE_SPI;
@@ -625,7 +629,7 @@ e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data)
 
 	msec_delay(10);
 release:
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 out:
 	return (ret_val);
@@ -641,7 +645,7 @@ out:
  * Writes data to EEPROM at offset using microwire interface.
  *
  * If e1000_update_nvm_checksum is not called after this function , the
- * EEPROM will most likley contain an invalid checksum.
+ * EEPROM will most likely contain an invalid checksum.
  */
 s32
 e1000_write_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
@@ -666,7 +670,7 @@ e1000_write_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 		goto out;
 	}
 
-	ret_val = e1000_acquire_nvm(hw);
+	ret_val = nvm->ops.acquire(hw);
 	if (ret_val)
 		goto out;
 
@@ -716,7 +720,7 @@ e1000_write_nvm_microwire(struct e1000_hw *hw, u16 offset, u16 words,
 	e1000_shift_out_eec_bits(hw, 0, (u16)(nvm->address_bits - 2));
 
 release:
-	e1000_release_nvm(hw);
+	nvm->ops.release(hw);
 
 out:
 	return (ret_val);
@@ -738,14 +742,14 @@ e1000_read_pba_num_generic(struct e1000_hw *hw, u32 *pba_num)
 
 	DEBUGFUNC("e1000_read_pba_num_generic");
 
-	ret_val = e1000_read_nvm(hw, NVM_PBA_OFFSET_0, 1, &nvm_data);
+	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_0, 1, &nvm_data);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
 		goto out;
 	}
 	*pba_num = (u32)(nvm_data << 16);
 
-	ret_val = e1000_read_nvm(hw, NVM_PBA_OFFSET_1, 1, &nvm_data);
+	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_1, 1, &nvm_data);
 	if (ret_val) {
 		DEBUGOUT("NVM Read Error\n");
 		goto out;
@@ -774,7 +778,7 @@ e1000_read_mac_addr_generic(struct e1000_hw *hw)
 
 	for (i = 0; i < ETH_ADDR_LEN; i += 2) {
 		offset = i >> 1;
-		ret_val = e1000_read_nvm(hw, offset, 1, &nvm_data);
+		ret_val = hw->nvm.ops.read(hw, offset, 1, &nvm_data);
 		if (ret_val) {
 			DEBUGOUT("NVM Read Error\n");
 			goto out;
@@ -811,7 +815,7 @@ e1000_validate_nvm_checksum_generic(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_validate_nvm_checksum_generic");
 
 	for (i = 0; i < (NVM_CHECKSUM_REG + 1); i++) {
-		ret_val = e1000_read_nvm(hw, i, 1, &nvm_data);
+		ret_val = hw->nvm.ops.read(hw, i, 1, &nvm_data);
 		if (ret_val) {
 			DEBUGOUT("NVM Read Error\n");
 			goto out;
@@ -847,7 +851,7 @@ e1000_update_nvm_checksum_generic(struct e1000_hw *hw)
 	DEBUGFUNC("e1000_update_nvm_checksum");
 
 	for (i = 0; i < NVM_CHECKSUM_REG; i++) {
-		ret_val = e1000_read_nvm(hw, i, 1, &nvm_data);
+		ret_val = hw->nvm.ops.read(hw, i, 1, &nvm_data);
 		if (ret_val) {
 			DEBUGOUT("NVM Read Error while updating checksum.\n");
 			goto out;
@@ -855,10 +859,9 @@ e1000_update_nvm_checksum_generic(struct e1000_hw *hw)
 		checksum += nvm_data;
 	}
 	checksum = (u16) NVM_SUM - checksum;
-	ret_val = e1000_write_nvm(hw, NVM_CHECKSUM_REG, 1, &checksum);
-	if (ret_val) {
+	ret_val = hw->nvm.ops.write(hw, NVM_CHECKSUM_REG, 1, &checksum);
+	if (ret_val)
 		DEBUGOUT("NVM Write Error while updating checksum.\n");
-	}
 
 out:
 	return (ret_val);
@@ -883,36 +886,4 @@ e1000_reload_nvm_generic(struct e1000_hw *hw)
 	ctrl_ext |= E1000_CTRL_EXT_EE_RST;
 	E1000_WRITE_REG(hw, E1000_CTRL_EXT, ctrl_ext);
 	E1000_WRITE_FLUSH(hw);
-}
-
-/* Function pointers local to this file and not intended for public use */
-
-/*
- * e1000_acquire_nvm - Acquire exclusive access to EEPROM
- * @hw: pointer to the HW structure
- *
- * For those silicon families which have implemented a NVM acquire function,
- * run the defined function else return success.
- */
-s32
-e1000_acquire_nvm(struct e1000_hw *hw)
-{
-	if (hw->func.acquire_nvm)
-		return (hw->func.acquire_nvm(hw));
-
-	return (E1000_SUCCESS);
-}
-
-/*
- * e1000_release_nvm - Release exclusive access to EEPROM
- * @hw: pointer to the HW structure
- *
- * For those silicon families which have implemented a NVM release function,
- * run the defined fucntion else return success.
- */
-void
-e1000_release_nvm(struct e1000_hw *hw)
-{
-	if (hw->func.release_nvm)
-		hw->func.release_nvm(hw);
 }

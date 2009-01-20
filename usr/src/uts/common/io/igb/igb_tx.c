@@ -1,17 +1,19 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at:
+ *	http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * When using or redistributing this file, you may do so under the
+ * License only. No other modification of this header is permitted.
+ *
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -20,12 +22,8 @@
  */
 
 /*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
- */
-
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms of the CDDL.
  */
 
 #include "igb_sw.h"
@@ -682,6 +680,7 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	union e1000_adv_tx_desc *tbd, *first_tbd;
 	tx_control_block_t *tcb, *first_tcb;
 	uint32_t hcksum_flags;
+	uint32_t pay_len;
 	int i;
 	igb_t *igb = tx_ring->igb;
 
@@ -692,6 +691,7 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	first_tcb = NULL;
 	desc_num = 0;
 	hcksum_flags = 0;
+	pay_len = 0;
 	load_context = B_FALSE;
 
 	/*
@@ -758,9 +758,12 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 			tbd->read.cmd_type_len = tcb->desc[i].length;
 
 			tbd->read.cmd_type_len |= E1000_ADVTXD_DCMD_RS |
-			    E1000_ADVTXD_DCMD_DEXT | E1000_ADVTXD_DTYP_DATA;
+			    E1000_ADVTXD_DCMD_DEXT | E1000_ADVTXD_DTYP_DATA |
+			    E1000_ADVTXD_DCMD_IFCS;
 
 			tbd->read.olinfo_status = 0;
+
+			pay_len += tcb->desc[i].length;
 
 			index = NEXT_INDEX(index, 1, tx_ring->ring_size);
 			desc_num++;
@@ -788,9 +791,14 @@ igb_tx_fill_ring(igb_tx_ring_t *tx_ring, link_list_t *pending_list,
 	/*
 	 * The Insert Ethernet CRC (IFCS) bit and the checksum fields are only
 	 * valid in the first descriptor of the packet.
+	 * 82576 also requires the payload length setting even without TSO
 	 */
 	ASSERT(first_tbd != NULL);
 	first_tbd->read.cmd_type_len |= E1000_ADVTXD_DCMD_IFCS;
+	if (hw->mac.type == e1000_82576) {
+		first_tbd->read.olinfo_status =
+		    (pay_len << E1000_ADVTXD_PAYLEN_SHIFT);
+	}
 
 	/* Set hardware checksum bits */
 	if (hcksum_flags != 0) {

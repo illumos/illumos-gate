@@ -1,7 +1,7 @@
 /*
  * CDDL HEADER START
  *
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,27 +22,29 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms of the CDDL.
  */
 
-/* IntelVersion: 1.13 v2007-12-10_dragonlake5 */
+/* IntelVersion: 1.18 v2008-10-7 */
 
 #ifndef _IGB_NVM_H
 #define	_IGB_NVM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+void e1000_init_nvm_ops_generic(struct e1000_hw *hw);
+s32  e1000_null_read_nvm(struct e1000_hw *hw, u16 a, u16 b, u16 *c);
+void e1000_null_nvm_generic(struct e1000_hw *hw);
+s32  e1000_null_led_default(struct e1000_hw *hw, u16 *data);
+s32  e1000_null_write_nvm(struct e1000_hw *hw, u16 a, u16 b, u16 *c);
 s32 e1000_acquire_nvm_generic(struct e1000_hw *hw);
 
 s32 e1000_poll_eerd_eewr_done(struct e1000_hw *hw, int ee_reg);
 s32 e1000_read_mac_addr_generic(struct e1000_hw *hw);
 s32 e1000_read_pba_num_generic(struct e1000_hw *hw, u32 *pba_num);
-s32 e1000_read_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words, u16 *data);
 s32 e1000_read_nvm_microwire(struct e1000_hw *hw, u16 offset,
     u16 words, u16 *data);
 s32 e1000_read_nvm_eerd(struct e1000_hw *hw, u16 offset, u16 words,
@@ -56,13 +58,7 @@ s32 e1000_write_nvm_microwire(struct e1000_hw *hw, u16 offset,
 s32 e1000_write_nvm_spi(struct e1000_hw *hw, u16 offset, u16 words,
     u16 *data);
 s32 e1000_update_nvm_checksum_generic(struct e1000_hw *hw);
-void e1000_stop_nvm(struct e1000_hw *hw);
 void e1000_release_nvm_generic(struct e1000_hw *hw);
-void e1000_reload_nvm_generic(struct e1000_hw *hw);
-
-/* Function pointers */
-s32 e1000_acquire_nvm(struct e1000_hw *hw);
-void e1000_release_nvm(struct e1000_hw *hw);
 
 #define	E1000_STM_OPCODE	0xDB00
 

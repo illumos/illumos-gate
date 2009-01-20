@@ -1,17 +1,19 @@
 /*
  * CDDL HEADER START
  *
+ * Copyright(c) 2007-2009 Intel Corporation. All rights reserved.
  * The contents of this file are subject to the terms of the
  * Common Development and Distribution License (the "License").
  * You may not use this file except in compliance with the License.
  *
- * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
- * or http://www.opensolaris.org/os/licensing.
+ * You can obtain a copy of the license at:
+ *	http://www.opensolaris.org/os/licensing.
  * See the License for the specific language governing permissions
  * and limitations under the License.
  *
- * When distributing Covered Code, include this CDDL HEADER in each
- * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * When using or redistributing this file, you may do so under the
+ * License only. No other modification of this header is permitted.
+ *
  * If applicable, add the following below this CDDL HEADER, with the
  * fields enclosed by brackets "[]" replaced with your own identifying
  * information: Portions Copyright [yyyy] [name of copyright owner]
@@ -20,35 +22,13 @@
  */
 
 /*
- * Copyright(c) 2007-2008 Intel Corporation. All rights reserved.
- */
-
-/*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms of the CDDL.
  */
 
 #include "igb_osdep.h"
 #include "igb_api.h"
 
-
-s32
-e1000_alloc_zeroed_dev_spec_struct(struct e1000_hw *hw, u32 size)
-{
-	hw->dev_spec = kmem_zalloc(size, KM_SLEEP);
-
-	return (E1000_SUCCESS);
-}
-
-void
-e1000_free_dev_spec_struct(struct e1000_hw *hw)
-{
-	if (hw->dev_spec == NULL)
-		return;
-
-	kmem_free(hw->dev_spec, hw->dev_spec_size);
-	hw->dev_spec = NULL;
-}
 
 void
 e1000_pci_set_mwi(struct e1000_hw *hw)
