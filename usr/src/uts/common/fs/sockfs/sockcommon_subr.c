@@ -1592,7 +1592,9 @@ socket_getopt_common(struct sonode *so, int level, int option_name,
 	case SO_RCVTIMEO: {
 		clock_t value;
 		socklen_t optlen = *optlenp;
-		if (get_udatamodel() == DATAMODEL_NATIVE) {
+
+		if (get_udatamodel() == DATAMODEL_NONE ||
+		    get_udatamodel() == DATAMODEL_NATIVE) {
 			if (optlen < sizeof (struct timeval))
 				return (EINVAL);
 		} else {
@@ -1604,7 +1606,8 @@ socket_getopt_common(struct sonode *so, int level, int option_name,
 		else
 			value = drv_hztousec(so->so_sndtimeo);
 
-		if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (get_udatamodel() == DATAMODEL_NONE ||
+		    get_udatamodel() == DATAMODEL_NATIVE) {
 			((struct timeval *)(optval))->tv_sec =
 			    value / (1000 * 1000);
 			((struct timeval *)(optval))->tv_usec =

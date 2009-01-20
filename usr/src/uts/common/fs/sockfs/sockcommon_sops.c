@@ -783,7 +783,8 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 			struct timeval tl;
 			clock_t t_usec;
 
-			if (get_udatamodel() == DATAMODEL_NATIVE) {
+			if (get_udatamodel() == DATAMODEL_NONE ||
+			    get_udatamodel() == DATAMODEL_NATIVE) {
 				if (optlen != sizeof (struct timeval)) {
 					error = EINVAL;
 					goto done;

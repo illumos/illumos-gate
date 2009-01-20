@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Software Initiator
@@ -415,14 +415,28 @@ iscsi_net_poll(void *socket, clock_t timeout)
 	int pflag;
 	char msg[64];
 	size_t recv = 0;
-	struct timeval tl;
 	ksocket_t ks = (ksocket_t)socket;
-	/* timeout is millisecond */
-	tl.tv_sec = timeout / 1000;
-	tl.tv_usec = (timeout % 1000) * 1000;
 
-	(void) ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVTIMEO, &tl,
-	    sizeof (struct timeval), CRED());
+	if (get_udatamodel() == DATAMODEL_NONE ||
+	    get_udatamodel() == DATAMODEL_NATIVE) {
+		struct timeval tl;
+
+		/* timeout is millisecond */
+		tl.tv_sec = timeout / 1000;
+		tl.tv_usec = (timeout % 1000) * 1000;
+		if (ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVTIMEO, &tl,
+		    sizeof (struct timeval), CRED()))
+			return (0);
+	} else {
+		struct timeval32 tl;
+
+		/* timeout is millisecond */
+		tl.tv_sec = timeout / 1000;
+		tl.tv_usec = (timeout % 1000) * 1000;
+		if (ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVTIMEO, &tl,
+		    sizeof (struct timeval32), CRED()))
+			return (0);
+	}
 
 	pflag = MSG_ANY;
 	bzero(msg, sizeof (msg));
@@ -454,15 +468,26 @@ iscsi_net_recvmsg(void *socket, struct msghdr *msg, int timeout)
 	int		prflag	    = msg->msg_flags;
 	ksocket_t	ks	    = (ksocket_t)socket;
 	size_t 		recv	    = 0;
-	struct timeval	tl;
-
-	tl.tv_sec = timeout;
-	tl.tv_usec = 0;
 
 	/* Set recv timeout */
-	if (ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVTIMEO, &tl,
-	    sizeof (struct timeval), CRED()))
-		return (0);
+	if (get_udatamodel() == DATAMODEL_NONE ||
+	    get_udatamodel() == DATAMODEL_NATIVE) {
+		struct timeval tl;
+
+		tl.tv_sec = timeout;
+		tl.tv_usec = 0;
+		if (ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVTIMEO, &tl,
+		    sizeof (struct timeval), CRED()))
+			return (0);
+	} else {
+		struct timeval32 tl;
+
+		tl.tv_sec = timeout;
+		tl.tv_usec = 0;
+		if (ksocket_setsockopt(ks, SOL_SOCKET, SO_RCVTIMEO, &tl,
+		    sizeof (struct timeval32), CRED()))
+			return (0);
+	}
 	/*
 	 * Receive the requested data.  Block until all
 	 * data is received or timeout.

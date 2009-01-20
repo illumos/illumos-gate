@@ -5204,7 +5204,8 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 			break;
 		case SO_RCVTIMEO:
 		case SO_SNDTIMEO:
-			if (get_udatamodel() == DATAMODEL_NATIVE) {
+			if (get_udatamodel() == DATAMODEL_NONE ||
+			    get_udatamodel() == DATAMODEL_NATIVE) {
 				if (maxlen < sizeof (struct timeval)) {
 					error = EINVAL;
 					eprintsoline(so, error);
@@ -5385,7 +5386,8 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 				val = drv_hztousec(so->so_sndtimeo);
 			tmo_val.tv_sec = val / (1000 * 1000);
 			tmo_val.tv_usec = val % (1000 * 1000);
-			if (get_udatamodel() == DATAMODEL_NATIVE) {
+			if (get_udatamodel() == DATAMODEL_NONE ||
+			    get_udatamodel() == DATAMODEL_NATIVE) {
 				option = &tmo_val;
 				len = sizeof (struct timeval);
 			} else {
@@ -5558,7 +5560,8 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 				break;
 			case SO_SNDTIMEO:
 			case SO_RCVTIMEO:
-				if (get_udatamodel() == DATAMODEL_NATIVE) {
+				if (get_udatamodel() == DATAMODEL_NONE ||
+				    get_udatamodel() == DATAMODEL_NATIVE) {
 					if (optlen !=
 					    sizeof (struct timeval)) {
 						error = EINVAL;
@@ -5615,7 +5618,8 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 				struct timeval tl;
 				clock_t val;
 
-				if (get_udatamodel() == DATAMODEL_NATIVE)
+				if (get_udatamodel() == DATAMODEL_NONE ||
+				    get_udatamodel() == DATAMODEL_NATIVE)
 					bcopy(&tl, (struct timeval *)optval,
 					    sizeof (struct timeval));
 				else
@@ -5782,7 +5786,8 @@ done:
 			break;
 		case SO_SNDTIMEO:
 		case SO_RCVTIMEO:
-			if (get_udatamodel() == DATAMODEL_NATIVE) {
+			if (get_udatamodel() == DATAMODEL_NONE ||
+			    get_udatamodel() == DATAMODEL_NATIVE) {
 				if (optlen != sizeof (struct timeval)) {
 					error = EINVAL;
 					eprintsoline(so, error);
@@ -5897,7 +5902,8 @@ done:
 			struct timeval tl;
 			clock_t val;
 
-			if (get_udatamodel() == DATAMODEL_NATIVE)
+			if (get_udatamodel() == DATAMODEL_NONE ||
+			    get_udatamodel() == DATAMODEL_NATIVE)
 				bcopy(&tl, (struct timeval *)optval,
 				    sizeof (struct timeval));
 			else
