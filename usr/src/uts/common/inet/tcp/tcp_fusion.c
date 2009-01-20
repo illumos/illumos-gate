@@ -560,7 +560,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	uint_t max_unread;
 	boolean_t flow_stopped, peer_data_queued = B_FALSE;
 	boolean_t urgent = (DB_TYPE(mp) != M_DATA);
-	boolean_t push = B_FALSE;
+	boolean_t push = B_TRUE;
 	mblk_t *mp1 = mp;
 	ill_t *ilp, *olp;
 	ipif_t *iifp, *oifp;
