@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3027,15 +3027,6 @@ strwaitq(stdata_t *stp, int flag, ssize_t count, int fmode, clock_t timout,
 		return (0);
 	}
 
-	if (fmode & (FNDELAY|FNONBLOCK)) {
-		if (!(flag & NOINTR))
-			error = EAGAIN;
-		else
-			error = 0;
-		*done = 1;
-		return (error);
-	}
-
 	if (stp->sd_flag & errs) {
 		/*
 		 * Check for errors before going to sleep since the
@@ -3083,6 +3074,15 @@ strwaitq(stdata_t *stp, int flag, ssize_t count, int fmode, clock_t timout,
 			*done = 0;
 			return (0);
 		}
+	}
+
+	if (fmode & (FNDELAY|FNONBLOCK)) {
+		if (!(flag & NOINTR))
+			error = EAGAIN;
+		else
+			error = 0;
+		*done = 1;
+		return (error);
 	}
 
 	stp->sd_flag |= slpflg;
