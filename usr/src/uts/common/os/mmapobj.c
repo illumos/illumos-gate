@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,6 +125,7 @@ struct mobj_stats {
 	uint_t	mobjs_map_elf_no_holes;
 	uint_t	mobjs_unmap_hole;
 	uint_t	mobjs_nomem_header;
+	uint_t	mobjs_inval_header;
 	uint_t	mobjs_overlap_header;
 	uint_t	mobjs_np2_align;
 	uint_t	mobjs_np2_align_overflow;
@@ -697,9 +698,12 @@ mmapobj_lookup_start_addr(struct lib_va *lvp)
 
 	/*
 	 * If we don't have an expected base address, or the one that we want
-	 * to use is not available, go get an acceptable address range.
+	 * to use is not available or acceptable, go get an acceptable
+	 * address range.
 	 */
-	if (base == NULL || as_gap(as, len, &base, &len, 0, NULL)) {
+	if (base == NULL || as_gap(as, len, &base, &len, 0, NULL) ||
+	    valid_usr_range(base, len, PROT_ALL, as, as->a_userlimit) !=
+	    RANGE_OKAY) {
 
 		if (lvp->lv_flags & LV_ELF64) {
 			ma_flags = 0;
@@ -827,9 +831,12 @@ mmapobj_alloc_start_addr(struct lib_va **lvpp, size_t len, int use_lib_va,
 
 	/*
 	 * If we don't have an expected base address, or the one that we want
-	 * to use is not available, go get an acceptable address range.
+	 * to use is not available or acceptable, go get an acceptable
+	 * address range.
 	 */
-	if (base == NULL || as_gap(as, len, &base, &len, 0, NULL)) {
+	if (base == NULL || as_gap(as, len, &base, &len, 0, NULL) ||
+	    valid_usr_range(base, len, PROT_ALL, as, as->a_userlimit) !=
+	    RANGE_OKAY) {
 		MOBJ_STAT_ADD(get_addr);
 		base = (caddr_t)align;
 		map_addr(&base, len, 0, 1, ma_flags);
@@ -1250,6 +1257,7 @@ calc_loadable(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, size_t *len,
 	int i;
 	int hsize;
 	model_t model;
+	ushort_t e_type = ehdrp->e_type;	/* same offset 32 and 64 bit */
 	uint_t p_type;
 	offset_t p_offset;
 	size_t p_memsz;
@@ -1310,6 +1318,18 @@ calc_loadable(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, size_t *len,
 				continue;
 			}
 			if (num_segs++ == 0) {
+				/*
+				 * The p_vaddr of the first PT_LOAD segment
+				 * must either be NULL or within the first
+				 * page in order to be interpreted.
+				 * Otherwise, its an invalid file.
+				 */
+				if (e_type == ET_DYN &&
+				    ((caddr_t)((uintptr_t)vaddr &
+				    (uintptr_t)PAGEMASK) != NULL)) {
+					MOBJ_STAT_ADD(inval_header);
+					return (ENOTSUP);
+				}
 				start_addr = vaddr;
 				/*
 				 * For the first segment, we need to map from
@@ -1737,7 +1757,7 @@ process_phdr(Ehdr *ehdrp, caddr_t phdrbase, int nphdrs, mmapobj_result_t *mrp,
 			if (hdr_seen == 0 && p_filesz != 0) {
 				mrp[current].mr_flags = MR_HDR_ELF;
 				/*
-				 * We modify mr_addr and mr_offset because we
+				 * We modify mr_offset because we
 				 * need to map the ELF header as well, and if
 				 * we didn't then the header could be left out
 				 * of the mapping that we will create later.
