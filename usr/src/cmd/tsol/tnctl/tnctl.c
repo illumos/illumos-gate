@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * tnctl.c -
@@ -142,7 +140,6 @@ translate_inet_addr(tsol_rhent_t *rhentp, int *alen, char abuf[], int abuflen)
 
 	if (rhentp->rh_address.ta_family == AF_INET6) {
 		aptr = &(rhentp->rh_address.ta_addr_v6);
-		*alen = sizeof (ipv6addr);
 		(void) inet_ntop(rhentp->rh_address.ta_family, aptr, abuf,
 		    abuflen);
 		if (rhentp->rh_prefix != 128) {
@@ -151,9 +148,9 @@ translate_inet_addr(tsol_rhent_t *rhentp, int *alen, char abuf[], int abuflen)
 				    "tnctl: buffer overflow detected: %s\n"),
 				    abuf);
 		}
+		*alen = strlen(abuf);
 	} else {
 		aptr = &(rhentp->rh_address.ta_addr_v4);
-		*alen = sizeof (rhent.rh_address.ta_addr_v4);
 		(void) inet_ntop(rhentp->rh_address.ta_family, aptr, abuf,
 		    abuflen);
 		if (rhentp->rh_prefix != 32) {
@@ -162,6 +159,7 @@ translate_inet_addr(tsol_rhent_t *rhentp, int *alen, char abuf[], int abuflen)
 				    "tnctl: buffer overflow detected: %s\n"),
 				    abuf);
 		}
+		*alen = strlen(abuf);
 	}
 }
 
@@ -330,7 +328,7 @@ process_rh(const char *hostname)
 	 */
 	if (!delete_mode &&
 	    rhentp->rh_template[0] == '\0' &&
-	    (rhentp = tsol_getrhbyaddr(abuf, alen,
+	    (rhentp = tsol_getrhbyaddr(abuf, alen+1,
 	    rhent.rh_address.ta_family)) == NULL) {
 		(void) fprintf(stderr,
 		    gettext("tnctl: database lookup failed for %s\n"),
