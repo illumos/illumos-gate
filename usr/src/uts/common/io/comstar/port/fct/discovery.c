@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -314,18 +314,18 @@ fct_handle_local_port_event(fct_i_local_port_t *iport)
 		ASSERT(0);
 	}
 	new_bits = iport->iport_link_state ^
-					(iport->iport_link_state | new_state);
+	    (iport->iport_link_state | new_state);
 	old_state = iport->iport_link_state;
 	iport->iport_link_state = new_state;
 	rw_exit(&iport->iport_lock);
 
 	stmf_trace(iport->iport_alias, "port state change from %x to %x",
-			old_state, new_state);
+	    old_state, new_state);
 
 	if (new_bits & S_PORT_CLEANUP) {
 		(void) fct_implicitly_logo_all(iport, 0);
 		fct_handle_event(iport->iport_port,
-			FCT_I_EVENT_CLEANUP_POLL, 0, 0);
+		    FCT_I_EVENT_CLEANUP_POLL, 0, 0);
 	}
 	if (retry_implicit_logo) {
 		(void) fct_implicitly_logo_all(iport, 1);
@@ -341,13 +341,13 @@ fct_handle_local_port_event(fct_i_local_port_t *iport)
 			    "port_get_link_info failed, ret %llx, forcing "
 			    "link down.", iport, li_ret);
 			fct_handle_event(iport->iport_port,
-				FCT_EVENT_LINK_DOWN, 0, 0);
+			    FCT_EVENT_LINK_DOWN, 0, 0);
 		} else {
 			iport->iport_login_retry = 0;
 			/* This will reset LI_STATE_FLAG_NO_LI_YET */
 			iport->iport_li_state = LI_STATE_START;
 			atomic_or_32(&iport->iport_flags,
-					IPORT_ALLOW_UNSOL_FLOGI);
+			    IPORT_ALLOW_UNSOL_FLOGI);
 		}
 		fct_log_local_port_event(iport->iport_port,
 		    ESC_SUNFC_PORT_ONLINE);
@@ -422,7 +422,7 @@ fct_do_flogi(fct_i_local_port_t *iport)
 	}
 	if (ret == FCT_NOT_FOUND) {
 		if (iport->iport_link_info.port_topology &
-				PORT_TOPOLOGY_PRIVATE_LOOP) {
+		    PORT_TOPOLOGY_PRIVATE_LOOP) {
 			/* This is a private loop. There is no switch. */
 			iport->iport_link_info.port_no_fct_flogi = 1;
 			return;
@@ -469,7 +469,7 @@ fct_do_flogi(fct_i_local_port_t *iport)
 	bcopy(fx.fx_pwwn, iport->iport_link_info.port_rpwwn, 8);
 	if (fx.fx_fport) {
 		iport->iport_link_info.port_topology |=
-			    PORT_TOPOLOGY_FABRIC_BIT;
+		    PORT_TOPOLOGY_FABRIC_BIT;
 		iport->iport_link_info.portid = fx.fx_did;
 	}
 	iport->iport_link_info.port_fct_flogi_done = 1;
@@ -576,14 +576,14 @@ check_state_again:
 			iport->iport_li_state++;
 			iport->iport_login_retry = 0;
 			iport->iport_li_cmd_timeout = ddi_get_lbolt() +
-				drv_usectohz(25 * 1000000);
+			    drv_usectohz(25 * 1000000);
 		}
 		goto check_state_again;
 
 	case LI_STATE_N2N_PLOGI:
 		ASSERT(IPORT_FLOGI_DONE(iport));
 		ASSERT(iport->iport_link_info.port_topology ==
-				PORT_TOPOLOGY_PT_TO_PT);
+		    PORT_TOPOLOGY_PT_TO_PT);
 		if (iport->iport_li_state & LI_STATE_FLAG_CMD_RETCHECK) {
 			iport->iport_li_state &= ~LI_STATE_FLAG_CMD_RETCHECK;
 			if (iport->iport_li_comp_status != FCT_SUCCESS) {
@@ -595,7 +595,7 @@ check_state_again:
 					    iport->iport_li_comp_status);
 					mutex_exit(&iport->iport_worker_lock);
 					fct_handle_event(iport->iport_port,
-						FCT_EVENT_LINK_DOWN, 0, 0);
+					    FCT_EVENT_LINK_DOWN, 0, 0);
 					mutex_enter(&iport->iport_worker_lock);
 				}
 			}
@@ -778,7 +778,7 @@ fct_handle_els(fct_cmd_t *cmd)
 {
 	fct_local_port_t	*port = cmd->cmd_port;
 	fct_i_local_port_t *iport =
-			(fct_i_local_port_t *)port->port_fct_private;
+	    (fct_i_local_port_t *)port->port_fct_private;
 	fct_i_cmd_t		*icmd = (fct_i_cmd_t *)cmd->cmd_fct_private;
 	fct_els_t		*els  = (fct_els_t *)cmd->cmd_specific;
 	fct_remote_port_t	*rp;
@@ -793,8 +793,8 @@ fct_handle_els(fct_cmd_t *cmd)
 	}
 	stmf_trace(iport->iport_alias, "Posting %ssol ELS %x (%s) rp_id=%x"
 	    " lp_id=%x", (cmd->cmd_type == FCT_CMD_RCVD_ELS) ? "un" : "",
-			op, FCT_ELS_NAME(op), cmd->cmd_rportid,
-			cmd->cmd_lportid);
+	    op, FCT_ELS_NAME(op), cmd->cmd_rportid,
+	    cmd->cmd_lportid);
 
 	rw_enter(&iport->iport_lock, RW_READER);
 start_els_posting:;
@@ -840,14 +840,14 @@ start_els_posting:;
 				 * a part of PLOGI.
 				 */
 				iport->iport_link_info.portid =
-							cmd->cmd_lportid;
+				    cmd->cmd_lportid;
 			}
 		}
 		mutex_exit(&iport->iport_worker_lock);
 		if (killit) {
 			rw_exit(&iport->iport_lock);
 			fct_queue_cmd_for_termination(cmd,
-						FCT_LOCAL_PORT_OFFLINE);
+			    FCT_LOCAL_PORT_OFFLINE);
 			return;
 		}
 	}
@@ -867,7 +867,7 @@ start_els_posting:;
 			    FCT_ELS_NAME(op), cmd->cmd_lportid,
 			    iport->iport_link_info.portid);
 			fct_queue_cmd_for_termination(cmd,
-					FCT_NOT_FOUND);
+			    FCT_NOT_FOUND);
 			return;
 		}
 	}
@@ -882,10 +882,10 @@ start_els_posting:;
 			/* drop the lock while we do allocations */
 			rw_exit(&iport->iport_lock);
 			rp = fct_alloc(FCT_STRUCT_REMOTE_PORT,
-				port->port_fca_rp_private_size, 0);
+			    port->port_fca_rp_private_size, 0);
 			if (rp == NULL) {
 				fct_queue_cmd_for_termination(cmd,
-					FCT_ALLOC_FAILURE);
+				    FCT_ALLOC_FAILURE);
 				return;
 			}
 			irp = (fct_i_remote_port_t *)rp->rp_fct_private;
@@ -914,7 +914,7 @@ start_els_posting:;
 
 		/* A PLOGI is by default a logout of previous session */
 		irp->irp_deregister_timer = ddi_get_lbolt() +
-			drv_usectohz(USEC_DEREG_RP_TIMEOUT);
+		    drv_usectohz(USEC_DEREG_RP_TIMEOUT);
 		irp->irp_dereg_count = 0;
 		fct_post_to_discovery_queue(iport, irp, NULL);
 
@@ -952,9 +952,9 @@ start_els_posting:;
 			/* This should not have happened */
 			rw_exit(&iport->iport_lock);
 			stmf_trace(iport->iport_alias,
-					"ran out of xchg resources");
+			    "ran out of xchg resources");
 			fct_queue_cmd_for_termination(cmd,
-					FCT_NO_XCHG_RESOURCE);
+			    FCT_NO_XCHG_RESOURCE);
 			return;
 		}
 	} else {
@@ -1004,7 +1004,7 @@ fct_trigger_rport_cleanup(fct_i_remote_port_t *irp, int ttc)
 	fct_remote_port_t	*rp = irp->irp_rp;
 	fct_local_port_t	*port = rp->rp_port;
 	fct_i_local_port_t	*iport =
-				(fct_i_local_port_t *)port->port_fct_private;
+	    (fct_i_local_port_t *)port->port_fct_private;
 	fct_cmd_t		*cmd;
 	fct_i_cmd_t		*icmd;
 	int			i;
@@ -1039,10 +1039,10 @@ fct_trigger_rport_cleanup(fct_i_remote_port_t *irp, int ttc)
 		if (cmd->cmd_type & ttc) {
 			if (cmd->cmd_type == FCT_CMD_FCP_XCHG)
 				fct_queue_scsi_task_for_termination(cmd,
-						FCT_ABORTED);
+				    FCT_ABORTED);
 			else
 				fct_q_for_termination_lock_held(iport, icmd,
-						FCT_ABORTED);
+				    FCT_ABORTED);
 			cleaned++;
 		} else {
 			skipped++;
@@ -1056,7 +1056,7 @@ fct_trigger_rport_cleanup(fct_i_remote_port_t *irp, int ttc)
 		 */
 		stmf_trace(iport->iport_alias, "Clean up trouble for irp"
 		    " %p, c/s/u/t = %d/%d/%d/%d", irp, cleaned, skipped,
-			unhandled, total);
+		    unhandled, total);
 		ret = 0;
 	}
 	if ((cleaned) && IS_WORKER_SLEEPING(iport))
@@ -1093,7 +1093,7 @@ fct_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
 	irp = (fct_i_remote_port_t *)rp->rp_fct_private;
 
 	if ((ret = port->port_register_remote_port(port, rp, cmd)) !=
-			FCT_SUCCESS)
+	    FCT_SUCCESS)
 		return (ret);
 
 	rw_enter(&iport->iport_lock, RW_WRITER);
@@ -1110,11 +1110,13 @@ fct_register_remote_port(fct_local_port_t *port, fct_remote_port_t *rp,
 		}
 		if ((iport->iport_rp_slots[rp->rp_handle] != NULL) &&
 		    (iport->iport_rp_slots[rp->rp_handle] != irp)) {
+			fct_i_remote_port_t *t_irp =
+			    iport->iport_rp_slots[rp->rp_handle];
 			(void) snprintf(info, 160, "fct_register_remote_port: "
 			    "FCA returned a handle %d for portid %x "
 			    "which was already in use for a different "
 			    "portid (%x)", rp->rp_handle, rp->rp_id,
-		    (iport->iport_rp_slots[rp->rp_handle])->irp_rp->rp_id);
+			    t_irp->irp_rp->rp_id);
 			info[159] = 0;
 			goto hba_fatal_err;
 		}
@@ -1226,12 +1228,15 @@ fct_walk_discovery_queue(fct_i_local_port_t *iport)
 		fct_i_remote_port_t *irp = *pirp;
 		disc_action_t ret = DISC_ACTION_NO_WORK;
 		int do_deregister = 0;
+		int irp_deregister_timer = 0;
 
 		if (irp->irp_els_list) {
 			ret |= fct_process_els(iport, irp);
 		}
-		if (irp->irp_deregister_timer) {
-			if (ddi_get_lbolt() >= irp->irp_deregister_timer) {
+
+		irp_deregister_timer = irp->irp_deregister_timer;
+		if (irp_deregister_timer) {
+			if (ddi_get_lbolt() >= irp_deregister_timer) {
 				do_deregister = 1;
 			} else {
 				ret |= DISC_ACTION_DELAY_RESCAN;
@@ -1245,7 +1250,7 @@ fct_walk_discovery_queue(fct_i_local_port_t *iport)
 			rw_enter(&irp->irp_lock, RW_WRITER);
 			mutex_enter(&iport->iport_worker_lock);
 			if (irp->irp_els_list == NULL) {
-				if (!irp->irp_deregister_timer ||
+				if (!irp_deregister_timer ||
 				    (do_deregister &&
 				    !irp->irp_sa_elses_count &&
 				    !irp->irp_nsa_elses_count &&
@@ -1253,13 +1258,13 @@ fct_walk_discovery_queue(fct_i_local_port_t *iport)
 				    !irp->irp_nonfcp_xchg_count)) {
 					/* dequeue irp from discovery queue */
 					atomic_and_32(&irp->irp_flags,
-						~IRP_IN_DISCOVERY_QUEUE);
+					    ~IRP_IN_DISCOVERY_QUEUE);
 					*pirp = irp->irp_discovery_next;
 					if (iport->iport_rpwe_head == NULL)
 						iport->iport_rpwe_tail = NULL;
 					else if (irp == iport->iport_rpwe_tail)
 						iport->iport_rpwe_tail =
-							prev_irp;
+						    prev_irp;
 
 					irp->irp_discovery_next = NULL;
 					if (do_deregister) {
@@ -1272,7 +1277,7 @@ fct_walk_discovery_queue(fct_i_local_port_t *iport)
 							    irp_cur_item = irp;
 						} else {
 							irp_cur_item->irp_next =
-								irp;
+							    irp;
 							irp_cur_item = irp;
 						}
 					} else {
@@ -1359,11 +1364,11 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 	fct_remote_port_t	*rp = cmd->cmd_rp;
 	fct_local_port_t	*port = cmd->cmd_port;
 	fct_i_local_port_t	*iport = (fct_i_local_port_t *)
-					port->port_fct_private;
+	    port->port_fct_private;
 	fct_els_t		*els = (fct_els_t *)
-					cmd->cmd_specific;
+	    cmd->cmd_specific;
 	fct_i_remote_port_t	*irp = (fct_i_remote_port_t *)
-					rp->rp_fct_private;
+	    rp->rp_fct_private;
 	uint8_t			*p;
 	fct_status_t		 ret;
 	uint8_t			 cmd_type   = cmd->cmd_type;
@@ -1380,7 +1385,7 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 			/* Cleanup everything except elses */
 			if (fct_trigger_rport_cleanup(irp, ~(cmd->cmd_type))) {
 				atomic_or_32(&irp->irp_flags,
-							IRP_SESSION_CLEANUP);
+				    IRP_SESSION_CLEANUP);
 			} else {
 				/* XXX: handle this */
 				/* EMPTY */
@@ -1403,8 +1408,8 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 
 		if ((ddi_get_lbolt() & 0x7f) == 0) {
 			stmf_trace(iport->iport_alias, "handling"
-				" PLOGI rp_id %x, waiting for cmds to"
-				" drain", cmd->cmd_rportid);
+			    " PLOGI rp_id %x, waiting for cmds to"
+			    " drain", cmd->cmd_rportid);
 		}
 		return (DISC_ACTION_DELAY_RESCAN);
 	}
@@ -1422,7 +1427,7 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 	if (cmd->cmd_type == FCT_CMD_RCVD_ELS) {
 		els->els_resp_size = els->els_req_size;
 		p = els->els_resp_payload = (uint8_t *)kmem_zalloc(
-					els->els_resp_size, KM_SLEEP);
+		    els->els_resp_size, KM_SLEEP);
 		els->els_resp_alloc_size = els->els_resp_size;
 		bcopy(els->els_req_payload, p, els->els_resp_size);
 		p[0] = ELS_OP_ACC;
@@ -1468,14 +1473,14 @@ fct_process_plogi(fct_i_cmd_t *icmd)
 			 * Check fct_process_els() for more info.
 			 */
 			atomic_or_32(&irp->irp_flags,
-				IRP_SOL_PLOGI_IN_PROGRESS);
+			    IRP_SOL_PLOGI_IN_PROGRESS);
 			atomic_or_32(&icmd->icmd_flags, ICMD_KNOWN_TO_FCA);
 			ret = port->port_send_cmd(cmd);
 			if (ret != FCT_SUCCESS) {
 				atomic_and_32(&icmd->icmd_flags,
 				    ~ICMD_KNOWN_TO_FCA);
 				atomic_and_32(&irp->irp_flags,
-					~IRP_SOL_PLOGI_IN_PROGRESS);
+				    ~IRP_SOL_PLOGI_IN_PROGRESS);
 			}
 		}
 	}
@@ -1513,11 +1518,11 @@ fct_process_prli(fct_i_cmd_t *icmd)
 	fct_remote_port_t	*rp    = cmd->cmd_rp;
 	fct_local_port_t	*port  = cmd->cmd_port;
 	fct_i_local_port_t	*iport = (fct_i_local_port_t *)
-					port->port_fct_private;
+	    port->port_fct_private;
 	fct_els_t		*els   = (fct_els_t *)
-					cmd->cmd_specific;
+	    cmd->cmd_specific;
 	fct_i_remote_port_t	*irp   = (fct_i_remote_port_t *)
-					rp->rp_fct_private;
+	    rp->rp_fct_private;
 	stmf_scsi_session_t	*ses   = NULL;
 	fct_status_t		 ret;
 	clock_t			 end_time;
@@ -1540,11 +1545,11 @@ fct_process_prli(fct_i_cmd_t *icmd)
 
 	/* Make sure the process is fcp in this case */
 	if ((els->els_req_size != 20) || (bcmp(els->els_req_payload,
-						fct_prli_temp, 16))) {
+	    fct_prli_temp, 16))) {
 		if (els->els_req_payload[4] != 0x08)
 			stmf_trace(iport->iport_alias, "PRLI received from"
 			    " %x for unknown FC-4 type %x", cmd->cmd_rportid,
-				els->els_req_payload[4]);
+			    els->els_req_payload[4]);
 		else
 			stmf_trace(iport->iport_alias, "Rejecting PRLI from %x "
 			    " pld sz %d, prli_flags %x", cmd->cmd_rportid,
@@ -1585,8 +1590,8 @@ fct_process_prli(fct_i_cmd_t *icmd)
 
 		if ((ddi_get_lbolt() & 0x7f) == 0) {
 			stmf_trace(iport->iport_alias, "handling"
-				" PRLI from %x, waiting for cmds to"
-				" drain", cmd->cmd_rportid);
+			    " PRLI from %x, waiting for cmds to"
+			    " drain", cmd->cmd_rportid);
 		}
 		return (DISC_ACTION_DELAY_RESCAN);
 	}
@@ -1608,7 +1613,7 @@ fct_process_prli(fct_i_cmd_t *icmd)
 		ses->ss_rport_id = (scsi_devid_desc_t *)irp->irp_id;
 		ses->ss_lport = port->port_lport;
 		if (stmf_register_scsi_session(port->port_lport, ses) !=
-							STMF_SUCCESS) {
+		    STMF_SUCCESS) {
 			stmf_free(ses);
 			ses = NULL;
 		} else {
@@ -1669,9 +1674,9 @@ fct_process_logo(fct_i_cmd_t *icmd)
 	fct_remote_port_t	*rp    = cmd->cmd_rp;
 	fct_local_port_t	*port  = cmd->cmd_port;
 	fct_i_local_port_t	*iport = (fct_i_local_port_t *)
-					port->port_fct_private;
+	    port->port_fct_private;
 	fct_i_remote_port_t	*irp   = (fct_i_remote_port_t *)
-					rp->rp_fct_private;
+	    rp->rp_fct_private;
 	fct_status_t		 ret;
 	char			 info[160];
 	clock_t			 end_time;
@@ -1685,7 +1690,7 @@ fct_process_logo(fct_i_cmd_t *icmd)
 			/* Cleanup everything except elses */
 			if (fct_trigger_rport_cleanup(irp, ~(cmd->cmd_type))) {
 				atomic_or_32(&irp->irp_flags,
-							IRP_SESSION_CLEANUP);
+				    IRP_SESSION_CLEANUP);
 			} else {
 				/* XXX: need more handling */
 				return (DISC_ACTION_DELAY_RESCAN);
@@ -1708,8 +1713,8 @@ fct_process_logo(fct_i_cmd_t *icmd)
 
 		if ((ddi_get_lbolt() & 0x7f) == 0) {
 			stmf_trace(iport->iport_alias, "handling"
-				" LOGO rp_id %x, waiting for cmds to"
-				" drain", cmd->cmd_rportid);
+			    " LOGO rp_id %x, waiting for cmds to"
+			    " drain", cmd->cmd_rportid);
 		}
 		return (DISC_ACTION_DELAY_RESCAN);
 	}
@@ -1748,7 +1753,7 @@ fct_process_logo(fct_i_cmd_t *icmd)
 	}
 
 	irp->irp_deregister_timer = ddi_get_lbolt() +
-				drv_usectohz(USEC_DEREG_RP_TIMEOUT);
+	    drv_usectohz(USEC_DEREG_RP_TIMEOUT);
 	irp->irp_dereg_count = 0;
 
 	/* Do not touch cmd here as it may have been freed */
@@ -1765,9 +1770,9 @@ fct_process_prlo(fct_i_cmd_t *icmd)
 	fct_remote_port_t	*rp    = cmd->cmd_rp;
 	fct_local_port_t	*port  = cmd->cmd_port;
 	fct_i_local_port_t	*iport = (fct_i_local_port_t *)
-					port->port_fct_private;
+	    port->port_fct_private;
 	fct_i_remote_port_t	*irp   = (fct_i_remote_port_t *)
-					rp->rp_fct_private;
+	    rp->rp_fct_private;
 	fct_status_t		 ret;
 	clock_t			 end_time;
 	char			 info[160];
@@ -1784,7 +1789,7 @@ fct_process_prlo(fct_i_cmd_t *icmd)
 			/* Cleanup everything except elses */
 			if (fct_trigger_rport_cleanup(irp, FCT_CMD_FCP_XCHG)) {
 				atomic_or_32(&irp->irp_flags,
-							IRP_FCP_CLEANUP);
+				    IRP_FCP_CLEANUP);
 			} else {
 				/* XXX: need more handling */
 				return (DISC_ACTION_DELAY_RESCAN);
@@ -1807,8 +1812,8 @@ fct_process_prlo(fct_i_cmd_t *icmd)
 
 		if ((ddi_get_lbolt() & 0x7f) == 0) {
 			stmf_trace(iport->iport_alias, "handling"
-				" PRLO from %x, waiting for cmds to"
-				" drain", cmd->cmd_rportid);
+			    " PRLO from %x, waiting for cmds to"
+			    " drain", cmd->cmd_rportid);
 		}
 		return (DISC_ACTION_DELAY_RESCAN);
 	}
@@ -1839,11 +1844,11 @@ fct_process_rcvd_adisc(fct_i_cmd_t *icmd)
 	fct_remote_port_t	*rp = cmd->cmd_rp;
 	fct_local_port_t	*port = cmd->cmd_port;
 	fct_i_local_port_t	*iport = (fct_i_local_port_t *)
-					port->port_fct_private;
+	    port->port_fct_private;
 	fct_els_t		*els = (fct_els_t *)
-					cmd->cmd_specific;
+	    cmd->cmd_specific;
 	fct_i_remote_port_t	*irp = (fct_i_remote_port_t *)
-					rp->rp_fct_private;
+	    rp->rp_fct_private;
 	uint8_t			*p;
 	uint32_t		*q;
 	fct_status_t		ret;
@@ -1987,18 +1992,18 @@ fct_process_els(fct_i_local_port_t *iport, fct_i_remote_port_t *irp)
 			/* This els might have set the CLEANUP flag */
 			atomic_and_32(&irp->irp_flags, ~IRP_SESSION_CLEANUP);
 			stmf_trace(iport->iport_alias, "Killing ELS %x cond 1",
-				els->els_req_payload[0]);
+			    els->els_req_payload[0]);
 		} else if (irp->irp_sa_elses_count &&
 		    (((*ppcmd)->icmd_flags & ICMD_SESSION_AFFECTING) == 0)) {
 			stmf_trace(iport->iport_alias, "Killing ELS %x cond 2",
-				els->els_req_payload[0]);
+			    els->els_req_payload[0]);
 			dq = 1;
 		} else if (((irp->irp_flags & IRP_PLOGI_DONE) == 0) &&
 		    (els->els_req_payload[0] != ELS_OP_PLOGI) &&
 		    (els->els_req_payload[0] != ELS_OP_LOGO) &&
 		    (special_prli_cond == 0)) {
 			stmf_trace(iport->iport_alias, "Killing ELS %x cond 3",
-				els->els_req_payload[0]);
+			    els->els_req_payload[0]);
 			dq = 1;
 		}
 
@@ -2023,7 +2028,7 @@ fct_process_els(fct_i_local_port_t *iport, fct_i_remote_port_t *irp)
 
 		atomic_and_32(&cmd_to_abort->icmd_flags, ~ICMD_IN_IRP_QUEUE);
 		fct_queue_cmd_for_termination(cmd_to_abort->icmd_cmd,
-				FCT_ABORTED);
+		    FCT_ABORTED);
 		cmd_to_abort = c;
 	}
 
@@ -2221,9 +2226,10 @@ fct_check_solcmd_queue(fct_i_local_port_t *iport)
 			if (iport->iport_solcmd_queue == icmd) {
 				iport->iport_solcmd_queue = next_icmd;
 			} else {
-				for (prev_icmd = iport->iport_solcmd_queue;
-				    prev_icmd->icmd_solcmd_next != icmd;
-				    prev_icmd = prev_icmd->icmd_solcmd_next);
+				prev_icmd = iport->iport_solcmd_queue;
+				while (prev_icmd->icmd_solcmd_next != icmd) {
+					prev_icmd = prev_icmd->icmd_solcmd_next;
+				}
 				prev_icmd->icmd_solcmd_next = next_icmd;
 			}
 
