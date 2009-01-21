@@ -94,7 +94,7 @@ static struct dev_ops fp_ops = {
 	fp_power	/* power */
 };
 
-#define	FP_VERSION		"1.97"
+#define	FP_VERSION		"1.98"
 #define	FP_NAME_VERSION		"SunFC Port v" FP_VERSION
 
 char *fp_version = FP_NAME_VERSION;
@@ -4094,7 +4094,9 @@ fp_port_login(fc_local_port_t *port, uint32_t d_id, job_request_t *job,
 	}
 
 	/* npiv check to make sure we don't log into ourself */
-	if (relogin && (port->fp_topology == FC_TOP_FABRIC)) {
+	if (relogin &&
+	    ((port->fp_npiv_type == FC_NPIV_PORT) ||
+	    (port->fp_npiv_flag == FC_NPIV_ENABLE))) {
 		if ((d_id & 0xffff00) ==
 		    (port->fp_port_id.port_id & 0xffff00)) {
 			found = 1;
