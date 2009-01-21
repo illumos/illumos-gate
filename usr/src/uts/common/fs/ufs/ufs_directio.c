@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * Portions of this source code were derived from Berkeley 4.3 BSD
  * under license from the Regents of the University of California.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -263,7 +261,7 @@ directio_wait(struct directio_buf *tail, long *bytes_iop)
  * Initiate direct IO request
  */
 static void
-directio_start(struct ufsvfs *ufsvfsp, dev_t dev, size_t nbytes,
+directio_start(struct ufsvfs *ufsvfsp, struct inode *ip, size_t nbytes,
 	offset_t offset, char *addr, enum seg_rw rw, struct proc *procp,
 	struct directio_buf **tailp, page_t **pplist)
 {
@@ -287,11 +285,12 @@ directio_start(struct ufsvfs *ufsvfsp, dev_t dev, size_t nbytes,
 	dbp->addr = addr;
 	dbp->nbytes = nbytes;
 	bp = &dbp->buf;
-	bp->b_edev = dev;
+	bp->b_edev = ip->i_dev;
 	bp->b_lblkno = btodt(offset);
 	bp->b_bcount = nbytes;
 	bp->b_un.b_addr = addr;
 	bp->b_proc = procp;
+	bp->b_file = ip->i_vnode;
 
 	/*
 	 * Note that S_WRITE implies B_READ and vice versa: a read(2)
@@ -702,7 +701,7 @@ skip_alloc:
 			/*
 			 * Kick off the direct write requests
 			 */
-			directio_start(ufsvfsp, ip->i_dev, nbytes, ldbtob(bn),
+			directio_start(ufsvfsp, ip, nbytes, ldbtob(bn),
 			    iov->iov_base, S_READ, procp, &tail, spplist);
 
 			/*
@@ -1011,7 +1010,7 @@ ufs_directio_read(struct inode *ip, uio_t *uio, cred_t *cr, int *statusp)
 				/*
 				 * Kick off the direct read requests
 				 */
-				directio_start(ufsvfsp, ip->i_dev, nbytes,
+				directio_start(ufsvfsp, ip, nbytes,
 				    ldbtob(bn), iov->iov_base,
 				    S_WRITE, procp, &tail, spplist);
 			}
