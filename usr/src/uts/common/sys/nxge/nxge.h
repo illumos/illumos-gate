@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -581,6 +581,7 @@ typedef struct _nxge_ring_group_t {
 	mac_group_handle_t	ghandle;
 	p_nxge_t		nxgep;
 	boolean_t		started;
+	boolean_t		port_default_grp;
 	mac_ring_type_t		type;
 	int			gindex;
 	int			sindex;
@@ -676,6 +677,7 @@ struct _nxge_t {
 
 	ether_addr_st		factaddr;	/* factory mac address	    */
 	ether_addr_st		ouraddr;	/* individual address	    */
+	boolean_t		primary;	/* primary addr set?.	    */
 	kmutex_t		ouraddr_lock;	/* lock to protect to uradd */
 
 	ddi_iblock_cookie_t	interrupt_cookie;

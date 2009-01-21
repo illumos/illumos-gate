@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,6 +162,7 @@ nxge_hio_init(nxge_t *nxge)
 		nxge->rx_hio_groups[i].gindex = 0;
 		nxge->rx_hio_groups[i].sindex = 0;
 		nxge->rx_hio_groups[i].started = B_FALSE;
+		nxge->rx_hio_groups[i].port_default_grp = B_FALSE;
 		nxge->rx_hio_groups[i].rdctbl = -1;
 		nxge->rx_hio_groups[i].n_mac_addrs = 0;
 	}
@@ -1013,6 +1014,7 @@ nxge_hio_init(
 		nxge->rx_hio_groups[i].gindex = 0;
 		nxge->rx_hio_groups[i].sindex = 0;
 		nxge->rx_hio_groups[i].started = B_FALSE;
+		nxge->rx_hio_groups[i].port_default_grp = B_FALSE;
 		nxge->rx_hio_groups[i].rdctbl = -1;
 		nxge->rx_hio_groups[i].n_mac_addrs = 0;
 	}
@@ -1114,6 +1116,32 @@ nxge_hio_group_mac_add(nxge_t *nxge, nxge_ring_group_t *g,
 }
 
 static int
+nxge_hio_set_unicst(void *arg, const uint8_t *macaddr)
+{
+	p_nxge_t		nxgep = (p_nxge_t)arg;
+	struct ether_addr	addrp;
+
+	bcopy(macaddr, (uint8_t *)&addrp, ETHERADDRL);
+	if (nxge_set_mac_addr(nxgep, &addrp)) {
+		NXGE_ERROR_MSG((nxgep, NXGE_ERR_CTL,
+		    "<== nxge_m_unicst: set unitcast failed"));
+		return (EINVAL);
+	}
+
+	nxgep->primary = B_TRUE;
+
+	return (0);
+}
+
+/*ARGSUSED*/
+static int
+nxge_hio_clear_unicst(p_nxge_t nxgep, const uint8_t *mac_addr)
+{
+	nxgep->primary = B_FALSE;
+	return (0);
+}
+
+static int
 nxge_hio_add_mac(void *arg, const uint8_t *mac_addr)
 {
 	nxge_ring_group_t *group = (nxge_ring_group_t *)arg;
@@ -1124,6 +1152,12 @@ nxge_hio_add_mac(void *arg, const uint8_t *mac_addr)
 	ASSERT(group->type == MAC_RING_TYPE_RX);
 
 	mutex_enter(nxge->genlock);
+
+	if (!nxge->primary && group->port_default_grp) {
+		rv = nxge_hio_set_unicst((void *)nxge, mac_addr);
+		mutex_exit(nxge->genlock);
+		return (rv);
+	}
 
 	/*
 	 * If the group is associated with a VR, then only one
@@ -1166,6 +1200,7 @@ static int
 nxge_hio_rem_mac(void *arg, const uint8_t *mac_addr)
 {
 	nxge_ring_group_t *group = (nxge_ring_group_t *)arg;
+	struct ether_addr addrp;
 	p_nxge_t nxge = group->nxgep;
 	nxge_mmac_t *mmac_info;
 	int rv, slot;
@@ -1177,8 +1212,20 @@ nxge_hio_rem_mac(void *arg, const uint8_t *mac_addr)
 	mmac_info = &nxge->nxge_mmac_info;
 	slot = find_mac_slot(mmac_info, mac_addr);
 	if (slot < 0) {
-		mutex_exit(nxge->genlock);
-		return (EINVAL);
+		if (group->port_default_grp && nxge->primary) {
+			bcopy(mac_addr, (uint8_t *)&addrp, ETHERADDRL);
+			if (ether_cmp(&addrp, &nxge->ouraddr) == 0) {
+				rv = nxge_hio_clear_unicst(nxge, mac_addr);
+				mutex_exit(nxge->genlock);
+				return (rv);
+			} else {
+				mutex_exit(nxge->genlock);
+				return (EINVAL);
+			}
+		} else {
+			mutex_exit(nxge->genlock);
+			return (EINVAL);
+		}
 	}
 
 	mutex_exit(nxge->genlock);
@@ -1287,6 +1334,10 @@ nxge_hio_group_get(void *arg, mac_ring_type_t type, int groupid,
 
 		dev_gindex = nxgep->pt_config.hw_config.def_mac_rxdma_grpid +
 		    groupid;
+
+		if (nxgep->pt_config.hw_config.def_mac_rxdma_grpid ==
+		    dev_gindex)
+			group->port_default_grp = B_TRUE;
 
 		infop->mgi_driver = (mac_group_driver_t)group;
 		infop->mgi_start = nxge_hio_group_start;
