@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -462,7 +462,68 @@ wifi_cfg_bsstype(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
 		wl_get_bsstype(ic, ow_opmode);
 		break;
 	case  WLAN_SET_PARAM:
+		if (*iw_opmode == ic->ic_opmode)
+			break;
+
 		err = wl_set_bsstype(ic, iw_opmode);
+		break;
+	default:
+		ieee80211_err("wifi_cfg_bsstype: unknown command %x\n", cmd);
+		outp->wldp_result = WL_NOTSUPPORTED;
+		err = EINVAL;
+		break;
+	}
+
+	freemsg(*mp);
+	*mp = omp;
+	return (err);
+}
+
+static int
+wifi_cfg_createibss(struct ieee80211com *ic, uint32_t cmd, mblk_t **mp)
+{
+	mblk_t *omp;
+	wldp_t *inp = (wldp_t *)(*mp)->b_rptr;
+	wldp_t *outp;
+	wl_create_ibss_t *iw_ibss = (wl_create_ibss_t *)inp->wldp_buf;
+	wl_create_ibss_t *ow_ibss;
+	int err = 0;
+
+	if ((omp = wifi_getoutmsg(*mp, cmd, sizeof (wl_create_ibss_t))) == NULL)
+		return (ENOMEM);
+	outp = (wldp_t *)omp->b_rptr;
+	ow_ibss = (wl_create_ibss_t *)outp->wldp_buf;
+
+	switch (cmd) {
+	case WLAN_GET_PARAM:
+		*ow_ibss = (ic->ic_flags & IEEE80211_F_IBSSON) ? 1 : 0;
+		break;
+	case  WLAN_SET_PARAM:
+		ieee80211_dbg(IEEE80211_MSG_CONFIG, "wifi_cfg_createibss: "
+		    "set createibss=%u\n", *iw_ibss);
+		if ((ic->ic_caps & IEEE80211_C_IBSS) == 0) {
+			outp->wldp_result = WL_LACK_FEATURE;
+			err = ENOTSUP;
+			break;
+		}
+		if (*iw_ibss) { /* create ibss */
+			if ((ic->ic_flags & IEEE80211_F_IBSSON) == 0) {
+				ic->ic_flags |= IEEE80211_F_IBSSON;
+				ic->ic_opmode = IEEE80211_M_IBSS;
+				/*
+				 * Yech, slot time may change depending on the
+				 * operating mode so reset it to be sure
+				 * everything is setup appropriately.
+				 */
+				ieee80211_reset_erp(ic);
+				err = ENETRESET;
+			}
+		} else {
+			if (ic->ic_flags & IEEE80211_F_IBSSON) {
+				ic->ic_flags &= ~IEEE80211_F_IBSSON;
+				err = ENETRESET;
+			}
+		}
 		break;
 	default:
 		ieee80211_err("wifi_cfg_bsstype: unknown command %x\n", cmd);
@@ -682,6 +743,8 @@ wifi_read_ap(void *arg, struct ieee80211_node *in)
 	if ((uint8_t *)conf > end)
 		return;
 
+	conf->wl_ess_conf_length = sizeof (struct wl_ess_conf);
+
 	/* skip newly allocated NULL bss node */
 	if (IEEE80211_ADDR_EQ(in->in_macaddr, ic->ic_macaddr))
 		return;
@@ -875,6 +938,8 @@ wifi_loaddefdata(struct ieee80211com *ic)
 		bzero(ic->ic_nw_keys[i].wk_key, IEEE80211_KEYBUF_SIZE);
 	}
 	ic->ic_curmode = IEEE80211_MODE_AUTO;
+	ic->ic_flags &= ~IEEE80211_F_IBSSON;
+	ic->ic_opmode = IEEE80211_M_STA;
 }
 
 static int
@@ -1244,6 +1309,9 @@ wifi_cfg_getset(struct ieee80211com *ic, mblk_t **mp, uint32_t cmd)
 	case WL_BSS_TYPE:
 		err = wifi_cfg_bsstype(ic, cmd, mp);
 		break;
+	case WL_CREATE_IBSS:
+		err = wifi_cfg_createibss(ic, cmd, mp);
+		break;
 	case WL_DESIRED_RATES:
 		err = wifi_cfg_desrates(ic, cmd, mp);
 		break;
@@ -1492,11 +1560,9 @@ wl_set_bsstype(struct ieee80211com *ic, const void *wldp_buf)
 			err = ENOTSUP;
 			break;
 		}
-		if ((ic->ic_flags & IEEE80211_F_IBSSON) == 0) {
-			ic->ic_flags |= IEEE80211_F_IBSSON;
-			ic->ic_opmode = IEEE80211_M_IBSS;
-			err = ENETRESET;
-		}
+
+		ic->ic_opmode = IEEE80211_M_IBSS;
+		err = ENETRESET;
 		break;
 	default:
 		ieee80211_err("wl_set_bsstype: "

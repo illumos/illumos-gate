@@ -1,11 +1,11 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,8 +34,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Node management routines
@@ -162,6 +160,7 @@ ieee80211_node_authorize(ieee80211_node_t *in)
 
 	in->in_flags |= IEEE80211_NODE_AUTH;
 	in->in_inact_reload = im->im_inact_run;
+	in->in_inact = in->in_inact_reload;
 }
 
 /*
@@ -391,6 +390,9 @@ ieee80211_reset_bss(ieee80211com_t *ic)
 {
 	ieee80211_node_t *in;
 	ieee80211_node_t *obss;
+
+	ieee80211_node_table_reset(&ic->ic_sta);
+	ieee80211_reset_erp(ic);
 
 	in = ieee80211_alloc_node(ic, &ic->ic_scan, ic->ic_macaddr);
 	ASSERT(in != NULL);

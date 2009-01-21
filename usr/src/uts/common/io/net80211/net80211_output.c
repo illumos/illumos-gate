@@ -1,11 +1,11 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,9 +34,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  * Send out 802.11 frames
@@ -402,18 +399,21 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 		if (mp == NULL)
 			return (ENOMEM);
 
-		bzero(frm, 8);	/* timestamp is set by hardware/driver */
+		bzero(frm, 8);	/* timestamp should be filled later */
 		frm += 8;
-		*(uint16_t *)frm = LE_16(in->in_intval);
+		*(uint16_t *)frm = LE_16(ic->ic_bss->in_intval);
 		frm += 2;
 		capinfo = ieee80211_get_capinfo(ic);
 		*(uint16_t *)frm = LE_16(capinfo);
 		frm += 2;
 
-		frm = ieee80211_add_ssid(frm, in->in_essid, in->in_esslen);
+		/* ssid */
+		frm = ieee80211_add_ssid(frm, ic->ic_bss->in_essid,
+		    ic->ic_bss->in_esslen);
+		/* supported rates */
 		frm = ieee80211_add_rates(frm, &in->in_rates);
 
-		if (ic->ic_phytype == IEEE80211_T_FH) {
+		if (IEEE80211_IS_CHAN_FHSS(ic->ic_curchan)) {
 			*frm++ = IEEE80211_ELEMID_FHPARMS;
 			*frm++ = IEEE80211_FH_LEN;
 			*frm++ = in->in_fhdwell & 0x00ff;
@@ -434,7 +434,12 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 			*frm++ = IEEE80211_IBSS_LEN;
 			*frm++ = 0; *frm++ = 0;		/* ATIM window */
 		}
+		/* ERP */
+		if (IEEE80211_IS_CHAN_ANYG(ic->ic_curchan))
+			frm = ieee80211_add_erp(frm, ic);
+		/* Extended supported rates */
 		frm = ieee80211_add_xrates(frm, &in->in_rates);
+		mp->b_wptr = frm;
 		break;
 
 	case IEEE80211_FC0_SUBTYPE_AUTH:
@@ -593,6 +598,7 @@ ieee80211_send_mgmt(ieee80211com_t *ic, ieee80211_node_t *in, int type, int arg)
 
 		frm = ieee80211_add_rates(frm, &in->in_rates);
 		frm = ieee80211_add_xrates(frm, &in->in_rates);
+		mp->b_wptr = frm;
 		break;
 
 	case IEEE80211_FC0_SUBTYPE_DISASSOC:

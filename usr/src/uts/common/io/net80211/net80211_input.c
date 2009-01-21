@@ -1,11 +1,11 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -73,6 +73,7 @@ ieee80211_input(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 	uint8_t tid;
 
 	ASSERT(in != NULL);
+	in->in_inact = in->in_inact_reload;
 	type = (uint8_t)-1;		/* undefined */
 	len = MBLKL(mp);
 	if (len < sizeof (struct ieee80211_frame_min)) {
@@ -179,7 +180,6 @@ ieee80211_input(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 			}
 			in->in_rxseqs[tid] = rxseq;
 		}
-		in->in_inact = 0;
 	}
 
 	switch (type) {
@@ -879,24 +879,21 @@ ieee80211_recv_beacon(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 		return;
 	}
 
-	if (scan.capinfo & IEEE80211_CAPINFO_IBSS) {
+	if (ic->ic_opmode == IEEE80211_M_IBSS &&
+	    scan.capinfo & IEEE80211_CAPINFO_IBSS) {
 		if (!IEEE80211_ADDR_EQ(wh->i_addr2, in->in_macaddr)) {
 			/*
 			 * Create a new entry in the neighbor table.
 			 */
 			in = ieee80211_add_neighbor(ic, wh, &scan);
-		} else if (in->in_capinfo == 0) {
-			/*
-			 * Update faked node created on transmit.
-			 * Note this also updates the tsf.
-			 */
-			ieee80211_init_neighbor(in, wh, &scan);
 		} else {
 			/*
-			 * Record tsf for potential resync.
+			 * Copy data from beacon to neighbor table.
+			 * Some of this information might change after
+			 * ieee80211_add_neighbor(), so we just copy
+			 * everything over to be safe.
 			 */
-			bcopy(scan.tstamp, in->in_tstamp.data,
-			    sizeof (in->in_tstamp));
+			ieee80211_init_neighbor(in, wh, &scan);
 		}
 		if (in != NULL) {
 			in->in_rssi = (uint8_t)rssi;
@@ -969,14 +966,20 @@ ieee80211_recv_mgmt(ieee80211com_t *ic, mblk_t *mp, struct ieee80211_node *in,
 			frm += frm[1] + 2;
 		}
 		IEEE80211_VERIFY_ELEMENT(rates, IEEE80211_RATE_MAXSIZE, break);
+		if (xrates != NULL) {
+			IEEE80211_VERIFY_ELEMENT(xrates,
+			    IEEE80211_RATE_MAXSIZE - rates[1], break);
+		}
 		IEEE80211_VERIFY_ELEMENT(ssid, IEEE80211_NWID_LEN, break);
 		IEEE80211_VERIFY_SSID(ic->ic_bss, ssid, break);
-		if ((ic->ic_flags & IEEE80211_F_HIDESSID) && ssid[1] == 0) {
-			ieee80211_dbg(IEEE80211_MSG_INPUT,
-			    "ieee80211_recv_mgmt: ignore %s, "
-			    "no ssid with ssid suppression enabled",
-			    IEEE80211_SUBTYPE_NAME(subtype));
-			break;
+		if (ic->ic_flags & IEEE80211_F_HIDESSID) {
+			if (ssid == NULL || ssid[1] == 0) {
+				ieee80211_dbg(IEEE80211_MSG_INPUT,
+				    "ieee80211_recv_mgmt: ignore %s, "
+				    "no ssid with ssid suppression enabled",
+				    IEEE80211_SUBTYPE_NAME(subtype));
+				break;
+			}
 		}
 
 		if (in == ic->ic_bss) {

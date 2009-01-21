@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -308,6 +308,8 @@ static int	iwk_rx_sens_init(iwk_sc_t *sc);
 static int	iwk_rx_sens(iwk_sc_t *sc);
 static int	iwk_cck_sens(iwk_sc_t *sc, uint32_t actual_rx_time);
 static int	iwk_ofdm_sens(iwk_sc_t *sc, uint32_t actual_rx_time);
+static void	iwk_recv_mgmt(struct ieee80211com *ic, mblk_t *mp,
+    struct ieee80211_node *in, int subtype, int rssi, uint32_t rstamp);
 
 static void	iwk_write_event_log(iwk_sc_t *);
 static void	iwk_write_error_log(iwk_sc_t *);
@@ -335,6 +337,11 @@ static int	iwk_m_getprop(void *arg, const char *pr_name,
 static void	iwk_destroy_locks(iwk_sc_t *sc);
 static int	iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type);
 static void	iwk_thread(iwk_sc_t *sc);
+static int	iwk_run_state_config_ibss(ieee80211com_t *ic);
+static int	iwk_run_state_config_sta(ieee80211com_t *ic);
+static int	iwk_start_tx_beacon(ieee80211com_t *ic);
+static int	iwk_clean_add_node_ibss(struct ieee80211com *ic,
+    uint8_t addr[IEEE80211_ADDR_LEN], uint8_t *index2);
 
 /*
  * Supported rates for 802.11b/g modes (in 500Kbps unit).
@@ -561,6 +568,8 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_INTR_PRI(sc->sc_intr_pri));
 	mutex_init(&sc->sc_mt_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(sc->sc_intr_pri));
+	mutex_init(&sc->sc_ibss.node_tb_lock, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(sc->sc_intr_pri));
 
 	cv_init(&sc->sc_fw_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&sc->sc_cmd_cv, NULL, CV_DRIVER, NULL);
@@ -651,6 +660,10 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * Support WPA/WPA2
 	 */
 	ic->ic_caps |= IEEE80211_C_WPA;
+	/*
+	 * support Adhoc mode
+	 */
+	ic->ic_caps |= IEEE80211_C_IBSS;
 
 	/* set supported .11b and .11g rates */
 	ic->ic_sup_rates[IEEE80211_MODE_11B] = iwk_rateset_11b;
@@ -665,6 +678,7 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ |
 		    IEEE80211_CHAN_PASSIVE;
 	}
+	ic->ic_ibss_chan = &ic->ic_sup_channels[0];
 
 	ic->ic_xmit = iwk_send;
 	/*
@@ -685,6 +699,7 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	sc->sc_newstate = ic->ic_newstate;
 	ic->ic_newstate = iwk_newstate;
 	sc->sc_recv_mgmt = ic->ic_recv_mgmt;
+	ic->ic_recv_mgmt = iwk_recv_mgmt;
 	ic->ic_node_alloc = iwk_node_alloc;
 	ic->ic_node_free = iwk_node_free;
 	ic->ic_crypto.cs_key_set = iwk_key_set;
@@ -727,7 +742,7 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	IEEE80211_ADDR_COPY(wd.wd_bssid, ic->ic_macaddr);
 
 	macp = mac_alloc(MAC_VERSION);
-	if (err != DDI_SUCCESS) {
+	if (macp == NULL) {
 		cmn_err(CE_WARN,
 		    "iwk_attach(): failed to do mac_alloc()\n");
 		goto attach_fail9;
@@ -1620,48 +1635,30 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		}
 		IWK_DBG((IWK_DEBUG_80211, "iwk: associated."));
 
+		/* IBSS mode */
+		if (ic->ic_opmode == IEEE80211_M_IBSS) {
+			/*
+			 * clean all nodes in ibss node table
+			 * in order to be consistent with hardware
+			 */
+			err = iwk_run_state_config_ibss(ic);
+			if (err != IWK_SUCCESS) {
+				cmn_err(CE_WARN, "iwk_newstate(): "
+				    "failed to update configuration "
+				    "in IBSS mode\n");
+				mutex_exit(&sc->sc_glock);
+				return (err);
+			}
+		}
+
 		/* none IBSS mode */
 		if (ic->ic_opmode != IEEE80211_M_IBSS) {
 			/* update adapter's configuration */
-			if (sc->sc_assoc_id != in->in_associd) {
-				cmn_err(CE_WARN,
-				    "associate ID mismatch: expected %d, "
-				    "got %d\n",
-				    in->in_associd, sc->sc_assoc_id);
-			}
-			sc->sc_config.assoc_id = in->in_associd & 0x3fff;
-			/*
-			 * short preamble/slot time are
-			 * negotiated when associating
-			 */
-			sc->sc_config.flags &=
-			    ~LE_32(RXON_FLG_SHORT_PREAMBLE_MSK |
-			    RXON_FLG_SHORT_SLOT_MSK);
-
-			if (ic->ic_flags & IEEE80211_F_SHSLOT)
-				sc->sc_config.flags |=
-				    LE_32(RXON_FLG_SHORT_SLOT_MSK);
-
-			if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
-				sc->sc_config.flags |=
-				    LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
-
-			sc->sc_config.filter_flags |=
-			    LE_32(RXON_FILTER_ASSOC_MSK);
-
-			if (ic->ic_opmode != IEEE80211_M_STA)
-				sc->sc_config.filter_flags |=
-				    LE_32(RXON_FILTER_BCON_AWARE_MSK);
-
-			IWK_DBG((IWK_DEBUG_80211, "config chan %d flags %x"
-			    " filter_flags %x\n",
-			    sc->sc_config.chan, sc->sc_config.flags,
-			    sc->sc_config.filter_flags));
-			err = iwk_cmd(sc, REPLY_RXON, &sc->sc_config,
-			    sizeof (iwk_rxon_cmd_t), 1);
+			err = iwk_run_state_config_sta(ic);
 			if (err != IWK_SUCCESS) {
-				cmn_err(CE_WARN, "could not update "
-				    "configuration\n");
+				cmn_err(CE_WARN, "iwk_newstate(): "
+				    "failed to update configuration "
+				    "in none IBSS mode\n");
 				mutex_exit(&sc->sc_glock);
 				return (err);
 			}
@@ -1678,7 +1675,22 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		if (err) {
 			cmn_err(CE_WARN, "iwk_newstate(): "
 			    "failed to set tx power table\n");
+			mutex_exit(&sc->sc_glock);
 			return (err);
+		}
+
+		if (ic->ic_opmode == IEEE80211_M_IBSS) {
+
+			/*
+			 * allocate and transmit beacon frames
+			 */
+			err = iwk_start_tx_beacon(ic);
+			if (err != IWK_SUCCESS) {
+				cmn_err(CE_WARN, "iwk_newstate(): "
+				    "can't transmit beacon frames\n");
+				mutex_exit(&sc->sc_glock);
+				return (err);
+			}
 		}
 
 		/* start automatic rate control */
@@ -1758,6 +1770,7 @@ static int iwk_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
 	iwk_sc_t *sc = (iwk_sc_t *)ic;
 	iwk_add_sta_t node;
 	int err;
+	uint8_t index1;
 
 	switch (k->wk_cipher->ic_cipher) {
 	case IEEE80211_CIPHER_WEP:
@@ -1778,6 +1791,66 @@ static int iwk_key_set(ieee80211com_t *ic, const struct ieee80211_key *k,
 	if (IEEE80211_IS_MULTICAST(mac)) {
 		(void) memset(node.bssid, 0xff, 6);
 		node.id = IWK_BROADCAST_ID;
+	} else if (ic->ic_opmode == IEEE80211_M_IBSS) {
+		mutex_exit(&sc->sc_glock);
+		mutex_enter(&sc->sc_ibss.node_tb_lock);
+
+		/*
+		 * search for node in ibss node table
+		 */
+		for (index1 = IWK_STA_ID; index1 < IWK_STATION_COUNT;
+		    index1++) {
+			if (sc->sc_ibss.ibss_node_tb[index1].used &&
+			    IEEE80211_ADDR_EQ(sc->sc_ibss.
+			    ibss_node_tb[index1].node.bssid,
+			    mac)) {
+				break;
+			}
+		}
+		if (index1 >= IWK_BROADCAST_ID) {
+			cmn_err(CE_WARN, "iwk_key_set(): "
+			    "have no this node in hardware node table\n");
+			mutex_exit(&sc->sc_ibss.node_tb_lock);
+			return (0);
+		} else {
+			/*
+			 * configure key for given node in hardware
+			 */
+			if (k->wk_flags & IEEE80211_KEY_XMIT) {
+				sc->sc_ibss.ibss_node_tb[index1].
+				    node.key_flags = 0;
+				sc->sc_ibss.ibss_node_tb[index1].
+				    node.keyp = k->wk_keyix;
+			} else {
+				sc->sc_ibss.ibss_node_tb[index1].
+				    node.key_flags = (1 << 14);
+				sc->sc_ibss.ibss_node_tb[index1].
+				    node.keyp = k->wk_keyix + 4;
+			}
+
+			(void) memcpy(sc->sc_ibss.ibss_node_tb[index1].node.key,
+			    k->wk_key, k->wk_keylen);
+			sc->sc_ibss.ibss_node_tb[index1].node.key_flags |=
+			    (STA_KEY_FLG_CCMP | (1 << 3) | (k->wk_keyix << 8));
+			sc->sc_ibss.ibss_node_tb[index1].node.sta_mask =
+			    STA_MODIFY_KEY_MASK;
+			sc->sc_ibss.ibss_node_tb[index1].node.control = 1;
+
+			mutex_enter(&sc->sc_glock);
+			err = iwk_cmd(sc, REPLY_ADD_STA,
+			    &sc->sc_ibss.ibss_node_tb[index1].node,
+			    sizeof (iwk_add_sta_t), 1);
+			if (err != IWK_SUCCESS) {
+				cmn_err(CE_WARN, "iwk_key_set(): "
+				    "failed to update IBSS node in hardware\n");
+				mutex_exit(&sc->sc_glock);
+				mutex_exit(&sc->sc_ibss.node_tb_lock);
+				return (0);
+			}
+			mutex_exit(&sc->sc_glock);
+		}
+		mutex_exit(&sc->sc_ibss.node_tb_lock);
+		return (1);
 	} else {
 		IEEE80211_ADDR_COPY(node.bssid, ic->ic_bss->in_bssid);
 		node.id = IWK_AP_ID;
@@ -2497,6 +2570,7 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	mblk_t *m, *m0;
 	int rate, hdrlen, len, len0, mblen, off, err = IWK_SUCCESS;
 	uint16_t masks = 0;
+	uint8_t index, index1, index2;
 
 	ring = &sc->sc_txq[0];
 	data = &ring->data[ring->cur];
@@ -2549,6 +2623,49 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	freemsg(mp);
 
 	wh = (struct ieee80211_frame *)m->b_rptr;
+
+	if (ic->ic_opmode == IEEE80211_M_IBSS &&
+	    (!(IEEE80211_IS_MULTICAST(wh->i_addr1)))) {
+		mutex_enter(&sc->sc_glock);
+		mutex_enter(&sc->sc_ibss.node_tb_lock);
+
+		/*
+		 * search for node in ibss node table
+		 */
+		for (index1 = IWK_STA_ID;
+		    index1 < IWK_STATION_COUNT; index1++) {
+			if (sc->sc_ibss.ibss_node_tb[index1].used &&
+			    IEEE80211_ADDR_EQ(sc->sc_ibss.
+			    ibss_node_tb[index1].node.bssid,
+			    wh->i_addr1)) {
+				break;
+			}
+		}
+
+		/*
+		 * if don't find in ibss node table
+		 */
+		if (index1 >= IWK_BROADCAST_ID) {
+			err = iwk_clean_add_node_ibss(ic,
+			    wh->i_addr1, &index2);
+			if (err != IWK_SUCCESS) {
+				cmn_err(CE_WARN, "iwk_send(): "
+				    "failed to clean all nodes "
+				    "and add one node\n");
+				mutex_exit(&sc->sc_ibss.node_tb_lock);
+				mutex_exit(&sc->sc_glock);
+				freemsg(m);
+				sc->sc_tx_err++;
+				err = IWK_SUCCESS;
+				goto exit;
+			}
+			index = index2;
+		} else {
+			index = index1;
+		}
+		mutex_exit(&sc->sc_ibss.node_tb_lock);
+		mutex_exit(&sc->sc_glock);
+	}
 
 	in = ieee80211_find_txnode(ic, wh->i_addr1);
 	if (in == NULL) {
@@ -2640,7 +2757,9 @@ iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type)
 	if (IEEE80211_IS_MULTICAST(wh->i_addr1)) {
 		tx->sta_id = IWK_BROADCAST_ID;
 	} else {
-		if (ic->ic_opmode != IEEE80211_M_IBSS)
+		if (ic->ic_opmode == IEEE80211_M_IBSS)
+			tx->sta_id = index;
+		else
 			tx->sta_id = IWK_AP_ID;
 	}
 
@@ -2740,7 +2859,15 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 {
 	iwk_sc_t	*sc  = (iwk_sc_t *)arg;
 	ieee80211com_t	*ic = &sc->sc_ic;
-	int		err;
+
+	enum ieee80211_opmode		oldmod;
+	iwk_tx_power_table_cmd_t	txpower;
+	iwk_add_sta_t			node;
+	iwk_link_quality_cmd_t		link_quality;
+	uint16_t			masks = 0;
+	int				i, err, err1;
+
+	oldmod = ic->ic_opmode;
 
 	mutex_enter(&sc->sc_glock);
 	if (sc->sc_flags & (IWK_F_SUSPEND | IWK_F_HW_ERR_RECOVER)) {
@@ -2751,6 +2878,125 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 	mutex_exit(&sc->sc_glock);
 
 	err = ieee80211_ioctl(ic, wq, mp);
+
+	/*
+	 * return to STA mode
+	 */
+	if ((0 == err || ENETRESET == err) && (oldmod != ic->ic_opmode) &&
+	    (ic->ic_opmode == IEEE80211_M_STA)) {
+		/* configure rxon */
+		(void) memset(&sc->sc_config, 0, sizeof (iwk_rxon_cmd_t));
+		IEEE80211_ADDR_COPY(sc->sc_config.node_addr, ic->ic_macaddr);
+		IEEE80211_ADDR_COPY(sc->sc_config.wlap_bssid, ic->ic_macaddr);
+		sc->sc_config.chan = ieee80211_chan2ieee(ic, ic->ic_curchan);
+		sc->sc_config.flags = (RXON_FLG_TSF2HOST_MSK |
+		    RXON_FLG_AUTO_DETECT_MSK |
+		    RXON_FLG_BAND_24G_MSK);
+		sc->sc_config.flags &= (~RXON_FLG_CCK_MSK);
+		switch (ic->ic_opmode) {
+		case IEEE80211_M_STA:
+			sc->sc_config.dev_type = RXON_DEV_TYPE_ESS;
+			sc->sc_config.filter_flags |=
+			    LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
+			    RXON_FILTER_DIS_DECRYPT_MSK |
+			    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
+			break;
+		case IEEE80211_M_IBSS:
+		case IEEE80211_M_AHDEMO:
+			sc->sc_config.dev_type = RXON_DEV_TYPE_IBSS;
+			sc->sc_config.flags |= RXON_FLG_SHORT_PREAMBLE_MSK;
+			sc->sc_config.filter_flags =
+			    LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
+			    RXON_FILTER_DIS_DECRYPT_MSK |
+			    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
+			break;
+		case IEEE80211_M_HOSTAP:
+			sc->sc_config.dev_type = RXON_DEV_TYPE_AP;
+			break;
+		case IEEE80211_M_MONITOR:
+			sc->sc_config.dev_type = RXON_DEV_TYPE_SNIFFER;
+			sc->sc_config.filter_flags |=
+			    LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
+			    RXON_FILTER_CTL2HOST_MSK |
+			    RXON_FILTER_PROMISC_MSK);
+			break;
+		}
+		sc->sc_config.cck_basic_rates  = 0x0f;
+		sc->sc_config.ofdm_basic_rates = 0xff;
+		sc->sc_config.ofdm_ht_single_stream_basic_rates = 0xff;
+		sc->sc_config.ofdm_ht_dual_stream_basic_rates = 0xff;
+		/* set antenna */
+		mutex_enter(&sc->sc_glock);
+		sc->sc_config.rx_chain = RXON_RX_CHAIN_DRIVER_FORCE_MSK |
+		    LE_16((0x7 << RXON_RX_CHAIN_VALID_POS) |
+		    (0x6 << RXON_RX_CHAIN_FORCE_SEL_POS) |
+		    (0x7 << RXON_RX_CHAIN_FORCE_MIMO_SEL_POS));
+		err1 = iwk_cmd(sc, REPLY_RXON, &sc->sc_config,
+		    sizeof (iwk_rxon_cmd_t), 1);
+		if (err1 != IWK_SUCCESS) {
+			cmn_err(CE_WARN, "iwk_m_ioctl(): "
+			    "failed to set configure command"
+			    " please run (ifconfig unplumb and"
+			    " ifconfig plumb)\n");
+		}
+		/*
+		 * set Tx power for 2.4GHz channels
+		 * (need further investigation. fix tx power at present)
+		 */
+		(void) memset(&txpower, 0, sizeof (txpower));
+		txpower.band = 1; /* for 2.4G */
+		txpower.channel = sc->sc_config.chan;
+		txpower.channel_normal_width = 0;
+		for (i = 0; i < POWER_TABLE_NUM_HT_OFDM_ENTRIES; i++) {
+			txpower.tx_power.ht_ofdm_power[i].
+			    s.ramon_tx_gain = 0x3f3f;
+			txpower.tx_power.ht_ofdm_power[i].
+			    s.dsp_predis_atten = 110 | (110 << 8);
+		}
+		txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES].
+		    s.ramon_tx_gain = 0x3f3f;
+		txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES].
+		    s.dsp_predis_atten = 110 | (110 << 8);
+		err1 = iwk_cmd(sc, REPLY_TX_PWR_TABLE_CMD, &txpower,
+		    sizeof (txpower), 1);
+		if (err1 != IWK_SUCCESS) {
+			cmn_err(CE_WARN, "iwk_m_ioctl(): failed to set txpower"
+			    " please run (ifconfig unplumb "
+			    "and ifconfig plumb)\n");
+		}
+		/* add broadcast node so that we can send broadcast frame */
+		(void) memset(&node, 0, sizeof (node));
+		(void) memset(node.bssid, 0xff, 6);
+		node.id = IWK_BROADCAST_ID;
+		err1 = iwk_cmd(sc, REPLY_ADD_STA, &node, sizeof (node), 1);
+		if (err1 != IWK_SUCCESS) {
+			cmn_err(CE_WARN, "iwk_m_ioctl(): "
+			    "failed to add broadcast node\n");
+		}
+
+		/* TX_LINK_QUALITY cmd */
+		(void) memset(&link_quality, 0, sizeof (link_quality));
+		for (i = 0; i < LINK_QUAL_MAX_RETRY_NUM; i++) {
+			masks |= RATE_MCS_CCK_MSK;
+			masks |= RATE_MCS_ANT_B_MSK;
+			masks &= ~RATE_MCS_ANT_A_MSK;
+			link_quality.rate_n_flags[i] =
+			    iwk_rate_to_plcp(2) | masks;
+		}
+		link_quality.general_params.single_stream_ant_msk = 2;
+		link_quality.general_params.dual_stream_ant_msk = 3;
+		link_quality.agg_params.agg_dis_start_th = 3;
+		link_quality.agg_params.agg_time_limit = LE_16(4000);
+		link_quality.sta_id = IWK_BROADCAST_ID;
+		err1 = iwk_cmd(sc, REPLY_TX_LINK_QUALITY_CMD, &link_quality,
+		    sizeof (link_quality), 1);
+		if (err1 != IWK_SUCCESS) {
+			cmn_err(CE_WARN, "iwk_m_ioctl(): "
+			    "failed to config link quality table\n");
+		}
+		mutex_exit(&sc->sc_glock);
+		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+	}
 
 	if (err == ENETRESET) {
 		/*
@@ -3252,7 +3498,7 @@ iwk_hw_set_before_auth(iwk_sc_t *sc)
 		return (err);
 	}
 
-	/* TX_LINK_QUALITY cmd ? */
+	/* TX_LINK_QUALITY cmd */
 	(void) memset(&link_quality, 0, sizeof (link_quality));
 	rs = ic->ic_sup_rates[ieee80211_chan2mode(ic, ic->ic_curchan)];
 	for (i = 0; i < LINK_QUAL_MAX_RETRY_NUM; i++) {
@@ -3505,6 +3751,7 @@ iwk_config(iwk_sc_t *sc)
 		    RXON_FILTER_DIS_DECRYPT_MSK |
 		    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
 		break;
+	case IEEE80211_M_IBSS:
 	case IEEE80211_M_AHDEMO:
 		sc->sc_config.dev_type = RXON_DEV_TYPE_IBSS;
 		sc->sc_config.flags |= RXON_FLG_SHORT_PREAMBLE_MSK;
@@ -5488,6 +5735,79 @@ static int iwk_ofdm_sens(iwk_sc_t *sc, uint32_t actual_rx_time)
 }
 
 /*
+ * additional process to management frames
+ */
+static void iwk_recv_mgmt(struct ieee80211com *ic, mblk_t *mp,
+    struct ieee80211_node *in,
+    int subtype, int rssi, uint32_t rstamp)
+{
+	iwk_sc_t *sc = (iwk_sc_t *)ic;
+	struct ieee80211_frame *wh;
+	uint8_t index1, index2;
+	int err;
+
+	sc->sc_recv_mgmt(ic, mp, in, subtype, rssi, rstamp);
+
+	mutex_enter(&sc->sc_glock);
+	switch (subtype) {
+	case IEEE80211_FC0_SUBTYPE_BEACON:
+		if (sc->sc_ibss.ibss_beacon.syncbeacon && in == ic->ic_bss &&
+		    ic->ic_state == IEEE80211_S_RUN) {
+			if (ieee80211_beacon_update(ic, in,
+			    &sc->sc_ibss.ibss_beacon.iwk_boff,
+			    sc->sc_ibss.ibss_beacon.mp, 0)) {
+				bcopy(sc->sc_ibss.ibss_beacon.mp->b_rptr,
+				    sc->sc_ibss.ibss_beacon.beacon_cmd.
+				    bcon_frame,
+				    MBLKL(sc->sc_ibss.ibss_beacon.mp));
+			}
+			err = iwk_cmd(sc, REPLY_TX_BEACON,
+			    &sc->sc_ibss.ibss_beacon.beacon_cmd,
+			    sc->sc_ibss.ibss_beacon.beacon_cmd_len, 1);
+			if (err != IWK_SUCCESS) {
+				cmn_err(CE_WARN, "iwk_recv_mgmt(): "
+				    "failed to TX beacon.\n");
+			}
+			sc->sc_ibss.ibss_beacon.syncbeacon = 0;
+		}
+		if (ic->ic_opmode == IEEE80211_M_IBSS &&
+		    ic->ic_state == IEEE80211_S_RUN) {
+			wh = (struct ieee80211_frame *)mp->b_rptr;
+			mutex_enter(&sc->sc_ibss.node_tb_lock);
+			/*
+			 * search for node in ibss node table
+			 */
+			for (index1 = IWK_STA_ID; index1 < IWK_STATION_COUNT;
+			    index1++) {
+				if (sc->sc_ibss.ibss_node_tb[index1].used &&
+				    IEEE80211_ADDR_EQ(sc->sc_ibss.
+				    ibss_node_tb[index1].node.bssid,
+				    wh->i_addr2)) {
+					break;
+				}
+			}
+			/*
+			 * if don't find in ibss node table
+			 */
+			if (index1 >= IWK_BROADCAST_ID) {
+				err = iwk_clean_add_node_ibss(ic,
+				    wh->i_addr2, &index2);
+				if (err != IWK_SUCCESS) {
+					cmn_err(CE_WARN, "iwk_recv_mgmt(): "
+					    "failed to clean all nodes "
+					    "and add one node\n");
+				}
+			}
+			mutex_exit(&sc->sc_ibss.node_tb_lock);
+		}
+		break;
+	case IEEE80211_FC0_SUBTYPE_PROBE_RESP:
+		break;
+	}
+	mutex_exit(&sc->sc_glock);
+}
+
+/*
  * 1)  log_event_table_ptr indicates base of the event log.  This traces
  *     a 256-entry history of uCode execution within a circular buffer.
  *     Its header format is:
@@ -5672,4 +5992,406 @@ static void iwk_write_error_log(iwk_sc_t *sc)
 	IWK_DBG((IWK_DEBUG_EEPROM, "tsf_hi=%d\n", iwk_mem_read(sc, err_ptr)));
 
 	iwk_mac_access_exit(sc);
+}
+
+static int
+iwk_run_state_config_ibss(ieee80211com_t *ic)
+{
+	iwk_sc_t *sc = (iwk_sc_t *)ic;
+	ieee80211_node_t *in = ic->ic_bss;
+	int i, err = IWK_SUCCESS;
+
+	mutex_enter(&sc->sc_ibss.node_tb_lock);
+
+	/*
+	 * clean all nodes in ibss node table assure be
+	 * consistent with hardware
+	 */
+	for (i = IWK_STA_ID; i < IWK_STATION_COUNT; i++) {
+		sc->sc_ibss.ibss_node_tb[i].used = 0;
+		(void) memset(&sc->sc_ibss.ibss_node_tb[i].node,
+		    0,
+		    sizeof (iwk_add_sta_t));
+	}
+
+	sc->sc_ibss.node_number = 0;
+
+	mutex_exit(&sc->sc_ibss.node_tb_lock);
+
+	/*
+	 * configure RX and TX
+	 */
+	sc->sc_config.dev_type = RXON_DEV_TYPE_IBSS;
+
+	sc->sc_config.flags |= RXON_FLG_SHORT_PREAMBLE_MSK;
+	sc->sc_config.filter_flags =
+	    LE_32(RXON_FILTER_ACCEPT_GRP_MSK |
+	    RXON_FILTER_DIS_DECRYPT_MSK |
+	    RXON_FILTER_DIS_GRP_DECRYPT_MSK);
+
+	sc->sc_config.assoc_id = 0;
+
+	IEEE80211_ADDR_COPY(sc->sc_config.bssid, in->in_bssid);
+	sc->sc_config.chan = ieee80211_chan2ieee(ic,
+	    in->in_chan);
+
+	if (ic->ic_curmode == IEEE80211_MODE_11B) {
+		sc->sc_config.cck_basic_rates = 0x03;
+		sc->sc_config.ofdm_basic_rates = 0;
+	} else if ((in->in_chan != IEEE80211_CHAN_ANYC) &&
+	    (IEEE80211_IS_CHAN_5GHZ(in->in_chan))) {
+		sc->sc_config.cck_basic_rates = 0;
+		sc->sc_config.ofdm_basic_rates = 0x15;
+
+	} else {
+		sc->sc_config.cck_basic_rates = 0x0f;
+		sc->sc_config.ofdm_basic_rates = 0xff;
+	}
+
+	sc->sc_config.flags &=
+	    ~LE_32(RXON_FLG_SHORT_PREAMBLE_MSK |
+	    RXON_FLG_SHORT_SLOT_MSK);
+
+	if (ic->ic_flags & IEEE80211_F_SHSLOT) {
+		sc->sc_config.flags |=
+		    LE_32(RXON_FLG_SHORT_SLOT_MSK);
+	}
+
+	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE) {
+		sc->sc_config.flags |=
+		    LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
+	}
+
+	sc->sc_config.filter_flags |=
+	    LE_32(RXON_FILTER_ASSOC_MSK);
+
+	err = iwk_cmd(sc, REPLY_RXON, &sc->sc_config,
+	    sizeof (iwk_rxon_cmd_t), 1);
+	if (err != IWK_SUCCESS) {
+		cmn_err(CE_WARN, "iwk_run_state_config_ibss(): "
+		    "failed to update configuration.\n");
+		return (err);
+	}
+
+	return (err);
+
+}
+
+static int
+iwk_run_state_config_sta(ieee80211com_t *ic)
+{
+	iwk_sc_t *sc = (iwk_sc_t *)ic;
+	ieee80211_node_t *in = ic->ic_bss;
+	int err = IWK_SUCCESS;
+
+	/* update adapter's configuration */
+	if (sc->sc_assoc_id != in->in_associd) {
+		cmn_err(CE_WARN, "iwk_run_state_config_sta(): "
+		    "associate ID mismatch: expected %d, "
+		    "got %d\n",
+		    in->in_associd, sc->sc_assoc_id);
+	}
+	sc->sc_config.assoc_id = in->in_associd & 0x3fff;
+
+	/*
+	 * short preamble/slot time are
+	 * negotiated when associating
+	 */
+	sc->sc_config.flags &=
+	    ~LE_32(RXON_FLG_SHORT_PREAMBLE_MSK |
+	    RXON_FLG_SHORT_SLOT_MSK);
+
+	if (ic->ic_flags & IEEE80211_F_SHSLOT)
+		sc->sc_config.flags |=
+		    LE_32(RXON_FLG_SHORT_SLOT_MSK);
+
+	if (ic->ic_flags & IEEE80211_F_SHPREAMBLE)
+		sc->sc_config.flags |=
+		    LE_32(RXON_FLG_SHORT_PREAMBLE_MSK);
+
+	sc->sc_config.filter_flags |=
+	    LE_32(RXON_FILTER_ASSOC_MSK);
+
+	if (ic->ic_opmode != IEEE80211_M_STA)
+		sc->sc_config.filter_flags |=
+		    LE_32(RXON_FILTER_BCON_AWARE_MSK);
+
+	IWK_DBG((IWK_DEBUG_80211, "config chan %d flags %x"
+	    " filter_flags %x\n",
+	    sc->sc_config.chan, sc->sc_config.flags,
+	    sc->sc_config.filter_flags));
+
+	err = iwk_cmd(sc, REPLY_RXON, &sc->sc_config,
+	    sizeof (iwk_rxon_cmd_t), 1);
+	if (err != IWK_SUCCESS) {
+		cmn_err(CE_WARN, "iwk_run_state_config_sta(): "
+		    "failed to update configuration\n");
+		return (err);
+	}
+
+	return (err);
+}
+
+static int
+iwk_start_tx_beacon(ieee80211com_t *ic)
+{
+	iwk_sc_t *sc = (iwk_sc_t *)ic;
+	ieee80211_node_t *in = ic->ic_bss;
+	int err = IWK_SUCCESS;
+	iwk_tx_beacon_cmd_t  *tx_beacon_p;
+	uint16_t  masks = 0;
+	mblk_t *mp;
+	int rate;
+
+	/*
+	 * allocate and transmit beacon frames
+	 */
+	tx_beacon_p = &sc->sc_ibss.ibss_beacon.beacon_cmd;
+
+	(void) memset(tx_beacon_p, 0,
+	    sizeof (iwk_tx_beacon_cmd_t));
+	rate = 0;
+	masks = 0;
+
+	tx_beacon_p->config.sta_id = IWK_BROADCAST_ID;
+	tx_beacon_p->config.stop_time.life_time =
+	    LE_32(0xffffffff);
+
+	if (sc->sc_ibss.ibss_beacon.mp != NULL) {
+		freemsg(sc->sc_ibss.ibss_beacon.mp);
+		sc->sc_ibss.ibss_beacon.mp = NULL;
+	}
+
+	sc->sc_ibss.ibss_beacon.mp =
+	    ieee80211_beacon_alloc(ic, in,
+	    &sc->sc_ibss.ibss_beacon.iwk_boff);
+	if (sc->sc_ibss.ibss_beacon.mp == NULL) {
+		cmn_err(CE_WARN, "iwk_start_tx_beacon(): "
+		    "failed to get beacon frame.\n");
+		return (IWK_FAIL);
+	}
+
+	mp = sc->sc_ibss.ibss_beacon.mp;
+
+	ASSERT(mp->b_cont == NULL);
+
+	bcopy(mp->b_rptr, tx_beacon_p->bcon_frame, MBLKL(mp));
+
+	tx_beacon_p->config.len = (uint16_t)(MBLKL(mp));
+	sc->sc_ibss.ibss_beacon.beacon_cmd_len =
+	    sizeof (iwk_tx_cmd_t) +
+	    4 + tx_beacon_p->config.len;
+
+	/*
+	 * beacons are sent at 1M
+	 */
+	rate = in->in_rates.ir_rates[0];
+	rate &= IEEE80211_RATE_VAL;
+
+	if (2 == rate || 4 == rate || 11 == rate ||
+	    22 == rate) {
+		masks |= RATE_MCS_CCK_MSK;
+	}
+
+	masks |= RATE_MCS_ANT_B_MSK;
+
+	tx_beacon_p->config.rate.r.rate_n_flags =
+	    (iwk_rate_to_plcp(rate) | masks);
+
+
+	tx_beacon_p->config.tx_flags =
+	    (TX_CMD_FLG_SEQ_CTL_MSK | TX_CMD_FLG_TSF_MSK);
+
+	if (ic->ic_bss->in_tstamp.tsf != 0) {
+		sc->sc_ibss.ibss_beacon.syncbeacon = 1;
+	} else {
+		if (ieee80211_beacon_update(ic, in,
+		    &sc->sc_ibss.ibss_beacon.iwk_boff,
+		    mp, 0)) {
+			bcopy(mp->b_rptr,
+			    tx_beacon_p->bcon_frame,
+			    MBLKL(mp));
+		}
+
+		err = iwk_cmd(sc, REPLY_TX_BEACON,
+		    tx_beacon_p,
+		    sc->sc_ibss.ibss_beacon.beacon_cmd_len,
+		    1);
+		if (err != IWK_SUCCESS) {
+			cmn_err(CE_WARN, "iwk_start_tx_beacon(): "
+			    "failed to TX beacon.\n");
+			return (err);
+		}
+
+		sc->sc_ibss.ibss_beacon.syncbeacon = 0;
+	}
+
+	return (err);
+}
+
+static int
+iwk_clean_add_node_ibss(struct ieee80211com *ic,
+    uint8_t addr[IEEE80211_ADDR_LEN], uint8_t *index2)
+{
+	iwk_sc_t *sc = (iwk_sc_t *)ic;
+	uint8_t	index;
+	iwk_add_sta_t bc_node;
+	iwk_link_quality_cmd_t bc_link_quality;
+	iwk_link_quality_cmd_t link_quality;
+	uint16_t  bc_masks = 0;
+	uint16_t  masks = 0;
+	int i, rate;
+	struct ieee80211_rateset rs;
+	iwk_ibss_node_t *ibss_node_p;
+	int err = IWK_SUCCESS;
+
+	/*
+	 * find a location that is not
+	 * used in ibss node table
+	 */
+	for (index = IWK_STA_ID;
+	    index < IWK_STATION_COUNT; index++) {
+		if (!sc->sc_ibss.ibss_node_tb[index].used) {
+			break;
+		}
+	}
+
+	/*
+	 * if have too many nodes in hardware, clean up
+	 */
+	if (index < IWK_BROADCAST_ID &&
+	    sc->sc_ibss.node_number >= 25) {
+		if (iwk_cmd(sc, REPLY_REMOVE_ALL_STA,
+		    NULL, 0, 1) != IWK_SUCCESS) {
+			cmn_err(CE_WARN, "iwk_clean_add_node_ibss(): "
+			    "failed to remove all nodes in hardware\n");
+			return (IWK_FAIL);
+		}
+
+		for (i = IWK_STA_ID; i < IWK_STATION_COUNT; i++) {
+			sc->sc_ibss.ibss_node_tb[i].used = 0;
+			(void) memset(&sc->sc_ibss.ibss_node_tb[i].node,
+			    0, sizeof (iwk_add_sta_t));
+		}
+
+		sc->sc_ibss.node_number = 0;
+
+		/*
+		 * add broadcast node so that we
+		 * can send broadcast frame
+		 */
+		(void) memset(&bc_node, 0, sizeof (bc_node));
+		(void) memset(bc_node.bssid, 0xff, 6);
+		bc_node.id = IWK_BROADCAST_ID;
+
+		err = iwk_cmd(sc, REPLY_ADD_STA, &bc_node, sizeof (bc_node), 1);
+		if (err != IWK_SUCCESS) {
+		cmn_err(CE_WARN, "iwk_clean_add_node_ibss(): "
+		    "failed to add broadcast node\n");
+		return (err);
+		}
+
+		/* TX_LINK_QUALITY cmd */
+		(void) memset(&bc_link_quality, 0, sizeof (bc_link_quality));
+		for (i = 0; i < LINK_QUAL_MAX_RETRY_NUM; i++) {
+			bc_masks |= RATE_MCS_CCK_MSK;
+			bc_masks |= RATE_MCS_ANT_B_MSK;
+			bc_masks &= ~RATE_MCS_ANT_A_MSK;
+			bc_link_quality.rate_n_flags[i] =
+			    iwk_rate_to_plcp(2) | bc_masks;
+		}
+
+		bc_link_quality.general_params.single_stream_ant_msk = 2;
+		bc_link_quality.general_params.dual_stream_ant_msk = 3;
+		bc_link_quality.agg_params.agg_dis_start_th = 3;
+		bc_link_quality.agg_params.agg_time_limit = LE_16(4000);
+		bc_link_quality.sta_id = IWK_BROADCAST_ID;
+
+		err = iwk_cmd(sc, REPLY_TX_LINK_QUALITY_CMD,
+		    &bc_link_quality, sizeof (bc_link_quality), 1);
+		if (err != IWK_SUCCESS) {
+			cmn_err(CE_WARN, "iwk_clean_add_node_ibss(): "
+			    "failed to config link quality table\n");
+			return (err);
+		}
+	}
+
+	if (index >= IWK_BROADCAST_ID) {
+		cmn_err(CE_WARN, "iwk_clean_add_node_ibss(): "
+		    "the count of node in hardware is too much\n");
+		return (IWK_FAIL);
+	}
+
+	/*
+	 * add a node into hardware
+	 */
+	ibss_node_p = &sc->sc_ibss.ibss_node_tb[index];
+
+	ibss_node_p->used = 1;
+
+	(void) memset(&ibss_node_p->node, 0,
+	    sizeof (iwk_add_sta_t));
+
+	IEEE80211_ADDR_COPY(ibss_node_p->node.bssid, addr);
+	ibss_node_p->node.id = index;
+	ibss_node_p->node.control = 0;
+	ibss_node_p->node.flags = 0;
+
+	err = iwk_cmd(sc, REPLY_ADD_STA, &ibss_node_p->node,
+	    sizeof (iwk_add_sta_t), 1);
+	if (err != IWK_SUCCESS) {
+		cmn_err(CE_WARN, "iwk_clean_add_node_ibss(): "
+		    "failed to add IBSS node\n");
+		ibss_node_p->used = 0;
+		(void) memset(&ibss_node_p->node, 0,
+		    sizeof (iwk_add_sta_t));
+		return (err);
+	}
+
+	sc->sc_ibss.node_number++;
+
+	(void) memset(&link_quality, 0, sizeof (link_quality));
+
+	rs = ic->ic_sup_rates[ieee80211_chan2mode(ic,
+	    ic->ic_curchan)];
+
+	for (i = 0; i < LINK_QUAL_MAX_RETRY_NUM; i++) {
+		if (i < rs.ir_nrates) {
+			rate = rs.
+			    ir_rates[rs.ir_nrates - i];
+		} else {
+			rate = 2;
+		}
+
+		if (2 == rate || 4 == rate ||
+		    11 == rate || 22 == rate) {
+			masks |= RATE_MCS_CCK_MSK;
+		}
+
+		masks |= RATE_MCS_ANT_B_MSK;
+		masks &= ~RATE_MCS_ANT_A_MSK;
+
+		link_quality.rate_n_flags[i] =
+		    iwk_rate_to_plcp(rate) | masks;
+	}
+
+	link_quality.general_params.single_stream_ant_msk = 2;
+	link_quality.general_params.dual_stream_ant_msk = 3;
+	link_quality.agg_params.agg_dis_start_th = 3;
+	link_quality.agg_params.agg_time_limit = LE_16(4000);
+	link_quality.sta_id = ibss_node_p->node.id;
+
+	err = iwk_cmd(sc, REPLY_TX_LINK_QUALITY_CMD,
+	    &link_quality, sizeof (link_quality), 1);
+	if (err != IWK_SUCCESS) {
+		cmn_err(CE_WARN, "iwk_clean_add_node_ibss(): "
+		    "failed to set up TX link quality\n");
+		ibss_node_p->used = 0;
+		(void) memset(ibss_node_p->node.bssid, 0, 6);
+		return (err);
+	}
+
+	*index2 = index;
+
+	return (err);
 }

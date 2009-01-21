@@ -1,11 +1,11 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Copyright (c) 2001 Atsushi Onoe
- * Copyright (c) 2002-2005 Sam Leffler, Errno Consulting
+ * Copyright (c) 2002-2008 Sam Leffler, Errno Consulting
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,8 +34,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * IEEE 802.11 protocol support
@@ -106,49 +104,49 @@ ieee80211_dump_pkt(const uint8_t *buf, int32_t len, int32_t rate, int32_t rssi)
 	switch (wh->i_fc[1] & IEEE80211_FC1_DIR_MASK) {
 	case IEEE80211_FC1_DIR_NODS:
 		(void) snprintf(buf2, sizeof (buf2), "NODS %s",
-			ieee80211_macaddr_sprintf(wh->i_addr2));
+		    ieee80211_macaddr_sprintf(wh->i_addr2));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		(void) snprintf(buf2, sizeof (buf2), "->%s",
-			ieee80211_macaddr_sprintf(wh->i_addr1));
+		    ieee80211_macaddr_sprintf(wh->i_addr1));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		(void) snprintf(buf2, sizeof (buf2), "(%s)",
-			ieee80211_macaddr_sprintf(wh->i_addr3));
+		    ieee80211_macaddr_sprintf(wh->i_addr3));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		break;
 	case IEEE80211_FC1_DIR_TODS:
 		(void) snprintf(buf2, sizeof (buf2), "TODS %s",
-			ieee80211_macaddr_sprintf(wh->i_addr2));
+		    ieee80211_macaddr_sprintf(wh->i_addr2));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		(void) snprintf(buf2, sizeof (buf2), "->%s",
-			ieee80211_macaddr_sprintf(wh->i_addr3));
+		    ieee80211_macaddr_sprintf(wh->i_addr3));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		(void) snprintf(buf2, sizeof (buf2), "(%s)",
-			ieee80211_macaddr_sprintf(wh->i_addr1));
+		    ieee80211_macaddr_sprintf(wh->i_addr1));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		break;
 	case IEEE80211_FC1_DIR_FROMDS:
 		(void) snprintf(buf2, sizeof (buf2), "FRDS %s",
-			ieee80211_macaddr_sprintf(wh->i_addr3));
+		    ieee80211_macaddr_sprintf(wh->i_addr3));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		(void) snprintf(buf2, sizeof (buf2), "->%s",
-			ieee80211_macaddr_sprintf(wh->i_addr1));
+		    ieee80211_macaddr_sprintf(wh->i_addr1));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		(void) snprintf(buf2, sizeof (buf2), "(%s)",
-			ieee80211_macaddr_sprintf(wh->i_addr2));
+		    ieee80211_macaddr_sprintf(wh->i_addr2));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		break;
 	case IEEE80211_FC1_DIR_DSTODS:
 		(void) snprintf(buf2, sizeof (buf2), "DSDS %s",
-			ieee80211_macaddr_sprintf((uint8_t *)&wh[1]));
+		    ieee80211_macaddr_sprintf((uint8_t *)&wh[1]));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		(void) snprintf(buf2, sizeof (buf2), "->%s  ",
-			ieee80211_macaddr_sprintf(wh->i_addr3));
+		    ieee80211_macaddr_sprintf(wh->i_addr3));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		(void) snprintf(buf2, sizeof (buf2), "%s",
-			ieee80211_macaddr_sprintf(wh->i_addr2));
+		    ieee80211_macaddr_sprintf(wh->i_addr2));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		(void) snprintf(buf2, sizeof (buf2), "->%s",
-			ieee80211_macaddr_sprintf(wh->i_addr1));
+		    ieee80211_macaddr_sprintf(wh->i_addr1));
 		(void) strncat(buf1, buf2, sizeof (buf2));
 		break;
 	}
@@ -161,13 +159,13 @@ ieee80211_dump_pkt(const uint8_t *buf, int32_t len, int32_t rate, int32_t rssi)
 		break;
 	case IEEE80211_FC0_TYPE_MGT:
 		(void) snprintf(buf2, sizeof (buf2), "%s",
-			ieee80211_mgt_subtype_name[
-				(wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK)
-				>> IEEE80211_FC0_SUBTYPE_SHIFT]);
+		    ieee80211_mgt_subtype_name[
+		    (wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK)
+		    >> IEEE80211_FC0_SUBTYPE_SHIFT]);
 		break;
 	default:
 		(void) snprintf(buf2, sizeof (buf2), "type#%d",
-			wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK);
+		    wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK);
 		break;
 	}
 	(void) strncat(buf1, buf2, sizeof (buf2));
@@ -194,7 +192,7 @@ ieee80211_dump_pkt(const uint8_t *buf, int32_t len, int32_t rate, int32_t rssi)
 			(void) strncat(buf1, buf2, 3);
 		}
 		ieee80211_dbg(IEEE80211_MSG_ANY, "ieee80211_dump_pkt(): %s",
-			buf1);
+		    buf1);
 	}
 }
 
@@ -327,7 +325,7 @@ ieee80211_reset_erp(ieee80211com_t *ic)
 	 * the driver is capable of doing it.
 	 */
 	ieee80211_set_shortslottime(ic,
-		ic->ic_curmode == IEEE80211_MODE_11A);
+	    ic->ic_curmode == IEEE80211_MODE_11A);
 	/*
 	 * Set short preamble and ERP barker-preamble flags.
 	 */
@@ -424,7 +422,7 @@ ieee80211_beacon_miss(ieee80211com_t *ic)
 	if (ic->ic_flags & IEEE80211_F_SCAN)
 		return;
 	ieee80211_dbg(IEEE80211_MSG_STATE | IEEE80211_MSG_DEBUG,
-		"%s\n", "beacon miss");
+	    "%s\n", "beacon miss");
 
 	/*
 	 * Our handling is only meaningful for stations that are
@@ -446,9 +444,9 @@ ieee80211_beacon_miss(ieee80211com_t *ic)
 		 */
 		IEEE80211_UNLOCK(ic);
 		(void) ieee80211_send_probereq(ic->ic_bss, ic->ic_macaddr,
-			ic->ic_bss->in_bssid, ic->ic_bss->in_bssid,
-			ic->ic_bss->in_essid, ic->ic_bss->in_esslen,
-			ic->ic_opt_ie, ic->ic_opt_ie_len);
+		    ic->ic_bss->in_bssid, ic->ic_bss->in_bssid,
+		    ic->ic_bss->in_essid, ic->ic_bss->in_esslen,
+		    ic->ic_opt_ie, ic->ic_opt_ie_len);
 		return;
 	}
 	im->im_bmiss_count = 0;
@@ -470,8 +468,8 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	IEEE80211_LOCK(ic);
 	ostate = ic->ic_state;
 	ieee80211_dbg(IEEE80211_MSG_STATE, "ieee80211_newstate(): "
-		"%s -> %s\n",
-		ieee80211_state_name[ostate], ieee80211_state_name[nstate]);
+	    "%s -> %s\n",
+	    ieee80211_state_name[ostate], ieee80211_state_name[nstate]);
 	ic->ic_state = nstate;
 	in = ic->ic_bss;
 	im->im_swbmiss_period = 0;	/* Reset software beacon miss period */
@@ -490,16 +488,23 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		case IEEE80211_S_ASSOC:
 			if (ic->ic_opmode == IEEE80211_M_STA) {
 				IEEE80211_SEND_MGMT(ic, in,
-					IEEE80211_FC0_SUBTYPE_DEAUTH,
-					IEEE80211_REASON_AUTH_LEAVE);
+				    IEEE80211_FC0_SUBTYPE_DEAUTH,
+				    IEEE80211_REASON_AUTH_LEAVE);
 			}
 			break;
 		case IEEE80211_S_RUN:
-			if (ic->ic_opmode == IEEE80211_M_STA) {
+			switch (ic->ic_opmode) {
+			case IEEE80211_M_STA:
 				IEEE80211_SEND_MGMT(ic, in,
-					IEEE80211_FC0_SUBTYPE_DISASSOC,
-					IEEE80211_REASON_ASSOC_LEAVE);
+				    IEEE80211_FC0_SUBTYPE_DISASSOC,
+				    IEEE80211_REASON_ASSOC_LEAVE);
 				ieee80211_sta_leave(ic, in);
+				break;
+			case IEEE80211_M_IBSS:
+				ieee80211_notify_node_leave(ic, in);
+				break;
+			default:
+				break;
 			}
 			break;
 		}
@@ -510,20 +515,9 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	case IEEE80211_S_SCAN:
 		switch (ostate) {
 		case IEEE80211_S_INIT:
-			if (ic->ic_opmode == IEEE80211_M_IBSS &&
-			    ic->ic_des_chan != IEEE80211_CHAN_ANYC) {
-				/*
-				 * AP operation and we already have a channel;
-				 * bypass the scan and startup immediately.
-				 */
-				ieee80211_create_ibss(ic, ic->ic_des_chan);
-			} else {
-				IEEE80211_UNLOCK(ic);
-				ieee80211_begin_scan(ic,
-					(arg == 0) ? B_FALSE : B_TRUE);
-				return (0);
-			}
-			break;
+			IEEE80211_UNLOCK(ic);
+			ieee80211_begin_scan(ic, (arg == 0) ? B_FALSE : B_TRUE);
+			return (0);
 		case IEEE80211_S_SCAN:
 			/*
 			 * Scan next. If doing an active scan and the
@@ -535,18 +529,18 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			    !IEEE80211_IS_CHAN_PASSIVE(ic->ic_curchan)) {
 				IEEE80211_UNLOCK(ic);
 				(void) ieee80211_send_probereq(in,
-					ic->ic_macaddr, wifi_bcastaddr,
-					wifi_bcastaddr,
-					ic->ic_des_essid, ic->ic_des_esslen,
-					ic->ic_opt_ie, ic->ic_opt_ie_len);
+				    ic->ic_macaddr, wifi_bcastaddr,
+				    wifi_bcastaddr,
+				    ic->ic_des_essid, ic->ic_des_esslen,
+				    ic->ic_opt_ie, ic->ic_opt_ie_len);
 				return (0);
 			}
 			break;
 		case IEEE80211_S_RUN:
 			/* beacon miss */
 			ieee80211_dbg(IEEE80211_MSG_STATE,
-				"no recent beacons from %s, rescanning\n",
-				ieee80211_macaddr_sprintf(in->in_macaddr));
+			    "no recent beacons from %s, rescanning\n",
+			    ieee80211_macaddr_sprintf(in->in_macaddr));
 			IEEE80211_UNLOCK(ic);
 			ieee80211_sta_leave(ic, in);
 			IEEE80211_LOCK(ic);
@@ -556,7 +550,7 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		case IEEE80211_S_ASSOC:
 			/* timeout restart scan */
 			in = ieee80211_find_node(&ic->ic_scan,
-				ic->ic_bss->in_macaddr);
+			    ic->ic_bss->in_macaddr);
 			if (in != NULL) {
 				in->in_fails++;
 				ieee80211_unref_node(&in);
@@ -565,12 +559,13 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		}
 		break;
 	case IEEE80211_S_AUTH:
+		ASSERT(ic->ic_opmode == IEEE80211_M_STA);
 		switch (ostate) {
 		case IEEE80211_S_INIT:
 		case IEEE80211_S_SCAN:
 			IEEE80211_UNLOCK(ic);
 			IEEE80211_SEND_MGMT(ic, in, IEEE80211_FC0_SUBTYPE_AUTH,
-				1);
+			    1);
 			return (0);
 		case IEEE80211_S_AUTH:
 		case IEEE80211_S_ASSOC:
@@ -578,7 +573,7 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			case IEEE80211_FC0_SUBTYPE_AUTH:
 				IEEE80211_UNLOCK(ic);
 				IEEE80211_SEND_MGMT(ic, in,
-					IEEE80211_FC0_SUBTYPE_AUTH, 2);
+				    IEEE80211_FC0_SUBTYPE_AUTH, 2);
 				return (0);
 			case IEEE80211_FC0_SUBTYPE_DEAUTH:
 				/* ignore and retry scan on timeout */
@@ -591,37 +586,38 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 				ic->ic_state = ostate;	/* stay RUN */
 				IEEE80211_UNLOCK(ic);
 				IEEE80211_SEND_MGMT(ic, in,
-					IEEE80211_FC0_SUBTYPE_AUTH, 2);
+				    IEEE80211_FC0_SUBTYPE_AUTH, 2);
 				return (0);
 			case IEEE80211_FC0_SUBTYPE_DEAUTH:
 				IEEE80211_UNLOCK(ic);
 				ieee80211_sta_leave(ic, in);
 				/* try to re-auth */
 				IEEE80211_SEND_MGMT(ic, in,
-					IEEE80211_FC0_SUBTYPE_AUTH, 1);
+				    IEEE80211_FC0_SUBTYPE_AUTH, 1);
 				return (0);
 			}
 			break;
 		}
 		break;
 	case IEEE80211_S_ASSOC:
+		ASSERT(ic->ic_opmode == IEEE80211_M_STA);
 		switch (ostate) {
 		case IEEE80211_S_INIT:
 		case IEEE80211_S_SCAN:
 		case IEEE80211_S_ASSOC:
 			ieee80211_dbg(IEEE80211_MSG_ANY, "ieee80211_newstate: "
-				"invalid transition\n");
+			    "invalid transition\n");
 			break;
 		case IEEE80211_S_AUTH:
 			IEEE80211_UNLOCK(ic);
 			IEEE80211_SEND_MGMT(ic, in,
-				IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 0);
+			    IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 0);
 			return (0);
 		case IEEE80211_S_RUN:
 			IEEE80211_UNLOCK(ic);
 			ieee80211_sta_leave(ic, in);
 			IEEE80211_SEND_MGMT(ic, in,
-				IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 1);
+			    IEEE80211_FC0_SUBTYPE_ASSOC_REQ, 1);
 			return (0);
 		}
 		break;
@@ -629,18 +625,17 @@ ieee80211_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 		switch (ostate) {
 		case IEEE80211_S_INIT:
 			ieee80211_err("ieee80211_newstate: "
-				"invalid transition\n");
+			    "invalid transition\n");
 			break;
 		case IEEE80211_S_AUTH:
 			ieee80211_err("ieee80211_newstate: "
-				"invalid transition\n");
+			    "invalid transition\n");
 			break;
 		case IEEE80211_S_SCAN:		/* adhoc/hostap mode */
 		case IEEE80211_S_ASSOC:		/* infra mode */
 			ASSERT(in->in_txrate < in->in_rates.ir_nrates);
 			im->im_mgt_timer = 0;
-			if (ic->ic_opmode == IEEE80211_M_STA)
-				ieee80211_notify_node_join(ic, in);
+			ieee80211_notify_node_join(ic, in);
 
 			/*
 			 * We can send data now; update the fastpath with our

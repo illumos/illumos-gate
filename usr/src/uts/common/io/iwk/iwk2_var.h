@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,6 +90,28 @@ typedef struct iwk_amrr {
 	int	recovery;
 } iwk_amrr_t;
 
+typedef struct iwk_ibss_node {
+	iwk_add_sta_t	node;
+	int8_t		used;
+} iwk_ibss_node_t;
+
+typedef struct iwk_ibss_beacon {
+	/* for update beacon frame dynamically */
+	struct			ieee80211_beacon_offsets iwk_boff;
+	uint32_t		beacon_cmd_len;
+	iwk_tx_beacon_cmd_t	beacon_cmd;
+	uint8_t			syncbeacon;
+	/* beacon frame allocated from net80211 module */
+	mblk_t			*mp;
+} iwk_ibss_beacon_t;
+
+typedef struct iwk_ibss {
+	iwk_ibss_node_t		ibss_node_tb[IWK_STATION_COUNT];
+	uint32_t		node_number;
+	kmutex_t		node_tb_lock;
+	iwk_ibss_beacon_t	ibss_beacon;
+} iwk_ibss_t;
+
 typedef struct iwk_softc {
 	struct ieee80211com	sc_ic;
 	dev_info_t		*sc_dip;
@@ -174,6 +196,7 @@ typedef struct iwk_softc {
 	uint32_t		sc_tx_err;
 	uint32_t		sc_rx_err;
 	uint32_t		sc_tx_retries;
+	iwk_ibss_t		sc_ibss;
 } iwk_sc_t;
 
 #define	IWK_F_ATTACHED		(1 << 0)
