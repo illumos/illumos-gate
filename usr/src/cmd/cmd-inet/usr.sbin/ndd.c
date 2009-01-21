@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,7 @@ static boolean_t do_getset(int fd, int cmd, char *buf, int buf_len);
 static int	get_value(char *msg, char *buf, int buf_len);
 static void	name_print(char *buf);
 static void	getset_interactive(int fd);
-static int	open_device(dladm_handle_t);
+static int	open_device(void);
 static char	*errmsg(int err);
 static void	fatal(char *fmt, ...);
 static void	printe(boolean_t print_errno, char *fmt, ...);
@@ -62,29 +62,36 @@ static char	usage_str[] =	"usage: ndd -set device_name name value\n"
  * to test for support of the flowctrl property.
  */
 static void
-gldv3_warning(dladm_handle_t handle, char *module)
+gldv3_warning(char *module)
 {
 	datalink_id_t	linkid;
 	dladm_status_t	status;
 	char		buf[DLADM_PROP_VAL_MAX], *cp;
 	uint_t		cnt = 1;
 	char		*link;
+	dladm_handle_t	handle;
 
 	link = strrchr(module, '/');
 	if (link == NULL)
 		return;
+
+	if (dladm_open(&handle) != DLADM_STATUS_OK)
+		return;
+
 	status = dladm_name2info(handle, ++link, &linkid, NULL, NULL, NULL);
-	if (status != DLADM_STATUS_OK)
-		return;
-	cp = buf;
-	status = dladm_get_linkprop(handle, linkid, DLADM_PROP_VAL_CURRENT,
-	    "flowctrl", &cp, &cnt);
-	if (status != DLADM_STATUS_OK)
-		return;
-	(void) fprintf(stderr, gettext(
-	    "WARNING: The ndd commands for datalink administration "
-	    "are obsolete and may be removed in a future release of "
-	    "Solaris. Use dladm(1M) to manage datalink tunables.\n"));
+	if (status == DLADM_STATUS_OK) {
+		cp = buf;
+		status = dladm_get_linkprop(handle, linkid,
+		    DLADM_PROP_VAL_CURRENT, "flowctrl", &cp, &cnt);
+		if (status == DLADM_STATUS_OK) {
+			(void) fprintf(stderr, gettext(
+			    "WARNING: The ndd commands for datalink "
+			    "administration are obsolete and may be "
+			    "removed in a future release of Solaris. "
+			    "Use dladm(1M) to manage datalink tunables.\n"));
+		}
+	}
+	dladm_close(handle);
 }
 
 /* ARGSUSED */
@@ -94,14 +101,10 @@ main(int argc, char **argv)
 	char	*cp, *value;
 	int	cmd;
 	int	fd;
-	dladm_handle_t handle;
 
-	if (dladm_open(&handle) != DLADM_STATUS_OK)
-		fatal("failed to open dladm handle");
 
 	if (!(cp = *++argv)) {
-		/* open_device() calls gldv3_warning() which needs handle */
-		while ((fd = open_device(handle)) != -1) {
+		while ((fd = open_device()) != -1) {
 			getset_interactive(fd);
 			(void) close(fd);
 		}
@@ -117,8 +120,7 @@ main(int argc, char **argv)
 		if (!(cp = *++argv))
 			fatal(usage_str);
 	}
-	gldv3_warning(handle, cp);
-	dladm_close(handle);
+	gldv3_warning(cp);
 
 	if ((fd = open(cp, O_RDWR)) == -1)
 		fatal("open of %s failed: %s", cp, errmsg(errno));
@@ -293,7 +295,7 @@ printe(boolean_t print_errno, char *fmt, ...)
 
 
 static int
-open_device(dladm_handle_t handle)
+open_device()
 {
 	char	name[80];
 	int	fd, len;
@@ -309,7 +311,7 @@ open_device(dladm_handle_t handle)
 			continue;
 		}
 
-		gldv3_warning(handle, name);
+		gldv3_warning(name);
 
 		if (isastream(fd))
 			return (fd);
