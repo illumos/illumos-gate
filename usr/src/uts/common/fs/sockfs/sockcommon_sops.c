@@ -780,6 +780,12 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 		switch (option_name) {
 		case SO_RCVTIMEO:
 		case SO_SNDTIMEO: {
+			/*
+			 * We pass down these two options to protocol in order
+			 * to support some third part protocols which need to
+			 * know them. For those protocols which don't care
+			 * these two options, simply return 0.
+			 */
 			struct timeval tl;
 			clock_t t_usec;
 
@@ -806,8 +812,7 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 			else
 				so->so_sndtimeo = drv_usectohz(t_usec);
 			mutex_exit(&so->so_lock);
-			SO_UNBLOCK_FALLBACK(so);
-			return (0);
+			break;
 		}
 		case SO_RCVBUF:
 			/*

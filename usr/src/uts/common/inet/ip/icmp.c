@@ -2300,6 +2300,13 @@ icmp_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 			 * Note: Do not modify *outlenp
 			 */
 			return (-EINVAL);
+		case SO_RCVTIMEO:
+		case SO_SNDTIMEO:
+			/*
+			 * Pass these two options in order for third part
+			 * protocol usage. Here just return directly.
+			 */
+			return (0);
 		/*
 		 * Following three not meaningful for icmp
 		 * Action is same as "default" so we keep them

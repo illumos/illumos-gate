@@ -2492,6 +2492,13 @@ udp_do_opt_set(conn_t *connp, int level, int name, uint_t inlen,
 			if (!checkonly)
 				udp->udp_exclbind = onoff;
 			break;
+		case SO_RCVTIMEO:
+		case SO_SNDTIMEO:
+			/*
+			 * Pass these two options in order for third part
+			 * protocol usage. Here just return directly.
+			 */
+			return (0);
 		default:
 			*outlenp = 0;
 			return (EINVAL);

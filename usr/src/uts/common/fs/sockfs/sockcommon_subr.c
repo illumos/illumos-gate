@@ -317,7 +317,7 @@ so_snd_wait_qnotfull_locked(struct sonode *so, boolean_t dontblock)
 		if (error == 0)
 			return (EINTR);
 		else if (error == -1)
-			return (ETIME);
+			return (EAGAIN);
 	}
 	return (0);
 }
@@ -946,7 +946,7 @@ try_again:
 				if (error == 0) {
 					error = EINTR;
 				} else if (error == -1) {
-					error = ETIME;
+					error = EAGAIN;
 				} else {
 					goto again1;
 				}

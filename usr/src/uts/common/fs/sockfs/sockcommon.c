@@ -331,7 +331,7 @@ socket_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 	default:
 		break;
 	case EINTR:
-	case ETIME:
+	/* EAGAIN is EWOULDBLOCK */
 	case EWOULDBLOCK:
 		/* We did a partial send */
 		if (uiop->uio_resid != orig_resid)
@@ -376,7 +376,7 @@ socket_recvmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop,
 
 	switch (error) {
 	case EINTR:
-	case ETIME:
+	/* EAGAIN is EWOULDBLOCK */
 	case EWOULDBLOCK:
 		/* We did a partial read */
 		if (uiop->uio_resid != orig_resid)

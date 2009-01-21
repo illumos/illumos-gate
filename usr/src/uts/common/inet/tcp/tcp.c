@@ -10131,6 +10131,13 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 				tcp->tcp_snd_zcopy_aware = 1;
 			}
 			break;
+		case SO_RCVTIMEO:
+		case SO_SNDTIMEO:
+			/*
+			 * Pass these two options in order for third part
+			 * protocol usage. Here just return directly.
+			 */
+			return (0);
 		case SO_ALLZONES:
 			/* Pass option along to IP level for handling */
 			return (-EINVAL);
