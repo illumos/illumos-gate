@@ -20,14 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PORT_IMPL_H
 #define	_SYS_PORT_IMPL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -205,6 +204,7 @@ typedef struct portfd {
 	struct polldat	pfd_pd;
 	struct portfd	*pfd_next;
 	struct portfd	*pfd_prev;
+	kthread_t	*pfd_thread;
 } portfd_t;
 
 #define	PFTOD(pfd)	(&(pfd)->pfd_pd)

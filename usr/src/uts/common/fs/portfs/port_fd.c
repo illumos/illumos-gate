@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -199,6 +198,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		return (EBADFD);
 
 	mutex_enter(&pcp->pc_lock);
+
 	if (pcp->pc_hash == NULL) {
 		/*
 		 * This is the first time that a fd is being associated with
@@ -292,6 +292,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		pkevp->portkev_user = user;
 	}
 
+	pfd->pfd_thread = curthread;
 	mutex_enter(&pkevp->portkev_lock);
 	pkevp->portkev_events = 0;	/* no fired events */
 	pdp->pd_events = events;	/* events associated */
@@ -318,6 +319,25 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 	curthread->t_pollcache = NULL;
 
 	/*
+	 * The pc_lock can get dropped and reaquired in VOP_POLL.
+	 * In the window pc_lock is dropped another thread in
+	 * port_dissociate can remove the pfd from the port cache
+	 * and free the pfd.
+	 * It is also possible for another thread to sneak in and do a
+	 * port_associate on the same fd during the same window.
+	 * For both these cases return the current value of error.
+	 * The application should take care to ensure that the threads
+	 * do not race with each other for association and disassociation
+	 * of the same fd.
+	 */
+	if (((pfd = port_cache_lookup_fp(pcp, fd, fp)) == NULL) ||
+	    (pfd->pfd_thread != curthread)) {
+		releasef(fd);
+		mutex_exit(&pcp->pc_lock);
+		return (error);
+	}
+
+	/*
 	 * To keep synchronization between VOP_POLL above and
 	 * pollhead_insert below, it is necessary to
 	 * call VOP_POLL() again (see port_bind_pollhead()).
@@ -326,7 +346,7 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		goto errout;
 	}
 
-	if (php != NULL) {
+	if (php != NULL && (pdp->pd_php != php)) {
 		/*
 		 * No events delivered yet.
 		 * Bind pollhead pointer with current polldat_t structure.
@@ -334,6 +354,25 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		 * argument.
 		 */
 		error = port_bind_pollhead(&php, pdp, &revents);
+		/*
+		 * The pc_lock can get dropped and reaquired in VOP_POLL.
+		 * In the window pc_lock is dropped another thread in
+		 * port_dissociate can remove the pfd from the port cache
+		 * and free the pfd.
+		 * It is also possible for another thread to sneak in and do a
+		 * port_associate on the same fd during the same window.
+		 * For both these cases return the current value of error.
+		 * The application should take care to ensure that the threads
+		 * do not race with each other for association
+		 * and disassociation of the same fd.
+		 */
+		if (((pfd = port_cache_lookup_fp(pcp, fd, fp)) == NULL) ||
+		    (pfd->pfd_thread != curthread)) {
+			releasef(fd);
+			mutex_exit(&pcp->pc_lock);
+			return (error);
+		}
+
 		if (error) {
 			goto errout;
 		}
@@ -441,7 +480,6 @@ port_dissociate_fd(port_t *pp, uintptr_t object)
 
 	/* remove port from the file descriptor interested list */
 	delfd_port(fd, pfd);
-	releasef(fd);
 
 	/*
 	 * Deactivate the association. No events get posted after
@@ -468,6 +506,7 @@ port_dissociate_fd(port_t *pp, uintptr_t object)
 		ASSERT(active == 0);
 		active = 1;
 	}
+	releasef(fd);
 	mutex_exit(&pcp->pc_lock);
 
 	/*
@@ -485,13 +524,6 @@ port_bind_pollhead(pollhead_t **php, polldat_t *pdp, short *revents)
 {
 	int		error;
 	file_t		*fp;
-
-	/*
-	 * During re-association of a fd with a port the pd_php pointer
-	 * is still the same as at the first association time.
-	 */
-	if (pdp->pd_php == *php)
-		return (0);		/* already associated */
 
 	/* polldat_t associated with another pollhead_t pointer */
 	if (pdp->pd_php != NULL)
@@ -579,10 +611,11 @@ port_remove_portfd(polldat_t *pdp, port_fdcache_t *pcp)
 {
 	port_t	*pp;
 	file_t	*fp;
+	int	fd;
 
 	ASSERT(MUTEX_HELD(&pcp->pc_lock));
 	pp = pdp->pd_portev->portkev_port;
-	fp = getf(pdp->pd_fd);
+	fp = getf(fd = pdp->pd_fd);
 	/*
 	 * If we did not get the fp for pd_fd but its portfd_t
 	 * still exist in the cache, it means the pd_fd is being
@@ -590,8 +623,8 @@ port_remove_portfd(polldat_t *pdp, port_fdcache_t *pcp)
 	 */
 	if (fp != NULL) {
 		delfd_port(pdp->pd_fd, PDTOF(pdp));
-		releasef(pdp->pd_fd);
 		(void) port_remove_fd_object(PDTOF(pdp), pp, pcp);
+		releasef(fd);
 	}
 }
 
