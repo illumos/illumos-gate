@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,9 @@ extern "C" {
 
 #define	INTEL_ESB2_SW_PCIE_DEV_ID(did) (((did) >= 0x3500 && (did) <= 0x3503) ||\
 	((did) >= 0x3510 && (did) <= 0x351B))
+
+#define	INTEL_NB5000_PEXCTRL_OFFSET		0x48
+#define	INTEL_NB5000_PEXCTRL_COALESCE_EN	0x400
 
 #ifdef	__cplusplus
 }

@@ -254,6 +254,7 @@ static void	pepb_intr_fini(pepb_devstate_t *pepb_p);
 /* Intel Workarounds */
 static void	pepb_intel_serr_workaround(dev_info_t *dip, boolean_t mcheck);
 static void	pepb_intel_rber_workaround(dev_info_t *dip);
+static void	pepb_intel_mps_workaround(dev_info_t *dip);
 static void	pepb_intel_sw_workaround(dev_info_t *dip);
 int pepb_intel_workaround_disable = 0;
 
@@ -442,6 +443,7 @@ next_step:
 	pepb_intel_serr_workaround(devi, pepb->pepb_no_aer_msi);
 	pepb_intel_rber_workaround(devi);
 	pepb_intel_sw_workaround(devi);
+	pepb_intel_mps_workaround(devi);
 
 	/*
 	 * If this is a root port, determine and set the max payload size.
@@ -1360,8 +1362,6 @@ static x86_error_reg_t intel_5000_rp_regs[] = {
 
 /*
  * 5400 Northbridge Root Ports.
- * MSIs are not working currently, so the MSI settings are the same as the
- * machinecheck settings
  */
 static x86_error_reg_t intel_5400_rp_regs[] = {
 	/* Command Register - Enable SERR */
@@ -1671,6 +1671,33 @@ pepb_intel_sw_workaround(dev_info_t *dip)
 	}
 
 	pci_config_teardown(&cfg_hdl);
+}
+
+/*
+ * The Intel 5000 Chipset has an errata that requires read completion
+ * coalescing to be disabled if the Max Payload Size is set to 256 bytes.
+ */
+static void
+pepb_intel_mps_workaround(dev_info_t *dip)
+{
+	uint16_t		vid, did;
+	uint32_t		pexctrl;
+	pcie_bus_t		*bus_p = PCIE_DIP2UPBUS(dip);
+
+	vid = bus_p->bus_dev_ven_id & 0xFFFF;
+	did = bus_p->bus_dev_ven_id >> 16;
+
+	if ((vid == INTEL_VENDOR_ID) && INTEL_NB5000_PCIE_DEV_ID(did)) {
+		pexctrl = pci_config_get32(bus_p->bus_cfg_hdl,
+		    INTEL_NB5000_PEXCTRL_OFFSET);
+		/*
+		 * Turn off coalescing (bit 10)
+		 */
+		pexctrl &= ~INTEL_NB5000_PEXCTRL_COALESCE_EN;
+
+		pci_config_put32(bus_p->bus_cfg_hdl,
+		    INTEL_NB5000_PEXCTRL_OFFSET, pexctrl);
+	}
 }
 
 /*
