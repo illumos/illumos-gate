@@ -1993,7 +1993,7 @@ ld_process_ifl(const char *name, const char *soname, int fd, Elf *elf,
 	 * been processed (rather than simply comparing filenames, the device
 	 * information provides a quicker comparison and detects linked files).
 	 */
-	if (!(flags & FLG_IF_EXTRACT))
+	if (fd && ((flags & FLG_IF_EXTRACT) == 0))
 		(void) fstat(fd, &status);
 	else {
 		status.st_dev = 0;
@@ -2292,6 +2292,26 @@ ld_process_open(const char *opath, const char *ofile, int *fd, Ofl_desc *ofl,
 		return (NULL);
 
 	return (ld_process_ifl(npath, nfile, *fd, elf, flags, ofl, rej));
+}
+
+/*
+ * Having successfully mapped a file, set up the necessary elf structures to
+ * process it further.  This routine is patterned after ld_process_open() and
+ * is only called by ld.so.1(1) to process a relocatable object.
+ */
+Ifl_desc *
+ld_process_mem(const char *path, const char *file, char *addr, size_t size,
+    Ofl_desc *ofl, Rej_desc *rej)
+{
+	Elf	*elf;
+
+	if ((elf = elf_memory(addr, size)) == NULL) {
+		eprintf(ofl->ofl_lml, ERR_ELF, MSG_INTL(MSG_ELF_MEMORY), path);
+		ofl->ofl_flags |= FLG_OF_FATAL;
+		return (0);
+	}
+
+	return (ld_process_ifl(path, file, 0, elf, 0, ofl, rej));
 }
 
 /*

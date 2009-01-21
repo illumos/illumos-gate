@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -38,7 +38,7 @@
 #	Policy for Shared Library Version Names and Interface Definitions
 
 
-SUNWprivate_4.68 {
+SUNWprivate_4.69 {
 	global:
 		dbg_desc = NODIRECT;	# interposed - ld.so.1(1)
 		dbg_print = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
@@ -138,6 +138,8 @@ SUNWprivate_4.68 {
 		Dbg64_file_lazyload;
 		Dbg32_file_ldso;
 		Dbg64_file_ldso;
+		Dbg32_file_mmapobj;
+		Dbg64_file_mmapobj;
 		Dbg32_file_mode_promote;
 		Dbg64_file_mode_promote;
 		Dbg32_file_modified;
@@ -214,6 +216,8 @@ SUNWprivate_4.68 {
 		Dbg64_move_adjexpandreloc;
 		Dbg32_move_adjmovereloc;
 		Dbg64_move_adjmovereloc;
+		Dbg32_move_bad;
+		Dbg64_move_bad;
 		Dbg32_move_data;
 		Dbg64_move_data;
 		Dbg32_move_entry1;
@@ -386,8 +390,6 @@ SUNWprivate_4.68 {
 		Dbg_tls_static_block;
 		Dbg_tls_static_resv;
 
-		Dbg32_util_broadcast;
-		Dbg64_util_broadcast;
 		Dbg32_util_call_array;
 		Dbg64_util_call_array;
 		Dbg32_util_call_fini;
@@ -418,8 +420,6 @@ SUNWprivate_4.68 {
 		Dbg64_util_scc_title;
 		Dbg32_util_str;
 		Dbg64_util_str;
-		Dbg32_util_wait;
-		Dbg64_util_wait;
 
 		Dbg32_unused_file;
 		Dbg64_unused_file;

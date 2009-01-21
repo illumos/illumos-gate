@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -406,11 +406,13 @@
 @ MSG_FIL_CONFIG	"file=%s  [ ELF ]; configuration alternate found: %s"
 
 
-@ MSG_FIL_DATA_DB	"    dynamic:  %#18llx  base:   %#18llx"
-@ MSG_FIL_DATA_SE	"    size:     %#18llx  entry:  %#18llx"
-@ MSG_FIL_DATA_S	"    size:     %#18llx"
+@ MSG_FIL_DATA_AS	"    addr:     %#18llx  size:   %#18llx"
 @ MSG_FIL_DATA_LL	"    lmid:     %18.18s  lmco:   %#18llx"
 @ MSG_FIL_DATA_EA	"    envp:     %#18llx  auxv:   %#18llx"
+
+@ MSG_FIL_MMAPOBJ	"file=%s  mmapobj entries=%d"
+@ MSG_FIL_MMAPOBJ_1	"  [%d]: addr:  %#18llx  fsize:  %#18llx  %s"
+@ MSG_FIL_MMAPOBJ_2	"       offset: %#17llx  msize:  %#18llx"
 
 @ MSG_FIL_BND_ADD	"file=%s;  add binding to:"
 @ MSG_FIL_BND_FILE	"    file=%s   %s"
@@ -544,6 +546,8 @@
 @ MSG_MOVE_PAREXPN	"expanding %s into .data: %s"
 @ MSG_MOVE_OUTMOVE	"copying move entries for %s into .SUNW_move"
 @ MSG_MOVE_INPUT	"collecting move entries: file=%s"
+@ MSG_MOVE_BAD		"move %lld offset invalid: %s: offset=0x%llx \
+			 lies outside memory image; move discarded"
 
 # Section header messages
 
@@ -751,9 +755,6 @@
 @ MSG_UTL_FINI		"calling .fini: %s"
 @ MSG_UTL_ARRAY		"calling %s[%d]:0x%llx: %s"
 @ MSG_UTL_TRANS		"transferring control: %s"
-@ MSG_UTL_WAIT		"suspending thread: %s from %s for completion of init \
-			 for %s"
-@ MSG_UTL_BROAD		"signal suspended threads: %s init complete"
 @ MSG_UTL_INTOOLATE	"loading after relocation has started: interposition \
 			 request (DF_1_INTERPOSE) ignored: %s"
 
@@ -793,7 +794,6 @@
 @ MSG_STR_ADD		"adding"
 @ MSG_STR_UP_1		"updating"
 @ MSG_STR_UP_2		"updated"
-@ MSG_STR_SYMBOL	"symbol binding"
 
 @ MSG_STR_UNKNOWN	"<unknown>"
 @ MSG_STR_ORPHAN	"<orphan>"
@@ -1346,3 +1346,9 @@
 # TLS information flags
 
 @ MSG_TLS_FLAG_STATIC	"STATIC-TLS"
+
+# mmapobj() mr_flags.
+
+@ MSG_MR_PADDING	"[ PADDING ]"
+@ MSG_MR_HDR_ELF	"[ HDR_ELF ]"
+@ MSG_MR_HDR_AOUT	"[ HDR_AOUT ]"

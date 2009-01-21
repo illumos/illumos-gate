@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Simplified version of malloc(), calloc() and free(), to be linked with
@@ -69,7 +67,6 @@ struct page {
 
 #define	HDR_BLOCK	(sizeof (struct block) - sizeof (void *))
 #define	HDR_PAGE	(sizeof (struct page) - sizeof (void *))
-#define	MINSZ		8
 
 static struct page	*memstart;
 
@@ -102,40 +99,35 @@ scribble(ulong_t *membgn, int pattern, size_t size)
 /*
  * Defragmentation
  */
-static void
-defrag(struct page *page)
+void
+defrag()
 {
-	struct block	*block;
+	struct page	*page;
+	Aliste		idx;
 
-	for (block = page->block; block; block = block->next) {
-		struct block	*block2;
+	for (APLIST_TRAVERSE(free_alp, idx, page)) {
+		struct block	*block;
 
-		if (block->status == BUSY)
-			continue;
-		for (block2 = block->next; block2 && block2->status == FREE;
-		    block2 = block2->next) {
-			block->next = block2->next;
-			block->size += block2->size + HDR_BLOCK;
-		}
-	}
+		for (block = page->block; block; block = block->next) {
+			struct block	*block2;
 
-	/*
-	 * Free page
-	 */
-	if (page->block->size == page->size - HDR_PAGE) {
-		if (page == memstart)
-			memstart = page->next;
-		else {
-			struct page	*page2;
-			for (page2 = memstart; page2->next;
-			    page2 = page2->next) {
-				if (page2->next == page) {
-					page2->next = page->next;
-					break;
-				}
+			if (block->status == BUSY)
+				continue;
+			for (block2 = block->next; block2 &&
+			    block2->status == FREE; block2 = block2->next) {
+				block->next = block2->next;
+				block->size += block2->size + HDR_BLOCK;
 			}
 		}
-		(void) munmap((caddr_t)page, (size_t)page->size);
+
+		/*
+		 * If a page becomes free, leave it, and save the unmapping
+		 * expense, as we'll probably come back and reclaim the page
+		 * for later malloc activity.
+		 *
+		 * Free the defrag index.
+		 */
+		aplist_delete(free_alp, &idx);
 	}
 }
 
@@ -156,18 +148,7 @@ split(struct block *block, size_t size)
 	}
 }
 
-
-/*
- * Align size on an appropriate boundary
- */
-static size_t
-align(size_t size, size_t bound)
-{
-	if (size < bound)
-		return (bound);
-	else
-		return (size + bound - 1 - (size + bound - 1) % bound);
-}
+#include <stdio.h>
 
 /*
  * Replace both malloc() and lmalloc() (libc's private memory allocator).
@@ -180,7 +161,7 @@ malloc(size_t size)
 	struct block	*block;
 	struct page	*page;
 
-	size = align(size, MINSZ);
+	size = S_DROUND(size);
 
 	/*
 	 * Try to locate necessary space
@@ -192,18 +173,16 @@ malloc(size_t size)
 		}
 	}
 found:
-
 	/*
 	 * Need to allocate a new page
 	 */
 	if (!page) {
-		size_t		totsize = size + HDR_PAGE;
-		size_t		totpage = align(totsize, syspagsz);
+		size_t	totsize = size + HDR_PAGE;
+		size_t	totpage = S_ROUND(totsize, syspagsz);
 
-		/* LINTED */
-		if ((page = (struct page *)dz_map(0, 0, totpage,
+		if ((page = dz_map(0, 0, totpage,
 		    PROT_READ | PROT_WRITE | PROT_EXEC,
-		    MAP_PRIVATE)) == (struct page *)-1)
+		    MAP_PRIVATE)) == MAP_FAILED)
 			return (0);
 
 		page->next = memstart;
@@ -237,7 +216,7 @@ calloc(size_t num, size_t size)
 }
 
 void *
-realloc(void * ptr, size_t size)
+realloc(void *ptr, size_t size)
 {
 	struct block	*block;
 	size_t		osize;
@@ -248,7 +227,7 @@ realloc(void * ptr, size_t size)
 
 	/* LINTED */
 	block = (struct block *)((char *)ptr - HDR_BLOCK);
-	size = align(size, MINSZ);
+	size = S_DROUND(size);
 	osize = block->size;
 
 	/*
@@ -273,7 +252,7 @@ realloc(void * ptr, size_t size)
 		return (NULL);
 	(void) memcpy(newptr, ptr, osize);
 	block->status = FREE;
-	defrag(block->page);
+	(void) aplist_test(&free_alp, block->page, AL_CNT_FREELIST);
 	return (newptr);
 }
 
@@ -282,7 +261,7 @@ realloc(void * ptr, size_t size)
  * They are both private here.
  */
 void
-free(void * ptr)
+free(void *ptr)
 {
 	struct block	*block;
 
@@ -295,23 +274,22 @@ free(void * ptr)
 #if	DEBUG
 	scribble((ulong_t *)&block->memstart, FREMEM, block->size);
 #endif
-	defrag(block->page);
+	(void) aplist_test(&free_alp, block->page, AL_CNT_FREELIST);
 }
 
 /* ARGSUSED1 */
 void
-lfree(void * ptr, size_t size)
+lfree(void *ptr, size_t size)
 {
 	free(ptr);
 }
-
 
 /*
  * We can use any memory after ld.so.1's .bss up until the next page boundary
  * as allocatable memory.
  */
 void
-addfree(void * ptr, size_t bytes)
+addfree(void *ptr, size_t bytes)
 {
 	struct block	*block;
 	struct page	*page;

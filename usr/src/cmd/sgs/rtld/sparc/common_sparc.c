@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include	<stdio.h>
 #include	<strings.h>
@@ -92,10 +90,10 @@ check_regsyms(Sym *sym1, const char *name1, Sym *sym2, const char *name2)
 }
 
 int
-elf_regsyms(Rt_map * lmp)
+elf_regsyms(Rt_map *lmp)
 {
-	Dyn *	dyn;
-	Sym *	symdef;
+	Dyn	*dyn;
+	Sym	*symdef;
 	ulong_t	rsymndx;
 
 	/*
@@ -105,7 +103,7 @@ elf_regsyms(Rt_map * lmp)
 	 * with any other register symbols.
 	 */
 	for (dyn = DYN(lmp); dyn->d_tag != DT_NULL; dyn++) {
-		Reglist *	rp;
+		Reglist	*rp;
 
 		if ((dyn->d_tag != DT_SPARC_REGISTER) &&
 		    (dyn->d_tag != DT_DEPRECATED_SPARC_REGISTER))
@@ -156,7 +154,7 @@ elf_regsyms(Rt_map * lmp)
 				return (0);
 			}
 		}
-		if ((rp = calloc(sizeof (Reglist), 1)) == (Reglist *)0)
+		if ((rp = calloc(sizeof (Reglist), 1)) == NULL)
 			return (0);
 		rp->rl_lmp = lmp;
 		rp->rl_sym = symdef;
@@ -164,74 +162,4 @@ elf_regsyms(Rt_map * lmp)
 		reglist = rp;
 	}
 	return (1);
-}
-
-
-/*
- * When the relocation loop realizes that it's dealing with relative
- * relocations in a shared object, it breaks into this tighter loop
- * as an optimization.
- */
-ulong_t
-elf_reloc_relative(ulong_t relbgn, ulong_t relend, ulong_t relsiz,
-    ulong_t basebgn, ulong_t etext, ulong_t emap)
-{
-	ulong_t roffset = ((Rela *) relbgn)->r_offset;
-	Byte rtype;
-
-	do {
-		roffset += basebgn;
-
-		/*
-		 * If this relocation is against an address not mapped in,
-		 * then break out of the relative relocation loop, falling
-		 * back on the main relocation loop.
-		 */
-		if (roffset < etext || roffset > emap)
-			break;
-
-		/*
-		 * Perform the actual relocation.
-		 */
-		*((ulong_t *)roffset) +=
-		    basebgn + (long)(((Rela *)relbgn)->r_addend);
-
-		relbgn += relsiz;
-
-		if (relbgn >= relend)
-			break;
-
-		rtype = (Byte)ELF_R_TYPE(((Rela *)relbgn)->r_info, M_MACH);
-		roffset = ((Rela *)relbgn)->r_offset;
-
-	} while (rtype == R_SPARC_RELATIVE);
-
-	return (relbgn);
-}
-
-/*
- * This is the tightest loop for RELATIVE relocations for those
- * objects built with the DT_RELACOUNT .dynamic entry.
- */
-ulong_t
-elf_reloc_relacount(ulong_t relbgn, ulong_t relacount, ulong_t relsiz,
-    ulong_t basebgn)
-{
-	ulong_t roffset = ((Rela *) relbgn)->r_offset;
-
-	for (; relacount; relacount--) {
-		roffset += basebgn;
-
-		/*
-		 * Perform the actual relocation.
-		 */
-		*((ulong_t *)roffset) =
-		    basebgn + (long)(((Rela *)relbgn)->r_addend);
-
-		relbgn += relsiz;
-
-		roffset = ((Rela *)relbgn)->r_offset;
-	}
-
-	return (relbgn);
 }

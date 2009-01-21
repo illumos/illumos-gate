@@ -20,16 +20,16 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #ifndef	_RTLD_H
 #define	_RTLD_H
 
 /*
  * Global include file for the runtime linker.
  */
+#include <sys/mman.h>
 #include <time.h>
 #include <sgs.h>
 #include <thread.h>
@@ -47,7 +47,6 @@
 extern "C" {
 #endif
 
-
 /*
  * We use rtld_ino_t instead of ino_t so that we can get
  * access to large inode values from 32-bit code.
@@ -58,20 +57,8 @@ typedef ino_t		rtld_ino_t;
 typedef ino64_t		rtld_ino_t;
 #endif
 
-
-/*
- * Linked list of directories or filenames (built from colon separated string).
- */
-typedef struct pnode {
-	const char	*p_name;
-	const char	*p_oname;
-	size_t		p_len;
-	uint_t		p_orig;
-	void		*p_info;
-	struct pnode	*p_next;
-} Pnode;
-
 typedef struct rt_map	Rt_map;
+typedef struct slookup	Slookup;
 
 /*
  * A binding descriptor.  Establishes the binding relationship between two
@@ -98,8 +85,8 @@ typedef struct {
  * rtld_db implementations of the future to recognize core files produced on
  * older systems and deal with these core files accordingly.
  *
- * As of version 'RTLD_DB_VERSION <= 2' the following fields were valid for core
- * file examination (basically the public Link_map):
+ * As of version 'R_RTLDDB_VERSION <= 2' the following fields were valid for
+ * core file examination (basically the public Link_map):
  *
  *		ADDR()
  *		NAME()
@@ -107,7 +94,7 @@ typedef struct {
  *		NEXT()
  *		PREV()
  *
- * Valid fields for RTLD_DB_VERSION3
+ * Valid fields for R_RTLDDB_VERSION3
  *
  *		PATHNAME()
  *		PADSTART()
@@ -116,11 +103,11 @@ typedef struct {
  *		FLAGS()
  *		FLAGS1()
  *
- * Valid fields for RTLD_DB_VERSION4
+ * Valid fields for R_RTLDDB_VERSION4
  *
  *		TLSMODID()
  *
- * Valid fields for RTLD_DB_VERSION5
+ * Valid fields for R_RTLDDB_VERSION5
  *
  *		Added rtld_flags & FLG_RT_RELOCED to stable flags range
  *
@@ -138,7 +125,7 @@ typedef struct rtld_db_priv {
 	struct r_debug	rtd_rdebug;	/* original r_debug structure */
 	Word		rtd_version;	/* version no. */
 	size_t		rtd_objpad;	/* padding around mmap()ed objects */
-	List *		rtd_dynlmlst;	/* pointer to Dynlm_list */
+	List		*rtd_dynlmlst;	/* pointer to Dynlm_list */
 } Rtld_db_priv;
 
 #ifdef _SYSCALL32
@@ -381,22 +368,25 @@ struct lm_list32 {
 
 #define	LML_TFLG_LOADFLTR	0x00000008	/* trigger filtee loading */
 
-#define	LML_TFLG_AUD_PREINIT	0x00100000	/* preinit (audit) exists */
-#define	LML_TFLG_AUD_OBJSEARCH	0x00200000	/* objsearch (audit) exists */
-#define	LML_TFLG_AUD_OBJOPEN	0x00400000	/* objopen (audit) exists */
-#define	LML_TFLG_AUD_OBJFILTER	0x00800000	/* objfilter (audit) exists */
-#define	LML_TFLG_AUD_OBJCLOSE	0x01000000	/* objclose (audit) exists */
-#define	LML_TFLG_AUD_SYMBIND	0x02000000	/* symbind (audit) exists */
-#define	LML_TFLG_AUD_PLTENTER	0x04000000	/* pltenter (audit) exists */
-#define	LML_TFLG_AUD_PLTEXIT	0x08000000	/* pltexit (audit) exists */
-#define	LML_TFLG_AUD_ACTIVITY	0x10000000	/* activity (audit) exists */
+#define	LML_TFLG_AUD_PREINIT	0x00001000	/* preinit (audit) exists */
+#define	LML_TFLG_AUD_OBJSEARCH	0x00002000	/* objsearch (audit) exists */
+#define	LML_TFLG_AUD_OBJOPEN	0x00004000	/* objopen (audit) exists */
+#define	LML_TFLG_AUD_OBJFILTER	0x00008000	/* objfilter (audit) exists */
+#define	LML_TFLG_AUD_OBJCLOSE	0x00010000	/* objclose (audit) exists */
+#define	LML_TFLG_AUD_SYMBIND	0x00020000	/* symbind (audit) exists */
+#define	LML_TFLG_AUD_PLTENTER	0x00040000	/* pltenter (audit) exists */
+#define	LML_TFLG_AUD_PLTEXIT	0x00080000	/* pltexit (audit) exists */
+#define	LML_TFLG_AUD_ACTIVITY	0x00100000	/* activity (audit) exists */
 
 /*
- * NOTE: Audit flags have duplicated FLAGS1() values.  If more audit flags are
- * added, update the FLAGS1() reservation FL1_AUD_RS_STR to FL1_AUD_RS_END
- * defined later.
+ * NOTE: Each auditing module establishes a set of audit flags, AFLAGS(), that
+ * define the auditing interfaces the module offers.  These auditing flags are
+ * the LML_TFLG_AUD_ flags defined above.  Global auditors result in setting
+ * the lm_tflags too.  Local auditors only use the AFLAGS().  All tests for
+ * auditing inspect the lm_tflags and AFLAGS() for a specific auditing
+ * interface, and thus use the same flag to test for both types of auditors.
  */
-#define	LML_TFLG_AUD_MASK	0xfff00000	/* audit interfaces mask */
+#define	LML_TFLG_AUD_MASK	0x0ffff000	/* audit interfaces mask */
 
 /*
  * Define a Group Handle.
@@ -466,7 +456,7 @@ typedef struct {
  * flags that indicate how the dependency can be used.
  */
 typedef struct {
-	Rt_map *	gd_depend;	/* dependency */
+	Rt_map		*gd_depend;	/* dependency */
 	uint_t		gd_flags;	/* dependency flags (GPD_ values) */
 } Grp_desc;
 
@@ -544,17 +534,6 @@ typedef struct {
 } FullPathNode;
 
 /*
- * Define a mapping structure, which is maintained to describe each mapping
- * of an object, ie. the text segment, data segment, bss segment, etc.
- */
-typedef struct {
-	caddr_t		m_vaddr;	/* mapping address */
-	size_t		m_fsize;	/* backing file size */
-	size_t		m_msize;	/* mapping size */
-	int		m_perm;		/* mapping permissions */
-} Mmap;
-
-/*
  * A given link-map can hold either a supplier or receiver copy
  * relocation list, but not both. This union is used to overlap
  * the space used for the two lists.
@@ -573,10 +552,10 @@ struct rt_map {
 	 * BEGIN: Exposed to rtld_db - don't move, don't delete
 	 */
 	Link_map	rt_public;	/* public data */
-	char		*rt_pathname;	/* full pathname of loaded object */
+	const char	*rt_pathname;	/* full pathname of loaded object */
 	ulong_t		rt_padstart;	/* start of image (including padding) */
 	ulong_t		rt_padimlen;	/* size of image (including padding */
-	ulong_t		rt_msize;	/* total memory mapped */
+	ulong_t		rt_msize;	/* total memory reservation range */
 	uint_t		rt_flags;	/* state flags, see FLG below */
 	uint_t		rt_flags1;	/* state flags1, see FL1 below */
 	ulong_t		rt_tlsmodid;	/* TLS module id */
@@ -585,17 +564,13 @@ struct rt_map {
 	 */
 	APlist		*rt_alias;	/* list of linked file names */
 	APlist		*rt_fpnode;	/* list of FullpathNode AVL nodes */
-	void		(*rt_init)();	/* address of _init */
-	void		(*rt_fini)();	/* address of _fini */
 	char		*rt_runpath;	/* LD_RUN_PATH and its equivalent */
-	Pnode		*rt_runlist;	/*	Pnode structures */
+	Alist		*rt_runlist;	/*	Pdesc structures */
 	APlist		*rt_depends;	/* list of dependencies */
 	APlist		*rt_callers;	/* list of callers */
 	APlist		*rt_handles;	/* dlopen handles */
 	APlist		*rt_groups;	/* groups we're a member of */
-	ulong_t		rt_etext;	/* etext address */
 	struct fct	*rt_fct;	/* file class table for this object */
-	Sym		*(*rt_symintp)(); /* link map symbol interpreter */
 	void		*rt_priv;	/* private data, object type specific */
 	Lm_list		*rt_list;	/* link map list we belong to */
 	uint_t		rt_objfltrndx;	/* object filtees .dynamic index */
@@ -606,8 +581,9 @@ struct rt_map {
 	uint_t		rt_cycgroup;	/* cyclic group */
 	dev_t		rt_stdev;	/* device id and inode number for .so */
 	rtld_ino_t	rt_stino;	/*	multiple inclusion checks */
-	char		*rt_origname;	/* original pathname of loaded object */
+	const char	*rt_origname;	/* original pathname of loaded object */
 	size_t		rt_dirsz;	/*	and its size */
+	size_t		rt_lmsize;	/* size of the link-map allocation */
 	Rt_map_copy	rt_copy;	/* list of copy relocations */
 	Audit_desc	*rt_auditors;	/* audit descriptor array */
 	Audit_info	*rt_audinfo;	/* audit information descriptor */
@@ -617,7 +593,7 @@ struct rt_map {
 	Addr		*rt_initarray;	/* .initarray table */
 	Addr		*rt_finiarray;	/* .finiarray table */
 	Addr		*rt_preinitarray; /* .preinitarray table */
-	Mmap		*rt_mmaps;	/* array of mapping information */
+	mmapobj_result_t *rt_mmaps;	/* array of mapping information */
 	uint_t		rt_mmapcnt;	/*	and associated number */
 	uint_t		rt_initarraysz;	/* size of .initarray table */
 	uint_t		rt_finiarraysz;	/* size of .finiarray table */
@@ -627,14 +603,17 @@ struct rt_map {
 	uint_t		rt_relacount;	/* no. of RELATIVE relocations */
 	uint_t		rt_idx;		/* hold index within linkmap list */
 	uint_t		rt_lazy;	/* lazy dependencies pending */
-	Rt_cond		*rt_condvar;	/*	variables */
 	Xword		rt_hwcap;	/* hardware capabilities */
 	Xword		rt_sfcap;	/* software capabilities */
-	thread_t	rt_threadid;	/* thread init/fini synchronization */
 	uint_t		rt_cntl;	/* link-map control list we belong to */
-	uint_t		rt_flags2;	/* state flags2, see FL2 below */
+	uint_t		rt_aflags;	/* auditor flags, see LML_TFLG_AUD_ */
+					/* address of _init */
+	void		(*rt_init)(void);
+					/* address of _fini */
+	void		(*rt_fini)(void);
+					/* link map symbol interpreter */
+	Sym		*(*rt_symintp)(Slookup *, Rt_map **, uint_t *, int *);
 };
-
 
 #ifdef _SYSCALL32
 /*
@@ -662,17 +641,13 @@ typedef struct rt_map32 {
 	 */
 	uint32_t	rt_alias;
 	uint32_t	rt_fpnode;
-	uint32_t 	rt_init;
-	uint32_t	rt_fini;
 	uint32_t	rt_runpath;
 	uint32_t	rt_runlist;
 	uint32_t	rt_depends;
 	uint32_t	rt_callers;
 	uint32_t	rt_handles;
 	uint32_t	rt_groups;
-	uint32_t	rt_etext;
 	uint32_t	rt_fct;
-	uint32_t	rt_symintp;
 	uint32_t	rt_priv;
 	uint32_t 	rt_list;
 	uint32_t 	rt_objfltrndx;
@@ -702,12 +677,13 @@ typedef struct rt_map32 {
 	uint32_t	rt_relacount;
 	uint32_t	rt_idx;
 	uint32_t	rt_lazy;
-	uint32_t	rt_condvar;
 	uint32_t	rt_hwcap;
 	uint32_t	rt_sfcap;
-	uint32_t	rt_threadid;
 	uint32_t	rt_cntl;
-	uint32_t	rt_flags2;
+	uint32_t	rt_aflags;
+	uint32_t 	rt_init;
+	uint32_t	rt_fini;
+	uint32_t	rt_symintp;
 } Rt_map32;
 
 #endif	/* _SYSCALL32 */
@@ -721,7 +697,7 @@ typedef struct rt_map32 {
 #define	FLG_RT_ISMAIN	0x00000001	/* object represents main executable */
 #define	FLG_RT_IMGALLOC	0x00000002	/* image is allocated (not mmap'ed) */
 	/*
-	 * Available for r_debug version >= RTLD_DB_VERSION5
+	 * Available for r_debug version >= R_RTLDDB_VERSION5
 	 */
 #define	FLG_RT_RELOCED	0x00000004	/* object has been relocated */
 /*
@@ -759,13 +735,13 @@ typedef struct rt_map32 {
 #define	FLG_RT_RELOCING	0x40000000	/* object is being relocated */
 
 #define	FL1_RT_COPYTOOK	0x00000001	/* copy relocation taken */
-#define	FL1_RT_RELATIVE	0x00000002	/* relative path expansion required */
+
 #define	FL1_RT_CONFSET	0x00000004	/* object was loaded by crle(1) */
 #define	FL1_RT_NODEFLIB	0x00000008	/* ignore default library search */
 #define	FL1_RT_ENDFILTE	0x00000010	/* filtee terminates filters search */
 #define	FL1_RT_DISPREL	0x00000020	/* object has *disp* relocation */
-#define	FL1_RT_TEXTREL	0x00000040	/* DT_TEXTREL set in object */
-#define	FL1_RT_INITWAIT	0x00000080	/* threads are waiting on .init */
+#define	FL1_RT_DTFLAGS	0x00000040	/* DT_FLAGS element exists */
+
 #define	FL1_RT_LDDSTUB	0x00000100	/* identify lddstub */
 #define	FL1_RT_NOINIFIN	0x00000200	/* no .init or .fini exists */
 #define	FL1_RT_USED	0x00000400	/* symbol referenced from this object */
@@ -783,22 +759,13 @@ typedef struct rt_map32 {
 #define	FL1_RT_GLOBAUD	0x00080000	/* establish global auditing */
 
 /*
- * The following range of bits are reserved to hold LML_TFLG_AUD_ values
- * (although the definitions themselves aren't used anywhere).
- */
-#define	FL1_AUD_RS_STR	0x00100000	/* RESERVATION start for AU flags */
-#define	FL1_AUD_RS_END	0x80000000	/* RESERVATION end for AU flags */
-
-#define	FL2_RT_DTFLAGS	0x00000001	/* DT_FLAGS element exists */
-
-/*
  * Flags for the tls_modactivity() routine
  */
 #define	TM_FLG_MODADD	0x01		/* call tls_modadd() interface */
 #define	TM_FLG_MODREM	0x02		/* call tls_modrem() interface */
 
 /*
- * Macros for getting to link_map data.
+ * Macros for getting to exposed, link_map data (R_RTLDDB_VERSION <= 2).
  */
 #define	ADDR(X)		((X)->rt_public.l_addr)
 #define	NAME(X)		((X)->rt_public.l_name)
@@ -833,7 +800,7 @@ typedef struct rt_map32 {
 #define	PREV_RT_MAP(X)	LINKMAP_TO_RTMAP(PREV(X))
 
 /*
- * Macros for getting to linker private data.
+ * Macros for getting to exposed, link_map data (R_RTLDDB_VERSION3).
  */
 #define	PATHNAME(X)	((X)->rt_pathname)
 #define	PADSTART(X)	((X)->rt_padstart)
@@ -841,9 +808,17 @@ typedef struct rt_map32 {
 #define	MSIZE(X)	((X)->rt_msize)
 #define	FLAGS(X)	((X)->rt_flags)
 #define	FLAGS1(X)	((X)->rt_flags1)
-#define	FLAGS2(X)	((X)->rt_flags2)
+
+/*
+ * Macros for getting to exposed, link_map data (R_RTLDDB_VERSION4).
+ */
 #define	TLSMODID(X)	((X)->rt_tlsmodid)
 
+/*
+ * Macros for getting to unexposed, link-map data.
+ */
+#define	LMSIZE(X)	((X)->rt_lmsize)
+#define	AFLAGS(X)	((X)->rt_aflags)
 #define	ALIAS(X)	((X)->rt_alias)
 #define	FPNODE(X)	((X)->rt_fpnode)
 #define	INIT(X)		((X)->rt_init)
@@ -854,7 +829,6 @@ typedef struct rt_map32 {
 #define	CALLERS(X)	((X)->rt_callers)
 #define	HANDLES(X)	((X)->rt_handles)
 #define	GROUPS(X)	((X)->rt_groups)
-#define	ETEXT(X)	((X)->rt_etext)
 #define	FCT(X)		((X)->rt_fct)
 #define	SYMINTP(X)	((X)->rt_symintp)
 #define	LIST(X)		((X)->rt_list)
@@ -886,18 +860,16 @@ typedef struct rt_map32 {
 #define	RELACOUNT(X)	((X)->rt_relacount)
 #define	IDX(X)		((X)->rt_idx)
 #define	LAZY(X)		((X)->rt_lazy)
-#define	CONDVAR(X)	((X)->rt_condvar)
 #define	CNTL(X)		((X)->rt_cntl)
 #define	HWCAP(X)	((X)->rt_hwcap)
 #define	SFCAP(X)	((X)->rt_sfcap)
-#define	THREADID(X)	((X)->rt_threadid)
 
 /*
  * Flags for tsorting.
  */
 #define	RT_SORT_FWD	0x01		/* topological sort (.fini) */
 #define	RT_SORT_REV	0x02		/* reverse topological sort (.init) */
-#define	RT_SORT_DELETE	0x10		/* process FLG_RT_DELNEED objects */
+#define	RT_SORT_DELETE	0x10		/* process FLG_RT_DELETE objects */
 					/*	only (called via dlclose()) */
 #define	RT_SORT_INTPOSE	0x20		/* process interposer objects */
 
@@ -966,7 +938,7 @@ typedef struct rt_map32 {
  * interpretation of copy relocations, etc.  Note, a number of flag settings
  * are established in lookup_sym() from attributes of the symbol reference.
  */
-typedef struct {
+struct slookup {
 	const char	*sl_name;	/* symbol name */
 	Rt_map		*sl_cmap;	/* callers link-map */
 	Rt_map		*sl_imap;	/* initial link-map to search */
@@ -978,7 +950,7 @@ typedef struct {
 					/*    symbol */
 	uchar_t		sl_bind;	/* symbols binding (returned) */
 	uint_t		sl_flags;	/* lookup flags */
-} Slookup;
+};
 
 #define	SLOOKUP_INIT(sl, name, cmap, imap, id, hash, rsymndx, rsym, rtype, \
     flags) \

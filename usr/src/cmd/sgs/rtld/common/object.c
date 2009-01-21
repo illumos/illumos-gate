@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,7 +40,8 @@
 #include	"_audit.h"
 #include	"_elf.h"
 
-static Rt_map	*olmp = 0;
+static Rt_map	*olmp = NULL;
+static Alist	*mpalp = NULL;
 
 static Ehdr	dehdr = { { ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3,
 			    M_CLASS, M_DATA }, 0, M_MACH, EV_CURRENT };
@@ -53,15 +54,25 @@ static Ehdr	dehdr = { { ELFMAG0, ELFMAG1, ELFMAG2, ELFMAG3,
  * elf_obj_fini() to complete the concatenation.
  */
 static Rt_map *
-elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
+elf_obj_init(Lm_list *lml, Aliste lmco, const char *oname)
 {
-	Ofl_desc *	ofl;
+	Ofl_desc	*ofl;
+	const char	*name;
+	size_t		lmsz;
+
+	/*
+	 * Allocate the name of this object, as the original name may be
+	 * associated with a data buffer that can be reused to load the
+	 * dependencies needed to processes this object.
+	 */
+	if ((name = stravl_insert(oname, 0, 0, 0)) == NULL)
+		return (NULL);
 
 	/*
 	 * Initialize an output file descriptor and the entrance criteria.
 	 */
-	if ((ofl = (Ofl_desc *)calloc(sizeof (Ofl_desc), 1)) == 0)
-		return (0);
+	if ((ofl = calloc(sizeof (Ofl_desc), 1)) == NULL)
+		return (NULL);
 
 	ofl->ofl_dehdr = &dehdr;
 
@@ -72,40 +83,40 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
 	/*
 	 * As ent_setup() will effectively lazy load the necessary support
 	 * libraries, make sure ld.so.1 is initialized for plt relocations.
-	 */
-	if (elf_rtld_load() == 0)
-		return (0);
-
-	/*
-	 * Configure libld.so to process objects of the desired target
+	 * Then configure libld.so to process objects of the desired target
 	 * type (this is the first call to libld.so, which will effectively
 	 * lazyload it).
 	 */
-	if (ld_init_target(lml, M_MACH) != 0)
-		return (0);
+	if ((elf_rtld_load() == 0) || (ld_init_target(lml, M_MACH) != 0)) {
+		free(ofl);
+		return (NULL);
+	}
 
 	/*
-	 * Obtain a generic set of entrance criteria
+	 * Obtain a generic set of entrance criteria, and generate a link map
+	 * place holder and use the ELFPRV() element to maintain the output
+	 * file descriptor.
 	 */
-	if (ld_ent_setup(ofl, syspagsz) == S_ERROR)
-		return (0);
+	lmsz = S_DROUND(sizeof (Rt_map)) + sizeof (Rt_elfp);
+	if ((ld_ent_setup(ofl, syspagsz) == S_ERROR) ||
+	    ((olmp = calloc(lmsz, 1)) == NULL)) {
+		free(ofl);
+		return (NULL);
+	}
 
-	/*
-	 * Generate a link map place holder and use the `rt_priv' element to
-	 * maintain the output file descriptor.
-	 */
-	if ((olmp = (Rt_map *)calloc(sizeof (Rt_map), 1)) == 0)
-		return (0);
-
-	DBG_CALL(Dbg_file_elf(lml, name, 0, 0, 0, 0, lml->lm_lmidstr, lmco));
+	DBG_CALL(Dbg_file_elf(lml, name, 0, 0, lml->lm_lmidstr, lmco));
 	FLAGS(olmp) |= FLG_RT_OBJECT;
-	olmp->rt_priv = (void *)ofl;
+	ELFPRV(olmp) = (void *)ofl;
 
 	/*
 	 * Initialize string tables.
 	 */
-	if (ld_init_strings(ofl) == S_ERROR)
-		return (0);
+	if (ld_init_strings(ofl) == S_ERROR) {
+		free(ofl);
+		free(olmp);
+		olmp = NULL;
+		return (NULL);
+	}
 
 	/*
 	 * Assign the output file name to be the initial object that got us
@@ -113,12 +124,28 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
 	 * don't actually generate an output file unless debugging is enabled.
 	 */
 	ofl->ofl_name = name;
-	ORIGNAME(olmp) = PATHNAME(olmp) = NAME(olmp) = (char *)name;
+	NAME(olmp) = (char *)name;
 	LIST(olmp) = lml;
 
 	lm_append(lml, lmco, olmp);
 	return (olmp);
 }
+
+/*
+ * Define a structure to retain the mapping information of the original
+ * relocatable object.  Typically, mmapobj(2) maps a relocatable object into one
+ * mapping.  However, if padding has been enabled by a debugger, then additional
+ * padding segments may have been added.  elf_obj_file() needs to know which
+ * segment is the relocatable objects data, and retain the initial segment and
+ * the associated segment number for unmapping this object later (see
+ * elf_obj_fini()).  Note, even if padding is enabled, the final shared object
+ * that is created by the link-editor for this relocatable object will have no
+ * associated padding, as ld(1) has no capabilities to provide padding.
+ */
+typedef struct {
+	mmapobj_result_t	*md_mpp;
+	uint_t			md_mnum;
+} Mmap_desc;
 
 /*
  * Initial processing of a relocatable object.  If this is the first object
@@ -129,29 +156,43 @@ elf_obj_init(Lm_list *lml, Aliste lmco, const char *name)
  * sections).
  */
 Rt_map *
-elf_obj_file(Lm_list *lml, Aliste lmco, const char *name, int fd)
+elf_obj_file(Lm_list *lml, Aliste lmco, const char *name,
+    mmapobj_result_t *hmpp, mmapobj_result_t *mpp, uint_t mnum)
 {
 	Rej_desc	rej;
+	Mmap_desc	md;
 
 	/*
 	 * If this is the first relocatable object (LD_PRELOAD could provide a
 	 * list of objects), initialize an input file descriptor and a link map.
 	 */
-	if (!olmp) {
-		/*
-		 * Load the link-editor library.
-		 */
-		if ((olmp = elf_obj_init(lml, lmco, name)) == 0)
-			return (0);
+	if ((olmp == NULL) && ((olmp = elf_obj_init(lml, lmco, name)) == NULL))
+		return (NULL);
+
+	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
+
+	/*
+	 * Keep track of the input image, as this must be free'd after all ELF
+	 * processing is completed.
+	 */
+	md.md_mpp = mpp;
+	md.md_mnum = mnum;
+	if (alist_append(&mpalp, &md, sizeof (Mmap_desc),
+	    AL_CNT_MPOBJS) == NULL) {
+		remove_so(lml, olmp);
+		return (NULL);
 	}
 
 	/*
-	 * Proceed to process the input file.
+	 * Pass the object mapping to the link-editor to commence processing the
+	 * file.
 	 */
-	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
-	if (ld_process_open(name, name, &fd, (Ofl_desc *)olmp->rt_priv,
-	    NULL, &rej) == (Ifl_desc *)S_ERROR)
-		return (0);
+	if (ld_process_mem(name, name, hmpp->mr_addr, hmpp->mr_msize,
+	    (Ofl_desc *)ELFPRV(olmp), &rej) == (Ifl_desc *)S_ERROR) {
+		remove_so(lml, olmp);
+		return (NULL);
+	}
+
 	return (olmp);
 }
 
@@ -163,29 +204,63 @@ elf_obj_file(Lm_list *lml, Aliste lmco, const char *name, int fd)
 Rt_map *
 elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 {
-	Ofl_desc	*ofl = (Ofl_desc *)lmp->rt_priv;
-	Rt_map		*nlmp;
-	Addr		etext;
-	Ehdr		*ehdr;
-	Phdr		*phdr;
-	Mmap		*mmaps;
-	uint_t		phnum, mmapcnt;
-	Lm_cntl 	*lmc;
+	Ofl_desc		*ofl = (Ofl_desc *)ELFPRV(lmp);
+	Rt_map			*nlmp, *tlmp;
+	Ehdr			*ehdr;
+	Phdr			*phdr;
+	mmapobj_result_t	*mpp, *hmpp;
+	uint_t			phnum;
+	int			mnum;
+	Lm_cntl			*lmc;
+	Aliste			idx1;
+	Mmap_desc		*mdp;
+	Fdesc			fd = { 0 };
+	Grp_hdl			*ghp;
+	Rej_desc		rej = { 0 };
 
 	DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
 
 	if (ld_reloc_init(ofl) == S_ERROR)
-		return (0);
+		return (NULL);
 	if (ld_sym_validate(ofl) == S_ERROR)
-		return (0);
+		return (NULL);
+
+	/*
+	 * At this point, all input section processing is complete.  If any
+	 * hardware or software capabilities have been established, ensure that
+	 * they are appropriate for this platform.
+	 */
+	if ((ofl->ofl_hwcap_1) && (hwcap_check(ofl->ofl_hwcap_1, &rej) == 0)) {
+		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) &&
+		    (lmp != NULL) && (FLAGS1(lmp) & FL1_RT_LDDSTUB) &&
+		    (NEXT(lmp) == NULL)) {
+			(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),
+			    ofl->ofl_name, rej.rej_str);
+		}
+		return (NULL);
+	}
+
+	if ((ofl->ofl_sfcap_1) && (sfcap_check(ofl->ofl_sfcap_1, &rej) == 0)) {
+		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) &&
+		    (lmp != NULL) && (FLAGS1(lmp) & FL1_RT_LDDSTUB) &&
+		    (NEXT(lmp) == NULL)) {
+			(void) printf(MSG_INTL(MSG_LDD_GEN_SFCAP_1),
+			    ofl->ofl_name, rej.rej_str);
+		}
+		return (NULL);
+	}
+
+	/*
+	 * Finish creating the output file.
+	 */
 	if (ld_make_sections(ofl) == S_ERROR)
-		return (0);
+		return (NULL);
 	if (ld_create_outfile(ofl) == S_ERROR)
-		return (0);
-	if ((etext = ld_update_outfile(ofl)) == (Addr)S_ERROR)
-		return (0);
+		return (NULL);
+	if (ld_update_outfile(ofl) == S_ERROR)
+		return (NULL);
 	if (ld_reloc_process(ofl) == S_ERROR)
-		return (0);
+		return (NULL);
 
 	/*
 	 * At this point we have a memory image of the shared object.  The link
@@ -199,45 +274,66 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	 */
 	ehdr = ofl->ofl_nehdr;
 	phdr = ofl->ofl_phdr;
-	if ((mmaps = calloc(ehdr->e_phnum, sizeof (Mmap))) == 0)
-		return (0);
-	for (mmapcnt = 0, phnum = 0; phnum < ehdr->e_phnum; phnum++) {
+
+	if ((mpp = hmpp = calloc(ehdr->e_phnum,
+	    sizeof (mmapobj_result_t))) == NULL)
+		return (NULL);
+	for (mnum = 0, phnum = 0; phnum < ehdr->e_phnum; phnum++) {
 		if (phdr[phnum].p_type != PT_LOAD)
 			continue;
 
-		mmaps[mmapcnt].m_vaddr = (caddr_t)
-		    (phdr[phnum].p_vaddr + (ulong_t)ehdr);
-		mmaps[mmapcnt].m_msize = phdr[phnum].p_memsz;
-		mmaps[mmapcnt].m_fsize = phdr[phnum].p_filesz;
-		mmaps[mmapcnt].m_perm = (PROT_READ | PROT_WRITE | PROT_EXEC);
-		mmapcnt++;
+		mpp[mnum].mr_addr = (caddr_t)((uintptr_t)phdr[phnum].p_vaddr +
+		    (uintptr_t)ehdr);
+		mpp[mnum].mr_msize = phdr[phnum].p_memsz;
+		mpp[mnum].mr_fsize = phdr[phnum].p_filesz;
+		mpp[mnum].mr_prot = (PROT_READ | PROT_WRITE | PROT_EXEC);
+		mnum++;
 	}
 
 	/*
 	 * Generate a new link map representing the memory image created.
 	 */
-	if ((nlmp = elf_new_lm(lml, ofl->ofl_name, ofl->ofl_name,
-	    ofl->ofl_osdynamic->os_outdata->d_buf, (ulong_t)ehdr,
-	    (ulong_t)ehdr + etext, CNTL(olmp), (ulong_t)ofl->ofl_size,
-	    0, 0, 0, mmaps, mmapcnt, in_nfavl)) == 0)
-		return (0);
+	fd.fd_nname = ofl->ofl_name;
+	if ((nlmp = elf_new_lmp(lml, CNTL(olmp), &fd, (Addr)hmpp->mr_addr,
+	    ofl->ofl_size, 0, in_nfavl)) == NULL)
+		return (NULL);
+
+	MMAPS(nlmp) = hmpp;
+	MMAPCNT(nlmp) = mnum;
+	PADSTART(nlmp) = (ulong_t)hmpp->mr_addr;
+	PADIMLEN(nlmp) = mpp->mr_addr + mpp->mr_msize - hmpp->mr_addr;
 
 	/*
-	 * Remove this link map from the end of the link map list and copy its
-	 * contents into the link map originally created for this file (we copy
-	 * the contents rather than manipulate the link map pointers as parts
-	 * of the dlopen code have remembered the original link map address).
+	 * Replace the original (temporary) link map with the new link map.
 	 */
-	NEXT(PREV_RT_MAP(nlmp)) = 0;
 	/* LINTED */
 	lmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, CNTL(nlmp));
-	lmc->lc_tail = PREV_RT_MAP(nlmp);
-	if (CNTL(nlmp) == ALIST_OFF_DATA)
-		lml->lm_tail = PREV_RT_MAP(nlmp);
 	lml->lm_obj--;
 
-	PREV(nlmp) = PREV(olmp);
-	NEXT(nlmp) = NEXT(olmp);
+	if ((tlmp = PREV_RT_MAP(nlmp)) == olmp)
+		tlmp = nlmp;
+
+	if (PREV(olmp)) {
+		NEXT(PREV_RT_MAP(olmp)) = (Link_map *)nlmp;
+		PREV(nlmp) = PREV(olmp);
+	} else {
+		PREV(nlmp) = NULL;
+		lmc->lc_head = nlmp;
+		if (CNTL(nlmp) == ALIST_OFF_DATA)
+			lml->lm_head = nlmp;
+	}
+
+	if (NEXT(olmp) != (Link_map *)nlmp) {
+		NEXT(nlmp) = NEXT(olmp);
+		PREV(NEXT_RT_MAP(olmp)) = (Link_map *)nlmp;
+	}
+
+	NEXT(tlmp) = NULL;
+
+	lmc->lc_tail = tlmp;
+	if (CNTL(nlmp) == ALIST_OFF_DATA)
+		lml->lm_tail = tlmp;
+
 	HANDLES(nlmp) = HANDLES(olmp);
 	GROUPS(nlmp) = GROUPS(olmp);
 	STDEV(nlmp) = STDEV(olmp);
@@ -248,33 +344,54 @@ elf_obj_fini(Lm_list *lml, Rt_map *lmp, int *in_nfavl)
 	MODE(nlmp) |= MODE(olmp);
 
 	NAME(nlmp) = NAME(olmp);
-	PATHNAME(nlmp) = PATHNAME(olmp);
-	ORIGNAME(nlmp) = ORIGNAME(olmp);
-	DIRSZ(nlmp) = DIRSZ(olmp);
+
+	/*
+	 * Reassign any original handles to the new link-map.
+	 */
+	for (APLIST_TRAVERSE(HANDLES(nlmp), idx1, ghp)) {
+		Grp_desc	*gdp;
+		Aliste		idx2;
+
+		ghp->gh_ownlmp = nlmp;
+
+		for (ALIST_TRAVERSE(ghp->gh_depends, idx2, gdp)) {
+			if (gdp->gd_depend == olmp) {
+				gdp->gd_depend = nlmp;
+				break;
+			}
+		}
+	}
 
 	ld_ofl_cleanup(ofl);
-	free(olmp->rt_priv);
-	(void) memcpy(olmp, nlmp, sizeof (Rt_map));
-	free(nlmp);
-	nlmp = olmp;
+	free(ELFPRV(olmp));
+	free(olmp);
 	olmp = 0;
 
 	/*
-	 * Now that we've allocated our permanent Rt_map structure, expand the
-	 * PATHNAME() and insert it into the FullpathNode AVL tree
+	 * Unmap the original relocatable object.
 	 */
-	if (FLAGS1(nlmp) & FL1_RT_RELATIVE)
-		(void) fullpath(nlmp, 0);
+	for (ALIST_TRAVERSE(mpalp, idx1, mdp)) {
+		unmap_obj(mdp->md_mpp, mdp->md_mnum);
+		free(mdp->md_mpp);
+	}
+	free(mpalp);
+	mpalp = NULL;
+
+	/*
+	 * Now that we've allocated our permanent link map structure, expand the
+	 * PATHNAME() and insert this path name into the FullPathNode AVL tree.
+	 */
+	(void) fullpath(nlmp, 0);
 	if (fpavl_insert(lml, nlmp, PATHNAME(nlmp), 0) == 0)
-		return (0);
+		return (NULL);
 
 	/*
 	 * If we're being audited tell the audit library of the file we've just
 	 * opened.
 	 */
-	if ((lml->lm_tflags | FLAGS1(nlmp)) & LML_TFLG_AUD_MASK) {
+	if ((lml->lm_tflags | AFLAGS(nlmp)) & LML_TFLG_AUD_MASK) {
 		if (audit_objopen(lmp, lmp) == 0)
-			return (0);
+			return (NULL);
 	}
 	return (nlmp);
 }

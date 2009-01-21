@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,89 +45,91 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
+#include	"_inline.h"
 #include	"msg.h"
 
 /*
  * Default and secure dependency search paths.
  */
-static Pnode		elf_dflt_dirs[] = {
+static Spath_defn _elf_def_dirs[] = {
 #if	defined(_ELF64)
-#ifndef	SGS_PRE_UNIFIED_PROCESS
-	{ MSG_ORIG(MSG_PTH_LIB_64),		0,	MSG_PTH_LIB_64_SIZE,
-		LA_SER_DEFAULT,			0,	&elf_dflt_dirs[1] },
-#endif
-	{ MSG_ORIG(MSG_PTH_USRLIB_64),		0,	MSG_PTH_USRLIB_64_SIZE,
-		LA_SER_DEFAULT,			0, 0 }
+	{ MSG_ORIG(MSG_PTH_LIB_64),		MSG_PTH_LIB_64_SIZE },
+	{ MSG_ORIG(MSG_PTH_USRLIB_64),		MSG_PTH_USRLIB_64_SIZE },
 #else
-#ifndef	SGS_PRE_UNIFIED_PROCESS
-	{ MSG_ORIG(MSG_PTH_LIB),		0,	MSG_PTH_LIB_SIZE,
-		LA_SER_DEFAULT,			0,	&elf_dflt_dirs[1] },
+	{ MSG_ORIG(MSG_PTH_LIB),		MSG_PTH_LIB_SIZE },
+	{ MSG_ORIG(MSG_PTH_USRLIB),		MSG_PTH_USRLIB_SIZE },
 #endif
-	{ MSG_ORIG(MSG_PTH_USRLIB),		0,	MSG_PTH_USRLIB_SIZE,
-		LA_SER_DEFAULT,			0, 0 }
-#endif
+	{ 0, 0 }
 };
 
-static Pnode		elf_secure_dirs[] = {
+static Spath_defn _elf_sec_dirs[] = {
 #if	defined(_ELF64)
-#ifndef	SGS_PRE_UNIFIED_PROCESS
-	{ MSG_ORIG(MSG_PTH_LIBSE_64),		0,	MSG_PTH_LIBSE_64_SIZE,
-		LA_SER_SECURE,			0,	&elf_secure_dirs[1] },
-#endif
-	{ MSG_ORIG(MSG_PTH_USRLIBSE_64),	0,
-		MSG_PTH_USRLIBSE_64_SIZE,
-		LA_SER_SECURE,			0, 0 }
+	{ MSG_ORIG(MSG_PTH_LIBSE_64),		MSG_PTH_LIBSE_64_SIZE },
+	{ MSG_ORIG(MSG_PTH_USRLIBSE_64),	MSG_PTH_USRLIBSE_64_SIZE },
 #else
-#ifndef	SGS_PRE_UNIFIED_PROCESS
-	{ MSG_ORIG(MSG_PTH_LIBSE),		0,	MSG_PTH_LIBSE_SIZE,
-		LA_SER_SECURE,			0,	&elf_secure_dirs[1] },
+	{ MSG_ORIG(MSG_PTH_LIBSE),		MSG_PTH_LIBSE_SIZE },
+	{ MSG_ORIG(MSG_PTH_USRLIBSE),		MSG_PTH_USRLIBSE_SIZE },
 #endif
-	{ MSG_ORIG(MSG_PTH_USRLIBSE),		0,	MSG_PTH_USRLIBSE_SIZE,
-		LA_SER_SECURE,			0, 0 }
-#endif
+	{ 0, 0 }
 };
+
+Alist	*elf_def_dirs = NULL;
+Alist	*elf_sec_dirs = NULL;
 
 /*
  * Defines for local functions.
  */
-static Pnode	*elf_fix_name(const char *, Rt_map *, uint_t);
-static int	elf_are_u(Rej_desc *);
 static void	elf_dladdr(ulong_t, Rt_map *, Dl_info *, void **, int);
-static ulong_t	elf_entry_pt(void);
-static char	*elf_get_so(const char *, const char *);
-static Rt_map	*elf_map_so(Lm_list *, Aliste, const char *, const char *,
-		    int, int *);
+static Addr	elf_entry_point(void);
+static int	elf_fix_name(const char *, Rt_map *, Alist **, Aliste, uint_t);
+static Alist	**elf_get_def_dirs(void);
+static Alist	**elf_get_sec_dirs(void);
+static char	*elf_get_so(const char *, const char *, size_t, size_t);
 static int	elf_needed(Lm_list *, Aliste, Rt_map *, int *);
-static void	elf_unmap_so(Rt_map *);
-static int	elf_verify_vers(const char *, Rt_map *, Rt_map *);
 
 /*
  * Functions and data accessed through indirect pointers.
  */
 Fct elf_fct = {
-	elf_are_u,
-	elf_entry_pt,
-	elf_map_so,
-	elf_unmap_so,
+	elf_verify,
+	elf_new_lmp,
+	elf_entry_point,
 	elf_needed,
 	lookup_sym,
 	elf_reloc,
-	elf_dflt_dirs,
-	elf_secure_dirs,
+	elf_get_def_dirs,
+	elf_get_sec_dirs,
 	elf_fix_name,
 	elf_get_so,
 	elf_dladdr,
-	dlsym_handle,
-	elf_verify_vers,
-	elf_set_prot
+	dlsym_handle
 };
 
+/*
+ * Default and secure dependency search paths.
+ */
+static Alist **
+elf_get_def_dirs()
+{
+	if (elf_def_dirs == NULL)
+		set_dirs(&elf_def_dirs, _elf_def_dirs, LA_SER_DEFAULT);
+	return (&elf_def_dirs);
+}
+
+static Alist **
+elf_get_sec_dirs()
+{
+	if (elf_sec_dirs == NULL)
+		set_dirs(&elf_sec_dirs, _elf_sec_dirs, LA_SER_SECURE);
+	return (&elf_sec_dirs);
+}
 
 /*
  * Redefine NEEDED name if necessary.
  */
-static Pnode *
-elf_fix_name(const char *name, Rt_map *clmp, uint_t orig)
+static int
+elf_fix_name(const char *name, Rt_map *clmp, Alist **alpp, Aliste alni,
+    uint_t orig)
 {
 	/*
 	 * For ABI compliance, if we are asked for ld.so.1, then really give
@@ -142,21 +144,68 @@ elf_fix_name(const char *name, Rt_map *clmp, uint_t orig)
 #endif
 	    (strcmp(name, MSG_ORIG(MSG_FIL_RTLD)) == 0)) {
 		/* END CSTYLED */
-		Pnode	*pnp;
+		Pdesc	*pdp;
 
 		DBG_CALL(Dbg_file_fixname(LIST(clmp), name,
 		    MSG_ORIG(MSG_PTH_LIBSYS)));
-		if (((pnp = calloc(sizeof (Pnode), 1)) == 0) ||
-		    ((pnp->p_name = strdup(MSG_ORIG(MSG_PTH_LIBSYS))) == 0)) {
-			if (pnp)
-				free(pnp);
+		if ((pdp = alist_append(alpp, 0, sizeof (Pdesc), alni)) == NULL)
 			return (0);
-		}
-		pnp->p_len = MSG_PTH_LIBSYS_SIZE;
-		return (pnp);
+
+		pdp->pd_pname = (char *)MSG_ORIG(MSG_PTH_LIBSYS);
+		pdp->pd_plen = MSG_PTH_LIBSYS_SIZE;
+		pdp->pd_flags = PD_FLG_PNSLASH;
+
+		return (1);
 	}
 
-	return (expand_paths(clmp, name, orig, 0));
+	return (expand_paths(clmp, name, alpp, alni, orig, 0));
+}
+
+/*
+ * Determine whether this object requires any hardware or software capabilities.
+ */
+static int
+elf_cap_check(Fdesc *fdp, Ehdr *ehdr, Rej_desc *rej)
+{
+	Phdr	*phdr;
+	int	cnt;
+
+	/* LINTED */
+	phdr = (Phdr *)((char *)ehdr + ehdr->e_phoff);
+	for (cnt = 0; cnt < ehdr->e_phnum; cnt++, phdr++) {
+		Cap	*cptr;
+
+		if (phdr->p_type != PT_SUNWCAP)
+			continue;
+
+		/* LINTED */
+		cptr = (Cap *)((char *)ehdr + phdr->p_offset);
+		while (cptr->c_tag != CA_SUNW_NULL) {
+			if (cptr->c_tag == CA_SUNW_HW_1) {
+				/*
+				 * Verify the hardware capabilities.
+				 */
+				if (hwcap_check(cptr->c_un.c_val, rej) == 0)
+					return (0);
+
+				/*
+				 * Retain this hardware capabilities value for
+				 * possible later inspection should this object
+				 * be processed as a filtee.
+				 */
+				fdp->fd_hwcap = cptr->c_un.c_val;
+			}
+			if (cptr->c_tag == CA_SUNW_SF_1) {
+				/*
+				 * Verify the software capabilities.
+				 */
+				if (sfcap_check(cptr->c_un.c_val, rej) == 0)
+					return (0);
+			}
+			cptr++;
+		}
+	}
+	return (1);
 }
 
 /*
@@ -164,62 +213,87 @@ elf_fix_name(const char *name, Rt_map *clmp, uint_t orig)
  * is compatible.  Returns 1 if true, else 0 and sets the reject descriptor
  * with associated error information.
  */
-static int
-elf_are_u(Rej_desc *rej)
+Fct *
+elf_verify(caddr_t addr, size_t size, Fdesc *fdp, const char *name,
+    Rej_desc *rej)
 {
 	Ehdr	*ehdr;
+	char	*caddr = (char *)addr;
 
 	/*
 	 * Determine if we're an elf file.  If not simply return, we don't set
 	 * any rejection information as this test allows use to scroll through
 	 * the objects we support (ELF, AOUT).
 	 */
-	if (fmap->fm_fsize < sizeof (Ehdr) ||
-	    fmap->fm_maddr[EI_MAG0] != ELFMAG0 ||
-	    fmap->fm_maddr[EI_MAG1] != ELFMAG1 ||
-	    fmap->fm_maddr[EI_MAG2] != ELFMAG2 ||
-	    fmap->fm_maddr[EI_MAG3] != ELFMAG3) {
-		return (0);
+	if (size < sizeof (Ehdr) ||
+	    caddr[EI_MAG0] != ELFMAG0 ||
+	    caddr[EI_MAG1] != ELFMAG1 ||
+	    caddr[EI_MAG2] != ELFMAG2 ||
+	    caddr[EI_MAG3] != ELFMAG3) {
+		return (NULL);
 	}
 
 	/*
 	 * Check class and encoding.
 	 */
 	/* LINTED */
-	ehdr = (Ehdr *)fmap->fm_maddr;
+	ehdr = (Ehdr *)addr;
 	if (ehdr->e_ident[EI_CLASS] != M_CLASS) {
 		rej->rej_type = SGS_REJ_CLASS;
 		rej->rej_info = (uint_t)ehdr->e_ident[EI_CLASS];
-		return (0);
+		return (NULL);
 	}
 	if (ehdr->e_ident[EI_DATA] != M_DATA) {
 		rej->rej_type = SGS_REJ_DATA;
 		rej->rej_info = (uint_t)ehdr->e_ident[EI_DATA];
-		return (0);
+		return (NULL);
 	}
 	if ((ehdr->e_type != ET_REL) && (ehdr->e_type != ET_EXEC) &&
 	    (ehdr->e_type != ET_DYN)) {
 		rej->rej_type = SGS_REJ_TYPE;
 		rej->rej_info = (uint_t)ehdr->e_type;
-		return (0);
+		return (NULL);
 	}
 
 	/*
-	 * Verify machine specific flags, and hardware capability requirements.
-	 */
-	if ((elf_mach_flags_check(rej, ehdr) == 0) ||
-	    (cap_check(rej, ehdr) == 0))
-		return (0);
-
-	/*
-	 * Verify ELF version.  ??? is this too restrictive ???
+	 * Verify ELF version.
 	 */
 	if (ehdr->e_version > EV_CURRENT) {
 		rej->rej_type = SGS_REJ_VERSION;
 		rej->rej_info = (uint_t)ehdr->e_version;
-		return (0);
+		return (NULL);
 	}
-	return (1);
+
+	/*
+	 * Verify machine specific flags.
+	 */
+	if (elf_mach_flags_check(rej, ehdr) == 0)
+		return (NULL);
+
+	/*
+	 * Verify any hardware/software capability requirements.  Note, if this
+	 * object is an explicitly defined shared object under inspection by
+	 * ldd(1), and contains an incompatible hardware capabilities
+	 * requirement, then inform the user, but continue processing.
+	 */
+	if (elf_cap_check(fdp, ehdr, rej) == 0) {
+		Rt_map	*lmp = lml_main.lm_head;
+
+		if ((lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) &&
+		    (lmp != NULL) && (FLAGS1(lmp) & FL1_RT_LDDSTUB) &&
+		    (NEXT(lmp) == NULL)) {
+			const char	*fmt;
+
+			if (rej->rej_type == SGS_REJ_HWCAP_1)
+				fmt = MSG_INTL(MSG_LDD_GEN_HWCAP_1);
+			else
+				fmt = MSG_INTL(MSG_LDD_GEN_SFCAP_1);
+			(void) printf(fmt, name, rej->rej_str);
+			return (&elf_fct);
+		}
+		return (NULL);
+	}
+	return (&elf_fct);
 }
 
 /*
@@ -265,9 +339,9 @@ elf_rtld_load()
 	 *	to elf_lazy_load().  This is because all dynamic dependencies
 	 * 	are recorded as lazy dependencies.
 	 */
-	(void) elf_reloc_relacount((ulong_t)JMPREL(lmp),
+	(void) elf_reloc_relative_count((ulong_t)JMPREL(lmp),
 	    (ulong_t)(PLTRELSZ(lmp) / RELENT(lmp)), (ulong_t)RELENT(lmp),
-	    (ulong_t)ADDR(lmp));
+	    (ulong_t)ADDR(lmp), lmp, NULL);
 #endif
 
 	lml->lm_flags |= LML_FLG_PLTREL;
@@ -281,10 +355,10 @@ Rt_map *
 elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
     int *in_nfavl)
 {
+	Alist		*palp = NULL;
 	Rt_map		*nlmp, *hlmp;
 	Dyninfo		*dip = &DYNINFO(clmp)[ndx], *pdip;
 	uint_t		flags = 0;
-	Pnode		*pnp;
 	const char	*name;
 	Lm_list		*lml = LIST(clmp);
 	Lm_cntl		*lmc;
@@ -293,7 +367,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	/*
 	 * If this dependency has already been processed, we're done.
 	 */
-	if (((nlmp = (Rt_map *)dip->di_info) != 0) ||
+	if (((nlmp = (Rt_map *)dip->di_info) != NULL) ||
 	    (dip->di_flags & FLG_DI_LDD_DONE))
 		return (nlmp);
 
@@ -337,8 +411,8 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	/*
 	 * Expand the requested name if necessary.
 	 */
-	if ((pnp = elf_fix_name(name, clmp, 0)) == 0)
-		return (0);
+	if (elf_fix_name(name, clmp, &palp, AL_CNT_NEEDED, 0) == 0)
+		return (NULL);
 
 	/*
 	 * Provided the object on the head of the link-map has completed its
@@ -347,9 +421,9 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	hlmp = lml->lm_head;
 	if (FLAGS(hlmp) & FLG_RT_RELOCED) {
 		if ((lmc = alist_append(&lml->lm_lists, 0, sizeof (Lm_cntl),
-		    AL_CNT_LMLISTS)) == 0) {
-			remove_pnode(pnp);
-			return (0);
+		    AL_CNT_LMLISTS)) == NULL) {
+			remove_plist(&palp, 1);
+			return (NULL);
 		}
 		lmco = (Aliste)((char *)lmc - (char *)lml->lm_lists);
 	} else {
@@ -361,14 +435,14 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 * Load the associated object.
 	 */
 	dip->di_info = nlmp =
-	    load_one(lml, lmco, pnp, clmp, MODE(clmp), flags, 0, in_nfavl);
+	    load_one(lml, lmco, palp, clmp, MODE(clmp), flags, 0, in_nfavl);
 
 	/*
 	 * Remove any expanded pathname infrastructure.  Reduce the pending lazy
 	 * dependency count of the caller, together with the link-map lists
 	 * count of objects that still have lazy dependencies pending.
 	 */
-	remove_pnode(pnp);
+	remove_plist(&palp, 1);
 	if (--LAZY(clmp) == 0)
 		LIST(clmp)->lm_lazy--;
 
@@ -377,16 +451,16 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 * create an association between the caller and this dependency.
 	 */
 	if (nlmp && ((bind_one(clmp, nlmp, BND_NEEDED) == 0) ||
-	    (analyze_lmc(lml, lmco, nlmp, in_nfavl) == 0) ||
+	    ((nlmp = analyze_lmc(lml, lmco, nlmp, in_nfavl)) == NULL) ||
 	    (relocate_lmc(lml, lmco, clmp, nlmp, in_nfavl) == 0)))
-		dip->di_info = nlmp = 0;
+		dip->di_info = nlmp = NULL;
 
 	/*
 	 * If this lazyload has failed, and we've created a new link-map
 	 * control list to which this request has added objects, then remove
 	 * all the objects that have been associated to this request.
 	 */
-	if ((nlmp == 0) && lmc && lmc->lc_head)
+	if ((nlmp == NULL) && lmc && lmc->lc_head)
 		remove_lmc(lml, clmp, lmc, lmco, name);
 
 	/*
@@ -399,7 +473,7 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 	 * If this lazy loading failed, record the fact, and bump the lazy
 	 * counts.
 	 */
-	if (nlmp == 0) {
+	if (nlmp == NULL) {
 		dip->di_flags |= FLG_DI_LAZYFAIL;
 		if (LAZY(clmp)++ == 0)
 			LIST(clmp)->lm_lazy++;
@@ -411,69 +485,24 @@ elf_lazy_load(Rt_map *clmp, Slookup *slp, uint_t ndx, const char *sym,
 /*
  * Return the entry point of the ELF executable.
  */
-static ulong_t
-elf_entry_pt(void)
+static Addr
+elf_entry_point(void)
 {
-	return (ENTRY(lml_main.lm_head));
-}
+	Rt_map	*lmp = lml_main.lm_head;
+	Ehdr	*ehdr = (Ehdr *)ADDR(lmp);
+	Addr	addr = (Addr)(ehdr->e_entry);
 
-/*
- * Unmap a given ELF shared object from the address space.
- */
-static void
-elf_unmap_so(Rt_map *lmp)
-{
-	caddr_t	addr;
-	size_t	size;
-	Mmap	*mmaps;
+	if ((FLAGS(lmp) & FLG_RT_FIXED) == 0)
+		addr += ADDR(lmp);
 
-	/*
-	 * If this link map represents a relocatable object concatenation, then
-	 * the image was simply generated in allocated memory.  Free the memory.
-	 *
-	 * Note: the memory was originally allocated in the libelf:_elf_outmap
-	 * routine and would normally have been free'd in elf_outsync(), but
-	 * because we 'interpose' on that routine the memory  wasn't free'd at
-	 * that time.
-	 */
-	if (FLAGS(lmp) & FLG_RT_IMGALLOC) {
-		free((void *)ADDR(lmp));
-		return;
-	}
-
-	/*
-	 * If padding was enabled via rtld_db, then we have at least one page
-	 * in front of the image - and possibly a trailing page.
-	 * Unmap the front page first:
-	 */
-	if (PADSTART(lmp) != ADDR(lmp)) {
-		addr = (caddr_t)M_PTRUNC(PADSTART(lmp));
-		size = ADDR(lmp) - (ulong_t)addr;
-		(void) munmap(addr, size);
-	}
-
-	/*
-	 * Unmap any trailing padding.
-	 */
-	if (M_PROUND((PADSTART(lmp) + PADIMLEN(lmp))) >
-	    M_PROUND(ADDR(lmp) + MSIZE(lmp))) {
-		addr = (caddr_t)M_PROUND(ADDR(lmp) + MSIZE(lmp));
-		size = M_PROUND(PADSTART(lmp) + PADIMLEN(lmp)) - (ulong_t)addr;
-		(void) munmap(addr, size);
-	}
-
-	/*
-	 * Unmmap all mapped segments.
-	 */
-	for (mmaps = MMAPS(lmp); mmaps->m_vaddr; mmaps++)
-		(void) munmap(mmaps->m_vaddr, mmaps->m_msize);
+	return (addr);
 }
 
 /*
  * Determine if a dependency requires a particular version and if so verify
  * that the version exists in the dependency.
  */
-static int
+int
 elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 {
 	Verneed		*vnd = VERNEED(clmp);
@@ -605,6 +634,7 @@ elf_verify_vers(const char *name, Rt_map *clmp, Rt_map *nlmp)
 static int
 elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 {
+	Alist		*palp = NULL;
 	Dyn		*dyn, *pdyn;
 	ulong_t		ndx = 0;
 	uint_t		lazy, flags;
@@ -623,7 +653,6 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 		Rt_map	*nlmp = 0;
 		char	*name;
 		int	silent = 0;
-		Pnode	*pnp;
 
 		switch (dyn->d_tag) {
 		case DT_POSFLAG_1:
@@ -723,9 +752,10 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 		 * Establish the objects name, load it and establish a binding
 		 * with the caller.
 		 */
-		if (((pnp = elf_fix_name(name, clmp, 0)) == 0) || ((nlmp =
-		    load_one(lml, lmco, pnp, clmp, MODE(clmp), flags, 0,
-		    in_nfavl)) == 0) || (bind_one(clmp, nlmp, BND_NEEDED) == 0))
+		if ((elf_fix_name(name, clmp, &palp, AL_CNT_NEEDED, 0) == 0) ||
+		    ((nlmp = load_one(lml, lmco, palp, clmp, MODE(clmp),
+		    flags, 0, in_nfavl)) == NULL) ||
+		    (bind_one(clmp, nlmp, BND_NEEDED) == 0))
 			nlmp = 0;
 
 		/*
@@ -733,8 +763,8 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 		 * error suppression state, if it had been previously set in
 		 * this routine.
 		 */
-		if (pnp)
-			remove_pnode(pnp);
+		remove_plist(&palp, 0);
+
 		if (silent)
 			rtld_flags &= ~RT_FL_SILENCERR;
 
@@ -746,576 +776,18 @@ elf_needed(Lm_list *lml, Aliste lmco, Rt_map *clmp, int *in_nfavl)
 			if ((MODE(clmp) & RTLD_CONFGEN) || (lmflags &
 			    (LML_FLG_LOADAVAIL | LML_FLG_TRC_ENABLE)))
 				continue;
-			else
+			else {
+				remove_plist(&palp, 1);
 				return (0);
+			}
 		}
 	}
 
 	if (LAZY(clmp))
 		lml->lm_lazy++;
 
+	remove_plist(&palp, 1);
 	return (1);
-}
-
-static int
-elf_map_check(Lm_list *lml, const char *name, caddr_t vaddr, Off size)
-{
-	prmap_t		*maps, *_maps;
-	int		pfd, num, _num;
-	caddr_t		eaddr = vaddr + size;
-	int		err;
-
-	/*
-	 * If memory reservations have been established for alternative objects
-	 * determine if this object falls within the reservation, if it does no
-	 * further checking is required.
-	 */
-	if (rtld_flags & RT_FL_MEMRESV) {
-		Rtc_head	*head = (Rtc_head *)config->c_bgn;
-
-		if ((vaddr >= (caddr_t)(uintptr_t)head->ch_resbgn) &&
-		    (eaddr <= (caddr_t)(uintptr_t)head->ch_resend))
-			return (0);
-	}
-
-	/*
-	 * Determine the mappings presently in use by this process.
-	 */
-	if ((pfd = pr_open(lml)) == FD_UNAVAIL)
-		return (1);
-
-	if (ioctl(pfd, PIOCNMAP, (void *)&num) == -1) {
-		err = errno;
-		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_PROC), name,
-		    strerror(err));
-		return (1);
-	}
-
-	if ((maps = malloc((num + 1) * sizeof (prmap_t))) == 0)
-		return (1);
-
-	if (ioctl(pfd, PIOCMAP, (void *)maps) == -1) {
-		err = errno;
-		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_PROC), name,
-		    strerror(err));
-		free(maps);
-		return (1);
-	}
-
-	/*
-	 * Determine if the supplied address clashes with any of the present
-	 * process mappings.
-	 */
-	for (_num = 0, _maps = maps; _num < num; _num++, _maps++) {
-		caddr_t		_eaddr = _maps->pr_vaddr + _maps->pr_size;
-		Rt_map		*lmp;
-		const char	*str;
-
-		if ((eaddr < _maps->pr_vaddr) || (vaddr >= _eaddr))
-			continue;
-
-		/*
-		 * We have a memory clash.  See if one of the known dynamic
-		 * dependency mappings represents this space so as to provide
-		 * the user a more meaningful message.
-		 */
-		if ((lmp = _caller(vaddr, 0)) != 0)
-			str = NAME(lmp);
-		else
-			str = MSG_INTL(MSG_STR_UNKNOWN);
-
-		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_MAPINUSE), name,
-		    EC_NATPTR(vaddr), EC_OFF(size), str);
-		return (1);
-	}
-	free(maps);
-	return (0);
-}
-
-/*
- * Obtain a memory reservation.  On newer systems, both MAP_ANON and MAP_ALIGN
- * are used to obtained an aligned reservation from anonymous memory.  If
- * MAP_ANON isn't available, then MAP_ALIGN isn't either, so obtain a standard
- * reservation using the file as backing.
- */
-static Am_ret
-elf_map_reserve(Lm_list *lml, const char *name, caddr_t *maddr, Off msize,
-    int mperm, int fd, Xword align)
-{
-	Am_ret	amret;
-	int	mflag = MAP_PRIVATE | MAP_NORESERVE;
-
-#if defined(MAP_ALIGN)
-	if ((rtld_flags2 & RT_FL2_NOMALIGN) == 0) {
-		mflag |= MAP_ALIGN;
-		*maddr = (caddr_t)align;
-	}
-#endif
-	if ((amret = anon_map(lml, maddr, msize, PROT_NONE, mflag)) == AM_ERROR)
-		return (amret);
-
-	if (amret == AM_OK)
-		return (AM_OK);
-
-	/*
-	 * If an anonymous memory request failed (which should only be the
-	 * case if it is unsupported on the system we're running on), establish
-	 * the initial mapping directly from the file.
-	 */
-	*maddr = 0;
-	if ((*maddr = mmap(*maddr, msize, mperm, MAP_PRIVATE,
-	    fd, 0)) == MAP_FAILED) {
-		int	err = errno;
-		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), name,
-		    strerror(err));
-		return (AM_ERROR);
-	}
-	return (AM_NOSUP);
-}
-
-static void *
-elf_map_textdata(caddr_t addr, Off flen, int mperm, int phdr_mperm, int mflag,
-    int fd, Off foff)
-{
-#if	defined(MAP_TEXT) && defined(MAP_INITDATA)
-	static int	notd = 0;
-
-	/*
-	 * If MAP_TEXT and MAP_INITDATA are available, select the appropriate
-	 * flag.
-	 */
-	if (notd == 0) {
-		if ((phdr_mperm & (PROT_WRITE | PROT_EXEC)) == PROT_EXEC)
-			mflag |= MAP_TEXT;
-		else
-			mflag |= MAP_INITDATA;
-	}
-#endif
-	if (mmap((caddr_t)addr, flen, mperm, mflag, fd, foff) != MAP_FAILED)
-		return (0);
-
-#if	defined(MAP_TEXT) && defined(MAP_INITDATA)
-	if ((notd == 0) && (errno == EINVAL)) {
-		/*
-		 * MAP_TEXT and MAP_INITDATA may not be supported on this
-		 * platform, try again without.
-		 */
-		notd = 1;
-		mflag &= ~(MAP_TEXT | MAP_INITDATA);
-
-		return (mmap((caddr_t)addr, flen, mperm, mflag, fd, foff));
-	}
-#endif
-	return (MAP_FAILED);
-}
-
-/*
- * Map in a file.
- */
-static caddr_t
-elf_map_it(
-	Lm_list		*lml,		/* link-map list */
-	const char	*name,		/* actual name stored for pathname */
-	Off		fsize,		/* total mapping claim of the file */
-	Ehdr		*ehdr,		/* ELF header of file */
-	Phdr		*fphdr,		/* first loadable Phdr */
-	Phdr		*lphdr,		/* last loadable Phdr */
-	Phdr		**rrphdr,	/* return first Phdr in reservation */
-	caddr_t		*rraddr,	/* return start of reservation */
-	Off		*rrsize,	/* return total size of reservation */
-	int		fixed,		/* image is resolved to a fixed addr */
-	int		fd,		/* images file descriptor */
-	Xword		align,		/* image segments maximum alignment */
-	Mmap		*mmaps,		/* mmap information array and */
-	uint_t		*mmapcnt)	/* 	mapping count */
-{
-	caddr_t		raddr;		/* reservation address */
-	Off		rsize;		/* reservation size */
-	Phdr		*phdr;		/* working program header poiner */
-	caddr_t		maddr;		/* working mmap address */
-	caddr_t		faddr;		/* working file address */
-	size_t		padsize;	/* object padding requirement */
-	size_t		padpsize = 0;	/* padding size rounded to next page */
-	size_t		padmsize = 0;	/* padding size rounded for alignment */
-	int		skipfseg;	/* skip mapping first segment */
-	int		mperm;		/* segment permissions */
-	Am_ret		amret = AM_NOSUP;
-
-	/*
-	 * If padding is required extend both the front and rear of the image.
-	 * To insure the image itself is mapped at the correct alignment the
-	 * initial padding is rounded up to the nearest page.  Once the image is
-	 * mapped the excess can be pruned to the nearest page required for the
-	 * actual padding itself.
-	 */
-	if ((padsize = r_debug.rtd_objpad) != 0) {
-		padpsize = M_PROUND(padsize);
-		if (fixed)
-			padmsize = padpsize;
-		else
-			padmsize = S_ROUND(padsize, align);
-	}
-
-	/*
-	 * Determine the initial permissions used to map in the first segment.
-	 * If this segments memsz is greater that its filesz then the difference
-	 * must be zeroed.  Make sure this segment is writable.
-	 */
-	mperm = 0;
-	if (fphdr->p_flags & PF_R)
-		mperm |= PROT_READ;
-	if (fphdr->p_flags & PF_X)
-		mperm |= PROT_EXEC;
-	if ((fphdr->p_flags & PF_W) || (fphdr->p_memsz > fphdr->p_filesz))
-		mperm |= PROT_WRITE;
-
-	/*
-	 * Determine whether or not to let system reserve address space based on
-	 * whether this is a dynamic executable (addresses in object are fixed)
-	 * or a shared object (addresses in object are relative to the objects'
-	 * base).
-	 */
-	if (fixed) {
-		/*
-		 * Determine the reservation address and size, and insure that
-		 * this reservation isn't already in use.
-		 */
-		faddr = maddr = (caddr_t)M_PTRUNC((ulong_t)fphdr->p_vaddr);
-		raddr = maddr - padpsize;
-		rsize = fsize + padpsize + padsize;
-
-		if (lml_main.lm_head) {
-			if (elf_map_check(lml, name, raddr, rsize) != 0)
-				return (0);
-		}
-
-		/*
-		 * As this is a fixed image, all segments must be individually
-		 * mapped.
-		 */
-		skipfseg = 0;
-
-	} else {
-		size_t	esize;
-
-		/*
-		 * If this isn't a fixed image, reserve enough address space for
-		 * the entire image to be mapped.  The amount of reservation is
-		 * the range between the beginning of the first, and end of the
-		 * last loadable segment, together with any padding, plus the
-		 * alignment of the first segment.
-		 *
-		 * The optimal reservation is made as a no-reserve mapping from
-		 * anonymous memory.  Each segment is then mapped into this
-		 * reservation.  If the anonymous mapping capability isn't
-		 * available, the reservation is obtained from the file itself.
-		 * In this case the first segment of the image is mapped as part
-		 * of the reservation, thus only the following segments need to
-		 * be remapped.
-		 */
-		rsize = fsize + padmsize + padsize;
-		if ((amret = elf_map_reserve(lml, name, &raddr, rsize, mperm,
-		    fd, align)) == AM_ERROR)
-			return (0);
-		maddr = raddr + padmsize;
-		faddr = (caddr_t)S_ROUND((Off)maddr, align);
-
-		/*
-		 * If this reservation has been obtained from anonymous memory,
-		 * then all segments must be individually mapped.  Otherwise,
-		 * the first segment heads the reservation.
-		 */
-		if (amret == AM_OK)
-			skipfseg = 0;
-		else
-			skipfseg = 1;
-
-		/*
-		 * For backward compatibility (where MAP_ALIGN isn't available),
-		 * insure the alignment of the reservation is adequate for this
-		 * object, and if not remap the object to obtain the correct
-		 * alignment.
-		 */
-		if (faddr != maddr) {
-			(void) munmap(raddr, rsize);
-
-			rsize += align;
-			if ((amret = elf_map_reserve(lml, name, &raddr, rsize,
-			    mperm, fd, align)) == AM_ERROR)
-				return (0);
-
-			maddr = faddr = (caddr_t)S_ROUND((Off)(raddr +
-			    padpsize), align);
-
-			esize = maddr - raddr + padpsize;
-
-			/*
-			 * As ths image has been realigned, the first segment
-			 * of the file needs to be remapped to its correct
-			 * location.
-			 */
-			skipfseg = 0;
-		} else
-			esize = padmsize - padpsize;
-
-		/*
-		 * If this reservation included padding, remove any excess for
-		 * the start of the image (the padding was adjusted to insure
-		 * the image was aligned appropriately).
-		 */
-		if (esize) {
-			(void) munmap(raddr, esize);
-			raddr += esize;
-			rsize -= esize;
-		}
-	}
-
-	/*
-	 * At this point we know the initial location of the image, and its
-	 * size.  Pass these back to the caller for inclusion in the link-map
-	 * that will eventually be created.
-	 */
-	*rraddr = raddr;
-	*rrsize = rsize;
-
-	/*
-	 * The first loadable segment is now pointed to by maddr.  This segment
-	 * will eventually contain the elf header and program headers, so reset
-	 * the program header.  Pass this  back to the caller for inclusion in
-	 * the link-map so it can be used for later unmapping operations.
-	 */
-	/* LINTED */
-	*rrphdr = (Phdr *)((char *)maddr + ehdr->e_phoff);
-
-	/*
-	 * If padding is required at the front of the image, obtain that now.
-	 * Note, if we've already obtained a reservation from anonymous memory
-	 * then this reservation will already include suitable padding.
-	 * Otherwise this reservation is backed by the file, or in the case of
-	 * a fixed image, doesn't yet exist.  Map the padding so that it is
-	 * suitably protected (PROT_NONE), and insure the first segment of the
-	 * file is mapped to its correct location.
-	 */
-	if (padsize) {
-		if (amret == AM_NOSUP) {
-			if (dz_map(lml, raddr, padpsize, PROT_NONE,
-			    (MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE)) ==
-			    MAP_FAILED)
-				return (0);
-
-			skipfseg = 0;
-		}
-		rsize -= padpsize;
-	}
-
-	/*
-	 * Map individual segments.  For a fixed image, these will each be
-	 * unique mappings.  For a reservation these will fill in the
-	 * reservation.
-	 */
-	for (phdr = fphdr; phdr <= lphdr;
-	    phdr = (Phdr *)((Off)phdr + ehdr->e_phentsize)) {
-		caddr_t	addr;
-		Off	mlen, flen;
-		size_t	size;
-
-		/*
-		 * Skip non-loadable segments or segments that don't occupy
-		 * any memory.
-		 */
-		if ((phdr->p_type != PT_LOAD) || (phdr->p_memsz == 0))
-			continue;
-
-		/*
-		 * Establish this segments address relative to our base.
-		 */
-		addr = (caddr_t)M_PTRUNC((ulong_t)(phdr->p_vaddr +
-		    (fixed ? 0 : faddr)));
-
-		/*
-		 * Determine the mapping protection from the segment attributes.
-		 * Also determine the etext address from the last loadable
-		 * segment which has permissions but no write access.
-		 */
-		mperm = 0;
-		if (phdr->p_flags) {
-			if (phdr->p_flags & PF_R)
-				mperm |= PROT_READ;
-			if (phdr->p_flags & PF_X)
-				mperm |= PROT_EXEC;
-			if (phdr->p_flags & PF_W)
-				mperm |= PROT_WRITE;
-			else
-				fmap->fm_etext = phdr->p_vaddr + phdr->p_memsz +
-				    (ulong_t)(fixed ? 0 : faddr);
-		}
-
-		/*
-		 * Determine the type of mapping required.
-		 */
-		if ((phdr->p_filesz == 0) && (phdr->p_flags == 0)) {
-			/*
-			 * If this segment has no backing file and no flags
-			 * specified, then it defines a reservation.  At this
-			 * point all standard loadable segments will have been
-			 * processed.  The segment reservation is mapped
-			 * directly from /dev/null.
-			 */
-			if (nu_map(lml, (caddr_t)addr, phdr->p_memsz, PROT_NONE,
-			    MAP_FIXED | MAP_PRIVATE) == MAP_FAILED)
-				return (0);
-
-			mlen = phdr->p_memsz;
-			flen = 0;
-
-		} else if (phdr->p_filesz == 0) {
-			/*
-			 * If this segment has no backing file then it defines a
-			 * nobits segment and is mapped directly from /dev/zero.
-			 */
-			if (dz_map(lml, (caddr_t)addr, phdr->p_memsz, mperm,
-			    MAP_FIXED | MAP_PRIVATE) == MAP_FAILED)
-				return (0);
-
-			mlen = phdr->p_memsz;
-			flen = 0;
-
-		} else {
-			Off	foff;
-
-			/*
-			 * This mapping originates from the file.  Determine the
-			 * file offset to which the mapping will be directed
-			 * (must be aligned) and how much to map (might be more
-			 * than the file in the case of .bss).
-			 */
-			foff = M_PTRUNC((ulong_t)phdr->p_offset);
-			mlen = phdr->p_memsz + (phdr->p_offset - foff);
-			flen = phdr->p_filesz + (phdr->p_offset - foff);
-
-			/*
-			 * If this is a non-fixed, non-anonymous mapping, and no
-			 * padding is involved, then the first loadable segment
-			 * is already part of the initial reservation.  In this
-			 * case there is no need to remap this segment.
-			 */
-			if ((skipfseg == 0) || (phdr != fphdr)) {
-				int phdr_mperm = mperm;
-				/*
-				 * If this segments memsz is greater that its
-				 * filesz then the difference must be zeroed.
-				 * Make sure this segment is writable.
-				 */
-				if (phdr->p_memsz > phdr->p_filesz)
-					mperm |= PROT_WRITE;
-
-				if (elf_map_textdata((caddr_t)addr, flen,
-				    mperm, phdr_mperm,
-				    (MAP_FIXED | MAP_PRIVATE), fd, foff) ==
-				    MAP_FAILED) {
-					int	err = errno;
-					eprintf(lml, ERR_FATAL,
-					    MSG_INTL(MSG_SYS_MMAP), name,
-					    strerror(err));
-					return (0);
-				}
-			}
-
-			/*
-			 * If the memory occupancy of the segment overflows the
-			 * definition in the file, we need to "zero out" the end
-			 * of the mapping we've established, and if necessary,
-			 * map some more space from /dev/zero.  Note, zero'ed
-			 * memory must end on a double word boundary to satisfy
-			 * zero().
-			 */
-			if (phdr->p_memsz > phdr->p_filesz) {
-				caddr_t	zaddr;
-				size_t	zlen, zplen;
-				Off	fend;
-
-				foff = (Off)(phdr->p_vaddr + phdr->p_filesz +
-				    (fixed ? 0 : faddr));
-				zaddr = (caddr_t)M_PROUND(foff);
-				zplen = (size_t)(zaddr - foff);
-
-				fend = (Off)S_DROUND((size_t)(phdr->p_vaddr +
-				    phdr->p_memsz + (fixed ? 0 : faddr)));
-				zlen = (size_t)(fend - foff);
-
-				/*
-				 * Determine whether the number of bytes that
-				 * must be zero'ed overflow to the next page.
-				 * If not, simply clear the exact bytes
-				 * (filesz to memsz) from this page.  Otherwise,
-				 * clear the remaining bytes of this page, and
-				 * map an following pages from /dev/zero.
-				 */
-				if (zlen < zplen)
-					zero((caddr_t)foff, (long)zlen);
-				else {
-					zero((caddr_t)foff, (long)zplen);
-
-					if ((zlen = (fend - (Off)zaddr)) > 0) {
-						if (dz_map(lml, zaddr, zlen,
-						    mperm,
-						    MAP_FIXED | MAP_PRIVATE) ==
-						    MAP_FAILED)
-							return (0);
-					}
-				}
-			}
-		}
-
-		/*
-		 * Unmap anything from the last mapping address to this one and
-		 * update the mapping claim pointer.
-		 */
-		if ((fixed == 0) && ((size = addr - maddr) != 0)) {
-			(void) munmap(maddr, size);
-			rsize -= size;
-		}
-
-		/*
-		 * Retain this segments mapping information.
-		 */
-		mmaps[*mmapcnt].m_vaddr = addr;
-		mmaps[*mmapcnt].m_msize = mlen;
-		mmaps[*mmapcnt].m_fsize = flen;
-		mmaps[*mmapcnt].m_perm = mperm;
-		(*mmapcnt)++;
-
-		maddr = addr + M_PROUND(mlen);
-		rsize -= M_PROUND(mlen);
-	}
-
-	/*
-	 * If padding is required at the end of the image, obtain that now.
-	 * Note, if we've already obtained a reservation from anonymous memory
-	 * then this reservation will already include suitable padding.
-	 */
-	if (padsize) {
-		if (amret == AM_NOSUP) {
-			/*
-			 * maddr is currently page aligned from the last segment
-			 * mapping.
-			 */
-			if (dz_map(lml, maddr, padsize, PROT_NONE,
-			    (MAP_PRIVATE | MAP_FIXED | MAP_NORESERVE)) ==
-			    MAP_FAILED)
-				return (0);
-		}
-		maddr += padsize;
-		rsize -= padsize;
-	}
-
-	/*
-	 * Unmap any final reservation.
-	 */
-	if ((fixed == 0) && (rsize != 0))
-		(void) munmap(maddr, rsize);
-
-	return (faddr);
 }
 
 /*
@@ -1334,14 +806,11 @@ elf_null_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
 static void
 elf_disable_filtee(Rt_map *lmp, Dyninfo *dip)
 {
-	dip->di_info = 0;
-
 	if ((dip->di_flags & FLG_DI_SYMFLTR) == 0) {
 		/*
-		 * If this is an object filter, free the filtee's duplication.
+		 * If this is an object filter, null out the reference name.
 		 */
 		if (OBJFLTRNDX(lmp) != FLTR_DISABLED) {
-			free(REFNAME(lmp));
 			REFNAME(lmp) = NULL;
 			OBJFLTRNDX(lmp) = FLTR_DISABLED;
 
@@ -1382,10 +851,11 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	const char	*name = slp->sl_name, *filtees;
 	Rt_map		*clmp = slp->sl_cmap;
 	Rt_map		*ilmp = slp->sl_imap;
-	Pnode		*pnp, **pnpp;
+	Pdesc		*pdp;
 	int		any;
 	Dyninfo		*dip = &DYNINFO(ilmp)[ndx];
 	Lm_list		*lml = LIST(ilmp);
+	Aliste		idx;
 
 	/*
 	 * Indicate that the filter has been used.  If a binding already exists
@@ -1425,8 +895,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	filtees = (char *)STRTAB(ilmp) + DYN(ilmp)[ndx].d_un.d_val;
 	if (dip->di_info == 0) {
 		if (rtld_flags2 & RT_FL2_FLTCFG)
-			dip->di_info = elf_config_flt(lml, PATHNAME(ilmp),
-			    filtees);
+			elf_config_flt(lml, PATHNAME(ilmp), filtees,
+			    (Alist **)&dip->di_info, AL_CNT_FILTEES);
 
 		if (dip->di_info == 0) {
 			DBG_CALL(Dbg_file_filter(lml, NAME(ilmp), filtees, 0));
@@ -1436,8 +906,8 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				(void) printf(MSG_INTL(MSG_LDD_FIL_FILTER),
 				    NAME(ilmp), filtees);
 
-			if ((dip->di_info = (void *)expand_paths(ilmp,
-			    filtees, 0, 0)) == 0) {
+			if (expand_paths(ilmp, filtees, (Alist **)&dip->di_info,
+			    AL_CNT_FILTEES, 0, 0) == 0) {
 				elf_disable_filtee(ilmp, dip);
 				return (NULL);
 			}
@@ -1448,13 +918,13 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 	 * Traverse the filtee list, dlopen()'ing any objects specified and
 	 * using their group handle to lookup the symbol.
 	 */
-	for (any = 0, pnpp = (Pnode **)&(dip->di_info), pnp = *pnpp; pnp;
-	    pnpp = &pnp->p_next, pnp = *pnpp) {
+	any = 0;
+	for (ALIST_TRAVERSE((Alist *)dip->di_info, idx, pdp)) {
 		int	mode;
 		Grp_hdl	*ghp;
 		Rt_map	*nlmp = 0;
 
-		if (pnp->p_len == 0)
+		if (pdp->pd_plen == 0)
 			continue;
 
 		/*
@@ -1479,13 +949,14 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 		 * link-map control list from which to analyze any newly added
 		 * objects.
 		 */
-		if ((pnp->p_info == 0) && (pnp->p_orig & PN_TKN_HWCAP)) {
-			Lm_cntl	*lmc;
-			Aliste	lmco;
+		if ((pdp->pd_info == 0) && (pdp->pd_flags & PD_TKN_HWCAP)) {
+			const char	*dir = pdp->pd_pname;
+			Lm_cntl		*lmc;
+			Aliste		lmco;
 
 			if (FLAGS(lml->lm_head) & FLG_RT_RELOCED) {
 				if ((lmc = alist_append(&lml->lm_lists, 0,
-				    sizeof (Lm_cntl), AL_CNT_LMLISTS)) == 0)
+				    sizeof (Lm_cntl), AL_CNT_LMLISTS)) == NULL)
 					return (NULL);
 				lmco = (Aliste)((char *)lmc -
 				    (char *)lml->lm_lists);
@@ -1494,8 +965,36 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				lmco = ALIST_OFF_DATA;
 			}
 
-			pnp = hwcap_filtees(pnpp, lmco, lmc, dip, ilmp, filtees,
-			    mode, (FLG_RT_HANDLE | FLG_RT_HWCAP), in_nfavl);
+			/*
+			 * Determine the hardware capability filtees.  If none
+			 * can be found, provide suitable diagnostics.
+			 */
+			DBG_CALL(Dbg_cap_hw_filter(lml, dir, ilmp));
+			if (hwcap_filtees((Alist **)&dip->di_info, idx, dir,
+			    lmco, lmc, ilmp, filtees, mode,
+			    (FLG_RT_HANDLE | FLG_RT_HWCAP), in_nfavl) == 0) {
+				if ((lml->lm_flags & LML_FLG_TRC_ENABLE) &&
+				    (dip->di_flags & FLG_DI_AUXFLTR) &&
+				    (rtld_flags & RT_FL_WARNFLTR)) {
+					(void) printf(
+					    MSG_INTL(MSG_LDD_HWCAP_NFOUND),
+					    dir);
+				}
+				DBG_CALL(Dbg_cap_hw_filter(lml, dir, 0));
+			}
+
+			/*
+			 * Re-establish the originating path name descriptor, as
+			 * the expansion of hardware capabilities filtees may
+			 * have re-allocated the controlling Alist.  Mark this
+			 * original pathname descriptor as unused so that the
+			 * descriptor isn't revisited for processing.  Any real
+			 * hardware capabilities filtees have been added as new
+			 * pathname descriptors following this descriptor.
+			 */
+			pdp = alist_item((Alist *)dip->di_info, idx);
+			pdp->pd_flags &= ~PD_TKN_HWCAP;
+			pdp->pd_plen = 0;
 
 			/*
 			 * Now that any hardware capability objects have been
@@ -1505,14 +1004,14 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				remove_cntl(lml, lmco);
 		}
 
-		if (pnp->p_len == 0)
+		if (pdp->pd_plen == 0)
 			continue;
 
 		/*
 		 * Process an individual filtee.
 		 */
-		if (pnp->p_info == 0) {
-			const char	*filtee = pnp->p_name;
+		if (pdp->pd_info == 0) {
+			const char	*filtee = pdp->pd_pname;
 			int		audit = 0;
 
 			DBG_CALL(Dbg_file_filtee(lml, NAME(ilmp), filtee, 0));
@@ -1550,7 +1049,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				 * recursion.
 				 */
 				if (nlmp && ghp)
-					pnp->p_info = (void *)ghp;
+					pdp->pd_info = (void *)ghp;
 
 				/*
 				 * Audit the filter/filtee established.  Ignore
@@ -1558,15 +1057,24 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				 * allow ignore filtering to ld.so.1, otherwise
 				 * nothing is going to work.
 				 */
-				if (nlmp && ((lml->lm_tflags | FLAGS1(ilmp)) &
+				if (nlmp && ((lml->lm_tflags | AFLAGS(ilmp)) &
 				    LML_TFLG_AUD_OBJFILTER))
 					(void) audit_objfilter(ilmp, filtees,
 					    nlmp, 0);
 
 			} else {
 				Rej_desc	rej = { 0 };
+				Fdesc		fd = { 0 };
 				Lm_cntl		*lmc;
 				Aliste		lmco;
+
+				/*
+				 * Trace the inspection of this file, determine
+				 * any auditor substitution, and seed the file
+				 * descriptor with the originating name.
+				 */
+				if (load_trace(lml, pdp, clmp, &fd) == NULL)
+					continue;
 
 				/*
 				 * Establish a new link-map control list from
@@ -1576,7 +1084,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 					if ((lmc =
 					    alist_append(&lml->lm_lists, 0,
 					    sizeof (Lm_cntl),
-					    AL_CNT_LMLISTS)) == 0)
+					    AL_CNT_LMLISTS)) == NULL)
 						return (NULL);
 					lmco = (Aliste)((char *)lmc -
 					    (char *)lml->lm_lists);
@@ -1586,17 +1094,15 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				}
 
 				/*
-				 * Load the filtee.  Note, an auditor can
-				 * provide an alternative name.
+				 * Locate and load the filtee.
 				 */
-				if ((nlmp = load_path(lml, lmco, &(pnp->p_name),
-				    ilmp, mode, FLG_RT_HANDLE, &ghp, 0,
-				    &rej, in_nfavl)) == 0) {
+				if ((nlmp = load_path(lml, lmco, ilmp, mode,
+				    FLG_RT_HANDLE, &ghp, &fd, &rej,
+				    in_nfavl)) == NULL)
 					file_notfound(LIST(ilmp), filtee, ilmp,
 					    FLG_RT_HANDLE, &rej);
-					remove_rej(&rej);
-				}
-				filtee = pnp->p_name;
+
+				filtee = pdp->pd_pname;
 
 				/*
 				 * Establish the filter handle to prevent any
@@ -1604,7 +1110,7 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				 */
 				if (nlmp && ghp) {
 					ghp->gh_flags |= GPH_FILTEE;
-					pnp->p_info = (void *)ghp;
+					pdp->pd_info = (void *)ghp;
 
 					FLAGS1(nlmp) |= FL1_RT_USED;
 				}
@@ -1630,9 +1136,10 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				 * provide sufficient information to tear down
 				 * this filtee if necessary.
 				 */
-				if (nlmp && ghp && ((analyze_lmc(lml, lmco,
-				    nlmp, in_nfavl) == 0) || (relocate_lmc(lml,
-				    lmco, ilmp, nlmp, in_nfavl) == 0)))
+				if (nlmp && ghp && (((nlmp = analyze_lmc(lml,
+				    lmco, nlmp, in_nfavl)) == NULL) ||
+				    (relocate_lmc(lml, lmco, ilmp, nlmp,
+				    in_nfavl) == 0)))
 					nlmp = 0;
 
 				/*
@@ -1647,6 +1154,14 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 				if (nlmp && ghp &&
 				    (hdl_add(ghp, ilmp, GPD_FILTER) == 0))
 					nlmp = 0;
+
+				/*
+				 * Generate a diagnostic if the filtee couldn't
+				 * be loaded.
+				 */
+				if (nlmp == 0)
+					DBG_CALL(Dbg_file_filtee(lml, 0, filtee,
+					    audit));
 
 				/*
 				 * If this filtee loading has failed, and we've
@@ -1667,22 +1182,19 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 			}
 
 			/*
-			 * Generate a diagnostic if the filtee couldn't be
-			 * loaded, null out the pnode entry, and continue
-			 * the search.  Otherwise, retain this group handle
-			 * for future symbol searches.
+			 * If the filtee couldn't be loaded, null out the
+			 * path name descriptor entry, and continue the search.
+			 * Otherwise, the group handle is retained for future
+			 * symbol searches.
 			 */
 			if (nlmp == 0) {
-				DBG_CALL(Dbg_file_filtee(lml, 0, filtee,
-				    audit));
-
-				pnp->p_info = 0;
-				pnp->p_len = 0;
+				pdp->pd_info = NULL;
+				pdp->pd_plen = 0;
 				continue;
 			}
 		}
 
-		ghp = (Grp_hdl *)pnp->p_info;
+		ghp = (Grp_hdl *)pdp->pd_info;
 
 		/*
 		 * If we're just here to trigger filtee loading skip the symbol
@@ -1748,14 +1260,14 @@ _elf_lookup_filtee(Slookup *slp, Rt_map **dlmp, uint_t *binfo, uint_t ndx,
 		return (NULL);
 
 	/*
-	 * If no filtees have been found for a filter, clean up any Pnode
-	 * structures and disable their search completely.  For auxiliary
+	 * If no filtees have been found for a filter, clean up any path name
+	 * descriptors and disable their search completely.  For auxiliary
 	 * filters we can reselect the symbol search function so that we never
 	 * enter this routine again for this object.  For standard filters we
 	 * use the null symbol routine.
 	 */
 	if (any == 0) {
-		remove_pnode((Pnode *)dip->di_info);
+		remove_plist((Alist **)&(dip->di_info), 1);
 		elf_disable_filtee(ilmp, dip);
 		return (NULL);
 	}
@@ -2117,105 +1629,145 @@ elf_find_sym(Slookup *slp, Rt_map **dlmp, uint_t *binfo, int *in_nfavl)
  * all values.
  */
 Rt_map *
-elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
-    ulong_t addr, ulong_t etext, Aliste lmco, ulong_t msize, ulong_t entry,
-    ulong_t paddr, ulong_t padimsize, Mmap *mmaps, uint_t mmapcnt,
-    int *in_nfavl)
+elf_new_lmp(Lm_list *lml, Aliste lmco, Fdesc *fdp, Addr addr, size_t msize,
+    void *odyn, int *in_nfavl)
 {
+	const char	*name = fdp->fd_nname;
 	Rt_map		*lmp;
-	ulong_t		base, fltr = 0, audit = 0, cfile = 0, crle = 0;
-	Xword		rpath = 0;
 	Ehdr		*ehdr = (Ehdr *)addr;
+	Phdr		*phdr, *tphdr = NULL, *dphdr = NULL, *uphdr = NULL;
+	Dyn		*dyn = (Dyn *)odyn;
+	Cap		*cap = NULL;
+	int		ndx;
+	Addr		base, fltr = 0, audit = 0, cfile = 0, crle = 0;
+	Xword		rpath = 0;
+	size_t		lmsz, rtsz, epsz, dynsz = 0;
+	uint_t		dyncnt = 0;
 
-	DBG_CALL(Dbg_file_elf(lml, pname, (ulong_t)ld, addr, msize, entry,
-	    lml->lm_lmidstr, lmco));
+	DBG_CALL(Dbg_file_elf(lml, name, addr, msize, lml->lm_lmidstr, lmco));
 
 	/*
-	 * Allocate space for the link-map and private elf information.  Once
-	 * these are allocated and initialized, we can use remove_so(0, lmp) to
-	 * tear down the link-map should any failures occur.
+	 * If this is a shared object, the base address of the shared object is
+	 * added to all address values defined within the object.  Otherwise, if
+	 * this is an executable, all object addresses are used as is.
 	 */
-	if ((lmp = calloc(sizeof (Rt_map), 1)) == 0)
-		return (0);
-	if ((ELFPRV(lmp) = calloc(sizeof (Rt_elfp), 1)) == 0) {
-		free(lmp);
-		return (0);
+	if (ehdr->e_type == ET_EXEC)
+		base = 0;
+	else
+		base = addr;
+
+	/*
+	 * Traverse the program header table, picking off required items.  This
+	 * traversal also provides for the sizing of the PT_DYNAMIC section.
+	 */
+	phdr = (Phdr *)((uintptr_t)ehdr + ehdr->e_phoff);
+	for (ndx = 0; ndx < (int)ehdr->e_phnum; ndx++,
+	    phdr = (Phdr *)((uintptr_t)phdr + ehdr->e_phentsize)) {
+		switch (phdr->p_type) {
+		case PT_DYNAMIC:
+			dphdr = phdr;
+			dyn = (Dyn *)((uintptr_t)phdr->p_vaddr + base);
+			break;
+		case PT_TLS:
+			tphdr = phdr;
+			break;
+		case PT_SUNWCAP:
+			cap = (Cap *)((uintptr_t)phdr->p_vaddr + base);
+			break;
+		case PT_SUNW_UNWIND:
+			uphdr = phdr;
+			break;
+		default:
+			break;
+		}
 	}
+
+	/*
+	 * Determine the number of PT_DYNAMIC entries for the DYNINFO()
+	 * allocation.  Sadly, this is a little larger than we really need,
+	 * as there are typically padding DT_NULL entries.  However, adding
+	 * this data to the initial link-map allocation is a win.
+	 */
+	if (dyn) {
+		dyncnt = dphdr->p_filesz / sizeof (Dyn);
+		dynsz = dyncnt * sizeof (Dyninfo);
+	}
+
+	/*
+	 * Allocate space for the link-map, private elf information, and
+	 * DYNINFO() data.  Once these are allocated and initialized,
+	 * remove_so(0, lmp) can be used to tear down the link-map allocation
+	 * should any failures occur.
+	 */
+	rtsz = S_DROUND(sizeof (Rt_map));
+	epsz = S_DROUND(sizeof (Rt_elfp));
+	lmsz = rtsz + epsz + dynsz;
+	if ((lmp = calloc(lmsz, 1)) == NULL)
+		return (NULL);
+	ELFPRV(lmp) = (void *)((uintptr_t)lmp + rtsz);
+	DYNINFO(lmp) = (Dyninfo *)((uintptr_t)lmp + rtsz + epsz);
+	LMSIZE(lmp) = lmsz;
 
 	/*
 	 * All fields not filled in were set to 0 by calloc.
 	 */
-	ORIGNAME(lmp) = PATHNAME(lmp) = NAME(lmp) = (char *)pname;
-	DYN(lmp) = ld;
+	NAME(lmp) = (char *)name;
 	ADDR(lmp) = addr;
 	MSIZE(lmp) = msize;
-	ENTRY(lmp) = (Addr)entry;
 	SYMINTP(lmp) = elf_find_sym;
-	ETEXT(lmp) = etext;
 	FCT(lmp) = &elf_fct;
 	LIST(lmp) = lml;
-	PADSTART(lmp) = paddr;
-	PADIMLEN(lmp) = padimsize;
-	THREADID(lmp) = rt_thr_self();
 	OBJFLTRNDX(lmp) = FLTR_DISABLED;
 	SORTVAL(lmp) = -1;
+	DYN(lmp) = dyn;
+	DYNINFOCNT(lmp) = dyncnt;
+	PTUNWIND(lmp) = uphdr;
 
-	MMAPS(lmp) = mmaps;
-	MMAPCNT(lmp) = mmapcnt;
-	ASSERT(mmapcnt != 0);
-
-	/*
-	 * If this is a shared object, add the base address to each address.
-	 * if this is an executable, use address as is.
-	 */
-	if (ehdr->e_type == ET_EXEC) {
-		base = 0;
+	if (ehdr->e_type == ET_EXEC)
 		FLAGS(lmp) |= FLG_RT_FIXED;
-	} else
-		base = addr;
 
 	/*
 	 * Fill in rest of the link map entries with information from the file's
 	 * dynamic structure.
 	 */
-	if (ld) {
+	if (dyn) {
 		uint_t		dynndx = 0;
 		Xword		pltpadsz = 0;
 		Rti_desc	*rti;
 
 		/* CSTYLED */
-		for ( ; ld->d_tag != DT_NULL; ++ld, dynndx++) {
-			switch ((Xword)ld->d_tag) {
+		for ( ; dyn->d_tag != DT_NULL; ++dyn, dynndx++) {
+			switch ((Xword)dyn->d_tag) {
 			case DT_SYMTAB:
-				SYMTAB(lmp) = (void *)(ld->d_un.d_ptr + base);
+				SYMTAB(lmp) = (void *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_SUNW_SYMTAB:
 				SUNWSYMTAB(lmp) =
-				    (void *)(ld->d_un.d_ptr + base);
+				    (void *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_SUNW_SYMSZ:
-				SUNWSYMSZ(lmp) = ld->d_un.d_val;
+				SUNWSYMSZ(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_STRTAB:
-				STRTAB(lmp) = (void *)(ld->d_un.d_ptr + base);
+				STRTAB(lmp) = (void *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_SYMENT:
-				SYMENT(lmp) = ld->d_un.d_val;
+				SYMENT(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_FEATURE_1:
-				ld->d_un.d_val |= DTF_1_PARINIT;
-				if (ld->d_un.d_val & DTF_1_CONFEXP)
+				dyn->d_un.d_val |= DTF_1_PARINIT;
+				if (dyn->d_un.d_val & DTF_1_CONFEXP)
 					crle = 1;
 				break;
 			case DT_MOVESZ:
-				MOVESZ(lmp) = ld->d_un.d_val;
+				MOVESZ(lmp) = dyn->d_un.d_val;
 				FLAGS(lmp) |= FLG_RT_MOVE;
 				break;
 			case DT_MOVEENT:
-				MOVEENT(lmp) = ld->d_un.d_val;
+				MOVEENT(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_MOVETAB:
-				MOVETAB(lmp) = (void *)(ld->d_un.d_ptr + base);
+				MOVETAB(lmp) = (void *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_REL:
 			case DT_RELA:
@@ -2223,78 +1775,78 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				 * At this time, ld.so. can only handle one
 				 * type of relocation per object.
 				 */
-				REL(lmp) = (void *)(ld->d_un.d_ptr + base);
+				REL(lmp) = (void *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_RELSZ:
 			case DT_RELASZ:
-				RELSZ(lmp) = ld->d_un.d_val;
+				RELSZ(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_RELENT:
 			case DT_RELAENT:
-				RELENT(lmp) = ld->d_un.d_val;
+				RELENT(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_RELCOUNT:
 			case DT_RELACOUNT:
-				RELACOUNT(lmp) = (uint_t)ld->d_un.d_val;
-				break;
-			case DT_TEXTREL:
-				FLAGS1(lmp) |= FL1_RT_TEXTREL;
+				RELACOUNT(lmp) = (uint_t)dyn->d_un.d_val;
 				break;
 			case DT_HASH:
-				HASH(lmp) = (uint_t *)(ld->d_un.d_ptr + base);
+				HASH(lmp) = (uint_t *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_PLTGOT:
-				PLTGOT(lmp) = (uint_t *)(ld->d_un.d_ptr + base);
+				PLTGOT(lmp) =
+				    (uint_t *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_PLTRELSZ:
-				PLTRELSZ(lmp) = ld->d_un.d_val;
+				PLTRELSZ(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_JMPREL:
-				JMPREL(lmp) = (void *)(ld->d_un.d_ptr + base);
+				JMPREL(lmp) = (void *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_INIT:
-				if (ld->d_un.d_ptr != NULL)
+				if (dyn->d_un.d_ptr != NULL)
 					INIT(lmp) =
-					    (void (*)())(ld->d_un.d_ptr + base);
+					    (void (*)())(dyn->d_un.d_ptr +
+					    base);
 				break;
 			case DT_FINI:
-				if (ld->d_un.d_ptr != NULL)
+				if (dyn->d_un.d_ptr != NULL)
 					FINI(lmp) =
-					    (void (*)())(ld->d_un.d_ptr + base);
+					    (void (*)())(dyn->d_un.d_ptr +
+					    base);
 				break;
 			case DT_INIT_ARRAY:
-				INITARRAY(lmp) = (Addr *)(ld->d_un.d_ptr +
+				INITARRAY(lmp) = (Addr *)(dyn->d_un.d_ptr +
 				    base);
 				break;
 			case DT_INIT_ARRAYSZ:
-				INITARRAYSZ(lmp) = (uint_t)ld->d_un.d_val;
+				INITARRAYSZ(lmp) = (uint_t)dyn->d_un.d_val;
 				break;
 			case DT_FINI_ARRAY:
-				FINIARRAY(lmp) = (Addr *)(ld->d_un.d_ptr +
+				FINIARRAY(lmp) = (Addr *)(dyn->d_un.d_ptr +
 				    base);
 				break;
 			case DT_FINI_ARRAYSZ:
-				FINIARRAYSZ(lmp) = (uint_t)ld->d_un.d_val;
+				FINIARRAYSZ(lmp) = (uint_t)dyn->d_un.d_val;
 				break;
 			case DT_PREINIT_ARRAY:
-				PREINITARRAY(lmp) = (Addr *)(ld->d_un.d_ptr +
+				PREINITARRAY(lmp) = (Addr *)(dyn->d_un.d_ptr +
 				    base);
 				break;
 			case DT_PREINIT_ARRAYSZ:
-				PREINITARRAYSZ(lmp) = (uint_t)ld->d_un.d_val;
+				PREINITARRAYSZ(lmp) = (uint_t)dyn->d_un.d_val;
 				break;
 			case DT_RPATH:
 			case DT_RUNPATH:
-				rpath = ld->d_un.d_val;
+				rpath = dyn->d_un.d_val;
 				break;
 			case DT_FILTER:
-				fltr = ld->d_un.d_val;
+				fltr = dyn->d_un.d_val;
 				OBJFLTRNDX(lmp) = dynndx;
 				FLAGS1(lmp) |= FL1_RT_OBJSFLTR;
 				break;
 			case DT_AUXILIARY:
 				if (!(rtld_flags & RT_FL_NOAUXFLTR)) {
-					fltr = ld->d_un.d_val;
+					fltr = dyn->d_un.d_val;
 					OBJFLTRNDX(lmp) = dynndx;
 				}
 				FLAGS1(lmp) |= FL1_RT_OBJAFLTR;
@@ -2311,10 +1863,10 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				break;
 			case DT_DEPAUDIT:
 				if (!(rtld_flags & RT_FL_NOAUDIT))
-					audit = ld->d_un.d_val;
+					audit = dyn->d_un.d_val;
 				break;
 			case DT_CONFIG:
-				cfile = ld->d_un.d_val;
+				cfile = dyn->d_un.d_val;
 				break;
 			case DT_DEBUG:
 				/*
@@ -2332,25 +1884,26 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				 * dependencies, and we can't handle requests
 				 * like object padding for alternative objects.
 				 */
-				if (ld->d_un.d_ptr)
+				if (dyn->d_un.d_ptr)
 					rtld_flags |=
 					    (RT_FL_DEBUGGER | RT_FL_NOOBJALT);
-				ld->d_un.d_ptr = (Addr)&r_debug;
+				dyn->d_un.d_ptr = (Addr)&r_debug;
 				break;
 			case DT_VERNEED:
-				VERNEED(lmp) = (Verneed *)(ld->d_un.d_ptr +
+				VERNEED(lmp) = (Verneed *)(dyn->d_un.d_ptr +
 				    base);
 				break;
 			case DT_VERNEEDNUM:
 				/* LINTED */
-				VERNEEDNUM(lmp) = (int)ld->d_un.d_val;
+				VERNEEDNUM(lmp) = (int)dyn->d_un.d_val;
 				break;
 			case DT_VERDEF:
-				VERDEF(lmp) = (Verdef *)(ld->d_un.d_ptr + base);
+				VERDEF(lmp) = (Verdef *)(dyn->d_un.d_ptr +
+				    base);
 				break;
 			case DT_VERDEFNUM:
 				/* LINTED */
-				VERDEFNUM(lmp) = (int)ld->d_un.d_val;
+				VERDEFNUM(lmp) = (int)dyn->d_un.d_val;
 				break;
 			case DT_VERSYM:
 				/*
@@ -2364,21 +1917,21 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				 * If DT_VERSYM is not present, then Solaris
 				 * versioning rules apply.
 				 */
-				VERSYM(lmp) = (Versym *)(ld->d_un.d_ptr + base);
+				VERSYM(lmp) = (Versym *)(dyn->d_un.d_ptr +
+				    base);
 				break;
 			case DT_BIND_NOW:
-				if ((rtld_flags2 & RT_FL2_BINDLAZY) == 0) {
+				if ((dyn->d_un.d_val & DF_BIND_NOW) &&
+				    ((rtld_flags2 & RT_FL2_BINDLAZY) == 0)) {
 					MODE(lmp) |= RTLD_NOW;
 					MODE(lmp) &= ~RTLD_LAZY;
 				}
 				break;
 			case DT_FLAGS:
-				FLAGS2(lmp) |= FL2_RT_DTFLAGS;
-				if (ld->d_un.d_val & DF_SYMBOLIC)
+				FLAGS1(lmp) |= FL1_RT_DTFLAGS;
+				if (dyn->d_un.d_val & DF_SYMBOLIC)
 					FLAGS1(lmp) |= FL1_RT_SYMBOLIC;
-				if (ld->d_un.d_val & DF_TEXTREL)
-					FLAGS1(lmp) |= FL1_RT_TEXTREL;
-				if ((ld->d_un.d_val & DF_BIND_NOW) &&
+				if ((dyn->d_un.d_val & DF_BIND_NOW) &&
 				    ((rtld_flags2 & RT_FL2_BINDLAZY) == 0)) {
 					MODE(lmp) |= RTLD_NOW;
 					MODE(lmp) &= ~RTLD_LAZY;
@@ -2387,46 +1940,43 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				 * Capture any static TLS use, and enforce that
 				 * this object be non-deletable.
 				 */
-				if (ld->d_un.d_val & DF_STATIC_TLS) {
+				if (dyn->d_un.d_val & DF_STATIC_TLS) {
 					FLAGS1(lmp) |= FL1_RT_TLSSTAT;
 					MODE(lmp) |= RTLD_NODELETE;
 				}
 				break;
 			case DT_FLAGS_1:
-				if (ld->d_un.d_val & DF_1_DISPRELPND)
+				if (dyn->d_un.d_val & DF_1_DISPRELPND)
 					FLAGS1(lmp) |= FL1_RT_DISPREL;
-				if (ld->d_un.d_val & DF_1_GROUP)
+				if (dyn->d_un.d_val & DF_1_GROUP)
 					FLAGS(lmp) |=
 					    (FLG_RT_SETGROUP | FLG_RT_HANDLE);
-				if ((ld->d_un.d_val & DF_1_NOW) &&
+				if ((dyn->d_un.d_val & DF_1_NOW) &&
 				    ((rtld_flags2 & RT_FL2_BINDLAZY) == 0)) {
 					MODE(lmp) |= RTLD_NOW;
 					MODE(lmp) &= ~RTLD_LAZY;
 				}
-				if (ld->d_un.d_val & DF_1_NODELETE)
+				if (dyn->d_un.d_val & DF_1_NODELETE)
 					MODE(lmp) |= RTLD_NODELETE;
-				if (ld->d_un.d_val & DF_1_INITFIRST)
+				if (dyn->d_un.d_val & DF_1_INITFIRST)
 					FLAGS(lmp) |= FLG_RT_INITFRST;
-				if (ld->d_un.d_val & DF_1_NOOPEN)
+				if (dyn->d_un.d_val & DF_1_NOOPEN)
 					FLAGS(lmp) |= FLG_RT_NOOPEN;
-				if (ld->d_un.d_val & DF_1_LOADFLTR)
+				if (dyn->d_un.d_val & DF_1_LOADFLTR)
 					FLAGS(lmp) |= FLG_RT_LOADFLTR;
-				if (ld->d_un.d_val & DF_1_NODUMP)
+				if (dyn->d_un.d_val & DF_1_NODUMP)
 					FLAGS(lmp) |= FLG_RT_NODUMP;
-				if (ld->d_un.d_val & DF_1_CONFALT)
+				if (dyn->d_un.d_val & DF_1_CONFALT)
 					crle = 1;
-				if (ld->d_un.d_val & DF_1_DIRECT)
+				if (dyn->d_un.d_val & DF_1_DIRECT)
 					FLAGS1(lmp) |= FL1_RT_DIRECT;
-				if (ld->d_un.d_val & DF_1_NODEFLIB)
+				if (dyn->d_un.d_val & DF_1_NODEFLIB)
 					FLAGS1(lmp) |= FL1_RT_NODEFLIB;
-				if (ld->d_un.d_val & DF_1_ENDFILTEE)
+				if (dyn->d_un.d_val & DF_1_ENDFILTEE)
 					FLAGS1(lmp) |= FL1_RT_ENDFILTE;
-				if (ld->d_un.d_val & DF_1_TRANS)
+				if (dyn->d_un.d_val & DF_1_TRANS)
 					FLAGS(lmp) |= FLG_RT_TRANS;
-#ifndef	EXPAND_RELATIVE
-				if (ld->d_un.d_val & DF_1_ORIGIN)
-					FLAGS1(lmp) |= FL1_RT_RELATIVE;
-#endif
+
 				/*
 				 * Global auditing is only meaningful when
 				 * specified by the initiating object of the
@@ -2436,7 +1986,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				 * link-map list, and consequently the link-map
 				 * list is empty.  (see setup()).
 				 */
-				if (ld->d_un.d_val & DF_1_GLOBAUDIT) {
+				if (dyn->d_un.d_val & DF_1_GLOBAUDIT) {
 					if (lml_main.lm_head == 0)
 						FLAGS1(lmp) |= FL1_RT_GLOBAUD;
 					else
@@ -2450,7 +2000,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				 * late to guarantee complete interposition.
 				 */
 				/* BEGIN CSTYLED */
-				if (ld->d_un.d_val &
+				if (dyn->d_un.d_val &
 				    (DF_1_INTERPOSE | DF_1_SYMINTPOSE)) {
 				    if (lml->lm_flags & LML_FLG_STARTREL) {
 					DBG_CALL(Dbg_util_intoolate(lmp));
@@ -2458,7 +2008,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 					    (void) printf(
 						MSG_INTL(MSG_LDD_REL_ERR2),
 						NAME(lmp));
-				    } else if (ld->d_un.d_val & DF_1_INTERPOSE)
+				    } else if (dyn->d_un.d_val & DF_1_INTERPOSE)
 					FLAGS(lmp) |= FLG_RT_OBJINTPO;
 				    else
 					FLAGS(lmp) |= FLG_RT_SYMINTPO;
@@ -2466,17 +2016,17 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				/* END CSTYLED */
 				break;
 			case DT_SYMINFO:
-				SYMINFO(lmp) = (Syminfo *)(ld->d_un.d_ptr +
+				SYMINFO(lmp) = (Syminfo *)(dyn->d_un.d_ptr +
 				    base);
 				break;
 			case DT_SYMINENT:
-				SYMINENT(lmp) = ld->d_un.d_val;
+				SYMINENT(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_PLTPAD:
-				PLTPAD(lmp) = (void *)(ld->d_un.d_ptr + base);
+				PLTPAD(lmp) = (void *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_PLTPADSZ:
-				pltpadsz = ld->d_un.d_val;
+				pltpadsz = dyn->d_un.d_val;
 				break;
 			case DT_SUNW_RTLDINF:
 				/*
@@ -2489,22 +2039,24 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				 * structure may provide atexit reservations.
 				 */
 				if ((rti = alist_append(&lml->lm_rti, 0,
-				    sizeof (Rti_desc), AL_CNT_RTLDINFO)) == 0) {
+				    sizeof (Rti_desc),
+				    AL_CNT_RTLDINFO)) == NULL) {
 					remove_so(0, lmp);
-					return (0);
+					return (NULL);
 				}
 				rti->rti_lmp = lmp;
-				rti->rti_info = (void *)(ld->d_un.d_ptr + base);
+				rti->rti_info = (void *)(dyn->d_un.d_ptr +
+				    base);
 				break;
 			case DT_SUNW_SORTENT:
-				SUNWSORTENT(lmp) = ld->d_un.d_val;
+				SUNWSORTENT(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_SUNW_SYMSORT:
 				SUNWSYMSORT(lmp) =
-				    (void *)(ld->d_un.d_ptr + base);
+				    (void *)(dyn->d_un.d_ptr + base);
 				break;
 			case DT_SUNW_SYMSORTSZ:
-				SUNWSYMSORTSZ(lmp) = ld->d_un.d_val;
+				SUNWSYMSORTSZ(lmp) = dyn->d_un.d_val;
 				break;
 			case DT_DEPRECATED_SPARC_REGISTER:
 			case M_DT_REGISTER:
@@ -2520,16 +2072,6 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 				PLTPADEND(lmp) = (void *)((Addr)PLTPAD(lmp) +
 				    pltpadsz);
 		}
-
-		/*
-		 * Allocate a Dynamic Info structure.
-		 */
-		if ((DYNINFO(lmp) = calloc((size_t)dynndx,
-		    sizeof (Dyninfo))) == 0) {
-			remove_so(0, lmp);
-			return (0);
-		}
-		DYNINFOCNT(lmp) = dynndx;
 	}
 
 	/*
@@ -2574,31 +2116,14 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 		if (cfile)
 			config->c_name = (const char *)(cfile +
 			    (char *)STRTAB(lmp));
-		else if (crle) {
+		else if (crle)
 			rtld_flags |= RT_FL_CONFAPP;
-#ifndef	EXPAND_RELATIVE
-			FLAGS1(lmp) |= FL1_RT_RELATIVE;
-#endif
-		}
 	}
 
 	if (rpath)
 		RPATH(lmp) = (char *)(rpath + (char *)STRTAB(lmp));
-	if (fltr) {
-		/*
-		 * If this object is a global filter, duplicate the filtee
-		 * string name(s) so that REFNAME() is available in core files.
-		 * This cludge was useful for debuggers at one point, but only
-		 * when the filtee name was an individual full path.
-		 */
-		if ((REFNAME(lmp) = strdup(fltr + (char *)STRTAB(lmp))) == 0) {
-			remove_so(0, lmp);
-			return (0);
-		}
-	}
-
-	if (rtld_flags & RT_FL_RELATIVE)
-		FLAGS1(lmp) |= FL1_RT_RELATIVE;
+	if (fltr)
+		REFNAME(lmp) = (char *)(fltr + (char *)STRTAB(lmp));
 
 	/*
 	 * For Intel ABI compatibility.  It's possible that a JMPREL can be
@@ -2610,7 +2135,7 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 	 * details.
 	 */
 	if (!RELENT(lmp) && JMPREL(lmp))
-		RELENT(lmp) = sizeof (Rel);
+		RELENT(lmp) = sizeof (M_RELOC);
 
 	/*
 	 * Establish any per-object auditing.  If we're establishing `main's
@@ -2622,36 +2147,44 @@ elf_new_lm(Lm_list *lml, const char *pname, const char *oname, Dyn *ld,
 
 		if (*cp) {
 			if (((AUDITORS(lmp) =
-			    calloc(1, sizeof (Audit_desc))) == 0) ||
-			    ((AUDITORS(lmp)->ad_name = strdup(cp)) == 0)) {
+			    calloc(1, sizeof (Audit_desc))) == NULL) ||
+			    ((AUDITORS(lmp)->ad_name = strdup(cp)) == NULL)) {
 				remove_so(0, lmp);
-				return (0);
+				return (NULL);
 			}
 			if (lml_main.lm_head) {
 				if (audit_setup(lmp, AUDITORS(lmp), 0,
 				    in_nfavl) == 0) {
 					remove_so(0, lmp);
-					return (0);
+					return (NULL);
 				}
-				FLAGS1(lmp) |= AUDITORS(lmp)->ad_flags;
+				AFLAGS(lmp) |= AUDITORS(lmp)->ad_flags;
 				lml->lm_flags |= LML_FLG_LOCAUDIT;
 			}
 		}
 	}
 
-	if ((CONDVAR(lmp) = rt_cond_create()) == 0) {
+	if (tphdr && (tls_assign(lml, lmp, tphdr) == 0)) {
 		remove_so(0, lmp);
-		return (0);
+		return (NULL);
 	}
-	if (oname && ((append_alias(lmp, oname, 0)) == 0)) {
-		remove_so(0, lmp);
-		return (0);
-	}
+
+	if (cap)
+		cap_assign(cap, lmp);
 
 	/*
 	 * Add the mapped object to the end of the link map list.
 	 */
 	lm_append(lml, lmco, lmp);
+
+	/*
+	 * Start the system loading in the ELF information we'll be processing.
+	 */
+	if (REL(lmp)) {
+		(void) madvise((void *)ADDR(lmp), (uintptr_t)REL(lmp) +
+		    (uintptr_t)RELSZ(lmp) - (uintptr_t)ADDR(lmp),
+		    MADV_WILLNEED);
+	}
 	return (lmp);
 }
 
@@ -2674,353 +2207,16 @@ cap_assign(Cap *cap, Rt_map *lmp)
 }
 
 /*
- * Map in an ELF object.
- * Takes an open file descriptor for the object to map and its pathname; returns
- * a pointer to a Rt_map structure for this object, or 0 on error.
- */
-static Rt_map *
-elf_map_so(Lm_list *lml, Aliste lmco, const char *pname, const char *oname,
-    int fd, int *in_nfavl)
-{
-	int		i; 		/* general temporary */
-	Off		memsize = 0;	/* total memory size of pathname */
-	Off		mentry;		/* entry point */
-	Ehdr		*ehdr;		/* ELF header of ld.so */
-	Phdr		*phdr;		/* first Phdr in file */
-	Phdr		*phdr0;		/* Saved first Phdr in file */
-	Phdr		*pptr;		/* working Phdr */
-	Phdr		*fph = 0;	/* first loadable Phdr */
-	Phdr		*lph;		/* last loadable Phdr */
-	Phdr		*lfph = 0;	/* last loadable (filesz != 0) Phdr */
-	Phdr		*lmph = 0;	/* last loadable (memsz != 0) Phdr */
-	Phdr		*tlph = 0;	/* program header for PT_TLS */
-	Phdr		*unwindph = 0;	/* program header for PT_SUNW_UNWIND */
-	Cap		*cap = 0;	/* program header for SUNWCAP */
-	Dyn		*mld = 0;	/* DYNAMIC structure for pathname */
-	size_t		size;		/* size of elf and program headers */
-	caddr_t		faddr = 0;	/* mapping address of pathname */
-	Rt_map		*lmp;		/* link map created */
-	caddr_t		paddr;		/* start of padded image */
-	Off		plen;		/* size of image including padding */
-	Half		etype;
-	int		fixed;
-	Mmap		*mmaps;
-	uint_t		mmapcnt = 0;
-	Xword		align = 0;
-
-	/* LINTED */
-	ehdr = (Ehdr *)fmap->fm_maddr;
-
-	/*
-	 * If this a relocatable object then special processing is required.
-	 */
-	if ((etype = ehdr->e_type) == ET_REL)
-		return (elf_obj_file(lml, lmco, pname, fd));
-
-	/*
-	 * If this isn't a dynamic executable or shared object we can't process
-	 * it.  If this is a dynamic executable then all addresses are fixed.
-	 */
-	if (etype == ET_EXEC) {
-		fixed = 1;
-	} else if (etype == ET_DYN) {
-		fixed = 0;
-	} else {
-		Conv_inv_buf_t inv_buf;
-
-		eprintf(lml, ERR_ELF, MSG_INTL(MSG_GEN_BADTYPE), pname,
-		    conv_ehdr_type(etype, 0, &inv_buf));
-		return (0);
-	}
-
-	/*
-	 * If our original mapped page was not large enough to hold all the
-	 * program headers remap them.
-	 */
-	size = (size_t)((char *)ehdr->e_phoff +
-	    (ehdr->e_phnum * ehdr->e_phentsize));
-	if (size > fmap->fm_fsize) {
-		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), pname);
-		return (0);
-	}
-	if (size > fmap->fm_msize) {
-		fmap_setup();
-		if ((fmap->fm_maddr = mmap(fmap->fm_maddr, size, PROT_READ,
-		    fmap->fm_mflags, fd, 0)) == MAP_FAILED) {
-			int	err = errno;
-			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP), pname,
-			    strerror(err));
-			return (0);
-		}
-		fmap->fm_msize = size;
-		/* LINTED */
-		ehdr = (Ehdr *)fmap->fm_maddr;
-	}
-	/* LINTED */
-	phdr0 = phdr = (Phdr *)((char *)ehdr + ehdr->e_ehsize);
-
-	/*
-	 * Get entry point.
-	 */
-	mentry = ehdr->e_entry;
-
-	/*
-	 * Point at program headers and perform some basic validation.
-	 */
-	for (i = 0, pptr = phdr; i < (int)ehdr->e_phnum; i++,
-	    pptr = (Phdr *)((Off)pptr + ehdr->e_phentsize)) {
-		if (pptr->p_type == PT_LOAD) {
-
-			if (fph == 0) {
-				fph = pptr;
-			/* LINTED argument lph is initialized in first pass */
-			} else if (pptr->p_vaddr <= lph->p_vaddr) {
-				eprintf(lml, ERR_ELF,
-				    MSG_INTL(MSG_GEN_INVPRGHDR), pname);
-				return (0);
-			}
-
-			lph = pptr;
-
-			if (pptr->p_memsz)
-				lmph = pptr;
-			if (pptr->p_filesz)
-				lfph = pptr;
-			if (pptr->p_align > align)
-				align = pptr->p_align;
-
-		} else if (pptr->p_type == PT_DYNAMIC) {
-			mld = (Dyn *)(pptr->p_vaddr);
-		} else if ((pptr->p_type == PT_TLS) && pptr->p_memsz) {
-			tlph = pptr;
-		} else if (pptr->p_type == PT_SUNWCAP) {
-			cap = (Cap *)(pptr->p_vaddr);
-		} else if (pptr->p_type == PT_SUNW_UNWIND) {
-			unwindph = pptr;
-		}
-	}
-
-#if defined(MAP_ALIGN)
-	/*
-	 * Make sure the maximum page alignment is a power of 2 >= the default
-	 * segment alignment, for use with MAP_ALIGN.
-	 */
-	align = S_ROUND(align, M_SEGM_ALIGN);
-#endif
-
-	/*
-	 * We'd better have at least one loadable segment, together with some
-	 * specified file and memory size.
-	 */
-	if ((fph == 0) || (lmph == 0) || (lfph == 0)) {
-		eprintf(lml, ERR_ELF, MSG_INTL(MSG_GEN_NOLOADSEG), pname);
-		return (0);
-	}
-
-	/*
-	 * Check that the files size accounts for the loadable sections
-	 * we're going to map in (failure to do this may cause spurious
-	 * bus errors if we're given a truncated file).
-	 */
-	if (fmap->fm_fsize < ((size_t)lfph->p_offset + lfph->p_filesz)) {
-		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_CORTRUNC), pname);
-		return (0);
-	}
-
-	/*
-	 * Memsize must be page rounded so that if we add object padding
-	 * at the end it will start at the beginning of a page.
-	 */
-	plen = memsize = M_PROUND((lmph->p_vaddr + lmph->p_memsz) -
-	    M_PTRUNC((ulong_t)fph->p_vaddr));
-
-	/*
-	 * Determine if an existing mapping is acceptable.
-	 */
-	if (interp && (lml->lm_flags & LML_FLG_BASELM) &&
-	    (strcmp(pname, interp->i_name) == 0)) {
-		/*
-		 * If this is the interpreter then it has already been mapped
-		 * and we have the address so don't map it again.  Note that
-		 * the common occurrence of a reference to the interpretor
-		 * (libdl -> ld.so.1) will have been caught during filter
-		 * initialization (see elf_lookup_filtee()).  However, some
-		 * ELF implementations are known to record libc.so.1 as the
-		 * interpretor, and thus this test catches this behavior.
-		 */
-		paddr = faddr = interp->i_faddr;
-
-	} else if ((fixed == 0) && (r_debug.rtd_objpad == 0) &&
-	    (memsize <= fmap->fm_msize) && ((fph->p_flags & PF_W) == 0) &&
-	    (fph == lph) && (fph->p_filesz == fph->p_memsz) &&
-	    (((Xword)fmap->fm_maddr % align) == 0)) {
-		size_t	rsize;
-
-		/*
-		 * If the file contains a single segment, and the mapping
-		 * required has already been established from the initial fmap
-		 * mapping, then we don't need to do anything more.  Reset the
-		 * fmap address so that any later files start a new fmap.  This
-		 * is really an optimization for filters, such as libdl.so,
-		 * libthread, etc. that are constructed to be a single text
-		 * segment.
-		 */
-		paddr = faddr = fmap->fm_maddr;
-
-		/*
-		 * Free any unused mapping by assigning the fmap buffer to the
-		 * unused region.  fmap_setup() will unmap this area and
-		 * establish defaults for future mappings.
-		 */
-		rsize = M_PROUND(fph->p_filesz);
-		fmap->fm_maddr += rsize;
-		fmap->fm_msize -= rsize;
-		fmap_setup();
-	}
-
-	/*
-	 * Allocate a mapping array to retain mapped segment information.
-	 */
-	if ((mmaps = calloc(ehdr->e_phnum, sizeof (Mmap))) == 0)
-		return (0);
-
-	/*
-	 * If we're reusing an existing mapping determine the objects etext
-	 * address.  Otherwise map the file (which will calculate the etext
-	 * address as part of the mapping process).
-	 */
-	if (faddr) {
-		caddr_t	base;
-
-		if (fixed)
-			base = 0;
-		else
-			base = faddr;
-
-		/* LINTED */
-		phdr0 = phdr = (Phdr *)((char *)faddr + ehdr->e_ehsize);
-
-		for (i = 0, pptr = phdr; i < (int)ehdr->e_phnum; i++,
-		    pptr = (Phdr *)((Off)pptr + ehdr->e_phentsize)) {
-			if (pptr->p_type != PT_LOAD)
-				continue;
-
-			mmaps[mmapcnt].m_vaddr = (pptr->p_vaddr + base);
-			mmaps[mmapcnt].m_msize = pptr->p_memsz;
-			mmaps[mmapcnt].m_fsize = pptr->p_filesz;
-			mmaps[mmapcnt].m_perm = (PROT_READ | PROT_EXEC);
-			mmapcnt++;
-
-			if (!(pptr->p_flags & PF_W)) {
-				fmap->fm_etext = (ulong_t)pptr->p_vaddr +
-				    (ulong_t)pptr->p_memsz +
-				    (ulong_t)(fixed ? 0 : faddr);
-			}
-		}
-	} else {
-		/*
-		 * Map the file.
-		 */
-		if (!(faddr = elf_map_it(lml, pname, memsize, ehdr, fph, lph,
-		    &phdr, &paddr, &plen, fixed, fd, align, mmaps, &mmapcnt)))
-			return (0);
-	}
-
-	/*
-	 * Calculate absolute base addresses and entry points.
-	 */
-	if (!fixed) {
-		if (mld)
-			/* LINTED */
-			mld = (Dyn *)((Off)mld + faddr);
-		if (cap)
-			/* LINTED */
-			cap = (Cap *)((Off)cap + faddr);
-		mentry += (Off)faddr;
-	}
-
-	/*
-	 * Create new link map structure for newly mapped shared object.
-	 */
-	if (!(lmp = elf_new_lm(lml, pname, oname, mld, (ulong_t)faddr,
-	    fmap->fm_etext, lmco, memsize, mentry, (ulong_t)paddr, plen, mmaps,
-	    mmapcnt, in_nfavl))) {
-		(void) munmap((caddr_t)faddr, memsize);
-		return (0);
-	}
-
-	/*
-	 * Start the system loading in the ELF information we'll be processing.
-	 */
-	if (REL(lmp)) {
-		(void) madvise((void *)ADDR(lmp), (uintptr_t)REL(lmp) +
-		    (uintptr_t)RELSZ(lmp) - (uintptr_t)ADDR(lmp),
-		    MADV_WILLNEED);
-	}
-
-	/*
-	 * If this shared object contains any special segments, record them.
-	 */
-	if (tlph && (tls_assign(lml, lmp, (phdr + (tlph - phdr0))) == 0)) {
-		remove_so(lml, lmp);
-		return (0);
-	}
-
-	if (unwindph)
-		PTUNWIND(lmp) = phdr + (unwindph - phdr0);
-
-	if (cap)
-		cap_assign(cap, lmp);
-
-	return (lmp);
-}
-
-/*
- * Function to correct protection settings.  Segments are all mapped initially
- * with permissions as given in the segment header.  We need to turn on write
- * permissions on a text segment if there are any relocations against that
- * segment, and them turn write permission back off again before returning
- * control to the user.  This function turns the permission on or off depending
- * on the value of the argument.
- */
-int
-elf_set_prot(Rt_map *lmp, int permission)
-{
-	Mmap	*mmaps;
-
-	/*
-	 * If this is an allocated image (ie. a relocatable object) we can't
-	 * mprotect() anything.
-	 */
-	if (FLAGS(lmp) & FLG_RT_IMGALLOC)
-		return (1);
-
-	DBG_CALL(Dbg_file_prot(lmp, permission));
-
-	for (mmaps = MMAPS(lmp); mmaps->m_vaddr; mmaps++) {
-		if (mmaps->m_perm & PROT_WRITE)
-			continue;
-
-		if (mprotect(mmaps->m_vaddr, mmaps->m_msize,
-		    (mmaps->m_perm | permission)) == -1) {
-			int	err = errno;
-			eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_SYS_MPROT),
-			    NAME(lmp), strerror(err));
-			return (0);
-		}
-	}
-	return (1);
-}
-
-/*
  * Build full pathname of shared object from given directory name and filename.
  */
 static char *
-elf_get_so(const char *dir, const char *file)
+elf_get_so(const char *dir, const char *file, size_t dlen, size_t flen)
 {
 	static char	pname[PATH_MAX];
 
-	(void) snprintf(pname, PATH_MAX, MSG_ORIG(MSG_FMT_PATH), dir, file);
+	(void) strncpy(pname, dir, dlen);
+	pname[dlen++] = '/';
+	(void) strncpy(&pname[dlen], file, flen + 1);
 	return (pname);
 }
 
@@ -3057,7 +2253,7 @@ elf_copy_reloc(char *name, Sym *rsym, Rt_map *rlmp, void *radd, Sym *dsym,
 		rc.r_size = (size_t)rsym->st_size;
 
 	if (alist_append(&COPY_R(dlmp), &rc, sizeof (Rel_copy),
-	    AL_CNT_COPYREL) == 0) {
+	    AL_CNT_COPYREL) == NULL) {
 		if (!(lml->lm_flags & LML_FLG_TRC_WARN))
 			return (0);
 		else
@@ -3435,9 +2631,9 @@ elf_lazy_find_sym(Slookup *slp, Rt_map **_lmp, uint_t *binfo, int *in_nfavl)
 			 */
 			if ((sl.sl_flags & LKUP_NODESCENT) == 0) {
 				if (aplist_append(&alist, nlmp,
-				    AL_CNT_LAZYFIND) == 0) {
+				    AL_CNT_LAZYFIND) == NULL) {
 					elf_lazy_cleanup(alist);
-					return (0);
+					return (NULL);
 				}
 				FLAGS(nlmp) |= FLG_RT_TMPLIST;
 			}
@@ -3480,7 +2676,7 @@ elf_reloc_bad(Rt_map *lmp, void *rel, uchar_t rtype, ulong_t roffset,
 	}
 
 	if (name == 0)
-		name = MSG_ORIG(MSG_STR_EMPTY);
+		name = MSG_INTL(MSG_STR_UNKNOWN);
 
 	if (trace) {
 		const char *rstr;
@@ -3594,4 +2790,95 @@ elf_reloc_error(Rt_map *lmp, const char *name, void *rel, uint_t binfo)
 	    demangle(name));
 
 	return (0);
+}
+
+/*
+ * Generic relative relocation function.
+ */
+inline static ulong_t
+_elf_reloc_relative(ulong_t rbgn, ulong_t base, Rt_map *lmp, APlist **textrel)
+{
+	mmapobj_result_t	*mpp;
+	ulong_t			roffset;
+
+	roffset = ((M_RELOC *)rbgn)->r_offset;
+	roffset += base;
+
+	/*
+	 * If this relocation is against an address that is not associated with
+	 * a mapped segment, fall back to the generic relocation loop to
+	 * collect the associated error.
+	 */
+	if ((mpp = find_segment((caddr_t)roffset, lmp)) == NULL)
+		return (0);
+
+	/*
+	 * If this relocation is against a segment that does not provide write
+	 * access, set the write permission for all non-writable mappings.
+	 */
+	if (((mpp->mr_prot & PROT_WRITE) == 0) && textrel &&
+	    ((set_prot(lmp, mpp, 1) == 0) ||
+	    (aplist_append(textrel, mpp, AL_CNT_TEXTREL) == NULL)))
+		return (0);
+
+	/*
+	 * Perform the actual relocation.  Note, for backward compatibility,
+	 * SPARC relocations are added to the offset contents (there was a time
+	 * when the offset was used to contain the addend, rather than using
+	 * the addend itself).
+	 */
+#if	defined(__sparc)
+	*((ulong_t *)roffset) += base + ((M_RELOC *)rbgn)->r_addend;
+#elif	defined(__amd64)
+	*((ulong_t *)roffset) = base + ((M_RELOC *)rbgn)->r_addend;
+#else
+	*((ulong_t *)roffset) += base;
+#endif
+	return (1);
+}
+
+/*
+ * When a generic relocation loop realizes that it's dealing with relative
+ * relocations, but no DT_RELCOUNT .dynamic tag is present, this tighter loop
+ * is entered as an optimization.
+ */
+ulong_t
+elf_reloc_relative(ulong_t rbgn, ulong_t rend, ulong_t rsize, ulong_t base,
+    Rt_map *lmp, APlist **textrel)
+{
+	char	rtype;
+
+	do {
+		if (_elf_reloc_relative(rbgn, base, lmp, textrel) == 0)
+			break;
+
+		rbgn += rsize;
+		if (rbgn >= rend)
+			break;
+
+		/*
+		 * Make sure the next type is a relative relocation.
+		 */
+		rtype = ELF_R_TYPE(((M_RELOC *)rbgn)->r_info, M_MACH);
+
+	} while (rtype == M_R_RELATIVE);
+
+	return (rbgn);
+}
+
+/*
+ * This is the tightest loop for RELATIVE relocations for those objects built
+ * with the DT_RELACOUNT .dynamic entry.
+ */
+ulong_t
+elf_reloc_relative_count(ulong_t rbgn, ulong_t rcount, ulong_t rsize,
+    ulong_t base, Rt_map *lmp, APlist **textrel)
+{
+	for (; rcount; rcount--) {
+		if (_elf_reloc_relative(rbgn, base, lmp, textrel) == 0)
+			break;
+
+		rbgn += rsize;
+	}
+	return (rbgn);
 }

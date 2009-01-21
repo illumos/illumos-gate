@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,8 +45,8 @@
 #include	<dlfcn.h>
 #include	<unistd.h>
 #include	<stdlib.h>
-#include	<limits.h>
 #include	<sys/auxv.h>
+#include	<limits.h>
 #include	<debug.h>
 #include	<conv.h>
 #include	"_rtld.h"
@@ -55,17 +55,6 @@
 #include	"msg.h"
 
 static int ld_flags_env(const char *, Word *, Word *, uint_t, int);
-
-/*
- * All error messages go through eprintf().  During process initialization these
- * messages should be directed to the standard error, however once control has
- * been passed to the applications code these messages should be stored in an
- * internal buffer for use with dlerror().  Note, fatal error conditions that
- * may occur while running the application will still cause a standard error
- * message, see rtldexit() in this file for details.
- * The `application' flag serves to indicate the transition between process
- * initialization and when the applications code is running.
- */
 
 /*
  * Null function used as place where a debugger can set a breakpoint.
@@ -400,7 +389,7 @@ pnavl_create(size_t size)
  * fpavl_insert() to expedite the insertion.
  */
 Rt_map *
-fpavl_recorded(Lm_list *lml, const char *name, avl_index_t *where)
+fpavl_recorded(Lm_list *lml, const char *name, uint_t hash, avl_index_t *where)
 {
 	FullPathNode	fpn, *fpnp;
 
@@ -412,7 +401,8 @@ fpavl_recorded(Lm_list *lml, const char *name, avl_index_t *where)
 		return (NULL);
 
 	fpn.fpn_node.pn_name = name;
-	fpn.fpn_node.pn_hash = sgs_str_hash(name);
+	if ((fpn.fpn_node.pn_hash = hash) == 0)
+		fpn.fpn_node.pn_hash = sgs_str_hash(name);
 
 	if ((fpnp = avl_find(lml->lm_fpavl, &fpn, where)) == NULL)
 		return (NULL);
@@ -432,10 +422,11 @@ int
 fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 {
 	FullPathNode	*fpnp;
+	uint_t		hash = sgs_str_hash(name);
 
 	if (where == 0) {
 		/* LINTED */
-		Rt_map	*_lmp = fpavl_recorded(lml, name, &where);
+		Rt_map	*_lmp = fpavl_recorded(lml, name, hash, &where);
 
 		/*
 		 * We better not get a hit now, we do not want duplicates in
@@ -451,7 +442,7 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 		return (0);
 
 	fpnp->fpn_node.pn_name = name;
-	fpnp->fpn_node.pn_hash = sgs_str_hash(name);
+	fpnp->fpn_node.pn_hash = hash;
 	fpnp->fpn_lmp = lmp;
 
 	if (aplist_append(&FPNODE(lmp), fpnp, AL_CNT_FPNODE) == NULL) {
@@ -465,9 +456,7 @@ fpavl_insert(Lm_list *lml, Rt_map *lmp, const char *name, avl_index_t where)
 }
 
 /*
- * Remove an object from the FullPath AVL tree.  Note, this is called *before*
- * the objects link-map is torn down (remove_so), which is where any NAME() and
- * PATHNAME() strings will be deallocated.
+ * Remove an object from the FullPathNode AVL tree.
  */
 void
 fpavl_remove(Rt_map *lmp)
@@ -492,7 +481,7 @@ fpavl_remove(Rt_map *lmp)
  * the insertion.
  */
 int
-nfavl_recorded(const char *name, avl_index_t *where)
+nfavl_recorded(const char *name, uint_t hash, avl_index_t *where)
 {
 	PathNode	pn;
 
@@ -501,10 +490,11 @@ nfavl_recorded(const char *name, avl_index_t *where)
 	 */
 	if ((nfavl == NULL) &&
 	    ((nfavl = pnavl_create(sizeof (PathNode))) == NULL))
-		return (0);
+		return (NULL);
 
 	pn.pn_name = name;
-	pn.pn_hash = sgs_str_hash(name);
+	if ((pn.pn_hash = hash) == 0)
+		pn.pn_hash = sgs_str_hash(name);
 
 	if (avl_find(nfavl, &pn, where) == NULL)
 		return (0);
@@ -519,10 +509,11 @@ void
 nfavl_insert(const char *name, avl_index_t where)
 {
 	PathNode	*pnp;
+	uint_t		hash = sgs_str_hash(name);
 
 	if (where == 0) {
 		/* LINTED */
-		int	in_nfavl = nfavl_recorded(name, &where);
+		int	in_nfavl = nfavl_recorded(name, hash, &where);
 
 		/*
 		 * We better not get a hit now, we do not want duplicates in
@@ -534,9 +525,9 @@ nfavl_insert(const char *name, avl_index_t where)
 	/*
 	 * Insert new node in tree.
 	 */
-	if ((pnp = calloc(sizeof (PathNode), 1)) != 0) {
+	if ((pnp = calloc(sizeof (PathNode), 1)) != NULL) {
 		pnp->pn_name = name;
-		pnp->pn_hash = sgs_str_hash(name);
+		pnp->pn_hash = hash;
 		avl_insert(nfavl, pnp, where);
 	}
 }
@@ -612,6 +603,95 @@ spavl_insert(const char *name)
 }
 
 /*
+ * Inspect the generic string AVL tree for the given string.  If the string is
+ * not present, duplicate it, and insert the string in the AVL tree.  Return the
+ * duplicated string to the caller.
+ *
+ * These strings are maintained for the life of ld.so.1 and represent path
+ * names, file names, and search paths.  All other AVL trees that maintain
+ * FullPathNode and not-found path names use the same string pointer
+ * established for this string.
+ */
+static avl_tree_t	*stravl = NULL;
+static char		*strbuf = NULL;
+static PathNode		*pnbuf = NULL;
+static size_t		strsize = 0, pnsize = 0;
+
+const char *
+stravl_insert(const char *name, uint_t hash, size_t nsize, int substr)
+{
+	char		str[PATH_MAX];
+	PathNode	*pnp;
+	avl_index_t	where;
+
+	/*
+	 * Create the avl tree if required.
+	 */
+	if ((stravl == NULL) &&
+	    ((stravl = pnavl_create(sizeof (PathNode))) == NULL))
+		return (NULL);
+
+	/*
+	 * Determine the string size if not provided by the caller.
+	 */
+	if (nsize == 0)
+		nsize = strlen(name) + 1;
+	else if (substr) {
+		/*
+		 * The string passed to us may be a multiple path string for
+		 * which we only need the first component.  Using the provided
+		 * size, strip out the required string.
+		 */
+		(void) strncpy(str, name, nsize);
+		str[nsize - 1] = '\0';
+		name = str;
+	}
+
+	/*
+	 * Allocate a PathNode buffer if one doesn't exist, or any existing
+	 * buffer has been used up.
+	 */
+	if ((pnbuf == NULL) || (sizeof (PathNode) > pnsize)) {
+		pnsize = syspagsz;
+		if ((pnbuf = dz_map(0, 0, pnsize, (PROT_READ | PROT_WRITE),
+		    MAP_PRIVATE)) == MAP_FAILED)
+			return (NULL);
+	}
+	/*
+	 * Determine whether this string already exists.
+	 */
+	pnbuf->pn_name = name;
+	if ((pnbuf->pn_hash = hash) == 0)
+		pnbuf->pn_hash = sgs_str_hash(name);
+
+	if ((pnp = avl_find(stravl, pnbuf, &where)) != NULL)
+		return (pnp->pn_name);
+
+	/*
+	 * Allocate a string buffer if one does not exist, or if there is
+	 * insufficient space for the new string in any existing buffer.
+	 */
+	if ((strbuf == NULL) || (nsize > strsize)) {
+		strsize = S_ROUND(nsize, syspagsz);
+
+		if ((strbuf = dz_map(0, 0, strsize, (PROT_READ | PROT_WRITE),
+		    MAP_PRIVATE)) == MAP_FAILED)
+			return (NULL);
+	}
+
+	(void) memcpy(strbuf, name, nsize);
+	pnp = pnbuf;
+	pnp->pn_name = strbuf;
+	avl_insert(stravl, pnp, where);
+
+	strbuf += nsize;
+	strsize -= nsize;
+	pnbuf++;
+	pnsize -= sizeof (PathNode);
+	return (pnp->pn_name);
+}
+
+/*
  * Prior to calling an object, either via a .plt or through dlsym(), make sure
  * its .init has fired.  Through topological sorting, ld.so.1 attempts to fire
  * init's in the correct order, however, this order is typically based on needed
@@ -633,7 +713,7 @@ is_dep_init(Rt_map *dlmp, Rt_map *clmp)
 	    (LIST(clmp) != LIST(dlmp)))
 		return;
 
-	if ((dlmp == clmp) || (rtld_flags & (RT_FL_BREADTH | RT_FL_INITFIRST)))
+	if ((dlmp == clmp) || (rtld_flags & RT_FL_INITFIRST))
 		return;
 
 	if ((FLAGS(dlmp) & (FLG_RT_RELOCED | FLG_RT_INITDONE)) ==
@@ -649,49 +729,6 @@ is_dep_init(Rt_map *dlmp, Rt_map *clmp)
 	if ((tobj = calloc(2, sizeof (Rt_map *))) != NULL) {
 		tobj[0] = dlmp;
 		call_init(tobj, DBG_INIT_DYN);
-	}
-}
-
-/*
- * In a threaded environment insure the thread responsible for loading an object
- * has completed .init processing for that object before any new thread is
- * allowed to access the object.  This check is only valid with libthread
- * TI_VERSION 2, where ld.so.1 implements locking through low level mutexes.
- *
- * When a new link-map is created, the thread that causes it to be loaded is
- * identified by THREADID(dlmp).  Compare this with the current thread to
- * determine if it must be blocked.
- *
- * NOTE, there are a number of instances (typically only for .plt processing)
- * where we must skip this test:
- *
- *   .	any thread id of 0 - threads that call thr_exit() may be in this state
- *	thus we can't deduce what tid they used to be.  Also some of the
- *	lib/libthread worker threads have this id and must bind (to themselves
- *	or libc) for libthread to function.
- *
- *   .	libthread itself binds to libc, and as libthread is INITFIRST
- *	libc's .init can't have fired yet.  Luckly libc's .init is not required
- *	by libthreads binding.
- *
- *   .	if the caller is an auditor, and the destination isn't, then don't
- *	block (see comments in load_completion()).
- */
-void
-/* ARGSUSED2 */
-is_dep_ready(Rt_map *dlmp, Rt_map *clmp, int what)
-{
-	thread_t	tid;
-
-	if ((LIST(clmp)->lm_flags & LML_FLG_NOAUDIT) &&
-	    (LIST(clmp) != LIST(dlmp)))
-		return;
-
-	if ((rtld_flags & RT_FL_CONCUR) &&
-	    ((FLAGS(dlmp) & FLG_RT_INITDONE) == 0) &&
-	    ((FLAGS(clmp) & FLG_RT_INITFRST) == 0) &&
-	    ((tid = rt_thr_self()) != 0) && (THREADID(dlmp) != tid)) {
-		rtldexit(LIST(dlmp), 1);
 	}
 }
 
@@ -776,24 +813,8 @@ call_init(Rt_map **tobj, int flag)
 		if (FLAGS(lmp) & FLG_RT_INITFRST)
 			rtld_flags |= RT_FL_INITFIRST;
 
-		if (INITARRAY(lmp) || iptr) {
-			Aliste		idx;
-			Bnd_desc 	*bdp;
-
-			/*
-			 * Make sure that all dependencies that have been
-			 * relocated to are initialized before this objects
-			 * .init is executed.  This insures that a dependency
-			 * on an external item that must first be initialized
-			 * by its associated object is satisfied.
-			 */
-			for (APLIST_TRAVERSE(DEPENDS(lmp), idx, bdp)) {
-				if ((bdp->b_flags & BND_REFER) == 0)
-					continue;
-				is_dep_ready(bdp->b_depend, lmp, DBG_WAIT_INIT);
-			}
+		if (INITARRAY(lmp) || iptr)
 			DBG_CALL(Dbg_util_call_init(lmp, flag));
-		}
 
 		if (iptr) {
 			leave(LIST(lmp), 0);
@@ -816,15 +837,6 @@ call_init(Rt_map **tobj, int flag)
 		 */
 		FLAGS(lmp) |= FLG_RT_INITDONE;
 		SORTVAL(lmp) = -1;
-
-		/*
-		 * Wake anyone up who might be waiting on this .init.
-		 */
-		if (FLAGS1(lmp) & FL1_RT_INITWAIT) {
-			DBG_CALL(Dbg_util_broadcast(lmp));
-			(void) rt_cond_broadcast(CONDVAR(lmp));
-			FLAGS1(lmp) &= ~FL1_RT_INITWAIT;
-		}
 
 		/*
 		 * If we're firing an INITFIRST object, and other objects must
@@ -869,24 +881,16 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 		Bnd_desc	*bdp;
 
 		/*
-		 * If concurrency checking isn't enabled only fire .fini if
-		 * .init has completed.  We collect all .fini sections of
-		 * objects that had their .init collected, but that doesn't
-		 * mean at the time that the .init had completed.
+		 * Only fire a .fini if the objects corresponding .init has
+		 * completed.  We collect all .fini sections of objects that
+		 * had their .init collected, but that doesn't mean that at
+		 * the time of collection, that the .init had completed.
 		 */
-		if ((rtld_flags & RT_FL_CONCUR) ||
-		    (FLAGS(lmp) & FLG_RT_INITDONE)) {
+		if (FLAGS(lmp) & FLG_RT_INITDONE) {
 			void	(*fptr)(void) = FINI(lmp);
 
-			if (FINIARRAY(lmp) || fptr) {
-				/*
-				 * If concurrency checking is enabled make sure
-				 * this object's .init is completed before
-				 * calling any .fini.
-				 */
-				is_dep_ready(lmp, lmp, DBG_WAIT_FINI);
+			if (FINIARRAY(lmp) || fptr)
 				DBG_CALL(Dbg_util_call_fini(lmp));
-			}
 
 			call_array(FINIARRAY(lmp), FINIARRAYSZ(lmp), lmp,
 			    SHT_FINI_ARRAY);
@@ -921,13 +925,13 @@ call_fini(Lm_list * lml, Rt_map ** tobj)
 		if ((lml->lm_flags & LML_FLG_LOCAUDIT) == 0)
 			continue;
 
-		if (FLAGS1(lmp) & LML_TFLG_AUD_OBJCLOSE)
+		if (AFLAGS(lmp) & LML_TFLG_AUD_OBJCLOSE)
 			_audit_objclose(&(AUDITORS(lmp)->ad_list), lmp);
 
 		for (APLIST_TRAVERSE(CALLERS(lmp), idx, bdp)) {
 			clmp = bdp->b_caller;
 
-			if (FLAGS1(clmp) & LML_TFLG_AUD_OBJCLOSE) {
+			if (AFLAGS(clmp) & LML_TFLG_AUD_OBJCLOSE) {
 				_audit_objclose(&(AUDITORS(clmp)->ad_list),
 				    lmp);
 				break;
@@ -970,7 +974,7 @@ atexit_fini()
 	 * called last, here.  This is the reverse of the explicit calls to
 	 * audit_objopen() made in setup().
 	 */
-	if ((lml->lm_tflags | FLAGS1(lmp)) & LML_TFLG_AUD_MASK) {
+	if ((lml->lm_tflags | AFLAGS(lmp)) & LML_TFLG_AUD_MASK) {
 		audit_objclose(lmp, (Rt_map *)lml_rtld.lm_head);
 		audit_objclose(lmp, lmp);
 	}
@@ -1060,7 +1064,7 @@ load_completion(Rt_map *nlmp)
 
 	if (nlmp && nlml->lm_init && ((nlml != &lml_main) ||
 	    (rtld_flags2 & (RT_FL2_PLMSETUP | RT_FL2_NOPLM)))) {
-		if ((tobj = tsort(nlmp, LIST(nlmp)->lm_init,
+		if ((tobj = tsort(nlmp, nlml->lm_init,
 		    RT_SORT_REV)) == (Rt_map **)S_ERROR)
 			tobj = 0;
 	}
@@ -1122,7 +1126,6 @@ list_append(List *lst, const void *item)
 	return (_lnp);
 }
 
-
 /*
  * Add an item after specified listnode, and return a pointer to the list
  * node created.
@@ -1132,8 +1135,8 @@ list_insert(List *lst, const void *item, Listnode *lnp)
 {
 	Listnode	*_lnp;
 
-	if ((_lnp = malloc(sizeof (Listnode))) == (Listnode *)0)
-		return (0);
+	if ((_lnp = malloc(sizeof (Listnode))) == NULL)
+		return (NULL);
 
 	_lnp->data = (void *)item;
 	_lnp->next = lnp->next;
@@ -1148,11 +1151,11 @@ list_insert(List *lst, const void *item, Listnode *lnp)
  * list node created.
  */
 Listnode *
-list_prepend(List * lst, const void * item)
+list_prepend(List *lst, const void *item)
 {
 	Listnode	*_lnp;
 
-	if ((_lnp = malloc(sizeof (Listnode))) == (Listnode *)0)
+	if ((_lnp = malloc(sizeof (Listnode))) == NULL)
 		return (0);
 
 	_lnp->data = (void *)item;
@@ -1166,7 +1169,6 @@ list_prepend(List * lst, const void * item)
 	}
 	return (_lnp);
 }
-
 
 /*
  * Delete a 'listnode' from a list.
@@ -1401,8 +1403,19 @@ lm_move(Lm_list *lml, Aliste nlmco, Aliste plmco, Lm_cntl *nlmc, Lm_cntl *plmc)
 	 * Indicate each new link-map has been moved to the previous link-map
 	 * control list.
 	 */
-	for (lmp = nlmc->lc_head; lmp; lmp = NEXT_RT_MAP(lmp))
+	for (lmp = nlmc->lc_head; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		CNTL(lmp) = plmco;
+
+		/*
+		 * If these objects are being added to the main link-map
+		 * control list, indicate that there are init's available
+		 * for harvesting.
+		 */
+		if (plmco == ALIST_OFF_DATA) {
+			lml->lm_init++;
+			lml->lm_flags |= LML_FLG_OBJADDED;
+		}
+	}
 
 	/*
 	 * Move the new link-map control list, to the callers link-map control
@@ -1479,7 +1492,7 @@ static	u_longlong_t		prmisa;		/* permanent ISA specific */
 #define	ENV_FLG_BIND_NOW	0x0000000004ULL
 #define	ENV_FLG_BIND_NOT	0x0000000008ULL
 #define	ENV_FLG_BINDINGS	0x0000000010ULL
-#define	ENV_FLG_CONCURRENCY	0x0000000020ULL
+
 #define	ENV_FLG_CONFGEN		0x0000000040ULL
 #define	ENV_FLG_CONFIG		0x0000000080ULL
 #define	ENV_FLG_DEBUG		0x0000000100ULL
@@ -1514,10 +1527,6 @@ static	u_longlong_t		prmisa;		/* permanent ISA specific */
 #define	ENV_FLG_BIND_LAZY	0x2000000000ULL
 #define	ENV_FLG_NOUNRESWEAK	0x4000000000ULL
 #define	ENV_FLG_NOPAREXT	0x8000000000ULL
-
-#ifdef	SIEBEL_DISABLE
-#define	ENV_FLG_FIX_1		0x8000000000ULL
-#endif
 
 #define	SEL_REPLACE		0x0001
 #define	SEL_PERMANT		0x0002
@@ -1588,7 +1597,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		}
 	}
 	/*
-	 * The LD_BIND family and LD_BREADTH (historic).
+	 * The LD_BIND family.
 	 */
 	else if (*s1 == 'B') {
 		if ((len == MSG_LD_BIND_LAZY_SIZE) && (strncmp(s1,
@@ -1621,31 +1630,13 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			 */
 			select |= SEL_ACT_SPEC_2;
 			variable = ENV_FLG_BINDINGS;
-#ifndef LD_BREADTH_DISABLED
-		} else if ((len == MSG_LD_BREADTH_SIZE) && (strncmp(s1,
-		    MSG_ORIG(MSG_LD_BREADTH), MSG_LD_BREADTH_SIZE) == 0)) {
-			/*
-			 * Besides some old patches this is no longer available.
-			 */
-			rtld_flags |= RT_FL_BREADTH;
-			return;
-#endif
 		}
 	}
 	/*
-	 * LD_CONCURRENCY and LD_CONFIG family.
+	 * LD_CONFIG family.
 	 */
 	else if (*s1 == 'C') {
-		if ((len == MSG_LD_CONCURRENCY_SIZE) && (strncmp(s1,
-		    MSG_ORIG(MSG_LD_CONCURRENCY),
-		    MSG_LD_CONCURRENCY_SIZE) == 0)) {
-			/*
-			 * Waiting in the wings, as concurrency checking isn't
-			 * yet enabled.
-			 */
-			select |= SEL_ACT_SPEC_2;
-			variable = ENV_FLG_CONCURRENCY;
-		} else if ((len == MSG_LD_CONFGEN_SIZE) && (strncmp(s1,
+		if ((len == MSG_LD_CONFGEN_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_CONFGEN), MSG_LD_CONFGEN_SIZE) == 0)) {
 			/*
 			 * Set by crle(1) to indicate it's building a
@@ -1834,21 +1825,6 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		}
 	}
 	/*
-	 * LD_ORIGIN.
-	 */
-	else if (*s1 == 'O') {
-#ifndef	EXPAND_RELATIVE
-		if ((len == MSG_LD_ORIGIN_SIZE) && (strncmp(s1,
-		    MSG_ORIG(MSG_LD_ORIGIN), MSG_LD_ORIGIN_SIZE) == 0)) {
-			/*
-			 * Besides some old patches this is no longer required.
-			 */
-			rtld_flags |= RT_FL_RELATIVE;
-		}
-#endif
-		return;
-	}
-	/*
 	 * LD_PRELOAD and LD_PROFILE family.
 	 */
 	else if (*s1 == 'P') {
@@ -1975,21 +1951,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			val = LML_FLG_TRC_WARN;
 			variable = ENV_FLG_WARN;
 		}
-#ifdef	SIEBEL_DISABLE
 	}
-	/*
-	 * LD__FIX__ (undocumented, enable future technology that can't be
-	 * delivered in a patch release).
-	 */
-	else if (*s1 == '_') {
-		if ((len == MSG_LD_FIX_1_SIZE) && (strncmp(s1,
-		    MSG_ORIG(MSG_LD_FIX_1), MSG_LD_FIX_1_SIZE) == 0)) {
-			select |= SEL_ACT_RT;
-			val = RT_FL_DISFIX_1;
-			variable = ENV_FLG_FIX_1;
-		}
-#endif
-	}
+
 	if (variable == 0)
 		return;
 
@@ -2098,11 +2061,6 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 				rpl_debug = MSG_ORIG(MSG_TKN_BINDINGS);
 			else
 				rpl_debug = 0;
-		} else if (variable == ENV_FLG_CONCURRENCY) {
-			if (s2)
-				rtld_flags &= ~RT_FL_NOCONCUR;
-			else
-				rtld_flags |= RT_FL_NOCONCUR;
 		} else if (variable == ENV_FLG_CONFGEN) {
 			if (s2) {
 				rtld_flags |= RT_FL_CONFGEN;
@@ -2144,7 +2102,7 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 				}
 				/* END CSTYLED */
 			} else
-				profile_lib = 0;
+				profile_lib = NULL;
 		} else if (variable == ENV_FLG_SIGNAL) {
 			killsig = s2 ? atoi(s2) : SIGKILL;
 		} else if (variable == ENV_FLG_TRACE_OBJS) {
@@ -2385,14 +2343,14 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
  * itself.
  */
 int
-readenv_user(const char ** envp, Word *lmflags, Word *lmtflags, int aout)
+readenv_user(const char **envp, Word *lmflags, Word *lmtflags, int aout)
 {
 	char	*locale;
 
-	if (envp == (const char **)0)
+	if (envp == NULL)
 		return (0);
 
-	while (*envp != (const char *)0)
+	while (*envp != NULL)
 		ld_str_env(*envp++, lmflags, lmtflags, 0, aout);
 
 	/*
@@ -2408,7 +2366,7 @@ readenv_user(const char ** envp, Word *lmflags, Word *lmtflags, int aout)
 	 * LML_FLG_TRC_ENABLE.
 	 */
 	if ((*lmflags & LML_FLG_TRC_ENABLE) || (rtld_flags & RT_FL_NOAUDIT))
-		rpl_audit = profile_lib = profile_name = 0;
+		rpl_audit = profile_lib = profile_name = NULL;
 	if ((*lmflags & LML_FLG_TRC_ENABLE) == 0)
 		*lmflags &= ~LML_MSK_TRC;
 
@@ -2458,7 +2416,7 @@ readenv_config(Rtc_env * envtbl, Addr addr, int aout)
 	Word	*lmflags = &(lml_main.lm_flags);
 	Word	*lmtflags = &(lml_main.lm_tflags);
 
-	if (envtbl == (Rtc_env *)0)
+	if (envtbl == NULL)
 		return (0);
 
 	while (envtbl->env_str) {
@@ -2488,7 +2446,7 @@ readenv_config(Rtc_env * envtbl, Addr addr, int aout)
 	 * LML_FLG_TRC_ENABLE.
 	 */
 	if ((*lmflags & LML_FLG_TRC_ENABLE) || (rtld_flags & RT_FL_NOAUDIT))
-		prm_audit = profile_lib = profile_name = 0;
+		prm_audit = profile_lib = profile_name = NULL;
 	if ((*lmflags & LML_FLG_TRC_ENABLE) == 0)
 		*lmflags &= ~LML_MSK_TRC;
 
@@ -2856,6 +2814,16 @@ printf(const char *format, ...)
 
 static char	errbuf[ERRSIZE], *nextptr = errbuf, *prevptr = 0;
 
+/*
+ * All error messages go through eprintf().  During process initialization,
+ * these messages are directed to the standard error, however once control has
+ * been passed to the applications code these messages are stored in an internal
+ * buffer for use with dlerror().  Note, fatal error conditions that may occur
+ * while running the application will still cause a standard error message, see
+ * rtldexit() in this file for details.
+ * The RT_FL_APPLIC flag serves to indicate the transition between process
+ * initialization and when the applications code is running.
+ */
 /*PRINTFLIKE3*/
 void
 eprintf(Lm_list *lml, Error error, const char *format, ...)
@@ -2961,12 +2929,12 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 	 * overflow condition, this message may be incomplete, in which case
 	 * make sure any partial string is null terminated.
 	 */
-	if (overflow)
-		*(prf.pr_cur) = '\0';
 	if ((rtld_flags & (RT_FL_APPLIC | RT_FL_SILENCERR)) == 0) {
 		*(prf.pr_cur - 1) = '\n';
 		(void) dowrite(&prf);
 	}
+	if (overflow)
+		*(prf.pr_cur - 1) = '\0';
 
 	DBG_CALL(Dbg_util_str(lml, nextptr));
 	va_end(args);
@@ -3029,8 +2997,8 @@ eprintf(Lm_list *lml, Error error, const char *format, ...)
 
 #if	DEBUG
 /*
- * Provide assfail() for ASSERT() statements,
- * see <sys/debug.h> for further details.
+ * Provide assfail() for ASSERT() statements.  See <sys/debug.h> for further
+ * details.
  */
 int
 assfail(const char *a, const char *f, int l)
@@ -3086,115 +3054,26 @@ rtldexit(Lm_list * lml, int status)
 }
 
 /*
- * Routines to co-ordinate the opening of /dev/zero and /proc.
- * dz_fd is exported for possible use by libld.so, and to insure it gets
- * closed on leaving ld.so.1.
+ * Map anonymous memory via MAP_ANON (added in Solaris 8).
  */
-int	dz_fd = FD_UNAVAIL;
-
-void
-dz_init(int fd)
-{
-	dz_fd = fd;
-}
-
-
-/*
- * mmap() a page from MAP_ANON
- *
- * Note: MAP_ANON is only on Solaris8++, we use this routine to
- *       not only mmap(MAP_ANON) but to also probe if it is available
- *	 on the current OS.
- */
-Am_ret
-anon_map(Lm_list *lml, caddr_t *addr, size_t len, int prot, int flags)
-{
-#if defined(MAP_ANON)
-	static int	noanon = 0;
-	caddr_t		va;
-
-	if (noanon == 0) {
-		if ((va = (caddr_t)mmap(*addr, len, prot,
-		    (flags | MAP_ANON), -1, 0)) != MAP_FAILED) {
-			*addr = va;
-			return (AM_OK);
-		}
-
-		if ((errno != EBADF) && (errno != EINVAL)) {
-			int	err = errno;
-			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
-			    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
-			return (AM_ERROR);
-		} else
-			noanon = 1;
-	}
-#endif
-	return (AM_NOSUP);
-}
-
-/*
- * Map anonymous memory from /dev/zero, or via MAP_ANON.
- *
- * (MAP_ANON only appears on Solaris 8, so we need fall-back
- * behavior for older systems.)
- */
-caddr_t
+void *
 dz_map(Lm_list *lml, caddr_t addr, size_t len, int prot, int flags)
 {
 	caddr_t	va;
-	int	err;
-	Am_ret	amret;
 
-	amret = anon_map(lml, &addr, len, prot, flags);
-
-	if (amret == AM_OK)
-		return (addr);
-	if (amret == AM_ERROR)
+	if ((va = (caddr_t)mmap(addr, len, prot,
+	    (flags | MAP_ANON), -1, 0)) == MAP_FAILED) {
+		int	err = errno;
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAPANON),
+		    strerror(err));
 		return (MAP_FAILED);
-
-	/* amret == AM_NOSUP -> fallback to a devzero mmaping */
-
-	if (dz_fd == FD_UNAVAIL) {
-		if ((dz_fd = open(MSG_ORIG(MSG_PTH_DEVZERO),
-		    O_RDONLY)) == FD_UNAVAIL) {
-			err = errno;
-			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN),
-			    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
-			return (MAP_FAILED);
-		}
-	}
-
-	if ((va = mmap(addr, len, prot, flags, dz_fd, 0)) == MAP_FAILED) {
-		err = errno;
-		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_MMAP),
-		    MSG_ORIG(MSG_PTH_DEVZERO), strerror(err));
 	}
 	return (va);
 }
 
-static int	pr_fd = FD_UNAVAIL;
-
-int
-pr_open(Lm_list *lml)
-{
-	char	proc[16];
-
-	if (pr_fd == FD_UNAVAIL) {
-		(void) snprintf(proc, 16, MSG_ORIG(MSG_FMT_PROC),
-		    (int)getpid());
-		if ((pr_fd = open(proc, O_RDONLY)) == FD_UNAVAIL) {
-			int	err = errno;
-
-			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), proc,
-			    strerror(err));
-		}
-	}
-	return (pr_fd);
-}
-
 static int	nu_fd = FD_UNAVAIL;
 
-caddr_t
+void *
 nu_map(Lm_list *lml, caddr_t addr, size_t len, int prot, int flags)
 {
 	caddr_t	va;
@@ -3240,42 +3119,45 @@ enter(int flags)
  * Determine whether a search path has been used.
  */
 static void
-is_path_used(Lm_list *lml, Word unref, int *nl, Pnode *pnp, const char *obj)
+is_path_used(Lm_list *lml, Word unref, int *nl, Alist *alp, const char *obj)
 {
-	for (; pnp; pnp = pnp->p_next) {
+	Pdesc	*pdp;
+	Aliste	idx;
+
+	for (ALIST_TRAVERSE(alp, idx, pdp)) {
 		const char	*fmt, *name;
 
-		if ((pnp->p_len == 0) || (pnp->p_orig & PN_FLG_USED))
+		if ((pdp->pd_plen == 0) || (pdp->pd_flags & PD_FLG_USED))
 			continue;
 
 		/*
 		 * If this pathname originated from an expanded token, use the
 		 * original for any diagnostic output.
 		 */
-		if ((name = pnp->p_oname) == NULL)
-			name = pnp->p_name;
+		if ((name = pdp->pd_oname) == NULL)
+			name = pdp->pd_pname;
 
 		if (unref == 0) {
 			if ((*nl)++ == 0)
 				DBG_CALL(Dbg_util_nl(lml, DBG_NL_STD));
-			DBG_CALL(Dbg_unused_path(lml, name, pnp->p_orig,
-			    (pnp->p_orig & PN_FLG_DUPLICAT), obj));
+			DBG_CALL(Dbg_unused_path(lml, name, pdp->pd_flags,
+			    (pdp->pd_flags & PD_FLG_DUPLICAT), obj));
 			continue;
 		}
 
-		if (pnp->p_orig & LA_SER_LIBPATH) {
-			if (pnp->p_orig & LA_SER_CONFIG) {
-				if (pnp->p_orig & PN_FLG_DUPLICAT)
+		if (pdp->pd_flags & LA_SER_LIBPATH) {
+			if (pdp->pd_flags & LA_SER_CONFIG) {
+				if (pdp->pd_flags & PD_FLG_DUPLICAT)
 					fmt = MSG_INTL(MSG_DUP_LDLIBPATHC);
 				else
 					fmt = MSG_INTL(MSG_USD_LDLIBPATHC);
 			} else {
-				if (pnp->p_orig & PN_FLG_DUPLICAT)
+				if (pdp->pd_flags & PD_FLG_DUPLICAT)
 					fmt = MSG_INTL(MSG_DUP_LDLIBPATH);
 				else
 					fmt = MSG_INTL(MSG_USD_LDLIBPATH);
 			}
-		} else if (pnp->p_orig & LA_SER_RUNPATH) {
+		} else if (pdp->pd_flags & LA_SER_RUNPATH) {
 			fmt = MSG_INTL(MSG_USD_RUNPATH);
 		} else
 			continue;
@@ -3415,47 +3297,6 @@ unused(Lm_list *lml)
 }
 
 /*
- * Initialization routine for the Fmap structure.  If the fmap structure is
- * already in use, any mapping is released.  The structure is then initialized
- * in preparation for further use.
- */
-void
-fmap_setup()
-{
-#if defined(MAP_ALIGN)
-	/*
-	 * If MAP_ALIGN is set, the fm_addr has been seeded with an alignment
-	 * value.  Otherwise, if fm_addr is non-null it indicates a mapping that
-	 * should now be freed.
-	 */
-	if (fmap->fm_maddr && ((fmap->fm_mflags & MAP_ALIGN) == 0))
-		(void) munmap((caddr_t)fmap->fm_maddr, fmap->fm_msize);
-
-	/*
-	 * Providing we haven't determined that this system doesn't support
-	 * MAP_ALIGN, initialize the mapping address with the default segment
-	 * alignment.
-	 */
-	if ((rtld_flags2 & RT_FL2_NOMALIGN) == 0) {
-		fmap->fm_maddr = (char *)M_SEGM_ALIGN;
-		fmap->fm_mflags = MAP_PRIVATE | MAP_ALIGN;
-	} else {
-		fmap->fm_maddr = 0;
-		fmap->fm_mflags = MAP_PRIVATE;
-	}
-#else
-	if (fmap->fm_maddr)
-		(void) munmap((caddr_t)fmap->fm_maddr, fmap->fm_msize);
-
-	fmap->fm_maddr = 0;
-	fmap->fm_mflags = MAP_PRIVATE;
-#endif
-
-	fmap->fm_msize = FMAP_SIZE;
-	fmap->fm_hwptr = 0;
-}
-
-/*
  * Generic cleanup routine called prior to returning control to the user.
  * Insures that any ld.so.1 specific file descriptors or temporary mapping are
  * released, and any locks dropped.
@@ -3463,9 +3304,9 @@ fmap_setup()
 void
 leave(Lm_list *lml, int flags)
 {
-	Lm_list	*elml = lml;
-	Rt_map	*clmp;
-	Aliste	idx;
+	Lm_list		*elml = lml;
+	Rt_map		*clmp;
+	Aliste		idx;
 
 	/*
 	 * Alert the debuggers that the link-maps are consistent.  Note, in the
@@ -3486,28 +3327,22 @@ leave(Lm_list *lml, int flags)
 		aplist_delete(elml->lm_actaudit, &idx);
 	}
 
-	if (dz_fd != FD_UNAVAIL) {
-		(void) close(dz_fd);
-		dz_fd = FD_UNAVAIL;
-	}
-
-	if (pr_fd != FD_UNAVAIL) {
-		(void) close(pr_fd);
-		pr_fd = FD_UNAVAIL;
-	}
-
 	if (nu_fd != FD_UNAVAIL) {
 		(void) close(nu_fd);
 		nu_fd = FD_UNAVAIL;
 	}
-
-	fmap_setup();
 
 	/*
 	 * Reinitialize error message pointer, and any overflow indication.
 	 */
 	nextptr = errbuf;
 	prevptr = 0;
+
+	/*
+	 * Defragment any freed memory.
+	 */
+	if (aplist_nitems(free_alp))
+		defrag();
 
 	/*
 	 * Don't drop our lock if we are running on our link-map list as
@@ -3680,13 +3515,12 @@ set_environ(Lm_list *lml)
 void
 security(uid_t uid, uid_t euid, gid_t gid, gid_t egid, int auxflags)
 {
-#ifdef AT_SUN_AUXFLAGS
 	if (auxflags != -1) {
 		if ((auxflags & AF_SUN_SETUGID) != 0)
 			rtld_flags |= RT_FL_SECURE;
 		return;
 	}
-#endif
+
 	if (uid == (uid_t)-1)
 		uid = getuid();
 	if (uid) {

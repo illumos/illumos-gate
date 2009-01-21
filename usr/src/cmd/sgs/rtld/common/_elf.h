@@ -18,19 +18,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #ifndef	__ELF_DOT_H
 #define	__ELF_DOT_H
 
 #include <sys/types.h>
+#include <sys/mman.h>
 #include <elf.h>
 #include <_rtld.h>
 
@@ -41,12 +41,13 @@ extern "C" {
 /*
  * Common extern functions for ELF file class.
  */
-extern	int	elf_reloc(Rt_map *, uint_t, int *);
-extern	int	elf_reloc_error(Rt_map *, const char *, void *, uint_t);
-extern	void	elf_plt_init(void *, caddr_t);
-extern	int	elf_set_prot(Rt_map *, int);
-extern	Rt_map	*elf_obj_file(Lm_list *, Aliste, const char *, int);
-extern	Rt_map	*elf_obj_fini(Lm_list *, Rt_map *, int *);
+extern	int	elf_config(Rt_map *, int);
+extern	Rtc_obj	*elf_config_ent(const char *, Word, int, const char **);
+extern	void	elf_config_flt(Lm_list *, const char *, const char *,
+		    Alist **, Aliste);
+#if	defined(__i386)
+extern	int	elf_copy_gen(Rt_map *);
+#endif
 extern	int	elf_copy_reloc(char *, Sym *, Rt_map *, void *, Sym *,
 		    Rt_map *, const void *);
 extern	Sym	*elf_find_sym(Slookup *, Rt_map **, uint_t *, int *);
@@ -55,19 +56,29 @@ extern	Rt_map	*elf_lazy_load(Rt_map *, Slookup *, uint_t, const char *,
 		    int *);
 extern	Sym	*elf_lookup_filtee(Slookup *, Rt_map **, uint_t *, uint_t,
 		    int *);
-extern	Rt_map	*elf_new_lm(Lm_list *, const char *, const char *, Dyn *,
-		    ulong_t, ulong_t, Aliste, ulong_t, ulong_t, ulong_t,
-		    ulong_t, Mmap *, uint_t, int *);
-extern	int	elf_rtld_load();
-
+extern	int	elf_mach_flags_check(Rej_desc *, Ehdr *);
+extern	Rt_map	*elf_new_lmp(Lm_list *, Aliste, Fdesc *, Addr, size_t, void *,
+		    int *);
+extern	Rt_map	*elf_obj_file(Lm_list *, Aliste, const char *,
+		    mmapobj_result_t *, mmapobj_result_t *, uint_t);
+extern	Rt_map	*elf_obj_fini(Lm_list *, Rt_map *, int *);
+extern	void	elf_plt_init(void *, caddr_t);
 #if	defined(__sparcv9)
 extern	void	elf_plt2_init(uint_t *, Rt_map *);
 #endif
-
-#if	defined(__i386)
-extern	ulong_t	elf_reloc_relacount(ulong_t, ulong_t, ulong_t, ulong_t);
-extern	int	elf_copy_gen(Rt_map *);
-#endif
+extern	int	elf_reloc(Rt_map *, uint_t, int *, APlist **);
+extern	void	elf_reloc_bad(Rt_map *, void *, uchar_t, ulong_t,
+		    ulong_t);
+extern	int	elf_reloc_error(Rt_map *, const char *, void *, uint_t);
+extern	ulong_t	elf_reloc_relative(ulong_t, ulong_t, ulong_t, ulong_t,
+		    Rt_map *, APlist **);
+extern	ulong_t	elf_reloc_relative_count(ulong_t, ulong_t, ulong_t, ulong_t,
+		    Rt_map *, APlist **);
+extern	int	elf_rtld_load();
+extern	long	elf_static_tls(Rt_map *, Sym *, void *, uchar_t, char *,
+		    ulong_t, long);
+extern	Fct	*elf_verify(caddr_t, size_t, Fdesc *, const char *, Rej_desc *);
+extern	int	elf_verify_vers(const char *, Rt_map *, Rt_map *);
 
 /*
  * Padinfo
@@ -92,7 +103,6 @@ typedef struct _rt_elf_private {
 	char		*e_strtab;	/* string table */
 	void		*e_reloc;	/* relocation table */
 	uint_t		*e_pltgot;	/* addrs for procedure linkage table */
-	void		*e_dynplt;	/* dynamic plt table - used by prof */
 	void		*e_jmprel;	/* plt relocations */
 	ulong_t		e_sunwsortent;	/* size of sunw[sym|tls]sort entry */
 	uint_t		*e_sunwsymsort;	/* sunwsymtab indices sorted by addr */
@@ -108,7 +118,6 @@ typedef struct _rt_elf_private {
 	Phdr		*e_pttls;	/* PT_TLS */
 	Phdr		*e_ptunwind;	/* PT_SUNW_UNWIND (amd64 specific) */
 	ulong_t		e_syment;	/* size of symtab entry */
-	ulong_t		e_entry;	/* entry point for file */
 	Verneed		*e_verneed;	/* versions needed by this image and */
 	int		e_verneednum;	/*	their associated count */
 	Verdef		*e_verdef;	/* versions defined by this image and */
@@ -132,7 +141,6 @@ typedef struct _rt_elf_private {
 #define	MOVESZ(X)		(((Rt_elfp *)(X)->rt_priv)->e_movesz)
 #define	MOVEENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_moveent)
 #define	MOVETAB(X)		(((Rt_elfp *)(X)->rt_priv)->e_movetab)
-#define	DYNPLT(X)		(((Rt_elfp *)(X)->rt_priv)->e_dynplt)
 #define	JMPREL(X)		(((Rt_elfp *)(X)->rt_priv)->e_jmprel)
 #define	SUNWSYMSZ(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsz)
 #define	PTTLS(X)		(((Rt_elfp *)(X)->rt_priv)->e_pttls)
@@ -142,7 +150,6 @@ typedef struct _rt_elf_private {
 #define	RELSZ(X)		(((Rt_elfp *)(X)->rt_priv)->e_relsz)
 #define	RELENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_relent)
 #define	SYMENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_syment)
-#define	ENTRY(X)		(((Rt_elfp *)(X)->rt_priv)->e_entry)
 #define	VERNEED(X)		(((Rt_elfp *)(X)->rt_priv)->e_verneed)
 #define	VERNEEDNUM(X)		(((Rt_elfp *)(X)->rt_priv)->e_verneednum)
 #define	VERDEF(X)		(((Rt_elfp *)(X)->rt_priv)->e_verdef)
@@ -154,6 +161,14 @@ typedef struct _rt_elf_private {
 #define	SUNWSORTENT(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsortent)
 #define	SUNWSYMSORT(X)		(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsort)
 #define	SUNWSYMSORTSZ(X)	(((Rt_elfp *)(X)->rt_priv)->e_sunwsymsortsz)
+
+/*
+ * Most of the above macros are used from ELF specific routines, however there
+ * are a couple of instances where we need to ensure the file being processed
+ * is ELF before dereferencing the macro.
+ */
+#define	THIS_IS_ELF(X)		(FCT(X) == &elf_fct)
+#define	THIS_IS_NOT_ELF(X)	(FCT(X) != &elf_fct)
 
 #ifdef	__cplusplus
 }

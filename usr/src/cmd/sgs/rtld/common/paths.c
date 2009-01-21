@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
  */
 
 #include	<stdio.h>
+#include	<unistd.h>
 #include	<limits.h>
 #include	<fcntl.h>
 #include	<string.h>
@@ -44,15 +45,72 @@
 #include	"msg.h"
 
 /*
+ * Default and secure dependency search path initialization.
+ */
+void
+set_dirs(Alist **alpp, Spath_defn *sdp, uint_t flags)
+{
+	while (sdp->sd_name) {
+		Pdesc	*pdp;
+
+		if ((pdp = alist_append(alpp, 0, sizeof (Pdesc),
+		    AL_CNT_SPATH)) == NULL)
+			return;
+
+		pdp->pd_pname = (char *)sdp->sd_name;
+		pdp->pd_plen = sdp->sd_len;
+		pdp->pd_flags = flags;
+		sdp++;
+	}
+}
+
+static void
+print_default_dirs(Lm_list *lml, Alist *alp, int search)
+{
+	uint_t	flags = 0;
+	int	num = 0;
+	Aliste	idx;
+	Pdesc	*pdp;
+
+	if (search)
+		(void) printf(MSG_INTL(MSG_LDD_PTH_BGNDFL));
+
+	for (ALIST_TRAVERSE(alp, idx, pdp)) {
+		flags = pdp->pd_flags;
+
+		if (search) {
+			const char	*fmt;
+
+			if (num++)
+				fmt = MSG_ORIG(MSG_LDD_FMT_PATHN);
+			else
+				fmt = MSG_ORIG(MSG_LDD_FMT_PATH1);
+
+			(void) printf(fmt, pdp->pd_pname);
+		} else
+			DBG_CALL(Dbg_libs_path(lml, pdp->pd_pname,
+			    pdp->pd_flags, config->c_name));
+	}
+
+	if (search) {
+		if (flags & LA_SER_CONFIG)
+			(void) printf(MSG_INTL(MSG_LDD_PTH_ENDDFLC),
+			    config->c_name);
+		else
+			(void) printf(MSG_INTL(MSG_LDD_PTH_ENDDFL));
+	}
+}
+
+/*
  * Given a search rule type, return a list of directories to search according
  * to the specified rule.
  */
-static Pnode *
+static Alist **
 get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 {
-	Pnode *		dirlist = (Pnode *)0;
-	Lm_list *	lml = LIST(lmp);
-	int		search;
+	Alist	**dalpp = NULL;
+	Lm_list *lml = LIST(lmp);
+	int	search;
 
 	/*
 	 * Determine whether ldd -s is in effect - ignore when we're searching
@@ -74,7 +132,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 		 * be preceded with the appropriate search path information.
 		 */
 		if (rpl_libpath) {
-			uint_t	mode = (LA_SER_LIBPATH | PN_FLG_UNIQUE);
+			uint_t	mode = (LA_SER_LIBPATH | PD_FLG_UNIQUE);
 
 			/*
 			 * Note, this path may have originated from the users
@@ -105,19 +163,19 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 				(void) printf(fmt, rpl_libpath, config->c_name);
 			}
 			if (rpl_libdirs && (rtld_flags & RT_FL_SECURE) &&
-			    (search || DBG_ENABLED)) {
-				free(rpl_libdirs);
-				rpl_libdirs = 0;
-			}
-			if (!rpl_libdirs) {
+			    (search || DBG_ENABLED))
+				remove_plist(&rpl_libdirs, 1);
+
+			if (rpl_libdirs == NULL) {
 				/*
 				 * If this is a secure application we need to
 				 * be selective over what directories we use.
 				 */
-				rpl_libdirs = expand_paths(lmp, rpl_libpath,
-				    mode, PN_TKN_HWCAP);
+				(void) expand_paths(lmp, rpl_libpath,
+				    &rpl_libdirs, AL_CNT_SEARCH, mode,
+				    PD_TKN_HWCAP);
 			}
-			dirlist = rpl_libdirs;
+			dalpp = &rpl_libdirs;
 		}
 		break;
 	case PRMENV:
@@ -129,7 +187,7 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 		 */
 		if (prm_libpath) {
 			uint_t	mode =
-			    (LA_SER_LIBPATH | LA_SER_CONFIG | PN_FLG_UNIQUE);
+			    (LA_SER_LIBPATH | LA_SER_CONFIG | PD_FLG_UNIQUE);
 
 			DBG_CALL(Dbg_libs_path(lml, prm_libpath, mode,
 			    config->c_name));
@@ -146,19 +204,19 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 				(void) printf(MSG_INTL(MSG_LDD_PTH_LIBPATHC),
 				    prm_libpath, config->c_name);
 			if (prm_libdirs && (rtld_flags & RT_FL_SECURE) &&
-			    (search || DBG_ENABLED)) {
-				free(prm_libdirs);
-				prm_libdirs = 0;
-			}
-			if (!prm_libdirs) {
+			    (search || DBG_ENABLED))
+				remove_plist(&prm_libdirs, 1);
+
+			if (prm_libdirs == NULL) {
 				/*
 				 * If this is a secure application we need to
 				 * be selective over what directories we use.
 				 */
-				prm_libdirs = expand_paths(lmp, prm_libpath,
-				    mode, PN_TKN_HWCAP);
+				(void) expand_paths(lmp, prm_libpath,
+				    &prm_libdirs, AL_CNT_SEARCH, mode,
+				    PD_TKN_HWCAP);
 			}
-			dirlist = prm_libdirs;
+			dalpp = &prm_libdirs;
 		}
 		break;
 	case RUNPATH:
@@ -183,104 +241,86 @@ get_dir_list(uchar_t rules, Rt_map *lmp, uint_t flags)
 				(void) printf(MSG_INTL(MSG_LDD_PTH_RUNPATH),
 				    RPATH(lmp), NAME(lmp));
 			if (RLIST(lmp) && (rtld_flags & RT_FL_SECURE) &&
-			    (search || DBG_ENABLED)) {
-				free(RLIST(lmp));
-				RLIST(lmp) = 0;
-			}
-			if (!(RLIST(lmp)))
+			    (search || DBG_ENABLED))
+				remove_plist(&RLIST(lmp), 1);
+
+			if (RLIST(lmp) == NULL) {
 				/*
 				 * If this is a secure application we need to
 				 * be selective over what directories we use.
 				 */
-				RLIST(lmp) = expand_paths(lmp, RPATH(lmp),
-				    LA_SER_RUNPATH, PN_TKN_HWCAP);
-			dirlist = RLIST(lmp);
+				(void) expand_paths(lmp, RPATH(lmp),
+				    &RLIST(lmp), AL_CNT_SEARCH, LA_SER_RUNPATH,
+				    PD_TKN_HWCAP);
+			}
+			dalpp = &RLIST(lmp);
 		}
 		break;
 	case DEFAULT:
 		if ((FLAGS1(lmp) & FL1_RT_NODEFLIB) == 0) {
 			if ((rtld_flags & RT_FL_SECURE) &&
 			    (flags & (FLG_RT_PRELOAD | FLG_RT_AUDIT)))
-				dirlist = LM_SECURE_DIRS(lmp);
+				dalpp = LM_SECURE_DIRS(lmp)();
 			else
-				dirlist = LM_DFLT_DIRS(lmp);
+				dalpp = LM_DEFAULT_DIRS(lmp)();
 		}
 
 		/*
 		 * For ldd(1) -s, indicate the default paths that'll be used.
 		 */
-		if (dirlist && (search || DBG_ENABLED)) {
-			Pnode *	pnp = dirlist;
-			int	num = 0;
-
-			if (search)
-				(void) printf(MSG_INTL(MSG_LDD_PTH_BGNDFL));
-			for (; pnp && pnp->p_name; pnp = pnp->p_next, num++) {
-				if (search) {
-					const char	*fmt;
-
-					if (num) {
-						fmt =
-						    MSG_ORIG(MSG_LDD_FMT_PATHN);
-					} else {
-						fmt =
-						    MSG_ORIG(MSG_LDD_FMT_PATH1);
-					}
-					(void) printf(fmt, pnp->p_name);
-				} else
-					DBG_CALL(Dbg_libs_path(lml, pnp->p_name,
-					    pnp->p_orig, config->c_name));
-			}
-			/* BEGIN CSTYLED */
-			if (search) {
-				if (dirlist->p_orig & LA_SER_CONFIG)
-					(void) printf(
-					    MSG_INTL(MSG_LDD_PTH_ENDDFLC),
-					    config->c_name);
-				else
-					(void) printf(
-					    MSG_INTL(MSG_LDD_PTH_ENDDFL));
-			}
-			/* END CSTYLED */
-		}
+		if (dalpp && (search || DBG_ENABLED))
+			print_default_dirs(lml, *dalpp, search);
 		break;
 	default:
 		break;
 	}
-	return (dirlist);
+	return (dalpp);
 }
 
 /*
- * Get the next dir in the search rules path.
+ * Get the next directory in the search rules path.  The seach path "cookie"
+ * provided by the caller (sdp) maintains the state of a search in progress.
+ *
+ * Typically, a search consists of a series of rules that govern the order of
+ * a search (ie. LD_LIBRARY_PATH, followed by RPATHS, followed by defaults).
+ * Each rule can establish a corresponding series of path names, which are
+ * maintained as an Alist.  The index within this Alist determines the present
+ * search directory.
  */
-Pnode *
-get_next_dir(Pnode ** dirlist, Rt_map * lmp, uint_t flags)
+Pdesc *
+get_next_dir(Spath_desc *sdp, Rt_map *lmp, uint_t flags)
 {
-	static unsigned char	*rules = NULL;
-
 	/*
-	 * Search rules consist of one or more directories names. If this is a
-	 * new search, then start at the beginning of the search rules.
-	 * Otherwise traverse the list of directories that make up the rule.
+	 * Make sure there are still rules to process.
 	 */
-	if (!*dirlist) {
-		rules = search_rules;
-	} else {
-		if ((*dirlist = (*dirlist)->p_next) != 0)
-			return (*dirlist);
-		else
-			rules++;
-	}
+	while (*sdp->sp_rule) {
+		Alist	*alp;
 
-	while (*rules) {
-		if ((*dirlist = get_dir_list(*rules, lmp, flags)) != 0)
-			return (*dirlist);
-		else
-			rules++;
+		/*
+		 * If an Alist for this rule already exists, use if, otherwise
+		 * obtain an Alist for this rule.  Providing the Alist has
+		 * content, and the present Alist index is less than the number
+		 * of Alist members, return the associated path name descriptor.
+		 */
+		if ((sdp->sp_dalpp || ((sdp->sp_dalpp =
+		    get_dir_list(*sdp->sp_rule, lmp, flags)) != NULL)) &&
+		    ((alp = *sdp->sp_dalpp) != NULL) &&
+		    (alist_nitems(alp) > sdp->sp_idx)) {
+			return (alist_item(alp, sdp->sp_idx++));
+		}
+
+		/*
+		 * If no Alist for this rule exists, or if this is the last
+		 * element of this Alist, reset the Alist pointer and index,
+		 * and prepare for the next rule.
+		 */
+		sdp->sp_rule++;
+		sdp->sp_dalpp = NULL;
+		sdp->sp_idx = 0;
 	}
 
 	/*
-	 * If we got here, no more directories to search, return NULL.
+	 * All rules and search paths have been exhausted.
 	 */
 	return (NULL);
 }
@@ -294,13 +334,14 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
     Rt_map *lmp)
 {
 	char	_name[PATH_MAX];
-	char	*token = 0, *oname, *optr, *_optr, *nptr, * _list;
+	char	*token = NULL, *oname, *ename, *optr, *_optr, *nptr, *_list;
 	size_t	olen = 0, nlen = 0, _len;
 	int	isaflag = 0;
 	uint_t	flags = 0;
 	Lm_list	*lml = LIST(lmp);
 
-	optr = _optr = oname = *name;
+	optr = _optr = oname = ename = *name;
+	ename += *len;
 	nptr = _name;
 
 	while ((olen < *len) && (nlen < PATH_MAX)) {
@@ -357,7 +398,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			 * caller to insure the expanded path matches a
 			 * registered secure name.
 			 */
-			if (((omit & PN_TKN_ORIGIN) == 0) &&
+			if (((omit & PD_TKN_ORIGIN) == 0) &&
 			    (((_len = DIRSZ(lmp)) != 0) ||
 			    ((_len = fullpath(lmp, 0)) != 0))) {
 				if ((nlen += _len) < PATH_MAX) {
@@ -366,7 +407,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					nptr = nptr +_len;
 					olen += MSG_TKN_ORIGIN_SIZE;
 					optr += MSG_TKN_ORIGIN_SIZE;
-					_flags |= PN_TKN_ORIGIN;
+					_flags |= PD_TKN_ORIGIN;
 				} else {
 					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
@@ -384,19 +425,19 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			 * established from the AT_SUN_PLATFORM aux vector, but
 			 * if not attempt to get it from sysconf().
 			 */
-			if (((omit & PN_TKN_PLATFORM) == 0) &&
+			if (((omit & PD_TKN_PLATFORM) == 0) &&
 			    ((platform == 0) && (platform_sz == 0))) {
 				char	_info[SYS_NMLN];
 				long	_size;
 
 				_size = sysinfo(SI_PLATFORM, _info, SYS_NMLN);
-				if ((_size != -1) &&
-				    ((platform = malloc((size_t)_size)) != 0)) {
+				if ((_size != -1) && ((platform =
+				    malloc((size_t)_size)) != NULL)) {
 					(void) strcpy(platform, _info);
 					platform_sz = (size_t)_size - 1;
 				}
 			}
-			if (((omit & PN_TKN_PLATFORM) == 0) &&
+			if (((omit & PD_TKN_PLATFORM) == 0) &&
 			    (platform != 0)) {
 				if ((nlen += platform_sz) < PATH_MAX) {
 					(void) strncpy(nptr, platform,
@@ -404,7 +445,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					nptr = nptr + platform_sz;
 					olen += MSG_TKN_PLATFORM_SIZE;
 					optr += MSG_TKN_PLATFORM_SIZE;
-					_flags |= PN_TKN_PLATFORM;
+					_flags |= PD_TKN_PLATFORM;
 				} else {
 					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
@@ -421,10 +462,10 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			 * $OSNAME expansion required.  This is established
 			 * from the sysname[] returned by uname(2).
 			 */
-			if (((omit & PN_TKN_OSNAME) == 0) && (uts == 0))
+			if (((omit & PD_TKN_OSNAME) == 0) && (uts == NULL))
 				uts = conv_uts();
 
-			if (((omit & PN_TKN_OSNAME) == 0) &&
+			if (((omit & PD_TKN_OSNAME) == 0) &&
 			    (uts && uts->uts_osnamesz)) {
 				if ((nlen += uts->uts_osnamesz) < PATH_MAX) {
 					(void) strncpy(nptr, uts->uts_osname,
@@ -432,7 +473,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					nptr = nptr + uts->uts_osnamesz;
 					olen += MSG_TKN_OSNAME_SIZE;
 					optr += MSG_TKN_OSNAME_SIZE;
-					_flags |= PN_TKN_OSNAME;
+					_flags |= PD_TKN_OSNAME;
 				} else {
 					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
@@ -449,10 +490,10 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			 * $OSREL expansion required.  This is established
 			 * from the release[] returned by uname(2).
 			 */
-			if (((omit & PN_TKN_OSREL) == 0) && (uts == 0))
+			if (((omit & PD_TKN_OSREL) == 0) && (uts == 0))
 				uts = conv_uts();
 
-			if (((omit & PN_TKN_OSREL) == 0) &&
+			if (((omit & PD_TKN_OSREL) == 0) &&
 			    (uts && uts->uts_osrelsz)) {
 				if ((nlen += uts->uts_osrelsz) < PATH_MAX) {
 					(void) strncpy(nptr, uts->uts_osrel,
@@ -460,7 +501,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					nptr = nptr + uts->uts_osrelsz;
 					olen += MSG_TKN_OSREL_SIZE;
 					optr += MSG_TKN_OSREL_SIZE;
-					_flags |= PN_TKN_OSREL;
+					_flags |= PD_TKN_OSREL;
 				} else {
 					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
@@ -482,12 +523,12 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			 * provided.  NOTE, that two $ISLIST expansions within
 			 * the same path aren't supported.
 			 */
-			if ((omit & PN_TKN_ISALIST) || isaflag++)
+			if ((omit & PD_TKN_ISALIST) || isaflag++)
 				ok = 0;
 			else
 				ok = 1;
 
-			if (ok && (isa == 0))
+			if (ok && (isa == NULL))
 				isa = conv_isalist();
 
 			if (ok && isa && isa->isa_listsz) {
@@ -501,7 +542,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					nptr = nptr + opt->isa_namesz;
 					olen += MSG_TKN_ISALIST_SIZE;
 					optr += MSG_TKN_ISALIST_SIZE;
-					_flags |= PN_TKN_ISALIST;
+					_flags |= PD_TKN_ISALIST;
 				} else {
 					eprintf(lml, ERR_FATAL,
 					    MSG_INTL(MSG_ERR_EXPAND1),
@@ -515,7 +556,8 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 					    (isa->isa_optno - 1)) +
 					    isa->isa_listsz - opt->isa_namesz +
 					    strlen(*list);
-					if ((_list = lptr = malloc(mlen)) == 0)
+					if ((_list = lptr =
+					    malloc(mlen)) == NULL)
 						return (0);
 
 					for (no = 1, opt++; no < isa->isa_optno;
@@ -554,7 +596,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			 * last element of the path.  Therefore, all we need do
 			 * is test the existence of the string "/$HWCAP\0".
 			 */
-			if (((omit & PN_TKN_HWCAP) == 0) &&
+			if (((omit & PD_TKN_HWCAP) == 0) &&
 			    (rtld_flags2 & RT_FL2_HWCAP) &&
 			    ((bptr > _name) && (*bptr == '/') &&
 			    ((*eptr == '\0') || (*eptr == ':')))) {
@@ -565,7 +607,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 				nptr--, nlen--;
 				olen += MSG_TKN_HWCAP_SIZE;
 				optr += MSG_TKN_HWCAP_SIZE;
-				_flags |= PN_TKN_HWCAP;
+				_flags |= PD_TKN_HWCAP;
 			}
 
 		} else {
@@ -578,7 +620,7 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 		}
 
 		/*
-		 * If reserved token was found, and could not be expanded,
+		 * If a reserved token was found, and could not be expanded,
 		 * diagnose the error condition.
 		 */
 		if (token) {
@@ -639,13 +681,11 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 			if (list)
 				*list = _list;
 		} else {
-			flags &= ~PN_TKN_ISALIST;
-
-			if ((nptr = calloc(1, (*len + 1))) == 0)
+			flags &= ~PD_TKN_ISALIST;
+			if ((nptr = (char *)stravl_insert(*name, 0,
+			    (*len + 1), 1)) == NULL)
 				return (0);
-			(void) strncpy(nptr, *name, *len);
 			*name = nptr;
-
 			return (TKN_NONE);
 		}
 	}
@@ -678,31 +718,33 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 	 * use of "$ORIGIN/../lib" will probably only match a configuration file
 	 * entry after resolution.
 	 */
-	if (list && ((rtld_flags & (RT_FL_DIRCFG | RT_FL_EXECNAME)) ==
-	    (RT_FL_DIRCFG | RT_FL_EXECNAME)) && (flags & TKN_DOTSLASH)) {
+	if (list && (rtld_flags & RT_FL_DIRCFG) && (flags & TKN_DOTSLASH)) {
 		int	len;
 
 		if ((len = resolvepath(_name, _name, (PATH_MAX - 1))) >= 0) {
 			nlen = (size_t)len;
 			_name[nlen] = '\0';
+			flags |= PD_TKN_RESOLVED;
 		}
 	}
 
 	/*
-	 * Allocate permanent storage for the new string and return to the user.
+	 * Allocate a new string if necessary.
+	 *
+	 * If any form of token expansion, or string resolution has occurred,
+	 * the storage must be allocated for the new string.
+	 *
+	 * If we're processing a substring, for example, any string besides the
+	 * last string within a search path "A:B:C", then this substring needs
+	 * to be isolated with a null terminator.  However, if this search path
+	 * was created from a previous ISALIST expansion, then all strings must
+	 * be allocated, as the isalist expansion will be freed after expansion
+	 * processing.
 	 */
-	if ((nptr = malloc(nlen + 1)) == 0)
+	if ((nptr = (char *)stravl_insert(_name, 0, (nlen + 1), 1)) == NULL)
 		return (0);
-	(void) strcpy(nptr, _name);
 	*name = nptr;
 	*len = nlen;
-
-	/*
-	 * Return an indication of any token expansion that may have occurred.
-	 * If this is a secure application, any path name expanded with the
-	 * $ORIGIN token must be validated against any registered trusted
-	 * directories.
-	 */
 	return (flags ? flags : TKN_NONE);
 }
 
@@ -712,9 +754,11 @@ expand(char **name, size_t *len, char **list, uint_t orig, uint_t omit,
 int
 is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 {
-	Pnode	*sdir = LM_SECURE_DIRS(LIST(clmp)->lm_head);
-	char	buffer[PATH_MAX], *npath = NULL;
-	Lm_list	*lml = LIST(clmp);
+	Alist		**salpp;
+	Aliste		idx;
+	char		buffer[PATH_MAX], *npath = NULL;
+	Lm_list		*lml = LIST(clmp);
+	Pdesc		*pdp;
 
 	/*
 	 * If a path name originates from a configuration file, use it.  The use
@@ -747,10 +791,10 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		 *   .	provided $ORIGIN expansion has not been employed, the
 		 *	above categories of path are deemed secure.
 		 */
-		if ((((str == 0) && ((info & PN_FLG_FULLPATH) == 0)) ||
+		if ((((str == 0) && ((info & PD_FLG_FULLPATH) == 0)) ||
 		    ((*opath == '/') && (str != opath) &&
-		    ((info & PN_FLG_EXTLOAD) == 0))) &&
-		    ((flags & PN_TKN_ORIGIN) == 0))
+		    ((info & PD_FLG_EXTLOAD) == 0))) &&
+		    ((flags & PD_TKN_ORIGIN) == 0))
 			return (1);
 
 		/*
@@ -775,7 +819,7 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 			 * any directory that has already been used to satisfy
 			 * other dependencies, to be used.
 			 */
-			if ((flags & PN_TKN_ORIGIN) &&
+			if ((flags & PD_TKN_ORIGIN) &&
 			    spavl_recorded(npath, 0)) {
 				DBG_CALL(Dbg_libs_insecure(lml, npath, 1));
 				return (1);
@@ -793,7 +837,7 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		 *   .	any relative path.
 		 */
 		if (((info & LA_SER_LIBPATH) == 0) && (*opath == '/') &&
-		    ((flags & PN_TKN_ORIGIN) == 0))
+		    ((flags & PD_TKN_ORIGIN) == 0))
 			return (1);
 
 		/*
@@ -802,7 +846,7 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 		 * application to use this path name only if the path name has
 		 * already been used to locate other dependencies.
 		 */
-		if (flags & PN_TKN_ORIGIN) {
+		if (flags & PD_TKN_ORIGIN) {
 			if ((lml->lm_flags & LML_FLG_RTLDLM) &&
 			    is_rtld_setuid())
 				return (1);
@@ -818,10 +862,10 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 	 * Determine whether the present directory is trusted.
 	 */
 	if (npath) {
-		while (sdir) {
-			if (strcmp(npath, sdir->p_name) == 0)
+		salpp = LM_SECURE_DIRS(LIST(clmp)->lm_head)();
+		for (ALIST_TRAVERSE(*salpp, idx, pdp)) {
+			if (strcmp(npath, pdp->pd_pname) == 0)
 				return (1);
-			sdir = sdir->p_next;
 		}
 	}
 
@@ -830,7 +874,7 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
 	 * diagnostic.  Preloaded, or audit libraries generate a warning, as
 	 * the process will run without them.
 	 */
-	if (info & PN_FLG_EXTLOAD) {
+	if (info & PD_FLG_EXTLOAD) {
 		if (lml->lm_flags & LML_FLG_TRC_ENABLE) {
 			if ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0)
 				(void) printf(MSG_INTL(MSG_LDD_FIL_ILLEGAL),
@@ -881,11 +925,14 @@ is_path_secure(char *opath, Rt_map *clmp, uint_t info, uint_t flags)
  * Determine whether a path already exists within the callers Pnode list.
  */
 inline static uint_t
-is_path_unique(Pnode *pnp, const char *path)
+is_path_unique(Alist *alp, const char *path)
 {
-	for (; pnp; pnp = pnp->p_next) {
-		if (pnp->p_len && (strcmp(pnp->p_name, path) == 0))
-			return (PN_FLG_DUPLICAT);
+	Aliste	idx;
+	Pdesc	*pdp;
+
+	for (ALIST_TRAVERSE(alp, idx, pdp)) {
+		if (pdp->pd_plen && (strcmp(pdp->pd_pname, path) == 0))
+			return (PD_FLG_DUPLICAT);
 	}
 	return (0);
 }
@@ -897,23 +944,25 @@ is_path_unique(Pnode *pnp, const char *path)
  * of path names.  Each individual path name is processed for possible reserved
  * token expansion.  All string nodes are maintained in allocated memory
  * (regardless of whether they are constant (":"), or token expanded) to
- * simplify pnode removal.
+ * simplify path name descriptor removal.
  *
  * The info argument passes in auxiliary information regarding the callers
  * intended use of the path names.  This information may be maintained in the
- * pnode element produced to describe the path name (i.e., LA_SER_LIBPATH etc.),
- * or may be used to determine additional security or diagnostic processing.
+ * path name descriptor element produced to describe the path name (i.e.,
+ * LA_SER_LIBPATH etc.), or may be used to determine additional security or
+ * diagnostic processing.
  */
-Pnode *
-expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
+int
+expand_paths(Rt_map *clmp, const char *list, Alist **alpp, Aliste alni,
+    uint_t orig, uint_t omit)
 {
 	char	*str, *olist = 0, *nlist = (char *)list;
-	Pnode	*pnp, *npnp, *opnp;
 	int	fnull = FALSE;	/* TRUE if empty final path segment seen */
-	uint_t	unique = 0;
+	Pdesc	*pdp = NULL;
 
-	for (pnp = opnp = 0, str = nlist; *nlist || fnull; str = nlist) {
+	for (str = nlist; *nlist || fnull; str = nlist) {
 		char	*ostr;
+		char	*elist = NULL;
 		size_t	len, olen;
 		uint_t	tkns = 0;
 
@@ -937,15 +986,16 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 			if (!(orig & (LA_SER_LIBPATH | LA_SER_RUNPATH)))
 				continue; /* Process next segment */
 
-			if ((str = strdup(MSG_ORIG(MSG_FMT_CWD))) == NULL)
-				return (NULL);
+			str = (char *)MSG_ORIG(MSG_FMT_CWD);
 			len = MSG_FMT_CWD_SIZE;
 
 		} else {
-			char	*elist;
+			uint_t	_tkns;
 
 			len = 0;
 			while (*nlist && (*nlist != ':') && (*nlist != ';')) {
+				if (*nlist == '/')
+					tkns |= PD_FLG_PNSLASH;
 				nlist++, len++;
 			}
 
@@ -963,27 +1013,19 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 			elist = nlist;
 			ostr = str;
 			olen = len;
-			if ((tkns = expand(&str, &len, &elist, orig, omit,
+			if ((_tkns = expand(&str, &len, &elist, orig, omit,
 			    clmp)) == 0)
 				continue;
-
-			if (elist != nlist) {
-				if (olist)
-					free(olist);
-				nlist = olist = elist;
-			}
+			tkns |= _tkns;
 		}
 
 		/*
 		 * If this a secure application, validation of the expanded
 		 * path name may be necessary.
 		 */
-		if (rtld_flags & RT_FL_SECURE) {
-			if (is_path_secure(str, clmp, orig, tkns) == 0) {
-				free(str);
-				continue;
-			}
-		}
+		if ((rtld_flags & RT_FL_SECURE) &&
+		    (is_path_secure(str, clmp, orig, tkns) == 0))
+			continue;
 
 		/*
 		 * If required, ensure that the string is unique.  For search
@@ -993,12 +1035,12 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 		 * so that the entry can be diagnosed later as part of unused
 		 * processing.
 		 */
-		if (orig & PN_FLG_UNIQUE) {
+		if (orig & PD_FLG_UNIQUE) {
 			Word	tracing;
 
 			tracing = LIST(clmp)->lm_flags &
 			    (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED);
-			unique = is_path_unique(pnp, str);
+			tkns |= is_path_unique(*alpp, str);
 
 			/*
 			 * Note, use the debug strings rpl_debug and prm_debug
@@ -1007,51 +1049,138 @@ expand_paths(Rt_map *clmp, const char *list, uint_t orig, uint_t omit)
 			 * LD_LIBRARY_PATH occurs in preparation for loading
 			 * our debugging library.
 			 */
-			if ((unique == PN_FLG_DUPLICAT) && (tracing == 0) &&
-			    (rpl_debug == 0) && (prm_debug == 0)) {
-				free(str);
+			if ((tkns & PD_FLG_DUPLICAT) && (tracing == 0) &&
+			    (rpl_debug == 0) && (prm_debug == 0))
 				continue;
-			}
 		}
 
 		/*
-		 * Allocate a new Pnode for this string.
+		 * Create a new pathname descriptor.
 		 */
-		if ((npnp = calloc(1, sizeof (Pnode))) == 0) {
-			free(str);
-			return (NULL);
+		if ((pdp = alist_append(alpp, 0, sizeof (Pdesc), alni)) == NULL)
+			return (0);
+
+		pdp->pd_pname = str;
+		pdp->pd_plen = len;
+		pdp->pd_flags = (orig & LA_SER_MASK) | (tkns & PD_MSK_INHERIT);
+
+		/*
+		 * If token expansion occurred, maintain the original string.
+		 * This string can be used to provide a more informative error
+		 * diagnostic for a file that fails to load, or for displaying
+		 * unused search paths.
+		 */
+		if ((tkns & PD_MSK_EXPAND) && ((pdp->pd_oname =
+		    stravl_insert(ostr, 0, (olen + 1), 1)) == NULL))
+			return (0);
+
+		/*
+		 * Now that any duplication of the original string has occurred,
+		 * release any previous old listing.
+		 */
+		if (elist && (elist != nlist)) {
+			if (olist)
+				free(olist);
+			nlist = olist = elist;
 		}
-		if (opnp == 0)
-			pnp = npnp;
-		else
-			opnp->p_next = npnp;
-
-		if (tkns & PN_TKN_MASK) {
-			char	*oname;
-
-			/*
-			 * If this is a path name, and any token expansion
-			 * occurred, maintain the original string for possible
-			 * diagnostic use.
-			 */
-			if ((oname = malloc(olen + 1)) == 0) {
-				free(str);
-				return (NULL);
-			}
-			(void) strncpy(oname, ostr, olen);
-			oname[olen] = '\0';
-			npnp->p_oname = oname;
-		}
-		npnp->p_name = str;
-		npnp->p_len = len;
-		npnp->p_orig = (orig & LA_SER_MASK) | unique |
-		    (tkns & PN_TKN_MASK);
-
-		opnp = npnp;
 	}
 
 	if (olist)
 		free(olist);
 
-	return (pnp);
+	/*
+	 * If no paths could be determined (perhaps because of security), then
+	 * indicate a failure.
+	 */
+	return (pdp != NULL);
+}
+
+/*
+ * Establish an objects fully resolved path.
+ *
+ * When $ORIGIN was first introduced, the expansion of a relative path name was
+ * deferred until it was required.  However now we insure a full path name is
+ * always created - things like the analyzer wish to rely on librtld_db
+ * returning a full path.  The overhead of this is perceived to be low,
+ * providing the associated libc version of getcwd is available (see 4336878).
+ * This getcwd() was ported back to Solaris 8.1.
+ */
+size_t
+fullpath(Rt_map *lmp, Fdesc *fdp)
+{
+	const char	*name;
+
+	/*
+	 * Determine whether this path name is already resolved.
+	 */
+	if (fdp && (fdp->fd_flags & FLG_FD_RESOLVED)) {
+		/*
+		 * If the resolved path differed from the original name, the
+		 * resolved path would have been recorded as the fd_pname.
+		 * Steal this path name from the file descriptor.  Otherwise,
+		 * the path name is the same as the name of this object.
+		 */
+		if (fdp->fd_pname)
+			PATHNAME(lmp) = fdp->fd_pname;
+		else
+			PATHNAME(lmp) = NAME(lmp);
+	} else {
+		/*
+		 * If this path name has not yet been resolved, resolve the
+		 * current name.
+		 */
+		char		_path[PATH_MAX];
+		const char	*path;
+		int		size, rsize;
+
+		if (fdp && fdp->fd_pname)
+			PATHNAME(lmp) = fdp->fd_pname;
+		else
+			PATHNAME(lmp) = NAME(lmp);
+
+		name = path = PATHNAME(lmp);
+		size = strlen(name);
+
+		if (path[0] != '/') {
+			/*
+			 * If we can't determine the current directory (possible
+			 * if too many files are open - EMFILE), or if the
+			 * created path is too big, simply revert back to the
+			 * initial path name.
+			 */
+			if (getcwd(_path, (PATH_MAX - 2 - size)) != NULL) {
+				(void) strcat(_path, MSG_ORIG(MSG_STR_SLASH));
+				(void) strcat(_path, name);
+				path = _path;
+				size = strlen(path);
+			}
+		}
+
+		/*
+		 * See if the path name can be reduced further.
+		 */
+		if ((rsize = resolvepath(path, _path, (PATH_MAX - 1))) > 0) {
+			_path[rsize] = '\0';
+			path = _path;
+			size = rsize;
+		}
+
+		/*
+		 * If the path name is different from the original, duplicate it
+		 * so that it is available in a core file.  If the duplication
+		 * fails simply leave the original path name alone.
+		 */
+		if ((PATHNAME(lmp) =
+		    stravl_insert(path, 0, (size + 1), 0)) == NULL)
+			PATHNAME(lmp) = name;
+	}
+
+	name = ORIGNAME(lmp) = PATHNAME(lmp);
+
+	/*
+	 * Establish the directory name size - this also acts as a flag that the
+	 * directory name has been computed.
+	 */
+	DIRSZ(lmp) = strrchr(name, '/') - name;
+	return (DIRSZ(lmp));
 }

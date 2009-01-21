@@ -23,10 +23,9 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Global variables
@@ -57,11 +56,6 @@ Listnode	*insert_lib;	/* insertion point for -L libraries */
  */
 char		def64_Plibpath[] = "/lib/64:/usr/lib/64";
 char		def32_Plibpath[] = "/usr/ccs/lib:/lib:/usr/lib";
-
-/*
- * For backward compatibility provide a /dev/zero file descriptor.
- */
-int		dz_fd = -1;
 
 /*
  * Rejected file error messages (indexed to match FLG_RJC_ values).

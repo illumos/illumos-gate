@@ -100,7 +100,6 @@ typedef enum {
 	REF_NUM				/* the number of symbol references */
 } Symref;
 
-
 /*
  * GOT reference models
  */
@@ -127,7 +126,6 @@ typedef struct {
 	Sym_desc *	gt_sym;
 	Gotndx		gt_gndx;
 } Gottable;
-
 
 /*
  * Output file processing structure
@@ -642,7 +640,6 @@ struct sg_desc {			/* output segment descriptor */
 	Elf_Scn		*sg_fscn;	/* the SCN of the first section. */
 };
 
-
 #define	FLG_SG_VADDR	0x0001		/* vaddr segment attribute set */
 #define	FLG_SG_PADDR	0x0002		/* paddr segment attribute set */
 #define	FLG_SG_LENGTH	0x0004		/* length segment attribute set */
@@ -762,7 +759,6 @@ struct sym_aux {
 	Half		sa_overndx;	/* output file versioning index */
 	Half		sa_dverndx;	/* dependency versioning index */
 };
-
 
 /*
  * Nodes used to track symbols in the global AVL symbol dictionary.
@@ -1092,7 +1088,7 @@ typedef struct ar_desc {
 #define	ld_make_sections	ld64_make_sections
 #define	ld_main			ld64_main
 #define	ld_ofl_cleanup		ld64_ofl_cleanup
-#define	ld_process_open		ld64_process_open
+#define	ld_process_mem		ld64_process_mem
 #define	ld_reloc_init		ld64_reloc_init
 #define	ld_reloc_process	ld64_reloc_process
 #define	ld_sym_validate		ld64_sym_validate
@@ -1107,7 +1103,7 @@ typedef struct ar_desc {
 #define	ld_make_sections	ld32_make_sections
 #define	ld_main			ld32_main
 #define	ld_ofl_cleanup		ld32_ofl_cleanup
-#define	ld_process_open		ld32_process_open
+#define	ld_process_mem		ld32_process_mem
 #define	ld_reloc_init		ld32_reloc_init
 #define	ld_reloc_process	ld32_reloc_process
 #define	ld_sym_validate		ld32_sym_validate
@@ -1126,8 +1122,8 @@ extern uintptr_t	ld_init_strings(Ofl_desc *);
 extern int		ld_init_target(Lm_list *, Half mach);
 extern uintptr_t	ld_make_sections(Ofl_desc *);
 extern void		ld_ofl_cleanup(Ofl_desc *);
-extern Ifl_desc		*ld_process_open(const char *, const char *, int *,
-			    Ofl_desc *, Word, Rej_desc *);
+extern Ifl_desc		*ld_process_mem(const char *, const char *, char *,
+			    size_t, Ofl_desc *, Rej_desc *);
 extern uintptr_t	ld_reloc_init(Ofl_desc *);
 extern uintptr_t	ld_reloc_process(Ofl_desc *);
 extern uintptr_t	ld_sym_validate(Ofl_desc *);

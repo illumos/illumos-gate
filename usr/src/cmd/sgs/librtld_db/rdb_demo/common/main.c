@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,12 +18,11 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,8 +47,7 @@
 #include "disasm.h"
 #include "gram.h"
 
-
-void
+static void
 init_proc()
 {
 	int		pfd;
@@ -59,8 +56,7 @@ init_proc()
 	sigset_t	sigset;
 	fltset_t	fltset;
 	sysset_t	sysset;
-	long		oper;
-	long		pflags;
+	long		oper, pflags;
 	struct iovec	piov[2];
 
 	/*
@@ -69,8 +65,7 @@ init_proc()
 	pid = getpid();
 	(void) sprintf(procname, "/proc/%d/ctl", pid);
 	if ((pfd = open(procname, O_WRONLY)) < 0) {
-		(void) fprintf(stderr, "can't open %s\n",
-			procname);
+		(void) fprintf(stderr, "can't open %s\n", procname);
 		exit(1);
 	}
 
@@ -130,7 +125,6 @@ init_proc()
 	(void) close(pfd);
 }
 
-
 int
 main(int argc, char *argv[])
 {
@@ -138,7 +132,7 @@ main(int argc, char *argv[])
 	int			pstatusfd;
 	char			procname[MAXPATHLEN];
 	char			*command;
-	char			*rdb_commands = 0;
+	char			*rdb_commands = NULL;
 	pid_t			cpid;
 	pstatus_t		pstatus;
 	sysset_t		sysset;
@@ -160,9 +154,9 @@ main(int argc, char *argv[])
 		}
 
 	if (error || (optind == argc)) {
-		printf("usage: %s [-f file] executable "
-			"[executable arguments ...]\n", command);
-		printf("\t-f	command file\n");
+		(void) printf("usage: %s [-f file] executable "
+		    "[executable arguments ...]\n", command);
+		(void) printf("\t-f	command file\n");
 		exit(1);
 	}
 
@@ -186,7 +180,8 @@ main(int argc, char *argv[])
 	 * initialize libelf
 	 */
 	if (elf_version(EV_CURRENT) == EV_NONE) {
-		fprintf(stderr, "elf_version() failed: %s\n", elf_errmsg(0));
+		(void) fprintf(stderr, "elf_version() failed: %s\n",
+		    elf_errmsg(0));
 		exit(1);
 	}
 
@@ -194,8 +189,8 @@ main(int argc, char *argv[])
 	 * initialize librtld_db
 	 */
 	if (rd_init(RD_VERSION) != RD_OK) {
-		fprintf(stderr, "librtld_db::rd_init() failed: version "
-			"submited: %d\n", RD_VERSION);
+		(void) fprintf(stderr, "librtld_db::rd_init() failed: version "
+		    "submitted: %d\n", RD_VERSION);
 		exit(1);
 	}
 
@@ -206,12 +201,12 @@ main(int argc, char *argv[])
 	 * exec.
 	 */
 	(void) sprintf(procname, "/proc/%d/ctl", cpid);
-	printf("parent: %d child: %d child procname: %s\n", getpid(),
-		cpid, procname);
+	(void) printf("parent: %d child: %d child procname: %s\n", getpid(),
+	    cpid, procname);
 	if ((pctlfd = open(procname, O_WRONLY)) < 0) {
 		perror(procname);
 		(void) fprintf(stderr, "%s: can't open child %s\n",
-			command, procname);
+		    command, procname);
 		exit(1);
 	}
 
@@ -242,7 +237,7 @@ main(int argc, char *argv[])
 	    (pstatus.pr_lwp.pr_what == SYS_execve))) {
 		long	pflags = 0;
 		if (!(pstatus.pr_lwp.pr_reg[R_PS] & ERRBIT)) {
-			/* sucessefull exec(2) */
+			/* successfull exec(2) */
 			break;
 		}
 
@@ -275,8 +270,9 @@ main(int argc, char *argv[])
 	    (pstatus.pr_lwp.pr_what != SYS_execve))) {
 		long	pflags = 0;
 
-		fprintf(stderr, "Didn't catch the exec, why: %d what: %d\n",
-			pstatus.pr_lwp.pr_why, pstatus.pr_lwp.pr_what);
+		(void) fprintf(stderr, "Didn't catch the exec, why: %d "
+		    "what: %d\n", pstatus.pr_lwp.pr_why,
+		    pstatus.pr_lwp.pr_what);
 
 		oper = PCRUN;
 		piov[1].iov_base = (caddr_t)&pflags;
@@ -286,11 +282,12 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
-	ps_init(pctlfd, pstatusfd, cpid, &proch);
+	(void) ps_init(pctlfd, pstatusfd, cpid, &proch);
 
 	if (rdb_commands) {
 		if ((yyin = fopen(rdb_commands, "r")) == NULL) {
-			printf("unable to open %s for input\n", rdb_commands);
+			(void) printf("unable to open %s for input\n",
+			    rdb_commands);
 			perr("fopen");
 		}
 	} else {
@@ -301,7 +298,8 @@ main(int argc, char *argv[])
 
 	if (proch.pp_flags & FLG_PP_PACT) {
 		long	pflags = PRCFAULT;
-		printf("\ncontinueing the hung process...\n");
+
+		(void) printf("\ncontinuing the hung process...\n");
 
 		pctlfd = proch.pp_ctlfd;
 		(void) ps_close(&proch);
@@ -311,7 +309,7 @@ main(int argc, char *argv[])
 		piov[1].iov_len = sizeof (pflags);
 		if (writev(pctlfd, piov, 2) == -1)
 			perr("PCRUN2");
-		close(pctlfd);
+		(void) close(pctlfd);
 	}
 
 	return (0);

@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # Generic interface definition for usr/src/cmd/sgs/rtld.
 #
@@ -39,7 +37,7 @@
 #
 # All symbols in ld.so.1 are private as no-one should bind to these directly.
 
-SUNWprivate_1.2 {
+SUNWprivate_1.3 {
 	protected:
 		 dladdr;		# Standard dlopen(3x) family
 		 dladdr1;
@@ -87,7 +85,6 @@ SUNWprivate_1.2 {
 		 strerror;
 
 		 calloc;		# Memory management (mapmalloc).
-		 dz_fd;
 		 free;
 		 malloc;
 		 realloc;

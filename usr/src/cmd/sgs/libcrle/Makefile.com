@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libcrle.a
@@ -38,13 +36,6 @@ include		$(SRC)/lib/Makefile.lib
 include		$(SRC)/cmd/sgs/Makefile.com
 
 SRCDIR =	../common
-
-# Building SUNWonld results in a call to the `package' target.  Requirements
-# needed to run this application on older releases are established:
-#   dlopen/dlclose requires libdl.so.1 prior to 5.10
-# 
-DLLIB =		$(VAR_DL_LIB)
-package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 
 lint :=		ZRECORD =
 LDLIBS +=	$(ZRECORD) -lmapmalloc $(DLLIB) -lc

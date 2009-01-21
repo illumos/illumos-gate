@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,7 +63,8 @@ elf_config_validate(Addr addr, Rtc_head *head, Rt_map *lmp)
 	 * that exec shells using execv(/usr/bin/ksh, sh ...).
 	 */
 	if (head->ch_app) {
-		char	*_str, *_cname, *cname, *aname = PATHNAME(lmp);
+		char		*_str, *_cname, *cname;
+		const char	*aname = PATHNAME(lmp);
 
 		obj = (Rtc_obj *)(head->ch_app + addr);
 		cname = _cname = (char *)(strtbl + obj->co_name);
@@ -199,7 +200,6 @@ elf_config(Rt_map *lmp, int aout)
 	int		fd, features = 0;
 	rtld_stat_t	status;
 	Addr		addr;
-	Pnode		*pnp;
 	const char	*str;
 	char		path[PATH_MAX];
 
@@ -230,7 +230,7 @@ elf_config(Rt_map *lmp, int aout)
 		 * Expand any configuration string.
 		 */
 		if ((tkns = expand(&estr, &size, 0, 0,
-		    (PN_TKN_ISALIST | PN_TKN_HWCAP), lmp)) == 0)
+		    (PD_TKN_ISALIST | PD_TKN_HWCAP), lmp)) == 0)
 			return (0);
 
 		/*
@@ -239,7 +239,7 @@ elf_config(Rt_map *lmp, int aout)
 		 * fall through to pick up the defaults.
 		 */
 		if ((rtld_flags & RT_FL_SECURE) &&
-		    (is_path_secure(estr, lmp, PN_FLG_FULLPATH, tkns) == 0))
+		    (is_path_secure(estr, lmp, PD_FLG_FULLPATH, tkns) == 0))
 			str = NULL;
 		else
 			str = (const char *)estr;
@@ -331,10 +331,9 @@ elf_config(Rt_map *lmp, int aout)
 #endif
 		}
 #endif
-		if ((pnp = expand_paths(lmp, str,
-		    (LA_SER_DEFAULT | LA_SER_CONFIG), PN_TKN_HWCAP)) != 0)
-			elf_fct.fct_dflt_dirs = pnp;
-		features |= CONF_EDLIBPATH;
+		if (expand_paths(lmp, str, &elf_def_dirs, AL_CNT_SEARCH,
+		    (LA_SER_DEFAULT | LA_SER_CONFIG), PD_TKN_HWCAP) != NULL)
+			features |= CONF_EDLIBPATH;
 	}
 	if (head->ch_eslibpath) {
 		str = (const char *)(head->ch_eslibpath + addr);
@@ -350,25 +349,22 @@ elf_config(Rt_map *lmp, int aout)
 #endif
 		}
 #endif
-		if ((pnp = expand_paths(lmp, str,
-		    (LA_SER_SECURE | LA_SER_CONFIG), PN_TKN_HWCAP)) != 0)
-			elf_fct.fct_secure_dirs = pnp;
-		features |= CONF_ESLIBPATH;
+		if (expand_paths(lmp, str, &elf_sec_dirs, AL_CNT_SEARCH,
+		    (LA_SER_SECURE | LA_SER_CONFIG), PD_TKN_HWCAP) != NULL)
+			features |= CONF_ESLIBPATH;
 	}
 #if	defined(__sparc) && !defined(_ELF64)
 	if (head->ch_adlibpath) {
 		str = (const char *)(head->ch_adlibpath + addr);
-		if ((pnp = expand_paths(lmp, str,
-		    (LA_SER_DEFAULT | LA_SER_CONFIG), PN_TKN_HWCAP)) != 0)
-			aout_fct.fct_dflt_dirs = pnp;
-		features |= CONF_ADLIBPATH;
+		if (expand_paths(lmp, str, &aout_def_dirs, AL_CNT_SEARCH,
+		    (LA_SER_DEFAULT | LA_SER_CONFIG), PD_TKN_HWCAP) != NULL)
+			features |= CONF_ADLIBPATH;
 	}
 	if (head->ch_aslibpath) {
 		str = (const char *)(head->ch_aslibpath + addr);
-		if ((pnp = expand_paths(lmp, str,
-		    (LA_SER_SECURE | LA_SER_CONFIG), PN_TKN_HWCAP)) != 0)
-			aout_fct.fct_secure_dirs = pnp;
-		features |= CONF_ASLIBPATH;
+		if (expand_paths(lmp, str, &aout_sec_dirs, AL_CNT_SEARCH,
+		    (LA_SER_SECURE | LA_SER_CONFIG), PD_TKN_HWCAP) != NULL)
+			features |= CONF_ASLIBPATH;
 	}
 #endif
 	/*
@@ -474,13 +470,13 @@ elf_config_ent(const char *name, Word hash, int id, const char **alternate)
 /*
  * Determine whether a filter and filtee string pair exists in the configuration
  * file.  If so, return the cached filtees that are associated with this pair as
- * a Pnode list.
+ * an Alist.
  */
-Pnode *
-elf_config_flt(Lm_list *lml, const char *filter, const char *string)
+void
+elf_config_flt(Lm_list *lml, const char *filter, const char *string,
+    Alist **alpp, Aliste alni)
 {
 	Rtc_fltr	*fltrtbl;
-	Pnode		*pnp = NULL, *npnp, *opnp = NULL;
 
 	for (fltrtbl = (Rtc_fltr *)config->c_fltr; fltrtbl->fr_filter;
 	    fltrtbl++) {
@@ -493,7 +489,7 @@ elf_config_flt(Lm_list *lml, const char *filter, const char *string)
 			continue;
 
 		/*
-		 * Create a pnode list for each filtee associated with this
+		 * Create a path descriptor for each filtee associated with this
 		 * filter/filtee string pair.  Note, no expansion of filtee
 		 * entries is called for, as any original expansion would have
 		 * been carried out before they were recorded in the
@@ -503,26 +499,19 @@ elf_config_flt(Lm_list *lml, const char *filter, const char *string)
 		for (fltetbl = (Rtc_flte *)((char *)config->c_flte +
 		    fltrtbl->fr_filtee); fltetbl->fe_filtee; fltetbl++) {
 			const char	*flte;
+			Pdesc		*pdp;
 
 			flte = config->c_strtbl + fltetbl->fe_filtee;
 
-			if (((npnp = calloc(1, sizeof (Pnode))) == NULL) ||
-			    ((npnp->p_name = strdup(flte)) == NULL))
-				return (0);
+			if ((pdp = alist_append(alpp, 0, sizeof (Pdesc),
+			    alni)) == NULL)
+				return;
+
+			pdp->pd_pname = (char *)flte;
+			pdp->pd_plen = strlen(flte) + 1;
+			pdp->pd_flags = LA_SER_CONFIG;
 
 			DBG_CALL(Dbg_file_filter(lml, fltr, flte, 1));
-
-			if (opnp == NULL)
-				pnp = npnp;
-			else
-				opnp->p_next = npnp;
-
-			npnp->p_len = strlen(flte) + 1;
-			npnp->p_orig = LA_SER_CONFIG;
-
-			opnp = npnp;
 		}
-		return (pnp);
 	}
-	return (0);
 }

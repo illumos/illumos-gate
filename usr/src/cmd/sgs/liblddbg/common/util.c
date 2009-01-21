@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"msg.h"
 #include	"_debug.h"
@@ -208,44 +207,6 @@ Dbg_util_scc_entry(Rt_map *lmp, uint_t idx)
 		return;
 
 	dbg_print(LIST(lmp), MSG_ORIG(MSG_UTL_SCC_ENTRY), idx, NAME(lmp));
-}
-
-void
-Dbg_util_broadcast(Rt_map *lmp)
-{
-	Lm_list	*lml = LIST(lmp);
-
-	if (DBG_NOTCLASS(DBG_C_INIT))
-		return;
-	if (DBG_NOTDETAIL())
-		return;
-
-	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_UTL_BROAD), NAME(lmp));
-	Dbg_util_nl(lml, DBG_NL_STD);
-}
-
-void
-Dbg_util_wait(Rt_map *clmp, Rt_map *dlmp, int what)
-{
-	Lm_list		*lml = LIST(clmp);
-	const char	*str;
-
-	if (DBG_NOTCLASS(DBG_C_INIT))
-		return;
-	if (DBG_NOTDETAIL())
-		return;
-
-	if (what == DBG_WAIT_INIT)
-		str = MSG_ORIG(MSG_SCN_INIT);
-	else if (what == DBG_WAIT_FINI)
-		str = MSG_ORIG(MSG_SCN_FINI);
-	else
-		str = MSG_INTL(MSG_STR_SYMBOL);
-
-	Dbg_util_nl(lml, DBG_NL_STD);
-	dbg_print(lml, MSG_INTL(MSG_UTL_WAIT), str, NAME(clmp), NAME(dlmp));
-	Dbg_util_nl(lml, DBG_NL_STD);
 }
 
 static	int ectoggle = 0;

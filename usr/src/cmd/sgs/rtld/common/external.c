@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Implementation of all external interfaces between ld.so.1 and libc.
@@ -357,11 +355,8 @@ get_lcinterface(Rt_map *lmp, Lc_interface *funcs)
 	}
 
 	/*
-	 * Indicate that we're now thread capable, and enable concurrency if
-	 * requested.
+	 * Indicate that we're now thread capable.
 	 */
-	if ((rtld_flags & RT_FL_NOCONCUR) == 0)
-		rtld_flags |= RT_FL_CONCUR;
 	if ((lml->lm_flags & LML_FLG_RTLDLM) == 0)
 		rtld_flags |= RT_FL_THREADS;
 }
@@ -447,7 +442,7 @@ rt_thr_init(Lm_list *lml)
 
 	if ((fptr = (void (*)())lml->lm_lcs[CI_THRINIT].lc_un.lc_func) != 0) {
 		lml->lm_lcs[CI_THRINIT].lc_un.lc_func = 0;
-		leave((Lm_list *)0, thr_flg_reenter);
+		leave(NULL, thr_flg_reenter);
 		(*fptr)();
 		(void) enter(thr_flg_reenter);
 	}
@@ -475,26 +470,6 @@ rt_mutex_unlock(Rt_lock * mp)
 {
 	return (_lwp_mutex_unlock((lwp_mutex_t *)mp));
 }
-
-Rt_cond *
-rt_cond_create()
-{
-	return (calloc(1, sizeof (Rt_cond)));
-}
-
-int
-rt_cond_wait(Rt_cond * cvp, Rt_lock * mp)
-{
-	return (_lwp_cond_wait(cvp, (lwp_mutex_t *)mp));
-}
-
-int
-rt_cond_broadcast(Rt_cond * cvp)
-{
-	return (_lwp_cond_broadcast(cvp));
-}
-
-#ifdef	EXPAND_RELATIVE
 
 /*
  * Mutex interfaces to resolve references from any objects extracted from
@@ -612,5 +587,3 @@ write(int fd, const void *buf, size_t size)
 	extern ssize_t __write(int, const void *, size_t);
 	return (__write(fd, buf, size));
 }
-
-#endif	/* EXPAND_RELATIVE */

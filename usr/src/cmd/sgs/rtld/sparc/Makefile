@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 # Object lists are organized into primary (most frequently used code) and
@@ -33,8 +31,7 @@ P_COMOBJS=	debugdata.o \
 		analyze.o	elf.o		external.o	globals.o \
 		malloc.o	paths.o		setup.o		util.o \
 		dlfcns.o	config_elf.o	locale.o	tsort.o \
-		getcwd.o	remove.o	move.o		tls.o \
-		cap.o
+		remove.o	move.o		tls.o		cap.o
 
 S_COMOBJS=	debug.o		audit.o		object.o	cache_a.out.o \
 		a.out.o
@@ -47,7 +44,7 @@ CP_MACHOBJS=	common_sparc.o
 
 S_MACHOBJS=	sparc_a.out.o
 
-P_ASOBJS=	boot.o		boot_elf.o	caller.o	zero.o
+P_ASOBJS=	boot.o		boot_elf.o	caller.o
 
 S_ASOBJS=	boot_a.out.o
 

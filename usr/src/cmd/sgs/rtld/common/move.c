@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
+#include	"_inline.h"
 #include	"msg.h"
 
 /*
@@ -47,15 +48,43 @@
 static	APlist	*alp = NULL;
 
 /*
- * Move data
+ * Warning message for bad move target.
+ */
+void
+elf_move_bad(Lm_list *lml, Rt_map *lmp, Sym *sym, ulong_t num, Addr addr)
+{
+	const char	*name;
+	int		trace;
+
+	trace = (lml->lm_flags & LML_FLG_TRC_ENABLE) &&
+	    (((rtld_flags & RT_FL_SILENCERR) == 0) ||
+	    (lml->lm_flags & (LML_FLG_TRC_VERBOSE | LML_FLG_TRC_WARN)));
+
+	if ((trace == 0) && (DBG_ENABLED == 0))
+		return;
+
+	if (ELF_ST_BIND(sym->st_info) != STB_LOCAL)
+		name = (const char *)(STRTAB(lmp) + sym->st_name);
+	else
+		name = MSG_INTL(MSG_STR_UNKNOWN);
+
+	if (trace)
+		(void) printf(MSG_INTL(MSG_LDD_MOVE_ERR), EC_XWORD(num), name,
+		    EC_ADDR(addr));
+	else
+		DBG_CALL(Dbg_move_bad(lml, num, name, addr));
+}
+
+/*
+ * Move data.  Apply sparse initialization to data in zeroed bss.
  */
 int
-move_data(Rt_map *lmp)
+move_data(Rt_map *lmp, APlist **textrel)
 {
-	Lm_list	*lml = LIST(lmp);
-	Move	*mv = MOVETAB(lmp);
-	ulong_t	num, mvnum = MOVESZ(lmp) / MOVEENT(lmp);
-	int	moves;
+	Lm_list		*lml = LIST(lmp);
+	Move		*mv = MOVETAB(lmp);
+	ulong_t		num, mvnum = MOVESZ(lmp) / MOVEENT(lmp);
+	int		moves;
 
 	/*
 	 * If these records are against the executable, and the executable was
@@ -63,22 +92,37 @@ move_data(Rt_map *lmp)
 	 * comment in analyze.c:lookup_sym_interpose() in regards Solaris 8
 	 * objects and DT_FLAGS.
 	 */
-	moves = (lmp == lml->lm_head) && ((FLAGS2(lmp) & FL2_RT_DTFLAGS) == 0);
+	moves = (lmp == lml->lm_head) && ((FLAGS1(lmp) & FL1_RT_DTFLAGS) == 0);
 
 	DBG_CALL(Dbg_move_data(lmp));
 	for (num = 0; num < mvnum; num++, mv++) {
-		Addr	addr, taddr;
-		Half 	rep, repno, stride;
-		Sym	*sym;
+		mmapobj_result_t	*mpp;
+		Addr			addr, taddr;
+		Half 			rep, repno, stride;
+		Sym			*sym;
 
 		if ((sym = (Sym *)SYMTAB(lmp) + ELF_M_SYM(mv->m_info)) == 0)
 			continue;
 
 		stride = mv->m_stride + 1;
 		addr = sym->st_value;
+
+		/*
+		 * Determine the move data target, and verify the address is
+		 * writable.
+		 */
 		if ((FLAGS(lmp) & FLG_RT_FIXED) == 0)
 			addr += ADDR(lmp);
 		taddr = addr + mv->m_poffset;
+
+		if ((mpp = find_segment((caddr_t)taddr, lmp)) == NULL) {
+			elf_move_bad(lml, lmp, sym, num, taddr);
+			continue;
+		}
+		if (((mpp->mr_prot & PROT_WRITE) == 0) &&
+		    ((set_prot(lmp, mpp, 1) == 0) ||
+		    (aplist_append(textrel, mpp, AL_CNT_TEXTREL) == NULL)))
+			return (0);
 
 		DBG_CALL(Dbg_move_entry2(lml, mv, sym->st_name,
 		    (const char *)(sym->st_name + STRTAB(lmp))));
@@ -122,7 +166,7 @@ move_data(Rt_map *lmp)
 		 * copy relocation processing.
 		 */
 		if (moves && repno &&
-		    (aplist_append(&alp, (void *)addr, AL_CNT_MOVES) == 0))
+		    (aplist_append(&alp, (void *)addr, AL_CNT_MOVES) == NULL))
 			return (0);
 	}
 

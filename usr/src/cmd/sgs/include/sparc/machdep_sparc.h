@@ -74,6 +74,10 @@ extern "C" {
 #define	M_STRUNC(X)	((X) & ~(M_SEGSIZE - 1))
 #define	M_SROUND(X)	(((X) + M_SEGSIZE - 1) & ~(M_SEGSIZE - 1))
 
+/*
+ * Relocation type macro.
+ */
+#define	M_RELOC		Rela
 
 /*
  * TLS static segments must be rounded to the following requirements,
@@ -84,7 +88,6 @@ extern "C" {
 #else
 #define	M_TLSSTATALIGN	0x08
 #endif
-
 
 /*
  * Instruction encodings.

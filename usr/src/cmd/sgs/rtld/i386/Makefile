@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 BASEPLAT =	i386
@@ -35,14 +33,13 @@ P_COMOBJS=	debugdata.o \
 		analyze.o	elf.o		external.o	globals.o \
 		malloc.o	paths.o		setup.o		util.o \
 		dlfcns.o	config_elf.o	locale.o	tsort.o \
-		getcwd.o	remove.o	move.o		tls.o \
-		cap.o
+		remove.o	move.o		tls.o		cap.o
 
 S_COMOBJS=	debug.o		audit.o		object.o
 
 G_MACHOBJS=	doreloc.o
 
-P_MACHOBJS=	i386_elf.o	_setup.o	zero.o
+P_MACHOBJS=	i386_elf.o	_setup.o
 
 CP_MACHOBJS=
 

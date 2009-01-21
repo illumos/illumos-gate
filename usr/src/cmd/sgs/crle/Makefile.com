@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		crle
@@ -39,13 +37,6 @@ OBJS=		$(BLTOBJ) $(COMOBJ)
 
 MAPFILE=	$(MAPFILE.NGB)
 MAPOPT=		$(MAPFILE:%=-M%)
-
-# Building SUNWonld results in a call to the `package' target.  Requirements
-# needed to run this application on older releases are established:
-#   dlopen/dlclose requires libdl.so.1 prior to 5.10
-# 
-DLLIB=		$(VAR_DL_LIB)
-package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 
 CPPFLAGS +=	-I. -I../../include -I../../include/$(MACH) \
 		-I$(SRC)/common/sgsrtcid -I$(SRCBASE)/uts/$(ARCH)/sys \

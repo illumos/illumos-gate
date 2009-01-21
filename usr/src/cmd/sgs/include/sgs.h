@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Global include file for all sgs.
@@ -189,7 +189,7 @@ struct	list32 {			/* a linked list */
  */
 typedef struct {
 	ushort_t	rej_type;	/* SGS_REJ_ value */
-	ushort_t	rej_flag;	/* additional information */
+	ushort_t	rej_flags;	/* additional information */
 	uint_t		rej_info;	/* numeric and string information */
 	const char	*rej_str;	/*	associated with error */
 	const char	*rej_name;	/* object name - expanded library */
@@ -212,6 +212,8 @@ typedef struct {
 #define	SGS_REJ_HWCAP_1		12	/* hardware capabilities mismatch */
 #define	SGS_REJ_SFCAP_1		13	/* software capabilities mismatch */
 
+#define	FLG_REJ_ALTER		0x01	/* object name is an alternative */
+
 /*
  * For those source files used both inside and outside of the
  * libld source base (tools/common/string_table.c) we can
@@ -229,7 +231,6 @@ extern void			libld_free(void *);
 extern void			*libld_malloc(size_t);
 extern void			*libld_realloc(void *, size_t);
 #endif
-
 
 /*
  * Data structures (defined in libld.h).

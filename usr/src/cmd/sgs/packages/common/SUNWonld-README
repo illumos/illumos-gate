@@ -1222,12 +1222,25 @@ Bugid   Risk Synopsis
 ================================================================================
 6629404 ld with -z ignore doesn't scale
 6606203 link editor ought to allow creation of >2gb sized objects (P)
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T139574-01
+    Solaris/SunOS 5.10_x86	patch T139575-01
+--------------------------------------------------------------------------------
 6746674 setuid applications do not find libraries any more because trusted
 	directories behavior changed (D)
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
-    Solaris/SunOS 5.10_sparc	patch TXXXXXX-YY
-    Solaris/SunOS 5.10_x86	patch TXXXXXX-YY
+    Solaris/SunOS 5.10_sparc	patch T139574-02
+    Solaris/SunOS 5.10_x86	patch T139575-02
+--------------------------------------------------------------------------------
+6703683 Can't build VirtualBox on Build 88 or 89
+6737579 process_req_lib() in libld consumes file descriptors
+6685125 ld/elfdump do not handle ZERO terminator .eh_frame amd64 unwind entry
+--------------------------------------------------------------------------------
+All the above changes are incorporated in the following patches:
+    Solaris/SunOS 5.10_sparc	patch T139574-03
+    Solaris/SunOS 5.10_x86	patch T139575-03
 --------------------------------------------------------------------------------
 
 --------------
@@ -1358,7 +1371,6 @@ Bugid   Risk Synopsis
 6681761 lies, darn lies, and linker README files
 6509323 Need to disable the Multiple Files loading - same name, different
 	directories (or its stat() use)
-6685125 ld/elfdump do not handle ZERO terminator .eh_frame amd64 unwind entry
 6686889 ld.so.1 regression - bad pointer created with 6509323 integration
 6695681 ldd(1) crashes when run from a chrooted environment
 6516212 usr/src/cmd/sgs/libelf warlock targets should be fixed or abandoned
@@ -1367,7 +1379,6 @@ Bugid   Risk Synopsis
 6699594 The ld command has a problem handling 'protected' mapfile keyword.
 6699131 elfdump should display core file notes (D)
 6702260 single threading .init/.fini sections breaks staroffice
-6703683 Can't build VirtualBox on Build 88 or 89
 6703919 boot hangs intermittently on x86 with onnv daily.0430 and on
 6701798 ld can enter infinite loop processing bad mapfile
 6706401 direct binding copy relocation fallback is insufficient for ild
@@ -1419,3 +1430,5 @@ Bugid   Risk Synopsis
 6789925 64-bit applications with SF1_SUNW_ADDR32 require non-default starting
 	address
 6792906 ld -z nopartial fix breaks TLS
+6686372 ld.so.1 should use mmapobj(2)
+6726108 dlopen() performance could be improved.

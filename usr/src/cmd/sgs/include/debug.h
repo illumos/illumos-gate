@@ -89,10 +89,6 @@ extern "C" {
 #define	DBG_DLCLOSE_IGNORE	1
 #define	DBG_DLCLOSE_RESCAN	2
 
-#define	DBG_WAIT_INIT		1
-#define	DBG_WAIT_FINI		2
-#define	DBG_WAIT_SYMBOL		3
-
 #define	DBG_SYM_REDUCE_GLOBAL	1	/* reporting global symbols to local */
 #define	DBG_SYM_REDUCE_RETAIN	2	/* reporting non reduced local syms */
 
@@ -258,6 +254,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_file_hdl_title	Dbg64_file_hdl_title
 #define	Dbg_file_lazyload	Dbg64_file_lazyload
 #define	Dbg_file_ldso		Dbg64_file_ldso
+#define	Dbg_file_mmapobj	Dbg64_file_mmapobj
 #define	Dbg_file_mode_promote	Dbg64_file_mode_promote
 #define	Dbg_file_modified	Dbg64_file_modified
 #define	Dbg_file_needed		Dbg64_file_needed
@@ -298,6 +295,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 
 #define	Dbg_move_adjexpandreloc	Dbg64_move_adjexpandreloc
 #define	Dbg_move_adjmovereloc	Dbg64_move_adjmovereloc
+#define	Dbg_move_bad		Dbg64_move_bad
 #define	Dbg_move_data		Dbg64_move_data
 #define	Dbg_move_entry1		Dbg64_move_entry1
 #define	Dbg_move_entry2		Dbg64_move_entry2
@@ -387,7 +385,6 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_syms_updated	Dbg64_syms_updated
 #define	Dbg_syms_up_title	Dbg64_syms_up_title
 
-#define	Dbg_util_broadcast	Dbg64_util_broadcast
 #define	Dbg_util_call_array	Dbg64_util_call_array
 #define	Dbg_util_call_fini	Dbg64_util_call_fini
 #define	Dbg_util_call_init	Dbg64_util_call_init
@@ -403,7 +400,6 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_util_scc_entry	Dbg64_util_scc_entry
 #define	Dbg_util_scc_title	Dbg64_util_scc_title
 #define	Dbg_util_str		Dbg64_util_str
-#define	Dbg_util_wait		Dbg64_util_wait
 
 #define	Dbg_unused_file		Dbg64_unused_file
 #define	Dbg_unused_lcinterface	Dbg64_unused_lcinterface
@@ -464,6 +460,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_file_hdl_title	Dbg32_file_hdl_title
 #define	Dbg_file_lazyload	Dbg32_file_lazyload
 #define	Dbg_file_ldso		Dbg32_file_ldso
+#define	Dbg_file_mmapobj	Dbg32_file_mmapobj
 #define	Dbg_file_mode_promote	Dbg32_file_mode_promote
 #define	Dbg_file_modified	Dbg32_file_modified
 #define	Dbg_file_needed		Dbg32_file_needed
@@ -504,6 +501,7 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 
 #define	Dbg_move_adjexpandreloc	Dbg32_move_adjexpandreloc
 #define	Dbg_move_adjmovereloc	Dbg32_move_adjmovereloc
+#define	Dbg_move_bad		Dbg32_move_bad
 #define	Dbg_move_data		Dbg32_move_data
 #define	Dbg_move_entry1		Dbg32_move_entry1
 #define	Dbg_move_entry2		Dbg32_move_entry2
@@ -594,7 +592,6 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_syms_updated	Dbg32_syms_updated
 #define	Dbg_syms_up_title	Dbg32_syms_up_title
 
-#define	Dbg_util_broadcast	Dbg32_util_broadcast
 #define	Dbg_util_call_array	Dbg32_util_call_array
 #define	Dbg_util_call_fini	Dbg32_util_call_fini
 #define	Dbg_util_call_init	Dbg32_util_call_init
@@ -610,7 +607,6 @@ extern	uintptr_t	Dbg_setup(const char *, Dbg_desc *);
 #define	Dbg_util_scc_entry	Dbg32_util_scc_entry
 #define	Dbg_util_scc_title	Dbg32_util_scc_title
 #define	Dbg_util_str		Dbg32_util_str
-#define	Dbg_util_wait		Dbg32_util_wait
 
 #define	Dbg_unused_file		Dbg32_unused_file
 #define	Dbg_unused_lcinterface	Dbg32_unused_lcinterface
@@ -671,8 +667,8 @@ extern	void	Dbg_ent_entry(Lm_list *, Half, Ent_desc *);
 extern	void	Dbg_ent_print(Lm_list *, Half, List *, Boolean);
 
 extern	void	Dbg_file_analyze(Rt_map *);
-extern	void	Dbg_file_aout(Lm_list *, const char *, ulong_t, ulong_t,
-		    ulong_t, const char *, Aliste);
+extern	void	Dbg_file_aout(Lm_list *, const char *, Addr, size_t,
+		    const char *, Aliste);
 extern	void	Dbg_file_ar(Lm_list *, const char *, int);
 extern	void	Dbg_file_ar_rescan(Lm_list *, int, int);
 extern	void	Dbg_file_bind_entry(Lm_list *, Bnd_desc *);
@@ -687,8 +683,8 @@ extern	void	Dbg_file_delete(Rt_map *);
 extern	void	Dbg_file_dlclose(Lm_list *, const char *, int);
 extern	void	Dbg_file_dldump(Rt_map *, const char *, int);
 extern	void	Dbg_file_dlopen(Rt_map *, const char *, int *, int);
-extern	void	Dbg_file_elf(Lm_list *, const char *, ulong_t, ulong_t,
-		    ulong_t, ulong_t, const char *, Aliste);
+extern	void	Dbg_file_elf(Lm_list *, const char *, Addr, size_t,
+		    const char *, Aliste);
 extern	void	Dbg_file_filtee(Lm_list *, const char *, const char *, int);
 extern	void	Dbg_file_filter(Lm_list *, const char *, const char *, int);
 extern	void	Dbg_file_fixname(Lm_list *, const char *, const char *);
@@ -699,6 +695,8 @@ extern	void	Dbg_file_hdl_title(int);
 extern	void	Dbg_file_lazyload(Rt_map *, const char *, const char *);
 extern	void	Dbg_file_ldso(Rt_map *, char **, auxv_t *, const char *,
 		    Aliste);
+extern	void	Dbg_file_mmapobj(Lm_list *, const char *, mmapobj_result_t *,
+		    uint_t);
 extern	void	Dbg_file_mode_promote(Rt_map *, int);
 extern	void	Dbg_file_modified(Lm_list *, const char *, const char *,
 		    const char *, int, int, Elf *, Elf *);
@@ -741,6 +739,7 @@ extern	void	Dbg_map_version(Lm_list *, const char *, const char *, int);
 
 extern 	void	Dbg_move_adjexpandreloc(Lm_list *, Xword, const char *);
 extern 	void	Dbg_move_adjmovereloc(Lm_list *, Xword, Xword, const char *);
+extern	void	Dbg_move_bad(Lm_list *, ulong_t, const char *, Addr);
 extern	void	Dbg_move_data(Rt_map *);
 extern 	void	Dbg_move_entry1(Lm_list *, int, Move *, Sym_desc *);
 extern 	void	Dbg_move_entry2(Lm_list *, Move *, Word, const char *);
@@ -852,7 +851,6 @@ extern	void	Dbg_tls_modactivity(Lm_list *, void *, uint_t);
 extern	void	Dbg_tls_static_block(Lm_list *, void *, ulong_t, ulong_t);
 extern	void	Dbg_tls_static_resv(Rt_map *, ulong_t, ulong_t);
 
-extern	void	Dbg_util_broadcast(Rt_map *);
 extern	void	Dbg_util_call_array(Rt_map *, void *, int, Word);
 extern	void	Dbg_util_call_fini(Rt_map *);
 extern	void	Dbg_util_call_init(Rt_map *, int);
@@ -869,7 +867,6 @@ extern	void	Dbg_util_no_init(Rt_map *);
 extern	void	Dbg_util_str(Lm_list *, const char *);
 extern	void	Dbg_util_scc_entry(Rt_map *, uint_t);
 extern	void	Dbg_util_scc_title(Lm_list *, int);
-extern	void	Dbg_util_wait(Rt_map *, Rt_map *, int);
 
 extern	void	Dbg_unused_file(Lm_list *, const char *, int, uint_t);
 extern	void	Dbg_unused_lcinterface(Rt_map *, Rt_map *, int);

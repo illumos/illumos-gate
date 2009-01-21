@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 .KEEP_STATE:
@@ -33,7 +31,7 @@ include		$(SRC)/cmd/sgs/Makefile.var
 
 SRCBASE =	../../../..
 
-i386_ARCH =	$(VAR_I386_ARCH)
+i386_ARCH =	intel
 sparc_ARCH =	sparc
 
 ARCH =		$($(MACH)_ARCH)

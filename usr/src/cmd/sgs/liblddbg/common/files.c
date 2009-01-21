@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,38 +51,69 @@ Dbg_file_analyze(Rt_map *lmp)
 }
 
 void
-Dbg_file_aout(Lm_list *lml, const char *name, ulong_t dynamic, ulong_t base,
-    ulong_t size, const char *lmid, Aliste lmco)
+Dbg_file_mmapobj(Lm_list *lml, const char *name, mmapobj_result_t *ompp,
+    uint_t onum)
+{
+	mmapobj_result_t	*mpp;
+	uint_t			mnum;
+
+	if (DBG_NOTCLASS(DBG_C_FILES))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	Dbg_util_nl(lml, DBG_NL_STD);
+	dbg_print(lml, MSG_INTL(MSG_FIL_MMAPOBJ), name, onum);
+
+	for (mnum = 0, mpp = ompp; mnum < onum; mnum++, mpp++) {
+		const char	*str;
+		uint_t		type = MR_GET_TYPE(mpp->mr_flags);
+
+		if (type == MR_PADDING)
+			str = MSG_ORIG(MSG_MR_PADDING);
+		else if (type == MR_HDR_ELF)
+			str = MSG_ORIG(MSG_MR_HDR_ELF);
+		else if (type == MR_HDR_AOUT)
+			str = MSG_ORIG(MSG_MR_HDR_AOUT);
+		else
+			str = MSG_ORIG(MSG_STR_EMPTY);
+
+		dbg_print(lml, MSG_INTL(MSG_FIL_MMAPOBJ_1), mnum,
+		    EC_NATPTR(mpp->mr_addr), EC_OFF(mpp->mr_fsize), str);
+		dbg_print(lml, MSG_INTL(MSG_FIL_MMAPOBJ_2),
+		    EC_OFF(mpp->mr_offset), EC_OFF(mpp->mr_msize));
+	}
+	Dbg_util_nl(lml, DBG_NL_STD);
+}
+
+void
+Dbg_file_aout(Lm_list *lml, const char *name, Addr addr, size_t size,
+    const char *lmid, Aliste lmco)
 {
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
 	dbg_print(lml, MSG_INTL(MSG_FIL_AOUT), name);
-	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_DB), EC_XWORD(dynamic),
-	    EC_ADDR(base));
-	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_S), EC_XWORD(size));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_AS), EC_ADDR(addr), EC_OFF(size));
 	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_LL), lmid, EC_XWORD(lmco));
 }
 
 void
-Dbg_file_elf(Lm_list *lml, const char *name, ulong_t dynamic, ulong_t base,
-    ulong_t size, ulong_t entry, const char *lmid, Aliste lmco)
+Dbg_file_elf(Lm_list *lml, const char *name, Addr addr, size_t size,
+    const char *lmid, Aliste lmco)
 {
 	const char	*str;
 
 	if (DBG_NOTCLASS(DBG_C_FILES))
 		return;
 
-	if (base == 0)
+	if (addr == 0)
 		str = MSG_INTL(MSG_STR_TEMPORARY);
 	else
 		str = MSG_ORIG(MSG_STR_EMPTY);
 
 	dbg_print(lml, MSG_INTL(MSG_FIL_ELF), name, str);
-	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_DB), EC_XWORD(dynamic),
-	    EC_ADDR(base));
-	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_SE), EC_XWORD(size),
-	    EC_XWORD(entry));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_AS), EC_ADDR(addr), EC_OFF(size));
 	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_LL), lmid, EC_XWORD(lmco));
 }
 
@@ -97,8 +128,8 @@ Dbg_file_ldso(Rt_map *lmp, char **envp, auxv_t *auxv, const char *lmid,
 
 	Dbg_util_nl(lml, DBG_NL_STD);
 	dbg_print(lml, MSG_INTL(MSG_FIL_LDSO), PATHNAME(lmp));
-	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_DB), EC_NATPTR(DYN(lmp)),
-	    EC_ADDR(ADDR(lmp)));
+	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_AS), EC_ADDR(ADDR(lmp)),
+	    EC_OFF(MSIZE(lmp)));
 	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_EA), EC_NATPTR(envp),
 	    EC_NATPTR(auxv));
 	dbg_print(lml, MSG_INTL(MSG_FIL_DATA_LL), lmid, EC_XWORD(lmco));

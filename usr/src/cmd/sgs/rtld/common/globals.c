@@ -23,8 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,16 +81,10 @@ List		dynlm_list =	{ 0, 0 };	/* dynamic list of link-maps */
  * END: Exposed to rtld_db
  */
 
-Reglist *	reglist = 0;			/* list of register symbols */
+Reglist		*reglist = NULL;		/* list of register symbols */
 
 ulong_t		hwcap = 0;			/* hardware capabilities */
 ulong_t		sfcap = 0;			/* software capabilities */
-
-/*
- * Initialized fmap structure.
- */
-static Fmap	_fmap = { 0, 0, 0, 0, 0 };
-Fmap *		fmap = &_fmap;			/* initial file mapping info */
 
 /*
  * Set of integers to track how many of what type of PLT's have been bound.
@@ -110,59 +103,49 @@ uint32_t	pltcntfar = 0;
 avl_tree_t	*nfavl = NULL;
 
 /*
- * Enable technology (via status flags for RTLD) dependent upon whether we're
- * in a patch or major release build environment.
- */
-uint_t		rtld_flags =
-#ifdef	EXPAND_RELATIVE
-			RT_FL_RELATIVE |
-#endif
-#ifdef	SIEBEL_DISABLE
-			RT_FL_DISFIX_1 |
-#endif
-			RT_FL_NOCONCUR;
-uint_t		rtld_flags2 = 0;
-
-/*
  * Various other global data.
  */
+uint_t		rtld_flags = 0;
+uint_t		rtld_flags2 = 0;
+
 Lc_desc		glcs[CI_MAX];		/* global external interfaces */
 
-const char	*procname = (const char *)0;
+const char	*procname = NULL;
 const char	*rtldname = MSG_ORIG(MSG_FIL_RTLD);
 
-char		*lasterr = (char *)0;	/* string describing last error */
+char		*lasterr = NULL;	/* string describing last error */
 					/*	cleared by each dlerror() */
-Interp		*interp = 0;		/* ELF interpreter info */
-List		hdl_list[HDLIST_SZ+2];	/* dlopen() handle list */
+Interp		*interp = NULL;		/* ELF interpreter info */
+APlist		*hdl_alp[HDLIST_SZ+2];	/* dlopen() handle list */
 size_t		syspagsz = 0;		/* system page size */
-unsigned long	at_flags = 0;		/* machine specific file flags */
-char		*platform = 0;		/* platform name from AT_SUN_PLATFORM */
+ulong_t		at_flags = 0;		/* machine specific file flags */
+char		*platform = NULL;	/* platform name from AT_SUN_PLATFORM */
 size_t		platform_sz = 0;	/* platform string length */
-Uts_desc	*uts;			/* utsname descriptor */
-Isa_desc	*isa;			/* isalist descriptor */
+Uts_desc	*uts = NULL; 		/* utsname descriptor */
+Isa_desc	*isa = NULL;		/* isalist descriptor */
 
 uint_t		audit_argcnt = 64;	/* no. of stack args to copy (default */
 					/*	is all) */
-Audit_desc	*auditors = 0;		/* global auditors (LD_AUDIT) */
+Audit_desc	*auditors = NULL;	/* global auditors (LD_AUDIT) */
 
-const char	*rpl_audit = 0;		/* replaceable LD_AUDIT string */
-const char	*rpl_debug = 0;		/* replaceable LD_DEBUG string */
-const char	*rpl_ldflags = 0;	/* replaceable LD_FLAGS string */
-const char	*rpl_libpath = 0;	/* replaceable LD_LIBRARY_PATH string */
-Pnode		*rpl_libdirs = 0;	/*	and associated Pnode list */
-const char	*rpl_preload = 0;	/* replaceable LD_PRELOAD string */
+const char	*rpl_audit = NULL;	/* replaceable LD_AUDIT string */
+const char	*rpl_debug = NULL;	/* replaceable LD_DEBUG string */
+const char	*rpl_ldflags = NULL;	/* replaceable LD_FLAGS string */
+const char	*rpl_libpath = NULL;	/* replaceable LD_LIBRARY_PATH string */
+Alist		*rpl_libdirs = NULL;	/*	and associated Pdesc list */
+const char	*rpl_preload = NULL;	/* replaceable LD_PRELOAD string */
 
-const char	*prm_audit = 0;		/* permanent LD_AUDIT string */
-const char	*prm_debug = 0;		/* permanent LD_DEBUG string */
-const char	*prm_ldflags = 0;	/* permanent LD_FLAGS string */
-const char	*prm_libpath = 0;	/* permanent LD_LIBRARY_PATH string */
-Pnode		*prm_libdirs = 0;	/*	and associated Pnode list */
-const char	*prm_preload = 0;	/* permanent LD_PRELOAD string */
+const char	*prm_audit = NULL;	/* permanent LD_AUDIT string */
+const char	*prm_debug = NULL;	/* permanent LD_DEBUG string */
+const char	*prm_ldflags = NULL;	/* permanent LD_FLAGS string */
+const char	*prm_libpath = NULL;	/* permanent LD_LIBRARY_PATH string */
+Alist		*prm_libdirs = NULL;	/*	and associated Pdesc list */
+const char	*prm_preload = NULL;	/* permanent LD_PRELOAD string */
 
 uint_t		env_info = 0;		/* information regarding environment */
 					/*	variables */
 int		killsig = SIGKILL;	/* signal sent on fatal exit */
+APlist		*free_alp = NULL;	/* defragmentation list */
 
 /*
  * Note, the debugging descriptor interposes on the default definition provided
@@ -171,17 +154,17 @@ int		killsig = SIGKILL;	/* signal sent on fatal exit */
  */
 static Dbg_desc	_dbg_desc = {0, 0, 0};
 Dbg_desc	*dbg_desc = &_dbg_desc;	/* debugging descriptor */
-const char	*dbg_file = 0;		/* debugging directed to file */
+const char	*dbg_file = NULL;	/* debugging directed to file */
 
 #pragma weak	environ = _environ	/* environ for PLT tracing - we */
-char		**_environ = 0;		/* supply the pair to satisfy any */
+char		**_environ = NULL;	/* supply the pair to satisfy any */
 					/* libc requirements (hwmuldiv) */
 
-const char	*profile_name;		/* object being profiled */
-const char	*profile_out;		/* profile output file */
-const char	*profile_lib;		/* audit library to perform profile */
+const char	*profile_name = NULL;	/* object being profiled */
+const char	*profile_out = NULL;	/* profile output file */
+const char	*profile_lib = NULL;	/* audit library to perform profile */
 
-unsigned char	search_rules[] = {	/* dependency search rules */
+uchar_t		search_rules[] = {	/* dependency search rules */
 		RPLENV,			/*	replaceable LD_LIBRARY_PATH */
 		PRMENV,			/*	permanent LD_LIBRARY_PATH */
 		RUNPATH,		/*	callers runpath */
@@ -197,7 +180,7 @@ Dl_argsinfo	argsinfo = { 0 };	/* process argument, environment and */
  * also provide for resetting should the locale change (see _ld_libc()).
  */
 const char	*err_strs[ERR_NUM] = { 0 };
-const char	*nosym_str = 0;
+const char	*nosym_str = NULL;
 
 
 /*
@@ -220,7 +203,6 @@ ldd_reject[] = {
 		MSG_LDD_REJ_HWCAP_1,	/* MSG_INTL(MSG_LDD_REJ_HWCAP_1) */
 		MSG_LDD_REJ_SFCAP_1,	/* MSG_INTL(MSG_LDD_REJ_SFCAP_1) */
 	};
-
 
 const Msg
 err_reject[] = {

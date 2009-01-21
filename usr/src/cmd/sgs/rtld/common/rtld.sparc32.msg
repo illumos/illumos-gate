@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,6 +34,8 @@
 			 value 0x%x overflows %d bits at offset 0x%x"
 
 @ MSG_GEN_OLDREV	"%s: has older revision than expected %s"
+
+@ MSG_SYS_PROC		"/proc error: %s"
 
 @ _END_
 
@@ -49,3 +51,6 @@
 @ MSG_PTH_USR4LIB	"/usr/4lib"
 
 @ MSG_SYM_LAV8PLTENTER	"la_sparcv8_pltenter"
+
+@ MSG_FMT_PROC		"/proc/%d"
+

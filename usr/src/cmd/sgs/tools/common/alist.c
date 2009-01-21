@@ -20,18 +20,13 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sgs.h>
 #include <string.h>
 #include <stdio.h>
 #include <sys/debug.h>
-
-
 
 /*
  * Alist manipulation.  An Alist is a list of elements formed into an array.
@@ -40,8 +35,6 @@
  *
  * See alist.h for more background information about array lists.
  */
-
-
 
 /*
  * Insert a value into an array at a specified index:
@@ -249,13 +242,9 @@ aplist_insert(APlist **lpp, const void *ptr, Aliste init_arritems, Aliste idx)
 	return (&lp->apl_data[idx]);
 }
 
-
-
-
-
 /*
  * Append a value to a list. These are convenience wrappers on top
- * of the insert operation. See the decription of those routine above
+ * of the insert operation. See the description of those routine above
  * for details.
  */
 void *
@@ -274,10 +263,6 @@ aplist_append(APlist **lpp, const void *ptr, Aliste init_arritems)
 
 	return (aplist_insert(lpp, ptr, init_arritems, ndx));
 }
-
-
-
-
 
 /*
  * Delete the item at a specified index/offset, and decrement the variable
@@ -371,10 +356,6 @@ aplist_delete(APlist *lp, Aliste *idxp)
 	(*idxp)--;
 }
 
-
-
-
-
 /*
  * Delete the pointer with a specified value from the APlist.
  *
@@ -408,12 +389,6 @@ aplist_delete_value(APlist *lp, const void *ptr)
 	/* If we get here, the item was not in the list */
 	return (0);
 }
-
-
-
-
-
-
 
 /*
  * Search the APlist for an element with a given value, and
@@ -463,12 +438,6 @@ aplist_test(APlist **lpp, const void *ptr, Aliste init_arritems)
 		return (ALE_ALLOCFAIL);
 	return (ALE_CREATE);
 }
-
-
-
-
-
-
 
 /*
  * Reset the given list to its empty state. Any memory allocated by the

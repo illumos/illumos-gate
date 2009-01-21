@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,10 +73,10 @@ void *_nd = &_end;
  */
 static Interp _interp;
 
-
 static int
 preload(const char *str, Rt_map *lmp)
 {
+	Alist		*palp = NULL;
 	Rt_map		*clmp = lmp;
 	char		*objs, *ptr, *next;
 	Word		lmflags = lml_main.lm_flags;
@@ -84,7 +84,7 @@ preload(const char *str, Rt_map *lmp)
 
 	DBG_CALL(Dbg_util_nl(&lml_main, DBG_NL_STD));
 
-	if ((objs = strdup(str)) == 0)
+	if ((objs = strdup(str)) == NULL)
 		return (0);
 
 	/*
@@ -100,8 +100,7 @@ preload(const char *str, Rt_map *lmp)
 
 	ptr = strtok_r(objs, MSG_ORIG(MSG_STR_DELIMIT), &next);
 	do {
-		Pnode	*pnp;
-		Rt_map	*nlmp = 0;
+		Rt_map	*nlmp = NULL;
 
 		DBG_CALL(Dbg_file_preload(&lml_main, ptr));
 
@@ -111,15 +110,15 @@ preload(const char *str, Rt_map *lmp)
 		 */
 		if (rtld_flags & RT_FL_SECURE)
 			rtld_flags2 |= RT_FL2_FTL2WARN;
-		if ((pnp = expand_paths(clmp, ptr, PN_FLG_EXTLOAD, 0)) != 0)
-			nlmp = load_one(&lml_main, ALIST_OFF_DATA, pnp, clmp,
+		if (expand_paths(clmp, ptr, &palp, AL_CNT_NEEDED,
+		    PD_FLG_EXTLOAD, 0) != 0)
+			nlmp = load_one(&lml_main, ALIST_OFF_DATA, palp, clmp,
 			    MODE(lmp), flags, 0, NULL);
-		if (pnp)
-			remove_pnode(pnp);
+		remove_plist(&palp, 0);
 		if (rtld_flags & RT_FL_SECURE)
 			rtld_flags2 &= ~RT_FL2_FTL2WARN;
 		if (nlmp && (bind_one(clmp, nlmp, BND_NEEDED) == 0))
-			nlmp = 0;
+			nlmp = NULL;
 
 		/*
 		 * Establish state for the next preloadable object.  If no
@@ -127,7 +126,7 @@ preload(const char *str, Rt_map *lmp)
 		 * link-map list contains an interposer.
 		 */
 		flags |= FLG_RT_OBJINTPO;
-		if (nlmp == 0) {
+		if (nlmp == NULL) {
 			if ((lmflags & LML_FLG_TRC_ENABLE) ||
 			    (rtld_flags & RT_FL_SECURE))
 				continue;
@@ -157,25 +156,27 @@ preload(const char *str, Rt_map *lmp)
 	} while ((ptr = strtok_r(NULL,
 	    MSG_ORIG(MSG_STR_DELIMIT), &next)) != NULL);
 
+	free(palp);
 	free(objs);
 	return (1);
 }
 
 Rt_map *
 setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
-    char *_rtldname, Dyn *dyn_ptr, ulong_t ld_base, ulong_t interp_base, int fd,
-    Phdr *phdr, char *execname, char **argv, int dz_fd, uid_t uid,
-    uid_t euid, gid_t gid, gid_t egid, void *aoutdyn, int auxflags,
-    uint_t hwcap_1)
+    char *_rtldname, ulong_t ld_base, ulong_t interp_base, int fd, Phdr *phdr,
+    char *execname, char **argv, uid_t uid, uid_t euid, gid_t gid, gid_t egid,
+    void *aoutdyn, int auxflags, uint_t hwcap_1)
 {
-	Rt_map		*rlmp, *mlmp, **tobj = 0;
-	Ehdr		*ehdr;
-	rtld_stat_t	status;
-	int		features = 0, ldsoexec = 0;
-	size_t		eaddr, esize;
-	char		*str, *argvname;
-	Mmap		*mmaps;
-	Word		lmflags;
+	Rt_map			*rlmp, *mlmp, **tobj = NULL;
+	Ehdr			*ehdr;
+	rtld_stat_t		status;
+	int			features = 0, ldsoexec = 0;
+	size_t			eaddr, esize;
+	char			*str, *argvname;
+	Word			lmflags;
+	mmapobj_result_t	*mpp;
+	Fdesc			fdr = { 0 }, fdm = { 0 };
+	Rej_desc		rej = { 0 };
 
 	/*
 	 * Now that ld.so has relocated itself, initialize our own 'environ' so
@@ -187,26 +188,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	_environ = envp;
 
 	/*
-	 * Far the most common application execution revolves around appending
-	 * the application name to the users PATH definition, thus a full name
-	 * is passed to exec() which will in turn be returned via
-	 * AT_SUN_EXECNAME.  Applications may also be invoked from the current
-	 * working directory, or via a relative name.
-	 *
-	 * Determine whether the kernel has supplied a AT_SUN_EXECNAME aux
-	 * vector.  This vector points to the full pathname, on the stack, of
-	 * the object that started the process.  If this is null, then
-	 * AT_SUN_EXECNAME isn't supported (if the pathname exceeded the system
-	 * limit (PATH_MAX) the exec would have failed).  This flag is used to
-	 * determine whether we can call resolvepath().
-	 */
-	if (execname)
-		rtld_flags |= RT_FL_EXECNAME;
-
-	/*
 	 * Determine how ld.so.1 has been executed.
 	 */
-	if ((fd == -1) && (phdr == 0)) {
+	if ((fd == -1) && (phdr == NULL)) {
 		/*
 		 * If we received neither the AT_EXECFD nor the AT_PHDR aux
 		 * vector, ld.so.1 must have been invoked directly from the
@@ -241,7 +225,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			argvname = execname = (char *)MSG_INTL(MSG_STR_UNKNOWN);
 
 		if (fd == -1) {
-			if ((str = strrchr(argvname, '/')) != 0)
+			if ((str = strrchr(argvname, '/')) != NULL)
 				procname = ++str;
 			else
 				procname = argvname;
@@ -255,7 +239,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 * runtime linkers name once the application is analyzed.
 		 */
 		if (_rtldname) {
-			if ((str = strrchr(_rtldname, '/')) != 0)
+			if ((str = strrchr(_rtldname, '/')) != NULL)
 				rtldname = ++str;
 			else
 				rtldname = _rtldname;
@@ -267,8 +251,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Initialize any global variables.
 	 */
 	at_flags = _flags;
-	if (dz_fd != FD_UNAVAIL)
-		dz_init(dz_fd);
 	platform = _platform;
 
 	/*
@@ -276,7 +258,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 */
 	if ((syspagsz = _syspagsz) == 0)
 		syspagsz = _sysconfig(_CONFIG_PAGESIZE);
-	fmap_setup();
 
 	/*
 	 * Add the unused portion of the last data page to the free space list.
@@ -297,14 +278,14 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Establish initial link-map list flags, and link-map list alists.
 	 */
 	if (alist_append(&lml_main.lm_lists, 0, sizeof (Lm_cntl),
-	    AL_CNT_LMLISTS) == 0)
+	    AL_CNT_LMLISTS) == NULL)
 		return (0);
 	lml_main.lm_flags |= LML_FLG_BASELM;
 	lml_main.lm_lmid = LM_ID_BASE;
 	lml_main.lm_lmidstr = (char *)MSG_ORIG(MSG_LMID_BASE);
 
 	if (alist_append(&lml_rtld.lm_lists, 0, sizeof (Lm_cntl),
-	    AL_CNT_LMLISTS) == 0)
+	    AL_CNT_LMLISTS) == NULL)
 		return (0);
 	lml_rtld.lm_flags |= (LML_FLG_RTLDLM | LML_FLG_NOAUDIT |
 	    LML_FLG_HOLDLOCK);
@@ -320,12 +301,11 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Initialize a hardware capability descriptor for use in comparing
 	 * each loaded object.
 	 */
-#ifdef	AT_SUN_AUXFLAGS
 	if (auxflags & AF_SUN_HWCAPVERIFY) {
 		rtld_flags2 |= RT_FL2_HWCAP;
 		hwcap = (ulong_t)hwcap_1;
 	}
-#endif
+
 	/*
 	 * Look for environment strings (allows things like LD_NOAUDIT to be
 	 * established, although debugging isn't enabled until later).
@@ -338,25 +318,30 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Create a mapping descriptor for ld.so.1.  We can determine our
 	 * two segments information from known symbols.
 	 */
-	if ((mmaps = calloc(3, sizeof (Mmap))) == 0)
+	if ((mpp = calloc(2, sizeof (mmapobj_result_t))) == NULL)
 		return (0);
-	mmaps[0].m_vaddr = (caddr_t)M_PTRUNC(ld_base);
-	mmaps[0].m_msize = (size_t)((caddr_t)&_etext - mmaps[0].m_vaddr);
-	mmaps[0].m_fsize = mmaps[0].m_msize;
-	mmaps[0].m_perm = (PROT_READ | PROT_EXEC);
-	mmaps[1].m_vaddr = (caddr_t)M_PTRUNC((ulong_t)&r_debug);
-	mmaps[1].m_msize = (size_t)((caddr_t)&_end - mmaps[1].m_vaddr);
-	mmaps[1].m_fsize = (size_t)((caddr_t)&_edata - mmaps[1].m_vaddr);
-	mmaps[1].m_perm = (PROT_READ | PROT_WRITE | PROT_EXEC);
+	mpp[0].mr_addr = (caddr_t)M_PTRUNC(ld_base);
+	mpp[0].mr_msize = (caddr_t)&_etext - mpp[0].mr_addr;
+	mpp[0].mr_fsize = mpp[0].mr_msize;
+	mpp[0].mr_prot = (PROT_READ | PROT_EXEC);
 
-	/*
-	 * Create a link map structure for ld.so.1.
-	 */
-	if ((rlmp = elf_new_lm(&lml_rtld, _rtldname, rtldname, dyn_ptr, ld_base,
-	    (ulong_t)&_etext, ALIST_OFF_DATA, (ulong_t)(eaddr - ld_base), 0,
-	    ld_base, (ulong_t)(eaddr - ld_base), mmaps, 2, NULL)) == 0) {
+	mpp[1].mr_addr = (caddr_t)M_PTRUNC((uintptr_t)&r_debug);
+	mpp[1].mr_msize = (caddr_t)&_end - mpp[1].mr_addr;
+	mpp[1].mr_fsize = (caddr_t)&_edata - mpp[1].mr_addr;
+	mpp[1].mr_prot = (PROT_READ | PROT_WRITE | PROT_EXEC);
+
+	if ((fdr.fd_nname = stravl_insert(_rtldname, 0, 0, 0)) == NULL)
 		return (0);
-	}
+	if ((rlmp = elf_new_lmp(&lml_rtld, ALIST_OFF_DATA, &fdr,
+	    (Addr)mpp->mr_addr, (size_t)((uintptr_t)eaddr - (uintptr_t)ld_base),
+	    NULL, NULL)) == NULL)
+		return (0);
+
+	MMAPS(rlmp) = mpp;
+	MMAPCNT(rlmp) = 2;
+	PADSTART(rlmp) = (ulong_t)mpp[0].mr_addr;
+	PADIMLEN(rlmp) = (ulong_t)mpp[0].mr_addr + (ulong_t)mpp[1].mr_addr +
+	    (ulong_t)mpp[1].mr_msize;
 
 	MODE(rlmp) |= (RTLD_LAZY | RTLD_NODELETE | RTLD_GLOBAL | RTLD_WORLD);
 	FLAGS(rlmp) |= (FLG_RT_ANALYZED | FLG_RT_RELOCED | FLG_RT_INITDONE |
@@ -366,7 +351,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Initialize the runtime linkers information.
 	 */
 	interp = &_interp;
-	interp->i_name = NAME(rlmp);
+	interp->i_name = (char *)rtldname;
 	interp->i_faddr = (caddr_t)ADDR(rlmp);
 	ldso_plt_init(rlmp);
 
@@ -401,18 +386,21 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	}
 
 	/*
-	 * Map in the file, if exec has not already done so.  If it has,
-	 * simply create a new link map structure for the executable.
+	 * Map in the file, if exec has not already done so, or if the file
+	 * was passed as an argument to an explicit execution of ld.so.1 from
+	 * the command line.
 	 */
 	if (fd != -1) {
-		Rej_desc	rej;
-		Fct		*ftp;
-
 		/*
-		 * Find out what type of object we have.
+		 * Map the file.  Once the object is mapped we no longer need
+		 * the file descriptor.
 		 */
 		(void) rtld_fstat(fd, &status);
-		if ((ftp = are_u_this(&rej, fd, &status, argvname)) == 0) {
+		fdm.fd_ftp = map_obj(&lml_main, &fdm, status.st_size, argvname,
+		    fd, &rej);
+		(void) close(fd);
+
+		if (fdm.fd_ftp == NULL) {
 			Conv_reject_desc_buf_t rej_buf;
 
 			eprintf(&lml_main, ERR_FATAL,
@@ -422,22 +410,29 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		}
 
 		/*
-		 * Map in object.
+		 * Finish processing the loading of the file.
 		 */
-		if ((mlmp = (ftp->fct_map_so)(&lml_main, ALIST_OFF_DATA,
-		    execname, argvname, fd, NULL)) == 0)
+		if ((fdm.fd_nname = stravl_insert(argvname, 0, 0, 0)) == NULL)
+			return (0);
+		fdm.fd_dev = status.st_dev;
+		fdm.fd_ino = status.st_ino;
+
+		if ((mlmp = load_file(&lml_main, ALIST_OFF_DATA, &fdm,
+		    NULL)) == NULL)
 			return (0);
 
 		/*
 		 * We now have a process name for error diagnostics.
 		 */
-		if ((str = strrchr(argvname, '/')) != 0)
+		if ((str = strrchr(argvname, '/')) != NULL)
 			procname = ++str;
 		else
 			procname = argvname;
 
 		if (ldsoexec) {
-			Addr	brkbase = 0;
+			mmapobj_result_t	*mpp = MMAPS(mlmp);
+			uint_t			mnum, mapnum = MMAPCNT(mlmp);
+			void			*brkbase = NULL;
 
 			/*
 			 * Since ld.so.1 was the primary executed object - the
@@ -446,43 +441,21 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			 * the end of the object.  For a shared object (ET_DYN)
 			 * initialize it to the first page in memory.
 			 */
-			ehdr = (Ehdr *)ADDR(mlmp);
+			for (mnum = 0; mnum < mapnum; mnum++, mpp++)
+				brkbase = mpp->mr_addr + mpp->mr_msize;
 
-			if ((FCT(mlmp) == &elf_fct) &&
-			    (ehdr->e_type == ET_EXEC)) {
-				int	i;
-				Phdr *_phdr = (Phdr *)((uintptr_t)ADDR(mlmp) +
-				    ehdr->e_phoff);
+			if (brkbase == NULL)
+				brkbase = (void *)syspagsz;
 
-				/*
-				 * We scan the program headers to find the tail
-				 * of the memory image.  We can't use MSIZE()
-				 * since that's already been page aligned.
-				 */
-				for (i = 0; i < ehdr->e_phnum; i++, _phdr++) {
-					if (_phdr->p_type == PT_LOAD)
-						brkbase = _phdr->p_vaddr +
-						    _phdr->p_memsz;
-				}
-			}
-
-			if (!brkbase)
-				brkbase = syspagsz;
-
-			if (_brk_unlocked((void *)brkbase) == -1) {
+			if (_brk_unlocked(brkbase) == -1) {
 				int	err = errno;
+
 				eprintf(&lml_main, ERR_FATAL,
 				    MSG_INTL(MSG_SYS_BRK), argvname,
 				    strerror(err));
+				return (0);
 			}
 		}
-
-		/*
-		 * The object has now been mmaped, we no longer need the file
-		 * descriptor.
-		 */
-		(void) close(fd);
-
 	} else {
 		/*
 		 * Set up function ptr and arguments according to the type
@@ -492,21 +465,40 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 */
 		if (aoutdyn) {
 #ifdef A_OUT
-			if ((mlmp = aout_new_lm(&lml_main, execname, argvname,
-			    aoutdyn, 0, 0, ALIST_OFF_DATA)) == 0)
+			mmapobj_result_t	*mpp;
+
+			/*
+			 * Create a mapping structure sufficient to describe
+			 * a single two segments.  The ADDR() of the a.out is
+			 * established as 0, which is required but the AOUT
+			 * relocation code.
+			 */
+			if ((mpp =
+			    calloc(sizeof (mmapobj_result_t), 2)) == NULL)
+				return (0);
+
+			if ((fdm.fd_nname =
+			    stravl_insert(execname, 0, 0, 0)) == NULL)
+				return (0);
+			if ((mlmp = aout_new_lmp(&lml_main, ALIST_OFF_DATA,
+			    &fdm, 0, 0, aoutdyn, NULL)) == NULL)
 				return (0);
 
 			/*
-			 * Set the memory size.  Note, we only know the end of
-			 * text, and although we could find the _end by looking
-			 * up the symbol, this may not be present.  We should
-			 * set ADDR to MAIN_BASE, but presently all the a.out
-			 * relocation code assumes ADDR is 0 for the dynamic
-			 * executable. (these data items are only used for
-			 * dladdr(3x), and there aren't many a.out dladdr(3x)
-			 * users to warrant spending much time on this :-).
+			 * Establish the true mapping information for the a.out.
 			 */
-			MSIZE(mlmp) = MAIN_BASE + ETEXT(mlmp);
+			if (aout_get_mmap(&lml_main, mpp)) {
+				free(mpp);
+				return (0);
+			}
+
+			MSIZE(mlmp) =
+			    (size_t)(mpp[1].mr_addr + mpp[1].mr_msize) -
+			    S_ALIGN((size_t)mpp[0].mr_addr, syspagsz);
+			MMAPS(mlmp) = mpp;
+			MMAPCNT(mlmp) = 2;
+			PADSTART(mlmp) = (ulong_t)mpp->mr_addr;
+			PADIMLEN(mlmp) = mpp->mr_msize;
 
 			/*
 			 * Disable any object configuration cache (BCP apps
@@ -526,15 +518,14 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			return (0);
 #endif
 		} else if (phdr) {
-			Phdr		*pptr, *firstptr = 0, *lastptr;
-			Phdr		*tlsphdr = 0, *unwindphdr = 0;
-			Dyn		*dyn = 0;
-			Cap		*cap = 0;
-			Off		i_offset = 0;
-			Addr		base = 0;
-			ulong_t		memsize, phsize, entry, etext;
-			uint_t		mmapcnt = 0;
-			int		i;
+			Phdr			*pptr;
+			Off			i_offset = 0;
+			Addr			base = 0;
+			ulong_t			phsize;
+			mmapobj_result_t	*mpp, *fmpp, *hmpp = NULL;
+			uint_t			mapnum = 0;
+			int			i;
+			size_t			msize;
 
 			/*
 			 * Using the executables phdr address determine the base
@@ -560,7 +551,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			 * Allocate a mapping array to retain mapped segment
 			 * information.
 			 */
-			if ((mmaps = calloc(ehdr->e_phnum, sizeof (Mmap))) == 0)
+			if ((fmpp = mpp = calloc(ehdr->e_phnum,
+			    sizeof (mmapobj_result_t))) == NULL)
 				return (0);
 
 			/*
@@ -578,9 +570,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 					int	perm = (PROT_READ | PROT_EXEC);
 					size_t	off;
 
-					if (!firstptr)
-						firstptr = pptr;
-					lastptr = pptr;
 					if (i_offset && pptr->p_filesz &&
 					    (i_offset >= pptr->p_offset) &&
 					    (i_offset <=
@@ -590,11 +579,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 						    pptr->p_offset + base;
 						i_offset = 0;
 					}
-					if ((pptr->p_flags &
-					    (PF_R | PF_W)) == PF_R)
-						etext = pptr->p_vaddr +
-						    pptr->p_memsz + base;
-					else
+
+					if (pptr->p_flags & PF_W)
 						perm |= PROT_WRITE;
 
 					/*
@@ -604,77 +590,70 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 					 * for mprotect() if required.
 					 */
 					off = pptr->p_vaddr + base;
-					mmaps[mmapcnt].m_vaddr =
-					    (caddr_t)M_PTRUNC(off);
-					off -= (size_t)mmaps[mmapcnt].m_vaddr;
-					mmaps[mmapcnt].m_msize =
-					    pptr->p_memsz + off;
-					mmaps[mmapcnt].m_fsize =
-					    pptr->p_filesz + off;
-					mmaps[mmapcnt].m_perm = perm;
-					mmapcnt++;
+					if (hmpp == NULL) {
+						hmpp = mpp;
+						mpp->mr_addr = (caddr_t)ehdr;
+					} else
+						mpp->mr_addr = (caddr_t)off;
 
-				} else if (pptr->p_type == PT_DYNAMIC) {
-					dyn = (Dyn *)(pptr->p_vaddr + base);
-				} else if ((pptr->p_type == PT_TLS) &&
-				    pptr->p_memsz) {
-					tlsphdr = pptr;
-				} else if (pptr->p_type == PT_SUNW_UNWIND) {
-					unwindphdr = pptr;
-				} else if (pptr->p_type == PT_SUNWCAP) {
-					cap = (Cap *)(pptr->p_vaddr + base);
+					off -= (size_t)(uintptr_t)mpp->mr_addr;
+					mpp->mr_msize = pptr->p_memsz + off;
+					mpp->mr_fsize = pptr->p_filesz + off;
+					mpp->mr_prot = perm;
+
+					mpp++, mapnum++;
 				}
+
 				pptr = (Phdr *)((ulong_t)pptr + phsize);
 			}
 
+			mpp--;
+			msize = (size_t)(mpp->mr_addr + mpp->mr_msize) -
+			    S_ALIGN((size_t)fmpp->mr_addr, syspagsz);
 
-			memsize = (lastptr->p_vaddr + lastptr->p_memsz) -
-			    S_ALIGN(firstptr->p_vaddr, syspagsz);
-
-			entry = ehdr->e_entry;
-			if (ehdr->e_type == ET_DYN)
-				entry += (ulong_t)ehdr;
-
-			if ((mlmp = elf_new_lm(&lml_main, execname, argvname,
-			    dyn, (Addr)ehdr, etext, ALIST_OFF_DATA, memsize,
-			    entry, (ulong_t)ehdr, memsize, mmaps,
-			    mmapcnt, NULL)) == 0) {
+			if ((fdm.fd_nname =
+			    stravl_insert(execname, 0, 0, 0)) == NULL)
 				return (0);
-			}
-			if (tlsphdr &&
-			    (tls_assign(&lml_main, mlmp, tlsphdr) == 0))
+			if ((mlmp = elf_new_lmp(&lml_main, ALIST_OFF_DATA, &fdm,
+			    (Addr)hmpp->mr_addr, msize, NULL, NULL)) == NULL)
 				return (0);
 
-			if (unwindphdr)
-				PTUNWIND(mlmp) = unwindphdr;
-
-			if (cap)
-				cap_assign(cap, mlmp);
+			MMAPS(mlmp) = fmpp;
+			MMAPCNT(mlmp) = mapnum;
+			PADSTART(mlmp) = (ulong_t)fmpp->mr_addr;
+			PADIMLEN(mlmp) = (ulong_t)fmpp->mr_addr +
+			    (ulong_t)mpp->mr_addr + (ulong_t)mpp->mr_msize;
 		}
 	}
 
 	/*
 	 * Establish the interpretors name as that defined within the initial
 	 * object (executable).  This provides for ORIGIN processing of ld.so.1
-	 * dependencies.
+	 * dependencies.  Note, the NAME() of the object remains that which was
+	 * passed to us as the SONAME on execution.
 	 */
 	if (ldsoexec == 0) {
 		size_t	len = strlen(interp->i_name);
-		(void) expand(&interp->i_name, &len, 0, 0,
-		    (PN_TKN_ISALIST | PN_TKN_HWCAP), rlmp);
-	}
-	PATHNAME(rlmp) = interp->i_name;
 
-	if (FLAGS1(rlmp) & FL1_RT_RELATIVE)
-		(void) fullpath(rlmp, 0);
-	else
-		ORIGNAME(rlmp) = PATHNAME(rlmp) = NAME(rlmp);
+		if (expand(&interp->i_name, &len, 0, 0,
+		    (PD_TKN_ISALIST | PD_TKN_HWCAP), rlmp) & PD_TKN_RESOLVED)
+			fdr.fd_flags |= FLG_FD_RESOLVED;
+	}
+	fdr.fd_pname = interp->i_name;
+	(void) fullpath(rlmp, &fdr);
+
+	/*
+	 * The runtime linker acts as a filtee for various dl*() functions that
+	 * are defined in libc (and libdl).  Make sure this standard name for
+	 * the runtime linker is also registered in the FullPathNode AVL tree.
+	 */
+	(void) fpavl_insert(&lml_rtld, rlmp, _rtldname, 0);
 
 	/*
 	 * Having established the true runtime linkers name, simplify the name
 	 * for error diagnostics.
 	 */
-	if ((str = strrchr(PATHNAME(rlmp), '/')) != 0)
+	if ((str = strrchr(PATHNAME(rlmp), '/')) != NULL)
 		rtldname = ++str;
 	else
 		rtldname = PATHNAME(rlmp);
@@ -684,43 +663,16 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * as a part of loading an object, but as the kernel probably mapped
 	 * it in, complete this processing now.
 	 */
-	if (FLAGS1(mlmp) & FL1_RT_RELATIVE)
-		(void) fullpath(mlmp, 0);
+	(void) fullpath(mlmp, 0);
 
 	/*
 	 * Some troublesome programs will change the value of argv[0].  Dupping
 	 * the process string protects us, and insures the string is left in
 	 * any core files.
 	 */
-	if ((str = (char *)strdup(procname)) == 0)
+	if ((str = (char *)strdup(procname)) == NULL)
 		return (0);
 	procname = str;
-
-	/*
-	 * If the kernel has provided hardware capabilities information, and
-	 * the executable contains hardware capabilities information, make
-	 * sure it's a valid object.
-	 */
-	if ((rtld_flags2 & RT_FL2_HWCAP) && HWCAP(mlmp)) {
-		ulong_t	mhwcap;
-
-		if ((mhwcap = (HWCAP(mlmp) & ~hwcap)) != 0) {
-			Conv_cap_val_hw1_buf_t cap_val_hw1_buf;
-
-			const char *str =
-			    conv_cap_val_hw1(mhwcap, M_MACH, 0,
-			    &cap_val_hw1_buf);
-
-			if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
-				(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),
-				    NAME(mlmp), str);
-			} else {
-				eprintf(&lml_main, ERR_FATAL,
-				    MSG_INTL(MSG_GEN_BADHWCAP_1), str);
-				return (0);
-			}
-		}
-	}
 
 #if	defined(_ELF64)
 	/*
@@ -732,6 +684,36 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	if (SFCAP(mlmp) & SF1_SUNW_ADDR32)
 		rtld_flags2 |= RT_FL2_ADDR32;
 #endif
+	/*
+	 * Validate any hardware capabilities information.
+	 */
+	if (HWCAP(mlmp) && (hwcap_check(HWCAP(mlmp), &rej) == 0)) {
+		if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
+			(void) printf(MSG_INTL(MSG_LDD_GEN_HWCAP_1),
+			    NAME(mlmp), rej.rej_str);
+		} else {
+			eprintf(&lml_main, ERR_FATAL,
+			    MSG_INTL(MSG_GEN_BADHWCAP_1), rej.rej_str);
+			return (0);
+		}
+	}
+
+	/*
+	 * Validate any software capabilities information, other than
+	 * SF1_SUNW_ADDR32.  Only dependencies need check their SF1_SUNW_ADDR32
+	 * use against the application enabling a 32-bit address space.
+	 */
+	if ((SFCAP(mlmp) & ~SF1_SUNW_ADDR32) &&
+	    (sfcap_check(SFCAP(mlmp), &rej) == 0)) {
+		if (lml_main.lm_flags & LML_FLG_TRC_ENABLE) {
+			(void) printf(MSG_INTL(MSG_LDD_GEN_SFCAP_1),
+			    NAME(mlmp), rej.rej_str);
+		} else {
+			eprintf(&lml_main, ERR_FATAL,
+			    MSG_INTL(MSG_GEN_BADSFCAP_1), rej.rej_str);
+			return (0);
+		}
+	}
 
 	FLAGS(mlmp) |= (FLG_RT_ISMAIN | FLG_RT_MODESET);
 	FLAGS1(mlmp) |= FL1_RT_USED;
@@ -742,8 +724,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * collected during tsort processing.  And, if the application has no
 	 * initarray or finiarray we can economize on establishing bindings.
 	 */
-	INIT(mlmp) = FINI(mlmp) = 0;
-	if ((INITARRAY(mlmp) == 0) && (FINIARRAY(mlmp) == 0))
+	INIT(mlmp) = FINI(mlmp) = NULL;
+	if ((INITARRAY(mlmp) == NULL) && (FINIARRAY(mlmp) == NULL))
 		FLAGS1(mlmp) |= FL1_RT_NOINIFIN;
 
 	/*
@@ -765,10 +747,10 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	/*
 	 * Add our two main link-maps to the dynlm_list
 	 */
-	if (list_append(&dynlm_list, &lml_main) == 0)
+	if (list_append(&dynlm_list, &lml_main) == NULL)
 		return (0);
 
-	if (list_append(&dynlm_list, &lml_rtld) == 0)
+	if (list_append(&dynlm_list, &lml_rtld) == NULL)
 		return (0);
 
 	/*
@@ -798,8 +780,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * Determine the dev/inode information for the executable to complete
 	 * load_so() checking for those who might dlopen(a.out).
 	 */
-	if ((FLAGS1(mlmp) & FL1_RT_RELATIVE) &&
-	    (rtld_stat(PATHNAME(mlmp), &status) == 0)) {
+	if (rtld_stat(PATHNAME(mlmp), &status) == 0) {
 		STDEV(mlmp) = status.st_dev;
 		STINO(mlmp) = status.st_ino;
 	}
@@ -884,15 +865,13 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		DBG_CALL(Dbg_file_ldso(rlmp, envp, auxv,
 		    LIST(rlmp)->lm_lmidstr, ALIST_OFF_DATA));
 
-		if (FCT(mlmp) == &elf_fct) {
+		if (THIS_IS_ELF(mlmp)) {
 			DBG_CALL(Dbg_file_elf(&lml_main, PATHNAME(mlmp),
-			    (ulong_t)DYN(mlmp), ADDR(mlmp), MSIZE(mlmp),
-			    ENTRY(mlmp), LIST(mlmp)->lm_lmidstr,
+			    ADDR(mlmp), MSIZE(mlmp), LIST(mlmp)->lm_lmidstr,
 			    ALIST_OFF_DATA));
 		} else {
 			DBG_CALL(Dbg_file_aout(&lml_main, PATHNAME(mlmp),
-			    (ulong_t)AOUTDYN(mlmp), (ulong_t)ADDR(mlmp),
-			    (ulong_t)MSIZE(mlmp), LIST(mlmp)->lm_lmidstr,
+			    ADDR(mlmp), MSIZE(mlmp), LIST(mlmp)->lm_lmidstr,
 			    ALIST_OFF_DATA));
 		}
 	}
@@ -912,16 +891,17 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		 * Any global auditing (set using LD_AUDIT or LD_PROFILE) that
 		 * can't be established is non-fatal.
 		 */
-		if ((auditors = calloc(1, sizeof (Audit_desc))) == 0)
+		if ((auditors = calloc(1, sizeof (Audit_desc))) == NULL)
 			return (0);
 
 		for (ndx = 0; ndx < 3; ndx++) {
 			if (aud[ndx]) {
-				if ((auditors->ad_name = strdup(aud[ndx])) == 0)
+				if ((auditors->ad_name =
+				    strdup(aud[ndx])) == NULL)
 					return (0);
 				rtld_flags2 |= RT_FL2_FTL2WARN;
 				(void) audit_setup(mlmp, auditors,
-				    PN_FLG_EXTLOAD, NULL);
+				    PD_FLG_EXTLOAD, NULL);
 				rtld_flags2 &= ~RT_FL2_FTL2WARN;
 			}
 		}
@@ -939,8 +919,8 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			 * auditing descriptor.  The effect is that a
 			 * DT_DEPAUDIT act as an LD_AUDIT.
 			 */
-			if ((auditors == 0) &&
-			    ((auditors = calloc(1, sizeof (Audit_desc))) == 0))
+			if ((auditors == NULL) && ((auditors = calloc(1,
+			    sizeof (Audit_desc))) == NULL))
 				return (0);
 
 			auditors->ad_name = AUDITORS(mlmp)->ad_name;
@@ -952,7 +932,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			 * Clear the local auditor information.
 			 */
 			free((void *) AUDITORS(mlmp));
-			AUDITORS(mlmp) = 0;
+			AUDITORS(mlmp) = NULL;
 
 		} else {
 			/*
@@ -961,7 +941,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 			if (audit_setup(mlmp, AUDITORS(mlmp), 0, NULL) == 0)
 				return (0);
 
-			FLAGS1(mlmp) |= AUDITORS(mlmp)->ad_flags;
+			AFLAGS(mlmp) |= AUDITORS(mlmp)->ad_flags;
 			lml_main.lm_flags |= LML_FLG_LOCAUDIT;
 		}
 	}
@@ -972,10 +952,10 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 * establish a cookie for ld.so.1 as this may be bound to via the
 	 * dl*() family.
 	 */
-	if ((lml_main.lm_tflags | FLAGS1(mlmp)) & LML_TFLG_AUD_MASK) {
+	if ((lml_main.lm_tflags | AFLAGS(mlmp)) & LML_TFLG_AUD_MASK) {
 		if (((audit_objopen(mlmp, mlmp) == 0) ||
 		    (audit_objopen(mlmp, rlmp) == 0)) &&
-		    (FLAGS1(mlmp) & LML_TFLG_AUD_MASK))
+		    (AFLAGS(mlmp) & LML_TFLG_AUD_MASK))
 			return (0);
 	}
 
@@ -992,7 +972,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	/*
 	 * Load all dependent (needed) objects.
 	 */
-	if (analyze_lmc(&lml_main, ALIST_OFF_DATA, mlmp, NULL) == 0)
+	if (analyze_lmc(&lml_main, ALIST_OFF_DATA, mlmp, NULL) == NULL)
 		return (0);
 
 	/*
@@ -1048,9 +1028,9 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 */
 	rd_event(&lml_main, RD_PREINIT, 0);
 
-	if ((lml_main.lm_tflags | FLAGS1(mlmp)) & LML_TFLG_AUD_ACTIVITY)
+	if ((lml_main.lm_tflags | AFLAGS(mlmp)) & LML_TFLG_AUD_ACTIVITY)
 		audit_activity(mlmp, LA_ACT_CONSISTENT);
-	if ((lml_main.lm_tflags | FLAGS1(mlmp)) & LML_TFLG_AUD_PREINIT)
+	if ((lml_main.lm_tflags | AFLAGS(mlmp)) & LML_TFLG_AUD_PREINIT)
 		audit_preinit(mlmp);
 
 	/*
@@ -1085,7 +1065,6 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 		rtldexit(&lml_main, 0);
 	}
 
-#ifdef	AT_SUN_AUXFLAGS
 	/*
 	 * Check if this instance of the linker should have a primary link
 	 * map.  This flag allows multiple copies of the -same- -version-
@@ -1122,7 +1101,7 @@ setup(char **envp, auxv_t *auxv, Word _flags, char *_platform, int _syspagsz,
 	 */
 	if (auxflags & AF_SUN_NOPLM)
 		rtld_flags2 |= RT_FL2_NOPLM;
-#endif
+
 	/*
 	 * Establish any static TLS for this primary link-map.  Note, regardless
 	 * of whether TLS is available, an initial handshake occurs with libc to

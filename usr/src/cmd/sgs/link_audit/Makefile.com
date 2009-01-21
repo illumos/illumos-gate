@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		../../../../lib/Makefile.lib
@@ -66,13 +64,6 @@ BINDPICS=	$(BINDSRC:%.c=$(PICDIR)/%.o) $(PICDIR)/env.o
 $(WHOPICS):=	SEMANTICCHK=
 
 LDLIBS +=	$(CONVLIBDIR) $(CONV_LIB)
-
-# Building SUNWonld results in a call to the `package' target.  Requirements
-# needed to run this application on older releases are established:
-#   dlopen/dlclose requires libdl.so.1 prior to 5.10
-# 
-DLLIB = $(VAR_DL_LIB)
-package	:=  DLLIB = $(VAR_PKG_DL_LIB)
 
 $(TRUSSLIB):=	PICS = $(TRUSSPICS)
 $(PERFLIB):=	PICS = $(PERFPICS)

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,9 +80,7 @@ DBG_options _Dbg_options[] = {
 	{MSG_ORIG(MSG_TOK_STRTAB),	DBG_C_STRTAB,	0},
 	{MSG_ORIG(MSG_TOK_STATS),	DBG_C_STATS,	0},
 	{MSG_ORIG(MSG_TOK_UNUSED),	DBG_C_UNUSED,	0},
-#ifdef	DEMANGLE
 	{MSG_ORIG(MSG_TOK_DEMANGLE),	DBG_C_DEMANGLE,	0},
-#endif
 	{MSG_ORIG(MSG_TOK_CAP),		DBG_C_CAP,	0},
 	{MSG_ORIG(MSG_TOK_INIT),	DBG_C_INIT,	0},
 	{NULL,				NULL},
@@ -284,7 +282,7 @@ Dbg_setup(const char *string, Dbg_desc *dbp)
 				 * once this routine returns.
 				 */
 				if (aplist_append(&dbp->d_list, name,
-				    AL_CNT_DEBUG) == 0)
+				    AL_CNT_DEBUG) == NULL)
 					return (S_ERROR);
 
 				found = TRUE;

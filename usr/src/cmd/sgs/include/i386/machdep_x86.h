@@ -79,6 +79,15 @@ extern "C" {
 #define	M_SROUND(X)	(((X) + M_SEGSIZE - 1) & ~(M_SEGSIZE - 1))
 
 /*
+ * Relocation type macros.
+ */
+#if	defined(_ELF64)
+#define	M_RELOC		Rela
+#else
+#define	M_RELOC		Rel
+#endif
+
+/*
  * TLS static segments must be rounded to the following requirements,
  * due to libthread stack allocation.
  */
@@ -87,7 +96,6 @@ extern "C" {
 #else
 #define	M_TLSSTATALIGN	0x08
 #endif
-
 
 /*
  * Other machine dependent entities

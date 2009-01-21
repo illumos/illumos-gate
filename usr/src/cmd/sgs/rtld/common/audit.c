@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Audit interfaces.  Auditing can be enabled in two ways:
@@ -40,13 +40,12 @@
  * flags can occur in different data items they are defined as one to simplify
  * audit interface requirements.  The basic test for all audit interfaces is:
  *
- *    if (((lml->lm_tflags | FLAGS1(lmp)) & LML_TFLG_AUD_MASK) &&
+ *    if (((lml->lm_tflags | AFLAGS(lmp)) & LML_TFLG_AUD_MASK) &&
  *	(lml == LIST(lmp)))
  *
  * The latter link-map list equivalence test insures that auditors themselves
  * (invoked through DT_DEPAUDIT) are not audited.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<sys/types.h>
@@ -303,6 +302,7 @@ _audit_objopen(List *list, Rt_map *nlmp, Lmid_t lmid, Audit_info *aip,
 			ulong_t		pltcnt;
 
 			acp->ac_flags |= FLG_AC_BINDFROM;
+
 			/*
 			 * We only need dynamic plt's if a pltenter and/or a
 			 * pltexit() entry point exist in one of our auditing
@@ -318,7 +318,7 @@ _audit_objopen(List *list, Rt_map *nlmp, Lmid_t lmid, Audit_info *aip,
 			 */
 			pltcnt = PLTRELSZ(nlmp) / RELENT(nlmp);
 			if ((aip->ai_dynplts = calloc(pltcnt,
-			    dyn_plt_ent_size)) == 0)
+			    dyn_plt_ent_size)) == NULL)
 				return (0);
 		}
 	}
@@ -359,7 +359,7 @@ audit_objopen(Rt_map *clmp, Rt_map *nlmp)
 	 *			    .........
 	 */
 	if ((AUDINFO(nlmp) = aip = calloc(1, sizeof (Audit_info) +
-	    (sizeof (Audit_client) * clients))) == 0)
+	    (sizeof (Audit_client) * clients))) == NULL)
 		return (0);
 
 	aip->ai_cnt = clients;
@@ -508,7 +508,6 @@ audit_pltenter(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx,
 
 	return (_sym.st_value);
 }
-
 
 /*
  * la_pltexit() caller.  Traverse through all audit library and call any
@@ -693,7 +692,6 @@ audit_symbind(Rt_map *rlmp, Rt_map *dlmp, Sym *sym, uint_t ndx, Addr value,
 	return (_sym.st_value);
 }
 
-
 /*
  * la_preinit() caller.  Traverse through all audit libraries and call any
  * la_preinit() entry points found.
@@ -734,7 +732,6 @@ audit_preinit(Rt_map *clmp)
 	if (appl)
 		rtld_flags &= ~RT_FL_APPLIC;
 }
-
 
 /*
  * Clean up (free) an audit descriptor.  First, gather a list of all handles,
@@ -982,7 +979,7 @@ audit_setup(Rt_map *clmp, Audit_desc *adp, uint_t orig, int *in_nfavl)
 		 * Allocate an audit list descriptor for this object and
 		 * search for all known entry points.
 		 */
-		if ((alp = calloc(1, sizeof (Audit_list))) == 0)
+		if ((alp = calloc(1, sizeof (Audit_list))) == NULL)
 			return (audit_disable(ptr, clmp, ghp, 0));
 
 		alp->al_libname = NAME(lmp);

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Generic interface definition for usr/src/cmd/sgs/libld.
@@ -35,7 +35,7 @@
 # definitions see:
 #	Policy for Shared Library Version Names and Interface Definitions
 
-SUNWprivate_4.4 {
+SUNWprivate_4.5 {
 	global:
 		dbg_print  = NODIRECT;	# interposed - ld(1) and ld.so.1(1)
 
@@ -56,8 +56,8 @@ SUNWprivate_4.4 {
 		ld64_make_sections;
 		ld32_ofl_cleanup;
 		ld64_ofl_cleanup;
-		ld32_process_open;
-		ld64_process_open;
+		ld32_process_mem;
+		ld64_process_mem;
 		ld32_reloc_init;
 		ld64_reloc_init;
 		ld32_reloc_process;

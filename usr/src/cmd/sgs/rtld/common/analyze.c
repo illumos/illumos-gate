@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include	<unistd.h>
 #include	<sys/stat.h>
 #include	<sys/mman.h>
+#include	<sys/debug.h>
 #include	<fcntl.h>
 #include	<limits.h>
 #include	<dlfcn.h>
@@ -44,15 +45,9 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
+#include	"_a.out.h"
+#include	"_inline.h"
 #include	"msg.h"
-
-static Fct	*vector[] = {
-	&elf_fct,
-#ifdef A_OUT
-	&aout_fct,
-#endif
-	0
-};
 
 /*
  * If a load filter flag is in effect, and this object is a filter, trigger the
@@ -96,13 +91,14 @@ load_filtees(Rt_map *lmp, int *in_nfavl)
  * initial object.  As dependencies are analyzed they are added to the link-map
  * control list.  Thus the list grows as we traverse it - this results in the
  * breadth first ordering of all needed objects.
+ *
+ * Return the initial link-map from which analysis starts for relocate_lmc().
  */
-int
+Rt_map *
 analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 {
-	Rt_map	*lmp = nlmp;
+	Rt_map	*lmp;
 	Lm_cntl	*nlmc;
-	int	ret = 1;
 
 	/*
 	 * If this link-map control list is being analyzed, return.  The object
@@ -115,7 +111,7 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 	/* LINTED */
 	nlmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, nlmco);
 	if (nlmc->lc_flags & LMC_FLG_ANALYZING)
-		return (1);
+		return (nlmp);
 
 	/*
 	 * If this object doesn't belong to the present link-map control list
@@ -124,11 +120,11 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 	 * case, ignore the object as it's already being taken care of.
 	 */
 	if (nlmco != CNTL(nlmp))
-		return (1);
+		return (nlmp);
 
 	nlmc->lc_flags |= LMC_FLG_ANALYZING;
 
-	for (; lmp; lmp = NEXT_RT_MAP(lmp)) {
+	for (lmp = nlmp; lmp; lmp = NEXT_RT_MAP(lmp)) {
 		if (FLAGS(lmp) &
 		    (FLG_RT_ANALZING | FLG_RT_ANALYZED | FLG_RT_DELETE))
 			continue;
@@ -143,12 +139,31 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 		 * need to finish the link-editing of the object at this point.
 		 */
 		if (FLAGS(lmp) & FLG_RT_OBJECT) {
-			if (elf_obj_fini(lml, lmp, in_nfavl) == 0) {
+			Rt_map	*olmp;
+
+			if ((olmp = elf_obj_fini(lml, lmp, in_nfavl)) == NULL) {
 				if (lml->lm_flags & LML_FLG_TRC_ENABLE)
 					continue;
-				ret = 0;
+				nlmp = NULL;
 				break;
 			}
+
+			/*
+			 * The original link-map that captured a relocatable
+			 * object is a temporary link-map, that basically acts
+			 * as a place holder in the link-map list.  On
+			 * completion of relocatable object processing, a new
+			 * link-map is created, and switched with the place
+			 * holder.  Therefore, reassign both the present
+			 * link-map pointer and the return link-map pointer.
+			 * The former resets this routines link-map processing,
+			 * while the latter provides for later functions, like
+			 * relocate_lmc(), to start processing from this new
+			 * link-map.
+			 */
+			if (nlmp == lmp)
+				nlmp = olmp;
+			lmp = olmp;
 		}
 
 		DBG_CALL(Dbg_file_analyze(lmp));
@@ -159,7 +174,7 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 		if (LM_NEEDED(lmp)(lml, nlmco, lmp, in_nfavl) == 0) {
 			if (lml->lm_flags & LML_FLG_TRC_ENABLE)
 				continue;
-			ret = 0;
+			nlmp = NULL;
 			break;
 		}
 
@@ -195,7 +210,7 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 	nlmc = (Lm_cntl *)alist_item_by_offset(lml->lm_lists, nlmco);
 	nlmc->lc_flags &= ~LMC_FLG_ANALYZING;
 
-	return (ret);
+	return (nlmp);
 }
 
 /*
@@ -214,8 +229,8 @@ analyze_lmc(Lm_list *lml, Aliste nlmco, Rt_map *nlmp, int *in_nfavl)
 static int
 are_bits_zero(Rt_map *dlmp, Sym *dsym, int dest)
 {
-	Mmap	*mmap = NULL, *mmaps;
-	caddr_t	daddr = (caddr_t)dsym->st_value;
+	mmapobj_result_t	*mpp;
+	caddr_t			daddr = (caddr_t)dsym->st_value;
 
 	if ((FLAGS(dlmp) & FLG_RT_FIXED) == 0)
 		daddr += ADDR(dlmp);
@@ -225,20 +240,13 @@ are_bits_zero(Rt_map *dlmp, Sym *dsym, int dest)
 	 * the copy relocation records have already been captured and verified,
 	 * a segment must be found (but we add an escape clause never the less).
 	 */
-	for (mmaps = MMAPS(dlmp); mmaps->m_vaddr; mmaps++) {
-		if ((daddr >= mmaps->m_vaddr) &&
-		    (daddr < (mmaps->m_vaddr + mmaps->m_msize))) {
-			mmap = mmaps;
-			break;
-		}
-	}
-	if (mmap == NULL)
+	if ((mpp = find_segment(daddr, dlmp)) == NULL)
 		return (1);
 
 	/*
 	 * If the definition is not within .bss, indicate this is not zero data.
 	 */
-	if (daddr < (mmap->m_vaddr + mmaps->m_fsize))
+	if (daddr < (mpp->mr_addr + mpp->mr_offset + mpp->mr_fsize))
 		return (0);
 
 	/*
@@ -269,6 +277,9 @@ are_bits_zero(Rt_map *dlmp, Sym *dsym, int dest)
 static int
 relocate_so(Lm_list *lml, Rt_map *lmp, int *relocated, int now, int *in_nfavl)
 {
+	APlist	*textrel = NULL;
+	int	ret = 1;
+
 	/*
 	 * If we're running under ldd(1), and haven't been asked to trace any
 	 * warnings, skip any actual relocation processing.
@@ -279,18 +290,44 @@ relocate_so(Lm_list *lml, Rt_map *lmp, int *relocated, int now, int *in_nfavl)
 		if (relocated)
 			(*relocated)++;
 
-		if ((LM_RELOC(lmp)(lmp, now, in_nfavl) == 0) &&
+		if ((LM_RELOC(lmp)(lmp, now, in_nfavl, &textrel) == 0) &&
 		    ((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0))
-			return (0);
+			ret = 0;
+
+		/*
+		 * Finally process any move data.  Note, this is carried out
+		 * with ldd(1) under relocation processing too, as it can flush
+		 * out move errors, and enables lari(1) to provide a true
+		 * representation of the runtime bindings.
+		 */
+		if ((FLAGS(lmp) & FLG_RT_MOVE) &&
+		    (move_data(lmp, &textrel) == 0) &&
+		    ((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0))
+			ret = 0;
 	}
-	return (1);
+
+	/*
+	 * If a text segment was write enabled to perform any relocations or
+	 * move records, then re-protect the segment by disabling writes.
+	 */
+	if (textrel) {
+		mmapobj_result_t	*mpp;
+		Aliste			idx;
+
+		for (APLIST_TRAVERSE(textrel, idx, mpp))
+			(void) set_prot(lmp, mpp, 0);
+		free(textrel);
+	}
+
+	return (ret);
 }
 
 /*
  * Relocate the objects on a link-map control list.
  */
 static int
-_relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated, int *in_nfavl)
+_relocate_lmc(Lm_list *lml, Aliste lmco, Rt_map *nlmp, int *relocated,
+    int *in_nfavl)
 {
 	Rt_map	*lmp;
 
@@ -322,23 +359,20 @@ _relocate_lmc(Lm_list *lml, Rt_map *nlmp, int *relocated, int *in_nfavl)
 		FLAGS(lmp) |= FLG_RT_RELOCED;
 
 		/*
-		 * Mark this object's init is available for harvesting.  Under
-		 * ldd(1) this marking is necessary for -i (tsort) gathering.
+		 * If this object is being relocated on the main link-map list
+		 * indicate that this object's init is available for harvesting.
+		 * Objects that are being collected on other link-map lists
+		 * will have there init availability tagged when the objects
+		 * are move to the main link-map list (ie, after we know they,
+		 * and their dependencies, are fully relocated and ready for
+		 * use).
+		 *
+		 * Note, even under ldd(1) this init identification is necessary
+		 * for -i (tsort) gathering.
 		 */
-		lml->lm_init++;
-		lml->lm_flags |= LML_FLG_OBJADDED;
-
-		/*
-		 * Process any move data.  Note, this is carried out under ldd
-		 * under relocation processing too, as it can flush out move
-		 * errors, and enables lari(1) to provide a true representation
-		 * of the runtime bindings.
-		 */
-		if ((FLAGS(lmp) & FLG_RT_MOVE) &&
-		    (((lml->lm_flags & LML_FLG_TRC_ENABLE) == 0) ||
-		    (lml->lm_flags & LML_FLG_TRC_WARN))) {
-			if (move_data(lmp) == 0)
-				return (0);
+		if (lmco == ALIST_OFF_DATA) {
+			lml->lm_init++;
+			lml->lm_flags |= LML_FLG_OBJADDED;
 		}
 
 		/*
@@ -486,7 +520,7 @@ relocate_lmc(Lm_list *lml, Aliste nlmco, Rt_map *clmp, Rt_map *nlmp,
 		 * to the present link-map control list, try and clean up any
 		 * failed objects now.
 		 */
-		lret = _relocate_lmc(lml, nlmp, &relocated, in_nfavl);
+		lret = _relocate_lmc(lml, nlmco, nlmp, &relocated, in_nfavl);
 		if ((lret == 0) && (nlmco != ALIST_OFF_DATA))
 			remove_lmc(lml, clmp, nlmc, nlmco, NAME(nlmp));
 	}
@@ -625,129 +659,20 @@ rejection_inherit(Rej_desc *rej1, Rej_desc *rej2)
 	if (rej2->rej_type && (rej1->rej_type == 0)) {
 		rej1->rej_type = rej2->rej_type;
 		rej1->rej_info = rej2->rej_info;
-		rej1->rej_flag = rej2->rej_flag;
+		rej1->rej_flags = rej2->rej_flags;
 		if (rej2->rej_name)
-			rej1->rej_name = strdup(rej2->rej_name);
-		if (rej2->rej_str) {
-			if ((rej1->rej_str = strdup(rej2->rej_str)) == NULL)
-				rej1->rej_str = MSG_ORIG(MSG_EMG_ENOMEM);
-		}
+			rej1->rej_name = stravl_insert(rej2->rej_name, 0, 0, 0);
+		if ((rej2->rej_str) && ((rej1->rej_str =
+		    stravl_insert(rej2->rej_str, 0, 0, 0)) == NULL))
+			rej1->rej_str = MSG_ORIG(MSG_EMG_ENOMEM);
 	}
-}
-
-/*
- * Determine the object type of a file.
- */
-Fct *
-are_u_this(Rej_desc *rej, int fd, rtld_stat_t *status, const char *name)
-{
-	int	i;
-	char	*maddr = 0;
-
-	fmap->fm_fsize = status->st_size;
-
-	/*
-	 * If this is a directory (which can't be mmap()'ed) generate a precise
-	 * error message.
-	 */
-	if ((status->st_mode & S_IFMT) == S_IFDIR) {
-		rej->rej_type = SGS_REJ_STR;
-		rej->rej_str = strerror(EISDIR);
-		return (NULL);
-	}
-
-	/*
-	 * Map in the first page of the file.  When this buffer is first used,
-	 * the mapping is a single system page.  This is typically enough to
-	 * inspect the ehdr and phdrs of the file, and can be reused for each
-	 * file that get loaded.  If a larger mapping is required to read the
-	 * ehdr and phdrs, a new mapping is created (see elf_map_it()).  This
-	 * new mapping is again used for each new file loaded.  Some objects,
-	 * such as filters, only take up one page, and in this case this mapping
-	 * will suffice for the file.
-	 */
-	maddr = mmap(fmap->fm_maddr, fmap->fm_msize, (PROT_READ | PROT_EXEC),
-	    fmap->fm_mflags, fd, 0);
-#if defined(MAP_ALIGN)
-	if ((maddr == MAP_FAILED) && (errno == EINVAL)) {
-		/*
-		 * If the mapping failed, and we used MAP_ALIGN, assume we're
-		 * on a system that doesn't support this option.  Try again
-		 * without MAP_ALIGN.
-		 */
-		if (fmap->fm_mflags & MAP_ALIGN) {
-			rtld_flags2 |= RT_FL2_NOMALIGN;
-			fmap_setup();
-
-			maddr = (char *)mmap(fmap->fm_maddr, fmap->fm_msize,
-			    (PROT_READ | PROT_EXEC), fmap->fm_mflags, fd, 0);
-		}
-	}
-#endif
-	if (maddr == MAP_FAILED) {
-		rej->rej_type = SGS_REJ_STR;
-		rej->rej_str = strerror(errno);
-		return (NULL);
-	}
-
-	/*
-	 * From now on we will re-use fmap->fm_maddr as the mapping address
-	 * so we augment the flags with MAP_FIXED and drop any MAP_ALIGN.
-	 */
-	fmap->fm_maddr = maddr;
-	fmap->fm_mflags |= MAP_FIXED;
-#if defined(MAP_ALIGN)
-	fmap->fm_mflags &= ~MAP_ALIGN;
-#endif
-
-	/*
-	 * Search through the object vectors to determine what kind of
-	 * object we have.
-	 */
-	for (i = 0; vector[i]; i++) {
-		if ((vector[i]->fct_are_u_this)(rej))
-			return (vector[i]);
-		else if (rej->rej_type) {
-			Rt_map	*lmp;
-
-			/*
-			 * If this object is an explicitly defined shared
-			 * object under inspection by ldd, and contains a
-			 * incompatible capabilities requirement, then
-			 * inform the user, but continue processing.
-			 *
-			 * XXXX - ldd -v for any rej failure.
-			 */
-			if (((rej->rej_type == SGS_REJ_HWCAP_1) ||
-			    (rej->rej_type == SGS_REJ_SFCAP_1)) &&
-			    (lml_main.lm_flags & LML_FLG_TRC_LDDSTUB) &&
-			    ((lmp = lml_main.lm_head) != 0) &&
-			    (FLAGS1(lmp) & FL1_RT_LDDSTUB) &&
-			    (NEXT(lmp) == 0)) {
-				const char	*fmt;
-				if (rej->rej_type == SGS_REJ_HWCAP_1)
-					fmt = MSG_INTL(MSG_LDD_GEN_HWCAP_1);
-				else
-					fmt = MSG_INTL(MSG_LDD_GEN_SFCAP_1);
-				(void) printf(fmt, name, rej->rej_str);
-				return (vector[i]);
-			}
-			return (NULL);
-		}
-	}
-
-	/*
-	 * Unknown file type.
-	 */
-	rej->rej_type = SGS_REJ_UNKFILE;
-	return (NULL);
 }
 
 /*
  * Helper routine for is_so_matched() that consolidates matching a path name,
  * or file name component of a link-map name.
  */
-static int
+inline static int
 _is_so_matched(const char *name, const char *str, int path)
 {
 	const char	*_str;
@@ -766,79 +691,43 @@ _is_so_matched(const char *name, const char *str, int path)
  *
  *  .	a NAME() - typically the full pathname of an object that has been
  *	loaded.  For example, when looking for the dependency "libc.so.1", a
- *	search path is applied, with the eventual NAME() being "/lib/ld.so.1".
- *	The name of the executable is typically a simple filename, such as
- *	"main", as this is the name passed to exec() to start the process.
+ *	search path is applied, with the eventual NAME() being "/lib/libc.so.1".
+ *	The name of a dynamic executable can be a simple filename, such as
+ *	"main", as this can be the name passed to exec() to start the process.
  *
  *  .	a PATHNAME() - this is maintained if the resolved NAME() is different
- * 	to NAME(), ie. the original name is a symbolic link.  This is also
- * 	the resolved full pathname for a dynamic executable.
+ * 	than NAME(), ie. a component of the original name is a symbolic link.
+ *	This is also the resolved full pathname for a simple dynamic executable.
  *
- *  .	a list of ALIAS() names - these are alternative names by which the
- *	object has been found, ie. when dependencies are loaded through a
- * 	variety of different symbolic links.
+ *  .	an ALIAS() name - these are alternative names by which the object has
+ *	been found, ie. when dependencies are loaded through a variety of
+ *	different symbolic links.
  *
  * The name pattern matching can differ depending on whether we are looking
  * for a full path name (path != 0), or a simple file name (path == 0).  Full
- * path names typically match NAME() or PATHNAME() entries, so these link-map
- * names are inspected first when a full path name is being searched for.
- * Simple file names typically match ALIAS() names, so these link-map names are
- * inspected first when a simple file name is being searched for.
+ * path names typically match NAME() or PATHNAME() entries.
  *
  * For all full path name searches, the link-map names are taken as is.  For
  * simple file name searches, only the file name component of any link-map
  * names are used for comparison.
  */
-static Rt_map *
+inline static Rt_map *
 is_so_matched(Rt_map *lmp, const char *name, int path)
 {
 	Aliste		idx;
 	const char	*cp;
 
-	/*
-	 * A pathname is typically going to match a NAME() or PATHNAME(), so
-	 * check these first.
-	 */
-	if (path) {
-		if (strcmp(name, NAME(lmp)) == 0)
-			return (lmp);
+	if (_is_so_matched(name, NAME(lmp), path) == 0)
+		return (lmp);
 
-		if (PATHNAME(lmp) != NAME(lmp)) {
-			if (strcmp(name, PATHNAME(lmp)) == 0)
-				return (lmp);
-		}
+	if (PATHNAME(lmp) != NAME(lmp)) {
+		if (_is_so_matched(name, PATHNAME(lmp), path) == 0)
+			return (lmp);
 	}
 
-	/*
-	 * Typically, dependencies are specified as simple file names
-	 * (DT_NEEDED == libc.so.1), which are expanded to full pathnames to
-	 * open the file.  The full pathname is NAME(), and the original name
-	 * is maintained on the ALIAS() list.
-	 *
-	 * If this is a simple filename, or a pathname has failed to match the
-	 * NAME() and PATHNAME() check above, look through the ALIAS() list.
-	 */
 	for (APLIST_TRAVERSE(ALIAS(lmp), idx, cp)) {
-		/*
-		 * If we're looking for a simple filename, _is_so_matched()
-		 * will reduce the ALIAS name to its simple name.
-		 */
 		if (_is_so_matched(name, cp, path) == 0)
 			return (lmp);
-	}
-
-	/*
-	 * Finally, if this is a simple file name, and any ALIAS() search has
-	 * been completed, match the simple file name of NAME() and PATHNAME().
-	 */
-	if (path == 0) {
-		if (_is_so_matched(name, NAME(lmp), 0) == 0)
-			return (lmp);
-
-		if (PATHNAME(lmp) != NAME(lmp)) {
-			if (_is_so_matched(name, PATHNAME(lmp), 0) == 0)
-				return (lmp);
-		}
 	}
 
 	return (NULL);
@@ -871,7 +760,7 @@ is_so_matched(Rt_map *lmp, const char *name, int path)
  *
  * A full path name, which is a fully resolved path name that starts with a "/"
  * character, or a relative path name that includes a "/" character, must match
- * the link-map names explicitly.  A simple file name, which is any name *not*
+ * the link-map names exactly.  A simple file name, which is any name *not*
  * containing a "/" character, are matched against the file name component of
  * any link-map names.
  */
@@ -889,10 +778,13 @@ is_so_loaded(Lm_list *lml, const char *name, int *in_nfavl)
 	 * registered on the FullPathNode AVL, or not-found AVL trees.
 	 */
 	if (name[0] == '/') {
-		if (((lmp = fpavl_recorded(lml, name, &where)) != NULL) &&
+		uint_t	hash = sgs_str_hash(name);
+
+		if (((lmp = fpavl_recorded(lml, name, hash, &where)) != NULL) &&
 		    ((FLAGS(lmp) & (FLG_RT_OBJECT | FLG_RT_DELETE)) == 0))
 			return (lmp);
-		if (nfavl_recorded(name, 0)) {
+
+		if (nfavl_recorded(name, hash, 0)) {
 			/*
 			 * For dlopen() and dlsym() fall backs, indicate that
 			 * a registered not-found path has indicated that this
@@ -975,7 +867,7 @@ trace_so(Rt_map *clmp, Rej_desc *rej, const char *name, const char *path,
 		 * Was an alternative pathname defined (from a configuration
 		 * file).
 		 */
-		if (rej->rej_flag & FLG_FD_ALTER)
+		if (rej->rej_flags & FLG_REJ_ALTER)
 			str = MSG_INTL(MSG_LDD_FIL_ALTER);
 	} else {
 		if (alter)
@@ -1052,15 +944,6 @@ update_mode(Rt_map *lmp, int omode, int nmode)
 		(void) aplist_append(&lmc->lc_now, lmp, AL_CNT_LMNOW);
 	}
 
-#ifdef	SIEBEL_DISABLE
-	/*
-	 * For patch backward compatibility the following .init collection
-	 * is disabled.
-	 */
-	if (rtld_flags & RT_FL_DISFIX_1)
-		return (pmode);
-#endif
-
 	/*
 	 * If this objects .init has been collected but has not yet been called,
 	 * it may be necessary to reevaluate the object using tsort().  For
@@ -1090,15 +973,15 @@ update_mode(Rt_map *lmp, int omode, int nmode)
  * Determine whether an alias name already exists, and if not create one.  This
  * is typically used to retain dependency names, such as "libc.so.1", which
  * would have been expanded to full path names when they were loaded.  The
- * full path names (NAME() and possibly PATHNAME()) are maintained as Fullpath
- * AVL nodes, and thus would have been matched by fpavl_loaded() during
- * file_open().
+ * full path names (NAME() and possibly PATHNAME()) are maintained on the
+ * FullPathNode AVL tree, and thus would have been matched by fpavl_loaded()
+ * during file_open().
  */
 int
 append_alias(Rt_map *lmp, const char *str, int *added)
 {
-	Aliste	idx;
-	char	*cp;
+	const char	*cp;
+	Aliste		idx;
 
 	/*
 	 * Determine if this filename is already on the alias list.
@@ -1111,13 +994,10 @@ append_alias(Rt_map *lmp, const char *str, int *added)
 	/*
 	 * This is a new alias, append it to the alias list.
 	 */
-	if ((cp = strdup(str)) == NULL)
+	if (((cp = stravl_insert(str, 0, 0, 0)) == NULL) ||
+	    (aplist_append(&ALIAS(lmp), cp, AL_CNT_ALIAS) == NULL))
 		return (0);
 
-	if (aplist_append(&ALIAS(lmp), cp, AL_CNT_ALIAS) == NULL) {
-		free(cp);
-		return (0);
-	}
 	if (added)
 		*added = 1;
 	return (1);
@@ -1200,7 +1080,7 @@ is_devinode_loaded(rtld_stat_t *status, Lm_list *lml, const char *name,
  */
 void
 file_notfound(Lm_list *lml, const char *name, Rt_map *clmp, uint_t flags,
-    Rej_desc * rej)
+    Rej_desc *rej)
 {
 	int	secure = 0;
 
@@ -1243,18 +1123,21 @@ file_notfound(Lm_list *lml, const char *name, Rt_map *clmp, uint_t flags,
 }
 
 static int
-file_open(int err, Lm_list *lml, const char *oname, const char *nname,
-    Rt_map *clmp, uint_t flags, Fdesc *fdesc, Rej_desc *rej, int *in_nfavl)
+file_open(int err, Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp,
+    Rej_desc *rej, int *in_nfavl)
 {
 	rtld_stat_t	status;
 	Rt_map		*nlmp;
-	int		resolved = 0;
-	char		*name;
 	avl_index_t	nfavlwhere = 0;
+	const char	*oname = fdp->fd_oname, *nname = fdp->fd_nname;
+	uint_t		hash = sgs_str_hash(nname);
 
-	fdesc->fd_oname = oname;
 
-	if ((err == 0) && (fdesc->fd_flags & FLG_FD_ALTER))
+	if ((nname = stravl_insert(fdp->fd_nname, hash, 0, 0)) == NULL)
+		return (0);
+	fdp->fd_nname = nname;
+
+	if ((err == 0) && (fdp->fd_flags & FLG_FD_ALTER))
 		DBG_CALL(Dbg_file_config_obj(lml, oname, 0, nname));
 
 	/*
@@ -1264,26 +1147,22 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 	 * one previously used, the process may have changed directory.
 	 */
 	if ((err == 0) && (nname[0] == '/')) {
-		if ((nlmp = fpavl_recorded(lml, nname,
-		    &(fdesc->fd_avlwhere))) != NULL) {
-			fdesc->fd_nname = nname;
-			fdesc->fd_lmp = nlmp;
+		if ((nlmp = fpavl_recorded(lml, nname, hash,
+		    &(fdp->fd_avlwhere))) != NULL) {
+			fdp->fd_lmp = nlmp;
 			return (1);
 		}
-		if (nfavl_recorded(nname, &nfavlwhere)) {
+		if (nfavl_recorded(nname, hash, &nfavlwhere)) {
 			/*
 			 * For dlopen() and dlsym() fall backs, indicate that
 			 * a registered not-found path has indicated that this
 			 * object does not exist.  If this path has been
 			 * constructed as part of expanding a HWCAP directory,
-			 * and as this is a silent failure, where no rejection
-			 * message is created, free the original name to
-			 * simplify the life of the caller.
+			 * this is a silent failure, where no rejection message
+			 * is created.
 			 */
 			if (in_nfavl)
 				(*in_nfavl)++;
-			if (flags & FLG_RT_HWCAP)
-				free((void *)nname);
 			return (0);
 		}
 	}
@@ -1295,14 +1174,25 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 		/*
 		 * If this path has been constructed as part of expanding a
 		 * HWCAP directory, ignore any subdirectories.  As this is a
-		 * silent failure, where no rejection message is created, free
-		 * the original name to simplify the life of the caller.  For
-		 * any other reference that expands to a directory, fall through
+		 * silent failure, no rejection message is created.  For any
+		 * other reference that expands to a directory, fall through
 		 * to construct a meaningful rejection message.
 		 */
 		if ((flags & FLG_RT_HWCAP) &&
-		    ((status.st_mode & S_IFMT) == S_IFDIR)) {
-			free((void *)nname);
+		    ((status.st_mode & S_IFMT) == S_IFDIR))
+			return (0);
+
+		/*
+		 * If this is a directory (which can't be mmap()'ed) generate a
+		 * precise error message.
+		 */
+		if ((status.st_mode & S_IFMT) == S_IFDIR) {
+			rej->rej_name = nname;
+			if (fdp->fd_flags & FLG_FD_ALTER)
+				rej->rej_flags = FLG_REJ_ALTER;
+			rej->rej_type = SGS_REJ_STR;
+			rej->rej_str = strerror(EISDIR);
+			DBG_CALL(Dbg_file_rejected(lml, rej, M_MACH));
 			return (0);
 		}
 
@@ -1310,20 +1200,22 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 		 * Resolve the filename and determine whether the resolved name
 		 * is already known.  Typically, the previous fpavl_loaded()
 		 * will have caught this, as both NAME() and PATHNAME() for a
-		 * link-map are recorded in the FullNode AVL tree.  However,
+		 * link-map are recorded in the FullPathNode AVL tree.  However,
 		 * instances exist where a file can be replaced (loop-back
 		 * mounts, bfu, etc.), and reference is made to the original
 		 * file through a symbolic link.  By checking the pathname here,
 		 * we don't fall through to the dev/inode check and conclude
 		 * that a new file should be loaded.
 		 */
-		if ((nname[0] == '/') && (rtld_flags & RT_FL_EXECNAME) &&
+		if ((nname[0] == '/') &&
 		    ((size = resolvepath(nname, path, (PATH_MAX - 1))) > 0)) {
 			path[size] = '\0';
 
+			fdp->fd_flags |= FLG_FD_RESOLVED;
+
 			if (strcmp(nname, path)) {
 				if ((nlmp =
-				    fpavl_recorded(lml, path, 0)) != NULL) {
+				    fpavl_recorded(lml, path, 0, 0)) != NULL) {
 					added = 0;
 
 					if (append_alias(nlmp, nname,
@@ -1334,8 +1226,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 					    DBG_CALL(Dbg_file_skip(LIST(clmp),
 						NAME(nlmp), nname));
 					/* END CSTYLED */
-					fdesc->fd_nname = nname;
-					fdesc->fd_lmp = nlmp;
+					fdp->fd_lmp = nlmp;
 					return (1);
 				}
 
@@ -1345,17 +1236,9 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 				 * have to be recomputed as part of fullpath()
 				 * processing.
 				 */
-				if ((fdesc->fd_pname = strdup(path)) == NULL)
+				if ((fdp->fd_pname = stravl_insert(path, 0,
+				    (size + 1), 0)) == NULL)
 					return (0);
-				resolved = 1;
-			} else {
-				/*
-				 * If the resolved name doesn't differ from the
-				 * original, save it without duplication.
-				 * Having fd_pname set indicates that no further
-				 * resolvepath processing is necessary.
-				 */
-				fdesc->fd_pname = nname;
 			}
 		}
 
@@ -1372,8 +1255,8 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 				/*
 				 * Otherwise, if an alternatively named file
 				 * has been found for the same dev/inode, add
-				 * a new name alias, and insert any alias full
-				 * pathname in the link-map lists AVL tree.
+				 * a new name alias.  Insert any alias full path
+				 * name in the FullPathNode AVL tree.
 				 */
 				added = 0;
 
@@ -1393,8 +1276,7 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 			 * Record in the file descriptor the existing object
 			 * that satisfies this open request.
 			 */
-			fdesc->fd_nname = nname;
-			fdesc->fd_lmp = nlmp;
+			fdp->fd_lmp = nlmp;
 			return (1);
 		}
 
@@ -1406,26 +1288,27 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 			rej->rej_type = SGS_REJ_STR;
 			rej->rej_str = strerror(errno);
 		} else {
-			Fct	*ftp;
+			/*
+			 * Map the object.  A successful return indicates that
+			 * the object is appropriate for ld.so.1 processing.
+			 */
+			fdp->fd_ftp = map_obj(lml, fdp, status.st_size, nname,
+			    fd, rej);
+			(void) close(fd);
 
-			if ((ftp = are_u_this(rej, fd, &status, nname)) != 0) {
-				fdesc->fd_nname = nname;
-				fdesc->fd_ftp = ftp;
-				fdesc->fd_dev = status.st_dev;
-				fdesc->fd_ino = status.st_ino;
-				fdesc->fd_fd = fd;
+			if (fdp->fd_ftp != NULL) {
+				fdp->fd_dev = status.st_dev;
+				fdp->fd_ino = status.st_ino;
 
 				/*
 				 * Trace that this open has succeeded.
 				 */
 				if (lml->lm_flags & LML_FLG_TRC_ENABLE) {
 					trace_so(clmp, 0, oname, nname,
-					    (fdesc->fd_flags & FLG_FD_ALTER),
-					    0);
+					    (fdp->fd_flags & FLG_FD_ALTER), 0);
 				}
 				return (1);
 			}
-			(void) close(fd);
 		}
 
 	} else if (errno != ENOENT) {
@@ -1441,23 +1324,16 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
 	 * Regardless of error, duplicate and record any full path names that
 	 * can't be used on the "not-found" AVL tree.
 	 */
-	if ((nname[0] == '/') && ((name = strdup(nname)) != NULL))
-		nfavl_insert(name, nfavlwhere);
+	if (nname[0] == '/')
+		nfavl_insert(nname, nfavlwhere);
 
 	/*
 	 * Indicate any rejection.
 	 */
 	if (rej->rej_type) {
-		/*
-		 * If this pathname was resolved and duplicated, remove the
-		 * allocated name to simplify the cleanup of the callers.
-		 */
-		if (resolved) {
-			free((void *)fdesc->fd_pname);
-			fdesc->fd_pname = NULL;
-		}
 		rej->rej_name = nname;
-		rej->rej_flag = (fdesc->fd_flags & FLG_FD_ALTER);
+		if (fdp->fd_flags & FLG_FD_ALTER)
+			rej->rej_flags = FLG_REJ_ALTER;
 		DBG_CALL(Dbg_file_rejected(lml, rej, M_MACH));
 	}
 	return (0);
@@ -1467,10 +1343,11 @@ file_open(int err, Lm_list *lml, const char *oname, const char *nname,
  * Find a full pathname (it contains a "/").
  */
 int
-find_path(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
-    Fdesc *fdesc, Rej_desc *rej, int *in_nfavl)
+find_path(Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp, Rej_desc *rej,
+    int *in_nfavl)
 {
-	int	err = 0;
+	const char	*oname = fdp->fd_oname;
+	int		err = 0;
 
 	/*
 	 * If directory configuration exists determine if this path is known.
@@ -1497,7 +1374,9 @@ find_path(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
 			    (rtld_flags & RT_FL_OBJALT) && (lml == &lml_main)) {
 				int	ret;
 
-				fdesc->fd_flags |= FLG_FD_ALTER;
+				fdp->fd_flags |= FLG_FD_ALTER;
+				fdp->fd_nname = aname;
+
 				/*
 				 * Attempt to open the alternative path.  If
 				 * this fails, and the alternative is flagged
@@ -1506,28 +1385,30 @@ find_path(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
 				 */
 				DBG_CALL(Dbg_libs_found(lml, aname,
 				    FLG_FD_ALTER));
-				if (((ret = file_open(0, lml, oname, aname,
-				    clmp, flags, fdesc, rej, in_nfavl)) != 0) ||
-				    ((obj->co_flags & RTC_OBJ_OPTINAL) == 0))
+				ret = file_open(0, lml, clmp, flags, fdp,
+				    rej, in_nfavl);
+				if (ret || ((obj->co_flags &
+				    RTC_OBJ_OPTINAL) == 0))
 					return (ret);
 
-				fdesc->fd_flags &= ~FLG_FD_ALTER;
+				fdp->fd_flags &= ~FLG_FD_ALTER;
 			}
 		}
 	}
 	DBG_CALL(Dbg_libs_found(lml, oname, 0));
-	return (file_open(err, lml, oname, oname, clmp, flags, fdesc,
-	    rej, in_nfavl));
+	fdp->fd_nname = oname;
+	return (file_open(err, lml, clmp, flags, fdp, rej, in_nfavl));
 }
 
 /*
  * Find a simple filename (it doesn't contain a "/").
  */
 static int
-_find_file(Lm_list *lml, const char *oname, const char *nname, Rt_map *clmp,
-    uint_t flags, Fdesc *fdesc, Rej_desc *rej, Pnode *dir, int aflag,
-    int *in_nfavl)
+_find_file(Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp, Rej_desc *rej,
+    Pdesc *pdp, int aflag, int *in_nfavl)
 {
+	const char	*nname = fdp->fd_nname;
+
 	DBG_CALL(Dbg_libs_found(lml, nname, aflag));
 	if ((lml->lm_flags & LML_FLG_TRC_SEARCH) &&
 	    ((FLAGS1(clmp) & FL1_RT_LDDSTUB) == 0)) {
@@ -1540,65 +1421,61 @@ _find_file(Lm_list *lml, const char *oname, const char *nname, Rt_map *clmp,
 	 * to go search for.  The audit library may offer an alternative
 	 * dependency, or indicate that this dependency should be ignored.
 	 */
-	if ((lml->lm_tflags | FLAGS1(clmp)) & LML_TFLG_AUD_OBJSEARCH) {
+	if ((lml->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_OBJSEARCH) {
 		char	*aname;
 
 		if ((aname = audit_objsearch(clmp, nname,
-		    (dir->p_orig & LA_SER_MASK))) == 0) {
+		    (pdp->pd_flags & LA_SER_MASK))) == NULL) {
 			DBG_CALL(Dbg_audit_terminate(lml, nname));
 			return (0);
 		}
 
-		/*
-		 * Protect ourselves from auditor mischief, by copying any
-		 * alternative name over the present name (the present name is
-		 * maintained in a static buffer - see elf_get_so());
-		 */
-		if (nname != aname)
-			(void) strncpy((char *)nname, aname, PATH_MAX);
+		if (aname != nname) {
+			fdp->fd_flags &= ~FLG_FD_SLASH;
+			fdp->fd_nname = aname;
+		}
 	}
-	return (file_open(0, lml, oname, nname, clmp, flags, fdesc,
-	    rej, in_nfavl));
+	return (file_open(0, lml, clmp, flags, fdp, rej, in_nfavl));
 }
 
 static int
-find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
-    Fdesc *fdesc, Rej_desc *rej, Pnode *dir, Word * strhash, size_t olen,
-    int *in_nfavl)
+find_file(Lm_list *lml, Rt_map *clmp, uint_t flags, Fdesc *fdp, Rej_desc *rej,
+    Pdesc *pdp, Word *strhash, int *in_nfavl)
 {
 	static Rtc_obj	Obj = { 0 };
 	Rtc_obj		*dobj;
-	const char	*nname = oname;
+	const char	*oname = fdp->fd_oname;
+	size_t		olen = strlen(oname);
 
-	if (dir->p_name == 0)
+	if (pdp->pd_pname == NULL)
 		return (0);
-	if (dir->p_info) {
-		dobj = (Rtc_obj *)dir->p_info;
+	if (pdp->pd_info) {
+		dobj = (Rtc_obj *)pdp->pd_info;
 		if ((dobj->co_flags &
 		    (RTC_OBJ_NOEXIST | RTC_OBJ_ALTER)) == RTC_OBJ_NOEXIST)
 			return (0);
 	} else
-		dobj = 0;
+		dobj = NULL;
 
 	/*
 	 * If configuration information exists see if this directory/file
 	 * combination exists.
 	 */
 	if ((rtld_flags & RT_FL_DIRCFG) &&
-	    ((dobj == 0) || (dobj->co_id != 0))) {
+	    ((dobj == NULL) || (dobj->co_id != 0))) {
 		Rtc_obj		*fobj;
-		const char	*alt = 0;
+		const char	*aname = NULL;
 
 		/*
-		 * If this pnode has not yet been searched for in the
-		 * configuration file go find it.
+		 * If this object descriptor has not yet been searched for in
+		 * the configuration file go find it.
 		 */
-		if (dobj == 0) {
-			dobj = elf_config_ent(dir->p_name,
-			    (Word)elf_hash(dir->p_name), 0, 0);
-			if (dobj == 0)
+		if (dobj == NULL) {
+			dobj = elf_config_ent(pdp->pd_pname,
+			    (Word)elf_hash(pdp->pd_pname), 0, 0);
+			if (dobj == NULL)
 				dobj = &Obj;
-			dir->p_info = (void *)dobj;
+			pdp->pd_info = (void *)dobj;
 
 			if ((dobj->co_flags & (RTC_OBJ_NOEXIST |
 			    RTC_OBJ_ALTER)) == RTC_OBJ_NOEXIST)
@@ -1609,10 +1486,10 @@ find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
 		 * If we found a directory search for the file.
 		 */
 		if (dobj->co_id != 0) {
-			if (*strhash == 0)
-				*strhash = (Word)elf_hash(nname);
-			fobj = elf_config_ent(nname, *strhash,
-			    dobj->co_id, &alt);
+			if (*strhash == NULL)
+				*strhash = (Word)elf_hash(oname);
+			fobj = elf_config_ent(oname, *strhash,
+			    dobj->co_id, &aname);
 
 			/*
 			 * If this object specifically does not exist, or the
@@ -1620,7 +1497,7 @@ find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
 			 * directory, continue looking.  If the object does
 			 * exist determine if an alternative object exists.
 			 */
-			if (fobj == 0) {
+			if (fobj == NULL) {
 				if (dobj->co_flags & RTC_OBJ_ALLENTS)
 					return (0);
 			} else {
@@ -1633,21 +1510,22 @@ find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
 				    (lml == &lml_main)) {
 					int	ret;
 
-					fdesc->fd_flags |= FLG_FD_ALTER;
+					fdp->fd_flags |= FLG_FD_ALTER;
+					fdp->fd_nname = aname;
+
 					/*
 					 * Attempt to open the alternative path.
 					 * If this fails, and the alternative is
 					 * flagged as optional, fall through to
 					 * open the original path.
 					 */
-					ret = _find_file(lml, oname, alt, clmp,
-					    flags, fdesc, rej, dir, 1,
-					    in_nfavl);
+					ret = _find_file(lml, clmp, flags, fdp,
+					    rej, pdp, 1, in_nfavl);
 					if (ret || ((fobj->co_flags &
 					    RTC_OBJ_OPTINAL) == 0))
 						return (ret);
 
-					fdesc->fd_flags &= ~FLG_FD_ALTER;
+					fdp->fd_flags &= ~FLG_FD_ALTER;
 				}
 			}
 		}
@@ -1656,120 +1534,361 @@ find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
 	/*
 	 * Protect ourselves from building an invalid pathname.
 	 */
-	if ((olen + dir->p_len + 1) >= PATH_MAX) {
-		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), nname,
+	if ((olen + pdp->pd_plen + 1) >= PATH_MAX) {
+		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_SYS_OPEN), oname,
 		    strerror(ENAMETOOLONG));
 			return (0);
 	}
-	if ((nname = (LM_GET_SO(clmp)(dir->p_name, nname))) == 0)
+	if ((fdp->fd_nname = (LM_GET_SO(clmp)(pdp->pd_pname, oname,
+	    pdp->pd_plen, olen))) == NULL)
 		return (0);
 
-	return (_find_file(lml, oname, nname, clmp, flags, fdesc, rej,
-	    dir, 0, in_nfavl));
+	return (_find_file(lml, clmp, flags, fdp, rej, pdp, 0, in_nfavl));
+}
+
+static Fct	*Vector[] = {
+	&elf_fct,
+#ifdef	A_OUT
+	&aout_fct,
+#endif
+	0
+};
+
+/*
+ * Remap the first page of a file to provide a better diagnostic as to why
+ * an mmapobj(2) operation on this file failed.  Sadly, mmapobj(), and all
+ * system calls for that matter, only pass back a generic failure in errno.
+ * Hopefully one day this will be improved, but in the mean time we repeat
+ * the kernels ELF verification to try and provide more detailed information.
+ */
+static int
+map_fail(Fdesc *fdp, size_t fsize, const char *name, int fd, Rej_desc *rej)
+{
+	caddr_t	addr;
+	int	vnum;
+	size_t	size;
+
+	/*
+	 * Use the original file size to determine what to map, and catch the
+	 * obvious error of a zero sized file.
+	 */
+	if (fsize == 0) {
+		rej->rej_type = SGS_REJ_UNKFILE;
+		return (1);
+	} else if (fsize < syspagsz)
+		size = fsize;
+	else
+		size = syspagsz;
+
+	if ((addr = mmap(0, size, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED)
+		return (0);
+
+	rej->rej_type = 0;
+
+	/*
+	 * Validate the file against each supported file type.  Should a
+	 * characteristic of the file be found invalid for this platform, a
+	 * rejection message will have been recorded.
+	 */
+	for (vnum = 0; Vector[vnum]; vnum++) {
+		if (((Vector[vnum]->fct_verify_file)(addr, size,
+		    fdp, name, rej) == 0) && rej->rej_type)
+			break;
+	}
+
+	/*
+	 * If no rejection message has been recorded, then this is simply an
+	 * unknown file type.
+	 */
+	if (rej->rej_type == 0)
+		rej->rej_type = SGS_REJ_UNKFILE;
+
+	(void) munmap(addr, size);
+	return (1);
+}
+
+/*
+ * Unmap a file.
+ */
+void
+unmap_obj(mmapobj_result_t *mpp, uint_t mapnum)
+{
+	uint_t	num;
+
+	for (num = 0; num < mapnum; num++) {
+		/* LINTED */
+		(void) munmap((void *)(uintptr_t)mpp[num].mr_addr,
+		    mpp[num].mr_msize);
+	}
+}
+
+/*
+ * Map a file.
+ */
+Fct *
+map_obj(Lm_list *lml, Fdesc *fdp, size_t fsize, const char *name, int fd,
+    Rej_desc *rej)
+{
+	static mmapobj_result_t	*smpp = NULL;
+	static uint_t		smapnum;
+	mmapobj_result_t	*mpp;
+	uint_t			mnum, mapnum, mflags;
+	void			*padding;
+
+	/*
+	 * Allocate an initial mapping array.  The initial size should be large
+	 * enough to handle the normal ELF objects we come across.
+	 */
+	if (smpp == NULL) {
+		smpp = malloc(sizeof (mmapobj_result_t) * MMAPFD_NUM);
+		if (smpp == NULL)
+			return (NULL);
+		smapnum = MMAPFD_NUM;
+	}
+
+	/*
+	 * If object padding is required, set the necessary flags.
+	 */
+	if (r_debug.rtd_objpad) {
+		mflags = MMOBJ_INTERPRET | MMOBJ_PADDING;
+		padding = &r_debug.rtd_objpad;
+	} else {
+		mflags = MMOBJ_INTERPRET;
+		padding = NULL;
+	}
+
+	/*
+	 * Map the file.  If the number of mappings required by this file
+	 * exceeds the present mapping structure, an error indicating the
+	 * return data is too big is returned.  Bail on any other error.
+	 */
+	mapnum = smapnum;
+	if (mmapobj(fd, mflags, smpp, &mapnum, padding) == -1) {
+		if (errno != E2BIG) {
+			int	err = errno;
+
+			/*
+			 * An unsupported error indicates that there's something
+			 * incompatible with this ELF file, and the process that
+			 * is already running.  Map the first page of the file
+			 * and see if we can generate a better error message.
+			 */
+			if ((errno == ENOTSUP) && map_fail(fdp, fsize, name,
+			    fd, rej))
+				return (NULL);
+
+			rej->rej_type = SGS_REJ_STR;
+			rej->rej_str = strerror(err);
+			return (NULL);
+		}
+
+		/*
+		 * The mapping requirement exceeds the present mapping
+		 * structure, however the number of mapping required is
+		 * available in the mapping number.
+		 */
+		free((void *)smpp);
+		if ((smpp = malloc(sizeof (mmapobj_result_t) * mapnum)) == NULL)
+			return (NULL);
+		smapnum = mapnum;
+
+		/*
+		 * With the appropriate mapping structure, try the mapping
+		 * request again.
+		 */
+		if (mmapobj(fd, mflags, smpp, &mapnum, padding) == -1) {
+			rej->rej_type = SGS_REJ_STR;
+			rej->rej_str = strerror(errno);
+			return (NULL);
+		}
+	}
+	ASSERT(mapnum != 0);
+
+	/*
+	 * Traverse the mappings in search of a file type ld.so.1 can process.
+	 * If the file type is verified as one ld.so.1 can process, retain the
+	 * mapping information, and the number of mappings this object uses,
+	 * and clear the static mapping pointer for the next map_obj() use of
+	 * mmapobj().
+	 */
+	DBG_CALL(Dbg_file_mmapobj(lml, name, smpp, mapnum));
+
+	for (mnum = 0, mpp = smpp; mnum < mapnum; mnum++, mpp++) {
+		uint_t	flags = (mpp->mr_flags & MR_TYPE_MASK);
+		Fct	*fptr = NULL;
+
+		if (flags == MR_HDR_ELF) {
+			fptr = elf_verify((mpp->mr_addr + mpp->mr_offset),
+			    mpp->mr_fsize, fdp, name, rej);
+		}
+#ifdef	A_OUT
+		if (flags == MR_HDR_AOUT) {
+			fptr = aout_verify((mpp->mr_addr + mpp->mr_offset),
+			    mpp->mr_fsize, fdp, name, rej);
+		}
+#endif
+		if (fptr) {
+			fdp->fd_mapn = mapnum;
+			fdp->fd_mapp = smpp;
+
+			smpp = NULL;
+
+			return (fptr);
+		}
+	}
+
+	/*
+	 * If the mapped file is inappropriate, indicate that the file type is
+	 * unknown, and free the mapping.
+	 */
+	if (rej->rej_type == 0)
+		rej->rej_type = SGS_REJ_UNKFILE;
+	unmap_obj(smpp, mapnum);
+
+	return (NULL);
 }
 
 /*
  * A unique file has been opened.  Create a link-map to represent it, and
  * process the various names by which it can be referenced.
  */
-static Rt_map *
-load_file(Lm_list *lml, Aliste lmco, Fdesc *fdesc, int *in_nfavl)
+Rt_map *
+load_file(Lm_list *lml, Aliste lmco, Fdesc *fdp, int *in_nfavl)
 {
-	const char	*oname = fdesc->fd_oname;
-	const char	*nname = fdesc->fd_nname;
-	Rt_map		*nlmp;
+	mmapobj_result_t	*fpmpp = NULL, *fmpp = NULL, *lpmpp, *lmpp;
+	mmapobj_result_t	*hmpp, *mpp, *ompp = fdp->fd_mapp;
+	uint_t			mnum, omapnum = fdp->fd_mapn;
+	const char		*nname = fdp->fd_nname;
+	Rt_map			*nlmp;
+	Ehdr			*ehdr = NULL;
 
 	/*
-	 * Typically we call fct_map_so() with the full pathname of the opened
-	 * file (nname) and the name that started the search (oname), thus for
-	 * a typical dependency on libc this would be /usr/lib/libc.so.1 and
-	 * libc.so.1 (DT_NEEDED).  The original name is maintained on an ALIAS
-	 * list for comparison when bringing in new dependencies.  If the user
-	 * specified name as a full path (from a dlopen() for example) then
-	 * there's no need to create an ALIAS.
+	 * Traverse the mappings for the input file to capture generic mapping
+	 * information, and create a link-map to represent the file.
 	 */
-	if (strcmp(oname, nname) == 0)
-		oname = 0;
+	for (mnum = 0, mpp = ompp; mnum < omapnum; mnum++, mpp++) {
+		uint_t	flags = (mpp->mr_flags & MR_TYPE_MASK);
+
+		/*
+		 * Keep track of the first and last mappings that may include
+		 * padding.
+		 */
+		if (fpmpp == NULL)
+			fpmpp = mpp;
+		lpmpp = mpp;
+
+		/*
+		 * Keep track of the first and last mappings that do not include
+		 * padding.
+		 */
+		if (flags != MR_PADDING) {
+			if (fmpp == NULL)
+				fmpp = mpp;
+			lmpp = mpp;
+		}
+		if (flags == MR_HDR_ELF) {
+			/* LINTED */
+			ehdr = (Ehdr *)(mpp->mr_addr + mpp->mr_offset);
+			hmpp = mpp;
+		} else if (flags == MR_HDR_AOUT)
+			hmpp = mpp;
+	}
 
 	/*
-	 * A new file has been opened, now map it into the process.  Close the
-	 * original file so as not to accumulate file descriptors.
-	 */
-	nlmp = ((fdesc->fd_ftp)->fct_map_so)(lml, lmco, nname, oname,
-	    fdesc->fd_fd, in_nfavl);
-	(void) close(fdesc->fd_fd);
-	fdesc->fd_fd = 0;
-
-	if (nlmp == 0)
-		return (NULL);
-
-	/*
-	 * Save the dev/inode information for later comparisons.
-	 */
-	STDEV(nlmp) = fdesc->fd_dev;
-	STINO(nlmp) = fdesc->fd_ino;
-
-	/*
-	 * Insert the names of this link-map into the FullpathNode AVL tree.
-	 * Save both the NAME() and PATHNAME() is they differ.
+	 * The only ELF files we can handle are ET_EXEC, ET_DYN, and ET_REL.
 	 *
-	 * If this is an OBJECT file, don't insert it yet as this is only a
-	 * temporary link-map.  During elf_obj_fini() the final link-map is
-	 * created, and its names will be inserted in the FullpathNode AVL
-	 * tree at that time.
+	 * ET_REL must be processed by ld(1) to create an in-memory ET_DYN.
+	 * The initial processing carried out by elf_obj_file() creates a
+	 * temporary link-map, that acts as a place holder, until the objects
+	 * processing is finished with elf_obj_fini().
 	 */
-	if ((FLAGS(nlmp) & FLG_RT_OBJECT) == 0) {
-		/*
-		 * Update the objects full path information if necessary.
-		 * Note, with pathname expansion in effect, the fd_pname will
-		 * be used as PATHNAME().  This allocated string will be freed
-		 * should this object be deleted.  However, without pathname
-		 * expansion, the fd_name should be freed now, as it is no
-		 * longer referenced.
-		 */
-		if (FLAGS1(nlmp) & FL1_RT_RELATIVE)
-			(void) fullpath(nlmp, fdesc->fd_pname);
-		else if (fdesc->fd_pname != fdesc->fd_nname)
-			free((void *)fdesc->fd_pname);
-		fdesc->fd_pname = 0;
-
-		if ((NAME(nlmp)[0] == '/') && (fpavl_insert(lml, nlmp,
-		    NAME(nlmp), fdesc->fd_avlwhere) == 0)) {
-			remove_so(lml, nlmp);
-			return (NULL);
-		}
-		if (((NAME(nlmp)[0] != '/') ||
-		    (NAME(nlmp) != PATHNAME(nlmp))) &&
-		    (fpavl_insert(lml, nlmp, PATHNAME(nlmp), 0) == 0)) {
-			remove_so(lml, nlmp);
-			return (NULL);
-		}
+	if (ehdr && (ehdr->e_type == ET_REL)) {
+		if ((nlmp = elf_obj_file(lml, lmco, nname, hmpp, ompp,
+		    omapnum)) == NULL)
+			return (nlmp);
+	} else {
+		Addr	addr;
+		size_t	msize;
 
 		/*
-		 * If this is a secure application, record any full path name
-		 * directory in which this dependency has been found.  This
-		 * directory can be deemed safe (as we've already found a
-		 * dependency here).  This recording provides a fall-back
-		 * should another objects $ORIGIN definition expands to this
-		 * directory, an expansion that would ordinarily be deemed
-		 * insecure.
+		 * The size of the total reservation, and the padding range,
+		 * are a historic artifact required by debuggers.  Although
+		 * these values express the range of the associated mappings,
+		 * there can be holes between segments (in which small objects
+		 * could be mapped).  Anyone who needs to verify offsets
+		 * against segments should analyze all the object mappings,
+		 * rather than relying on these address ranges.
 		 */
-		if (rtld_flags & RT_FL_SECURE) {
-			if (NAME(nlmp)[0] == '/')
-				spavl_insert(NAME(nlmp));
-			if ((NAME(nlmp) != PATHNAME(nlmp)) &&
-			    (PATHNAME(nlmp)[0] == '/'))
-				spavl_insert(PATHNAME(nlmp));
-		}
+		addr = (Addr)(hmpp->mr_addr + hmpp->mr_offset);
+		msize = lmpp->mr_addr + lmpp->mr_msize - fmpp->mr_addr;
+
+		if ((nlmp = ((fdp->fd_ftp)->fct_new_lmp)(lml, lmco, fdp, addr,
+		    msize, NULL, in_nfavl)) == NULL)
+			return (NULL);
+
+		/*
+		 * Save generic mapping information.
+		 */
+		MMAPS(nlmp) = ompp;
+		MMAPCNT(nlmp) = omapnum;
+		PADSTART(nlmp) = (ulong_t)fpmpp->mr_addr;
+		PADIMLEN(nlmp) = lpmpp->mr_addr + lpmpp->mr_msize -
+		    fpmpp->mr_addr;
+	}
+
+	/*
+	 * Save the dev/inode information for later comparisons, and identify
+	 * this as a new object.
+	 */
+	STDEV(nlmp) = fdp->fd_dev;
+	STINO(nlmp) = fdp->fd_ino;
+	FLAGS(nlmp) |= FLG_RT_NEWLOAD;
+
+	/*
+	 * If this is ELF relocatable object, we're done for now.
+	 */
+	if (ehdr && (ehdr->e_type == ET_REL))
+		return (nlmp);
+
+	/*
+	 * Insert the names of this link-map into the FullPathNode AVL tree.
+	 * Save both the NAME() and PATHNAME() if the names differ.
+	 */
+	(void) fullpath(nlmp, fdp);
+
+	if ((NAME(nlmp)[0] == '/') && (fpavl_insert(lml, nlmp, NAME(nlmp),
+	    fdp->fd_avlwhere) == 0)) {
+		remove_so(lml, nlmp);
+		return (NULL);
+	}
+	if (((NAME(nlmp)[0] != '/') || (NAME(nlmp) != PATHNAME(nlmp))) &&
+	    (fpavl_insert(lml, nlmp, PATHNAME(nlmp), 0) == 0)) {
+		remove_so(lml, nlmp);
+		return (NULL);
+	}
+
+	/*
+	 * If this is a secure application, record any full path name directory
+	 * in which this dependency has been found.  This directory can be
+	 * deemed safe (as we've already found a dependency here).  This
+	 * recording provides a fall-back should another objects $ORIGIN
+	 * definition expands to this directory, an expansion that would
+	 * ordinarily be deemed insecure.
+	 */
+	if (rtld_flags & RT_FL_SECURE) {
+		if (NAME(nlmp)[0] == '/')
+			spavl_insert(NAME(nlmp));
+		if ((NAME(nlmp) != PATHNAME(nlmp)) &&
+		    (PATHNAME(nlmp)[0] == '/'))
+			spavl_insert(PATHNAME(nlmp));
 	}
 
 	/*
 	 * If we're processing an alternative object reset the original name
 	 * for possible $ORIGIN processing.
 	 */
-	if (fdesc->fd_flags & FLG_FD_ALTER) {
-		const char	*odir;
-		char		*ndir;
+	if (fdp->fd_flags & FLG_FD_ALTER) {
+		const char	*odir, *ndir;
 		size_t		olen;
 
 		FLAGS(nlmp) |= FLG_RT_ALTER;
@@ -1780,32 +1899,23 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdesc, int *in_nfavl)
 		 * directory is in dir->p_name (which is all we need for
 		 * $ORIGIN).
 		 */
-		if (fdesc->fd_flags & FLG_FD_SLASH) {
+		if (fdp->fd_flags & FLG_FD_SLASH) {
 			char	*ofil;
 
-			odir = oname;
-			ofil = strrchr(oname, '/');
+			odir = fdp->fd_oname;
+			ofil = strrchr(fdp->fd_oname, '/');
 			olen = ofil - odir + 1;
 		} else {
-			odir = fdesc->fd_odir;
+			odir = fdp->fd_odir;
 			olen = strlen(odir) + 1;
 		}
-
-		if ((ndir = (char *)malloc(olen)) == 0) {
+		if ((ndir = stravl_insert(odir, 0, olen, 1)) == NULL) {
 			remove_so(lml, nlmp);
 			return (NULL);
 		}
-		(void) strncpy(ndir, odir, olen);
-		ndir[--olen] = '\0';
-
 		ORIGNAME(nlmp) = ndir;
-		DIRSZ(nlmp) = olen;
+		DIRSZ(nlmp) = --olen;
 	}
-
-	/*
-	 * Identify this as a new object.
-	 */
-	FLAGS(nlmp) |= FLG_RT_NEWLOAD;
 
 	return (nlmp);
 }
@@ -1818,38 +1928,29 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc *fdesc, int *in_nfavl)
  * of link maps and return a pointer to the new link map.  Return 0 on error.
  */
 static Rt_map *
-load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
-    uint_t flags, Fdesc *nfdp, Rej_desc *rej, int *in_nfavl)
+load_so(Lm_list *lml, Aliste lmco, Rt_map *clmp, uint_t flags,
+    Fdesc *fdp, Rej_desc *rej, int *in_nfavl)
 {
-	char		*name;
-	uint_t		slash = 0;
-	size_t		olen;
-	Fdesc		fdesc = { 0 };
-	Pnode		*dir;
+	const char	*oname = fdp->fd_oname;
+	Pdesc		*pdp;
 
 	/*
-	 * If the file is the run time linker then it's already loaded.
+	 * If this path name hasn't already been identified as containing a
+	 * slash, check the path name.  Most paths have been constructed
+	 * through appending a file name to a search path, and/or have been
+	 * inspected by expand(), and thus have a slash.  However, we can
+	 * receive path names via auditors or configuration files, and thus
+	 * an evaluation here catches these instances.
 	 */
-	if (interp && (strcmp(oname, NAME(lml_rtld.lm_head)) == 0))
-		return (lml_rtld.lm_head);
-
-	/*
-	 * If this isn't a hardware capabilities pathname, which is already a
-	 * full, duplicated pathname, determine whether the pathname contains
-	 * a slash, and if not determine the input filename (for max path
-	 * length verification).
-	 */
-	if ((flags & FLG_RT_HWCAP) == 0) {
+	if ((fdp->fd_flags & FLG_FD_SLASH) == 0) {
 		const char	*str;
 
 		for (str = oname; *str; str++) {
 			if (*str == '/') {
-				slash++;
+				fdp->fd_flags |= FLG_FD_SLASH;
 				break;
 			}
 		}
-		if (slash == 0)
-			olen = (str - oname) + 1;
 	}
 
 	/*
@@ -1877,37 +1978,19 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		/*
 		 * If this object is already loaded, we're done.
 		 */
-		if (nfdp->fd_lmp)
-			return (nfdp->fd_lmp);
+		if (fdp->fd_lmp)
+			return (fdp->fd_lmp);
 
 		/*
 		 * Obtain the avl index for this object.
 		 */
-		(void) fpavl_recorded(lml, nfdp->fd_nname,
-		    &(nfdp->fd_avlwhere));
+		(void) fpavl_recorded(lml, fdp->fd_nname, 0,
+		    &(fdp->fd_avlwhere));
 
-		/*
-		 * If the name and resolved pathname differ, duplicate the path
-		 * name once more to provide for generic cleanup by the caller.
-		 */
-		if (nfdp->fd_pname && (nfdp->fd_nname != nfdp->fd_pname)) {
-			char	*pname;
-
-			if ((pname = strdup(nfdp->fd_pname)) == NULL)
-				return (NULL);
-			nfdp->fd_pname = pname;
-		}
-
-		nfdp->fd_flags |= FLG_FD_SLASH;
-
-	} else if (slash) {
+	} else if (fdp->fd_flags & FLG_FD_SLASH) {
 		Rej_desc	_rej = { 0 };
 
-		*nfdp = fdesc;
-		nfdp->fd_flags = FLG_FD_SLASH;
-
-		if (find_path(lml, oname, clmp, flags, nfdp,
-		    &_rej, in_nfavl) == 0) {
+		if (find_path(lml, clmp, flags, fdp, &_rej, in_nfavl) == 0) {
 			rejection_inherit(rej, &_rej);
 			return (NULL);
 		}
@@ -1915,36 +1998,28 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		/*
 		 * If this object is already loaded, we're done.
 		 */
-		if (nfdp->fd_lmp)
-			return (nfdp->fd_lmp);
+		if (fdp->fd_lmp)
+			return (fdp->fd_lmp);
 
 	} else {
 		/*
 		 * No '/' - for each directory on list, make a pathname using
 		 * that directory and filename and try to open that file.
 		 */
-		Pnode		*dirlist = (Pnode *)0;
+		Spath_desc	sd = { search_rules, NULL, 0 };
 		Word		strhash = 0;
-#if	!defined(ISSOLOAD_BASENAME_DISABLED)
-		Rt_map		*nlmp;
-#endif
+		int		found = 0;
+
 		DBG_CALL(Dbg_libs_find(lml, oname));
 
-#if	!defined(ISSOLOAD_BASENAME_DISABLED)
-		if ((nlmp = is_so_loaded(lml, oname, in_nfavl)))
-			return (nlmp);
-#endif
 		/*
-		 * Make sure we clear the file descriptor new name in case the
-		 * following directory search doesn't provide any directories
-		 * (odd, but this can be forced with a -znodefaultlib test).
+		 * Traverse the search path lists, creating full pathnames and
+		 * attempt to load each path.
 		 */
-		*nfdp = fdesc;
-		for (dir = get_next_dir(&dirlist, clmp, flags); dir;
-		    dir = get_next_dir(&dirlist, clmp, flags)) {
+		for (pdp = get_next_dir(&sd, clmp, flags); pdp;
+		    pdp = get_next_dir(&sd, clmp, flags)) {
 			Rej_desc	_rej = { 0 };
-
-			*nfdp = fdesc;
+			Fdesc		fd = { 0 };
 
 			/*
 			 * Under debugging, duplicate path name entries are
@@ -1953,16 +2028,18 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 			 * Skip these entries, as this path would have already
 			 * been attempted.
 			 */
-			if (dir->p_orig & PN_FLG_DUPLICAT)
+			if (pdp->pd_flags & PD_FLG_DUPLICAT)
 				continue;
+
+			fd = *fdp;
 
 			/*
 			 * Try and locate this file.  Make sure to clean up
 			 * any rejection information should the file have
 			 * been found, but not appropriate.
 			 */
-			if (find_file(lml, oname, clmp, flags, nfdp, &_rej,
-			    dir, &strhash, olen, in_nfavl) == 0) {
+			if (find_file(lml, clmp, flags, &fd, &_rej, pdp,
+			    &strhash, in_nfavl) == 0) {
 				rejection_inherit(rej, &_rej);
 				continue;
 			}
@@ -1972,17 +2049,19 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 			 * this is an LD_LIBRARY_PATH setting, ignore any use
 			 * by ld.so.1 itself.
 			 */
-			if (((dir->p_orig & LA_SER_LIBPATH) == 0) ||
+			if (((pdp->pd_flags & LA_SER_LIBPATH) == 0) ||
 			    ((lml->lm_flags & LML_FLG_RTLDLM) == 0))
-				dir->p_orig |= PN_FLG_USED;
+				pdp->pd_flags |= PD_FLG_USED;
 
 			/*
 			 * If this object is already loaded, we're done.
 			 */
-			if (nfdp->fd_lmp)
-				return (nfdp->fd_lmp);
+			*fdp = fd;
+			if (fdp->fd_lmp)
+				return (fdp->fd_lmp);
 
-			nfdp->fd_odir = dir->p_name;
+			fdp->fd_odir = pdp->pd_pname;
+			found = 1;
 			break;
 		}
 
@@ -1994,23 +2073,9 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		 * (i.e., a file might have a dependency on foo.so.1 which has
 		 * already been opened using its full pathname).
 		 */
-		if (nfdp->fd_nname == NULL)
+		if (found == 0)
 			return (is_so_loaded(lml, oname, in_nfavl));
 	}
-
-	/*
-	 * Duplicate the file name so that NAME() is available in core files.
-	 * Note, that hardware capability names are already duplicated, but
-	 * they get duplicated once more to insure consistent cleanup in the
-	 * event of an error condition.
-	 */
-	if ((name = strdup(nfdp->fd_nname)) == NULL)
-		return (NULL);
-
-	if (nfdp->fd_nname == nfdp->fd_pname)
-		nfdp->fd_nname = nfdp->fd_pname = name;
-	else
-		nfdp->fd_nname = name;
 
 	/*
 	 * Finish mapping the file and return the link-map descriptor.  Note,
@@ -2020,16 +2085,16 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 	 * this mapping needs to be reset to insure it doesn't mistakenly get
 	 * unmapped as part of HWCAP cleanup.
 	 */
-	return (load_file(lml, lmco, nfdp, in_nfavl));
+	return (load_file(lml, lmco, fdp, in_nfavl));
 }
 
 /*
- * Trace an attempt to load an object.
+ * Trace an attempt to load an object, and seed the originating name.
  */
-int
-load_trace(Lm_list *lml, const char **oname, Rt_map *clmp)
+const char *
+load_trace(Lm_list *lml, Pdesc *pdp, Rt_map *clmp, Fdesc *fdp)
 {
-	const char	*name = *oname;
+	const char	*name = pdp->pd_pname;
 
 	/*
 	 * First generate any ldd(1) diagnostics.
@@ -2039,41 +2104,38 @@ load_trace(Lm_list *lml, const char **oname, Rt_map *clmp)
 		(void) printf(MSG_INTL(MSG_LDD_FIL_FIND), name, NAME(clmp));
 
 	/*
+	 * Propagate any knowledge of a slash within the path name.
+	 */
+	if (pdp->pd_flags & PD_FLG_PNSLASH)
+		fdp->fd_flags |= FLG_FD_SLASH;
+
+	/*
 	 * If we're being audited tell the audit library of the file we're
 	 * about to go search for.
 	 */
-	if (((lml->lm_tflags | FLAGS1(clmp)) & LML_TFLG_AUD_ACTIVITY) &&
+	if (((lml->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_ACTIVITY) &&
 	    (lml == LIST(clmp)))
 		audit_activity(clmp, LA_ACT_ADD);
 
-	if ((lml->lm_tflags | FLAGS1(clmp)) & LML_TFLG_AUD_OBJSEARCH) {
-		char	*aname = audit_objsearch(clmp, name, LA_SER_ORIG);
+	if ((lml->lm_tflags | AFLAGS(clmp)) & LML_TFLG_AUD_OBJSEARCH) {
+		char	*aname;
 
 		/*
 		 * The auditor can indicate that this object should be ignored.
 		 */
-		if (aname == NULL) {
+		if ((aname =
+		    audit_objsearch(clmp, name, LA_SER_ORIG)) == NULL) {
 			DBG_CALL(Dbg_audit_terminate(lml, name));
-			return (0);
+			return (NULL);
 		}
 
-		/*
-		 * Protect ourselves from auditor mischief, by duplicating any
-		 * alternative name.  The original name has been allocated from
-		 * expand(), so free this allocation before using the audit
-		 * alternative.
-		 */
 		if (name != aname) {
-			if ((aname = strdup(aname)) == NULL) {
-				eprintf(lml, ERR_FATAL,
-				    MSG_INTL(MSG_GEN_AUDITERM), name);
-				return (0);
-			}
-			free((void *)*oname);
-			*oname = aname;
+			fdp->fd_flags &= ~FLG_FD_SLASH;
+			name = aname;
 		}
 	}
-	return (1);
+	fdp->fd_oname = name;
+	return (name);
 }
 
 /*
@@ -2094,9 +2156,8 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 	 * If this dependency is associated with a required version insure that
 	 * the version is present in the loaded file.
 	 */
-	if (((rtld_flags & RT_FL_NOVERSION) == 0) &&
-	    (FCT(clmp) == &elf_fct) && VERNEED(clmp) &&
-	    (LM_VERIFY_VERS(clmp)(name, clmp, nlmp) == 0))
+	if (((rtld_flags & RT_FL_NOVERSION) == 0) && THIS_IS_ELF(clmp) &&
+	    VERNEED(clmp) && (elf_verify_vers(name, clmp, nlmp) == 0))
 		return (0);
 
 	/*
@@ -2127,18 +2188,8 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 
 	/*
 	 * Establish new mode and flags.
-	 *
-	 * For patch backward compatibility, the following use of update_mode()
-	 * is disabled.
 	 */
-#ifdef	SIEBEL_DISABLE
-	if (rtld_flags & RT_FL_DISFIX_1)
-		promote = MODE(nlmp) |=
-		    (nmode & ~(RTLD_PARENT | RTLD_NOLOAD | RTLD_FIRST));
-	else
-#endif
-		promote = update_mode(nlmp, MODE(nlmp), nmode);
-
+	promote = update_mode(nlmp, MODE(nlmp), nmode);
 	FLAGS(nlmp) |= flags;
 
 	/*
@@ -2291,7 +2342,7 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 		 * Otherwise, this object exists and has dependencies, so add
 		 * all of its dependencies to the handle were operating on.
 		 */
-		if (aplist_append(&lmalp, nlmp, AL_CNT_DEPCLCT) == 0)
+		if (aplist_append(&lmalp, nlmp, AL_CNT_DEPCLCT) == NULL)
 			return (0);
 
 		for (APLIST_TRAVERSE(lmalp, idx1, dlmp1)) {
@@ -2320,15 +2371,13 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
 				continue;
 
 			if ((exist = hdl_add(ghp, dlmp1,
-			    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS))) != 0) {
-				if (exist == ALE_CREATE) {
-					(void) update_mode(dlmp1, MODE(dlmp1),
-					    nmode);
-				}
-				continue;
+			    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS))) == 0) {
+				free(lmalp);
+				return (0);
 			}
-			free(lmalp);
-			return (0);
+
+			if (exist == ALE_CREATE)
+				(void) update_mode(dlmp1, MODE(dlmp1), nmode);
 		}
 		free(lmalp);
 	}
@@ -2339,26 +2388,19 @@ load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
  * The central routine for loading shared objects.  Insures ldd() diagnostics,
  * handles and any other related additions are all done in one place.
  */
-static Rt_map *
-_load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
-    int nmode, uint_t flags, Grp_hdl ** hdl, Fdesc *nfdp, Rej_desc *rej,
-    int *in_nfavl)
+Rt_map *
+load_path(Lm_list *lml, Aliste lmco, Rt_map *clmp, int nmode, uint_t flags,
+    Grp_hdl **hdl, Fdesc *fdp, Rej_desc *rej, int *in_nfavl)
 {
+	const char	*name = fdp->fd_oname;
 	Rt_map		*nlmp;
-	const char	*name = *oname;
 
 	if ((nmode & RTLD_NOLOAD) == 0) {
 		/*
 		 * If this isn't a noload request attempt to load the file.
-		 * Note, the name of the file may be changed by an auditor.
 		 */
-		if ((load_trace(lml, oname, clmp)) == 0)
-			return (NULL);
-
-		name = *oname;
-
-		if ((nlmp = load_so(lml, lmco, name, clmp, flags,
-		    nfdp, rej, in_nfavl)) == 0)
+		if ((nlmp = load_so(lml, lmco, clmp, flags, fdp, rej,
+		    in_nfavl)) == NULL)
 			return (NULL);
 
 		/*
@@ -2440,7 +2482,7 @@ _load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
 	if (FLAGS(nlmp) & FLG_RT_NEWLOAD) {
 		FLAGS(nlmp) &= ~FLG_RT_NEWLOAD;
 
-		if (((lml->lm_tflags | FLAGS1(clmp) | FLAGS1(nlmp)) &
+		if (((lml->lm_tflags | AFLAGS(clmp) | AFLAGS(nlmp)) &
 		    LML_TFLG_AUD_MASK) && (((lml->lm_flags |
 		    LIST(clmp)->lm_flags) & LML_FLG_NOAUDIT) == 0)) {
 			if (audit_objopen(clmp, nlmp) == 0) {
@@ -2452,59 +2494,6 @@ _load_path(Lm_list *lml, Aliste lmco, const char **oname, Rt_map *clmp,
 	return (nlmp);
 }
 
-Rt_map *
-load_path(Lm_list *lml, Aliste lmco, const char **name, Rt_map *clmp, int nmode,
-    uint_t flags, Grp_hdl **hdl, Fdesc *cfdp, Rej_desc *rej, int *in_nfavl)
-{
-	Rt_map	*lmp;
-	Fdesc	nfdp = { 0 };
-
-	/*
-	 * If this path resulted from a $HWCAP specification, then the best
-	 * hardware capability object has already been establish, and is
-	 * available in the calling file descriptor.
-	 */
-	if (flags & FLG_RT_HWCAP) {
-		if (cfdp->fd_lmp == 0) {
-			/*
-			 * If this object hasn't yet been mapped, re-establish
-			 * the file descriptor structure to reflect this objects
-			 * original initial page mapping.  Make sure any present
-			 * file descriptor mapping is removed before overwriting
-			 * the structure.
-			 */
-#if	defined(MAP_ALIGN)
-			if (fmap->fm_maddr &&
-			    ((fmap->fm_mflags & MAP_ALIGN) == 0))
-#else
-			if (fmap->fm_maddr)
-#endif
-				(void) munmap(fmap->fm_maddr, fmap->fm_msize);
-
-			*fmap = cfdp->fd_fmap;
-		}
-		nfdp = *cfdp;
-	}
-
-	lmp = _load_path(lml, lmco, name, clmp, nmode, flags, hdl, &nfdp,
-	    rej, in_nfavl);
-
-	/*
-	 * If this path originated from a $HWCAP specification, re-establish the
-	 * fdesc information.  For single paged objects, such as filters, the
-	 * original mapping may have been sufficient to capture the file, thus
-	 * this mapping needs to be reset to insure it doesn't mistakenly get
-	 * unmapped as part of HWCAP cleanup.
-	 */
-	if ((flags & FLG_RT_HWCAP) && (cfdp->fd_lmp == 0)) {
-		cfdp->fd_fmap.fm_maddr = fmap->fm_maddr;
-		cfdp->fd_fmap.fm_mflags = fmap->fm_mflags;
-		cfdp->fd_fd = nfdp.fd_fd;
-	}
-
-	return (lmp);
-}
-
 /*
  * Load one object from a possible list of objects.  Typically, for requests
  * such as NEEDED's, only one object is specified.  However, this object could
@@ -2512,45 +2501,56 @@ load_path(Lm_list *lml, Aliste lmco, const char **name, Rt_map *clmp, int nmode,
  * that can be loaded is used (ie. the best).
  */
 Rt_map *
-load_one(Lm_list *lml, Aliste lmco, Pnode *pnp, Rt_map *clmp, int mode,
+load_one(Lm_list *lml, Aliste lmco, Alist *palp, Rt_map *clmp, int mode,
     uint_t flags, Grp_hdl **hdl, int *in_nfavl)
 {
 	Rej_desc	rej = { 0 };
-	Pnode   	*tpnp;
+	Aliste		idx;
+	Pdesc   	*pdp;
 	const char	*name;
 
-	for (tpnp = pnp; tpnp && tpnp->p_name; tpnp = tpnp->p_next) {
-		Rt_map	*tlmp;
+	for (ALIST_TRAVERSE(palp, idx, pdp)) {
+		Rt_map	*lmp = NULL;
 
 		/*
 		 * A Hardware capabilities requirement can itself expand into
 		 * a number of candidates.
 		 */
-		if (tpnp->p_orig & PN_TKN_HWCAP) {
-			if ((tlmp = load_hwcap(lml, lmco, tpnp->p_name, clmp,
-			    mode, (flags | FLG_RT_HWCAP), hdl, &rej,
-			    in_nfavl)) != 0) {
-				remove_rej(&rej);
-				return (tlmp);
-			}
+		if (pdp->pd_flags & PD_TKN_HWCAP) {
+			lmp = load_hwcap(lml, lmco, pdp->pd_pname, clmp,
+			    mode, (flags | FLG_RT_HWCAP), hdl, &rej, in_nfavl);
 		} else {
-			if ((tlmp = load_path(lml, lmco, &tpnp->p_name, clmp,
-			    mode, flags, hdl, 0, &rej, in_nfavl)) != 0) {
-				remove_rej(&rej);
-				return (tlmp);
-			}
+			Fdesc	fd = { 0 };
+
+			/*
+			 * Trace the inspection of this file, determine any
+			 * auditor substitution, and seed the file descriptor
+			 * with the originating name.
+			 */
+			if (load_trace(lml, pdp, clmp, &fd) == NULL)
+				continue;
+
+			/*
+			 * Locate and load the file.
+			 */
+			lmp = load_path(lml, lmco, clmp, mode, flags, hdl, &fd,
+			    &rej, in_nfavl);
 		}
+		if (lmp)
+			return (lmp);
 	}
 
 	/*
-	 * If this pathname originated from an expanded token, use the original
-	 * for any diagnostic output.
+	 * If no objects can be found, use the first path name from the Alist
+	 * to provide a diagnostic.  If this pathname originated from an
+	 * expanded token, use the original name for any diagnostic output.
 	 */
-	if ((name = pnp->p_oname) == 0)
-		name = pnp->p_name;
+	pdp = alist_item(palp, 0);
+
+	if ((name = pdp->pd_oname) == 0)
+		name = pdp->pd_pname;
 
 	file_notfound(lml, name, clmp, flags, &rej);
-	remove_rej(&rej);
 	return (NULL);
 }
 
@@ -2640,7 +2640,7 @@ lookup_sym_interpose(Slookup *slp, Rt_map **dlmp, uint_t *binfo, Sym *osym,
 	 * .bss symbol definition as has been directly bound to, redirect the
 	 * binding to the executables data definition.
 	 */
-	if (osym && ((FLAGS2(lmp) & FL2_RT_DTFLAGS) == 0) &&
+	if (osym && ((FLAGS1(lmp) & FL1_RT_DTFLAGS) == 0) &&
 	    (FCT(lmp) == &elf_fct) &&
 	    (ELF_ST_TYPE(osym->st_info) != STT_FUNC) &&
 	    are_bits_zero(*dlmp, osym, 0)) {
@@ -3236,10 +3236,10 @@ bind_one(Rt_map *clmp, Rt_map *dlmp, uint_t flags)
 		 * Append the binding descriptor to the caller and the
 		 * dependency.
 		 */
-		if (aplist_append(&DEPENDS(clmp), bdp, AL_CNT_DEPENDS) == 0)
+		if (aplist_append(&DEPENDS(clmp), bdp, AL_CNT_DEPENDS) == NULL)
 			return (0);
 
-		if (aplist_append(&CALLERS(dlmp), bdp, AL_CNT_CALLERS) == 0)
+		if (aplist_append(&CALLERS(dlmp), bdp, AL_CNT_CALLERS) == NULL)
 			return (0);
 	}
 
@@ -3258,7 +3258,7 @@ bind_one(Rt_map *clmp, Rt_map *dlmp, uint_t flags)
  * Cleanup after relocation processing.
  */
 int
-relocate_finish(Rt_map *lmp, APlist *bound, int textrel, int ret)
+relocate_finish(Rt_map *lmp, APlist *bound, int ret)
 {
 	DBG_CALL(Dbg_reloc_run(lmp, 0, ret, DBG_REL_FINISH));
 
@@ -3266,7 +3266,6 @@ relocate_finish(Rt_map *lmp, APlist *bound, int textrel, int ret)
 	 * Establish bindings to all objects that have been bound to.
 	 */
 	if (bound) {
-		Aliste	idx;
 		Rt_map	*_lmp;
 		Word	used;
 
@@ -3282,6 +3281,8 @@ relocate_finish(Rt_map *lmp, APlist *bound, int textrel, int ret)
 		    (LML_FLG_TRC_UNREF | LML_FLG_TRC_UNUSED);
 
 		if (ret || used) {
+			Aliste	idx;
+
 			for (APLIST_TRAVERSE(bound, idx, _lmp)) {
 				if (bind_one(lmp, _lmp, BND_REFER) || used)
 					continue;
@@ -3293,12 +3294,43 @@ relocate_finish(Rt_map *lmp, APlist *bound, int textrel, int ret)
 		free(bound);
 	}
 
-	/*
-	 * If we write enabled the text segment to perform these relocations
-	 * re-protect by disabling writes.
-	 */
-	if (textrel)
-		(void) LM_SET_PROT(lmp)(lmp, 0);
-
 	return (ret);
+}
+
+/*
+ * Function to correct protection settings.  Segments are all mapped initially
+ * with permissions as given in the segment header.  We need to turn on write
+ * permissions on a text segment if there are any relocations against that
+ * segment, and then turn write permission back off again before returning
+ * control to the caller.  This function turns the permission on or off
+ * depending on the value of the permission argument.
+ */
+int
+set_prot(Rt_map *lmp, mmapobj_result_t *mpp, int perm)
+{
+	int	prot;
+
+	/*
+	 * If this is an allocated image (ie. a relocatable object) we can't
+	 * mprotect() anything.
+	 */
+	if (FLAGS(lmp) & FLG_RT_IMGALLOC)
+		return (1);
+
+	DBG_CALL(Dbg_file_prot(lmp, perm));
+
+	if (perm)
+		prot = mpp->mr_prot | PROT_WRITE;
+	else
+		prot = mpp->mr_prot & ~PROT_WRITE;
+
+	if (mprotect((void *)(uintptr_t)mpp->mr_addr,
+	    mpp->mr_msize, prot) == -1) {
+		int	err = errno;
+		eprintf(LIST(lmp), ERR_FATAL, MSG_INTL(MSG_SYS_MPROT),
+		    NAME(lmp), strerror(err));
+		return (0);
+	}
+	mpp->mr_prot = prot;
+	return (1);
 }

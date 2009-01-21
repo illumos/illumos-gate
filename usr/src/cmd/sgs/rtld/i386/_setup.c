@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,6 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * i386 specific setup routine  -  relocate ld.so's symbols, setup its
@@ -49,42 +47,29 @@
 #include	<sys/stat.h>
 #include	<link.h>
 #include	<dlfcn.h>
-#include	<debug.h>
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"msg.h"
 
-extern int	_end;
-extern int	_etext;
-
-
-/*
- * Stub routine to prevent atexit_init() being extracted from libc_pic.a on
- * i386 and added to ld.so.1.  We don't need it.
- */
-void
-atexit_init()
-{
-}
-
 /* VARARGS */
 unsigned long
-_setup(Boot * ebp, Dyn * ld_dyn)
+_setup(Boot *ebp, Dyn *ld_dyn)
 {
-	unsigned long	reladdr, relcount, ld_base = 0;
-	unsigned long	relent = 0;
-	unsigned long	strtab, soname, interp_base = 0;
+	ulong_t		reladdr, relcount, ld_base = 0;
+	ulong_t		relent = 0;
+	ulong_t		strtab, soname, interp_base = 0;
 	char		*_rt_name, **_envp, **_argv;
-	int		_syspagsz = 0, fd = -1, dz_fd = FD_UNAVAIL;
+	int		_syspagsz = 0, fd = -1;
 	uint_t		_flags = 0, hwcap_1 = 0;
-	Dyn *		dyn_ptr;
-	Phdr *		phdr = 0;
-	Rt_map *	lmp;
+	Dyn		*dyn_ptr;
+	Phdr		*phdr = NULL;
+	Rt_map		*lmp;
 	auxv_t		*auxv, *_auxv;
 	uid_t		uid = (uid_t)-1, euid = (uid_t)-1;
 	gid_t		gid = (gid_t)-1, egid = (gid_t)-1;
-	char		*_platform = 0, *_execname = 0, *_emulator = 0;
+	char		*_platform = NULL, *_execname = NULL, *_emulator = NULL;
 	int		auxflags = -1;
+
 	/*
 	 * Scan the bootstrap structure to pick up the basics.
 	 */
@@ -101,9 +86,6 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 			break;
 		case EB_AUXV:
 			_auxv = (auxv_t *)ebp->eb_un.eb_ptr;
-			break;
-		case EB_DEVZERO:
-			dz_fd = (int)ebp->eb_un.eb_val;
 			break;
 		case EB_PAGESIZE:
 			_syspagsz = (int)ebp->eb_un.eb_val;
@@ -153,34 +135,26 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 			/* real group id for the executable */
 			gid = (gid_t)auxv->a_un.a_val;
 			break;
-#ifdef	AT_SUN_PLATFORM			/* Defined on SunOS 5.5 & greater. */
 		case AT_SUN_PLATFORM:
 			/* platform name */
 			_platform = auxv->a_un.a_ptr;
 			break;
-#endif
-#ifdef	AT_SUN_EXECNAME			/* Defined on SunOS 5.6 & greater. */
 		case AT_SUN_EXECNAME:
 			/* full pathname of execed object */
 			_execname = auxv->a_un.a_ptr;
 			break;
-#endif
-#ifdef	AT_SUN_AUXFLAGS			/* At the behest of PSARC 2002/188 */
 		case AT_SUN_AUXFLAGS:
+			/* auxiliary flags */
 			auxflags = (int)auxv->a_un.a_val;
 			break;
-#endif
-#ifdef	AT_SUN_HWCAP			/* Hardware capabilities */
 		case AT_SUN_HWCAP:
+			/* hardware capabilities */
 			hwcap_1 = (uint_t)auxv->a_un.a_val;
 			break;
-#endif
-#ifdef	AT_SUN_EMULATOR			/* Emulation library name */
 		case AT_SUN_EMULATOR:
 			/* name of emulation library, if any */
 			_emulator = auxv->a_un.a_ptr;
 			break;
-#endif
 		}
 	}
 
@@ -211,18 +185,15 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 	_rt_name = (char *)strtab + soname;
 
 	/*
-	 * If we don't have a RELENT, just assume
-	 * the size.
+	 * If we don't have a RELENT, just assume the size.
 	 */
 	if (relent == 0)
 		relent = sizeof (Rel);
 
 	/*
-	 * Relocate all symbols in ld.so.
-	 *
-	 * Because ld.so.1 is built with -Bsymbolic there should only be
-	 * RELATIVE and JMPSLOT relocations, both of which get relative
-	 * additions against them.
+	 * As all global symbol references within ld.so.1 are protected
+	 * (symbolic), only RELATIVE and JMPSLOT relocations should be left
+	 * to process at runtime.  Process all relative relocations now.
 	 */
 	for (; relcount; relcount--) {
 		ulong_t	roffset;
@@ -255,8 +226,8 @@ _setup(Boot * ebp, Dyn * ld_dyn)
 	 * Continue with generic startup processing.
 	 */
 	if ((lmp = setup((char **)_envp, (auxv_t *)_auxv, _flags, _platform,
-	    _syspagsz, _rt_name, dyn_ptr, ld_base, interp_base, fd, phdr,
-	    _execname, _argv, dz_fd, uid, euid, gid, egid, NULL, auxflags,
+	    _syspagsz, _rt_name, ld_base, interp_base, fd, phdr,
+	    _execname, _argv, uid, euid, gid, egid, NULL, auxflags,
 	    hwcap_1)) == NULL) {
 		rtldexit(&lml_main, 1);
 	}

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY =	libld.a
@@ -95,13 +93,6 @@ KRTLD_AMD64 = $(SRCBASE)/uts/$(VAR_PLAT_amd64)/krtld
 KRTLD_SPARC = $(SRCBASE)/uts/$(VAR_PLAT_sparc)/krtld
 
 
-# Building SUNWonld results in a call to the `package' target.  Requirements
-# needed to run this application on older releases are established:
-#   dlopen/dlclose requires libdl.so.1 prior to 5.10
-# 
-DLLIB =		$(VAR_DL_LIB)
-package	:=	DLLIB = $(VAR_PKG_DL_LIB)
-
 CPPFLAGS +=	-DUSE_LIBLD_MALLOC -I$(SRCBASE)/lib/libc/inc \
 		    -I$(SRCBASE)/uts/common/krtld -I$(ELFCAP) \
 		    -I$(SRCBASE)/uts/sparc \
@@ -114,7 +105,6 @@ LINTFLAGS64 +=	-u -D_REENTRANT
 
 DYNFLAGS +=	$(VERSREF) $(USE_PROTO) '-R$$ORIGIN'
 
-$(VAR_POUND_3)DEFS=
 native:=	DYNFLAGS	+= $(CONVLIBDIR)
 
 BLTDEFS =	msg.h

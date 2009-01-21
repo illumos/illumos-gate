@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include		$(SRC)/Makefile.master
@@ -91,15 +89,6 @@ PKGDIRS=	../libcrle \
 
 $(SUBDIRS1) $(SUBDIRS2) :=	TARGET = install
 $(PKGDIRS) :=	TARGET = package
-
-
-M32:sh=		if [ "$MACH" = "sparc" ]; \
-			then echo sparc; \
-		elif [ "$MACH" = "i386" ]; \
-			then echo "$(VAR_I386_ARCH)"; \
-		else \
-			echo "unknown"; \
-		fi
 
 ../%:		FRC
 		@ cd $@; pwd; $(MAKE) $(TARGET)

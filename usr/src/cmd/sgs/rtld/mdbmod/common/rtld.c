@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,6 @@
 typedef struct {
 	uint_t	w_flags;
 } W_desc;
-
 
 /*
  * Flags values for dcmds
@@ -81,13 +80,11 @@ static const mdb_bitmask_t rtflags_bits[] = {
 
 static const mdb_bitmask_t rtflags1_bits[] = {
 	{ MSG_ORIG(MSG_FL1_COPYTOOK), FL1_RT_COPYTOOK, FL1_RT_COPYTOOK},
-	{ MSG_ORIG(MSG_FL1_RELATIVE), FL1_RT_RELATIVE, FL1_RT_RELATIVE },
 	{ MSG_ORIG(MSG_FL1_CONFSET), FL1_RT_CONFSET, FL1_RT_CONFSET },
 	{ MSG_ORIG(MSG_FL1_NODEFLIB), FL1_RT_NODEFLIB, FL1_RT_NODEFLIB },
 	{ MSG_ORIG(MSG_FL1_ENDFILTE), FL1_RT_ENDFILTE, FL1_RT_ENDFILTE },
 	{ MSG_ORIG(MSG_FL1_DISPREL), FL1_RT_DISPREL, FL1_RT_DISPREL },
-	{ MSG_ORIG(MSG_FL1_TEXTREL), FL1_RT_TEXTREL, FL1_RT_TEXTREL },
-	{ MSG_ORIG(MSG_FL1_INITWAIT), FL1_RT_INITWAIT, FL1_RT_INITWAIT },
+	{ MSG_ORIG(MSG_FL1_DTFLAGS), FL1_RT_DTFLAGS, FL1_RT_DTFLAGS},
 	{ MSG_ORIG(MSG_FL1_LDDSTUB), FL1_RT_LDDSTUB, FL1_RT_LDDSTUB},
 	{ MSG_ORIG(MSG_FL1_NOINIFIN), FL1_RT_NOINIFIN, FL1_RT_NOINIFIN },
 	{ MSG_ORIG(MSG_FL1_USED), FL1_RT_USED, FL1_RT_USED },
@@ -100,7 +97,10 @@ static const mdb_bitmask_t rtflags1_bits[] = {
 	{ MSG_ORIG(MSG_FL1_TLSSTAT), FL1_RT_TLSSTAT, FL1_RT_TLSSTAT },
 	{ MSG_ORIG(MSG_FL1_DIRECT), FL1_RT_DIRECT, FL1_RT_DIRECT},
 	{ MSG_ORIG(MSG_FL1_GLOBAUD), FL1_RT_GLOBAUD, FL1_RT_GLOBAUD},
+	{ NULL, 0, 0}
+};
 
+static const mdb_bitmask_t rtaflags_bits[] = {
 	{ MSG_ORIG(MSG_LTFL_AUD_PREINIT), LML_TFLG_AUD_PREINIT,
 	    LML_TFLG_AUD_PREINIT },
 	{ MSG_ORIG(MSG_LTFL_AUD_OBJSEARCH), LML_TFLG_AUD_OBJSEARCH,
@@ -274,7 +274,7 @@ Depends(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 {
 	APlist		apl;
 	uintptr_t	listcalc, listndx;
-	Bnd_desc *	bdp;
+	Bnd_desc	*bdp;
 
 	/*
 	 * Obtain the APlist and determine its number of elements and those
@@ -478,15 +478,19 @@ dcmd_rtmap(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf(MSG_ORIG(MSG_RTMAP_LINE20), FLAGS(&rtmap), rtflags_bits);
 	mdb_printf(MSG_ORIG(MSG_RTMAP_LINE13), FLAGS1(&rtmap));
 	mdb_printf(MSG_ORIG(MSG_RTMAP_LINE20), FLAGS1(&rtmap), rtflags1_bits);
-	mdb_printf(MSG_ORIG(MSG_RTMAP_LINE14), MODE(&rtmap));
+	if (AFLAGS(&rtmap)) {
+		mdb_printf(MSG_ORIG(MSG_RTMAP_LINE14), AFLAGS(&rtmap));
+		mdb_printf(MSG_ORIG(MSG_RTMAP_LINE20), AFLAGS(&rtmap),
+		    rtaflags_bits);
+	}
+	mdb_printf(MSG_ORIG(MSG_RTMAP_LINE15), MODE(&rtmap));
 	mdb_printf(MSG_ORIG(MSG_RTMAP_LINE20), MODE(&rtmap), rtmode_bits);
 
 	return (DCMD_OK);
 }
 
-
 static int
-rtmap_format(uintptr_t addr, const void * data, void * private)
+rtmap_format(uintptr_t addr, const void *data, void *private)
 {
 	const Rt_map	*lmp = (const Rt_map *)data;
 	W_desc		*wdp = (W_desc *)private;
@@ -618,9 +622,9 @@ dcmd_Rtmaps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 static int
 /* ARGSUSED2 */
-format_listnode(uintptr_t addr, const void * data, void * private)
+format_listnode(uintptr_t addr, const void *data, void *private)
 {
-	Listnode *	lnp = (Listnode *)data;
+	Listnode	*lnp = (Listnode *)data;
 
 	mdb_printf(MSG_ORIG(MSG_FMT_LN), addr, lnp->data, lnp->next);
 	return (0);
@@ -780,6 +784,12 @@ static const mdb_bitmask_t lml_flags_bit[] = {
 	{ MSG_ORIG(MSG_LFL_OBJREEVAL), LML_FLG_OBJREEVAL, LML_FLG_OBJREEVAL },
 	{ MSG_ORIG(MSG_LFL_NOPENDGLBLAZY), LML_FLG_NOPENDGLBLAZY,
 	    LML_FLG_NOPENDGLBLAZY },
+	{ MSG_ORIG(MSG_LFL_INTRPOSETSORT), LML_FLG_INTRPOSETSORT,
+	    LML_FLG_INTRPOSETSORT },
+	{ MSG_ORIG(MSG_LFL_AUDITNOTIFY), LML_FLG_AUDITNOTIFY,
+	    LML_FLG_AUDITNOTIFY },
+	{ MSG_ORIG(MSG_LFL_GROUPSEXIST), LML_FLG_GROUPSEXIST,
+	    LML_FLG_GROUPSEXIST },
 
 	{ MSG_ORIG(MSG_LFL_TRC_LDDSTUB), LML_FLG_TRC_LDDSTUB,
 	    LML_FLG_TRC_LDDSTUB },
@@ -794,6 +804,10 @@ static const mdb_bitmask_t lml_flags_bit[] = {
 	{ MSG_ORIG(MSG_LFL_TRC_UNUSED), LML_FLG_TRC_UNUSED,
 	    LML_FLG_TRC_UNUSED },
 	{ MSG_ORIG(MSG_LFL_TRC_INIT), LML_FLG_TRC_INIT, LML_FLG_TRC_INIT },
+	{ MSG_ORIG(MSG_LFL_TRC_NOUNRESWEAK), LML_FLG_TRC_NOUNRESWEAK,
+	    LML_FLG_TRC_NOUNRESWEAK },
+	{ MSG_ORIG(MSG_LFL_TRC_NOPAREXT), LML_FLG_TRC_NOPAREXT,
+	    LML_FLG_TRC_NOPAREXT },
 	{ NULL, 0, 0}
 };
 
@@ -1180,7 +1194,7 @@ dcmd_Handles(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t		flg = 0;
 	APlist		apl;
 	uintptr_t	listcalc, listndx;
-	Grp_hdl *	ghp;
+	Grp_hdl		*ghp;
 
 	/*
 	 * Insure we have a valid address, and provide for a -v option.
@@ -1277,7 +1291,7 @@ dcmd_Groups(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	APlist		apl;
 	uint_t		flg = 0;
 	uintptr_t	listcalc, listndx;
-	Grp_hdl *	ghp;
+	Grp_hdl		*ghp;
 
 	/*
 	 * Insure we have a valid address, and provide for a -v option.

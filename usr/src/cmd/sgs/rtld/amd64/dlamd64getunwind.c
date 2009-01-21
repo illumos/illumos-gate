@@ -20,24 +20,20 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+#pragma ident	"@(#)dlamd64getunwind.c	1.10	08/07/30 SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#include	<string.h>
+#include	<dlfcn.h>
+#include	<stdio.h>
+#include	<debug.h>
+#include	"_rtld.h"
+#include	"_elf.h"
+#include	"_inline.h"
+#include	"msg.h"
 
-/*
- * Block comment which describes the contents of this file.
- */
-
-#include <string.h>
-#include <dlfcn.h>
-#include <debug.h>
-#include <_rtld.h>
-#include <_elf.h>
-#include <msg.h>
-
-#include <stdio.h>
 
 static Dl_amd64_unwindinfo *
 getunwind_core(Lm_list *lml, void *pc, Dl_amd64_unwindinfo *unwindinfo)
@@ -78,24 +74,19 @@ getunwind_core(Lm_list *lml, void *pc, Dl_amd64_unwindinfo *unwindinfo)
 	lmp = _caller(pc, CL_NONE);
 
 	if (lmp) {
-		Mmap	*immap;
-
-		unwindinfo->dlui_objname = PATHNAME(lmp);
+		mmapobj_result_t	*mpp;
 
 		/*
-		 * Scan through the mmaps of this object to get the specific
-		 * segment found.
+		 * Determine the associated segment.
 		 */
-		for (immap = MMAPS(lmp); immap->m_vaddr; immap++) {
-			if (((caddr_t)pc >= immap->m_vaddr) &&
-			    ((caddr_t)pc < (immap->m_vaddr + immap->m_msize))) {
-				break;
-			}
-		}
-		unwindinfo->dlui_segstart = immap->m_vaddr;
-		unwindinfo->dlui_segend = immap->m_vaddr + immap->m_msize;
+		if ((mpp = find_segment(pc, lmp)) == NULL)
+			return (0);
 
-		if (PTUNWIND(lmp) && (immap->m_vaddr)) {
+		unwindinfo->dlui_objname = (char *)PATHNAME(lmp);
+		unwindinfo->dlui_segstart = mpp->mr_addr;
+		unwindinfo->dlui_segend = mpp->mr_addr + mpp->mr_msize;
+
+		if (PTUNWIND(lmp) && (mpp->mr_addr)) {
 			uintptr_t   base;
 
 			if (FLAGS(lmp) & FLG_RT_FIXED)
@@ -109,7 +100,7 @@ getunwind_core(Lm_list *lml, void *pc, Dl_amd64_unwindinfo *unwindinfo)
 			    (void *)(PTUNWIND(lmp)->p_vaddr +
 			    PTUNWIND(lmp)->p_memsz + base);
 
-		} else if (immap->m_vaddr)
+		} else if (mpp->mr_addr)
 			unwindinfo->dlui_flags |= DLUI_FLG_NOUNWIND;
 		else
 			unwindinfo->dlui_flags |=

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -425,7 +425,6 @@
 @ MSG_TARG_UNSUPPORTED	"unsupported ELF machine type: %s"
 
 
-
 # ELF processing messages
 
 @ MSG_ELF_LIBELF	"libelf: version not supported: %d"
@@ -609,6 +608,7 @@
 @ MSG_ELF_GETPHDR	"file %s: elf_getphdr"
 @ MSG_ELF_GETSCN	"file %s: elf_getscn: scnndx: %d"
 @ MSG_ELF_GETSHDR	"file %s: elf_getshdr"
+@ MSG_ELF_MEMORY	"file %s: elf_memory"
 @ MSG_ELF_NDXSCN	"file %s: elf_ndxscn"
 @ MSG_ELF_NEWDATA	"file %s: elf_newdata"
 @ MSG_ELF_NEWEHDR	"file %s: elf_newehdr"

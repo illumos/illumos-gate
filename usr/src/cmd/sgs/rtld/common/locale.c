@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -228,7 +228,7 @@ dgettext(const char *domain, const char *msgid)
 	 * Determine if we've initialized any domains yet.
 	 */
 	if (domaincnt == 0) {
-		if ((domains = (Domain *)calloc(sizeof (Domain), 2)) == 0)
+		if ((domains = calloc(sizeof (Domain), 2)) == NULL)
 			return ((char *)msgid);
 		domains[0].dom_name = MSG_ORIG(MSG_SUNW_OST_SGS);
 		domains[1].dom_name = MSG_ORIG(MSG_SUNW_OST_OSLIB);

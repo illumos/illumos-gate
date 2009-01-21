@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"msg.h"
 #include	"_debug.h"
@@ -167,4 +166,16 @@ Dbg_move_entry2(Lm_list *lml, Move *mv, Word st_name, const char *name)
 
 	dbg_print(lml, MSG_INTL(MSG_MOVE_ENTRYIN), EC_XWORD(mv->m_poffset),
 	    EC_LWORD(mv->m_value), mv->m_repeat, mv->m_stride, sname);
+}
+
+void
+Dbg_move_bad(Lm_list *lml, ulong_t num, const char *name, Addr addr)
+{
+	if (DBG_NOTCLASS(DBG_C_MOVE))
+		return;
+	if (DBG_NOTDETAIL())
+		return;
+
+	dbg_print(lml, MSG_INTL(MSG_MOVE_BAD), EC_XWORD(num), name,
+	    EC_ADDR(addr));
 }

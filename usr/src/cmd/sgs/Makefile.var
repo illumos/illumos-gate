@@ -20,83 +20,27 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
-# The link-editor related source files and Makefile files are normally unified
-# across all presently maintained release gates.  However, some of the compiler
-# pre-processor flags, linker flags are different among the releases.  This
-# file is used to specify such flags. 
+# The link-editor related source files and Makefile files have at times been
+# unified across all presently maintained release gates.  However, some of the
+# compiler pre-processor flags and link-editor flags are different among the
+# releases.  This file is used to specify such flags. 
 # 
-# This file is included by ./Makefile.com, but may also be included directly
-# in the case where the utility is relying on the contents of 
-# ../../Makefile.com.
+# This file is included by ./Makefile.com, but may also be included directly in
+# the case where the utility is relying on the contents of ../../Makefile.com.
 # 
 # This file should be the only file which is different among the presently
-# maintained release workspaces and the files that generate the link-editors
-# and related tools.
-
+# maintained release workspaces, when the sources are unified.
 #
 # CPPFEATUREMACROS provides for selectively turning on/off features within the
-# build of ld.so.1 and liblddbg.so.
+# various link-editor components.  Presently, none are set.
 #
-# Current values for ld.so.1 are:
-#
-#	LD_BREADTH_DISABLED
-#		per bug id 4313765, the LD_BREADTH= environment variable is no
-#		longer checked.  However, on older releases we still want to
-#		keep this check valid.
-#
-#	EXPAND_RELATIVE
-#		per bug id 4336980 (and 4336878), relative path expansion is
-#		insured at process startup.  This implementation can come at
-#		some cost unless the corresponding getcwd() implementation from
-#		libc_pic.a is also available.  On older releases defer any
-#		relative pathname expansion until it is required.
-#
-#	ISSOLOAD_BASENAME_DISABLED
-#		The bugfix for bug#4469400 updates the logic by which
-#		shared objects are loaded into memory (and makes it
-#		more precise).  However - this update to logic can
-#		mess up the loading of objects which have a dependency
-#		on both '/usr/lib/lwp/libthread.so.1' and
-#		'/usr/lib/libthread.so.1'.  The error that occurs is that
-#		both libraries are loaded into memory - which doesn't
-#		work out very well.  This fix re-enables the `loose'
-#		logic which was implemented on older releases to avoid
-#		exposing problems with multiple libthreads.  Since Soliars9
-#		again only has one libthread - we can use the more precise
-#		logic.
-#
-#	SIEBEL_DISABLE
-#		Prior to Solaris 10, bug fixes 4651709 and 4651493 were deter-
-#		mined to be inappropriate for patch releases as they broke the
-#		Siebel server.  Siebel agree to fix their code in preparation
-#		for these changes to become default in Solaris 10.  Users who
-#		want these fixes in patch releases can set LD__FIX__1.
-#
-#
-# Current value for liblddbg.so is:
-#
-#	DEMANGLE
-#		enable use of the "demangle" debug token.  Old versions of the
-#		demangle library libdemangle.so.1 used an excessive amount of
-#		stack space that could cause debugging a threaded application
-#		(with say LD_DEBUG=symbols,demangle) to segv because of an
-#		exhausted stack.  See 4376081.  DEMANGLE should not be enabled
-#		for patch builds.
-#
-#		Note that demangling support within liblddbg.so.1 is always
-#		available, as tools such as elfdump(1) and pvs(1) may call this
-#		directly.  These tools aren't threaded, and thus don't expose
-#		the problems raised by enabling ld.so.1's debugging output.
-#
-#
-# Although most files are unified among on10-gate, on81-patch, and on28-patch
-# gates, some files in libld and rtld need to use #ifdef to distinguish between
-# the patch release, and for the packages targeting to the pre-libc/libthread
-# unified environment.  These values are available for CPPFLAGS:
+# Some source files need to use #ifdef to distinguish between the patch release,
+# and for the packages targeting to the pre-libc/libthread unified environment.
+# These values are available for CPPFLAGS:
 #	
 #	SGS_PRE_UNIFIED_PROCESS
 #
@@ -107,9 +51,7 @@
 # Common Macro definitions
 #
 VAR_CPPFLAGS=
-
 VAR_LINTFLAGS64=	-m64
-VAR_I386_ARCH=		intel
 
 VAR_PLAT_sparc=		sparc
 VAR_PLAT_i386=		intel/ia32
@@ -117,7 +59,6 @@ VAR_PLAT_amd64=		intel/amd64
 
 VAR_POUND_1=
 VAR_POUND_2=		$(POUND_SIGN)
-VAR_POUND_3=		$(POUND_SIGN)
 
 #
 # VAR_AVLDIR - directory to find avl.c in.
@@ -167,18 +108,6 @@ VAR_SGSCCSLINK64=	$(ROOTCCSBINLINK64)
 VAR_LD_NATIVE_LLDLIBS=
 VAR_LD_LLDFLAGS=	'-R$$ORIGIN/../../lib'
 VAR_LD_LLDFLAGS64 =	'-R$$ORIGIN/../../../lib/$(MACH64)'
-
-#
-# on 5.10 we no longer link against libdl - However we still
-# need to link against it when building the SUNWonld package (which
-# may run on 5.9 or 5.8 systems).  
-#
-# Below are two macros - they should be toggled one way or the other
-# depending upon whether or not the base build provides '-ldl' or
-# the build of SUNWonld does.
-#
-VAR_PKG_DL_LIB =	-ldl
-VAR_DL_LIB =
 
 #
 # elfdump
@@ -246,9 +175,6 @@ VAR_RTLD_SONAME=	/lib/ld.so.1
 VAR_RTLD_V9_SONAME=	/lib/sparcv9/ld.so.1
 
 VAR_RTLD_ETCDYNLIB=
-VAR_RTLD_CPPFEATUREMACROS= \
-			-DLD_BREADTH_DISABLED \
-			-DEXPAND_RELATIVE \
-			-DISSOLOAD_BASENAME_DISABLED
+VAR_RTLD_CPPFEATUREMACROS=
 VAR_RTLD_CPPFLAGS=	$(VAR_AVLINCDIR)
 VAR_RTLD_EXTRASUBDIRS=	mdbmod

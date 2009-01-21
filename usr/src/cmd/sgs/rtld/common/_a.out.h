@@ -18,17 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 #ifndef	_A_DOT_OUT_DOT_H
 #define	_A_DOT_OUT_DOT_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <sys/types.h>
+#include <sys/mman.h>
 #include <a.out.h>
 #include <_rtld.h>
 
@@ -44,13 +43,15 @@ typedef struct link_dynamic	Link_dynamic;
  * Extern functions for a.out format file class.
  */
 extern	ulong_t	aout_bndr(caddr_t);
+extern	int	aout_get_mmap(Lm_list *, mmapobj_result_t *);
 extern	Sym	*aout_lookup_sym(Slookup *, Rt_map **, uint_t *, int *);
-extern	Rt_map	*aout_new_lm(Lm_list *, const char *, const char *,
-		    Link_dynamic *, caddr_t, size_t, Aliste);
+extern	Rt_map	*aout_new_lmp(Lm_list *, Aliste, Fdesc *, Addr, size_t, void *,
+		    int *);
 extern	void	aout_plt_write(caddr_t, ulong_t);
-extern	int	aout_reloc(Rt_map *, uint_t, int *);
+extern	int	aout_reloc(Rt_map *, uint_t, int *, APlist **);
 extern	void	aout_rtbndr(caddr_t);
-extern	int	aout_set_prot(Rt_map *, int);
+extern	Fct	*aout_verify(caddr_t, size_t, Fdesc *, const char *,
+		    Rej_desc *);
 
 /*
  * Private data for an a.out format file class.
@@ -263,6 +264,13 @@ struct	link_dynamic {
 #define	LM2LP(X)	((struct ld_private *)((Rt_aoutp *) \
 				(X)->rt_priv)->lm_lpd)
 #define	TEXTBASE(X)	(LM2LP(X)->lp_textbase)
+
+/*
+ * Most of the above macros are used from AOUT specific routines, however there
+ * are a couple of instances where we need to ensure the file being processed
+ * is AOUT before dereferencing the macro.
+ */
+#define	THIS_IS_AOUT(X)		(FCT(X) == &aout_fct)
 
 /*
  * Code collapsing macros.

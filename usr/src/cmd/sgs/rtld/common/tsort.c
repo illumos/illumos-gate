@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ typedef struct {
  * qsort(3c) comparison function.
  */
 static int
-compare(const void * lmpp1, const void * lmpp2)
+compare(const void *lmpp1, const void *lmpp2)
 {
 	Rt_map	*lmp1 = *((Rt_map **)lmpp1);
 	Rt_map	*lmp2 = *((Rt_map **)lmpp2);
@@ -88,7 +88,7 @@ compare(const void * lmpp1, const void * lmpp2)
  * sorted.
  */
 static int
-sort_scc(Sort * sort, int fndx, int flag)
+sort_scc(Sort *sort, int fndx, int flag)
 {
 	static const char	*tfmt = 0, *ffmt;
 	static int		cnt = 1;
@@ -122,9 +122,9 @@ sort_scc(Sort * sort, int fndx, int flag)
 			Aliste		idx2;
 
 			for (APLIST_TRAVERSE(DEPENDS(lmp2), idx2, bdp)) {
-				Rt_map	*lmp = bdp->b_depend;
+				Rt_map	*lmp3 = bdp->b_depend;
 
-				if (IDX(lmp))
+				if (IDX(lmp3) || (LIST(lmp3) != lml))
 					continue;
 
 				/*
@@ -132,14 +132,14 @@ sort_scc(Sort * sort, int fndx, int flag)
 				 * encies .init has been called, skip it.
 				 */
 				if ((flag & RT_SORT_REV) &&
-				    (FLAGS(lmp) & FLG_RT_INITCALL))
+				    (FLAGS(lmp3) & FLG_RT_INITCALL))
 					continue;
 
-				if (aplist_append(&sort->s_queue, lmp,
+				if (aplist_append(&sort->s_queue, lmp3,
 				    sort->s_num) == NULL)
 					return (0);
 
-				IDX(lmp) = ndx++;
+				IDX(lmp3) = ndx++;
 			}
 		}
 	}
@@ -244,7 +244,7 @@ sort_scc(Sort * sort, int fndx, int flag)
  * to sort_scc() to sort these elements.
  */
 static int
-visit(Lm_list *lml, Rt_map * lmp, Sort *sort, int flag)
+visit(Lm_list *lml, Rt_map *lmp, Sort *sort, int flag)
 {
 	APlist		*alp = NULL;
 	int		num = sort->s_lndx;
@@ -281,7 +281,7 @@ visit(Lm_list *lml, Rt_map * lmp, Sort *sort, int flag)
 		 * If tracing, save the strongly connected component.
 		 */
 		if (tracing && (aplist_append(&alp, tlmp,
-		    AL_CNT_SCC) == 0))
+		    AL_CNT_SCC) == NULL))
 			return (0);
 	} while (tlmp != lmp);
 
@@ -294,7 +294,7 @@ visit(Lm_list *lml, Rt_map * lmp, Sort *sort, int flag)
 			return (0);
 
 		if (tracing && (aplist_append(&sort->s_scc, alp,
-		    AL_CNT_SCC) == 0))
+		    AL_CNT_SCC) == NULL))
 			return (0);
 	} else if (alp)
 		free(alp);
@@ -392,7 +392,7 @@ dep_visit(Lm_list *lml, Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Sort *sort,
     int flag)
 {
 	int 		min;
-	Aliste		idx;
+	Aliste		idx1;
 	Bnd_desc	*bdp;
 	Dyninfo		*dip;
 
@@ -407,7 +407,7 @@ dep_visit(Lm_list *lml, Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Sort *sort,
 	/*
 	 * Traverse both explicit and implicit dependencies.
 	 */
-	for (APLIST_TRAVERSE(DEPENDS(lmp), idx, bdp)) {
+	for (APLIST_TRAVERSE(DEPENDS(lmp), idx1, bdp)) {
 		if ((min = _dep_visit(lml, min, lmp, bdp->b_depend,
 		    bdp->b_flags, sort, flag)) == -1)
 			return (-1);
@@ -416,25 +416,27 @@ dep_visit(Lm_list *lml, Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Sort *sort,
 	/*
 	 * Traverse any filtee dependencies.
 	 */
-	if (((dip = DYNINFO(lmp)) != 0) && (FLAGS1(lmp) & MSK_RT_FILTER)) {
+	if (((dip = DYNINFO(lmp)) != NULL) && (FLAGS1(lmp) & MSK_RT_FILTER)) {
 		uint_t	cnt, max = DYNINFOCNT(lmp);
 
 		for (cnt = 0; cnt < max; cnt++, dip++) {
-			Pnode	*pnp = (Pnode *)dip->di_info;
+			Alist	*falp;
+			Pdesc	*pdp;
 
-			if ((pnp == 0) ||
+			if (((falp = (Alist *)dip->di_info) == NULL) ||
 			    ((dip->di_flags & MSK_DI_FILTER) == 0))
 				continue;
 
-			for (; pnp; pnp = pnp->p_next) {
-				Grp_hdl		*ghp = (Grp_hdl *)dip->di_info;
+			for (ALIST_TRAVERSE(falp, idx1, pdp)) {
+				Aliste		idx2;
+				Grp_hdl		*ghp;
 				Grp_desc	*gdp;
 
-				if ((pnp->p_len == 0) ||
-				    ((ghp = (Grp_hdl *)pnp->p_info) == 0))
+				if ((pdp->pd_plen == 0) ||
+				    ((ghp = (Grp_hdl *)pdp->pd_info) == NULL))
 					continue;
 
-				for (ALIST_TRAVERSE(ghp->gh_depends, idx,
+				for (ALIST_TRAVERSE(ghp->gh_depends, idx2,
 				    gdp)) {
 
 					if (gdp->gd_depend == lmp)
@@ -459,59 +461,6 @@ dep_visit(Lm_list *lml, Rt_map *clmp, uint_t cbflags, Rt_map *lmp, Sort *sort,
 	}
 	return (min);
 }
-
-
-#ifndef	LD_BREADTH_DISABLED
-/*
- * Reverse LD_BREATH search (used to fire .init's the old fashioned way).
- */
-static void
-rb_visit(Rt_map * lmp, Sort * sort)
-{
-	Rt_map *	nlmp;
-
-	if ((nlmp = NEXT_RT_MAP(lmp)) != 0)
-		rb_visit(nlmp, sort);
-
-	/*
-	 * Only collect objects that have been relocated and haven't already
-	 * been collected.
-	 */
-	if ((FLAGS(lmp) & (FLG_RT_RELOCED | FLG_RT_INITCLCT)) ==
-	    FLG_RT_RELOCED) {
-		sort->s_lmpa[(sort->s_lndx)++] = lmp;
-		FLAGS(lmp) |= FLG_RT_INITCLCT;
-		LIST(lmp)->lm_init--;
-	}
-}
-
-/*
- * Forward LD_BREATH search (used to fire .fini's the old fashioned way).
- */
-static void
-fb_visit(Rt_map * lmp, Sort * sort, int flag)
-{
-	while (lmp) {
-		/*
-		 * If we're called from dlclose() then we only collect those
-		 * objects marked for deletion.
-		 */
-		if (!(flag & RT_SORT_DELETE) || (FLAGS(lmp) & FLG_RT_DELETE)) {
-			/*
-			 * Only collect objects that have had their .init
-			 * collected, and haven't already been .fini collected.
-			 */
-			if ((FLAGS(lmp) &
-			    (FLG_RT_INITCLCT | FLG_RT_FINICLCT)) ==
-			    (FLG_RT_INITCLCT)) {
-				sort->s_lmpa[(sort->s_lndx)++] = lmp;
-				FLAGS(lmp) |= FLG_RT_FINICLCT;
-			}
-		}
-		lmp = NEXT_RT_MAP(lmp);
-	}
-}
-#endif
 
 /*
  * Find corresponding strongly connected component structure.
@@ -538,7 +487,7 @@ trace_find_scc(Sort *sort, Rt_map *lmp)
  * Print out the .init dependency information (ldd).
  */
 static void
-trace_sort(Sort * sort)
+trace_sort(Sort *sort)
 {
 	int 		ndx = 0;
 	APlist		*alp;
@@ -557,12 +506,6 @@ trace_sort(Sort * sort)
 		if (sfmt == 0)
 			sfmt = MSG_INTL(MSG_LDD_INIT_FMT_02);
 
-#ifndef	LD_BREADTH_DISABLED
-		if (rtld_flags & RT_FL_BREADTH) {
-			(void) printf(sfmt, NAME(lmp1));
-			continue;
-		}
-#endif
 		/*
 		 * If the only component on the strongly connected list is
 		 * this link-map, then there are no dependencies.
@@ -603,8 +546,8 @@ trace_sort(Sort * sort)
 static void
 r_initfirst(Sort * sort, int end)
 {
-	Rt_map *	tlmp;
-	int		bgn, ifst, lifst = 0;
+	Rt_map *tlmp;
+	int	bgn, ifst, lifst = 0;
 
 	for (bgn = 0; bgn < sort->s_initfirst; bgn++) {
 		for (ifst = lifst; ifst <= end; ifst++) {
@@ -645,10 +588,10 @@ r_initfirst(Sort * sort, int end)
  * of these elements to the front of the list.
  */
 static void
-f_initfirst(Sort * sort, int end)
+f_initfirst(Sort *sort, int end)
 {
-	Rt_map *	tlmp;
-	int		bgn, ifst, lifst = 0;
+	Rt_map *tlmp;
+	int	bgn, ifst, lifst = 0;
 
 	for (bgn = 0; bgn < sort->s_initfirst; bgn++) {
 		for (ifst = lifst; ifst <= end; ifst++) {
@@ -721,10 +664,11 @@ initorfini(Lm_list *lml, Rt_map *lmp, int flag, Sort *sort)
 Rt_map **
 tsort(Rt_map *lmp, int num, int flag)
 {
-	Rt_map *	_lmp;
-	Lm_list *	lml = LIST(lmp);
-	Word		init = lml->lm_flags & LML_FLG_TRC_INIT;
-	Sort		sort = { 0 };
+	Rt_map	*_lmp;
+	Lm_list	*lml = LIST(lmp);
+	Word	init = lml->lm_flags & LML_FLG_TRC_INIT;
+	Sort	sort = { 0 };
+	size_t	size;
 
 	if (num == 0)
 		return (0);
@@ -740,38 +684,15 @@ tsort(Rt_map *lmp, int num, int flag)
 	/*
 	 * Allocate memory for link-map list array.  Calloc the array to insure
 	 * all elements are zero, we might find that no objects need processing.
+	 * At the same time, allocate a stack for any topological sorting that
+	 * might be necessary.
 	 */
 	sort.s_lmp = lmp;
 	sort.s_num = num + 1;
-	if ((sort.s_lmpa = calloc(sort.s_num, sizeof (Rt_map *))) == NULL)
+	size = sort.s_num * sizeof (Rt_map *);
+	if ((sort.s_lmpa = calloc(2, size)) == NULL)
 		return ((Rt_map **)S_ERROR);
-
-#ifndef	LD_BREADTH_DISABLED
-	/*
-	 * A breadth first search is easy, simply add each object to the
-	 * link-map array.
-	 */
-	if (rtld_flags & RT_FL_BREADTH) {
-		if (flag & RT_SORT_REV)
-			rb_visit(lmp, &sort);
-		else
-			fb_visit(lmp, &sort, flag);
-
-		/*
-		 * If tracing .init sections (only meaningful for RT_SORT_REV)
-		 * print out the sorted dependencies.
-		 */
-		if (init)
-			trace_sort(&sort);
-
-		return (sort.s_lmpa);
-	}
-#endif
-	/*
-	 * We need to topologically sort the dependencies.
-	 */
-	if ((sort.s_stack = malloc(sort.s_num * sizeof (Rt_map *))) == NULL)
-		return ((Rt_map **)S_ERROR);
+	sort.s_stack = (Rt_map **)((uintptr_t)sort.s_lmpa + size);
 
 	/*
 	 * Determine where to start searching for tsort() candidates.  Any call
@@ -871,7 +792,7 @@ tsort(Rt_map *lmp, int num, int flag)
 		int	bgn = 0, end = sort.s_lndx - 1;
 
 		while (bgn < end) {
-			Rt_map *	tlmp = sort.s_lmpa[end];
+			Rt_map	*tlmp = sort.s_lmpa[end];
 
 			sort.s_lmpa[end] = sort.s_lmpa[bgn];
 			sort.s_lmpa[bgn] = tlmp;
@@ -901,9 +822,6 @@ tsort(Rt_map *lmp, int num, int flag)
 	/*
 	 * Clean any temporary structures prior to return.
 	 */
-	if (sort.s_stack)
-		free(sort.s_stack);
-
 	if (sort.s_queue) {
 		Aliste idx;
 		Rt_map	*lmp2;

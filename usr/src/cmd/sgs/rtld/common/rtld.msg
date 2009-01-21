@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -70,16 +70,10 @@
 
 @ MSG_GEN_NOFILE	"%s: can't find file"
 @ MSG_GEN_ALTER		"%s: alternate file in use"
-@ MSG_GEN_CORTRUNC	"%s: corrupt or truncated file"
 @ MSG_GEN_NOSYM		"%s: can't find symbol"
-@ MSG_GEN_BADTYPE	"%s: bad ELF type: %s"
-@ MSG_GEN_INVPRGHDR	"%s: invalid ELF program header, segments out of order"
-@ MSG_GEN_NOLOADSEG	"%s: no loadable ELF segments found"
-@ MSG_GEN_MAPINUSE	"%s: required mapping 0x%llx size 0x%llx, \
-			 is already in use by file %s"
 @ MSG_GEN_NODUMP	"%s: DF_1_NODUMP tagged object may not be dldump()'ed"
-@ MSG_GEN_AUDITERM	"%s: auditing terminated search"
 @ MSG_GEN_BADHWCAP_1	"hardware capability unsupported: %s"
+@ MSG_GEN_BADSFCAP_1	"software capability unsupported: %s"
 
 
 # Move related messages
@@ -106,9 +100,8 @@
 @ MSG_SYS_BRK		"%s: brk failed: %s"
 @ MSG_SYS_OPEN		"%s: open failed: %s"
 @ MSG_SYS_MMAP		"%s: mmap failed: %s"
-@ MSG_SYS_MMAPANON	"%s: mmap anon failed: %s"
 @ MSG_SYS_MPROT		"%s: mprotect failed: %s"
-@ MSG_SYS_PROC		"%s: /proc error: %s"
+@ MSG_SYS_MMAPANON	"mmap anon failed: %s"
 
 @ MSG_SEC_OPEN		"%s: open failed: No such file in secure directories"
 @ MSG_SEC_ILLEGAL	"%s: open failed: illegal insecure pathname"
@@ -166,6 +159,8 @@
 			 lies outside memory image; relocation discarded\n"
 @ MSG_LDD_REL_ERR2	"\tloading after relocation has started: interposition \
 			 request (DF_1_INTERPOSE) ignored: %s\n"
+@ MSG_LDD_MOVE_ERR	"\tmove %lld offset invalid: %s: offset=0x%llx \
+			 lies outside memory image; move discarded\n"
 @ MSG_LDD_CPY_SIZDIF	"\trelocation %s sizes differ: %s\n\
 			 \t\t(file %s size=0x%llx; file %s size=0x%llx)\n"
 @ MSG_LDD_CPY_INSDATA	"\t\t%s size used; possible insufficient data copied\n"
@@ -266,7 +261,6 @@
 @ MSG_LDD_VER_FOUND	"\t%s (%s) =>\t %s\n"
 
 
-
 # The following strings represent reserved words, files, pathnames and symbols.
 # Reference to this strings is via the MSG_ORIG() macro, and thus no message
 # translation is required.
@@ -296,10 +290,7 @@
 @ MSG_TKN_POSIX		"POSIX"
 @ MSG_TKN_DOTDOT	".."
 
-@ MSG_FMT_PATH		"%s/%s"
 @ MSG_FMT_CWD		"."
-@ MSG_FMT_PARENT	"/.."
-@ MSG_FMT_PROC		"/proc/%d"
 @ MSG_FMT_MSGFILE	"/usr/lib/locale/%s/LC_MESSAGES/%s.mo"
 
 @ MSG_FIL_RTLD		"ld.so.1"
@@ -332,7 +323,6 @@
 @ MSG_PTH_LIBSE		"/lib/secure"
 @ MSG_PTH_USRLIBSE	"/usr/lib/secure"
 @ MSG_PTH_DEVNULL	"/dev/null"
-@ MSG_PTH_DEVZERO	"/dev/zero"
 @ MSG_PTH_CONFIG	"/var/ld/ld.config"
 @ MSG_PTH_VARTMP	"/var/tmp"
 
@@ -344,8 +334,6 @@
 @ MSG_LD_BIND_NOW	"BIND_NOW"
 @ MSG_LD_BIND_NOT	"BIND_NOT"
 @ MSG_LD_BINDINGS	"BINDINGS"
-@ MSG_LD_BREADTH	"BREADTH"
-@ MSG_LD_CONCURRENCY	"CONCURRENCY"
 @ MSG_LD_CONFGEN	"CONFGEN"
 @ MSG_LD_CONFIG		"CONFIG"
 @ MSG_LD_DEBUG		"DEBUG"
@@ -369,7 +357,6 @@
 @ MSG_LD_NOPAREXT	"NOPAREXT"
 @ MSG_LD_NOUNRESWEAK	"NOUNRESWEAK"
 @ MSG_LD_NOVERSION	"NOVERSION"
-@ MSG_LD_ORIGIN		"ORIGIN"
 @ MSG_LD_PRELOAD	"PRELOAD"
 @ MSG_LD_PROFILE	"PROFILE"
 @ MSG_LD_PROFILE_OUTPUT	"PROFILE_OUTPUT"
@@ -384,8 +371,6 @@
 @ MSG_LD_WARN		"WARN"
 
 @ MSG_LD_BRAND_PREFIX	"BRAND_"
-
-@ MSG_LD_FIX_1		"_FIX_1_"
 
 @ MSG_LC_ALL		"ALL="
 @ MSG_LC_MESSAGES	"MESSAGES="

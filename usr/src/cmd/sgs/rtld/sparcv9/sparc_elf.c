@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SPARC V9 machine dependent and ELF file class dependent functions.
@@ -44,6 +42,7 @@
 #include	"_rtld.h"
 #include	"_audit.h"
 #include	"_elf.h"
+#include	"_inline.h"
 #include	"msg.h"
 
 extern void	iflush_range(caddr_t, size_t);
@@ -52,7 +51,6 @@ extern void	plt_upper_44(uintptr_t, uintptr_t);
 extern void	plt_full_range(uintptr_t, uintptr_t);
 extern void	elf_rtbndr(Rt_map *, ulong_t, caddr_t);
 extern void	elf_rtbndr_far(Rt_map *, ulong_t, caddr_t);
-
 
 int
 elf_mach_flags_check(Rej_desc *rej, Ehdr *ehdr)
@@ -95,7 +93,7 @@ elf_mach_flags_check(Rej_desc *rej, Ehdr *ehdr)
 
 
 void
-ldso_plt_init(Rt_map * lmp)
+ldso_plt_init(Rt_map *lmp)
 {
 	/*
 	 * There is no need to analyze ld.so because we don't map in any of
@@ -172,6 +170,7 @@ elf_plt_write(uintptr_t addr, uintptr_t vaddr, void *rptr, uintptr_t symval,
 		Pltbindtype	rc;
 
 		pltent = (uint_t *)pltaddr;
+
 		/*
 		 * The
 		 *
@@ -232,8 +231,6 @@ elf_plt_write(uintptr_t addr, uintptr_t vaddr, void *rptr, uintptr_t symval,
 	return (PLT_T_FULL);
 }
 
-
-
 /*
  * Once relocated, the following 6 instruction sequence moves
  * a 64-bit immediate value into register %g1
@@ -271,14 +268,12 @@ static const Byte dyn_plt_template[] = {
 					/*	to get 8-byte alignment */
 };
 
-
 int	dyn_plt_ent_size = sizeof (dyn_plt_template) +
 		sizeof (Addr) +		/* reflmp */
 		sizeof (Addr) +		/* deflmp */
 		sizeof (Word) +		/* symndx */
 		sizeof (Word) +		/* sb_flags */
 		sizeof (Sym);		/* symdef */
-
 
 /*
  * the dynamic plt entry is:
@@ -325,7 +320,6 @@ int	dyn_plt_ent_size = sizeof (dyn_plt_template) +
  *	Sym		symdef  (Elf64_Sym = 24-bytes)
  */
 
-
 /*
  * Relocate the instructions given by the VAL64_TO_G1 macro above.
  * The arguments parallel those of do_reloc_rtld().
@@ -340,7 +334,7 @@ int	dyn_plt_ent_size = sizeof (dyn_plt_template) +
  *	Returns TRUE for success, FALSE for failure.
  */
 static int
-reloc_val64_to_g1(Byte *off, Addr *value, const char *sym, Lm_list *lml)
+reloc_val64_to_g1(uchar_t *off, Addr *value, const char *sym, Lm_list *lml)
 {
 	Xword	tmp_value;
 
@@ -388,12 +382,13 @@ reloc_val64_to_g1(Byte *off, Addr *value, const char *sym, Lm_list *lml)
 }
 
 static caddr_t
-elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
-    Sym * sym, uint_t symndx, ulong_t pltndx, caddr_t to, uint_t sb_flags,
+elf_plt_trace_write(caddr_t addr, Rela *rptr, Rt_map *rlmp, Rt_map *dlmp,
+    Sym *sym, uint_t symndx, ulong_t pltndx, caddr_t to, uint_t sb_flags,
     int *fail)
 {
 	extern ulong_t	elf_plt_trace();
-	Addr		dyn_plt, *dyndata;
+	uchar_t		*dyn_plt;
+	uintptr_t	*dyndata;
 
 	/*
 	 * If both pltenter & pltexit have been disabled there
@@ -410,8 +405,8 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 	 * We only need to add the glue code if there is an auditing
 	 * library that is interested in this binding.
 	 */
-	dyn_plt = (Xword)AUDINFO(rlmp)->ai_dynplts +
-	    (pltndx * dyn_plt_ent_size);
+	dyn_plt = (uchar_t *)((uintptr_t)AUDINFO(rlmp)->ai_dynplts +
+	    (pltndx * dyn_plt_ent_size));
 
 	/*
 	 * Have we initialized this dynamic plt entry yet?  If we haven't do it
@@ -419,24 +414,24 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
 	 * different plt (ie. from another shared object).  In that case
 	 * we just set the plt to point to the new dyn_plt.
 	 */
-	if (*(Word *)dyn_plt == 0) {
+	if (*dyn_plt == 0) {
 		Sym	*symp;
 		Lm_list	*lml = LIST(rlmp);
 
 		(void) memcpy((void *)dyn_plt, dyn_plt_template,
 		    sizeof (dyn_plt_template));
-		dyndata = (Addr *)(dyn_plt + sizeof (dyn_plt_template));
+		dyndata = (uintptr_t *)((uintptr_t)dyn_plt +
+		    sizeof (dyn_plt_template));
 
 		/*
 		 * relocating:
 		 *	VAL64_TO_G1(dyndata)
 		 *	VAL64_TO_G1(&elf_plt_trace)
 		 */
-		if (!(reloc_val64_to_g1((Byte *) (dyn_plt + 0x14), dyndata,
+		if (!(reloc_val64_to_g1((dyn_plt + 0x14), dyndata,
 		    MSG_ORIG(MSG_SYM_LADYNDATA), lml) &&
-		    reloc_val64_to_g1((Byte *) (dyn_plt + 0x30),
-		    (Addr *)&elf_plt_trace, MSG_ORIG(MSG_SYM_ELFPLTTRACE),
-		    lml))) {
+		    reloc_val64_to_g1((dyn_plt + 0x30), (Addr *)&elf_plt_trace,
+		    MSG_ORIG(MSG_SYM_ELFPLTTRACE), lml))) {
 			*fail = 1;
 			return (0);
 		}
@@ -477,7 +472,6 @@ elf_plt_trace_write(caddr_t addr, Rela * rptr, Rt_map * rlmp, Rt_map * dlmp,
  *
  * On error, causes process to terminate with a signal.
  */
-
 ulong_t
 elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 {
@@ -487,13 +481,12 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	Rela		*rptr;
 	Sym		*rsym, *nsym;
 	Xword		pltndx;
-	uint_t		binfo, sb_flags = 0;
+	uint_t		binfo, sb_flags = 0, dbg_class;
 	ulong_t		rsymndx;
 	Slookup		sl;
 	Pltbindtype	pbtype;
 	int		entry, lmflags, farplt = 0;
-	uint_t		dbg_class;
-	Lm_list		*lml = LIST(lmp);
+	Lm_list		*lml;
 
 	/*
 	 * For compatibility with libthread (TI_VERSION 1) we track the entry
@@ -503,6 +496,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 	 */
 	entry = enter(0);
 
+	lml = LIST(lmp);
 	if ((lmflags = lml->lm_flags) & LML_FLG_RTLDLM) {
 		dbg_class = dbg_desc->d_class;
 		dbg_desc->d_class = 0;
@@ -588,7 +582,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 			rtldexit(lml, 1);
 	}
 
-	if ((lml->lm_tflags | FLAGS1(lmp)) & LML_TFLG_AUD_SYMBIND) {
+	if ((lml->lm_tflags | AFLAGS(lmp)) & LML_TFLG_AUD_SYMBIND) {
 		/* LINTED */
 		uint_t	symndx = (uint_t)(((uintptr_t)nsym -
 		    (uintptr_t)SYMTAB(nlmp)) / SYMENT(nlmp));
@@ -604,7 +598,7 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 
 	pbtype = PLT_T_NONE;
 	if (!(rtld_flags & RT_FL_NOBIND)) {
-		if (((lml->lm_tflags | FLAGS1(lmp)) &
+		if (((lml->lm_tflags | AFLAGS(lmp)) &
 		    (LML_TFLG_AUD_PLTENTER | LML_TFLG_AUD_PLTEXIT)) &&
 		    AUDINFO(lmp)->ai_dynplts) {
 			int	fail = 0;
@@ -653,18 +647,12 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 		load_completion(nlmp);
 
 	/*
-	 * If the object we've bound to is in the process of being initialized
-	 * by another thread, determine whether we should block.
-	 */
-	is_dep_ready(nlmp, lmp, DBG_WAIT_SYMBOL);
-
-	/*
 	 * Make sure the object to which we've bound has had it's .init fired.
 	 * Cleanup before return to user code.
 	 */
 	if (entry) {
 		is_dep_init(nlmp, lmp);
-		leave(LIST(lmp), 0);
+		leave(lml, 0);
 	}
 
 	if (lmflags & LML_FLG_RTLDLM)
@@ -672,7 +660,6 @@ elf_bndr(Rt_map *lmp, ulong_t pltoff, caddr_t from)
 
 	return (symval);
 }
-
 
 static int
 bindpltpad(Rt_map *lmp, List *padlist, Addr value, void **pltaddr,
@@ -714,7 +701,6 @@ bindpltpad(Rt_map *lmp, List *padlist, Addr value, void **pltaddr,
 	rel.r_info = 0;
 	rel.r_addend = 0;
 
-
 	/*
 	 * elf_plt_write assumes the plt was previously filled
 	 * with NOP's, so fill it in now.
@@ -752,11 +738,10 @@ bindpltpad(Rt_map *lmp, List *padlist, Addr value, void **pltaddr,
  * the file.
  */
 int
-elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
+elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl, APlist **textrel)
 {
 	ulong_t		relbgn, relend, relsiz, basebgn, pltbgn, pltend;
-	ulong_t		roffset, rsymndx, psymndx = 0, etext = ETEXT(lmp);
-	ulong_t		emap, pltndx;
+	ulong_t		pltndx, roffset, rsymndx, psymndx = 0;
 	uint_t		dsymndx, binfo, pbinfo;
 	Byte		rtype;
 	long		reladd;
@@ -764,7 +749,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 	Sym		*symref, *psymref, *symdef, *psymdef;
 	char		*name, *pname;
 	Rt_map		*_lmp, *plmp;
-	int		textrel = 0, ret = 1, noplt = 0;
+	int		ret = 1, noplt = 0;
 	long		relacount = RELACOUNT(lmp);
 	Rela		*rel;
 	Pltbindtype	pbtype;
@@ -786,13 +771,18 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 	 * to find this useful.
 	 */
 	if ((plt == 0) && PLTGOT(lmp)) {
-		Xword pltoff;
+		mmapobj_result_t	*mpp;
+		Xword			pltoff;
 
-		if ((ulong_t)PLTGOT(lmp) < etext) {
-			if (elf_set_prot(lmp, PROT_WRITE) == 0)
-				return (0);
-			textrel = 1;
-		}
+		/*
+		 * Make sure the segment is writable.
+		 */
+		if ((((mpp =
+		    find_segment((caddr_t)PLTGOT(lmp), lmp)) != NULL) &&
+		    ((mpp->mr_prot & PROT_WRITE) == 0)) &&
+		    ((set_prot(lmp, mpp, 1) == 0) ||
+		    (aplist_append(textrel, mpp, AL_CNT_TEXTREL) == NULL)))
+			return (0);
 
 		/*
 		 * Install the lm pointer in .PLT2 as per the ABI.
@@ -867,7 +857,6 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 
 	relsiz = (ulong_t)(RELENT(lmp));
 	basebgn = ADDR(lmp);
-	emap = ADDR(lmp) + MSIZE(lmp);
 
 	DBG_CALL(Dbg_reloc_run(lmp, M_REL_SHT_TYPE, plt, DBG_REL_START));
 
@@ -882,8 +871,9 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 	 * Loop through relocations.
 	 */
 	while (relbgn < relend) {
-		Addr		vaddr;
-		uint_t		sb_flags = 0;
+		mmapobj_result_t	*mpp;
+		uint_t			sb_flags = 0;
+		Addr			vaddr;
 
 		rtype = (Byte)ELF_R_TYPE(((Rela *)relbgn)->r_info, M_MACH);
 
@@ -896,28 +886,13 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 		 */
 		if ((rtype == R_SPARC_RELATIVE) &&
 		    ((FLAGS(lmp) & FLG_RT_FIXED) == 0) && (DBG_ENABLED == 0)) {
-			/*
-			 * It's possible that the relative relocation block
-			 * has relocations against the text segment as well
-			 * as the data segment.  Since our optimized relocation
-			 * engine does not check which segment the relocation
-			 * is against - just mprotect it now if it's been
-			 * marked as containing TEXTREL's.
-			 */
-			if ((textrel == 0) && (FLAGS1(lmp) & FL1_RT_TEXTREL)) {
-				if (elf_set_prot(lmp, PROT_WRITE) == 0) {
-					ret = 0;
-					break;
-				}
-				textrel = 1;
-			}
 			if (relacount) {
-				relbgn = elf_reloc_relacount(relbgn, relacount,
-				    relsiz, basebgn);
+				relbgn = elf_reloc_relative_count(relbgn,
+				    relacount, relsiz, basebgn, lmp, textrel);
 				relacount = 0;
 			} else {
 				relbgn = elf_reloc_relative(relbgn, relend,
-				    relsiz, basebgn, etext, emap);
+				    relsiz, basebgn, lmp, textrel);
 			}
 			if (relbgn >= relend)
 				break;
@@ -956,8 +931,8 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 			 * If this relocation is not against part of the image
 			 * mapped into memory we skip it.
 			 */
-			if ((roffset < ADDR(lmp)) || (roffset > (ADDR(lmp) +
-			    MSIZE(lmp)))) {
+			if ((mpp = find_segment((caddr_t)roffset,
+			    lmp)) == NULL) {
 				elf_reloc_bad(lmp, (void *)rel, rtype, roffset,
 				    rsymndx);
 				continue;
@@ -965,7 +940,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 		}
 
 		/*
-		 * If we're promoting plts determine if this one has already
+		 * If we're promoting plts, determine if this one has already
 		 * been written. An uninitialized plts' second instruction is a
 		 * branch.
 		 */
@@ -982,6 +957,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 		binfo = 0;
 		pltndx = (ulong_t)-1;
 		pbtype = PLT_T_NONE;
+
 		/*
 		 * If a symbol index is specified then get the symbol table
 		 * entry, locate the symbol definition, and determine its
@@ -1054,7 +1030,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 					binfo = pbinfo;
 
 					if ((LIST(_lmp)->lm_tflags |
-					    FLAGS1(_lmp)) &
+					    AFLAGS(_lmp)) &
 					    LML_TFLG_AUD_SYMBIND) {
 						value = audit_symbind(lmp, _lmp,
 						    /* LINTED */
@@ -1153,7 +1129,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 						pbinfo = binfo;
 					}
 					if ((LIST(_lmp)->lm_tflags |
-					    FLAGS1(_lmp)) &
+					    AFLAGS(_lmp)) &
 					    LML_TFLG_AUD_SYMBIND) {
 						/* LINTED */
 						dsymndx = (((uintptr_t)symdef -
@@ -1220,16 +1196,14 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 		    M_REL_SHT_TYPE, rel, NULL, name));
 
 		/*
-		 * If this object has relocations in the text segment, turn
-		 * off the write protect.
+		 * Make sure the segment is writable.
 		 */
-		if ((rtype != R_SPARC_REGISTER) && (roffset < etext) &&
-		    (textrel == 0)) {
-			if (elf_set_prot(lmp, PROT_WRITE) == 0) {
-				ret = 0;
-				break;
-			}
-			textrel = 1;
+		if ((rtype != R_SPARC_REGISTER) &&
+		    ((mpp->mr_prot & PROT_WRITE) == 0) &&
+		    ((set_prot(lmp, mpp, 1) == 0) ||
+		    (aplist_append(textrel, mpp, AL_CNT_TEXTREL) == NULL))) {
+			ret = 0;
+			break;
 		}
 
 		/*
@@ -1284,7 +1258,7 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 			else
 				vaddr = ADDR(lmp);
 
-			if (((LIST(lmp)->lm_tflags | FLAGS1(lmp)) &
+			if (((LIST(lmp)->lm_tflags | AFLAGS(lmp)) &
 			    (LML_TFLG_AUD_PLTENTER | LML_TFLG_AUD_PLTEXIT)) &&
 			    AUDINFO(lmp)->ai_dynplts) {
 				int	fail = 0;
@@ -1385,22 +1359,20 @@ elf_reloc(Rt_map *lmp, uint_t plt, int *in_nfavl)
 	 * Free up any items on the pltpadlist if it was allocated
 	 */
 	if (pltpadlist.head) {
-		Listnode *	lnp;
-		Listnode *	plnp;
-		Pltpadinfo *	pip;
+		Listnode	*lnp, *plnp = NULL;
+		Pltpadinfo	*pip;
 
-		plnp = 0;
 		for (LIST_TRAVERSE(&pltpadlist, lnp, pip)) {
-			if (plnp != 0)
+			if (plnp)
 				free(plnp);
 			free(pip);
 			plnp = lnp;
 		}
-		if (plnp != 0)
+		if (plnp)
 			free(plnp);
 	}
 
-	return (relocate_finish(lmp, bound, textrel, ret));
+	return (relocate_finish(lmp, bound, ret));
 }
 
 /*

@@ -488,11 +488,6 @@ extern const int	dynsymsort_symtype[STT_NUM];
 	ld_swap_reloc_data(_ofl, _rel))
 
 /*
- * For backward compatibility provide a /dev/zero file descriptor.
- */
-extern int		dz_fd;
-
-/*
  * Local functions.
  */
 extern char		*add_string(char *, char *);
@@ -548,6 +543,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_files	ld64_process_files
 #define	ld_process_flags	ld64_process_flags
 #define	ld_process_ifl		ld64_process_ifl
+#define	ld_process_open		ld64_process_open
 #define	ld_process_ordered	ld64_process_ordered
 #define	ld_process_sym_reloc	ld64_process_sym_reloc
 #define	ld_recalc_shdrcnt	ld64_recalc_shdrcnt
@@ -632,6 +628,7 @@ extern Sdf_desc		*sdf_find(const char *, List *);
 #define	ld_process_files	ld32_process_files
 #define	ld_process_flags	ld32_process_flags
 #define	ld_process_ifl		ld32_process_ifl
+#define	ld_process_open		ld32_process_open
 #define	ld_process_ordered	ld32_process_ordered
 #define	ld_process_sym_reloc	ld32_process_sym_reloc
 #define	ld_recalc_shdrcnt	ld32_recalc_shdrcnt
@@ -734,6 +731,8 @@ extern uintptr_t	ld_process_files(Ofl_desc *, int, char **);
 extern uintptr_t	ld_process_flags(Ofl_desc *, int, char **);
 extern Ifl_desc		*ld_process_ifl(const char *, const char *, int, Elf *,
 			    Word, Ofl_desc *, Rej_desc *);
+extern Ifl_desc		*ld_process_open(const char *, const char *, int *,
+			    Ofl_desc *, Word, Rej_desc *);
 extern uintptr_t	ld_process_ordered(Ifl_desc *, Ofl_desc *, Word, Word);
 extern uintptr_t	ld_process_sym_reloc(Ofl_desc *, Rel_desc *, Rel *,
 			    Is_desc *, const char *);

@@ -26,6 +26,8 @@
  * Use is subject to license terms.
  */
 
+#pragma ident	"@(#)llib-llddbg	1.79	08/06/20 SMI"
+
 #include <sys/types.h>
 #include <sys/auxv.h>
 #include <debug.h>
@@ -84,10 +86,10 @@ void	Dbg64_ent_print(Lm_list *, Elf64_Half, List *, Boolean);
 
 void	Dbg32_file_analyze(Rt_map *);
 void	Dbg64_file_analyze64(Rt_map *);
-void	Dbg32_file_aout(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
-	    const char *, Aliste);
-void	Dbg64_file_aout(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
-	    const char *, Aliste);
+void	Dbg32_file_aout(Lm_list *, const char *, Addr, size_t, const char *,
+	    Aliste);
+void	Dbg64_file_aout(Lm_list *, const char *, Addr, size_t, const char *,
+	    Aliste);
 void	Dbg32_file_archive(Lm_list *, const char *, int);
 void	Dbg64_file_archive(Lm_list *, const char *, int);
 void	Dbg32_file_bind_entry(Lm_list *, Bnd_desc *);
@@ -114,10 +116,10 @@ void	Dbg32_file_dldump(Rt_map *, const char *, int);
 void	Dbg64_file_dldump(Rt_map *, const char *, int);
 void	Dbg32_file_dlopen(Rt_map *, const char *, int *, int);
 void	Dbg64_file_dlopen(Rt_map *, const char *, int *, int);
-void	Dbg32_file_elf(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
-	    ulong_t, const char *, Aliste);
-void	Dbg64_file_elf(Lm_list *, const char *, ulong_t, ulong_t, ulong_t,
-	    ulong_t, const char *, Aliste);
+void	Dbg32_file_elf(Lm_list *, const char *, Addr, size_t, const char *,
+	    Aliste);
+void	Dbg64_file_elf(Lm_list *, const char *, Addr, size_t, const char *,
+	    Aliste);
 void	Dbg32_file_filtee(Lm_list *, const char *, const char *, int);
 void	Dbg64_file_filtee(Lm_list *, const char *, const char *, int);
 void	Dbg32_file_filter(Lm_list *, const char *, const char *, int);
@@ -134,6 +136,8 @@ void	Dbg64_file_lazyload(Rt_map *, const char *, const char *);
 void	Dbg32_file_lazyload(Rt_map *, const char *, const char *);
 void	Dbg32_file_ldso(Rt_map *, char **, auxv_t *, const char *, Aliste);
 void	Dbg64_file_ldso(Rt_map *, char **, auxv_t *, const char *, Aliste);
+void	Dbg32_file_mmapobj(Lm_list *, const char *, mmapobj_result_t *, uint_t);
+void	Dbg64_file_mmapobj(Lm_list *, const char *, mmapobj_result_t *, uint_t);
 void	Dbg32_file_mode_promote(Rt_map *, int);
 void	Dbg64_file_mode_promote(Rt_map *, int);
 void	Dbg32_file_modified(Lm_list *, const char *, const char *, const char *,
@@ -216,6 +220,8 @@ void	Dbg32_move_adjmovereloc(Lm_list *, Elf32_Word, Elf32_Word,
 	    const char *);
 void	Dbg64_move_adjmovereloc(Lm_list *, Elf64_Xword, Elf64_Xword,
 	    const char *);
+void	Dbg32_move_bad(Lm_list *, ulong_t, const char *, Addr);
+void	Dbg64_move_bad(Lm_list *, ulong_t, const char *, Addr);
 void	Dbg32_move_data(Rt_map *);
 void	Dbg64_move_data(Rt_map *);
 void	Dbg32_move_entry1(Lm_list *, int, Move *, Sym_desc *);
@@ -450,7 +456,7 @@ const char *Elf_demangle_name(const char *);
 void Elf_syminfo_entry(Lm_list *, Word, Syminfo *, const char *, const char *);
 void Elf_syminfo_title(Lm_list *);
 void Elf_ver_def_title(Lm_list *);
-void Elf_ver_need_title(Lm_list *, int gnuver);
+void Elf_ver_need_title(Lm_list *, int);
 void Elf_ver_line_1(Lm_list *, const char *, const char *, const char *,
     const char *);
 void Elf_ver_line_2(Lm_list *, const char *, const char *);
