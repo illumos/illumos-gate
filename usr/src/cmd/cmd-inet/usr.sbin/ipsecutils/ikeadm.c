@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,8 +66,9 @@ static int	doorfd = -1;
 #define	IKEADM_HELP_FLUSH	IKE_SVC_MAX + 7
 #define	IKEADM_HELP_READ	IKE_SVC_MAX + 8
 #define	IKEADM_HELP_WRITE	IKE_SVC_MAX + 9
-#define	IKEADM_HELP_HELP	IKE_SVC_MAX + 10
-#define	IKEADM_EXIT		IKE_SVC_MAX + 11
+#define	IKEADM_HELP_TOKEN	IKE_SVC_MAX + 10
+#define	IKEADM_HELP_HELP	IKE_SVC_MAX + 11
+#define	IKEADM_EXIT		IKE_SVC_MAX + 12
 
 static void
 command_complete(int s)
@@ -104,12 +105,14 @@ print_help()
 	(void) printf("\tadd   rule|preshared {%s}|%s\n",
 	    gettext("definition"), gettext("filename"));
 	(void) printf("\tdel   p1|rule|preshared %s\n", gettext("identifier"));
-	(void) printf("\tdump  p1|rule|preshared\n");
-	(void) printf("\tflush p1\n");
+	(void) printf("\tdump  p1|rule|preshared|certcache\n");
+	(void) printf("\tflush p1|certcache\n");
 	(void) printf("\tread  rule|preshared [%s]\n", gettext("filename"));
 	(void) printf("\twrite rule|preshared %s\n", gettext("filename"));
+	(void) printf("\ttoken <login|logout> %s\n",
+	    gettext("<PKCS#11 Token Object>"));
 	(void) printf(
-	    "\thelp  [get|set|add|del|dump|flush|read|write|help]\n");
+	    "\thelp  [get|set|add|del|dump|flush|read|write|token|help]\n");
 	(void) printf("\texit  %s\n", gettext("exit the program"));
 	(void) printf("\tquit  %s\n", gettext("exit the program"));
 	(void) printf("\n");
@@ -219,6 +222,8 @@ print_dump_help()
 	(void) printf(gettext("all phase 1 rules\n"));
 	(void) printf("\tpreshared\t");
 	(void) printf(gettext("all preshared keys\n"));
+	(void) printf("\tcertcache\t");
+	(void) printf(gettext("all cached certificates\n"));
 	(void) printf("\n");
 
 	command_complete(0);
@@ -232,6 +237,8 @@ print_flush_help()
 	(void) printf(gettext("Tables that may be flushed include:\n"));
 	(void) printf("\tp1\t\t");
 	(void) printf(gettext("all phase 1 SAs\n"));
+	(void) printf("\tcertcache\t");
+	(void) printf(gettext("all cached certificates\n"));
 	(void) printf("\n");
 
 	command_complete(0);
@@ -277,6 +284,24 @@ print_write_help()
 }
 
 static void
+print_token_help()
+{
+	(void) printf(gettext(
+	    "This command logs IKE into and out of PKCS#11 tokens.\n\n"));
+	(void) printf(gettext("Commands include:\n"));
+	(void) printf("\tlogin <PKCS#11 Token Object>\t");
+	(void) printf(gettext("log into token\n"));
+	(void) printf("\tlogout <PKCS#11 Token Object>\t");
+	(void) printf(gettext("log out of token\n\n"));
+	(void) printf(
+	    gettext("The PKCS#11 Token Object name must be "
+	    "enclosed in quotation marks.\n"));
+	(void) printf("\n");
+
+	command_complete(0);
+}
+
+static void
 print_help_help()
 {
 	(void) printf(
@@ -311,7 +336,7 @@ open_door(void)
 {
 	if (doorfd >= 0)
 		(void) close(doorfd);
-	doorfd = open(DOORNM, O_RDWR);
+	doorfd = open(DOORNM, O_RDONLY);
 	return (doorfd);
 }
 
@@ -356,7 +381,7 @@ retry:
 static int
 parsecmd(char *cmdstr, char *objstr)
 {
-#define	MAXOBJS		10
+#define	MAXOBJS		11
 	struct objtbl {
 		char	*obj;
 		int	token;
@@ -383,6 +408,12 @@ parsecmd(char *cmdstr, char *objstr)
 				{NULL,		IKE_SVC_ERROR}
 			}
 		},
+		{"token", IKE_SVC_ERROR, {
+				{"login",	IKE_SVC_SET_PIN},
+				{"logout",	IKE_SVC_DEL_PIN},
+				{NULL,		IKE_SVC_ERROR},
+			}
+		},
 		{"add", IKE_SVC_ERROR, {
 				{"rule",	IKE_SVC_NEW_RULE},
 				{"preshared",	IKE_SVC_NEW_PS},
@@ -400,11 +431,13 @@ parsecmd(char *cmdstr, char *objstr)
 				{"p1",		IKE_SVC_DUMP_P1S},
 				{"rule",	IKE_SVC_DUMP_RULES},
 				{"preshared",	IKE_SVC_DUMP_PS},
+				{"certcache",	IKE_SVC_DUMP_CERTCACHE},
 				{NULL,		IKE_SVC_ERROR}
 			}
 		},
 		{"flush", IKE_SVC_ERROR, {
 				{"p1",		IKE_SVC_FLUSH_P1S},
+				{"certcache",	IKE_SVC_FLUSH_CERTCACHE},
 				{NULL,		IKE_SVC_ERROR}
 			}
 		},
@@ -429,6 +462,7 @@ parsecmd(char *cmdstr, char *objstr)
 				{"flush",	IKEADM_HELP_FLUSH},
 				{"read",	IKEADM_HELP_READ},
 				{"write",	IKEADM_HELP_WRITE},
+				{"token",	IKEADM_HELP_TOKEN},
 				{"help",	IKEADM_HELP_HELP},
 				{NULL,		IKE_SVC_ERROR}
 			}
@@ -497,6 +531,21 @@ parse_label(int argc, char **argv, char *label)
 		return (-1);
 
 	return (1);
+}
+
+/*
+ * Parse a PKCS#11 token get the label.
+ */
+static int
+parse_token(int argc, char **argv, char *token_label)
+{
+	if ((argc < 1) || (argv == NULL))
+		return (-1);
+
+	if (strlcpy(token_label, argv[0], PKCS11_TOKSIZE) >= PKCS11_TOKSIZE)
+		return (-1);
+
+	return (0);
 }
 
 /*
@@ -1175,10 +1224,21 @@ errstr(int err)
 		return (gettext("Request invalid"));
 	case IKE_ERR_NO_PRIV:
 		return (gettext("Not allowed at current privilege level"));
+	case IKE_ERR_NO_AUTH:
+		return (gettext("User not authorized"));
 	case IKE_ERR_SYS_ERR:
 		return (gettext("System error"));
 	case IKE_ERR_DUP_IGNORED:
 		return (gettext("One or more duplicate entries ignored"));
+	case IKE_ERR_NO_TOKEN:
+		return (gettext(
+		    "token login failed or no objects on device"));
+	case IKE_ERR_IN_PROGRESS:
+		return (gettext(
+		    "Duplicate operation already in progress"));
+	case IKE_ERR_NO_MEM:
+		return (gettext(
+		    "Insufficient memory"));
 	default:
 		(void) snprintf(rtn, MAXLINESIZE,
 		    gettext("<unknown error %d>"), err);
@@ -1829,6 +1889,37 @@ print_p1(ike_p1_sa_t *p1)
 }
 
 static void
+print_certcache(ike_certcache_t *c)
+{
+	(void) printf("\n");
+
+	(void) printf(gettext("CERTIFICATE CACHE ID: %d\n"), c->cache_id);
+	(void) printf(gettext("\tSubject Name: <%s>\n"),
+	    (c->subject != NULL) ? c->subject : gettext("Name unavailable"));
+	(void) printf(gettext("\t Issuer Name: <%s>\n"),
+	    (c->issuer != NULL) ? c->issuer : gettext("Name unavailable"));
+	if ((int)c->class == -1)
+		(void) printf(gettext("\t\t[trusted certificate]\n"));
+	switch (c->linkage) {
+	case CERT_OFF_WIRE:
+		(void) printf(gettext("\t\t[Public certificate only]\n"));
+		(void) printf(gettext(
+		    "\t\t[Obtained via certificate payload]\n"));
+		break;
+	case CERT_NO_PRIVKEY:
+		(void) printf(gettext("\t\t[Public certificate only]\n"));
+		break;
+	case CERT_PRIVKEY_LOCKED:
+		(void) printf(gettext(
+		    "\t\t[Private key linked but locked]\n"));
+		break;
+	case CERT_PRIVKEY_AVAIL:
+		(void) printf(gettext("\t\t[Private key available]\n"));
+		break;
+	}
+}
+
+static void
 print_ps(ike_ps_t *ps)
 {
 	sadb_ident_t	*lidp, *ridp;
@@ -2207,6 +2298,58 @@ do_getvar(int cmd)
 	}
 }
 
+/*
+ * Log into a token and unlock all objects
+ * referenced by PKCS#11 hint files.
+ */
+static void
+do_setdel_pin(int cmd, int argc, char **argv)
+{
+	ike_service_t	req, *rtn;
+	ike_pin_t	*preq;
+	char		token_label[PKCS11_TOKSIZE];
+	char		*token_pin;
+	char		prompt[80];
+
+	if (argc < 1)
+		Bail(gettext("Must specify PKCS#11 token object."));
+
+	preq = &req.svc_pin;
+	preq->cmd = cmd;
+
+	switch (cmd) {
+	case IKE_SVC_SET_PIN:
+		if (parse_token(argc, argv, token_label) != 0)
+			Bail("Invalid syntax for \"token login\"");
+		(void) snprintf(prompt, sizeof (prompt),
+		    "Enter PIN for PKCS#11 token \'%s\': ", token_label);
+		token_pin =
+		    getpassphrase(prompt);
+		(void) strlcpy((char *)preq->token_pin, token_pin, MAX_PIN_LEN);
+		bzero(token_pin, strlen(token_pin));
+		break;
+	case IKE_SVC_DEL_PIN:
+		if (parse_token(argc, argv, token_label) != 0)
+			Bail("Invalid syntax for \"token logout\"");
+		break;
+	default:
+		bail_msg(gettext("unrecognized token command (%d)"), cmd);
+	}
+
+	(void) strlcpy(preq->pkcs11_token, token_label, PKCS11_TOKSIZE);
+
+	rtn = ikedoor_call((char *)&req, sizeof (ike_pin_t), NULL, 0);
+	if (cmd == IKE_SVC_SET_PIN)
+		bzero(preq->token_pin, sizeof (preq->token_pin));
+
+	if ((rtn == NULL) || (rtn->svc_err.cmd == IKE_SVC_ERROR)) {
+		ikeadm_err_exit(&rtn->svc_err,
+		    gettext("PKCS#11 operation"));
+	}
+	preq = &rtn->svc_pin;
+	message(gettext("PKCS#11 operation successful"));
+}
+
 static void
 do_setvar(int cmd, int argc, char **argv)
 {
@@ -2349,6 +2492,9 @@ do_dump(int cmd)
 	case IKE_SVC_DUMP_PS:
 		name = gettext("preshared keys");
 		break;
+	case IKE_SVC_DUMP_CERTCACHE:
+		name = gettext("certcache");
+		break;
 	default:
 		bail_msg(gettext("unrecognized dump command (%d)"), cmd);
 	}
@@ -2379,6 +2525,9 @@ do_dump(int cmd)
 			break;
 		case IKE_SVC_DUMP_PS:
 			print_ps((ike_ps_t *)(dump + 1));
+			break;
+		case IKE_SVC_DUMP_CERTCACHE:
+			print_certcache((ike_certcache_t *)(dump + 1));
 			break;
 		}
 
@@ -2798,7 +2947,7 @@ do_flush(int cmd)
 	ike_service_t	*rtnp;
 	ike_flush_t	flush;
 
-	if (cmd != IKE_SVC_FLUSH_P1S) {
+	if (cmd != IKE_SVC_FLUSH_P1S && cmd != IKE_SVC_FLUSH_CERTCACHE) {
 		bail_msg(gettext("unrecognized flush command (%d)."), cmd);
 	}
 
@@ -2808,7 +2957,10 @@ do_flush(int cmd)
 	if ((rtnp == NULL) || (rtnp->svc_err.cmd == IKE_SVC_ERROR)) {
 		ikeadm_err_exit(&rtnp->svc_err, gettext("error doing flush"));
 	}
-	message(gettext("Successfully flushed P1 SAs."));
+	if (cmd == IKE_SVC_FLUSH_P1S)
+		message(gettext("Successfully flushed P1 SAs."));
+	else
+		message(gettext("Successfully flushed cert cache."));
 }
 
 static void
@@ -2959,9 +3111,14 @@ parseit(int argc, char **argv, char *notused, boolean_t notused_either)
 	case IKE_SVC_SET_PRIV:
 		do_setvar(cmd, argc, argv);
 		break;
+	case IKE_SVC_SET_PIN:
+	case IKE_SVC_DEL_PIN:
+		do_setdel_pin(cmd, argc, argv);
+		break;
 	case IKE_SVC_DUMP_P1S:
 	case IKE_SVC_DUMP_RULES:
 	case IKE_SVC_DUMP_PS:
+	case IKE_SVC_DUMP_CERTCACHE:
 		do_dump(cmd);
 		break;
 	case IKE_SVC_GET_P1:
@@ -2977,6 +3134,7 @@ parseit(int argc, char **argv, char *notused, boolean_t notused_either)
 		do_new(cmd, argc, argv);
 		break;
 	case IKE_SVC_FLUSH_P1S:
+	case IKE_SVC_FLUSH_CERTCACHE:
 		do_flush(cmd);
 		break;
 	case IKE_SVC_READ_RULES:
@@ -3011,6 +3169,9 @@ parseit(int argc, char **argv, char *notused, boolean_t notused_either)
 		break;
 	case IKEADM_HELP_WRITE:
 		print_write_help();
+		break;
+	case IKEADM_HELP_TOKEN:
+		print_token_help();
 		break;
 	case IKEADM_HELP_HELP:
 		print_help_help();

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,6 +80,10 @@ extern "C" {
 #ifndef INSECURE_PERMS
 #define	INSECURE_PERMS(sbuf)	(((sbuf).st_uid != 0) || \
 	((sbuf).st_mode & S_IRWXG) || ((sbuf).st_mode & S_IRWXO))
+#endif
+
+#ifndef PKCS11_TOKSIZE
+#define	PKCS11_TOKSIZE 32	/* Fixed length of PKCS#11 token string len. */
 #endif
 
 /*

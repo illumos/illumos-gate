@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,12 @@ typedef enum {
 	IKE_SVC_DBG_RBDUMP,
 
 	IKE_SVC_GET_DEFS,
+
+	IKE_SVC_SET_PIN,
+	IKE_SVC_DEL_PIN,
+
+	IKE_SVC_DUMP_CERTCACHE,
+	IKE_SVC_FLUSH_CERTCACHE,
 
 	IKE_SVC_ERROR
 } ike_svccmd_t;
@@ -405,6 +411,22 @@ typedef struct {
 	 */
 } ike_ps_t;
 
+#define	DN_MAX			1024
+#define	CERT_OFF_WIRE		-1
+#define	CERT_NO_PRIVKEY		0
+#define	CERT_PRIVKEY_LOCKED	1
+#define	CERT_PRIVKEY_AVAIL	2
+
+/*
+ * data formatting structure for cached certs
+ */
+typedef struct {
+	uint32_t	cache_id;
+	uint32_t	class;
+	int		linkage;
+	char		subject[DN_MAX];
+	char		issuer[DN_MAX];
+} ike_certcache_t;
 
 /* identification types */
 #define	IKE_ID_IDENT_PAIR	1
@@ -430,6 +452,10 @@ typedef struct {
 #define	IKE_ERR_NO_PRIV		9	/* privilege level not high enough */
 #define	IKE_ERR_SYS_ERR		10	/* syserr occurred while processing */
 #define	IKE_ERR_DUP_IGNORED	11	/* attempt to add a duplicate entry */
+#define	IKE_ERR_NO_TOKEN	12	/* cannot login into pkcs#11 token */
+#define	IKE_ERR_NO_AUTH		13	/* not authorized */
+#define	IKE_ERR_IN_PROGRESS	14	/* operation already in progress */
+#define	IKE_ERR_NO_MEM		15	/* insufficient memory */
 
 
 /*
@@ -521,7 +547,7 @@ typedef struct {
 } ike_defreq_t;
 
 /*
- * IKE_SVC_DUMP_{P1S|RULES|PS}
+ * IKE_SVC_DUMP_{P1S|RULES|PS|CERTCACHE}
  * Used to request a table dump, and to return info for a single table
  * item.  The expectation is that all of the table data will be passed
  * through the door, one entry at a time; an individual request must be
@@ -539,6 +565,7 @@ typedef struct {
  *   IKE_SVC_DUMP_P1S:		ike_p1_sa_t
  *   IKE_SVC_DUMP_RULES:	ike_rule_t
  *   IKE_SVC_DUMP_PS:		ike_ps_t
+ *   IKE_SVC_DUMP_CERTCACHE:	ike_certcache_t
  */
 typedef struct {
 	ike_svccmd_t	cmd;
@@ -671,12 +698,32 @@ typedef struct {
 
 /*
  * IKE_SVC_FLUSH_P1S
- * Used to request and acknowledge tear-down of all P1 SAs.
+ * IKE_SVC_FLUSH_CERTCACHE
+ *
+ * Used to request and acknowledge tear-down of all P1 SAs
+ * or to flush the certificate cache.
  */
 typedef struct {
 	ike_svccmd_t	cmd;
 } ike_flush_t;
 
+
+#ifndef PKCS11_TOKSIZE
+#define	PKCS11_TOKSIZE 32
+#endif
+#define	MAX_PIN_LEN 256
+/*
+ * IKE_SVC_SET_PIN
+ * IKE_SVC_DEL_PIN
+ *
+ * Used to supply a pin for a PKCS#11 tokenj object.
+ *
+ */
+typedef struct {
+	ike_svccmd_t	cmd;
+	char pkcs11_token[PKCS11_TOKSIZE];
+	uchar_t token_pin[MAX_PIN_LEN];
+} ike_pin_t;
 
 /*
  * IKE_SVC_ERROR
@@ -692,7 +739,6 @@ typedef struct {
 	uint32_t	ike_err_reserved;
 } ike_err_t;
 
-
 /*
  * Generic type for use when the request/reply type is unknown
  */
@@ -702,7 +748,7 @@ typedef struct {
 
 
 /*
- * Union containing all possible request/retrun structures.
+ * Union containing all possible request/return structures.
  */
 typedef union {
 	ike_cmd_t	svc_cmd;
@@ -715,6 +761,7 @@ typedef union {
 	ike_del_t	svc_del;
 	ike_rw_t	svc_rw;
 	ike_flush_t	svc_flush;
+	ike_pin_t	svc_pin;
 	ike_err_t	svc_err;
 	ike_defreq_t	svc_defaults;
 } ike_service_t;
