@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -322,6 +320,7 @@ clean: clean_pod clean_utilities clean_x2p clean_extensions clean_lib
 clobber_extensions:
 	-@ unset VERSION; \
 	cd ext; pwd; \
+	$(RM) -r Sys/Syslog/lib; \
 	( \
 	cd DynaLoader; \
 	[ -f Makefile.old ] && mf=Makefile.old; \
