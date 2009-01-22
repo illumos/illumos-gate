@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -195,12 +195,15 @@ cat <<EOF >> $HGRC
 filemerge.gui=True
 filemerge.args=-a \$base \$local \$other \$output
 filemerge.priority=1
+filemerge.premerge=False
 
 meld.gui=True
 meld.priority=0
+meld.premerge=False
 
 gpyfm.gui=True
 gpyfm.priority=0
+gpyfm.premerge=False
 
 [ui]
 username=$username

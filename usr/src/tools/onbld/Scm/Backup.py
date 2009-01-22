@@ -14,7 +14,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -26,8 +26,10 @@ Backup format is:
       wsname/
          generation#/
             dirstate (handled by CdmUncommittedBackup)
-                File containing dirstate nodeid (the tip we expect to be at
-                after applying the bundle).
+                File containing dirstate nodeid (the changeset we need
+                to update the workspace to after applying the bundle).
+                This is the node to which the working copy changes
+                (see 'diff', below) will be applied if applicable.
 
             bundle (handled by CdmCommittedBackup)
                 An Hg bundle containing outgoing committed changes.
@@ -56,8 +58,40 @@ dirstate, are optional.
 '''
 
 import os, pwd, shutil, traceback, tarfile, time
-from mercurial import changegroup, patch, node, util
+from mercurial import changegroup, patch, node, util, revlog
 from cStringIO import StringIO
+
+
+class CdmNodeMissing(util.Abort):
+    '''a required node is not present in the destination workspace.
+
+    This may occur both in the case where the bundle contains a
+    changeset which is a child of a node not present in the
+    destination workspace (because the destination workspace is not as
+    up-to-date as the source), or because the source and destination
+    workspace are not related.
+
+    It may also happen in cases where the uncommitted changes need to
+    be applied onto a node that the workspace does not possess even
+    after application of the bundle (on a branch not present
+    in the bundle or destination workspace, for instance)'''
+
+    def __init__(self, msg, name):
+        #
+        # If e.name is a string 20 characters long, it is
+        # assumed to be a node.  (Mercurial makes this
+        # same assumption, when creating a LookupError)
+        #
+        if isinstance(name, str) and len(name) == 20:
+            n = node.short(name)
+        else:
+            n = name
+
+        util.Abort.__init__(self, "%s: changeset '%s' is missing\n"
+                            "Your workspace is either not "
+                            "sufficiently up to date,\n"
+                            "or is unrelated to the workspace from "
+                            "which the backup was taken.\n" % (msg, n))
 
 
 class CdmCommittedBackup(object):
@@ -122,6 +156,9 @@ class CdmCommittedBackup(object):
                 except EnvironmentError, e:
                     raise util.Abort("couldn't restore committed changes: %s\n"
                                      "   %s" % (bfile, e))
+                except revlog.LookupError, e:
+                    raise CdmNodeMissing("couldn't restore committed changes",
+                                                     e.name)
             finally:
                 if f and not f.closed:
                     f.close()
@@ -247,6 +284,9 @@ class CdmUncommittedBackup(object):
 
         try:
             self.ws.clean(rev=dirstate)
+        except revlog.LookupError, e:
+            raise CdmNodeMissing("couldn't restore uncommitted changes",
+                                             e.name)
         except util.Abort, e:
             raise util.Abort("couldn't update to saved node: %s" % e)
 
@@ -702,4 +742,4 @@ class CdmBackup(object):
         except util.Abort, e:
             raise util.Abort('Error restoring workspace:\n'
                              '%s\n'
-                             'Workspace will be partially restored' % e)
+                             'Workspace may be partially restored' % e)
