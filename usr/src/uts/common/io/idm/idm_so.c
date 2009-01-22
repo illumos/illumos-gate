@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2096,10 +2096,9 @@ idm_so_buf_rx_from_ini(idm_task_t *idt, idm_buf_t *idb)
 	mutex_exit(&idt->idt_mutex);
 
 	/*
-	 * Transmit the PDU.  Call the internal routine directly as there
-	 * is already implicit ordering of the PDU.
+	 * Transmit the PDU.
 	 */
-	(void) idm_i_so_tx(pdu);
+	idm_pdu_tx(pdu);
 
 	return (IDM_STATUS_SUCCESS);
 }

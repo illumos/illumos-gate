@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +99,7 @@ static struct dev_ops iscsit_dev_ops = {
 	&iscsit_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
 	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 static struct modldrv modldrv = {
@@ -1303,7 +1304,7 @@ iscsit_buf_xfer_cb(idm_buf_t *idb, idm_status_t status)
 		 * longer valid.
 		 */
 		if (iscsit_send_scsi_status(itask->it_stmf_task, 0)
-		    != IDM_STATUS_SUCCESS) {
+		    != STMF_SUCCESS) {
 			/* Failed to send status */
 			dbuf->db_xfer_status = STMF_FAILURE;
 			stmf_data_xfer_done(itask->it_stmf_task, dbuf,
@@ -1377,7 +1378,7 @@ iscsit_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 	} else {
 		if (itask->it_idm_task->idt_state != TASK_ACTIVE) {
 			mutex_exit(&itask->it_idm_task->idt_mutex);
-			return (IDM_STATUS_FAIL);
+			return (STMF_FAILURE);
 		}
 		itask->it_idm_task->idt_state = TASK_COMPLETE;
 		/* PDU callback releases task hold */
