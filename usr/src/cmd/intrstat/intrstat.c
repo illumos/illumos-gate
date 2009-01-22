@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -42,6 +39,7 @@
 #define	INTRSTAT_COLUMNS_PER_CPU	15
 #define	INTRSTAT_CPUS_PER_LINE(w)	\
 	(((w) - INTRSTAT_COLUMN_OFFS) / INTRSTAT_COLUMNS_PER_CPU)
+#define	INTRSTAT_OPTSTR			"x:c:C:"
 
 static dtrace_hdl_t *g_dtp;
 static int *g_present;
@@ -79,7 +77,7 @@ static void
 usage(void)
 {
 	(void) fprintf(stderr,
-	    "usage:  intrstat [ -C psrset | -c cpulist ] "
+	    "usage:  intrstat [ -C psrset | -c cpulist ]  [-x opt[=val]] "
 	    "[interval [ count]]\n");
 
 	exit(EXIT_FAILURE);
@@ -204,7 +202,7 @@ walk(const dtrace_aggdata_t *data, void *arg)
 		if (j++ == 0) {
 			print_header();
 			(void) snprintf(c, sizeof (c), "%s#%d",
-				name, *instance);
+			    name, *instance);
 			(void) printf("%12s |", c);
 		}
 
@@ -355,7 +353,7 @@ main(int argc, char **argv)
 	struct sigevent ev;
 	sigset_t set;
 	timer_t tid;
-	char *end;
+	char *end, *p;
 	char c;
 	hrtime_t last, now;
 	dtrace_optval_t statustime;
@@ -403,7 +401,7 @@ main(int argc, char **argv)
 
 	bzero(g_pset_cpus, sizeof (processorid_t) * g_max_cpus);
 
-	while ((c = getopt(argc, argv, "c:C:")) != EOF) {
+	while ((c = getopt(argc, argv, INTRSTAT_OPTSTR)) != EOF) {
 		switch (c) {
 		case 'c': {
 			/*
@@ -455,7 +453,42 @@ main(int argc, char **argv)
 		}
 
 		default:
-			usage();
+			if (strchr(INTRSTAT_OPTSTR, c) == NULL)
+				usage();
+		}
+	}
+
+	if ((g_dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
+		fatal("cannot open dtrace library: %s\n",
+		    dtrace_errmsg(NULL, err));
+	}
+
+	if ((prog = dtrace_program_strcompile(g_dtp, g_prog,
+	    DTRACE_PROBESPEC_NAME, 0, 0, NULL)) == NULL)
+		fatal("invalid program");
+
+	if (dtrace_program_exec(g_dtp, prog, &info) == -1)
+		fatal("failed to enable probes");
+
+	if (dtrace_setopt(g_dtp, "aggsize", "128k") == -1)
+		fatal("failed to set 'aggsize'");
+
+	if (dtrace_setopt(g_dtp, "aggrate", "0") == -1)
+		fatal("failed to set 'aggrate'");
+
+	if (dtrace_setopt(g_dtp, "aggpercpu", 0) == -1)
+		fatal("failed to set 'aggpercpu'");
+
+	optind = 1;
+	while ((c = getopt(argc, argv, INTRSTAT_OPTSTR)) != EOF) {
+		switch (c) {
+		case 'x':
+			if ((p = strchr(optarg, '=')) != NULL)
+				*p++ = '\0';
+
+			if (dtrace_setopt(g_dtp, optarg, p) != 0)
+				fatal("failed to set -x %s", optarg);
+			break;
 		}
 	}
 
@@ -499,27 +532,6 @@ main(int argc, char **argv)
 			g_present[i] = p_online(i, P_STATUS) == -1 ? 0 : 1;
 	}
 
-	if ((g_dtp = dtrace_open(DTRACE_VERSION, 0, &err)) == NULL) {
-		fatal("cannot open dtrace library: %s\n",
-		    dtrace_errmsg(NULL, err));
-	}
-
-	if ((prog = dtrace_program_strcompile(g_dtp, g_prog,
-	    DTRACE_PROBESPEC_NAME, 0, 0, NULL)) == NULL)
-		fatal("invalid program");
-
-	if (dtrace_program_exec(g_dtp, prog, &info) == -1)
-		fatal("failed to enable probes");
-
-	if (dtrace_setopt(g_dtp, "aggsize", "128k") == -1)
-		fatal("failed to set 'aggsize'");
-
-	if (dtrace_setopt(g_dtp, "aggrate", "0") == -1)
-		fatal("failed to set 'aggrate'");
-
-	if (dtrace_setopt(g_dtp, "aggpercpu", 0) == -1)
-		fatal("failed to set 'aggpercpu'");
-
 	if (dtrace_go(g_dtp) != 0)
 		fatal("dtrace_go()");
 
@@ -549,7 +561,8 @@ main(int argc, char **argv)
 
 		(void) sigsuspend(&set);
 
-		(void) dtrace_status(g_dtp);
+		if (dtrace_status(g_dtp) == -1)
+			fatal("dtrace_status()");
 
 		if (g_intr == 0)
 			continue;
