@@ -1052,6 +1052,7 @@ main(int ac, char *av[])
 			exit_code += printer_query(optarg, report_device,
 						encryption, verbose, 0);
 			break;
+		case 'R':	/* set "rank" flag in first pass */
 		case 'o':
 			exit_code += job_query(optarg, report_job,
 						encryption, rank, verbose);
@@ -1097,7 +1098,6 @@ main(int ac, char *av[])
 		case 'L':	/* local-only, ignored */
 		case 'l':	/* increased verbose level in first pass */
 		case 'D':	/* set "description" flag in first pass */
-		case 'R':	/* set "rank" flag in first pass */
 		case 'E':	/* set encryption in the first pass */
 			break;
 		default:
