@@ -4677,7 +4677,7 @@ loopback_kstat_update(kstat_t *ksp, int rw)
 /*
  * Has ifindex been plumbed already?
  */
-static boolean_t
+boolean_t
 phyint_exists(uint_t index, ip_stack_t *ipst)
 {
 	ASSERT(index != 0);

@@ -387,8 +387,7 @@ extern void	*ip6_kstat_init(netstackid_t, ip6_stat_t *);
 extern void	ip6_kstat_fini(netstackid_t, kstat_t *);
 extern size_t	ip6_get_src_preferences(conn_t *, uint32_t *);
 extern int	ip6_set_src_preferences(conn_t *, uint32_t);
-extern int	ip6_set_pktinfo(cred_t *, conn_t *, struct in6_pktinfo *,
-    mblk_t *);
+extern int	ip6_set_pktinfo(cred_t *, conn_t *, struct in6_pktinfo *);
 extern int	ip_proto_bind_laddr_v6(conn_t *, mblk_t **, uint8_t,
     const in6_addr_t *, uint16_t, boolean_t);
 extern int	ip_proto_bind_connected_v6(conn_t *, mblk_t **,

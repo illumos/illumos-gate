@@ -12719,11 +12719,9 @@ ip6_get_src_preferences(conn_t *connp, uint32_t *val)
 }
 
 int
-ip6_set_pktinfo(cred_t *cr, conn_t *connp, struct in6_pktinfo *pkti, mblk_t *mp)
+ip6_set_pktinfo(cred_t *cr, conn_t *connp, struct in6_pktinfo *pkti)
 {
-	ill_t	*ill;
 	ire_t	*ire;
-	int	error;
 	ip_stack_t	*ipst = connp->conn_netstack->netstack_ip;
 
 	/*
@@ -12732,20 +12730,12 @@ ip6_set_pktinfo(cred_t *cr, conn_t *connp, struct in6_pktinfo *pkti, mblk_t *mp)
 	 * checked in ip_wput_v6.
 	 */
 	if (pkti->ipi6_ifindex != 0) {
-		ASSERT(connp != NULL);
-		ill = ill_lookup_on_ifindex(pkti->ipi6_ifindex, B_TRUE,
-		    CONNP_TO_WQ(connp), mp, ip_restart_optmgmt, &error, ipst);
-		if (ill == NULL) {
-			/*
-			 * We just want to know if the interface exists, we
-			 * don't really care about the ill pointer itself.
-			 */
-			if (error != EINPROGRESS)
-				return (error);
-			error = 0;	/* Ensure we don't use it below */
-		} else {
-			ill_refrele(ill);
+		rw_enter(&ipst->ips_ill_g_lock, RW_READER);
+		if (!phyint_exists(pkti->ipi6_ifindex, ipst)) {
+			rw_exit(&ipst->ips_ill_g_lock);
+			return (ENXIO);
 		}
+		rw_exit(&ipst->ips_ill_g_lock);
 	}
 	if (!IN6_IS_ADDR_UNSPECIFIED(&pkti->ipi6_addr) &&
 	    secpolicy_net_rawaccess(cr) != 0) {

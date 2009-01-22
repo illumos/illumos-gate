@@ -10510,7 +10510,7 @@ tcp_opt_set(conn_t *connp, uint_t optset_context, int level, int name,
 					    level, name, invalp, inlen, cr);
 				} else {
 					reterr = ip6_set_pktinfo(cr,
-					    tcp->tcp_connp, pkti, mblk);
+					    tcp->tcp_connp, pkti);
 				}
 				if (reterr != 0)
 					return (reterr);
@@ -22409,17 +22409,30 @@ non_urgent_data:
 		tcp_info_req(tcp, mp);
 		break;
 	case T_SVR4_OPTMGMT_REQ:	/* manage options req */
-		(void) svr4_optcom_req(tcp->tcp_wq, mp, cr,
-		    &tcp_opt_obj, B_TRUE);
+		/*
+		 * If EINPROGRESS is returned, the request has been queued
+		 * for subsequent processing by ip_restart_optmgmt(), which
+		 * will do the CONN_DEC_REF().
+		 */
+		CONN_INC_REF(connp);
+		if (svr4_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
+		    B_TRUE) != EINPROGRESS) {
+			CONN_DEC_REF(connp);
+		}
 		break;
 	case T_OPTMGMT_REQ:
 		/*
 		 * Note:  no support for snmpcom_req() through new
 		 * T_OPTMGMT_REQ. See comments in ip.c
+		 *
+		 * see comments above in T_SVR4_OPTMGMT_REQ for conn
+		 * reference changes.
 		 */
-		/* Only IP is allowed to return meaningful value */
-		(void) tpi_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
-		    B_TRUE);
+		CONN_INC_REF(connp);
+		if (tpi_optcom_req(tcp->tcp_wq, mp, cr, &tcp_opt_obj,
+		    B_TRUE) != EINPROGRESS) {
+			CONN_DEC_REF(connp);
+		}
 		break;
 
 	case T_UNITDATA_REQ:	/* unitdata request */

@@ -11163,7 +11163,7 @@ ip_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			if (inlen == 0)
 				return (-EINVAL);	/* clearing option */
 			error = ip6_set_pktinfo(cr, connp,
-			    (struct in6_pktinfo *)invalp, first_mp);
+			    (struct in6_pktinfo *)invalp);
 			if (error != 0)
 				*outlenp = 0;
 			else

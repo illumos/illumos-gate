@@ -465,6 +465,7 @@ extern	void	ip_sioctl_iocack(ipsq_t *, queue_t *, mblk_t *, void *);
 extern	ip_ioctl_cmd_t *ip_sioctl_lookup(int);
 
 extern	void	conn_delete_ire(conn_t *, caddr_t);
+extern	boolean_t	phyint_exists(uint_t, ip_stack_t *);
 
 /*
  * Notes on reference tracing on ill, ipif, ire, nce data structures:
