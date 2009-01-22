@@ -1432,3 +1432,4 @@ Bugid   Risk Synopsis
 6792906 ld -z nopartial fix breaks TLS
 6686372 ld.so.1 should use mmapobj(2)
 6726108 dlopen() performance could be improved.
+6792836 ld is slow when processing GNU linkonce sections

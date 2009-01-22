@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,43 +30,6 @@
 #include	<debug.h>
 #include	"msg.h"
 #include	"_libld.h"
-
-/*
- * Define an AVL node for maintain group names, together with a compare function
- * for the Grp_node AVL tree.
- */
-typedef struct {
-	const char	*gn_name;	/* group name */
-	Is_desc		*gn_isc;	/* group input section */
-	avl_node_t	gn_avl;		/* avl book-keeping (see SGSOFFSETOF) */
-	uint_t		gn_hash;	/* group name hash value */
-} Grp_node;
-
-static int
-gnavl_compare(const void *n1, const void *n2)
-{
-	uint_t		hash1, hash2;
-	const char	*st1, *st2;
-	int		rc;
-
-	hash1 = ((Grp_node *)n1)->gn_hash;
-	hash2 = ((Grp_node *)n2)->gn_hash;
-
-	if (hash1 > hash2)
-		return (1);
-	if (hash1 < hash2)
-		return (-1);
-
-	st1 = ((Grp_node *)n1)->gn_name;
-	st2 = ((Grp_node *)n2)->gn_name;
-
-	rc = strcmp(st1, st2);
-	if (rc > 0)
-		return (1);
-	if (rc < 0)
-		return (-1);
-	return (0);
-}
 
 /*
  * Determine whether a (COMDAT) group has already been encountered.  If so,
@@ -79,40 +42,39 @@ gnavl_compare(const void *n1, const void *n2)
 static uintptr_t
 gpavl_loaded(Ofl_desc *ofl, Group_desc *gdp)
 {
-	Grp_node	gpn, *gpnp;
+	Isd_node	isd, *isdp;
 	avl_tree_t	*avlt;
 	avl_index_t	where;
 
 	/*
-	 * Create an avl tree if required.
+	 * Create a groups avl tree if required.
 	 */
-	if ((avlt = ofl->ofl_groups) == 0) {
-		if ((avlt = calloc(sizeof (avl_tree_t), 1)) == NULL)
+	if ((avlt = ofl->ofl_groups) == NULL) {
+		if ((avlt = libld_calloc(sizeof (avl_tree_t), 1)) == NULL)
 			return (S_ERROR);
-		avl_create(avlt, gnavl_compare, sizeof (Grp_node),
-		    SGSOFFSETOF(Grp_node, gn_avl));
+		avl_create(avlt, isdavl_compare, sizeof (Isd_node),
+		    SGSOFFSETOF(Isd_node, isd_avl));
 		ofl->ofl_groups = avlt;
 	}
 
-	gpn.gn_name = gdp->gd_name;
-	gpn.gn_hash = sgs_str_hash(gdp->gd_name);
+	isd.isd_hash = sgs_str_hash(gdp->gd_isc->is_name);
+	isd.isd_isp = gdp->gd_isc;
 
-	if ((gpnp = avl_find(avlt, &gpn, &where)) != NULL) {
-		gdp->gd_oisc = gpnp->gn_isc;
+	if ((isdp = avl_find(avlt, &isd, &where)) != NULL) {
+		gdp->gd_oisc = isdp->isd_isp;
 		return (1);
 	}
 
 	/*
-	 * This is a new group, save it.
+	 * This is a new group - so keep it.
 	 */
-	if ((gpnp = calloc(sizeof (Grp_node), 1)) == NULL)
+	if ((isdp = libld_calloc(sizeof (Isd_node), 1)) == NULL)
 		return (S_ERROR);
 
-	gpnp->gn_name = gpn.gn_name;
-	gpnp->gn_hash = gpn.gn_hash;
-	gpnp->gn_isc = gdp->gd_isc;
+	isdp->isd_hash = isd.isd_hash;
+	isdp->isd_isp = isd.isd_isp;
 
-	avl_insert(avlt, gpnp, where);
+	avl_insert(avlt, isdp, where);
 	return (0);
 }
 

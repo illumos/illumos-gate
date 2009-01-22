@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,15 +43,15 @@
 /*
  * AVL tree comparator function:
  *
- *	The primary key is the 'sa_hashval' with a secondary
- *	key of the symbol name itself.
+ * The primary key is the symbol name hash with a secondary key of the symbol
+ * name itself.
  */
 int
 ld_sym_avl_comp(const void *elem1, const void *elem2)
 {
-	int	res;
 	Sym_avlnode	*sav1 = (Sym_avlnode *)elem1;
 	Sym_avlnode	*sav2 = (Sym_avlnode *)elem2;
+	int		res;
 
 	res = sav1->sav_hash - sav2->sav_hash;
 
@@ -71,7 +71,6 @@ ld_sym_avl_comp(const void *elem1, const void *elem2)
 	return (-1);
 }
 
-
 /*
  * Focal point for verifying symbol names.
  */
@@ -80,21 +79,21 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
     int symndx, Word shndx, const char *symsecname, const char *strsecname,
     Word *flags)
 {
-	Word		name = sym->st_name;
+	Word	name = sym->st_name;
 
 	if (name) {
 		if ((ifl->ifl_flags & FLG_IF_HSTRTAB) == 0) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_NOSTRTABLE), ifl->ifl_name,
 			    symsecname, symndx, EC_XWORD(name));
-			return (0);
+			return (NULL);
 		}
 		if (name >= (Word)strsize) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_FIL_EXCSTRTABLE), ifl->ifl_name,
 			    symsecname, symndx, EC_XWORD(name),
 			    strsecname, EC_XWORD(strsize));
-			return (0);
+			return (NULL);
 		}
 	}
 
@@ -107,7 +106,7 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
 		    sym, strs, symndx, shndx, symsecname, flags);
 
 		if (regname == (const char *)S_ERROR) {
-			return (0);
+			return (NULL);
 		}
 		if (regname)
 			return (regname);
@@ -128,7 +127,6 @@ string(Ofl_desc *ofl, Ifl_desc *ifl, Sym *sym, const char *strs, size_t strsize,
 	return (strs + name);
 }
 
-
 /*
  * For producing symbol names strings to use in error messages.
  * If the symbol has a non-null name, then the string returned by
@@ -145,12 +143,10 @@ demangle_symname(const char *name, const char *symtab_name, Word symndx)
 {
 #define	INIT_BUFSIZE 256
 
-	static char *buf;
-	static size_t bufsize = 0;
-
+	static char	*buf;
+	static size_t	bufsize = 0;
 	size_t		len;
 	int		use_name;
-
 
 	use_name = (name != NULL) && (*name != '\0');
 
@@ -172,8 +168,7 @@ demangle_symname(const char *name, const char *symtab_name, Word symndx)
 			new_bufsize = INIT_BUFSIZE;
 		while (len > new_bufsize)
 			new_bufsize *= 2;
-		new_buf = libld_malloc(new_bufsize);
-		if (new_buf == NULL)
+		if ((new_buf = libld_malloc(new_bufsize)) == NULL)
 			return (name);
 		buf = new_buf;
 		bufsize = new_bufsize;
@@ -270,7 +265,7 @@ ld_sym_copy(Sym_desc *sdp)
 	Sym	*nsym;
 
 	if (sdp->sd_flags & FLG_SY_CLEAN) {
-		if ((nsym = libld_malloc(sizeof (Sym))) == 0)
+		if ((nsym = libld_malloc(sizeof (Sym))) == NULL)
 			return (S_ERROR);
 		*nsym = *(sdp->sd_sym);
 		sdp->sd_sym = nsym;
@@ -287,8 +282,7 @@ ld_sym_copy(Sym_desc *sdp)
 Sym_desc *
 ld_sym_find(const char *name, Word hash, avl_index_t *where, Ofl_desc *ofl)
 {
-	Sym_avlnode	qsav;
-	Sym_avlnode	*sav;
+	Sym_avlnode	qsav, *sav;
 
 	if (hash == SYM_NOHASH)
 		/* LINTED */
@@ -306,15 +300,14 @@ ld_sym_find(const char *name, Word hash, avl_index_t *where, Ofl_desc *ofl)
 	/*
 	 * If symbol was not found in the avl tree, return null to show that.
 	 */
-	if (sav == 0)
-		return (0);
+	if (sav == NULL)
+		return (NULL);
 
 	/*
 	 * Return symbol found.
 	 */
 	return (sav->sav_symdesc);
 }
-
 
 /*
  * Enter a new symbol into the link editors internal symbol table.
@@ -351,7 +344,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 * contiguously.
 	 */
 	if ((savl = libld_calloc(sizeof (Sym_avlnode) + sizeof (Sym_desc) +
-	    sizeof (Sym_aux), 1)) == 0)
+	    sizeof (Sym_aux), 1)) == NULL)
 		return ((Sym_desc *)S_ERROR);
 	sdp = (Sym_desc *)((uintptr_t)savl + sizeof (Sym_avlnode));
 	sap = (Sym_aux *)((uintptr_t)sdp + sizeof (Sym_desc));
@@ -371,7 +364,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	sdp->sd_flags |= sdflags;
 	sdp->sd_flags1 |= sdflags1;
 
-	if ((_name = libld_malloc(strlen(name) + 1)) == 0)
+	if ((_name = libld_malloc(strlen(name) + 1)) == NULL)
 		return ((Sym_desc *)S_ERROR);
 	savl->sav_name = sdp->sd_name = (const char *)strcpy(_name, name);
 
@@ -387,7 +380,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		 */
 		where = &_where;
 		_savl = avl_find(&ofl->ofl_symavl, savl, where);
-		assert(_savl == 0);
+		assert(_savl == NULL);
 	}
 	avl_insert(&ofl->ofl_symavl, savl, *where);
 
@@ -409,7 +402,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 		 * caller can continue processing all symbols, and hence flush
 		 * out as many error conditions as possible.
 		 */
-		if ((etype == ET_REL) && (sdp->sd_isc == 0)) {
+		if ((etype == ET_REL) && (sdp->sd_isc == NULL)) {
 			eprintf(ofl->ofl_lml, ERR_FATAL,
 			    MSG_INTL(MSG_SYM_INVSEC), name, ifl->ifl_name,
 			    EC_XWORD(shndx));
@@ -555,10 +548,10 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 * The `sa_dfiles' list is used to maintain the list of files that
 	 * define the same symbol.  This list can be used for two reasons:
 	 *
-	 *   o	To save the first definition of a symbol that is not available
+	 *   -	To save the first definition of a symbol that is not available
 	 *	for this link-edit.
 	 *
-	 *   o	To save all definitions of a symbol when the -m option is in
+	 *   -	To save all definitions of a symbol when the -m option is in
 	 *	effect.  This is optional as it is used to list multiple
 	 *	(interposed) definitions of a symbol (refer to ldmap_out()),
 	 *	and can be quite expensive.
@@ -609,7 +602,7 @@ ld_sym_enter(const char *name, Sym *osym, Word hash, Ifl_desc *ifl,
 	 * information, therefore the diagnosing of the symbol is deferred until
 	 * later (see Dbg_map_symbol()).
 	 */
-	if ((ifl == 0) || ((ifl->ifl_flags & FLG_IF_MAPFILE) == 0))
+	if ((ifl == NULL) || ((ifl->ifl_flags & FLG_IF_MAPFILE) == 0))
 		DBG_CALL(Dbg_syms_entered(ofl, nsym, sdp));
 	return (sdp);
 }
@@ -707,7 +700,7 @@ sym_add_spec(const char *name, const char *uname, Word sdaux_id,
 		/*
 		 * If the symbol does not exist create it.
 		 */
-		if ((sym = libld_calloc(sizeof (Sym), 1)) == 0)
+		if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
 			return (S_ERROR);
 		sym->st_shndx = SHN_ABS;
 		sym->st_info = ELF_ST_INFO(STB_GLOBAL, STT_OBJECT);
@@ -813,17 +806,17 @@ sym_undef_title(Ofl_desc *ofl)
 /*
  * Undefined symbols can fall into one of four types:
  *
- *  o	the symbol is really undefined (SHN_UNDEF).
+ *  -	the symbol is really undefined (SHN_UNDEF).
  *
- *  o	versioning has been enabled, however this symbol has not been assigned
+ *  -	versioning has been enabled, however this symbol has not been assigned
  *	to one of the defined versions.
  *
- *  o	the symbol has been defined by an implicitly supplied library, ie. one
+ *  -	the symbol has been defined by an implicitly supplied library, ie. one
  *	which was encounted because it was NEEDED by another library, rather
  * 	than from a command line supplied library which would become the only
  *	dependency of the output file being produced.
  *
- *  o	the symbol has been defined by a version of a shared object that is
+ *  -	the symbol has been defined by a version of a shared object that is
  *	not permitted for this link-edit.
  *
  * In all cases the file who made the first reference to this symbol will have
@@ -1068,15 +1061,15 @@ ensure_array_local(Ofl_desc *ofl, List *list, const char *str)
  * counting has been carried out (ie. no more symbols will be read, generated,
  * or modified), validate and count the relevant entries:
  *
- *	o	check and print any undefined symbols remaining.  Note that
+ *	-	check and print any undefined symbols remaining.  Note that
  *		if a symbol has been defined by virtue of the inclusion of
  *		an implicit shared library, it is still classed as undefined.
  *
- * 	o	count the number of global needed symbols together with the
+ * 	-	count the number of global needed symbols together with the
  *		size of their associated name strings (if scoping has been
  *		indicated these symbols may be reduced to locals).
  *
- *	o	establish the size and alignment requirements for the global
+ *	-	establish the size and alignment requirements for the global
  *		.bss section (the alignment of this section is based on the
  *		first symbol that it will contain).
  */
@@ -1201,7 +1194,7 @@ ld_sym_validate(Ofl_desc *ofl)
 			Is_desc		*isp = sdp->sd_isc;
 			Ifl_desc	*ifl = sdp->sd_file;
 
-			if ((isp == 0) || (isp->is_shdr == 0) ||
+			if ((isp == NULL) || (isp->is_shdr == NULL) ||
 			    ((isp->is_shdr->sh_flags & SHF_TLS) == 0)) {
 				eprintf(ofl->ofl_lml, ERR_FATAL,
 				    MSG_INTL(MSG_SYM_TLS),
@@ -1558,10 +1551,10 @@ ld_sym_validate(Ofl_desc *ofl)
 		int	ndx;
 
 		for (ndx = 0; ndx < ofl->ofl_regsymsno; ndx++) {
-			if ((sdp = ofl->ofl_regsyms[ndx]) == 0)
+			if ((sdp = ofl->ofl_regsyms[ndx]) == NULL)
 				continue;
 			if (sdp->sd_ref != REF_REL_NEED) {
-				ofl->ofl_regsyms[ndx] = 0;
+				ofl->ofl_regsyms[ndx] = NULL;
 				continue;
 			}
 
@@ -1666,27 +1659,39 @@ ld_sym_validate(Ofl_desc *ofl)
 /*
  * qsort(3c) comparison function.  As an optimization for associating weak
  * symbols to their strong counterparts sort global symbols according to their
- * address and binding.
+ * section index, address and binding.
  */
 static int
-compare(const void * sdpp1, const void * sdpp2)
+compare(const void *sdpp1, const void *sdpp2)
 {
-	Sym_desc *	sdp1 = *((Sym_desc **)sdpp1);
-	Sym_desc *	sdp2 = *((Sym_desc **)sdpp2);
-	Sym *		sym1, * sym2;
+	Sym_desc	*sdp1 = *((Sym_desc **)sdpp1);
+	Sym_desc	*sdp2 = *((Sym_desc **)sdpp2);
+	Sym		*sym1, *sym2;
 	uchar_t		bind1, bind2;
 
 	/*
 	 * Symbol descriptors may be zero, move these to the front of the
 	 * sorted array.
 	 */
-	if (sdp1 == 0)
+	if (sdp1 == NULL)
 		return (-1);
-	if (sdp2 == 0)
+	if (sdp2 == NULL)
 		return (1);
 
 	sym1 = sdp1->sd_sym;
 	sym2 = sdp2->sd_sym;
+
+	/*
+	 * Compare the symbols section index.  This is important when sorting
+	 * the symbol tables of relocatable objects.  In this case, a symbols
+	 * value is the offset within the associated section, and thus many
+	 * symbols can have the same value, but are effectively different
+	 * addresses.
+	 */
+	if (sym1->st_shndx > sym2->st_shndx)
+		return (1);
+	if (sym1->st_shndx < sym2->st_shndx)
+		return (-1);
 
 	/*
 	 * Compare the symbols value (address).
@@ -1710,7 +1715,6 @@ compare(const void * sdpp1, const void * sdpp2)
 
 	return (0);
 }
-
 
 /*
  * Issue a MSG_SYM_BADADDR error from ld_sym_process(). This error
@@ -1759,10 +1763,10 @@ issue_badaddr_msg(Ifl_desc *ifl, Ofl_desc *ofl, Sym_desc *sdp,
  * input sections from this input file have been assigned an input section
  * descriptor which is saved in the `ifl_isdesc' array.
  *
- *	o	local symbols are saved (as is) if the input file is a
+ *	-	local symbols are saved (as is) if the input file is a
  *		relocatable object
  *
- *	o	global symbols are added to the linkers internal symbol
+ *	-	global symbols are added to the linkers internal symbol
  *		table if they are not already present, otherwise a symbol
  *		resolution function is called upon to resolve the conflict.
  */
@@ -1801,7 +1805,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 	Conv_inv_buf_t	inv_buf;
 	Sym		*sym = (Sym *)isc->is_indata->d_buf;
-	Word		*symshndx = 0;
+	Word		*symshndx = NULL;
 	Shdr		*shdr = isc->is_shdr;
 	Sym_desc	*sdp;
 	size_t		strsize;
@@ -1812,7 +1816,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	int		etype_rel;
 	const char	*symsecname, *strsecname;
 	avl_index_t	where;
-	int		test_gnu_hidden_bit;
+	int		test_gnu_hidden_bit, weak;
 
 	/*
 	 * Its possible that a file may contain more that one symbol table,
@@ -1880,12 +1884,12 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 * image, they are used as part of symbol resolution.
 	 */
 	if ((ifl->ifl_oldndx = libld_malloc((size_t)(total *
-	    sizeof (Sym_desc *)))) == 0)
+	    sizeof (Sym_desc *)))) == NULL)
 		return (S_ERROR);
 	etype_rel = (etype == ET_REL);
 	if (etype_rel && local) {
 		if ((ifl->ifl_locs =
-		    libld_calloc(sizeof (Sym_desc), local)) == 0)
+		    libld_calloc(sizeof (Sym_desc), local)) == NULL)
 			return (S_ERROR);
 		/* LINTED */
 		ifl->ifl_locscnt = (Word)local;
@@ -1923,7 +1927,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * Check if st_name has a valid value or not.
 			 */
 			if ((name = string(ofl, ifl, sym, strs, strsize, ndx,
-			    shndx, symsecname, strsecname, &sdflags)) == 0) {
+			    shndx, symsecname, strsecname, &sdflags)) == NULL) {
 				ofl->ofl_flags |= FLG_OF_FATAL;
 				continue;
 			}
@@ -1971,7 +1975,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 
 				if (etype == ET_DYN) {
 					if ((sdp = libld_calloc(
-					    sizeof (Sym_desc), 1)) == 0)
+					    sizeof (Sym_desc), 1)) == NULL)
 						return (S_ERROR);
 					sdp->sd_ref = REF_DYN_SEEN;
 
@@ -1984,11 +1988,11 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			/*
 			 * Fill in the remaining symbol descriptor information.
 			 */
-			if (sdp == 0) {
+			if (sdp == NULL) {
 				sdp = &(ifl->ifl_locs[ndx]);
 				sdp->sd_ref = REF_REL_NEED;
 			}
-			if (rsdp == 0) {
+			if (rsdp == NULL) {
 				sdp->sd_name = name;
 				sdp->sd_sym = sym;
 				sdp->sd_shndx = shndx;
@@ -2027,7 +2031,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 				 * The presence of FLG_SY_REGSYM means that
 				 * the pointers in ld_targ.t_ms are non-NULL.
 				 */
-				if ((rsdp == 0) &&
+				if ((rsdp == NULL) &&
 				    ((*ld_targ.t_ms.ms_reg_enter)(sdp, ofl) ==
 				    0))
 					return (S_ERROR);
@@ -2119,7 +2123,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    (sym->st_shndx != SHN_COMMON))) {
 				Is_desc	*isp = sdp->sd_isc;
 
-				if ((isp == 0) || (isp->is_shdr == 0) ||
+				if ((isp == NULL) || (isp->is_shdr == NULL) ||
 				    ((isp->is_shdr->sh_flags & SHF_TLS) == 0)) {
 					eprintf(ofl->ofl_lml, ERR_FATAL,
 					    MSG_INTL(MSG_SYM_TLS),
@@ -2142,7 +2146,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    ((sym->st_shndx == SHN_COMMON)) ||
 			    ((type == STT_FILE) &&
 			    (sym->st_shndx != SHN_ABS))) ||
-			    (sdp->sd_isc && (sdp->sd_isc->is_osdesc == 0))) {
+			    (sdp->sd_isc && (sdp->sd_isc->is_osdesc == NULL))) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_SYM_INVSHNDX),
 				    demangle_symname(name, isc->is_name, ndx),
@@ -2200,6 +2204,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	 */
 	sym = (Sym *)isc->is_indata->d_buf;
 	sym += local;
+	weak = 0;
 	/* LINTED */
 	for (ndx = (int)local; ndx < total; sym++, ndx++) {
 		const char	*name;
@@ -2222,7 +2227,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 		 * Check if st_name has a valid value or not.
 		 */
 		if ((name = string(ofl, ifl, sym, strs, strsize, ndx, shndx,
-		    symsecname, strsecname, &sdflags)) == 0) {
+		    symsecname, strsecname, &sdflags)) == NULL) {
 			ofl->ofl_flags |= FLG_OF_FATAL;
 			continue;
 		}
@@ -2282,6 +2287,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    conv_sym_info_bind(bind, 0, &inv_buf));
 			continue;
 		}
+		if (bind == STB_WEAK)
+			weak++;
 
 		/*
 		 * If this symbol falls within the range of a section being
@@ -2309,7 +2316,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			isp = ifl->ifl_isdesc[shndx];
 			if (isp && (isp->is_flags & FLG_IS_DISCARD)) {
 				if ((sdp =
-				    libld_calloc(sizeof (Sym_desc), 1)) == 0)
+				    libld_calloc(sizeof (Sym_desc), 1)) == NULL)
 					return (S_ERROR);
 
 				/*
@@ -2376,7 +2383,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * the pointers in ld_targ.t_ms are non-NULL.
 			 */
 			rsdp = (*ld_targ.t_ms.ms_reg_find)(sdp->sd_sym, ofl);
-			if (rsdp == 0) {
+			if (rsdp == NULL) {
 				if ((*ld_targ.t_ms.ms_reg_enter)(sdp, ofl) == 0)
 					return (S_ERROR);
 			} else if (rsdp != sdp) {
@@ -2409,53 +2416,75 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 	}
 
 	/*
-	 * If this is a shared object scan the globals one more time and
-	 * associate any weak/global associations.  This association is needed
-	 * should the weak definition satisfy a reference in the dynamic
-	 * executable:
+	 * Associate weak (alias) symbols to their non-weak counterparts by
+	 * scaning the global symbols one more time.
 	 *
-	 *  o	if the symbol is a data item it will be copied to the
-	 *	executables address space, thus we must also reassociate the
-	 *	alias symbol with its new location in the executable.
+	 * This association is needed when processing the symbols from a shared
+	 * object dependency when a a weak definition satisfies a reference:
 	 *
-	 *  o	if the symbol is a function then we may need to promote	the
-	 *	symbols binding from undefined weak to undefined, otherwise the
-	 *	run-time linker will not generate the correct relocation error
-	 *	should the symbol not be found.
+	 *  -	When building a dynamic executable, if a referenced symbol is a
+	 *	data item, the symbol data is copied to the executables address
+	 *	space.  In this copy-relocation case, we must also reassociate
+	 *	the alias symbol with its new location in the executable.
+	 *
+	 *  -	If the referenced symbol is a function then we may need to
+	 *	promote the symbols binding from undefined weak to undefined,
+	 *	otherwise the run-time linker will not generate the correct
+	 *	relocation error should the symbol not be found.
+	 *
+	 * Weak alias association is also required when a local dynsym table
+	 * is being created.  This table should only contain one instance of a
+	 * symbol that is associated to a given address.
 	 *
 	 * The true association between a weak/strong symbol pair is that both
-	 * symbol entries are identical, thus first we created a sorted symbol
-	 * list keyed off of the symbols value (if the value is the same chances
-	 * are the rest of the symbols data is).  This list is then scanned for
-	 * weak symbols, and if one is found then any strong association will
-	 * exist in the following entries.  Thus we just have to scan one
-	 * (typical single alias) or more (in the uncommon instance of multiple
-	 * weak to strong associations) entries to determine if a match exists.
+	 * symbol entries are identical, thus first we create a sorted symbol
+	 * list keyed off of the symbols section index and value.  If the symbol
+	 * belongs to the same section and has the same value, then the chances
+	 * are that the rest of the symbols data is the same.  This list is then
+	 * scanned for weak symbols, and if one is found then any strong
+	 * association will exist in the entries that follow.  Thus we just have
+	 * to scan one (typically a single alias) or more (in the uncommon
+	 * instance of multiple weak to strong associations) entries to
+	 * determine if a match exists.
 	 */
-	if ((OFL_ALLOW_LDYNSYM(ofl) || (etype == ET_DYN)) &&
+	if (weak && (OFL_ALLOW_LDYNSYM(ofl) || (etype == ET_DYN)) &&
 	    (total > local)) {
-		Sym_desc **	sort;
-		size_t		size = (total - local) * sizeof (Sym_desc *);
+		static Sym_desc	**sort;
+		static size_t	osize = 0;
+		size_t		nsize = (total - local) * sizeof (Sym_desc *);
 
-		if ((sort = libld_malloc(size)) == 0)
-			return (S_ERROR);
-		(void) memcpy((void *)sort, &ifl->ifl_oldndx[local], size);
+		/*
+		 * As we might be processing many input files, and many symbols,
+		 * try and reuse a static sort buffer.  Note, presently we're
+		 * playing the game of never freeing any buffers as there's a
+		 * belief this wastes time.
+		 */
+		if ((osize == 0) || (nsize > osize)) {
+			if ((sort = libld_malloc(nsize)) == NULL)
+				return (S_ERROR);
+			osize = nsize;
+		}
+		(void) memcpy((void *)sort, &ifl->ifl_oldndx[local], nsize);
 
 		qsort(sort, (total - local), sizeof (Sym_desc *), compare);
 
 		for (ndx = 0; ndx < (total - local); ndx++) {
-			Sym_desc *	wsdp = sort[ndx];
-			Sym *		wsym;
+			Sym_desc	*wsdp = sort[ndx];
+			Sym		*wsym;
 			int		sndx;
 
-			if (wsdp == 0)
+			/*
+			 * Ignore any empty symbol descriptor, or the case where
+			 * the symbol has been resolved to a different file.
+			 */
+			if ((wsdp == NULL) || (wsdp->sd_file != ifl))
 				continue;
 
 			wsym = wsdp->sd_sym;
 
-			if ((ELF_ST_BIND(wsym->st_info) != STB_WEAK) ||
-			    (wsdp->sd_sym->st_shndx == SHN_UNDEF) ||
-			    (wsdp->sd_flags & FLG_SY_SPECSEC))
+			if ((wsym->st_shndx == SHN_UNDEF) ||
+			    (wsdp->sd_flags & FLG_SY_SPECSEC) ||
+			    (ELF_ST_BIND(wsym->st_info) != STB_WEAK))
 				continue;
 
 			/*
@@ -2467,66 +2496,70 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * the last weak).
 			 */
 			for (sndx = ndx + 1; sndx < (total - local); sndx++) {
-				Sym_desc *	ssdp = sort[sndx];
-				Sym *		ssym;
+				Sym_desc	*ssdp = sort[sndx];
+				Sym		*ssym;
+				int		w_dynbits, s_dynbits;
 
-				if (ssdp == 0)
-					break;
+				/*
+				 * Ignore any empty symbol descriptor, or the
+				 * case where the symbol has been resolved to a
+				 * different file.
+				 */
+				if ((ssdp == NULL) || (ssdp->sd_file != ifl))
+					continue;
 
 				ssym = ssdp->sd_sym;
 
-				if (wsym->st_value != ssym->st_value)
+				if (ssym->st_shndx == SHN_UNDEF)
+					continue;
+
+				if ((ssym->st_shndx != wsym->st_shndx) ||
+				    (ssym->st_value != wsym->st_value))
 					break;
 
-				if ((ssdp->sd_file == ifl) &&
-				    (wsdp->sd_file == ifl) &&
-				    (wsym->st_size == ssym->st_size) &&
-				    (ssdp->sd_sym->st_shndx != SHN_UNDEF) &&
-				    (ELF_ST_BIND(ssym->st_info) != STB_WEAK) &&
-				    ((ssdp->sd_flags & FLG_SY_SPECSEC) == 0)) {
-					int w_dynbits, s_dynbits;
+				if ((ssym->st_size != wsym->st_size) ||
+				    (ssdp->sd_flags & FLG_SY_SPECSEC) ||
+				    (ELF_ST_BIND(ssym->st_info) == STB_WEAK))
+					continue;
 
-					/*
-					 * If a sharable object, set link
-					 * fields so they reference each other
-					 */
-					if (etype == ET_DYN) {
-						ssdp->sd_aux->sa_linkndx =
-						    (Word)wsdp->sd_symndx;
-						wsdp->sd_aux->sa_linkndx =
-						    (Word)ssdp->sd_symndx;
-					}
-					/*
-					 * Determine which of these two symbols
-					 * go into the sort section. If the
-					 * mapfile has made explicit settings
-					 * of the FLG_SY_*DYNSORT flags for both
-					 * symbols, then we do what they say.
-					 * If one has the DYNSORT flags set,
-					 * we set the NODYNSORT bit in the
-					 * other. And if neither has an
-					 * explicit setting, then we favor the
-					 * weak symbol because they usually
-					 * lack the leading underscore.
-					 */
-					w_dynbits = wsdp->sd_flags &
-					    (FLG_SY_DYNSORT | FLG_SY_NODYNSORT);
-					s_dynbits = ssdp->sd_flags &
-					    (FLG_SY_DYNSORT | FLG_SY_NODYNSORT);
-					if (!(w_dynbits && s_dynbits)) {
-						if (s_dynbits) {
-							if (s_dynbits ==
-							    FLG_SY_DYNSORT)
+				/*
+				 * If a sharable object, set link fields so
+				 * that they reference each other.`
+				 */
+				if (etype == ET_DYN) {
+					ssdp->sd_aux->sa_linkndx =
+					    (Word)wsdp->sd_symndx;
+					wsdp->sd_aux->sa_linkndx =
+					    (Word)ssdp->sd_symndx;
+				}
+
+				/*
+				 * Determine which of these two symbols go into
+				 * the sort section.  If a mapfile has made
+				 * explicit settings of the FLG_SY_*DYNSORT
+				 * flags for both symbols, then we do what they
+				 * say.  If one has the DYNSORT flags set, we
+				 * set the NODYNSORT bit in the other.  And if
+				 * neither has an explicit setting, then we
+				 * favor the weak symbol because they usually
+				 * lack the leading underscore.
+				 */
+				w_dynbits = wsdp->sd_flags &
+				    (FLG_SY_DYNSORT | FLG_SY_NODYNSORT);
+				s_dynbits = ssdp->sd_flags &
+				    (FLG_SY_DYNSORT | FLG_SY_NODYNSORT);
+				if (!(w_dynbits && s_dynbits)) {
+					if (s_dynbits) {
+						if (s_dynbits == FLG_SY_DYNSORT)
 							wsdp->sd_flags |=
 							    FLG_SY_NODYNSORT;
-						} else if (w_dynbits !=
-						    FLG_SY_NODYNSORT) {
-							ssdp->sd_flags |=
-							    FLG_SY_NODYNSORT;
-						}
+					} else if (w_dynbits !=
+					    FLG_SY_NODYNSORT) {
+						ssdp->sd_flags |=
+						    FLG_SY_NODYNSORT;
 					}
-					break;
 				}
+				break;
 			}
 		}
 	}
@@ -2546,7 +2579,7 @@ Sym_desc *
 ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 {
 	Sym		*sym;
-	Ifl_desc	*ifl = 0, *_ifl;
+	Ifl_desc	*ifl = NULL, *_ifl;
 	Sym_desc	*sdp;
 	Word		hash;
 	Listnode	*lnp;
@@ -2582,14 +2615,14 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	/*
 	 * If no descriptor exists create one.
 	 */
-	if (ifl == 0) {
+	if (ifl == NULL) {
 		if ((ifl = libld_calloc(sizeof (Ifl_desc), 1)) ==
 		    (Ifl_desc *)0)
 			return ((Sym_desc *)S_ERROR);
 		ifl->ifl_name = reference;
 		ifl->ifl_flags = FLG_IF_NEEDED | FLG_IF_FILEREF;
 		if ((ifl->ifl_ehdr = libld_calloc(sizeof (Ehdr),
-		    1)) == 0)
+		    1)) == NULL)
 			return ((Sym_desc *)S_ERROR);
 		ifl->ifl_ehdr->e_type = ET_REL;
 
@@ -2600,7 +2633,7 @@ ld_sym_add_u(const char *name, Ofl_desc *ofl, Msg mid)
 	/*
 	 * Allocate a symbol structure and add it to the global symbol table.
 	 */
-	if ((sym = libld_calloc(sizeof (Sym), 1)) == 0)
+	if ((sym = libld_calloc(sizeof (Sym), 1)) == NULL)
 		return ((Sym_desc *)S_ERROR);
 	sym->st_info = ELF_ST_INFO(STB_GLOBAL, STT_NOTYPE);
 	sym->st_shndx = SHN_UNDEF;

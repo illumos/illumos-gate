@@ -305,7 +305,7 @@ struct _ld_heap {
 	void		*lh_end;
 };
 
-#define	HEAPBLOCK	0x68000		/* default allocation block size */
+#define	HEAPBLOCK	0x800000	/* default allocation block size */
 #define	HEAPALIGN	0x8		/* heap blocks alignment requirement */
 
 /*
@@ -334,6 +334,7 @@ typedef struct {
 #define	AL_CNT_OFL_DTSFLTRS	4	/* ofl_dtsfltrs initial alist count */
 #define	AL_CNT_OFL_SYMFLTRS	20	/* ofl_symfltrs initial alist count */
 #define	AL_CNT_OS_MSTRISDESCS	10	/* os_mstrisdescs */
+#define	AL_CNT_OS_RELISDESCS	100	/* os_relisdescs */
 #define	AL_CNT_OS_COMDATS	20	/* os_comdats */
 #define	AL_CNT_SG_OSDESC	40	/* sg_osdescs initial alist count */
 #define	AL_CNT_SG_SECORDER	40	/* sg_secorder initial alist count */
@@ -474,7 +475,6 @@ extern const int	dynsymsort_symtype[STT_NUM];
 		(*_cnt_var)_inc_or_dec_op;	/* Increment/Decrement */ \
 }
 
-
 /*
  * The OFL_SWAP_RELOC macros are used to determine whether
  * relocation processing needs to swap the data being relocated.
@@ -482,10 +482,19 @@ extern const int	dynsymsort_symtype[STT_NUM];
  * the function call in the case where the linker host and the
  * target have the same byte order.
  */
-
 #define	OFL_SWAP_RELOC_DATA(_ofl, _rel) \
 	(((_ofl)->ofl_flags1 & FLG_OF1_ENCDIFF) && \
 	ld_swap_reloc_data(_ofl, _rel))
+
+/*
+ * Define an AVL node for maintaining input section descriptors.  AVL trees of
+ * these descriptors are used to process group and COMDAT section.
+ */
+typedef struct {
+	avl_node_t	isd_avl;	/* avl book-keeping (see SGSOFFSETOF) */
+	Is_desc		*isd_isp;	/* input section descriptor */
+	uint_t		isd_hash;	/* input section name hash value */
+} Isd_node;
 
 /*
  * Local functions.
@@ -503,6 +512,8 @@ extern Listnode		*list_appendc(List *, const void *);
 extern Listnode		*list_insertc(List *, const void *, Listnode *);
 extern Listnode		*list_prependc(List *, const void *);
 extern Listnode		*list_where(List *, Word num);
+
+extern int		isdavl_compare(const void *, const void *);
 
 extern Sdf_desc		*sdf_add(const char *, List *);
 extern Sdf_desc		*sdf_find(const char *, List *);
@@ -801,7 +812,6 @@ extern uintptr_t	add_regsym(Sym_desc *, Ofl_desc *);
 extern Word		hashbkts(Word);
 extern Xword		lcm(Xword, Xword);
 extern Listnode		*list_where(List *, Word);
-
 
 /*
  * Most platforms have both a 32 and 64-bit variant (e.g. EM_SPARC and

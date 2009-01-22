@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -722,9 +722,37 @@ ld_getopt(Lm_list *lml, int ndx, int argc, char **argv)
 }
 
 /*
+ * A compare routine for Isd_node AVLT trees.
+ */
+int
+isdavl_compare(const void *n1, const void *n2)
+{
+	uint_t		hash1, hash2;
+	const char	*st1, *st2;
+	int		rc;
+
+	hash1 = ((Isd_node *)n1)->isd_hash;
+	hash2 = ((Isd_node *)n2)->isd_hash;
+
+	if (hash1 > hash2)
+		return (1);
+	if (hash1 < hash2)
+		return (-1);
+
+	st1 = ((Isd_node *)n1)->isd_isp->is_name;
+	st2 = ((Isd_node *)n2)->isd_isp->is_name;
+
+	rc = strcmp(st1, st2);
+	if (rc > 0)
+		return (1);
+	if (rc < 0)
+		return (-1);
+	return (0);
+}
+
+/*
  * Messaging support - funnel everything through dgettext().
  */
-
 const char *
 _libld_msg(Msg mid)
 {

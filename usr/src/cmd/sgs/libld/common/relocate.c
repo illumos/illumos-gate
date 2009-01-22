@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1363,11 +1363,13 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
  *
  * entry:
  *	reld - Relocation
- *	orig_sdp - Symbol to be replaced. Must be a local symbol (STB_LOCAL).
+ *	sdp - Symbol to be replaced. Must be a local symbol (STB_LOCAL).
  *
  * exit:
  *	Returns address of replacement symbol descriptor if one was
- *	found, and NULL otherwise.
+ *	found, and NULL otherwise. The result is also cached in
+ *	ofl->ofl_sr_cache as an optimization to speed following calls
+ *	for the same value of sdp.
  *
  * note:
  *	The word "COMDAT" is used to refer to actual COMDAT sections, COMDAT
@@ -1383,7 +1385,7 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
  *	really supply the correct information. However, we see a couple of
  *	situations where it is useful to do this: (1) Older Sun C compilers
  *	generated DWARF sections that would refer to one of the COMDAT
- *	sections, and (2) gcc, when its COMDAT feature is enabled.
+ *	sections, and (2) gcc, when its GNU linkonce COMDAT feature is enabled.
  *	It turns out that the GNU ld does these sloppy remappings.
  *
  *	The GNU ld takes an approach that hard wires special section
@@ -1393,35 +1395,39 @@ ld_process_sym_reloc(Ofl_desc *ofl, Rel_desc *reld, Rel *reloc, Is_desc *isp,
  *	that our heuristic is somewhat different than theirs, but the
  *	end result is close enough to solve the same problem.
  *
- *	gcc may eventually phase out the need for sloppy relocations, and
+ *	gcc is in the process of converting to SHF_GROUP. This will
+ *	eventually phase out the need for sloppy relocations, and
  *	then this logic won't be needed. In the meantime, relaxed relocation
  *	processing allows us to interoperate.
- *
- *	Here is how we do it: The symbol points at the input section,
- *	and the input section points at the output section to which it
- *	is assigned. The output section contains a list of all of the
- *	input sections that have been mapped to it, including the
- *	corresponding COMDAT section that was kept. The kept COMDAT
- *	section contains a reference to its input file, where we can find
- *	the array of all the symbols in that file. From the input file,
- *	we then locate the corresponding symbol that references the kept
- *	COMDAT section.
- *
  */
 static Sym_desc *
 sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 {
-	Listnode	*lnp;
 	Is_desc		*rep_isp;
-	Sym		*sym = sdp->sd_sym;
-	Is_desc		*isp = sdp->sd_isc;
-	Ifl_desc	*ifl = sdp->sd_file;
+	Sym		*sym, *rep_sym;
+	Is_desc		*isp;
+	Ifl_desc	*ifl;
 	Conv_inv_buf_t	inv_buf;
+	Word		scnndx, symscnt;
+	Sym_desc	**oldndx, *rep_sdp;
 
 	/*
-	 * Examine each input section assigned to this output section.
-	 * The replacement section must:
-	 *	- Have the same name as the original
+	 * If we looked up the same symbol on the previous call, we can
+	 * return the cached value.
+	 */
+	if (sdp == ofl->ofl_sr_cache.sr_osdp)
+		return (ofl->ofl_sr_cache.sr_rsdp);
+
+	ofl->ofl_sr_cache.sr_osdp = sdp;
+	sym = sdp->sd_sym;
+	isp = sdp->sd_isc;
+	ifl = sdp->sd_file;
+
+	/*
+	 * When a COMDAT section is discarded in favor of another COMDAT
+	 * section, the replacement is recorded in its section descriptor
+	 * (is_comdatkeep). We must validate the replacement before using
+	 * it. The replacement section must:
 	 *	- Not have been discarded
 	 *	- Have the same size (*)
 	 *	- Have the same section type
@@ -1434,81 +1440,74 @@ sloppy_comdat_reloc(Ofl_desc *ofl, Rel_desc *reld, Sym_desc *sdp)
 	 * ld. If the sections are not the same size, the chance of them
 	 * being interchangeable drops significantly.
 	 */
-	/* BEGIN CSTYLED */
-	for (LIST_TRAVERSE(&isp->is_osdesc->os_isdescs, lnp, rep_isp)) {
+	if (((rep_isp = isp->is_comdatkeep) == NULL) ||
+	    ((rep_isp->is_flags & FLG_IS_DISCARD) != 0) ||
+	    ((rep_isp->is_flags & FLG_IS_COMDAT) == 0) ||
+	    (isp->is_indata->d_size != rep_isp->is_indata->d_size) ||
+	    (isp->is_shdr->sh_type != rep_isp->is_shdr->sh_type) ||
+	    ((isp->is_shdr->sh_flags & SHF_GROUP) !=
+	    (rep_isp->is_shdr->sh_flags & SHF_GROUP)))
+		return (ofl->ofl_sr_cache.sr_rsdp = NULL);
 
-	    if (((rep_isp->is_flags &
-		(FLG_IS_COMDAT | FLG_IS_DISCARD)) == FLG_IS_COMDAT) &&
-		(isp->is_indata->d_size == rep_isp->is_indata->d_size) &&
-		(isp->is_shdr->sh_type == rep_isp->is_shdr->sh_type) &&
-		((isp->is_shdr->sh_flags & SHF_GROUP) ==
-		(rep_isp->is_shdr->sh_flags & SHF_GROUP)) &&
-		(strcmp(rep_isp->is_name, isp->is_name) == 0)) {
-		/*
-		 * We found the kept COMDAT section. Now, look at all of the
-		 * symbols from the input file that contains it to find the
-		 * symbol that corresponds to the one we started with:
-		 *	- Hasn't been discarded
-		 *	- Has section index of kept section
-		 *	- If one symbol has a name, the other must have
-		 *		the same name. The st_name field of a symbol
-		 *		is 0 if there is no name, and is a string
-		 *		table offset otherwise. The string table
-		 *		offsets may well not agree --- it is the
-		 *		actual string that matters.
-		 *	- Type and binding attributes match (st_info)
-		 *	- Values match (st_value)
-		 *	- Sizes match (st_size)
-		 *	- Visibility matches (st_other)
-		 */
-		Word scnndx = rep_isp->is_scnndx;
-		Sym_desc **oldndx = rep_isp->is_file->ifl_oldndx;
-		Word symscnt = rep_isp->is_file->ifl_symscnt;
-		Sym_desc *rep_sdp;
-		Sym *rep_sym;
+	/*
+	 * We found the kept COMDAT section. Now, look at all of the
+	 * symbols from the input file that contains it to find the
+	 * symbol that corresponds to the one we started with:
+	 *	- Hasn't been discarded
+	 *	- Has section index of kept section
+	 *	- If one symbol has a name, the other must have
+	 *		the same name. The st_name field of a symbol
+	 *		is 0 if there is no name, and is a string
+	 *		table offset otherwise. The string table
+	 *		offsets may well not agree --- it is the
+	 *		actual string that matters.
+	 *	- Type and binding attributes match (st_info)
+	 *	- Values match (st_value)
+	 *	- Sizes match (st_size)
+	 *	- Visibility matches (st_other)
+	 */
+	scnndx = rep_isp->is_scnndx;
+	oldndx = rep_isp->is_file->ifl_oldndx;
+	symscnt = rep_isp->is_file->ifl_symscnt;
+	while (symscnt--) {
+		rep_sdp = *oldndx++;
+		if ((rep_sdp == NULL) || (rep_sdp->sd_flags & FLG_SY_ISDISC) ||
+		    ((rep_sym = rep_sdp->sd_sym)->st_shndx != scnndx) ||
+		    ((sym->st_name == 0) != (rep_sym->st_name == 0)) ||
+		    ((sym->st_name != 0) &&
+		    (strcmp(sdp->sd_name, rep_sdp->sd_name) != 0)) ||
+		    (sym->st_info != rep_sym->st_info) ||
+		    (sym->st_value != rep_sym->st_value) ||
+		    (sym->st_size != rep_sym->st_size) ||
+		    (sym->st_other != rep_sym->st_other))
+			continue;
 
-		while (symscnt--) {
-		    rep_sdp = *oldndx++;
-		    if (rep_sdp && !(rep_sdp->sd_flags & FLG_SY_ISDISC) &&
-			((rep_sym = rep_sdp->sd_sym)->st_shndx == scnndx) &&
-			((sym->st_name == 0) == (rep_sym->st_name == 0)) &&
-			!((sym->st_name != 0) &&
-			    (strcmp(sdp->sd_name, rep_sdp->sd_name) != 0)) &&
-			(sym->st_info == rep_sym->st_info) &&
-			(sym->st_value == rep_sym->st_value) &&
-			(sym->st_size == rep_sym->st_size) &&
-			(sym->st_other == rep_sym->st_other)) {
 
-			if (ofl->ofl_flags & FLG_OF_VERBOSE) {
-			    if (sym->st_name != 0) {
+		if (ofl->ofl_flags & FLG_OF_VERBOSE) {
+			if (sym->st_name != 0) {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_REL_SLOPCDATNAM),
 				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
-					reld->rel_rtype, 0, &inv_buf),
+				    reld->rel_rtype, 0, &inv_buf),
 				    ifl->ifl_name, reld->rel_isdesc->is_name,
 				    rep_sdp->sd_name, isp->is_name,
 				    rep_sdp->sd_file->ifl_name);
-			    } else {
+			} else {
 				eprintf(ofl->ofl_lml, ERR_WARNING,
 				    MSG_INTL(MSG_REL_SLOPCDATNONAM),
-				    conv_reloc_type(
-					ifl->ifl_ehdr->e_machine,
-					reld->rel_rtype, 0, &inv_buf),
+				    conv_reloc_type(ifl->ifl_ehdr->e_machine,
+				    reld->rel_rtype, 0, &inv_buf),
 				    ifl->ifl_name, reld->rel_isdesc->is_name,
 				    isp->is_name, rep_sdp->sd_file->ifl_name);
-			    }
 			}
-			DBG_CALL(Dbg_reloc_sloppycomdat(ofl->ofl_lml,
-			    isp->is_name, rep_sdp));
-			return (rep_sdp);
-		    }
 		}
-	    }
+		DBG_CALL(Dbg_reloc_sloppycomdat(ofl->ofl_lml,
+		    isp->is_name, rep_sdp));
+		return (ofl->ofl_sr_cache.sr_rsdp = rep_sdp);
 	}
-	/* END CSTYLED */
 
 	/* If didn't return above, we didn't find it */
-	return (NULL);
+	return (ofl->ofl_sr_cache.sr_rsdp = NULL);
 }
 
 /*
@@ -1905,11 +1904,11 @@ reloc_segments(int wr_flag, Ofl_desc *ofl)
 			continue;
 
 		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
-			Is_desc		*risp;
-			Listnode	*lnp3;
+			Is_desc	*risp;
+			Aliste	idx;
 
 			osp->os_szoutrels = 0;
-			for (LIST_TRAVERSE(&(osp->os_relisdescs), lnp3, risp)) {
+			for (APLIST_TRAVERSE(osp->os_relisdescs, idx, risp)) {
 				Word	indx;
 
 				/*
@@ -1935,7 +1934,7 @@ reloc_segments(int wr_flag, Ofl_desc *ofl)
 			 * Check for relocations against non-writable
 			 * allocatable sections.
 			 */
-			if ((osp->os_szoutrels) &&
+			if (osp->os_szoutrels &&
 			    (sgp->sg_phdr.p_type == PT_LOAD) &&
 			    ((sgp->sg_phdr.p_flags & PF_W) == 0)) {
 				ofl->ofl_flags |= FLG_OF_TEXTREL;
@@ -2134,6 +2133,7 @@ ld_reloc_init(Ofl_desc *ofl)
 
 	if (reloc_segments(PF_W, ofl) == S_ERROR)
 		return (S_ERROR);
+
 
 	/*
 	 * Process any extra relocations.  These are relocation sections that

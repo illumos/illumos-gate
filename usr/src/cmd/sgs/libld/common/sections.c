@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1905,27 +1905,24 @@ make_reloc(Ofl_desc *ofl, Os_desc *osp)
 		shdr->sh_flags |= SHF_INFO_LINK;
 	}
 
-	/*
-	 * Associate this relocation section to the section its going to
-	 * relocate.
-	 */
 	rosp = ld_place_section(ofl, isec, ld_targ.t_id.id_rel, 0);
 	if (rosp == (Os_desc *)S_ERROR)
 		return (S_ERROR);
 
+	/*
+	 * Associate this relocation section to the section its going to
+	 * relocate.
+	 */
 	if (osp) {
-		Listnode	*lnp;
-		Is_desc		*risp;
+		Aliste	idx;
+		Is_desc	*risp;
 
 		/*
-		 * We associate the input relocation sections - with
-		 * the newly created output relocation section.
-		 *
 		 * This is used primarily so that we can update
 		 * SHT_GROUP[sect_no] entries to point to the
 		 * created output relocation sections.
 		 */
-		for (LIST_TRAVERSE(&(osp->os_relisdescs), lnp, risp)) {
+		for (APLIST_TRAVERSE(osp->os_relisdescs, idx, risp)) {
 			risp->is_osdesc = rosp;
 
 			/*

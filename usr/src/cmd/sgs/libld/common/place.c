@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,13 +152,24 @@ ld_append_isp(Ofl_desc * ofl, Os_desc *osp, Is_desc *isp, int mstr_only)
 static uintptr_t
 add_comdat(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 {
-	Aliste	idx;
-	Is_desc *cisp;
+	Isd_node	isd, *isdp;
+	avl_tree_t	*avlt;
+	avl_index_t	where;
 
-	for (APLIST_TRAVERSE(osp->os_comdats, idx, cisp)) {
-		if (strcmp(isp->is_name, cisp->is_name))
-			continue;
+	/*
+	 * Create a COMDAT avl tree for this output section if required.
+	 */
+	if ((avlt = osp->os_comdats) == NULL) {
+		if ((avlt = libld_calloc(sizeof (avl_tree_t), 1)) == NULL)
+			return (S_ERROR);
+		avl_create(avlt, isdavl_compare, sizeof (Isd_node),
+		    SGSOFFSETOF(Isd_node, isd_avl));
+		osp->os_comdats = avlt;
+	}
+	isd.isd_hash = sgs_str_hash(isp->is_name);
+	isd.isd_isp = isp;
 
+	if ((isdp = avl_find(avlt, &isd, &where)) != NULL) {
 		isp->is_osdesc = osp;
 
 		/*
@@ -167,7 +178,9 @@ add_comdat(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 		 */
 		if ((isp->is_flags & FLG_IS_DISCARD) == 0) {
 			isp->is_flags |= FLG_IS_DISCARD;
-			DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml, isp, cisp));
+			isp->is_comdatkeep = isdp->isd_isp;
+			DBG_CALL(Dbg_sec_discarded(ofl->ofl_lml, isp,
+			    isdp->isd_isp));
 		}
 
 		/*
@@ -178,18 +191,19 @@ add_comdat(Ofl_desc *ofl, Os_desc *osp, Is_desc *isp)
 		 * output section so that the sloppy relocation logic will have
 		 * the information necessary to do its work.
 		 */
-		if (ofl->ofl_flags1 & FLG_OF1_RLXREL)
-			return (1);
-		else
-			return (0);
+		return (0);
 	}
 
 	/*
 	 * This is a new COMDAT section - so keep it.
 	 */
-	if (aplist_append(&(osp->os_comdats), isp, AL_CNT_OS_COMDATS) == NULL)
+	if ((isdp = libld_calloc(sizeof (Isd_node), 1)) == NULL)
 		return (S_ERROR);
 
+	isdp->isd_hash = isd.isd_hash;
+	isdp->isd_isp = isp;
+
+	avl_insert(avlt, isdp, where);
 	return (1);
 }
 
@@ -223,7 +237,7 @@ gnu_comdat_sym(Ifl_desc *ifl, Is_desc *gisp)
 		 * link-edits.  For now, size the section name dynamically.
 		 */
 		ssize = strlen(isp->is_name);
-		if ((strncmp(isp->is_name, gisp->is_name, ssize) != NULL) &&
+		if ((strncmp(isp->is_name, gisp->is_name, ssize) != 0) &&
 		    (gisp->is_name[ssize] == '.'))
 			return ((char *)&gisp->is_name[ssize]);
 	}
@@ -382,7 +396,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 				 * the information necessary to do its work.
 				 */
 				if (!(ofl->ofl_flags1 & FLG_OF1_RLXREL))
-					return ((Os_desc *)0);
+					return (NULL);
 			}
 		}
 
@@ -393,7 +407,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		if (shdr->sh_type == SHT_GROUP) {
 			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
 				isp->is_flags |= FLG_IS_DISCARD;
-				return ((Os_desc *)0);
+				return (NULL);
 			}
 		}
 	}
@@ -429,7 +443,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 			char	*file;
 			int	found = 0;
 
-			if (isp->is_file == 0)
+			if (isp->is_file == NULL)
 				continue;
 
 			for (LIST_TRAVERSE(&(enp->ec_files), lnp2, file)) {
@@ -461,7 +475,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		break;
 	}
 
-	if ((sgp = enp->ec_segment) == 0)
+	if ((sgp = enp->ec_segment) == NULL)
 		sgp = ((Ent_desc *)(ofl->ofl_ents.tail->data))->ec_segment;
 
 	/*
@@ -785,9 +799,9 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 	/*
 	 * Create a new output section descriptor.
 	 */
-	if ((osp = libld_calloc(sizeof (Os_desc), 1)) == 0)
+	if ((osp = libld_calloc(sizeof (Os_desc), 1)) == NULL)
 		return ((Os_desc *)S_ERROR);
-	if ((osp->os_shdr = libld_calloc(sizeof (Shdr), 1)) == 0)
+	if ((osp->os_shdr = libld_calloc(sizeof (Shdr), 1)) == NULL)
 		return ((Os_desc *)S_ERROR);
 
 	/*
@@ -805,7 +819,7 @@ ld_place_section(Ofl_desc *ofl, Is_desc *isp, int ident, Word link)
 		shdr->sh_type = SHT_PROGBITS;
 	}
 	if ((isp->is_flags & FLG_IS_COMDAT) &&
-	    (aplist_append(&(osp->os_comdats), isp, AL_CNT_OS_COMDATS) == NULL))
+	    (add_comdat(ofl, osp, isp) == S_ERROR))
 		return ((Os_desc *)S_ERROR);
 
 	osp->os_shdr->sh_type = shdr->sh_type;

@@ -23,7 +23,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,7 @@ process_member(Ar_mem *amp, const char *name, Sym_desc *sdp, Ofl_desc *ofl)
 				continue;
 		}
 
-		if (strcmp(strs + syms->st_name, name) == NULL)
+		if (strcmp(strs + syms->st_name, name) == 0)
 			return (1);
 	}
 	return (0);

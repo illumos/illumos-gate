@@ -1368,7 +1368,8 @@ rel_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			    isc->is_name, risc->is_name);
 			return (0);
 		}
-		if (list_appendc(&osp->os_relisdescs, isc) == 0)
+		if (aplist_append(&osp->os_relisdescs, isc,
+		    AL_CNT_OS_RELISDESCS) == NULL)
 			return (S_ERROR);
 	}
 	return (1);

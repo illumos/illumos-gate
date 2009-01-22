@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<stdio.h>
 #include	<stdarg.h>
@@ -49,7 +48,7 @@
  * dbg_print() can require the output filename for use in the diagnostics
  * created.  Save the address of the output filename pointer for this use.
  */
-static const char	**Name = 0;
+static const char	**Name = NULL;
 static int		Phase = 0;
 
 uintptr_t
@@ -73,7 +72,7 @@ dbg_setup(const char *options, Dbg_desc *dbp, const char **name, int phase)
 void
 dbg_print(Lm_list *lml, const char *format, ...)
 {
-	static char	*prestr = 0;
+	static char	*prestr = NULL;
 	va_list		args;
 
 #if	defined(lint)
@@ -81,7 +80,7 @@ dbg_print(Lm_list *lml, const char *format, ...)
 	 * The lml argument is only meaningful for diagnostics sent to ld.so.1.
 	 * Supress the lint error by making a dummy assignment.
 	 */
-	lml = 0;
+	lml = NULL;
 #endif
 	/*
 	 * Knock off any newline indicator to signify that a diagnostic has
@@ -94,7 +93,7 @@ dbg_print(Lm_list *lml, const char *format, ...)
 		 * If the debugging options have requested each diagnostic line
 		 * be prepended by a name create a prefix string.
 		 */
-		if ((prestr == 0) && *Name) {
+		if ((prestr == NULL) && *Name) {
 			const char	*name, *cls;
 			size_t		len;
 
@@ -106,7 +105,7 @@ dbg_print(Lm_list *lml, const char *format, ...)
 				name = *Name;
 			else {
 				if ((name =
-				    strrchr(*Name, '/')) == 0)
+				    strrchr(*Name, '/')) == NULL)
 					name = *Name;
 				else
 					name++;
@@ -130,7 +129,7 @@ dbg_print(Lm_list *lml, const char *format, ...)
 			/*
 			 * Allocate a string to build the prefix.
 			 */
-			if ((prestr = malloc(len)) == 0)
+			if ((prestr = libld_malloc(len)) == NULL)
 				prestr = (char *)MSG_INTL(MSG_DBG_DFLT_FMT);
 			else {
 				(void) snprintf(prestr, len,

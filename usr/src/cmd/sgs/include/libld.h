@@ -128,6 +128,16 @@ typedef struct {
 } Gottable;
 
 /*
+ * The link-editor caches the results of sloppy relocation processing
+ * in a variable of this type. Symbols come for processing in sorted
+ * order, so a 1 element cache suffices to eliminate duplicate lookups.
+ */
+typedef struct sreloc_cache {
+	Sym_desc	*sr_osdp;	/* Original symbol */
+	Sym_desc	*sr_rsdp;	/* Replacement symbol */
+} Sreloc_cache;
+
+/*
  * Output file processing structure
  */
 typedef Lword ofl_flag_t;
@@ -279,6 +289,8 @@ struct ofl_desc {
 	Xword		ofl_sfcap_1;	/* software capabilities */
 	Lm_list		*ofl_lml;	/* runtime link-map list */
 	Gottable	*ofl_gottable;	/* debugging got information */
+	Sreloc_cache	ofl_sr_cache;	/* Cache last result from */
+					/*	sloppy_comdat_reloc() */
 };
 
 #define	FLG_OF_DYNAMIC	0x00000001	/* generate dynamic output module */
@@ -559,6 +571,8 @@ struct is_desc {			/* input section descriptor */
 					/*	input section */
 	Elf_Data	*is_indata;	/* input sections raw data */
 	Is_desc		*is_symshndx;	/* related SHT_SYM_SHNDX section */
+	Is_desc		*is_comdatkeep;	/* If COMDAT section is discarded, */
+					/* 	this is section that was kept */
 	Word		is_scnndx;	/* original section index in file */
 	Word		is_txtndx;	/* Index for section.  Used to decide */
 					/*	where to insert section when */
@@ -590,15 +604,15 @@ struct os_desc {			/* Output section descriptor */
 	Elf_Scn		*os_scn;	/* the elf section descriptor */
 	Shdr		*os_shdr;	/* the elf section header */
 	Os_desc		*os_relosdesc;	/* the output relocation section */
-	List		os_relisdescs;	/* reloc input section descriptors */
+	APlist		*os_relisdescs;	/* reloc input section descriptors */
 					/*	for this output section */
 	List		os_isdescs;	/* list of input sections in output */
 	APlist		*os_mstrisdescs; /* FLG_IS_INSTRMRG input sections */
 	Sort_desc	*os_sort;	/* used for sorting sections */
 	Sg_desc		*os_sgdesc;	/* segment os_desc is placed on */
 	Elf_Data	*os_outdata;	/* output sections raw data */
-	APlist		*os_comdats;	/* list of COMDAT sections present */
-					/*	in current output section */
+	avl_tree_t	*os_comdats;	/* AVL tree of COMDAT input sections */
+					/*	associated to output section */
 	Word		os_scnsymndx;	/* index in output symtab of section */
 					/*	symbol for this section */
 	Word		os_txtndx;	/* Index for section.  Used to decide */
