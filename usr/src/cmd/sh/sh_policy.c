@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * Policy backing functions for kpolicy=suser,profiles=yes
  *
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <grp.h>
@@ -40,7 +37,7 @@
 #include "sh_policy.h"
 
 
-static const char *username;
+static char *username;
 
 /*
  * get the ruid and passwd name
@@ -50,6 +47,11 @@ secpolicy_init(void)
 {
 	uid_t		ruid;
 	struct passwd	*passwd_ent;
+
+	if (username != NULL) {
+		free(username);
+		username = NULL;
+	}
 
 	ruid = getuid();
 
@@ -70,26 +72,24 @@ secpolicy_init(void)
 static char **
 secpolicy_set_argv(char **arg_v)
 {
-	register int	i, j;
-	register int	arglen = 0;
-	char		**pfarg_v = (char **)NULL;
+	int	i;
+	int	arg_c = 0;
+	char	**pfarg_v = NULL;
 
 	if (*arg_v == NULL) {
 		return (pfarg_v);
 	}
-	for (i = 0; arg_v[i] != 0; i++) {
-		arglen += strlen(arg_v[i]);
+	for (i = 0; arg_v[i] != NULL; i++) {
+		arg_c++;
 	}
-	arglen += strlen(PFEXEC);
-	arglen++;	/* for null termination */
-	if ((pfarg_v = (char **)calloc(1, arglen)) == NULL) {
+	/* +2 for PFEXEC and null termination */
+	if ((pfarg_v = calloc(arg_c + 2, sizeof (char *))) == NULL) {
 		return (pfarg_v);
 	}
-	pfarg_v[0] = (char *)PFEXEC;
-	for (i = 0, j = 1; arg_v[i] != 0; i++, j++) {
-		pfarg_v[j] = arg_v[i];
+	pfarg_v[0] = PFEXEC;
+	for (i = 0; i < arg_c; i++) {
+		pfarg_v[i + 1] = arg_v[i];
 	}
-	pfarg_v[j] = 0;
 
 	return (pfarg_v);
 }
