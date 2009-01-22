@@ -21,7 +21,7 @@
 #
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -38,6 +38,7 @@ DRVR_ALIASES_sparc="\
 	pci1077,2312 \
 	pci1077,2422 \
 	pciex1077,2432 \
+	pciex1077,2532 \
 	pciex1077,5432 \
 	"
 
@@ -48,6 +49,7 @@ DRVR_ALIASES_i386="\
 	pci1077,132 \
 	pci1077,2422 \
 	pciex1077,2432 \
+	pciex1077,2532 \
 	pciex1077,5432 \
 	"
 
