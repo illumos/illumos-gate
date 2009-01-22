@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,7 +57,7 @@ add_admin_old_princ(void *handle, krb5_context context,
 int
 add_admin_sname_princ(void *handle, krb5_context context,
     char *sname, int attrs, int lifetime);
-int
+static int
 add_admin_princ(void *handle, krb5_context context,
     krb5_principal principal, int attrs, int lifetime);
 
@@ -264,7 +264,7 @@ clean_and_exit:
  * attributes attrs and max life of lifetime (if not zero).
  */
 
-int add_admin_princ(void *handle, krb5_context context,
+static int add_admin_princ(void *handle, krb5_context context,
     krb5_principal principal, int attrs, int lifetime)
 {
      char *fullname;
@@ -294,7 +294,63 @@ int add_admin_princ(void *handle, krb5_context context,
 	  }
      } else {
 	  /* only randomize key if we created the principal */
-	  ret = kadm5_randkey_principal(handle, ent.principal, NULL, NULL);
+
+	  /*
+	   * Solaris Kerberos:
+	   * Create kadmind principals with keys for all supported encryption types.
+	   * Follows a similar pattern to add_principal() in keytab.c.
+	   */
+	  krb5_enctype *tmpenc, *enctype = NULL;
+	  krb5_key_salt_tuple *keysalt;
+	  int num_ks, i;
+	  krb5_int32 normalsalttype;
+
+	  ret = krb5_get_permitted_enctypes(context, &enctype);
+	  if (ret || *enctype == NULL) {
+	       com_err(progname, ret,
+		   gettext("while getting list of permitted encryption types"));
+	       krb5_free_principal(context, ent.principal);
+	       free(fullname);
+	       return ERR;
+	  }
+
+	  /* Count the number of enc types */
+	  for (tmpenc = enctype, num_ks = 0; *tmpenc; tmpenc++)
+		num_ks++;
+
+	  keysalt = malloc (sizeof (krb5_key_salt_tuple) * num_ks);
+	  if (keysalt == NULL) {
+	       com_err(progname, ENOMEM,
+		   gettext("while generating list of key salt tuples"));
+	       krb5_free_ktypes(context, enctype);
+	       krb5_free_principal(context, ent.principal);
+	       free(fullname);
+	       return ERR;
+	  }
+
+	  ret = krb5_string_to_salttype("normal", &normalsalttype);
+	  if (ret) {
+	  	com_err(progname, ret,
+	  	 	gettext("while converting \"normal\" to a salttype"));
+		free(keysalt);
+		krb5_free_ktypes(context, enctype);
+	  	krb5_free_principal(context, ent.principal);
+	  	free(fullname);
+	  	return ERR;
+	  }
+
+	  /* Only create keys with "normal" salttype */
+	  for (i = 0; i < num_ks; i++) {
+		keysalt[i].ks_enctype = enctype[i];
+		keysalt[i].ks_salttype = normalsalttype;
+	  }
+
+	  ret = kadm5_randkey_principal_3(handle, ent.principal, FALSE, num_ks,
+	      keysalt, NULL, NULL);
+	  free(keysalt);
+          krb5_free_ktypes (context, enctype);
+
+
 	  if (ret) {
 	       com_err(progname, ret,
 			gettext(str_RANDOM_KEY), fullname);
