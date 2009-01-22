@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,12 @@ static int aggr_m_unicst(void *, const uint8_t *);
 static int aggr_m_stat(void *, uint_t, uint64_t *);
 static void aggr_m_ioctl(void *, queue_t *, mblk_t *);
 static boolean_t aggr_m_capab_get(void *, mac_capab_t, void *);
+static int aggr_m_setprop(void *, const char *, mac_prop_id_t, uint_t,
+    const void *);
+static int aggr_m_getprop(void *, const char *, mac_prop_id_t, uint_t,
+    uint_t, void *, uint_t *);
+
+
 static aggr_port_t *aggr_grp_port_lookup(aggr_grp_t *, datalink_id_t);
 static int aggr_grp_rem_port(aggr_grp_t *, aggr_port_t *, boolean_t *,
     boolean_t *);
@@ -104,7 +110,8 @@ static id_space_t	*key_ids;
 
 static uchar_t aggr_zero_mac[] = {0, 0, 0, 0, 0, 0};
 
-#define	AGGR_M_CALLBACK_FLAGS	(MC_IOCTL | MC_GETCAPAB)
+#define	AGGR_M_CALLBACK_FLAGS	\
+	(MC_IOCTL | MC_GETCAPAB | MC_SETPROP | MC_GETPROP)
 
 static mac_callbacks_t aggr_m_callbacks = {
 	AGGR_M_CALLBACK_FLAGS,
@@ -116,7 +123,11 @@ static mac_callbacks_t aggr_m_callbacks = {
 	NULL,
 	aggr_m_tx,
 	aggr_m_ioctl,
-	aggr_m_capab_get
+	aggr_m_capab_get,
+	NULL,
+	NULL,
+	aggr_m_setprop,
+	aggr_m_getprop
 };
 
 /*ARGSUSED*/
@@ -2139,7 +2150,6 @@ aggr_grp_max_sdu(aggr_grp_t *grp)
 	uint_t max_sdu = (uint_t)-1;
 	aggr_port_t *port;
 
-	ASSERT(grp->lg_mh == NULL);
 	ASSERT(grp->lg_ports != NULL);
 
 	for (port = grp->lg_ports; port != NULL; port = port->lp_next) {
@@ -2208,4 +2218,128 @@ aggr_grp_margin_check(aggr_grp_t *grp, aggr_port_t *port)
 
 	grp->lg_margin = port->lp_margin;
 	return (B_TRUE);
+}
+
+/*
+ * Set MTU on individual ports of an aggregation group
+ */
+static int
+aggr_set_port_sdu(aggr_grp_t *grp, aggr_port_t *port, uint32_t sdu,
+    uint32_t *old_mtu)
+{
+	boolean_t 		removed = B_FALSE;
+	mac_perim_handle_t	mph;
+	mac_diag_t		diag;
+	int			err, rv, retry = 0;
+
+	if (port->lp_mah != NULL) {
+		(void) mac_unicast_remove(port->lp_mch, port->lp_mah);
+		port->lp_mah = NULL;
+		removed = B_TRUE;
+	}
+	err = mac_set_mtu(port->lp_mh, sdu, old_mtu);
+try_again:
+	if (removed && (rv = mac_unicast_primary_add(port->lp_mch,
+	    &port->lp_mah, &diag)) != 0) {
+		/*
+		 * following is a workaround for a bug in 'bge' driver.
+		 * See CR 6794654 for more information and this work around
+		 * will be removed once the CR is fixed.
+		 */
+		if (rv == EIO && retry++ < 3) {
+			delay(2 * hz);
+			goto try_again;
+		}
+		/*
+		 * if mac_unicast_primary_add() failed while setting the MTU,
+		 * detach the port from the group.
+		 */
+		mac_perim_enter_by_mh(port->lp_mh, &mph);
+		(void) aggr_grp_detach_port(grp, port);
+		mac_perim_exit(mph);
+		cmn_err(CE_WARN, "Unable to restart the port %s while "
+		    "setting MTU. Detaching the port from the aggregation.",
+		    mac_client_name(port->lp_mch));
+	}
+	return (err);
+}
+
+static int
+aggr_sdu_update(aggr_grp_t *grp, uint32_t sdu)
+{
+	int			err = 0, i, rv;
+	aggr_port_t		*port;
+	uint32_t		*mtu;
+
+	ASSERT(MAC_PERIM_HELD(grp->lg_mh));
+
+	/*
+	 * If the MTU being set is equal to aggr group's maximum
+	 * allowable value, then there is nothing to change
+	 */
+	if (sdu == grp->lg_max_sdu)
+		return (0);
+
+	/* 0 is aggr group's min sdu */
+	if (sdu == 0)
+		return (EINVAL);
+
+	mtu = kmem_alloc(sizeof (uint32_t) * grp->lg_nports, KM_SLEEP);
+	for (port = grp->lg_ports, i = 0; port != NULL && err == 0;
+	    port = port->lp_next, i++) {
+		err = aggr_set_port_sdu(grp, port, sdu, mtu + i);
+	}
+	if (err != 0) {
+		/* recover from error: reset the mtus of the ports */
+		aggr_port_t *tmp;
+
+		for (tmp = grp->lg_ports, i = 0; tmp != port;
+		    tmp = tmp->lp_next, i++) {
+			(void) aggr_set_port_sdu(grp, tmp, *(mtu + i), NULL);
+		}
+		goto bail;
+	}
+	grp->lg_max_sdu = aggr_grp_max_sdu(grp);
+	rv = mac_maxsdu_update(grp->lg_mh, grp->lg_max_sdu);
+	ASSERT(rv == 0);
+bail:
+	kmem_free(mtu, sizeof (uint32_t) * grp->lg_nports);
+	return (err);
+}
+
+/*
+ * Callback functions for set/get of properties
+ */
+/*ARGSUSED*/
+static int
+aggr_m_setprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_valsize, const void *pr_val)
+{
+	int 		err = ENOTSUP;
+	aggr_grp_t 	*grp = m_driver;
+
+	switch (pr_num) {
+	case MAC_PROP_MTU: {
+		uint32_t 	mtu;
+
+		if (pr_valsize < sizeof (mtu)) {
+			err = EINVAL;
+			break;
+		}
+		bcopy(pr_val, &mtu, sizeof (mtu));
+		err = aggr_sdu_update(grp, mtu);
+		break;
+	}
+	default:
+		break;
+	}
+	return (err);
+}
+
+/*ARGSUSED*/
+static int
+aggr_m_getprop(void *m_driver, const char *pr_name, mac_prop_id_t pr_num,
+    uint_t pr_flags, uint_t pr_valsize, void *pr_val, uint_t *perm)
+{
+	return (ENOTSUP);
 }

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2733,12 +2733,23 @@ mac_set_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize)
 		bcopy(val, &mrp, sizeof (mrp));
 		return (mac_set_resources(mh, &mrp));
 	}
-	/* For driver properties, call driver's callback */
-	if (mip->mi_callbacks->mc_callbacks & MC_SETPROP) {
-		err = mip->mi_callbacks->mc_setprop(mip->mi_driver,
-		    macprop->mp_name, macprop->mp_id, valsize, val);
-	}
+	switch (macprop->mp_id) {
+	case MAC_PROP_MTU: {
+		uint32_t mtu;
 
+		if (valsize < sizeof (mtu))
+			return (EINVAL);
+		bcopy(val, &mtu, sizeof (mtu));
+		err = mac_set_mtu(mh, mtu, NULL);
+		break;
+	}
+	default:
+		/* For other driver properties, call driver's callback */
+		if (mip->mi_callbacks->mc_callbacks & MC_SETPROP) {
+			err = mip->mi_callbacks->mc_setprop(mip->mi_driver,
+			    macprop->mp_name, macprop->mp_id, valsize, val);
+		}
+	}
 	return (err);
 }
 
@@ -2778,15 +2789,20 @@ mac_get_prop(mac_handle_t mh, mac_prop_t *macprop, void *val, uint_t valsize,
 		if ((macprop->mp_flags & MAC_PROP_DEFAULT) == 0) {
 			mac_sdu_get(mh, NULL, &sdu);
 			bcopy(&sdu, val, sizeof (sdu));
-			if (mac_set_prop(mh, macprop, val, sizeof (sdu)) != 0)
-				*perm = MAC_PROP_PERM_READ;
-			else
+			if ((mip->mi_callbacks->mc_callbacks & MC_SETPROP) &&
+			    (mip->mi_callbacks->mc_setprop(mip->mi_driver,
+			    macprop->mp_name, macprop->mp_id, valsize,
+			    val) == 0)) {
 				*perm = MAC_PROP_PERM_RW;
+			} else {
+				*perm = MAC_PROP_PERM_READ;
+			}
 			return (0);
 		} else {
 			if (mip->mi_info.mi_media == DL_ETHER) {
 				sdu = ETHERMTU;
 				bcopy(&sdu, val, sizeof (sdu));
+
 				return (0);
 			}
 			/*

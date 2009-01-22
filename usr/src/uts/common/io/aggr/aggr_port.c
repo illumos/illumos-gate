@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -307,8 +307,8 @@ aggr_port_delete(aggr_port_t *port)
 	 * port's MAC_NOTE_UNICST notify callback function being called.
 	 */
 	(void) mac_unicast_primary_set(port->lp_mh, port->lp_addr);
-
-	(void) mac_unicast_remove(port->lp_mch, port->lp_mah);
+	if (port->lp_mah != NULL)
+		(void) mac_unicast_remove(port->lp_mch, port->lp_mah);
 	mac_client_close(port->lp_mch, MAC_CLOSE_FLAGS_EXCLUSIVE);
 	mac_close(port->lp_mh);
 	AGGR_PORT_REFRELE(port);
