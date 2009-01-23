@@ -275,10 +275,10 @@ mapline_to_mapent(struct mapent **mapents, struct mapline *ml, char *key,
 		strcpy(defaultopts, mapopts);
 
 	/*
-	 * implied is true if there is no '/' (the usual NFS case)
-	 * or if there are two slashes (for smbfs direct entries)
+	 * implied is true if there is no '/'
+	 * We need the same code path if we have an smbfs mount.
 	 */
-	implied = ((*w != '/') || (isdirect && *(w+1) == '/'));
+	implied = (*w != '/') || (strstr(defaultopts, "fstype=smbfs") != NULL);
 	while (*w == '/' || implied) {
 		mp = me;
 		if ((me = (struct mapent *)malloc(sizeof (*me))) == NULL)
