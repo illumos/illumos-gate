@@ -764,6 +764,8 @@ so_setsockopt(struct sonode *so, int level, int option_name,
     const void *optval, socklen_t optlen, struct cred *cr)
 {
 	int error = 0;
+	struct timeval tl;
+	const void *opt = optval;
 
 	SO_BLOCK_FALLBACK(so,
 	    SOP_SETSOCKOPT(so, level, option_name, optval, optlen, cr));
@@ -786,7 +788,6 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 			 * know them. For those protocols which don't care
 			 * these two options, simply return 0.
 			 */
-			struct timeval tl;
 			clock_t t_usec;
 
 			if (get_udatamodel() == DATAMODEL_NONE ||
@@ -805,6 +806,8 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 				TIMEVAL32_TO_TIMEVAL(&tl,
 				    (struct timeval32 *)optval);
 			}
+			opt = &tl;
+			optlen = sizeof (tl);
 			t_usec = tl.tv_sec * 1000 * 1000 + tl.tv_usec;
 			mutex_enter(&so->so_lock);
 			if (option_name == SO_RCVTIMEO)
@@ -826,7 +829,7 @@ so_setsockopt(struct sonode *so, int level, int option_name,
 		}
 	}
 	error = (*so->so_downcalls->sd_setsockopt)
-	    (so->so_proto_handle, level, option_name, optval, optlen, cr);
+	    (so->so_proto_handle, level, option_name, opt, optlen, cr);
 done:
 	SO_UNBLOCK_FALLBACK(so);
 	return (error);

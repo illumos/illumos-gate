@@ -81,6 +81,10 @@ opdes_t	icmp_opt_arr[] = {
 { SO_TYPE,	SOL_SOCKET, OA_R, OA_R, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 { SO_SNDBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
 { SO_RCVBUF,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0 },
+{ SO_SNDTIMEO,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
+	sizeof (struct timeval), 0 },
+{ SO_RCVTIMEO,	SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT,
+	sizeof (struct timeval), 0 },
 { SO_DGRAM_ERRIND, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int),
 	0 },
 { SO_TIMESTAMP, SOL_SOCKET, OA_RW, OA_RW, OP_NP, OP_PASSNEXT, sizeof (int), 0
