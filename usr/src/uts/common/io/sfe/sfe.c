@@ -32,7 +32,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,7 +55,7 @@
 #include "sfe_util.h"
 #include "sfereg.h"
 
-char	ident[] = "sis900/dp83815 driver v" "2.6.1t29os";
+char	ident[] = "sis900/dp83815 driver v" "2.6.1t30os";
 
 /* Debugging support */
 #ifdef DEBUG_LEVEL
@@ -951,6 +951,46 @@ sfe_stop_chip(struct gem_dev *dp)
 
 	return (GEM_SUCCESS);
 }
+
+#ifndef	__sparc
+/*
+ * Stop nic core gracefully for quiesce
+ */
+static int
+sfe_stop_chip_quiesce(struct gem_dev *dp)
+{
+	struct sfe_dev	*lp = dp->private;
+	uint32_t	done;
+	int		i;
+	uint32_t	val;
+
+	/*
+	 * Although we inhibit interrupt here, we don't clear soft copy of
+	 * interrupt mask to avoid bogus interrupts.
+	 */
+	OUTL(dp, IMR, 0);
+
+	/* stop TX and RX immediately */
+	OUTL(dp, CR, CR_TXR | CR_RXR);
+
+	done = 0;
+	for (i = 0; done != (ISR_RXRCMP | ISR_TXRCMP); i++) {
+		if (i > 1000) {
+			/*
+			 * As gem layer will call sfe_reset_chip(),
+			 * we don't neet to reset futher
+			 */
+
+			return (DDI_FAILURE);
+		}
+		val = INL(dp, ISR);
+		done |= val & (ISR_RXRCMP | ISR_TXRCMP);
+		lp->isr_pended |= val & lp->our_intr_bits;
+		drv_usecwait(10);
+	}
+	return (DDI_SUCCESS);
+}
+#endif
 
 /*
  * Setup media mode
@@ -2289,13 +2329,43 @@ sfedetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	return (DDI_FAILURE);
 }
 
+/*
+ * quiesce(9E) entry point.
+ *
+ * This function is called when the system is single-threaded at high
+ * PIL with preemption disabled. Therefore, this function must not be
+ * blocked.
+ *
+ * This function returns DDI_SUCCESS on success, or DDI_FAILURE on failure.
+ * DDI_FAILURE indicates an error condition and should almost never happen.
+ */
+#ifdef	__sparc
+#define	sfe_quiesce	ddi_quiesce_not_supported
+#else
+static int
+sfe_quiesce(dev_info_t *dip)
+{
+	struct gem_dev	*dp;
+	int	ret = 0;
+
+	dp = GEM_GET_DEV(dip);
+
+	if (dp == NULL)
+		return (DDI_FAILURE);
+
+	ret = sfe_stop_chip_quiesce(dp);
+
+	return (ret);
+}
+#endif
+
 /* ======================================================== */
 /*
  * OS depend (loadable streams driver) routine
  */
 /* ======================================================== */
 DDI_DEFINE_STREAM_OPS(sfe_ops, nulldev, nulldev, sfeattach, sfedetach,
-	nodev, NULL, D_MP, NULL, ddi_quiesce_not_supported);
+	nodev, NULL, D_MP, NULL, sfe_quiesce);
 
 static struct modldrv modldrv = {
 	&mod_driverops,	/* Type of module.  This one is a driver */
