@@ -185,6 +185,7 @@ static struct dev_ops iscsi_dev_ops = {
 	&iscsi_cb_ops,		/* driver operations */
 	NULL,			/* bus ops */
 	NULL,			/* power management */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 static struct modldrv modldrv = {
