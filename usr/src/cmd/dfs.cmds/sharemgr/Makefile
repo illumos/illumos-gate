@@ -19,9 +19,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -50,6 +48,8 @@ lint	:=	TARGET= lint
 all clean clobber lint _msg:	$(SUBDIRS)
 
 install: $(SUBDIRS) $(ROOTMANIFEST)
+
+check:	$(CHKMANIFEST)
 
 $(SUBDIRS) $(TESTSUBS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

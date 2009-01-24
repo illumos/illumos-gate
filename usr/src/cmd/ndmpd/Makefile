@@ -133,6 +133,8 @@ all: $(PROG)
 
 install: all $(ROOTNDMPDDIR)  $(ROOTNDMPDFILE) $(ROOTSVCMETHOD) $(ROOTMANIFEST) 
 
+check:	$(CHKMANIFEST)
+
 clobber:
 
 $(PROG) : $(OBJS)

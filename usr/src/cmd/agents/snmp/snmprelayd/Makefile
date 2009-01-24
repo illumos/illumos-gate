@@ -18,12 +18,9 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# snmp/snmprelayd/Makefile
 #
 
 include ../../Makefile.vars
@@ -157,6 +154,8 @@ CLOBBERFILES += y.tab.c $(BINPROG)
 all: $(SOURCES.h) $(BINPROG) $(CONFIG_FILES)
 
 install: all $(OPTPROG) $(CONFRULE) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check:	$(CHKMANIFEST)
 
 $(BINPROG): $(BIN) $(OBJECTS) $(BIN)/config.o $(MYLIBS) $(MAPFILES)
 	$(CC) -o $(BINPROG) $(LDFLAGS) $(OBJECTS) $(BIN)/config.o \

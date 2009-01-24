@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 MANIFEST = keymap.xml
@@ -41,6 +39,8 @@ CFLAGS	+= $(CCVERBOSE)
 all: $(PROG)
 
 install: all $(ROOTETCDEFAULTFILES) $(ROOTPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check:	$(CHKMANIFEST)
 
 clean:
 

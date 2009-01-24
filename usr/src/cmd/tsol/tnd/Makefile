@@ -19,13 +19,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/tsol/tnd/Makefile
-#
+
 PROG= tnd
 OBJS= tnd.o
 
@@ -53,6 +50,8 @@ all:	$(PROG)
 
 install:	all $(ROOTTSOLPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD) \
 		$(ROOTUSRSBIN)/$(PROG)
+
+check:	$(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJS) tags

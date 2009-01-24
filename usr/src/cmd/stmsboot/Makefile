@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -49,10 +49,10 @@ install: all					\
 	$(ROOTFSLIB_MPXIO)			\
 	$(ROOTFSLIB_MPXIO)/$(STMSBOOT_UTIL)	\
 	$(ROOTMANIFEST)				\
-	$(ROOTSVCMETHOD)				\
+	$(ROOTSVCMETHOD)			\
 	$(ROOTUSRSBIN)/stmsboot
 
-check:
+check:	$(CHKMANIFEST)
 	$(CSTYLE) -pP $(SRCS)
 
 clean:

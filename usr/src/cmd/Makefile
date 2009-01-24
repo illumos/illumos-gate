@@ -17,11 +17,9 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
-
-
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -809,107 +807,12 @@ BSMSUBDIRS=		\
 #
 BWOSDIRS=
 
-#
-# Commands providing manifests must offer a check target.  A recursive check
-# target across all commands directories is not currently provided.
-#
-MANIFEST_TOPDIRS=			\
-	auditd				\
-	bnu				\
-	consadm				\
-	coreadm				\
-	cron				\
-	cvcd				\
-	dispadmin			\
-	drd				\
-	dumpadm				\
-	eeprom				\
-	fm				\
-	intrd				\
-	ipf				\
-	keyserv				\
-	ldapcachemgr			\
-	dlmgmtd				\
-	nscd				\
-	oplhpd				\
-	power				\
-	rexd				\
-	rpcbind				\
-	rpcsvc				\
-	saf				\
-	sf880drd			\
-	smserverd			\
-	syseventd			\
-	syslogd				\
-	utmpd				\
-	vntsd				\
-	ypcmd				\
-	zoneadmd
-
-MANIFEST_SUBDIRS=			\
-	boot/scripts			\
-	cmd-crypto/scripts		\
-	cmd-inet/usr.lib/in.chargend	\
-	cmd-inet/usr.lib/in.daytimed	\
-	cmd-inet/usr.lib/in.dhcpd	\
-	cmd-inet/usr.lib/in.discardd	\
-	cmd-inet/usr.lib/in.echod	\
-	cmd-inet/usr.lib/in.ndpd	\
-	cmd-inet/usr.lib/in.ripngd	\
-	cmd-inet/usr.lib/in.timed	\
-	cmd-inet/usr.lib/inetd		\
-	cmd-inet/usr.lib/mdnsd		\
-	cmd-inet/usr.lib/slpd		\
-	cmd-inet/usr.lib/wpad		\
-	cmd-inet/usr.sbin		\
-	cmd-inet/usr.sbin/in.ftpd	\
-	cmd-inet/usr.sbin/in.rdisc	\
-	cmd-inet/usr.sbin/in.routed	\
-	cmd-inet/usr.sbin/in.talkd	\
-	cmd-inet/usr.sbin/routeadm	\
-	cmd/tsol/labeld			\
-	cmd/tsol/tnctl			\
-	cmd/tsol/tnd			\
-	cmd/tsol/tsol-zones		\
-	dcs/sparc/sun4u			\
-	fs.d/autofs			\
-	fs.d/cachefs			\
-	fs.d/nfs/svc			\
-	gss/gssd			\
-	idmap/idmapd			\
-	krb5/kadmin/server		\
-	krb5/krb5kdc			\
-	krb5/kwarn			\
-	krb5/slave			\
-	lp/cmd/lpsched			\
-	lvm/rpc.metad			\
-	lvm/rpc.metamedd		\
-	lvm/rpc.metamhd			\
-	lvm/md_monitord			\
-	lvm/metassist/sysfiles		\
-	lvm/util			\
-	picl/picld			\
-	print/gateway			\
-	print/lp			\
-	rcap/rcapd			\
-	rpcsvc/rpc.bootparamd		\
-	sendmail/lib			\
-	smartcard/daemon		\
-	ssh/etc				\
-	svc/milestone			\
-	ypcmd/yppasswd			\
-	ypcmd/ypupdated			\
-	xntpd/xntpd
-
-DTEST_SUBDIRS= \
-	dtrace/test/tst
 
 all :=		TARGET = all
 install :=	TARGET = install
 clean :=	TARGET = clean
 clobber :=	TARGET = clobber
 lint :=		TARGET = lint
-check :=	TARGET = check
 _msg :=		TARGET = _msg
 _dc :=		TARGET = _dc
 
@@ -917,30 +820,18 @@ _dc :=		TARGET = _dc
 
 SUBDIRS = $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 
-.PARALLEL:	$(BWOSDIRS) $(SUBDIRS) $(MSGSUBDIRS) $(BSMSUBDIRS) \
-		$(DTEST_SUBDIRS)
+.PARALLEL:	$(BWOSDIRS) $(SUBDIRS) $(MSGSUBDIRS) $(BSMSUBDIRS)
 
 all install clean clobber lint: $(FIRST_SUBDIRS) .WAIT $(SUBDIRS) $(BSMSUBDIRS)
 
-# Manifests cannot be checked in parallel, because we are using the global
-# repository that is in $(SRC)/cmd/svc/seed/global.db.  This is a
-# repository that is built from the manifests in this workspace, whereas
-# the build machine's repository may be out of sync with these manifests.
-# Because we are using a private repository, svccfg-native must start up a
-# private copy of configd-native.  We cannot have multiple copies of
-# configd-native trying to access global.db simultaneously.
-
-.NO_PARALLEL:	$(MANIFEST_TOPDIRS) $(MANIFEST_SUBDIRS)
-
-check: svccfg_check .WAIT $(MANIFEST_TOPDIRS) $(MANIFEST_SUBDIRS) \
-	$(DTEST_SUBDIRS)
-
-svccfg_check:
-	@$(ECHO) "building requirements for svccfg check ..."; \
-	(cd $(SRC)/cmd/svc/seed && pwd && $(MAKE) $(MFLAGS) global.db)
-
-$(DTEST_SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+#
+# Manifests cannot be checked in parallel, because we are using
+# the global repository that is in $(SRC)/cmd/svc/seed/global.db.
+# For this reason, to avoid .PARALLEL and .NO_PARALLEL conflicts,
+# we spawn off a sub-make to perform the non-parallel 'make check'
+#
+check:
+	$(MAKE) -f Makefile.check check
 
 #
 # The .WAIT directive works around an apparent bug in parallel make.
@@ -958,7 +849,7 @@ _dc: $(DCSUBDIRS)
 fs.d: fstyp
 ksh:	shcomp isaexec
 
-$(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(BSMSUBDIRS) $(MANIFEST_SUBDIRS): FRC
+$(FIRST_SUBDIRS) $(BWOSDIRS) $(SUBDIRS) $(BSMSUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \
 		cd $@; pwd; $(MAKE) $(TARGET); \
 	else \

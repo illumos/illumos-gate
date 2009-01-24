@@ -1,0 +1,174 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+
+include ../Makefile.master
+
+#
+# Commands providing manifests must offer a check target.  A recursive check
+# target across all commands directories is not currently provided.
+#
+MANIFEST_TOPDIRS=			\
+	acctadm				\
+	auditd				\
+	bnu				\
+	consadm				\
+	coreadm				\
+	cron				\
+	cvcd				\
+	dispadmin			\
+	drd				\
+	dumpadm				\
+	fcinfo				\
+	fm				\
+	intrd				\
+	iscsid				\
+	iscsitsvc			\
+	kbd				\
+	keyserv				\
+	ldapcachemgr			\
+	mms				\
+	dlmgmtd				\
+	ndmpd				\
+	nscd				\
+	oplhpd				\
+	pools				\
+	power				\
+	rexd				\
+	rmvolmgr			\
+	rpcbind				\
+	rpcsvc				\
+	sa				\
+	saf				\
+	sckmd				\
+	sf880drd			\
+	smserverd			\
+	stmfsvc				\
+	stmsboot			\
+	syseventd			\
+	syslogd				\
+	utmpd				\
+	vntsd				\
+	ypcmd				\
+	zoneadm				\
+	zoneadmd
+
+MANIFEST_SUBDIRS=			\
+	agents/snmp/snmprelayd		\
+	boot/scripts			\
+	cmd-crypto/scripts		\
+	cmd-inet/usr.lib/in.chargend	\
+	cmd-inet/usr.lib/in.daytimed	\
+	cmd-inet/usr.lib/in.dhcpd	\
+	cmd-inet/usr.lib/in.discardd	\
+	cmd-inet/usr.lib/in.echod	\
+	cmd-inet/usr.lib/in.ndpd	\
+	cmd-inet/usr.lib/in.ripngd	\
+	cmd-inet/usr.lib/in.timed	\
+	cmd-inet/usr.lib/inetd		\
+	cmd-inet/usr.lib/mdnsd		\
+	cmd-inet/usr.lib/slpd		\
+	cmd-inet/usr.lib/wpad		\
+	cmd-inet/usr.sbin		\
+	cmd-inet/usr.sbin/in.ftpd	\
+	cmd-inet/usr.sbin/in.rdisc	\
+	cmd-inet/usr.sbin/in.routed	\
+	cmd-inet/usr.sbin/in.talkd	\
+	cmd-inet/usr.sbin/ipsecutils	\
+	cmd-inet/usr.sbin/kssl/ksslcfg	\
+	cmd-inet/usr.sbin/routeadm	\
+	dcs/sparc/sun4u			\
+	dfs.cmds/sharemgr		\
+	fps/fpsd			\
+	fs.d/autofs			\
+	fs.d/nfs/svc			\
+	fs.d/smbclnt/svc		\
+	gss/gssd			\
+	hal/addons/network-devices	\
+	hal/hald/solaris		\
+	hostid/smf			\
+	idmap/idmapd			\
+	ipf/svc				\
+	iscsi/iscsitgtd			\
+	isns/isnsd			\
+	krb5/kadmin/server		\
+	krb5/krb5kdc			\
+	krb5/kwarn			\
+	krb5/slave			\
+	lp/cmd/lpsched			\
+	lvm/rpc.mdcommd			\
+	lvm/rpc.metad			\
+	lvm/rpc.metamedd		\
+	lvm/rpc.metamhd			\
+	lvm/md_monitord			\
+	lvm/util			\
+	picl/picld			\
+	pools/poold			\
+	print/bsd-sysv-commands		\
+	print/ppdmgr			\
+	rcap/rcapd			\
+	rpcsvc/rpc.bootparamd		\
+	sendmail/lib			\
+	smbsrv/smbd			\
+	ssh/etc				\
+	svc/milestone			\
+	tsol/labeld			\
+	tsol/tnctl			\
+	tsol/tnd			\
+	tsol/tsol-zones			\
+	vscan/vscand			\
+	xvm/ipagent			\
+	ypcmd/yppasswd			\
+	ypcmd/ypupdated			\
+	xntpd/xntpd
+
+$(CLOSED_BUILD)MANIFEST_SUBDIRS +=		\
+	$(CLOSED)/cmd/smartcard/daemon		\
+	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked
+
+DTEST_SUBDIRS= \
+	dtrace/test/tst
+
+.KEEP_STATE:
+
+# Manifests cannot be checked in parallel, because we are using the global
+# repository that is in $(SRC)/cmd/svc/seed/global.db.  This is a
+# repository that is built from the manifests in this workspace, whereas
+# the build machine's repository may be out of sync with these manifests.
+# Because we are using a private repository, svccfg-native must start up a
+# private copy of configd-native.  We cannot have multiple copies of
+# configd-native trying to access global.db simultaneously.
+
+.NO_PARALLEL:
+
+check: svccfg_check $(MANIFEST_TOPDIRS) $(MANIFEST_SUBDIRS) $(DTEST_SUBDIRS)
+
+svccfg_check:
+	@$(ECHO) "building requirements for svccfg check ..."; \
+	(cd $(SRC)/cmd/svc/seed && pwd && $(MAKE) $(MFLAGS) global.db)
+
+$(MANIFEST_TOPDIRS) $(MANIFEST_SUBDIRS) $(DTEST_SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) check
+
+FRC:
