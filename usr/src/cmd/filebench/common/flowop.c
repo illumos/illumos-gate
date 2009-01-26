@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -584,13 +584,43 @@ flowop_start(threadflow_t *threadflow)
 	pthread_exit(&threadflow->tf_abort);
 }
 
+void flowoplib_flowinit(void);
+void fb_lfs_flowinit(void);
+
 void
 flowop_init(void)
 {
 	(void) pthread_mutex_init(&controlstats_lock,
 	    ipc_mutexattr(IPC_MUTEX_NORMAL));
-	flowoplib_init();
+	flowoplib_flowinit();
 }
+
+static int plugin_flowinit_done = FALSE;
+
+/*
+ * Initialize any "plug-in" flowops. Called when the first "create fileset"
+ * command is encountered.
+ */
+void
+flowop_plugin_flowinit(void)
+{
+	if (plugin_flowinit_done)
+		return;
+
+	plugin_flowinit_done = TRUE;
+
+	switch (filebench_shm->shm_filesys_type) {
+	case LOCAL_FS_PLUG:
+		fb_lfs_flowinit();
+		break;
+
+	case NFS3_PLUG:
+	case NFS4_PLUG:
+	case CIFS_PLUG:
+		break;
+	}
+}
+
 
 /*
  * Delete the designated flowop from the thread's flowop list.
@@ -1111,5 +1141,64 @@ flowop_composite_destruct(flowop_t *flowop)
 		}
 		flowop_delete(&flowop->fo_comp_fops, inner_flowop);
 		inner_flowop = inner_flowop->fo_exec_next;
+	}
+}
+
+/*
+ * Support routines for libraries of flowops
+ */
+
+int
+flowop_init_generic(flowop_t *flowop)
+{
+	(void) ipc_mutex_unlock(&flowop->fo_lock);
+	return (FILEBENCH_OK);
+}
+
+void
+flowop_destruct_generic(flowop_t *flowop)
+{
+	char *buf;
+
+	/* release any local resources held by the flowop */
+	(void) ipc_mutex_lock(&flowop->fo_lock);
+	buf = flowop->fo_buf;
+	flowop->fo_buf = NULL;
+	(void) ipc_mutex_unlock(&flowop->fo_lock);
+
+	if (buf)
+		free(buf);
+}
+
+
+/*
+ * Loops through the supplied list of flowops and creates and initializes
+ * a flowop for each one by calling flowop_define. As a side effect of
+ * calling flowop define, the created flowops are placed on the
+ * master flowop list. All created flowops are set to instance "0".
+ */
+void
+flowop_flow_init(flowop_proto_t *list, int nops)
+{
+	int i;
+
+	for (i = 0; i < nops; i++) {
+		flowop_t *flowop;
+		flowop_proto_t *fl;
+
+		fl = &(list[i]);
+
+		if ((flowop = flowop_define(NULL,
+		    fl->fl_name, NULL, NULL, 0, fl->fl_type)) == 0) {
+			filebench_log(LOG_ERROR,
+			    "failed to create flowop %s\n",
+			    fl->fl_name);
+			filebench_shutdown(1);
+		}
+
+		flowop->fo_func = fl->fl_func;
+		flowop->fo_init = fl->fl_init;
+		flowop->fo_destruct = fl->fl_destruct;
+		flowop->fo_attrs = fl->fl_attrs;
 	}
 }

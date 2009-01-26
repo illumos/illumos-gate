@@ -19,16 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _FB_THREADFLOW_H
 #define	_FB_THREADFLOW_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "config.h"
+#include "fsplug.h"
 #include <pthread.h>
 
 #ifndef HAVE_CADDR_T1
@@ -86,7 +85,7 @@ typedef struct threadflow {
 	caddr_t		tf_mem;		/* Private Memory */
 	avd_t		tf_memsize;	/* Private Memory size attribute */
 	fbint_t		tf_constmemsize; /* constant copy of memory size */
-	int		tf_fd[THREADFLOW_MAXFD + 1]; /* Thread local fd's */
+	fb_fdesc_t	tf_fd[THREADFLOW_MAXFD + 1]; /* Thread local fd's */
 	filesetentry_t	*tf_fse[THREADFLOW_MAXFD + 1]; /* Thread local files */
 	int		tf_fdrotor;	/* Rotating fd within set */
 	flowstat_t	tf_stats;	/* Thread statistics */

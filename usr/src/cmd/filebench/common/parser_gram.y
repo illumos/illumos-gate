@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2008 Denis Cheng
@@ -1786,6 +1786,9 @@ main(int argc, char *argv[])
 			exit(1);
 		}
 
+		/* get correct function pointer for each child process */
+		filebench_plugin_funcvecinit();
+
 		if (procflow_exec(procname, instance) < 0) {
 			filebench_log(LOG_ERROR, "Cannot startup process %s",
 			    procname);
@@ -1802,6 +1805,7 @@ main(int argc, char *argv[])
 	if (fscriptname)
 		(void) strcpy(filebench_shm->shm_fscriptname, fscriptname);
 
+	filebench_plugin_funcvecinit();
 	flowop_init();
 	stats_init();
 	eventgen_init();
@@ -2599,6 +2603,12 @@ parser_fileset_define_common(cmd_t *cmd)
 	avd_t name;
 	attr_t *attr;
 	avd_t pathname;
+
+	/*
+	 * Make sure all plugin flowops are initialized.
+	 * Defaults to local fs for now
+	 */
+	flowop_plugin_flowinit();
 
 	/* Get the name of the file */
 	if (attr = get_attr_fileset(cmd, FSA_NAME)) {

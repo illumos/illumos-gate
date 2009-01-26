@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@
 
 #include "vars.h"
 #include "fb_avl.h"
+
 #define	FILE_ALLOC_BLOCK (off64_t)(1024 * 1024)
 
 #ifdef	__cplusplus
@@ -173,8 +174,8 @@ typedef struct fileset {
 } fileset_t;
 
 int fileset_createset(fileset_t *);
-int fileset_openfile(fileset_t *fileset, filesetentry_t *entry,
-    int flag, int mode, int attrs);
+int fileset_openfile(fb_fdesc_t *fd, fileset_t *fileset,
+    filesetentry_t *entry, int flag, int mode, int attrs);
 fileset_t *fileset_define(avd_t);
 fileset_t *fileset_find(char *name);
 filesetentry_t *fileset_pick(fileset_t *fileset, int flags, int tid,

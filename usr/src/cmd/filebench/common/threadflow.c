@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2008 Denis Cheng
@@ -314,10 +314,11 @@ threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
 void
 threadflow_delete_all(threadflow_t **threadlist, int wait_cnt)
 {
-	threadflow_t *threadflow = *threadlist;
+	threadflow_t *threadflow;
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_threadflow_lock);
 
+	threadflow = *threadlist;
 	filebench_log(LOG_DEBUG_IMPL, "Deleting all threads");
 
 	while (threadflow) {

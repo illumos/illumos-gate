@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2008 Denis Cheng
@@ -628,7 +628,7 @@ procflow_allstarted()
 void
 procflow_shutdown(void)
 {
-	procflow_t *procflow = filebench_shm->shm_proclist;
+	procflow_t *procflow;
 	int wait_cnt;
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_procs_running_lock);
@@ -640,6 +640,7 @@ procflow_shutdown(void)
 	(void) ipc_mutex_unlock(&filebench_shm->shm_procs_running_lock);
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
+	procflow = filebench_shm->shm_proclist;
 	filebench_shm->shm_f_abort = 1;
 	wait_cnt = SHUTDOWN_WAIT_SECONDS;
 

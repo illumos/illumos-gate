@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2008 Denis Cheng
@@ -91,6 +91,7 @@ extern int noproc;
 void filebench_init();
 void filebench_log __V((int level, const char *fmt, ...));
 void filebench_shutdown(int error);
+void filebench_plugin_funcvecinit(void);
 
 #ifndef HAVE_UINT64_MAX
 #define	UINT64_MAX (((off64_t)1UL<<63UL) - 1UL)
@@ -117,7 +118,7 @@ void filebench_shutdown(int error);
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
 
-#define	FILEBENCH_VERSION	"1.4.2"
+#define	FILEBENCH_VERSION	"1.4.3"
 #define	FILEBENCHDIR	"/usr/benchmarks/filebench"
 #define	FILEBENCH_PROMPT	"filebench> "
 #define	MAX_LINE_LEN	1024

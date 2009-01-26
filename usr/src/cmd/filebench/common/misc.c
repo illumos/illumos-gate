@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <fcntl.h>
@@ -36,13 +34,16 @@
 #include "ipc.h"
 #include "eventgen.h"
 #include "utils.h"
+#include "fsplug.h"
+
+/* File System functions vector */
+fsplug_func_t *fs_functions_vec;
 
 /*
  * Routines to access high resolution system time, initialize and
  * shutdown filebench, log filebench run progress and errors, and
  * access system information strings.
  */
-
 
 #if !defined(sun) && defined(USE_RDTSC)
 /*
@@ -159,7 +160,6 @@ filebench_init(void)
 		filebench_shutdown(1);
 	}
 #endif /* USE_RDTSC */
-
 }
 
 extern int lex_lineno;
@@ -453,4 +453,31 @@ script_var(var_t *var)
 	free(f);
 
 	return (var);
+}
+
+void fb_lfs_funcvecinit(void);
+
+/*
+ * Initialize any "plug-in" I/O function vectors. Called by each
+ * filebench process that is forked, as the vector is relative to
+ * its image.
+ */
+void
+filebench_plugin_funcvecinit(void)
+{
+
+	switch (filebench_shm->shm_filesys_type) {
+	case LOCAL_FS_PLUG:
+		fb_lfs_funcvecinit();
+		break;
+
+	case NFS3_PLUG:
+	case NFS4_PLUG:
+	case CIFS_PLUG:
+		break;
+	default:
+		filebench_log(LOG_ERROR,
+		    "filebench_plugin_funcvecinit: unknown file system");
+		break;
+	}
 }

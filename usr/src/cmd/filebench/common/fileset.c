@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Portions Copyright 2008 Denis Cheng
@@ -37,6 +37,7 @@
 #include "fileset.h"
 #include "gamma_dist.h"
 #include "utils.h"
+#include "fsplug.h"
 
 /*
  * File sets, of type fileset_t, are entities which contain
@@ -130,31 +131,6 @@ fileset_usage(void)
 }
 
 /*
- * Frees up memory mapped file region of supplied size. The
- * file descriptor "fd" indicates which memory mapped file.
- * If successful, returns 0. Otherwise returns -1 if "size"
- * is zero, or -1 times the number of times msync() failed.
- */
-static int
-fileset_freemem(int fd, off64_t size)
-{
-	off64_t left;
-	int ret = 0;
-
-	for (left = size; left > 0; left -= MMAP_SIZE) {
-		off64_t thismapsize;
-		caddr_t addr;
-
-		thismapsize = MIN(MMAP_SIZE, left);
-		addr = mmap64(0, thismapsize, PROT_READ|PROT_WRITE,
-		    MAP_SHARED, fd, size - left);
-		ret += msync(addr, thismapsize, MS_INVALIDATE);
-		(void) munmap(addr, thismapsize);
-	}
-	return (ret);
-}
-
-/*
  * Creates a path string from the filesetentry_t "*entry"
  * and all of its parent's path names. The resulting path
  * is a concatination of all the individual parent paths.
@@ -222,7 +198,7 @@ fileset_mkdir(char *path, int mode)
 
 	/* Make the directories, from closest to root downwards. */
 	for (--i; i >= 0; i--) {
-		(void) mkdir(dirs[i], mode);
+		(void) FB_MKDIR(dirs[i], mode);
 		free(dirs[i]);
 	}
 
@@ -304,7 +280,7 @@ fileset_alloc_leafdir(filesetentry_t *entry)
 	if (!((entry->fse_flags & FSE_REUSING) && (stat64(path, &sb) == 0))) {
 
 		/* No file or not reusing, so create */
-		if (mkdir(path, 0755) < 0) {
+		if (FB_MKDIR(path, 0755) < 0) {
 			filebench_log(LOG_ERROR,
 			    "Failed to pre-allocate leaf directory %s: %s",
 			    path, strerror(errno));
@@ -331,7 +307,7 @@ fileset_alloc_file(filesetentry_t *entry)
 	struct stat64 sb;
 	char *pathtmp;
 	off64_t seek;
-	int fd;
+	fb_fdesc_t fdesc;
 
 	fileset = entry->fse_fileset;
 	(void) fb_strlcpy(path, avd_get_str(fileset->fs_path), MAXPATHLEN);
@@ -344,8 +320,8 @@ fileset_alloc_file(filesetentry_t *entry)
 	filebench_log(LOG_DEBUG_IMPL, "Populated %s", entry->fse_path);
 
 	/* see if reusing and this file exists */
-	if ((entry->fse_flags & FSE_REUSING) && (stat64(path, &sb) == 0)) {
-		if ((fd = open64(path, O_RDWR)) < 0) {
+	if ((entry->fse_flags & FSE_REUSING) && (FB_STAT(path, &sb) == 0)) {
+		if (FB_OPEN(&fdesc, path, O_RDWR, 0) == FILEBENCH_ERROR) {
 			filebench_log(LOG_INFO,
 			    "Attempted but failed to Re-use file %s",
 			    path);
@@ -358,10 +334,9 @@ fileset_alloc_file(filesetentry_t *entry)
 			    "Re-using file %s", path);
 
 			if (!avd_get_bool(fileset->fs_cached))
-				(void) fileset_freemem(fd,
-				    entry->fse_size);
+				(void) FB_FREEMEM(&fdesc, entry->fse_size);
 
-			(void) close(fd);
+			(void) FB_CLOSE(&fdesc);
 
 			/* unbusy the allocated entry */
 			fileset_unbusy(entry, TRUE, TRUE, 0);
@@ -372,17 +347,12 @@ fileset_alloc_file(filesetentry_t *entry)
 			filebench_log(LOG_DEBUG_IMPL,
 			    "Truncating & re-using file %s", path);
 
-#ifdef HAVE_FTRUNCATE64
-			(void) ftruncate64(fd, (off64_t)entry->fse_size);
-#else
-			(void) ftruncate(fd, (off_t)entry->fse_size);
-#endif
+			(void) FB_FTRUNC(&fdesc, (off64_t)entry->fse_size);
 
 			if (!avd_get_bool(fileset->fs_cached))
-				(void) fileset_freemem(fd,
-				    entry->fse_size);
+				(void) FB_FREEMEM(&fdesc, entry->fse_size);
 
-			(void) close(fd);
+			(void) FB_CLOSE(&fdesc);
 
 			/* unbusy the allocated entry */
 			fileset_unbusy(entry, TRUE, TRUE, 0);
@@ -391,7 +361,8 @@ fileset_alloc_file(filesetentry_t *entry)
 	} else {
 
 		/* No file or not reusing, so create */
-		if ((fd = open64(path, O_RDWR | O_CREAT, 0644)) < 0) {
+		if (FB_OPEN(&fdesc, path, O_RDWR | O_CREAT, 0644) ==
+		    FILEBENCH_ERROR) {
 			filebench_log(LOG_ERROR,
 			    "Failed to pre-allocate file %s: %s",
 			    path, strerror(errno));
@@ -418,12 +389,12 @@ fileset_alloc_file(filesetentry_t *entry)
 		 */
 		wsize = MIN(entry->fse_size - seek, FILE_ALLOC_BLOCK);
 
-		ret = write(fd, buf, wsize);
+		ret = FB_WRITE(&fdesc, buf, wsize);
 		if (ret != wsize) {
 			filebench_log(LOG_ERROR,
 			    "Failed to pre-allocate file %s: %s",
 			    path, strerror(errno));
-			(void) close(fd);
+			(void) FB_CLOSE(&fdesc);
 			free(buf);
 			fileset_unbusy(entry, TRUE, FALSE, 0);
 			return (FILEBENCH_ERROR);
@@ -432,9 +403,9 @@ fileset_alloc_file(filesetentry_t *entry)
 	}
 
 	if (!avd_get_bool(fileset->fs_cached))
-		(void) fileset_freemem(fd, entry->fse_size);
+		(void) FB_FREEMEM(&fdesc, entry->fse_size);
 
-	(void) close(fd);
+	(void) FB_CLOSE(&fdesc);
 
 	free(buf);
 
@@ -478,17 +449,17 @@ fileset_alloc_thread(filesetentry_t *entry)
  * and opens the file with open64(). It unlocks the fileset
  * entry lock, sets the DIRECTIO_ON or DIRECTIO_OFF flags
  * as requested, and returns the file descriptor integer
- * for the opened file.
+ * for the opened file in the supplied filebench file descriptor.
+ * Returns FILEBENCH_ERROR on error, and FILEBENCH_OK on success.
  */
 int
-fileset_openfile(fileset_t *fileset,
+fileset_openfile(fb_fdesc_t *fdesc, fileset_t *fileset,
     filesetentry_t *entry, int flag, int filemode, int attrs)
 {
 	char path[MAXPATHLEN];
 	char dir[MAXPATHLEN];
 	char *pathtmp;
 	struct stat64 sb;
-	int fd;
 	int open_attrs = 0;
 
 	(void) fb_strlcpy(path, avd_get_str(fileset->fs_path), MAXPATHLEN);
@@ -514,7 +485,8 @@ fileset_openfile(fileset_t *fileset,
 #endif
 	}
 
-	if ((fd = open64(path, flag | open_attrs, filemode)) < 0) {
+	if (FB_OPEN(fdesc, path, flag | open_attrs, filemode)
+	    == FILEBENCH_ERROR) {
 		filebench_log(LOG_ERROR,
 		    "Failed to open file %d, %s, with status %x: %s",
 		    entry->fse_index, path, entry->fse_flags, strerror(errno));
@@ -530,12 +502,12 @@ fileset_openfile(fileset_t *fileset,
 
 #ifdef sun
 	if (attrs & FLOW_ATTR_DIRECTIO)
-		(void) directio(fd, DIRECTIO_ON);
+		(void) directio(fdesc->fd_num, DIRECTIO_ON);
 	else
-		(void) directio(fd, DIRECTIO_OFF);
+		(void) directio(fdesc->fd_num, DIRECTIO_OFF);
 #endif
 
-	return (fd);
+	return (FILEBENCH_OK);
 }
 
 /*
@@ -1071,7 +1043,7 @@ fileset_create(fileset_t *fileset)
 		filebench_log(LOG_VERBOSE,
 		    "making tree for filset %s", path);
 
-		(void) mkdir(path, 0755);
+		(void) FB_MKDIR(path, 0755);
 
 		if (fileset_create_subdirs(fileset, path) == FILEBENCH_ERROR)
 			return (FILEBENCH_ERROR);
@@ -1120,7 +1092,7 @@ fileset_create(fileset_t *fileset)
 				    &filebench_shm->shm_fsparalloc_lock);
 			}
 
-			/* quit if any allocation thread reports and error */
+			/* quit if any allocation thread reports an error */
 			if (filebench_shm->shm_fsparalloc_count < 0) {
 				(void) pthread_mutex_unlock(
 				    &filebench_shm->shm_fsparalloc_lock);
