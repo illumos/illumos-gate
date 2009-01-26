@@ -429,7 +429,7 @@
 @ MSG_FIL_DEP_ORPHAN	"    file=%s;  object remains on orphan handle  %s"
 @ MSG_FIL_DEP_REINST	"    file=%s;  object reinstated  %s"
 
-@ MSG_FIL_HDL_CREATE	"handle=%s;  creating:"
+@ MSG_FIL_HDL_CREATE	"handle=%s;  creating: 0x%llx"
 @ MSG_FIL_HDL_ADD	"handle=%s;  adding dependent objects:"
 @ MSG_FIL_HDL_DELETE	"handle=%s;  inspecting for deletion:"
 @ MSG_FIL_HDL_ORPHAN	"handle=%s;  deletion cannot be completed: moving to \

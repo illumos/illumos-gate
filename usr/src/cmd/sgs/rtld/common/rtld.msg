@@ -52,7 +52,7 @@
 @ MSG_ARG_ILLPATH	"illegal pathname"
 @ MSG_ARG_ILLSYM	"illegal symbol name"
 @ MSG_ARG_INVADDR	"address 0x%llx does not fall within any mapped object"
-@ MSG_ARG_INVHNDL	"invalid handle"
+@ MSG_ARG_INVHNDL	"invalid handle: 0x%llx"
 @ MSG_ARG_ILLVAL	"illegal request value"
 @ MSG_ARG_NOCONFIG	"no configuration file in use"
 @ MSG_ARG_NOPROFNAME	"no profile target specified"

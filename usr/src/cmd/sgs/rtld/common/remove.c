@@ -169,7 +169,7 @@ remove_plist(Alist **alpp, int complete)
 void
 remove_lml(Lm_list *lml)
 {
-	if (lml && (lml->lm_head == 0)) {
+	if (lml && (lml->lm_head == NULL)) {
 		/*
 		 * As a whole link-map list is being removed, the debuggers
 		 * would have been alerted of this deletion (or an addition
@@ -223,7 +223,7 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 {
 	Dyninfo *dip;
 
-	if (lmp == 0)
+	if (lmp == NULL)
 		return;
 
 	/*
@@ -243,12 +243,12 @@ remove_so(Lm_list *lml, Rt_map *lmp)
 
 		for (tag = 0; tag < CI_MAX; tag++) {
 			if (lml->lm_lcs[tag].lc_lmp == lmp) {
-				lml->lm_lcs[tag].lc_lmp = 0;
+				lml->lm_lcs[tag].lc_lmp = NULL;
 				lml->lm_lcs[tag].lc_un.lc_val = 0;
 			}
 			if (glcs[tag].lc_lmp == lmp) {
-				ASSERT(glcs[tag].lc_lmp != 0);
-				glcs[tag].lc_lmp = 0;
+				ASSERT(glcs[tag].lc_lmp != NULL);
+				glcs[tag].lc_lmp = NULL;
 				glcs[tag].lc_un.lc_val = 0;
 			}
 		}
@@ -442,7 +442,7 @@ remove_lists(Rt_map *lmp, int lazy)
 					continue;
 
 				if (dip->di_info == (void *)lmp) {
-					dip->di_info = 0;
+					dip->di_info = NULL;
 
 					if (LAZY(clmp)++ == 0)
 						LIST(clmp)->lm_lazy++;
@@ -475,7 +475,7 @@ remove_cntl(Lm_list *lml, Aliste lmco)
 		/*
 		 * This element should be empty.
 		 */
-		ASSERT(lmc->lc_head == 0);
+		ASSERT(lmc->lc_head == NULL);
 #endif
 		alist_delete_by_offset(lml->lm_lists, &_lmco);
 	}
@@ -506,10 +506,10 @@ remove_incomplete(Lm_list *lml, Aliste lmco)
 	 * effectively the link-map control head gets updated to point to the
 	 * next link-map.
 	 */
-	while ((lmp = lmc->lc_head) != 0)
+	while ((lmp = lmc->lc_head) != NULL)
 		remove_so(lml, lmp);
 
-	lmc->lc_head = lmc->lc_tail = 0;
+	lmc->lc_head = lmc->lc_tail = NULL;
 }
 
 /*
@@ -863,12 +863,12 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 		 * Establish a handle, and should anything fail, fall through
 		 * to remove the link-map control list.
 		 */
-		if (((ghp =
-		    hdl_create(lml, lmc->lc_head, 0, 0, GPD_ADDEPS, 0)) == 0) ||
+		if (((ghp = hdl_create(lml, lmc->lc_head, 0, 0,
+		    GPD_ADDEPS, 0)) == NULL) ||
 		    (hdl_initialize(ghp, lmc->lc_head, 0, 0) == 0))
 			lmc->lc_flags &= ~LMC_FLG_RELOCATING;
 	} else {
-		ghp = 0;
+		ghp = NULL;
 	}
 
 	/*
@@ -885,7 +885,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 		return;
 	}
 
-	ASSERT(ghp != 0);
+	ASSERT(ghp != NULL);
 
 	/*
 	 * As the objects of this handle are being forcibly removed, first
@@ -931,7 +931,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 
 				for (ALIST_TRAVERSE(falp, idx2, pdp)) {
 					if ((Grp_hdl *)pdp->pd_info == ghp) {
-						pdp->pd_info = 0;
+						pdp->pd_info = NULL;
 						break;
 					}
 				}
@@ -947,7 +947,7 @@ remove_lmc(Lm_list *lml, Rt_map *clmp, Lm_cntl *lmc, Aliste lmco,
 	 * objects.
 	 */
 	ghp->gh_refcnt = 1;
-	(void) remove_hdl(ghp, clmp, 0);
+	(void) remove_hdl(ghp, clmp, NULL);
 
 	/*
 	 * If this link-map control list still contains objects, determine the
@@ -1103,7 +1103,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		 * Establish which link-map list we're dealing with for later
 		 * .fini processing.
 		 */
-		if (lml == 0)
+		if (lml == NULL)
 			lml = LIST(lmp);
 
 		/*
@@ -1205,7 +1205,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		 * If this handle is already an orphan, or if it's owner is
 		 * deletable there's no need to inspect its dependencies.
 		 */
-		if ((ghp->gh_ownlmp == 0) ||
+		if ((ghp->gh_ownlmp == NULL) ||
 		    (FLAGS(ghp->gh_ownlmp) & FLG_RT_DELETE))
 			continue;
 
@@ -1307,7 +1307,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		lml->lm_flags |= LML_FLG_OBJDELETED;
 
 		if (((tobj = tsort(lml->lm_head, delcnt,
-		    (RT_SORT_DELETE | RT_SORT_FWD))) != 0) &&
+		    (RT_SORT_DELETE | RT_SORT_FWD))) != NULL) &&
 		    (tobj != (Rt_map **)S_ERROR)) {
 			error = purge_exit_handlers(lml, tobj);
 			call_fini(lml, tobj);
@@ -1450,7 +1450,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			 */
 			if (ghp->gh_ownlmp == lmp) {
 				(void) aplist_delete_value(HANDLES(lmp), ghp);
-				ghp->gh_ownlmp = 0;
+				ghp->gh_ownlmp = NULL;
 			}
 
 			(void) aplist_delete_value(GROUPS(lmp), ghp);
@@ -1487,7 +1487,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 			free(ghp->gh_depends);
 			free(ghp);
 
-		} else if ((removed == 0) && (ghp->gh_refcnt == 0) &&
+		} else if ((ghp->gh_refcnt == 0) &&
 		    ((ghp->gh_flags & GPH_ZERO) == 0)) {
 			/*
 			 * Move this handle to the orphans list.
@@ -1535,7 +1535,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 	do {
 		APlist		*alp;
 		Aliste		idx;
-		Grp_hdl		*ghp, *oghp = 0;
+		Grp_hdl		*ghp, *oghp = NULL;
 		int		title = 0;
 
 		/*
@@ -1554,7 +1554,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 
 			if (oghp) {
 				(void) aplist_delete_value(alp, oghp);
-				oghp = 0;
+				oghp = NULL;
 			}
 
 			if (((_error = remove_hdl(ghp, clmp, &_remove)) != 0) &&
@@ -1568,7 +1568,7 @@ remove_hdl(Grp_hdl *ghp, Rt_map *clmp, int *removed)
 		}
 		if (oghp) {
 			(void) aplist_delete_value(alp, oghp);
-			oghp = 0;
+			oghp = NULL;
 		}
 		if (alp)
 			free((void *)alp);

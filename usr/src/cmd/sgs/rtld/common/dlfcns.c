@@ -184,7 +184,7 @@ Grp_hdl *
 hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
     uint_t ndflags, uint_t cdflags)
 {
-	Grp_hdl	*ghp = 0, *_ghp;
+	Grp_hdl	*ghp = NULL, *_ghp;
 	APlist	**alpp;
 	Aliste	idx;
 
@@ -213,7 +213,7 @@ hdl_create(Lm_list *lml, Rt_map *nlmp, Rt_map *clmp, uint_t hflags,
 		}
 	}
 
-	if (ghp == 0) {
+	if (ghp == NULL) {
 		uint_t	ndx;
 
 		DBG_CALL(Dbg_file_hdl_title(DBG_HDL_CREATE));
@@ -447,7 +447,7 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp, Lm_list *lml)
 	 * is part of an alternative link-map list, determine if the whole list
 	 * can be removed also.
 	 */
-	error = remove_hdl(ghp, clmp, 0);
+	error = remove_hdl(ghp, clmp, NULL);
 
 	if ((lml->lm_flags & (LML_FLG_BASELM | LML_FLG_RTLDLM)) == 0)
 		remove_lml(lml);
@@ -462,8 +462,8 @@ dlclose_core(Grp_hdl *ghp, Rt_map *clmp, Lm_list *lml)
 int
 dlclose_intn(Grp_hdl *ghp, Rt_map *clmp)
 {
-	Rt_map	*nlmp = 0;
-	Lm_list	*olml = 0;
+	Rt_map	*nlmp = NULL;
+	Lm_list	*olml = NULL;
 	int	error;
 
 	/*
@@ -506,7 +506,8 @@ dlclose_check(void *handle, Rt_map *clmp)
 	Grp_hdl	*ghp = (Grp_hdl *)handle;
 
 	if (hdl_validate(ghp) == 0) {
-		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));
+		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL),
+		    EC_NATPTR(handle));
 		return (1);
 	}
 	return (dlclose_intn(ghp, clmp));
@@ -556,7 +557,7 @@ newlmid(Lm_list *lml)
 		    MSG_ORIG(MSG_LMID_FMT), MSG_ORIG(MSG_LMID_ALT),
 		    lml->lm_lmid);
 	}
-	if ((lml->lm_lmidstr = strdup(buffer)) == 0)
+	if ((lml->lm_lmidstr = strdup(buffer)) == NULL)
 		return (0);
 
 	return (1);
@@ -594,7 +595,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * If the path specified is null then we're operating on global
 	 * objects.  Associate a dummy handle with the link-map list.
 	 */
-	if (path == 0) {
+	if (path == NULL) {
 		Grp_hdl *ghp;
 		uint_t	hflags = GPH_ZERO, cdflags = GPD_PARENT;
 		int	promote = 0;
@@ -626,8 +627,8 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 			cdflags |= GPD_RELOC;
 
 		if ((ghp = hdl_create(lml, 0, clmp, hflags,
-		    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS), cdflags)) == 0)
-			return (0);
+		    (GPD_DLSYM | GPD_RELOC | GPD_ADDEPS), cdflags)) == NULL)
+			return (NULL);
 
 		/*
 		 * Traverse the main link-map control list, updating the mode
@@ -664,13 +665,13 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * provides flexibility should we be able to support dlopening more
 	 * than one object in the future.
 	 */
-	if (LM_FIX_NAME(clmp)(path, clmp, &palp, AL_CNT_NEEDED, orig) == 0)
-		return (0);
+	if (LM_FIX_NAME(clmp)(path, clmp, &palp, AL_CNT_NEEDED, orig) == NULL)
+		return (NULL);
 
 	if ((palp->al_arritems > 1) && ((mode & RTLD_FIRST) == 0)) {
 		remove_plist(&palp, 1);
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_5));
-		return (0);
+		return (NULL);
 	}
 
 	/*
@@ -678,9 +679,9 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * associated object.
 	 */
 	if ((lmc = alist_append(&lml->lm_lists, 0, sizeof (Lm_cntl),
-	    AL_CNT_LMLISTS)) == 0) {
+	    AL_CNT_LMLISTS)) == NULL) {
 		remove_plist(&palp, 1);
-		return (0);
+		return (NULL);
 	}
 	olmco = nlmco = (Aliste)((char *)lmc - (char *)lml->lm_lists);
 
@@ -692,9 +693,9 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * couldn't be loaded, cleanup.
 	 */
 	remove_plist(&palp, 1);
-	if (nlmp == 0) {
+	if (nlmp == NULL) {
 		remove_cntl(lml, olmco);
-		return (0);
+		return (NULL);
 	}
 
 	/*
@@ -717,7 +718,7 @@ dlmopen_core(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 */
 	if (((nlmp = analyze_lmc(lml, nlmco, nlmp, in_nfavl)) == NULL) ||
 	    (relocate_lmc(lml, nlmco, clmp, nlmp, in_nfavl) == 0)) {
-		ghp = 0;
+		ghp = NULL;
 		nlmp = NULL;
 	}
 
@@ -775,7 +776,7 @@ Grp_hdl *
 dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
     uint_t flags, uint_t orig)
 {
-	Rt_map	*dlmp = 0;
+	Rt_map	*dlmp = NULL;
 	Grp_hdl	*ghp;
 	int	in_nfavl = 0;
 
@@ -806,7 +807,7 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 			lml->lm_flags |= LML_FLG_NOAUDIT;
 		}
 
-		if (list_append(&dynlm_list, lml) == 0) {
+		if (list_append(&dynlm_list, lml) == NULL) {
 			free(lml);
 			return (NULL);
 		}
@@ -833,7 +834,7 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	 * file system has changed since this "not-found" recording was made,
 	 * retry the dlopen() with a clean "not-found" AVL tree.
 	 */
-	if ((ghp == 0) && in_nfavl) {
+	if ((ghp == NULL) && in_nfavl) {
 		avl_tree_t	*oavlt = nfavl;
 
 		nfavl = NULL;
@@ -868,10 +869,10 @@ dlmopen_intn(Lm_list *lml, const char *path, int mode, Rt_map *clmp,
 	/*
 	 * If this load failed, remove any alternative link-map list.
 	 */
-	if ((ghp == 0) &&
+	if ((ghp == NULL) &&
 	    ((lml->lm_flags & (LML_FLG_BASELM | LML_FLG_RTLDLM)) == 0)) {
 		remove_lml(lml);
-		lml = 0;
+		lml = NULL;
 	}
 
 	/*
@@ -911,7 +912,7 @@ dlmopen_check(Lm_list *lml, const char *path, int mode, Rt_map *clmp)
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_2));
 		return (0);
 	}
-	if ((lml == (Lm_list *)LM_ID_NEWLM) && (path == 0)) {
+	if ((lml == (Lm_list *)LM_ID_NEWLM) && (path == NULL)) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLMODE_3));
 		return (0);
 	}
@@ -983,7 +984,7 @@ dlsym_handle(Grp_hdl *ghp, Slookup *slp, Rt_map **_lmp, uint_t *binfo,
 	Rt_map		*nlmp, * lmp = ghp->gh_ownlmp;
 	Rt_map		*clmp = slp->sl_cmap;
 	const char	*name = slp->sl_name;
-	Sym		*sym = 0;
+	Sym		*sym = NULL;
 	Slookup		sl = *slp;
 
 	sl.sl_flags = (LKUP_FIRST | LKUP_SPEC);
@@ -1200,7 +1201,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		 * lookup_sym(), however here, we must do this up-front, as
 		 * lookup_sym() will be used to inspect the next object.
 		 */
-		if ((sl.sl_rsymndx) && ((sip = SYMINFO(clmp)) != 0)) {
+		if ((sl.sl_rsymndx) && ((sip = SYMINFO(clmp)) != NULL)) {
 			/* LINTED */
 			sip = (Syminfo *)((char *)sip +
 			    (sl.sl_rsymndx * SYMINENT(clmp)));
@@ -1215,7 +1216,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 			 * lookup_sym() of the next object.
 			 */
 			sl.sl_rsymndx = 0;
-			sl.sl_rsym = 0;
+			sl.sl_rsym = NULL;
 		}
 
 		/*
@@ -1231,7 +1232,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 		    (nlmp ? NAME(nlmp) : MSG_INTL(MSG_STR_NULL)),
 		    DBG_DLSYM_NEXT));
 
-		if (nlmp == 0)
+		if (nlmp == NULL)
 			return (0);
 
 		sl.sl_flags = LKUP_NEXT;
@@ -1330,7 +1331,7 @@ dlsym_core(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp,
 void *
 dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 {
-	Rt_map		*llmp = 0;
+	Rt_map		*llmp = NULL;
 	void		*error;
 	Aliste		idx;
 	Grp_desc	*gdp;
@@ -1352,7 +1353,8 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 			llmp = LIST(ghp->gh_ownlmp)->lm_tail;
 		else {
 			for (ALIST_TRAVERSE(ghp->gh_depends, idx, gdp)) {
-				if ((llmp = LIST(gdp->gd_depend)->lm_tail) != 0)
+				if ((llmp =
+				    LIST(gdp->gd_depend)->lm_tail) != NULL)
 					break;
 			}
 		}
@@ -1366,7 +1368,7 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	 * the file system has changed since this "not-found" recording was
 	 * made, retry the dlsym() with a clean "not-found" AVL tree.
 	 */
-	if ((error == 0) && in_nfavl) {
+	if ((error == NULL) && in_nfavl) {
 		avl_tree_t	*oavlt = nfavl;
 
 		nfavl = NULL;
@@ -1382,12 +1384,12 @@ dlsym_intn(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 		nfavl = oavlt;
 	}
 
-	if (error == 0) {
+	if (error == NULL) {
 		/*
 		 * Cache the error message, as Java tends to fall through this
 		 * code many times.
 		 */
-		if (nosym_str == 0)
+		if (nosym_str == NULL)
 			nosym_str = MSG_INTL(MSG_GEN_NOSYM);
 		eprintf(LIST(clmp), ERR_FATAL, nosym_str, name);
 	}
@@ -1405,15 +1407,16 @@ dlsym_check(void *handle, const char *name, Rt_map *clmp, Rt_map **dlmp)
 	/*
 	 * Verify the arguments.
 	 */
-	if (name == 0) {
+	if (name == NULL) {
 		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_ILLSYM));
-		return (0);
+		return (NULL);
 	}
 	if ((handle != RTLD_NEXT) && (handle != RTLD_DEFAULT) &&
 	    (handle != RTLD_SELF) && (handle != RTLD_PROBE) &&
 	    (hdl_validate((Grp_hdl *)handle) == 0)) {
-		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));
-		return (0);
+		eprintf(LIST(clmp), ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL),
+		    EC_NATPTR(handle));
+		return (NULL);
 	}
 	return (dlsym_intn(handle, name, clmp, dlmp));
 }
@@ -1429,7 +1432,7 @@ void *
 dlsym(void *handle, const char *name)
 {
 	int	entry;
-	Rt_map	*clmp, *dlmp = 0;
+	Rt_map	*clmp, *dlmp = NULL;
 	void	*addr;
 
 	entry = enter(0);
@@ -1458,8 +1461,8 @@ dladdr_core(Rt_map *clmp, void *addr, Dl_info *dlip, void **info, int flags)
 	dlip->dli_fname = PATHNAME(clmp);
 
 	dlip->dli_fbase = (void *)ADDR(clmp);
-	dlip->dli_sname = 0;
-	dlip->dli_saddr = 0;
+	dlip->dli_sname = NULL;
+	dlip->dli_saddr = NULL;
 
 	/*
 	 * Determine the nearest symbol to this address.
@@ -1486,7 +1489,7 @@ dladdr(void *addr, Dl_info *dlip)
 	 * with the supplied address.  If a caller can't be determined,
 	 * indicate the failure.
 	 */
-	if ((clmp = _caller(addr, CL_NONE)) == 0) {
+	if ((clmp = _caller(addr, CL_NONE)) == NULL) {
 		eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
 		    EC_NATPTR(addr));
 		error = 0;
@@ -1520,7 +1523,7 @@ dladdr1(void *addr, Dl_info *dlip, void **info, int flags)
 			    flags);
 			return (0);
 		}
-		if (info == 0) {
+		if (info == NULL) {
 			eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_ILLINFO), flags);
 			return (0);
 		}
@@ -1533,7 +1536,7 @@ dladdr1(void *addr, Dl_info *dlip, void **info, int flags)
 	 * with the supplied address.  If a caller can't be determined,
 	 * indicate the failure.
 	 */
-	if ((clmp = _caller(addr, CL_NONE)) == 0) {
+	if ((clmp = _caller(addr, CL_NONE)) == NULL) {
 		eprintf(0, ERR_FATAL, MSG_INTL(MSG_ARG_INVADDR),
 		    EC_NATPTR(addr));
 		error = 0;
@@ -1573,7 +1576,7 @@ dldump_core(Lm_list *lml, const char *ipath, const char *opath, int flags)
 	 * have to be revisited.
 	 */
 	if (ipath) {
-		if ((lmp = is_so_loaded(&lml_main, ipath, NULL)) == 0) {
+		if ((lmp = is_so_loaded(&lml_main, ipath, NULL)) == NULL) {
 			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_GEN_NOFILE),
 			    ipath);
 			return (1);
@@ -1664,7 +1667,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	Lm_list	*lml = LIST(clmp);
 	Rt_map	*lmp;
 
-	if ((request > RTLD_DI_MAX) || (p == 0)) {
+	if ((request > RTLD_DI_MAX) || (p == NULL)) {
 		eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_ILLVAL));
 		return (-1);
 	}
@@ -1675,7 +1678,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	if (request == RTLD_DI_CONFIGADDR) {
 		Dl_info	*dlip = (Dl_info *)p;
 
-		if ((config->c_name == 0) || (config->c_bgn == 0) ||
+		if ((config->c_name == NULL) || (config->c_bgn == 0) ||
 		    (config->c_end == 0)) {
 			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_NOCONFIG));
 			return (-1);
@@ -1743,7 +1746,8 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 		Grp_hdl	*ghp = (Grp_hdl *)handle;
 
 		if (!hdl_validate(ghp)) {
-			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL));
+			eprintf(lml, ERR_FATAL, MSG_INTL(MSG_ARG_INVHNDL),
+			    EC_NATPTR(handle));
 			return (-1);
 		}
 		lmp = ghp->gh_ownlmp;
@@ -1803,10 +1807,10 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 		/*
 		 * Traverse search path entries for this object.
 		 */
-		while ((pdp = get_next_dir(&sd, lmp, 0)) != 0) {
+		while ((pdp = get_next_dir(&sd, lmp, 0)) != NULL) {
 			size_t	_size;
 
-			if (pdp->pd_pname == 0)
+			if (pdp->pd_pname == NULL)
 				continue;
 
 			/*

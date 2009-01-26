@@ -256,7 +256,7 @@ Dbg_file_hdl_action(Grp_hdl *ghp, Rt_map *lmp, int type, uint_t flags)
 			else
 				name = MSG_INTL(MSG_STR_UNKNOWN);
 
-			dbg_print(lml, MSG_INTL(hdl_str), name);
+			dbg_print(lml, MSG_INTL(hdl_str), name, EC_NATPTR(ghp));
 		}
 		hdl_title = 0;
 	}
