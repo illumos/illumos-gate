@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,19 +319,29 @@ cpudrv_pm_get_topspeed(void *ctx)
 	cpudrv_mach_state_t	*mach_state;
 	cpu_acpi_handle_t	handle;
 	cpudrv_devstate_t	*cpudsp;
+	cpudrv_pm_t		*cpupm;
 	dev_info_t		*dip;
 	int			instance;
 	int			plat_level;
+	int			max_level;
 
 	dip = ctx;
 	instance = ddi_get_instance(dip);
 	cpudsp = ddi_get_soft_state(cpudrv_state, instance);
 	ASSERT(cpudsp != NULL);
+	cpupm = &(cpudsp->cpudrv_pm);
 	mach_state = cpudsp->mach_state;
 	handle = mach_state->acpi_handle;
 
 	cpu_acpi_cache_ppc(handle);
 	plat_level = CPU_ACPI_PPC(handle);
+	max_level = cpupm->num_spd - 1;
+	if ((plat_level < 0) || (plat_level > max_level)) {
+		cmn_err(CE_NOTE, "!cpudrv_pm_get_topspeed: instance %d: "
+		    "_PPC out of range %d", instance, plat_level);
+
+		plat_level = max_level;
+	}
 	return (plat_level);
 }
 
