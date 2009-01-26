@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -826,7 +826,7 @@ dr_cpu_check_psrset(uint32_t *cpuids, dr_cpu_res_t *res, int nres)
 		 * cpupart_t counts only online cpus, so it is safe
 		 * to remove an offline cpu without testing ncpus.
 		 */
-		if (cp->cpu_flags & CPU_OFFLINE)
+		if (cpu_is_offline(cp))
 			continue;
 
 		if (--psrset[set_idx].ncpus == 0) {
@@ -1173,6 +1173,15 @@ dr_cpu_unconfigure(processorid_t cpuid, int *status, boolean_t force)
 
 		/* set the force flag correctly */
 		cpu_flags = (force) ? CPU_FORCED : 0;
+
+		/*
+		 * Before we take the CPU offline, we first enable interrupts.
+		 * Otherwise, cpu_offline() might reject the request.  Note:
+		 * if the offline subsequently fails, the target cpu will be
+		 * left with interrupts enabled.  This is consistent with the
+		 * behavior of psradm(1M) and p_online(2).
+		 */
+		cpu_intr_enable(cp);
 
 		if ((rv = cpu_offline(cp, cpu_flags)) != 0) {
 			DR_DBG_CPU("failed to offline CPU %d (%d)\n",
