@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <rctl.h>
@@ -238,13 +236,13 @@ main(int argc, char **argv)
 			    strcmp(optarg, "pid") == 0)
 				arg_entity_type = RCENTITY_PROCESS;
 			else if (strcmp(optarg, "project") == 0 ||
-				strcmp(optarg, "projid") == 0)
+			    strcmp(optarg, "projid") == 0)
 				arg_entity_type = RCENTITY_PROJECT;
 			else if (strcmp(optarg, "task") == 0 ||
-				strcmp(optarg, "taskid") == 0)
+			    strcmp(optarg, "taskid") == 0)
 				arg_entity_type = RCENTITY_TASK;
 			else if (strcmp(optarg, "zone") == 0 ||
-				strcmp(optarg, "zoneid") == 0)
+			    strcmp(optarg, "zoneid") == 0)
 				arg_entity_type = RCENTITY_ZONE;
 			else {
 				warn(gettext("unknown idtype %s"), optarg);
@@ -334,7 +332,7 @@ main(int argc, char **argv)
 	/* if -v is specified without -r, -x, -d, or -e, -s is implied */
 	if (arg_valuestring &&
 	    (!(arg_operation & (ACTION_REPLACE | ACTION_DELETE |
-		ACTION_DISABLE | ACTION_ENABLE)))) {
+	    ACTION_DISABLE | ACTION_ENABLE)))) {
 		arg_operation |= ACTION_SET;
 	}
 	/* operations require -n */
@@ -484,10 +482,8 @@ main(int argc, char **argv)
 			char *sigchr;
 			char *iter;
 
-			if ((strcmp(arg_action_string,
-			    "signal") == 0) ||
-			    (strcmp(arg_action_string,
-				"sig") == 0)) {
+			if ((strcmp(arg_action_string, "signal") == 0) ||
+			    (strcmp(arg_action_string, "sig") == 0)) {
 
 				if (arg_operation & ACTION_ENABLE) {
 					warn(gettext(
@@ -502,7 +498,7 @@ main(int argc, char **argv)
 			} else if ((strncmp(arg_action_string,
 			    "signal=", strlen("signal=")) == 0) ||
 			    (strncmp(arg_action_string,
-				"sig=", strlen("sig=")) == 0)) {
+			    "sig=", strlen("sig=")) == 0)) {
 
 				arg_action = RCTL_LOCAL_SIGNAL;
 				sigchr = strrchr(arg_action_string, '=');
@@ -848,7 +844,7 @@ done_parse:
 						goto out;
 
 					preserve_error(gettext(
-						"Internal Error"));
+					    "Internal Error"));
 					errflg = 1;
 					goto out;
 				}
@@ -858,8 +854,7 @@ done_parse:
 				 *  the replace will fail.
 				 */
 				if (rctlblkB != NULL &&
-				    arg_value !=
-					rctlblk_get_value(rctlblkA)) {
+				    arg_value != rctlblk_get_value(rctlblkA)) {
 
 					preserve_error(gettext("replacement "
 					    "resource control already "
@@ -876,6 +871,10 @@ done_parse:
 					errflg = 1;
 					goto out;
 				}
+				localaction =
+				    rctlblk_get_local_action(rctlblkA, &signal);
+				rctlblk_set_local_action(rctlblkB, localaction,
+				    signal);
 				rctlblk_set_value(rctlblkB, arg_value);
 				rctlblk_set_privilege(rctlblkB,
 				    rctlblk_get_privilege(rctlblkA));
@@ -924,7 +923,7 @@ done_parse:
 					rctlblk_set_value(rctlblkB,
 					    arg_value);
 					rctlblk_set_privilege(
-						rctlblkB, arg_priv);
+					    rctlblkB, arg_priv);
 					if (change_action(rctlblkB)) {
 						errflg = 1;
 						goto out;
@@ -961,9 +960,9 @@ done_parse:
 				rctlblk_set_local_action(rctlblkB, localaction,
 				    signal);
 				rctlblk_set_privilege(rctlblkB,
-					rctlblk_get_privilege(rctlblkA));
+				    rctlblk_get_privilege(rctlblkA));
 				rctlblk_set_value(rctlblkB,
-					rctlblk_get_value(rctlblkA));
+				    rctlblk_get_value(rctlblkA));
 
 				if (change_action(rctlblkB)) {
 					errflg = 1;
@@ -1165,10 +1164,8 @@ store_rctls(const char *rctlname, void *walk_data)
 
 	if (((arg_priv == 0) || (rblk_priv == arg_priv)) &&
 	    ((arg_name == NULL) ||
-		strncmp(rctlname, arg_name,
-		    strlen(arg_name)) == 0) &&
-	    (arg_entity_string == NULL ||
-		rblk_entity >= arg_entity_type)) {
+	    strncmp(rctlname, arg_name, strlen(arg_name)) == 0) &&
+	    (arg_entity_string == NULL || rblk_entity >= arg_entity_type)) {
 
 		/* Once we know we have some controls, store the name */
 		if ((list = store_list_entry(rctlname)) == NULL) {
@@ -1200,10 +1197,9 @@ store_rctls(const char *rctlname, void *walk_data)
 		 */
 		if (((arg_priv == 0) || (rblk_priv == arg_priv)) &&
 		    ((arg_name == NULL) ||
-			strncmp(rctlname, arg_name,
-			    strlen(arg_name)) == 0) &&
+		    strncmp(rctlname, arg_name, strlen(arg_name)) == 0) &&
 		    (arg_entity_string == NULL ||
-			rblk_entity == arg_entity_type)) {
+		    rblk_entity == arg_entity_type)) {
 
 			/* May not have created the list yet. */
 			if (list == NULL) {
@@ -1672,7 +1668,7 @@ change_action(rctlblk_t *blk)
 	/* enable deny if it must be enabled */
 	if (arg_global_flags & RCTL_GLOBAL_DENY_ALWAYS) {
 		rctlblk_set_local_action(blk, RCTL_LOCAL_DENY | action,
-		signal);
+		    signal);
 	}
 	return (0);
 }
@@ -1849,7 +1845,7 @@ bail:
 		 */
 		Pdestroy_agent(Pr);
 		preserve_error(gettext("cannot relinquish privileges "
-			    "for pid %d. The process was killed."),
+		    "for pid %d. The process was killed."),
 		    Pstatus(Pr)->pr_pid);
 	} else {
 		if (Punsetflags(Pr, PR_KLC) != 0)
@@ -2075,7 +2071,7 @@ grab_process_by_id(char *idname, rctl_entity_t type, pr_info_handle_t *p,
 			if (type == RCENTITY_ZONE &&
 			    (p->psinfo).pr_zoneid != zoneid) {
 				continue;
-			} if (type == RCENTITY_PROJECT &&
+			} else if (type == RCENTITY_PROJECT &&
 			    ((p->psinfo).pr_projid != projid ||
 			    (p->psinfo).pr_zoneid != zone_self)) {
 				continue;
