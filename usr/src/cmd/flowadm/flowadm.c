@@ -226,13 +226,13 @@ static print_field_t flow_fields[] = {
     offsetof(flow_fields_buf_t, flow_name),	CMD_TYPE_ANY},
 {  "link",	"LINK",		11,
     offsetof(flow_fields_buf_t, flow_link),	CMD_TYPE_ANY},
-{  "ipaddr",	"IP ADDR",	30,
+{  "ipaddr",	"IPADDR",	30,
     offsetof(flow_fields_buf_t, flow_ipaddr),	CMD_TYPE_ANY},
-{  "transport",	"PROTO",	6,
+{  "proto",	"PROTO",	6,
     offsetof(flow_fields_buf_t, flow_proto),	CMD_TYPE_ANY},
 {  "port",	 "PORT",	7,
     offsetof(flow_fields_buf_t, flow_port),	CMD_TYPE_ANY},
-{  "dsfield",	"DSFLD",	9,
+{  "dsfld",	"DSFLD",	9,
     offsetof(flow_fields_buf_t, flow_dsfield),	CMD_TYPE_ANY}}
 ;
 
@@ -436,7 +436,7 @@ main(int argc, char *argv[])
 			cmdp->c_fn(argc - 1, &argv[1]);
 
 			dladm_close(handle);
-			exit(0);
+			exit(EXIT_SUCCESS);
 		}
 	}
 
@@ -1114,7 +1114,7 @@ do_show_flow(int argc, char *argv[])
 	print_field_t		**fields;
 	uint_t			nfields;
 	char			*all_fields =
-	    "flow,link,ipaddr,transport,port,dsfield";
+	    "flow,link,ipaddr,proto,port,dsfld";
 
 	bzero(&state, sizeof (state));
 
@@ -1173,6 +1173,12 @@ do_show_flow(int argc, char *argv[])
 			break;
 		}
 	}
+	if (state.fs_parseable && !o_arg)
+		die("-p requires -o");
+
+	if (state.fs_parseable && strcasecmp(fields_str, "all") == 0)
+		die("\"-o all\" is invalid with -p");
+
 	if (i_arg && !(s_arg || S_arg))
 		die("the -i option can be used only with -s or -S");
 
@@ -1405,7 +1411,7 @@ done:
 	dladm_free_props(proplist);
 	if (status != DLADM_STATUS_OK) {
 		dladm_close(handle);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -1692,6 +1698,7 @@ static void
 do_show_flowprop(int argc, char **argv)
 {
 	int			option;
+	boolean_t		o_arg = B_FALSE;
 	dladm_arg_list_t	*proplist = NULL;
 	show_flowprop_state_t	state;
 	char			*fields_str = NULL;
@@ -1731,6 +1738,7 @@ do_show_flowprop(int argc, char **argv)
 				die("invalid link '%s'", optarg);
 			break;
 		case 'o':
+			o_arg = B_TRUE;
 			if (strcasecmp(optarg, "all") == 0)
 				fields_str = all_fields;
 			else
@@ -1741,6 +1749,12 @@ do_show_flowprop(int argc, char **argv)
 			break;
 		}
 	}
+
+	if (state.fs_parseable && !o_arg)
+		die("-p requires -o");
+
+	if (state.fs_parseable && strcasecmp(fields_str, "all") == 0)
+		die("\"-o all\" is invalid with -p");
 
 	if (optind == (argc - 1)) {
 		if (strlen(argv[optind]) >= MAXFLOWNAMELEN)
@@ -1969,19 +1983,38 @@ print_field(print_state_t *statep, print_field_t *pfp, const char *value,
     boolean_t parseable)
 {
 	uint_t	width = pfp->pf_width;
-	uint_t	valwidth = strlen(value);
+	uint_t	valwidth;
 	uint_t	compress;
 
+	/*
+	 * Parsable fields are separated by ':'. If such a field contains
+	 * a ':' or '\', this character is prefixed by a '\'.
+	 */
 	if (parseable) {
-		(void) printf("%s=\"%s\"", pfp->pf_header, value);
+		char	c;
+
+		if (statep->ps_nfields == 1) {
+			(void) printf("%s", value);
+			return;
+		}
+		while ((c = *value++) != '\0') {
+			if (c == ':' || c == '\\')
+				(void) putchar('\\');
+			(void) putchar(c);
+		}
+		if (!statep->ps_lastfield)
+			(void) putchar(':');
+		return;
 	} else {
 		if (value[0] == '\0')
 			value = STR_UNDEF_VAL;
 		if (statep->ps_lastfield) {
 			(void) printf("%s", value);
+			statep->ps_overflow = 0;
 			return;
 		}
 
+		valwidth = strlen(value);
 		if (valwidth > width) {
 			statep->ps_overflow += valwidth - width;
 		} else if (valwidth < width && statep->ps_overflow > 0) {

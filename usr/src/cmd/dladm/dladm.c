@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4250,6 +4250,12 @@ do_show_vnic_common(int argc, char *argv[], const char *use,
 			die_opterr(optopt, option, use);
 		}
 	}
+
+	if (state.vs_parseable && !o_arg)
+		die("-p requires -o");
+
+	if (state.vs_parseable && strcasecmp(fields_str, "all") == 0)
+		die("\"-o all\" is invalid with -p");
 
 	if (i_arg && !s_arg)
 		die("the option -i can be used only with -s");

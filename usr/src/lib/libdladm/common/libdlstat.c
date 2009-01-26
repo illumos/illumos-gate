@@ -260,7 +260,13 @@ print_link_stats(dladm_handle_t handle, struct flowlist *flist)
 static int
 link_flowstats(dladm_handle_t handle, datalink_id_t linkid, void *arg)
 {
-	return (dladm_walk_flow(flow_kstats, handle, linkid, arg, B_FALSE));
+	dladm_status_t	status;
+
+	status = dladm_walk_flow(flow_kstats, handle, linkid, arg, B_FALSE);
+	if (status == DLADM_STATUS_OK)
+		return (DLADM_WALK_CONTINUE);
+	else
+		return (DLADM_WALK_TERMINATE);
 }
 
 /*ARGSUSED*/
