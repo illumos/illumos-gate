@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,6 +187,7 @@ static void vgen_print_attr_info(vgen_ldc_t *ldcp, int endpoint);
 static void vgen_print_hparams(vgen_hparams_t *hp);
 static void vgen_print_ldcinfo(vgen_ldc_t *ldcp);
 static void vgen_stop_rcv_thread(vgen_ldc_t *ldcp);
+static void vgen_drain_rcv_thread(vgen_ldc_t *ldcp);
 static void vgen_ldc_rcv_worker(void *arg);
 static void vgen_handle_evt_read(vgen_ldc_t *ldcp);
 static void vgen_rx(vgen_ldc_t *ldcp, mblk_t *bp);
@@ -323,6 +324,7 @@ uint32_t vgen_hwd_interval = 5;		/* handshake watchdog freq in sec */
 uint32_t vgen_max_hretries = VNET_NUM_HANDSHAKES; /* # of handshake retries */
 uint32_t vgen_ldcwr_retries = 10;	/* max # of ldc_write() retries */
 uint32_t vgen_ldcup_retries = 5;	/* max # of ldc_up() retries */
+uint32_t vgen_ldccl_retries = 5;	/* max # of ldc_close() retries */
 uint32_t vgen_recv_delay = 1;		/* delay when rx descr not ready */
 uint32_t vgen_recv_retries = 10;	/* retry when rx descr not ready */
 uint32_t vgen_tx_retries = 0x4;		/* retry when tx descr not available */
@@ -3178,6 +3180,7 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 {
 	vgen_t *vgenp = LDC_TO_VGEN(ldcp);
 	int	rv;
+	uint_t	retries = 0;
 
 	DBG1(vgenp, ldcp, "enter\n");
 	LDC_LOCK(ldcp);
@@ -3226,6 +3229,17 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 
 	drv_usecwait(1000);
 
+	if (ldcp->rcv_thread != NULL) {
+		/*
+		 * Note that callbacks have been disabled already(above). The
+		 * drain function takes care of the condition when an already
+		 * executing callback signals the worker to start processing or
+		 * the worker has already been signalled and is in the middle of
+		 * processing.
+		 */
+		vgen_drain_rcv_thread(ldcp);
+	}
+
 	/* acquire locks again; any pending transmits and callbacks are done */
 	LDC_LOCK(ldcp);
 
@@ -3233,10 +3247,19 @@ vgen_ldc_uninit(vgen_ldc_t *ldcp)
 
 	vgen_uninit_tbufs(ldcp);
 
-	rv = ldc_close(ldcp->ldc_handle);
-	if (rv != 0) {
-		DWARN(vgenp, ldcp, "ldc_close err\n");
+	/* close the channel - retry on EAGAIN */
+	while ((rv = ldc_close(ldcp->ldc_handle)) == EAGAIN) {
+		if (++retries > vgen_ldccl_retries) {
+			break;
+		}
+		drv_usecwait(VGEN_LDC_CLOSE_DELAY);
 	}
+	if (rv != 0) {
+		cmn_err(CE_NOTE,
+		    "!vnet%d: Error(%d) closing the channel(0x%lx)\n",
+		    vgenp->instance, rv, ldcp->ldc_id);
+	}
+
 	ldcp->ldc_status = LDC_INIT;
 	ldcp->flags &= ~(CHANNEL_STARTED);
 
@@ -6635,10 +6658,12 @@ vgen_ldc_rcv_worker(void *arg)
 			break;
 		}
 		ldcp->rcv_thr_flags &= ~VGEN_WTHR_DATARCVD;
+		ldcp->rcv_thr_flags |= VGEN_WTHR_PROCESSING;
 		mutex_exit(&ldcp->rcv_thr_lock);
 		DBG2(vgenp, ldcp, "calling vgen_handle_evt_read\n");
 		vgen_handle_evt_read(ldcp);
 		mutex_enter(&ldcp->rcv_thr_lock);
+		ldcp->rcv_thr_flags &= ~VGEN_WTHR_PROCESSING;
 	}
 
 	/*
@@ -6675,6 +6700,54 @@ vgen_stop_rcv_thread(vgen_ldc_t *ldcp)
 	mutex_exit(&ldcp->rcv_thr_lock);
 	ldcp->rcv_thread = NULL;
 	DBG1(vgenp, ldcp, "exit\n");
+}
+
+/*
+ * Wait for the channel rx-queue to be drained by allowing the receive
+ * worker thread to read all messages from the rx-queue of the channel.
+ * Assumption: further callbacks are disabled at this time.
+ */
+static void
+vgen_drain_rcv_thread(vgen_ldc_t *ldcp)
+{
+	clock_t	tm;
+	clock_t	wt;
+	clock_t	rv;
+
+	/*
+	 * If there is data in ldc rx queue, wait until the rx
+	 * worker thread runs and drains all msgs in the queue.
+	 */
+	wt = drv_usectohz(MILLISEC);
+
+	mutex_enter(&ldcp->rcv_thr_lock);
+
+	tm = ddi_get_lbolt() + wt;
+
+	/*
+	 * We need to check both bits - DATARCVD and PROCESSING, to be cleared.
+	 * If DATARCVD is set, that means the callback has signalled the worker
+	 * thread, but the worker hasn't started processing yet. If PROCESSING
+	 * is set, that means the thread is awake and processing. Note that the
+	 * DATARCVD state can only be seen once, as the assumption is that
+	 * further callbacks have been disabled at this point.
+	 */
+	while (ldcp->rcv_thr_flags &
+	    (VGEN_WTHR_DATARCVD | VGEN_WTHR_PROCESSING)) {
+		rv = cv_timedwait(&ldcp->rcv_thr_cv, &ldcp->rcv_thr_lock, tm);
+		if (rv == -1) {	/* timeout */
+			/*
+			 * Note that the only way we return is due to a timeout;
+			 * we set the new time to wait, before we go back and
+			 * check the condition. The other(unlikely) possibility
+			 * is a premature wakeup(see cv_timedwait(9F)) in which
+			 * case we just continue to use the same time to wait.
+			 */
+			tm = ddi_get_lbolt() + wt;
+		}
+	}
+
+	mutex_exit(&ldcp->rcv_thr_lock);
 }
 
 /*
