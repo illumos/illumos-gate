@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -91,6 +91,7 @@ REPORTDIR=`dirname $REPORT`
 
 #  MMS Service Configuration
 PGADMIN=`/bin/svcprop -c -p method_context/user mms:db`
+PGBIN=`/bin/svcprop -c -p postgresql/bin mms:db`
 PGDATA=`/bin/svcprop -c -p postgresql/data mms:db`
 PGHOST=`/bin/svcprop -c -p db/host mms:mm`
 PGPORT=`/bin/svcprop -c -p db/port mms:mm`
@@ -400,7 +401,7 @@ done
 
 echo "\nPatches installed for MMS:\n" >>$REPORT
 
-verbose "/bin/showrev -p 2>/dev/null | /bin/egrep 'SUNWhsmr|SUNWhsmu|SUNWmmsr|SUNWmmsu|SUNWpostgr|SUNWopenssl' | /bin/sed -e 's/Obso.*//' | /bin/sed -e 's/Patch: //' > $TMPPAT"
+verbose "/bin/showrev -p 2>/dev/null | /bin/egrep 'SUNWhsmr|SUNWhsmu|SUNWmmsr|SUNWmmsu|SUNWpostgr-83-client|SUNWpostgr-83-server|SUNWopenssl' | /bin/sed -e 's/Obso.*//' | /bin/sed -e 's/Patch: //' > $TMPPAT"
 
 showifiles $TMPPAT
 for i in `/bin/cat $TMPPAT`; do
@@ -414,9 +415,8 @@ done
 # SUNWhsmu	- Sun ADM HSM software Solaris 11 (usr)
 # SUNWmmsr     - MMS Solaris (root)
 # SUNWmmsu     - MMS Solaris (usr)
-# SUNWpostgr	- Postgres psql (client programs)
-# SUNWpostgr-libs - Postgres libpq (client)
-# SUNWpostgr-server - Postgres postmaster (server)
+# SUNWpostgr-83-client - PostgreSQL client tools
+# SUNWpostgr-83-server - PostgreSQL database server
 # SUNWopenssl-commands - OpenSSL commands (usr)
 # SUNWopenssl-libraries - OpenSSL libraries (usr)
 # SUNWopensslr	- OpenSSL (root)
@@ -433,7 +433,7 @@ done
 #
 echo "------------------- package info --------------------" >>$REPORT
 
-for PACKAGE in SUNWhsmr SUNWhsmu SUNWmmsr SUNWmmsu SUNWpostgr SUNWpostgr-libs SUNWpostgr-server SUNWopenssl-commands SUNWopenssl-libraries SUNWopensslr STKacsls SUNWfcp SUNWfcpx SUNWfctl SUNWfctlx SUNWqlc SUNWqlcx SUNWsmgr JNIC QLA2200-3
+for PACKAGE in SUNWhsmr SUNWhsmu SUNWmmsr SUNWmmsu SUNWpostgr-83-client SUNWpostgr-83-server SUNWopenssl-commands SUNWopenssl-libraries SUNWopensslr STKacsls SUNWfcp SUNWfcpx SUNWfctl SUNWfctlx SUNWqlc SUNWqlcx SUNWsmgr JNIC QLA2200-3
 do
 	twiddle
 	echo "" >>$REPORT 2>&1
@@ -534,15 +534,15 @@ showenuf $CURRENT $BEFORE $AFTER
 
 # database snapshot
 object="APPLICATION AI CONNECTION SESSION NOTIFY NOTIFYRULES "\
-"EVENTRULES LIBRARY LM BAY SLOTTYPE CARTRIDGEGROUP CARTRIDGETYPE "\
-"CARTRIDGE CARTRIDGEGROUPAPPLICATION SIDE PARTITION VOLUME DRIVEGROUP "\
-"DRIVEGROUPAPPLICATION DRIVE DM DMCAPABILITY DMCAPABILITYTOKEN "\
-"DMCAPABILITYDEFAULTTOKEN DMCAPABILITYGROUP DMCAPABILITYGROUPTOKEN "\
-"DMBITFORMAT DMBITFORMATTOKEN SLOTGROUP SLOT SLOTCONFIG MOUNTLOGICAL "\
-"MOUNTPHYSICAL DRIVECARTRIDGEACCESS TASK TASKCARTRIDGE TASKDRIVE "\
-"TASKLIBRARY MESSAGE REQUEST SYSTEM STALEHANDLE DMSHAPEPRIORITY "\
-"DMDENSITYPRIORITY DMMOUNTPOINT LIBRARYLIST DRIVELIST CARTRIDGELIST "\
-"DRIVECARTRIDGEERROR"
+"EVENTRULES LIBRARYACCESS LIBRARY LM BAY SLOTTYPE CARTRIDGEGROUP "\
+"CARTRIDGETYPE CARTRIDGE CARTRIDGEGROUPAPPLICATION SIDE PARTITION VOLUME "\
+"DRIVEGROUP DRIVEGROUPAPPLICATION DRIVE DRIVECARTRIDGEERROR DM DMCAPABILITY "\
+"DMCAPABILITYTOKEN DMCAPABILITYDEFAULTTOKEN DMCAPABILITYGROUP "\
+"DMCAPABILITYGROUPTOKEN DMBITFORMAT DMBITFORMATTOKEN SLOTGROUP SLOT "\
+"SLOTCONFIG MOUNTLOGICAL MOUNTPHYSICAL DRIVECARTRIDGEACCESS "\
+"TASK TASKCARTRIDGE TASKDRIVE TASKLIBRARY MESSAGE REQUEST SYSTEM "\
+"STALEHANDLE DMSHAPEPRIORITY DMDENSITYPRIORITY "\
+"LIBRARYLIST DRIVELIST CARTRIDGELIST "
 
 cmd="select * from \\\"MM\\\";"
 cmd="$cmd select \\\"ApplicationName\\\",length(\\\"Password\\\") from \\\"MMPASSWORD\\\";"
@@ -551,7 +551,7 @@ for table in $object; do
 	cmd="$cmd select * from \\\"$table\\\";"
 done
 
-/bin/su - $PGADMIN -c "PGPASSFILE=${PGPASS} ; export PGPASSFILE ; /bin/echo \"$cmd\" | /usr/bin/psql -h $PGHOST -p $PGPORT -d $DBNAME -U $PGUSER -e" 2>&1 | /bin/gzip -f > $OUTDATABASE
+/bin/su - $PGADMIN -c "PGPASSFILE=${PGPASS} ; export PGPASSFILE ; /bin/echo \"$cmd\" | $PGBIN/psql -h $PGHOST -p $PGPORT -d $DBNAME -U $PGUSER -e" 2>&1 | /bin/gzip -f > $OUTDATABASE
 
 echo "------------------- media manager service -----------" >>$REPORT
 echo ""		>>$REPORT 2>&1

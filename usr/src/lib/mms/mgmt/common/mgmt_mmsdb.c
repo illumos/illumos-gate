@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 
 static char *_SrcFile = __FILE__;
 #define	HERE _SrcFile, __LINE__
+#define	MMS_MGMT_PGA	".pga"
 
 typedef struct {
 	char	port[10];
@@ -55,7 +56,6 @@ typedef struct {
 } mmsdb_opts_t;
 
 /* If this path changes, make sure similar changes are made to mmsexplorer */
-static char *db_cli = "/var/mms/db/.pga";
 static char db_cli_env[1024];
 
 static int get_db_user(char *buf, int buflen, uid_t *uid, gid_t *gid);
@@ -141,7 +141,7 @@ create_db_dirs(char *dbpath, uid_t uid, gid_t gid, nvlist_t *errs)
 {
 	int		st;
 	struct stat64	statbuf;
-	char		*dbsubdirs[] = {"data", "dump", "log", NULL};
+	char		*dbsubdirs[] = {"dump", "log", NULL};
 	int		i;
 	char		buf[2048];
 
@@ -164,7 +164,7 @@ create_db_dirs(char *dbpath, uid_t uid, gid_t gid, nvlist_t *errs)
 	}
 
 	for (i = 0; dbsubdirs[i] != NULL; i++) {
-		(void) snprintf(buf, sizeof (buf), "%s/%s", dbpath,
+		(void) snprintf(buf, sizeof (buf), "%s/../%s", dbpath,
 		    dbsubdirs[i]);
 		st = create_dir(buf, 0711, NULL, uid, NULL, gid);
 		if (st != 0) {
@@ -197,19 +197,17 @@ mgmt_db_init(void)
 	}
 
 	/* see if we've been initialized already, bail if so */
-	(void) snprintf(buf, sizeof (buf), "%s/data/postgresql.conf",
-	    opts.path);
+	(void) snprintf(buf, sizeof (buf), "%s/postgresql.conf", opts.path);
 	st = access(buf, F_OK);
 	if (st == 0) {
 		return (0);
 	}
 
 	(void) snprintf(dbbuf, sizeof (dbbuf), "%s/initdb", opts.bindir);
-	(void) snprintf(buf, sizeof (buf), "%s/data", opts.path);
 
 	cmd[0] = dbbuf;
 	cmd[1] = "-D";
-	cmd[2] = buf;
+	cmd[2] = opts.path;
 	cmd[3] = NULL;
 
 	pid = exec_mgmt_cmd(NULL, NULL, opts.dbuid, opts.dbgid,
@@ -227,7 +225,6 @@ mgmt_get_db_opts(mmsdb_opts_t *opts)
 	struct passwd	pwd;
 	struct passwd	*pwdp;
 	char		buf[2048];
-	char		*bufp;
 
 	if (opts == NULL) {
 		return (MMS_MGMT_NOARG);
@@ -235,14 +232,6 @@ mgmt_get_db_opts(mmsdb_opts_t *opts)
 
 	st = mms_cfg_getvar(MMS_CFG_DB_DATA, opts->path);
 	if (st == 0) {
-		/*
-		 * The *data* dir is stored in SMF.  We need the
-		 * parent thereof.
-		 */
-		bufp = strrchr(opts->path, '/');
-		if (bufp) {
-			*bufp = '\0';
-		}
 		st = mms_cfg_getvar(MMS_CFG_MM_DB_USER, opts->user);
 	}
 	if (st == 0) {
@@ -257,16 +246,10 @@ mgmt_get_db_opts(mmsdb_opts_t *opts)
 	if (st == 0) {
 		st = mms_cfg_getvar(MMS_CFG_DB_BIN, opts->bindir);
 	}
-#ifdef	MMS_VAR_CFG
-	if (st == 0) {
-		st = mms_cfg_getvar(MMS_CFG_DB_LOG, opts->logdir);
-	}
-#else
 	if (st == 0) {
 		(void) snprintf(opts->logdir, sizeof (opts->logdir),
-		    "%s/log", opts->path);
+		    "%s/../log", opts->path);
 	}
-#endif	/* MMS_VAR_CFG */
 
 	if (st != 0) {
 		return (st);
@@ -281,8 +264,8 @@ mgmt_get_db_opts(mmsdb_opts_t *opts)
 	opts->dbgid = pwdp->pw_gid;
 
 	/* set the envvar for PGPASSFILE */
-	(void) snprintf(db_cli_env, sizeof (db_cli_env), "PGPASSFILE=%s",
-	    db_cli);
+	(void) snprintf(db_cli_env, sizeof (db_cli_env),
+	    "PGPASSFILE=%s/../%s", opts->path, MMS_MGMT_PGA);
 	st = putenv(db_cli_env);
 
 	return (st);
@@ -359,17 +342,9 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist)
 		}
 
 		/* check to see if files exist, even if svc is stopped */
-		(void) snprintf(buf, sizeof (buf), "%s/data/%s", opts.path,
-		    "base");
+		(void) snprintf(buf, sizeof (buf), "%s/base", opts.path);
 		if (access(buf, F_OK) == 0) {
 			return (EALREADY);
-		} else {
-			/* create the dirs we need */
-			st = create_db_dirs(opts.path, opts.dbuid, opts.dbgid,
-			    NULL);
-			if (st != 0) {
-				return (st);
-			}
 		}
 
 		st = mgmt_db_init();
@@ -377,6 +352,12 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist)
 			st = configure_pgconf(opts.port, opts.logdir);
 		}
 
+		if (st != 0) {
+			return (st);
+		}
+
+		/* create the dirs we need */
+		st = create_db_dirs(opts.path, opts.dbuid, opts.dbgid, NULL);
 		if (st != 0) {
 			return (st);
 		}
@@ -392,7 +373,7 @@ mgmt_db_create(int initialize, int populate, nvlist_t *optlist)
 			return (st);
 		}
 
-		(void) snprintf(buf, sizeof (buf), "%s/%s", opts.path, "mmsdb");
+		(void) snprintf(buf, sizeof (buf), "%s/../mmsdb", opts.path);
 		st = get_dbver_from_optfile(buf, &oldver);
 		if (st != 0) {
 			if (st != ENOENT) {
@@ -526,7 +507,7 @@ mgmt_db_check(void)
 		return (st);
 	}
 
-	(void) snprintf(dbbuf, sizeof (dbbuf), "%s/psql", dbbuf);
+	(void) snprintf(dbbuf, sizeof (dbbuf), "%s/psql", opts.bindir);
 
 	cmd[0] = dbbuf;
 	cmd[1] = "-h";
@@ -688,9 +669,9 @@ typedef struct {
 static pgconf_t pgconf_opts[] = {
 	{"port", NULL},
 	{"log_directory", NULL},
-	{"external_pid_file", "'(none)'"},
-	{"log_destination", "stderr"},
-	{"redirect_stderr", "on"},
+	{"external_pid_file", "'postgres.pid'"},
+	{"log_destination", "'stderr'"},
+	{"logging_collector", "on"},
 	{"log_filename", "'log.%a'"},
 	{"log_rotation_size", "10000"},
 	{"log_truncate_on_rotation", "on"},
@@ -698,10 +679,9 @@ static pgconf_t pgconf_opts[] = {
 	{"client_min_messages", "WARNING"},
 	{"log_min_messages", "INFO"},
 	{"log_disconnections", "on"},
+	{"track_counts", "on"},
 	{"autovacuum", "on"},
-	{"autovacuum_naptime", "1200"},
-	{"stats_start_collector", "on"},
-	{"stats_row_level", "on"}
+	{"autovacuum_naptime", "1200"}
 };
 
 static int numpgopts = sizeof (pgconf_opts) / sizeof (pgconf_t);
@@ -991,8 +971,8 @@ mk_cmds_from_optfile(mmsdb_opts_t *opts, char *path, int vers, char cmdtype,
 	}
 
 	/* create our cmdfile */
-	(void) snprintf(buf, sizeof (buf), "/var/mms/db/mmsdbcmd-%c-%d",
-	    cmdtype, time(NULL));
+	(void) snprintf(buf, sizeof (buf), "%s/../mmsdbcmd-%c-%d",
+	    opts->path, cmdtype, time(NULL));
 
 	fd = open(buf, O_CREAT|O_TRUNC|O_APPEND|O_WRONLY|O_NOFOLLOW|O_NOLINKS,
 	    0600);
@@ -1049,7 +1029,8 @@ mk_cmds_from_optfile(mmsdb_opts_t *opts, char *path, int vers, char cmdtype,
 		pass = mms_net_cfg_read_pass_file(MMS_NET_CFG_HELLO_FILE);
 		if (pass != NULL) {
 			(void) fprintf(ofp,
-			    "UPDATE \"MMPASSWORD\" SET \"Password\" = '%s';\n",
+			    "UPDATE \"MMPASSWORD\" SET \"Password\" = '%s' "
+			    "WHERE \"ApplicationName\" = 'MMS';\n",
 			    pass);
 			free(pass);
 		}
@@ -1236,7 +1217,7 @@ mgmt_set_db_pass(char *dbpass, nvlist_t *errs)
 	boolean_t	ismd5 = B_FALSE;
 	int		fd = -1;
 	int		wr = 0;
-	char		*tfile = "/var/mms/db/tsql";
+	char		file[MAXPATHLEN];
 
 	/* no provided password means use 'trust' */
 	if (dbpass) {
@@ -1249,10 +1230,11 @@ mgmt_set_db_pass(char *dbpass, nvlist_t *errs)
 	}
 
 	/* tell Postgres to use the new password */
-	fd = open64(tfile, O_CREAT|O_TRUNC|O_WRONLY, 0600);
+	(void) snprintf(file, sizeof (file), "%s/../tsql", opts.path);
+	fd = open64(file, O_CREAT|O_TRUNC|O_WRONLY, 0600);
 	if (fd == -1) {
 		st = errno;
-		MGMT_ADD_ERR(errs, tfile, st);
+		MGMT_ADD_ERR(errs, file, st);
 		return (st);
 	}
 
@@ -1265,19 +1247,19 @@ mgmt_set_db_pass(char *dbpass, nvlist_t *errs)
 	(void) close(fd);
 
 	if (wr == -1) {
-		MGMT_ADD_ERR(errs, tfile, EIO);
-		(void) unlink(tfile);
+		MGMT_ADD_ERR(errs, file, EIO);
+		(void) unlink(file);
 		return (EIO);
 	}
 
-	st = mgmt_db_sql_exec(tfile, &opts);
+	st = mgmt_db_sql_exec(file, &opts);
 	if (st != 0) {
 		MGMT_ADD_ERR(errs, "postgres failure", st);
-		(void) unlink(tfile);
+		(void) unlink(file);
 		return (st);
 	}
 
-	(void) unlink(tfile);
+	(void) unlink(file);
 
 	/* next, set up the conf file */
 	st = update_pghba(ismd5, &opts, errs);
@@ -1286,10 +1268,12 @@ mgmt_set_db_pass(char *dbpass, nvlist_t *errs)
 	}
 
 	/* write the PGPASSFILE */
-	fd = open64(db_cli, O_CREAT|O_TRUNC|O_WRONLY, 0600);
+	(void) snprintf(file, sizeof (file), "%s/../%s",
+	    opts.path, MMS_MGMT_PGA);
+	fd = open64(file, O_CREAT|O_TRUNC|O_WRONLY, 0600);
 	if (fd == -1) {
 		st = errno;
-		MGMT_ADD_ERR(errs, db_cli, st);
+		MGMT_ADD_ERR(errs, file, st);
 		return (st);
 	}
 	(void) fchown(fd, opts.dbuid, opts.dbgid);
@@ -1299,8 +1283,8 @@ mgmt_set_db_pass(char *dbpass, nvlist_t *errs)
 	(void) close(fd);
 
 	if (wr == -1) {
-		MGMT_ADD_ERR(errs, db_cli, EIO);
-		(void) unlink(db_cli);
+		MGMT_ADD_ERR(errs, file, EIO);
+		(void) unlink(file);
 		return (EIO);
 	}
 
@@ -1338,8 +1322,8 @@ update_pghba(boolean_t ismd5, mmsdb_opts_t *dbopts, nvlist_t *errs)
 		return (MMS_MGMT_NOARG);
 	}
 
-	(void) snprintf(confpath, sizeof (confpath), "%s/data/%s", dbopts->path,
-	    "pg_hba.conf");
+	(void) snprintf(confpath, sizeof (confpath), "%s/pg_hba.conf",
+	    dbopts->path);
 
 	st = stat64(confpath, &statbuf);
 	if (st != 0) {

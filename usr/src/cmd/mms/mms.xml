@@ -19,7 +19,7 @@
     information: Portions Copyright [yyyy] [name of copyright owner]
 
     CDDL HEADER END
-    Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+    Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
     Use is subject to license terms.
 
 -->
@@ -197,11 +197,11 @@
 		    <propval
 			name='bin'
 			type='astring'
-			value='/usr/bin' />
+			value='/usr/postgres/8.3/bin' />
 		    <propval
 			name='data'
 			type='astring'
-			value='/var/mms/db/data' />
+			value='/var/mms/db/data83' />
 		    <propval
 			name='value_authorization'
 			type='astring'

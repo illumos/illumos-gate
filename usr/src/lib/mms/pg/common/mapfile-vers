@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -35,6 +35,7 @@ SUNWprivate_1.1 {
 		pg_detoast_datum = extern;
 		MemoryContextAlloc = extern;
 		CurrentMemoryContext = extern;
+		Pg_magic_func = extern;
 	local:
 		*;
 };

@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -173,7 +173,8 @@ $SkipUnusedSearchPath = qr{
 	/usr/sfw/lib.*\ from\ .*libcrypto\.so\.0\.9\.8 |	# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.5 |		# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1 |		# non-OSNet
-	/usr.*\ from\ .*tst\.gcc\.exe				# gcc built
+	/usr.*\ from\ .*tst\.gcc\.exe |				# gcc built
+	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5		# non-OSNET
 }x;
 
 # Skip "unreferenced object=" ldd(1) diagnostics.
@@ -195,7 +196,7 @@ $SkipUnrefObject = qr{
 	/lib.*\ of\ .*libssl3\.so |				# non-OSNET
 	/lib.*\ of\ .*libxml2\.so\.2 |				# non-OSNET
 	/lib.*\ of\ .*libxslt\.so\.1 |				# non-OSNET
-	/lib.*\ of\ .*libpq\.so\.4				# non-OSNET
+	/lib.*\ of\ .*libpq\.so\.4 				# non-OSNET
 }x;
 
 # Define any files that should only have unused (ldd -u) processing.

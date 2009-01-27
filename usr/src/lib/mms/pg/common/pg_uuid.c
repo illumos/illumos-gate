@@ -18,16 +18,13 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #include <postgres.h>
 #include <fmgr.h>
-#ifdef PG_MODULE_MAGIC
-PG_MODULE_MAGIC;
-#endif
 #include <string.h>
 #include <sys/types.h>
 #include <sys/uuid.h>
@@ -50,19 +47,17 @@ PG_FUNCTION_INFO_V1(pg_get_uuid);
 Datum
 pg_get_uuid(PG_FUNCTION_ARGS)
 {
-	text *pg_uuid;
-	int len;
-	uuid_t uuid;
-	char buf[UUID_POSTGRES_LEN+1];
+	void		*pg_uuid;
+	int32		len;
+	uuid_t		uuid;
+	char		buf[UUID_POSTGRES_LEN+1];
 
 	len = VARHDRSZ + UUID_POSTGRES_LEN;
-	pg_uuid = (text*)palloc(len);
-	if (pg_uuid == NULL) {
+	if ((pg_uuid = (void *) palloc(len)) == NULL) {
 		/* LINTED: end-of-loop code not reached */
 		PG_RETURN_NULL();
 	}
-	(void) memset(pg_uuid, 0, len);
-	VARATT_SIZEP(pg_uuid) = len;
+	SET_VARSIZE(pg_uuid, len);
 
 	/* cefa7a9c-1dd2-11b2-8350-880020adbeef */
 	uuid_clear(uuid);

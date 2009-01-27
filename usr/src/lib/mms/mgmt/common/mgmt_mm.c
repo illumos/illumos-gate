@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -314,7 +314,6 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 	char			*pass = NULL;
 	char			*hosttype = NULL;
 	char			cfgvar[2048];
-	char			*bufp;
 	char			buf[2048];
 	int			i;
 	nvlist_t		*init_errs = NULL;
@@ -440,7 +439,7 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 		if (st == ENOENT) {
 			st = nvlist_lookup_string(opts, O_DBDIR, &val);
 			if (st == 0) {
-				(void) snprintf(buf, sizeof (buf), "%s/%s",
+				(void) snprintf(buf, sizeof (buf), "%s/../%s",
 				    val, "log");
 				st = nvlist_add_string(opts, O_DBLOG, buf);
 			}
@@ -480,20 +479,10 @@ mms_mgmt_init_host(nvlist_t *opts, nvlist_t **errs)
 			MGMT_ADD_OPTERR(init_errs, O_DBDIR, st);
 			goto done;
 		} else {
-			/*
-			 * currently storing up to data in SMF.
-			 * Change to parent dir for creating subdirs.
-			 */
-			bufp = strrchr(cfgvar, '/');
-			if (bufp != NULL) {
-				if (strcmp(bufp, "/data") == 0) {
-					*bufp = '\0';
-				}
-			}
 			(void) nvlist_add_string(opts, O_DBDIR, cfgvar);
 
 			/* fixed path for log dir */
-			(void) strlcat(cfgvar, "/log", sizeof (cfgvar));
+			(void) strlcat(cfgvar, "/../log", sizeof (cfgvar));
 			(void) nvlist_add_string(opts, O_DBLOG, cfgvar);
 		}
 		st = mms_cfg_getvar(MMS_CFG_MM_DB_PORT, cfgvar);

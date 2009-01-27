@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -81,7 +81,7 @@ case "$1" in
 	status=`$PGBIN/pg_ctl -D $PGDATA status | /bin/grep PID`
         $PGBIN/pg_ctl -D $PGDATA stop -m fast
 	if [ -z "$status" ]; then
-		pattern="$PGBIN/postmaster -D $PGDATA"
+		pattern="$PGBIN/postgres -D $PGDATA"
 		/bin/pgrep -u $PGUSER -f "$pattern" > /dev/null 2>&1
 		if [ $? -eq 0 ]; then
 			echo "Sending immediate shutdown signal."

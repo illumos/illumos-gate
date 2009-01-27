@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -42,15 +42,12 @@ ROOTCMDDIR=	$(ROOT)/lib/svc/method
 CPPFLAGS += -DMMS_OPENSSL
 CPPFLAGS += -I. -I../common -I$(SRC)/common/mms/mms
 CPPFLAGS += -I$(SRC)/lib/mms/mms/common -I$(SRC)/lib/mms/mms/common
-CPPFLAGS += -I/usr/include/libxml2 -I/usr/include/pgsql
+CPPFLAGS += -I/usr/include/libxml2 -I/usr/postgres/8.3/include
 
 CFLAGS +=  $(CTF_FLAGS) $(CC_VERBOSE)
-LDLIBS += -lc -lsocket -lnsl -luuid $(ZIGNORE) -lpq
-LDLIBS += -lxml2 -lscf
+LDLIBS += -lc -lsocket -lnsl -luuid $(ZIGNORE)
+LDLIBS += -lxml2 -lscf -L/usr/postgres/8.3/lib -lpq -R/usr/postgres/8.3/lib
 LDLIBS += -L$(SRC)/lib/mms/mms/$(MACH) -lmms -R/usr/lib
-
-LDFLAGS += $(ZIGNORE)
-DYNFLAGS += $(ZIGNORE)
 
 C99MODE=	$(C99_ENABLE)
 

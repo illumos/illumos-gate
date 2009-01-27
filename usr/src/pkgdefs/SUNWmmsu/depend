@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"@(#)depend	1.1	08/06/25 SMI"
@@ -51,5 +51,6 @@ P SUNWcsu		Core Solaris, (Usr)
 P SUNWcsd		Core Solaris Devices
 P SUNWcsl		Core Solaris Libraries
 P SUNWlxml		The XML library
-P SUNWpostgr-libs	The shared libraries required for any PostgreSQL clients
+P SUNWpostgr-83-server	PostgreSQL database server
+P SUNWpostgr-83-client	PostgreSQL client tools
 P SUNWopensslr		OpenSSL (Root)
