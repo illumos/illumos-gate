@@ -6734,7 +6734,7 @@ discard:
  */
 #define	IPSEC_HDR_DONT_PROCESS	0
 #define	IPSEC_HDR_PROCESS	1
-#define	IPSEC_MEMORY_ERROR	2
+#define	IPSEC_MEMORY_ERROR	2 /* or malformed packet */
 static int
 ipsec_needs_processing_v6(mblk_t *mp, uint8_t *nexthdr)
 {
@@ -6819,8 +6819,10 @@ ipsec_needs_processing_v6(mblk_t *mp, uint8_t *nexthdr)
 		length += ehdrlen;
 		whereptr += ehdrlen;
 	}
-	panic("ipsec_needs_processing_v6");
-	/*NOTREACHED*/
+	/*
+	 * Malformed/truncated packet.
+	 */
+	return (IPSEC_MEMORY_ERROR);
 }
 
 /*
@@ -7860,10 +7862,13 @@ tcp_fanout:
 			uint8_t *optptr;
 			ip6_dest_t *desthdr;
 
+			/* If packet is too short, look no further */
+			if (remlen < MIN_EHDR_LEN)
+				goto pkt_too_short;
+
 			/* Check if AH is present. */
 			if (ipsec_early_ah_v6(q, first_mp, mctl_present, ill,
 			    inill, hada_mp, zoneid)) {
-				ip0dbg(("dst early hada drop\n"));
 				return;
 			}
 
@@ -7875,9 +7880,6 @@ tcp_fanout:
 			whereptr = (uint8_t *)((uintptr_t)mp->b_rptr +
 			    (uintptr_t)(whereptr - ((uint8_t *)ip6h)));
 			ip6h = (ip6_t *)mp->b_rptr;
-
-			if (remlen < MIN_EHDR_LEN)
-				goto pkt_too_short;
 
 			desthdr = (ip6_dest_t *)whereptr;
 			nexthdr = desthdr->ip6d_nxt;
@@ -8027,10 +8029,13 @@ tcp_fanout:
 			uint_t ehdrlen;
 			ip6_rthdr_t *rthdr;
 
+			/* If packet is too short, look no further */
+			if (remlen < MIN_EHDR_LEN)
+				goto pkt_too_short;
+
 			/* Check if AH is present. */
 			if (ipsec_early_ah_v6(q, first_mp, mctl_present, ill,
 			    inill, hada_mp, zoneid)) {
-				ip0dbg(("routing hada drop\n"));
 				return;
 			}
 
@@ -8043,8 +8048,6 @@ tcp_fanout:
 			    (uintptr_t)(whereptr - ((uint8_t *)ip6h)));
 			ip6h = (ip6_t *)mp->b_rptr;
 
-			if (remlen < MIN_EHDR_LEN)
-				goto pkt_too_short;
 			rthdr = (ip6_rthdr_t *)whereptr;
 			nexthdr = rthdr->ip6r_nxt;
 			prev_nexthdr_offset = (uint_t)(whereptr -
