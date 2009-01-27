@@ -340,7 +340,7 @@ cpudrv_pm_get_topspeed(void *ctx)
 		cmn_err(CE_NOTE, "!cpudrv_pm_get_topspeed: instance %d: "
 		    "_PPC out of range %d", instance, plat_level);
 
-		plat_level = max_level;
+		plat_level = 0;
 	}
 	return (plat_level);
 }
