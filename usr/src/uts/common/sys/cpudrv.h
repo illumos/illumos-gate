@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,7 +76,7 @@ typedef struct cpudrv_pm {
 	cpudrv_pm_spd_t	*cur_spd;	/* ptr to current speed */
 	uint_t		num_spd;	/* number of speeds */
 	hrtime_t	lastquan_mstate[NCMSTATES]; /* last quantum's mstate */
-	clock_t		lastquan_lbolt;	/* last quantum's lbolt */
+	clock_t		lastquan_ticks; /* last quantum's clock tick */
 	int		pm_busycnt;	/* pm_busy_component() count  */
 	taskq_t		*tq;		/* taskq handler for CPU monitor */
 	timeout_id_t	timeout_id;	/* cpudrv_pm_monitor()'s timeout_id */
