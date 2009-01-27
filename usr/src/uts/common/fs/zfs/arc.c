@@ -2758,6 +2758,8 @@ top:
 				spa_config_exit(spa, SCL_L2ARC, vd);
 			}
 		} else {
+			if (vd != NULL)
+				spa_config_exit(spa, SCL_L2ARC, vd);
 			if (l2arc_ndev != 0) {
 				DTRACE_PROBE1(l2arc__miss,
 				    arc_buf_hdr_t *, hdr);
