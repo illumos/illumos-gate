@@ -6078,6 +6078,7 @@ lscf_service_import(void *v, void *pvt)
 	cbdata.sc_service = 1;
 	cbdata.sc_source_fmri = s->sc_fmri;
 	cbdata.sc_target_fmri = imp_str;
+	cbdata.sc_flags = 0;
 
 	if (uu_list_walk(s->sc_pgroups, entity_pgroup_import, &cbdata,
 	    UU_DEFAULT) != 0) {
