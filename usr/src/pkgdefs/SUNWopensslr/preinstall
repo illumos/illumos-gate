@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 CLEANUP=/tmp/CLEANUP
@@ -73,6 +73,8 @@ if [ ! -h $SOURCE -a -d $SOURCE ]; then
 	fi
 	if { mv $PKG_INSTALL_ROOT/$OPENSSL_DIROLD $TARGET > /dev/null; } then
 		touch $TMPFILE
+		# pkginstall is expecting an empty directory
+		mkdir $PKG_INSTALL_ROOT/$OPENSSL_DIROLD
 	else
 		rc=1
 		MESSAGE="$MESSAGE3"
