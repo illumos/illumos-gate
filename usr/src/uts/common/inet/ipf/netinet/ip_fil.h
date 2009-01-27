@@ -6,7 +6,7 @@
  * @(#)ip_fil.h	1.35 6/5/96
  * $Id: ip_fil.h,v 2.170.2.22 2005/07/16 05:55:35 darrenr Exp $
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -377,8 +377,7 @@ typedef	struct	fr_info	{
 	u_short	fin_off;
 	int	fin_depth;		/* Group nesting depth */
 	int	fin_error;		/* Error code to return */
-	void	*fin_nat;
-	void	*fin_state;
+	u_int	fin_pktnum;
 	void	*fin_nattag;
 	union {
 		ip_t	*fip_ip;

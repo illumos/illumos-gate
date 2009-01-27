@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1462,12 +1462,7 @@ u_int flags;
 		COPYIFNAME(fin->fin_ifp, is->is_ifname[out << 1], fin->fin_v);
 	}
 
-	/*
-	 * It may seem strange to set is_ref to 2, but fr_check() will call
-	 * fr_statederef() after calling fr_addstate() and the idea is to
-	 * have it exist at the end of fr_check() with is_ref == 1.
-	 */
-	is->is_ref = 2;
+	is->is_ref = 1;
 	is->is_pkts[0] = 0, is->is_bytes[0] = 0;
 	is->is_pkts[1] = 0, is->is_bytes[1] = 0;
 	is->is_pkts[2] = 0, is->is_bytes[2] = 0;
@@ -1523,7 +1518,6 @@ u_int flags;
 		ipstate_log(is, ISL_NEW, ifs);
 
 	RWLOCK_EXIT(&ifs->ifs_ipf_state);
-	fin->fin_state = is;
 	fin->fin_rev = IP6_NEQ(&is->is_dst, &fin->fin_daddr);
 	fin->fin_flx |= FI_STATE;
 	if (fin->fin_flx & FI_FRAG)
@@ -2067,7 +2061,7 @@ ipstate_t *is;
 	clone->is_flags &= ~SI_CLONE;
 	clone->is_flags |= SI_CLONED;
 	fr_stinsert(clone, fin->fin_rev, ifs);
-	clone->is_ref = 2;
+	clone->is_ref = 1;
 	if (clone->is_p == IPPROTO_TCP) {
 		(void) fr_tcp_age(&clone->is_sti, fin, ifs->ifs_ips_tqtqb,
 				  clone->is_flags);
@@ -2932,6 +2926,7 @@ ipftq_t *ifq;
 		fr_movequeue(tqe, tqe->tqe_ifq, ifq, ifs);
 
 	is->is_pkts[i]++;
+	fin->fin_pktnum = is->is_pkts[i] + is->is_icmppkts[i];
 	is->is_bytes[i] += fin->fin_plen;
 	MUTEX_EXIT(&is->is_lock);
 
@@ -2993,9 +2988,7 @@ u_32_t *passp;
 	 * Search the hash table for matching packet header info.
 	 */
 	ifq = NULL;
-	is = fin->fin_state;
-	if (is == NULL)
-		is = fr_stlookup(fin, tcp, &ifq);
+	is = fr_stlookup(fin, tcp, &ifq);
 	switch (fin->fin_p)
 	{
 #ifdef	USE_INET6
@@ -3059,13 +3052,7 @@ matched:
 	fin->fin_rule = is->is_rulen;
 	pass = is->is_pass;
 	fr_updatestate(fin, is, ifq);
-	if (fin->fin_out == 1)
-		fin->fin_nat = is->is_nat[fin->fin_rev];
 
-	fin->fin_state = is;
-	MUTEX_ENTER(&is->is_lock);
-	is->is_ref++;
-	MUTEX_EXIT(&is->is_lock);
 	RWLOCK_EXIT(&ifs->ifs_ipf_state);
 	fin->fin_flx |= FI_STATE;
 	if ((pass & FR_LOGFIRST) != 0)
@@ -3800,10 +3787,12 @@ int flags;
 		default :
 #if defined(_KERNEL)
 # if SOLARIS
+#  ifdef IPFDEBUG
 			cmn_err(CE_NOTE,
 				"tcp %lx flags %x si %lx nstate %d ostate %d\n",
 				(u_long)tcp, tcpflags, (u_long)tqe,
 				nstate, ostate);
+#  endif
 # else
 			printf("tcp %lx flags %x si %lx nstate %d ostate %d\n",
 				(u_long)tcp, tcpflags, (u_long)tqe,

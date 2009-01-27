@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -939,6 +939,10 @@ ipf_stack_t *ifs;
 		n->in_space = ~ntohl(n->in_outmsk);
 	else
 		n->in_space = 1;
+	if (n->in_flags & NAT_TCPUDPICMPQ) {
+		if (ntohs(n->in_pmax) < ntohs(n->in_pmin))
+			return EINVAL;
+	}
 
 	/*
 	 * Calculate the number of valid IP addresses in the output
@@ -1949,22 +1953,7 @@ ipf_stack_t *ifs;
 	}
 
 	MUTEX_ENTER(&nat->nat_lock);
- 	if (logtype == NL_DESTROY) {
- 		/*
- 		 * NL_DESTROY should only be passed when nat_ref >= 2.
- 		 * This happens when a nat'd packet is blocked, we have
-		 * just created the nat table entry (reason why the ref
-		 * count is 2 or higher), but and we want to throw away
-		 * that NAT session as result of the blocked packet.
- 		 */
- 		if (nat->nat_ref > 2) {
- 			nat->nat_ref -= 2;
- 			MUTEX_EXIT(&nat->nat_lock);
- 			if (removed)
- 				ifs->ifs_nat_stats.ns_orphans++;
- 			return (nat->nat_ref);
- 		}
- 	} else if (nat->nat_ref > 1) {
+ 	if (nat->nat_ref > 1) {
 		nat->nat_ref--;
 		MUTEX_EXIT(&nat->nat_lock);
  		if (removed)
@@ -2248,7 +2237,7 @@ natinfo_t *ni;
 				port = np->in_pnext;
 			} else {
 				port = ipf_random() % (ntohs(np->in_pmax) -
-						       ntohs(np->in_pmin));
+						       ntohs(np->in_pmin) + 1);
 				port += ntohs(np->in_pmin);
 			}
 			port = htons(port);
@@ -4028,9 +4017,8 @@ nonatfrag:
 			nat_update(fin, nat, nat->nat_ptr);
 			nat->nat_bytes[1] += fin->fin_plen;
 			nat->nat_pkts[1]++;
-			nat->nat_ref++;
+			fin->fin_pktnum = nat->nat_pkts[1];
 			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
 		}
 	} else
 		rval = natfailed;
@@ -4356,10 +4344,8 @@ nonatfrag:
 			nat_update(fin, nat, nat->nat_ptr);
 			nat->nat_bytes[0] += fin->fin_plen;
 			nat->nat_pkts[0]++;
-			nat->nat_ref++;
+			fin->fin_pktnum = nat->nat_pkts[0];
 			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
-			fin->fin_state = nat->nat_state;
 		}
 	} else
 		rval = natfailed;
@@ -5759,4 +5745,58 @@ ipf_stack_t *ifs;
 
         SPL_X(s);
         return (removed);
+}
+
+
+/* ------------------------------------------------------------------------ */
+/* Function:    nat_uncreate                                                */
+/* Returns:     Nil                                                         */
+/* Parameters:  fin(I) - pointer to packet information                      */
+/*                                                                          */
+/* This function is used to remove a NAT entry from the NAT table when we   */
+/* decide that the create was actually in error. It is thus assumed that    */
+/* fin_flx will have both FI_NATED and FI_NATNEW set. Because we're dealing */
+/* with the translated packet (not the original), we have to reverse the    */
+/* lookup. Although doing the lookup is expensive (relatively speaking), it */
+/* is not anticipated that this will be a frequent occurance for normal     */
+/* traffic patterns.                                                        */
+/* ------------------------------------------------------------------------ */
+void nat_uncreate(fin)
+fr_info_t *fin;
+{
+	ipf_stack_t *ifs = fin->fin_ifs;
+	int nflags;
+	nat_t *nat;
+
+	switch (fin->fin_p)
+	{
+	case IPPROTO_TCP :
+		nflags = IPN_TCP;
+		break;
+	case IPPROTO_UDP :
+		nflags = IPN_UDP;
+		break;
+	default :
+		nflags = 0;
+		break;
+	}
+
+	WRITE_ENTER(&ifs->ifs_ipf_nat);
+
+	if (fin->fin_out == 0) {
+		nat = nat_outlookup(fin, nflags, (u_int)fin->fin_p,
+				    fin->fin_dst, fin->fin_src);
+	} else {
+		nat = nat_inlookup(fin, nflags, (u_int)fin->fin_p,
+				   fin->fin_src, fin->fin_dst);
+	}
+
+	if (nat != NULL) {
+		ifs->ifs_nat_stats.ns_uncreate[fin->fin_out][0]++;
+		nat_delete(nat, NL_DESTROY, ifs);
+	} else {
+		ifs->ifs_nat_stats.ns_uncreate[fin->fin_out][1]++;
+	}
+
+	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 }

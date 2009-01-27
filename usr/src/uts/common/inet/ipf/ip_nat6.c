@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2173,14 +2173,9 @@ maskloop:
 
 	if (nat != NULL) {
 		rval = fr_nat6out(fin, nat, natadd, nflags);
-		if (rval == 1) {
-			MUTEX_ENTER(&nat->nat_lock);
-			nat->nat_ref++;
-			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
-		}
-	} else
+	} else {
 		rval = natfailed;
+	}
 	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 
 	if (rval == -1) {
@@ -2460,15 +2455,9 @@ maskloop:
 	}
 	if (nat != NULL) {
 		rval = fr_nat6in(fin, nat, natadd, nflags);
-		if (rval == 1) {
-			MUTEX_ENTER(&nat->nat_lock);
-			nat->nat_ref++;
-			MUTEX_EXIT(&nat->nat_lock);
-			fin->fin_nat = nat;
-			fin->fin_state = nat->nat_state;
-		}
-	} else
+	} else {
 		rval = natfailed;
+	}
 	RWLOCK_EXIT(&ifs->ifs_ipf_nat);
 
 	if (rval == -1) {

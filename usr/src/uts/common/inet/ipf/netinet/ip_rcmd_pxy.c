@@ -5,14 +5,12 @@
  *
  * $Id: ip_rcmd_pxy.c,v 1.41.2.4 2005/02/04 10:22:55 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Simple RCMD transparent proxy for in-kernel use.  For use with the NAT
  * code.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	IPF_RCMD_PROXY
 
@@ -134,7 +132,6 @@ ifs_rcmdpxy_t *ifsrcmd;
 	nat_t *nat2;
 	ip_t *ip;
 	mb_t *m;
-	ipf_stack_t *ifs = fin->fin_ifs;
 
 	tcp = (tcphdr_t *)fin->fin_dp;
 
@@ -228,8 +225,6 @@ ifs_rcmdpxy_t *ifsrcmd;
 				ip->ip_dst = nat->nat_inip;
 			}
 			(void) fr_addstate(&fi, &nat2->nat_state, SI_W_DPORT);
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 		}
 		ip->ip_len = slen;
 		ip->ip_src = swip;

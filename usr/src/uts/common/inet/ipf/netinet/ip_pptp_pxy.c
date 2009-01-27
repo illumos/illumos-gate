@@ -6,11 +6,9 @@
  *
  * $Id: ip_pptp_pxy.c,v 2.10.2.10 2005/07/15 21:56:52 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	IPF_PPTP_PROXY
 
@@ -189,8 +187,6 @@ ifs_pptppxy_t *ifspptp;
 	if ((nat2 == NULL) || (pptp->pptp_state == NULL)) {
 		bcopy((char *)fin, (char *)&fi, sizeof(fi));
 		bzero((char *)&gre, sizeof(gre));
-		fi.fin_state = NULL;
-		fi.fin_nat = NULL;
 		fi.fin_fi.fi_p = IPPROTO_GRE;
 		fi.fin_fr = &ifspptp->pptpfr;
 		if ((nat->nat_dir == NAT_OUTBOUND && fin->fin_out) ||
@@ -244,8 +240,6 @@ ifs_pptppxy_t *ifspptp;
 		fi.fin_ifp = NULL;
 		pptp->pptp_state = fr_addstate(&fi, &pptp->pptp_state,
 					       0);
-		if (fi.fin_state != NULL)
-			fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 	}
 	ip->ip_p = p;
 	return;

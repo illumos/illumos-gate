@@ -20,9 +20,7 @@
 # CDDL HEADER END
 #
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -53,21 +51,21 @@ logmsg()
 load_ipf() {
 	bad=0
 	if [ -r ${IPFILCONF} ]; then
-		ipf -IFa -f ${IPFILCONF} >/dev/null
+		ipf -IFa -f ${IPFILCONF}
 		if [ $? != 0 ]; then
 			echo "$0: load of ${IPFILCONF} into alternate set failed"
 			bad=1
 		fi
 	fi
 	if [ -r ${IP6FILCONF} ]; then
-		ipf -6IFa -f ${IP6FILCONF} >/dev/null
+		ipf -6IFa -f ${IP6FILCONF}
 		if [ $? != 0 ]; then
 			echo "$0: load of ${IP6FILCONF} into alternate set failed"
 			bad=1
 		fi
 	fi
 	if [ $bad -eq 0 ] ; then
-		ipf -s -y >/dev/null
+		ipf -s -y
 		return 0
 	else
 		echo "Not switching config due to load error."
@@ -78,12 +76,12 @@ load_ipf() {
 
 load_ipnat() {
 	if [ -r ${IPNATCONF} ]; then
-		ipnat -CF -f ${IPNATCONF} >/dev/null
+		ipnat -CF -f ${IPNATCONF}
 		if [ $? != 0 ]; then
 			echo "$0: load of ${IPNATCONF} failed"
 			return 1
 		else
-			ipf -y >/dev/null
+			ipf -y
 			return 0
 		fi
 	else
@@ -94,8 +92,8 @@ load_ipnat() {
 
 load_ippool() {
 	if [ -r ${IPPOOLCONF} ]; then
-		ippool -F >/dev/null
-		ippool -f ${IPPOOLCONF} >/dev/null
+		ippool -F
+		ippool -f ${IPPOOLCONF}
 		if [ $? != 0 ]; then
 			echo "$0: load of ${IPPOOLCONF} failed"
 			return 1
@@ -112,7 +110,7 @@ case "$1" in
 	start)
 		[ ! -f ${IPFILCONF} -a ! -f ${IPNATCONF} ] && exit 0
 		ipf -E
-		[ -n "$pid" ] && kill -TERM $pid 2>/dev/null
+		[ -n "$pid" ] && kill -TERM $pid
 		if load_ippool && load_ipf && load_ipnat ; then
 			/usr/sbin/ipmon -Ds
 		else
@@ -128,7 +126,7 @@ case "$1" in
 
 	pause)
 		ipfs -l
-		ipfs -NS -w
+		ipfs -d /var/db/ipf -W
 		ipf -D
 		if [ -f $PIDFILE ] ; then
 			if kill -0 $pid; then

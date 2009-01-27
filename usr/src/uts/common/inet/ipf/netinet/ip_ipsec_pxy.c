@@ -8,11 +8,9 @@
  *
  * $Id: ip_ipsec_pxy.c,v 2.20.2.7 2005/07/15 21:56:50 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	IPF_IPSEC_PROXY
 
@@ -176,8 +174,6 @@ void *private;
 	ipn->in_p = IPPROTO_ESP;
 
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_fi.fi_p = IPPROTO_ESP;
 	fi.fin_fr = &ifsipsec->ipsecfr;
 	fi.fin_data[0] = 0;
@@ -209,8 +205,6 @@ void *private;
 		fi.fin_data[1] = 0;
 		ipsec->ipsc_state = fr_addstate(&fi, &ipsec->ipsc_state,
 						SI_WILDP);
-		if (fi.fin_state != NULL)
-			fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 	}
 	ip->ip_p = p & 0xff;
 	return 0;
@@ -248,8 +242,6 @@ void *private;
 
 		if ((ipsec->ipsc_nat == NULL) || (ipsec->ipsc_state == NULL)) {
 			bcopy((char *)fin, (char *)&fi, sizeof(fi));
-			fi.fin_state = NULL;
-			fi.fin_nat = NULL;
 			fi.fin_fi.fi_p = IPPROTO_ESP;
 			fi.fin_fr = &ifsipsec->ipsecfr;
 			fi.fin_data[0] = 0;
@@ -291,8 +283,6 @@ void *private;
 			ipsec->ipsc_state = fr_addstate(&fi,
 							&ipsec->ipsc_state,
 							SI_WILDP);
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 		}
 		ip->ip_p = p;
 	}

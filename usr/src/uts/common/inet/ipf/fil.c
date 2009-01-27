@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -331,7 +331,7 @@ static	INLINE void	frpr_gre6 __P((fr_info_t *));
 static	INLINE void	frpr_udp6 __P((fr_info_t *));
 static	INLINE void	frpr_tcp6 __P((fr_info_t *));
 static	INLINE void	frpr_icmp6 __P((fr_info_t *));
-static	INLINE int	frpr_ipv6hdr __P((fr_info_t *));
+static	INLINE void	frpr_ipv6hdr __P((fr_info_t *));
 static	INLINE void	frpr_short6 __P((fr_info_t *, int));
 static	INLINE int	frpr_hopopts6 __P((fr_info_t *));
 static	INLINE int	frpr_routing6 __P((fr_info_t *));
@@ -362,14 +362,14 @@ int xmin;
 
 /* ------------------------------------------------------------------------ */
 /* Function:    frpr_ipv6hdr                                                */
-/* Returns:     int                                                         */
+/* Returns:     Nil                                                         */
 /* Parameters:  fin(I) - pointer to packet information                      */
 /*                                                                          */
 /* IPv6 Only                                                                */
 /* Copy values from the IPv6 header into the fr_info_t struct and call the  */
 /* per-protocol analyzer if it exists.                                      */
 /* ------------------------------------------------------------------------ */
-static INLINE int frpr_ipv6hdr(fin)
+static INLINE void frpr_ipv6hdr(fin)
 fr_info_t *fin;
 {
 	ip6_t *ip6 = (ip6_t *)fin->fin_ip;
@@ -484,11 +484,6 @@ fr_info_t *fin;
 		}
 	}
 	fi->fi_p = p;
-
-	if (fin->fin_flx & FI_BAD)
-		return -1;
-
-	return 0;
 }
 
 
@@ -1527,8 +1522,6 @@ fr_info_t *fin;
 {
 	int v;
 
-	fin->fin_nat = NULL;
-	fin->fin_state = NULL;
 	fin->fin_depth = 0;
 	fin->fin_hlen = (u_short)hlen;
 	fin->fin_ip = ip;
@@ -1542,10 +1535,8 @@ fr_info_t *fin;
 	if (v == 4)
 		frpr_ipv4hdr(fin);
 #ifdef	USE_INET6
-	else if (v == 6) {
-		if (frpr_ipv6hdr(fin) == -1)
-			return -1;
-	}
+	else if (v == 6)
+		frpr_ipv6hdr(fin);
 #endif
 	if (fin->fin_ip == NULL)
 		return -1;
@@ -2565,8 +2556,13 @@ ipf_stack_t *ifs;
 	}
 #endif
 
-	if (fin->fin_state != NULL)
-		fr_statederef((ipstate_t **)&fin->fin_state, ifs);
+	/*
+	 * The FI_STATE flag is cleared here so that calling fr_checkstate
+	 * will work when called from inside of fr_fastroute.  Although
+	 * there is a similar flag, FI_NATED, for NAT, it does have the same
+	 * impact on code execution.
+	 */
+	fin->fin_flx &= ~FI_STATE;
 
 	/*
 	 * Only allow FR_DUP to work if a rule matched - it makes no sense to
@@ -2588,22 +2584,6 @@ ipf_stack_t *ifs;
 		 * some operating systems.
 		 */
 		if (!out) {
-			nat_t *savenat;
-
-			/*
-			 * In case this packet is associated with a NAT entry,
-			 * we need to save a pointer to it, set it to NULL,
-			 * and restore the pointer after any return packets
-			 * have been sent.
-			 *
-			 * We must do this to keep calls to fr_send_icmp_err()
-			 * and fr_send_reset() from trying to dereference the
-			 * entry; as the dereference happens (for all packets)
- 			 * later on.
-			 */
-			savenat = fin->fin_nat;
-			fin->fin_nat = NULL;
-
 			if (pass & FR_RETICMP) {
 				int dst;
 
@@ -2619,33 +2599,9 @@ ipf_stack_t *ifs;
 					IPF_BUMP(ifs->ifs_frstats[1].fr_ret);
 				}
 			}
-
-			fin->fin_nat = savenat;
 		} else {
 			if (pass & FR_RETRST)
 				fin->fin_error = ECONNRESET;
-		}
-	}
-
-	/*
-	 * fr_send_icmp_err() and fr_send_reset() are the last functions that
-	 * could require use of a NAT entry.  If this packet is associated with
-	 * one, it's time to clean up our reference to it.
-	 *
-	 * Note:
-	 * If a new NAT entry was created as result of this packet, and the
-	 * packet was blocked, then the entry should be forcibly removed
-	 * from the table.  Otherwise, it's sufficient to simply give up the
-	 * reference to it.
-	 */
-	if (fin->fin_nat != NULL) {
-		if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT)) {
-			WRITE_ENTER(&ifs->ifs_ipf_nat);
-			(void) nat_delete((nat_t *)fin->fin_nat, NL_DESTROY, ifs);
-			RWLOCK_EXIT(&ifs->ifs_ipf_nat);
-			fin->fin_nat = NULL;
-		} else {
-			fr_natderef((nat_t **)&fin->fin_nat, ifs);
 		}
 	}
 
@@ -2685,6 +2641,9 @@ filtered:
 		if (mc != NULL)
 			(void) fr_fastroute(mc, &mc, fin, &fr->fr_dif);
 	}
+
+	if (FR_ISBLOCK(pass) && (fin->fin_flx & FI_NEWNAT))
+		nat_uncreate(fin);
 
 	/*
 	 * This late because the likes of fr_fastroute() use fin_fr.

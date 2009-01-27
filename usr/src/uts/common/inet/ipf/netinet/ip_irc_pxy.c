@@ -5,11 +5,9 @@
  *
  * $Id: ip_irc_pxy.c,v 2.39.2.4 2005/02/04 10:22:55 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	IPF_IRC_PROXY
 
@@ -290,7 +288,6 @@ ifs_ircpxy_t *ifsirc;
 #ifdef	MENTAT
 	mb_t *m1;
 #endif
-	ipf_stack_t *ifs = fin->fin_ifs;
 
 	m = fin->fin_m;
 	ip = fin->fin_ip;
@@ -425,8 +422,6 @@ ifs_ircpxy_t *ifsirc;
 		tcp2->th_win = htons(8192);
 		tcp2->th_sport = sp;
 		tcp2->th_dport = 0; /* XXX - don't specify remote port */
-		fi.fin_state = NULL;
-		fi.fin_nat = NULL;
 		fi.fin_data[0] = ntohs(sp);
 		fi.fin_data[1] = 0;
 		fi.fin_dp = (char *)tcp2;
@@ -442,8 +437,6 @@ ifs_ircpxy_t *ifsirc;
 			nat_update(&fi, nat2, nat2->nat_ptr);
 
 			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 		}
 		ip->ip_src = swip;
 	}

@@ -3,11 +3,9 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__FreeBSD__
 # ifndef __FreeBSD_cc_version
@@ -92,9 +90,9 @@ void usage()
 	fprintf(stderr, "usage: %s [-nv] -u\n", progname);
 	fprintf(stderr, "usage: %s [-nv] [-d <dir>] -R\n", progname);
 	fprintf(stderr, "usage: %s [-nv] [-d <dir>] -W\n", progname);
-	fprintf(stderr, "usage: %s [-nNSv] [-f <file>] -r\n", progname);
-	fprintf(stderr, "usage: %s [-nNSv] [-f <file>] -w\n", progname);
-	fprintf(stderr, "usage: %s [-nNSv] -f <filename> -i <if1>,<if2>\n",
+	fprintf(stderr, "usage: %s [-nv] [-N|-S] [-f <file>] -r\n", progname);
+	fprintf(stderr, "usage: %s [-nv] [-N|-S] [-f <file>] -w\n", progname);
+	fprintf(stderr, "usage: %s [-nv] [-N|-S] -f <file> -i <if1>,<if2>\n",
 		progname);
 	exit(1);
 }

@@ -5,11 +5,9 @@
  *
  * $Id: ip_raudio_pxy.c,v 1.40.2.3 2005/02/04 10:22:55 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	IPF_RAUDIO_PROXY
 
@@ -221,7 +219,6 @@ void *private;
 	u_char swp;
 	ip_t *ip;
 	mb_t *m;
-	ipf_stack_t *ifs = fin->fin_ifs;
 	ifs_raudiopxy_t *ifsraudio = (ifs_raudiopxy_t *)private;
 
 	/*
@@ -304,8 +301,6 @@ void *private;
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
 	bzero((char *)tcp2, sizeof(*tcp2));
 	TCP_OFF_A(tcp2, 5);
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_dp = (char *)tcp2;
 	fi.fin_fr = &ifsraudio->raudiofr;
@@ -332,8 +327,6 @@ void *private;
 			nat_update(&fi, nat2, nat2->nat_ptr);
 
 			(void) fr_addstate(&fi, NULL, (sp ? 0 : SI_W_SPORT));
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 		}
 	}
 
@@ -352,8 +345,6 @@ void *private;
 			nat_update(&fi, nat2, nat2->nat_ptr);
 
 			(void) fr_addstate(&fi, NULL, SI_W_DPORT);
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 		}
 	}
 

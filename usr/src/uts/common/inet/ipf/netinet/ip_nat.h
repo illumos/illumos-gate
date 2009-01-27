@@ -6,7 +6,7 @@
  * @(#)ip_nat.h	1.5 2/4/96
  * $Id: ip_nat.h,v 2.90.2.11 2005/06/18 02:41:32 darrenr Exp $
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -396,6 +396,7 @@ typedef	struct	natstat	{
 	hostmap_t *ns_maplist;
 	u_long	*ns_bucketlen[2];
 	u_int	ns_orphans;
+	u_long	ns_uncreate[2][2];
 } natstat_t;
 
 typedef	struct	natlog {
@@ -483,6 +484,7 @@ extern	int	fr_natout __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	int	fr_checknatin __P((fr_info_t *, u_32_t *));
 extern	int	fr_natin __P((fr_info_t *, nat_t *, int, u_32_t));
 extern	void	fr_natunload __P((ipf_stack_t *));
+extern	void	nat_uncreate __P((fr_info_t *));
 extern	void	fr_natexpire __P((ipf_stack_t *));
 extern	void	nat_log __P((struct nat *, u_int, ipf_stack_t *));
 extern	void	fix_incksum __P((u_short *, u_32_t));

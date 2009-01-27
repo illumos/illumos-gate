@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,7 +255,8 @@ int mode;
 					    ifs->ifs_fr_active, 1, ifs);
 				}
 			} else {
-				error = fr_auth_ioctl(data, mode, cmd, uid, NULL, ifs);
+				error = fr_auth_ioctl(data, cmd, mode, uid,
+						      NULL, ifs);
 			}
 		} else
 			error = EIO;

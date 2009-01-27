@@ -5,14 +5,12 @@
  *
  * $Id: ip_ftp_pxy.c,v 2.88.2.15 2005/03/19 19:38:10 darrenr Exp $
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Simple FTP transparent proxy for in-kernel use.  For use with the NAT
  * code.
 */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	IPF_FTP_PROXY
 
@@ -347,8 +345,6 @@ ifs_ftppxy_t *ifsftp;
 	 * mapping.
 	 */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_data[0] = sp;
 	fi.fin_data[1] = fin->fin_data[1] - 1;
@@ -404,8 +400,6 @@ ifs_ftppxy_t *ifsftp;
 				ip->ip_dst = nat->nat_inip;
 			}
 			(void) fr_addstate(&fi, &nat2->nat_state, SI_W_DPORT);
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 		}
 		ip->ip_len = slen;
 		ip->ip_src = swip;
@@ -709,8 +703,6 @@ ifs_ftppxy_t *ifsftp;
 	 * other way.
 	 */
 	bcopy((char *)fin, (char *)&fi, sizeof(fi));
-	fi.fin_state = NULL;
-	fi.fin_nat = NULL;
 	fi.fin_flx |= FI_IGNORE;
 	fi.fin_data[0] = 0;
 	fi.fin_data[1] = port;
@@ -770,8 +762,6 @@ ifs_ftppxy_t *ifsftp;
 				ip->ip_dst = nat->nat_inip;
 			}
 			(void) fr_addstate(&fi, &nat2->nat_state, sflags);
-			if (fi.fin_state != NULL)
-				fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 		}
 
 		ip->ip_len = slen;

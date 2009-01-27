@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -42,8 +42,6 @@
  *
  *	$Id: ip_rpcb_pxy.c,v 2.25.2.3 2005/02/04 10:22:56 darrenr Exp $
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	IPF_RPCB_PROXY
 
@@ -1288,7 +1286,6 @@ ippr_rpcb_getnat(fin, nat, proto, port, ifsrpcb)
 	if (is == NULL) {
 		/* Create state entry.  Return NULL if this fails. */
 		fi.fin_dst = nat->nat_inip;
-		fi.fin_nat = (void *)natl;
 		fi.fin_flx |= FI_NATED;
 		fi.fin_flx &= ~FI_STATE;
 		nflags &= NAT_TCPUDP;
@@ -1304,8 +1301,6 @@ ippr_rpcb_getnat(fin, nat, proto, port, ifsrpcb)
 			 */
 			return(-1);
 		}
-		if (fi.fin_state != NULL)
-			fr_statederef((ipstate_t **)&fi.fin_state, ifs);
 	}
 
 	return(0);

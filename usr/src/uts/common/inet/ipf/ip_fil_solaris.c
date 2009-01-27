@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -761,8 +761,10 @@ int *rp;
 		break;
 
 	default :
+#ifdef	IPFDEBUG
 		cmn_err(CE_NOTE, "Unknown: cmd 0x%x data %p",
 			cmd, (void *)data);
+#endif
 		error = EINVAL;
 		break;
 	}
@@ -1144,7 +1146,7 @@ int dst;
 
 	code = fin->fin_icode;
 #ifdef USE_INET6
-	if ((code < 0) || (code > sizeof(icmptoicmp6unreach)/sizeof(int)))
+	if ((code < 0) || (code >= ICMP_MAX_UNREACH))
 		return -1;
 #endif
 
@@ -1429,20 +1431,15 @@ u_short fr_nextipid(fin)
 fr_info_t *fin;
 {
 	static u_short ipid = 0;
-	ipstate_t *is;
-	nat_t *nat;
 	u_short id;
 	ipf_stack_t *ifs = fin->fin_ifs;
 
 	MUTEX_ENTER(&ifs->ifs_ipf_rw);
-	if (fin->fin_state != NULL) {
-		is = fin->fin_state;
-		id = (u_short)(is->is_pkts[(fin->fin_rev << 1) + 1] & 0xffff);
-	} else if (fin->fin_nat != NULL) {
-		nat = fin->fin_nat;
-		id = (u_short)(nat->nat_pkts[fin->fin_out] & 0xffff);
-	} else
+	if (fin->fin_pktnum != 0) {
+		id = fin->fin_pktnum & 0xffff;
+	} else {
 		id = ipid++;
+	}
 	MUTEX_EXIT(&ifs->ifs_ipf_rw);
 
 	return id;
@@ -1800,9 +1797,6 @@ frdest_t *fdp;
 			goto bad_fastroute;
 		fin->fin_out = 0;
 		fin->fin_ifp = saveifp;
-
-		if (fin->fin_nat != NULL)
-			fr_natderef((nat_t **)&fin->fin_nat, ifs);
 	}
 #ifndef	sparc
 	if (fin->fin_v == 4) {
