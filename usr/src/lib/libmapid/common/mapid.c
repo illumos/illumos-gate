@@ -69,6 +69,7 @@
 #define	__LIBMAPID_IMPL
 #include <nfs/mapid.h>
 #pragma	init(_lib_init)
+#pragma	fini(_lib_fini)
 
 /*
  * DEBUG Only
@@ -589,7 +590,13 @@ resolv_query_thread(void *arg)
 		(void) sleep(nap_time);
 
 		resolv_txt_reset();
-		(void) resolv_init();
+		if (resolv_init() < 0) {
+			/*
+			 * Failed to initialize resolver. Do not
+			 * query DNS server.
+			 */
+			goto thr_reset;
+		}
 		switch (resolv_search()) {
 		case NETDB_SUCCESS:
 			resolv_decode();
@@ -761,7 +768,17 @@ get_dns_txt_domain(cb_t *argp)
 	}
 	(void) rw_unlock(&s_dns_impl_lock);
 
-	(void) resolv_init();
+	if (resolv_init() < 0) {
+		/*
+		 * Failed to initialize resolver. Do not
+		 * query DNS server.
+		 */
+		(void) rw_wrlock(&s_dns_data_lock);
+		dns_txt_cached = 0;
+		(void) rw_unlock(&s_dns_data_lock);
+		resolv_txt_reset();
+		return;
+	}
 	switch (resolv_search()) {
 	case NETDB_SUCCESS:
 		/*
@@ -1194,9 +1211,15 @@ mapid_derive_domain(void)
 void
 _lib_init(void)
 {
-	(void) resolv_init();
+	(void) resolv_init(); /* May fail! */
 	(void) rwlock_init(&mapid_domain_lock, USYNC_THREAD, NULL);
 	(void) thr_keycreate(&s_thr_key, NULL);
 	lib_init_done++;
+	resolv_destroy();
+}
+
+void
+_lib_fini(void)
+{
 	resolv_destroy();
 }
