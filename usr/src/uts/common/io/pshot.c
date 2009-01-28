@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3372,20 +3372,6 @@ strtoi(char *str)
 	return (val);
 }
 
-struct m_to_reg {
-	char	*mc;
-	int	n_regs;
-	int	regs[3];
-};
-
-struct m_to_reg m_regspecs[] = {
-	{"sun4c", 3, {0xf, 0x6000000, 0x20}},
-	{"sun4d", 3, {0xf, 0x6000000, 0x20}},
-	{"sun4m", 3, {0xf, 0x6000000, 0x20}},
-	{"sun4u", 3, {0xf, 0x6000000, 0x20}},
-	{"i86pc", 3, {0xf, 0x6000000, 0x20}},
-	{NULL, 0, {0, 0, 0}},
-};
 #endif
 
 static void
