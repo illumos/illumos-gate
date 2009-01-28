@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8587,7 +8587,7 @@ devname_lookup_handler(void *cookie, char *argp, size_t arg_size,
 		dci.dci_flags |= DCA_FLUSH_PATHINST;
 
 		pre_and_post_cleanup(RM_PRE);
-		devi_tree_walk(&dci, DINFOFORCE|DI_CACHE_SNAPSHOT_FLAGS, NULL);
+		devi_tree_walk(&dci, DI_CACHE_SNAPSHOT_FLAGS, NULL);
 		error = (int32_t)dci.dci_error;
 		if (!error) {
 			pre_and_post_cleanup(RM_POST);

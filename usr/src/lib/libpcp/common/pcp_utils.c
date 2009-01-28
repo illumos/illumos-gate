@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,8 +30,6 @@
  * transport (glvc) to the logical domain channel (vldc) transport native
  * to platforms running Logical Domains (LDoms).
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <sys/types.h>
@@ -233,10 +231,7 @@ svc_name_to_glvc_dev_path(char *service)
 		return (NULL);
 
 	/* Ensure that the 'glvc' driver is loaded */
-	(void) di_init_driver("glvc", DI_CACHE_SNAPSHOT_FLAGS | DINFOFORCE);
-
-	/* Get device node */
-	root_node = di_init("/", DINFOCPYALL);
+	root_node = di_init_driver("glvc", DINFOCPYALL);
 	if (root_node == DI_NODE_NIL) {
 		return (dev_path);
 	}
@@ -290,10 +285,7 @@ svc_name_to_vldc_dev_path(char *service)
 	char *dev_path = NULL;
 
 	/* Ensure that the 'vldc' driver is loaded */
-	(void) di_init_driver("vldc", DI_CACHE_SNAPSHOT_FLAGS | DINFOFORCE);
-
-	/* Get device node */
-	root_node = di_init("/", DINFOCPYALL);
+	root_node = di_init_driver("vldc", DINFOCPYALL);
 	if (root_node == DI_NODE_NIL) {
 		return (dev_path);
 	}
