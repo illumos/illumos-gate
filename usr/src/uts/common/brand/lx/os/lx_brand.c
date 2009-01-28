@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,11 +151,10 @@ lx_proc_exit(proc_t *p, klwp_t *lwp)
 		    zone_status_get(z) < ZONE_IS_SHUTTING_DOWN &&
 		    zone_status_get(global_zone) < ZONE_IS_SHUTTING_DOWN)
 			(void) zone_kadmin(A_REBOOT, 0, NULL, CRED());
-	} else {
-		lx_exitlwp(lwp);
-		kmem_free(p->p_brand_data, sizeof (struct lx_proc_data));
-		p->p_brand_data = NULL;
 	}
+	lx_exitlwp(lwp);
+	kmem_free(p->p_brand_data, sizeof (struct lx_proc_data));
+	p->p_brand_data = NULL;
 }
 
 void

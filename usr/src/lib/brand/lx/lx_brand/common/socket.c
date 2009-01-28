@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -966,32 +964,35 @@ lx_sendto(ulong_t *args)
 	void *buf = (void *)args[1];
 	size_t len = (size_t)args[2];
 	int flags = (int)args[3];
-	struct sockaddr *to, oldto;
-	socklen_t tolen;
+	struct sockaddr *to = NULL, oldto;
+	socklen_t tolen = 0;
 	ssize_t r;
 	int abst_sock;
 
 	int nosigpipe = flags & LX_MSG_NOSIGNAL;
 	struct sigaction newact, oact;
 
-	if (uucopy((struct sockaddr *)args[4], &oldto,
-	    sizeof (struct sockaddr)) != 0)
-		return (-errno);
+	if ((args[4] != NULL) && (args[5] > 0)) {
+		if (uucopy((struct sockaddr *)args[4], &oldto,
+		    sizeof (struct sockaddr)) != 0)
+			return (-errno);
 
-	/* Handle Linux abstract sockets */
-	abst_sock = (oldto.sa_family == AF_UNIX) &&
-	    (oldto.sa_data[0] == '\0');
+		/* Handle Linux abstract sockets */
+		abst_sock = (oldto.sa_family == AF_UNIX) &&
+		    (oldto.sa_data[0] == '\0');
 
-	/*
-	 * convert_sockaddr will expand the socket path, if it is abstract, so
-	 * we need to allocate extra memory for it now.
-	 */
-	if ((to = SAFE_ALLOCA(args[5] + abst_sock * ABST_PRFX_LEN)) == NULL)
-		return (-EINVAL);
+		/*
+		 * convert_sockaddr will expand the socket path, if it is
+		 * abstract, so we need to allocate extra memory for it now.
+		 */
+		if ((to = SAFE_ALLOCA(args[5] + abst_sock * ABST_PRFX_LEN))
+		    == NULL)
+			return (-EINVAL);
 
-	if ((r = convert_sockaddr(to, &tolen, (struct sockaddr *)args[4],
-	    (socklen_t)args[5])) < 0)
-		return (r);
+		if ((r = convert_sockaddr(to, &tolen,
+		    (struct sockaddr *)args[4], (socklen_t)args[5])) < 0)
+			return (r);
+	}
 
 
 	lx_debug("\tsendto(%d, 0x%p, 0x%d, 0x%x, 0x%x, %d)", sockfd, buf, len,
@@ -1000,7 +1001,7 @@ lx_sendto(ulong_t *args)
 	flags = convert_sockflags(flags);
 
 	/* return this error to make auditing subsystem happy */
-	if (to->sa_family == AF_ROUTE) {
+	if (to && to->sa_family == AF_ROUTE) {
 		return (-ECONNREFUSED);
 	}
 
