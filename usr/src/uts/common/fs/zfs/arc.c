@@ -442,7 +442,7 @@ struct arc_buf_hdr {
 	/* immutable */
 	arc_buf_contents_t	b_type;
 	uint64_t		b_size;
-	spa_t			*b_spa;
+	uint64_t		b_spa;
 
 	/* protected by arc state mutex */
 	arc_state_t		*b_state;
@@ -464,7 +464,7 @@ static arc_buf_hdr_t arc_eviction_hdr;
 static void arc_get_data_buf(arc_buf_t *buf);
 static void arc_access(arc_buf_hdr_t *buf, kmutex_t *hash_lock);
 static int arc_evict_needed(arc_buf_contents_t type);
-static void arc_evict_ghost(arc_state_t *state, spa_t *spa, int64_t bytes);
+static void arc_evict_ghost(arc_state_t *state, uint64_t spa, int64_t bytes);
 
 #define	GHOST_STATE(state)	\
 	((state) == arc_mru_ghost || (state) == arc_mfu_ghost ||	\
@@ -630,9 +630,8 @@ static void l2arc_hdr_stat_add(void);
 static void l2arc_hdr_stat_remove(void);
 
 static uint64_t
-buf_hash(spa_t *spa, const dva_t *dva, uint64_t birth)
+buf_hash(uint64_t spa, const dva_t *dva, uint64_t birth)
 {
-	uintptr_t spav = (uintptr_t)spa;
 	uint8_t *vdva = (uint8_t *)dva;
 	uint64_t crc = -1ULL;
 	int i;
@@ -642,7 +641,7 @@ buf_hash(spa_t *spa, const dva_t *dva, uint64_t birth)
 	for (i = 0; i < sizeof (dva_t); i++)
 		crc = (crc >> 8) ^ zfs_crc64_table[(crc ^ vdva[i]) & 0xFF];
 
-	crc ^= (spav>>8) ^ birth;
+	crc ^= (spa>>8) ^ birth;
 
 	return (crc);
 }
@@ -658,7 +657,7 @@ buf_hash(spa_t *spa, const dva_t *dva, uint64_t birth)
 	((buf)->b_birth == birth) && ((buf)->b_spa == spa)
 
 static arc_buf_hdr_t *
-buf_hash_find(spa_t *spa, const dva_t *dva, uint64_t birth, kmutex_t **lockp)
+buf_hash_find(uint64_t spa, const dva_t *dva, uint64_t birth, kmutex_t **lockp)
 {
 	uint64_t idx = BUF_HASH_INDEX(spa, dva, birth);
 	kmutex_t *hash_lock = BUF_HASH_LOCK(idx);
@@ -1185,7 +1184,7 @@ arc_buf_alloc(spa_t *spa, int size, void *tag, arc_buf_contents_t type)
 	ASSERT(BUF_EMPTY(hdr));
 	hdr->b_size = size;
 	hdr->b_type = type;
-	hdr->b_spa = spa;
+	hdr->b_spa = spa_guid(spa);
 	hdr->b_state = arc_anon;
 	hdr->b_arc_access = 0;
 	buf = kmem_cache_alloc(buf_cache, KM_PUSHPAGE);
@@ -1501,7 +1500,7 @@ arc_buf_size(arc_buf_t *buf)
  * It may also return without evicting as much space as requested.
  */
 static void *
-arc_evict(arc_state_t *state, spa_t *spa, int64_t bytes, boolean_t recycle,
+arc_evict(arc_state_t *state, uint64_t spa, int64_t bytes, boolean_t recycle,
     arc_buf_contents_t type)
 {
 	arc_state_t *evicted_state;
@@ -1627,7 +1626,7 @@ arc_evict(arc_state_t *state, spa_t *spa, int64_t bytes, boolean_t recycle,
  * bytes.  Destroy the buffers that are removed.
  */
 static void
-arc_evict_ghost(arc_state_t *state, spa_t *spa, int64_t bytes)
+arc_evict_ghost(arc_state_t *state, uint64_t spa, int64_t bytes)
 {
 	arc_buf_hdr_t *ab, *ab_prev;
 	list_t *list = &state->arcs_list[ARC_BUFC_DATA];
@@ -1786,29 +1785,34 @@ arc_do_user_evicts(void)
 void
 arc_flush(spa_t *spa)
 {
+	uint64_t guid = 0;
+
+	if (spa)
+		guid = spa_guid(spa);
+
 	while (list_head(&arc_mru->arcs_list[ARC_BUFC_DATA])) {
-		(void) arc_evict(arc_mru, spa, -1, FALSE, ARC_BUFC_DATA);
+		(void) arc_evict(arc_mru, guid, -1, FALSE, ARC_BUFC_DATA);
 		if (spa)
 			break;
 	}
 	while (list_head(&arc_mru->arcs_list[ARC_BUFC_METADATA])) {
-		(void) arc_evict(arc_mru, spa, -1, FALSE, ARC_BUFC_METADATA);
+		(void) arc_evict(arc_mru, guid, -1, FALSE, ARC_BUFC_METADATA);
 		if (spa)
 			break;
 	}
 	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_DATA])) {
-		(void) arc_evict(arc_mfu, spa, -1, FALSE, ARC_BUFC_DATA);
+		(void) arc_evict(arc_mfu, guid, -1, FALSE, ARC_BUFC_DATA);
 		if (spa)
 			break;
 	}
 	while (list_head(&arc_mfu->arcs_list[ARC_BUFC_METADATA])) {
-		(void) arc_evict(arc_mfu, spa, -1, FALSE, ARC_BUFC_METADATA);
+		(void) arc_evict(arc_mfu, guid, -1, FALSE, ARC_BUFC_METADATA);
 		if (spa)
 			break;
 	}
 
-	arc_evict_ghost(arc_mru_ghost, spa, -1);
-	arc_evict_ghost(arc_mfu_ghost, spa, -1);
+	arc_evict_ghost(arc_mru_ghost, guid, -1);
+	arc_evict_ghost(arc_mfu_ghost, guid, -1);
 
 	mutex_enter(&arc_reclaim_thr_lock);
 	arc_do_user_evicts();
@@ -2376,7 +2380,7 @@ arc_read_done(zio_t *zio)
 	 * reason for it not to be found is if we were freed during the
 	 * read.
 	 */
-	found = buf_hash_find(zio->io_spa, &hdr->b_dva, hdr->b_birth,
+	found = buf_hash_find(hdr->b_spa, &hdr->b_dva, hdr->b_birth,
 	    &hash_lock);
 
 	ASSERT((found == NULL && HDR_FREED_IN_READ(hdr) && hash_lock == NULL) ||
@@ -2523,9 +2527,10 @@ arc_read_nolock(zio_t *pio, spa_t *spa, blkptr_t *bp,
 	arc_buf_t *buf;
 	kmutex_t *hash_lock;
 	zio_t *rzio;
+	uint64_t guid = spa_guid(spa);
 
 top:
-	hdr = buf_hash_find(spa, BP_IDENTITY(bp), bp->blk_birth, &hash_lock);
+	hdr = buf_hash_find(guid, BP_IDENTITY(bp), bp->blk_birth, &hash_lock);
 	if (hdr && hdr->b_datacnt > 0) {
 
 		*arc_flags |= ARC_CACHED;
@@ -2790,9 +2795,10 @@ arc_tryread(spa_t *spa, blkptr_t *bp, void *data)
 {
 	arc_buf_hdr_t *hdr;
 	kmutex_t *hash_mtx;
+	uint64_t guid = spa_guid(spa);
 	int rc = 0;
 
-	hdr = buf_hash_find(spa, BP_IDENTITY(bp), bp->blk_birth, &hash_mtx);
+	hdr = buf_hash_find(guid, BP_IDENTITY(bp), bp->blk_birth, &hash_mtx);
 
 	if (hdr && hdr->b_datacnt > 0 && !HDR_IO_IN_PROGRESS(hdr)) {
 		arc_buf_t *buf = hdr->b_buf;
@@ -2952,7 +2958,7 @@ arc_release(arc_buf_t *buf, void *tag)
 		arc_buf_hdr_t *nhdr;
 		arc_buf_t **bufp;
 		uint64_t blksz = hdr->b_size;
-		spa_t *spa = hdr->b_spa;
+		uint64_t spa = hdr->b_spa;
 		arc_buf_contents_t type = hdr->b_type;
 		uint32_t flags = hdr->b_flags;
 
@@ -3236,12 +3242,13 @@ arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
 	arc_buf_hdr_t *ab;
 	kmutex_t *hash_lock;
 	zio_t	*zio;
+	uint64_t guid = spa_guid(spa);
 
 	/*
 	 * If this buffer is in the cache, release it, so it
 	 * can be re-used.
 	 */
-	ab = buf_hash_find(spa, BP_IDENTITY(bp), bp->blk_birth, &hash_lock);
+	ab = buf_hash_find(guid, BP_IDENTITY(bp), bp->blk_birth, &hash_lock);
 	if (ab != NULL) {
 		/*
 		 * The checksum of blocks to free is not always
@@ -3724,7 +3731,7 @@ arc_fini(void)
  */
 
 static boolean_t
-l2arc_write_eligible(spa_t *spa, arc_buf_hdr_t *ab)
+l2arc_write_eligible(uint64_t spa_guid, arc_buf_hdr_t *ab)
 {
 	/*
 	 * A buffer is *not* eligible for the L2ARC if it:
@@ -3734,7 +3741,7 @@ l2arc_write_eligible(spa_t *spa, arc_buf_hdr_t *ab)
 	 * 4. has an I/O in progress (it may be an incomplete read).
 	 * 5. is flagged not eligible (zfs property).
 	 */
-	if (ab->b_spa != spa || ab->b_buf == NULL || ab->b_l2hdr != NULL ||
+	if (ab->b_spa != spa_guid || ab->b_buf == NULL || ab->b_l2hdr != NULL ||
 	    HDR_IO_IN_PROGRESS(ab) || !HDR_L2CACHE(ab))
 		return (B_FALSE);
 
@@ -4212,6 +4219,7 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 	boolean_t have_lock, full;
 	l2arc_write_callback_t *cb;
 	zio_t *pio, *wzio;
+	uint64_t guid = spa_guid(spa);
 
 	ASSERT(dev->l2ad_vdev != NULL);
 
@@ -4265,7 +4273,7 @@ l2arc_write_buffers(spa_t *spa, l2arc_dev_t *dev, uint64_t target_sz)
 				break;
 			}
 
-			if (!l2arc_write_eligible(spa, ab)) {
+			if (!l2arc_write_eligible(guid, ab)) {
 				mutex_exit(hash_lock);
 				continue;
 			}
