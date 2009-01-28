@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1607,20 +1607,34 @@ spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
  * descend down the tree.
  */
 
-#define	ZIO_MAXDEPTH	16
+#define	ZIO_MAXINDENT	24
+#define	ZIO_MAXWIDTH	(sizeof (uintptr_t) * 2 + ZIO_MAXINDENT)
+#define	ZIO_WALK_SELF	0
+#define	ZIO_WALK_CHILD	1
+#define	ZIO_WALK_PARENT	2
+
+typedef struct zio_print_args {
+	int	zpa_current_depth;
+	int	zpa_min_depth;
+	int	zpa_max_depth;
+	int	zpa_type;
+	uint_t	zpa_flags;
+} zio_print_args_t;
+
+static int zio_child_cb(uintptr_t addr, const void *unknown, void *arg);
 
 static int
 zio_print_cb(uintptr_t addr, const void *data, void *priv)
 {
 	const zio_t *zio = data;
-	uintptr_t depth = (uintptr_t)priv;
+	zio_print_args_t *zpa = priv;
 	mdb_ctf_id_t type_enum, stage_enum;
+	int indent = zpa->zpa_current_depth;
 	const char *type, *stage;
-	int maxdepth;
+	uintptr_t laddr;
 
-	maxdepth = sizeof (uintptr_t) * 2 + ZIO_MAXDEPTH;
-	if (depth > ZIO_MAXDEPTH)
-		depth = ZIO_MAXDEPTH;
+	if (indent > ZIO_MAXINDENT)
+		indent = ZIO_MAXINDENT;
 
 	if (mdb_ctf_lookup_by_name("enum zio_type", &type_enum) == -1 ||
 	    mdb_ctf_lookup_by_name("enum zio_stage", &stage_enum) == -1) {
@@ -1638,45 +1652,100 @@ zio_print_cb(uintptr_t addr, const void *data, void *priv)
 	else
 		stage = "?";
 
+	if (zpa->zpa_current_depth >= zpa->zpa_min_depth) {
+		if (zpa->zpa_flags & DCMD_PIPE_OUT) {
+			mdb_printf("%?p\n", addr);
+		} else {
+			mdb_printf("%*s%-*p %-5s %-16s ", indent, "",
+			    ZIO_MAXWIDTH - indent, addr, type, stage);
+			if (zio->io_waiter)
+				mdb_printf("%?p\n", zio->io_waiter);
+			else
+				mdb_printf("-\n");
+		}
+	}
 
-	mdb_printf("%*s%-*p %-5s %-22s ",
-	    depth, "", maxdepth - depth, addr, type, stage);
-	if (zio->io_waiter)
-		mdb_printf("%?p\n", zio->io_waiter);
+	if (zpa->zpa_current_depth >= zpa->zpa_max_depth)
+		return (WALK_NEXT);
+
+	if (zpa->zpa_type == ZIO_WALK_PARENT)
+		laddr = addr + OFFSETOF(zio_t, io_parent_list);
 	else
-		mdb_printf("-\n");
+		laddr = addr + OFFSETOF(zio_t, io_child_list);
 
-	if (mdb_pwalk("zio_child", zio_print_cb, (void *)(depth + 1),
-	    addr) !=  0) {
-		mdb_warn("failed to walk zio_t children at %p\n", addr);
+	zpa->zpa_current_depth++;
+	if (mdb_pwalk("list", zio_child_cb, zpa, laddr) != 0) {
+		mdb_warn("failed to walk zio_t children at %p\n", laddr);
 		return (WALK_ERR);
 	}
+	zpa->zpa_current_depth--;
 
 	return (WALK_NEXT);
 }
 
-/*ARGSUSED*/
+/* ARGSUSED */
+static int
+zio_child_cb(uintptr_t addr, const void *unknown, void *arg)
+{
+	zio_link_t zl;
+	zio_t zio;
+	uintptr_t ziop;
+	zio_print_args_t *zpa = arg;
+
+	if (mdb_vread(&zl, sizeof (zl), addr) == -1) {
+		mdb_warn("failed to read zio_link_t at %p", addr);
+		return (WALK_ERR);
+	}
+
+	if (zpa->zpa_type == ZIO_WALK_PARENT)
+		ziop = (uintptr_t)zl.zl_parent;
+	else
+		ziop = (uintptr_t)zl.zl_child;
+
+	if (mdb_vread(&zio, sizeof (zio_t), ziop) == -1) {
+		mdb_warn("failed to read zio_t at %p", ziop);
+		return (WALK_ERR);
+	}
+
+	return (zio_print_cb(ziop, &zio, arg));
+}
+
+/* ARGSUSED */
 static int
 zio_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	zio_t zio;
-	int maxdepth;
-
-	maxdepth = sizeof (uintptr_t) * 2 + ZIO_MAXDEPTH;
+	zio_print_args_t zpa = { 0 };
 
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'r', MDB_OPT_SETBITS, INT_MAX, &zpa.zpa_max_depth,
+	    'c', MDB_OPT_SETBITS, ZIO_WALK_CHILD, &zpa.zpa_type,
+	    'p', MDB_OPT_SETBITS, ZIO_WALK_PARENT, &zpa.zpa_type,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	zpa.zpa_flags = flags;
+	if (zpa.zpa_max_depth != 0) {
+		if (zpa.zpa_type == ZIO_WALK_SELF)
+			zpa.zpa_type = ZIO_WALK_CHILD;
+	} else if (zpa.zpa_type != ZIO_WALK_SELF) {
+		zpa.zpa_min_depth = 1;
+		zpa.zpa_max_depth = 1;
+	}
 
 	if (mdb_vread(&zio, sizeof (zio_t), addr) == -1) {
 		mdb_warn("failed to read zio_t at %p", addr);
 		return (DCMD_ERR);
 	}
 
-	if (DCMD_HDRSPEC(flags))
-		mdb_printf("%<u>%-*s %-5s %-22s %-?s%</u>\n", maxdepth,
+	if (!(flags & DCMD_PIPE_OUT) && DCMD_HDRSPEC(flags))
+		mdb_printf("%<u>%-*s %-5s %-16s %-?s%</u>\n", ZIO_MAXWIDTH,
 		    "ADDRESS", "TYPE", "STAGE", "WAITER");
 
-	if (zio_print_cb(addr, &zio, NULL) != WALK_NEXT)
+	if (zio_print_cb(addr, &zio, &zpa) != WALK_NEXT)
 		return (DCMD_ERR);
 
 	return (DCMD_OK);
@@ -1880,50 +1949,6 @@ zio_walk_step(mdb_walk_state_t *wsp)
 }
 
 /*
- * ::walk zio_child
- *
- * Walk the children of a zio_t structure.
- */
-static int
-zio_child_walk_init(mdb_walk_state_t *wsp)
-{
-	zio_t zio;
-
-	if (wsp->walk_addr == 0) {
-		mdb_warn("::walk zio_child doesn't support global walks\n");
-		return (WALK_ERR);
-	}
-
-	if (mdb_vread(&zio, sizeof (zio), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read zio_t at %p", wsp->walk_addr);
-		return (WALK_ERR);
-	}
-
-	wsp->walk_addr = (uintptr_t)zio.io_child;
-	return (WALK_NEXT);
-}
-
-static int
-zio_sibling_walk_step(mdb_walk_state_t *wsp)
-{
-	zio_t zio;
-	int status;
-
-	if (wsp->walk_addr == NULL)
-		return (WALK_DONE);
-
-	if (mdb_vread(&zio, sizeof (zio), wsp->walk_addr) == -1) {
-		mdb_warn("failed to read zio_t at %p", wsp->walk_addr);
-		return (WALK_ERR);
-	}
-
-	status = wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata);
-
-	wsp->walk_addr = (uintptr_t)zio.io_sibling_next;
-	return (status);
-}
-
-/*
  * [addr]::walk zio_root
  *
  * Walk only root zio_t structures, optionally for a particular spa_t.
@@ -1941,7 +1966,9 @@ zio_walk_root_step(mdb_walk_state_t *wsp)
 	if (wsp->walk_data != NULL && wsp->walk_data != zio.io_spa)
 		return (WALK_NEXT);
 
-	if ((uintptr_t)zio.io_parent != NULL)
+	/* If the parent list is not empty, ignore */
+	if (zio.io_parent_list.list_head.list_next !=
+	    &((zio_t *)wsp->walk_addr)->io_parent_list.list_head)
 		return (WALK_NEXT);
 
 	return (wsp->walk_callback(wsp->walk_addr, &zio, wsp->walk_cbdata));
@@ -2129,23 +2156,27 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "dbuf", ":", "print dmu_buf_impl_t", dbuf },
 	{ "dbuf_stats", ":", "dbuf stats", dbuf_stats },
 	{ "dbufs",
-	"\t[-O objset_impl_t*] [-n objset_name | \"mos\"] "
-	"[-o object | \"mdn\"] \n"
-	"\t[-l level] [-b blkid | \"bonus\"]",
-	"find dmu_buf_impl_t's that match specified criteria", dbufs },
+	    "\t[-O objset_impl_t*] [-n objset_name | \"mos\"] "
+	    "[-o object | \"mdn\"] \n"
+	    "\t[-l level] [-b blkid | \"bonus\"]",
+	    "find dmu_buf_impl_t's that match specified criteria", dbufs },
 	{ "abuf_find", "dva_word[0] dva_word[1]",
-	"find arc_buf_hdr_t of a specified DVA",
-	abuf_find },
+	    "find arc_buf_hdr_t of a specified DVA",
+	    abuf_find },
 	{ "spa", "?[-cv]", "spa_t summary", spa_print },
 	{ "spa_config", ":", "print spa_t configuration", spa_print_config },
 	{ "spa_verify", ":", "verify spa_t consistency", spa_verify },
 	{ "spa_space", ":[-b]", "print spa_t on-disk space usage", spa_space },
 	{ "spa_vdevs", ":", "given a spa_t, print vdev summary", spa_vdevs },
 	{ "vdev", ":[-re]\n"
-	"\t-r display recursively\n"
-	"\t-e print statistics\n",
-	"vdev_t summary", vdev_print },
-	{ "zio", ":", "zio_t summary", zio_print },
+	    "\t-r display recursively\n"
+	    "\t-e print statistics",
+	    "vdev_t summary", vdev_print },
+	{ "zio", ":[cpr]\n"
+	    "\t-c display children\n"
+	    "\t-p display parents\n"
+	    "\t-r display recursively",
+	    "zio_t summary", zio_print },
 	{ "zio_state", "?", "print out all zio_t structures on system or "
 	    "for a particular pool", zio_state },
 	{ "zio_pipeline", ":", "decode a zio pipeline", zio_pipeline },
@@ -2179,8 +2210,6 @@ static const mdb_walker_t walkers[] = {
 		txg_list3_walk_init, txg_list_walk_step, NULL },
 	{ "zio", "walk all zio structures, optionally for a particular spa_t",
 		zio_walk_init, zio_walk_step, NULL },
-	{ "zio_child", "walk children of a zio_t structure",
-		zio_child_walk_init, zio_sibling_walk_step, NULL },
 	{ "zio_root", "walk all root zio_t structures, optionally for a "
 	    "particular spa_t",
 		zio_walk_init, zio_walk_root_step, NULL },

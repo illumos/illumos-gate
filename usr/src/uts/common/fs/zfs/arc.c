@@ -2548,7 +2548,7 @@ top:
 				acb->acb_private = private;
 				if (pio != NULL)
 					acb->acb_zio_dummy = zio_null(pio,
-					    spa, NULL, NULL, zio_flags);
+					    spa, NULL, NULL, NULL, zio_flags);
 
 				ASSERT(acb->acb_done != NULL);
 				acb->acb_next = hdr->b_acb;
@@ -4008,11 +4008,15 @@ l2arc_read_done(zio_t *zio)
 		 * storage now.  If there *is* a waiter, the caller must
 		 * issue the i/o in a context where it's OK to block.
 		 */
-		if (zio->io_waiter == NULL)
-			zio_nowait(zio_read(zio->io_parent,
-			    cb->l2rcb_spa, &cb->l2rcb_bp,
+		if (zio->io_waiter == NULL) {
+			zio_t *pio = zio_unique_parent(zio);
+
+			ASSERT(!pio || pio->io_child_type == ZIO_CHILD_LOGICAL);
+
+			zio_nowait(zio_read(pio, cb->l2rcb_spa, &cb->l2rcb_bp,
 			    buf->b_data, zio->io_size, arc_read_done, buf,
 			    zio->io_priority, cb->l2rcb_flags, &cb->l2rcb_zb));
+		}
 	}
 
 	kmem_free(cb, sizeof (l2arc_read_callback_t));
