@@ -18,15 +18,13 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #ifndef _DEVINFO_DEVLINK_H
 #define	_DEVINFO_DEVLINK_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -418,8 +416,8 @@ static int devlink_create(const char *root, const char *name, int dca_flags);
 static int dca_init(const char *name, struct dca_off *dcp, int dca_flags);
 static void exec_cmd(const char *root, struct dca_off *dcp);
 static int do_exec(const char *path, char *const argv[]);
-static int start_daemon(const char *root);
-static void daemon_call(const char *root, struct dca_off *dcp);
+static int start_daemon(const char *root, int install);
+static int daemon_call(const char *root, struct dca_off *dcp);
 
 int is_minor_node(const char *contents, const char **mn_root);
 char *s_realpath(const char *path, char *resolved_path);

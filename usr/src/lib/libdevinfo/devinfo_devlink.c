@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "libdevinfo.h"
 #include "devinfo_devlink.h"
@@ -3272,6 +3270,7 @@ static int
 devlink_create(const char *root, const char *name, int dca_devlink_flag)
 {
 	int i;
+	int install;
 	struct dca_off dca;
 
 	assert(root);
@@ -3287,7 +3286,7 @@ devlink_create(const char *root, const char *name, int dca_devlink_flag)
 	 */
 	i = 0;
 	do {
-		daemon_call(root, &dca);
+		install = daemon_call(root, &dca);
 
 		dprintf(DBG_INFO, "daemon_call() retval=%d\n", dca.dca_error);
 
@@ -3309,7 +3308,8 @@ devlink_create(const char *root, const char *name, int dca_devlink_flag)
 	/*
 	 * Daemon may not be running. Try to start it.
 	 */
-	} while ((++i < MAX_DAEMON_ATTEMPTS) && start_daemon(root) == 0);
+	} while ((++i < MAX_DAEMON_ATTEMPTS) &&
+	    start_daemon(root, install) == 0);
 
 	dprintf(DBG_INFO, "devlink_create: can't start daemon\n");
 
@@ -3377,7 +3377,7 @@ dca_init(const char *name, struct dca_off *dcp, int dca_flags)
 #define	DAEMON_STARTUP_TIME	1 /* 1 second. This may need to be adjusted */
 #define	DEVNAME_CHECK_FILE	"/etc/devname_check_RDONLY"
 
-static void
+static int
 daemon_call(const char *root, struct dca_off *dcp)
 {
 	door_arg_t	arg;
@@ -3388,6 +3388,7 @@ daemon_call(const char *root, struct dca_off *dcp)
 	char		*prefix;
 	int		rofd;
 	int		rdonly;
+	int		install = 0;
 
 	/*
 	 * If root is readonly, there are two possibilities:
@@ -3424,6 +3425,9 @@ daemon_call(const char *root, struct dca_off *dcp)
 		prefix = (char *)root;
 	}
 
+	if (rdonly && stat(DEVNAME_CHECK_FILE, &sb) != -1)
+		install = 1;
+
 	(void) snprintf(synch_door, sizeof (synch_door),
 	    "%s/etc/dev/%s", prefix, DEVFSADM_SYNCH_DOOR);
 
@@ -3437,14 +3441,14 @@ daemon_call(const char *root, struct dca_off *dcp)
 			dcp->dca_error = ENOENT;
 		dprintf(DBG_ERR, "stat failed: %s: no file or not root owned\n",
 		    synch_door);
-		return;
+		return (install);
 	}
 
 	if ((fd = open(synch_door, O_RDONLY)) == -1) {
 		dcp->dca_error = errno;
 		dprintf(DBG_ERR, "open of %s failed: %s\n",
 		    synch_door, strerror(errno));
-		return;
+		return (install);
 	}
 
 	arg.data_ptr = (char *)dcp;
@@ -3470,7 +3474,7 @@ daemon_call(const char *root, struct dca_off *dcp)
 	(void) close(fd);
 
 	if (door_error)
-		return;
+		return (install);
 
 	assert(arg.data_ptr);
 
@@ -3483,6 +3487,8 @@ daemon_call(const char *root, struct dca_off *dcp)
 	 */
 	if (arg.rbuf != (char *)dcp)
 		(void) munmap(arg.rbuf, arg.rsize);
+
+	return (install);
 }
 
 #define	DEVFSADM_PATH	"/usr/sbin/devfsadm"
@@ -3492,13 +3498,18 @@ daemon_call(const char *root, struct dca_off *dcp)
 #define	DEVFSADM_DAEMON	"devfsadmd"
 
 static int
-start_daemon(const char *root)
+start_daemon(const char *root, int install)
 {
 	int rv, i = 0;
 	char *argv[20];
 
 	argv[i++] = DEVFSADM_DAEMON;
-	if (strcmp(root, "/")) {
+	if (install) {
+		argv[i++] = "-a";
+		argv[i++] = "/tmp";
+		argv[i++] = "-p";
+		argv[i++] = "/tmp/root/etc/path_to_inst";
+	} else if (strcmp(root, "/")) {
 		argv[i++] = "-r";
 		argv[i++] = (char *)root;
 	}
