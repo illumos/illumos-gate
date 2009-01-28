@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,6 +220,10 @@ extern int is_sparc(void);
 	"/boot/platform/i86pc/kernel/$ISADIR/unix"
 #define	DIRECT_BOOT_FAILSAFE_LINE	DIRECT_BOOT_FAILSAFE_KERNEL " -s"
 #define	DIRECT_BOOT_KERNEL_ZFS	DIRECT_BOOT_KERNEL " " ZFS_BOOT
+#define	DIRECT_BOOT_PREFIX	"/platform/i86pc/"
+#define	KERNEL_PREFIX	"/platform/i86pc/"
+#define	AMD_UNIX_SPACE	"/amd64/unix "
+#define	UNIX_SPACE	"/unix "
 
 /* xVM kernels */
 #define	XEN_KERNEL_SUBSTR "xen.gz"

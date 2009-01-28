@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -789,7 +789,7 @@ bam_menu(char *subcmd, char *opt, int largc, char *largv[])
 		(void) snprintf(path, sizeof (path), "%s", GRUB_slice);
 	}
 
-	if (stat(path, &sb) == 0)
+	if (bam_verbose && stat(path, &sb) == 0)
 		bam_error(GRUB_SLICE_FILE_EXISTS, path);
 
 	if (is_zfs(menu_root)) {
@@ -2624,6 +2624,12 @@ kernel_parser(entry_t *entry, char *cmd, char *arg, int linenum)
 	} else if (!(entry->flags & (BAM_ENTRY_BOOTADM|BAM_ENTRY_LU))) {
 		BAM_DPRINTF((D_SET_HAND_KERNEL, fcn, arg));
 		return (BAM_ERROR);
+	} else if (strncmp(arg, KERNEL_PREFIX, strlen(KERNEL_PREFIX)) == 0 &&
+	    strstr(arg, UNIX_SPACE)) {
+		entry->flags |= BAM_ENTRY_DBOOT | BAM_ENTRY_32BIT;
+	} else if (strncmp(arg, KERNEL_PREFIX, strlen(KERNEL_PREFIX)) == 0 &&
+	    strstr(arg, AMD_UNIX_SPACE)) {
+		entry->flags |= BAM_ENTRY_DBOOT | BAM_ENTRY_64BIT;
 	} else {
 		BAM_DPRINTF((D_IS_UNKNOWN_KERNEL, fcn, arg));
 		bam_error(UNKNOWN_KERNEL_LINE, linenum);
@@ -3383,7 +3389,6 @@ get_grubroot(char *osroot, char *osdev, char *menu_root)
 	char		*ctdname = strstr(osdev, "dsk/");
 	char		linebuf[PATH_MAX];
 	FILE		*fp;
-	const char	*fcn = "get_grubroot()";
 
 	INJECT_ERROR1("GRUBROOT_INVALID_OSDEV", ctdname = NULL);
 	if (ctdname == NULL) {
@@ -3393,7 +3398,7 @@ get_grubroot(char *osroot, char *osdev, char *menu_root)
 
 	if (menu_root && !menu_on_bootdisk(osroot, menu_root)) {
 		/* menu bears no resemblance to our reality */
-		bam_error(CANNOT_GRUBROOT_BOOTDISK, fcn, osdev);
+		bam_error(CANNOT_GRUBROOT_BOOTDISK, osdev);
 		return (NULL);
 	}
 
@@ -3429,7 +3434,7 @@ get_grubroot(char *osroot, char *osdev, char *menu_root)
 
 	INJECT_ERROR1("GRUBROOT_BIOSDEV_FAIL", found = 0);
 	if (found == 0) {
-		bam_error(BIOSDEV_FAIL, osdev);
+		bam_error(BIOSDEV_SKIP, osdev);
 		return (NULL);
 	}
 
@@ -6011,7 +6016,8 @@ is_bootdisk(char *osroot, char *physical)
 
 	INJECT_ERROR1("IS_BOOTDISK_GRUBROOT", grubroot = NULL);
 	if (grubroot == NULL) {
-		bam_error(NO_GRUBROOT_FOR_DISK, fcn, physical);
+		if (bam_verbose)
+			bam_error(NO_GRUBROOT_FOR_DISK, physical);
 		return (0);
 	}
 	ret = grubroot[3] == '0';

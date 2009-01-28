@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,8 +159,8 @@ extern "C" {
 #define	DISKMAP_FAIL \
     gettext("create_diskmap command failed for OS root: %s.\n")
 
-#define	BIOSDEV_FAIL \
-    gettext("biosdev command failed for disk: %s.\n")
+#define	BIOSDEV_SKIP \
+    gettext("not using biosdev command for disk: %s.\n")
 
 #define	CHECK_NOT_SUPPORTED \
 	gettext("the check option is not supported with subcmd: %s\n")
@@ -444,10 +444,10 @@ gettext("Found or created GRUB signature %s for %s\n")
 #define	RDONLY_TEST_ERROR gettext("error during read-only test on %s: %s\n")
 
 #define	CANNOT_GRUBROOT_BOOTDISK \
-	gettext("%s: cannot get (hd?,?,?) for menu. menu not on bootdisk: %s\n")
+	gettext("cannot get (hd?,?,?) for menu. menu not on bootdisk: %s\n")
 
 #define	NO_GRUBROOT_FOR_DISK \
-gettext("%s: cannot determine BIOS disk ID 'hd?' for disk: %s\n")
+	gettext("cannot determine BIOS disk ID 'hd?' for disk: %s\n")
 
 #define	CACHE_MNTTAB_FAIL gettext("%s: failed to cache /etc/mnttab\n")
 
