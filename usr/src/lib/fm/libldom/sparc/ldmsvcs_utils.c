@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,12 +39,14 @@
 #include <sys/processor.h>
 #include <poll.h>
 #include <pthread.h>
+#include <signal.h>
 #include <values.h>
 #include <libscf.h>
 
 #include <ctype.h>
 
 #include "ldmsvcs_utils.h"
+#include "ldom_alloc.h"
 
 #define	ASSERT(cnd) \
 	((void) ((cnd) || ((void) fprintf(stderr, \
@@ -337,7 +339,7 @@ poller_remove_client(void)
 
 
 static int
-poller_add_pending(struct ldom_hdl *lhp, uint64_t req_num)
+poller_add_pending(uint64_t req_num)
 {
 	int newlen, index, i, j;
 
@@ -369,20 +371,20 @@ poller_add_pending(struct ldom_hdl *lhp, uint64_t req_num)
 			ASSERT(pollbase.list_len < pollbase.nclients + 1);
 
 			newlen = pollbase.list_len + 5;
-			newlist = lhp->allocp(newlen *
-			    sizeof (struct listdata_s));
+			newlist = ldom_alloc(newlen *
+			    sizeof (struct listdata_s *));
 
 			for (i = 0; i < pollbase.list_len; i++)
 				newlist[i] = pollbase.list[i];
 
 			oldlist = pollbase.list;
 			pollbase.list = newlist;
-			lhp->freep(oldlist, pollbase.list_len *
-			    sizeof (struct listdata_s));
+			ldom_free(oldlist, pollbase.list_len *
+			    sizeof (struct listdata_s *));
 
 			for (i = pollbase.list_len; i < newlen; i++) {
 				pollbase.list[i] =
-				    lhp->allocp(sizeof (struct listdata_s));
+				    ldom_alloc(sizeof (struct listdata_s));
 				pollbase.list[i]->status = UNUSED;
 			}
 
@@ -413,13 +415,19 @@ poller_delete_pending(uint64_t req_num, int index)
 
 
 static void
-poller_shutdown(void)
+poller_shutdown(boolean_t wait)
 {
 	(void) pthread_mutex_lock(&pollbase.mt);
 
 	pollbase.doexit = 1;
 
 	(void) pthread_mutex_unlock(&pollbase.mt);
+
+	if (wait == B_TRUE) {
+		/* stop the poller thread  and wait for it to end */
+		(void) pthread_kill(pollbase.polling_tid, SIGTERM);
+		(void) pthread_join(pollbase.polling_tid, NULL);
+	}
 }
 
 
@@ -466,7 +474,7 @@ poller_loop(void *arg)
 			/*
 			 * start exit preparations
 			 */
-			poller_shutdown();
+			poller_shutdown(B_FALSE);
 			continue;
 		}
 
@@ -501,20 +509,14 @@ poller_init(struct ldmsvcs_info *lsp)
 	(void) pthread_mutex_lock(&pollbase.mt);
 
 	if (pollbase.polling_tid == 0) {
-		pthread_attr_t attr;
+		pthread_attr_t *attr = NULL;
 
 		/*
-		 * create polling thread for receiving messages
+		 * create a joinable polling thread for receiving messages
 		 */
-		(void) pthread_attr_init(&attr);
-		(void) pthread_attr_setdetachstate(&attr,
-		    PTHREAD_CREATE_DETACHED);
-
-		if (pthread_create(&pollbase.polling_tid, &attr,
+		if (pthread_create(&pollbase.polling_tid, attr,
 		    poller_loop, lsp) != 0)
 			rc = 1;
-
-		(void) pthread_attr_destroy(&attr);
 	}
 
 	(void) pthread_mutex_unlock(&pollbase.mt);
@@ -522,6 +524,35 @@ poller_init(struct ldmsvcs_info *lsp)
 	return (rc);
 }
 
+/*
+ * Cleanup the polling thread
+ */
+static void
+poller_fini(void)
+{
+	int i;
+
+	/* stop the poller thread */
+	poller_shutdown(B_TRUE);
+
+	(void) pthread_mutex_lock(&pollbase.mt);
+
+	/* Free up the list of outstanding requests */
+	if (pollbase.list != NULL) {
+		for (i = 0; i < pollbase.list_len; i++) {
+			if (pollbase.list[i]) {
+				ldom_free(pollbase.list[i],
+				    sizeof (struct listdata_s));
+			}
+		}
+		ldom_free(pollbase.list, pollbase.list_len *
+		    sizeof (struct listdata_s *));
+		pollbase.list = NULL;
+		pollbase.list_len = 0;
+	}
+
+	(void) pthread_mutex_unlock(&pollbase.mt);
+}
 
 /*
  * utilities for message handlers
@@ -929,7 +960,7 @@ static const ds_msg_handler_t ds_msg_handlers[] = {
  * message and service internal functions
  */
 static void
-fds_svc_alloc(struct ldom_hdl *lhp, struct ldmsvcs_info *lsp)
+fds_svc_alloc(struct ldmsvcs_info *lsp)
 {
 	int i;
 	static char *name[] = { LDM_DS_NAME_CPU, LDM_DS_NAME_MEM,
@@ -942,12 +973,12 @@ fds_svc_alloc(struct ldom_hdl *lhp, struct ldmsvcs_info *lsp)
 	    lsp->fmas_svcs.nsvcs++)
 		;
 
-	lsp->fmas_svcs.tbl = (fds_svc_t **)lhp->allocp(sizeof (fds_svc_t *) *
+	lsp->fmas_svcs.tbl = (fds_svc_t **)ldom_alloc(sizeof (fds_svc_t *) *
 	    lsp->fmas_svcs.nsvcs);
 
 	for (i = 0; i < lsp->fmas_svcs.nsvcs; i++) {
 		lsp->fmas_svcs.tbl[i] =
-		    (fds_svc_t *)lhp->allocp(sizeof (fds_svc_t));
+		    (fds_svc_t *)ldom_alloc(sizeof (fds_svc_t));
 		bzero(lsp->fmas_svcs.tbl[i], sizeof (fds_svc_t));
 		lsp->fmas_svcs.tbl[i]->name = name[i];
 	}
@@ -1124,12 +1155,13 @@ channel_openreset(struct ldmsvcs_info *lsp)
 static void
 channel_fini(void)
 {
+	int i;
 	struct ldmsvcs_info *lsp;
 
 	/*
 	 * End the poller thread
 	 */
-	poller_shutdown();
+	poller_fini();
 
 	if ((lsp = channel_init(NULL)) == NULL)
 		return;
@@ -1140,6 +1172,14 @@ channel_fini(void)
 	(void) close(lsp->fds_chan.fd);
 
 	(void) pthread_mutex_unlock(&lsp->mt);
+
+	/* Free the ldom service structure */
+	for (i = 0; i < lsp->fmas_svcs.nsvcs; i++) {
+		ldom_free(lsp->fmas_svcs.tbl[i], sizeof (fds_svc_t));
+	}
+	ldom_free(lsp->fmas_svcs.tbl,
+	    lsp->fmas_svcs.nsvcs * sizeof (fds_svc_t *));
+	ldom_free(lsp, sizeof (struct ldmsvcs_info));
 }
 
 
@@ -1171,7 +1211,7 @@ channel_init(struct ldom_hdl *lhp)
 	(void) pthread_mutex_unlock(&mt);
 
 	root = (struct ldmsvcs_info *)
-	    lhp->allocp(sizeof (struct ldmsvcs_info));
+	    ldom_alloc(sizeof (struct ldmsvcs_info));
 	bzero(root, sizeof (struct ldmsvcs_info));
 
 	root->fds_chan.state = CHANNEL_UNINITIALIZED;
@@ -1180,11 +1220,11 @@ channel_init(struct ldom_hdl *lhp)
 
 	if (pthread_mutex_init(&root->mt, NULL) != 0 ||
 	    pthread_cond_init(&root->cv, NULL) != 0) {
-		lhp->freep(root, sizeof (struct ldmsvcs_info));
+		ldom_free(root, sizeof (struct ldmsvcs_info));
 		return (NULL);
 	}
 
-	fds_svc_alloc(lhp, root);
+	fds_svc_alloc(root);
 	fds_svc_reset(root, -1);
 
 	(void) poller_init(root);
@@ -1254,7 +1294,7 @@ sendrecv(struct ldom_hdl *lhp, uint64_t req_num,
 			*svc_hdl = svc->hdl;
 		}
 
-		index = poller_add_pending(lhp, req_num);
+		index = poller_add_pending(req_num);
 
 		if ((ier = fds_send(lsp, msg, msglen)) != 0 ||
 		    (ier = poller_recv_data(lhp, req_num, index, resp,
