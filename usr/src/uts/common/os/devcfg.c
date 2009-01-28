@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -5588,6 +5588,11 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 	dev_info_t *pdip = ddi_get_parent(dip);
 	int ret = NDI_SUCCESS;
 	ddi_eventcookie_t cookie;
+	char *path = NULL;
+	char *class = NULL;
+	char *driver = NULL;
+	int instance = -1;
+	int post_event = 0;
 
 	ASSERT(pdip && DEVI_BUSY_OWNED(pdip));
 
@@ -5643,22 +5648,22 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 	}
 
 	if (i_ddi_node_state(dip) == DS_INITIALIZED) {
-		char *path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+		path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 		(void) ddi_pathname(dip, path);
 		if (flags & NDI_DEVI_OFFLINE)
 			i_ndi_devi_report_status_change(dip, path);
 
 		if (need_remove_event(dip, flags)) {
-			(void) i_log_devfs_remove_devinfo(path,
-			    i_ddi_devi_class(dip),
-			    (char *)ddi_driver_name(dip),
-			    ddi_get_instance(dip),
-			    flags);
+			post_event = 1;
+			class = i_ddi_strdup(i_ddi_devi_class(dip), KM_SLEEP);
+			driver = i_ddi_strdup((char *)ddi_driver_name(dip),
+			    KM_SLEEP);
+			instance = ddi_get_instance(dip);
+
 			mutex_enter(&(DEVI(dip)->devi_lock));
 			DEVI_SET_EVREMOVE(dip);
 			mutex_exit(&(DEVI(dip)->devi_lock));
 		}
-		kmem_free(path, MAXPATHLEN);
 	}
 
 	if (flags & (NDI_UNCONFIG | NDI_DEVI_REMOVE)) {
@@ -5672,10 +5677,23 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 			if (!ndi_dev_is_persistent_node(dip))
 				flags |= NDI_DEVI_REMOVE;
 
-			if (flags & NDI_DEVI_REMOVE)
+			if (flags & NDI_DEVI_REMOVE) {
 				ret = ddi_remove_child(dip, 0);
+				if (post_event && ret == NDI_SUCCESS) {
+					(void) i_log_devfs_remove_devinfo(path,
+					    class, driver, instance, flags);
+				}
+			}
+
 		}
 	}
+
+	if (path)
+		kmem_free(path, MAXPATHLEN);
+	if (class)
+		kmem_free(class, strlen(class) + 1);
+	if (driver)
+		kmem_free(driver, strlen(driver) + 1);
 
 	return (ret);
 }
