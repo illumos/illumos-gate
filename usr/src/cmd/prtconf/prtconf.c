@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,15 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved	*/
 
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -261,6 +258,13 @@ main(int argc, char *argv[])
 		char		*path = argv[optind];
 		int		error;
 
+		if (opts.o_prominfo) {
+			/* PROM tree cannot be used with path */
+			(void) fprintf(stderr, "%s: path and -p option are "
+			    "mutually exclusive\n", opts.o_progname);
+			return (1);
+		}
+
 		if (strlen(path) >= MAXPATHLEN) {
 			(void) fprintf(stderr, "%s: "
 			    "path specified is too long\n", opts.o_progname);
@@ -271,11 +275,11 @@ main(int argc, char *argv[])
 
 			/* an invalid path was specified */
 			(void) fprintf(stderr, "%s: invalid path specified\n",
-					opts.o_progname);
+			    opts.o_progname);
 			return (1);
 
 		} else if (((sinfo.st_mode & S_IFMT) == S_IFCHR) ||
-				((sinfo.st_mode & S_IFMT) == S_IFBLK)) {
+		    ((sinfo.st_mode & S_IFMT) == S_IFBLK)) {
 
 			opts.o_devt = sinfo.st_rdev;
 			error = 0;
@@ -362,10 +366,10 @@ main(int argc, char *argv[])
 
 		if (ii >= mbyte)
 			(void) printf("%ld Megabytes\n",
-				(long)((ii+mbyte-1) / mbyte));
+			    (long)((ii+mbyte-1) / mbyte));
 		else
 			(void) printf("%ld Kilobytes\n",
-				(long)((ii+kbyte-1) / kbyte));
+			    (long)((ii+kbyte-1) / kbyte));
 	}
 
 	if (opts.o_prominfo) {
