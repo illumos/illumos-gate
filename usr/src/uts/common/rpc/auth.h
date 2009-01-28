@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -40,8 +40,6 @@
 
 #ifndef	_RPC_AUTH_H
 #define	_RPC_AUTH_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <rpc/xdr.h>
 #include <rpc/clnt_stat.h>
@@ -319,6 +317,9 @@ extern struct opaque_auth _null_auth;
 extern AUTH *authkern_create(void);		/* takes no parameters */
 extern int authkern_init(void *, void *, int);
 extern struct kmem_cache *authkern_cache;
+extern AUTH *authnone_create(void);		/* takes no parameters */
+extern int authnone_init(void *, void *, int);
+extern struct kmem_cache *authnone_cache;
 extern AUTH *authloopback_create(void);		/* takes no parameters */
 extern int authloopback_init(void *, void *, int);
 extern struct kmem_cache *authloopback_cache;

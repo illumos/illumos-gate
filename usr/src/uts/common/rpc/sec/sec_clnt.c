@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -66,6 +64,8 @@ static int clnt_authdes_cachesz = 64;
 static uint_t authdes_win = 5*60;  /* 5 minutes -- should be mount option */
 
 struct kmem_cache *authkern_cache;
+
+struct kmem_cache *authnone_cache;
 
 struct kmem_cache *authloopback_cache;
 
@@ -445,9 +445,9 @@ sec_clnt_geth(CLIENT *client, struct sec_data *secdata, cred_t *cr, AUTH **ap)
 
 		switch (authflavor) {
 		case AUTH_NONE:
-			/*
-			 * XXX: should do real AUTH_NONE, instead of AUTH_UNIX
-			 */
+			*ap = (AUTH *) authnone_create();
+			return ((*ap != NULL) ? 0 : EINTR);
+
 		case AUTH_UNIX:
 			*ap = (AUTH *) authkern_create();
 			return ((*ap != NULL) ? 0 : EINTR);
@@ -795,6 +795,8 @@ sec_subrinit(void)
 {
 	authkern_cache = kmem_cache_create("authkern_cache",
 	    sizeof (AUTH), 0, authkern_init, NULL, NULL, NULL, NULL, 0);
+	authnone_cache = kmem_cache_create("authnone_cache",
+	    sizeof (AUTH), 0, authnone_init, NULL, NULL, NULL, NULL, 0);
 	authloopback_cache = kmem_cache_create("authloopback_cache",
 	    sizeof (AUTH), 0, authloopback_init, NULL, NULL, NULL, NULL, 0);
 	mutex_init(&desauthtab_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -814,6 +816,7 @@ sec_subrfini(void)
 {
 	mutex_destroy(&desauthtab_lock);
 	kmem_cache_destroy(authkern_cache);
+	kmem_cache_destroy(authnone_cache);
 	kmem_cache_destroy(authloopback_cache);
 
 	/* RPC stuff */
