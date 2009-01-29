@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Define an Alist, a list maintained as a reallocable array, and a for() loop
@@ -31,8 +31,6 @@
 
 #ifndef	_ALIST_H
 #define	_ALIST_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -244,11 +242,14 @@ typedef enum {
 	((void *)((_off) + (char *)(_lp)))
 
 /*
- * # of items currently found in a list. These macros handle the case
- * where the list has not been allocated yet.
+ * The number of items currently found in a list (nitems), and the total number
+ * of slots in the current data allocation (arritems).  These macros handle the
+ * case where the list has not been allocated yet.
  */
-#define	alist_nitems(_lp) (((_lp) == NULL) ? 0 : (_lp)->al_nitems)
-#define	aplist_nitems(_lp) (((_lp) == NULL) ? 0 : (_lp)->apl_nitems)
+#define	alist_nitems(_lp)	(((_lp) == NULL) ? 0 : (_lp)->al_nitems)
+#define	aplist_nitems(_lp)	(((_lp) == NULL) ? 0 : (_lp)->apl_nitems)
+#define	alist_arritems(_lp)	(((_lp) == NULL) ? 0 : (_lp)->al_arritems)
+#define	aplist_arritems(_lp)	(((_lp) == NULL) ? 0 : (_lp)->apl_arritems)
 
 
 extern void		*alist_append(Alist **, const void *, size_t, Aliste);

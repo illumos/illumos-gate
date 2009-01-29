@@ -136,8 +136,8 @@ struct fct {
  * Define Alist initialization counts.
  */
 #define	AL_CNT_ALIAS	2		/* ALIAS() */
-#define	AL_CNT_DEPENDS	10		/* DEPENDS() */
-#define	AL_CNT_CALLERS	10		/* CALLERS() */
+#define	AL_CNT_DEPENDS	20		/* DEPENDS() */
+#define	AL_CNT_CALLERS	20		/* CALLERS() */
 #define	AL_CNT_GROUPS	4		/* GROUPS() */
 #define	AL_CNT_COPYREL	10		/* COPY() */
 #define	AL_CNT_LAZYFIND	10		/* elf_lazy_find_sym() */
@@ -156,7 +156,7 @@ struct fct {
 #define	AL_CNT_SEARCH	4		/* search path */
 #define	AL_CNT_FILTEES	2		/* filtee path */
 #define	AL_CNT_HANDLES	1		/* hdl_list[] */
-#define	AL_CNT_FREELIST	40		/* free_alp */
+#define	AL_CNT_FREELIST	80		/* free_alp */
 #define	AL_CNT_HWCAP	10		/* hwcap candidate */
 #define	AL_CNT_SPATH	4		/* search path */
 

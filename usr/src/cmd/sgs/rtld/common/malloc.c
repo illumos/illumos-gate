@@ -252,6 +252,19 @@ realloc(void *ptr, size_t size)
 		return (NULL);
 	(void) memcpy(newptr, ptr, osize);
 	block->status = FREE;
+
+	/*
+	 * Add the free block to the free APlist for later defragmentation.
+	 * However, this addition can only be achieved if there is room on the
+	 * free APlist.  The APlist can't be allowed to grow, as the growth
+	 * requires a realloc(), which would recurse back here, resulting in an
+	 * infinite loop.  If the free APlist is full, defrag() now.  This
+	 * defragmentation might not be able to collapse any free space, but
+	 * the free APlist will be cleared as part of the processing, ensuring
+	 * room for the addition.
+	 */
+	if (free_alp && (aplist_nitems(free_alp) >= aplist_arritems(free_alp)))
+		defrag();
 	(void) aplist_test(&free_alp, block->page, AL_CNT_FREELIST);
 	return (newptr);
 }
