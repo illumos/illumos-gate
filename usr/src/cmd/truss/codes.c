@@ -95,7 +95,7 @@
 #include "proto.h"
 
 #define	FCNTLMIN	F_DUPFD
-#define	FCNTLMAX	44		/* F_SETLK64_NBMAND */
+#define	FCNTLMAX	F_BADFD
 const char *const FCNTLname[] = {
 	"F_DUPFD",
 	"F_GETFD",
@@ -141,7 +141,9 @@ const char *const FCNTLname[] = {
 	"F_UNSHARE",
 	"F_SETLK_NBMAND",
 	"F_SHARE_NBMAND",
-	"F_SETLK64_NBMAND"
+	"F_SETLK64_NBMAND",
+	NULL,		/* 45 */
+	"F_BADFD"
 };
 
 #define	SYSFSMIN	GETFSIND
@@ -163,7 +165,7 @@ const char *const PLOCKname[] = {
 };
 
 #define	SCONFMIN	_CONFIG_NGROUPS
-#define	SCONFMAX	_CONFIG_CPUID_MAX
+#define	SCONFMAX	_CONFIG_EPHID_MAX
 const char *const SCONFname[] = {
 	"_CONFIG_NGROUPS",		/*  2 */
 	"_CONFIG_CHILD_MAX",		/*  3 */
@@ -208,21 +210,115 @@ const char *const SCONFname[] = {
 	"_CONFIG_MAXPID",		/* 42 */
 	"_CONFIG_STACK_PROT",		/* 43 */
 	"_CONFIG_NPROC_MAX",		/* 44 */
-	"_CONFIG_CPUID_MAX"		/* 45 */
+	"_CONFIG_CPUID_MAX",		/* 45 */
+	"_CONFIG_SYMLOOP_MAX",		/* 46 */
+	"_CONFIG_EPHID_MAX",		/* 47 */
 };
 
 #define	PATHCONFMIN	_PC_LINK_MAX
-#define	PATHCONFMAX	_PC_CHOWN_RESTRICTED
+#define	PATHCONFMAX	_PC_XATTR_EXISTS
 const char *const PATHCONFname[] = {
-	"_PC_LINK_MAX",
-	"_PC_MAX_CANON",
-	"_PC_MAX_INPUT",
-	"_PC_NAME_MAX",
-	"_PC_PATH_MAX",
-	"_PC_PIPE_BUF",
-	"_PC_NO_TRUNC",
-	"_PC_VDISABLE",
-	"_PC_CHOWN_RESTRICTED"
+	"_PC_LINK_MAX",			/*  1 */
+	"_PC_MAX_CANON",		/*  2 */
+	"_PC_MAX_INPUT",		/*  3 */
+	"_PC_NAME_MAX",			/*  4 */
+	"_PC_PATH_MAX",			/*  5 */
+	"_PC_PIPE_BUF",			/*  6 */
+	"_PC_NO_TRUNC",			/*  7 */
+	"_PC_VDISABLE",			/*  8 */
+	"_PC_CHOWN_RESTRICTED",		/*  9 */
+	"_PC_ASYNC_IO",			/* 10 */
+	"_PC_PRIO_IO",			/* 11 */
+	"_PC_SYNC_IO",			/* 12 */
+	"_PC_ALLOC_SIZE_MIN",		/* 13 */
+	"_PC_REC_INCR_XFER_SIZE",	/* 14 */
+	"_PC_REC_MAX_XFER_SIZE",	/* 15 */
+	"_PC_REC_MIN_XFER_SIZE",	/* 16 */
+	"_PC_REC_XFER_ALIGN",		/* 17 */
+	"_PC_SYMLINK_MAX",		/* 18 */
+	"_PC_2_SYMLINKS",		/* 19 */
+	"_PC_ACL_ENABLED",		/* 20 */
+	"_PC_MIN_HOLE_SIZE",		/* 21 */
+	"_PC_CASE_BEHAVIOR",		/* 22 */
+	"_PC_SATTR_ENABLED",		/* 23 */
+	"_PC_SATTR_EXISTS",		/* 24 */
+	NULL,				/* 25 */
+	NULL,				/* 26 */
+	NULL,				/* 27 */
+	NULL,				/* 28 */
+	NULL,				/* 29 */
+	NULL,				/* 30 */
+	NULL,				/* 31 */
+	NULL,				/* 32 */
+	NULL,				/* 33 */
+	NULL,				/* 34 */
+	NULL,				/* 35 */
+	NULL,				/* 36 */
+	NULL,				/* 37 */
+	NULL,				/* 38 */
+	NULL,				/* 39 */
+	NULL,				/* 40 */
+	NULL,				/* 41 */
+	NULL,				/* 42 */
+	NULL,				/* 43 */
+	NULL,				/* 44 */
+	NULL,				/* 45 */
+	NULL,				/* 46 */
+	NULL,				/* 47 */
+	NULL,				/* 48 */
+	NULL,				/* 49 */
+	NULL,				/* 50 */
+	NULL,				/* 51 */
+	NULL,				/* 52 */
+	NULL,				/* 53 */
+	NULL,				/* 54 */
+	NULL,				/* 55 */
+	NULL,				/* 56 */
+	NULL,				/* 57 */
+	NULL,				/* 58 */
+	NULL,				/* 59 */
+	NULL,				/* 60 */
+	NULL,				/* 61 */
+	NULL,				/* 62 */
+	NULL,				/* 63 */
+	NULL,				/* 64 */
+	NULL,				/* 65 */
+	NULL,				/* 66 */
+	"_PC_FILESIZEBITS",		/* 67 */
+	NULL,				/* 68 */
+	NULL,				/* 69 */
+	NULL,				/* 70 */
+	NULL,				/* 71 */
+	NULL,				/* 72 */
+	NULL,				/* 73 */
+	NULL,				/* 74 */
+	NULL,				/* 75 */
+	NULL,				/* 76 */
+	NULL,				/* 77 */
+	NULL,				/* 78 */
+	NULL,				/* 79 */
+	NULL,				/* 80 */
+	NULL,				/* 81 */
+	NULL,				/* 82 */
+	NULL,				/* 83 */
+	NULL,				/* 84 */
+	NULL,				/* 85 */
+	NULL,				/* 86 */
+	NULL,				/* 87 */
+	NULL,				/* 88 */
+	NULL,				/* 89 */
+	NULL,				/* 90 */
+	NULL,				/* 91 */
+	NULL,				/* 92 */
+	NULL,				/* 93 */
+	NULL,				/* 94 */
+	NULL,				/* 95 */
+	NULL,				/* 96 */
+	NULL,				/* 97 */
+	NULL,				/* 98 */
+	NULL,				/* 99 */
+	"_PC_XATTR_ENABLED",		/* 100 */
+	"_PC_XATTR_EXISTS",		/* 101, _PC_LAST */
 };
 
 const struct ioc {
@@ -1178,6 +1274,11 @@ si86name(int code)
 	case SI86SHRGN:		str = "SI86SHRGN";	break;
 	case SI86CHIDT:		str = "SI86CHIDT";	break;
 	case SI86EMULRDA: 	str = "SI86EMULRDA";	break;
+/* RTC commands */
+	case WTODC:		str = "WTODC";		break;
+	case SGMTL:		str = "SGMTL";		break;
+	case GGMTL:		str = "GGMTL";		break;
+	case RTCSYNC:		str = "RTCSYNC";	break;
 	}
 #endif /* __i386 */
 

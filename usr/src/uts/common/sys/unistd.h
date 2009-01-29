@@ -26,7 +26,7 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,6 @@
 
 #ifndef _SYS_UNISTD_H
 #define	_SYS_UNISTD_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* From SVR4.0 1.3 */
 
 #include <sys/feature_tests.h>
 
@@ -321,13 +319,17 @@ extern "C" {
  * value space.
  */
 #define	_PC_FILESIZEBITS	67
-#define	_PC_LAST		67
 
 /*
  * Extended attributes
  */
 #define	_PC_XATTR_ENABLED	100
 #define	_PC_XATTR_EXISTS	101
+
+/*
+ * If you add a _PC define above 101, you must change _PC_LAST (and truss).
+ */
+#define	_PC_LAST		101
 
 /*
  * Case sensitivity values (related to _PC_CASE_BEHAVIOR)
