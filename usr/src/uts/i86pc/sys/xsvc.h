@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_XSVC_H
 #define	_SYS_XSVC_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef __cplusplus
 extern "C" {
@@ -121,6 +119,8 @@ typedef struct xsvc_state_s {
 	 */
 	kmutex_t	xs_mutex;
 	uint64_t	xs_currently_alloced;
+
+	kmutex_t	xs_cookie_mutex;
 
 	xsvc_mlist_t	xs_mlist;
 } xsvc_state_t;

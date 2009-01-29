@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,9 +122,6 @@ static int xsvc_mnode_key_compare(const void *q, const void *e);
 static int xsvc_umem_cookie_alloc(caddr_t kva, size_t size, int flags,
     ddi_umem_cookie_t *cookiep);
 static void xsvc_umem_cookie_free(ddi_umem_cookie_t *cookiep);
-static void xsvc_devmap_unmap(devmap_cookie_t dhp, void *pvtp, offset_t off,
-    size_t len, devmap_cookie_t new_dhp1, void **new_pvtp1,
-    devmap_cookie_t new_dhp2, void **new_pvtp2);
 
 
 void *xsvc_statep;
@@ -135,11 +132,20 @@ static ddi_device_acc_attr_t xsvc_device_attr = {
 	DDI_STRICTORDER_ACC
 };
 
+static int xsvc_devmap_map(devmap_cookie_t dhp, dev_t dev, uint_t flags,
+    offset_t off, size_t len, void **pvtp);
+static int xsvc_devmap_dup(devmap_cookie_t dhp, void *pvtp,
+    devmap_cookie_t new_dhp, void **new_pvtp);
+static void xsvc_devmap_unmap(devmap_cookie_t dhp, void *pvtp, offset_t off,
+    size_t len, devmap_cookie_t new_dhp1, void **new_pvtp1,
+    devmap_cookie_t new_dhp2, void **new_pvtp2);
+
+
 static struct devmap_callback_ctl xsvc_callbk = {
 	DEVMAP_OPS_REV,
+	xsvc_devmap_map,
 	NULL,
-	NULL,
-	NULL,
+	xsvc_devmap_dup,
 	xsvc_devmap_unmap
 };
 
@@ -237,6 +243,8 @@ xsvc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	mutex_init(&state->xs_mutex, NULL, MUTEX_DRIVER, NULL);
 	state->xs_currently_alloced = 0;
 
+	mutex_init(&state->xs_cookie_mutex, NULL, MUTEX_DRIVER, NULL);
+
 	/* create the minor node (for the ioctl) */
 	err = ddi_create_minor_node(dip, "xsvc", S_IFCHR, instance, DDI_PSEUDO,
 	    0);
@@ -265,6 +273,7 @@ xsvc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 attachfail_minor_node:
+	mutex_destroy(&state->xs_cookie_mutex);
 	mutex_destroy(&state->xs_mutex);
 attachfail_get_soft_state:
 	(void) ddi_soft_state_free(xsvc_statep, instance);
@@ -314,6 +323,7 @@ xsvc_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	avl_destroy(&state->xs_mlist.ml_avl);
 	mutex_destroy(&state->xs_mlist.ml_mutex);
 
+	mutex_destroy(&state->xs_cookie_mutex);
 	mutex_destroy(&state->xs_mutex);
 	(void) ddi_soft_state_free(xsvc_statep, state->xs_instance);
 	return (DDI_SUCCESS);
@@ -947,6 +957,77 @@ xsvc_umem_cookie_free(ddi_umem_cookie_t *cookiep)
 	*cookiep = NULL;
 }
 
+
+/*
+ * xsvc_devmap_map()
+ *
+ */
+/*ARGSUSED*/
+static int
+xsvc_devmap_map(devmap_cookie_t dhc, dev_t dev, uint_t flags, offset_t off,
+    size_t len, void **pvtp)
+{
+	struct ddi_umem_cookie *cp;
+	devmap_handle_t *dhp;
+	xsvc_state_t *state;
+	int instance;
+
+
+	instance = getminor(dev);
+	state = ddi_get_soft_state(xsvc_statep, instance);
+	if (state == NULL) {
+		return (ENXIO);
+	}
+
+	dhp = (devmap_handle_t *)dhc;
+	/* This driver only supports MAP_SHARED, not MAP_PRIVATE */
+	if (flags & MAP_PRIVATE) {
+		cmn_err(CE_WARN, "!xsvc driver doesn't support MAP_PRIVATE");
+		return (EINVAL);
+	}
+
+	cp = (struct ddi_umem_cookie *)dhp->dh_cookie;
+	cp->cook_refcnt = 1;
+
+	*pvtp = state;
+	return (0);
+}
+
+
+/*
+ * xsvc_devmap_dup()
+ *
+ *   keep a reference count for forks so we don't unmap if we have multiple
+ *   mappings.
+ */
+/*ARGSUSED*/
+static int
+xsvc_devmap_dup(devmap_cookie_t dhc, void *pvtp, devmap_cookie_t new_dhp,
+    void **new_pvtp)
+{
+	struct ddi_umem_cookie *cp;
+	devmap_handle_t *dhp;
+	xsvc_state_t *state;
+
+
+	state = (xsvc_state_t *)pvtp;
+	dhp = (devmap_handle_t *)dhc;
+
+	mutex_enter(&state->xs_cookie_mutex);
+	cp = (struct ddi_umem_cookie *)dhp->dh_cookie;
+	if (cp == NULL) {
+		mutex_exit(&state->xs_cookie_mutex);
+		return (ENOMEM);
+	}
+
+	cp->cook_refcnt++;
+	mutex_exit(&state->xs_cookie_mutex);
+
+	*new_pvtp = state;
+	return (0);
+}
+
+
 /*
  * xsvc_devmap_unmap()
  *
@@ -962,8 +1043,11 @@ xsvc_devmap_unmap(devmap_cookie_t dhc, void *pvtp, offset_t off, size_t len,
     devmap_cookie_t new_dhp1, void **new_pvtp1, devmap_cookie_t new_dhp2,
     void **new_pvtp2)
 {
+	struct ddi_umem_cookie *ncp;
 	struct ddi_umem_cookie *cp;
+	devmap_handle_t *ndhp;
 	devmap_handle_t *dhp;
+	xsvc_state_t *state;
 	size_t npages;
 	caddr_t kvai;
 	caddr_t kva;
@@ -971,22 +1055,46 @@ xsvc_devmap_unmap(devmap_cookie_t dhc, void *pvtp, offset_t off, size_t len,
 	int i;
 
 
+	state = (xsvc_state_t *)pvtp;
+	mutex_enter(&state->xs_cookie_mutex);
+
 	/* peek into the umem cookie to figure out what we need to free up */
 	dhp = (devmap_handle_t *)dhc;
 	cp = (struct ddi_umem_cookie *)dhp->dh_cookie;
-	kva = cp->cvaddr;
-	size = cp->size;
+	ASSERT(cp != NULL);
 
-	/*
-	 * free up the umem cookie, then unmap all the pages what we mapped
-	 * in during devmap, then free up the kva space.
-	 */
-	npages = btop(size);
-	xsvc_umem_cookie_free(&dhp->dh_cookie);
-	kvai = kva;
-	for (i = 0; i < npages; i++) {
-		hat_unload(kas.a_hat, kvai, PAGESIZE, HAT_UNLOAD_UNLOCK);
-		kvai = (caddr_t)((uintptr_t)kvai + PAGESIZE);
+	if (new_dhp1 != NULL) {
+		ndhp = (devmap_handle_t *)new_dhp1;
+		ncp = (struct ddi_umem_cookie *)ndhp->dh_cookie;
+		ncp->cook_refcnt++;
+		*new_pvtp1 = state;
 	}
-	vmem_free(heap_arena, kva, size);
+	if (new_dhp2 != NULL) {
+		ndhp = (devmap_handle_t *)new_dhp2;
+		ncp = (struct ddi_umem_cookie *)ndhp->dh_cookie;
+		ncp->cook_refcnt++;
+		*new_pvtp2 = state;
+	}
+
+	cp->cook_refcnt--;
+	if (cp->cook_refcnt == 0) {
+		kva = cp->cvaddr;
+		size = cp->size;
+
+		/*
+		 * free up the umem cookie, then unmap all the pages what we
+		 * mapped in during devmap, then free up the kva space.
+		 */
+		npages = btop(size);
+		xsvc_umem_cookie_free(&dhp->dh_cookie);
+		kvai = kva;
+		for (i = 0; i < npages; i++) {
+			hat_unload(kas.a_hat, kvai, PAGESIZE,
+			    HAT_UNLOAD_UNLOCK);
+			kvai = (caddr_t)((uintptr_t)kvai + PAGESIZE);
+		}
+		vmem_free(heap_arena, kva, size);
+	}
+
+	mutex_exit(&state->xs_cookie_mutex);
 }
