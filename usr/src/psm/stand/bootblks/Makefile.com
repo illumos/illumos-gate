@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # psm/stand/bootblks/Makefile.com
 #
@@ -68,14 +66,6 @@ FILEMODE	= 444
 DIRMODE		= 755
 OWNER		= root
 GROUP		= sys
-
-#
-# Lint rules (adapted from Makefile.uts)
-#
-LHEAD		= ( $(ECHO) "\n$@";
-LGREP		= grep -v "pointer cast may result in improper alignment"
-LTAIL		= ) 2>&1 | $(LGREP)
-LINT_DEFS	+= -Dlint
 
 #
 # For building lint objects

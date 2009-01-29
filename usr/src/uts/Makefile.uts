@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -147,13 +147,13 @@ MODEL		= $(MODEL_$(CLASS))
 #
 #	Build rules for linting the kernel.
 #
-LHEAD =	( $(ECHO) "\n$@";
+LHEAD =	$(ECHO) "\n$@";
 
 # Note: egrep returns "failure" if there are no matches, which is
 # exactly the opposite of what we need.
 LGREP.2 =	if egrep -v ' (_init|_fini|_info|_depends_on) '; then false; else true; fi
 
-LTAIL =	)
+LTAIL =
 
 LINT.c =	$(LINT) -c -dirout=$(LINTS_DIR) $(LINTFLAGS) $(LINT_DEFS) $(CPPFLAGS)
 
