@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,12 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * 	selfcheck.c
- *      Copyright (c) 1999 Sun Microsystems Inc.
- *      All Rights Reserved.
+ * selfcheck.c
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <syslog.h>
@@ -41,8 +38,7 @@
 #include <net/if.h>
 
 int
-self_check(hostname)
-	char *hostname;
+self_check(char *hostname)
 {
 	int s, res = 0;
 	struct sioc_addrreq areq;
@@ -110,7 +106,7 @@ self_check(hostname)
  * freed.
  */
 struct lifconf *
-getmyaddrs()
+getmyaddrs(void)
 {
 	int sock;
 	struct lifnum lifn;
@@ -135,17 +131,16 @@ getmyaddrs()
 	numifs = lifn.lifn_count;
 
 	lifc = (struct lifconf *)malloc(sizeof (struct lifconf));
-	lifc = malloc(sizeof (struct lifconf));
 	if (lifc == NULL) {
 		syslog(LOG_ERR,
-			"statd:getmyaddrs, malloc for lifconf failed: %m");
+		    "statd:getmyaddrs, malloc for lifconf failed: %m");
 		(void) close(sock);
 		return ((struct lifconf *)NULL);
 	}
 	buf = (char *)malloc(numifs * sizeof (struct lifreq));
 	if (buf == NULL) {
 		syslog(LOG_ERR,
-			"statd:getmyaddrs, malloc for lifreq failed: %m");
+		    "statd:getmyaddrs, malloc for lifreq failed: %m");
 		(void) close(sock);
 		free(lifc);
 		return ((struct lifconf *)NULL);
