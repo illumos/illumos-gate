@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,16 +212,21 @@ convert_local_tpgt(char **text, int *text_length, char *local_tpgt)
 			 * check the node's name to see if this is correct or
 			 * not.
 			 */
-			if (tpgt->x_child == NULL) {
+			if ((tpgt = tgt_node_next(tpgt, XML_ELEMENT_IPADDRLIST,
+			    NULL)) == NULL) {
 				return (False);
 			}
-			for (x = tpgt->x_child; x; x = x->x_sibling) {
+
+			x = NULL;
+			while ((x = tgt_node_next(tpgt, XML_ELEMENT_IPADDR, x))
+			    != NULL) {
 				if (inet_pton(AF_INET, x->x_value, &ipaddr)
 				    == 1) {
 					/*
 					 * Valid IPv4 address
 					 */
 					(void) snprintf(buf, sizeof (buf),
+
 					    "%s,%s", x->x_value, local_tpgt);
 				} else {
 					/*
