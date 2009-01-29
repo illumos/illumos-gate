@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3085,7 +3085,7 @@ get_the_stuff(
 
 			    fh3p->fh3_length = res.
 				WNL_LOOKUP3res_u.res_ok.object.data.data_len;
-			    memcpy(fh3p->fh3_u.data, &res.
+			    memcpy(fh3p->fh3_u.data, res.
 				WNL_LOOKUP3res_u.res_ok.object.data.data_val,
 				fh3p->fh3_length);
 

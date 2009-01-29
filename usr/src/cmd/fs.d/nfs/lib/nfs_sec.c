@@ -21,7 +21,7 @@
 /* LINTLIBRARY */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -655,7 +655,7 @@ nfs_sec_nego(rpcprog_t vers, CLIENT *clnt, char *fspath, struct snego_t *snego)
 				 * 5th and after: sec flavors.
 				 */
 				{
-					char *c = (char *)&res.WNL_LOOKUP3res_u.
+					char *c = res.WNL_LOOKUP3res_u.
 					    res_ok.object.data.data_val;
 					int ii;
 					int len = res.WNL_LOOKUP3res_u.res_ok.
