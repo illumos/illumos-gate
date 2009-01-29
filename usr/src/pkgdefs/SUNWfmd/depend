@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 P SUNWcar	Core Architecture, (Root)
@@ -36,3 +34,6 @@ P SUNWcsu	Core Solaris, (Usr)
 P SUNWcsd	Core Solaris Devices
 P SUNWcsl	Core Solaris Libraries
 P SUNWfmdr	Fault Management Daemon and Utilities (Root)
+P SUNWsmagt     System Management Agent files and libraries
+P SUNWlxmlr     The XML library (Root)
+P SUNWzfsr      ZFS (Root)
