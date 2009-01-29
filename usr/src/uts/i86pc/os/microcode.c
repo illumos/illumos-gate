@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,17 +77,20 @@ static uint32_t ucode_load_intel(ucode_file_t *, cpu_ucode_info_t *, cpu_t *);
 
 #ifdef	__xpv
 static void ucode_load_xpv(ucode_update_t *);
+static void ucode_chipset_amd(uint8_t *, int);
 #endif
 
-static int ucode_equiv_cpu_amd(cpu_t *, int *);
+static int ucode_equiv_cpu_amd(cpu_t *, uint16_t *);
 
 static ucode_errno_t ucode_locate_amd(cpu_t *, cpu_ucode_info_t *,
     ucode_file_t *);
 static ucode_errno_t ucode_locate_intel(cpu_t *, cpu_ucode_info_t *,
     ucode_file_t *);
 
-static ucode_errno_t ucode_match_amd(int, cpu_ucode_info_t *,
+#ifndef __xpv
+static ucode_errno_t ucode_match_amd(uint16_t, cpu_ucode_info_t *,
     ucode_file_amd_t *, int);
+#endif
 static ucode_errno_t ucode_match_intel(int, cpu_ucode_info_t *,
     ucode_header_intel_t *, ucode_ext_table_intel_t *);
 
@@ -205,20 +208,14 @@ ucode_capable_amd(cpu_t *cp)
 	if (xpv_is_hvm) {
 		return (0);
 	}
-
-	return (cpuid_getfamily(cp) >= 0x10);
 #else
 	if (!DOMAIN_IS_INITDOMAIN(xen_info)) {
 		return (0);
 	}
-
-	/*
-	 * XXPV - change when microcode loading works in dom0. Don't support
-	 * microcode loading in dom0 right now for AMD.
-	 */
-	return (0);
 #endif
+	return (cpuid_getfamily(cp) >= 0x10);
 }
+
 static int
 ucode_capable_intel(cpu_t *cp)
 {
@@ -282,7 +279,7 @@ ucode_file_reset_intel(ucode_file_t *ufp, processorid_t id)
  * Find the equivalent CPU id in the equivalence table.
  */
 static int
-ucode_equiv_cpu_amd(cpu_t *cp, int *eq_sig)
+ucode_equiv_cpu_amd(cpu_t *cp, uint16_t *eq_sig)
 {
 	char name[MAXPATHLEN];
 	intptr_t fd;
@@ -351,7 +348,6 @@ ucode_equiv_cpu_amd(cpu_t *cp, int *eq_sig)
 			;
 
 	*eq_sig = eqtbl->ue_equiv_cpu;
-	*eq_sig = ((*eq_sig >> 8) & 0xff00) | (*eq_sig & 0xff);
 
 	/* No equivalent CPU id found, assume outdated microcode file. */
 	if (*eq_sig == 0)
@@ -361,19 +357,61 @@ ucode_equiv_cpu_amd(cpu_t *cp, int *eq_sig)
 }
 
 /*
+ * xVM cannot check for the presence of PCI devices. Look for chipset-
+ * specific microcode patches in the container file and disable them
+ * by setting their CPU revision to an invalid value.
+ */
+#ifdef __xpv
+static void
+ucode_chipset_amd(uint8_t *buf, int size)
+{
+	ucode_header_amd_t *uh;
+	uint32_t *ptr = (uint32_t *)buf;
+	int len = 0;
+
+	/* skip to first microcode patch */
+	ptr += 2; len = *ptr++; ptr += len >> 2; size -= len;
+
+	while (size >= sizeof (ucode_header_amd_t) + 8) {
+		ptr++; len = *ptr++;
+		uh = (ucode_header_amd_t *)ptr;
+		ptr += len >> 2; size -= len;
+
+		if (uh->uh_nb_id) {
+			cmn_err(CE_WARN, "ignoring northbridge-specific ucode: "
+			    "chipset id %x, revision %x",
+			    uh->uh_nb_id, uh->uh_nb_rev);
+			uh->uh_cpu_rev = 0xffff;
+		}
+
+		if (uh->uh_sb_id) {
+			cmn_err(CE_WARN, "ignoring southbridge-specific ucode: "
+			    "chipset id %x, revision %x",
+			    uh->uh_sb_id, uh->uh_sb_rev);
+			uh->uh_cpu_rev = 0xffff;
+		}
+	}
+}
+#endif
+
+/*
  * Populate the ucode file structure from microcode file corresponding to
  * this CPU, if exists.
  *
  * Return EM_OK on success, corresponding error code on failure.
  */
+/*ARGSUSED*/
 static ucode_errno_t
 ucode_locate_amd(cpu_t *cp, cpu_ucode_info_t *uinfop, ucode_file_t *ufp)
 {
 	char name[MAXPATHLEN];
 	intptr_t fd;
-	int count, i, rc;
-	int eq_sig = 0;
+	int count, rc;
 	ucode_file_amd_t *ucodefp = ufp->amd;
+
+#ifndef __xpv
+	uint16_t eq_sig = 0;
+	int i;
 
 	/* get equivalent CPU id */
 	if ((rc = ucode_equiv_cpu_amd(cp, &eq_sig)) != EM_OK)
@@ -415,6 +453,59 @@ ucode_locate_amd(cpu_t *cp, cpu_ucode_info_t *uinfop, ucode_file_t *ufp)
 			return (EM_OK);
 	}
 	return (EM_NOMATCH);
+#else
+	int size = 0;
+	char c;
+
+	/*
+	 * The xVM case is special. To support mixed-revision systems, the
+	 * hypervisor will choose which patch to load for which CPU, so the
+	 * whole microcode patch container file will have to be loaded.
+	 *
+	 * Since this code is only run on the boot cpu, we don't have to care
+	 * about failing ucode_zalloc() or freeing allocated memory.
+	 */
+	if (cp->cpu_id != 0)
+		return (EM_INVALIDARG);
+
+	(void) snprintf(name, MAXPATHLEN, "/%s/%s/container",
+	    UCODE_INSTALL_PATH, cpuid_getvendorstr(cp));
+
+	if ((fd = kobj_open(name)) == -1)
+		return (EM_OPENFILE);
+
+	/* get the file size by counting bytes */
+	do {
+		count = kobj_read(fd, &c, 1, size);
+		size += count;
+	} while (count);
+
+	ucodefp = ucode_zalloc(cp->cpu_id, sizeof (*ucodefp));
+	ASSERT(ucodefp);
+	ufp->amd = ucodefp;
+
+	ucodefp->usize = size;
+	ucodefp->ucodep = ucode_zalloc(cp->cpu_id, size);
+	ASSERT(ucodefp->ucodep);
+
+	/* load the microcode patch container file */
+	count = kobj_read(fd, (char *)ucodefp->ucodep, size, 0);
+	(void) kobj_close(fd);
+
+	if (count != size)
+		return (EM_FILESIZE);
+
+	/* make sure the container file is valid */
+	rc = ucode->validate(ucodefp->ucodep, ucodefp->usize);
+
+	if (rc != EM_OK)
+		return (rc);
+
+	/* disable chipset-specific patches */
+	ucode_chipset_amd(ucodefp->ucodep, ucodefp->usize);
+
+	return (EM_OK);
+#endif
 }
 
 static ucode_errno_t
@@ -551,9 +642,10 @@ ucode_locate_intel(cpu_t *cp, cpu_ucode_info_t *uinfop, ucode_file_t *ufp)
 	return (rc);
 }
 
+#ifndef __xpv
 static ucode_errno_t
-ucode_match_amd(int eq_sig, cpu_ucode_info_t *uinfop, ucode_file_amd_t *ucodefp,
-    int size)
+ucode_match_amd(uint16_t eq_sig, cpu_ucode_info_t *uinfop,
+    ucode_file_amd_t *ucodefp, int size)
 {
 	ucode_header_amd_t *uh;
 
@@ -590,6 +682,7 @@ ucode_match_amd(int eq_sig, cpu_ucode_info_t *uinfop, ucode_file_amd_t *ucodefp,
 
 	return (EM_OK);
 }
+#endif
 
 /*
  * Returns 1 if the microcode is for this processor; 0 otherwise.
@@ -681,15 +774,17 @@ ucode_load_amd(ucode_file_t *ufp, cpu_ucode_info_t *uinfop, cpu_t *cp)
 	wrmsr(ucode->write_msr, (uintptr_t)ucodefp);
 	ucode->read_rev(uinfop);
 	kpreempt_enable();
+
+	return (ucodefp->uf_header.uh_patch_id);
 #else
-	uus.ucodep = (uint8_t *)ucodefp;
-	uus.usize = sizeof (*ucodefp);
+	uus.ucodep = ucodefp->ucodep;
+	uus.usize = ucodefp->usize;
 	ucode_load_xpv(&uus);
 	ucode->read_rev(uinfop);
 	uus.new_rev = uinfop->cui_rev;
-#endif
 
-	return (ucodefp->uf_header.uh_patch_id);
+	return (uus.new_rev);
+#endif
 }
 
 /*ARGSUSED2*/
@@ -794,10 +889,14 @@ ucode_read_rev_intel(cpu_ucode_info_t *uinfop)
 static ucode_errno_t
 ucode_extract_amd(ucode_update_t *uusp, uint8_t *ucodep, int size)
 {
+#ifndef __xpv
 	uint32_t *ptr = (uint32_t *)ucodep;
 	ucode_eqtbl_amd_t *eqtbl;
 	ucode_file_amd_t *ufp;
-	int count, eq_sig;
+	int count;
+	int higher = 0;
+	ucode_errno_t rc = EM_NOMATCH;
+	uint16_t eq_sig;
 
 	/* skip over magic number & equivalence table header */
 	ptr += 2; size -= 8;
@@ -809,7 +908,6 @@ ucode_extract_amd(ucode_update_t *uusp, uint8_t *ucodep, int size)
 		;
 
 	eq_sig = eqtbl->ue_equiv_cpu;
-	eq_sig = ((eq_sig >> 8) & 0xff00) | (eq_sig & 0xff);
 
 	/* No equivalent CPU id found, assume outdated microcode file. */
 	if (eq_sig == 0)
@@ -820,16 +918,32 @@ ucode_extract_amd(ucode_update_t *uusp, uint8_t *ucodep, int size)
 		ptr += count >> 2; size -= count;
 
 		if (!size)
-			return (EM_NOMATCH);
+			return (higher ? EM_HIGHERREV : EM_NOMATCH);
 
 		ptr++; size -= 4;
 		count = *ptr++; size -= 4;
 		ufp = (ucode_file_amd_t *)ptr;
-	} while (ucode_match_amd(eq_sig, &uusp->info, ufp, count) != EM_OK);
+
+		rc = ucode_match_amd(eq_sig, &uusp->info, ufp, count);
+		if (rc == EM_HIGHERREV)
+			higher = 1;
+	} while (rc != EM_OK);
 
 	uusp->ucodep = (uint8_t *)ufp;
 	uusp->usize = count;
 	uusp->expected_rev = ufp->uf_header.uh_patch_id;
+#else
+	/*
+	 * The hypervisor will choose the patch to load, so there is no way to
+	 * know the "expected revision" in advance. This is especially true on
+	 * mixed-revision systems where more than one patch will be loaded.
+	 */
+	uusp->expected_rev = 0;
+	uusp->ucodep = ucodep;
+	uusp->usize = size;
+
+	ucode_chipset_amd(ucodep, size);
+#endif
 
 	return (EM_OK);
 }
@@ -986,13 +1100,16 @@ ucode_update(uint8_t *ucodep, int size)
 		kpreempt_enable();
 		CPUSET_DEL(cpuset, id);
 
-		if (uusp->expected_rev == uusp->new_rev) {
-			cmn_err(CE_CONT, ucode_success_fmt,
-			    id, uusp->info.cui_rev, uusp->expected_rev);
-		} else {
+		if (uusp->new_rev != 0 && uusp->info.cui_rev == uusp->new_rev) {
+			rc = EM_HIGHERREV;
+		} else if ((uusp->new_rev == 0) || (uusp->expected_rev != 0 &&
+		    uusp->expected_rev != uusp->new_rev)) {
 			cmn_err(CE_WARN, ucode_failure_fmt,
 			    id, uusp->info.cui_rev, uusp->expected_rev);
 			rc = EM_UPDATE;
+		} else {
+			cmn_err(CE_CONT, ucode_success_fmt,
+			    id, uusp->info.cui_rev, uusp->new_rev);
 		}
 	}
 

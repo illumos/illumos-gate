@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG = ucodeadm
@@ -40,10 +38,11 @@ POFILE = ucodeadm_all.po
 POFILES = $(PROG_OBJS:%.o=%.po)
 
 INTEL_UCODE_FILE = intel-ucode.txt
-AMD_UCODE_FILE = amd-ucode.txt
+AMD_UCODE_FILE = amd-ucode.bin
 
 ROOTUCODEPATH = $(ROOT)/platform/i86pc/ucode
 ROOTINTELUCODE = $(INTEL_UCODE_FILE:%=$(ROOTUCODEPATH)/%)
+ROOTAMDUCODE = $(AMD_UCODE_FILE:%=$(ROOTUCODEPATH)/%)
 
 CPPFLAGS = -I../../common -I../../uts/common
 CFLAGS	+= -v
@@ -57,6 +56,7 @@ OWNER = root
 GROUP = sys
 
 $(ROOTINTELUCODE) := FILEMODE = 0444
+$(ROOTAMDUCODE) := FILEMODE = 0444
 
 install := TARGET = install
 clobber := TARGET = clobber
@@ -67,7 +67,7 @@ CLEANFILES += $(PROG) $(OBJS) ucode_errno.c $(POFILES) $(POFILE)
 
 all: $(PROG)
 
-install: all $(ROOTUSRSBINPROG) $(ROOTUCODEPATH) $(ROOTINTELUCODE)
+install: all $(ROOTUSRSBINPROG) $(ROOTUCODEPATH) $(ROOTINTELUCODE) $(ROOTAMDUCODE)
 
 _msg: ucodeadm_all.po
 

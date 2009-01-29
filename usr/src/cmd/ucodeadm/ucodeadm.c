@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -242,13 +242,33 @@ ucode_gen_files_amd(uint8_t *buf, int size, char *path)
 	ucode_header_amd_t *uh;
 	int last_cpu_rev = 0;
 
+	/* write container file */
+	(void) snprintf(path + plen, PATH_MAX - plen, "/container");
+
+	dprintf("path = %s\n", path);
+	fd = open(path, O_WRONLY | O_CREAT | O_TRUNC,
+	    S_IRUSR | S_IRGRP | S_IROTH);
+
+	if (fd == -1) {
+		ucode_perror(path, EM_SYS);
+		return (EM_SYS);
+	}
+
+	if (write(fd, buf, size) != size) {
+		(void) close(fd);
+		ucode_perror(path, EM_SYS);
+		return (EM_SYS);
+	}
+
+	(void) close(fd);
+
 	/* skip over magic number & equivalence table header */
 	ptr += 2; size -= 8;
 
 	count = *ptr++; size -= 4;
 
 	/* equivalence table uses special name */
-	(void) strlcat(path, "/equivalence-table", PATH_MAX);
+	(void) snprintf(path + plen, PATH_MAX - plen, "/equivalence-table");
 
 	for (;;) {
 		dprintf("path = %s\n", path);

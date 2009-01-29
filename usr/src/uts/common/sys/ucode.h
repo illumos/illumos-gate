@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,18 +110,24 @@ typedef struct ucode_header_amd {
 } ucode_header_amd_t;
 
 typedef struct ucode_file_amd {
+#ifndef __xpv
 	ucode_header_amd_t uf_header;
 	uint8_t uf_data[896];
 	uint8_t uf_resv[896];
 	uint8_t uf_code_present;
 	uint8_t uf_code[191];
+#else
+	uint8_t *ucodep;
+	uint32_t usize;
+#endif
 } ucode_file_amd_t;
 
 typedef struct ucode_eqtbl_amd {
 	uint32_t ue_inst_cpu;
 	uint32_t ue_fixed_mask;
 	uint32_t ue_fixed_comp;
-	uint32_t ue_equiv_cpu;
+	uint16_t ue_equiv_cpu;
+	uint16_t ue_reserved;
 } ucode_eqtbl_amd_t;
 
 /*

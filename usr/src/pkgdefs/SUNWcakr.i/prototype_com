@@ -98,5 +98,6 @@ f none platform/i86pc/kernel/misc/pcie 755 root sys
 f none platform/i86pc/kernel/unix 755 root sys
 f none platform/i86pc/multiboot 755 root sys
 d none platform/i86pc/ucode 755 root sys
+v none platform/i86pc/ucode/amd-ucode.bin 444 root sys
 v none platform/i86pc/ucode/intel-ucode.txt 444 root sys
 f none platform/i86pc/kernel/drv/amd64/cpudrv 755 root sys
