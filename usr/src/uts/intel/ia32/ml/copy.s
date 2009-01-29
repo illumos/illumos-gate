@@ -19,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2008, Intel Corporation
+ * Copyright (c) 2009, Intel Corporation
  * All rights reserved.
  */
 
@@ -960,21 +960,23 @@ kzero(void *addr, size_t count)
 0:
 #endif
 	/*
-	 * pass lofault value as 3rd argument to do_zero_fault
+	 * pass lofault value as 3rd argument for fault return 
 	 */
 	leaq	_kzeroerr(%rip), %rdx
 
-do_zero_fault:
 	movq	%gs:CPU_THREAD, %r9	/* %r9 = thread addr */
 	movq	T_LOFAULT(%r9), %r11	/* save the current lofault */
 	movq	%rdx, T_LOFAULT(%r9)	/* new lofault */
 	call	bzero_altentry
-	
+	xorl	%eax, %eax
+	movq	%r11, T_LOFAULT(%r9)	/* restore the original lofault */
+	ret
 	/*
-	 * A fault during do_zero_fault is indicated through an errno value
+	 * A fault during bzero is indicated through an errno value
 	 * in %rax when we iretq to here.
 	 */
 _kzeroerr:
+	addq	$8, %rsp		/* pop bzero_altentry call ret addr */
 	movq	%r11, T_LOFAULT(%r9)	/* restore the original lofault */
 	ret
 	SET_SIZE(kzero)
@@ -997,7 +999,6 @@ _kzeroerr:
 #endif
 	lea	_kzeroerr, %eax		/* kzeroerr is lofault value */
 
-do_zero_fault:
 	pushl	%ebp			/* save stack base */
 	movl	%esp, %ebp		/* set new stack base */
 	pushl	%edi			/* save %edi */
@@ -1020,7 +1021,7 @@ do_zero_fault:
 	  sstob			/* %ecx contains residual bytes to clear */
 
 	/*
-	 * A fault during do_zero_fault is indicated through an errno value
+	 * A fault during kzero is indicated through an errno value
 	 * in %eax when we iret to here.
 	 */
 _kzeroerr:
@@ -1440,7 +1441,7 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 	ENTRY(copyin)
 	pushq	%rbp
 	movq	%rsp, %rbp
-	subq	$32, %rsp
+	subq	$24, %rsp
 
 	/*
 	 * save args in case we trap and need to rerun as a copyop
@@ -1470,6 +1471,7 @@ copyin(const void *uaddr, void *kaddr, size_t count)
 
 _copyin_err:
 	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */	
+	addq	$8, %rsp		/* pop bcopy_altentry call ret addr */
 3:
 	movq	T_COPYOPS(%r9), %rax
 	cmpq	$0, %rax
@@ -1547,7 +1549,7 @@ xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
 	ENTRY(xcopyin_nta)
 	pushq	%rbp
 	movq	%rsp, %rbp
-	subq	$32, %rsp
+	subq	$24, %rsp
 
 	/*
 	 * save args in case we trap and need to rerun as a copyop
@@ -1592,6 +1594,7 @@ xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
 	orq	%rdx, %r10
 	andq	$COUNT_ALIGN_MASK, %r10
 	jnz	do_copy_fault
+	leaq	_xcopyin_nta_err(%rip), %rcx	/* doesn't set rflags */
 	jmp	do_copy_fault_nta	/* use non-temporal access */
 	
 4:
@@ -1604,6 +1607,8 @@ xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
 	 * trap handler to here.
 	 */
 _xcopyin_err:
+	addq	$8, %rsp		/* pop bcopy_altentry call ret addr */
+_xcopyin_nta_err:
 	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */
 3:
 	movq	T_COPYOPS(%r9), %r8
@@ -1715,7 +1720,7 @@ copyout(const void *kaddr, void *uaddr, size_t count)
 	ENTRY(copyout)
 	pushq	%rbp
 	movq	%rsp, %rbp
-	subq	$32, %rsp
+	subq	$24, %rsp
 
 	/*
 	 * save args in case we trap and need to rerun as a copyop
@@ -1745,6 +1750,7 @@ copyout(const void *kaddr, void *uaddr, size_t count)
 
 _copyout_err:
 	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */
+	addq	$8, %rsp		/* pop bcopy_altentry call ret addr */
 3:
 	movq	T_COPYOPS(%r9), %rax
 	cmpq	$0, %rax
@@ -1822,7 +1828,7 @@ xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
 	ENTRY(xcopyout_nta)
 	pushq	%rbp
 	movq	%rsp, %rbp
-	subq	$32, %rsp
+	subq	$24, %rsp
 
 	/*
 	 * save args in case we trap and need to rerun as a copyop
@@ -1866,6 +1872,7 @@ xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
 	orq	%rdx, %r10
 	andq	$COUNT_ALIGN_MASK, %r10
 	jnz	do_copy_fault
+	leaq	_xcopyout_nta_err(%rip), %rcx
 	jmp	do_copy_fault_nta
 
 4:
@@ -1878,6 +1885,8 @@ xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
 	 * trap handler to here.
 	 */
 _xcopyout_err:
+	addq	$8, %rsp		/* pop bcopy_altentry call ret addr */
+_xcopyout_nta_err:
 	movq	%r11, T_LOFAULT(%r9)	/* restore original lofault */
 3:
 	movq	T_COPYOPS(%r9), %r8
