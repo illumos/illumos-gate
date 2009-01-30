@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ibtf_util.c
@@ -134,9 +131,8 @@ ibt_usec2ib(clock_t time_val)
 	IBTF_DPRINTF_L3(ibtf_util, "ibt_usec2ib(%ld)", time_val);
 
 	/* First, leap through the table by 4 entries at a time */
-	for (i = 0; ibtl_ib2usec_tbl[i + 4] < time_val; i += 4)
-		if (i == 60)	/* Don't go beyond the end of table */
-			break;
+	for (i = 0; (i + 4) < 64 && ibtl_ib2usec_tbl[i + 4] < time_val; i += 4)
+		;
 	/* Find the return value; it's now between i and i + 4, inclusive */
 	while (ibtl_ib2usec_tbl[i] < time_val)
 		i++;
@@ -300,9 +296,9 @@ ibtf_vlog(char *name, uint_t level, char *fmt, va_list ap)
 			size_t left = ibtf_buf_eptr - ibtf_buf_sptr;
 
 			bcopy((caddr_t)ibtf_print_buf,
-				(caddr_t)ibtf_buf_sptr, left);
+			    (caddr_t)ibtf_buf_sptr, left);
 			bcopy((caddr_t)ibtf_print_buf + left,
-				(caddr_t)ibtf_debug_buf, len - left);
+			    (caddr_t)ibtf_debug_buf, len - left);
 			ibtf_buf_sptr = ibtf_debug_buf + len - left;
 		} else {
 			bcopy((caddr_t)ibtf_print_buf, ibtf_buf_sptr, len);
