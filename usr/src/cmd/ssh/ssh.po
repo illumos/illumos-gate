@@ -1,8 +1,6 @@
 #
-# Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 #
@@ -16,40 +14,40 @@ msgstr ""
 msgid "mkstemp(\"%s\"): %s"
 msgstr ""
 #
-# File: ../common/authfd.c, line: 128
+# File: ../common/authfd.c, line: 126
 msgid "Error writing to authentication socket."
 msgstr ""
 #
-# File: ../common/authfd.c, line: 142
+# File: ../common/authfd.c, line: 140
 msgid "Error reading response length from authentication socket."
 msgstr ""
 #
-# File: ../common/authfd.c, line: 151
+# File: ../common/authfd.c, line: 149
 #, c-format
 msgid "Authentication response too long: %d"
 msgstr ""
 #
-# File: ../common/authfd.c, line: 163
+# File: ../common/authfd.c, line: 161
 msgid "Error reading response from authentication socket."
 msgstr ""
 #
-# File: ../common/authfd.c, line: 297
+# File: ../common/authfd.c, line: 295
 #, c-format
 msgid "Bad authentication reply message type: %d"
 msgstr ""
 #
-# File: ../common/authfd.c, line: 303
+# File: ../common/authfd.c, line: 301
 #, c-format
 msgid "Too many identities in authentication reply: %d"
 msgstr ""
 #
-# File: ../common/authfd.c, line: 406
-# File: ../common/authfd.c, line: 456
+# File: ../common/authfd.c, line: 404
+# File: ../common/authfd.c, line: 454
 #, c-format
 msgid "Bad authentication response: %d"
 msgstr ""
 #
-# File: ../common/authfd.c, line: 660
+# File: ../common/authfd.c, line: 639
 #, c-format
 msgid "Bad response from authentication agent: %d"
 msgstr ""
@@ -240,34 +238,34 @@ msgstr ""
 msgid "buffer_get_char: buffer error"
 msgstr ""
 #
-# File: ../common/buffer.c, line: 107
+# File: ../common/buffer.c, line: 109
 #, c-format
 msgid "buffer_append_space: len %u not supported"
 msgstr ""
 #
-# File: ../common/buffer.c, line: 129
+# File: ../common/buffer.c, line: 131
 #, c-format
 msgid "buffer_append_space: alloc %u not supported"
 msgstr ""
 #
-# File: ../common/buffer.c, line: 173
+# File: ../common/buffer.c, line: 175
 #, c-format
 msgid "buffer_get_ret: trying to get more bytes %d than in buffer %d"
 msgstr ""
 #
-# File: ../common/buffer.c, line: 186
+# File: ../common/buffer.c, line: 188
 msgid "buffer_get: buffer error"
 msgstr ""
 #
-# File: ../common/buffer.c, line: 195
+# File: ../common/buffer.c, line: 197
 msgid "buffer_consume_ret: trying to get more bytes than in buffer"
 msgstr ""
 #
-# File: ../common/buffer.c, line: 206
+# File: ../common/buffer.c, line: 208
 msgid "buffer_consume: buffer error"
 msgstr ""
 #
-# File: ../common/buffer.c, line: 224
+# File: ../common/buffer.c, line: 226
 msgid "buffer_consume_end: trying to get more bytes than in buffer"
 msgstr ""
 #
@@ -372,7 +370,7 @@ msgstr ""
 #
 # File: ../common/channels.c, line: 1156
 # File: ../common/channels.c, line: 1280
-# File: sshd.c, line: 1489
+# File: sshd.c, line: 1343
 #, c-format
 msgid "accept: %.100s"
 msgstr ""
@@ -405,77 +403,77 @@ msgstr ""
 # File: ../common/channels.c, line: 2103
 # File: ../common/channels.c, line: 2128
 # File: ../common/channels.c, line: 2150
-# File: ../common/channels.c, line: 2877
-# File: ../common/channels.c, line: 3016
-# File: ../common/kex.c, line: 175
-# File: ../common/kex.c, line: 248
-# File: ../common/kexdhc.c, line: 88
-# File: ../common/kexdhs.c, line: 71
-# File: ../common/kexgexc.c, line: 89
-# File: ../common/kexgexc.c, line: 130
-# File: ../common/kexgexs.c, line: 81
-# File: ../common/kexgexs.c, line: 111
-# File: ../common/packet.c, line: 807
-# File: altprivsep.c, line: 568
-# File: altprivsep.c, line: 655
-# File: auth-rsa.c, line: 146
-# File: auth1.c, line: 139
-# File: auth1.c, line: 170
-# File: auth1.c, line: 188
-# File: auth1.c, line: 207
-# File: auth1.c, line: 240
-# File: auth1.c, line: 331
+# File: ../common/channels.c, line: 2875
+# File: ../common/channels.c, line: 3014
+# File: ../common/kex.c, line: 168
+# File: ../common/kex.c, line: 242
+# File: ../common/kexdhc.c, line: 87
+# File: ../common/kexdhs.c, line: 70
+# File: ../common/kexgexc.c, line: 88
+# File: ../common/kexgexc.c, line: 129
+# File: ../common/kexgexs.c, line: 80
+# File: ../common/kexgexs.c, line: 110
+# File: ../common/packet.c, line: 931
+# File: altprivsep.c, line: 640
+# File: altprivsep.c, line: 728
+# File: auth-rsa.c, line: 145
+# File: auth1.c, line: 136
+# File: auth1.c, line: 167
+# File: auth1.c, line: 185
+# File: auth1.c, line: 204
+# File: auth1.c, line: 236
+# File: auth1.c, line: 323
 # File: auth2-chall.c, line: 280
 # File: auth2-gss.c, line: 87
-# File: auth2-gss.c, line: 137
-# File: auth2-gss.c, line: 213
-# File: auth2-gss.c, line: 258
-# File: auth2-gss.c, line: 317
-# File: auth2-gss.c, line: 353
+# File: auth2-gss.c, line: 135
+# File: auth2-gss.c, line: 214
+# File: auth2-gss.c, line: 261
+# File: auth2-gss.c, line: 321
+# File: auth2-gss.c, line: 358
 # File: auth2-kbdint.c, line: 53
-# File: auth2-none.c, line: 107
-# File: auth2-pam.c, line: 378
-# File: auth2-passwd.c, line: 58
-# File: auth2-pubkey.c, line: 130
-# File: auth2-pubkey.c, line: 163
-# File: auth2.c, line: 139
-# File: clientloop.c, line: 1328
-# File: clientloop.c, line: 1338
-# File: clientloop.c, line: 1347
-# File: clientloop.c, line: 1374
-# File: clientloop.c, line: 1414
-# File: clientloop.c, line: 1529
-# File: serverloop.c, line: 1024
-# File: serverloop.c, line: 1040
-# File: serverloop.c, line: 1053
-# File: serverloop.c, line: 1070
-# File: serverloop.c, line: 1094
-# File: session.c, line: 283
-# File: session.c, line: 318
-# File: session.c, line: 370
-# File: session.c, line: 1486
-# File: session.c, line: 1594
-# File: session.c, line: 1608
-# File: session.c, line: 1650
-# File: session.c, line: 1717
-# File: session.c, line: 1727
-# File: session.c, line: 1737
-# File: ssh.c, line: 926
-# File: ssh.c, line: 974
+# File: auth2-none.c, line: 106
+# File: auth2-pam.c, line: 404
+# File: auth2-passwd.c, line: 57
+# File: auth2-pubkey.c, line: 127
+# File: auth2-pubkey.c, line: 161
+# File: auth2.c, line: 136
+# File: clientloop.c, line: 1341
+# File: clientloop.c, line: 1351
+# File: clientloop.c, line: 1360
+# File: clientloop.c, line: 1387
+# File: clientloop.c, line: 1427
+# File: clientloop.c, line: 1543
+# File: serverloop.c, line: 1036
+# File: serverloop.c, line: 1052
+# File: serverloop.c, line: 1065
+# File: serverloop.c, line: 1082
+# File: serverloop.c, line: 1106
+# File: session.c, line: 280
+# File: session.c, line: 315
+# File: session.c, line: 367
+# File: session.c, line: 1483
+# File: session.c, line: 1590
+# File: session.c, line: 1604
+# File: session.c, line: 1646
+# File: session.c, line: 1714
+# File: session.c, line: 1724
+# File: session.c, line: 1734
+# File: ssh.c, line: 918
+# File: ssh.c, line: 966
 # File: sshconnect1.c, line: 122
 # File: sshconnect1.c, line: 260
 # File: sshconnect1.c, line: 377
 # File: sshconnect1.c, line: 437
 # File: sshconnect1.c, line: 560
-# File: sshconnect2.c, line: 327
-# File: sshconnect2.c, line: 449
-# File: sshconnect2.c, line: 483
-# File: sshconnect2.c, line: 656
-# File: sshconnect2.c, line: 708
-# File: sshconnect2.c, line: 791
-# File: sshconnect2.c, line: 816
-# File: sshconnect2.c, line: 1382
-# File: sshd.c, line: 2043
+# File: sshconnect2.c, line: 332
+# File: sshconnect2.c, line: 454
+# File: sshconnect2.c, line: 488
+# File: sshconnect2.c, line: 661
+# File: sshconnect2.c, line: 713
+# File: sshconnect2.c, line: 796
+# File: sshconnect2.c, line: 821
+# File: sshconnect2.c, line: 1387
+# File: sshd.c, line: 1807
 msgid "Packet integrity error."
 msgstr ""
 #
@@ -549,31 +547,31 @@ msgstr ""
 # File: ../common/channels.c, line: 2266
 # File: ../common/channels.c, line: 2570
 # File: ../common/channels.c, line: 2670
-# File: ../common/channels.c, line: 2745
-# File: session.c, line: 203
+# File: ../common/channels.c, line: 2743
+# File: session.c, line: 200
 # File: sshconnect.c, line: 206
-# File: sshd.c, line: 1343
+# File: sshd.c, line: 1197
 #, c-format
 msgid "socket: %.100s"
 msgstr ""
 #
 # File: ../common/channels.c, line: 2276
-# File: sshd.c, line: 1358
+# File: sshd.c, line: 1212
 #, c-format
 msgid "setsockopt SO_REUSEADDR: %s"
 msgstr ""
 #
 # File: ../common/channels.c, line: 2284
 # File: ../common/channels.c, line: 2286
-# File: session.c, line: 211
+# File: session.c, line: 208
 #, c-format
 msgid "bind: %.100s"
 msgstr ""
 #
 # File: ../common/channels.c, line: 2293
-# File: ../common/channels.c, line: 2716
-# File: session.c, line: 218
-# File: sshd.c, line: 1376
+# File: ../common/channels.c, line: 2714
+# File: session.c, line: 215
+# File: sshd.c, line: 1230
 #, c-format
 msgid "listen: %.100s"
 msgstr ""
@@ -644,138 +642,138 @@ msgstr ""
 msgid "setsockopt IPV6_V6ONLY: %.100s"
 msgstr ""
 #
-# File: ../common/channels.c, line: 2709
+# File: ../common/channels.c, line: 2707
 msgid "Failed to allocate internet-domain X11 display socket."
 msgstr ""
 #
-# File: ../common/channels.c, line: 2752
+# File: ../common/channels.c, line: 2750
 #, c-format
 msgid "connect %.100s: %.100s"
 msgstr ""
 #
-# File: ../common/channels.c, line: 2769
+# File: ../common/channels.c, line: 2767
 msgid "DISPLAY not set."
 msgstr ""
 #
-# File: ../common/channels.c, line: 2787
-# File: ../common/channels.c, line: 2813
+# File: ../common/channels.c, line: 2785
+# File: ../common/channels.c, line: 2811
 #, c-format
 msgid "Could not parse display number from DISPLAY: %.100s"
 msgstr ""
 #
-# File: ../common/channels.c, line: 2807
+# File: ../common/channels.c, line: 2805
 #, c-format
 msgid "Could not find ':' in DISPLAY: %.100s"
 msgstr ""
 #
-# File: ../common/channels.c, line: 2824
+# File: ../common/channels.c, line: 2822
 #, c-format
 msgid "%.100s: unknown host. (%s)"
 msgstr ""
 #
-# File: ../common/channels.c, line: 2846
+# File: ../common/channels.c, line: 2844
 #, c-format
 msgid "connect %.100s port %d: %.100s"
 msgstr ""
 #
-# File: ../common/channels.c, line: 2910
-# File: clientloop.c, line: 1437
+# File: ../common/channels.c, line: 2908
+# File: clientloop.c, line: 1450
 msgid "Warning: ssh server tried agent forwarding."
 msgstr ""
 #
-# File: ../common/channels.c, line: 2913
-# File: clientloop.c, line: 1403
+# File: ../common/channels.c, line: 2911
+# File: clientloop.c, line: 1416
 msgid "Warning: ssh server tried X11 forwarding."
 msgstr ""
 #
-# File: ../common/channels.c, line: 2916
+# File: ../common/channels.c, line: 2914
 #, c-format
 msgid "deny_input_open: type %d"
 msgstr ""
 #
-# File: ../common/channels.c, line: 2919
-# File: clientloop.c, line: 1404
-# File: clientloop.c, line: 1438
+# File: ../common/channels.c, line: 2917
+# File: clientloop.c, line: 1417
+# File: clientloop.c, line: 1451
 msgid ""
 "Warning: this is probably a break in attempt by a malicious server."
 msgstr ""
 #
-# File: ../common/channels.c, line: 2964
+# File: ../common/channels.c, line: 2962
 #, c-format
 msgid "x11_request_forwarding: bad authentication data: %.100s"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 199
+# File: ../common/cipher.c, line: 206
 msgid ""
 "Warning: use of DES is strongly discouraged due to cryptographic "
 "weaknesses"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 209
+# File: ../common/cipher.c, line: 216
 #, c-format
 msgid "cipher_init: key length %d is insufficient for %s."
 msgstr ""
 #
-# File: ../common/cipher.c, line: 212
+# File: ../common/cipher.c, line: 219
 #, c-format
 msgid "cipher_init: iv length %d is insufficient for %s."
 msgstr ""
 #
-# File: ../common/cipher.c, line: 222
+# File: ../common/cipher.c, line: 229
 #, c-format
 msgid "cipher_init: EVP_CipherInit failed for %s"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 228
+# File: ../common/cipher.c, line: 235
 #, c-format
 msgid "cipher_init: set keylen failed (%d -> %d)"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 232
+# File: ../common/cipher.c, line: 239
 #, c-format
 msgid "cipher_init: EVP_CipherInit: set key failed for %s"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 241
+# File: ../common/cipher.c, line: 248
 #, c-format
 msgid "cipher_encrypt: bad plaintext length %d"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 244
+# File: ../common/cipher.c, line: 251
 msgid "evp_crypt: EVP_Cipher failed"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 253
+# File: ../common/cipher.c, line: 260
 msgid "cipher_cleanup: EVP_CIPHER_CTX_cleanup failed"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 347
+# File: ../common/cipher.c, line: 354
 msgid "ssh1_3des_cbc: no context"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 480
+# File: ../common/cipher.c, line: 487
 #, c-format
 msgid "%s: wrong iv length %d != %d"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 494
+# File: ../common/cipher.c, line: 501
 #, c-format
 msgid "%s: bad 3des iv length: %d"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 497
-# File: ../common/cipher.c, line: 537
+# File: ../common/cipher.c, line: 504
+# File: ../common/cipher.c, line: 544
 #, c-format
 msgid "%s: no 3des context"
 msgstr ""
 #
-# File: ../common/cipher.c, line: 505
-# File: ../common/cipher.c, line: 545
+# File: ../common/cipher.c, line: 512
+# File: ../common/cipher.c, line: 552
 #, c-format
 msgid "%s: bad cipher %d"
 msgstr ""
 #
-# File: ../common/cipher-ctr.c, line: 130
+# File: ../common/cipher-ctr.c, line: 116
 msgid "ssh_aes_ctr_iv: no context"
 msgstr ""
 #
@@ -803,59 +801,59 @@ msgstr ""
 msgid "detect_attack: bad length %d"
 msgstr ""
 #
+# File: ../common/dh.c, line: 82
 # File: ../common/dh.c, line: 84
-# File: ../common/dh.c, line: 86
 msgid "parse_prime: BN_new failed"
 msgstr ""
 #
-# File: ../common/dh.c, line: 102
+# File: ../common/dh.c, line: 100
 #, c-format
 msgid "Bad prime description in line %d"
 msgstr ""
 #
-# File: ../common/dh.c, line: 165
+# File: ../common/dh.c, line: 163
 #, c-format
 msgid "WARNING: line %d disappeared in %s, giving up"
 msgstr ""
 #
-# File: ../common/dh.c, line: 202
+# File: ../common/dh.c, line: 200
 msgid "dh_gen_key: dh->p == NULL"
 msgstr ""
 #
-# File: ../common/dh.c, line: 204
+# File: ../common/dh.c, line: 202
 #, c-format
 msgid "dh_gen_key: group too small: %d (2*need %d)"
 msgstr ""
 #
-# File: ../common/dh.c, line: 210
+# File: ../common/dh.c, line: 208
 msgid "dh_gen_key: BN_new failed"
 msgstr ""
 #
-# File: ../common/dh.c, line: 213
+# File: ../common/dh.c, line: 211
 msgid "dh_gen_key: BN_rand failed"
 msgstr ""
 #
-# File: ../common/dh.c, line: 215
-msgid "DH_generate_key"
+# File: ../common/dh.c, line: 213
+msgid "dh_gen_key: DH_generate_key() failed"
 msgstr ""
 #
-# File: ../common/dh.c, line: 222
+# File: ../common/dh.c, line: 220
 msgid "dh_gen_key: too many bad keys: giving up"
 msgstr ""
 #
-# File: ../common/dh.c, line: 232
+# File: ../common/dh.c, line: 230
 msgid "dh_new_group_asc: DH_new"
 msgstr ""
 #
-# File: ../common/dh.c, line: 235
+# File: ../common/dh.c, line: 233
 msgid "BN_hex2bn p"
 msgstr ""
 #
-# File: ../common/dh.c, line: 237
+# File: ../common/dh.c, line: 235
 msgid "BN_hex2bn g"
 msgstr ""
 #
-# File: ../common/dh.c, line: 254
+# File: ../common/dh.c, line: 252
 msgid "dh_new_group: DH_new"
 msgstr ""
 #
@@ -866,6 +864,31 @@ msgstr ""
 # File: ../common/dispatch.c, line: 96
 #, c-format
 msgid "protocol error: rcvd type %d"
+msgstr ""
+#
+# File: ../common/engine.c, line: 49
+#, c-format
+msgid "%s engine does not exist"
+msgstr ""
+#
+# File: ../common/engine.c, line: 55
+#, c-format
+msgid "can't initialize %s engine"
+msgstr ""
+#
+# File: ../common/engine.c, line: 75
+#, c-format
+msgid "can't use %s engine for RSA"
+msgstr ""
+#
+# File: ../common/engine.c, line: 79
+#, c-format
+msgid "can't use %s engine for DSA"
+msgstr ""
+#
+# File: ../common/engine.c, line: 83
+#, c-format
+msgid "can't use %s engine for symmetric ciphers"
 msgstr ""
 #
 # File: ../common/mac.c, line: 84
@@ -1090,263 +1113,282 @@ msgstr ""
 msgid "key_demote: DSA_new failed"
 msgstr ""
 #
-# File: ../common/kex.c, line: 138
+# File: ../common/kex.c, line: 131
 #, c-format
 msgid "Hm, kex protocol error: type %d seq %u"
 msgstr ""
 #
-# File: ../common/kex.c, line: 197
+# File: ../common/kex.c, line: 191
 msgid "kex_send_kexinit: no kex, cannot rekey"
 msgstr ""
 #
-# File: ../common/kex.c, line: 211
+# File: ../common/kex.c, line: 205
 msgid "kex_send_kexinit: kex proposal too short"
 msgstr ""
 #
-# File: ../common/kex.c, line: 236
+# File: ../common/kex.c, line: 230
 msgid "kex_input_kexinit: no kex, cannot rekey"
 msgstr ""
 #
-# File: ../common/kex.c, line: 312
+# File: ../common/kex.c, line: 316
 #, c-format
 msgid "Unsupported key exchange %d"
 msgstr ""
 #
-# File: ../common/kex.c, line: 328
+# File: ../common/kex.c, line: 348
 #, c-format
-msgid "no matching cipher found: client %s server %s"
+msgid ""
+"Client and server could not agree on a common cipher: client \"%s\", "
+"server \"%s\". The server cipher list can be controlled using the "
+"\"Ciphers\" option, see sshd_config(4) for more information."
 msgstr ""
 #
-# File: ../common/kex.c, line: 330
+# File: ../common/kex.c, line: 350
+#, c-format
+msgid ""
+"Client and server could not agree on a common cipher:\n"
+"  client: %s\n"
+"  server: %s\n"
+"\n"
+"The client cipher list can be controlled using the \"Ciphers\" "
+"option, \n"
+"see ssh_config(4) for more information. The \"-o "
+"Ciphers=<cipher-list>\"\n"
+"option may be used to temporarily override the ciphers the client\n"
+"offers."
+msgstr ""
+#
+# File: ../common/kex.c, line: 354
 #, c-format
 msgid "matching cipher is not supported: %s"
 msgstr ""
 #
-# File: ../common/kex.c, line: 343
+# File: ../common/kex.c, line: 369
 #, c-format
 msgid "no matching mac found: client %s server %s"
 msgstr ""
 #
-# File: ../common/kex.c, line: 345
+# File: ../common/kex.c, line: 371
 #, c-format
 msgid "unsupported mac %s"
 msgstr ""
 #
-# File: ../common/kex.c, line: 358
+# File: ../common/kex.c, line: 384
 #, c-format
 msgid "no matching comp found: client %s server %s"
 msgstr ""
 #
-# File: ../common/kex.c, line: 364
+# File: ../common/kex.c, line: 390
 #, c-format
 msgid "unsupported comp %s"
 msgstr ""
 #
-# File: ../common/kex.c, line: 373
-msgid "no kex alg"
+# File: ../common/kex.c, line: 399
+#, c-format
+msgid "no common kex alg: client '%s', server '%s'"
 msgstr ""
 #
-# File: ../common/kex.c, line: 384
+# File: ../common/kex.c, line: 411
 #, c-format
 msgid "bad kex alg %s"
 msgstr ""
 #
-# File: ../common/kex.c, line: 391
+# File: ../common/kex.c, line: 418
 msgid "no hostkey alg"
 msgstr ""
 #
-# File: ../common/kex.c, line: 394
+# File: ../common/kex.c, line: 421
 #, c-format
 msgid "bad hostkey alg '%s'"
 msgstr ""
 #
-# File: ../common/kex.c, line: 544
+# File: ../common/kex.c, line: 571
 #, c-format
 msgid "Negotiated main locale: %s"
 msgstr ""
 #
-# File: ../common/kex.c, line: 552
+# File: ../common/kex.c, line: 580
 #, c-format
 msgid "Negotiated messages locale: %s"
 msgstr ""
 #
-# File: ../common/kexdhc.c, line: 71
-# File: ../common/kexgexc.c, line: 113
+# File: ../common/kexdhc.c, line: 70
+# File: ../common/kexgexc.c, line: 112
 msgid "cannot decode server_host_key_blob"
 msgstr ""
 #
-# File: ../common/kexdhc.c, line: 73
-# File: ../common/kexgexc.c, line: 115
+# File: ../common/kexdhc.c, line: 72
+# File: ../common/kexgexc.c, line: 114
 msgid "type mismatch for decoded server_host_key_blob"
 msgstr ""
 #
-# File: ../common/kexdhc.c, line: 75
-# File: ../common/kexgexc.c, line: 117
+# File: ../common/kexdhc.c, line: 74
+# File: ../common/kexgexc.c, line: 116
 msgid "cannot verify server_host_key"
 msgstr ""
 #
-# File: ../common/kexdhc.c, line: 77
-# File: ../common/kexgexc.c, line: 119
+# File: ../common/kexdhc.c, line: 76
+# File: ../common/kexgexc.c, line: 118
 msgid "server_host_key verification failed"
 msgstr ""
 #
-# File: ../common/kexdhc.c, line: 81
-# File: ../common/kexgexc.c, line: 123
+# File: ../common/kexdhc.c, line: 80
+# File: ../common/kexgexc.c, line: 122
 # File: ../common/kexgssc.c, line: 94
 msgid "dh_server_pub == NULL"
 msgstr ""
 #
-# File: ../common/kexdhc.c, line: 91
-# File: ../common/kexgexc.c, line: 133
-# File: ../common/kexgssc.c, line: 263
+# File: ../common/kexdhc.c, line: 90
+# File: ../common/kexgexc.c, line: 132
+# File: ../common/kexgssc.c, line: 266
 msgid "bad server public DH value"
 msgstr ""
 #
-# File: ../common/kexdhc.c, line: 98
+# File: ../common/kexdhc.c, line: 97
 msgid "kexdh_client: BN_new failed"
 msgstr ""
 #
-# File: ../common/kexdhc.c, line: 119
-# File: ../common/kexgexc.c, line: 167
+# File: ../common/kexdhc.c, line: 118
+# File: ../common/kexgexc.c, line: 166
 msgid "key_verify failed for server_host_key"
 msgstr ""
 #
-# File: ../common/kexdhs.c, line: 62
-# File: ../common/kexgexs.c, line: 56
+# File: ../common/kexdhs.c, line: 61
+# File: ../common/kexgexs.c, line: 55
 msgid "Cannot load hostkey"
 msgstr ""
 #
-# File: ../common/kexdhs.c, line: 65
-# File: ../common/kexgexs.c, line: 59
+# File: ../common/kexdhs.c, line: 64
+# File: ../common/kexgexs.c, line: 58
 #, c-format
 msgid "Unsupported hostkey type %d"
 msgstr ""
 #
-# File: ../common/kexdhs.c, line: 69
-# File: ../common/kexgexs.c, line: 109
+# File: ../common/kexdhs.c, line: 68
+# File: ../common/kexgexs.c, line: 108
 # File: ../common/kexgsss.c, line: 111
 msgid "dh_client_pub == NULL"
 msgstr ""
 #
-# File: ../common/kexdhs.c, line: 77
-# File: ../common/kexgexs.c, line: 117
+# File: ../common/kexdhs.c, line: 76
+# File: ../common/kexgexs.c, line: 116
 # File: ../common/kexgsss.c, line: 172
 msgid "bad client public DH value"
 msgstr ""
 #
-# File: ../common/kexdhs.c, line: 84
+# File: ../common/kexdhs.c, line: 83
 msgid "kexdh_server: BN_new failed"
 msgstr ""
 #
-# File: ../common/kexgexc.c, line: 84
-# File: ../common/kexgexc.c, line: 87
+# File: ../common/kexgexc.c, line: 83
+# File: ../common/kexgexc.c, line: 86
 msgid "BN_new"
 msgstr ""
 #
-# File: ../common/kexgexc.c, line: 92
+# File: ../common/kexgexc.c, line: 91
 #, c-format
 msgid "DH_GEX group out of range: %d !< %d !< %d"
 msgstr ""
 #
-# File: ../common/kexgexc.c, line: 140
+# File: ../common/kexgexc.c, line: 139
 msgid "kexgex_client: BN_new failed"
 msgstr ""
 #
-# File: ../common/kexgexs.c, line: 79
+# File: ../common/kexgexs.c, line: 78
 #, c-format
 msgid "protocol error during kex, no DH_GEX_REQUEST: %d"
 msgstr ""
 #
-# File: ../common/kexgexs.c, line: 84
+# File: ../common/kexgexs.c, line: 83
 #, c-format
 msgid "DH_GEX_REQUEST, bad parameters: %d !< %d !< %d"
 msgstr ""
 #
-# File: ../common/kexgexs.c, line: 90
+# File: ../common/kexgexs.c, line: 89
 msgid "Protocol error: no matching DH grp found"
 msgstr ""
 #
-# File: ../common/kexgexs.c, line: 124
+# File: ../common/kexgexs.c, line: 123
 msgid "kexgex_server: BN_new failed"
 msgstr ""
 #
 # File: ../common/kexgssc.c, line: 81
-# File: ../common/kexgsss.c, line: 91
+# File: ../common/kexgsss.c, line: 90
 msgid "Couldn't match the negotiated GSS key exchange"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 115
+# File: ../common/kexgssc.c, line: 112
 msgid ""
 "A GSS-API error occurred during GSS-API protected SSHv2 key exchange\n"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 131
+# File: ../common/kexgssc.c, line: 128
 msgid "Mutual authentication failed"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 135
+# File: ../common/kexgssc.c, line: 132
 msgid "Integrity check failed"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 190
-# File: ../common/kexgssc.c, line: 211
+# File: ../common/kexgssc.c, line: 191
+# File: ../common/kexgssc.c, line: 213
 msgid ""
 "Protocol error: received GSS-API context token though the context was "
 "already established"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 218
+# File: ../common/kexgssc.c, line: 220
 msgid "Protocol error: did not receive expected GSS-API context token"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 229
+# File: ../common/kexgssc.c, line: 231
 #, c-format
 msgid ""
 "Server had a GSS-API error; the connection will close (%d/%d):\n"
 "%s"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 232
-# File: ../common/kexgssc.c, line: 327
+# File: ../common/kexgssc.c, line: 234
+# File: ../common/kexgssc.c, line: 325
 msgid ""
 "Use the GssKeyEx option to disable GSS-API key exchange and try again."
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 234
+# File: ../common/kexgssc.c, line: 236
 msgid ""
 "The server had a GSS-API error during GSS-API protected SSHv2 key "
 "exchange\n"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 239
-# File: ../common/kexgsss.c, line: 127
+# File: ../common/kexgssc.c, line: 241
+# File: ../common/kexgsss.c, line: 128
 #, c-format
 msgid "Protocol error: didn't expect packet type %d"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 247
+# File: ../common/kexgssc.c, line: 249
 msgid "Not complete, and no token output"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 257
+# File: ../common/kexgssc.c, line: 260
 msgid "Expected SSH2_MSG_KEXGSS_COMPLETE never arrived"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 259
+# File: ../common/kexgssc.c, line: 262
 msgid "Internal error in GSS-API protected SSHv2 key exchange"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 297
+# File: ../common/kexgssc.c, line: 295
 msgid "Hash's MIC didn't verify"
 msgstr ""
 #
-# File: ../common/kexgssc.c, line: 324
+# File: ../common/kexgssc.c, line: 322
 msgid ""
 "The GSS-API protected key exchange has failed without indication\n"
 "from the server, possibly due to misconfiguration of the server."
 msgstr ""
 #
-# File: ../common/kexgsss.c, line: 104
+# File: ../common/kexgsss.c, line: 103
 msgid "Received KEXGSS_INIT after initialising"
 msgstr ""
 #
@@ -1396,15 +1438,16 @@ msgid "replacearg: tried to replace invalid arg %d >= %d"
 msgstr ""
 #
 # File: ../common/misc.c, line: 592
-# File: ../common/readconf.c, line: 497
-# File: ../common/readconf.c, line: 518
-# File: ../common/readconf.c, line: 578
-# File: ../common/readconf.c, line: 598
-# File: ../common/readconf.c, line: 610
-# File: ../common/readconf.c, line: 621
-# File: ../common/readconf.c, line: 632
-# File: ../common/readconf.c, line: 644
-# File: ../common/readconf.c, line: 726
+# File: ../common/readconf.c, line: 499
+# File: ../common/readconf.c, line: 537
+# File: ../common/readconf.c, line: 558
+# File: ../common/readconf.c, line: 618
+# File: ../common/readconf.c, line: 638
+# File: ../common/readconf.c, line: 650
+# File: ../common/readconf.c, line: 661
+# File: ../common/readconf.c, line: 672
+# File: ../common/readconf.c, line: 684
+# File: ../common/readconf.c, line: 766
 #, c-format
 msgid "%.200s line %d: Missing argument."
 msgstr ""
@@ -1497,108 +1540,118 @@ msgid ""
 "%.100s"
 msgstr ""
 #
-# File: ../common/packet.c, line: 148
+# File: ../common/packet.c, line: 178
 msgid "packet_set_connection: cannot load cipher 'none'"
 msgstr ""
 #
-# File: ../common/packet.c, line: 295
-#, c-format
-msgid "packet_set_seqnr: bad mode %d"
-msgstr ""
-#
-# File: ../common/packet.c, line: 326
-# File: ../common/packet.c, line: 330
-# File: altprivsep.c, line: 238
-# File: altprivsep.c, line: 272
+# File: ../common/packet.c, line: 263
+# File: ../common/packet.c, line: 267
+# File: altprivsep.c, line: 282
+# File: sshd.c, line: 1624
 #, c-format
 msgid "fcntl O_NONBLOCK: %.100s"
 msgstr ""
 #
-# File: ../common/packet.c, line: 415
+# File: ../common/packet.c, line: 352
 msgid "INTERNAL ERROR: The monitor cannot compress."
 msgstr ""
 #
-# File: ../common/packet.c, line: 419
+# File: ../common/packet.c, line: 356
 msgid "Compression already enabled."
 msgstr ""
 #
-# File: ../common/packet.c, line: 440
+# File: ../common/packet.c, line: 377
 #, c-format
 msgid "packet_set_encryption_key: unknown cipher number %d"
 msgstr ""
 #
-# File: ../common/packet.c, line: 442
+# File: ../common/packet.c, line: 379
 #, c-format
 msgid "packet_set_encryption_key: keylen too small: %d"
 msgstr ""
 #
-# File: ../common/packet.c, line: 444
+# File: ../common/packet.c, line: 381
 #, c-format
 msgid "packet_set_encryption_key: keylen too big: %d"
 msgstr ""
 #
-# File: ../common/packet.c, line: 633
+# File: ../common/packet.c, line: 575
 #, c-format
 msgid "newkeys: no keys for mode %d"
 msgstr ""
 #
-# File: ../common/packet.c, line: 834
+# File: ../common/packet.c, line: 676
+# File: clientloop.c, line: 763
+# File: ssh.c, line: 929
+# File: sshd.c, line: 1136
+#, c-format
+msgid "daemon() failed: %.200s"
+msgstr ""
+#
+# File: ../common/packet.c, line: 811
+msgid "too many packets encrypted with same key"
+msgstr ""
+#
+# File: ../common/packet.c, line: 958
 #, c-format
 msgid "Read from socket failed: %.100s"
 msgstr ""
 #
-# File: ../common/packet.c, line: 860
+# File: ../common/packet.c, line: 984
 #, c-format
 msgid "Protocol error: expected packet type %d, got %d"
 msgstr ""
 #
-# File: ../common/packet.c, line: 888
-# File: ../common/packet.c, line: 992
+# File: ../common/packet.c, line: 1012
 #, c-format
 msgid "Bad packet length %d."
 msgstr ""
 #
-# File: ../common/packet.c, line: 909
+# File: ../common/packet.c, line: 1033
 msgid "crc32 compensation attack: network attack detected"
 msgstr ""
 #
-# File: ../common/packet.c, line: 913
+# File: ../common/packet.c, line: 1037
 msgid "deattack denial of service detected"
 msgstr ""
 #
-# File: ../common/packet.c, line: 937
+# File: ../common/packet.c, line: 1061
 #, c-format
 msgid "packet_read_poll1: len %d != buffer_len %d."
 msgstr ""
 #
-# File: ../common/packet.c, line: 943
+# File: ../common/packet.c, line: 1067
 msgid "Corrupted check bytes on input."
 msgstr ""
 #
-# File: ../common/packet.c, line: 1002
-#, c-format
-msgid "padding error: need %d block %d mod %d"
+# File: ../common/packet.c, line: 1116
+# File: ../common/packet.c, line: 1126
+msgid "Bad packet length."
 msgstr ""
 #
-# File: ../common/packet.c, line: 1025
+# File: ../common/packet.c, line: 1148
 msgid "Corrupted MAC on input."
 msgstr ""
 #
-# File: ../common/packet.c, line: 1039
+# File: ../common/packet.c, line: 1160
+msgid "too many packets with same key"
+msgstr ""
+#
+# File: ../common/packet.c, line: 1168
 #, c-format
 msgid "Corrupted padlen %d on input."
 msgstr ""
 #
-# File: ../common/packet.c, line: 1292
+# File: ../common/packet.c, line: 1434
 msgid "packet_disconnect called recursively."
 msgstr ""
 #
-# File: ../common/packet.c, line: 1358
+# File: ../common/packet.c, line: 1500
 #, c-format
 msgid "Write failed: %.100s"
 msgstr ""
 #
-# File: ../common/packet.c, line: 1569
+# File: ../common/packet.c, line: 1725
 #, c-format
 msgid "Monitor failed to start: %s"
 msgstr ""
@@ -1702,9 +1755,9 @@ msgstr ""
 msgid "ssh_dss_verify: BN_new failed"
 msgstr ""
 #
-# File: ../common/ssh-gss.c, line: 292
-# File: gss-clnt.c, line: 58
-# File: gss-serv.c, line: 73
+# File: ../common/ssh-gss.c, line: 290
+# File: gss-clnt.c, line: 57
+# File: gss-serv.c, line: 72
 #, c-format
 msgid "INTERNAL ERROR (%s)"
 msgstr ""
@@ -1821,7 +1874,6 @@ msgstr ""
 #
 # File: ../common/uidswap.c, line: 89
 # File: ../common/uidswap.c, line: 146
-# File: sshd.c, line: 745
 #, c-format
 msgid "setgroups: %.100s"
 msgstr ""
@@ -1893,285 +1945,172 @@ msgstr ""
 msgid "xfree: NULL pointer given as argument"
 msgstr ""
 #
-# File: ../common/monitor_wrap.c, line: 81
-# File: ../common/monitor_wrap.c, line: 83
-#, c-format
-msgid "%s: write"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 99
-#, c-format
-msgid "%s: read: %ld"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 103
-#, c-format
-msgid "%s: read: bad msg_len %d"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 108
-#, c-format
-msgid "%s: read: %ld != msg_len"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 121
-#, c-format
-msgid "%s: read: rtype %d != type %d"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 144
-#, c-format
-msgid "%s: MONITOR_ANS_MODULI failed"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 147
-# File: ../common/monitor_wrap.c, line: 149
-# File: ../common/monitor_wrap.c, line: 896
-#, c-format
-msgid "%s: BN_new failed"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 204
-#, c-format
-msgid "%s: struct passwd size mismatch"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 310
-# File: auth.c, line: 542
-# File: sshconnect2.c, line: 976
-# File: sshconnect2.c, line: 1352
-# File: sshconnect2.c, line: 1354
-#, c-format
-msgid "%s"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 419
-#, c-format
-msgid "%s: bad ivlen: expected %u != %u"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 423
-#, c-format
-msgid "%s: bad cipher name %s or pointer %p"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 429
-#, c-format
-msgid "%s: can not init mac %s"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 433
-#, c-format
-msgid "%s: bad mac key length: %u > %d"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 444
-#, c-format
-msgid "newkeys_from_blob: remaining bytes in blob %u"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 462
-#, c-format
-msgid "%s: newkey == NULL"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 559
-# File: ../common/monitor_wrap.c, line: 565
-#, c-format
-msgid "%s: conversion of newkeys failed"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 650
-#, c-format
-msgid "close(s->ptymaster): %s"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 875
-#, c-format
-msgid "%s: key_from_blob failed"
-msgstr ""
-#
-# File: ../common/monitor_wrap.c, line: 900
-# File: ../common/monitor_wrap.c, line: 928
-# File: monitor.c, line: 1096
-#, c-format
-msgid "%s: key_to_blob failed"
-msgstr ""
-#
-# File: ../common/monitor_fdpass.c, line: 58
-#, c-format
-msgid "%s: sendmsg(%d): %s"
-msgstr ""
-#
-# File: ../common/monitor_fdpass.c, line: 61
-#, c-format
-msgid "%s: sendmsg: expected sent 1 got %ld"
-msgstr ""
-#
-# File: ../common/monitor_fdpass.c, line: 88
-#, c-format
-msgid "%s: recvmsg: %s"
-msgstr ""
-#
-# File: ../common/monitor_fdpass.c, line: 90
-#, c-format
-msgid "%s: recvmsg: expected received 1 got %ld"
-msgstr ""
-#
-# File: ../common/monitor_fdpass.c, line: 95
-#, c-format
-msgid "%s: no fd"
-msgstr ""
-#
-# File: ../common/readconf.c, line: 215
+# File: ../common/readconf.c, line: 216
 msgid "Privileged ports can only be forwarded by root."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 218
+# File: ../common/readconf.c, line: 219
 #, c-format
 msgid "Too many local forwards (max %d)."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 239
+# File: ../common/readconf.c, line: 240
 #, c-format
 msgid "Too many remote forwards (max %d)."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 318
+# File: ../common/readconf.c, line: 320
 #, c-format
 msgid "we can't have more than %d unknown options:"
 msgstr ""
 #
-# File: ../common/readconf.c, line: 322
+# File: ../common/readconf.c, line: 324
 #, c-format
 msgid "%s:%d:%s"
 msgstr ""
 #
-# File: ../common/readconf.c, line: 327
+# File: ../common/readconf.c, line: 329
 msgid "too many unknown options found, can't continue"
 msgstr ""
 #
-# File: ../common/readconf.c, line: 344
-# File: servconf.c, line: 587
+# File: ../common/readconf.c, line: 346
+# File: servconf.c, line: 576
 #, c-format
 msgid "%s line %d: missing time value."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 347
-# File: servconf.c, line: 590
+# File: ../common/readconf.c, line: 349
+# File: servconf.c, line: 579
 #, c-format
 msgid "%s line %d: invalid time value."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 358
+# File: ../common/readconf.c, line: 360
 #, c-format
 msgid "%.200s line %d: Missing yes/no argument."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 365
+# File: ../common/readconf.c, line: 367
 #, c-format
 msgid "%.200s line %d: Bad yes/no argument."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 459
+# File: ../common/readconf.c, line: 461
 #, c-format
 msgid "%.200s line %d: Missing yes/no/ask argument."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 469
+# File: ../common/readconf.c, line: 471
 #, c-format
 msgid "%.200s line %d: Bad yes/no/ask argument."
 msgstr ""
 #
 # File: ../common/readconf.c, line: 501
-#, c-format
-msgid "%.200s line %d: Too many identity files specified (max %d)."
-msgstr ""
-#
-# File: ../common/readconf.c, line: 580
-# File: ../common/readconf.c, line: 585
+# File: ../common/readconf.c, line: 504
+# File: ../common/readconf.c, line: 620
+# File: ../common/readconf.c, line: 625
 #, c-format
 msgid "%.200s line %d: Bad number."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 601
+# File: ../common/readconf.c, line: 519
+#, c-format
+msgid "%.200s line %d: Invalid RekeyLimit suffix"
+msgstr ""
+#
+# File: ../common/readconf.c, line: 525
+#, c-format
+msgid "%.200s line %d: RekeyLimit too large"
+msgstr ""
+#
+# File: ../common/readconf.c, line: 528
+#, c-format
+msgid "%.200s line %d: RekeyLimit too small"
+msgstr ""
+#
+# File: ../common/readconf.c, line: 541
+#, c-format
+msgid "%.200s line %d: Too many identity files specified (max %d)."
+msgstr ""
+#
+# File: ../common/readconf.c, line: 641
 #, c-format
 msgid "%.200s line %d: Bad cipher '%s'."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 612
+# File: ../common/readconf.c, line: 652
 #, c-format
 msgid "%.200s line %d: Bad SSH2 cipher spec '%s'."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 623
+# File: ../common/readconf.c, line: 663
 #, c-format
 msgid "%.200s line %d: Bad SSH2 Mac spec '%s'."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 634
+# File: ../common/readconf.c, line: 674
 #, c-format
 msgid "%.200s line %d: Bad protocol 2 host key algorithms '%s'."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 647
+# File: ../common/readconf.c, line: 687
 #, c-format
 msgid "%.200s line %d: Bad protocol spec '%s'."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 658
-# File: servconf.c, line: 835
+# File: ../common/readconf.c, line: 698
+# File: servconf.c, line: 824
 #, c-format
 msgid "%.200s line %d: unsupported log level '%s'"
 msgstr ""
 #
-# File: ../common/readconf.c, line: 668
-# File: ../common/readconf.c, line: 693
+# File: ../common/readconf.c, line: 708
+# File: ../common/readconf.c, line: 733
 #, c-format
 msgid "%.200s line %d: Missing port argument."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 672
+# File: ../common/readconf.c, line: 712
 #, c-format
 msgid "%.200s line %d: Missing target argument."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 679
+# File: ../common/readconf.c, line: 719
 #, c-format
 msgid "%.200s line %d: Bad forwarding specification."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 697
+# File: ../common/readconf.c, line: 737
 #, c-format
 msgid "%.200s line %d: Bad dynamic forwarding specification."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 735
+# File: ../common/readconf.c, line: 775
 #, c-format
 msgid "%.200s line %d: Bad escape character."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 765
+# File: ../common/readconf.c, line: 805
 #, c-format
 msgid "%.200s line %d: Bad yes/no/in-exec-mode argument."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 779
+# File: ../common/readconf.c, line: 823
 #, c-format
 msgid "process_config_line: Unimplemented opcode %d"
 msgstr ""
 #
-# File: ../common/readconf.c, line: 784
+# File: ../common/readconf.c, line: 828
 #, c-format
 msgid "%.200s line %d: garbage at end of line; \"%.200s\"."
 msgstr ""
 #
-# File: ../common/readconf.c, line: 1155
+# File: ../common/readconf.c, line: 1205
 #, c-format
 msgid "%s: line %d: unknown configuration option: %s"
 msgstr ""
 #
-# File: ../common/readconf.c, line: 1165
+# File: ../common/readconf.c, line: 1215
 #, c-format
 msgid "terminating, %d bad configuration option(s)"
 msgstr ""
@@ -2216,7 +2155,7 @@ msgstr ""
 msgid "Unknown status"
 msgstr ""
 #
-# File: ssh.c, line: 164
+# File: ssh.c, line: 159
 #, c-format
 msgid ""
 "Usage: %s [options] host [command]\n"
@@ -2262,190 +2201,183 @@ msgid ""
 "  -b addr     Local IP address.\n"
 msgstr ""
 #
-# File: ssh.c, line: 268
+# File: ssh.c, line: 262
 #, c-format
 msgid "setrlimit failed: %.100s"
 msgstr ""
 #
-# File: ssh.c, line: 274
+# File: ssh.c, line: 268
 msgid "You don't exist, go away!"
 msgstr ""
 #
-# File: ssh.c, line: 328
+# File: ssh.c, line: 322
 msgid "Warning: Option -P has been deprecated\n"
 msgstr ""
 #
-# File: ssh.c, line: 342
+# File: ssh.c, line: 336
 #, c-format
 msgid "Warning: Identity file %s does not exist.\n"
 msgstr ""
 #
-# File: ssh.c, line: 348
+# File: ssh.c, line: 342
 #, c-format
 msgid "Too many identity files specified (max %d)"
 msgstr ""
 #
 # File: ssh-keyscan.c, line: 725
-# File: ssh.c, line: 371
+# File: ssh.c, line: 363
 msgid "Too high debugging level."
 msgstr ""
 #
-# File: ssh.c, line: 375
+# File: ssh.c, line: 367
 #, c-format
 msgid "%s, SSH protocols %d.%d/%d.%d, OpenSSL 0x%8.8lx\n"
 msgstr ""
 #
-# File: ssh.c, line: 398
+# File: ssh.c, line: 390
 #, c-format
 msgid "Bad escape character '%s'.\n"
 msgstr ""
 #
-# File: ssh.c, line: 413
+# File: ssh.c, line: 405
 #, c-format
 msgid "Unknown cipher type '%s'\n"
 msgstr ""
 #
-# File: ssh.c, line: 431
+# File: ssh.c, line: 423
 #, c-format
 msgid "Unknown mac type '%s'\n"
 msgstr ""
 #
 # File: ssh-keyscan.c, line: 704
-# File: ssh.c, line: 439
+# File: ssh.c, line: 431
 #, c-format
 msgid "Bad port '%s'\n"
 msgstr ""
 #
-# File: ssh.c, line: 452
+# File: ssh.c, line: 444
 #, c-format
 msgid "Bad local forwarding specification '%s'\n"
 msgstr ""
 #
-# File: ssh.c, line: 460
+# File: ssh.c, line: 452
 #, c-format
 msgid "Bad remote forwarding specification '%s'\n"
 msgstr ""
 #
-# File: ssh.c, line: 466
+# File: ssh.c, line: 458
 #, c-format
 msgid "Bad dynamic forwarding specification '%s'\n"
 msgstr ""
 #
-# File: ssh.c, line: 546
+# File: ssh.c, line: 538
 msgid "You must specify a subsystem to invoke.\n"
 msgstr ""
 #
-# File: ssh.c, line: 561
+# File: ssh.c, line: 553
 msgid "Cannot fork into background without a command to execute."
 msgstr ""
 #
-# File: ssh.c, line: 573
+# File: ssh.c, line: 565
 msgid ""
 "Pseudo-terminal will not be allocated because stdin is not a terminal."
 msgstr ""
 #
-# File: ssh.c, line: 592
+# File: ssh.c, line: 584
 #, c-format
 msgid "Can't open user config file %.100s: %.100s"
 msgstr ""
 #
-# File: ssh.c, line: 634
-# File: ssh.c, line: 648
+# File: ssh.c, line: 626
+# File: ssh.c, line: 640
 msgid "rsh_connect returned"
 msgstr ""
 #
-# File: ssh.c, line: 710
+# File: ssh.c, line: 702
 #, c-format
 msgid "Could not create directory '%.200s'."
 msgstr ""
 #
-# File: ssh.c, line: 792
+# File: ssh.c, line: 784
 msgid "Could not request local forwarding."
 msgstr ""
 #
-# File: ssh.c, line: 808
+# File: ssh.c, line: 800
 msgid "Warning: Could not request remote forwarding."
 msgstr ""
 #
-# File: ssh.c, line: 838
+# File: ssh.c, line: 830
 msgid "Compression level must be from 1 (fast) to 9 (slow, best)."
 msgstr ""
 #
-# File: ssh.c, line: 849
+# File: ssh.c, line: 841
 msgid "Warning: Remote host refused compression."
 msgstr ""
 #
-# File: ssh.c, line: 851
+# File: ssh.c, line: 843
 msgid "Protocol error waiting for compression response."
 msgstr ""
 #
-# File: ssh.c, line: 889
+# File: ssh.c, line: 881
 msgid "Warning: Remote host failed or refused to allocate a pseudo tty."
 msgstr ""
 #
-# File: ssh.c, line: 891
+# File: ssh.c, line: 883
 msgid "Protocol error waiting for pty request response."
 msgstr ""
 #
-# File: ssh.c, line: 909
+# File: ssh.c, line: 901
 msgid "Warning: Remote host denied X11 forwarding."
 msgstr ""
 #
-# File: ssh.c, line: 911
+# File: ssh.c, line: 903
 msgid "Protocol error waiting for X11 forwarding"
 msgstr ""
 #
-# File: clientloop.c, line: 1328
-# File: clientloop.c, line: 1338
-# File: clientloop.c, line: 1347
-# File: clientloop.c, line: 1374
-# File: clientloop.c, line: 1414
-# File: clientloop.c, line: 1529
-# File: ssh.c, line: 926
-# File: ssh.c, line: 974
+# File: clientloop.c, line: 1341
+# File: clientloop.c, line: 1351
+# File: clientloop.c, line: 1360
+# File: clientloop.c, line: 1387
+# File: clientloop.c, line: 1427
+# File: clientloop.c, line: 1543
+# File: ssh.c, line: 918
+# File: ssh.c, line: 966
 # File: sshconnect1.c, line: 122
 # File: sshconnect1.c, line: 260
 # File: sshconnect1.c, line: 377
 # File: sshconnect1.c, line: 437
 # File: sshconnect1.c, line: 560
-# File: sshconnect2.c, line: 327
-# File: sshconnect2.c, line: 449
-# File: sshconnect2.c, line: 483
-# File: sshconnect2.c, line: 656
-# File: sshconnect2.c, line: 708
-# File: sshconnect2.c, line: 791
-# File: sshconnect2.c, line: 816
-# File: sshconnect2.c, line: 1382
+# File: sshconnect2.c, line: 332
+# File: sshconnect2.c, line: 454
+# File: sshconnect2.c, line: 488
+# File: sshconnect2.c, line: 661
+# File: sshconnect2.c, line: 713
+# File: sshconnect2.c, line: 796
+# File: sshconnect2.c, line: 821
+# File: sshconnect2.c, line: 1387
 #, c-format
 msgid "Packet integrity error (%d bytes remaining) at %s:%d"
 msgstr ""
 #
-# File: ssh.c, line: 928
+# File: ssh.c, line: 920
 msgid "Warning: Remote host denied authentication agent forwarding."
 msgstr ""
 #
-# File: ssh.c, line: 937
-# File: ssh.c, line: 1159
-# File: sshd.c, line: 1284
-#, c-format
-msgid "daemon() failed: %.200s"
-msgstr ""
-#
-# File: ssh.c, line: 976
+# File: ssh.c, line: 968
 #, c-format
 msgid "Request for subsystem '%.*s' failed on channel %d"
 msgstr ""
 #
-# File: ssh.c, line: 994
+# File: ssh.c, line: 986
 #, c-format
 msgid "Warning: remote port forwarding failed for listen port %d"
 msgstr ""
 #
-# File: ssh.c, line: 1115
+# File: ssh.c, line: 1107
 msgid "dup() in/out/err failed"
 msgstr ""
 #
-# File: ssh.c, line: 1195
+# File: ssh.c, line: 1186
 msgid "Using rsh.  WARNING: Connection will not be encrypted."
 msgstr ""
 #
@@ -2454,8 +2386,8 @@ msgstr ""
 msgid "Could not create pipes to communicate with the proxy: %.100s"
 msgstr ""
 #
-# File: session.c, line: 458
-# File: session.c, line: 577
+# File: session.c, line: 455
+# File: session.c, line: 574
 # File: sshconnect.c, line: 160
 #, c-format
 msgid "fork failed: %.100s"
@@ -2679,7 +2611,7 @@ msgid ""
 "Are you sure you want to continue connecting (%s/%s)"
 msgstr ""
 #
-# File: sshconnect.c, line: 1056
+# File: sshconnect.c, line: 1072
 #, c-format
 msgid ""
 "WARNING: %s key found for host %s\n"
@@ -2748,7 +2680,7 @@ msgstr ""
 #
 # File: sshconnect1.c, line: 442
 # File: sshconnect1.c, line: 483
-# File: sshconnect2.c, line: 935
+# File: sshconnect2.c, line: 940
 msgid "Permission denied, please try again."
 msgstr ""
 #
@@ -2794,7 +2726,7 @@ msgid ""
 msgstr ""
 #
 # File: sshconnect1.c, line: 566
-# File: sshconnect2.c, line: 86
+# File: sshconnect2.c, line: 84
 msgid "Host key verification failed."
 msgstr ""
 #
@@ -2841,7 +2773,7 @@ msgid "Protocol error: got %d in response to rhosts auth"
 msgstr ""
 #
 # File: sshconnect1.c, line: 798
-# File: sshconnect2.c, line: 937
+# File: sshconnect2.c, line: 942
 #, c-format
 msgid "%.30s@%.128s's password: "
 msgstr ""
@@ -2850,250 +2782,252 @@ msgstr ""
 msgid "Permission denied."
 msgstr ""
 #
-# File: sshconnect2.c, line: 94
+# File: sshconnect2.c, line: 92
 msgid ""
 "GSS-API authenticated host key addition to known_hosts file failed"
 msgstr ""
 #
-# File: sshconnect2.c, line: 116
+# File: sshconnect2.c, line: 117
 msgid "No valid ciphers for protocol version 2 given, using defaults."
 msgstr ""
 #
-# File: sshconnect2.c, line: 319
+# File: sshconnect2.c, line: 324
 #, c-format
 msgid "Server denied authentication request: %d"
 msgstr ""
 #
-# File: sshconnect2.c, line: 347
+# File: sshconnect2.c, line: 352
 msgid "ssh_userauth2: internal error: cannot send userauth none request"
 msgstr ""
 #
-# File: sshconnect2.c, line: 380
+# File: sshconnect2.c, line: 385
 #, c-format
 msgid "Permission denied (%s)."
 msgstr ""
 #
-# File: sshconnect2.c, line: 395
+# File: sshconnect2.c, line: 400
 #, c-format
 msgid "input_userauth_error: bad message during authentication: type %d"
 msgstr ""
 #
-# File: sshconnect2.c, line: 427
+# File: sshconnect2.c, line: 432
 msgid "input_userauth_success: no authentication context"
 msgstr ""
 #
-# File: sshconnect2.c, line: 445
+# File: sshconnect2.c, line: 450
 msgid "input_userauth_failure: no authentication context"
 msgstr ""
 #
-# File: sshconnect2.c, line: 452
+# File: sshconnect2.c, line: 457
 msgid "Authenticated with partial success."
 msgstr ""
 #
-# File: sshconnect2.c, line: 470
+# File: sshconnect2.c, line: 475
 msgid "input_userauth_pk_ok: no authentication context"
 msgstr ""
 #
-# File: sshconnect2.c, line: 503
+# File: sshconnect2.c, line: 508
 #, c-format
 msgid ""
 "input_userauth_pk_ok: type mismatch for decoded key (received %d, "
 "expected %d)"
 msgstr ""
 #
-# File: sshconnect2.c, line: 617
-# File: sshconnect2.c, line: 698
-# File: sshconnect2.c, line: 775
-# File: sshconnect2.c, line: 832
+# File: sshconnect2.c, line: 622
+# File: sshconnect2.c, line: 703
+# File: sshconnect2.c, line: 780
+# File: sshconnect2.c, line: 837
 msgid "input_gssapi_response: no authentication context"
 msgstr ""
 #
-# File: sshconnect2.c, line: 970
+# File: sshconnect2.c, line: 975
 msgid "input_userauth_passwd_changereq: no authentication context"
 msgstr ""
 #
-# File: sshconnect2.c, line: 985
+# File: auth.c, line: 568
+# File: sshconnect2.c, line: 981
+# File: sshconnect2.c, line: 1357
+# File: sshconnect2.c, line: 1359
+#, c-format
+msgid "%s"
+msgstr ""
+#
+# File: sshconnect2.c, line: 990
 #, c-format
 msgid "Enter %.30s@%.128s's old password: "
 msgstr ""
 #
-# File: sshconnect2.c, line: 994
+# File: sshconnect2.c, line: 999
 #, c-format
 msgid "Enter %.30s@%.128s's new password: "
 msgstr ""
 #
-# File: sshconnect2.c, line: 1002
+# File: sshconnect2.c, line: 1007
 #, c-format
 msgid "Retype %.30s@%.128s's new password: "
 msgstr ""
 #
-# File: sshconnect2.c, line: 1008
+# File: sshconnect2.c, line: 1013
 msgid "Mismatch; try again, EOF to quit."
 msgstr ""
 #
-# File: sshconnect2.c, line: 1115
+# File: sshconnect2.c, line: 1120
 msgid "userauth_pubkey: internal error"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1177
+# File: sshconnect2.c, line: 1182
 #, c-format
 msgid "Enter passphrase for key '%.100s': "
 msgstr ""
 #
-# File: sshconnect2.c, line: 1344
+# File: sshconnect2.c, line: 1349
 msgid "input_userauth_info_req: no authentication context"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1400
+# File: sshconnect2.c, line: 1405
 #, c-format
 msgid "ssh_keysign: no installed: %s"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1404
+# File: sshconnect2.c, line: 1409
 #, c-format
 msgid "ssh_keysign: fflush: %s"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1406
-# File: sshconnect2.c, line: 1410
+# File: sshconnect2.c, line: 1411
+# File: sshconnect2.c, line: 1415
 #, c-format
 msgid "ssh_keysign: pipe: %s"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1414
+# File: sshconnect2.c, line: 1419
 #, c-format
 msgid "ssh_keysign: fork: %s"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1422
-# File: sshconnect2.c, line: 1425
+# File: sshconnect2.c, line: 1427
+# File: sshconnect2.c, line: 1430
 #, c-format
 msgid "ssh_keysign: dup2: %s"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1429
+# File: sshconnect2.c, line: 1434
 #, c-format
 msgid "ssh_keysign: exec(%s): %s"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1441
+# File: sshconnect2.c, line: 1446
 msgid "ssh_keysign: no reply"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1453
+# File: sshconnect2.c, line: 1458
 msgid "ssh_keysign: bad version"
 msgstr ""
 #
-# File: sshconnect2.c, line: 1498
+# File: sshconnect2.c, line: 1503
 msgid "userauth_hostbased: cannot get local ipaddr/name"
 msgstr ""
 #
 # File: ssh-keysign.c, line: 249
-# File: sshconnect2.c, line: 1535
+# File: sshconnect2.c, line: 1540
 msgid "key_sign failed"
 msgstr ""
 #
-# File: clientloop.c, line: 284
+# File: clientloop.c, line: 285
 msgid ""
 "Warning: untrusted X11 forwarding setup failed: xauth key data not "
 "generated"
 msgstr ""
 #
-# File: clientloop.c, line: 309
+# File: clientloop.c, line: 310
 msgid ""
 "Warning: No xauth data; using fake authentication data for X11 "
 "forwarding."
 msgstr ""
 #
-# File: clientloop.c, line: 460
+# File: clientloop.c, line: 461
 msgid "Timeout, server not responding."
 msgstr ""
 #
-# File: clientloop.c, line: 619
+# File: clientloop.c, line: 620
 #, c-format
 msgid "Connection to %.300s closed by remote host.\r\n"
 msgstr ""
 #
-# File: clientloop.c, line: 637
+# File: clientloop.c, line: 638
 #, c-format
 msgid "Read from remote host %.300s: %.100s\r\n"
 msgstr ""
 #
-# File: clientloop.c, line: 672
+# File: clientloop.c, line: 673
 msgid "Commands:"
 msgstr ""
 #
-# File: clientloop.c, line: 673
+# File: clientloop.c, line: 674
 msgid ""
 "      -L[bind_address:]port:host:hostport    Request local forward"
 msgstr ""
 #
-# File: clientloop.c, line: 675
+# File: clientloop.c, line: 676
 msgid ""
 "      -R[bind_address:]port:host:hostport    Request remote forward"
 msgstr ""
 #
-# File: clientloop.c, line: 677
+# File: clientloop.c, line: 678
 msgid ""
 "      -KR[bind_address:]port                 Cancel remote forward"
 msgstr ""
 #
-# File: clientloop.c, line: 687
+# File: clientloop.c, line: 688
 # File: sftp.c, line: 894
 msgid "Invalid command."
 msgstr ""
 #
-# File: clientloop.c, line: 693
+# File: clientloop.c, line: 694
 msgid "Not supported."
 msgstr ""
 #
-# File: clientloop.c, line: 697
+# File: clientloop.c, line: 698
 msgid "Not supported for SSH protocol version 1."
 msgstr ""
 #
-# File: clientloop.c, line: 706
+# File: clientloop.c, line: 707
 msgid "Bad forwarding close port"
 msgstr ""
 #
-# File: clientloop.c, line: 712
+# File: clientloop.c, line: 713
 msgid "Bad forwarding specification."
 msgstr ""
 #
-# File: clientloop.c, line: 719
-# File: clientloop.c, line: 726
+# File: clientloop.c, line: 720
+# File: clientloop.c, line: 727
 msgid "Port forwarding failed."
 msgstr ""
 #
-# File: clientloop.c, line: 731
+# File: clientloop.c, line: 732
 msgid "Forwarding port."
 msgstr ""
 #
-# File: clientloop.c, line: 779
+# File: clientloop.c, line: 802
 #, c-format
 msgid "%c^Z [suspend ssh]\r\n"
 msgstr ""
 #
-# File: clientloop.c, line: 792
+# File: clientloop.c, line: 815
 #, c-format
 msgid "%cB [sent break]\r\n"
 msgstr ""
 #
-# File: clientloop.c, line: 806
+# File: clientloop.c, line: 829
 msgid "Server does not support re-keying"
 msgstr ""
 #
-# File: clientloop.c, line: 825
+# File: clientloop.c, line: 848
 #, c-format
 msgid "%c& [backgrounded]\n"
 msgstr ""
 #
-# File: clientloop.c, line: 832
-# File: sshd.c, line: 1580
-#, c-format
-msgid "fork: %.100s"
-msgstr ""
-#
-# File: clientloop.c, line: 865
+# File: clientloop.c, line: 880
 #, c-format
 msgid ""
 "%c?\r\n"
@@ -3110,96 +3044,70 @@ msgid ""
 "(Note that escapes are only recognized immediately after newline.)\r\n"
 msgstr ""
 #
-# File: clientloop.c, line: 1057
+# File: clientloop.c, line: 1072
 #, c-format
 msgid "client_channel_closed: id %d != session_ident %d"
 msgstr ""
 #
-# File: clientloop.c, line: 1262
+# File: clientloop.c, line: 1275
 #, c-format
 msgid "Killed by signal %d."
 msgstr ""
 #
-# File: clientloop.c, line: 1272
+# File: clientloop.c, line: 1285
 #, c-format
 msgid "Connection to %.64s closed.\r\n"
 msgstr ""
 #
-# File: clientloop.c, line: 1282
+# File: clientloop.c, line: 1295
 msgid "Write failed flushing stdout buffer."
 msgstr ""
 #
-# File: clientloop.c, line: 1294
+# File: clientloop.c, line: 1307
 msgid "Write failed flushing stderr buffer."
 msgstr ""
 #
-# File: clientloop.c, line: 1518
+# File: clientloop.c, line: 1532
 #, c-format
 msgid "client_input_channel_req: no channel %d"
 msgstr ""
 #
-# File: clientloop.c, line: 1520
+# File: clientloop.c, line: 1534
 #, c-format
 msgid "client_input_channel_req: channel %d: wrong channel: %d"
 msgstr ""
 #
-# File: clientloop.c, line: 1525
+# File: clientloop.c, line: 1539
 #, c-format
 msgid "client_input_channel_req: channel %d: unknown channel"
 msgstr ""
 #
-# File: sshd.c, line: 347
+# File: sshd.c, line: 336
 #, c-format
 msgid "Timeout before authentication for %s"
 msgstr ""
 #
-# File: sshd.c, line: 496
+# File: sshd.c, line: 485
 #, c-format
 msgid "Generating %s%d bit RSA key."
 msgstr ""
 #
-# File: sshd.c, line: 502
+# File: sshd.c, line: 491
 msgid "RSA key generation complete."
 msgstr ""
 #
-# File: sshd.c, line: 628
+# File: sshd.c, line: 617
 msgid ""
 "Your ssh version is too old and is no longer supported.  Please "
 "install a newer version."
 msgstr ""
 #
-# File: sshd.c, line: 725
-# File: sshd.c, line: 1235
-#, c-format
-msgid "Privilege separation user %s does not exist"
-msgstr ""
-#
-# File: sshd.c, line: 732
-#, c-format
-msgid "chroot(\"%s\"): %s"
-msgstr ""
-#
-# File: sshd.c, line: 735
-#, c-format
-msgid "chdir(\"/\"): %s"
-msgstr ""
-#
-# File: sshd.c, line: 743
-#, c-format
-msgid "setgid failed for %u"
-msgstr ""
-#
-# File: sshd.c, line: 764
-# File: sshd.c, line: 826
-msgid "fork of unprivileged child failed"
-msgstr ""
-#
-# File: sshd.c, line: 948
+# File: sshd.c, line: 793
 #, c-format
 msgid "sshd version %s\n"
 msgstr ""
 #
-# File: sshd.c, line: 950
+# File: sshd.c, line: 795
 #, c-format
 msgid ""
 "Usage: %s [options]\n"
@@ -3222,270 +3130,265 @@ msgid ""
 "configuration file.\n"
 msgstr ""
 #
-# File: sshd.c, line: 1039
+# File: sshd.c, line: 883
 msgid "Debug level too high.\n"
 msgstr ""
 #
-# File: sshd.c, line: 1064
+# File: sshd.c, line: 908
 msgid "too many ports.\n"
 msgstr ""
 #
-# File: sshd.c, line: 1069
+# File: sshd.c, line: 913
 msgid "Bad port number.\n"
 msgstr ""
 #
-# File: sshd.c, line: 1076
+# File: sshd.c, line: 920
 msgid "Invalid login grace time.\n"
 msgstr ""
 #
-# File: sshd.c, line: 1083
+# File: sshd.c, line: 927
 msgid "Invalid key regeneration interval.\n"
 msgstr ""
 #
-# File: sshd.c, line: 1091
+# File: sshd.c, line: 935
 msgid "too many host keys.\n"
 msgstr ""
 #
-# File: sshd.c, line: 1144
+# File: sshd.c, line: 992
 #, c-format
 msgid "Extra argument %s.\n"
 msgstr ""
 #
-# File: sshd.c, line: 1165
+# File: sshd.c, line: 1013
 #, c-format
 msgid "Could not load host key: %s"
 msgstr ""
 #
-# File: sshd.c, line: 1209
+# File: sshd.c, line: 1057
 msgid "Bad server key size.\n"
 msgstr ""
 #
-# File: sshd.c, line: 1239
-#, c-format
-msgid "Missing privilege separation directory: %s"
-msgstr ""
-#
-# File: sshd.c, line: 1245
-#, c-format
-msgid "Bad owner or mode for %s"
-msgstr ""
-#
-# File: sshd.c, line: 1331
+# File: sshd.c, line: 1185
 msgid "Too many listen sockets. Enlarge MAX_LISTEN_SOCKS"
 msgstr ""
 #
-# File: sshd.c, line: 1336
+# File: sshd.c, line: 1190
 msgid "getnameinfo failed"
 msgstr ""
 #
-# File: sshd.c, line: 1347
+# File: sshd.c, line: 1201
 #, c-format
 msgid "listen_sock O_NONBLOCK: %s"
 msgstr ""
 #
-# File: sshd.c, line: 1365
+# File: sshd.c, line: 1219
 #, c-format
 msgid "Bind to port %s on %s failed: %.200s."
 msgstr ""
 #
-# File: sshd.c, line: 1382
+# File: sshd.c, line: 1236
 msgid "Cannot bind any address."
 msgstr ""
 #
-# File: serverloop.c, line: 359
-# File: serverloop.c, line: 812
-# File: sshd.c, line: 1451
+# File: serverloop.c, line: 357
+# File: serverloop.c, line: 814
+# File: sshd.c, line: 1305
 #, c-format
 msgid "select: %.100s"
 msgstr ""
 #
-# File: sshd.c, line: 1493
+# File: sshd.c, line: 1347
 #, c-format
 msgid "newsock del O_NONBLOCK: %s"
 msgstr ""
 #
-# File: sshd.c, line: 1659
+# File: sshd.c, line: 1435
+#, c-format
+msgid "fork: %.100s"
+msgstr ""
+#
+# File: sshd.c, line: 1521
 msgid "libwrap refuse returns"
 msgstr ""
 #
-# File: sshd.c, line: 1665
+# File: sshd.c, line: 1527
 #, c-format
 msgid "Connection from %.500s port %d"
 msgstr ""
 #
-# File: sshd.c, line: 1747
-msgid "Monitor could not be started."
-msgstr ""
-#
-# File: sshd.c, line: 1877
+# File: sshd.c, line: 1642
 #, c-format
 msgid "Closing connection to %.100s"
 msgstr ""
 #
-# File: sshd.c, line: 1903
+# File: sshd.c, line: 1667
 #, c-format
 msgid ""
 "do_connection: %s: server_key %d < host_key %d + "
 "SSH_KEY_BITS_RESERVED %d"
 msgstr ""
 #
-# File: sshd.c, line: 1919
+# File: sshd.c, line: 1683
 #, c-format
 msgid ""
 "do_connection: %s: host_key %d < server_key %d + "
 "SSH_KEY_BITS_RESERVED %d"
 msgstr ""
 #
-# File: sshd.c, line: 2022
+# File: sshd.c, line: 1786
 msgid "Warning: client selects unsupported cipher."
 msgstr ""
 #
-# File: sshd.c, line: 2030
+# File: sshd.c, line: 1794
 msgid "IP Spoofing check bytes do not match."
 msgstr ""
 #
-# File: sshd.c, line: 2038
+# File: sshd.c, line: 1802
 msgid "do_ssh1_kex: BN_new failed"
 msgstr ""
 #
-# File: sshd.c, line: 2058
+# File: sshd.c, line: 1822
 #, c-format
 msgid ""
 "do_connection: bad session key len from %s: session_key_int %d > "
 "sizeof(session_key) %lu"
 msgstr ""
 #
-# File: altprivsep.c, line: 206
+# File: altprivsep.c, line: 238
 msgid "Monitor startup failed: missing state"
 msgstr ""
 #
-# File: altprivsep.c, line: 216
+# File: altprivsep.c, line: 244
 #, c-format
 msgid "Monitor startup failure: could not create pipes: %s"
 msgstr ""
 #
-# File: altprivsep.c, line: 300
+# File: altprivsep.c, line: 334
 msgid "Missing key exchange context in unprivileged process"
 msgstr ""
 #
-# File: altprivsep.c, line: 306
-# File: altprivsep.c, line: 335
-# File: altprivsep.c, line: 795
-# File: altprivsep.c, line: 870
-# File: altprivsep.c, line: 885
+# File: altprivsep.c, line: 339
+# File: altprivsep.c, line: 369
+# File: altprivsep.c, line: 945
+# File: altprivsep.c, line: 1019
+# File: altprivsep.c, line: 1033
 msgid "Monitor not responding"
 msgstr ""
 #
-# File: altprivsep.c, line: 344
+# File: altprivsep.c, line: 378
 msgid "Received garbage from monitor"
 msgstr ""
 #
-# File: altprivsep.c, line: 446
+# File: altprivsep.c, line: 481
 msgid "Received garbage from monitor during re-keying"
 msgstr ""
 #
-# File: altprivsep.c, line: 458
+# File: altprivsep.c, line: 493
 msgid "Monitor negotiated an unknown cipher during re-key"
 msgstr ""
 #
-# File: altprivsep.c, line: 466
+# File: altprivsep.c, line: 501
 msgid "Monitor negotiated an unknown MAC algorithm during re-key"
 msgstr ""
 #
-# File: altprivsep.c, line: 471
+# File: altprivsep.c, line: 506
 #, c-format
 msgid "%s: bad mac key length: %d > %d"
 msgstr ""
 #
-# File: altprivsep.c, line: 477
+# File: altprivsep.c, line: 512
 msgid ""
 "Monitor negotiated an unknown compression algorithm during re-key"
 msgstr ""
 #
-# File: altprivsep.c, line: 888
+# File: altprivsep.c, line: 793
+msgid "APS_MSG_AUTH_CONTEXT message subtype expected."
+msgstr ""
+#
+# File: altprivsep.c, line: 1036
 #, c-format
 msgid ""
 "Protocol error in privilege separation; expected packet type %d, got "
 "%d"
 msgstr ""
 #
-# File: auth.c, line: 198
+# File: altprivsep.c, line: 1080
+msgid "Monitor could not be started."
+msgstr ""
+#
+# File: auth.c, line: 196
 #, c-format
 msgid "%s: INTERNAL ERROR"
 msgstr ""
 #
-# File: auth1.c, line: 128
+# File: auth1.c, line: 125
 msgid "Rhosts authentication disabled."
 msgstr ""
 #
-# File: auth1.c, line: 149
+# File: auth1.c, line: 146
 msgid "Rhosts with RSA authentication disabled."
 msgstr ""
 #
-# File: auth1.c, line: 167
+# File: auth1.c, line: 164
 #, c-format
 msgid ""
 "Warning: keysize mismatch for client_host_key: actual %d, announced %d"
 msgstr ""
 #
-# File: auth1.c, line: 181
+# File: auth1.c, line: 178
 msgid "RSA authentication disabled."
 msgstr ""
 #
-# File: auth1.c, line: 186
+# File: auth1.c, line: 183
 msgid "do_authloop: BN_new failed"
 msgstr ""
 #
-# File: auth1.c, line: 197
+# File: auth1.c, line: 194
 msgid "Password authentication disabled."
 msgstr ""
 #
-# File: auth1.c, line: 274
-msgid "Privsep is not supported"
-msgstr ""
-#
-# File: auth1.c, line: 305
-# File: auth2.c, line: 372
+# File: auth1.c, line: 297
+# File: auth2.c, line: 367
 #, c-format
 msgid "Too many authentication failures for %.100s"
 msgstr ""
 #
-# File: auth1.c, line: 366
+# File: auth1.c, line: 355
 msgid "Cannot change user when server not running as root."
 msgstr ""
 #
-# File: auth2.c, line: 142
+# File: auth2.c, line: 139
 msgid "input_service_request: no authctxt"
 msgstr ""
 #
-# File: auth2.c, line: 160
+# File: auth2.c, line: 157
 #, c-format
 msgid "bad service request %s"
 msgstr ""
 #
-# File: auth2.c, line: 173
+# File: auth2.c, line: 170
 msgid "input_userauth_request: no authctxt"
 msgstr ""
 #
-# File: auth2-hostbased.c, line: 70
-# File: auth2-none.c, line: 105
-# File: auth2-passwd.c, line: 52
-# File: auth2-pubkey.c, line: 69
-# File: auth2.c, line: 286
+# File: auth2-hostbased.c, line: 69
+# File: auth2-none.c, line: 104
+# File: auth2-passwd.c, line: 51
+# File: auth2-pubkey.c, line: 66
+# File: auth2.c, line: 280
 #, c-format
 msgid "%s: missing context"
 msgstr ""
 #
-# File: auth2.c, line: 425
+# File: auth2.c, line: 420
 #, c-format
 msgid "Change of service not allowed: %s and %s"
 msgstr ""
 #
-# File: auth2.c, line: 666
+# File: auth2.c, line: 661
 msgid "Internal error in authmethod_count_attempt()"
 msgstr ""
 #
-# File: auth-options.c, line: 278
+# File: auth-options.c, line: 277
 msgid "Bugs in auth-options.c option processing."
 msgstr ""
 #
@@ -3514,21 +3417,21 @@ msgid "No authentication context during gssapi-keyex userauth"
 msgstr ""
 #
 # File: auth2-gss.c, line: 205
-# File: auth2-gss.c, line: 254
+# File: auth2-gss.c, line: 255
 msgid ""
 "No authentication or GSSAPI context during gssapi-with-mic userauth"
 msgstr ""
 #
-# File: auth2-gss.c, line: 357
+# File: auth2-gss.c, line: 362
 msgid "No authentication or GSSAPI context"
 msgstr ""
 #
-# File: auth2-hostbased.c, line: 90
+# File: auth2-hostbased.c, line: 89
 #, c-format
 msgid "userauth_hostbased: cannot decode key: %s"
 msgstr ""
 #
-# File: auth2-hostbased.c, line: 94
+# File: auth2-hostbased.c, line: 93
 #, c-format
 msgid ""
 "userauth_hostbased: type mismatch for decoded key (received %d, "
@@ -3540,46 +3443,46 @@ msgstr ""
 msgid "%s: missing contex"
 msgstr ""
 #
-# File: auth2-pam.c, line: 60
+# File: auth2-pam.c, line: 59
 msgid "auth2_pam: internal error: no user"
 msgstr ""
 #
-# File: auth2-pam.c, line: 62
+# File: auth2-pam.c, line: 61
 msgid "auth2_pam: internal error: no method"
 msgstr ""
 #
-# File: auth2-pam.c, line: 106
+# File: auth2-pam.c, line: 109
 msgid "Warning: Your password has expired, please change it now."
 msgstr ""
 #
-# File: auth2-pam.c, line: 337
+# File: auth2-pam.c, line: 363
 msgid "input_userauth_info_response_pam: no authentication context"
 msgstr ""
 #
-# File: auth2-pam.c, line: 354
+# File: auth2-pam.c, line: 380
 #, c-format
 msgid "%s: too many replies"
 msgstr ""
 #
-# File: auth2-pam.c, line: 369
+# File: auth2-pam.c, line: 395
 #, c-format
 msgid "%s: too few replies (%d < %d)"
 msgstr ""
 #
-# File: auth2-pubkey.c, line: 94
+# File: auth2-pubkey.c, line: 91
 #, c-format
 msgid "userauth_pubkey: cannot decode key: %s"
 msgstr ""
 #
-# File: auth2-pubkey.c, line: 98
+# File: auth2-pubkey.c, line: 95
 #, c-format
 msgid ""
 "userauth_pubkey: type mismatch for decoded key (received %d, expected "
 "%d)"
 msgstr ""
 #
-# File: auth-rsa.c, line: 332
-# File: auth2-pubkey.c, line: 295
+# File: auth-rsa.c, line: 331
+# File: auth2-pubkey.c, line: 293
 #, c-format
 msgid "Found matching %s key: %s"
 msgstr ""
@@ -3588,108 +3491,108 @@ msgstr ""
 msgid "get_challenge: numprompts < 1"
 msgstr ""
 #
-# File: auth-pam.c, line: 101
-# File: auth-pam.c, line: 144
+# File: auth-pam.c, line: 97
+# File: auth-pam.c, line: 140
 msgid "Userauth method unknown while starting PAM"
 msgstr ""
 #
-# File: auth-pam.c, line: 141
+# File: auth-pam.c, line: 137
 msgid "Internal error during userauth"
 msgstr ""
 #
-# File: auth-pam.c, line: 188
+# File: auth-pam.c, line: 184
 #, c-format
 msgid "PAM initialization failed during %s userauth"
 msgstr ""
 #
-# File: auth-pam.c, line: 198
+# File: auth-pam.c, line: 194
 #, c-format
 msgid "Could not set PAM_RHOST item during %s userauth"
 msgstr ""
 #
-# File: auth-pam.c, line: 204
+# File: auth-pam.c, line: 200
 #, c-format
 msgid "Could not set PAM_TTY item during %s userauth"
 msgstr ""
 #
-# File: auth-pam.c, line: 211
+# File: auth-pam.c, line: 207
 #, c-format
 msgid "Could not set PAM_AUSER item during %s userauth"
 msgstr ""
 #
-# File: auth-pam.c, line: 272
+# File: auth-pam.c, line: 268
 #, c-format
 msgid "PAM failure: pam_get_item(PAM_USER) returned %d: %.200s"
 msgstr ""
 #
-# File: auth-rsa.c, line: 68
+# File: auth-rsa.c, line: 67
 msgid "auth_rsa_generate_challenge: BN_new() failed"
 msgstr ""
 #
-# File: auth-rsa.c, line: 72
+# File: auth-rsa.c, line: 71
 msgid "auth_rsa_generate_challenge: BN_CTX_new() failed"
 msgstr ""
 #
-# File: auth-rsa.c, line: 88
+# File: auth-rsa.c, line: 87
 #, c-format
 msgid ""
 "auth_rsa_verify_response: RSA modulus too small: %d < minimum %d bits"
 msgstr ""
 #
-# File: auth-rsa.c, line: 96
+# File: auth-rsa.c, line: 95
 #, c-format
 msgid "auth_rsa_verify_response: bad challenge length %d"
 msgstr ""
 #
-# File: auth-rsa.c, line: 128
+# File: auth-rsa.c, line: 127
 msgid "auth_rsa_challenge_dialog: BN_new() failed"
 msgstr ""
 #
+# File: auth-rsa.c, line: 313
 # File: auth-rsa.c, line: 314
-# File: auth-rsa.c, line: 315
 msgid "Wrong response to RSA authentication challenge."
 msgstr ""
 #
-# File: auth-rsa.c, line: 337
+# File: auth-rsa.c, line: 336
 msgid "RSA authentication accepted."
 msgstr ""
 #
-# File: auth-rh-rsa.c, line: 74
+# File: auth-rh-rsa.c, line: 72
 msgid "Your host key cannot be verified: unknown or invalid host key."
 msgstr ""
 #
-# File: auth-rh-rsa.c, line: 91
+# File: auth-rh-rsa.c, line: 89
 #, c-format
 msgid ""
 "Rhosts with RSA host authentication accepted for %.100s, %.100s on "
 "%.700s."
 msgstr ""
 #
-# File: auth-rh-rsa.c, line: 93
+# File: auth-rh-rsa.c, line: 91
 msgid "Rhosts with RSA host authentication accepted."
 msgstr ""
 #
-# File: bsmaudit.c, line: 115
+# File: bsmaudit.c, line: 113
 #, c-format
 msgid "Auditing of password change failed: %s (%s)"
 msgstr ""
 #
-# File: bsmaudit.c, line: 162
-# File: bsmaudit.c, line: 212
+# File: bsmaudit.c, line: 172
+# File: bsmaudit.c, line: 252
 #, c-format
 msgid "Auditing of login failed: %s (%s)"
 msgstr ""
 #
-# File: bsmaudit.c, line: 249
+# File: bsmaudit.c, line: 289
 #, c-format
 msgid "Auditing of logout failed: %s (%s)"
 msgstr ""
 #
-# File: gss-serv.c, line: 178
+# File: gss-serv.c, line: 172
 msgid "Zero length GSS context token output when continue needed"
 msgstr ""
 #
-# File: gss-serv.c, line: 242
+# File: gss-serv.c, line: 239
 msgid "Missing context while storing GSS-API credentials"
 msgstr ""
 #
@@ -3713,693 +3616,469 @@ msgstr ""
 msgid "%s: Error reading from %s: Expecting %d, got %d"
 msgstr ""
 #
-# File: monitor.c, line: 296
-#, c-format
-msgid "%s: unexpected authentication from %d"
-msgstr ""
-#
-# File: monitor.c, line: 317
-#, c-format
-msgid "%s: authenticated invalid user"
-msgstr ""
-#
-# File: monitor.c, line: 390
-#, c-format
-msgid "%s: unpermitted request %d"
-msgstr ""
-#
-# File: monitor.c, line: 408
-#, c-format
-msgid "%s: unsupported request: %d"
-msgstr ""
-#
-# File: monitor.c, line: 456
-#, c-format
-msgid "%s: bad parameters: %d %d %d"
-msgstr ""
-#
-# File: monitor.c, line: 492
-#, c-format
-msgid "%s: data length incorrect: %u"
-msgstr ""
-#
-# File: monitor.c, line: 502
-#, c-format
-msgid "%s: no hostkey from index %d"
-msgstr ""
-#
-# File: monitor.c, line: 504
-#, c-format
-msgid "%s: key_sign failed"
-msgstr ""
-#
-# File: monitor.c, line: 534
-#, c-format
-msgid "%s: multiple attempts for getpwnam"
-msgstr ""
-#
-# File: monitor.c, line: 700
-#, c-format
-msgid "%s: key type and protocol mismatch"
-msgstr ""
-#
-# File: monitor.c, line: 722
-#, c-format
-msgid "%s: unknown key type %d"
-msgstr ""
-#
-# File: monitor.c, line: 883
-# File: monitor.c, line: 1128
-# File: monitor.c, line: 1165
-#, c-format
-msgid "%s: bad key, not previously allowed"
-msgstr ""
-#
-# File: monitor.c, line: 887
-#, c-format
-msgid "%s: bad public key blob"
-msgstr ""
-#
-# File: monitor.c, line: 902
-#, c-format
-msgid "%s: bad signature data blob"
-msgstr ""
-#
-# File: monitor.c, line: 974
-#, c-format
-msgid "%s: dup2"
-msgstr ""
-#
-# File: monitor.c, line: 983
-#, c-format
-msgid "%s: open(/dev/null): %s"
-msgstr ""
-#
-# File: monitor.c, line: 985
-#, c-format
-msgid "%s: fd0 %d != 0"
-msgstr ""
-#
-# File: monitor.c, line: 1031
-# File: monitor.c, line: 1082
-#, c-format
-msgid "%s: BN_new"
-msgstr ""
-#
-# File: monitor.c, line: 1059
-#, c-format
-msgid "%s: bad ssh1 session id"
-msgstr ""
-#
-# File: monitor.c, line: 1125
-# File: monitor.c, line: 1159
-#, c-format
-msgid "%s: authctxt not valid"
-msgstr ""
-#
-# File: monitor.c, line: 1130
-#, c-format
-msgid "%s: key type mismatch"
-msgstr ""
-#
-# File: monitor.c, line: 1132
-# File: monitor.c, line: 1169
-#, c-format
-msgid "%s: received bad key"
-msgstr ""
-#
-# File: monitor.c, line: 1161
-#, c-format
-msgid "%s: no ssh1_challenge"
-msgstr ""
-#
-# File: monitor.c, line: 1167
-#, c-format
-msgid "%s: key type mismatch: %d"
-msgstr ""
-#
-# File: monitor.c, line: 1172
-#, c-format
-msgid "%s: received bad response to challenge"
-msgstr ""
-#
-# File: monitor.c, line: 1279
-msgid "mm_get_get: internal error: bad session id"
-msgstr ""
-#
-# File: monitor.c, line: 1356
-# File: monitor.c, line: 1362
-#, c-format
-msgid "%s: bad request size"
-msgstr ""
-#
-# File: monitor.c, line: 1383
-#, c-format
-msgid "%s: mm_zalloc(%u, %u)"
-msgstr ""
-#
-# File: monitor.c, line: 1417
-#, c-format
-msgid "%s: socketpair"
-msgstr ""
-#
-# File: monitor.c, line: 1419
-# File: monitor.c, line: 1420
-#, c-format
-msgid "fcntl(%d, F_SETFD)"
-msgstr ""
-#
-# File: monitor.c, line: 1540
-#, c-format
-msgid "%s: data length incorrect: %d"
-msgstr ""
-#
-# File: monitor_mm.c, line: 76
-#, c-format
-msgid "mm_make_entry(%p): double address %p->%p(%lu)"
-msgstr ""
-#
-# File: monitor_mm.c, line: 105
-#, c-format
-msgid "mmap(%lu): %s"
-msgstr ""
-#
-# File: monitor_mm.c, line: 145
-#, c-format
-msgid "munmap(%p, %lu): %s"
-msgstr ""
-#
-# File: monitor_mm.c, line: 161
-#, c-format
-msgid "%s: mm_malloc(%lu)"
-msgstr ""
-#
-# File: monitor_mm.c, line: 174
-msgid "mm_malloc: try to allocate 0 space"
-msgstr ""
-#
-# File: monitor_mm.c, line: 176
-msgid "mm_malloc: size too big"
-msgstr ""
-#
-# File: monitor_mm.c, line: 218
-#, c-format
-msgid "mm_free(%p): can not find %p"
-msgstr ""
-#
-# File: monitor_mm.c, line: 226
-#, c-format
-msgid "mm_free(%p): double address %p"
-msgstr ""
-#
-# File: monitor_mm.c, line: 248
-#, c-format
-msgid "mm_free: memory corruption: %p(%lu) > %p"
-msgstr ""
-#
-# File: monitor_mm.c, line: 271
-#, c-format
-msgid "mm_free: memory corruption: %p < %p(%lu)"
-msgstr ""
-#
-# File: monitor_mm.c, line: 346
-#, c-format
-msgid "mm_memvalid: address too small: %p"
-msgstr ""
-#
-# File: monitor_mm.c, line: 348
-#, c-format
-msgid "mm_memvalid: end < address: %p < %p"
-msgstr ""
-#
-# File: monitor_mm.c, line: 350
-#, c-format
-msgid "mm_memvalid: address too large: %p"
-msgstr ""
-#
-# File: servconf.c, line: 482
+# File: servconf.c, line: 471
 #, c-format
 msgid "%s: line %d: Bad configuration option: %s"
 msgstr ""
 #
-# File: servconf.c, line: 514
+# File: servconf.c, line: 503
 #, c-format
 msgid "bad addr or host: %s (%s)"
 msgstr ""
 #
-# File: servconf.c, line: 555
+# File: servconf.c, line: 544
 #, c-format
 msgid "%s line %d: ports must be specified before ListenAddress."
 msgstr ""
 #
-# File: servconf.c, line: 558
+# File: servconf.c, line: 547
 #, c-format
 msgid "%s line %d: too many ports."
 msgstr ""
 #
-# File: servconf.c, line: 562
+# File: servconf.c, line: 551
 #, c-format
 msgid "%s line %d: missing port number."
 msgstr ""
 #
-# File: servconf.c, line: 566
+# File: servconf.c, line: 555
 #, c-format
 msgid "%s line %d: Badly formatted port number."
 msgstr ""
 #
-# File: servconf.c, line: 575
+# File: servconf.c, line: 564
 #, c-format
 msgid "%s line %d: missing integer value."
 msgstr ""
 #
-# File: servconf.c, line: 603
+# File: servconf.c, line: 592
 #, c-format
 msgid "%s line %d: missing inet addr."
 msgstr ""
 #
-# File: servconf.c, line: 607
+# File: servconf.c, line: 596
 #, c-format
 msgid "%s line %d: bad ipv6 inet addr usage."
 msgstr ""
 #
-# File: servconf.c, line: 621
+# File: servconf.c, line: 610
 #, c-format
 msgid "%s line %d: bad inet addr:port usage."
 msgstr ""
 #
-# File: servconf.c, line: 626
+# File: servconf.c, line: 615
 #, c-format
 msgid "%s line %d: bad port number."
 msgstr ""
 #
-# File: servconf.c, line: 633
+# File: servconf.c, line: 622
 #, c-format
 msgid "%s line %d: bad inet addr usage."
 msgstr ""
 #
-# File: servconf.c, line: 640
+# File: servconf.c, line: 629
 #, c-format
 msgid "%s line %d: too many host keys specified (max %d)."
 msgstr ""
 #
-# File: servconf.c, line: 646
+# File: servconf.c, line: 635
 #, c-format
 msgid "%s line %d: missing file name."
 msgstr ""
 #
-# File: servconf.c, line: 664
+# File: servconf.c, line: 653
 #, c-format
 msgid ""
 "%s line %d: missing yes/without-password/forced-commands-only/no "
 "argument."
 msgstr ""
 #
-# File: servconf.c, line: 677
+# File: servconf.c, line: 666
 #, c-format
 msgid ""
 "%s line %d: Bad yes/without-password/forced-commands-only/no "
 "argument: %s"
 msgstr ""
 #
-# File: servconf.c, line: 689
+# File: servconf.c, line: 678
 #, c-format
 msgid "%s line %d: missing yes/no argument."
 msgstr ""
 #
-# File: servconf.c, line: 697
+# File: servconf.c, line: 686
 #, c-format
 msgid "%s line %d: Bad yes/no argument: %s"
 msgstr ""
 #
-# File: servconf.c, line: 811
+# File: servconf.c, line: 800
 #, c-format
 msgid "%.200s line %d: Bad yes/no/clientspecified argument."
 msgstr ""
 #
-# File: servconf.c, line: 824
+# File: servconf.c, line: 813
 #, c-format
 msgid "%.200s line %d: unsupported log facility '%s'"
 msgstr ""
 #
-# File: servconf.c, line: 852
+# File: servconf.c, line: 844
 #, c-format
 msgid "%s line %d: too many allow users."
 msgstr ""
 #
-# File: servconf.c, line: 862
+# File: servconf.c, line: 854
 #, c-format
 msgid "%s line %d: too many deny users."
 msgstr ""
 #
-# File: servconf.c, line: 872
+# File: servconf.c, line: 864
 #, c-format
 msgid "%s line %d: too many allow groups."
 msgstr ""
 #
-# File: servconf.c, line: 882
+# File: servconf.c, line: 874
 #, c-format
 msgid "%s line %d: too many deny groups."
 msgstr ""
 #
-# File: servconf.c, line: 891
-# File: servconf.c, line: 902
-# File: servconf.c, line: 914
+# File: servconf.c, line: 883
+# File: servconf.c, line: 894
+# File: servconf.c, line: 906
 #, c-format
 msgid "%s line %d: Missing argument."
 msgstr ""
 #
-# File: servconf.c, line: 893
+# File: servconf.c, line: 885
 #, c-format
 msgid "%s line %d: Bad SSH2 cipher spec '%s'."
 msgstr ""
 #
-# File: servconf.c, line: 904
+# File: servconf.c, line: 896
 #, c-format
 msgid "%s line %d: Bad SSH2 mac spec '%s'."
 msgstr ""
 #
-# File: servconf.c, line: 917
+# File: servconf.c, line: 909
 #, c-format
 msgid "%s line %d: Bad protocol spec '%s'."
 msgstr ""
 #
-# File: servconf.c, line: 925
+# File: servconf.c, line: 917
 #, c-format
 msgid "%s line %d: too many subsystems defined."
 msgstr ""
 #
-# File: servconf.c, line: 930
+# File: servconf.c, line: 922
 #, c-format
 msgid "%s line %d: Missing subsystem name."
 msgstr ""
 #
-# File: servconf.c, line: 934
+# File: servconf.c, line: 926
 #, c-format
 msgid "%s line %d: Subsystem '%s' already defined."
 msgstr ""
 #
-# File: servconf.c, line: 939
+# File: servconf.c, line: 931
 #, c-format
 msgid "%s line %d: Missing subsystem command."
 msgstr ""
 #
-# File: servconf.c, line: 948
+# File: servconf.c, line: 940
 #, c-format
 msgid "%s line %d: Missing MaxStartups spec."
 msgstr ""
 #
-# File: servconf.c, line: 958
-# File: servconf.c, line: 961
+# File: servconf.c, line: 950
+# File: servconf.c, line: 953
 #, c-format
 msgid "%s line %d: Illegal MaxStartups spec."
 msgstr ""
 #
-# File: servconf.c, line: 1012
+# File: servconf.c, line: 1007
 #, c-format
 msgid "%s line %d: Missing handler for opcode %s (%d)"
 msgstr ""
 #
-# File: servconf.c, line: 1016
+# File: servconf.c, line: 1011
 #, c-format
 msgid "%s line %d: garbage at end of line; \"%.200s\"."
 msgstr ""
 #
-# File: servconf.c, line: 1044
+# File: servconf.c, line: 1039
 #, c-format
 msgid "%s: terminating, %d bad configuration options"
 msgstr ""
 #
-# File: serverloop.c, line: 118
+# File: serverloop.c, line: 116
 #, c-format
 msgid "pipe(notify_pipe) failed %s"
 msgstr ""
 #
-# File: serverloop.c, line: 121
+# File: serverloop.c, line: 119
 #, c-format
 msgid "fcntl(notify_pipe, F_SETFD) failed %s"
 msgstr ""
 #
-# File: serverloop.c, line: 237
+# File: serverloop.c, line: 235
 msgid "No open channels after timeout!"
 msgstr ""
 #
-# File: serverloop.c, line: 243
+# File: serverloop.c, line: 241
 msgid "Timeout, your session not responding."
 msgstr ""
 #
-# File: serverloop.c, line: 381
+# File: serverloop.c, line: 382
 #, c-format
 msgid "Connection closed by %.100s"
 msgstr ""
 #
-# File: serverloop.c, line: 389
+# File: serverloop.c, line: 391
 #, c-format
 msgid "Read error from remote host %.100s: %.100s"
 msgstr ""
 #
-# File: serverloop.c, line: 710
+# File: serverloop.c, line: 712
 #, c-format
 msgid "wait: %.100s"
 msgstr ""
 #
-# File: serverloop.c, line: 712
+# File: serverloop.c, line: 714
 #, c-format
 msgid "Strange, wait returned pid %ld, expected %ld"
 msgstr ""
 #
-# File: serverloop.c, line: 742
+# File: serverloop.c, line: 744
 #, c-format
 msgid "Command terminated on signal %d."
 msgstr ""
 #
-# File: serverloop.c, line: 746
-# File: session.c, line: 2069
+# File: serverloop.c, line: 748
+# File: session.c, line: 2065
 #, c-format
 msgid "wait returned status %04x."
 msgstr ""
 #
-# File: serverloop.c, line: 1181
+# File: serverloop.c, line: 1193
 msgid "server_input_global_request: no user"
 msgstr ""
 #
-# File: serverloop.c, line: 1195
+# File: serverloop.c, line: 1207
 msgid "Server has disabled port forwarding."
 msgstr ""
 #
-# File: serverloop.c, line: 1239
+# File: serverloop.c, line: 1251
 #, c-format
 msgid "server_input_channel_req: unknown channel %d"
 msgstr ""
 #
-# File: session.c, line: 171
+# File: session.c, line: 168
 msgid "authentication forwarding requested twice."
 msgstr ""
 #
-# File: session.c, line: 185
+# File: session.c, line: 182
 #, c-format
 msgid "Agent forwarding disabled: mkdtemp() failed: %.100s"
 msgstr ""
 #
-# File: session.c, line: 285
+# File: session.c, line: 282
 #, c-format
 msgid "Received illegal compression level %d."
 msgstr ""
 #
-# File: session.c, line: 410
+# File: session.c, line: 407
 #, c-format
 msgid "Could not create socket pairs: %.100s"
 msgstr ""
 #
-# File: session.c, line: 414
+# File: session.c, line: 411
 msgid "do_exec_no_pty: no session"
 msgstr ""
 #
-# File: session.c, line: 431
+# File: session.c, line: 428
 #, c-format
 msgid "setsid failed: %.100s"
 msgstr ""
 #
-# File: session.c, line: 497
+# File: session.c, line: 494
 msgid "do_exec_pty: no session"
 msgstr ""
 #
-# File: session.c, line: 515
+# File: session.c, line: 512
 #, c-format
 msgid "pipe failed: %.100s"
 msgstr ""
 #
-# File: session.c, line: 536
+# File: session.c, line: 533
 #, c-format
 msgid "dup2 stdin: %s"
 msgstr ""
 #
-# File: session.c, line: 538
+# File: session.c, line: 535
 #, c-format
 msgid "dup2 stdout: %s"
 msgstr ""
 #
-# File: session.c, line: 540
+# File: session.c, line: 537
 #, c-format
 msgid "dup2 stderr: %s"
 msgstr ""
 #
-# File: session.c, line: 591
+# File: session.c, line: 588
 #, c-format
 msgid "dup #1 failed: %.100s"
 msgstr ""
 #
-# File: session.c, line: 596
+# File: session.c, line: 593
 #, c-format
 msgid "dup #2 failed: %.100s"
 msgstr ""
 #
-# File: session.c, line: 779
+# File: session.c, line: 776
 #, c-format
 msgid "child_set_env: too many env vars, skipping: %.100s"
 msgstr ""
 #
-# File: session.c, line: 815
+# File: session.c, line: 812
 #, c-format
 msgid "Too many lines in environment file %s"
 msgstr ""
 #
-# File: session.c, line: 824
+# File: session.c, line: 821
 #, c-format
 msgid "Bad line %u in %.100s\n"
 msgstr ""
 #
-# File: session.c, line: 911
+# File: session.c, line: 908
 #, c-format
 msgid "Could not set ULIMIT to %ld from %s\n"
 msgstr ""
 #
-# File: session.c, line: 1063
+# File: session.c, line: 1060
 msgid "Environment:\n"
 msgstr ""
 #
-# File: session.c, line: 1168
+# File: session.c, line: 1165
 #, c-format
 msgid "setlogin failed: %s"
 msgstr ""
 #
-# File: session.c, line: 1185
+# File: session.c, line: 1182
 #, c-format
 msgid "Failed to set uids to %u."
 msgstr ""
 #
-# File: session.c, line: 1304
+# File: session.c, line: 1301
 #, c-format
 msgid "Could not chdir to home directory %s: %s\n"
 msgstr ""
 #
-# File: session.c, line: 1418
+# File: session.c, line: 1415
 msgid "no more sessions"
 msgstr ""
 #
-# File: session.c, line: 1424
-# File: session.c, line: 2207
+# File: session.c, line: 1421
+# File: session.c, line: 2203
 #, c-format
 msgid "no user for session %d"
 msgstr ""
 #
-# File: session.c, line: 1474
+# File: session.c, line: 1471
 #, c-format
 msgid "session_by_pid: unknown pid %ld"
 msgstr ""
 #
-# File: session.c, line: 1502
+# File: session.c, line: 1499
 msgid "Protocol error: you already have a pty."
 msgstr ""
 #
-# File: session.c, line: 1572
+# File: session.c, line: 1569
 #, c-format
 msgid "session_pty_req: session %d alloc failed"
 msgstr ""
 #
-# File: session.c, line: 1615
+# File: session.c, line: 1611
 #, c-format
 msgid "subsystem: cannot stat %s: %s"
 msgstr ""
 #
-# File: session.c, line: 1682
+# File: session.c, line: 1679
 #, c-format
 msgid ""
 "failed to create the temporary X authority file %s: %.100s; will use "
 "the default one"
 msgstr ""
 #
-# File: session.c, line: 1688
+# File: session.c, line: 1685
 #, c-format
 msgid "cannot remove xauth directory %s: %.100s"
 msgstr ""
 #
-# File: session.c, line: 1706
+# File: session.c, line: 1703
 #, c-format
 msgid ""
 "failed to create a directory for the temporary X authority file: "
 "%.100s; will use the default xauth file"
 msgstr ""
 #
-# File: session.c, line: 1811
+# File: session.c, line: 1807
 #, c-format
 msgid "Missing locale support for %s=%s"
 msgstr ""
 #
-# File: session.c, line: 1816
+# File: session.c, line: 1812
 #, c-format
 msgid "Channel %d set: %s=%s"
 msgstr ""
 #
-# File: session.c, line: 1921
+# File: session.c, line: 1917
 msgid "session_set_fds: called for proto != 2.0"
 msgstr ""
 #
-# File: session.c, line: 1928
+# File: session.c, line: 1924
 #, c-format
 msgid "no channel for session %d"
 msgstr ""
 #
-# File: session.c, line: 1947
+# File: session.c, line: 1943
 msgid "session_pty_cleanup: no session"
 msgstr ""
 #
-# File: session.c, line: 1978
+# File: session.c, line: 1974
 #, c-format
 msgid "close(s->ptymaster/%d): %s"
 msgstr ""
 #
-# File: session.c, line: 2001
+# File: session.c, line: 1997
 msgid "session_xauthfile_cleanup: no session"
 msgstr ""
 #
-# File: session.c, line: 2009
+# File: session.c, line: 2005
 #, c-format
 msgid "session_xauthfile_cleanup: cannot remove xauth file: %.100s"
 msgstr ""
 #
-# File: session.c, line: 2016
+# File: session.c, line: 2012
 #, c-format
 msgid "session_xauthfile_cleanup: cannot remove xauth directory: %.100s"
 msgstr ""
 #
-# File: session.c, line: 2049
+# File: session.c, line: 2045
 #, c-format
 msgid "session_exit_message: session %d: no channel %d"
 msgstr ""
 #
-# File: session.c, line: 2220
+# File: session.c, line: 2216
 msgid "X11 forwarding disabled in user configuration file."
 msgstr ""
 #
-# File: session.c, line: 2229
+# File: session.c, line: 2225
 msgid "No xauth program; cannot forward with spoofing."
 msgstr ""
 #
-# File: session.c, line: 2233
+# File: session.c, line: 2229
 msgid "X11 forwarding disabled; not compatible with UseLogin=yes."
 msgstr ""
 #
-# File: session.c, line: 2250
+# File: session.c, line: 2246
 #, c-format
 msgid "gethostname: %.100s"
 msgstr ""
@@ -4556,85 +4235,85 @@ msgstr ""
 msgid "%s: invalid user name\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 98
+# File: ssh-add.c, line: 96
 #, c-format
 msgid "Bad key file %s\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 102
+# File: ssh-add.c, line: 100
 #, c-format
 msgid "Identity removed: %s (%s)\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 106
+# File: ssh-add.c, line: 104
 #, c-format
 msgid "Could not remove identity: %s\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 127
+# File: ssh-add.c, line: 125
 msgid "All identities removed.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 129
+# File: ssh-add.c, line: 127
 msgid "Failed to remove all identities.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 158
+# File: ssh-add.c, line: 156
 #, c-format
 msgid "Enter passphrase for %.200s: "
 msgstr ""
 #
-# File: ssh-add.c, line: 170
+# File: ssh-add.c, line: 168
 msgid "Bad passphrase, try again: "
 msgstr ""
 #
-# File: ssh-add.c, line: 176
-# File: ssh-add.c, line: 183
+# File: ssh-add.c, line: 174
+# File: ssh-add.c, line: 181
 #, c-format
 msgid "Identity added: %s (%s)\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 181
+# File: ssh-add.c, line: 179
 #, c-format
 msgid "Lifetime set to %d seconds\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 187
+# File: ssh-add.c, line: 185
 #, c-format
 msgid "Could not add identity: %s\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 221
-# File: ssh-keygen.c, line: 425
-# File: ssh-keygen.c, line: 539
+# File: ssh-add.c, line: 217
+# File: ssh-keygen.c, line: 421
+# File: ssh-keygen.c, line: 533
 msgid "key_write failed"
 msgstr ""
 #
-# File: ssh-add.c, line: 229
+# File: ssh-add.c, line: 225
 msgid "The agent has no identities.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 247
+# File: ssh-add.c, line: 243
 msgid "Passwords do not match.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 255
+# File: ssh-add.c, line: 251
 msgid "Agent locked.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 257
+# File: ssh-add.c, line: 253
 msgid "Agent unlocked.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 261
+# File: ssh-add.c, line: 257
 msgid "Failed to lock agent.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 263
+# File: ssh-add.c, line: 259
 msgid "Failed to unlock agent.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 287
+# File: ssh-add.c, line: 283
 #, c-format
 msgid ""
 "Usage: %s [options]\n"
@@ -4648,70 +4327,70 @@ msgid ""
 "  -t life     Set lifetime (seconds) when adding identities.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 321
+# File: ssh-add.c, line: 315
 msgid "Could not open a connection to your authentication agent.\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 350
+# File: ssh-add.c, line: 343
 msgid "Invalid lifetime\n"
 msgstr ""
 #
-# File: ssh-add.c, line: 371
+# File: ssh-add.c, line: 363
 #, c-format
 msgid "No user found with uid %u\n"
 msgstr ""
 #
-# File: ssh-agent.c, line: 143
+# File: ssh-agent.c, line: 139
 #, c-format
 msgid "internal error, bad protocol version %d"
 msgstr ""
 #
-# File: ssh-agent.c, line: 216
+# File: ssh-agent.c, line: 212
 msgid "process_authentication_challenge1: BN_new failed"
 msgstr ""
 #
-# File: ssh-agent.c, line: 352
+# File: ssh-agent.c, line: 348
 #, c-format
 msgid "process_remove_identity: internal error: tab->nentries %d"
 msgstr ""
 #
-# File: sftp-server.c, line: 1172
-# File: ssh-agent.c, line: 630
+# File: sftp-server.c, line: 1170
+# File: ssh-agent.c, line: 623
 #, c-format
 msgid "Unknown message %d"
 msgstr ""
 #
-# File: ssh-agent.c, line: 644
+# File: ssh-agent.c, line: 637
 #, c-format
 msgid "fcntl O_NONBLOCK: %s"
 msgstr ""
 #
-# File: ssh-agent.c, line: 688
+# File: ssh-agent.c, line: 681
 #, c-format
 msgid "Unknown socket type %d"
 msgstr ""
 #
-# File: ssh-agent.c, line: 745
+# File: ssh-agent.c, line: 738
 #, c-format
 msgid "accept from AUTH_SOCKET: %s"
 msgstr ""
 #
-# File: ssh-agent.c, line: 750
+# File: ssh-agent.c, line: 743
 #, c-format
 msgid "getpeereid %d failed: %s"
 msgstr ""
 #
-# File: ssh-agent.c, line: 756
+# File: ssh-agent.c, line: 749
 #, c-format
 msgid "uid mismatch: peer euid %u != uid %u"
 msgstr ""
 #
-# File: ssh-agent.c, line: 800
+# File: ssh-agent.c, line: 793
 #, c-format
 msgid "Unknown type %d"
 msgstr ""
 #
-# File: ssh-agent.c, line: 845
+# File: ssh-agent.c, line: 838
 #, c-format
 msgid ""
 "Usage: %s [options] [command [args ...]]\n"
@@ -4723,301 +4402,301 @@ msgid ""
 "  -a socket   Bind agent socket to given name.\n"
 msgstr ""
 #
-# File: ssh-agent.c, line: 929
+# File: ssh-agent.c, line: 922
 #, c-format
 msgid "%s not set, cannot kill agent\n"
 msgstr ""
 #
-# File: ssh-agent.c, line: 936
+# File: ssh-agent.c, line: 929
 #, c-format
 msgid "%s=\")%s\", which is not a good PID\n"
 msgstr ""
 #
-# File: ssh-agent.c, line: 948
+# File: ssh-agent.c, line: 941
 #, c-format
 msgid "Agent pid %ld killed;\n"
 msgstr ""
 #
-# File: ssh-agent.c, line: 1004
-# File: ssh-agent.c, line: 1022
+# File: ssh-agent.c, line: 997
+# File: ssh-agent.c, line: 1015
 #, c-format
 msgid "Agent pid %ld;\n"
 msgstr ""
 #
-# File: ssh-agent.c, line: 1049
+# File: ssh-agent.c, line: 1042
 #, c-format
 msgid "priv_str_to_set failed: %m"
 msgstr ""
 #
-# File: ssh-agent.c, line: 1061
+# File: ssh-agent.c, line: 1054
 #, c-format
 msgid "setsid: %s"
 msgstr ""
 #
-# File: ssh-agent.c, line: 1074
+# File: ssh-agent.c, line: 1067
 #, c-format
 msgid "setrlimit RLIMIT_CORE: %s"
 msgstr ""
 #
-# File: sftp-server.c, line: 1313
-# File: ssh-agent.c, line: 1099
+# File: sftp-server.c, line: 1311
+# File: ssh-agent.c, line: 1092
 #, c-format
 msgid "select: %s"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 117
+# File: ssh-keygen.c, line: 113
 msgid "bad key type"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 144
-# File: ssh-keygen.c, line: 841
+# File: ssh-keygen.c, line: 140
+# File: ssh-keygen.c, line: 835
 msgid "Enter passphrase: "
 msgstr ""
 #
-# File: ssh-keygen.c, line: 164
-# File: ssh-keygen.c, line: 342
-# File: ssh-keygen.c, line: 414
-# File: ssh-keygen.c, line: 448
-# File: ssh-keygen.c, line: 742
-# File: ssh-keygen.c, line: 828
+# File: ssh-keygen.c, line: 160
+# File: ssh-keygen.c, line: 338
+# File: ssh-keygen.c, line: 410
+# File: ssh-keygen.c, line: 442
+# File: ssh-keygen.c, line: 736
+# File: ssh-keygen.c, line: 822
 msgid "Enter file in which the key is"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 171
-# File: ssh-keygen.c, line: 421
+# File: ssh-keygen.c, line: 167
+# File: ssh-keygen.c, line: 417
 msgid "load failed\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 176
+# File: ssh-keygen.c, line: 172
 msgid "key_to_blob failed\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 181
+# File: ssh-keygen.c, line: 177
 #, c-format
 msgid "Comment: \"%u-bit %s, converted from OpenSSH by %s@%s\"\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 198
+# File: ssh-keygen.c, line: 194
 #, c-format
 msgid "buffer_get_bignum_bits: input buffer too small: need %d have %d"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 201
+# File: ssh-keygen.c, line: 197
 msgid "buffer_get_bignum_bits: BN_bin2bn failed"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 221
+# File: ssh-keygen.c, line: 217
 #, c-format
 msgid "bad magic 0x%x != 0x%x"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 233
+# File: ssh-keygen.c, line: 229
 #, c-format
 msgid "unsupported cipher %s"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 287
+# File: ssh-keygen.c, line: 283
 #, c-format
 msgid ""
 "do_convert_private_ssh2_from_blob: remaining bytes in key blob %d"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 381
+# File: ssh-keygen.c, line: 377
 msgid "uudecode failed.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 388
+# File: ssh-keygen.c, line: 384
 msgid "decode blob failed.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 397
+# File: ssh-keygen.c, line: 393
 msgid "key write failed"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 472
-# File: ssh-keygen.c, line: 589
+# File: ssh-keygen.c, line: 466
+# File: ssh-keygen.c, line: 583
 #, c-format
 msgid "line %d too long: %.40s..."
 msgstr ""
 #
-# File: ssh-keygen.c, line: 517
+# File: ssh-keygen.c, line: 511
 msgid "no comment"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 525
+# File: ssh-keygen.c, line: 519
 #, c-format
 msgid "%s is not a public key file.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 536
+# File: ssh-keygen.c, line: 530
 msgid "hash_host failed"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 556
+# File: ssh-keygen.c, line: 550
 msgid "Specified known hosts path too long"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 561
+# File: ssh-keygen.c, line: 555
 #, c-format
 msgid "fopen: %s"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 573
+# File: ssh-keygen.c, line: 567
 msgid "known_hosts path too long"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 576
+# File: ssh-keygen.c, line: 570
 #, c-format
 msgid "mkstemp: %s"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 580
+# File: ssh-keygen.c, line: 574
 #, c-format
 msgid "fdopen: %s"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 612
+# File: ssh-keygen.c, line: 606
 #, c-format
 msgid "line %d missing key: %.40s..."
 msgstr ""
 #
-# File: ssh-keygen.c, line: 626
+# File: ssh-keygen.c, line: 620
 #, c-format
 msgid "line %d invalid key: %.40s..."
 msgstr ""
 #
-# File: ssh-keygen.c, line: 638
+# File: ssh-keygen.c, line: 632
 #, c-format
 msgid "line %d: invalid hashed name: %.64s..."
 msgstr ""
 #
-# File: ssh-keygen.c, line: 645
-# File: ssh-keygen.c, line: 659
+# File: ssh-keygen.c, line: 639
+# File: ssh-keygen.c, line: 653
 #, c-format
 msgid "# Host %s found: line %d type %s\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 671
+# File: ssh-keygen.c, line: 665
 #, c-format
 msgid "Warning: ignoring host name with metacharacters: %.64s\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 686
+# File: ssh-keygen.c, line: 680
 #, c-format
 msgid "%s is not a valid known_host file.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 689
+# File: ssh-keygen.c, line: 683
 msgid "Not replacing existing known_hosts file because of errors\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 702
+# File: ssh-keygen.c, line: 696
 #, c-format
 msgid "unlink %.100s: %s"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 704
+# File: ssh-keygen.c, line: 698
 #, c-format
 msgid "link %.100s to %.100s: %s"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 708
+# File: ssh-keygen.c, line: 702
 #, c-format
 msgid "rename\"%s\" to \"%s\": %s"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 715
+# File: ssh-keygen.c, line: 709
 #, c-format
 msgid "%s updated.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 716
+# File: ssh-keygen.c, line: 710
 #, c-format
 msgid "Original contents retained as %s\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 718
+# File: ssh-keygen.c, line: 712
 #, c-format
 msgid "WARNING: %s contains unhashed entries\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 720
+# File: ssh-keygen.c, line: 714
 msgid "Delete this file to ensure privacy of hostnames\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 754
+# File: ssh-keygen.c, line: 748
 msgid "Enter old passphrase: "
 msgstr ""
 #
-# File: ssh-keygen.c, line: 761
-# File: ssh-keygen.c, line: 848
+# File: ssh-keygen.c, line: 755
+# File: ssh-keygen.c, line: 842
 msgid "Bad passphrase.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 765
+# File: ssh-keygen.c, line: 759
 #, c-format
 msgid "Key has comment '%s'\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 773
+# File: ssh-keygen.c, line: 767
 msgid "Enter new passphrase (empty for no passphrase): "
 msgstr ""
 #
-# File: ssh-keygen.c, line: 775
-# File: ssh-keygen.c, line: 1144
+# File: ssh-keygen.c, line: 769
+# File: ssh-keygen.c, line: 1129
 msgid "Enter same passphrase again: "
 msgstr ""
 #
-# File: ssh-keygen.c, line: 784
+# File: ssh-keygen.c, line: 778
 msgid "Pass phrases do not match.  Try again.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 795
-# File: ssh-keygen.c, line: 878
-# File: ssh-keygen.c, line: 1174
+# File: ssh-keygen.c, line: 789
+# File: ssh-keygen.c, line: 872
+# File: ssh-keygen.c, line: 1159
 #, c-format
 msgid "Saving the key failed: %s.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 808
+# File: ssh-keygen.c, line: 802
 msgid "Your identification has been saved with the new passphrase.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 855
+# File: ssh-keygen.c, line: 849
 msgid "Comments are only supported for RSA1 keys.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 860
+# File: ssh-keygen.c, line: 854
 #, c-format
 msgid "Key now has comment '%s'\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 865
+# File: ssh-keygen.c, line: 859
 msgid "Enter new comment: "
 msgstr ""
 #
-# File: ssh-keygen.c, line: 893
-# File: ssh-keygen.c, line: 1194
+# File: ssh-keygen.c, line: 887
+# File: ssh-keygen.c, line: 1179
 #, c-format
 msgid "Could not save your public key in %s\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 899
-# File: ssh-keygen.c, line: 1200
+# File: ssh-keygen.c, line: 893
+# File: ssh-keygen.c, line: 1185
 #, c-format
 msgid "fdopen %s failed"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 903
-# File: ssh-keygen.c, line: 1204
+# File: ssh-keygen.c, line: 897
+# File: ssh-keygen.c, line: 1189
 msgid "write key failed"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 910
+# File: ssh-keygen.c, line: 904
 msgid "The comment in your key file has been changed.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 918
+# File: ssh-keygen.c, line: 912
 #, c-format
 msgid ""
 "Usage: %s [options]\n"
@@ -5041,87 +4720,83 @@ msgid ""
 "  -y          Read private key file and print public key.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 978
+# File: ssh-keygen.c, line: 968
 msgid "You don't exist, go away!\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 992
+# File: ssh-keygen.c, line: 983
 msgid "Bits has bad value.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1061
+# File: ssh-keygen.c, line: 1051
 msgid "Too many arguments.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1065
+# File: ssh-keygen.c, line: 1055
 msgid "Can only have one of -p and -c.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1084
-msgid "no support for smartcards."
-msgstr ""
-#
-# File: ssh-keygen.c, line: 1091
+# File: ssh-keygen.c, line: 1076
 msgid "You must specify a key type (-t).\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1096
+# File: ssh-keygen.c, line: 1081
 #, c-format
 msgid "unknown key type %s\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1101
+# File: ssh-keygen.c, line: 1086
 #, c-format
 msgid "Generating public/private %s key pair.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1105
+# File: ssh-keygen.c, line: 1090
 msgid "key_generate failed"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1111
+# File: ssh-keygen.c, line: 1096
 msgid "Enter file in which to save the key"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1118
+# File: ssh-keygen.c, line: 1103
 #, c-format
 msgid "Could not create directory '%s'."
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1120
+# File: ssh-keygen.c, line: 1105
 #, c-format
 msgid "Created directory '%s'.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1125
+# File: ssh-keygen.c, line: 1110
 #, c-format
 msgid "%s already exists.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1126
+# File: ssh-keygen.c, line: 1111
 #, c-format
 msgid "Overwrite (%s/%s)? "
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1142
+# File: ssh-keygen.c, line: 1127
 msgid "Enter passphrase (empty for no passphrase): "
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1156
+# File: ssh-keygen.c, line: 1141
 msgid "Passphrases do not match.  Try again.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1188
+# File: ssh-keygen.c, line: 1173
 #, c-format
 msgid "Your identification has been saved in %s.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1210
+# File: ssh-keygen.c, line: 1195
 #, c-format
 msgid "Your public key has been saved in %s.\n"
 msgstr ""
 #
-# File: ssh-keygen.c, line: 1212
+# File: ssh-keygen.c, line: 1197
 msgid "The key fingerprint is:\n"
 msgstr ""
 #
@@ -5170,7 +4845,7 @@ msgstr ""
 msgid "no matching hostkey found"
 msgstr ""
 #
-# File: ssh-keyscan.c, line: 284
+# File: ssh-keyscan.c, line: 283
 #, c-format
 msgid "%s: invalid packet type"
 msgstr ""
@@ -5268,78 +4943,78 @@ msgstr ""
 msgid "%s: not enough file descriptors"
 msgstr ""
 #
-# File: sftp-server.c, line: 483
+# File: sftp-server.c, line: 481
 #, c-format
 msgid "received client version %d"
 msgstr ""
 #
-# File: sftp-server.c, line: 562
+# File: sftp-server.c, line: 560
 msgid "process_read: seek failed"
 msgstr ""
 #
-# File: sftp-server.c, line: 601
+# File: sftp-server.c, line: 599
 msgid "process_write: seek failed"
 msgstr ""
 #
-# File: sftp-server.c, line: 606
+# File: sftp-server.c, line: 604
 msgid "process_write: write failed"
 msgstr ""
 #
-# File: sftp-server.c, line: 632
+# File: sftp-server.c, line: 630
 #, c-format
 msgid "%sstat name \"%s\""
 msgstr ""
 #
-# File: sftp-server.c, line: 959
+# File: sftp-server.c, line: 957
 #, c-format
 msgid "realpath \"%s\""
 msgstr ""
 #
-# File: sftp-server.c, line: 1038
+# File: sftp-server.c, line: 1036
 #, c-format
 msgid "readlink \"%s\""
 msgstr ""
 #
-# File: sftp-server.c, line: 1101
+# File: sftp-server.c, line: 1099
 #, c-format
 msgid "bad message from %s local user %s"
 msgstr ""
 #
-# File: sftp-server.c, line: 1177
+# File: sftp-server.c, line: 1175
 msgid "iqueue grew unexpectedly"
 msgstr ""
 #
-# File: sftp-server.c, line: 1180
+# File: sftp-server.c, line: 1178
 #, c-format
 msgid "msg_len %d < consumed %d"
 msgstr ""
 #
-# File: sftp-server.c, line: 1241
+# File: sftp-server.c, line: 1239
 #, c-format
 msgid "Invalid log level \"%s\""
 msgstr ""
 #
-# File: sftp-server.c, line: 1246
+# File: sftp-server.c, line: 1244
 #, c-format
 msgid "Invalid log facility \"%s\""
 msgstr ""
 #
-# File: sftp-server.c, line: 1259
+# File: sftp-server.c, line: 1257
 #, c-format
 msgid "Malformed SSH_CONNECTION variable: \"%s\""
 msgstr ""
 #
-# File: sftp-server.c, line: 1266
+# File: sftp-server.c, line: 1264
 #, c-format
 msgid "No user found for uid %lu"
 msgstr ""
 #
-# File: sftp-server.c, line: 1324
+# File: sftp-server.c, line: 1322
 #, c-format
 msgid "read: %s"
 msgstr ""
 #
-# File: sftp-server.c, line: 1334
+# File: sftp-server.c, line: 1332
 #, c-format
 msgid "write: %s"
 msgstr ""
@@ -5634,230 +5309,230 @@ msgstr ""
 msgid "Couldn't wait for ssh process: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 81
+# File: sftp-client.c, line: 79
 #, c-format
 msgid "Outbound message too long %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 91
+# File: sftp-client.c, line: 89
 #, c-format
 msgid "Couldn't send packet: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 104
-# File: sftp-client.c, line: 116
+# File: sftp-client.c, line: 102
+# File: sftp-client.c, line: 114
 msgid "Connection closed"
 msgstr ""
 #
-# File: sftp-client.c, line: 106
+# File: sftp-client.c, line: 104
 #, c-format
 msgid "Couldn't read packet: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 111
+# File: sftp-client.c, line: 109
 #, c-format
 msgid "Received message too long %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 118
+# File: sftp-client.c, line: 116
 #, c-format
 msgid "Read packet: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 165
-# File: sftp-client.c, line: 191
-# File: sftp-client.c, line: 223
-# File: sftp-client.c, line: 378
-# File: sftp-client.c, line: 598
+# File: sftp-client.c, line: 163
+# File: sftp-client.c, line: 189
+# File: sftp-client.c, line: 221
+# File: sftp-client.c, line: 376
+# File: sftp-client.c, line: 596
 #, c-format
 msgid "ID mismatch (%u != %u)"
 msgstr ""
 #
-# File: sftp-client.c, line: 167
+# File: sftp-client.c, line: 165
 #, c-format
 msgid "Expected SSH2_FXP_STATUS(%u) packet, got %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 195
+# File: sftp-client.c, line: 193
 #, c-format
 msgid "Couldn't get handle: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 199
+# File: sftp-client.c, line: 197
 #, c-format
 msgid "Expected SSH2_FXP_HANDLE(%u) packet, got %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 230
+# File: sftp-client.c, line: 228
 #, c-format
 msgid "Couldn't stat remote file: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 234
+# File: sftp-client.c, line: 232
 #, c-format
 msgid "Expected SSH2_FXP_ATTRS(%u) packet, got %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 262
+# File: sftp-client.c, line: 260
 #, c-format
 msgid "Invalid packet back from SSH2_FXP_INIT (type %u)"
 msgstr ""
 #
-# File: sftp-client.c, line: 321
+# File: sftp-client.c, line: 319
 #, c-format
 msgid "Couldn't close file: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 388
+# File: sftp-client.c, line: 386
 #, c-format
 msgid "Couldn't read directory: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 395
-# File: sftp-client.c, line: 606
+# File: sftp-client.c, line: 393
+# File: sftp-client.c, line: 604
 #, c-format
 msgid "Expected SSH2_FXP_NAME(%u) packet, got %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 471
+# File: sftp-client.c, line: 469
 #, c-format
 msgid "Couldn't delete file: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 486
+# File: sftp-client.c, line: 484
 #, c-format
 msgid "Couldn't create directory: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 502
+# File: sftp-client.c, line: 500
 #, c-format
 msgid "Couldn't remove directory: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 555
+# File: sftp-client.c, line: 553
 #, c-format
 msgid "Couldn't setstat on \"%s\": %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 573
+# File: sftp-client.c, line: 571
 #, c-format
 msgid "Couldn't fsetstat: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 603
+# File: sftp-client.c, line: 601
 #, c-format
 msgid "Couldn't canonicalise: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 611
+# File: sftp-client.c, line: 609
 #, c-format
 msgid "Got multiple names (%d) from SSH_FXP_REALPATH"
 msgstr ""
 #
-# File: sftp-client.c, line: 647
+# File: sftp-client.c, line: 645
 #, c-format
 msgid "Couldn't rename file \"%s\" to \"%s\": %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 660
+# File: sftp-client.c, line: 658
 msgid "This server does not support the symlink operation"
 msgstr ""
 #
-# File: sftp-client.c, line: 679
+# File: sftp-client.c, line: 677
 #, c-format
 msgid "Couldn't symlink file \"%s\" to \"%s\": %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 740
+# File: sftp-client.c, line: 738
 #, c-format
 msgid "Cannot download non-regular file: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 772
+# File: sftp-client.c, line: 770
 #, c-format
 msgid "Couldn't open local file \"%s\" for writing: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 831
+# File: sftp-client.c, line: 829
 #, c-format
 msgid "Unexpected reply %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 849
+# File: sftp-client.c, line: 847
 #, c-format
 msgid "Received more data than asked for %u > %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 896
+# File: sftp-client.c, line: 894
 #, c-format
 msgid "Expected SSH2_FXP_DATA(%u) packet, got %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 906
+# File: sftp-client.c, line: 904
 msgid "Transfer complete, but requests still in queue"
 msgstr ""
 #
-# File: sftp-client.c, line: 909
+# File: sftp-client.c, line: 907
 #, c-format
 msgid "Couldn't read from remote file \"%s\" : %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 913
+# File: sftp-client.c, line: 911
 #, c-format
 msgid "Couldn't write to \"%s\": %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 924
+# File: sftp-client.c, line: 922
 #, c-format
 msgid "Couldn't set mode on \"%s\": %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 932
+# File: sftp-client.c, line: 930
 #, c-format
 msgid "Can't set times on \"%s\": %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 968
+# File: sftp-client.c, line: 966
 #, c-format
 msgid "Couldn't open local file \"%s\" for reading: %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 973
+# File: sftp-client.c, line: 971
 #, c-format
 msgid "Couldn't fstat local file \"%s\": %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 979
+# File: sftp-client.c, line: 977
 #, c-format
 msgid "%s is not a regular file"
 msgstr ""
 #
-# File: sftp-client.c, line: 1037
+# File: sftp-client.c, line: 1035
 #, c-format
 msgid "Couldn't read from \"%s\": %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 1060
+# File: sftp-client.c, line: 1058
 #, c-format
 msgid "Unexpected ACK %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 1072
+# File: sftp-client.c, line: 1070
 #, c-format
 msgid "Expected SSH2_FXP_STATUS(%d) packet, got %d"
 msgstr ""
 #
-# File: sftp-client.c, line: 1084
+# File: sftp-client.c, line: 1082
 #, c-format
 msgid "Can't find request for ID %u"
 msgstr ""
 #
-# File: sftp-client.c, line: 1088
+# File: sftp-client.c, line: 1086
 #, c-format
 msgid "Couldn't write to remote file \"%s\": %s"
 msgstr ""
 #
-# File: sftp-client.c, line: 1111
+# File: sftp-client.c, line: 1109
 #, c-format
 msgid "Couldn't close local file \"%s\": %s"
 msgstr ""
@@ -5888,31 +5563,31 @@ msgstr ""
 msgid "ssh-http-proxy: HTTP reply not understood\n"
 msgstr ""
 #
-# File: ssh-socks5-proxy-connect.c, line: 63
+# File: ssh-socks5-proxy-connect.c, line: 62
 msgid ""
 "Usage: ssh-socks5-proxy-connect [-h socks5_proxy_host] [-p "
 "socks5_proxy_port] \n"
 "remote_host remote_port\n"
 msgstr ""
 #
-# File: ssh-socks5-proxy-connect.c, line: 173
+# File: ssh-socks5-proxy-connect.c, line: 182
 #, c-format
 msgid "Unsupported SOCKS version: %x\n"
 msgstr ""
 #
-# File: ssh-socks5-proxy-connect.c, line: 209
+# File: ssh-socks5-proxy-connect.c, line: 218
 msgid "ssh-socks5-proxy: SOCKS Server reply not understood\n"
 msgstr ""
 #
-# File: ssh-socks5-proxy-connect.c, line: 224
+# File: ssh-socks5-proxy-connect.c, line: 233
 #, c-format
 msgid "ssh-socks5-proxy: Address type not supported: %u\n"
 msgstr ""
 #
-# File: ssh-socks5-proxy-connect.c, line: 289
+# File: ssh-socks5-proxy-connect.c, line: 298
 msgid "ssh-socks5-proxy: SOCKS5 SERVER not specified\n"
 msgstr ""
 #
-# File: ssh-socks5-proxy-connect.c, line: 327
+# File: ssh-socks5-proxy-connect.c, line: 336
 msgid "ssh-socks5-proxy: Client and Server versions differ.\n"
 msgstr ""

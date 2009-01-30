@@ -41,7 +41,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1100,6 +1100,28 @@ main(int ac, char **av)
 		log_stderr = 1;
 	log_init(__progname, options.log_level, options.log_facility, log_stderr);
 
+	/*
+	 * Solaris 9 and systems upgraded from it may have the Ciphers option
+	 * explicitly set to "aes128-cbc,blowfish-cbc,3des-cbc" in the
+	 * sshd_config. Since the default server cipher list completely changed
+	 * since then we rather notify the administator on startup. We do this
+	 * check after log_init() so that the message goes to syslogd and not to
+	 * stderr (unless the server is in the debug mode). Note that since
+	 * Solaris 10 we no longer ship sshd_config with explicit settings for
+	 * Ciphers or MACs. Do not try to augment the cipher list here since
+	 * that might end up in a very confusing situation.
+	 */
+#define	OLD_DEFAULT_CIPHERS_LIST "aes128-cbc,blowfish-cbc,3des-cbc"
+	if (options.ciphers != NULL &&
+	    strcmp(options.ciphers, OLD_DEFAULT_CIPHERS_LIST) == 0) {
+		notice("Old default value \"%s\" for the \"Ciphers\" "
+		    "option found in use. In general it is prudent to let "
+		    "the server choose the defaults unless your environment "
+		    "specifically needs an explicit setting. See "
+		    "sshd_config(4) for more information.",
+		    OLD_DEFAULT_CIPHERS_LIST);
+	}
+
 #ifdef HAVE_BSM
 	(void) setauid(&auid);
 #endif /* HAVE_BSM */
@@ -1874,6 +1896,9 @@ prepare_for_ssh2_kex(void)
 	Kex *kex;
 	Kex_hook_func kex_hook = NULL;
 	char **locales;
+	static char **myproposal;
+
+	myproposal = my_srv_proposal;
 
 	if (options.ciphers != NULL) {
 		myproposal[PROPOSAL_ENC_ALGS_CTOS] =

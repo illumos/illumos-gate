@@ -7,7 +7,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -358,9 +358,9 @@ keygrab_ssh2(con *c)
 
 	packet_set_connection(c->c_fd, c->c_fd);
 	enable_compat20();
-	myproposal[PROPOSAL_SERVER_HOST_KEY_ALGS] = c->c_keytype == KT_DSA?
-	    "ssh-dss": "ssh-rsa";
-	c->c_kex = kex_setup(c->c_name, myproposal, NULL);
+	my_clnt_proposal[PROPOSAL_SERVER_HOST_KEY_ALGS] =
+	    c->c_keytype == KT_DSA? "ssh-dss": "ssh-rsa";
+	c->c_kex = kex_setup(c->c_name, my_clnt_proposal, NULL);
 	kex_start(c->c_kex);
 	c->c_kex->kex[KEX_DH_GRP1_SHA1] = kexdh_client;
 	c->c_kex->kex[KEX_DH_GEX_SHA1] = kexgex_client;

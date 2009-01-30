@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -321,14 +321,46 @@ choose_lang(char **lang, char *client, char *server)
 	else
 		*lang = g11n_srvr_locale_negotiate(client, NULL);
 }
+
+/*
+ * Make the message clear enough so that if this happens the user can figure out
+ * the workaround of changing the Ciphers option.
+ */
+#define	CLIENT_ERR_MSG							       \
+  "Client and server could not agree on a common cipher:\n"		       \
+  "  client: %s\n"							       \
+  "  server: %s\n"							       \
+  "\n"									       \
+  "The client cipher list can be controlled using the \"Ciphers\" option, \n"  \
+  "see ssh_config(4) for more information. The \"-o Ciphers=<cipher-list>\"\n" \
+  "option may be used to temporarily override the ciphers the client\n"	       \
+  "offers."
+
+/*
+ * The server side message goes to syslogd and we do not want to send multiline
+ * messages there. What's more, the server side notification may be shorter
+ * since we expect that an administrator will deal with that, not the user.
+ */
+#define	SERVER_ERR_MSG							       \
+  "Client and server could not agree on a common cipher: client \"%s\", "      \
+  "server \"%s\". The server cipher list can be controlled using the "	       \
+  "\"Ciphers\" option, see sshd_config(4) for more information."
+
 static void
-choose_enc(Enc *enc, char *client, char *server)
+choose_enc(int is_server, Enc *enc, char *client, char *server)
 {
 	char *name = match_list(client, server, NULL);
-	if (name == NULL)
-		fatal("no matching cipher found: client %s server %s", client, server);
+
+	if (name == NULL) {
+		if (is_server == 1)
+			fatal(SERVER_ERR_MSG, client, server);
+		else
+			fatal(CLIENT_ERR_MSG, client, server);
+	}
+
 	if ((enc->cipher = cipher_by_name(name)) == NULL)
 		fatal("matching cipher is not supported: %s", name);
+
 	enc->name = name;
 	enc->enabled = 0;
 	enc->iv = NULL;
@@ -336,6 +368,7 @@ choose_enc(Enc *enc, char *client, char *server)
 	enc->key_len = cipher_keylen(enc->cipher);
 	enc->block_size = cipher_blocksize(enc->cipher);
 }
+
 static void
 choose_mac(Mac *mac, char *client, char *server)
 {
@@ -456,8 +489,8 @@ kex_choose_conf(Kex *kex)
 		nenc  = ctos ? PROPOSAL_ENC_ALGS_CTOS  : PROPOSAL_ENC_ALGS_STOC;
 		nmac  = ctos ? PROPOSAL_MAC_ALGS_CTOS  : PROPOSAL_MAC_ALGS_STOC;
 		ncomp = ctos ? PROPOSAL_COMP_ALGS_CTOS : PROPOSAL_COMP_ALGS_STOC;
-		choose_enc (&newkeys->enc,  cprop[nenc],  sprop[nenc]);
-		choose_mac (&newkeys->mac,  cprop[nmac],  sprop[nmac]);
+		choose_enc(kex->server, &newkeys->enc,  cprop[nenc],  sprop[nenc]);
+		choose_mac(&newkeys->mac,  cprop[nmac],  sprop[nmac]);
 		choose_comp(&newkeys->comp, cprop[ncomp], sprop[ncomp]);
 		debug("kex: %s %s %s %s",
 		    ctos ? "client->server" : "server->client",
