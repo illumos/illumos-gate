@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -992,14 +992,29 @@ populate_bus_res(uchar_t bus)
 	pci_bus_res[bus].io_ports = find_bus_res(bus, IO_TYPE);
 	pci_bus_res[bus].bus_space = find_bus_res(bus, BUSRANGE_TYPE);
 
+	/*
+	 * attempt to initialize sub_bus from the largest range-end
+	 * in the bus_space list
+	 */
+	if (pci_bus_res[bus].bus_space != NULL) {
+		struct memlist *entry;
+		int current;
+
+		entry = pci_bus_res[bus].bus_space;
+		while (entry != NULL) {
+			current = entry->address + entry->size - 1;
+			if (current > pci_bus_res[bus].sub_bus)
+				pci_bus_res[bus].sub_bus = current;
+			entry = entry->next;
+		}
+	}
+
 	if (bus == 0) {
 		/*
 		 * Special treatment of bus 0:
 		 * If no IO/MEM resource from ACPI/MPSPEC/HRT, copy
 		 * pcimem from boot and make I/O space the entire range
-		 * starting at 0x100.  At root bus 0, consider
-		 * no difference between prefetchable memory and
-		 * ordinary memory.
+		 * starting at 0x100.
 		 */
 		if (pci_bus_res[0].mem_space == NULL)
 			pci_bus_res[0].mem_space =
