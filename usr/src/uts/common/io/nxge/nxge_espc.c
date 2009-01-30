@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -307,7 +307,8 @@ nxge_check_vpd_version(p_nxge_t nxgep)
 				if (ver_num_str[j] == ' ')
 					break;
 			}
-			ver_num_str[j] = '\0';
+			if (j < NXGE_FCODE_VER_STR_LEN)
+				ver_num_str[j] = '\0';
 			break;
 		}
 	}

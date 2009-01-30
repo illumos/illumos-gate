@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -258,12 +258,12 @@ typedef enum  {
 /*
  * Defaults
  */
-#define	NXGE_RDC_RCR_THRESHOLD		8
-#define	NXGE_RDC_RCR_TIMEOUT		16
+#define	NXGE_RDC_RCR_THRESHOLD		32
+#define	NXGE_RDC_RCR_TIMEOUT		8
 
 #define	NXGE_RDC_RCR_THRESHOLD_MAX	1024
 #define	NXGE_RDC_RCR_TIMEOUT_MAX	64
-#define	NXGE_RDC_RCR_THRESHOLD_MIN	1
+#define	NXGE_RDC_RCR_THRESHOLD_MIN	8
 #define	NXGE_RDC_RCR_TIMEOUT_MIN	1
 #define	NXGE_RCR_FULL_HEADER		1
 

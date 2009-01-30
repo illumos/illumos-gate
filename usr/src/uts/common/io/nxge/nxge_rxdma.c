@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,9 @@ extern uint32_t nxge_mblks_pending;
  */
 extern uint32_t nxge_max_rx_pkts;
 boolean_t nxge_jumbo_enable;
+
+extern uint16_t nxge_rcr_timeout;
+extern uint16_t nxge_rcr_threshold;
 
 /*
  * Tunables to manage the receive buffer blocks.
@@ -2248,16 +2251,22 @@ nxge_rx_pkts(p_nxge_t nxgep, p_rx_rcr_ring_t rcr_p, rx_dma_ctl_stat_t cs,
 	rcr_p->rcr_desc_rd_head_pp = rcr_desc_rd_head_pp;
 	rcr_p->comp_rd_index = comp_rd_index;
 	rcr_p->rcr_desc_rd_head_p = rcr_desc_rd_head_p;
-
 	if ((nxgep->intr_timeout != rcr_p->intr_timeout) ||
 	    (nxgep->intr_threshold != rcr_p->intr_threshold)) {
-		rcr_p->intr_timeout = nxgep->intr_timeout;
-		rcr_p->intr_threshold = nxgep->intr_threshold;
+
+		rcr_p->intr_timeout = (nxgep->intr_timeout <
+		    NXGE_RDC_RCR_TIMEOUT_MIN) ? NXGE_RDC_RCR_TIMEOUT_MIN :
+		    nxgep->intr_timeout;
+
+		rcr_p->intr_threshold = (nxgep->intr_threshold <
+		    NXGE_RDC_RCR_THRESHOLD_MIN) ? NXGE_RDC_RCR_THRESHOLD_MIN :
+		    nxgep->intr_threshold;
+
 		rcr_cfg_b.value = 0x0ULL;
-		if (rcr_p->intr_timeout)
-			rcr_cfg_b.bits.ldw.entout = 1;
+		rcr_cfg_b.bits.ldw.entout = 1;
 		rcr_cfg_b.bits.ldw.timeout = rcr_p->intr_timeout;
 		rcr_cfg_b.bits.ldw.pthres = rcr_p->intr_threshold;
+
 		RXDMA_REG_WRITE64(handle, RCRCFIG_B_REG,
 		    channel, rcr_cfg_b.value);
 	}
@@ -3318,12 +3327,12 @@ nxge_map_rxdma(p_nxge_t nxgep, int channel)
 
 	/*
 	 * Timeout should be set based on the system clock divider.
-	 * The following timeout value of 1 assumes that the
+	 * A timeout value of 1 assumes that the
 	 * granularity (1000) is 3 microseconds running at 300MHz.
 	 */
 
-	nxgep->intr_threshold = RXDMA_RCR_PTHRES_DEFAULT;
-	nxgep->intr_timeout = RXDMA_RCR_TO_DEFAULT;
+	nxgep->intr_threshold = nxge_rcr_threshold;
+	nxgep->intr_timeout = nxge_rcr_timeout;
 
 	/*
 	 * Map descriptors from the buffer polls for each dma channel.
@@ -3716,8 +3725,15 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 	 * Zero out buffer block ring descriptors.
 	 */
 	bzero((caddr_t)dmap->kaddrp, dmap->alength);
-	rcrp->intr_timeout = nxgep->intr_timeout;
-	rcrp->intr_threshold = nxgep->intr_threshold;
+
+	rcrp->intr_timeout = (nxgep->intr_timeout <
+	    NXGE_RDC_RCR_TIMEOUT_MIN) ? NXGE_RDC_RCR_TIMEOUT_MIN :
+	    nxgep->intr_timeout;
+
+	rcrp->intr_threshold = (nxgep->intr_threshold <
+	    NXGE_RDC_RCR_THRESHOLD_MIN) ? NXGE_RDC_RCR_THRESHOLD_MIN :
+	    nxgep->intr_threshold;
+
 	rcrp->full_hdr_flag = B_FALSE;
 	rcrp->sw_priv_hdr_len = 0;
 
@@ -3735,7 +3751,7 @@ nxge_map_rxdma_channel_cfg_ring(p_nxge_t nxgep, uint16_t dma_channel,
 
 	/*
 	 * Timeout should be set based on the system clock divider.
-	 * The following timeout value of 1 assumes that the
+	 * A timeout value of 1 assumes that the
 	 * granularity (1000) is 3 microseconds running at 300MHz.
 	 */
 	cfgb_p->bits.ldw.pthres = rcrp->intr_threshold;

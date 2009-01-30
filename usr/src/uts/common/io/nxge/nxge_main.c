@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1757,11 +1757,7 @@ nxge_uninit(p_nxge_t nxgep)
 void
 nxge_get64(p_nxge_t nxgep, p_mblk_t mp)
 {
-#if defined(__i386)
-	size_t		reg;
-#else
 	uint64_t	reg;
-#endif
 	uint64_t	regdata;
 	int		i, retry;
 
@@ -1778,19 +1774,11 @@ nxge_get64(p_nxge_t nxgep, p_mblk_t mp)
 void
 nxge_put64(p_nxge_t nxgep, p_mblk_t mp)
 {
-#if defined(__i386)
-	size_t		reg;
-#else
 	uint64_t	reg;
-#endif
 	uint64_t	buf[2];
 
 	bcopy((char *)mp->b_rptr, (char *)&buf[0], 2 * sizeof (uint64_t));
-#if defined(__i386)
-	reg = (size_t)buf[0];
-#else
 	reg = buf[0];
-#endif
 
 	NXGE_NPI_PIO_WRITE64(nxgep->npi_handle, reg, buf[1]);
 }
@@ -2563,8 +2551,8 @@ nxge_alloc_rx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	i = 0;
 	size_index = 0;
 	array_size =  sizeof (alloc_sizes)/sizeof (size_t);
-	while ((alloc_sizes[size_index] < alloc_size) &&
-	    (size_index < array_size))
+	while ((size_index < array_size) &&
+	    (alloc_sizes[size_index] < alloc_size))
 		size_index++;
 	if (size_index >= array_size) {
 		size_index = array_size - 1;
@@ -3059,8 +3047,8 @@ nxge_alloc_tx_buf_dma(p_nxge_t nxgep, uint16_t dma_channel,
 	i = 0;
 	size_index = 0;
 	array_size =  sizeof (alloc_sizes) /  sizeof (size_t);
-	while ((alloc_sizes[size_index] < alloc_size) &&
-	    (size_index < array_size))
+	while ((size_index < array_size) &&
+	    (alloc_sizes[size_index] < alloc_size))
 		size_index++;
 	if (size_index >= array_size) {
 		size_index = array_size - 1;

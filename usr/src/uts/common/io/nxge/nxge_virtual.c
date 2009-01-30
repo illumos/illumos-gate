@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2219,6 +2219,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
 	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		if ((prop_len > 0) && (prop_len <= p_cfgp->max_rdcs)) {
+			nxge_rcr_timeout = prop_val[0];
 			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
 			    nxgep->dip, prop, prop_val, prop_len);
 		}
@@ -2229,6 +2230,7 @@ nxge_use_cfg_dma_config(p_nxge_t nxgep)
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip, 0, prop,
 	    &prop_val, &prop_len) == DDI_PROP_SUCCESS) {
 		if ((prop_len > 0) && (prop_len <= p_cfgp->max_rdcs)) {
+			nxge_rcr_threshold = prop_val[0];
 			(void) ddi_prop_update_int_array(DDI_DEV_T_NONE,
 			    nxgep->dip, prop, prop_val, prop_len);
 		}

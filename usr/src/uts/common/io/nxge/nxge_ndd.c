@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -303,11 +303,11 @@ static nxge_param_t	nxge_param_arr[] = {
 
 	{ nxge_param_get_generic, nxge_param_rx_intr_time, NXGE_PARAM_RXDMA_RW,
 		NXGE_RDC_RCR_TIMEOUT_MIN, NXGE_RDC_RCR_TIMEOUT_MAX,
-		RXDMA_RCR_TO_DEFAULT, 0, "rxdma-intr-time", "rxdma_intr_time"},
+		NXGE_RDC_RCR_TIMEOUT, 0, "rxdma-intr-time", "rxdma_intr_time"},
 
 	{ nxge_param_get_generic, nxge_param_rx_intr_pkts, NXGE_PARAM_RXDMA_RW,
 		NXGE_RDC_RCR_THRESHOLD_MIN, NXGE_RDC_RCR_THRESHOLD_MAX,
-		RXDMA_RCR_PTHRES_DEFAULT, 0,
+		NXGE_RDC_RCR_THRESHOLD, 0,
 		"rxdma-intr-pkts", "rxdma_intr_pkts"},
 
 	{ nxge_param_get_generic, NULL, NXGE_PARAM_READ_PROP |
@@ -1108,7 +1108,7 @@ nxge_param_get_rxdma_rdcgrp_info(p_nxge_t nxgep, queue_t *q,
 	((mblk_t *)np)->b_wptr += print_len;
 	buf_len -= print_len;
 
-	for (i = 0; i < NXGE_MAX_RDCS; i++) {
+	for (i = 0; i < NXGE_MAX_RDC_GROUPS; i++) {
 		if (p_cfgp->grpids[i]) {
 			rdc_grp_p = &p_dma_cfgp->rdc_grps[i];
 			print_len = snprintf((char *)((mblk_t *)np)->b_wptr,
