@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 LIBRARY=	libpsvcplugin_psr.a
@@ -42,7 +40,7 @@ LIBS =		$(DYNLIB)
 
 ROOT_PLATFORM =		$(USR_PLAT_DIR)/SUNW,Sun-Fire-880
 DYNFLAGS_PLAT =		/usr/platform/\$$PLATFORM/lib/picl/plugins
-DYNFLAGS_SUN4U =	/usr/platform/sun4u/lib/picl/plugins
+DYNFLAGS_SUN4U =	/usr/platform/sun4u/lib/picl/plugins:/usr/platform/sun4u/lib
 DYNFLAGS_COM =		/usr/lib/picl/plugins
 
 ROOTLIBDIR =	$(ROOT_PLAT_PLUGINDIR)
