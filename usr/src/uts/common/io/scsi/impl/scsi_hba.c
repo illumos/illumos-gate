@@ -610,8 +610,10 @@ scsi_hba_tran_alloc(
 	tran = kmem_zalloc(sizeof (scsi_hba_tran_t),
 	    (flags & SCSI_HBA_CANSLEEP) ? KM_SLEEP : KM_NOSLEEP);
 
-	tran->tran_interconnect_type = INTERCONNECT_PARALLEL;
-	tran->tran_hba_flags |= SCSI_HBA_TRAN_ALLOC;
+	if (tran) {
+		tran->tran_interconnect_type = INTERCONNECT_PARALLEL;
+		tran->tran_hba_flags |= SCSI_HBA_TRAN_ALLOC;
+	}
 
 	return (tran);
 }
