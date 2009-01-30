@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Software Initiator
@@ -31,7 +31,7 @@
 #include "iscsi.h"		/* main header */
 #include <sys/scsi/adapters/iscsi_if.h>		/* ioctl interfaces */
 /* protocol structs and defines */
-#include <sys/scsi/adapters/iscsi_protocol.h>
+#include <sys/iscsi_protocol.h>
 #include "persistent.h"
 #include <sys/scsi/adapters/iscsi_door.h>
 #include "iscsi_targetparam.h"

@@ -20,14 +20,14 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI protocol login and enumeration
  */
 
 #include "iscsi.h"
-#include <sys/scsi/adapters/iscsi_protocol.h>
+#include <sys/iscsi_protocol.h>
 #include <sys/scsi/adapters/iscsi_door.h>
 
 /* internal login protocol interfaces */

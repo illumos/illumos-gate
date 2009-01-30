@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _FEATURE_H
 #define	_FEATURE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include "iscsi_conn.h"
@@ -39,5 +37,9 @@
 #define	ASYNC_LOGOUT_TIMEOUT	10
 
 Boolean_t iscsi_full_feature(iscsi_conn_t *c);
+
+uint32_t iscsi_crc32c(void *address, unsigned long length);
+uint32_t iscsi_crc32c_continued(void *address, unsigned long length,
+    uint32_t crc);
 
 #endif /* _FEATURE_H */

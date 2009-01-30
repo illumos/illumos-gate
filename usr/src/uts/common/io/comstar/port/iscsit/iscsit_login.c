@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1925,13 +1925,13 @@ login_sm_build_login_response(iscsit_conn_t *ict)
 				lsm->icl_login_resp_buf =
 				    idm_pdu_init_text_data(lsm->icl_login_resp,
 				    lsm->icl_login_resp_itb,
-				    ISCSI_DEFAULT_MAX_RECV_DATA_SEGMENT_LENGTH,
+				    ISCSI_DEFAULT_MAX_RECV_SEG_LEN,
 				    lsm->icl_login_resp_buf, &text_transit);
 			}
 		} else {
 			lsm->icl_login_resp_buf = idm_pdu_init_text_data(
 			    lsm->icl_login_resp, lsm->icl_login_resp_itb,
-			    ISCSI_DEFAULT_MAX_RECV_DATA_SEGMENT_LENGTH,
+			    ISCSI_DEFAULT_MAX_RECV_SEG_LEN,
 			    lsm->icl_login_resp_buf, &text_transit);
 		}
 	} else {

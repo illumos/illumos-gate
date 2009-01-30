@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Exception List for protocmp
@@ -958,9 +958,7 @@ usr/include/sys/bmc_intf.h		sparc
 #
 usr/include/libdscp.h			sparc
 #
-# These files are used by the iSCSI Target which is in this consolidation
-# and the iSCSI Initiator which is in the DMG consolidation. There's no
-# reason to ship these files.
+# These files are used by the iSCSI Target and the iSCSI Initiator
 #
 usr/include/sys/iscsi_protocol.h	sparc
 usr/include/sys/iscsi_authclient.h	sparc
@@ -1340,7 +1338,6 @@ usr/lib/libunistat.so			sparc
 # No reason to ship them.
 #
 usr/include/sys/scsi/adapters/iscsi_door.h		sparc
-usr/include/sys/scsi/adapters/iscsi_protocol.h		sparc
 usr/include/sys/scsi/adapters/iscsi_if.h		sparc
 
 # qus driver headers not installed

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,11 +44,6 @@ extern "C" {
 #include <sys/isa_defs.h>
 
 #define	ISCSI_MAX_NAME_LEN	224
-
-/* prototypes for iscsi_crc.c */
-uint32_t iscsi_crc32c(void *address, unsigned long length);
-uint32_t iscsi_crc32c_continued(void *address, unsigned long length,
-    uint32_t crc);
 
 /* iSCSI listen port for incoming connections */
 #define	ISCSI_LISTEN_PORT 3260
@@ -89,12 +84,6 @@ uint32_t iscsi_crc32c_continued(void *address, unsigned long length,
 #define	ISCSI_TEXT_IRRELEVANT		"Irrelevant"
 #define	ISCSI_TEXT_NOTUNDERSTOOD	"NotUnderstood"
 
-/* Sun's initiator session ID */
-#define	ISCSI_SUN_ISID_0	0x40	/* ISID - EN format */
-#define	ISCSI_SUN_ISID_1	0x00	/* Sec B */
-#define	ISCSI_SUN_ISID_2	0x00	/* Sec B */
-#define	ISCSI_SUN_ISID_3	0x2A	/* Sec C - 42 = Sun's EN */
-
 /* Reserved value for initiator/target task tag */
 #define	ISCSI_RSVD_TASK_TAG	0xffffffff
 
@@ -102,8 +91,6 @@ uint32_t iscsi_crc32c_continued(void *address, unsigned long length,
 #define	KEY_MAXLEN 64
 #define	VALUE_MAXLEN 255
 #define	TARGET_NAME_MAXLEN    VALUE_MAXLEN
-
-#define	ISCSI_DEFAULT_MAX_RECV_DATA_SEGMENT_LENGTH 8192
 
 /* most PDU types have a final bit */
 #define	ISCSI_FLAG_FINAL		0x80
@@ -683,7 +670,7 @@ typedef struct _iscsi_reject_rsp_hdr {
 #define	ISCSI_DEFAULT_TIME_TO_RETAIN		20 /* 20 seconds */
 #define	ISCSI_DEFAULT_HEADER_DIGEST		ISCSI_DIGEST_NONE
 #define	ISCSI_DEFAULT_DATA_DIGEST		ISCSI_DIGEST_NONE
-#define	ISCSI_DEFAULT_MAX_RECV_SEG_LEN		(64 * 1024)
+#define	ISCSI_DEFAULT_MAX_RECV_SEG_LEN		(8 * 1024)
 #define	ISCSI_DEFAULT_MAX_XMIT_SEG_LEN		(8 * 1024)
 #define	ISCSI_DEFAULT_MAX_CONNECTIONS		1
 #define	ISCSI_DEFAULT_MAX_OUT_R2T		1

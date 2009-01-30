@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Pseudo HBA Driver
@@ -30,7 +30,7 @@
 
 #include "chap.h"
 #include "iscsi.h"
-#include <sys/scsi/adapters/iscsi_protocol.h>
+#include <sys/iscsi_protocol.h>
 #include "iscsiAuthClient.h"
 #include "persistent.h"
 

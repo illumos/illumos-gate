@@ -31,7 +31,7 @@
  */
 #include "iscsi.h"		/* main header */
 #include <sys/scsi/adapters/iscsi_if.h>		/* ioctl interfaces */
-#include <sys/scsi/adapters/iscsi_protocol.h>
+#include <sys/iscsi_protocol.h>
 /* protocol structs and defines */
 
 #include "iscsi_targetparam.h"

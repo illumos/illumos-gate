@@ -40,7 +40,7 @@
 #include <libdevinfo.h>
 
 #include <sys/scsi/adapters/iscsi_if.h>
-#include <sys/scsi/adapters/iscsi_protocol.h>
+#include <sys/iscsi_protocol.h>
 #include <ima.h>
 #include "iscsiadm.h"
 #include "sun_ima.h"

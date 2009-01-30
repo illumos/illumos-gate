@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * iSCSI Pseudo HBA Driver
@@ -35,7 +35,7 @@
 #include <sys/strsun.h>		/* DB_TYPE() */
 
 #include "iscsi.h"		/* iscsi driver */
-#include <sys/scsi/adapters/iscsi_protocol.h>	/* iscsi protocol */
+#include <sys/iscsi_protocol.h>	/* iscsi protocol */
 
 /* generic io helpers */
 static uint32_t n2h24(uchar_t *ptr);

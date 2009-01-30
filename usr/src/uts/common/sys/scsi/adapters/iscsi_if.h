@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@ extern "C" {
 #endif
 #include <netinet/in.h>
 #include <sys/scsi/impl/uscsi.h>
-#include <sys/scsi/adapters/iscsi_protocol.h>
+#include <sys/iscsi_protocol.h>
 
 /*
  * Each of the top level structures have a version field as
@@ -47,12 +47,6 @@ extern "C" {
  * if the version is correct.
  */
 #define	ISCSI_INTERFACE_VERSION			3
-
-/*
- * The maximum length of an iSCSI name is 223.  224 is used
- * to provide space for a null character.
- */
-#define	ISCSI_MAX_NAME_LEN			224
 
 /*
  * Login parameter values are used instead of ascii text

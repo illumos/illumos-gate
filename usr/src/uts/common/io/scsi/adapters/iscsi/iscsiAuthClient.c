@@ -20,7 +20,7 @@
  */
 /*
  * Copyright 2000 by Cisco Systems, Inc.  All rights reserved.
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * This file implements the iSCSI CHAP authentication method based.

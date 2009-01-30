@@ -48,7 +48,7 @@ extern "C" {
 #include <sys/sdt.h>
 
 #include <sys/scsi/adapters/iscsi_if.h>
-#include <sys/scsi/adapters/iscsi_protocol.h>
+#include <sys/iscsi_protocol.h>
 #include <iscsiAuthClient.h>
 #include <iscsi_stats.h>
 #include <iscsi_thread.h>
