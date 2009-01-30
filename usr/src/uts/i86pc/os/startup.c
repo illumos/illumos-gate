@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +114,7 @@
 #include <sys/debug_info.h>
 #include <sys/bootinfo.h>
 #include <sys/ddi_timer.h>
+#include <sys/systeminfo.h>
 #include <sys/multiboot.h>
 
 #ifdef __xpv
@@ -144,7 +145,6 @@ extern int size_pse_array(pgcnt_t, int);
 #include <sys/rtc.h>
 
 static int32_t set_soft_hostid(void);
-extern char hw_serial[];
 static char hostid_file[] = "/etc/hostid";
 
 #endif
@@ -1484,11 +1484,11 @@ startup_modules(void)
 	/*
 	 * This is needed here to initialize hw_serial[] for cluster booting.
 	 */
-	if ((h = set_soft_hostid()) == -1)
+	if ((h = set_soft_hostid()) == HW_INVALID_HOSTID) {
 		cmn_err(CE_WARN, "Unable to set hostid");
-	else {
+	} else {
 		for (v = h, cnt = 0; cnt < 10; cnt++) {
-			d[cnt] = v % 10;
+			d[cnt] = (char)(v % 10);
 			v /= 10;
 			if (v == 0)
 				break;
@@ -2118,7 +2118,6 @@ startup_end(void)
 	PRM_POINT("startup_end() done");
 }
 
-extern char hw_serial[];
 /*
  * Don't remove the following 2 variables.  They are necessary
  * for reading the hostid from the legacy file (/kernel/misc/sysinit).
@@ -2557,7 +2556,7 @@ set_soft_hostid(void)
 	int done = 0;
 	u_longlong_t tmp;
 	int i;
-	int32_t hostid = -1;
+	int32_t hostid = (int32_t)HW_INVALID_HOSTID;
 	unsigned char *c;
 	hrtime_t tsc;
 
@@ -2583,7 +2582,7 @@ set_soft_hostid(void)
 				hostid = (int32_t)atoi(hw_serial);
 			(void) modunload(i);
 		}
-		if (hostid == -1) {
+		if (hostid == HW_INVALID_HOSTID) {
 			tsc = tsc_read();
 			if (tsc == 0)	/* tsc_read can return zero sometimes */
 				hostid = (int32_t)tenmicrodata & 0x0CFFFFF;
@@ -2638,7 +2637,7 @@ set_soft_hostid(void)
 
 			}
 		}
-		if (hostid == -1) /* didn't find a hostid string */
+		if (hostid == HW_INVALID_HOSTID) /* didn't find a hostid */
 			kobj_file_err(CE_WARN, file,
 			    "hostid missing or corrupt");
 
@@ -2646,7 +2645,8 @@ set_soft_hostid(void)
 	}
 	/*
 	 * hostid is now the value read from /etc/hostid, or the
-	 * new hostid we generated in this routine or -1 if not set.
+	 * new hostid we generated in this routine or HW_INVALID_HOSTID if not
+	 * set.
 	 */
 	return (hostid);
 }

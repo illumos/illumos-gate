@@ -20,10 +20,9 @@
 
  CDDL HEADER END
 
- Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
- ident	"%Z%%M%	%I%	%E% SMI"
 -->
 
 <!--Element Definitions-->
@@ -132,12 +131,15 @@
 
 <!ATTLIST mcap		physcap		CDATA #REQUIRED>
 
-<!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device | deleted-device | rctl | attr | dataset | package | patch | dev-perm | tmp_pool | pset | mcap)*>
+<!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device |
+			deleted-device | rctl | attr | dataset | package |
+			patch | dev-perm | tmp_pool | pset | mcap)*>
 
 <!ATTLIST zone		name		CDATA #REQUIRED
 			zonepath	CDATA #REQUIRED
 			autoboot	(true | false) #REQUIRED
 			ip-type		CDATA ""
+			hostid		CDATA ""
 			pool		CDATA ""
 			limitpriv	CDATA ""
 			bootargs	CDATA ""

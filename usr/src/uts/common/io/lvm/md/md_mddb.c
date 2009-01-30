@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3413,7 +3413,7 @@ set_dtag(mddb_set_t *s, md_error_t *ep)
 	bzero((caddr_t)&tag, sizeof (mddb_dtag_t));
 
 	/* Get the HW serial number for this host */
-	(void) strncpy(tag.dt_sn, hw_serial, MDDB_SN_LEN);
+	(void) snprintf(tag.dt_sn, MDDB_SN_LEN, "%u", zone_get_hostid(NULL));
 	tag.dt_sn[MDDB_SN_LEN - 1] = '\0';
 
 	/* Get the nodename that this host goes by */
@@ -6005,106 +6005,133 @@ load_old_replicas(
 		 * Don't do this during upgrade.
 		 */
 		if (!(MD_UPGRADE)) {
-		    for (li = 0; li < lbp->lb_loccnt; li++) {
-			lp = &lbp->lb_locators[li];
-			if (lp->l_flags & MDDB_F_DELETED)
-				continue;
-			did_info = &(did_icp->did_ic_blkp->blk_info[li]);
-			if ((did_info->info_flags & MDDB_DID_VALID) &&
-			    !(did_info->info_flags & MDDB_DID_UPDATED)) {
-				if (lbp->lb_flags & MDDB_MNSET) {
-					int 	j;
-					int	index = -1;
-					mnlbp = (mddb_mnlb_t *)lbp;
-					for (j = 0; j < MD_MNMAXSIDES; j++) {
-					    mnslp = &mnlbp->
-						lb_mnsidelocators[j][li];
-					    if (mnslp->mnl_sideno ==
-						s->s_sideno)
-						break;
-					    if (mnslp->mnl_sideno == 0)
-						index = j;
-					}
-					if (j == MD_MNMAXSIDES) {
-					    /* No match found; take empty */
-					    mnslp = &mnlbp->
-						lb_mnsidelocators[index][li];
-					    write_lb = 1;
-					    mnslp->mnl_mnum =
-						md_getminor(newdev[li]);
-					} else if (mnslp->mnl_mnum !=
-					    md_getminor(newdev[li])) {
-						write_lb = 1;
-						mnslp->mnl_mnum =
-						    md_getminor(newdev[li]);
-					}
-				} else {
-					slp = &lbp->
-					    lb_sidelocators[s->s_sideno][li];
-					if (slp->l_mnum !=
-					    md_getminor(newdev[li])) {
-						write_lb = 1;
-						slp->l_mnum =
-						    md_getminor(newdev[li]);
-					}
-				}
-				name = ddi_major_to_name(
-						md_getmajor(newdev[li]));
-				if (lbp->lb_flags & MDDB_MNSET) {
-					i = mnslp->mnl_drvnm_index;
-				} else {
-					i = slp->l_drvnm_index;
-				}
-				if (strncmp(lbp->lb_drvnm[i].dn_data, name,
-					lbp->lb_drvnm[i].dn_len) != 0) {
-					/* Driver name has changed */
-					len = strlen(name);
-					/* Look for the driver name */
-					for (i = 0; i < MDDB_DRVNMCNT; i++) {
-						if (lbp->lb_drvnm[i].dn_len
-						    != len)
-							continue;
-						if (strncmp(
-						    lbp->lb_drvnm[i].dn_data,
-						    name, len) == 0)
-							break;
-					}
-					/* Didn't find one, add it */
-					if (i == MDDB_DRVNMCNT) {
-					    for (i = 0; i < MDDB_DRVNMCNT;
-						i++) {
-						if (lbp->lb_drvnm[i].dn_len
-						    == 0)
-							break;
-					    }
-					    if (i == MDDB_DRVNMCNT) {
-						cmn_err(CE_WARN,
-						    "Unable to update driver"
-						    " name for dev:  "
-						    "major = %d, "
-						    "minor = %d\n",
-						    md_getmajor(newdev[li]),
-						    md_getminor(newdev[li]));
-						continue;
-					    }
-					    (void) strncpy(
-						lbp->lb_drvnm[i].dn_data,
-						name, MD_MAXDRVNM);
-					    lbp->lb_drvnm[i].dn_len =
-						(uchar_t)strlen(name);
-					}
-					/* Fill in the drvnm index */
+			for (li = 0; li < lbp->lb_loccnt; li++) {
+				lp = &lbp->lb_locators[li];
+				if (lp->l_flags & MDDB_F_DELETED)
+					continue;
+				did_info = &(did_icp->did_ic_blkp->blk_info
+				    [li]);
+				if ((did_info->info_flags & MDDB_DID_VALID) &&
+				    !(did_info->info_flags &
+				    MDDB_DID_UPDATED)) {
 					if (lbp->lb_flags & MDDB_MNSET) {
-						mnslp->mnl_drvnm_index = i;
+						int j;
+						int index = -1;
+						mnlbp = (mddb_mnlb_t *)lbp;
+						for (j = 0; j < MD_MNMAXSIDES;
+						    j++) {
+							mnslp = &mnlbp->
+							    lb_mnsidelocators[j]
+							    [li];
+							if (mnslp->mnl_sideno ==
+							    s->s_sideno)
+								break;
+							if (mnslp->mnl_sideno ==
+							    0)
+								index = j;
+						}
+						if (j == MD_MNMAXSIDES) {
+							/*
+							 * No match found; take
+							 * empty
+							 */
+							mnslp = &mnlbp->
+							    lb_mnsidelocators
+							    [index][li];
+							write_lb = 1;
+							mnslp->mnl_mnum =
+							    md_getminor(newdev
+							    [li]);
+						} else if (mnslp->mnl_mnum !=
+						    md_getminor(newdev[li])) {
+							write_lb = 1;
+							mnslp->mnl_mnum =
+							    md_getminor(newdev
+							    [li]);
+						}
 					} else {
-						slp->l_drvnm_index = i;
+						slp = &lbp->
+						    lb_sidelocators[s->s_sideno]
+						    [li];
+						if (slp->l_mnum !=
+						    md_getminor(newdev[li])) {
+							write_lb = 1;
+							slp->l_mnum =
+							    md_getminor(newdev
+							    [li]);
+						}
 					}
-					write_lb = 1;
+					name = ddi_major_to_name(md_getmajor(
+					    newdev[li]));
+					if (lbp->lb_flags & MDDB_MNSET)
+						i = mnslp->mnl_drvnm_index;
+					else
+						i = slp->l_drvnm_index;
+					if (strncmp(lbp->lb_drvnm[i].dn_data,
+					    name, lbp->lb_drvnm[i].dn_len) !=
+					    0) {
+						/* Driver name has changed */
+						len = strlen(name);
+						/* Look for the driver name */
+						for (i = 0; i < MDDB_DRVNMCNT;
+						    i++) {
+							if (lbp->lb_drvnm[i].
+							    dn_len != len)
+								continue;
+							if (strncmp(lbp->
+							    lb_drvnm[i].dn_data,
+							    name, len) == 0)
+								break;
+						}
+						/* Didn't find one, add it */
+						if (i == MDDB_DRVNMCNT) {
+							for (i = 0; i <
+							    MDDB_DRVNMCNT;
+							    i++) {
+								if (lbp->
+								    lb_drvnm[i].
+								    dn_len == 0)
+									break;
+							}
+							if (i ==
+							    MDDB_DRVNMCNT) {
+								cmn_err(CE_WARN,
+								    "Unable to "
+								    " update "
+								    "driver "
+								    " name for "
+								    "dev:  "
+								    "major = %d"
+								    ", minor = "
+								    "%d\n",
+								    md_getmajor(
+								    newdev[li]),
+								    md_getminor(
+								    newdev
+								    [li]));
+								continue;
+							}
+							(void) strncpy(lbp->
+							    lb_drvnm[i].dn_data,
+							    name, MD_MAXDRVNM);
+							lbp->lb_drvnm[i].
+							    dn_len = (uchar_t)
+							    strlen(name);
+						}
+						/* Fill in the drvnm index */
+						if (lbp->lb_flags &
+						    MDDB_MNSET)
+							mnslp->mnl_drvnm_index =
+							    i;
+						else
+							slp->l_drvnm_index = i;
+						write_lb = 1;
+					}
+					did_info->info_flags |=
+					    MDDB_DID_UPDATED;
 				}
-				did_info->info_flags |= MDDB_DID_UPDATED;
 			}
 		}
-	    }
 	}
 	kmem_free(newdev, sizeof (md_dev64_t) * MDDB_NLB);
 
@@ -7092,7 +7119,8 @@ init_set(
 	s->s_setno = setno;
 	s->s_sideno = sideno;
 	if (setno == MD_LOCAL_SET) {
-		(void) strcpy(s->s_ident.serial, hw_serial);
+		(void) snprintf(s->s_ident.serial, sizeof (s->s_ident.serial),
+		    "%u", zone_get_hostid(NULL));
 	} else {
 		s->s_ident.createtime = *created;
 		s->s_setname = (char *)kmem_alloc(strlen(setname) + 1,
@@ -11356,34 +11384,38 @@ mddb_parse(mddb_parse_parm_t *mpp)
 				for (tdep = first_dep; tdep;
 				    tdep = tdep->de_next) {
 					if (dep->de_recid == tdep->de_recid) {
-					    writeout = 0;
-					    /* Check first mddb location */
-					    if ((dep->de_optinfo[0].o_li !=
-						tdep->de_optinfo[0].o_li) ||
-						(dep->de_optinfo[0].o_flags !=
-						tdep->de_optinfo[0].o_flags)) {
-						    dep->de_optinfo[0] =
-						    tdep->de_optinfo[0];
-						    writeout = 1;
-					    }
-					    /* Check second mddb location */
-					    if ((dep->de_optinfo[1].o_li !=
-						tdep->de_optinfo[1].o_li) ||
-						(dep->de_optinfo[1].o_flags !=
-						tdep->de_optinfo[1].o_flags)) {
-						    dep->de_optinfo[1] =
-						    tdep->de_optinfo[1];
-						    writeout = 1;
-					    }
-					    /* Record owner should rewrite it */
-					    if ((writeout) &&
-						(dep->de_owner_nodeid ==
-						md_set[mpp->c_setno].
-						s_nodeid)) {
-						    (void) writeoptrecord(s,
-							dep);
-					    }
-					    break;
+						writeout = 0;
+						/* Check first mddb location */
+						if ((dep->de_optinfo[0].o_li !=
+						    tdep->de_optinfo[0].o_li) ||
+						    (dep->de_optinfo[0].
+						    o_flags != tdep->de_optinfo
+						    [0].o_flags)) {
+							dep->de_optinfo[0] =
+							    tdep->de_optinfo[0];
+							writeout = 1;
+						}
+						/* Check second mddb location */
+						if ((dep->de_optinfo[1].o_li !=
+						    tdep->de_optinfo[1].o_li) ||
+						    (dep->de_optinfo[1].
+						    o_flags != tdep->de_optinfo
+						    [1].o_flags)) {
+							dep->de_optinfo[1] =
+							    tdep->de_optinfo[1];
+							writeout = 1;
+						}
+						/*
+						 * Record owner should rewrite
+						 * it
+						 */
+						if ((writeout) &&
+						    (dep->de_owner_nodeid ==
+						    md_set[mpp->c_setno].
+						    s_nodeid))
+							(void) writeoptrecord(s,
+							    dep);
+						break;
 					}
 				}
 			}

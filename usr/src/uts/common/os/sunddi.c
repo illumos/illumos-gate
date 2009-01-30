@@ -82,6 +82,7 @@
 #include <sys/ctype.h>
 #include <net/if.h>
 #include <sys/rctl.h>
+#include <sys/zone.h>
 
 extern	pri_t	minclsyspri;
 
@@ -7614,7 +7615,6 @@ i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
 	return (DDI_FAILURE);
 }
 
-extern char	hw_serial[];
 static kmutex_t devid_gen_mutex;
 static short	devid_gen_number;
 
@@ -7858,8 +7858,7 @@ ddi_devid_init(
 	/* Fill in id field */
 	if (devid_type == DEVID_FAB) {
 		char		*cp;
-		int		hostid;
-		char		*hostid_cp = &hw_serial[0];
+		uint32_t	hostid;
 		struct timeval32 timestamp32;
 		int		i;
 		int		*ip;
@@ -7873,7 +7872,7 @@ ddi_devid_init(
 		cp = i_devid->did_id;
 
 		/* Fill in host id (big-endian byte ordering) */
-		hostid = stoi(&hostid_cp);
+		hostid = zone_get_hostid(NULL);
 		*cp++ = hibyte(hiword(hostid));
 		*cp++ = lobyte(hiword(hostid));
 		*cp++ = hibyte(loword(hostid));

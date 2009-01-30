@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _ZONECFG_H
 #define	_ZONECFG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * header file for zonecfg command
@@ -90,9 +88,10 @@ extern "C" {
 #define	RT_SCHED	23	/* really a property, but for info ... */
 #define	RT_IPTYPE	24	/* really a property, but for info ... */
 #define	RT_PCAP		25
+#define	RT_HOSTID	26	/* really a property, but for info ... */
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_PCAP
+#define	RT_MAX		RT_HOSTID
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0
@@ -131,9 +130,10 @@ extern "C" {
 #define	PT_SCHED	33
 #define	PT_IPTYPE	34
 #define	PT_DEFROUTER	35
+#define	PT_HOSTID	36
 
 #define	PT_MIN		PT_UNKNOWN
-#define	PT_MAX		PT_DEFROUTER
+#define	PT_MAX		PT_HOSTID
 
 #define	MAX_EQ_PROP_PAIRS	3
 

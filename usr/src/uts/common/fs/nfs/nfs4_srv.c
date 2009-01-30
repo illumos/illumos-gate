@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
 #include <sys/fem.h>
 #include <sys/sdt.h>
 #include <sys/ddi.h>
+#include <sys/zone.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -521,7 +522,7 @@ rfs4_srvrinit(void)
 	 * different servers will have the same verifier.
 	 * XXX - this is broken on LP64 kernels.
 	 */
-	verf.tv_sec = (time_t)nfs_atoi(hw_serial);
+	verf.tv_sec = (time_t)zone_get_hostid(NULL);
 	if (verf.tv_sec != 0) {
 		verf.tv_nsec = gethrestime_sec();
 	} else {

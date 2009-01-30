@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,7 +29,6 @@
  * intended to be called by users - it is intended to be invoked by the
  * zones utilities.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <ctype.h>
 #include <errno.h>
@@ -44,6 +43,7 @@
 #include <stropts.h>
 #include <sys/ioccom.h>
 #include <sys/stat.h>
+#include <sys/systeminfo.h>
 #include <sys/types.h>
 #include <sys/varargs.h>
 #include <unistd.h>
@@ -444,6 +444,7 @@ lxs_verify(char *xmlfile)
 	boolean_t		audio, restart;
 	char			*idev, *odev, *kvers;
 	zone_iptype_t		iptype;
+	char			hostidp[HW_HOSTID_LEN];
 
 	if ((handle = zonecfg_init_handle()) == NULL)
 		lxs_err(gettext("internal libzonecfg.so.1 error"), 0);
@@ -505,6 +506,14 @@ lxs_verify(char *xmlfile)
 		zonecfg_fini_handle(handle);
 		lxs_err(gettext("lx zones do not support an 'exclusive' "
 		    "ip-type"));
+	}
+
+	/*
+	 * Check to see whether the zone has hostid emulation enabled.
+	 */
+	if (zonecfg_get_hostid(handle, hostidp, sizeof (hostidp)) == Z_OK) {
+		zonecfg_fini_handle(handle);
+		lxs_err(gettext("lx zones do not support hostid emulation"));
 	}
 
 	/* Extract any relevant attributes from the config file. */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,7 @@
 #include <sys/atomic.h>
 #include <sys/policy.h>
 #include <sys/sdt.h>
+#include <sys/zone.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -2393,7 +2394,7 @@ nfs3create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 		 * reasonable.
 		 */
 		verfp = (nfstime3 *)&args.how.createhow3_u.verf;
-		verfp->seconds = nfs_atoi(hw_serial);
+		verfp->seconds = zone_get_hostid(NULL);
 		if (verfp->seconds != 0)
 			verfp->nseconds = newnum();
 		else {

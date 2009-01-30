@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _LIBZONECFG_H
 #define	_LIBZONECFG_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Zone configuration header file.
@@ -100,6 +98,7 @@ extern "C" {
 #define	Z_NO_POOL		47	/* no such pool configured */
 #define	Z_POOL_CREATE		48	/* pool create failed */
 #define	Z_POOL_BIND		49	/* pool bind failed */
+#define	Z_HOSTID_FUBAR		50	/* invalid hostid provided */
 
 /*
  * Warning: these are shared with the admin/install consolidation.
@@ -340,6 +339,13 @@ extern	int	zonecfg_delete_nwif(zone_dochandle_t, struct zone_nwiftab *);
 extern	int	zonecfg_modify_nwif(zone_dochandle_t, struct zone_nwiftab *,
     struct zone_nwiftab *);
 extern	int	zonecfg_lookup_nwif(zone_dochandle_t, struct zone_nwiftab *);
+
+/*
+ * Hostid emulation configuration.
+ */
+extern	int	zonecfg_get_hostid(zone_dochandle_t, char *, size_t);
+extern	int	zonecfg_set_hostid(zone_dochandle_t, const char *);
+extern	int	zonecfg_valid_hostid(const char *);
 
 /*
  * Device configuration and rule matching.

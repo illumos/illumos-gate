@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,7 @@
 #include <sys/scsi/impl/uscsi.h>	/* uscsi commands */
 #include <sys/ioctl.h>
 #include <sys/mtio.h>			/* tape io */
+#include <sys/systeminfo.h>		/* for hostid access */
 #include <sys/scsi/targets/stdef.h>
 #include <sys/fs/ufs_inode.h>
 #include <sys/vfs.h>
@@ -314,7 +315,6 @@ static struct modlinkage dda_ml = {
 
 /* dev_info structure, one instance per dda device */
 static void *dda_state;
-extern char hw_serial[];
 
 /* Loadable module configuration entry points */
 
@@ -1629,9 +1629,6 @@ dda_tape_unload(dda_t *dda)
  * Parameters:
  *	- dda:		DDA tape drive.
  *
- * Globals:
- *	- hw_serial:	Hostid.
- *
  * Generate DDA unit serial number from the computer hostid and drive
  * instance number.
  *
@@ -1645,16 +1642,13 @@ dda_gen_serial_num(dda_t *dda)
 	char		sn[100];
 	int		len;
 	int		off;
-	char		*hostid_p = &hw_serial[0];
-	int		hostid_i;
 
 	/*
 	 * Generate unit serial number:
 	 *	zeros, hostid, instance number
 	 */
-	hostid_i = stoi(&hostid_p);
-	len = snprintf(sn, sizeof (sn),
-	    "%016x%x%x", 0, hostid_i, dda->dda_inst);
+	len = snprintf(sn, sizeof (sn), "%016x%x%x", 0, zone_get_hostid(NULL),
+	    dda->dda_inst);
 
 	/*
 	 * Use least significant part of generated serial number

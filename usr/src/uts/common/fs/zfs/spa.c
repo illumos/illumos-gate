@@ -60,6 +60,10 @@
 #include <sys/sunddi.h>
 #include <sys/spa_boot.h>
 
+#ifdef	_KERNEL
+#include <sys/zone.h>
+#endif	/* _KERNEL */
+
 #include "zfs_prop.h"
 #include "zfs_comutil.h"
 
@@ -1222,9 +1226,17 @@ spa_load(spa_t *spa, nvlist_t *config, spa_load_state_t state, int mosconfig)
 			VERIFY(nvlist_lookup_string(newconfig,
 			    ZPOOL_CONFIG_HOSTNAME, &hostname) == 0);
 
+#ifdef	_KERNEL
+			myhostid = zone_get_hostid(NULL);
+#else	/* _KERNEL */
+			/*
+			 * We're emulating the system's hostid in userland, so
+			 * we can't use zone_get_hostid().
+			 */
 			(void) ddi_strtoul(hw_serial, NULL, 10, &myhostid);
+#endif	/* _KERNEL */
 			if (hostid != 0 && myhostid != 0 &&
-			    (unsigned long)hostid != myhostid) {
+			    hostid != myhostid) {
 				cmn_err(CE_WARN, "pool '%s' could not be "
 				    "loaded as it was last accessed by "
 				    "another system (host: %s hostid: 0x%lx). "

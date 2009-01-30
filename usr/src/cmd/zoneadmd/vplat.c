@@ -71,6 +71,7 @@
 #include <sys/sockio.h>
 #include <sys/stropts.h>
 #include <sys/conf.h>
+#include <sys/systeminfo.h>
 
 #include <libdlpi.h>
 #include <libdllink.h>
@@ -3966,6 +3967,69 @@ setup_zone_rm(zlog_t *zlogp, char *zone_name, zoneid_t zoneid)
 	return (Z_OK);
 }
 
+/*
+ * Sets the hostid of the new zone based on its configured value.  The zone's
+ * zone_t structure must already exist in kernel memory.  'zlogp' refers to the
+ * log used to report errors and warnings and must be non-NULL.  'zone_namep'
+ * is the name of the new zone and must be non-NULL.  'zoneid' is the numeric
+ * ID of the new zone.
+ *
+ * This function returns zero on success and a nonzero error code on failure.
+ */
+static int
+setup_zone_hostid(zlog_t *zlogp, char *zone_namep, zoneid_t zoneid)
+{
+	int res;
+	zone_dochandle_t handle;
+	char hostidp[HW_HOSTID_LEN];
+	unsigned int hostid;
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		return (Z_BAD_HANDLE);
+	}
+	if ((res = zonecfg_get_snapshot_handle(zone_namep, handle)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (res);
+	}
+
+	if ((res = zonecfg_get_hostid(handle, hostidp, sizeof (hostidp))) ==
+	    Z_OK) {
+		if (zonecfg_valid_hostid(hostidp) != Z_OK) {
+			zerror(zlogp, B_FALSE,
+			    "zone hostid is not valid: %s", hostidp);
+			zonecfg_fini_handle(handle);
+			return (Z_HOSTID_FUBAR);
+		}
+		hostid = (unsigned int)strtoul(hostidp, NULL, 16);
+		if (zone_setattr(zoneid, ZONE_ATTR_HOSTID, &hostid,
+		    sizeof (hostid)) != 0) {
+			zerror(zlogp, B_TRUE,
+			    "zone hostid is not valid: %s", hostidp);
+			zonecfg_fini_handle(handle);
+			return (Z_SYSTEM);
+		}
+	} else if (res != Z_BAD_PROPERTY) {
+		/*
+		 * Z_BAD_PROPERTY is an acceptable error value (from
+		 * zonecfg_get_hostid()) because it indicates that the zone
+		 * doesn't have a hostid.
+		 */
+		if (res == Z_TOO_BIG)
+			zerror(zlogp, B_FALSE, "hostid string in zone "
+			    "configuration is too large.");
+		else
+			zerror(zlogp, B_TRUE, "fetching zone hostid from "
+			    "configuration");
+		zonecfg_fini_handle(handle);
+		return (res);
+	}
+
+	zonecfg_fini_handle(handle);
+	return (Z_OK);
+}
+
 zoneid_t
 vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 {
@@ -4152,12 +4216,15 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 		struct brand_attr attr;
 		char modname[MAXPATHLEN];
 
+		if (setup_zone_hostid(zlogp, zone_name, zoneid) != Z_OK)
+			goto error;
+
 		if ((zone_get_brand(zone_name, attr.ba_brandname,
 		    MAXNAMELEN) != Z_OK) ||
 		    (bh = brand_open(attr.ba_brandname)) == NULL) {
 			zerror(zlogp, B_FALSE,
 			    "unable to determine brand name");
-			return (-1);
+			goto error;
 		}
 
 		/*
@@ -4168,7 +4235,7 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 			brand_close(bh);
 			zerror(zlogp, B_FALSE,
 			    "unable to determine brand kernel module");
-			return (-1);
+			goto error;
 		}
 		brand_close(bh);
 
@@ -4182,10 +4249,8 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 			}
 		}
 
-		if (setup_zone_rm(zlogp, zone_name, zoneid) != Z_OK) {
-			(void) zone_shutdown(zoneid);
+		if (setup_zone_rm(zlogp, zone_name, zoneid) != Z_OK)
 			goto error;
-		}
 
 		set_mlps(zlogp, zoneid, zcent);
 	}
@@ -4194,8 +4259,10 @@ vplat_create(zlog_t *zlogp, zone_mnt_t mount_cmd)
 	zoneid = -1;
 
 error:
-	if (zoneid != -1)
+	if (zoneid != -1) {
+		(void) zone_shutdown(zoneid);
 		(void) zone_destroy(zoneid);
+	}
 	if (rctlbuf != NULL)
 		free(rctlbuf);
 	priv_freeset(privs);

@@ -62,6 +62,7 @@
 #include <sys/sdt.h>
 #include <sys/list.h>
 #include <sys/stat.h>
+#include <sys/zone.h>
 
 #include <rpc/types.h>
 #include <rpc/auth.h>
@@ -929,7 +930,7 @@ recov_retry:
 		open_args->mode = createmode;
 		if (createmode == EXCLUSIVE4) {
 			if (did_excl_setup == FALSE) {
-				verf.seconds = nfs_atoi(hw_serial);
+				verf.seconds = zone_get_hostid(NULL);
 				if (verf.seconds != 0)
 					verf.nseconds = newnum();
 				else {

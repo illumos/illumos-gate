@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,25 +32,25 @@
  * under license from the Regents of the University of California.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include "lint.h"
 #include <sys/types.h>
 #include <sys/systeminfo.h>
 #include <stdlib.h>
 
-#define	HOSTIDLEN	40
-
 long
 gethostid(void)
 {
-	char	name[HOSTIDLEN+1], *end;
-	unsigned long	hostid;
+	char name[HW_HOSTID_LEN], *end;
+	unsigned long hostid;
 
-	if (sysinfo(SI_HW_SERIAL, name, HOSTIDLEN) == -1)
-		return (-1);
+	/*
+	 * HW_INVALID_HOSTID must be cast to an int to ensure that it's sign
+	 * extended to 64 bits in 64-bit builds.
+	 */
+	if (sysinfo(SI_HW_SERIAL, name, sizeof (name)) == -1)
+		return ((int)HW_INVALID_HOSTID);
 	hostid = strtoul(name, &end, 10);
 	if (end == name)
-		return (-1);
+		return ((int)HW_INVALID_HOSTID);
 	return ((long)hostid);
 }

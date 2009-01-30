@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@
 #include <sys/cyclic_impl.h>
 #include <sys/disp.h>
 #include <sys/tuneable.h>
+#include <sys/systeminfo.h>
 
 #include <sys/vmem.h>
 #include <sys/clock.h>
@@ -494,6 +495,14 @@ struct var v;			/* System Configuration Information */
  * System Configuration Information
  */
 
+/*
+ * The physical system's host identifier, expressed as a decimal string.
+ * Code should only directly access this value when writing to it (setting the
+ * physical system's host identifier).  Code that reads the physical system's
+ * host identifier should use zone_get_hostid(NULL) instead.
+ */
+char hw_serial[HW_HOSTID_LEN] = "0";
+
 #if defined(__sparc)
 
 /*
@@ -502,7 +511,6 @@ struct var v;			/* System Configuration Information */
  */
 char architecture[] = "sparcv9";
 char architecture_32[] = "sparc";
-char hw_serial[11];
 char hw_provider[] = "Sun_Microsystems";
 
 #elif defined(__i386)
@@ -513,7 +521,6 @@ char hw_provider[] = "Sun_Microsystems";
  */
 char architecture[] = "i386";
 char architecture_32[] = "i386";
-char hw_serial[11] = "0";
 char hw_provider[SYS_NMLN] = "";
 
 #elif defined(__amd64)
@@ -524,7 +531,6 @@ char hw_provider[SYS_NMLN] = "";
  */
 char architecture[] = "amd64";
 char architecture_32[] = "i386";
-char hw_serial[11] = "0";
 char hw_provider[SYS_NMLN] = "";
 
 #else

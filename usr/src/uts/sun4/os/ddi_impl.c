@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sun4 specific DDI implementation
@@ -1742,14 +1740,10 @@ void
 parse_idprom(void)
 {
 	if (idprom.id_format == IDFORM_1) {
-		uint_t i;
-
 		(void) localetheraddr((struct ether_addr *)idprom.id_ether,
 		    (struct ether_addr *)NULL);
-
-		i = idprom.id_machine << 24;
-		i = i + idprom.id_serial;
-		numtos((ulong_t)i, hw_serial);
+		(void) snprintf(hw_serial, HW_HOSTID_LEN, "%u",
+		    (idprom.id_machine << 24) + idprom.id_serial);
 	} else
 		prom_printf("Invalid format code in IDprom.\n");
 }

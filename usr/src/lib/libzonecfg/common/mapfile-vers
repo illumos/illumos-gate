@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 SUNWprivate_1.1 {
@@ -106,6 +104,7 @@ SUNWprivate_1.1 {
 	zonecfg_getdsent;
 	zonecfg_getfsent;
 	zonecfg_get_handle;
+	zonecfg_get_hostid;
 	zonecfg_getipdent;
 	zonecfg_get_iptype;
 	zonecfg_get_limitpriv;
@@ -177,6 +176,7 @@ SUNWprivate_1.1 {
 	zonecfg_setdevperment;
 	zonecfg_setdsent;
 	zonecfg_setfsent;
+	zonecfg_set_hostid;
 	zonecfg_setipdent;
 	zonecfg_set_iptype;
 	zonecfg_set_limitpriv;
@@ -193,6 +193,7 @@ SUNWprivate_1.1 {
 	zonecfg_validate_zonename;
 	zonecfg_valid_alias_limit;
 	zonecfg_valid_fs_type;
+	zonecfg_valid_hostid;
 	zonecfg_valid_importance;
 	zonecfg_valid_memlimit;
 	zonecfg_valid_ncpus;

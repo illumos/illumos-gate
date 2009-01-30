@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_ZONE_H
 #define	_SYS_ZONE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mutex.h>
@@ -97,6 +95,7 @@ extern "C" {
 #define	ZONE_ATTR_PHYS_MCAP	12
 #define	ZONE_ATTR_SCHED_CLASS	13
 #define	ZONE_ATTR_FLAGS		14
+#define	ZONE_ATTR_HOSTID	15
 
 /* Start of the brand-specific attribute namespace */
 #define	ZONE_ATTR_BRAND_ATTRS	32768
@@ -319,6 +318,17 @@ typedef struct zone {
 	 */
 	char		*zone_nodename;	/* utsname.nodename equivalent */
 	char		*zone_domain;	/* srpc_domain equivalent */
+	/*
+	 * zone_hostid is used for per-zone hostid emulation.
+	 * Currently it isn't modified after it's set (so no locks protect
+	 * accesses), but that might have to change when we allow
+	 * administrators to change running zones' properties.
+	 *
+	 * The global zone's zone_hostid must always be HW_INVALID_HOSTID so
+	 * that zone_get_hostid() will function correctly.
+	 */
+	uint32_t	zone_hostid;	/* zone's hostid, HW_INVALID_HOSTID */
+					/* if not emulated */
 	/*
 	 * zone_lock protects the following fields of a zone_t:
 	 * 	zone_ref
@@ -597,6 +607,13 @@ extern int zone_status_wait_sig(zone_t *, zone_status_t);
  * have progressed by the time it is returned.
  */
 extern zone_status_t zone_status_get(zone_t *);
+
+/*
+ * Safely get the hostid of the specified zone (defaults to machine's hostid
+ * if the specified zone doesn't emulate a hostid).  Passing NULL retrieves
+ * the global zone's (i.e., physical system's) hostid.
+ */
+extern uint32_t zone_get_hostid(zone_t *);
 
 /*
  * Get the "kcred" credentials corresponding to the given zone.

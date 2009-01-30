@@ -21,11 +21,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 
@@ -59,7 +57,7 @@ extern void yyerror(char *s);
 %token HELP CREATE EXPORT ADD DELETE REMOVE SELECT SET INFO CANCEL END VERIFY
 %token COMMIT REVERT EXIT SEMICOLON TOKEN ZONENAME ZONEPATH AUTOBOOT POOL NET
 %token FS IPD ATTR DEVICE RCTL SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL
-%token IPTYPE
+%token IPTYPE HOSTID
 %token NAME MATCH PRIV LIMIT ACTION VALUE EQUAL OPEN_SQ_BRACKET CLOSE_SQ_BRACKET
 %token OPEN_PAREN CLOSE_PAREN COMMA DATASET LIMITPRIV BOOTARGS BRAND PSET PCAP
 %token MCAP NCPUS IMPORTANCE SHARES MAXLWPS MAXSHMMEM MAXSHMIDS MAXMSGIDS
@@ -71,7 +69,7 @@ extern void yyerror(char *s);
 %type <ival> resource_type NET FS IPD DEVICE RCTL ATTR DATASET PSET PCAP MCAP
 %type <ival> property_name SPECIAL RAW DIR OPTIONS TYPE ADDRESS PHYSICAL NAME
     MATCH ZONENAME ZONEPATH AUTOBOOT POOL LIMITPRIV BOOTARGS VALUE PRIV LIMIT
-    ACTION BRAND SCHED IPTYPE DEFROUTER
+    ACTION BRAND SCHED IPTYPE DEFROUTER HOSTID
 %type <cmd> command
 %type <cmd> add_command ADD
 %type <cmd> cancel_command CANCEL
@@ -542,6 +540,15 @@ info_command:	INFO
 		$$->cmd_res_type = RT_MAXSEMIDS;
 		$$->cmd_prop_nv_pairs = 0;
 	}
+	|	INFO HOSTID
+	{
+		if (($$ = alloc_cmd()) == NULL)
+			YYERROR;
+		cmd = $$;
+		$$->cmd_handler = &info_func;
+		$$->cmd_res_type = RT_HOSTID;
+		$$->cmd_prop_nv_pairs = 0;
+	}
 	|	INFO resource_type property_name EQUAL property_value
 	{
 		if (($$ = alloc_cmd()) == NULL)
@@ -884,6 +891,7 @@ property_name: SPECIAL	{ $$ = PT_SPECIAL; }
 	| MAXMSGIDS	{ $$ = PT_MAXMSGIDS; }
 	| MAXSEMIDS	{ $$ = PT_MAXSEMIDS; }
 	| SCHED		{ $$ = PT_SCHED; }
+	| HOSTID	{ $$ = PT_HOSTID; }
 
 /*
  * The grammar builds data structures from the bottom up.  Thus various

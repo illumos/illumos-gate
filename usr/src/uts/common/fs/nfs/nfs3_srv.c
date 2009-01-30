@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,8 @@
 
 #include <sys/tsol/label.h>
 #include <sys/tsol/tndb.h>
+
+#include <sys/zone.h>
 
 #include <inet/ip.h>
 #include <inet/ip6.h>
@@ -4574,7 +4576,7 @@ rfs3_srvrinit(void)
 	gethrestime(&now);
 	verfp = (struct rfs3_verf_overlay *)&write3verf;
 	verfp->ts = (int)now.tv_sec;
-	verfp->id = (uint_t)nfs_atoi(hw_serial);
+	verfp->id = zone_get_hostid(NULL);
 
 	if (verfp->id == 0)
 		verfp->id = (uint_t)now.tv_nsec;

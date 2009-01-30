@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All rights reserved.	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -57,6 +55,7 @@ systeminfo(int command, char *buf, long count)
 	int error = 0;
 	long strcnt, getcnt;
 	char *kstr;
+	char hostidp[HW_HOSTID_LEN];
 
 	if (count < 0 && command != SI_SET_HOSTNAME &&
 	    command != SI_SET_SRPC_DOMAIN)
@@ -103,7 +102,9 @@ systeminfo(int command, char *buf, long count)
 		break;
 #endif
 	case SI_HW_SERIAL:
-		kstr = hw_serial;
+		(void) snprintf(hostidp, sizeof (hostidp), "%u",
+		    zone_get_hostid(curzone));
+		kstr = hostidp;
 		break;
 	case SI_HW_PROVIDER:
 		kstr = hw_provider;

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,7 @@
 #include <libzfs.h>
 #include <sys/brand.h>
 #include <libbrand.h>
+#include <sys/systeminfo.h>
 #include <libdladm.h>
 #include <libinetutil.h>
 
@@ -180,6 +181,7 @@ static char *res_types[] = {
 	"scheduling-class",
 	"ip-type",
 	"capped-cpu",
+	"hostid",
 	NULL
 };
 
@@ -221,6 +223,7 @@ static char *prop_types[] = {
 	"scheduling-class",
 	"ip-type",
 	"defrouter",
+	"hostid",
 	NULL
 };
 
@@ -332,6 +335,7 @@ static const char *set_cmds[] = {
 	"set " ALIAS_MAXMSGIDS "=",
 	"set " ALIAS_MAXSEMIDS "=",
 	"set " ALIAS_SHARES "=",
+	"set hostid=",
 	NULL
 };
 
@@ -361,6 +365,7 @@ static const char *info_cmds[] = {
 	"info max-msg-ids",
 	"info max-sem-ids",
 	"info cpu-shares",
+	"info hostid",
 	NULL
 };
 
@@ -1143,6 +1148,8 @@ usage(boolean_t verbose, uint_t flags)
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_IPTYPE));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
+		    pt_to_str(PT_HOSTID));
+		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_MAXLWPS));
 		(void) fprintf(fp, "\t%s\t%s\n", gettext("(global)"),
 		    pt_to_str(PT_MAXSHMMEM));
@@ -1625,6 +1632,7 @@ export_func(cmd_t *cmd)
 	char bootargs[BOOTARGS_MAX];
 	char sched[MAXNAMELEN];
 	char brand[MAXNAMELEN];
+	char hostidp[HW_HOSTID_LEN];
 	char *limitpriv;
 	FILE *of;
 	boolean_t autoboot;
@@ -1726,6 +1734,11 @@ export_func(cmd_t *cmd)
 			    pt_to_str(PT_IPTYPE), "exclusive");
 			break;
 		}
+	}
+
+	if (zonecfg_get_hostid(handle, hostidp, sizeof (hostidp)) == Z_OK) {
+		(void) fprintf(of, "%s %s=%s\n", cmd_to_str(CMD_SET),
+		    pt_to_str(PT_HOSTID), hostidp);
 	}
 
 	if ((err = zonecfg_setipdent(handle)) != Z_OK) {
@@ -2281,7 +2294,7 @@ gz_invalid_rt_property(int type)
 	return (global_zone && (type == RT_ZONENAME || type == RT_ZONEPATH ||
 	    type == RT_AUTOBOOT || type == RT_LIMITPRIV ||
 	    type == RT_BOOTARGS || type == RT_BRAND || type == RT_SCHED ||
-	    type == RT_IPTYPE));
+	    type == RT_IPTYPE || type == RT_HOSTID));
 }
 
 static boolean_t
@@ -2290,7 +2303,7 @@ gz_invalid_property(int type)
 	return (global_zone && (type == PT_ZONENAME || type == PT_ZONEPATH ||
 	    type == PT_AUTOBOOT || type == PT_LIMITPRIV ||
 	    type == PT_BOOTARGS || type == PT_BRAND || type == PT_SCHED ||
-	    type == PT_IPTYPE));
+	    type == PT_IPTYPE || type == PT_HOSTID));
 }
 
 void
@@ -3482,6 +3495,12 @@ clear_global(cmd_t *cmd)
 	case PT_SHARES:
 		remove_aliased_rctl(PT_SHARES, ALIAS_SHARES);
 		return;
+	case PT_HOSTID:
+		if ((err = zonecfg_set_hostid(handle, NULL)) != Z_OK)
+			z_cmd_rt_perror(CMD_CLEAR, RT_HOSTID, err, B_TRUE);
+		else
+			need_to_commit = B_TRUE;
+		return;
 	default:
 		zone_perror(pt_to_str(type), Z_NO_PROPERTY_TYPE, B_TRUE);
 		long_usage(CMD_CLEAR, B_TRUE);
@@ -3937,6 +3956,8 @@ set_func(cmd_t *cmd)
 			res_type = RT_MAXSEMIDS;
 		} else if (prop_type == PT_SHARES) {
 			res_type = RT_SHARES;
+		} else if (prop_type == PT_HOSTID) {
+			res_type = RT_HOSTID;
 		} else {
 			zerr(gettext("Cannot set a resource-specific property "
 			    "from the global scope."));
@@ -4138,6 +4159,19 @@ set_func(cmd_t *cmd)
 		return;
 	case RT_SHARES:
 		set_aliased_rctl(ALIAS_SHARES, prop_type, prop_id);
+		return;
+	case RT_HOSTID:
+		if ((err = zonecfg_set_hostid(handle, prop_id)) != Z_OK) {
+			if (err == Z_TOO_BIG) {
+				zerr(gettext("hostid string is too large: %s"),
+				    prop_id);
+				saw_error = B_TRUE;
+			} else {
+				zone_perror(pt_to_str(prop_type), err, B_TRUE);
+			}
+			return;
+		}
+		need_to_commit = B_TRUE;
 		return;
 	case RT_FS:
 		switch (prop_type) {
@@ -4650,6 +4684,21 @@ info_iptype(zone_dochandle_t handle, FILE *fp)
 	} else {
 		zone_perror(zone, err, B_TRUE);
 	}
+}
+
+static void
+info_hostid(zone_dochandle_t handle, FILE *fp)
+{
+	char hostidp[HW_HOSTID_LEN];
+
+	/*
+	 * This will display "hostid: " if there isn't a hostid or an
+	 * error occurs while retrieving the hostid from the configuration
+	 * file.
+	 */
+	if (zonecfg_get_hostid(handle, hostidp, sizeof (hostidp)) != Z_OK)
+		hostidp[0] = '\0';
+	(void) fprintf(fp, "%s: %s\n", pt_to_str(PT_HOSTID), hostidp);
 }
 
 static void
@@ -5197,6 +5246,7 @@ info_func(cmd_t *cmd)
 			info_limitpriv(handle, fp);
 			info_sched(handle, fp);
 			info_iptype(handle, fp);
+			info_hostid(handle, fp);
 		}
 		info_aliased_rctl(handle, fp, ALIAS_MAXLWPS);
 		info_aliased_rctl(handle, fp, ALIAS_MAXSHMMEM);
@@ -5293,6 +5343,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_MCAP:
 		info_mcap(handle, fp);
+		break;
+	case RT_HOSTID:
+		info_hostid(handle, fp);
 		break;
 	default:
 		zone_perror(rt_to_str(cmd->cmd_res_type), Z_NO_RESOURCE_TYPE,
@@ -5431,6 +5484,7 @@ verify_func(cmd_t *cmd)
 	char zonepath[MAXPATHLEN];
 	char sched[MAXNAMELEN];
 	char brand[MAXNAMELEN];
+	char hostidp[HW_HOSTID_LEN];
 	int err, ret_val = Z_OK, arg;
 	int pset_res;
 	boolean_t save = B_FALSE;
@@ -5506,6 +5560,12 @@ verify_func(cmd_t *cmd)
 		check_reqd_prop(fstab.zone_fs_dir, RT_IPD, PT_DIR, &ret_val);
 	}
 	(void) zonecfg_endipdent(handle);
+
+	if (zonecfg_get_hostid(handle, hostidp, sizeof (hostidp)) == Z_OK &&
+	    (err = zonecfg_valid_hostid(hostidp)) != Z_OK) {
+		zone_perror(zone, err, B_TRUE);
+		return;
+	}
 
 	if ((err = zonecfg_setfsent(handle)) != Z_OK) {
 		zone_perror(zone, err, B_TRUE);

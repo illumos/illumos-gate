@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 #include <sys/ethernet.h>
 #include <sys/sdt.h>
 #include <sys/nvpair.h>
+#include <sys/zone.h>
 
 #include <stmf.h>
 #include <lpif.h>
@@ -463,7 +464,7 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		mutex_enter(&stmf_state.stmf_lock);
 		iocd->stmf_obuf_max_nentries = stmf_state.stmf_nlus;
 		n = min(stmf_state.stmf_nlus,
-				(iocd->stmf_obuf_size)/sizeof (slist_lu_t));
+		    (iocd->stmf_obuf_size)/sizeof (slist_lu_t));
 		iocd->stmf_obuf_nentries = n;
 		ilu = stmf_state.stmf_ilulist;
 		luid_list = (slist_lu_t *)obuf;
@@ -480,7 +481,7 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		mutex_enter(&stmf_state.stmf_lock);
 		iocd->stmf_obuf_max_nentries = stmf_state.stmf_nlports;
 		n = min(stmf_state.stmf_nlports,
-			(iocd->stmf_obuf_size)/sizeof (slist_target_port_t));
+		    (iocd->stmf_obuf_size)/sizeof (slist_target_port_t));
 		iocd->stmf_obuf_nentries = n;
 		ilport = stmf_state.stmf_ilportlist;
 		lportid_list = (slist_target_port_t *)obuf;
@@ -502,7 +503,7 @@ stmf_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 		}
 		mutex_enter(&stmf_state.stmf_lock);
 		for (ilport = stmf_state.stmf_ilportlist; ilport; ilport =
-				ilport->ilport_next) {
+		    ilport->ilport_next) {
 			uint8_t *id;
 			id = (uint8_t *)ilport->ilport_lport->lport_id;
 			if ((p_id[3] == id[3]) &&
@@ -1224,7 +1225,7 @@ stmf_set_stmf_state(stmf_state_desc_t *std)
 			if (ilport->ilport_prev_state != STMF_STATE_ONLINE)
 				continue;
 			(void) stmf_ctl(STMF_CMD_LPORT_ONLINE,
-					ilport->ilport_lport, &ssi);
+			    ilport->ilport_lport, &ssi);
 		}
 
 		for (ilu = stmf_state.stmf_ilulist; ilu != NULL;
@@ -1333,7 +1334,7 @@ stmf_alloc(stmf_struct_id_t struct_id, int additional_size, int flags)
 
 	additional_size = (additional_size + 7) & (~7);
 	stmf_size = stmf_sizes[struct_id].shared +
-		stmf_sizes[struct_id].fw_private + additional_size;
+	    stmf_sizes[struct_id].fw_private + additional_size;
 
 	sh = (__stmf_t *)kmem_zalloc(stmf_size, kmem_flag);
 
@@ -1681,7 +1682,7 @@ stmf_delete_ppd(stmf_pp_data_t *ppd)
 	}
 
 	for (pppd = &stmf_state.stmf_ppdlist; *pppd != NULL;
-			pppd = &((*pppd)->ppd_next)) {
+	    pppd = &((*pppd)->ppd_next)) {
 		if (*pppd == ppd)
 			break;
 	}
@@ -1898,7 +1899,7 @@ stmf_register_local_port(stmf_local_port_t *lport)
 	}
 	ilport->ilport_tg =
 	    stmf_lookup_group_for_target(lport->lport_id->ident,
-		lport->lport_id->ident_length);
+	    lport->lport_id->ident_length);
 	ilport->ilport_rtpid = atomic_add_16_nv(&stmf_rtpid_counter, 1);
 	STMF_EVENT_ALLOC_HANDLE(ilport->ilport_event_hdl);
 	if (stmf_workers_state == STMF_WORKERS_DISABLED) {
@@ -2007,7 +2008,7 @@ void
 stmf_deregister_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 {
 	stmf_i_local_port_t *ilport = (stmf_i_local_port_t *)
-					lport->lport_stmf_private;
+	    lport->lport_stmf_private;
 	stmf_i_scsi_session_t *iss, **ppss;
 	int found = 0;
 
@@ -2019,7 +2020,7 @@ stmf_deregister_scsi_session(stmf_local_port_t *lport, stmf_scsi_session_t *ss)
 try_dereg_ss_again:
 	mutex_enter(&stmf_state.stmf_lock);
 	atomic_and_32(&iss->iss_flags,
-		~(ISS_LUN_INVENTORY_CHANGED | ISS_GOT_INITIAL_LUNS));
+	    ~(ISS_LUN_INVENTORY_CHANGED | ISS_GOT_INITIAL_LUNS));
 	if (iss->iss_flags & ISS_EVENT_ACTIVE) {
 		mutex_exit(&stmf_state.stmf_lock);
 		delay(1);
@@ -2053,10 +2054,10 @@ stmf_session_id_to_issptr(uint64_t session_id, int stay_locked)
 
 	mutex_enter(&stmf_state.stmf_lock);
 	for (ilport = stmf_state.stmf_ilportlist; ilport != NULL;
-					ilport = ilport->ilport_next) {
+	    ilport = ilport->ilport_next) {
 		rw_enter(&ilport->ilport_lock, RW_WRITER);
 		for (iss = ilport->ilport_ss_list; iss != NULL;
-					iss = iss->iss_next) {
+		    iss = iss->iss_next) {
 			if (iss->iss_ss->ss_session_id == session_id) {
 				if (!stay_locked)
 					rw_exit(&ilport->ilport_lock);
@@ -2081,7 +2082,7 @@ stmf_release_itl_handle(stmf_lu_t *lu, stmf_itl_data_t *itl)
 	ilu = (stmf_i_lu_t *)lu->lu_stmf_private;
 	mutex_enter(&ilu->ilu_task_lock);
 	for (itlpp = &ilu->ilu_itl_list; (*itlpp) != NULL;
-					itlpp = &(*itlpp)->itl_next) {
+	    itlpp = &(*itlpp)->itl_next) {
 		if ((*itlpp) == itl)
 			break;
 	}
@@ -2089,7 +2090,7 @@ stmf_release_itl_handle(stmf_lu_t *lu, stmf_itl_data_t *itl)
 	*itlpp = itl->itl_next;
 	mutex_exit(&ilu->ilu_task_lock);
 	lu->lu_abort(lu, STMF_LU_ITL_HANDLE_REMOVED, itl->itl_handle,
-				(uint32_t)itl->itl_hdlrm_reason);
+	    (uint32_t)itl->itl_hdlrm_reason);
 	kmem_free(itl, sizeof (*itl));
 }
 
@@ -2115,7 +2116,7 @@ stmf_register_itl_handle(stmf_lu_t *lu, uint8_t *lun,
 
 	n = ((uint16_t)lun[1] | (((uint16_t)(lun[0] & 0x3F)) << 8));
 	lun_map_ent = (stmf_lun_map_ent_t *)
-			stmf_get_ent_from_map(iss->iss_sm, n);
+	    stmf_get_ent_from_map(iss->iss_sm, n);
 	if ((lun_map_ent == NULL) || (lun_map_ent->ent_lu != lu)) {
 		rw_exit(iss->iss_lockp);
 		return (STMF_NOT_FOUND);
@@ -2189,7 +2190,7 @@ dereg_itl_start:;
 	if (nmaps == 0)
 		return (STMF_NOT_FOUND);
 	itl_list = (stmf_itl_data_t **)kmem_zalloc(
-			nmaps * sizeof (stmf_itl_data_t *), KM_SLEEP);
+	    nmaps * sizeof (stmf_itl_data_t *), KM_SLEEP);
 	mutex_enter(&stmf_state.stmf_lock);
 	if (nmaps != ilu->ilu_ref_cnt) {
 		/* Something changed, start all over */
@@ -2199,10 +2200,10 @@ dereg_itl_start:;
 	}
 	nu = 0;
 	for (ilport = stmf_state.stmf_ilportlist; ilport != NULL;
-				ilport = ilport->ilport_next) {
+	    ilport = ilport->ilport_next) {
 		rw_enter(&ilport->ilport_lock, RW_WRITER);
 		for (iss = ilport->ilport_ss_list; iss != NULL;
-					iss = iss->iss_next) {
+		    iss = iss->iss_next) {
 			lm = iss->iss_sm;
 			if (!lm)
 				continue;
@@ -2211,7 +2212,7 @@ dereg_itl_start:;
 					continue;
 				ent = (stmf_lun_map_ent_t *)lm->lm_plus[i];
 				if ((ent->ent_lu == lu) &&
-						(ent->ent_itl_datap)) {
+				    (ent->ent_itl_datap)) {
 					itl_list[nu++] = ent->ent_itl_datap;
 					ent->ent_itl_datap = NULL;
 					if (nu == nmaps) {
@@ -2229,7 +2230,7 @@ dai_scan_done:
 
 	for (i = 0; i < nu; i++) {
 		stmf_do_itl_dereg(lu, itl_list[i],
-					STMF_ITL_REASON_DEREG_REQUEST);
+		    STMF_ITL_REASON_DEREG_REQUEST);
 	}
 	kmem_free(itl_list, nmaps * sizeof (stmf_itl_data_t *));
 
@@ -2266,7 +2267,7 @@ stmf_deregister_itl_handle(stmf_lu_t *lu, uint8_t *lun,
 	if (lun) {
 		n = ((uint16_t)lun[1] | (((uint16_t)(lun[0] & 0x3F)) << 8));
 		ent = (stmf_lun_map_ent_t *)
-				stmf_get_ent_from_map(iss->iss_sm, n);
+		    stmf_get_ent_from_map(iss->iss_sm, n);
 	} else {
 		if (itl_handle == NULL) {
 			rw_exit(iss->iss_lockp);
@@ -2284,7 +2285,7 @@ stmf_deregister_itl_handle(stmf_lu_t *lu, uint8_t *lun,
 		}
 	}
 	if ((ent == NULL) || (ent->ent_lu != lu) ||
-			(ent->ent_itl_datap == NULL)) {
+	    (ent->ent_itl_datap == NULL)) {
 		rw_exit(iss->iss_lockp);
 		return (STMF_NOT_FOUND);
 	}
@@ -2329,7 +2330,7 @@ stmf_get_itl_handle(stmf_lu_t *lu, uint8_t *lun, stmf_scsi_session_t *ss,
 	} else {
 		n = ((uint16_t)lun[1] | (((uint16_t)(lun[0] & 0x3F)) << 8));
 		ent = (stmf_lun_map_ent_t *)
-				stmf_get_ent_from_map(iss->iss_sm, n);
+		    stmf_get_ent_from_map(iss->iss_sm, n);
 		if (lu && (ent->ent_lu != lu))
 			ent = NULL;
 	}
@@ -2442,7 +2443,8 @@ stmf_task_alloc(struct stmf_local_port *lport, stmf_scsi_session_t *ss,
 		mutex_enter(&ilu->ilu_task_lock);
 		for (ppitask = &ilu->ilu_free_tasks; (*ppitask != NULL) &&
 		    ((*ppitask)->itask_cdb_buf_size < cdb_length);
-		    ppitask = &((*ppitask)->itask_lu_free_next));
+		    ppitask = &((*ppitask)->itask_lu_free_next))
+			;
 		if (*ppitask) {
 			itask = *ppitask;
 			*ppitask = (*ppitask)->itask_lu_free_next;
@@ -2743,14 +2745,14 @@ stmf_task_free(scsi_task_t *task)
 {
 	stmf_local_port_t *lport = task->task_lport;
 	stmf_i_scsi_task_t *itask = (stmf_i_scsi_task_t *)
-					task->task_stmf_private;
+	    task->task_stmf_private;
 
 	stmf_free_task_bufs(itask, lport);
 	if (itask->itask_itl_datap) {
 		if (atomic_add_32_nv(&itask->itask_itl_datap->itl_counter,
 		    -1) == 0) {
 			stmf_release_itl_handle(task->task_lu,
-						itask->itask_itl_datap);
+			    itask->itask_itl_datap);
 		}
 	}
 	lport->lport_task_free(task);
@@ -2915,8 +2917,8 @@ stmf_xfer_data(scsi_task_t *task, stmf_data_buf_t *dbuf, uint32_t ioflags)
 		return (STMF_ABORTED);
 #ifdef	DEBUG
 	if (stmf_drop_buf_counter > 0) {
-		if (atomic_add_32_nv((uint32_t *)&stmf_drop_buf_counter,
-								-1) == 1)
+		if (atomic_add_32_nv((uint32_t *)&stmf_drop_buf_counter, -1) ==
+		    1)
 			return (STMF_SUCCESS);
 	}
 #endif
@@ -3004,7 +3006,7 @@ stmf_status_t
 stmf_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 {
 	stmf_i_scsi_task_t *itask =
-		(stmf_i_scsi_task_t *)task->task_stmf_private;
+	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	if (ioflags & STMF_IOF_LU_DONE) {
 		uint32_t new, old;
 		do {
@@ -3029,12 +3031,12 @@ stmf_send_scsi_status(scsi_task_t *task, uint32_t ioflags)
 	    task->task_expected_xfer_length) {
 		task->task_status_ctrl = TASK_SCTRL_OVER;
 		task->task_resid = task->task_cmd_xfer_length -
-					task->task_expected_xfer_length;
+		    task->task_expected_xfer_length;
 	} else if (task->task_nbytes_transferred <
-					task->task_expected_xfer_length) {
+	    task->task_expected_xfer_length) {
 		task->task_status_ctrl = TASK_SCTRL_UNDER;
 		task->task_resid = task->task_expected_xfer_length -
-					task->task_nbytes_transferred;
+		    task->task_nbytes_transferred;
 	} else {
 		task->task_status_ctrl = 0;
 		task->task_resid = 0;
@@ -3121,7 +3123,7 @@ void
 stmf_task_lu_done(scsi_task_t *task)
 {
 	stmf_i_scsi_task_t *itask =
-		(stmf_i_scsi_task_t *)task->task_stmf_private;
+	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	stmf_worker_t *w = itask->itask_worker;
 	uint32_t new, old;
 
@@ -3447,8 +3449,7 @@ stmf_do_task_abort(scsi_task_t *task)
 		}
 	} while (atomic_cas_32(&itask->itask_flags, old, new) != old);
 	if (call_port_abort) {
-		ret = lport->lport_abort(lport, STMF_LPORT_ABORT_TASK,
-								task, 0);
+		ret = lport->lport_abort(lport, STMF_LPORT_ABORT_TASK, task, 0);
 		if ((ret == STMF_ABORT_SUCCESS) || (ret == STMF_NOT_FOUND)) {
 			stmf_task_lport_aborted(task, ret, STMF_IOF_LPORT_DONE);
 		} else if (ret == STMF_BUSY) {
@@ -3715,11 +3716,11 @@ stmf_info(uint32_t cmd, void *arg1, void *arg2, uint8_t *buf,
 		return (stmf_info_impl(cmd, arg1, arg2, buf, bufsizep));
 	}
 	if (cl == SI_LPORT) {
-		return (((stmf_local_port_t *)arg1)->lport_info(cmd,
-				arg1, arg2, buf, bufsizep));
+		return (((stmf_local_port_t *)arg1)->lport_info(cmd, arg1,
+		    arg2, buf, bufsizep));
 	} else if (cl == SI_LU) {
-		return (((stmf_lu_t *)arg1)->lu_info(cmd, arg1, arg2,
-						buf, bufsizep));
+		return (((stmf_lu_t *)arg1)->lu_info(cmd, arg1, arg2, buf,
+		    bufsizep));
 	}
 
 	return (STMF_NOT_SUPPORTED);
@@ -3784,7 +3785,6 @@ stmf_prepare_tpgs_data()
 
 
 static uint16_t stmf_lu_id_gen_number = 0;
-extern char hw_serial[];
 
 stmf_status_t
 stmf_scsilib_uniq_lu_id(uint32_t company_id, scsi_devid_desc_t *lu_id)
@@ -3811,8 +3811,7 @@ stmf_scsilib_uniq_lu_id(uint32_t company_id, scsi_devid_desc_t *lu_id)
 	p[6] = (company_id >> 4) & 0xff;
 	p[7] = (company_id << 4) & 0xf0;
 	if (!localetheraddr((struct ether_addr *)NULL, &mac)) {
-		char *hp = &hw_serial[0];
-		int hid = BE_32(stoi(&hp));
+		int hid = BE_32((int)zone_get_hostid(NULL));
 
 		e[0] = (hid >> 24) & 0xff;
 		e[1] = (hid >> 16) & 0xff;
@@ -3916,7 +3915,7 @@ stmf_scsilib_prepare_vpd_page83(scsi_task_t *task, uint8_t *page,
 			p[1] = 0x14;
 			p[3] = 4;
 			ilport = (stmf_i_local_port_t *)
-					task->task_lport->lport_stmf_private;
+			    task->task_lport->lport_stmf_private;
 			p[6] = (ilport->ilport_rtpid >> 8) & 0xff;
 			p[7] = ilport->ilport_rtpid & 0xff;
 			sz = 8;
@@ -3937,7 +3936,7 @@ void
 stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf)
 {
 	stmf_i_scsi_task_t *itask =
-			(stmf_i_scsi_task_t *)task->task_stmf_private;
+	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	stmf_xfer_data_t *xd;
 	uint32_t sz, minsz;
 
@@ -3956,7 +3955,7 @@ stmf_scsilib_handle_report_tpgs(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 	if (task->task_cmd_xfer_length < 16) {
 		stmf_scsilib_send_status(task, STATUS_CHECK,
-			STMF_SAA_INVALID_FIELD_IN_CDB);
+		    STMF_SAA_INVALID_FIELD_IN_CDB);
 		return;
 	}
 
@@ -4038,7 +4037,7 @@ stmf_handle_lun_reset(scsi_task_t *task)
 	if (ilu->ilu_flags & ILU_RESET_ACTIVE) {
 		mutex_exit(&stmf_state.stmf_lock);
 		stmf_scsilib_send_status(task, STATUS_CHECK,
-				STMF_SAA_OPERATION_IN_PROGRESS);
+		    STMF_SAA_OPERATION_IN_PROGRESS);
 		return;
 	}
 	atomic_or_32(&ilu->ilu_flags, ILU_RESET_ACTIVE);
@@ -4058,7 +4057,7 @@ stmf_handle_lun_reset(scsi_task_t *task)
 	if (stmf_task_poll_lu(task, ITASK_DEFAULT_POLL_TIMEOUT)
 	    != STMF_SUCCESS) {
 		stmf_abort(STMF_QUEUE_TASK_ABORT, task, STMF_ALLOC_FAILURE,
-						NULL);
+		    NULL);
 		return;
 	}
 }
@@ -4090,7 +4089,7 @@ stmf_handle_target_reset(scsi_task_t *task)
 		rw_exit(iss->iss_lockp);
 		mutex_exit(&stmf_state.stmf_lock);
 		stmf_scsilib_send_status(task, STATUS_CHECK,
-				STMF_SAA_OPERATION_IN_PROGRESS);
+		    STMF_SAA_OPERATION_IN_PROGRESS);
 		return;
 	}
 	atomic_or_32(&iss->iss_flags, ISS_RESET_ACTIVE);
@@ -4111,7 +4110,7 @@ stmf_handle_target_reset(scsi_task_t *task)
 			rw_exit(iss->iss_lockp);
 			mutex_exit(&stmf_state.stmf_lock);
 			stmf_scsilib_send_status(task, STATUS_CHECK,
-					STMF_SAA_OPERATION_IN_PROGRESS);
+			    STMF_SAA_OPERATION_IN_PROGRESS);
 			return;
 		}
 	}
@@ -4126,7 +4125,7 @@ stmf_handle_target_reset(scsi_task_t *task)
 
 	/* ok, start the damage */
 	itask->itask_flags |= ITASK_DEFAULT_HANDLING |
-					ITASK_CAUSING_TARGET_RESET;
+	    ITASK_CAUSING_TARGET_RESET;
 	for (i = 0; i < lm->lm_nentries; i++) {
 		if (lm->lm_plus[i] == NULL)
 			continue;
@@ -4142,14 +4141,14 @@ stmf_handle_target_reset(scsi_task_t *task)
 			continue;
 		lm_ent = (stmf_lun_map_ent_t *)lm->lm_plus[i];
 		stmf_abort(STMF_QUEUE_ABORT_LU, task, STMF_ABORTED,
-				lm_ent->ent_lu);
+		    lm_ent->ent_lu);
 	}
 
 	/* Start polling on this task */
 	if (stmf_task_poll_lu(task, ITASK_DEFAULT_POLL_TIMEOUT)
 	    != STMF_SUCCESS) {
 		stmf_abort(STMF_QUEUE_TASK_ABORT, task, STMF_ALLOC_FAILURE,
-						NULL);
+		    NULL);
 		return;
 	}
 }
@@ -4168,7 +4167,7 @@ stmf_handle_cmd_during_ic(stmf_i_scsi_task_t *itask)
 		return (0);
 	}
 	atomic_and_32(&iss->iss_flags,
-		~(ISS_LUN_INVENTORY_CHANGED | ISS_GOT_INITIAL_LUNS));
+	    ~(ISS_LUN_INVENTORY_CHANGED | ISS_GOT_INITIAL_LUNS));
 	rw_exit(iss->iss_lockp);
 
 	if (task->task_cdb[0] == SCMD_REPORT_LUNS) {
@@ -4289,7 +4288,7 @@ stmf_worker_loop:;
 					    w->worker_wait_head;
 				else
 					w->worker_task_tail->itask_worker_next =
-						w->worker_wait_head;
+					    w->worker_wait_head;
 				w->worker_task_tail = w->worker_wait_tail;
 				w->worker_wait_head = w->worker_wait_tail =
 				    NULL;
@@ -4732,7 +4731,7 @@ stmf_dlun0_new_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 
 		if (sz < 16) {
 			stmf_scsilib_send_status(task, STATUS_CHECK,
-				STMF_SAA_INVALID_FIELD_IN_CDB);
+			    STMF_SAA_INVALID_FIELD_IN_CDB);
 			return;
 		}
 
@@ -4764,7 +4763,7 @@ stmf_dlun0_new_task(scsi_task_t *task, stmf_data_buf_t *dbuf)
 		stmf_xd_to_dbuf(dbuf);
 
 		atomic_and_32(&iss->iss_flags,
-			~(ISS_LUN_INVENTORY_CHANGED | ISS_GOT_INITIAL_LUNS));
+		    ~(ISS_LUN_INVENTORY_CHANGED | ISS_GOT_INITIAL_LUNS));
 		dbuf->db_flags = DB_DIRECTION_TO_RPORT;
 		(void) stmf_xfer_data(task, dbuf, 0);
 		return;
@@ -4809,7 +4808,7 @@ stmf_dlun0_abort(struct stmf_lu *lu, int abort_cmd, void *arg, uint32_t flags)
 {
 	scsi_task_t *task = (scsi_task_t *)arg;
 	stmf_i_scsi_task_t *itask =
-			(stmf_i_scsi_task_t *)task->task_stmf_private;
+	    (stmf_i_scsi_task_t *)task->task_stmf_private;
 	stmf_i_lu_t *ilu = (stmf_i_lu_t *)task->task_lu->lu_stmf_private;
 	int i;
 	uint8_t map;
@@ -4931,7 +4930,7 @@ void
 stmf_abort_target_reset(scsi_task_t *task)
 {
 	stmf_i_scsi_session_t *iss = (stmf_i_scsi_session_t *)
-				task->task_session->ss_stmf_private;
+	    task->task_session->ss_stmf_private;
 	stmf_lun_map_t *lm;
 	stmf_lun_map_ent_t *lm_ent;
 	stmf_i_lu_t *ilu;
@@ -5018,7 +5017,7 @@ void
 stmf_target_reset_poll(struct scsi_task *task)
 {
 	stmf_i_scsi_session_t *iss = (stmf_i_scsi_session_t *)
-				task->task_session->ss_stmf_private;
+	    task->task_session->ss_stmf_private;
 	stmf_lun_map_t *lm;
 	stmf_lun_map_ent_t *lm_ent;
 	stmf_i_lu_t *ilu;
@@ -5102,7 +5101,7 @@ stmf_status_t
 stmf_lport_add_event(stmf_local_port_t *lport, int eventid)
 {
 	stmf_i_local_port_t *ilport =
-		(stmf_i_local_port_t *)lport->lport_stmf_private;
+	    (stmf_i_local_port_t *)lport->lport_stmf_private;
 
 	if ((eventid < 0) || (eventid >= STMF_MAX_NUM_EVENTS)) {
 		return (STMF_INVALID_ARG);
@@ -5116,7 +5115,7 @@ stmf_status_t
 stmf_lport_remove_event(stmf_local_port_t *lport, int eventid)
 {
 	stmf_i_local_port_t *ilport =
-		(stmf_i_local_port_t *)lport->lport_stmf_private;
+	    (stmf_i_local_port_t *)lport->lport_stmf_private;
 
 	if (eventid == STMF_EVENT_ALL) {
 		STMF_EVENT_CLEAR_ALL(ilport->ilport_event_hdl);
@@ -5239,7 +5238,7 @@ stmf_svc_loop:
 			/* Kill all the pending I/Os for this LU */
 			mutex_exit(&stmf_state.stmf_lock);
 			stmf_task_lu_killall((stmf_lu_t *)req->svc_obj, NULL,
-				STMF_ABORTED);
+			    STMF_ABORTED);
 			mutex_enter(&stmf_state.stmf_lock);
 			waitq_add = 1;
 			break;
@@ -5369,28 +5368,28 @@ stmf_svc_loop:
 					port_level++;
 					stmf_level++;
 					atomic_and_32(&iss->iss_flags,
-						~ISS_GOT_INITIAL_LUNS);
+					    ~ISS_GOT_INITIAL_LUNS);
 					atomic_or_32(&iss->iss_flags,
-						ISS_EVENT_ACTIVE);
+					    ISS_EVENT_ACTIVE);
 					rw_exit(&ilport->ilport_lock);
 					mutex_exit(&stmf_state.stmf_lock);
 					stmf_generate_lport_event(ilport,
 					    LPORT_EVENT_INITIAL_LUN_MAPPED,
 					    iss->iss_ss, 0);
 					atomic_and_32(&iss->iss_flags,
-						~ISS_EVENT_ACTIVE);
+					    ~ISS_EVENT_ACTIVE);
 					mutex_enter(&stmf_state.stmf_lock);
 					/*
 					 * scan all the ilports again as the
 					 * ilport list might have changed.
 					 */
 					next_ilport =
-						stmf_state.stmf_ilportlist;
+					    stmf_state.stmf_ilportlist;
 					break;
 				}
 				if (port_level == 0) {
 					atomic_and_32(&ilport->ilport_flags,
-						~ILPORT_SS_GOT_INITIAL_LUNS);
+					    ~ILPORT_SS_GOT_INITIAL_LUNS);
 				}
 				/* drop the lock if we are holding it. */
 				if (rw_lock_held(&ilport->ilport_lock))

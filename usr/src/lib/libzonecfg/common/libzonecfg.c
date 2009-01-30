@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <sys/nvpair.h>
 #include <sys/types.h>
 #include <sys/sockio.h>
+#include <sys/systeminfo.h>
 #include <ftw.h>
 #include <pool.h>
 #include <libscf.h>
@@ -123,6 +124,7 @@
 #define	DTD_ATTR_MODE		(const xmlChar *) "mode"
 #define	DTD_ATTR_ACL		(const xmlChar *) "acl"
 #define	DTD_ATTR_BRAND		(const xmlChar *) "brand"
+#define	DTD_ATTR_HOSTID		(const xmlChar *) "hostid"
 
 #define	DTD_ENTITY_BOOLEAN	"boolean"
 #define	DTD_ENTITY_DEVPATH	"devpath"
@@ -2340,6 +2342,90 @@ zonecfg_modify_nwif(
 	return (Z_OK);
 }
 
+/*
+ * Gets the zone hostid string stored in the specified zone configuration
+ * document.  This function returns Z_OK on success.  Z_BAD_PROPERTY is returned
+ * if the config file doesn't specify a hostid or if the hostid is blank.
+ *
+ * Note that buflen should be at least HW_HOSTID_LEN.
+ */
+int
+zonecfg_get_hostid(zone_dochandle_t handle, char *bufp, size_t buflen)
+{
+	int err;
+
+	if ((err = getrootattr(handle, DTD_ATTR_HOSTID, bufp, buflen)) != Z_OK)
+		return (err);
+	if (bufp[0] == '\0')
+		return (Z_BAD_PROPERTY);
+	return (Z_OK);
+}
+
+/*
+ * Sets the hostid string in the specified zone config document to the given
+ * string value.  If 'hostidp' is NULL, then the config document's hostid
+ * attribute is cleared.  Non-NULL hostids are validated.  This function returns
+ * Z_OK on success.  Any other return value indicates failure.
+ */
+int
+zonecfg_set_hostid(zone_dochandle_t handle, const char *hostidp)
+{
+	int err;
+
+	/*
+	 * A NULL hostid string is interpreted as a request to clear the
+	 * hostid.
+	 */
+	if (hostidp == NULL || (err = zonecfg_valid_hostid(hostidp)) == Z_OK)
+		return (setrootattr(handle, DTD_ATTR_HOSTID, hostidp));
+	return (err);
+}
+
+/*
+ * Determines if the specified string is a valid hostid string.  This function
+ * returns Z_OK if the string is a valid hostid string.  It returns Z_INVAL if
+ * 'hostidp' is NULL, Z_TOO_BIG if 'hostidp' refers to a string buffer
+ * containing a hex string with more than 8 digits, and Z_HOSTID_FUBAR if the
+ * string has an invalid format.
+ */
+int
+zonecfg_valid_hostid(const char *hostidp)
+{
+	char *currentp;
+	u_longlong_t hostidval;
+	size_t len;
+
+	if (hostidp == NULL)
+		return (Z_INVAL);
+
+	/* Empty strings and strings with whitespace are invalid. */
+	if (*hostidp == '\0')
+		return (Z_HOSTID_FUBAR);
+	for (currentp = (char *)hostidp; *currentp != '\0'; ++currentp) {
+		if (isspace(*currentp))
+			return (Z_HOSTID_FUBAR);
+	}
+	len = (size_t)(currentp - hostidp);
+
+	/*
+	 * The caller might pass a hostid that is larger than the maximum
+	 * unsigned 32-bit integral value.  Check for this!  Also, make sure
+	 * that the whole string is converted (this helps us find illegal
+	 * characters) and that the whole string fits within a buffer of size
+	 * HW_HOSTID_LEN.
+	 */
+	currentp = (char *)hostidp;
+	if (strncmp(hostidp, "0x", 2) == 0 || strncmp(hostidp, "0X", 2) == 0)
+		currentp += 2;
+	hostidval = strtoull(currentp, &currentp, 16);
+	if ((size_t)(currentp - hostidp) >= HW_HOSTID_LEN)
+		return (Z_TOO_BIG);
+	if (hostidval > UINT_MAX || hostidval == HW_INVALID_HOSTID ||
+	    currentp != hostidp + len)
+		return (Z_HOSTID_FUBAR);
+	return (Z_OK);
+}
+
 int
 zonecfg_lookup_dev(zone_dochandle_t handle, struct zone_devtab *tabptr)
 {
@@ -3373,6 +3459,8 @@ zonecfg_strerror(int errnum)
 		    "Could not create a temporary pool"));
 	case Z_POOL_BIND:
 		return (dgettext(TEXT_DOMAIN, "Could not bind zone to pool"));
+	case Z_HOSTID_FUBAR:
+		return (dgettext(TEXT_DOMAIN, "Specified hostid is invalid"));
 	case Z_SYSTEM:
 		return (strerror(errno));
 	default:

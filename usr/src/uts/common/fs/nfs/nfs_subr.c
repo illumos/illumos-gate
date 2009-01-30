@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -3300,20 +3298,6 @@ newname(void)
 	}
 	*s = '\0';
 	return (news);
-}
-
-int
-nfs_atoi(char *cp)
-{
-	int n;
-
-	n = 0;
-	while (*cp != '\0') {
-		n = n * 10 + (*cp - '0');
-		cp++;
-	}
-
-	return (n);
 }
 
 /*
