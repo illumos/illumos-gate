@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_OPL_MODULE_H
 #define	_SYS_OPL_MODULE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/async.h>
 
@@ -123,7 +121,6 @@ extern void stick_adj(int64_t skew);
 extern void stick_timestamp(int64_t *ts);
 extern void hwblkpagecopy(const void *src, void *dst);
 extern void opl_error_setup(uint64_t);
-extern void opl_mpg_enable(void);
 extern int  cpu_queue_events(opl_async_flt_t *, char *, uint64_t);
 extern void ras_cntr_reset(void *);
 

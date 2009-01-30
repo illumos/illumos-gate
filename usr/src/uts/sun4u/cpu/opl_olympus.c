@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
  * Support for Olympus-C (SPARC64-VI) and Jupiter (SPARC64-VII).
  */
-
 
 #include <sys/types.h>
 #include <sys/systm.h>
@@ -564,7 +563,7 @@ cpu_setup(void)
 	 * Enable MMU translating multiple page sizes for
 	 * sITLB and sDTLB.
 	 */
-	opl_mpg_enable();
+	cpu_early_feature_init();
 
 	/*
 	 * Setup chip-specific trap handlers.
@@ -1767,12 +1766,6 @@ opl_cpu_reg_init()
 	this_cpu_log = va_to_pa((void*)(((uint64_t)opl_err_log) +
 	    ERRLOG_BUFSZ * (getprocessorid())));
 	opl_error_setup(this_cpu_log);
-
-	/*
-	 * Enable MMU translating multiple page sizes for
-	 * sITLB and sDTLB.
-	 */
-	opl_mpg_enable();
 }
 
 /*

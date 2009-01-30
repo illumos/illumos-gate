@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_CPU_MODULE_H
 #define	_SYS_CPU_MODULE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/pte.h>
 #include <sys/async.h>
@@ -225,6 +223,9 @@ void    cpu_mp_init(void);
 
 #pragma weak cpu_feature_init
 void    cpu_feature_init(void);
+
+#pragma weak cpu_early_feature_init
+void    cpu_early_feature_init(void);
 
 #pragma weak cpu_error_init
 void	cpu_error_init(int);

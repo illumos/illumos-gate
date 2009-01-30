@@ -19,13 +19,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Assembly code support for the Olympus-C module
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if !defined(lint)
 #include "assym.h"
@@ -2014,11 +2012,11 @@ opl_error_setup(uint64_t cpu_err_log_pa)
 #if defined(lint)
 /* ARGSUSED */
 void
-opl_mpg_enable(void)
+cpu_early_feature_init(void)
 {
 }
 #else	/* lint */
-	ENTRY_NP(opl_mpg_enable)
+	ENTRY_NP(cpu_early_feature_init)
 	/*
 	 * Enable MMU translating multiple page sizes for
 	 * sITLB and sDTLB.
@@ -2026,9 +2024,17 @@ opl_mpg_enable(void)
         mov	LSU_MCNTL, %o0
         ldxa	[%o0] ASI_MCNTL, %o1
         or	%o1, MCNTL_MPG_SITLB | MCNTL_MPG_SDTLB, %o1
-	retl
           stxa	%o1, [%o0] ASI_MCNTL
-	SET_SIZE(opl_mpg_enable)
+	/*
+	 * Demap all previous entries.
+	 */
+	sethi	%hi(FLUSH_ADDR), %o1
+	set	DEMAP_ALL_TYPE, %o0
+	stxa	%g0, [%o0]ASI_DTLB_DEMAP
+	stxa	%g0, [%o0]ASI_ITLB_DEMAP
+	retl
+	  flush	%o1
+	SET_SIZE(cpu_early_feature_init)
 #endif /* lint */
 
 #if	defined(lint)
