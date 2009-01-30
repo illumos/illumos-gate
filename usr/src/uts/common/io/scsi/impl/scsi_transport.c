@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Main Transport Routine for SCSA
@@ -74,17 +72,6 @@ scsi_flag_nointr_comp(struct scsi_pkt *pkt)
 	 */
 	cv_broadcast(&scsi_flag_nointr_cv);
 	mutex_exit(&scsi_flag_nointr_mutex);
-}
-
-static void
-scsi_consistent_comp(struct scsi_pkt *pkt)
-{
-	struct scsi_pkt_cache_wrapper *pcw =
-	    (struct scsi_pkt_cache_wrapper *)pkt;
-
-	pkt->pkt_comp = pcw->pcw_orig_comp;
-	scsi_sync_pkt(pkt);
-	(*pkt->pkt_comp)(pkt);
 }
 
 /*
@@ -140,19 +127,6 @@ scsi_transport(struct scsi_pkt *pkt)
 #endif	/* DEBUG */
 	}
 
-	/* determine if we need to sync the data on the HBA's behalf */
-	if ((pkt->pkt_dma_flags & DDI_DMA_CONSISTENT) &&
-	    ((pkt->pkt_comp) != NULL) &&
-	    ((P_TO_TRAN(pkt)->tran_setup_pkt) != NULL)) {
-		struct scsi_pkt_cache_wrapper *pcw =
-		    (struct scsi_pkt_cache_wrapper *)pkt;
-
-		_NOTE(SCHEME_PROTECTS_DATA("unique per pkt", \
-			scsi_pkt_cache_wrapper::pcw_orig_comp));
-
-		pcw->pcw_orig_comp = pkt->pkt_comp;
-		pkt->pkt_comp = scsi_consistent_comp;
-	}
 	/*
 	 * Check if we are required to do polled I/O. We can
 	 * get scsi_pkts that don't have the FLAG_NOINTR bit
@@ -201,11 +175,7 @@ scsi_transport(struct scsi_pkt *pkt)
 				 */
 				pkt->pkt_comp = savec;
 				pkt->pkt_flags = savef;
-
-				if (pkt->pkt_comp != NULL) {
-					(*pkt->pkt_comp)(pkt);
-				}
-
+				scsi_hba_pkt_comp(pkt);
 				return (rval);
 			}
 

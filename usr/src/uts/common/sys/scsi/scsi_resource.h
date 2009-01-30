@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,13 +87,11 @@ struct scsi_pkt_cache_wrapper {
 	uint_t			 pcw_granular;
 	struct buf		*pcw_bp;
 	ddi_dma_cookie_t	 pcw_cookie;
-	void			(*pcw_orig_comp)(struct scsi_pkt *);
 	uint_t			 pcw_flags;
 };
 
 #ifdef __lock_lint
 _NOTE(SCHEME_PROTECTS_DATA("unique per packet",
-	scsi_pkt_cache_wrapper::pcw_orig_comp
 	scsi_pkt_cache_wrapper::pcw_bp
 	scsi_pkt_cache_wrapper::pcw_curwin
 	scsi_pkt_cache_wrapper::pcw_flags

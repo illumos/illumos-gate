@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3173,4 +3173,26 @@ scsi_hba_bus_unconfig(dev_info_t *self, uint_t flag, ddi_bus_config_op_t op,
 		return (tran->tran_bus_unconfig(self, flag, op, arg));
 	}
 	return (ndi_busop_bus_unconfig(self, flag, op, arg));
+}
+
+void
+scsi_hba_pkt_comp(struct scsi_pkt *pkt)
+{
+	ASSERT(pkt);
+	if (pkt->pkt_comp == NULL)
+		return;
+
+	/*
+	 * For HBA drivers that implement tran_setup_pkt(9E), if we are
+	 * completing a 'consistent' mode DMA operation then we must
+	 * perform dma_sync prior to calling pkt_comp to ensure that
+	 * the target driver sees the correct data in memory.
+	 */
+	ASSERT((pkt->pkt_flags & FLAG_NOINTR) == 0);
+	if (((pkt->pkt_dma_flags & DDI_DMA_CONSISTENT) &&
+	    (pkt->pkt_dma_flags & DDI_DMA_READ)) &&
+	    ((P_TO_TRAN(pkt)->tran_setup_pkt) != NULL)) {
+		scsi_sync_pkt(pkt);
+	}
+	(*pkt->pkt_comp)(pkt);
 }

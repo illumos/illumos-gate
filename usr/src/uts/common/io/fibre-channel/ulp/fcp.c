@@ -14021,9 +14021,7 @@ fcp_prepare_pkt(struct fcp_port *pptr, struct fcp_pkt *cmd,
 static void
 fcp_post_callback(struct fcp_pkt *cmd)
 {
-	if (cmd->cmd_pkt->pkt_comp) {
-		(*cmd->cmd_pkt->pkt_comp) (cmd->cmd_pkt);
-	}
+	scsi_hba_pkt_comp(cmd->cmd_pkt);
 }
 
 

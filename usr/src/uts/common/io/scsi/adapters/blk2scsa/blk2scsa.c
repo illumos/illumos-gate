@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -584,8 +584,8 @@ b2s_request_done_pkt(b2s_request_impl_t *ri)
 	/*
 	 * Finally, execute the callback (unless running POLLED)
 	 */
-	if (((pkt->pkt_flags & FLAG_NOINTR) == 0) && (pkt->pkt_comp != NULL)) {
-		pkt->pkt_comp(pkt);
+	if ((pkt->pkt_flags & FLAG_NOINTR) == 0) {
+		scsi_hba_pkt_comp(pkt);
 	}
 
 }
