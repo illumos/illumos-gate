@@ -300,7 +300,24 @@
             </facility>
         </set> 
         <set type='product'
-	    setlist='Sun-Fire-X4450'>
+	    setlist='Sun-Fire-X4450|SUN-FIRE-X4450'>
+	    <!--
+	       chip FRU label
+	    -->
+            <propgroup name='protocol' version='1'
+                name-stability='Private' data-stability='Private' >
+                <propmethod name='fsb2_chip_label' version='0'
+		            propname='label' proptype='string' >
+              
+                    <argval name='format' type='string' value='CPU %d' />
+                    <argval name='offset' type='uint32' value='0' />
+
+                </propmethod>
+
+            </propgroup>
+        </set> 
+        <set type='product'
+	    setlist='Sun-Blade-X6450-Server-Module|SUN-BLADE-X6450-SERVER-MODULE|Sun-Blade-X6450|SUN-BLADE-X6450'>
 	    <!--
 	       chip FRU label
 	    -->

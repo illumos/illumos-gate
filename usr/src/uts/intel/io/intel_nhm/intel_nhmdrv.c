@@ -298,7 +298,8 @@ static struct dev_ops inhm_mc_ops = {
 	nodev,			/* devo_reset */
 	&inhm_mc_cb_ops,		/* devo_cb_ops */
 	NULL,			/* devo_bus_ops */
-	NULL			/* devo_power */
+	NULL,			/* devo_power */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {
