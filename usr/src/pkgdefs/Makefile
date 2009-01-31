@@ -445,6 +445,8 @@ COMMON_SUBDIRS= \
 	SUNWsmbsu  \
 	SUNWsmedia \
 	SUNWsmediar \
+	SUNWsmhba \
+	SUNWsmhbar \
 	SUNWsmpd \
 	SUNWsn1rint \
 	SUNWsn1uint \
