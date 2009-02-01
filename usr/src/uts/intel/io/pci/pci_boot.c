@@ -128,7 +128,7 @@ int pci_bus_always_renumber = 0;
 void
 pci_setup_tree()
 {
-	uchar_t i, root_bus_addr = 0;
+	uint_t i, root_bus_addr = 0;
 
 	alloc_res_array();
 	for (i = 0; i <= pci_bios_nbus; i++) {
