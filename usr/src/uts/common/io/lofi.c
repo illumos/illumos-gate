@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -784,11 +784,7 @@ lofi_strategy_task(void *arg)
 	}
 	bp_mapin(bp);
 	bufaddr = bp->b_un.b_addr;
-#ifdef _LP64
 	offset = bp->b_lblkno * DEV_BSIZE;	/* offset within file */
-#else
-	offset = bp->b_blkno * DEV_BSIZE;	/* offset within file */
-#endif /* _LP64 */
 	if (lsp->ls_crypto_enabled) {
 		/* encrypted data really begins after crypto header */
 		offset += lsp->ls_crypto_offset;
@@ -1036,11 +1032,7 @@ lofi_strategy(struct buf *bp)
 		return (0);
 	}
 
-#ifdef _LP64
 	offset = bp->b_lblkno * DEV_BSIZE;	/* offset within file */
-#else
-	offset = bp->b_blkno * DEV_BSIZE;	/* offset within file */
-#endif /* _LP64 */
 	if (lsp->ls_crypto_enabled) {
 		/* encrypted data really begins after crypto header */
 		offset += lsp->ls_crypto_offset;
@@ -1333,7 +1325,8 @@ fake_disk_geometry(struct lofi_state *lsp)
 	bzero(&lsp->ls_vtoc, sizeof (struct vtoc));
 	lsp->ls_vtoc.v_sanity = VTOC_SANE;
 	lsp->ls_vtoc.v_version = V_VERSION;
-	bcopy(LOFI_DRIVER_NAME, lsp->ls_vtoc.v_volume, 7);
+	(void) strncpy(lsp->ls_vtoc.v_volume, LOFI_DRIVER_NAME,
+	    sizeof (lsp->ls_vtoc.v_volume));
 	lsp->ls_vtoc.v_sectorsz = DEV_BSIZE;
 	lsp->ls_vtoc.v_nparts = 1;
 	lsp->ls_vtoc.v_part[0].p_tag = V_UNASSIGNED;
