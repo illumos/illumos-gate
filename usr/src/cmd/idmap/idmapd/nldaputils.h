@@ -19,18 +19,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _NLDAPUTILS_H
 #define	_NLDAPUTILS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #include <stdio.h>
 #include <stdlib.h>
-#include <syslog.h>
 #include <stdarg.h>
 #include <synch.h>
 #include <thread.h>

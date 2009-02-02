@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,19 +75,19 @@ typedef struct idmap_pg_config {
 	 */
 	char		*machine_sid;		/* machine sid */
 	char		*default_domain;	/* default domain name */
-	bool_t		dflt_dom_set_in_smf;
+	boolean_t	dflt_dom_set_in_smf;
 	char		*domain_name;		/* AD domain name */
-	int		domain_name_auto_disc;
+	boolean_t		domain_name_auto_disc;
 	idmap_ad_disc_ds_t
 			*domain_controller;	/* domain controller hosts */
-	int		domain_controller_auto_disc;
+	boolean_t	domain_controller_auto_disc;
 	char		*forest_name;		/* forest name */
-	int		forest_name_auto_disc;
+	boolean_t	forest_name_auto_disc;
 	char		*site_name;		/* site name */
-	int		site_name_auto_disc;
+	boolean_t	site_name_auto_disc;
 	idmap_ad_disc_ds_t
 			*global_catalog;	/* global catalog hosts */
-	int		global_catalog_auto_disc;
+	boolean_t	global_catalog_auto_disc;
 	ad_disc_domainsinforest_t
 			*domains_in_forest;
 	ad_disc_trusteddomains_t
@@ -103,8 +103,8 @@ typedef struct idmap_pg_config {
 	char		*ad_unixuser_attr;
 	char		*ad_unixgroup_attr;
 	char		*nldap_winname_attr;
-	bool_t		ds_name_mapping_enabled;
-	bool_t		eph_map_unres_sids;
+	boolean_t	ds_name_mapping_enabled;
+	boolean_t	eph_map_unres_sids;
 } idmap_pg_config_t;
 
 typedef struct idmap_cfg {

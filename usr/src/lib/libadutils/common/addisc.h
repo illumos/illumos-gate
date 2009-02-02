@@ -20,16 +20,15 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_ADINFO_H
 #define	_ADINFO_H
 
-#include "idmap_priv.h"
 #include "idmap_prot.h"
-#include "idmap_impl.h"
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,15 +39,15 @@ extern "C" {
  * another '-', and ridcount (max 15) 10-digit RIDs plus '-' in between, plus
  * a null.
  */
-
-#define	AD_DISC_MAXSID	185
+#define	MAXSTRSID		185
+#define	MAXDOMAINNAME		256
 
 typedef struct ad_disc *ad_disc_t;
 
 
 typedef struct ad_disc_domains_in_forest {
-	char domain[AD_DISC_MAXHOSTNAME];
-	char sid[AD_DISC_MAXSID];
+	char domain[MAXDOMAINNAME];
+	char sid[MAXSTRSID];
 	int trusted;			/* This is not used by auto */
 					/* discovery. It is provided so that */
 					/* domains in a forest can be marked */
@@ -57,10 +56,9 @@ typedef struct ad_disc_domains_in_forest {
 
 
 typedef struct ad_disc_trusted_domains {
-		char domain[AD_DISC_MAXHOSTNAME];
+		char domain[MAXDOMAINNAME];
 		int direction;
 } ad_disc_trusteddomains_t;
-
 
 enum ad_disc_req {
 		AD_DISC_PREFER_SITE = 0, /* Prefer Site specific version */
@@ -76,27 +74,27 @@ void ad_disc_fini(ad_disc_t);
  * The following routines auto discover the specific item
  */
 char *
-ad_disc_get_DomainName(ad_disc_t ctx, int *auto_discovered);
+ad_disc_get_DomainName(ad_disc_t ctx, boolean_t *auto_discovered);
 
 idmap_ad_disc_ds_t *
 ad_disc_get_DomainController(ad_disc_t ctx,
-		enum ad_disc_req req, int *auto_discovered);
+		enum ad_disc_req req, boolean_t *auto_discovered);
 
 char *
-ad_disc_get_SiteName(ad_disc_t ctx, int *auto_discovered);
+ad_disc_get_SiteName(ad_disc_t ctx, boolean_t *auto_discovered);
 
 char *
-ad_disc_get_ForestName(ad_disc_t ctx, int *auto_discovered);
+ad_disc_get_ForestName(ad_disc_t ctx, boolean_t *auto_discovered);
 
 idmap_ad_disc_ds_t *
 ad_disc_get_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req,
-				int *auto_discovered);
+				boolean_t *auto_discovered);
 
 ad_disc_trusteddomains_t *
-ad_disc_get_TrustedDomains(ad_disc_t ctx,  int *auto_discovered);
+ad_disc_get_TrustedDomains(ad_disc_t ctx,  boolean_t *auto_discovered);
 
 ad_disc_domainsinforest_t *
-ad_disc_get_DomainsInForest(ad_disc_t ctx,  int *auto_discovered);
+ad_disc_get_DomainsInForest(ad_disc_t ctx,  boolean_t *auto_discovered);
 
 
 /*
@@ -131,7 +129,7 @@ void ad_disc_refresh(ad_disc_t);
 int ad_disc_unset(ad_disc_t ctx);
 
 /* This routine test for subnet changes */
-int ad_disc_SubnetChanged(ad_disc_t);
+boolean_t ad_disc_SubnetChanged(ad_disc_t);
 
 /* This routine returns the Time To Live for auto discovered items */
 int ad_disc_get_TTL(ad_disc_t);

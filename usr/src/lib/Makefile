@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -532,8 +532,8 @@ gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
 libadt_jni:	libbsm
 $(CLOSED_BUILD)libc:		$(CLOSED)/lib/libc_i18n
 libast: 	libsocket
-libadutils: 	libldap5 libidmap
-nsswitch:	libadutils
+libadutils: 	libldap5 libresolv libsocket libnsl
+nsswitch:	libadutils libidmap
 libbsm:		libtsol
 libcmd: 	libsum libast libsocket libnsl
 libcmdutils:	libavl
@@ -552,7 +552,7 @@ libdtrace_jni:	libuutil libdtrace
 libefi:		libuuid
 libfstyp:	libnvpair
 libelfsign:	libcryptoutil libkmf
-libidmap:	libnsl
+libidmap:	libadutils libldap5 libavl libsldap
 libinetcfg:	libnsl libsocket libdlpi
 libiscsit:	libc libnvpair libstmf libuuid libnsl
 libkmf:		libcryptoutil pkcs11 openssl

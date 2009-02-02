@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,13 +107,13 @@ generate_machine_sid(char **machine_sid)
 
 /* In the case of error, exists is set to FALSE anyway */
 static int
-prop_exists(idmap_cfg_handles_t *handles, char *name, bool_t *exists)
+prop_exists(idmap_cfg_handles_t *handles, char *name, boolean_t *exists)
 {
 
 	scf_property_t *scf_prop;
 	scf_value_t *value;
 
-	*exists = FALSE;
+	*exists = B_FALSE;
 
 	scf_prop = scf_property_create(handles->main);
 	if (scf_prop == NULL) {
@@ -130,7 +130,7 @@ prop_exists(idmap_cfg_handles_t *handles, char *name, bool_t *exists)
 	}
 
 	if (scf_pg_get_property(handles->config_pg, name, scf_prop) == 0)
-		*exists = TRUE;
+		*exists = B_TRUE;
 
 	scf_value_destroy(value);
 	scf_property_destroy(scf_prop);
@@ -514,7 +514,7 @@ destruction:
  * If nothing has changed it returns 0 else 1
  */
 static int
-update_bool(bool_t *value, bool_t *new, char *name)
+update_bool(boolean_t *value, boolean_t *new, char *name)
 {
 	if (*value == *new)
 		return (0);
@@ -692,11 +692,11 @@ static int
 compare_trusteddomainsinforest(ad_disc_domainsinforest_t *df1,
 			ad_disc_domainsinforest_t *df2)
 {
-	int	i, j;
-	int	num_df1 = 0;
-	int	num_df2 = 0;
-	int	match;
-	int	err;
+	int		i, j;
+	int		num_df1 = 0;
+	int		num_df2 = 0;
+	boolean_t	match;
+	int		err;
 
 	for (i = 0; df1[i].domain[0] != '\0'; i++)
 		if (df1[i].trusted)
@@ -711,14 +711,14 @@ compare_trusteddomainsinforest(ad_disc_domainsinforest_t *df1,
 
 	for (i = 0; df1[i].domain[0] != '\0'; i++) {
 		if (df1[i].trusted) {
-			match = FALSE;
+			match = B_FALSE;
 			for (j = 0; df2[j].domain[0] != '\0'; j++) {
 				if (df2[j].trusted &&
 				    u8_strcmp(df1[i].domain, df2[i].domain, 0,
 				    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err)
 				    == 0 && err == 0 &&
 				    strcmp(df1[i].sid, df2[i].sid) == 0) {
-					match = TRUE;
+					match = B_TRUE;
 					break;
 				}
 			}
@@ -740,7 +740,7 @@ update_trusted_forest(idmap_trustedforest_t **value, int *num_value,
 			idmap_trustedforest_t **new, int *num_new, char *name)
 {
 	int i, j;
-	int match;
+	boolean_t match;
 
 	if (*value == *new)
 		/* Nothing to do */
@@ -750,7 +750,7 @@ update_trusted_forest(idmap_trustedforest_t **value, int *num_value,
 		if (*num_value != *num_new)
 			goto not_equal;
 		for (i = 0; i < *num_value; i++) {
-			match = FALSE;
+			match = B_FALSE;
 			for (j = 0; j < *num_new; j++) {
 				if (strcmp((*value)[i].forest_name,
 				    (*new)[j].forest_name) == 0 &&
@@ -760,7 +760,7 @@ update_trusted_forest(idmap_trustedforest_t **value, int *num_value,
 				    compare_trusteddomainsinforest(
 				    (*value)[i].domains_in_forest,
 				    (*new)[i].domains_in_forest) == 0) {
-					match = TRUE;
+					match = B_TRUE;
 					break;
 				}
 			}
@@ -907,14 +907,14 @@ retry:
 		 */
 		(void) unlink(IDMAP_CACHEDIR "/ccache");
 		/* HUP is the refresh method, so re-read SMF config */
-		(void) idmapdlog(LOG_INFO, "SMF refresh");
+		idmapdlog(LOG_INFO, "SMF refresh");
 		rc = idmap_cfg_load(_idmapdstate.cfg, CFG_DISCOVER|CFG_LOG);
 		if (rc < -1) {
-			(void) idmapdlog(LOG_ERR, "Fatal errors while reading "
+			idmapdlog(LOG_ERR, "Fatal errors while reading "
 			    "SMF properties");
 			exit(1);
 		} else if (rc == -1) {
-			(void) idmapdlog(LOG_WARNING, "Various errors "
+			idmapdlog(LOG_WARNING, "Various errors "
 			    "re-loading configuration may cause AD lookups "
 			    "to fail");
 		}
@@ -958,7 +958,7 @@ idmap_cfg_update_thread(void *arg)
 		(void) ad_disc_SubnetChanged(ad_ctx);
 
 		if (idmap_cfg_load(_idmapdstate.cfg, CFG_DISCOVER) < -1) {
-			(void) idmapdlog(LOG_ERR, "Fatal errors while reading "
+			idmapdlog(LOG_ERR, "Fatal errors while reading "
 			    "SMF properties");
 			exit(1);
 		}
@@ -1049,7 +1049,7 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	int rc;
 	uint8_t bool_val;
 	char *str = NULL;
-	bool_t new_debug_mode;
+	boolean_t new_debug_mode;
 
 	if (scf_pg_update(handles->config_pg) < 0) {
 		idmapdlog(LOG_ERR, "scf_pg_update() failed: %s",
@@ -1069,7 +1069,7 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 		errors++;
 
 	if (_idmapdstate.debug_mode != new_debug_mode) {
-		if (_idmapdstate.debug_mode == FALSE) {
+		if (!_idmapdstate.debug_mode) {
 			_idmapdstate.debug_mode = new_debug_mode;
 			idmap_log_stderr(LOG_DEBUG);
 			idmapdlog(LOG_DEBUG, "debug mode enabled");
@@ -1097,7 +1097,7 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	else {
 		(void) ad_disc_set_DomainName(handles->ad_ctx,
 		    pgcfg->domain_name);
-		pgcfg->domain_name_auto_disc = FALSE;
+		pgcfg->domain_name_auto_disc = B_FALSE;
 	}
 
 	rc = get_val_astring(handles, "default_domain",
@@ -1122,10 +1122,10 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	 * property was set and the new config/domain_name property was
 	 * not set).
 	 */
-	pgcfg->dflt_dom_set_in_smf = TRUE;
+	pgcfg->dflt_dom_set_in_smf = B_TRUE;
 	if (pgcfg->default_domain == NULL) {
 
-		pgcfg->dflt_dom_set_in_smf = FALSE;
+		pgcfg->dflt_dom_set_in_smf = B_FALSE;
 
 		if (pgcfg->domain_name != NULL) {
 			pgcfg->default_domain = strdup(pgcfg->domain_name);
@@ -1136,7 +1136,7 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 			}
 		} else if (str != NULL) {
 			pgcfg->default_domain = strdup(str);
-			pgcfg->dflt_dom_set_in_smf = TRUE;
+			pgcfg->dflt_dom_set_in_smf = B_TRUE;
 			idmapdlog(LOG_WARNING,
 			    "The config/mapping_domain property is "
 			    "obsolete; support for it will be removed, "
@@ -1168,7 +1168,7 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	else {
 		(void) ad_disc_set_DomainController(handles->ad_ctx,
 		    pgcfg->domain_controller);
-		pgcfg->domain_controller_auto_disc = FALSE;
+		pgcfg->domain_controller_auto_disc = B_FALSE;
 	}
 
 	rc = get_val_astring(handles, "forest_name", &pgcfg->forest_name);
@@ -1177,7 +1177,7 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	else {
 		(void) ad_disc_set_ForestName(handles->ad_ctx,
 		    pgcfg->forest_name);
-		pgcfg->forest_name_auto_disc = FALSE;
+		pgcfg->forest_name_auto_disc = B_FALSE;
 	}
 
 	rc = get_val_astring(handles, "site_name", &pgcfg->site_name);
@@ -1194,7 +1194,7 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	else {
 		(void) ad_disc_set_GlobalCatalog(handles->ad_ctx,
 		    pgcfg->global_catalog);
-		pgcfg->global_catalog_auto_disc = FALSE;
+		pgcfg->global_catalog_auto_disc = B_FALSE;
 	}
 
 	/*
@@ -1208,7 +1208,7 @@ idmap_cfg_load_smf(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg,
 	if (!bool_val)
 		return (rc);
 
-	pgcfg->ds_name_mapping_enabled = TRUE;
+	pgcfg->ds_name_mapping_enabled = B_TRUE;
 	rc = get_val_astring(handles, "ad_unixuser_attr",
 	    &pgcfg->ad_unixuser_attr);
 	if (rc != 0)
@@ -1273,7 +1273,7 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 	int i, j, k, l;
 	char *forestname;
 	int num_trusteddomains;
-	int new_forest;
+	boolean_t new_forest;
 	int err;
 	char *trusteddomain;
 	idmap_ad_disc_ds_t *globalcatalog;
@@ -1354,11 +1354,11 @@ idmap_cfg_discover(idmap_cfg_handles_t *handles, idmap_pg_config_t *pgcfg)
 			}
 
 			/* Is this a new forest? */
-			new_forest = TRUE;
+			new_forest = B_TRUE;
 			for (k = 0; k < j; k++) {
 				if (strcasecmp(forestname,
 				    trustedforests[k].forest_name) == 0) {
-					new_forest = FALSE;
+					new_forest = B_FALSE;
 					domainsinforest =
 					    trustedforests[k].domains_in_forest;
 					break;
@@ -1527,7 +1527,7 @@ idmap_cfg_load(idmap_cfg_t *cfg, int flags)
 	    &new_pgcfg.nldap_winname_attr, "nldap_winname_attr");
 
 	/* Props that can be discovered and set in SMF updated here */
-	if (live_pgcfg->dflt_dom_set_in_smf == FALSE)
+	if (!live_pgcfg->dflt_dom_set_in_smf)
 		changed += update_string(&live_pgcfg->default_domain,
 		    &new_pgcfg.default_domain, "default_domain");
 

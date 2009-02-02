@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,24 +44,6 @@
 #include "idmap_cache.h"
 
 /*LINTLIBRARY*/
-
-/*
- * The following structure determines where the log messages from idmapdlog()
- * go to. It can be stderr (idmap, idmapd -d) and/or syslog (idmapd).
- *
- * logstate.max_pri is integer cutoff necessary to silence low-priority
- * messages to stderr. Syslog has its own means so there a boolean
- * logstate.write_syslog is enough.
- *
- * logstate.degraded is a mode used by idmapd in its degraded state.
- */
-
-static struct {
-	bool_t write_syslog;
-	int max_pri; /* Max priority written to stderr */
-	bool_t degraded;
-} logstate = {FALSE, LOG_DEBUG, FALSE};
-
 
 static struct timeval TIMEOUT = { 25, 0 };
 
@@ -2565,46 +2547,4 @@ idmap_stat
 idmap_getwinnamebygid(gid_t gid, int flag, char **name, char **domain)
 {
 	return (idmap_getwinnamebypid(gid, 0, flag, name, domain));
-}
-
-
-/* printflike */
-void
-idmapdlog(int pri, const char *format, ...) {
-	va_list args;
-
-	va_start(args, format);
-	if (pri <= logstate.max_pri) {
-		(void) vfprintf(stderr, format, args);
-		(void) fprintf(stderr, "\n");
-	}
-
-	/*
-	 * We don't want to fill up the logs with useless messages when
-	 * we're degraded, but we still want to log.
-	 */
-	if (logstate.degraded)
-		pri = LOG_DEBUG;
-
-	if (logstate.write_syslog)
-		(void) vsyslog(pri, format, args);
-	va_end(args);
-}
-
-void
-idmap_log_stderr(int pri)
-{
-	logstate.max_pri = pri;
-}
-
-void
-idmap_log_syslog(bool_t what)
-{
-	logstate.write_syslog = what;
-}
-
-void
-idmap_log_degraded(bool_t what)
-{
-	logstate.degraded = what;
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,6 @@
 #include <ldap.h>
 #include <pthread.h>
 #include "addisc.h"
-#include "idmap_priv.h"
 #include "idmap_prot.h"
 #include "libadutils.h"
 
@@ -43,13 +42,6 @@ extern "C" {
 #define	ADUTILS_SEARCH_TIMEOUT	3
 #define	ADUTILS_LDAP_OPEN_TIMEOUT	1
 
-/*
- * Maximum string SID size. 4 bytes for "S-1-", 15 for 2^48 (max authority),
- * another '-', and ridcount (max 15) 10-digit RIDs plus '-' in between, plus
- * a null.
- */
-#define	MAXSID				185
-#define	MAXDOMAINNAME			256
 
 typedef struct adutils_sid {
 	uchar_t		version;
@@ -62,7 +54,7 @@ struct adutils_host;
 
 struct known_domain {
 	char		name[MAXDOMAINNAME];
-	char		sid[MAXSID];
+	char		sid[MAXSTRSID];
 };
 
 
@@ -153,6 +145,20 @@ struct adutils_query_state {
 	char			*basedn;
 	adutils_q_t		queries[1];	/* array of query results */
 };
+
+/* Private routines */
+
+char *DN_to_DNS(const char *dn_name);
+
+int adutils_getsid(BerValue *bval, adutils_sid_t *sidp);
+
+char *adutils_sid2txt(adutils_sid_t *sidp);
+
+int saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts);
+
+/* Global logger function */
+
+extern adutils_logger logger;
 
 #ifdef	__cplusplus
 }

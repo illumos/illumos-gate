@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * main() of idmapd(1M)
@@ -40,7 +39,6 @@
 #include <stropts.h>
 #include <netconfig.h>
 #include <sys/resource.h> /* rlimit */
-#include <syslog.h>
 #include <rpcsvc/daemon_utils.h> /* DAEMON_UID and DAEMON_GID */
 #include <priv_utils.h> /* privileges */
 #include <locale.h>
@@ -61,6 +59,7 @@ static void	term_handler(int);
 static void	init_idmapd();
 static void	fini_idmapd();
 
+
 #define	_RPCSVC_CLOSEDOWN 120
 
 int _rpcsvcstate = _IDLE;	/* Set when a request is serviced */
@@ -77,6 +76,24 @@ static int degraded = 0;	/* whether the FMRI has been marked degraded */
 static uint32_t		num_threads = 0;
 static pthread_key_t	create_threads_key;
 static uint32_t		max_threads = 40;
+
+
+/*
+ * The following structure determines where the log messages from idmapdlog()
+ * go to. It can be stderr (idmapd -d) and/or the real idmapdlog (idmapd).
+ *
+ * logstate.max_pri is integer cutoff necessary to silence low-priority
+ * messages to stderr. idmapdlog has its own means so there a boolean
+ * logstate.write_idmapdlog is enough.
+ *
+ * logstate.degraded is a mode used by idmapd in its degraded state.
+ */
+
+static struct {
+	boolean_t write_syslog;
+	int max_pri; /* Max priority written to stderr */
+	boolean_t degraded;
+} logstate = {B_FALSE, LOG_DEBUG, B_FALSE};
 
 /*
  * Server door thread start routine.
@@ -183,9 +200,9 @@ term_handler(int sig)
 static void
 usr1_handler(int sig)
 {
-	bool_t saved_debug_mode = _idmapdstate.debug_mode;
+	boolean_t saved_debug_mode = _idmapdstate.debug_mode;
 
-	_idmapdstate.debug_mode = TRUE;
+	_idmapdstate.debug_mode = B_TRUE;
 	idmap_log_stderr(LOG_DEBUG);
 
 	print_idmapdstate();
@@ -281,7 +298,8 @@ main(int argc, char **argv)
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
-	idmap_log_syslog(TRUE);
+	idmap_set_logger(idmapdlog);
+	idmap_log_syslog(B_TRUE);
 	idmap_log_stderr(_idmapdstate.daemon_mode ? -1 : LOG_DEBUG);
 
 	if (is_system_labeled() && getzoneid() != GLOBAL_ZONEID) {
@@ -308,7 +326,7 @@ main(int argc, char **argv)
 
 	if (_idmapdstate.daemon_mode == TRUE) {
 		if (daemonize_start() < 0) {
-			(void) idmapdlog(LOG_ERR, "unable to daemonize");
+			idmapdlog(LOG_ERR, "unable to daemonize");
 			exit(-1);
 		}
 	} else
@@ -491,7 +509,7 @@ degrade_svc(int poke_discovery, const char *reason)
 
 	membar_producer();
 	degraded = 1;
-	idmap_log_degraded(TRUE);
+	idmap_log_degraded(B_TRUE);
 
 	if ((fmri = get_fmri()) != NULL)
 		(void) smf_degrade_instance(fmri, 0);
@@ -511,33 +529,52 @@ restore_svc(void)
 
 	membar_producer();
 	degraded = 0;
-	idmap_log_degraded(FALSE);
+	idmap_log_degraded(B_FALSE);
 
 	idmapdlog(LOG_NOTICE, "Normal operation restored");
 }
 
-#if 0
+
+/* printflike */
 void
-idmapdlog(int pri, const char *format, ...)
-{
+idmapdlog(int pri, const char *format, ...) {
 	va_list args;
 
-	va_start(args, format);
-
-	if (_idmapdstate.debug_mode == TRUE ||
-	    _idmapdstate.daemon_mode == FALSE) {
+	if (pri <= logstate.max_pri) {
+		va_start(args, format);
 		(void) vfprintf(stderr, format, args);
 		(void) fprintf(stderr, "\n");
+		va_end(args);
 	}
 
 	/*
 	 * We don't want to fill up the logs with useless messages when
 	 * we're degraded, but we still want to log.
 	 */
-	if (degraded)
+	if (logstate.degraded)
 		pri = LOG_DEBUG;
 
-	(void) vsyslog(pri, format, args);
-	va_end(args);
+	if (logstate.write_syslog) {
+		va_start(args, format);
+		vsyslog(pri, format, args);
+		va_end(args);
+	}
 }
-#endif
+
+void
+idmap_log_stderr(int pri)
+{
+	logstate.max_pri = pri;
+}
+
+void
+idmap_log_syslog(boolean_t what)
+{
+	logstate.write_syslog = what;
+}
+
+void
+idmap_log_degraded(boolean_t what)
+{
+	logstate.degraded = what;
+}

@@ -20,10 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
 
 /*
  * Active Directory Auto-Discovery.
@@ -100,6 +99,8 @@
 #include <ldap.h>
 #include <sasl/sasl.h>
 #include <sys/u8_textprep.h>
+#include <syslog.h>
+#include "adutils_impl.h"
 #include "addisc.h"
 
 
@@ -141,7 +142,7 @@ typedef struct ad_disc {
 	struct __res_state res_state;
 	int		res_ninitted;
 	ad_subnet_t	*subnets;
-	int		subnets_changed;
+	boolean_t	subnets_changed;
 	time_t		subnets_last_check;
 	ad_item_t	domain_name;		/* DNS hostname string */
 	ad_item_t	domain_controller;	/* Directory hostname and */
@@ -208,17 +209,17 @@ update_version(ad_item_t *item, int  num, ad_item_t *param)
 
 
 
-static int
+static boolean_t
 is_valid(ad_item_t *item)
 {
 	if (item->value != NULL) {
 		if (item->state == AD_STATE_FIXED)
-			return (TRUE);
+			return (B_TRUE);
 		if (item->state == AD_STATE_AUTO &&
 		    (item->ttl == 0 || item->ttl > time(NULL)))
-			return (TRUE);
+			return (B_TRUE);
 	}
-	return (FALSE);
+	return (B_FALSE);
 }
 
 
@@ -256,10 +257,10 @@ update_item(ad_item_t *item, void *value, enum ad_item_state state,
 int
 ad_disc_compare_ds(idmap_ad_disc_ds_t *ds1, idmap_ad_disc_ds_t *ds2)
 {
-	int	i, j;
-	int	num_ds1;
-	int	num_ds2;
-	int	match;
+	int		i, j;
+	int		num_ds1;
+	int		num_ds2;
+	boolean_t	match;
 
 	for (i = 0; ds1[i].host[0] != '\0'; i++)
 		continue;
@@ -271,11 +272,11 @@ ad_disc_compare_ds(idmap_ad_disc_ds_t *ds1, idmap_ad_disc_ds_t *ds2)
 		return (1);
 
 	for (i = 0; i < num_ds1; i++) {
-		match = FALSE;
+		match = B_FALSE;
 		for (j = 0; j < num_ds2; j++) {
 			if (strcmp(ds1[i].host, ds2[i].host) == 0 &&
 			    ds1[i].port == ds2[i].port) {
-				match = TRUE;
+				match = B_TRUE;
 				break;
 			}
 		}
@@ -309,11 +310,11 @@ int
 ad_disc_compare_trusteddomains(ad_disc_trusteddomains_t *td1,
 			ad_disc_trusteddomains_t *td2)
 {
-	int	i, j;
-	int	num_td1;
-	int	num_td2;
-	int	match;
-	int 	err;
+	int		i, j;
+	int		num_td1;
+	int		num_td2;
+	boolean_t	match;
+	int 		err;
 
 	for (i = 0; td1[i].domain[0] != '\0'; i++)
 		continue;
@@ -327,12 +328,12 @@ ad_disc_compare_trusteddomains(ad_disc_trusteddomains_t *td1,
 		return (1);
 
 	for (i = 0; i < num_td1; i++) {
-		match = FALSE;
+		match = B_FALSE;
 		for (j = 0; j < num_td2; j++) {
 			if (u8_strcmp(td1[i].domain, td2[i].domain, 0,
 			    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err) == 0 &&
 			    err == 0) {
-				match = TRUE;
+				match = B_TRUE;
 				break;
 			}
 		}
@@ -368,11 +369,11 @@ int
 ad_disc_compare_domainsinforest(ad_disc_domainsinforest_t *df1,
 			ad_disc_domainsinforest_t *df2)
 {
-	int	i, j;
-	int	num_df1;
-	int	num_df2;
-	int	match;
-	int	err;
+	int		i, j;
+	int		num_df1;
+	int		num_df2;
+	boolean_t	match;
+	int		err;
 
 	for (i = 0; df1[i].domain[0] != '\0'; i++)
 		continue;
@@ -386,13 +387,13 @@ ad_disc_compare_domainsinforest(ad_disc_domainsinforest_t *df1,
 		return (1);
 
 	for (i = 0; i < num_df1; i++) {
-		match = FALSE;
+		match = B_FALSE;
 		for (j = 0; j < num_df2; j++) {
 			if (u8_strcmp(df1[i].domain, df2[i].domain, 0,
 			    U8_STRCMP_CI_LOWER, U8_UNICODE_LATEST, &err) == 0 &&
 			    err == 0 &&
 			    strcmp(df1[i].sid, df2[i].sid) == 0) {
-				match = TRUE;
+				match = B_TRUE;
 				break;
 			}
 		}
@@ -444,7 +445,7 @@ find_subnets()
 	lifrp = &lifr;
 
 	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		idmapdlog(LOG_ERR, "Failed to open IPv4 socket for "
+		logger(LOG_ERR, "Failed to open IPv4 socket for "
 		    "listing network interfaces (%s)", strerror(errno));
 		return (NULL);
 	}
@@ -452,7 +453,7 @@ find_subnets()
 	lifn.lifn_family = AF_INET;
 	lifn.lifn_flags = 0;
 	if (ioctl(sock, SIOCGLIFNUM, (char *)&lifn) < 0) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    "Failed to find the number of network interfaces (%s)",
 		    strerror(errno));
 		close(sock);
@@ -460,7 +461,7 @@ find_subnets()
 	}
 
 	if (lifn.lifn_count < 1) {
-		idmapdlog(LOG_ERR, "No IPv4 network interfaces found");
+		logger(LOG_ERR, "No IPv4 network interfaces found");
 		close(sock);
 		return (NULL);
 	}
@@ -471,13 +472,13 @@ find_subnets()
 	lifc.lifc_buf = malloc(lifc.lifc_len);
 
 	if (lifc.lifc_buf == NULL) {
-		idmapdlog(LOG_ERR, "Out of memory");
+		logger(LOG_ERR, "Out of memory");
 		close(sock);
 		return (NULL);
 	}
 
 	if (ioctl(sock, SIOCGLIFCONF, (char *)&lifc) < 0) {
-		idmapdlog(LOG_ERR, "Failed to list network interfaces (%s)",
+		logger(LOG_ERR, "Failed to list network interfaces (%s)",
 		    strerror(errno));
 		free(lifc.lifc_buf);
 		close(sock);
@@ -522,7 +523,7 @@ cmpsubnets(ad_subnet_t *subnets1, ad_subnet_t *subnets2)
 {
 	int num_subnets1;
 	int num_subnets2;
-	int matched;
+	boolean_t matched;
 	int i, j;
 
 	for (i = 0; subnets1[i].subnet[0] != '\0'; i++)
@@ -537,11 +538,11 @@ cmpsubnets(ad_subnet_t *subnets1, ad_subnet_t *subnets2)
 		return (1);
 
 	for (i = 0;  i < num_subnets1; i++) {
-		matched = FALSE;
+		matched = B_FALSE;
 		for (j = 0; j < num_subnets2; j++) {
 			if (strcmp(subnets1[i].subnet,
 			    subnets2[j].subnet) == 0) {
-				matched = TRUE;
+				matched = B_TRUE;
 				break;
 			}
 		}
@@ -555,7 +556,7 @@ cmpsubnets(ad_subnet_t *subnets1, ad_subnet_t *subnets2)
 
 
 /* Convert a DN's DC components into a DNS domainname */
-static char *
+char *
 DN_to_DNS(const char *dn_name)
 {
 	char	dns[DNS_MAX_NAME];
@@ -690,7 +691,6 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 	uint16_t class;
 	uint32_t rttl;
 	uint16_t size;
-	char *query_type;
 	char namebuf[NS_MAXDNAME];
 
 	if (state == NULL)
@@ -703,26 +703,33 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 
 	/* Search, querydomain or query */
 	if (rrname != NULL) {
-		query_type = "search";
 		*rrname = NULL;
 		len = res_nsearch(state, svc_name, C_IN, T_SRV,
 		    msg.buf, sizeof (msg.buf));
+		logger(LOG_DEBUG, "Searching DNS for SRV RRs named '%s'",
+		    svc_name);
+		if (len < 0) {
+			logger(LOG_DEBUG, "DNS search for '%s' failed (%s)",
+			    svc_name, hstrerror(state->res_h_errno));
+			return (NULL);
+		}
 	} else if (dname != NULL) {
-		query_type = "query";
 		len = res_nquerydomain(state, svc_name, dname, C_IN, T_SRV,
 		    msg.buf, sizeof (msg.buf));
+		logger(LOG_DEBUG,
+		    "Querying DNS for SRV RRs named '%s' for '%s' ",
+		    svc_name, dname);
+
+		if (len < 0) {
+			logger(LOG_DEBUG,
+			    "DNS query for '%s' for '%s' failed (%s)",
+			    svc_name, dname, hstrerror(state->res_h_errno));
+			return (NULL);
+		}
 	}
 
-	idmapdlog(LOG_DEBUG, "%sing DNS for SRV RRs named '%s'",
-	    query_type, svc_name);
-
-	if (len < 0) {
-		idmapdlog(LOG_DEBUG, "DNS %s for '%s' failed (%s)",
-		    query_type, svc_name, hstrerror(state->res_h_errno));
-		return (NULL);
-	}
 	if (len > sizeof (msg.buf)) {
-		idmapdlog(LOG_ERR, "DNS query %ib message doesn't fit"
+		logger(LOG_ERR, "DNS query %ib message doesn't fit"
 		    " into %ib buffer",
 		    len, sizeof (msg.buf));
 		return (NULL);
@@ -737,7 +744,7 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 
 	for (cnt = qdcount; cnt > 0; --cnt) {
 		if ((len = dn_skipname(ptr, eom)) < 0) {
-			idmapdlog(LOG_ERR, "DNS query invalid message format");
+			logger(LOG_ERR, "DNS query invalid message format");
 			return (NULL);
 		}
 		ptr += len + QFIXEDSZ;
@@ -754,7 +761,7 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 		len = dn_expand(msg.buf, eom, ptr, namebuf,
 		    sizeof (namebuf));
 		if (len < 0) {
-			idmapdlog(LOG_ERR, "DNS query invalid message format");
+			logger(LOG_ERR, "DNS query invalid message format");
 			return (NULL);
 		}
 		if (rrname != NULL && *rrname == NULL)
@@ -765,7 +772,7 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 		NS_GET32(rttl, ptr);
 		NS_GET16(size, ptr);
 		if ((end = ptr + size) > eom) {
-			idmapdlog(LOG_ERR, "DNS query invalid message format");
+			logger(LOG_ERR, "DNS query invalid message format");
 			return (NULL);
 		}
 
@@ -780,14 +787,14 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 		len = dn_expand(msg.buf, eom, ptr, srv->host,
 		    sizeof (srv->host));
 		if (len < 0) {
-			idmapdlog(LOG_ERR, "DNS query invalid SRV record");
+			logger(LOG_ERR, "DNS query invalid SRV record");
 			return (NULL);
 		}
 
 		if (rttl < *ttl)
 			*ttl = rttl;
 
-		idmapdlog(LOG_DEBUG, "Found %s %d IN SRV [%d][%d] %s:%d",
+		logger(LOG_DEBUG, "Found %s %d IN SRV [%d][%d] %s:%d",
 		    namebuf, rttl, srv->priority, srv->weight, srv->host,
 		    srv->port);
 
@@ -803,23 +810,6 @@ srv_query(res_state state, const char *svc_name, const char *dname,
 	return (srv_res);
 }
 
-
-static int
-/* ARGSUSED */
-saslcallback(LDAP *ld, unsigned flags, void *defaults, void *prompts)
-{
-	sasl_interact_t *interact;
-
-	if (prompts == NULL || flags != LDAP_SASL_INTERACTIVE)
-		return (LDAP_PARAM_ERROR);
-
-	/* There should be no extra arguemnts for SASL/GSSAPI authentication */
-	for (interact = prompts; interact->id != SASL_CB_LIST_END; interact++) {
-		interact->result = NULL;
-		interact->len = 0;
-	}
-	return (LDAP_SUCCESS);
-}
 
 /*
  * A utility function to bind to a Directory server
@@ -839,7 +829,7 @@ ldap_lookup_init(idmap_ad_disc_ds_t *ds)
 	for (i = 0; ds[i].host[0] != '\0'; i++) {
 		ld = ldap_init(ds[i].host, ds[i].port);
 		if (ld == NULL) {
-			idmapdlog(LOG_DEBUG, "Couldn't connect to "
+			logger(LOG_DEBUG, "Couldn't connect to "
 			    "AD DC %s:%d (%s)",
 			    ds[i].host, ds[i].port,
 			    strerror(errno));
@@ -866,13 +856,14 @@ ldap_lookup_init(idmap_ad_disc_ds_t *ds)
 		if (rc == LDAP_SUCCESS)
 			break;
 
-		idmapdlog(LOG_INFO, "LDAP SASL bind to %s:%d failed (%s)",
+		logger(LOG_INFO, "LDAP SASL bind to %s:%d failed (%s)",
 		    ds[i].host, ds[i].port, ldap_err2string(rc));
 		(void) ldap_unbind(ld);
 		ld = NULL;
 	}
 	return (ld);
 }
+
 
 
 /*
@@ -1009,77 +1000,6 @@ ldap_lookup_trusted_domains(LDAP **ld, idmap_ad_disc_ds_t *globalCatalog,
 	return (trusted_domains);
 }
 
-static int
-decode_sid(BerValue *bval, char *sid_txt)
-{
-	int		i, j;
-	uchar_t		*v;
-	uint32_t	a;
-	struct sid {
-		uchar_t		version;
-		uchar_t		sub_authority_count;
-		uint64_t	authority;  /* really, 48-bits */
-		uint32_t	sub_authorities[16];
-	} sid;
-	char *ptr;
-	int len;
-	int rlen;
-
-
-	/*
-	 * The binary format of a SID is as follows:
-	 *
-	 * byte #0: version, always 0x01
-	 * byte #1: RID count, always <= 0x0f
-	 * bytes #2-#7: SID authority, big-endian 48-bit unsigned int
-	 *
-	 * followed by RID count RIDs, each a little-endian, unsigned
-	 * 32-bit int.
-	 */
-	/*
-	 * Sanity checks: must have at least one RID, version must be
-	 * 0x01, and the length must be 8 + rid count * 4
-	 */
-	if (bval->bv_len > 8 && bval->bv_val[0] == 0x01 &&
-	    bval->bv_len == 1 + 1 + 6 + bval->bv_val[1] * 4) {
-		v = (uchar_t *)bval->bv_val;
-		sid.version = v[0];
-		sid.sub_authority_count = v[1];
-		sid.authority =
-		    /* big endian -- so start from the left */
-		    ((u_longlong_t)v[2] << 40) |
-		    ((u_longlong_t)v[3] << 32) |
-		    ((u_longlong_t)v[4] << 24) |
-		    ((u_longlong_t)v[5] << 16) |
-		    ((u_longlong_t)v[6] << 8) |
-		    (u_longlong_t)v[7];
-		for (i = 0; i < sid.sub_authority_count; i++) {
-			j = 8 + (i * 4);
-			/* little endian -- so start from the right */
-			a = (v[j + 3] << 24) | (v[j + 2] << 16) |
-			    (v[j + 1] << 8) | (v[j]);
-			sid.sub_authorities[i] = a;
-		}
-
-		ptr = sid_txt;
-		len = AD_DISC_MAXSID;
-		rlen = snprintf(ptr, len, "S-1-%llu", sid.authority);
-
-		ptr += rlen;
-		len -= rlen;
-
-		for (i = 0; i < sid.sub_authority_count; i++) {
-			assert(len > 0);
-			rlen = snprintf(
-			    ptr, len, "-%u", sid.sub_authorities[i]);
-			ptr += rlen;
-			len -= rlen;
-		}
-		assert(len > 0);
-		return (0);
-	}
-	return (-1);
-}
 
 /*
  * This functions finds all the domains in a forest.
@@ -1102,19 +1022,18 @@ ldap_lookup_domains_in_forest(LDAP **ld, idmap_ad_disc_ds_t *globalCatalogs)
 	struct berval	**sid_ber;
 	int		num = 0;
 	ad_disc_domainsinforest_t *domains = NULL;
+	ad_disc_domainsinforest_t *tmp;
 	int		i;
 	char 		*name;
+	adutils_sid_t	sid;
+	char		*sid_str;
 
 
 	if (*ld == NULL)
 		*ld = ldap_lookup_init(globalCatalogs);
 
-	if (*ld == NULL) {
-		idmapdlog(LOG_NOTICE, "Couldn't open and SASL bind LDAP "
-		    "connections to any domain controllers; discovery of "
-		    "some items will fail");
+	if (*ld == NULL)
 		return (NULL);
-	}
 
 	root_attrs[0] = "namingContexts";
 	root_attrs[1] = NULL;
@@ -1149,25 +1068,41 @@ ldap_lookup_domains_in_forest(LDAP **ld, idmap_ad_disc_ds_t *globalCatalogs)
 				    "objectSid");
 				if (sid_ber != NULL) {
 					num++;
-					domains = realloc(domains,
+					tmp = realloc(domains,
 					    (num + 1) *
 					    sizeof (ad_disc_domainsinforest_t));
-					if (domains == NULL) {
+					if (tmp == NULL) {
+						if (domains != NULL)
+							free(domains);
 						ldap_value_free_len(sid_ber);
 						ldap_msgfree(result);
 						ldap_value_free(nc);
 						return (NULL);
 					}
+					domains = tmp;
 					memset(&domains[num], 0,
 					    sizeof (ad_disc_domainsinforest_t));
-					if (decode_sid(sid_ber[0],
-					    domains[num - 1].sid) < 0) {
+
+					if (adutils_getsid(sid_ber[0], &sid)
+					    < 0) {
+						free(domains);
 						ldap_value_free_len(sid_ber);
 						ldap_msgfree(result);
 						ldap_value_free(nc);
 						return (NULL);
 					}
+					if ((sid_str = adutils_sid2txt(&sid))
+					    == NULL) {
+						free(domains);
+						ldap_value_free_len(sid_ber);
+						ldap_msgfree(result);
+						ldap_value_free(nc);
+						return (NULL);
+					}
+
 					ldap_value_free_len(sid_ber);
+					strcpy(domains[num - 1].sid, sid_str);
+					free(sid_str);
 
 					name = DN_to_DNS(nc[i]);
 					if (name == NULL) {
@@ -1328,7 +1263,7 @@ validate_DomainName(ad_disc_t ctx)
 	free(srvname);
 
 	if (dname == NULL) {
-		idmapdlog(LOG_ERR, "Out of memory");
+		logger(LOG_ERR, "Out of memory");
 		return (NULL);
 	}
 
@@ -1343,7 +1278,7 @@ validate_DomainName(ad_disc_t ctx)
 
 
 char *
-ad_disc_get_DomainName(ad_disc_t ctx, int *auto_discovered)
+ad_disc_get_DomainName(ad_disc_t ctx, boolean_t *auto_discovered)
 {
 	char *domain_name = NULL;
 	ad_item_t *domain_name_item;
@@ -1356,7 +1291,7 @@ ad_disc_get_DomainName(ad_disc_t ctx, int *auto_discovered)
 			*auto_discovered =
 			    (domain_name_item->state == AD_STATE_AUTO);
 	} else if (auto_discovered != NULL)
-		*auto_discovered = FALSE;
+		*auto_discovered = B_FALSE;
 
 	return (domain_name);
 }
@@ -1368,8 +1303,8 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 {
 	uint32_t ttl = 0;
 	idmap_ad_disc_ds_t *domain_controller = NULL;
-	int validate_global = FALSE;
-	int validate_site = FALSE;
+	boolean_t validate_global = B_FALSE;
+	boolean_t validate_site = B_FALSE;
 	ad_item_t *domain_name_item;
 	ad_item_t *site_name_item = NULL;
 
@@ -1382,13 +1317,13 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 		return (NULL);
 
 	if (req == AD_DISC_GLOBAL)
-		validate_global = TRUE;
+		validate_global = B_TRUE;
 	else {
 		site_name_item = validate_SiteName(ctx);
 		if (site_name_item != NULL)
-			validate_site = TRUE;
+			validate_site = B_TRUE;
 		else if (req == AD_DISC_PREFER_SITE)
-			validate_global = TRUE;
+			validate_global = B_TRUE;
 	}
 
 	if (validate_global) {
@@ -1449,7 +1384,7 @@ validate_DomainController(ad_disc_t ctx, enum ad_disc_req req)
 
 idmap_ad_disc_ds_t *
 ad_disc_get_DomainController(ad_disc_t ctx, enum ad_disc_req req,
-			int *auto_discovered)
+			boolean_t *auto_discovered)
 {
 	ad_item_t *domain_controller_item;
 	idmap_ad_disc_ds_t *domain_controller = NULL;
@@ -1462,7 +1397,7 @@ ad_disc_get_DomainController(ad_disc_t ctx, enum ad_disc_req req,
 			*auto_discovered =
 			    (domain_controller_item->state == AD_STATE_AUTO);
 	} else if (auto_discovered != NULL)
-		*auto_discovered = FALSE;
+		*auto_discovered = B_FALSE;
 
 	return (domain_controller);
 }
@@ -1482,7 +1417,7 @@ validate_SiteName(ad_disc_t ctx)
 	char *forest_name;
 	int len;
 	int i;
-	int update_required = FALSE;
+	boolean_t update_required = B_FALSE;
 	ad_item_t *domain_controller_item;
 
 	if (is_fixed(&ctx->site_name))
@@ -1498,12 +1433,12 @@ validate_SiteName(ad_disc_t ctx)
 	    ctx->subnets == NULL || ctx->subnets_changed) {
 		subnets = find_subnets();
 		ctx->subnets_last_check = time(NULL);
-		update_required = TRUE;
+		update_required = B_TRUE;
 	} else if (ctx->subnets_last_check + 60 < time(NULL)) {
 		subnets = find_subnets();
 		ctx->subnets_last_check = time(NULL);
 		if (cmpsubnets(ctx->subnets, subnets) != 0)
-			update_required = TRUE;
+			update_required = B_TRUE;
 	}
 
 	if (!update_required) {
@@ -1573,7 +1508,7 @@ validate_SiteName(ad_disc_t ctx)
 	}
 	ctx->subnets = subnets;
 	subnets = NULL;
-	ctx->subnets_changed = FALSE;
+	ctx->subnets_changed = B_FALSE;
 
 out:
 	if (ld != NULL)
@@ -1598,7 +1533,7 @@ out:
 
 
 char *
-ad_disc_get_SiteName(ad_disc_t ctx, int *auto_discovered)
+ad_disc_get_SiteName(ad_disc_t ctx, boolean_t *auto_discovered)
 {
 	ad_item_t *site_name_item;
 	char	*site_name = NULL;
@@ -1610,7 +1545,7 @@ ad_disc_get_SiteName(ad_disc_t ctx, int *auto_discovered)
 			*auto_discovered =
 			    (site_name_item->state == AD_STATE_AUTO);
 	} else if (auto_discovered != NULL)
-		*auto_discovered = FALSE;
+		*auto_discovered = B_FALSE;
 
 	return (site_name);
 }
@@ -1677,7 +1612,7 @@ validate_ForestName(ad_disc_t ctx)
 
 
 char *
-ad_disc_get_ForestName(ad_disc_t ctx, int *auto_discovered)
+ad_disc_get_ForestName(ad_disc_t ctx, boolean_t *auto_discovered)
 {
 	ad_item_t *forest_name_item;
 	char	*forest_name = NULL;
@@ -1690,7 +1625,7 @@ ad_disc_get_ForestName(ad_disc_t ctx, int *auto_discovered)
 			*auto_discovered =
 			    (forest_name_item->state == AD_STATE_AUTO);
 	} else if (auto_discovered != NULL)
-		*auto_discovered = FALSE;
+		*auto_discovered = B_FALSE;
 
 	return (forest_name);
 }
@@ -1702,8 +1637,8 @@ validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 {
 	idmap_ad_disc_ds_t *global_catalog = NULL;
 	uint32_t ttl = 0;
-	int	validate_global = FALSE;
-	int	validate_site = FALSE;
+	boolean_t validate_global = B_FALSE;
+	boolean_t validate_site = B_FALSE;
 	ad_item_t *forest_name_item;
 	ad_item_t *site_name_item;
 
@@ -1716,13 +1651,13 @@ validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 		return (NULL);
 
 	if (req == AD_DISC_GLOBAL)
-		validate_global = TRUE;
+		validate_global = B_TRUE;
 	else {
 		site_name_item = validate_SiteName(ctx);
 		if (site_name_item != NULL)
-			validate_site = TRUE;
+			validate_site = B_TRUE;
 		else if (req == AD_DISC_PREFER_SITE)
-			validate_global = TRUE;
+			validate_global = B_TRUE;
 	}
 
 	if (validate_global) {
@@ -1788,7 +1723,7 @@ validate_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req)
 
 idmap_ad_disc_ds_t *
 ad_disc_get_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req,
-			int *auto_discovered)
+			boolean_t *auto_discovered)
 {
 	idmap_ad_disc_ds_t *global_catalog = NULL;
 	ad_item_t *global_catalog_item;
@@ -1801,7 +1736,7 @@ ad_disc_get_GlobalCatalog(ad_disc_t ctx, enum ad_disc_req req,
 			*auto_discovered =
 			    (global_catalog_item->state == AD_STATE_AUTO);
 	} else if (auto_discovered != NULL)
-		*auto_discovered = FALSE;
+		*auto_discovered = B_FALSE;
 
 	return (global_catalog);
 }
@@ -1871,7 +1806,7 @@ validate_TrustedDomains(ad_disc_t ctx)
 
 
 ad_disc_trusteddomains_t *
-ad_disc_get_TrustedDomains(ad_disc_t ctx, int *auto_discovered)
+ad_disc_get_TrustedDomains(ad_disc_t ctx, boolean_t *auto_discovered)
 {
 	ad_disc_trusteddomains_t *trusted_domains = NULL;
 	ad_item_t *trusted_domains_item;
@@ -1884,7 +1819,7 @@ ad_disc_get_TrustedDomains(ad_disc_t ctx, int *auto_discovered)
 			*auto_discovered =
 			    (trusted_domains_item->state == AD_STATE_AUTO);
 	} else if (auto_discovered != NULL)
-		*auto_discovered = FALSE;
+		*auto_discovered = B_FALSE;
 
 	return (trusted_domains);
 }
@@ -1926,7 +1861,7 @@ validate_DomainsInForest(ad_disc_t ctx)
 
 
 ad_disc_domainsinforest_t *
-ad_disc_get_DomainsInForest(ad_disc_t ctx, int *auto_discovered)
+ad_disc_get_DomainsInForest(ad_disc_t ctx, boolean_t *auto_discovered)
 {
 	ad_disc_domainsinforest_t *domains_in_forest = NULL;
 	ad_item_t *domains_in_forest_item;
@@ -1939,7 +1874,7 @@ ad_disc_get_DomainsInForest(ad_disc_t ctx, int *auto_discovered)
 			*auto_discovered =
 			    (domains_in_forest_item->state == AD_STATE_AUTO);
 	} else if (auto_discovered != NULL)
-		*auto_discovered = FALSE;
+		*auto_discovered = B_FALSE;
 
 	return (domains_in_forest);
 }
@@ -2080,17 +2015,17 @@ ad_disc_get_TTL(ad_disc_t ctx)
 	return (ttl);
 }
 
-int
+boolean_t
 ad_disc_SubnetChanged(ad_disc_t ctx)
 {
 	ad_subnet_t *subnets;
 
 	if (ctx->subnets_changed || ctx->subnets == NULL)
-		return (TRUE);
+		return (B_TRUE);
 
 	if ((subnets = find_subnets()) != NULL) {
 		if (cmpsubnets(subnets, ctx->subnets) != 0)
-			ctx->subnets_changed = TRUE;
+			ctx->subnets_changed = B_TRUE;
 		free(subnets);
 	}
 

@@ -19,32 +19,43 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 LIBRARY =	libadutils.a
 VERS =		.1
-OBJECTS =	adutils.o
-LINT_OBJECTS =	adutils.o
+OBJECTS =	adutils.o addisc.o
+LINT_OBJECTS =	adutils.o addisc.o
 
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lldap -lidmap
+LDLIBS +=	-lc -lldap -lresolv -lsocket -lnsl
 SRCDIR =	../common
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
+
 IDMAP_PROT_DIR =	$(SRC)/head/rpcsvc
+IDMAP_PROT_X =		$(IDMAP_PROT_DIR)/idmap_prot.x
+IDMAP_PROT_H =		$(IDMAP_PROT_DIR)/idmap_prot.h
+
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(SRC)/lib/libidmap/common \
-		-I$(IDMAP_PROT_DIR)
+CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(IDMAP_PROT_DIR)
+
+CLOBBERFILES +=	$(IDMAP_PROT_H)
 
 lint := OBJECTS = $(LINT_OBJECTS)
 
 .KEEP_STATE:
 
-all: $(LIBS)
+all: $(IDMAP_PROT_H) $(LIBS)
+
+$(IDMAP_PROT_H):	$(IDMAP_PROT_X)
+	$(RM) $@; $(RPCGEN) -CMNh -o $@ $(IDMAP_PROT_X)
 
 lint: lintcheck
+
+LINTFLAGS += -erroff=E_CONSTANT_CONDITION
+LINTFLAGS64 += -erroff=E_CONSTANT_CONDITION
 
 include ../../Makefile.targ

@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +30,7 @@
 #include <strings.h>
 #include <errno.h>
 #include <limits.h>
+#include <syslog.h>
 #include <sys/varargs.h>
 #include "idmap_engine.h"
 #include "idmap_priv.h"
@@ -248,6 +248,7 @@ static int do_set_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_unset_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 static int do_get_namemap(flag_t *f, int argc, char **argv, cmd_pos_t *pos);
 
+
 /* Command names and their hanlers to be passed to idmap_engine */
 
 static cmd_ops_t commands[] = {
@@ -312,6 +313,7 @@ static cmd_ops_t commands[] = {
 		do_unset_namemap
 	}
 };
+
 
 /* Print error message, possibly with a position */
 /* printflike */
@@ -671,7 +673,6 @@ init_nm_command(char *user, char *passwd, char *auth, char *windomain,
 	}
 
 	if (namemaps.handle == NULL) {
-		idmap_log_stderr(LOG_INFO);
 		stat = idmap_init_namemaps(handle, &namemaps.handle, user,
 		    passwd, auth, windomain, direction);
 		if (stat != IDMAP_SUCCESS) {
@@ -3477,6 +3478,21 @@ cleanup:
 }
 
 
+/* printflike */
+void
+/* LINTED E_FUNC_ARG_UNUSED */
+logger(int pri, const char *format, ...)
+{
+	va_list args;
+
+	va_start(args, format);
+
+	(void) vfprintf(stderr, format, args);
+	(void) fprintf(stderr, "\n");
+
+	va_end(args);
+}
+
 
 /* main function. Returns 1 for error, 0 otherwise */
 int
@@ -3487,6 +3503,9 @@ main(int argc, char *argv[])
 	/* set locale and domain for internationalization */
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
+
+	/* Redirect logging */
+	idmap_set_logger(logger);
 
 	/* idmap_engine determines the batch_mode: */
 	rc = engine_init(sizeof (commands) / sizeof (cmd_ops_t),

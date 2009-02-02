@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1093,7 +1093,7 @@ load_cfg_in_state(lookup_state_t *state)
 		UNLOCK_CONFIG();
 		return (IDMAP_SUCCESS);
 	}
-	if (_idmapdstate.cfg->pgcfg.ds_name_mapping_enabled == FALSE) {
+	if (!_idmapdstate.cfg->pgcfg.ds_name_mapping_enabled) {
 		UNLOCK_CONFIG();
 		return (IDMAP_SUCCESS);
 	}

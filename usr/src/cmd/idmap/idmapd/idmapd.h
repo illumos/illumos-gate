@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,9 +35,11 @@
 #include <libintl.h>
 #include <strings.h>
 #include <sqlite/sqlite.h>
+#include <syslog.h>
 #include <inttypes.h>
 #include "idmap_prot.h"
 #include "adutils.h"
+#include "idmap_priv.h"
 #include "idmap_config.h"
 #include "libadutils.h"
 
@@ -277,6 +279,11 @@ extern idmap_retcode	lookup_name2sid(sqlite *, const char *, const char *,
 				idmap_mapping *, int);
 extern idmap_retcode	lookup_wksids_name2sid(const char *, char **, char **,
 				idmap_rid_t *, int *);
+
+
+extern void 	idmap_log_stderr(int);
+extern void	idmap_log_syslog(boolean_t);
+extern void	idmap_log_degraded(boolean_t);
 
 #ifdef __cplusplus
 }

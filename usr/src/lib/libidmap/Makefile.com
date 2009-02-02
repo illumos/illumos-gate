@@ -19,21 +19,21 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
 
 LIBRARY =	libidmap.a
 VERS =		.1
-OBJECTS =	idmap_xdr.o utils.o idmap_api.o namemaps.o addisc.o idmap_cache.o
-LINT_OBJECTS =	utils.o idmap_api.o namemaps.o addisc.o idmap_cache.o
+OBJECTS =	idmap_xdr.o utils.o idmap_api.o namemaps.o idmap_cache.o
+LINT_OBJECTS =	utils.o idmap_api.o namemaps.o idmap_cache.o
 
 include ../../Makefile.lib
 
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lnsl -lldap -lresolv -lsldap -lsocket -lavl
+LDLIBS +=	-lc -lldap -lsldap -lavl -ladutils -lnsl
 CPPFLAGS += -I$(SRC)/lib/libsldap/common
 
 SRCDIR =	../common
@@ -43,16 +43,18 @@ IDMAP_PROT_DIR =	$(SRC)/head/rpcsvc
 IDMAP_PROT_X =		$(IDMAP_PROT_DIR)/idmap_prot.x
 IDMAP_PROT_H =		$(IDMAP_PROT_DIR)/idmap_prot.h
 
+ADUTILS_DIR =		$(SRC)/lib/libadutils/common
+
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(IDMAP_PROT_DIR)
-#CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR)
+CPPFLAGS +=	-D_REENTRANT -I$(SRCDIR) -I$(IDMAP_PROT_DIR) -I$(ADUTILS_DIR)
+
 CLOBBERFILES +=	$(IDMAP_PROT_H) $(SRCDIR)/idmap_xdr.c
 
 lint := OBJECTS = $(LINT_OBJECTS)
 
 .KEEP_STATE:
 
-all: $(LIBS)
+all: $(IDMAP_PROT_H) $(LIBS)
 
 $(IDMAP_PROT_H):	$(IDMAP_PROT_X)
 	$(RM) $@; $(RPCGEN) -CMNh -o $@ $(IDMAP_PROT_X)

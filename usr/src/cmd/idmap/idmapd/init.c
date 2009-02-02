@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -303,7 +303,7 @@ print_idmapdstate()
 	}
 
 	idmapdlog(LOG_DEBUG, "ds_name_mapping_enabled=%s",
-	    (pgcfg->ds_name_mapping_enabled == TRUE) ? "true" : "false");
+	    (pgcfg->ds_name_mapping_enabled) ? "true" : "false");
 	idmapdlog(LOG_DEBUG, "ad_unixuser_attr=%s",
 	    CHECK_NULL(pgcfg->ad_unixuser_attr));
 	idmapdlog(LOG_DEBUG, "ad_unixgroup_attr=%s",

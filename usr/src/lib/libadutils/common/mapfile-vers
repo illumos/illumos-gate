@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -45,7 +45,27 @@ SUNWprivate {
 	adutils_ad_free;
 	adutils_add_ds;
 	adutils_add_domain;
-	adutils_set_log;
+	adutils_set_logger;
+	ad_disc_fini;
+	ad_disc_init;
+	ad_disc_get_DomainName;
+	ad_disc_set_DomainName;
+	ad_disc_compare_ds;
+	ad_disc_compare_trusteddomains;
+	ad_disc_compare_domainsinforest;
+	ad_disc_SubnetChanged;
+	ad_disc_get_GlobalCatalog;
+	ad_disc_set_GlobalCatalog;
+	ad_disc_get_TTL;
+	ad_disc_set_ForestName;
+	ad_disc_get_ForestName;
+	ad_disc_get_DomainController;
+	ad_disc_set_DomainController;
+	ad_disc_set_SiteName;
+	ad_disc_refresh;
+	ad_disc_get_SiteName;
+	ad_disc_get_TrustedDomains;
+	ad_disc_get_DomainsInForest;
     local:
 	*;
 };

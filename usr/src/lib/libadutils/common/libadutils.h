@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,6 +129,9 @@ typedef enum adutils_ad_partition {
  *
  */
 
+typedef void (*adutils_logger)(int, const char *, ...);
+
+
 extern adutils_rc	adutils_ad_alloc(adutils_ad_t **new_ad,
 				const char *default_domain,
 				adutils_ad_partition_t part);
@@ -138,8 +141,6 @@ extern adutils_rc	adutils_add_ds(adutils_ad_t *ad,
 extern adutils_rc	adutils_add_domain(adutils_ad_t *ad,
 				const char *domain_name,
 				const char *domain_sid);
-extern void		adutils_set_log(int pri, bool_t syslog,
-				bool_t degraded);
 extern void		adutils_freeresult(adutils_result_t **result);
 extern adutils_rc	adutils_lookup(adutils_ad_t *ad,
 				const char *searchfilter,
@@ -178,6 +179,7 @@ extern int		adutils_lookup_check_domain(
 extern int		adutils_lookup_check_sid_prefix(
 				adutils_query_state_t *state,
 				const char *sid);
+extern void		adutils_set_logger(adutils_logger logger);
 
 #ifdef	__cplusplus
 }

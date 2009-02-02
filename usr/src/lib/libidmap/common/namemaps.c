@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,9 +29,27 @@
 #include <sasl/sasl.h>
 #include <libintl.h>
 #include <strings.h>
+#include <syslog.h>
 
+#include "addisc.h"
+#include "libadutils.h"
 #include "idmap_impl.h"
 #include "ns_sldap.h"
+
+/*
+ * syslog is the default logger.
+ * It can be overwritten by supplying a logger
+ * with  idmap_set_logger()
+ */
+idmap_logger logger = syslog;
+
+
+void
+idmap_set_logger(idmap_logger funct)
+{
+	logger = funct;
+	adutils_set_logger(funct);
+}
 
 
 /* From adutils.c: */
@@ -107,7 +125,7 @@ string2auth(const char *from, ns_auth_t *na)
 		na->saslmech = NS_LDAP_SASL_DIGEST_MD5;
 		na->saslopt = NS_LDAP_SASLOPT_NONE;
 	} else {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    gettext("Invalid authentication method \"%s\" specified\n"),
 		    from);
 		return (IDMAP_ERR_ARG);
@@ -179,7 +197,7 @@ idmap_open_ad_conn(idmap_nm_handle_t *adh)
 	/* Open and bind an LDAP connection */
 	adh->ad = ldap_init(adh->ad_host, adh->ad_port);
 	if (adh->ad == NULL) {
-		idmapdlog(LOG_INFO, "ldap_init() to server "
+		logger(LOG_INFO, "ldap_init() to server "
 		    "%s port %d failed. (%s)", CHECK_NULL(adh->ad_host),
 		    adh->ad_port, strerror(errno));
 		rc = IDMAP_ERR_INTERNAL;
@@ -199,7 +217,7 @@ idmap_open_ad_conn(idmap_nm_handle_t *adh)
 	if (ldap_rc != LDAP_SUCCESS) {
 		(void) ldap_unbind(adh->ad);
 		adh->ad = NULL;
-		idmapdlog(LOG_INFO, "ldap_sasl_interactive_bind_s() to server "
+		logger(LOG_INFO, "ldap_sasl_interactive_bind_s() to server "
 		    "%s port %d failed. (%s)", CHECK_NULL(adh->ad_host),
 		    adh->ad_port, ldap_err2string(ldap_rc));
 		rc = IDMAP_ERR_INTERNAL;
@@ -231,7 +249,7 @@ idmap_init_ad(idmap_nm_handle_t *p)
 
 	ad_ctx = ad_disc_init();
 	if (ad_ctx == NULL) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    gettext("AD autodiscovery initialization failed"));
 		return (IDMAP_ERR_INTERNAL);
 	}
@@ -241,7 +259,7 @@ idmap_init_ad(idmap_nm_handle_t *p)
 	/* Based on the supplied or default domain, find the proper AD: */
 	if (ad_disc_set_DomainName(ad_ctx, p->windomain)) {
 		rc = IDMAP_ERR_INTERNAL;
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    gettext("Setting a domain name \"%s\" for autodiscovery"
 		    " failed, most likely not enough memory"), p->windomain);
 		goto cleanup;
@@ -250,7 +268,7 @@ idmap_init_ad(idmap_nm_handle_t *p)
 	dc = ad_disc_get_DomainController(ad_ctx, AD_DISC_GLOBAL, NULL);
 	if (dc == NULL) {
 		rc = IDMAP_ERR_ARG;
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    gettext("A domain controller for the "
 		    "domain \"%s\" not found."), p->windomain);
 		goto cleanup;
@@ -347,7 +365,7 @@ idmap_init_namemaps(idmap_handle_t *handle, idmap_nm_handle_t **adh,
 	rc = idmap_get_prop_str(handle, PROP_DEFAULT_DOMAIN,
 	    &p->default_domain);
 	if (rc != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    gettext("Error obtaining default domain from idmapd (%s)"),
 		    idmap_stat2string(NULL, rc));
 		goto cleanup;
@@ -356,7 +374,7 @@ idmap_init_namemaps(idmap_handle_t *handle, idmap_nm_handle_t **adh,
 	rc = idmap_get_prop_str(handle, PROP_AD_UNIXUSER_ATTR,
 	    &p->ad_unixuser_attr);
 	if (rc != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    gettext("Error obtaining AD unixuser attribute (%s)"),
 		    idmap_stat2string(NULL, rc));
 		goto cleanup;
@@ -365,7 +383,7 @@ idmap_init_namemaps(idmap_handle_t *handle, idmap_nm_handle_t **adh,
 	rc = idmap_get_prop_str(handle, PROP_AD_UNIXGROUP_ATTR,
 	    &p->ad_unixgroup_attr);
 	if (rc != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    gettext("Error obtaining AD unixgroup attribute (%s)"),
 		    idmap_stat2string(NULL, rc));
 		goto cleanup;
@@ -375,7 +393,7 @@ idmap_init_namemaps(idmap_handle_t *handle, idmap_nm_handle_t **adh,
 	rc = idmap_get_prop_str(handle, PROP_NLDAP_WINNAME_ATTR,
 	    &p->nldap_winname_attr);
 	if (rc != IDMAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    gettext("Error obtaining AD unixgroup attribute (%s)"),
 		    idmap_stat2string(NULL, rc));
 		goto cleanup;
@@ -394,7 +412,7 @@ idmap_init_namemaps(idmap_handle_t *handle, idmap_nm_handle_t **adh,
 			goto cleanup;
 		}
 	} else if (direction == IDMAP_DIRECTION_W2U) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    gettext("Windows domain not given and idmapd daemon"
 		    " didn't provide a default one"));
 		rc = IDMAP_ERR_ARG;
@@ -572,7 +590,7 @@ unixname2dn(idmap_nm_handle_t *p, char *unixname, int is_user, char **dn,
 
 
 	if (rc_ns == NS_LDAP_NOTFOUND) {
-		idmapdlog(LOG_ERR, is_user ? gettext("User \"%s\" not found.")
+		logger(LOG_ERR, is_user ? gettext("User \"%s\" not found.")
 		    : gettext("Group %s not found."),  unixname);
 		return (IDMAP_ERR_NOTFOUND);
 	} else if (rc_ns != NS_LDAP_SUCCESS) {
@@ -580,12 +598,12 @@ unixname2dn(idmap_nm_handle_t *p, char *unixname, int is_user, char **dn,
 		if (errorp != NULL) {
 			(void) __ns_ldap_err2str(errorp->status, &msg);
 		}
-		idmapdlog(LOG_ERR, gettext("Ldap list failed (%s)."), msg);
+		logger(LOG_ERR, gettext("Ldap list failed (%s)."), msg);
 		return (IDMAP_ERR_ARG);
 	}
 
 	if (res == NULL) {
-		idmapdlog(LOG_ERR, gettext("User %s not found"), unixname);
+		logger(LOG_ERR, gettext("User %s not found"), unixname);
 		return (IDMAP_ERR_ARG);
 	}
 
@@ -602,7 +620,7 @@ unixname2dn(idmap_nm_handle_t *p, char *unixname, int is_user, char **dn,
 	if (dn != NULL) {
 		attrs = __ns_ldap_getAttr(&res->entry[0], "dn");
 		if (attrs == NULL || attrs[0] == NULL) {
-			idmapdlog(LOG_ERR, gettext("dn for %s not found"),
+			logger(LOG_ERR, gettext("dn for %s not found"),
 			    unixname);
 			return (IDMAP_ERR_ARG);
 		}
@@ -662,7 +680,7 @@ winname2dn(idmap_nm_handle_t *p, char *winname,
 	free(filter);
 
 	if (ldap_rc != LDAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    "Ldap query to server %s port %d failed. (%s)",
 		    p->ad_host, p->ad_port, ldap_err2string(ldap_rc));
 		(void) ldap_msgfree(results);
@@ -709,7 +727,7 @@ winname2dn(idmap_nm_handle_t *p, char *winname,
 	}
 
 	if (*dn == NULL) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    *is_wuser == IDMAP_YES ? gettext("User %s@%s not found") :
 		    *is_wuser == IDMAP_NO ? gettext("Group %s@%s not found") :
 		    gettext("%s@%s not found"), winname, p->windomain);
@@ -753,7 +771,7 @@ idmap_ad_set(idmap_nm_handle_t *p, char *dn, char *attr, char *value)
 
 	ldap_rc = ldap_modify_s(p->ad, dn, mods);
 	if (ldap_rc != LDAP_SUCCESS) {
-		idmapdlog(LOG_ERR,
+		logger(LOG_ERR,
 		    "Ldap modify of %s, attribute %s failed. (%s)",
 		    dn, attr, ldap_err2string(ldap_rc));
 		rc = IDMAP_ERR_INTERNAL;
@@ -827,7 +845,7 @@ idmap_nldap_set(idmap_nm_handle_t *p, ns_cred_t *nsc, char *dn, char *attr,
 		if (errorp != NULL) {
 			(void) __ns_ldap_err2str(errorp->status, &msg);
 		}
-		idmapdlog(LOG_ERR, gettext("__ns_ldap_addAttr/rep/delAttr"
+		logger(LOG_ERR, gettext("__ns_ldap_addAttr/rep/delAttr"
 		    " failed (%s)"), msg);
 		return (IDMAP_ERR_ARG);
 	}
@@ -847,7 +865,7 @@ idmap_set_namemap(idmap_nm_handle_t *p, char *winname, char *unixname,
 	if (direction == IDMAP_DIRECTION_W2U) {
 		if (!p->is_ad) {
 			rc = IDMAP_ERR_ARG;
-			idmapdlog(LOG_ERR,
+			logger(LOG_ERR,
 			    gettext("AD namemaps aren't set up."));
 			goto cleanup;
 		}
@@ -870,7 +888,7 @@ idmap_set_namemap(idmap_nm_handle_t *p, char *winname, char *unixname,
 
 		if (!p->is_nldap) {
 			rc = IDMAP_ERR_ARG;
-			idmapdlog(LOG_ERR,
+			logger(LOG_ERR,
 			    gettext("Native ldap namemaps aren't set up."));
 			goto cleanup;
 		}
@@ -937,7 +955,7 @@ idmap_unset_namemap(idmap_nm_handle_t *p, char *winname, char *unixname,
 	if (direction == IDMAP_DIRECTION_W2U) {
 		if (!p->is_ad) {
 			rc = IDMAP_ERR_ARG;
-			idmapdlog(LOG_ERR,
+			logger(LOG_ERR,
 			    gettext("AD namemaps aren't set up."));
 			goto cleanup;
 		}
@@ -955,7 +973,7 @@ idmap_unset_namemap(idmap_nm_handle_t *p, char *winname, char *unixname,
 	} else { /* direction == IDMAP_DIRECTION_U2W */
 		if (!p->is_nldap) {
 			rc = IDMAP_ERR_ARG;
-			idmapdlog(LOG_ERR,
+			logger(LOG_ERR,
 			    gettext("Native ldap namemaps aren't set up."));
 			goto cleanup;
 		}
@@ -994,7 +1012,7 @@ idmap_get_namemap(idmap_nm_handle_t *p, int *is_source_ad, char **winname,
 
 		if (p->is_ad == NULL) {
 			rc = IDMAP_ERR_ARG;
-			idmapdlog(LOG_ERR,
+			logger(LOG_ERR,
 			    gettext("AD namemaps are not active."));
 			goto cleanup;
 			/* In future maybe resolve winname and try nldap? */
@@ -1003,7 +1021,7 @@ idmap_get_namemap(idmap_nm_handle_t *p, int *is_source_ad, char **winname,
 		rc = winname2dn(p, *winname, is_wuser, &dn, unixuser,
 		    unixgroup);
 		if (rc != IDMAP_SUCCESS) {
-			idmapdlog(LOG_ERR,
+			logger(LOG_ERR,
 			    gettext("Winname %s@%s not found in AD."),
 			    *winname, p->windomain);
 		}
@@ -1015,7 +1033,7 @@ idmap_get_namemap(idmap_nm_handle_t *p, int *is_source_ad, char **winname,
 
 		if (p->is_nldap == NULL) {
 			rc = IDMAP_ERR_ARG;
-			idmapdlog(LOG_ERR,
+			logger(LOG_ERR,
 			    gettext("Native ldap namemaps aren't active."));
 			goto cleanup;
 			/* In future maybe resolve unixname and try AD? */
@@ -1032,7 +1050,7 @@ idmap_get_namemap(idmap_nm_handle_t *p, int *is_source_ad, char **winname,
 		rc = unixname2dn(p, unixname, is_user, NULL, winname,
 		    windomain);
 		if (rc != IDMAP_SUCCESS) {
-			idmapdlog(LOG_ERR,
+			logger(LOG_ERR,
 			    gettext("%s %s not found in native ldap."),
 			    is_user == IDMAP_YES ? "UNIX user" : "UNIX group",
 			    unixname);

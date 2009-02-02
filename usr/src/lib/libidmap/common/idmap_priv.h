@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,10 +30,8 @@
 #ifndef _IDMAP_PRIV_H
 #define	_IDMAP_PRIV_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libscf.h>
-#include <syslog.h>
 #include <resolv.h>
 
 #include "idmap.h"
@@ -213,22 +211,6 @@ extern idmap_stat idmap_getext_sidbyuid(idmap_get_handle_t *, uid_t, int,
 extern idmap_stat idmap_getext_sidbygid(idmap_get_handle_t *, gid_t, int,
 	char **, idmap_rid_t *, idmap_info *, idmap_stat *);
 
-
-
-/* logging */
-extern void idmapdlog(int, const char *, ...);
-
-/*
- * The maximal priority to be logged to stderr: set to -1 to suppress
- * stderr logging completely.
- */
-extern void idmap_log_stderr(int);
-
-/* write log messages to syslog? */
-extern void idmap_log_syslog(bool_t);
-
-/* write log messages to syslog? */
-extern void idmap_log_degraded(bool_t);
 
 #ifdef __cplusplus
 }
