@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -509,11 +509,18 @@ acl_removeentries(acl_t *acl, acl_t *removeacl, int start_slot, int flag)
 			match = acl_match(acl_entry, remove_entry);
 			if (match == 0)  {
 				found++;
+
+				/* avoid memmove if last entry */
+				if (acl->acl_cnt == (j + 1)) {
+					acl->acl_cnt--;
+					break;
+				}
+
 				start = (char *)acl_entry +
 				    acl->acl_entry_size;
 				(void) memmove(acl_entry, start,
 				    acl->acl_entry_size *
-				    acl->acl_cnt-- - (j + 1));
+				    (acl->acl_cnt-- - (j + 1)));
 
 				if (flag == ACL_REMOVE_FIRST)
 					break;
