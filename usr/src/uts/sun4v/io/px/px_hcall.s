@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Hypervisor calls called by px nexus driver.
@@ -428,7 +427,7 @@ px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr)
 	mov     %o2, %o4
 	mov     HVIO_MSIQ_INFO, %o5
 	ta      FAST_TRAP
-	brnz    1f
+	brnz	%o0, 1f
 	nop
 	stx     %o1, [%o4]
 	stuw    %o2, [%o3]
