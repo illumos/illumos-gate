@@ -82,7 +82,9 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 	dev_info_t		*dip = irq_ptr->airq_dip;
 	int			cap_ptr = i_ddi_get_msi_msix_cap_ptr(dip);
 	ddi_acc_handle_t	handle = i_ddi_get_pci_config_handle(dip);
+#if !defined(__xpv)
 	msi_regs_t		msi_regs;
+#endif	/* ! __xpv */
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_pci_msi_enable_vector: dip=0x%p\n"
 	    "\tdriver = %s, inum=0x%x vector=0x%x apicid=0x%x\n", (void *)dip,
@@ -90,17 +92,29 @@ apic_pci_msi_enable_vector(apic_irq_t *irq_ptr, int type, int inum, int vector,
 
 	ASSERT((handle != NULL) && (cap_ptr != 0));
 
+#if !defined(__xpv)
 	msi_regs.mr_data = vector;
 	msi_regs.mr_addr = target_apic_id;
 
 	apic_vt_ops->apic_intrr_alloc_entry(irq_ptr);
 	apic_vt_ops->apic_intrr_map_entry(irq_ptr, (void *)&msi_regs);
 	apic_vt_ops->apic_intrr_record_msi(irq_ptr, &msi_regs);
+
 	/* MSI Address */
 	msi_addr = msi_regs.mr_addr;
 
 	/* MSI Data: MSI is edge triggered according to spec */
 	msi_data = msi_regs.mr_data;
+#else
+	/* MSI Address */
+	msi_addr = (MSI_ADDR_HDR |
+	    (target_apic_id << MSI_ADDR_DEST_SHIFT));
+	msi_addr |= ((MSI_ADDR_RH_FIXED << MSI_ADDR_RH_SHIFT) |
+	    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT));
+
+	/* MSI Data: MSI is edge triggered according to spec */
+	msi_data = ((MSI_DATA_TM_EDGE << MSI_DATA_TM_SHIFT) | vector);
+#endif	/* ! __xpv */
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_pci_msi_enable_vector: addr=0x%lx "
 	    "data=0x%lx\n", (long)msi_addr, (long)msi_data));

@@ -1686,7 +1686,9 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		ioapic_write(ioapic_ix, APIC_RDT_CMD + 2 * intin, AV_MASK);
 	}
 
+#if !defined(__xpv)
 	apic_vt_ops->apic_intrr_free_entry(irqptr);
+#endif
 
 	if (max_ipl == PSM_INVALID_IPL) {
 		ASSERT(irqheadptr == irqptr);
@@ -2888,6 +2890,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 		if ((uint32_t)bind_cpu == IRQ_UNBOUND) {
 			irdt.ir_lo =  AV_LDEST | AV_LOPRI |
 			    irq_ptr->airq_rdt_entry;
+#if !defined(__xpv)
 			irdt.ir_hi = AV_TOALL >> APIC_ID_BIT_OFFSET;
 
 			apic_vt_ops->apic_intrr_alloc_entry(irq_ptr);
@@ -2897,9 +2900,11 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 
 			/* Write the RDT entry -- no specific CPU binding */
 			WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
-			    irdt.ir_hi |
-			    (AV_TOALL | ((1 << APIC_ID_BIT_OFFSET) - 1)));
-
+			    irdt.ir_hi | AV_TOALL);
+#else
+			WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
+			    AV_TOALL);
+#endif
 			if (airq_temp_cpu != IRQ_UNINIT && airq_temp_cpu !=
 			    IRQ_UNBOUND)
 				apic_cpus[airq_temp_cpu].aci_temp_bound--;
@@ -2931,6 +2936,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 		irdt.ir_lo = AV_PDEST | AV_FIXED | irq_ptr->airq_rdt_entry;
 		irdt.ir_hi = cpu_infop->aci_local_id;
 
+#if !defined(__xpv)
 		apic_vt_ops->apic_intrr_alloc_entry(irq_ptr);
 		apic_vt_ops->apic_intrr_map_entry(irq_ptr, (void *)&irdt);
 		apic_vt_ops->apic_intrr_record_rdt(irq_ptr, &irdt);
@@ -2938,7 +2944,11 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 		/* Write the RDT entry -- bind to a specific CPU: */
 		WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
 		    irdt.ir_hi);
-
+#else
+		/* Write the RDT entry -- bind to a specific CPU: */
+		WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
+		    irdt.ir_hi << APIC_ID_BIT_OFFSET);
+#endif
 		/* Write the vector, trigger, and polarity portion of the RDT */
 		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapicindex, intin_no,
 		    irdt.ir_lo);
