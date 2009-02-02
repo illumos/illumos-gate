@@ -1753,8 +1753,20 @@ find_all_global_interfaces(struct lifconf *lifcp, char **buf,
 	int n;
 	ni_t *nip;
 	struct lifreq *lifrp;
+	dladm_handle_t dld_handle;
+	dladm_status_t status;
+	char errmsg[DLADM_STRSIZE];
 
-	(void) dlpi_walk(ni_entry, NULL, 0);
+	if ((status = dladm_open(&dld_handle)) != DLADM_STATUS_OK) {
+		(void) fprintf(stderr,
+		    "ifconfig: find_all_global_interfaces failed: %s\n",
+		    dladm_status2str(status, errmsg));
+		return (-1);
+	}
+
+	(void) dlpi_walk(ni_entry, dld_handle, 0);
+
+	dladm_close(dld_handle);
 
 	/*
 	 * Now, translate the linked list into
@@ -4867,19 +4879,13 @@ add_ni(const char *name)
 	num_ni++;
 }
 
-/* ARGSUSED2 */
 static boolean_t
 ni_entry(const char *linkname, void *arg)
 {
 	dlpi_handle_t	dh;
-	dladm_handle_t	dld_handle;
 	datalink_class_t class;
 
-	if (dladm_open(&dld_handle) != DLADM_STATUS_OK)
-		return (_B_FALSE);
-
-	(void) dladm_name2info(dld_handle, linkname, NULL, NULL, &class, NULL);
-	dladm_close(dld_handle);
+	(void) dladm_name2info(arg, linkname, NULL, NULL, &class, NULL);
 
 	if (class == DATALINK_CLASS_ETHERSTUB)
 		return (_B_FALSE);

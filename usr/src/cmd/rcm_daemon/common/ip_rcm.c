@@ -238,6 +238,9 @@ static struct rcm_mod_ops ip_ops =
 struct rcm_mod_ops *
 rcm_mod_init(void)
 {
+	char errmsg[DLADM_STRSIZE];
+	dladm_status_t status;
+
 	rcm_log_message(RCM_TRACE1, "IP: mod_init\n");
 
 	cache_head.ip_next = &cache_tail;
@@ -246,7 +249,12 @@ rcm_mod_init(void)
 	cache_tail.ip_next = NULL;
 	(void) mutex_init(&cache_lock, NULL, NULL);
 
-	(void) dladm_open(&dld_handle);
+	if ((status = dladm_open(&dld_handle)) != DLADM_STATUS_OK) {
+		rcm_log_message(RCM_WARNING,
+		    "IP: mod_init failed: cannot get datalink handle: %s\n",
+		    dladm_status2str(status, errmsg));
+		return (NULL);
+	}
 
 	/* Return the ops vectors */
 	return (&ip_ops);

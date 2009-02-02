@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,13 +134,21 @@ static struct rcm_mod_ops net_ops = {
 struct rcm_mod_ops *
 rcm_mod_init(void)
 {
+	dladm_status_t	status;
+	char		errmsg[DLADM_STRSIZE];
+
 	cache_head.next = &cache_tail;
 	cache_head.prev = NULL;
 	cache_tail.prev = &cache_head;
 	cache_tail.next = NULL;
 	(void) mutex_init(&cache_lock, NULL, NULL);
 
-	dladm_open(&dld_handle);
+	if ((status = dladm_open(&dld_handle)) != DLADM_STATUS_OK) {
+		rcm_log_message(RCM_WARNING,
+		    "NET: mod_init failed: cannot open datalink handle: %s\n",
+		    dladm_status2str(status, errmsg));
+		return (NULL);
+	}
 
 	/* Return the ops vectors */
 	return (&net_ops);

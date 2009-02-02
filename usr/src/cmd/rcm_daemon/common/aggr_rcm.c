@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,6 +168,9 @@ static struct rcm_mod_ops aggr_ops =
 struct rcm_mod_ops *
 rcm_mod_init(void)
 {
+	dladm_status_t status;
+	char errmsg[DLADM_STRSIZE];
+
 	rcm_log_message(RCM_TRACE1, "AGGR: mod_init\n");
 
 	cache_head.vc_next = &cache_tail;
@@ -181,7 +184,12 @@ rcm_mod_init(void)
 	aggr_tail.da_next = NULL;
 	(void) mutex_init(&aggr_list_lock, NULL, NULL);
 
-	(void) dladm_open(&dld_handle);
+	if ((status = dladm_open(&dld_handle)) != DLADM_STATUS_OK) {
+		rcm_log_message(RCM_WARNING,
+		    "AGGR: mod_init failed: cannot open datalink handle: %s\n",
+		    dladm_status2str(status, errmsg));
+		return (NULL);
+	}
 
 	/* Return the ops vectors */
 	return (&aggr_ops);
