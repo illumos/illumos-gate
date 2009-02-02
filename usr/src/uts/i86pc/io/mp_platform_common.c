@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1686,6 +1686,8 @@ apic_delspl_common(int irqno, int ipl, int min_ipl, int max_ipl)
 		ioapic_write(ioapic_ix, APIC_RDT_CMD + 2 * intin, AV_MASK);
 	}
 
+	apic_vt_ops->apic_intrr_free_entry(irqptr);
+
 	if (max_ipl == PSM_INVALID_IPL) {
 		ASSERT(irqheadptr == irqptr);
 		bind_cpu = irqptr->airq_temp_cpu;
@@ -2836,6 +2838,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 	apic_cpus_info_t	*cpu_infop;
 	uint32_t		rdt_entry;
 	int			which_irq;
+	ioapic_rdt_t		irdt;
 
 	which_irq = apic_vector_to_irq[irq_ptr->airq_vector];
 
@@ -2883,12 +2886,19 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 		 */
 
 		if ((uint32_t)bind_cpu == IRQ_UNBOUND) {
-			rdt_entry = AV_LDEST | AV_LOPRI |
+			irdt.ir_lo =  AV_LDEST | AV_LOPRI |
 			    irq_ptr->airq_rdt_entry;
+			irdt.ir_hi = AV_TOALL >> APIC_ID_BIT_OFFSET;
+
+			apic_vt_ops->apic_intrr_alloc_entry(irq_ptr);
+			apic_vt_ops->apic_intrr_map_entry(
+			    irq_ptr, (void *)&irdt);
+			apic_vt_ops->apic_intrr_record_rdt(irq_ptr, &irdt);
 
 			/* Write the RDT entry -- no specific CPU binding */
 			WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
-			    AV_TOALL);
+			    irdt.ir_hi |
+			    (AV_TOALL | ((1 << APIC_ID_BIT_OFFSET) - 1)));
 
 			if (airq_temp_cpu != IRQ_UNINIT && airq_temp_cpu !=
 			    IRQ_UNBOUND)
@@ -2899,7 +2909,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 			 * the RDT
 			 */
 			WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapicindex, intin_no,
-			    rdt_entry);
+			    irdt.ir_lo);
 
 			irq_ptr->airq_temp_cpu = IRQ_UNBOUND;
 			return (0);
@@ -2912,21 +2922,26 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 		cpu_infop->aci_temp_bound++;
 	}
 	ASSERT((bind_cpu & ~IRQ_USER_BOUND) < apic_nproc);
-	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
-		/* Write the RDT entry -- bind to a specific CPU: */
-		WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
-		    cpu_infop->aci_local_id << APIC_ID_BIT_OFFSET);
-	}
+
 	if ((airq_temp_cpu != IRQ_UNBOUND) && (airq_temp_cpu != IRQ_UNINIT)) {
 		apic_cpus[airq_temp_cpu].aci_temp_bound--;
 	}
 	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
 
-		rdt_entry = AV_PDEST | AV_FIXED | irq_ptr->airq_rdt_entry;
+		irdt.ir_lo = AV_PDEST | AV_FIXED | irq_ptr->airq_rdt_entry;
+		irdt.ir_hi = cpu_infop->aci_local_id;
+
+		apic_vt_ops->apic_intrr_alloc_entry(irq_ptr);
+		apic_vt_ops->apic_intrr_map_entry(irq_ptr, (void *)&irdt);
+		apic_vt_ops->apic_intrr_record_rdt(irq_ptr, &irdt);
+
+		/* Write the RDT entry -- bind to a specific CPU: */
+		WRITE_IOAPIC_RDT_ENTRY_HIGH_DWORD(ioapicindex, intin_no,
+		    irdt.ir_hi);
 
 		/* Write the vector, trigger, and polarity portion of the RDT */
 		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapicindex, intin_no,
-		    rdt_entry);
+		    irdt.ir_lo);
 
 	} else {
 		int type = (irq_ptr->airq_mps_intr_index == MSI_INDEX) ?
@@ -2937,7 +2952,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 				/* first one */
 				DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
 				    "apic_pci_msi_enable_vector\n"));
-				apic_pci_msi_enable_vector(irq_ptr->airq_dip,
+				apic_pci_msi_enable_vector(irq_ptr,
 				    type, which_irq, irq_ptr->airq_vector,
 				    irq_ptr->airq_intin_no,
 				    cpu_infop->aci_local_id);
@@ -2951,7 +2966,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu,
 				    type, which_irq);
 			}
 		} else { /* MSI-X */
-			apic_pci_msi_enable_vector(irq_ptr->airq_dip, type,
+			apic_pci_msi_enable_vector(irq_ptr, type,
 			    irq_ptr->airq_origirq, irq_ptr->airq_vector, 1,
 			    cpu_infop->aci_local_id);
 			apic_pci_msi_enable_mode(irq_ptr->airq_dip, type,

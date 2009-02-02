@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Portions Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@ extern "C" {
 #endif
 
 #include <sys/types.h>
+#include <sys/bitset.h>
 #include <sys/dmar_acpi.h>
 #include <sys/iommu_rscs.h>
 #include <sys/cpu.h>
@@ -130,6 +131,8 @@ extern void return_instr(void);
 /* fault register */
 #define	IOMMU_FAULT_STS_PPF		(2)
 #define	IOMMU_FAULT_STS_PFO		(1)
+#define	IOMMU_FAULT_STS_ITE		(1 << 6)
+#define	IOMMU_FAULT_STS_ICE		(1 << 5)
 #define	IOMMU_FAULT_STS_IQE		(1 << 4)
 #define	IOMMU_FAULT_GET_INDEX(x)	(((x) >> 8) & 0xff)
 #define	IOMMU_FRR_GET_F(x)		((x) >> 63)
@@ -151,6 +154,8 @@ extern void return_instr(void);
 #define	IOMMU_CAP_ND(x)			(1 << (((x) & 0x7) *2 + 4)) -1
 #define	IOMMU_ECAP_GET_IRO(x)		((((x) >> 8) & 0x3ff) << 4)
 #define	IOMMU_ECAP_GET_C(x)		((x) & 0x1)
+#define	IOMMU_ECAP_GET_MHMV(x)		((x >> 20) & 0xf)
+#define	IOMMU_ECAP_GET_EIM(x)		((x) & 0x10)
 #define	IOMMU_ECAP_GET_IR(x)		((x) & 0x8)
 #define	IOMMU_ECAP_GET_DI(x)		((x) & 0x4)
 #define	IOMMU_ECAP_GET_QI(x)		((x) & 0x2)
@@ -208,6 +213,56 @@ extern void return_instr(void);
 #define	IOMMU_INTR_IPL			(8)
 #define	IOMMU_REG_FEVNT_CON_IM_SHIFT	(31)
 
+/* iommu enable state */
+#define	DMAR_ENABLE		0x1
+#define	QINV_ENABLE		0x2
+#define	INTRR_ENABLE		0x4
+
+/* invalidation queue table entry size */
+#define	QINV_ENTRY_SIZE		0x10
+
+/* max value of Queue Size field of Invalidation Queue Address Register */
+#define	QINV_MAX_QUEUE_SIZE	0x7
+
+/* status data size of invalidation wait descriptor */
+#define	QINV_SYNC_DATA_SIZE	0x4
+
+/* status data value of invalidation wait descriptor */
+#define	QINV_SYNC_DATA_FENCE	1
+#define	QINV_SYNC_DATA_UNFENCE	2
+
+/* invalidation queue head and tail */
+#define	QINV_IQA_HEAD(QH)	BITX((QH), 18, 4)
+#define	QINV_IQA_TAIL_SHIFT	4
+
+/* max value of Size field of Interrupt Remapping Table Address Register */
+#define	INTRR_MAX_IRTA_SIZE	0xf
+
+/* interrupt remapping table entry size */
+#define	INTRR_RTE_SIZE		0x10
+
+/* ioapic redirection table entry related shift of remappable interrupt */
+#define	INTRR_IOAPIC_IIDX_SHIFT		17
+#define	INTRR_IOAPIC_FORMAT_SHIFT	16
+#define	INTRR_IOAPIC_TM_SHIFT		15
+#define	INTRR_IOAPIC_POL_SHIFT		13
+#define	INTRR_IOAPIC_IIDX15_SHIFT	11
+
+/* msi intr entry related shift of remappable interrupt */
+#define	INTRR_MSI_IIDX_SHIFT	5
+#define	INTRR_MSI_FORMAT_SHIFT	4
+#define	INTRR_MSI_SHV_SHIFT	3
+#define	INTRR_MSI_IIDX15_SHIFT	2
+
+#define	INTRR_IIDX_FULL		(uint_t)-1
+
+#define	RDT_DLM(rdt)	BITX((rdt), 10, 8)
+#define	RDT_DM(rdt)	BT_TEST(&(rdt), 11)
+#define	RDT_POL(rdt)	BT_TEST(&(rdt), 13)
+#define	RDT_TM(rdt)	BT_TEST(&(rdt), 15)
+
+#define	INTRR_DISABLE	(void *)-1
+
 /* page entry structure */
 typedef uint64_t *iopte_t;
 
@@ -238,7 +293,9 @@ typedef struct iovpte {
 typedef struct iommu_kstat {
 
 	/* hardware dependent */
-	kstat_named_t is_enabled;
+	kstat_named_t is_dmar_enabled;
+	kstat_named_t is_qinv_enabled;
+	kstat_named_t is_intrr_enabled;
 	kstat_named_t is_iotlb_psi;
 	kstat_named_t is_iotlb_domain;
 	kstat_named_t is_iotlb_global;
@@ -283,6 +340,11 @@ typedef enum {
 	CTT_INV_G_DOMAIN,
 	CTT_INV_G_DEVICE
 } ctt_inv_g_t;
+
+typedef enum {
+	IEC_INV_GLOBAL = 0,
+	IEC_INV_INDEX,
+} iec_inv_g_t;
 
 /*
  * struct dmar_ops
@@ -349,6 +411,9 @@ typedef struct iotlb_pend_head {
 	list_t		ich_mem_list;
 } iotlb_pend_head_t;
 
+struct inv_queue_state;
+struct intr_remap_tbl_state;
+
 /*
  * struct intel_iommu_state
  *   This structure describes the state information
@@ -378,6 +443,8 @@ typedef struct iotlb_pend_head {
  * iu_statistics	- iommu statistics
  * iu_dmar_ops		- iommu operation functions
  * iu_pend_head		- pending iotlb list
+ * iu_inv_queue		- invalidation queue state
+ * iu_intr_remap_tbl	- interrupt remapping table state
  */
 typedef struct intel_iommu_state {
 	list_node_t		node;
@@ -395,12 +462,14 @@ typedef struct intel_iommu_state {
 	uint32_t		iu_global_cmd_reg;
 	int			iu_max_domain;
 	iommu_rscs_t		iu_domain_id_hdl;
-	boolean_t		iu_enabled;
+	uchar_t			iu_enabled;
 	boolean_t		iu_coherency;
 	kstat_t			*iu_kstat;
 	iommu_stat_t		iu_statistics;
 	struct dmar_ops		*iu_dmar_ops;
 	iotlb_pend_head_t	iu_pend_head;
+	struct inv_queue_state	*iu_inv_queue;
+	struct intr_remap_tbl_state	*iu_intr_remap_tbl;
 } intel_iommu_state_t;
 
 /*
@@ -512,6 +581,138 @@ typedef struct dvma_cookie_head {
 	iommu_dvma_cookie_t	*dch_next;
 	uint_t			dch_count;
 } dvma_cookie_head_t;
+
+/* physical contigous pages for invalidation queue */
+typedef struct inv_queue_mem {
+	kmutex_t		lock;
+	ddi_dma_handle_t	dma_hdl;
+	ddi_acc_handle_t	acc_hdl;
+	caddr_t			vaddr;
+	paddr_t			paddr;
+	uint_t			size;
+	uint16_t		head;
+	uint16_t		tail;
+} inv_queue_mem_t;
+
+/*
+ * invalidation queue state
+ *   This structure describes the state information of the
+ *   invalidation queue table and related status memeory for
+ *   invalidation wait descriptor
+ *
+ * iq_table		- invalidation queue table
+ * iq_sync		- sync status memory for invalidation wait descriptor
+ * iotlb_pend_node	- pending tlb node
+ */
+typedef struct inv_queue_state {
+	inv_queue_mem_t		iq_table;
+	inv_queue_mem_t		iq_sync;
+	iotlb_pend_node_t	**iotlb_pend_node;
+} inv_queue_state_t;
+
+/* invalidation queue entry structure */
+typedef struct inv_dsc {
+	uint64_t	lo;
+	uint64_t	hi;
+} inv_dsc_t;
+
+/* helper macro for making queue invalidation descriptor */
+#define	INV_DSC_TYPE(dsc)	((dsc)->lo & 0xF)
+#define	CC_INV_DSC_HIGH		(0)
+#define	CC_INV_DSC_LOW(fm, sid, did, g)	(((uint64_t)(fm) << 48) | \
+	((uint64_t)(sid) << 32) | \
+	((uint64_t)(did) << 16) | \
+	((uint64_t)(g) << 4) | \
+	1)
+
+#define	IOTLB_INV_DSC_HIGH(addr, ih, am) (((uint64_t)(addr)) | \
+	((uint64_t)(ih) << 6) |	\
+	((uint64_t)(am)))
+
+#define	IOTLB_INV_DSC_LOW(did, dr, dw, g) (((uint64_t)(did) << 16) | \
+	((uint64_t)(dr) << 7) | \
+	((uint64_t)(dw) << 6) | \
+	((uint64_t)(g) << 4) | \
+	2)
+
+#define	DEV_IOTLB_INV_DSC_HIGH(addr, s) (((uint64_t)(addr)) | (s))
+
+#define	DEV_IOTLB_INV_DSC_LOW(sid, max_invs_pd) ( \
+	((uint64_t)(sid) << 32) | \
+	((uint64_t)(max_invs_pd) << 16) | \
+	3)
+
+#define	IEC_INV_DSC_HIGH (0)
+#define	IEC_INV_DSC_LOW(iidx, im, g) (((uint64_t)(iidx) << 32) | \
+	((uint64_t)(im) << 27) | \
+	((uint64_t)(g) << 4) | \
+	4)
+
+#define	INV_WAIT_DSC_HIGH(saddr) ((uint64_t)(saddr))
+
+#define	INV_WAIT_DSC_LOW(sdata, fn, sw, iflag) (((uint64_t)(sdata) << 32) | \
+	((uint64_t)(fn) << 6) | \
+	((uint64_t)(sw) << 5) | \
+	((uint64_t)(iflag) << 4) | \
+	5)
+
+/* save source id and iommu structure for ioapic */
+typedef struct ioapic_iommu_info {
+	uint16_t		sid;
+	intel_iommu_state_t	*iommu;
+} ioapic_iommu_info_t;
+
+typedef struct intr_remap_private {
+	intel_iommu_state_t	*ir_iommu;
+	uint16_t		ir_iidx;
+	uint32_t		ir_sid_svt_sq;
+} intr_remap_private_t;
+
+#define	INTRR_PRIVATE(airq) ((intr_remap_private_t *)airq->airq_intrr_private)
+#define	AIRQ_PRIVATE(airq) (airq->airq_intrr_private)
+
+/* interrupt remapping table state info */
+typedef struct intr_remap_tbl_state {
+	kmutex_t		lock;
+	ddi_dma_handle_t	dma_hdl;
+	ddi_acc_handle_t	acc_hdl;
+	caddr_t			vaddr;
+	paddr_t			paddr;
+	uint_t			size;
+	bitset_t		map;
+	uint_t			free;
+} intr_remap_tbl_state_t;
+
+/* interrupt remapping table entry */
+typedef struct intr_rte {
+	uint64_t	lo;
+	uint64_t	hi;
+} intr_rte_t;
+
+#define	IRTE_HIGH(sid_svt_sq) (sid_svt_sq)
+#define	IRTE_LOW(dst, vector, dlm, tm, rh, dm, fpd, p)	\
+	    (((uint64_t)(dst) << 32) |  \
+	    ((uint64_t)(vector) << 16) | \
+	    ((uint64_t)(dlm) << 5) | \
+	    ((uint64_t)(tm) << 4) | \
+	    ((uint64_t)(rh) << 3) | \
+	    ((uint64_t)(dm) << 2) | \
+	    ((uint64_t)(fpd) << 1) | \
+	    (p))
+
+typedef enum {
+	SVT_NO_VERIFY = 0, 	/* no verification */
+	SVT_ALL_VERIFY,		/* using sid and sq to verify */
+	SVT_BUS_VERIFY,		/* verify #startbus and #endbus */
+	SVT_RSVD
+} intrr_svt_t;
+
+typedef enum {
+	SQ_VERIFY_ALL = 0,	/* verify all 16 bits */
+	SQ_VERIFY_IGR_1,	/* ignore bit 3 */
+	SQ_VERIFY_IGR_2,	/* ignore bit 2-3 */
+	SQ_VERIFY_IGR_3		/* ignore bit 1-3 */
+} intrr_sq_t;
 
 #ifdef	__cplusplus
 }

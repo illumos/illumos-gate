@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Portions Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -215,6 +215,18 @@ extern boolean_t intel_iommu_support;
 extern intel_dmar_info_t *dmar_info;
 extern void intel_iommu_release_dmar_info(void);
 extern void intel_iommu_probe_and_parse(void);
+
+/*
+ * interrupt source id and drhd info for ioapic
+ */
+typedef struct ioapic_drhd_info {
+	list_node_t	node;
+	uchar_t		ioapic_id;	/* ioapic id */
+	uint16_t	sid;		/* ioapic source id */
+	drhd_info_t	*drhd;
+} ioapic_drhd_info_t;
+
+extern list_t ioapic_drhd_infos;
 
 #ifdef	__cplusplus
 }

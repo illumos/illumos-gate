@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Portions Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -80,6 +80,9 @@ static dev_info_t *lpc_devinfo = NULL;
 static uint_t dvma_cache_high = 64;
 static dvma_cookie_head_t cookie_cache[MAX_COOKIE_CACHE_SIZE];
 
+/* ioapic info for interrupt remapping */
+static ioapic_iommu_info_t *ioapic_iommu_infos[MAX_IO_APIC];
+
 /*
  * switch to turn on/off the gfx dma remapping unit,
  * this is used when there is a dedicated drhd for the
@@ -113,6 +116,130 @@ static char *dmar_fault_reason[] = {
 };
 
 #define	DMAR_MAX_REASON_NUMBER	(14)
+
+#define	IOMMU_ALLOC_RESOURCE_DELAY	drv_usectohz(5000)
+
+/*
+ * QS field of Invalidation Queue Address Register
+ * the size of invalidation queue is 1 << (qinv_iqa_qs + 8)
+ */
+static uint_t qinv_iqa_qs = 6;
+
+/*
+ * the invalidate desctiptor type of queued invalidation interface
+ */
+static char *qinv_dsc_type[] = {
+	"Reserved",
+	"Context Cache Invalidate Descriptor",
+	"IOTLB Invalidate Descriptor",
+	"Device-IOTLB Invalidate Descriptor",
+	"Interrupt Entry Cache Invalidate Descriptor",
+	"Invalidation Wait Descriptor",
+	"Incorrect queue invalidation type"
+};
+
+#define	QINV_MAX_DSC_TYPE	(6)
+
+/*
+ * S field of the Interrupt Remapping Table Address Register
+ * the size of the interrupt remapping table is 1 << (intrr_irta_s + 1)
+ */
+static uint_t intrr_irta_s = INTRR_MAX_IRTA_SIZE;
+
+/*
+ * whether disable interrupt remapping in LOCAL_APIC mode
+ */
+static int intrr_only_for_x2apic = 1;
+
+/*
+ * whether verify the source id of interrupt request
+ */
+static int intrr_enable_sid_verify = 0;
+
+/* the fault reason for interrupt remapping */
+static char *intrr_fault_reason[] = {
+	"reserved field set in IRTE",
+	"interrupt_index exceed the intr-remap table size",
+	"present field in IRTE is clear",
+	"hardware access intr-remap table address resulted in error",
+	"reserved field set in IRTE, inlcude various conditional",
+	"hardware blocked an interrupt request in Compatibility format",
+	"remappable interrupt request blocked due to verification failure"
+};
+
+#define	INTRR_MAX_REASON_NUMBER	(6)
+
+/*
+ * the queued invalidation interface functions
+ */
+static int iommu_qinv_init(intel_iommu_state_t *iommu);
+static void iommu_qinv_fini(intel_iommu_state_t *iommu);
+static void iommu_qinv_enable(intel_iommu_state_t *iommu);
+static void qinv_submit_inv_dsc(intel_iommu_state_t *iommu, inv_dsc_t *dsc);
+static void qinv_cc_common(intel_iommu_state_t *iommu, uint8_t function_mask,
+    uint16_t source_id, uint_t domain_id, ctt_inv_g_t type);
+static void qinv_iotlb_common(intel_iommu_state_t *iommu, uint_t domain_id,
+    uint64_t addr, uint_t am, uint_t hint, tlb_inv_g_t type);
+static void qinv_iec_common(intel_iommu_state_t *iommu, uint_t iidx,
+    uint_t im, uint_t g);
+static void qinv_iec_global(intel_iommu_state_t *iommu);
+static void qinv_iec_single(intel_iommu_state_t *iommu, uint_t iidx);
+static void qinv_iec(intel_iommu_state_t *iommu, uint_t iidx, uint_t cnt);
+static uint_t qinv_alloc_sync_mem_entry(intel_iommu_state_t *iommu);
+static void qinv_wait_async_unfence(intel_iommu_state_t *iommu,
+    iotlb_pend_node_t *node);
+static void qinv_wait_sync(intel_iommu_state_t *iommu);
+static int qinv_wait_async_finish(intel_iommu_state_t *iommu, int *count);
+static void qinv_cc_fsi(intel_iommu_state_t *iommu, uint8_t function_mask,
+    uint16_t source_id, uint_t domain_id);
+static void qinv_cc_dsi(intel_iommu_state_t *iommu, uint_t domain_id);
+static void qinv_cc_gbl(intel_iommu_state_t *iommu);
+static void qinv_iotlb_psi(intel_iommu_state_t *iommu, uint_t domain_id,
+    uint64_t dvma, uint_t count, uint_t hint);
+static void qinv_iotlb_dsi(intel_iommu_state_t *iommu, uint_t domain_id);
+static void qinv_iotlb_gbl(intel_iommu_state_t *iommu);
+static void qinv_plant_wait(intel_iommu_state_t *iommu,
+    iommu_dvma_cookie_t *dcookies, uint_t count, uint_t array_size);
+static void qinv_reap_wait(intel_iommu_state_t *iommu);
+
+/*LINTED*/
+static void qinv_wait_async_fence(intel_iommu_state_t *iommu);
+/*LINTED*/
+static void qinv_dev_iotlb_common(intel_iommu_state_t *iommu, uint16_t sid,
+    uint64_t addr, uint_t size, uint_t max_invs_pd);
+
+/* interrupt remapping related functions */
+static int intr_remap_init_unit(intel_iommu_state_t *iommu);
+static void intr_remap_fini_unit(intel_iommu_state_t *iommu);
+static void intr_remap_enable_unit(intel_iommu_state_t *iommu);
+static uint_t bitset_find_free(bitset_t *, uint_t);
+static uint_t bitset_find_multi_free(bitset_t *, uint_t, uint_t);
+static int intrr_tbl_alloc_entry(intr_remap_tbl_state_t *);
+static int intrr_tbl_alloc_multi_entries(intr_remap_tbl_state_t *, uint_t);
+static void get_ioapic_iommu_info(void);
+static void intr_remap_get_iommu(apic_irq_t *);
+static void intr_remap_get_sid(apic_irq_t *);
+
+static int intr_remap_init(int);
+static void intr_remap_enable(void);
+static void intr_remap_alloc_entry(apic_irq_t *);
+static void intr_remap_map_entry(apic_irq_t *, void *);
+static void intr_remap_free_entry(apic_irq_t *);
+static void intr_remap_record_rdt(apic_irq_t *, ioapic_rdt_t *);
+static void intr_remap_record_msi(apic_irq_t *, msi_regs_t *);
+
+static struct apic_intrr_ops intr_remap_ops = {
+	intr_remap_init,
+	intr_remap_enable,
+	intr_remap_alloc_entry,
+	intr_remap_map_entry,
+	intr_remap_free_entry,
+	intr_remap_record_rdt,
+	intr_remap_record_msi,
+};
+
+/* apic mode, APIC/X2APIC */
+static int intrr_apic_mode = LOCAL_APIC;
 
 /*
  * cpu_clflush()
@@ -218,6 +345,15 @@ destroy_iommu_state(intel_iommu_state_t *iommu)
 	mutex_destroy(&(iommu->iu_root_context_lock));
 	ddi_regs_map_free(&(iommu->iu_reg_handle));
 	kmem_free(iommu->iu_dmar_ops, sizeof (struct dmar_ops));
+
+	if (iommu->iu_inv_queue) {
+		iommu_qinv_fini(iommu);
+	}
+
+	if (iommu->iu_intr_remap_tbl) {
+		intr_remap_fini_unit(iommu);
+	}
+
 	kmem_free(iommu, sizeof (intel_iommu_state_t));
 }
 
@@ -243,8 +379,13 @@ iommu_update_stats(kstat_t *ksp, int rw)
 	iommu_ksp = (iommu_kstat_t *)ksp->ks_data;
 	ASSERT(iommu_ksp != NULL);
 
-	state = iommu->iu_enabled ? "enabled" : "disabled";
-	(void) strcpy(iommu_ksp->is_enabled.value.c, state);
+	state = (iommu->iu_enabled & DMAR_ENABLE) ? "enabled" : "disabled";
+	(void) strcpy(iommu_ksp->is_dmar_enabled.value.c, state);
+	state = (iommu->iu_enabled & QINV_ENABLE) ? "enabled" : "disabled";
+	(void) strcpy(iommu_ksp->is_qinv_enabled.value.c, state);
+	state = (iommu->iu_enabled & INTRR_ENABLE) ?
+	    "enabled" : "disabled";
+	(void) strcpy(iommu_ksp->is_intrr_enabled.value.c, state);
 	iommu_ksp->is_iotlb_psi.value.ui64 =
 	    iommu->iu_statistics.st_iotlb_psi;
 	iommu_ksp->is_iotlb_domain.value.ui64 =
@@ -297,7 +438,11 @@ iommu_init_stats(intel_iommu_state_t *iommu)
 	/*
 	 * Initialize all the statistics
 	 */
-	kstat_named_init(&(iommu_ksp->is_enabled), "iommu_enable",
+	kstat_named_init(&(iommu_ksp->is_dmar_enabled), "dmar_enable",
+	    KSTAT_DATA_CHAR);
+	kstat_named_init(&(iommu_ksp->is_qinv_enabled), "qinv_enable",
+	    KSTAT_DATA_CHAR);
+	kstat_named_init(&(iommu_ksp->is_intrr_enabled), "intrr_enable",
 	    KSTAT_DATA_CHAR);
 	kstat_named_init(&(iommu_ksp->is_iotlb_psi), "iotlb_psi",
 	    KSTAT_DATA_UINT64);
@@ -352,8 +497,7 @@ iommu_intr_handler(intel_iommu_state_t *iommu)
 
 	/* check if we have a pending fault for this IOMMU */
 	if (!(status & IOMMU_FAULT_STS_PPF)) {
-		mutex_exit(&(iommu->iu_reg_lock));
-		return (0);
+		goto no_primary_faults;
 	}
 
 	/*
@@ -370,6 +514,7 @@ iommu_intr_handler(intel_iommu_state_t *iommu)
 		uint8_t fault_type;
 		uint16_t sid;
 		uint64_t pg_addr;
+		uint64_t iidx;
 
 		/* read the higher 64bits */
 		val = iommu_get_reg64(iommu,
@@ -388,40 +533,92 @@ iommu_intr_handler(intel_iommu_state_t *iommu)
 		val = iommu_get_reg64(iommu,
 		    fault_reg_offset + index * 16);
 		pg_addr = val & IOMMU_PAGE_MASK;
+		iidx = val >> 48;
 
 		/* clear the fault */
 		iommu_put_reg32(iommu, fault_reg_offset + index * 16 + 12,
 		    (((uint32_t)1) << 31));
 
 		/* report the fault info */
-		cmn_err(CE_WARN,
-		    "%s generated a fault event when translating DMA %s\n"
-		    "\t on address 0x%" PRIx64 " for PCI(%d, %d, %d), "
-		    "the reason is:\n\t %s",
-		    ddi_node_name(iommu->iu_drhd->di_dip),
-		    fault_type ? "read" : "write", pg_addr,
-		    (sid >> 8) & 0xff, (sid >> 3) & 0x1f, sid & 0x7,
-		    dmar_fault_reason[MIN(fault_reason,
-		    DMAR_MAX_REASON_NUMBER)]);
+		if (fault_reason < 0x20) {
+			/* dmar-remapping fault */
+			cmn_err(CE_WARN,
+			    "%s generated a fault event when translating "
+			    "DMA %s\n"
+			    "\t on address 0x%" PRIx64 " for PCI(%d, %d, %d), "
+			    "the reason is:\n\t %s",
+			    ddi_node_name(iommu->iu_drhd->di_dip),
+			    fault_type ? "read" : "write", pg_addr,
+			    (sid >> 8) & 0xff, (sid >> 3) & 0x1f, sid & 0x7,
+			    dmar_fault_reason[MIN(fault_reason,
+			    DMAR_MAX_REASON_NUMBER)]);
+		} else if (fault_reason < 0x27) {
+			/* intr-remapping fault */
+			cmn_err(CE_WARN,
+			    "%s generated a fault event when translating "
+			    "interrupt request\n"
+			    "\t on index 0x%" PRIx64 " for PCI(%d, %d, %d), "
+			    "the reason is:\n\t %s",
+			    ddi_node_name(iommu->iu_drhd->di_dip),
+			    iidx,
+			    (sid >> 8) & 0xff, (sid >> 3) & 0x1f, sid & 0x7,
+			    intrr_fault_reason[MIN((fault_reason - 0x20),
+			    INTRR_MAX_REASON_NUMBER)]);
+		}
 
 		index++;
 		if (index > max_fault_index)
 			index = 0;
 	}
 
-	/*
-	 * At this point we have cleared the overflow if any
-	 */
-	status = iommu_get_reg32(iommu, IOMMU_REG_FAULT_STS);
+no_primary_faults:
 
-	/* clear over flow */
-	if (status & IOMMU_FAULT_STS_PFO) {
-#ifdef	DEBUG
-		cmn_err(CE_WARN, "Primary Fault logging overflow detected. "
-		    "Clearing fault overflow");
-#endif
-		iommu_put_reg32(iommu, IOMMU_REG_FAULT_STS, 1);
+	/*
+	 * handle queued invalidation interface errors
+	 */
+	if (status & IOMMU_FAULT_STS_IQE) {
+		uint64_t	head;
+		inv_dsc_t	*dsc;
+
+		head = QINV_IQA_HEAD(
+		    iommu_get_reg64(iommu, IOMMU_REG_INVAL_QH));
+		dsc = (inv_dsc_t *)(iommu->iu_inv_queue->iq_table.vaddr
+		    + (head * QINV_ENTRY_SIZE));
+
+		/* report the error */
+		cmn_err(CE_WARN,
+		    "%s generated a fault when fetching a descriptor from the\n"
+		    "\tinvalidation queue, or detects that the fetched\n"
+		    "\tdescriptor is invalid. The head register is "
+		    "0x%" PRIx64 ",\n"
+		    "\tthe type is %s\n",
+		    ddi_node_name(iommu->iu_drhd->di_dip), head,
+		    qinv_dsc_type[MIN(INV_DSC_TYPE(dsc),
+		    QINV_MAX_DSC_TYPE)]);
 	}
+
+	/*
+	 * Hardware received an unexpected or invalid Device-IOTLB
+	 * invalidation completion
+	 */
+	if (status & IOMMU_FAULT_STS_ICE) {
+		cmn_err(CE_WARN,
+		    "Hardware received an unexpected or invalid "
+		    "Device-IOTLB invalidation completion.\n");
+	}
+
+	/*
+	 * Hardware detected a Device-IOTLB invalidation
+	 * completion time-out
+	 */
+	if (status & IOMMU_FAULT_STS_ITE) {
+		cmn_err(CE_WARN,
+		    "Hardware detected a Device-IOTLB invalidation "
+		    "completion time-out.\n");
+	}
+
+	/* clear the fault */
+	iommu_put_reg32(iommu, IOMMU_REG_FAULT_STS, 1);
 
 	mutex_exit(&(iommu->iu_reg_lock));
 
@@ -466,14 +663,19 @@ intel_iommu_add_intr(void)
 	msi_addr = (MSI_ADDR_HDR |
 	    (MSI_ADDR_RH_FIXED << MSI_ADDR_RH_SHIFT) |
 	    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT) |
-	    apic_cpus[0].aci_local_id);
+	    (apic_cpus[0].aci_local_id & 0xFF));
 	msi_data = ((MSI_DATA_TM_EDGE << MSI_DATA_TM_SHIFT) | vect);
 
 	for_each_in_list(&iommu_states, iommu) {
 		(void) iommu_intr_handler(iommu);
 		mutex_enter(&(iommu->iu_reg_lock));
 		iommu_put_reg32(iommu, IOMMU_REG_FEVNT_ADDR, msi_addr);
-		iommu_put_reg32(iommu, IOMMU_REG_FEVNT_UADDR, 0);
+		if (intrr_apic_mode == LOCAL_X2APIC) {
+			iommu_put_reg32(iommu, IOMMU_REG_FEVNT_UADDR,
+			    apic_cpus[0].aci_local_id & 0xFFFFFF00);
+		} else {
+			iommu_put_reg32(iommu, IOMMU_REG_FEVNT_UADDR, 0);
+		}
 		iommu_put_reg32(iommu, IOMMU_REG_FEVNT_DATA, msi_data);
 		iommu_put_reg32(iommu, IOMMU_REG_FEVNT_CON, 0);
 		mutex_exit(&(iommu->iu_reg_lock));
@@ -801,6 +1003,7 @@ dmar_enable_unit(intel_iommu_state_t *iommu)
 	    iommu_get_reg32, (status & IOMMU_GSTS_TES), status);
 	mutex_exit(&(iommu->iu_reg_lock));
 	iommu->iu_global_cmd_reg |= IOMMU_GCMD_TE;
+	iommu->iu_enabled |= DMAR_ENABLE;
 	cmn_err(CE_CONT, "?\t%s enabled\n",
 	    ddi_node_name(iommu->iu_drhd->di_dip));
 }
@@ -836,7 +1039,10 @@ iommu_bringup_unit(intel_iommu_state_t *iommu)
 	 * at last enable the unit
 	 */
 	iommu->iu_dmar_ops->do_enable(iommu);
-	iommu->iu_enabled = B_TRUE;
+
+	/* enable queued invalidation */
+	if (iommu->iu_inv_queue)
+		iommu_qinv_enable(iommu);
 }
 
 /*
@@ -1264,7 +1470,7 @@ create_iommu_state(drhd_info_t *drhd)
 	/*
 	 * the iommu is orginally disabled
 	 */
-	iommu->iu_enabled = B_FALSE;
+	iommu->iu_enabled = 0;
 	iommu->iu_global_cmd_reg = 0;
 
 	/*
@@ -1282,6 +1488,23 @@ create_iommu_state(drhd_info_t *drhd)
 	 * alloc root entry table, this should put after init ops
 	 */
 	iommu->iu_root_entry_paddr = iommu_get_page(iommu, KM_SLEEP);
+
+	/*
+	 * init queued invalidation interface
+	 */
+	iommu->iu_inv_queue = NULL;
+	if (IOMMU_ECAP_GET_QI(iommu->iu_excapability)) {
+		if (iommu_qinv_init(iommu) != DDI_SUCCESS) {
+			cmn_err(CE_WARN,
+			    "%s init queued invalidation interface failed\n",
+			    ddi_node_name(iommu->iu_drhd->di_dip));
+		}
+	}
+
+	/*
+	 * init intr remapping table state pointer
+	 */
+	iommu->iu_intr_remap_tbl = NULL;
 
 	/*
 	 * initialize the iotlb pending list and cache
@@ -2461,6 +2684,13 @@ intel_iommu_attach_dmar_nodes(void)
 	}
 
 	/*
+	 * register interrupt remap ops
+	 */
+	if (dmar_info->dmari_intr_remap == B_TRUE) {
+		psm_vt_ops = &intr_remap_ops;
+	}
+
+	/*
 	 * collect the reserved memory pages
 	 */
 	cmn_err(CE_CONT, "?Start to collect the reserved memory\n");
@@ -2739,7 +2969,7 @@ intel_iommu_map_sgl(ddi_dma_handle_t handle,
 	}
 
 	/* direct return if drhd is disabled */
-	if (!(domain->dm_iommu->iu_enabled) ||
+	if (!(domain->dm_iommu->iu_enabled & DMAR_ENABLE) ||
 	    domain->dm_identity)
 		return (IOMMU_SGL_DISABLE);
 
@@ -2952,7 +3182,7 @@ intel_iommu_unmap_sgl(ddi_dma_handle_t handle)
 	(void) iommu_get_domain(dma->dp_dip, &domain);
 
 	/* if the drhd is disabled, nothing will be done */
-	if (!(domain->dm_iommu->iu_enabled) ||
+	if (!(domain->dm_iommu->iu_enabled & DMAR_ENABLE) ||
 	    domain->dm_identity)
 		return;
 
@@ -2966,4 +3196,1396 @@ intel_iommu_unmap_sgl(ddi_dma_handle_t handle)
 	domain->dm_iommu->iu_dmar_ops->do_reap_wait(domain->dm_iommu);
 	domain->dm_iommu->iu_dmar_ops->do_plant_wait(domain->dm_iommu,
 	    dcookies, sinfo->si_sgl_size, sinfo->si_max_pages);
+}
+
+/*
+ * initialize invalidation request queue structure.
+ * call ddi_dma_mem_alloc to allocate physical contigous
+ * pages for invalidation queue table
+ */
+static int
+iommu_qinv_init(intel_iommu_state_t *iommu)
+{
+	inv_queue_state_t *inv_queue;
+	size_t size;
+
+	ddi_dma_attr_t inv_queue_dma_attr = {
+		DMA_ATTR_V0,
+		0U,
+		0xffffffffU,
+		0xffffffffU,
+		MMU_PAGESIZE, /* page aligned */
+		0x1,
+		0x1,
+		0xffffffffU,
+		0xffffffffU,
+		1,
+		4,
+		0
+	};
+
+	ddi_device_acc_attr_t inv_queue_acc_attr = {
+		DDI_DEVICE_ATTR_V0,
+		DDI_NEVERSWAP_ACC,
+		DDI_STRICTORDER_ACC
+	};
+
+	if (qinv_iqa_qs > QINV_MAX_QUEUE_SIZE)
+		qinv_iqa_qs = QINV_MAX_QUEUE_SIZE;
+
+	inv_queue = (inv_queue_state_t *)
+	    kmem_zalloc(sizeof (inv_queue_state_t), KM_SLEEP);
+
+	/* set devi_ops in dev info structure for ddi_dma_mem_alloc */
+	DEVI(iommu->iu_drhd->di_dip)->devi_ops =
+	    DEVI(ddi_root_node())->devi_ops;
+
+	/*
+	 * set devi_bus_dma_allochdl in dev info structure for
+	 * ddi_dma_free_handle
+	 */
+	DEVI(iommu->iu_drhd->di_dip)->devi_bus_dma_allochdl =
+	    DEVI(ddi_root_node());
+
+	if (ddi_dma_alloc_handle(iommu->iu_drhd->di_dip,
+	    &inv_queue_dma_attr,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &(inv_queue->iq_table.dma_hdl)) != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "alloc invalidation queue table handler failed\n");
+		goto queue_table_handle_failed;
+	}
+
+	if (ddi_dma_alloc_handle(iommu->iu_drhd->di_dip,
+	    &inv_queue_dma_attr,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &(inv_queue->iq_sync.dma_hdl)) != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "alloc invalidation queue sync mem handler failed\n");
+		goto sync_table_handle_failed;
+	}
+
+	inv_queue->iq_table.size = (1 << (qinv_iqa_qs + 8));
+	size = inv_queue->iq_table.size * QINV_ENTRY_SIZE;
+
+	/* alloc physical contiguous pages for invalidation queue */
+	if (ddi_dma_mem_alloc(inv_queue->iq_table.dma_hdl,
+	    size,
+	    &inv_queue_acc_attr,
+	    DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &(inv_queue->iq_table.vaddr),
+	    &size,
+	    &(inv_queue->iq_table.acc_hdl)) != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "alloc invalidation queue table failed\n");
+		goto queue_table_mem_failed;
+	}
+
+	ASSERT(!((uintptr_t)inv_queue->iq_table.vaddr & MMU_PAGEOFFSET));
+	bzero(inv_queue->iq_table.vaddr, size);
+
+	/* get the base physical address of invalidation request queue */
+	inv_queue->iq_table.paddr = pfn_to_pa(
+	    hat_getpfnum(kas.a_hat, inv_queue->iq_table.vaddr));
+
+	inv_queue->iq_table.head = inv_queue->iq_table.tail = 0;
+
+	inv_queue->iq_sync.size = inv_queue->iq_table.size;
+	size = inv_queue->iq_sync.size * QINV_SYNC_DATA_SIZE;
+
+	/* alloc status memory for invalidation wait descriptor */
+	if (ddi_dma_mem_alloc(inv_queue->iq_sync.dma_hdl,
+	    size,
+	    &inv_queue_acc_attr,
+	    DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &(inv_queue->iq_sync.vaddr),
+	    &size,
+	    &(inv_queue->iq_sync.acc_hdl)) != DDI_SUCCESS) {
+		cmn_err(CE_WARN,
+		    "alloc invalidation queue sync mem failed\n");
+		goto sync_table_mem_failed;
+	}
+
+	ASSERT(!((uintptr_t)inv_queue->iq_sync.vaddr & MMU_PAGEOFFSET));
+	bzero(inv_queue->iq_sync.vaddr, size);
+	inv_queue->iq_sync.paddr = pfn_to_pa(
+	    hat_getpfnum(kas.a_hat, inv_queue->iq_sync.vaddr));
+
+	inv_queue->iq_sync.head = inv_queue->iq_sync.tail = 0;
+
+	mutex_init(&(inv_queue->iq_table.lock), NULL, MUTEX_DRIVER, NULL);
+	mutex_init(&(inv_queue->iq_sync.lock), NULL, MUTEX_DRIVER, NULL);
+
+	/*
+	 * init iotlb pend node for submitting invalidation iotlb
+	 * queue request
+	 */
+	inv_queue->iotlb_pend_node = (iotlb_pend_node_t **)
+	    kmem_zalloc(inv_queue->iq_sync.size
+	    * sizeof (iotlb_pend_node_t *), KM_SLEEP);
+
+	/* set invalidation queue structure */
+	iommu->iu_inv_queue = inv_queue;
+
+	return (DDI_SUCCESS);
+
+sync_table_mem_failed:
+	ddi_dma_mem_free(&(inv_queue->iq_table.acc_hdl));
+
+queue_table_mem_failed:
+	ddi_dma_free_handle(&(inv_queue->iq_sync.dma_hdl));
+
+sync_table_handle_failed:
+	ddi_dma_free_handle(&(inv_queue->iq_table.dma_hdl));
+
+queue_table_handle_failed:
+	kmem_free(inv_queue, sizeof (inv_queue_state_t));
+
+	return (ENOMEM);
+}
+
+/* destroy invalidation queue structure */
+static void
+iommu_qinv_fini(intel_iommu_state_t *iommu)
+{
+	inv_queue_state_t *inv_queue;
+
+	inv_queue = iommu->iu_inv_queue;
+	kmem_free(inv_queue->iotlb_pend_node,
+	    inv_queue->iq_sync.size
+	    * sizeof (iotlb_pend_node_t *));
+	ddi_dma_mem_free(&(inv_queue->iq_sync.acc_hdl));
+	ddi_dma_mem_free(&(inv_queue->iq_table.acc_hdl));
+	ddi_dma_free_handle(&(inv_queue->iq_sync.dma_hdl));
+	ddi_dma_free_handle(&(inv_queue->iq_table.dma_hdl));
+	mutex_destroy(&(inv_queue->iq_table.lock));
+	mutex_destroy(&(inv_queue->iq_sync.lock));
+	kmem_free(inv_queue, sizeof (inv_queue_state_t));
+}
+
+/* enable queued invalidation interface */
+static void
+iommu_qinv_enable(intel_iommu_state_t *iommu)
+{
+	inv_queue_state_t *inv_queue;
+	uint64_t iqa_reg_value;
+	uint32_t status;
+
+	struct dmar_ops *dmar_ops;
+
+	inv_queue = iommu->iu_inv_queue;
+
+	iqa_reg_value = inv_queue->iq_table.paddr | qinv_iqa_qs;
+
+	mutex_enter(&iommu->iu_reg_lock);
+	/* Initialize the Invalidation Queue Tail register to zero */
+	iommu_put_reg64(iommu, IOMMU_REG_INVAL_QT, 0);
+
+	/* set invalidation queue base address register */
+	iommu_put_reg64(iommu, IOMMU_REG_INVAL_QAR, iqa_reg_value);
+
+	/* enable queued invalidation interface */
+	iommu_put_reg32(iommu, IOMMU_REG_GLOBAL_CMD,
+	    iommu->iu_global_cmd_reg | IOMMU_GCMD_QIE);
+	iommu_wait_completion(iommu, IOMMU_REG_GLOBAL_STS,
+	    iommu_get_reg32, (status & IOMMU_GSTS_QIES), status);
+	mutex_exit(&iommu->iu_reg_lock);
+
+	iommu->iu_global_cmd_reg |= IOMMU_GCMD_QIE;
+	iommu->iu_enabled |= QINV_ENABLE;
+
+	/* set new queued invalidation interface */
+	dmar_ops = iommu->iu_dmar_ops;
+
+	dmar_ops->do_context_fsi = qinv_cc_fsi;
+	dmar_ops->do_context_dsi = qinv_cc_dsi;
+	dmar_ops->do_context_gbl = qinv_cc_gbl;
+	dmar_ops->do_iotlb_psi = qinv_iotlb_psi;
+	dmar_ops->do_iotlb_dsi = qinv_iotlb_dsi;
+	dmar_ops->do_iotlb_gbl = qinv_iotlb_gbl;
+	dmar_ops->do_plant_wait = qinv_plant_wait;
+	dmar_ops->do_reap_wait = qinv_reap_wait;
+}
+
+/* submit invalidation request descriptor to invalidation queue */
+static void
+qinv_submit_inv_dsc(intel_iommu_state_t *iommu, inv_dsc_t *dsc)
+{
+	inv_queue_state_t *inv_queue;
+	inv_queue_mem_t *iq_table;
+	uint_t tail;
+	uint_t old_tail;
+
+	inv_queue = iommu->iu_inv_queue;
+	iq_table = &(inv_queue->iq_table);
+
+	mutex_enter(&iq_table->lock);
+	tail = iq_table->tail;
+	iq_table->tail++;
+
+	if (iq_table->tail == iq_table->size)
+		iq_table->tail = 0;
+
+	while (iq_table->head == iq_table->tail) {
+		/*
+		 * inv queue table exhausted, wait hardware to fetch
+		 * next decscritor
+		 */
+		iq_table->head = QINV_IQA_HEAD(
+		    iommu_get_reg64(iommu, IOMMU_REG_INVAL_QH));
+	}
+	old_tail = iq_table->tail;
+	mutex_exit(&iq_table->lock);
+
+	bcopy(dsc, iq_table->vaddr + tail * QINV_ENTRY_SIZE,
+	    QINV_ENTRY_SIZE);
+
+	mutex_enter(&iq_table->lock);
+	if (old_tail == iq_table->tail)
+		iommu_put_reg64(iommu, IOMMU_REG_INVAL_QT,
+		    iq_table->tail << QINV_IQA_TAIL_SHIFT);
+	mutex_exit(&iq_table->lock);
+}
+
+/* queued invalidation interface -- invalidate context cache */
+static void
+qinv_cc_common(intel_iommu_state_t *iommu, uint8_t function_mask,
+    uint16_t source_id, uint_t domain_id, ctt_inv_g_t type)
+{
+	inv_dsc_t dsc;
+
+	dsc.lo = CC_INV_DSC_LOW(function_mask, source_id, domain_id, type);
+	dsc.hi = CC_INV_DSC_HIGH;
+
+	qinv_submit_inv_dsc(iommu, &dsc);
+
+	/* record the context cache statistics */
+	atomic_inc_64(&(iommu->iu_statistics.st_context_cache));
+}
+
+/* queued invalidation interface -- invalidate iotlb */
+static void
+qinv_iotlb_common(intel_iommu_state_t *iommu, uint_t domain_id,
+    uint64_t addr, uint_t am, uint_t hint, tlb_inv_g_t type)
+{
+	inv_dsc_t dsc;
+	uint8_t dr = 0;
+	uint8_t dw = 0;
+
+	if (IOMMU_CAP_GET_DRD(iommu->iu_capability))
+		dr = 1;
+	if (IOMMU_CAP_GET_DWD(iommu->iu_capability))
+		dw = 1;
+
+	switch (type) {
+	case TLB_INV_G_PAGE:
+		if (!IOMMU_CAP_GET_PSI(iommu->iu_capability) ||
+		    am > IOMMU_CAP_GET_MAMV(iommu->iu_capability) ||
+		    addr & IOMMU_PAGE_OFFSET) {
+			type = TLB_INV_G_DOMAIN;
+			goto qinv_ignore_psi;
+		}
+		dsc.lo = IOTLB_INV_DSC_LOW(domain_id, dr, dw, type);
+		dsc.hi = IOTLB_INV_DSC_HIGH(addr, hint, am);
+		break;
+
+	qinv_ignore_psi:
+	case TLB_INV_G_DOMAIN:
+		dsc.lo = IOTLB_INV_DSC_LOW(domain_id, dr, dw, type);
+		dsc.hi = 0;
+		break;
+
+	case TLB_INV_G_GLOBAL:
+		dsc.lo = IOTLB_INV_DSC_LOW(0, dr, dw, type);
+		dsc.hi = 0;
+		break;
+	default:
+		cmn_err(CE_WARN, "incorrect iotlb flush type");
+		return;
+	}
+
+	qinv_submit_inv_dsc(iommu, &dsc);
+
+	/*
+	 * check the result and record the statistics
+	 */
+	switch (type) {
+	/* global */
+	case TLB_INV_G_GLOBAL:
+		atomic_inc_64(&(iommu->iu_statistics.st_iotlb_global));
+		break;
+	/* domain */
+	case TLB_INV_G_DOMAIN:
+		atomic_inc_64(&(iommu->iu_statistics.st_iotlb_domain));
+		break;
+	/* psi */
+	case TLB_INV_G_PAGE:
+		atomic_inc_64(&(iommu->iu_statistics.st_iotlb_psi));
+		break;
+	default:
+		break;
+	}
+}
+
+/* queued invalidation interface -- invalidate dev_iotlb */
+static void
+qinv_dev_iotlb_common(intel_iommu_state_t *iommu, uint16_t sid,
+    uint64_t addr, uint_t size, uint_t max_invs_pd)
+{
+	inv_dsc_t dsc;
+
+	dsc.lo = DEV_IOTLB_INV_DSC_LOW(sid, max_invs_pd);
+	dsc.hi = DEV_IOTLB_INV_DSC_HIGH(addr, size);
+
+	qinv_submit_inv_dsc(iommu, &dsc);
+}
+
+/* queued invalidation interface -- invalidate interrupt entry cache */
+static void
+qinv_iec_common(intel_iommu_state_t *iommu, uint_t iidx, uint_t im, uint_t g)
+{
+	inv_dsc_t dsc;
+
+	dsc.lo = IEC_INV_DSC_LOW(iidx, im, g);
+	dsc.hi = IEC_INV_DSC_HIGH;
+
+	qinv_submit_inv_dsc(iommu, &dsc);
+}
+
+/* queued invalidation interface -- global invalidate interrupt entry cache */
+static void
+qinv_iec_global(intel_iommu_state_t *iommu)
+{
+	qinv_iec_common(iommu, 0, 0, IEC_INV_GLOBAL);
+	qinv_wait_sync(iommu);
+}
+
+/* queued invalidation interface -- invalidate single interrupt entry cache */
+static void
+qinv_iec_single(intel_iommu_state_t *iommu, uint_t iidx)
+{
+	qinv_iec_common(iommu, iidx, 0, IEC_INV_INDEX);
+	qinv_wait_sync(iommu);
+}
+
+/* queued invalidation interface -- invalidate interrupt entry caches */
+static void
+qinv_iec(intel_iommu_state_t *iommu, uint_t iidx, uint_t cnt)
+{
+	uint_t	i, mask = 0;
+
+	ASSERT(cnt != 0);
+
+	/* requested interrupt count is not a power of 2 */
+	if (!ISP2(cnt)) {
+		for (i = 0; i < cnt; i++) {
+			qinv_iec_common(iommu, iidx + cnt, 0, IEC_INV_INDEX);
+		}
+		qinv_wait_sync(iommu);
+		return;
+	}
+
+	while ((2 << mask) < cnt) {
+		mask++;
+	}
+
+	if (mask > IOMMU_ECAP_GET_MHMV(iommu->iu_excapability)) {
+		for (i = 0; i < cnt; i++) {
+			qinv_iec_common(iommu, iidx + cnt, 0, IEC_INV_INDEX);
+		}
+		qinv_wait_sync(iommu);
+		return;
+	}
+
+	qinv_iec_common(iommu, iidx, mask, IEC_INV_INDEX);
+
+	qinv_wait_sync(iommu);
+}
+
+/*
+ * alloc free entry from sync status table
+ */
+static uint_t
+qinv_alloc_sync_mem_entry(intel_iommu_state_t *iommu)
+{
+	inv_queue_mem_t *sync_mem;
+	uint_t tail;
+
+	sync_mem = &iommu->iu_inv_queue->iq_sync;
+
+sync_mem_exhausted:
+	mutex_enter(&sync_mem->lock);
+	tail = sync_mem->tail;
+	sync_mem->tail++;
+	if (sync_mem->tail == sync_mem->size)
+		sync_mem->tail = 0;
+
+	if (sync_mem->head == sync_mem->tail) {
+		/* should never happen */
+		cmn_err(CE_WARN, "sync mem exhausted\n");
+		sync_mem->tail = tail;
+		mutex_exit(&sync_mem->lock);
+		delay(IOMMU_ALLOC_RESOURCE_DELAY);
+		goto sync_mem_exhausted;
+	}
+	mutex_exit(&sync_mem->lock);
+
+	return (tail);
+}
+
+/*
+ * queued invalidation interface -- invalidation wait descriptor
+ *   fence flag not set, need status data to indicate the invalidation
+ *   wait descriptor completion
+ */
+static void
+qinv_wait_async_unfence(intel_iommu_state_t *iommu, iotlb_pend_node_t *node)
+{
+	inv_dsc_t dsc;
+	inv_queue_mem_t *sync_mem;
+	uint64_t saddr;
+	uint_t tail;
+
+	sync_mem = &iommu->iu_inv_queue->iq_sync;
+	tail = qinv_alloc_sync_mem_entry(iommu);
+
+	/* plant an iotlb pending node */
+	iommu->iu_inv_queue->iotlb_pend_node[tail] = node;
+
+	saddr = sync_mem->paddr + tail * QINV_SYNC_DATA_SIZE;
+
+	/*
+	 * sdata = QINV_SYNC_DATA_UNFENCE, fence = 0, sw = 1, if = 0
+	 * indicate the invalidation wait descriptor completion by
+	 * performing a coherent DWORD write to the status address,
+	 * not by generating an invalidation completion event
+	 */
+	dsc.lo = INV_WAIT_DSC_LOW(QINV_SYNC_DATA_UNFENCE, 0, 1, 0);
+	dsc.hi = INV_WAIT_DSC_HIGH(saddr);
+
+	qinv_submit_inv_dsc(iommu, &dsc);
+}
+
+/*
+ * queued invalidation interface -- invalidation wait descriptor
+ *   fence flag set, indicate descriptors following the invalidation
+ *   wait descriptor must be processed by hardware only after the
+ *   invalidation wait descriptor completes.
+ */
+static void
+qinv_wait_async_fence(intel_iommu_state_t *iommu)
+{
+	inv_dsc_t dsc;
+
+	/* sw = 0, fence = 1, iflag = 0 */
+	dsc.lo = INV_WAIT_DSC_LOW(0, 1, 0, 0);
+	dsc.hi = 0;
+	qinv_submit_inv_dsc(iommu, &dsc);
+}
+
+/*
+ * queued invalidation interface -- invalidation wait descriptor
+ *   wait until the invalidation request finished
+ */
+static void
+qinv_wait_sync(intel_iommu_state_t *iommu)
+{
+	inv_dsc_t dsc;
+	inv_queue_mem_t *sync_mem;
+	uint64_t saddr;
+	uint_t tail;
+	volatile uint32_t *status;
+
+	sync_mem = &iommu->iu_inv_queue->iq_sync;
+	tail = qinv_alloc_sync_mem_entry(iommu);
+	saddr = sync_mem->paddr + tail * QINV_SYNC_DATA_SIZE;
+	status = (uint32_t *)(sync_mem->vaddr + tail * QINV_SYNC_DATA_SIZE);
+
+	/*
+	 * sdata = QINV_SYNC_DATA_FENCE, fence = 1, sw = 1, if = 0
+	 * indicate the invalidation wait descriptor completion by
+	 * performing a coherent DWORD write to the status address,
+	 * not by generating an invalidation completion event
+	 */
+	dsc.lo = INV_WAIT_DSC_LOW(QINV_SYNC_DATA_FENCE, 1, 1, 0);
+	dsc.hi = INV_WAIT_DSC_HIGH(saddr);
+
+	qinv_submit_inv_dsc(iommu, &dsc);
+
+	while ((*status) != QINV_SYNC_DATA_FENCE)
+		iommu_cpu_nop();
+	*status = QINV_SYNC_DATA_UNFENCE;
+}
+
+/* get already completed invalidation wait requests */
+static int
+qinv_wait_async_finish(intel_iommu_state_t *iommu, int *cnt)
+{
+	inv_queue_mem_t *sync_mem;
+	int index;
+	volatile uint32_t *value;
+
+	ASSERT((*cnt) == 0);
+
+	sync_mem = &iommu->iu_inv_queue->iq_sync;
+
+	mutex_enter(&sync_mem->lock);
+	index = sync_mem->head;
+	value = (uint32_t *)(sync_mem->vaddr + index
+	    * QINV_SYNC_DATA_SIZE);
+	while (*value == QINV_SYNC_DATA_UNFENCE) {
+		*value = 0;
+		(*cnt)++;
+		sync_mem->head++;
+		if (sync_mem->head == sync_mem->size) {
+			sync_mem->head = 0;
+			value = (uint32_t *)(sync_mem->vaddr);
+		} else
+			value = (uint32_t *)((char *)value +
+			    QINV_SYNC_DATA_SIZE);
+	}
+
+	mutex_exit(&sync_mem->lock);
+	if ((*cnt) > 0)
+		return (index);
+	else
+		return (-1);
+}
+
+/*
+ * queued invalidation interface
+ *   function based context cache invalidation
+ */
+static void
+qinv_cc_fsi(intel_iommu_state_t *iommu, uint8_t function_mask,
+    uint16_t source_id, uint_t domain_id)
+{
+	qinv_cc_common(iommu, function_mask, source_id,
+	    domain_id, CTT_INV_G_DEVICE);
+	qinv_wait_sync(iommu);
+}
+
+/*
+ * queued invalidation interface
+ *   domain based context cache invalidation
+ */
+static void
+qinv_cc_dsi(intel_iommu_state_t *iommu, uint_t domain_id)
+{
+	qinv_cc_common(iommu, 0, 0, domain_id, CTT_INV_G_DOMAIN);
+	qinv_wait_sync(iommu);
+}
+
+/*
+ * queued invalidation interface
+ *   invalidation global context cache
+ */
+static void
+qinv_cc_gbl(intel_iommu_state_t *iommu)
+{
+	qinv_cc_common(iommu, 0, 0, 0, CTT_INV_G_GLOBAL);
+	qinv_wait_sync(iommu);
+}
+
+/*
+ * queued invalidation interface
+ *   paged based iotlb invalidation
+ */
+static void
+qinv_iotlb_psi(intel_iommu_state_t *iommu, uint_t domain_id,
+	uint64_t dvma, uint_t count, uint_t hint)
+{
+	uint_t am = 0;
+	uint_t max_am;
+
+	max_am = IOMMU_CAP_GET_MAMV(iommu->iu_capability);
+
+	/* choose page specified invalidation */
+	if (IOMMU_CAP_GET_PSI(iommu->iu_capability)) {
+		while (am <= max_am) {
+			if ((ADDR_AM_OFFSET(IOMMU_BTOP(dvma), am) + count)
+			    <= ADDR_AM_MAX(am)) {
+				qinv_iotlb_common(iommu, domain_id,
+				    dvma, am, hint, TLB_INV_G_PAGE);
+				break;
+			}
+			am++;
+		}
+		if (am > max_am) {
+			qinv_iotlb_common(iommu, domain_id,
+			    dvma, 0, hint, TLB_INV_G_DOMAIN);
+		}
+
+	/* choose domain invalidation */
+	} else {
+		qinv_iotlb_common(iommu, domain_id, dvma,
+		    0, hint, TLB_INV_G_DOMAIN);
+	}
+}
+
+/*
+ * queued invalidation interface
+ *   domain based iotlb invalidation
+ */
+static void
+qinv_iotlb_dsi(intel_iommu_state_t *iommu, uint_t domain_id)
+{
+	qinv_iotlb_common(iommu, domain_id, 0, 0, 0, TLB_INV_G_DOMAIN);
+	qinv_wait_sync(iommu);
+}
+
+/*
+ * queued invalidation interface
+ *    global iotlb invalidation
+ */
+static void
+qinv_iotlb_gbl(intel_iommu_state_t *iommu)
+{
+	qinv_iotlb_common(iommu, 0, 0, 0, 0, TLB_INV_G_GLOBAL);
+	qinv_wait_sync(iommu);
+}
+
+/*
+ * the plant wait operation for queued invalidation interface
+ */
+static void
+qinv_plant_wait(intel_iommu_state_t *iommu, iommu_dvma_cookie_t *dcookies,
+		uint_t count, uint_t array_size)
+{
+	iotlb_pend_node_t *node = NULL;
+	iotlb_pend_head_t *head;
+
+	head = &(iommu->iu_pend_head);
+	mutex_enter(&(head->ich_mem_lock));
+	node = list_head(&(head->ich_mem_list));
+	if (node) {
+		list_remove(&(head->ich_mem_list), node);
+	}
+	mutex_exit(&(head->ich_mem_lock));
+
+	/* no cache, alloc one */
+	if (node == NULL) {
+		node = kmem_zalloc(sizeof (iotlb_pend_node_t), KM_SLEEP);
+	}
+	node->icn_dcookies = dcookies;
+	node->icn_count = count;
+	node->icn_array_size = array_size;
+
+	/* plant an invalidation wait descriptor, not wait its completion */
+	qinv_wait_async_unfence(iommu, node);
+}
+
+/*
+ * the reap wait operation for queued invalidation interface
+ */
+static void
+qinv_reap_wait(intel_iommu_state_t *iommu)
+{
+	int index, cnt = 0;
+	iotlb_pend_node_t *node;
+	iotlb_pend_head_t *head;
+
+	head = &(iommu->iu_pend_head);
+
+	index = qinv_wait_async_finish(iommu, &cnt);
+
+	while (cnt--) {
+		node = iommu->iu_inv_queue->iotlb_pend_node[index];
+		if (node == NULL)
+			continue;
+		dmar_release_dvma_cookie(node->icn_dcookies,
+		    node->icn_count, node->icn_array_size);
+
+		mutex_enter(&(head->ich_mem_lock));
+		list_insert_head(&(head->ich_mem_list), node);
+		mutex_exit(&(head->ich_mem_lock));
+		iommu->iu_inv_queue->iotlb_pend_node[index] = NULL;
+		index++;
+		if (index == iommu->iu_inv_queue->iq_sync.size)
+			index = 0;
+	}
+}
+
+/* init interrupt remapping table */
+static int
+intr_remap_init_unit(intel_iommu_state_t *iommu)
+{
+	intr_remap_tbl_state_t *intr_remap_tbl;
+	size_t size;
+
+	ddi_dma_attr_t intrr_dma_attr = {
+		DMA_ATTR_V0,
+		0U,
+		0xffffffffU,
+		0xffffffffU,
+		MMU_PAGESIZE,	/* page aligned */
+		0x1,
+		0x1,
+		0xffffffffU,
+		0xffffffffU,
+		1,
+		4,
+		0
+	};
+
+	ddi_device_acc_attr_t intrr_acc_attr = {
+		DDI_DEVICE_ATTR_V0,
+		DDI_NEVERSWAP_ACC,
+		DDI_STRICTORDER_ACC
+	};
+
+	if (intrr_apic_mode == LOCAL_X2APIC) {
+		if (!IOMMU_ECAP_GET_EIM(iommu->iu_excapability)) {
+			return (DDI_FAILURE);
+		}
+	}
+
+	if (intrr_irta_s > INTRR_MAX_IRTA_SIZE) {
+		intrr_irta_s = INTRR_MAX_IRTA_SIZE;
+	}
+
+	intr_remap_tbl = (intr_remap_tbl_state_t *)
+	    kmem_zalloc(sizeof (intr_remap_tbl_state_t), KM_SLEEP);
+
+	if (ddi_dma_alloc_handle(iommu->iu_drhd->di_dip,
+	    &intrr_dma_attr,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &(intr_remap_tbl->dma_hdl)) != DDI_SUCCESS) {
+		goto intrr_tbl_handle_failed;
+	}
+
+	intr_remap_tbl->size = 1 << (intrr_irta_s + 1);
+	size = intr_remap_tbl->size * INTRR_RTE_SIZE;
+	if (ddi_dma_mem_alloc(intr_remap_tbl->dma_hdl,
+	    size,
+	    &intrr_acc_attr,
+	    DDI_DMA_CONSISTENT | IOMEM_DATA_UNCACHED,
+	    DDI_DMA_SLEEP,
+	    NULL,
+	    &(intr_remap_tbl->vaddr),
+	    &size,
+	    &(intr_remap_tbl->acc_hdl)) != DDI_SUCCESS) {
+		goto intrr_tbl_mem_failed;
+
+	}
+
+	ASSERT(!((uintptr_t)intr_remap_tbl->vaddr & MMU_PAGEOFFSET));
+	bzero(intr_remap_tbl->vaddr, size);
+	intr_remap_tbl->paddr = pfn_to_pa(
+	    hat_getpfnum(kas.a_hat, intr_remap_tbl->vaddr));
+
+	mutex_init(&(intr_remap_tbl->lock), NULL, MUTEX_DRIVER, NULL);
+	bitset_init(&intr_remap_tbl->map);
+	bitset_resize(&intr_remap_tbl->map, intr_remap_tbl->size);
+	intr_remap_tbl->free = 0;
+
+	iommu->iu_intr_remap_tbl = intr_remap_tbl;
+
+	return (DDI_SUCCESS);
+
+intrr_tbl_mem_failed:
+	ddi_dma_free_handle(&(intr_remap_tbl->dma_hdl));
+
+intrr_tbl_handle_failed:
+	kmem_free(intr_remap_tbl, sizeof (intr_remap_tbl_state_t));
+
+	return (ENOMEM);
+}
+
+/* destroy interrupt remapping table */
+static void
+intr_remap_fini_unit(intel_iommu_state_t *iommu)
+{
+	intr_remap_tbl_state_t *intr_remap_tbl;
+
+	intr_remap_tbl = iommu->iu_intr_remap_tbl;
+	bitset_fini(&intr_remap_tbl->map);
+	ddi_dma_mem_free(&(intr_remap_tbl->acc_hdl));
+	ddi_dma_free_handle(&(intr_remap_tbl->dma_hdl));
+	kmem_free(intr_remap_tbl, sizeof (intr_remap_tbl_state_t));
+}
+
+/* enable interrupt remapping hardware unit */
+static void
+intr_remap_enable_unit(intel_iommu_state_t *iommu)
+{
+	uint32_t status;
+	uint64_t irta_reg;
+	intr_remap_tbl_state_t *intr_remap_tbl;
+
+	intr_remap_tbl = iommu->iu_intr_remap_tbl;
+
+	irta_reg = intr_remap_tbl->paddr | intrr_irta_s;
+
+	if (intrr_apic_mode == LOCAL_X2APIC)
+		irta_reg |= (0x1 << 11);
+
+	/* set interrupt remap table pointer */
+	mutex_enter(&(iommu->iu_reg_lock));
+	iommu_put_reg64(iommu, IOMMU_REG_IRTAR,	irta_reg);
+	iommu_put_reg32(iommu, IOMMU_REG_GLOBAL_CMD,
+	    iommu->iu_global_cmd_reg | IOMMU_GCMD_SIRTP);
+	iommu_wait_completion(iommu, IOMMU_REG_GLOBAL_STS,
+	    iommu_get_reg32, (status & IOMMU_GSTS_IRTPS), status);
+	mutex_exit(&(iommu->iu_reg_lock));
+
+	/* global flush intr entry cache */
+	qinv_iec_global(iommu);
+
+	/* enable interrupt remapping */
+	mutex_enter(&(iommu->iu_reg_lock));
+	iommu_put_reg32(iommu, IOMMU_REG_GLOBAL_CMD,
+	    iommu->iu_global_cmd_reg | IOMMU_GCMD_IRE);
+	iommu_wait_completion(iommu, IOMMU_REG_GLOBAL_STS,
+	    iommu_get_reg32, (status & IOMMU_GSTS_IRES),
+	    status);
+	iommu->iu_global_cmd_reg |= IOMMU_GCMD_IRE;
+
+	/* set compatible mode */
+	iommu_put_reg32(iommu, IOMMU_REG_GLOBAL_CMD,
+	    iommu->iu_global_cmd_reg | IOMMU_GCMD_CFI);
+	iommu_wait_completion(iommu, IOMMU_REG_GLOBAL_STS,
+	    iommu_get_reg32, (status & IOMMU_GSTS_CFIS),
+	    status);
+	iommu->iu_global_cmd_reg |= IOMMU_GCMD_CFI;
+	mutex_exit(&(iommu->iu_reg_lock));
+
+	iommu->iu_enabled |= INTRR_ENABLE;
+}
+
+/*
+ * helper function to find the free interrupt remapping
+ * table entry
+ */
+static uint_t
+bitset_find_free(bitset_t *b, uint_t post)
+{
+	uint_t	i;
+	uint_t	cap = bitset_capacity(b);
+
+	if (post == cap)
+		post = 0;
+
+	ASSERT(post < cap);
+
+	for (i = post; i < cap; i++) {
+		if (!bitset_in_set(b, i))
+			return (i);
+	}
+
+	for (i = 0; i < post; i++) {
+		if (!bitset_in_set(b, i))
+			return (i);
+	}
+
+	return (INTRR_IIDX_FULL);	/* no free index */
+}
+
+/*
+ * helper function to find 'count' contigous free
+ * interrupt remapping table entries
+ */
+static uint_t
+bitset_find_multi_free(bitset_t *b, uint_t post, uint_t count)
+{
+	uint_t  i, j;
+	uint_t	cap = bitset_capacity(b);
+
+	if (post == INTRR_IIDX_FULL) {
+		return (INTRR_IIDX_FULL);
+	}
+
+	if (count > cap)
+		return (INTRR_IIDX_FULL);
+
+	ASSERT(post < cap);
+
+	for (i = post; (i + count) <= cap; i++) {
+		for (j = 0; j < count; j++) {
+			if (bitset_in_set(b, (i + j))) {
+				i = i + j;
+				break;
+			}
+			if (j == count - 1)
+				return (i);
+		}
+	}
+
+	for (i = 0; (i < post) && ((i + count) <= cap); i++) {
+		for (j = 0; j < count; j++) {
+			if (bitset_in_set(b, (i + j))) {
+				i = i + j;
+				break;
+			}
+			if (j == count - 1)
+				return (i);
+		}
+	}
+
+	return (INTRR_IIDX_FULL);  		/* no free index */
+}
+
+/* alloc one interrupt remapping table entry */
+static int
+intrr_tbl_alloc_entry(intr_remap_tbl_state_t *intr_remap_tbl)
+{
+	uint32_t iidx;
+
+retry_alloc_iidx:
+	mutex_enter(&intr_remap_tbl->lock);
+	iidx = intr_remap_tbl->free;
+	if (iidx == INTRR_IIDX_FULL) {
+		/* no free intr entry, use compatible format intr */
+		mutex_exit(&intr_remap_tbl->lock);
+		if (intrr_apic_mode == LOCAL_X2APIC) {
+			/*
+			 * x2apic mode not allowed compatible
+			 * interrupt
+			 */
+			delay(IOMMU_ALLOC_RESOURCE_DELAY);
+			goto retry_alloc_iidx;
+		}
+	} else {
+		bitset_add(&intr_remap_tbl->map, iidx);
+		intr_remap_tbl->free = bitset_find_free(&intr_remap_tbl->map,
+		    iidx + 1);
+		mutex_exit(&intr_remap_tbl->lock);
+	}
+
+	return (iidx);
+}
+
+/* alloc 'cnt' contigous interrupt remapping table entries */
+static int
+intrr_tbl_alloc_multi_entries(intr_remap_tbl_state_t *intr_remap_tbl,
+    uint_t cnt)
+{
+	uint_t iidx, pos, i;
+
+retry_alloc_iidxs:
+	mutex_enter(&intr_remap_tbl->lock);
+	pos = intr_remap_tbl->free;
+	iidx = bitset_find_multi_free(&intr_remap_tbl->map, pos, cnt);
+	if (iidx != INTRR_IIDX_FULL) {
+		if (iidx <= pos && pos < (iidx + cnt)) {
+			intr_remap_tbl->free = bitset_find_free(
+			    &intr_remap_tbl->map, iidx + cnt);
+		}
+		for (i = 0; i < cnt; i++) {
+			bitset_add(&intr_remap_tbl->map, iidx + i);
+		}
+		mutex_exit(&intr_remap_tbl->lock);
+	} else {
+		mutex_exit(&intr_remap_tbl->lock);
+		if (intrr_apic_mode == LOCAL_X2APIC) {
+			/* x2apic mode not allowed comapitible interrupt */
+			delay(IOMMU_ALLOC_RESOURCE_DELAY);
+			goto retry_alloc_iidxs;
+		}
+	}
+
+	return (iidx);
+}
+
+/* get ioapic source id and iommu structure for ioapics */
+static void
+get_ioapic_iommu_info(void)
+{
+	ioapic_drhd_info_t *ioapic_dinfo;
+	uint_t i;
+
+	for_each_in_list(&ioapic_drhd_infos, ioapic_dinfo) {
+		for (i = 0; i < MAX_IO_APIC; i++) {
+			if (ioapic_dinfo->ioapic_id == apic_io_id[i]) {
+				ioapic_iommu_infos[i] = kmem_zalloc(
+				    sizeof (ioapic_iommu_info_t), KM_SLEEP);
+				ioapic_iommu_infos[i]->sid = ioapic_dinfo->sid;
+				ioapic_iommu_infos[i]->iommu =
+				    (intel_iommu_state_t *)
+				    ioapic_dinfo->drhd->di_iommu;
+				break;
+			}
+		}
+	}
+}
+
+/* initialize interrupt remapping */
+static int
+intr_remap_init(int apic_mode)
+{
+	intel_iommu_state_t *iommu;
+	int intrr_all_disable = 1;
+
+	intrr_apic_mode = apic_mode;
+
+	if ((intrr_apic_mode != LOCAL_X2APIC) && intrr_only_for_x2apic) {
+		/*
+		 * interrupt remapping is not a must in apic mode
+		 */
+		return (DDI_FAILURE);
+	}
+
+	for_each_in_list(&iommu_states, iommu) {
+		if ((iommu->iu_enabled & QINV_ENABLE) &&
+		    IOMMU_ECAP_GET_IR(iommu->iu_excapability)) {
+			if (intr_remap_init_unit(iommu) == DDI_SUCCESS) {
+				intrr_all_disable = 0;
+			}
+		}
+	}
+
+	if (intrr_all_disable) {
+		/*
+		 * if all drhd unit disabled intr remapping,
+		 * return FAILURE
+		 */
+		return (DDI_FAILURE);
+	} else {
+		return (DDI_SUCCESS);
+	}
+}
+
+/* enable interrupt remapping */
+static void
+intr_remap_enable(void)
+{
+	intel_iommu_state_t *iommu;
+
+	for_each_in_list(&iommu_states, iommu) {
+		if (iommu->iu_intr_remap_tbl)
+			intr_remap_enable_unit(iommu);
+	}
+
+	/* get iommu structure and interrupt source id for ioapic */
+	get_ioapic_iommu_info();
+}
+
+/* alloc remapping entry for the interrupt */
+static void
+intr_remap_alloc_entry(apic_irq_t *irq_ptr)
+{
+	intel_iommu_state_t	*iommu;
+	intr_remap_tbl_state_t *intr_remap_tbl;
+	uint32_t		iidx, cnt, i;
+	uint_t			vector, irqno;
+	uint32_t		sid_svt_sq;
+
+	if (AIRQ_PRIVATE(irq_ptr) == INTRR_DISABLE ||
+	    AIRQ_PRIVATE(irq_ptr) != NULL) {
+		return;
+	}
+
+	AIRQ_PRIVATE(irq_ptr) =
+	    kmem_zalloc(sizeof (intr_remap_private_t), KM_SLEEP);
+
+	intr_remap_get_iommu(irq_ptr);
+
+	iommu = INTRR_PRIVATE(irq_ptr)->ir_iommu;
+	if (iommu == NULL) {
+		goto intr_remap_disable;
+	}
+
+	intr_remap_tbl = iommu->iu_intr_remap_tbl;
+
+	if (irq_ptr->airq_mps_intr_index == MSI_INDEX) {
+		cnt = irq_ptr->airq_intin_no;
+	} else {
+		cnt = 1;
+	}
+
+	if (cnt == 1) {
+		iidx = intrr_tbl_alloc_entry(intr_remap_tbl);
+	} else {
+		iidx = intrr_tbl_alloc_multi_entries(intr_remap_tbl, cnt);
+	}
+
+	if (iidx == INTRR_IIDX_FULL) {
+		goto intr_remap_disable;
+	}
+
+	INTRR_PRIVATE(irq_ptr)->ir_iidx = iidx;
+
+	intr_remap_get_sid(irq_ptr);
+
+	if (cnt == 1) {
+		if (IOMMU_CAP_GET_CM(iommu->iu_capability)) {
+			qinv_iec_single(iommu, iidx);
+		} else {
+			iommu->iu_dmar_ops->do_flwb(iommu);
+		}
+		return;
+	}
+
+	sid_svt_sq = INTRR_PRIVATE(irq_ptr)->ir_sid_svt_sq;
+
+	vector = irq_ptr->airq_vector;
+
+	for (i = 1; i < cnt; i++) {
+		irqno = apic_vector_to_irq[vector + i];
+		irq_ptr = apic_irq_table[irqno];
+
+		ASSERT(irq_ptr);
+
+		AIRQ_PRIVATE(irq_ptr) =
+		    kmem_zalloc(sizeof (intr_remap_private_t), KM_SLEEP);
+
+		INTRR_PRIVATE(irq_ptr)->ir_iommu = iommu;
+		INTRR_PRIVATE(irq_ptr)->ir_sid_svt_sq = sid_svt_sq;
+		INTRR_PRIVATE(irq_ptr)->ir_iidx = iidx + i;
+	}
+
+	if (IOMMU_CAP_GET_CM(iommu->iu_capability)) {
+		qinv_iec(iommu, iidx, cnt);
+	} else {
+		iommu->iu_dmar_ops->do_flwb(iommu);
+	}
+
+	return;
+
+intr_remap_disable:
+	kmem_free(AIRQ_PRIVATE(irq_ptr), sizeof (intr_remap_private_t));
+	AIRQ_PRIVATE(irq_ptr) = INTRR_DISABLE;
+}
+
+/* helper function to get iommu structure */
+static void intr_remap_get_iommu(apic_irq_t *irq_ptr)
+{
+	intel_iommu_state_t	*iommu = NULL;
+
+	ASSERT(INTRR_PRIVATE(irq_ptr)->ir_iommu == NULL);
+
+	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
+		/* for fixed interrupt */
+		uint_t ioapic_index = irq_ptr->airq_ioapicindex;
+		if (ioapic_iommu_infos[ioapic_index])
+			iommu = ioapic_iommu_infos[ioapic_index]->iommu;
+	} else {
+		if (irq_ptr->airq_dip != NULL) {
+			iommu = iommu_get_dmar(irq_ptr->airq_dip);
+		}
+	}
+
+	if ((iommu != NULL) && (iommu->iu_enabled & INTRR_ENABLE)) {
+		INTRR_PRIVATE(irq_ptr)->ir_iommu = iommu;
+	}
+}
+
+/* helper function to get interrupt request source id */
+static void
+intr_remap_get_sid(apic_irq_t *irq_ptr)
+{
+	dev_info_t	*dip, *pdip;
+	iommu_private_t	*private;
+	uint16_t	sid;
+	uchar_t		svt, sq;
+
+	if (!intrr_enable_sid_verify) {
+		return;
+	}
+
+	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
+		/* for interrupt through I/O APIC */
+		uint_t ioapic_index = irq_ptr->airq_ioapicindex;
+
+		sid = ioapic_iommu_infos[ioapic_index]->sid;
+
+		svt = SVT_ALL_VERIFY;
+		sq = SQ_VERIFY_ALL;
+	} else {
+		/* MSI/MSI-X interrupt */
+		dip = irq_ptr->airq_dip;
+		ASSERT(dip);
+		pdip = get_pci_top_bridge(dip);
+		if (pdip == NULL) {
+			/* pcie device */
+			private = DEVI(dip)->devi_iommu_private;
+			ASSERT(private);
+			sid = (private->idp_bus << 8) | private->idp_devfn;
+			svt = SVT_ALL_VERIFY;
+			sq = SQ_VERIFY_ALL;
+		} else {
+			private = DEVI(pdip)->devi_iommu_private;
+			ASSERT(private);
+
+			if (private->idp_bbp_type == IOMMU_PPB_PCIE_PCI) {
+				/* device behind pcie to pci bridge */
+				sid = (private->idp_bus << 8) | \
+				    private->idp_sec;
+				svt = SVT_BUS_VERIFY;
+				sq = SQ_VERIFY_ALL;
+			} else {
+				/* device behind pci to pci bridge */
+				sid = (private->idp_bus << 8) | \
+				    private->idp_devfn;
+				svt = SVT_ALL_VERIFY;
+				sq = SQ_VERIFY_ALL;
+			}
+		}
+	}
+
+	INTRR_PRIVATE(irq_ptr)->ir_sid_svt_sq = sid | (svt << 18) | (sq << 16);
+}
+
+/* remapping the interrupt */
+static void
+intr_remap_map_entry(apic_irq_t *irq_ptr, void *intr_data)
+{
+	intel_iommu_state_t	*iommu;
+	intr_remap_tbl_state_t	*intr_remap_tbl;
+	ioapic_rdt_t	*irdt = (ioapic_rdt_t *)intr_data;
+	msi_regs_t	*mregs = (msi_regs_t *)intr_data;
+	intr_rte_t	irte;
+	uint_t		iidx, i, cnt;
+	uint32_t	dst, sid_svt_sq;
+	uchar_t		vector, dlm, tm, rh, dm;
+
+	if (AIRQ_PRIVATE(irq_ptr) == INTRR_DISABLE) {
+		return;
+	}
+
+	if (irq_ptr->airq_mps_intr_index == MSI_INDEX) {
+		cnt = irq_ptr->airq_intin_no;
+	} else {
+		cnt = 1;
+	}
+
+	iidx = INTRR_PRIVATE(irq_ptr)->ir_iidx;
+	iommu = INTRR_PRIVATE(irq_ptr)->ir_iommu;
+	intr_remap_tbl = iommu->iu_intr_remap_tbl;
+	sid_svt_sq = INTRR_PRIVATE(irq_ptr)->ir_sid_svt_sq;
+	vector = irq_ptr->airq_vector;
+
+	if (!APIC_IS_MSI_OR_MSIX_INDEX(irq_ptr->airq_mps_intr_index)) {
+		dm = RDT_DM(irdt->ir_lo);
+		rh = 0;
+		tm = RDT_TM(irdt->ir_lo);
+		dlm = RDT_DLM(irdt->ir_lo);
+		dst = irdt->ir_hi;
+	} else {
+		dm = MSI_ADDR_DM_PHYSICAL;
+		rh = MSI_ADDR_RH_FIXED;
+		tm = MSI_DATA_TM_EDGE;
+		dlm = 0;
+		dst = mregs->mr_addr;
+	}
+
+	if (intrr_apic_mode == LOCAL_APIC)
+		dst = (dst & 0xFF) << 8;
+
+	if (cnt == 1) {
+		irte.lo = IRTE_LOW(dst, vector, dlm, tm, rh, dm, 0, 1);
+		irte.hi = IRTE_HIGH(sid_svt_sq);
+
+		/* set interrupt remapping table entry */
+		bcopy(&irte, intr_remap_tbl->vaddr +
+		    iidx * INTRR_RTE_SIZE,
+		    INTRR_RTE_SIZE);
+
+		qinv_iec_single(iommu, iidx);
+
+	} else {
+		vector = irq_ptr->airq_vector;
+		for (i = 0; i < cnt; i++) {
+			irte.lo = IRTE_LOW(dst, vector, dlm, tm, rh, dm, 0, 1);
+			irte.hi = IRTE_HIGH(sid_svt_sq);
+
+			/* set interrupt remapping table entry */
+			bcopy(&irte, intr_remap_tbl->vaddr +
+			    iidx * INTRR_RTE_SIZE,
+			    INTRR_RTE_SIZE);
+			vector++;
+			iidx++;
+		}
+
+		qinv_iec(iommu, iidx, cnt);
+	}
+}
+
+/* free the remapping entry */
+static void
+intr_remap_free_entry(apic_irq_t *irq_ptr)
+{
+	intel_iommu_state_t *iommu;
+	intr_remap_tbl_state_t *intr_remap_tbl;
+	uint32_t iidx;
+
+	if (AIRQ_PRIVATE(irq_ptr) == INTRR_DISABLE) {
+		AIRQ_PRIVATE(irq_ptr) = NULL;
+		return;
+	}
+
+	iommu = INTRR_PRIVATE(irq_ptr)->ir_iommu;
+	intr_remap_tbl = iommu->iu_intr_remap_tbl;
+	iidx = INTRR_PRIVATE(irq_ptr)->ir_iidx;
+
+	bzero(intr_remap_tbl->vaddr + iidx * INTRR_RTE_SIZE,
+	    INTRR_RTE_SIZE);
+
+	qinv_iec_single(iommu, iidx);
+
+	mutex_enter(&intr_remap_tbl->lock);
+	bitset_del(&intr_remap_tbl->map, iidx);
+	if (intr_remap_tbl->free == INTRR_IIDX_FULL) {
+		intr_remap_tbl->free = iidx;
+	}
+	mutex_exit(&intr_remap_tbl->lock);
+
+	kmem_free(AIRQ_PRIVATE(irq_ptr), sizeof (intr_remap_private_t));
+	AIRQ_PRIVATE(irq_ptr) = NULL;
+}
+
+/* record the ioapic rdt entry */
+static void
+intr_remap_record_rdt(apic_irq_t *irq_ptr, ioapic_rdt_t *irdt)
+{
+	uint32_t rdt_entry, tm, pol, iidx, vector;
+
+	rdt_entry = irdt->ir_lo;
+
+	if (INTRR_PRIVATE(irq_ptr) != NULL) {
+		iidx = INTRR_PRIVATE(irq_ptr)->ir_iidx;
+		tm = RDT_TM(rdt_entry);
+		pol = RDT_POL(rdt_entry);
+		vector = irq_ptr->airq_vector;
+		irdt->ir_lo = (tm << INTRR_IOAPIC_TM_SHIFT) |
+		    (pol << INTRR_IOAPIC_POL_SHIFT) |
+		    ((iidx >> 15) << INTRR_IOAPIC_IIDX15_SHIFT) |
+		    vector;
+		irdt->ir_hi = (iidx << INTRR_IOAPIC_IIDX_SHIFT) |
+		    (1 << INTRR_IOAPIC_FORMAT_SHIFT);
+	} else {
+		irdt->ir_hi <<= APIC_ID_BIT_OFFSET;
+	}
+}
+
+/* record the msi interrupt structure */
+/*ARGSUSED*/
+static void
+intr_remap_record_msi(apic_irq_t *irq_ptr, msi_regs_t *mregs)
+{
+	uint_t	iidx;
+
+	if (INTRR_PRIVATE(irq_ptr) != NULL) {
+		iidx = INTRR_PRIVATE(irq_ptr)->ir_iidx;
+
+		mregs->mr_data = 0;
+		mregs->mr_addr = MSI_ADDR_HDR |
+		    ((iidx & 0x7fff) << INTRR_MSI_IIDX_SHIFT) |
+		    (1 << INTRR_MSI_FORMAT_SHIFT) | (1 << INTRR_MSI_SHV_SHIFT) |
+		    ((iidx >> 15) << INTRR_MSI_IIDX15_SHIFT);
+	} else {
+		mregs->mr_addr = MSI_ADDR_HDR |
+		    (MSI_ADDR_RH_FIXED << MSI_ADDR_RH_SHIFT) |
+		    (MSI_ADDR_DM_PHYSICAL << MSI_ADDR_DM_SHIFT) |
+		    (mregs->mr_addr << MSI_ADDR_DEST_SHIFT);
+		mregs->mr_data = (MSI_DATA_TM_EDGE << MSI_DATA_TM_SHIFT) |
+		    mregs->mr_data;
+	}
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -480,6 +480,7 @@ typedef struct	apic_irq {
 	uint_t	airq_busy;		/* How frequently did clock find */
 					/* us in this */
 	struct apic_irq *airq_next;	/* chain of shared intpts */
+	void		*airq_intrr_private; /* intr remap private data */
 } apic_irq_t;
 
 #define	IRQ_USER_BOUND	0x80000000 /* user requested bind if set in airq_cpu */
@@ -526,6 +527,32 @@ typedef	struct apic_regs_ops {
 	void		(*apic_write_int_cmd)(uint32_t, uint32_t);
 	void		(*apic_send_eoi)(uint32_t);
 } apic_reg_ops_t;
+
+/*
+ * interrupt structure for ioapic and msi
+ */
+typedef struct ioapic_rdt {
+	uint32_t	ir_lo;
+	uint32_t	ir_hi;
+} ioapic_rdt_t;
+
+typedef struct msi_regs {
+	uint32_t	mr_data;
+	uint64_t	mr_addr;
+}msi_regs_t;
+
+/*
+ * APIC ops to support intel interrupt remapping
+ */
+typedef struct apic_intrr_ops {
+	int	(*apic_intrr_init)(int);
+	void	(*apic_intrr_enable)(void);
+	void	(*apic_intrr_alloc_entry)(apic_irq_t *);
+	void	(*apic_intrr_map_entry)(apic_irq_t *, void *);
+	void	(*apic_intrr_free_entry)(apic_irq_t *);
+	void	(*apic_intrr_record_rdt)(apic_irq_t *, ioapic_rdt_t *);
+	void	(*apic_intrr_record_msi)(apic_irq_t *, msi_regs_t *);
+} apic_intrr_ops_t;
 
 /*
  * Various poweroff methods and ports & bits for them
@@ -767,7 +794,7 @@ extern uchar_t apic_modify_vector(uchar_t vector, int irq);
 extern void apic_pci_msi_unconfigure(dev_info_t *rdip, int type, int inum);
 extern void apic_pci_msi_disable_mode(dev_info_t *rdip, int type);
 extern void apic_pci_msi_enable_mode(dev_info_t *rdip, int type, int inum);
-extern void apic_pci_msi_enable_vector(dev_info_t *dip, int type, int inum,
+extern void apic_pci_msi_enable_vector(apic_irq_t *, int type, int inum,
     int vector, int count, int target_apic_id);
 extern char *apic_get_apic_type();
 extern uint16_t	apic_get_apic_version();
@@ -824,6 +851,7 @@ extern void x2apic_update_psm();
 extern void apic_change_ops();
 extern void apic_common_send_ipi(int, int);
 
+extern apic_intrr_ops_t *apic_vt_ops;
 
 #ifdef	__cplusplus
 }

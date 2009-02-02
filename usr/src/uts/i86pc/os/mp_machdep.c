@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,6 +164,10 @@ static struct psm_ops mach_ops;
 static struct psm_ops *mach_set[4] = {&mach_ops, NULL, NULL, NULL};
 static ushort_t mach_ver[4] = {0, 0, 0, 0};
 
+/*
+ * virtualization support for psm
+ */
+void *psm_vt_ops = NULL;
 /*
  * If non-zero, idle cpus will become "halted" when there's
  * no work to do.

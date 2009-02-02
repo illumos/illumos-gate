@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Portions Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Portions Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,6 +69,12 @@ int intel_iommu_blacklist_id;
  */
 boolean_t intel_iommu_support;
 intel_dmar_info_t *dmar_info;
+
+/*
+ * global varables to save source id and drhd info for ioapic
+ * to support interrupt remapping
+ */
+list_t	ioapic_drhd_infos;
 
 /*
  * internal varables
@@ -347,6 +353,7 @@ parse_dmar_drhd(dmar_acpi_unit_head_t *head)
 	dmar_acpi_dev_scope_t *scope;
 	list_t *lp;
 	pci_dev_scope_t *devs;
+	ioapic_drhd_info_t	*ioapic_dinfo;
 
 	drhd = (dmar_acpi_drhd_t *)head;
 	ASSERT(head->uh_type == DMAR_UNIT_TYPE_DRHD);
@@ -377,6 +384,19 @@ parse_dmar_drhd(dmar_acpi_unit_head_t *head)
 		if (parse_dmar_dev_scope(scope, &devs)
 		    != PARSE_DMAR_SUCCESS) {
 			return (PARSE_DMAR_FAIL);
+		}
+		/* get ioapic source id for interrupt remapping */
+		if (devs->pds_type == DEV_SCOPE_IOAPIC) {
+			ioapic_dinfo = kmem_zalloc
+			    (sizeof (ioapic_drhd_info_t), KM_SLEEP);
+
+			ioapic_dinfo->ioapic_id = scope->ds_enumid;
+			ioapic_dinfo->sid =
+			    (devs->pds_bus << 8) |
+			    (devs->pds_dev << 3) |
+			    (devs->pds_func);
+			ioapic_dinfo->drhd = dinfo;
+			list_insert_tail(&ioapic_drhd_infos, ioapic_dinfo);
 		}
 
 		list_insert_tail(&dinfo->di_dev_list, devs);
@@ -759,6 +779,10 @@ intel_iommu_probe_and_parse(void)
 		list_create(&(dmar_info->dmari_rmrr[i]), sizeof (rmrr_info_t),
 		    offsetof(rmrr_info_t, node));
 	}
+
+	/* create ioapic - drhd map info for interrupt remapping */
+	list_create(&ioapic_drhd_infos, sizeof (ioapic_drhd_info_t),
+	    offsetof(ioapic_drhd_info_t, node));
 
 	/*
 	 * parse dmar acpi table

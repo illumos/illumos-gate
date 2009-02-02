@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_SMP_IMPLDEFS_H
 #define	_SYS_SMP_IMPLDEFS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/sunddi.h>
@@ -115,6 +113,11 @@ extern struct av_head autovect[]; /* array of auto intr vectors		*/
 extern uint32_t rm_platter_pa;	/* phy addr realmode startup storage	*/
 extern caddr_t rm_platter_va;	/* virt addr realmode startup storage	*/
 extern cpuset_t mp_cpus;	/* bit map of possible cpus found	*/
+
+/*
+ * virtulization support for psm
+ */
+extern void *psm_vt_ops;
 
 #ifdef	__cplusplus
 }
