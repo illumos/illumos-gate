@@ -505,11 +505,10 @@ ire_ftable_lookup_simple(ipaddr_t addr,
 	if (ire->ire_ipif == NULL) {
 		tmp_ire = ire;
 		/*
-		 * Look to see if the nexthop entry is in the
-		 * cachetable (I am inlining a simpler ire_cache_lookup
-		 * here).
+		 * Look to see if the nexthop entry is in the cachetable
 		 */
-		ire = ire_cache_lookup_simple(ire->ire_gateway_addr, ipst);
+		ire = ire_cache_lookup(ire->ire_gateway_addr, zoneid, NULL,
+		    ipst);
 		if (ire == NULL) {
 			/* Try ire_route_lookup */
 			ire = tmp_ire;
@@ -1240,8 +1239,8 @@ ire_forward_simple(ipaddr_t dst, enum ire_forward_action *ret_action,
 	 * the RTF_REJECT or RTF_BLACKHOLE flags set and that the IRE is
 	 * either an IRE_CACHE, IRE_IF_NORESOLVER or IRE_IF_RESOLVER.
 	 */
-	if ((ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE))) {
-		ASSERT(ire->ire_type & (IRE_CACHE | IRE_INTERFACE));
+	if ((ire->ire_flags & (RTF_REJECT | RTF_BLACKHOLE)) ||
+	    ((ire->ire_type & (IRE_CACHE | IRE_INTERFACE)) == 0)) {
 		ip3dbg(("ire 0x%p is not cache/resolver/noresolver\n",
 		    (void *)ire));
 		goto icmp_err_ret;
