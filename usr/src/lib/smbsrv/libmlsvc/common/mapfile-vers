@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -27,11 +27,6 @@
 SUNWprivate {
     global:
 	dssetup_clear_domain_info;
-	lsa_enum_trusted_domains;
-	lsa_free_info;
-	lsa_query_account_domain_info;
-	lsa_query_dns_domain_info;
-	lsa_query_primary_domain_info;
 	mlsvc_get_door_fd;
 	mlsvc_get_num_users;
 	mlsvc_get_user_list;

@@ -19,196 +19,362 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"@(#)smb_find.c	1.7	08/07/30 SMI"
-
-#include <smbsrv/smb_incl.h>
-
 
 /*
+ * smb_com_search
+ * smb_com_find, smb_com_find_close
+ * smb_find_unique
+ *
+ * These commands are used for directory searching. They share the same
+ * message formats, defined below:
+ *
+ * Client Request                     Description
+ * ---------------------------------- ---------------------------------
+ *
+ * UCHAR WordCount;                   Count of parameter words = 2
+ * USHORT MaxCount;                   Number of dir. entries to return
+ * USHORT SearchAttributes;
+ * USHORT ByteCount;                  Count of data bytes;  min = 5
+ * UCHAR BufferFormat1;               0x04 -- ASCII
+ * UCHAR FileName[];                  File name, may be null
+ * UCHAR BufferFormat2;               0x05 -- Variable block
+ * USHORT ResumeKeyLength;            Length of resume key, may be 0
+ * UCHAR ResumeKey[];                 Resume key
+ *
+ * FileName specifies the file to be sought.  SearchAttributes indicates
+ * the attributes that the file must have.  If  SearchAttributes is
+ * zero then only normal files are returned.  If the system file, hidden or
+ * directory attributes are specified then the search is inclusive - both the
+ * specified type(s) of files and normal files are returned.  If the volume
+ * label attribute is specified then the search is exclusive, and only the
+ * volume label entry is returned.
+ *
+ * MaxCount specifies the number of directory entries to be returned.
+ *
+ * Server Response                    Description
+ * ---------------------------------- ---------------------------------
+ *
+ * UCHAR WordCount;                   Count of parameter words = 1
+ * USHORT Count;                      Number of entries returned
+ * USHORT ByteCount;                  Count of data bytes;  min = 3
+ * UCHAR BufferFormat;                0x05 -- Variable block
+ * USHORT DataLength;                 Length of data
+ * UCHAR DirectoryInformationData[];  Data
+ *
+ * The response will contain one or more directory entries as determined by
+ * the Count field.  No more than MaxCount entries will be returned.  Only
+ * entries that match the sought FileName and SearchAttributes combination
+ * will be returned.
+ *
+ * ResumeKey must be null (length = 0) on the initial search request.
+ * Subsequent search requests intended to continue a search must contain
+ * the ResumeKey field extracted from the last directory entry of the
+ * previous response.  ResumeKey is self-contained, for calls containing
+ * a non-zero ResumeKey neither the SearchAttributes or FileName fields
+ * will be valid in the request.  ResumeKey has the following format:
+ *
+ * Resume Key Field                   Description
+ * ---------------------------------- ---------------------------------
+ *
+ * UCHAR Reserved;                    bit 7 - consumer use
+ *                                    bits 5,6 - system use (must preserve)
+ *                                    bits 0-4 - server use (must preserve)
+ * UCHAR FileName[11];                Name of the returned file
+ * UCHAR ReservedForServer[5];        Client must not modify
+ *                                    byte 0 - uniquely identifies find
+ *                                    through find_close
+ *                                    bytes 1-4 - available for server use
+ *                                    (must be non-zero)
+ * UCHAR ReservedForConsumer[4];      Server must not modify
+ *
+ * FileName is 8.3 format, with the three character extension left
+ * justified into FileName[9-11].
+ *
+ * There may be multiple matching entries in response to a single request
+ * as wildcards are supported in the last component of FileName of the
+ * initial request.
+ *
+ * Returned directory entries in the DirectoryInformationData field of the
+ * response each have the following format:
+ *
+ * Directory Information Field        Description
+ * ---------------------------------- ---------------------------------
+ *
+ * SMB_RESUME_KEY ResumeKey;          Described above
+ * UCHAR FileAttributes;              Attributes of the found file
+ * SMB_TIME LastWriteTime;            Time file was last written
+ * SMB_DATE LastWriteDate;            Date file was last written
+ * ULONG FileSize;                    Size of the file
+ * UCHAR FileName[13];                ASCII, space-filled null terminated
+ *
+ * FileName must conform to 8.3 rules, and is padded after the extension
+ * with 0x20 characters if necessary.
+ *
+ * As can be seen from the above structure, these commands cannot return
+ * long filenames, and cannot return UNICODE filenames.
+ *
+ * Files which have a size greater than 2^32 bytes should have the least
+ * significant 32 bits of their size returned in FileSize.
+ *
+ * smb_com_search
+ * --------------
+ *
+ * If the client is prior to the LANMAN1.0 dialect, the returned FileName
+ * should be uppercased.
+ * If the client has negotiated a dialect prior to the LANMAN1.0 dialect,
+ * or if bit0 of the Flags2 SMB header field of the request is clear,
+ * the returned FileName should be uppercased.
+ *
+ * SMB_COM_SEARCH terminates when either the requested maximum number of
+ * entries that match the named file are found, or the end of directory is
+ * reached without the maximum number of matches being found.  A response
+ * containing no entries indicates that no matching entries were found
+ * between the starting point of the search and the end of directory.
+ *
+ *
+ * The find, find_close and find_unique protocols may be used in place of
+ * the core "search" protocol when LANMAN 1.0 dialect has been negotiated.
+ *
  * smb_com_find
+ * ------------
  *
- * Request Format: (same as core Search Protocol - "Find First" form)
+ * The find protocol is used to match the find OS/2 system call.
  *
- *  Client Request                     Description
- *  ================================== =================================
- *
- *  BYTE  smb_wct;			value = 2
- *  WORD  smb_count;			max number of entries to find
- *  WORD  smb_attr;			search attribute
- *  WORD  smb_bcc;			minimum value = 5
- *  BYTE  smb_ident1;			ASCII  (04)
- *  BYTE  smb_pathname[];		filename (may contain global characters)
- *  BYTE  smb_ident2;			Variable Block (05)
- *  WORD  smb_keylen;			resume key length (zero if "Find First")
- *  BYTE  smb_resumekey[*];		"Find Next" key, * = value of smb_keylen
- *
- * Response Format: (same as core Search Protocol)
- *
- *  Server Response                    Description
- *  ================================== =================================
- *  BYTE  smb_wct;			value = 1
- *  WORD  smb_count;			number of entries found
- *  WORD  smb_bcc;			minimum value = 3
- *  BYTE  smb_ident;			Variable Block (05)
- *  WORD  smb_datalen;			data length
- *  BYTE  smb_data[*];			directory entries
- *
- * Directory Information Entry (dir_info) Format: (same as core Search Protocol)
- *
- *  BYTE  find_buf_reserved[21];	reserved (resume_key)
- *  BYTE  find_buf_attr;		attribute
- *  WORD  find_buf_time;		modification time (hhhhh mmmmmm xxxxx)
- *					 where 'xxxxx' is in 2 second increments
- *  WORD  find_buf_date;		modification date (yyyyyyy mmmm ddddd)
- *  DWORD  find_buf_size;		file size
- *  STRING find_buf_pname[13];		file name -- ASCII (null terminated)
- *
- * The resume_key has the following format:
- *
- *  BYTE  sr_res;			reserved:
- *					bit  7 - reserved for consumer use
- *					bit  5,6 - reserved for system use
- *					   (must be preserved)
- *					bits 0-4 - reserved for server
- *					   (must be preserved)
- *  BYTE  sr_name[11];			pathname sought.
- *					 Format: 1-8 character file name,
- *					 left justified 0-3 character extension,
- *  BYTE  sr_findid[1];			uniquely identifies find through
- *					 find_close
- *  BYTE  sr_server[4];			available for server use
- *					 (must be non-zero)
- *  BYTE  sr_res[4];			reserved for consumer use
- *
- * Service:
- *
- * The Find protocol finds the directory entry or group of entries matching the
- * specified file pathname. The filename portion of the pathname may contain
- * global (wild card) characters.
- *
- * The Find protocol is used to match the find OS/2 system call. The protocols
- * "Find", "Find_Unique" and "Find_Close" are methods of reading (or searching)
- * a directory. These protocols may be used in place of the core "Search"
- * protocol when LANMAN 1.0 dialect has been negotiated. There may be cases
- * where the Search protocol will still be used.
- *
- * The format of the Find protocol is the same as the core "Search" protocol.
- * The difference is that the directory is logically Opened with a Find protocol
- * and logically closed with the Find Close protocol. This allows the Server to
- * make better use of its resources. Search buffers are thus held (allowing
- * search resumption via presenting a "resume_key") until a Find Close protocol
- * is received. The sr_findid field of each resume key is a unique identifier
- * (within the session) of the search from "Find" through "Find close". Thus if
- * the consumer does "Find ahead", any find buffers containing resume keys with
- * the matching find id may be released when the Find Close is requested.
- *
- * As is true of a failing open, if a Find request (Find "first" request where
+ * The format of the find protocol is the same as the core "search" protocol.
+ * The difference is that the directory is logically Opened with a find protocol
+ * and logically closed with the find close protocol.
+ * As is true of a failing open, if a find request (find "first" request where
  * resume_key is null) fails (no entries are found), no find close protocol is
  * expected.
  *
- * If no global characters are present, a "Find Unique" protocol should be used
+ * If no global characters are present, a "find unique" protocol should be used
  * (only one entry is expected and find close need not be sent).
  *
- * The file path name in the request specifies the file to be sought. The
- * attribute field indicates the attributes that the file must have. If the
- * attribute is zero then only normal files are returned. If the system file,
- * hidden or directory attributes are specified then the search is inclusive --
- * both the specified type(s) of files and normal files are returned. If the
- * volume label attribute is specified then the search is exclusive, and only
- * the volume label entry is returned
+ * A find request will terminate when either the requested maximum number of
+ * entries that match the named file are found, or the end of directory is
+ * reached without the maximum number of matches being found. A response
+ * containing no entries indicates that no matching entries were found between
+ * the starting point of the search and the end of directory.
  *
- * The max-count field specifies the number of directory entries to be returned.
- * The response will contain zero or more directory entries as determined by the
- * count-returned field. No more than max-count entries will be returned. Only
- * entries that match the sought filename/attribute will be returned.
- *
- * The resume_key field must be null (length = 0) on the initial ("Find First")
- * find request. Subsequent find requests intended to continue a search must
- * contain the resume_key field extracted from the last directory entry of the
- * previous response. The resume_key field is self-contained, for on calls
- * containing a resume_key neither the attribute or pathname fields will be
- * valid in the request. A find request will terminate when either the
- * requested maximum number of entries that match the named file are found, or
- * the end of directory is reached without the maximum number of matches being
- * found. A response containing no entries indicates that no matching entries
- * were found between the starting point of the search and the end of directory.
- *
- * There may be multiple matching entries in response to a single request as
- * Find supports "wild cards" in the file name (last component of the pathname).
- * "?" is the wild single characters, "*" or "null" will match any number of
- * filename characters within a single part of the filename component. The
- * filename is divided into two parts -- an eight character name and a three
- * character extension. The name and extension are divided by a ".".
- *
- * If a filename part commences with one or more "?"s then exactly that number
- * of characters will be matched by the Wild Cards, e.g., "??x" will equal "abx"
- * but not "abcx" or "ax". When a filename part has trailing "?"s then it will
- * match the specified number of characters  or less, e.g., "x??" will match
- * "xab", "xa" and "x", but not "xabc". If only "?"s are present in the filename
- * part, then it is handled as for trailing "?"s "*" or "null" match entire
- * pathname parts, thus "*.abc" or ".abc" will match any file with an extension
- * of "abc". "*.*", "*" or "null" will match all files in a directory.
- *
- * Unprotected servers require the requester to have read permission on the
- * subtree containing the directory searched (the share specifies read
- * permission).
- *
- * Protected servers require the requester to have permission to search the
- * specified directory.
- *
- * If a Find requests more data than can be placed in a message of the
+ * If a find requests more data than can be placed in a message of the
  * max-xmit-size for the TID specified, the server will return only the number
  * of entries which will fit.
  *
- * The number of entries returned will be the minimum of:
- *    1. The number of entries requested.
- *    2. The number of (complete) entries that will fit in the negotiated SMB
- *       buffer.
- *    3. The number of entries that match the requested name pattern and
- *       attributes.
  *
- * The error ERRnofiles set in smb_err field of the response header or a zero
- * value in smb_count of the response indicates no matching entry was found.
+ * smb_com_find_close
+ * ------------------
  *
- * The resume search key returned along with each directory entry is a server
- * defined key which when returned in the Find Next protocol, allows the
- * directory search to be resumed at the directory entry fol lowing the one
- * denoted by the resume search key.
+ * The find close protocol is used to match the find close OS/2 system call.
  *
- * The date is in the following format:
- *   bits:
- *	1 1 1 1  1 1
- *	5 4 3 2  1 0 9 8  7 6 5 4  3 2 1 0
- *	y y y y  y y y m  m m m d  d d d d
- *   where:
- *	y - bit of year 0-119 (1980-2099)
- *	m - bit of month 1-12
- *	d - bit of day 1-31
+ * Whereas the first find protocol logically opens the directory, subsequent
+ * find  protocols presenting a resume_key further "read" the directory, the
+ * find close  protocol "closes" the  directory allowing the server to free any
+ * resources held in support of the directory search.
  *
- * The time is in the following format:
- *   bits:
- *	1 1 1 1  1 1
- *	5 4 3 2  1 0 9 8  7 6 5 4  3 2 1 0
- *	h h h h  h m m m  m m m x  x x x x
- *   where:
- *	h - bit of hour (0-23)
- *	m - bit of minute (0-59)
- *	x - bit of 2 second increment
+ * In our implementation this translates to closing the odir.
  *
- * Find may generate the following errors.
- *	ERRDOS/ERRnofiles
- *	ERRDOS/ERRbadpath
- *	ERRDOS/ERRnoaccess
- *	ERRDOS/ERRbadaccess
- *	ERRDOS/ERRbadshare
- *	ERRSRV/ERRerror
- *	ERRSRV/ERRaccess
- *	ERRSRV/ERRinvnid
+ *
+ * smb_com_find_unique
+ * -------------------
+ *
+ * The format of the find unique protocol is the same as the core "search"
+ * protocol. The difference is that the directory is logically opened, any
+ * matching entries returned, and then the directory is logically closed.
+ *
+ * The resume search key key will be returned as in the find protocol and
+ * search protocol however it may NOT be returned to continue the search.
+ * Only one buffer of entries is expected and find close need not be sent.
+ *
+ * If a find unique requests more data than can be placed in a message of the
+ * max-xmit-size for the TID specified, the server will abort the virtual
+ * circuit to the consumer.
  */
+
+#include <smbsrv/smb_incl.h>
+
+/* *** smb_com_search *** */
+
+smb_sdrc_t
+smb_pre_search(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Search__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_search(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__Search__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_search(smb_request_t *sr)
+{
+	int			rc;
+	uint16_t		count, maxcount, index;
+	uint16_t		sattr, odid;
+	uint16_t		key_len;
+	uint32_t		client_key;
+	char			name[SMB_SHORTNAMELEN];
+	char			*path;
+	unsigned char		resume_char;
+	unsigned char		type;
+	boolean_t		find_first, to_upper;
+	smb_tree_t		*tree;
+	smb_odir_t		*od;
+	smb_fileinfo_t		fileinfo;
+	smb_odir_resume_t	odir_resume;
+	boolean_t		eos;
+
+	to_upper = B_FALSE;
+	if ((sr->session->dialect <= LANMAN1_0) ||
+	    ((sr->smb_flg2 & SMB_FLAGS2_KNOWS_LONG_NAMES) == 0)) {
+		to_upper = B_TRUE;
+	}
+
+	/* We only handle 8.3 name here */
+	sr->smb_flg2 &= ~SMB_FLAGS2_KNOWS_LONG_NAMES;
+	sr->smb_flg &= ~SMB_FLAGS_CASE_INSENSITIVE;
+
+	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
+		return (SDRC_ERROR);
+
+	rc = smbsr_decode_data(sr, "%Abw", sr, &path, &type, &key_len);
+	if ((rc != 0) || (type != 0x05))
+		return (SDRC_ERROR);
+
+	tree = sr->tid_tree;
+
+	/* Volume information only */
+	if ((sattr == FILE_ATTRIBUTE_VOLUME) && (key_len != 21)) {
+		(void) memset(name, ' ', sizeof (name));
+		(void) strncpy(name, tree->t_volume, sizeof (name));
+
+		if (key_len >= 21) {
+			(void) smb_mbc_decodef(&sr->smb_data, "17.l",
+			    &client_key);
+		} else {
+			client_key = 0;
+		}
+
+		(void) smb_mbc_encodef(&sr->reply, "bwwbwb11c5.lb8.13c",
+		    1, 0, VAR_BCC, 5, 0, 0, path+1,
+		    client_key, sattr, name);
+
+		rc = (sr->reply.chain_offset - sr->cur_reply_offset) - 8;
+		(void) smb_mbc_poke(&sr->reply, sr->cur_reply_offset, "bwwbw",
+		    1, 1, rc+3, 5, rc);
+
+		return (SDRC_SUCCESS);
+	}
+
+	if ((key_len != 0) && (key_len != 21))
+		return (SDRC_ERROR);
+
+	find_first = (key_len == 0);
+	resume_char = 0;
+	client_key = 0;
+
+	if (find_first) {
+		/* NT interprets NULL filename as "\" */
+		if (strlen(path) == 0)
+			path = "\\";
+
+		odid = smb_odir_open(sr, path, sattr);
+		if (odid == 0) {
+			if (sr->smb_error.status == NT_STATUS_ACCESS_DENIED)
+				smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
+				    ERRDOS, ERROR_NO_MORE_FILES);
+			return (SDRC_ERROR);
+		}
+	} else {
+		if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
+		    &resume_char, &index, &odid, &client_key) != 0) {
+			return (SDRC_ERROR);
+		}
+	}
+
+	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	if (od == NULL) {
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
+		    ERRDOS, ERROR_INVALID_HANDLE);
+		return (SDRC_ERROR);
+	}
+
+	if (!find_first) {
+		odir_resume.or_type = SMB_ODIR_RESUME_IDX;
+		odir_resume.or_idx = index;
+		smb_odir_resume_at(od, &odir_resume);
+	}
+
+	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
+
+	rc = 0;
+	index = 0;
+	count = 0;
+	if (maxcount > SMB_MAX_SEARCH)
+		maxcount = SMB_MAX_SEARCH;
+
+	while (count < maxcount) {
+		rc = smb_odir_read_fileinfo(sr, od, &fileinfo, &eos);
+		if ((rc != 0 || (eos == B_TRUE)))
+			break;
+
+		if (smb_is_dot_or_dotdot(fileinfo.fi_name))
+			continue;
+
+		if (*fileinfo.fi_shortname == NULL) {
+			(void) strlcpy(fileinfo.fi_shortname,
+			    fileinfo.fi_name, SMB_SHORTNAMELEN - 1);
+			if (to_upper)
+				(void) utf8_strupr(fileinfo.fi_shortname);
+		}
+
+		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
+		    resume_char,
+		    fileinfo.fi_name83, fileinfo.fi_name83+9,
+		    index, odid, client_key,
+		    fileinfo.fi_dosattr & 0xff,
+		    smb_gmt2local(sr, fileinfo.fi_mtime.tv_sec),
+		    (int32_t)fileinfo.fi_size,
+		    fileinfo.fi_shortname);
+
+		smb_odir_save_cookie(od, index, fileinfo.fi_cookie);
+
+		count++;
+		index++;
+	}
+	smb_odir_release(od);
+
+	if (rc != 0) {
+		smb_odir_close(od);
+		return (SDRC_ERROR);
+	}
+
+	if (count == 0 && find_first) {
+		smb_odir_close(od);
+		smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
+		    ERRDOS, ERROR_NO_MORE_FILES);
+		return (SDRC_ERROR);
+	}
+
+	rc = (sr->reply.chain_offset - sr->cur_reply_offset) - 8;
+	if (smb_mbc_poke(&sr->reply, sr->cur_reply_offset, "bwwbw",
+	    1, count, rc+3, 5, rc) < 0) {
+		smb_odir_close(od);
+		return (SDRC_ERROR);
+	}
+
+	return (SDRC_SUCCESS);
+}
+
+
+/* *** smb_com_find *** */
+
 smb_sdrc_t
 smb_pre_find(smb_request_t *sr)
 {
@@ -226,17 +392,19 @@ smb_sdrc_t
 smb_com_find(smb_request_t *sr)
 {
 	int			rc;
-	unsigned short		sattr, count, maxcount;
+	uint16_t		count, maxcount, index;
+	uint16_t		sattr, odid;
+	uint16_t		key_len;
+	uint32_t		client_key;
+	smb_odir_t		*od;
+	smb_fileinfo_t		fileinfo;
+	boolean_t		eos;
+
 	char			*path;
 	unsigned char		resume_char;
-	uint32_t		client_key;
-	uint16_t		index;
-	uint32_t		cookie;
-	struct smb_node		*node;
 	unsigned char		type;
-	unsigned short		key_len;
-	smb_odir_context_t	*pc;
 	boolean_t		find_first = B_TRUE;
+	smb_odir_resume_t	odir_resume;
 
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
 		return (SDRC_ERROR);
@@ -245,78 +413,78 @@ smb_com_find(smb_request_t *sr)
 	if ((rc != 0) || (type != 0x05))
 		return (SDRC_ERROR);
 
-	if (key_len == 0) {		/* begin search */
-		if (smb_rdir_open(sr, path, sattr) != 0)
-			return (SDRC_ERROR);
-		cookie = 0;
-	} else if (key_len == 21) {
-		sr->smb_sid = 0;
-		if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
-		    &resume_char, &index, &sr->smb_sid, &client_key) != 0) {
-			/* We don't know which rdir to close */
-			return (SDRC_ERROR);
-		}
-
-		sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree,
-		    sr->smb_sid);
-		if (sr->sid_odir == NULL) {
-			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
-			    ERRDOS, ERRbadfid);
-			return (SDRC_ERROR);
-		}
-
-		cookie = sr->sid_odir->d_cookies[index];
-		if (cookie != 0)
-			find_first = B_FALSE;
-	} else {
-		/* We don't know which rdir to close */
+	if ((key_len != 0) && (key_len != 21))
 		return (SDRC_ERROR);
+
+	find_first = (key_len == 0);
+	resume_char = 0;
+	client_key = 0;
+
+	if (find_first) {
+		odid = smb_odir_open(sr, path, sattr);
+		if (odid == 0)
+			return (SDRC_ERROR);
+	} else {
+		if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
+		    &resume_char, &index, &odid, &client_key) != 0) {
+			return (SDRC_ERROR);
+		}
+	}
+
+	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	if (od == NULL) {
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
+		    ERRDOS, ERROR_INVALID_HANDLE);
+		return (SDRC_ERROR);
+	}
+
+	if (!find_first) {
+		odir_resume.or_type = SMB_ODIR_RESUME_IDX;
+		odir_resume.or_idx = index;
+		smb_odir_resume_at(od, &odir_resume);
 	}
 
 	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
 
-	pc = kmem_zalloc(sizeof (smb_odir_context_t), KM_SLEEP);
-	pc->dc_cookie = cookie;
+	rc = 0;
 	index = 0;
 	count = 0;
-	node = NULL;
-	rc = 0;
-
 	if (maxcount > SMB_MAX_SEARCH)
 		maxcount = SMB_MAX_SEARCH;
 
 	while (count < maxcount) {
-		if ((rc = smb_rdir_next(sr, &node, pc)) != 0)
+		rc = smb_odir_read_fileinfo(sr, od, &fileinfo, &eos);
+		if ((rc != 0 || (eos == B_TRUE)))
 			break;
+
+		if (*fileinfo.fi_shortname == NULL) {
+			(void) strlcpy(fileinfo.fi_shortname,
+			    fileinfo.fi_name, SMB_SHORTNAMELEN - 1);
+		}
 
 		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
 		    resume_char,
-		    pc->dc_name83, pc->dc_name83+9,
-		    index, sr->smb_sid, client_key,
-		    pc->dc_dattr & 0xff,
-		    smb_gmt2local(sr, pc->dc_attr.sa_vattr.va_mtime.tv_sec),
-		    (int32_t)smb_node_get_size(node, &pc->dc_attr),
-		    (*pc->dc_shortname) ? pc->dc_shortname :
-		    pc->dc_name);
+		    fileinfo.fi_name83, fileinfo.fi_name83+9,
+		    index, odid, client_key,
+		    fileinfo.fi_dosattr & 0xff,
+		    smb_gmt2local(sr, fileinfo.fi_mtime.tv_sec),
+		    (int32_t)fileinfo.fi_size,
+		    fileinfo.fi_shortname);
 
-		smb_node_release(node);
-		node = NULL;
-		sr->sid_odir->d_cookies[index] = pc->dc_cookie;
+		smb_odir_save_cookie(od, index, fileinfo.fi_cookie);
+
 		count++;
 		index++;
 	}
+	smb_odir_release(od);
 
-	kmem_free(pc, sizeof (smb_odir_context_t));
-
-	if ((rc != 0) && (rc != ENOENT)) {
-		/* returned error by smb_rdir_next() */
-		smb_rdir_close(sr);
-		smbsr_errno(sr, rc);
+	if (rc != 0) {
+		smb_odir_close(od);
 		return (SDRC_ERROR);
 	}
 
 	if (count == 0 && find_first) {
-		smb_rdir_close(sr);
+		smb_odir_close(od);
 		smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
 		    ERRDOS, ERROR_NO_MORE_FILES);
 		return (SDRC_ERROR);
@@ -325,91 +493,16 @@ smb_com_find(smb_request_t *sr)
 	rc = (MBC_LENGTH(&sr->reply) - sr->cur_reply_offset) - 8;
 	if (smb_mbc_poke(&sr->reply, sr->cur_reply_offset, "bwwbw",
 	    1, count, rc+3, 5, rc) < 0) {
-		smb_rdir_close(sr);
+		smb_odir_close(od);
 		return (SDRC_ERROR);
 	}
 
 	return (SDRC_SUCCESS);
 }
 
-/*
- * smb_com_find_close
- *
- * Request Format: (same as core Search Protocol - "Find Next" form)
- *
- *  Client Request                     Description
- *  ================================== =================================
- *
- *  BYTE  smb_wct;			value = 2
- *  WORD  smb_count;			max number of entries to find
- *  WORD  smb_attr;			search attribute
- *  WORD  smb_bcc;			minimum value = 5
- *  BYTE  smb_ident1;			ASCII  (04)
- *  BYTE  smb_pathname[];		null (may contain only null)
- *  BYTE  smb_ident2;			Variable Block (05)
- *  WORD  smb_keylen;			resume (close) key length
- *					 (may not be zero)
- *  BYTE  smb_resumekey[*];		"Find Close" key
- *					 (* = value of smb_keylen)
- *
- * Response Format: (same format as core Search Protocol)
- *
- *  Server Response                    Description
- *  ================================== =================================
- *
- *  BYTE  smb_wct;			value = 1
- *  WORD  smb_reserved;			reserved
- *  WORD  smb_bcc;			value = 3
- *  BYTE  smb_ident;			Variable Block (05)
- *  WORD  smb_datalen;			data length (value = 0)
- *
- *  The resume_key (or close key) has the following format:
- *
- *  BYTE  sr_res;			reserved:
- * 					bit  7 - reserved for consumer use
- *					bit  5,6 - reserved for system use
- *					  (must be preserved)
- *					bits 0-4 - rsvd for server
- *					  (must be preserved by consumer)
- *  BYTE  sr_name[11];			pathname sought.
- * 					Format: 1-8 character file name,
- *					left justified 0-3 character extension,
- *					left justified (in last 3 chars)
- *  BYTE  sr_findid[1];			uniquely identifies find
- * 					through find_close
- *  BYTE  sr_server[4];			available for server use
- * 					(must be non-zero)
- *  BYTE  sr_res[4];			reserved for consumer use
- *
- *  Service:
- *
- * The  Find_Close  protocol  closes  the  association  between  a  Find  id
- * returned  (in  the  resume_key)  by  the Find protocol and the directory
- * search.
- *
- * Whereas  the  First  Find  protocol  logically  opens  the  directory,
- * subsequent  find  protocols  presenting  a resume_key  further "read" the
- * directory,  the  Find  Close  protocol "closes" the  directory  allowing  the
- * server to free any resources held in support of the directory search.
- *
- * The  Find  Close  protocol  is  used  to  match  the  find  Close  OS/2
- * system call.  The  protocols "Find", "Find Unique" and "Find  Close" are
- * methods  of reading  (or  searching)  a  directory.  These  protocols  may
- * be used in place of the core "Search" protocol when LANMAN 1.0 dialect has
- * been negotiated.  There may be cases where the Search protocol will still be
- * used.
- *
- * Although  only  the  find  id  portion  the  resume  key  should  be
- * required to  identify  the  search  being  ter minated,  the entire
- * resume_key as returned in  the previous Find, either a "Find  First" or "Find
- * Next" is sent to the server in this protocol.
- *
- * Find Close may generate the following errors:
- *
- *	ERRDOS/ERRbadfid
- *	ERRSRV/ERRerror
- *	ERRSRV/ERRinvnid
- */
+
+/* *** smb_com_find_close *** */
+
 smb_sdrc_t
 smb_pre_find_close(smb_request_t *sr)
 {
@@ -426,14 +519,15 @@ smb_post_find_close(smb_request_t *sr)
 smb_sdrc_t
 smb_com_find_close(smb_request_t *sr)
 {
-	unsigned short		sattr, maxcount;
-	char			*path;
-	unsigned char		resume_char;
-	uint32_t		resume_key;
-	uint16_t		index;
-	unsigned char		type;
-	unsigned short		key_len;
-	int			rc;
+	int		rc;
+	uint16_t	maxcount, index;
+	uint16_t	sattr, odid;
+	uint16_t	key_len;
+	uint32_t	client_key;
+	char		*path;
+	unsigned char	resume_char;
+	unsigned char	type;
+	smb_odir_t	*od;
 
 	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
 		return (SDRC_ERROR);
@@ -442,31 +536,132 @@ smb_com_find_close(smb_request_t *sr)
 	if ((rc != 0) || (type != 0x05))
 		return (SDRC_ERROR);
 
-	if (key_len == 0) {		/* begin search */
-		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
+	if (key_len == 0) {
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
+		    ERRDOS, ERROR_INVALID_HANDLE);
+		return (SDRC_ERROR);
+	} else if (key_len != 21) {
 		return (SDRC_ERROR);
 	}
 
-	if (key_len == 21) {
-		sr->smb_sid = 0;
-		if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
-		    &resume_char, &index, &sr->smb_sid, &resume_key) != 0) {
-			return (SDRC_ERROR);
-		}
-
-		sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree,
-		    sr->smb_sid);
-		if (sr->sid_odir == NULL) {
-			smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
-			    ERRDOS, ERRbadfid);
-			return (SDRC_ERROR);
-		}
-	} else {
+	odid = 0;
+	if (smb_mbc_decodef(&sr->smb_data, "b12.wwl",
+	    &resume_char, &index, &odid, &client_key) != 0) {
 		return (SDRC_ERROR);
 	}
 
-	smb_rdir_close(sr);
+	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	if (od == NULL) {
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
+		    ERRDOS, ERROR_INVALID_HANDLE);
+		return (SDRC_ERROR);
+	}
+
+	smb_odir_release(od);
+	smb_odir_close(od);
+
 	if (smbsr_encode_result(sr, 1, 3, "bwwbw", 1, 0, 3, 5, 0))
 		return (SDRC_ERROR);
+
+	return (SDRC_SUCCESS);
+}
+
+
+/* *** smb_com_find_unique *** */
+
+smb_sdrc_t
+smb_pre_find_unique(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__FindUnique__start, smb_request_t *, sr);
+	return (SDRC_SUCCESS);
+}
+
+void
+smb_post_find_unique(smb_request_t *sr)
+{
+	DTRACE_SMB_1(op__FindUnique__done, smb_request_t *, sr);
+}
+
+smb_sdrc_t
+smb_com_find_unique(struct smb_request *sr)
+{
+	int			rc;
+	uint16_t		count, maxcount, index;
+	uint16_t		sattr, odid;
+	char			*path;
+	unsigned char		resume_char = '\0';
+	uint32_t		client_key = 0;
+	smb_odir_t		*od;
+	smb_fileinfo_t		fileinfo;
+	boolean_t		eos;
+	struct vardata_block	*vdb;
+
+	if (smbsr_decode_vwv(sr, "ww", &maxcount, &sattr) != 0)
+		return (SDRC_ERROR);
+
+	vdb = kmem_alloc(sizeof (struct vardata_block), KM_SLEEP);
+	if ((smbsr_decode_data(sr, "%AV", sr, &path, vdb) != 0) ||
+	    (vdb->len != 0)) {
+		kmem_free(vdb, sizeof (struct vardata_block));
+		return (SDRC_ERROR);
+	}
+	kmem_free(vdb, sizeof (struct vardata_block));
+
+	(void) smb_mbc_encodef(&sr->reply, "bwwbw", 1, 0, VAR_BCC, 5, 0);
+
+	odid = smb_odir_open(sr, path, sattr);
+	if (odid == 0)
+		return (SDRC_ERROR);
+	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	if (od == NULL)
+		return (SDRC_ERROR);
+
+	rc = 0;
+	count = 0;
+	index = 0;
+	if (maxcount > SMB_MAX_SEARCH)
+		maxcount = SMB_MAX_SEARCH;
+
+	while (count < maxcount) {
+		rc = smb_odir_read_fileinfo(sr, od, &fileinfo, &eos);
+		if ((rc != 0 || (eos == B_TRUE)))
+			break;
+
+		if (*fileinfo.fi_shortname == NULL) {
+			(void) strlcpy(fileinfo.fi_shortname,
+			    fileinfo.fi_name, SMB_SHORTNAMELEN - 1);
+		}
+
+		(void) smb_mbc_encodef(&sr->reply, "b8c3c.wwlbYl13c",
+		    resume_char,
+		    fileinfo.fi_name83, fileinfo.fi_name83+9,
+		    index, odid, client_key,
+		    fileinfo.fi_dosattr & 0xff,
+		    smb_gmt2local(sr, fileinfo.fi_mtime.tv_sec),
+		    (int32_t)fileinfo.fi_size,
+		    fileinfo.fi_shortname);
+
+		count++;
+		index++;
+	}
+
+	smb_odir_release(od);
+	smb_odir_close(od);
+
+	if (rc != 0)
+		return (SDRC_ERROR);
+
+	if (count == 0) {
+		smbsr_warn(sr, NT_STATUS_NO_MORE_FILES,
+		    ERRDOS, ERROR_NO_MORE_FILES);
+		return (SDRC_ERROR);
+	}
+
+	rc = (MBC_LENGTH(&sr->reply) - sr->cur_reply_offset) - 8;
+	if (smb_mbc_poke(&sr->reply, sr->cur_reply_offset,
+	    "bwwbw", 1, count, rc+3, 5, rc) < 0) {
+		return (SDRC_ERROR);
+	}
+
 	return (SDRC_SUCCESS);
 }

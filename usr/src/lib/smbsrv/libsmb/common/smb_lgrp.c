@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -216,7 +216,7 @@ smb_lgrp_add(char *gname, char *cmnt)
 	grp.sg_name = utf8_strlwr(gname);
 	grp.sg_cmnt = cmnt;
 
-	wka = smb_wka_lookup(gname);
+	wka = smb_wka_lookup_name(gname);
 	if (wka == NULL) {
 		if ((pxgrp = getgrnam(gname)) == NULL)
 			return (SMB_LGRP_NOT_FOUND);
@@ -289,11 +289,11 @@ smb_lgrp_rename(char *gname, char *new_gname)
 		return (SMB_LGRP_SUCCESS);
 
 	/* Cannot rename well-known groups */
-	if (smb_wka_is_wellknown(gname))
+	if (smb_wka_lookup_name(gname) != NULL)
 		return (SMB_LGRP_WKSID);
 
 	/* Cannot rename to a well-known groups */
-	if (smb_wka_is_wellknown(new_gname))
+	if (smb_wka_lookup_name(new_gname) != NULL)
 		return (SMB_LGRP_WKSID);
 
 	grp.sg_name = new_gname;
@@ -321,7 +321,7 @@ smb_lgrp_delete(char *gname)
 		return (SMB_LGRP_INVALID_NAME);
 
 	/* Cannot remove a built-in group */
-	if (smb_wka_is_wellknown(gname))
+	if (smb_wka_lookup_name(gname) != NULL)
 		return (SMB_LGRP_WKSID);
 
 	db = smb_lgrp_db_open(SMB_LGRP_DB_ORW);
@@ -619,33 +619,6 @@ smb_lgrp_numbydomain(smb_gdomain_t dom_type, int *count)
 }
 
 /*
- * smb_lgrp_numbydomain
- *
- * Returns the number of groups which have the given SID
- * as a member.
- */
-int
-smb_lgrp_numbymember(smb_sid_t *msid, int *count)
-{
-	smb_giter_t gi;
-	smb_group_t grp;
-	int rc;
-
-	*count = 0;
-	rc = smb_lgrp_iteropen(&gi);
-	if (rc != SMB_LGRP_SUCCESS)
-		return (rc);
-
-	while (smb_lgrp_iterate(&gi, &grp) == SMB_LGRP_SUCCESS) {
-		if (smb_lgrp_is_member(&grp, msid))
-			(*count)++;
-		smb_lgrp_free(&grp);
-	}
-	smb_lgrp_iterclose(&gi);
-	return (SMB_LGRP_SUCCESS);
-}
-
-/*
  * smb_lgrp_free
  *
  * Frees the allocated memory for the fields of the given
@@ -935,7 +908,7 @@ smb_lgrp_start(void)
 
 	ngrp = sizeof (supported_bg) / sizeof (supported_bg[0]);
 	for (i = 0; i < ngrp; i++) {
-		wka = smb_wka_lookup(supported_bg[i]);
+		wka = smb_wka_lookup_name(supported_bg[i]);
 		if (wka == NULL)
 			continue;
 		rc = smb_lgrp_add(wka->wka_name, wka->wka_desc);
@@ -1636,11 +1609,9 @@ smb_lgrp_dtbl_getidx(sqlite *db, smb_sid_t *sid, uint16_t sid_type,
 		return (SMB_LGRP_SUCCESS);
 	}
 
-	dom_sid = smb_sid_dup(sid);
-	if (dom_sid == NULL)
+	if ((dom_sid = smb_sid_split(sid, rid)) == NULL)
 		return (SMB_LGRP_NO_MEMORY);
 
-	(void) smb_sid_split(dom_sid, rid);
 	smb_sid_tostr(dom_sid, sidstr);
 	free(dom_sid);
 

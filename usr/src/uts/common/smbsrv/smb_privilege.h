@@ -19,16 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMB_PRIVILEGE_H
 #define	_SMB_PRIVILEGE_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#include <smbsrv/smb_xdr.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -187,11 +183,6 @@ void smb_privset_merge(smb_privset_t *dst, smb_privset_t *src);
 void smb_privset_enable(smb_privset_t *privset, uint32_t id);
 int smb_privset_query(smb_privset_t *privset, uint32_t id);
 void smb_privset_log(smb_privset_t *privset);
-
-/* XDR routines */
-extern bool_t xdr_smb_luid_t();
-extern bool_t xdr_smb_luid_attrs_t();
-extern bool_t xdr_smb_privset_t();
 
 #ifdef __cplusplus
 }

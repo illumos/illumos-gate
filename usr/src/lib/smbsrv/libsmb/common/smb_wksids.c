@@ -130,76 +130,21 @@ static smb_wka_t wka_tbl[] = {
 #define	SMB_WKA_NUM	(sizeof (wka_tbl)/sizeof (wka_tbl[0]))
 
 /*
- * smb_wka_lookup_sid
- *
- * Search the wka_tbl looking for a match on the specified SID. If the
- * SID matches a builtin entry, the associated name is returned.
- * Otherwise a null pointer is returned.
- */
-char *
-smb_wka_lookup_sid(smb_sid_t *sid, uint16_t *sid_name_use)
-{
-	smb_wka_t *entry;
-	int i;
-
-	for (i = 0; i < SMB_WKA_NUM; ++i) {
-		entry = &wka_tbl[i];
-
-		if (smb_sid_cmp(sid, entry->wka_binsid)) {
-			if (sid_name_use)
-				*sid_name_use = entry->wka_type;
-			return (entry->wka_name);
-		}
-	}
-
-	return (NULL);
-}
-
-
-/*
- * smb_wka_lookup_name
- *
- * Search the wka_tbl looking for a match on the specified name. If the
- * name matches a builtin entry, the associated SID (which is in
- * malloc'd memory) is returned. Otherwise a null pointer is returned.
- */
-smb_sid_t *
-smb_wka_lookup_name(char *name, uint16_t *sid_name_use)
-{
-	smb_wka_t *entry;
-	int i;
-
-	for (i = 0; i < SMB_WKA_NUM; ++i) {
-		entry = &wka_tbl[i];
-
-		if (!utf8_strcasecmp(name, entry->wka_name)) {
-			if (sid_name_use)
-				*sid_name_use = entry->wka_type;
-			return (smb_sid_dup(entry->wka_binsid));
-		}
-	}
-
-	return (NULL);
-}
-
-/*
- * smb_wka_lookup
- *
- * Search the wka_tbl looking for a match on the specified name. If the
- * name matches a builtin entry then pointer to that entry will be
- * returned. Otherwise 0 is returned.
+ * Looks up well known accounts table for the given SID.
+ * Upon success returns a pointer to the account entry in
+ * the table, otherwise returns NULL.
  */
 smb_wka_t *
-smb_wka_lookup(char *name)
+smb_wka_lookup_sid(smb_sid_t *sid)
 {
 	smb_wka_t *entry;
 	int i;
 
 	(void) rw_rdlock(&wk_rwlock);
+
 	for (i = 0; i < SMB_WKA_NUM; ++i) {
 		entry = &wka_tbl[i];
-
-		if (!utf8_strcasecmp(name, entry->wka_name)) {
+		if (smb_sid_cmp(sid, entry->wka_binsid)) {
 			(void) rw_unlock(&wk_rwlock);
 			return (entry);
 		}
@@ -211,42 +156,43 @@ smb_wka_lookup(char *name)
 
 
 /*
- * smb_wka_is_wellknown
- *
- * Search the wka_tbl looking for a match on the specified name. If the
- * name matches a builtin entry returns 1. Otherwise returns 0.
+ * Looks up well known accounts table for the given name.
+ * Upon success returns a pointer to the binary SID of the
+ * entry, otherwise returns NULL.
  */
-boolean_t
-smb_wka_is_wellknown(char *name)
+smb_sid_t *
+smb_wka_get_sid(char *name)
 {
-	int i;
+	smb_wka_t *entry;
+	smb_sid_t *sid = NULL;
 
-	for (i = 0; i < SMB_WKA_NUM; ++i) {
-		if (utf8_strcasecmp(name, wka_tbl[i].wka_name) == 0)
-			return (B_TRUE);
-	}
+	if ((entry = smb_wka_lookup_name(name)) != NULL)
+		sid = entry->wka_binsid;
 
-	return (B_FALSE);
+	return (sid);
 }
 
 /*
- * smb_wka_lookup_domain
- *
- * Return the builtin domain name for the specified alias or group name.
+ * Looks up well known accounts table for the given name.
+ * Upon success returns a pointer to the account entry in
+ * the table, otherwise returns NULL.
  */
-char *
-smb_wka_lookup_domain(char *name)
+smb_wka_t *
+smb_wka_lookup_name(char *name)
 {
 	smb_wka_t *entry;
 	int i;
 
+	(void) rw_rdlock(&wk_rwlock);
 	for (i = 0; i < SMB_WKA_NUM; ++i) {
 		entry = &wka_tbl[i];
-
-		if (!utf8_strcasecmp(name, entry->wka_name))
-			return (wka_nbdomain[entry->wka_domidx]);
+		if (!utf8_strcasecmp(name, entry->wka_name)) {
+			(void) rw_unlock(&wk_rwlock);
+			return (entry);
+		}
 	}
 
+	(void) rw_unlock(&wk_rwlock);
 	return (NULL);
 }
 
@@ -260,6 +206,33 @@ smb_wka_get_domain(int idx)
 		return (wka_nbdomain[idx]);
 
 	return (NULL);
+}
+
+uint32_t
+smb_wka_token_groups(boolean_t isadmin, smb_ids_t *gids)
+{
+	static char *grps[] =
+		{"Authenticated Users", "NETWORK", "Administrators"};
+	smb_id_t *id;
+	int gcnt, i;
+	int total_cnt;
+
+	gcnt = (isadmin) ? 3 : 2;
+	total_cnt = gids->i_cnt + gcnt;
+
+	gids->i_ids = realloc(gids->i_ids, total_cnt * sizeof (smb_id_t));
+	if (gids->i_ids == NULL)
+		return (NT_STATUS_NO_MEMORY);
+
+	id = gids->i_ids + gids->i_cnt;
+	for (i = 0; i < gcnt; i++, gids->i_cnt++, id++) {
+		id->i_sid = smb_sid_dup(smb_wka_get_sid(grps[i]));
+		id->i_attrs = 0x7;
+		if (id->i_sid == NULL)
+			return (NT_STATUS_NO_MEMORY);
+	}
+
+	return (NT_STATUS_SUCCESS);
 }
 
 /*

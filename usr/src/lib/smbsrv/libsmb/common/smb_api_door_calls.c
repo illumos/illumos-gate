@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -249,7 +249,7 @@ smb_join(smb_joininfo_t *jdi)
  *	    domain information.
  */
 uint32_t
-smb_get_dcinfo(char *namebuf, uint32_t namebuflen, uint32_t *ipaddr)
+smb_get_dcinfo(char *namebuf, uint32_t namebuflen, smb_inaddr_t *ipaddr)
 {
 	door_arg_t arg;
 	char *buf;
@@ -285,7 +285,7 @@ smb_get_dcinfo(char *namebuf, uint32_t namebuflen, uint32_t *ipaddr)
 	if (srvname) {
 		(void) strlcpy(namebuf, srvname, namebuflen);
 		if ((h = smb_gethostbyname(srvname, &error_num)) == NULL) {
-			*ipaddr = 0;
+			bzero(ipaddr, sizeof (smb_inaddr_t));
 		} else {
 			(void) memcpy(ipaddr, h->h_addr, h->h_length);
 			freehostent(h);

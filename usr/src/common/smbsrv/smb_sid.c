@@ -19,14 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * NT Security Identifier (SID) library functions.
  */
 
 #ifndef _KERNEL
@@ -149,23 +143,26 @@ smb_sid_getrid(smb_sid_t *sid, uint32_t *rid)
  * smb_sid_split
  *
  * Take a full sid and split it into a domain sid and a relative id (rid).
- *
- * IMPORTANT: The original sid is modified in place - use smb_sid_dup before
- * calling this function to preserve the original SID. Be careful if you're
- * using this function in kernel code, after calling this function 'sid'
- * cannot be passed to smb_sid_free() because the size won't match the original
- * allocated size. Use smb_sid_ksplit() instead.
+ * The domain SID is allocated and a pointer to it will be returned. The
+ * RID value is passed back in 'rid' arg if it's not NULL. The allocated
+ * memory for the domain SID must be freed by caller.
  */
-int
+smb_sid_t *
 smb_sid_split(smb_sid_t *sid, uint32_t *rid)
 {
-	if (!smb_sid_isvalid(sid) || (sid->sid_subauthcnt == 0))
-		return (-1);
+	smb_sid_t *domsid;
 
-	--sid->sid_subauthcnt;
+	if (!smb_sid_isvalid(sid) || (sid->sid_subauthcnt == 0))
+		return (NULL);
+
+	if ((domsid = smb_sid_dup(sid)) == NULL)
+		return (NULL);
+
+	--domsid->sid_subauthcnt;
 	if (rid)
-		*rid = sid->sid_subauth[sid->sid_subauthcnt];
-	return (0);
+		*rid = domsid->sid_subauth[domsid->sid_subauthcnt];
+
+	return (domsid);
 }
 
 /*
@@ -464,3 +461,20 @@ smb_sid_free(smb_sid_t *sid)
 	free(sid);
 #endif
 }
+
+#ifndef _KERNEL
+void
+smb_ids_free(smb_ids_t *ids)
+{
+	smb_id_t *id;
+	int i;
+
+	if ((ids != NULL) && (ids->i_ids != NULL)) {
+		id = ids->i_ids;
+		for (i = 0; i < ids->i_cnt; i++, id++)
+			smb_sid_free(id->i_sid);
+
+		free(ids->i_ids);
+	}
+}
+#endif

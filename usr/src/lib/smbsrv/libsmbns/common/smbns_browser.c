@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -661,7 +661,7 @@ smb_browser_addr_of_subnet(struct name_entry *name, smb_hostinfo_t *hinfo,
 	if (hinfo->hi_nic.nic_smbflags & SMB_NICF_ALIAS)
 		return (-1);
 
-	ipaddr = hinfo->hi_nic.nic_ip;
+	ipaddr = hinfo->hi_nic.nic_ip.a_ipv4;
 	mask = hinfo->hi_nic.nic_mask;
 
 	*result = *name;
@@ -869,7 +869,8 @@ smb_browser_process_AnnouncementRequest(struct datagram *datagram,
 	(void) rw_rdlock(&smb_binfo.bi_hlist_rwl);
 	hinfo = list_head(&smb_binfo.bi_hlist);
 	while (hinfo) {
-		if ((hinfo->hi_nic.nic_ip & hinfo->hi_nic.nic_mask) ==
+		if ((hinfo->hi_nic.nic_ip.a_ipv4 &
+		    hinfo->hi_nic.nic_mask) ==
 		    (datagram->src.addr_list.sin.sin_addr.s_addr &
 		    hinfo->hi_nic.nic_mask)) {
 			h_found = B_TRUE;
@@ -1072,8 +1073,9 @@ smb_browser_config(void)
 	hinfo = list_head(&smb_binfo.bi_hlist);
 	while (hinfo) {
 		smb_init_name_struct((unsigned char *)resource_domain, 0x00, 0,
-		    hinfo->hi_nic.nic_ip, htons(DGM_SRVC_UDP_PORT),
-		    NAME_ATTR_GROUP, NAME_ATTR_LOCAL, &name);
+		    hinfo->hi_nic.nic_ip.a_ipv4,
+		    htons(DGM_SRVC_UDP_PORT), NAME_ATTR_GROUP,
+		    NAME_ATTR_LOCAL, &name);
 		(void) smb_name_add_name(&name);
 
 		hinfo = list_next(&smb_binfo.bi_hlist, hinfo);
@@ -1157,11 +1159,11 @@ smb_browser_init(void)
 		(void) strlcpy(hinfo->hi_nbname, hinfo->hi_nic.nic_host,
 		    NETBIOS_NAME_SZ);
 		(void) utf8_strupr(hinfo->hi_nbname);
-
 		/* 0x20: file server service  */
 		smb_init_name_struct((unsigned char *)hinfo->hi_nbname,
-		    0x20, 0, hinfo->hi_nic.nic_ip, htons(DGM_SRVC_UDP_PORT),
-		    NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL, &hinfo->hi_netname);
+		    0x20, 0, hinfo->hi_nic.nic_ip.a_ipv4,
+		    htons(DGM_SRVC_UDP_PORT), NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL,
+		    &hinfo->hi_netname);
 
 		list_insert_tail(&smb_binfo.bi_hlist, hinfo);
 		smb_binfo.bi_hcnt++;

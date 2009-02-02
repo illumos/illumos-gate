@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -428,13 +428,15 @@ smb_com_trans2_query_file_information(struct smb_request *sr, struct smb_xa *xa)
  * entries (smb_fsop_stream_readdir) it is treated as if there are
  * no [more] directory entries. The entries that have been read so
  * far are returned and no error is reported.
+ *
+ * Offset calculation:
+ * 2 dwords + 2 quadwords => 4 + 4 + 8 + 8 => 24
  */
-
 void
 smb_encode_stream_info(
     struct smb_request *sr,
     struct smb_xa *xa,
-    struct smb_node *snode,
+    struct smb_node *fnode,
     smb_attr_t *attr)
 {
 	char *stream_name;
@@ -442,76 +444,59 @@ smb_encode_stream_info(
 	uint32_t stream_nlen;
 	uint32_t pad;
 	u_offset_t datasz;
-	int is_dir;
-	uint32_t cookie = 0;
-	struct fs_stream_info *stream_info;
-	struct fs_stream_info *stream_info_next;
+	boolean_t is_dir;
+	smb_streaminfo_t *sinfo, *sinfo_next;
 	int rc = 0;
-	int done = 0;
+	boolean_t done = B_FALSE;
+	boolean_t eos = B_FALSE;
+	uint16_t odid;
+	smb_odir_t *od = NULL;
 
-	stream_info = kmem_alloc(sizeof (struct fs_stream_info), KM_SLEEP);
-	stream_info_next = kmem_alloc(sizeof (struct fs_stream_info), KM_SLEEP);
-	is_dir = (attr->sa_vattr.va_type == VDIR) ? 1 : 0;
+	sinfo = kmem_alloc(sizeof (smb_streaminfo_t), KM_SLEEP);
+	sinfo_next = kmem_alloc(sizeof (smb_streaminfo_t), KM_SLEEP);
+	is_dir = (attr->sa_vattr.va_type == VDIR);
 	datasz = attr->sa_vattr.va_size;
 
-	rc = smb_fsop_stream_readdir(sr, kcred, snode, &cookie, stream_info,
-	    NULL, NULL);
+	odid = smb_odir_openat(sr, fnode);
+	if (odid != 0)
+		od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	if (od != NULL)
+		rc = smb_odir_read_streaminfo(sr, od, sinfo, &eos);
 
-	if ((cookie == 0x7FFFFFFF) || (rc != 0)) {
-		if (is_dir == 0) {
-			stream_name = "::$DATA";
-			stream_nlen =
-			    smb_ascii_or_unicode_strlen(sr, stream_name);
-			next_offset = 0;
+	if ((od == NULL) || (rc != 0) || (eos))
+		done = B_TRUE;
 
-			(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu",
-			    sr, next_offset, stream_nlen, datasz, datasz,
-			    stream_name);
-		}
-		/* No named streams, we're done  */
-		kmem_free(stream_info, sizeof (struct fs_stream_info));
-		kmem_free(stream_info_next, sizeof (struct fs_stream_info));
-		return;
-	}
-
-	if (is_dir == 0) {
+	/*
+	 * If not a directory, encode an entry for the unnamed stream.
+	 */
+	if (!is_dir) {
 		stream_name = "::$DATA";
 		stream_nlen = smb_ascii_or_unicode_strlen(sr, stream_name);
 
-		/*
-		 * Offset calculation:
-		 * 2 dwords + 2 quadwords => 4 + 4 + 8 + 8 => 24
-		 */
-		next_offset = 24 + stream_nlen +
-		    smb_ascii_or_unicode_null_len(sr);
+		if (done)
+			next_offset = 0;
+		else
+			next_offset = 24 + stream_nlen +
+			    smb_ascii_or_unicode_null_len(sr);
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu", sr,
 		    next_offset, stream_nlen, datasz, datasz, stream_name);
 	}
 
+	/*
+	 * Since last packet does not have a pad we need to check
+	 * for the next stream before we encode the current one
+	 */
 	while (!done) {
-		/*
-		 * Named streams.
-		 */
-		stream_nlen = smb_ascii_or_unicode_strlen(sr,
-		    stream_info->name);
-		next_offset = 0;
-		pad = 0;
+		stream_nlen = smb_ascii_or_unicode_strlen(sr, sinfo->si_name);
+		sinfo_next->si_name[0] = 0;
 
-		/*
-		 * this is a little kludgy, since we use a cookie now and last
-		 * packet does not have a pad we need to check the next item
-		 * before we encode the current one
-		 */
-		stream_info_next->name[0] = 0;
-		rc = smb_fsop_stream_readdir(sr, kcred, snode, &cookie,
-		    stream_info_next, NULL, NULL);
-		if ((cookie == 0x7FFFFFFF) || (rc != 0)) {
-			done = 1;
+		rc = smb_odir_read_streaminfo(sr, od, sinfo_next, &eos);
+		if ((rc != 0) || (eos)) {
+			done = B_TRUE;
+			next_offset = 0;
+			pad = 0;
 		} else {
-			if (cookie == 0) {
-				break;
-			}
 			next_offset = 24 + stream_nlen +
 			    smb_ascii_or_unicode_null_len(sr);
 			pad = smb_pad_align(next_offset, 8);
@@ -519,14 +504,18 @@ smb_encode_stream_info(
 		}
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llqqu#.",
 		    sr, next_offset, stream_nlen,
-		    stream_info->size, stream_info->size,
-		    stream_info->name, pad);
+		    sinfo->si_size, sinfo->si_size,
+		    sinfo->si_name, pad);
 
-		(void) memcpy(stream_info, stream_info_next,
-		    sizeof (struct fs_stream_info));
+		(void) memcpy(sinfo, sinfo_next, sizeof (smb_streaminfo_t));
 	}
-	kmem_free(stream_info, sizeof (struct fs_stream_info));
-	kmem_free(stream_info_next, sizeof (struct fs_stream_info));
+
+	kmem_free(sinfo, sizeof (smb_streaminfo_t));
+	kmem_free(sinfo_next, sizeof (smb_streaminfo_t));
+	if (od) {
+		smb_odir_release(od);
+		smb_odir_close(od);
+	}
 }
 
 /*

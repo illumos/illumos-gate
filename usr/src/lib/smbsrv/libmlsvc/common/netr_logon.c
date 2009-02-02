@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,9 +47,9 @@
 #include <smbsrv/smb_token.h>
 #include <mlsvc.h>
 
-static DWORD netlogon_logon_private(netr_client_t *, smb_userinfo_t *);
-static DWORD netr_server_samlogon(mlsvc_handle_t *, netr_info_t *, char *,
-    netr_client_t *, smb_userinfo_t *);
+static uint32_t netlogon_logon_private(netr_client_t *, smb_token_t *);
+static uint32_t netr_server_samlogon(mlsvc_handle_t *, netr_info_t *, char *,
+    netr_client_t *, smb_token_t *);
 static void netr_invalidate_chain(void);
 static void netr_interactive_samlogon(netr_info_t *, netr_client_t *,
     struct netr_logon_info1 *);
@@ -57,6 +57,11 @@ static void netr_network_samlogon(ndr_heap_t *, netr_info_t *,
     netr_client_t *, struct netr_logon_info2 *);
 static void netr_setup_identity(ndr_heap_t *, netr_client_t *,
     netr_logon_id_t *);
+static boolean_t netr_isadmin(struct netr_validation_info3 *);
+static uint32_t netr_setup_domain_groups(struct netr_validation_info3 *,
+    smb_ids_t *);
+static uint32_t netr_setup_token_wingrps(struct netr_validation_info3 *,
+    smb_token_t *);
 
 /*
  * Shared with netr_auth.c
@@ -80,27 +85,27 @@ static mutex_t netlogon_logon_mutex;
  * NT status will be returned, in which case the token contents will
  * be invalid.
  */
-DWORD
-netlogon_logon(netr_client_t *clnt, smb_userinfo_t *user_info)
+uint32_t
+netlogon_logon(netr_client_t *clnt, smb_token_t *token)
 {
-	DWORD status;
+	uint32_t status;
 
 	(void) mutex_lock(&netlogon_logon_mutex);
 
-	status = netlogon_logon_private(clnt, user_info);
+	status = netlogon_logon_private(clnt, token);
 
 	(void) mutex_unlock(&netlogon_logon_mutex);
 	return (status);
 }
 
-static DWORD
-netlogon_logon_private(netr_client_t *clnt, smb_userinfo_t *user_info)
+static uint32_t
+netlogon_logon_private(netr_client_t *clnt, smb_token_t *token)
 {
 	char resource_domain[SMB_PI_MAX_DOMAIN];
 	char server[NETBIOS_NAME_SZ * 2];
 	mlsvc_handle_t netr_handle;
 	smb_domain_t di;
-	DWORD status;
+	uint32_t status;
 	int retries = 0, server_changed = 0;
 
 	(void) smb_getdomainname(resource_domain, SMB_PI_MAX_DOMAIN);
@@ -144,7 +149,7 @@ netlogon_logon_private(netr_client_t *clnt, smb_userinfo_t *user_info)
 		}
 
 		status = netr_server_samlogon(&netr_handle,
-		    &netr_global_info, di.d_dc, clnt, user_info);
+		    &netr_global_info, di.d_dc, clnt, token);
 
 		(void) netr_close(&netr_handle);
 	} while (status == NT_STATUS_INSUFFICIENT_LOGON_INFO && retries++ < 3);
@@ -155,75 +160,51 @@ netlogon_logon_private(netr_client_t *clnt, smb_userinfo_t *user_info)
 	return (status);
 }
 
-static DWORD
-netr_setup_userinfo(struct netr_validation_info3 *info3,
-    smb_userinfo_t *user_info, netr_client_t *clnt, netr_info_t *netr_info)
+static uint32_t
+netr_setup_token(struct netr_validation_info3 *info3, netr_client_t *clnt,
+    netr_info_t *netr_info, smb_token_t *token)
 {
-	smb_sid_attrs_t *other_grps;
 	char *username, *domain;
-	int i, nbytes;
 	unsigned char rc4key[SMBAUTH_SESSION_KEY_SZ];
+	smb_sid_t *domsid;
+	uint32_t status;
+	char nbdomain[NETBIOS_NAME_SZ];
 
-	user_info->sid_name_use = SidTypeUser;
-	user_info->rid = info3->UserId;
-	user_info->primary_group_rid = info3->PrimaryGroupId;
-	user_info->domain_sid = smb_sid_dup((smb_sid_t *)info3->LogonDomainId);
+	domsid = (smb_sid_t *)info3->LogonDomainId;
 
-	if (user_info->domain_sid == NULL)
+	token->tkn_user.i_sid = smb_sid_splice(domsid, info3->UserId);
+	if (token->tkn_user.i_sid == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
-	user_info->user_sid = smb_sid_splice(user_info->domain_sid,
-	    user_info->rid);
-	if (user_info->user_sid == NULL)
-		return (NT_STATUS_NO_MEMORY);
-
-	user_info->pgrp_sid = smb_sid_splice(user_info->domain_sid,
-	    user_info->primary_group_rid);
-	if (user_info->pgrp_sid == NULL)
+	token->tkn_primary_grp.i_sid = smb_sid_splice(domsid,
+	    info3->PrimaryGroupId);
+	if (token->tkn_primary_grp.i_sid == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
 	username = (info3->EffectiveName.str)
-	    ? (char *)info3->EffectiveName.str : clnt->username;
-	domain = (info3->LogonDomainName.str)
-	    ? (char *)info3->LogonDomainName.str : clnt->domain;
+	    ? (char *)info3->EffectiveName.str : clnt->real_username;
+
+	if (info3->LogonDomainName.str) {
+		domain = (char *)info3->LogonDomainName.str;
+	} else if (*clnt->real_domain != '\0') {
+		domain = clnt->real_domain;
+	} else {
+		(void) smb_getdomainname(nbdomain, sizeof (nbdomain));
+		domain = nbdomain;
+	}
 
 	if (username)
-		user_info->name = strdup(username);
+		token->tkn_account_name = strdup(username);
 	if (domain)
-		user_info->domain_name = strdup(domain);
+		token->tkn_domain_name = strdup(domain);
 
-	if (user_info->name == NULL || user_info->domain_name == NULL)
+	if (token->tkn_account_name == NULL || token->tkn_domain_name == NULL)
 		return (NT_STATUS_NO_MEMORY);
 
-	nbytes = info3->GroupCount * sizeof (smb_rid_attrs_t);
-	if (nbytes) {
-		if ((user_info->groups = malloc(nbytes)) != NULL) {
-			user_info->n_groups = info3->GroupCount;
-			(void) memcpy(user_info->groups,
-			    info3->GroupIds, nbytes);
-		} else {
-			return (NT_STATUS_NO_MEMORY);
-		}
-	}
-	nbytes = info3->SidCount * sizeof (smb_sid_attrs_t);
-	if (nbytes) {
-		if ((other_grps = malloc(nbytes)) != NULL) {
-			user_info->other_grps = other_grps;
-			for (i = 0; i < info3->SidCount; i++) {
-				other_grps[i].attrs =
-				    info3->ExtraSids[i].attributes;
+	status = netr_setup_token_wingrps(info3, token);
+	if (status != NT_STATUS_SUCCESS)
+		return (status);
 
-				other_grps[i].sid = smb_sid_dup(
-				    (smb_sid_t *)info3->ExtraSids[i].sid);
-
-				if (other_grps[i].sid == NULL)
-					break;
-			}
-			user_info->n_other_grps = i;
-		} else {
-			return (NT_STATUS_NO_MEMORY);
-		}
-	}
 	/*
 	 * The UserSessionKey in NetrSamLogon RPC is obfuscated using the
 	 * session key obtained in the NETLOGON credential chain.
@@ -232,15 +213,15 @@ netr_setup_userinfo(struct netr_validation_info3 *info3,
 	 * exclusively ored with the 16 byte UserSessionKey to recover
 	 * the the clear form.
 	 */
-	if ((user_info->session_key = malloc(SMBAUTH_SESSION_KEY_SZ)) == NULL)
+	if ((token->tkn_session_key = malloc(SMBAUTH_SESSION_KEY_SZ)) == NULL)
 		return (NT_STATUS_NO_MEMORY);
 	bzero(rc4key, SMBAUTH_SESSION_KEY_SZ);
 	bcopy(netr_info->session_key.key, rc4key, netr_info->session_key.len);
-	bcopy(info3->UserSessionKey.data, user_info->session_key,
+	bcopy(info3->UserSessionKey.data, token->tkn_session_key,
 	    SMBAUTH_SESSION_KEY_SZ);
-	rand_hash((unsigned char *)user_info->session_key,
+	rand_hash((unsigned char *)token->tkn_session_key,
 	    SMBAUTH_SESSION_KEY_SZ, rc4key, SMBAUTH_SESSION_KEY_SZ);
-	mlsvc_setadmin_user_info(user_info);
+
 	return (NT_STATUS_SUCCESS);
 }
 
@@ -268,9 +249,9 @@ netr_setup_userinfo(struct netr_validation_info3 *info3,
  *	NT_STATUS_PASSWORD_EXPIRED
  *	NT_STATUS_ACCOUNT_DISABLED
  */
-DWORD
+uint32_t
 netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
-    char *server, netr_client_t *clnt, smb_userinfo_t *user_info)
+    char *server, netr_client_t *clnt, smb_token_t *token)
 {
 	struct netr_SamLogon arg;
 	struct netr_authenticator auth;
@@ -281,7 +262,7 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 	ndr_heap_t *heap;
 	int opnum;
 	int rc, len;
-	DWORD status;
+	uint32_t status;
 
 	bzero(&arg, sizeof (struct netr_SamLogon));
 	opnum = NETR_OPNUM_SamLogon;
@@ -359,7 +340,7 @@ netr_server_samlogon(mlsvc_handle_t *netr_handle, netr_info_t *netr_info,
 		}
 
 		info3 = arg.ru.info3;
-		status = netr_setup_userinfo(info3, user_info, clnt, netr_info);
+		status = netr_setup_token(info3, clnt, netr_info, token);
 	}
 
 	ndr_rpc_release(netr_handle);
@@ -476,7 +457,7 @@ netr_setup_authenticator(netr_info_t *netr_info,
  *
  * Generate the new seed for the credential chain. The new seed is
  * formed by adding (timestamp + 1) to the current client credential.
- * The only quirk is the DWORD style addition.
+ * The only quirk is the uint32_t style addition.
  *
  * Returns NT_STATUS_INSUFFICIENT_LOGON_INFO if auth->credential is a
  * NULL pointer. The Authenticator field of the SamLogon response packet
@@ -487,12 +468,12 @@ netr_setup_authenticator(netr_info_t *netr_info,
  * Returns NT_STATUS_SUCCESS if the server returned a valid credential.
  * Otherwise we retirm NT_STATUS_UNSUCCESSFUL.
  */
-DWORD
+uint32_t
 netr_validate_chain(netr_info_t *netr_info, struct netr_authenticator *auth)
 {
 	netr_cred_t cred;
-	DWORD result = NT_STATUS_SUCCESS;
-	DWORD *dwp;
+	uint32_t result = NT_STATUS_SUCCESS;
+	uint32_t *dwp;
 
 	++netr_info->timestamp;
 
@@ -523,7 +504,7 @@ netr_validate_chain(netr_info_t *netr_info, struct netr_authenticator *auth)
 		 * Otherwise generate the next step in the chain.
 		 */
 		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		dwp = (DWORD *)&netr_info->client_credential;
+		dwp = (uint32_t *)&netr_info->client_credential;
 		dwp[0] += netr_info->timestamp;
 
 		netr_info->flags |= NETR_FLG_VALID;
@@ -588,4 +569,128 @@ netr_setup_identity(ndr_heap_t *heap, netr_client_t *clnt,
 	 */
 	ndr_heap_mkvcs(heap, clnt->workstation,
 	    (ndr_vcstr_t *)&identity->workstation);
+}
+
+/*
+ * Sets up domain, local and well-known group membership for the given
+ * token. Two assumptions have been made here:
+ *
+ *   a) token already contains a valid user SID so that group
+ *      memberships can be established
+ *
+ *   b) token belongs to a domain user
+ */
+static uint32_t
+netr_setup_token_wingrps(struct netr_validation_info3 *info3,
+    smb_token_t *token)
+{
+	smb_ids_t tkn_grps;
+	uint32_t status;
+
+	tkn_grps.i_cnt = 0;
+	tkn_grps.i_ids = NULL;
+
+	status = netr_setup_domain_groups(info3, &tkn_grps);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_ids_free(&tkn_grps);
+		return (status);
+	}
+
+	status = smb_sam_usr_groups(token->tkn_user.i_sid, &tkn_grps);
+	if (status != NT_STATUS_SUCCESS) {
+		smb_ids_free(&tkn_grps);
+		return (status);
+	}
+
+	status = smb_wka_token_groups(netr_isadmin(info3), &tkn_grps);
+	if (status == NT_STATUS_SUCCESS)
+		token->tkn_win_grps = tkn_grps;
+	else
+		smb_ids_free(&tkn_grps);
+
+	return (status);
+}
+
+/*
+ * Converts groups information in the returned structure by domain controller
+ * (info3) to an internal representation (gids)
+ */
+static uint32_t
+netr_setup_domain_groups(struct netr_validation_info3 *info3, smb_ids_t *gids)
+{
+	smb_sid_t *domain_sid;
+	smb_id_t *ids;
+	int i, total_cnt;
+
+	if ((i = info3->GroupCount) == 0)
+		i++;
+	i += info3->SidCount;
+
+	total_cnt = gids->i_cnt + i;
+
+	gids->i_ids = realloc(gids->i_ids, total_cnt * sizeof (smb_id_t));
+	if (gids->i_ids == NULL)
+		return (NT_STATUS_NO_MEMORY);
+
+	domain_sid = (smb_sid_t *)info3->LogonDomainId;
+
+	ids = gids->i_ids + gids->i_cnt;
+	for (i = 0; i < info3->GroupCount; i++, gids->i_cnt++, ids++) {
+		ids->i_sid = smb_sid_splice(domain_sid, info3->GroupIds[i].rid);
+		if (ids->i_sid == NULL)
+			return (NT_STATUS_NO_MEMORY);
+
+		ids->i_attrs = info3->GroupIds[i].attributes;
+	}
+
+	if (info3->GroupCount == 0) {
+		/*
+		 * if there's no global group should add the primary group.
+		 */
+		ids->i_sid = smb_sid_splice(domain_sid, info3->PrimaryGroupId);
+		if (ids->i_sid == NULL)
+			return (NT_STATUS_NO_MEMORY);
+
+		ids->i_attrs = 0x7;
+		gids->i_cnt++;
+		ids++;
+	}
+
+	/* Add the extra SIDs */
+	for (i = 0; i < info3->SidCount; i++, gids->i_cnt++, ids++) {
+		ids->i_sid = smb_sid_dup((smb_sid_t *)info3->ExtraSids[i].sid);
+		if (ids->i_sid == NULL)
+			return (NT_STATUS_NO_MEMORY);
+
+		ids->i_attrs = info3->ExtraSids[i].attributes;
+	}
+
+	return (NT_STATUS_SUCCESS);
+}
+
+/*
+ * Determines if the given user is the domain Administrator or a
+ * member of Domain Admins
+ */
+static boolean_t
+netr_isadmin(struct netr_validation_info3 *info3)
+{
+	nt_domain_t *domain;
+	int i;
+
+	if ((domain = nt_domain_lookupbytype(NT_DOMAIN_PRIMARY)) == NULL)
+		return (B_FALSE);
+
+	if (!smb_sid_cmp((smb_sid_t *)info3->LogonDomainId, domain->sid))
+		return (B_FALSE);
+
+	if ((info3->UserId == DOMAIN_USER_RID_ADMIN) ||
+	    (info3->PrimaryGroupId == DOMAIN_GROUP_RID_ADMINS))
+		return (B_TRUE);
+
+	for (i = 0; i < info3->GroupCount; i++)
+		if (info3->GroupIds[i].rid == DOMAIN_GROUP_RID_ADMINS)
+			return (B_TRUE);
+
+	return (B_FALSE);
 }

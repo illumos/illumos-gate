@@ -34,6 +34,7 @@ extern "C" {
 #include <sys/list.h>
 #include <arpa/inet.h>
 #include <net/if.h>
+#include <inet/tcp.h>
 #include <netdb.h>
 #include <stdlib.h>
 #include <libscf.h>
@@ -140,6 +141,7 @@ typedef enum {
 	SMB_CI_KPASSWD_DOMAIN,
 	SMB_CI_KPASSWD_SEQNUM,
 	SMB_CI_NETLOGON_SEQNUM,
+	SMB_CI_IPV6_ENABLE,
 	SMB_CI_MAX
 } smb_cfg_id_t;
 
@@ -183,7 +185,7 @@ extern int smb_config_get_secmode(void);
 extern int smb_config_set_secmode(int);
 extern int smb_config_set_idmap_domain(char *);
 extern int smb_config_refresh_idmap(void);
-
+extern int smb_config_getip(smb_cfg_id_t, smb_inaddr_t *);
 
 extern void smb_load_kconfig(smb_kmod_cfg_t *kcfg);
 extern uint32_t smb_crc_gen(uint8_t *, size_t);
@@ -220,7 +222,7 @@ extern void smb_config_getdomaininfo(char *domain, char *fqdn, char *forest,
     char *guid);
 extern void smb_config_setdomaininfo(char *domain, char *fqdn, char *forest,
     char *guid);
-extern uint32_t smb_get_dcinfo(char *, uint32_t, uint32_t *);
+extern uint32_t smb_get_dcinfo(char *, uint32_t, smb_inaddr_t *);
 
 /*
  * buffer context structure. This is used to keep track of the buffer
@@ -270,10 +272,10 @@ extern int smb_getsamaccount(char *, size_t);
 
 extern smb_sid_t *smb_getdomainsid(void);
 
-extern int smb_get_nameservers(struct in_addr *, int);
+extern int smb_get_nameservers(smb_inaddr_t *, int);
 extern void smb_tonetbiosname(char *, char *, char);
 
-extern int smb_chk_hostaccess(ipaddr_t, char *);
+extern int smb_chk_hostaccess(smb_inaddr_t *, char *);
 
 void smb_trace(const char *s);
 void smb_tracef(const char *fmt, ...);
@@ -446,7 +448,6 @@ extern smb_passwd_t *smb_pwd_getpwnam(const char *, smb_passwd_t *);
 extern smb_passwd_t *smb_pwd_getpwuid(uid_t, smb_passwd_t *);
 extern int smb_pwd_setpasswd(const char *, const char *);
 extern int smb_pwd_setcntl(const char *, int);
-extern int smb_pwd_num(void);
 
 extern int smb_pwd_iteropen(smb_pwditer_t *);
 extern smb_luser_t *smb_pwd_iterate(smb_pwditer_t *);
@@ -637,8 +638,6 @@ int smb_lgrp_add_member(char *, smb_sid_t *, uint16_t);
 int smb_lgrp_del_member(char *, smb_sid_t *, uint16_t);
 int smb_lgrp_getbyname(char *, smb_group_t *);
 int smb_lgrp_getbyrid(uint32_t, smb_gdomain_t, smb_group_t *);
-int smb_lgrp_numbydomain(smb_gdomain_t, int *);
-int smb_lgrp_numbymember(smb_sid_t *, int *);
 void smb_lgrp_free(smb_group_t *);
 boolean_t smb_lgrp_is_member(smb_group_t *, smb_sid_t *);
 char *smb_lgrp_strerror(int);
@@ -702,7 +701,7 @@ typedef struct {
 	char		nic_nbname[NETBIOS_NAME_SZ];
 	char		nic_cmnt[SMB_PI_MAX_COMMENT];
 	char		nic_ifname[LIFNAMSIZ];
-	uint32_t	nic_ip;
+	smb_inaddr_t	nic_ip;
 	uint32_t	nic_mask;
 	uint32_t	nic_bcast;
 	uint32_t	nic_smbflags;
@@ -723,7 +722,7 @@ int smb_nic_addhost(const char *, const char *, int, const char **);
 int smb_nic_delhost(const char *);
 int smb_nic_getfirst(smb_niciter_t *);
 int smb_nic_getnext(smb_niciter_t *);
-boolean_t smb_nic_exists(uint32_t, boolean_t);
+boolean_t smb_nic_exists(smb_inaddr_t *, boolean_t);
 
 /* NIC Monitoring functions */
 int smb_nicmon_start(const char *);
@@ -764,12 +763,31 @@ typedef struct smb_wka {
  */
 int smb_wka_init(void);
 void smb_wka_fini(void);
-smb_wka_t *smb_wka_lookup(char *);
-char *smb_wka_lookup_sid(smb_sid_t *, uint16_t *);
-smb_sid_t *smb_wka_lookup_name(char *, uint16_t *);
-char *smb_wka_lookup_domain(char *);
-boolean_t smb_wka_is_wellknown(char *);
+smb_wka_t *smb_wka_lookup_name(char *);
+smb_wka_t *smb_wka_lookup_sid(smb_sid_t *);
+smb_sid_t *smb_wka_get_sid(char *);
 char *smb_wka_get_domain(int);
+uint32_t smb_wka_token_groups(boolean_t, smb_ids_t *);
+
+/*
+ * In memory account representation
+ */
+typedef struct smb_account {
+	char		*a_name;
+	char		*a_domain;
+	uint16_t	a_type;
+	smb_sid_t	*a_sid;
+	smb_sid_t	*a_domsid;
+	uint32_t	a_rid;
+} smb_account_t;
+
+uint32_t smb_sam_lookup_name(char *, char *, uint16_t, smb_account_t *);
+uint32_t smb_sam_lookup_sid(smb_sid_t *, smb_account_t *);
+int smb_sam_usr_cnt(void);
+uint32_t smb_sam_usr_groups(smb_sid_t *, smb_ids_t *);
+int smb_sam_grp_cnt(nt_domain_type_t);
+void smb_account_free(smb_account_t *);
+boolean_t smb_account_validate(smb_account_t *);
 
 #ifdef	__cplusplus
 }

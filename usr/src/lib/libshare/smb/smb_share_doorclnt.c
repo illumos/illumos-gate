@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -358,50 +358,6 @@ smb_share_rename(char *from, char *to)
 	}
 
 	rc = smb_dr_get_uint32(dec_ctx);
-	if (smb_dr_decode_finish(dec_ctx) != 0) {
-		smb_share_door_clnt_exit(arg, B_FALSE, "decode");
-		return (NERR_InternalError);
-	}
-
-	smb_share_door_clnt_exit(arg, B_FALSE, NULL);
-	return (rc);
-}
-
-uint32_t
-smb_share_get(char *share_name, smb_share_t *si)
-{
-	door_arg_t *arg;
-	smb_dr_ctx_t *dec_ctx;
-	smb_dr_ctx_t *enc_ctx;
-	uint32_t rc;
-
-	if ((arg = smb_share_door_clnt_enter()) == NULL)
-		return (NERR_InternalError);
-
-	enc_ctx = smb_dr_encode_start(arg->data_ptr, SMB_SHARE_DSIZE);
-	smb_dr_put_uint32(enc_ctx, SMB_SHROP_GETINFO);
-	smb_dr_put_string(enc_ctx, share_name);
-
-	rc = smb_dr_encode_finish(enc_ctx, (unsigned int *)&arg->data_size);
-	if (rc != 0) {
-		smb_share_door_clnt_exit(arg, B_FALSE, "encode");
-		return (NERR_InternalError);
-	}
-
-	if (smb_share_door_call(smb_share_dfd, arg) < 0) {
-		smb_share_door_clnt_exit(arg, B_TRUE, "door call");
-		return (NERR_InternalError);
-	}
-
-	dec_ctx = smb_dr_decode_start(arg->data_ptr, arg->data_size);
-	if (smb_share_dchk(dec_ctx) != 0) {
-		(void) smb_dr_decode_finish(dec_ctx);
-		smb_share_door_clnt_exit(arg, B_FALSE, "decode");
-		return (NERR_InternalError);
-	}
-
-	rc = smb_dr_get_uint32(dec_ctx);
-	smb_dr_get_share(dec_ctx, si);
 	if (smb_dr_decode_finish(dec_ctx) != 0) {
 		smb_share_door_clnt_exit(arg, B_FALSE, "decode");
 		return (NERR_InternalError);

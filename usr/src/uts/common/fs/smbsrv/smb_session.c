@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <smbsrv/netbios.h>
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_i18n.h>
+#include <inet/tcp.h>
 
 static volatile uint64_t smb_kids;
 
@@ -42,7 +43,7 @@ static int smb_session_xprt_puthdr(smb_session_t *, smb_xprt_t *,
     uint8_t *, size_t);
 static smb_user_t *smb_session_lookup_user(smb_session_t *, char *, char *);
 static void smb_request_init_command_mbuf(smb_request_t *sr);
-
+void dump_smb_inaddr(smb_inaddr_t *ipaddr);
 
 void
 smb_session_timers(smb_session_list_t *se)
@@ -120,7 +121,7 @@ smb_session_correct_keep_alive_values(
  * there is no NetBIOS name.  See also Knowledge Base article Q301673.
  */
 void
-smb_session_reconnection_check(smb_session_list_t *se, smb_session_t *session)
+smb_session_reconnection_check(smb_session_list_t *se, smb_session_t *sess)
 {
 	smb_session_t	*sn;
 
@@ -128,12 +129,14 @@ smb_session_reconnection_check(smb_session_list_t *se, smb_session_t *session)
 	sn = list_head(&se->se_act.lst);
 	while (sn) {
 		ASSERT(sn->s_magic == SMB_SESSION_MAGIC);
-		if ((sn != session) &&
-		    (sn->ipaddr == session->ipaddr) &&
-		    (sn->local_ipaddr == session->local_ipaddr) &&
-		    (strcasecmp(sn->workstation, session->workstation) == 0) &&
-		    (sn->opentime <= session->opentime) &&
-		    (sn->s_kid < session->s_kid)) {
+		if ((sn != sess) &&
+		    smb_inet_equal(&sn->ipaddr, &sess->ipaddr,
+		    SMB_INET_NOMASK) &&
+		    smb_inet_equal(&sn->local_ipaddr, &sess->local_ipaddr,
+		    SMB_INET_NOMASK) &&
+		    (strcasecmp(sn->workstation, sess->workstation) == 0) &&
+		    (sn->opentime <= sess->opentime) &&
+		    (sn->s_kid < sess->s_kid)) {
 			tsignal(sn->s_thread, SIGINT);
 		}
 		sn = list_next(&se->se_act.lst, sn);
@@ -323,8 +326,8 @@ smb_session_xprt_gethdr(smb_session_t *session, smb_xprt_t *ret_hdr)
 		ret_hdr->xh_type = buf[0];
 
 		if (ret_hdr->xh_type != 0) {
-			cmn_err(CE_WARN, "0x%08x: invalid type (%u)",
-			    session->ipaddr, ret_hdr->xh_type);
+			cmn_err(CE_WARN, "invalid type (%u)", ret_hdr->xh_type);
+			dump_smb_inaddr(&session->ipaddr);
 			return (EPROTO);
 		}
 
@@ -334,8 +337,8 @@ smb_session_xprt_gethdr(smb_session_t *session, smb_xprt_t *ret_hdr)
 		break;
 
 	default:
-		cmn_err(CE_WARN, "0x%08x: invalid port %u",
-		    session->ipaddr, session->s_local_port);
+		cmn_err(CE_WARN, "invalid port %u", session->s_local_port);
+		dump_smb_inaddr(&session->ipaddr);
 		return (EPROTO);
 	}
 
@@ -371,8 +374,8 @@ smb_session_xprt_puthdr(smb_session_t *session, smb_xprt_t *hdr,
 		break;
 
 	default:
-		cmn_err(CE_WARN, "0x%08x: invalid port (%u)",
-		    session->ipaddr, session->s_local_port);
+		cmn_err(CE_WARN, "invalid port %u", session->s_local_port);
+		dump_smb_inaddr(&session->ipaddr);
 		return (-1);
 	}
 
@@ -634,10 +637,12 @@ smb_session_message(smb_session_t *session)
  * Port will be SSN_SRVC_TCP_PORT or SMB_SRVC_TCP_PORT.
  */
 smb_session_t *
-smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv)
+smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv,
+    int family)
 {
 	struct sockaddr_in	sin;
 	socklen_t		slen;
+	struct sockaddr_in6	sin6;
 	smb_session_t		*session;
 
 	session = kmem_cache_alloc(sv->si_cache_session, KM_SLEEP);
@@ -669,17 +674,25 @@ smb_session_create(ksocket_t new_so, uint16_t port, smb_server_t *sv)
 	smb_rwx_init(&session->s_lock);
 
 	if (new_so) {
-		slen = sizeof (sin);
-
-		(void) ksocket_getsockname(new_so, (struct sockaddr *)&sin,
-		    &slen, CRED());
-		session->local_ipaddr = sin.sin_addr.s_addr;
-
-		slen = sizeof (sin);
-		(void) ksocket_getpeername(new_so, (struct sockaddr *)&sin,
-		    &slen, CRED());
-		session->ipaddr = sin.sin_addr.s_addr;
-
+		if (family == AF_INET) {
+			slen = sizeof (sin);
+			(void) ksocket_getsockname(new_so,
+			    (struct sockaddr *)&sin, &slen, CRED());
+			bcopy(&sin, &session->local_ipaddr.a_ip, slen);
+			(void) ksocket_getpeername(new_so,
+			    (struct sockaddr *)&sin, &slen, CRED());
+			bcopy(&sin6, &session->ipaddr.a_ip, slen);
+		} else {
+			slen = sizeof (sin6);
+			(void) ksocket_getsockname(new_so,
+			    (struct sockaddr *)&sin6, &slen, CRED());
+			bcopy(&sin, &session->local_ipaddr.a_ip, slen);
+			(void) ksocket_getpeername(new_so,
+			    (struct sockaddr *)&sin6, &slen, CRED());
+			bcopy(&sin6, &session->ipaddr.a_ip, slen);
+		}
+		session->ipaddr.a_family = family;
+		session->local_ipaddr.a_family = family;
 		session->s_local_port = port;
 		session->sock = new_so;
 	}
@@ -1105,7 +1118,6 @@ smb_request_free(smb_request_t *sr)
 	ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 	ASSERT(sr->session);
 	ASSERT(sr->fid_ofile == NULL);
-	ASSERT(sr->sid_odir == NULL);
 	ASSERT(sr->r_xa == NULL);
 
 	if (sr->tid_tree)
@@ -1133,4 +1145,15 @@ smb_request_free(smb_request_t *sr)
 	sr->sr_magic = 0;
 	mutex_destroy(&sr->sr_mutex);
 	kmem_cache_free(sr->sr_cache, sr);
+}
+
+void
+dump_smb_inaddr(smb_inaddr_t *ipaddr)
+{
+char ipstr[INET6_ADDRSTRLEN];
+
+	if (smb_inet_ntop(ipaddr, ipstr, SMB_IPSTRLEN(ipaddr->a_family)))
+		cmn_err(CE_WARN, "error ipstr=%s", ipstr);
+	else
+		cmn_err(CE_WARN, "error converting ip address");
 }

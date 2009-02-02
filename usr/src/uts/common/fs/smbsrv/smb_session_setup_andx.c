@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -226,6 +226,29 @@
 #include <smbsrv/smb_token.h>
 #include <smbsrv/smb_door_svc.h>
 
+typedef struct smb_sessionsetup_info {
+	char		*ssi_user;
+	char		*ssi_domain;
+	char		*ssi_native_os;
+	char		*ssi_native_lm;
+	uint16_t	ssi_cipwlen;
+	uint8_t		*ssi_cipwd;
+	uint16_t	ssi_cspwlen;
+	uint8_t		*ssi_cspwd;
+	uint16_t	ssi_maxbufsize;
+	uint16_t	ssi_maxmpxcount;
+	uint16_t	ssi_vcnumber;
+	uint32_t	ssi_capabilities;
+	uint32_t	ssi_sesskey;
+} smb_sessionsetup_info_t;
+
+#define	SMB_AUTH_FAILED	-1
+#define	SMB_AUTH_USER	0
+#define	SMB_AUTH_GUEST	1
+
+static int smb_authenticate(smb_request_t *, smb_sessionsetup_info_t *,
+    smb_session_key_t **);
+
 smb_sdrc_t
 smb_pre_session_setup_andx(smb_request_t *sr)
 {
@@ -242,41 +265,26 @@ smb_post_session_setup_andx(smb_request_t *sr)
 smb_sdrc_t
 smb_com_session_setup_andx(smb_request_t *sr)
 {
-	uint16_t maxbufsize, maxmpxcount, vcnumber = 0;
-	uint32_t sesskey;
-	uint32_t capabilities = 0;
-	char *username = "";
-	char *userdomain = "";
-	char *native_os = "";
-	char *native_lanman = "";
-	char *hostname = sr->sr_cfg->skc_hostname;
-	char *nbdomain = sr->sr_cfg->skc_nbdomain;
-	char *fqdn = sr->sr_cfg->skc_fqdn;
-	smb_token_t *usr_token = NULL;
-	smb_user_t *user = NULL;
-	int security = sr->sr_cfg->skc_secmode;
-
-	uint16_t ci_pwlen = 0;
-	unsigned char *ci_password = NULL;
-	uint16_t cs_pwlen = 0;
-	unsigned char *cs_password = NULL;
-
-	netr_client_t clnt_info;
+	smb_sessionsetup_info_t sinfo;
 	smb_session_key_t *session_key = NULL;
-	int rc;
 	char ipaddr_buf[INET6_ADDRSTRLEN];
-	boolean_t known_domain;
+	int auth_res;
+	int rc;
+
+	bzero(&sinfo, sizeof (smb_sessionsetup_info_t));
 
 	if (sr->session->dialect >= NT_LM_0_12) {
 		rc = smbsr_decode_vwv(sr, "b.wwwwlww4.l", &sr->andx_com,
-		    &sr->andx_off, &maxbufsize, &maxmpxcount, &vcnumber,
-		    &sesskey, &ci_pwlen, &cs_pwlen, &capabilities);
+		    &sr->andx_off, &sinfo.ssi_maxbufsize,
+		    &sinfo.ssi_maxmpxcount, &sinfo.ssi_vcnumber,
+		    &sinfo.ssi_sesskey, &sinfo.ssi_cipwlen,
+		    &sinfo.ssi_cspwlen, &sinfo.ssi_capabilities);
 
 		if (rc != 0)
 			return (SDRC_ERROR);
 
-		ci_password = kmem_alloc(ci_pwlen + 1, KM_SLEEP);
-		cs_password = kmem_alloc(cs_pwlen + 1, KM_SLEEP);
+		sinfo.ssi_cipwd = kmem_alloc(sinfo.ssi_cipwlen + 1, KM_SLEEP);
+		sinfo.ssi_cspwd = kmem_alloc(sinfo.ssi_cspwlen + 1, KM_SLEEP);
 
 		/*
 		 * The padding between the Native OS and Native LM is a
@@ -293,27 +301,30 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		 */
 		rc = smbsr_decode_data(sr, "%#c#cuuu",
 		    sr,
-		    ci_pwlen, ci_password,
-		    cs_pwlen, cs_password,
-		    &username,
-		    &userdomain,
-		    &native_os);
+		    sinfo.ssi_cipwlen, sinfo.ssi_cipwd,
+		    sinfo.ssi_cspwlen, sinfo.ssi_cspwd,
+		    &sinfo.ssi_user,
+		    &sinfo.ssi_domain,
+		    &sinfo.ssi_native_os);
 
 		if (rc != 0) {
-			kmem_free(ci_password, ci_pwlen + 1);
-			kmem_free(cs_password, cs_pwlen + 1);
+			kmem_free(sinfo.ssi_cipwd, sinfo.ssi_cipwlen + 1);
+			kmem_free(sinfo.ssi_cspwd, sinfo.ssi_cspwlen + 1);
 			return (SDRC_ERROR);
 		}
 
-		ci_password[ci_pwlen] = 0;
-		cs_password[cs_pwlen] = 0;
+		sinfo.ssi_cipwd[sinfo.ssi_cipwlen] = 0;
+		sinfo.ssi_cspwd[sinfo.ssi_cspwlen] = 0;
 
-		sr->session->native_os = smbnative_os_value(native_os);
+		sr->session->native_os =
+		    smbnative_os_value(sinfo.ssi_native_os);
 
 		if (sr->session->native_os == NATIVE_OS_WINNT)
-			rc = smbsr_decode_data(sr, "%,u", sr, &native_lanman);
+			rc = smbsr_decode_data(sr, "%,u", sr,
+			    &sinfo.ssi_native_lm);
 		else
-			rc = smbsr_decode_data(sr, "%u", sr, &native_lanman);
+			rc = smbsr_decode_data(sr, "%u", sr,
+			    &sinfo.ssi_native_lm);
 
 		/*
 		 * Native Lanman could be null so we really don't care
@@ -321,24 +332,26 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		 * the field we set it to Win NT.
 		 */
 		if (rc != 0)
-			native_lanman = "NT LAN Manager 4.0";
-
+			sinfo.ssi_native_lm = "NT LAN Manager 4.0";
 	} else {
 		rc = smbsr_decode_vwv(sr, "b.wwwwlw4.", &sr->andx_com,
-		    &sr->andx_off, &maxbufsize, &maxmpxcount,
-		    &vcnumber, &sesskey, &ci_pwlen);
+		    &sr->andx_off, &sinfo.ssi_maxbufsize,
+		    &sinfo.ssi_maxmpxcount,
+		    &sinfo.ssi_vcnumber, &sinfo.ssi_sesskey,
+		    &sinfo.ssi_cipwlen);
 
 		if (rc != 0)
 			return (SDRC_ERROR);
 
-		ci_password = kmem_alloc(ci_pwlen + 1, KM_SLEEP);
-		rc = smbsr_decode_data(sr, "%#c", sr, ci_pwlen, ci_password);
+		sinfo.ssi_cipwd = kmem_alloc(sinfo.ssi_cipwlen + 1, KM_SLEEP);
+		rc = smbsr_decode_data(sr, "%#c", sr, sinfo.ssi_cipwlen,
+		    sinfo.ssi_cipwd);
 		if (rc != 0) {
-			kmem_free(ci_password, ci_pwlen + 1);
+			kmem_free(sinfo.ssi_cipwd, sinfo.ssi_cipwlen + 1);
 			return (SDRC_ERROR);
 		}
 
-		ci_password[ci_pwlen] = 0;
+		sinfo.ssi_cipwd[sinfo.ssi_cipwlen] = 0;
 
 		/*
 		 * Despite the CIFS/1.0 spec, the rest of this message is
@@ -346,191 +359,50 @@ smb_com_session_setup_andx(smb_request_t *sr)
 		 * name and the primary domain but we don't care about the
 		 * the native OS or native LanMan fields.
 		 */
-		if (smbsr_decode_data(sr, "%u", sr, &username) != 0)
-			username = "";
+		if (smbsr_decode_data(sr, "%u", sr, &sinfo.ssi_user) != 0)
+			sinfo.ssi_user = "";
 
-		if (smbsr_decode_data(sr, "%u", sr, &userdomain) != 0)
-			userdomain = "";
+		if (smbsr_decode_data(sr, "%u", sr, &sinfo.ssi_domain) != 0)
+			sinfo.ssi_domain = "";
 
 		sr->session->native_os = NATIVE_OS_UNKNOWN;
 	}
 
 	/*
-	 * If the vcnumber is zero, we can discard any
+	 * If the sinfo.ssi_vcnumber is zero, we can discard any
 	 * other connections associated with this client.
 	 */
-	sr->session->vcnumber = vcnumber;
-	if (vcnumber == 0)
+	sr->session->vcnumber = sinfo.ssi_vcnumber;
+	if (sinfo.ssi_vcnumber == 0)
 		smb_server_reconnection_check(sr->sr_server, sr->session);
 
-	sr->session->smb_msg_size = maxbufsize;
+	sr->session->smb_msg_size = sinfo.ssi_maxbufsize;
 
-	bzero(&clnt_info, sizeof (netr_client_t));
-
-	/*
-	 * Both local and domain users can be authenticated in
-	 * domain mode. Whether a user is local or not is determined
-	 * by given domain name in the request. If client does not
-	 * specify the domain name, both local and domain
-	 * authentications should be tried. The preferred order is to
-	 * try the local authentication first.
-	 */
-	known_domain = B_TRUE;
-	if (*userdomain == 0) {
-		userdomain = hostname;
-		if (security == SMB_SECMODE_DOMAIN)
-			known_domain = B_FALSE;
-	}
-
-	if ((cs_pwlen == 0) &&
-	    (ci_pwlen == 0 || (ci_pwlen == 1 && *ci_password == 0))) {
-		/* anonymous user */
-		clnt_info.flags |= NETR_CFLG_ANON;
-		username = "nobody";
-	} else if (*username == '\0') {
-		if (ci_password)
-			kmem_free(ci_password, ci_pwlen + 1);
-		if (cs_password)
-			kmem_free(cs_password, cs_pwlen + 1);
+	if ((sinfo.ssi_cspwlen == 0) &&
+	    (sinfo.ssi_cipwlen == 0 ||
+	    (sinfo.ssi_cipwlen == 1 && *sinfo.ssi_cipwd == 0))) {
+		sinfo.ssi_user = "anonymous";
+	} else if (*sinfo.ssi_user == '\0') {
+		if (sinfo.ssi_cipwd)
+			kmem_free(sinfo.ssi_cipwd, sinfo.ssi_cipwlen + 1);
+		if (sinfo.ssi_cspwd)
+			kmem_free(sinfo.ssi_cspwd, sinfo.ssi_cspwlen + 1);
 		smbsr_error(sr, 0, ERRSRV, ERRaccess);
 		return (SDRC_ERROR);
-	} else if (security == SMB_SECMODE_DOMAIN) {
-		/*
-		 * If the system is running in domain mode, domain
-		 * authentication will be performed only when the client
-		 * sends the domain that matches either the NetBIOS name
-		 * or FQDN of the domain. Otherwise, local authentication
-		 * will be performed.
-		 */
-		if (utf8_strcasecmp(userdomain, nbdomain) == 0 ||
-		    utf8_strcasecmp(userdomain, fqdn) == 0)
-			clnt_info.flags |= NETR_CFLG_DOMAIN;
-		else
-			clnt_info.flags |= NETR_CFLG_LOCAL;
-	} else if (security == SMB_SECMODE_WORKGRP) {
-		clnt_info.flags |= NETR_CFLG_LOCAL;
 	}
 
-	/*
-	 * If the domain is unknown, we are unable to determine
-	 * whether the specified user is local or domain until
-	 * the authentication has taken place; thus, the user
-	 * lookup will be postponed until the user is successfully
-	 * authenticated.
-	 */
-	if (known_domain)
-		user = smb_session_dup_user(sr->session,
-		    (clnt_info.flags & NETR_CFLG_LOCAL) ?
-		    hostname : nbdomain, username);
+	auth_res = smb_authenticate(sr, &sinfo, &session_key);
 
-	if (user == NULL) {
-		cred_t		*cr;
-		uint32_t	privileges;
+	if (sinfo.ssi_cipwd)
+		kmem_free(sinfo.ssi_cipwd, sinfo.ssi_cipwlen + 1);
 
-		clnt_info.logon_level = NETR_NETWORK_LOGON;
-		clnt_info.domain = userdomain;
-		clnt_info.username = username;
-		clnt_info.workstation = sr->session->workstation;
-		clnt_info.ipaddr = sr->session->ipaddr;
-		clnt_info.local_ipaddr = sr->session->local_ipaddr;
-		clnt_info.challenge_key.challenge_key_val =
-		    sr->session->challenge_key;
-		clnt_info.challenge_key.challenge_key_len =
-		    sr->session->challenge_len;
-		clnt_info.nt_password.nt_password_val = cs_password;
-		clnt_info.nt_password.nt_password_len = cs_pwlen;
-		clnt_info.lm_password.lm_password_val = ci_password;
-		clnt_info.lm_password.lm_password_len = ci_pwlen;
-		clnt_info.native_os = sr->session->native_os;
-		clnt_info.native_lm = smbnative_lm_value(native_lanman);
-		clnt_info.local_port = sr->session->s_local_port;
-
-		DTRACE_PROBE1(smb__sessionsetup__clntinfo, netr_client_t *,
-		    &clnt_info);
-
-		usr_token = smb_upcall_get_token(&clnt_info);
-
-		/*
-		 * If the domain is unknown and we fail to authenticate
-		 * the user locally, pass-through authentication will be
-		 * attempted.
-		 */
-		if (!known_domain) {
-			if (usr_token == NULL) {
-				clnt_info.domain = nbdomain;
-				clnt_info.flags &= ~NETR_CFLG_LOCAL;
-				clnt_info.flags |= NETR_CFLG_DOMAIN;
-				usr_token = smb_upcall_get_token(&clnt_info);
-			}
-
-			/*
-			 * Now that the user has successfully been
-			 * authenticated, the clnt_info.domain is valid.
-			 * Try to see if the user has already logged in from
-			 * this session.
-			 *
-			 * If this is a subsequent login, a duplicate user
-			 * instance will be returned. Otherwise, NULL is
-			 * returned.
-			 */
-			if (usr_token != NULL)
-				user = smb_session_dup_user(sr->session,
-				    clnt_info.domain, username);
-		}
-
-
-		/* authentication fails */
-		if (usr_token == NULL) {
-			if (ci_password)
-				kmem_free(ci_password, ci_pwlen + 1);
-			if (cs_password)
-				kmem_free(cs_password, cs_pwlen + 1);
-			smbsr_error(sr, 0, ERRSRV, ERRbadpw);
-			return (SDRC_ERROR);
-		}
-
-		if (usr_token->tkn_session_key) {
-			session_key = kmem_alloc(sizeof (smb_session_key_t),
-			    KM_SLEEP);
-			(void) memcpy(session_key, usr_token->tkn_session_key,
-			    sizeof (smb_session_key_t));
-		}
-
-		/* first login */
-		if (user == NULL) {
-			cr = smb_cred_create(usr_token, &privileges);
-			if (cr != NULL) {
-				user = smb_user_login(sr->session, cr,
-				    usr_token->tkn_domain_name,
-				    usr_token->tkn_account_name,
-				    usr_token->tkn_flags,
-				    privileges,
-				    usr_token->tkn_audit_sid);
-				smb_cred_rele(user->u_cred);
-
-				if (user->u_privcred)
-					smb_cred_rele(user->u_privcred);
-			}
-		}
-		smb_token_free(usr_token);
-	}
-
-	if (ci_password)
-		kmem_free(ci_password, ci_pwlen + 1);
-
-	if (user == NULL) {
-		if (session_key)
-			kmem_free(session_key, sizeof (smb_session_key_t));
-		if (cs_password)
-			kmem_free(cs_password, cs_pwlen + 1);
-		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_HANDLE);
+	if (auth_res == SMB_AUTH_FAILED) {
+		if (sinfo.ssi_cspwd)
+			kmem_free(sinfo.ssi_cspwd, sinfo.ssi_cspwlen + 1);
 		return (SDRC_ERROR);
 	}
 
-	sr->user_cr = user->u_cred;
-	sr->smb_uid = user->u_uid;
-	sr->uid_user = user;
-	sr->session->capabilities = capabilities;
+	sr->session->capabilities = sinfo.ssi_capabilities;
 
 	/*
 	 * Check to see if SMB signing is enable, but if it is already turned
@@ -543,18 +415,19 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	    (sr->session->secmode & NEGOTIATE_SECURITY_SIGNATURES_ENABLED) &&
 	    (sr->smb_flg2 & SMB_FLAGS2_SMB_SECURITY_SIGNATURE) &&
 	    session_key)
-		smb_sign_init(sr, session_key, (char *)cs_password, cs_pwlen);
+		smb_sign_init(sr, session_key, (char *)sinfo.ssi_cspwd,
+		    sinfo.ssi_cspwlen);
 
-	if (cs_password)
-		kmem_free(cs_password, cs_pwlen + 1);
+	if (sinfo.ssi_cspwd)
+		kmem_free(sinfo.ssi_cspwd, sinfo.ssi_cspwlen + 1);
 
 	if (session_key)
 		kmem_free(session_key, sizeof (smb_session_key_t));
 
 	if (!(sr->smb_flg2 & SMB_FLAGS2_SMB_SECURITY_SIGNATURE) &&
 	    (sr->sr_cfg->skc_signing_required)) {
-		(void) inet_ntop(AF_INET, (char *)&sr->session->ipaddr,
-		    ipaddr_buf, sizeof (ipaddr_buf));
+		(void) smb_inet_ntop(&sr->session->ipaddr, ipaddr_buf,
+		    SMB_IPSTRLEN(sr->session->ipaddr.a_family));
 		cmn_err(CE_NOTE,
 		    "SmbSessonSetupX: client %s is not capable of signing",
 		    ipaddr_buf);
@@ -580,12 +453,172 @@ smb_com_session_setup_andx(smb_request_t *sr)
 	    3,
 	    sr->andx_com,
 	    -1,			/* andx_off */
-	    ((user->u_flags & SMB_USER_FLAG_GUEST) ? 1 : 0),
+	    (auth_res == SMB_AUTH_GUEST) ? 1 : 0,
 	    VAR_BCC,
 	    sr,
 	    "Windows NT 4.0",
 	    "NT LAN Manager 4.0",
-	    nbdomain);
+	    sr->sr_cfg->skc_nbdomain);
 
 	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+}
+
+/*
+ * Tries to authenticate the connected user.
+ *
+ * It first tries to see if the user has already been authenticated.
+ * If a match is found, the user structure in the session is duplicated
+ * and the function returns. Otherwise, user information is passed to
+ * smbd for authentication. If smbd can authenticate the user an access
+ * token structure is returned. A cred_t and user structure is created
+ * based on the returned access token.
+ */
+static int
+smb_authenticate(smb_request_t *sr, smb_sessionsetup_info_t *sinfo,
+    smb_session_key_t **session_key)
+{
+	char *hostname = sr->sr_cfg->skc_hostname;
+	int security = sr->sr_cfg->skc_secmode;
+	smb_token_t *usr_token = NULL;
+	smb_user_t *user = NULL;
+	netr_client_t clnt_info;
+	boolean_t need_lookup = B_FALSE;
+	uint32_t privileges;
+	cred_t *cr;
+	char *buf;
+	size_t buflen = 0;
+	char *p;
+
+	bzero(&clnt_info, sizeof (netr_client_t));
+
+	/*
+	 * Handle user@domain format.
+	 *
+	 * We need to extract the user and domain names but
+	 * should keep the request data as is. This is important
+	 * for some forms of authentication.
+	 */
+	clnt_info.real_username = sinfo->ssi_user;
+	clnt_info.real_domain = sinfo->ssi_domain;
+
+	if (*sinfo->ssi_domain == '\0') {
+		buflen = strlen(sinfo->ssi_user) + 1;
+		buf = smb_kstrdup(sinfo->ssi_user, buflen);
+		if ((p = strchr(buf, '@')) != NULL) {
+			*p = '\0';
+			clnt_info.real_username = buf;
+			clnt_info.real_domain = p + 1;
+		}
+	}
+
+	/*
+	 * See if this user has already been authenticated.
+	 *
+	 * If no domain name is provided we cannot determine whether
+	 * this is a local or domain user when server is operating
+	 * in domain mode, so lookup will be done after authentication.
+	 */
+	if (security == SMB_SECMODE_WORKGRP) {
+		user = smb_session_dup_user(sr->session, hostname,
+		    clnt_info.real_username);
+	} else if (*clnt_info.real_domain != '\0') {
+		user = smb_session_dup_user(sr->session, clnt_info.real_domain,
+		    clnt_info.real_username);
+	} else {
+		need_lookup = B_TRUE;
+	}
+
+	if (user != NULL) {
+		sr->user_cr = user->u_cred;
+		sr->smb_uid = user->u_uid;
+		sr->uid_user = user;
+
+		if (buflen != 0)
+			kmem_free(buf, buflen);
+
+		return ((user->u_flags & SMB_USER_FLAG_GUEST)
+		    ? SMB_AUTH_GUEST : SMB_AUTH_USER);
+	}
+
+	clnt_info.logon_level = NETR_NETWORK_LOGON;
+	clnt_info.domain = sinfo->ssi_domain;
+	clnt_info.username = sinfo->ssi_user;
+	clnt_info.workstation = sr->session->workstation;
+	clnt_info.ipaddr = sr->session->ipaddr;
+	clnt_info.local_ipaddr = sr->session->local_ipaddr;
+	clnt_info.challenge_key.challenge_key_val =
+	    sr->session->challenge_key;
+	clnt_info.challenge_key.challenge_key_len =
+	    sr->session->challenge_len;
+	clnt_info.nt_password.nt_password_val = sinfo->ssi_cspwd;
+	clnt_info.nt_password.nt_password_len = sinfo->ssi_cspwlen;
+	clnt_info.lm_password.lm_password_val = sinfo->ssi_cipwd;
+	clnt_info.lm_password.lm_password_len = sinfo->ssi_cipwlen;
+	clnt_info.native_os = sr->session->native_os;
+	clnt_info.native_lm = smbnative_lm_value(sinfo->ssi_native_lm);
+	clnt_info.local_port = sr->session->s_local_port;
+
+	DTRACE_PROBE1(smb__sessionsetup__clntinfo, netr_client_t *,
+	    &clnt_info);
+
+	usr_token = smb_get_token(&clnt_info);
+
+	if (buflen != 0)
+		kmem_free(buf, buflen);
+
+	if (usr_token == NULL) {
+		smbsr_error(sr, 0, ERRSRV, ERRbadpw);
+		return (SMB_AUTH_FAILED);
+	}
+
+	if (need_lookup) {
+		user = smb_session_dup_user(sr->session,
+		    usr_token->tkn_domain_name, usr_token->tkn_account_name);
+
+		if (user != NULL) {
+			sr->user_cr = user->u_cred;
+			sr->smb_uid = user->u_uid;
+			sr->uid_user = user;
+
+			smb_token_free(usr_token);
+			return ((user->u_flags & SMB_USER_FLAG_GUEST)
+			    ? SMB_AUTH_GUEST : SMB_AUTH_USER);
+		}
+	}
+
+	if (usr_token->tkn_session_key) {
+		*session_key = kmem_alloc(sizeof (smb_session_key_t),
+		    KM_SLEEP);
+		(void) memcpy(*session_key, usr_token->tkn_session_key,
+		    sizeof (smb_session_key_t));
+	}
+
+	if ((cr = smb_cred_create(usr_token, &privileges)) != NULL) {
+		user = smb_user_login(sr->session, cr,
+		    usr_token->tkn_domain_name,
+		    usr_token->tkn_account_name,
+		    usr_token->tkn_flags,
+		    privileges,
+		    usr_token->tkn_audit_sid);
+
+		smb_cred_rele(user->u_cred);
+		if (user->u_privcred)
+			smb_cred_rele(user->u_privcred);
+	}
+
+	smb_token_free(usr_token);
+
+	if (user == NULL) {
+		if (*session_key)
+			kmem_free(*session_key, sizeof (smb_session_key_t));
+		smbsr_error(sr, 0, ERRDOS, ERROR_INVALID_HANDLE);
+		return (SMB_AUTH_FAILED);
+	}
+
+	sr->user_cr = user->u_cred;
+	sr->smb_uid = user->u_uid;
+	sr->uid_user = user;
+
+	return ((user->u_flags & SMB_USER_FLAG_GUEST)
+	    ? SMB_AUTH_GUEST : SMB_AUTH_USER);
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,7 @@ smb_kshare_fini(door_handle_t dhdl)
 
 uint32_t
 smb_kshare_getinfo(door_handle_t dhdl, char *share_name, smb_share_t *si,
-    uint32_t ipaddr)
+    smb_inaddr_t *ipaddr)
 {
 	door_arg_t arg;
 	char *buf;
@@ -80,7 +80,7 @@ smb_kshare_getinfo(door_handle_t dhdl, char *share_name, smb_share_t *si,
 	enc_ctx = smb_dr_encode_start(buf, SMB_SHARE_DSIZE);
 	smb_dr_put_uint32(enc_ctx, opcode);
 	smb_dr_put_string(enc_ctx, share_name);
-	smb_dr_put_uint32(enc_ctx, ipaddr);
+	smb_dr_put_buf(enc_ctx, (uchar_t *)ipaddr, sizeof (smb_inaddr_t));
 
 	if (smb_dr_encode_finish(enc_ctx, &used) != 0) {
 		kmem_free(buf, SMB_SHARE_DSIZE);

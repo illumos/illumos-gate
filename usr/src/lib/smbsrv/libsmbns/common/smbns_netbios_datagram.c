@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Description:
@@ -316,7 +314,7 @@ int
 smb_netbios_datagram_send(struct name_entry *src, struct name_entry *dest,
     unsigned char *data, int length)
 {
-	uint32_t ipaddr;
+	smb_inaddr_t ipaddr;
 	size_t count, srclen, destlen, sinlen;
 	struct addr_entry *addr;
 	struct sockaddr_in sin;
@@ -375,12 +373,13 @@ smb_netbios_datagram_send(struct name_entry *src, struct name_entry *dest,
 	sinlen = sizeof (sin);
 	addr = &dest->addr_list;
 	do {
-		ipaddr = addr->sin.sin_addr.s_addr;
+		ipaddr.a_ipv4 = addr->sin.sin_addr.s_addr;
+		ipaddr.a_family = AF_INET;
 		/* Don't send anything to myself... */
-		if (smb_nic_exists(ipaddr, B_FALSE))
+		if (smb_nic_exists(&ipaddr, B_FALSE))
 			goto next;
 
-		sin.sin_addr.s_addr = ipaddr;
+		sin.sin_addr.s_addr = ipaddr.a_ipv4;
 		sin.sin_port = addr->sin.sin_port;
 		(void) sendto(datagram_sock, buffer, count, 0,
 		    (struct sockaddr *)&sin, sinlen);
@@ -396,7 +395,7 @@ int
 smb_netbios_datagram_send_to_net(struct name_entry *src,
     struct name_entry *dest, char *data, int length)
 {
-	uint32_t ipaddr;
+	smb_inaddr_t ipaddr;
 	size_t count, srclen, destlen, sinlen;
 	struct addr_entry *addr;
 	struct sockaddr_in sin;
@@ -455,11 +454,12 @@ smb_netbios_datagram_send_to_net(struct name_entry *src,
 	sinlen = sizeof (sin);
 	addr = &dest->addr_list;
 	do {
-		ipaddr = addr->sin.sin_addr.s_addr;
-		if (smb_nic_exists(ipaddr, B_FALSE))
+		ipaddr.a_ipv4 = addr->sin.sin_addr.s_addr;
+		ipaddr.a_family = AF_INET;
+		if (smb_nic_exists(&ipaddr, B_FALSE))
 			goto next;
 
-		sin.sin_addr.s_addr = ipaddr;
+		sin.sin_addr.s_addr = ipaddr.a_ipv4;
 		sin.sin_port = addr->sin.sin_port;
 		(void) sendto(datagram_sock, buffer, count, 0,
 		    (struct sockaddr *)&sin, sinlen);
@@ -951,6 +951,7 @@ smb_netbios_datagram_service_daemon(void *arg)
 	struct sockaddr_in 	sin;
 	struct datagram 	*datagram;
 	int			bytes, flag = 1;
+	smb_inaddr_t 		ipaddr;
 
 	(void) mutex_lock(&smb_dgq_mtx);
 	bzero(&smb_datagram_queue, sizeof (smb_datagram_queue));
@@ -1005,8 +1006,9 @@ ignore:		bzero(&datagram->inaddr, sizeof (struct addr_entry));
 		}
 
 		/* Ignore any incoming packets from myself... */
-		if (smb_nic_exists(datagram->inaddr.sin.sin_addr.s_addr,
-		    B_FALSE)) {
+		ipaddr.a_ipv4 = datagram->inaddr.sin.sin_addr.s_addr;
+		ipaddr.a_family = AF_INET;
+		if (smb_nic_exists(&ipaddr, B_FALSE)) {
 			goto ignore;
 		}
 

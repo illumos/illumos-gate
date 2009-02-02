@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,7 +151,7 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 	smb_shrlist_t lmshr_list;
 	smb_enumshare_info_t esi;
 	int offset;
-	ipaddr_t ipaddr;
+	smb_inaddr_t ipaddr;
 
 	if ((cookie != SMB_SHARE_DSRV_COOKIE) || (ptr == NULL) ||
 	    (size < sizeof (uint32_t))) {
@@ -205,15 +205,14 @@ smb_share_dsrv_dispatch(void *cookie, char *ptr, size_t size, door_desc_t *dp,
 
 	case SMB_SHROP_GETINFO:
 		sharename = smb_dr_get_string(dec_ctx);
-		ipaddr = smb_dr_get_uint32(dec_ctx);
+		(void) smb_dr_get_buf(dec_ctx, (unsigned char *)&ipaddr,
+		    sizeof (smb_inaddr_t));
 		if ((dec_status = smb_dr_decode_finish(dec_ctx)) != 0) {
 			smb_dr_free_string(sharename);
 			goto decode_error;
 		}
-
-
 		rc = smb_shr_get(sharename, &lmshr_info);
-		smb_shr_hostaccess(&lmshr_info, ipaddr);
+		smb_shr_hostaccess(&lmshr_info, &ipaddr);
 		smb_dr_put_int32(enc_ctx, SMB_SHARE_DSUCCESS);
 		smb_dr_put_uint32(enc_ctx, rc);
 		smb_dr_put_share(enc_ctx, &lmshr_info);

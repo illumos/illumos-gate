@@ -45,8 +45,6 @@
 #include <time.h>
 #include <libscf.h>
 #include <zone.h>
-#include <time.h>
-#include <tzfile.h>
 #include <libgen.h>
 #include <pwd.h>
 #include <grp.h>
@@ -90,6 +88,8 @@ static pthread_t localtime_thr;
 static int smbd_refresh_init(void);
 static void smbd_refresh_fini(void);
 static void *smbd_refresh_monitor(void *);
+static void smbd_refresh_dc(void);
+
 static pthread_t nbt_listener;
 static pthread_t tcp_listener;
 static pthread_t refresh_thr;
@@ -529,8 +529,6 @@ smbd_refresh_monitor(void *arg)
 			exit(SMF_EXIT_OK);
 		}
 
-		syslog(LOG_DEBUG, "refresh");
-
 		/*
 		 * We've been woken up by a refresh event so go do
 		 * what is necessary.
@@ -549,9 +547,9 @@ smbd_refresh_monitor(void *arg)
 		/* re-initialize NIC table */
 		if (smb_nic_init() != 0)
 			smbd_report("failed to get NIC information");
-
 		smb_netbios_name_reconfig();
 		smb_browser_reconfig();
+		smbd_refresh_dc();
 		dyndns_update_zones();
 
 		if (smbd_set_netlogon_cred()) {
@@ -592,6 +590,23 @@ smbd_refresh_monitor(void *arg)
 	}
 
 	return (NULL);
+}
+
+/*
+ * Update DC information on a refresh.
+ */
+static void
+smbd_refresh_dc(void)
+{
+	char fqdomain[MAXHOSTNAMELEN];
+	if (smb_config_get_secmode() != SMB_SECMODE_DOMAIN)
+		return;
+
+	if (smb_getfqdomainname(fqdomain, MAXHOSTNAMELEN))
+		return;
+
+	if (smb_locate_dc(fqdomain, "", NULL))
+		smbd_report("DC discovery failed");
 }
 
 void

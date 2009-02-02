@@ -285,15 +285,25 @@ logr_s_EventLogOpen(void *arg, ndr_xa_t *mxa)
 	struct logr_EventLogOpen *param = arg;
 	ndr_hdid_t *id = NULL;
 	ndr_handle_t *hd;
+	char *log_name = NULL;
+
+	if (param->log_name.length != 0)
+		log_name = (char *)param->log_name.str;
+
+	if ((log_name == NULL) || strcasecmp(log_name, "System") != 0) {
+		bzero(&param->handle, sizeof (logr_handle_t));
+		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
+		return (NDR_DRC_OK);
+	}
 
 	id = logr_hdalloc(mxa);
 	if (id && ((hd = logr_hdlookup(mxa, id)) != NULL)) {
 		hd->nh_data_free = logr_context_data_free;
 		bcopy(id, &param->handle, sizeof (logr_handle_t));
-		param->status = ERROR_SUCCESS;
+		param->status = NT_STATUS_SUCCESS;
 	} else {
 		bzero(&param->handle, sizeof (logr_handle_t));
-		param->status = ERROR_ACCESS_DENIED;
+		param->status = NT_SC_ERROR(NT_STATUS_ACCESS_DENIED);
 	}
 
 	return (NDR_DRC_OK);

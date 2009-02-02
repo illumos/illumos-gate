@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_SMB_VOPS_H
 #define	_SMBSRV_SMB_VOPS_H
-
-#pragma ident	"@(#)smb_vops.h	1.9	08/08/07 SMI"
 
 /*
  * Common file system interfaces and definitions.
@@ -56,80 +54,7 @@ extern "C" {
 #define	SMB_STREAM_PREFIX_LEN (sizeof (SMB_STREAM_PREFIX) - 1)
 
 #define	SMB_SHORTNAMELEN 14
-#define	SMB_EOF	0x7FFFFFFF
-
-/*
- * SMB_MINLEN_RDDIR_BUF: minimum length of buffer server will provide to
- *	VOP_READDIR.  Its value is the size of the maximum possible edirent_t
- *	for solaris.  The EDIRENT_RECLEN macro returns the size of edirent_t
- *	required for a given name length.  MAXNAMELEN is the maximum
- *	filename length allowed in Solaris.  The first two EDIRENT_RECLEN()
- *	macros are to allow for . and .. entries -- just a minor tweak to try
- *	and guarantee that buffer we give to VOP_READDIR will be large enough
- *	to hold ., .., and the largest possible solaris edirent_t.
- *
- *	This bufsize will also be used when reading dirent64_t entries.
- */
-
-#define	SMB_MINLEN_RDDIR_BUF \
-	(EDIRENT_RECLEN(1) + EDIRENT_RECLEN(2) + EDIRENT_RECLEN(MAXNAMELEN))
-
-/*
- * DP_TO_EDP
- *
- * Fill in an edirent_t structure with information from a dirent64_t.
- * This allows the use of an edirent_t in code where both edirent_t's
- * and dirent64_t's are manipulated.
- */
-
-#define	DP_TO_EDP(dp, edp)						\
-{									\
-	ASSERT((dp));							\
-	ASSERT((edp));							\
-	(edp)->ed_ino = (dp)->d_ino;					\
-	(edp)->ed_off = (dp)->d_off;					\
-	(edp)->ed_eflags = 0;						\
-	(edp)->ed_reclen = (dp)->d_reclen;				\
-	(void) strlcpy((edp)->ed_name, (dp)->d_name, MAXNAMELEN);	\
-}
-
-/*
- * DP_ADVANCE
- *
- * In readdir operations, advance to read the next entry in a buffer
- * returned from VOP_READDIR.  The entries are of type dirent64_t.
- */
-
-#define	DP_ADVANCE(dp, dirbuf, numbytes)				\
-{									\
-	ASSERT((dp));							\
-	if ((dp)->d_reclen == 0) {					\
-		(dp) = NULL;						\
-	} else {							\
-		(dp) = (dirent64_t *)((char *)(dp) + (dp)->d_reclen);	\
-		if ((dp) >= (dirent64_t *)((dirbuf) + (numbytes)))	\
-			(dp) = NULL;					\
-	}								\
-}
-
-/*
- * EDP_ADVANCE
- *
- * In readdir operations, advance to read the next entry in a buffer
- * returned from VOP_READDIR.  The entries are of type edirent_t.
- */
-
-#define	EDP_ADVANCE(edp, dirbuf, numbytes)				\
-{									\
-	ASSERT((edp));							\
-	if ((edp)->ed_reclen == 0) {					\
-		(edp) = NULL;						\
-	} else {							\
-		(edp) = (edirent_t *)((char *)(edp) + (edp)->ed_reclen);\
-		if ((edp) >= (edirent_t *)((dirbuf) + (numbytes)))	\
-			(edp) = NULL;					\
-	}								\
-}
+#define	SMB_MAXDIRSIZE	0x7FFFFFFF
 
 struct smb_node;
 struct smb_request;
@@ -173,11 +98,6 @@ typedef struct smb_attr {
 			SMB_AT_ATIME|SMB_AT_MTIME|SMB_AT_CTIME|SMB_AT_RDEV|\
 			SMB_AT_BLKSIZE|SMB_AT_NBLOCKS|SMB_AT_SEQ|SMB_AT_SMB)
 
-struct fs_stream_info {
-	char name[MAXPATHLEN];
-	uint64_t size;
-};
-
 int fhopen(const struct smb_node *, int);
 
 int smb_vop_init(void);
@@ -200,19 +120,14 @@ int smb_vop_rename(vnode_t *, char *, vnode_t *, char *, int, cred_t *);
 int smb_vop_mkdir(vnode_t *, char *, smb_attr_t *, vnode_t **, int, cred_t *,
     vsecattr_t *);
 int smb_vop_rmdir(vnode_t *, char *, int, cred_t *);
-int smb_vop_readdir(vnode_t *, uint32_t *, char *, int *, ino64_t *, vnode_t **,
-    char *, int, cred_t *);
+int smb_vop_readdir(vnode_t *, uint32_t, void *, int *, int *, cred_t *);
 int smb_vop_commit(vnode_t *, cred_t *);
-int smb_vop_getdents(struct smb_node *, uint32_t *, uint64_t *, int32_t *,
-    char *, char *, uint32_t, struct smb_request *, cred_t *);
 int smb_vop_statfs(vnode_t *, struct statvfs64 *, cred_t *);
 int smb_vop_stream_lookup(vnode_t *, char *, vnode_t **, char *, vnode_t **,
     int, vnode_t *, cred_t *);
 int smb_vop_stream_create(vnode_t *, char *, smb_attr_t *, vnode_t **,
     vnode_t **, int, cred_t *);
 int smb_vop_stream_remove(vnode_t *, char *, int, cred_t *);
-int smb_vop_stream_readdir(vnode_t *, uint32_t *, struct fs_stream_info *,
-    vnode_t **, vnode_t **, int, cred_t *);
 int smb_vop_lookup_xattrdir(vnode_t *, vnode_t **, int, cred_t *);
 int smb_vop_traverse_check(vnode_t **);
 

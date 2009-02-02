@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,10 +46,10 @@
 #include <smbsrv/netbios.h>
 #include <smbsrv/cifs.h>
 #include <smbsrv/ntstatus.h>
-#include <smbsrv/libmlsvc.h>
 #include <smbrdr.h>
 #include <smbrdr_ipc_util.h>
 
+#define	SMBRDR_DOMAIN_MAX		32
 
 static uint16_t smbrdr_ports[] = {
 	SMB_SRVC_TCP_PORT,
@@ -58,7 +58,7 @@ static uint16_t smbrdr_ports[] = {
 
 static int smbrdr_nports = sizeof (smbrdr_ports) / sizeof (smbrdr_ports[0]);
 
-static struct sdb_session session_table[MLSVC_DOMAIN_MAX];
+static struct sdb_session session_table[SMBRDR_DOMAIN_MAX];
 static mutex_t smbrdr_screate_mtx;
 static uint32_t session_id = 0;
 
@@ -229,22 +229,35 @@ smbrdr_trnsprt_connect(struct sdb_session *sess, uint16_t port)
 {
 	char hostname[MAXHOSTNAMELEN];
 	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
 	int sock, rc;
 	mts_wchar_t unicode_server_name[SMB_PI_MAX_DOMAIN];
 	char server_name[SMB_PI_MAX_DOMAIN];
 	unsigned int cpid = oem_get_smb_cpid();
+	char ipstr[INET6_ADDRSTRLEN];
 
-	if ((sock = socket(AF_INET, SOCK_STREAM, 0)) <= 0) {
+	if ((sock = socket(sess->srv_ipaddr.a_family, SOCK_STREAM, 0)) <= 0) {
 		syslog(LOG_DEBUG, "smbrdr: socket failed: %s", strerror(errno));
 		return (-1);
 	}
+	if (sess->srv_ipaddr.a_family == AF_INET) {
+		bzero(&sin, sizeof (struct sockaddr_in));
+		sin.sin_family = AF_INET;
+		sin.sin_addr.s_addr = sess->srv_ipaddr.a_ipv4;
+		sin.sin_port = htons(port);
+		rc = connect(sock, (struct sockaddr *)&sin, sizeof (sin));
+	} else {
+		(void) smb_inet_ntop(&sess->srv_ipaddr, ipstr,
+		    SMB_IPSTRLEN(sess->srv_ipaddr.a_family));
+		bzero(&sin6, sizeof (struct sockaddr_in6));
+		sin6.sin6_family = AF_INET6;
+		bcopy(&sess->srv_ipaddr.a_ipv6, &sin6.sin6_addr.s6_addr,
+		    IPV6_ADDR_LEN);
+		sin6.sin6_port = htons(port);
+		rc = connect(sock, (struct sockaddr *)&sin6, sizeof (sin6));
+	}
 
-	bzero(&sin, sizeof (struct sockaddr_in));
-	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = sess->srv_ipaddr;
-	sin.sin_port = htons(port);
-
-	if ((rc = connect(sock, (struct sockaddr *)&sin, sizeof (sin))) < 0) {
+	if (rc  < 0) {
 		syslog(LOG_DEBUG, "smbrdr: connect failed: %s",
 		    strerror(errno));
 		if (sock != 0)
@@ -391,7 +404,7 @@ static struct sdb_session *
 smbrdr_session_init(char *domain_controller, char *domain)
 {
 	struct sdb_session *session = NULL;
-	uint32_t ipaddr;
+	smb_inaddr_t ipaddr;
 	int i, rc;
 	struct hostent *h;
 
@@ -405,9 +418,10 @@ smbrdr_session_init(char *domain_controller, char *domain)
 	}
 
 	(void) memcpy(&ipaddr, h->h_addr, h->h_length);
+	ipaddr.a_family = h->h_addrtype;
 	freehostent(h);
 
-	for (i = 0; i < MLSVC_DOMAIN_MAX; ++i) {
+	for (i = 0; i < SMBRDR_DOMAIN_MAX; ++i) {
 		session = &session_table[i];
 
 		(void) rw_wrlock(&session->rwl);
@@ -526,7 +540,7 @@ smbrdr_session_lock(char *server, char *username, int lmode)
 	if (server == NULL)
 		return (NULL);
 
-	for (i = 0; i < MLSVC_DOMAIN_MAX; ++i) {
+	for (i = 0; i < SMBRDR_DOMAIN_MAX; ++i) {
 		session = &session_table[i];
 
 		(lmode == SDB_SLCK_READ) ? (void) rw_rdlock(&session->rwl) :
@@ -594,18 +608,16 @@ smbrdr_dump_sessions(void)
 {
 	struct sdb_session *session;
 	struct sdb_logon *logon;
-	char ipstr[16];
+	char ipstr[INET6_ADDRSTRLEN];
 	int i;
 
-	for (i = 0; i < MLSVC_DOMAIN_MAX; ++i) {
+	for (i = 0; i < SMBRDR_DOMAIN_MAX; ++i) {
 		session = &session_table[i];
 
 		(void) rw_rdlock(&session->rwl);
 		if (session->state != SDB_SSTATE_START) {
-			(void) inet_ntop(AF_INET,
-			    (const void *)(&session->srv_ipaddr),
-			    ipstr, sizeof (ipstr));
-
+			(void) smb_inet_ntop(&session->srv_ipaddr, ipstr,
+			    SMB_IPSTRLEN(session->srv_ipaddr.a_family));
 			syslog(LOG_DEBUG, "session[%d]: state=%d",
 			    i, session->state);
 			syslog(LOG_DEBUG, "session[%d]: %s %s (%s)", i,

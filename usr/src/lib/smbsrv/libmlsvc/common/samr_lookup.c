@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,25 +51,19 @@ static int samr_set_user_password(smb_auth_info_t *, BYTE *);
  * samr_lookup_domain
  *
  * Lookup up the domain SID for the specified domain name. The handle
- * should be one returned from samr_connect. The results will be
- * returned in user_info - which should have been allocated by the
- * caller. On success sid_name_use will be set to SidTypeDomain.
- *
- * Returns 0 on success, otherwise returns -ve error code.
+ * should be one returned from samr_connect. The allocated memory for
+ * the returned SID must be freed by caller.
  */
-int
-samr_lookup_domain(mlsvc_handle_t *samr_handle, char *domain_name,
-    smb_userinfo_t *user_info)
+smb_sid_t *
+samr_lookup_domain(mlsvc_handle_t *samr_handle, char *domain_name)
 {
 	struct samr_LookupDomain arg;
+	smb_sid_t *domsid = NULL;
 	int opnum;
-	int rc;
 	size_t length;
 
-	if (ndr_is_null_handle(samr_handle) ||
-	    domain_name == NULL || user_info == NULL) {
-		return (-1);
-	}
+	if (ndr_is_null_handle(samr_handle) || domain_name == NULL)
+		return (NULL);
 
 	opnum = SAMR_OPNUM_LookupDomain;
 	bzero(&arg, sizeof (struct samr_LookupDomain));
@@ -85,15 +79,11 @@ samr_lookup_domain(mlsvc_handle_t *samr_handle, char *domain_name,
 	arg.domain_name.allosize = length;
 	arg.domain_name.str = (unsigned char *)domain_name;
 
-	rc = ndr_rpc_call(samr_handle, opnum, &arg);
-	if (rc == 0) {
-		user_info->sid_name_use = SidTypeDomain;
-		user_info->domain_sid = smb_sid_dup((smb_sid_t *)arg.sid);
-		user_info->domain_name = MEM_STRDUP("ndr", domain_name);
-	}
+	if (ndr_rpc_call(samr_handle, opnum, &arg) == 0)
+		domsid = smb_sid_dup((smb_sid_t *)arg.sid);
 
 	ndr_rpc_release(samr_handle);
-	return (rc);
+	return (domsid);
 }
 
 /*
@@ -140,26 +130,27 @@ samr_enum_local_domains(mlsvc_handle_t *samr_handle)
 /*
  * samr_lookup_domain_names
  *
- * Lookup up a name
- * returned in user_info - which should have been allocated by the
- * caller. On success sid_name_use will be set to SidTypeDomain.
+ * Lookup up the given name in the domain specified by domain_handle.
+ * Upon a successful lookup the information is returned in the account
+ * arg and caller must free allocated memories by calling smb_account_free().
  *
- * Returns 0 on success. Otherwise returns an NT status code.
+ * Returns NT status codes.
  */
-DWORD
+uint32_t
 samr_lookup_domain_names(mlsvc_handle_t *domain_handle, char *name,
-    smb_userinfo_t *user_info)
+    smb_account_t *account)
 {
 	struct samr_LookupNames arg;
 	int opnum;
-	DWORD status;
+	uint32_t status;
 	size_t length;
 
 	if (ndr_is_null_handle(domain_handle) ||
-	    name == NULL || user_info == NULL) {
+	    name == NULL || account == NULL) {
 		return (NT_STATUS_INVALID_PARAMETER);
 	}
 
+	bzero(account, sizeof (smb_account_t));
 	opnum = SAMR_OPNUM_LookupNames;
 	bzero(&arg, sizeof (struct samr_LookupNames));
 
@@ -180,7 +171,7 @@ samr_lookup_domain_names(mlsvc_handle_t *domain_handle, char *name,
 
 	if (ndr_rpc_call(domain_handle, opnum, &arg) != 0) {
 		status = NT_STATUS_INVALID_PARAMETER;
-	} else if (arg.status != 0) {
+	} else if (arg.status != NT_STATUS_SUCCESS) {
 		status = NT_SC_VALUE(arg.status);
 
 		/*
@@ -189,10 +180,9 @@ samr_lookup_domain_names(mlsvc_handle_t *domain_handle, char *name,
 		if (status != NT_STATUS_NONE_MAPPED)
 			ndr_rpc_status(domain_handle, opnum, arg.status);
 	} else {
-		user_info->name = MEM_STRDUP("ndr", name);
-		user_info->sid_name_use = arg.rid_types.rid_type[0];
-		user_info->rid = arg.rids.rid[0];
-		status = 0;
+		account->a_type = arg.rid_types.rid_type[0];
+		account->a_rid = arg.rids.rid[0];
+		status = NT_STATUS_SUCCESS;
 	}
 
 	ndr_rpc_release(domain_handle);
@@ -248,7 +238,8 @@ samr_query_user_info(mlsvc_handle_t *user_handle, WORD switch_value,
  *
  * Returns 0 on success, otherwise returns -1.
  */
-static int samr_setup_user_info(WORD switch_value,
+static int
+samr_setup_user_info(WORD switch_value,
     struct samr_QueryUserInfo *arg, union samr_user_info *user_info)
 {
 	struct samr_QueryUserInfo1 *info1;
@@ -312,14 +303,15 @@ static int samr_setup_user_info(WORD switch_value,
  * Returns 0 on success, otherwise returns -1.
  */
 int
-samr_query_user_groups(mlsvc_handle_t *user_handle, smb_userinfo_t *user_info)
+samr_query_user_groups(mlsvc_handle_t *user_handle, int *n_groups,
+    struct samr_UserGroups **groups)
 {
 	struct samr_QueryUserGroups arg;
 	int opnum;
 	int rc;
 	int nbytes;
 
-	if (ndr_is_null_handle(user_handle) || user_info == NULL)
+	if (ndr_is_null_handle(user_handle))
 		return (-1);
 
 	opnum = SAMR_OPNUM_QueryUserGroups;
@@ -335,15 +327,13 @@ samr_query_user_groups(mlsvc_handle_t *user_handle, smb_userinfo_t *user_info)
 		} else {
 			nbytes = arg.info->n_entry *
 			    sizeof (struct samr_UserGroups);
-			user_info->groups = malloc(nbytes);
 
-			if (user_info->groups == NULL) {
-				user_info->n_groups = 0;
+			if ((*groups = malloc(nbytes)) == NULL) {
+				*n_groups = 0;
 				rc = -1;
 			} else {
-				user_info->n_groups = arg.info->n_entry;
-				(void) memcpy(user_info->groups,
-				    arg.info->groups, nbytes);
+				*n_groups = arg.info->n_entry;
+				bcopy(arg.info->groups, *groups, nbytes);
 			}
 		}
 	}

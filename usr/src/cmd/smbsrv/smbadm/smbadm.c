@@ -781,7 +781,7 @@ smbadm_list(int argc, char **argv)
 	char srvname[MAXHOSTNAMELEN];
 	char modename[16];
 	int rc;
-	uint32_t srvipaddr;
+	smb_inaddr_t srvipaddr;
 	char ipstr[INET6_ADDRSTRLEN];
 
 	rc = smb_config_getstr(SMB_CI_SECURITY, modename, sizeof (modename));
@@ -808,9 +808,9 @@ smbadm_list(int argc, char **argv)
 
 	if ((smb_get_dcinfo(srvname, MAXHOSTNAMELEN, &srvipaddr)
 	    == NT_STATUS_SUCCESS) && (*srvname != '\0') &&
-	    (srvipaddr != 0)) {
-		(void) inet_ntop(AF_INET, (const void *)&srvipaddr,
-		    ipstr, sizeof (ipstr));
+	    (!smb_inet_iszero(&srvipaddr))) {
+		(void) smb_inet_ntop(&srvipaddr, ipstr,
+		    SMB_IPSTRLEN(srvipaddr.a_family));
 		(void) printf(gettext("\t[+%s.%s] [%s]\n"),
 		    srvname, fqdn, ipstr);
 	}

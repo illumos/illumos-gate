@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"@(#)smb_nt_transact_notify_change.c	1.6	08/08/07 SMI"
 
 /*
  * File Change Notification (FCN)
@@ -495,7 +493,6 @@ smb_reply_specific_cancel_request(struct smb_request *zsr)
 		ASSERT(sr->sr_magic == SMB_REQ_MAGIC);
 		tmp = smb_slist_next(&smb_ncr_list, sr);
 		if ((sr->session == zsr->session) &&
-		    (sr->smb_sid == zsr->smb_sid) &&
 		    (sr->smb_uid == zsr->smb_uid) &&
 		    (sr->smb_pid == zsr->smb_pid) &&
 		    (sr->smb_tid == zsr->smb_tid) &&

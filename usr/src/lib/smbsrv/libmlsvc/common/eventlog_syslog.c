@@ -38,38 +38,27 @@
 #include <ctype.h>
 #include "eventlog.h"
 
-#define	LOGR_SYSLOG_PARSE_ENTRY_SUCCESS	0
-#define	LOGR_SYSLOG_PARSE_ENTRY_ERR	-1
-#define	LOGR_SYSLOG_PARSE_NOPRI_ERR	-2
-
-#define	LOGR_SYSLOG_PARSE_IDTOKEN_PFX	"[ID"
-
 typedef enum {
-	LOGR_SYSLOG_MONTH = 0,
-	LOGR_SYSLOG_DAY,
-	LOGR_SYSLOG_TIME,
-	LOGR_SYSLOG_MACHINENAME,
-	LOGR_SYSLOG_SOURCE,
-	LOGR_SYSLOG_ID,
-	LOGR_SYSLOG_PRI_FAC,
-	LOGR_SYSLOG_NARG
-} logr_syslog_tokens;
-
-typedef enum {
-	LOGR_SYSLOG_FACILITY = 0,
-	LOGR_SYSLOG_PRIORITY,
-	LOGR_SYSLOG_PRI_FAC_NARG
-} logr_syslog_pri_fac_tokens;
+	LOGR_MONTH = 0,
+	LOGR_DAY,
+	LOGR_TIME,
+	LOGR_HOST,
+	LOGR_SOURCE,
+	LOGR_IDTAG,
+	LOGR_ID,
+	LOGR_PRI_FAC,
+	LOGR_NARG
+} logr_syslog_tokens_t;
 
 /*
  * Event code translation struct for use in processing config file
  */
-typedef struct logr_code_tbl {
-	char	*c_name;
-	int	c_val;
-} logr_code_tbl_t;
+typedef struct logr_priority {
+	char	*p_name;
+	int	p_value;
+} logr_priority_t;
 
-static logr_code_tbl_t	logr_syslog_pri_names[] = {
+static logr_priority_t logr_pri_names[] = {
 	"panic",	LOG_EMERG,
 	"emerg",	LOG_EMERG,
 	"alert",	LOG_ALERT,
@@ -83,233 +72,126 @@ static logr_code_tbl_t	logr_syslog_pri_names[] = {
 	"debug",	LOG_DEBUG
 };
 
-static logr_code_tbl_t	logr_syslog_fac_names[] = {
-	"kern",		LOG_KERN,
-	"user",		LOG_USER,
-	"mail",		LOG_MAIL,
-	"daemon",	LOG_DAEMON,
-	"auth",		LOG_AUTH,
-	"security",	LOG_AUTH,
-	"syslog",	LOG_SYSLOG,
-	"lpr",		LOG_LPR,
-	"news",		LOG_NEWS,
-	"uucp",		LOG_UUCP,
-	"audit",	LOG_AUDIT,
-	"cron",		LOG_CRON,
-	"local0",	LOG_LOCAL0,
-	"local1",	LOG_LOCAL1,
-	"local2",	LOG_LOCAL2,
-	"local3",	LOG_LOCAL3,
-	"local4",	LOG_LOCAL4,
-	"local5",	LOG_LOCAL5,
-	"local6",	LOG_LOCAL6,
-	"local7",	LOG_LOCAL7
-};
-
 typedef struct logr_syslog_node {
 	list_node_t	ln_node;
 	char		ln_logline[LOGR_MAXENTRYLEN];
 } logr_syslog_node_t;
 
 /*
- * Sets the loghost of an syslog entry.
- * Returns 0 on success, -1 on failure.
+ * Set the syslog timestamp.
+ *
+ * This is a private helper for logr_syslog_parse_entry(), which
+ * must ensure that the appropriate argv entries are non-null.
  */
-static int
-logr_syslog_set_loghost(char *log_host, logr_entry_t *le)
+static void
+logr_syslog_set_timestamp(char **argv, logr_entry_t *le)
 {
-	if (log_host == NULL)
-		return (-1);
-
-	(void) strlcpy(le->le_hostname, log_host, MAXHOSTNAMELEN);
-
-	return (0);
-}
-
-/*
- * Sets the timestamp of an syslog entry.
- * Returns 0 on success, -1 on failure.
- */
-static int
-logr_syslog_set_timestamp(char *month, char *day, char *time, logr_entry_t *le)
-{
+	char *month = argv[LOGR_MONTH];
+	char *day = argv[LOGR_DAY];
+	char *time = argv[LOGR_TIME];
 	struct timeval	now;
 	struct tm tm, cur_tm;
-	char buf[30];
-
-	if ((month == NULL) || (day == NULL) || (time == NULL))
-		return (-1);
+	char buf[32];
 
 	bzero(&tm, sizeof (tm));
-	(void) snprintf(buf, 30, "%s %s %s", month, day, time);
-	if (strptime(buf, "%b" "%d" "%H:%M:%S", &tm) == NULL)
-		return (-1);
+	(void) snprintf(buf, 32, "%s %s %s", month, day, time);
+	if (strptime(buf, "%b" "%d" "%H:%M:%S", &tm) == NULL) {
+		le->le_timestamp.tv_sec = 0;
+		return;
+	}
 
-	/* get the current dst, year and apply it. */
-	if (gettimeofday(&now, NULL) != 0)
-		return (-1);
-
-	if (localtime_r(&now.tv_sec, &cur_tm) == NULL)
-		return (-1);
+	(void) gettimeofday(&now, NULL);
+	(void) localtime_r(&now.tv_sec, &cur_tm);
 
 	tm.tm_isdst = cur_tm.tm_isdst;
 	tm.tm_year = cur_tm.tm_year;
 	if (tm.tm_mon > cur_tm.tm_mon)
-		tm.tm_year = tm.tm_year - 1;
+		tm.tm_year--;
 
-	if ((le->le_timestamp.tv_sec = mktime(&tm)) == -1)
-		return (-1);
-
-	return (0);
+	le->le_timestamp.tv_sec = mktime(&tm);
 }
 
 /*
- * Sets the Priority and Facility of an syslog entry.
- * Returns 0 on success, -1 on failure.
+ * Set the syslog priority.
+ *
+ * This is a private helper for logr_syslog_parse_entry(), which
+ * must ensure that the appropriate argv entries are non-null.
  */
-static int
-logr_syslog_set_pri_fac(char *pf_tkn, logr_entry_t *le)
+static void
+logr_syslog_set_priority(char **argv, logr_entry_t *le)
 {
-	int pri_fac[LOGR_SYSLOG_PRI_FAC_NARG];
-	int j, sz = 0;
+	logr_priority_t *entry;
+	char *token;
+	int sz = sizeof (logr_pri_names) / sizeof (logr_pri_names[0]);
+	int i;
 
 	le->le_pri = LOG_INFO;
 
-	if (pf_tkn == NULL)
-		return (-1);
+	if ((token = argv[LOGR_PRI_FAC]) == NULL)
+		return;
 
-	/* Defaults */
-	pri_fac[LOGR_SYSLOG_FACILITY] = LOG_USER;
-	pri_fac[LOGR_SYSLOG_PRIORITY] = LOG_INFO;
+	for (i = 0; i < sz; i++) {
+		entry = &logr_pri_names[i];
 
-	sz = sizeof (logr_syslog_fac_names) / sizeof (logr_syslog_fac_names[0]);
-	for (j = 0; j < sz; j++) {
-		if (strstr(pf_tkn, logr_syslog_fac_names[j].c_name) != NULL) {
-			pri_fac[LOGR_SYSLOG_FACILITY] =
-			    logr_syslog_fac_names[j].c_val;
+		if (strstr(token, entry->p_name) != NULL) {
+			le->le_pri = entry->p_value;
 			break;
 		}
 	}
-
-	sz = sizeof (logr_syslog_pri_names) / sizeof (logr_syslog_pri_names[0]);
-	for (j = 0; j < sz; j++) {
-		if (strstr(pf_tkn, logr_syslog_pri_names[j].c_name) != NULL) {
-			pri_fac[LOGR_SYSLOG_PRIORITY] =
-			    logr_syslog_pri_names[j].c_val;
-			break;
-		}
-	}
-
-	le->le_pri = pri_fac[LOGR_SYSLOG_PRIORITY];
-
-	return (0);
 }
 
 /*
- * Sets the messages of an syslog entry.
- */
-static void
-logr_syslog_set_message(char *logline, logr_entry_t *le)
-{
-	char *p;
-
-	if ((p = strchr(logline, '\n')) != NULL)
-		*p = '\0';
-
-	(void) strlcpy(le->le_msg, logline, LOGR_MAXENTRYLEN);
-}
-
-/*
- * Parses the tokens from an syslog entry. A typical syslog entry is of the
- * following standard format,
+ * Parse a syslog entry into a log_entry_t structure.  A typical syslog
+ * entry has one of the following formats:
  *
- *  <month> <day> <time> <loghost> <source>: [ID <ID> <facility.priority>] <msg>
+ * <month> <day> <time> <host> <msg>
+ * <month> <day> <time> <host> <source>: [ID <ID> <facility.priority>] <msg>
+ *
  * For Example:
- *  Oct 29 09:49:20 pbgalaxy1 smbd[104039]: [ID 702911 daemon.info] init done.
- *
- * This method parses the above syslog entry and populates the log_entry_t
- * structure from the parsed tokens. It returns the following return codes.
- *
- * Returns,
- *   LOGR_SYSLOG_PARSE_ENTRY_ERR:	If the syslog entry is NULL, or there is
- *					error in parsing the entry or entry is
- *					not in the standard format.
- *   LOGR_SYSLOG_PARSE_NOPRI_ERR:	If the priority of the message cannot be
- *					obtained from the parsed tokens.
- *   LOGR_SYSLOG_PARSE_ENTRY_SUCCESS:	If the syslog entry is sucessfully
- *					parsed.
- */
-static int
-logr_syslog_parse_tokens(char *logline, logr_entry_t *le)
-{
-	char *argv[LOGR_SYSLOG_NARG];
-	int i;
-	boolean_t no_pri = B_TRUE;
-
-	for (i = 0; i < LOGR_SYSLOG_NARG; ++i) {
-		if ((argv[i] = strsep(&logline, " ")) == NULL)
-			return (LOGR_SYSLOG_PARSE_ENTRY_ERR);
-
-		(void) trim_whitespace(logline);
-
-		if ((i == LOGR_SYSLOG_ID) &&
-		    (strcmp(argv[i], LOGR_SYSLOG_PARSE_IDTOKEN_PFX) == 0)) {
-			i--;
-			no_pri = B_FALSE;
-		}
-	}
-
-	if (logr_syslog_set_timestamp(argv[LOGR_SYSLOG_MONTH],
-	    argv[LOGR_SYSLOG_DAY], argv[LOGR_SYSLOG_TIME], le) < 0)
-		return (LOGR_SYSLOG_PARSE_ENTRY_ERR);
-
-	if (logr_syslog_set_loghost(argv[LOGR_SYSLOG_MACHINENAME], le) < 0)
-		return (LOGR_SYSLOG_PARSE_ENTRY_ERR);
-
-	if (no_pri)
-		return (LOGR_SYSLOG_PARSE_NOPRI_ERR);
-
-	if (logr_syslog_set_pri_fac(argv[LOGR_SYSLOG_PRI_FAC], le) < 0)
-		return (LOGR_SYSLOG_PARSE_NOPRI_ERR);
-
-	logr_syslog_set_message(logline, le);
-
-	return (LOGR_SYSLOG_PARSE_ENTRY_SUCCESS);
-}
-
-/*
- * log_syslog_parse_entry
- *
- * Parse the given syslog entry into a log_entry_t structure.
- *
- * Returns,
- *   LOGR_SYSLOG_PARSE_ENTRY_SUCCESS:	If the parsing is successful.
- *   An error code less than zero, if parsing fails.
+ * Oct 29 09:49:20 galaxy smbd[104039]: [ID 702911 daemon.info] init done
  */
 static int
 logr_syslog_parse_entry(char *logline, logr_entry_t *le)
 {
-	char *dup_logline;
-	int ret = LOGR_SYSLOG_PARSE_ENTRY_SUCCESS;
+	char buf[LOGR_MAXENTRYLEN];
+	char *argv[LOGR_NARG];
+	char *value;
+	char *bp;
+	int i;
 
-	if (logline == NULL)
-		return (LOGR_SYSLOG_PARSE_ENTRY_ERR);
+	(void) memset(argv, 0, sizeof (char *) * LOGR_NARG);
+	(void) strlcpy(buf, logline, LOGR_MAXENTRYLEN);
 
-	dup_logline = strdup(logline);
-	ret = logr_syslog_parse_tokens(dup_logline, le);
-	free(dup_logline);
+	for (bp = buf, i = 0; i < LOGR_NARG; ++i) {
+		if (i == LOGR_SOURCE) {
+			/*
+			 * If the [ID key is not present, everything
+			 * that follows is the message text.
+			 */
+			if (strstr(bp, "[ID") == NULL)
+				break;
+		}
 
-	switch (ret) {
-	case LOGR_SYSLOG_PARSE_NOPRI_ERR:
-		le->le_pri = LOG_INFO;
-		logr_syslog_set_message(logline, le);
-		ret = LOGR_SYSLOG_PARSE_ENTRY_SUCCESS;
-		break;
-	default:
-		break;
+		do {
+			if ((value = strsep(&bp, " \t")) == NULL)
+				break;
+		} while (*value == '\0');
+
+		if ((argv[i] = value) == NULL)
+			return (-1);
 	}
 
-	return (ret);
+	/*
+	 * bp should be pointing at the remaining message text.
+	 */
+	if ((value = strchr(bp, '\n')) != NULL)
+		*value = '\0';
+
+	(void) strlcpy(le->le_msg, bp, LOGR_MAXENTRYLEN);
+	(void) strlcpy(le->le_hostname, argv[LOGR_HOST], MAXHOSTNAMELEN);
+	logr_syslog_set_timestamp(argv, le);
+	logr_syslog_set_priority(argv, le);
+	return (0);
 }
 
 static void
@@ -383,8 +265,7 @@ logr_syslog_load(FILE *fp, logr_info_t *log)
 	while (node) {
 		entry = &log->li_entry[i];
 
-		if (logr_syslog_parse_entry(node->ln_logline, entry) !=
-		    LOGR_SYSLOG_PARSE_ENTRY_SUCCESS) {
+		if (logr_syslog_parse_entry(node->ln_logline, entry) != 0) {
 			node = list_next(&queue, node);
 			continue;
 		}

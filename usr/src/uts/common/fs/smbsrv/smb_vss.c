@@ -201,12 +201,19 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 		/* note the value of cur_node->vp */
 		err = vnodetopath(fsrootvp, cur_node->vp, nodepath,
 		    MAXPATHLEN, kcred);
-
-		if (err != 0)
+		if (err != 0) {
+			VN_RELE(vp);
 			goto error;
+		}
 
 		*vss_root_node = smb_node_lookup(sr, NULL, kcred, vp,
 		    gmttoken, cur_node, NULL, &attr);
+		VN_RELE(vp);
+
+		if (*vss_root_node == NULL) {
+			err = ENOENT;
+			goto error;
+		}
 
 		(void) snprintf(rootpath, MAXPATHLEN, ".zfs/snapshot/%s/%s",
 		    snapname, nodepath);
@@ -217,6 +224,8 @@ smb_vss_lookup_nodes(smb_request_t *sr, smb_node_t *root_node,
 		if (vp) {
 			*vss_cur_node = smb_node_lookup(sr, NULL, kcred, vp,
 			    gmttoken, cur_node, NULL, &attr);
+			VN_RELE(vp);
+
 			if (*vss_cur_node != NULL) {
 				smb_vss_remove_first_token_from_path(buf);
 			} else {

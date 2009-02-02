@@ -624,9 +624,11 @@ smb_shr_exists(char *sharename)
  * Precedence is none is checked first followed by ro then rw if
  * needed.  If x is wildcard (< 0) then check to see if the other
  * values are a match. If a match, that wins.
+ *
+ * ipv6 is wide open for now, see smb_chk_hostaccess
  */
 void
-smb_shr_hostaccess(smb_share_t *si, ipaddr_t ipaddr)
+smb_shr_hostaccess(smb_share_t *si, smb_inaddr_t *ipaddr)
 {
 	int acc = SMB_SHRF_ACC_OPEN;
 
@@ -634,7 +636,8 @@ smb_shr_hostaccess(smb_share_t *si, ipaddr_t ipaddr)
 	 * Check to see if there area any share level access
 	 * restrictions.
 	 */
-	if (ipaddr != 0 && (si->shr_flags & SMB_SHRF_ACC_ALL) != 0) {
+	if ((!smb_inet_iszero(ipaddr)) &&
+	    (si->shr_flags & SMB_SHRF_ACC_ALL) != 0) {
 		int none = SMB_SHRF_ACC_OPEN;
 		int rw = SMB_SHRF_ACC_OPEN;
 		int ro = SMB_SHRF_ACC_OPEN;
@@ -645,7 +648,6 @@ smb_shr_hostaccess(smb_share_t *si, ipaddr_t ipaddr)
 			rw = smb_chk_hostaccess(ipaddr, si->shr_access_rw);
 		if (si->shr_flags & SMB_SHRF_ACC_RO)
 			ro = smb_chk_hostaccess(ipaddr, si->shr_access_ro);
-
 		/* make first pass to get basic value */
 		if (none != 0)
 			acc = SMB_SHRF_ACC_NONE;
@@ -864,7 +866,6 @@ smb_shr_lookup(char *sharename, smb_share_t *si)
 
 	if (sharename == NULL || *sharename == '\0')
 		return (NERR_NetNameNotFound);
-
 	if (smb_shr_cache_lock(SMB_SHR_CACHE_RDLOCK) == NERR_Success) {
 		cached_si = smb_shr_cache_findent(sharename);
 		if (cached_si != NULL) {
@@ -874,7 +875,6 @@ smb_shr_lookup(char *sharename, smb_share_t *si)
 
 		smb_shr_cache_unlock();
 	}
-
 	return (status);
 }
 
@@ -1323,7 +1323,6 @@ smb_shr_sa_get(sa_share_t share, sa_resource_t resource, smb_share_t *si)
 
 	(void) strlcpy(si->shr_path, path, sizeof (si->shr_path));
 	(void) strlcpy(si->shr_name, rname, sizeof (si->shr_name));
-
 	sa_free_attr_string(path);
 	sa_free_attr_string(rname);
 

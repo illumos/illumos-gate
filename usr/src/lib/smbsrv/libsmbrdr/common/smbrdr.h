@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,7 @@ typedef struct sdb_logon {
 
 struct sdb_session {
 	char srv_name[MAXHOSTNAMELEN];
-	uint32_t srv_ipaddr;
+	smb_inaddr_t srv_ipaddr;
 	char domain[MAXHOSTNAMELEN];
 	char scope[SMB_PI_MAX_SCOPE];
 	char native_os[SMB_PI_MAX_NATIVE_OS];

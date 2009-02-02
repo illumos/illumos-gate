@@ -19,12 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- */
-
-/*
- * SMB session logon and logoff functions. See CIFS section 4.1.
  */
 
 #include <pthread.h>
@@ -39,11 +35,12 @@
 #include <arpa/inet.h>
 #include <smbsrv/wintypes.h>
 #include <smbsrv/libsmbrdr.h>
-#include <smbsrv/libmlsvc.h>
 #include <smbsrv/ntstatus.h>
 #include <smbsrv/smb.h>
 #include <smbrdr_ipc_util.h>
 #include <smbrdr.h>
+
+#define	SMBRDR_ANON_USER	"IPC$"
 
 static int smbrdr_anonymous_logon(char *domain_controller, char *domain_name);
 static int smbrdr_auth_logon(char *domain_controller, char *domain_name,
@@ -58,16 +55,16 @@ static int smbrdr_authenticate(char *, char *, char *, unsigned char *);
 /*
  * mlsvc_logon
  *
- * If the username is MLSVC_ANON_USER, an anonymous session will be established.
- * Otherwise, an authenticated session will be established based on the
- * specified credentials.
+ * If the username is SMBRDR_ANON_USER, an anonymous session will be
+ * established. Otherwise, an authenticated session will be established
+ * based on the specified credentials.
  */
 int
 mlsvc_logon(char *domain_controller, char *domain, char *username)
 {
 	int rc;
 
-	if (strcmp(username, MLSVC_ANON_USER) == 0)
+	if (strcmp(username, SMBRDR_ANON_USER) == 0)
 		rc = smbrdr_anonymous_logon(domain_controller, domain);
 	else
 		rc = smbrdr_auth_logon(domain_controller, domain, username);
@@ -85,7 +82,7 @@ mlsvc_logon(char *domain_controller, char *domain, char *username)
 static int
 smbrdr_anonymous_logon(char *domain_controller, char *domain_name)
 {
-	if (smbrdr_logon_validate(domain_controller, MLSVC_ANON_USER))
+	if (smbrdr_logon_validate(domain_controller, SMBRDR_ANON_USER))
 		return (0);
 
 	if (smbrdr_negotiate(domain_controller, domain_name) != 0) {
@@ -93,7 +90,7 @@ smbrdr_anonymous_logon(char *domain_controller, char *domain_name)
 		return (-1);
 	}
 
-	if (smbrdr_logon_user(domain_controller, MLSVC_ANON_USER, 0) < 0) {
+	if (smbrdr_logon_user(domain_controller, SMBRDR_ANON_USER, 0) < 0) {
 		syslog(LOG_DEBUG, "smbrdr_anonymous_logon: logon failed");
 		return (-1);
 	}
@@ -207,7 +204,7 @@ smbrdr_logon_user(char *server, char *username, unsigned char *pwd)
 	int ret;
 
 	if ((server == NULL) || (username == NULL) ||
-	    ((strcmp(username, MLSVC_ANON_USER) != 0) && (pwd == NULL)))
+	    ((strcmp(username, SMBRDR_ANON_USER) != 0) && (pwd == NULL)))
 		return (-1);
 
 	session = smbrdr_session_lock(server, 0, SDB_SLCK_WRITE);

@@ -519,6 +519,8 @@ smb_domain_populate_table(char *domain, char *server)
 
 	if (lsa_query_primary_domain_info(server, domain, &info)
 	    == NT_STATUS_SUCCESS) {
+		nt_domain_flush(NT_DOMAIN_PRIMARY);
+
 		nt_info = &info.i_domain.di_primary;
 		smb_domain_update_tabent(NT_DOMAIN_PRIMARY, nt_info);
 		lsa_free_info(&info);
@@ -526,6 +528,8 @@ smb_domain_populate_table(char *domain, char *server)
 
 	if (lsa_query_account_domain_info(server, domain, &info)
 	    == NT_STATUS_SUCCESS) {
+		nt_domain_flush(NT_DOMAIN_ACCOUNT);
+
 		nt_info = &info.i_domain.di_account;
 		smb_domain_update_tabent(NT_DOMAIN_ACCOUNT, nt_info);
 		lsa_free_info(&info);
@@ -534,6 +538,9 @@ smb_domain_populate_table(char *domain, char *server)
 	if (lsa_enum_trusted_domains(server, domain, &info)
 	    == NT_STATUS_SUCCESS) {
 		lsa_trusted_domainlist_t *list = &info.i_domain.di_trust;
+
+		nt_domain_flush(NT_DOMAIN_TRUSTED);
+
 		for (i = 0; i < list->t_num; i++) {
 			nt_info = &list->t_domains[i];
 			smb_domain_update_tabent(NT_DOMAIN_TRUSTED, nt_info);
@@ -549,7 +556,7 @@ static void
 smb_domain_update_tabent(int domain_type, lsa_nt_domaininfo_t *info)
 {
 	nt_domain_t *entry;
-	nt_domain_flush(domain_type);
+
 	entry = nt_domain_new(domain_type, info->n_domain, info->n_sid);
 	(void) nt_domain_add(entry);
 }

@@ -538,7 +538,7 @@ extern "C" {
 
 /*
  * Flags for TRANS2_FIND_FIRST2 and TRANS2_FIND_NEXT2
- * (NTDDK cifs.h and smbtrans.h).
+ * (NTDDK cifs.h).
  *
  * If SMB_FIND_RETURN_RESUME_KEYS was set in the request parameters,
  * each entry is preceded by a four-byte resume key.

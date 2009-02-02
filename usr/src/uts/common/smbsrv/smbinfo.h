@@ -28,6 +28,8 @@
 
 #include <sys/types.h>
 #include <smbsrv/netbios.h>
+#include <netinet/in.h>
+#include <smbsrv/smb_inet.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -114,6 +116,7 @@ typedef struct smb_kmod_cfg {
 	int32_t skc_oplock_enable;
 	int32_t skc_sync_enable;
 	int32_t skc_secmode;
+	int32_t skc_ipv6_enable;
 	char skc_nbdomain[NETBIOS_NAME_SZ];
 	char skc_fqdn[SMB_PI_MAX_DOMAIN];
 	char skc_hostname[SMB_PI_MAX_HOST];

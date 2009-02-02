@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2134,6 +2134,7 @@ smb_send_node_status_response(struct addr_entry *addr,
 	unsigned char 		*scan_end;
 	unsigned char		data[MAX_NETBIOS_REPLY_DATA_SIZE];
 	boolean_t scan_done = B_FALSE;
+	smb_inaddr_t ipaddr;
 
 	bzero(&packet, sizeof (struct name_packet));
 	bzero(&answer, sizeof (struct resource_record));
@@ -2160,7 +2161,9 @@ smb_send_node_status_response(struct addr_entry *addr,
 
 	scan_end = data + MAX_NETBIOS_REPLY_DATA_SIZE;
 
-	if (smb_nic_exists(addr->sin.sin_addr.s_addr, B_TRUE))
+	ipaddr.a_ipv4 = addr->sin.sin_addr.s_addr;
+	ipaddr.a_family = AF_INET;
+	if (smb_nic_exists(&ipaddr, B_TRUE))
 		net_ipaddr = addr->sin.sin_addr.s_addr;
 	else
 		net_ipaddr = 0;
@@ -4584,12 +4587,14 @@ smb_netbios_name_config(void)
 			continue;
 
 		smb_init_name_struct((unsigned char *)ni.ni_nic.nic_host,
-		    0x00, 0, ni.ni_nic.nic_ip, htons(DGM_SRVC_UDP_PORT),
+		    0x00, 0, ni.ni_nic.nic_ip.a_ipv4,
+		    htons(DGM_SRVC_UDP_PORT),
 		    NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL, &name);
 		(void) smb_netbios_cache_insert(&name);
 
 		smb_init_name_struct((unsigned char *)ni.ni_nic.nic_host,
-		    0x20, 0, ni.ni_nic.nic_ip, htons(DGM_SRVC_UDP_PORT),
+		    0x20, 0, ni.ni_nic.nic_ip.a_ipv4,
+		    htons(DGM_SRVC_UDP_PORT),
 		    NAME_ATTR_UNIQUE, NAME_ATTR_LOCAL, &name);
 		(void) smb_netbios_cache_insert(&name);
 	} while (smb_nic_getnext(&ni) == 0);
@@ -4643,6 +4648,7 @@ smb_netbios_name_service_daemon(void *arg)
 	int			flag = 1;
 	char 			*buf;
 	worker_param_t 		*worker_param;
+	smb_inaddr_t		ipaddr;
 
 	/*
 	 * Initialize reply_queue
@@ -4719,7 +4725,10 @@ ignore:		bzero(addr, sizeof (struct addr_entry));
 		}
 
 		/* Ignore any incoming packets from myself... */
-		if (smb_nic_exists(addr->sin.sin_addr.s_addr, B_FALSE))
+
+		ipaddr.a_ipv4 = addr->sin.sin_addr.s_addr;
+		ipaddr.a_family = AF_INET;
+		if (smb_nic_exists(&ipaddr, B_FALSE))
 			goto ignore;
 
 		/*

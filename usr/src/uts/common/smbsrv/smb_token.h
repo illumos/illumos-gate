@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #include <smbsrv/netrauth.h>
 #include <smbsrv/smb_privilege.h>
 #include <smbsrv/smb_sid.h>
+#include <smbsrv/smb_xdr.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,40 +52,8 @@ typedef struct smb_session_key {
  * used when access is requested to an object by comparing this
  * information with the DACL in the object's security descriptor.
  *
- * Only group attributes are defined. No user attributes defined.
- */
-
-#define	SE_GROUP_MANDATORY		0x00000001
-#define	SE_GROUP_ENABLED_BY_DEFAULT	0x00000002
-#define	SE_GROUP_ENABLED		0x00000004
-#define	SE_GROUP_OWNER			0x00000008
-#define	SE_GROUP_USE_FOR_DENY_ONLY	0x00000010
-#define	SE_GROUP_LOGON_ID		0xC0000000
-
-typedef struct smb_sid_attrs {
-	uint32_t attrs;
-	smb_sid_t *sid;
-} smb_sid_attrs_t;
-
-/*
- * smb_id_t consists of both the Windows security identifier
- * and its corresponding POSIX/ephemeral ID.
- */
-typedef struct smb_id {
-	smb_sid_attrs_t i_sidattr;
-	uid_t i_id;
-} smb_id_t;
-
-/*
- * Windows groups (each group SID is associated with a POSIX/ephemeral
- * gid.
- */
-typedef struct smb_win_grps {
-	uint16_t wg_count;
-	smb_id_t wg_groups[ANY_SIZE_ARRAY];
-} smb_win_grps_t;
-
-/*
+ * There should be one unique token per user per session per client.
+ *
  * Access Token Flags
  *
  * SMB_ATF_GUEST	Token belongs to guest user
@@ -106,80 +75,26 @@ typedef struct smb_win_grps {
  * It consists of the primary and supplementary POSIX groups.
  */
 typedef struct smb_posix_grps {
-	uint32_t pg_ngrps;
-	gid_t pg_grps[ANY_SIZE_ARRAY];
+	uint32_t	pg_ngrps;
+	gid_t		pg_grps[ANY_SIZE_ARRAY];
 } smb_posix_grps_t;
 
-/*
- * Token Structure.
- *
- * This structure contains information of a user. There should be one
- * unique token per user per session per client. The information
- * provided will either give or deny access to shares, files or folders.
- */
 typedef struct smb_token {
-	smb_id_t *tkn_user;
-	smb_id_t *tkn_owner;
-	smb_id_t *tkn_primary_grp;
-	smb_win_grps_t *tkn_win_grps;
-	smb_privset_t *tkn_privileges;
-	char *tkn_account_name;
-	char *tkn_domain_name;
-	uint32_t tkn_flags;
-	uint32_t tkn_audit_sid;
+	smb_id_t	tkn_user;
+	smb_id_t	tkn_owner;
+	smb_id_t	tkn_primary_grp;
+	smb_ids_t	tkn_win_grps;
+	smb_privset_t	*tkn_privileges;
+	char		*tkn_account_name;
+	char		*tkn_domain_name;
+	uint32_t	tkn_flags;
+	uint32_t	tkn_audit_sid;
 	smb_session_key_t *tkn_session_key;
 	smb_posix_grps_t *tkn_posix_grps;
 } smb_token_t;
 
-/*
- * Information returned by an RPC call is allocated on an internal heap
- * which is deallocated before returning from the interface call. The
- * smb_userinfo structure provides a useful common mechanism to get the
- * information back to the caller. It's like a compact access token but
- * only parts of it are filled in by each RPC so the content is call
- * specific.
- */
-typedef struct smb_rid_attrs {
-	uint32_t rid;
-	uint32_t attributes;
-} smb_rid_attrs_t;
-
-#define	SMB_UINFO_FLAG_ANON	0x01
-#define	SMB_UINFO_FLAG_LADMIN	0x02	/* Local admin */
-#define	SMB_UINFO_FLAG_DADMIN	0x04	/* Domain admin */
-#define	SMB_UINFO_FLAG_ADMIN	(SMB_UINFO_FLAG_LADMIN | SMB_UINFO_FLAG_DADMIN)
-
-/*
- * This structure is mainly used where there's some
- * kind of user related interaction with a domain
- * controller via different RPC calls.
- */
-typedef struct smb_userinfo {
-	uint16_t sid_name_use;
-	uint32_t rid;
-	uint32_t primary_group_rid;
-	char *name;
-	char *domain_name;
-	smb_sid_t *domain_sid;
-	uint32_t n_groups;
-	smb_rid_attrs_t *groups;
-	uint32_t n_other_grps;
-	smb_sid_attrs_t *other_grps;
-	smb_session_key_t *session_key;
-
-	smb_sid_t *user_sid;
-	smb_sid_t *pgrp_sid;
-	uint32_t flags;
-} smb_userinfo_t;
-
 /* XDR routines */
-extern bool_t xdr_smb_session_key_t();
 extern bool_t xdr_netr_client_t();
-extern bool_t xdr_smb_sid_t();
-extern bool_t xdr_smb_sid_attrs_t();
-extern bool_t xdr_smb_id_t();
-extern bool_t xdr_smb_win_grps_t();
-extern bool_t xdr_smb_posix_grps_t();
 extern bool_t xdr_smb_token_t();
 
 

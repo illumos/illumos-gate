@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,24 +188,21 @@ lsar_query_info_policy(mlsvc_handle_t *lsa_handle, WORD infoClass,
  * NT_STATUS_NONE_MAPPED.
  */
 uint32_t
-lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
-    smb_userinfo_t *user_info)
+lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name, smb_account_t *info)
 {
-	int opnum;
-	int index;
-	uint32_t status;
 	struct mslsa_LookupNames arg;
-	size_t length;
-	lookup_name_table_t name_table;
 	struct mslsa_rid_entry *rid_entry;
 	struct mslsa_domain_entry *domain_entry;
+	lookup_name_table_t name_table;
+	uint32_t status = NT_STATUS_SUCCESS;
+	int opnum;
+	size_t length;
 	char *p;
 
-	if (lsa_handle == NULL || name == NULL || user_info == NULL)
+	if (lsa_handle == NULL || name == NULL || info == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	bzero(user_info, sizeof (smb_userinfo_t));
-	user_info->sid_name_use = SidTypeUnknown;
+	bzero(info, sizeof (smb_account_t));
 
 	opnum = LSARPC_OPNUM_LookupNames;
 
@@ -248,34 +245,39 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
 	name_table.name[0].str = (unsigned char *)name;
 
 	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
-		status = NT_STATUS_INVALID_PARAMETER;
-	} else if (arg.status != 0) {
-		ndr_rpc_status(lsa_handle, opnum, arg.status);
-		status = NT_SC_VALUE(arg.status);
-	} else if (arg.mapped_count == 0) {
-		user_info->sid_name_use = SidTypeInvalid;
-		status = NT_STATUS_NONE_MAPPED;
-	} else {
-		rid_entry = &arg.translated_sids.rids[0];
-		user_info->sid_name_use = rid_entry->sid_name_use;
-		user_info->rid = rid_entry->rid;
-		user_info->name = MEM_STRDUP("ndr", name);
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_INVALID_PARAMETER);
+	}
 
-		if ((index = rid_entry->domain_index) == -1) {
-			user_info->domain_sid = 0;
-			user_info->domain_name = 0;
-		} else {
-			domain_entry =
-			    &arg.domain_table->entries[index];
-			user_info->domain_sid = smb_sid_dup(
-			    (smb_sid_t *)domain_entry->domain_sid);
-			user_info->domain_name = MEM_STRDUP("ndr",
-			    (const char *)
-			    domain_entry->domain_name.str);
-			user_info->user_sid = smb_sid_splice(
-			    user_info->domain_sid, user_info->rid);
-		}
-		status = NT_STATUS_SUCCESS;
+	if (arg.status != NT_STATUS_SUCCESS) {
+		ndr_rpc_status(lsa_handle, opnum, arg.status);
+		ndr_rpc_release(lsa_handle);
+		return (NT_SC_VALUE(arg.status));
+	}
+
+	if (arg.mapped_count == 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_NONE_MAPPED);
+	}
+
+	rid_entry = &arg.translated_sids.rids[0];
+	if (rid_entry->domain_index != 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_NONE_MAPPED);
+	}
+
+	domain_entry = &arg.domain_table->entries[0];
+
+	info->a_type = rid_entry->sid_name_use;
+	info->a_name = strdup(name);
+	info->a_domsid = smb_sid_dup((smb_sid_t *)domain_entry->domain_sid);
+	info->a_domain = strdup((const char *)domain_entry->domain_name.str);
+	info->a_rid = rid_entry->rid;
+	info->a_sid = smb_sid_splice(info->a_domsid, info->a_rid);
+
+	if (!smb_account_validate(info)) {
+		smb_account_free(info);
+		status = NT_STATUS_NO_MEMORY;
 	}
 
 	ndr_rpc_release(lsa_handle);
@@ -293,19 +295,19 @@ lsar_lookup_names(mlsvc_handle_t *lsa_handle, char *name,
  */
 uint32_t
 lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
-    smb_userinfo_t *user_info)
+    smb_account_t *account)
 {
 	struct mslsa_LookupSids arg;
 	struct mslsa_lup_sid_entry sid_entry;
 	struct mslsa_name_entry *name_entry;
 	struct mslsa_domain_entry *domain_entry;
+	uint32_t status = NT_STATUS_SUCCESS;
 	int opnum;
-	int index;
-	uint32_t status;
 
-	if (lsa_handle == NULL || sid == NULL || user_info == NULL)
+	if (lsa_handle == NULL || sid == NULL || account == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
 
+	bzero(account, sizeof (smb_account_t));
 	opnum = LSARPC_OPNUM_LookupSids;
 
 	bzero(&arg, sizeof (struct mslsa_LookupSids));
@@ -317,43 +319,38 @@ lsar_lookup_sids(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	arg.lup_sid_table.entries = &sid_entry;
 
 	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
-		status = NT_STATUS_INVALID_PARAMETER;
-	} else if (arg.mapped_count == 0) {
-		user_info->sid_name_use = SidTypeInvalid;
-		status = NT_STATUS_NONE_MAPPED;
-	} else if (arg.status != 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_INVALID_PARAMETER);
+	}
+
+	if (arg.status != NT_STATUS_SUCCESS) {
 		ndr_rpc_status(lsa_handle, opnum, arg.status);
-		status = NT_SC_VALUE(arg.status);
-	} else {
-		name_entry = &arg.name_table.entries[0];
-		user_info->sid_name_use = name_entry->sid_name_use;
+		ndr_rpc_release(lsa_handle);
+		return (NT_SC_VALUE(arg.status));
+	}
 
-		if (user_info->sid_name_use == SidTypeUser ||
-		    user_info->sid_name_use == SidTypeGroup ||
-		    user_info->sid_name_use == SidTypeAlias) {
+	if (arg.mapped_count == 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_NONE_MAPPED);
+	}
 
-			user_info->rid =
-			    sid->SubAuthority[sid->SubAuthCount - 1];
+	name_entry = &arg.name_table.entries[0];
+	if (name_entry->domain_ix != 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_NONE_MAPPED);
+	}
 
-			user_info->name = MEM_STRDUP("ndr",
-			    (const char *)name_entry->name.str);
-		}
+	domain_entry = &arg.domain_table->entries[0];
 
-		if ((index = name_entry->domain_ix) == -1) {
-			user_info->domain_sid = 0;
-			user_info->domain_name = 0;
-		} else {
-			domain_entry =
-			    &arg.domain_table->entries[index];
+	account->a_type = name_entry->sid_name_use;
+	account->a_name = strdup((char const *)name_entry->name.str);
+	account->a_sid = smb_sid_dup((smb_sid_t *)sid);
+	account->a_domain = strdup((char const *)domain_entry->domain_name.str);
+	account->a_domsid = smb_sid_dup((smb_sid_t *)domain_entry->domain_sid);
 
-			user_info->domain_sid = smb_sid_dup(
-			    (smb_sid_t *)domain_entry->domain_sid);
-
-			user_info->domain_name = MEM_STRDUP("ndr",
-			    (const char *)
-			    domain_entry->domain_name.str);
-		}
-		status = NT_STATUS_SUCCESS;
+	if (!smb_account_validate(account)) {
+		smb_account_free(account);
+		status = NT_STATUS_NO_MEMORY;
 	}
 
 	ndr_rpc_release(lsa_handle);
@@ -496,8 +493,7 @@ lsar_enum_trusted_domains(mlsvc_handle_t *lsa_handle, DWORD *enum_context,
  */
 /*ARGSUSED*/
 int
-lsar_enum_privs_account(mlsvc_handle_t *account_handle,
-    smb_userinfo_t *user_info)
+lsar_enum_privs_account(mlsvc_handle_t *account_handle, smb_account_t *account)
 {
 	struct mslsa_EnumPrivsAccount arg;
 	int opnum;
@@ -659,21 +655,21 @@ lsar_lookup_priv_display_name(mlsvc_handle_t *lsa_handle, char *name,
 /*
  * lsar_lookup_sids2
  */
-DWORD
+uint32_t
 lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
-    smb_userinfo_t *user_info)
+    smb_account_t *account)
 {
 	struct lsar_lookup_sids2 arg;
 	struct lsar_name_entry2 *name_entry;
 	struct mslsa_lup_sid_entry sid_entry;
 	struct mslsa_domain_entry *domain_entry;
+	uint32_t status = NT_STATUS_SUCCESS;
 	int opnum;
-	int index;
-	DWORD status;
 
-	if (lsa_handle == NULL || sid == NULL || user_info == NULL)
+	if (lsa_handle == NULL || sid == NULL || account == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
 
+	bzero(account, sizeof (smb_account_t));
 	opnum = LSARPC_OPNUM_LookupSids2;
 
 	if (ndr_rpc_server_os(lsa_handle) != NATIVE_OS_WIN2000)
@@ -689,42 +685,38 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
 	arg.requested_count = arg.lup_sid_table.n_entry;
 
 	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
-		status = NT_STATUS_INVALID_PARAMETER;
-	} else if (arg.mapped_count == 0) {
-		user_info->sid_name_use = SidTypeInvalid;
-		status = NT_STATUS_NONE_MAPPED;
-	} else if (arg.status != 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_INVALID_PARAMETER);
+	}
+
+	if (arg.status != NT_STATUS_SUCCESS) {
 		ndr_rpc_status(lsa_handle, opnum, arg.status);
-		status = NT_SC_VALUE(arg.status);
-	} else {
-		name_entry = &arg.name_table.entries[0];
-		user_info->sid_name_use = name_entry->sid_name_use;
+		ndr_rpc_release(lsa_handle);
+		return (NT_SC_VALUE(arg.status));
+	}
 
-		if (user_info->sid_name_use == SidTypeUser ||
-		    user_info->sid_name_use == SidTypeGroup ||
-		    user_info->sid_name_use == SidTypeAlias) {
+	if (arg.mapped_count == 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_NONE_MAPPED);
+	}
 
-			user_info->rid =
-			    sid->SubAuthority[sid->SubAuthCount - 1];
+	name_entry = &arg.name_table.entries[0];
+	if (name_entry->domain_ix != 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_NONE_MAPPED);
+	}
 
-			user_info->name = MEM_STRDUP("ndr",
-			    (char const *)name_entry->name.str);
+	domain_entry = &arg.domain_table->entries[0];
 
-		}
+	account->a_type = name_entry->sid_name_use;
+	account->a_name = strdup((char const *)name_entry->name.str);
+	account->a_sid = smb_sid_dup((smb_sid_t *)sid);
+	account->a_domain = strdup((char const *)domain_entry->domain_name.str);
+	account->a_domsid = smb_sid_dup((smb_sid_t *)domain_entry->domain_sid);
 
-		if ((index = name_entry->domain_ix) == -1) {
-			user_info->domain_sid = 0;
-			user_info->domain_name = 0;
-		} else {
-			domain_entry = &arg.domain_table->entries[index];
-
-			user_info->domain_sid = smb_sid_dup(
-			    (smb_sid_t *)domain_entry->domain_sid);
-
-			user_info->domain_name = MEM_STRDUP("ndr",
-			    (char const *)domain_entry->domain_name.str);
-		}
-		status = NT_STATUS_SUCCESS;
+	if (!smb_account_validate(account)) {
+		smb_account_free(account);
+		status = NT_STATUS_NO_MEMORY;
 	}
 
 	ndr_rpc_release(lsa_handle);
@@ -749,23 +741,20 @@ lsar_lookup_sids2(mlsvc_handle_t *lsa_handle, struct mslsa_sid *sid,
  * It should be okay to lookup DOMAIN\Administrator in this function.
  */
 uint32_t
-lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
-    smb_userinfo_t *user_info)
+lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name, smb_account_t *info)
 {
-	int opnum;
-	int index;
 	struct lsar_LookupNames2 arg;
-	size_t length;
-	lookup_name_table_t name_table;
 	struct lsar_rid_entry2 *rid_entry;
 	struct mslsa_domain_entry *domain_entry;
-	uint32_t status;
+	lookup_name_table_t name_table;
+	uint32_t status = NT_STATUS_SUCCESS;
+	size_t length;
+	int opnum;
 
-	if (lsa_handle == NULL || name == NULL || user_info == NULL)
+	if (lsa_handle == NULL || name == NULL || info == NULL)
 		return (NT_STATUS_INVALID_PARAMETER);
 
-	bzero(user_info, sizeof (smb_userinfo_t));
-	user_info->sid_name_use = SidTypeUnknown;
+	bzero(info, sizeof (smb_account_t));
 
 	opnum = LSARPC_OPNUM_LookupNames2;
 
@@ -786,39 +775,45 @@ lsar_lookup_names2(mlsvc_handle_t *lsa_handle, char *name,
 	name_table.name[0].str = (unsigned char *)name;
 
 	if (ndr_rpc_call(lsa_handle, opnum, &arg) != 0) {
-		status = NT_STATUS_INVALID_PARAMETER;
-	} else if (arg.status != 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_INVALID_PARAMETER);
+	}
+
+	if (arg.status != NT_STATUS_SUCCESS) {
 		ndr_rpc_status(lsa_handle, opnum, arg.status);
-		status = NT_SC_VALUE(arg.status);
-	} else if (arg.mapped_count == 0) {
-		user_info->sid_name_use = SidTypeInvalid;
-		status = NT_STATUS_NONE_MAPPED;
-	} else {
-		rid_entry = &arg.translated_sids.rids[0];
-		user_info->sid_name_use = rid_entry->sid_name_use;
-		user_info->rid = rid_entry->rid;
-		user_info->name = MEM_STRDUP("ndr", name);
+		ndr_rpc_release(lsa_handle);
+		return (NT_SC_VALUE(arg.status));
+	}
 
-		if ((index = rid_entry->domain_index) == -1) {
-			user_info->domain_sid = 0;
-			user_info->domain_name = 0;
-		} else {
-			domain_entry = &arg.domain_table->entries[index];
+	if (arg.mapped_count == 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_NONE_MAPPED);
+	}
 
-			user_info->domain_sid = smb_sid_dup(
-			    (smb_sid_t *)domain_entry->domain_sid);
+	rid_entry = &arg.translated_sids.rids[0];
+	if (rid_entry->domain_index != 0) {
+		ndr_rpc_release(lsa_handle);
+		return (NT_STATUS_NONE_MAPPED);
+	}
 
-			user_info->domain_name = MEM_STRDUP("ndr",
-			    (char const *)domain_entry->domain_name.str);
-			user_info->user_sid = smb_sid_splice(
-			    user_info->domain_sid, user_info->rid);
-		}
-		status = NT_STATUS_SUCCESS;
+	domain_entry = &arg.domain_table->entries[0];
+
+	info->a_type = rid_entry->sid_name_use;
+	info->a_name = strdup(name);
+	info->a_domsid = smb_sid_dup((smb_sid_t *)domain_entry->domain_sid);
+	info->a_domain = strdup((char const *)domain_entry->domain_name.str);
+	info->a_rid = rid_entry->rid;
+	info->a_sid = smb_sid_splice(info->a_domsid, info->a_rid);
+
+	if (!smb_account_validate(info)) {
+		smb_account_free(info);
+		status = NT_STATUS_NO_MEMORY;
 	}
 
 	ndr_rpc_release(lsa_handle);
 	return (status);
 }
+
 static void
 lsar_set_nt_domaininfo(smb_sid_t *sid, char *nb_domain,
     lsa_nt_domaininfo_t *info)

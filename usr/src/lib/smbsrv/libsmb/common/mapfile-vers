@@ -87,6 +87,8 @@ SUNWprivate {
 	oemstounicodes;
 	rand_hash;
 	randomize;
+	smb_account_free;
+	smb_account_validate;
 	smb_auth_DES;
 	smb_auth_gen_session_key;
 	smb_auth_hmac_md5;
@@ -103,6 +105,7 @@ SUNWprivate {
 	smb_config_get_secmode;
 	smb_config_getbool;
 	smb_config_getdomaininfo;
+	smb_config_getip;
 	smb_config_getname;
 	smb_config_getnum;
 	smb_config_getstr;
@@ -183,7 +186,11 @@ SUNWprivate {
 	smb_idmap_restart;
 	smb_idmap_start;
 	smb_idmap_stop;
+	smb_ids_free;
 	smb_ishostname;
+	smb_inet_equal;
+	smb_inet_iszero;
+	smb_inet_ntop;
 	smb_join;
 	smb_lgrp_add;
 	smb_lgrp_add_member;
@@ -198,8 +205,6 @@ SUNWprivate {
 	smb_lgrp_iterate;
 	smb_lgrp_iterclose;
 	smb_lgrp_iteropen;
-	smb_lgrp_numbydomain;
-	smb_lgrp_numbymember;
 	smb_lgrp_rename;
 	smb_lgrp_setcmnt;
 	smb_lgrp_setpriv;
@@ -267,9 +272,13 @@ SUNWprivate {
 	smb_pwd_iterate = AUXILIARY libsmb_pwd.so;
 	smb_pwd_iterclose = AUXILIARY libsmb_pwd.so;
 	smb_pwd_iteropen = AUXILIARY libsmb_pwd.so;
-	smb_pwd_num = AUXILIARY libsmb_pwd.so;
 	smb_pwd_setcntl = AUXILIARY libsmb_pwd.so;
 	smb_pwd_setpasswd = AUXILIARY libsmb_pwd.so;
+	smb_sam_lookup_name;
+	smb_sam_lookup_sid;
+	smb_sam_grp_cnt;
+	smb_sam_usr_cnt;
+	smb_sam_usr_groups;
 	smb_setdomainprops;
 	smb_sid_cmp;
 	smb_sid_dup;
@@ -294,12 +303,11 @@ SUNWprivate {
 	smb_update_netlogon_seqnum;
 	smb_wka_fini;
 	smb_wka_get_domain;
+	smb_wka_get_sid;
 	smb_wka_init;
-	smb_wka_is_wellknown;
-	smb_wka_lookup;
-	smb_wka_lookup_domain;
 	smb_wka_lookup_name;
 	smb_wka_lookup_sid;
+	smb_wka_token_groups;
 	smbnative_lm_value;
 	smbnative_os_value;
 	smbnative_pdc_value;

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -882,8 +882,6 @@ smb_dcmd_request(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    sr->uid_user);
 			mdb_printf("File: %u (%p)\n",
 			    sr->smb_fid, sr->fid_ofile);
-			mdb_printf("Dir.: %u (%p)\n", sr->smb_sid,
-			    sr->sid_odir);
 			mdb_printf("PID: %u\n", sr->smb_pid);
 			mdb_printf("MID: %u\n\n", sr->smb_mid);
 		} else {
@@ -1169,10 +1167,10 @@ smb_dcmd_odir(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    "%<b>%<u>SMB odir information (%p):%</u>%</b>\n\n",
 			    addr);
 			mdb_printf("State: %d (%s)\n", od->d_state, state);
-			mdb_printf("SID: %u\n", od->d_sid);
+			mdb_printf("SID: %u\n", od->d_odid);
 			mdb_printf("Reference Count: %d\n", od->d_refcnt);
 			mdb_printf("Pattern: %s\n", od->d_pattern);
-			mdb_printf("SMB Node: %p\n\n", od->d_dir_snode);
+			mdb_printf("SMB Node: %p\n\n", od->d_dnode);
 		} else {
 			if (DCMD_HDRSPEC(flags))
 				mdb_printf(
@@ -1183,7 +1181,7 @@ smb_dcmd_odir(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 				    "ODIR", "SID", "VNODE", "PATTERN");
 
 			mdb_printf("%?p %-5u %-16s %s\n",
-			    addr, od->d_sid, od->d_dir_snode, od->d_pattern);
+			    addr, od->d_odid, od->d_dnode, od->d_pattern);
 		}
 	}
 	return (DCMD_OK);

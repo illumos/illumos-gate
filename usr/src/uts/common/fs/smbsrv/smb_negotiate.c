@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -197,7 +197,6 @@
 #include <smbsrv/smbinfo.h>
 #include <smbsrv/smb_i18n.h>
 
-
 /*
  * Maximum buffer size for DOS: chosen to be the same as NT.
  * Do not change this value, DOS is very sensitive to it.
@@ -255,7 +254,7 @@ smb_com_negotiate(smb_request_t *sr)
 	int			rc;
 	unsigned short		max_mpx_count;
 	int16_t			tz_correction;
-	char			ipaddr_buf[INET_ADDRSTRLEN];
+	char			ipaddr_buf[INET6_ADDRSTRLEN];
 	char			*tmpbuf;
 	int			buflen;
 	smb_msgbuf_t		mb;
@@ -394,9 +393,8 @@ smb_com_negotiate(smb_request_t *sr)
 
 			sr->session->secmode = secmode;
 		}
-
-		(void) inet_ntop(AF_INET, (char *)&sr->session->ipaddr,
-		    ipaddr_buf, sizeof (ipaddr_buf));
+		(void) smb_inet_ntop(&sr->session->ipaddr, ipaddr_buf,
+		    SMB_IPSTRLEN(sr->session->ipaddr.a_family));
 
 		max_mpx_count = sr->sr_cfg->skc_maxworkers;
 

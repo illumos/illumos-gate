@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *
@@ -548,9 +548,6 @@ smbsr_cleanup(smb_request_t *sr)
 	if (sr->fid_ofile)
 		smbsr_disconnect_file(sr);
 
-	if (sr->sid_odir)
-		smbsr_disconnect_dir(sr);
-
 	if (sr->r_xa) {
 		if (sr->r_xa->xa_flags & SMB_XA_FLAG_COMPLETE)
 			smb_xa_close(sr->r_xa);
@@ -590,9 +587,7 @@ smb_dispatch_request(struct smb_request *sr)
 	ASSERT(sr->tid_tree == 0);
 	ASSERT(sr->uid_user == 0);
 	ASSERT(sr->fid_ofile == 0);
-	ASSERT(sr->sid_odir == 0);
 	sr->smb_fid = (uint16_t)-1;
-	sr->smb_sid = (uint16_t)-1;
 
 	/* temporary until we identify a user */
 	sr->user_cr = kcred;
@@ -1171,15 +1166,6 @@ smbsr_disconnect_file(smb_request_t *sr)
 
 	sr->fid_ofile = NULL;
 	(void) smb_ofile_release(of);
-}
-
-void
-smbsr_disconnect_dir(smb_request_t *sr)
-{
-	smb_odir_t	*od = sr->sid_odir;
-
-	sr->sid_odir = NULL;
-	smb_odir_release(od);
 }
 
 static int

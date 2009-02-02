@@ -1033,6 +1033,7 @@ NFSSRV_OBJS +=	nfs_server.o	nfs_srv.o	nfs3_srv.o \
 		nfs4_deleg_ops.o nfs4_srv_readdir.o nfs4_dispatch.o
 
 SMBSRV_SHARED_OBJS += \
+		smb_inet.o \
 		smb_match.o \
 		smb_msgbuf.o \
 		smb_oem.o \
@@ -1056,7 +1057,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_check_directory.o			\
 		smb_close.o				\
 		smb_common_open.o			\
-		smb_common_search.o			\
 		smb_common_transact.o			\
 		smb_create.o				\
 		smb_create_directory.o			\
@@ -1066,7 +1066,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_echo.o				\
 		smb_fem.o				\
 		smb_find.o				\
-		smb_find_unique.o			\
 		smb_flush.o				\
 		smb_fsops.o				\
 		smb_init.o				\
@@ -1106,7 +1105,6 @@ SMBSRV_OBJS +=	$(SMBSRV_SHARED_OBJS)			\
 		smb_read.o				\
 		smb_rename.o				\
 		smb_sd.o				\
-		smb_search.o				\
 		smb_seek.o				\
 		smb_server.o				\
 		smb_session.o				\

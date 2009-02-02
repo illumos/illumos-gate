@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -285,17 +285,11 @@ smb_idmap_batch_getid(idmap_get_handle_t *idmaph, smb_idmap_t *sim,
 	idmap_stat stat;
 	int flag = 0;
 
-	if (!idmaph || !sim || !sid)
+	if (idmaph == NULL || sim == NULL || sid == NULL)
 		return (IDMAP_ERR_ARG);
 
-	tmpsid = smb_sid_dup(sid);
-	if (!tmpsid)
+	if ((tmpsid = smb_sid_split(sid, &sim->sim_rid)) == NULL)
 		return (IDMAP_ERR_MEMORY);
-
-	if (smb_sid_split(tmpsid, &sim->sim_rid) != 0) {
-		smb_sid_free(tmpsid);
-		return (IDMAP_ERR_ARG);
-	}
 
 	smb_sid_tostr(tmpsid, sidstr);
 	sim->sim_domsid = sidstr;

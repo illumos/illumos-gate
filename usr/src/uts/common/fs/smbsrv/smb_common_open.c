@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -548,7 +548,8 @@ smb_open_subr(smb_request_t *sr)
 			if ((!(op->desired_access &
 			    (FILE_WRITE_DATA | FILE_APPEND_DATA |
 			    FILE_WRITE_ATTRIBUTES | FILE_WRITE_EA))) ||
-			    (!smb_sattr_check(&node->attr, NULL, op->dattr))) {
+			    (!smb_sattr_check(node->attr.sa_dosattr,
+			    op->dattr, NULL))) {
 				rw_exit(&node->n_share_lock);
 				smb_node_release(node);
 				smb_node_release(dnode);

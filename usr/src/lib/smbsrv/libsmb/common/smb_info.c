@@ -67,6 +67,7 @@ smb_load_kconfig(smb_kmod_cfg_t *kcfg)
 	kcfg->skc_restrict_anon = smb_config_getbool(SMB_CI_RESTRICT_ANON);
 	kcfg->skc_signing_enable = smb_config_getbool(SMB_CI_SIGNING_ENABLE);
 	kcfg->skc_signing_required = smb_config_getbool(SMB_CI_SIGNING_REQD);
+	kcfg->skc_ipv6_enable = smb_config_getbool(SMB_CI_IPV6_ENABLE);
 	kcfg->skc_oplock_enable = smb_config_getbool(SMB_CI_OPLOCK_ENABLE);
 	kcfg->skc_sync_enable = smb_config_getbool(SMB_CI_SYNC_ENABLE);
 	kcfg->skc_secmode = smb_config_get_secmode();
@@ -448,11 +449,12 @@ smb_tonetbiosname(char *name, char *nb_name, char suffix)
 }
 
 int
-smb_get_nameservers(struct in_addr *ips, int sz)
+smb_get_nameservers(smb_inaddr_t *ips, int sz)
 {
 	union res_sockaddr_union set[MAXNS];
 	int i, cnt;
 	struct __res_state res_state;
+	char ipstr[INET6_ADDRSTRLEN];
 
 	if (ips == NULL)
 		return (0);
@@ -465,15 +467,23 @@ smb_get_nameservers(struct in_addr *ips, int sz)
 	for (i = 0; i < cnt; i++) {
 		if (i >= sz)
 			break;
-		ips[i] = set[i].sin.sin_addr;
-		syslog(LOG_DEBUG, "NS Found %s name server\n",
-		    inet_ntoa(ips[i]));
+		ips[i].a_family = AF_INET;
+		bcopy(&set[i].sin.sin_addr, &ips[i].a_ipv4, INADDRSZ);
+		if (inet_ntop(AF_INET, &ips[i].a_ipv4, ipstr,
+		    INET_ADDRSTRLEN)) {
+			syslog(LOG_DEBUG, "Found %s name server\n", ipstr);
+			continue;
+		}
+		ips[i].a_family = AF_INET6;
+		bcopy(&set[i].sin.sin_addr, &ips[i].a_ipv6, IPV6_ADDR_LEN);
+		if (inet_ntop(AF_INET6, &ips[i].a_ipv6, ipstr,
+		    INET6_ADDRSTRLEN)) {
+			syslog(LOG_DEBUG, "Found %s name server\n", ipstr);
+		}
 	}
-	syslog(LOG_DEBUG, "NS Found %d name servers\n", i);
 	res_ndestroy(&res_state);
 	return (i);
 }
-
 /*
  * smb_gethostbyname
  *
@@ -492,7 +502,8 @@ smb_gethostbyname(const char *name, int *err_num)
 	struct hostent *h;
 
 	h = getipnodebyname(name, AF_INET, 0, err_num);
-
+	if ((h == NULL) || h->h_length != INADDRSZ)
+		h = getipnodebyname(name, AF_INET6, AI_DEFAULT, err_num);
 	return (h);
 }
 

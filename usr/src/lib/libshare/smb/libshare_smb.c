@@ -882,6 +882,8 @@ struct smb_proto_option_defs {
 	    string_length_check_validator, SMB_REFRESH_REFRESH },
 	{ SMB_CI_DYNDNS_ENABLE, 0, 0, true_false_validator, 0 },
 	{ SMB_CI_AUTOHOME_MAP, 0, MAX_VALUE_BUFLEN, path_validator, 0 },
+	{ SMB_CI_IPV6_ENABLE, 0, 0, true_false_validator,
+	    SMB_REFRESH_REFRESH },
 };
 
 #define	SMB_OPT_NUM \

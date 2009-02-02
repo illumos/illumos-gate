@@ -36,8 +36,6 @@
 #include <netdb.h>
 #include <strings.h>
 #include <time.h>
-#include <tzfile.h>
-#include <time.h>
 #include <thread.h>
 #include <ctype.h>
 #include <stdlib.h>
@@ -861,7 +859,7 @@ mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
 	smb_dr_ulist_t *ulist;
 	smb_opipe_context_t *user;
 	char *workstation;
-	char ipaddr_buf[INET_ADDRSTRLEN];
+	char ipaddr_buf[INET6_ADDRSTRLEN];
 	int n_users;
 	int offset = 0;
 	int i;
@@ -888,8 +886,8 @@ mlsvc_NetSessionEnumLevel0(struct mslm_infonres *infonres, DWORD n_sessions,
 
 		workstation = user->oc_workstation;
 		if (workstation == NULL || *workstation == '\0') {
-			(void) inet_ntop(AF_INET, (char *)&user->oc_ipaddr,
-			    ipaddr_buf, sizeof (ipaddr_buf));
+			(void) smb_inet_ntop(&user->oc_ipaddr,
+			    ipaddr_buf, SMB_IPSTRLEN(user->oc_ipaddr.a_family));
 			workstation = ipaddr_buf;
 		}
 
@@ -920,7 +918,7 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
 	smb_opipe_context_t *user;
 	char *workstation;
 	char account[MAXNAMELEN];
-	char ipaddr_buf[INET_ADDRSTRLEN];
+	char ipaddr_buf[INET6_ADDRSTRLEN];
 	int n_users;
 	int offset = 0;
 	int i;
@@ -947,8 +945,8 @@ mlsvc_NetSessionEnumLevel1(struct mslm_infonres *infonres, DWORD n_sessions,
 
 		workstation = user->oc_workstation;
 		if (workstation == NULL || *workstation == '\0') {
-			(void) inet_ntop(AF_INET, (char *)&user->oc_ipaddr,
-			    ipaddr_buf, sizeof (ipaddr_buf));
+			(void) smb_inet_ntop(&user->oc_ipaddr,
+			    ipaddr_buf, SMB_IPSTRLEN(user->oc_ipaddr.a_family));
 			workstation = ipaddr_buf;
 		}
 

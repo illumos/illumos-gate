@@ -32,6 +32,7 @@ extern "C" {
 
 #include <rpc/xdr.h>
 #include <sys/param.h>
+#include <smbsrv/smbinfo.h>
 
 typedef struct smb_dr_kshare {
 	int32_t k_op;
@@ -101,7 +102,7 @@ typedef struct smb_opipe_context {
 	char *oc_account;
 	uint16_t oc_workstation_len;
 	char *oc_workstation;
-	uint32_t oc_ipaddr;
+	smb_inaddr_t oc_ipaddr;
 	int32_t oc_native_os;
 	int64_t oc_logon_time;
 	uint32_t oc_flags;
@@ -117,6 +118,7 @@ extern bool_t xdr_smb_dr_string_t(XDR *, smb_dr_string_t *);
 extern bool_t xdr_smb_dr_bytes_t(XDR *, smb_dr_bytes_t *);
 extern bool_t xdr_smb_dr_ulist_t(XDR *, smb_dr_ulist_t *);
 extern bool_t xdr_smb_dr_kshare_t(XDR *, smb_dr_kshare_t *);
+extern bool_t xdr_smb_inaddr_t(XDR *, smb_inaddr_t *);
 
 int smb_opipe_hdr_encode(smb_opipe_hdr_t *, uint8_t *, uint32_t);
 int smb_opipe_hdr_decode(smb_opipe_hdr_t *, uint8_t *, uint32_t);

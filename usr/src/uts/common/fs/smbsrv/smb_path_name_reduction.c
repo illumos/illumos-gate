@@ -494,14 +494,16 @@ smb_pathname(
 
 			if (++nlink > MAXSYMLINKS) {
 				err = ELOOP;
+				VN_RELE(vp);
 				break;
 			}
 
 			(void) pn_alloc(&link_pn);
 			err = pn_getsymlink(vp, &link_pn, cred);
+			VN_RELE(vp);
 
 			if (err) {
-				(void) pn_free(&link_pn);
+				pn_free(&link_pn);
 				break;
 			}
 
@@ -537,6 +539,7 @@ smb_pathname(
 
 			fnode = smb_node_lookup(sr, NULL, cred, vp, namep,
 			    dnode, NULL, &attr);
+			VN_RELE(vp);
 
 			if (fnode == NULL) {
 				err = ENOMEM;
@@ -548,6 +551,7 @@ smb_pathname(
 			upn.pn_path++;
 			upn.pn_pathlen--;
 		}
+
 	}
 
 	/*

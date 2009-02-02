@@ -63,7 +63,7 @@ smb_user_auth_logoff(uint32_t audit_sid)
 }
 
 smb_token_t *
-smb_upcall_get_token(netr_client_t *clnt_info)
+smb_get_token(netr_client_t *clnt_info)
 {
 	char *arg, *rsp;
 	size_t arg_size, rsp_size;

@@ -48,48 +48,6 @@
 extern "C" {
 #endif
 
-typedef struct lsa_nt_domaininfo {
-	smb_sid_t	*n_sid;
-	char		n_domain[NETBIOS_NAME_SZ];
-} lsa_nt_domaininfo_t;
-
-typedef struct lsa_trusted_domainlist {
-	uint32_t		t_num;
-	lsa_nt_domaininfo_t	*t_domains;
-} lsa_trusted_domainlist_t;
-
-typedef struct lsa_dns_domaininfo {
-	smb_sid_t	*d_sid;
-	char		d_nbdomain[NETBIOS_NAME_SZ];
-	char		d_fqdomain[MAXHOSTNAMELEN];
-	char		d_forest[MAXHOSTNAMELEN];
-	mslsa_guid_t	d_guid;
-} lsa_dns_domaininfo_t;
-
-typedef enum lsa_info_type {
-	LSA_INFO_NONE,
-	LSA_INFO_PRIMARY_DOMAIN,
-	LSA_INFO_ACCOUNT_DOMAIN,
-	LSA_INFO_DNS_DOMAIN,
-	LSA_INFO_TRUSTED_DOMAINS
-} lsa_info_type_t;
-
-typedef struct lsa_info {
-	lsa_info_type_t		i_type;
-	union {
-		lsa_nt_domaininfo_t		di_primary;
-		lsa_nt_domaininfo_t		di_account;
-		lsa_dns_domaininfo_t		di_dns;
-		lsa_trusted_domainlist_t	di_trust;
-	} i_domain;
-} lsa_info_t;
-
-extern DWORD lsa_query_primary_domain_info(char *, char *, lsa_info_t *);
-extern DWORD lsa_query_account_domain_info(char *, char *, lsa_info_t *);
-extern DWORD lsa_query_dns_domain_info(char *, char *, lsa_info_t *);
-extern DWORD lsa_enum_trusted_domains(char *, char *, lsa_info_t *);
-extern void lsa_free_info(lsa_info_t *);
-
 extern uint32_t mlsvc_lookup_name(char *, smb_sid_t **, uint16_t *);
 extern uint32_t mlsvc_lookup_sid(smb_sid_t *, char **);
 
@@ -164,12 +122,6 @@ typedef struct smb_autohome {
 
 extern void smb_autohome_add(const char *);
 extern void smb_autohome_remove(const char *);
-
-smb_userinfo_t *mlsvc_alloc_user_info(void);
-void mlsvc_free_user_info(smb_userinfo_t *user_info);
-void mlsvc_release_user_info(smb_userinfo_t *user_info);
-void mlsvc_setadmin_user_info(smb_userinfo_t *user_info);
-char *mlsvc_sid_name_use(unsigned int snu_id);
 
 /*
  * A local unique id (LUID) is an opaque id used by servers to identify

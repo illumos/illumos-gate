@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"@(#)Makefile	1.5	08/07/16 SMI"
@@ -31,7 +31,7 @@ SRCS=	smbadm.c
 include ../../Makefile.cmd
 include ../Makefile.smbsrv.defs
 
-LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lsmb -lumem -lnsl
+LDLIBS += -L$(ROOT)/usr/lib/smbsrv -lsmb -lumem
 LDFLAGS += -R/usr/lib/smbsrv
 
 all:		$(PROG)

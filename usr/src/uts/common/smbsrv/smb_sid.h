@@ -216,6 +216,31 @@ typedef struct smb_sid {
 } smb_sid_t;
 
 /*
+ * Only group attributes are defined. No user attributes defined.
+ */
+#define	SE_GROUP_MANDATORY		0x00000001
+#define	SE_GROUP_ENABLED_BY_DEFAULT	0x00000002
+#define	SE_GROUP_ENABLED		0x00000004
+#define	SE_GROUP_OWNER			0x00000008
+#define	SE_GROUP_USE_FOR_DENY_ONLY	0x00000010
+#define	SE_GROUP_LOGON_ID		0xC0000000
+
+/*
+ * smb_id_t consists of both the Windows security identifier
+ * and its corresponding POSIX/ephemeral ID.
+ */
+typedef struct smb_id {
+	uint32_t	i_attrs;
+	smb_sid_t	*i_sid;
+	uid_t		i_id;
+} smb_id_t;
+
+typedef struct smb_ids {
+	uint32_t	i_cnt;
+	smb_id_t	*i_ids;
+} smb_ids_t;
+
+/*
  * The maximum size of a SID in string format
  */
 #define	SMB_SID_STRSZ		256
@@ -225,7 +250,7 @@ int smb_sid_len(smb_sid_t *);
 smb_sid_t *smb_sid_dup(smb_sid_t *);
 smb_sid_t *smb_sid_splice(smb_sid_t *, uint32_t);
 int smb_sid_getrid(smb_sid_t *, uint32_t *);
-int smb_sid_split(smb_sid_t *, uint32_t *);
+smb_sid_t *smb_sid_split(smb_sid_t *, uint32_t *);
 boolean_t smb_sid_cmp(smb_sid_t *, smb_sid_t *);
 boolean_t smb_sid_islocal(smb_sid_t *);
 boolean_t smb_sid_indomain(smb_sid_t *, smb_sid_t *);
@@ -234,6 +259,8 @@ int smb_sid_splitstr(char *, uint32_t *);
 void smb_sid_tostr(smb_sid_t *, char *);
 smb_sid_t *smb_sid_fromstr(char *);
 char *smb_sid_type2str(uint16_t);
+
+void smb_ids_free(smb_ids_t *);
 
 #ifdef __cplusplus
 }

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,11 +52,12 @@ static int smb_match_reserved(char *name, char *rsrv);
  * there is a match.
  */
 int
-smb_match_name(ino64_t fileid, char *name, char *shortname,
-    char *name83, char *pattern, boolean_t ignore_case)
+smb_match_name(ino64_t fileid, char *name, char *pattern, boolean_t ignore_case)
 {
 	int rc = 0;
 	int force;
+	char name83[SMB_SHORTNAMELEN];
+	char shortname[SMB_SHORTNAMELEN];
 
 	/* Leading or trailing dots are disallowed */
 	if (smb_is_reserved_dos_name(name))
@@ -670,19 +671,17 @@ int smb_mangle_name(
 int
 smb_unmangle_name(struct smb_request *sr, cred_t *cred, smb_node_t *dir_node,
 	char *name, char *real_name, int realname_size, char *shortname,
-	char *name83, int od)
+	char *name83, int ondisk)
 {
 	int err;
-	int len;
-	int force = 0;
-	ino64_t inode;
-	uint32_t cookie;
 	struct smb_node *snode = NULL;
 	smb_attr_t ret_attr;
-	char *dot_pos = NULL;
-	char *readdir_name;
-	char *shortp;
 	char namebuf[SMB_SHORTNAMELEN];
+	char  *path;
+	uint16_t odid;
+	smb_odir_t *od;
+	smb_odirent_t *odirent;
+	boolean_t eos;
 
 	if (dir_node == NULL || name == NULL || real_name == NULL ||
 	    realname_size == 0)
@@ -692,7 +691,7 @@ smb_unmangle_name(struct smb_request *sr, cred_t *cred, smb_node_t *dir_node,
 	snode = NULL;
 
 	if (smb_maybe_mangled_name(name) == 0) {
-		if (od == 0) {
+		if (ondisk == 0) {
 			(void) strlcpy(real_name, name, realname_size);
 			return (0);
 		}
@@ -713,65 +712,42 @@ smb_unmangle_name(struct smb_request *sr, cred_t *cred, smb_node_t *dir_node,
 	if (name83 == 0)
 		name83 = namebuf;
 
-	cookie = 0;
+	/* determine the pathname and open an smb_odir_t */
+	path =  kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	if ((err = vnodetopath(sr->tid_tree->t_snode->vp, dir_node->vp, path,
+	    MAXNAMELEN, kcred)) != 0)
+		return (err);
 
-	readdir_name = kmem_alloc(MAXNAMELEN, KM_SLEEP);
+	if ((strlcat(path, "/*", MAXNAMELEN) >= MAXNAMELEN) ||
+	    ((odid = smb_odir_open(sr, path, SMB_SEARCH_ATTRIBUTES)) == 0) ||
+	    ((od = smb_tree_lookup_odir(sr->tid_tree, odid)) == NULL)) {
+		err = ENOENT;
+	}
+	kmem_free(path, MAXNAMELEN);
+	if (err != 0)
+		return (err);
 
-	snode = NULL;
-	while (cookie != 0x7FFFFFFF) {
-
-		len = realname_size - 1;
-
-		err = smb_fsop_readdir(sr, cred, dir_node, &cookie,
-		    readdir_name, &len, &inode, NULL, &snode, &ret_attr);
-
-		if (err || (cookie == 0x7FFFFFFF))
+	odirent = kmem_alloc(sizeof (smb_odirent_t), KM_SLEEP);
+	for (;;) {
+		err = smb_odir_read(sr, od, odirent, &eos);
+		if ((err != 0) || (eos))
 			break;
 
-		readdir_name[len] = 0;
+		(void) smb_mangle_name(odirent->od_ino, odirent->od_name,
+		    shortname, name83, 1);
 
-		/*
-		 * smb_fsop_readdir() may return a mangled name if the
-		 * name has a case collision.
-		 *
-		 * If readdir_name is not a mangled name, we mangle
-		 * readdir_name to see if it will match the name the
-		 * client passed in.
-		 *
-		 * If smb_needs_mangle() does not succeed, we try again
-		 * using the force flag.  It is possible that the client
-		 * is using a mangled name that resulted from a prior
-		 * case collision which no longer exists in the directory.
-		 * smb_needs_mangle(), with the force flag, will produce
-		 * a mangled name regardless of whether the name passed in
-		 * meets standard DOS criteria for name mangling.
-		 */
-
-		if (smb_maybe_mangled_name(readdir_name)) {
-			shortp = readdir_name;
-		} else {
-			if (smb_needs_mangle(readdir_name, &dot_pos) == 0)
-				force = 1;
-			(void) smb_mangle_name(inode, readdir_name, shortname,
-			    name83, force);
-			shortp = shortname;
-		}
-
-		if (utf8_strcasecmp(name, shortp) == 0) {
-			kmem_free(readdir_name, MAXNAMELEN);
-			(void) strlcpy(real_name, snode->od_name,
+		if (utf8_strcasecmp(name, shortname) == 0) {
+			(void) strlcpy(real_name, odirent->od_name,
 			    realname_size);
-
-			smb_node_release(snode);
-
+			kmem_free(odirent, sizeof (smb_odirent_t));
+			smb_odir_release(od);
+			smb_odir_close(od);
 			return (0);
-		} else {
-			smb_node_release(snode);
-			snode = NULL;
 		}
 	}
 
-	kmem_free(readdir_name, MAXNAMELEN);
-
+	kmem_free(odirent, sizeof (smb_odirent_t));
+	smb_odir_release(od);
+	smb_odir_close(od);
 	return (ENOENT);
 }

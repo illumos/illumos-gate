@@ -150,14 +150,14 @@ void smb_kdoor_clnt_free(char *, size_t, char *, size_t);
 /*
  * SMB upcalls
  */
-smb_token_t *smb_upcall_get_token(netr_client_t *);
+smb_token_t *smb_get_token(netr_client_t *);
 int smb_set_downcall_desc(door_desc_t *, uint_t);
 void smb_user_nonauth_logon(uint32_t);
 void smb_user_auth_logoff(uint32_t);
 uint32_t smb_upcall_vss_get_count(char *);
-void smb_upcall_vss_get_snapshots(char *resource_path, uint32_t count,
-    smb_dr_return_gmttokens_t *gmttokens);
-void smb_upcall_vss_get_snapshots_free(smb_dr_return_gmttokens_t *reply);
+void smb_upcall_vss_get_snapshots(char *, uint32_t,
+    smb_dr_return_gmttokens_t *);
+void smb_upcall_vss_get_snapshots_free(smb_dr_return_gmttokens_t *);
 void smb_upcall_vss_map_gmttoken(char *, char *, char *);
 #else /* _KERNEL */
 

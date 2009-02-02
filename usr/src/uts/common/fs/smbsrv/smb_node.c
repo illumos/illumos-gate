@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,10 +171,9 @@ smb_node_fini(void)
  *
  * smb_node_lookup() is called upon successful lookup, mkdir, and create
  * (for both non-streams and streams).  In each of these cases, a held vnode is
- * passed into this routine.  If an smb_node already exists for this vnode,
- * the vp is released.  Otherwise, a new smb_node will be created and the
- * reference will be held until the refcnt on the node goes to 0 (see
- * smb_node_release()).
+ * passed into this routine.  If a new smb_node is created it will take its
+ * own hold on the vnode.  The caller's hold therefore still belongs to, and
+ * should be released by, the caller.
  *
  * A reference is taken on the smb_node whether found in the hash table
  * or newly created.
@@ -272,7 +271,6 @@ smb_node_lookup(
 					smb_audit_node(node);
 					smb_rwx_xexit(&node->n_lock);
 					smb_llist_exit(node_hdr);
-					VN_RELE(vp);
 					return (node);
 
 				case SMB_NODE_STATE_DESTROYING:
@@ -309,6 +307,7 @@ smb_node_lookup(
 	node->n_hash_bucket = node_hdr;
 	node->n_sr = sr;
 	node->vp = vp;
+	VN_HOLD(node->vp);
 	node->n_hashkey = hashkey;
 	node->n_refcnt = 1;
 	node->attr = *attr;
@@ -381,15 +380,6 @@ smb_stream_node_lookup(struct smb_request *sr, cred_t *cr, smb_node_t *fnode,
 	snode = smb_node_lookup(sr, NULL, cr, vp, stream_name, xattrdir_node,
 	    fnode, ret_attr);
 
-	/*
-	 * The following VN_HOLD is necessary because the caller will VN_RELE
-	 * xattrdirvp in the case of an error.  (xattrdir_node has the original
-	 * hold on the vnode, which the smb_node_release() call below will
-	 * release.)
-	 */
-	if (snode == NULL) {
-		VN_HOLD(xattrdirvp);
-	}
 	(void) smb_node_release(xattrdir_node);
 	return (snode);
 }

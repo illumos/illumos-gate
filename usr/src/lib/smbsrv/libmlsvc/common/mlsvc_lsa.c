@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,7 @@ static DWORD lsarpc_s_PrimaryDomainInfo(struct mslsa_PrimaryDomainInfo *,
 static DWORD lsarpc_s_AccountDomainInfo(struct mslsa_AccountDomainInfo *,
     ndr_xa_t *);
 static int lsarpc_s_UpdateDomainTable(ndr_xa_t *,
-    smb_userinfo_t *, struct mslsa_domain_table *, DWORD *);
+    smb_account_t *, struct mslsa_domain_table *, DWORD *);
 
 static ndr_stub_table_t lsarpc_stub_table[] = {
 	{ lsarpc_s_CloseHandle,		  LSARPC_OPNUM_CloseHandle },
@@ -680,11 +680,11 @@ lsarpc_s_LookupNames(void *arg, ndr_xa_t *mxa)
 {
 	struct mslsa_LookupNames *param = arg;
 	struct mslsa_rid_entry *rids;
-	smb_userinfo_t *user_info = 0;
 	struct mslsa_domain_table *domain_table;
 	struct mslsa_domain_entry *domain_entry;
-	DWORD status = NT_STATUS_SUCCESS;
-	char *account;
+	smb_account_t account;
+	uint32_t status;
+	char *accname;
 	int rc = 0;
 
 	if (param->name_table->n_entry != 1)
@@ -693,24 +693,26 @@ lsarpc_s_LookupNames(void *arg, ndr_xa_t *mxa)
 	rids = NDR_NEW(mxa, struct mslsa_rid_entry);
 	domain_table = NDR_NEW(mxa, struct mslsa_domain_table);
 	domain_entry = NDR_NEW(mxa, struct mslsa_domain_entry);
-	user_info = mlsvc_alloc_user_info();
 
-	if (rids == NULL || domain_table == NULL ||
-	    domain_entry == NULL || user_info == NULL) {
-		status = NT_STATUS_NO_MEMORY;
-		goto name_lookup_failed;
+	if (rids == NULL || domain_table == NULL || domain_entry == NULL) {
+		bzero(param, sizeof (struct mslsa_LookupNames));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (NDR_DRC_OK);
 	}
 
-	account = (char *)param->name_table->names->str;
-	status = lsa_lookup_name(account, SidTypeUnknown, user_info);
-	if (status != NT_STATUS_SUCCESS)
-		goto name_lookup_failed;
+	accname = (char *)param->name_table->names->str;
+	status = lsa_lookup_name(accname, SidTypeUnknown, &account);
+	if (status != NT_STATUS_SUCCESS) {
+		bzero(param, sizeof (struct mslsa_LookupNames));
+		param->status = NT_SC_ERROR(status);
+		return (NDR_DRC_OK);
+	}
 
 	/*
 	 * Set up the rid table.
 	 */
-	rids[0].sid_name_use = user_info->sid_name_use;
-	rids[0].rid = user_info->rid;
+	rids[0].sid_name_use = account.a_type;
+	rids[0].rid = account.a_rid;
 	rids[0].domain_index = 0;
 	param->translated_sids.n_entry = 1;
 	param->translated_sids.rids = rids;
@@ -722,27 +724,23 @@ lsarpc_s_LookupNames(void *arg, ndr_xa_t *mxa)
 	domain_table->n_entry = 1;
 	domain_table->max_n_entry = MLSVC_DOMAIN_MAX;
 
-	rc = NDR_MSTRING(mxa, user_info->domain_name,
+	rc = NDR_MSTRING(mxa, account.a_domain,
 	    (ndr_mstring_t *)&domain_entry->domain_name);
 	domain_entry->domain_sid =
-	    (struct mslsa_sid *)NDR_SIDDUP(mxa, user_info->domain_sid);
+	    (struct mslsa_sid *)NDR_SIDDUP(mxa, account.a_domsid);
 
 	if (rc == -1 || domain_entry->domain_sid == NULL) {
-		status = NT_STATUS_NO_MEMORY;
-		goto name_lookup_failed;
+		smb_account_free(&account);
+		bzero(param, sizeof (struct mslsa_LookupNames));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (NDR_DRC_OK);
 	}
 
 	param->domain_table = domain_table;
 	param->mapped_count = 1;
-	param->status = 0;
+	param->status = NT_STATUS_SUCCESS;
 
-	mlsvc_free_user_info(user_info);
-	return (NDR_DRC_OK);
-
-name_lookup_failed:
-	mlsvc_free_user_info(user_info);
-	bzero(param, sizeof (struct mslsa_LookupNames));
-	param->status = NT_SC_ERROR(status);
+	smb_account_free(&account);
 	return (NDR_DRC_OK);
 }
 
@@ -767,13 +765,11 @@ lsarpc_s_LookupSids(void *arg, ndr_xa_t *mxa)
 	struct mslsa_domain_entry *domain_entry;
 	struct mslsa_name_entry *names;
 	struct mslsa_name_entry *name;
-	smb_userinfo_t *user_info;
+	smb_account_t account;
 	smb_sid_t *sid;
 	DWORD n_entry;
 	int result;
 	int i;
-
-	user_info = mlsvc_alloc_user_info();
 
 	n_entry = param->lup_sid_table.n_entry;
 	names = NDR_NEWN(mxa, struct mslsa_name_entry, n_entry);
@@ -781,8 +777,7 @@ lsarpc_s_LookupSids(void *arg, ndr_xa_t *mxa)
 	domain_entry = NDR_NEWN(mxa, struct mslsa_domain_entry,
 	    MLSVC_DOMAIN_MAX);
 
-	if (names == NULL || domain_table == NULL ||
-	    domain_entry == NULL || user_info == NULL) {
+	if (names == NULL || domain_table == NULL || domain_entry == NULL) {
 		bzero(param, sizeof (struct mslsa_LookupSids));
 		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
 		return (NDR_DRC_OK);
@@ -797,18 +792,18 @@ lsarpc_s_LookupSids(void *arg, ndr_xa_t *mxa)
 		bzero(&names[i], sizeof (struct mslsa_name_entry));
 		sid = (smb_sid_t *)param->lup_sid_table.entries[i].psid;
 
-		result = lsa_lookup_sid(sid, user_info);
+		result = lsa_lookup_sid(sid, &account);
 		if (result != NT_STATUS_SUCCESS)
 			goto lookup_sid_failed;
 
-		if (NDR_MSTRING(mxa, user_info->name,
+		if (NDR_MSTRING(mxa, account.a_name,
 		    (ndr_mstring_t *)&name->name) == -1) {
 			result = NT_STATUS_NO_MEMORY;
 			goto lookup_sid_failed;
 		}
-		name->sid_name_use = user_info->sid_name_use;
+		name->sid_name_use = account.a_type;
 
-		result = lsarpc_s_UpdateDomainTable(mxa, user_info,
+		result = lsarpc_s_UpdateDomainTable(mxa, &account,
 		    domain_table, &name->domain_ix);
 
 		if (result == -1) {
@@ -816,7 +811,7 @@ lsarpc_s_LookupSids(void *arg, ndr_xa_t *mxa)
 			goto lookup_sid_failed;
 		}
 
-		mlsvc_release_user_info(user_info);
+		smb_account_free(&account);
 	}
 
 	param->domain_table = domain_table;
@@ -825,7 +820,6 @@ lsarpc_s_LookupSids(void *arg, ndr_xa_t *mxa)
 	param->mapped_count = n_entry;
 	param->status = 0;
 
-	mlsvc_free_user_info(user_info);
 	return (NDR_DRC_OK);
 
 lookup_sid_failed:
@@ -835,7 +829,7 @@ lookup_sid_failed:
 	param->mapped_count = 0;
 	param->status = NT_SC_ERROR(result);
 
-	mlsvc_free_user_info(user_info);
+	smb_account_free(&account);
 	return (NDR_DRC_OK);
 }
 
@@ -850,7 +844,7 @@ lookup_sid_failed:
  */
 static int
 lsarpc_s_UpdateDomainTable(ndr_xa_t *mxa,
-    smb_userinfo_t *user_info, struct mslsa_domain_table *domain_table,
+    smb_account_t *account, struct mslsa_domain_table *domain_table,
     DWORD *domain_idx)
 {
 	struct mslsa_domain_entry *dentry;
@@ -858,8 +852,8 @@ lsarpc_s_UpdateDomainTable(ndr_xa_t *mxa,
 	DWORD i;
 	int rc;
 
-	if (user_info->sid_name_use == SidTypeUnknown ||
-	    user_info->sid_name_use == SidTypeInvalid) {
+	if (account->a_type == SidTypeUnknown ||
+	    account->a_type == SidTypeInvalid) {
 		/*
 		 * These types don't need to reference an entry in the
 		 * domain table. So return -1.
@@ -876,7 +870,7 @@ lsarpc_s_UpdateDomainTable(ndr_xa_t *mxa,
 
 	for (i = 0; i < n_entry; ++i) {
 		if (smb_sid_cmp((smb_sid_t *)dentry[i].domain_sid,
-		    user_info->domain_sid)) {
+		    account->a_domsid)) {
 			*domain_idx = i;
 			return (0);
 		}
@@ -885,10 +879,10 @@ lsarpc_s_UpdateDomainTable(ndr_xa_t *mxa,
 	if (i == MLSVC_DOMAIN_MAX)
 		return (-1);
 
-	rc = NDR_MSTRING(mxa, user_info->domain_name,
+	rc = NDR_MSTRING(mxa, account->a_domain,
 	    (ndr_mstring_t *)&dentry[i].domain_name);
 	dentry[i].domain_sid =
-	    (struct mslsa_sid *)NDR_SIDDUP(mxa, user_info->domain_sid);
+	    (struct mslsa_sid *)NDR_SIDDUP(mxa, account->a_domsid);
 
 	if (rc == -1 || dentry[i].domain_sid == NULL)
 		return (-1);
@@ -912,13 +906,11 @@ lsarpc_s_LookupSids2(void *arg, ndr_xa_t *mxa)
 	struct lsar_name_entry2 *name;
 	struct mslsa_domain_table *domain_table;
 	struct mslsa_domain_entry *domain_entry;
-	smb_userinfo_t *user_info;
+	smb_account_t account;
 	smb_sid_t *sid;
 	DWORD n_entry;
 	int result;
 	int i;
-
-	user_info = mlsvc_alloc_user_info();
 
 	n_entry = param->lup_sid_table.n_entry;
 	names = NDR_NEWN(mxa, struct lsar_name_entry2, n_entry);
@@ -926,8 +918,7 @@ lsarpc_s_LookupSids2(void *arg, ndr_xa_t *mxa)
 	domain_entry = NDR_NEWN(mxa, struct mslsa_domain_entry,
 	    MLSVC_DOMAIN_MAX);
 
-	if (names == NULL || domain_table == NULL ||
-	    domain_entry == NULL || user_info == NULL) {
+	if (names == NULL || domain_table == NULL || domain_entry == NULL) {
 		bzero(param, sizeof (struct lsar_lookup_sids2));
 		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
 		return (NDR_DRC_OK);
@@ -942,18 +933,18 @@ lsarpc_s_LookupSids2(void *arg, ndr_xa_t *mxa)
 		bzero(name, sizeof (struct lsar_name_entry2));
 		sid = (smb_sid_t *)param->lup_sid_table.entries[i].psid;
 
-		result = lsa_lookup_sid(sid, user_info);
+		result = lsa_lookup_sid(sid, &account);
 		if (result != NT_STATUS_SUCCESS)
 			goto lookup_sid_failed;
 
-		if (NDR_MSTRING(mxa, user_info->name,
+		if (NDR_MSTRING(mxa, account.a_name,
 		    (ndr_mstring_t *)&name->name) == -1) {
 			result = NT_STATUS_NO_MEMORY;
 			goto lookup_sid_failed;
 		}
-		name->sid_name_use = user_info->sid_name_use;
+		name->sid_name_use = account.a_type;
 
-		result = lsarpc_s_UpdateDomainTable(mxa, user_info,
+		result = lsarpc_s_UpdateDomainTable(mxa, &account,
 		    domain_table, &name->domain_ix);
 
 		if (result == -1) {
@@ -961,7 +952,7 @@ lsarpc_s_LookupSids2(void *arg, ndr_xa_t *mxa)
 			goto lookup_sid_failed;
 		}
 
-		mlsvc_release_user_info(user_info);
+		smb_account_free(&account);
 	}
 
 	param->domain_table = domain_table;
@@ -970,7 +961,6 @@ lsarpc_s_LookupSids2(void *arg, ndr_xa_t *mxa)
 	param->mapped_count = n_entry;
 	param->status = 0;
 
-	mlsvc_free_user_info(user_info);
 	return (NDR_DRC_OK);
 
 lookup_sid_failed:
@@ -980,7 +970,7 @@ lookup_sid_failed:
 	param->mapped_count = 0;
 	param->status = NT_SC_ERROR(result);
 
-	mlsvc_free_user_info(user_info);
+	smb_account_free(&account);
 	return (NDR_DRC_OK);
 }
 
@@ -995,11 +985,11 @@ lsarpc_s_LookupNames2(void *arg, ndr_xa_t *mxa)
 {
 	struct lsar_LookupNames2 *param = arg;
 	struct lsar_rid_entry2 *rids;
-	smb_userinfo_t *user_info = 0;
 	struct mslsa_domain_table *domain_table;
 	struct mslsa_domain_entry *domain_entry;
-	char *account;
-	DWORD status = NT_STATUS_SUCCESS;
+	smb_account_t account;
+	uint32_t status;
+	char *accname;
 	int rc = 0;
 
 	if (param->name_table->n_entry != 1)
@@ -1008,25 +998,27 @@ lsarpc_s_LookupNames2(void *arg, ndr_xa_t *mxa)
 	rids = NDR_NEW(mxa, struct lsar_rid_entry2);
 	domain_table = NDR_NEW(mxa, struct mslsa_domain_table);
 	domain_entry = NDR_NEW(mxa, struct mslsa_domain_entry);
-	user_info = mlsvc_alloc_user_info();
 
-	if (rids == 0 || domain_table == 0 ||
-	    domain_entry == 0 || user_info == 0) {
-		status = NT_STATUS_NO_MEMORY;
-		goto name_lookup2_failed;
+	if (rids == NULL || domain_table == NULL || domain_entry == NULL) {
+		bzero(param, sizeof (struct lsar_LookupNames2));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (NDR_DRC_OK);
 	}
 
-	account = (char *)param->name_table->names->str;
-	status = lsa_lookup_name(account, SidTypeUnknown, user_info);
-	if (status != NT_STATUS_SUCCESS)
-		goto name_lookup2_failed;
+	accname = (char *)param->name_table->names->str;
+	status = lsa_lookup_name(accname, SidTypeUnknown, &account);
+	if (status != NT_STATUS_SUCCESS) {
+		bzero(param, sizeof (struct lsar_LookupNames2));
+		param->status = NT_SC_ERROR(status);
+		return (NDR_DRC_OK);
+	}
 
 	/*
 	 * Set up the rid table.
 	 */
 	bzero(rids, sizeof (struct lsar_rid_entry2));
-	rids[0].sid_name_use = user_info->sid_name_use;
-	rids[0].rid = user_info->rid;
+	rids[0].sid_name_use = account.a_type;
+	rids[0].rid = account.a_rid;
 	rids[0].domain_index = 0;
 	param->translated_sids.n_entry = 1;
 	param->translated_sids.rids = rids;
@@ -1038,28 +1030,24 @@ lsarpc_s_LookupNames2(void *arg, ndr_xa_t *mxa)
 	domain_table->n_entry = 1;
 	domain_table->max_n_entry = MLSVC_DOMAIN_MAX;
 
-	rc = NDR_MSTRING(mxa, user_info->domain_name,
+	rc = NDR_MSTRING(mxa, account.a_domain,
 	    (ndr_mstring_t *)&domain_entry->domain_name);
 
 	domain_entry->domain_sid =
-	    (struct mslsa_sid *)NDR_SIDDUP(mxa, user_info->domain_sid);
+	    (struct mslsa_sid *)NDR_SIDDUP(mxa, account.a_domsid);
 
 	if (rc == -1 || domain_entry->domain_sid == NULL) {
-		status = NT_STATUS_NO_MEMORY;
-		goto name_lookup2_failed;
+		smb_account_free(&account);
+		bzero(param, sizeof (struct lsar_LookupNames2));
+		param->status = NT_SC_ERROR(NT_STATUS_NO_MEMORY);
+		return (NDR_DRC_OK);
 	}
 
 	param->domain_table = domain_table;
 	param->mapped_count = 1;
-	param->status = 0;
+	param->status = NT_STATUS_SUCCESS;
 
-	mlsvc_free_user_info(user_info);
-	return (NDR_DRC_OK);
-
-name_lookup2_failed:
-	mlsvc_free_user_info(user_info);
-	bzero(param, sizeof (struct lsar_LookupNames2));
-	param->status = NT_SC_ERROR(status);
+	smb_account_free(&account);
 	return (NDR_DRC_OK);
 }
 

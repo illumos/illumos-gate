@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,6 +190,8 @@ static int smb_tree_getattr(smb_node_t *, smb_tree_t *);
 static void smb_tree_get_volname(vfs_t *, smb_tree_t *);
 static void smb_tree_get_flags(vfs_t *, smb_tree_t *);
 static void smb_tree_log(smb_request_t *, const char *, const char *, ...);
+static void smb_tree_close_odirs(smb_tree_t *, uint16_t);
+static smb_odir_t *smb_tree_get_odir(smb_tree_t *, smb_odir_t *);
 
 /*
  * Extract the share name and share type and connect as appropriate.
@@ -263,7 +265,7 @@ smb_tree_disconnect(
 		/*
 		 * The directories opened under this tree are closed.
 		 */
-		smb_odir_close_all(tree);
+		smb_tree_close_odirs(tree, 0);
 		mutex_enter(&tree->t_mutex);
 		tree->t_state = SMB_TREE_STATE_DISCONNECTED;
 	}
@@ -329,7 +331,7 @@ smb_tree_close_pid(
 	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
 
 	smb_ofile_close_all_by_pid(tree, pid);
-	smb_odir_close_all_by_pid(tree, pid);
+	smb_tree_close_odirs(tree, pid);
 }
 
 /*
@@ -377,7 +379,7 @@ smb_tree_connect_disk(smb_request_t *sr, const char *sharename)
 	si = kmem_zalloc(sizeof (smb_share_t), KM_SLEEP);
 
 	if (smb_kshare_getinfo(sr->sr_server->sv_lmshrd, (char *)sharename, si,
-	    sr->session->ipaddr) != NERR_Success) {
+	    &sr->session->ipaddr) != NERR_Success) {
 		smb_tree_log(sr, sharename, "share not found");
 		smbsr_error(sr, 0, ERRSRV, ERRinvnetname);
 		kmem_free(si, sizeof (smb_share_t));
@@ -532,7 +534,7 @@ smb_tree_alloc(
 		return (NULL);
 	}
 
-	if (smb_idpool_constructor(&tree->t_sid_pool)) {
+	if (smb_idpool_constructor(&tree->t_odid_pool)) {
 		smb_idpool_destructor(&tree->t_fid_pool);
 		smb_idpool_free(&user->u_tid_pool, tid);
 		kmem_cache_free(user->u_server->si_cache_tree, tree);
@@ -616,7 +618,7 @@ smb_tree_dealloc(smb_tree_t *tree)
 	smb_llist_destructor(&tree->t_ofile_list);
 	smb_llist_destructor(&tree->t_odir_list);
 	smb_idpool_destructor(&tree->t_fid_pool);
-	smb_idpool_destructor(&tree->t_sid_pool);
+	smb_idpool_destructor(&tree->t_odid_pool);
 	kmem_cache_free(tree->t_server->si_cache_tree, tree);
 }
 
@@ -865,4 +867,106 @@ smb_tree_log(smb_request_t *sr, const char *sharename, const char *fmt, ...)
 
 	cmn_err(CE_NOTE, "smbd[%s\\%s]: %s %s",
 	    user->u_domain, user->u_name, sharename, buf);
+}
+
+/*
+ * smb_tree_lookup_odir
+ *
+ * Find the specified odir in the tree's list of odirs, and
+ * attempt to obtain a hold on the odir.
+ *
+ * Returns NULL if odir not found or a hold cannot be obtained.
+ */
+smb_odir_t *
+smb_tree_lookup_odir(smb_tree_t *tree, uint16_t odid)
+{
+	smb_odir_t	*od;
+	smb_llist_t	*od_list;
+
+	ASSERT(tree);
+	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+
+	od_list = &tree->t_odir_list;
+	smb_llist_enter(od_list, RW_READER);
+
+	od = smb_llist_head(od_list);
+	while (od) {
+		if (od->d_odid == odid) {
+			if (!smb_odir_hold(od))
+				od = NULL;
+			break;
+		}
+		od = smb_llist_next(od_list, od);
+	}
+
+	smb_llist_exit(od_list);
+	return (od);
+}
+
+/*
+ * smb_tree_get_odir
+ *
+ * Find the next open odir in the tree's list of odirs, and obtain
+ * a hold on it. (A hold can only be obtained on an open odir.)
+ * If the specified odir is NULL the search starts at the beginning
+ * of the tree's odir list, otherwise the search starts after the
+ * specified odir.
+ */
+static smb_odir_t *
+smb_tree_get_odir(smb_tree_t *tree, smb_odir_t *od)
+{
+	smb_llist_t *od_list;
+
+	ASSERT(tree);
+	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+
+	od_list = &tree->t_odir_list;
+	smb_llist_enter(od_list, RW_READER);
+
+	if (od) {
+		ASSERT(od->d_magic == SMB_ODIR_MAGIC);
+		od = smb_llist_next(od_list, od);
+	} else {
+		od = smb_llist_head(od_list);
+	}
+
+	while (od) {
+		ASSERT(od->d_magic == SMB_ODIR_MAGIC);
+
+		if (smb_odir_hold(od))
+			break;
+		od = smb_llist_next(od_list, od);
+	}
+
+	smb_llist_exit(od_list);
+	return (od);
+}
+
+/*
+ * smb_tree_close_odirs
+ *
+ * Close all open odirs in the tree's list which were opened by
+ * the process identified by pid.
+ * If pid is zero, close all open odirs in the tree's list.
+ */
+static void
+smb_tree_close_odirs(smb_tree_t *tree, uint16_t pid)
+{
+	smb_odir_t *od, *next_od;
+
+	ASSERT(tree);
+	ASSERT(tree->t_magic == SMB_TREE_MAGIC);
+
+	od = smb_tree_get_odir(tree, NULL);
+	while (od) {
+		ASSERT(od->d_magic == SMB_ODIR_MAGIC);
+		ASSERT(od->d_tree == tree);
+
+		next_od = smb_tree_get_odir(tree, od);
+		if ((pid == 0) || (od->d_opened_by_pid == pid))
+				smb_odir_close(od);
+		smb_odir_release(od);
+
+		od = next_od;
+	}
 }

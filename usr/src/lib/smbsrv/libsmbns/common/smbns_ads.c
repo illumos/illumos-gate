@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,8 +100,16 @@
  * Length of "dc=" prefix.
  */
 #define	SMB_ADS_DN_PREFIX_LEN	3
-
 #define	SMB_ADS_MSDCS_SVC_CNT	2
+
+static char *smb_ads_computer_objcls[] = {
+	"top", "person", "organizationalPerson",
+	"user", "computer", NULL
+};
+
+static char *smb_ads_share_objcls[] = {
+	"top", "leaf", "connectionPoint", "volume", NULL
+};
 
 /* Cached ADS server to communicate with */
 static smb_ads_host_info_t *smb_ads_cached_host_info = NULL;
@@ -240,13 +248,10 @@ smb_ads_build_unc_name(char *unc_name, int maxlen,
 static int
 smb_ads_ldap_ping(smb_ads_host_info_t *ads_host)
 {
-	struct in_addr addr;
 	int ldversion = LDAP_VERSION3, status, timeoutms = 5 * 1000;
 	LDAP *ld = NULL;
 
-	addr.s_addr = ads_host->ip_addr;
-
-	ld = ldap_init((char *)inet_ntoa(addr), ads_host->port);
+	ld = ldap_init(ads_host->name, ads_host->port);
 	if (ld == NULL)
 		return (-1);
 
@@ -446,9 +451,10 @@ smb_ads_decode_host_ip(int addit_cnt, int ans_cnt, uchar_t **ptr,
     uchar_t *eom, uchar_t *buf, smb_ads_host_info_t *ads_host_list)
 {
 	int i, j, len;
-	in_addr_t ipaddr;
+	smb_inaddr_t ipaddr;
 	char hostname[MAXHOSTNAMELEN];
 	char *name;
+	uint16_t size = 0;
 
 	for (i = 0; i < addit_cnt; i++) {
 
@@ -460,10 +466,25 @@ smb_ads_decode_host_ip(int addit_cnt, int ans_cnt, uchar_t **ptr,
 		*ptr += len;
 
 		/* skip type, class, TTL, data len */
-		*ptr += 10;
-
+		*ptr += 8;
 		/* LINTED: E_CONSTANT_CONDITION */
-		NS_GET32(ipaddr, *ptr);
+		NS_GET16(size, *ptr);
+
+		if (size == INADDRSZ) {
+			/* LINTED: E_CONSTANT_CONDITION */
+			NS_GET32(ipaddr.a_ipv4, *ptr);
+			ipaddr.a_ipv4 = htonl(ipaddr.a_ipv4);
+			ipaddr.a_family = AF_INET;
+		} else if (size == IN6ADDRSZ) {
+#ifdef BIG_ENDIAN
+			bcopy(*ptr, &ipaddr.a_ipv6, IN6ADDRSZ);
+#else
+			for (i = 0; i < IN6ADDRSZ; i++)
+				(uint8_t *)(ipaddr.a_ipv6)
+				    [IN6ADDRSZ-1-i] = *(*ptr+i);
+#endif
+			ipaddr.a_family = AF_INET6;
+		}
 
 		/*
 		 * find the host in the list of DC records from
@@ -473,12 +494,11 @@ smb_ads_decode_host_ip(int addit_cnt, int ans_cnt, uchar_t **ptr,
 		for (j = 0; j < ans_cnt; j++) {
 			if ((name = ads_host_list[j].name) == NULL)
 				continue;
-
-			if (utf8_strcasecmp(name, hostname) == 0)
-				ads_host_list[j].ip_addr = htonl(ipaddr);
+			if (utf8_strcasecmp(name, hostname) == 0) {
+				ads_host_list[j].ipaddr = ipaddr;
+			}
 		}
 	}
-
 	return (0);
 }
 
@@ -691,12 +711,25 @@ smb_ads_getipnodebyname(smb_ads_host_info_t *hentry)
 	struct hostent *h;
 	int error;
 
-	h = getipnodebyname(hentry->name, AF_INET, 0, &error);
-	if (h == NULL || h->h_addr == NULL)
+	switch (hentry->ipaddr.a_family) {
+	case AF_INET6:
+		h = getipnodebyname(hentry->name, hentry->ipaddr.a_family,
+		    AI_DEFAULT, &error);
+		if (h == NULL || h->h_length != IPV6_ADDR_LEN)
+			return (-1);
+		break;
+
+	case AF_INET:
+		h = getipnodebyname(hentry->name, hentry->ipaddr.a_family,
+		    0, &error);
+		if (h == NULL || h->h_length != INADDRSZ)
+			return (-1);
+		break;
+
+	default:
 		return (-1);
-
-	(void) memcpy(&hentry->ip_addr, h->h_addr, h->h_length);
-
+	}
+	bcopy(*(h->h_addr_list), &hentry->ipaddr.a_ip, h->h_length);
 	freehostent(h);
 	return (0);
 }
@@ -778,9 +811,8 @@ smb_ads_find_host(char *domain, char *sought)
 	hlistp = hlist->ah_list;
 
 	for (i = 0; i < hlist->ah_cnt; i++) {
-
 		/* Do a host lookup by hostname to get the IP address */
-		if (hlistp[i].ip_addr == 0) {
+		if (smb_inet_iszero(&hlistp[i].ipaddr)) {
 			if (smb_ads_getipnodebyname(&hlistp[i]) < 0)
 				continue;
 		}
@@ -940,20 +972,17 @@ smb_ads_open_main(char *domain, char *user, char *password)
 	LDAP *ld;
 	int version = 3;
 	smb_ads_host_info_t *ads_host = NULL;
-	struct in_addr addr;
 
 	ads_host = smb_ads_find_host(domain, NULL);
 	if (ads_host == NULL)
 		return (NULL);
-
 
 	ah = (smb_ads_handle_t *)malloc(sizeof (smb_ads_handle_t));
 	if (ah == NULL)
 		return (NULL);
 	(void) memset(ah, 0, sizeof (smb_ads_handle_t));
 
-	addr.s_addr = ads_host->ip_addr;
-	if ((ld = ldap_init((char *)inet_ntoa(addr), ads_host->port)) == NULL) {
+	if ((ld = ldap_init(ads_host->name, ads_host->port)) == NULL) {
 		smb_ads_free_cached_host();
 		free(ah);
 		return (NULL);
@@ -1454,10 +1483,10 @@ smb_ads_add_share(smb_ads_handle_t *ah, const char *adsShareName,
     const char *unc_name, const char *adsContainer)
 {
 	LDAPMod *attrs[SMB_ADS_SHARE_NUM_ATTR];
-	char *tmp1[5], *tmp2[5];
 	int j = 0;
 	char *share_dn;
 	int len, ret;
+	char *unc_names[] = {(char *)unc_name, NULL};
 
 	len = 5 + strlen(adsShareName) + strlen(adsContainer) +
 	    strlen(ah->domain_dn) + 1;
@@ -1476,18 +1505,11 @@ smb_ads_add_share(smb_ads_handle_t *ah, const char *adsShareName,
 
 	attrs[j]->mod_op = LDAP_MOD_ADD;
 	attrs[j]->mod_type = "objectClass";
-	tmp1[0] = "top";
-	tmp1[1] = "leaf";
-	tmp1[2] = "connectionPoint";
-	tmp1[3] = "volume";
-	tmp1[4] = 0;
-	attrs[j]->mod_values = tmp1;
+	attrs[j]->mod_values = smb_ads_share_objcls;
 
 	attrs[++j]->mod_op = LDAP_MOD_ADD;
 	attrs[j]->mod_type = "uNCName";
-	tmp2[0] = (char *)unc_name;
-	tmp2[1] = 0;
-	attrs[j]->mod_values = tmp2;
+	attrs[j]->mod_values = unc_names;
 
 	if ((ret = ldap_add_s(ah->ld, share_dn, attrs)) != LDAP_SUCCESS) {
 		smb_tracef("smbns_ads: %s: ldap_add error: %s",
@@ -1890,7 +1912,7 @@ static int
 smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 {
 	LDAPMod *attrs[SMB_ADS_COMPUTER_NUM_ATTR];
-	char *oc_vals[6], *sam_val[2], *usr_val[2];
+	char *sam_val[2], *usr_val[2];
 	char *spn_set[SMBKRB5_SPN_IDX_MAX + 1], *ctl_val[2], *fqh_val[2];
 	char *encrypt_val[2];
 	int j = -1;
@@ -1939,13 +1961,7 @@ smb_ads_computer_op(smb_ads_handle_t *ah, int op, int dclevel, char *dn)
 	if (op == LDAP_MOD_ADD) {
 		attrs[++j]->mod_op = op;
 		attrs[j]->mod_type = "objectClass";
-		oc_vals[0] = "top";
-		oc_vals[1] = "person";
-		oc_vals[2] = "organizationalPerson";
-		oc_vals[3] = "user";
-		oc_vals[4] = "computer";
-		oc_vals[5] = 0;
-		attrs[j]->mod_values = oc_vals;
+		attrs[j]->mod_values = smb_ads_computer_objcls;
 	}
 
 	attrs[++j]->mod_op = op;
@@ -2226,38 +2242,29 @@ smb_ads_find_computer(smb_ads_handle_t *ah, char *dn)
  * Modify the user account control attribute of an existing computer
  * object on AD.
  *
- * Returns 0 on success. Otherwise, returns -1.
+ * Returns LDAP error code.
  */
 static int
-smb_ads_update_computer_cntrl_attr(smb_ads_handle_t *ah, int des_only, char *dn)
+smb_ads_update_computer_cntrl_attr(smb_ads_handle_t *ah, int flags, char *dn)
 {
 	LDAPMod *attrs[2];
 	char *ctl_val[2];
-	int ret, usrctl_flags = 0;
+	int ret = 0;
 	char usrctl_buf[16];
 
 	if (smb_ads_alloc_attr(attrs, sizeof (attrs) / sizeof (LDAPMod *)) != 0)
-		return (-1);
+		return (LDAP_NO_MEMORY);
 
 	attrs[0]->mod_op = LDAP_MOD_REPLACE;
 	attrs[0]->mod_type = SMB_ADS_ATTR_CTL;
 
-	usrctl_flags |= (SMB_ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
-	    SMB_ADS_USER_ACCT_CTL_TRUSTED_FOR_DELEGATION |
-	    SMB_ADS_USER_ACCT_CTL_DONT_EXPIRE_PASSWD);
-
-	if (des_only)
-		usrctl_flags |= SMB_ADS_USER_ACCT_CTL_USE_DES_KEY_ONLY;
-
-	(void) snprintf(usrctl_buf, sizeof (usrctl_buf), "%d", usrctl_flags);
+	(void) snprintf(usrctl_buf, sizeof (usrctl_buf), "%d", flags);
 	ctl_val[0] = usrctl_buf;
 	ctl_val[1] = 0;
 	attrs[0]->mod_values = ctl_val;
-
 	if ((ret = ldap_modify_s(ah->ld, dn, attrs)) != LDAP_SUCCESS) {
 		smb_tracef("smbns_ads: ldap_modify error: %s",
 		    ldap_err2string(ret));
-		ret = -1;
 	}
 
 	smb_ads_free_attr(attrs);
@@ -2355,7 +2362,7 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 	boolean_t des_only, delete = B_TRUE;
 	smb_adjoin_status_t rc = SMB_ADJOIN_SUCCESS;
 	boolean_t new_acct;
-	int dclevel, num;
+	int dclevel, num, usrctl_flags = 0;
 	smb_ads_qstat_t qstat;
 	char dn[SMB_ADS_DN_MAX];
 	char *tmpfile;
@@ -2448,7 +2455,31 @@ smb_ads_join(char *domain, char *user, char *usr_passwd, char *machine_passwd,
 
 	kvno = smb_ads_lookup_computer_attr_kvno(ah, dn);
 
-	if (smb_ads_update_computer_cntrl_attr(ah, des_only, dn)
+	/*
+	 * Only members of Domain Admins and Enterprise Admins can set
+	 * the TRUSTED_FOR_DELEGATION userAccountControl flag.
+	 */
+	if (smb_ads_update_computer_cntrl_attr(ah,
+	    SMB_ADS_USER_ACCT_CTL_TRUSTED_FOR_DELEGATION, dn)
+	    == LDAP_INSUFFICIENT_ACCESS) {
+		usrctl_flags |= (SMB_ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
+		    SMB_ADS_USER_ACCT_CTL_DONT_EXPIRE_PASSWD);
+
+		syslog(LOG_NOTICE, "smbns_ads: Unable to set the "
+		    "TRUSTED_FOR_DELEGATION userAccountControl flag on "
+		    "the machine account in Active Directory.  Please refer "
+		    "to the Troubleshooting guide for more information.");
+
+	} else {
+		usrctl_flags |= (SMB_ADS_USER_ACCT_CTL_WKSTATION_TRUST_ACCT |
+		    SMB_ADS_USER_ACCT_CTL_TRUSTED_FOR_DELEGATION |
+		    SMB_ADS_USER_ACCT_CTL_DONT_EXPIRE_PASSWD);
+	}
+
+	if (des_only)
+		usrctl_flags |= SMB_ADS_USER_ACCT_CTL_USE_DES_KEY_ONLY;
+
+	if (smb_ads_update_computer_cntrl_attr(ah, usrctl_flags, dn)
 	    != 0) {
 		rc = SMB_ADJOIN_ERR_UPDATE_CNTRL_ATTR;
 		goto adjoin_cleanup;
@@ -2524,30 +2555,6 @@ smb_adjoin_report_err(smb_adjoin_status_t status)
 }
 
 /*
- * smb_ads_get_pdc_ip
- *
- * Check to see if there is any configured PDC.
- * If there is then converts the string IP to
- * integer format and returns it.
- */
-static uint32_t
-smb_ads_get_pdc_ip(void)
-{
-	char p[INET_ADDRSTRLEN];
-	uint32_t ipaddr = 0;
-	int rc;
-
-	rc = smb_config_getstr(SMB_CI_DOMAIN_SRV, p, sizeof (p));
-	if (rc == SMBD_SMF_OK) {
-		rc = inet_pton(AF_INET, p, &ipaddr);
-		if (rc == 0)
-			ipaddr = 0;
-	}
-
-	return (ipaddr);
-}
-
-/*
  * smb_ads_select_pdc
  *
  * This method walks the list of DCs and returns the first DC record that
@@ -2561,17 +2568,17 @@ static smb_ads_host_info_t *
 smb_ads_select_pdc(smb_ads_host_list_t *hlist)
 {
 	smb_ads_host_info_t *hentry;
-	uint32_t ip;
+	smb_inaddr_t ipaddr;
 	size_t cnt;
 	int i;
 
-	if ((ip = smb_ads_get_pdc_ip()) == 0)
+	if (smb_config_getip(SMB_CI_DOMAIN_SRV, &ipaddr) != SMBD_SMF_OK)
 		return (NULL);
 
 	cnt = hlist->ah_cnt;
 	for (i = 0; i < cnt; i++) {
 		hentry = &hlist->ah_list[i];
-		if ((hentry->ip_addr == ip) &&
+		if (smb_inet_equal(&hentry->ipaddr, &ipaddr, SMB_INET_NOMASK) &&
 		    (smb_ads_ldap_ping(hentry) == 0))
 			return (hentry);
 	}
@@ -2605,10 +2612,15 @@ smb_ads_select_dcfromsubnet(smb_ads_host_list_t *hlist)
 
 		for (i = 0; i < cnt; i++) {
 			hentry = &hlist->ah_list[i];
-			if ((hentry->ip_addr & lnic->nic_mask) ==
-			    (lnic->nic_ip & lnic->nic_mask))
-				if (smb_ads_ldap_ping(hentry) == 0)
-					return (hentry);
+			if ((hentry->ipaddr.a_family == AF_INET) &&
+			    (lnic->nic_ip.a_family == AF_INET)) {
+				if ((hentry->ipaddr.a_ipv4 &
+				    lnic->nic_mask) ==
+				    (lnic->nic_ip.a_ipv4 &
+				    lnic->nic_mask))
+					if (smb_ads_ldap_ping(hentry) == 0)
+						return (hentry);
+			}
 		}
 	} while (smb_nic_getnext(&ni) == 0);
 
@@ -2735,8 +2747,8 @@ smb_ads_lookup_msdcs(char *fqdn, char *server, char *buf, uint32_t buflen)
 {
 	smb_ads_host_info_t *hinfo = NULL;
 	char *p;
-	struct in_addr addr;
 	char *sought_host;
+	char ipstr[INET6_ADDRSTRLEN];
 
 	if (!fqdn || !buf)
 		return (B_FALSE);
@@ -2746,9 +2758,9 @@ smb_ads_lookup_msdcs(char *fqdn, char *server, char *buf, uint32_t buflen)
 	if ((hinfo = smb_ads_find_host(fqdn, sought_host)) == NULL)
 		return (B_FALSE);
 
-	addr.s_addr = hinfo->ip_addr;
-	syslog(LOG_DEBUG, "msdcsLookupADS: %s [%s]", hinfo->name,
-	    inet_ntoa(addr));
+	smb_tracef("msdcsLookupADS: %s [%s]", hinfo->name,
+	    smb_inet_ntop(&hinfo->ipaddr, ipstr,
+	    SMB_IPSTRLEN(hinfo->ipaddr.a_family)));
 
 	(void) strlcpy(buf, hinfo->name, buflen);
 	/*

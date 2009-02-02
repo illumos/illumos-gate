@@ -19,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef _SMBSRV_SAMLIB_H
-#define	_SMBSRV_SAMLIB_H
+#ifndef _SAMLIB_H
+#define	_SAMLIB_H
 
 /*
  * Prototypes for the SAM library and RPC client side library interface.
@@ -61,49 +61,26 @@ extern "C" {
 /*
  * samlib.c
  */
-int sam_lookup_user_info(char *server, char *domain_name, char *username,
-    smb_userinfo_t *user_info);
-
-DWORD sam_create_trust_account(char *server, char *domain,
-    smb_auth_info_t *auth);
-
-DWORD sam_create_account(char *server, char *domain_name, char *account_name,
-    smb_auth_info_t *auth, DWORD account_flags);
-
-DWORD sam_remove_trust_account(char *server, char *domain);
-
-DWORD sam_delete_account(char *server, char *domain_name, char *account_name);
-
-DWORD sam_lookup_name(char *server, char *domain_name, char *account_name,
-    DWORD *rid_ret);
-
-DWORD sam_get_local_domains(char *server, char *domain_name);
-DWORD sam_check_user(char *server, char *domain_name, char *account_name);
+DWORD sam_create_trust_account(char *, char *, smb_auth_info_t *);
+DWORD sam_create_account(char *, char *, char *, smb_auth_info_t *, DWORD);
+DWORD sam_remove_trust_account(char *, char *);
+DWORD sam_delete_account(char *, char *, char *);
+DWORD sam_get_local_domains(char *, char *);
+DWORD sam_check_user(char *, char *, char *);
 
 /*
  * samr_open.c
  */
-int samr_open(char *server, char *domain, char *username,
-    DWORD access_mask, mlsvc_handle_t *samr_handle);
-
-int samr_connect(char *server, char *domain, char *username,
-    DWORD access_mask, mlsvc_handle_t *samr_handle);
-
-int samr_close_handle(mlsvc_handle_t *handle);
-
-DWORD samr_open_domain(mlsvc_handle_t *samr_handle, DWORD access_mask,
-    struct samr_sid *sid, mlsvc_handle_t *domain_handle);
-
-DWORD samr_open_user(mlsvc_handle_t *domain_handle, DWORD access_mask,
-    DWORD rid, mlsvc_handle_t *user_handle);
-
-DWORD samr_delete_user(mlsvc_handle_t *user_handle);
-
-int samr_open_group(mlsvc_handle_t *domain_handle, DWORD rid,
-    mlsvc_handle_t *group_handle);
-
-DWORD samr_create_user(mlsvc_handle_t *domain_handle, char *username,
-    DWORD account_flags, DWORD *rid, mlsvc_handle_t *user_handle);
+int samr_open(char *, char *, char *, DWORD, mlsvc_handle_t *);
+int samr_connect(char *, char *, char *, DWORD, mlsvc_handle_t *);
+int samr_close_handle(mlsvc_handle_t *);
+DWORD samr_open_domain(mlsvc_handle_t *, DWORD, struct samr_sid *,
+    mlsvc_handle_t *);
+DWORD samr_open_user(mlsvc_handle_t *, DWORD, DWORD, mlsvc_handle_t *);
+DWORD samr_delete_user(mlsvc_handle_t *);
+int samr_open_group(mlsvc_handle_t *, DWORD, mlsvc_handle_t *);
+DWORD samr_create_user(mlsvc_handle_t *, char *, DWORD, DWORD *,
+    mlsvc_handle_t *);
 
 /*
  * samr_lookup.c
@@ -140,21 +117,11 @@ union samr_user_info {
 };
 
 
-int samr_lookup_domain(mlsvc_handle_t *samr_handle, char *domain_name,
-    smb_userinfo_t *user_info);
-
-DWORD samr_enum_local_domains(mlsvc_handle_t *samr_handle);
-
-DWORD samr_lookup_domain_names(mlsvc_handle_t *domain_handle, char *name,
-    smb_userinfo_t *user_info);
-
-int samr_query_user_info(mlsvc_handle_t *user_handle, WORD switch_value,
-    union samr_user_info *user_info);
-
-int samr_query_user_groups(mlsvc_handle_t *user_handle,
-    smb_userinfo_t *user_info);
-
-DWORD samr_get_user_pwinfo(mlsvc_handle_t *user_handle);
+smb_sid_t *samr_lookup_domain(mlsvc_handle_t *, char *);
+DWORD samr_enum_local_domains(mlsvc_handle_t *);
+uint32_t samr_lookup_domain_names(mlsvc_handle_t *, char *, smb_account_t *);
+int samr_query_user_info(mlsvc_handle_t *, WORD, union samr_user_info *);
+DWORD samr_get_user_pwinfo(mlsvc_handle_t *);
 
 typedef struct oem_password {
 	BYTE data[512];
@@ -162,12 +129,11 @@ typedef struct oem_password {
 } oem_password_t;
 
 
-int sam_oem_password(oem_password_t *oem_password, unsigned char *new_password,
-    unsigned char *old_password);
+int sam_oem_password(oem_password_t *, unsigned char *, unsigned char *);
 
 #ifdef __cplusplus
 }
 #endif
 
 
-#endif /* _SMBSRV_SAMLIB_H */
+#endif /* _SAMLIB_H */

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,19 +93,6 @@ smb_ascii_or_unicode_null_len(struct smb_request *sr)
 	if (sr->smb_flg2 & SMB_FLAGS2_UNICODE)
 		return (2);
 	return (1);
-}
-
-int
-smb_component_match(
-    struct smb_request *sr,
-    ino64_t fileid,
-    struct smb_odir *od,
-    smb_odir_context_t *pc)
-{
-	boolean_t ignore_case = SMB_TREE_IS_CASEINSENSITIVE(sr);
-
-	return (smb_match_name(fileid, pc->dc_name, pc->dc_shortname,
-	    pc->dc_name83, od->d_pattern, ignore_case));
 }
 
 int
@@ -208,7 +195,7 @@ smb_is_dot_or_dotdot(const char *name)
  * Returns true if the file and sattr match; otherwise, returns false.
  */
 boolean_t
-smb_sattr_check(smb_attr_t *ap, char *name, unsigned short sattr)
+smb_sattr_check(uint16_t dosattr, uint16_t sattr, char *name)
 {
 	if (name) {
 		if (smb_is_dot_or_dotdot(name) &&
@@ -216,15 +203,15 @@ smb_sattr_check(smb_attr_t *ap, char *name, unsigned short sattr)
 			return (B_FALSE);
 	}
 
-	if ((ap->sa_vattr.va_type == VDIR) &&
+	if ((dosattr & FILE_ATTRIBUTE_DIRECTORY) &&
 	    !(sattr & FILE_ATTRIBUTE_DIRECTORY))
 		return (B_FALSE);
 
-	if ((ap->sa_dosattr & FILE_ATTRIBUTE_HIDDEN) &&
+	if ((dosattr & FILE_ATTRIBUTE_HIDDEN) &&
 	    !(sattr & FILE_ATTRIBUTE_HIDDEN))
 		return (B_FALSE);
 
-	if ((ap->sa_dosattr & FILE_ATTRIBUTE_SYSTEM) &&
+	if ((dosattr & FILE_ATTRIBUTE_SYSTEM) &&
 	    !(sattr & FILE_ATTRIBUTE_SYSTEM))
 		return (B_FALSE);
 
@@ -1850,14 +1837,14 @@ smb_cred_set_sid(smb_id_t *id, ksid_t *ksid)
 	int rc;
 
 	ASSERT(id);
-	ASSERT(id->i_sidattr.sid);
+	ASSERT(id->i_sid);
 
 	ksid->ks_id = id->i_id;
-	smb_sid_tostr(id->i_sidattr.sid, sidstr);
+	smb_sid_tostr(id->i_sid, sidstr);
 	rc = smb_sid_splitstr(sidstr, &ksid->ks_rid);
 	ASSERT(rc == 0);
 
-	ksid->ks_attr = id->i_sidattr.attrs;
+	ksid->ks_attr = id->i_attrs;
 	ksid->ks_domain = ksid_lookupdomain(sidstr);
 }
 
@@ -1868,19 +1855,18 @@ smb_cred_set_sid(smb_id_t *id, ksid_t *ksid)
  * access token.
  */
 static ksidlist_t *
-smb_cred_set_sidlist(smb_win_grps_t *token_grps)
+smb_cred_set_sidlist(smb_ids_t *token_grps)
 {
 	int i;
 	ksidlist_t *lp;
 
-	lp = kmem_zalloc(KSIDLIST_MEM(token_grps->wg_count), KM_SLEEP);
+	lp = kmem_zalloc(KSIDLIST_MEM(token_grps->i_cnt), KM_SLEEP);
 	lp->ksl_ref = 1;
-	lp->ksl_nsid = token_grps->wg_count;
+	lp->ksl_nsid = token_grps->i_cnt;
 	lp->ksl_neid = 0;
 
 	for (i = 0; i < lp->ksl_nsid; i++) {
-		smb_cred_set_sid(&token_grps->wg_groups[i],
-		    &lp->ksl_sids[i]);
+		smb_cred_set_sid(&token_grps->i_ids[i], &lp->ksl_sids[i]);
 		if (lp->ksl_sids[i].ks_id > IDMAP_WK__MAX_GID)
 			lp->ksl_neid++;
 	}
@@ -1910,8 +1896,8 @@ smb_cred_create(smb_token_t *token, uint32_t *privileges)
 	ASSERT(cr != NULL);
 
 	posix_grps = token->tkn_posix_grps;
-	if (crsetugid(cr, token->tkn_user->i_id,
-	    token->tkn_primary_grp->i_id) != 0) {
+	if (crsetugid(cr, token->tkn_user.i_id,
+	    token->tkn_primary_grp.i_id) != 0) {
 		crfree(cr);
 		return (NULL);
 	}
@@ -1921,13 +1907,13 @@ smb_cred_create(smb_token_t *token, uint32_t *privileges)
 		return (NULL);
 	}
 
-	smb_cred_set_sid(token->tkn_user, &ksid);
+	smb_cred_set_sid(&token->tkn_user, &ksid);
 	crsetsid(cr, &ksid, KSID_USER);
-	smb_cred_set_sid(token->tkn_primary_grp, &ksid);
+	smb_cred_set_sid(&token->tkn_primary_grp, &ksid);
 	crsetsid(cr, &ksid, KSID_GROUP);
-	smb_cred_set_sid(token->tkn_owner, &ksid);
+	smb_cred_set_sid(&token->tkn_owner, &ksid);
 	crsetsid(cr, &ksid, KSID_OWNER);
-	ksidlist = smb_cred_set_sidlist(token->tkn_win_grps);
+	ksidlist = smb_cred_set_sidlist(&token->tkn_win_grps);
 	crsetsidlist(cr, ksidlist);
 
 	*privileges = 0;
@@ -1982,7 +1968,7 @@ smb_cred_is_member(cred_t *cr, smb_sid_t *sid)
 	ASSERT(cr);
 
 	bzero(&id, sizeof (smb_id_t));
-	id.i_sidattr.sid = sid;
+	id.i_sid = sid;
 	smb_cred_set_sid(&id, &ksid1);
 
 	ksidlist = crgetsidlist(cr);

@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"@(#)Makefile	1.6	08/08/07 SMI"
 
 include ../../../Makefile.master
 
@@ -66,6 +64,7 @@ HDRS=	alloc.h			\
 	smb_i18n.h		\
 	smb_idmap.h		\
 	smb_incl.h		\
+	smb_inet.h		\
 	smb_ioctl.h		\
 	smb_kproto.h		\
 	smb_kstat.h		\
@@ -77,7 +76,6 @@ HDRS=	alloc.h			\
 	smb_xdr.h		\
 	smbfmt.h		\
 	smbinfo.h		\
-	smbtrans.h		\
 	string.h		\
 	svrapi.h		\
 	winioctl.h		\

@@ -111,6 +111,7 @@ static int dyndns_clear_rev_zone(char *);
 static void dyndns_msgid_init(void);
 static int dyndns_get_msgid(void);
 static void dyndns_syslog(int, int, const char *);
+static int dyndns_getnameinfo(smb_inaddr_t *, char *, int, int);
 
 int
 dyndns_start(void)
@@ -500,6 +501,9 @@ dyndns_put_byte(char *buf, char val)
 	return (buf);
 }
 
+
+
+
 static char *
 dyndns_put_int(char *buf, int val)
 {
@@ -508,6 +512,15 @@ dyndns_put_int(char *buf, int val)
 	return (buf);
 }
 
+static char *
+dyndns_put_v6addr(char *buf, smb_inaddr_t *val)
+{
+
+	val->a_family = AF_INET6;
+	(void) memcpy(buf, &val->a_ipv6, IN6ADDRSZ);
+	buf += IN6ADDRSZ;
+	return (buf);
+}
 /*
  * dyndns_stuff_str
  * Converts a domain string by removing periods and replacing with a byte value
@@ -663,22 +676,28 @@ dyndns_build_update(char **ptr, int buf_len, char *name, int type, int class,
 {
 	char *namePtr;
 	int rec_len, data_len;
+	smb_inaddr_t ipaddr;
+	int isv4 = 1;
 
 	rec_len = strlen(name) + 10;
+	if (inet_pton(AF_INET, data, &ipaddr) == 1)
+		isv4 = 1;
+	else if (inet_pton(AF_INET6, data, &ipaddr) == 1)
+		isv4 = 0;
+
 	if (add_del == UPDATE_ADD) {
 		if (forw_rev == UPDATE_FORW)
-			data_len = 4;
+			data_len = isv4 ? 4 : 16;
 		else
 			data_len = strlen(data) + 2;
 	} else {
 		if (del_type == DEL_ALL)
 			data_len = 0;
 		else if (forw_rev == UPDATE_FORW)
-			data_len = 4;
+			data_len = isv4 ? 4 : 16;
 		else
 			data_len = strlen(data) + 2;
 	}
-
 	if (rec_len + data_len > buf_len) {
 		syslog(LOG_ERR, "dyndns update section: buffer too small");
 		return (-1);
@@ -687,7 +706,10 @@ dyndns_build_update(char **ptr, int buf_len, char *name, int type, int class,
 	namePtr = *ptr;
 	(void) dyndns_stuff_str(&namePtr, name);
 	*ptr = namePtr;
-	*ptr = dyndns_put_nshort(*ptr, type);
+	if (isv4)
+		*ptr = dyndns_put_nshort(*ptr, type);
+	else
+		*ptr = dyndns_put_nshort(*ptr, ns_t_aaaa);
 	*ptr = dyndns_put_nshort(*ptr, class);
 	*ptr = dyndns_put_nlong(*ptr, ttl);
 
@@ -697,8 +719,13 @@ dyndns_build_update(char **ptr, int buf_len, char *name, int type, int class,
 	}
 
 	if (forw_rev == UPDATE_FORW) {
-		*ptr = dyndns_put_nshort(*ptr, 4);
-		*ptr = dyndns_put_int(*ptr, inet_addr(data));	/* ip address */
+		if (isv4) {
+			*ptr = dyndns_put_nshort(*ptr, 4);
+			*ptr = dyndns_put_int(*ptr, ipaddr.a_ipv4);
+		} else {
+			*ptr = dyndns_put_nshort(*ptr, 16);
+			*ptr = dyndns_put_v6addr(*ptr, &ipaddr);
+		}
 	} else {
 		*ptr = dyndns_put_nshort(*ptr, strlen(data)+2);
 		namePtr = *ptr;
@@ -848,44 +875,69 @@ dyndns_build_tsig(char **ptr, int buf_len, int msg_id, char *name,
  *   descriptor: descriptor referencing the created socket
  *   -1        : error
  */
+
 static int
-dyndns_open_init_socket(int sock_type, unsigned long dest_addr, int port)
+dyndns_open_init_socket(int sock_type, smb_inaddr_t *dest_addr, int port)
 {
 	int s;
 	struct sockaddr_in my_addr;
+	struct sockaddr_in6 my6_addr;
 	struct sockaddr_in serv_addr;
+	struct sockaddr_in6 serv6_addr;
+	int family;
 
-	if ((s = socket(AF_INET, sock_type, 0)) == -1) {
-		syslog(LOG_ERR, "dyndns: socket error");
+	family = dest_addr->a_family;
+
+	if ((s = socket(family, sock_type, 0)) == -1) {
+		syslog(LOG_ERR, "dyndns: socket error\n");
 		return (-1);
 	}
-
-	bzero(&my_addr, sizeof (my_addr));
-	my_addr.sin_family = AF_INET;
-	my_addr.sin_port = htons(0);
-	my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-	if (bind(s, (struct sockaddr *)&my_addr, sizeof (my_addr)) < 0) {
-		syslog(LOG_ERR, "dyndns: client bind error");
-		(void) close(s);
-		return (-1);
+	if (family == AF_INET) {
+		bzero(&my_addr, sizeof (my_addr));
+		my_addr.sin_family = family;
+		my_addr.sin_port = htons(0);
+		my_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		if (bind(s, (struct sockaddr *)&my_addr,
+		    sizeof (my_addr)) < 0) {
+			syslog(LOG_ERR, "dyndns: client bind err\n");
+			(void) close(s);
+			return (-1);
+		}
+		serv_addr.sin_family = family;
+		serv_addr.sin_port = htons(port);
+		serv_addr.sin_addr.s_addr = dest_addr->a_ipv4;
+		if (connect(s, (struct sockaddr *)&serv_addr,
+		    sizeof (struct sockaddr_in)) < 0) {
+			syslog(LOG_ERR, "dyndns: client connect (%s)\n",
+			    strerror(errno));
+			(void) close(s);
+			return (-1);
+		}
+	} else {
+		bzero(&my6_addr, sizeof (my6_addr));
+		my6_addr.sin6_family = family;
+		my6_addr.sin6_port = htons(0);
+		bzero(&my6_addr.sin6_addr.s6_addr, IN6ADDRSZ);
+		if (bind(s, (struct sockaddr *)&my6_addr,
+		    sizeof (my6_addr)) < 0) {
+			syslog(LOG_ERR, "dyndns: client bind err\n");
+			(void) close(s);
+			return (-1);
+		}
+		serv6_addr.sin6_family = family;
+		serv6_addr.sin6_port = htons(port);
+		bcopy(&serv6_addr.sin6_addr.s6_addr, &dest_addr->a_ipv6,
+		    IN6ADDRSZ);
+		if (connect(s, (struct sockaddr *)&serv6_addr,
+		    sizeof (struct sockaddr_in6)) < 0) {
+			syslog(LOG_ERR, "dyndns: client connect err (%s)\n",
+			    strerror(errno));
+			(void) close(s);
+			return (-1);
+		}
 	}
-
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(port);
-	serv_addr.sin_addr.s_addr = dest_addr;
-
-	if (connect(s, (struct sockaddr *)&serv_addr,
-	    sizeof (struct sockaddr_in)) < 0) {
-		syslog(LOG_ERR, "dyndns: client connect error (%s)",
-		    strerror(errno));
-		(void) close(s);
-		return (-1);
-	}
-
 	return (s);
 }
-
 /*
  * dyndns_build_tkey_msg
  * This routine is used to build the TKEY message to transmit GSS tokens
@@ -1106,27 +1158,24 @@ dyndns_establish_sec_ctx(gss_ctx_id_t *gss_context, gss_cred_id_t cred_handle,
  *   -1: error
  *    0: success
  */
+
 static gss_ctx_id_t
-dyndns_get_sec_context(const char *hostname, int dns_ip)
+dyndns_get_sec_context(const char *hostname, smb_inaddr_t *dns_ip)
 {
 	int s;
 	gss_cred_id_t cred_handle;
 	gss_ctx_id_t gss_context;
 	gss_OID oid;
-	struct hostent *hentry;
 	char *key_name, dns_hostname[MAXHOSTNAMELEN];
 
 	cred_handle = GSS_C_NO_CREDENTIAL;
 	oid = GSS_C_NO_OID;
 	key_name = (char *)hostname;
 
-	hentry = gethostbyaddr((char *)&dns_ip, 4, AF_INET);
-	if (hentry == NULL) {
-		syslog(LOG_ERR, "dyndns gethostbyaddr failed");
+	if (dyndns_getnameinfo(dns_ip, dns_hostname,
+	    sizeof (dns_hostname), 0)) {
 		return (NULL);
 	}
-	(void) strcpy(dns_hostname, hentry->h_name);
-
 	if ((s = dyndns_open_init_socket(SOCK_STREAM, dns_ip, 53)) < 0) {
 		return (NULL);
 	}
@@ -1137,6 +1186,33 @@ dyndns_get_sec_context(const char *hostname, int dns_ip)
 
 	(void) close(s);
 	return (gss_context);
+}
+
+static int
+dyndns_getnameinfo(smb_inaddr_t *dns_ip, char *dns_hostname,
+    int hostlen, int flags)
+{
+	socklen_t salen;
+	struct sockaddr_in6 sin6;
+	struct sockaddr_in sin;
+	void *sp;
+
+	if (dns_ip->a_family == AF_INET) {
+		salen = sizeof (struct sockaddr_in);
+		sin.sin_family = dns_ip->a_family;
+		sin.sin_port = 0;
+		sin.sin_addr.s_addr = dns_ip->a_ipv4;
+		sp = &sin;
+	} else {
+		salen = sizeof (struct sockaddr_in6);
+		sin6.sin6_family = dns_ip->a_family;
+		sin6.sin6_port = 0;
+		(void) memcpy(&sin6.sin6_addr.s6_addr, &dns_ip->a_ipv6,
+		    sizeof (sin6.sin6_addr.s6_addr));
+		sp = &sin6;
+	}
+	return (getnameinfo((struct sockaddr *)sp, salen,
+	    dns_hostname, hostlen, NULL, 0, flags));
 }
 
 /*
@@ -1185,6 +1261,9 @@ dyndns_build_add_remove_msg(char *buf, int update_zone, const char *hostname,
 	char *zone, *resource, *data, zone_buf[100], resrc_buf[100];
 	int zoneType, zoneClass, type, class, ttl;
 	char *p;
+	smb_inaddr_t tmp_addr;
+	int i, j, k;
+	int fourcnt;
 
 	queryReq = REQ_UPDATE;
 	zoneCount = 1;
@@ -1220,26 +1299,54 @@ dyndns_build_add_remove_msg(char *buf, int update_zone, const char *hostname,
 		resource = (char *)hostname;
 		data = (char *)ip_addr;
 	} else {
-		(void) sscanf(ip_addr, "%d.%d.%d.%d", &a, &b, &c, &d);
-		(void) sprintf(zone_buf, "%d.%d.%d.in-addr.arpa", c, b, a);
-		zone = p = zone_buf;
+		if (inet_pton(AF_INET, ip_addr, &tmp_addr) == 1) {
+			(void) sscanf(ip_addr, "%d.%d.%d.%d", &a, &b, &c, &d);
+			(void) sprintf(zone_buf, "%d.%d.%d.in-addr.arpa",
+			    c, b, a);
+			zone = p = zone_buf;
 
-		/* Try higher domains according to the level requested */
-		while (--level >= 0) {
-			/* domain */
-			if ((zone = (char *)strchr(p, '.')) == NULL) {
-				return (-1);
+			/* Try higher domains based on level requested */
+			while (--level >= 0) {
+				/* domain */
+				if ((zone = (char *)strchr(p, '.')) == NULL) {
+					return (-1);
+				}
+				zone += 1;
+				p = zone;
 			}
-			zone += 1;
-			p = zone;
+			(void) sprintf(resrc_buf, "%d.%d.%d.%d.in-addr.arpa",
+			    d, c, b, a);
+		} else {
+			/*
+			 * create reverse nibble ipv6 format
+			 */
+			bzero(resrc_buf, 100);
+			i = 0;
+			j = 0;
+			while (ip_addr[i] != 0)
+				i++;
+			i--;
+			while (i >= 0) {
+				fourcnt = 3;
+				while ((i >= 0) && (ip_addr[i] != ':')) {
+					resrc_buf[j++] = ip_addr[i];
+					(void) strcat(&resrc_buf[j++], ".");
+					fourcnt --;
+					i--;
+				}
+				for (k = 0; k <= fourcnt; k++) {
+					resrc_buf[j++] = '0';
+					(void) strcat(&resrc_buf[j++], ".");
+				}
+				i--;
+			}
+			(void) strcat(resrc_buf, "ip6.arpa");
+			(void) strcpy(zone_buf, &resrc_buf[32]);
+			zone = zone_buf;
 		}
-
-		(void) sprintf(resrc_buf, "%d.%d.%d.%d.in-addr.arpa",
-		    d, c, b, a);
 		resource = resrc_buf;	/* ip info */
 		data = (char *)hostname;
 	}
-
 	if (dyndns_build_quest_zone(&bufptr, BUFLEN_UDP(bufptr, buf), zone,
 	    zoneType, zoneClass) == -1) {
 		return (-1);
@@ -1393,13 +1500,14 @@ dyndns_build_signed_tsig_msg(char *buf, int update_zone, const char *hostname,
  *   rec_buf: reply dat
  *    0     : success
  */
+
 static int
 dyndns_udp_send_recv(int s, char *buf, int buf_sz, char *rec_buf)
 {
 	int i, retval, addr_len;
 	struct timeval tv, timeout;
 	fd_set rfds;
-	struct sockaddr_in from_addr;
+	struct sockaddr_in6 from_addr;
 
 	timeout.tv_usec = 0;
 	timeout.tv_sec = DYNDNS_QUERY_TIMEOUT;
@@ -1422,11 +1530,10 @@ dyndns_udp_send_recv(int s, char *buf, int buf_sz, char *rec_buf)
 			return (-1);
 		} else if (retval > 0) {
 			bzero(rec_buf, NS_PACKETSZ);
-			/* required by recvfrom */
-			addr_len = sizeof (struct sockaddr_in);
+			addr_len = sizeof (struct sockaddr_in6);
 			if (recvfrom(s, rec_buf, NS_PACKETSZ, 0,
 			    (struct sockaddr *)&from_addr, &addr_len) == -1) {
-				syslog(LOG_ERR, "dyndns: UDP recv error");
+				syslog(LOG_ERR, "dyndns: UDP recv error ");
 				return (-1);
 			}
 			break;
@@ -1441,7 +1548,6 @@ dyndns_udp_send_recv(int s, char *buf, int buf_sz, char *rec_buf)
 
 	return (0);
 }
-
 /*
  * dyndns_sec_add_remove_entry
  * Perform secure dynamic DNS update after getting security context.
@@ -1484,7 +1590,7 @@ dyndns_sec_add_remove_entry(int update_zone, const char *hostname,
 	OM_uint32 min, maj;
 	gss_buffer_desc in_mic, out_mic;
 	gss_ctx_id_t gss_context;
-	int dns_ip;
+	smb_inaddr_t dns_ip;
 	char *key_name;
 	int buf_sz;
 	int level = 0;
@@ -1492,18 +1598,21 @@ dyndns_sec_add_remove_entry(int update_zone, const char *hostname,
 	assert(dns_str);
 	assert(*dns_str);
 
-	dns_ip = inet_addr(dns_str);
+	if (inet_pton(AF_INET, dns_str, &dns_ip) == 1)
+		dns_ip.a_family = AF_INET;
+	else if (inet_pton(AF_INET6, dns_str, &dns_ip) == 1)
+		dns_ip.a_family = AF_INET6;
 
 sec_retry_higher:
 
 	if ((gss_context = dyndns_get_sec_context(hostname,
-	    dns_ip)) == NULL) {
+	    &dns_ip)) == NULL) {
 		return (-1);
 	}
 
 	key_name = (char *)hostname;
 
-	if ((s2 = dyndns_open_init_socket(SOCK_DGRAM, dns_ip, 53)) < 0) {
+	if ((s2 = dyndns_open_init_socket(SOCK_DGRAM, &dns_ip, 53)) < 0) {
 		if (gss_context != GSS_C_NO_CONTEXT)
 			(void) gss_delete_sec_context(&min, &gss_context, NULL);
 		return (-1);
@@ -1598,40 +1707,71 @@ sec_retry_higher:
  *   0       : an entry does not exist
  */
 /*ARGSUSED*/
+
 static int
 dyndns_search_entry(int update_zone, const char *hostname, const char *ip_addr,
     int update_type, struct timeval *time_out, int *is_match)
 {
-	struct hostent *hentry;
-	struct in_addr in;
-	in_addr_t ip;
-	int i;
+	smb_inaddr_t ipaddr, dnsip;
+	char dns_hostname[NI_MAXHOST];
+	struct addrinfo hints, *res = NULL;
+	int salen;
+	int family;
 
 	*is_match = 0;
+	if (inet_pton(AF_INET, ip_addr, &ipaddr) == 1) {
+		salen = sizeof (ipaddr.a_ipv4);
+		family = AF_INET;
+	} else if (inet_pton(AF_INET6, ip_addr, &ipaddr) == 1) {
+		salen = sizeof (ipaddr.a_ipv6);
+		family = AF_INET6;
+	}
 	if (update_zone == UPDATE_FORW) {
-		hentry = gethostbyname(hostname);
-		if (hentry) {
-			ip = inet_addr(ip_addr);
-			for (i = 0; hentry->h_addr_list[i]; i++) {
-				(void) memcpy(&in.s_addr,
-				    hentry->h_addr_list[i], sizeof (in.s_addr));
-				if (ip == in.s_addr) {
-					*is_match = 1;
-					break;
+		bzero((char *)&hints, sizeof (hints));
+		hints.ai_family = family;
+		hints.ai_flags = AI_NUMERICHOST;
+		if (getaddrinfo(hostname, NULL, &hints, &res)) {
+			return (NULL);
+		}
+		if (res) {
+			/*
+			 * if both ips aren't the same family skip to
+			 * the next record
+			 */
+			do {
+				if ((res->ai_family == AF_INET) &&
+				    (family == AF_INET)) {
+					(void) memcpy(&dnsip, &res->ai_addr[0],
+					    salen);
+					if (ipaddr.a_ipv4 ==
+					    dnsip.a_ipv4) {
+						*is_match = 1;
+						break;
+					}
+				} else if ((res->ai_family == AF_INET6) &&
+				    (family == AF_INET6)) {
+					(void) memcpy(&dnsip, &res->ai_addr[0],
+					    salen);
+					/* need compare macro here */
+					if (!memcmp(&ipaddr, &dnsip,
+					    IN6ADDRSZ)) {
+						*is_match = 1;
+						break;
+					}
 				}
-			}
+			} while (res->ai_next);
+			freeaddrinfo(res);
 			return (1);
 		}
 	} else {
-		int dns_ip = inet_addr(ip_addr);
-		hentry = gethostbyaddr((char *)&dns_ip, 4, AF_INET);
-		if (hentry) {
-			if (strncasecmp(hentry->h_name, hostname,
-			    strlen(hostname)) == 0) {
-				*is_match = 1;
-			}
-			return (1);
+		if (dyndns_getnameinfo(&ipaddr, dns_hostname, NI_MAXHOST, 0)) {
+			return (NULL);
 		}
+		if (strncasecmp(dns_hostname, hostname,
+		    strlen(hostname)) == 0) {
+			*is_match = 1;
+		}
+		return (1);
 	}
 
 	/* entry does not exist */
@@ -1679,16 +1819,15 @@ dyndns_add_remove_entry(int update_zone, const char *hostname,
 	int s;
 	uint16_t id, rid;
 	char buf[NS_PACKETSZ], buf2[NS_PACKETSZ];
-	int ret, dns_ip;
+	int ret;
 	int is_exist, is_match;
 	struct timeval timeout;
 	int buf_sz;
 	int level = 0;
+	smb_inaddr_t dns_ip;
 
 	assert(dns_str);
 	assert(*dns_str);
-
-	dns_ip = inet_addr(dns_str);
 
 	if (do_check == DNS_CHECK && del_type != DEL_ALL) {
 		is_exist = dyndns_search_entry(update_zone, hostname, ip_addr,
@@ -1701,10 +1840,14 @@ dyndns_add_remove_entry(int update_zone, const char *hostname,
 		}
 	}
 
+	if (inet_pton(AF_INET, dns_str, &dns_ip) == 1)
+		dns_ip.a_family = AF_INET;
+	else if (inet_pton(AF_INET6, dns_str, &dns_ip) == 1)
+		dns_ip.a_family = AF_INET6;
+
 retry_higher:
-	if ((s = dyndns_open_init_socket(SOCK_DGRAM, dns_ip, 53)) < 0) {
+	if ((s = dyndns_open_init_socket(SOCK_DGRAM, &dns_ip, 53)) < 0)
 		return (-1);
-	}
 
 	id = 0;
 	if ((buf_sz = dyndns_build_add_remove_msg(buf, update_zone, hostname,
@@ -1775,37 +1918,32 @@ static int
 dyndns_add_entry(int update_zone, const char *hostname, const char *ip_addr,
     int life_time)
 {
-	char *dns_str;
+	const char *dns_str;
 	char *which_zone;
-	struct in_addr ns_list[MAXNS];
+	smb_inaddr_t ns_list[MAXNS];
+	char dns_buf[INET6_ADDRSTRLEN];
 	int i, cnt;
-	int addr, rc = 0;
+	int rc = 0;
 
-	if (hostname == NULL || ip_addr == NULL)
+	if (hostname == NULL || ip_addr == NULL) {
 		return (-1);
-
-	addr = (int)inet_addr(ip_addr);
-	if ((addr == -1) || (addr == 0))
-		return (-1);
-
-	cnt = smb_get_nameservers(ns_list, MAXNS);
+	}
+	cnt = smb_get_nameservers(&ns_list[0], MAXNS);
 
 	for (i = 0; i < cnt; i++) {
-		dns_str = inet_ntoa(ns_list[i]);
-		if ((dns_str == NULL) ||
-		    (strcmp(dns_str, "0.0.0.0") == 0)) {
+		dns_str = smb_inet_ntop(&ns_list[i], dns_buf,
+		    SMB_IPSTRLEN(ns_list[i].a_family));
+		if (dns_str == NULL)
 			continue;
-		}
 
 		which_zone = (update_zone == UPDATE_FORW) ?
 		    "forward" : "reverse";
-
 		syslog(LOG_DEBUG, "dyndns %s lookup zone update %s (%s)",
 		    which_zone, hostname, ip_addr);
 
 		if (dyndns_add_remove_entry(update_zone, hostname,
 		    ip_addr, life_time,
-		    UPDATE_ADD, DNS_NOCHECK, DEL_NONE, dns_str) != -1) {
+		    UPDATE_ADD, DNS_NOCHECK, DEL_NONE, dns_buf) != -1) {
 			rc = 1;
 			break;
 		}
@@ -1835,46 +1973,44 @@ static int
 dyndns_remove_entry(int update_zone, const char *hostname, const char *ip_addr,
 	int del_type)
 {
-	char *dns_str;
-	char *which_zone;
-	struct in_addr ns_list[MAXNS];
+	const char *dns_str;
+	smb_inaddr_t ns_list[MAXNS];
+	char dns_buf[INET6_ADDRSTRLEN];
 	int i, cnt, scnt;
-	int addr;
 
 	if ((hostname == NULL || ip_addr == NULL)) {
 		return (-1);
 	}
-
-	addr = (int)inet_addr(ip_addr);
-	if ((addr == -1) || (addr == 0)) {
-		return (-1);
-	}
-
 	cnt = smb_get_nameservers(ns_list, MAXNS);
 	scnt = 0;
-
 	for (i = 0; i < cnt; i++) {
-		dns_str = inet_ntoa(ns_list[i]);
-		if ((dns_str == NULL) ||
-		    (strcmp(dns_str, "0.0.0.0") == 0)) {
+		dns_str = smb_inet_ntop(&ns_list[i], dns_buf,
+		    SMB_IPSTRLEN(ns_list[i].a_family));
+		if (dns_str == NULL)
 			continue;
-		}
-
-		which_zone = (update_zone == UPDATE_FORW) ?
-		    "forward" : "reverse";
-
-		if (del_type == DEL_ONE) {
-			syslog(LOG_DEBUG,
-			    "dyndns %s lookup zone remove %s (%s)",
-			    which_zone, hostname, ip_addr);
+		if (update_zone == UPDATE_FORW) {
+			if (del_type == DEL_ONE) {
+				syslog(LOG_DEBUG, "Dynamic update "
+				    "on forward lookup "
+				    "zone for %s (%s)...\n", hostname, ip_addr);
+			} else {
+				syslog(LOG_DEBUG, "Removing all "
+				    "entries of %s "
+				    "in forward lookup zone...\n", hostname);
+			}
 		} else {
-			syslog(LOG_DEBUG,
-			    "dyndns %s lookup zone remove all %s",
-			    which_zone, hostname);
+			if (del_type == DEL_ONE) {
+				syslog(LOG_DEBUG, "Dynamic update "
+				    "on reverse lookup "
+				    "zone for %s (%s)...\n", hostname, ip_addr);
+			} else {
+				syslog(LOG_DEBUG, "Removing all "
+				    "entries of %s "
+				    "in reverse lookup zone...\n", ip_addr);
+			}
 		}
-
 		if (dyndns_add_remove_entry(update_zone, hostname, ip_addr, 0,
-		    UPDATE_DEL, DNS_NOCHECK, del_type, dns_str) != -1) {
+		    UPDATE_DEL, DNS_NOCHECK, del_type, dns_buf) != -1) {
 			scnt++;
 			break;
 		}
@@ -1900,12 +2036,12 @@ dyndns_remove_entry(int update_zone, const char *hostname, const char *ip_addr,
  *   -1: some dynamic DNS updates errors
  *    0: successful or DDNS disabled.
  */
-static int
+int
 dyndns_update_core(char *fqdn)
 {
 	int forw_update_ok, error;
-	char *my_ip;
-	struct in_addr addr;
+	char my_ip[INET6_ADDRSTRLEN];
+	const char *my_str;
 	smb_niciter_t ni;
 	int rc;
 	char fqhn[MAXHOSTNAMELEN];
@@ -1938,32 +2074,31 @@ dyndns_update_core(char *fqdn)
 	do {
 		if (ni.ni_nic.nic_sysflags & IFF_PRIVATE)
 			continue;
-
-		addr.s_addr = ni.ni_nic.nic_ip;
-		my_ip = (char *)strdup(inet_ntoa(addr));
-		if (my_ip == NULL) {
+		/* first try ipv4, then ipv6 */
+		my_str = smb_inet_ntop(&ni.ni_nic.nic_ip, my_ip,
+		    SMB_IPSTRLEN(ni.ni_nic.nic_ip.a_family));
+		if (my_str == NULL) {
 			error++;
 			continue;
 		}
 
 		if (forw_update_ok) {
-			rc = dyndns_add_entry(UPDATE_FORW, fqhn, my_ip,
+			rc = dyndns_add_entry(UPDATE_FORW, fqhn, my_str,
 			    DDNS_TTL);
 
 			if (rc == -1)
 				error++;
 		}
 
-		rc = dyndns_remove_entry(UPDATE_REV, fqhn, my_ip, DEL_ALL);
+		rc = dyndns_remove_entry(UPDATE_REV, fqhn, my_str, DEL_ALL);
 		if (rc == 0) {
-			rc = dyndns_add_entry(UPDATE_REV, fqhn, my_ip,
+			rc = dyndns_add_entry(UPDATE_REV, fqhn, my_str,
 			    DDNS_TTL);
 		}
 
 		if (rc == -1)
 			error++;
 
-		(void) free(my_ip);
 	} while (smb_nic_getnext(&ni) == 0);
 
 	return ((error == 0) ? 0 : -1);
@@ -1980,15 +2115,15 @@ dyndns_update_core(char *fqdn)
  *   -1: some dynamic DNS updates errors
  *    0: successful or DDNS disabled.
  */
-static int
+int
 dyndns_clear_rev_zone(char *fqdn)
 {
 	int error;
-	char *my_ip;
-	struct in_addr addr;
+	char my_ip[INET6_ADDRSTRLEN];
 	smb_niciter_t ni;
 	int rc;
 	char fqhn[MAXHOSTNAMELEN];
+	const char *my_str;
 
 	if (!smb_config_getbool(SMB_CI_DYNDNS_ENABLE))
 		return (0);
@@ -2005,10 +2140,9 @@ dyndns_clear_rev_zone(char *fqdn)
 	do {
 		if (ni.ni_nic.nic_sysflags & IFF_PRIVATE)
 			continue;
-
-		addr.s_addr = ni.ni_nic.nic_ip;
-		my_ip = (char *)strdup(inet_ntoa(addr));
-		if (my_ip == NULL) {
+		my_str = smb_inet_ntop(&ni.ni_nic.nic_ip, my_ip,
+		    SMB_IPSTRLEN(ni.ni_nic.nic_ip.a_family));
+		if (my_str == NULL) {
 			error++;
 			continue;
 		}
@@ -2017,7 +2151,6 @@ dyndns_clear_rev_zone(char *fqdn)
 		if (rc != 0)
 			error++;
 
-		(void) free(my_ip);
 	} while (smb_nic_getnext(&ni) == 0);
 
 	return ((error == 0) ? 0 : -1);

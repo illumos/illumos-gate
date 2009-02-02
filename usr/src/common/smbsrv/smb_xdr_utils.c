@@ -29,7 +29,7 @@
 #include <strings.h>
 #endif /* _KERNEL */
 #include <smbsrv/smb_xdr.h>
-
+#include <sys/socket.h>
 #ifdef _KERNEL
 /*
  * xdr_vector():
@@ -199,6 +199,22 @@ smb_opipe_context_decode(smb_opipe_context_t *ctx, uint8_t *buf,
 }
 
 bool_t
+xdr_smb_inaddr_t(XDR *xdrs, smb_inaddr_t *objp)
+{
+	if (!xdr_int32_t(xdrs, &objp->a_family))
+		return (FALSE);
+	if (objp->a_family == AF_INET) {
+		if (!xdr_uint32_t(xdrs, (in_addr_t *)&objp->a_ipv4))
+			return (FALSE);
+	} else {
+		if (!xdr_vector(xdrs, (char *)&objp->a_ipv6,
+		    sizeof (objp->a_ipv6), sizeof (char), (xdrproc_t)xdr_char))
+			return (FALSE);
+	}
+	return (TRUE);
+}
+
+bool_t
 smb_opipe_context_xdr(XDR *xdrs, smb_opipe_context_t *objp)
 {
 	if (!xdr_uint64_t(xdrs, &objp->oc_session_id))
@@ -217,7 +233,7 @@ smb_opipe_context_xdr(XDR *xdrs, smb_opipe_context_t *objp)
 		return (FALSE);
 	if (!xdr_string(xdrs, &objp->oc_workstation, ~0))
 		return (FALSE);
-	if (!xdr_uint32_t(xdrs, &objp->oc_ipaddr))
+	if (!xdr_smb_inaddr_t(xdrs, &objp->oc_ipaddr))
 		return (FALSE);
 	if (!xdr_int32_t(xdrs, &objp->oc_native_os))
 		return (FALSE);
@@ -227,7 +243,6 @@ smb_opipe_context_xdr(XDR *xdrs, smb_opipe_context_t *objp)
 		return (FALSE);
 	return (TRUE);
 }
-
 
 bool_t
 xdr_smb_dr_ulist_t(xdrs, objp)

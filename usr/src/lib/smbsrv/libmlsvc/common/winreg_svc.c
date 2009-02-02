@@ -26,10 +26,24 @@
 /*
  * Windows Registry RPC (WINREG) server-side interface.
  *
- * The WINREG RPC interface returns Win32 error codes.
+ * The registry is a database with a hierarchical structure similar to
+ * a file system, with keys in place of directories and values in place
+ * of files.  The top level keys are known as root keys and each key can
+ * contain subkeys and values.  As with directories and sub-directories,
+ * the terms key and subkey are used interchangeably.  Values, analogous
+ * to files, contain data.
  *
- * HKLM		Hive Key Local Machine
- * HKU		Hive Key Users
+ * A specific subkey can be identifies by its fully qualified name (FQN),
+ * which is analogous to a file system path.  In the registry, the key
+ * separator is the '\' character, which is reserved and cannot appear
+ * in key or value names.  Registry names are case-insensitive.
+ *
+ * For example:  HKEY_LOCAL_MACHINE\System\CurrentControlSet
+ *
+ * The HKEY_LOCAL_MACHINE root key contains a subkey call System, and
+ * System contains a subkey called CurrentControlSet.
+ *
+ * The WINREG RPC interface returns Win32 error codes.
  */
 
 #include <sys/utsname.h>
@@ -42,22 +56,13 @@
 #include <smbsrv/libmlsvc.h>
 #include <smbsrv/ndl/winreg.ndl>
 
-#define	WINREG_LOGR_SYSTEMKEY	\
-	"System\\CurrentControlSet\\Services\\Eventlog\\System"
-
-/*
- * Local handle management keys.
- */
-static int winreg_hk;
-static int winreg_hklm;
-static int winreg_hkuser;
-static int winreg_hkkey;
-
 /*
  * List of supported registry keys (case-insensitive).
  */
 static char *winreg_keys[] = {
 	"System\\CurrentControlSet\\Services\\Eventlog",
+	"System\\CurrentControlSet\\Services\\Eventlog\\Application",
+	"System\\CurrentControlSet\\Services\\Eventlog\\Security",
 	"System\\CurrentControlSet\\Services\\Eventlog\\System",
 	"System\\CurrentControlSet\\Control\\ProductOptions",
 	"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"
@@ -78,12 +83,19 @@ typedef struct winreg_keylist {
 static winreg_keylist_t winreg_keylist;
 
 static boolean_t winreg_key_has_subkey(const char *);
+static char *winreg_enum_subkey(ndr_xa_t *, const char *, uint32_t);
 static char *winreg_lookup_value(const char *);
-static char *winreg_lookup_eventlog_registry(char *, char *);
 
-static int winreg_s_OpenHK(void *, ndr_xa_t *);
+static int winreg_s_OpenHKCR(void *, ndr_xa_t *);
+static int winreg_s_OpenHKCU(void *, ndr_xa_t *);
 static int winreg_s_OpenHKLM(void *, ndr_xa_t *);
-static int winreg_s_OpenHKUsers(void *, ndr_xa_t *);
+static int winreg_s_OpenHKPD(void *, ndr_xa_t *);
+static int winreg_s_OpenHKU(void *, ndr_xa_t *);
+static int winreg_s_OpenHKCC(void *, ndr_xa_t *);
+static int winreg_s_OpenHKDD(void *, ndr_xa_t *);
+static int winreg_s_OpenHKPT(void *, ndr_xa_t *);
+static int winreg_s_OpenHKPN(void *, ndr_xa_t *);
+static int winreg_s_OpenHK(void *, ndr_xa_t *, const char *);
 static int winreg_s_Close(void *, ndr_xa_t *);
 static int winreg_s_CreateKey(void *, ndr_xa_t *);
 static int winreg_s_DeleteKey(void *, ndr_xa_t *);
@@ -103,11 +115,11 @@ static int winreg_s_AbortShutdown(void *, ndr_xa_t *);
 static int winreg_s_GetVersion(void *, ndr_xa_t *);
 
 static ndr_stub_table_t winreg_stub_table[] = {
-	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKCR },
-	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKCU },
+	{ winreg_s_OpenHKCR,	WINREG_OPNUM_OpenHKCR },
+	{ winreg_s_OpenHKCU,	WINREG_OPNUM_OpenHKCU },
 	{ winreg_s_OpenHKLM,	WINREG_OPNUM_OpenHKLM },
-	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKPD },
-	{ winreg_s_OpenHKUsers,	WINREG_OPNUM_OpenHKUsers },
+	{ winreg_s_OpenHKPD,	WINREG_OPNUM_OpenHKPD },
+	{ winreg_s_OpenHKU,	WINREG_OPNUM_OpenHKUsers },
 	{ winreg_s_Close,	WINREG_OPNUM_Close },
 	{ winreg_s_CreateKey,	WINREG_OPNUM_CreateKey },
 	{ winreg_s_DeleteKey,	WINREG_OPNUM_DeleteKey },
@@ -125,10 +137,10 @@ static ndr_stub_table_t winreg_stub_table[] = {
 	{ winreg_s_Shutdown,	WINREG_OPNUM_Shutdown },
 	{ winreg_s_AbortShutdown,	WINREG_OPNUM_AbortShutdown },
 	{ winreg_s_GetVersion,	WINREG_OPNUM_GetVersion },
-	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKCC },
-	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKDD },
-	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKPT },
-	{ winreg_s_OpenHK,	WINREG_OPNUM_OpenHKPN },
+	{ winreg_s_OpenHKCC,	WINREG_OPNUM_OpenHKCC },
+	{ winreg_s_OpenHKDD,	WINREG_OPNUM_OpenHKDD },
+	{ winreg_s_OpenHKPT,	WINREG_OPNUM_OpenHKPT },
+	{ winreg_s_OpenHKPN,	WINREG_OPNUM_OpenHKPN },
 	{0}
 };
 
@@ -188,70 +200,80 @@ winreg_initialize(void)
 	(void) ndr_svc_register(&winreg_service);
 }
 
-/*
- * winreg_s_OpenHK
- *
- * Stub.
- */
 static int
-winreg_s_OpenHK(void *arg, ndr_xa_t *mxa)
+winreg_s_OpenHKCR(void *arg, ndr_xa_t *mxa)
 {
-	struct winreg_OpenHKCR *param = arg;
-	ndr_hdid_t *id;
-
-	if ((id = ndr_hdalloc(mxa, &winreg_hk)) == NULL) {
-		bzero(&param->handle, sizeof (winreg_handle_t));
-		param->status = ERROR_ACCESS_DENIED;
-	} else {
-		bcopy(id, &param->handle, sizeof (winreg_handle_t));
-		param->status = ERROR_SUCCESS;
-	}
-
-	return (NDR_DRC_OK);
+	return (winreg_s_OpenHK(arg, mxa, "HKCR"));
 }
 
-/*
- * winreg_s_OpenHKLM
- *
- * This is a request to open the HKLM and get a handle.
- * The client should treat the handle as an opaque object.
- *
- * Status:
- *	ERROR_SUCCESS		Valid handle returned.
- *	ERROR_ACCESS_DENIED	Unable to allocate a handle.
- */
+static int
+winreg_s_OpenHKCU(void *arg, ndr_xa_t *mxa)
+{
+	return (winreg_s_OpenHK(arg, mxa, "HKCU"));
+}
+
 static int
 winreg_s_OpenHKLM(void *arg, ndr_xa_t *mxa)
 {
-	struct winreg_OpenHKLM *param = arg;
-	ndr_hdid_t *id;
+	return (winreg_s_OpenHK(arg, mxa, "HKLM"));
+}
 
-	if ((id = ndr_hdalloc(mxa, &winreg_hklm)) == NULL) {
-		bzero(&param->handle, sizeof (winreg_handle_t));
-		param->status = ERROR_ACCESS_DENIED;
-	} else {
-		bcopy(id, &param->handle, sizeof (winreg_handle_t));
-		param->status = ERROR_SUCCESS;
-	}
+static int
+winreg_s_OpenHKPD(void *arg, ndr_xa_t *mxa)
+{
+	return (winreg_s_OpenHK(arg, mxa, "HKPD"));
+}
 
-	return (NDR_DRC_OK);
+static int
+winreg_s_OpenHKU(void *arg, ndr_xa_t *mxa)
+{
+	return (winreg_s_OpenHK(arg, mxa, "HKU"));
+}
+
+static int
+winreg_s_OpenHKCC(void *arg, ndr_xa_t *mxa)
+{
+	return (winreg_s_OpenHK(arg, mxa, "HKCC"));
+}
+
+static int
+winreg_s_OpenHKDD(void *arg, ndr_xa_t *mxa)
+{
+	return (winreg_s_OpenHK(arg, mxa, "HKDD"));
+}
+
+static int
+winreg_s_OpenHKPT(void *arg, ndr_xa_t *mxa)
+{
+	return (winreg_s_OpenHK(arg, mxa, "HKPT"));
+}
+
+static int
+winreg_s_OpenHKPN(void *arg, ndr_xa_t *mxa)
+{
+	return (winreg_s_OpenHK(arg, mxa, "HKPN"));
 }
 
 /*
- * winreg_s_OpenHKUsers
+ * winreg_s_OpenHK
  *
- * This is a request to get a HKUsers handle. I'm not sure we are
- * ready to fully support this interface yet, mostly due to the need
- * to support subsequent requests, but we may support enough now. It
- * seems okay with regedt32.
+ * Common code to open root HKEYs.
  */
 static int
-winreg_s_OpenHKUsers(void *arg, ndr_xa_t *mxa)
+winreg_s_OpenHK(void *arg, ndr_xa_t *mxa, const char *hkey)
 {
-	struct winreg_OpenHKUsers *param = arg;
+	struct winreg_OpenHKCR *param = arg;
 	ndr_hdid_t *id;
+	char *dupkey;
 
-	if ((id = ndr_hdalloc(mxa, &winreg_hkuser)) == NULL) {
+	if ((dupkey = strdup(hkey)) == NULL) {
+		bzero(&param->handle, sizeof (winreg_handle_t));
+		param->status = ERROR_NOT_ENOUGH_MEMORY;
+		return (NDR_DRC_OK);
+	}
+
+	if ((id = ndr_hdalloc(mxa, dupkey)) == NULL) {
+		free(dupkey);
 		bzero(&param->handle, sizeof (winreg_handle_t));
 		param->status = ERROR_ACCESS_DENIED;
 	} else {
@@ -275,6 +297,12 @@ winreg_s_Close(void *arg, ndr_xa_t *mxa)
 {
 	struct winreg_Close *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
+
+	if ((hd = ndr_hdlookup(mxa, id)) != NULL) {
+		free(hd->nh_data);
+		hd->nh_data = NULL;
+	}
 
 	ndr_hdfree(mxa, id);
 
@@ -294,6 +322,7 @@ winreg_s_CreateKey(void *arg, ndr_xa_t *mxa)
 	ndr_handle_t *hd;
 	winreg_subkey_t *key;
 	char *subkey;
+	char *dupkey;
 	DWORD *action;
 
 	subkey = (char *)param->subkey.str;
@@ -339,10 +368,17 @@ new_key:
 	/*
 	 * Create a new key.
 	 */
-	id = ndr_hdalloc(mxa, &winreg_hkkey);
+	if ((dupkey = strdup(subkey)) == NULL) {
+		bzero(param, sizeof (struct winreg_CreateKey));
+		param->status = ERROR_NOT_ENOUGH_MEMORY;
+		return (NDR_DRC_OK);
+	}
+
+	id = ndr_hdalloc(mxa, dupkey);
 	key = malloc(sizeof (winreg_subkey_t));
 
 	if ((id == NULL) || (key == NULL)) {
+		free(dupkey);
 		bzero(param, sizeof (struct winreg_CreateKey));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
 		return (NDR_DRC_OK);
@@ -369,6 +405,7 @@ winreg_s_DeleteKey(void *arg, ndr_xa_t *mxa)
 {
 	struct winreg_DeleteKey *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
+	ndr_handle_t *hd;
 	winreg_subkey_t *key;
 	char *subkey;
 
@@ -396,6 +433,13 @@ winreg_s_DeleteKey(void *arg, ndr_xa_t *mxa)
 
 			list_remove(&winreg_keylist.kl_list, key);
 			--winreg_keylist.kl_count;
+
+			hd = ndr_hdlookup(mxa, &key->sk_handle);
+			if (hd != NULL) {
+				free(hd->nh_data);
+				hd->nh_data = NULL;
+			}
+
 			ndr_hdfree(mxa, &key->sk_handle);
 			free(key);
 			param->status = ERROR_SUCCESS;
@@ -433,34 +477,14 @@ winreg_key_has_subkey(const char *subkey)
 	return (B_FALSE);
 }
 
-/*
- * winreg_subkey_get_relative_name
- *
- * Each key contains one or more child keys, each called a subkey.
- * For any specified key, its name MUST be unique for any other subkeys that
- * have the same parent key.
- *
- * To accurately identify a given subkey within the key namespace, its fully
- * qualified name (FQN) is used. The FQN MUST consist of the name of the subkey
- * and the name of all of its parent keys all the way to the root of the tree.
- *
- * The "\" character MUST be used as a hierarchy separator to identify each key
- * in the FQN and therefore MUST not be used in the name of a single key.
- * For example, the subkey "MountedDevices" belongs to the subtree
- * HKEY_LOCAL_MACHINE, as shown in the following example.
- *
- *	HKEY_LOCAL_MACHINE -> SYSTEM -> MountedDevices
- *
- * The FQN for MountedDevices is HKEY_LOCAL_MACHINE\SYSTEM\MountedDevices.
- * The relative name of the subkey is "MountedDevices". The relative name
- * MUST be used only for operations that are performed on its immediate parent
- * key (SYSTEM in the previous example).
- */
 static char *
-winreg_subkey_get_relative_name(const char *subkey)
+winreg_enum_subkey(ndr_xa_t *mxa, const char *subkey, uint32_t index)
 {
 	winreg_subkey_t *key;
-	char *value;
+	char *entry;
+	char *p;
+	int subkeylen;
+	int count = 0;
 
 	if (subkey == NULL)
 		return (NULL);
@@ -468,14 +492,37 @@ winreg_subkey_get_relative_name(const char *subkey)
 	if (list_is_empty(&winreg_keylist.kl_list))
 		return (NULL);
 
-	key = list_head(&winreg_keylist.kl_list);
-	do {
-		if (strcasecmp(subkey, key->sk_name) == 0) {
-			value = strrchr(key->sk_name, '\\');
-			if (value != NULL)
-				return (++value);
+	subkeylen = strlen(subkey);
+
+	for (key = list_head(&winreg_keylist.kl_list);
+	    key != NULL; key = list_next(&winreg_keylist.kl_list, key)) {
+		if (strncasecmp(subkey, key->sk_name, subkeylen) == 0) {
+			p = key->sk_name + subkeylen;
+
+			if ((*p != '\\') || (*p == '\0')) {
+				/*
+				 * Not the same subkey or an exact match.
+				 * We're looking for children of subkey.
+				 */
+				continue;
+			}
+
+			++p;
+
+			if (count < index) {
+				++count;
+				continue;
+			}
+
+			if ((entry = NDR_STRDUP(mxa, p)) == NULL)
+				return (NULL);
+
+			if ((p = strchr(entry, '\\')) != NULL)
+				*p = '\0';
+
+			return (entry);
 		}
-	} while ((key = list_next(&winreg_keylist.kl_list, key)) != NULL);
+	}
 
 	return (NULL);
 }
@@ -501,45 +548,35 @@ winreg_s_EnumKey(void *arg, ndr_xa_t *mxa)
 {
 	struct winreg_EnumKey *param = arg;
 	ndr_hdid_t *id = (ndr_hdid_t *)&param->handle;
-	winreg_string_t	*name, *class;
-	char *value, *namep = NULL, *classp = NULL;
-	int slen = 0;
+	ndr_handle_t *hd;
+	char *subkey;
+	char *name = NULL;
 
-	if (ndr_hdlookup(mxa, id) == NULL) {
+	if ((hd = ndr_hdlookup(mxa, id)) != NULL)
+		name = hd->nh_data;
+
+	if (hd == NULL || name == NULL) {
 		bzero(param, sizeof (struct winreg_EnumKey));
 		param->status = ERROR_NO_MORE_ITEMS;
 		return (NDR_DRC_OK);
 	}
 
-	if (param->index > 0) {
+	subkey = winreg_enum_subkey(mxa, name, param->index);
+	if (subkey == NULL) {
 		bzero(param, sizeof (struct winreg_EnumKey));
 		param->status = ERROR_NO_MORE_ITEMS;
 		return (NDR_DRC_OK);
 	}
 
-	name = (winreg_string_t	*)&param->name_in;
-	class = (winreg_string_t *)&param->class_in;
-	if (name->length != 0)
-		namep = (char *)name->str;
-
-	if (class->length != 0)
-		classp = (char *)class->str;
-
-	value = winreg_lookup_eventlog_registry(namep, classp);
-	if (value == NULL) {
-		bzero(param, sizeof (struct winreg_EnumKey));
-		param->status = ERROR_CANTREAD;
-		return (NDR_DRC_OK);
-	}
-
-	slen = mts_wcequiv_strlen(value) + sizeof (mts_wchar_t);
-	param->name_out.length = slen;
-	param->name_out.allosize = slen;
-	if ((param->name_out.str = NDR_STRDUP(mxa, value)) == NULL) {
+	if (NDR_MSTRING(mxa, subkey, (ndr_mstring_t *)&param->name_out) == -1) {
 		bzero(param, sizeof (struct winreg_EnumKey));
 		param->status = ERROR_NOT_ENOUGH_MEMORY;
 		return (NDR_DRC_OK);
 	}
+	/*
+	 * This request requires that the length includes the null.
+	 */
+	param->name_out.length = param->name_out.allosize;
 
 	param->status = ERROR_SUCCESS;
 	return (NDR_DRC_OK);
@@ -631,8 +668,9 @@ winreg_s_OpenKey(void *arg, ndr_xa_t *mxa)
 	char *subkey = (char *)param->name.str;
 	ndr_hdid_t *id = NULL;
 	winreg_subkey_t *key;
+	char *dupkey;
 
-	if (list_is_empty(&winreg_keylist.kl_list)) {
+	if (subkey == NULL || list_is_empty(&winreg_keylist.kl_list)) {
 		bzero(&param->result_handle, sizeof (winreg_handle_t));
 		param->status = ERROR_FILE_NOT_FOUND;
 		return (NDR_DRC_OK);
@@ -641,10 +679,16 @@ winreg_s_OpenKey(void *arg, ndr_xa_t *mxa)
 	key = list_head(&winreg_keylist.kl_list);
 	do {
 		if (strcasecmp(subkey, key->sk_name) == 0) {
-			if (key->sk_predefined == B_TRUE)
-				id = ndr_hdalloc(mxa, &winreg_hkkey);
-			else
+			if (key->sk_predefined == B_TRUE) {
+				if ((dupkey = strdup(subkey)) == NULL)
+					break;
+
+				id = ndr_hdalloc(mxa, dupkey);
+				if (id == NULL)
+					free(dupkey);
+			} else {
 				id = &key->sk_handle;
+			}
 
 			if (id == NULL)
 				break;
@@ -787,22 +831,6 @@ winreg_lookup_value(const char *name)
 	}
 
 	return (NULL);
-}
-
-/*
- * winreg_lookup_eventlog_registry
- *
- * Return the subkey of the specified EventLog key. Decoding of
- * class paramater not yet supported.
- */
-/*ARGSUSED*/
-static char *
-winreg_lookup_eventlog_registry(char *name, char *class)
-{
-	if (name == NULL)
-		return (winreg_subkey_get_relative_name(WINREG_LOGR_SYSTEMKEY));
-
-	return (winreg_subkey_get_relative_name(name));
 }
 
 /*

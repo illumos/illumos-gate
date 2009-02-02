@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,36 +40,13 @@
 #include <smbsrv/smb_vops.h>
 #include <smbsrv/string.h>
 
-#include <smbsrv/smbtrans.h>
 #include <smbsrv/smb_fsops.h>
 #include <smbsrv/smb_kproto.h>
 #include <smbsrv/smb_incl.h>
 
-void
-smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr);
-
-static int
-smb_vop_readdir_readpage(vnode_t *, void *, uint32_t, int *, cred_t *);
-
-static int
-smb_vop_readdir_entry(vnode_t *, uint32_t *, char *, int *,
-    ino64_t *, vnode_t **, char *, int, cred_t *, char *, int);
-
-static int
-smb_vop_getdents_entries(smb_node_t *, uint32_t *, int32_t *, char *, uint32_t,
-    smb_request_t *, cred_t *, char *, int *, int, char *);
-
-extern int
-smb_gather_dents_info(char *args, ino_t fileid, int namelen,
-    char *name, uint32_t cookie, int32_t *countp,
-    smb_attr_t *attr, struct smb_node *snode,
-    char *shortname, char *name83);
-
-static void
-smb_sa_to_va_mask(uint_t sa_mask, uint_t *va_maskp);
-
-static
-callb_cpr_t *smb_lock_frlock_callback(flk_cb_when_t, void *);
+static void smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr);
+static void smb_sa_to_va_mask(uint_t sa_mask, uint_t *va_maskp);
+static callb_cpr_t *smb_lock_frlock_callback(flk_cb_when_t, void *);
 
 extern sysid_t lm_alloc_sysidt();
 
@@ -235,6 +212,8 @@ smb_vop_write(vnode_t *vp, uio_t *uiop, int ioflag, uint32_t *lcount,
  *
  * File systems without VFSFT_XVATTR do not support DOS attributes or create
  * time (crtime). In this case the mtime is used as the crtime.
+ * Likewise if VOP_GETATTR doesn't return any system attributes the dosattr
+ * is 0 and the mtime is used as the crtime.
  */
 int
 smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
@@ -273,68 +252,49 @@ smb_vop_getattr(vnode_t *vp, vnode_t *unnamed_vp, smb_attr_t *ret_attr,
 		ret_attr->sa_vattr = tmp_xvattr.xva_vattr;
 		ret_attr->sa_dosattr = 0;
 
-		ASSERT(tmp_xvattr.xva_vattr.va_mask & AT_XVATTR);
+		if (tmp_xvattr.xva_vattr.va_mask & AT_XVATTR) {
+			xoap = xva_getxoptattr(&tmp_xvattr);
+			ASSERT(xoap);
 
-		xoap = xva_getxoptattr(&tmp_xvattr);
-		ASSERT(xoap);
-
-		if (XVA_ISSET_RTN(&tmp_xvattr, XAT_READONLY)) {
-			if (xoap->xoa_readonly)
+			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_READONLY)) &&
+			    (xoap->xoa_readonly)) {
 				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_READONLY;
-		}
-
-		if (XVA_ISSET_RTN(&tmp_xvattr, XAT_HIDDEN)) {
-			if (xoap->xoa_hidden)
-				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_HIDDEN;
-		}
-
-		if (XVA_ISSET_RTN(&tmp_xvattr, XAT_SYSTEM)) {
-			if (xoap->xoa_system)
-				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_SYSTEM;
-		}
-
-		if (XVA_ISSET_RTN(&tmp_xvattr, XAT_ARCHIVE)) {
-			if (xoap->xoa_archive)
-				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_ARCHIVE;
-		}
-
-		ret_attr->sa_crtime = xoap->xoa_createtime;
-
-		if (unnamed_vp) {
-			ret_attr->sa_vattr.va_type = VREG;
-
-			if (ret_attr->sa_mask & SMB_AT_SIZE) {
-				tmp_xvattr.xva_vattr.va_mask = AT_SIZE;
-
-				error = VOP_GETATTR(vp, &tmp_xvattr.xva_vattr,
-				    flags, cr, &smb_ct);
-				if (error != 0)
-					return (error);
-
-				ret_attr->sa_vattr.va_size =
-				    tmp_xvattr.xva_vattr.va_size;
-
 			}
+
+			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_HIDDEN)) &&
+			    (xoap->xoa_hidden)) {
+				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_HIDDEN;
+			}
+
+			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_SYSTEM)) &&
+			    (xoap->xoa_system)) {
+				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_SYSTEM;
+			}
+
+			if ((XVA_ISSET_RTN(&tmp_xvattr, XAT_ARCHIVE)) &&
+			    (xoap->xoa_archive)) {
+				ret_attr->sa_dosattr |= FILE_ATTRIBUTE_ARCHIVE;
+			}
+
+			ret_attr->sa_crtime = xoap->xoa_createtime;
+		} else {
+			ret_attr->sa_crtime = ret_attr->sa_vattr.va_mtime;
 		}
+	} else {
+		/*
+		 * Support for file systems without VFSFT_XVATTR
+		 */
+		smb_sa_to_va_mask(ret_attr->sa_mask,
+		    &ret_attr->sa_vattr.va_mask);
 
-		if (ret_attr->sa_vattr.va_type == VDIR)
-			ret_attr->sa_dosattr |= FILE_ATTRIBUTE_DIRECTORY;
+		error = VOP_GETATTR(use_vp, &ret_attr->sa_vattr,
+		    flags, cr, &smb_ct);
+		if (error != 0)
+			return (error);
 
-		return (error);
+		ret_attr->sa_dosattr = 0;
+		ret_attr->sa_crtime = ret_attr->sa_vattr.va_mtime;
 	}
-
-	/*
-	 * Support for file systems without VFSFT_XVATTR
-	 */
-	smb_sa_to_va_mask(ret_attr->sa_mask,
-	    &ret_attr->sa_vattr.va_mask);
-
-	error = VOP_GETATTR(use_vp, &ret_attr->sa_vattr, flags, cr, &smb_ct);
-	if (error != 0)
-		return (error);
-
-	ret_attr->sa_dosattr = 0;
-	ret_attr->sa_crtime = ret_attr->sa_vattr.va_mtime;
 
 	if (unnamed_vp) {
 		ret_attr->sa_vattr.va_type = VREG;
@@ -676,7 +636,7 @@ smb_vop_commit(vnode_t *vp, cred_t *cr)
 	return (VOP_FSYNC(vp, 1, cr, &smb_ct));
 }
 
-void
+static void
 smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)
 {
 	xoptattr_t *xoap = NULL;
@@ -753,116 +713,27 @@ smb_vop_setup_xvattr(smb_attr_t *smb_attr, xvattr_t *xvattr)
 	}
 }
 
-
 /*
  * smb_vop_readdir()
  *
- * Upon return, the "name" field will contain either the on-disk name or, if
- * it needs mangling or has a case-insensitive collision, the mangled
- * "shortname."
- *
- * vpp is an optional parameter.  If non-NULL, it will contain a pointer to
- * the vnode for the name that is looked up (the vnode will be returned held).
- *
- * od_name is an optional parameter (NULL can be passed if the on-disk name
- * is not needed by the caller).
- */
-
-int
-smb_vop_readdir(vnode_t *dvp, uint32_t *cookiep, char *name, int *namelen,
-    ino64_t *inop, vnode_t **vpp, char *od_name, int flags, cred_t *cr)
-{
-	int num_bytes;
-	int error = 0;
-	char *dirbuf = NULL;
-
-	ASSERT(dvp);
-	ASSERT(cookiep);
-	ASSERT(name);
-	ASSERT(namelen);
-	ASSERT(inop);
-	ASSERT(cr);
-
-	if (dvp->v_type != VDIR) {
-		*namelen = 0;
-		return (ENOTDIR);
-	}
-
-	if (vpp)
-		*vpp = NULL;
-
-	dirbuf = kmem_zalloc(SMB_MINLEN_RDDIR_BUF, KM_SLEEP);
-	num_bytes = SMB_MINLEN_RDDIR_BUF;
-
-	/*
-	 * The goal is to retrieve the first valid entry from *cookiep
-	 * forward.  smb_vop_readdir_readpage() collects an
-	 * SMB_MINLEN_RDDIR_BUF-size "page" of directory entry information.
-	 * smb_vop_readdir_entry() attempts to find the first valid entry
-	 * in that page.
-	 */
-
-	while ((error = smb_vop_readdir_readpage(dvp, dirbuf, *cookiep,
-	    &num_bytes, cr)) == 0) {
-
-		if (num_bytes <= 0)
-			break;
-
-		name[0] = '\0';
-
-		error = smb_vop_readdir_entry(dvp, cookiep, name, namelen,
-		    inop, vpp, od_name, flags, cr, dirbuf, num_bytes);
-
-		if (error)
-			break;
-
-		if (*name)
-			break;
-
-		bzero(dirbuf, SMB_MINLEN_RDDIR_BUF);
-		num_bytes = SMB_MINLEN_RDDIR_BUF;
-	}
-
-
-	if (error) {
-		kmem_free(dirbuf, SMB_MINLEN_RDDIR_BUF);
-		*namelen = 0;
-		return (error);
-	}
-
-	if (num_bytes == 0) { /* EOF */
-		kmem_free(dirbuf, SMB_MINLEN_RDDIR_BUF);
-		*cookiep = SMB_EOF;
-		*namelen = 0;
-		return (0);
-	}
-
-	kmem_free(dirbuf, SMB_MINLEN_RDDIR_BUF);
-	return (0);
-}
-
-/*
- * smb_vop_readdir_readpage()
- *
- * Collects an SMB_MINLEN_RDDIR_BUF "page" of directory entries.  (The
- * directory entries are returned in an fs-independent format by the
+ * Collects an SMB_MINLEN_RDDIR_BUF "page" of directory entries.
+ * The directory entries are returned in an fs-independent format by the
  * underlying file system.  That is, the "page" of information returned is
- * not literally stored on-disk in the format returned.)
+ * not literally stored on-disk in the format returned.
+ * If the file system supports extended directory entries (has features
+ * VFSFT_DIRENTFLAGS), set V_RDDIR_ENTFLAGS to cause the buffer to be
+ * filled with edirent_t structures, instead of dirent64_t structures.
  *
- * Much of the following is borrowed from getdents64()
- *
- * MAXGETDENTS_SIZE is defined in getdents.c
+ * Some file systems can have directories larger than SMB_MAXDIRSIZE.
+ * After VOP_READDIR, if offset is larger than SMB_MAXDIRSIZE treat as EOF.
  */
-
-#define	MAXGETDENTS_SIZE	(64 * 1024)
-
-static int
-smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
-    cred_t *cr)
+int
+smb_vop_readdir(vnode_t *vp, uint32_t offset,
+    void *buf, int *count, int *eof, cred_t *cr)
 {
 	int error = 0;
 	int rdirent_flags = 0;
-	int sink;
+	int rdirent_size;
 	struct uio auio;
 	struct iovec aiov;
 
@@ -870,22 +741,14 @@ smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
 		return (ENOTDIR);
 
 	if (vfs_has_feature(vp->v_vfsp, VFSFT_DIRENTFLAGS)) {
-		/*
-		 * Setting V_RDDIR_ENTFLAGS will cause the buffer to
-		 * be filled with edirent_t structures (instead of
-		 * dirent64_t structures).
-		 */
 		rdirent_flags = V_RDDIR_ENTFLAGS;
-
-		if (*count < sizeof (edirent_t))
-			return (EINVAL);
+		rdirent_size = sizeof (edirent_t);
 	} else {
-		if (*count < sizeof (dirent64_t))
-			return (EINVAL);
+		rdirent_size = sizeof (dirent64_t);
 	}
 
-	if (*count > MAXGETDENTS_SIZE)
-		*count = MAXGETDENTS_SIZE;
+	if (*count < rdirent_size)
+		return (EINVAL);
 
 	aiov.iov_base = buf;
 	aiov.iov_len = *count;
@@ -897,183 +760,14 @@ smb_vop_readdir_readpage(vnode_t *vp, void *buf, uint32_t offset, int *count,
 	auio.uio_fmode = 0;
 
 	(void) VOP_RWLOCK(vp, V_WRITELOCK_FALSE, &smb_ct);
-	error = VOP_READDIR(vp, &auio, cr, &sink, &smb_ct, rdirent_flags);
+	error = VOP_READDIR(vp, &auio, cr, eof, &smb_ct, rdirent_flags);
 	VOP_RWUNLOCK(vp, V_WRITELOCK_FALSE, &smb_ct);
 
-	if (error) {
-		if (error == ENOENT) {
-			/* Fake EOF if offset is bad due to dropping of lock */
-			*count = 0;
-			return (0);
-		} else {
-			return (error);
-		}
-	}
+	if (auio.uio_loffset > SMB_MAXDIRSIZE)
+		*eof = 1;
 
-	/*
-	 * Windows cannot handle an offset > SMB_EOF.
-	 * Pretend we are at EOF.
-	 */
-
-	if (auio.uio_loffset > SMB_EOF) {
-		*count = 0;
-		return (0);
-	}
-
-	*count = *count - auio.uio_resid;
-	return (0);
-}
-
-/*
- * smb_vop_readdir_entry()
- *
- * This function retrieves the first valid entry from the
- * SMB_MINLEN_RDDIR_BUF-sized buffer returned by smb_vop_readdir_readpage()
- * to smb_vop_readdir().
- *
- * Both dirent64_t and edirent_t structures need to be handled.  The former is
- * needed for file systems that do not support VFSFT_DIRENTFLAGS.  The latter
- * is required for proper handling of case collisions on file systems that
- * support case-insensitivity.  edirent_t structures are also used for
- * case-sensitive file systems if VFSFT_DIRENTFLAGS is supported.
- */
-
-static int
-smb_vop_readdir_entry(
-    vnode_t		*dvp,
-    uint32_t		*cookiep,
-    char		*name,
-    int			*namelen,
-    ino64_t		*inop,
-    vnode_t		**vpp,
-    char		*od_name,
-    int			flags,
-    cred_t		*cr,
-    char		*dirbuf,
-    int			 num_bytes)
-{
-	uint32_t next_cookie;
-	int ebufsize;
-	int error = 0;
-	int len;
-	int rc;
-	char shortname[SMB_SHORTNAMELEN];
-	char name83[SMB_SHORTNAMELEN];
-	char *ebuf = NULL;
-	edirent_t *edp;
-	dirent64_t *dp = NULL;
-	vnode_t *vp = NULL;
-
-	ASSERT(dirbuf);
-
-	/*
-	 * Use edirent_t structure for both
-	 */
-	if (vfs_has_feature(dvp->v_vfsp, VFSFT_DIRENTFLAGS)) {
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		edp = (edirent_t *)dirbuf;
-	} else {
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		dp = (dirent64_t *)dirbuf;
-		ebufsize = EDIRENT_RECLEN(MAXNAMELEN);
-		ebuf = kmem_zalloc(ebufsize, KM_SLEEP);
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		edp = (edirent_t *)ebuf;
-	}
-
-	while (edp) {
-		if (dp)
-			DP_TO_EDP(dp, edp);
-
-		next_cookie = (uint32_t)edp->ed_off;
-		if (edp->ed_ino == 0) {
-			*cookiep = next_cookie;
-
-			if (dp) {
-				/*LINTED E_BAD_PTR_CAST_ALIGN*/
-				DP_ADVANCE(dp, dirbuf, num_bytes);
-				if (dp == NULL)
-					edp = NULL;
-			} else {
-				/*LINTED E_BAD_PTR_CAST_ALIGN*/
-				EDP_ADVANCE(edp, dirbuf, num_bytes);
-			}
-			continue;
-		}
-
-		len = strlen(edp->ed_name);
-
-		if (*namelen < len) {
-			*namelen = 0;
-
-			if (ebuf)
-				kmem_free(ebuf, ebufsize);
-
-			return (EOVERFLOW);
-		}
-
-		/*
-		 * Do not pass SMB_IGNORE_CASE to smb_vop_lookup
-		 */
-
-		error = smb_vop_lookup(dvp, edp->ed_name, vpp ? vpp : &vp,
-		    od_name, 0, NULL, cr);
-
-		if (error) {
-			if (error == ENOENT) {
-				*cookiep = (uint32_t)next_cookie;
-
-				if (dp) {
-					/*LINTED E_BAD_PTR_CAST_ALIGN*/
-					DP_ADVANCE(dp, dirbuf, num_bytes);
-					if (dp == NULL)
-						edp = NULL;
-				} else {
-					/*LINTED E_BAD_PTR_CAST_ALIGN*/
-					EDP_ADVANCE(edp, dirbuf, num_bytes);
-				}
-				continue;
-			}
-
-
-			*namelen = 0;
-
-			if (ebuf)
-				kmem_free(ebuf, ebufsize);
-
-			return (error);
-		}
-
-		if ((flags & SMB_IGNORE_CASE) && ED_CASE_CONFLICTS(edp)) {
-			rc = smb_mangle_name(edp->ed_ino, edp->ed_name,
-			    shortname, name83, 1);
-
-			if (rc == 1) { /* success */
-				(void) strlcpy(name, shortname, *namelen + 1);
-				*namelen = strlen(shortname);
-			} else {
-				(void) strlcpy(name, edp->ed_name,
-				    *namelen + 1);
-				name[*namelen] = '\0';
-			}
-
-		} else {
-			(void) strlcpy(name, edp->ed_name, *namelen + 1);
-				*namelen = len;
-		}
-
-		if (vpp == NULL)
-			VN_RELE(vp);
-
-		if (inop)
-			*inop = edp->ed_ino;
-
-		*cookiep = (uint32_t)next_cookie;
-		break;
-	}
-
-	if (ebuf)
-		kmem_free(ebuf, ebufsize);
+	if (error == 0)
+		*count = *count - auio.uio_resid;
 
 	return (error);
 }
@@ -1099,266 +793,6 @@ smb_sa_to_va_mask(uint_t sa_mask, uint_t *va_maskp)
 
 		smask >>= 1;
 	}
-}
-
-/*
- * smb_vop_getdents()
- *
- * Upon success, the smb_node corresponding to each entry returned will
- * have a reference taken on it.  These will be released in
- * smb_trans2_find_get_dents().
- *
- * If an error is returned from this routine, a list of already processed
- * entries will be returned.  The smb_nodes corresponding to these entries
- * will be referenced, and will be released in smb_trans2_find_get_dents().
- *
- * The returned dp->d_name field will contain either the on-disk name or, if
- * it needs mangling or has a case-insensitive collision, the mangled
- * "shortname."  In this case, the on-disk name can be retrieved from the
- * smb_node's od_name (the smb_node is passed to smb_gather_dents_info()).
- */
-
-int /*ARGSUSED*/
-smb_vop_getdents(
-    smb_node_t		*dir_snode,
-    uint32_t		*cookiep,
-    uint64_t		*verifierp,
-    int32_t		*dircountp,
-    char		*arg,
-    char		*pattern,
-    uint32_t		flags,
-    smb_request_t	*sr,
-    cred_t		*cr)
-{
-	int		error = 0;
-	int		maxentries;
-	int		num_bytes;
-	int		resid;
-	char		*dirbuf = NULL;
-	vnode_t		*dvp;
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	smb_dent_info_hdr_t *ihdr = (smb_dent_info_hdr_t *)arg;
-
-	dvp = dir_snode->vp;
-
-	resid = ihdr->uio.uio_resid;
-	maxentries = resid / SMB_MAX_DENT_INFO_SIZE;
-
-	bzero(ihdr->iov->iov_base, resid);
-
-	dirbuf = kmem_alloc(SMB_MINLEN_RDDIR_BUF, KM_SLEEP);
-
-	while (maxentries) {
-
-		bzero(dirbuf, SMB_MINLEN_RDDIR_BUF);
-
-		num_bytes = SMB_MINLEN_RDDIR_BUF;
-		error = smb_vop_readdir_readpage(dvp, dirbuf, *cookiep,
-		    &num_bytes, cr);
-
-		if (error || (num_bytes <= 0))
-			break;
-
-		error = smb_vop_getdents_entries(dir_snode, cookiep, dircountp,
-		    arg, flags, sr, cr, dirbuf, &maxentries, num_bytes,
-		    pattern);
-
-		if (error)
-			goto out;
-	}
-
-	if (num_bytes < 0) {
-		error = -1;
-	} else if (num_bytes == 0) {
-		*cookiep = SMB_EOF;
-		error = 0;
-	} else {
-		error = 0;
-	}
-
-out:
-	if (dirbuf)
-		kmem_free(dirbuf, SMB_MINLEN_RDDIR_BUF);
-
-	return (error);
-}
-
-/*
- * smb_vop_getdents_entries()
- *
- * This function retrieves names from the SMB_MINLEN_RDDIR_BUF-sized buffer
- * returned by smb_vop_readdir_readpage() to smb_vop_getdents().
- *
- * Both dirent64_t and edirent_t structures need to be handled.  The former is
- * needed for file systems that do not support VFSFT_DIRENTFLAGS.  The latter
- * is required for properly handling case collisions on file systems that
- * support case-insensitivity.  edirent_t is also used on case-sensitive
- * file systems where VFSFT_DIRENTFLAGS is available.
- */
-
-static int
-smb_vop_getdents_entries(
-    smb_node_t		*dir_snode,
-    uint32_t		*cookiep,
-    int32_t		*dircountp,
-    char		*arg,
-    uint32_t		flags,
-    smb_request_t	*sr,
-    cred_t		*cr,
-    char		*dirbuf,
-    int			*maxentries,
-    int			num_bytes,
-    char		*pattern)
-{
-	uint32_t	next_cookie;
-	int		ebufsize;
-	char		*tmp_name;
-	int		rc;
-	char		shortname[SMB_SHORTNAMELEN];
-	char		name83[SMB_SHORTNAMELEN];
-	char		*ebuf = NULL;
-	dirent64_t	*dp = NULL;
-	edirent_t	*edp;
-	smb_node_t	*ret_snode;
-	smb_attr_t	ret_attr;
-	vnode_t		*dvp;
-	vnode_t		*fvp;
-
-	ASSERT(dirbuf);
-
-	dvp = dir_snode->vp;
-
-	if (vfs_has_feature(dvp->v_vfsp, VFSFT_DIRENTFLAGS)) {
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		edp = (edirent_t *)dirbuf;
-	} else {
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		dp = (dirent64_t *)dirbuf;
-		ebufsize = EDIRENT_RECLEN(MAXNAMELEN);
-		ebuf = kmem_zalloc(ebufsize, KM_SLEEP);
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		edp = (edirent_t *)ebuf;
-	}
-
-	while (edp) {
-		if (dp)
-			DP_TO_EDP(dp, edp);
-
-		if (*maxentries == 0)
-			break;
-
-		next_cookie = (uint32_t)edp->ed_off;
-
-		if (edp->ed_ino == 0) {
-			*cookiep = next_cookie;
-			if (dp) {
-				/*LINTED E_BAD_PTR_CAST_ALIGN*/
-				DP_ADVANCE(dp, dirbuf, num_bytes);
-				if (dp == NULL)
-					edp = NULL;
-			} else {
-				/*LINTED E_BAD_PTR_CAST_ALIGN*/
-				EDP_ADVANCE(edp, dirbuf, num_bytes);
-			}
-			continue;
-		}
-
-		rc = smb_vop_lookup(dvp, edp->ed_name, &fvp,
-		    NULL, 0, NULL, cr);
-
-		if (rc) {
-			if (rc == ENOENT) {
-				*cookiep = next_cookie;
-				if (dp) {
-					/*LINTED E_BAD_PTR_CAST_ALIGN*/
-					DP_ADVANCE(dp, dirbuf,
-					    num_bytes);
-					if (dp == NULL)
-						edp = NULL;
-				} else {
-					/*LINTED E_BAD_PTR_CAST_ALIGN*/
-					EDP_ADVANCE(edp, dirbuf,
-					    num_bytes);
-				}
-				continue;
-			}
-			if (ebuf)
-				kmem_free(ebuf, ebufsize);
-
-			return (rc);
-		}
-
-		ret_snode = smb_node_lookup(sr, NULL, cr, fvp,
-		    edp->ed_name, dir_snode, NULL, &ret_attr);
-
-		if (ret_snode == NULL) {
-			VN_RELE(fvp);
-
-			if (ebuf)
-				kmem_free(ebuf, ebufsize);
-
-			return (ENOMEM);
-		}
-
-		if (smb_match_name(edp->ed_ino, edp->ed_name, shortname,
-		    name83, pattern, (flags & SMB_IGNORE_CASE))) {
-
-			tmp_name = edp->ed_name;
-
-			if ((flags & SMB_IGNORE_CASE) &&
-			    ED_CASE_CONFLICTS(edp)) {
-				rc = smb_mangle_name(edp->ed_ino, edp->ed_name,
-				    shortname, name83, 1);
-				if (rc == 1)
-					tmp_name = shortname;
-			} else {
-				rc = smb_mangle_name(edp->ed_ino, edp->ed_name,
-				    shortname, name83, 0);
-			}
-
-			if (rc != 1) {
-				(void) strlcpy(shortname, edp->ed_name,
-				    SMB_SHORTNAMELEN);
-				(void) strlcpy(name83, edp->ed_name,
-				    SMB_SHORTNAMELEN);
-				shortname[SMB_SHORTNAMELEN - 1] = '\0';
-				name83[SMB_SHORTNAMELEN - 1] = '\0';
-			}
-
-			rc = smb_gather_dents_info(arg, edp->ed_ino,
-			    strlen(tmp_name), tmp_name, next_cookie, dircountp,
-			    &ret_attr, ret_snode, shortname, name83);
-
-			if (rc < 0) {
-				if (ebuf)
-					kmem_free(ebuf, ebufsize);
-				*maxentries = 0;
-				return (0);
-			}
-
-			if (rc > 0)
-				(*maxentries)--;
-		} else {
-			smb_node_release(ret_snode);
-		}
-
-		*cookiep = next_cookie;
-
-		if (dp) {
-			/*LINTED E_BAD_PTR_CAST_ALIGN*/
-			DP_ADVANCE(dp, dirbuf, num_bytes);
-			if (dp == NULL)
-				edp = NULL;
-		} else {
-			/*LINTED E_BAD_PTR_CAST_ALIGN*/
-			EDP_ADVANCE(edp, dirbuf, num_bytes);
-		}
-	}
-
-	if (ebuf)
-		kmem_free(ebuf, ebufsize);
-
-	return (0);
 }
 
 /*
@@ -1468,80 +902,6 @@ smb_vop_stream_remove(vnode_t *vp, char *stream_name, int flags, cred_t *cr)
 	error = smb_vop_remove(xattrdirvp, solaris_stream_name, flags, cr);
 
 	kmem_free(solaris_stream_name, MAXNAMELEN);
-
-	return (error);
-}
-
-/*
- * smb_vop_stream_readdir()
- *
- * Note: stream_info.size is not filled in in this routine.
- * It needs to be filled in by the caller due to the parameters for getattr.
- *
- * stream_info.name is set to the on-disk stream name with the SMB_STREAM_PREFIX
- * removed.
- */
-
-int
-smb_vop_stream_readdir(vnode_t *fvp, uint32_t *cookiep,
-    struct fs_stream_info *stream_info, vnode_t **vpp, vnode_t **xattrdirvpp,
-    int flags, cred_t *cr)
-{
-	int nsize;
-	int error = 0;
-	ino64_t ino;
-	char *tmp_name;
-	vnode_t *xattrdirvp;
-	vnode_t *vp;
-
-	if ((error = smb_vop_lookup_xattrdir(fvp, &xattrdirvp, LOOKUP_XATTR,
-	    cr)) != 0)
-		return (error);
-
-	bzero(stream_info->name, sizeof (stream_info->name));
-	stream_info->size = 0;
-
-	tmp_name = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
-
-	for (;;) {
-		nsize = MAXNAMELEN-1;
-		error = smb_vop_readdir(xattrdirvp, cookiep, tmp_name, &nsize,
-		    &ino, &vp, NULL, flags, cr);
-
-		if (error || (*cookiep == SMB_EOF))
-			break;
-
-		if (strncmp(tmp_name, SMB_STREAM_PREFIX,
-		    SMB_STREAM_PREFIX_LEN)) {
-			VN_RELE(vp);
-			continue;
-		}
-
-		tmp_name[nsize] = '\0';
-		(void) strlcpy(stream_info->name,
-		    &(tmp_name[SMB_STREAM_PREFIX_LEN]),
-		    sizeof (stream_info->name));
-
-		nsize -= SMB_STREAM_PREFIX_LEN;
-		break;
-	}
-
-	if ((error == 0) && nsize) {
-		if (vpp)
-			*vpp = vp;
-		else
-			VN_RELE(vp);
-
-		if (xattrdirvpp)
-			*xattrdirvpp = xattrdirvp;
-		else
-			VN_RELE(xattrdirvp);
-
-	} else {
-		VN_RELE(xattrdirvp);
-	}
-
-	kmem_free(tmp_name, MAXNAMELEN);
 
 	return (error);
 }

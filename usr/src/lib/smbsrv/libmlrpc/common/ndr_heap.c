@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,19 +68,19 @@ ndr_heap_create(void)
 {
 	ndr_heap_t *heap;
 	char *base;
+	size_t allocsize = sizeof (ndr_heap_t) + NDR_HEAP_BLKSZ;
 
-	if ((base = (char *)malloc(NDR_HEAP_BLKSZ)) == NULL)
+	if ((heap = malloc(allocsize)) == NULL)
 		return (NULL);
 
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	heap = (ndr_heap_t *)base;
+	base = (char *)heap;
 	bzero(heap, sizeof (ndr_heap_t));
 
 	heap->iovcnt = NDR_HEAP_MAXIOV;
 	heap->iov = heap->iovec;
 	heap->iov->iov_base = base;
 	heap->iov->iov_len = sizeof (ndr_heap_t);
-	heap->top = base + NDR_HEAP_BLKSZ;
+	heap->top = base + allocsize;
 	heap->next = base + sizeof (ndr_heap_t);
 
 	return (heap);

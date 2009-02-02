@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,79 +204,26 @@
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/msgbuf.h>
-#include <smbsrv/smbtrans.h>
 #include <smbsrv/smb_fsops.h>
 
+typedef struct smb_find_args {
+	uint16_t fa_infolev;
+	uint16_t fa_maxcount;
+	uint16_t fa_fflag;
+	uint32_t fa_maxdata;
+} smb_find_args_t;
+
+static int smb_trans2_find_entries(smb_request_t *, smb_xa_t *,
+    smb_odir_t *, smb_find_args_t *, boolean_t *);
 static int smb_trans2_find_get_maxdata(smb_request_t *, uint16_t, uint16_t);
-
-int smb_trans2_find_get_dents(smb_request_t *, smb_xa_t *,
-    uint16_t, uint16_t, int, smb_node_t *,
-    uint16_t, uint16_t, int, char *, uint32_t *, int *, int *);
-
-int smb_gather_dents_info(char *, ino_t, int, char *, uint32_t, int32_t *,
-    smb_attr_t *, smb_node_t *, char *, char *);
-
-int smb_trans2_find_process_ients(smb_request_t *, smb_xa_t *,
-    smb_dent_info_hdr_t *, uint16_t, uint16_t, int,
-    smb_node_t *, int *, uint32_t *);
-
-int smb_trans2_find_mbc_encode(smb_request_t *, smb_xa_t *,
-    smb_dent_info_t *, int, uint16_t, uint16_t,
-    uint32_t, smb_node_t *, smb_node_t *);
-
-/*
- * The UNIX characters below are considered illegal in Windows file names.
- * The following character conversions are used to support sites in which
- * Catia v4 is in use on UNIX and Catia v5 is in use on Windows.
- *
- * ---------------------------
- * Unix-char	| Windows-char
- * ---------------------------
- *   "		| (0x00a8) Diaeresis
- *   *		| (0x00a4) Currency Sign
- *   :		| (0x00f7) Division Sign
- *   <		| (0x00ab) Left-Pointing Double Angle Quotation Mark
- *   >		| (0x00bb) Right-Pointing Double Angle Quotation Mark
- *   ?		| (0x00bf) Inverted Question mark
- *   \		| (0x00ff) Latin Small Letter Y with Diaeresis
- *   |		| (0x00a6) Broken Bar
- */
-static int (*catia_callback)(uint8_t *, uint8_t *, int) = NULL;
-void smb_register_catia_callback(
-    int (*catia_v4tov5)(uint8_t *, uint8_t *, int));
-void smb_unregister_catia_callback();
+static int smb_trans2_find_mbc_encode(smb_request_t *, smb_xa_t *,
+    smb_fileinfo_t *, smb_find_args_t *);
 
 /*
  * Tunable parameter to limit the maximum
  * number of entries to be returned.
  */
 uint16_t smb_trans2_find_max = 128;
-
-/*
- * smb_register_catia_callback
- *
- * This function will be invoked by the catia module to register its
- * function that translates filename in version 4 to a format that is
- * compatible to version 5.
- */
-void
-smb_register_catia_callback(
-    int (*catia_v4tov5)(uint8_t *, uint8_t *, int))
-{
-	catia_callback = catia_v4tov5;
-}
-
-/*
- * smb_unregister_catia_callback
- *
- * This function will unregister the catia callback prior to the catia
- * module gets unloaded.
- */
-void
-smb_unregister_catia_callback()
-{
-	catia_callback = 0;
-}
 
 /*
  * smb_com_trans2_find_first2
@@ -324,16 +271,14 @@ smb_unregister_catia_callback()
 smb_sdrc_t
 smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 {
-	int		more = 0, rc;
-	uint16_t	sattr, fflag, infolev;
-	uint16_t	maxcount = 0;
-	int		maxdata;
-	int		count, wildcards;
-	uint32_t	cookie;
+	int		count;
+	uint16_t	sattr, odid;
 	char		*path;
-	smb_node_t	*dir_snode;
-	char		*pattern;
-	uint16_t	sid;
+	smb_odir_t	*od;
+	smb_find_args_t	args;
+	boolean_t	eos;
+
+	bzero(&args, sizeof (smb_find_args_t));
 
 	if (!STYPE_ISDSK(sr->tid_tree->t_res_type)) {
 		smbsr_error(sr, NT_STATUS_ACCESS_DENIED,
@@ -341,94 +286,57 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 		return (SDRC_ERROR);
 	}
 
-	if (smb_mbc_decodef(&xa->req_param_mb, "%wwww4.u", sr,
-	    &sattr, &maxcount, &fflag, &infolev, &path) != 0) {
+	if (smb_mbc_decodef(&xa->req_param_mb, "%wwww4.u", sr, &sattr,
+	    &args.fa_maxcount, &args.fa_fflag, &args.fa_infolev, &path) != 0) {
 		return (SDRC_ERROR);
 	}
 
-	/*
-	 * stream files not allowed
-	 */
 	if (smb_is_stream_name(path)) {
 		smbsr_error(sr, NT_STATUS_OBJECT_NAME_INVALID,
 		    ERRDOS, ERROR_INVALID_NAME);
 		return (SDRC_ERROR);
 	}
 
-	if (fflag & SMB_FIND_WITH_BACKUP_INTENT)
+	if (args.fa_fflag & SMB_FIND_WITH_BACKUP_INTENT)
 		sr->user_cr = smb_user_getprivcred(sr->uid_user);
 
-	maxdata = smb_trans2_find_get_maxdata(sr, infolev, fflag);
-	if (maxdata == 0) {
-		smbsr_error(sr, NT_STATUS_INVALID_LEVEL,
-		    ERRDOS, ERROR_INVALID_LEVEL);
+	args.fa_maxdata =
+	    smb_trans2_find_get_maxdata(sr, args.fa_infolev, args.fa_fflag);
+	if (args.fa_maxdata == 0)
 		return (SDRC_ERROR);
-	}
-
-	/*
-	 * When maxcount is zero Windows behaves as if it was 1.
-	 */
-	if (maxcount == 0)
-		maxcount = 1;
-
-	if ((smb_trans2_find_max != 0) && (maxcount > smb_trans2_find_max))
-		maxcount = smb_trans2_find_max;
 
 	if (sr->smb_flg2 & SMB_FLAGS2_UNICODE)
 		(void) smb_convert_unicode_wildcards(path);
 
-	if (smb_rdir_open(sr, path, sattr) != 0)
+	odid = smb_odir_open(sr, path, sattr);
+	if (odid == 0)
 		return (SDRC_ERROR);
 
-	/*
-	 * Get a copy of information
-	 */
-	dir_snode = sr->sid_odir->d_dir_snode;
-	pattern = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	(void) strcpy(pattern, sr->sid_odir->d_pattern);
+	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	if (od == NULL)
+		return (SDRC_ERROR);
+	count = smb_trans2_find_entries(sr, xa, od, &args, &eos);
+	smb_odir_release(od);
 
-	if (strcmp(pattern, "*.*") == 0)
-		(void) strncpy(pattern, "*", sizeof (pattern));
-
-	wildcards = sr->sid_odir->d_wildcards;
-	sattr = sr->sid_odir->d_sattr;
-	cookie = 0;
-
-	rc = smb_trans2_find_get_dents(sr, xa, fflag, infolev, maxdata,
-	    dir_snode, sattr, maxcount, wildcards,
-	    pattern, &cookie, &more, &count);
-
-	if (!count)
-		rc = ENOENT;
-
-	if (rc) {
-		smb_rdir_close(sr);
-		kmem_free(pattern, MAXNAMELEN);
-		smbsr_errno(sr, rc);
+	if (count == -1) {
+		smb_odir_close(od);
 		return (SDRC_ERROR);
 	}
 
-	/*
-	 * Save the sid here in case the search is closed below,
-	 * which will invalidate sr->smb_sid.  We return the
-	 * sid, even though the search has been closed, to be
-	 * compatible with Windows.
-	 */
-	sid = sr->smb_sid;
-
-	if (fflag & SMB_FIND_CLOSE_AFTER_REQUEST ||
-	    (!more && fflag & SMB_FIND_CLOSE_AT_EOS)) {
-		smb_rdir_close(sr);
-	} else {
-		mutex_enter(&sr->sid_odir->d_mutex);
-		sr->sid_odir->d_cookie = cookie;
-		mutex_exit(&sr->sid_odir->d_mutex);
+	if (count == 0) {
+		smb_odir_close(od);
+		smbsr_errno(sr, ENOENT);
+		return (SDRC_ERROR);
 	}
+
+	if ((args.fa_fflag & SMB_FIND_CLOSE_AFTER_REQUEST) ||
+	    (eos && (args.fa_fflag & SMB_FIND_CLOSE_AT_EOS))) {
+		smb_odir_close(od);
+	} /* else leave odir open for trans2_find_next2 */
 
 	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwwww",
-	    sid, count, (more ? 0 : 1), 0, 0);
+	    odid, count, (eos) ? 1 : 0, 0, 0);
 
-	kmem_free(pattern, MAXNAMELEN);
 	return (SDRC_SUCCESS);
 }
 
@@ -486,10 +394,10 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
  * null-terminated unicode string.
  *
  * smb_mbc_decodef(&xa->req_param_mb, "%www lwu", sr,
- *    &sr->smb_sid, &maxcount, &infolev, &cookie, &fflag, &fname)
+ *    &odid, &fa_maxcount, &fa_infolev, &cookie, &fa_fflag, &fname)
  *
- * The filename parameter is not currently decoded because we a
- * expect 2-byte null but Mac OS 10 clients send a 1-byte null,
+ * The filename parameter is not currently decoded because we
+ * expect a 2-byte null but Mac OS 10 clients send a 1-byte null,
  * which leads to a decode error.
  * Thus, we do not support resume by filename.  We treat a request
  * to resume by filename as SMB_FIND_CONTINUE_FROM_LAST.
@@ -497,88 +405,118 @@ smb_com_trans2_find_first2(smb_request_t *sr, smb_xa_t *xa)
 smb_sdrc_t
 smb_com_trans2_find_next2(smb_request_t *sr, smb_xa_t *xa)
 {
-	uint16_t fflag, infolev;
-	int	maxdata, count, wildcards, more = 0, rc;
-	uint32_t cookie;
-	uint16_t maxcount = 0;
-	smb_node_t *dir_snode;
-	char *pattern;
-	uint16_t sattr;
+	int			count;
+	uint16_t		odid;
+	uint32_t		cookie;
+	smb_odir_t		*od;
+	smb_find_args_t		args;
+	boolean_t		eos;
+	smb_odir_resume_t	odir_resume;
 
-	if (smb_mbc_decodef(&xa->req_param_mb, "%wwwlw", sr,
-	    &sr->smb_sid, &maxcount, &infolev, &cookie, &fflag) != 0) {
+	bzero(&args, sizeof (smb_find_args_t));
+
+	if (smb_mbc_decodef(&xa->req_param_mb, "%wwwlw", sr, &odid,
+	    &args.fa_maxcount, &args.fa_infolev, &cookie, &args.fa_fflag)
+	    != 0) {
 		return (SDRC_ERROR);
 	}
 
 	/* continuation by filename not supported */
-	if (cookie == 0)
-		fflag |= SMB_FIND_CONTINUE_FROM_LAST;
+	if ((args.fa_fflag & SMB_FIND_CONTINUE_FROM_LAST) || (cookie == 0)) {
+		odir_resume.or_type = SMB_ODIR_RESUME_IDX;
+		odir_resume.or_idx = 0;
+	} else {
+		odir_resume.or_type = SMB_ODIR_RESUME_COOKIE;
+		odir_resume.or_cookie = cookie;
+	}
 
-	if (fflag & SMB_FIND_WITH_BACKUP_INTENT)
+	if (args.fa_fflag & SMB_FIND_WITH_BACKUP_INTENT)
 		sr->user_cr = smb_user_getprivcred(sr->uid_user);
 
-	sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree, sr->smb_sid);
-	if (sr->sid_odir == NULL) {
-		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
+	args.fa_maxdata =
+	    smb_trans2_find_get_maxdata(sr, args.fa_infolev, args.fa_fflag);
+	if (args.fa_maxdata == 0)
+		return (SDRC_ERROR);
+
+	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	if (od == NULL) {
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
+		    ERRDOS, ERROR_INVALID_HANDLE);
+		return (SDRC_ERROR);
+	}
+	smb_odir_resume_at(od, &odir_resume);
+	count = smb_trans2_find_entries(sr, xa, od, &args, &eos);
+	smb_odir_release(od);
+
+	if (count == -1) {
+		smb_odir_close(od);
 		return (SDRC_ERROR);
 	}
 
-	maxdata = smb_trans2_find_get_maxdata(sr, infolev, fflag);
-	if (maxdata == 0) {
-		smb_rdir_close(sr);
-		smbsr_error(sr, NT_STATUS_INVALID_LEVEL,
-		    ERRDOS, ERROR_INVALID_LEVEL);
-		return (SDRC_ERROR);
-	}
+	if ((args.fa_fflag & SMB_FIND_CLOSE_AFTER_REQUEST) ||
+	    (eos && (args.fa_fflag & SMB_FIND_CLOSE_AT_EOS))) {
+		smb_odir_close(od);
+	} /* else leave odir open for trans2_find_next2 */
 
-	/*
-	 * When maxcount is zero Windows behaves as if it was 1.
-	 */
-	if (maxcount == 0)
+	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
+	    count, (eos) ? 1 : 0, 0, 0);
+
+	return (SDRC_SUCCESS);
+}
+
+
+/*
+ * smb_trans2_find_entries
+ *
+ * Find and encode up to args->fa_maxcount directory entries.
+ * For compatibilty with Windows, if args->fa_maxcount is zero treat it as 1.
+ *
+ * Returns:
+ *   count - count of entries encoded
+ *           *eos = B_TRUE if no more directory entries
+ *      -1 - error
+ */
+static int
+smb_trans2_find_entries(smb_request_t *sr, smb_xa_t *xa, smb_odir_t *od,
+    smb_find_args_t *args, boolean_t *eos)
+{
+	int		rc;
+	uint16_t	count, maxcount;
+	uint32_t	cookie;
+	smb_fileinfo_t	fileinfo;
+
+	if ((maxcount = args->fa_maxcount) == 0)
 		maxcount = 1;
 
 	if ((smb_trans2_find_max != 0) && (maxcount > smb_trans2_find_max))
 		maxcount = smb_trans2_find_max;
 
-	/*
-	 * Get a copy of information
-	 */
-	dir_snode = sr->sid_odir->d_dir_snode;
-	pattern = kmem_alloc(MAXNAMELEN, KM_SLEEP);
-	(void) strcpy(pattern, sr->sid_odir->d_pattern);
-	wildcards = sr->sid_odir->d_wildcards;
-	sattr = sr->sid_odir->d_sattr;
-	if (fflag & SMB_FIND_CONTINUE_FROM_LAST) {
-		mutex_enter(&sr->sid_odir->d_mutex);
-		cookie = sr->sid_odir->d_cookie;
-		mutex_exit(&sr->sid_odir->d_mutex);
+	count = 0;
+	while (count < maxcount) {
+		if (smb_odir_read_fileinfo(sr, od, &fileinfo, eos) != 0)
+			return (-1);
+		if (*eos == B_TRUE)
+			break;
+
+		rc = smb_trans2_find_mbc_encode(sr, xa, &fileinfo, args);
+		if (rc == -1)
+			return (-1);
+		if (rc == 1)
+			break;
+
+		cookie = fileinfo.fi_cookie;
+		++count;
 	}
 
-	rc = smb_trans2_find_get_dents(sr, xa, fflag, infolev, maxdata,
-	    dir_snode, sattr, maxcount, wildcards, pattern, &cookie,
-	    &more, &count);
+	/* save the last cookie returned to client */
+	if (count != 0)
+		smb_odir_save_cookie(od, 0, cookie);
 
-	if (rc) {
-		smb_rdir_close(sr);
-		kmem_free(pattern, MAXNAMELEN);
-		smbsr_errno(sr, rc);
-		return (SDRC_ERROR);
-	}
+	/* if eos not already detected, check if more entries */
+	if (!*eos)
+		(void) smb_odir_read_fileinfo(sr, od, &fileinfo, eos);
 
-	if (fflag & SMB_FIND_CLOSE_AFTER_REQUEST ||
-	    (!more && fflag & SMB_FIND_CLOSE_AT_EOS))
-		smb_rdir_close(sr);
-	else {
-		mutex_enter(&sr->sid_odir->d_mutex);
-		sr->sid_odir->d_cookie = cookie;
-		mutex_exit(&sr->sid_odir->d_mutex);
-	}
-
-	(void) smb_mbc_encodef(&xa->rep_param_mb, "wwww",
-	    count, (more ? 0 : 1), 0, 0);
-
-	kmem_free(pattern, MAXNAMELEN);
-	return (SDRC_SUCCESS);
+	return (count);
 }
 
 /*
@@ -642,341 +580,15 @@ smb_trans2_find_get_maxdata(smb_request_t *sr, uint16_t infolev, uint16_t fflag)
 
 	default:
 		maxdata = 0;
+		smbsr_error(sr, NT_STATUS_INVALID_LEVEL,
+		    ERRDOS, ERROR_INVALID_LEVEL);
 	}
 
 	return (maxdata);
 }
 
 /*
- * smb_trans2_find_get_dents
- *
- * This function will get all the directory entry information and mbc
- * encode it in the xa. If there is an error, it will be returned;
- * otherwise, 0 is returned.
- *
- * The more field will be updated. If the value returned is one, it means
- * there are more entries; otherwise, the returned value will be zero. The
- * cookie will also be updated to indicate the next start point for the
- * search. The count value will also be updated to stores the total entries
- * encoded.
- */
-int smb_trans2_find_get_dents(
-    smb_request_t	*sr,
-    smb_xa_t		*xa,
-    uint16_t		fflag,
-    uint16_t		infolev,
-    int			maxdata,
-    smb_node_t		*dir_snode,
-    uint16_t		sattr,
-    uint16_t		maxcount,
-    int			wildcards,
-    char		*pattern,
-    uint32_t		*cookie,
-    int			*more,
-    int			*count)
-{
-	smb_dent_info_hdr_t	*ihdr;
-	smb_dent_info_t		*ient;
-	int			dent_buf_size;
-	int			i;
-	int			total;
-	int			maxentries;
-	int			rc;
-
-	ihdr = kmem_zalloc(sizeof (smb_dent_info_hdr_t), KM_SLEEP);
-	*count = 0;
-
-	if (!wildcards)
-		maxentries = maxcount = 1;
-	else {
-		maxentries = (xa->rep_data_mb.max_bytes -
-		    xa->rep_data_mb.chain_offset) / maxdata;
-		if (maxcount > SMB_MAX_DENTS_IOVEC)
-			maxcount = SMB_MAX_DENTS_IOVEC;
-		if (maxentries > maxcount)
-			maxentries = maxcount;
-	}
-
-	/* Each entry will need to be aligned so add _POINTER_ALIGNMENT */
-	dent_buf_size =
-	    maxentries * (SMB_MAX_DENT_INFO_SIZE + _POINTER_ALIGNMENT);
-	ihdr->iov->iov_base = kmem_alloc(dent_buf_size, KM_SLEEP);
-
-	ihdr->sattr = sattr;
-	ihdr->pattern = pattern;
-	ihdr->sr = sr;
-
-	ihdr->uio.uio_iovcnt = maxcount;
-	ihdr->uio.uio_resid = dent_buf_size;
-	ihdr->uio.uio_iov = ihdr->iov;
-	ihdr->uio.uio_loffset = 0;
-
-	rc = smb_get_dents(sr, cookie, dir_snode, wildcards, ihdr, more);
-	if (rc != 0) {
-		goto out;
-	}
-
-	if (ihdr->iov->iov_len == 0)
-		*count = 0;
-	else
-		*count = smb_trans2_find_process_ients(sr, xa, ihdr, fflag,
-		    infolev, maxdata, dir_snode, more, cookie);
-	rc = 0;
-
-out:
-
-	total = maxcount - ihdr->uio.uio_iovcnt;
-	ASSERT((total >= 0) && (total <= SMB_MAX_DENTS_IOVEC));
-	for (i = 0; i < total; i++) {
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		ient = (smb_dent_info_t *)ihdr->iov[i].iov_base;
-		ASSERT(ient);
-		smb_node_release(ient->snode);
-	}
-
-	kmem_free(ihdr->iov->iov_base, dent_buf_size);
-	kmem_free(ihdr, sizeof (smb_dent_info_hdr_t));
-	return (0);
-}
-
-
-/*
- * smb_get_dents
- *
- * This function utilizes "smb_fsop_getdents()" to get dir entries.
- * The "smb_gather_dents_info()" is the call back function called
- * inside the file system. It is very important that the function
- * does not sleep or yield since it is processed inside a file
- * system transaction.
- *
- * The function returns 0 when successful and error code when failed.
- * If more is provided, the return value of 1 is returned indicating
- * more entries; otherwise, 0 is returned.
- */
-int smb_get_dents(
-    smb_request_t	*sr,
-    uint32_t		*cookie,
-    smb_node_t		*dir_snode,
-    uint32_t		wildcards,
-    smb_dent_info_hdr_t	*ihdr,
-    int			*more)
-{
-	int		rc;
-	char		*namebuf;
-	smb_node_t	*snode;
-	smb_attr_t	file_attr;
-	uint32_t	maxcnt = ihdr->uio.uio_iovcnt;
-	char		shortname[SMB_SHORTNAMELEN], name83[SMB_SHORTNAMELEN];
-
-	namebuf = kmem_zalloc(MAXNAMELEN, KM_SLEEP);
-	if (more)
-		*more = 0;
-
-	if (!wildcards) {
-		/* Already found entry? */
-		if (*cookie != 0)
-			return (0);
-		shortname[0] = '\0';
-
-		rc = smb_fsop_lookup(sr, sr->user_cr, 0, sr->tid_tree->t_snode,
-		    dir_snode, ihdr->pattern, &snode, &file_attr, shortname,
-		    name83);
-
-		if (rc) {
-			kmem_free(namebuf, MAXNAMELEN);
-			return (rc);
-		}
-
-		(void) strlcpy(namebuf, snode->od_name, MAXNAMELEN);
-
-		/*
-		 * It is not necessary to set the "force" flag (i.e. to
-		 * take into account mangling for case-insensitive collisions)
-		 */
-
-		if (shortname[0] == '\0')
-			(void) smb_mangle_name(snode->attr.sa_vattr.va_nodeid,
-			    namebuf, shortname, name83, 0);
-		(void) smb_gather_dents_info((char *)ihdr,
-		    snode->attr.sa_vattr.va_nodeid,
-		    strlen(namebuf), namebuf, -1, (int *)&maxcnt,
-		    &snode->attr, snode, shortname, name83);
-		kmem_free(namebuf, MAXNAMELEN);
-		return (0);
-	}
-
-	if ((rc = smb_fsop_getdents(sr, sr->user_cr, dir_snode, cookie,
-	    0, (int *)&maxcnt, (char *)ihdr, ihdr->pattern)) != 0) {
-		if (rc == ENOENT) {
-			kmem_free(namebuf, MAXNAMELEN);
-			return (0);
-		}
-		kmem_free(namebuf, MAXNAMELEN);
-		return (rc);
-	}
-
-	if (*cookie != 0x7FFFFFFF && more)
-		*more = 1;
-
-	kmem_free(namebuf, MAXNAMELEN);
-	return (0);
-}
-
-
-/*
- * smb_gather_dents_info
- *
- * The function will accept information of each directory entry and put
- * the needed information in the buffer. It is passed as the call back
- * function for smb_fsop_getdents() to gather trans2 find info.
- *
- * Only valid entry will be stored in the buffer.
- *
- * Returns: -1 - error, buffer too small
- *           n - number of valid entries (0 or 1)
- */
-int /*ARGSUSED*/
-smb_gather_dents_info(
-    char	*args,
-	ino_t	fileid,
-    int		namelen,
-    char	*name,
-    uint32_t	cookie,
-    int32_t	*countp,
-    smb_attr_t	*attr,
-    smb_node_t	*snode,
-    char	*shortname,
-    char	*name83)
-{
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	smb_dent_info_hdr_t	*ihdr = (smb_dent_info_hdr_t *)args;
-	smb_dent_info_t		*ient;
-	uint8_t			*v5_name = NULL;
-	uint8_t			*np = (uint8_t *)name;
-	int			reclen = sizeof (smb_dent_info_t) + namelen;
-
-	v5_name = kmem_alloc(MAXNAMELEN-1, KM_SLEEP);
-
-	if (!ihdr->uio.uio_iovcnt || ihdr->uio.uio_resid < reclen) {
-		kmem_free(v5_name, MAXNAMELEN-1);
-		smb_node_release(snode);
-		return (-1);
-	}
-
-	if (!smb_sattr_check(attr, name, ihdr->sattr)) {
-		kmem_free(v5_name, MAXNAMELEN-1);
-		smb_node_release(snode);
-		return (0);
-	}
-
-	if (catia_callback) {
-		catia_callback(v5_name, (uint8_t *)name,  MAXNAMELEN-1);
-		np = v5_name;
-		reclen = sizeof (smb_dent_info_t) + strlen((char *)v5_name);
-	}
-
-	ASSERT(snode);
-	ASSERT(snode->n_magic == SMB_NODE_MAGIC);
-	ASSERT(snode->n_state != SMB_NODE_STATE_DESTROYING);
-
-	/*
-	 * Each entry needs to be properly aligned or we may get an alignment
-	 * fault on sparc.
-	 */
-	ihdr->uio.uio_loffset = (offset_t)PTRALIGN(ihdr->uio.uio_loffset);
-	/*LINTED E_BAD_PTR_CAST_ALIGN*/
-	ient = (smb_dent_info_t *)&ihdr->iov->iov_base[ihdr->uio.uio_loffset];
-
-	ient->cookie = cookie;
-	ient->attr = *attr;
-	ient->snode = snode;
-
-	(void) strcpy(ient->name, (char *)np);
-	(void) strcpy(ient->shortname, shortname);
-	(void) strcpy(ient->name83, name83);
-	ihdr->uio.uio_iov->iov_base = (char *)ient;
-	ihdr->uio.uio_iov->iov_len = reclen;
-
-	ihdr->uio.uio_iov++;
-	ihdr->uio.uio_iovcnt--;
-	ihdr->uio.uio_resid -= reclen;
-	ihdr->uio.uio_loffset += reclen;
-
-	kmem_free(v5_name, MAXNAMELEN-1);
-	return (1);
-}
-
-
-
-/*
- * smb_trans2_find_process_ients
- *
- * This function encodes the directory entry information store in
- * the iov structure of the ihdr structure.
- *
- * The total entries encoded will be returned. If the entries encoded
- * is less than the total entries in the iov, the more field will
- * be updated to 1. Also, the next cookie wil be updated as well.
- */
-int
-smb_trans2_find_process_ients(
-    smb_request_t	*sr,
-    smb_xa_t		*xa,
-    smb_dent_info_hdr_t	*ihdr,
-    uint16_t		fflag,
-    uint16_t		infolev,
-    int			maxdata,
-    smb_node_t		*dir_snode,
-    int			*more,
-    uint32_t		*cookie)
-{
-	int i, err = 0;
-	smb_dent_info_t *ient;
-	uint32_t mb_flags = (sr->smb_flg2 & SMB_FLAGS2_UNICODE)
-	    ? SMB_MSGBUF_UNICODE : 0;
-
-	for (i = 0; i < SMB_MAX_DENTS_IOVEC; i++) {
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		if ((ient = (smb_dent_info_t *)ihdr->iov[i].iov_base) == 0)
-			break;
-
-		/*
-		 * Observed differences between our response and Windows
-		 * response, which hasn't caused a problem yet!
-		 *
-		 * 1. The NextEntryOffset field for the last entry should
-		 * be 0.  This code always calculate the record length
-		 * and puts the result in the NextEntryOffset field.
-		 *
-		 * 2. The FileIndex field is always 0.  This code puts
-		 * the cookie in the FileIndex field.
-		 */
-		err = smb_trans2_find_mbc_encode(sr, xa, ient, maxdata, infolev,
-		    fflag, mb_flags, dir_snode, NULL);
-
-		if (err)
-			break;
-	}
-
-	/*
-	 * Not enough space to store all the entries returned,
-	 * which is indicated by setting more.
-	 */
-	if (more && err < 0) {
-		*more = 1;
-
-		/*
-		 * Assume the space will be at least enough for 1 entry.
-		 */
-		/*LINTED E_BAD_PTR_CAST_ALIGN*/
-		ient = (smb_dent_info_t *)ihdr->iov[i-1].iov_base;
-		*cookie = ient->cookie;
-	}
-	return (i);
-}
-
-/*
- * smb_trans2_find_mbc_encode
+ * smb_trans2_mbc_encode
  *
  * This function encodes the mbc for one directory entry.
  *
@@ -991,41 +603,31 @@ smb_trans2_find_process_ients(
  * filename is ascii the name length returned to the client should
  * include the null terminator. Otherwise the length returned to
  * the client should not include the terminator.
+ *
+ * Returns: 0 - data successfully encoded
+ *          1 - client request's maxdata limit reached
+ *	   -1 - error
  */
-int /*ARGSUSED*/
-smb_trans2_find_mbc_encode(
-    smb_request_t	*sr,
-    smb_xa_t		*xa,
-    smb_dent_info_t	*ient,
-    int			maxdata,
-    uint16_t		infolev,
-    uint16_t		fflag,
-    uint32_t		mb_flags,
-    smb_node_t		*dir_snode,
-    smb_node_t		*sd_snode)
+static int
+smb_trans2_find_mbc_encode(smb_request_t *sr, smb_xa_t *xa,
+    smb_fileinfo_t *fileinfo, smb_find_args_t *args)
 {
-	int namelen, shortlen, buflen;
-	uint32_t next_entry_offset;
-	char buf83[26];
-	char *tmpbuf;
-	smb_msgbuf_t mb;
-	uint32_t dattr = 0;
-	uint32_t dsize32 = 0;
-	uint32_t asize32 = 0;
-	u_offset_t datasz = 0;
-	u_offset_t allocsz = 0;
-	smb_node_t *lnk_snode;
-	smb_attr_t lnkattr;
-	int rc;
+	int		namelen, shortlen, buflen;
+	uint32_t	next_entry_offset;
+	uint32_t	dsize32, asize32;
+	uint32_t	mb_flags = 0;
+	char		buf83[26];
+	char		*tmpbuf;
+	smb_msgbuf_t	mb;
 
-	namelen = smb_ascii_or_unicode_strlen(sr, ient->name);
+	namelen = smb_ascii_or_unicode_strlen(sr, fileinfo->fi_name);
 	if (namelen == -1)
-		return (1);
-
-	next_entry_offset = maxdata + namelen;
-
-	if (MBC_ROOM_FOR(&xa->rep_data_mb, (maxdata + namelen)) == 0)
 		return (-1);
+
+	next_entry_offset = args->fa_maxdata + namelen;
+
+	if (MBC_ROOM_FOR(&xa->rep_data_mb, (args->fa_maxdata + namelen)) == 0)
+		return (1);
 
 	/*
 	 * If ascii the filename length returned to the client should
@@ -1033,77 +635,38 @@ smb_trans2_find_mbc_encode(
 	 * EASIZE.
 	 */
 	if (!(sr->smb_flg2 & SMB_FLAGS2_UNICODE)) {
-		if ((infolev != SMB_INFO_STANDARD) &&
-		    (infolev != SMB_INFO_QUERY_EA_SIZE))
+		if ((args->fa_infolev != SMB_INFO_STANDARD) &&
+		    (args->fa_infolev != SMB_INFO_QUERY_EA_SIZE))
 			namelen += 1;
 	}
 
-	if (ient->attr.sa_vattr.va_type == VLNK) {
-		rc = smb_fsop_lookup(sr, sr->user_cr, SMB_FOLLOW_LINKS,
-		    sr->tid_tree->t_snode, dir_snode, ient->name, &lnk_snode,
-		    &lnkattr, 0, 0);
+	mb_flags = (sr->smb_flg2 & SMB_FLAGS2_UNICODE) ? SMB_MSGBUF_UNICODE : 0;
+	dsize32 = (fileinfo->fi_size > UINT_MAX) ?
+	    UINT_MAX : (uint32_t)fileinfo->fi_size;
+	asize32 = (fileinfo->fi_alloc_size > UINT_MAX) ?
+	    UINT_MAX : (uint32_t)fileinfo->fi_alloc_size;
 
-		/*
-		 * We normally want to resolve the object to which a symlink
-		 * refers so that CIFS clients can access sub-directories and
-		 * find the correct association for files. This causes a
-		 * problem, however, if a symlink in a sub-directory points
-		 * to a parent directory (some UNIX GUI's create a symlink in
-		 * $HOME/.desktop that points to the user's home directory).
-		 * Some Windows applications (i.e. virus scanning) loop/hang
-		 * trying to follow this recursive path and there is little
-		 * we can do because the path is constructed on the client.
-		 * skc_dirsymlink_enable allows an end-user to disable
-		 * symlinks to directories. Symlinks to other object types
-		 * should be unaffected.
-		 */
-		if (rc == 0) {
-			if (smb_dirsymlink_enable ||
-			    (lnkattr.sa_vattr.va_type != VDIR)) {
-				smb_node_release(ient->snode);
-				ient->snode = lnk_snode;
-				ient->attr = lnkattr;
-			} else {
-				smb_node_release(lnk_snode);
-			}
-		}
-	}
-
-	if (infolev != SMB_FIND_FILE_NAMES_INFO) {
-		/* data size */
-		datasz = smb_node_get_size(ient->snode, &ient->attr);
-		dsize32 = (datasz > UINT_MAX) ? UINT_MAX : (uint32_t)datasz;
-
-		/* allocation size */
-		allocsz = ient->attr.sa_vattr.va_nblocks * DEV_BSIZE;
-		asize32 = (allocsz > UINT_MAX) ? UINT_MAX : (uint32_t)allocsz;
-
-		dattr = smb_node_get_dosattr(ient->snode);
-	}
-
-	switch (infolev) {
+	switch (args->fa_infolev) {
 	case SMB_INFO_STANDARD:
-		if (fflag & SMB_FIND_RETURN_RESUME_KEYS)
+		if (args->fa_fflag & SMB_FIND_RETURN_RESUME_KEYS)
 			(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
-			    ient->cookie);
+			    fileinfo->fi_cookie);
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwbu", sr,
-		    ient->attr.sa_crtime.tv_sec ?
-		    smb_gmt2local(sr, ient->attr.sa_crtime.tv_sec) :
-		    smb_gmt2local(sr, ient->attr.sa_vattr.va_mtime.tv_sec),
-		    smb_gmt2local(sr, ient->attr.sa_vattr.va_atime.tv_sec),
-		    smb_gmt2local(sr, ient->attr.sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, fileinfo->fi_crtime.tv_sec),
+		    smb_gmt2local(sr, fileinfo->fi_atime.tv_sec),
+		    smb_gmt2local(sr, fileinfo->fi_mtime.tv_sec),
 		    dsize32,
 		    asize32,
-		    dattr,
+		    fileinfo->fi_dosattr,
 		    namelen,
-		    ient->name);
+		    fileinfo->fi_name);
 		break;
 
 	case SMB_INFO_QUERY_EA_SIZE:
-		if (fflag & SMB_FIND_RETURN_RESUME_KEYS)
+		if (args->fa_fflag & SMB_FIND_RETURN_RESUME_KEYS)
 			(void) smb_mbc_encodef(&xa->rep_data_mb, "l",
-			    ient->cookie);
+			    fileinfo->fi_cookie);
 
 		/*
 		 * Unicode filename should NOT be aligned. Encode ('u')
@@ -1115,7 +678,7 @@ smb_trans2_find_mbc_encode(
 		buflen = namelen + sizeof (mts_wchar_t);
 		tmpbuf = kmem_zalloc(buflen, KM_SLEEP);
 		smb_msgbuf_init(&mb, (uint8_t *)tmpbuf, buflen, mb_flags);
-		if (smb_msgbuf_encode(&mb, "u", ient->name) < 0) {
+		if (smb_msgbuf_encode(&mb, "u", fileinfo->fi_name) < 0) {
 			smb_msgbuf_term(&mb);
 			kmem_free(tmpbuf, buflen);
 			return (-1);
@@ -1123,14 +686,12 @@ smb_trans2_find_mbc_encode(
 		tmpbuf[namelen] = '\0';
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%yyyllwlb#c", sr,
-		    ient->attr.sa_crtime.tv_sec ?
-		    smb_gmt2local(sr, ient->attr.sa_crtime.tv_sec) :
-		    smb_gmt2local(sr, ient->attr.sa_vattr.va_mtime.tv_sec),
-		    smb_gmt2local(sr, ient->attr.sa_vattr.va_atime.tv_sec),
-		    smb_gmt2local(sr, ient->attr.sa_vattr.va_mtime.tv_sec),
+		    smb_gmt2local(sr, fileinfo->fi_crtime.tv_sec),
+		    smb_gmt2local(sr, fileinfo->fi_atime.tv_sec),
+		    smb_gmt2local(sr, fileinfo->fi_mtime.tv_sec),
 		    dsize32,
 		    asize32,
-		    dattr,
+		    fileinfo->fi_dosattr,
 		    0L,		/* EA Size */
 		    namelen,
 		    namelen + 1,
@@ -1143,81 +704,77 @@ smb_trans2_find_mbc_encode(
 	case SMB_FIND_FILE_DIRECTORY_INFO:
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqllu", sr,
 		    next_entry_offset,
-		    ient->cookie,
-		    ient->attr.sa_crtime.tv_sec ? &ient->attr.sa_crtime :
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_atime,
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_ctime,
-		    (uint64_t)datasz,
-		    (uint64_t)allocsz,
-		    dattr,
+		    fileinfo->fi_cookie,
+		    &fileinfo->fi_crtime,
+		    &fileinfo->fi_atime,
+		    &fileinfo->fi_mtime,
+		    &fileinfo->fi_ctime,
+		    fileinfo->fi_size,
+		    fileinfo->fi_alloc_size,
+		    fileinfo->fi_dosattr,
 		    namelen,
-		    ient->name);
+		    fileinfo->fi_name);
 		break;
 
 	case SMB_FIND_FILE_FULL_DIRECTORY_INFO:
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlllu", sr,
 		    next_entry_offset,
-		    ient->cookie,
-		    ient->attr.sa_crtime.tv_sec ? &ient->attr.sa_crtime :
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_atime,
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_ctime,
-		    (uint64_t)datasz,
-		    (uint64_t)allocsz,
-		    dattr,
+		    fileinfo->fi_cookie,
+		    &fileinfo->fi_crtime,
+		    &fileinfo->fi_atime,
+		    &fileinfo->fi_mtime,
+		    &fileinfo->fi_ctime,
+		    fileinfo->fi_size,
+		    fileinfo->fi_alloc_size,
+		    fileinfo->fi_dosattr,
 		    namelen,
 		    0L,
-		    ient->name);
+		    fileinfo->fi_name);
 		break;
 
 	case SMB_FIND_FILE_ID_FULL_DIRECTORY_INFO:
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlll4.qu", sr,
 		    next_entry_offset,
-		    ient->cookie,
-		    ient->attr.sa_crtime.tv_sec ? &ient->attr.sa_crtime :
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_atime,
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_ctime,
-		    (uint64_t)datasz,
-		    (uint64_t)allocsz,
-		    dattr,
+		    fileinfo->fi_cookie,
+		    &fileinfo->fi_crtime,
+		    &fileinfo->fi_atime,
+		    &fileinfo->fi_mtime,
+		    &fileinfo->fi_ctime,
+		    fileinfo->fi_size,
+		    fileinfo->fi_alloc_size,
+		    fileinfo->fi_dosattr,
 		    namelen,
 		    0L,
-		    ient->attr.sa_vattr.va_nodeid,
-		    ient->name);
+		    fileinfo->fi_nodeid,
+		    fileinfo->fi_name);
 		break;
 
 	case SMB_FIND_FILE_BOTH_DIRECTORY_INFO:
 		bzero(buf83, sizeof (buf83));
 		smb_msgbuf_init(&mb, (uint8_t *)buf83, sizeof (buf83),
 		    mb_flags);
-		if (smb_msgbuf_encode(&mb, "U", ient->shortname) < 0) {
+		if (smb_msgbuf_encode(&mb, "U", fileinfo->fi_shortname) < 0) {
 			smb_msgbuf_term(&mb);
 			return (-1);
 		}
-		shortlen = mts_wcequiv_strlen(ient->shortname);
+		shortlen = mts_wcequiv_strlen(fileinfo->fi_shortname);
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%llTTTTqqlllb.24cu",
 		    sr,
 		    next_entry_offset,
-		    ient->cookie,
-		    ient->attr.sa_crtime.tv_sec ? &ient->attr.sa_crtime :
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_atime,
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_ctime,
-		    (uint64_t)datasz,
-		    (uint64_t)allocsz,
-		    dattr,
+		    fileinfo->fi_cookie,
+		    &fileinfo->fi_crtime,
+		    &fileinfo->fi_atime,
+		    &fileinfo->fi_mtime,
+		    &fileinfo->fi_ctime,
+		    fileinfo->fi_size,
+		    fileinfo->fi_alloc_size,
+		    fileinfo->fi_dosattr,
 		    namelen,
 		    0L,
 		    shortlen,
 		    buf83,
-		    ient->name);
+		    fileinfo->fi_name);
 
 		smb_msgbuf_term(&mb);
 		break;
@@ -1226,31 +783,31 @@ smb_trans2_find_mbc_encode(
 		bzero(buf83, sizeof (buf83));
 		smb_msgbuf_init(&mb, (uint8_t *)buf83, sizeof (buf83),
 		    mb_flags);
-		if (smb_msgbuf_encode(&mb, "u", ient->shortname) < 0) {
+		if (smb_msgbuf_encode(&mb, "u", fileinfo->fi_shortname) < 0) {
 			smb_msgbuf_term(&mb);
 			return (-1);
 		}
-		shortlen = smb_ascii_or_unicode_strlen(sr, ient->shortname);
+		shortlen = smb_ascii_or_unicode_strlen(sr,
+		    fileinfo->fi_shortname);
 
 		(void) smb_mbc_encodef(&xa->rep_data_mb,
 		    "%llTTTTqqlllb.24c2.qu",
 		    sr,
 		    next_entry_offset,
-		    ient->cookie,
-		    ient->attr.sa_crtime.tv_sec ? &ient->attr.sa_crtime :
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_atime,
-		    &ient->attr.sa_vattr.va_mtime,
-		    &ient->attr.sa_vattr.va_ctime,
-		    (uint64_t)datasz,
-		    (uint64_t)allocsz,
-		    dattr,
+		    fileinfo->fi_cookie,
+		    &fileinfo->fi_crtime,
+		    &fileinfo->fi_atime,
+		    &fileinfo->fi_mtime,
+		    &fileinfo->fi_ctime,
+		    fileinfo->fi_size,
+		    fileinfo->fi_alloc_size,
+		    fileinfo->fi_dosattr,
 		    namelen,
 		    0L,
 		    shortlen,
 		    buf83,
-		    ient->attr.sa_vattr.va_nodeid,
-		    ient->name);
+		    fileinfo->fi_nodeid,
+		    fileinfo->fi_name);
 
 		smb_msgbuf_term(&mb);
 		break;
@@ -1258,9 +815,9 @@ smb_trans2_find_mbc_encode(
 	case SMB_FIND_FILE_NAMES_INFO:
 		(void) smb_mbc_encodef(&xa->rep_data_mb, "%lllu", sr,
 		    next_entry_offset,
-		    ient->cookie,
+		    fileinfo->fi_cookie,
 		    namelen,
-		    ient->name);
+		    fileinfo->fi_name);
 		break;
 	}
 
@@ -1273,12 +830,8 @@ smb_trans2_find_mbc_encode(
 smb_sdrc_t
 smb_pre_find_close2(smb_request_t *sr)
 {
-	int rc;
-
-	rc = smbsr_decode_vwv(sr, "w", &sr->smb_sid);
-
 	DTRACE_SMB_1(op__FindClose2__start, smb_request_t *, sr);
-	return ((rc == 0) ? SDRC_SUCCESS : SDRC_ERROR);
+	return (SDRC_SUCCESS);
 }
 
 void
@@ -1290,13 +843,21 @@ smb_post_find_close2(smb_request_t *sr)
 smb_sdrc_t
 smb_com_find_close2(smb_request_t *sr)
 {
-	sr->sid_odir = smb_odir_lookup_by_sid(sr->tid_tree, sr->smb_sid);
-	if (sr->sid_odir == NULL) {
-		smbsr_error(sr, NT_STATUS_INVALID_HANDLE, ERRDOS, ERRbadfid);
+	uint16_t	odid;
+	smb_odir_t	*od;
+
+	if (smbsr_decode_vwv(sr, "w", &odid) != 0)
+		return (SDRC_ERROR);
+
+	od = smb_tree_lookup_odir(sr->tid_tree, odid);
+	if (od == NULL) {
+		smbsr_error(sr, NT_STATUS_INVALID_HANDLE,
+		    ERRDOS, ERROR_INVALID_HANDLE);
 		return (SDRC_ERROR);
 	}
 
-	smb_rdir_close(sr);
+	smb_odir_close(od);
+	smb_odir_release(od);
 
 	if (smbsr_encode_empty_result(sr))
 		return (SDRC_ERROR);

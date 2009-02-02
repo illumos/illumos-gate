@@ -208,7 +208,7 @@ boolean_t smb_oplock_conflict(struct smb_node *, struct smb_session *,
 
 #define	SMB_SAME_SESSION(sess1, sess2)				\
 	((sess1) && (sess2) &&					\
-	((sess1)->ipaddr == (sess2)->ipaddr) &&			\
+	(smb_inet_equal(&sess1->ipaddr, &sess2->ipaddr, 0)) &&	\
 	((sess1)->s_kid == (sess2)->s_kid))			\
 
 #define	SMB_ATTR_ONLY_OPEN(op)					\
@@ -248,10 +248,6 @@ int	smb_ascii_or_unicode_strlen_null(struct smb_request *, char *);
 int	smb_ascii_or_unicode_null_len(struct smb_request *);
 
 int	smb_search(struct smb_request *);
-void smb_rdir_close(struct smb_request *);
-int	smb_rdir_open(struct smb_request *, char *, unsigned short);
-int smb_rdir_next(smb_request_t *sr, smb_node_t **rnode,
-    smb_odir_context_t *pc);
 
 uint32_t smb_common_open(smb_request_t *);
 DWORD smb_validate_object_name(char *path, unsigned int ftype);
@@ -295,10 +291,7 @@ int	smb_xlate_dialect_str_to_cd(char *);
 char	*smb_xlate_com_cd_to_str(int);
 char	*smb_xlate_dialect_cd_to_str(int);
 
-void	smb_od_destruct(struct smb_session *, struct smb_odir *);
 int	smbd_fs_query(smb_request_t *, smb_fqi_t *, int);
-int smb_component_match(struct smb_request *sr, ino64_t fileid,
-    struct smb_odir *od, smb_odir_context_t *pc);
 
 int smb_lock_range_access(struct smb_request *, struct smb_node *,
     uint64_t, uint64_t, boolean_t);
@@ -481,14 +474,14 @@ int smb_sign_check_secondary(struct smb_request *req, unsigned int seqnum);
 
 void smb_sign_reply(struct smb_request *req, struct mbuf_chain *reply);
 
-boolean_t smb_sattr_check(smb_attr_t *, char *, unsigned short);
+boolean_t smb_sattr_check(uint16_t, uint16_t, char *);
 
 void smb_request_cancel(smb_request_t *sr);
 
 /*
  * session functions (file smb_session.c)
  */
-smb_session_t *smb_session_create(ksocket_t, uint16_t, smb_server_t *);
+smb_session_t *smb_session_create(ksocket_t, uint16_t, smb_server_t *, int);
 int smb_session_daemon(smb_session_list_t *);
 void smb_session_reconnection_check(smb_session_list_t *, smb_session_t *);
 void smb_session_timers(smb_session_list_t *);
@@ -539,13 +532,21 @@ cred_t *smb_ofile_getcred(smb_ofile_t *);
 /*
  * odir functions (file smb_odir.c)
  */
-smb_odir_t *smb_odir_open(smb_tree_t *tree, smb_node_t *node, char *pattern,
-    uint16_t pid, unsigned short sattr);
-void smb_odir_close(smb_odir_t *od);
-void smb_odir_close_all(smb_tree_t *tree);
-void smb_odir_close_all_by_pid(smb_tree_t *tree, uint16_t pid);
-void smb_odir_release(smb_odir_t *od);
-smb_odir_t *smb_odir_lookup_by_sid(smb_tree_t *tree, uint16_t sid);
+uint16_t smb_odir_open(smb_request_t *, char *, uint16_t);
+uint16_t smb_odir_openat(smb_request_t *, smb_node_t *);
+void smb_odir_close(smb_odir_t *);
+boolean_t smb_odir_hold(smb_odir_t *);
+void smb_odir_release(smb_odir_t *);
+
+int smb_odir_read(smb_request_t *, smb_odir_t *,
+    smb_odirent_t *, boolean_t *);
+int smb_odir_read_fileinfo(smb_request_t *, smb_odir_t *,
+    smb_fileinfo_t *, boolean_t *);
+int smb_odir_read_streaminfo(smb_request_t *, smb_odir_t *,
+    smb_streaminfo_t *, boolean_t *);
+
+void smb_odir_save_cookie(smb_odir_t *, int, uint32_t cookie);
+void smb_odir_resume_at(smb_odir_t *, smb_odir_resume_t *);
 
 /*
  * SMB user functions (file smb_user.c)
@@ -579,8 +580,8 @@ void smb_tree_close_pid(smb_tree_t *, uint16_t);
 boolean_t smb_tree_has_feature(smb_tree_t *, uint_t);
 boolean_t smb_tree_hold(smb_tree_t *);
 void smb_tree_release(smb_tree_t *);
-
 void smb_dr_ulist_free(smb_dr_ulist_t *ulist);
+smb_odir_t *smb_tree_lookup_odir(smb_tree_t *, uint16_t);
 
 /*
  * SMB user's credential functions
@@ -625,7 +626,7 @@ size_t oemstounicodes(mts_wchar_t *unicodestring, const char *oemstring,
 
 int uioxfer(struct uio *src_uio, struct uio *dst_uio, int n);
 
-int smb_match_name(ino64_t, char *, char *, char *, char *, boolean_t);
+int smb_match_name(ino64_t, char *, char *, boolean_t);
 boolean_t smb_is_dot_or_dotdot(const char *);
 int token2buf(smb_token_t *token, char *buf);
 

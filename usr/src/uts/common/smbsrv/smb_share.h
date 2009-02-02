@@ -211,7 +211,7 @@ uint32_t smb_shr_rename(char *, char *);
 uint32_t smb_shr_get(char *, smb_share_t *);
 uint32_t smb_shr_modify(smb_share_t *);
 uint32_t smb_shr_get_realpath(const char *, char *, int);
-void smb_shr_hostaccess(smb_share_t *, ipaddr_t);
+void smb_shr_hostaccess(smb_share_t *, smb_inaddr_t *);
 
 boolean_t smb_shr_exists(char *);
 int smb_shr_is_special(char *);
@@ -228,7 +228,6 @@ void smb_shr_sa_csc_option(const char *, smb_share_t *);
  */
 uint32_t smb_share_list(int, smb_shrlist_t *);
 int smb_share_count(void);
-uint32_t smb_share_get(char *, smb_share_t *);
 uint32_t smb_share_delete(char *);
 uint32_t smb_share_rename(char *, char *);
 uint32_t smb_share_create(smb_share_t *);
@@ -238,7 +237,8 @@ uint32_t smb_share_modify(smb_share_t *);
 
 door_handle_t smb_kshare_init(int);
 void smb_kshare_fini(door_handle_t);
-uint32_t smb_kshare_getinfo(door_handle_t, char *, smb_share_t *, ipaddr_t);
+uint32_t smb_kshare_getinfo(door_handle_t, char *, smb_share_t *,
+    smb_inaddr_t *);
 int smb_kshare_upcall(door_handle_t, void *, boolean_t);
 uint32_t smb_kshare_enum(door_handle_t, smb_enumshare_info_t *);
 

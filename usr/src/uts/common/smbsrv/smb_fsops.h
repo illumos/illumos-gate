@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SMBSRV_SMB_FSOPS_H
 #define	_SMBSRV_SMB_FSOPS_H
-
-#pragma ident	"@(#)smb_fsops.h	1.8	08/07/15 SMI"
 
 /*
  * This header file contains all the functions for the interface between
@@ -68,15 +66,6 @@ int smb_fsop_rmdir(struct smb_request *sr, cred_t *cr, smb_node_t *dir_snode,
 int smb_fsop_getattr(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
     smb_attr_t *attr);
 
-int smb_fsop_readdir(struct smb_request *sr, cred_t *cr, smb_node_t *snode,
-    uint32_t *cookie, char *name, int *namelen, ino64_t *fileid,
-    struct fs_stream_info *stream_info, smb_node_t **ret_snode,
-    smb_attr_t *ret_attr);
-
-int smb_fsop_getdents(struct smb_request *sr, cred_t *cr,
-    struct smb_node *dir_snode, uint32_t *cookie, uint64_t *verifierp,
-    int32_t *maxcnt, char *args, char *pattern);
-
 int smb_maybe_mangled_name(char *name);
 
 int smb_fsop_rename(struct smb_request *sr, cred_t *cr,
@@ -114,10 +103,6 @@ int smb_fsop_lookup(struct smb_request *sr, cred_t *cr, int flags,
     char *ret_name83);
 
 int smb_fsop_commit(smb_request_t *sr, cred_t *cr, struct smb_node *snode);
-
-int smb_fsop_stream_readdir(struct smb_request *sr, cred_t *cr,
-    smb_node_t *fnode, uint32_t *cookiep, struct fs_stream_info *stream_info,
-    smb_node_t **ret_snode, smb_attr_t *ret_attr);
 
 int smb_fsop_aclread(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *);
 int smb_fsop_aclwrite(smb_request_t *, cred_t *, smb_node_t *, smb_fssd_t *);

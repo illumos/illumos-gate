@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -480,15 +480,14 @@ smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr)
 {
 	static int initialized = 0;
 	uint32_t ipaddr;
-	uint32_t prefer_ipaddr = 0;
-	char ipstr[16];
-	char srcip[16];
+	uint32_t prefer_ipaddr;
+	char ipstr[INET_ADDRSTRLEN];
+	char srcip[INET_ADDRSTRLEN];
 	int rc;
 
-	(void) inet_ntop(AF_INET, (const void *)(&src_ipaddr),
-	    srcip, sizeof (srcip));
+	(void) inet_ntop(AF_INET, &src_ipaddr, srcip, INET_ADDRSTRLEN);
 
-	rc = smb_config_getstr(SMB_CI_DOMAIN_SRV, ipstr, sizeof (ipstr));
+	rc = smb_config_getstr(SMB_CI_DOMAIN_SRV, ipstr, INET_ADDRSTRLEN);
 	if (rc == SMBD_SMF_OK) {
 		rc = inet_pton(AF_INET, ipstr, &prefer_ipaddr);
 		if (rc == 0)
@@ -505,8 +504,8 @@ smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr)
 	    ntdomain_info.n_domain, src_name, srcip);
 
 	if (ntdomain_info.n_ipaddr != 0) {
-		if (prefer_ipaddr != 0 && prefer_ipaddr ==
-		    ntdomain_info.n_ipaddr) {
+		if (prefer_ipaddr != 0 &&
+		    prefer_ipaddr == ntdomain_info.n_ipaddr) {
 			syslog(LOG_DEBUG, "DC for %s: %s [%s]",
 			    ntdomain_info.n_domain, src_name, srcip);
 			(void) mutex_unlock(&ntdomain_mtx);
@@ -533,17 +532,24 @@ smb_netlogon_rdc_rsp(char *src_name, uint32_t src_ipaddr)
 static int
 smb_better_dc(uint32_t cur_ip, uint32_t new_ip)
 {
+	smb_inaddr_t ipaddr;
+
 	/*
 	 * If we don't have any current DC,
 	 * then use the new one of course.
 	 */
+
 	if (cur_ip == 0)
 		return (1);
 
-	if (smb_nic_exists(cur_ip, B_TRUE))
+	ipaddr.a_family = AF_INET;
+	ipaddr.a_ipv4 = cur_ip;
+	if (smb_nic_exists(&ipaddr, B_TRUE))
 		return (0);
 
-	if (smb_nic_exists(new_ip, B_TRUE))
+	ipaddr.a_family = AF_INET;
+	ipaddr.a_ipv4 = new_ip;
+	if (smb_nic_exists(&ipaddr, B_TRUE))
 		return (1);
 	/*
 	 * Otherwise, just keep the old one.

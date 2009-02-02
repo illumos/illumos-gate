@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,7 @@
 static int smb_delete_check_path(smb_request_t *, boolean_t *);
 static int smb_delete_single_file(smb_request_t *, smb_error_t *);
 static int smb_delete_multiple_files(smb_request_t *, smb_error_t *);
-static int smb_delete_find_fname(smb_request_t *, uint32_t *);
+static int smb_delete_find_fname(smb_request_t *, smb_odir_t *);
 static int smb_delete_check_attr(smb_request_t *, smb_error_t *);
 static int smb_delete_remove_file(smb_request_t *, smb_error_t *);
 
@@ -254,7 +254,7 @@ smb_delete_single_file(smb_request_t *sr, smb_error_t *err)
 /*
  * smb_delete_multiple_files
  *
- * For each matching file found by smb_delete_find_name:
+ * For each matching file found by smb_delete_find_fname:
  * 1. lookup file
  * 2. check the file's attributes
  *    - The search ends with an error if a readonly file
@@ -273,14 +273,24 @@ static int
 smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 {
 	int rc, deleted = 0;
-	uint32_t cookie = 0;
 	smb_fqi_t *fqi;
 	smb_attr_t ret_attr;
+	uint16_t odid;
+	smb_odir_t *od;
 
 	fqi = &sr->arg.dirop.fqi;
 
+	/*
+	 * Specify all search attributes (SMB_SEARCH_ATTRIBUTES) so that
+	 * delete-specific checking can be done (smb_delete_check_attr).
+	 */
+	if ((odid = smb_odir_open(sr, fqi->path, SMB_SEARCH_ATTRIBUTES)) == 0)
+		return (-1);
+	if ((od = smb_tree_lookup_odir(sr->tid_tree, odid)) == NULL)
+		return (-1);
+
 	for (;;) {
-		rc = smb_delete_find_fname(sr, &cookie);
+		rc = smb_delete_find_fname(sr, od);
 		if (rc != 0)
 			break;
 
@@ -293,6 +303,8 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 		if (smb_delete_check_attr(sr, err) != 0) {
 			smb_node_release(fqi->last_snode);
 			if (err->status == NT_STATUS_CANNOT_DELETE) {
+				smb_odir_release(od);
+				smb_odir_close(od);
 				return (-1);
 			}
 			if ((err->status == NT_STATUS_FILE_IS_A_DIRECTORY) &&
@@ -311,10 +323,14 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
 			continue;
 		}
 
+		smb_odir_release(od);
+		smb_odir_close(od);
 		smb_node_release(fqi->last_snode);
 		return (-1);
 	}
 
+	smb_odir_release(od);
+	smb_odir_close(od);
 
 	if ((rc != 0) && (rc != ENOENT)) {
 		smbsr_map_errno(rc, err);
@@ -336,42 +352,52 @@ smb_delete_multiple_files(smb_request_t *sr, smb_error_t *err)
  * Find next filename that matches search pattern (fqi->last_comp)
  * and save it in fqi->last_comp_od.
  *
+ * Case insensitivity note:
+ * If the tree is case insensitive and there's a case conflict
+ * with the name returned from smb_odir_read, smb_delete_find_fname
+ * performs case conflict name mangling to produce a unique filename.
+ * This ensures that any subsequent smb_fsop_lookup, (which will
+ * find the first case insensitive match) will find the correct file.
+ *
  * Returns: 0 - success
  *          errno
  */
 static int
-smb_delete_find_fname(smb_request_t *sr, uint32_t *cookie)
+smb_delete_find_fname(smb_request_t *sr, smb_odir_t *od)
 {
-	int rc, n_name;
-	ino64_t fileid;
-	smb_fqi_t *fqi;
-	char name83[SMB_SHORTNAMELEN];
-	char shortname[SMB_SHORTNAMELEN];
-	boolean_t ignore_case;
+	int		rc;
+	smb_odirent_t	*odirent;
+	boolean_t	eos;
+	char		*name;
+	char		shortname[SMB_SHORTNAMELEN];
+	char		name83[SMB_SHORTNAMELEN];
+	smb_fqi_t	*fqi;
 
 	fqi = &sr->arg.dirop.fqi;
+	odirent = kmem_alloc(sizeof (smb_odirent_t), KM_SLEEP);
 
-	ignore_case = SMB_TREE_IS_CASEINSENSITIVE(sr);
-
-	for (;;) {
-		n_name = sizeof (fqi->last_comp_od)  - 1;
-
-		rc = smb_fsop_readdir(sr, sr->user_cr, fqi->dir_snode, cookie,
-		    fqi->last_comp_od, &n_name, &fileid, NULL, NULL, NULL);
-
-		if (rc != 0)
-			return (rc);
-
-		/* check for EOF */
-		if (n_name == 0)
-			return (ENOENT);
-
-		fqi->last_comp_od[n_name] = '\0';
-
-		if (smb_match_name(fileid, fqi->last_comp_od, shortname, name83,
-		    fqi->last_comp, ignore_case))
-			return (0);
+	rc = smb_odir_read(sr, od, odirent, &eos);
+	if (rc != 0) {
+		kmem_free(odirent, sizeof (smb_odirent_t));
+		return (rc);
 	}
+	if (eos) {
+		kmem_free(odirent, sizeof (smb_odirent_t));
+		return (ENOENT);
+	}
+
+	/* if case conflict, force mangle and use shortname */
+	if ((od->d_ignore_case) && (odirent->od_eflags & ED_CASE_CONFLICT)) {
+		(void) smb_mangle_name(odirent->od_ino, odirent->od_name,
+		    shortname, name83, 1);
+		name = shortname;
+	} else {
+		name = odirent->od_name;
+	}
+	(void) strlcpy(fqi->last_comp_od, name, sizeof (fqi->last_comp_od));
+
+	kmem_free(odirent, sizeof (smb_odirent_t));
+	return (0);
 }
 
 /*

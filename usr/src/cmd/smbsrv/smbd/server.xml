@@ -21,7 +21,7 @@ information: Portions Copyright [yyyy] [name of copyright owner]
 
 CDDL HEADER END
 
-Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 Use is subject to license terms.
 
 NOTE:  This service manifest is not editable; its contents will
@@ -192,6 +192,8 @@ file.
 			value='0' override='true'/>
 		<propval name='netlogon_seqnum' type='integer'
 			value='0' override='true'/>
+		<propval name='ipv6_enable' type='boolean'
+			value='false' override='true'/>
 	</property_group>
 
 	<!-- 6. Identify faults to be ignored. -->

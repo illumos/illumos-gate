@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <errno.h>
@@ -86,6 +84,8 @@ smbd_user_auth_logon(netr_client_t *clnt)
 	adt_event_data_t *event;
 	au_tid_addr_t termid;
 	char sidbuf[SMB_SID_STRSZ];
+	char *username;
+	char *domain;
 	uid_t uid;
 	gid_t gid;
 	char *sid;
@@ -96,13 +96,17 @@ smbd_user_auth_logon(netr_client_t *clnt)
 		uid = ADT_NO_ATTRIB;
 		gid = ADT_NO_ATTRIB;
 		sid = NT_NULL_SIDSTR;
+		username = clnt->real_username;
+		domain = clnt->real_domain;
 		status = ADT_FAILURE;
 		retval = ADT_FAIL_VALUE_AUTH;
 	} else {
-		uid = token->tkn_user->i_id;
-		gid = token->tkn_primary_grp->i_id;
-		smb_sid_tostr(token->tkn_user->i_sidattr.sid, sidbuf);
+		uid = token->tkn_user.i_id;
+		gid = token->tkn_primary_grp.i_id;
+		smb_sid_tostr(token->tkn_user.i_sid, sidbuf);
 		sid = sidbuf;
+		username = token->tkn_account_name;
+		domain = token->tkn_domain_name;
 		status = ADT_SUCCESS;
 		retval = ADT_SUCCESS;
 	}
@@ -123,8 +127,14 @@ smbd_user_auth_logon(netr_client_t *clnt)
 
 	(void) memset(&termid, 0, sizeof (au_tid_addr_t));
 	termid.at_port = clnt->local_port;
-	termid.at_type = AU_IPv4;
-	termid.at_addr[0] = clnt->ipaddr;
+
+	if (clnt->ipaddr.a_family == AF_INET) {
+		termid.at_addr[0] = clnt->ipaddr.a_ipv4;
+		termid.at_type = AU_IPv4;
+	} else {
+		bcopy(&clnt->ipaddr.a_ip, termid.at_addr, IPV6_ADDR_LEN);
+		termid.at_type = AU_IPv6;
+	}
 	adt_set_termid(ah, &termid);
 
 	if (adt_set_user(ah, uid, gid, uid, gid, NULL, ADT_NEW)) {
@@ -135,8 +145,8 @@ smbd_user_auth_logon(netr_client_t *clnt)
 		return (NULL);
 	}
 
-	event->adt_smbd_session.domain = clnt->domain;
-	event->adt_smbd_session.username = clnt->username;
+	event->adt_smbd_session.domain = domain;
+	event->adt_smbd_session.username = username;
 	event->adt_smbd_session.sid = sid;
 
 	if (adt_put_event(event, status, retval))
@@ -155,8 +165,8 @@ smbd_user_auth_logon(netr_client_t *clnt)
 		entry->sa_handle = ah;
 		entry->sa_uid = uid;
 		entry->sa_gid = gid;
-		entry->sa_username = strdup(clnt->username);
-		entry->sa_domain = strdup(clnt->domain);
+		entry->sa_username = strdup(username);
+		entry->sa_domain = strdup(domain);
 
 		smb_autohome_add(entry->sa_username);
 		smbd_audit_link(entry);

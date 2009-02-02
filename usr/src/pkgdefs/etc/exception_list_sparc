@@ -1124,6 +1124,7 @@ usr/include/smbsrv/smb_fsops.h		sparc
 usr/include/smbsrv/smb_i18n.h		sparc
 usr/include/smbsrv/smb_idmap.h		sparc
 usr/include/smbsrv/smb_incl.h		sparc
+usr/include/smbsrv/smb_inet.h		sparc
 usr/include/smbsrv/smb_ioctl.h		sparc
 usr/include/smbsrv/smb_kproto.h		sparc
 usr/include/smbsrv/smb_kstat.h		sparc
@@ -1136,7 +1137,6 @@ usr/include/smbsrv/smb_vops.h		sparc
 usr/include/smbsrv/smb_xdr.h		sparc
 usr/include/smbsrv/smbfmt.h		sparc
 usr/include/smbsrv/smbinfo.h		sparc
-usr/include/smbsrv/smbtrans.h		sparc
 usr/include/smbsrv/string.h		sparc
 usr/include/smbsrv/svrapi.h		sparc
 usr/include/smbsrv/winioctl.h		sparc

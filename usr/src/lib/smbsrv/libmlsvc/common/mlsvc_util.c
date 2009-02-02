@@ -62,22 +62,19 @@ extern int mlsvc_user_getauth(char *, char *, smb_auth_info_t *);
  * call free when it is no longer required.
  */
 uint32_t
-mlsvc_lookup_name(char *account, smb_sid_t **sid, uint16_t *sid_type)
+mlsvc_lookup_name(char *name, smb_sid_t **sid, uint16_t *sid_type)
 {
-	smb_userinfo_t *ainfo;
+	smb_account_t account;
 	uint32_t status;
 
-	if ((ainfo = mlsvc_alloc_user_info()) == NULL)
-		return (NT_STATUS_NO_MEMORY);
-
-	status = lsa_lookup_name(account, *sid_type, ainfo);
+	status = lsa_lookup_name(name, *sid_type, &account);
 	if (status == NT_STATUS_SUCCESS) {
-		*sid = ainfo->user_sid;
-		ainfo->user_sid = NULL;
-		*sid_type = ainfo->sid_name_use;
+		*sid = account.a_sid;
+		account.a_sid = NULL;
+		*sid_type = account.a_type;
+		smb_account_free(&account);
 	}
 
-	mlsvc_free_user_info(ainfo);
 	return (status);
 }
 
@@ -92,132 +89,22 @@ mlsvc_lookup_name(char *account, smb_sid_t **sid, uint16_t *sid_type)
 uint32_t
 mlsvc_lookup_sid(smb_sid_t *sid, char **name)
 {
-	smb_userinfo_t *ainfo;
+	smb_account_t ainfo;
 	uint32_t status;
 	int namelen;
 
-	if ((ainfo = mlsvc_alloc_user_info()) == NULL)
-		return (NT_STATUS_NO_MEMORY);
+	if ((status = lsa_lookup_sid(sid, &ainfo)) == NT_STATUS_SUCCESS) {
+		namelen = strlen(ainfo.a_domain) + strlen(ainfo.a_name) + 2;
+		if ((*name = malloc(namelen)) != NULL)
+			(void) snprintf(*name, namelen, "%s\\%s",
+			    ainfo.a_domain, ainfo.a_name);
+		else
+			status = NT_STATUS_NO_MEMORY;
 
-	status = lsa_lookup_sid(sid, ainfo);
-	if (status == NT_STATUS_SUCCESS) {
-		namelen = strlen(ainfo->domain_name) + strlen(ainfo->name) + 2;
-		if ((*name = malloc(namelen)) == NULL) {
-			mlsvc_free_user_info(ainfo);
-			return (NT_STATUS_NO_MEMORY);
-		}
-		(void) snprintf(*name, namelen, "%s\\%s",
-		    ainfo->domain_name, ainfo->name);
+		smb_account_free(&ainfo);
 	}
 
-	mlsvc_free_user_info(ainfo);
 	return (status);
-}
-
-/*
- * mlsvc_alloc_user_info
- *
- * Allocate a user_info structure and set the contents to zero. A
- * pointer to the user_info structure is returned.
- */
-smb_userinfo_t *
-mlsvc_alloc_user_info(void)
-{
-	smb_userinfo_t *user_info;
-
-	user_info = (smb_userinfo_t *)malloc(sizeof (smb_userinfo_t));
-	if (user_info == NULL)
-		return (NULL);
-
-	bzero(user_info, sizeof (smb_userinfo_t));
-	return (user_info);
-}
-
-/*
- * mlsvc_free_user_info
- *
- * Free a user_info structure. This function ensures that the contents
- * of the user_info are freed as well as the user_info itself.
- */
-void
-mlsvc_free_user_info(smb_userinfo_t *user_info)
-{
-	if (user_info) {
-		mlsvc_release_user_info(user_info);
-		free(user_info);
-	}
-}
-
-/*
- * mlsvc_release_user_info
- *
- * Release the contents of a user_info structure and zero out the
- * elements but do not free the user_info structure itself. This
- * function cleans out the structure so that it can be reused without
- * worrying about stale contents.
- */
-void
-mlsvc_release_user_info(smb_userinfo_t *user_info)
-{
-	int i;
-
-	if (user_info == NULL)
-		return;
-
-	free(user_info->name);
-	free(user_info->domain_sid);
-	free(user_info->domain_name);
-	free(user_info->groups);
-
-	if (user_info->n_other_grps) {
-		for (i = 0; i < user_info->n_other_grps; i++)
-			free(user_info->other_grps[i].sid);
-
-		free(user_info->other_grps);
-	}
-
-	free(user_info->session_key);
-	free(user_info->user_sid);
-	free(user_info->pgrp_sid);
-	bzero(user_info, sizeof (smb_userinfo_t));
-}
-
-/*
- * mlsvc_setadmin_user_info
- *
- * Determines if the given user is the domain Administrator or a
- * member of Domain Admins or Administrators group and set the
- * user_info->flags accordingly.
- */
-void
-mlsvc_setadmin_user_info(smb_userinfo_t *user_info)
-{
-	nt_domain_t *domain;
-	smb_group_t grp;
-	int rc, i;
-
-	if ((domain = nt_domain_lookupbytype(NT_DOMAIN_PRIMARY)) == NULL)
-		return;
-
-	if (!smb_sid_cmp((smb_sid_t *)user_info->domain_sid, domain->sid))
-		return;
-
-	if (user_info->rid == DOMAIN_USER_RID_ADMIN)
-		user_info->flags |= SMB_UINFO_FLAG_DADMIN;
-	else if (user_info->primary_group_rid == DOMAIN_GROUP_RID_ADMINS)
-		user_info->flags |= SMB_UINFO_FLAG_DADMIN;
-	else {
-		for (i = 0; i < user_info->n_groups; i++)
-			if (user_info->groups[i].rid == DOMAIN_GROUP_RID_ADMINS)
-				user_info->flags |= SMB_UINFO_FLAG_DADMIN;
-	}
-
-	rc = smb_lgrp_getbyname("Administrators", &grp);
-	if (rc == SMB_LGRP_SUCCESS) {
-		if (smb_lgrp_is_member(&grp, user_info->user_sid))
-			user_info->flags |= SMB_UINFO_FLAG_LADMIN;
-		smb_lgrp_free(&grp);
-	}
 }
 
 DWORD

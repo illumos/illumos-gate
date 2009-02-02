@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,7 @@ typedef struct smb_ads_host_info {
 	int port;		/* ldap port */
 	int priority;		/* DNS SRV record priority */
 	int weight;		/* DNS SRV record weight */
-	in_addr_t ip_addr;	/* network byte order */
+	smb_inaddr_t ipaddr;	/* network byte order */
 } smb_ads_host_info_t;
 
 typedef struct smb_ads_host_list {

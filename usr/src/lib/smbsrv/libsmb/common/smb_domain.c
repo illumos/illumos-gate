@@ -293,11 +293,20 @@ nt_domain_xlat_type_name(char *type_name)
 nt_domain_t *
 nt_domain_lookup_name(char *domain_name)
 {
+	char nbname[MAXHOSTNAMELEN];
 	nt_domain_t *domain = nt_domain_list;
+	char *p;
+
+	if (domain_name == NULL || *domain_name == '\0')
+		return (NULL);
+
+	(void) strlcpy(nbname, domain_name, sizeof (nbname));
+	if ((p = strchr(nbname, '.')) != NULL)
+		*p = '\0';
 
 	(void) rw_rdlock(&nt_domain_lock);
 	while (domain) {
-		if (utf8_strcasecmp(domain->name, domain_name) == 0)
+		if (utf8_strcasecmp(domain->name, nbname) == 0)
 			break;
 
 		domain = domain->next;

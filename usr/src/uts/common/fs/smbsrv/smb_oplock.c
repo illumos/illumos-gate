@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 
 #include <smbsrv/smb_incl.h>
 #include <smbsrv/smb_fsops.h>
+#include <inet/tcp.h>
 
 /*
  * Oplock functionality enable/disable
@@ -338,7 +339,8 @@ smb_oplock_break(smb_node_t *node)
 				node->n_oplock.op_flags &=
 				    ~OPLOCK_FLAG_BREAKING;
 				node->n_oplock.op_ofile = NULL;
-				node->n_oplock.op_ipaddr = 0;
+				bzero(&node->n_oplock.op_ipaddr,
+				    sizeof (node->n_oplock.op_ipaddr));
 				node->n_oplock.op_kid = 0;
 
 				smb_rwx_rwexit(&node->n_lock);
@@ -427,7 +429,7 @@ smb_oplock_release(smb_node_t *node, boolean_t have_rwx)
 	node->flags &= ~NODE_OPLOCKS_IN_FORCE;
 	node->n_oplock.op_flags &= ~OPLOCK_FLAG_BREAKING;
 	node->n_oplock.op_ofile = NULL;
-	node->n_oplock.op_ipaddr = 0;
+	bzero(&node->n_oplock.op_ipaddr, sizeof (node->n_oplock.op_ipaddr));
 	node->n_oplock.op_kid = 0;
 
 	if (!have_rwx)
