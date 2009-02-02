@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -41,6 +41,7 @@
 import re, os, sys
 from onbld.Checks.DbLookups import Rti, RtiException, RtiNotFound, RtiOffSwan
 
+opensolarisGateRe = re.compile(r'.*osol[0-9]+-sust$')
 patchGateRe = re.compile(r'.*-patch.*')
 testGateRe = re.compile(r'.*-(stc2|test)$')
 
@@ -77,6 +78,11 @@ def rti(bugids, gatePath=None, consolidation=None,
 				gateName = gatePath[-3]
 		except IndexError:
 			pass
+
+		# Is this an OpenSolaris gate?
+		if opensolarisGateRe.search(gateName):
+			rtiType = "OpenSolaris"
+			gateType = "OpenSolaris"
 
 		# Is this a patch gate?
 		if patchGateRe.search(gateName):
