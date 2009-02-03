@@ -652,12 +652,10 @@ typedef struct tcp_opt_s {
 struct tcp_options {
 	uint_t			to_flags;
 	ssize_t			to_boundif;	/* IPV6_BOUND_IF */
-	sock_upper_handle_t	to_handle;
 };
 
 #define	TCPOPT_BOUNDIF		0x00000001	/* set IPV6_BOUND_IF */
 #define	TCPOPT_RECVPKTINFO	0x00000002	/* set IPV6_RECVPKTINFO */
-#define	TCPOPT_UPPERHANDLE	0x00000004	/* set upper handle */
 
 /*
  * RFC1323-recommended phrasing of TSTAMP option, for easier parsing
@@ -979,6 +977,8 @@ static int tcp_do_bind(conn_t *, struct sockaddr *, socklen_t, cred_t *,
 static int tcp_do_unbind(conn_t *);
 static int tcp_bind_check(conn_t *, struct sockaddr *, socklen_t, cred_t *,
     boolean_t);
+
+static void tcp_ulp_newconn(conn_t *, conn_t *, mblk_t *);
 
 /*
  * Routines related to the TCP_IOC_ABORT_CONN ioctl command.
@@ -4812,7 +4812,6 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	/* Inherit the listener's non-STREAMS flag */
 	if (IPCL_IS_NONSTR(lconnp)) {
 		connp->conn_flags |= IPCL_NONSTR;
-		connp->conn_upcalls = lconnp->conn_upcalls;
 	}
 
 	return (0);
@@ -4939,7 +4938,6 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 	/* Inherit the listener's non-STREAMS flag */
 	if (IPCL_IS_NONSTR(lconnp)) {
 		connp->conn_flags |= IPCL_NONSTR;
-		connp->conn_upcalls = lconnp->conn_upcalls;
 	}
 
 	return (0);
@@ -9855,6 +9853,8 @@ tcp_getsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	void		*optvalp_buf;
 	int		len;
 
+	ASSERT(connp->conn_upper_handle != NULL);
+
 	error = proto_opt_check(level, option_name, *optlen, &max_optbuf_len,
 	    tcp_opt_obj.odb_opt_des_arr,
 	    tcp_opt_obj.odb_opt_arr_cnt,
@@ -10776,6 +10776,7 @@ tcp_setsockopt(sock_lower_handle_t proto_handle, int level, int option_name,
 	squeue_t	*sqp = connp->conn_sqp;
 	int		error;
 
+	ASSERT(connp->conn_upper_handle != NULL);
 	/*
 	 * Entering the squeue synchronously can result in a context switch,
 	 * which can cause a rather sever performance degradation. So we try to
@@ -12700,26 +12701,47 @@ tcp_send_conn_ind(void *arg, mblk_t *mp, void *arg2)
 		    tcp->tcp_remote)] = tcp->tcp_remote;
 	}
 	mutex_exit(&listener->tcp_eager_lock);
-	if (need_send_conn_ind) {
-		if (IPCL_IS_NONSTR(lconnp)) {
-			ASSERT(tcp->tcp_listener == listener);
-			ASSERT(tcp->tcp_saved_listener == listener);
-			if ((*lconnp->conn_upcalls->su_newconn)
-			    (lconnp->conn_upper_handle,
-			    (sock_lower_handle_t)tcp->tcp_connp,
-			    &sock_tcp_downcalls, DB_CRED(mp), DB_CPID(mp),
-			    &tcp->tcp_connp->conn_upcalls) != NULL) {
-				/*
-				 * Keep the message around
-				 * in case of fallback
-				 */
-				tcp->tcp_conn.tcp_eager_conn_ind = mp;
-			} else {
-				freemsg(mp);
-			}
-		} else {
-			putnext(listener->tcp_rq, mp);
+	if (need_send_conn_ind)
+		tcp_ulp_newconn(lconnp, tcp->tcp_connp, mp);
+}
+
+/*
+ * Send the newconn notification to ulp. The eager is blown off if the
+ * notification fails.
+ */
+static void
+tcp_ulp_newconn(conn_t *lconnp, conn_t *econnp, mblk_t *mp)
+{
+	if (IPCL_IS_NONSTR(lconnp)) {
+		ASSERT(econnp->conn_tcp->tcp_listener == lconnp->conn_tcp);
+		ASSERT(econnp->conn_tcp->tcp_saved_listener ==
+		    lconnp->conn_tcp);
+
+		/* Keep the message around in case of a fallback to TPI */
+		econnp->conn_tcp->tcp_conn.tcp_eager_conn_ind = mp;
+
+		/*
+		 * Notify the ULP about the newconn. It is guaranteed that no
+		 * tcp_accept() call will be made for the eager if the
+		 * notification fails, so it's safe to blow it off in that
+		 * case.
+		 *
+		 * The upper handle will be assigned when tcp_accept() is
+		 * called.
+		 */
+		if ((*lconnp->conn_upcalls->su_newconn)
+		    (lconnp->conn_upper_handle,
+		    (sock_lower_handle_t)econnp,
+		    &sock_tcp_downcalls, DB_CRED(mp), DB_CPID(mp),
+		    &econnp->conn_upcalls) == NULL) {
+			/* Failed to allocate a socket */
+			BUMP_MIB(&lconnp->conn_tcp->tcp_tcps->tcps_mib,
+			    tcpEstabResets);
+			(void) tcp_eager_blowoff(lconnp->conn_tcp,
+			    econnp->conn_tcp->tcp_conn_req_seqnum);
 		}
+	} else {
+		putnext(lconnp->conn_tcp->tcp_rq, mp);
 	}
 }
 
@@ -17824,10 +17846,6 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		/* Safe to free conn_ind message */
 		freemsg(tcp->tcp_conn.tcp_eager_conn_ind);
 		tcp->tcp_conn.tcp_eager_conn_ind = NULL;
-
-		/* The listener tells us which upper handle to use */
-		ASSERT(tcpopt->to_flags & TCPOPT_UPPERHANDLE);
-		connp->conn_upper_handle = tcpopt->to_handle;
 	}
 
 	tcp->tcp_detached = B_FALSE;
@@ -18233,17 +18251,16 @@ tcp_send_pending(void *arg, mblk_t *mp, void *arg2)
 	struct T_conn_ind *conn_ind;
 	tcp_t *tcp;
 
+	conn_ind = (struct T_conn_ind *)mp->b_rptr;
+	bcopy(mp->b_rptr + conn_ind->OPT_offset, &tcp,
+	    conn_ind->OPT_length);
+
 	if (listener->tcp_state == TCPS_CLOSED ||
 	    TCP_IS_DETACHED(listener)) {
 		/*
 		 * If listener has closed, it would have caused a
 		 * a cleanup/blowoff to happen for the eager.
-		 */
-
-		conn_ind = (struct T_conn_ind *)mp->b_rptr;
-		bcopy(mp->b_rptr + conn_ind->OPT_offset, &tcp,
-		    conn_ind->OPT_length);
-		/*
+		 *
 		 * We need to drop the ref on eager that was put
 		 * tcp_rput_data() before trying to send the conn_ind
 		 * to listener. The conn_ind was deferred in tcp_send_conn_ind
@@ -18254,30 +18271,13 @@ tcp_send_pending(void *arg, mblk_t *mp, void *arg2)
 		freemsg(mp);
 		return;
 	}
-	if (IPCL_IS_NONSTR(connp)) {
-		conn_ind = (struct T_conn_ind *)mp->b_rptr;
-		bcopy(mp->b_rptr + conn_ind->OPT_offset, &tcp,
-		    conn_ind->OPT_length);
 
-		if ((*connp->conn_upcalls->su_newconn)
-		    (connp->conn_upper_handle,
-		    (sock_lower_handle_t)tcp->tcp_connp,
-		    &sock_tcp_downcalls, DB_CRED(mp), DB_CPID(mp),
-		    &tcp->tcp_connp->conn_upcalls) != NULL) {
-			/* Keep the message around in case of fallback */
-			tcp->tcp_conn.tcp_eager_conn_ind = mp;
-		} else {
-			freemsg(mp);
-		}
-	} else {
-		putnext(listener->tcp_rq, mp);
-	}
+	tcp_ulp_newconn(connp, tcp->tcp_connp, mp);
 }
 
 /* ARGSUSED */
 static int
-tcp_accept_common(conn_t *lconnp, conn_t *econnp,
-    sock_upper_handle_t sock_handle, cred_t *cr)
+tcp_accept_common(conn_t *lconnp, conn_t *econnp, cred_t *cr)
 {
 	tcp_t *listener, *eager;
 	mblk_t *opt_mp;
@@ -18306,7 +18306,6 @@ tcp_accept_common(conn_t *lconnp, conn_t *econnp,
 	bzero((char *)opt_mp->b_rptr, sizeof (struct tcp_options));
 	eager->tcp_issocket = B_TRUE;
 
-	econnp->conn_upcalls = lconnp->conn_upcalls;
 	econnp->conn_zoneid = listener->tcp_connp->conn_zoneid;
 	econnp->conn_allzones = listener->tcp_connp->conn_allzones;
 	ASSERT(econnp->conn_netstack ==
@@ -18334,17 +18333,11 @@ tcp_accept_common(conn_t *lconnp, conn_t *econnp,
 
 	/*
 	 * Prepare for inheriting IPV6_BOUND_IF and IPV6_RECVPKTINFO
-	 * from listener to acceptor. In case of non-STREAMS sockets,
-	 * we also need to pass the upper handle along.
+	 * from listener to acceptor.
 	 */
 	tcpopt = (struct tcp_options *)opt_mp->b_rptr;
 	tcpopt->to_flags = 0;
 
-	if (IPCL_IS_NONSTR(econnp)) {
-		ASSERT(sock_handle != NULL);
-		tcpopt->to_flags |= TCPOPT_UPPERHANDLE;
-		tcpopt->to_handle = sock_handle;
-	}
 	if (listener->tcp_bound_if != 0) {
 		tcpopt->to_flags |= TCPOPT_BOUNDIF;
 		tcpopt->to_boundif = listener->tcp_bound_if;
@@ -18450,6 +18443,15 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 	ASSERT(eager->tcp_listener != NULL);
 	tcps = eager->tcp_tcps;
 
+	/*
+	 * It is OK to manipulate these fields outside the eager's squeue
+	 * because they will not start being used until tcp_accept_finish
+	 * has been called.
+	 */
+	ASSERT(lconnp->conn_upper_handle != NULL);
+	ASSERT(econnp->conn_upper_handle == NULL);
+	econnp->conn_upper_handle = sock_handle;
+	econnp->conn_upcalls = lconnp->conn_upcalls;
 	ASSERT(IPCL_IS_NONSTR(econnp));
 	/*
 	 * Create helper stream if it is a non-TPI TCP connection.
@@ -18465,7 +18467,7 @@ tcp_accept(sock_lower_handle_t lproto_handle,
 	ASSERT(eager->tcp_rq != NULL);
 
 	eager->tcp_sodirect = SOD_SOTOSODP(sock_handle);
-	return (tcp_accept_common(lconnp, econnp, sock_handle, cr));
+	return (tcp_accept_common(lconnp, econnp, cr));
 }
 
 
@@ -18533,7 +18535,7 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 		 */
 		eager->tcp_sodirect = SOD_QTOSODP(eager->tcp_rq);
 		if (tcp_accept_common(listener->tcp_connp,
-		    econnp, NULL, CRED()) < 0) {
+		    econnp, CRED()) < 0) {
 			mp = mi_tpi_err_ack_alloc(mp, TPROTO, 0);
 			if (mp != NULL)
 				putnext(rq, mp);
@@ -18591,7 +18593,7 @@ tcp_tpi_accept(queue_t *q, mblk_t *mp)
 }
 
 static int
-tcp_getmyname(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
+tcp_do_getsockname(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
 {
 	sin_t *sin = (sin_t *)sa;
 	sin6_t *sin6 = (sin6_t *)sa;
@@ -18605,8 +18607,11 @@ tcp_getmyname(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
 
 		*sin = sin_null;
 		sin->sin_family = AF_INET;
-		sin->sin_port = tcp->tcp_lport;
-		sin->sin_addr.s_addr = tcp->tcp_ipha->ipha_src;
+		if (tcp->tcp_state >= TCPS_BOUND) {
+			sin->sin_port = tcp->tcp_lport;
+			sin->sin_addr.s_addr = tcp->tcp_ipha->ipha_src;
+		}
+		*salenp = sizeof (sin_t);
 		break;
 
 	case AF_INET6:
@@ -18615,13 +18620,16 @@ tcp_getmyname(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
 
 		*sin6 = sin6_null;
 		sin6->sin6_family = AF_INET6;
-		sin6->sin6_port = tcp->tcp_lport;
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
-			    &sin6->sin6_addr);
-		} else {
-			sin6->sin6_addr = tcp->tcp_ip6h->ip6_src;
+		if (tcp->tcp_state >= TCPS_BOUND) {
+			sin6->sin6_port = tcp->tcp_lport;
+			if (tcp->tcp_ipversion == IPV4_VERSION) {
+				IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
+				    &sin6->sin6_addr);
+			} else {
+				sin6->sin6_addr = tcp->tcp_ip6h->ip6_src;
+			}
 		}
+		*salenp = sizeof (sin6_t);
 		break;
 	}
 
@@ -18629,7 +18637,7 @@ tcp_getmyname(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
 }
 
 static int
-i_tcp_getpeername(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
+tcp_do_getpeername(tcp_t *tcp, struct sockaddr *sa, uint_t *salenp)
 {
 	sin_t *sin = (sin_t *)sa;
 	sin6_t *sin6 = (sin6_t *)sa;
@@ -18692,10 +18700,10 @@ tcp_wput_cmdblk(queue_t *q, mblk_t *mp)
 
 	switch (cmdp->cb_cmd) {
 	case TI_GETPEERNAME:
-		cmdp->cb_error = i_tcp_getpeername(tcp, data, &cmdp->cb_len);
+		cmdp->cb_error = tcp_do_getpeername(tcp, data, &cmdp->cb_len);
 		break;
 	case TI_GETMYNAME:
-		cmdp->cb_error = tcp_getmyname(tcp, data, &cmdp->cb_len);
+		cmdp->cb_error = tcp_do_getsockname(tcp, data, &cmdp->cb_len);
 		break;
 	default:
 		cmdp->cb_error = EINVAL;
@@ -22198,10 +22206,10 @@ tcp_wput_iocdata(tcp_t *tcp, mblk_t *mp)
 
 	switch (iocp->ioc_cmd) {
 	case TI_GETMYNAME:
-		error = tcp_getmyname(tcp, (void *)mp1->b_rptr, &addrlen);
+		error = tcp_do_getsockname(tcp, (void *)mp1->b_rptr, &addrlen);
 		break;
 	case TI_GETPEERNAME:
-		error = i_tcp_getpeername(tcp, (void *)mp1->b_rptr, &addrlen);
+		error = tcp_do_getpeername(tcp, (void *)mp1->b_rptr, &addrlen);
 		break;
 	}
 
@@ -27084,6 +27092,7 @@ tcp_bind(sock_lower_handle_t proto_handle, struct sockaddr *sa,
 	squeue_t	*sqp = connp->conn_sqp;
 
 	ASSERT(sqp != NULL);
+	ASSERT(connp->conn_upper_handle != NULL);
 
 	error = squeue_synch_enter(sqp, connp, 0);
 	if (error != 0) {
@@ -27248,6 +27257,8 @@ tcp_connect(sock_lower_handle_t proto_handle, const struct sockaddr *sa,
 	squeue_t	*sqp = connp->conn_sqp;
 	int		error;
 
+	ASSERT(connp->conn_upper_handle != NULL);
+
 	error = proto_verify_ip_addr(tcp->tcp_family, sa, len);
 	if (error != 0) {
 		return (error);
@@ -27339,6 +27350,8 @@ tcp_activate(sock_lower_handle_t proto_handle, sock_upper_handle_t sock_handle,
 	conn_t *connp = (conn_t *)proto_handle;
 	struct sock_proto_props sopp;
 
+	ASSERT(connp->conn_upper_handle == NULL);
+
 	sopp.sopp_flags = SOCKOPT_RCVHIWAT | SOCKOPT_RCVLOWAT |
 	    SOCKOPT_MAXPSZ | SOCKOPT_MAXBLK | SOCKOPT_RCVTIMER |
 	    SOCKOPT_RCVTHRESH | SOCKOPT_MAXADDRLEN | SOCKOPT_MINPSZ;
@@ -27364,6 +27377,8 @@ int
 tcp_close(sock_lower_handle_t proto_handle, int flags, cred_t *cr)
 {
 	conn_t *connp = (conn_t *)proto_handle;
+
+	ASSERT(connp->conn_upper_handle != NULL);
 
 	tcp_close_common(connp, flags);
 
@@ -27396,6 +27411,7 @@ tcp_sendmsg(sock_lower_handle_t proto_handle, mblk_t *mp, struct nmsghdr *msg,
 	int32_t		tcpstate;
 
 	ASSERT(connp->conn_ref >= 2);
+	ASSERT(connp->conn_upper_handle != NULL);
 
 	if (msg->msg_controllen != 0) {
 		return (EOPNOTSUPP);
@@ -27494,52 +27510,15 @@ tcp_output_urgent(void *arg, mblk_t *mp, void *arg2)
 /* ARGSUSED */
 int
 tcp_getpeername(sock_lower_handle_t proto_handle, struct sockaddr *addr,
-    socklen_t *addrlen, cred_t *cr)
+    socklen_t *addrlenp, cred_t *cr)
 {
-	sin_t   *sin;
-	sin6_t  *sin6;
 	conn_t	*connp = (conn_t *)proto_handle;
 	tcp_t	*tcp = connp->conn_tcp;
 
+	ASSERT(connp->conn_upper_handle != NULL);
 	ASSERT(tcp != NULL);
-	if (tcp->tcp_state < TCPS_SYN_RCVD)
-		return (ENOTCONN);
 
-	addr->sa_family = tcp->tcp_family;
-	switch (tcp->tcp_family) {
-	case AF_INET:
-		if (*addrlen < sizeof (sin_t))
-			return (EINVAL);
-
-		sin = (sin_t *)addr;
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		if (tcp->tcp_ipversion == IPV4_VERSION) {
-			IN6_V4MAPPED_TO_IPADDR(&tcp->tcp_remote_v6,
-			    sin->sin_addr.s_addr);
-		}
-		sin->sin_port = tcp->tcp_fport;
-		*addrlen = sizeof (struct sockaddr_in);
-		break;
-	case AF_INET6:
-		sin6 = (sin6_t *)addr;
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-
-		if (*addrlen < sizeof (struct sockaddr_in6))
-			return (EINVAL);
-
-		if (tcp->tcp_ipversion == IPV6_VERSION) {
-			sin6->sin6_flowinfo = tcp->tcp_ip6h->ip6_vcf &
-			    ~IPV6_VERS_AND_FLOW_MASK;
-		}
-
-		sin6->sin6_addr = tcp->tcp_remote_v6;
-		sin6->sin6_port = tcp->tcp_fport;
-		*addrlen = sizeof (struct sockaddr_in6);
-		break;
-	}
-	return (0);
+	return (tcp_do_getpeername(tcp, addr, addrlenp));
 }
 
 /* ARGSUSED */
@@ -27547,45 +27526,12 @@ int
 tcp_getsockname(sock_lower_handle_t proto_handle, struct sockaddr *addr,
     socklen_t *addrlenp, cred_t *cr)
 {
-	sin_t   *sin;
-	sin6_t  *sin6;
 	conn_t	*connp = (conn_t *)proto_handle;
 	tcp_t	*tcp = connp->conn_tcp;
 
-	switch (tcp->tcp_family) {
-	case AF_INET:
-		ASSERT(tcp->tcp_ipversion == IPV4_VERSION);
-		if (*addrlenp < sizeof (sin_t))
-			return (EINVAL);
-		sin = (sin_t *)addr;
-		*sin = sin_null;
-		sin->sin_family = AF_INET;
-		*addrlenp = sizeof (sin_t);
-		if (tcp->tcp_state >= TCPS_BOUND) {
-			sin->sin_addr.s_addr =  tcp->tcp_ipha->ipha_src;
-			sin->sin_port = tcp->tcp_lport;
-		}
-		break;
+	ASSERT(connp->conn_upper_handle != NULL);
 
-	case AF_INET6:
-		if (*addrlenp < sizeof (sin6_t))
-			return (EINVAL);
-		sin6 = (sin6_t *)addr;
-		*sin6 = sin6_null;
-		sin6->sin6_family = AF_INET6;
-		*addrlenp = sizeof (sin6_t);
-		if (tcp->tcp_state >= TCPS_BOUND) {
-			sin6->sin6_port = tcp->tcp_lport;
-			if (tcp->tcp_ipversion == IPV4_VERSION) {
-				IN6_IPADDR_TO_V4MAPPED(tcp->tcp_ipha->ipha_src,
-				    &sin6->sin6_addr);
-			} else {
-				sin6->sin6_addr = tcp->tcp_ip6h->ip6_src;
-			}
-		}
-		break;
-	}
-	return (0);
+	return (tcp_do_getsockname(tcp, addr, addrlenp));
 }
 
 /*
@@ -27831,6 +27777,8 @@ tcp_shutdown(sock_lower_handle_t proto_handle, int how, cred_t *cr)
 	conn_t  *connp = (conn_t *)proto_handle;
 	tcp_t   *tcp = connp->conn_tcp;
 
+	ASSERT(connp->conn_upper_handle != NULL);
+
 	/*
 	 * X/Open requires that we check the connected state.
 	 */
@@ -27868,6 +27816,8 @@ tcp_listen(sock_lower_handle_t proto_handle, int backlog, cred_t *cr)
 	conn_t	*connp = (conn_t *)proto_handle;
 	int 	error;
 	squeue_t *sqp = connp->conn_sqp;
+
+	ASSERT(connp->conn_upper_handle != NULL);
 
 	error = squeue_synch_enter(sqp, connp, 0);
 	if (error != 0) {
@@ -27995,6 +27945,8 @@ tcp_clr_flowctrl(sock_lower_handle_t proto_handle)
 	tcp_stack_t	*tcps = tcp->tcp_tcps;
 	uint_t thwin;
 
+	ASSERT(connp->conn_upper_handle != NULL);
+
 	(void) squeue_synch_enter(connp->conn_sqp, connp, 0);
 
 	/* Flow control condition has been removed. */
@@ -28026,6 +27978,8 @@ tcp_ioctl(sock_lower_handle_t proto_handle, int cmd, intptr_t arg,
 {
 	conn_t  	*connp = (conn_t *)proto_handle;
 	int		error;
+
+	ASSERT(connp->conn_upper_handle != NULL);
 
 	switch (cmd) {
 		case ND_SET:

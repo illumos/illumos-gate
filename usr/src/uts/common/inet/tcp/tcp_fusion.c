@@ -781,9 +781,14 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp, uint32_t send_size)
 	/*
 	 * Enqueue data into the peer's receive list; we may or may not
 	 * drain the contents depending on the conditions below.
+	 *
+	 * tcp_hard_binding indicates that accept has not yet completed,
+	 * in which case we use tcp_rcv_enqueue() instead of calling
+	 * su_recv directly. Queued data will be drained when the accept
+	 * completes (in tcp_accept_finish()).
 	 */
 	if (IPCL_IS_NONSTR(peer_tcp->tcp_connp) &&
-	    peer_tcp->tcp_connp->conn_upper_handle != NULL) {
+	    !peer_tcp->tcp_hard_binding) {
 		int error;
 		int flags = 0;
 

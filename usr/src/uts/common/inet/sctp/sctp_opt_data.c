@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1222,6 +1222,8 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			}
 			/* Silently ignore zero */
 			if (*i1 != 0) {
+				struct sock_proto_props sopp;
+
 				/*
 				 * Insist on a receive window that is at least
 				 * sctp_recv_hiwat_minmss * MSS (default 4*MSS)
@@ -1235,6 +1237,11 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				sctp->sctp_rwnd = *i1;
 				sctp->sctp_irwnd = sctp->sctp_rwnd;
 				sctp->sctp_pd_point = sctp->sctp_rwnd;
+
+				sopp.sopp_flags = SOCKOPT_RCVHIWAT;
+				sopp.sopp_rxhiwat = *i1;
+				sctp->sctp_ulp_prop(sctp->sctp_ulpd, &sopp);
+
 			}
 			/*
 			 * XXX should we return the rwnd here
