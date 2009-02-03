@@ -1,12 +1,10 @@
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_SYS_SEGMENTS_H
 #define	_SYS_SEGMENTS_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -402,7 +400,7 @@ extern void set_usegd(user_desc_t *, void *, size_t, uint_t, uint_t,
 #endif	/* __i386 */
 
 extern void set_gatesegd(gate_desc_t *, void (*)(void), selector_t,
-    uint_t, uint_t);
+    uint_t, uint_t, uint_t);
 
 extern void set_syssegd(system_desc_t *, void *, size_t, uint_t, uint_t);
 

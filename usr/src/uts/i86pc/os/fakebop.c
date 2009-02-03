@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1571,8 +1571,13 @@ bop_idt_init(void)
 	    do_bsys_alloc(NULL, NULL, MMU_PAGESIZE, MMU_PAGESIZE);
 	bzero(bop_idt, MMU_PAGESIZE);
 	for (t = 0; t < NIDT; ++t) {
+		/*
+		 * Note that since boot runs without a TSS, the
+		 * double fault handler cannot use an alternate stack
+		 * (64-bit) or a task gate (32-bit).
+		 */
 		set_gatesegd(&bop_idt[t], &bop_trap_handler, bcode_sel,
-		    SDT_SYSIGT, TRP_KPL);
+		    SDT_SYSIGT, TRP_KPL, 0);
 	}
 	bop_idt_info.dtr_limit = (NIDT * sizeof (gate_desc_t)) - 1;
 	bop_idt_info.dtr_base = (uintptr_t)bop_idt;

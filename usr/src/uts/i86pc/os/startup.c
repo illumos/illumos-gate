@@ -1897,7 +1897,7 @@ startup_vm(void)
 
 		bcopy(idt0, newidt, NIDT * sizeof (*idt0));
 		set_gatesegd(&newidt[T_PGFLT], &pentium_pftrap,
-		    KCS_SEL, SDT_SYSIGT, TRP_KPL);
+		    KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
 
 		(void) as_setprot(&kas, (caddr_t)newidt, MMU_PAGESIZE,
 		    PROT_READ | PROT_EXEC);

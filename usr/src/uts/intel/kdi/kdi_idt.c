@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Management of KMDB's IDT, which is installed upon KMDB activation.
@@ -191,7 +189,7 @@ kdi_idt_init(selector_t sel)
 			caddr_t hdlr = (caddr_t)id->id_basehdlr +
 			    incr * (i - id->id_low);
 			set_gatesegd(&kdi_idt[i], (void (*)())hdlr, sel,
-			    SDT_SYSIGT, TRP_KPL);
+			    SDT_SYSIGT, TRP_KPL, i);
 		}
 	}
 }
@@ -247,7 +245,7 @@ kdi_idt_gates_install(selector_t sel, int saveold)
 		const kdi_gate_spec_t *gs = &kdi_gate_specs[i];
 		uintptr_t func = GATESEG_GETOFFSET(&kdi_idt[gs->kgs_vec]);
 		set_gatesegd(&gates[i], (void (*)())func, sel, SDT_SYSIGT,
-		    gs->kgs_dpl);
+		    gs->kgs_dpl, gs->kgs_vec);
 	}
 
 	for (i = 0; i < KDI_GATE_NVECS; i++) {

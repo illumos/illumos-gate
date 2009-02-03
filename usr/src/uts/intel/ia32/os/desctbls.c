@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Copyright (c) 1992 Terrence R. Lambert.
@@ -313,9 +311,10 @@ get_ssd_base(system_desc_t *dp)
 
 #if defined(__amd64)
 
+/*ARGSUSED*/
 void
 set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel,
-    uint_t type, uint_t dpl)
+    uint_t type, uint_t dpl, uint_t vector)
 {
 	dp->sgd_looffset = (uintptr_t)func;
 	dp->sgd_hioffset = (uintptr_t)func >> 16;
@@ -329,7 +328,7 @@ set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel,
 	 * (tss_rsp0) stack.
 	 */
 #if !defined(__xpv)
-	if (type == T_DBLFLT)
+	if (vector == T_DBLFLT)
 		dp->sgd_ist = 1;
 	else
 #endif
@@ -342,9 +341,10 @@ set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel,
 
 #elif defined(__i386)
 
+/*ARGSUSED*/
 void
 set_gatesegd(gate_desc_t *dp, void (*func)(void), selector_t sel,
-    uint_t type, uint_t dpl)
+    uint_t type, uint_t dpl, uint_t unused)
 {
 	dp->sgd_looffset = (uintptr_t)func;
 	dp->sgd_hioffset = (uintptr_t)func >> 16;
@@ -914,15 +914,22 @@ init_gdt(void)
 static void
 init_idt_common(gate_desc_t *idt)
 {
-	set_gatesegd(&idt[T_ZERODIV], &div0trap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_SGLSTP], &dbgtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_NMIFLT], &nmiint, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_BPTFLT], &brktrap, KCS_SEL, SDT_SYSIGT, TRP_UPL);
-	set_gatesegd(&idt[T_OVFLW], &ovflotrap, KCS_SEL, SDT_SYSIGT, TRP_UPL);
+	set_gatesegd(&idt[T_ZERODIV], &div0trap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+	    0);
+	set_gatesegd(&idt[T_SGLSTP], &dbgtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+	    0);
+	set_gatesegd(&idt[T_NMIFLT], &nmiint, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+	    0);
+	set_gatesegd(&idt[T_BPTFLT], &brktrap, KCS_SEL, SDT_SYSIGT, TRP_UPL,
+	    0);
+	set_gatesegd(&idt[T_OVFLW], &ovflotrap, KCS_SEL, SDT_SYSIGT, TRP_UPL,
+	    0);
 	set_gatesegd(&idt[T_BOUNDFLT], &boundstrap, KCS_SEL, SDT_SYSIGT,
-	    TRP_KPL);
-	set_gatesegd(&idt[T_ILLINST], &invoptrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_NOEXTFLT], &ndptrap,  KCS_SEL, SDT_SYSIGT, TRP_KPL);
+	    TRP_KPL, 0);
+	set_gatesegd(&idt[T_ILLINST], &invoptrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+	    0);
+	set_gatesegd(&idt[T_NOEXTFLT], &ndptrap,  KCS_SEL, SDT_SYSIGT, TRP_KPL,
+	    0);
 
 	/*
 	 * double fault handler.
@@ -934,14 +941,16 @@ init_idt_common(gate_desc_t *idt)
 #if !defined(__xpv)
 #if defined(__amd64)
 
-	set_gatesegd(&idt[T_DBLFLT], &syserrtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
+	set_gatesegd(&idt[T_DBLFLT], &syserrtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+	    T_DBLFLT);
 
 #elif defined(__i386)
 
 	/*
 	 * task gate required.
 	 */
-	set_gatesegd(&idt[T_DBLFLT], NULL, DFTSS_SEL, SDT_SYSTASKGT, TRP_KPL);
+	set_gatesegd(&idt[T_DBLFLT], NULL, DFTSS_SEL, SDT_SYSTASKGT, TRP_KPL,
+	    0);
 
 #endif	/* __i386 */
 #endif	/* !__xpv */
@@ -950,44 +959,49 @@ init_idt_common(gate_desc_t *idt)
 	 * T_EXTOVRFLT coprocessor-segment-overrun not supported.
 	 */
 
-	set_gatesegd(&idt[T_TSSFLT], &invtsstrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_SEGFLT], &segnptrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_STKFLT], &stktrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_GPFLT], &gptrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_PGFLT], &pftrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_EXTERRFLT], &ndperr, KCS_SEL, SDT_SYSIGT, TRP_KPL);
+	set_gatesegd(&idt[T_TSSFLT], &invtsstrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+	    0);
+	set_gatesegd(&idt[T_SEGFLT], &segnptrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+	    0);
+	set_gatesegd(&idt[T_STKFLT], &stktrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
+	set_gatesegd(&idt[T_GPFLT], &gptrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
+	set_gatesegd(&idt[T_PGFLT], &pftrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
+	set_gatesegd(&idt[T_EXTERRFLT], &ndperr, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+	    0);
 	set_gatesegd(&idt[T_ALIGNMENT], &achktrap, KCS_SEL, SDT_SYSIGT,
-	    TRP_KPL);
-	set_gatesegd(&idt[T_MCE], &mcetrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
-	set_gatesegd(&idt[T_SIMDFPE], &xmtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
+	    TRP_KPL, 0);
+	set_gatesegd(&idt[T_MCE], &mcetrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
+	set_gatesegd(&idt[T_SIMDFPE], &xmtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
 
 	/*
 	 * install "int80" handler at, well, 0x80.
 	 */
-	set_gatesegd(&idt0[T_INT80], &sys_int80, KCS_SEL, SDT_SYSIGT, TRP_UPL);
+	set_gatesegd(&idt0[T_INT80], &sys_int80, KCS_SEL, SDT_SYSIGT, TRP_UPL,
+	    0);
 
 	/*
 	 * install fast trap handler at 210.
 	 */
-	set_gatesegd(&idt[T_FASTTRAP], &fasttrap, KCS_SEL, SDT_SYSIGT, TRP_UPL);
+	set_gatesegd(&idt[T_FASTTRAP], &fasttrap, KCS_SEL, SDT_SYSIGT, TRP_UPL,
+	    0);
 
 	/*
 	 * System call handler.
 	 */
 #if defined(__amd64)
 	set_gatesegd(&idt[T_SYSCALLINT], &sys_syscall_int, KCS_SEL, SDT_SYSIGT,
-	    TRP_UPL);
+	    TRP_UPL, 0);
 
 #elif defined(__i386)
 	set_gatesegd(&idt[T_SYSCALLINT], &sys_call, KCS_SEL, SDT_SYSIGT,
-	    TRP_UPL);
+	    TRP_UPL, 0);
 #endif	/* __i386 */
 
 	/*
 	 * Install the DTrace interrupt handler for the pid provider.
 	 */
 	set_gatesegd(&idt[T_DTRACE_RET], &dtrace_ret, KCS_SEL,
-	    SDT_SYSIGT, TRP_UPL);
+	    SDT_SYSIGT, TRP_UPL, 0);
 
 	/*
 	 * Prepare interposing descriptors for the branded "int80"
@@ -997,17 +1011,17 @@ init_idt_common(gate_desc_t *idt)
 	brand_tbl[0].ih_inum = T_INT80;
 	brand_tbl[0].ih_default_desc = idt0[T_INT80];
 	set_gatesegd(&(brand_tbl[0].ih_interp_desc), &brand_sys_int80, KCS_SEL,
-	    SDT_SYSIGT, TRP_UPL);
+	    SDT_SYSIGT, TRP_UPL, 0);
 
 	brand_tbl[1].ih_inum = T_SYSCALLINT;
 	brand_tbl[1].ih_default_desc = idt0[T_SYSCALLINT];
 
 #if defined(__amd64)
 	set_gatesegd(&(brand_tbl[1].ih_interp_desc), &brand_sys_syscall_int,
-	    KCS_SEL, SDT_SYSIGT, TRP_UPL);
+	    KCS_SEL, SDT_SYSIGT, TRP_UPL, 0);
 #elif defined(__i386)
 	set_gatesegd(&(brand_tbl[1].ih_interp_desc), &brand_sys_call,
-	    KCS_SEL, SDT_SYSIGT, TRP_UPL);
+	    KCS_SEL, SDT_SYSIGT, TRP_UPL, 0);
 #endif	/* __i386 */
 
 	brand_tbl[2].ih_inum = 0;
@@ -1018,7 +1032,6 @@ init_idt_common(gate_desc_t *idt)
 static void
 init_idt(gate_desc_t *idt)
 {
-	bzero(idt, sizeof (*idt) * NIDT);
 	init_idt_common(idt);
 }
 
@@ -1038,13 +1051,15 @@ init_idt(gate_desc_t *idt)
 	 * unsupported and reserved.
 	 */
 	for (i = 0; i < NIDT; i++)
-		set_gatesegd(&idt[i], &resvtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
+		set_gatesegd(&idt[i], &resvtrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+		    0);
 
 	/*
 	 * 20-31 reserved
 	 */
 	for (i = 20; i < 32; i++)
-		set_gatesegd(&idt[i], &invaltrap, KCS_SEL, SDT_SYSIGT, TRP_KPL);
+		set_gatesegd(&idt[i], &invaltrap, KCS_SEL, SDT_SYSIGT, TRP_KPL,
+		    0);
 
 	/*
 	 * interrupts 32 - 255
@@ -1055,7 +1070,7 @@ init_idt(gate_desc_t *idt)
 		if (ivctptr == NULL)
 			panic("kobj_getsymvalue(%s) failed", ivctname);
 
-		set_gatesegd(&idt[i], ivctptr, KCS_SEL, SDT_SYSIGT, TRP_KPL);
+		set_gatesegd(&idt[i], ivctptr, KCS_SEL, SDT_SYSIGT, TRP_KPL, 0);
 	}
 
 	/*
@@ -1191,6 +1206,7 @@ init_desctbls(void)
 #endif
 	idt0 = (gate_desc_t *)BOP_ALLOC(bootops, (caddr_t)IDT_VA,
 	    PAGESIZE, PAGESIZE);
+	bzero(idt0, PAGESIZE);
 	init_idt(idt0);
 	for (vec = 0; vec < NIDT; vec++)
 		xen_idt_write(&idt0[vec], vec);
@@ -1225,11 +1241,13 @@ init_desctbls(void)
 #endif
 	idt0 = (gate_desc_t *)BOP_ALLOC(bootops, (caddr_t)IDT_VA,
 	    PAGESIZE, PAGESIZE);
+	bzero(idt0, PAGESIZE);
 #if !defined(__lint)
 	ASSERT(sizeof (*ktss0) <= PAGESIZE);
 #endif
 	ktss0 = (struct tss *)BOP_ALLOC(bootops, (caddr_t)KTSS_VA,
 	    PAGESIZE, PAGESIZE);
+	bzero(ktss0, PAGESIZE);
 
 #if defined(__i386)
 #if !defined(__lint)
@@ -1237,6 +1255,7 @@ init_desctbls(void)
 #endif
 	dftss0 = (struct tss *)BOP_ALLOC(bootops, (caddr_t)DFTSS_VA,
 	    PAGESIZE, PAGESIZE);
+	bzero(dftss0, PAGESIZE);
 #endif
 
 	/*

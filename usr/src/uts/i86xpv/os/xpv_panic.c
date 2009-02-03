@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -501,24 +501,32 @@ switch_to_xpv_panic_idt()
 	selector_t cs = get_cs_register();
 
 	for (i = 0; i < 32; i++)
-		set_gatesegd(&idt[i], &xpv_invaltrap, cs, SDT_SYSIGT, TRP_XPL);
+		set_gatesegd(&idt[i], &xpv_invaltrap, cs, SDT_SYSIGT, TRP_XPL,
+		    0);
 
-	set_gatesegd(&idt[T_ZERODIV], &xpv_div0trap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_SGLSTP], &xpv_dbgtrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_NMIFLT], &xpv_nmiint, cs, SDT_SYSIGT, TRP_XPL);
+	set_gatesegd(&idt[T_ZERODIV], &xpv_div0trap, cs, SDT_SYSIGT, TRP_XPL,
+	    0);
+	set_gatesegd(&idt[T_SGLSTP], &xpv_dbgtrap, cs, SDT_SYSIGT, TRP_XPL, 0);
+	set_gatesegd(&idt[T_NMIFLT], &xpv_nmiint, cs, SDT_SYSIGT, TRP_XPL, 0);
 	set_gatesegd(&idt[T_BOUNDFLT], &xpv_boundstrap, cs, SDT_SYSIGT,
-	    TRP_XPL);
-	set_gatesegd(&idt[T_ILLINST], &xpv_invoptrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_NOEXTFLT], &xpv_ndptrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_TSSFLT], &xpv_invtsstrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_SEGFLT], &xpv_segnptrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_STKFLT], &xpv_stktrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_GPFLT], &xpv_gptrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_PGFLT], &xpv_pftrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_EXTERRFLT], &xpv_ndperr, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_ALIGNMENT], &xpv_achktrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_MCE], &xpv_mcetrap, cs, SDT_SYSIGT, TRP_XPL);
-	set_gatesegd(&idt[T_SIMDFPE], &xpv_xmtrap, cs, SDT_SYSIGT, TRP_XPL);
+	    TRP_XPL, 0);
+	set_gatesegd(&idt[T_ILLINST], &xpv_invoptrap, cs, SDT_SYSIGT, TRP_XPL,
+	    0);
+	set_gatesegd(&idt[T_NOEXTFLT], &xpv_ndptrap, cs, SDT_SYSIGT, TRP_XPL,
+	    0);
+	set_gatesegd(&idt[T_TSSFLT], &xpv_invtsstrap, cs, SDT_SYSIGT, TRP_XPL,
+	    0);
+	set_gatesegd(&idt[T_SEGFLT], &xpv_segnptrap, cs, SDT_SYSIGT, TRP_XPL,
+	    0);
+	set_gatesegd(&idt[T_STKFLT], &xpv_stktrap, cs, SDT_SYSIGT, TRP_XPL, 0);
+	set_gatesegd(&idt[T_GPFLT], &xpv_gptrap, cs, SDT_SYSIGT, TRP_XPL, 0);
+	set_gatesegd(&idt[T_PGFLT], &xpv_pftrap, cs, SDT_SYSIGT, TRP_XPL, 0);
+	set_gatesegd(&idt[T_EXTERRFLT], &xpv_ndperr, cs, SDT_SYSIGT, TRP_XPL,
+	    0);
+	set_gatesegd(&idt[T_ALIGNMENT], &xpv_achktrap, cs, SDT_SYSIGT, TRP_XPL,
+	    0);
+	set_gatesegd(&idt[T_MCE], &xpv_mcetrap, cs, SDT_SYSIGT, TRP_XPL, 0);
+	set_gatesegd(&idt[T_SIMDFPE], &xpv_xmtrap, cs, SDT_SYSIGT, TRP_XPL, 0);
 
 	/*
 	 * We have no double fault handler.  Any single fault represents a
@@ -534,11 +542,11 @@ switch_to_xpv_panic_idt()
 	 */
 	for (i = 33; i < NIDT; i++)
 		set_gatesegd(&idt[i], &xpv_surprise_intr, cs, SDT_SYSIGT,
-		    TRP_XPL);
+		    TRP_XPL, 0);
 
 	/* The one interrupt we expect to get is from the APIC timer.  */
 	set_gatesegd(&idt[T_XPV_TIMER], &xpv_timer_trap, cs, SDT_SYSIGT,
-	    TRP_XPL);
+	    TRP_XPL, 0);
 
 	idtr.dtr_base = (uintptr_t)xpv_panic_idt;
 	idtr.dtr_limit = sizeof (xpv_panic_idt) - 1;
