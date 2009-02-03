@@ -3980,6 +3980,8 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 		return (0);
 	else if (len > plsz)
 		len = plsz;
+	else
+		len = P2ROUNDUP(len, PAGESIZE);
 	ASSERT(plsz >= len);
 
 	ZFS_ENTER(zfsvfs);
@@ -4002,8 +4004,10 @@ zfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 			ASSERT3U((*pl)->p_offset, ==, off);
 			off += PAGESIZE;
 			addr += PAGESIZE;
-			if (len >= PAGESIZE)
+			if (len > 0) {
+				ASSERT3U(len, >=, PAGESIZE);
 				len -= PAGESIZE;
+			}
 			ASSERT3U(plsz, >=, PAGESIZE);
 			plsz -= PAGESIZE;
 			pl++;
