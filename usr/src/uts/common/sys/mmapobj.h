@@ -38,7 +38,6 @@ extern "C" {
 #define	LIBVA_CACHED_SEGS 3
 
 #ifdef _KERNEL
-extern void lib_va_init(void);
 extern void mmapobj_unmap(mmapobj_result_t *, int, int, ushort_t);
 #endif
 

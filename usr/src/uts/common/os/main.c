@@ -555,14 +555,6 @@ main(void)
 	lgrp_main_mp_init();
 
 	/*
-	 * Initialize lib_va arenas.  Needs to be done after start_other_cpus
-	 * so that USERLIMIT32 represents the final value after any
-	 * workarounds have been applied. Also need to be done before we
-	 * create any processes so that all libs can be cached.
-	 */
-	lib_va_init();
-
-	/*
 	 * After mp_init(), number of cpus are known (this is
 	 * true for the time being, when there are actually
 	 * hot pluggable cpus then this scheme  would not do).
