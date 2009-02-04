@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 
 #ifndef _SYS_PX_REGS_H
 #define	_SYS_PX_REGS_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -1149,8 +1148,11 @@ extern "C" {
 #define	MMU_CONTROL_AND_STATUS_TIP	  42
 #define	MMU_CONTROL_AND_STATUS_TCM	40
 #define	MMU_CONTROL_AND_STATUS_TCM_MASK	0x3
-#define	MMU_CONTROL_AND_STATUS_SPAREC	16
-#define	MMU_CONTROL_AND_STATUS_SPAREC_MASK	0xf
+#define	MMU_CONTROL_AND_STATUS_ROE	16
+#define	MMU_CONTROL_AND_STATUS_ROE_MASK	0x7
+#define	MMU_CONTROL_AND_STATUS_ROE_BIT63_ENABLE	(1 << 2)
+#define	MMU_CONTROL_AND_STATUS_ROE_BIT43_ENABLE	(1 << 1)
+#define	MMU_CONTROL_AND_STATUS_ROE_BIT35_ENABLE	(1 << 0)
 #define	MMU_CONTROL_AND_STATUS_PD	  12
 #define	MMU_CONTROL_AND_STATUS_SE	  10
 #define	MMU_CONTROL_AND_STATUS_CM	8

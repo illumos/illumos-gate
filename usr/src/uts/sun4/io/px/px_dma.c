@@ -1080,9 +1080,13 @@ px_dma_newwin(dev_info_t *dip, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp,
 
 		/* close up the cookie up to (including) prev_pfn */
 		baddr = MMU_PTOB(seg_pfn0);
-		if (bypass && (px_lib_iommu_getbypass(dip,
-		    baddr, attr, &baddr) != DDI_SUCCESS))
-			return (DDI_FAILURE);
+		if (bypass) {
+			if (px_lib_iommu_getbypass(dip, baddr, attr, &baddr)
+			    == DDI_SUCCESS)
+				baddr = px_lib_ro_bypass(dip, attr, baddr);
+			else
+				return (DDI_FAILURE);
+		}
 
 		MAKE_DMA_COOKIE(cookie_p, baddr, MMU_PTOB(pfn_no));
 		DBG(DBG_BYPASS, mp->dmai_rdip, "cookie %p (%x pages)\n",
@@ -1094,9 +1098,13 @@ px_dma_newwin(dev_info_t *dip, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp,
 	}
 
 	baddr = MMU_PTOB(seg_pfn0);
-	if (bypass && (px_lib_iommu_getbypass(dip,
-	    baddr, attr, &baddr) != DDI_SUCCESS))
-		return (DDI_FAILURE);
+	if (bypass) {
+		if (px_lib_iommu_getbypass(dip, baddr, attr, &baddr)
+		    == DDI_SUCCESS)
+			baddr = px_lib_ro_bypass(dip, attr, baddr);
+		else
+			return (DDI_FAILURE);
+	}
 
 	MAKE_DMA_COOKIE(cookie_p, baddr, MMU_PTOB(pfn_no));
 	DBG(DBG_BYPASS, mp->dmai_rdip, "cookie %p (%x pages) of total %x\n",

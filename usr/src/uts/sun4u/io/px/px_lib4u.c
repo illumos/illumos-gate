@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -615,6 +615,22 @@ px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra, io_attributes_t attr,
 	    *io_addr_p);
 
 	return (DDI_SUCCESS);
+}
+
+/*
+ * Returns any needed IO address bit(s) for relaxed ordering in IOMMU
+ * bypass mode.
+ */
+uint64_t
+px_lib_ro_bypass(dev_info_t *dip, io_attributes_t attr, uint64_t ioaddr)
+{
+	px_t	*px_p = DIP_TO_STATE(dip);
+	pxu_t	*pxu_p = (pxu_t *)px_p->px_plat_p;
+
+	if ((PX_CHIP_TYPE(pxu_p) == PX_CHIP_OBERON) && (attr & PCI_MAP_ATTR_RO))
+		return (MMU_OBERON_BYPASS_RO | ioaddr);
+	else
+		return (ioaddr);
 }
 
 /*

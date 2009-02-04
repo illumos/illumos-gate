@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,6 +91,8 @@ extern int px_lib_dma_bypass_rngchk(dev_info_t *dip, ddi_dma_attr_t *attr_p,
     uint64_t *lo_p, uint64_t *hi_p);
 extern int px_lib_iommu_getbypass(dev_info_t *dip, r_addr_t ra,
     io_attributes_t attr, io_addr_t *io_addr_p);
+extern uint64_t px_lib_ro_bypass(dev_info_t *dip, io_attributes_t attr,
+    uint64_t io_addr);
 extern int px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip,
     ddi_dma_handle_t handle, off_t off, size_t len, uint_t cache_flags);
 

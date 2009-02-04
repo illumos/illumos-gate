@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1749,6 +1749,8 @@ hvio_mmu_init(caddr_t csr_base, pxu_t *pxu_p)
 	 */
 	val = CSR_XR(csr_base, MMU_CONTROL_AND_STATUS);
 	val |= ((1ull << MMU_CONTROL_AND_STATUS_SE)
+	    |  (MMU_CONTROL_AND_STATUS_ROE_BIT63_ENABLE <<
+	    MMU_CONTROL_AND_STATUS_ROE)
 	    | (MMU_CONTROL_AND_STATUS_CM_MASK << MMU_CONTROL_AND_STATUS_CM)
 	    | (1ull << MMU_CONTROL_AND_STATUS_BE)
 	    | (1ull << MMU_CONTROL_AND_STATUS_TE));

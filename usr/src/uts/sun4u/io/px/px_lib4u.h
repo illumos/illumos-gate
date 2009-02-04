@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_PX_LIB4U_H
 #define	_SYS_PX_LIB4U_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -185,6 +184,8 @@ typedef	struct eq_rec {
 
 #define	MMU_OBERON_BYPASS_BASE		0x7FFC000000000000ull
 #define	MMU_OBERON_BYPASS_END		0x7FFC7FFFFFFFFFFFull
+
+#define	MMU_OBERON_BYPASS_RO		0x8000000000000000ull
 
 #define	MMU_TSB_PA_MASK		0x7FFFFFFFE000
 
