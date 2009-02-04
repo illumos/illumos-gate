@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -391,7 +391,7 @@ struct dev_ops usbsacm_ops = {
 	&usbsacm_cb_ops,	/* devo_cb_ops */
 	(struct bus_ops *)NULL,	/* devo_bus_ops */
 	usbser_power,		/* devo_power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 extern struct mod_ops mod_driverops;

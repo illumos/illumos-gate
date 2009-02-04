@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,7 +107,7 @@ static struct dev_ops ugen_skel_ops = {
 	&ugen_skel_cb_ops,		/* driver operations */
 	NULL,				/* bus operations */
 	ugen_skel_power,		/* power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 static struct modldrv modldrv = {

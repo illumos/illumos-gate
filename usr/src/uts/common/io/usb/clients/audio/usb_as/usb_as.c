@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,7 +246,7 @@ static struct dev_ops usb_as_dev_ops = {
 	&usb_as_cb_ops,		/* devi_cb_ops */
 	NULL,			/* devo_busb_as_ops */
 	usb_as_power,		/* devo_power */
-	ddi_quiesce_not_supported,	/* devo_quiesce */
+	ddi_quiesce_not_needed,	/* devo_quiesce */
 };
 
 /* Linkage structure for loadable drivers */
