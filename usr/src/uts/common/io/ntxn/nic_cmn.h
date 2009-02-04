@@ -18,12 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#ifndef UNM_NIC_CMN_H
-#define	UNM_NIC_CMN_H
+
+#ifndef _UNM_NIC_CMN_H_
+#define	_UNM_NIC_CMN_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef sun
 #include "unm_nic_config.h"
@@ -226,18 +232,18 @@ typedef uint8_t  U8;
 
 typedef struct __msg
 {
-    __uint32_t  PegId:2,   // 0x2 for tx and 01 for rx.
-			    privId:1, // must be 1
-			    Count:15, // for doorbell
-			    CtxId:10, // Ctx_id
+    __uint32_t  PegId:2,   /* 0x2 for tx and 01 for rx */
+			    privId:1, /* must be 1 */
+			    Count:15, /* for doorbell */
+			    CtxId:10, /* Ctx_id */
 			    Opcode:4; /* opcode */
 }ctx_msg, CTX_MSG, *PCTX_MSG;
 
 typedef struct __int_msg
 {
-    __uint32_t  Count:18, // INT
+    __uint32_t  Count:18, /* INT */
 			    ConsumerIdx:10,
-			    CtxId:4; // Ctx_id
+			    CtxId:4; /* Ctx_id */
 
 }int_msg, INT_MSG, *PINT_MSG;
 
@@ -273,9 +279,9 @@ typedef struct PREALIGN(64) _RingContext
 
 	__uint32_t		CtxId;
 
-    __uint64_t		D3_STATE_REGISTER;
-    __uint32_t		DummyDmaAddrLo;
-    __uint32_t		DummyDmaAddrHi;
+	__uint64_t		D3_STATE_REGISTER;
+	__uint32_t		DummyDmaAddrLo;
+	__uint32_t		DummyDmaAddrHi;
 
 }POSTALIGN(64) RingContext, RING_CTX, *PRING_CTX;
 
@@ -321,14 +327,14 @@ typedef struct PREALIGN(64) _rssCmdDesc
 
 	unm_msgword_t		Key0[2];
 	unm_halfmsgword_t	HashMethod;
-    unm_halfmsgword_t
+	unm_halfmsgword_t
 						HashKeySize:8,
 						Unused:16,
 						opcode:8;
 
-    unm_msgword_t    Key1[3];
-    unm_msgword_t    Unused1;
-    unm_msgword_t    Unused2;
+	unm_msgword_t    Key1[3];
+	unm_msgword_t    Unused1;
+	unm_msgword_t    Unused2;
 
 #endif
 
@@ -343,22 +349,22 @@ typedef struct PREALIGN(64) cmdDescType0
 	union {
 		struct {
 			__uint32_t	tcpHdrOffset:8, /* For LSO only */
-						ipHdrOffset:8,  // For LSO only
-						flags:7, /* as defined above */
+			ipHdrOffset:8,  /* For LSO only */
+			flags:7, /* as defined above */
 			/* This location/size must not change... */
-						opcode:6,
-						Unused:3;
+			opcode:6,
+			Unused:3;
 			/* total number of segments (buffers */
 			__uint32_t	numOfBuffers:8,
 			/* for this packet. (could be more than 4) */
 
-						/* Total size of the packet */
-						totalLength:24;
-	}s1;
-	__uint64_t	word0;
+			/* Total size of the packet */
+			totalLength:24;
+		}s1;
+		__uint64_t	word0;
 	}u1;
 
-    union {
+	union {
 		struct {
 			__uint32_t AddrLowPart2;
 			__uint32_t AddrHighPart2;
@@ -420,16 +426,16 @@ typedef struct PREALIGN(64) cmdDescType0
 		__uint64_t	word6;
 	}u7;
 
-    __uint64_t unused;
+	__uint64_t unused;
 
 } POSTALIGN(64) cmdDescType0_t;
 
 /* Note: sizeof(rcvDesc) should always be a mutliple of 2 */
 typedef struct rcvDesc
 {
-    __uint32_t	referenceHandle:16,
+	__uint32_t	referenceHandle:16,
 				flags:16;
-    __uint32_t
+	__uint32_t
 		/* allocated buffer length (usually 2K) */
 				bufferLength:32;
 	__uint64_t	AddrBuffer;
@@ -456,7 +462,7 @@ typedef struct rcvDesc
 #define	LRO_NORMAL_FRAG_DESC	((LRO_NORMAL_FRAG)<<63)
 
 typedef struct PREALIGN(16) statusDesc {
-    union {
+	union {
 		struct {
 					/* initially to be used but noe now */
 			__uint32_t	port:4,
@@ -562,7 +568,7 @@ typedef struct PREALIGN(16) statusDesc {
 #if UNM_CONF_PROCESSOR == UNM_CONF_X86
 
 typedef struct PREALIGN(512) s_ipsec_sa {
-    U32	SrcAddr;
+	U32	SrcAddr;
 	U32	SrcMask;
 	U32	DestAddr;
 	U32	DestMask;
@@ -625,19 +631,19 @@ typedef struct _unm_ah_header_s {
 	U32	NextProto:8,
 		length:8,
 		reserved:16;
-    U32    SPI;
-    U32    seqno;
-    U16    ICV;
-    U16    ICV1;
-    U16    ICV2;
-    U16    ICV3;
-    U16    ICV4;
-    U16    ICV5;
+	U32    SPI;
+	U32    seqno;
+	U16    ICV;
+	U16    ICV1;
+	U16    ICV2;
+	U16    ICV3;
+	U16    ICV4;
+	U16    ICV5;
 } unm_ah_header_t;
 
 typedef struct _unm_esp_hdr_s {
-    U32 SPI;
-    U32 seqno;
+	U32 SPI;
+	U32 seqno;
 } unm_esp_hdr_t;
 
 #endif /* UNM_IPSECOFFLOAD */
@@ -707,23 +713,27 @@ typedef struct _unm_esp_hdr_s {
  * Commands. Must match the definitions in nic/Linux/include/unm_nic_ioctl.h
  */
 enum {
-    UNM_IP_FILTER_CLEAR = 1,
-    UNM_IP_FILTER_ADD,
-    UNM_IP_FILTER_DEL,
-    UNM_IP_FILTER_SHOW
+	UNM_IP_FILTER_CLEAR = 1,
+	UNM_IP_FILTER_ADD,
+	UNM_IP_FILTER_DEL,
+	UNM_IP_FILTER_SHOW
 };
 
 #define	MAX_FILTER_ENTRIES		16
 
 typedef struct {
-    __int32_t count;
-    __uint32_t ip_addr[15];
+	__int32_t count;
+	__uint32_t ip_addr[15];
 } unm_ip_filter_t;
 #endif /* UNM_IP_FILTER */
 
 enum {
-    UNM_RCV_PEG_0 = 0,
-    UNM_RCV_PEG_1
+	UNM_RCV_PEG_0 = 0,
+	UNM_RCV_PEG_1
 };
 
-#endif /* !UNM_NIC_CMN_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* !_UNM_NIC_CMN_H_ */

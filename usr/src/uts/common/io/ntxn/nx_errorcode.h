@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -29,6 +30,10 @@
 
 #ifndef _NX_ERRORCODE_H_
 #define	_NX_ERRORCODE_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  *        Common Error Codes
@@ -77,5 +82,9 @@
  *       Macros
  */
 #define	NX_IS_RCODE_VALID(ERR)		(ERR >= NX_RCODE_MAX)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _NX_ERRORCODE_H_ */

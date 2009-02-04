@@ -18,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
@@ -300,8 +302,8 @@ nx_fw_cmd_create_rx_ctx(struct unm_adapter_s *adapter)
 	prq->sds_ring_offset = prq->rds_ring_offset +
 	    (sizeof (nx_hostrq_rds_ring_t) * nrds_rings);
 
-	prq_rds = (nx_hostrq_rds_ring_t *)(uintptr_t)(prq->data +
-	    prq->rds_ring_offset);
+	prq_rds = (nx_hostrq_rds_ring_t *)(uintptr_t)((char *)prq +
+	    sizeof (*prq) + prq->rds_ring_offset);
 
 	for (i = 0; i < nrds_rings; i++) {
 		rcv_desc = &recv_ctx->rcv_desc[i];
@@ -312,8 +314,8 @@ nx_fw_cmd_create_rx_ctx(struct unm_adapter_s *adapter)
 		prq_rds[i].buff_size = HOST_TO_LE_64(rcv_desc->dma_size);
 	}
 
-	prq_sds = (nx_hostrq_sds_ring_t *)(uintptr_t)(prq->data +
-	    prq->sds_ring_offset);
+	prq_sds = (nx_hostrq_sds_ring_t *)(uintptr_t)((char *)prq +
+	    sizeof (*prq) + prq->sds_ring_offset);
 
 	prq_sds[0].host_phys_addr =
 	    HOST_TO_LE_64(recv_ctx->rcvStatusDesc_physAddr);
@@ -340,8 +342,8 @@ nx_fw_cmd_create_rx_ctx(struct unm_adapter_s *adapter)
 	}
 
 
-	prsp_rds = ((nx_cardrsp_rds_ring_t *)(uintptr_t)
-	    &prsp->data[prsp->rds_ring_offset]);
+	prsp_rds = (nx_cardrsp_rds_ring_t *)(uintptr_t)((char *)prsp +
+	    sizeof (*prsp) + prsp->rds_ring_offset);
 
 	for (i = 0; i < LE_TO_HOST_32(prsp->num_rds_rings); i++) {
 		rcv_desc = &recv_ctx->rcv_desc[i];
@@ -350,8 +352,8 @@ nx_fw_cmd_create_rx_ctx(struct unm_adapter_s *adapter)
 		rcv_desc->host_rx_producer = UNM_NIC_REG(reg - 0x200);
 	}
 
-	prsp_sds = ((nx_cardrsp_sds_ring_t *)(uintptr_t)
-	    &prsp->data[prsp->sds_ring_offset]);
+	prsp_sds = (nx_cardrsp_sds_ring_t *)(uintptr_t)((char *)prsp +
+	    sizeof (*prsp) + prsp->sds_ring_offset);
 	reg = LE_TO_HOST_32(prsp_sds[0].host_consumer_crb);
 	recv_ctx->host_sds_consumer = UNM_NIC_REG(reg - 0x200);
 

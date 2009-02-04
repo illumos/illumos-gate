@@ -18,14 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
@@ -201,7 +203,7 @@ get_flash_mac_addr(struct unm_adapter_s *adapter, u64 mac[])
 		// FOR P3, read from CAM RAM
 
 		int pci_func = adapter->ahw.pci_func;
-		pmac16 += (4*pci_func);
+		pmac16 += (4 * pci_func);
 		crbaddr = CRB_MAC_BLOCK_START + (4 * ((pci_func/2) * 3)) +
 		    (4 * (pci_func & 1));
 

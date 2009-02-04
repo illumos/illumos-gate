@@ -18,12 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#ifndef __UNM_BRDINFO_H
-#define	__UNM_BRDINFO_H
+
+#ifndef _UNM_BRDINFO_H_
+#define	_UNM_BRDINFO_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* The version of the main data structure */
 #define	UNM_BDINFO_VERSION 1
@@ -75,7 +81,7 @@ typedef enum {
 	UNM_BRDTYPE_P3_10G_CX4		=	0x0031, /* Reference CX4 */
 	UNM_BRDTYPE_P3_10G_XFP		=	0x0032, /* Reference XFP */
 
-    UNM_BRDTYPE_P3_10G_TRP	 =  0x0080,
+    UNM_BRDTYPE_P3_10G_TRP	 =  0x0080
 
 } unm_brdtype_t;
 
@@ -85,7 +91,7 @@ typedef enum {
 	NX_P3_CT_TYPE_ROMIMAGE,
 	NX_P3_MN_TYPE_ROMIMAGE,
 	NX_P3_MS_TYPE_ROMIMAGE,
-	NX_UNKNOWN_TYPE_ROMIMAGE_LAST,
+	NX_UNKNOWN_TYPE_ROMIMAGE_LAST
 } nx_fw_type_t;
 
 /* board type specific information */
@@ -220,16 +226,16 @@ typedef struct {
 #define	FLASH_NUM_MAC_PER_PORT		32
 typedef struct {
     __uint8_t  flash_md5[16 * 64];
-	// __uint8_t  crbinit_md5[16];
-	// __uint8_t  brdcfg_md5[16];
+	/* __uint8_t  crbinit_md5[16]; */
+	/* __uint8_t  brdcfg_md5[16]; */
 	/* bootloader */
     __uint32_t bootld_version;
     __uint32_t bootld_size;
-	// __uint8_t  bootld_md5[16];
+	/* __uint8_t  bootld_md5[16]; */
 	/* image */
     __uint32_t image_version;
     __uint32_t image_size;
-	// U8  image_md5[16];
+	/* U8  image_md5[16]; */
 	/* primary image status */
     __uint32_t primary_status;
     __uint32_t secondary_present;
@@ -258,7 +264,7 @@ typedef enum {
     PXE_FIRST_STAGE_PPC = 0x3C4000, /* PPC First Stage info */
     PXE_SECOND_STAGE_INTEL = 0x3B0000, /* Intel Second Stage info */
     PXE_SECOND_STAGE_PPC = 0x3A0000, /* Intel Second Stage info */
-//    LICENSE_TIME_START = 0x3C0000, /* license expiry time info */
+/*    LICENSE_TIME_START = 0x3C0000,  license expiry time info */
 	PXE_START		= 0x3D0000,   /* PXE image area */
     DEFAULT_DATA_START = 0x3e0000, /* where we place default factory data */
 	/* User defined region for new boards */
@@ -270,4 +276,8 @@ typedef enum {
 
 #define	USER_START_OLD		PXE_START /* for backward compatibility */
 
-#endif	/* !__UNM_BRDINFO_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* !_UNM_BRDINFO_H_ */

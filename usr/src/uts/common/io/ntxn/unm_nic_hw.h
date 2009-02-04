@@ -18,12 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #ifndef _UNM_NIC_HW_
 #define	_UNM_NIC_HW_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "unm_inc.h"
 
@@ -103,5 +109,9 @@ typedef struct {
 typedef struct {
 	crb_128M_2M_sub_block_map_t sub_block[16];
 } crb_128M_2M_block_map_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _UNM_NIC_HW_ */

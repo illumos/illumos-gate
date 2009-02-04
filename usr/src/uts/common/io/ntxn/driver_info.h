@@ -18,12 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#ifndef _driver_info_h_
-#define	_driver_info_h_
+
+#ifndef _DRIVER_INFO_H_
+#define	_DRIVER_INFO_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 static const unm_brdinfo_t unm_boards[] = {
 	{UNM_BRDTYPE_P2_SB31_10G_CX4,	1, NX_P2_MN_TYPE_ROMIMAGE,
@@ -64,4 +70,8 @@ static const unm_brdinfo_t unm_boards[] = {
 			"NX3031 with 1/10 Gigabit Ethernet"},
 };
 
-#endif /* !_driver_info_h_ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* !_DRIVER_INFO_H_ */

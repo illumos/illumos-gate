@@ -18,14 +18,16 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
@@ -222,7 +224,7 @@ unm_nic_disable_int(unm_adapter *adapter)
 	    &temp, 4);
 }
 
-static inline int
+static int
 unm_nic_clear_int(unm_adapter *adapter)
 {
 	uint32_t	mask, temp, our_int, status;

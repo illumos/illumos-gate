@@ -18,14 +18,26 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#ifndef _UNM_VERSION_H
-#define	_UNM_VERSION_H
+
+#ifndef _UNM_VERSION_H_
+#define	_UNM_VERSION_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define	UNM_NIC_VERSIONID	"4.0.219"
 #define	_UNM_NIC_MAJOR		4
 #define	_UNM_NIC_MINOR		0
 #define	_UNM_NIC_SUBVERSION	219
-#endif /* !_UNM_VERSION_H */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* !_UNM_VERSION_H_ */

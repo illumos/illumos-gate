@@ -18,12 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#ifndef __UNM_INC_H
-#define	__UNM_INC_H
+
+#ifndef _UNM_INC_H_
+#define	_UNM_INC_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include "nx_errorcode.h"
 
@@ -1462,7 +1468,7 @@ typedef	enum {
 	UNM_I2Q_SRC_EXT2		= 47, /* External 2 */
 	/* [48:63] reserved */
 	UNM_I2Q_SRC_MAX			= 47, /* max used interrupt line */
-	UNM_I2Q_SRC_MAX_LO		= 32, /* max bits in "lo" register */
+	UNM_I2Q_SRC_MAX_LO		= 32 /* max bits in "lo" register */
 } unm_i2q_source_t;
 
 /*
@@ -1774,4 +1780,8 @@ typedef struct {
 #define	NX_SET_SYSTEM_LEGACY(MIU_CTRL)		{(MIU_CTRL) &= ~0x4; }
 #define	NX_SET_SYSTEM_CUT_THROUGH(MIU_CTRL)	{(MIU_CTRL) |= 0x4; }
 
-#endif /* __UNM_INC_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _UNM_INC_H_ */

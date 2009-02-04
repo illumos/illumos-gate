@@ -18,12 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #ifndef __UNM_NIC_IOCTL_H__
 #define	__UNM_NIC_IOCTL_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* ioctl's dealing with PCI read/writes */
 #define	UNM_CMD_START 0
@@ -75,5 +81,9 @@ struct unm_statistics {
 };
 
 #pragma pack()
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* !__UNM_NIC_IOCTL_H__ */

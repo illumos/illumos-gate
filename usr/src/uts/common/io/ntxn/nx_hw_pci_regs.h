@@ -18,12 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#ifndef __NX_HW_REGS_H
-#define	__NX_HW_REGS_H
+
+#ifndef _NX_HW_REGS_H_
+#define	_NX_HW_REGS_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  *		PCI related defines.
@@ -165,4 +171,8 @@ struct nx_legacy_intr_set {
 		ISR_MSI_INT_TRIGGER(7) },	\
 }
 
-#endif /* __NX_HW_REGS_H */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* !_NX_HW_REGS_H_ */

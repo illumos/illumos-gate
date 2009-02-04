@@ -18,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #include <sys/types.h>
 #include <sys/conf.h>
 #include <sys/debug.h>
@@ -1971,7 +1973,7 @@ void
 unm_nic_stop_port(struct unm_adapter_s *adapter)
 {
 
-	mac_unregister(adapter->mach);
+	(void) mac_unregister(adapter->mach);
 
 	switch (adapter->ahw.board_type) {
 	case UNM_NIC_GBE:

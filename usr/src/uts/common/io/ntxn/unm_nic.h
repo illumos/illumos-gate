@@ -18,16 +18,22 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #ifndef _UNM_NIC_
 #define	_UNM_NIC_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <sys/inttypes.h>
 #include <sys/rwlock.h>
@@ -815,5 +821,9 @@ enum ioc_reply {
 #define	MBPS_10		10
 #define	MBPS_100	100
 #define	MBPS_1000	1000
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif	/* !_UNM_NIC_ */

@@ -18,12 +18,18 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#ifndef NIC_PHAN_REG_H
-#define	NIC_PHAN_REG_H
+
+#ifndef _NIC_PHAN_REG_H_
+#define	_NIC_PHAN_REG_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define	NIC_CRB_BASE				UNM_CAM_RAM(0x200)
 #define	NIC_CRB_BASE_2				UNM_CAM_RAM(0x700)
@@ -158,4 +164,9 @@ enum {
 
 #define	D3_CRB_REG_FUN2		(UNM_PCIX_PS_REG(0x2084))
 #define	D3_CRB_REG_FUN3		(UNM_PCIX_PS_REG(0x3084))
-#endif /* NIC_PHAN_REG_H */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* !_NIC_PHAN_REG_H_ */

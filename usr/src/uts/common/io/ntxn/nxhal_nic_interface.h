@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -29,6 +30,10 @@
 
 #ifndef _NXHAL_NIC_INTERFACE_H_
 #define	_NXHAL_NIC_INTERFACE_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  *        Simple Types
@@ -429,7 +434,7 @@ typedef struct nx_hostrq_rx_ctx_s {
 	U32 capabilities[4];	/* Flag bit vector */
 	U32 host_int_crb_mode;	/* Interrupt crb usage */
 	U32 host_rds_crb_mode;	/* RDS crb usage */
-	/* These ring offsets are relative to data[0] below */
+	/* These ring offsets are relative to end of structure */
 	U32 rds_ring_offset;	/* Offset to RDS config */
 	U32 sds_ring_offset;	/* Offset to SDS config */
 	U16 num_rds_rings;	/* Count of RDS rings */
@@ -443,7 +448,6 @@ typedef struct nx_hostrq_rx_ctx_s {
 	 * - N hostrq_rds_rings
 	 * - N hostrq_sds_rings
 	 */
-	char data[];
 } nx_hostrq_rx_ctx_t;
 
 typedef struct nx_cardrsp_rds_ring_s {
@@ -457,7 +461,7 @@ typedef struct nx_cardrsp_sds_ring_s {
 } nx_cardrsp_sds_ring_t;
 
 typedef struct nx_cardrsp_rx_ctx_s {
-	/* These ring offsets are relative to data[0] below */
+	/* These ring offsets are relative to end of structure */
 	U32 rds_ring_offset;	/* Offset to RDS config */
 	U32 sds_ring_offset;	/* Offset to SDS config */
 	U32 host_ctx_state;	/* Starting State */
@@ -474,7 +478,6 @@ typedef struct nx_cardrsp_rx_ctx_s {
 	 * - N cardrsp_rds_rings
 	 * - N cardrs_sds_rings
 	 */
-	char data[];
 } nx_cardrsp_rx_ctx_t;
 
 #define	SIZEOF_HOSTRQ_RX(HOSTRQ_RX, rds_rings, sds_rings)	\
@@ -540,6 +543,8 @@ typedef struct nx_hostrq_stat_setup_s {
 	U16 stat_interval;	/* Frequency of update */
 } nx_hostrq_stat_setup_t;
 
-
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _NXHAL_NIC_INTERFACE_H_ */

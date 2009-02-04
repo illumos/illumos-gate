@@ -18,10 +18,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2008 NetXen, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #include "unm_nic.h"
 
 static char transfer_speed_propname[] = "transfer-speed";
