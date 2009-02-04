@@ -20,14 +20,12 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	drand48, etc. pseudo-random number generator
@@ -99,17 +97,6 @@ static unsigned x[3] = { X0, X1, X2 }, a[3] = { A0, A1, A2 }, c = C;
 static unsigned short lastx[3];
 static void next(void);
 
-static double
-ipf_r_drand48_u(void)
-{
-	static double two16m = 1.0 / ((int32_t)1 << N);
-
-	next();
-	return (two16m * (two16m * (two16m * x[0] + x[1]) + x[2]));
-}
-
-NEST(double, ipf_r_erand48_u, ipf_r_drand48_u)
-
 static long
 ipf_r_lrand48_u(void)
 {
@@ -160,62 +147,7 @@ ipf_r_srand48(long seedval)
 	mutex_exit(&seed_lock);
 }
 
-unsigned short *
-ipf_r_seed48(unsigned short seed16v[3])
-{
-	if (init48done == 0)
-		init48();
-	mutex_enter(&seed_lock);
-	SETLOW(lastx, x, 0);
-	SEED(LOW(seed16v[0]), LOW(seed16v[1]), LOW(seed16v[2]));
-	mutex_exit(&seed_lock);
-	return (lastx);
-}
-
-void
-ipf_r_lcong48(unsigned short param[7])
-{
-	if (init48done == 0)
-		init48();
-	mutex_enter(&seed_lock);
-	SETLOW(x, param, 0);
-	SETLOW(a, param, 3);
-	c = LOW(param[6]);
-	mutex_exit(&seed_lock);
-}
-
-NEST(long, ipf_r_nrand48_u, ipf_r_lrand48_u)
-
-NEST(long, ipf_r_jrand48_u, ipf_r_mrand48_u)
-
-EXPORT0(double, ipf_r_drand48, ipf_r_drand48_u)
-EXPORT1(double, ipf_r_erand48, ipf_r_erand48_u)
-
 EXPORT0(long, ipf_r_lrand48, ipf_r_lrand48_u)
-EXPORT1(long, ipf_r_nrand48, ipf_r_nrand48_u)
-
-EXPORT0(long, ipf_r_mrand48, ipf_r_mrand48_u)
-EXPORT1(long, ipf_r_jrand48, ipf_r_jrand48_u)
-
-#ifdef DRIVER
-/*
-	This should print the sequences of integers in Tables 2
-		and 1 of the TM:
-	1623, 3442, 1447, 1829, 1305, ...
-	657EB7255101, D72A0C966378, 5A743C062A23, ...
- */
-#include <stdio.h>
-
-main()
-{
-	int i;
-
-	for (i = 0; i < 80; i++) {
-		printf("%4d ", (int)(4096 * ipf_r_drand48()));
-		printf("%.4X%.4X%.4X\n", x[2], x[1], x[0]);
-	}
-}
-#else
 
 #include <sys/random.h>
 
@@ -244,4 +176,3 @@ ipf_random()
 
 	return (unsigned)ipf_r_lrand48();
 }
-#endif
