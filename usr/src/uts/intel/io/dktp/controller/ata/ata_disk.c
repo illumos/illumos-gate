@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3100,6 +3100,9 @@ static void
 ata_set_write_cache(ata_ctl_t *ata_ctlp, ata_drv_t *ata_drvp)
 {
 	char *path;
+
+	if (!(IS_WRITE_CACHE_SUPPORTED(ata_drvp->ad_id)))
+		return;
 
 	if (ata_write_cache == 1) {
 		if (ata_set_feature(ata_ctlp, ata_drvp, FC_WRITE_CACHE_ON, 0)

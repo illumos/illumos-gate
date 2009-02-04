@@ -210,6 +210,10 @@ extern "C" {
 		    ((dp->ad_id.ai_config >> 8) & DTYPE_MASK) == \
 		    DTYPE_RODIRECT)
 
+/* Test whether the device support write cache */
+#define	IS_WRITE_CACHE_SUPPORTED(x) \
+	((((x).ai_cmdset82) & 0x20) >> 5)
+
 /*  macros from old common hba code */
 
 #define	ATA_INTPROP(devi, pname, pval, plen) \
