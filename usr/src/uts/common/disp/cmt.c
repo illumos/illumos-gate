@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -445,18 +445,28 @@ pg_cmt_cpu_fini(cpu_t *cp)
 	lgrp_handle = lgrp_plat_cpu_to_hand(cp->cpu_id);
 
 	lgrp = pg_cmt_find_lgrp(lgrp_handle);
-	if (lgrp == NULL) {
+	if (ncpus == 1 && lgrp != cpu0_lgrp) {
 		/*
-		 * This is a bit of a special case.
-		 * The only way this can happen is if the CPU's lgrp
-		 * handle changed out from underneath us, which is what
-		 * happens with null_proc_lpa on starcat systems.
+		 * One might wonder how we could be deconfiguring the
+		 * only CPU in the system.
 		 *
-		 * Use the initial boot CPU lgrp, since this is what
-		 * we need to tear down.
+		 * On Starcat systems when null_proc_lpa is detected,
+		 * the boot CPU (which is already configured into a leaf
+		 * lgroup), is moved into the root lgroup. This is done by
+		 * deconfiguring it from both lgroups and processor
+		 * groups), and then later reconfiguring it back in.  This
+		 * call to pg_cmt_cpu_fini() is part of that deconfiguration.
+		 *
+		 * This special case is detected by noting that the platform
+		 * has changed the CPU's lgrp affiliation (since it now
+		 * belongs in the root). In this case, use the cmt_lgrp_t
+		 * cached for the boot CPU, since this is what needs to be
+		 * torn down.
 		 */
 		lgrp = cpu0_lgrp;
 	}
+
+	ASSERT(lgrp != NULL);
 
 	/*
 	 * First, clean up anything load balancing specific for each of
