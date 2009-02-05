@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,14 +74,17 @@ dlmgmt_getlink_by_dev(char *devname)
  * be consumed by the datalink sysevent module.
  */
 static void
-dlmgmt_post_sysevent(const char *subclass, datalink_id_t linkid)
+dlmgmt_post_sysevent(const char *subclass, datalink_id_t linkid,
+    boolean_t reconfigured)
 {
 	nvlist_t	*nvl = NULL;
 	sysevent_id_t	eid;
 	int		err;
 
 	if (((err = nvlist_alloc(&nvl, NV_UNIQUE_NAME_TYPE, 0)) != 0) ||
-	    ((err = nvlist_add_uint64(nvl, RCM_NV_LINKID, linkid)) != 0)) {
+	    ((err = nvlist_add_uint64(nvl, RCM_NV_LINKID, linkid)) != 0) ||
+	    ((err = nvlist_add_boolean_value(nvl, RCM_NV_RECONFIGURED,
+	    reconfigured)) != 0)) {
 		goto done;
 	}
 
@@ -110,6 +113,7 @@ dlmgmt_upcall_create(void *argp, void *retp)
 	uint32_t		flags;
 	int			err = 0;
 	boolean_t		created = B_FALSE;
+	boolean_t		reconfigured = B_FALSE;
 
 	/*
 	 * Determine whether this link is persistent. Note that this request
@@ -153,8 +157,15 @@ dlmgmt_upcall_create(void *argp, void *retp)
 		if (err != 0)
 			goto done;
 
+		/*
+		 * This is a device that is dynamic reconfigured.
+		 */
+		if ((linkp->ll_flags & DLMGMT_ACTIVE) == 0)
+			reconfigured = B_TRUE;
+
 		linkp->ll_flags |= flags;
 		linkp->ll_gen++;
+
 		goto done;
 	}
 
@@ -216,7 +227,8 @@ noupdate:
 		 * is consumed by the datalink sysevent module which in
 		 * turn generates the RCM_RESOURCE_LINK_NEW RCM event.
 		 */
-		dlmgmt_post_sysevent(ESC_DATALINK_PHYS_ADD, retvalp->lr_linkid);
+		dlmgmt_post_sysevent(ESC_DATALINK_PHYS_ADD,
+		    retvalp->lr_linkid, reconfigured);
 	}
 
 	retvalp->lr_err = err;

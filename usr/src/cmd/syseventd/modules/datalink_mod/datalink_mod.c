@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,8 +56,12 @@ datalink_deliver_event(sysevent_t *ev, int unused)
 	if (sysevent_get_attr_list(ev, &nvl) != 0)
 		return (EINVAL);
 
-	if (rcm_notify_event(rcm_hdl, RCM_RESOURCE_LINK_NEW, 0, nvl, NULL) !=
-	    RCM_SUCCESS) {
+	/*
+	 * Send the PHYSLINK_NEW event to network_rcm to update the network
+	 * devices cache accordingly.
+	 */
+	if ((rcm_notify_event(rcm_hdl, RCM_RESOURCE_PHYSLINK_NEW, 0,
+	    nvl, NULL) != RCM_SUCCESS)) {
 		err = EINVAL;
 	}
 

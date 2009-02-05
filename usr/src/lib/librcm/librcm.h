@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,11 +95,15 @@ extern "C" {
 #define	RCM_CLIENT_NAME		"rcm.client_name"
 #define	RCM_CLIENT_EXPORTS	"rcm.client_exports"
 
-/* Resource name to register for new links come up */
+/* Resource name to register for new links reconfigured */
 #define	RCM_RESOURCE_LINK_NEW		"SUNW_event/resource/new/link"
+
+/* Resource name to register for new physical data-links */
+#define	RCM_RESOURCE_PHYSLINK_NEW	"SUNW_event/resource/new/physlink"
 
 /* name-value pair definitions for rcm_notify_event() */
 #define	RCM_NV_LINKID		"linkid"
+#define	RCM_NV_RECONFIGURED	"reconfigured"
 
 /*
  * rcm handles

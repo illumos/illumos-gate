@@ -199,15 +199,15 @@ net_register(rcm_handle_t *hd)
 	 * getting attached, so we get attach event notifications
 	 */
 	if (!events_registered) {
-		if (rcm_register_event(hd, RCM_RESOURCE_LINK_NEW, 0, NULL)
+		if (rcm_register_event(hd, RCM_RESOURCE_PHYSLINK_NEW, 0, NULL)
 		    != RCM_SUCCESS) {
 			rcm_log_message(RCM_ERROR,
 			    _("NET: failed to register %s\n"),
-			    RCM_RESOURCE_LINK_NEW);
+			    RCM_RESOURCE_PHYSLINK_NEW);
 			return (RCM_FAILURE);
 		} else {
-			rcm_log_message(RCM_DEBUG, _("NET: registered %s\n"),
-			    RCM_RESOURCE_LINK_NEW);
+			rcm_log_message(RCM_DEBUG, _("NET: registered %s \n"),
+			    RCM_RESOURCE_PHYSLINK_NEW);
 			events_registered++;
 		}
 	}
@@ -245,15 +245,15 @@ net_unregister(rcm_handle_t *hd)
 	 * Need to unregister interest in all new resources
 	 */
 	if (events_registered) {
-		if (rcm_unregister_event(hd, RCM_RESOURCE_LINK_NEW, 0)
+		if (rcm_unregister_event(hd, RCM_RESOURCE_PHYSLINK_NEW, 0)
 		    != RCM_SUCCESS) {
 			rcm_log_message(RCM_ERROR,
 			    _("NET: failed to unregister %s\n"),
-			    RCM_RESOURCE_LINK_NEW);
+			    RCM_RESOURCE_PHYSLINK_NEW);
 			return (RCM_FAILURE);
 		} else {
 			rcm_log_message(RCM_DEBUG, _("NET: unregistered %s\n"),
-			    RCM_RESOURCE_LINK_NEW);
+			    RCM_RESOURCE_PHYSLINK_NEW);
 			events_registered--;
 		}
 	}
@@ -817,9 +817,13 @@ static int
 net_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
     char **errorp, nvlist_t *nvl, rcm_info_t **depend_info)
 {
+	nvpair_t	*nvp = NULL;
+	uint64_t	id64 = (uint64_t)DATALINK_INVALID_LINKID;
+	boolean_t	reconfigured = B_FALSE;
+
 	rcm_log_message(RCM_TRACE1, _("NET: notify_event(%s)\n"), rsrc);
 
-	if (strcmp(rsrc, RCM_RESOURCE_LINK_NEW) != 0) {
+	if (strcmp(rsrc, RCM_RESOURCE_PHYSLINK_NEW) != 0) {
 		rcm_log_message(RCM_INFO,
 		    _("NET: unrecognized event for %s\n"), rsrc);
 		errno = EINVAL;
@@ -828,6 +832,67 @@ net_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 
 	/* Update cache to reflect latest physical links */
 	update_cache(hd);
+
+	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
+		if (strcmp(nvpair_name(nvp), RCM_NV_RECONFIGURED) == 0) {
+			if (nvpair_value_boolean_value(nvp,
+			    &reconfigured) != 0) {
+				rcm_log_message(RCM_INFO,
+				    _("NET: unrecognized %s event data\n"),
+				    RCM_NV_RECONFIGURED);
+				errno = EINVAL;
+				return (RCM_FAILURE);
+			}
+
+			rcm_log_message(RCM_TRACE1,
+			    "NET: %s event data (%sreconfiguration)\n",
+			    RCM_NV_RECONFIGURED, reconfigured ? "" : "not ");
+		}
+
+		if (strcmp(nvpair_name(nvp), RCM_NV_LINKID) == 0) {
+			if (nvpair_value_uint64(nvp, &id64) != 0) {
+				rcm_log_message(RCM_INFO,
+				    _("NET: unrecognized %s event data\n"),
+				    RCM_NV_LINKID);
+				errno = EINVAL;
+				return (RCM_FAILURE);
+			}
+
+			rcm_log_message(RCM_TRACE1,
+			    "NET: %s event data (linkid %d)\n", RCM_NV_LINKID,
+			    (datalink_id_t)id64);
+		}
+	}
+
+	if ((datalink_id_t)id64 == DATALINK_INVALID_LINKID) {
+		rcm_log_message(RCM_INFO, _("NET: invalid datalink\n"));
+		errno = EINVAL;
+		return (RCM_FAILURE);
+	}
+
+	/*
+	 * If this is device reconfiguration, populate the LINK_NEW event
+	 * to start the DR process.
+	 */
+	if (reconfigured) {
+		nvlist_t *nnvl = NULL;
+
+		rcm_log_message(RCM_TRACE1,
+		    "NET: reconfigured data-link (id %d)\n",
+		    (datalink_id_t)id64);
+
+		if ((nvlist_alloc(&nnvl, 0, 0) != 0) || (nvlist_add_uint64(nnvl,
+		    RCM_NV_LINKID, id64) != 0) || (rcm_notify_event(hd,
+		    RCM_RESOURCE_LINK_NEW, 0, nnvl, NULL) != RCM_SUCCESS)) {
+			nvlist_free(nnvl);
+			rcm_log_message(RCM_INFO,
+			    _("NET: notify %s event failed\n"),
+			    RCM_RESOURCE_LINK_NEW);
+			errno = EINVAL;
+			return (RCM_FAILURE);
+		}
+		nvlist_free(nnvl);
+	}
 
 	rcm_log_message(RCM_TRACE1,
 	    _("NET: notify_event: device configuration complete\n"));
