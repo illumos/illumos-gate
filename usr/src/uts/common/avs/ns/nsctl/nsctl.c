@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +92,7 @@ int _nsc_maxdev;
 extern void _nsc_global_setup(void);
 
 static int nsc_load(), nsc_unload();
+static void nscteardown();
 
 /*
  * Solaris specific driver module interface code.
@@ -281,6 +282,7 @@ static int
 _nsctl_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	if (cmd == DDI_DETACH) {
+		nscteardown();
 		_nsc_deinit_raw();
 
 		ddi_remove_minor_node(dip, NULL);
@@ -375,19 +377,49 @@ nsc_init()
 void
 nscsetup()
 {
-	if (nsc_max_devices() == 0)
+	if (nsc_max_devices() == 0 || _nsc_minor_fd != NULL)
 		return;
 
 	_nsc_minor_fd = nsc_kmem_zalloc(sizeof (nsc_fd_t *)*_nsc_maxdev,
 	    0, _nsc_local_mem);
 
+	if (!_nsc_minor_fd) {
+		cmn_err(CE_WARN, "nscsetup - alloc failed");
+		return;
+	}
+
 	_nsc_minor_slp = nsc_kmem_zalloc(sizeof (kmutex_t *)*_nsc_maxdev,
 	    0, _nsc_local_mem);
 
-	if (!_nsc_minor_fd || !_nsc_minor_slp)
+	if (!_nsc_minor_slp)  {
 		cmn_err(CE_WARN, "nscsetup - alloc failed");
+		nsc_kmem_free(_nsc_minor_fd, sizeof (nsc_fd_t *) * _nsc_maxdev);
+		_nsc_minor_fd = (nsc_fd_t **)NULL;
+	}
 }
 
+static void
+nscteardown()
+{
+	int i;
+
+	if (_nsc_minor_fd == NULL)
+		return;
+
+#ifdef DEBUG
+	/* Check all devices were closed.  Index 0 is the prototype dev. */
+	for (i = 1; i < _nsc_maxdev; i++) {
+		ASSERT(_nsc_minor_slp[i] == NULL);
+		ASSERT(_nsc_minor_fd[i] == NULL);
+	}
+#endif /* DEBUG */
+
+	nsc_kmem_free(_nsc_minor_fd, sizeof (nsc_fd_t *) * _nsc_maxdev);
+	nsc_kmem_free(_nsc_minor_slp, sizeof (kmutex_t *) * _nsc_maxdev);
+
+	_nsc_minor_fd = (nsc_fd_t **)NULL;
+	_nsc_minor_slp = (kmutex_t **)NULL;
+}
 
 int
 nsc_load()
@@ -403,6 +435,8 @@ nsc_unload()
 	if (!_nsc_init_done) {
 		return (0);
 	}
+
+	nscteardown();
 
 	(void) _nsc_deinit_power();
 	_nsc_deinit_resv();
