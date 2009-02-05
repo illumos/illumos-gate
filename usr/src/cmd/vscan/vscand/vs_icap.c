@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,8 +27,6 @@
  * Description:  Module contains supporting functions used by functions
  * defined in vs_svc.c. It also contains some internal(static) functions.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -1227,7 +1225,7 @@ vs_icap_send_chunk(vs_scan_ctx_t *ctx, int chunk_len)
 		hlen = snprintf(head, sizeof (head), "%x\r\n", nread);
 		hdr += (VS_HDR_SZ - hlen);
 		(void) memcpy(hdr, head, hlen);
-		tail = hdr + (hlen + nread);
+		tail = dbuf + nread;
 		tail[0] = '\r';
 		tail[1] = '\n';
 
