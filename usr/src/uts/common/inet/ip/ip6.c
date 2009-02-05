@@ -8824,8 +8824,9 @@ reass_done:
  * the option.
  */
 in6_addr_t
-ip_get_dst_v6(ip6_t *ip6h, boolean_t *is_fragment)
+ip_get_dst_v6(ip6_t *ip6h, mblk_t *mp, boolean_t *is_fragment)
 {
+	mblk_t *current_mp = mp;
 	uint8_t nexthdr;
 	uint8_t *whereptr;
 	ip6_hbh_t *hbhhdr;
@@ -8836,14 +8837,58 @@ ip_get_dst_v6(ip6_t *ip6h, boolean_t *is_fragment)
 	int left;
 	in6_addr_t *ap, rv;
 
+	rv = ip6h->ip6_dst;
+
 	if (is_fragment != NULL)
 		*is_fragment = B_FALSE;
 
-	rv = ip6h->ip6_dst;
+	if ((uint8_t *)ip6h >= current_mp->b_wptr ||
+	    (uint8_t *)ip6h < current_mp->b_rptr) {
+		/* Bad packet.  Return what we can. */
+		DTRACE_PROBE2(ip_get_dst_v6_badpkt1, mblk_t *, mp, ip6_t *,
+		    ip6h);
+		goto done;
+	}
 
 	nexthdr = ip6h->ip6_nxt;
-	whereptr = (uint8_t *)&ip6h[1];
+
+	whereptr = (uint8_t *)ip6h;
+	ehdrlen = sizeof (ip6_t);
+
 	for (;;) {
+		while (whereptr + ehdrlen >= current_mp->b_wptr) {
+			ehdrlen -= (current_mp->b_wptr - whereptr);
+			current_mp = current_mp->b_cont;
+			if (current_mp == NULL) {
+				/* Bad packet.  Return what we can. */
+				DTRACE_PROBE3(ip_get_dst_v6_badpkt2,
+				    mblk_t *, mp, mblk_t *, current_mp, ip6_t *,
+				    ip6h);
+				goto done;
+			}
+			whereptr = current_mp->b_rptr;
+		}
+		whereptr += ehdrlen;
+
+		/* Enough room for next-header and length (2 bytes)? */
+		if (whereptr + 2 > current_mp->b_wptr) {
+			whereptr -= (uintptr_t)current_mp->b_rptr;
+			/* Grumble -- eat the pullup. */
+			if (!pullupmsg(current_mp, -1)) {
+				DTRACE_PROBE3(ip_get_dst_v6_pullup_failed,
+				    mblk_t *, mp, mblk_t *, current_mp, ip6_t *,
+				    ip6h);
+				goto done;
+			}
+			whereptr += (uintptr_t)current_mp->b_rptr;
+			if (whereptr + 2 > current_mp->b_wptr) {
+				/* Bad packet.  Return what we can. */
+				DTRACE_PROBE3(ip_get_dst_v6_badpkt3,
+				    mblk_t *, mp, mblk_t *, current_mp, ip6_t *,
+				    ip6h);
+				goto done;
+			}
+		}
 
 		ASSERT(nexthdr != IPPROTO_RAW);
 		switch (nexthdr) {
@@ -8861,6 +8906,13 @@ ip_get_dst_v6(ip6_t *ip6h, boolean_t *is_fragment)
 			rthdr = (ip6_rthdr0_t *)whereptr;
 			nexthdr = rthdr->ip6r0_nxt;
 			ehdrlen = 8 * (rthdr->ip6r0_len + 1);
+			if (nexthdr + ehdrlen > (uintptr_t)current_mp->b_wptr) {
+				/* Bad packet.  Return what we can. */
+				DTRACE_PROBE3(ip_get_dst_v6_badpkt4,
+				    mblk_t *, mp, mblk_t *, current_mp, ip6_t *,
+				    ip6h);
+				goto done;
+			}
 
 			left = rthdr->ip6r0_segleft;
 			ap = (in6_addr_t *)((char *)rthdr + sizeof (*rthdr));
@@ -8879,11 +8931,10 @@ ip_get_dst_v6(ip6_t *ip6h, boolean_t *is_fragment)
 			ehdrlen = sizeof (ip6_frag_t);
 			if (is_fragment != NULL)
 				*is_fragment = B_TRUE;
-			goto done;
-		default :
+			/* FALLTHRU */
+		default:
 			goto done;
 		}
-		whereptr += ehdrlen;
 	}
 
 done:

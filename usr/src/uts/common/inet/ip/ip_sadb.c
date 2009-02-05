@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -589,7 +589,7 @@ ipsec_outbound_sa(mblk_t *mp, uint_t proto)
 		ip6_t *ip6h = (ip6_t *)data_mp->b_rptr;
 
 		ASSERT(IPH_HDR_VERSION(ip6h) == IPV6_VERSION);
-		dst6 = ip_get_dst_v6(ip6h, NULL);
+		dst6 = ip_get_dst_v6(ip6h, data_mp, NULL);
 		af = AF_INET6;
 
 		bzero(&ipp, sizeof (ipp));

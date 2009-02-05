@@ -4652,7 +4652,7 @@ ip_wput_attach_policy(mblk_t *ipsec_mp, ipha_t *ipha, ip6_t *ip6h, ire_t *ire,
 			sel.ips_local_addr_v6 = ip6h->ip6_src;
 		}
 
-		sel.ips_remote_addr_v6 = ip_get_dst_v6(ip6h, &is_fragment);
+		sel.ips_remote_addr_v6 = ip_get_dst_v6(ip6h, mp, &is_fragment);
 		if (is_fragment) {
 			/*
 			 * It's a packet fragment for a packet that
@@ -5493,7 +5493,7 @@ ipsec_tun_outbound(mblk_t *mp, tun_t *atp, ipha_t *inner_ipv4,
 		sel.ips_isv4 = B_FALSE;
 		sel.ips_local_addr_v6 = inner_ipv6->ip6_src;
 		/* Use ip_get_dst_v6() just for the fragment bit. */
-		sel.ips_remote_addr_v6 = ip_get_dst_v6(inner_ipv6,
+		sel.ips_remote_addr_v6 = ip_get_dst_v6(inner_ipv6, mp,
 		    &is_fragment);
 		/*
 		 * Reset, because we don't care about routing-header dests

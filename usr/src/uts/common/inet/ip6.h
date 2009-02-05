@@ -347,7 +347,7 @@ extern void	ip_build_hdrs_v6(uchar_t *, uint_t, ip6_pkt_t *, uint8_t);
 extern int	ip_fanout_send_icmp_v6(queue_t *, mblk_t *, uint_t,
     uint_t, uint8_t, uint_t, boolean_t, zoneid_t, ip_stack_t *);
 extern int	ip_find_hdr_v6(mblk_t *, ip6_t *, ip6_pkt_t *, uint8_t *);
-extern in6_addr_t ip_get_dst_v6(ip6_t *, boolean_t *);
+extern in6_addr_t ip_get_dst_v6(ip6_t *, mblk_t *, boolean_t *);
 extern ip6_rthdr_t	*ip_find_rthdr_v6(ip6_t *, uint8_t *);
 extern int	ip_hdr_complete_v6(ip6_t *, zoneid_t, ip_stack_t *);
 extern boolean_t	ip_hdr_length_nexthdr_v6(mblk_t *, ip6_t *,
