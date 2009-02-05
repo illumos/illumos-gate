@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -548,11 +548,11 @@ main(int cnt, char **vec)
 		    strerror(errno));
 	new_cc.loadaverage_thold = DFLT_THOLD;
 	parse_conf_file(power_conf, NULL);
-	if (pm_status.perm)
-		(void) close(pm_fd);
 	if (fflag)
 		rval = write_conf();
 	cleanup();
+	if (pm_status.perm)
+		(void) close(pm_fd);
 	if (rval == 0)
 		rval = (update_cprconfig() || restart_powerd());
 
