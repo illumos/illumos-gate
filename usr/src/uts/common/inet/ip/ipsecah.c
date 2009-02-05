@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -827,22 +827,32 @@ inbound_task(void *arg)
 	mblk_t *mp = (mblk_t *)arg;
 	ipsec_in_t *ii = (ipsec_in_t *)mp->b_rptr;
 	int ipsec_rc;
-	netstack_t	*ns = ii->ipsec_in_ns;
-	ipsecah_stack_t	*ahstack = ns->netstack_ipsecah;
+	netstack_t *ns;
+	ipsecah_stack_t	*ahstack;
+
+	ns = netstack_find_by_stackid(ii->ipsec_in_stackid);
+	if (ns == NULL || ns != ii->ipsec_in_ns) {
+		/* Just freemsg(). */
+		if (ns != NULL)
+			netstack_rele(ns);
+		freemsg(mp);
+		return;
+	}
+
+	ahstack = ns->netstack_ipsecah;
 
 	ah2dbg(ahstack, ("in AH inbound_task"));
 
 	ASSERT(ahstack != NULL);
 	ah = ipsec_inbound_ah_sa(mp, ns);
-	if (ah == NULL)
-		return;
-	ASSERT(ii->ipsec_in_ah_sa != NULL);
-	ipsec_rc = ii->ipsec_in_ah_sa->ipsa_input_func(mp, ah);
-	if (ipsec_rc != IPSEC_STATUS_SUCCESS)
-		return;
-	ip_fanout_proto_again(mp, NULL, NULL, NULL);
+	if (ah != NULL) {
+		ASSERT(ii->ipsec_in_ah_sa != NULL);
+		ipsec_rc = ii->ipsec_in_ah_sa->ipsa_input_func(mp, ah);
+		if (ipsec_rc == IPSEC_STATUS_SUCCESS)
+			ip_fanout_proto_again(mp, NULL, NULL, NULL);
+	}
+	netstack_rele(ns);
 }
-
 
 /*
  * Now that weak-key passed, actually ADD the security association, and
@@ -1035,10 +1045,8 @@ ah_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	 * ah_inbound_* and ah_outbound_*() calls?
 	 */
 
-
 	if (rc == 0 && lpkt != NULL)
-		rc = !taskq_dispatch(ah_taskq, inbound_task,
-		    (void *) lpkt, TQ_NOSLEEP);
+		rc = !taskq_dispatch(ah_taskq, inbound_task, lpkt, TQ_NOSLEEP);
 
 	if (rc != 0) {
 		ip_drop_packet(lpkt, B_TRUE, NULL, NULL,
@@ -1232,9 +1240,8 @@ ah_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 		return (rcode);
 	}
 
-	HANDLE_BUF_PKT(ah_taskq,
-	    ahstack->ipsecah_netstack->netstack_ipsec, ahstack->ah_dropper,
-	    buf_pkt);
+	HANDLE_BUF_PKT(ah_taskq, ahstack->ipsecah_netstack->netstack_ipsec,
+	    ahstack->ah_dropper, buf_pkt);
 
 	return (rcode);
 }
@@ -2900,11 +2907,11 @@ ah_submit_req_inbound(mblk_t *ipsec_mp, size_t skip_len, uint32_t ah_offset,
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
 
 	/*
-	 * In case kEF queues and calls back, keep netstackid_t for
-	 * verification that the IP instance is still around in
-	 * ah_kcf_callback().
+	 * In case kEF queues and calls back, make sure we have the
+	 * netstackid_t for verification that the IP instance is still around
+	 * in esp_kcf_callback().
 	 */
-	ii->ipsec_in_stackid = ns->netstack_stackid;
+	ASSERT(ii->ipsec_in_stackid == ns->netstack_stackid);
 
 	/* init arguments for the crypto framework */
 	AH_INIT_CRYPTO_DATA(&ii->ipsec_in_crypto_data, AH_MSGSIZE(phdr_mp),

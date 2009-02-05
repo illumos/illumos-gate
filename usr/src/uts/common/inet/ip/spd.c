@@ -4455,6 +4455,7 @@ ipsec_in_alloc(boolean_t isv4, netstack_t *ns)
 	ii->ipsec_in_v4 = isv4;
 	ii->ipsec_in_secure = B_TRUE;
 	ii->ipsec_in_ns = ns;		/* No netstack_hold */
+	ii->ipsec_in_stackid = ns->netstack_stackid;
 
 	ii->ipsec_in_frtn.free_func = ipsec_in_free;
 	ii->ipsec_in_frtn.free_arg = (char *)ii;

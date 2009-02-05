@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2131,11 +2131,11 @@ esp_submit_req_inbound(mblk_t *ipsec_mp, ipsa_t *assoc, uint_t esph_offset)
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
 
 	/*
-	 * In case kEF queues and calls back, keep netstackid_t for
-	 * verification that the IP instance is still around in
-	 * esp_kcf_callback().
+	 * In case kEF queues and calls back, make sure we have the
+	 * netstackid_t for verification that the IP instance is still around
+	 * in esp_kcf_callback().
 	 */
-	ii->ipsec_in_stackid = ns->netstack_stackid;
+	ASSERT(ii->ipsec_in_stackid == ns->netstack_stackid);
 
 	do_auth = assoc->ipsa_auth_alg != SADB_AALG_NONE;
 	do_encr = assoc->ipsa_encr_alg != SADB_EALG_NULL;
@@ -2294,6 +2294,36 @@ esp_prepare_udp(netstack_t *ns, mblk_t *mp, ipha_t *ipha)
 }
 
 /*
+ * taskq handler so we can send the NAT-T keepalive on a separate thread.
+ */
+static void
+actually_send_keepalive(void *arg)
+{
+	mblk_t *ipsec_mp = (mblk_t *)arg;
+	ipsec_out_t *io = (ipsec_out_t *)ipsec_mp->b_rptr;
+	ipha_t *ipha;
+	netstack_t *ns;
+
+	ASSERT(DB_TYPE(ipsec_mp) == M_CTL);
+	ASSERT(io->ipsec_out_type == IPSEC_OUT);
+	ASSERT(ipsec_mp->b_cont != NULL);
+	ASSERT(DB_TYPE(ipsec_mp->b_cont) == M_DATA);
+
+	ns = netstack_find_by_stackid(io->ipsec_out_stackid);
+	if (ns == NULL || ns != io->ipsec_out_ns) {
+		/* Just freemsg(). */
+		if (ns != NULL)
+			netstack_rele(ns);
+		freemsg(ipsec_mp);
+		return;
+	}
+
+	ipha = (ipha_t *)ipsec_mp->b_cont->b_rptr;
+	ip_wput_ipsec_out(NULL, ipsec_mp, ipha, NULL, NULL);
+	netstack_rele(ns);
+}
+
+/*
  * Send a one-byte UDP NAT-T keepalive.  Construct an IPSEC_OUT too that'll
  * get fed into esp_send_udp/ip_wput_ipsec_out.
  */
@@ -2341,9 +2371,22 @@ ipsecesp_send_keepalive(ipsa_t *assoc)
 	io = (ipsec_out_t *)ipsec_mp->b_rptr;
 	io->ipsec_out_zoneid =
 	    netstackid_to_zoneid(assoc->ipsa_netstack->netstack_stackid);
+	io->ipsec_out_stackid = assoc->ipsa_netstack->netstack_stackid;
 
 	esp_prepare_udp(assoc->ipsa_netstack, mp, ipha);
-	ip_wput_ipsec_out(NULL, ipsec_mp, ipha, NULL, NULL);
+	/*
+	 * We're holding an isaf_t bucket lock, so pawn off the actual
+	 * packet transmission to another thread.  Just in case syncq
+	 * processing causes a same-bucket packet to be processed.
+	 */
+	if (taskq_dispatch(esp_taskq, actually_send_keepalive, ipsec_mp,
+	    TQ_NOSLEEP) == 0) {
+		/* Assume no memory if taskq_dispatch() fails. */
+		ip_drop_packet(ipsec_mp, B_FALSE, NULL, NULL,
+		    DROPPER(assoc->ipsa_netstack->netstack_ipsec,
+		    ipds_esp_nomem),
+		    &assoc->ipsa_netstack->netstack_ipsecesp->esp_dropper);
+	}
 }
 
 static ipsec_status_t
@@ -3141,7 +3184,8 @@ ipsecesp_algs_changed(netstack_t *ns)
 }
 
 /*
- * taskq_dispatch handler.
+ * Stub function that taskq_dispatch() invokes to take the mblk (in arg)
+ * and put() it into AH and STREAMS again.
  */
 static void
 inbound_task(void *arg)
@@ -3149,21 +3193,32 @@ inbound_task(void *arg)
 	esph_t *esph;
 	mblk_t *mp = (mblk_t *)arg;
 	ipsec_in_t *ii = (ipsec_in_t *)mp->b_rptr;
-	netstack_t		*ns = ii->ipsec_in_ns;
-	ipsecesp_stack_t	*espstack = ns->netstack_ipsecesp;
+	netstack_t *ns;
+	ipsecesp_stack_t *espstack;
 	int ipsec_rc;
+
+	ns = netstack_find_by_stackid(ii->ipsec_in_stackid);
+	if (ns == NULL || ns != ii->ipsec_in_ns) {
+		/* Just freemsg(). */
+		if (ns != NULL)
+			netstack_rele(ns);
+		freemsg(mp);
+		return;
+	}
+
+	espstack = ns->netstack_ipsecesp;
 
 	esp2dbg(espstack, ("in ESP inbound_task"));
 	ASSERT(espstack != NULL);
 
 	esph = ipsec_inbound_esp_sa(mp, ns);
-	if (esph == NULL)
-		return;
-	ASSERT(ii->ipsec_in_esp_sa != NULL);
-	ipsec_rc = ii->ipsec_in_esp_sa->ipsa_input_func(mp, esph);
-	if (ipsec_rc != IPSEC_STATUS_SUCCESS)
-		return;
-	ip_fanout_proto_again(mp, NULL, NULL, NULL);
+	if (esph != NULL) {
+		ASSERT(ii->ipsec_in_esp_sa != NULL);
+		ipsec_rc = ii->ipsec_in_esp_sa->ipsa_input_func(mp, esph);
+		if (ipsec_rc == IPSEC_STATUS_SUCCESS)
+			ip_fanout_proto_again(mp, NULL, NULL, NULL);
+	}
+	netstack_rele(ns);
 }
 
 /*
@@ -3350,10 +3405,8 @@ esp_add_sa_finish(mblk_t *mp, sadb_msg_t *samsg, keysock_in_t *ksi,
 	    mp, samsg, ksi, primary, secondary, larval, clone, is_inbound,
 	    diagnostic, espstack->ipsecesp_netstack, &espstack->esp_sadb);
 
-	if (rc == 0 && lpkt != NULL) {
-		rc = !taskq_dispatch(esp_taskq, inbound_task,
-		    (void *) lpkt, TQ_NOSLEEP);
-	}
+	if (rc == 0 && lpkt != NULL)
+		rc = !taskq_dispatch(esp_taskq, inbound_task, lpkt, TQ_NOSLEEP);
 
 	if (rc != 0) {
 		ip_drop_packet(lpkt, B_TRUE, NULL, NULL,
@@ -3651,8 +3704,7 @@ esp_update_sa(mblk_t *mp, keysock_in_t *ksi, int *diagnostic,
 		return (rcode);
 	}
 
-	HANDLE_BUF_PKT(esp_taskq,
-	    espstack->ipsecesp_netstack->netstack_ipsec,
+	HANDLE_BUF_PKT(esp_taskq, espstack->ipsecesp_netstack->netstack_ipsec,
 	    espstack->esp_dropper, buf_pkt);
 
 	return (rcode);

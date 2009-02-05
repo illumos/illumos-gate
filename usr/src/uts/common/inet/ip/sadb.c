@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6861,6 +6861,14 @@ sadb_set_lpkt(ipsa_t *ipsa, mblk_t *npkt, netstack_t *ns)
 	ipsec_stack_t	*ipss = ns->netstack_ipsec;
 	boolean_t is_larval;
 
+	/*
+	 * Check the packet's netstack id in case we go asynch with a
+	 * taskq_dispatch.
+	 */
+	ASSERT(((ipsec_in_t *)npkt->b_rptr)->ipsec_in_type == IPSEC_IN);
+	ASSERT(((ipsec_in_t *)npkt->b_rptr)->ipsec_in_stackid ==
+	    ns->netstack_stackid);
+
 	mutex_enter(&ipsa->ipsa_lock);
 	is_larval = (ipsa->ipsa_state == IPSA_STATE_LARVAL);
 	if (is_larval) {
@@ -6921,6 +6929,14 @@ sadb_buf_pkt(ipsa_t *ipsa, mblk_t *bpkt, netstack_t *ns)
 	    (ipsa->ipsa_type == SADB_SATYPE_AH) ? IPPROTO_AH : IPPROTO_ESP,
 	    ipsa->ipsa_spi, ipsa->ipsa_addrfam, *srcaddr, *dstaddr, NULL);
 
+	/*
+	 * Check the packet's netstack id in case we go asynch with a
+	 * taskq_dispatch.
+	 */
+	ASSERT(((ipsec_in_t *)bpkt->b_rptr)->ipsec_in_type == IPSEC_IN);
+	ASSERT(((ipsec_in_t *)bpkt->b_rptr)->ipsec_in_stackid ==
+	    ns->netstack_stackid);
+
 	mutex_enter(&ipsa->ipsa_lock);
 	ipsa->ipsa_mblkcnt++;
 	if (ipsa->ipsa_bpkt_head == NULL) {
@@ -6950,15 +6966,30 @@ void
 sadb_clear_buf_pkt(void *ipkt)
 {
 	mblk_t	*tmp, *buf_pkt;
+	netstack_t *ns;
+	ipsec_in_t *ii;
 
 	buf_pkt = (mblk_t *)ipkt;
+
+	ii = (ipsec_in_t *)buf_pkt->b_rptr;
+	ASSERT(ii->ipsec_in_type == IPSEC_IN);
+	ns = netstack_find_by_stackid(ii->ipsec_in_stackid);
+	if (ns != NULL && ns != ii->ipsec_in_ns) {
+		netstack_rele(ns);
+		ns = NULL;  /* For while-loop below. */
+	}
 
 	while (buf_pkt != NULL) {
 		tmp = buf_pkt->b_next;
 		buf_pkt->b_next = NULL;
-		ip_fanout_proto_again(buf_pkt, NULL, NULL, NULL);
+		if (ns != NULL)
+			ip_fanout_proto_again(buf_pkt, NULL, NULL, NULL);
+		else
+			freemsg(buf_pkt);
 		buf_pkt = tmp;
 	}
+	if (ns != NULL)
+		netstack_rele(ns);
 }
 /*
  * Walker callback used by sadb_alg_update() to free/create crypto
