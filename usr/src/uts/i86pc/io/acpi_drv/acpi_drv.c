@@ -20,27 +20,15 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Driver for ACPI Battery, Lid, and LCD Monitoring and Control
+ * Driver for ACPI Battery, Lid, and Hotkey Control
  */
-
-#include <sys/conf.h>
-#include <sys/modctl.h>
-#include <sys/ddi.h>
-#include <sys/sunddi.h>
-#include <sys/stat.h>
-#include <sys/sysevent/eventdefs.h>
+#include <sys/hotkey_drv.h>
 #include <sys/sysevent/pwrctl.h>
-#include <sys/reboot.h>
-#include <sys/sysmacros.h>
-#include <sys/acpi/acpi.h>
-#include <sys/acpica.h>
-#include <sys/note.h>
-#include <sys/acpi_drv.h>
 
 
 #define	ACPI_DRV_MOD_STRING		"ACPI driver"
@@ -53,15 +41,10 @@
 					(idx))
 #define	MINOR_LID(idx)			(ACPI_DRV_TYPE_LID << MINOR_SHIFT | \
 					(idx))
-#define	MINOR_DISPLAY(idx)		(ACPI_DRV_TYPE_DISPLAY << MINOR_SHIFT \
+#define	MINOR_HOTKEY(idx)		(ACPI_DRV_TYPE_HOTKEY << MINOR_SHIFT \
 					| (idx))
-#define	MINOR_OUTPUT(idx)		(ACPI_DRV_TYPE_OUTPUT << MINOR_SHIFT | \
-					(idx))
 #define	MINOR2IDX(minor)		((minor) & IDX_MASK)
 #define	MINOR2TYPE(minor)		((minor) >> MINOR_SHIFT)
-
-#define	ACPI_DRV_OK			(0)
-#define	ACPI_DRV_ERR			(1)
 
 #define	ACPI_DRV_MAX_BAT_NUM		8
 #define	ACPI_DRV_MAX_AC_NUM		10
@@ -108,42 +91,6 @@ enum acpi_drv_notify {
 	ACPI_DRV_NTF_UNKNOWN = -1,	/* No notifications seen, ever. */
 	ACPI_DRV_NTF_CHANGED,
 	ACPI_DRV_NTF_OK
-};
-
-/* Battery device types */
-enum acpi_drv_type {
-	ACPI_DRV_TYPE_UNKNOWN,
-	ACPI_DRV_TYPE_CBAT,
-	ACPI_DRV_TYPE_AC,
-	ACPI_DRV_TYPE_LID,
-	ACPI_DRV_TYPE_DISPLAY,
-	ACPI_DRV_TYPE_OUTPUT
-};
-
-struct acpi_drv_dev {
-	ACPI_HANDLE hdl;
-	char hid[9];		/* ACPI HardwareId */
-	char uid[9];		/* ACPI UniqueId */
-	ACPI_INTEGER adr;	/* Bus device Id */
-	int valid;		/* the device state is valid */
-
-	/*
-	 * Unlike most other devices, when a battery is inserted or
-	 * removed from the system, the device itself(the battery bay)
-	 * is still considered to be present in the system.
-	 *
-	 * Value:
-	 *    0 -- On-line
-	 *    1 -- Off-line
-	 *   -1 -- Unknown
-	 */
-	int present;
-	enum acpi_drv_type type;
-	int index;	/* device index */
-	int minor;
-
-	struct acpi_drv_output_state *op;
-	struct acpi_drv_display_state *dp;
 };
 
 static int acpi_drv_dev_present(struct acpi_drv_dev *);
@@ -293,43 +240,7 @@ struct acpi_drv_lid_state {
 } lid;
 static int nlid = 0;
 
-/* Output device status */
-#define	ACPI_DRV_DCS_CONNECTOR_EXIST	(1 << 0)
-#define	ACPI_DRV_DCS_ACTIVE		(1 << 1)
-#define	ACPI_DRV_DCS_READY		(1 << 2)
-#define	ACPI_DRV_DCS_FUNCTIONAL		(1 << 3)
-#define	ACPI_DRV_DCS_ATTACHED		(1 << 4)
-
-/* _DOS default value is 1 */
-/* _DOS bit 1:0 */
-#define	ACPI_DRV_DOS_SWITCH_OS_DGS	0
-#define	ACPI_DRV_DOS_SWITCH_BIOS	1
-#define	ACPI_DRV_DOS_SWITCH_DGS_LOCKED	2
-#define	ACPI_DRV_DOS_SWITCH_OS_EVENT	3
-/* _DOS bit 2 */
-#define	ACPI_DRV_DOS_BRIGHT_BIOS	(0 << 2)
-#define	ACPI_DRV_DOS_BRIGHT_OS		(1 << 2)
-
-struct acpi_drv_output_state {
-	struct acpi_drv_dev dev;
-	uint32_t adr;
-	uint32_t *levels;
-	int num_levels; /* number of levels */
-	int nlev; /* actual array size of levels */
-	int cur_level;
-	int cur_level_index;
-	int state;
-	struct acpi_drv_output_state *next;
-	struct acpi_drv_output_state *tail;
-};
-static struct acpi_drv_output_state *outputs = NULL;
-static int noutput = 0;
-
-struct acpi_drv_display_state {
-	struct acpi_drv_dev dev;
-	int mode;
-	int noutput;
-} display;
+struct hotkey_drv acpi_hotkey;
 
 static int acpi_drv_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
 static int acpi_drv_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
@@ -347,28 +258,10 @@ static int acpi_drv_cbat_ioctl(int index, int cmd, intptr_t arg, int mode,
     cred_t *cr, int *rval);
 static int acpi_drv_lid_ioctl(int index, int cmd, intptr_t arg, int mode,
     cred_t *cr, int *rval);
-static int acpi_drv_output_ioctl(int index, int cmd, intptr_t arg, int mode,
-    cred_t *cr, int *rval);
 #ifdef DEBUG
 static void acpi_drv_printf(struct acpi_drv_dev *devp, uint_t lev,
     const char *fmt, ...);
 #endif
-
-/*
- * Output device functions
- */
-static int acpi_drv_output_init(ACPI_HANDLE hdl, struct acpi_drv_dev *dev);
-static void acpi_drv_output_notify(ACPI_HANDLE hdl, UINT32 val, void *ctx);
-static int acpi_drv_output_get_level(struct acpi_drv_output_state *op);
-static int acpi_drv_output_set_level(struct acpi_drv_output_state *op,
-    uint32_t level);
-static struct acpi_drv_output_state *acpi_drv_idx2output(int idx);
-
-/*
- * Display device functions
- */
-static void acpi_drv_display_set_mode(struct acpi_drv_display_state *dp,
-    int state);
 
 static int acpi_drv_update_bif(struct acpi_drv_cbat_state *bp);
 static int acpi_drv_update_bst(struct acpi_drv_cbat_state *bp);
@@ -405,16 +298,16 @@ static struct cb_ops acpi_drv_cb_ops = {
 static struct dev_ops acpi_drv_dev_ops = {
 	DEVO_REV,
 	0,			/* refcnt */
-	acpi_drv_getinfo,		/* getinfo */
+	acpi_drv_getinfo,	/* getinfo */
 	nulldev,		/* identify */
 	nulldev,		/* probe */
-	acpi_drv_attach,		/* attach */
-	acpi_drv_detach,		/* detach */
+	acpi_drv_attach,	/* attach */
+	acpi_drv_detach,	/* detach */
 	nodev,			/* reset */
 	&acpi_drv_cb_ops,
 	NULL,			/* no bus operations */
 	NULL,			/* power */
-	ddi_quiesce_not_needed,		/* quiesce */
+	ddi_quiesce_not_needed,	/* quiesce */
 };
 
 static struct modldrv modldrv1 = {
@@ -475,7 +368,6 @@ acpi_drv_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	char name[20];
 	int i;
 	struct acpi_drv_cbat_state *bp;
-	struct acpi_drv_output_state *op;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -503,25 +395,10 @@ acpi_drv_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto error;
 	}
 
-	/* Create minor node for each output. */
-	for (op = outputs; op != NULL; op = op->next) {
-		if (op->dev.valid) {
-			(void) snprintf(name, sizeof (name), "output%d",
-			    op->dev.index);
-			if (ddi_create_minor_node(devi, name, S_IFCHR,
-			    MINOR_OUTPUT(op->dev.index), DDI_PSEUDO, 0) ==
-			    DDI_FAILURE) {
-				ACPI_DRV_DBG(CE_WARN, NULL,
-				    "%s: minor node create failed", name);
-				goto error;
-			}
-		}
-	}
-
-	/* Create minor node for display device. */
-	if (ddi_create_minor_node(devi, "display", S_IFCHR, MINOR_DISPLAY(0),
+	/* Create minor node for hotkey device. */
+	if (ddi_create_minor_node(devi, "hotkey", S_IFCHR, MINOR_HOTKEY(0),
 	    DDI_PSEUDO, 0) == DDI_FAILURE) {
-		ACPI_DRV_DBG(CE_WARN, NULL, "display: "
+		ACPI_DRV_DBG(CE_WARN, NULL, "hotkey: "
 		    "minor node create failed");
 		goto error;
 	}
@@ -641,8 +518,8 @@ acpi_drv_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cr,
 	case ACPI_DRV_TYPE_LID:
 		res = acpi_drv_lid_ioctl(index, cmd, arg, mode, cr, rval);
 		break;
-	case ACPI_DRV_TYPE_OUTPUT:
-		res = acpi_drv_output_ioctl(index, cmd, arg, mode, cr, rval);
+	case ACPI_DRV_TYPE_HOTKEY:
+		res = acpi_drv_hotkey_ioctl(cmd, arg, mode, cr, rval);
 		break;
 	default:
 		res = EINVAL;
@@ -928,7 +805,7 @@ acpi_drv_prt_notify(ACPI_HANDLE hdl, UINT32 val)
 }
 #endif /* DEBUG */
 
-static void
+void
 acpi_drv_gen_sysevent(struct acpi_drv_dev *devp, char *ev, uint32_t val)
 {
 	nvlist_t *attr_list = NULL;
@@ -1685,11 +1562,11 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 	if ((info->Valid & ACPI_VALID_HID) == 0) {
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "AcpiGetObjectInfo(): _HID not available");
-		(void) strncpy(p->uid, "\0", 9);
+		(void) strncpy(p->uid, "\0", ID_LEN);
 	} else {
-		(void) strncpy(p->hid, info->HardwareId.Value, 9);
+		(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
 	}
-	(void) strncpy(p->hid, info->HardwareId.Value, 9);
+	(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
 
 	/*
 	 * This object is optional, but is required when the device
@@ -1699,9 +1576,9 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 		ACPI_DRV_DBG(CE_WARN, NULL,
 		    "AcpiGetObjectInfo(): _UID not available");
 		/* Use 0 as the default _UID */
-		(void) strncpy(p->uid, "\0", 9);
+		(void) strncpy(p->uid, "\0", ID_LEN);
 	} else {
-		(void) strncpy(p->uid, info->UniqueId.Value, 9);
+		(void) strncpy(p->uid, info->UniqueId.Value, ID_LEN);
 	}
 
 	p->valid = 1;
@@ -1747,24 +1624,6 @@ acpi_drv_obj_init(struct acpi_drv_dev *p)
 		(void) acpi_drv_update_lid(p);
 		ntf_handler = acpi_drv_lid_notify;
 		ACPI_DRV_DBG(CE_NOTE, p, "added");
-	} else if (info->Valid & ACPI_VALID_ADR) {
-		p->adr = info->Address;
-		if (p->type == ACPI_DRV_TYPE_DISPLAY) {
-			p->index = 0;
-			/* Enable display control by OS */
-			display.mode = ACPI_DRV_DOS_SWITCH_OS_EVENT |
-			    ACPI_DRV_DOS_BRIGHT_OS;
-			acpi_drv_display_set_mode(&display, display.mode);
-		} else {
-			p->index = noutput - 1;
-			if (acpi_drv_output_init(p->hdl, p) == ACPI_DRV_ERR) {
-				p->valid = 0;
-				AcpiOsFree(info);
-				return (ACPI_DRV_ERR);
-			}
-			ntf_handler = acpi_drv_output_notify;
-			p->type = ACPI_DRV_TYPE_OUTPUT;
-		}
 	} else {
 		ACPI_DRV_DBG(CE_NOTE, p, "unknown device");
 		p->valid = 0;
@@ -1820,70 +1679,6 @@ acpi_drv_find_cb(ACPI_HANDLE ObjHandle, UINT32 NestingLevel, void *Context,
 		nlid++;
 		lp = &lid;
 		devp = (struct acpi_drv_dev *)lp;
-	} else if (*type == ACPI_DRV_TYPE_OUTPUT) {
-		int adr = 0;
-		ACPI_BUFFER buf1 = {ACPI_ALLOCATE_BUFFER, NULL};
-		ACPI_BUFFER buf2;
-		char str[256];
-		ACPI_HANDLE ohl = NULL;
-		struct acpi_drv_display_state *dp;
-		struct acpi_drv_output_state *op;
-
-		/*
-		 * Reduce the search by checking for support of _ADR
-		 * method.
-		 */
-		if (acpica_eval_int(ObjHandle, "_ADR", &adr) != AE_OK) {
-			return (AE_OK);
-		}
-
-		/*
-		 * Find the display device.
-		 */
-		if (ACPI_SUCCESS(AcpiEvaluateObjectTyped(ObjHandle, "_DOD",
-		    NULL, &buf1, ACPI_TYPE_PACKAGE))) {
-			AcpiOsFree(buf1.Pointer);
-
-			buf2.Pointer = str;
-			buf2.Length = sizeof (str);
-			if (!ACPI_FAILURE(AcpiGetName(ObjHandle,
-			    ACPI_FULL_PATHNAME, &buf2))) {
-				ACPI_DRV_DBG(CE_NOTE, NULL,
-				    "_DOD Supported Pathname=%s\n",
-				    (char *)buf2.Pointer);
-			}
-
-			dp = &display;
-			devp = (struct acpi_drv_dev *)dp;
-			devp->hdl = ObjHandle;
-			devp->type = ACPI_DRV_TYPE_DISPLAY;
-			(void) acpi_drv_obj_init(devp);
-
-			/*
-			 * Find the output devices.
-			 */
-			while (ACPI_SUCCESS(AcpiGetNextObject(ACPI_TYPE_DEVICE,
-			    ObjHandle, ohl, &ohl))) {
-				op = kmem_zalloc
-				    (sizeof (struct acpi_drv_output_state),
-				    KM_SLEEP);
-				if (outputs == NULL) {
-					outputs = op;
-					outputs->tail = op;
-				} else {
-					outputs->tail->next = op;
-					outputs->tail = op;
-				}
-
-				noutput++;
-				devp = (struct acpi_drv_dev *)op;
-				devp->op = op;
-				devp->hdl = ohl;
-				(void) acpi_drv_obj_init(devp);
-			}
-			dp->noutput = noutput;
-		}
-		return (AE_OK);
 	} else {
 		ACPI_DRV_DBG(CE_WARN, NULL, "acpi_drv_find_cb(): "
 		    "Unknown device");
@@ -1902,6 +1697,7 @@ acpi_drv_acpi_init()
 {
 	int *retp, type;
 	int status = ACPI_DRV_ERR;
+	hotkey_drv_t *htkp;
 
 	/* Check to see if ACPI CA services are available */
 	if (AcpiSubsystemStatus() != AE_OK) {
@@ -1930,10 +1726,13 @@ acpi_drv_acpi_init()
 		status = ACPI_DRV_OK;
 	}
 
-	/* Init Output Devices */
-	type = ACPI_DRV_TYPE_OUTPUT;
-	if (ACPI_SUCCESS(AcpiGetDevices(NULL, acpi_drv_find_cb,
-	    &type, (void *)&retp)) && noutput) {
+	/* Init Hotkey Device */
+	type = ACPI_DRV_TYPE_HOTKEY;
+	htkp = &acpi_hotkey;
+	bzero(htkp, sizeof (hotkey_drv_t));
+	htkp->dip = acpi_drv_dip;
+	htkp->hotkey_lock = &acpi_drv_mutex;
+	if (hotkey_init(htkp) == ACPI_DRV_OK) {
 		status = ACPI_DRV_OK;
 	}
 
@@ -1947,7 +1746,6 @@ acpi_drv_acpi_fini(void)
 {
 	int i;
 	struct acpi_drv_cbat_state *bp;
-	struct acpi_drv_output_state *op;
 
 	for (bp = &acpi_drv_cbat[0]; bp < &acpi_drv_cbat[ACPI_DRV_MAX_BAT_NUM];
 	    bp++) {
@@ -1962,17 +1760,9 @@ acpi_drv_acpi_fini(void)
 	}
 	AcpiRemoveNotifyHandler(lid.dev.hdl, ACPI_DEVICE_NOTIFY,
 	    acpi_drv_lid_notify);
-	for (op = outputs; op != NULL; op = op->next) {
-		if (op->dev.valid) {
-			if (op->levels) {
-				kmem_free(op->levels,
-				    op->nlev * sizeof (uint32_t));
-			}
-			AcpiRemoveNotifyHandler(op->dev.hdl, ACPI_DEVICE_NOTIFY,
-			    acpi_drv_output_notify);
-		}
-		kmem_free(op, sizeof (struct acpi_drv_output_state));
-	}
+
+	if (acpi_hotkey.hotkey_method != HOTKEY_METHOD_NONE)
+		(void) hotkey_fini(&acpi_hotkey);
 }
 
 /*ARGSUSED*/
@@ -2244,7 +2034,7 @@ acpi_drv_kstat_fini()
 	}
 }
 
-static int
+int
 acpi_drv_set_int(ACPI_HANDLE dev, char *method, uint32_t aint)
 {
 	ACPI_OBJECT_LIST al;
@@ -2257,269 +2047,55 @@ acpi_drv_set_int(ACPI_HANDLE dev, char *method, uint32_t aint)
 	return (AcpiEvaluateObject(dev, method, &al, NULL));
 }
 
-static int
-acpi_drv_output_init(ACPI_HANDLE hdl, struct acpi_drv_dev *dev)
+int
+acpi_drv_dev_init(struct acpi_drv_dev *p)
 {
-	struct acpi_drv_output_state *op;
-	int adr;
-	ACPI_BUFFER buf1, buf2;
-	ACPI_OBJECT *objp;
-	char str[256];
+	ACPI_DEVICE_INFO *info;
+	ACPI_BUFFER buf;
+	ACPI_STATUS ret;
 
-	if (acpica_eval_int(hdl, "_ADR", &adr) != AE_OK) {
+	ASSERT(p != NULL && p->hdl != NULL);
+
+	p->valid = 0;
+
+	/* Info size is variable depending on existance of _CID */
+	buf.Length = ACPI_ALLOCATE_BUFFER;
+	ret = AcpiGetObjectInfo(p->hdl, &buf);
+	if (ACPI_FAILURE(ret)) {
+		ACPI_DRV_DBG(CE_WARN, NULL,
+		    "AcpiGetObjectInfo() fail: %d", (int32_t)ret);
 		return (ACPI_DRV_ERR);
 	}
 
-	op = dev->op;
-	op->adr = adr;
-
-	buf1.Pointer = str;
-	buf1.Length = sizeof (str);
-
-	if (!ACPI_FAILURE(AcpiGetName(hdl, ACPI_FULL_PATHNAME, &buf1))) {
-		ACPI_DRV_DBG(CE_NOTE, NULL, "Pathname=%s\n",
-		    (char *)buf1.Pointer);
-	}
-
-	buf2.Length = ACPI_ALLOCATE_BUFFER;
-	if (ACPI_SUCCESS(AcpiEvaluateObjectTyped(hdl, "_BCL",
-	    NULL, &buf2, ACPI_TYPE_PACKAGE))) {
-		int i, j, k, l, m, nlev, tmp;
-
-		ACPI_DRV_DBG(CE_NOTE, NULL, "_BCL supported\n");
-		objp = buf2.Pointer;
-		/*
-		 * op->nlev will be needed to free op->levels.
-		 */
-		op->nlev = nlev = objp->Package.Count;
-		op->levels = kmem_zalloc(nlev * sizeof (uint32_t),
-		    KM_SLEEP);
-		/*
-		 * Get all the supported brightness levels.
-		 */
-		for (i = 0; i < nlev; i++) {
-			ACPI_OBJECT *o = &objp->Package.Elements[i];
-			int lev = o->Integer.Value;
-
-			ACPI_DRV_DBG(CE_NOTE, NULL, "acpi_drv_output_init() "
-			    "brlev=%d i=%d nlev=%d\n", lev, i, nlev);
-			if (o->Type != ACPI_TYPE_INTEGER) {
-				continue;
-			}
-			op->levels[i] = lev;
-		}
-
-		/*
-		 * Sort the brightness levels.
-		 */
-		for (j = 0; j < nlev; j++) {
-			for (k = 0; k < nlev - 1; k++) {
-				if (op->levels[k] > op->levels[k+1]) {
-					tmp = op->levels[k+1];
-					op->levels[k+1] = op->levels[k];
-					op->levels[k] = tmp;
-				}
-			}
-		}
-
-		/*
-		 * The first two levels could be duplicated, so remove
-		 * any duplicates.
-		 */
-		for (l = 0; l < nlev - 1; l++) {
-			if (op->levels[l] == op->levels[l+1]) {
-				for (m = l + 1; m < nlev - 1; m++) {
-					op->levels[m] = op->levels[m+1];
-				}
-				nlev--;
-			}
-		}
-		op->num_levels = nlev;
-
-		AcpiOsFree(objp);
-		(void) acpi_drv_output_get_level(op);
-		ACPI_DRV_DBG(CE_NOTE, NULL, "acpi_drv_output_init(): "
-		    "create minor "
-		    "node for dev->adr=%"PRIu64, dev->adr);
+	info = buf.Pointer;
+	if ((info->Valid & ACPI_VALID_HID) == 0) {
+		ACPI_DRV_DBG(CE_WARN, NULL,
+		    "!AcpiGetObjectInfo(): _HID not available");
+		(void) strncpy(p->uid, "\0", ID_LEN);
 	} else {
-		ACPI_DRV_DBG(CE_NOTE, NULL, "_BCL NOT supported\n");
+		(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
 	}
+	(void) strncpy(p->hid, info->HardwareId.Value, ID_LEN);
+
+	/*
+	 * This object is optional, but is required when the device
+	 * has no other way to report a persistent unique device ID.
+	 */
+	if ((info->Valid & ACPI_VALID_UID) == 0) {
+		ACPI_DRV_DBG(CE_WARN, NULL,
+		    "!AcpiGetObjectInfo(): _UID not available");
+		/* Use 0 as the default _UID */
+		(void) strncpy(p->uid, "\0", ID_LEN);
+	} else {
+		(void) strncpy(p->uid, info->UniqueId.Value, ID_LEN);
+	}
+
+	if (info->Valid & ACPI_VALID_ADR) {
+		p->valid = 1;
+		p->type = ACPI_DRV_TYPE_HOTKEY;
+	}
+
+	AcpiOsFree(info);
 
 	return (ACPI_DRV_OK);
-}
-
-/*ARGSUSED*/
-static int
-acpi_drv_output_ioctl(int index, int cmd, intptr_t arg, int mode, cred_t *cr,
-    int *rval)
-{
-	struct acpi_drv_output_state *op;
-	int res = 0;
-	op = acpi_drv_idx2output(index);
-	if (!op || op->dev.valid != 1) {
-		return (ENXIO);
-	}
-
-	switch (cmd) {
-	case ACPI_DRV_IOC_INFO: {
-		struct acpi_drv_output_info inf;
-		inf.adr = op->adr;
-		inf.nlev = op->num_levels;
-		if (copyout(&inf, (void *)arg, sizeof (inf))) {
-			res = EFAULT;
-		}
-		break;
-	}
-
-	case ACPI_DRV_IOC_LEVELS:
-		if (copyout(op->levels, (void *)arg,
-		    sizeof (*op->levels) * op->num_levels)) {
-			res = EFAULT;
-		}
-		break;
-
-	case ACPI_DRV_IOC_STATUS: {
-		/*
-		 * Need to get the current levels through ACPI first
-		 * then go through array of levels to find index.
-		 */
-		struct acpi_drv_output_status status;
-		int i;
-
-		status.state = op->state;
-		status.num_levels = op->num_levels;
-		status.cur_level = op->cur_level;
-		for (i = 0; i < op->num_levels; i++) {
-			if (op->levels[i] == op->cur_level) {
-				status.cur_level_index = i;
-			ACPI_DRV_DBG(CE_NOTE, NULL, "ACPI_DRV_IOC_STATUS "
-			    "cur_level_index %d\n", i);
-				break;
-			}
-		}
-		if (copyout(&status, (void *)arg, sizeof (status))) {
-			res = EFAULT;
-		}
-		break;
-	}
-
-	case ACPI_DRV_IOC_SET_BRIGHTNESS: {
-		int level;
-
-		if (drv_priv(cr)) {
-			res = EPERM;
-			break;
-		}
-		if (copyin((void *)arg, &level, sizeof (level))) {
-			res = EFAULT;
-			break;
-		}
-		ACPI_DRV_DBG(CE_NOTE, NULL,
-		    "ACPI_DRV_IOC_SET_BRIGHTNESS level=%d\n", level);
-		if (acpi_drv_output_set_level(op, level) != ACPI_DRV_OK) {
-			res = EFAULT;
-		}
-		break;
-	}
-
-	default:
-		res = EINVAL;
-		break;
-	}
-	return (res);
-}
-
-static struct acpi_drv_output_state *
-acpi_drv_idx2output(int idx)
-{
-	struct acpi_drv_output_state *op = outputs;
-
-	while ((op != NULL) && (op->dev.index != idx)) {
-		op = op->next;
-	}
-	return (op);
-}
-
-/*
- * Get the current brightness level and index.
- */
-static int
-acpi_drv_output_get_level(struct acpi_drv_output_state *op)
-{
-	int i;
-
-	if (acpica_eval_int(op->dev.hdl, "_BQC", &op->cur_level) != AE_OK) {
-		op->cur_level = ACPI_DRV_NTF_UNKNOWN;
-		return (ACPI_DRV_ERR);
-	}
-	for (i = 0; i < op->num_levels; i++) {
-		if (op->levels[i] == op->cur_level) {
-			op->cur_level_index = i;
-			ACPI_DRV_DBG(CE_NOTE, NULL,
-			    "acpi_drv_output_get_level(): "
-			    "cur_level = %d, cur_level_index = %d\n",
-			    op->cur_level, i);
-			break;
-		}
-	}
-	return (ACPI_DRV_OK);
-}
-
-static int
-acpi_drv_output_set_level(struct acpi_drv_output_state *op, uint32_t level)
-{
-	if (acpi_drv_set_int(op->dev.hdl, "_BCM", op->levels[level]) !=
-	    AE_OK) {
-		return (ACPI_DRV_ERR);
-	}
-	op->cur_level = op->levels[level];
-	op->cur_level_index = level;
-	return (ACPI_DRV_OK);
-}
-
-static void
-acpi_drv_output_notify(ACPI_HANDLE hdl, UINT32 val, void *ctx)
-{
-	struct acpi_drv_dev *dev = ctx;
-	struct acpi_drv_output_state *op = dev->op;
-
-	ACPI_DRV_DBG(CE_NOTE, NULL, "acpi_drv_output_notify() val=0x%x\n", val);
-	mutex_enter(&acpi_drv_mutex);
-	ACPI_DRV_PRT_NOTIFY(hdl, val);
-	switch (val) {
-	case 0x86: /* increase brightness */
-		if (op->cur_level_index < op->num_levels - 1) {
-			if (acpi_drv_output_set_level(op,
-			    op->cur_level_index + 1) != AE_OK) {
-				break;
-			}
-		}
-		acpi_drv_gen_sysevent(&op->dev, ESC_PWRCTL_BRIGHTNESS_UP, 0);
-		break;
-	case 0x87: /* decrease brightness */
-		if (op->cur_level_index > 0) {
-			if (acpi_drv_output_set_level(op,
-			    op->cur_level_index - 1) != AE_OK) {
-				break;
-			}
-		}
-		acpi_drv_gen_sysevent(&op->dev, ESC_PWRCTL_BRIGHTNESS_DOWN, 0);
-		break;
-	default:
-		break;
-	}
-	mutex_exit(&acpi_drv_mutex);
-}
-
-/*
- * Set the display control modes of display switching and brightness
- * from BIOS or OSPM.
- */
-static void
-acpi_drv_display_set_mode(struct acpi_drv_display_state *dp, int state)
-{
-	if (acpi_drv_set_int(dp->dev.hdl, "_DOS", state) != AE_OK) {
-		ACPI_DRV_DBG(CE_WARN, NULL, "Cannot set display mode %d\n",
-		    state);
-	}
 }

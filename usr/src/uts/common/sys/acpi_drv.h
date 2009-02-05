@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,10 +206,14 @@ typedef struct acpi_drv_bst_kstat_s {
 	struct kstat_named	acpi_drv_bst_voltage;
 } acpi_drv_bst_kstat_t;
 
-struct acpi_drv_display_info {
-	int noutput; /* number of output devices */
-	int sw_on;
-	int bright_on;
+/* acpi device types */
+enum acpi_drv_type {
+	ACPI_DRV_TYPE_UNKNOWN,
+	ACPI_DRV_TYPE_CBAT,
+	ACPI_DRV_TYPE_AC,
+	ACPI_DRV_TYPE_LID,
+	ACPI_DRV_TYPE_DISPLAY,
+	ACPI_DRV_TYPE_HOTKEY
 };
 
 struct acpi_drv_output_info {
@@ -223,6 +227,9 @@ struct acpi_drv_output_status {
 	int cur_level;
 	int cur_level_index;
 };
+
+#define	ACPI_DRV_OK			0
+#define	ACPI_DRV_ERR			-1
 
 #ifdef	__cplusplus
 }

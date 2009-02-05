@@ -68,6 +68,7 @@ f none kernel/drv/aggr 755 root sys
 f none kernel/drv/arp 755 root sys
 f none kernel/drv/acpi_drv 755 root sys
 f none kernel/drv/acpi_drv.conf 644 root sys
+f none kernel/drv/acpi_toshiba 755 root sys
 f none kernel/drv/amd_iommu 755 root sys
 f none kernel/drv/bl 755 root sys
 f none kernel/drv/bmc 755 root sys
@@ -293,6 +294,7 @@ d none kernel/drv/amd64 755 root sys
 f none kernel/drv/amd64/aggr 755 root sys
 f none kernel/drv/amd64/arp 755 root sys
 f none kernel/drv/amd64/acpi_drv 755 root sys
+f none kernel/drv/amd64/acpi_toshiba 755 root sys
 f none kernel/drv/amd64/amd_iommu 755 root sys
 f none kernel/drv/amd64/bl 755 root sys
 f none kernel/drv/amd64/bmc 755 root sys

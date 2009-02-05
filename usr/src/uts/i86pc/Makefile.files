@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This Makefile defines file modules in the directory uts/i86pc
@@ -171,7 +171,7 @@ PCI_E_NEXUS_OBJS += pci_common.o pci_kstats.o pci_tools.o
 PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
 PCPLUSMP_OBJS += apic.o apic_regops.o psm_common.o apic_introp.o mp_platform_common.o
 
-ACPI_DRV_OBJS	+= acpi_drv.o
+ACPI_DRV_OBJS	+= acpi_drv.o acpi_video.o
 
 CPUDRV_OBJS	+= \
 	cpudrv.o \

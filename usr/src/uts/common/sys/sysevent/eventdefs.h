@@ -225,6 +225,15 @@ extern "C" {
 #define	ESC_PWRCTL_BRIGHTNESS_UP	"ESC_pwrctl_brightness_up"
 #define	ESC_PWRCTL_BRIGHTNESS_DOWN	"ESC_pwrctl_brightness_down"
 
+/* EC_ACPIEV subclass definitions */
+#define	EC_ACPIEV			"EC_acpiev"
+#define	ESC_ACPIEV_DISPLAY_SWITCH	"ESC_acpiev_display_switch"
+#define	ESC_ACPIEV_SCREEN_LOCK		"ESC_acpiev_screen_lock"
+#define	ESC_ACPIEV_SLEEP		"ESC_acpiev_sleep"
+#define	ESC_ACPIEV_AUDIO_MUTE		"ESC_acpiev_audio_mute"
+#define	ESC_ACPIEV_WIFI			"ESC_acpiev_wifi"
+#define	ESC_ACPIEV_TOUCHPAD		"ESC_acpiev_touchpad"
+
 /*
  * ZFS subclass definitions.  supporting attributes (name/value paris) are found
  * in sys/fs/zfs.h

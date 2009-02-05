@@ -2,14 +2,12 @@
  *
  * probe-acpi.c : Probe for ACPI device information
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Licensed under the Academic Free License version 2.1
  *
  **************************************************************************/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -66,7 +64,7 @@ main(int argc, char *argv[])
 		battery_update(ctx, udi, fd);
 	} else if (strstr(udi, "_lid")) {
 		lid_update(ctx, udi, fd);
-	} else if (strstr(udi, "_output")) {
+	} else if (strstr(udi, "_hotkey")) {
 		laptop_panel_update(ctx, udi, fd);
 	}
 
