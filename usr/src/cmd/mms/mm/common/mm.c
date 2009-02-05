@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,6 +104,47 @@ mm_signal_handler(int signo)
 		mms_trace(MMS_DEVP, "SIGPIPE received");
 		break;
 	}
+}
+
+/*
+ * mm_is_exiting
+ *
+ * Parameters:
+ *	None
+ *
+ * This routine determines if mm is exiting by
+ * detecting if our smf service is disabled.
+ *
+ * Return Values:
+ *	Non-zero if mm should exit.
+ *
+ */
+int
+mm_is_exiting(void)
+{
+	int		signum;
+	sigset_t	mask;
+	struct timespec	ts;
+
+	/* any thread check for service disabled */
+	sigemptyset(&mask);
+	sigaddset(&mask, SIGINT);
+	sigaddset(&mask, SIGHUP);
+	sigaddset(&mask, SIGTERM);
+	sigaddset(&mask, SIGPIPE);
+
+	/* set timeout to zero, don't wait for signal */
+	(void) memset(&ts, 0, sizeof (struct timespec));
+
+	/* query for pending signal */
+	if ((signum = sigtimedwait(&mask, NULL, &ts)) != -1) {
+		/* let signal hander set state */
+		mms_trace(MMS_DEVP, "thread %d signal check, signum %d",
+		    pthread_self(), signum);
+		mm_signal_handler(signum);
+	}
+
+	return (mm_exiting);
 }
 
 /*

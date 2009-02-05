@@ -174,7 +174,8 @@ $SkipUnusedSearchPath = qr{
 	/usr/sfw/lib.*\ from\ .*libnetsnmp\.so\.5 |		# non-OSNet
 	/usr/sfw/lib.*\ from\ .*libgcc_s\.so\.1 |		# non-OSNet
 	/usr.*\ from\ .*tst\.gcc\.exe |				# gcc built
-	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5		# non-OSNET
+	/usr/postgres/8.3/lib.*\ from\ .*libpq\.so\.5 |		# non-OSNET
+	/usr/sfw/lib.*\ from\ .*libpq\.so\.5			# non-OSNET
 }x;
 
 # Skip "unreferenced object=" ldd(1) diagnostics.

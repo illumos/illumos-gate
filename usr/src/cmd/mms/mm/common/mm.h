@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -706,6 +706,7 @@ struct mm_range {
 };
 
 /* MM routines */
+int mm_is_exiting(void);
 int mm_rm_mount(mm_command_t *cmd);
 int mm_rm_unmount(mm_command_t *cmd);
 extern int mm_candidate_cartridge_ok(mm_wka_t *mm_wka,
