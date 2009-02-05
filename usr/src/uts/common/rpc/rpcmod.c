@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -159,6 +159,10 @@ _init(void)
 	 */
 	rw_init(&rdma_lock, NULL, RW_DEFAULT, NULL);
 	mutex_init(&rdma_modload_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	cv_init(&rdma_wait.svc_cv, NULL, CV_DEFAULT, NULL);
+	mutex_init(&rdma_wait.svc_lock, NULL, MUTEX_DEFAULT, NULL);
+
 	mt_kstat_init();
 
 	/*

@@ -19,12 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 2007, The Ohio State University. All rights reserved.
+ * Copyright (c) 2008, The Ohio State University. All rights reserved.
  *
  * Portions of this source code is developed by the team members of
  * The Ohio State University's Network-Based Computing Laboratory (NBCL),
@@ -53,6 +53,9 @@ uint_t rdma_minchunk = RDMA_MINCHUNK;
 int rdma_modloaded = 0;		/* flag to load RDMA plugin modules */
 int rdma_dev_available = 0;	/* if any RDMA device is loaded */
 kmutex_t rdma_modload_lock;	/* protects rdma_modloaded flag */
+
+rdma_svc_wait_t rdma_wait;
+
 rdma_registry_t	*rdma_mod_head = NULL;	/* head for RDMA modules */
 krwlock_t	rdma_lock;		/* protects rdma_mod_head list */
 ldi_ident_t rpcmod_li = NULL;	/* identifies us with ldi_ framework */
@@ -62,7 +65,7 @@ kmem_cache_t *clist_cache = NULL;
 /*
  * Statics
  */
-static ldi_handle_t rpcib_handle = NULL;
+ldi_handle_t rpcib_handle = NULL;
 
 /*
  * Externs
@@ -96,6 +99,12 @@ rdma_register_mod(rdma_mod_t *mod)
 	while (*mp != NULL) {
 		if (strncmp((*mp)->r_mod->rdma_api, mod->rdma_api,
 		    KNC_STRSIZE) == 0) {
+			if ((*mp)->r_mod_state == RDMA_MOD_INACTIVE) {
+				(*mp)->r_mod_state = RDMA_MOD_ACTIVE;
+				(*mp)->r_mod->rdma_ops = mod->rdma_ops;
+				(*mp)->r_mod->rdma_count = mod->rdma_count;
+				goto announce_hca;
+			}
 			rw_exit(&rdma_lock);
 			return (RDMA_REG_EXIST);
 		}
@@ -112,8 +121,20 @@ rdma_register_mod(rdma_mod_t *mod)
 	m->r_mod->rdma_api = kmem_zalloc(KNC_STRSIZE, KM_SLEEP);
 	(void) strncpy(m->r_mod->rdma_api, mod->rdma_api, KNC_STRSIZE);
 	m->r_mod->rdma_api[KNC_STRSIZE - 1] = '\0';
+	m->r_mod_state = RDMA_MOD_ACTIVE;
 	*mp = m;
+
+announce_hca:
 	rw_exit(&rdma_lock);
+	/*
+	 * Start the nfs service on the rdma xprts.
+	 * (this notification mechanism will need to change when we support
+	 * multiple hcas and have support for multiple rdma plugins).
+	 */
+	mutex_enter(&rdma_wait.svc_lock);
+	rdma_wait.svc_stat = RDMA_HCA_ATTACH;
+	cv_signal(&rdma_wait.svc_cv);
+	mutex_exit(&rdma_wait.svc_lock);
 
 	return (RDMA_SUCCESS);
 }
@@ -140,27 +161,37 @@ rdma_unregister_mod(rdma_mod_t *mod)
 		/*
 		 * Check if any device attached, if so return error
 		 */
-		if ((*m)->r_mod->rdma_count != 0) {
+		if (mod->rdma_count != 0) {
 			rw_exit(&rdma_lock);
 			return (RDMA_FAILED);
 		}
 		/*
-		 * Found entry. Now remove it.
+		 * Found entry. Mark it inactive.
 		 */
 		mmod = *m;
-		*m = (*m)->r_next;
-		kmem_free(mmod->r_mod->rdma_api, KNC_STRSIZE);
-		kmem_free(mmod->r_mod, sizeof (rdma_mod_t));
-		kmem_free(mmod, sizeof (rdma_registry_t));
-		rw_exit(&rdma_lock);
-		return (RDMA_SUCCESS);
+		mmod->r_mod->rdma_count = 0;
+		mmod->r_mod_state = RDMA_MOD_INACTIVE;
+		break;
 	}
+
+	rdma_modloaded = 0;
+	rdma_dev_available = 0;
+	rw_exit(&rdma_lock);
+
+	/*
+	 * Stop the nfs service running on the rdma xprts.
+	 * (this notification mechanism will need to change when we support
+	 * multiple hcas and have support for multiple rdma plugins).
+	 */
+	mutex_enter(&rdma_wait.svc_lock);
+	rdma_wait.svc_stat = RDMA_HCA_DETACH;
+	cv_signal(&rdma_wait.svc_cv);
+	mutex_exit(&rdma_wait.svc_lock);
 
 	/*
 	 * Not found.
 	 */
-	rw_exit(&rdma_lock);
-	return (RDMA_FAILED);
+	return (RDMA_SUCCESS);
 }
 
 struct clist *
@@ -423,15 +454,23 @@ rdma_modload()
 	status = ldi_open_by_name("/devices/ib/rpcib@0:rpcib",
 	    FREAD | FWRITE, kcred,
 	    &rpcib_handle, rpcmod_li);
+
 	if (status != 0)
 		return (EPROTONOSUPPORT);
 
-	/* success */
-	rdma_kstat_init();
 
-	clist_cache = kmem_cache_create("rdma_clist",
-	    sizeof (struct clist), _POINTER_ALIGNMENT, NULL,
-	    NULL, NULL, NULL, 0, 0);
+	/*
+	 * We will need to reload the plugin module after it was unregistered
+	 * but the resources below need to allocated only the first time.
+	 */
+	if (!clist_cache) {
+		clist_cache = kmem_cache_create("rdma_clist",
+		    sizeof (struct clist), _POINTER_ALIGNMENT, NULL,
+		    NULL, NULL, NULL, 0, 0);
+		rdma_kstat_init();
+	}
+
+	(void) ldi_close(rpcib_handle, FREAD|FWRITE, kcred);
 
 	return (0);
 }
@@ -461,4 +500,29 @@ rdma_kstat_init(void)
 		ksp->ks_data = (void *) rdmarsstat_ptr;
 		kstat_install(ksp);
 	}
+}
+
+rdma_stat
+rdma_kwait(void)
+{
+	int ret;
+	rdma_stat stat;
+
+	mutex_enter(&rdma_wait.svc_lock);
+
+	ret = cv_wait_sig(&rdma_wait.svc_cv, &rdma_wait.svc_lock);
+
+	/*
+	 * If signalled by a hca attach/detach, pass the right
+	 * stat back.
+	 */
+
+	if (ret)
+		stat =  rdma_wait.svc_stat;
+	else
+		stat = RDMA_INTR;
+
+	mutex_exit(&rdma_wait.svc_lock);
+
+	return (stat);
 }

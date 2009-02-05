@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -804,7 +804,7 @@ extern int	svc_rdma_kcreate(char *, SVC_CALLOUT_TABLE *, int,
 			rdma_xprt_group_t *);
 extern void	svc_rdma_kstop(SVCMASTERXPRT *);
 extern void	svc_rdma_kdestroy(SVCMASTERXPRT *);
-extern void	rdma_stop(rdma_xprt_group_t);
+extern void	rdma_stop(rdma_xprt_group_t *);
 
 /*
  * GSS cleanup method.

@@ -421,15 +421,10 @@ _fini()
 {
 	int status;
 
-	if ((status = rdma_unregister_mod(&rib_mod)) != RDMA_SUCCESS) {
-		return (EBUSY);
-	}
-
 	/*
 	 * Remove module
 	 */
 	if ((status = mod_remove(&rib_modlinkage)) != 0) {
-		(void) rdma_register_mod(&rib_mod);
 		return (status);
 	}
 	mutex_destroy(&plugin_state_lock);
@@ -534,33 +529,40 @@ rpcib_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	mutex_enter(&rib_stat->open_hca_lock);
 	if (open_hcas(rib_stat) != RDMA_SUCCESS) {
-		ibt_free_hca_list(rib_stat->hca_guids, rib_stat->hca_count);
-		(void) ibt_detach(rib_stat->ibt_clnt_hdl);
 		mutex_exit(&rib_stat->open_hca_lock);
-		mutex_destroy(&rib_stat->open_hca_lock);
-		kmem_free(rib_stat, sizeof (*rib_stat));
-		rib_stat = NULL;
-		return (DDI_FAILURE);
+		goto open_fail;
 	}
 	mutex_exit(&rib_stat->open_hca_lock);
+
+	if (ddi_prop_update_int(DDI_DEV_T_NONE, dip, DDI_NO_AUTODETACH, 1) !=
+	    DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "rpcib_attach: ddi-no-autodetach prop update "
+		    "failed.");
+		goto register_fail;
+	}
 
 	/*
 	 * Register with rdmatf
 	 */
-	rib_mod.rdma_count = rib_stat->hca_count;
+	rib_mod.rdma_count = rib_stat->nhca_inited;
 	r_status = rdma_register_mod(&rib_mod);
 	if (r_status != RDMA_SUCCESS && r_status != RDMA_REG_EXIST) {
-		rib_detach_hca(rib_stat->hca);
-		ibt_free_hca_list(rib_stat->hca_guids, rib_stat->hca_count);
-		(void) ibt_detach(rib_stat->ibt_clnt_hdl);
-		mutex_destroy(&rib_stat->open_hca_lock);
-		kmem_free(rib_stat, sizeof (*rib_stat));
-		rib_stat = NULL;
-		return (DDI_FAILURE);
+		cmn_err(CE_WARN, "rpcib_attach:rdma_register_mod failed, "
+		    "status = %d", r_status);
+		goto register_fail;
 	}
 
-
 	return (DDI_SUCCESS);
+
+register_fail:
+	rib_detach_hca(rib_stat->hca);
+open_fail:
+	ibt_free_hca_list(rib_stat->hca_guids, rib_stat->hca_count);
+	(void) ibt_detach(rib_stat->ibt_clnt_hdl);
+	mutex_destroy(&rib_stat->open_hca_lock);
+	kmem_free(rib_stat, sizeof (*rib_stat));
+	rib_stat = NULL;
+	return (DDI_FAILURE);
 }
 
 /*ARGSUSED*/
@@ -586,11 +588,18 @@ rpcib_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	rib_detach_hca(rib_stat->hca);
 	ibt_free_hca_list(rib_stat->hca_guids, rib_stat->hca_count);
 	(void) ibt_detach(rib_stat->ibt_clnt_hdl);
+	mutex_destroy(&rib_stat->open_hca_lock);
+	if (rib_stat->hcas) {
+		kmem_free(rib_stat->hcas, rib_stat->hca_count *
+		    sizeof (rib_hca_t));
+		rib_stat->hcas = NULL;
+	}
+	kmem_free(rib_stat, sizeof (*rib_stat));
+	rib_stat = NULL;
 
 	mutex_enter(&rpcib.rpcib_mutex);
 	rpcib.rpcib_dip = NULL;
 	mutex_exit(&rpcib.rpcib_mutex);
-
 	mutex_destroy(&rpcib.rpcib_mutex);
 	return (DDI_SUCCESS);
 }
@@ -3905,16 +3914,27 @@ rib_rm_conn(CONN *cn, rib_conn_list_t *connlist)
  * connection), the connection should be destroyed. A connection transitions
  * into this state when it is being destroyed.
  */
+/* ARGSUSED */
 static rdma_stat
 rib_conn_get(struct netbuf *svcaddr, int addr_type, void *handle, CONN **conn)
 {
 	CONN *cn;
 	int status = RDMA_SUCCESS;
-	rib_hca_t *hca = (rib_hca_t *)handle;
+	rib_hca_t *hca = rib_stat->hca;
 	rib_qp_t *qp;
 	clock_t cv_stat, timout;
 	ibt_path_info_t path;
 	ibt_ip_addr_t s_ip, d_ip;
+
+	if (hca == NULL)
+		return (RDMA_FAILED);
+
+	rw_enter(&rib_stat->hca->state_lock, RW_READER);
+	if (hca->state == HCA_DETACHED) {
+		rw_exit(&rib_stat->hca->state_lock);
+		return (RDMA_FAILED);
+	}
+	rw_exit(&rib_stat->hca->state_lock);
 
 again:
 	rw_enter(&hca->cl_conn_list.conn_lock, RW_READER);
@@ -4269,19 +4289,31 @@ rib_detach_hca(rib_hca_t *hca)
 	rib_stop_services(hca);
 	rib_close_channels(&hca->cl_conn_list);
 	rib_close_channels(&hca->srv_conn_list);
+
+	rib_mod.rdma_count--;
+
 	rw_exit(&hca->state_lock);
 
-	rib_purge_connlist(&hca->cl_conn_list);
-	rib_purge_connlist(&hca->srv_conn_list);
-
+	/*
+	 * purge will free all datastructures used by CQ handlers. We don't
+	 * want to receive completions after purge, so we'll free the CQs now.
+	 */
 	(void) ibt_free_cq(hca->clnt_rcq->rib_cq_hdl);
 	(void) ibt_free_cq(hca->clnt_scq->rib_cq_hdl);
 	(void) ibt_free_cq(hca->svc_rcq->rib_cq_hdl);
 	(void) ibt_free_cq(hca->svc_scq->rib_cq_hdl);
+
+	rib_purge_connlist(&hca->cl_conn_list);
+	rib_purge_connlist(&hca->srv_conn_list);
+
 	kmem_free(hca->clnt_rcq, sizeof (rib_cq_t));
 	kmem_free(hca->clnt_scq, sizeof (rib_cq_t));
 	kmem_free(hca->svc_rcq, sizeof (rib_cq_t));
 	kmem_free(hca->svc_scq, sizeof (rib_cq_t));
+	if (stats_enabled) {
+		kstat_delete_byname_zone("unix", 0, "rpcib_cache",
+		    GLOBAL_ZONEID);
+	}
 
 	rw_enter(&hca->srv_conn_list.conn_lock, RW_READER);
 	rw_enter(&hca->cl_conn_list.conn_lock, RW_READER);
@@ -4294,6 +4326,7 @@ rib_detach_hca(rib_hca_t *hca)
 		rib_rbufpool_destroy(hca, RECV_BUFFER);
 		rib_rbufpool_destroy(hca, SEND_BUFFER);
 		rib_destroy_cache(hca);
+		rdma_unregister_mod(&rib_mod);
 		(void) ibt_free_pd(hca->hca_hdl, hca->pd_hdl);
 		(void) ibt_close_hca(hca->hca_hdl);
 		hca->hca_hdl = NULL;
@@ -4306,12 +4339,16 @@ rib_detach_hca(rib_hca_t *hca)
 		while (hca->inuse)
 			cv_wait(&hca->cb_cv, &hca->inuse_lock);
 		mutex_exit(&hca->inuse_lock);
+
+		rdma_unregister_mod(&rib_mod);
+
 		/*
 		 * conn_lists are now NULL, so destroy
 		 * buffers, close hca and be done.
 		 */
 		rib_rbufpool_destroy(hca, RECV_BUFFER);
 		rib_rbufpool_destroy(hca, SEND_BUFFER);
+		rib_destroy_cache(hca);
 		(void) ibt_free_pd(hca->hca_hdl, hca->pd_hdl);
 		(void) ibt_close_hca(hca->hca_hdl);
 		hca->hca_hdl = NULL;
@@ -4385,7 +4422,9 @@ rib_server_side_cache_cleanup(void *argp)
 			kmem_free(rb, sizeof (rib_lrc_entry_t));
 		}
 		mutex_destroy(&rcas->node_lock);
-		kmem_cache_free(hca->server_side_cache, rcas);
+		if (hca->server_side_cache) {
+			kmem_cache_free(hca->server_side_cache, rcas);
+		}
 		if ((cache_allocation) < cache_limit) {
 			rw_exit(&hca->avl_rw_lock);
 			return;
@@ -4417,8 +4456,12 @@ rib_destroy_cache(rib_hca_t *hca)
 		ddi_taskq_destroy(hca->reg_cache_clean_up);
 		hca->reg_cache_clean_up = NULL;
 	}
-	if (!hca->avl_init) {
-		kmem_cache_destroy(hca->server_side_cache);
+	if (hca->avl_init) {
+		rib_server_side_cache_reclaim((void *)hca);
+		if (hca->server_side_cache) {
+			kmem_cache_destroy(hca->server_side_cache);
+			hca->server_side_cache = NULL;
+		}
 		avl_destroy(&hca->avl_tree);
 		mutex_destroy(&hca->cache_allocation);
 		rw_destroy(&hca->avl_rw_lock);

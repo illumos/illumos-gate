@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,8 +217,20 @@ typedef struct ibnex_s {
 
 	/* Pseudo nodes inited from ibnex_get_snapshot? */
 	int			ibnex_pseudo_inited;
+	/*
+	 * IOC list used by all HCAs.
+	 */
+	kcondvar_t		ibnex_ioc_list_cv;
+	uint32_t		ibnex_ioc_list_state;
 	ibdm_ioc_info_t		*ibnex_ioc_list;
 } ibnex_t;
+
+/*
+ * States for ibnex_ioc_list_state
+ */
+#define	IBNEX_IOC_LIST_READY	0x0
+#define	IBNEX_IOC_LIST_RENEW	0x1
+#define	IBNEX_IOC_LIST_ACCESS	0x2
 
 /*
  * States for ibnex_reprobe_state

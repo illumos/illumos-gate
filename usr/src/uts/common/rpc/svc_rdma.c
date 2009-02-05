@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -360,7 +360,10 @@ svc_rdma_kstart(SVCMASTERXPRT *xprt)
 	 * Create a listener for  module at this port
 	 */
 
-	(*rmod->rdma_ops->rdma_svc_listen)(svcdata);
+	if (rmod->rdma_count != 0)
+		(*rmod->rdma_ops->rdma_svc_listen)(svcdata);
+	else
+		svcdata->err_code = RDMA_FAILED;
 }
 
 void
@@ -373,9 +376,13 @@ svc_rdma_kstop(SVCMASTERXPRT *xprt)
 	rmod = ((struct rdma_data *)xprt->xp_p2)->r_mod;
 
 	/*
-	 * Call the stop listener routine for each plugin.
+	 * Call the stop listener routine for each plugin. If rdma_count is
+	 * already zero set active to zero.
 	 */
-	(*rmod->rdma_ops->rdma_svc_stop)(svcdata);
+	if (rmod->rdma_count != 0)
+		(*rmod->rdma_ops->rdma_svc_stop)(svcdata);
+	else
+		svcdata->active = 0;
 	if (svcdata->active)
 		DTRACE_PROBE(krpc__e__svcrdma__kstop);
 }

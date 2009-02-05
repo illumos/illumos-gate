@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
@@ -530,6 +530,7 @@ clnt_rdma_kcallit(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 	XDR 	*rdmahdr_o_xdrs, *rdmahdr_i_xdrs;
 
 	struct rpc_msg 	reply_msg;
+	rdma_registry_t	*m;
 
 	struct clist *cl_sendlist;
 	struct clist *cl_recvlist;
@@ -578,6 +579,27 @@ call_again:
 	rcil.rcil_len_alt = 0;
 	long_reply_len = 0;
 
+	rw_enter(&rdma_lock, RW_READER);
+	m = (rdma_registry_t *)p->cku_rd_handle;
+	if (m->r_mod_state == RDMA_MOD_INACTIVE) {
+		/*
+		 * If we didn't find a matching RDMA module in the registry
+		 * then there is no transport.
+		 */
+		rw_exit(&rdma_lock);
+		p->cku_err.re_status = RPC_CANTSEND;
+		p->cku_err.re_errno = EIO;
+		ticks = clnt_rdma_min_delay * drv_usectohz(1000000);
+		if (h->cl_nosignal == TRUE) {
+			delay(ticks);
+		} else {
+			if (delay_sig(ticks) == EINTR) {
+				p->cku_err.re_status = RPC_INTR;
+				p->cku_err.re_errno = EINTR;
+			}
+		}
+		return (RPC_CANTSEND);
+	}
 	/*
 	 * Get unique xid
 	 */
@@ -586,6 +608,7 @@ call_again:
 
 	status = RDMA_GET_CONN(p->cku_rd_mod->rdma_ops, &p->cku_addr,
 	    p->cku_addrfmly, p->cku_rd_handle, &conn);
+	rw_exit(&rdma_lock);
 
 	/*
 	 * If there is a problem with the connection reflect the issue
@@ -1266,6 +1289,10 @@ rdma_reachable(int addr_type, struct netbuf *addr, struct knetconfig **knconf)
 	rw_enter(&rdma_lock, RW_READER);
 	rp = rdma_mod_head;
 	while (rp != NULL) {
+		if (rp->r_mod_state == RDMA_MOD_INACTIVE) {
+			rp = rp->r_next;
+			continue;
+		}
 		status = RDMA_REACHABLE(rp->r_mod->rdma_ops, addr_type, addr,
 		    &handle);
 		if (status == RDMA_SUCCESS) {
@@ -1285,7 +1312,7 @@ rdma_reachable(int addr_type, struct netbuf *addr, struct knetconfig **knconf)
 
 			knc->knc_protofmly = pf;
 			knc->knc_proto = p;
-			knc->knc_rdev = (dev_t)handle;
+			knc->knc_rdev = (dev_t)rp;
 			*knconf = knc;
 			rw_exit(&rdma_lock);
 			return (0);

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -407,10 +407,12 @@ _init(void)
 	IBTF_DPRINTF_L4("ibnex", "\t_init");
 	mutex_init(&ibnex.ibnex_mutex, NULL, MUTEX_DRIVER, NULL);
 	cv_init(&ibnex.ibnex_reprobe_cv, NULL, CV_DRIVER, NULL);
+	cv_init(&ibnex.ibnex_ioc_list_cv, NULL, CV_DRIVER, NULL);
 	if ((error = mod_install(&modlinkage)) != 0) {
 		IBTF_DPRINTF_L2("ibnex", "\t_init: mod_install failed");
 		mutex_destroy(&ibnex.ibnex_mutex);
 		cv_destroy(&ibnex.ibnex_reprobe_cv);
+		cv_destroy(&ibnex.ibnex_ioc_list_cv);
 	} else {
 		ibdm_ibnex_register_callback(ibnex_dm_callback);
 		ibtl_ibnex_register_callback(ibnex_ibtl_callback);
@@ -436,6 +438,7 @@ _fini(void)
 	ibtl_ibnex_unregister_callback();
 	mutex_destroy(&ibnex.ibnex_mutex);
 	cv_destroy(&ibnex.ibnex_reprobe_cv);
+	cv_destroy(&ibnex.ibnex_ioc_list_cv);
 	return (0);
 }
 
@@ -1301,34 +1304,43 @@ ibnex_bus_config(dev_info_t *parent, uint_t flag,
 		 * ibdm and configure all children.
 		 */
 		if (parent == ibnex.ibnex_dip) {
-			ibdm_ioc_info_t	*ioc_list;
+			ibdm_ioc_info_t	*ioc_list, *new_ioc_list;
 
+			mutex_enter(&ibnex.ibnex_mutex);
+			while (ibnex.ibnex_ioc_list_state !=
+			    IBNEX_IOC_LIST_READY) {
+				cv_wait(&ibnex.ibnex_ioc_list_cv,
+				    &ibnex.ibnex_mutex);
+			}
+			ibnex.ibnex_ioc_list_state = IBNEX_IOC_LIST_RENEW;
+			mutex_exit(&ibnex.ibnex_mutex);
+			/* Enumerate all the IOC's */
+			ibdm_ibnex_port_settle_wait(0,
+			    ibnex_port_settling_time);
+
+			new_ioc_list = ibdm_ibnex_get_ioc_list(
+			    IBDM_IBNEX_NORMAL_PROBE);
+			IBTF_DPRINTF_L4("ibnex",
+			    "\tbus_config: alloc ioc_list %p", new_ioc_list);
 			/*
 			 * Optimize the calls for each BUS_CONFIG_ALL request
 			 * to the IB Nexus dip. This is currently done for
 			 * each PDIP.
 			 */
-			if (ibnex.ibnex_ioc_list) {
+			mutex_enter(&ibnex.ibnex_mutex);
+			ioc_list = ibnex.ibnex_ioc_list;
+			ibnex.ibnex_ioc_list = new_ioc_list;
+			ibnex.ibnex_ioc_list_state = IBNEX_IOC_LIST_READY;
+			cv_broadcast(&ibnex.ibnex_ioc_list_cv);
+			mutex_exit(&ibnex.ibnex_mutex);
+
+			if (ioc_list) {
 				IBTF_DPRINTF_L4("ibnex",
 				    "\tbus_config: freeing ioc_list %p",
-				    ibnex.ibnex_ioc_list);
-				ibdm_ibnex_free_ioc_list(ibnex.ibnex_ioc_list);
-				mutex_enter(&ibnex.ibnex_mutex);
-				ibnex.ibnex_ioc_list = NULL;
-				mutex_exit(&ibnex.ibnex_mutex);
+				    ioc_list);
+				ibdm_ibnex_free_ioc_list(ioc_list);
 			}
 
-			/* Enumerate all the IOC's */
-			ibdm_ibnex_port_settle_wait(0,
-			    ibnex_port_settling_time);
-
-			ioc_list = ibdm_ibnex_get_ioc_list(
-			    IBDM_IBNEX_NORMAL_PROBE);
-			IBTF_DPRINTF_L4("ibnex",
-			    "\tbus_config: alloc ioc_list %p", ioc_list);
-			mutex_enter(&ibnex.ibnex_mutex);
-			ibnex.ibnex_ioc_list = ioc_list;
-			mutex_exit(&ibnex.ibnex_mutex);
 
 			ret = mdi_vhci_bus_config(parent,
 			    flag, op, devname, child, NULL);
@@ -1524,14 +1536,18 @@ ibnex_config_all_children(dev_info_t *parent)
 
 	ibnex_pseudo_initnodes();
 
-	ioc_list = ibnex.ibnex_ioc_list;
-
 	mutex_enter(&ibnex.ibnex_mutex);
-
+	while (ibnex.ibnex_ioc_list_state != IBNEX_IOC_LIST_READY) {
+		cv_wait(&ibnex.ibnex_ioc_list_cv, &ibnex.ibnex_mutex);
+	}
+	ibnex.ibnex_ioc_list_state = IBNEX_IOC_LIST_ACCESS;
+	ioc_list = ibnex.ibnex_ioc_list;
 	while (ioc_list) {
 		(void) ibnex_ioc_config_from_pdip(ioc_list, parent, 0);
 		ioc_list = ioc_list->ioc_next;
 	}
+	ibnex.ibnex_ioc_list_state = IBNEX_IOC_LIST_READY;
+	cv_broadcast(&ibnex.ibnex_ioc_list_cv);
 
 	/* Config IBTF Pseudo clients */
 	ibnex_config_pseudo_all(parent);
@@ -3188,6 +3204,7 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 	ibnex_node_data_t	*node_data;
 	ibnex_port_node_t	*port_node;
 	char devname[MAXNAMELEN];
+	int 			cdip_allocated = 0;
 
 	ASSERT(MUTEX_HELD(&ibnex.ibnex_mutex));
 
@@ -3265,9 +3282,7 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 			IBTF_DPRINTF_L2("ibnex", "\tcommsvc_initnode:"
 			    "\tInvalid Node type");
 			*rval = IBNEX_FAILURE;
-			mutex_exit(&ibnex.ibnex_mutex);
 			ibnex_delete_port_node_data(node_data);
-			mutex_enter(&ibnex.ibnex_mutex);
 			return (NULL);
 	}
 
@@ -3277,11 +3292,14 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 			node_data->node_data.port_node.port_pdip = parent;
 			node_data->node_state = IBNEX_CFGADM_CONFIGURED;
 			ddi_set_parent_data(cdip, node_data);
+			IBTF_DPRINTF_L4("ibnex", "\tcommsvc_initnode: found "
+			    "attached cdip 0x%p for devname %s", cdip, devname);
 			return (cdip);
 		}
 	} else {
 		ndi_devi_alloc_sleep(parent,
 		    IBNEX_IBPORT_CNAME, (pnode_t)DEVI_SID_NODEID, &cdip);
+		cdip_allocated = 1;
 	}
 
 	node_data->node_dip	= cdip;
@@ -3301,11 +3319,16 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 			node_data->node_data.port_node.port_pdip = parent;
 			return (cdip);
 		}
+		IBTF_DPRINTF_L4("ibnex", "\tcommsvc_initnode: BIND/ONLINE "
+		    "of cdip 0x%p for devname %s and flag %d failed", cdip,
+		    devname, flag);
 	}
 
 	*rval = IBNEX_FAILURE;
-	ibnex_delete_port_node_data(node_data);
-	(void) ndi_devi_free(cdip);
+	node_data->node_dip = NULL;
+	ddi_set_parent_data(cdip, NULL);
+	if (cdip_allocated)
+		(void) ndi_devi_free(cdip);
 	mutex_enter(&ibnex.ibnex_mutex);
 	IBTF_DPRINTF_L4("ibnex", "\tcommsvc_initnode: failure exit");
 	return (NULL);
@@ -3562,7 +3585,6 @@ ibnex_create_port_compatible_prop(dev_info_t *child_dip,
 static void
 ibnex_delete_port_node_data(ibnex_node_data_t *node)
 {
-	mutex_enter(&ibnex.ibnex_mutex);
 	if ((node->node_next == NULL) && (node->node_prev == NULL))
 		ibnex.ibnex_port_node_head = NULL;
 	else if (node->node_next == NULL)
@@ -3574,7 +3596,6 @@ ibnex_delete_port_node_data(ibnex_node_data_t *node)
 		node->node_prev->node_next = node->node_next;
 		node->node_next->node_prev = node->node_prev;
 	}
-	mutex_exit(&ibnex.ibnex_mutex);
 	kmem_free(node, sizeof (ibnex_node_data_t));
 }
 

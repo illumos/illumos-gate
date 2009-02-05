@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -919,11 +919,6 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 
 		rv = CFGA_IB_OK;	/* Other status don't matter */
 
-		if (!ib_confirm(confp, IB_CONFIRM1)) {
-			ib_cleanup_after_devctl_cmd(hdl, nvl);
-			return (CFGA_NACK);
-		}
-
 		if (devctl_ap_configure(hdl, nvl) != 0) {
 			DPRINTF("cfga_change_state: devctl_ap_configure "
 			    "failed. errno: %d\n", errno);
@@ -1284,7 +1279,7 @@ cfga_private_func(const char *func, const char *ap_id, const char *options,
 		}
 
 		/* CHECK: Only supported on fabric ap_ids */
-		if (fab_apid == NULL) {
+		if (fab_apid == NULL || strcmp(fab_apid, IBNEX_FABRIC) != 0) {
 			DPRINTF("cfga_private_func: fabric apid needed\n");
 			return (ib_err_msg(errstring, CFGA_IB_INVALID_OP_ERR,
 			    ap_id, errno));

@@ -261,8 +261,8 @@ ib_time_t	ibcm_max_sidr_rep_proctime = IBCM_MAX_SIDR_PROCESS_TIME;
 ib_time_t	ibcm_max_sidr_pktlife_time = IBCM_MAX_SIDR_PKT_LIFE_TIME;
 
 ib_time_t	ibcm_max_sidr_rep_store_time = 18;
-uint32_t	ibcm_wait_for_acc_cnt_timeout = 500000;	/* 500 ms */
-uint32_t	ibcm_wait_for_res_cnt_timeout = 500000;	/* 500 ms */
+uint32_t	ibcm_wait_for_acc_cnt_timeout = 2000000;	/* 2 sec */
+uint32_t	ibcm_wait_for_res_cnt_timeout = 2000000;	/* 2 sec */
 
 ib_time_t	ibcm_max_ib_pkt_lt = IBCM_MAX_IB_PKT_LT;
 ib_time_t	ibcm_max_ib_mad_pkt_lt = IBCM_MAX_IB_MAD_PKT_LT;
@@ -933,7 +933,7 @@ ibcm_hca_detach(ibcm_hca_info_t *hcap)
 	 */
 	hcap->hca_state = IBCM_HCA_NOT_ACTIVE;
 
-	/* wait on response CV to 500mS */
+	/* wait on response CV */
 	absolute_time = ddi_get_lbolt() +
 	    drv_usectohz(ibcm_wait_for_acc_cnt_timeout);
 
@@ -944,15 +944,10 @@ ibcm_hca_detach(ibcm_hca_info_t *hcap)
 
 	if (hcap->hca_acc_cnt != 0) {
 		/* We got a timeout */
-#ifdef DEBUG
-		if (ibcm_test_mode > 0)
-			IBTF_DPRINTF_L1(cmlog, "ibcm_hca_detach: Unexpected "
-			    "abort due to timeout on acc_cnt %u",
-			    hcap->hca_acc_cnt);
-		else
-#endif
-			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_detach: Aborting due"
-			    " to timeout on acc_cnt %u", hcap->hca_acc_cnt);
+		IBTF_DPRINTF_L2(cmlog, "ibcm_hca_detach: Aborting due"
+		    " to timeout on hca_acc_cnt %u, \n Some CM Clients are "
+		    "still active, looks like we need to wait some more time "
+		    "(ibcm_wait_for_acc_cnt_timeout).", hcap->hca_acc_cnt);
 		hcap->hca_state = IBCM_HCA_ACTIVE;
 		return (IBCM_FAILURE);
 	}
@@ -989,10 +984,10 @@ ibcm_hca_detach(ibcm_hca_info_t *hcap)
 	 * All these stateps must be short lived ones, waiting to be cleaned
 	 * up after some timeout value, based on the current state.
 	 */
-	IBTF_DPRINTF_L5(cmlog, "ibcm_hca_detach:hca_guid = 0x%llX res_cnt = %d",
+	IBTF_DPRINTF_L3(cmlog, "ibcm_hca_detach:hca_guid = 0x%llX res_cnt = %d",
 	    hcap->hca_guid, hcap->hca_res_cnt);
 
-	/* wait on response CV to 500mS */
+	/* wait on response CV */
 	absolute_time = ddi_get_lbolt() +
 	    drv_usectohz(ibcm_wait_for_res_cnt_timeout);
 
@@ -1003,15 +998,11 @@ ibcm_hca_detach(ibcm_hca_info_t *hcap)
 
 	if (hcap->hca_res_cnt != 0) {
 		/* We got a timeout waiting for hca_res_cnt to become 0 */
-#ifdef DEBUG
-		if (ibcm_test_mode > 0)
-			IBTF_DPRINTF_L1(cmlog, "ibcm_hca_detach: Unexpected "
-			    "abort due to timeout on res_cnt %d",
-			    hcap->hca_res_cnt);
-		else
-#endif
-			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_detach: Aborting due"
-			    " to timeout on res_cnt %d", hcap->hca_res_cnt);
+		IBTF_DPRINTF_L2(cmlog, "ibcm_hca_detach: Aborting due"
+		    " to timeout on res_cnt %d, \n Some CM connections are "
+		    "still in transient state, looks like we need to wait "
+		    "some more time (ibcm_wait_for_res_cnt_timeout).",
+		    hcap->hca_res_cnt);
 		hcap->hca_state = IBCM_HCA_ACTIVE;
 		return (IBCM_FAILURE);
 	}

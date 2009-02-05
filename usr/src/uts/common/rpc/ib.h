@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -205,8 +205,8 @@ typedef struct {
 } rib_conn_list_t;
 
 enum hca_state {
+	HCA_DETACHED,		/* hca in detached state */
 	HCA_INITED,		/* hca in up and running state */
-	HCA_DETACHED		/* hca in detached state */
 };
 
 /*

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2585,21 +2585,24 @@ svc_detach_thread(SVCXPRT *clone_xprt)
  * to cleanup the pool and destroy the xprt in svc_queueclose()
  */
 void
-rdma_stop(rdma_xprt_group_t rdma_xprts)
+rdma_stop(rdma_xprt_group_t *rdma_xprts)
 {
 	SVCMASTERXPRT *xprt;
 	rdma_xprt_record_t *curr_rec;
 	queue_t *q;
 	mblk_t *mp;
-	int i;
+	int i, rtg_count;
 	SVCPOOL *pool;
 
-	if (rdma_xprts.rtg_count == 0)
+	if (rdma_xprts->rtg_count == 0)
 		return;
 
-	for (i = 0; i < rdma_xprts.rtg_count; i++) {
-		curr_rec = rdma_xprts.rtg_listhead;
-		rdma_xprts.rtg_listhead = curr_rec->rtr_next;
+	rtg_count = rdma_xprts->rtg_count;
+
+	for (i = 0; i < rtg_count; i++) {
+		curr_rec = rdma_xprts->rtg_listhead;
+		rdma_xprts->rtg_listhead = curr_rec->rtr_next;
+		rdma_xprts->rtg_count--;
 		curr_rec->rtr_next = NULL;
 		xprt = curr_rec->rtr_xprt_ptr;
 		q = xprt->xp_wq;
@@ -2617,8 +2620,13 @@ rdma_stop(rdma_xprt_group_t rdma_xprts)
 			mp->b_next = (mblk_t *)0;
 			pool->p_reqs--;
 			mutex_exit(&pool->p_req_lock);
-			if (mp)
+			if (mp) {
+				rdma_recv_data_t *rdp = (rdma_recv_data_t *)
+				    mp->b_rptr;
+				RDMA_BUF_FREE(rdp->conn, &rdp->rpcmsg);
+				RDMA_REL_CONN(rdp->conn);
 				freemsg(mp);
+			}
 		}
 		mutex_exit(&xprt->xp_req_lock);
 		svc_queueclose(q);
@@ -2631,7 +2639,7 @@ rdma_stop(rdma_xprt_group_t rdma_xprts)
 		 * based master transport handle.
 		 */
 		kmem_free(curr_rec, sizeof (rdma_xprt_record_t));
-		if (!rdma_xprts.rtg_listhead)
+		if (!rdma_xprts->rtg_listhead)
 			break;
 	}
 }

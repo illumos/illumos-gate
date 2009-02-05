@@ -64,6 +64,8 @@ COMMON_PERL_SCRIPT_SRC =
 
 sparc_PERL_SCRIPT_SRC = SUNW,vdevices.pl
 
+COMMON_SHELL_SCRIPT_SRC = SUNW,ibsdpu.sh
+
 COMMON_MOD_OBJ = \
 	filesys_rcm.o \
 	dump_rcm.o \
@@ -135,7 +137,8 @@ POFILES = $(SRCS:.c=.po)
 POFILE = prcm_daemon.po
 
 PERL_SCRIPTS = $(COMMON_PERL_SRC) $($(MACH)_PERL_SCRIPT_SRC)
-RCM_SCRIPTS = $(PERL_SCRIPTS)
+SHELL_SCRIPTS = $(COMMON_SHELL_SCRIPT_SRC)
+RCM_SCRIPTS = $(PERL_SCRIPTS) $(SHELL_SCRIPTS)
 
 # install specifics
 

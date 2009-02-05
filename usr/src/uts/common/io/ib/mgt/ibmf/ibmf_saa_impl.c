@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/ib/mgt/ibmf/ibmf_saa_impl.h>
 #include <sys/ib/mgt/ibmf/ibmf_saa_utils.h>
@@ -72,7 +70,7 @@ static void ibmf_saa_impl_set_transaction_params(saa_port_t *saa_portp,
     ibt_hca_portinfo_t *portinfop);
 static void ibmf_saa_impl_update_sa_address_info(saa_port_t *saa_portp,
     ibmf_msg_t *msgp);
-static void ibmf_saa_impl_ibmf_unreg(saa_port_t *saa_portp);
+static int ibmf_saa_impl_ibmf_unreg(saa_port_t *saa_portp);
 
 int	ibmf_saa_max_wait_time = IBMF_SAA_MAX_WAIT_TIME_IN_SECS;
 int	ibmf_saa_trans_wait_time = IBMF_SAA_TRANS_WAIT_TIME_IN_SECS;
@@ -164,6 +162,7 @@ ibmf_saa_impl_fini()
 {
 	int		ret = 0;
 	saa_port_t	*saa_portp;
+	saa_port_t	*next;
 
 	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4, ibmf_saa_impl_fini_start,
 	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_fini() enter\n");
@@ -231,16 +230,16 @@ ibmf_saa_impl_fini()
 	 * no more clients nor pending transaction:
 	 * unregister ibmf and destroy port entries
 	 */
-	saa_portp = saa_statep->saa_port_list;
-	while (saa_portp != NULL) {
+	while (saa_statep->saa_port_list != NULL) {
+
+		saa_portp = saa_statep->saa_port_list;
+		next = saa_portp->next;
 
 		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L3,
 		    ibmf_saa_impl_fini, IBMF_TNF_TRACE, "",
 		    "ibmf_saa_impl_fini: %s, prefix = %016" PRIx64 "\n",
 		    tnf_string, msg, "deinitializing port",
 		    tnf_opaque, port_guid, saa_portp->saa_pt_port_guid);
-
-		saa_statep->saa_port_list = saa_portp->next;
 
 		_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*saa_portp))
 
@@ -251,13 +250,17 @@ ibmf_saa_impl_fini()
 
 			mutex_exit(&saa_portp->saa_pt_mutex);
 
-			ibmf_saa_impl_ibmf_unreg(saa_portp);
+			if (ibmf_saa_impl_ibmf_unreg(saa_portp)
+			    != IBMF_SUCCESS) {
+				ret = EBUSY;
+				goto bail;
+			}
 		} else
-
-		mutex_exit(&saa_portp->saa_pt_mutex);
+			mutex_exit(&saa_portp->saa_pt_mutex);
 
 		ibmf_saa_impl_destroy_port(saa_portp);
-		saa_portp = saa_statep->saa_port_list;
+
+		saa_statep->saa_port_list = next;
 	}
 
 	taskq_destroy(saa_statep->saa_event_taskq);
@@ -515,14 +518,12 @@ bail:
 
 	if (status != IBMF_SUCCESS) {
 
-		mutex_enter(
-			&saa_portp->saa_pt_kstat_mutex);
+		mutex_enter(&saa_portp->saa_pt_kstat_mutex);
 
 		IBMF_SAA_ADD32_KSTATS(saa_portp,
 		    clients_reg_failed, 1);
 
-		mutex_exit(
-			&saa_portp->saa_pt_kstat_mutex);
+		mutex_exit(&saa_portp->saa_pt_kstat_mutex);
 
 		/* decrementing refcount is last thing we do on entry */
 
@@ -828,6 +829,98 @@ ibmf_saa_impl_register_failed(saa_port_t *saa_portp)
 	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_register_failed() exit\n");
 }
 
+static int
+ibmf_saa_impl_setup_qp_async_cb(saa_port_t *saa_portp, int setup_async_cb_only)
+{
+	int		status;
+	int		unreg_status;
+	ib_pkey_t	p_key;
+	ib_qkey_t	q_key;
+	uint8_t		portnum;
+	boolean_t	qp_alloced = B_FALSE;
+
+	if (setup_async_cb_only == 0) {
+
+		/* allocate a qp through ibmf */
+		status = ibmf_alloc_qp(saa_portp->saa_pt_ibmf_handle,
+		    IB_PKEY_DEFAULT_LIMITED, IB_GSI_QKEY,
+		    IBMF_ALT_QP_MAD_RMPP, &saa_portp->saa_pt_qp_handle);
+
+		if (status != IBMF_SUCCESS) {
+
+			IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
+			    ibmf_saa_impl_setup_qp_async_cb, IBMF_TNF_ERROR, "",
+			    "ibmf_saa_impl_setup_qp_async_cb: %s, "
+			    "ibmf_status = %d\n",
+			    tnf_string, msg, "Cannot alloc qp with ibmf",
+			    tnf_int, status, status);
+
+			return (status);
+		}
+
+		qp_alloced = B_TRUE;
+
+		/*
+		 * query the queue pair number; we will need it to unsubscribe
+		 * from notice reports
+		 */
+		status = ibmf_query_qp(saa_portp->saa_pt_ibmf_handle,
+		    saa_portp->saa_pt_qp_handle, &saa_portp->saa_pt_qpn,
+		    &p_key, &q_key, &portnum, 0);
+
+		if (status != IBMF_SUCCESS) {
+
+			IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
+			    ibmf_saa_impl_setup_qp_async_cb, IBMF_TNF_ERROR, "",
+			    "ibmf_saa_impl_setup_qp_async_cb: %s, "
+			    "ibmf_status = %d\n",
+			    tnf_string, msg,
+			    "Cannot query alt qp to get qp num",
+			    tnf_int, status, status);
+
+			goto bail;
+		}
+	}
+
+	/*
+	 * core ibmf is taking advantage of the fact that saa_portp is our
+	 * callback arg. If this changes, the code in ibmf_recv would need to
+	 * change as well
+	 */
+	status = ibmf_setup_async_cb(saa_portp->saa_pt_ibmf_handle,
+	    saa_portp->saa_pt_qp_handle, ibmf_saa_report_cb, saa_portp, 0);
+	if (status != IBMF_SUCCESS) {
+
+		IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
+		    ibmf_saa_impl_setup_qp_async_cb, IBMF_TNF_ERROR, "",
+		    "ibmf_saa_impl_setup_qp_async_cb: %s, ibmf_status = %d\n",
+		    tnf_string, msg, "Cannot register async cb with ibmf",
+		    tnf_int, status, status);
+
+		goto bail;
+	}
+
+	return (IBMF_SUCCESS);
+
+bail:
+	if (qp_alloced == B_TRUE) {
+		/* free alternate qp */
+		unreg_status = ibmf_free_qp(saa_portp->saa_pt_ibmf_handle,
+		    &saa_portp->saa_pt_qp_handle, 0);
+		if (unreg_status != IBMF_SUCCESS) {
+
+			IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
+			    ibmf_saa_impl_setup_qp_async_cb, IBMF_TNF_ERROR, "",
+			    "ibmf_saa_impl_setup_qp_async_cb: %s, ibmf_status ="
+			    " %d\n", tnf_string, msg,
+			    "Cannot free alternate queue pair with ibmf",
+			    tnf_int, unreg_status, unreg_status);
+		}
+	}
+
+	return (status);
+}
+
 /*
  * ibmf_saa_impl_register_port:
  */
@@ -843,12 +936,8 @@ ibmf_saa_impl_register_port(
 	ibt_hca_portinfo_t *port_info_list = NULL;
 	uint_t		port_count	= 0;
 	uint_t		port_size	= 0;
-	ib_pkey_t	p_key;
-	ib_qkey_t	q_key;
-	uint8_t		portnum;
 	int		ihca, iport;
 	ib_guid_t	port_guid;
-	boolean_t	qp_alloced = B_FALSE;
 	boolean_t	ibmf_reg = B_FALSE;
 
 	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4,
@@ -990,79 +1079,10 @@ ibmf_saa_impl_register_port(
 
 	ibmf_reg = B_TRUE;
 
-	/* allocate a qp through ibmf */
-	status = ibmf_alloc_qp(saa_portp->saa_pt_ibmf_handle,
-	    IB_PKEY_DEFAULT_LIMITED, IB_GSI_QKEY, IBMF_ALT_QP_MAD_RMPP,
-	    &saa_portp->saa_pt_qp_handle);
-
-	if (status != IBMF_SUCCESS) {
-
-		IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
-		    ibmf_saa_impl_register_port, IBMF_TNF_ERROR, "",
-		    "ibmf_saa_impl_register_port: %s, ibmf_status = %d\n",
-		    tnf_string, msg, "Cannot alloc qp with ibmf",
-		    tnf_int, status, status);
-
-		goto bail;
-	}
-
-	qp_alloced = B_TRUE;
-
-	/*
-	 * query the queue pair number; we will need it to unsubscribe from
-	 * notice reports
-	 */
-	status = ibmf_query_qp(saa_portp->saa_pt_ibmf_handle,
-	    saa_portp->saa_pt_qp_handle, &saa_portp->saa_pt_qpn, &p_key, &q_key,
-	    &portnum, 0);
-	if (status != IBMF_SUCCESS) {
-
-		IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
-		    ibmf_saa_impl_register_port, IBMF_TNF_ERROR, "",
-		    "ibmf_saa_impl_register_port: %s, ibmf_status = %d\n",
-		    tnf_string, msg, "Cannot query alt qp to get qp num",
-		    tnf_int, status, status);
-
-		goto bail;
-	}
-
-	/*
-	 * core ibmf is taking advantage of the fact that saa_portp is our
-	 * callback arg. If this changes, the code in ibmf_recv would need to
-	 * change as well
-	 */
-	status = ibmf_setup_async_cb(saa_portp->saa_pt_ibmf_handle,
-	    saa_portp->saa_pt_qp_handle, ibmf_saa_report_cb, saa_portp, 0);
-	if (status != IBMF_SUCCESS) {
-
-		IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
-		    ibmf_saa_impl_register_port, IBMF_TNF_ERROR, "",
-		    "ibmf_saa_impl_register_port: %s, ibmf_status = %d\n",
-		    tnf_string, msg, "Cannot register async cb with ibmf",
-		    tnf_int, status, status);
-
-		goto bail;
-	}
-
-	return (IBMF_SUCCESS);
+	if (ibmf_saa_impl_setup_qp_async_cb(saa_portp, 0) == IBMF_SUCCESS)
+		return (IBMF_SUCCESS);
 
 bail:
-	if (qp_alloced == B_TRUE) {
-
-		/* free alternate qp */
-		unreg_status = ibmf_free_qp(saa_portp->saa_pt_ibmf_handle,
-		    &saa_portp->saa_pt_qp_handle, 0);
-		if (unreg_status != IBMF_SUCCESS) {
-
-			IBMF_TRACE_2(IBMF_TNF_NODEBUG, DPRINT_L1,
-			    ibmf_saa_impl_register_port, IBMF_TNF_ERROR, "",
-			    "ibmf_saa_impl_register_port: %s, ibmf_status ="
-			    " %d\n", tnf_string, msg,
-			    "Cannot free alternate queue pair with ibmf",
-			    tnf_int, unreg_status, unreg_status);
-		}
-	}
-
 	if (ibmf_reg == B_TRUE) {
 		/* unregister from ibmf */
 		unreg_status = ibmf_unregister(
@@ -1458,12 +1478,12 @@ ibmf_saa_impl_send_request(saa_impl_trans_info_t *trans_info)
 		    (sleep_flag == B_TRUE)) {
 			if (sa_is_redirected == B_TRUE) {
 				ibmf_status = ibmf_saa_impl_revert_to_qp1(
-					saa_portp, msgp, ibmf_callback,
-					    ibmf_callback_arg, transport_flags);
+				    saa_portp, msgp, ibmf_callback,
+				    ibmf_callback_arg, transport_flags);
 			} else {
 				ibmf_status = ibmf_saa_impl_new_smlid_retry(
-					saa_portp, msgp, ibmf_callback,
-					    ibmf_callback_arg, transport_flags);
+				    saa_portp, msgp, ibmf_callback,
+				    ibmf_callback_arg, transport_flags);
 			}
 		}
 
@@ -1524,7 +1544,7 @@ ibmf_saa_impl_send_request(saa_impl_trans_info_t *trans_info)
 		 */
 		if (mad_status == MAD_STATUS_BUSY)
 			delay(drv_usectohz(
-				IBMF_SAA_BUSY_RETRY_SLEEP_SECS * 1000000));
+			    IBMF_SAA_BUSY_RETRY_SLEEP_SECS * 1000000));
 	}
 
 	if (ibmf_status != IBMF_SUCCESS) {
@@ -2530,8 +2550,23 @@ ibmf_saa_impl_hca_detach(saa_port_t *saa_removed)
 
 	mutex_exit(&saa_portp->saa_pt_mutex);
 
-	if (must_unreg == B_TRUE)
-		ibmf_saa_impl_ibmf_unreg(saa_portp);
+	if (must_unreg == B_TRUE) {
+		if (ibmf_saa_impl_ibmf_unreg(saa_portp) != IBMF_SUCCESS) {
+			mutex_enter(&saa_portp->saa_pt_mutex);
+			mutex_enter(&saa_portp->saa_pt_kstat_mutex);
+			(void) ibmf_saa_impl_init_kstats(saa_portp);
+			mutex_exit(&saa_portp->saa_pt_kstat_mutex);
+			saa_portp->saa_pt_state = IBMF_SAA_PORT_STATE_READY;
+			if (must_unsub == B_TRUE)
+				saa_portp->saa_pt_reference_count++;
+			mutex_exit(&saa_portp->saa_pt_mutex);
+
+			if (must_unsub == B_TRUE) {
+				ibmf_saa_subscribe_events(saa_portp, B_TRUE,
+				    B_FALSE);
+			}
+		}
+	}
 bail:
 	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L3, ibmf_saa_impl_hca_detach_end,
 	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_hca_detach() exit\n");
@@ -3545,9 +3580,9 @@ ibmf_saa_impl_update_sa_address_info(saa_port_t *saa_portp, ibmf_msg_t *msgp)
 		return;
 	}
 	rv = ibmf_saa_utils_unpack_payload(
-		msgp->im_msgbufs_recv.im_bufs_cl_data,
-		    msgp->im_msgbufs_recv.im_bufs_cl_data_len, attr_id, &result,
-		    &length, sa_hdr->AttributeOffset, B_TRUE, KM_NOSLEEP);
+	    msgp->im_msgbufs_recv.im_bufs_cl_data,
+	    msgp->im_msgbufs_recv.im_bufs_cl_data_len, attr_id, &result,
+	    &length, sa_hdr->AttributeOffset, B_TRUE, KM_NOSLEEP);
 	if (rv != IBMF_SUCCESS) {
 
 		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L1,
@@ -3579,8 +3614,8 @@ ibmf_saa_impl_update_sa_address_info(saa_port_t *saa_portp, ibmf_msg_t *msgp)
 
 		mutex_exit(&saa_portp->saa_pt_mutex);
 		ibt_status = ibt_query_hca_ports_byguid(
-			saa_portp->saa_pt_node_guid, saa_portp->saa_pt_port_num,
-			    &ibt_pinfo, &nports, &size);
+		    saa_portp->saa_pt_node_guid, saa_portp->saa_pt_port_num,
+		    &ibt_pinfo, &nports, &size);
 		if (ibt_status != IBT_SUCCESS) {
 
 			IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L1,
@@ -3645,7 +3680,7 @@ ibmf_saa_impl_update_sa_address_info(saa_port_t *saa_portp, ibmf_msg_t *msgp)
 /*
  * ibmf_saa_impl_ibmf_unreg:
  */
-static void
+static int
 ibmf_saa_impl_ibmf_unreg(saa_port_t *saa_portp)
 {
 	int	ibmf_status;
@@ -3658,12 +3693,13 @@ ibmf_saa_impl_ibmf_unreg(saa_port_t *saa_portp)
 	    saa_portp->saa_pt_qp_handle, 0);
 	if (ibmf_status != IBMF_SUCCESS) {
 
-		/* continue anyway even though unreg will probably fail */
 		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L1,
 		    ibmf_saa_impl_ibmf_unreg, IBMF_TNF_TRACE, "",
 		    "ibmf_saa_impl_ibmf_unreg: %s, ibmf_status = %d\n",
 		    tnf_string, msg, "Could not tear down async cb",
 		    tnf_int, ibmf_status, ibmf_status);
+
+		goto bail;
 	}
 
 	/* free qp */
@@ -3672,12 +3708,14 @@ ibmf_saa_impl_ibmf_unreg(saa_port_t *saa_portp)
 
 	if (ibmf_status != IBMF_SUCCESS) {
 
-		/* continue anyway even though unreg will probably fail */
 		IBMF_TRACE_2(IBMF_TNF_DEBUG, DPRINT_L1,
 		    ibmf_saa_impl_ibmf_unreg, IBMF_TNF_TRACE, "",
 		    "ibmf_saa_impl_ibmf_unreg: %s, ibmf_status = %d\n",
 		    tnf_string, msg, "Could not free queue pair",
 		    tnf_int, ibmf_status, ibmf_status);
+
+		(void) ibmf_saa_impl_setup_qp_async_cb(saa_portp, 1);
+		goto bail;
 	}
 
 	ibmf_status = ibmf_unregister(&saa_portp->saa_pt_ibmf_handle, 0);
@@ -3689,8 +3727,13 @@ ibmf_saa_impl_ibmf_unreg(saa_port_t *saa_portp)
 		    "ibmf_saa_impl_ibmf_unreg: %s, ibmf_status = %d\n",
 		    tnf_string, msg, "ibmf_unregister() failed",
 		    tnf_int, ibmf_status, ibmf_status);
+
+		(void) ibmf_saa_impl_setup_qp_async_cb(saa_portp, 0);
 	}
 
+bail:
 	IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4, ibmf_saa_impl_ibmf_unreg_end,
 	    IBMF_TNF_TRACE, "", "ibmf_saa_impl_ibmf_unreg() exit\n");
+
+	return (ibmf_status);
 }

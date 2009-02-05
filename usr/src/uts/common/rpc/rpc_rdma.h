@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,11 +169,13 @@ typedef enum {
 	 */
 	RDMA_BADVERS = 16,	/* mismatch RDMATF versions */
 	RDMA_REG_EXIST = 17,	/* RDMATF registration already exists */
+	RDMA_HCA_ATTACH = 18,
+	RDMA_HCA_DETACH = 19,
 
 	/*
 	 * fallback error
 	 */
-	RDMA_FAILED = 18	/* generic error */
+	RDMA_FAILED = 20	/* generic error */
 } rdma_stat;
 
 /*
@@ -302,8 +304,15 @@ typedef struct rdma_mod {
  */
 typedef struct rdma_registry {
 	rdma_mod_t	*r_mod;		/* plugin mod info */
+	uint32_t	r_mod_state;
 	struct rdma_registry *r_next;	/* next registered RDMA plugin */
 } rdma_registry_t;
+
+/*
+ * RDMA MODULE state flags (r_mod_state).
+ */
+#define	RDMA_MOD_ACTIVE		1
+#define	RDMA_MOD_INACTIVE	0
 
 /*
  * RDMA transport information
@@ -421,6 +430,14 @@ typedef struct rdmaops {
 	rdma_stat	(*rdma_getinfo)(rdma_info_t *info);
 } rdmaops_t;
 
+typedef struct rdma_svc_wait {
+	kmutex_t svc_lock;
+	kcondvar_t svc_cv;
+	rdma_stat svc_stat;
+} rdma_svc_wait_t;
+
+extern rdma_svc_wait_t rdma_wait;
+
 /*
  * RDMA operations.
  */
@@ -513,6 +530,7 @@ extern rdma_stat rdma_buf_alloc(CONN *, rdma_buf_t *);
 extern void rdma_buf_free(CONN *, rdma_buf_t *);
 extern int rdma_modload();
 extern bool_t   rdma_get_wchunk(struct svc_req *, iovec_t *, struct clist *);
+extern rdma_stat rdma_kwait(void);
 
 /*
  * RDMA XDR
