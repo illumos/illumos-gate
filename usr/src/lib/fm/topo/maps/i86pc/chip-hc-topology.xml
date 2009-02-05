@@ -48,6 +48,7 @@
         </set> 
         <set type='product' setlist='SUN-FIRE-X4150|SUN-FIRE-X4250'>
 	    
+	    <fac-enum provider='fac_prov_ipmi' />
             <propgroup name='protocol' version='1'
                 name-stability='Private' data-stability='Private' >
 
@@ -59,6 +60,17 @@
 
                 </propmethod>
 
+            </propgroup>
+            <propgroup name='ipmi' version='1'
+               name-stability='Private' data-stability='Private' >
+                 <propmethod name='ipmi_entity' version='0'
+		            propname='entity_ref' proptype='string' >
+              
+                    <argval name='format' type='string' value='MB/P%d' />
+                    <argval name='offset' type='uint32' value='0' />
+                    <argval name='nparams' type='uint32' value='1' />
+
+                </propmethod>
             </propgroup>
 
         </set> 

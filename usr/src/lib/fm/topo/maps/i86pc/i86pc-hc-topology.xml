@@ -41,6 +41,18 @@
         </propgroup>
 
       </set>
+      <set type='product' setlist='SUN-FIRE-X4150|SUN-FIRE-X4250'>
+        <fac-enum provider='fac_prov_ipmi' />
+        <propgroup name='protocol' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='label' type='string' value='MB' />
+        </propgroup>
+        <propgroup name='ipmi' version='1'
+            name-stability='Private' data-stability='Private' >
+            <propval name='entity_ref' type='string' value='MB' />
+        </propgroup>
+
+      </set>
       <set type='product' setlist='default'>
         <propgroup name='protocol' version='1'
             name-stability='Private' data-stability='Private' >
@@ -68,6 +80,13 @@
           <propgroup name='ipmi' version='1'
               name-stability='Private' data-stability='Private' >
              <propval name='entity_ref' type='string' value='sys.intsw' />
+          </propgroup>
+        </set>
+        <set type='product' setlist='SUN-FIRE-X4150|SUN-FIRE-X4250'>
+          <fac-enum provider='fac_prov_ipmi' />
+          <propgroup name='ipmi' version='1'
+              name-stability='Private' data-stability='Private' >
+             <propval name='entity_ref' type='string' value='/SYS/VPS' />
           </propgroup>
         </set>
         <set type='product' setlist='Sun-Fire-X4100-Server|Sun-Fire-X4200-Server|Sun-Fire-X4100-M2|Sun-Fire-X4200-M2'>
@@ -236,7 +255,7 @@
        </set>
     </set>
 
-    <set type='product' setlist='Sun-Fire-X4500|Sun-Fire-X4540'>
+    <set type='product' setlist='Sun-Fire-X4500|Sun-Fire-X4540|SUN-FIRE-X4150|SUN-FIRE-X4250'>
        <range name='psu' min='0' max='100'>
  	  <propmap name='psu' />
        </range>
@@ -262,6 +281,9 @@
        </range>
        <range name='fan' min='0' max='3'>
           <propmap name='fan' />
+       </range>
+       <range name='bay' min='0' max='3'>
+          <propmap name='Sun-Fire-X4600-M2-disk' />
        </range>
     </set>
 

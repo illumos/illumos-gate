@@ -200,4 +200,101 @@
         </node>
     </range>
   </set>
+  <set type='product' setlist='SUN-FIRE-X4150|SUN-FIRE-X4250'>
+    <range name='psu' min='0' max='1'>
+        <fac-enum provider='fac_prov_ipmi' />
+	<node instance='0'>
+	<facility name='PS0.VINOK' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='PS%d/VINOK' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
+	<facility name='PS0.PWROK' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='PS%d/PWROK' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
+	  <propgroup name='protocol' version='1'
+	       name-stability='Private' data-stability='Private' >
+                    <propval name='label' type='string' value='PS0' />
+		      <propmethod name='ipmi_fru_fmri' version='0'
+			   propname='FRU' proptype='fmri' >
+			  <argval name='entity' type='string' value='self' />
+		      </propmethod>
+	  </propgroup>
+	  <propgroup name='ipmi' version='1'
+		       name-stability='Private' data-stability='Private' >
+	
+		      <propval name='entity_ref' type='string' value='PS0/PRSNT' />
+	  </propgroup>
+	  <enum-method name='ipmi' version='1' />
+        </node>
+	<node instance='1'>
+	<facility name='PS1.VINOK' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='PS%d/VINOK' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
+	<facility name='PS1.PWROK' type='sensor' provider='fac_prov_ipmi' >
+              <propgroup name='facility' version='1' name-stability='Private' data-stability='Private' >
+                    <propval name='type' type='uint32' value='270' />
+		    <propval name='sensor-type' type='string' value='discrete' />
+		    <propmethod name='ipmi_entity' version='0'
+		      propname='entity_ref' proptype='string' >
+			<argval name='format' type='string' value='PS%d/PWROK' />
+			<argval name='offset' type='uint32' value='0' />
+			<argval name='nparams' type='uint32' value='1' />
+                    </propmethod>
+		    <propmethod name='ipmi_sensor_state' version='0'
+			propname='state' proptype='uint32' >
+		    </propmethod>
+              </propgroup>
+	</facility>
+	  <propgroup name='protocol' version='1'
+	       name-stability='Private' data-stability='Private' >
+                    <propval name='label' type='string' value='PS1' />
+		      <propmethod name='ipmi_fru_fmri' version='0'
+			   propname='FRU' proptype='fmri' >
+			  <argval name='entity' type='string' value='self' />
+		      </propmethod>
+	  </propgroup>
+	  <propgroup name='ipmi' version='1'
+		       name-stability='Private' data-stability='Private' >
+	
+		      <propval name='entity_ref' type='string' value='PS1/PRSNT' />
+	  </propgroup>
+	  <enum-method name='ipmi' version='1' />
+        </node>
+    </range>
+  </set>
 </topology>

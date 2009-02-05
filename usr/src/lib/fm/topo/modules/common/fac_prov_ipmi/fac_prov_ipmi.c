@@ -705,16 +705,25 @@ thumper_indicator_mode(topo_mod_t *mod, tnode_t *node, topo_version_t vers,
 static int
 make_sensor_node(topo_mod_t *mod, tnode_t *pnode, struct sensor_data *sd)
 {
-	int err, ret;
+	int err, ret, i;
 	tnode_t *fnode;
-	char *ftype = "sensor";
+	char *ftype = "sensor", facname[MAX_ID_LEN];
 	topo_pgroup_info_t pgi;
 	nvlist_t *arg_nvl = NULL;
 
-	if ((fnode = topo_node_facbind(mod, pnode, sd->sd_entity_ref,
-	    ftype)) == NULL) {
+	/*
+	 * Some platforms have '/' characters in the IPMI entity name, but '/'
+	 * has a special meaning for FMRI's so we change them to '.' before
+	 * binding the node into the topology.
+	 */
+	(void) strcpy(facname, sd->sd_entity_ref);
+	for (i = 0; facname[i]; i++)
+		if (facname[i] == '/')
+			facname[i] = '.';
+
+	if ((fnode = topo_node_facbind(mod, pnode, facname, ftype)) == NULL) {
 		topo_mod_dprintf(mod, "Failed to bind facility node: %s\n",
-		    sd->sd_entity_ref);
+		    facname);
 		/* topo errno set */
 		return (-1);
 	}
