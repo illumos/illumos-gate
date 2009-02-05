@@ -2141,7 +2141,7 @@ ndp_input_advert(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 		 */
 		if (haddr != NULL) {
 			if (!nce_cmp_ll_addr(dst_nce, haddr, hlen))
-				goto out;   /* from us -- no conflict */
+				goto out;	/* from us -- no conflict */
 
 			/*
 			 * If we're in an IPMP group, check if this is an echo
@@ -2161,14 +2161,22 @@ ndp_input_advert(ill_t *ill, mblk_t *mp, mblk_t *dl_mp)
 		}
 
 		/*
+		 * Our own (looped-back) unsolicited neighbor advertisements
+		 * will get here with dl_mp == NULL.  (These will usually be
+		 * filtered by the `haddr' checks above, but point-to-point
+		 * links have no hardware address and thus make it here.)
+		 */
+		if (dl_mp == NULL && dst_nce->nce_state != ND_PROBE)
+			goto out;
+
+		/*
 		 * This appears to be a real conflict.  If we're trying to
 		 * configure this NCE (ND_PROBE), then shut it down.
 		 * Otherwise, handle the discovered conflict.
 		 *
-		 * Note that dl_mp might be NULL if we're getting a unicast
-		 * reply.  This isn't typically done (multicast is the norm in
-		 * response to a probe), but we can handle the dl_mp == NULL
-		 * case as well.
+		 * In the ND_PROBE case, dl_mp might be NULL if we're getting
+		 * a unicast reply.  This isn't typically done (multicast is
+		 * the norm in response to a probe), but we can handle it.
 		 */
 		if (dst_nce->nce_state == ND_PROBE)
 			ip_ndp_failure(ill, mp, dl_mp);

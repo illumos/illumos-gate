@@ -1206,8 +1206,8 @@ ip_ioctl_cmd_t ip_ndx_ioctl_table[] = {
 
 	/* 153 */ { IPI_DONTCARE, 0, 0, 0, NULL, NULL },
 
-	/* 154 */ { SIOCGLIFBINDING, sizeof (struct lifreq), IPI_GET_CMD |
-			IPI_WR, LIF_CMD, ip_sioctl_get_binding, NULL },
+	/* 154 */ { SIOCGLIFBINDING, sizeof (struct lifreq), IPI_GET_CMD,
+			LIF_CMD, ip_sioctl_get_binding, NULL },
 	/* 155 */ { SIOCSLIFGROUPNAME, sizeof (struct lifreq),
 			IPI_PRIV | IPI_WR,
 			LIF_CMD, ip_sioctl_groupname, ip_sioctl_groupname },
@@ -14241,7 +14241,7 @@ ip_rput_process_multicast(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 	    ntohs(ipha->ipha_length));
 
 	/*
-	 * So that we don't end up with dups, only one ill an IPMP group is
+	 * So that we don't end up with dups, only one ill in an IPMP group is
 	 * nominated to receive multicast traffic.
 	 */
 	if (IS_UNDER_IPMP(ill) && !ill->ill_nom_cast)

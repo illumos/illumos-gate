@@ -7131,6 +7131,25 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	if (IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
 		BUMP_MIB(ill->ill_ip_mib, ipIfStatsHCInMcastPkts);
 		UPDATE_MIB(ill->ill_ip_mib, ipIfStatsHCInMcastOctets, pkt_len);
+
+		/*
+		 * So that we don't end up with dups, only one ill in an IPMP
+		 * group is nominated to receive multicast data traffic.
+		 * However, link-locals on any underlying interfaces will have
+		 * joined their solicited-node multicast addresses and we must
+		 * accept those packets.  (We don't attempt to precisely
+		 * filter out duplicate solicited-node multicast packets since
+		 * e.g. an IPMP interface and underlying interface may have
+		 * the same solicited-node multicast address.)  Note that we
+		 * won't generally have duplicates because we only issue a
+		 * DL_ENABMULTI_REQ on one interface in a group; the exception
+		 * is when PHYI_MULTI_BCAST is set.
+		 */
+		if (IS_UNDER_IPMP(ill) && !ill->ill_nom_cast &&
+		    !IN6_IS_ADDR_MC_SOLICITEDNODE(&ip6h->ip6_dst)) {
+			goto drop_pkt;
+		}
+
 		/*
 		 * XXX TODO Give to mrouted to for multicast forwarding.
 		 */
@@ -7142,7 +7161,7 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 				    "  which is not for us: %s\n", AF_INET6,
 				    &ip6h->ip6_dst);
 			}
-			BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
+drop_pkt:		BUMP_MIB(ill->ill_ip_mib, ipIfStatsInDiscards);
 			freemsg(hada_mp);
 			freemsg(first_mp);
 			return;

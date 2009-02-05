@@ -1489,19 +1489,17 @@ phyint_inst_check_for_failure(struct phyint_instance *pii)
 		}
 
 		/*
+		 * If the failed interface was active, activate another
+		 * INACTIVE interface in the group if possible.
+		 */
+		if (was_active)
+			phyint_activate_another(pi);
+
+		/*
 		 * If the interface is offline, the state change will be
 		 * noted when it comes back online.
 		 */
 		if (pi->pi_state != PI_OFFLINE) {
-			/*
-			 * If the failed interface was active, activate
-			 * another INACTIVE interface in the group if
-			 * possible.  (If the interface is PI_OFFLINE,
-			 * we already activated another.)
-			 */
-			if (was_active)
-				phyint_activate_another(pi);
-
 			phyint_chstate(pi, PI_FAILED);
 			reset_crtt_all(pi);
 		}

@@ -13083,7 +13083,7 @@ static void
 ipif_transfer(ipif_t *sipif, ipif_t *dipif, ipif_t *virgipif)
 {
 	ipsq_t *ipsq = sipif->ipif_ill->ill_phyint->phyint_ipsq;
-	int ipx_current_ioctl;
+	ipxop_t *ipx = ipsq->ipsq_xop;
 
 	ASSERT(sipif != dipif);
 	ASSERT(sipif != virgipif);
@@ -13113,11 +13113,11 @@ ipif_transfer(ipif_t *sipif, ipif_t *dipif, ipif_t *virgipif)
 	/*
 	 * Transfer ownership of the current xop, if necessary.
 	 */
-	if (ipsq->ipsq_xop->ipx_current_ipif == sipif) {
-		ASSERT(ipsq->ipsq_xop->ipx_pending_ipif == NULL);
-		ipx_current_ioctl = ipsq->ipsq_xop->ipx_current_ioctl;
-		ipsq_current_finish(ipsq);
-		ipsq_current_start(ipsq, dipif, ipx_current_ioctl);
+	if (ipx->ipx_current_ipif == sipif) {
+		ASSERT(ipx->ipx_pending_ipif == NULL);
+		mutex_enter(&ipx->ipx_lock);
+		ipx->ipx_current_ipif = dipif;
+		mutex_exit(&ipx->ipx_lock);
 	}
 
 	if (virgipif == NULL)
@@ -14277,19 +14277,19 @@ int
 ip_sioctl_get_binding(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *ifreq)
 {
-	ill_t		*bound_ill;
+	ill_t		*ill;
 	struct lifreq	*lifr = ifreq;
+	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
 
 	if (!IS_IPMP(ipif->ipif_ill))
 		return (EINVAL);
 
-	if ((bound_ill = ipmp_ipif_hold_bound_ill(ipif)) == NULL) {
+	rw_enter(&ipst->ips_ipmp_lock, RW_READER);
+	if ((ill = ipif->ipif_bound_ill) == NULL)
 		lifr->lifr_binding[0] = '\0';
-		return (0);
-	}
-
-	(void) strlcpy(lifr->lifr_binding, bound_ill->ill_name, LIFNAMSIZ);
-	ill_refrele(bound_ill);
+	else
+		(void) strlcpy(lifr->lifr_binding, ill->ill_name, LIFNAMSIZ);
+	rw_exit(&ipst->ips_ipmp_lock);
 	return (0);
 }
 
@@ -14322,8 +14322,8 @@ int
 ip_sioctl_groupinfo(ipif_t *dummy_ipif, sin_t *sin, queue_t *q, mblk_t *mp,
     ip_ioctl_cmd_t *ipip, void *dummy)
 {
-	lifgroupinfo_t	*lifgr;
 	ipmp_grp_t	*grp;
+	lifgroupinfo_t	*lifgr;
 	ip_stack_t	*ipst = CONNQ_TO_IPST(q);
 
 	/* ip_wput_nondata() verified mp->b_cont->b_cont */

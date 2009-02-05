@@ -404,7 +404,7 @@ phyint_create(char *pi_name, struct phyint_group *pg, uint_t ifindex,
 	pi->pi_flags = PHYINT_FLAGS(flags);
 
 	/*
-	 * Initialise the link state.  The link state is initialised to
+	 * Initialize the link state.  The link state is initialized to
 	 * up, so that if the link is down when IPMP starts monitoring
 	 * the interface, it will appear as though there has been a
 	 * transition from the link up to link down.  This avoids
@@ -1349,6 +1349,7 @@ phyint_delete(struct phyint *pi)
 int
 phyint_offline(struct phyint *pi, uint_t minred)
 {
+	boolean_t was_active;
 	unsigned int nusable = 0;
 	struct phyint *pi2;
 	struct phyint_group *pg = pi->pi_group;
@@ -1370,7 +1371,9 @@ phyint_offline(struct phyint *pi, uint_t minred)
 	if (nusable < minred)
 		return (IPMP_EMINRED);
 
-	if (!change_pif_flags(pi, IFF_OFFLINE, 0))
+	was_active = ((pi->pi_flags & IFF_INACTIVE) == 0);
+
+	if (!change_pif_flags(pi, IFF_OFFLINE, IFF_INACTIVE))
 		return (IPMP_FAILURE);
 
 	/*
@@ -1413,7 +1416,7 @@ phyint_offline(struct phyint *pi, uint_t minred)
 	 * If this interface was active, try to activate another INACTIVE
 	 * interface in the group.
 	 */
-	if (!(pi->pi_flags & IFF_INACTIVE))
+	if (was_active)
 		phyint_activate_another(pi);
 
 	return (IPMP_SUCCESS);
