@@ -1453,7 +1453,7 @@ dlsym(void *handle, const char *name)
  * Core dladdr activity.
  */
 static void
-dladdr_core(Rt_map *clmp, void *addr, Dl_info *dlip, void **info, int flags)
+dladdr_core(Rt_map *clmp, void *addr, Dl_info_t *dlip, void **info, int flags)
 {
 	/*
 	 * Set up generic information and any defaults.
@@ -1477,7 +1477,7 @@ dladdr_core(Rt_map *clmp, void *addr, Dl_info *dlip, void **info, int flags)
  * structure that reflects the symbol closest to the address specified.
  */
 int
-dladdr(void *addr, Dl_info *dlip)
+dladdr(void *addr, Dl_info_t *dlip)
 {
 	int	entry, error;
 	Rt_map	*clmp;
@@ -1506,7 +1506,7 @@ dladdr(void *addr, Dl_info *dlip)
 #pragma weak _dladdr1 = dladdr1
 
 int
-dladdr1(void *addr, Dl_info *dlip, void **info, int flags)
+dladdr1(void *addr, Dl_info_t *dlip, void **info, int flags)
 {
 	int	entry, error = 0;
 	Rt_map	*clmp;
@@ -1676,7 +1676,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	 * Return configuration cache name and address.
 	 */
 	if (request == RTLD_DI_CONFIGADDR) {
-		Dl_info	*dlip = (Dl_info *)p;
+		Dl_info_t	*dlip = (Dl_info_t *)p;
 
 		if ((config->c_name == NULL) || (config->c_bgn == 0) ||
 		    (config->c_end == 0)) {
@@ -1759,7 +1759,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	 * the environment pointer on each request.
 	 */
 	if (request == RTLD_DI_ARGSINFO) {
-		Dl_argsinfo	*aip = (Dl_argsinfo *)p;
+		Dl_argsinfo_t	*aip = (Dl_argsinfo_t *)p;
 		Lm_list		*lml = LIST(lmp);
 
 		*aip = argsinfo;
@@ -1794,13 +1794,13 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 	if ((request == RTLD_DI_SERINFO) || (request == RTLD_DI_SERINFOSIZE)) {
 		Spath_desc	sd = { search_rules, NULL, 0 };
 		Pdesc		*pdp;
-		Dl_serinfo	*info;
-		Dl_serpath	*path;
+		Dl_serinfo_t	*info;
+		Dl_serpath_t	*path;
 		char		*strs;
-		size_t		size = sizeof (Dl_serinfo);
+		size_t		size = sizeof (Dl_serinfo_t);
 		uint_t		cnt = 0;
 
-		info = (Dl_serinfo *)p;
+		info = (Dl_serinfo_t *)p;
 		path = &info->dls_serpath[0];
 		strs = (char *)&info->dls_serpath[info->dls_cnt];
 
@@ -1828,7 +1828,7 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 			 * Keep track of search path count and total info size.
 			 */
 			if (cnt++)
-				size += sizeof (Dl_serpath);
+				size += sizeof (Dl_serpath_t);
 			_size = pdp->pd_plen + 1;
 			size += _size;
 
@@ -1869,6 +1869,8 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 			info->dls_size = size;
 			info->dls_cnt = cnt;
 		}
+
+		return (0);
 	}
 
 	/*
@@ -1882,6 +1884,31 @@ dlinfo_core(void *handle, int request, void *p, Rt_map *clmp)
 		str += DIRSZ(lmp);
 		*str = '\0';
 
+		return (0);
+	}
+
+	/*
+	 * Return the number of object mappings, or the mapping information for
+	 * this object.
+	 */
+	if (request == RTLD_DI_MMAPCNT) {
+		uint_t	*cnt = (uint_t *)p;
+
+		*cnt = MMAPCNT(lmp);
+		return (0);
+	}
+	if (request == RTLD_DI_MMAPS) {
+		Dl_mapinfo_t	*mip = (Dl_mapinfo_t *)p;
+
+		if (mip->dlm_acnt && mip->dlm_maps) {
+			uint_t	cnt = 0;
+
+			while ((cnt < mip->dlm_acnt) && (cnt < MMAPCNT(lmp))) {
+				mip->dlm_maps[cnt] = MMAPS(lmp)[cnt];
+				cnt++;
+			}
+			mip->dlm_rcnt = cnt;
+		}
 		return (0);
 	}
 

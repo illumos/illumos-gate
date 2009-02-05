@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1989 AT&T
@@ -31,12 +30,11 @@
 #ifndef _DLFCN_H
 #define	_DLFCN_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
-
 #include <sys/feature_tests.h>
 #include <sys/types.h>
 #if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
 #include <sys/auxv.h>
+#include <sys/mman.h>
 #endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 
 #ifdef	__cplusplus
@@ -62,29 +60,20 @@ typedef struct	dl_info {
 	void		*dli_saddr;
 } Dl_info;
 #endif /* __STDC__ */
+typedef	Dl_info		Dl_info_t;
 
 typedef struct	dl_serpath {
 	char		*dls_name;	/* library search path name */
 	uint_t		dls_flags;	/* path information */
 } Dl_serpath;
+typedef	Dl_serpath	Dl_serpath_t;
 
 typedef struct	dl_serinfo {
 	size_t		dls_size;	/* total buffer size */
 	uint_t		dls_cnt;	/* number of path entries */
 	Dl_serpath	dls_serpath[1];	/* there may be more than one */
 } Dl_serinfo;
-
-typedef struct {
-	uint_t	    dlui_version;	/* version # */
-	uint_t	    dlui_flags;		/* flags */
-	char	    *dlui_objname;	/* path to object */
-	void	    *dlui_unwindstart;	/* star of unwind hdr */
-	void	    *dlui_unwindend;	/* end of unwind hdr */
-	void	    *dlui_segstart;	/* start of segment described */
-					/*  by unwind block */
-	void	    *dlui_segend;	/* end of segment described */
-					/*  by unwind block */
-} Dl_amd64_unwindinfo;
+typedef	Dl_serinfo	Dl_serinfo_t;
 
 typedef struct	dl_argsinfo {
 	long		dla_argc;	/* process argument count */
@@ -92,6 +81,27 @@ typedef struct	dl_argsinfo {
 	char		**dla_envp;	/* process environment variables */
 	auxv_t		*dla_auxv;	/* process auxv vectors */
 } Dl_argsinfo;
+typedef	Dl_argsinfo	Dl_argsinfo_t;
+
+typedef struct {
+	mmapobj_result_t *dlm_maps;	/* mapping information */
+	uint_t		dlm_acnt;	/* number of dlm_maps mappings */
+	uint_t		dlm_rcnt;	/* number of returned mappings */
+} Dl_mapinfo_t;
+
+typedef struct {
+	uint_t		dlui_version;	/* version # */
+	uint_t		dlui_flags;	/* flags */
+	char		*dlui_objname;	/* path to object */
+	void		*dlui_unwindstart; /* star of unwind hdr */
+	void		*dlui_unwindend; /* end of unwind hdr */
+	void		*dlui_segstart;	/* start of segment described */
+					/*  by unwind block */
+	void		*dlui_segend;	/* end of segment described */
+					/*  by unwind block */
+} Dl_amd64_unwindinfo;
+typedef	Dl_amd64_unwindinfo	Dl_amd64_unwindinfo_t;
+
 #endif /* !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__) */
 
 
@@ -214,7 +224,9 @@ extern Dl_amd64_unwindinfo  *dlamd64getunwind();
 #define	RTLD_DI_SETSIGNAL	10		/* set termination signal */
 #define	RTLD_DI_ARGSINFO	11		/* get process arguments */
 						/*	environment and auxv */
-#define	RTLD_DI_MAX		11
+#define	RTLD_DI_MMAPS		12		/* obtain objects mappings or */
+#define	RTLD_DI_MMAPCNT		13		/*	mapping count */
+#define	RTLD_DI_MAX		13
 
 #if !defined(_XOPEN_SOURCE) || defined(__EXTENSIONS__)
 /*

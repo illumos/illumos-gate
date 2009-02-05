@@ -1435,3 +1435,6 @@ Bugid   Risk Synopsis
 6792836 ld is slow when processing GNU linkonce sections
 6797468 ld.so.1: orphaned handles aren't processed correctly
 6798676 ld.so.1: enters infinite loop with realloc/defragmentation logic
+6237063 request extension to dl* family to provide segment bounds
+	information (D)
+	PSARC/2009/054 dlinfo(3c) - segment mapping retrieval
