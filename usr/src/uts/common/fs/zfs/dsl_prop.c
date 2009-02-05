@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dmu.h>
 #include <sys/dmu_objset.h>
@@ -415,6 +413,34 @@ dsl_prop_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
 	    "%s=%s dataset = %llu", psa->name, valstr, ds->ds_object);
 }
 
+static void
+dsl_props_set_sync(void *arg1, void *arg2, cred_t *cr, dmu_tx_t *tx)
+{
+	dsl_dataset_t *ds = arg1;
+	nvlist_t *nvl = arg2;
+	nvpair_t *elem = NULL;
+
+	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
+		struct prop_set_arg psa;
+
+		psa.name = nvpair_name(elem);
+
+		if (nvpair_type(elem) == DATA_TYPE_STRING) {
+			VERIFY(nvpair_value_string(elem,
+			    (char **)&psa.buf) == 0);
+			psa.intsz = 1;
+			psa.numints = strlen(psa.buf) + 1;
+		} else {
+			uint64_t intval;
+			VERIFY(nvpair_value_uint64(elem, &intval) == 0);
+			psa.intsz = sizeof (intval);
+			psa.numints = 1;
+			psa.buf = &intval;
+		}
+		dsl_prop_set_sync(ds, &psa, cr, tx);
+	}
+}
+
 void
 dsl_prop_set_uint64_sync(dsl_dir_t *dd, const char *name, uint64_t val,
     cred_t *cr, dmu_tx_t *tx)
@@ -466,6 +492,38 @@ dsl_prop_set(const char *dsname, const char *propname,
 	psa.buf = buf;
 	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
 	    NULL, dsl_prop_set_sync, ds, &psa, 2);
+
+	dsl_dataset_rele(ds, FTAG);
+	return (err);
+}
+
+int
+dsl_props_set(const char *dsname, nvlist_t *nvl)
+{
+	dsl_dataset_t *ds;
+	nvpair_t *elem = NULL;
+	int err;
+
+	while ((elem = nvlist_next_nvpair(nvl, elem)) != NULL) {
+		if (nvpair_type(elem) == DATA_TYPE_STRING) {
+			char *valstr;
+			VERIFY(nvpair_value_string(elem, &valstr) == 0);
+			if (strlen(valstr) >= ZAP_MAXNAMELEN)
+				return (ENAMETOOLONG);
+		}
+	}
+
+	if (err = dsl_dataset_hold(dsname, FTAG, &ds))
+		return (err);
+
+	if (dsl_dataset_is_snapshot(ds) &&
+	    spa_version(ds->ds_dir->dd_pool->dp_spa) < SPA_VERSION_SNAP_PROPS) {
+		dsl_dataset_rele(ds, FTAG);
+		return (ENOTSUP);
+	}
+
+	err = dsl_sync_task_do(ds->ds_dir->dd_pool,
+	    NULL, dsl_props_set_sync, ds, nvl, 2);
 
 	dsl_dataset_rele(ds, FTAG);
 	return (err);
