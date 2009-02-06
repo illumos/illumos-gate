@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -586,8 +586,15 @@ kcage_glist_alloc(void)
 
 	if ((new = kcage_glist_freelist) != NULL) {
 		kcage_glist_freelist = new->next;
-	} else {
+	} else if (kernel_cage_enable) {
 		new = vmem_alloc(kcage_arena, sizeof (*new), VM_NOSLEEP);
+	} else {
+		/*
+		 * On DR supported platforms we allow memory add
+		 * even when kernel cage is disabled. "kcage_arena" is
+		 * created only when kernel cage is enabled.
+		 */
+		new = kmem_zalloc(sizeof (*new), KM_NOSLEEP);
 	}
 
 	if (new != NULL)
