@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -590,28 +590,32 @@ unpackmedia()
 		bzcat "$MEDIA/$RELEASE/Tools/Boot/pkg_db.cpio.bz2" |
 		    cpio -icdmu 2> /dev/null
 
-		# unpack gnome, perl, java and misc
-		# Remove symlinks left from unpacking x86.miniroot so that
-		# unpacking subsequent archives will populate appropriately.
-		#
-		rm -rf usr/perl5
-		rm -rf usr/lib/install/data/wizards
-		rm -rf usr/lib/lp
+		if [ -d "$MINIROOT/platform/i86pc" ] ; then
 
-		# Gnome list saved off from packmedia
-		for i in `cat .tmp_proto/gnome_saved`
-		do
-			rm -rf $i
-		done
-		
-		bzcat "$MEDIA/$RELEASE/Tools/Boot/gnome.cpio.bz2" |
-		    cpio -icdmu 2>/dev/null
-		bzcat "$MEDIA/$RELEASE/Tools/Boot/javaui.cpio.bz2" |
-		    cpio -icdmu 2>/dev/null
-		bzcat "$MEDIA/$RELEASE/Tools/Boot/lpmisc.cpio.bz2" |
-		    cpio -icdmu 2>/dev/null
-		bzcat "$MEDIA/$RELEASE/Tools/Boot/perl.cpio.bz2" |
-		    cpio -icdmu 2>/dev/null
+			# unpack gnome, perl, java and misc
+			# Remove symlinks left from unpacking x86.miniroot
+			# so that unpacking subsequent archives will populate
+			# appropriately.
+			#
+			rm -rf usr/perl5
+			rm -rf usr/lib/install/data/wizards
+			rm -rf usr/lib/lp
+
+			# Gnome list saved off from packmedia
+			for i in `cat .tmp_proto/gnome_saved`
+			do
+				rm -rf $i
+			done
+			
+			bzcat "$MEDIA/$RELEASE/Tools/Boot/gnome.cpio.bz2" |
+			    cpio -icdmu 2>/dev/null
+			bzcat "$MEDIA/$RELEASE/Tools/Boot/javaui.cpio.bz2" |
+			    cpio -icdmu 2>/dev/null
+			bzcat "$MEDIA/$RELEASE/Tools/Boot/lpmisc.cpio.bz2" |
+			    cpio -icdmu 2>/dev/null
+			bzcat "$MEDIA/$RELEASE/Tools/Boot/perl.cpio.bz2" |
+			    cpio -icdmu 2>/dev/null
+		fi
 	)
 }
 
