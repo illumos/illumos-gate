@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <sys/modctl.h>
 #include <sys/sdcard/sda.h>
 #include <sys/pci.h>
+#include <sys/kstat.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 
@@ -295,5 +296,13 @@
 #define	ADMA_ERROR_STATE_ST_TFR		3
 #define	ADMA_ERROR_STATE_MASK		0x3
 #define	ADMA_ERROR_LEN_MISMATCH		BIT(2)
+
+/*
+ * Properties.
+ */
+#define	SDHOST_PROP_ENABLE_MSI		"enable-msi"
+#define	SDHOST_PROP_ENABLE_MSIX		"enable-msix"
+#define	SDHOST_PROP_FORCE_PIO		"force-pio"
+#define	SDHOST_PROP_FORCE_DMA		"force-dma"
 
 #endif	/* _SYS_SDCARD_SDHOST_H */

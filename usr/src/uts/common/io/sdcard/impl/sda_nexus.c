@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -700,6 +700,7 @@ sda_nexus_ap_ioctl(sda_host_t *h, int snum, int cmd, intptr_t arg)
 		break;
 
 	case DEVCTL_AP_GETSTATE:
+		bzero(&ap_state, sizeof (ap_state));
 		sda_nexus_ap_getstate(slot, &ap_state);
 		if (ndi_dc_return_ap_state(&ap_state, dcp) != NDI_SUCCESS) {
 			rv = EFAULT;
@@ -746,6 +747,7 @@ sda_nexus_ap_control(sda_host_t *h, int snum, intptr_t arg, int mode)
 	case SDA_CFGA_GET_CARD_INFO: {
 		sda_card_info_t	ci;
 
+		bzero(&ci, sizeof (ci));
 		if (apc.size < sizeof (sda_card_info_t)) {
 			apc.size = sizeof (sda_card_info_t);
 			break;

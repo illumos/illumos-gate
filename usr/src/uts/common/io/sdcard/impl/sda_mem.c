@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -27,7 +27,6 @@
  * Memory target support for SDcard.
  */
 
-#include <sys/types.h>
 #include <sys/types.h>
 #include <sys/note.h>
 #include <sys/conf.h>
@@ -181,11 +180,12 @@ sda_mem_b2s_rw(sda_slot_t *slot, b2s_request_t *reqp)
 	if (slot->s_hostp->h_dma != NULL) {
 		b2s_request_dma(reqp, &cmdp->sc_ndmac, &cmdp->sc_dmacs);
 		cmdp->sc_kvaddr = 0;
+	} else {
+		cmdp->sc_ndmac = 0;
 	}
 	if ((slot->s_caps & SLOT_CAP_NOPIO) == 0) {
 		size_t	maplen;
 		b2s_request_mapin(reqp, &cmdp->sc_kvaddr, &maplen);
-		cmdp->sc_ndmac = 0;
 	}
 
 	if (nblks == 0) {

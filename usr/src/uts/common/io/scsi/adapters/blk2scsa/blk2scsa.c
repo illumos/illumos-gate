@@ -27,6 +27,7 @@
 #include <sys/ksynch.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/note.h>
 #include <sys/scsi/scsi.h>
 #include <sys/scsi/adapters/blk2scsa.h>
 
@@ -202,8 +203,10 @@ static void b2s_tran_tgt_free(dev_info_t *, dev_info_t *,
     scsi_hba_tran_t *, struct scsi_device *);
 static int b2s_tran_getcap(struct scsi_address *, char *, int);
 static int b2s_tran_setcap(struct scsi_address *, char *, int, int);
-static void b2s_tran_teardown_pkt(struct scsi_pkt *);
-static int b2s_tran_setup_pkt(struct scsi_pkt *, int (*)(caddr_t), caddr_t);
+static void b2s_tran_destroy_pkt(struct scsi_address *, struct scsi_pkt *);
+static struct scsi_pkt *b2s_tran_init_pkt(struct scsi_address *,
+    struct scsi_pkt *, struct buf *, int, int, int, int,
+    int (*)(caddr_t), caddr_t);
 static int b2s_tran_start(struct scsi_address *, struct scsi_pkt *);
 static int b2s_tran_abort(struct scsi_address *, struct scsi_pkt *);
 static int b2s_tran_reset(struct scsi_address *, int);
@@ -451,28 +454,11 @@ void
 b2s_request_mapin(b2s_request_t *req, caddr_t *addrp, size_t *lenp)
 {
 	b2s_request_impl_t	 *ri = (void *)req;
-	struct scsi_pkt		*pkt = ri->ri_pkt;
 	buf_t			*bp;
 
-	if ((pkt != NULL) && ((bp = scsi_pkt2bp(pkt)) != NULL) &&
-	    (bp->b_bcount != 0)) {
-
-		/*
-		 * This uses some undocumented fields of the SCSI
-		 * packet, but it is what is required to get the
-		 * kernel virtual addresses.
-		 */
-
-		ri->ri_bp = bioclone(bp, pkt->pkt_dma_offset,
-		    pkt->pkt_dma_len, bp->b_edev, bp->b_blkno, NULL,
-		    ri->ri_bp, KM_SLEEP);
-		if ((bp->b_flags & (B_PAGEIO | B_PHYS)) != 0) {
-			ri->ri_flags |= B2S_REQUEST_FLAG_MAPIN;
-			bp_mapin(ri->ri_bp);
-		}
-
-		*addrp = ri->ri_bp->b_un.b_addr;
-		*lenp = pkt->pkt_dma_len;
+	if (((bp = ri->ri_bp) != NULL) && (bp->b_bcount != 0)) {
+		*addrp = bp->b_un.b_addr;
+		*lenp = bp->b_bcount;
 	} else {
 		*addrp = 0;
 		*lenp = 0;
@@ -482,11 +468,14 @@ b2s_request_mapin(b2s_request_t *req, caddr_t *addrp, size_t *lenp)
 void
 b2s_request_dma(b2s_request_t *req, uint_t *ndmacp, ddi_dma_cookie_t **dmacsp)
 {
-	b2s_request_impl_t	*ri = (void *)req;
-	struct scsi_pkt		*pkt = ri->ri_pkt;
+	/*
+	 * We don't support direct DMA right now... there are no
+	 * clients that need it.  Frankly, bcopy is safer right now.
+	 */
+	_NOTE(ARGUNUSED(req));
 
-	*ndmacp = pkt->pkt_numcookies;
-	*dmacsp = pkt->pkt_cookies;
+	*ndmacp = 0;
+	*dmacsp = NULL;
 }
 
 void
@@ -631,7 +620,6 @@ b2s_request_done(b2s_request_t *req, b2s_err_t err, size_t resid)
 	}
 }
 
-/*ARGSUSED*/
 int
 b2s_tran_tgt_init(dev_info_t *hbadip, dev_info_t *tgtdip,
     scsi_hba_tran_t *tran, struct scsi_device *sd)
@@ -639,6 +627,9 @@ b2s_tran_tgt_init(dev_info_t *hbadip, dev_info_t *tgtdip,
 	uint_t		tgt, lun;
 	b2s_nexus_t	*n;
 	b2s_leaf_t	*l;
+
+	_NOTE(ARGUNUSED(hbadip));
+	_NOTE(ARGUNUSED(sd));
 
 	/*
 	 * Lookup the target and lun.
@@ -666,52 +657,79 @@ b2s_tran_tgt_init(dev_info_t *hbadip, dev_info_t *tgtdip,
 	return (DDI_SUCCESS);
 }
 
-/*ARGSUSED*/
 void
 b2s_tran_tgt_free(dev_info_t *hbadip, dev_info_t *tgtdip,
     scsi_hba_tran_t *tran, struct scsi_device *sd)
 {
 	b2s_leaf_t	*l;
 
+	_NOTE(ARGUNUSED(hbadip));
+	_NOTE(ARGUNUSED(tgtdip));
+	_NOTE(ARGUNUSED(sd));
+
 	l = tran->tran_tgt_private;
 	ASSERT(l != NULL);
 	b2s_rele_leaf(l);
 }
 
-/*ARGSUSED*/
-int
-b2s_tran_setup_pkt(struct scsi_pkt *pkt, int (*cb)(caddr_t), caddr_t arg)
+struct scsi_pkt *
+b2s_tran_init_pkt(struct scsi_address *ap, struct scsi_pkt *pkt,
+    struct buf *bp, int cmdlen, int statuslen, int tgtlen, int flags,
+    int (*cb)(caddr_t), caddr_t cbarg)
 {
-	b2s_request_impl_t *ri = pkt->pkt_ha_private;
+	int			(*func)(caddr_t);
+	dev_info_t		*dip;
+	scsi_hba_tran_t		*tran;
+	b2s_request_impl_t	*ri;
 
-	ri->ri_pkt = pkt;
-	ri->ri_sts = (struct scsi_arq_status *)(void *)pkt->pkt_scbp;
-	ri->ri_bp = getrbuf(KM_SLEEP);
+	_NOTE(ARGUNUSED(flags));
+	_NOTE(ARGUNUSED(cbarg));
+
+	tran = ap->a_hba_tran;
+	dip = tran->tran_hba_dip;
 
 	/*
-	 * NB: The other fields are initialized properly at tran_start(9e).
-	 * We don't care about their values the rest of the time.
+	 * We just unconditionally map this in for now.  This makes
+	 * sure that we will always have kernel virtual addresses for
+	 * copying with.
 	 */
-	return (0);
+	if (bp && (bp->b_bcount)) {
+		bp_mapin(bp);
+	}
+
+	if (pkt == NULL) {
+		func = (cb == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
+		pkt = scsi_hba_pkt_alloc(dip, ap, cmdlen, statuslen,
+		    tgtlen, sizeof (b2s_request_impl_t), func, NULL);
+		if (pkt == NULL)
+			return (NULL);
+
+		ri = pkt->pkt_ha_private;
+		ri->ri_pkt = pkt;
+		ri->ri_sts = (struct scsi_arq_status *)(void *)pkt->pkt_scbp;
+		ri->ri_bp = bp;
+
+		/*
+		 * NB: This would be the time to do DMA allocation.
+		 */
+	}
+
+	return (pkt);
 }
 
-/*ARGSUSED*/
 void
-b2s_tran_teardown_pkt(struct scsi_pkt *pkt)
+b2s_tran_destroy_pkt(struct scsi_address *ap, struct scsi_pkt *pkt)
 {
-	b2s_request_impl_t *ri = pkt->pkt_ha_private;
-
-	/*
-	 * Free the cloned buf header.
-	 */
-	freerbuf(ri->ri_bp);
+	scsi_hba_pkt_free(ap, pkt);
 }
 
-/*ARGSUSED*/
 int
 b2s_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 {
 	int	capid;
+
+	_NOTE(ARGUNUSED(ap));
+	_NOTE(ARGUNUSED(whom));
 
 	capid = scsi_hba_lookup_capstr(cap);
 
@@ -719,6 +737,8 @@ b2s_tran_getcap(struct scsi_address *ap, char *cap, int whom)
 	case SCSI_CAP_ARQ:
 	case SCSI_CAP_UNTAGGED_QING:
 		return (1);
+	case SCSI_CAP_DMA_MAX:
+		return (65536);
 
 	default:
 		return (-1);
@@ -835,11 +855,14 @@ b2s_tran_reset(struct scsi_address *ap, int level)
 	return (B_TRUE);
 }
 
-/*ARGSUSED*/
 int
 b2s_tran_setcap(struct scsi_address *ap, char *cap, int val, int whom)
 {
 	int	capid;
+
+	_NOTE(ARGUNUSED(ap));
+	_NOTE(ARGUNUSED(val));
+	_NOTE(ARGUNUSED(whom));
 
 	capid = scsi_hba_lookup_capstr(cap);
 
@@ -865,8 +888,7 @@ b2s_tran_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	ri->ri_errno = B2S_EOK;
 	ri->ri_resid = 0;
-	ri->ri_public.br_args.a_ints[0] = 0;
-	ri->ri_public.br_args.a_ints[1] = 0;
+	bzero(&ri->ri_public.br_args, sizeof (ri->ri_public.br_args));
 	ri->ri_flags = 0;
 	ri->ri_done = NULL;
 
@@ -1684,6 +1706,7 @@ b2s_scmd_mode_sense_done(b2s_request_impl_t *ri)
 		resid -= len;
 		ptr += len;
 	}
+
 	ri->ri_resid = 0;
 	ri->ri_errno = B2S_EOK;
 }
@@ -1810,8 +1833,10 @@ b2s_alloc_nexus(b2s_nexus_info_t *info)
 	tran->tran_abort = 		b2s_tran_abort;
 	tran->tran_getcap = 		b2s_tran_getcap;
 	tran->tran_setcap = 		b2s_tran_setcap;
-	tran->tran_setup_pkt =		b2s_tran_setup_pkt;
-	tran->tran_teardown_pkt =	b2s_tran_teardown_pkt;
+	tran->tran_init_pkt = 		b2s_tran_init_pkt;
+	tran->tran_destroy_pkt = 	b2s_tran_destroy_pkt;
+	tran->tran_setup_pkt =		NULL;
+	tran->tran_teardown_pkt =	NULL;
 	tran->tran_hba_len =		sizeof (b2s_request_impl_t);
 	tran->tran_bus_config =		b2s_bus_config;
 

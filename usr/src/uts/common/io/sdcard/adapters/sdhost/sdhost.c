@@ -25,8 +25,29 @@
 
 #include "sdhost.h"
 
+typedef	struct sdstats	sdstats_t;
 typedef	struct sdslot	sdslot_t;
 typedef	struct sdhost	sdhost_t;
+
+struct sdstats {
+	kstat_named_t	ks_ncmd;
+	kstat_named_t	ks_ixfr;
+	kstat_named_t	ks_oxfr;
+	kstat_named_t	ks_ibytes;
+	kstat_named_t	ks_obytes;
+	kstat_named_t	ks_npio;
+	kstat_named_t	ks_ndma;
+	kstat_named_t	ks_nmulti;
+	kstat_named_t	ks_baseclk;
+	kstat_named_t	ks_cardclk;
+	kstat_named_t	ks_tmusecs;
+	kstat_named_t	ks_width;
+	kstat_named_t	ks_flags;
+	kstat_named_t	ks_capab;
+};
+
+#define	SDFLAG_FORCE_PIO		(1U << 0)
+#define	SDFLAG_FORCE_DMA		(1U << 1)
 
 /*
  * Per slot state.
@@ -37,27 +58,48 @@ struct sdslot {
 	ddi_acc_handle_t	ss_acch;
 	caddr_t 		ss_regva;
 	kmutex_t		ss_lock;
-	uint32_t		ss_capab;
-	uint32_t		ss_baseclk;	/* Hz */
-	uint32_t		ss_cardclk;	/* Hz */
 	uint8_t			ss_tmoutclk;
-	uint32_t		ss_tmusecs;	/* timeout units in usecs */
 	uint32_t		ss_ocr;		/* OCR formatted voltages */
 	uint16_t		ss_mode;
 	boolean_t		ss_suspended;
+	sdstats_t		ss_stats;
+#define	ss_ncmd			ss_stats.ks_ncmd.value.ui64
+#define	ss_ixfr			ss_stats.ks_ixfr.value.ui64
+#define	ss_oxfr			ss_stats.ks_oxfr.value.ui64
+#define	ss_ibytes		ss_stats.ks_ibytes.value.ui64
+#define	ss_obytes		ss_stats.ks_obytes.value.ui64
+#define	ss_ndma			ss_stats.ks_ndma.value.ui64
+#define	ss_npio			ss_stats.ks_npio.value.ui64
+#define	ss_nmulti		ss_stats.ks_nmulti.value.ui64
+
+#define	ss_baseclk		ss_stats.ks_baseclk.value.ui32
+#define	ss_cardclk		ss_stats.ks_cardclk.value.ui32
+#define	ss_tmusecs		ss_stats.ks_tmusecs.value.ui32
+#define	ss_width		ss_stats.ks_width.value.ui32
+#define	ss_flags		ss_stats.ks_flags.value.ui32
+#define	ss_capab		ss_stats.ks_capab.value.ui32
+	kstat_t			*ss_ksp;
 
 	/*
 	 * Command in progress
 	 */
 	uint8_t			*ss_kvaddr;
-	ddi_dma_cookie_t	*ss_dmacs;
-	uint_t			ss_ndmac;
 	int			ss_blksz;
 	uint16_t		ss_resid;	/* in blocks */
+	int			ss_rcnt;
 
 	/* scratch buffer, to receive extra PIO data */
-	uint32_t		ss_bounce[2048 / 4];
+	caddr_t			ss_bounce;
+	ddi_dma_handle_t	ss_bufdmah;
+	ddi_acc_handle_t	ss_bufacch;
+	ddi_dma_cookie_t	ss_bufdmac;
 };
+
+/*
+ * This allocates a rather large chunk of contiguous memory for DMA.
+ * But doing so means that we'll almost never have to resort to PIO.
+ */
+#define	SDHOST_BOUNCESZ		65536
 
 /*
  * Per controller state.
@@ -75,6 +117,10 @@ struct sdhost {
 	int			sh_icap;
 	uint_t			sh_ipri;
 };
+
+#define	PROPSET(x)							\
+	(ddi_prop_get_int(DDI_DEV_T_ANY, dip,				\
+	DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, x, 0) != 0)
 
 
 static int sdhost_attach(dev_info_t *, ddi_attach_cmd_t);
@@ -141,6 +187,12 @@ static struct sda_ops sdhost_ops = {
 static ddi_device_acc_attr_t sdhost_regattr = {
 	DDI_DEVICE_ATTR_V0,	/* devacc_attr_version */
 	DDI_STRUCTURE_LE_ACC,	/* devacc_attr_endian_flags */
+	DDI_STRICTORDER_ACC,	/* devacc_attr_dataorder */
+	DDI_DEFAULT_ACC,	/* devacc_attr_access */
+};
+static ddi_device_acc_attr_t sdhost_bufattr = {
+	DDI_DEVICE_ATTR_V0,	/* devacc_attr_version */
+	DDI_NEVERSWAP_ACC,	/* devacc_attr_endian_flags */
 	DDI_STRICTORDER_ACC,	/* devacc_attr_dataorder */
 	DDI_DEFAULT_ACC,	/* devacc_attr_access */
 };
@@ -254,12 +306,12 @@ sdhost_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	shp->sh_dmaattr.dma_attr_addr_lo = 0;
 	shp->sh_dmaattr.dma_attr_addr_hi = 0xffffffffU;
 	shp->sh_dmaattr.dma_attr_count_max = 0xffffffffU;
-	shp->sh_dmaattr.dma_attr_align = 1;
+	shp->sh_dmaattr.dma_attr_align = 4096;		/* Ricoh needs it */
 	shp->sh_dmaattr.dma_attr_burstsizes = 0;	/* for now! */
 	shp->sh_dmaattr.dma_attr_minxfer = 1;
-	shp->sh_dmaattr.dma_attr_maxxfer = 0xffffffffU;
-	shp->sh_dmaattr.dma_attr_sgllen = -1;		/* unlimited! */
-	shp->sh_dmaattr.dma_attr_seg = 0xfff;		/* 4K segments */
+	shp->sh_dmaattr.dma_attr_maxxfer = 0x7ffffU;
+	shp->sh_dmaattr.dma_attr_sgllen = 1;		/* no scatter/gather */
+	shp->sh_dmaattr.dma_attr_seg = 0x7ffffU;	/* not to cross 512K */
 	shp->sh_dmaattr.dma_attr_granular = 1;
 	shp->sh_dmaattr.dma_attr_flags = 0;
 
@@ -570,7 +622,14 @@ sdhost_soft_reset(sdslot_t *ss, uint8_t bits)
 		PUT16(ss, REG_CLOCK_CONTROL, CLOCK_CONTROL_INT_CLOCK_EN);
 		/* simple 1msec wait, don't wait for clock to stabilize */
 		drv_usecwait(1000);
+		/*
+		 * reset the card clock & width -- master reset also
+		 * resets these
+		 */
+		ss->ss_cardclk = 0;
+		ss->ss_width = 1;
 	}
+
 
 	PUT8(ss, REG_SOFT_RESET, bits);
 	for (count = 100000; count != 0; count -= 10) {
@@ -642,15 +701,13 @@ sdhost_setup_intr(dev_info_t *dip, sdhost_t *shp)
 	 *
 	 * We don't do this if the FIXED type isn't supported though!
 	 */
-	if ((ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "enable-msi", 0) == 0) &&
-	    (itypes & DDI_INTR_TYPE_FIXED)) {
-		itypes &= ~DDI_INTR_TYPE_MSI;
-	}
-	if ((ddi_prop_get_int(DDI_DEV_T_ANY, dip,
-	    DDI_PROP_DONTPASS | DDI_PROP_NOTPROM, "enable-msix", 0) == 0) &&
-	    (itypes & DDI_INTR_TYPE_FIXED)) {
-		itypes &= ~DDI_INTR_TYPE_MSIX;
+	if (itypes & DDI_INTR_TYPE_FIXED) {
+		if (!PROPSET(SDHOST_PROP_ENABLE_MSI)) {
+			itypes &= ~DDI_INTR_TYPE_MSI;
+		}
+		if (!PROPSET(SDHOST_PROP_ENABLE_MSIX)) {
+			itypes &= ~DDI_INTR_TYPE_MSIX;
+		}
 	}
 
 	/*
@@ -763,7 +820,7 @@ sdhost_slot_intr(sdslot_t *ss)
 {
 	uint16_t	intr;
 	uint16_t	errs;
-	uint8_t		*data;
+	caddr_t		data;
 	int		count;
 
 	mutex_enter(&ss->ss_lock);
@@ -794,26 +851,16 @@ sdhost_slot_intr(sdslot_t *ss)
 		/*
 		 * We have crossed a DMA/page boundary.  Cope with it.
 		 */
-		if (ss->ss_ndmac) {
-			ss->ss_ndmac--;
-			ss->ss_dmacs++;
-			PUT16(ss, REG_INT_STAT, INT_DMA);
-			PUT32(ss, REG_SDMA_ADDR, ss->ss_dmacs->dmac_address);
-
-		} else {
-			/*
-			 * Apparently some sdhost controllers issue a
-			 * final DMA interrupt if the DMA completes on
-			 * a boundary, even though there is no further
-			 * data to transfer.
-			 *
-			 * There might be a risk here of the
-			 * controller continuing to access the same
-			 * data over and over again, but we accept the
-			 * risk.
-			 */
-			PUT16(ss, REG_INT_STAT, INT_DMA);
-		}
+		/*
+		 * Apparently some sdhost controllers issue a final
+		 * DMA interrupt if the DMA completes on a boundary,
+		 * even though there is no further data to transfer.
+		 *
+		 * There might be a risk here of the controller
+		 * continuing to access the same data over and over
+		 * again, but we accept the risk.
+		 */
+		PUT16(ss, REG_INT_STAT, INT_DMA);
 	}
 
 	if (intr & INT_RD) {
@@ -828,7 +875,7 @@ sdhost_slot_intr(sdslot_t *ss)
 
 		while ((ss->ss_resid > 0) && CHECK_STATE(ss, BUF_RD_EN)) {
 
-			data = (void *)ss->ss_bounce;
+			data = ss->ss_bounce;
 			count = ss->ss_blksz;
 
 			ASSERT(count > 0);
@@ -860,7 +907,7 @@ sdhost_slot_intr(sdslot_t *ss)
 		/*
 		 * PIO write!  PIO is quite suboptimal, but we expect
 		 * performance critical applications to use DMA
-		 * whenever possible.  We have to stage this trhough
+		 * whenever possible.  We have to stage this through
 		 * the bounce buffer to meet alignment considerations.
 		 */
 
@@ -868,7 +915,7 @@ sdhost_slot_intr(sdslot_t *ss)
 
 		while ((ss->ss_resid > 0) && CHECK_STATE(ss, BUF_WR_EN)) {
 
-			data = (void *)ss->ss_bounce;
+			data = ss->ss_bounce;
 			count = ss->ss_blksz;
 
 			ASSERT(count > 0);
@@ -897,6 +944,13 @@ sdhost_slot_intr(sdslot_t *ss)
 	}
 
 	if (intr & INT_XFR) {
+		if ((ss->ss_mode & (XFR_MODE_READ | XFR_MODE_DMA_EN)) ==
+		    (XFR_MODE_READ | XFR_MODE_DMA_EN)) {
+			(void) ddi_dma_sync(ss->ss_bufdmah, 0, 0,
+			    DDI_DMA_SYNC_FORKERNEL);
+			bcopy(ss->ss_bounce, ss->ss_kvaddr, ss->ss_rcnt);
+			ss->ss_rcnt = 0;
+		}
 		PUT16(ss, REG_INT_STAT, INT_XFR);
 
 		sdhost_xfer_done(ss, SDA_EOK);
@@ -962,6 +1016,10 @@ sdhost_init_slot(dev_info_t *dip, sdhost_t *shp, int num, int bar)
 	sdslot_t	*ss;
 	uint32_t	capab;
 	uint32_t	clk;
+	char		ksname[16];
+	size_t		blen;
+	unsigned	ndmac;
+	int		rv;
 
 	/*
 	 * Register the private state.
@@ -970,12 +1028,76 @@ sdhost_init_slot(dev_info_t *dip, sdhost_t *shp, int num, int bar)
 	ss->ss_host = shp->sh_host;
 	ss->ss_num = num;
 	sda_host_set_private(shp->sh_host, num, ss);
-
 	/*
 	 * Initialize core data structure, locks, etc.
 	 */
 	mutex_init(&ss->ss_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(shp->sh_ipri));
+
+	/*
+	 * Set up DMA.
+	 */
+	rv = ddi_dma_alloc_handle(dip, &shp->sh_dmaattr,
+	    DDI_DMA_SLEEP, NULL, &ss->ss_bufdmah);
+	if (rv != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Failed to alloc dma handle (%d)!", rv);
+		return (DDI_FAILURE);
+	}
+
+	rv = ddi_dma_mem_alloc(ss->ss_bufdmah, SDHOST_BOUNCESZ,
+	    &sdhost_bufattr, DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
+	    &ss->ss_bounce, &blen, &ss->ss_bufacch);
+	if (rv != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Failed to alloc bounce buffer (%d)!", rv);
+		return (DDI_FAILURE);
+	}
+
+	rv = ddi_dma_addr_bind_handle(ss->ss_bufdmah, NULL, ss->ss_bounce,
+	    blen, DDI_DMA_RDWR | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL,
+	    &ss->ss_bufdmac, &ndmac);
+	if ((rv != DDI_DMA_MAPPED) || (ndmac != 1)) {
+		cmn_err(CE_WARN, "Failed to bind DMA bounce buffer (%d, %u)!",
+		    rv, ndmac);
+		return (DDI_FAILURE);
+	}
+
+	/*
+	 * Set up virtual kstats.
+	 */
+	(void) snprintf(ksname, sizeof (ksname), "slot%d", num);
+	ss->ss_ksp = kstat_create(ddi_driver_name(dip), ddi_get_instance(dip),
+	    ksname, "misc", KSTAT_TYPE_NAMED,
+	    sizeof (sdstats_t) / sizeof (kstat_named_t), KSTAT_FLAG_VIRTUAL);
+	if (ss->ss_ksp != NULL) {
+		sdstats_t	*sp = &ss->ss_stats;
+		ss->ss_ksp->ks_data = sp;
+		ss->ss_ksp->ks_private = ss;
+		ss->ss_ksp->ks_lock = &ss->ss_lock;
+		/* counters are 64 bits wide */
+		kstat_named_init(&sp->ks_ncmd, "ncmd", KSTAT_DATA_UINT64);
+		kstat_named_init(&sp->ks_ixfr, "ixfr", KSTAT_DATA_UINT64);
+		kstat_named_init(&sp->ks_oxfr, "oxfr", KSTAT_DATA_UINT64);
+		kstat_named_init(&sp->ks_ibytes, "ibytes", KSTAT_DATA_UINT64);
+		kstat_named_init(&sp->ks_obytes, "obytes", KSTAT_DATA_UINT64);
+		kstat_named_init(&sp->ks_npio, "npio", KSTAT_DATA_UINT64);
+		kstat_named_init(&sp->ks_ndma, "ndma", KSTAT_DATA_UINT64);
+		kstat_named_init(&sp->ks_nmulti, "nmulti", KSTAT_DATA_UINT64);
+		/* these aren't counters -- leave them at 32 bits */
+		kstat_named_init(&sp->ks_baseclk, "baseclk", KSTAT_DATA_UINT32);
+		kstat_named_init(&sp->ks_cardclk, "cardclk", KSTAT_DATA_UINT32);
+		kstat_named_init(&sp->ks_tmusecs, "tmusecs", KSTAT_DATA_UINT32);
+		kstat_named_init(&sp->ks_width, "width", KSTAT_DATA_UINT32);
+		kstat_named_init(&sp->ks_flags, "flags", KSTAT_DATA_UINT32);
+		kstat_named_init(&sp->ks_capab, "capab", KSTAT_DATA_UINT32);
+		kstat_install(ss->ss_ksp);
+	}
+
+	if (PROPSET(SDHOST_PROP_FORCE_PIO)) {
+		ss->ss_flags |= SDFLAG_FORCE_PIO;
+	}
+	if (PROPSET(SDHOST_PROP_FORCE_DMA)) {
+		ss->ss_flags |= SDFLAG_FORCE_DMA;
+	}
 
 	if (ddi_regs_map_setup(dip, bar, &ss->ss_regva, 0, 0, &sdhost_regattr,
 	    &ss->ss_acch) != DDI_SUCCESS) {
@@ -1093,6 +1215,20 @@ sdhost_uninit_slot(sdhost_t *shp, int num)
 		return;
 
 	(void) sdhost_soft_reset(ss, SOFT_RESET_ALL);
+
+	if (ss->ss_bufdmac.dmac_address) {
+		(void) ddi_dma_unbind_handle(ss->ss_bufdmah);
+	}
+	if (ss->ss_bufacch != NULL) {
+		ddi_dma_mem_free(&ss->ss_bufacch);
+	}
+	if (ss->ss_bufdmah != NULL) {
+		ddi_dma_free_handle(&ss->ss_bufdmah);
+	}
+	if (ss->ss_ksp != NULL) {
+		kstat_delete(ss->ss_ksp);
+		ss->ss_ksp = NULL;
+	}
 
 	ddi_regs_map_free(&ss->ss_acch);
 	mutex_destroy(&ss->ss_lock);
@@ -1275,31 +1411,44 @@ sdhost_cmd(void *arg, sda_cmd_t *cmdp)
 
 		ss->ss_blksz = blksz;
 
+		ss->ss_kvaddr = (void *)cmdp->sc_kvaddr;
+		ss->ss_rcnt = 0;
+		ss->ss_resid = 0;
+
 		/*
 		 * Only SDMA for now.  We can investigate ADMA2 later.
 		 * (Right now we don't have ADMA2 capable hardware.)
+		 * We always use a bounce buffer, which solves weird
+		 * problems with certain controllers.  Doing this with
+		 * a large contiguous buffer may be faster than
+		 * servicing all the little per-page interrupts
+		 * anyway. (Bcopy of 64 K vs. 16 interrupts.)
 		 */
 		if (((ss->ss_capab & CAPAB_SDMA) != 0) &&
-		    (cmdp->sc_ndmac != 0)) {
-			ddi_dma_cookie_t	*dmacs = cmdp->sc_dmacs;
+		    ((ss->ss_flags & SDFLAG_FORCE_PIO) == 0) &&
+		    ((blksz * nblks) <= SDHOST_BOUNCESZ)) {
 
-			ASSERT(dmacs != NULL);
-
-			ss->ss_kvaddr = NULL;
-			ss->ss_resid = 0;
-			ss->ss_dmacs = dmacs;
-			ss->ss_ndmac = cmdp->sc_ndmac - 1;
-
-			PUT32(ss, REG_SDMA_ADDR, dmacs->dmac_address);
+			if (cmdp->sc_flags & SDA_CMDF_WRITE) {
+				/*
+				 * if we're writing, prepare initial round
+				 * of data
+				 */
+				bcopy(cmdp->sc_kvaddr, ss->ss_bounce,
+				    nblks * blksz);
+				(void) ddi_dma_sync(ss->ss_bufdmah, 0, 0,
+				    DDI_DMA_SYNC_FORDEV);
+			} else {
+				ss->ss_rcnt = nblks * blksz;
+			}
+			PUT32(ss, REG_SDMA_ADDR, ss->ss_bufdmac.dmac_address);
 			mode = XFR_MODE_DMA_EN;
-			PUT16(ss, REG_BLKSZ, blksz);
+			PUT16(ss, REG_BLKSZ, BLKSZ_BOUNDARY_512K | blksz);
+			ss->ss_ndma++;
 
 		} else {
-			ss->ss_kvaddr = (void *)cmdp->sc_kvaddr;
-			ss->ss_resid = nblks;
-			ss->ss_dmacs = NULL;
-			ss->ss_ndmac = 0;
 			mode = 0;
+			ss->ss_npio++;
+			ss->ss_resid = nblks;
 			PUT16(ss, REG_BLKSZ, blksz);
 		}
 
@@ -1307,9 +1456,15 @@ sdhost_cmd(void *arg, sda_cmd_t *cmdp)
 			mode |= XFR_MODE_MULTI | XFR_MODE_COUNT;
 			if (cmdp->sc_flags & SDA_CMDF_AUTO_CMD12)
 				mode |= XFR_MODE_AUTO_CMD12;
+			ss->ss_nmulti++;
 		}
 		if ((cmdp->sc_flags & SDA_CMDF_READ) != 0) {
 			mode |= XFR_MODE_READ;
+			ss->ss_ixfr++;
+			ss->ss_ibytes += nblks * blksz;
+		} else {
+			ss->ss_oxfr++;
+			ss->ss_obytes += nblks * blksz;
 		}
 
 		ss->ss_mode = mode;
@@ -1322,6 +1477,7 @@ sdhost_cmd(void *arg, sda_cmd_t *cmdp)
 	PUT32(ss, REG_ARGUMENT, cmdp->sc_argument);
 	PUT16(ss, REG_COMMAND, command);
 
+	ss->ss_ncmd++;
 	rv = sdhost_wait_cmd(ss, cmdp);
 
 	mutex_exit(&ss->ss_lock);
@@ -1379,11 +1535,13 @@ sdhost_getprop(void *arg, sda_prop_t prop, uint32_t *val)
 		break;
 
 	case SDA_PROP_CAP_NOPIO:
-		if ((ss->ss_capab & CAPAB_SDMA) != 0) {
-			*val = B_TRUE;
-		} else {
-			*val = B_FALSE;
-		}
+		/*
+		 * We might have to use PIO for buffers that don't
+		 * have reasonable alignments.  A few controllers seem
+		 * not to deal with granularity or alignments of
+		 * something other 32-bits.
+		 */
+		*val = B_FALSE;
 		break;
 
 	case SDA_PROP_CAP_INTR:
@@ -1429,9 +1587,11 @@ sdhost_setprop(void *arg, sda_prop_t prop, uint32_t val)
 	case SDA_PROP_BUSWIDTH:
 		switch (val) {
 		case 1:
+			ss->ss_width = val;
 			CLR8(ss, REG_HOST_CONTROL, HOST_CONTROL_DATA_WIDTH);
 			break;
 		case 4:
+			ss->ss_width = val;
 			SET8(ss, REG_HOST_CONTROL, HOST_CONTROL_DATA_WIDTH);
 			break;
 		default:
