@@ -17750,9 +17750,10 @@ ipif_lookup_on_ifindex(uint_t index, boolean_t isv6, zoneid_t zoneid,
 }
 
 /*
- * We first need to ensure that the new index is unique, and
- * then carry the change across both v4 and v6 ill representation
- * of the physical interface.
+ * Change an existing physical interface's index. If the new index
+ * is acceptable we update the index and the phyint_list_avl_by_index tree.
+ * Finally, we update other systems which may have a dependence on the
+ * index value.
  */
 /* ARGSUSED */
 int
@@ -17764,9 +17765,8 @@ ip_sioctl_slifindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 	struct ifreq	*ifr = (struct ifreq *)ifreq;
 	struct lifreq	*lifr = (struct lifreq *)ifreq;
 	uint_t	old_index, index;
-	ill_t	*ill_v4;
-	ill_t	*ill_v6;
 	ip_stack_t	*ipst = ipif->ipif_ill->ill_ipst;
+	avl_index_t	where;
 
 	if (ipip->ipi_cmd_type == IF_CMD)
 		index = ifr->ifr_index;
@@ -17787,24 +17787,28 @@ ip_sioctl_slifindex(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 		return (0);
 
 	/*
-	 * Use ill_lookup_on_ifindex to determine if the
-	 * new index is unused and if so allow the change.
+	 * Use phyint_exists() to determine if the new interface index
+	 * is already in use. If the index is unused then we need to
+	 * change the phyint's position in the phyint_list_avl_by_index
+	 * tree. If we do not do this, subsequent lookups (using the new
+	 * index value) will not find the phyint.
 	 */
-	ill_v6 = ill_lookup_on_ifindex(index, B_TRUE, NULL, NULL, NULL, NULL,
-	    ipst);
-	ill_v4 = ill_lookup_on_ifindex(index, B_FALSE, NULL, NULL, NULL, NULL,
-	    ipst);
-	if (ill_v6 != NULL || ill_v4 != NULL) {
-		if (ill_v4 != NULL)
-			ill_refrele(ill_v4);
-		if (ill_v6 != NULL)
-			ill_refrele(ill_v6);
-		return (EBUSY);
+	rw_enter(&ipst->ips_ill_g_lock, RW_WRITER);
+	if (phyint_exists(index, ipst)) {
+		rw_exit(&ipst->ips_ill_g_lock);
+		return (EEXIST);
 	}
 
 	/* The new index is unused. Set it in the phyint. */
 	old_index = phyi->phyint_ifindex;
 	phyi->phyint_ifindex = index;
+
+	avl_remove(&ipst->ips_phyint_g_list->phyint_list_avl_by_index, phyi);
+	(void) avl_find(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
+	    &index, &where);
+	avl_insert(&ipst->ips_phyint_g_list->phyint_list_avl_by_index,
+	    phyi, where);
+	rw_exit(&ipst->ips_ill_g_lock);
 
 	/* Update SCTP's ILL list */
 	sctp_ill_reindex(ill, old_index);
