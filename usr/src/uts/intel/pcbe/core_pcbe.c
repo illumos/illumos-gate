@@ -19,12 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*
- * Performance Counter Back-End for Intel Family 6 Models 15, 23, 26 & 28
+ * Performance Counter Back-End for Intel processors supporting Architectural
+ * Performance Monitoring.
  */
 
 #include <sys/cpuvar.h>
@@ -160,7 +161,7 @@ pcbe_ops_t core_pcbe_ops = {
 	core_pcbe_free			/* pcbe_free */
 };
 
-struct nametable_fam6mod15_23 {
+struct nametable_core_uarch {
 	const char	*name;
 	uint64_t	restricted_bits;
 	uint8_t		event_num;
@@ -176,9 +177,9 @@ struct nametable_fam6mod15_23 {
 
 /*
  * The events listed in the following table can be counted on all
- * general-purpose counters on processors that are of Family 6 Models 15 or 23
+ * general-purpose counters on processors that are of Penryn and Merom Family
  */
-static const struct nametable_fam6mod15_23 cmn_gpc_events_f6m15_23[] = {
+static const struct nametable_core_uarch cmn_gpc_events_core_uarch[] = {
 	/* Alphabetical order of event name */
 
 	{ "baclears",			0x0,	0xe6 },
@@ -336,7 +337,7 @@ static const struct nametable_fam6mod15_23 cmn_gpc_events_f6m15_23[] = {
  * check in configure_gpc() to find whether an event hard-coded as a number by
  * the user has any privilege requirements
  */
-static const struct nametable_fam6mod15_23 pic0_events[] = {
+static const struct nametable_core_uarch pic0_events[] = {
 	/* Alphabetical order of event name */
 
 	{ "cycles_div_busy",		0x0,	0x14 },
@@ -348,7 +349,7 @@ static const struct nametable_fam6mod15_23 pic0_events[] = {
 	{ "",				0x0,	NT_END }
 };
 
-static const struct nametable_fam6mod15_23 pic1_events[] = {
+static const struct nametable_core_uarch pic1_events[] = {
 	/* Alphabetical order of event name */
 
 	{ "delayed_bypass",	0x0,	0x19 },
@@ -863,11 +864,6 @@ static uint64_t known_ffc_num;
 	{ 0xE4, 0x1,  C0|C1, "bogus_br" },                             	\
 	{ 0xE6, 0x1,  C0|C1, "baclears.any" }
 
-#define	EVENTS_FAM6_MOD37						\
-{ 0xB0, 0x08, C0|C1|C2|C3, "offcore_requests.any.read" },		\
-{ 0xB0, 0x01, C0|C1|C2|C3, "offcore_requests.demand.read_data" },	\
-{ 0xB0, 0x04, C0|C1|C2|C3, "offcore_requests.demand.rfo" }
-
 static const struct events_table_t *events_table = NULL;
 
 const struct events_table_t events_fam6_mod26[] = {
@@ -880,21 +876,15 @@ const struct events_table_t events_fam6_mod28[] = {
 	{ NT_END, 0, 0, "" }
 };
 
-const struct events_table_t events_fam6_mod37[] = {
-	EVENTS_FAM6_MOD26,
-	EVENTS_FAM6_MOD37,
-	{ NT_END, 0, 0, "" }
-};
-
 /*
  * Initialize string containing list of supported general-purpose counter
- * events for processors of Family 6 Models 15 and 23
+ * events for processors of Penryn and Merom Family
  */
 static void
-pcbe_init_fam6_model15_23()
+pcbe_init_core_uarch()
 {
-	const struct nametable_fam6mod15_23	*n;
-	const struct nametable_fam6mod15_23	*picspecific_events;
+	const struct nametable_core_uarch	*n;
+	const struct nametable_core_uarch	*picspecific_events;
 	size_t			common_size;
 	size_t			size;
 	uint64_t		i;
@@ -903,7 +893,7 @@ pcbe_init_fam6_model15_23()
 
 	/* Calculate space needed to save all the common event names */
 	common_size = 0;
-	for (n = cmn_gpc_events_f6m15_23; n->event_num != NT_END; n++) {
+	for (n = cmn_gpc_events_core_uarch; n->event_num != NT_END; n++) {
 		common_size += strlen(n->name) + 1;
 	}
 
@@ -940,7 +930,7 @@ pcbe_init_fam6_model15_23()
 				(void) strcat(gpc_names[i], ",");
 			}
 		}
-		for (n = cmn_gpc_events_f6m15_23; n->event_num != NT_END;
+		for (n = cmn_gpc_events_core_uarch; n->event_num != NT_END;
 		    n++) {
 			(void) strcat(gpc_names[i], n->name);
 			(void) strcat(gpc_names[i], ",");
@@ -1077,10 +1067,11 @@ core_pcbe_init(void)
 
 	/* GPC events for Family 6 Models 15 & 23 only */
 	if ((cpuid_getfamily(CPU) == 6) &&
-	    ((cpuid_getmodel(CPU) == 15) || (cpuid_getmodel(CPU) == 23))) {
+	    ((cpuid_getmodel(CPU) == 15) || (cpuid_getmodel(CPU) == 23) ||
+	    (cpuid_getmodel(CPU) == 29))) {
 		(void) snprintf(core_impl_name, IMPL_NAME_LEN,
 		    "Core Microarchitecture");
-		pcbe_init_fam6_model15_23();
+		pcbe_init_core_uarch();
 		return (0);
 	}
 
@@ -1129,8 +1120,6 @@ core_pcbe_init(void)
 			events_table = events_fam6_mod26;
 		} else if (cpuid_getmodel(CPU) == 28) {
 			events_table = events_fam6_mod28;
-		} else if (cpuid_getmodel(CPU) == 37) {
-			events_table = events_fam6_mod37;
 		}
 
 		for (i = 0; i < num_gpc; i++) {
@@ -1224,11 +1213,11 @@ static char *core_pcbe_list_attrs(void)
 	}
 }
 
-static const struct nametable_fam6mod15_23 *
-find_gpcevent_f6m15_23(char *name,
-    const struct nametable_fam6mod15_23 *nametable)
+static const struct nametable_core_uarch *
+find_gpcevent_core_uarch(char *name,
+    const struct nametable_core_uarch *nametable)
 {
-	const struct nametable_fam6mod15_23 *n;
+	const struct nametable_core_uarch *n;
 	int compare_result = -1;
 
 	for (n = nametable; n->event_num != NT_END; n++) {
@@ -1288,12 +1277,14 @@ core_pcbe_event_coverage(char *event)
 			    BITMASK_XBITS(num_gpc));
 		}
 	} else {
-		if (find_gpcevent_f6m15_23(event, cmn_gpc_events_f6m15_23) !=
-		    NULL) {
+		if (find_gpcevent_core_uarch(event, cmn_gpc_events_core_uarch)
+		    != NULL) {
 			bitmap |= BITMASK_XBITS(num_gpc);
-		} else if (find_gpcevent_f6m15_23(event, pic0_events) != NULL) {
+		} else if (find_gpcevent_core_uarch(event, pic0_events) !=
+		    NULL) {
 			bitmap |= 1ULL;
-		} else if (find_gpcevent_f6m15_23(event, pic1_events) != NULL) {
+		} else if (find_gpcevent_core_uarch(event, pic1_events) !=
+		    NULL) {
 			bitmap |= 1ULL << 1;
 		}
 	}
@@ -1337,7 +1328,7 @@ core_pcbe_overflow_bitmap(void)
 
 static int
 check_cpc_securitypolicy(core_pcbe_config_t *conf,
-    const struct nametable_fam6mod15_23 *n)
+    const struct nametable_core_uarch *n)
 {
 	if (conf->core_ctl & n->restricted_bits) {
 		if (secpolicy_cpc_cpu(crgetcred()) != 0) {
@@ -1352,10 +1343,10 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
     uint_t nattrs, kcpc_attr_t *attrs, void **data)
 {
 	core_pcbe_config_t	conf;
-	const struct nametable_fam6mod15_23	*n;
-	const struct nametable_fam6mod15_23	*m;
-	const struct nametable_fam6mod15_23	*picspecific_events;
-	struct nametable_fam6mod15_23	nt_raw = { "", 0x0, 0x0 };
+	const struct nametable_core_uarch	*n;
+	const struct nametable_core_uarch	*m;
+	const struct nametable_core_uarch	*picspecific_events;
+	struct nametable_core_uarch	nt_raw = { "", 0x0, 0x0 };
 	uint_t			i;
 	long			event_num;
 	const struct events_table_t *eventcode;
@@ -1389,7 +1380,7 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 			conf.core_ctl = event_num & 0xFF;
 		}
 	} else {
-		n = find_gpcevent_f6m15_23(event, cmn_gpc_events_f6m15_23);
+		n = find_gpcevent_core_uarch(event, cmn_gpc_events_core_uarch);
 		if (n == NULL) {
 			switch (picnum) {
 				case 0:
@@ -1403,7 +1394,7 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 					break;
 			}
 			if (picspecific_events != NULL) {
-				n = find_gpcevent_f6m15_23(event,
+				n = find_gpcevent_core_uarch(event,
 				    picspecific_events);
 			}
 		}
@@ -1424,9 +1415,9 @@ configure_gpc(uint_t picnum, char *event, uint64_t preset, uint32_t flags,
 			 * specified has an privilege requirements.  Currently
 			 * none of the pic-specific counters have any privilege
 			 * requirements.  Hence only the table
-			 * cmn_gpc_events_f6m15_23 is searched.
+			 * cmn_gpc_events_core_uarch is searched.
 			 */
-			for (m = cmn_gpc_events_f6m15_23;
+			for (m = cmn_gpc_events_core_uarch;
 			    m->event_num != NT_END;
 			    m++) {
 				if (event_num == m->event_num) {
