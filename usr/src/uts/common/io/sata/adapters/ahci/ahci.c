@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,8 +140,7 @@ static	void ahci_watchdog_handler(ahci_ctl_t *);
 
 static	uint_t ahci_intr(caddr_t, caddr_t);
 static	void ahci_port_intr(ahci_ctl_t *, ahci_port_t *, uint8_t);
-static	int ahci_add_legacy_intrs(ahci_ctl_t *);
-static	int ahci_add_msi_intrs(ahci_ctl_t *);
+static	int ahci_add_intrs(ahci_ctl_t *, int);
 static	void ahci_rem_intrs(ahci_ctl_t *);
 static	void ahci_enable_all_intrs(ahci_ctl_t *);
 static	void ahci_disable_all_intrs(ahci_ctl_t *);
@@ -317,7 +316,7 @@ static size_t ahci_cmd_table_size;
 int ahci_dma_prdt_number = AHCI_PRDT_NUMBER;
 
 /* AHCI MSI is tunable */
-boolean_t ahci_msi_enabled = B_FALSE;
+boolean_t ahci_msi_enabled = B_TRUE;
 
 /* 64-bit dma addressing is tunable */
 boolean_t ahci_64bit_dma_addressed = B_TRUE;
@@ -682,7 +681,8 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		/*
 		 * Try MSI first, but fall back to FIXED if failed
 		 */
-		if (ahci_add_msi_intrs(ahci_ctlp) == DDI_SUCCESS) {
+		if (ahci_add_intrs(ahci_ctlp, DDI_INTR_TYPE_MSI) ==
+		    DDI_SUCCESS) {
 			ahci_ctlp->ahcictl_intr_type = DDI_INTR_TYPE_MSI;
 			AHCIDBG0(AHCIDBG_INIT|AHCIDBG_INTR, ahci_ctlp,
 			    "Using MSI interrupt type");
@@ -695,7 +695,8 @@ ahci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (intr_types & DDI_INTR_TYPE_FIXED) {
-		if (ahci_add_legacy_intrs(ahci_ctlp) == DDI_SUCCESS) {
+		if (ahci_add_intrs(ahci_ctlp, DDI_INTR_TYPE_FIXED) ==
+		    DDI_SUCCESS) {
 			ahci_ctlp->ahcictl_intr_type = DDI_INTR_TYPE_FIXED;
 			AHCIDBG0(AHCIDBG_INIT|AHCIDBG_INTR, ahci_ctlp,
 			    "Using FIXED interrupt type");
@@ -2941,6 +2942,7 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 	ushort_t caps_ptr, cap_count, cap;
 #if AHCI_DEBUG
 	ushort_t pmcap, pmcsr;
+	ushort_t msimc;
 #endif
 	uint8_t revision;
 
@@ -3056,7 +3058,16 @@ ahci_config_space_init(ahci_ctl_t *ahci_ctlp)
 			break;
 
 		case PCI_CAP_ID_MSI:
-			AHCIDBG0(AHCIDBG_PM, ahci_ctlp, "MSI capability found");
+#if AHCI_DEBUG
+			msimc = pci_config_get16(
+			    ahci_ctlp->ahcictl_pci_conf_handle,
+			    caps_ptr + PCI_MSI_CTRL);
+			AHCIDBG1(AHCIDBG_MSI, ahci_ctlp,
+			    "Message Signaled Interrupt capability found "
+			    "MSICAP_MC.MMC = 0x%x", (msimc & 0xe) >> 1);
+#endif
+			AHCIDBG0(AHCIDBG_MSI, ahci_ctlp,
+			    "MSI capability found");
 			break;
 
 		case PCI_CAP_ID_PCIX:
@@ -5658,131 +5669,57 @@ ahci_disable_all_intrs(ahci_ctl_t *ahci_ctlp)
 }
 
 /*
- * Handle INTx and legacy interrupts.
+ * Handle FIXED or MSI interrupts.
  */
-static int
-ahci_add_legacy_intrs(ahci_ctl_t *ahci_ctlp)
-{
-	dev_info_t	*dip = ahci_ctlp->ahcictl_dip;
-	int		actual, count = 0;
-	int		x, y, rc, inum = 0;
-
-	AHCIDBG0(AHCIDBG_ENTRY|AHCIDBG_INIT, ahci_ctlp,
-	    "ahci_add_legacy_intrs enter");
-
-	/* get number of interrupts. */
-	rc = ddi_intr_get_nintrs(dip, DDI_INTR_TYPE_FIXED, &count);
-	if ((rc != DDI_SUCCESS) || (count == 0)) {
-		AHCIDBG2(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
-		    "ddi_intr_get_nintrs() failed, "
-		    "rc %d count %d\n", rc, count);
-		return (DDI_FAILURE);
-	}
-
-	/* Allocate an array of interrupt handles. */
-	ahci_ctlp->ahcictl_intr_size = count * sizeof (ddi_intr_handle_t);
-	ahci_ctlp->ahcictl_intr_htable =
-	    kmem_zalloc(ahci_ctlp->ahcictl_intr_size, KM_SLEEP);
-
-	/* call ddi_intr_alloc(). */
-	rc = ddi_intr_alloc(dip, ahci_ctlp->ahcictl_intr_htable,
-	    DDI_INTR_TYPE_FIXED,
-	    inum, count, &actual, DDI_INTR_ALLOC_STRICT);
-
-	if ((rc != DDI_SUCCESS) || (actual == 0)) {
-		AHCIDBG1(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
-		    "ddi_intr_alloc() failed, rc %d\n", rc);
-		kmem_free(ahci_ctlp->ahcictl_intr_htable,
-		    ahci_ctlp->ahcictl_intr_size);
-		return (DDI_FAILURE);
-	}
-
-	if (actual < count) {
-		AHCIDBG2(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
-		    "Requested: %d, Received: %d", count, actual);
-
-		for (x = 0; x < actual; x++) {
-			(void) ddi_intr_free(ahci_ctlp->ahcictl_intr_htable[x]);
-		}
-
-		kmem_free(ahci_ctlp->ahcictl_intr_htable,
-		    ahci_ctlp->ahcictl_intr_size);
-		return (DDI_FAILURE);
-	}
-
-	ahci_ctlp->ahcictl_intr_cnt = actual;
-
-	/* Get intr priority. */
-	if (ddi_intr_get_pri(ahci_ctlp->ahcictl_intr_htable[0],
-	    &ahci_ctlp->ahcictl_intr_pri) != DDI_SUCCESS) {
-		AHCIDBG0(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
-		    "ddi_intr_get_pri() failed");
-
-		for (x = 0; x < actual; x++) {
-			(void) ddi_intr_free(ahci_ctlp->ahcictl_intr_htable[x]);
-		}
-
-		kmem_free(ahci_ctlp->ahcictl_intr_htable,
-		    ahci_ctlp->ahcictl_intr_size);
-		return (DDI_FAILURE);
-	}
-
-	/* Test for high level interrupt. */
-	if (ahci_ctlp->ahcictl_intr_pri >= ddi_intr_get_hilevel_pri()) {
-		AHCIDBG0(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
-		    "ahci_add_legacy_intrs: Hi level intr not supported");
-
-		for (x = 0; x < actual; x++) {
-			(void) ddi_intr_free(ahci_ctlp->ahcictl_intr_htable[x]);
-		}
-
-		kmem_free(ahci_ctlp->ahcictl_intr_htable,
-		    sizeof (ddi_intr_handle_t));
-
-		return (DDI_FAILURE);
-	}
-
-	/* Call ddi_intr_add_handler(). */
-	for (x = 0; x < actual; x++) {
-		if (ddi_intr_add_handler(ahci_ctlp->ahcictl_intr_htable[x],
-		    ahci_intr, (caddr_t)ahci_ctlp, NULL) != DDI_SUCCESS) {
-			AHCIDBG0(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
-			    "ddi_intr_add_handler() failed");
-
-			for (y = 0; y < actual; y++) {
-				(void) ddi_intr_free(
-				    ahci_ctlp->ahcictl_intr_htable[y]);
-			}
-
-			kmem_free(ahci_ctlp->ahcictl_intr_htable,
-			    ahci_ctlp->ahcictl_intr_size);
-			return (DDI_FAILURE);
-		}
-	}
-
-	/* Call ddi_intr_enable() for legacy interrupts. */
-	for (x = 0; x < ahci_ctlp->ahcictl_intr_cnt; x++) {
-		(void) ddi_intr_enable(ahci_ctlp->ahcictl_intr_htable[x]);
-	}
-
-	return (DDI_SUCCESS);
-}
-
 /*
- * Handle MSI interrupts.
+ * According to AHCI spec, the HBA may support several interrupt modes:
+ *	* pin based interrupts (FIXED)
+ *	* single MSI message interrupts
+ *	* multiple MSI based message interrupts
+ *
+ * For pin based interrupts, the software interrupt handler need to check IS
+ * register to find out which port has pending interrupts. And then check
+ * PxIS register to find out which interrupt events happened on that port.
+ *
+ * For single MSI message interrupts, MSICAP.MC.MSIE is set with '1', and
+ * MSICAP.MC.MME is set with '0'. This mode is similar to pin based interrupts
+ * in that software interrupt handler need to check IS register to determine
+ * which port triggered the interrupts since it uses a single message for all
+ * port interrupts.
+ *
+ * HBA may optionally support multiple MSI message for better performance. In
+ * this mode, each port may have its own interrupt message, and thus generation
+ * of interrupts is no longer controlled through the IS register. MSICAP.MC.MMC
+ * represents a power-of-2 wrapper on the number of implemented ports, and
+ * the mapping of ports to interrupts is done in a 1-1 relationship, up to the
+ * maximum number of assigned interrupts. When the number of MSI messages
+ * allocated is less than the number requested, then hardware may have two
+ * implementation behaviors:
+ *	* assign each ports its own interrupt and then force all additional
+ *	  ports to share the last interrupt message, and this condition is
+ *	  indicated by clearing GHC.MRSM to '0'
+ *	* revert to single MSI mode, indicated by setting GHC.MRSM to '1'
+ * When multiple-message MSI is enabled, hardware will still set IS register
+ * as single message case. And this IS register may be used by software when
+ * fewer than the requested number of messages is granted in order to determine
+ * which port had the interrupt.
+ *
+ * Note: The current ahci driver only supports the first two interrupt modes:
+ * pin based interrupts and single MSI message interrupts, and the reason
+ * is indicated in below code.
  */
 static int
-ahci_add_msi_intrs(ahci_ctl_t *ahci_ctlp)
+ahci_add_intrs(ahci_ctl_t *ahci_ctlp, int intr_type)
 {
 	dev_info_t *dip = ahci_ctlp->ahcictl_dip;
 	int		count, avail, actual;
-	int		x, y, rc, inum = 0;
+	int		i, rc;
 
-	AHCIDBG0(AHCIDBG_ENTRY|AHCIDBG_INIT, ahci_ctlp,
-	    "ahci_add_msi_intrs enter");
+	AHCIDBG1(AHCIDBG_ENTRY|AHCIDBG_INIT|AHCIDBG_INTR, ahci_ctlp,
+	    "ahci_add_intrs enter interrupt type 0x%x", intr_type);
 
 	/* get number of interrupts. */
-	rc = ddi_intr_get_nintrs(dip, DDI_INTR_TYPE_MSI, &count);
+	rc = ddi_intr_get_nintrs(dip, intr_type, &count);
 	if ((rc != DDI_SUCCESS) || (count == 0)) {
 		AHCIDBG2(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
 		    "ddi_intr_get_nintrs() failed, "
@@ -5791,7 +5728,7 @@ ahci_add_msi_intrs(ahci_ctl_t *ahci_ctlp)
 	}
 
 	/* get number of available interrupts. */
-	rc = ddi_intr_get_navail(dip, DDI_INTR_TYPE_MSI, &avail);
+	rc = ddi_intr_get_navail(dip, intr_type, &avail);
 	if ((rc != DDI_SUCCESS) || (avail == 0)) {
 		AHCIDBG2(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
 		    "ddi_intr_get_navail() failed, "
@@ -5802,10 +5739,25 @@ ahci_add_msi_intrs(ahci_ctl_t *ahci_ctlp)
 #if AHCI_DEBUG
 	if (avail < count) {
 		AHCIDBG2(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
-		    "ddi_intr_get_nvail returned %d, navail() returned %d",
+		    "ddi_intr_get_nintrs returned %d, navail() returned %d",
 		    count, avail);
 	}
 #endif
+
+	/*
+	 * Note: So far Solaris restricts the maximum number of messages for
+	 * x86 to 2, that is avail is 2, so here we set the count with 1 to
+	 * force the driver to use single MSI message interrupt. In future if
+	 * Solaris remove the restriction, then we need to delete the below
+	 * code and try to use multiple interrupt routine to gain better
+	 * performance.
+	 */
+	if ((intr_type == DDI_INTR_TYPE_MSI) && (count > 1)) {
+		AHCIDBG1(AHCIDBG_INTR, ahci_ctlp,
+		    "force to use one interrupt routine though the "
+		    "HBA supports %d interrupt", count);
+		count = 1;
+	}
 
 	/* Allocate an array of interrupt handles. */
 	ahci_ctlp->ahcictl_intr_size = count * sizeof (ddi_intr_handle_t);
@@ -5814,11 +5766,12 @@ ahci_add_msi_intrs(ahci_ctl_t *ahci_ctlp)
 
 	/* call ddi_intr_alloc(). */
 	rc = ddi_intr_alloc(dip, ahci_ctlp->ahcictl_intr_htable,
-	    DDI_INTR_TYPE_MSI, inum, count, &actual, DDI_INTR_ALLOC_NORMAL);
+	    intr_type, 0, count, &actual, DDI_INTR_ALLOC_NORMAL);
 
 	if ((rc != DDI_SUCCESS) || (actual == 0)) {
-		AHCIDBG1(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
-		    "ddi_intr_alloc() failed, rc %d\n", rc);
+		AHCIDBG4(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
+		    "ddi_intr_alloc() failed, rc %d count %d actual %d "
+		    "avail %d\n", rc, count, actual, avail);
 		kmem_free(ahci_ctlp->ahcictl_intr_htable,
 		    ahci_ctlp->ahcictl_intr_size);
 		return (DDI_FAILURE);
@@ -5835,7 +5788,7 @@ ahci_add_msi_intrs(ahci_ctl_t *ahci_ctlp)
 	ahci_ctlp->ahcictl_intr_cnt = actual;
 
 	/*
-	 * Get priority for first msi, assume remaining are all the same.
+	 * Get priority for first, assume remaining are all the same.
 	 */
 	if (ddi_intr_get_pri(ahci_ctlp->ahcictl_intr_htable[0],
 	    &ahci_ctlp->ahcictl_intr_pri) != DDI_SUCCESS) {
@@ -5843,8 +5796,8 @@ ahci_add_msi_intrs(ahci_ctl_t *ahci_ctlp)
 		    "ddi_intr_get_pri() failed");
 
 		/* Free already allocated intr. */
-		for (y = 0; y < actual; y++) {
-			(void) ddi_intr_free(ahci_ctlp->ahcictl_intr_htable[y]);
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_free(ahci_ctlp->ahcictl_intr_htable[i]);
 		}
 
 		kmem_free(ahci_ctlp->ahcictl_intr_htable,
@@ -5855,11 +5808,11 @@ ahci_add_msi_intrs(ahci_ctl_t *ahci_ctlp)
 	/* Test for high level interrupt. */
 	if (ahci_ctlp->ahcictl_intr_pri >= ddi_intr_get_hilevel_pri()) {
 		AHCIDBG0(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
-		    "ahci_add_msi_intrs: Hi level intr not supported");
+		    "ahci_add_intrs: Hi level intr not supported");
 
 		/* Free already allocated intr. */
-		for (y = 0; y < actual; y++) {
-			(void) ddi_intr_free(ahci_ctlp->ahcictl_intr_htable[y]);
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_free(ahci_ctlp->ahcictl_intr_htable[i]);
 		}
 
 		kmem_free(ahci_ctlp->ahcictl_intr_htable,
@@ -5869,16 +5822,16 @@ ahci_add_msi_intrs(ahci_ctl_t *ahci_ctlp)
 	}
 
 	/* Call ddi_intr_add_handler(). */
-	for (x = 0; x < actual; x++) {
-		if (ddi_intr_add_handler(ahci_ctlp->ahcictl_intr_htable[x],
+	for (i = 0; i < actual; i++) {
+		if (ddi_intr_add_handler(ahci_ctlp->ahcictl_intr_htable[i],
 		    ahci_intr, (caddr_t)ahci_ctlp, NULL) != DDI_SUCCESS) {
 			AHCIDBG0(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
 			    "ddi_intr_add_handler() failed");
 
 			/* Free already allocated intr. */
-			for (y = 0; y < actual; y++) {
+			for (i = 0; i < actual; i++) {
 				(void) ddi_intr_free(
-				    ahci_ctlp->ahcictl_intr_htable[y]);
+				    ahci_ctlp->ahcictl_intr_htable[i]);
 			}
 
 			kmem_free(ahci_ctlp->ahcictl_intr_htable,
@@ -5887,19 +5840,31 @@ ahci_add_msi_intrs(ahci_ctl_t *ahci_ctlp)
 		}
 	}
 
+	if (ddi_intr_get_cap(ahci_ctlp->ahcictl_intr_htable[0],
+	    &ahci_ctlp->ahcictl_intr_cap) != DDI_SUCCESS) {
+		AHCIDBG0(AHCIDBG_INTR|AHCIDBG_INIT, ahci_ctlp,
+		    "ddi_intr_get_cap() failed");
 
-	(void) ddi_intr_get_cap(ahci_ctlp->ahcictl_intr_htable[0],
-	    &ahci_ctlp->ahcictl_intr_cap);
+		/* Free already allocated intr. */
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_free(
+			    ahci_ctlp->ahcictl_intr_htable[i]);
+		}
+
+		kmem_free(ahci_ctlp->ahcictl_intr_htable,
+		    ahci_ctlp->ahcictl_intr_size);
+		return (DDI_FAILURE);
+	}
 
 	if (ahci_ctlp->ahcictl_intr_cap & DDI_INTR_FLAG_BLOCK) {
 		/* Call ddi_intr_block_enable() for MSI. */
 		(void) ddi_intr_block_enable(ahci_ctlp->ahcictl_intr_htable,
 		    ahci_ctlp->ahcictl_intr_cnt);
 	} else {
-		/* Call ddi_intr_enable() for MSI non block enable. */
-		for (x = 0; x < ahci_ctlp->ahcictl_intr_cnt; x++) {
+		/* Call ddi_intr_enable() for FIXED or MSI non block enable. */
+		for (i = 0; i < ahci_ctlp->ahcictl_intr_cnt; i++) {
 			(void) ddi_intr_enable(
-			    ahci_ctlp->ahcictl_intr_htable[x]);
+			    ahci_ctlp->ahcictl_intr_htable[i]);
 		}
 	}
 

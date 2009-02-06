@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -362,6 +362,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ahci_ctl_t::ahcictl_mutex,
 #define	AHCIDBG_NCQ		0x4000
 #define	AHCIDBG_PM		0x8000
 #define	AHCIDBG_UNDERFLOW	0x10000
+#define	AHCIDBG_MSI		0x20000
 
 extern int ahci_debug_flag;
 
