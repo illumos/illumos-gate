@@ -34,18 +34,56 @@ extern uint32_t	hxge_tx_intr_thres;
 extern uint32_t	hxge_tx_max_gathers;
 extern uint32_t	hxge_tx_tiny_pack;
 extern uint32_t	hxge_tx_use_bcopy;
-extern uint32_t	hxge_tx_lb_policy;
-extern uint32_t	hxge_no_tx_lb;
 
-typedef struct _mac_tx_hint {
-	uint16_t	sap;
-	uint16_t	vid;
-	void		*hash;
-} mac_tx_hint_t, *p_mac_tx_hint_t;
+static int hxge_start(p_hxge_t hxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp);
 
-int hxge_tx_lb_ring(p_mblk_t, uint32_t, p_mac_tx_hint_t);
+void
+hxge_tx_ring_task(void *arg)
+{
+	p_tx_ring_t	ring = (p_tx_ring_t)arg;
 
-int
+	MUTEX_ENTER(&ring->lock);
+	(void) hxge_txdma_reclaim(ring->hxgep, ring, 0);
+	MUTEX_EXIT(&ring->lock);
+
+	mac_tx_ring_update(ring->hxgep->mach, ring->ring_handle);
+}
+
+static void
+hxge_tx_ring_dispatch(p_tx_ring_t ring)
+{
+	/*
+	 * Kick the ring task to reclaim some buffers.
+	 */
+	(void) ddi_taskq_dispatch(ring->taskq,
+	    hxge_tx_ring_task, (void *)ring, DDI_SLEEP);
+}
+
+mblk_t *
+hxge_tx_ring_send(void *arg, mblk_t *mp)
+{
+	p_hxge_ring_handle_t    rhp = (p_hxge_ring_handle_t)arg;
+	p_hxge_t		hxgep;
+	p_tx_ring_t		tx_ring_p;
+	int			status;
+
+	ASSERT(rhp != NULL);
+	ASSERT((rhp->index >= 0) && (rhp->index < HXGE_MAX_TDCS));
+
+	hxgep = rhp->hxgep;
+	tx_ring_p = hxgep->tx_rings->rings[rhp->index];
+	ASSERT(hxgep == tx_ring_p->hxgep);
+
+	status = hxge_start(hxgep, tx_ring_p, mp);
+	if (status != 0) {
+		hxge_tx_ring_dispatch(tx_ring_p);
+		return (mp);
+	}
+
+	return ((mblk_t *)NULL);
+}
+
+static int
 hxge_start(p_hxge_t hxgep, p_tx_ring_t tx_ring_p, p_mblk_t mp)
 {
 	int 			status = 0;
@@ -183,10 +221,6 @@ start_again:
 		cas32((uint32_t *)&tx_ring_p->queueing, 0, 1);
 		tdc_stats->tx_no_desc++;
 		MUTEX_EXIT(&tx_ring_p->lock);
-		if (hxgep->resched_needed && !hxgep->resched_running) {
-			hxgep->resched_running = B_TRUE;
-			ddi_trigger_softintr(hxgep->resched_id);
-		}
 		status = 1;
 		goto hxge_start_fail1;
 	}
@@ -801,8 +835,6 @@ hxge_start_fail2:
 			    tx_ring_p->tx_wrap_mask);
 
 		}
-
-		hxgep->resched_needed = B_TRUE;
 	}
 
 	MUTEX_EXIT(&tx_ring_p->lock);
@@ -811,216 +843,4 @@ hxge_start_fail1:
 	/* Add FMA to check the access handle hxge_hregh */
 	HXGE_DEBUG_MSG((hxgep, TX_CTL, "<== hxge_start"));
 	return (status);
-}
-
-boolean_t
-hxge_send(p_hxge_t hxgep, mblk_t *mp, p_mac_tx_hint_t hp)
-{
-	p_tx_ring_t 		*tx_rings;
-	uint8_t			ring_index;
-
-	HXGE_DEBUG_MSG((hxgep, TX_CTL, "==> hxge_send"));
-
-	ASSERT(mp->b_next == NULL);
-
-	ring_index = hxge_tx_lb_ring(mp, hxgep->max_tdcs, hp);
-	tx_rings = hxgep->tx_rings->rings;
-	HXGE_DEBUG_MSG((hxgep, TX_CTL, "==> hxge_tx_msg: tx_rings $%p",
-	    tx_rings));
-	HXGE_DEBUG_MSG((hxgep, TX_CTL, "==> hxge_tx_msg: max_tdcs %d "
-	    "ring_index %d", hxgep->max_tdcs, ring_index));
-
-	if (hxge_start(hxgep, tx_rings[ring_index], mp)) {
-		HXGE_DEBUG_MSG((hxgep, TX_CTL, "<== hxge_send: failed "
-		    "ring index %d", ring_index));
-		return (B_FALSE);
-	}
-
-	HXGE_DEBUG_MSG((hxgep, TX_CTL, "<== hxge_send: ring index %d",
-	    ring_index));
-	return (B_TRUE);
-}
-
-/*
- * hxge_m_tx() - send a chain of packets
- */
-mblk_t *
-hxge_m_tx(void *arg, mblk_t *mp)
-{
-	p_hxge_t 		hxgep = (p_hxge_t)arg;
-	mblk_t 			*next;
-	mac_tx_hint_t		hint;
-
-	if (!(hxgep->drv_state & STATE_HW_INITIALIZED)) {
-		HXGE_DEBUG_MSG((hxgep, DDI_CTL,
-		    "==> hxge_m_tx: hardware not initialized"));
-		HXGE_DEBUG_MSG((hxgep, DDI_CTL, "<== hxge_m_tx"));
-		return (mp);
-	}
-
-	hint.hash =  NULL;
-	hint.vid =  0;
-	hint.sap =  0;
-
-	while (mp != NULL) {
-		next = mp->b_next;
-		mp->b_next = NULL;
-
-		/*
-		 * Until Nemo tx resource works, the mac driver
-		 * does the load balancing based on TCP port,
-		 * or CPU. For debugging, we use a system
-		 * configurable parameter.
-		 */
-		if (!hxge_send(hxgep, mp, &hint)) {
-			mp->b_next = next;
-			break;
-		}
-
-		mp = next;
-
-		HXGE_DEBUG_MSG((NULL, TX_CTL,
-		    "==> hxge_m_tx: (go back to loop) mp $%p next $%p",
-		    mp, next));
-	}
-	return (mp);
-}
-
-int
-hxge_tx_lb_ring(p_mblk_t mp, uint32_t maxtdcs, p_mac_tx_hint_t hp)
-{
-	uint8_t		ring_index = 0;
-	uint8_t		*tcp_port;
-	p_mblk_t	nmp;
-	size_t		mblk_len;
-	size_t		iph_len;
-	size_t		hdrs_size;
-	uint8_t		hdrs_buf[sizeof (struct  ether_header) +
-	    IP_MAX_HDR_LENGTH + sizeof (uint32_t)];
-
-	/*
-	 * allocate space big enough to cover
-	 * the max ip header length and the first
-	 * 4 bytes of the TCP/IP header.
-	 */
-	boolean_t		qos = B_FALSE;
-
-	HXGE_DEBUG_MSG((NULL, TX_CTL, "==> hxge_tx_lb_ring"));
-
-	if (hp->vid) {
-		qos = B_TRUE;
-	}
-	switch (hxge_tx_lb_policy) {
-	case HXGE_TX_LB_TCPUDP: /* default IPv4 TCP/UDP */
-	default:
-		tcp_port = mp->b_rptr;
-		if (!hxge_no_tx_lb && !qos &&
-		    (ntohs(((p_ether_header_t)tcp_port)->ether_type) ==
-		    ETHERTYPE_IP)) {
-			nmp = mp;
-			mblk_len = MBLKL(nmp);
-			tcp_port = NULL;
-			if (mblk_len > sizeof (struct ether_header) +
-			    sizeof (uint8_t)) {
-				tcp_port = nmp->b_rptr +
-				    sizeof (struct ether_header);
-				mblk_len -= sizeof (struct ether_header);
-				iph_len = ((*tcp_port) & 0x0f) << 2;
-				if (mblk_len > (iph_len + sizeof (uint32_t))) {
-					tcp_port = nmp->b_rptr;
-				} else {
-					tcp_port = NULL;
-				}
-			}
-			if (tcp_port == NULL) {
-				hdrs_size = 0;
-				((p_ether_header_t)hdrs_buf)->ether_type = 0;
-				while ((nmp) && (hdrs_size <
-				    sizeof (hdrs_buf))) {
-					mblk_len = MBLKL(nmp);
-					if (mblk_len >=
-					    (sizeof (hdrs_buf) - hdrs_size))
-						mblk_len = sizeof (hdrs_buf) -
-						    hdrs_size;
-					bcopy(nmp->b_rptr,
-					    &hdrs_buf[hdrs_size], mblk_len);
-					hdrs_size += mblk_len;
-					nmp = nmp->b_cont;
-				}
-				tcp_port = hdrs_buf;
-			}
-			tcp_port += sizeof (ether_header_t);
-			if (!(tcp_port[6] & 0x3f) && !(tcp_port[7] & 0xff)) {
-				switch (tcp_port[9]) {
-				case IPPROTO_TCP:
-				case IPPROTO_UDP:
-				case IPPROTO_ESP:
-					tcp_port += ((*tcp_port) & 0x0f) << 2;
-					ring_index = ((tcp_port[0] ^
-					    tcp_port[1] ^
-					    tcp_port[2] ^
-					    tcp_port[3]) % maxtdcs);
-					break;
-
-				case IPPROTO_AH:
-					/* SPI starts at the 4th byte */
-					tcp_port += ((*tcp_port) & 0x0f) << 2;
-					ring_index = ((tcp_port[4] ^
-					    tcp_port[5] ^
-					    tcp_port[6] ^
-					    tcp_port[7]) % maxtdcs);
-					break;
-
-				default:
-					ring_index = tcp_port[19] % maxtdcs;
-					break;
-				}
-			} else { /* fragmented packet */
-				ring_index = tcp_port[19] % maxtdcs;
-			}
-		} else {
-			ring_index = mp->b_band % maxtdcs;
-		}
-		break;
-
-	case HXGE_TX_LB_HASH:
-		if (hp->hash) {
-#if defined(__i386)
-			ring_index = ((uint32_t)(hp->hash) % maxtdcs);
-#else
-			ring_index = ((uint64_t)(hp->hash) % maxtdcs);
-#endif
-		} else {
-			ring_index = mp->b_band % maxtdcs;
-		}
-		break;
-
-	case HXGE_TX_LB_DEST_MAC:
-		/* Use destination MAC address */
-		tcp_port = mp->b_rptr;
-		ring_index = tcp_port[5] % maxtdcs;
-		break;
-	}
-	HXGE_DEBUG_MSG((NULL, TX_CTL, "<== hxge_tx_lb_ring"));
-	return (ring_index);
-}
-
-uint_t
-hxge_reschedule(caddr_t arg)
-{
-	p_hxge_t hxgep;
-
-	hxgep = (p_hxge_t)arg;
-
-	HXGE_DEBUG_MSG((hxgep, TX_CTL, "==> hxge_reschedule"));
-
-	if (hxgep->hxge_mac_state == HXGE_MAC_STARTED &&
-	    hxgep->resched_needed) {
-		mac_tx_update(hxgep->mach);
-		hxgep->resched_needed = B_FALSE;
-		hxgep->resched_running = B_FALSE;
-	}
-
-	HXGE_DEBUG_MSG((NULL, TX_CTL, "<== hxge_reschedule"));
-	return (DDI_INTR_CLAIMED);
 }

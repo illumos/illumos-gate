@@ -30,6 +30,7 @@
 extern "C" {
 #endif
 
+#include <sys/taskq.h>
 #include <hxge_txdma_hw.h>
 #include <hpi_txdma.h>
 
@@ -123,6 +124,8 @@ typedef struct _hxge_tdc_sys_stats {
 typedef struct _tx_ring_t {
 	hxge_os_dma_common_t	tdc_desc;
 	struct _hxge_t		*hxgep;
+	mac_ring_handle_t	ring_handle;
+	ddi_taskq_t		*taskq;
 	p_tx_msg_t		tx_msg_ring;
 	uint32_t		tnblocks;
 	tdc_tdr_cfg_t		tx_ring_cfig;
@@ -233,6 +236,7 @@ void hxge_txdma_fix_hung_channel(p_hxge_t hxgep, uint16_t channel);
 void hxge_txdma_fixup_hung_channel(p_hxge_t hxgep, p_tx_ring_t ring_p,
 	uint16_t channel);
 
+mblk_t *hxge_tx_ring_send(void *arg, mblk_t *mp);
 void hxge_reclaim_rings(p_hxge_t hxgep);
 int hxge_txdma_channel_hung(p_hxge_t hxgep,
 	p_tx_ring_t tx_ring_p, uint16_t channel);

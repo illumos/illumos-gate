@@ -784,14 +784,14 @@ hxge_txdma_reclaim(p_hxge_t hxgep, p_tx_ring_t tx_ring_p, int nmblks)
 			tx_msg_p = &tx_msg_ring[tx_rd_index];
 		}
 
-		status = (nmblks <= (tx_ring_p->tx_ring_size -
-		    tx_ring_p->descs_pending - TX_FULL_MARK));
+		status = (nmblks <= ((int)tx_ring_p->tx_ring_size -
+		    (int)tx_ring_p->descs_pending - TX_FULL_MARK));
 		if (status) {
 			cas32((uint32_t *)&tx_ring_p->queueing, 1, 0);
 		}
 	} else {
-		status = (nmblks <= (tx_ring_p->tx_ring_size -
-		    tx_ring_p->descs_pending - TX_FULL_MARK));
+		status = (nmblks <= ((int)tx_ring_p->tx_ring_size -
+		    (int)tx_ring_p->descs_pending - TX_FULL_MARK));
 	}
 
 	HXGE_DEBUG_MSG((hxgep, TX_CTL,
@@ -1864,6 +1864,7 @@ hxge_map_txdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 	int			i, j, index;
 	uint32_t		size, bsize;
 	uint32_t		nblocks, nmsgs;
+	char			qname[TASKQ_NAMELEN];
 
 	HXGE_DEBUG_MSG((hxgep, MEM3_CTL,
 	    "==> hxge_map_txdma_channel_buf_ring"));
@@ -1889,7 +1890,17 @@ hxge_map_txdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 
 		goto hxge_map_txdma_channel_buf_ring_exit;
 	}
+
 	tx_ring_p = (p_tx_ring_t)KMEM_ZALLOC(sizeof (tx_ring_t), KM_SLEEP);
+	tx_ring_p->hxgep = hxgep;
+	(void) snprintf(qname, TASKQ_NAMELEN, "hxge_%d_%d",
+	    hxgep->instance, channel);
+	tx_ring_p->taskq = ddi_taskq_create(hxgep->dip, qname, 1,
+	    TASKQ_DEFAULTPRI, 0);
+	if (tx_ring_p->taskq == NULL) {
+		goto hxge_map_txdma_channel_buf_ring_fail1;
+	}
+
 	MUTEX_INIT(&tx_ring_p->lock, NULL, MUTEX_DRIVER,
 	    (void *) hxgep->interrupt_cookie);
 	/*
@@ -1973,6 +1984,11 @@ hxge_map_txdma_channel_buf_ring(p_hxge_t hxgep, uint16_t channel,
 	goto hxge_map_txdma_channel_buf_ring_exit;
 
 hxge_map_txdma_channel_buf_ring_fail1:
+	if (tx_ring_p->taskq) {
+		ddi_taskq_destroy(tx_ring_p->taskq);
+		tx_ring_p->taskq = NULL;
+	}
+
 	index--;
 	for (; index >= 0; index--) {
 		if (tx_msg_ring[index].dma_handle != NULL) {
@@ -2011,6 +2027,7 @@ hxge_unmap_txdma_channel_buf_ring(p_hxge_t hxgep, p_tx_ring_t tx_ring_p)
 	    "==> hxge_unmap_txdma_channel_buf_ring: channel %d",
 	    tx_ring_p->tdc));
 
+	MUTEX_ENTER(&tx_ring_p->lock);
 	tx_msg_ring = tx_ring_p->tx_msg_ring;
 	for (i = 0; i < tx_ring_p->tx_ring_size; i++) {
 		tx_msg_p = &tx_msg_ring[i];
@@ -2041,6 +2058,12 @@ hxge_unmap_txdma_channel_buf_ring(p_hxge_t hxgep, p_tx_ring_t tx_ring_p)
 		if (tx_msg_ring[i].dma_handle != NULL) {
 			ddi_dma_free_handle(&tx_msg_ring[i].dma_handle);
 		}
+	}
+	MUTEX_EXIT(&tx_ring_p->lock);
+
+	if (tx_ring_p->taskq) {
+		ddi_taskq_destroy(tx_ring_p->taskq);
+		tx_ring_p->taskq = NULL;
 	}
 
 	MUTEX_DESTROY(&tx_ring_p->lock);

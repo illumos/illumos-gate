@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,8 @@
 #define	RDC_NAME_FORMAT1 "RDC_"
 #define	TDC_NAME_FORMAT1 "TDC_"
 #define	CH_NAME_FORMAT "%d"
+
+static int hxge_mmac_stat_update(kstat_t *ksp, int rw);
 
 void
 hxge_init_statsp(p_hxge_t hxgep)
@@ -297,6 +299,51 @@ hxge_kstat_index_t hxge_peu_sys_stats[] = {
 	{HCR_PARERR, KSTAT_DATA_UINT64, "hcr_parerr"},
 	{TDC_SYS_STAT_END, NULL, NULL}
 };
+
+typedef enum {
+	MMAC_MAX_ADDR,
+	MMAC_AVAIL_ADDR,
+	MMAC_ADDR_POOL1,
+	MMAC_ADDR_POOL2,
+	MMAC_ADDR_POOL3,
+	MMAC_ADDR_POOL4,
+	MMAC_ADDR_POOL5,
+	MMAC_ADDR_POOL6,
+	MMAC_ADDR_POOL7,
+	MMAC_ADDR_POOL8,
+	MMAC_ADDR_POOL9,
+	MMAC_ADDR_POOL10,
+	MMAC_ADDR_POOL11,
+	MMAC_ADDR_POOL12,
+	MMAC_ADDR_POOL13,
+	MMAC_ADDR_POOL14,
+	MMAC_ADDR_POOL15,
+	MMAC_ADDR_POOL16,
+	MMAC_STATS_END
+} hxge_mmac_stat_index_t;
+
+hxge_kstat_index_t hxge_mmac_stats[] = {
+	{MMAC_MAX_ADDR, KSTAT_DATA_UINT64, "max_mmac_addr"},
+	{MMAC_AVAIL_ADDR, KSTAT_DATA_UINT64, "avail_mmac_addr"},
+	{MMAC_ADDR_POOL1, KSTAT_DATA_UINT64, "mmac_addr_1"},
+	{MMAC_ADDR_POOL2, KSTAT_DATA_UINT64, "mmac_addr_2"},
+	{MMAC_ADDR_POOL3, KSTAT_DATA_UINT64, "mmac_addr_3"},
+	{MMAC_ADDR_POOL4, KSTAT_DATA_UINT64, "mmac_addr_4"},
+	{MMAC_ADDR_POOL5, KSTAT_DATA_UINT64, "mmac_addr_5"},
+	{MMAC_ADDR_POOL6, KSTAT_DATA_UINT64, "mmac_addr_6"},
+	{MMAC_ADDR_POOL7, KSTAT_DATA_UINT64, "mmac_addr_7"},
+	{MMAC_ADDR_POOL8, KSTAT_DATA_UINT64, "mmac_addr_8"},
+	{MMAC_ADDR_POOL9, KSTAT_DATA_UINT64, "mmac_addr_9"},
+	{MMAC_ADDR_POOL10, KSTAT_DATA_UINT64, "mmac_addr_10"},
+	{MMAC_ADDR_POOL11, KSTAT_DATA_UINT64, "mmac_addr_11"},
+	{MMAC_ADDR_POOL12, KSTAT_DATA_UINT64, "mmac_addr_12"},
+	{MMAC_ADDR_POOL13, KSTAT_DATA_UINT64, "mmac_addr_13"},
+	{MMAC_ADDR_POOL14, KSTAT_DATA_UINT64, "mmac_addr_14"},
+	{MMAC_ADDR_POOL15, KSTAT_DATA_UINT64, "mmac_addr_15"},
+	{MMAC_ADDR_POOL16, KSTAT_DATA_UINT64, "mmac_addr_16"},
+	{MMAC_STATS_END, NULL, NULL},
+};
+
 
 /* ARGSUSED */
 int
@@ -664,6 +711,13 @@ hxge_setup_kstats(p_hxge_t hxgep)
 	    VMAC_STAT_END, hxge_vmac_stat_update);
 	if (hxgep->statsp->vmac_ksp == NULL)
 		cmn_err(CE_WARN, "kstat_create failed for vmac");
+
+	/* Setup MMAC Statistics. */
+	hxgep->statsp->mmac_ksp = hxge_setup_local_kstat(hxgep,
+	    hxgep->instance, "MMAC", &hxge_mmac_stats[0],
+	    MMAC_STATS_END, hxge_mmac_stat_update);
+	if (hxgep->statsp->mmac_ksp == NULL)
+		cmn_err(CE_WARN, "kstat_create failed for mmac");
 
 	/* Setup PEU System statistics */
 	hxgep->statsp->peu_sys_ksp = hxge_setup_local_kstat(hxgep,
@@ -1190,5 +1244,78 @@ hxge_m_stat(void *arg, uint_t stat, uint64_t *value)
 		return (ENOTSUP);
 	}
 	*value = val;
+	return (0);
+}
+
+static uint64_t
+hxge_mac_octet_to_u64(uint8_t *addr)
+{
+	int		i;
+	uint64_t	addr64 = 0;
+
+	for (i = ETHERADDRL - 1; i >= 0; i--) {
+		addr64 <<= 8;
+		addr64 |= addr[i];
+	}
+	return (addr64);
+}
+
+/*ARGSUSED*/
+static int
+hxge_mmac_stat_update(kstat_t *ksp, int rw)
+{
+	p_hxge_t		hxgep;
+	p_hxge_mmac_kstat_t	mmac_kstatsp;
+
+	hxgep = (p_hxge_t)ksp->ks_private;
+	if (hxgep == NULL)
+		return (-1);
+
+	HXGE_DEBUG_MSG((hxgep, KST_CTL, "==> hxge_mmac_stat_update"));
+
+	if (rw == KSTAT_WRITE) {
+		cmn_err(CE_WARN, "Can not write mmac stats");
+	} else {
+		MUTEX_ENTER(hxgep->genlock);
+		mmac_kstatsp = (p_hxge_mmac_kstat_t)ksp->ks_data;
+		mmac_kstatsp->mmac_max_addr_cnt.value.ul = hxgep->mmac.total;
+		mmac_kstatsp->mmac_avail_addr_cnt.value.ul =
+		    hxgep->mmac.available;
+		mmac_kstatsp->mmac_addr1.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[0].addr);
+		mmac_kstatsp->mmac_addr2.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[1].addr);
+		mmac_kstatsp->mmac_addr3.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[2].addr);
+		mmac_kstatsp->mmac_addr4.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[3].addr);
+		mmac_kstatsp->mmac_addr5.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[4].addr);
+		mmac_kstatsp->mmac_addr6.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[5].addr);
+		mmac_kstatsp->mmac_addr7.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[6].addr);
+		mmac_kstatsp->mmac_addr8.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[7].addr);
+		mmac_kstatsp->mmac_addr9.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[8].addr);
+		mmac_kstatsp->mmac_addr10.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[9].addr);
+		mmac_kstatsp->mmac_addr11.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[10].addr);
+		mmac_kstatsp->mmac_addr12.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[11].addr);
+		mmac_kstatsp->mmac_addr13.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[12].addr);
+		mmac_kstatsp->mmac_addr14.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[13].addr);
+		mmac_kstatsp->mmac_addr15.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[14].addr);
+		mmac_kstatsp->mmac_addr16.value.ul =
+		    hxge_mac_octet_to_u64(hxgep->mmac.addrs[15].addr);
+		MUTEX_EXIT(hxgep->genlock);
+	}
+
+	HXGE_DEBUG_MSG((hxgep, KST_CTL, "<== hxge_mmac_stat_update"));
 	return (0);
 }

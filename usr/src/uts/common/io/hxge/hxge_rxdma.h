@@ -312,6 +312,11 @@ typedef struct _rx_msg_t {
 typedef struct _rx_rcr_ring_t {
 	hxge_os_dma_common_t	rcr_desc;
 	struct _hxge_t		*hxgep;
+	mac_ring_handle_t   	rcr_mac_handle;
+	uint64_t		rcr_gen_num;
+	boolean_t		poll_flag;
+	p_hxge_ldv_t		ldvp;
+	p_hxge_ldg_t		ldgp;
 
 	p_hxge_rx_ring_stats_t	rdc_stats;	/* pointer to real kstats */
 
@@ -341,7 +346,6 @@ typedef struct _rx_rcr_ring_t {
 	struct _rx_rbr_ring_t	*rx_rbr_p;
 	uint32_t		intr_timeout;
 	uint32_t		intr_threshold;
-	uint64_t		max_receive_pkts;
 	uint32_t		rcvd_pkt_bytes; /* Received bytes of a packet */
 } rx_rcr_ring_t, *p_rx_rcr_ring_t;
 
@@ -479,6 +483,10 @@ hxge_status_t hxge_enable_rxdma_channel(p_hxge_t hxgep,
 hxge_status_t hxge_rxdma_hw_mode(p_hxge_t hxgep, boolean_t enable);
 int hxge_rxdma_get_ring_index(p_hxge_t hxgep, uint16_t channel);
 hxge_status_t hxge_rxdma_handle_sys_errors(p_hxge_t hxgep);
+
+extern int hxge_enable_poll(void *arg);
+extern int hxge_disable_poll(void *arg);
+extern mblk_t *hxge_rx_poll(void *arg, int bytes_to_read);
 
 
 #ifdef	__cplusplus

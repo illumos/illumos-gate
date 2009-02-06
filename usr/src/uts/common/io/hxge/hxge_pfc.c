@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,15 +30,6 @@
 #include <hpi_pfc.h>
 #include <sys/ethernet.h>
 
-/*
- * Ethernet broadcast address definition.
- */
-static ether_addr_st etherbroadcastaddr = {\
-	0xff, 0xff, 0xff, 0xff, 0xff, 0xff \
-};
-
-static hxge_status_t hxge_pfc_set_mac_address(p_hxge_t, uint32_t,
-	struct ether_addr *);
 static uint32_t crc32_mchash(p_ether_addr_t addr);
 static hxge_status_t hxge_pfc_load_hash_table(p_hxge_t hxgep);
 static uint32_t hxge_get_blade_id(p_hxge_t hxgep);
@@ -332,51 +323,6 @@ hxge_pfc_set_default_mac_addr(p_hxge_t hxgep)
 	return (status);
 }
 
-hxge_status_t
-hxge_set_mac_addr(p_hxge_t hxgep, struct ether_addr *addrp)
-{
-	hxge_status_t status = HXGE_OK;
-
-	HXGE_DEBUG_MSG((hxgep, PFC_CTL, "==> hxge_set_mac_addr"));
-
-	MUTEX_ENTER(&hxgep->ouraddr_lock);
-
-	/*
-	 * Exit if the address is same as ouraddr or multicast or broadcast
-	 */
-	if (((addrp->ether_addr_octet[0] & 01) == 1) ||
-	    (ether_cmp(addrp, &etherbroadcastaddr) == 0) ||
-	    (ether_cmp(addrp, &hxgep->ouraddr) == 0)) {
-		goto hxge_set_mac_addr_exit;
-	}
-	hxgep->ouraddr = *addrp;
-
-	/*
-	 * Set new interface local address and re-init device.
-	 * This is destructive to any other streams attached
-	 * to this device.
-	 */
-	RW_ENTER_WRITER(&hxgep->filter_lock);
-	status = hxge_pfc_set_mac_address(hxgep,
-	    HXGE_MAC_DEFAULT_ADDR_SLOT, addrp);
-	RW_EXIT(&hxgep->filter_lock);
-
-	MUTEX_EXIT(&hxgep->ouraddr_lock);
-	goto hxge_set_mac_addr_end;
-
-hxge_set_mac_addr_exit:
-	MUTEX_EXIT(&hxgep->ouraddr_lock);
-
-hxge_set_mac_addr_end:
-	HXGE_DEBUG_MSG((hxgep, PFC_CTL, "<== hxge_set_mac_addr"));
-	return (status);
-fail:
-	MUTEX_EXIT(&hxgep->ouraddr_lock);
-	HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL, "hxge_set_mac_addr: "
-	    "Unable to set mac address"));
-	return (status);
-}
-
 /*
  * Add a multicast address entry into the HW hash table
  */
@@ -499,8 +445,19 @@ fail:
 	return (status);
 }
 
+hxge_status_t
+hxge_pfc_clear_mac_address(p_hxge_t hxgep, uint32_t slot)
+{
+	hpi_status_t status;
 
-static hxge_status_t
+	status = hpi_pfc_clear_mac_address(hxgep->hpi_reg_handle, slot);
+	if (status != HPI_SUCCESS)
+		return (HXGE_ERROR);
+
+	return (HXGE_OK);
+}
+
+hxge_status_t
 hxge_pfc_set_mac_address(p_hxge_t hxgep, uint32_t slot,
     struct ether_addr *addrp)
 {
@@ -542,7 +499,7 @@ hxge_pfc_set_mac_address(p_hxge_t hxgep, uint32_t slot,
 
 /*ARGSUSED*/
 hxge_status_t
-hxge_pfc_num_macs_get(p_hxge_t hxgep, uint32_t *nmacs)
+hxge_pfc_num_macs_get(p_hxge_t hxgep, uint8_t *nmacs)
 {
 	*nmacs = PFC_N_MAC_ADDRESSES;
 	return (HXGE_OK);
@@ -802,9 +759,9 @@ hxge_pfc_vlan_tbl_clear_all(p_hxge_t hxgep)
 		return (HXGE_ERROR);
 	}
 
-	mutex_enter(&hw_p->hxge_vlan_lock);
+	MUTEX_ENTER(&hw_p->hxge_vlan_lock);
 	rs = hpi_pfc_cfg_vlan_table_clear(handle);
-	mutex_exit(&hw_p->hxge_vlan_lock);
+	MUTEX_EXIT(&hw_p->hxge_vlan_lock);
 
 	if (rs != HPI_SUCCESS) {
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,

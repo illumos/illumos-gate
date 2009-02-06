@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,17 +39,15 @@ extern "C" {
  */
 #define	HXGE_IOC		((((('N' << 8) + 'X') << 8) + 'G') << 8)
 
-#define	HXGE_GET64		(HXGE_IOC|1)
-#define	HXGE_PUT64		(HXGE_IOC|2)
-#define	HXGE_GET_TX_RING_SZ	(HXGE_IOC|3)
-#define	HXGE_GET_TX_DESC	(HXGE_IOC|4)
-#define	HXGE_GLOBAL_RESET	(HXGE_IOC|5)
-#define	HXGE_TX_SIDE_RESET	(HXGE_IOC|6)
-#define	HXGE_RX_SIDE_RESET	(HXGE_IOC|7)
-#define	HXGE_RESET_MAC		(HXGE_IOC|8)
-#define	HXGE_RTRACE		(HXGE_IOC|9)
-#define	HXGE_GET_TCAM		(HXGE_IOC|10)
-#define	HXGE_PUT_TCAM		(HXGE_IOC|11)
+#define	HXGE_GET_TX_RING_SZ	(HXGE_IOC|1)
+#define	HXGE_GET_TX_DESC	(HXGE_IOC|2)
+#define	HXGE_GLOBAL_RESET	(HXGE_IOC|3)
+#define	HXGE_TX_SIDE_RESET	(HXGE_IOC|4)
+#define	HXGE_RX_SIDE_RESET	(HXGE_IOC|5)
+#define	HXGE_RESET_MAC		(HXGE_IOC|6)
+#define	HXGE_RTRACE		(HXGE_IOC|7)
+#define	HXGE_GET_TCAM		(HXGE_IOC|8)
+#define	HXGE_PUT_TCAM		(HXGE_IOC|9)
 
 #define	HXGE_OK			0
 #define	HXGE_ERROR		0x40000000
@@ -243,6 +241,45 @@ typedef struct _hxge_timeout {
 	boolean_t	report_link_status;
 } hxge_timeout;
 
+typedef struct _hxge_addr {
+	boolean_t	set;
+	boolean_t	primary;
+	uint8_t		addr[ETHERADDRL];
+} hxge_addr_t;
+
+#define	HXGE_MAX_MAC_ADDRS	16
+
+typedef struct _hxge_mmac {
+	uint8_t		total;
+	uint8_t		available;
+	hxge_addr_t	addrs[HXGE_MAX_MAC_ADDRS];
+} hxge_mmac_t;
+
+/*
+ * Ring Group Strucuture.
+ */
+#define	HXGE_MAX_RX_GROUPS	1
+
+typedef struct _hxge_rx_ring_group_t {
+	mac_ring_type_t		type;
+	mac_group_handle_t	ghandle;
+	struct _hxge_t		*hxgep;
+	int			index;
+	boolean_t		started;
+} hxge_ring_group_t;
+
+/*
+ * Ring Handle
+ */
+typedef struct _hxge_ring_handle_t {
+	struct _hxge_t		*hxgep;
+	int			index;		/* port-wise */
+	mac_ring_handle_t	ring_handle;
+	boolean_t		started;
+} hxge_ring_handle_t;
+
+typedef hxge_ring_handle_t 	*p_hxge_ring_handle_t;
+
 /*
  * Hydra Device instance state information.
  * Each instance is dynamically allocated on first attach.
@@ -255,9 +292,6 @@ struct _hxge_t {
 	uint64_t		hxge_debug_level; /* driver state bit flags */
 	kmutex_t		genlock[1];
 	enum hxge_mac_state	hxge_mac_state;
-	ddi_softintr_t		resched_id;	/* reschedule callback */
-	boolean_t		resched_needed;
-	boolean_t		resched_running;
 
 	p_dev_regs_t		dev_regs;
 	hpi_handle_t		hpi_handle;
@@ -280,6 +314,10 @@ struct _hxge_t {
 	uint8_t			ntdc;
 	uint8_t			tdc[HXGE_MAX_TDCS];
 
+	hxge_ring_handle_t	tx_ring_handles[HXGE_MAX_TDCS];
+	hxge_ring_handle_t	rx_ring_handles[HXGE_MAX_RDCS];
+	hxge_ring_group_t	rx_groups[HXGE_MAX_RX_GROUPS];
+
 	hxge_intr_t		hxge_intr_type;
 	hxge_dma_pt_cfg_t 	pt_config;
 	hxge_class_pt_cfg_t 	class_config;
@@ -292,6 +330,7 @@ struct _hxge_t {
 	ether_addr_st		factaddr;	/* factory mac address	    */
 	ether_addr_st		ouraddr;	/* individual address	    */
 	kmutex_t		ouraddr_lock;	/* lock to protect to uradd */
+	hxge_mmac_t		mmac;
 
 	ddi_iblock_cookie_t	interrupt_cookie;
 
@@ -596,8 +635,6 @@ typedef struct _hxge_peu_sys_kstat {
  */
 hxge_status_t hxge_init(p_hxge_t);
 void hxge_uninit(p_hxge_t);
-void hxge_get64(p_hxge_t hxgep, p_mblk_t mp);
-void hxge_put64(p_hxge_t hxgep, p_mblk_t mp);
 
 typedef	void	(*fptrv_t)();
 timeout_id_t hxge_start_timer(p_hxge_t hxgep, fptrv_t func, int msec);

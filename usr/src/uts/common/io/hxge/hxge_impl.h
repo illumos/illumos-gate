@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,10 +139,10 @@ typedef enum  {
 } hxge_rx_block_size_t;
 
 #ifdef TX_ONE_BUF
-#define	TX_BCOPY_MAX 1514
+#define	TX_BCOPY_MAX 512
 #else
-#define	TX_BCOPY_MAX	2048
-#define	TX_BCOPY_SIZE	2048
+#define	TX_BCOPY_MAX	512
+#define	TX_BCOPY_SIZE	512
 #endif
 
 #define	TX_STREAM_MIN 512
@@ -360,7 +360,6 @@ hxge_status_t hxge_pfc_config_tcam_enable(p_hxge_t);
 hxge_status_t hxge_pfc_config_tcam_disable(p_hxge_t);
 hxge_status_t hxge_pfc_ip_class_config(p_hxge_t, tcam_class_t, uint32_t);
 hxge_status_t hxge_pfc_ip_class_config_get(p_hxge_t, tcam_class_t, uint32_t *);
-hxge_status_t hxge_pfc_num_macs_get(p_hxge_t, uint32_t *);
 hxge_status_t hxge_pfc_mac_addrs_get(p_hxge_t hxgep);
 
 
@@ -445,7 +444,10 @@ hxge_status_t hxge_tx_vmac_reset(p_hxge_t hxgep);
 hxge_status_t hxge_rx_vmac_reset(p_hxge_t hxgep);
 hxge_status_t hxge_add_mcast_addr(p_hxge_t, struct ether_addr *);
 hxge_status_t hxge_del_mcast_addr(p_hxge_t, struct ether_addr *);
-hxge_status_t hxge_set_mac_addr(p_hxge_t hxgep, struct ether_addr *addr);
+hxge_status_t hxge_pfc_set_mac_address(p_hxge_t hxgep, uint32_t slot,
+    struct ether_addr *addrp);
+hxge_status_t hxge_pfc_num_macs_get(p_hxge_t hxgep, uint8_t *nmacs);
+hxge_status_t hxge_pfc_clear_mac_address(p_hxge_t, uint32_t slot);
 hxge_status_t hxge_set_promisc(p_hxge_t hxgep, boolean_t on);
 void hxge_save_cntrs(p_hxge_t hxgep);
 int hxge_vmac_set_framesize(p_hxge_t hxgep);
