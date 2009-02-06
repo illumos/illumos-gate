@@ -677,7 +677,7 @@ lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
 	 *
 	 * Notes: "alignedoffset" is "offset" rounded down to nearest
 	 * MAXBSIZE boundary.  "len" is next page boundary of size
-	 * MAXBSIZE after "alignedoffset".
+	 * PAGESIZE after "alignedoffset".
 	 */
 	mapoffset = offset & MAXBOFFSET;
 	alignedoffset = offset - mapoffset;
@@ -687,7 +687,7 @@ lofi_mapped_rdwr(caddr_t bufaddr, offset_t offset, struct buf *bp,
 	do {
 		xfersize = MIN(lsp->ls_vp_comp_size - offset,
 		    MIN(MAXBSIZE - mapoffset, bp->b_resid));
-		len = roundup(mapoffset + xfersize, MAXBSIZE);
+		len = roundup(mapoffset + xfersize, PAGESIZE);
 		mapaddr = segmap_getmapflt(segkmap, lsp->ls_vp,
 		    alignedoffset, MAXBSIZE, 1, srw);
 		/*
@@ -2207,7 +2207,7 @@ lofi_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 			if (ddi_copyout(&vtoc32, (void *)arg,
 			    sizeof (struct vtoc32), flag))
 				return (EFAULT);
-				break;
+			break;
 			}
 
 		case DDI_MODEL_NONE:
