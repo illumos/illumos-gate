@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/hold_page.h>
 
@@ -32,16 +30,26 @@
 #include <sys/hypervisor.h>
 #endif
 
-/*ARGSUSED*/
 int
 plat_hold_page(pfn_t pfn, int lock, page_t **pp_ret)
 {
-#if defined(__xpv)
 	page_t *pp = page_numtopp_nolock(pfn);
 
 	if (pp == NULL)
 		return (PLAT_HOLD_FAIL);
 
+#if !defined(__xpv)
+	/*
+	 * Pages are locked SE_SHARED because some hypervisors
+	 * like xVM ESX reclaim Guest OS memory by locking
+	 * it SE_EXCL so we want to leave these pages alone.
+	 */
+	if (lock == PLAT_HOLD_LOCK) {
+		ASSERT(pp_ret != NULL);
+		if (page_trylock(pp, SE_SHARED) == 0)
+			return (PLAT_HOLD_FAIL);
+	}
+#else	/* __xpv */
 	if (lock == PLAT_HOLD_LOCK) {
 		ASSERT(pp_ret != NULL);
 		if (page_trylock(pp, SE_EXCL) == 0)
@@ -55,19 +63,17 @@ plat_hold_page(pfn_t pfn, int lock, page_t **pp_ret)
 		}
 		return (PLAT_HOLD_FAIL);
 	}
+#endif	/* __xpv */
+
 	if (lock == PLAT_HOLD_LOCK)
 		*pp_ret = pp;
-#endif	/* __xpv */
 
 	return (PLAT_HOLD_OK);
 }
 
-/*ARGSUSED*/
 void
 plat_release_page(page_t *pp)
 {
-#if defined(__xpv)
 	ASSERT((pp != NULL) && PAGE_LOCKED(pp));
 	page_unlock(pp);
-#endif
 }
