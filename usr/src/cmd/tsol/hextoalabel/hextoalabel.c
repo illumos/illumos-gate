@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	hextoalabel - Convert an internal label to its human readable
@@ -38,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stropts.h>
 
 #include <sys/param.h>
 
@@ -116,19 +116,22 @@ main(int argc, char **argv)
 	} else {
 		/* read label from standard input */
 
-		if ((c = read(STDIN_FILENO, hex, sizeof (hex))) < 0) {
+		if ((c = read(STDIN_FILENO, hex, sizeof (hex))) <= 0) {
 
 			perror(gettext("reading hexadecimal label"));
 			exit(1);
 			/*NOTREACHED*/
 		}
-		if (hex[c-1] == '\n') {
-			/* replace '\n' with end of string */
-			hex[c-1] = '\000';
-		} else {
-			/* ensure end of string */
-			hex[c] = '\000';
-		}
+
+		/*
+		 * replace '\n' or (end of buffer) with end of string.
+		 */
+		hex[c-1] = '\0';
+
+		/*
+		 * flush any remaining input past the size of the buffer.
+		 */
+		(void) ioctl(STDIN_FILENO, I_FLUSH, FLUSHR);
 	}
 
 	if (cflg) {

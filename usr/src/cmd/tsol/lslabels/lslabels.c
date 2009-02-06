@@ -20,11 +20,10 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	lslabels - Display all labels dominating the specified label.
@@ -37,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <stropts.h>
 
 #include <sys/param.h>
 
@@ -180,18 +180,21 @@ main(int argc, char **argv)
 		(void) strlcpy(ascii, argv[optind], sizeof (ascii));
 	} else {
 		/* read label from standard input */
-		if ((c = read(STDIN_FILENO, ascii, sizeof (ascii))) < 0) {
+		if ((c = read(STDIN_FILENO, ascii, sizeof (ascii))) <= 0) {
 			perror(gettext("reading ASCII coded label"));
 			exit(1);
 			/*NOTREACHED*/
 		}
-		if (ascii[c-1] == '\n') {
-			/* replace '\n' with end of string */
-			ascii[c-1] = '\0';
-		} else {
-			/* ensure end of string */
-			ascii[c] = '\0';
-		}
+
+		/*
+		 * replace '\n' or (end of buffer) with end of string.
+		 */
+		ascii[c-1] = '\0';
+
+		/*
+		 * flush any remaining input past the size of the buffer.
+		 */
+		(void) ioctl(STDIN_FILENO, I_FLUSH, FLUSHR);
 	}
 
 	if (str_to_label(ascii, &label, MAC_LABEL, L_NO_CORRECTION,
