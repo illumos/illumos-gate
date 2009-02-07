@@ -473,13 +473,15 @@ dmar_blacklisted(caddr_t dmart)
 	if (n < 4 || n % 4 != 0) {
 		cmn_err(CE_WARN,
 		    "invalid Intel IOMMU blacklist: not a multiple of four");
+		ddi_prop_free(blacklist);
 		return (0);
 	}
 
 	for (i = 0; i < n; i += 4) {
 		if (strcmp(blacklist[i], "SMBIOS") == 0 &&
 		    strcmp(blacklist[i+1], mfgr) == 0 &&
-		    strcmp(blacklist[i+2], product) == 0 &&
+		    (blacklist[i+2][0] == '\0' ||
+		    strcmp(blacklist[i+2], product) == 0) &&
 		    (blacklist[i+3][0] == '\0' ||
 		    strcmp(blacklist[i+3], version) == 0)) {
 			ddi_prop_free(blacklist);
@@ -487,7 +489,8 @@ dmar_blacklisted(caddr_t dmart)
 		}
 		if (strcmp(blacklist[i], "DMAR") == 0 &&
 		    strcmp(blacklist[i+1], oemid) == 0 &&
-		    strcmp(blacklist[i+2], oem_tblid) == 0 &&
+		    (blacklist[i+2][0] == '\0' ||
+		    strcmp(blacklist[i+2], oem_tblid) == 0) &&
 		    (blacklist[i+3][0] == '\0' ||
 		    strcmp(blacklist[i+3], oemrev) == 0)) {
 			ddi_prop_free(blacklist);
@@ -603,6 +606,7 @@ detect_dmar(void)
 {
 	int len;
 	char *intel_iommu;
+	char *enable;
 
 	/*
 	 * if "intel-iommu = no" boot property is set,
@@ -617,6 +621,23 @@ detect_dmar(void)
 			return (B_FALSE);
 		}
 		kmem_free(intel_iommu, len);
+	}
+
+	/*
+	 * Check rootnex.conf for enable/disable IOMMU
+	 * Fake up a dev_t since searching global prop list needs it
+	 */
+	if (ddi_prop_lookup_string(
+	    makedevice(ddi_name_to_major("rootnex"), 0), ddi_root_node(),
+	    DDI_PROP_DONTPASS | DDI_PROP_ROOTNEX_GLOBAL,
+	    "intel-iommu", &enable) == DDI_PROP_SUCCESS) {
+		if (strcmp(enable, "false") == 0 || strcmp(enable, "no") == 0) {
+			dcmn_err(CE_CONT,
+			    "\"intel-iommu=no\" set in rootnex.conf\n");
+			ddi_prop_free(enable);
+			return (B_FALSE);
+		}
+		ddi_prop_free(enable);
 	}
 
 	/*
