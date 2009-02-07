@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 # 
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -47,6 +47,7 @@ LINTDIR = $(KBASE)/lintdir
 POFILE = dsstat_all.po
 POFILES = $(OBJS:%.o=%.po)
 LFILE = $(LINTDIR)/dsstat.ln
+ROOTLINK = $(ROOTUSRSBIN)/$(PROG)
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -60,7 +61,7 @@ lint	:=	TARGET= lint
 
 all: $(SUBDIRS) $(PROG)
 
-install: $(SUBDIRS) all $(ROOTPROG)
+install: $(SUBDIRS) all $(ROOTPROG) $(ROOTLINK)
 
 lint:	$(SUBDIRS) lint_SRCS
 
@@ -77,6 +78,9 @@ $(POFILE): $(POFILES)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+$(ROOTLINK): $(ROOTUSRSBIN) $(ROOTPROG)
+	-$(RM) $@; $(LN) $(ROOTPROG) $@
 
 FRC:
 

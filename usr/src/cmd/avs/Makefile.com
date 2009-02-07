@@ -18,13 +18,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/avs/Makefile.com
 #
 CLUSTERDIR = $(ROOT)/usr/cluster
-CLUSTERSBIN = $(CLUSTERDIR)/sbin
+CLUSTERSBINDIR = $(CLUSTERDIR)/sbin
 CLUSTERLIBDIR = $(CLUSTERDIR)/lib
 CLUSTERLIBDSCFGDIR = $(CLUSTERLIBDIR)/dscfg
 CLUSTERLIBSTOPDIR = $(CLUSTERLIBDIR)/stop

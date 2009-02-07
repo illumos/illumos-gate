@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -64,6 +64,8 @@ LINTFLAGS += -erroff=E_SEC_PRINTF_VAR_FMT
 LINTFLAGS += -erroff=E_FUNC_SET_NOT_USED
 POFILE = rdc_all.po
 POFILES = sndradm.po sndrboot.po
+ROOTLIBLINKS = $(ROOTLIB)/sndrd $(ROOTLIB)/sndrsyncd
+ROOTUSRSBINLINKS = $(ROOTUSRSBIN)/sndradm $(ROOTUSRSBIN)/sndrboot
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -77,7 +79,7 @@ lint	:=	TARGET= lint
 
 all: $(SUBDIRS) $(PROG) $(POFILES)
 
-install: $(SUBDIRS) all $(ROOTPROG)
+install: $(SUBDIRS) all $(ROOTPROG) $(ROOTLIBLINKS) $(ROOTUSRSBINLINKS)
 
 lint:	$(SUBDIRS) lint_SRCS
 
@@ -97,6 +99,16 @@ sdbc_ioctl.o: ../sdbc/sdbc_ioctl.c
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+$(ROOTLIBLINKS): $(ROOTLIB) $(ROOTPROG)
+	-$(RM) $(ROOTLIBLINKS);
+	$(LN) $(ROOTBIN)/sndrd $(ROOTLIB)/sndrd;
+	$(LN) $(ROOTBIN)/sndrsyncd $(ROOTLIB)/sndrsyncd
+
+$(ROOTUSRSBINLINKS): $(ROOTUSRSBIN) $(ROOTPROG)
+	-$(RM) $(ROOTUSRSBINLINKS);
+	$(LN) $(ROOTBIN)/sndradm $(ROOTUSRSBIN)/sndradm;
+	$(LN) $(ROOTBIN)/sndrboot $(ROOTUSRSBIN)/sndrboot
 
 FRC:
 

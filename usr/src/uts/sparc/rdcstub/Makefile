@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/rdcstub/Makefile
@@ -44,6 +44,7 @@ OBJECTS		= $(RDCSTUB_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(RDCSTUB_OBJS:%.o=$(LINTS_DIR)/%.ln)
 INC_PATH	+= -I$(ROOT)/usr/include
 ROOTMODULE      = $(USR_DRV_DIR)/$(MODULE)
+ROOTLINK        = $(USR_MISC_DIR)/$(MODULE)
 
 #
 #       Include common rules.
@@ -56,7 +57,7 @@ include $(UTSBASE)/common/avs/Makefile.com
 #
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 
 #
 # lint pass one enforcement
@@ -82,6 +83,9 @@ modlintlib:	$(MODLINTLIB_DEPS)
 clean.lint:	$(CLEAN_LINT_DEPS)
 
 install:	$(INSTALL_DEPS)
+
+$(ROOTLINK):	$(USR_MISC_DIR) $(ROOTMODULE)
+		-$(RM) $@; $(LN) $(ROOTMODULE) $@
 
 #
 #	Include common targets.

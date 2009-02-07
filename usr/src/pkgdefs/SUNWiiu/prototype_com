@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -60,12 +60,16 @@ s none usr/sbin/iiadm=../bin/iiadm
 s none usr/sbin/iicpbmp=../bin/iicpbmp
 s none usr/sbin/iicpshd=../bin/iicpshd
 
+d none etc 0755 root sys
+d none etc/init.d 0755 root sys
+f none etc/init.d/ii.cluster 0744 root bin
+
 d none usr/cluster 0755 root sys
 d none usr/cluster/lib 0755 root bin
 d none usr/cluster/lib/dscfg 0755 root bin
 d none usr/cluster/lib/dscfg/start 0755 root bin
 d none usr/cluster/lib/dscfg/stop 0755 root bin
 d none usr/cluster/sbin 0755 root other
-f none usr/cluster/sbin/ii=etc/init.d/ii.cluster 0744 root bin
+l none usr/cluster/sbin/ii=../../../etc/init.d/ii.cluster
 s none usr/cluster/lib/dscfg/start/05ii=../../../sbin/ii
 s none usr/cluster/lib/dscfg/stop/20ii=../../../sbin/ii

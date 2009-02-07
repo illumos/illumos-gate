@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -41,11 +41,15 @@ ROOTINIT_DPROG2= $(ROOTINIT_D)/ii.cluster
 
 all:	$(SHFILES)
 
-install:  $(ROOTINIT_DPROG) $(ROOTINIT_DPROG2)
+install:  $(ROOTINIT_DPROG) $(ROOTINIT_DPROG2) $(CLUSTERSBINDIR) $(ROOTLIBSVCMETHOD)
 	-$(RM) $(CLUSTERLIBDSCFGSTOPDIR)/20ii
 	-$(RM) $(CLUSTERLIBDSCFGSTARTDIR)/05ii
+	-$(RM) $(CLUSTERSBINDIR)/ii
+	-$(RM) $(ROOTLIBSVCMETHOD)/svc-ii
 	-$(SYMLINK) ../../../sbin/ii $(CLUSTERLIBDSCFGSTOPDIR)/20ii
 	-$(SYMLINK) ../../../sbin/ii $(CLUSTERLIBDSCFGSTARTDIR)/05ii
+	$(LN) $(ROOTINIT_D)/ii $(ROOTLIBSVCMETHOD)/svc-ii
+	$(LN) $(ROOTINIT_D)/ii.cluster $(CLUSTERSBINDIR)/ii
 
 $(ROOTINIT_DPROG): ii
 	$(INS.file) ii

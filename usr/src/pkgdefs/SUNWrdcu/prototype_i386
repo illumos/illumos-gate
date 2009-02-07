@@ -17,7 +17,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -33,14 +33,18 @@
 !include prototype_com
 
 d none usr/kernel/drv/amd64 0755 root sys
-f none usr/kernel/drv/amd64/rdc 0755 root sys
 f none usr/kernel/drv/rdc 0755 root sys
+f none usr/kernel/drv/rdcstub 0755 root sys
+f none usr/kernel/drv/rdcsrv 0755 root sys
+f none usr/kernel/drv/amd64/rdc 0755 root sys
+f none usr/kernel/drv/amd64/rdcstub 0755 root sys
+f none usr/kernel/drv/amd64/rdcsrv 0755 root sys
 
 d none usr/kernel/misc/amd64 0755 root sys
-f none usr/kernel/misc/rdcstub=usr/kernel/drv/rdcstub 0755 root sys
-f none usr/kernel/misc/amd64/rdcstub=usr/kernel/drv/amd64/rdcstub 0755 root sys
-f none usr/kernel/misc/rdcsrv=usr/kernel/drv/rdcsrv 0755 root sys
-f none usr/kernel/misc/amd64/rdcsrv=usr/kernel/drv/amd64/rdcsrv 0755 root sys
+l none usr/kernel/misc/rdcstub=../drv/rdcstub
+l none usr/kernel/misc/amd64/rdcstub=../../drv/amd64/rdcstub
+l none usr/kernel/misc/rdcsrv=../drv/rdcsrv
+l none usr/kernel/misc/amd64/rdcsrv=../../drv/amd64/rdcsrv
 
 d none usr/lib/mdb/kvm/amd64 0755 root sys
 f none usr/lib/mdb/kvm/rdc.so 0555 root sys

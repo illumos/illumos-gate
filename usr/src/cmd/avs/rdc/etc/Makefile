@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 include ../../../Makefile.cmd
@@ -44,11 +44,17 @@ ROOTINIT_DPROG3 = $(ROOTINIT_D)/$(PROG3)
 
 all:	$(SHFILES) $(ETCFILES) $(INITFILES)
 
-install: $(ROOTINIT_DPROG1) $(ROOTINIT_DPROG2) $(ROOTINIT_DPROG3)
+install: $(ROOTINIT_DPROG1) $(ROOTINIT_DPROG2) $(ROOTINIT_DPROG3) $(ROOTLIBSVCMETHOD) $(CLUSTERSBINDIR)
 	-$(RM) $(CLUSTERLIBDSCFGSTOPDIR)/15rdc
 	-$(RM) $(CLUSTERLIBDSCFGSTARTDIR)/10rdc
+	-$(RM) $(ROOTLIBSVCMETHOD)/svc-rdc
+	-$(RM) $(ROOTLIBSVCMETHOD)/svc-rdcsyncd
+	-$(RM) $(CLUSTERSBINDIR)/rdc
 	-$(SYMLINK) ../../../sbin/rdc $(CLUSTERLIBDSCFGSTOPDIR)/15rdc
 	-$(SYMLINK) ../../../sbin/rdc $(CLUSTERLIBDSCFGSTARTDIR)/10rdc
+	$(LN) $(ROOTINIT_D)/rdc $(ROOTLIBSVCMETHOD)/svc-rdc
+	$(LN) $(ROOTINIT_D)/rdcfinish $(ROOTLIBSVCMETHOD)/svc-rdcsyncd
+	$(LN) $(ROOTINIT_D)/rdc.cluster $(CLUSTERSBINDIR)/rdc
 
 $(ROOTINIT_DPROG1): $(PROG1)
 	$(INS.file) $(PROG1)

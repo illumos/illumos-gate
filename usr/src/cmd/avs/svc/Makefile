@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -33,6 +33,8 @@ clean	:=	TARGET= clean
 clobber	:=	TARGET= clobber
 lint	:=	TARGET= lint
 
+ROOTSVCSYSFILES = $(XML:%=$(ROOTSVCSYSTEM)/%)
+
 .KEEP_STATE:
 
 .PARALLEL: $(OBJS)
@@ -41,14 +43,14 @@ all:	$(SHFILES)
 
 lint:
 
-install: all $(ROOTLIBSHFILES)
+install: all $(ROOTLIBSHFILES) $(ROOTSVCSYSFILES)
 
 clean:
 	$(RM) *.xml
 
 $(SHFILES): $(XML:%=manifest/%)
-	rm -f  $(@F)
-	cp  $(@F:%=manifest/%) .
+	$(RM) $(@F)
+	$(CP) $(@F:%=manifest/%) .
 
 OWNER = root
 GROUP = sys
@@ -56,6 +58,10 @@ FILEMODE = 0444
 
 $(ROOTLIBSHFILES): $(SHFILES)
 	$(INS.file)  $(@F)
+
+$(ROOTSVCSYSFILES): $(SHFILES)
+	-$(RM) $@; $(LN) $(@F:%=$(ROOTLIB)/%) $@
+
 FRC:
 
 include ../../Makefile.targ

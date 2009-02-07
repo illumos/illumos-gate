@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -45,6 +45,8 @@ LINTFLAGS += -Xa -n -s -x -m -u -Dlint -errhdr=%user -DDEBUG
 LINTDIR = $(KBASE)/lintdir
 POFILE = nsctl_all.po
 LFILE = $(LINTDIR)/nsctl.ln
+ROOTLIBLINK = $(ROOTLIB)/nskernd
+ROOTSBINLINK = $(ROOTUSRSBIN)/nscadm
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -61,7 +63,7 @@ nskernd	:=	LDLIBS += $(NSKERND_LDLIBS)
 
 all: $(PROG) $(POFILES)
 
-install: all $(ROOTPROG) $(ROOTBIN)/nskernd
+install: all $(ROOTPROG) $(ROOTBIN)/nskernd $(ROOTLIBLINK) $(ROOTSBINLINK)
 
 lint:	lint_SRCS
 
@@ -75,5 +77,11 @@ $(PROG): $$(POBJS)
 $(POFILE): $(POFILES)
 	$(RM) $@
 	$(CAT) $(POFILES) > $@
+
+$(ROOTLIBLINK): $(ROOTLIB) $(ROOTBIN)/nskernd
+	-$(RM) $@; $(LN) $(ROOTBIN)/nskernd $@
+
+$(ROOTSBINLINK): $(ROOTUSRSBIN) $(ROOTPROG)
+	-$(RM) $@; $(LN) $(ROOTBIN)/nscadm $@
 
 include	../../Makefile.targ

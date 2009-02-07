@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -39,17 +39,25 @@ i depend
 i i.manifest
 i r.manifest
 
+d none etc 0755 root sys
+d none etc/init.d 0755 root sys
+f none etc/init.d/sv 0744 root bin
+
 d none lib 0755 root bin
 d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
-f none lib/svc/method/svc-sv=etc/init.d/sv 0744 root bin
+l none lib/svc/method/svc-sv=../../../etc/init.d/sv
 
 d none kernel 0755 root sys
 d none kernel/kmdb 755 root sys
+
+d none usr 0755 root sys
+d none usr/lib 0755 root bin
+f none usr/lib/nws_sv.xml 0444 root sys
 
 # SMF service
 d none var 0755 root sys
 d none var/svc 0755 root sys
 d none var/svc/manifest 0755 root sys
 d none var/svc/manifest/system 0755 root sys
-f manifest var/svc/manifest/system/nws_sv.xml=usr/lib/nws_sv.xml 0444 root sys
+l manifest var/svc/manifest/system/nws_sv.xml=../../../../usr/lib/nws_sv.xml

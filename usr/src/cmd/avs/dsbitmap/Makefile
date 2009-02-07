@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -39,6 +39,7 @@ CFLAGS += -v
 LDLIBS += -lunistat -ladm
 LINTFLAGS +=	-Xa -n -s -x -m -u -Dlint -errhdr=%user
 LINTFLAGS +=	-erroff=E_SEC_PRINTF_VAR_FMT
+ROOTLINK = $(ROOTUSRSBIN)/$(PROG)
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -52,7 +53,7 @@ lint	:=	TARGET= lint
 
 all:	$(PROG)
 
-install: all $(ROOTPROG)
+install: all $(ROOTPROG) $(ROOTLINK)
 
 lint:	lint_SRCS
 
@@ -65,6 +66,9 @@ $(PROG): $$(POBJS)
 
 check:	$(PROG).c
 	$(CSTYLE) -pP $(SRCS:%=%)
+
+$(ROOTLINK): $(ROOTBIN)/$(PROG) $(ROOTUSRSBIN)
+	-$(RM) $@; $(LN) $(ROOTBIN)/$(PROG) $@
 
 FRC:
 

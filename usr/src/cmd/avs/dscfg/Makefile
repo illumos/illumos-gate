@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -47,6 +47,8 @@ LINTFLAGS += -erroff=E_FUNC_RET_MAYBE_IGNORED2
 LINTFLAGS += -erroff=E_FUNC_RET_ALWAYS_IGNOR2
 LINTDIR = $(KBASE)/lintdir
 LFILE = $(LINTDIR)/dscfg.ln
+ROOTLINK = $(ROOTUSRSBIN)/$(PROG)
+ROOTSHLINK = $(ROOTUSRSBIN)/$(SHFILES)
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -56,7 +58,7 @@ lint	:=	TARGET= lint
 
 all: $(SUBDIRS) $(PROG) $(SHFILES)
 
-install: $(SUBDIRS) all $(ROOTSHFILES) $(ROOTPROG)
+install: $(SUBDIRS) all $(ROOTSHFILES) $(ROOTPROG) $(ROOTLINK) $(ROOTSHLINK)
 
 lint:	$(SUBDIRS) lint_PROG
 
@@ -65,6 +67,12 @@ clean:	$(SUBDIRS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+$(ROOTLINK):	$(ROOTUSRSBIN) $(ROOTPROG)
+	-$(RM) $@; $(LN) $(ROOTPROG) $@
+
+$(ROOTSHLINK):	$(ROOTUSRSBIN) $(ROOTSHFILES)
+	-$(RM) $@; $(LN) $(ROOTSHFILES) $@
 
 FRC:
 

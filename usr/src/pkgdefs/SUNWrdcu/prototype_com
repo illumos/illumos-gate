@@ -17,7 +17,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -51,12 +51,22 @@ f none usr/lib/librdc.so.1 0755 root bin
 d none usr/lib/mdb 0755 root sys
 d none usr/lib/mdb/kvm 0755 root sys
 
-f none usr/lib/sndrd=usr/bin/sndrd 0555 root bin
-f none usr/lib/sndrsyncd=usr/bin/sndrsyncd 0555 root bin
+d none usr/bin 0755 root bin
+f none usr/bin/sndrd 0555 root bin
+f none usr/bin/sndrsyncd 0555 root bin
+f none usr/bin/sndrboot 0555 root bin
+f none usr/bin/sndradm 0555 root bin
 
 d none usr/sbin 0755 root bin
-f none usr/sbin/sndrboot=usr/bin/sndrboot 0555 root bin
-f none usr/sbin/sndradm=usr/bin/sndradm 0555 root bin
+l none usr/sbin/sndrboot=../bin/sndrboot 0555 root bin
+l none usr/sbin/sndradm=../bin/sndradm 0555 root bin
+
+l none usr/lib/sndrd=../bin/sndrd
+l none usr/lib/sndrsyncd=../bin/sndrsyncd
+
+d none etc 0755 root sys
+d none etc/init.d 0755 root sys
+f none etc/init.d/rdc.cluster 0744 root bin
 
 d none usr/cluster 0755 root sys
 d none usr/cluster/lib 0755 root bin
@@ -64,6 +74,6 @@ d none usr/cluster/lib/dscfg 0755 root bin
 d none usr/cluster/lib/dscfg/start 0755 root bin
 d none usr/cluster/lib/dscfg/stop 0755 root bin
 d none usr/cluster/sbin 0755 root other
-f none usr/cluster/sbin/rdc=etc/init.d/rdc.cluster 0744 root bin
+l none usr/cluster/sbin/rdc=../../../etc/init.d/rdc.cluster
 s none usr/cluster/lib/dscfg/start/10rdc=../../../sbin/rdc
 s none usr/cluster/lib/dscfg/stop/15rdc=../../../sbin/rdc

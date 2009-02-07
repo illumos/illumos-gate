@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -47,6 +47,8 @@ CFLAGS += -v
 LINTFLAGS += -erroff=E_NAME_USED_NOT_DEF2
 LINTFLAGS += -erroff=E_SEC_SCANF_UNBOUNDED_COPY
 LINTFLAGS += -erroff=E_SEC_PRINTF_VAR_FMT
+ROOTLINK1 = $(ROOTUSRSBIN)/svadm
+ROOTLINK2 = $(ROOTUSRSBIN)/svboot
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -60,7 +62,7 @@ lint	:=	TARGET= lint
 
 all:	$(SUBDIRS) $(PROG) $(POFILES) 
 
-install: $(SUBDIRS) all $(ROOTPROG)
+install: $(SUBDIRS) all $(ROOTPROG) $(ROOTLINK1) $(ROOTLINK2)
 
 lint:	$(SUBDIRS) $(LPROG)
 
@@ -80,6 +82,12 @@ $(SUBDIRS):	FRC
 
 $(LPROG):
 	$(LINT.c) $(@:%.li=%.c) $(LDLIBS)
+
+$(ROOTLINK1):	$(ROOTUSRSBIN) $(ROOTPROG)
+	-$(RM) $@; $(LN) $(ROOTBIN)/svadm $@
+
+$(ROOTLINK2):	$(ROOTUSRSBIN) $(ROOTPROG)
+	-$(RM) $@; $(LN) $(ROOTBIN)/svboot $@
 
 FRC:
 

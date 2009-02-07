@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -68,6 +68,7 @@ LINTFLAGS +=	-erroff=E_SEC_SPRINTF_UNBOUNDED_COPY
 LINTFLAGS +=	-erroff=E_SEC_SCANF_UNBOUNDED_COPY
 LINTFLAGS +=	-erroff=E_SEC_FORBIDDEN_WARN_ASCFTIME
 LINTFLAGS +=	-DDEBUG
+ROOTLINK = $(ROOTUSRSBIN)/scmadm
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -81,7 +82,7 @@ lint	:=	TARGET= lint
 
 all:	$(SUBDIRS) $(PROG) $(POFILE)
 
-install: $(SUBDIRS) all $(ROOTPROG)
+install: $(SUBDIRS) all $(ROOTPROG) $(ROOTLINK)
 
 lint:	$(SUBDIRS) lint_SRCS
 
@@ -97,6 +98,9 @@ $(PROG):	$$(POBJS)
 
 $(SUBDIRS):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+$(ROOTLINK): $(ROOTUSRSBIN) $(ROOTBIN)/scmadm
+	-$(RM) $@; $(LN) $(ROOTBIN)/scmadm $@
 
 include ../../Makefile.targ
 

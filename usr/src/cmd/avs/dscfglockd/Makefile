@@ -18,7 +18,7 @@
 # CDDL HEADER END
 #
 # 
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -46,6 +46,7 @@ LINTFLAGS += -DDEBUG -erroff=E_SEC_SCANF_UNBOUNDED_COPY
 LINTDIR = $(KBASE)/lintdir
 POFILE = dscfglockd_all.po
 LFILE = $(LINTDIR)/rdc.ln
+ROOTLINK = $(ROOTLIB)/dscfglockd
 
 all	:=	TARGET= all
 install	:=	TARGET= install
@@ -59,7 +60,7 @@ lint	:=	TARGET= lint
 
 all: $(SUBDIRS) $(PROG) $(POFILES)
 
-install: $(SUBDIRS) all $(ROOTPROG)
+install: $(SUBDIRS) all $(ROOTPROG) $(ROOTLINK)
 
 lint:	$(SUBDIRS) lint_SRCS
 
@@ -73,6 +74,9 @@ $(POFILE): $(POFILES)
 $(PROG):	$$(POBJS)
 	$(LINK.c) $(POBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
+
+$(ROOTLINK):	$(ROOTLIB) $(ROOTBIN)/dscfglockd
+	-$(RM) $@; $(LN) $(ROOTBIN)/dscfglockd $@
 
 FRC:
 

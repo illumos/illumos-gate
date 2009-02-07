@@ -18,12 +18,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/ns/sdbc/etc/Makefile
 
 include ../../../Makefile.cmd
+include ../../Makefile.com
 
 INITPROGS = scm
 BINPROGS = dscfg_reconfigure.cluster
@@ -45,7 +46,11 @@ $(ROOTBINPROGS) := FILEMODE= 555
 
 all:	$(SHFILES) $(INITPROGS) $(BINPROGS)
 
-install: $(ROOTBINPROGS) $(ROOTINITPROGS)
+install: $(ROOTBINPROGS) $(ROOTINITPROGS) $(ROOTLIBSVCMETHOD) $(CLUSTERSBINDIR)
+	-$(RM) $(ROOTLIBSVCMETHOD)/svc-scm
+	-$(RM) $(CLUSTERSBINDIR)/dscfg_reconfigure
+	$(LN) $(ROOTINIT_D)/scm $(ROOTLIBSVCMETHOD)/svc-scm
+	$(LN) $(ROOTBIN)/$(BINPROGS) $(CLUSTERSBINDIR)/dscfg_reconfigure
 
 $(ROOTINIT_D)/%: %
 	$(INS.file)

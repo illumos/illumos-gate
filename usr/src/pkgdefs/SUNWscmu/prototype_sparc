@@ -17,7 +17,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -43,4 +43,4 @@ f none usr/kernel/misc/sparcv9/spuni 0755 root sys
 # /usr/lib/mdb directory structure
 d none usr/lib/mdb/kvm/sparcv9 0755 root sys
 f none usr/lib/mdb/kvm/sparcv9/nsctl.so 0555 root sys
-f none usr/lib/mdb/kvm/sparcv9/sdbc.so=usr/lib/mdb/kvm/sparcv9/sdbc.so 0555 root sys
+f none usr/lib/mdb/kvm/sparcv9/sdbc.so 0555 root sys
