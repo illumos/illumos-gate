@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <sys/types.h>
@@ -40,6 +37,94 @@
 
 #include <stdio.h>
 
+struct sobj_type_info {
+	int		sobj_type;
+	const char	*sobj_name;
+	const char	*sobj_ops_name;
+} sobj_types[] = {
+	{ SOBJ_MUTEX,	"mutex",	"mutex_sobj_ops" },
+	{ SOBJ_RWLOCK,	"rwlock",	"rw_sobj_ops" },
+	{ SOBJ_CV,	"cv",		"cv_sobj_ops" },
+	{ SOBJ_SEMA,	"sema",		"sema_sobj_ops" },
+	{ SOBJ_USER,	"user",		"lwp_sobj_ops" },
+	{ SOBJ_USER_PI,	"user_pi",	"lwp_sobj_pi_ops" },
+	{ SOBJ_SHUTTLE,	"shuttle",	"shuttle_sobj_ops" }
+};
+#define	NUM_SOBJ_TYPES (sizeof (sobj_types) / sizeof (*sobj_types))
+
+void
+sobj_type_to_text(int type, char *out, size_t sz)
+{
+	int idx;
+	if (type == SOBJ_NONE) {
+		mdb_snprintf(out, sz, "<none>");
+		return;
+	}
+
+	for (idx = 0; idx < NUM_SOBJ_TYPES; idx++) {
+		struct sobj_type_info *info = &sobj_types[idx];
+		if (info->sobj_type == type) {
+			mdb_snprintf(out, sz, "%s",
+			    sobj_types[idx].sobj_name);
+			return;
+		}
+	}
+	mdb_snprintf(out, sz, "<unk:%02x>", type);
+}
+
+void
+sobj_ops_to_text(uintptr_t addr, char *out, size_t sz)
+{
+	sobj_ops_t ops;
+
+	if (addr == 0) {
+		mdb_snprintf(out, sz, "<none>");
+		return;
+	}
+	if (mdb_vread(&ops, sizeof (ops), addr) == -1) {
+		mdb_snprintf(out, sz, "??", ops.sobj_type);
+		return;
+	}
+
+	sobj_type_to_text(ops.sobj_type, out, sz);
+}
+
+int
+sobj_text_to_ops(const char *name, uintptr_t *sobj_ops_out)
+{
+	int idx;
+	GElf_Sym sym;
+
+	for (idx = 0; idx < NUM_SOBJ_TYPES; idx++) {
+		struct sobj_type_info *info = &sobj_types[idx];
+		if (strcasecmp(info->sobj_name, name) == 0) {
+			if (mdb_lookup_by_name(info->sobj_ops_name,
+			    &sym) == -1) {
+				mdb_warn("unable to find symbol \"%s\"",
+				    info->sobj_ops_name);
+				return (-1);
+			}
+			*sobj_ops_out = (uintptr_t)sym.st_value;
+			return (0);
+		}
+	}
+
+	mdb_warn("sobj type \"%s\" unknown\n", name);
+	return (-1);
+}
+
+void
+sobj_type_walk(void (*cbfunc)(int, const char *, const char *, void *),
+    void *cbarg)
+{
+	int idx;
+
+	for (idx = 0; idx < NUM_SOBJ_TYPES; idx++) {
+		struct sobj_type_info *info = &sobj_types[idx];
+		cbfunc(info->sobj_type, info->sobj_name, info->sobj_ops_name,
+		    cbarg);
+	}
+}
 
 typedef struct wchan_walk_data {
 	caddr_t *ww_seen;

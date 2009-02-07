@@ -19,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef	_KMEM_H
 #define	_KMEM_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 
@@ -114,6 +112,7 @@ extern int whatthread(uintptr_t, uint_t, int, const mdb_arg_t *);
  * utility functions for the rest of genunix
  */
 extern void kmem_init(void);
+extern void kmem_statechange(void);
 extern int kmem_get_magsize(const kmem_cache_t *);
 extern size_t kmem_estimate_allocated(uintptr_t, const kmem_cache_t *);
 

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -305,6 +305,60 @@ dispq_walk_fini(mdb_walk_state_t *wsp)
 	mdb_free(wsp->walk_data, sizeof (dispq_walk_t));
 }
 
+struct thread_state {
+	uint_t ts_state;
+	const char *ts_name;
+} thread_states[] = {
+	{ TS_FREE,	"free" },
+	{ TS_SLEEP,	"sleep" },
+	{ TS_RUN,	"run" },
+	{ TS_ONPROC,	"onproc" },
+	{ TS_ZOMB,	"zomb" },
+	{ TS_STOPPED,	"stopped" },
+	{ TS_WAIT,	"wait" }
+};
+#define	NUM_THREAD_STATES (sizeof (thread_states) / sizeof (*thread_states))
+
+void
+thread_state_to_text(uint_t state, char *out, size_t out_sz)
+{
+	int idx;
+
+	for (idx = 0; idx < NUM_THREAD_STATES; idx++) {
+		struct thread_state *tsp = &thread_states[idx];
+		if (tsp->ts_state == state) {
+			mdb_snprintf(out, out_sz, "%s", tsp->ts_name);
+			return;
+		}
+	}
+	mdb_snprintf(out, out_sz, "inval/%02x", state);
+}
+
+int
+thread_text_to_state(const char *state, uint_t *out)
+{
+	int idx;
+
+	for (idx = 0; idx < NUM_THREAD_STATES; idx++) {
+		struct thread_state *tsp = &thread_states[idx];
+		if (strcasecmp(tsp->ts_name, state) == 0) {
+			*out = tsp->ts_state;
+			return (0);
+		}
+	}
+	return (-1);
+}
+
+void
+thread_walk_states(void (*cbfunc)(uint_t, const char *, void *), void *cbarg)
+{
+	int idx;
+
+	for (idx = 0; idx < NUM_THREAD_STATES; idx++) {
+		struct thread_state *tsp = &thread_states[idx];
+		cbfunc(tsp->ts_state, tsp->ts_name, cbarg);
+	}
+}
 
 #define	TF_INTR		0x01
 #define	TF_PROC		0x02
@@ -333,7 +387,6 @@ thread(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	uint_t		oflags = 0;
 	uint_t		fflag = FALSE;
 	int		first;
-	char		*state;
 	char		stbuf[20];
 
 	/*
@@ -439,39 +492,14 @@ thread(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* priority/interrupt information */
 	if (oflags & TF_INTR) {
 		SPACER();
-		switch (t.t_state) {
-		case TS_FREE:
-			state = "free";
-			break;
-		case TS_SLEEP:
-			state = "sleep";
-			break;
-		case TS_RUN:
-			state = "run";
-			break;
-		case TS_ONPROC:
-			state = "onproc";
-			break;
-		case TS_ZOMB:
-			state = "zomb";
-			break;
-		case TS_STOPPED:
-			state = "stopped";
-			break;
-		case TS_WAIT:
-			state = "wait";
-			break;
-		default:
-			(void) mdb_snprintf(stbuf, 11, "inval/%02x", t.t_state);
-			state = stbuf;
-		}
+		thread_state_to_text(t.t_state, stbuf, sizeof (stbuf));
 		if (t.t_intr == NULL) {
 			mdb_printf(" %-8s %4x %4x %4x %5d %5d %3d %?s",
-			    state, t.t_flag, t.t_proc_flag, t.t_schedflag,
+			    stbuf, t.t_flag, t.t_proc_flag, t.t_schedflag,
 			    t.t_pri, t.t_epri, t.t_pil, "n/a");
 		} else {
 			mdb_printf(" %-8s %4x %4x %4x %5d %5d %3d %?p",
-			    state, t.t_flag, t.t_proc_flag, t.t_schedflag,
+			    stbuf, t.t_flag, t.t_proc_flag, t.t_schedflag,
 			    t.t_pri, t.t_epri, t.t_pil, t.t_intr);
 		}
 	}

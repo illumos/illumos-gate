@@ -4298,6 +4298,10 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "findstack", ":[-v]", "find kernel thread stack", findstack },
 	{ "findstack_debug", NULL, "toggle findstack debugging",
 		findstack_debug },
+	{ "stacks", "?[-afiv] [-c func] [-C func] [-s sobj | -S sobj] "
+		"[-t tstate | -T tstate]",
+		"print unique kernel thread stacks",
+		stacks, stacks_help },
 
 	/* from irm.c */
 	{ "irmpools", NULL, "display interrupt pools", irmpools_dcmd },
@@ -4874,13 +4878,26 @@ static const mdb_walker_t walkers[] = {
 
 static const mdb_modinfo_t modinfo = { MDB_API_VERSION, dcmds, walkers };
 
+/*ARGSUSED*/
+static void
+genunix_statechange_cb(void *ignored)
+{
+	/*
+	 * Force ::findleaks and ::stacks to let go any cached state.
+	 */
+	leaky_cleanup(1);
+	stacks_cleanup(1);
+
+	kmem_statechange();	/* notify kmem */
+}
+
 const mdb_modinfo_t *
 _mdb_init(void)
 {
-	if (findstack_init() != DCMD_OK)
-		return (NULL);
-
 	kmem_init();
+
+	(void) mdb_callback_add(MDB_CALLBACK_STCHG,
+	    genunix_statechange_cb, NULL);
 
 	return (&modinfo);
 }
@@ -4888,8 +4905,6 @@ _mdb_init(void)
 void
 _mdb_fini(void)
 {
-	/*
-	 * Force ::findleaks to let go any cached memory
-	 */
 	leaky_cleanup(1);
+	stacks_cleanup(1);
 }

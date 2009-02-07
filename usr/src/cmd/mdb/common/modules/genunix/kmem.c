@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_param.h>
 #include <mdb/mdb_modapi.h>
@@ -43,7 +41,6 @@
 #include "combined.h"
 #include "dist.h"
 #include "kmem.h"
-#include "leaky.h"
 #include "list.h"
 
 #define	dprintf(x) if (mdb_debug_level) { \
@@ -4256,13 +4253,10 @@ kmem_ready_check(void)
 	return (ready);
 }
 
-/*ARGSUSED*/
-static void
-kmem_statechange_cb(void *arg)
+void
+kmem_statechange(void)
 {
 	static int been_ready = 0;
-
-	leaky_cleanup(1);	/* state changes invalidate leaky state */
 
 	if (been_ready)
 		return;
@@ -4295,8 +4289,7 @@ kmem_init(void)
 		return;
 	}
 
-	(void) mdb_callback_add(MDB_CALLBACK_STCHG, kmem_statechange_cb, NULL);
-	kmem_statechange_cb(NULL);
+	kmem_statechange();
 }
 
 typedef struct whatthread {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,10 @@ int threadlist(uintptr_t, uint_t, int, const mdb_arg_t *);
 void threadlist_help(void);
 int stackinfo(uintptr_t, uint_t, int, const mdb_arg_t *);
 void stackinfo_help(void);
+
+void thread_state_to_text(uint_t, char *, size_t);
+int thread_text_to_state(const char *, uint_t *);
+void thread_walk_states(void (*)(uint_t, const char *, void *), void *);
 
 #ifdef	__cplusplus
 }
