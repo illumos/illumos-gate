@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -7979,6 +7979,17 @@ st_set_devconfig_page(struct scsi_tape *un, int compression_on)
 	ST_FUNC(ST_DEVINFO, st_set_devconfig_page);
 
 	ASSERT(mutex_owned(ST_MUTEX));
+
+	/*
+	 * if the mode sense page is not the correct one, load the correct one.
+	 */
+	if (un->un_mspl->page_code != ST_DEV_CONFIG_PAGE) {
+		rval = st_gen_mode_sense(un, st_uscsi_cmd, ST_DEV_CONFIG_PAGE,
+		    un->un_mspl, sizeof (struct seq_mode));
+		if (rval)
+			return (rval);
+	}
+
 	/*
 	 * Figure what to set compression flag to.
 	 */
@@ -7998,7 +8009,7 @@ st_set_devconfig_page(struct scsi_tape *un, int compression_on)
 	 * And if this not the first time we has tried.
 	 */
 	if ((cflag == un->un_mspl->page.dev.comp_alg) &&
-	    (un->un_comp_page == ST_DEV_DATACOMP_PAGE)) {
+	    (un->un_comp_page == ST_DEV_CONFIG_PAGE)) {
 		return (EALREADY);
 	}
 
@@ -8034,6 +8045,17 @@ st_set_datacomp_page(struct scsi_tape *un, int compression_on)
 	ST_FUNC(ST_DEVINFO, st_set_datacomp_page);
 
 	ASSERT(mutex_owned(ST_MUTEX));
+
+	/*
+	 * if the mode sense page is not the correct one, load the correct one.
+	 */
+	if (un->un_mspl->page_code != ST_DEV_DATACOMP_PAGE) {
+		rval = st_gen_mode_sense(un, st_uscsi_cmd, ST_DEV_DATACOMP_PAGE,
+		    un->un_mspl, sizeof (struct seq_mode));
+		if (rval)
+			return (rval);
+	}
+
 	/*
 	 * If drive is not capable of compression (at this time)
 	 * return EALREADY so caller doesn't think that this page
@@ -8106,14 +8128,14 @@ st_modesense(struct scsi_tape *un)
 
 	case ST_DEV_DATACOMP_PAGE | ST_DEV_CONFIG_PAGE:
 		if (un->un_dp->options & ST_MODE_SEL_COMP) {
-			page = ST_DEV_CONFIG_PAGE;
+			page = ST_DEV_DATACOMP_PAGE;
 			rval = st_gen_mode_sense(un, st_uscsi_cmd, page,
 			    un->un_mspl, sizeof (struct seq_mode));
 			if (rval == 0 && un->un_mspl->page_code == page) {
 				un->un_comp_page = page;
 				break;
 			}
-			page = ST_DEV_DATACOMP_PAGE;
+			page = ST_DEV_CONFIG_PAGE;
 			rval = st_gen_mode_sense(un, st_uscsi_cmd, page,
 			    un->un_mspl, sizeof (struct seq_mode));
 			if (rval == 0 && un->un_mspl->page_code == page) {
@@ -9030,6 +9052,8 @@ st_make_uscsi_cmd(struct scsi_tape *un, struct uscsi_cmd *ucmd,
 		pkt->pkt_flags |= FLAG_SILENT;
 	}
 
+	(void) scsi_uscsi_pktinit(ucmd, pkt);
+
 	pkt->pkt_time = ucmd->uscsi_timeout;
 	if (bp == un->un_recov_buf) {
 		pkt->pkt_comp = st_recov_cb;
@@ -9645,17 +9669,41 @@ st_intr(struct scsi_pkt *pkt)
 	/*
 	 * check for undetected path failover.
 	 */
-	if ((un->un_multipath) &&
-	    (un->un_last_path_instance != pkt->pkt_path_instance)) {
-		if (un->un_state > ST_STATE_OPENING) {
-			ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
-			    "Failover detected, action is %s\n",
-			    errstatenames[action]);
-			if (action == COMMAND_DONE) {
-				action = PATH_FAILED;
-			}
+	if (un->un_multipath) {
+
+		struct uscsi_cmd *ucmd = BP_UCMD(bp);
+		int pkt_valid;
+
+		if (ucmd) {
+			/*
+			 * Also copies path instance to the uscsi structure.
+			 */
+			pkt_valid = scsi_uscsi_pktfini(pkt, ucmd);
+
+			/*
+			 * scsi_uscsi_pktfini() zeros pkt_path_instance.
+			 */
+			pkt->pkt_path_instance = ucmd->uscsi_path_instance;
+		} else {
+			pkt_valid = scsi_pkt_allocated_correctly(pkt);
 		}
-		un->un_last_path_instance = pkt->pkt_path_instance;
+
+		/*
+		 * If the scsi_pkt was not allocated correctly the
+		 * pkt_path_instance is not even there.
+		 */
+		if ((pkt_valid != 0) &&
+		    (un->un_last_path_instance != pkt->pkt_path_instance)) {
+			if (un->un_state > ST_STATE_OPENING) {
+				ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
+				    "Failover detected, action is %s\n",
+				    errstatenames[action]);
+				if (action == COMMAND_DONE) {
+					action = PATH_FAILED;
+				}
+			}
+			un->un_last_path_instance = pkt->pkt_path_instance;
+		}
 	}
 
 	/*
@@ -10816,6 +10864,8 @@ common:
 	case KEY_MEDIUM_ERROR:
 		ST_DO_ERRSTATS(un, st_harderrs);
 		severity = SCSI_ERR_FATAL;
+		un->un_pos.pmode = invalid;
+		un->un_running.pmode = invalid;
 check_keys:
 		/*
 		 * attempt to process the keys in the presence of
@@ -16696,6 +16746,9 @@ st_recov_ret(struct scsi_tape *un, st_err_info *errinfo, errstate err)
 		    "st_recov_ret with unhandled errstat %d\n", err);
 		/* FALLTHROUGH */
 	case COMMAND_DONE_ERROR:
+		un->un_pos.pmode = invalid;
+		un->un_running.pmode = invalid;
+		/* FALLTHROUGH */
 	case COMMAND_DONE_EACCES:
 		ST_DO_KSTATS(bp, kstat_waitq_exit);
 		ST_DO_ERRSTATS(un, st_transerrs);
@@ -16755,7 +16808,13 @@ st_recover(void *arg)
 	 * any data it might have in the buffer.
 	 */
 	if (rval == 0 && rcv->cmd_attrib->chg_tape_data) {
-		(void) st_rcmd(un, SCMD_WRITE_FILE_MARK, 0, SYNC_CMD);
+		rval = st_rcmd(un, SCMD_WRITE_FILE_MARK, 0, SYNC_CMD);
+		if (rval) {
+			ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
+			    "st_recover failed to flush, returned %d\n", rval);
+			st_recov_ret(un, errinfo, COMMAND_DONE_ERROR);
+			return;
+		}
 	}
 	switch (errinfo->ei_error_type) {
 	case ATTEMPT_RETRY:
@@ -16950,14 +17009,16 @@ st_recov_cb(struct scsi_pkt *pkt)
 	/*
 	 * check for undetected path failover.
 	 */
-	if ((un->un_multipath) &&
-	    (un->un_last_path_instance != pkt->pkt_path_instance)) {
-		if (un->un_state > ST_STATE_OPENING) {
-			ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
-			    "Failover detected in recovery, action is %s\n",
-			    errstatenames[action]);
+	if (un->un_multipath) {
+		if (scsi_pkt_allocated_correctly(pkt) &&
+		    (un->un_last_path_instance != pkt->pkt_path_instance)) {
+			if (un->un_state > ST_STATE_OPENING) {
+				ST_RECOV(ST_DEVINFO, st_label, CE_NOTE,
+				    "Failover detected in recovery, action is "
+				    "%s\n", errstatenames[action]);
+			}
+			un->un_last_path_instance = pkt->pkt_path_instance;
 		}
-		un->un_last_path_instance = pkt->pkt_path_instance;
 	}
 
 	ST_RECOV(ST_DEVINFO, st_label, CE_WARN,
