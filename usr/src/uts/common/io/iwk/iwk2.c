@@ -337,6 +337,7 @@ static int	iwk_m_getprop(void *arg, const char *pr_name,
 static void	iwk_destroy_locks(iwk_sc_t *sc);
 static int	iwk_send(ieee80211com_t *ic, mblk_t *mp, uint8_t type);
 static void	iwk_thread(iwk_sc_t *sc);
+static void	iwk_watchdog(void *arg);
 static int	iwk_run_state_config_ibss(ieee80211com_t *ic);
 static int	iwk_run_state_config_sta(ieee80211com_t *ic);
 static int	iwk_start_tx_beacon(ieee80211com_t *ic);
@@ -698,6 +699,7 @@ iwk_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	sc->sc_newstate = ic->ic_newstate;
 	ic->ic_newstate = iwk_newstate;
+	ic->ic_watchdog = iwk_watchdog;
 	sc->sc_recv_mgmt = ic->ic_recv_mgmt;
 	ic->ic_recv_mgmt = iwk_recv_mgmt;
 	ic->ic_node_alloc = iwk_node_alloc;
@@ -1542,6 +1544,7 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			iwk_add_sta_t node;
 
 			sc->sc_flags |= IWK_F_SCANNING;
+			sc->sc_scan_pending = 0;
 			iwk_set_led(sc, 2, 10, 2);
 
 			/*
@@ -1581,6 +1584,15 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 			}
 			break;
 		}
+
+		case IEEE80211_S_AUTH:
+		case IEEE80211_S_ASSOC:
+		case IEEE80211_S_RUN:
+			sc->sc_flags |= IWK_F_SCANNING;
+			sc->sc_scan_pending = 0;
+
+			iwk_set_led(sc, 2, 10, 2);
+			/* FALLTHRU */
 		case IEEE80211_S_SCAN:
 			mutex_exit(&sc->sc_glock);
 			/* step to next channel before actual FW scan */
@@ -1761,6 +1773,33 @@ iwk_newstate(ieee80211com_t *ic, enum ieee80211_state nstate, int arg)
 	}
 
 	return (err);
+}
+
+static void
+iwk_watchdog(void *arg)
+{
+	iwk_sc_t *sc = arg;
+	struct ieee80211com *ic = &sc->sc_ic;
+#ifdef DEBUG
+	timeout_id_t timeout_id = ic->ic_watchdog_timer;
+#endif
+
+	ieee80211_stop_watchdog(ic);
+
+	if ((ic->ic_state != IEEE80211_S_AUTH) &&
+	    (ic->ic_state != IEEE80211_S_ASSOC))
+		return;
+
+	if (ic->ic_bss->in_fails > 0) {
+		IWK_DBG((IWK_DEBUG_80211, "watchdog (0x%x) reset: "
+		    "node (0x%x)\n", timeout_id, &ic->ic_bss));
+		ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+	} else {
+		IWK_DBG((IWK_DEBUG_80211, "watchdog (0x%x) timeout: "
+		    "node (0x%x), retry (%d)\n",
+		    timeout_id, &ic->ic_bss, ic->ic_bss->in_fails + 1));
+		ieee80211_watchdog(ic);
+	}
 }
 
 /*ARGSUSED*/
@@ -2953,10 +2992,9 @@ iwk_m_ioctl(void* arg, queue_t *wq, mblk_t *mp)
 			txpower.tx_power.ht_ofdm_power[i].
 			    s.dsp_predis_atten = 110 | (110 << 8);
 		}
-		txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES].
-		    s.ramon_tx_gain = 0x3f3f;
-		txpower.tx_power.ht_ofdm_power[POWER_TABLE_NUM_HT_OFDM_ENTRIES].
-		    s.dsp_predis_atten = 110 | (110 << 8);
+		txpower.tx_power.legacy_cck_power.s.ramon_tx_gain = 0x3f3f;
+		txpower.tx_power.legacy_cck_power.s.dsp_predis_atten
+		    = 110 | (110 << 8);
 		err1 = iwk_cmd(sc, REPLY_TX_PWR_TABLE_CMD, &txpower,
 		    sizeof (txpower), 1);
 		if (err1 != IWK_SUCCESS) {
@@ -3173,13 +3211,13 @@ iwk_m_stop(void *arg)
 
 	iwk_stop(sc);
 	ieee80211_new_state(ic, IEEE80211_S_INIT, -1);
+	ieee80211_stop_watchdog(ic);
 	mutex_enter(&sc->sc_mt_lock);
 	sc->sc_flags &= ~IWK_F_HW_ERR_RECOVER;
 	sc->sc_flags &= ~IWK_F_RATE_AUTO_CTL;
 	mutex_exit(&sc->sc_mt_lock);
 	mutex_enter(&sc->sc_glock);
 	sc->sc_flags &= ~IWK_F_RUNNING;
-	sc->sc_flags &= ~IWK_F_SCANNING;
 	mutex_exit(&sc->sc_glock);
 }
 
@@ -3429,6 +3467,13 @@ iwk_hw_set_before_auth(iwk_sc_t *sc)
 	struct ieee80211_rateset rs;
 	uint16_t masks = 0, rate;
 	int i, err;
+
+	if (in->in_chan == IEEE80211_CHAN_ANYC) {
+		cmn_err(CE_WARN, "iwk_hw_set_before_auth():"
+		    "channel (%d) isn't in proper range\n",
+		    ieee80211_chan2ieee(ic, in->in_chan));
+		return (IWK_FAIL);
+	}
 
 	/* update adapter's configuration according the info of target AP */
 	IEEE80211_ADDR_COPY(sc->sc_config.bssid, in->in_bssid);
@@ -4211,6 +4256,9 @@ iwk_stop(iwk_sc_t *sc)
 	iwk_stop_master(sc);
 
 	sc->sc_tx_timer = 0;
+	sc->sc_flags &= ~IWK_F_SCANNING;
+	sc->sc_scan_pending = 0;
+
 	tmp = IWK_READ(sc, CSR_RESET);
 	IWK_WRITE(sc, CSR_RESET, tmp | CSR_RESET_REG_FLAG_SW_RESET);
 
