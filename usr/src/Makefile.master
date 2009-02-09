@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -653,9 +653,15 @@ ALWAYS_LINT_DEFS +=	-erroff=E_INTEGRAL_CONST_EXP_EXPECTED
 ALWAYS_LINT_DEFS +=	-erroff=E_PASS_INT_TO_SMALL_INT
 ALWAYS_LINT_DEFS +=	-erroff=E_PTR_CONV_LOSES_BITS
 
+# This forces lint to pick up note.h and sys/note.h from Devpro rather than
+# from the proto area.  The note.h that ON delivers would disable NOTE().
+ONLY_LINT_DEFS =	-I$(SPRO_VROOT)/prod/include/lint
+
 SECLEVEL=	core
-LINT.c=		$(LINT) $(LINTFLAGS) $(CPPFLAGS) $(ALWAYS_LINT_DEFS)
-LINT64.c=	$(LINT) $(LINTFLAGS64) $(CPPFLAGS) $(ALWAYS_LINT_DEFS)
+LINT.c=		$(LINT) $(ONLY_LINT_DEFS) $(LINTFLAGS) $(CPPFLAGS) \
+		$(ALWAYS_LINT_DEFS)
+LINT64.c=	$(LINT) $(ONLY_LINT_DEFS) $(LINTFLAGS64) $(CPPFLAGS) \
+		$(ALWAYS_LINT_DEFS)
 LINT.s=		$(LINT.c)
 
 # For some future builds, NATIVE_MACH and MACH might be different.

@@ -390,7 +390,6 @@ bm_chunk_setup(bitmap_t *bmp, bmap_chunk_t *cp, u_quad_t bn)
 	h = HASH(bn);
 	hp = &bmp->bm_hash[h];
 
-	/* LINTED: E_CONSTANT_CONDITION */
 	TAILQ_INSERT_HEAD(hp, cp, c_hash);
 	cp->c_off = off;
 	cp->c_clen = cl;
@@ -462,7 +461,6 @@ hash_free(bmap_list_t *hp)
 
 	while (!TAILQ_EMPTY(hp)) {
 		cp = TAILQ_FIRST(hp);
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_REMOVE(hp, cp, c_hash);
 		free(cp->c_bmp);
 		free(cp);
@@ -497,9 +495,7 @@ bm_chunk_reposition(bitmap_t *bmp, bmap_list_t *hp, bmap_chunk_t *cp)
 		return;
 
 	if (TAILQ_FIRST(hp) != cp) {
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_REMOVE(hp, cp, c_hash);
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_INSERT_HEAD(hp, cp, c_hash);
 	}
 }
@@ -641,7 +637,6 @@ hash_init(bmap_list_t *hp)
 	int i;
 
 	for (i = 0; i < BMAP_HASH_SIZE; hp++, i++) {
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_INIT(hp);
 	}
 }
@@ -999,11 +994,9 @@ dbm_chunk_load(dbitmap_t *bmp, dbmap_chunk_t *cp, u_quad_t bn, int new)
 	}
 
 	if (cp) {
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_INSERT_TAIL(&bmp->bm_lru, cp, c_lru);
 		h = HASH(bn);
 		hp = &bmp->bm_hash[h];
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_INSERT_HEAD(hp, cp, c_hash);
 		cp->c_flags = 0;
 		cp->c_off = off;
@@ -1068,11 +1061,9 @@ dbm_chunk_alloc(dbitmap_t *bmp, u_quad_t bn)
 	if (BMAP_CIS_DIRTY(cp))
 		(void) dbm_chunk_flush(bmp, cp);
 
-	/* LINTED: E_CONSTANT_CONDITION */
 	TAILQ_REMOVE(&bmp->bm_lru, cp, c_lru);
 	h = HASH(cp->c_off);
 	hp = &bmp->bm_hash[h];
-	/* LINTED: E_CONSTANT_CONDITION */
 	TAILQ_REMOVE(hp, cp, c_hash);
 	return (dbm_chunk_load(bmp, cp, bn, BMAP_OLD_CHUNK));
 }
@@ -1098,7 +1089,6 @@ dbm_chunks_free(dbitmap_t *bmp)
 
 	while (!TAILQ_EMPTY(headp)) {
 		cp = TAILQ_FIRST(headp);
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_REMOVE(headp, cp, c_lru);
 		free(cp->c_bmp);
 		free(cp);
@@ -1115,14 +1105,10 @@ static void
 dbm_chunk_reposition(dbitmap_t *bmp, dbmap_list_t *hp, dbmap_chunk_t *cp)
 {
 	if (bmp && hp && cp) {
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_REMOVE(&bmp->bm_lru, cp, c_lru);
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_INSERT_TAIL(&bmp->bm_lru, cp, c_lru);
 		if (TAILQ_FIRST(hp) != cp) {
-			/* LINTED: E_CONSTANT_CONDITION */
 			TAILQ_REMOVE(hp, cp, c_hash);
-			/* LINTED: E_CONSTANT_CONDITION */
 			TAILQ_INSERT_HEAD(hp, cp, c_hash);
 		}
 	}
@@ -1427,7 +1413,6 @@ dbm_alloc(char *fname, u_quad_t len, int set)
 		bmp->bm_len = len;
 		bmp->bm_ccur = 0;
 		bmp->bm_cmax = BMAP_CHUNK_MAX;
-		/* LINTED: E_CONSTANT_CONDITION */
 		TAILQ_INIT(&bmp->bm_lru);
 		hash_init((bmap_list_t *)bmp->bm_hash);
 	}

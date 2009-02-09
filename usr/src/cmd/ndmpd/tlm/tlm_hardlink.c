@@ -59,7 +59,6 @@ hardlink_q_init()
 
 	qhead = (struct hardlink_q *)malloc(sizeof (struct hardlink_q));
 	if (qhead) {
-		/* LINTED: E_CONSTANT_CONDITION */
 		SLIST_INIT(qhead);
 	}
 
@@ -87,7 +86,6 @@ hardlink_q_cleanup(struct hardlink_q *hl_q)
 			NDMP_LOG(LOG_DEBUG, "(2): remove node, inode = %lu",
 			    hl->inode);
 
-		/* LINTED: E_CONSTANT_CONDITION */
 		SLIST_REMOVE_HEAD(hl_q, next_hardlink);
 
 		/* remove the temporary file */
@@ -193,7 +191,6 @@ hardlink_q_add(struct hardlink_q *hl_q, unsigned long inode,
 		    "(2): added node, inode = %lu, path = %p (%s)",
 		    hl->inode, hl->path, hl->path? hl->path : "(--)");
 
-	/* LINTED: E_CONSTANT_CONDITION */
 	SLIST_INSERT_HEAD(hl_q, hl, next_hardlink);
 
 	return (0);

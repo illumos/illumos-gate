@@ -1611,7 +1611,6 @@ ndmp_open_list_add(ndmp_connection_t *conn, char *dev, int sid, int lun, int fd)
 		else
 			olp->ol_fd = -1;
 		(void) mutex_lock(&ol_mutex);
-		/* LINTED: E_CONSTANT_CONDITION */
 		LIST_INSERT_HEAD(olhp, olp, ol_q);
 		(void) mutex_unlock(&ol_mutex);
 	}
@@ -1651,7 +1650,6 @@ ndmp_open_list_del(char *dev, int sid, int lun)
 	if (--olp->ol_nref <= 0) {
 		NDMP_LOG(LOG_DEBUG,
 		    "Removed dev: %s, sid: %d, lun: %d", dev, sid, lun);
-		/* LINTED: E_CONSTANT_CONDITION */
 		LIST_REMOVE(olp, ol_q);
 		free(olp->ol_devnm);
 		free(olp);
@@ -1689,7 +1687,6 @@ ndmp_open_list_release(ndmp_connection_t *conn)
 			NDMP_LOG(LOG_DEBUG,
 			    "Removed dev: %s, sid: %d, lun: %d",
 			    olp->ol_devnm, olp->ol_sid, olp->ol_lun);
-			/* LINTED: E_CONSTANT_CONDITION */
 			LIST_REMOVE(olp, ol_q);
 			if (olp->ol_fd > 0)
 				(void) close(olp->ol_fd);

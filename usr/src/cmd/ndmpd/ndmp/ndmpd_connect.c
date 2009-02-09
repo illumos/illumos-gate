@@ -684,7 +684,6 @@ ndmp_connect_list_add(ndmp_connection_t *connection, int *id)
 	clp->cl_id = *id;
 
 	(void) mutex_lock(&cl_mutex);
-	/* LINTED: E_CONSTANT_CONDITION */
 	LIST_INSERT_HEAD(&cl_head, clp, cl_q);
 	(*id)++;
 	(void) mutex_unlock(&cl_mutex);
@@ -716,7 +715,6 @@ ndmp_connect_list_del(ndmp_connection_t *connection)
 		return (-1);
 	}
 
-	/* LINTED: E_CONSTANT_CONDITION */
 	LIST_REMOVE(clp, cl_q);
 	(void) mutex_unlock(&cl_mutex);
 	free(clp);
