@@ -21,11 +21,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,6 +60,8 @@ static const topo_modops_t zfs_ops =
 static const topo_modinfo_t zfs_info =
 	{ ZFS, FM_FMRI_SCHEME_ZFS, ZFS_VERSION, &zfs_ops };
 
+static libzfs_handle_t *g_zfs;
+
 int
 zfs_init(topo_mod_t *mod, topo_version_t version)
 {
@@ -81,6 +81,7 @@ zfs_init(topo_mod_t *mod, topo_version_t version)
 		    "%s\n", topo_mod_errmsg(mod));
 		return (-1); /* mod errno already set */
 	}
+	g_zfs = libzfs_init();
 
 	return (0);
 }
@@ -88,6 +89,8 @@ zfs_init(topo_mod_t *mod, topo_version_t version)
 void
 zfs_fini(topo_mod_t *mod)
 {
+	libzfs_fini(g_zfs);
+	g_zfs = NULL;
 	topo_mod_unregister(mod);
 }
 
@@ -112,8 +115,6 @@ typedef struct cbdata {
 	uint64_t	cb_guid;
 	zpool_handle_t	*cb_pool;
 } cbdata_t;
-
-libzfs_handle_t *g_zfs;
 
 static int
 find_pool(zpool_handle_t *zhp, void *data)
@@ -147,7 +148,7 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	cb.cb_guid = pool_guid;
 	cb.cb_pool = NULL;
 
-	if (zpool_iter(g_zfs, find_pool, &cb) == 1) {
+	if (g_zfs != NULL && zpool_iter(g_zfs, find_pool, &cb) == 1) {
 		name = zpool_get_name(cb.cb_pool);
 	} else {
 		(void) snprintf(guidbuf, sizeof (guidbuf), "%llx", pool_guid);
