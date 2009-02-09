@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,7 +96,7 @@ static int bstart, bindex;		/* Global vars for adding/extracting */
 static uint8_t leftover[HASHSIZE];	/* leftover output */
 static uint32_t	swrand_XKEY[6];		/* one extra word for getentropy */
 static int leftover_bytes;		/* leftover length */
-static uint32_t previous_bytes[SHA1WORDS];	/* previous random bytes */
+static uint32_t previous_bytes[HASHSIZE/BYTES_IN_WORD];	/* prev random bytes */
 
 static physmem_entsrc_t entsrc;		/* Physical mem as an entropy source */
 static timeout_id_t rnd_timeout_id;
@@ -320,7 +320,7 @@ swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t nonblock)
 	int i, bytes;
 	HASH_CTX hashctx;
 	uint8_t digest[HASHSIZE], *pool;
-	uint32_t tempout[SHA1WORDS];
+	uint32_t tempout[HASHSIZE/BYTES_IN_WORD];
 	int size;
 
 	mutex_enter(&srndpool_lock);
@@ -398,11 +398,11 @@ swrand_get_entropy(uint8_t *ptr, size_t len, boolean_t nonblock)
 		 * generated block. Test shall fail if any two compared
 		 * n-bit blocks are equal.
 		 */
-		for (i = 0; i < size/BYTES_IN_WORD; i++) {
+		for (i = 0; i < HASHSIZE/BYTES_IN_WORD; i++) {
 			if (tempout[i] != previous_bytes[i])
 				break;
 		}
-		if (i == size/BYTES_IN_WORD)
+		if (i == HASHSIZE/BYTES_IN_WORD)
 			cmn_err(CE_WARN, "swrand: The value of 160-bit block "
 			    "random bytes are same as the previous one.\n");
 
