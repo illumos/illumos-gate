@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * supporting modules.
@@ -136,8 +134,7 @@ vntsd_get_yes_no(vntsd_client_t *clientp, char *msg, int *yes_no)
 		}
 
 		if ((rv = vntsd_write_client(clientp, vntsd_eol,
-			VNTSD_EOL_LEN)) !=
-		    VNTSD_SUCCESS) {
+		    VNTSD_EOL_LEN)) != VNTSD_SUCCESS) {
 			return (rv);
 		}
 
@@ -186,9 +183,9 @@ vntsd_open_vcc(char *dev_name, uint_t cons_no)
 
 		if ((drvfd < 0) && (errno == EAGAIN)) {
 			if (vntsd_vcc_ioctl(VCC_FORCE_CLOSE, cons_no, &cons_no)
-				!= VNTSD_SUCCESS) {
+			    != VNTSD_SUCCESS) {
 				break;
-			    }
+			}
 		} else {
 			break;
 		}
@@ -327,7 +324,7 @@ vntsd_read_data(vntsd_client_t *clientp, char *c)
 
 	for (; ; ) {
 		if ((rv = vntsd_read_char(clientp, c)) != VNTSD_SUCCESS) {
-		    return (rv);
+			return (rv);
 		}
 
 		/* daemon cmd? */
@@ -365,7 +362,7 @@ vntsd_read_line(vntsd_client_t *clientp, char *buf, int *in_sz)
 	for (; ; ) {
 
 		if ((rv =  vntsd_read_data(clientp, &c)) !=  VNTSD_SUCCESS) {
-		    return (rv);
+			return (rv);
 		}
 
 		if (c == BS) {
@@ -549,6 +546,11 @@ vntsd_log(vntsd_status_t status, char *msg)
 		status_msg = "All console(s) in the group have been deleted.";
 		break;
 
+	case VNTSD_STATUS_AUTH_ENABLED:
+		critical = 1;
+		status_msg = "VNTSD_STATUS_AUTH_ENABLED";
+		break;
+
 	case VNTSD_ERR_NO_MEM:
 		critical = 1;
 		status_msg = "NO MEMORY";
@@ -652,8 +654,7 @@ vntsd_log(vntsd_status_t status, char *msg)
 		    thr_self(), msg);
 	}
 #ifdef DEBUG
-	DERR(stderr, "%s: thread[%d] %s\n", status_msg,
-		    thr_self(), msg);
+	DERR(stderr, "%s: thread[%d] %s\n", status_msg, thr_self(), msg);
 	syslog(LOG_ERR, "%s: thread[%d] %s\n", status_msg, thr_self(), msg);
 #endif
 }

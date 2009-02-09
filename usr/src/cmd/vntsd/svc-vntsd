@@ -1,6 +1,6 @@
 #!/sbin/sh
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -22,8 +22,6 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Start script for vntsd
 #
 # For modifying parameters passed to vntsd, do not edit
@@ -34,24 +32,103 @@
 # svc:> select ldoms/vntsd
 # svc:/ldoms/vntsd> setprop vntsd/vcc_device = "virtual-console-concentrator@1"
 # svc:/ldoms/vntsd> setprop vntsd/listen_addr = "192.168.1.1"
+# svc:/ldoms/vntsd> setprop vntsd/authorization="true"
 # svc:/ldoms/vntsd> exit
 
 . /lib/svc/share/smf_include.sh
 
-vcc_device=`svcprop -p vntsd/vcc_device $SMF_FMRI 2>/dev/null`
+AUTH_ATTR=/etc/security/auth_attr
+USER_ATTR=/etc/user_attr
+GREP=/usr/bin/grep
+CAT=/usr/bin/cat
+ED=/usr/bin/ed
+SVCCFG=/usr/sbin/svccfg
+SVCPROP=/bin/svcprop
+
+#
+# Add LDoms vntsd authorization entries to etc/security/auth_attr if not
+# present. These define authorizations used by LDoms vntsd daemon.
+#
+add_auth_entries()
+{
+	# Add entries to auth_attr file, if needed
+	$GREP '^solaris.vntsd.:' ${AUTH_ATTR} >/dev/null 2>&1
+	if  [ $? -ne 0 ] ; then
+		$CAT >>${AUTH_ATTR} << EOF
+# Added by svc-vntsd
+solaris.vntsd.:::LDoms vntsd Administration::
+solaris.vntsd.grant:::Delegate LDoms vntsd Administration::
+solaris.vntsd.consoles:::Access All LDoms Guest Consoles::
+# End of svc-vntsd
+EOF
+	fi
+}
+
+#
+# Add a LDoms user/role entry to etc/user_attr if not present.
+# This defines user/role used by useradd or roleadd.
+#
+add_user_entries()
+{
+	#
+	# Add entries to user_attr file, if needed.
+	#
+	$GREP 'solaris.vntsd.grant' ${USER_ATTR} >/dev/null 2>&1
+
+	if  [ $? -ne 0 ] ; then
+
+		$GREP '^root' ${USER_ATTR} | $GREP 'auths=' >/dev/null 2>&1
+		if  [ $? -eq 0 ] ; then
+		    #
+		    # Add vntsd attribute to an existing root entry.
+		    #
+		    $ED -s ${USER_ATTR} <<- EOF > /dev/null 2>&1
+			g/^root.*auths\=/s/^roo.*auths\=/&solaris.vntsd.grant,/
+			w
+			q
+			EOF
+		else 
+		    #
+		    # Add a root entry with vntsd attribute. 
+		    #
+		    $CAT >>${USER_ATTR} << EOF
+# Added by svc-vntsd
+root::::type=normal;auths=solaris.vntsd.grant;lock_after_retries=0
+# End of svc-vntsd
+EOF
+		fi
+	fi
+}
+
+#
+# Update 'vntsd' authorizations in the relevant files. Note that adding these
+# entries from this smf script rather than from the pkg install scripts,
+# ensures that they are added only if the vntsd service is being enabled; and
+# hence avoids adding these entries unnecessarily into client guest domains.
+# The functions check before adding, that the entries are not already present.
+#
+add_auth_entries
+add_user_entries
+
+vcc_device=`$SVCPROP -p vntsd/vcc_device $SMF_FMRI 2>/dev/null`
 if [ -z "$vcc_device" ]; then
 	vcc_device="virtual-console-concentrator@0"
 fi
 args="-i $vcc_device"
 
-listen_addr=`svcprop -p vntsd/listen_addr $SMF_FMRI 2>/dev/null`
+listen_addr=`$SVCPROP -p vntsd/listen_addr $SMF_FMRI 2>/dev/null`
 if [ -n "$listen_addr" ]; then
 	args="$args -p $listen_addr"
 fi
 
-timeout=`svcprop -p vntsd/timeout_minutes $SMF_FMRI 2>/dev/null`
+timeout=`$SVCPROP -p vntsd/timeout_minutes $SMF_FMRI 2>/dev/null`
 if [ -n "$timeout" ]; then
 	args="$args -t $timeout"
+fi
+
+auth=`$SVCPROP -p vntsd/authorization $SMF_FMRI 2>/dev/null`
+if [ "$auth" = "true" ]; then
+	args="$args -A"
 fi
 
 if [ -x /usr/lib/ldoms/vntsd ]; then

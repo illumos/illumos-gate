@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * VNTSD main
@@ -38,6 +36,7 @@
  * -d
  *	Do not daemonize. This is only available in a DEBUG build.
  * -t	timeout for inactivity 0 = indefinite
+ * -A	enable Authorization checking. Mutually exclusive with -p.
  */
 
 #include <stdio.h>
@@ -263,7 +262,7 @@ static void
 vntsd_help(void)
 {
 	(void) fprintf(stderr, gettext("Usage: vntsd -i <VCC device instance> "
-	    "[-p <listen address>] [-t <timeout in minutes>]\n"));
+	    "[-p <listen address>] [-t <timeout in minutes>] [-A]\n"));
 }
 
 /*
@@ -373,7 +372,7 @@ main(int argc, char ** argv)
 	    NULL);
 
 	/* get CLI options */
-	while ((option = getopt(argc, argv, "i:t:p:"DEBUG_OPTIONS)) != EOF) {
+	while ((option = getopt(argc, argv, "i:t:p:A"DEBUG_OPTIONS)) != EOF) {
 		switch (option) {
 #ifdef DEBUG
 		case 'd':
@@ -394,6 +393,24 @@ main(int argc, char ** argv)
 			}
 			break;
 
+		case 'A':
+			/*
+			 * This option enables authorization checking of the
+			 * user for the console(s) being accessed. As the
+			 * authorization checking can be done only for a local
+			 * client process, it requires that vntsd listen only
+			 * on the loopback address. It means while this option
+			 * is enabled, vntsd cannot listen on either INADDR_ANY
+			 * or a specific ip address and thus the telnet client
+			 * must also run on the local machine in order to
+			 * connect to vntsd. The '-p' option if specified while
+			 * this option is enabled, will be ignored and the auth
+			 * checking takes precedence forcing vntsd to listen on
+			 * the loopback interface.
+			 */
+			vntsdp->options |= VNTSD_OPT_AUTH_CHECK;
+			break;
+
 		default:
 			vntsd_help();
 			exit(1);
@@ -409,6 +426,11 @@ main(int argc, char ** argv)
 	    strcmp(listen_addr, LOCALHOST_IPv4) == 0 ||
 	    strcmp(listen_addr, LOCALHOST_IPv6) == 0) {
 		/* by default listen on loopback interface */
+		vntsdp->ip_addr.s_addr = htonl(INADDR_LOOPBACK);
+	} else if ((vntsdp->options & VNTSD_OPT_AUTH_CHECK) != 0) {
+		vntsd_log(VNTSD_STATUS_AUTH_ENABLED,
+		    "Listen address ignored as authorization checking "
+		    "is enabled");
 		vntsdp->ip_addr.s_addr = htonl(INADDR_LOOPBACK);
 	} else if (strcmp(listen_addr, "any") == 0) {
 		vntsdp->ip_addr.s_addr = htonl(INADDR_ANY);

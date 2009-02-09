@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #
@@ -29,6 +29,12 @@ PATH=/usr/bin:/usr/sbin:${PATH}
 export PATH
 
 EXIT=0
+
+AUTH_ATTR=$BASEDIR/etc/security/auth_attr
+USER_ATTR=$BASEDIR/etc/user_attr
+GREP=/usr/bin/grep
+CAT=/usr/bin/cat
+ED=/usr/bin/ed
 
 not_installed()
 {
@@ -42,6 +48,98 @@ not_installed()
 		return 0
 	fi
 }
+
+#
+# Remove LDoms vntsd authorization entries from etc/security/auth_attr, which
+# were added during installation. These define authorizations used by LDoms
+# vntsd daemon.
+#
+remove_auth_entries()
+{
+	#
+	# Remove entries from auth_attr file, if needed
+	#
+	$GREP '^solaris.vntsd.:' ${AUTH_ATTR} >/dev/null 2>&1
+	if  [ $? -eq 0 ] ; then
+		$ED -s ${AUTH_ATTR} <<- EOF > /dev/null 2>&1
+			g/svc-vntsd/d
+			g/^solaris.vntsd.:/d
+			g/^solaris.vntsd.grant/d
+			g/^solaris.vntsd.consoles/d
+			w
+			q
+		EOF
+	fi
+}
+
+#
+# Delete entries that were added by svc-vntsd to etc/user_attr file. 
+#
+delete_vntsd_entry()
+{
+    vntsd_entry=$1
+
+    $GREP ${vntsd_entry} ${USER_ATTR} >/dev/null 2>&1
+    if  [ $? -eq 0 ] ; then
+	    $ED -s ${USER_ATTR} <<- EOF > /dev/null 2>&1
+		g/${vntsd_entry}/d
+		w
+		q
+		EOF
+    fi
+}
+
+#
+# Remove vntsd attributes from etc/user_attr file. 
+#
+remove_vntsd_attr()
+{
+	if [ $# -eq 1 ] ; then
+	    replacement=""
+	else 
+	    replacement=$2
+	fi
+
+	vntsd_attr=$1
+
+	$GREP ${vntsd_attr} ${USER_ATTR} >/dev/null 2>&1
+	if  [ $? -eq 0 ] ; then
+		$ED -s ${USER_ATTR} <<- EOF > /dev/null 2>&1
+			g/${vntsd_attr}/s/${vntsd_attr}/${replacement}/g
+			w
+			q
+			EOF
+	fi
+}
+
+#
+# Remove LDoms vntsd user/role entry from /etc/user_attr, which were added
+# during installation. This defines the user/role used by useradd/roleadd.
+#
+remove_user_entries()
+{
+	#
+	# Delete entries that may be added during installation.
+	#
+	delete_vntsd_entry 'svc-vntsd'
+	delete_vntsd_entry '^root::::type=normal;auths=solaris.vntsd.grant;lock_after_retries=0$'
+
+	#
+	# Remove vntsd attributes for root user 
+	# Possible entries are:
+	#
+
+	remove_vntsd_attr ",solaris.vntsd.grant$"
+	remove_vntsd_attr ",solaris.vntsd.grant;" ";"
+	remove_vntsd_attr "solaris.vntsd.grant,"
+	remove_vntsd_attr "auths=solaris.vntsd.grant$"
+	remove_vntsd_attr "auths=solaris.vntsd.grant;"
+}
+
+# Main
+
+remove_auth_entries
+remove_user_entries
 
 # 
 # Unload and remove drivers

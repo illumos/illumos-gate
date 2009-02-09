@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,8 +167,6 @@
 #ifndef _VNTSD_H
 #define	_VNTSD_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -205,6 +203,7 @@ extern "C" {
 
 /* vntsd options */
 #define	    VNTSD_OPT_DAEMON_OFF	0x1
+#define	    VNTSD_OPT_AUTH_CHECK	0x2	/* Enable auth checking */
 
 /*
  * group states
@@ -364,6 +363,7 @@ typedef enum {
 	VNTSD_STATUS_INTR,		/* thread receive a signal */
 	VNTSD_STATUS_DISCONN_CONS,	/* disconnect a client from cons */
 	VNTSD_STATUS_NO_CONS,		/* disconnect a client from cons */
+	VNTSD_STATUS_AUTH_ENABLED,	/* auth enabled; can't process '-p' */
 
 	/* resource errors */
 	VNTSD_ERR_NO_MEM,		/* memory allocation error */
@@ -473,7 +473,7 @@ boolean_t	vntsd_vcc_cons_alive(vntsd_cons_t *consp);
 boolean_t	vntsd_notify_client_cons_del(vntsd_client_t *clientp);
 int		vntsd_chk_group_total_cons(vntsd_group_t *groupp);
 boolean_t	vntsd_mark_deleted_cons(vntsd_cons_t *consp);
-
+boolean_t	auth_check_fd(int sock_fd, char *group_name);
 
 #ifdef	DEBUG
 

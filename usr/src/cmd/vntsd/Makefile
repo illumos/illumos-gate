@@ -19,15 +19,14 @@
 # CDDL HEADER END
 #
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG =	vntsd
-SRCS =	cmd.c common.c console.c listen.c queue.c read.c vntsd.c vntsdvcc.c \
-        write.c	
+SRCS =	auth.c cmd.c common.c console.c listen.c queue.c read.c vntsd.c \
+	vntsdvcc.c write.c
 OBJS = $(SRCS:.c=.o)
 
 MANIFEST = vntsd.xml
@@ -40,7 +39,7 @@ POFILE = $(PROG)_msg.po
 
 CFLAGS += $(CCVERBOSE)
 
-LDLIBS += -lsocket -lnsl
+LDLIBS += -lsocket -lnsl -lsecdb
 
 ROOTCMDDIR =	$(ROOTLIB)/ldoms
 ROOTMANIFESTDIR = $(ROOTSVCPLATFORMSUN4V)

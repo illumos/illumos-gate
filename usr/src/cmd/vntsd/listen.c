@@ -19,10 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Each group has a listen thread. It is created at the time
@@ -158,7 +157,7 @@ open_socket(int port_no, int *sockfd)
 		 * a just released port.
 		 */
 		if (bind(*sockfd, (struct sockaddr *)&addr,
-			    sizeof (addr)) < 0) {
+		    sizeof (addr)) < 0) {
 
 			if (errno == EINTR) {
 				return (VNTSD_STATUS_INTR);
@@ -262,7 +261,7 @@ create_console_thread(vntsd_group_t *groupp, int sockfd)
 
 	/* create console selection thread */
 	if (thr_create(NULL, 0, (thr_func_t)vntsd_console_thread,
-		    thr_arg, THR_DETACHED, &clientp->cons_tid)) {
+	    thr_arg, THR_DETACHED, &clientp->cons_tid)) {
 
 		free(thr_arg);
 		(void) mutex_unlock(&clientp->lock);
@@ -289,11 +288,14 @@ vntsd_listen_thread(vntsd_group_t *groupp)
 	struct		sockaddr_in cli_addr;
 	int		rv;
 	int		num_cons;
+	vntsd_t		*vntsdp;
 
 	assert(groupp);
 
 	D1(stderr, "t@%d listen@%lld\n", thr_self(), groupp->tcp_port);
 
+
+	vntsdp = groupp->vntsd;
 
 	/* initialize listen socket */
 	(void) mutex_lock(&groupp->lock);
@@ -307,7 +309,7 @@ vntsd_listen_thread(vntsd_group_t *groupp)
 
 		/* listen to the socket */
 		newsockfd = accept(groupp->sockfd, (struct sockaddr *)&cli_addr,
-			    &clilen);
+		    &clilen);
 
 		D1(stderr, "t@%d listen_thread() connected sockfd=%d\n",
 		    thr_self(), newsockfd);
@@ -322,6 +324,19 @@ vntsd_listen_thread(vntsd_group_t *groupp)
 			}
 			continue;
 		}
+
+		/* Check authorization if enabled */
+		if ((vntsdp->options & VNTSD_OPT_AUTH_CHECK) != 0) {
+			rv = auth_check_fd(newsockfd, groupp->group_name);
+			if (rv != B_TRUE) {
+				D3(stderr, "t@%d listen@%lld group@%s: "
+				    "authorization failure\n", thr_self(),
+				    groupp->tcp_port, groupp->group_name);
+				(void) close(newsockfd);
+				continue;
+			}
+		}
+
 		num_cons = vntsd_chk_group_total_cons(groupp);
 		if (num_cons == 0) {
 			(void) close(newsockfd);
