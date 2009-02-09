@@ -6589,7 +6589,7 @@ fp_adisc_intr(fc_packet_t *pkt)
 		    sizeof (fc_frame_hdr_t));
 		bcopy((caddr_t)pkt->pkt_resp,
 		    (caddr_t)cmd->cmd_ulp_pkt->pkt_resp,
-		    sizeof (la_els_logi_t));
+		    sizeof (la_els_adisc_t));
 	}
 
 	if ((cmd->cmd_flags & FP_CMD_PLOGI_RETAIN) == 0) {
