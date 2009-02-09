@@ -922,7 +922,7 @@ update_boot_archive(int new_state)
 	if (getzoneid() != GLOBAL_ZONEID)
 		return;
 
-	(void) system("/sbin/bootadm -a update_all");
+	(void) system("/sbin/bootadm -ea update_all");
 }
 
 /*
@@ -1290,8 +1290,8 @@ retry_for_proc_slot:
 		 */
 		if (op_modes == NORMAL_MODES &&
 		    (cmd.c_action == M_OFF ||
-			(cmd.c_action & (M_ONCE|M_WAIT)) &&
-			cur_state == prev_state))
+		    (cmd.c_action & (M_ONCE|M_WAIT)) &&
+		    cur_state == prev_state))
 			continue;
 
 		/*
@@ -1307,7 +1307,8 @@ retry_for_proc_slot:
 
 		} else {
 			spawn(pp, &cmd);
-			while (waitproc(pp) == FAILURE);
+			while (waitproc(pp) == FAILURE)
+				;
 			(void) account(DEAD_PROCESS, pp, NULL);
 			pp->p_flags = 0;
 		}
@@ -1932,12 +1933,12 @@ init_env()
 
 	if (rflg) {
 		glob_envp[1] =
-			malloc((unsigned)(strlen("_DVFS_RECONFIG=YES")+2));
+		    malloc((unsigned)(strlen("_DVFS_RECONFIG=YES")+2));
 		(void) strcpy(glob_envp[1], "_DVFS_RECONFIG=YES");
 		++glob_envn;
 	} else if (bflg == 1) {
 		glob_envp[1] =
-			malloc((unsigned)(strlen("RB_NOBOOTRC=YES")+2));
+		    malloc((unsigned)(strlen("RB_NOBOOTRC=YES")+2));
 		(void) strcpy(glob_envp[1], "RB_NOBOOTRC=YES");
 		++glob_envn;
 	}
@@ -2109,7 +2110,7 @@ boot_init()
 					    (char *)0, glob_envp);
 					console(B_TRUE,
 "Command\n\"%s\"\n failed to execute.  errno = %d (exec of shell failed)\n",
-						cmd.c_command, errno);
+					    cmd.c_command, errno);
 					exit(1);
 				} else while (waitproc(process) == FAILURE);
 				process->p_flags = 0;
@@ -2312,7 +2313,7 @@ siglvl(int sig, siginfo_t *sip, ucontext_t *ucp)
 	 * data preventing the fixed command line from executing.
 	 */
 	for (process = proc_table;
-		(process < proc_table + num_proc); process++) {
+	    (process < proc_table + num_proc); process++) {
 		process->p_time = 0L;
 		process->p_count = 0;
 	}
@@ -2370,7 +2371,7 @@ childeath_single()
 	pid = wait(&status);
 
 	for (process = proc_table;
-		(process < proc_table + num_proc); process++) {
+	    (process < proc_table + num_proc); process++) {
 		if ((process->p_flags & (LIVING|OCCUPIED)) ==
 		    (LIVING|OCCUPIED) && process->p_pid == pid) {
 
@@ -2510,7 +2511,7 @@ efork(int action, struct PROC_TABLE *process, int modes)
 			 * for a free slot.
 			 */
 			for (process = proc_table;  process->p_flags != 0 &&
-				(process < proc_table + num_proc); process++)
+			    (process < proc_table + num_proc); process++)
 					;
 
 			if (process == (proc_table + num_proc)) {
@@ -2719,7 +2720,7 @@ account(short state, struct PROC_TABLE *process, char *program)
 		bcopy(oldu->ut_line, u->ut_line, sizeof (u->ut_line));
 		bcopy(oldu->ut_host, u->ut_host, sizeof (u->ut_host));
 		u->ut_syslen = (tmplen = strlen(u->ut_host)) ?
-			min(tmplen + 1, sizeof (u->ut_host)) : 0;
+		    min(tmplen + 1, sizeof (u->ut_host)) : 0;
 
 		if (oldu->ut_type == USER_PROCESS && state == DEAD_PROCESS) {
 			notify_pam_dead(oldu);
@@ -2849,10 +2850,8 @@ prog_name(char *string)
 	 * '/', thus when a ' ', '\t', '\n', or '\0' is found, "ptr" will
 	 * point to the last element of the pathname.
 	 */
-	for (ptr = string;
-		*string != ' ' && *string != '\t' && *string != '\n' &&
-							*string != '\0';
-		string++) {
+	for (ptr = string; *string != ' ' && *string != '\t' && 
+	    *string != '\n' && *string != '\0'; string++) {
 		if (*string == '/')
 			ptr = string+1;
 	}
@@ -4455,7 +4454,7 @@ startd_run(const char *cline, int tmpl, ctid_t old_ctid)
 			/* Put smf_options in the environment. */
 			glob_envp[glob_envn] =
 			    malloc(sizeof ("SMF_OPTIONS=") - 1 +
-				strlen(smf_options) + 1);
+			    strlen(smf_options) + 1);
 
 			if (glob_envp[glob_envn] != NULL) {
 				/* LINTED */

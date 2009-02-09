@@ -57,7 +57,11 @@
 #include <ctype.h>
 #include <libgen.h>
 #include <sys/sysmacros.h>
+#include <sys/elf.h>
 #include <libscf.h>
+#include <zlib.h>
+#include <sys/lockfs.h>
+#include <sys/filio.h>
 
 #if !defined(_OPB)
 #include <sys/ucode.h>
@@ -153,9 +157,6 @@ typedef enum zfs_mnted {
 	ZFS_ALREADY
 } zfs_mnted_t;
 
-
-
-
 /*
  * The following two defines are used to detect and create the correct
  * boot archive  when safemode patching is underway.  LOFS_PATCH_FILE is a
@@ -163,7 +164,6 @@ typedef enum zfs_mnted {
  * consolidation.  It is set by pdo.c when a patch with SUNW_PATCH_SAFEMODE
  * is applied.
  */
-
 #define	LOFS_PATCH_FILE		"/var/run/.patch_loopback_mode"
 #define	LOFS_PATCH_MNT		"/var/run/.patch_root_loopbackmnt"
 
@@ -223,6 +223,8 @@ static char *bam_root;
 static int bam_rootlen;
 static int bam_root_readonly;
 static int bam_alt_root;
+static int bam_extend = 0;
+static int bam_purge = 0;
 static char *bam_subcmd;
 static char *bam_opt;
 static char **bam_argv;
@@ -307,12 +309,78 @@ static subcmd_defn_t arch_subcmds[] = {
 	NULL,			0,		NULL, 0	/* must be last */
 };
 
-static struct {
-	nvlist_t *new_nvlp;
-	nvlist_t *old_nvlp;
-	int need_update;
-} walk_arg;
+enum dircache_copy_opt {
+	FILE32 = 0,
+	FILE64,
+	CACHEDIR_NUM
+};
 
+/*
+ * Directory specific flags:
+ * NEED_UPDATE : the specified archive needs to be updated
+ * NO_MULTI : don't extend the specified archive, but recreate it
+ */
+#define	NEED_UPDATE		0x00000001
+#define	NO_MULTI		0x00000002
+
+#define	set_dir_flag(id, f)	(walk_arg.dirinfo[id].flags |= f)
+#define	unset_dir_flag(id, f)	(walk_arg.dirinfo[id].flags &= ~f)
+#define	is_dir_flag_on(id, f)	(walk_arg.dirinfo[id].flags & f ? 1 : 0)
+
+#define	get_cachedir(id)	(walk_arg.dirinfo[id].cdir_path)
+#define	get_updatedir(id)	(walk_arg.dirinfo[id].update_path)
+#define	get_count(id)		(walk_arg.dirinfo[id].count)
+#define	has_cachedir(id)	(walk_arg.dirinfo[id].has_dir)
+#define	set_dir_present(id)	(walk_arg.dirinfo[id].has_dir = 1)
+
+/*
+ * dirinfo_t (specific cache directory information):
+ * cdir_path:   path to the archive cache directory
+ * update_path: path to the update directory (contains the files that will be
+ *              used to extend the archive)
+ * has_dir:	the specified cache directory is active
+ * count:	the number of files to update
+ * flags:	directory specific flags
+ */
+typedef struct _dirinfo {
+	char	cdir_path[PATH_MAX];
+	char	update_path[PATH_MAX];
+	int	has_dir;
+	int	count;
+	int	flags;
+} dirinfo_t;
+
+/*
+ * Update flags:
+ * NEED_CACHE_DIR : cache directory is missing and needs to be created
+ * IS_SPARC_TARGET : the target mountpoint is a SPARC environment
+ * UPDATE_ERROR : an error occourred while traversing the list of files
+ * RDONLY_FSCHK : the target filesystem is read-only
+ * RAMDSK_FSCHK : the target filesystem is on a ramdisk
+ */
+#define	NEED_CACHE_DIR		0x00000001
+#define	IS_SPARC_TARGET		0x00000002
+#define	UPDATE_ERROR		0x00000004
+#define	RDONLY_FSCHK		0x00000008
+#define	RAMDSK_FSCHK		0x00000010
+
+#define	is_flag_on(flag)	(walk_arg.update_flags & flag ? 1 : 0)
+#define	set_flag(flag)		(walk_arg.update_flags |= flag)
+#define	unset_flag(flag)	(walk_arg.update_flags &= ~flag)
+
+/*
+ * struct walk_arg :
+ * update_flags: flags related to the current updating process
+ * new_nvlp/old_nvlp: new and old list of archive-files / attributes pairs
+ * sparcfile: list of file paths for mkisofs -path-list (SPARC only)
+ */
+static struct {
+	int 		update_flags;
+	nvlist_t 	*new_nvlp;
+	nvlist_t 	*old_nvlp;
+	FILE 		*sparcfile;
+	dirinfo_t	dirinfo[CACHEDIR_NUM];
+} walk_arg;
 
 struct safefile {
 	char *name;
@@ -322,13 +390,36 @@ struct safefile {
 static struct safefile *safefiles = NULL;
 #define	NEED_UPDATE_FILE "/etc/svc/volatile/boot_archive_needs_update"
 
+/* Thanks growisofs */
+#define	CD_BLOCK	((off64_t)2048)
+#define	VOLDESC_OFF	16
+#define	DVD_BLOCK	(32*1024)
+#define	MAX_IVDs	16
+
+struct iso_pdesc {
+    unsigned char type	[1];
+    unsigned char id	[5];
+    unsigned char void1	[80-5-1];
+    unsigned char volume_space_size [8];
+    unsigned char void2	[2048-80-8];
+};
+
+/*
+ * COUNT_MAX:	maximum number of changed files to justify a multisession update
+ * BA_SIZE_MAX:	maximum size of the boot_archive to justify a multisession
+ * 		update
+ */
+#define	COUNT_MAX		50
+#define	BA_SIZE_MAX		(50 * 1024 * 1024)
+
+#define	bam_nowrite()		(bam_check || bam_smf_check)
+
 static int sync_menu = 1;	/* whether we need to sync the BE menus */
 
 static void
 usage(void)
 {
 	(void) fprintf(stderr, "USAGE:\n");
-
 
 	/* archive usage */
 	(void) fprintf(stderr,
@@ -447,6 +538,10 @@ parse_args(int argc, char *argv[])
  *	-m list_entry	-- list-menu
  *	-m update_temp	-- (reboot -- [boot-args])
  *	-m delete_all_entries -- (called from install)
+ * A set of private flags is there too:
+ *	-F		-- purge the cache directories and rebuild them
+ *	-e		-- use the (faster) archive update approach (used by
+ *			   reboot)
  */
 static void
 parse_args_internal(int argc, char *argv[])
@@ -459,7 +554,7 @@ parse_args_internal(int argc, char *argv[])
 	opterr = 0;
 
 	error = 0;
-	while ((c = getopt(argc, argv, "a:d:fm:no:vCR:p:Z")) != -1) {
+	while ((c = getopt(argc, argv, "a:d:fm:no:veFCR:p:Z")) != -1) {
 		switch (c) {
 		case 'a':
 			if (bam_cmd) {
@@ -477,11 +572,10 @@ parse_args_internal(int argc, char *argv[])
 			bam_debug = s_strtol(optarg);
 			break;
 		case 'f':
-			if (bam_force) {
-				error = 1;
-				bam_error(DUP_OPT, c);
-			}
 			bam_force = 1;
+			break;
+		case 'F':
+			bam_purge = 1;
 			break;
 		case 'm':
 			if (bam_cmd) {
@@ -492,10 +586,6 @@ parse_args_internal(int argc, char *argv[])
 			bam_subcmd = optarg;
 			break;
 		case 'n':
-			if (bam_check) {
-				error = 1;
-				bam_error(DUP_OPT, c);
-			}
 			bam_check = 1;
 			break;
 		case 'o':
@@ -506,10 +596,6 @@ parse_args_internal(int argc, char *argv[])
 			bam_opt = optarg;
 			break;
 		case 'v':
-			if (bam_verbose) {
-				error = 1;
-				bam_error(DUP_OPT, c);
-			}
 			bam_verbose = 1;
 			break;
 		case 'C':
@@ -542,6 +628,9 @@ parse_args_internal(int argc, char *argv[])
 			break;
 		case 'Z':
 			bam_zfs = 1;
+			break;
+		case 'e':
+			bam_extend = 1;
 			break;
 		case '?':
 			error = 1;
@@ -1243,29 +1332,363 @@ list2file(char *root, char *tmp, char *final, line_t *start)
 }
 
 /*
- * This function should always return 0 - since we want
- * to create stat data for *all* files in the list.
+ * Checks if the path specified (without the file name at the end) exists
+ * and creates it if not. If the path exists and is not a directory, an attempt
+ * to unlink is made.
  */
+static int
+setup_path(char *path)
+{
+	char 		*p;
+	int		ret;
+	struct stat	sb;
+
+	p = strrchr(path, '/');
+	if (p != NULL) {
+		*p = '\0';
+		if (stat(path, &sb) != 0 || !(S_ISDIR(sb.st_mode))) {
+			/* best effort attempt, mkdirp will catch the error */
+			(void) unlink(path);
+			if (bam_verbose)
+				bam_print(NEED_DIRPATH, path);
+			ret = mkdirp(path, DIR_PERMS);
+			if (ret == -1) {
+				bam_error(MKDIR_FAILED, path, strerror(errno));
+				*p = '/';
+				return (BAM_ERROR);
+			}
+		}
+		*p = '/';
+		return (BAM_SUCCESS);
+	}
+	return (BAM_SUCCESS);
+}
+
+typedef union {
+	gzFile	gzfile;
+	int	fdfile;
+} outfile;
+
+typedef struct {
+	char		path[PATH_MAX];
+	outfile		out;
+} cachefile;
+
+static int
+setup_file(char *base, const char *path, cachefile *cf)
+{
+	int	ret;
+	char	*strip;
+
+	/* init gzfile or fdfile in case we fail before opening */
+	if (bam_direct == BAM_DIRECT_DBOOT)
+		cf->out.gzfile = NULL;
+	else
+		cf->out.fdfile = -1;
+
+	/* strip the trailing altroot path */
+	strip = (char *)path + strlen(rootbuf);
+
+	ret = snprintf(cf->path, sizeof (cf->path), "%s/%s", base, strip);
+	if (ret >= sizeof (cf->path)) {
+		bam_error(PATH_TOO_LONG, rootbuf);
+		return (BAM_ERROR);
+	}
+
+	/* Check if path is present in the archive cache directory */
+	if (setup_path(cf->path) == BAM_ERROR)
+		return (BAM_ERROR);
+
+	if (bam_direct == BAM_DIRECT_DBOOT) {
+		if ((cf->out.gzfile = gzopen(cf->path, "wb")) == NULL) {
+			bam_error(GZ_OPEN_FAIL, gzerror(cf->out.gzfile, NULL));
+			return (BAM_ERROR);
+		}
+		(void) gzsetparams(cf->out.gzfile, Z_BEST_SPEED,
+		    Z_DEFAULT_STRATEGY);
+	} else {
+		if ((cf->out.fdfile = open(cf->path, O_WRONLY | O_CREAT, 0644))
+		    == -1) {
+			bam_error(OPEN_FAIL, cf->path, strerror(errno));
+			return (BAM_ERROR);
+		}
+	}
+
+	return (BAM_SUCCESS);
+}
+
+static int
+cache_write(cachefile cf, char *buf, int size)
+{
+	int	err;
+
+	if (bam_direct == BAM_DIRECT_DBOOT) {
+		if (gzwrite(cf.out.gzfile, buf, size) < 1) {
+			bam_error(GZ_WRITE_FAIL, gzerror(cf.out.gzfile, &err));
+			if (err == Z_ERRNO)
+				bam_error(WRITE_FAIL, cf.path, strerror(errno));
+			return (BAM_ERROR);
+		}
+	} else {
+		if (write(cf.out.fdfile, buf, size) < 1) {
+			bam_error(WRITE_FAIL, cf.path, strerror(errno));
+			return (BAM_ERROR);
+		}
+	}
+	return (BAM_SUCCESS);
+}
+
+static int
+cache_close(cachefile cf)
+{
+	int	ret;
+
+	if (bam_direct == BAM_DIRECT_DBOOT) {
+		if (cf.out.gzfile) {
+			ret = gzclose(cf.out.gzfile);
+			if (ret == Z_OK)
+				return (BAM_SUCCESS);
+			else if (ret == Z_ERRNO)
+				bam_error(CLOSE_FAIL, cf.path, strerror(errno));
+			else
+				bam_error(GZCLOSE_FAIL, gzerror(cf.out.gzfile,
+				    NULL));
+			return (BAM_ERROR);
+		}
+	} else {
+		if (cf.out.fdfile != -1) {
+			ret = close(cf.out.fdfile);
+			if (ret != 0) {
+				bam_error(CLOSE_FAIL, cf.path, strerror(errno));
+				return (BAM_ERROR);
+			}
+		}
+	}
+
+	return (BAM_SUCCESS);
+}
+
+static int
+dircache_updatefile(const char *path, int what)
+{
+	int 		ret, exitcode;
+	char 		buf[4096 * 4];
+	FILE 		*infile;
+	cachefile 	outfile, outupdt;
+
+	if (bam_nowrite())
+		return (BAM_SUCCESS);
+
+	if ((infile = fopen(path, "rb")) == NULL) {
+		bam_error(OPEN_FAIL, path, strerror(errno));
+		return (BAM_ERROR);
+	}
+
+	ret = setup_file(get_cachedir(what), path, &outfile);
+	if (ret == BAM_ERROR) {
+		exitcode = BAM_ERROR;
+		goto out;
+	}
+	if (!is_dir_flag_on(what, NO_MULTI)) {
+		ret = setup_file(get_updatedir(what), path, &outupdt);
+		if (ret == BAM_ERROR)
+			set_dir_flag(what, NO_MULTI);
+	}
+
+	while ((ret = fread(buf, 1, sizeof (buf), infile)) > 0) {
+		if (cache_write(outfile, buf, ret) == BAM_ERROR) {
+			exitcode = BAM_ERROR;
+			goto out;
+		}
+		if (!is_dir_flag_on(what, NO_MULTI))
+			if (cache_write(outupdt, buf, ret) == BAM_ERROR)
+				set_dir_flag(what, NO_MULTI);
+	}
+
+	set_dir_flag(what, NEED_UPDATE);
+	get_count(what)++;
+	exitcode = BAM_SUCCESS;
+out:
+	(void) fclose(infile);
+	if (cache_close(outfile) == BAM_ERROR)
+		exitcode = BAM_ERROR;
+	if (!is_dir_flag_on(what, NO_MULTI) &&
+	    cache_close(outupdt) == BAM_ERROR)
+		exitcode = BAM_ERROR;
+	if (exitcode == BAM_ERROR)
+		set_flag(UPDATE_ERROR);
+	return (exitcode);
+}
+
+static int
+dircache_updatedir(const char *path, int what, int updt)
+{
+	int		ret;
+	char		dpath[PATH_MAX];
+	char		*strip;
+	struct stat	sb;
+
+	strip = (char *)path + strlen(rootbuf);
+
+	ret = snprintf(dpath, sizeof (dpath), "%s/%s", updt ?
+	    get_updatedir(what) : get_cachedir(what), strip);
+
+	if (ret >= sizeof (dpath)) {
+		bam_error(PATH_TOO_LONG, rootbuf);
+		set_flag(UPDATE_ERROR);
+		return (BAM_ERROR);
+	}
+
+	if (stat(dpath, &sb) == 0 && S_ISDIR(sb.st_mode))
+		return (BAM_SUCCESS);
+
+	if (updt) {
+		if (!is_dir_flag_on(what, NO_MULTI))
+			if (!bam_nowrite() && mkdirp(dpath, DIR_PERMS) == -1)
+				set_dir_flag(what, NO_MULTI);
+	} else {
+		if (!bam_nowrite() && mkdirp(dpath, DIR_PERMS) == -1) {
+			set_flag(UPDATE_ERROR);
+			return (BAM_ERROR);
+		}
+	}
+
+	set_dir_flag(what, NEED_UPDATE);
+	return (BAM_SUCCESS);
+}
+
+#define	DO_CACHE_DIR	0
+#define	DO_UPDATE_DIR	1
+
+#if defined(_LP64) || defined(_LONGLONG_TYPE)
+typedef		Elf64_Ehdr	_elfhdr;
+#else
+typedef		Elf32_Ehdr	_elfhdr;
+#endif
+
+/*
+ * This routine updates the contents of the cache directory
+ */
+static int
+update_dircache(const char *path, int flags)
+{
+	int rc = BAM_SUCCESS;
+
+	switch (flags) {
+	case FTW_F:
+		{
+		int	fd;
+		_elfhdr	elf;
+
+		if ((fd = open(path, O_RDONLY)) < 0) {
+			bam_error(OPEN_FAIL, path, strerror(errno));
+			set_flag(UPDATE_ERROR);
+			rc = BAM_ERROR;
+			break;
+		}
+
+		/*
+		 * libelf and gelf would be a cleaner and easier way to handle
+		 * this, but libelf fails compilation if _ILP32 is defined &&
+		 * _FILE_OFFSET_BITS is != 32 ...
+		 */
+		if (read(fd, (void *)&elf, sizeof (_elfhdr)) < 0) {
+			bam_error(READ_FAIL, path, strerror(errno));
+			set_flag(UPDATE_ERROR);
+			(void) close(fd);
+			rc = BAM_ERROR;
+			break;
+		}
+		(void) close(fd);
+
+		/*
+		 * If the file is not an executable and is not inside an amd64
+		 * directory, we copy it in both the cache directories,
+		 * otherwise, we only copy it inside the 64-bit one.
+		 */
+		if (memcmp(elf.e_ident, ELFMAG, 4) != 0) {
+			if (strstr(path, "/amd64")) {
+				if (has_cachedir(FILE64))
+					rc = dircache_updatefile(path, FILE64);
+			} else if (has_cachedir(FILE64)) {
+				rc = dircache_updatefile(path, FILE32);
+				if (rc == BAM_SUCCESS)
+					rc = dircache_updatefile(path, FILE64);
+			} else {
+				rc = dircache_updatefile(path, FILE32);
+			}
+		} else {
+			/*
+			 * Based on the ELF class we copy the file in the 32-bit
+			 * or the 64-bit cache directory.
+			 */
+			if (elf.e_ident[EI_CLASS] == ELFCLASS32)
+				rc = dircache_updatefile(path, FILE32);
+			else if (elf.e_ident[EI_CLASS] == ELFCLASS64)
+				if (has_cachedir(FILE64))
+					rc = dircache_updatefile(path, FILE64);
+			else {
+				bam_print(NO3264ELF, path);
+				/* paranoid */
+				rc  = dircache_updatefile(path, FILE32);
+				if (rc == BAM_SUCCESS)
+					rc = dircache_updatefile(path, FILE64);
+			}
+		}
+		break;
+		}
+	case FTW_D:
+		if (strstr(path, "/amd64") == NULL) {
+			rc = dircache_updatedir(path, FILE32, DO_UPDATE_DIR);
+			if (rc == BAM_SUCCESS)
+				rc = dircache_updatedir(path, FILE32,
+				    DO_CACHE_DIR);
+		} else {
+			if (has_cachedir(FILE64)) {
+				rc = dircache_updatedir(path, FILE64,
+				    DO_UPDATE_DIR);
+				if (rc == BAM_SUCCESS)
+					rc = dircache_updatedir(path, FILE64,
+					    DO_CACHE_DIR);
+			}
+		}
+		break;
+	default:
+		rc = BAM_ERROR;
+		break;
+	}
+
+	return (rc);
+}
+
 /*ARGSUSED*/
 static int
 cmpstat(
 	const char *file,
-	const struct stat *stat,
+	const struct stat *st,
 	int flags,
 	struct FTW *ftw)
 {
-	uint_t sz;
-	uint64_t *value;
-	uint64_t filestat[2];
-	int error;
+	uint_t 		sz;
+	uint64_t 	*value;
+	uint64_t 	filestat[2];
+	int 		error, ret;
 
 	struct safefile *safefilep;
-	FILE *fp;
+	FILE 		*fp;
+	struct stat	sb;
 
 	/*
-	 * We only want regular files
+	 * On SPARC we create/update links too.
 	 */
-	if (!S_ISREG(stat->st_mode))
+	if (flags != FTW_F && flags != FTW_D && (flags == FTW_SL &&
+	    !is_flag_on(IS_SPARC_TARGET)))
+		return (0);
+
+	/*
+	 * Ignore broken links
+	 */
+	if (flags == FTW_SL && stat(file, &sb) < 0)
 		return (0);
 
 	/*
@@ -1273,20 +1696,13 @@ cmpstat(
 	 * but this is not fatal to update determination.
 	 */
 	if (walk_arg.new_nvlp) {
-		filestat[0] = stat->st_size;
-		filestat[1] = stat->st_mtime;
+		filestat[0] = st->st_size;
+		filestat[1] = st->st_mtime;
 		error = nvlist_add_uint64_array(walk_arg.new_nvlp,
 		    file + bam_rootlen, filestat, 2);
 		if (error)
 			bam_error(NVADD_FAIL, file, strerror(error));
 	}
-
-	/*
-	 * The remaining steps are only required if we haven't made a
-	 * decision about update or if we are checking (-n)
-	 */
-	if (walk_arg.need_update && !bam_check)
-		return (0);
 
 	/*
 	 * If we are invoked as part of system/filesystem/boot-archive, then
@@ -1320,6 +1736,41 @@ cmpstat(
 	}
 
 	/*
+	 * On SPARC we create a -path-list file for mkisofs
+	 */
+	if (is_flag_on(IS_SPARC_TARGET) && !bam_nowrite()) {
+		if (flags != FTW_D) {
+			char	*strip;
+
+			strip = (char *)file + strlen(rootbuf);
+			(void) fprintf(walk_arg.sparcfile, "/%s=%s\n", strip,
+			    file);
+		}
+	}
+
+	/*
+	 * We are transitioning from the old model to the dircache or the cache
+	 * directory was removed: create the entry without further checkings.
+	 */
+	if (is_flag_on(NEED_CACHE_DIR)) {
+		if (bam_verbose)
+			bam_print(PARSEABLE_NEW_FILE, file);
+
+		if (is_flag_on(IS_SPARC_TARGET)) {
+			set_dir_flag(FILE64, NEED_UPDATE);
+			return (0);
+		}
+
+		ret = update_dircache(file, flags);
+		if (ret == BAM_ERROR) {
+			bam_error(UPDT_CACHE_FAIL, file);
+			return (-1);
+		}
+
+		return (0);
+	}
+
+	/*
 	 * We need an update if file doesn't exist in old archive
 	 */
 	if (walk_arg.old_nvlp == NULL ||
@@ -1327,11 +1778,30 @@ cmpstat(
 	    file + bam_rootlen, &value, &sz) != 0) {
 		if (bam_smf_check)	/* ignore new during smf check */
 			return (0);
-		walk_arg.need_update = 1;
+
+		if (is_flag_on(IS_SPARC_TARGET)) {
+			set_dir_flag(FILE64, NEED_UPDATE);
+		} else {
+			ret = update_dircache(file, flags);
+			if (ret == BAM_ERROR) {
+				bam_error(UPDT_CACHE_FAIL, file);
+				return (-1);
+			}
+		}
+
 		if (bam_verbose)
 			bam_print(PARSEABLE_NEW_FILE, file);
 		return (0);
 	}
+
+	/*
+	 * If we got there, the file is already listed as to be included in the
+	 * iso image. We just need to know if we are going to rebuild it or not
+	 */
+
+	if (is_flag_on(IS_SPARC_TARGET) &&
+	    is_dir_flag_on(FILE64, NEED_UPDATE) && !bam_smf_check)
+		return (0);
 
 	/*
 	 * File exists in old archive. Check if file has changed
@@ -1339,8 +1809,8 @@ cmpstat(
 	assert(sz == 2);
 	bcopy(value, filestat, sizeof (filestat));
 
-	if (filestat[0] != stat->st_size ||
-	    filestat[1] != stat->st_mtime) {
+	if (flags != FTW_D && (filestat[0] != st->st_size ||
+	    filestat[1] != st->st_mtime)) {
 		if (bam_smf_check) {
 			safefilep = safefiles;
 			while (safefilep != NULL) {
@@ -1352,7 +1822,17 @@ cmpstat(
 				safefilep = safefilep->next;
 			}
 		}
-		walk_arg.need_update = 1;
+
+		if (is_flag_on(IS_SPARC_TARGET)) {
+			set_dir_flag(FILE64, NEED_UPDATE);
+		} else {
+			ret = update_dircache(file, flags);
+			if (ret == BAM_ERROR) {
+				bam_error(UPDT_CACHE_FAIL, file);
+				return (-1);
+			}
+		}
+
 		if (bam_verbose)
 			if (bam_smf_check)
 				bam_print("    %s\n", file);
@@ -1364,64 +1844,260 @@ cmpstat(
 }
 
 /*
- * Check flags and presence of required files.
+ * Remove a directory path recursively
+ */
+static int
+rmdir_r(char *path)
+{
+	struct dirent 	*d = NULL;
+	DIR 		*dir = NULL;
+	char 		tpath[PATH_MAX];
+	struct stat 	sb;
+
+	if ((dir = opendir(path)) == NULL)
+		return (-1);
+
+	while (d = readdir(dir)) {
+		if ((strcmp(d->d_name, ".") != 0) &&
+		    (strcmp(d->d_name, "..") != 0)) {
+			(void) snprintf(tpath, sizeof (tpath), "%s/%s",
+			    path, d->d_name);
+			if (stat(tpath, &sb) == 0) {
+				if (sb.st_mode & S_IFDIR)
+					(void) rmdir_r(tpath);
+				else
+					(void) remove(tpath);
+			}
+		}
+	}
+	return (remove(path));
+}
+
+/*
+ * Check if cache directory exists and, if not, create it and update flags
+ * accordingly. If the path exists, but it's not a directory, a best effort
+ * attempt to remove and recreate it is made.
+ * If the user requested a 'purge', always recreate the directory from scratch.
+ */
+static int
+set_cache_dir(char *root, int what)
+{
+	struct stat	sb;
+	int		ret = 0;
+
+	ret = snprintf(get_cachedir(what), sizeof (get_cachedir(what)),
+	    "%s%s%s%s%s", root, ARCHIVE_PREFIX, get_machine(), what == FILE64 ?
+	    "/amd64" : "", CACHEDIR_SUFFIX);
+
+	if (ret >= sizeof (get_cachedir(what))) {
+		bam_error(PATH_TOO_LONG, rootbuf);
+		return (BAM_ERROR);
+	}
+
+	if (bam_purge)
+		(void) rmdir_r(get_cachedir(what));
+
+	if (stat(get_cachedir(what), &sb) != 0 || !(S_ISDIR(sb.st_mode))) {
+		/* best effort unlink attempt, mkdir will catch errors */
+		(void) unlink(get_cachedir(what));
+
+		if (bam_verbose)
+			bam_print(UPDATE_CDIR_MISS, get_cachedir(what));
+		ret = mkdir(get_cachedir(what), DIR_PERMS);
+		if (ret < 0) {
+			bam_error(MKDIR_FAILED, get_cachedir(what),
+			    strerror(errno));
+			get_cachedir(what)[0] = '\0';
+			return (ret);
+		}
+		set_flag(NEED_CACHE_DIR);
+		set_dir_flag(what, NO_MULTI);
+	}
+
+	return (BAM_SUCCESS);
+}
+
+static int
+set_update_dir(char *root, int what)
+{
+	struct stat	sb;
+	int		ret;
+
+	if (is_dir_flag_on(what, NO_MULTI))
+		return (BAM_SUCCESS);
+
+	if (!bam_extend) {
+		set_dir_flag(what, NO_MULTI);
+		return (BAM_SUCCESS);
+	}
+
+	if (what == FILE64 && !is_flag_on(IS_SPARC_TARGET))
+		ret = snprintf(get_updatedir(what),
+		    sizeof (get_updatedir(what)), "%s%s%s/amd64%s", root,
+		    ARCHIVE_PREFIX, get_machine(), UPDATEDIR_SUFFIX);
+	else
+		ret = snprintf(get_updatedir(what),
+		    sizeof (get_updatedir(what)), "%s%s%s%s", root,
+		    ARCHIVE_PREFIX, get_machine(), UPDATEDIR_SUFFIX);
+
+	if (ret >= sizeof (get_updatedir(what))) {
+		bam_error(PATH_TOO_LONG, rootbuf);
+		return (BAM_ERROR);
+	}
+
+	if (stat(get_updatedir(what), &sb) == 0) {
+		if (S_ISDIR(sb.st_mode))
+			ret = rmdir_r(get_updatedir(what));
+		else
+			ret = unlink(get_updatedir(what));
+
+		if (ret != 0)
+			set_dir_flag(what, NO_MULTI);
+	}
+
+	if (mkdir(get_updatedir(what), DIR_PERMS) < 0)
+		set_dir_flag(what, NO_MULTI);
+
+	return (BAM_SUCCESS);
+}
+
+static int
+is_valid_archive(char *root, int what)
+{
+	char 		archive_path[PATH_MAX];
+	struct stat 	sb;
+	int 		ret;
+
+	if (what == FILE64 && !is_flag_on(IS_SPARC_TARGET))
+		ret = snprintf(archive_path, sizeof (archive_path),
+		    "%s%s%s/amd64%s", root, ARCHIVE_PREFIX, get_machine(),
+		    ARCHIVE_SUFFIX);
+	else
+		ret = snprintf(archive_path, sizeof (archive_path), "%s%s%s%s",
+		    root, ARCHIVE_PREFIX, get_machine(), ARCHIVE_SUFFIX);
+
+	if (ret >= sizeof (archive_path)) {
+		bam_error(PATH_TOO_LONG, rootbuf);
+		return (BAM_ERROR);
+	}
+
+	if (stat(archive_path, &sb) != 0) {
+		if (bam_verbose && !bam_check)
+			bam_print(UPDATE_ARCH_MISS, archive_path);
+		set_dir_flag(what, NEED_UPDATE);
+		set_dir_flag(what, NO_MULTI);
+		return (BAM_SUCCESS);
+	}
+
+	if (is_flag_on(IS_SPARC_TARGET))
+		return (BAM_SUCCESS);
+
+	if (bam_extend && sb.st_size > BA_SIZE_MAX) {
+		if (bam_verbose && !bam_check)
+			bam_print(MULTI_SIZE, archive_path, BA_SIZE_MAX);
+		set_dir_flag(what, NO_MULTI);
+	}
+
+	return (BAM_SUCCESS);
+}
+
+/*
+ * Check flags and presence of required files and directories.
  * The force flag and/or absence of files should
  * trigger an update.
  * Suppress stdout output if check (-n) option is set
  * (as -n should only produce parseable output.)
  */
-static void
+static int
 check_flags_and_files(char *root)
 {
-	char path[PATH_MAX];
-	struct stat sb;
+
+	struct stat 	sb;
+	int 		ret;
+
+	/*
+	 * If archive is missing, create archive
+	 */
+	if (is_flag_on(IS_SPARC_TARGET)) {
+		ret = is_valid_archive(root, FILE64);
+	} else {
+		int	what = FILE32;
+		do {
+			ret = is_valid_archive(root, what);
+			if (ret == BAM_ERROR)
+				return (BAM_ERROR);
+			what++;
+		} while (bam_direct == BAM_DIRECT_DBOOT && what < CACHEDIR_NUM);
+	}
+
+	if (bam_nowrite())
+		return (BAM_SUCCESS);
+
+
+	/*
+	 * check if cache directories exist on x86.
+	 * check (and always open) the cache file on SPARC.
+	 */
+	if (is_sparc()) {
+		ret = snprintf(get_cachedir(FILE64),
+		    sizeof (get_cachedir(FILE64)), "%s%s%s/%s", root,
+		    ARCHIVE_PREFIX, get_machine(), CACHEDIR_SUFFIX);
+
+		if (ret >= sizeof (get_cachedir(FILE64))) {
+			bam_error(PATH_TOO_LONG, rootbuf);
+			return (BAM_ERROR);
+		}
+
+		if (stat(get_cachedir(FILE64), &sb) != 0) {
+			set_flag(NEED_CACHE_DIR);
+			set_dir_flag(FILE64, NEED_UPDATE);
+		}
+
+		walk_arg.sparcfile = fopen(get_cachedir(FILE64), "w");
+		if (walk_arg.sparcfile == NULL) {
+			bam_error(OPEN_FAIL, get_cachedir(FILE64),
+			    strerror(errno));
+			return (BAM_ERROR);
+		}
+
+		set_dir_present(FILE64);
+	} else {
+		int	what = FILE32;
+
+		do {
+			if (set_cache_dir(root, what) != 0)
+				return (BAM_ERROR);
+
+			set_dir_present(what);
+
+			if (set_update_dir(root, what) != 0)
+				return (BAM_ERROR);
+			what++;
+		} while (bam_direct == BAM_DIRECT_DBOOT && what < CACHEDIR_NUM);
+	}
 
 	/*
 	 * if force, create archive unconditionally
 	 */
 	if (bam_force) {
-		walk_arg.need_update = 1;
-		if (bam_verbose && !bam_check)
+		if (!is_sparc())
+			set_dir_flag(FILE32, NEED_UPDATE);
+		set_dir_flag(FILE64, NEED_UPDATE);
+		if (bam_verbose)
 			bam_print(UPDATE_FORCE);
-		return;
+		return (BAM_SUCCESS);
 	}
 
-	/*
-	 * If archive is missing, create archive
-	 */
-	if (is_sparc()) {
-		(void) snprintf(path, sizeof (path), "%s%s%s%s", root,
-		    ARCHIVE_PREFIX, get_machine(), ARCHIVE_SUFFIX);
-	} else {
-		if (bam_direct == BAM_DIRECT_DBOOT) {
-			(void) snprintf(path, sizeof (path), "%s%s", root,
-			    DIRECT_BOOT_ARCHIVE_64);
-			if (stat(path, &sb) != 0) {
-				if (bam_verbose && !bam_check)
-					bam_print(UPDATE_ARCH_MISS, path);
-				walk_arg.need_update = 1;
-				return;
-			}
-		}
-		(void) snprintf(path, sizeof (path), "%s%s", root,
-		    DIRECT_BOOT_ARCHIVE_32);
-	}
-
-	if (stat(path, &sb) != 0) {
-		if (bam_verbose && !bam_check)
-			bam_print(UPDATE_ARCH_MISS, path);
-		walk_arg.need_update = 1;
-		return;
-	}
+	return (BAM_SUCCESS);
 }
 
 static error_t
 read_one_list(char *root, filelist_t  *flistp, char *filelist)
 {
-	char path[PATH_MAX];
-	FILE *fp;
-	char buf[BAM_MAXLINE];
-	const char *fcn = "read_one_list()";
+	char 		path[PATH_MAX];
+	FILE 		*fp;
+	char 		buf[BAM_MAXLINE];
+	const char 	*fcn = "read_one_list()";
 
 	(void) snprintf(path, sizeof (path), "%s%s", root, filelist);
 
@@ -1446,11 +2122,11 @@ read_one_list(char *root, filelist_t  *flistp, char *filelist)
 static error_t
 read_list(char *root, filelist_t  *flistp)
 {
-	char path[PATH_MAX];
-	char cmd[PATH_MAX];
-	struct stat sb;
-	int n, rval;
-	const char *fcn = "read_list()";
+	char 		path[PATH_MAX];
+	char 		cmd[PATH_MAX];
+	struct stat 	sb;
+	int 		n, rval;
+	const char 	*fcn = "read_list()";
 
 	flistp->head = flistp->tail = NULL;
 
@@ -1523,38 +2199,34 @@ read_list(char *root, filelist_t  *flistp)
 static void
 getoldstat(char *root)
 {
-	char path[PATH_MAX];
-	int fd, error;
-	struct stat sb;
-	char *ostat;
+	char 		path[PATH_MAX];
+	int 		fd, error;
+	struct stat 	sb;
+	char 		*ostat;
 
 	(void) snprintf(path, sizeof (path), "%s%s", root, FILE_STAT);
 	fd = open(path, O_RDONLY);
 	if (fd == -1) {
 		if (bam_verbose)
 			bam_print(OPEN_FAIL, path, strerror(errno));
-		walk_arg.need_update = 1;
-		return;
+		goto out_err;
 	}
 
 	if (fstat(fd, &sb) != 0) {
 		bam_error(STAT_FAIL, path, strerror(errno));
-		(void) close(fd);
-		walk_arg.need_update = 1;
-		return;
+		goto out_err;
 	}
 
 	ostat = s_calloc(1, sb.st_size);
 
 	if (read(fd, ostat, sb.st_size) != sb.st_size) {
 		bam_error(READ_FAIL, path, strerror(errno));
-		(void) close(fd);
 		free(ostat);
-		walk_arg.need_update = 1;
-		return;
+		goto out_err;
 	}
 
 	(void) close(fd);
+	fd = -1;
 
 	walk_arg.old_nvlp = NULL;
 	error = nvlist_unpack(ostat, sb.st_size, &walk_arg.old_nvlp, 0);
@@ -1564,9 +2236,36 @@ getoldstat(char *root)
 	if (error) {
 		bam_error(UNPACK_FAIL, path, strerror(error));
 		walk_arg.old_nvlp = NULL;
-		walk_arg.need_update = 1;
+		goto out_err;
+	} else {
 		return;
 	}
+
+out_err:
+	if (fd != -1)
+		(void) close(fd);
+	set_dir_flag(FILE32, NEED_UPDATE);
+	set_dir_flag(FILE64, NEED_UPDATE);
+}
+
+/* Best effort stale entry removal */
+static void
+delete_stale(char *file, int what)
+{
+	char		path[PATH_MAX];
+	struct stat	sb;
+
+	(void) snprintf(path, sizeof (path), "%s/%s", get_cachedir(what), file);
+	if (!bam_check && stat(path, &sb) == 0) {
+		if (sb.st_mode & S_IFDIR)
+			(void) rmdir_r(path);
+		else
+			(void) unlink(path);
+
+		set_dir_flag(what, (NEED_UPDATE | NO_MULTI));
+	}
+	if (bam_verbose)
+		bam_print(PARSEABLE_STALE_FILE, path);
 }
 
 /*
@@ -1582,12 +2281,18 @@ check4stale(char *root)
 	nvlist_t	*nvlp;
 	char 		*file;
 	char		path[PATH_MAX];
-	struct stat	sb;
 
 	/*
 	 * Skip stale file check during smf check
 	 */
 	if (bam_smf_check)
+		return;
+
+	/*
+	 * If we need to (re)create the cache, there's no need to check for
+	 * stale files
+	 */
+	if (is_flag_on(NEED_CACHE_DIR))
 		return;
 
 	/* Nothing to do if no old stats */
@@ -1601,10 +2306,15 @@ check4stale(char *root)
 			continue;
 		(void) snprintf(path, sizeof (path), "%s/%s",
 		    root, file);
-		if (stat(path, &sb) == -1) {
-			walk_arg.need_update = 1;
-			if (bam_verbose)
-				bam_print(PARSEABLE_STALE_FILE, path);
+		if (access(path, F_OK) < 0) {
+			int	what;
+
+			if (is_flag_on(IS_SPARC_TARGET))
+				set_dir_flag(FILE64, NEED_UPDATE);
+
+			for (what = FILE32; what < CACHEDIR_NUM; what++)
+				if (has_cachedir(what))
+					delete_stale(file, what);
 		}
 	}
 }
@@ -1624,7 +2334,7 @@ create_newstat(void)
 	}
 }
 
-static void
+static int
 walk_list(char *root, filelist_t *flistp)
 {
 	char path[PATH_MAX];
@@ -1639,6 +2349,8 @@ walk_list(char *root, filelist_t *flistp)
 		 */
 		(void) snprintf(path, sizeof (path), "%s%s", root, lp->line);
 		if (nftw(path, cmpstat, 20, FTW_PHYS) == -1) {
+			if (is_flag_on(UPDATE_ERROR))
+				return (BAM_ERROR);
 			/*
 			 * Some files may not exist.
 			 * For example: etc/rtc_config on a x86 diskless system
@@ -1648,16 +2360,18 @@ walk_list(char *root, filelist_t *flistp)
 				bam_print(NFTW_FAIL, path, strerror(errno));
 		}
 	}
+
+	return (BAM_SUCCESS);
 }
 
 static void
 savenew(char *root)
 {
-	char path[PATH_MAX];
-	char path2[PATH_MAX];
-	size_t sz;
-	char *nstat;
-	int fd, wrote, error;
+	char 	path[PATH_MAX];
+	char 	path2[PATH_MAX];
+	size_t 	sz;
+	char 	*nstat;
+	int 	fd, wrote, error;
 
 	nstat = NULL;
 	sz = 0;
@@ -1691,6 +2405,8 @@ savenew(char *root)
 	}
 }
 
+#define	init_walk_args()	bzero(&walk_arg, sizeof (walk_arg))
+
 static void
 clear_walk_args(void)
 {
@@ -1698,9 +2414,11 @@ clear_walk_args(void)
 		nvlist_free(walk_arg.old_nvlp);
 	if (walk_arg.new_nvlp)
 		nvlist_free(walk_arg.new_nvlp);
-	walk_arg.need_update = 0;
+	if (walk_arg.sparcfile)
+		(void) fclose(walk_arg.sparcfile);
 	walk_arg.old_nvlp = NULL;
 	walk_arg.new_nvlp = NULL;
+	walk_arg.sparcfile = NULL;
 }
 
 /*
@@ -1720,20 +2438,24 @@ clear_walk_args(void)
 static int
 update_required(char *root)
 {
-	struct stat sb;
-	char path[PATH_MAX];
-	filelist_t flist;
-	filelist_t *flistp = &flist;
-	int need_update;
+	struct stat 	sb;
+	char 		path[PATH_MAX];
+	filelist_t 	flist;
+	filelist_t 	*flistp = &flist;
+	int 		ret;
 
 	flistp->head = flistp->tail = NULL;
 
-	walk_arg.need_update = 0;
+	if (is_sparc())
+		set_flag(IS_SPARC_TARGET);
 
 	/*
-	 * Without consulting stat data, check if we need update
+	 * Check if cache directories and archives are present
 	 */
-	check_flags_and_files(root);
+
+	ret = check_flags_and_files(root);
+	if (ret < 0)
+		return (BAM_ERROR);
 
 	/*
 	 * In certain deployment scenarios, filestat may not
@@ -1745,20 +2467,13 @@ update_required(char *root)
 			return (0);
 	}
 
-	/*
-	 * consult stat data only if we haven't made a decision
-	 * about update. If checking (-n) however, we always
-	 * need stat data (since we want to compare old and new)
-	 */
-	if (!walk_arg.need_update || bam_check)
-		getoldstat(root);
+	getoldstat(root);
 
 	/*
 	 * Check if the archive contains files that are no longer
 	 * present on the root filesystem.
 	 */
-	if (!walk_arg.need_update || bam_check)
-		check4stale(root);
+	check4stale(root);
 
 	/*
 	 * read list of files
@@ -1776,38 +2491,471 @@ update_required(char *root)
 	 * we need to create new stat nvlist
 	 */
 	create_newstat();
-
 	/*
 	 * This walk does 2 things:
 	 *  	- gets new stat data for every file
 	 *	- (optional) compare old and new stat data
 	 */
-	walk_list(root, &flist);
+	ret = walk_list(root, &flist);
 
 	/* done with the file list */
 	filelist_free(flistp);
 
-	/*
-	 * if we didn't succeed in  creating new stat data above
-	 * just return result of update check so that archive is built.
-	 */
-	if (walk_arg.new_nvlp == NULL) {
-		bam_error(NO_NEW_STAT);
-		need_update = walk_arg.need_update;
-		clear_walk_args();
-		return (need_update ? 1 : 0);
+	/* something went wrong */
+
+	if (ret == BAM_ERROR) {
+		bam_error(CACHE_FAIL);
+		return (BAM_ERROR);
 	}
 
+	if (walk_arg.new_nvlp == NULL) {
+		(void) fclose(walk_arg.sparcfile);
+		bam_error(NO_NEW_STAT);
+	}
 
-	/*
-	 * If no update required, discard newstat
-	 */
-	if (!walk_arg.need_update) {
+	/* If nothing was updated, discard newstat. */
+
+	if (!is_dir_flag_on(FILE32, NEED_UPDATE) &&
+	    !is_dir_flag_on(FILE64, NEED_UPDATE)) {
 		clear_walk_args();
 		return (0);
 	}
 
+	(void) fclose(walk_arg.sparcfile);
+
 	return (1);
+}
+
+/*
+ * Returns 1 if we're dealing with a bfu archive update, 0 otherwise
+ */
+static int
+is_bfu()
+{
+	char *path;
+
+	path = getenv("PATH");
+	if (path != NULL &&
+	    strncmp(path, "/tmp/bfubin", strlen("/tmp/bfubin")) == 0) {
+		struct stat	sb;
+		if (stat("/tmp/bfubin", &sb) == 0) {
+			if (!(sb.st_mode & S_IFDIR))
+				return (0);
+			if (sb.st_uid != getuid())
+				return (0);
+			return (1);
+		}
+	}
+	return (0);
+}
+
+#define	LOCKFS_PATH	(is_bfu() ? LOCKFS_BFU : LOCKFS_BIN)
+
+static int
+flushfs(char *root)
+{
+	char	cmd[PATH_MAX + 30];
+
+	(void) snprintf(cmd, sizeof (cmd), "%s -f \"%s\" 2>/dev/null",
+	    LOCKFS_PATH, root);
+
+	return (exec_cmd(cmd, NULL));
+}
+
+static int
+do_archive_copy(char *source, char *dest)
+{
+
+	(void) sync();
+
+	/* the equivalent of mv archive-new-$pid boot_archive */
+	if (rename(source, dest) != 0)
+		return (BAM_ERROR);
+
+	if (flushfs(bam_root) != 0)
+		(void) sync();
+
+	return (BAM_SUCCESS);
+}
+
+static int
+check_cmdline(filelist_t flist)
+{
+	line_t	*lp;
+
+	for (lp = flist.head; lp; lp = lp->next) {
+		if (strstr(lp->line, "Error:") != NULL ||
+		    strstr(lp->line, "Inode number overflow") != NULL) {
+			(void) fprintf(stderr, "%s", lp->line);
+			return (BAM_ERROR);
+		}
+	}
+
+	return (BAM_SUCCESS);
+}
+
+static int
+check_archive(char *dest)
+{
+	struct stat	sb;
+
+	if (stat(dest, &sb) != 0 || !S_ISREG(sb.st_mode) ||
+	    sb.st_size < 10000) {
+		bam_error(ARCHIVE_BAD, dest);
+		(void) unlink(dest);
+		return (BAM_ERROR);
+	}
+
+	return (BAM_SUCCESS);
+}
+
+/*
+ * Returns 1 if mkiso is in the expected PATH, 0 otherwise
+ */
+static int
+is_mkisofs()
+{
+	if (is_bfu()) {
+		if (access(MKISOFS_BFUBIN, X_OK) == 0)
+			return (1);
+	} else {
+		if (access(MKISOFS_BIN, X_OK) == 0)
+			return (1);
+	}
+	return (0);
+}
+
+#define	MKISO_PARAMS	" -quiet -graft-points -dlrDJN -relaxed-filenames "
+#define	MKISO_PATH	(is_bfu() ? MKISOFS_BFUBIN : MKISOFS_BIN)
+#define	DD_PATH		(is_bfu() ? DD_PATH_BFU : DD_PATH_USR)
+
+static int
+create_sparc_archive(char *archive, char *tempname, char *bootblk, char *list)
+{
+	int		ret;
+	char		cmdline[3 * PATH_MAX + 64];
+	filelist_t	flist = {0};
+	const char	*func = "create_sparc_archive()";
+
+	if (access(bootblk, R_OK) == 1) {
+		bam_error(BOOTBLK_FAIL, bootblk);
+		return (BAM_ERROR);
+	}
+
+	/*
+	 * Prepare mkisofs command line and execute it
+	 */
+	(void) snprintf(cmdline, sizeof (cmdline), "%s %s -G %s -o \"%s\" "
+	    "-path-list \"%s\" 2>&1", MKISO_PATH, MKISO_PARAMS, bootblk,
+	    tempname, list);
+
+	BAM_DPRINTF((D_CMDLINE, func, cmdline));
+
+	ret = exec_cmd(cmdline, &flist);
+	if (ret != 0 || check_cmdline(flist) == BAM_ERROR)
+		goto out_err;
+
+	filelist_free(&flist);
+
+	/*
+	 * Prepare dd command line to copy the bootblk on the new archive and
+	 * execute it
+	 */
+	(void) snprintf(cmdline, sizeof (cmdline), "%s if=\"%s\" of=\"%s\""
+	    " bs=1b oseek=1 count=15 conv=notrunc conv=sync 2>&1", DD_PATH,
+	    bootblk, tempname);
+
+	BAM_DPRINTF((D_CMDLINE, func, cmdline));
+
+	ret = exec_cmd(cmdline, &flist);
+	if (ret != 0 || check_cmdline(flist) == BAM_ERROR)
+		goto out_err;
+
+	filelist_free(&flist);
+
+	/* Did we get a valid archive ? */
+	if (check_archive(tempname) == BAM_ERROR)
+		return (BAM_ERROR);
+
+	return (do_archive_copy(tempname, archive));
+
+out_err:
+	filelist_free(&flist);
+	bam_error(ARCHIVE_FAIL, cmdline);
+	(void) unlink(tempname);
+	return (BAM_ERROR);
+}
+
+static unsigned int
+from_733(unsigned char *s)
+{
+	int		i;
+	unsigned int	ret = 0;
+
+	for (i = 0; i < 4; i++)
+		ret |= s[i] << (8 * i);
+
+	return (ret);
+}
+
+static void
+to_733(unsigned char *s, unsigned int val)
+{
+	int	i;
+
+	for (i = 0; i < 4; i++)
+		s[i] = s[7-i] = (val >> (8 * i)) & 0xFF;
+}
+
+/*
+ * Extends the current boot archive without recreating it from scratch
+ */
+static int
+extend_iso_archive(char *archive, char *tempname, char *update_dir)
+{
+	int			fd = -1, newfd = -1, ret, i;
+	int			next_session = 0, new_size = 0;
+	char			cmdline[3 * PATH_MAX + 64];
+	const char		*func = "extend_iso_archive()";
+	filelist_t		flist = {0};
+	struct iso_pdesc	saved_desc[MAX_IVDs];
+
+	fd = open(archive, O_RDWR);
+	if (fd == -1) {
+		bam_error(OPEN_FAIL, archive, strerror(errno));
+		goto out_err;
+	}
+
+	/*
+	 * A partial read is likely due to a corrupted file
+	 */
+	ret = pread64(fd, saved_desc, sizeof (saved_desc),
+	    VOLDESC_OFF * CD_BLOCK);
+	if (ret != sizeof (saved_desc)) {
+		bam_error(READ_FAIL, archive, strerror(errno));
+		goto out_err;
+	}
+
+	if (memcmp(saved_desc[0].type, "\1CD001", 6)) {
+		bam_error(SIGN_FAIL, archive);
+		goto out_err;
+	}
+
+	/*
+	 * Read primary descriptor and locate next_session offset (it should
+	 * point to the end of the archive)
+	 */
+	next_session = P2ROUNDUP(from_733(saved_desc[0].volume_space_size), 16);
+
+	(void) snprintf(cmdline, sizeof (cmdline), "%s -C 16,%d -M %s %s -o \""
+	    "%s\" \"%s\" 2>&1", MKISO_PATH, next_session, archive, MKISO_PARAMS,
+	    tempname, update_dir);
+
+	BAM_DPRINTF((D_CMDLINE, func, cmdline));
+
+	ret = exec_cmd(cmdline, &flist);
+	if (ret != 0 || check_cmdline(flist) == BAM_ERROR) {
+		bam_error(MULTI_FAIL, cmdline);
+		goto out_flist_err;
+	}
+	filelist_free(&flist);
+
+	newfd = open(tempname, O_RDONLY);
+	if (newfd == -1) {
+		bam_error(OPEN_FAIL, archive, strerror(errno));
+		goto out_err;
+	}
+
+	ret = pread64(newfd, saved_desc, sizeof (saved_desc),
+	    VOLDESC_OFF * CD_BLOCK);
+	if (ret != sizeof (saved_desc)) {
+		bam_error(READ_FAIL, archive, strerror(errno));
+		goto out_err;
+	}
+
+	if (memcmp(saved_desc[0].type, "\1CD001", 6)) {
+		bam_error(SIGN_FAIL, archive);
+		goto out_err;
+	}
+
+	new_size = from_733(saved_desc[0].volume_space_size) + next_session;
+	to_733(saved_desc[0].volume_space_size, new_size);
+
+	for (i = 1; i < MAX_IVDs; i++) {
+		if (saved_desc[i].type[0] == (unsigned char)255)
+			break;
+		if (memcmp(saved_desc[i].id, "CD001", 5))
+			break;
+
+		if (bam_verbose)
+			bam_print("%s: Updating descriptor entry [%d]\n", func,
+			    i);
+
+		to_733(saved_desc[i].volume_space_size, new_size);
+	}
+
+	ret = pwrite64(fd, saved_desc, DVD_BLOCK, VOLDESC_OFF*CD_BLOCK);
+	if (ret != DVD_BLOCK) {
+		bam_error(WRITE_FAIL, archive, strerror(errno));
+		goto out_err;
+	}
+	(void) close(newfd);
+	newfd = -1;
+
+	ret = close(fd);
+	if (ret != 0) {
+		bam_error(CLOSE_FAIL, archive, strerror(errno));
+		return (BAM_ERROR);
+	}
+	fd = -1;
+
+	(void) snprintf(cmdline, sizeof (cmdline), "%s if=%s of=%s bs=32k "
+	    "seek=%d conv=sync 2>&1", DD_PATH, tempname, archive,
+	    (next_session/16));
+
+	BAM_DPRINTF((D_CMDLINE, func, cmdline));
+
+	ret = exec_cmd(cmdline, &flist);
+	if (ret != 0 || check_cmdline(flist) == BAM_ERROR) {
+		bam_error(MULTI_FAIL, cmdline);
+		goto out_flist_err;
+	}
+	filelist_free(&flist);
+
+	(void) unlink(tempname);
+
+	if (bam_verbose)
+		bam_print("boot archive updated successfully\n");
+
+	return (BAM_SUCCESS);
+
+out_flist_err:
+	filelist_free(&flist);
+out_err:
+	if (fd != -1)
+		(void) close(fd);
+	if (newfd != -1)
+		(void) close(newfd);
+	return (BAM_ERROR);
+}
+
+static int
+create_x86_archive(char *archive, char *tempname, char *update_dir)
+{
+	int		ret;
+	char		cmdline[3 * PATH_MAX + 64];
+	filelist_t	flist = {0};
+	const char	*func = "create_x86_archive()";
+
+	(void) snprintf(cmdline, sizeof (cmdline), "%s %s -o \"%s\" \"%s\" "
+	    "2>&1", MKISO_PATH, MKISO_PARAMS, tempname, update_dir);
+
+	BAM_DPRINTF((D_CMDLINE, func, cmdline));
+
+	ret = exec_cmd(cmdline, &flist);
+	if (ret != 0 || check_cmdline(flist) == BAM_ERROR) {
+		bam_error(ARCHIVE_FAIL, cmdline);
+		filelist_free(&flist);
+		(void) unlink(tempname);
+		return (BAM_ERROR);
+	}
+
+	filelist_free(&flist);
+
+	if (check_archive(tempname) == BAM_ERROR)
+		return (BAM_ERROR);
+
+	return (do_archive_copy(tempname, archive));
+}
+
+static int
+mkisofs_archive(char *root, int what)
+{
+	int		ret;
+	char		temp[PATH_MAX];
+	char 		bootblk[PATH_MAX];
+	char		boot_archive[PATH_MAX];
+
+	if (what == FILE64 && !is_flag_on(IS_SPARC_TARGET))
+		ret = snprintf(temp, sizeof (temp),
+		    "%s%s%s/amd64/archive-new-%d", root, ARCHIVE_PREFIX,
+		    get_machine(), getpid());
+	else
+		ret = snprintf(temp, sizeof (temp), "%s%s%s/archive-new-%d",
+		    root, ARCHIVE_PREFIX, get_machine(), getpid());
+
+	if (ret >= sizeof (temp))
+		goto out_path_err;
+
+	if (what == FILE64 && !is_flag_on(IS_SPARC_TARGET))
+		ret = snprintf(boot_archive, sizeof (boot_archive),
+		    "%s%s%s/amd64%s", root, ARCHIVE_PREFIX, get_machine(),
+		    ARCHIVE_SUFFIX);
+	else
+		ret = snprintf(boot_archive, sizeof (boot_archive),
+		    "%s%s%s%s", root, ARCHIVE_PREFIX, get_machine(),
+		    ARCHIVE_SUFFIX);
+
+	if (ret >= sizeof (boot_archive))
+		goto out_path_err;
+
+	bam_print("updating %s\n", boot_archive);
+
+	if (is_flag_on(IS_SPARC_TARGET)) {
+		ret = snprintf(bootblk, sizeof (bootblk),
+		    "%s/platform/%s/lib/fs/hsfs/bootblk", root, get_machine());
+		if (ret >= sizeof (bootblk))
+			goto out_path_err;
+
+		ret = create_sparc_archive(boot_archive, temp, bootblk,
+		    get_cachedir(what));
+	} else {
+		if (!is_dir_flag_on(what, NO_MULTI)) {
+			if (bam_verbose)
+				bam_print("Attempting to extend x86 archive: "
+				    "%s\n", boot_archive);
+
+			ret = extend_iso_archive(boot_archive, temp,
+			    get_updatedir(what));
+			if (ret == BAM_SUCCESS) {
+				if (bam_verbose)
+					bam_print("Successfully extended %s\n",
+					    boot_archive);
+
+				(void) rmdir_r(get_updatedir(what));
+				return (BAM_SUCCESS);
+			}
+		}
+		/*
+		 * The boot archive will be recreated from scratch. We get here
+		 * if at least one of these conditions is true:
+		 * - bootadm was called without the -e switch
+		 * - the archive (or the archive cache) doesn't exist
+		 * - archive size is bigger than BA_SIZE_MAX
+		 * - more than COUNT_MAX files need to be updated
+		 * - an error occourred either populating the /updates directory
+		 *   or extend_iso_archive() failed
+		 */
+		if (bam_verbose)
+			bam_print("Unable to extend %s... rebuilding archive\n",
+			    boot_archive);
+
+		if (get_updatedir(what)[0] != '\0')
+			(void) rmdir_r(get_updatedir(what));
+
+
+		ret = create_x86_archive(boot_archive, temp,
+		    get_cachedir(what));
+	}
+
+	if (ret == BAM_SUCCESS && bam_verbose)
+		bam_print("Successfully created %s\n", boot_archive);
+
+	return (ret);
+
+out_path_err:
+	bam_error(PATH_TOO_LONG, root);
+	return (BAM_ERROR);
 }
 
 static error_t
@@ -1816,10 +2964,26 @@ create_ramdisk(char *root)
 	char *cmdline, path[PATH_MAX];
 	size_t len;
 	struct stat sb;
+	int ret, what;
+
+	/* If there is mkisofs, use it to create the required archives */
+	if (is_mkisofs()) {
+		for (what = FILE32; what < CACHEDIR_NUM; what++) {
+			if (is_dir_flag_on(what, NEED_UPDATE)) {
+				ret = mkisofs_archive(root, what);
+				if (ret != 0)
+					return (BAM_ERROR);
+			}
+		}
+		return (BAM_SUCCESS);
+	}
 
 	/*
-	 * Setup command args for create_ramdisk.ksh
+	 * Else setup command args for create_ramdisk.ksh for the UFS archives
 	 */
+	if (bam_verbose)
+		bam_print("mkisofs not found, creating UFS archive\n");
+
 	(void) snprintf(path, sizeof (path), "%s/%s", root, CREATE_RAMDISK);
 	if (stat(path, &sb) != 0) {
 		bam_error(ARCH_EXEC_MISS, path, strerror(errno));
@@ -1850,13 +3014,11 @@ create_ramdisk(char *root)
 		return (BAM_ERROR);
 	}
 	free(cmdline);
-
 	/*
 	 * The existence of the expected archives used to be
 	 * verified here. This check is done in create_ramdisk as
 	 * it needs to be in sync with the altroot operated upon.
 	 */
-
 	return (BAM_SUCCESS);
 }
 
@@ -1885,7 +3047,6 @@ is_ramdisk(char *root)
 	 * worth it.
 	 * The other two conditions are handled here
 	 */
-
 	fp = fopen(MNTTAB, "r");
 	if (fp == NULL) {
 		bam_error(OPEN_FAIL, MNTTAB, strerror(errno));
@@ -2093,6 +3254,9 @@ update_archive(char *root, char *opt)
 	assert(root);
 	assert(opt == NULL);
 
+	init_walk_args();
+	(void) umask(022);
+
 	/*
 	 * root must belong to a boot archive based OS,
 	 */
@@ -2103,7 +3267,7 @@ update_archive(char *root, char *opt)
 		 */
 		if (!bam_update_all || bam_verbose)
 			bam_print(NOT_ARCHIVE_BOOT, root);
-		return (BAM_SUCCESS);
+		return (BAM_ERROR);
 	}
 
 	/*
@@ -2111,26 +3275,26 @@ update_archive(char *root, char *opt)
 	 * on first reboot following an upgrade because service
 	 * dependency is messed up), skip the check.
 	 */
-	if (bam_smf_check && !bam_root_readonly)
+	if (bam_smf_check && !bam_root_readonly && !is_zfs(root))
 		return (BAM_SUCCESS);
 
 	/*
 	 * root must be writable. This check applies to alternate
 	 * root (-R option); bam_root_readonly applies to '/' only.
+	 * The behaviour translates into being the one of a 'check'.
 	 */
 	if (!bam_smf_check && !bam_check && is_readonly(root)) {
-		if (bam_verbose)
-			bam_print(RDONLY_FS, root);
-		return (BAM_SUCCESS);
+		set_flag(RDONLY_FSCHK);
+		bam_check = 1;
 	}
 
 	/*
-	 * Don't generate archive on ramdisk
+	 * Don't generate archive on ramdisk, but still check if the
+	 * archive is up-to-date
 	 */
 	if (is_ramdisk(root)) {
-		if (bam_verbose)
-			bam_print(SKIP_RAMDISK);
-		return (BAM_SUCCESS);
+		set_flag(RAMDSK_FSCHK);
+		bam_check = 1;
 	}
 
 	/*
@@ -2141,8 +3305,24 @@ update_archive(char *root, char *opt)
 	/*
 	 * The check command (-n) is *not* a dry run
 	 * It only checks if the archive is in sync.
+	 * A readonly filesystem or being on a ramdisk have to be considered
+	 * errors only if an update is required.
 	 */
 	if (bam_check) {
+		if (is_flag_on(RDONLY_FSCHK)) {
+			if (ret > 0)
+				bam_error(RDONLY_FS, root);
+			if (bam_update_all)
+				return ((ret != 0) ? BAM_ERROR : BAM_SUCCESS);
+		}
+
+		if (is_flag_on(RAMDSK_FSCHK)) {
+			if (ret > 0)
+				bam_error(SKIP_RAMDISK, root);
+			if (bam_update_all)
+				return ((ret != 0) ? BAM_ERROR : BAM_SUCCESS);
+		}
+
 		bam_exit((ret != 0) ? 1 : 0);
 	}
 
@@ -2369,7 +3549,7 @@ update_all(char *root, char *opt)
 	 * mount of root.
 	 */
 	if (stat(LOFS_PATCH_FILE, &sb) == 0)  {
-		if (mkdir(LOFS_PATCH_MNT, 0755) == -1 &&
+		if (mkdir(LOFS_PATCH_MNT, DIR_PERMS) == -1 &&
 		    errno != EEXIST) {
 			bam_error(MKDIR_FAILED, "%s", LOFS_PATCH_MNT,
 			    strerror(errno));
@@ -3747,7 +4927,7 @@ mount_legacy_dataset(char *pool, zfs_mnted_t *mnted)
 	ret = stat(tmpmnt, &sb);
 	if (ret == -1) {
 		BAM_DPRINTF((D_Z_MOUNT_TOP_LEG_MNTPT_ABS, fcn, pool, tmpmnt));
-		ret = mkdirp(tmpmnt, 0755);
+		ret = mkdirp(tmpmnt, DIR_PERMS);
 		INJECT_ERROR1("Z_MOUNT_TOP_LEG_MNTPT_MKDIRP", ret = -1);
 		if (ret == -1) {
 			bam_error(MKDIR_FAILED, tmpmnt, strerror(errno));
@@ -4676,7 +5856,7 @@ FindAllUfsSignatures(void)
 	    "/tmp/bootadm_ufs_sign_mnt.%d", getpid());
 	(void) unlink(tmpmnt);
 
-	ret = mkdirp(tmpmnt, 0755);
+	ret = mkdirp(tmpmnt, DIR_PERMS);
 	error = errno;
 	INJECT_ERROR1("MKDIRP_SIGN_MNT", ret = -1);
 	if (ret == -1) {
@@ -5021,7 +6201,7 @@ set_backup_common(char *mntpt, char *sign)
 	INJECT_ERROR1("SET_BACKUP_STAT", ret = -1);
 	if (ret == -1) {
 		BAM_DPRINTF((D_BACKUP_DIR_NOEXIST, fcn, bdir));
-		ret = mkdirp(bdir, 0755);
+		ret = mkdirp(bdir, DIR_PERMS);
 		error = errno;
 		INJECT_ERROR1("SET_BACKUP_MKDIRP", ret = -1);
 		if (ret == -1) {
@@ -5174,7 +6354,7 @@ set_primary_common(char *mntpt, char *sign)
 
 	if (stat(signdir, &sb) == -1) {
 		BAM_DPRINTF((D_PRIMARY_DIR_NOEXIST, fcn, signdir));
-		ret = mkdirp(signdir, 0755);
+		ret = mkdirp(signdir, DIR_PERMS);
 		error = errno;
 		INJECT_ERROR1("SET_PRIMARY_MKDIRP", ret = -1);
 		if (ret == -1) {

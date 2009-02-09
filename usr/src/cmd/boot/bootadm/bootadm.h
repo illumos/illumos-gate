@@ -231,6 +231,8 @@ extern int is_sparc(void);
 /* Boot archives */
 #define	ARCHIVE_PREFIX		"/platform/"
 #define	ARCHIVE_SUFFIX		"/boot_archive"
+#define	CACHEDIR_SUFFIX		"/archive_cache"
+#define	UPDATEDIR_SUFFIX	"/updates"
 #define	DIRECT_BOOT_ARCHIVE	"/platform/i86pc/$ISADIR/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE_32	"/platform/i86pc/boot_archive"
 #define	DIRECT_BOOT_ARCHIVE_64	"/platform/i86pc/amd64/boot_archive"
@@ -238,6 +240,10 @@ extern int is_sparc(void);
 #define	FAILSAFE_ARCHIVE	"/boot/$ISADIR/x86.miniroot-safe"
 #define	FAILSAFE_ARCHIVE_32	"/boot/x86.miniroot-safe"
 #define	FAILSAFE_ARCHIVE_64	"/boot/amd64/x86.miniroot-safe"
+#define	CACHEDIR_32		"/platform/i86pc/archive_cache"
+#define	CACHEDIR_64		"/platform/i86pc/amd64/archive_cache"
+#define	UPDATEDIR_32		"/platform/i86pc/updates"
+#define	UPDATEDIR_64		"/platform/i86pc/amd64/updates"
 
 /* Hypervisors */
 #define	XEN_32			"/boot/xen.gz"
@@ -247,6 +253,14 @@ extern int is_sparc(void);
 #define	XEN_KERNEL_MODULE_LINE	HYPERVISOR_KERNEL " " HYPERVISOR_KERNEL
 #define	XEN_KERNEL_MODULE_LINE_ZFS	\
 	HYPERVISOR_KERNEL " " HYPERVISOR_KERNEL " " ZFS_BOOT
+
+/* Helpers */
+#define	MKISOFS_BIN		"/usr/bin/mkisofs"
+#define	MKISOFS_BFUBIN		"/tmp/bfubin/mkisofs"
+#define	DD_PATH_USR		"/usr/bin/dd"
+#define	DD_PATH_BFU		"/tmp/bfubin/dd"
+#define	LOCKFS_BIN		"/usr/sbin/lockfs"
+#define	LOCKFS_BFU		"/tmp/bfubin/lockfs"
 
 /* A first guess at the number of entries in a menu */
 #define	BAM_ENTRY_NUM		10

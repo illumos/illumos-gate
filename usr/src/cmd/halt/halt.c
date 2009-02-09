@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1366,24 +1366,25 @@ main(int argc, char *argv[])
 		need_check_zones = halt_zones();
 	}
 
-	/* sync boot archive in the global zone */
-	if (zoneid == GLOBAL_ZONEID && !nosync) {
-		char *fast_argv[] = {"/sbin/bootadm", "-a", "update_all",
+	/* if we're dumping, do the archive update here and don't defer it */
+
+	if (cmd == A_DUMP && zoneid == GLOBAL_ZONEID && !nosync) {
+		char *fast_argv[] = {"/sbin/bootadm", "-ea", "update_all",
 		    "fastboot", NULL};
-		char *b_argv[] = {"/sbin/bootadm", "-a", "update_all", NULL};
+		char *b_argv[] = {"/sbin/bootadm", "-ea", "update_all", NULL};
 
 		if (fast_reboot)
 			r = posix_spawn(NULL, fast_argv[0], NULL, NULL,
 			    fast_argv, NULL);
-		else
+			else
 			r = posix_spawn(NULL, b_argv[0], NULL, NULL, b_argv,
 			    NULL);
 
-	/* if posix_spawn fails we emit a warning and continue rebooting */
+		/* if posix_spawn fails we emit a warning and continue */
 
 		if (r != 0)
 			(void) fprintf(stderr, gettext("%s: WARNING, unable to"
-			    "start boot archive update\n"), cmdname);
+			    " start boot archive update\n"), cmdname);
 		else
 			(void) wait(NULL);
 	}
@@ -1441,8 +1442,41 @@ main(int argc, char *argv[])
 	 * handle a SIGTERM and clean up properly.
 	 */
 	if (cmd != A_DUMP) {
+		int	start, end, delta;
+
 		(void) kill(-1, SIGTERM);
-		(void) sleep(5);
+		start = time(NULL);
+
+		if (zoneid == GLOBAL_ZONEID && !nosync) {
+			char *fast_argv[] = {"/sbin/bootadm", "-ea",
+			    "update_all", "fastboot", NULL};
+			char *b_argv[] = {"/sbin/bootadm", "-ea", "update_all",
+			    NULL};
+
+			if (fast_reboot)
+				r = posix_spawn(NULL, fast_argv[0], NULL, NULL,
+				    fast_argv, NULL);
+			else
+				r = posix_spawn(NULL, b_argv[0], NULL, NULL,
+				    b_argv, NULL);
+
+			/*
+			 * if posix_spawn fails we emit a warning and
+			 * continue
+			 */
+
+			if (r != 0)
+				(void) fprintf(stderr, gettext("%s: WARNING, "
+				    "unable to start boot archive update\n"),
+				    cmdname);
+			else
+				(void) wait(NULL);
+		}
+
+		end = time(NULL);
+		delta = end - start;
+		if (delta < 5)
+			(void) sleep(5 - delta);
 	}
 
 	(void) signal(SIGINT, SIG_IGN);

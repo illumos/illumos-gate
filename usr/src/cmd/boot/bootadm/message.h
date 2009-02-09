@@ -59,6 +59,9 @@ extern "C" {
 
 #define	ABS_PATH_REQ gettext("path is not absolute: %s\n")
 
+#define	PATH_TOO_LONG \
+	gettext("unable to create path on mountpoint %s, path too long\n")
+
 #define	TOO_LONG gettext("the following line is too long (> %d chars)\n\t%s\n")
 
 #define	NOT_GRUB_BOOT \
@@ -79,7 +82,7 @@ extern "C" {
 
 #define	CANNOT_LOCATE_GRUB_MENU gettext("cannot find GRUB menu\n")
 
-#define	GRUB_MENU_PATH gettext("The location for the active GRUB menu is: %s\n")
+#define	GRUB_MENU_PATH gettext("the location for the active GRUB menu is: %s\n")
 
 #define	STUBBOOT_DIR_NOT_FOUND gettext("cannot find stubboot directory\n")
 
@@ -98,9 +101,9 @@ extern "C" {
 
 #define	SUBOPT_MISS gettext("missing suboption: %s\n")
 
-#define	NO_KERNEL gettext("No kernel line found in entry %d\n")
+#define	NO_KERNEL gettext("no kernel line found in entry %d\n")
 
-#define	EMPTY_MENU gettext("The GRUB menu is empty\n")
+#define	EMPTY_MENU gettext("the GRUB menu is empty\n")
 
 #define	UNLINK_EMPTY gettext("file is empty, deleting file: %s\n")
 
@@ -110,9 +113,12 @@ extern "C" {
 
 #define	INVALID_OPT gettext("invalid option: %s\n")
 
-#define	FAILED_SIG gettext("Cannot set SIGCHLD disposition: %s\n")
+#define	FAILED_SIG gettext("cannot set SIGCHLD disposition: %s\n")
 
-#define	CANT_UNBLOCK_SIGCHLD gettext("Cannot unblock SIGCHLD: %s\n")
+#define	CANT_UNBLOCK_SIGCHLD gettext("cannot unblock SIGCHLD: %s\n")
+
+#define	NO3264ELF \
+    gettext("WARNING: file %s is neither a 32-bit nor a 64-bit ELF\n")
 
 #define	BLOCKED_SIG gettext("SIGCHLD signal blocked. Cannot exec: %s\n")
 
@@ -124,17 +130,21 @@ extern "C" {
 
 #define	OPEN_FAIL gettext("failed to open file: %s: %s\n")
 
+#define	GZ_OPEN_FAIL gettext("failed to open %s\n")
+
 #define	LOCK_FAIL gettext("failed to lock file: %s: %s\n")
 
 #define	UNLOCK_FAIL gettext("failed to unlock file: %s: %s\n")
 
 #define	MMAP_FAIL gettext("failed to mmap file: %s: %s\n")
 
-#define	FILE_LOCKED gettext("Another instance of bootadm (pid %u) is running\n")
+#define	FILE_LOCKED gettext("another instance of bootadm (pid %u) is running\n")
 
 #define	NO_FLIST gettext("archive filelist is empty\n")
 
 #define	CLOSE_FAIL gettext("failed to close file: %s: %s\n")
+
+#define	GZCLOSE_FAIL gettext("unable to close %s\n")
 
 #define	RENAME_FAIL gettext("rename to file failed: %s: %s\n")
 
@@ -144,9 +154,23 @@ extern "C" {
 
 #define	ROOT_ABS gettext("this sub-command doesn't take root arguments: %s\n")
 
-#define	ARCHIVE_FAIL gettext("Command '%s' failed to create boot archive\n")
+#define	ARCHIVE_FAIL gettext("boot-archive creation FAILED, command: '%s'\n")
+
+#define	MULTI_FAIL \
+    gettext("Command '%s' failed while generating multisession archive\n")
+
+#define	INFILE_FAIL gettext("unable to read from %s: %s\n")
+
+#define	ARCHIVE_BAD gettext("archive file %s not generated correctly\n")
+
+#define	CACHE_FAIL	\
+    gettext("Failed to gather cache files, archives generation aborted\n")
+
+#define	BOOTBLK_FAIL gettext("unable to access bootblk file : %s\n")
 
 #define	WRITE_FAIL gettext("write to file failed: %s: %s\n")
+
+#define	GZ_WRITE_FAIL gettext("failed to write to %s\n")
 
 #define	STAT_FAIL gettext("stat of file failed: %s: %s\n")
 
@@ -177,17 +201,25 @@ extern "C" {
 
 #define	UPDATE_ARCH_MISS gettext("archive not found: %s\n")
 
+#define	UPDATE_CDIR_MISS gettext("archive cache directory not found: %s\n")
+
+#define	MULTI_SIZE \
+    gettext("archive %s is bigger than %d bytes and will be rebuilt\n")
+
 #define	READ_FAIL gettext("read failed for file: %s: %s\n")
 
 #define	UNPACK_FAIL gettext("failed to unpack stat data: %s: %s\n")
 
 #define	NFTW_FAIL gettext("cannot find: %s: %s\n")
 
+#define	SIGN_FAIL gettext("iso descriptor signature for %s is invalid\n")
+
 #define	STATVFS_FAIL gettext("statvfs failed for %s: %s\n")
 
 #define	IS_RAMDISK gettext("%s is on a ramdisk device\n")
 
-#define	SKIP_RAMDISK gettext("Skipping archive creation\n")
+#define	SKIP_RAMDISK \
+	gettext("Filesystem %s is on a ramdisk, skipping archive creation\n")
 
 #define	PRINT gettext("%s\n")
 
@@ -238,7 +270,7 @@ extern "C" {
 #define	FDISK_FILES_FOUND \
 	gettext("Deferred FDISK update file(s) found: %s, %s. Not supported.\n")
 
-#define	UNKNOWN_KERNEL	gettext("Unable to expand %s to a full file path.\n")
+#define	UNKNOWN_KERNEL	gettext("unable to expand %s to a full file path.\n")
 
 #define	UNKNOWN_KERNEL_REBOOT	\
 	gettext("Rebooting with default kernel and options.\n")
@@ -364,23 +396,23 @@ updated.  Not updating line %d\n")
 
 #define	INVALID_DEV_DSK gettext("not a /dev/[r]dsk name: %s\n")
 
-#define	CVT_FINDROOT gettext("Converting entries to findroot...\n")
+#define	CVT_FINDROOT gettext("converting entries to findroot...\n")
 
-#define	CVT_HV gettext("Adding xVM entries...\n")
+#define	CVT_HV gettext("adding xVM entries...\n")
 
-#define	CVT_DBOOT gettext("Converting entries to dboot...\n")
+#define	CVT_DBOOT gettext("converting entries to dboot...\n")
 
 #define	DOWNGRADE_NOTSUP \
-gettext("Automated downgrade of GRUB menu to older version not supported.\n")
+gettext("automated downgrade of GRUB menu to older version not supported.\n")
 
-#define	CANT_FIND_GRUBSIGN gettext("Cannot find GRUB signature for %s\n")
+#define	CANT_FIND_GRUBSIGN gettext("cannot find GRUB signature for %s\n")
 
 #define	CVT_TODO	\
-gettext("One or more GRUB menu entries were not automatically upgraded\n\
+gettext("one or more GRUB menu entries were not automatically upgraded\n\
 For details on manually updating entries, see %s\n")
 
 #define	CVT_ABORT	\
-gettext("Error upgrading GRUB menu entries on %s. Aborting.\n\
+gettext("error upgrading GRUB menu entries on %s. Aborting.\n\
 For details on manually updating entries, see %s\n")
 
 #define	HAND_ADDED_ENTRIES	\
@@ -389,57 +421,58 @@ bootadm(1M) or lu(1M). The following entries on %s will not be upgraded.\n\
 For details on manually updating entries, see %s\n")
 
 #define	SIGN_FSTYPE_MISMATCH	\
-gettext("Found mismatched boot signature %s for filesystem type: %s.\n")
+gettext("found mismatched boot signature %s for filesystem type: %s.\n")
 
 #define	REBOOT_FSTYPE_FAILED	\
-gettext("Failed to determine filesystem type for \"/\". Reboot with \n\
+gettext("failed to determine filesystem type for \"/\". Reboot with \n\
 arguments failed.\n")
 
 #define	REBOOT_SPECIAL_FAILED	\
-gettext("Failed to find device special file for \"/\". Reboot with \n\
+gettext("failed to find device special file for \"/\". Reboot with \n\
 arguments failed.\n")
 
 #define	REBOOT_SIGN_FAILED	\
-gettext("Failed to find boot signature. Reboot with arguments failed.\n")
+gettext("failed to find boot signature. Reboot with arguments failed.\n")
 
 #define	REBOOT_DIRECT_FAILED	\
-gettext("The root filesystem is not a dboot Solaris instance. \n\
+gettext("the root filesystem is not a dboot Solaris instance. \n\
 This version of bootadm is not supported on this version of Solaris.\n")
 
 #define	BOOTENV_FSTYPE_FAILED	\
-gettext("Cannot determine filesystem type for \"/\".\n\
+gettext("cannot determine filesystem type for \"/\".\n\
 Cannot generate GRUB menu entry with EEPROM arguments.\n")
 
 #define	BOOTENV_SPECIAL_FAILED	\
-gettext("Cannot determine device special file for \"/\".\n\
+gettext("cannot determine device special file for \"/\".\n\
 Cannot generate GRUB menu entry with EEPROM arguments.\n")
 
 #define	BOOTENV_SIGN_FAILED	\
-gettext("Cannot determine boot signature for \"/\".\n\
+gettext("cannot determine boot signature for \"/\".\n\
 Cannot generate GRUB menu entry with EEPROM arguments.\n")
 
 #define	GRUB_SLICE_FILE_EXISTS \
 	gettext("unsupported GRUB slice file (%s) exists - ignoring.\n")
 
 #define	GRUBSIGN_FOUND_OR_CREATED \
-gettext("Found or created GRUB signature %s for %s\n")
+gettext("found or created GRUB signature %s for %s\n")
 
-#define	GET_FSTYPE_ARGS gettext("No OS mountpoint. Cannot determine fstype\n")
+#define	GET_FSTYPE_ARGS gettext("no OS mountpoint. Cannot determine fstype\n")
 
 #define	MNTTAB_MNTPT_NOT_FOUND \
-	gettext("Failed to find OS mountpoint %s in %s\n")
+	gettext("failed to find OS mountpoint %s in %s\n")
 
 #define	MNTTAB_FSTYPE_NULL gettext("NULL fstype found for OS root %s\n")
 
-#define	MISSING_ARG gettext("Missing argument for sub-command\n")
+#define	MISSING_ARG gettext("missing argument for sub-command\n")
 
-#define	INVALID_BINARY gettext("Invalid or corrupted binary: %s\n")
+#define	INVALID_BINARY gettext("invalid or corrupted binary: %s\n")
 
 #define	PCFS_ROOT_NOTSUP gettext("root <%s> on PCFS is not supported\n")
 
 #define	NO_O_OSROOT gettext("OS root not specified with -o option: %s\n")
 
-#define	RDONLY_FS gettext("is a READONLY filesystem: %s\n")
+#define	RDONLY_FS \
+	gettext("archive update failed for %s: filesystem is readonly\n")
 
 #define	RDONLY_TEST_ERROR gettext("error during read-only test on %s: %s\n")
 
@@ -469,13 +502,13 @@ gettext("failed to set primary sign (%s) for %s: %s\n")
 #define	GET_FSTYPE_FAILED gettext("failed to get fstype for %s\n")
 
 #define	GET_SPECIAL_NULL_MNTPT \
-	gettext("Cannot get special file: NULL mount-point\n")
+	gettext("cannot get special file: NULL mount-point\n")
 
 #define	GET_SPECIAL_NULL \
-	gettext("Cannot get special file for mount-point: %s\n")
+	gettext("cannot get special file for mount-point: %s\n")
 
 #define	GET_PHYSICAL_MENU_NULL \
-	gettext("Cannot get physical device special file for menu root: %s\n")
+	gettext("cannot get physical device special file for menu root: %s\n")
 
 #define	GET_GRUBSIGN_ERROR \
 	gettext("failed to get grubsign for root: %s, device %s\n")
@@ -621,6 +654,10 @@ gettext("failed to get special file for menu_root: %s\n")
 
 #define	PROP_GRUB_MENU \
 	gettext("propagating updated GRUB menu\n")
+
+#define	NEED_DIRPATH	gettext("need to create directory path for %s\n")
+
+#define	UPDT_CACHE_FAIL	gettext("directory cache update failed for %s\n")
 
 /*
  * NOTE: The following are debug messages and not I18Ned
@@ -1047,6 +1084,8 @@ gettext("failed to get special file for menu_root: %s\n")
 
 #define	D_SET_HV "%s: setting XEN HV flag: %s\n"
 
+#define	D_REC_MKDIR "%s: making recursive directory %s\n"
+
 #define	D_SET_HAND_KERNEL "%s: is HAND kernel flag: %s\n"
 
 #define	D_IS_UNKNOWN_KERNEL "%s: is UNKNOWN kernel entry: %s\n"
@@ -1066,6 +1105,8 @@ gettext("failed to get special file for menu_root: %s\n")
 #define	D_IS_ROOT_CMD "%s: setting ROOT: %s\n"
 
 #define	D_IS_FINDROOT_CMD "%s: setting FINDROOT: %s\n"
+
+#define	D_CMDLINE  "%s: executing: %s\n"
 
 #define	D_IS_CHAINLOADER_CMD "%s: setting CHAINLOADER: %s\n"
 

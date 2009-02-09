@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 # 
 
 PROG= bootadm
@@ -37,13 +35,16 @@ include ../Makefile.com
 
 .KEEP_STATE:
 
-LDLIBS +=	-lnvpair -lgen -ladm -lefi -lscf
+LDLIBS +=	-lnvpair -lgen -ladm -lefi -lscf -lz
 
 # Writing into string literals is incorrect.  We need to match gcc's
 # behavior, which causes us to take SIGSEGV on such a write.
 CFLAGS +=	$(XSTRCONST)
 CPPFLAGS +=	-D_FILE_OFFSET_BITS=64
 CPPFLAGS +=	-I../../../uts/common -I../../../common
+
+LINTFLAGS += -erroff=E_INCONS_ARG_DECL2
+LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2
 
 all: $(PROG)
 

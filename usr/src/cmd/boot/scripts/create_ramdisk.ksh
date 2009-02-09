@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 format=ufs
@@ -263,7 +263,7 @@ function create_ufs
 
 	# do the actual copy
 	copy_files "$list"
-	umount "$rdmnt"
+	umount -f "$rdmnt"
 	rmdir "$rdmnt"
 
 	if [ $ISA = sparc ] ; then
@@ -287,6 +287,10 @@ function create_ufs
 		gzip -c "$rdfile" > "${archive}-new"
 	else
 		cat "$rdfile" > "${archive}-new"
+	fi
+	
+	if [ $? -ne 0 ] ; then
+		rm -f "${archive}-new"
 	fi
 }
 
@@ -340,12 +344,21 @@ function create_isofs
 	# compressed, and the final compression will accomplish very
 	# little.  To save time, we skip the gzip in this case.
 	#
+	mkiso_ret=0
+
 	if [ $ISA = i386 ] &&[ $compress = no ] && [ -x $GZIP_CMD ]
 	then
 		ksh -c "$isocmd" 2> "$errlog" | \
 		    gzip > "${archive}-new"
 	else
 		ksh -c "$isocmd" 2> "$errlog" > "${archive}-new"
+	fi
+
+	if [ $? -ne 0 ]; then
+		cat "$errlog"
+		rm -f "${archive}-new" 2> /dev/null
+		rm -f "$errlog" 2> /dev/null
+		return
 	fi
 
 	dd_ret=0
@@ -382,7 +395,7 @@ function create_archive
 
 	# sanity check the archive before moving it into place
 	#
-	ARCHIVE_SIZE=`ls -l "${archive}-new" | nawk '{ print $5 }'`
+	ARCHIVE_SIZE=`ls -l "${archive}-new" 2> /dev/null | nawk '{ print $5 }'`
 	if [ $compress = yes ] || [ $ISA = sparc ] ; then
 		#
 		# 'file' will report "English text" for uncompressed
@@ -398,7 +411,7 @@ function create_archive
 		LC_MESSAGES=C file "${archive}-new" | grep gzip > /dev/null
 	fi
 
-	if [ $? = 1 ] && [ -x $GZIP_CMD ] || [ $ARCHIVE_SIZE -lt 5000 ]
+	if [ $? = 1 ] && [ -x $GZIP_CMD ] || [ "$ARCHIVE_SIZE" -lt 10000 ]
 	then
 		#
 		# Two of these functions may be run in parallel.  We
