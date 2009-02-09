@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Object Management Functions
@@ -266,12 +264,12 @@ meta_CreateObject(CK_SESSION_HANDLE hSession, CK_ATTRIBUTE_PTR pTemplate,
 		object->clones[slot_num] = slot_object;
 		object->master_clone_slotnum = slot_num;
 
-		if (object->isToken || object->isFreeToken == FREE_ENABLED)
-			meta_slot_object_activate(slot_object,
-			    slot_session, B_TRUE);
-		else
-			meta_slot_object_activate(slot_object,
-			    slot_session, B_FALSE);
+		/* Allow FreeToken to activate onto token obj list */
+		if (object->isFreeToken == FREE_ENABLED)
+			object->isToken = B_TRUE;
+
+		meta_slot_object_activate(slot_object, slot_session,
+		    object->isToken);
 
 		slot_object = NULL;
 		meta_release_slot_session(slot_session);
@@ -328,7 +326,7 @@ cleanup:
 	if (slot_session)
 		meta_release_slot_session(slot_session);
 	if (object)
-		(void) meta_object_dealloc(object, B_TRUE);
+		(void) meta_object_dealloc(session, object, B_TRUE);
 
 	REFRELEASE(session);
 
@@ -544,6 +542,10 @@ meta_CopyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject,
 			}
 		}
 
+		/* Allow FreeToken to activate onto token obj list */
+		if (dst_object->isFreeToken == FREE_ENABLED)
+			dst_object->isToken = TRUE;
+
 		meta_slot_object_activate(dst_slot_object,
 		    slot_session, dst_object->isToken);
 
@@ -579,7 +581,8 @@ finish:
 			meta_slot_object_dealloc(dst_slot_object);
 
 		if (dst_object)
-			(void) meta_object_dealloc(dst_object, B_TRUE);
+			(void) meta_object_dealloc(session, dst_object,
+			    B_TRUE);
 
 		if (slot_session)
 			meta_release_slot_session(slot_session);
@@ -633,7 +636,7 @@ meta_DestroyObject(CK_SESSION_HANDLE hSession, CK_OBJECT_HANDLE hObject)
 	 * created a clone of this object.
 	 */
 	if (rv == CKR_OK)
-		rv = meta_object_dealloc(object, B_TRUE);
+		rv = meta_object_dealloc(session, object, B_TRUE);
 
 	REFRELEASE(session);
 
@@ -986,7 +989,8 @@ process_find_results(CK_OBJECT_HANDLE *results, CK_ULONG num_results,
 
 			rv = meta_slot_object_alloc(&slot_object);
 			if (rv != CKR_OK) {
-				(void) meta_object_dealloc(object, B_TRUE);
+				(void) meta_object_dealloc(session, object,
+				    B_TRUE);
 				return (rv);
 			}
 
@@ -999,7 +1003,8 @@ process_find_results(CK_OBJECT_HANDLE *results, CK_ULONG num_results,
 			rv = meta_object_get_attr(slot_session,
 			    slot_object->hObject, object);
 			if (rv != CKR_OK) {
-				(void) meta_object_dealloc(object, B_TRUE);
+				(void) meta_object_dealloc(session, object,
+				    B_TRUE);
 				return (rv);
 			}
 

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # lib/pkcs11/libsoftcrypto/sun4u/Makefile.com
@@ -42,7 +42,7 @@ BIGNUM_PSM_OBJS= mont_mulf_asm.o
 BIGNUM_FLAGS += -DUSE_FLOATING_POINT
 
 MAPFILES = ../mapfile-vers
-OBJECTS = $(AES_OBJS) $(ARCFOUR_OBJS) $(DES_OBJS) $(BIGNUM_PSM_OBJS) \
+OBJECTS = $(AES_OBJS) $(ARCFOUR_OBJS) $(DES_OBJS) $(BIGNUM_OBJS) \
 	$(MODES_OBJS)
 
 # Compiler settings

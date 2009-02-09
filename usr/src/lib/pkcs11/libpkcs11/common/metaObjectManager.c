@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdlib.h>
 #include <string.h>
@@ -445,7 +444,7 @@ meta_object_activate(meta_object_t *new_object)
  * Removes the object from the list of valid meta objects.  Note
  * that this function does not clean up any allocated
  * resources (memory, object clones, etc).   Cleaning up of
- * allocated resources is done by calling the meta_object_deallocate()
+ * allocated resources is done by calling the meta_object_dealloc()
  *
  */
 CK_RV
@@ -469,7 +468,7 @@ meta_object_deactivate(meta_object_t *object, boolean_t have_list_lock,
 	object->isClosingObject = B_TRUE;
 	(void) pthread_mutex_unlock(&object->isClosingObject_lock);
 
-	if (object->isToken) {
+	if (object->isToken || (object->isFreeToken == FREE_ENABLED)) {
 		list_lock = &tokenobject_list_lock;
 		list_head = &tokenobject_list_head;
 	} else {
@@ -546,7 +545,8 @@ meta_object_deactivate(meta_object_t *object, boolean_t have_list_lock,
  * object from the underlying slot.
  */
 CK_RV
-meta_object_dealloc(meta_object_t *object, boolean_t nukeSourceObj)
+meta_object_dealloc(meta_session_t *session, meta_object_t *object,
+    boolean_t nukeSourceObj)
 {
 	CK_RV rv, save_rv = CKR_OK;
 	CK_ULONG slotnum, num_slots;
@@ -566,7 +566,9 @@ meta_object_dealloc(meta_object_t *object, boolean_t nukeSourceObj)
 		    get_keystore_slotnum() == slotnum))) {
 
 			rv = meta_get_slot_session(slotnum, &obj_session,
-			    object->creator_session->session_flags);
+			    (session == NULL) ?
+			    object->creator_session->session_flags :
+			    session->session_flags);
 
 			if (rv == CKR_OK) {
 				rv = FUNCLIST(obj_session->fw_st_id)->\
@@ -1494,7 +1496,8 @@ finish:
 	}
 
 	if (tmp_meta_obj) {
-		(void) meta_object_dealloc(tmp_meta_obj, B_TRUE);
+		(void) meta_object_dealloc(tmp_meta_session, tmp_meta_obj,
+		    B_TRUE);
 	}
 
 	if (tmp_meta_session) {
@@ -1772,7 +1775,7 @@ meta_token_object_deactivate(token_obj_type_t token_type)
 				save_rv = rv;
 				goto finish;
 			}
-			rv = meta_object_dealloc(object, B_FALSE);
+			rv = meta_object_dealloc(NULL, object, B_FALSE);
 			if ((rv != CKR_OK) && (save_rv == CKR_OK)) {
 				save_rv = rv;
 				goto finish;

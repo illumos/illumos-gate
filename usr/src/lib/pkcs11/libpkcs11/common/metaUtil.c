@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1120,6 +1120,10 @@ loop_cleanup:
 		}
 	}
 
+	/* Allow FreeToken to activate onto token obj list */
+	if (key1->isFreeToken == FREE_ENABLED)
+		key1->isToken = B_TRUE;
+
 	meta_slot_object_activate(slot_key1, gen_session, key1->isToken);
 	key1->clones[slotnum] = slot_key1;
 	key1->master_clone_slotnum = slotnum;
@@ -1131,6 +1135,10 @@ loop_cleanup:
 	}
 
 	if (doKeyPair) {
+		/* Allow FreeToken to activate onto token obj list */
+		if (key2->isFreeToken == FREE_ENABLED)
+			key2->isToken = B_TRUE;
+
 		meta_slot_object_activate(slot_key2, gen_session,
 		    key2->isToken);
 		key2->clones[slotnum] = slot_key2;
@@ -1677,6 +1685,10 @@ loop_cleanup:
 		if (rv != CKR_OK) {
 			goto finish;
 		}
+
+		/* Allow FreeToken to activate onto token obj list */
+		if (newKey1->isFreeToken == FREE_ENABLED)
+			newKey1->isToken = B_TRUE;
 
 		meta_slot_object_activate(slotkey1, derive_session,
 		    newKey1->isToken);

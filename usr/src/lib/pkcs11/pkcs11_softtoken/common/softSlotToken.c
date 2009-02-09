@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <strings.h>
 #include <cryptoutil.h>
@@ -292,10 +290,7 @@ C_GetSlotInfo(CK_SLOT_ID slotID, CK_SLOT_INFO_PTR pInfo)
 	(void) strncpy((char *)pInfo->slotDescription, SOFT_SLOT_DESCRIPTION,
 	    64);
 	(void) strncpy((char *)pInfo->manufacturerID, SOFT_MANUFACTURER_ID, 32);
-	pInfo->flags = 0;
-	if (soft_keystore_status(KEYSTORE_PRESENT)) {
-		pInfo->flags |= CKF_TOKEN_PRESENT;
-	}
+	pInfo->flags = CKF_TOKEN_PRESENT;
 	pInfo->hardwareVersion.major = HARDWARE_VERSION_MAJOR;
 	pInfo->hardwareVersion.minor = HARDWARE_VERSION_MINOR;
 	pInfo->firmwareVersion.major = FIRMWARE_VERSION_MAJOR;

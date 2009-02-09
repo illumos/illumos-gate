@@ -19,14 +19,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _METAGLOBAL_H
 #define	_METAGLOBAL_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains all the data structures used for the meta slot
@@ -640,7 +639,8 @@ CK_RV meta_object_get_attr(slot_session_t *slot_session,
 void meta_object_activate(meta_object_t *object);
 CK_RV meta_object_deactivate(meta_object_t *object, boolean_t have_list_lock,
     boolean_t have_object_lock);
-CK_RV meta_object_dealloc(meta_object_t *object, boolean_t nukeSourceObj);
+CK_RV meta_object_dealloc(meta_session_t *session, meta_object_t *object,
+    boolean_t nukeSourceObj);
 CK_RV meta_slot_object_alloc(slot_object_t **object);
 void meta_slot_object_activate(slot_object_t *object, slot_session_t *session,
 	boolean_t isToken);

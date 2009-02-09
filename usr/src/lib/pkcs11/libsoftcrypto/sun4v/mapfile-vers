@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 
@@ -28,6 +28,25 @@ SUNWprivate {
     global:
 	arcfour_crypt;
 	arcfour_key_init;
+	big_One;
+	big_Two;
+	big_add;
+	big_bitlength;
+	big_cmp_abs;
+	big_copy;
+	big_div_pos;
+	big_ext_gcd_pos;
+	big_extend;
+	big_finish;
+	big_init1;
+	big_init;
+	big_modexp;
+	big_modexp_crt;
+	big_mul;
+	big_nextprime_pos;
+	big_sub;
+	big_sub_pos;
+	bignum2bytestring;
     local:
 	*;
 };

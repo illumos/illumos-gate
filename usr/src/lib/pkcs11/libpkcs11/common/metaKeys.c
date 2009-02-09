@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Key Management Functions
@@ -59,7 +56,7 @@ meta_GenerateKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		goto finish;
 
 	rv = meta_generate_keys(session, pMechanism, pTemplate, ulCount, key,
-		NULL, 0, NULL);
+	    NULL, 0, NULL);
 	if (rv != CKR_OK)
 		goto finish;
 
@@ -70,7 +67,7 @@ meta_GenerateKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 finish:
 	if (rv != CKR_OK) {
 		if (key)
-			(void) meta_object_dealloc(key, B_TRUE);
+			(void) meta_object_dealloc(session, key, B_TRUE);
 	}
 
 	REFRELEASE(session);
@@ -124,9 +121,9 @@ meta_GenerateKeyPair(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 finish:
 	if (rv != CKR_OK) {
 		if (key1)
-			(void) meta_object_dealloc(key1, B_TRUE);
+			(void) meta_object_dealloc(session, key1, B_TRUE);
 		if (key2)
-			(void) meta_object_dealloc(key2, B_TRUE);
+			(void) meta_object_dealloc(session, key2, B_TRUE);
 	}
 
 	REFRELEASE(session);
@@ -227,7 +224,7 @@ meta_UnwrapKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 finish:
 	if (rv != CKR_OK) {
 		if (outputKey)
-			(void) meta_object_dealloc(outputKey, B_TRUE);
+			(void) meta_object_dealloc(session, outputKey, B_TRUE);
 	}
 
 	OBJRELEASE(unwrappingKey);
@@ -254,7 +251,7 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	meta_session_t *session;
 	meta_object_t *basekey1 = NULL, *basekey2 = NULL;
 	meta_object_t *newKey1 = NULL, *newKey2 = NULL, *newKey3 = NULL,
-		*newKey4 = NULL;
+	    *newKey4 = NULL;
 	boolean_t ssl_keys = B_FALSE;
 	boolean_t tlsprf = B_FALSE;
 
@@ -320,7 +317,7 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	 */
 	switch (pMech->mechanism) {
 
-	    case CKM_ECMQV_DERIVE:
+	case CKM_ECMQV_DERIVE:
 		/* uses CK_ECDH2_DERIVE_PARAMS struct as the parameter */
 
 		if ((pMech->pParameter == NULL) || (pMech->ulParameterLen
@@ -340,8 +337,8 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		phBaseKey2 = &ecdh_params.hPrivateData;
 		break;
 
-	    case CKM_X9_42_DH_HYBRID_DERIVE:
-	    case CKM_X9_42_MQV_DERIVE:
+	case CKM_X9_42_DH_HYBRID_DERIVE:
+	case CKM_X9_42_MQV_DERIVE:
 		/* both use CK_X9_42_DH2_DERIVE_PARAMS as the parameter */
 
 		if ((pMech->pParameter == NULL) || (pMech->ulParameterLen
@@ -361,7 +358,7 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		phBaseKey2 = &x942_params.hPrivateData;
 		break;
 
-	    case CKM_CONCATENATE_BASE_AND_KEY:
+	case CKM_CONCATENATE_BASE_AND_KEY:
 		/* uses a CK_OBJECT_HANDLE as the parameter */
 
 		if ((pMech->pParameter == NULL) || (pMech->ulParameterLen
@@ -378,7 +375,7 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		phBaseKey2 = (CK_OBJECT_HANDLE *) &metaMech.pParameter;
 		break;
 
-	    default:
+	default:
 		/* nothing special to do. */
 		break;
 	}
@@ -412,8 +409,7 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 
 	/* Perform the actual key derive operation. */
 	rv = meta_derive_key(session, pMech, basekey1, basekey2, phBaseKey2,
-		pTemplate, ulAttributeCount,
-		newKey1, newKey2, newKey3, newKey4);
+	    pTemplate, ulAttributeCount, newKey1, newKey2, newKey3, newKey4);
 	if (rv != CKR_OK)
 		goto finish;
 
@@ -437,13 +433,13 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 finish:
 	if (rv != CKR_OK) {
 		if (newKey1)
-			(void) meta_object_dealloc(newKey1, B_TRUE);
+			(void) meta_object_dealloc(session, newKey1, B_TRUE);
 		if (newKey2)
-			(void) meta_object_dealloc(newKey2, B_TRUE);
+			(void) meta_object_dealloc(session, newKey2, B_TRUE);
 		if (newKey3)
-			(void) meta_object_dealloc(newKey3, B_TRUE);
+			(void) meta_object_dealloc(session, newKey3, B_TRUE);
 		if (newKey4)
-			(void) meta_object_dealloc(newKey4, B_TRUE);
+			(void) meta_object_dealloc(session, newKey4, B_TRUE);
 	}
 
 	if (basekey1)
