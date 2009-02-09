@@ -49,7 +49,7 @@ PATH2INST	= path_to_inst
 CONFIGFILES	= name_to_major minor_perm driver_aliases name_to_sysnum \
 		  driver_classes dacf.conf $(PATH2INST) mach
 SECCONFIG	= device_policy priv_names
-BOOTIMAGE	= solaris.xpm
+BOOTIMAGE	= solaris.xpm.gz
 BOOTENVRC	= bootenv.rc
 DEVMASTER	= master
 FILEMODE	= 644

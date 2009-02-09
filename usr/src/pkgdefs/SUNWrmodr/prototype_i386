@@ -55,7 +55,7 @@ i i.master
 # SUNWrmodr
 #
 d none boot 755 root sys
-f none boot/solaris.xpm 644 root sys
+f none boot/solaris.xpm.gz 644 root sys
 d none boot/solaris 755 root sys
 e bootenvrc boot/solaris/bootenv.rc 644 root sys
 d none boot/solaris/devicedb 755 root sys

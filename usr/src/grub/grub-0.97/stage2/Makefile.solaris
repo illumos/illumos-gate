@@ -611,7 +611,7 @@ SRC_FILES	= Makefile.am Makefile.in apic.h apm.S asm.S bios.c boot.c \
 		  fsys_reiserfs.c fsys_ufs.c fsys_ufs2.c fsys_vstafs.c \
 		  fsys_xfs.c graphics.c graphics.h gunzip.c hercules.c \
 		  hercules.h i386-elf.h imgact_aout.h iso9660.h jfs.h \
-		  logo.xbm mb_header.h mb_info.h md5.c md5.h nbi.h nbloader.S \
+		  mb_header.h mb_info.h md5.c md5.h nbi.h nbloader.S \
 		  pc_slice.h pxeloader.S serial.c serial.h setjmp.S shared.h \
 		  size_test smp-imps.c smp-imps.h stage1_5.c stage2.c \
 		  start.S start_eltorito.S term.h terminfo.c terminfo.h \

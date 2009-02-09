@@ -30,7 +30,9 @@
 #include <shared.h>
 #include <graphics.h>
 
+#ifdef	OVERLAY_LOGO
 #include <logo.xbm>
+#endif	/* OVERLAY_LOGO */
 
 int saved_videomode;
 unsigned char *font8x16;
@@ -101,8 +103,11 @@ static color_state graphics_color_state = COLOR_STATE_STANDARD;
 /* graphics local functions */
 static void graphics_setxy(int col, int row);
 static void graphics_scroll(void);
-static void draw_xbmlogo(void);
 static int read_image(char *);
+
+#ifdef	OVERLAY_LOGO
+static void draw_xbmlogo(void);
+#endif	/* OVERLAY_LOGO */
 
 /* FIXME: where do these really belong? */
 static inline void outb(unsigned short port, unsigned char val)
@@ -170,7 +175,9 @@ int graphics_init()
     graphics_set_palette(0x11, PALETTE_RED(border), PALETTE_GREEN(border),
 	PALETTE_BLUE(border));
 
+#ifdef	OVERLAY_LOGO
     draw_xbmlogo();
+#endif	/* OVERLAY_LOGO */
 
     graphics_inited = 1;
 
@@ -309,6 +316,7 @@ int graphics_setcursor (int on) {
     return 1;
 }
 
+#ifdef	OVERLAY_LOGO
 static void draw_xbmlogo(void)
 {
     unsigned char mask;
@@ -347,6 +355,7 @@ static void draw_xbmlogo(void)
 	fb_offset += ROWBYTES;
     }
 }
+#endif	/* OVERLAY_LOGO */
 
 /*
  * Read in the splashscreen image and set the palette up appropriately.
