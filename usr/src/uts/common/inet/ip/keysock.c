@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -854,7 +854,7 @@ keysock_opt_set(queue_t *q, uint_t mgmt_flags, int level,
     int name, uint_t inlen, uchar_t *invalp, uint_t *outlenp,
     uchar_t *outvalp, void *thisdg_attrs, cred_t *cr, mblk_t *mblk)
 {
-	int *i1 = (int *)invalp;
+	int *i1 = (int *)invalp, errno = 0;
 	keysock_t *ks = (keysock_t *)q->q_ptr;
 	keysock_stack_t	*keystack = ks->keysock_keystack;
 
@@ -869,20 +869,26 @@ keysock_opt_set(queue_t *q, uint_t mgmt_flags, int level,
 			break;
 		case SO_SNDBUF:
 			if (*i1 > keystack->keystack_max_buf)
-				return (ENOBUFS);
-			q->q_hiwat = *i1;
+				errno = ENOBUFS;
+			else q->q_hiwat = *i1;
 			break;
 		case SO_RCVBUF:
-			if (*i1 > keystack->keystack_max_buf)
-				return (ENOBUFS);
-			RD(q)->q_hiwat = *i1;
-			(void) proto_set_rx_hiwat(RD(q), NULL, *i1);
+			if (*i1 > keystack->keystack_max_buf) {
+				errno = ENOBUFS;
+			} else {
+				RD(q)->q_hiwat = *i1;
+				(void) proto_set_rx_hiwat(RD(q), NULL, *i1);
+			}
 			break;
+		default:
+			errno = EINVAL;
 		}
 		mutex_exit(&ks->keysock_lock);
 		break;
+	default:
+		errno = EINVAL;
 	}
-	return (0);
+	return (errno);
 }
 
 /*
