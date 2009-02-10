@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -78,6 +78,7 @@ f none opt/onbld/bin/jstyle 555 root bin
 f none opt/onbld/bin/keywords 555 root bin
 f none opt/onbld/bin/makebfu 555 root bin
 f none opt/onbld/bin/make_pkg_db 555 root bin
+f none opt/onbld/bin/mapfilechk 555 root bin
 f none opt/onbld/bin/mkacr 555 root bin
 f none opt/onbld/bin/mkbfu 555 root bin
 f none opt/onbld/bin/mkclosed 555 root bin
@@ -118,6 +119,8 @@ f none opt/onbld/lib/python/onbld/Checks/CStyle.py 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/CStyle.pyc 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/Cddl.py 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/Cddl.pyc 444 root bin
+f none opt/onbld/lib/python/onbld/Checks/CmtBlk.py 444 root bin
+f none opt/onbld/lib/python/onbld/Checks/CmtBlk.pyc 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/Comments.py 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/Comments.pyc 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/Copyright.py 444 root bin
@@ -130,6 +133,8 @@ f none opt/onbld/lib/python/onbld/Checks/JStyle.py 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/JStyle.pyc 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/Keywords.py 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/Keywords.pyc 444 root bin
+f none opt/onbld/lib/python/onbld/Checks/Mapfile.py 444 root bin
+f none opt/onbld/lib/python/onbld/Checks/Mapfile.pyc 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/ProcessCheck.py 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/ProcessCheck.pyc 444 root bin
 f none opt/onbld/lib/python/onbld/Checks/Rti.py 444 root bin
@@ -180,6 +185,7 @@ f none opt/onbld/man/man1/hgsetup.1 644 root bin
 f none opt/onbld/man/man1/jstyle.1 644 root bin
 f none opt/onbld/man/man1/lintdump.1 644 root bin
 f none opt/onbld/man/man1/make_pkg_db.1 644 root bin
+f none opt/onbld/man/man1/mapfilechk.1 644 root bin
 f none opt/onbld/man/man1/mkacr.1 644 root bin
 f none opt/onbld/man/man1/nightly.1 644 root bin
 f none opt/onbld/man/man1/sccscheck.1 644 root bin

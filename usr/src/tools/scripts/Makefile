@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -76,6 +76,7 @@ PYFILES= \
 	copyrightchk \
 	hdrchk \
 	hg-active \
+	mapfilechk \
 	rtichk \
 	wsdiff
 
@@ -92,6 +93,7 @@ MAN1FILES= \
 	hdrchk.1 \
 	hgsetup.1 \
 	jstyle.1 \
+	mapfilechk.1 \
 	mkacr.1 \
 	nightly.1 \
 	sccscheck.1 \

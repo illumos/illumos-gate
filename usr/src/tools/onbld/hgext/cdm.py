@@ -14,7 +14,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -54,7 +54,7 @@ from mercurial import cmdutil, node, ignore
 from onbld.Scm.WorkSpace import WorkSpace, ActiveEntry
 from onbld.Scm.Backup import CdmBackup
 from onbld.Checks import Cddl, Comments, Copyright, CStyle, HdrChk
-from onbld.Checks import JStyle, Keywords, Rti, onSWAN
+from onbld.Checks import JStyle, Keywords, Mapfile, Rti, onSWAN
 
 
 def yes_no(ui, msg, default):
@@ -125,10 +125,29 @@ def not_check(repo, cmd):
     '''return a function which returns boolean indicating whether a file
     should be skipped for CMD.'''
 
-    notfile = repo.join('cdm/%s.NOT' % cmd)
 
-    if os.path.exists(notfile):
-        return ignore.ignore(repo.root, [notfile], repo.ui.warn)
+    #
+    # The ignore routines need a canonical path to the file (relative to the
+    # repo root), whereas the check commands get paths relative to the cwd.
+    #
+    # Wrap our argument such that the path is canonified before it is checked.
+    #
+    def canonified_check(ignfunc):
+        def f(path):
+            cpath = util.canonpath(repo.root, repo.getcwd(), path)
+            return ignfunc(cpath)
+        return f
+
+    ignorefiles = []
+
+    for f in [ repo.join('cdm/%s.NOT' % cmd),
+               repo.wjoin('exception_lists/%s' % cmd) ]:
+        if os.path.exists(f):
+	    ignorefiles.append(f)
+
+    if ignorefiles:
+        ign = ignore.ignore(repo.root, ignorefiles, repo.ui.warn)
+        return canonified_check(ign)
     else:
         return util.never
 
@@ -305,6 +324,35 @@ def cdm_cddlchk(ui, repo, *args, **opts):
 
         fh = open(f, 'r')
         ret |= Cddl.cddlchk(fh, lenient=lenient, output=ui)
+        fh.close()
+    return ret
+
+
+def cdm_mapfilechk(ui, repo, *args, **opts):
+    '''check for a valid MAPFILE header block in active files
+
+    Check that all link-editor mapfiles contain the standard mapfile
+    header comment directing the reader to the document containing
+    Solaris object versioning rules (README.mapfile).'''
+
+    filelist = opts.get('filelist') or _buildfilelist(repo, args)
+
+    ui.write('Mapfile comment check:\n')
+
+    ret = 0
+    exclude = not_check(repo, 'mapfilechk')
+
+    for f, e in filelist.iteritems():
+        if e and e.is_removed():
+            continue
+        elif f.find('mapfile') == -1:
+            continue
+        elif (e or opts.get('honour_nots')) and exclude(f):
+            ui.status('Skipping %s...\n' % f)
+            continue
+
+        fh = open(f, 'r')
+        ret |= Mapfile.mapfilechk(fh, output=ui)
         fh.close()
     return ret
 
@@ -644,14 +692,15 @@ def run_checks(ws, cmds, *args, **opts):
 def cdm_nits(ui, repo, *args, **opts):
     '''check for stylistic nits in active files
 
-    Run cddlchk, copyright, cstyle, hdrchk, jstyle, permchk, and
-    keywords checks.'''
+    Run cddlchk, copyright, cstyle, hdrchk, jstyle, mapfilechk,
+    permchk, and keywords checks.'''
 
     cmds = [cdm_cddlchk,
         cdm_copyright,
         cdm_cstyle,
         cdm_hdrchk,
         cdm_jstyle,
+        cdm_mapfilechk,
         cdm_permchk,
         cdm_keywords]
 
@@ -661,9 +710,9 @@ def cdm_nits(ui, repo, *args, **opts):
 def cdm_pbchk(ui, repo, *args, **opts):
     '''pre-putback check all active files
 
-    Run cddlchk, comchk, copyright, cstyle, hdrchk, jstyle, permchk, tagchk,
-    branchchk, keywords and rtichk checks.  Additionally, warn about
-    uncommitted changes.'''
+    Run cddlchk, comchk, copyright, cstyle, hdrchk, jstyle, mapfilechk,
+    permchk, tagchk, branchchk, keywords and rtichk checks.  Additionally,
+    warn about uncommitted changes.'''
 
     #
     # The current ordering of these is that the commands from cdm_nits
@@ -675,6 +724,7 @@ def cdm_pbchk(ui, repo, *args, **opts):
         cdm_cstyle,
         cdm_hdrchk,
         cdm_jstyle,
+        cdm_mapfilechk,
         cdm_permchk,
         cdm_keywords,
         cdm_comchk,
@@ -987,6 +1037,8 @@ cmdtable = {
                                 ('a', 'added', None, 'show added files'),
                                 ('m', 'modified', None, 'show modified files')],
                     'hg list [-amrRu] [-p PARENT]'),
+    'mapfilechk': (cdm_mapfilechk, [('p', 'parent', '', 'parent workspace')],
+                'hg mapfilechk [-p PARENT]'),
     '^nits': (cdm_nits, [('p', 'parent', '', 'parent workspace')],
              'hg nits [-p PARENT]'),
     '^pbchk': (cdm_pbchk, [('p', 'parent', '', 'parent workspace'),

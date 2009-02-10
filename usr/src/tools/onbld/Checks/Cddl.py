@@ -22,104 +22,30 @@ CDDL HEADER END
 '''
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 
 #
-# Check source files contain a valid CDDL block
+# Check that source files contain a valid CDDL block
 #
 
-import re, sys
+import sys, CmtBlk
 
-CDDL = CDDL.splitlines()[1:]		# Don't include initial \n
+# scmtest has a test for cddlchk that depends on the variable
+# Cddl.CmntChrs. However, that variable has been refactored into
+# CmtBlk. The following line preserves the original interface
+# from the Cddl module, and allows existing programs that assume
+# Cddl.CmntChrs exists to continue working.
+#
+CmntChrs = CmtBlk.CmntChrs
 
-CmntChrs = r'#*!/\\";. '
-CDDLStartRE = re.compile(r'^[%s ]*CDDL HEADER START' % CmntChrs)
-CDDLEndRE = re.compile(r'^[%s ]*CDDL HEADER END' % CmntChrs)
-
-class CddlError(Exception):
-	def __init__(self, lineno, seen, shouldbe):
-		Exception.__init__(self)
-		self.lineno = lineno
-		self.seen = seen
-		self.shouldbe = shouldbe
-
-def checkblock(block):
-	line = block['start']
-	lictxt = block['block']
-
-	for actual, valid in map(lambda x, y: (x and x.lstrip(CmntChrs), y),
-			       lictxt, CDDL):
-		if actual != valid:
-			raise CddlError(line, actual, valid)
-		line += 1
+# The CDDL string above contains the block guards so that the text will
+# be tested by cddlchk. However, we don't want to include the initial
+# \n or the block guards in the text passed in.
+# 
+CDDL = CDDL.splitlines()[3:-2]
 
 def cddlchk(fh, filename=None, lenient=False, verbose=False, output=sys.stderr):
-	ret = 0
-	blocks = []
-	lic = []
-	in_cddl = False
-	start = 0
-	lineno = 0
-
-	if not filename:
-		filename = fh.name
-
-	for line in fh:
-		line = line.rstrip('\r\n')
-		lineno += 1
-		
-		if CDDLStartRE.search(line):
-			in_cddl = True
-			lic.append(line)
-			start = lineno
-		elif in_cddl and CDDLEndRE.search(line):
-			in_cddl = False
-			lic.append(line)
-			blocks.append({'start':start, 'block':lic})
-			start = 0
-			lic = []
-		elif in_cddl:
-			lic.append(line)
-
-	if in_cddl:
-		output.write('Error: Incomplete CDDL block in file %s\n'
-			     '    at line %s\n''' % (filename, start))
-
-	# Check for no CDDL, warn if we're not being lenient
-	if not len(blocks) and not lenient:
-		if not ret:
-			ret = 2
-		output.write("Warning: No CDDL block in file %s\n" % filename)
-
-	# Check for multiple CDDL blocks
-	if len(blocks) > 1:
-		ret = 1
-		output.write('Error: Multiple CDDL blocks in file %s\n'
-			     '    at lines %s\n''' %
-			     (filename, ', '.join([str(x['start'])
-						   for x in blocks])))
-
-	# Validate each CDDL block
-	for b in blocks:
-		try:
-			checkblock(b)
-		except CddlError, e:
-			ret = 1
-			output.write(
-				"Error: Invalid line in CDDL block in file %s\n"
-				"    at line %d, should be\n"
-				"    '%s'\n"
-				"    is\n"
-				"    '%s'\n" % (filename, e.lineno,
-						e.shouldbe, e.seen))
-			break
-		
-	if verbose and not ret:
-		output.write("Message: Valid CDDL block in file %s\n" %
-			     filename)
-
-	return ret
+	return CmtBlk.cmtblkchk(fh, 'CDDL', CDDL, filename=filename,
+				lenient=lenient, verbose=verbose, output=output)

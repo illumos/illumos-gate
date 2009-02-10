@@ -17,10 +17,9 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
-.\" ident	"%Z%%M%	%I%	%E% SMI"
 .TH cddlchk 1 "1 June 2008"
 .SH NAME
 cddlchk \- Check for valid CDDL header blocks
@@ -52,11 +51,24 @@ Report on all files, not just those with invalid headers
 Load an exceptions file containing a list of files, directories and
 file extensions to be ignored.
 Exceptions may be one of three types:
-.nf
-	* File paths
-	* Directories, specified with a trailing '/'
-	* File extensions, specified with a leading '*.'
-.fi
+.RS +4
+.TP
+.ie t \(bu
+.el o
+File paths
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+Directories, specified with a trailing '/'
+.RE
+.RS +4
+.TP
+.ie t \(bu
+.el o
+File extensions, specified with a leading '*.'
+.RE
 .LP
 .SH EXIT STATUS
 .TP 4
@@ -71,5 +83,4 @@ One or more errors or warnings were reported.
 .LP
 .TP 4
 .B 2
-Invalid command-line arguments were specified to the command, or one
-of the command-line help functions was invoked.
+Invalid command-line arguments were specified to the command.

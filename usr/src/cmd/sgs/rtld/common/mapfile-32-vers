@@ -24,6 +24,20 @@
 # Use is subject to license terms.
 #
 
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
 SUNWprivate_1.3 {
 	protected:
 		do32_reloc_rtld;	# Required to support librtld.so

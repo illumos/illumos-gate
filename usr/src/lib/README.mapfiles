@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 Mapfiles and versioning in ON
@@ -162,7 +160,9 @@ if you are masochistic, libc or libnsl.
 The ISA-specific mapfiles look like the common mapfile, except that only
 the ISA-specific names appear.  The version names are the same as those
 in the common mapfile, but only non-empty version instances are present
-and no inheritance specification is present.
+and no inheritance specification is present. The link-editor reads the
+information from the common and ISA-specific mapfiles and merges them
+in memory into a single description used to create the resulting object.
 
 -------------------------------------------------------------------------------
 
@@ -203,6 +203,14 @@ is no need to introduce a new private version name.  Be careful not to use
 a lower numbered private version name; doing so can cause runtime errors
 (as opposed to load time errors) when running an application with older
 versions of the library.
+
+There are libraries in the OSnet consolidation that contain only private
+interfaces. In such libraries, the SUNWprivate_m.n may be incremented
+to ensure that the programs that depend on them are built and delivered as a
+integrated unit. A notable example of this is libld.so (usr/src/cmd/sgs/libld),
+which contains the implementation of the link-editor, the public interface to
+which is provided by the ld command. When making a modification to the interface
+of such a library, you should follow the convention already in place. 
 
 4.3 Adding new public interfaces in an update release
 
@@ -328,12 +336,16 @@ would be the version that it would be associated with.
 
 5.3 Scoping a Private interface local
 
-Any interfaces not present in the mapfile-vers file will automatically be
-scoped local (i.e., they will not be visible outside the library).  Simply
+Any interfaces not present in the mapfile-vers file will be scoped local
+due to the presence of the
+    local:
+	*;
+lines discussed earlier. This ensures that such interfaces will not be visible
+outside the library.  To move an interface from Private to local scope, simply
 remove the Private interface from the mapfile-vers file and the header file
 to prevent it from being exported.  This may require moving the Private
 interface into a library-private header file.  Scope reduction of Public
-interfaces is not allowed.
+interfaces is not allowed without specific ARC review and approval.
 
 For the interface to be used in more than one file within the library, it
 should be in a header file that can be included by each file in the library

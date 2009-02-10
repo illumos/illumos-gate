@@ -1,5 +1,4 @@
-.\" ident	"%Z%%M%	%I%	%E% SMI"
-.\" Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+.\" Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 .\" Use is subject to license terms.
 .\"
 .\" CDDL HEADER START
@@ -21,12 +20,12 @@
 .\"
 .\" CDDL HEADER END
 .\"
-.TH check_rtime 1 "21 April 2008"
+.TH check_rtime 1 "29 January 2009"
 .SH NAME
 .I check_rtime
 \- check ELF runtime attributes
 .SH SYNOPSIS
-\fBcheck_rtime [-a] [-d depdir] [-i] [-m] [-o] [-s] file | dir, ...\fP
+\fBcheck_rtime [-a] [-d depdir] [-i] [-m] [-o] [-s] [-v] file | dir, ...\fP
 .LP
 .SH DESCRIPTION
 .IX "OS-Net build tools" "check_rtime" "" "\fBcheck_rtime\fP"
@@ -358,6 +357,16 @@ foo: non-conforming mcs(1) comment  <no $(POST_PROCESS)?>
 .RE
 .sp
 .LP
+.I check_rtime
+uses \fBpvs(1)\fP to display version definitions under the \fB-v\fP option.
+Each symbol defined by the object is shown along with the version it belongs to.
+Changes to the symbols defined by an object, or the versions they belong to,
+do not necessarily indicate an error condition, but
+provides information that is often useful for gatekeepers to track
+changes in a release.
+.RE
+.sp
+.LP
 .SH OPTIONS
 .LP
 The following options are supported:
@@ -402,6 +411,10 @@ more appropriate for sorting and diffing with previous build results.
 .TP
 .B \-s
 Determine whether \fI.stabs\fP sections exist.
+.TP
+.B \-v
+Provide version definition information. Each symbol defined by the object
+is printed along with the version it is assigned to.
 .LP
 .SH ALTERNATIVE DEPENDENCY MAPPING
 As

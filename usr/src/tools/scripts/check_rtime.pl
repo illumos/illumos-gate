@@ -303,7 +303,7 @@ if ($Mach =~ /sparc/) {
 }
 
 # Check that we have arguments.
-if ((getopts('ad:imos', \%opt) == 0) || ($#ARGV == -1)) {
+if ((getopts('ad:imosv', \%opt) == 0) || ($#ARGV == -1)) {
 	print "usage: $Prog [-a] [-d depdir] [-m] [-o] [-s] file | dir, ...\n";
 	print "\t[-a]\t\tprocess all files (ignore any exception lists)\n";
 	print "\t[-d dir]\testablish dependencies from under directory\n";
@@ -311,6 +311,7 @@ if ((getopts('ad:imos', \%opt) == 0) || ($#ARGV == -1)) {
 	print "\t[-m]\t\tprocess mcs(1) comments\n";
 	print "\t[-o]\t\tproduce one-liner output (prefixed with pathname)\n";
 	print "\t[-s]\t\tprocess .stab and .symtab entries\n";
+	print "\t[-v]\t\tprocess version definition entries\n";
 	exit 1;
 } else {
 	my($Proto);
@@ -465,7 +466,7 @@ sub ProcFile {
 	my(@Elf, @Ldd, $Dyn, $Intp, $Dll, $Ttl, $Sym, $Interp, $Stack);
 	my($Sun, $Relsz, $Pltsz, $Tex, $Stab, $Strip, $Lddopt, $SymSort);
 	my($Val, $Header, $SkipLdd, $IsX86, $RWX, $UnDep);
-	my($HasDirectBinding);
+	my($HasDirectBinding, $HasVerdef);
 
 	# Ignore symbolic links.
 	if (-l $FullPath) {
@@ -491,7 +492,7 @@ sub ProcFile {
 
 	# Determine whether we have a executable (static or dynamic) or a
 	# shared object.
-	@Elf = split(/\n/, `elfdump -epdicy $FullPath 2>&1`);
+	@Elf = split(/\n/, `elfdump -epdicyv $FullPath 2>&1`);
 
 	$Dyn = $Intp = $Dll = $Stack = $IsX86 = $RWX = 0;
 	$Interp = 1;
@@ -795,6 +796,7 @@ DYN:
 	$Sun = $Relsz = $Pltsz = $Dyn = $Stab = $SymSort = 0;
 	$Tex = $Strip = 1;
 	$HasDirectBinding = 0;
+	$HasVerdef = 0;
 
 	$Header = 'None';
 ELF:	foreach my $Line (@Elf) {
@@ -827,6 +829,9 @@ ELF:	foreach my $Line (@Elf) {
 			next;
 		} elsif ($Line =~ /^Syminfo Section/) {
 			$Header = 'Syminfo';
+			next;
+		} elsif ($Line =~ /^Version Definition Section/) {
+			$HasVerdef = 1;
 			next;
 		} elsif (($Header ne 'Dyn') && ($Header ne 'Syminfo')) {
 			next;
@@ -955,6 +960,11 @@ DONESTAB:
 	# If there are symbol sort sections in this object, report on
 	# any that have duplicate addresses.
 	ProcSymSort($FullPath, $RelPath, \$Ttl) if $SymSort;
+
+	# If -v was specified, and the object has a version definition
+	# section, generate output showing each public symbol and the
+	# version it belongs to.
+	ProcVerdef($FullPath, $RelPath, \$Ttl) if $HasVerdef && $opt{v};
 }
 
 
@@ -1046,6 +1056,74 @@ sub ProcSymSort {
 		if (scalar(@dups) > 1);
 	
 	close SORT;
+}
+
+
+## ProcVerdef(FullPath, RelPath)
+#
+# Examine the version definition section for the given object and report
+# each public symbol along with the version it belongs to.
+#
+sub ProcVerdef {
+
+	my($FullPath, $RelPath, $RefTtl) = @_;
+	my $line;
+	my $cur_ver = '';
+	my $tab = $opt{o} ? '' : "\t";
+
+	# pvs -dov provides information about the versioning hierarchy
+	# in the file. Lines are of the format:
+	#	path - version[XXX];
+	# where [XXX] indicates optional information, such as flags
+	# or inherited versions.
+	#
+	# Private versions are allowed to change freely, so ignore them.
+	open(PVS, "pvs -dov $FullPath|") ||
+	    die "$Prog: Unable to execute pvs (version definition section)\n";
+
+	while ($line = <PVS>) {
+		chomp $line;
+
+		if ($line =~ /^[^\s]+\s+-\s+([^;]+)/) {
+			my $ver = $1;
+
+			next if $ver =~ /private/i;
+			OutMsg($$RefTtl++, $RelPath, "${tab}VERDEF=$ver");
+		}
+	}
+	close PVS;
+
+	# pvs -dos lists the symbols assigned to each version definition.
+	# Lines are of the format:
+	#	path - version: symbol;
+	#	path - version: symbol (size);
+	# where the (size) is added to data items, but not for functions.
+	# We strip off the size, if present.
+
+	open(PVS, "pvs -dos $FullPath|") ||
+	    die "$Prog: Unable to execute pvs (version definition section)\n";
+	while ($line = <PVS>) {
+		chomp $line;
+		if ($line =~ /^[^\s]+\s+-\s+([^:]+):\s*([^\s;]+)/) {
+		    my $ver = $1;
+		    my $sym = $2;
+
+		    next if $ver =~ /private/i;
+
+		    if ($opt{o}) {
+			OutMsg($$RefTtl++, $RelPath,
+			       "VERSION=$ver, SYMBOL=$sym");
+		    } else {
+			if ($cur_ver ne $ver) {
+			    OutMsg($$RefTtl++, $RelPath, "\tVERSION=$ver");
+			    $cur_ver = $ver;
+			}			    
+			OutMsg($$RefTtl++, $RelPath, "\t\tSYMBOL=$sym");
+		    }
+		}
+	}
+	
+	close PVS;
 }
 
 

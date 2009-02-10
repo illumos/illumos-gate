@@ -1,12 +1,27 @@
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-# Copyright (c) 2001 by Sun Microsystems, Inc.
-# All rights reserved.
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
 #
 # Linker mapfile that allows the dynamic library to reference some symbols
 # defined by the application.
 #
+
 {
 	global:
 		allow_severity = extern;

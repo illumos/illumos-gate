@@ -18,22 +18,27 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+
+#
+# MAPFILE HEADER START
+#
+# WARNING:  STOP NOW.  DO NOT MODIFY THIS FILE.
+# Object versioning must comply with the rules detailed in
+#
+#	usr/src/lib/README.mapfiles
+#
+# You should not be making modifications here until you've read the most current
+# copy of that file. If you need help, contact a gatekeeper for guidance.
+#
+# MAPFILE HEADER END
+#
+
 #
 # Generic interface definition for usr/src/lib/librdc.
 #
-# For information regarding the establishment of versioned definitions see:
-#	The Linker and Libraries Manual (version 2.5 or greater)
-# This is part of the Developers Guide in the Answerbook.  Specifically refer
-# to Chapter 2 under section "Defining Additional Symbols" through section
-# "Reducing Symbol Scope", and Chapter 5 "Versioning".
-#
-# For specific OSNET rules for the modification (evolution) of these version
-# definitions see:
-#	Policy for Shared Library Version Names and Interface Definitions
-
 
 SUNWprivate_1.1 {
 	global:

@@ -20,10 +20,8 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include $(SRC)/Makefile.master
@@ -32,12 +30,14 @@ include ../../Makefile.tools
 PYSRCS= \
 	CStyle.py	\
 	Cddl.py		\
+	CmtBlk.py	\
 	Comments.py	\
 	Copyright.py	\
 	DbLookups.py	\
 	HdrChk.py	\
 	JStyle.py	\
 	Keywords.py	\
+	Mapfile.py		\
 	ProcessCheck.py \
 	Rti.py		\
 	__init__.py
