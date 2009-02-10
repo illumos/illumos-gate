@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/spa.h>
 #include <sys/dmu.h>
@@ -78,8 +76,8 @@ zap_normalize(zap_t *zap, const char *name, char *namenorm)
 
 	err = 0;
 	(void) u8_textprep_str((char *)name, &inlen, namenorm, &outlen,
-	    zap->zap_normflags | U8_TEXTPREP_IGNORE_NULL, U8_UNICODE_LATEST,
-	    &err);
+	    zap->zap_normflags | U8_TEXTPREP_IGNORE_NULL |
+	    U8_TEXTPREP_IGNORE_INVALID, U8_UNICODE_LATEST, &err);
 
 	return (err);
 }
