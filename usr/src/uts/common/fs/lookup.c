@@ -1061,7 +1061,7 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, cred_t *cr)
 				rpn.pn_path = rpn.pn_buf;
 
 				/*
-				 * Ensure the mointpoint still exists.
+				 * Ensure the mountpoint still exists.
 				 */
 				VN_HOLD(vrootp);
 				if (vrootp != rootdir)
@@ -1088,6 +1088,49 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, cred_t *cr)
 			} else {
 				refstr_rele(mntpt);
 			}
+		}
+
+		/*
+		 * Shortcut: see if this vnode has correct v_path. If so,
+		 * we have the work done.
+		 */
+		mutex_enter(&vp->v_lock);
+		if (vp->v_path != NULL) {
+
+			if ((err = pn_set(&pn, vp->v_path)) == 0) {
+				mutex_exit(&vp->v_lock);
+				rpn.pn_path = rpn.pn_buf;
+
+				/*
+				 * Ensure the v_path pointing to correct vnode
+				 */
+				VN_HOLD(vrootp);
+				if (vrootp != rootdir)
+					VN_HOLD(vrootp);
+				if (lookuppnvp(&pn, &rpn, 0, NULL,
+				    &cmpvp, vrootp, vrootp, cr) == 0) {
+
+					if (VN_CMP(vp, cmpvp)) {
+						VN_RELE(cmpvp);
+
+						complen = strlen(rpn.pn_path);
+						bufloc -= complen;
+						if (bufloc < buf) {
+							err = ERANGE;
+							goto out;
+						}
+						bcopy(rpn.pn_path, bufloc,
+						    complen);
+						break;
+					} else {
+						VN_RELE(cmpvp);
+					}
+				}
+			} else {
+				mutex_exit(&vp->v_lock);
+			}
+		} else {
+			mutex_exit(&vp->v_lock);
 		}
 
 		/*
@@ -1120,6 +1163,38 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, cred_t *cr)
 		}
 
 		/*
+		 * Try to obtain the path component from dnlc cache
+		 * before searching through the directory.
+		 */
+		if ((cmpvp = dnlc_reverse_lookup(vp, dbuf, dlen)) != NULL) {
+			/*
+			 * If we got parent vnode as a result,
+			 * then the answered path is correct.
+			 */
+			if (VN_CMP(cmpvp, pvp)) {
+				VN_RELE(cmpvp);
+				complen = strlen(dbuf);
+				bufloc -= complen;
+				if (bufloc <= buf) {
+					err = ENAMETOOLONG;
+					goto out;
+				}
+				bcopy(dbuf, bufloc, complen);
+
+				/* Prepend a slash to the current path */
+				*--bufloc = '/';
+
+				/* And continue with the next component */
+				VN_RELE(vp);
+				vp = pvp;
+				pvp = NULL;
+				continue;
+			} else {
+				VN_RELE(cmpvp);
+			}
+		}
+
+		/*
 		 * Search the parent directory for the entry corresponding to
 		 * this vnode.
 		 */
@@ -1149,6 +1224,15 @@ dirtopath(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen, cred_t *cr)
 	if (bufloc != buf)
 		ovbcopy(bufloc, buf, buflen - (bufloc - buf));
 
+	/*
+	 * We got here because of invalid v_path in startvp.
+	 * Now, we have all info to fix it.
+	 * Path must not include leading slash to let vn_renamepath
+	 * pre-attach chroot'd root directory path. Also, trailing '\0'
+	 * is not counted to length.
+	 */
+	vn_renamepath(vrootp, startvp, &buf[1], buflen - (bufloc - buf) - 2);
+
 out:
 	/*
 	 * If the error was ESTALE and the current directory to look in
@@ -1177,7 +1261,7 @@ out:
 }
 
 /*
- * The additional flag, LOOKUP_CHECKREAD, is ued to enforce artificial
+ * The additional flag, LOOKUP_CHECKREAD, is used to enforce artificial
  * constraints in order to be standards compliant.  For example, if we have
  * the cached path of '/foo/bar', and '/foo' has permissions 100 (execute
  * only), then we can legitimately look up the path to the current working
@@ -1273,20 +1357,13 @@ vnodetopath_common(vnode_t *vrootp, vnode_t *vp, char *buf, size_t buflen,
 			}
 
 			/*
-			 * The original pn was changed through lookuppnvp(), so
-			 * reset it.
+			 * The original pn was changed through lookuppnvp().
+			 * Set it to local for next validation attempt.
 			 */
 			if (local) {
 				(void) pn_set(&pn, local);
 			} else {
-				mutex_enter(&vp->v_lock);
-				if (vp->v_path != NULL) {
-					(void) pn_set(&pn, vp->v_path);
-					mutex_exit(&vp->v_lock);
-				} else {
-					mutex_exit(&vp->v_lock);
-					goto notcached;
-				}
+				goto notcached;
 			}
 		}
 
