@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -158,7 +158,7 @@ struct extvtoc {
 		v.v_part[i].p_flag = extv.v_part[i].p_flag;		\
 		v.v_part[i].p_start = (daddr_t)extv.v_part[i].p_start;	\
 		v.v_part[i].p_size = (long)extv.v_part[i].p_size;	\
-		v.timestamp[i] = (time_t)v.timestamp[i];		\
+		v.timestamp[i] = (time_t)extv.timestamp[i];		\
 	}								\
 	bcopy(extv.v_asciilabel, v.v_asciilabel, LEN_DKL_ASCII);	\
 	}

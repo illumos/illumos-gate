@@ -113,6 +113,16 @@ static struct driver_minor_data dk_minor_data_efi[] = {
 	{"f", 5, S_IFBLK},
 	{"g", 6, S_IFBLK},
 	{"wd", 7, S_IFBLK},
+#if defined(_SUNOS_VTOC_16)
+	{"i", 8, S_IFBLK},
+	{"j", 9, S_IFBLK},
+	{"k", 10, S_IFBLK},
+	{"l", 11, S_IFBLK},
+	{"m", 12, S_IFBLK},
+	{"n", 13, S_IFBLK},
+	{"o", 14, S_IFBLK},
+	{"p", 15, S_IFBLK},
+#endif			/* defined(_SUNOS_VTOC_16) */
 #if defined(_FIRMWARE_NEEDS_FDISK)
 	{"q", 16, S_IFBLK},
 	{"r", 17, S_IFBLK},
@@ -128,6 +138,16 @@ static struct driver_minor_data dk_minor_data_efi[] = {
 	{"f,raw", 5, S_IFCHR},
 	{"g,raw", 6, S_IFCHR},
 	{"wd,raw", 7, S_IFCHR},
+#if defined(_SUNOS_VTOC_16)
+	{"i,raw", 8, S_IFCHR},
+	{"j,raw", 9, S_IFCHR},
+	{"k,raw", 10, S_IFCHR},
+	{"l,raw", 11, S_IFCHR},
+	{"m,raw", 12, S_IFCHR},
+	{"n,raw", 13, S_IFCHR},
+	{"o,raw", 14, S_IFCHR},
+	{"p,raw", 15, S_IFCHR},
+#endif			/* defined(_SUNOS_VTOC_16) */
 #if defined(_FIRMWARE_NEEDS_FDISK)
 	{"q,raw", 16, S_IFCHR},
 	{"r,raw", 17, S_IFCHR},
@@ -2135,7 +2155,7 @@ cmlb_check_efi_mbr(uchar_t *buf, int *is_mbr)
 
 	if (LE_16(mbp->signature) != MBB_MAGIC) {
 		if (is_mbr != NULL)
-			is_mbr = FALSE;
+			*is_mbr = FALSE;
 		return (TRUE);
 	}
 
@@ -3778,6 +3798,8 @@ cmlb_dkio_set_extvtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 {
 	int		rval = 0;
 	struct vtoc	user_vtoc;
+	boolean_t	internal;
+
 
 	/*
 	 * Checking callers data model does not make much sense here
@@ -3800,6 +3822,7 @@ cmlb_dkio_set_extvtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 	vtoctovtoc32(user_extvtoc, user_vtoc);
 #endif
 
+	internal = ((cl->cl_alter_behavior & (CMLB_INTERNAL_MINOR_NODES)) != 0);
 	mutex_enter(CMLB_MUTEX(cl));
 #if defined(__i386) || defined(__amd64)
 	if (cl->cl_tgt_blocksize != cl->cl_sys_blocksize) {
@@ -3817,12 +3840,13 @@ cmlb_dkio_set_extvtoc(struct cmlb_lun *cl, dev_t dev, caddr_t arg, int flag,
 	cmlb_clear_efi(cl, tg_cookie);
 	ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd");
 	ddi_remove_minor_node(CMLB_DEVINFO(cl), "wd,raw");
-	(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "h",
+	(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h",
 	    S_IFBLK, (CMLBUNIT(dev) << CMLBUNIT_SHIFT) | WD_NODE,
-	    cl->cl_node_type, NULL);
-	(void) ddi_create_minor_node(CMLB_DEVINFO(cl), "h,raw",
+	    cl->cl_node_type, NULL, internal);
+	(void) cmlb_create_minor(CMLB_DEVINFO(cl), "h,raw",
 	    S_IFCHR, (CMLBUNIT(dev) << CMLBUNIT_SHIFT) | WD_NODE,
-	    cl->cl_node_type, NULL);
+	    cl->cl_node_type, NULL, internal);
+
 	mutex_enter(CMLB_MUTEX(cl));
 
 	if ((rval = cmlb_build_label_vtoc(cl, &user_vtoc)) == 0) {
