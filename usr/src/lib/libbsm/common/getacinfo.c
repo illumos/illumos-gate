@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* getacinfo.c  -  get audit control info */
 
@@ -88,13 +86,7 @@ static mutex_t mutex_acf = DEFAULTMUTEX;
  */
 
 int
-#ifdef __STDC__
 getacdir(char *dir, int len)
-#else
-getacdir(dir, len)
-	char	*dir;
-	int	len;
-#endif
 {
 	int	retstat = SUCCESS, gotone = 0, dirlen, dirst;
 	char	entry[LEN];
@@ -186,12 +178,7 @@ getacdir(dir, len)
  */
 
 int
-#ifdef __STDC__
 getacmin(int *min_val)
-#else
-getacmin(min_val)
-	int	*min_val;
-#endif
 {
 	int	retstat = SUCCESS, gotone = 0;
 	char	entry[LEN];
@@ -213,10 +200,10 @@ getacmin(min_val)
 					break;
 				case 'm':
 					if (strncmp(entry, MINLABEL,
-						strlen(MINLABEL)) == 0) {
-						(void)
-						sscanf(entry + strlen(MINLABEL),
-							"%d", min_val);
+					    strlen(MINLABEL)) == 0) {
+						(void) sscanf(entry +
+						    strlen(MINLABEL),
+						    "%d", min_val);
 						gotone = 1;
 					} else
 						retstat = FORMAT_ERR;
@@ -261,15 +248,8 @@ getacmin(min_val)
  *		-3 - error - directory entry format error
  */
 
-#ifdef __STDC__
 int
 getacflg(char *auditstring, int len)
-#else
-int
-getacflg(auditstring, len)
-	char	*auditstring;
-	int	len;
-#endif
 {
 	int	retstat = SUCCESS, gotone = 0, minst, minlen;
 	char	entry[LEN];
@@ -293,23 +273,23 @@ getacflg(auditstring, len)
 			case 'f':
 
 			if ((strncmp(entry, DEFFLGLABEL,
-					strlen(DEFFLGLABEL))) == 0) {
+			    strlen(DEFFLGLABEL))) == 0) {
 				if (entry[strlen(DEFFLGLABEL)] == ' ') {
 					minst = strlen(DEFFLGLABEL) + 1;
 					minlen = strlen(entry) -
-						(strlen(DEFFLGLABEL) + 2);
+					    (strlen(DEFFLGLABEL) + 2);
 				} else {
 					minst = strlen(DEFFLGLABEL);
 					minlen = strlen(entry) -
-						(strlen(DEFFLGLABEL) + 1);
+					    (strlen(DEFFLGLABEL) + 1);
 				}
 				if (minlen > len)
 					retstat = FORMAT_ERR;
 				else {
 					(void) strcpy(auditstring,
-						entry + minst);
+					    entry + minst);
 					(void) strcpy(auditstring + minlen,
-						"\0");
+					    "\0");
 					gotone = 1;
 				}
 			} else
@@ -354,15 +334,8 @@ getacflg(auditstring, len)
  *		-3 - error - directory entry format error
  */
 
-#ifdef __STDC__
 int
 getacna(char *auditstring, int len)
-#else
-int
-getacna(auditstring, len)
-	char	*auditstring;
-	int	len;
-#endif
 {
 	int	retstat = SUCCESS, gotone = 0, minst, minlen;
 	char	entry[LEN];
@@ -377,7 +350,7 @@ getacna(auditstring, len)
 
 	if (retstat == SUCCESS) do {
 		if (fgets(entry, LEN, acf) != NULL)
-		    switch (*entry) {
+			switch (*entry) {
 			case '#':
 				break;
 			case 'd':
@@ -388,24 +361,24 @@ getacna(auditstring, len)
 				break;
 			case 'n':
 
-			if ((strncmp(entry, NAFLGLABEL, strlen(NAFLGLABEL))) ==
-					0) {
+			if ((strncmp(entry, NAFLGLABEL,
+			    strlen(NAFLGLABEL))) == 0) {
 				if (entry[strlen(NAFLGLABEL)] == ' ') {
 					minst = strlen(NAFLGLABEL) + 1;
 					minlen = strlen(entry) -
-						(strlen(NAFLGLABEL) + 2);
+					    (strlen(NAFLGLABEL) + 2);
 				} else {
 					minst = strlen(NAFLGLABEL);
 					minlen = strlen(entry) -
-						(strlen(NAFLGLABEL) + 1);
+					    (strlen(NAFLGLABEL) + 1);
 				}
 				if (minlen > len)
 					retstat = FORMAT_ERR;
 				else {
 					(void) strcpy(auditstring,
-						entry + minst);
+					    entry + minst);
 					(void) strcpy(auditstring + minlen,
-						"\0");
+					    "\0");
 					gotone = 1;
 				}
 			} else

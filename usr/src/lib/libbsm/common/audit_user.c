@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Interfaces to audit_user(4)  (/etc/security/audit_user)
@@ -177,14 +175,8 @@ getauuserent_r(au_user_ent_t *au_user_entry)
 }
 
 
-#ifdef __STDC__
 au_user_ent_t *
 getauusernam(char *name)
-#else
-au_user_ent_t *
-getauusernam(name)
-	char *name;
-#endif
 {
 	static au_user_ent_t u;
 	static char	logname[MAX_USERNAME+1];
@@ -195,15 +187,8 @@ getauusernam(name)
 	return (getauusernam_r(&u, name));
 }
 
-#ifdef __STDC__
 au_user_ent_t *
 getauusernam_r(au_user_ent_t *u, char *name)
-#else
-au_user_ent_t *
-getauusernam_r(u, name)
-	au_user_ent_t *u;
-	char *name;
-#endif
 {
 
 	if (use_nsswitch) {

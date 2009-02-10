@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,10 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#ifndef lint
-static char sccsid[] = "@(#)au_usermask.c	1.9	01/06/26 SMI";
-#endif
 
 /*
- * Copyright (c) 1988, 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #include <sys/types.h>
@@ -59,12 +54,7 @@ static char sccsid[] = "@(#)au_usermask.c	1.9	01/06/26 SMI";
  * continues.
  */
 int
-#ifdef __STDC__
 au_user_mask(char *username, au_mask_t *p_mask)
-#else
-char *username;
-au_mask_t *p_mask;
-#endif /* __STDC__ */
 {
 	char auditstring[AUDITSTRING_LEN];
 	au_user_ent_t *p_user = NULL;

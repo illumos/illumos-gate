@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * au_preselect.c
@@ -59,7 +57,7 @@ static mutex_t mutex_au_preselect = DEFAULTMUTEX;
  * au_preselect:
  *
  * Keep a dynamic array of event<-->class mappings.
- * Refresh the map when the value of flag is non-zero.
+ * Refresh the map when the value of flag is AU_PRS_REREAD.
  * Return:
  *	1: The event is preselected.
  *	0: The event is not preselected.
@@ -68,15 +66,7 @@ static mutex_t mutex_au_preselect = DEFAULTMUTEX;
  *		Couldn't find event.
  */
 int
-#ifdef __STDC__
 au_preselect(au_event_t au_event, au_mask_t *au_mask_p, int sorf, int flag)
-#else
-au_preselect(au_event, au_mask_p, sorf, flag)
-	au_event_t au_event;	/* event */
-	au_mask_t *au_mask_p;	/* preselection mask */
-	int sorf;		/* success or failure */
-	int flag;		/* re-read flag */
-#endif /* __STDC__ */
 {
 	static char been_here_before;  /* we cache the map */
 	register int i;

@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Interfaces to audit_class(5)  (/etc/security/audit_class)
@@ -91,17 +89,16 @@ getauclassent()
  *	in the au_class_ent structure.
  */
 au_class_ent_t *
-getauclassent_r(au_class_entry)
-	au_class_ent_t *au_class_entry;
+getauclassent_r(au_class_ent_t *au_class_entry)
 {
 	int	i, error = 0, found = 0;
 	char	*s, input[256];
 	unsigned long v;
 
 	if (au_class_entry == (au_class_ent_t *)NULL ||
-		au_class_entry->ac_name == (char *)NULL ||
-		au_class_entry->ac_desc == (char *)NULL) {
-			return ((au_class_ent_t *)NULL);
+	    au_class_entry->ac_name == (char *)NULL ||
+	    au_class_entry->ac_desc == (char *)NULL) {
+		return ((au_class_ent_t *)NULL);
 	}
 
 	/* open audit class file if it isn't already */
@@ -161,12 +158,7 @@ getauclassent_r(au_class_entry)
 
 
 au_class_ent_t *
-#ifdef __STDC__
 getauclassnam(char *name)
-#else
-getauclassnam(name)
-	char *name;
-#endif
 {
 	static au_class_ent_t e;
 	static char	cname[AU_CLASS_NAME_MAX];
@@ -179,13 +171,7 @@ getauclassnam(name)
 }
 
 au_class_ent_t *
-#ifdef __STDC__
 getauclassnam_r(au_class_ent_t *e, char *name)
-#else
-getauclassnam_r()
-	au_class_ent_t *e;
-	char *name;
-#endif
 {
 	while (getauclassent_r(e) != NULL) {
 		if (strcmp(e->ac_name, name) == 0) {
@@ -208,11 +194,8 @@ getauclassnam_r()
  *	Return   1, set result pointer to a valid entry, if class is in cache.
  */
 static int
-xcacheauclass(result, class_name, class_no, flags)
-	au_class_ent_t **result; /* set this pointer to an entry in the cache */
-	char	*class_name; /* name of class to look up */
-	au_class_t class_no;
-	int	flags;
+xcacheauclass(au_class_ent_t **result, char *class_name, au_class_t class_no,
+    int flags)
 {
 	static int	invalid;
 	static au_class_ent_t **class_tbl;
@@ -243,7 +226,7 @@ xcacheauclass(result, class_name, class_no, flags)
 		}
 		(void) fclose(fp);
 		class_tbl = (au_class_ent_t **)calloc((size_t)lines + 1,
-			sizeof (au_class_ent_t));
+		    sizeof (au_class_ent_t));
 		if (class_tbl == NULL) {
 			(void) mutex_unlock(&mutex_classcache);
 			return (-2);
@@ -258,7 +241,7 @@ xcacheauclass(result, class_name, class_no, flags)
 		 */
 		while ((p_class = getauclassent()) != NULL) {
 			class_tbl[lines] = (au_class_ent_t *)
-				malloc(sizeof (au_class_ent_t));
+			    malloc(sizeof (au_class_ent_t));
 			if (class_tbl[lines] == NULL) {
 				(void) mutex_unlock(&mutex_classcache);
 				return (-3);
@@ -274,7 +257,7 @@ xcacheauclass(result, class_name, class_no, flags)
 		endauclass();
 		invalid = lines;
 		class_tbl[invalid] = (au_class_ent_t *)
-			malloc(sizeof (au_class_ent_t));
+		    malloc(sizeof (au_class_ent_t));
 		if (class_tbl[invalid] == NULL) {
 			(void) mutex_unlock(&mutex_classcache);
 			return (-4);
@@ -316,29 +299,17 @@ xcacheauclass(result, class_name, class_no, flags)
 
 
 int
-#ifdef __STDC__
 cacheauclass(au_class_ent_t **result, au_class_t class_no)
-#else
-cacheauclass(result, class_no)
-	au_class_ent_t **result; /* set this pointer to an entry in the cache */
-	au_class_t class_no;
-#endif
 {
 	return (xcacheauclass(result, "", class_no, AU_CACHE_NUMBER));
 }
 
 
 int
-#ifdef __STDC__
 cacheauclassnam(au_class_ent_t **result, char *class_name)
-#else
-cacheauclassnam(result, class_name)
-	au_class_ent_t **result; /* set this pointer to an entry in the cache */
-	char	*class_name;
-#endif
 {
 	return (xcacheauclass(result, class_name, (au_class_t)0,
-		AU_CACHE_NAME));
+	    AU_CACHE_NAME));
 }
 
 
