@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -411,9 +411,7 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 	uint_t keepopen;
 	int err = 0;
 	nvlist_t *asru = NULL;
-#ifndef i386
 	uint32_t index;
-#endif
 
 	err |= nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid);
 	err |= nvlist_lookup_nvlist_array(nvl, FM_SUSPECT_FAULT_LIST,
@@ -456,7 +454,6 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 		}
 	}
 
-#ifndef i386
 	/*
 	 * Do not close the case if we are handling cache faults.
 	 */
@@ -469,7 +466,6 @@ cma_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl, const char *class)
 			}
 		}
 	}
-#endif
 
 	if (!keepopen && strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
 		fmd_case_uuresolved(hdl, uuid);

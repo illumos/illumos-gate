@@ -285,12 +285,31 @@ topo_snap_create(topo_hdl_t *thp, int *errp)
 
 	uuid_generate(uuid);
 	uuid_unparse(uuid, thp->th_uuid);
+	if ((ustr = topo_hdl_strdup(thp, thp->th_uuid)) == NULL) {
+		*errp = ETOPO_NOMEM;
+		topo_hdl_unlock(thp);
+		return (NULL);
+	}
+
+	thp->th_di = di_init("/", DI_CACHE_SNAPSHOT_FLAGS | DINFOCLEANUP);
+	thp->th_pi = di_prom_init();
 
 	if (topo_tree_enum_all(thp) < 0) {
 		topo_dprintf(thp, TOPO_DBG_ERR, "enumeration failure: %s\n",
 		    topo_hdl_errmsg(thp));
 		if (topo_hdl_errno(thp) == ETOPO_ENUM_FATAL) {
 			*errp = thp->th_errno;
+
+			if (thp->th_di != DI_NODE_NIL) {
+				di_fini(thp->th_di);
+				thp->th_di = DI_NODE_NIL;
+			}
+			if (thp->th_pi != DI_PROM_HANDLE_NIL) {
+				di_prom_fini(thp->th_pi);
+				thp->th_pi = DI_PROM_HANDLE_NIL;
+			}
+
+			topo_hdl_strfree(thp, ustr);
 			topo_hdl_unlock(thp);
 			return (NULL);
 		}
@@ -303,12 +322,6 @@ topo_snap_create(topo_hdl_t *thp, int *errp)
 		    "failed to refresh IPMI sdr repository: %s\n",
 		    ipmi_errmsg(thp->th_ipmi));
 	}
-
-	if ((ustr = topo_hdl_strdup(thp, thp->th_uuid)) == NULL)
-		*errp = ETOPO_NOMEM;
-
-	thp->th_di = DI_NODE_NIL;
-	thp->th_pi = DI_PROM_HANDLE_NIL;
 
 	topo_hdl_unlock(thp);
 
@@ -436,6 +449,19 @@ topo_snap_destroy(topo_hdl_t *thp)
 		}
 
 	}
+
+	/*
+	 * Clean-up our cached devinfo and prom tree handles.
+	 */
+	if (thp->th_di != DI_NODE_NIL) {
+		di_fini(thp->th_di);
+		thp->th_di = DI_NODE_NIL;
+	}
+	if (thp->th_pi != DI_PROM_HANDLE_NIL) {
+		di_prom_fini(thp->th_pi);
+		thp->th_pi = DI_PROM_HANDLE_NIL;
+	}
+
 
 	if (thp->th_uuid != NULL) {
 		topo_hdl_free(thp, thp->th_uuid, TOPO_UUID_SIZE);
@@ -710,4 +736,16 @@ topo_walk_bottomup(topo_walk_t *wp, int flag)
 	topo_node_rele(cnp); /* done with current node */
 
 	return (status);
+}
+
+di_node_t
+topo_hdl_devinfo(topo_hdl_t *thp)
+{
+	return (thp == NULL ? DI_NODE_NIL : thp->th_di);
+}
+
+di_prom_handle_t
+topo_hdl_prominfo(topo_hdl_t *thp)
+{
+	return (thp == NULL ? DI_PROM_HANDLE_NIL : thp->th_pi);
 }

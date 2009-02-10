@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -309,7 +309,8 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 	nvlist_t *fmri = NULL;
 	int err, nerr = 0;
 	int32_t fms[3];
-	const char *vendor = NULL;
+	const char *vendor;
+	boolean_t create_mc = B_FALSE;
 
 	if ((err = nvlist_lookup_int32(cpu, FM_PHYSCPU_INFO_CHIP_ID, &chipid))
 	    != 0) {
@@ -351,6 +352,8 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 		if (topo_node_range_create(mod, chip, CORE_NODE_NAME,
 		    0, 255) != 0)
 			return (-1);
+
+		create_mc = B_TRUE;
 	}
 
 	err = create_core(mod, chip, cpu, auth);
@@ -359,11 +362,13 @@ create_chip(topo_mod_t *mod, tnode_t *pnode, topo_instance_t min,
 	 * Create memory-controller node under a chip for architectures
 	 * that may have on-chip memory-controller(s).
 	 */
-	if (vendor != NULL && strcmp(vendor, "AuthenticAMD") == 0)
-		amd_mc_create(mod, chip, MCT_NODE_NAME, auth,
-		    fms[0], fms[1], fms[2], &nerr);
-	else if (!mc_offchip)
-		onchip_mc_create(mod, chip, MCT_NODE_NAME, auth);
+	if (create_mc) {
+		if (strcmp(vendor, "AuthenticAMD") == 0)
+			amd_mc_create(mod, chip, MCT_NODE_NAME, auth,
+			    fms[0], fms[1], fms[2], &nerr);
+		else if (!mc_offchip)
+			onchip_mc_create(mod, chip, MCT_NODE_NAME, auth);
+	}
 
 	return (err == 0 && nerr == 0 ? 0 : -1);
 }

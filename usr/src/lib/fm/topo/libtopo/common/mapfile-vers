@@ -50,11 +50,13 @@ SUNWprivate {
 	topo_fmri_unretire;
 	topo_fmri_unusable;
 	topo_hdl_alloc;
+	topo_hdl_devinfo;
 	topo_hdl_errmsg;
 	topo_hdl_errno;
 	topo_hdl_free;
 	topo_hdl_nvalloc;
 	topo_hdl_nvdup;
+	topo_hdl_prominfo;
 	topo_hdl_strdup;
 	topo_hdl_strfree;
 	topo_hdl_zalloc;

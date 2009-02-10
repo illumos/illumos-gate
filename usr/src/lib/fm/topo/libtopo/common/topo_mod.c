@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -615,17 +615,6 @@ topo_mod_setdebug(topo_mod_t *mod)
 	mod->tm_debug = 1;
 }
 
-di_node_t
-topo_mod_devinfo(topo_mod_t *mod)
-{
-	topo_hdl_t *thp = mod->tm_hdl;
-
-	if (thp->th_di == DI_NODE_NIL)
-		thp->th_di = di_init("/", DINFOCPYALL);
-
-	return (thp->th_di);
-}
-
 ipmi_handle_t *
 topo_mod_ipmi_hold(topo_mod_t *mod)
 {
@@ -655,15 +644,16 @@ topo_mod_ipmi_rele(topo_mod_t *mod)
 	(void) pthread_mutex_unlock(&thp->th_ipmi_lock);
 }
 
+di_node_t
+topo_mod_devinfo(topo_mod_t *mod)
+{
+	return (topo_hdl_devinfo(mod->tm_hdl));
+}
+
 di_prom_handle_t
 topo_mod_prominfo(topo_mod_t *mod)
 {
-	topo_hdl_t *thp = mod->tm_hdl;
-
-	if (thp->th_pi == DI_PROM_HANDLE_NIL)
-		thp->th_pi = di_prom_init();
-
-	return (thp->th_pi);
+	return (topo_hdl_prominfo(mod->tm_hdl));
 }
 
 void

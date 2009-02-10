@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Topology Trees
@@ -193,20 +191,6 @@ topo_tree_enum(topo_hdl_t *thp, ttree_t *tp)
 				}
 			}
 		}
-	}
-
-	/*
-	 * It would be nice to leave the devinfo and prominfo trees
-	 * active but the interfaces consume copious amounts of memory
-	 * while searching for property information
-	 */
-	if (thp->th_di != DI_NODE_NIL) {
-		di_fini(thp->th_di);
-		thp->th_di = DI_NODE_NIL;
-	}
-	if (thp->th_pi != DI_PROM_HANDLE_NIL) {
-		di_prom_fini(thp->th_pi);
-		thp->th_pi = DI_PROM_HANDLE_NIL;
 	}
 
 	if (rv != 0)

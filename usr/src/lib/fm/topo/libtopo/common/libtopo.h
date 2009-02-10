@@ -29,6 +29,7 @@
 
 #include <sys/nvpair.h>
 #include <stdio.h>
+#include <libdevinfo.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,6 +71,8 @@ extern topo_walk_t *topo_walk_init(topo_hdl_t *, const char *, topo_walk_cb_t,
     void *, int *);
 extern int topo_walk_step(topo_walk_t *, int);
 extern void topo_walk_fini(topo_walk_t *);
+extern di_node_t topo_hdl_devinfo(topo_hdl_t *);
+extern di_prom_handle_t topo_hdl_prominfo(topo_hdl_t *);
 
 /*
  * Walk status returned from walker

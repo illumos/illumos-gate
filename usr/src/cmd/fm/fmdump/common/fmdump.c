@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <alloca.h>
 #include <unistd.h>
@@ -36,6 +34,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <regex.h>
+#include <dirent.h>
 
 #include <fmdump.h>
 
@@ -445,6 +444,92 @@ log_filter_silent(fmd_log_t *lp, const fmd_log_record_t *rp, void *arg)
 	    FM_SUSPECT_MESSAGE, &msg) != 0 || msg != 0);
 }
 
+struct loglink {
+	char 		*path;
+	long		suffix;
+	struct loglink	*next;
+};
+
+static void
+addlink(struct loglink **llp, char *dirname, char *logname, long suffix)
+{
+	struct loglink *newp;
+	size_t len;
+	char *str;
+
+	newp = malloc(sizeof (struct loglink));
+	len = strlen(dirname) + strlen(logname) + 2;
+	str = malloc(len);
+	if (newp == NULL || str == NULL) {
+		(void) fprintf(stderr, "%s: failed to allocate memory: %s\n",
+		    g_pname, strerror(errno));
+		exit(FMDUMP_EXIT_FATAL);
+	}
+
+	(void) snprintf(str, len, "%s/%s", dirname, logname);
+	newp->path = str;
+	newp->suffix = suffix;
+
+	while (*llp != NULL && suffix < (*llp)->suffix)
+		llp = &(*llp)->next;
+
+	newp->next = *llp;
+	*llp = newp;
+}
+
+/*
+ * Find and return all the rotated logs.
+ */
+static struct loglink *
+get_rotated_logs(char *logpath)
+{
+	char dirname[PATH_MAX], *logname, *endptr;
+	DIR *dirp;
+	struct dirent *dp;
+	long len, suffix;
+	struct loglink *head = NULL;
+
+	(void) strlcpy(dirname, logpath, sizeof (dirname));
+	logname = strrchr(dirname, '/');
+	*logname++ = '\0';
+	len = strlen(logname);
+
+	if ((dirp = opendir(dirname)) == NULL) {
+		(void) fprintf(stderr, "%s: failed to opendir `%s': %s\n",
+		    g_pname, dirname, strerror(errno));
+		return (NULL);
+	}
+
+	while ((dp = readdir(dirp)) != NULL) {
+		/*
+		 * Search the log directory for logs named "<logname>.0",
+		 * "<logname>.1", etc and add to the link in the
+		 * reverse numeric order.
+		 */
+		if (strlen(dp->d_name) < len + 2 ||
+		    strncmp(dp->d_name, logname, len) != 0 ||
+		    dp->d_name[len] != '.')
+			continue;
+
+		/*
+		 * "*.0-" file normally should not be seen.  It may
+		 * exist when user manually run 'fmadm rotate'.
+		 * In such case, we put it at the end of the list so
+		 * it'll be dumped after all the rotated logs, before
+		 * the current one.
+		 */
+		if (strcmp(dp->d_name + len + 1, "0-") == 0)
+			addlink(&head, dirname, dp->d_name, -1);
+		else if ((suffix = strtol(dp->d_name + len + 1,
+		    &endptr, 10)) >= 0 && *endptr == '\0')
+			addlink(&head, dirname, dp->d_name, suffix);
+	}
+
+	(void) closedir(dirp);
+
+	return (head);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -469,6 +554,8 @@ main(int argc, char *argv[])
 	fmd_log_t *lp;
 	int c, err;
 	off64_t off = 0;
+	ulong_t recs;
+	struct loglink *rotated_logs = NULL, *llp;
 
 	g_pname = argv[0];
 
@@ -553,6 +640,13 @@ main(int argc, char *argv[])
 	if (*ifile == '\0') {
 		(void) snprintf(ifile, sizeof (ifile), "%s/var/fm/fmd/%slog",
 		    g_root ? g_root : "", opt_e && !opt_u ? "err" : "flt");
+		/*
+		 * logadm may rotate the logs.  When no input file is specified,
+		 * we try to dump all the rotated logs as well in the right
+		 * order.
+		 */
+		if (!opt_H && off == 0)
+			rotated_logs = get_rotated_logs(ifile);
 	} else if (g_root != NULL) {
 		(void) fprintf(stderr, "%s: -R option is not appropriate "
 		    "when file operand is present\n", g_pname);
@@ -640,14 +734,40 @@ main(int argc, char *argv[])
 		farg = &lyr;
 	}
 
+	for (llp = rotated_logs; llp != NULL; llp = llp->next) {
+		fmd_log_t *rlp;
+
+		if ((rlp = fmd_log_open(FMD_LOG_VERSION, llp->path, &err))
+		    == NULL) {
+			(void) fprintf(stderr, "%s: failed to open %s: %s\n",
+			    g_pname, llp->path, fmd_log_errmsg(NULL, err));
+			g_errs++;
+			continue;
+		}
+
+		recs = 0;
+		if (fmd_log_xiter(rlp, iflags, filtc, filtv,
+		    func, error, farg, &recs) != 0) {
+			(void) fprintf(stderr,
+			    "%s: failed to dump %s: %s\n", g_pname, llp->path,
+			    fmd_log_errmsg(rlp, fmd_log_errno(rlp)));
+			g_errs++;
+		}
+		g_recs += recs;
+
+		fmd_log_close(rlp);
+	}
+
 	do {
+		recs = 0;
 		if (fmd_log_xiter(lp, iflags, filtc, filtv,
-		    func, error, farg, &g_recs) != 0) {
+		    func, error, farg, &recs) != 0) {
 			(void) fprintf(stderr,
 			    "%s: failed to dump %s: %s\n", g_pname, ifile,
 			    fmd_log_errmsg(lp, fmd_log_errno(lp)));
 			g_errs++;
 		}
+		g_recs += recs;
 
 		if (opt_f)
 			(void) sleep(1);
