@@ -781,6 +781,7 @@ typedef struct find_module_struct {
 	const char *name;
 } find_module_struct_t;
 
+/*ARGSUSED*/
 int
 find_module_cb(uintptr_t addr, const void *modctl_arg, void *cbarg)
 {
