@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file contains the environmental PICL plug-in module.
@@ -592,14 +590,14 @@ get_fan_speed(env_fan_t *fanp, fanspeed_t *fanspeedp)
 	}
 
 	/* try to read the fan information */
-	for (retries = 0; retries <= MAX_FAN_RETRIES; retries++) {
+	for (retries = 0; retries < MAX_FAN_RETRIES; retries++) {
 		if (ioctl(fanp->fd, PIC_GET_FAN_SPEED, &tach) == 0)
 			break;
 		(void) sleep(1);
 	}
 
 	total_fan_retries += retries;
-	if (retries == MAX_FAN_RETRIES)
+	if (retries >= MAX_FAN_RETRIES)
 		return (-1);
 
 	if (total_fan_retries && env_debug) {
@@ -984,7 +982,7 @@ envd_es_setup(void)
 		uint32_t ess_id;
 
 		(void) memcpy(&ess_id,
-			sensorp->ess_id, sizeof (sensorp->ess_id));
+		    sensorp->ess_id, sizeof (sensorp->ess_id));
 
 		if (env_debug) {
 			envd_log(LOG_INFO, "\n Sensor Id %x offset %x",
@@ -1282,9 +1280,11 @@ system_temp_thr(void *args)
 				    (wtstamp == 0 || (ct - wtstamp) >=
 				    sensor_warning_interval)) {
 					envd_log(LOG_CRIT, ENV_WARNING_MSG,
-					sensorp->name, sensorp->cur_temp,
-					(int8_t)sensorp->es->esb_low_warning,
-					(int8_t)sensorp->es->esb_high_warning);
+					    sensorp->name, sensorp->cur_temp,
+					    (int8_t)
+					    sensorp->es->esb_low_warning,
+					    (int8_t)
+					    sensorp->es->esb_high_warning);
 
 					sensorp->warning_tstamp = ct;
 				}
@@ -1311,10 +1311,12 @@ system_temp_thr(void *args)
 					sensorp->shutdown_initiated = B_TRUE;
 
 					(void) snprintf(msgbuf, sizeof (msgbuf),
-					ENV_SHUTDOWN_MSG, sensorp->name,
-					sensorp->cur_temp,
-					(int8_t)sensorp->es->esb_low_shutdown,
-					(int8_t)sensorp->es->esb_high_shutdown);
+					    ENV_SHUTDOWN_MSG, sensorp->name,
+					    sensorp->cur_temp,
+					    (int8_t)
+					    sensorp->es->esb_low_shutdown,
+					    (int8_t)
+					    sensorp->es->esb_high_shutdown);
 
 					envd_log(LOG_ALERT, msgbuf);
 
@@ -1490,12 +1492,12 @@ get_disk_temp(env_disk_t *diskp)
 
 		if (env_debug) {
 			envd_log(LOG_ERR, "flags = 0x%x%x,curr = 0x%x,"
-			"data = 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n",
-			temp_attrib->flags[0], temp_attrib->flags[1],
-			temp_attrib->raw_data[0], temp_attrib->raw_data[1],
-			temp_attrib->raw_data[2], temp_attrib->raw_data[3],
-			temp_attrib->raw_data[4], temp_attrib->raw_data[5],
-			temp_attrib->raw_data[6], temp_attrib->raw_data[7]);
+			    "data = 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n",
+			    temp_attrib->flags[0], temp_attrib->flags[1],
+			    temp_attrib->raw_data[0], temp_attrib->raw_data[1],
+			    temp_attrib->raw_data[2], temp_attrib->raw_data[3],
+			    temp_attrib->raw_data[4], temp_attrib->raw_data[5],
+			    temp_attrib->raw_data[6], temp_attrib->raw_data[7]);
 		}
 		if (temp_attrib->raw_data[1] != 0xFF) {
 			diskp->current_temp = temp_attrib->raw_data[2];
@@ -1770,15 +1772,15 @@ fan_thr(void *args)
 				continue;
 			psufan_last_status = FAN_FAILED;
 			(void) snprintf(msgbuf, sizeof (msgbuf),
-				ENV_FAN_FAILURE_WARNING_MSG, SENSOR_PSU,
-				fan_rpm_string, fan_status_string);
+			    ENV_FAN_FAILURE_WARNING_MSG, SENSOR_PSU,
+			    fan_rpm_string, fan_status_string);
 			envd_log(LOG_ALERT, msgbuf);
 		} else {
 			if (psufan_last_status == FAN_OK)
 				continue;
 			psufan_last_status = FAN_OK;
 			(void) snprintf(msgbuf, sizeof (msgbuf),
-				ENV_FAN_OK_MSG, SENSOR_PSU);
+			    ENV_FAN_OK_MSG, SENSOR_PSU);
 			envd_log(LOG_ALERT, msgbuf);
 		}
 	}
