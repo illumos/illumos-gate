@@ -4298,8 +4298,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "findstack", ":[-v]", "find kernel thread stack", findstack },
 	{ "findstack_debug", NULL, "toggle findstack debugging",
 		findstack_debug },
-	{ "stacks", "?[-afiv] [-c func] [-C func] [-s sobj | -S sobj] "
-		"[-t tstate | -T tstate]",
+	{ "stacks", "?[-afiv] [-c func] [-C func] [-m module] [-M module] "
+		"[-s sobj | -S sobj] [-t tstate | -T tstate]",
 		"print unique kernel thread stacks",
 		stacks, stacks_help },
 

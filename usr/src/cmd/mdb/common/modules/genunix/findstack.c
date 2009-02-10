@@ -30,6 +30,7 @@
 #include <sys/regset.h>
 #include <sys/stack.h>
 #include <sys/thread.h>
+#include <sys/modctl.h>
 
 #include "findstack.h"
 #include "thread.h"
@@ -775,6 +776,65 @@ stacks_has_caller(stacks_entry_t *sep, uintptr_t addr)
 	return (0);
 }
 
+typedef struct find_module_struct {
+	struct modctl *mcp;
+	const char *name;
+} find_module_struct_t;
+
+int
+find_module_cb(uintptr_t addr, const void *modctl_arg, void *cbarg)
+{
+	find_module_struct_t *sp = cbarg;
+	char mod_modname[MODMAXNAMELEN + 1];
+	const struct modctl *mp = modctl_arg;
+
+	if (!mp->mod_modname)
+		return (WALK_NEXT);
+
+	if (mdb_readstr(mod_modname, sizeof (mod_modname),
+	    (uintptr_t)mp->mod_modname) == -1) {
+		mdb_warn("failed to read mod_modname in \"modctl\" walk");
+		return (WALK_ERR);
+	}
+
+	if (strcmp(sp->name, mod_modname))
+		return (WALK_NEXT);
+
+	sp->mcp = mdb_alloc(sizeof (*sp->mcp), UM_SLEEP | UM_GC);
+	bcopy(mp, sp->mcp, sizeof (*sp->mcp));
+	return (WALK_DONE);
+}
+
+static struct modctl *
+find_module(const char *name)
+{
+	find_module_struct_t mptr;
+
+	mptr.name = name;
+	mptr.mcp = NULL;
+
+	if (mdb_walk("modctl", find_module_cb, &mptr) != 0)
+		mdb_warn("cannot walk \"modctl\"");
+	return (mptr.mcp);
+}
+
+static int
+stacks_has_module(stacks_entry_t *sep, struct modctl *mp)
+{
+	int idx;
+
+	if (mp == NULL)
+		return (0);
+
+	for (idx = 0; idx < sep->se_depth; idx++)
+		if (sep->se_stack[idx] >= (uintptr_t)mp->mod_text &&
+		    sep->se_stack[idx] <
+		    ((uintptr_t)mp->mod_text + mp->mod_text_size))
+			return (1);
+	return (0);
+}
+
+
 static int
 uintptrcomp(const void *lp, const void *rp)
 {
@@ -854,6 +914,11 @@ stacks_help(void)
 "        Only print threads whose stacks contain func/func+offset.\n"
 "  -C func[+offset]\n"
 "        Only print threads whose stacks do not contain func/func+offset.\n"
+"  -m module\n"
+"        Only print threads whose stacks contain functions from module.\n"
+"  -M module\n"
+"        Only print threads whose stacks do not contain functions from\n"
+"        module.\n"
 "  -s {type | ALL}\n"
 "        Only print threads which are on a 'type' synchronization object\n"
 "        (SOBJ).\n"
@@ -883,6 +948,9 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	const char *caller_str = NULL;
 	const char *excl_caller_str = NULL;
 	uintptr_t caller = 0, excl_caller = 0;
+	const char *module_str = NULL;
+	const char *excl_module_str = NULL;
+	struct modctl *module = NULL, *excl_module = NULL;
 	const char *sobj = NULL;
 	const char *excl_sobj = NULL;
 	uintptr_t sobj_ops = 0, excl_sobj_ops = 0;
@@ -917,6 +985,8 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
 	    'c', MDB_OPT_STR, &caller_str,
 	    'C', MDB_OPT_STR, &excl_caller_str,
+	    'm', MDB_OPT_STR, &module_str,
+	    'M', MDB_OPT_STR, &excl_module_str,
 	    's', MDB_OPT_STR, &sobj,
 	    'S', MDB_OPT_STR, &excl_sobj,
 	    't', MDB_OPT_STR, &tstate_str,
@@ -956,6 +1026,18 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 	mdb_set_dot(addr);
 
+	if (module_str != NULL &&
+	    (module = find_module(module_str)) == NULL) {
+		mdb_warn("stacks: module \"%s\" is unknown", module_str);
+		return (DCMD_ABORT);
+	}
+
+	if (excl_module_str != NULL &&
+	    (excl_module = find_module(excl_module_str)) == NULL) {
+		mdb_warn("stacks: module \"%s\" is unknown", excl_module_str);
+		return (DCMD_ABORT);
+	}
+
 	if (sobj != NULL &&
 	    text_to_sobj(sobj, &sobj_ops) != 0)
 		return (DCMD_USAGE);
@@ -969,10 +1051,11 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 	}
 
-	if (tstate_str &&
+	if (tstate_str != NULL &&
 	    text_to_tstate(tstate_str, &tstate) != 0)
 		return (DCMD_USAGE);
-	if (excl_tstate_str &&
+
+	if (excl_tstate_str != NULL &&
 	    text_to_tstate(excl_tstate_str, &excl_tstate) != 0)
 		return (DCMD_USAGE);
 
@@ -1076,6 +1159,10 @@ stacks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (caller != 0 && !stacks_has_caller(sep, caller))
 			continue;
 		if (excl_caller != 0 && stacks_has_caller(sep, excl_caller))
+			continue;
+		if (module != 0 && !stacks_has_module(sep, module))
+			continue;
+		if (excl_module != 0 && stacks_has_module(sep, excl_module))
 			continue;
 
 		if (tstate != -1U) {
