@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Emulex.  All rights reserved.
+ * Copyright 2009 Emulex.  All rights reserved.
  * Use is subject to License terms.
  */
 
@@ -5633,6 +5633,7 @@ emlxs_hba_attach(dev_info_t *dip)
 	/* uint32_t i; */
 	/* uint32_t device_id_valid; */
 	uint32_t init_flag = 0;
+	char local_pm_components[32];
 #ifdef EMLXS_I386
 	uint32_t i;
 #endif	/* EMLXS_I386 */
@@ -5833,8 +5834,9 @@ emlxs_hba_attach(dev_info_t *dip)
 	mutex_exit(&hba->pm_lock);
 
 	/* Set the pm component name */
-	(void) sprintf(emlxs_pm_components[0], "NAME=%s%d", DRIVER_NAME,
+	(void) sprintf(local_pm_components, "NAME=%s%d", DRIVER_NAME,
 	    ddiinst);
+	emlxs_pm_components[0] = local_pm_components;
 
 	/* Check if power management support is enabled */
 	if (cfg[CFG_PM_SUPPORT].current) {
