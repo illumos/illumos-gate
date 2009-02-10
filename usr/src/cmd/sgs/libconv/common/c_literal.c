@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -132,7 +130,7 @@ conv_str_to_c_literal(const char *buf, size_t n,
 		} else {
 			/* Generic unprintable character: Use octal notation */
 			(void) snprintf(octal_buf, sizeof (octal_buf),
-			    MSG_ORIG(MSG_FMT_OCTCONST), *buf);
+			    MSG_ORIG(MSG_FMT_OCTCONST), (uchar_t)*buf);
 			(*outfunc)(octal_buf, strlen(octal_buf), uvalue);
 			buf++;
 			n--;

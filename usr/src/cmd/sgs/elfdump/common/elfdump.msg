@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -148,6 +148,8 @@
 			 shdr[%d: %s].sh_entsize (%#llx)\n"
 @ MSG_ERR_DYNSYMVAL	"%s: %s: symbol value does not match \
 			 DT_%s entry: %s: value: %#llx\n"
+@ MSG_ERR_MALSTR	"%s: %s: malformed string table, initial or final byte\n"
+
 
 @ MSG_WARN_INVINTERP1	"%s: PT_INTERP header has no associated section\n"
 @ MSG_WARN_INVINTERP2	"%s: interp section: %s: and PT_INTERP program \

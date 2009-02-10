@@ -1910,6 +1910,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			const char	*name;
 			Sym_desc	*rsdp;
 			int		shndx_bad = 0;
+			int		symtab_enter = 1;
 
 			/*
 			 * Determine and validate the associated section index.
@@ -1980,7 +1981,7 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 					sdp->sd_ref = REF_DYN_SEEN;
 
 					/* Will not appear in output object */
-					ofl->ofl_locscnt--;
+					symtab_enter = 0;
 				}
 			} else if (etype == ET_DYN)
 				continue;
@@ -2164,7 +2165,8 @@ ld_sym_process(Is_desc *isc, Ifl_desc *ifl, Ofl_desc *ofl)
 			 * (and hence symbol resolution) is complete during
 			 * sym_validate().
 			 */
-			if (!(ofl->ofl_flags & FLG_OF_REDLSYM)) {
+			if (!(ofl->ofl_flags & FLG_OF_REDLSYM) &&
+			    symtab_enter) {
 				ofl->ofl_locscnt++;
 
 				if ((((sdp->sd_flags & FLG_SY_REGSYM) == 0) ||

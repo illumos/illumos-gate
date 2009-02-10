@@ -1438,3 +1438,4 @@ Bugid   Risk Synopsis
 6237063 request extension to dl* family to provide segment bounds
 	information (D)
 	PSARC/2009/054 dlinfo(3c) - segment mapping retrieval
+6800388 shstrtab can be sized incorrectly when -z ignore is used

@@ -164,11 +164,9 @@ ignore_sym(Ofl_desc *ofl, Ifl_desc *ifl, Sym_desc *sdp, int allow_ldynsym)
 /*
  * If -zignore has been in effect, scan all input files to determine if the
  * file, or sections from the file, have been referenced.  If not, the file or
- * some of the files sections can be discarded.
- *
- * which haven't been referenced (and hence can be discarded).  If sections are
- * to be discarded, rescan the output relocations and the symbol table and
- * remove the relocations and symbol entries that are no longer required.
+ * some of the files sections can be discarded. If sections are to be
+ * discarded, rescan the output relocations and the symbol table and remove
+ * the relocations and symbol entries that are no longer required.
  *
  * Note:  It's possible that a section which is being discarded has contributed
  *	  to the GOT table or the PLT table.  However, we can't at this point
@@ -183,12 +181,15 @@ ignore_sym(Ofl_desc *ofl, Ifl_desc *ifl, Sym_desc *sdp, int allow_ldynsym)
 static uintptr_t
 ignore_section_processing(Ofl_desc *ofl)
 {
-	Listnode	*lnp;
+	Sg_desc		*sgp;
+	Listnode	*lnp1, *lnp2;
+	Is_desc		*isp;
+	Os_desc		*osp;
 	Ifl_desc	*ifl;
 	Rel_cache	*rcp;
 	int		allow_ldynsym = OFL_ALLOW_LDYNSYM(ofl);
 
-	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp, ifl)) {
+	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp1, ifl)) {
 		uint_t	num, discard;
 
 		/*
@@ -209,14 +210,10 @@ ignore_section_processing(Ofl_desc *ofl)
 		discard = 0;
 		if (ifl->ifl_flags & FLG_IF_FILEREF) {
 			for (num = 1; num < ifl->ifl_shnum; num++) {
-				Is_desc	*isp = ifl->ifl_isdesc[num];
-				Os_desc *osp;
-				Sg_desc	*sgp;
-
-				if (((isp = ifl->ifl_isdesc[num]) != 0) &&
+				if (((isp = ifl->ifl_isdesc[num]) != NULL) &&
 				    ((isp->is_flags & FLG_IS_SECTREF) == 0) &&
-				    ((osp = isp->is_osdesc) != 0) &&
-				    ((sgp = osp->os_sgdesc) != 0) &&
+				    ((osp = isp->is_osdesc) != NULL) &&
+				    ((sgp = osp->os_sgdesc) != NULL) &&
 				    (sgp->sg_phdr.p_type == PT_LOAD)) {
 					discard++;
 					break;
@@ -266,16 +263,14 @@ ignore_section_processing(Ofl_desc *ofl)
 	 * Scan all output relocations searching for those against discarded or
 	 * ignored sections.  If one is found, decrement the total outrel count.
 	 */
-	for (LIST_TRAVERSE(&ofl->ofl_outrels, lnp, rcp)) {
+	for (LIST_TRAVERSE(&ofl->ofl_outrels, lnp1, rcp)) {
 		Rel_desc	*rsp;
-		Os_desc		*osp;
 
 		/* LINTED */
 		for (rsp = (Rel_desc *)(rcp + 1); rsp < rcp->rc_free; rsp++) {
 			Is_desc		*isc = rsp->rel_isdesc;
 			uint_t		flags, entsize;
 			Shdr		*shdr;
-			Ifl_desc	*ifl;
 
 			if ((isc == 0) ||
 			    ((isc->is_flags & (FLG_IS_SECTREF))) ||
@@ -308,6 +303,69 @@ ignore_section_processing(Ofl_desc *ofl)
 				ofl->ofl_relocrelcnt--;
 		}
 	}
+
+	/*
+	 * The number of output sections may have decreased. We must make a
+	 * pass over the output sections, and if we detect this situation,
+	 * decrement ofl->ofl_shdrcnt and remove the section name from the
+	 * .shstrtab string table (ofl->ofl_shdrsttab).
+	 *
+	 * This code must be kept in sync with the similar code
+	 * found in outfile.c:ld_create_outfile().
+	 *
+	 * For each output section, look at the input sections to find at least
+	 * one input section that has not been eliminated. If none are found,
+	 * the -z ignore processing above has eliminated that output section.
+	 */
+	for (LIST_TRAVERSE(&ofl->ofl_segs, lnp1, sgp)) {
+		Aliste	idx;
+		Word	ptype = sgp->sg_phdr.p_type;
+
+		for (APLIST_TRAVERSE(sgp->sg_osdescs, idx, osp)) {
+			int keep = 0;
+
+			for (LIST_TRAVERSE(&(osp->os_isdescs), lnp2, isp)) {
+				ifl = isp->is_file;
+
+				/* Input section is tagged for discard? */
+				if (isp->is_flags & FLG_IS_DISCARD)
+					continue;
+
+				/*
+				 * If the file is discarded, it will take
+				 * the section with it.
+				 */
+				if (ifl &&
+				    (((ifl->ifl_flags & FLG_IF_FILEREF) == 0) ||
+				    ((ptype == PT_LOAD) &&
+				    ((isp->is_flags & FLG_IS_SECTREF) == 0) &&
+				    (isp->is_shdr->sh_size > 0))) &&
+				    (ifl->ifl_flags & FLG_IF_IGNORE))
+					continue;
+
+				/*
+				 * We have found a kept input section,
+				 * so the output section will be created.
+				 */
+				keep = 1;
+				break;
+			}
+			/*
+			 * If no section of this name was kept, decrement
+			 * the count and remove the name from .shstrtab.
+			 */
+			if (keep == 0) {
+				/* LINTED - only used for assert() */
+				int err;
+
+				ofl->ofl_shdrcnt--;
+				err = st_delstring(ofl->ofl_shdrsttab,
+				    osp->os_name);
+				assert(err != -1);
+			}
+		}
+	}
+
 	return (1);
 }
 
@@ -895,7 +953,7 @@ make_dynamic(Ofl_desc *ofl)
 		 * determine if an alternative shared object name has been
 		 * specified.
 		 */
-		if (((sdf = ifl->ifl_sdfdesc) != 0) &&
+		if (((sdf = ifl->ifl_sdfdesc) != NULL) &&
 		    (sdf->sdf_flags & FLG_SDF_SONAME))
 			ifl->ifl_soname = sdf->sdf_soname;
 
@@ -1417,18 +1475,6 @@ make_symtab(Ofl_desc *ofl)
 	Is_desc		*xisec = 0;
 	size_t		size;
 	Word		symcnt;
-
-	/*
-	 * We increment the number of sections in the output object
-	 * (ofl->ofl_shdrcnt) as we add them. However, if -z ignore
-	 * processing is in effect, the number of sections later removed
-	 * is not reflected in that count. Updating the count as we
-	 * remove these sections is a relatively expensive operation.
-	 * Hence, if -z ignore is in use, we recompute the number of
-	 * sections in a single final pass.
-	 */
-	if (ofl->ofl_flags1 & FLG_OF1_IGNPRC)
-		ld_recalc_shdrcnt(ofl);
 
 	/*
 	 * Create the section headers. Note that we supply an ent_cnt

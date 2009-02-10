@@ -3842,6 +3842,29 @@ ld_update_outfile(Ofl_desc *ofl)
 	}
 
 	/*
+	 * Sanity test: First and last data byte of a string table
+	 * must be NULL.
+	 */
+	assert((ofl->ofl_osshstrtab == NULL) ||
+	    (*((char *)ofl->ofl_osshstrtab->os_outdata->d_buf) == '\0'));
+	assert((ofl->ofl_osshstrtab == NULL) ||
+	    (*(((char *)ofl->ofl_osshstrtab->os_outdata->d_buf) +
+	    ofl->ofl_osshstrtab->os_outdata->d_size - 1) == '\0'));
+
+	assert((ofl->ofl_osstrtab == NULL) ||
+	    (*((char *)ofl->ofl_osstrtab->os_outdata->d_buf) == '\0'));
+	assert((ofl->ofl_osstrtab == NULL) ||
+	    (*(((char *)ofl->ofl_osstrtab->os_outdata->d_buf) +
+	    ofl->ofl_osstrtab->os_outdata->d_size - 1) == '\0'));
+
+	assert((ofl->ofl_osdynstr == NULL) ||
+	    (*((char *)ofl->ofl_osdynstr->os_outdata->d_buf) == '\0'));
+	assert((ofl->ofl_osdynstr == NULL) ||
+	    (*(((char *)ofl->ofl_osdynstr->os_outdata->d_buf) +
+	    ofl->ofl_osdynstr->os_outdata->d_size - DYNSTR_EXTRA_PAD - 1) ==
+	    '\0'));
+
+	/*
 	 * Emit Strtab diagnostics.
 	 */
 	DBG_CALL(Dbg_sec_strtab(ofl->ofl_lml, ofl->ofl_osshstrtab,

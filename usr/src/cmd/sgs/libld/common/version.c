@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -461,10 +461,14 @@ ld_vers_check_need(Ofl_desc *ofl)
 		}
 
 		if (need) {
+			const char *soname;
+
 			ifl->ifl_flags |= FLG_IF_VERNEED;
 			ofl->ofl_verneedsz += sizeof (Verneed);
-			if (st_insert(ofl->ofl_dynstrtab,
-			    ifl->ifl_soname) == -1)
+			soname = ((sdf != NULL) &&
+			    (sdf->sdf_flags & FLG_SDF_SONAME)) ?
+			    sdf->sdf_soname : ifl->ifl_soname;
+			if (st_insert(ofl->ofl_dynstrtab, soname) == -1)
 				return (S_ERROR);
 		}
 	}

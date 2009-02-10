@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3865,6 +3865,21 @@ shdr_cache(const char *file, Elf *elf, Ehdr *ehdr, size_t shstrndx,
 			failure(file, MSG_ORIG(MSG_ELF_GETDATA));
 			(void) fprintf(stderr, MSG_INTL(MSG_ELF_ERR_SCNDATA),
 			    EC_WORD(elf_ndxscn(scn)));
+		}
+
+		/*
+		 * If a string table, verify that it has NULL first and
+		 * final bytes.
+		 */
+		if ((_cache->c_shdr->sh_type == SHT_STRTAB) &&
+		    (_cache->c_data->d_buf != NULL) &&
+		    (_cache->c_data->d_size > 0)) {
+			const char *s = _cache->c_data->d_buf;
+
+			if ((*s != '\0') ||
+			    (*(s + _cache->c_data->d_size - 1) != '\0'))
+				(void) fprintf(stderr, MSG_INTL(MSG_ERR_MALSTR),
+				    file, _cache->c_name);
 		}
 	}
 
