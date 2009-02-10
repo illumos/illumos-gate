@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2559,6 +2559,10 @@ add_ranges_prop(int bus, int ppb)
 	int total, alloc_size;
 	void	*rp, *next_rp;
 
+	/* no devinfo node - unused bus, return */
+	if (pci_bus_res[bus].dip == NULL)
+		return;
+
 	total = memlist_count(pci_bus_res[bus].io_ports);
 	total += memlist_count(pci_bus_res[bus].mem_space);
 	total += memlist_count(pci_bus_res[bus].pmem_space);
@@ -2619,6 +2623,10 @@ add_bus_available_prop(int bus)
 {
 	int i, count;
 	struct pci_phys_spec *sp;
+
+	/* no devinfo node - unused bus, return */
+	if (pci_bus_res[bus].dip == NULL)
+		return;
 
 	count = memlist_count(pci_bus_res[bus].io_ports) +
 	    memlist_count(pci_bus_res[bus].mem_space) +
