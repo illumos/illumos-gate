@@ -2239,6 +2239,8 @@ so_tpi_fallback(struct sonode *so, struct cred *cr)
 	bcopy(so, &origso, sizeof (*so));
 #endif
 
+	sp->sp_stats.sps_nfallback.value.ui64++;
+
 	newsp = sockparams_hold_ephemeral_bydev(so->so_family, so->so_type,
 	    so->so_protocol, so->so_sockparams->sp_sdev_info.sd_devpath,
 	    KM_SLEEP, &error);

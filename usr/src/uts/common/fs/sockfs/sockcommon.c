@@ -107,6 +107,7 @@ socket_create(int family, int type, int protocol, char *devpath, char *mod,
 
 	ASSERT(sp->sp_smod_info != NULL);
 	ASSERT(flags == SOCKET_SLEEP || flags == SOCKET_NOSLEEP);
+	sp->sp_stats.sps_ncreate.value.ui64++;
 	so = sp->sp_smod_info->smod_sock_create_func(sp, family, type,
 	    protocol, version, flags, errorp, cr);
 	if (so == NULL) {
@@ -140,6 +141,7 @@ socket_newconn(struct sonode *parent, sock_lower_handle_t lh,
 	sp = parent->so_sockparams;
 	ASSERT(sp != NULL);
 
+	sp->sp_stats.sps_ncreate.value.ui64++;
 	so = sp->sp_smod_info->smod_sock_create_func(sp, parent->so_family,
 	    parent->so_type, parent->so_protocol, parent->so_version, flags,
 	    errorp, cr);

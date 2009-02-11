@@ -54,6 +54,7 @@
 #include <sys/socket.h>
 #include <sys/ksocket.h>
 #include <sys/sodirect.h>
+#include <sys/kstat.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -410,6 +411,12 @@ typedef struct smod_info {
 	list_node_t	smod_node;
 } smod_info_t;
 
+typedef struct sockparams_stats {
+	kstat_named_t	sps_nfallback;	/* # of fallbacks to TPI */
+	kstat_named_t	sps_nactive;	/* # of active sockets */
+	kstat_named_t	sps_ncreate;	/* total # of created sockets */
+} sockparams_stats_t;
+
 /*
  * sockparams
  *
@@ -431,6 +438,8 @@ struct sockparams {
 
 	kmutex_t	sp_lock;	/* lock for refcnt */
 	uint64_t	sp_refcnt;	/* entry reference count */
+	sockparams_stats_t sp_stats;
+	kstat_t		*sp_kstat;
 
 	/*
 	 * The entries below are only modified while holding

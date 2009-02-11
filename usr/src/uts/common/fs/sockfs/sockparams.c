@@ -76,6 +76,16 @@ static krwlock_t splist_lock;
 static list_t sp_ephem_list;
 static krwlock_t sp_ephem_lock;
 
+/* Global kstats for sockparams */
+typedef struct sockparams_g_stats {
+	kstat_named_t spgs_ephem_nalloc;
+	kstat_named_t spgs_ephem_nreuse;
+} sockparams_g_stats_t;
+
+static sockparams_g_stats_t sp_g_stats;
+static kstat_t *sp_g_kstat;
+
+
 void
 sockparams_init(void)
 {
@@ -86,6 +96,75 @@ sockparams_init(void)
 
 	rw_init(&splist_lock, NULL, RW_DEFAULT, NULL);
 	rw_init(&sp_ephem_lock, NULL, RW_DEFAULT, NULL);
+
+	kstat_named_init(&sp_g_stats.spgs_ephem_nalloc, "ephemeral_nalloc",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&sp_g_stats.spgs_ephem_nreuse, "ephemeral_nreuse",
+	    KSTAT_DATA_UINT64);
+
+	sp_g_kstat = kstat_create("sockfs", 0, "sockparams", "misc",
+	    KSTAT_TYPE_NAMED, sizeof (sp_g_stats) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+	if (sp_g_kstat == NULL)
+		return;
+
+	sp_g_kstat->ks_data = &sp_g_stats;
+
+	kstat_install(sp_g_kstat);
+}
+
+static int
+sockparams_kstat_update(kstat_t *ksp, int rw)
+{
+	struct sockparams *sp = ksp->ks_private;
+	sockparams_stats_t *sps = ksp->ks_data;
+
+	if (rw == KSTAT_WRITE)
+		return (EACCES);
+
+	sps->sps_nactive.value.ui64 = sp->sp_refcnt;
+
+	return (0);
+}
+
+/*
+ * Setup kstats for the given sockparams entry.
+ */
+static void
+sockparams_kstat_init(struct sockparams *sp)
+{
+	char name[KSTAT_STRLEN];
+
+	kstat_named_init(&sp->sp_stats.sps_nfallback, "nfallback",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&sp->sp_stats.sps_nactive, "nactive",
+	    KSTAT_DATA_UINT64);
+	kstat_named_init(&sp->sp_stats.sps_ncreate, "ncreate",
+	    KSTAT_DATA_UINT64);
+
+	(void) snprintf(name, KSTAT_STRLEN, "socket_%d_%d_%d", sp->sp_family,
+	    sp->sp_type, sp->sp_protocol);
+
+	sp->sp_kstat = kstat_create("sockfs", 0, name, "misc", KSTAT_TYPE_NAMED,
+	    sizeof (sockparams_stats_t) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL);
+
+	if (sp->sp_kstat == NULL)
+		return;
+
+	sp->sp_kstat->ks_data = &sp->sp_stats;
+	sp->sp_kstat->ks_update = sockparams_kstat_update;
+	sp->sp_kstat->ks_private = sp;
+	kstat_install(sp->sp_kstat);
+}
+
+static void
+sockparams_kstat_fini(struct sockparams *sp)
+{
+	if (sp->sp_kstat != NULL) {
+		kstat_delete(sp->sp_kstat);
+		sp->sp_kstat = NULL;
+	}
 }
 
 /*
@@ -148,6 +227,15 @@ sockparams_create(int family, int type, int protocol, char *modname,
 	sp->sp_refcnt = 0;
 	sp->sp_flags = flags;
 
+	/*
+	 * We do not create kstats for ephemeral entries, but we do keep
+	 * track how many we have created.
+	 */
+	if (sp->sp_flags & SOCKPARAMS_EPHEMERAL)
+		sp_g_stats.spgs_ephem_nalloc.value.ui64++;
+	else
+		sockparams_kstat_init(sp);
+
 	if (modname != NULL) {
 		sp->sp_smod_name = modname;
 	} else {
@@ -177,8 +265,10 @@ error:
 		kmem_free(modname, strlen(modname) + 1);
 	if (devpathlen != 0)
 		kmem_free(devpath, devpathlen);
-	if (sp != NULL)
+	if (sp != NULL) {
+		sockparams_kstat_fini(sp);
 		kmem_free(sp, sizeof (*sp));
+	}
 	return (NULL);
 }
 
@@ -236,6 +326,7 @@ sockparams_destroy(struct sockparams *sp)
 	sp->sp_smod_name = NULL;
 	sp->sp_smod_info = NULL;
 	mutex_destroy(&sp->sp_lock);
+	sockparams_kstat_fini(sp);
 
 	kmem_free(sp, sizeof (*sp));
 }
@@ -325,6 +416,7 @@ sockparams_hold_ephemeral(int family, int type, int protocol,
 	if (sp != NULL) {
 		SOCKPARAMS_INC_REF(sp);
 		rw_exit(&sp_ephem_lock);
+		sp_g_stats.spgs_ephem_nreuse.value.ui64++;
 
 		return (sp);
 	} else {
