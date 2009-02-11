@@ -111,7 +111,7 @@ int threadflow_init(procflow_t *);
 void flowop_start(threadflow_t *threadflow);
 void threadflow_usage(void);
 void threadflow_allstarted(pid_t pid, threadflow_t *threadflow);
-void threadflow_delete_all(threadflow_t **threadlist, int wait_cnt);
+void threadflow_delete_all(threadflow_t **threadlist);
 
 #ifdef	__cplusplus
 }

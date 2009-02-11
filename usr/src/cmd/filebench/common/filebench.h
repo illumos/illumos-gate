@@ -118,12 +118,12 @@ void filebench_plugin_funcvecinit(void);
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
 
-#define	FILEBENCH_VERSION	"1.4.3"
+#define	FILEBENCH_VERSION	"1.4.4"
 #define	FILEBENCHDIR	"/usr/benchmarks/filebench"
 #define	FILEBENCH_PROMPT	"filebench> "
 #define	MAX_LINE_LEN	1024
 #define	MAX_CMD_HIST	128
-#define	SHUTDOWN_WAIT_SECONDS	5 /* time to wait for proc / thrd to quit */
+#define	SHUTDOWN_WAIT_SECONDS	3 /* time to wait for proc / thrd to quit */
 
 #define	FILEBENCH_DONE	 1
 #define	FILEBENCH_OK	 0

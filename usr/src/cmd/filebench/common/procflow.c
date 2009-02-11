@@ -41,6 +41,7 @@ procflow_t *my_procflow = NULL;
 
 static procflow_t *procflow_define_common(procflow_t **list, char *name,
     procflow_t *inherit, int instance);
+static void procflow_sleep(procflow_t *procflow, int wait_cnt);
 
 #ifdef USE_PROCESS_MODEL
 
@@ -403,6 +404,26 @@ procflow_createnwait(void *nothing)
 	/* NOTREACHED */
 	return (NULL);
 }
+
+/*
+ * Cancel all threads within a processes, as well as the process itself.
+ * Called by ^c or by sig_kill
+ */
+/* ARGSUSED */
+static void
+procflow_cancel(int arg1)
+{
+	filebench_log(LOG_DEBUG_IMPL, "Process signal handler on pid %",
+	    my_procflow->pf_pid);
+
+	procflow_sleep(my_procflow, SHUTDOWN_WAIT_SECONDS);
+
+	threadflow_delete_all(&my_procflow->pf_threads);
+
+	/* quit the main procflow thread and hence the process */
+	exit(0);
+}
+
 #endif	/* USE_PROCESS_MODEL */
 
 /*
@@ -430,6 +451,8 @@ procflow_init(void)
 		return (ret);
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
+
+	(void) signal(SIGUSR1, procflow_cancel);
 
 	if ((ret = pthread_cond_wait(&filebench_shm->shm_procflow_procs_cv,
 	    &filebench_shm->shm_procflow_lock)) != 0)
@@ -468,20 +491,29 @@ procflow_wait(pid_t pid)
 #endif
 
 /*
- * Deletes the designated procflow and all its threadflows except
- * for FLOW_MASTER ones. Waits 10 seconds if the procflow is still
- * running, then kills the associated process. Finally it frees the
+ * Common routine to sleep for wait_cnt seconds or for pf_running to
+ * go false. Checks once a second to see if pf_running has gone false.
+ */
+static void
+procflow_sleep(procflow_t *procflow, int wait_cnt)
+{
+	while (procflow->pf_running & wait_cnt) {
+		sleep(1);
+		wait_cnt--;
+	}
+}
+
+/*
+ * Deletes the designated procflow. Finally it frees the
  * procflow entity. filebench_shm->shm_procflow_lock must be held on entry.
  *
  * If the designated procflow is not found on the list it returns -1 and
  * the procflow is not deleted. Otherwise it returns 0.
  */
 static int
-procflow_delete(procflow_t *procflow, int wait_cnt)
+procflow_cleanup(procflow_t *procflow)
 {
 	procflow_t *entry;
-
-	threadflow_delete_all(&procflow->pf_threads, wait_cnt);
 
 	filebench_log(LOG_DEBUG_SCRIPT,
 	    "Deleted proc: (%s-%d) pid %d",
@@ -489,36 +521,8 @@ procflow_delete(procflow_t *procflow, int wait_cnt)
 	    procflow->pf_instance,
 	    procflow->pf_pid);
 
-	while (procflow->pf_running == 1) {
-		filebench_log(LOG_DEBUG_SCRIPT,
-		    "Waiting for process %s-%d %d",
-		    procflow->pf_name,
-		    procflow->pf_instance,
-		    procflow->pf_pid);
+	procflow->pf_running = 0;
 
-		if (wait_cnt) {
-			(void) ipc_mutex_unlock(
-			    &filebench_shm->shm_procflow_lock);
-			(void) sleep(1);
-			(void) ipc_mutex_lock(
-			    &filebench_shm->shm_procflow_lock);
-			wait_cnt--;
-			continue;
-		}
-#ifdef USE_PROCESS_MODEL
-		(void) kill(procflow->pf_pid, SIGKILL);
-		filebench_log(LOG_DEBUG_SCRIPT,
-		    "procflow_delete: Had to kill process %s-%d %d!",
-		    procflow->pf_name,
-		    procflow->pf_instance,
-		    procflow->pf_pid);
-		procflow->pf_running = 0;
-#endif
-	}
-
-#ifdef USE_PROCESS_MODEL
-	procflow_wait(procflow->pf_pid);
-#endif
 	/* remove entry from proclist */
 	entry = filebench_shm->shm_proclist;
 
@@ -628,8 +632,8 @@ procflow_allstarted()
 void
 procflow_shutdown(void)
 {
-	procflow_t *procflow;
-	int wait_cnt;
+	procflow_t *procflow, *next_procflow;
+	int wait_cnt = SHUTDOWN_WAIT_SECONDS;
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_procs_running_lock);
 	if (filebench_shm->shm_procs_running <= 0) {
@@ -642,7 +646,6 @@ procflow_shutdown(void)
 	(void) ipc_mutex_lock(&filebench_shm->shm_procflow_lock);
 	procflow = filebench_shm->shm_proclist;
 	filebench_shm->shm_f_abort = 1;
-	wait_cnt = SHUTDOWN_WAIT_SECONDS;
 
 	while (procflow) {
 		if (procflow->pf_instance &&
@@ -654,10 +657,33 @@ procflow_shutdown(void)
 		    procflow->pf_name,
 		    procflow->pf_instance,
 		    procflow->pf_pid);
-		(void) procflow_delete(procflow, wait_cnt);
-		procflow = procflow->pf_next;
-		/* grow more impatient */
-		if (wait_cnt)
+
+		next_procflow = procflow->pf_next;
+
+		/*
+		 * Signalling the process with SIGUSR1 will result in it
+		 * gracefully shutting down and exiting
+		 */
+		procflow_sleep(procflow, wait_cnt);
+		if (procflow->pf_running) {
+#ifdef USE_PROCESS_MODEL
+			pid_t pid;
+
+			pid = procflow->pf_pid;
+#ifdef HAVE_SIGSEND
+			(void) sigsend(P_PID, pid, SIGUSR1);
+#else
+			(void) kill(pid, SIGUSR1);
+#endif
+			procflow_wait(pid);
+
+#else /* USE_PROCESS_MODEL */
+			threadflow_delete_all(&procflow->pf_threads);
+#endif /* USE_PROCESS_MODEL */
+		}
+		(void) procflow_cleanup(procflow);
+		procflow = next_procflow;
+		if (wait_cnt > 0)
 			wait_cnt--;
 	}
 
@@ -707,8 +733,6 @@ procflow_define_common(procflow_t **list, char *name,
 
 	filebench_log(LOG_DEBUG_IMPL, "defining process %s-%d", name, instance);
 
-	filebench_log(LOG_DEBUG_IMPL, "process %s-%d proclist %zx",
-	    name, instance, filebench_shm->shm_proclist);
 	/* Add procflow to list, lock is being held already */
 	if (*list == NULL) {
 		*list = procflow;

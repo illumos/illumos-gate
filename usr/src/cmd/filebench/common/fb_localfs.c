@@ -411,7 +411,7 @@ fb_lfsflow_aiowait(threadflow_t *threadflow, flowop_t *flowop)
 
 		flowop_beginop(threadflow, flowop);
 
-#ifdef HAVE_AIOWAITN
+#if (defined(HAVE_AIOWAITN) && defined(USE_PROCESS_MODEL))
 		if (((aio_waitn64((struct aiocb64 **)worklist,
 		    MAXREAP, &todo, &timeout)) == -1) &&
 		    errno && (errno != ETIME)) {
@@ -447,14 +447,14 @@ fb_lfsflow_aiowait(threadflow_t *threadflow, flowop_t *flowop)
 		for (ncompleted = 0, inprogress = 0,
 		    aio = flowop->fo_thread->tf_aiolist;
 		    ncompleted < todo, aio != NULL; aio = aio->al_next) {
-			int result = aio_error64(aio->al_aiocb);
+			int result = aio_error64(&aio->al_aiocb);
 
 			if (result == EINPROGRESS) {
 				inprogress++;
 				continue;
 			}
 
-			if ((aio_return64(aio->al_aiocb) == -1) || result) {
+			if ((aio_return64(&aio->al_aiocb) == -1) || result) {
 				filebench_log(LOG_ERROR, "aio failed: %s",
 				    strerror(result));
 				continue;
@@ -464,7 +464,7 @@ fb_lfsflow_aiowait(threadflow_t *threadflow, flowop_t *flowop)
 
 			if (aio_deallocate(flowop, &aio->al_aiocb) < 0) {
 				filebench_log(LOG_ERROR, "Could not remove "
-				    aio from list ");
+				    "aio from list ");
 				flowop_endop(threadflow, flowop, 0);
 				return (FILEBENCH_ERROR);
 			}

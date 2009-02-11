@@ -104,40 +104,6 @@ threadflow_createthread(threadflow_t *threadflow)
 }
 
 /*
- * Terminates (exits) all the threads of the procflow (process).
- * The procflow is determined from a process private pointer
- * initialized by threadflow_init().
- */
-/* ARGSUSED */
-static void
-threadflow_cancel(int arg1)
-{
-	threadflow_t *threadflow;
-
-#ifdef HAVE_LWPS
-	filebench_log(LOG_DEBUG_IMPL, "Thread signal handler on tid %d",
-	    _lwp_self());
-#endif
-
-	threadflow = my_procflow->pf_threads;
-	my_procflow->pf_running = 0;
-
-	while (threadflow) {
-		if (threadflow->tf_tid) {
-			/* make sure thread has been cleaned up */
-			flowop_destruct_all_flows(threadflow);
-
-			(void) pthread_cancel(threadflow->tf_tid);
-			filebench_log(LOG_DEBUG_IMPL, "Thread %d cancelled...",
-			    threadflow->tf_tid);
-		}
-		threadflow = threadflow->tf_next;
-	}
-
-	exit(0);
-}
-
-/*
  * Creates threads for the threadflows associated with a procflow.
  * The routine iterates through the list of threadflows in the
  * supplied procflow's pf_threads list. For each threadflow on
@@ -160,8 +126,6 @@ threadflow_init(procflow_t *procflow)
 	int ret = 0;
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_threadflow_lock);
-
-	(void) signal(SIGUSR1, threadflow_cancel);
 
 	while (threadflow) {
 		threadflow_t *newthread;
@@ -221,8 +185,10 @@ threadflow_init(procflow_t *procflow)
  * its associated process to end the thread.
  */
 static void
-threadflow_kill(threadflow_t *threadflow, int wait_cnt)
+threadflow_kill(threadflow_t *threadflow)
 {
+	int wait_cnt = 2;
+
 	/* Tell thread to finish */
 	threadflow->tf_abort = 1;
 
@@ -232,15 +198,10 @@ threadflow_kill(threadflow_t *threadflow, int wait_cnt)
 		wait_cnt--;
 	}
 
-#ifdef USE_PROCESS_MODEL
-#ifdef HAVE_SIGSEND
-	(void) sigsend(P_PID, threadflow->tf_process->pf_pid, SIGUSR1);
-#else
-	(void) kill(threadflow->tf_process->pf_pid, SIGUSR1);
-#endif
-#else /* USE_PROCESS_MODEL */
-	threadflow->tf_process->pf_running = 0;
-#endif /* USE_PROCESS_MODEL */
+	if (threadflow->tf_running) {
+		threadflow->tf_running = FALSE;
+		pthread_kill(threadflow->tf_tid, SIGKILL);
+	}
 }
 
 /*
@@ -253,8 +214,7 @@ threadflow_kill(threadflow_t *threadflow, int wait_cnt)
  * returns -1.
  */
 static int
-threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
-    int wait_cnt)
+threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow)
 {
 	threadflow_t *entry = *threadlist;
 
@@ -271,7 +231,7 @@ threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
 		    threadflow->tf_name,
 		    threadflow->tf_instance);
 
-		threadflow_kill(threadflow, wait_cnt);
+		threadflow_kill(threadflow);
 		flowop_delete_all(&threadflow->tf_thrd_fops);
 		*threadlist = threadflow->tf_next;
 		(void) pthread_mutex_destroy(&threadflow->tf_lock);
@@ -293,7 +253,7 @@ threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
 			    "Deleted thread: (%s-%d)",
 			    entry->tf_next->tf_name,
 			    entry->tf_next->tf_instance);
-			threadflow_kill(entry->tf_next, wait_cnt);
+			threadflow_kill(entry->tf_next);
 			flowop_delete_all(&entry->tf_next->tf_thrd_fops);
 			(void) pthread_mutex_destroy(&threadflow->tf_lock);
 			ipc_free(FILEBENCH_THREADFLOW, (char *)threadflow);
@@ -312,7 +272,7 @@ threadflow_delete(threadflow_t **threadlist, threadflow_t *threadflow,
  * except the FLOW_MASTER.
  */
 void
-threadflow_delete_all(threadflow_t **threadlist, int wait_cnt)
+threadflow_delete_all(threadflow_t **threadlist)
 {
 	threadflow_t *threadflow;
 
@@ -327,11 +287,8 @@ threadflow_delete_all(threadflow_t **threadlist, int wait_cnt)
 			threadflow = threadflow->tf_next;
 			continue;
 		}
-		(void) threadflow_delete(threadlist, threadflow, wait_cnt);
+		(void) threadflow_delete(threadlist, threadflow);
 		threadflow = threadflow->tf_next;
-		/* grow more impatient */
-		if (wait_cnt > 0)
-			wait_cnt--;
 	}
 
 	(void) ipc_mutex_unlock(&filebench_shm->shm_threadflow_lock);

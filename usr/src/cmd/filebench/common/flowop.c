@@ -718,6 +718,7 @@ void
 flowop_delete_all(flowop_t **flowoplist)
 {
 	flowop_t *flowop = *flowoplist;
+	flowop_t *next_flowop;
 
 	(void) ipc_mutex_lock(&filebench_shm->shm_flowop_lock);
 
@@ -730,8 +731,9 @@ flowop_delete_all(flowop_t **flowoplist)
 			flowop = flowop->fo_exec_next;
 			continue;
 		}
+		next_flowop = flowop->fo_exec_next;
 		flowop_delete(flowoplist, flowop);
-		flowop = flowop->fo_exec_next;
+		flowop = next_flowop;
 	}
 
 	(void) ipc_mutex_unlock(&filebench_shm->shm_flowop_lock);
