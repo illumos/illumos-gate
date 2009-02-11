@@ -7952,7 +7952,6 @@ update_temp(menu_t *mp, char *dummy, char *opt)
 		return (BAM_ERROR);
 	}
 
-	free(fstype);
 	free(osdev);
 	(void) strlcpy(signbuf, sign, sizeof (signbuf));
 	free(sign);
@@ -7967,6 +7966,7 @@ update_temp(menu_t *mp, char *dummy, char *opt)
 	 */
 	INJECT_ERROR1("REBOOT_NOT_DBOOT", bam_direct = BAM_DIRECT_MULTIBOOT);
 	if (bam_direct != BAM_DIRECT_DBOOT) {
+		free(fstype);
 		bam_error(REBOOT_DIRECT_FAILED);
 		return (BAM_ERROR);
 	}
@@ -7977,12 +7977,21 @@ update_temp(menu_t *mp, char *dummy, char *opt)
 		ret = get_kernel(mp, KERNEL_CMD, kernbuf, sizeof (kernbuf));
 		INJECT_ERROR1("REBOOT_GET_KERNEL", ret = BAM_ERROR);
 		if (ret != BAM_SUCCESS) {
+			free(fstype);
 			bam_error(REBOOT_GET_KERNEL_FAILED);
 			return (BAM_ERROR);
 		}
 		if (kernbuf[0] == '\0')
 			(void) strlcpy(kernbuf, DIRECT_BOOT_KERNEL,
 			    sizeof (kernbuf));
+		/*
+		 * If this is a zfs file system and kernbuf does not
+		 * have "-B $ZFS-BOOTFS" string yet, add it.
+		 */
+		if (strcmp(fstype, "zfs") == 0 && !strstr(kernbuf, ZFS_BOOT)) {
+			(void) strlcat(kernbuf, " ", sizeof (kernbuf));
+			(void) strlcat(kernbuf, ZFS_BOOT, sizeof (kernbuf));
+		}
 		(void) strlcat(kernbuf, " ", sizeof (kernbuf));
 		(void) strlcat(kernbuf, opt, sizeof (kernbuf));
 		BAM_DPRINTF((D_REBOOT_OPTION, fcn, kernbuf));
@@ -8010,6 +8019,7 @@ update_temp(menu_t *mp, char *dummy, char *opt)
 			    sizeof (args_buf));
 			INJECT_ERROR1("REBOOT_GET_ARGS", ret = BAM_ERROR);
 			if (ret != BAM_SUCCESS) {
+				free(fstype);
 				bam_error(REBOOT_GET_ARGS_FAILED);
 				return (BAM_ERROR);
 			}
@@ -8053,6 +8063,7 @@ update_temp(menu_t *mp, char *dummy, char *opt)
 				INJECT_ERROR1("UPDATE_TEMP_PARTIAL_ARGS",
 				    ret = BAM_ERROR);
 				if (ret != BAM_SUCCESS) {
+					free(fstype);
 					bam_error(REBOOT_GET_ARGS_FAILED);
 					return (BAM_ERROR);
 				}
@@ -8066,11 +8077,13 @@ update_temp(menu_t *mp, char *dummy, char *opt)
 			}
 			BAM_DPRINTF((D_REBOOT_RESOLVED_PARTIAL, fcn, kernbuf));
 		} else {
+			free(fstype);
 			bam_error(UNKNOWN_KERNEL, opt);
 			bam_print_stderr(UNKNOWN_KERNEL_REBOOT);
 			return (BAM_ERROR);
 		}
 	}
+	free(fstype);
 	entry = add_boot_entry(mp, REBOOT_TITLE, signbuf, kernbuf,
 	    NULL, NULL);
 	INJECT_ERROR1("REBOOT_ADD_BOOT_ENTRY", entry = BAM_ERROR);
