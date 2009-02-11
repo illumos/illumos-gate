@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,8 +43,9 @@
 #define	CPUDRV_INTEL_PDC_C1_HALT	0x0002
 #define	CPUDRV_INTEL_PDC_TS_MSR		0x0004
 #define	CPUDRV_INTEL_PDC_MP		0x0008
-#define	CPUDRV_INTEL_PDC_PSD		0x0020
+#define	CPUDRV_INTEL_PDC_SW_PSD		0x0020
 #define	CPUDRV_INTEL_PDC_TSD		0x0080
+#define	CPUDRV_INTEL_PDC_HW_PSD		0x0800
 
 static uint32_t cpudrv_intel_pdccap = 0;
 
@@ -70,7 +71,7 @@ cpudrv_intel_init(cpudrv_devstate_t *cpudsp)
 		mach_state->cpupm_pstate_ops = &speedstep_ops;
 		cpudrv_intel_pdccap = CPUDRV_INTEL_PDC_PS_MSR |
 		    CPUDRV_INTEL_PDC_C1_HALT | CPUDRV_INTEL_PDC_MP |
-		    CPUDRV_INTEL_PDC_PSD;
+		    CPUDRV_INTEL_PDC_SW_PSD | CPUDRV_INTEL_PDC_HW_PSD;
 	} else {
 		mach_state->cpupm_pstate_ops = NULL;
 	}
