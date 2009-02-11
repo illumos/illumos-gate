@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * SBP2 module
@@ -32,6 +30,7 @@
 #include <sys/errno.h>
 #include <sys/cred.h>
 #include <sys/conf.h>
+#include <sys/disp.h>
 #include <sys/modctl.h>
 #include <sys/stat.h>
 #include <sys/stream.h>
@@ -902,6 +901,16 @@ sbp2_ses_submit_task(sbp2_ses_t *sp, sbp2_task_t *new_task)
 		mutex_exit(&ap->a_mutex);
 		sbp2_agent_release(ap);
 		return (SBP2_SUCCESS);
+	}
+
+	/*
+	 * cannot submit tasks from interrupt context,
+	 * upper layer driver is responsible to call nudge
+	 */
+	if (servicing_interrupt()) {
+		mutex_exit(&ap->a_mutex);
+		sbp2_agent_release(ap);
+		return (SBP2_ECONTEXT);
 	}
 
 	/* no active task, grab the first one on the list in INIT state */

@@ -19,11 +19,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * 1394 mass storage SBP-2 driver routines
@@ -626,7 +624,7 @@ scsa1394_sbp2_start(scsa1394_lun_t *lp, scsa1394_cmd_t *cmd)
 
 	ret = sbp2_ses_submit_task(lp->l_ses, task);
 
-	if (ret == SBP2_SUCCESS) {
+	if ((ret == SBP2_SUCCESS) || (ret == SBP2_ECONTEXT)) {
 		return (TRAN_ACCEPT);
 	} if (task->ts_error == SBP2_TASK_ERR_BUS) {
 		if (task->ts_bus_error == CMD1394_EDEVICE_BUSY) {

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1094,6 +1094,10 @@ scsa1394_probe_g0_nodata(struct scsi_device *sd, int (*waitfunc)(),
 	if (scsa1394_probe_tran(pkt) < 0) {
 		if (pkt->pkt_reason == CMD_INCOMPLETE) {
 			ret = SCSIPROBE_NORESP;
+		} else if ((pkt->pkt_reason == CMD_TRAN_ERR) &&
+		    ((*(pkt->pkt_scbp) & STATUS_MASK) == STATUS_CHECK) &&
+		    (pkt->pkt_state & STATE_ARQ_DONE)) {
+			ret = SCSIPROBE_EXISTS;
 		} else {
 			ret = SCSIPROBE_FAILURE;
 		}
@@ -1994,7 +1998,7 @@ scsa1394_scsi_start(struct scsi_address *ap, struct scsi_pkt *pkt)
 
 	scsa1394_sbp2_cmd2orb(lp, cmd);		/* convert into ORB */
 
-	if ((ret = scsa1394_sbp2_start(lp, cmd)) != DDI_SUCCESS) {
+	if ((ret = scsa1394_sbp2_start(lp, cmd)) != TRAN_BUSY) {
 		scsa1394_sbp2_nudge(lp);
 	}
 
