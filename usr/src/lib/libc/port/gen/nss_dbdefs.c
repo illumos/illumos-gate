@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "lint.h"
 #include <mtlib.h>
@@ -242,12 +240,16 @@ typedef struct {
  * necessitate re-testing for possible collisions.
  */
 
-#define	DBOP_PRIME_HASH		223
+#define	DBOP_PRIME_HASH		227
 #define	DBOP_HASH_TAG		0xf0000000
 static int getXbyYdbopHASH[DBOP_PRIME_HASH] = { 0 };
 static mutex_t getXbydbop_hash_lock = DEFAULTMUTEX;
 static int getXbyYdbop_hashed = 0;
 
+/*
+ * If the size of getXbyY_to_dbop[] is changed then hash function must be
+ * corrected to be without collisions in nss_dbop_search().
+ */
 static getXbyY_to_dbop_t getXbyY_to_dbop[] = {
 	/* NSS_MK_GETXYDBOP(ALIASES, ?, ?), */
 	NSS_MK_GETXYDBOPD(AUDITUSER, BYNAME, "auuser", "audituser", "n"),
@@ -300,6 +302,7 @@ nss_dbop_search(const char *name, uint32_t dbop)
 	uint32_t hval, g;
 	const char *cp;
 	int i, idx;
+	static const uint32_t hbits_tst = 0xf0000000;
 
 	/* Uses a table size is known to have no collisions */
 	if (getXbyYdbop_hashed == 0) {
@@ -310,7 +313,7 @@ nss_dbop_search(const char *name, uint32_t dbop)
 				hval = 0;
 				while (*cp) {
 					hval = (hval << 4) + *cp++;
-					if ((g = (hval & 0xf00000000)) != 0)
+					if ((g = (hval & hbits_tst)) != 0)
 						hval ^= g >> 24;
 					hval &= ~g;
 				}
@@ -333,7 +336,7 @@ nss_dbop_search(const char *name, uint32_t dbop)
 	hval = 0;
 	while (*cp) {
 		hval = (hval << 4) + *cp++;
-		if ((g = (hval & 0xf00000000)) != 0)
+		if ((g = (hval & hbits_tst)) != 0)
 			hval ^= g >> 24;
 		hval &= ~g;
 	}
