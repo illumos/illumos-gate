@@ -634,7 +634,8 @@ apic_init_intr()
 	if (apic_cpus[cpun].aci_local_ver < APIC_INTEGRATED_VERS) {
 		nlvt = 3;
 	} else {
-		nlvt = ((apicadr[APIC_VERS_REG] >> 16) & 0xFF) + 1;
+		nlvt = ((apic_reg_ops->apic_read(APIC_VERS_REG) >> 16) &
+		    0xFF) + 1;
 	}
 
 	if (nlvt >= 5) {
@@ -1693,8 +1694,8 @@ apic_shutdown(int cmd, int fcn)
 		(void) AcpiDisable();
 
 	if (fcn == AD_FASTREBOOT) {
-		apicadr[APIC_INT_CMD1] = AV_ASSERT | AV_RESET |
-		    AV_SH_ALL_EXCSELF;
+		apic_reg_ops->apic_write(APIC_INT_CMD1,
+		    AV_ASSERT | AV_RESET | AV_SH_ALL_EXCSELF);
 	}
 
 	/* remainder of function is for shutdown+poweroff case only */
