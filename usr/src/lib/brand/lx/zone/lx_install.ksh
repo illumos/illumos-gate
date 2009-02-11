@@ -85,6 +85,8 @@ no_install=$(gettext "Could not create install directory '%s'")
 no_log=$(gettext "Could not create log directory '%s'")
 no_logfile=$(gettext "Could not create log file '%s'")
 
+root_full=$(gettext "Zonepath root %s exists and contains data; remove or move aside prior to install.")
+
 install_zone=$(gettext "Installing zone '%s' at root directory '%s'")
 install_from=$(gettext "from archive '%s'")
 
@@ -455,6 +457,15 @@ then
 		screenlog "$no_install" "$install_root"
 		exit $int_code
 	fi
+fi
+
+#
+# Check for a non-empty root.
+# 
+cnt=`ls $install_root | wc -l`
+if [ $cnt -ne 0 ]; then
+	screenlog "$root_full" "$install_root"
+	exit $int_code
 fi
 
 if [[ ! -d "$logdir" ]]

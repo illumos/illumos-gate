@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * sw_support does install, detach and attach processing for svr4 pkgs.
@@ -3646,23 +3644,62 @@ done:
 	return (res);
 }
 
+static boolean_t
+add_opts(char *buf, int bsize, char opt, char *arg)
+{
+	char argbuf[MAXPATHLEN];
+
+	if (snprintf(argbuf, sizeof (argbuf), " -%c '%s'", opt, arg)
+	    > sizeof (argbuf) || strlcat(buf, argbuf, bsize) >= bsize) {
+		(void) fprintf(stderr, gettext("Command line too long"));
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+static boolean_t
+add_opt(char *buf, int bsize, char opt)
+{
+	char argbuf[4];
+
+	(void) snprintf(argbuf, sizeof (argbuf), " -%c", opt);
+	if (strlcat(buf, argbuf, bsize) >= bsize) {
+		(void) fprintf(stderr, gettext("Command line too long"));
+		return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
 static void
 install_usage()
 {
-	(void) fprintf(stderr, gettext("usage:\t%s brand options: none\n"),
+	(void) fprintf(stderr, gettext("usage:\t%s brand options:\n"
+	    "\tWith no options the zone is freshly installed:\n"
+	    "\t\tinstall\n"
+	    "\tAlternatively, the zone may be installed using an existing\n"
+	    "\tsystem image from an archive or a directory:\n"
+	    "\t\tinstall -a archive (-u | -p) [-v | -s] [-b patchid]*\n"
+	    "\t\tinstall -d directory (-u | -p) [-v | -s] [-b patchid]*\n"),
 	    MY_BRAND_NAME);
 }
 
 static int
 install_func(int argc, char *argv[])
 {
-	char cmdbuf[MAXPATHLEN];
+	char cmdbuf[NCARGS];
+	char argbuf[NCARGS];
 	int arg;
 	int status;
+	boolean_t image_install = B_FALSE;
+	char image_install_arg = '\0';
+
+	argbuf[0] = '\0';
 
 	opterr = 0;
 	optind = 0;
-	while ((arg = getopt(argc, argv, "?x:")) != EOF) {
+	while ((arg = getopt(argc, argv, "?a:b:d:psuvx:")) != EOF) {
 		switch (arg) {
 		case '?':
 			if (optopt != '?') {
@@ -3672,6 +3709,50 @@ install_func(int argc, char *argv[])
 			}
 			install_usage();
 			return (optopt == '?' ? Z_OK : ZONE_SUBPROC_USAGE);
+
+		case 'a':
+			if (image_install) {
+				install_usage();
+				return (ZONE_SUBPROC_USAGE);
+			}
+			image_install = B_TRUE;
+			if (add_opts(argbuf, sizeof (argbuf), arg, optarg))
+				return (Z_ERR);
+			break;
+		case 'b':
+			image_install_arg = optopt;
+			if (add_opts(argbuf, sizeof (argbuf), arg, optarg))
+				return (Z_ERR);
+			break;
+		case 'd':
+			if (image_install) {
+				install_usage();
+				return (ZONE_SUBPROC_USAGE);
+			}
+			image_install = B_TRUE;
+			if (add_opts(argbuf, sizeof (argbuf), arg, optarg))
+				return (Z_ERR);
+			break;
+		case 'p':
+			image_install_arg = optopt;
+			if (add_opt(argbuf, sizeof (argbuf), arg))
+				return (Z_ERR);
+			break;
+		case 's':
+			image_install_arg = optopt;
+			if (add_opt(argbuf, sizeof (argbuf), arg))
+				return (Z_ERR);
+			break;
+		case 'u':
+			image_install_arg = optopt;
+			if (add_opt(argbuf, sizeof (argbuf), arg))
+				return (Z_ERR);
+			break;
+		case 'v':
+			image_install_arg = optopt;
+			if (add_opt(argbuf, sizeof (argbuf), arg))
+				return (Z_ERR);
+			break;
 		case 'x':
 			if (strcmp(optarg, "nodataset") != 0) {
 				(void) fprintf(stderr, gettext("%s brand: "
@@ -3693,9 +3774,70 @@ install_func(int argc, char *argv[])
 		return (ZONE_SUBPROC_USAGE);
 	}
 
-	if (snprintf(cmdbuf, sizeof (cmdbuf), "/usr/lib/lu/lucreatezone -z %s",
-	    zonename) >= sizeof (cmdbuf))
-		return (Z_ERR);
+	/*
+	 * Either install the zone using a system image or using the
+	 * traditional lu support.
+	 */
+	if (image_install) {
+		if (snprintf(cmdbuf, sizeof (cmdbuf),
+		    "/usr/lib/brand/native/image_install %s %s %s", zonename,
+		    zonepath, argbuf) >= sizeof (cmdbuf))
+			return (Z_ERR);
+
+	} else {
+		struct stat	stbuf;
+		char		rootpath[MAXPATHLEN]; /* zone root path */
+
+		if (snprintf(rootpath, sizeof (rootpath), "%s/root", zonepath)
+		    >= sizeof (rootpath)) {
+			(void) fprintf(stderr,
+			    gettext("Zonepath %s is too long.\n"), zonepath);
+			return (Z_ERR);
+		}
+
+		if (stat(rootpath, &stbuf) == 0) {
+			struct dirent	*dp;
+			DIR		*dirp;
+			boolean_t	empty = B_TRUE;
+
+			if ((dirp = opendir(rootpath)) == NULL) {
+				(void) fprintf(stderr, gettext("Could not "
+				    "open rootpath %s\n"), rootpath);
+				return (Z_ERR);
+			}
+
+			/* Verify that the dir is empty. */
+			while ((dp = readdir(dirp)) != NULL) {
+				if (strcmp(dp->d_name, ".") == 0 ||
+				    strcmp(dp->d_name, "..") == 0)
+					continue;
+
+				empty = B_FALSE;
+				break;
+			}
+			(void) closedir(dirp);
+
+			if (!empty) {
+				(void) fprintf(stderr, gettext("Zonepath root "
+				    "%s exists and contains data; remove or "
+				    "move aside prior to install.\n"),
+				    rootpath);
+				return (Z_ERR);
+			}
+		}
+
+		if (image_install_arg != '\0') {
+			(void) fprintf(stderr, gettext("%s brand: option: %c "
+			    "is only valid with -a or -d\n"), MY_BRAND_NAME,
+			    image_install_arg);
+			return (ZONE_SUBPROC_USAGE);
+		}
+
+		if (snprintf(cmdbuf, sizeof (cmdbuf),
+		    "/usr/lib/lu/lucreatezone -z %s", zonename) >=
+		    sizeof (cmdbuf))
+			return (Z_ERR);
+	}
 
 	/*
 	 * According to the Application Packaging Developer's Guide, a

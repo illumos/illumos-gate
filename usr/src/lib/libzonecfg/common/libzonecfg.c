@@ -7161,6 +7161,14 @@ zonecfg_grab_lock_file(const char *zone_name, int *lockfd)
 	return (Z_OK);
 }
 
+boolean_t
+zonecfg_lock_file_held(int *lockfd)
+{
+	if (*lockfd >= 0 || zone_lock_cnt > 0)
+		return (B_TRUE);
+	return (B_FALSE);
+}
+
 static boolean_t
 get_doorname(const char *zone_name, char *buffer)
 {

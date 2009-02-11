@@ -558,6 +558,7 @@ extern boolean_t zonecfg_is_scratch(const char *);
 extern void zonecfg_init_lock_file(const char *, char **);
 extern void zonecfg_release_lock_file(const char *, int);
 extern int zonecfg_grab_lock_file(const char *, int *);
+extern boolean_t zonecfg_lock_file_held(int *);
 extern int zonecfg_ping_zoneadmd(const char *);
 extern int zonecfg_call_zoneadmd(const char *, zone_cmd_arg_t *, char *,
     boolean_t);

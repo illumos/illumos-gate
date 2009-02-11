@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -78,6 +78,8 @@ ROOT.SYS= \
 	/devices \
 	/devices/pseudo \
 	/etc \
+	/etc/brand  \
+	/etc/brand/native  \
 	/etc/certs	\
 	/etc/cron.d \
 	/etc/crypto \
@@ -259,6 +261,7 @@ ROOT.BIN= \
 	/usr/lib/abi \
 	/usr/lib/brand \
 	/usr/lib/brand/native \
+	/usr/lib/brand/shared \
 	/usr/lib/brand/sn1 \
 	/usr/lib/class \
 	/usr/lib/class/FSS \

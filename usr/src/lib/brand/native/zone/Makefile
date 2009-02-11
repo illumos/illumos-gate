@@ -20,18 +20,28 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
+
+ETCBRANDDIR=	$(ROOT)/etc/brand/native
+ETCUSER=	$(USERFILES:%=$(ETCBRANDDIR)/%)
+$(ETCUSER) :=	FILEMODE = 644
+$(ETCUSER) :=	OWNER = root
+$(ETCUSER) :=	GROUP = sys
+
+$(ETCBRANDDIR)/%: %
+	$(INS.file)
 
 PROG=		sw_support
 BRAND=		native
-PROGS=		attach_update $(PROG)
-XMLDOCS=	config.xml platform.xml
+PROGS=		attach_update image_install p2v $(PROG)
+XMLDOCS=	config.xml platform.xml smf_disable.lst pkgrm.lst
+USERFILES=	smf_disable.conf pkgrm.conf
+SHARED=		common.ksh
 TEMPLATES=	SUNWdefault.xml SUNWblank.xml
-CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
+CLOBBERFILES=	$(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ROOTSHARED) \
+	$(ETCUSER)
 
 all:	$(PROGS)
 
@@ -52,7 +62,8 @@ _msg: $(MSGDOMAINPOFILE)
 
 lint: lint_PROG
 
-install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES)
+install: $(PROGS) $(ROOTPROGS) $(ROOTXMLDOCS) $(ROOTTEMPLATES) $(ROOTSHARED) \
+	$(ETCUSER)
 
 clean:
 	-$(RM) $(PROGS)

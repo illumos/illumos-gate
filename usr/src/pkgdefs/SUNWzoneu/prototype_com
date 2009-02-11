@@ -19,10 +19,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -54,8 +52,14 @@ d none usr/lib/brand 755 root bin
 d none usr/lib/brand/native 755 root sys
 f none usr/lib/brand/native/attach_update 755 root bin
 f none usr/lib/brand/native/config.xml 444 root bin
+f none usr/lib/brand/native/image_install 755 root bin
+f none usr/lib/brand/native/p2v 755 root bin
+f none usr/lib/brand/native/pkgrm.lst 444 root bin
 f none usr/lib/brand/native/platform.xml 444 root bin
+f none usr/lib/brand/native/smf_disable.lst 444 root bin
 f none usr/lib/brand/native/sw_support 755 root bin
+d none usr/lib/brand/shared 755 root sys
+f none usr/lib/brand/shared/common.ksh 444 root bin
 f none usr/lib/libbrand.so.1 755 root bin
 f none usr/lib/libzonecfg.so.1 755 root bin
 d none usr/lib/zones 755 root bin

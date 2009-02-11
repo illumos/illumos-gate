@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,7 +102,6 @@ typedef struct zone_entry {
 
 static zone_entry_t *zents;
 static size_t nzents;
-static boolean_t is_native_zone = B_TRUE;
 
 #define	LOOPBACK_IF	"lo0"
 #define	SOCKET_AF(af)	(((af) == AF_UNSPEC) ? AF_INET : (af))
@@ -1087,10 +1086,6 @@ validate_zonepath(char *path, int cmd_num)
 			return (Z_ERR);
 		}
 		if ((res = stat(rootpath, &stbuf)) == 0) {
-			struct dirent	*dp;
-			DIR		*dirp;
-			boolean_t	empty = B_TRUE;
-
 			if (zonecfg_detached(rpath)) {
 				(void) fprintf(stderr,
 				    gettext("Cannot %s detached "
@@ -1119,32 +1114,6 @@ validate_zonepath(char *path, int cmd_num)
 				    "0755.\n"), rootpath);
 				return (Z_ERR);
 			}
-
-			if ((dirp = opendir(rootpath)) == NULL) {
-				(void) fprintf(stderr, gettext("Could not "
-				    "open rootpath %s\n"), rootpath);
-				return (Z_ERR);
-			}
-
-			/* Verify that the dir is empty. */
-			while ((dp = readdir(dirp)) != NULL) {
-				if (strcmp(dp->d_name, ".") == 0 ||
-				    strcmp(dp->d_name, "..") == 0)
-					continue;
-
-				empty = B_FALSE;
-				break;
-			}
-			(void) closedir(dirp);
-
-			if (!empty) {
-				(void) fprintf(stderr, gettext("Rootpath %s "
-				    "exists and contains data; remove or move "
-				    "aside prior to %s.\n"), rootpath,
-				    cmd_to_str(cmd_num));
-				return (Z_ERR);
-			}
-
 		}
 	}
 
@@ -1713,6 +1682,17 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 			}
 			break;
 		case CMD_ATTACH:
+			if (state == ZONE_STATE_INSTALLED) {
+				zerror(gettext("is already %s."),
+				    zone_state_str(ZONE_STATE_INSTALLED));
+				return (Z_ERR);
+			} else if (state == ZONE_STATE_INCOMPLETE && !force) {
+				zerror(gettext("zone is %s; %s required."),
+				    zone_state_str(ZONE_STATE_INCOMPLETE),
+				    cmd_to_str(CMD_UNINSTALL));
+				return (Z_ERR);
+			}
+			break;
 		case CMD_CLONE:
 		case CMD_INSTALL:
 			if (state == ZONE_STATE_INSTALLED) {
@@ -1735,14 +1715,10 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 			if ((cmd_num == CMD_BOOT || cmd_num == CMD_MOUNT) &&
 			    force)
 				min_state = ZONE_STATE_INCOMPLETE;
+			else if (cmd_num == CMD_MARK)
+				min_state = ZONE_STATE_CONFIGURED;
 			else
 				min_state = ZONE_STATE_INSTALLED;
-
-			if (force && cmd_num == CMD_BOOT && is_native_zone) {
-				zerror(gettext("Only branded zones may be "
-				    "force-booted."));
-				return (Z_ERR);
-			}
 
 			if (state < min_state) {
 				zerror(gettext("must be %s before %s."),
@@ -4625,6 +4601,10 @@ attach_func(int argc, char *argv[])
 	int manifest_pos;
 	brand_handle_t bh = NULL;
 	int status;
+	int last_index = 0;
+	int offset;
+	char *up;
+	boolean_t forced_update = B_FALSE;
 
 	if (zonecfg_in_alt_root()) {
 		zerror(gettext("cannot attach zone in alternate root"));
@@ -4634,7 +4614,7 @@ attach_func(int argc, char *argv[])
 	/* Check the argv string for args we handle internally */
 	optind = 0;
 	opterr = 0;
-	while ((arg = getopt(argc, argv, "?Fn:")) != EOF) {
+	while ((arg = getopt(argc, argv, "?Fn:U")) != EOF) {
 		switch (arg) {
 		case '?':
 			if (optopt == '?') {
@@ -4651,10 +4631,25 @@ attach_func(int argc, char *argv[])
 			manifest_path = optarg;
 			manifest_pos = optind - 1;
 			break;
+		case 'U':
+			/*
+			 * Undocumented 'force update' option for p2v update on
+			 * attach when zone is in the incomplete state.  Change
+			 * the option back to 'u' and set forced_update flag.
+			 */
+			if (optind == last_index)
+				offset = optind;
+			else
+				offset = optind - 1;
+			if ((up = index(argv[offset], 'U')) != NULL)
+				*up = 'u';
+			forced_update = B_TRUE;
+			break;
 		default:
 			/* Ignore unknown options - may be brand specific. */
 			break;
 		}
+		last_index = optind;
 	}
 
 	if (brand_help) {
@@ -4676,7 +4671,7 @@ attach_func(int argc, char *argv[])
 	if (execute) {
 		if (!brand_help) {
 			if (sanity_check(target_zone, CMD_ATTACH, B_FALSE,
-			    B_TRUE, B_FALSE) != Z_OK)
+			    B_TRUE, forced_update) != Z_OK)
 				return (Z_ERR);
 			if (verify_details(CMD_ATTACH, argv) != Z_OK)
 				return (Z_ERR);
@@ -4749,14 +4744,14 @@ attach_func(int argc, char *argv[])
 		 */
 		if (cmdbuf[0] != '\0') {
 			/* Run the attach hook */
-			status = do_subproc_interactive(cmdbuf);
+			status = do_subproc(cmdbuf);
 			if ((status = subproc_status(gettext("brand-specific "
 			    "attach"), status, B_FALSE)) != ZONE_SUBPROC_OK) {
 				if (status == ZONE_SUBPROC_USAGE && !brand_help)
 					sub_usage(SHELP_ATTACH, CMD_ATTACH);
 
 				if (execute && !brand_help) {
-					assert(lockfd >= 0);
+					assert(zonecfg_lock_file_held(&lockfd));
 					zonecfg_release_lock_file(target_zone,
 					    lockfd);
 					lockfd = -1;
@@ -4799,7 +4794,7 @@ attach_func(int argc, char *argv[])
 		zperror(gettext("could not reset state"), B_TRUE);
 	}
 
-	assert(lockfd >= 0);
+	assert(zonecfg_lock_file_held(&lockfd));
 	zonecfg_release_lock_file(target_zone, lockfd);
 	lockfd = -1;
 
@@ -5118,10 +5113,38 @@ static int
 mark_func(int argc, char *argv[])
 {
 	int err, lockfd;
+	int arg;
+	boolean_t force = B_FALSE;
+	int state;
 
-	if (argc != 1 || strcmp(argv[0], "incomplete") != 0)
+	optind = 0;
+	opterr = 0;
+	while ((arg = getopt(argc, argv, "F")) != EOF) {
+		switch (arg) {
+		case 'F':
+			force = B_TRUE;
+			break;
+		default:
+			return (Z_USAGE);
+		}
+	}
+
+	if (argc != (optind + 1))
 		return (Z_USAGE);
-	if (sanity_check(target_zone, CMD_MARK, B_FALSE, B_FALSE, B_FALSE)
+
+	if (strcmp(argv[optind], "configured") == 0)
+		state = ZONE_STATE_CONFIGURED;
+	else if (strcmp(argv[optind], "incomplete") == 0)
+		state = ZONE_STATE_INCOMPLETE;
+	else if (strcmp(argv[optind], "installed") == 0)
+		state = ZONE_STATE_INSTALLED;
+	else
+		return (Z_USAGE);
+
+	if (state != ZONE_STATE_INCOMPLETE && !force)
+		return (Z_USAGE);
+
+	if (sanity_check(target_zone, CMD_MARK, B_FALSE, B_TRUE, B_FALSE)
 	    != Z_OK)
 		return (Z_ERR);
 
@@ -5137,7 +5160,7 @@ mark_func(int argc, char *argv[])
 		return (Z_ERR);
 	}
 
-	err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
+	err = zone_set_state(target_zone, state);
 	if (err != Z_OK) {
 		errno = err;
 		zperror2(target_zone, gettext("could not set state"));
@@ -5592,7 +5615,6 @@ main(int argc, char **argv)
 			zerror(gettext("missing or invalid brand"));
 			exit(Z_ERR);
 		}
-		is_native_zone = (strcmp(target_brand, NATIVE_BRAND_NAME) == 0);
 	}
 
 	err = parse_and_run(argc - optind, &argv[optind]);

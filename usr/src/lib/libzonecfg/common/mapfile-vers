@@ -146,6 +146,7 @@ SUNWprivate_1.1 {
 	zonecfg_init_lock_file;
 	zonecfg_is_rctl;
 	zonecfg_is_scratch;
+	zonecfg_lock_file_held;
 	zonecfg_lock_scratch;
 	zonecfg_lookup_attr;
 	zonecfg_lookup_dev;
