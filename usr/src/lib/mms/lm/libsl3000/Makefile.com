@@ -18,39 +18,55 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#
 
-include ../../Makefile.lib
+LIBRARY =	libSL3000_net.a
+VERS =		.1
+OBJS_COMMON =	lm_sl3000.o
+OBJS_SHARED =	lm_acs_common.o lm_acs_display.o lm_comm.o lm_lcom.o
 
-SUBDIRS = \
-	libdisk \
-	libl180 \
-	libl500 \
-	libl700 \
-	libsl3000
+OBJECTS = 	$(OBJS_COMMON) $(OBJS_SHARED)
+
+include $(SRC)/lib/Makefile.lib
+include ../../Makefile.defs
+
+LIBS =		$(DYNLIB) $(LINTLIB)
+
+SRCDIR =	../common
+
+LMDIR = $(SRC)/lib/mms/lm/libcommon
+
+SRCS =	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)	\
+	$(OBJS_SHARED:%.o=$(LMDIR)/%.c)
+
+ROOTLIBDIR = 	$(ROOTMMSLMLIBDIR)
+
+LMLIBDIR = $(ROOT)/usr/lib/mms/lm
+
+LDLIBS +=	-lc
+LDLIBS +=	-L$(SRC)/lib/mms/mms/$(MACH) -lmms
+
+CFLAGS +=	$(CCVERBOSE)
+
+CPPFLAGS +=	-DMMS_OPENSSL
+CPPFLAGS +=	-I$(SRCDIR) -I$(SRC)/common/mms/mms
+CPPFLAGS +=	-I$(SRC)/cmd/mms/lm/common -I../../../mms/common
+CPPFLAGS +=	-I../../libcommon -I$(ACSLSH)
+CPPFLAGS +=	-erroff=E_IMPLICIT_DECL_FUNC_RETURN_INT
 
 .KEEP_STATE:
 
-.PARALLEL:
+all: $(LIBS)
 
-all := TARGET += all
-check := TARGET += check
-clean := TARGET += clean
-clobber := TARGET += clobber
-install := TARGET += install
-install_h := TARGET += install_h
-lint := TARGET += lint
-_msg := TARGET += _msg
+lint: $(LINTLIB) lintcheck
 
-all check clean clobber install install_h lint: $(SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+pics/%.o: $(LMDIR)/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 include $(SRC)/lib/Makefile.targ
+include ../../Makefile.rootdirs

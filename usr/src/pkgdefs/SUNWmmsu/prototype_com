@@ -154,3 +154,6 @@ f none usr/lib/mms/lm/llib-lL500_net.ln 0644 root other
 f none usr/lib/mms/lm/libL180_net.so.1 0755 root other
 s none usr/lib/mms/lm/libL180_net.so=libL180_net.so.1
 f none usr/lib/mms/lm/llib-lL180_net.ln 0644 root other
+f none usr/lib/mms/lm/libSL3000_net.so.1 0755 root other
+s none usr/lib/mms/lm/libSL3000_net.so=libSL3000_net.so.1
+f none usr/lib/mms/lm/llib-lSL3000_net.ln 0644 root other

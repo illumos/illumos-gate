@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,9 @@ lm_need_libapi(char *type) {
 		return (1);
 	}
 	if (strcmp(type, "SL500") == 0) {
+		return (1);
+	}
+	if (strcmp(type, "SL3000") == 0) {
 		return (1);
 	}
 	return (0);

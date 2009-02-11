@@ -18,39 +18,12 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#
 
-include ../../Makefile.lib
+include ../Makefile.com
 
-SUBDIRS = \
-	libdisk \
-	libl180 \
-	libl500 \
-	libl700 \
-	libsl3000
-
-.KEEP_STATE:
-
-.PARALLEL:
-
-all := TARGET += all
-check := TARGET += check
-clean := TARGET += clean
-clobber := TARGET += clobber
-install := TARGET += install
-install_h := TARGET += install_h
-lint := TARGET += lint
-_msg := TARGET += _msg
-
-all check clean clobber install install_h lint: $(SUBDIRS)
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
-
-include $(SRC)/lib/Makefile.targ
+install: all $(ROOTLIBS) $(ROOTLINKS)

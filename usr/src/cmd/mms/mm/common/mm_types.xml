@@ -63,6 +63,7 @@
 			<mm_slottype name="L500"/>
 			<mm_slottype name="L700"/>
 			<mm_slottype name="SL500"/>
+			<mm_slottype name="SL3000"/>
 		</mm_slottype_list>
 		<mm_cartridgeshape_list>
 			<mm_cartridgeshape name="9840"/>

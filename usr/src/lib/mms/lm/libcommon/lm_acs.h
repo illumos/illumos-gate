@@ -18,7 +18,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,6 +87,8 @@ extern "C" {
 #define	MAX_L500_CAP_SIZE	5
 #define	MAX_L700_CAPS		2
 #define	MAX_L700_CAP_SIZE	20
+#define	MAX_SL3000_CAPS		4
+#define	MAX_SL3000_CAP_SIZE	26
 
 typedef struct acs_rsp_ele {
 	mms_list_node_t		acs_rsp_next;
