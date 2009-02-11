@@ -23,11 +23,9 @@
 
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/t_lock.h>
@@ -155,7 +153,7 @@ fsflush_do_pages()
 		pp = page_next_scan_init(&pp_cookie);
 
 	pcount = 0;
-	while (pcount <= nscan) {
+	while (pcount < nscan) {
 
 		/*
 		 * move to the next page, skipping over large pages
@@ -418,7 +416,7 @@ loop:
 					BWRITE(bp);
 				} else {
 					UFS_BWRITE(VTOI(bp->b_vp)->i_ufsvfs,
-									bp);
+					    bp);
 				}
 				mutex_enter(hmp);
 				bp = dwp->av_forw;
@@ -465,7 +463,7 @@ loop:
 				vfs_refvfssw(vswp);
 				RUNLOCK_VFSSW();
 				(void) fsop_sync_by_kind(vswp - vfssw,
-					SYNC_ATTR, kcred);
+				    SYNC_ATTR, kcred);
 				vfs_unrefvfssw(vswp);
 				RLOCK_VFSSW();
 			}
