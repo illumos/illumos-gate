@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mtmalloc.h>
 #include "mtmalloc_impl.h"
@@ -267,6 +265,21 @@ realloc(void * ptr, size_t bytes)
 	data_ptr = ptr;
 	mem = (caddr_t)ptr - OVERHEAD;
 
+	/*
+	 * Optimization possibility :
+	 *	p = malloc(64);
+	 *	q = realloc(p, 64);
+	 * q can be same as p.
+	 * Apply this optimization for the normal
+	 * sized caches for now.
+	 */
+	if (*(uintptr_t *)mem < MTMALLOC_OVERSIZE_MAGIC ||
+	    *(uintptr_t *)mem > MTMALLOC_MEMALIGN_MIN_MAGIC) {
+		cacheptr = (cache_t *)*(uintptr_t *)mem;
+		if (bytes <= (cacheptr->mt_size - OVERHEAD))
+			return (ptr);
+	}
+
 	new = malloc(bytes);
 
 	if (new == NULL)
@@ -308,7 +321,7 @@ realloc(void * ptr, size_t bytes)
 	cacheptr = (cache_t *)*(uintptr_t *)mem;
 
 	(void) memcpy(new, data_ptr,
-		MIN(cacheptr->mt_size - OVERHEAD - shift, bytes));
+	    MIN(cacheptr->mt_size - OVERHEAD - shift, bytes));
 	free(ptr);
 
 	return (new);
@@ -439,9 +452,8 @@ memalign(size_t alignment, size_t size)
 	void *alloc_buf;
 	void *ret_buf;
 
-	if (size == 0 || alignment == 0 ||
-		misaligned(alignment) ||
-		(alignment & (alignment - 1)) != 0) {
+	if (size == 0 || alignment == 0 || misaligned(alignment) ||
+	    (alignment & (alignment - 1)) != 0) {
 		errno = EINVAL;
 		return (NULL);
 	}
@@ -477,7 +489,7 @@ memalign(size_t alignment, size_t size)
 		/* aligned correctly */
 
 		size_t frag_size = alloc_size -
-			(size + MTMALLOC_MIN_ALIGN + OVSZ_HEADER_SIZE);
+		    (size + MTMALLOC_MIN_ALIGN + OVSZ_HEADER_SIZE);
 
 		/*
 		 * If the leftover piece of the memory > MAX_CACHED,
@@ -488,12 +500,12 @@ memalign(size_t alignment, size_t size)
 			uintptr_t taddr;
 			size_t data_size;
 			taddr = ALIGN((uintptr_t)alloc_buf + size,
-					MTMALLOC_MIN_ALIGN);
+			    MTMALLOC_MIN_ALIGN);
 			data_size = taddr - (uintptr_t)alloc_buf;
 			orig = (oversize_t *)((uintptr_t)alloc_buf -
-					OVSZ_HEADER_SIZE);
+			    OVSZ_HEADER_SIZE);
 			frag_size = orig->size - data_size -
-					OVSZ_HEADER_SIZE;
+			    OVSZ_HEADER_SIZE;
 			orig->size = data_size;
 			tail = oversize_header_alloc(taddr, frag_size);
 			free_oversize(tail);
@@ -528,17 +540,17 @@ memalign(size_t alignment, size_t size)
 		head_sz = shift - MAX(MEMALIGN_HEADER_SIZE, OVSZ_HEADER_SIZE);
 
 		tail_sz = alloc_size -
-			(shift + size + MTMALLOC_MIN_ALIGN + OVSZ_HEADER_SIZE);
+		    (shift + size + MTMALLOC_MIN_ALIGN + OVSZ_HEADER_SIZE);
 
 		oversize_bits |= IS_OVERSIZE(head_sz, alloc_size) |
-				IS_OVERSIZE(size, alloc_size) << DATA_SHIFT |
-				IS_OVERSIZE(tail_sz, alloc_size) << TAIL_SHIFT;
+		    IS_OVERSIZE(size, alloc_size) << DATA_SHIFT |
+		    IS_OVERSIZE(tail_sz, alloc_size) << TAIL_SHIFT;
 
 		switch (oversize_bits) {
 			case NONE_OVERSIZE:
 			case DATA_OVERSIZE:
 				MEMALIGN_HEADER_ALLOC(ret_addr, shift,
-					alloc_buf);
+				    alloc_buf);
 				break;
 			case HEAD_OVERSIZE:
 				/*
@@ -548,19 +560,19 @@ memalign(size_t alignment, size_t size)
 				 * otherwise just create memalign header.
 				 */
 				tsize = (shift + size) - (MAX_CACHED + 8 +
-					MTMALLOC_MIN_ALIGN + OVSZ_HEADER_SIZE);
+				    MTMALLOC_MIN_ALIGN + OVSZ_HEADER_SIZE);
 
 				if (!IS_OVERSIZE(tsize, alloc_size)) {
 					MEMALIGN_HEADER_ALLOC(ret_addr, shift,
-						alloc_buf);
+					    alloc_buf);
 					break;
 				} else {
 					tsize += OVSZ_HEADER_SIZE;
 					taddr = ALIGN((uintptr_t)alloc_buf +
-						tsize, MTMALLOC_MIN_ALIGN);
+					    tsize, MTMALLOC_MIN_ALIGN);
 					tshift = ret_addr - taddr;
 					MEMALIGN_HEADER_ALLOC(ret_addr, tshift,
-						taddr);
+					    taddr);
 					ret_addr = taddr;
 					shift = ret_addr - (uintptr_t)alloc_buf;
 				}
@@ -573,10 +585,9 @@ memalign(size_t alignment, size_t size)
 				 * of (data + tail fragment).
 				 */
 				orig = (oversize_t *)((uintptr_t)alloc_buf -
-						OVSZ_HEADER_SIZE);
+				    OVSZ_HEADER_SIZE);
 				big = oversize_header_alloc(ret_addr -
-						OVSZ_HEADER_SIZE,
-						(orig->size - shift));
+				    OVSZ_HEADER_SIZE, (orig->size - shift));
 				(void) mutex_lock(&oversize_lock);
 				insert_hash(big);
 				(void) mutex_unlock(&oversize_lock);
@@ -592,13 +603,13 @@ memalign(size_t alignment, size_t size)
 				 * end, otherwise just create memalign header.
 				 */
 				orig = (oversize_t *)((uintptr_t)alloc_buf -
-						OVSZ_HEADER_SIZE);
+				    OVSZ_HEADER_SIZE);
 				tsize =  orig->size - (MAX_CACHED + 8 +
-					shift + OVSZ_HEADER_SIZE +
-					MTMALLOC_MIN_ALIGN);
+				    shift + OVSZ_HEADER_SIZE +
+				    MTMALLOC_MIN_ALIGN);
 				if (!IS_OVERSIZE(tsize, alloc_size)) {
 					MEMALIGN_HEADER_ALLOC(ret_addr, shift,
-						alloc_buf);
+					    alloc_buf);
 					break;
 				} else {
 					size = MAX_CACHED + 8;
@@ -613,15 +624,15 @@ memalign(size_t alignment, size_t size)
 				 * (head fragment + data).
 				 */
 				taddr = ALIGN(ret_addr + size,
-						MTMALLOC_MIN_ALIGN);
+				    MTMALLOC_MIN_ALIGN);
 				data_sz = (size_t)(taddr -
-						(uintptr_t)alloc_buf);
+				    (uintptr_t)alloc_buf);
 				orig = (oversize_t *)((uintptr_t)alloc_buf -
-						OVSZ_HEADER_SIZE);
+				    OVSZ_HEADER_SIZE);
 				tsize = orig->size - data_sz;
 				orig->size = data_sz;
 				MEMALIGN_HEADER_ALLOC(ret_buf, shift,
-					alloc_buf);
+				    alloc_buf);
 				tsize -= OVSZ_HEADER_SIZE;
 				tail = oversize_header_alloc(taddr,  tsize);
 				free_oversize(tail);
@@ -636,10 +647,10 @@ memalign(size_t alignment, size_t size)
 				 * should be oversize in size.
 				 */
 				orig = (oversize_t *)((uintptr_t)alloc_buf -
-					OVSZ_HEADER_SIZE);
+				    OVSZ_HEADER_SIZE);
 				tsize =  orig->size - (MAX_CACHED + 8 +
-					OVSZ_HEADER_SIZE + shift +
-					MTMALLOC_MIN_ALIGN);
+				    OVSZ_HEADER_SIZE + shift +
+				    MTMALLOC_MIN_ALIGN);
 
 				if (!IS_OVERSIZE(tsize, alloc_size)) {
 					/*
@@ -648,13 +659,12 @@ memalign(size_t alignment, size_t size)
 					 * we just keep them as one piece.
 					 */
 					big = oversize_header_alloc(ret_addr -
-						OVSZ_HEADER_SIZE,
-						orig->size - shift);
+					    OVSZ_HEADER_SIZE,
+					    orig->size - shift);
 					(void) mutex_lock(&oversize_lock);
 					insert_hash(big);
 					(void) mutex_unlock(&oversize_lock);
-					orig->size = shift -
-						OVSZ_HEADER_SIZE;
+					orig->size = shift - OVSZ_HEADER_SIZE;
 					free_oversize(orig);
 					break;
 				} else {
@@ -673,22 +683,22 @@ memalign(size_t alignment, size_t size)
 				 * Alloc oversize header for data seg.
 				 */
 				orig = (oversize_t *)((uintptr_t)alloc_buf -
-					OVSZ_HEADER_SIZE);
+				    OVSZ_HEADER_SIZE);
 				tsize = orig->size;
 				orig->size = shift - OVSZ_HEADER_SIZE;
 				free_oversize(orig);
 
 				taddr = ALIGN(ret_addr + size,
-					MTMALLOC_MIN_ALIGN);
+				    MTMALLOC_MIN_ALIGN);
 				data_sz = taddr - ret_addr;
 				assert(tsize > (shift + data_sz +
-					OVSZ_HEADER_SIZE));
+				    OVSZ_HEADER_SIZE));
 				tail_sz = tsize -
-					(shift + data_sz + OVSZ_HEADER_SIZE);
+				    (shift + data_sz + OVSZ_HEADER_SIZE);
 
 				/* create oversize header for data seg */
 				big = oversize_header_alloc(ret_addr -
-					OVSZ_HEADER_SIZE, data_sz);
+				    OVSZ_HEADER_SIZE, data_sz);
 				(void) mutex_lock(&oversize_lock);
 				insert_hash(big);
 				(void) mutex_unlock(&oversize_lock);
@@ -904,10 +914,10 @@ create_cache(cache_t *cp, size_t size, uint_t chunksize)
 		*(cp->mt_freelist) = mask;
 	} else {
 		cp->mt_arena = (caddr_t)ALIGN((caddr_t)cp->mt_freelist +
-			nblocks, 32);
+		    nblocks, 32);
 		/* recompute nblocks */
 		nblocks = (uintptr_t)((caddr_t)cp->mt_freelist +
-			cp->mt_span - cp->mt_arena) / cp->mt_size;
+		    cp->mt_span - cp->mt_arena) / cp->mt_size;
 		cp->mt_nfree = ((nblocks >> 3) << 3);
 		/* Set everything to free */
 		(void) memset(cp->mt_freelist, 0xff, nblocks >> 3);
@@ -938,9 +948,9 @@ reinit_cpu_list(void)
 	for (cpuptr = &cpu_list[0]; cpuptr < &cpu_list[ncpus]; cpuptr++) {
 		(void) mutex_lock(&cpuptr->mt_parent_lock);
 		for (cachehead = &cpuptr->mt_caches[0]; cachehead <
-			&cpuptr->mt_caches[NUM_CACHES]; cachehead++) {
+		    &cpuptr->mt_caches[NUM_CACHES]; cachehead++) {
 			for (thiscache = cachehead->mt_cache; thiscache != NULL;
-				thiscache = thiscache->mt_next) {
+			    thiscache = thiscache->mt_next) {
 				(void) mutex_lock(&thiscache->mt_cache_lock);
 				if (thiscache->mt_nfree == 0) {
 					(void) mutex_unlock(
@@ -967,17 +977,17 @@ reinit_cache(cache_t *thiscache)
 	freeblocks = (uint32_t *)thiscache->mt_freelist;
 	while (freeblocks < (uint32_t *)thiscache->mt_arena) {
 		if (*freeblocks & 0xffffffff) {
-		    for (i = 0; i < 32; i++) {
-			if (FLIP_EM(*freeblocks) & (0x80000000 >> i)) {
-				n = (uintptr_t)(((freeblocks -
-				    (uint32_t *)thiscache->mt_freelist) << 5)
-				    + i) * thiscache->mt_size;
-				ret = thiscache->mt_arena + n;
-				ret += OVERHEAD;
-				copy_pattern(FREEPATTERN, ret,
-				    thiscache->mt_size);
+			for (i = 0; i < 32; i++) {
+				if (FLIP_EM(*freeblocks) & (0x80000000 >> i)) {
+					n = (uintptr_t)(((freeblocks -
+					    (uint32_t *)thiscache->mt_freelist)
+					    << 5) + i) * thiscache->mt_size;
+					ret = thiscache->mt_arena + n;
+					ret += OVERHEAD;
+					copy_pattern(FREEPATTERN, ret,
+					    thiscache->mt_size);
+				}
 			}
-		    }
 		}
 		freeblocks++;
 	}
@@ -1043,9 +1053,9 @@ malloc_internal(size_t size, percpu_t *cpuptr)
 		thiscache = (cache_t *)morecore(thisrequest * HUNKSIZE);
 
 		if (thiscache == (cache_t *)-1) {
-		    (void) mutex_unlock(&cpuptr->mt_parent_lock);
-		    errno = EAGAIN;
-		    return (NULL);
+			(void) mutex_unlock(&cpuptr->mt_parent_lock);
+			errno = EAGAIN;
+			return (NULL);
 		}
 		create_cache(thiscache, buffer_size, thisrequest);
 
@@ -1105,7 +1115,7 @@ malloc_internal(size_t size, percpu_t *cpuptr)
 	(void) mutex_unlock(&cpuptr->mt_parent_lock);
 
 	n = (uintptr_t)(((freeblocks - (uint32_t *)thiscache->mt_freelist) << 5)
-		+ i) * thiscache->mt_size;
+	    + i) * thiscache->mt_size;
 	/*
 	 * Now you have the offset in n, you've changed the free mask
 	 * in the freelist. Nothing left to do but find the block
@@ -1123,7 +1133,7 @@ malloc_internal(size_t size, percpu_t *cpuptr)
 	 * owned by this cache.
 	 */
 	assert(ret + thiscache->mt_size <= thiscache->mt_freelist +
-		thiscache->mt_span);
+	    thiscache->mt_span);
 
 	ret += OVERHEAD;
 
@@ -1332,14 +1342,14 @@ add_oversize(oversize_t *lp)
 
 	if (nx->size) {
 
-	    /* Check for adjacency with right chunk */
-	    if ((uintptr_t)nx == endp_lp) {
-		size_nx = OVSZ_HEADER_SIZE + nx->size;
-		endp_nx = ALIGN((uintptr_t)nx + size_nx,
-		    MTMALLOC_MIN_ALIGN);
-		size_nx = endp_nx - (uintptr_t)nx;
-		merge_flags |= COALESCE_RIGHT;
-	    }
+		/* Check for adjacency with right chunk */
+		if ((uintptr_t)nx == endp_lp) {
+			size_nx = OVSZ_HEADER_SIZE + nx->size;
+			endp_nx = ALIGN((uintptr_t)nx + size_nx,
+			    MTMALLOC_MIN_ALIGN);
+			size_nx = endp_nx - (uintptr_t)nx;
+			merge_flags |= COALESCE_RIGHT;
+		}
 	}
 
 	/*
