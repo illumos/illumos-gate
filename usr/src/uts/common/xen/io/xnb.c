@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,15 +69,6 @@
  * - transfer credit limiting.
  * - MAC address based filtering.
  */
-
-/*
- * Linux expects to have some headroom in received buffers.  The Linux
- * frontend driver (netfront) checks to see if the headroom is
- * available and will re-allocate the buffer to make room if
- * necessary.  To avoid this we add RX_BUFFER_HEADROOM bytes of
- * headroom to each packet we pass to the peer.
- */
-#define	RX_BUFFER_HEADROOM	16
 
 /*
  * Should we attempt to defer checksum calculation?
@@ -683,7 +674,6 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 		netif_rx_request_t *rxreq;
 		netif_rx_response_t *rxresp;
 		char *valoop;
-		size_t offset;
 		mblk_t *ml;
 		uint16_t cksum_flags;
 
@@ -708,11 +698,9 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 		hat_devload(kas.a_hat, xnbp->xnb_rx_va, PAGESIZE,
 		    pfn, PROT_READ | PROT_WRITE, HAT_LOAD);
 
-		offset = RX_BUFFER_HEADROOM;
-
 		/* 3 */
 		len = 0;
-		valoop = xnbp->xnb_rx_va + offset;
+		valoop = xnbp->xnb_rx_va;
 		for (ml = mp; ml != NULL; ml = ml->b_cont) {
 			size_t chunk = ml->b_wptr - ml->b_rptr;
 
@@ -721,7 +709,7 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 			len += chunk;
 		}
 
-		ASSERT(len + offset < PAGESIZE);
+		ASSERT(len < PAGESIZE);
 
 		/* Release the pfn. */
 		hat_unload(kas.a_hat, xnbp->xnb_rx_va, PAGESIZE,
@@ -735,7 +723,7 @@ xnb_to_peer(xnb_t *xnbp, mblk_t *mp)
 
 		/* 5.1 */
 		rxresp = RING_GET_RESPONSE(&xnbp->xnb_rx_ring, prod);
-		rxresp->offset = offset;
+		rxresp->offset = 0;
 		rxresp->flags = 0;
 
 		cksum_flags = xnbp->xnb_flavour->xf_cksum_to_peer(xnbp, mp);
@@ -1026,7 +1014,7 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 	    XNB_RING_HAS_UNCONSUMED_REQUESTS(&xnbp->xnb_rx_ring)) {
 		netif_rx_request_t	*rxreq;
 		netif_rx_response_t	*rxresp;
-		size_t			offset, d_offset;
+		size_t			d_offset;
 		size_t			len;
 		uint16_t		cksum_flags;
 		int16_t			status = NETIF_RSP_OKAY;
@@ -1043,7 +1031,7 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 #endif /* XNB_DEBUG */
 
 		/* 2 */
-		d_offset = offset = RX_BUFFER_HEADROOM;
+		d_offset = 0;
 		len = 0;
 		item_count = 0;
 
@@ -1142,7 +1130,7 @@ xnb_copy_to_peer(xnb_t *xnbp, mblk_t *mp)
 
 		/* 4 */
 		rxresp = RING_GET_RESPONSE(&xnbp->xnb_rx_ring, prod);
-		rxresp->offset = offset;
+		rxresp->offset = 0;
 
 		rxresp->flags = 0;
 
