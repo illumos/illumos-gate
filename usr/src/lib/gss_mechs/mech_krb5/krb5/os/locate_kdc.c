@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -797,7 +797,13 @@ krb5int_locate_server (krb5_context context, const krb5_data *realm,
 	code = prof_locate_server(context, realm, &al, svc, socktype, family);
 
 #ifdef KRB5_DNS_LOOKUP
-	if (code) {		/* Try DNS for all profile errors?  */
+	/*
+	 * Solaris Kerberos:
+	 * There is no point in trying to locate the KDC in DNS if "realm"
+	 * is empty.
+	 */
+	/* Try DNS for all profile errors?  */
+	if (code && !krb5_is_referral_realm(realm)) {
 	    krb5_error_code code2;
 	    code2 = dns_locate_server(context, realm, &al, svc, socktype,
 				      family);

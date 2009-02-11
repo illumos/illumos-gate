@@ -122,7 +122,7 @@ K5_CC= cc_file.o cc_memory.o ccbase.o ccfns.o ccdefault.o ccdefops.o ser_cc.o cc
 
 # krb5/keytab
 K5_KT=	ktadd.o ktbase.o ktdefault.o ktfr_entry.o \
-	ktremove.o read_servi.o kt_file.o kt_srvtab.o ktfns.o
+	ktremove.o read_servi.o kt_file.o kt_srvtab.o ktfns.o kt_findrealm.o
 
 K5_KRB= addr_comp.o  addr_order.o  addr_srch.o \
 	auth_con.o  bld_pr_ext.o  bld_princ.o  chk_trans.o \

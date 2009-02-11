@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1452,6 +1452,10 @@ krb5_kt_next_entry(krb5_context context, krb5_keytab keytab,
 krb5_error_code KRB5_CALLCONV
 krb5_kt_end_seq_get(krb5_context context, krb5_keytab keytab,
 		    krb5_kt_cursor *cursor);
+/* Solaris Kerberos */
+krb5_error_code
+krb5_kt_find_realm(krb5_context context, krb5_keytab keytab,
+		  krb5_principal princ, krb5_data *realm);
 
 /*
  * end "keytab.h"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,6 +75,10 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+
+/* Solaris Kerberos */
+#include <libintl.h>
+#include <locale.h>
 
 #include "k5-int.h"
 #include "gss_libinit.h"
@@ -1064,8 +1068,11 @@ principal_ignore_inst_compare(context, princ1, princ2)
     if (nelem != krb5_princ_size(context, princ2))
 	return FALSE;
 
-    if (! krb5_realm_compare(context, princ1, princ2))
-	return FALSE;
+    /*
+     * Solaris Kerberos:
+     * Don't bother to compare the realms as princ1 will always have a 
+     * referral realm set.
+     */
 
     /*
      * Solaris Kerberos
@@ -1288,12 +1295,15 @@ get_instance_keytab(
 	register const krb5_data *p;
 	char *realm=NULL, *s=NULL;
 	krb5_principal client=NULL, princ=NULL;
+	size_t realm_size = strlen(KRB5_REFERRAL_REALM) + 1;
 
 	if (!keytab)
 		return EINVAL;
 
-	if (ret = krb5_get_default_realm(context, &realm))
-		return ret;
+	realm = malloc(realm_size);
+	if (realm == NULL)
+		return (ENOMEM);
+	strlcpy(realm, KRB5_REFERRAL_REALM, realm_size);
 
 	ret = krb5_build_principal(context, &client, strlen(realm),
 				      realm, sname, "*",
@@ -1387,6 +1397,28 @@ load_root_cred_using_keytab(
 		code = krb5_sname_to_principal(context, NULL, sname,
 					    KRB5_NT_SRV_HST, &me);
 	}
+
+	/* Solaris Kerberos */
+	if (krb5_is_referral_realm(&me->realm)) {
+		krb5_data realm;
+		code = krb5_kt_find_realm(context, keytab, me, &realm);
+		if (code == 0) {
+			krb5_free_data_contents(context, &me->realm);
+			me->realm.length = realm.length;
+			me->realm.data = realm.data;
+		} else {
+			/* Try to set a useful error message */
+			char *princ = NULL;
+			krb5_unparse_name(context, me, &princ);
+
+			krb5_set_error_message(context, code,
+			    gettext("Failed to find realm for %s in keytab"),
+			    princ ? princ : "<unknown>");
+			if (princ)
+				krb5_free_unparsed_name(context, princ);
+		}
+	}
+
 	if (code) {
 		(void) krb5_kt_close(context, keytab);
 		*minor_status = code;

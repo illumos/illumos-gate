@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,10 @@
  * this software for any purpose.  It is provided "as is" without express
  * or implied warranty.
  */
+
+/* Solaris Kerberos */
+#include <libintl.h>
+#include <locale.h>
 
 #include "k5-int.h"
 
@@ -108,6 +112,39 @@ krb5_get_init_creds_keytab(krb5_context context,
 				 "krb5_get_init_creds_keytab");
    if (ret)
       return ret;
+
+   /*
+    * Solaris Kerberos:
+    * If "client" was constructed from krb5_sname_to_princ() it may
+    * have a referral realm. This happens when there is no applicable 
+    * domain-to-realm mapping in the Kerberos configuration file.
+    * If that is the case then the realm of the first principal found
+    * in the keytab which matches the client can be used for the client's
+    * realm.
+    */
+   if (krb5_is_referral_realm(&client->realm)) {
+	krb5_data realm;
+	ret = krb5_kt_find_realm(context, keytab, client, &realm);
+	if (ret == 0) {
+		krb5_free_data_contents(context, &client->realm);
+		client->realm.length = realm.length;
+		client->realm.data = realm.data;
+	} else {
+		/* Try to set a useful error message */
+		char *princ = NULL;
+		krb5_unparse_name(context, client, &princ);
+
+		krb5_set_error_message(context, ret,
+		    gettext("Failed to find realm for %s in keytab"),
+		    princ ? princ : "<unknown>");
+		if (princ)
+			krb5_free_unparsed_name(context, princ);
+	}
+   }
+
+   if (ret != 0)
+	goto cleanup;
+
 
    use_master = 0;
 
