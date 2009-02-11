@@ -19,15 +19,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_ks.h>
 
+#include <ctype.h>
 #include <sys/types.h>
 #include <sys/strsubr.h>
 #include <sys/stream.h>
@@ -216,49 +215,49 @@ static const strtypes_t mbt[] = {
 
 /* Allocation flow trace events, starting from 0 */
 static const char *ftev_alloc[] = {
-/* 0 */	":allocb",
-/* 1 */	":esballoc",
-/* 2 */	":desballoc",
-/* 3 */	":esballoca",
-/* 4 */	":desballoca",
-/* 5 */	":allocbig",
-/* 6 */	":allocbw",
-/* 7 */	":bcallocb",
-/* 8 */	":freeb",
-/* 9 */	":dupb",
-/* A */	":copyb",
+/* 0 */	"allocb",
+/* 1 */	"esballoc",
+/* 2 */	"desballoc",
+/* 3 */	"esballoca",
+/* 4 */	"desballoca",
+/* 5 */	"allocbig",
+/* 6 */	"allocbw",
+/* 7 */	"bcallocb",
+/* 8 */	"freeb",
+/* 9 */	"dupb",
+/* A */	"copyb",
 };
 
 #define	FTEV_PROC_START FTEV_PUT
 
 /* Procedures recorded by flow tracing, starting from 0x100 */
 static const char *ftev_proc[] = {
-/* 100 */	":put",
-/* 101 */	":undefined (0x101)",
-/* 102 */	":undefined (0x102)",
-/* 103 */	":undefined (0x103)",
-/* 104 */	":undefined (0x104)",
-/* 105 */	":putq",
-/* 106 */	":getq",
-/* 107 */	":rmvq",
-/* 108 */	":insq",
-/* 109 */	":putbq",
-/* 10A */	":flushq",
-/* 10B */	":undefined (0x10b)",
-/* 10C */ 	":undefined (0x10c)",
-/* 10D */	":putnext",
-/* 10E */	":rwnext",
+/* 100 */	"put",
+/* 101 */	"0x101",
+/* 102 */	"0x102",
+/* 103 */	"0x103",
+/* 104 */	"0x104",
+/* 105 */	"putq",
+/* 106 */	"getq",
+/* 107 */	"rmvq",
+/* 108 */	"insq",
+/* 109 */	"putbq",
+/* 10A */	"flushq",
+/* 10B */	"0x10b",
+/* 10C */ 	"0x10c",
+/* 10D */	"putnext",
+/* 10E */	"rwnext",
 };
 
 static const char *db_control_types[] = {
 /* 00 */	"data",
 /* 01 */	"proto",
 /* 02 */	"multidata",
-/* 03 */	"unused (0x03)",
-/* 04 */	"unused (0x04)",
-/* 05 */	"unused (0x05)",
-/* 06 */	"unused (0x06)",
-/* 07 */	"unused (0x07)",
+/* 03 */	"0x03",
+/* 04 */	"0x04",
+/* 05 */	"0x05",
+/* 06 */	"0x06",
+/* 07 */	"0x07",
 /* 08 */	"break",
 /* 09 */	"passfp",
 /* 0a */	"event",
@@ -290,8 +289,8 @@ static const char *db_control_hipri_types[] = {
 /* 90 */	"starti",
 /* 91 */	"pcevent",
 /* 92 */	"unhangup",
+/* 93 */	"cmd",
 };
-
 
 #define	A_SIZE(a) (sizeof (a) / sizeof (a[0]))
 
@@ -776,7 +775,6 @@ q2x(uintptr_t addr, int argc, qprint_func prfunc)
 	return (DCMD_OK);
 }
 
-
 /*ARGSUSED*/
 int
 q2syncq(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -857,7 +855,6 @@ str2wrq(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (sd2x(addr, argc, sdprint_wrq));
 }
 
-
 /*
  * If this syncq is a part of the queue pair structure, find the queue for it.
  */
@@ -889,7 +886,6 @@ syncq2q(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	return (DCMD_OK);
 }
-
 
 int
 queue_walk_init(mdb_walk_state_t *wsp)
@@ -1169,7 +1165,6 @@ mblk2dblk(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_printf("%p\n", mb.b_datap);
 	return (DCMD_OK);
 }
-
 
 static void
 mblk_error(int *error, uintptr_t addr, char *message)
@@ -1484,47 +1479,88 @@ strftblk_step(mdb_walk_state_t *wsp)
 	return (status);
 }
 
-
 void
 strftblk_walk_fini(mdb_walk_state_t *wsp)
 {
 	mdb_free(wsp->walk_data, sizeof (ftblkdata_t));
 }
 
+static const char *
+getqname(const void *nameptr, char *buf, uint_t bufsize)
+{
+	char *cp;
+
+	if (mdb_readstr(buf, bufsize, (uintptr_t)nameptr) == -1)
+		goto fail;
+
+	/*
+	 * Sanity-check the name we read.  This is needed because the pointer
+	 * value may have been recycled for some other purpose in the kernel
+	 * (e.g., if the STREAMS module was unloaded).
+	 */
+	for (cp = buf; *cp != '\0'; cp++) {
+		if (!isprint(*cp))
+			goto fail;
+	}
+	return (buf);
+fail:
+	return (strncpy(buf, "?", bufsize));
+}
+
 /*ARGSUSED*/
 int
 strftevent(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
+	int i;
+	struct ftstk stk;
 	struct ftevnt ev;
-	char modname[MODMAXNAMELEN];
+	char name[FMNAMESZ + 1];
+	boolean_t havestk = B_FALSE;
 
 	if (!(flags & DCMD_ADDRSPEC))
 		return (DCMD_USAGE);
 
 	if (DCMD_HDRSPEC(flags)) {
-		mdb_printf("%?s %?s %s %s %-24s  %s\n",
-		    "ADDR", "MID", "EVNT", "DATA", "NAME", "EVENT");
+		mdb_printf("%?s %-18s %-9s %-18s %4s %s\n",
+		    "ADDR", "Q/CALLER", "QNEXT", "STACK", "DATA", "EVENT");
 	}
 
 	if (mdb_vread(&ev, sizeof (ev), addr) == -1) {
-		mdb_warn("couldn't read ft event at %p", addr);
+		mdb_warn("couldn't read struct ftevnt at %p", addr);
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("%0?p %0?p %4x %4x",
-	    addr, ev.mid, ev.evnt, ev.data);
+	mdb_printf("%0?p", addr);
 
-	if (ev.evnt & FTEV_QMASK) {
-		if (mdb_readstr(modname, sizeof (modname),
-		    (uintptr_t)ev.mid) == -1)
-			mdb_warn("couldn't read module name at %p", ev.mid);
-		mdb_printf(" %-24s", modname);
-	} else
-		mdb_printf(" %-24a", ev.mid);
+	if (ev.evnt & FTEV_QMASK)
+		mdb_printf(" %-18s", getqname(ev.mid, name, sizeof (name)));
+	else
+		mdb_printf(" %-18a", ev.mid);
 
+	if ((ev.evnt & FTEV_MASK) == FTEV_PUTNEXT)
+		mdb_printf(" %-9s", getqname(ev.midnext, name, sizeof (name)));
+	else
+		mdb_printf(" %-9s", "--");
+
+	if (ev.stk == NULL) {
+		mdb_printf(" %-18s", "--");
+	} else if (mdb_vread(&stk, sizeof (stk), (uintptr_t)ev.stk) == -1) {
+		mdb_printf(" %-18s", "?");
+	} else {
+		mdb_printf(" %-18a", stk.fs_stk[0]);
+		havestk = B_TRUE;
+	}
+
+	mdb_printf(" %4x", ev.data);
 	ft_printevent(ev.evnt);
-
 	mdb_printf("\n");
+
+	if (havestk) {
+		for (i = 1; i < stk.fs_depth; i++) {
+			mdb_printf("%?s %-18s %-9s %-18a\n", "", "", "",
+			    stk.fs_stk[i]);
+		}
+	}
 
 	return (DCMD_OK);
 }
@@ -1538,22 +1574,25 @@ ft_printevent(ushort_t ev)
 	/* Get event class first */
 	if (ev & FTEV_PROC_START) {
 		if (proc_ev >= A_SIZE(ftev_proc))
-			mdb_printf("  undefined");
+			mdb_printf(" undefined");
 		else
-			mdb_printf("  %s", ftev_proc[proc_ev]);
-	} else if (alloc_ev >= A_SIZE(ftev_alloc))
-		mdb_printf("  undefined");
-	else
-		mdb_printf("  %s", ftev_alloc[alloc_ev]);
+			mdb_printf(" %s", ftev_proc[proc_ev]);
+	} else if (alloc_ev >= A_SIZE(ftev_alloc)) {
+		mdb_printf(" undefined");
+	} else {
+		mdb_printf(" %s", ftev_alloc[alloc_ev]);
+	}
 
 	/* Print event modifiers, if any */
-
-	if (ev & FTEV_PS)
-		mdb_printf(" | PS");
-	if (ev & FTEV_CS)
-		mdb_printf(" | CS");
-	if (ev & FTEV_ISWR)
-		mdb_printf(" | ISWR");
+	if (ev & (FTEV_PS | FTEV_CS | FTEV_ISWR)) {
+		mdb_printf("|");
+		if (ev & FTEV_ISWR)
+			mdb_printf("W");
+		if (ev & FTEV_CS)
+			mdb_printf("C");
+		if (ev & FTEV_PS)
+			mdb_printf("P");
+	}
 }
 
 /*

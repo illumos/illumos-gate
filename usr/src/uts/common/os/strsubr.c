@@ -4130,19 +4130,17 @@ strcopyout(void *from, void *to, size_t len, int copyflag)
  * it returns.
  */
 void
-strsignal_nolock(stdata_t *stp, int sig, int32_t band)
+strsignal_nolock(stdata_t *stp, int sig, uchar_t band)
 {
 	ASSERT(MUTEX_HELD(&stp->sd_lock));
 	switch (sig) {
 	case SIGPOLL:
 		if (stp->sd_sigflags & S_MSG)
-			strsendsig(stp->sd_siglist, S_MSG, (uchar_t)band, 0);
+			strsendsig(stp->sd_siglist, S_MSG, band, 0);
 		break;
-
 	default:
-		if (stp->sd_pgidp) {
+		if (stp->sd_pgidp)
 			pgsignal(stp->sd_pgidp, sig);
-		}
 		break;
 	}
 }

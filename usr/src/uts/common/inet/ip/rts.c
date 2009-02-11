@@ -964,6 +964,7 @@ rts_wrw(queue_t *q, struiod_t *dp)
 			break;
 		if ((mp1 = mp->b_cont) == NULL) {
 			rts->rts_error = EINVAL;
+			freemsg(mp);
 			goto err_ret;
 		}
 		freeb(mp);
@@ -980,6 +981,7 @@ rts_wrw(queue_t *q, struiod_t *dp)
 		if ((mp->b_wptr - mp->b_rptr) < sizeof (rt_msghdr_t)) {
 			if (!pullupmsg(mp, sizeof (rt_msghdr_t))) {
 				rts->rts_error = EINVAL;
+				freemsg(mp);
 				goto err_ret;
 			}
 		}

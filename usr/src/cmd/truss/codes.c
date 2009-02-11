@@ -488,9 +488,8 @@ const struct ioc {
 	{ (uint_t)I_SETCLTIME,	"I_SETCLTIME",	NULL },
 	{ (uint_t)I_GETCLTIME,	"I_GETCLTIME",	NULL },
 	{ (uint_t)I_CANPUT,	"I_CANPUT",	NULL },
-#ifdef I_ANCHOR
 	{ (uint_t)I_ANCHOR,	"I_ANCHOR",	NULL },
-#endif
+	{ (uint_t)_I_CMD,	"_I_CMD",	NULL },
 #ifdef TI_GETINFO
 	{ (uint_t)TI_GETINFO,	"TI_GETINFO",	NULL },
 	{ (uint_t)TI_OPTMGMT,	"TI_OPTMGMT",	NULL },

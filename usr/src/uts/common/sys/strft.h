@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,14 +19,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #ifndef _SYS_STRFT_H
 #define	_SYS_STRFT_H
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -82,22 +79,35 @@ extern "C" {
 #define	FTEV_PUTNEXT	0x010D
 #define	FTEV_RWNEXT	0x010E
 
-#define	FTBLK_EVNTS	0x9
+#define	FTBLK_EVNTS	9
+#define	FTSTK_DEPTH	15
 
 /*
- * Data structure that contains the timestamp, module, event and event data
- * (not certain as to its use yet: RSF).  There is one per event.  Every time
- * str_ftevent() is called, one of the indices is filled in with this data.
+ * Stack information for each flow trace event; recorded when str_ftstack
+ * is non-zero.
+ */
+typedef struct ftstk {
+	uint_t		fs_depth;
+	pc_t		fs_stk[FTSTK_DEPTH];
+} ftstk_t;
+
+/*
+ * Data structure that contains the timestamp, module/driver name, next
+ * module/driver name, optional callstack, event and event data (not certain
+ * as to its use yet: RSF).  There is one per event.  Every time str_ftevent()
+ * is called, one of the indices is filled in with this data.
  */
 typedef struct ftevnt {
-	hrtime_t ts;	/* a time-stamp as returned by gethrtime() */
-	char *mid;	/* the q->q_qinfo->qi_minfo->mi_idname pointer */
-	ushort_t evnt;	/* what event occured (put, srv, freeb, ...) */
-	ushort_t data;	/* event data */
+	hrtime_t	ts;		/* event timestamp, per gethrtime() */
+	char 		*mid;		/* module/driver name */
+	char		*midnext; 	/* next module/driver name */
+	ushort_t 	evnt;		/* FTEV_* value above */
+	ushort_t 	data;		/* event data */
+	ftstk_t		*stk;		/* optional event callstack */
 } ftevnt_t;
 
 /*
- * A linked list of ftevnts.
+ * A linked list of ftevnt arrays.
  */
 typedef struct ftblk {
 	struct ftblk *nxt;	/* next ftblk (or NULL if none) */
@@ -129,7 +139,7 @@ struct datab;
 
 extern void str_ftevent(fthdr_t *, void *, ushort_t, ushort_t);
 extern void str_ftfree(struct datab *);
-extern int str_ftnever;
+extern int str_ftnever, str_ftstack;
 
 /*
  * Allocate flow-trace information and record an allocation event.

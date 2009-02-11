@@ -23,7 +23,7 @@
 
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -808,6 +808,14 @@ typedef struct str_stack str_stack_t;
 #define	SQ(rq)		((syncq_t *)((rq) + 2))
 
 /*
+ * Get the module/driver name for a queue.  Since some queues don't have
+ * q_info structures (e.g., see log_makeq()), fall back to "?".
+ */
+#define	Q2NAME(q) \
+	(((q)->q_qinfo != NULL && (q)->q_qinfo->qi_minfo->mi_idname != NULL) ? \
+	(q)->q_qinfo->qi_minfo->mi_idname : "?")
+
+/*
  * Locking macros
  */
 #define	QLOCK(q)	(&(q)->q_lock)
@@ -1229,7 +1237,7 @@ extern void strsetrputhooks(vnode_t *, uint_t, msgfunc_t, msgfunc_t);
 extern void strsetwputhooks(vnode_t *, uint_t, clock_t);
 extern void strsetrwputdatahooks(vnode_t *, msgfunc_t, msgfunc_t);
 extern int strwaitmark(vnode_t *);
-extern void strsignal_nolock(stdata_t *, int, int32_t);
+extern void strsignal_nolock(stdata_t *, int, uchar_t);
 
 struct multidata_s;
 struct pdesc_s;
