@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,8 @@
 #include <rpc/clnt.h>
 #include <rpc/rpc_msg.h>
 
+#include <sys/sdt.h>
+
 static enum clnt_stat clnt_clts_kcallit(CLIENT *, rpcproc_t, xdrproc_t,
 		    caddr_t, xdrproc_t, caddr_t, struct timeval);
 static void	clnt_clts_kabort(CLIENT *);
@@ -96,7 +98,7 @@ static struct clnt_ops clts_ops = {
 typedef struct endpnt_type {
 	struct endpnt_type *e_next;	/* pointer to next endpoint type */
 	list_t		e_pool;		/* list of available endpoints */
-	list_t		e_ilist;	/* list of idle endpints */
+	list_t		e_ilist;	/* list of idle endpoints */
 	struct endpnt	*e_pcurr;	/* pointer to current endpoint */
 	char		e_protofmly[KNC_STRSIZE];	/* protocol family */
 	dev_t		e_rdev;		/* device */
@@ -467,7 +469,7 @@ clnt_clts_kcallit_addr(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 	mblk_t *resp = NULL;
 	mblk_t *tmp;
 	calllist_t *call = &p->cku_call;
-	clock_t timout = 0;
+	clock_t ori_timout, timout;
 	bool_t interrupted;
 	enum clnt_stat status;
 	struct rpc_msg reply_msg;
@@ -480,6 +482,7 @@ clnt_clts_kcallit_addr(CLIENT *h, rpcproc_t procnum, xdrproc_t xdr_args,
 	RPCLOG(2, "clnt_clts_kcallit_addr: wait.tv_usec: %ld\n", wait.tv_usec);
 
 	timout = TIMEVAL_TO_TICK(&wait);
+	ori_timout = timout;
 
 	if (p->cku_xid == 0) {
 		p->cku_xid = alloc_xid();
@@ -1023,10 +1026,17 @@ done:
 	 * RPC was not successful.  A retry may occur at a higher level and
 	 * in this case we may want to send the request over the same
 	 * source port.
+	 * Endpoint is also released for one-way RPC: no reply, nor retransmit
+	 * is expected.
 	 */
-	if (p->cku_err.re_status == RPC_SUCCESS && p->cku_endpnt != NULL) {
+	if ((p->cku_err.re_status == RPC_SUCCESS ||
+	    (p->cku_err.re_status == RPC_TIMEDOUT && ori_timout == 0)) &&
+	    p->cku_endpnt != NULL) {
 		endpnt_rele(p->cku_endpnt);
 		p->cku_endpnt = NULL;
+	} else {
+		DTRACE_PROBE2(clnt_clts_kcallit_done, int, p->cku_err.re_status,
+		    struct endpnt *, p->cku_endpnt);
 	}
 
 	return (p->cku_err.re_status);
@@ -1356,7 +1366,7 @@ check_endpnt(struct endpnt *endp, struct endpnt **newp)
 	 * The first condition we check for is if the endpoint has been
 	 * allocated, but is unusable either because it has been closed or
 	 * has been marked stale.  Only *one* thread will be allowed to
-	 * execute the then clause.  This is enforced becuase the first thread
+	 * execute the then clause.  This is enforced because the first thread
 	 * to check this condition will clear the flags, so that subsequent
 	 * thread(s) checking this endpoint will move on.
 	 */
