@@ -41,6 +41,7 @@ d none etc 0755 root sys
 d none etc/init.d 0755 root sys
 f none etc/init.d/rdc 0744 root bin
 f none etc/init.d/rdcfinish 0744 root bin
+f none etc/init.d/rdc.cluster 0744 root bin
 
 d none lib 0755 root bin
 d none lib/svc 0755 root bin
@@ -51,14 +52,9 @@ l none lib/svc/method/svc-rdcsyncd=../../../etc/init.d/rdcfinish
 d none kernel 0755 root sys
 d none kernel/kmdb 755 root sys
 
-d none usr 0755 root sys
-d none usr/lib 0755 root bin
-f none usr/lib/nws_rdc.xml 0444 root sys
-f none usr/lib/nws_rdcsyncd.xml 0444 root sys
-
 d none var 0755 root sys
 d none var/svc 0755 root sys
 d none var/svc/manifest 0755 root sys
 d none var/svc/manifest/system 0755 root sys
-l manifest var/svc/manifest/system/nws_rdc.xml=../../../../usr/lib/nws_rdc.xml
-l manifest var/svc/manifest/system/nws_rdcsyncd.xml=../../../../usr/lib/nws_rdcsyncd.xml
+f manifest var/svc/manifest/system/nws_rdc.xml 0444 root sys
+f manifest var/svc/manifest/system/nws_rdcsyncd.xml 0444 root sys

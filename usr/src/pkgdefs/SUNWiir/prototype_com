@@ -41,6 +41,7 @@ i r.manifest
 d none etc 0755 root sys
 d none etc/init.d 0755 root sys
 f none etc/init.d/ii 0744 root bin
+f none etc/init.d/ii.cluster 0744 root bin
 
 d none lib 755 root bin
 d none lib/svc 755 root bin
@@ -50,12 +51,8 @@ l none lib/svc/method/svc-ii=../../../etc/init.d/ii
 d none kernel 0755 root sys
 d none kernel/kmdb 755 root sys
 
-d none usr 0755 root sys
-d none usr/lib 0755 root bin
-f none usr/lib/nws_ii.xml 0444 root sys
-
 d none var 755 root sys
 d none var/svc 755 root sys
 d none var/svc/manifest 755 root sys
 d none var/svc/manifest/system 755 root sys
-l manifest var/svc/manifest/system/nws_ii.xml=../../../../usr/lib/nws_ii.xml
+f manifest var/svc/manifest/system/nws_ii.xml 0444 root sys

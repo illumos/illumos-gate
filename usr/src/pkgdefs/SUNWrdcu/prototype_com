@@ -64,16 +64,12 @@ l none usr/sbin/sndradm=../bin/sndradm 0555 root bin
 l none usr/lib/sndrd=../bin/sndrd
 l none usr/lib/sndrsyncd=../bin/sndrsyncd
 
-d none etc 0755 root sys
-d none etc/init.d 0755 root sys
-f none etc/init.d/rdc.cluster 0744 root bin
-
 d none usr/cluster 0755 root sys
 d none usr/cluster/lib 0755 root bin
 d none usr/cluster/lib/dscfg 0755 root bin
 d none usr/cluster/lib/dscfg/start 0755 root bin
 d none usr/cluster/lib/dscfg/stop 0755 root bin
 d none usr/cluster/sbin 0755 root other
-l none usr/cluster/sbin/rdc=../../../etc/init.d/rdc.cluster
+f none usr/cluster/sbin/rdc 0744 root bin
 s none usr/cluster/lib/dscfg/start/10rdc=../../../sbin/rdc
 s none usr/cluster/lib/dscfg/stop/15rdc=../../../sbin/rdc

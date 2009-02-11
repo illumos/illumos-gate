@@ -54,7 +54,7 @@ install: $(ROOTINIT_DPROG1) $(ROOTINIT_DPROG2) $(ROOTINIT_DPROG3) $(ROOTLIBSVCME
 	-$(SYMLINK) ../../../sbin/rdc $(CLUSTERLIBDSCFGSTARTDIR)/10rdc
 	$(LN) $(ROOTINIT_D)/rdc $(ROOTLIBSVCMETHOD)/svc-rdc
 	$(LN) $(ROOTINIT_D)/rdcfinish $(ROOTLIBSVCMETHOD)/svc-rdcsyncd
-	$(LN) $(ROOTINIT_D)/rdc.cluster $(CLUSTERSBINDIR)/rdc
+	$(CP) $(ROOTINIT_D)/rdc.cluster $(CLUSTERSBINDIR)/rdc
 
 $(ROOTINIT_DPROG1): $(PROG1)
 	$(INS.file) $(PROG1)

@@ -54,16 +54,13 @@ d none usr/sbin 0755 root bin
 l none usr/sbin/svadm=../bin/svadm
 l none usr/sbin/svboot=../bin/svboot
 
-d none etc 0755 root sys
-d none etc/init.d 0755 root sys
-f none etc/init.d/sv.cluster 0744 root bin
-
 d none usr/cluster 0755 root sys
 d none usr/cluster/lib 0755 root bin
 d none usr/cluster/lib/dscfg 0755 root bin
 d none usr/cluster/lib/dscfg/start 0755 root bin
 d none usr/cluster/lib/dscfg/stop 0755 root bin
+
 d none usr/cluster/sbin 0755 root other
-l none usr/cluster/sbin/sv=../../../etc/init.d/sv.cluster
+f none usr/cluster/sbin/sv 0744 root bin
 s none usr/cluster/lib/dscfg/start/15sv=../../../sbin/sv
 s none usr/cluster/lib/dscfg/stop/10sv=../../../sbin/sv

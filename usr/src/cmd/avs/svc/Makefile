@@ -27,12 +27,6 @@ include ../../Makefile.cmd
 XML = nws_scm.xml nws_sv.xml nws_ii.xml nws_rdc.xml nws_rdcsyncd.xml
 SHFILES = $(XML)
 
-all	:=	TARGET= all
-install	:=	TARGET= install
-clean	:=	TARGET= clean
-clobber	:=	TARGET= clobber
-lint	:=	TARGET= lint
-
 ROOTSVCSYSFILES = $(XML:%=$(ROOTSVCSYSTEM)/%)
 
 .KEEP_STATE:
@@ -43,7 +37,7 @@ all:	$(SHFILES)
 
 lint:
 
-install: all $(ROOTLIBSHFILES) $(ROOTSVCSYSFILES)
+install: all $(ROOTSVCSYSFILES)
 
 clean:
 	$(RM) *.xml
@@ -56,12 +50,7 @@ OWNER = root
 GROUP = sys
 FILEMODE = 0444
 
-$(ROOTLIBSHFILES): $(SHFILES)
-	$(INS.file)  $(@F)
+$(ROOTSVCSYSFILES): $(SHFILES)
 
-$(ROOTSVCSYSFILES): $(SHFILES) $(ROOTLIBSHFILES)
-	-$(RM) $@; $(LN) $(@F:%=$(ROOTLIB)/%) $@
-
-FRC:
 
 include ../../Makefile.targ
