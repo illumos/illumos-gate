@@ -1331,6 +1331,16 @@ usage(void)
 	const char *argstr = gettext("[-n] [-o <field> [-P]] -a|-g|-i|-p|-t");
 
 	(void) fprintf(stderr, gettext("usage: %s %s\n"), progname, argstr);
+	(void) fprintf(stderr, gettext("\n"
+	    "  output modes:\t -a  display IPMP data address information\n"
+	    "\t\t -g  display IPMP group information\n"
+	    "\t\t -i  display IPMP-related IP interface information\n"
+	    "\t\t -p  display IPMP probe information\n"
+	    "\t\t -t  display IPMP target information\n\n"
+	    "       options:\t -n  display IP addresses numerically\n"
+	    "\t\t -o  display only the specified fields, in order\n"
+	    "\t\t -P  display using parsable output mode\n"));
+
 	exit(EXIT_FAILURE);
 }
 
