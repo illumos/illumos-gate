@@ -14,11 +14,9 @@
  */
 
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
 **  CONF.H -- All user-configurable parameters for sendmail
@@ -467,6 +465,7 @@ typedef int		pid_t;
 #   endif /* SOLARIS >= 21000 || (SOLARIS < 10000 && SOLARIS >= 210) */
 #   if SOLARIS >= 21100 || (SOLARIS < 10000 && SOLARIS >= 211)
 #    define GETLDAPALIASBYNAME_VERSION 2	/* changed in S11 */
+#    define HAVE_NANOSLEEP	1	/* moved from librt to libc in S11 */
 #   endif /* SOLARIS >= 21100 || (SOLARIS < 10000 && SOLARIS >= 211) */
 #   ifndef HASGETUSERSHELL
 #    define HASGETUSERSHELL 0	/* getusershell(3) causes core dumps pre-2.7 */
