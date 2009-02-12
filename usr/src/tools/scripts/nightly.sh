@@ -1629,6 +1629,7 @@ TMPDIR="/tmp/nightly.tmpdir.$$"
 export TMPDIR
 rm -rf ${TMPDIR}
 mkdir -p $TMPDIR || exit 1
+chmod 777 $TMPDIR
 
 #
 # Keep elfsign's use of pkcs11_softtoken from looking in the user home
