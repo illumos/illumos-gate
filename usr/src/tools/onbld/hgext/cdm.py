@@ -65,17 +65,14 @@ def yes_no(ui, msg, default):
         prompt = ' [y/N]:'
         defanswer = 'n'
 
-    if ui.interactive and sys.stdin.isatty():
-        resp = ui.prompt(msg + prompt, r'([Yy(es)?|[Nn]o?)?',
-                         default=defanswer)
-        if not resp:
-            return default
-        elif resp[0] in ['Y', 'y']:
-            return True
-        else:
-            return False
+    resp = ui.prompt(msg + prompt, r'([Yy(es)?|[Nn]o?)?',
+		     default=defanswer)
+    if not resp:
+	return default
+    elif resp[0] in ['Y', 'y']:
+	return True
     else:
-        return default
+	return False
 
 
 def _buildfilelist(repo, args):
@@ -170,8 +167,9 @@ def reposetup(ui, repo):
     if repo.local() and repo not in wslist:
         wslist[repo] = WorkSpace(repo)
 
-        ui.setconfig('hooks', 'preoutgoing.cdm_pbconfirm',
-                     'python:hgext_cdm.pbconfirm')
+	if ui.interactive and sys.stdin.isatty():
+	    ui.setconfig('hooks', 'preoutgoing.cdm_pbconfirm',
+			 'python:hgext_cdm.pbconfirm')
 
 def pbconfirm(ui, repo, hooktype, source):
     def wrapper(settings=None):
