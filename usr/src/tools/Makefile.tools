@@ -18,9 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+
 #
 # Definitions common to tool source.
 #
@@ -30,7 +33,8 @@ FILEMODE=	0555
 
 TOOLS=			$(SRC)/tools
 TOOLS_PROTO=		$(TOOLS)/proto
-ROOTONBLD=		$(TOOLS_PROTO)/opt/onbld
+ROOTOPT=		$(TOOLS_PROTO)/opt
+ROOTONBLD=		$(ROOTOPT)/onbld
 ROOTONBLDBIN=		$(ROOTONBLD)/bin
 ROOTONBLDBINMACH=	$(ROOTONBLD)/bin/$(MACH)
 ROOTONBLDETC=		$(ROOTONBLD)/etc

@@ -18,40 +18,18 @@
 #
 # CDDL HEADER END
 #
-
 #
 # Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
-SHFILES= \
-	get_depend_info \
-	make_pkg_db \
-
-ETCFILES= \
-	SampleLinks \
-	SamplePkgLinks
-
-MAN1FILES= \
-	get_depend_info.1 \
-	make_pkg_db.1
-
-include ../Makefile.tools
-
-OWNER=		root
-GROUP=		bin
-$(ROOTONBLDETCFILES) := FILEMODE=	644
-$(ROOTONBLDMAN1FILES) := FILEMODE=	644
-
-.KEEP_STATE:
-
-all:	$(SHFILES) $(MAN1FILES)
-
-install: all .WAIT $(ROOTONBLDSHFILES) $(ROOTONBLDETCFILES) \
-	$(ROOTONBLDMAN1FILES)
-
-clean:
-	$(RM) $(CLEANFILES)
-
-include ../Makefile.targ
-
+# Exception List for protocmp
+#
+###########################################
+#
+# ENTRIES FILTERED OUT OF THE protolist
+#
+###########################################
+#
+# elfsign is only used with nightly -t
+#
+opt/onbld/bin/i386/elfsign	i386

@@ -28,6 +28,7 @@
 # The 'pkgmk' command uses this file to identify the contents of a package
 # and their location on the development machine when building the package.
 # Can be created via a text editor or through use of the 'pkgproto' command.
+#
 
 #!search <pathname pathname ...>	# where to find pkg objects
 #!include <filename>			# include another 'prototype' file
@@ -49,8 +50,6 @@ d none opt 755 root sys
 d none opt/onbld 755 root bin
 d none opt/onbld/bin 755 root bin
 f none opt/onbld/bin/Install 555 root bin
-f none opt/onbld/bin/SampleLinks 644 root bin
-f none opt/onbld/bin/SamplePkgLinks 644 root bin
 f none opt/onbld/bin/acr 555 root bin
 f none opt/onbld/bin/bfu 555 root bin
 f none opt/onbld/bin/bfudrop 555 root bin
@@ -67,6 +66,7 @@ f none opt/onbld/bin/ctffindmod 555 root bin
 f none opt/onbld/bin/ctfcvtptbl 555 root bin
 f none opt/onbld/bin/bindrop 555 root bin
 f none opt/onbld/bin/elfcmp 555 root bin
+f none opt/onbld/bin/elfsigncmp 555 root bin
 f none opt/onbld/bin/flg.flp 555 root bin
 f none opt/onbld/bin/genoffsets 555 root bin
 f none opt/onbld/bin/get_depend_info 555 root bin
@@ -156,7 +156,10 @@ f none opt/onbld/lib/python/onbld/Scm/WorkSpace.pyc 444 root bin
 d none opt/onbld/env 755 root bin
 f none opt/onbld/env/developer 644 root bin
 f none opt/onbld/env/gatekeeper 644 root bin
+f none opt/onbld/env/opensolaris 644 root bin
 d none opt/onbld/etc 755 root bin
+f none opt/onbld/etc/SampleLinks 644 root bin
+f none opt/onbld/etc/SamplePkgLinks 644 root bin
 d none opt/onbld/etc/abi 755 root bin
 f none opt/onbld/etc/abi/exceptions 444 root bin
 f none opt/onbld/etc/abi/ABI_i386.db 444 root bin
@@ -187,6 +190,7 @@ f none opt/onbld/man/man1/lintdump.1 644 root bin
 f none opt/onbld/man/man1/make_pkg_db.1 644 root bin
 f none opt/onbld/man/man1/mapfilechk.1 644 root bin
 f none opt/onbld/man/man1/mkacr.1 644 root bin
+f none opt/onbld/man/man1/ndrgen.1 644 root bin
 f none opt/onbld/man/man1/nightly.1 644 root bin
 f none opt/onbld/man/man1/sccscheck.1 644 root bin
 f none opt/onbld/man/man1/sccscp.1 644 root bin

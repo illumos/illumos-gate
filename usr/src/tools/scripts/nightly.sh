@@ -1182,6 +1182,7 @@ SO_FLAG=n
 XMOD_OPT=
 #
 build_ok=y
+tools_build_ok=y
 
 is_source_build() {
 	[ "$SE_FLAG" = "y" -o "$SD_FLAG" = "y" -o \
@@ -1707,8 +1708,12 @@ logshuffle() {
 	if [ "$build_ok" = "y" ]; then
 		mv $ATLOG/proto_list_${MACH} $LLOG
 
+		if [ -f $ATLOG/proto_list_tools_${MACH} ]; then
+			mv $ATLOG/proto_list_tools_${MACH} $LLOG
+	        fi
+
 		if [ -f $TMPDIR/wsdiff.results ]; then
-		    mv $TMPDIR/wsdiff.results $LLOG
+		    	mv $TMPDIR/wsdiff.results $LLOG
 		fi
 
 		if [ -f $TMPDIR/wsdiff-nd.results ]; then
@@ -2539,8 +2544,41 @@ if [[ "$t_FLAG" = "y" || "$O_FLAG" = y ]]; then
 	set_non_debug_build_flags
 
 	build_tools ${TOOLS_PROTO}
+	if [[ $? = 0 ]]; then
+		tools_build_ok=n
+	fi
 
-	if [[ $? -ne 0 && "$t_FLAG" = y ]]; then
+	if [[ $tools_build_ok = y ]]; then
+		echo "\n==== Creating protolist tools file at `date` ====" \
+			>> $LOGFILE
+		protolist $TOOLS_PROTO > $ATLOG/proto_list_tools_${MACH}
+		echo "==== protolist tools file created at `date` ====\n" \
+			>> $LOGFILE
+
+		if [ "$N_FLAG" != "y" ]; then
+			echo "\n==== Impact on tools packages ====\n" \
+				>> $mail_msg_file
+
+			# Use the current tools exception list.
+			exc=etc/exception_list_$MACH
+			if [ -f $SRC/tools/$exc ]; then
+				TOOLS_ELIST="-e $SRC/tools/$exc"
+			fi
+			# Compare the build's proto list with current package
+			# definitions to audit the quality of package
+			# definitions and makefile install targets.
+			$PROTOCMPTERSE \
+			    "Files missing from the proto area:" \
+			    "Files missing from packages:" \
+			    "Inconsistencies between pkgdefs and proto area:" \
+			    ${TOOLS_ELIST} \
+			    -d $SRC/tools \
+			    $ATLOG/proto_list_tools_${MACH} \
+			    >> $mail_msg_file
+		fi
+	fi
+
+	if [[ $tools_build_ok = y && "$t_FLAG" = y ]]; then
 		use_tools $TOOLS_PROTO
 		export ONBLD_TOOLS=${ONBLD_TOOLS:=${TOOLS_PROTO}/opt/onbld}
 	fi

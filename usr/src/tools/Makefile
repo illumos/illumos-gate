@@ -18,8 +18,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -85,19 +86,12 @@ SUBDIRS= \
 #
 # Packages built here
 #
-COMMON_PKG_SUBDIRS= \
-	SUNWonbld
-
-sparc_PKG_SUBDIRS=
-
-i386_PKG_SUBDIRS= \
-	SUNWmrtools
-
-PKG_SUBDIRS= $($(MACH)_PKG_SUBDIRS) $(COMMON_PKG_SUBDIRS)
+PKG_SUBDIRS= SUNWonbld
 
 include Makefile.tools
 
 ROOTDIRS= \
+	$(ROOTOPT) \
 	$(ROOTONBLD) \
 	$(ROOTONBLD)/bin \
 	$(ROOTONBLD)/bin/$(MACH) \
