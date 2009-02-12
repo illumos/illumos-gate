@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -65,7 +65,7 @@ CODEMGR_WS="/builds/$GATE";			export CODEMGR_WS
 PARENT_WS="/ws/$GATE";				export PARENT_WS
 
 # CLONE_WS is the workspace nightly should do a bringover from.
-CLONE_WS="ssh://onnv.sfbay.sun.com//export/onnv-clone";	export CLONE_WS
+CLONE_WS="ssh://anonhg@onnv.sfbay.sun.com//export/onnv-clone";	export CLONE_WS
 
 # CLOSED_CLONE_WS is the workspace from which nightly will acquire the
 # usr/closed tree.
