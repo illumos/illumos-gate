@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4347,7 +4347,7 @@ ce_count_unum(int status, int len, char *unum)
 				psimm[i].intermittent_total = 0;
 				psimm[i].persistent_total = 0;
 				psimm[i].sticky_total = 1;
-				cmn_err(CE_WARN,
+				cmn_err(CE_NOTE,
 				    "[AFT0] Sticky Softerror encountered "
 				    "on Memory Module %s\n", unum);
 				page_status = PR_MCE;
@@ -4376,7 +4376,7 @@ ce_count_unum(int status, int len, char *unum)
 			 */
 			if (status & ECC_STICKY) {
 				psimm[i].sticky_total++;
-				cmn_err(CE_WARN,
+				cmn_err(CE_NOTE,
 				    "[AFT0] Sticky Softerror encountered "
 				    "on Memory Module %s\n", unum);
 				page_status = PR_MCE;
@@ -4387,7 +4387,7 @@ ce_count_unum(int status, int len, char *unum)
 				    &psimm[i].leaky_bucket_cnt, 1);
 				psimm[i].persistent_total++;
 				if (new_value > ecc_softerr_limit) {
-					cmn_err(CE_WARN, "[AFT0] Most recent %d"
+					cmn_err(CE_NOTE, "[AFT0] Most recent %d"
 					    " soft errors from Memory Module"
 					    " %s exceed threshold (N=%d,"
 					    " T=%dh:%02dm) triggering page"
