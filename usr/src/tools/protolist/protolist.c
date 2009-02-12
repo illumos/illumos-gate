@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,11 +20,9 @@
  */
 
 /*
- * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <sys/stat.h>
@@ -59,7 +56,7 @@ visit_dir(const char *path, const struct stat *st,
 
 	/*
 	 * The first directory is the current directory '.',
-	 * this is relevant in out protolist - I throw it out.
+	 * this is relevant in our protolist, so I throw it out.
 	 */
 	if (first_time) {
 		first_time = 0;
@@ -145,8 +142,8 @@ visit_dir(const char *path, const struct stat *st,
 		inum = st->st_ino;
 
 	(void) printf("%c %-30s %-20s %4lo %-5s %-5s %6d %2ld %2s %2s\n",
-		ftype, name, symsrc, st->st_mode % 010000, uid, gid,
-		inum, st->st_nlink, maj, min);
+	    ftype, name, symsrc, st->st_mode % 010000, uid, gid,
+	    inum, st->st_nlink, maj, min);
 	return (0);
 }
 
