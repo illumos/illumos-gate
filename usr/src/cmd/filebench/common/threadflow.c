@@ -200,7 +200,7 @@ threadflow_kill(threadflow_t *threadflow)
 
 	if (threadflow->tf_running) {
 		threadflow->tf_running = FALSE;
-		pthread_kill(threadflow->tf_tid, SIGKILL);
+		(void) pthread_kill(threadflow->tf_tid, SIGKILL);
 	}
 }
 

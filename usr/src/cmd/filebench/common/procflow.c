@@ -498,7 +498,7 @@ static void
 procflow_sleep(procflow_t *procflow, int wait_cnt)
 {
 	while (procflow->pf_running & wait_cnt) {
-		sleep(1);
+		(void) sleep(1);
 		wait_cnt--;
 	}
 }
