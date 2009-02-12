@@ -6530,9 +6530,13 @@ vd_setup_vd(vd_t *vd)
 		ddi_release_devi(dip);
 		VN_RELE(vnp);
 
-		if (vd_identify_dev(vd, &drv_type) != 0) {
-			PRN("%s identification failed", path);
-			status = EIO;
+		if ((status = vd_identify_dev(vd, &drv_type)) != 0) {
+			if (status != ENODEV && status != ENXIO &&
+			    status != ENOENT && status != EROFS) {
+				PRN("%s identification failed with status %d",
+				    path, status);
+				status = EIO;
+			}
 			break;
 		}
 
