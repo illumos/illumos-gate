@@ -116,7 +116,12 @@ extern "C" {
 		hxgep->hpi_reg_handle.regp = ap;
 
 #define	HPI_MSI_ACC_HANDLE_SET(hxgep, ah) (hxgep->hpi_msi_handle.regh = ah)
-#define	HPI_MSI_ADD_HANDLE_SET(hxgep, ap) (hxgep->hpi_msi_handle.regp = ap)
+#define	HPI_MSI_ADD_HANDLE_SET(hxgep, ap)	\
+		hxgep->hpi_msi_handle.is_vraddr = B_FALSE;	\
+		hxgep->hpi_msi_handle.function.instance = hxgep->instance;   \
+		hxgep->hpi_msi_handle.function.function = 0;   \
+		hxgep->hpi_msi_handle.hxgep = (void *) hxgep;   \
+		hxgep->hpi_msi_handle.regp = ap;
 
 #define	HPI_DMA_ACC_HANDLE_SET(dmap, ah) (dmap->hpi_handle.regh = ah)
 #define	HPI_DMA_ACC_HANDLE_GET(dmap) 	(dmap->hpi_handle.regh)

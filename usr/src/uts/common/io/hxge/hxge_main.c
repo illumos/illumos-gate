@@ -481,9 +481,6 @@ hxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		goto hxge_attach_fail3;
 	}
 
-	/* Scrub the MSI-X memory */
-	hxge_msix_init(hxgep);
-
 	status = hxge_init_common_dev(hxgep);
 	if (status != HXGE_OK) {
 		HXGE_ERROR_MSG((hxgep, HXGE_ERR_CTL,
@@ -509,6 +506,9 @@ hxge_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		HXGE_DEBUG_MSG((hxgep, DDI_CTL, "set mutex failed"));
 		goto hxge_attach_fail;
 	}
+
+	/* Scrub the MSI-X memory */
+	hxge_msix_init(hxgep);
 
 	status = hxge_get_config_properties(hxgep);
 	if (status != HXGE_OK) {
