@@ -19,11 +19,10 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2007 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <syslog.h>
 #include "ldap_common.h"
@@ -67,7 +66,6 @@ typedef struct {
 	ns_ldap_result_t *results;
 	ns_ldap_entry_t *entry;
 	char **attrs;
-	void *cookie;
 	char *netgroup;
 	netgroup_table_t tab;
 } getnetgrent_cookie_t;
@@ -99,7 +97,8 @@ get_hash(const char *s)
  *
  * Returns
  *	0 if successfully added or already present
- *	-1 if memory allocation error
+ *	-1 if memory allocation error or NULL netgroup_table_t
+ *         from caller.
  */
 
 static int
@@ -109,8 +108,17 @@ add_netgroup_name(const char *name, netgroup_table_t *tab)
 	netgroup_name_t	*ng;
 	netgroup_name_t	*ng_new;
 
-	if (tab == NULL || name == NULL || *name == '\0')
-	return (NULL);
+	if (tab == NULL) {
+		/*
+		 * Should never happen. But if it does,
+		 * that's an error condition.
+		 */
+		return (-1);
+	}
+	if (name == NULL || *name == '\0') {
+		/* no name to add means success */
+		return (0);
+	}
 
 	h = get_hash(name);
 	ng = tab->hash_list[h];
@@ -323,6 +331,10 @@ match_triple_entry(struct nss_innetgr_args *ia, const ns_ldap_entry_t *entry)
 	} else {
 		phost0 = phost[0];
 		phlen = strlen(phost0);
+#ifdef DEBUG
+		syslog(LOG_DEBUG, "nss_ldap: match_triple_entry: "
+		    "entering with host: %s", phost0 ? phost0 : "");
+#endif
 	}
 	nusers = ia->arg[NSS_NETGR_USER].argc;
 	pusers = (char **)ia->arg[NSS_NETGR_USER].argv;
@@ -331,15 +343,30 @@ match_triple_entry(struct nss_innetgr_args *ia, const ns_ldap_entry_t *entry)
 	} else {
 		pusers0 = pusers[0];
 		pulen = strlen(pusers0);
+#ifdef DEBUG
+		syslog(LOG_DEBUG, "nss_ldap: match_triple_entry: "
+		    "entering with user: %s", pusers0 ? pusers0 : "");
+#endif
 	}
 	ndomains = ia->arg[NSS_NETGR_DOMAIN].argc;
 	pdomains = (char **)ia->arg[NSS_NETGR_DOMAIN].argv;
 	if (pdomains == NULL || *pdomains == NULL)
 		ndomains = 0;
+#ifdef DEBUG
+	else
+		syslog(LOG_DEBUG, "nss_ldap: match_triple_entry: "
+		    "entering with domain: %s", pdomains[0] ? pdomains[0] : "");
+#endif
 
 	attr = __ns_ldap_getAttr(entry, _N_TRIPLE);
 	if (attr == NULL || *attr == NULL)
 		return (0);
+
+#ifdef DEBUG
+	syslog(LOG_DEBUG, "nss_ldap: match_triple_entry: "
+	    "(nusers: %d, nhost:%d, ndomains: %d)",
+	    nusers, nhost, ndomains);
+#endif
 
 	/* Special cases for speedup */
 	if (nusers == 1 && nhost == 0 && ndomains == 0) {
@@ -347,6 +374,10 @@ match_triple_entry(struct nss_innetgr_args *ia, const ns_ldap_entry_t *entry)
 		for (; *attr; attr++) {
 			/* jump to first comma and check next character */
 			current = *attr;
+#ifdef DEBUG
+			syslog(LOG_DEBUG, "nss_ldap: match_triple_entry: "
+			    "current is: %s", current);
+#endif
 			if ((current = strchr(current, COMMA)) == NULL)
 				continue;
 			current++;
@@ -390,6 +421,10 @@ match_triple_entry(struct nss_innetgr_args *ia, const ns_ldap_entry_t *entry)
 
 			/* jump to first character and check */
 			current = *attr;
+#ifdef DEBUG
+			syslog(LOG_DEBUG, "nss_ldap: match_triple_entry: "
+			    "current is: %s", current);
+#endif
 			current++;
 
 			/* skip whitespaces */
@@ -426,6 +461,10 @@ match_triple_entry(struct nss_innetgr_args *ia, const ns_ldap_entry_t *entry)
 			if (strlcpy(triple, *attr,
 			    sizeof (triple)) >= sizeof (triple))
 				continue;
+#ifdef DEBUG
+			syslog(LOG_DEBUG, "nss_ldap: match_triple_entry: "
+			    "triple is: %s", triple);
+#endif
 			if (split_triple(triple, &thost, &tuser, &tdomain) != 0)
 				continue;
 			if (thost != NULL && *thost != '\0' && nhost != 0) {
@@ -515,7 +554,6 @@ top_down_search(struct nss_innetgr_args *ia, char *netgrname)
 	ns_ldap_result_t	*result = NULL;
 	ns_ldap_error_t		*error = NULL;
 	int			rc;
-	void			*cookie = NULL;
 	nss_status_t		status = NSS_NOTFOUND;
 	nss_status_t		status1;
 	netgroup_table_t	tab;
@@ -528,6 +566,10 @@ top_down_search(struct nss_innetgr_args *ia, char *netgrname)
 		return ((nss_status_t)NSS_NOTFOUND);
 
 	while ((ng = get_next_netgroup(&tab)) != NULL) {
+#ifdef DEBUG
+		syslog(LOG_DEBUG, "nss_ldap: top_down_search: netgroup  loop "
+		    "(ng->name: %s)", ng->name ? ng->name : "null !");
+#endif
 		if (_ldap_filter_name(name, ng->name, sizeof (name)) != 0)
 			break;
 		ret = snprintf(searchfilter, sizeof (searchfilter),
@@ -540,9 +582,10 @@ top_down_search(struct nss_innetgr_args *ia, char *netgrname)
 		if (ret >= sizeof (userdata) || ret < 0)
 			break;
 
-		rc = __ns_ldap_firstEntry(_NETGROUP, searchfilter,
-		    _merge_SSD_filter, netgrent_attrs, NULL, 0, &cookie,
-		    &result, &error, userdata);
+		/* searching for current netgroup name entry */
+		rc = __ns_ldap_list(_NETGROUP, searchfilter,
+		    _merge_SSD_filter, netgrent_attrs, NULL, 0, &result,
+		    &error, NULL, userdata);
 
 		if (error != NULL) {
 			status1 = switch_err(rc, error);
@@ -554,45 +597,32 @@ top_down_search(struct nss_innetgr_args *ia, char *netgrname)
 		}
 
 		(void) __ns_ldap_freeError(&error);
-		while (rc == NS_LDAP_SUCCESS && result != NULL) {
+		if (rc == NS_LDAP_SUCCESS) {
 			if (match_triple(ia, result) == 1) {
 				/* We found a match */
 				ia->status = NSS_NETGR_FOUND;
 				status = NSS_SUCCESS;
+#ifdef DEBUG
+				syslog(LOG_DEBUG, "nss_ldap: top_down_search: "
+				    "found match");
+#endif
 				break;
 			}
 
+			/*
+			 * No match found. Check for membernisnetgroup
+			 * in result and if yes, start again with those.
+			 */
 			rc = add_netgroup_member(result, &tab);
-			(void) __ns_ldap_freeResult(&result);
-
-			if (rc != NS_LDAP_SUCCESS)
+			if (rc != 0)
 				break;
-			rc = __ns_ldap_nextEntry(cookie, &result, &error);
-			if (error != NULL) {
-				status1 = switch_err(rc, error);
-				if (status1 == NSS_TRYAGAIN) {
-					free_netgroup_table(&tab);
-					(void) __ns_ldap_freeError(&error);
-					(void) __ns_ldap_endEntry(&cookie,
-					    &error);
-					(void) __ns_ldap_freeError(&error);
-					return (status1);
-				}
-			}
-			(void) __ns_ldap_freeError(&error);
+		} else if (rc != NS_LDAP_NOTFOUND) {
+			break;
 		}
 		(void) __ns_ldap_freeResult(&result);
-		(void) __ns_ldap_endEntry(&cookie, &error);
-		(void) __ns_ldap_freeError(&error);
-
-		if (status == NSS_SUCCESS ||
-		    (rc != NS_LDAP_SUCCESS && rc != NS_LDAP_NOTFOUND))
-		break;
 	}
 
 	(void) __ns_ldap_freeResult(&result);
-	(void) __ns_ldap_endEntry(&cookie, &error);
-	(void) __ns_ldap_freeError(&error);
 	free_netgroup_table(&tab);
 	return (status);
 }
@@ -674,7 +704,6 @@ getnetgr_ldap_setent(ldap_backend_ptr be, void *a)
 static void
 free_getnetgrent_cookie(getnetgrent_cookie_t **cookie)
 {
-	ns_ldap_error_t	*error = NULL;
 	getnetgrent_cookie_t *p = *cookie;
 
 #ifdef DEBUG
@@ -685,8 +714,6 @@ free_getnetgrent_cookie(getnetgrent_cookie_t **cookie)
 		return;
 
 	(void) __ns_ldap_freeResult(&p->results);
-	(void) __ns_ldap_endEntry(&p->cookie, &error);
-	(void) __ns_ldap_freeError(&error);
 	free_netgroup_table(&p->tab);
 	free(p->netgroup);
 	free(p);
@@ -733,7 +760,6 @@ getnetgr_ldap_getent(ldap_backend_ptr be, void *a)
 	char			userdata[SEARCHFILTERLEN];
 	char			name[SEARCHFILTERLEN];
 	int			rc;
-	void			*cookie = NULL;
 	ns_ldap_result_t	*result = NULL;
 	ns_ldap_error_t		*error = NULL;
 	char			**attrs;
@@ -756,58 +782,71 @@ getnetgr_ldap_getent(ldap_backend_ptr be, void *a)
 		return ((nss_status_t)NSS_SUCCESS);
 
 	for (;;) {
-		while (p->cookie == NULL) {
-			ng = get_next_netgroup(&p->tab);
-			if (ng == NULL)	 /* no more */
-				break;
-
-			if (_ldap_filter_name(name, ng->name,
-			    sizeof (name)) != 0)
-				break;
-
-			ret = snprintf(searchfilter,
-			    sizeof (searchfilter),
-			    _F_SETMEMBER, name);
-			if (ret >= sizeof (searchfilter) || ret < 0)
-				break;
-
-			ret = snprintf(userdata, sizeof (userdata),
-			    _F_SETMEMBER_SSD, name);
-			if (ret >= sizeof (userdata) || ret < 0)
-				break;
-
-			result = NULL;
-			rc = __ns_ldap_firstEntry(_NETGROUP,
-			    searchfilter,
-			    _merge_SSD_filter, netgrent_attrs,
-			    NULL, 0, &cookie,
-			    &result, &error, userdata);
-			(void) __ns_ldap_freeError(&error);
-
-			if (rc == NS_LDAP_SUCCESS && result != NULL) {
-				p->cookie = cookie;
-				p->results = result;
-				break;
-			}
-			(void) __ns_ldap_freeResult(&result);
-			(void) __ns_ldap_endEntry(&cookie, &error);
-			(void) __ns_ldap_freeError(&error);
-		}
-		if (p->cookie == NULL)
-			break;
+		/*
+		 * Search through each netgroup consecutively: only search
+		 * next netgroup when results from previous netgroup are
+		 * processed.
+		 * Needed for nested netgroup (memberNisNetgroup attributes).
+		 */
 		if (p->results == NULL) {
-			result = NULL;
-			rc = __ns_ldap_nextEntry(p->cookie, &result,
-			    &error);
-			(void) __ns_ldap_freeError(&error);
-			if (rc == NS_LDAP_SUCCESS && result != NULL)
-				p->results = result;
-			else {
-				(void) __ns_ldap_freeResult(&result);
-				(void) __ns_ldap_endEntry(&p->cookie,
-				    &error);
+			if ((ng = get_next_netgroup(&p->tab)) != NULL) {
+				if (_ldap_filter_name(name, ng->name,
+				    sizeof (name)) != 0)
+					break;
+
+				ret = snprintf(searchfilter,
+				    sizeof (searchfilter),
+				    _F_SETMEMBER, name);
+				if (ret >= sizeof (searchfilter) || ret < 0)
+					break;
+
+#ifdef DEBUG
+				syslog(LOG_DEBUG, "nss_ldap: "
+				    "getnetgr_ldap_getent: "
+				    "netgroup name: %s", name);
+#endif
+				ret = snprintf(userdata, sizeof (userdata),
+				    _F_SETMEMBER_SSD, name);
+				if (ret >= sizeof (userdata) || ret < 0)
+					break;
+
+				result = NULL;
+				rc = __ns_ldap_list(_NETGROUP, searchfilter,
+				    _merge_SSD_filter, netgrent_attrs, NULL,
+				    0, &result, &error, NULL, userdata);
 				(void) __ns_ldap_freeError(&error);
-				p->cookie = NULL;
+
+				if (rc == NS_LDAP_SUCCESS && result != NULL) {
+					p->results = result;
+				} else {
+#ifdef DEBUG
+					syslog(LOG_DEBUG, "nss_ldap: "
+					    "getnetgr_ldap_getent: "
+					    "__ns_ldap_list() returned %d "
+					    "(result: 0x%x)", rc, result);
+#endif
+					/*
+					 * Will exit when no more netgroup
+					 * to search and no more p->results
+					 * to process.
+					 */
+					(void) __ns_ldap_freeResult(&result);
+				}
+			} else { /* no more netgroup to process */
+				/*
+				 * If no more results to process, and since
+				 * there's no more netgroup to process either,
+				 * then it's time to break and exit the for
+				 * loop.
+				 */
+#ifdef DEBUG
+				syslog(LOG_DEBUG, "nss_ldap: "
+				    "getnetgr_ldap_getent: no more netgroup "
+				    "to process, p->results: 0x%x",
+				    p->results);
+#endif
+				if (p->results == NULL)
+					break;
 			}
 		}
 		if (p->results == NULL)
@@ -847,6 +886,15 @@ getnetgr_ldap_getent(ldap_backend_ptr be, void *a)
 				args->retp[NSS_NETGR_USER] = username;
 				args->retp[NSS_NETGR_DOMAIN] = domain;
 				args->status = NSS_NETGR_FOUND;
+#ifdef DEBUG
+				syslog(LOG_DEBUG, "nss_ldap: "
+				    "getnetgr_ldap_getent: found triple "
+				    "(%s, %s, %s), 0x%x to process",
+				    hostname ? hostname : "",
+				    username ? username : "",
+				    domain ? domain : "",
+				    p->attrs);
+#endif
 				if (p->attrs != NULL)
 					break;
 			}
