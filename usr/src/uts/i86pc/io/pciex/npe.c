@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -347,6 +347,8 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	struct regspec	reg;
 	pci_acc_cfblk_t	*cfp;
 	int		retval;
+	int64_t		*ecfginfo;
+	uint_t		nelem;
 
 	mr = *mp; /* Get private copy of request */
 	mp = &mr;
@@ -512,13 +514,33 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			return (ret);
 		}
 
-		pci_rp->pci_phys_low = ddi_prop_get_int64(DDI_DEV_T_ANY,
-		    rdip, 0, "ecfga-base-address", 0);
+		if (ddi_prop_lookup_int64_array(DDI_DEV_T_ANY, rdip, 0,
+		    "ecfg", &ecfginfo, &nelem) == DDI_PROP_SUCCESS) {
 
-		pci_rp->pci_phys_low += ((cfp->c_busnum << 20) |
-		    (cfp->c_devnum) << 15 | (cfp->c_funcnum << 12));
+			if (nelem != 4) {
+				/* invalid property; give up */
+				ddi_prop_free(ecfginfo);
+				return (DDI_FAILURE);
+			}
 
-		pci_rp->pci_size_low = PCIE_CONF_HDR_SIZE;
+			if (cfp->c_busnum < ecfginfo[2] ||
+			    cfp->c_busnum > ecfginfo[3]) {
+				/* Doesn't contain our bus; give up */
+				ddi_prop_free(ecfginfo);
+				return (DDI_FAILURE);
+			}
+
+			pci_rp->pci_phys_low = ecfginfo[0];
+
+			ddi_prop_free(ecfginfo);
+
+			pci_rp->pci_phys_low += ((cfp->c_busnum << 20) |
+			    (cfp->c_devnum) << 15 | (cfp->c_funcnum << 12));
+
+			pci_rp->pci_size_low = PCIE_CONF_HDR_SIZE;
+		} else {
+			return (DDI_FAILURE);
+		}
 	}
 
 	length = pci_rp->pci_size_low;

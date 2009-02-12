@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -500,7 +500,8 @@ pcitool_swap_endian(uint64_t data, int size)
  *
  * Extended config space is available only through memory-mapped access.
  * Standard config space on pci express devices is available either way,
- * so do it memory-mapped here too, for simplicity.
+ * so do it memory-mapped here too, for simplicity, if allowed by MCFG.
+ * If anything fails, return EINVAL so caller can try I/O access.
  */
 /*ARGSUSED*/
 static int
@@ -510,14 +511,36 @@ pcitool_pciex_cfg_access(dev_info_t *dip, pcitool_reg_t *prg,
 	int rval = SUCCESS;
 	uint64_t virt_addr;
 	size_t	num_virt_pages;
+	int first_bus, last_bus;
+	int64_t *ecfginfo;
+	uint_t nelem;
 
 	prg->status = PCITOOL_SUCCESS;
 
-	prg->phys_addr = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
-	    "ecfga-base-address", 0);
-	if (prg->phys_addr == 0) {
-		prg->status = PCITOOL_IO_ERROR;
-		return (EIO);
+	if (ddi_prop_lookup_int64_array(DDI_DEV_T_ANY, dip, 0,
+	    "ecfg", &ecfginfo, &nelem) == DDI_PROP_SUCCESS) {
+
+		/*
+		 * We must have a four-element property; base addr [0] must
+		 * be nonzero.  Also, segment [1] must be 0 for now; we don't
+		 * handle nonzero segments (or create a property containing
+		 * them)
+		 */
+		if ((nelem != 4) || (ecfginfo[0] == 0) || (ecfginfo[1] != 0)) {
+			ddi_prop_free(ecfginfo);
+			return (EINVAL);
+		}
+
+		prg->phys_addr = ecfginfo[0];
+		first_bus = ecfginfo[2];
+		last_bus = ecfginfo[3];
+
+		ddi_prop_free(ecfginfo);
+
+		if (prg->bus_no < first_bus || prg->bus_no > last_bus)
+			return (EINVAL);
+	} else {
+		return (EINVAL);
 	}
 
 	prg->phys_addr += prg->offset +
@@ -527,10 +550,9 @@ pcitool_pciex_cfg_access(dev_info_t *dip, pcitool_reg_t *prg,
 
 	virt_addr = pcitool_map(prg->phys_addr,
 	    PCITOOL_ACC_ATTR_SIZE(prg->acc_attr), &num_virt_pages);
-	if (virt_addr == NULL) {
-		prg->status = PCITOOL_IO_ERROR;
-		return (EIO);
-	}
+
+	if (virt_addr == NULL)
+		return (EINVAL);
 
 	rval = pcitool_mem_access(dip, prg, virt_addr, write_flag);
 	pcitool_unmap(virt_addr, num_virt_pages);
@@ -548,10 +570,17 @@ pcitool_cfg_access(dev_info_t *dip, pcitool_reg_t *prg, boolean_t write_flag)
 	uint64_t local_data;
 
 	/*
-	 * NOTE: there is no way to verify whether or not the address is valid.
-	 * The put functions return void and the get functions return ff on
+	 * NOTE: there is no way to verify whether or not the address is
+	 * valid other than that it is within the maximum offset.  The
+	 * put functions return void and the get functions return ff on
 	 * error.
 	 */
+
+	if (prg->offset + size - 1 > 0xFF) {
+		prg->status = PCITOOL_INVALID_ADDRESS;
+		return (ENOTSUP);
+	}
+
 	prg->status = PCITOOL_SUCCESS;
 
 	if (write_flag) {
@@ -958,12 +987,18 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 			    (cpuid_getvendor(CPU) == X86_VENDOR_AMD)) {
 				rval = pcitool_cfg_access(dip, &prg,
 				    write_flag);
-			} else if (max_cfg_size == PCIE_CONF_HDR_SIZE)
+			} else if (max_cfg_size == PCIE_CONF_HDR_SIZE) {
 				rval = pcitool_pciex_cfg_access(dip, &prg,
 				    write_flag);
-			else
+				if (rval == EINVAL) {
+					/* Not valid for MMIO; try IO */
+					rval = pcitool_cfg_access(dip, &prg,
+					    write_flag);
+				}
+			} else {
 				rval = pcitool_cfg_access(dip, &prg,
 				    write_flag);
+			}
 
 			if (pcitool_debug)
 				prom_printf(

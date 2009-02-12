@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,9 +98,8 @@ extern boolean_t pcie_full_scan;
 
 /*
  * Query the MCFG table using ACPI.  If MCFG is found, setup the
- * 'ecfga-base-address' (Enhanced Configuration Access base address)
- * property accordingly.  Otherwise, set the value of the property
- * to the default value.
+ * 'ecfg' property accordingly.  Otherwise, set the values
+ * to the default values.
  */
 void
 npe_query_acpi_mcfg(dev_info_t *dip)
@@ -108,7 +107,8 @@ npe_query_acpi_mcfg(dev_info_t *dip)
 	MCFG_TABLE *mcfgp;
 	CFG_BASE_ADDR_ALLOC *cfg_baap;
 	char *cfg_baa_endp;
-	uint64_t ecfga_base;
+	int64_t ecfginfo[4];
+	int ecfg_found = 0;
 
 	/* Query the MCFG table using ACPI */
 	if (AcpiGetTable(ACPI_SIG_MCFG, 1, (ACPI_TABLE_HEADER **)&mcfgp) ==
@@ -118,25 +118,43 @@ npe_query_acpi_mcfg(dev_info_t *dip)
 		cfg_baa_endp = ((char *)mcfgp) + mcfgp->Length;
 
 		while ((char *)cfg_baap < cfg_baa_endp) {
-			ecfga_base = cfg_baap->base_addr;
-			if (ecfga_base != (uint64_t)0) {
+			if (cfg_baap->base_addr != (uint64_t)0 &&
+			    cfg_baap->segment == 0) {
 				/*
-				 * Setup the 'ecfga-base-address' property to
-				 * the base_addr found in the MCFG and return.
+				 * Set up the 'ecfg' property to hold
+				 * base_addr, segment, and first/last bus.
+				 * We only do the first entry that maps
+				 * segment 0; nonzero segments are not yet
+				 * known, or handled.  If they appear,
+				 * we'll need to figure out which bus node
+				 * should have which entry by examining the
+				 * ACPI _SEG method on each bus node.
 				 */
-				(void) ndi_prop_update_int64(DDI_DEV_T_NONE,
-				    dip, "ecfga-base-address", ecfga_base);
-				return;
+				ecfginfo[0] = cfg_baap->base_addr;
+				ecfginfo[1] = cfg_baap->segment;
+				ecfginfo[2] = cfg_baap->start_bno;
+				ecfginfo[3] = cfg_baap->end_bno;
+				(void) ndi_prop_update_int64_array(
+				    DDI_DEV_T_NONE, dip, "ecfg",
+				    ecfginfo, 4);
+				ecfg_found = 1;
+				break;
 			}
 			cfg_baap++;
 		}
 	}
+	if (ecfg_found)
+		return;
 	/*
 	 * If MCFG is not found or ecfga_base is not found in MCFG table,
-	 * set the 'ecfga-base-address' property to the default value.
+	 * set the property to the default values.
 	 */
-	(void) ndi_prop_update_int64(DDI_DEV_T_NONE, dip,
-	    "ecfga-base-address", npe_default_ecfga_base);
+	ecfginfo[0] = npe_default_ecfga_base;
+	ecfginfo[1] = 0;		/* segment 0 */
+	ecfginfo[2] = 0;		/* first bus 0 */
+	ecfginfo[3] = 0xff;		/* last bus ff */
+	(void) ndi_prop_update_int64_array(DDI_DEV_T_NONE, dip,
+	    "ecfg", ecfginfo, 4);
 }
 
 
