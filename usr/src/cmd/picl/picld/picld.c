@@ -20,11 +20,9 @@
  */
 
 /*
- * Copyright 2008 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2009 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * PICL daemon
@@ -993,6 +991,16 @@ picld_server_create_fn(door_info_t *dip)
 {
 	pthread_attr_t attr;
 
+	/*
+	 * For the non-private pool do nothing. It's used for events which are
+	 * single threaded anyway. The single thread servicing that pool is
+	 * created when the event plugin creates its door. Note that the event
+	 * plugin runs before setup_door instantiates picld_server_create_fn as
+	 * the new create_proc so the door library default create_proc is used.
+	 */
+	if (dip == NULL)
+		return;
+
 	(void) pthread_mutex_lock(&pool_mutex);
 	if (pool_count < MAX_POOL_SIZE) {
 		(void) pthread_attr_init(&attr);
@@ -1156,9 +1164,7 @@ main(int argc, char **argv)
 		}
 
 		(void) setsid();
-		(void) close(STDIN_FILENO);
-		(void) close(STDOUT_FILENO);
-		(void) close(STDERR_FILENO);
+		closefrom(0);
 		(void) open("/dev/null", O_RDWR, 0);
 		(void) dup2(STDIN_FILENO, STDOUT_FILENO);
 		(void) dup2(STDIN_FILENO, STDERR_FILENO);
